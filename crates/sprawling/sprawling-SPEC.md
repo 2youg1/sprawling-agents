@@ -1037,6 +1037,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 ## 12 Decisions
 
+**测量读数不进 Ledger，也不常驻城里的盘；时长只取单调钟**（8-129）。一件事发生的时刻是城的历史，写在每行的 `t` 里，含义由 `EventRecord::moment` 给出；主机为城的一段工作花了多久、机器的资源被用了多少，是运行这座城的主机在那一刻的事实：前者写成诊断行，后者只在有人看时进监视器的 300 点历史，要留下来就由看的人（`sprawling gauge`）写到它自己的 stdout。时长一律是 `bin::serving::standing::monotonic_now` 两次读数之差，城钟只用来给账本行打时刻。**被否掉的**：资源读数作为一个整数单位的新事件种类写进 Ledger——每秒一行都要过记账线程的屏障，整链审计、重放与每个折叠随之变长，而进了哈希链的读数删不掉；城在保留子树里常驻写一份读数文件——城树多一个写者，要自带保留与轮转，没人看的城也一直付开销。条件变了就重议：城里有一个决定要读资源的历史，而不只是此刻的读数。
+
 **`replay <ledger-dir>`：「这里没有账本」不得与「验过且为空」同形**。本子命令的路径是人敲的，故它先问 `storage::ledger_segments_at`，一段都没有即报 `E_PATH_NOT_FOUND` 并给 recovery，不进验链。有段时经 `storage::audit_chain` 一段一段地验，每行过同一个 `LineCheck`，常驻一行；它答的只是行数与 tail seq（`chain verified: <n> line(s), tail seq <n-1 或 none>`，`main::tests` 的 `replay_names_the_lines_it_verified_and_the_tail_seq` 钉住这个形状），用不着 `VerifiedLedger` 那份整本的原始行与记录；断链照旧是那一行的三段式拒绝。**依据为什么在这一层而不在 `runtime::replay` 或 `storage::audit_chain`**：它们的生产调用方都自持城根算出路径，而已开未写的城就是一个无段目录（`JsonlLedger::open` 只建目录），在那一层报错会把合法启动打红，并迫使每个调用方各写一份相同的守卫。空账本仍然合法，故问的是「有没有段」而不是「有没有行」。参见 runtime-SPEC §8-1、storage-SPEC §8。
 
 **doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id**（wire-SPEC §8-25）。`Requirement::enables` 是 `sprawling doctor` 那份终端报告的措辞，终端只说英文，这句话与它描述的那一行同住 `bin::doctor::table`，改一行的人在同一处看见它；页面按 `DoctorItem::name` 从 `client/src/lang.json` 的 `machine_enables_<name>`（name 里的连字符写成 `_`，因为词表的键一律 snake_case）取 en 与 zh，与 doctor 其余每一种状态同口径——终端的 `absent` 由 `paint` 拼，页面的 `machine_absent` 由 `lang.json` 给，两面各说各的，线上只携枚举与 id。两面的集合由 `bin::doctor::tests` 的 `every_item_has_the_page_clause_in_both_languages` 钉在一起：需求表多一行而 `lang.json` 没给它词，测试红。**被否掉的**：终端也从 `lang.json` 取英文（二进制在编译期读 `client/` 的一份源文件，每次 doctor 都要解析整张词表，而终端从不说第二种语言）；线上继续携英文句子（页面的词成了服务端的选择，中文读者看到的是英文）。条件变了就重议：终端要说第二种语言时，两面合用一张词表。
@@ -4350,6 +4352,155 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 2. 沉默 5 s 即结束，而不是永远等：读数每秒一个，5 个空拍说明城已停或已不再发，一个 agent 读到 EOF 比读到永远的阻塞有用。重新考虑的条件：采样的节拍变长。
 
 **测试。** `wire_client::watching::tests`：一帧读数在 `Lines` 下是一行 JSON 加换行，在 `Screen` 下是清屏序列接一屏；不是读数的帧什么也不输出、不进历史。
+
+## 8-129 测量工具箱：一个动词 `gauge`，一处读机器，一个单调钟（`bin::main::gauge`、`bin::main::gauge::lines`、`bin::monitor::tree`、`bin::monitor::spread`、`bin::audience`，形状：adapter / projection / value）
+
+开发这份代码用的测量手段——按微秒计的时长、进程与整机的资源读数、样本的分位数——随产品发出：一个动词 `sprawling gauge`，一份随发行包发出的 skill `skills/gauge/`。读它的是 agent：在这座城上做性能工作的，和在别的项目里要量一条命令的。本节定下五件事：每种读数住在哪里；每种读数只在哪一处采样，谁只读；采样本身花多少、由哪个确定性计数守住；动词的参数与输出；skill 教的流程。8-94 至 8-98 讲的监视器照旧，本节只写它们之外的部分和它们要改的地方。
+
+### 8-129-1 三种读数，三个家
+
+| 读数 | 例子 | 住在哪里 | 谁读它 |
+|---|---|---|---|
+| 城里一件事发生的时刻 | `model_called`、`model_returned`、`tool_called`、`tool_result` 的 `t`（整数毫秒） | Ledger；含义只经 `EventRecord::moment` 读（kernel-SPEC「信封 `t` 记的是什么」） | `view` |
+| 这台主机为城的一段内部工作花了多久，以及那段工作的确定性计数 | 开城各段（8-121）、整链审计一遍（8-90）、派活准备（`[prepare_dispatch_ms]`） | 诊断行，每种一个渲染处，按下限写出（`docs/logging.md` §2、§3） | 服务所在的终端、记录页的 log 透镜、`bench_startup` 留下的日志 |
+| 机器的资源被用了多少 | CPU、private、工作集、读写字节、卷剩余空间、进程树 | 城内：监视器的 300 点历史（8-94），有人看才采样；城外：`gauge` 的 stdout | `gauge`、WebUI 监视页 |
+
+第三种读数不常驻盘上。要一段后台记录，就让一个看的人把它写出去：`sprawling gauge --at <地址> > readings.jsonl` 在后台跑多久，城就记多久；它是一个看整页的人，停下它，采样就停（8-94 决定 1 不变）。
+
+### 8-129-2 一个权威：谁采样，谁只读
+
+| 事实 | 唯一的采样处 | 只读的一方 | 并进来的第二份 |
+|---|---|---|---|
+| 进程、整机、卷、进程树的计数 | `bin::monitor`：`counters`、`counters::own_process`、`memory`、`volume`、`tree` | 采样线程（8-96）、计划推进的内存闸（§8-46-3）、入口按卷卸载（8-116）、`gauge` | 无；`xtask mem` 留在城外，见决定 4 |
+| 时长 | `bin::serving::standing::monotonic_now`，以 `fn() -> Instant` 交给用它的模块 | `OpeningCost`（8-121）、整链审计（8-90）、视图切快照的节奏（8-99）、采样线程量自己一拍的读取用时、`gauge` 的 `wall_us` | `stage_dispatch` 与 `Laying::mcp_tools` 各读两次城钟相减（`[prepare_dispatch_ms]`），`credentials::probing` 的 `elapsed_ms` 也是两次城钟之差（8-62）：三处都改用单调钟，单位与线上字段不变 |
+| 时刻 | 驱动的 `RunHooks::now`，只在串行阶段采样 | Ledger 的 `t` | 无 |
+| 计数 | 由拥有它的模块自己数：`Health` 由 relay 数（8-98），视图积压由视图线程数（8-123），开城时核对的行数、读过与哈希过的字节由开城路径自己数（8-122） | 采样线程读 `Health` 与积压；开城的计数随 8-121 那一行写出 | 无 |
+| 分位数 | `bin::monitor::spread::Spread` | `gauge`、citysim 的 `bench` 与 `bench_startup`、crate 内的仪表（8-84、8-99） | `bench` 的 `Reading::of` 取第 ⌊n·p/100⌋ 个（零起），`bench_startup` 的 `Samples::of` 取第 ⌈n·p/100⌉ 个（一起）；两份已经不一致：200 个样本时前者的 p50 是第 101 个，后者是第 100 个 |
+| stdout 那头是谁 | `bin::audience::Audience::of_stdout` | `view`（8-105）、`gauge`、`wire_client::watching`（8-97） | `main::view::Audience` 与 `wire_client::watching::Output::{Screen, Lines}` 是同一条规则的两种拼法，合成一个库模块 |
+
+时长只取单调钟，理由与 8-121「时间从哪来」相同：墙钟被人调过，一段就可能是负数；城钟又只到毫秒，而人的定规要内部热路径按微秒读。计数不是时间，所以可以在 accounting 与 storage 里累计，不必经过 `bin::assembly` 的采样点。
+
+### 8-129-3 采样花多少，由什么守住
+
+每一拍读什么，由看的人决定，并且只有下面这几种读法：
+
+| 谁在看 | 每拍的平台读取 | 目标（每拍） | 现状 |
+|---|---|---|---|
+| 没有人 | 0：不建 `Counters`，只读两只原子数 | 0 | 已如此（8-94） |
+| 只看摘要 | 本进程 1 次（`memory-stats` 加 `cpu-time`），外加 `Health` 与积压的几次原子读 | ≤ 50 µs | 本进程约 1.1 µs（8-96 决定 1） |
+| 看整页 | 本进程 1 次，整机 1 次（CPU、内存、磁盘列表） | ≤ 50 µs；上限 1 ms，即 1 Hz 下一个核的 0.1% | 整机 CPU 0.7–8 ms、磁盘 0.2–0.8 ms，超出上限 |
+| `gauge` 量一棵进程树 | 进程表 1 次，在 `gauge` 自己的进程里 | 上限：每拍至多一次整表读取，拍距不短于 250 ms | Windows 上一次 17–65 ms（8-96 决定 1） |
+
+城的采样线程没有一条路径去遍历进程表：整表读取只在 `monitor::tree` 里，城的采样线程不调用它。
+
+- **门是计数。** `Counters` 与 `tree::Tree` 各自数平台读取的次数，以一个 `Reads { own: u64, machine: u64, table: u64 }` 交出。测试按看的人走 N 拍，断言三项的精确值：没有人是 0/0/0，只看摘要是 N/0/0，看整页是 N/N/0，`gauge` 的进程树是 0/0/N。这几条断言是 CI 的回退门，与 `index_refresh_read` 同一种做法：它们与机器快慢无关，而共享 CI 机器上的墙钟噪声会让一个墙钟门时红时绿。
+- **墙钟只记录。** `instrument_monitor_beat`（`#[ignore]`，`just bench` 按 `/::instrument_/` 跑它）对每种读取各采 200 次，经 `Spread` 印出 floor、p50、p99（µs），读数登记到 `budgets.toml` 的新行 `[monitor_beat]`，不设门，理由与 `[local_latency]` 相同。
+- **线上看得见开销。** 采样线程用单调钟量这一拍的读取用了多久，下一拍的 `Sample.read_nanos` 带上它，所以在看的人从同一条读数流里就能看到采样本身花了多少。
+- 看整页时超出上限的那部分（`sysinfo` 的整机 CPU 与磁盘列表）仍是性能上的待办，重开条件见 8-96 决定 1。
+
+### 8-129-4 `sprawling gauge`
+
+```text
+sprawling gauge [--at <addr>] [--token <t>]                                一座服务中的城（别名 top）
+sprawling gauge --pid <pid> [--every <ms>] [--samples <n>]                 一个在跑的进程和它的子孙
+sprawling gauge [--every <ms>] [--samples <n>] -- <program> [<arg>...]     一条命令，跑 n 次
+```
+
+```rust
+// bin::main::gauge —— shape: adapter
+pub(super) fn verb(read: &Arguments) -> ExitCode;
+pub(super) enum Subject {
+    City { at: String, token: Option<String> },
+    Process { pid: u32, every: Every, beats: Option<NonZeroU32> },     // 缺省：直到根进程退出
+    Command { argv: Vec<OsString>, every: Every, samples: NonZeroU32 }, // samples 缺省 1
+}
+pub(super) fn subject(read: &Arguments) -> Result<Subject, LineError>;
+pub(super) struct Every(Duration);          // 250 ms ..= 60 s，缺省 1 s
+pub(super) struct Run { index: u32, exit: Option<i32>, wall: Duration, beats: u64, seen: Seen, child: ChildPeaks, read_cost: Duration }
+pub(super) struct Host { cores: NonZeroUsize, physical_bytes: u64 } // available_parallelism 与 monitor::memory::read
+// bin::main::gauge::lines —— shape: projection；每种行只在这里变成文字
+pub(super) fn tree_line(at: Duration, reading: &TreeReading, audience: Audience) -> String;
+pub(super) fn run_line(run: &Run, samples: NonZeroU32, audience: Audience) -> String;
+pub(super) fn spread_line(spread: &Spread, failed: u32, host: Host, audience: Audience) -> String;
+// bin::monitor::tree —— shape: adapter
+pub(crate) struct Tree;                     // 私有：sysinfo::System、根 pid、每个见过的 pid 的上一读数
+impl Tree {
+    pub(crate) fn open(root: u32) -> Tree;
+    pub(crate) fn read(&mut self, elapsed: Duration) -> Option<TreeReading>; // 根已不在：None
+    pub(crate) fn seen(&self) -> Seen;       // 见过的每个 pid 最后一次读数之和，与各峰值
+    pub(crate) fn reads(&self) -> Reads;
+}
+pub(crate) struct TreeReading { processes: u64, cpu_permille: Option<u64>, private_bytes: u64, working_set_bytes: u64, read_bytes: u64, written_bytes: u64 }
+// bin::monitor::counters
+pub(crate) struct Reads { pub(crate) own: u64, pub(crate) machine: u64, pub(crate) table: u64 }
+impl Counters { pub(crate) fn reads(&self) -> Reads; }
+// bin::monitor::spread —— shape: value
+pub struct Spread { /* 私有：samples、floor、p50、p95、p99、peak、suspicious */ }
+impl Spread {
+    pub fn of(head: Duration, tail: impl IntoIterator<Item = Duration>) -> Spread; // 头是参数，空集写不出来
+    pub fn p(&self, share: Share) -> Duration;  // 最近秩：第 ⌈n·p/100⌉ 个（一起）
+    pub fn floor(&self) -> Duration;  pub fn peak(&self) -> Duration;
+    pub fn samples(&self) -> u64;     pub fn suspicious(&self) -> u64; // 超过 p50 的 SUSPICIOUS_TIMES 倍
+}
+pub enum Share { P50, P95, P99 }
+pub const SUSPICIOUS_TIMES: u32 = 3;
+// bin::audience —— shape: value
+pub enum Audience { Agent, Person }
+impl Audience { pub fn of_stdout() -> Audience; } // stdout 是终端即 Person
+```
+
+**选哪个对象。** 给了 `--pid` 是 `Process`，`--` 之后有词是 `Command`，都没有是 `City`。命令行错误退 2（8-103 的 `Line`），一行说明哪里错、最近的合法写法是什么：`--pid` 与 `--` 同时出现；`--at`、`--token` 配 `Process` 或 `Command`；`--every`、`--samples` 配 `City`（城的拍距由城定，8-96）；`--every` 在范围外或不是整数；`--samples` 为 0 或不是整数；`--` 之后没有词。
+
+**`--` 之后原样交出。** 第一个 `--` 结束 sprawling 自己的参数，之后每个词原样成为被量命令的 argv，不当作标志读。8-89 的优先规则（`--help`、`--version` 出现在任何位置都先生效）只扫描到第一个 `--` 为止，所以 `sprawling gauge -- cargo --version` 量的是 cargo。命令表每行多一项：这个动词收不收 `--` 之后的词，只有 `gauge` 收。
+
+**一次 run 从哪里量到哪里。** 从 `spawn` 之前到 `wait` 返回：可观察的端点是看到进程退出（citysim-SPEC §3-2）。`wait` 在调用线程上阻塞，拍在一条名为 `sprawling-gauge` 的线程上走，所以一次 run 的结束由 `wait` 看到，`wall_us` 没有一拍那么大的误差。被量命令的 stdin 是空的；它的 stdout 与 stderr 都接到 `gauge` 的 stderr（`Stdio::from(io::stderr())`），`gauge` 的 stdout 上只有读数行。n 次 run 依次跑，第一次不丢：它是冷的那一次，`run` 行的 `index` 为 0，spread 里 floor 与 p50 的差有一部分是它留下的，其余是机器的负载。
+
+**给 agent 的输出（stdout 不是终端）。** 每行一个 JSON 对象，值只有整数、`null` 与 `line` 这一个字符串键，键序固定，单位写在键名末尾（`_us`、`_ms`、`_bytes`、`_permille`），没有单位的是计数。没有量到的值是 `null`，不是 0。
+
+- `City`：每秒一行 `{"line":"city", …}`，其余键是 `Sample` 的字段名（8-95 的 `json_line`，多出 `line` 一个键）。`Sample` 没读到的项仍按 8-96 读作 0。
+- `Process`：每拍一行 `{"line":"tree","at_us":…,"processes":…,"cpu_permille":…,"private_bytes":…,"working_set_bytes":…,"read_bytes":…,"written_bytes":…}`，是这一拍还活着的整棵树。第一拍没有上一拍可比，`cpu_permille` 为 `null`；CPU 是两拍之间整棵树的 CPU 时间增量除以墙钟增量与核数，截到 `0..=1000`。根进程退出、或走满 `--samples` 拍，就结束。
+- `Command`：每次 run 结束一行 `{"line":"run","index":…,"exit":…,"wall_us":…,"beats":…,"seen_cpu_ms":…,"seen_read_bytes":…,"seen_written_bytes":…,"seen_peak_private_bytes":…,"seen_peak_working_set_bytes":…,"child_peak_private_bytes":…,"child_peak_working_set_bytes":…,"read_cost_us":…}`，最后一行 `{"line":"spread","samples":…,"failed":…,"floor_us":…,"p50_us":…,"p95_us":…,"p99_us":…,"peak_us":…,"suspicious":…,"cores":…,"physical_bytes":…}`。`exit` 是被量命令的退出码，被信号结束时为 `null`；`failed` 是 `exit` 不为 0 的 run 数。`seen_*` 取自拍：每个在某一拍出现过的进程取它最后一次读数，再求和或取最大，所以它们是下界，两拍之间生灭的进程不在内；这次 run 一拍都没走（比 `--every` 短）时 `beats` 为 0，`seen_*` 全为 `null`。`child_peak_*` 是直接子进程由平台记下的峰值：在 Windows 上 `wait` 之后、句柄关闭之前经 `win32job::utils::get_process_memory_info` 读出，是精确值而不是拍上的读数；其他平台为 `null`。`read_cost_us` 是这次 run 里读进程表花掉的时间，agent 据此判断测量本身扰动了多少。`cores` 与 `physical_bytes` 写出机器的等级，不写机器是谁。
+
+**给人的输出（stdout 是终端）。** `City` 是 8-95 的一屏。`Process` 每拍一行，`Command` 每次 run 一行、最后一行 spread，读数按 8-95 的单位规则写（`µs`、`ms`、`MiB`，一位小数，截断）。单位换算只有 `monitor::top` 那一份，`lines` 调它。
+
+**退出码**（8-103 的 `Exit`）：0，测量做完了，被量命令失败也是 0，它的退出码是 `run` 行里的数据；1，起不了被量的程序（找不到程序是 `E_PATH_NOT_FOUND`，subject 是程序名，recovery 是检查 PATH 或写全路径；其余起不来是 `E_TOOL_UNAVAILABLE`，带平台给的原因），或者没有这个 pid 的进程（`E_INVALID_ARGS`，recovery 是给一个在跑的进程的 id）；2，命令行读不懂；4，`City` 的 `--at` 那里没有城（与 8-97 相同）。`City` 在连续 5 s 没有读数时正常结束（8-97 决定 2）。
+
+### 8-129-5 skill `skills/gauge/`
+
+`skills/gauge/SKILL.md`，许可 MPL-2.0，列进 `skills/README.md` 的表与 `skills/LICENSES.md`；发行包按目录收 `skills/`，不必另列。它教 agent 按这个次序做：
+
+1. 先把负载钉住：同一份输入、同一个构建（产品的 feature 集，citysim-SPEC §3-9）；输入是文件时记下它的摘要，两条读数只在摘要相同时可比（citysim-SPEC §3-8）。
+2. 取基线：`sprawling gauge --samples 20 -- <命令> > before.jsonl`，读最后那行 spread。floor 贴着设计的下限，p50 带着机器其余的负载（citysim-SPEC 8-6）；`suspicious` 不为 0 时先看是哪几次、是不是第一次。
+3. 一次只改一处，取 after；前后交替跑几轮（一轮先 before 后 after），只在同一机器等级上比较 floor 与 p50。
+4. 回退门用确定性计数，墙钟只记录：找一个随规模增长的计数（读过的字节、核对的行数、文件操作数），在 N 与 2N 两种规模下断言它。
+5. 资源：长命令看 `run` 行的 `seen_*` 与 `child_peak_*`；一个已在跑的进程用 `--pid`；一座服务中的城用 `gauge --at <地址> > 文件` 在后台记录。`city` 行里的 0 可能是「没读到」（8-96），其余行里没读到的是 `null`。
+6. 在 sprawling 自己身上：一次调用花多久，读 `view` 给出的 `tool_called` 与 `tool_result`、`model_called` 与 `model_returned` 的 `t`（账本版本 2 起才是这一行自己的时刻）；开城各段读 `serve` 写出的 `opened the city in` 那一行；派活准备打开 `--log trace`。人能感知的操作落在毫秒、内部热路径落在微秒，以秒计的读数就是要做的活（人的定规）。
+7. 报读数时写机器等级（核数、内存、盘的种类）和负载的摘要，不写机器名、账户名和路径（AGENTS.md *Privacy*）。
+
+### 8-129-6 对 wire 的需求（wire-SPEC 8-47）
+
+- `Sample.view_backlog: u64`：视图积压的条数，读 8-123 给出的读法。
+- `Sample.read_nanos: u64`：上一拍的读取用时，由采样线程用单调钟量出；第一拍为 0。
+- 加上这两项，`Sample` 是 15 个 `u64`，历史 300 × 15 × 8 = 36 000 字节，仍在 `HISTORY_BUDGET`（64 KiB）之内，编译期断言不必改。
+- `monitor::top::screen` 随之多两行；WebUI 监视页的两行随页面的改动做。
+- 不要求：`relay_p50_nanos`、`event_to_screen_p50_nanos`、`queued_runs` 的来源（8-98 的当前状态）。
+
+**决定。**
+
+1. **读数不进 Ledger，时刻除外。** 时刻是城的历史，已经写在每行的 `t` 里；时长与资源读数是运行这座城的主机在那一刻的事实，与 8-121 决定 2、`docs/logging.md` §2 同一条界线。被否：给资源读数一个新事件种类，按整数单位经单写者写入——1 Hz 一天 86 400 行，每行都要过 relay 与记账线程的屏障，而记账线程上的长任务正是 8-123 要设界的；整链审计、重放、快照与每个折叠都随它变长；读数进了哈希链就删不掉，而资源读数随时可丢。重开条件：某个城内的决定要读资源的历史（今天的决定都只读此刻：内存闸与卷卸载）。
+2. **城不在自己的保留子树里常驻记录。** 被否：在城里放一份只追加的读数文件，一直写。那是城树里的第二个写者，要为它设计保留与轮转（轮转归操作系统，`docs/logging.md` §7），没人看的城每天多写 86 400 行，违背 8-94 决定 1；在别的项目里量一条命令的 agent 手里也没有城。后台记录由一个看的人写出（8-129-1）。重开条件：人要看一座在没人看时崩溃的城在崩溃前的资源曲线。
+3. **一个动词，收下 `top`。** `top` 成为 `gauge` 的别名，`sprawling top` 的行为不变，只多出 `line` 键。被否：在 `top` 旁边再加一个动词——两个动词读同一条读数流，参数与输出要在两处维持；也被否：测量手段只留在 `xtask` 与 citysim——它们不随发行包走，在别的项目里的 agent 手里什么也没有。名字取 `gauge`：`measure` 已是 browser 工具的一个动作（量元素的框，glossary 的 **browser**），同一个词会担两个概念；`bench` 是开发者跑固定场景的配方 `just bench`。
+4. **进程树经 `sysinfo` 整表读取，`xtask mem` 留在城外。** 以安全接口读直接子进程以外的进程，`sysinfo` 是依赖树里唯一的路，它在 Windows 上每次都遍历整张进程表（17–65 ms），所以 `gauge` 的拍距不短于 250 ms，每拍至多一次（8-129-3）。被否：把被量命令放进一个 Job Object，读它的累计 CPU、读写字节与峰值——要 `QueryInformationJobObject`，`win32job` 的安全接口只给 pid 列表与限额；工作区 `forbid` 了 `unsafe`，Zig 叶子也要一处 `extern` 的 `unsafe`，而 `forbid` 在 crate 内提不起来。`xtask mem` 读 PowerShell 的 `PeakPagedMemorySize64`（峰值 commit），`sysinfo` 不给峰值，所以它不改为调用 `gauge --pid`。重开条件：出现以安全接口给出 Job Object 累计计数、或任意 pid 的峰值 commit 与读写字节的 crate；那时 `seen_*` 换成精确值，`xtask mem` 改为调用 `gauge --pid <pid> --samples 1`。
+5. **`gauge` 不转述被量命令的退出码。** `Exit` 是退出码的唯一定义（8-103）；把子进程的 3 或 4 原样退出，会被读成「城没回话」「没有城」。被量命令的退出码在 `run` 行里，失败的次数在 spread 行里。
+6. **被量命令的 stdout 接到 `gauge` 的 stderr。** 被否：继承 stdout——它的输出会和读数行交错，agent 解析不了；丢弃——失败的 run 就没有诊断可看。
+7. **没量到写 `null`。** agent 会把 0 当成一个读数。`city` 行照旧沿用 `Sample` 的 0（8-96），skill 写明这一点；让 `Sample` 的每一项都能为空是线协议的改动，本节不要求。
+8. **分位数取最近秩。** 登记册的 `[install]` 一行已写明「p50/p95/p99 nearest-rank」，`bench_startup` 的 `Samples::of` 就这样算；`bench` 的 `Reading::of` 改为经 `Spread`，它登记在 `budgets.toml` 里的各行要在新规则下重取。被否：两份各留各的——同一个 p50 在两份读数里指的是不同的样本，读数行上看不出这个差别。
+9. **开销用确定性计数守，墙钟只记录**（8-129-3）。被否：给一拍的用时设墙钟门——共享 CI 机器上它时红时绿，而拍的读取次数在任何机器上都一样。
+10. **没有 Lean 模型。** 采样线程的读法由看的人一次选定，`gauge` 的 run 依次进行，两处都没有交错；要守的性质是读取次数，由 8-129-3 的计数断言与 `Subject` 这个穷尽枚举守住。重开条件：`gauge` 同时量多个对象，或采样改为多线程。
+
+**测试（随实现落地）。** `monitor::tests` 与 `monitor::sampler::tests`：按看的人走 N 拍，`Reads` 等于 8-129-3 的精确值。`monitor::spread::tests`：n 为 1、2、100、200 时各分位与手算的最近秩相等，`suspicious` 数对。`monitor::tree::tests`：起一个子进程，第一次读数 `processes ≥ 1`、工作集非零、`cpu_permille` 为 `null`，它退出后 `read` 为 `None`，`reads().table` 等于读的次数。`main::grammar::tests`：`--` 之后的词原样交出，其中的 `--help`、`--version` 不生效。`main::gauge::tests`：每条命令行错误退 2；三种行按整串比较；`--samples 3` 量一个很快退出的程序，stdout 恰好三行 `run`、一行 `spread`，程序以非零退出时 `gauge` 仍退 0、`failed` 为 3。citysim：`Reading::of` 与 `Samples::of` 的既有测试按最近秩改期望。
+
+**本节接口的当前状态。** 本节设计的接口都还没有代码，8-94 至 8-98 描述的监视器是现状。按依赖排的次序：先 `bin::monitor::spread`，citysim 的两处改为调用它；再 `Reads` 计数、`bin::monitor::tree` 与 `instrument_monitor_beat`；再命令表与解析器（`--` 之后原样交出、`gauge` 一行、别名 `top`）、`bin::audience`、`bin::main::gauge` 与 `lines`，glossary 同时收下 **gauge**；`Sample` 的两项随 8-129-6 的线协议改动进来，采样线程同时量自己的读取；三处城钟时长改用单调钟；最后是 `skills/gauge/` 与 README、`docs/operating.md` 里的动词。`bin::main::gauge` 要在 Windows 目标上依赖 `win32job`（今天只有 runtime 依赖它）。模块在有文件时才登记进模块图。
 
 ## 8-98 核心健康：记账队列与持久水位线跨线程可读（`accounting::worker::health`，形状：数据）
 
