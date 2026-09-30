@@ -2967,7 +2967,32 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **`assembly::listening::hearing`**：把 views 与金库收成一条 `TranscribeSink`。金库是**工人开的那一把**，经启动握手那条通道交出来（`Started.vault`）——第二个 `Custodian` 会是同一批机密的第二扇门。
 - **容器从请求头读**：`AudioType::of_media_type` fail closed，拒词列出这座城发得出去的五种。浏览器录进它手上有的容器，而只有它知道是哪一个。
 - **页面**：`core/speaking.ts` 管录音与上传，composer 多一个按钮，**转写结果落进输入框而不是直接发出去**——机器听错的那一句必须能改，否则它会花掉一次 run。没有 `transcribe` 选择的城不画这个按钮（`useHearing`）。
+- **同一个选择也给 run 一件工具**：`transcribe`，有没有它读的是同一次 `select`，只是按 run 所在那座楼的楼规读（8-131）。
 - **验收**：`wire` 的 `/transcribe` 路由在没有 content-type 时按名拒绝；`gateway::transcribe::recording` 的 `of_media_type` 认得五种容器、拒第六种并列出前五种。
+
+## 8-131 城给 run 的转写工具 `transcribe`（`accounting::worker::workbench::tools::transcribe`；gateway-SPEC §8-12、§8-33）
+
+**原因**：computer use 要能把声音变成字，而二进制里不内置任何模型（定规），所以模型只能经人接入的转写端点转写。composer 的麦克风已经经这个端点把录音变成字（8-56），run 却没有任何一条路用它。
+
+```rust
+// accounting::worker::workbench::tools::transcribe（形状 4 适配器）
+impl Laying {
+    pub(super) fn transcription_tool(&self, site: &Site) -> Result<Option<TranscribeTool>, AxError>;
+}
+pub(super) struct TranscribeTool { /* root、building、transcriber: Mutex<Transcriber>、meta —— 私有 */ }
+impl kernel::Tool for TranscribeTool { … }   // 名 `transcribe`；参数 `{ path }`；答 `{ path, text }`
+
+// accounting::worker::workbench::Laying 多一格
+book: gateway::EndpointBook,   // 派活立起那一刻的端点账本
+```
+
+- **有没有这件工具，与 composer 的麦克风读同一个选择。** `EndpointBook::select(ModelTag::Transcribe, 楼的 policy)` 成了，`gateway::transcriber_for` 把它变成设施，工具上表；拒了，工具不上表。没有第二个「这座城能不能转写」的开关。与 `views::hearing` 只差 policy：run 有楼，读楼规，于是机密楼只拿得到回环地址上的转写端点；口述没有楼，按普通楼。`select` 的三种拒绝——没选、端点已撤、机密楼而端点离机——对模型是同一件事：这座楼没有转写，一件叫了必败的工具不放上表。`transcriber_for` 的失败（HTTP 客户端造不起来）照常上抛，因为它对主模型的调用同样成立。设施放在一把锁后面：它里面的凭据解析器是 `Send` 而不是 `Sync`，而一件工具要在一波调用之间共享，于是同一个 run 的两次转写轮流进行。
+- **账本在 `RunWorker::laying` 里复制一份进 `Laying`。** 工作台在驾驶这个 run 的 lane 里摆（8-113），账本属于 accounting 线程；`Laying` 本来就带着「派活立起那一刻」的值（`waiting`、`locks`、`trust`），账本是同一种值，几个端点的复制是微秒量级。被否：在 `agree_to_work` 里造好设施随 `Agreed` 带过去——那样工具在一处造、在另一处登记，「这件工具有没有」就有两处答案；只把 `Transcriber` 放进 `Laying`——`laying()` 手里没有楼规，造不出对的 policy。
+- **录音从 run 自己这座楼里的一个文件进来。** 参数是相对城根的路径（审查楼里是这个 run 的树），与 `read` 同一种写法。不经 CAS：今天没有一条路把音频放进 CAS（desktop 的录音落在临时目录，desktop-SPEC §14；连接器只把 png 存进 CAS）。只收本楼，理由有二：发出这段录音的端点是按本楼的 policy 选的，录音也出自本楼，于是判这次上传的只有一份楼规；读别楼要问读界（read bound），而把一条模型选的路径判成「可读」的那一处是 `runtime::tools::chosen_path`，crate 私有，在这里再写一份就是第二个权威。判定只用已有的权威：`Address::parse`（语法）、`Address::is_within`（本楼）、`Address::is_reserved`（reserved subtree）、`storage::WriteTarget::within`（路上不许有 link）。最后一项对读比 `chosen_path::land` 更严：它拒 link 而不去解析 link，所以放不进 `land` 会拒的东西。容器从文件名读（`AudioType::of_file_name`），字节经 `Recording::read_from` 读到上限为止（gateway-SPEC §8-33）。
+- **效果是 `Effect::Read`。** 它读一个文件，城里什么都不写；录音出门去的是人为这类活选定、已按本楼 policy 判过的端点，与 run 的对话去主模型端点是同一种出门，而模型调用不是工具效果。被否：`Effect::Egress`——那一类的定义是「目的地由这次调用指名」，出网门扫的是参数里的字节，而这里参数只有一条路径，出去的是录音，判它的是已经判过的 `select`。`CostTier::Heavy`：一次 provider 往返，数秒，可能计费。`timeout: None`：设施自己的 `TRANSCRIBE_TIMEOUT_MS` 已是上限，第二个期限会是第二个权威。`render: Generic`：它产出的是文字。
+- **在工具表上的位置**：内置工具与按用途加的那几件之后、城外工具（浏览器、MCP）之前。provider 按位置缓存工具数组，所以新的内置工具接在内置那一段的末尾。
+- **验收**：`crates/sprawling/tests/acceptance/episodes.rs` 末尾一段。选了转写端点的城，run 调 `transcribe` 拿回脚本端点转出的字，端点收到的模型名是人选的那一个；机密楼配离机转写端点时，工具不在表上。没选转写的城不上这件工具，由 catalogue 的两条覆盖测试守着：上了表而没被调用，会被点名。工具自己的拒绝（别楼的路径、认不得的容器、不存在的文件）由 `transcribe` 模块的测试守着。
+- **未决**：读别楼的录音（读界之内的任意路径，或一个 `cas:` 块）要等 runtime 把 `chosen_path` 的判定公开成一扇按字节读的门。促成它的证据是出现一条把音频放进 CAS 或放进别楼的生产路径，例如 desktop 的录音交回城里（desktop-SPEC §15.2）。
 
 ## 8-57 浏览器是一族引擎，不是一个牌子（`bin::doctor::family`、`family::gecko`／`chromium`／`webkit`、`bin::doctor::registry`）
 
