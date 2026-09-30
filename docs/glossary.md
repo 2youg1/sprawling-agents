@@ -79,6 +79,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **frozen prefix** | The frozen prefix in four segments — city, Building, Resident, Run. Assembling it is itself an event. |
 | **Handoff** | The five-section artifact that carries a session across a freeze or a resume. |
 | **turn** | The turn state machine: four phases, four cancellation-safe points. An interruption inside a phase cannot be spelled. |
+| **first content** | The first non-empty prose or reasoning a streamed reply delivers. The turn reads its clock when it arrives and records the moment as `first_at` on `model_returned`; the time to first content is that moment minus the `model_called` line's `t`. A reply that came through a door with no stream, or streamed only tool calls, has none. |
 | **Steer** | A redirection: add an instruction to a run **without interrupting it**. It lands at the end of the next tool result. |
 | **Cancel** | Stop this run. When Cancel and Steer meet on the same boundary, Cancel wins. |
 | **result envelope** | The envelope around a tool result, carrying three attachments: clock stamp, network reminder, and Steer. |
