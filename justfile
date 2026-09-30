@@ -404,6 +404,21 @@ proof:
 sim:
     cargo test --package citysim --locked
 
+# The stand-in provider (tools/citysim/citysim-SPEC.md section 8-10):
+# plays a wire script on a loopback port, appends every exchange to the
+# record, and prints `SPRAWLING_PROVIDER=<url>` before it answers, so the
+# check started beside it reads the URL from that line. `listen` is a
+# loopback address, a free port when left out.
+provider script record *listen:
+    cargo run --package citysim --bin provider --locked -- {{script}} {{record}} {{listen}}
+
+# Every page of the client at 1440 and 1920, dark and light, as PNG files
+# and an index under target/shots (tools/xtask/xtask-SPEC.md section
+# 8-44). Not a gate: a person reads the pictures. `--origin <url>`
+# photographs a served city instead of the bundle.
+shots *args: build-web
+    cargo xtask shots {{args}}
+
 # Create a crate's Spec.lean skeleton (tools/xtask/xtask-SPEC.md section 8-41).
 spec crate:
     cargo xtask spec {{crate}}
