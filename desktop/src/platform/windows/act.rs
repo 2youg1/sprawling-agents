@@ -8,8 +8,9 @@
 //!
 //! One call, one action. The tool description promises no retry, no
 //! chaining and no fallback to a nearby element, and this module is
-//! where that promise is kept: it builds the events for exactly what was
-//! asked and sends them in one batch, so a partially-applied action is
+//! where that promise is kept: `super::strokes` decides which events the
+//! action is, and this module turns each into the event Win32 reads and
+//! sends them in one batch, so a partially-applied action is
 //! not a state this server can leave a desktop in.
 //!
 //! Mouse coordinates go out as absolute positions on the **virtual**
@@ -36,46 +37,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use super::fault;
 use super::geometry::Point;
 use super::keys::Modifier;
+use super::strokes::{self, Action, Edge, Motion, Stroke};
 use crate::refusal::{Refusal, RefusalCode};
-
-/// How far one notch of the wheel turns, in the units Win32 counts them
-/// in. This is Microsoft's own `WHEEL_DELTA`, restated because the
-/// binding does not export it under that name.
-const ONE_NOTCH: i32 = 120;
-
-/// What one call asks to happen. Exhaustive, and each arm already
-/// carries what it needs, so an action that reached this module with a
-/// missing argument cannot be spelled.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Action {
-    Click { at: Point },
-    Double { at: Point },
-    Right { at: Point },
-    Drag { from: Point, to: Point },
-    Scroll { at: Point, notches: i32 },
-    Type { text: String },
-    Key { code: u16 },
-}
-
-impl Action {
-    /// Where on the screen this action lands, when it lands anywhere.
-    ///
-    /// `type` and `key` go wherever the keyboard is, so they name no
-    /// place; a drag names the place it starts from, because that is
-    /// the window it picks something up in. `super::focus` reads this
-    /// to decide whether a second question has to be asked before the
-    /// events are sent.
-    pub(super) fn lands_at(&self) -> Option<Point> {
-        match self {
-            Action::Click { at }
-            | Action::Double { at }
-            | Action::Right { at }
-            | Action::Scroll { at, .. } => Some(*at),
-            Action::Drag { from, .. } => Some(*from),
-            Action::Type { .. } | Action::Key { .. } => None,
-        }
-    }
-}
 
 /// Carries out one action, holding `modifiers` down for the whole of it.
 ///
@@ -84,62 +47,43 @@ impl Action {
 /// locked screen or an elevated window in the foreground looks like from
 /// here.
 pub(crate) fn perform(action: &Action, modifiers: &[Modifier]) -> Result<(), Refusal> {
-    let mut events: Vec<INPUT> = modifiers
+    let events = strokes::of(action, modifiers)?
         .iter()
-        .map(|held| key(held.code(), true))
-        .collect();
-    events.extend(spelled(action)?);
-    // Released in the reverse of the order they were pressed, which is
-    // what a keyboard does and what an application watching for the
-    // release order expects.
-    events.extend(modifiers.iter().rev().map(|held| key(held.code(), false)));
+        .map(input)
+        .collect::<Result<Vec<INPUT>, Refusal>>()?;
     send(&events)
 }
 
-/// The events one action is, in the order they happen.
-fn spelled(action: &Action) -> Result<Vec<INPUT>, Refusal> {
-    Ok(match action {
-        Action::Click { at } => vec![
-            mouse(*at, MOUSEEVENTF_MOVE, 0)?,
-            mouse(*at, MOUSEEVENTF_LEFTDOWN, 0)?,
-            mouse(*at, MOUSEEVENTF_LEFTUP, 0)?,
-        ],
-        Action::Double { at } => vec![
-            mouse(*at, MOUSEEVENTF_MOVE, 0)?,
-            mouse(*at, MOUSEEVENTF_LEFTDOWN, 0)?,
-            mouse(*at, MOUSEEVENTF_LEFTUP, 0)?,
-            mouse(*at, MOUSEEVENTF_LEFTDOWN, 0)?,
-            mouse(*at, MOUSEEVENTF_LEFTUP, 0)?,
-        ],
-        Action::Right { at } => vec![
-            mouse(*at, MOUSEEVENTF_MOVE, 0)?,
-            mouse(*at, MOUSEEVENTF_RIGHTDOWN, 0)?,
-            mouse(*at, MOUSEEVENTF_RIGHTUP, 0)?,
-        ],
-        Action::Drag { from, to } => vec![
-            mouse(*from, MOUSEEVENTF_MOVE, 0)?,
-            mouse(*from, MOUSEEVENTF_LEFTDOWN, 0)?,
-            mouse(*to, MOUSEEVENTF_MOVE, 0)?,
-            mouse(*to, MOUSEEVENTF_LEFTUP, 0)?,
-        ],
-        Action::Scroll { at, notches } => vec![
-            mouse(*at, MOUSEEVENTF_MOVE, 0)?,
-            mouse(
-                *at,
-                MOUSEEVENTF_WHEEL,
-                notches.checked_mul(ONE_NOTCH).ok_or_else(|| {
-                    Refusal::new(
-                        RefusalCode::InvalidArgs,
-                        "act on a window",
-                        format!("{notches} notches is further than a wheel turns"),
-                        "scroll in smaller steps and look at the window between them",
-                    )
-                })?,
-            )?,
-        ],
-        Action::Type { text } => text.encode_utf16().flat_map(unicode).collect(),
-        Action::Key { code } => vec![key(*code, true), key(*code, false)],
+/// The Win32 event one stroke is.
+fn input(stroke: &Stroke) -> Result<INPUT, Refusal> {
+    Ok(match *stroke {
+        Stroke::Key { code, edge } => keyboard(VIRTUAL_KEY(code), 0, edge_flag(edge)),
+        // `KEYEVENTF_UNICODE` is what makes typing independent of the
+        // keyboard layout: the character arrives as a character, so a
+        // model typing `@` does not have to know this machine's layout.
+        Stroke::Unicode { unit, edge } => {
+            keyboard(VIRTUAL_KEY(0), unit, KEYEVENTF_UNICODE | edge_flag(edge))
+        }
+        Stroke::Pointer { at, motion } => {
+            let (flags, data) = match motion {
+                Motion::Move => (MOUSEEVENTF_MOVE, 0),
+                Motion::LeftDown => (MOUSEEVENTF_LEFTDOWN, 0),
+                Motion::LeftUp => (MOUSEEVENTF_LEFTUP, 0),
+                Motion::RightDown => (MOUSEEVENTF_RIGHTDOWN, 0),
+                Motion::RightUp => (MOUSEEVENTF_RIGHTUP, 0),
+                Motion::Wheel { delta } => (MOUSEEVENTF_WHEEL, delta),
+            };
+            mouse(at, flags, data)?
+        }
     })
+}
+
+/// The flag a key event carries for the way it moves.
+fn edge_flag(edge: Edge) -> KEYBD_EVENT_FLAGS {
+    match edge {
+        Edge::Down => KEYBD_EVENT_FLAGS(0),
+        Edge::Up => KEYEVENTF_KEYUP,
+    }
 }
 
 /// Hands the whole batch to Win32 at once.
@@ -227,164 +171,19 @@ fn normalised(at: Point) -> Result<(i32, i32), Refusal> {
     Ok((x, y))
 }
 
-/// One key going down or coming up.
-fn key(code: u16, down: bool) -> INPUT {
+/// One keyboard event: a virtual key, or a UTF-16 unit when the flags
+/// say `KEYEVENTF_UNICODE`.
+fn keyboard(key: VIRTUAL_KEY, unit: u16, flags: KEYBD_EVENT_FLAGS) -> INPUT {
     INPUT {
         r#type: INPUT_KEYBOARD,
         Anonymous: INPUT_0 {
             ki: KEYBDINPUT {
-                wVk: VIRTUAL_KEY(code),
-                wScan: 0,
-                dwFlags: if down {
-                    KEYBD_EVENT_FLAGS(0)
-                } else {
-                    KEYEVENTF_KEYUP
-                },
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    }
-}
-
-/// One UTF-16 unit typed as itself.
-///
-/// `KEYEVENTF_UNICODE` is what makes this independent of the keyboard
-/// layout: the character arrives as a character, so a model typing `@`
-/// does not have to know whether this machine is on a British layout.
-fn unicode(unit: u16) -> [INPUT; 2] {
-    let event = |flags: KEYBD_EVENT_FLAGS| INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: VIRTUAL_KEY(0),
+                wVk: key,
                 wScan: unit,
-                dwFlags: KEYEVENTF_UNICODE | flags,
+                dwFlags: flags,
                 time: 0,
                 dwExtraInfo: 0,
             },
         },
-    };
-    [event(KEYBD_EVENT_FLAGS(0)), event(KEYEVENTF_KEYUP)]
-}
-
-#[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    reason = "test code"
-)]
-mod tests {
-    use super::*;
-
-    /// Nothing here presses a key on the machine running the tests: the
-    /// events are built and counted, never sent. Whether a click landed
-    /// is what an operator checks on a real desktop
-    /// (desktop-SPEC.md §16.2).
-    #[test]
-    fn each_action_is_the_events_it_says_it_is_and_no_more() {
-        let at = Point { x: 10, y: 20 };
-        let counted = |action: &Action| spelled(action).unwrap().len();
-        assert_eq!(counted(&Action::Click { at }), 3);
-        assert_eq!(counted(&Action::Right { at }), 3);
-        // A double click is one more down-up pair than a click, which is
-        // what makes it a double click rather than two calls.
-        assert_eq!(counted(&Action::Double { at }), 5);
-        assert_eq!(
-            counted(&Action::Drag {
-                from: at,
-                to: Point { x: 99, y: 99 }
-            }),
-            4
-        );
-        assert_eq!(counted(&Action::Scroll { at, notches: -3 }), 2);
-        assert_eq!(counted(&Action::Key { code: 0x0D }), 2);
-    }
-
-    /// One character is one press and one release, so a string is
-    /// exactly twice its UTF-16 length — including the two units an
-    /// emoji takes, which is the case a `chars()` count gets wrong.
-    /// The two actions that go to the keyboard alone name no place, so
-    /// nothing asks what lies under a point they never touch.
-    #[test]
-    fn only_the_pointer_actions_name_a_place_on_the_screen() {
-        let at = Point { x: 10, y: 20 };
-        let to = Point { x: 99, y: 99 };
-        assert_eq!(Action::Click { at }.lands_at(), Some(at));
-        assert_eq!(Action::Scroll { at, notches: -3 }.lands_at(), Some(at));
-        // A drag is judged where it picks something up.
-        assert_eq!(Action::Drag { from: at, to }.lands_at(), Some(at));
-        assert_eq!(
-            Action::Type {
-                text: "hello".to_owned()
-            }
-            .lands_at(),
-            None
-        );
-        assert_eq!(Action::Key { code: 0x0D }.lands_at(), None);
-    }
-
-    #[test]
-    fn typing_is_one_press_and_one_release_per_utf16_unit() {
-        let plain = Action::Type {
-            text: "hello".to_owned(),
-        };
-        assert_eq!(spelled(&plain).unwrap().len(), 10);
-        let paired = Action::Type {
-            text: "a🌍".to_owned(),
-        };
-        assert_eq!(spelled(&paired).unwrap().len(), 6);
-        let empty = Action::Type {
-            text: String::new(),
-        };
-        assert!(spelled(&empty).unwrap().is_empty());
-    }
-
-    /// A modifier is pressed before the action and released after it,
-    /// and several are released in the reverse order — which is what a
-    /// hand does and what an application watching the order expects.
-    #[expect(
-        unsafe_code,
-        reason = "test code reads back the union arm it wrote one line earlier"
-    )]
-    #[test]
-    fn modifiers_wrap_the_action_and_come_off_in_the_reverse_order() {
-        let mut events: Vec<INPUT> = [Modifier::Ctrl, Modifier::Shift]
-            .iter()
-            .map(|held| key(held.code(), true))
-            .collect();
-        events.extend(spelled(&Action::Key { code: 0x0D }).unwrap());
-        events.extend(
-            [Modifier::Ctrl, Modifier::Shift]
-                .iter()
-                .rev()
-                .map(|held| key(held.code(), false)),
-        );
-        assert_eq!(events.len(), 6);
-        // SAFETY: every event built above is `INPUT_KEYBOARD`, so the
-        // keyboard arm of the union is the arm that was written.
-        let code = |at: usize| unsafe { events[at].Anonymous.ki.wVk.0 };
-        assert_eq!(code(0), Modifier::Ctrl.code());
-        assert_eq!(code(1), Modifier::Shift.code());
-        assert_eq!(code(4), Modifier::Shift.code());
-        assert_eq!(code(5), Modifier::Ctrl.code());
-    }
-
-    /// A scroll far enough to overflow the wheel count is a refusal
-    /// rather than a wrapped one that would scroll the other way.
-    #[test]
-    fn a_scroll_too_far_to_count_is_refused_rather_than_wrapped() {
-        let overflowing = spelled(&Action::Scroll {
-            at: Point { x: 0, y: 0 },
-            notches: i32::MAX,
-        });
-        // `INPUT` has no `Debug`, so the refusal is taken out by hand
-        // rather than through `expect_err`.
-        let Err(refusal) = overflowing else {
-            panic!("a wheel count that overflows is not a smaller scroll")
-        };
-        assert_eq!(refusal.as_error()["data"]["code"], "E_INVALID_ARGS");
     }
 }

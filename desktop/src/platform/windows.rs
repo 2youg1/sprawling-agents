@@ -36,6 +36,7 @@ mod geometry;
 mod keys;
 mod reading;
 mod record;
+mod strokes;
 mod target;
 mod tree;
 mod views;
@@ -46,9 +47,9 @@ use crate::answer::Answer;
 use crate::refusal::{Refusal, RefusalCode};
 use crate::scope::Admitted;
 use crate::tools::ToolName;
-use act::Action;
 use geometry::Point;
 use reading::{asked_for, generation, held, inset, missing, notches, region, text, whole};
+use strokes::Action;
 use views::{DEFAULT_DEPTH, Views};
 
 /// What one connection remembers between calls.
