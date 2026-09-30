@@ -15,6 +15,16 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
+/// What a caller does after a tool reported its own failure.
+const FAILED_RECOVERY: &str = "the server said what failed and what to do instead in the words \
+                               above; follow them rather than repeating the call unchanged";
+
+/// What a caller does after a failure the server marked as possibly
+/// half done.
+const UNKNOWN_RECOVERY: &str = "the server says part of this call may already have taken \
+                                effect; look at what it acted on before calling again, and do \
+                                not repeat it unchanged";
+
 pub(crate) fn float_at(value: &Value, path: String) -> Option<String> {
     match value {
         Value::Number(number) => {
@@ -345,6 +355,69 @@ mod tests {
         .unwrap_err();
         assert!(err.subject().contains("no such repo"));
         assert_eq!(err.code(), &AxCode::ToolUnavailable);
+    }
+
+    /// The tool that answers `line` with `answer`, and the call that
+    /// reaches it, both through the doors production uses.
+    fn answering(answer: &str) -> (McpTool, ToolCall) {
+        let arguments = json!({ "title": "kiln" });
+        let line = Rpc::new()
+            .call_tool("GITHUB_CREATE_ISSUE", &arguments)
+            .unwrap();
+        let mut scripted = ScriptedOutbound::new();
+        scripted.answer(&line, answer).unwrap();
+        let meta = tools_from(&label(), &listing()).unwrap().remove(0).meta;
+        let name = meta.name.clone();
+        let tool = McpTool::new(
+            meta,
+            "GITHUB_CREATE_ISSUE".to_owned(),
+            Box::new(scripted),
+            false,
+        )
+        .unwrap();
+        let call = ToolCall {
+            id: "tu_1".to_owned(),
+            name,
+            args: Payload::new(arguments.as_object().unwrap().clone()).unwrap(),
+        };
+        (tool, call)
+    }
+
+    /// A tool that says it failed has failed: the model reads the
+    /// server's own words as an error, not as a strange answer.
+    #[test]
+    fn a_tool_that_reports_its_own_failure_is_a_failure_in_the_servers_words() {
+        let (tool, call) = answering(
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"E_GATE_DENIED: cannot use the desktop \u{2014} no\\ninstead: add it\"}],\"isError\":true}}",
+        );
+        assert_eq!(
+            tool.invoke(&call),
+            Err(AxError::failure(
+                AxCode::ToolUnavailable,
+                "call an external tool",
+                "GITHUB_CREATE_ISSUE reported a failure: E_GATE_DENIED: cannot use the desktop \u{2014} no\ninstead: add it",
+            )
+            .with_recovery(FAILED_RECOVERY))
+        );
+    }
+
+    /// A failure the server marks as possibly half done is not a call to
+    /// repeat, and says so through the retry the city reads.
+    #[test]
+    fn a_failure_whose_effect_is_unknown_says_so() {
+        let (tool, call) = answering(
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"E_GATE_DENIED: cannot use the desktop \u{2014} no\\ninstead: add it\"}],\"isError\":true,\"_meta\":{\"sprawling/effect-unknown\":true}}}",
+        );
+        assert_eq!(
+            tool.invoke(&call),
+            Err(AxError::failure(
+                AxCode::ToolOutcomeUnknown,
+                "call an external tool",
+                "GITHUB_CREATE_ISSUE reported a failure: E_GATE_DENIED: cannot use the desktop \u{2014} no\ninstead: add it",
+            )
+            .effect_unknown()
+            .with_recovery(UNKNOWN_RECOVERY))
+        );
     }
 
     #[test]
