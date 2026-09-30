@@ -33,7 +33,7 @@
 | gates（命令） | 不带名字时跑全部门，带名字时只跑点名的那几道（按门表次序）；名字不在门表里即以 `unknown-gate` 退出码 2 拒绝并列出全部门名，不退回「全跑」；聚合报告，任一违规即退出码 1（§12 第 2 条） |
 | spec（命令） | 生成 `<名>-SPEC.md` 骨架，写进那个包的目录；名字是包的 lib 名，没有 lib 的包用包名（`just spec`，§8-39） |
 | members（命令） | 包在哪：`--owning` 答一组路径属于哪些工作区包，`--dir` 答一个包住在哪个目录；`justfile` 用它，不再从路径里推包名（§8-39） |
-| apisync（命令） | 不在门名册里：`cargo xtask apisync` 只判两条跨 crate 的缝 kernel 与 channels 的基线新鲜——`cargo public-api` 实时面与已提交基线逐行同；夜间作业跑它（§8-32） |
+| apisync（命令） | 不在门名册里：`cargo xtask apisync` 只判两条跨 crate 的缝 kernel 与 wire 的基线新鲜——`cargo public-api` 实时面与已提交基线逐行同；夜间作业跑它（§8-32） |
 
 ### 门禁针对的 LLM 失效模式（本 crate 存在的理由）
 
@@ -92,7 +92,7 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 
 **已复核字面量表**：判定器恒不改——它的活是在入口捕获一切像钥匙的东西，那里误报不要钱；**本门问的是另一个问题**「这里是不是提交了一份凭证」，那里误报要一次构建。故门内持一张 `NOT_CREDENTIALS` 精确字面量表，逐条写明它是谁、为什么不可能是凭证。三条纪律：①**整串精确匹配**——带前缀或后缀的更长 token 仍是命中，故没人能靠戴一个已复核的名字混过去（一条断言钉这件事）；②**表住门里而不是站点上**——注释式豁免是注入内容能写的洞，这张表不是；③表在门机械的路径下，增一条与被判源码分开提交。表里的条目是 Cargo 的分目标 C 编译器变量名（`release.yml` 的 musl job 设它），以及 `desktop/Cargo.toml` 用来选出 Windows 臂 API 面的 `windows` crate feature 名：feature 名由 resolver 读取、自身恒不持值，`Win32` 里的数字与下划线并置才是触发混合字母表规则的原因；只列长度 ≥20 字节的名字，更短的够不着熵侦测器。
 
-**apisync 细则**：基线集是 `SEAM_CRATES`，按 lib 名写（kernel、channels），基线住 `xtask/api-baselines/<lib>.txt`，由 `cargo xtask apisync --write` 生成（`cargo public-api -p <包名> --simplified`，包名由 `members` 按 lib 名查出，§8-39）；实时重算与基线逐行同，工具链缺失时拒判并报装机指引。接口变动要不要进 SPEC 交给评审，机器不判（§8-32）。cargo-public-api 与 nightly 是环境前置，`just prereqs` 把它们列为可选。
+**apisync 细则**：基线集是 `SEAM_CRATES`，按 lib 名写（kernel、wire），基线住 `xtask/api-baselines/<lib>.txt`，由 `cargo xtask apisync --write` 生成（`cargo public-api -p <包名> --simplified`，包名由 `members` 按 lib 名查出，§8-39）；实时重算与基线逐行同，工具链缺失时拒判并报装机指引。接口变动要不要进 SPEC 交给评审，机器不判（§8-32）。cargo-public-api 与 nightly 是环境前置，`just prereqs` 把它们列为可选。
 
 ## 8 接口先行
 
@@ -246,7 +246,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 **为什么依赖拓扑而不是字母序**：Effect 的 `Schema` 是运行期值，`const B = Schema.Struct({ a: A })` 要求 `A` 已定义；字母序会撞 TDZ。拓扑序内按名字母序断平，故输出确定；环（自引用类型）以 `Refused` 拒绝——线上今天没有一个，出现那天再上 `Schema.suspend`，不预留。
 
-**依赖**：`channels = { path, default-features = false, features = ["schema"] }`——不开 `server`，xtask 不为此拖进 tokio 与 axum；`schemars` 经 channels 的 `schema` feature 到达。xtask 是工作区成员而不占产品拓扑（§7 对 kernel 已用过同一条理由）。
+**依赖**：`wire = { workspace = true, features = ["schema"] }`，工作区那一行关掉缺省 feature——不开 `server`，xtask 不为此拖进 tokio 与 axum；`schemars` 经 wire 的 `schema` feature 到达。xtask 是工作区成员而不占产品拓扑（§7 对 kernel 已用过同一条理由）。
 
 ### 8-8 color：一个客户端，一处颜色产地（形状 6 数据面）
 
@@ -681,13 +681,13 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 **限制**：没有门起 cargo 编译，并行的上限是最慢那道纯读门。
 
-### 8-32 `apisync` 不在门名册里，只判 kernel 与 channels（裁决）
+### 8-32 `apisync` 不在门名册里，只判 kernel 与 wire（裁决）
 
-**决定**：`apisync` 移出 `GATES`，因而也移出 `just check` 与 CI 的门作业；`cargo xtask apisync` 只比 kernel 与 channels 两条跨 crate 缝的基线，由 `nightly.yml` 跑。「基线变了就要求同 crate SPEC 同集被碰」这条共现断言删掉，接口要不要进 SPEC 交给评审。这是人的裁决。
+**决定**：`apisync` 移出 `GATES`，因而也移出 `just check` 与 CI 的门作业；`cargo xtask apisync` 只比 kernel 与 wire 两条跨 crate 缝的基线，由 `nightly.yml` 跑。「基线变了就要求同 crate SPEC 同集被碰」这条共现断言删掉，接口要不要进 SPEC 交给评审。这是人的裁决。
 
 **为什么**：它在门阶段里最慢（每次 `just check` 起十一次 `cargo public-api`，量级数十秒），而它保证的只是「SPEC 文件被碰过」：碰一个字节就过，拆提交就绕开，判不出宽度也判不出内容。其余九个 crate 的公开面只被本仓自己用，缝之外的面由编译器守。
 
-**败给的方案**：整道删掉。kernel 与 channels 的公开面有仓外读者（`adversary/`、客户端生成的 `wire.ts` 所依的线），它们的漂移值得一张夜间可见的差异表。
+**败给的方案**：整道删掉。kernel 与 wire 的公开面有仓外读者（`adversary/`、客户端生成的 `wire.ts` 所依的线），它们的漂移值得一张夜间可见的差异表。
 
 **重议条件**：又有 crate 的公开面出现仓外读者，或夜间作业里 `apisync` 的红多次在合并后才被发现。
 
