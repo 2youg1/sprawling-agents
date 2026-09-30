@@ -59,7 +59,9 @@ impl Drop for Script {
 }
 
 /// A route command that prints `lines`, in which `{local}` stands for the
-/// address the route hands the command.
+/// address the route hands the command. A child that waits does so in its
+/// own process, so ending it leaves nothing behind that holds this test's
+/// output open.
 fn script(name: &str, lines: &[&str], then: Then) -> (Script, RouteCommand) {
     let stem = format!("sprawling-route-{}-{name}", std::process::id());
     if cfg!(windows) {
@@ -75,7 +77,7 @@ fn script(name: &str, lines: &[&str], then: Then) -> (Script, RouteCommand) {
             .collect();
         let waited = match then {
             Then::Exit => "",
-            Then::Wait => "ping -n 6 127.0.0.1 >NUL\r\n",
+            Then::Wait => ":wait\r\ngoto wait\r\n",
         };
         std::fs::write(&path, format!("@echo off\r\n{printed}{waited}")).unwrap();
         let command = RouteCommand {
@@ -90,7 +92,7 @@ fn script(name: &str, lines: &[&str], then: Then) -> (Script, RouteCommand) {
             .replace("{local}", &format!("${LOCAL_ENV}"));
         let waited = match then {
             Then::Exit => "",
-            Then::Wait => "sleep 5\n",
+            Then::Wait => "exec sleep 5\n",
         };
         std::fs::write(&path, format!("cat <<EOF\n{printed}\nEOF\n{waited}")).unwrap();
         let command = RouteCommand {

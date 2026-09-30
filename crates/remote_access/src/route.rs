@@ -84,7 +84,32 @@ impl PublicUrl {
     /// invitation appends a fragment of its own, and the address is
     /// printed into a QR code.
     pub fn parse(text: &str) -> Result<Self, AxError> {
-        Err(unusable(text, "not yet read"))
+        let (scheme, rest) = text
+            .split_once("://")
+            .ok_or_else(|| unusable(text, "no scheme"))?;
+        if !scheme.eq_ignore_ascii_case("https") {
+            return Err(unusable(text, "not https"));
+        }
+        if text
+            .chars()
+            .any(|each| each.is_whitespace() || each.is_control())
+        {
+            return Err(unusable(text, "a blank or a control character"));
+        }
+        if text.contains('#') {
+            return Err(unusable(text, "a fragment"));
+        }
+        let authority = rest
+            .split(['/', '?'])
+            .next()
+            .ok_or_else(|| unusable(text, "no host"))?;
+        if authority.is_empty() || authority.starts_with(':') {
+            return Err(unusable(text, "no host"));
+        }
+        if authority.contains('@') {
+            return Err(unusable(text, "a user name before the host"));
+        }
+        Ok(Self(format!("https://{rest}")))
     }
 
     #[must_use]
