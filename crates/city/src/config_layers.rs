@@ -21,14 +21,16 @@
 use std::path::{Path, PathBuf};
 
 use kernel::{
-    Address, AxError, Effort, FrozenConfig, KeepWarm, LayeredValue, McpServer, SandboxLimits,
-    SecondThreshold, ServerLabel,
+    Address, AxError, ClockStampGranularity, Effort, FrozenConfig, KeepWarm, LayeredValue,
+    McpServer, SandboxLimits, SecondThreshold, ServerLabel,
 };
 use serde::Deserialize;
 
 use cache::CacheSection;
+use clock::ClockSection;
 use context::ContextSection;
 mod cache;
+mod clock;
 mod context;
 mod ladder;
 mod mcp;
@@ -76,6 +78,8 @@ pub struct ConfigLayer {
     mcp: Option<Vec<McpServer>>,
     /// The second context-reminder rung this layer states.
     second_threshold: Option<SecondThreshold>,
+    /// How often this layer's results carry the clock line.
+    clock_stamp: Option<ClockStampGranularity>,
     keep_warm: Option<KeepWarm>,
     shelves: Option<Vec<String>>,
 }
@@ -148,6 +152,7 @@ impl ConfigLayer {
             sandbox,
             mcp,
             second_threshold,
+            clock_stamp: file.clock.map(|section| section.stamp),
             keep_warm: file.cache.map(|section| section.keep_warm),
             // The paths are kept as written: turning `~` into a
             // directory needs this person's home, which is not this
@@ -174,6 +179,12 @@ impl ConfigLayer {
     #[must_use]
     pub fn second_threshold(&self) -> Option<SecondThreshold> {
         self.second_threshold
+    }
+
+    /// How often this layer asks for the clock line (city-SPEC 8-31).
+    #[must_use]
+    pub fn clock_stamp(&self) -> Option<ClockStampGranularity> {
+        self.clock_stamp
     }
 
     #[must_use]
@@ -213,10 +224,9 @@ impl ConfigLayer {
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
     let ladder = Ladder::read(city_root, addr)?;
     Ok(kernel::config::freeze(
-        // No layer of this file has a key for either clock concern
-        // yet: writing one is refused where it is written, so nothing
-        // on the ladder can state them.
-        &LayeredValue::default(),
+        &ladder.resolve(ConfigLayer::clock_stamp),
+        // No layer states zones: a stamp is written in UTC, and the key
+        // is refused where it is written (city-SPEC 12.7).
         &LayeredValue::default(),
         &ladder.resolve(ConfigLayer::effort),
         &ladder.resolve(|layer| layer.sandbox().cloned()),
@@ -236,6 +246,8 @@ pub(crate) struct ConfigFile {
     mcp: Option<Vec<mcp::McpSection>>,
     #[serde(default)]
     context: Option<ContextSection>,
+    #[serde(default)]
+    clock: Option<ClockSection>,
     #[serde(default)]
     cache: Option<CacheSection>,
     #[serde(default)]
