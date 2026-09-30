@@ -107,13 +107,13 @@ impl CityFingerprint {
     /// The one place a fingerprint is computed.
     #[must_use]
     pub fn of(city: &VerifyingKey) -> Self {
-        Self([0; FINGERPRINT_BYTES])
+        Self(sha256(city.as_bytes()))
     }
 
     /// Base32 in lower case, the alphabet of the pairing code: 52 symbols.
     #[must_use]
     pub fn text(&self) -> String {
-        String::new()
+        encode(&self.0)
     }
 
     /// Reads the text [`Self::text`] wrote, in either case.
@@ -122,7 +122,16 @@ impl CityFingerprint {
     /// Refuses anything but the one canonical text of 32 bytes, so two
     /// fingerprints are equal exactly when their texts are.
     pub fn read(text: &str) -> Result<Self, AxError> {
-        Err(not_built(text))
+        let lowered = text.trim().to_lowercase();
+        match decode(&lowered).map(<[u8; FINGERPRINT_BYTES]>::try_from) {
+            Some(Ok(bytes)) if encode(&bytes) == lowered => Ok(Self(bytes)),
+            Some(Ok(_) | Err(_)) | None => Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "read a city fingerprint",
+                format!("{} characters", lowered.chars().count()),
+            )
+            .with_recovery("scan the code on the city's console again")),
+        }
     }
 }
 
@@ -191,7 +200,11 @@ impl Claim {
 /// # Errors
 /// Fails only when the cryptographic library refuses to generate a key.
 pub fn device_pair_hello(nonce: [u8; NONCE_BYTES]) -> Result<DevicePairing, AxError> {
-    Err(not_built("a pairing hello"))
+    let (ephemeral, public) = Ephemeral::generate()?;
+    Ok(DevicePairing {
+        hello: PairHello::from_bytes(&[public.as_slice(), &nonce].concat())?,
+        ephemeral,
+    })
 }
 
 impl DevicePairing {
@@ -214,7 +227,33 @@ impl DevicePairing {
         invitation: &Invitation,
         device_key: &SigningKey,
     ) -> Result<Claimed, AxError> {
-        Err(not_built("a claim"))
+        let code = code_text(&invitation.code)?;
+        let [presented, x_peer, ciphertext, signature] = reply.parts();
+        let city = VerifyingKey::from_bytes(presented)?;
+        if CityFingerprint::of(&city) != invitation.city {
+            return Err(unrecognised("the key the city presented"));
+        }
+        let transcript = record(PAIRING, self.hello.as_bytes(), reply.unsigned());
+        city.verify(
+            &signed(PAIRING, CITY_SIGNS, &transcript),
+            &Signature::from_bytes(signature)?,
+        )
+        .map_err(|_| unrecognised("the city's signature"))?;
+        let keys = self.ephemeral.keys(&transcript, x_peer, ciphertext)?;
+        let proof = device_key.sign(&signed(PAIRING, DEVICE_SIGNS, &transcript))?;
+        let claim = [
+            code.as_bytes(),
+            device_key.public().as_bytes().as_slice(),
+            proof.as_bytes().as_slice(),
+        ]
+        .concat();
+        let mut session = keys.device_session()?;
+        let sealed = session.sealer.seal(&claim)?;
+        Ok(Claimed {
+            sealed,
+            city,
+            session,
+        })
     }
 }
 
@@ -229,7 +268,18 @@ pub fn city_pair_reply(
     city: &SigningKey,
     nonce: [u8; NONCE_BYTES],
 ) -> Result<(PairReply, CityPairing), AxError> {
-    Err(not_built("a pairing reply"))
+    let (x_peer, kem_peer) = hello.parts();
+    let answer = Answer::new(x_peer, kem_peer)?;
+    let unsigned = [city.public().as_bytes().as_slice(), &answer.public, &nonce].concat();
+    let transcript = record(PAIRING, hello.as_bytes(), &unsigned);
+    let signature = city.sign(&signed(PAIRING, CITY_SIGNS, &transcript))?;
+    Ok((
+        PairReply::from_bytes(&[unsigned.as_slice(), signature.as_bytes()].concat())?,
+        CityPairing {
+            transcript,
+            keys: answer.keys(&transcript)?,
+        },
+    ))
 }
 
 impl CityPairing {
@@ -243,7 +293,32 @@ impl CityPairing {
     /// of any other length, and one whose signature its key did not make.
     /// The code stays in the door until it expires.
     pub fn open_claim(self, sealed: &[u8]) -> Result<(Claim, Session), AxError> {
-        Err(not_built("a sealed claim"))
+        let mut session = self.keys.city_session()?;
+        let opened = session
+            .opener
+            .open(sealed)
+            .map_err(|_| unclaimed("a sealed claim"))?;
+        let bytes: [u8; CLAIM_BYTES] = fixed(&opened, "read a pairing claim")?;
+        let (code, rest) = bytes.split_at(CODE_TEXT_BYTES);
+        let (key, proof) = rest.split_at(PUBLIC_BYTES);
+        let device_key = VerifyingKey::from_bytes(key)?;
+        device_key
+            .verify(
+                &signed(PAIRING, DEVICE_SIGNS, &self.transcript),
+                &Signature::from_bytes(proof)?,
+            )
+            .map_err(|_| unclaimed("the device's signature"))?;
+        let code = std::str::from_utf8(code)
+            .map(PairingCode::read)
+            .map_err(|_| {
+                AxError::failure(
+                    AxCode::WireMismatch,
+                    "read a pairing claim",
+                    "a code that is not text",
+                )
+                .with_recovery("the device and the city are on different versions; reload the page")
+            })?;
+        Ok((Claim { code, device_key }, session))
     }
 }
 
@@ -271,9 +346,4 @@ fn unclaimed(subject: &str) -> AxError {
     AxError::failure(AxCode::GateDenied, "open a pairing claim", subject).with_recovery(
         "the connection ends and the code stays valid until it expires; scan it again",
     )
-}
-
-fn not_built(subject: &str) -> AxError {
-    AxError::failure(AxCode::StorageFatal, "pair a device", subject)
-        .with_recovery("the pairing handshake is not built yet")
 }

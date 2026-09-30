@@ -6,7 +6,7 @@
 /-!
 # 配对握手：配对码只封给二维码钉住的那座城
 
-规定 `crates/remote_access/src/handshake.rs` 里配对的那一半（remote_access-SPEC.md §8-6）：
+规定 `crates/remote_access/src/handshake/pairing.rs`，握手里配对的那一半（remote_access-SPEC.md §8-6）：
 一台还没配对的设备第一次连上城时，线上走哪几条消息，城在什么时候把一个配对码交给门去兑。
 Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。门自己的性质（码只兑
 一次、只在本纪元、只在到期之前，等等）在 `crates/remote_access/spec/Door.lean`，这里不重述：
