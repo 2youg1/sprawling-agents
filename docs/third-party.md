@@ -15,7 +15,7 @@ Calling a face this city did not invent requires knowing the shape of the reques
 | Project | Licence | What is followed | Where to look | Tracked to |
 |---|---|---|---|---|
 | [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) | Apache-2.0 | the platform table the three Kimi hosts in `gateway::provider::preset` are read from: each host's base path and that it answers on the OpenAI-compatible face | `src/kimi_cli/auth/` | `b5f48ef2aaf1` |
-| [openai/openai-openapi](https://github.com/openai/openai-openapi) | MIT | the request and answer of the embeddings face, which every compatible server copied | `openapi.yaml` | `b6059fc737ac` |
+| [openai/openai-openapi](https://github.com/openai/openai-openapi) | MIT | the request and answer of the embeddings face, which every compatible server copied; the request, the `output` items and the named stream events of the responses face; and the `reasoning_effort` values and the `max_completion_tokens` ceiling field of the chat face | `openapi.yaml` | `a36ff95bb335` |
 | [huggingface/text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) | Apache-2.0 | the request and answer of the rerank face, which has no OpenAI shape to copy | `docs/openapi.json` | `d246fbf17cc7` |
 | [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Claude Code is started as an ACP agent: the adapter package and its version | `claude-acp/` | `4b785db2d336` |
 | [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Codex is started as an ACP agent: the adapter package and its version | `codex-acp/` | `7c3079219894` |
@@ -41,6 +41,8 @@ Calling a face this city did not invent requires knowing the shape of the reques
 **The rerank face is the one shape in this table with no vendor behind it.** Nobody publishes `/rerank` as an API a vendor owns; the servers that serve it defined it, so the row follows the description of the server this city targets, and a second server answering a different shape is a second connection rather than a wildcard in the reader.
 
 **How to re-check**: watch the paths above for changes rather than watching releases, because an endpoint migration often arrives in a patch version with no mention in the changelog. Where two sources disagree, the provider's own documentation decides, not the majority. Every row above was read at the commit its `Tracked to` cell names.
+
+**A tracked commit is written in the table above and nowhere else.** A module header or a SPEC that reads one of these paths names the repository, the path and the schemas it read, and says it read them at the commit this section tracks. A commit written beside the code stays true after the watermark moves past it, so nothing tells its reader that the code has fallen behind; pointing here keeps one watermark for each path.
 
 **The watch is automated.** Every day `upstream-watch` asks each path for its newest commit and compares it with `Tracked to`; a difference opens one issue naming the commit, a compare view, and the row's *What is followed* cell as the fact to re-check. `Tracked to` advances only in the pull request that realigns the constants, the same change-set that carries the new facts, so the watermark never runs ahead of what the code knows.
 

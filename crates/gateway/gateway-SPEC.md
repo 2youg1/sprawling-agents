@@ -33,6 +33,7 @@
 - 线格式 JSON 允许浮点（temperature 等 provider 字段）：dialect 是翻译面不是判定路径；判定路径（cost／market 价目）恒整数。
 - **只有 Anthropic 兼容格式在结算前交出调用。** `Endpoint` 经 `Model::call_speculating`（kernel SPEC「模型端口第三扇门」）在 `content_block_stop` 到达时交出完整调用，消费方是 `runtime::turn::speculation`（runtime-SPEC §8-3），它守的性质由 `tools/adversary/design/Speculating.lean` 证明。OpenAI 两种兼容格式在结算前不交出调用：它们的调用在哪一帧完整，线上没有一帧明说。
 - **加密金库文件还没有探针选它**：`Custodian::probe` 只试平台服务，何时向人要口令、口令从哪里来未定（§8-21）。
+- **responses 面答 `usage: null` 时算不算「供应方没报用量」，未定。** `openai-openapi` 把 `Response.usage` 写作 `ResponseUsage` 或 `null`。`dialect::responses::reply` 在 `usage` 缺席时报 `E_WIRE_MISMATCH`，为 `null` 时经 `mismatch::tokens_or_zero` 把输入与输出都读成 0 token：两种缺法得到相反的结论，后一种让这次调用的用量从账上静默消失。规格没有说 `status` 为 `completed` 的 response 会不会带 `null`，所以读法暂不改；要定下它，需要一个真实供应方在已完成的 response 里答出 `usage: null` 的记录。
 
 ## 4 现状分析
 
@@ -664,7 +665,7 @@ pub struct Ranks;                                // of(&AttachedEndpoint, model)
 - **人设的 body override 不到向量面**：override 是指向对话请求体的 JSON 指针（`endpoint::config::apply_override` 会替它造出缺失的路径），同一指针落到 embeddings 体上会多出一个没人读的字段——那是本城在替人回答一个他没问过的关于对话的问题。**额外的头会到**：头是关于端点的事实，不是关于一个体的。
 - **凭据每次调用赎回一次**（`Redemption` 作为调用参数而不是字段）：赎回按设计不缓存，它只为一次操作存在，把 `Secrets` 挂在长寿命对象上就是让它活到一整批检索跑完。
 - **每次调用把手写的那一行还回调用方**：`embed` 返 `(Embeddings, EmbeddingCalled)`、`rank` 返 `(Ranking, RerankCalled)`。本模块没有账本可写，而那一行的归宿是 run 的历史：拿得住账本的人 append `Payload::of(&record)`。载荷的字段类型住 `kernel::event::record::modality`，本模块不另写一份键名。**rerank 那一行没有用量列**：本城写入的那两张脸不报用量，填一个派生数就是把本城的估算放进人读账单的那一列，而留一个永远写不进 `Some` 的字段同样是给读账本的人一句填不上的承诺。`RerankCalled` 因此只有 `model`／`passages`／`ranks` 三键；用量只在 embedding 面上有，且只在供应方真的报了它时出现（`EmbeddingCalled::prompt_tokens`）。
-- **两张脸的字节形状也各只有一处**：`embedding` 的请求与回答照 `openai/openai-openapi` 的 `CreateEmbeddingRequest`／`CreateEmbeddingResponse`／`Embedding` 三个 schema 写，`rerank` 照 `huggingface/text-embeddings-inference` 的 `docs/openapi.json` 的 `/rerank` 路径与 `RerankRequest`／`Rank` 写；两处出处与读取日期写在模块头。**请求显式写 `encoding_format`**，因为读答案的那段只认一种编码，而厂商可改的默认值不是可以照着解析的依据。**回答按 `index` 归位而不按到达顺序**：把第三段文字的向量配给第一段，是一个不报错的检索错误。**名次不在本城重排**：分数只在一次回答内可比，服务端排好的序就是答案，再排一次就是本城对自己付钱问来的名次有第二个意见。
+- **两张脸的字节形状也各只有一处**：`embedding` 的请求与回答照 `openai/openai-openapi` 的 `CreateEmbeddingRequest`／`CreateEmbeddingResponse`／`Embedding` 三个 schema 写，`rerank` 照 `huggingface/text-embeddings-inference` 的 `docs/openapi.json` 的 `/rerank` 路径与 `RerankRequest`／`Rank` 写；两处出处（仓库、文件与 schema 名）写在模块头，读到的提交只记在 docs/third-party.md §1。**请求显式写 `encoding_format`**，因为读答案的那段只认一种编码，而厂商可改的默认值不是可以照着解析的依据。**回答按 `index` 归位而不按到达顺序**：把第三段文字的向量配给第一段，是一个不报错的检索错误。**名次不在本城重排**：分数只在一次回答内可比，服务端排好的序就是答案，再排一次就是本城对自己付钱问来的名次有第二个意见。
 - **chat 不是本枚举的成员**：会话路径归已经在调用它的那处（`router::attached::chat_path`），在这里再写一次就是每回合都在发的那条路径有了第二个家。
 
 ### 8-19 system prefix 的稳定性是一条被守护的性质
@@ -686,7 +687,7 @@ pub struct Ranks;                                // of(&AttachedEndpoint, model)
 
 `dialect/responses/` 三个文件——`request.rs`（规范请求 → `input` 数组）、`reply.rs`（`output` 数组 ↔ `ChatResponse`）、`stream.rs`（具名事件 → `Increment`，终帧 → 已定答案）。`dialect` 的五个入口各多一条臂，闭集由二变三。
 
-**形状取自供应方自己的规格**：`openai/openai-openapi`，`openapi.yaml` 自述 `info.version` ＝ 2.3.0，提交 `d983890f`（2026-09-26）。不取自任何客户端库，也不取自记忆。看着不对的字段通常是搬过家的字段——改这里之前先读那份文档。
+**形状取自供应方自己的规格**：`openai/openai-openapi` 的 `openapi.yaml`，读到的提交只记在 docs/third-party.md §1，那一行看着的就是这一面的请求、`output` 项与具名流事件。不取自任何客户端库，也不取自记忆。看着不对的字段通常是搬过家的字段——改这里之前先读那份文档。
 
 **它不是第二支笔的一个开关。** chat 面发 `messages`、读 `choices`；这面发 `input`、读 `output`——一个数组，成员是消息、函数调用与推理项，而不是一条挂着若干字段的消息。流是第三套文法：具名事件（`response.output_text.delta`）而不是匿名 chunk。折在一起就是一个在每一步上分支的写入器。
 

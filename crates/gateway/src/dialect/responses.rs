@@ -6,10 +6,10 @@
 //! OpenAI's responses face, in both directions.
 //!
 //! **Every shape here is read off the provider's own specification, not
-//! off a client library.** The source is `openai/openai-openapi`, the
-//! document `openapi.yaml` declares as API version 2.3.0, read at
-//! commit `d983890f`. A field that looks wrong is usually a field that
-//! moved, so check that document before changing anything below.
+//! off a client library.** The source is `openapi.yaml` in
+//! `openai/openai-openapi`, read at the commit `docs/third-party.md`
+//! section 1 tracks it to. A field that looks wrong is usually a field
+//! that moved, so check that document before changing anything below.
 //!
 //! **This is a third dialect and not a variant of the second.** The
 //! chat face sends `messages` and reads `choices`; this one sends
