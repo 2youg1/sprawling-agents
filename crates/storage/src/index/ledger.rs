@@ -149,12 +149,20 @@ impl LedgerIndex {
         let vfs = self.seam();
         let names = crate::jsonl::segment_names(vfs.as_ref(), dir)?;
         let mut spans = Vec::new();
+        // Folded segments this listing still holds. Names in one listing
+        // are distinct, so fewer hits than folded segments means one of
+        // them vanished: one ordered lookup per name, not names squared.
+        let mut held_here: usize = 0;
         for name in &names {
             let path = dir.join(name);
             let size = vfs
                 .size(&path)
                 .map_err(crate::error::io_err("stat segment", &path))?;
-            match self.folded.scanned.get(name).copied() {
+            let held = self.folded.scanned.get(name).copied();
+            if held.is_some() {
+                held_here = held_here.saturating_add(1);
+            }
+            match held {
                 Some(done) if done == size => continue,
                 Some(done) if done < size => spans.push(Span {
                     name: name.clone(),
@@ -169,7 +177,7 @@ impl LedgerIndex {
                 }),
             }
         }
-        if self.folded.scanned.keys().any(|held| !names.contains(held)) {
+        if held_here < self.folded.scanned.len() {
             return Ok(RefreshPlan::Rebuild);
         }
         if spans.is_empty() {
