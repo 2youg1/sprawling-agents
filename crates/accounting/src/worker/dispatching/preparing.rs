@@ -43,7 +43,7 @@ pub(in crate::worker) struct LaneHalf {
 /// What a lane carries home, whether its preparation held or not: the
 /// assignment and the site go back to `land`, which gives back the tree
 /// the site may hold before it reads how the drive went.
-pub struct Flown {
+pub(crate) struct Flown {
     pub at: Assignment,
     pub site: Site,
     pub driven: Result<Driven, AxError>,
@@ -54,7 +54,7 @@ impl Staged {
         Staged { at, site, lane }
     }
 
-    pub fn run_id(&self) -> RunId {
+    pub(crate) fn run_id(&self) -> RunId {
         self.site.run_id
     }
 
@@ -63,7 +63,7 @@ impl Staged {
     /// Generic in the ledger for the reason [`drive_run`] is: a lane
     /// writes through its relay, and a test on the accounting thread
     /// writes through the city's own ledger.
-    pub fn fly<L: Ledger>(self, ledger: &mut L, context: DriveContext) -> Flown {
+    pub(crate) fn fly<L: Ledger>(self, ledger: &mut L, context: DriveContext) -> Flown {
         let Staged { at, mut site, lane } = self;
         let driven = lane
             .prepare(&at, &mut site, ledger, &context)

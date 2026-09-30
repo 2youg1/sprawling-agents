@@ -159,7 +159,7 @@ mod tests {
         use kernel::layout::CityLayout;
 
         let dir = tempfile::tempdir().unwrap();
-        crate::views::tests::founded(dir.path());
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let lab = Address::parse("lab").unwrap();
         city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
         let layout = CityLayout::new(dir.path());
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn rules_that_will_not_load_answer_unavailable_rather_than_admitting_nothing() {
         let dir = tempfile::tempdir().unwrap();
-        crate::views::tests::founded(dir.path());
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let lab = Address::parse("lab").unwrap();
         city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
         std::fs::write(

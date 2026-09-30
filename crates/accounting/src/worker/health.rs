@@ -38,7 +38,7 @@ impl Health {
     }
 
     /// The append `asked` announced never entered the queue.
-    pub fn withdrawn(&self) {
+    pub(crate) fn withdrawn(&self) {
         lower(&self.0.queued, 1);
     }
 

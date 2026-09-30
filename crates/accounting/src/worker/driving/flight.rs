@@ -42,7 +42,7 @@ pub(super) struct InLane {
 /// worker loop only needs to know that it made progress, and a pursuit
 /// needs to know which of its own rows came back.
 #[derive(Debug)]
-pub enum Landed {
+pub(crate) enum Landed {
     /// No run came home in this look. Relay requests were still
     /// served, which is the half that keeps the lanes moving.
     Nothing,

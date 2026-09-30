@@ -114,7 +114,7 @@ impl Standing {
 /// # Errors
 /// Propagates opening the ledger, chain verification, and whatever a fold
 /// says about a payload it cannot read.
-pub fn fold_city(
+pub(crate) fn fold_city(
     ledger_dir: &Path,
     now: kernel::TimeMs,
     cost: &mut OpeningCost,

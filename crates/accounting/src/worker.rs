@@ -290,7 +290,7 @@ impl RunWorker {
     /// Propagates a ledger that cannot be read and a city with no
     /// genesis line: a city with no genesis has no identity to sign
     /// with.
-    pub fn city_hash(&self) -> Result<kernel::B3Hash, AxError> {
+    pub(crate) fn city_hash(&self) -> Result<kernel::B3Hash, AxError> {
         if let Some(known) = self.city.get() {
             return Ok(*known);
         }

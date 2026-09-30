@@ -43,7 +43,10 @@ use kernel::{Address, AxError, EventRecord, RunId};
 /// `gateway::EndpointTuning::DEFAULTS`, which is their one home; a
 /// form that printed its own numbers into empty boxes is what this
 /// answer exists to retire.
-pub fn config_answer(city_root: &Path, addr: &Address) -> Result<wire::ConfigAnswer, AxError> {
+pub(crate) fn config_answer(
+    city_root: &Path,
+    addr: &Address,
+) -> Result<wire::ConfigAnswer, AxError> {
     let defaults = gateway::EndpointTuning::DEFAULTS;
     let domain = wire::SecondDomain {
         min: kernel::consts_policy::CTX_REMINDER_SECOND_MIN,
@@ -89,7 +92,7 @@ fn rung_of(layer: city::Layer) -> wire::ConfigLayer {
 }
 
 /// The settings page's read of the endpoint book.
-pub fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsAnswer {
+pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsAnswer {
     let endpoints = book
         .endpoints()
         .map(|endpoint| wire::EndpointSummary {
@@ -130,7 +133,7 @@ pub fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsAnswer {
 /// preset table (wire-SPEC.md 8-51). A row the normaliser refuses
 /// is a defect of the table, and the answer names itself unavailable
 /// with the row's refusal rather than listing the rest as if whole.
-pub fn known_hosts_answer() -> wire::Answer {
+pub(crate) fn known_hosts_answer() -> wire::Answer {
     let hosts = match gateway::known_hosts() {
         Ok(hosts) => hosts,
         Err(fault) => {
@@ -158,7 +161,7 @@ pub fn known_hosts_answer() -> wire::Answer {
 /// that starts it, and whether the search the served city handed in
 /// finds that command's program (wire-SPEC.md 8-52, accounting-SPEC.md
 /// 8-10).
-pub fn harnesses_answer(find: fn(&str) -> Option<PathBuf>) -> wire::Answer {
+pub(crate) fn harnesses_answer(find: fn(&str) -> Option<PathBuf>) -> wire::Answer {
     wire::Answer::Harnesses(wire::HarnessesAnswer {
         harnesses: agent_protocols::Harness::ALL
             .iter()
@@ -201,7 +204,7 @@ pub fn pursued(record: &EventRecord) -> Result<Address, AxError> {
 /// well would be a second parse of the same file, and the two would
 /// disagree the first time one of them was invalidated and the other was
 /// not.
-pub fn buildings_of(city_root: &Path) -> Vec<Address> {
+pub(crate) fn buildings_of(city_root: &Path) -> Vec<Address> {
     let mut found = city::buildings(city_root).unwrap_or_default();
     found.sort_by(|left, right| left.as_str().cmp(right.as_str()));
     found
@@ -216,7 +219,7 @@ pub fn buildings_of(city_root: &Path) -> Vec<Address> {
 /// # Errors
 /// Refuses a line this build cannot read as a signal: skipping it would
 /// leave a waiting signal out of the view.
-pub fn signal_line(record: &EventRecord) -> Result<(Address, wire::SignalLine), AxError> {
+pub(crate) fn signal_line(record: &EventRecord) -> Result<(Address, wire::SignalLine), AxError> {
     let signal = collab::Signal::from_payload(record.data())?;
     Ok((
         signal.room().clone(),
@@ -232,7 +235,7 @@ pub fn signal_line(record: &EventRecord) -> Result<(Address, wire::SignalLine), 
 /// The rows one `file_discarded` record states: one per path, each with
 /// the record's way back. A record this version cannot read states no
 /// rows, for the reason [`signal_line`] gives.
-pub fn discard_lines(record: &EventRecord) -> Vec<wire::DiscardLine> {
+pub(crate) fn discard_lines(record: &EventRecord) -> Vec<wire::DiscardLine> {
     let Ok(FileDiscarded { paths, restoration }) = record.data().read() else {
         return Vec::new();
     };
@@ -249,7 +252,7 @@ pub fn discard_lines(record: &EventRecord) -> Vec<wire::DiscardLine> {
 
 /// The paths one `discard_restored` record put back; none when this
 /// version cannot read it.
-pub fn restored_paths(record: &EventRecord) -> Vec<String> {
+pub(crate) fn restored_paths(record: &EventRecord) -> Vec<String> {
     record
         .data()
         .read::<DiscardRestored>()
@@ -258,7 +261,7 @@ pub fn restored_paths(record: &EventRecord) -> Vec<String> {
 
 /// One shelf entry, as the registry shows it. `None` for a record with
 /// no room or one this version cannot read.
-pub fn registry_line(record: &EventRecord) -> Option<wire::RegistryLine> {
+pub(crate) fn registry_line(record: &EventRecord) -> Option<wire::RegistryLine> {
     let AssetArchived { kind, subject, .. } = record.data().read().ok()?;
     Some(wire::RegistryLine {
         addr: record.addr().cloned()?,
@@ -268,7 +271,7 @@ pub fn registry_line(record: &EventRecord) -> Option<wire::RegistryLine> {
     })
 }
 
-pub fn summarize(run: RunId, hot: &storage::RunHot) -> wire::RunSummary {
+pub(crate) fn summarize(run: RunId, hot: &storage::RunHot) -> wire::RunSummary {
     wire::RunSummary {
         run,
         who: hot.who.clone(),

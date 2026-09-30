@@ -29,7 +29,7 @@ pub struct BlockedJob {
 /// What a run was sent out to do. Read back from `run_started`, which is
 /// the record that carries both halves.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
-pub struct Sent {
+pub(crate) struct Sent {
     pub task: String,
     pub goal: String,
 }
@@ -118,7 +118,7 @@ impl Governance {
         clippy::wildcard_enum_match_arm,
         reason = "a few kinds move this fold; the rest of the event vocabulary does not"
     )]
-    pub fn absorb(
+    pub(crate) fn absorb(
         &mut self,
         kind: EventKind,
         run: RunId,

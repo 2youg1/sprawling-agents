@@ -27,7 +27,7 @@ use super::registering::GoalAsk;
 /// The two travel together because a driving thread is blocked on the
 /// second until the first has been written: an append with no way back
 /// is a thread that never wakes.
-pub struct RelayRequest {
+pub(crate) struct RelayRequest {
     draft: EventDraft,
     /// A rendezvous channel, so there is no third state between "the
     /// accounting thread wrote it" and "the driving thread knows".
@@ -40,7 +40,7 @@ pub struct RelayRequest {
 /// One queue, because a thread blocks on one thing at a time: a queue
 /// per mouth is polled with timeouts that every request waits out
 /// (sprawling-SPEC.md 8-42-4, `crates/sprawling/spec/Assembly/Attending.lean`).
-pub enum Wake {
+pub(crate) enum Wake {
     /// A lane's append, waiting for its answer.
     Relay(RelayRequest),
     /// A lane's claim on a plan node, decided in queue order.
@@ -57,7 +57,7 @@ pub enum Wake {
 }
 
 /// What one look at the queue leaves the accounting thread.
-pub struct Drained {
+pub(crate) struct Drained {
     /// Every line the ledger took, in ledger order: a line a lane wrote
     /// is history as much as one the accounting thread wrote, so the
     /// same folds are shown it (sprawling-SPEC.md 8-110).
@@ -69,7 +69,7 @@ pub struct Drained {
 }
 
 /// How long one look at the queue may wait for its first wake.
-pub enum Patience {
+pub(crate) enum Patience {
     /// Not at all: serve what is already queued.
     Now,
     /// At most this long: an idle city's one unasked wake, the schedule.
@@ -85,7 +85,7 @@ pub enum Patience {
 /// and the bytes stay with the adapter on the accounting side, which is
 /// what keeps one city to one writer.
 #[derive(Clone)]
-pub struct Relay {
+pub(crate) struct Relay {
     asking: mpsc::Sender<Wake>,
     health: Health,
 }
@@ -123,7 +123,7 @@ impl Ledger for Relay {
 /// It holds a sender of its own so the channel stays connected while a
 /// city is served: a gate that had handed out every sender would report
 /// "nobody is writing" as "the writer is gone".
-pub struct RelayGate {
+pub(crate) struct RelayGate {
     wakes: mpsc::Receiver<Wake>,
     issuing: mpsc::Sender<Wake>,
     pub booked: ClaimBook,
@@ -149,7 +149,7 @@ impl RelayGate {
     }
 
     /// One handle for one driving thread.
-    pub fn issue(&self) -> Relay {
+    pub(crate) fn issue(&self) -> Relay {
         Relay {
             asking: self.issuing.clone(),
             health: self.health.clone(),
@@ -157,7 +157,7 @@ impl RelayGate {
     }
 
     /// A sender for the lanes coming home and for the desk.
-    pub fn bell(&self) -> mpsc::Sender<Wake> {
+    pub(crate) fn bell(&self) -> mpsc::Sender<Wake> {
         self.issuing.clone()
     }
 

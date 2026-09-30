@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use super::{Place, founded, view_record};
+use super::{Place, view_record};
 use crate::views::Views;
 use kernel::{Address, EventKind, Payload, RunId};
 
@@ -14,7 +14,7 @@ use kernel::{Address, EventKind, Payload, RunId};
 fn the_prompt_a_run_was_told_is_read_after_the_views_are_released() {
     use kernel::Ledger;
     let dir = tempfile::tempdir().unwrap();
-    let report = founded(dir.path());
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let run = RunId::from_bytes([7u8; 16]);
     let room = Address::parse("lab/room1").unwrap();
     let told = b"the city says";
@@ -76,7 +76,7 @@ fn the_prompt_a_run_was_told_is_read_after_the_views_are_released() {
 #[test]
 fn a_plan_nobody_has_read_yet_is_read_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
-    founded(dir.path());
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let building = dir.path().join("lab");
     std::fs::create_dir_all(&building).unwrap();
     let query = wire::Query::BuildingView {
@@ -101,7 +101,7 @@ fn a_plan_nobody_has_read_yet_is_read_after_the_views_are_released() {
 fn the_ledger_readers_read_after_the_views_are_released() {
     use kernel::Ledger;
     let dir = tempfile::tempdir().unwrap();
-    let report = founded(dir.path());
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let run = RunId::from_bytes([7u8; 16]);
     let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
         .unwrap()
@@ -152,7 +152,7 @@ fn the_ledger_readers_read_after_the_views_are_released() {
 #[test]
 fn the_mcp_health_page_reads_its_servers_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
-    founded(dir.path());
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let views = Views::new(dir.path());
     let prepared = views.prepare(&wire::Query::McpHealth { addr: room.clone() });
@@ -181,7 +181,7 @@ fn the_mcp_health_page_reads_its_servers_after_the_views_are_released() {
 #[test]
 fn a_poisoned_ledger_index_is_rebuilt_rather_than_read_as_an_empty_history() {
     let dir = tempfile::tempdir().unwrap();
-    founded(dir.path());
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut views = Views::new(dir.path());
     let query = wire::Query::History {
         before: None,

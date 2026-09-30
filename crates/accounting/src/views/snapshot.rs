@@ -27,7 +27,7 @@ use start::SnapshotFold;
 const VIEWS_FOLD_RULES: &str = "views-fold-d7c8c7871ba51264";
 
 /// The `fold_version` a views snapshot is cut and accepted under.
-pub fn views_fold_version() -> u32 {
+pub(crate) fn views_fold_version() -> u32 {
     let rules = [env!("CARGO_PKG_VERSION"), VIEWS_FOLD_RULES].join("\n");
     let [a, b, c, d, ..] = *B3Hash::digest(rules.as_bytes()).as_bytes();
     u32::from_le_bytes([a, b, c, d])
@@ -147,7 +147,10 @@ impl Views {
     /// # Errors
     /// `StorageFatal` when the index lock is poisoned, and the ledger
     /// read's own failure.
-    pub fn last_folded_line(&self, ledger_dir: &Path) -> Result<Option<(Seq, Vec<u8>)>, AxError> {
+    pub(crate) fn last_folded_line(
+        &self,
+        ledger_dir: &Path,
+    ) -> Result<Option<(Seq, Vec<u8>)>, AxError> {
         let Some(seq) = self.next_unfolded.value().checked_sub(1).map(Seq::new) else {
             return Ok(None);
         };

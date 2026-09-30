@@ -30,7 +30,7 @@ use crate::effect;
 /// Who a run's claims are made for, and the clock their lines are
 /// stamped by. The five travel together from the run's dispatch to
 /// every claim it makes.
-pub struct Claimant {
+pub(crate) struct Claimant {
     /// The building whose plan the claimed nodes belong to.
     pub building: Address,
     /// The room the run works in, which the claim's line is filed under.
@@ -43,7 +43,7 @@ pub struct Claimant {
 
 /// One claim, its `roadmap_claimed` line, the line that would hand the
 /// node back, and the address its answer goes back to.
-pub struct ClaimAsk {
+pub(crate) struct ClaimAsk {
     building: Address,
     node: NodeId,
     line: EventDraft,
@@ -61,7 +61,7 @@ struct Booked {
 /// Which run holds which node of which building's plan while those runs
 /// are in flight.
 #[derive(Default)]
-pub struct ClaimBook {
+pub(crate) struct ClaimBook {
     held: BTreeMap<(Address, NodeId), Booked>,
 }
 
@@ -70,7 +70,7 @@ pub struct ClaimBook {
 /// reaches the ledger; whatever it did not close is still owed to the
 /// history.
 #[must_use = "a claim written at call time stays open on the history until its put-back line is written"]
-pub struct OpenClaims {
+pub(crate) struct OpenClaims {
     run: RunId,
     put_backs: BTreeMap<NodeId, effect::Line>,
 }
@@ -147,7 +147,7 @@ impl ClaimBook {
 /// The booking a run's plan desk asks through: a claim carried on the
 /// accounting thread's one queue and waited for, like a relay append.
 /// The claim's instant is taken when the model makes it.
-pub fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::Booking {
+pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::Booking {
     collab::Booking::new(move |claim: &collab::ClaimEffect| {
         let line = EventDraft {
             run: claimant.run,

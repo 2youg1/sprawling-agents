@@ -34,7 +34,7 @@ mod placing;
 /// thread** (sprawling-SPEC.md 8-46-1). A drive that borrowed the
 /// bench, the tree or the resident's name borrowed them from locals of
 /// the call that built it, so a lane could never have been handed one.
-pub struct Driving {
+pub(crate) struct Driving {
     /// The model this run calls, already chosen and already credentialed.
     /// Owned, and handed back inside [`Driven`]: who holds the adapter is
     /// a fact the types state, not a loan the reader has to track.
@@ -76,7 +76,7 @@ pub struct Driving {
 /// What the sieve needs from the city for one run: a store to pin the
 /// original in, the room the model reads the rest from, the
 /// filter table frozen with the run, and what this run already saw.
-pub struct Sieving {
+pub(crate) struct Sieving {
     /// The store the lanes share, taken for the length of one package.
     pub cas: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
     pub city_root: PathBuf,

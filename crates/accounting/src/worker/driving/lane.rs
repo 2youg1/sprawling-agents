@@ -30,7 +30,7 @@ use super::{Driven, Driving};
 /// and which one arrives is what separates the accounting thread from a
 /// lane.
 #[derive(Clone)]
-pub struct DriveContext {
+pub(crate) struct DriveContext {
     /// Where a model's text goes while it is still arriving.
     pub watching: Option<std::sync::Arc<dyn Fn(wire::Delta) + Send + Sync>>,
     /// What the person asked of this run, read at its safe points. One
@@ -188,7 +188,7 @@ fn poison(what: &str) -> AxError {
 /// # Errors
 /// Propagates a checkpoint that will not open, which is the one failure
 /// that happens before the run starts.
-pub fn drive_run<L: Ledger>(
+pub(crate) fn drive_run<L: Ledger>(
     driving: Driving,
     ledger: &mut L,
     context: DriveContext,

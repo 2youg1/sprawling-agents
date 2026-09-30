@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn a_governing_file_reads_back_whole() {
         let dir = tempfile::tempdir().unwrap();
-        crate::views::tests::founded(dir.path());
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let mut views = Views::new(dir.path());
         let rules = Address::parse(&format!(
             "hall/{}/{}",

@@ -289,7 +289,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates the handoff's refusal of an empty must-read list, and
     /// the ledger's refusal to take the line.
-    pub fn close_city(&mut self, why: &Closing) -> Result<(), AxError> {
+    pub(crate) fn close_city(&mut self, why: &Closing) -> Result<(), AxError> {
         // The city's own norm, not a building's: `city::norms` answers
         // for a run at an address, and this line belongs to the city.
         // Through the same reader the prefix uses. What this city's

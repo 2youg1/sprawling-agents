@@ -15,11 +15,11 @@ use std::collections::BTreeMap;
 /// The chosen adapter, wrapped so every request a run sends enters the
 /// keep-warm account (runtime-SPEC 8-4-2), timed on the worker's own
 /// clock (accounting-SPEC.md 8-3).
-pub type Door = runtime::prefix::warmth::Warmed<DoorClock>;
+pub(crate) type Door = runtime::prefix::warmth::Warmed<DoorClock>;
 
 /// What a door reads the time through: the worker's clock, carried into
 /// the lane the run is driven on.
-pub type DoorClock = Box<dyn FnMut() -> Result<TimeMs, AxError> + Send>;
+pub(crate) type DoorClock = Box<dyn FnMut() -> Result<TimeMs, AxError> + Send>;
 
 /// The doors that still owe a renewal, one per room.
 ///
@@ -88,7 +88,7 @@ fn answered(answer: ModelReturn) -> CacheRenewed {
 
 impl RunWorker {
     /// When the next kept door is due, if any is kept.
-    pub fn warm_due(&self) -> Option<u64> {
+    pub(crate) fn warm_due(&self) -> Option<u64> {
         self.warm.next_due()
     }
 
@@ -96,7 +96,7 @@ impl RunWorker {
     /// line per renewal under its room, answered or refused. Only a line
     /// the ledger would not take goes to the diagnostic log, and it does
     /// not stop the city, as a schedule that cannot be read does not.
-    pub fn renew_warm(&mut self, now: TimeMs) {
+    pub(crate) fn renew_warm(&mut self, now: TimeMs) {
         for (room, renewed) in self.warm.renew_due(now.value()) {
             let written = Payload::of(&renewed)
                 .and_then(|line| self.record_at(EventKind::CacheRenewed, room, line));

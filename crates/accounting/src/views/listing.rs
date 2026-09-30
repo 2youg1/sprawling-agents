@@ -88,7 +88,7 @@ mod tests {
     #[test]
     fn the_city_root_lists_the_reserved_subtree_and_the_buildings() {
         let dir = tempfile::tempdir().unwrap();
-        crate::views::tests::founded(dir.path());
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let mut views = Views::new(dir.path());
         let wire::Answer::Listing(answer) = views.answer(&wire::Query::Listing { at: None }) else {
             panic!("Listing answers with a listing");
@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn a_building_lists_its_directories_before_its_files() {
         let dir = tempfile::tempdir().unwrap();
-        crate::views::tests::founded(dir.path());
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let mut views = Views::new(dir.path());
         let hall = Address::parse("hall").unwrap();
         let wire::Answer::Listing(answer) = views.answer(&wire::Query::Listing { at: Some(hall) })

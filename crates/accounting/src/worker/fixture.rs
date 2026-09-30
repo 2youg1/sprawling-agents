@@ -29,7 +29,7 @@ pub(super) use provider::{
 /// nothing, no interpreter and no shell, and no execution engine. A test
 /// that needs a real hand puts that one in: `Hands { reveal, ..hands() }`
 /// or a `with_*` door.
-pub(super) fn hands() -> Hands {
+pub(crate) fn hands() -> Hands {
     Hands {
         vault: gateway::Custodian::in_memory(),
         clock: std::sync::Arc::new(WallClock),
@@ -108,7 +108,7 @@ impl crate::Machine for NoMachine {
 
 /// A city formed with the test hands, adopting nothing: what the
 /// worker's tests stand on (accounting-SPEC.md 12-19).
-pub(super) fn init_city(city_root: &Path) -> Result<InitReport, AxError> {
+pub(crate) fn init_city(city_root: &Path) -> Result<InitReport, AxError> {
     super::genesis::form(city_root, Adopt::Nothing, hands())
 }
 

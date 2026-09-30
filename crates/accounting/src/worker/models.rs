@@ -13,7 +13,7 @@ use super::credentials::dialect_headers;
 
 /// Reaches a chosen model the way the endpoint book describes it: the
 /// dialect's own headers, then `gateway::adapter_for`.
-pub struct GatewayModels;
+pub(crate) struct GatewayModels;
 
 impl crate::ModelFactory for GatewayModels {
     fn build(

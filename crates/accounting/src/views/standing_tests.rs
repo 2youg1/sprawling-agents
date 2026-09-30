@@ -207,7 +207,7 @@ fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {
 fn an_evicted_run_still_answers_its_run_view() {
     use kernel::Ledger;
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::views::tests::founded(dir.path());
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let run_of = |i: u64| RunId::from_bytes(u128::from(i + 1).to_be_bytes());
     let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
@@ -266,7 +266,7 @@ fn an_evicted_run_still_answers_its_run_view() {
 /// the first of them is out of the hot view.
 fn a_city_whose_first_billed_run_was_evicted(root: &std::path::Path) -> Views {
     use kernel::Ledger;
-    let report = crate::views::tests::founded(root);
+    let report = crate::worker::fixture::init_city(root).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
         .unwrap()

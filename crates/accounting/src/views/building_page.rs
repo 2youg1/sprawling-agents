@@ -14,7 +14,7 @@ use kernel::Address;
 /// These files grow for as long as a building works, and the interface
 /// reads them rather than edits them. A cut is stated on the answer, so
 /// a reader who needs the rest knows there is a rest.
-pub const DOC_BYTES_MAX: usize = 64 * 1024;
+pub(crate) const DOC_BYTES_MAX: usize = 64 * 1024;
 
 /// One building, as the files in it say it is.
 ///
@@ -24,7 +24,7 @@ pub const DOC_BYTES_MAX: usize = 64 * 1024;
 /// one projection that reads it: a second parse here would be a second
 /// answer to "what is stuck and why", and only one of them would be
 /// folding the records that say why.
-pub fn read_building(
+pub(crate) fn read_building(
     city_root: &Path,
     addr: &Address,
     plan: crate::plan_view::PlanReading,

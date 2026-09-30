@@ -3,13 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use super::founded;
 use crate::views::Views;
 
 #[test]
 fn a_roadmap_counts_only_the_rows_that_carry_evidence() {
     let dir = tempfile::tempdir().unwrap();
-    founded(dir.path());
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let building = dir.path().join("lab");
     std::fs::create_dir_all(&building).unwrap();
     let evidence = format!("cas:b3-{}", "ab".repeat(32));
@@ -54,7 +53,7 @@ fn a_roadmap_counts_only_the_rows_that_carry_evidence() {
 #[test]
 fn a_roadmap_that_cannot_be_parsed_reports_its_rows_rather_than_a_number() {
     let dir = tempfile::tempdir().unwrap();
-    founded(dir.path());
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let building = dir.path().join("lab");
     std::fs::create_dir_all(&building).unwrap();
     std::fs::write(

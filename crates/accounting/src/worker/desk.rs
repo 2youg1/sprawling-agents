@@ -136,7 +136,7 @@ impl CommandDesk {
     /// Rings `bell` from now on whenever a command is posted or the city
     /// closes. What was posted before is already on the desk, and the
     /// thread that attends it looks there before it first waits.
-    pub fn ring_through(&self, bell: std::sync::mpsc::Sender<Wake>) {
+    pub(crate) fn ring_through(&self, bell: std::sync::mpsc::Sender<Wake>) {
         if let Ok(mut ringing) = self.bell.lock() {
             *ringing = Some(bell);
         }

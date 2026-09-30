@@ -45,7 +45,7 @@ pub struct Memory {
 /// (sprawling-SPEC.md 8-46-3, 8-46-8). Until that card lands, a wider
 /// pool would only park lanes in admission — which moves the queue from
 /// somewhere that can count to somewhere that cannot.
-pub const DRIVING_LANES: u32 = 4;
+pub(crate) const DRIVING_LANES: u32 = 4;
 
 /// The share of physical memory a new run leaves free: one part in
 /// this many. A share rather than a byte count, because a byte count
@@ -56,7 +56,7 @@ const RESERVE_SHARE: u64 = 10;
 /// left behind. The two travel together because neither is anything
 /// without the other — a `Driven` names no run, and a run id says
 /// nothing about what to settle.
-pub struct Arrival {
+pub(crate) struct Arrival {
     pub run: RunId,
     pub(in crate::worker) flown: Flown,
 }
@@ -66,7 +66,7 @@ pub struct Arrival {
 /// Nothing here decides anything: which runs to start and what to do
 /// with one that came home are the caller's, and both of those are
 /// judgements about a plan rather than about a thread.
-pub struct DrivingPool {
+pub(crate) struct DrivingPool {
     lanes: u32,
     /// Handed to each lane: a run comes home on the accounting
     /// thread's one queue, beside the relay requests it wrote.
@@ -115,7 +115,7 @@ impl DrivingPool {
     /// [`Self::start_waiting`] runs whenever a lane comes home: so this
     /// reads zero only when nothing waits either. A change that lets a
     /// drive wait for another reason counts the waiting drives here.
-    pub fn in_flight(&self) -> u32 {
+    pub(crate) fn in_flight(&self) -> u32 {
         u32::try_from(self.running.len()).unwrap_or(u32::MAX)
     }
 
@@ -173,7 +173,7 @@ impl DrivingPool {
     /// out queues behind work that was already waiting.
     ///
     /// Returns each run whose lane would not start, with the refusal.
-    pub fn start_waiting(&mut self) -> Vec<(RunId, AxError)> {
+    pub(crate) fn start_waiting(&mut self) -> Vec<(RunId, AxError)> {
         let mut refused = Vec::new();
         // Memory is read at each start, because every lane started here
         // is a run the next reading has to make room for.

@@ -153,7 +153,7 @@ pub(super) struct Knock {
 /// What one dispatch left behind. Carried rather than re-derived,
 /// because the run that asked for the work has to be told how it ended
 /// and the ledger is not a thing this layer reads back mid-command.
-pub struct Dispatched {
+pub(crate) struct Dispatched {
     pub(super) run: RunId,
     pub(super) addr: Address,
     pub(super) who: String,

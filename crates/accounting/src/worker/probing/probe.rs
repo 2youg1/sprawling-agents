@@ -22,14 +22,14 @@ use kernel::{AxCode, AxError};
 /// timestamp, because two probes built on the same day are still two
 /// probes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProbeId {
+pub(crate) struct ProbeId {
     pub name: String,
     pub version: u32,
 }
 
 /// The questions, in the order they are asked.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Probe {
+pub(crate) struct Probe {
     id: ProbeId,
     questions: Vec<String>,
 }
@@ -109,7 +109,7 @@ impl Probe {
 ///
 /// # Errors
 /// Cannot fail on this fixed list; the `Result` is the constructor's.
-pub fn handoff_probe() -> Result<Probe, AxError> {
+pub(crate) fn handoff_probe() -> Result<Probe, AxError> {
     Probe::new(
         ProbeId {
             name: "handoff".to_owned(),

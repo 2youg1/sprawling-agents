@@ -238,7 +238,7 @@ impl Views {
     ///
     /// # Errors
     /// Propagates a segment the index names that cannot be read.
-    pub fn hold_index(
+    pub(crate) fn hold_index(
         &mut self,
         index: storage::LedgerIndex,
         ledger_dir: &Path,
@@ -260,7 +260,7 @@ impl Views {
 
     /// The first seq this view has not folded: an answer read from here
     /// reflects every record before it.
-    pub fn next_unfolded(&self) -> kernel::Seq {
+    pub(crate) fn next_unfolded(&self) -> kernel::Seq {
         self.next_unfolded
     }
 
