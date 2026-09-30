@@ -51,6 +51,14 @@ pub(crate) fn run(root: &Path, crate_name: Option<&str>) -> Result<String, Xtask
             path.to_string_lossy()
         ));
     }
+    std::fs::write(&path, skeleton(name)).map_err(|source| XtaskError::Io {
+        path: path.to_string_lossy().into_owned(),
+        source,
+    })?;
+    Ok(format!("created {}", path.to_string_lossy()))
+}
+
+fn skeleton(name: &str) -> String {
     let mut body = format!(
         "# {name}-SPEC.md\n\n> crate：`{name}`。本 SPEC 先于代码存在；实现不多不少地遵守本文。\n\
          > 骨架：apostle-sdd 十七节；按模块分章、每章自足（ARCHITECTURE.md §5）。\n\
@@ -61,11 +69,7 @@ pub(crate) fn run(root: &Path, crate_name: Option<&str>) -> Result<String, Xtask
         body.push_str(section);
         body.push('\n');
     }
-    std::fs::write(&path, body).map_err(|source| XtaskError::Io {
-        path: path.to_string_lossy().into_owned(),
-        source,
-    })?;
-    Ok(format!("created {}", path.to_string_lossy()))
+    body
 }
 
 #[cfg(test)]

@@ -54,14 +54,33 @@ use std::path::Path;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-const EXPECTED: [&str; 4] = [
-    "// This Source Code Form is subject to the terms of the Mozilla Public",
-    "// License, v. 2.0. If a copy of the MPL was not distributed with this",
-    "// file, You can obtain one at https://mozilla.org/MPL/2.0/.",
-    "// Copyright (c) 2026 2youg1 and the sprawling contributors",
+/// The MPL-2.0 notice and the copyright line, without the comment leader
+/// a language puts in front of them; `notice` adds it.
+pub(crate) const NOTICE: [&str; 4] = [
+    "This Source Code Form is subject to the terms of the Mozilla Public",
+    "License, v. 2.0. If a copy of the MPL was not distributed with this",
+    "file, You can obtain one at https://mozilla.org/MPL/2.0/.",
+    "Copyright (c) 2026 2youg1 and the sprawling contributors",
 ];
 
+/// The line comment of a language the header is written in.
+#[derive(Clone, Copy)]
+pub(crate) enum Leader {
+    Rust,
+    Lean,
+}
+
+/// The four rows as a file in that language spells them.
+pub(crate) fn notice(leader: Leader) -> [String; 4] {
+    let mark = match leader {
+        Leader::Rust => "//",
+        Leader::Lean => "--",
+    };
+    NOTICE.map(|row| format!("{mark} {row}"))
+}
+
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
+    let expected = notice(Leader::Rust);
     let mut violations = Vec::new();
     for file in walk::files_with_ext(root, &["rs"])? {
         let rel = walk::rel(root, &file);
@@ -70,7 +89,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         }
         let text = walk::read_text(&file)?;
         let rows: Vec<&str> = text.lines().map(|l| l.trim_end_matches('\r')).collect();
-        let opens = EXPECTED
+        let opens = expected
             .iter()
             .zip(rows.iter())
             .all(|(want, found)| want == found);
@@ -84,7 +103,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             });
             continue;
         }
-        if let Some(again) = repeated(&rows) {
+        if let Some(again) = repeated(&rows, &expected) {
             violations.push(Violation {
                 gate: "header",
                 location: format!("{rel}:{again}"),
@@ -103,38 +122,43 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 /// The one-based line where the notice begins a second time, if it
 /// does. The first row is enough to find it: the opening comparison has
 /// already established that this file starts with the whole notice.
-fn repeated(rows: &[&str]) -> Option<usize> {
-    let first = EXPECTED.first()?;
+fn repeated(rows: &[&str], expected: &[String; 4]) -> Option<usize> {
+    let first = expected.first()?;
     rows.iter()
         .enumerate()
         .skip(1)
-        .find(|(_, row)| *row == first)
+        .find(|(_, row)| **row == first.as_str())
         .map(|(index, _)| index.saturating_add(1))
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 mod tests {
-    use super::{EXPECTED, repeated};
+    use super::{Leader, notice, repeated};
 
     #[test]
     fn this_file_carries_the_header() {
         let text = include_str!("header.rs");
         let mut lines = text.lines();
-        for want in EXPECTED {
-            assert_eq!(lines.next(), Some(want));
+        for want in notice(Leader::Rust) {
+            assert_eq!(lines.next(), Some(want.as_str()));
         }
     }
 
     #[test]
     fn a_second_copy_is_found_wherever_it_sits() {
-        let once: Vec<&str> = EXPECTED
+        let expected = notice(Leader::Rust);
+        let once: Vec<&str> = expected
             .iter()
-            .copied()
+            .map(String::as_str)
             .chain(["", "//! a module"])
             .collect();
-        assert_eq!(repeated(&once), None);
-        let twice: Vec<&str> = once.iter().copied().chain(EXPECTED).collect();
-        assert_eq!(repeated(&twice), Some(7));
+        assert_eq!(repeated(&once, &expected), None);
+        let twice: Vec<&str> = once
+            .iter()
+            .copied()
+            .chain(expected.iter().map(String::as_str))
+            .collect();
+        assert_eq!(repeated(&twice, &expected), Some(7));
     }
 }
