@@ -209,15 +209,58 @@ pub(crate) enum Ending {
 /// white space become one, and a name past [`LABEL_MOST`] characters is
 /// cut there and ends in `…`.
 pub(crate) fn label(raw: &str) -> String {
-    raw.to_owned()
+    let cleaned: String = raw
+        .chars()
+        .map(|character| {
+            if character.is_control() {
+                ' '
+            } else {
+                character
+            }
+        })
+        .collect();
+    let joined = cleaned.split_whitespace().collect::<Vec<&str>>().join(" ");
+    if joined.chars().count() <= LABEL_MOST {
+        return joined;
+    }
+    let mut cut: String = joined.chars().take(LABEL_MOST).collect();
+    cut.push('…');
+    cut
 }
 
 /// The outline: one line per element, indented two spaces per level of
 /// depth, and a last line saying why the walk stopped when it stopped
 /// early. The same lines always fold to the same bytes.
 pub(crate) fn fold<'a>(lines: impl IntoIterator<Item = Line<'a>>, ending: &Ending) -> String {
-    let _unread = (lines.into_iter().count(), ending);
-    String::new()
+    let mut out = String::new();
+    for line in lines {
+        for _level in 0..line.depth {
+            out.push_str("  ");
+        }
+        out.push_str(line.reference);
+        out.push(' ');
+        out.push_str(line.role.word());
+        if !line.name.is_empty() {
+            out.push_str(" \"");
+            out.push_str(line.name);
+            out.push('"');
+        }
+        out.push('\n');
+    }
+    match ending {
+        Ending::Whole => {}
+        Ending::RefLimit { most } => {
+            out.push_str(&format!(
+                "… stopped at {most} refs, the most one snapshot mints\n"
+            ));
+        }
+        Ending::Fault(why) => {
+            out.push_str(&format!(
+                "… stopped early: {why}; nothing below this line was read\n"
+            ));
+        }
+    }
+    out
 }
 
 #[cfg(test)]

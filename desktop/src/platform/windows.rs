@@ -54,6 +54,7 @@ mod views;
 use serde_json::{Value, json};
 
 use crate::answer::Answer;
+use crate::outline::{self, Line};
 use crate::refusal::{Refusal, RefusalCode};
 use crate::scope::Admitted;
 use crate::tools::ToolName;
@@ -102,7 +103,7 @@ impl Desk {
         self.pixels.as_ref().map_err(Clone::clone)?;
         match tool {
             ToolName::Windows => listing(arguments, admitted).map(|facts| Answer::facts(&facts)),
-            ToolName::Snapshot => self.snapshot(arguments).map(|facts| Answer::facts(&facts)),
+            ToolName::Snapshot => self.snapshot(arguments),
             ToolName::Act => self.act(arguments).map(|facts| Answer::facts(&facts)),
             ToolName::Screenshot => screenshot(arguments),
             ToolName::Record => self.record(arguments).map(|facts| Answer::facts(&facts)),
@@ -110,9 +111,9 @@ impl Desk {
         }
     }
 
-    /// `desktop.snapshot`: one window's tree, and the generation the
-    /// refs in it belong to.
-    fn snapshot(&mut self, arguments: &Value) -> Result<Value, Refusal> {
+    /// `desktop.snapshot`: one window's tree as an outline, and the
+    /// generation the refs in it belong to.
+    fn snapshot(&mut self, arguments: &Value) -> Result<Answer, Refusal> {
         let window = resolved(arguments)?;
         let depth = whole(arguments, "depth")?.unwrap_or(DEFAULT_DEPTH);
         let reader = match self.reader.take() {
@@ -121,26 +122,27 @@ impl Desk {
         };
         let read = reader.read(&window.handle, depth);
         self.reader = Some(reader);
-        let nodes = read?.nodes;
-        let described: Vec<Value> = nodes
-            .iter()
-            .map(|node| {
-                json!({
-                    "ref": node.reference,
-                    "role": node.role.word(),
-                    "name": node.name,
-                    "depth": node.depth,
-                    "bounds": node.bounds.as_json(),
-                })
-            })
-            .collect();
-        let generation = self.views.mint(sight(&window), nodes);
-        Ok(json!({
-            "title": window.named.title,
-            "process": window.named.process,
-            "generation": generation,
-            "nodes": described,
-        }))
+        let walked = read?;
+        let text = outline::fold(
+            walked.nodes.iter().map(|node| Line {
+                reference: &node.reference,
+                role: node.role,
+                name: &node.name,
+                depth: node.depth,
+            }),
+            &walked.ending,
+        );
+        // The rectangles stay here, where `desktop.act` looks a ref up;
+        // a model has no use for them (desktop-SPEC.md section 12.10 (b)).
+        let generation = self.views.mint(sight(&window), walked.nodes);
+        Ok(Answer::outline(
+            text,
+            &json!({
+                "title": window.named.title,
+                "process": window.named.process,
+                "generation": generation,
+            }),
+        ))
     }
 
     /// `desktop.act`: one action, at a ref from a snapshot or at a point

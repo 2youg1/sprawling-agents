@@ -117,11 +117,13 @@ pub(crate) fn table() -> Vec<ToolCard> {
         },
         ToolCard {
             name: ToolName::Snapshot,
-            description: "Read the accessibility tree of one named window: role, name, ref and \
-                 bounds per node, with a generation number that `desktop.act` carries back, \
-                 which stops being accepted once the window is snapshotted again, moves or \
-                 changes size. It does not return pixels, it does not expose native handles, and it does not read \
-                 a window the scope file leaves out."
+            description: "Read one named window as an outline: one line per element, its ref, \
+                 role and name, indented by depth and in the order the window lists them, then \
+                 a line with the window's title, process and the generation number \
+                 `desktop.act` carries back, which stops being accepted once the window is \
+                 snapshotted again, moves or changes size. It does not return pixels or \
+                 positions, it does not expose native handles, and it does not read a window the \
+                 scope file leaves out."
                 .to_owned(),
             schema: json!({
                 "type": "object",

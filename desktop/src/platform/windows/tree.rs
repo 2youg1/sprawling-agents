@@ -36,7 +36,7 @@ use winsafe::guard::CoUninitializeGuard;
 use super::fault;
 use super::geometry::Bounds;
 use super::views::{MOST_REFS_PER_SNAPSHOT, Node};
-use crate::outline::{Ending, Role};
+use crate::outline::{self, Ending, Role};
 use crate::refusal::Refusal;
 
 /// What one desk reads trees with.
@@ -164,45 +164,90 @@ impl Branches for Reader {
         })
     }
 
+    /// No list longer than the most refs one snapshot mints is read in
+    /// full: the snapshot could not mint refs for the rest of it.
     fn children(&self, parent: &UIElement) -> Result<Vec<UIElement>, String> {
         let mut found: Vec<UIElement> = Vec::new();
-        let mut next = self.walker.get_first_child(parent).ok();
+        let mut next = listed(self.walker.get_first_child(parent))?;
         while let Some(child) = next {
             if found.len() >= MOST_REFS_PER_SNAPSHOT {
                 break;
             }
-            next = self.walker.get_next_sibling(&child).ok();
+            next = listed(self.walker.get_next_sibling(&child))?;
             found.push(child);
         }
         Ok(found)
     }
 }
 
+/// One step along a list of elements: the next one, the end of the
+/// list, or a fault.
+///
+/// The walker answers "there is no such element" as an error whose code
+/// is zero, which is how the binding spells a call that succeeded with
+/// nothing to hand back; that is the end of a list. Any other code is
+/// the element's provider failing, and reading it as the end would hand
+/// a model a tree that looks whole and is not (desktop-SPEC.md section
+/// 12.10).
+fn listed(step: uiautomation::Result<UIElement>) -> Result<Option<UIElement>, String> {
+    match step {
+        Ok(element) => Ok(Some(element)),
+        Err(err) if err.code() == 0 => Ok(None),
+        Err(err) => Err(format!(
+            "an element would not list what it holds ({})",
+            err.message()
+        )),
+    }
+}
+
 /// The bounded walk, and the only place a ref is minted.
+///
+/// Document order: a parent before what it holds, and siblings in the
+/// order the tree lists them, so the outline reads the window top to
+/// bottom. A frame nobody named costs no ref and hides nothing: its
+/// children are read as if it were not there.
 pub(crate) fn walk<T: Branches>(tree: &T, root: T::Element, depth: u32) -> Walked {
     let mut nodes: Vec<Node> = Vec::new();
     let mut frontier: Vec<(T::Element, u32)> = vec![(root, 0)];
     while let Some((element, level)) = frontier.pop() {
         if nodes.len() >= MOST_REFS_PER_SNAPSHOT {
-            break;
+            return Walked {
+                nodes,
+                ending: Ending::RefLimit {
+                    most: MOST_REFS_PER_SNAPSHOT,
+                },
+            };
         }
         if let Some(seen) = tree.seen(&element) {
-            nodes.push(Node {
-                reference: format!("e{}", nodes.len().saturating_add(1)),
-                role: seen.role,
-                name: seen.name,
-                bounds: seen.bounds,
-                depth: level,
-            });
+            let name = outline::label(&seen.name);
+            if !(name.is_empty() && seen.role.frames()) {
+                nodes.push(Node {
+                    reference: format!("e{}", nodes.len().saturating_add(1)),
+                    role: seen.role,
+                    name,
+                    bounds: seen.bounds,
+                    depth: level,
+                });
+            }
         }
         if level >= depth {
             continue;
         }
-        let Ok(children) = tree.children(&element) else {
-            continue;
-        };
-        for child in children {
-            frontier.push((child, level.saturating_add(1)));
+        match tree.children(&element) {
+            // Pushed last to first, so the first child is the next
+            // popped.
+            Ok(children) => frontier.extend(
+                children
+                    .into_iter()
+                    .rev()
+                    .map(|child| (child, level.saturating_add(1))),
+            ),
+            Err(why) => {
+                return Walked {
+                    nodes,
+                    ending: Ending::Fault(why),
+                };
+            }
         }
     }
     Walked {
@@ -211,7 +256,7 @@ pub(crate) fn walk<T: Branches>(tree: &T, root: T::Element, depth: u32) -> Walke
     }
 }
 
-/// The word a control type is. A match with no fallback, so a type the
+// The word a control type is. A match with no fallback, so a type the
 /// binding adds is a compile error here rather than a silent default.
 fn role(control: ControlType) -> Role {
     match control {

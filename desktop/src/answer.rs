@@ -50,6 +50,22 @@ impl Answer {
         }
     }
 
+    /// An outline of a window, then the facts about it: the outline
+    /// comes first because it is what was asked for, and it travels as
+    /// the text it already is rather than as a JSON string of it.
+    #[cfg_attr(
+        not(any(windows, test)),
+        expect(
+            dead_code,
+            reason = "the non-Windows arm refuses every call, so it builds no answer"
+        )
+    )]
+    pub(crate) fn outline(outline: String, facts: &Value) -> Answer {
+        Answer {
+            blocks: vec![Block::Text(outline), Block::Text(facts.to_string())],
+        }
+    }
+
     /// A picture, then the facts about it: the image block comes first
     /// because it is what was asked for, and the text beside it says
     /// what the picture is.
@@ -107,6 +123,18 @@ mod tests {
             json!({ "content": [
                 { "type": "image", "data": "iVBORw==", "mimeType": "image/png" },
                 { "type": "text", "text": "{\"height\":1,\"lossless\":true,\"title\":\"a.txt\",\"width\":1}" },
+            ]})
+        );
+    }
+
+    #[test]
+    fn an_outline_travels_as_its_own_text_before_its_facts() {
+        assert_eq!(
+            Answer::outline("e1 window \"w\"\n".to_owned(), &json!({ "generation": 1 }))
+                .as_result(),
+            json!({ "content": [
+                { "type": "text", "text": "e1 window \"w\"\n" },
+                { "type": "text", "text": "{\"generation\":1}" },
             ]})
         );
     }
