@@ -52,7 +52,9 @@
 
 ## 4 现状分析
 
-公开面见 `tools/xtask/api-baselines/channels.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
+公开面见 `tools/xtask/api-baselines/wire.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
+
+**已定而未落的改形。** 下列改形落地时按 §12.1 进位：`Note::Fenced` 改名 `Note::Checkpointed`（线上 `"fenced"` 变 `"checkpointed"`）；`Sample.view_backlog: u64`（已提交、发布出去的视图还没折进的记录条数）；`Turn.first_at`；`Call` 与 `Turn` 带出「这一刻是否量过」；`CommitAnswer` 的 `previous`、`parents` 与提交说明；`Call.effect`、`Call.render`；`Output.pinned`；`Dispatch.mode` 收成 `chat`／`work`，以及运行策略、写入限制 `Create`、准入证据的字段；身份、导入、保存回执与上手进度的线面；城一级配置的写入口与 `PreferencePatch` 的 `[core] priority` 一臂；`ModelTag` 的 OCR 一值。下列新名字只动名字表，哈希随之变，不另进位：`PutRules`、自动化只读查询、按房间列出 session 的查询、从检查点取回单个文件的命令。每落一项删一项。
 
 ## 5 权威信源
 
@@ -268,7 +270,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 - **无界队列而非 `broadcast`**：一条拒绝丢不得，而它的量级是「人点错的次数」，不是事件流量。
 - **未做且已知**：`/enroll` 路由同病。它同步答 201，而 `PutSecret` 是投递到同一张桌子的，工人的拒绝到不了 HTTP 响应。此处**不顺手改**，因为桌子在一次 dispatch 期间不被读取，把 HTTP 请求做成同步等待会让它挂上几分钟；正确的形状是有界等待加 202，随 `sprawling enrol` 一并落。
 
-**Query 的答面**。`ServeConfig.queries: Arc<dyn Fn(Query) -> Result<Answer, AxError> + Send + Sync>`，同步；`ServerFrame` 增 `Answer(Box<Answer>)` 变体。答面类型住 `frames`：`Answer`（City／Run／Approvals／Cost／Unavailable）、`RunSummary`、`CityAnswer`、`ApprovalsAnswer`、`CostAnswer`。
+**Query 的答面**。`ServeConfig.queries: Arc<dyn Fn(Query) -> Result<Answer, AxError> + Send + Sync>`，同步；`ServerFrame` 增 `Answer(Box<Answer>)` 变体。答面类型住 `answer`：`Answer`（City／Run／Approvals／Cost／Unavailable）、`RunSummary`、`CityAnswer`、`ApprovalsAnswer`、`CostAnswer`。
 
 **`Query::BuildingView { addr }` → `Answer::Building(Box<BuildingAnswer>)`**（`BuildingDoc`／`ArchiveLine` 随之入 wire）。楼里的文件是楼的记忆，服务端在被问的那一刻读盘——**文件是权威**，另存一份索引就是第二个权威。`QUERY_NAMES` 因此从 10 增到 11，schema 哈希随之从 `238f11b2…` 变为 `85705c03…`：客户端与服务端同批发布，旧页面会在握手期被明确拒绝并提示刷新。
 
@@ -412,6 +414,16 @@ WireCommand::Dispatch { addr, task, goal, mode, idem, session: Option<SessionNam
 - **`E_CONFIG_INVALID`**：不可——绑定非回环而无令牌必须在**启动时**拒绝，这是配置判定不是请求判定。
 - **没有 signal-unknown 码**：握手的 schema 哈希保证同一连接的两端共享同一份词汇，一个本版本不认的 Signal 种类只能来自更新的二进制写的 Ledger，而那已由版本方向门拒在外面（collab-SPEC §8-1）。
 
+### 12.1 `WIRE_V` 在两次推送之间最多进一位，进在第一个改形的提交
+
+**决定**：握手要保证的只有一件事：两份可能相遇的构建，只要线上语法不同，`(WIRE_V, schema_hash())` 就不同。`schema_hash()` 已经吃进命令名、查询名与事件种类名（§8-1、§8-16），所以增删、改名、调序一个 `Command`／`Query` 变体或一个 `EventKind`，哈希自己会变，`WIRE_V` 不为此进位。名字都不变而形状变了——答面或既有帧加字段、一个枚举换词或加值（`Mode`、`ModelTag`、`Note` 这类）、`ServerFrame` 加一臂——哈希不变，`WIRE_V` 必须进位。进位按推送计：上一次推送之后，第一个名字不变而改形的提交把 `WIRE_V` 加一，此后到下一次推送之前的改形共用这个值；推送之后再遇到改形，再进一位。
+
+**理由**：会相遇的构建在人手上：发布版与推送过的 `main`。一个由构建 X 送出的页面连到构建 Y 的服务端，只发生在人换了二进制而页面还开着或缓存着的时候；没推送的中间提交只在开发机上跑，彼此不会各自服务一个人的页面。进在第一个改形的提交而不是推送前收尾：收尾才进，中间各树会以上一次推送的号放行语法不同的旧页面。改形只由一个写者按次序落地：两条并行分支各自进位，曾让两份语法不同的构建共用一个号、互相通过握手。
+
+**被否**：①每个改形的提交各进一位：更严，但一次推送带出几个号只取决于提交怎么切，读者从号上读不出任何东西；②推送前统一进位：理由见上；③改名也进位：哈希已经拒掉旧页面，多进一位不多拒任何页面。
+
+**守护**：`tests/wire_contract.rs` 钉住去掉文档文字之后的 `wire_schema()` 摘要。改形即红，失败信息写出本条；改的人据此判断这一次要不要进位，再更新摘要。它不判断该不该进位，那取决于上一次推送之后是否已经进过一位。
+
 ## 13 依赖选型
 
 | 依赖 | 用途 | 依据与替代 |
@@ -432,7 +444,7 @@ WireCommand::Dispatch { addr, task, goal, mode, idem, session: Option<SessionNam
 
 ## 15 影响面
 
-- 改 `Command`／`Query`／帧：`WIRE_V` 与 schema golden 同变，`client/src/wire.ts` 重新生成（`cargo xtask wire-ts`），`crates/sprawling` 的处理器穷尽匹配随之改，§19-2 的 reach 表增删一行（`xtask wiring`）。
+- 改 `Command`／`Query`／帧：名字变了，schema golden 随之变；名字不变而形状变了，按 §12.1 进 `WIRE_V`；`client/src/wire.ts` 重新生成（`cargo xtask wire-ts`），`crates/sprawling` 的处理器穷尽匹配随之改，§19-2 的 reach 表增删一行（`xtask wiring`）。
 - 改 `ServeConfig`：波及 `crates/sprawling` 的 `serve` 装配点。
 
 ## 16 测试与约束

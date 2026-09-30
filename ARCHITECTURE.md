@@ -480,7 +480,7 @@ the part worth knowing before starting, not after.
 | To change this | Go here | Held by |
 |---|---|---|
 | a new event kind, or a payload | `kernel::event` + kernel-SPEC | the kind set is closed; `storage` fixtures compare bytes across platforms |
-| a new `Command` or `Query` frame | `wire::frames` + wire-SPEC | `WIRE_V` must rise, and every `Query` must be answered or it does not compile |
+| a new `Command` or `Query` frame | `wire::frames` + wire-SPEC | the new name moves the schema hash, so an older page is refused at the handshake; `WIRE_V` rises only when a frame changes shape while every name stays (wire-SPEC §12.1); every `Query` must be answered or it does not compile |
 | what a model may call | `runtime::catalog`, tools in `runtime` or `collab` | `kernel::tool` is the seam; a tool with no conformance suite is not a seam |
 | how a provider is spoken to | `gateway::dialect` + gateway-SPEC | a pure two-way translation with the canonical shape in the middle |
 | how a key is kept and redeemed | `gateway::credential` | plaintext may reach only the platform vault; `secret` gate reads every boundary |
