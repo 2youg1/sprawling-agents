@@ -126,6 +126,27 @@ fn an_spdx_expression_is_read_the_way_cargo_deny_reads_it() {
     );
 }
 
+/// Parentheses group before an `OR` splits them, `WITH` binds its
+/// exception to one licence, and an expression that does not parse is a
+/// licence nobody stated (xtask-SPEC.md section 8-12).
+#[test]
+fn parentheses_group_before_an_or_splits_them() {
+    let permitted: BTreeSet<String> = [
+        "MIT".to_owned(),
+        "Apache-2.0".to_owned(),
+        "Zlib".to_owned(),
+        "Apache-2.0 WITH LLVM-exception".to_owned(),
+    ]
+    .into();
+    assert!(!allowed("(MIT OR Apache-2.0) AND GPL-3.0", &permitted));
+    assert!(allowed("(MIT AND Zlib)", &permitted));
+    assert!(allowed("MIT OR (GPL-3.0 AND Apache-2.0)", &permitted));
+    assert!(allowed("Apache-2.0 WITH LLVM-exception", &permitted));
+    assert!(!allowed("GPL-3.0 WITH LLVM-exception", &permitted));
+    assert!(!allowed("(MIT OR Apache-2.0", &permitted));
+    assert!(!allowed("MIT AND", &permitted));
+}
+
 /// The allowlist has one home. A second copy inside this gate would let
 /// the two sides of the tree carry different licences and call both
 /// green.
