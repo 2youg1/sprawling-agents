@@ -23,7 +23,7 @@ release notes and their commits.
 **sprawling 0.0.7 citior (pre-alpha)**
 
 Pre-alpha. It records what landed in the repository after
-`v0.0.6-Pre-alpha-260922`. WIRE_V <!-- xtask:begin wire_v -->44<!-- xtask:end -->.
+`v0.0.6-Pre-alpha-260922`. WIRE_V <!-- xtask:begin wire_v -->45<!-- xtask:end -->.
 
 This section quotes no wall-clock figure. The measurements that would price
 this release's changes are taken after it, so the entries below say what the
