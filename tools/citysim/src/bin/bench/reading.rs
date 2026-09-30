@@ -155,10 +155,11 @@ impl Reading {
     /// The reading line: fixed key order, integer microseconds.
     pub(crate) fn line(&self) -> String {
         format!(
-            "perf load={} sub={} machine_class={} samples={} floor_us={} p50_us={} p95_us={} p99_us={}",
+            "perf load={} sub={} machine_class={} fixture={} samples={} floor_us={} p50_us={} p95_us={} p99_us={}",
             self.load.as_str(),
             self.sub.as_str(),
             self.taken.machine.as_str(),
+            citysim::fixture_label(&self.taken.fixture),
             self.samples,
             self.floor.as_micros(),
             self.p50.as_micros(),
