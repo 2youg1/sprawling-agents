@@ -362,6 +362,45 @@ mod tests {
         assert_eq!(rows[0].unit.spell(390), "390 packages");
     }
 
+    /// The package count is printed beside its row with its reading,
+    /// and no count, however large, is a finding (xtask-SPEC.md section
+    /// 8-25).
+    #[test]
+    fn a_package_count_is_reported_beside_its_row_and_refused_by_nothing() {
+        let root = std::env::temp_dir().join(format!("xtask-budget-count-{}", std::process::id()));
+        if root.exists() {
+            std::fs::remove_dir_all(&root).unwrap();
+        }
+        let write = |path: &str, text: &str| crate::root::fixture::write(&root, path, text);
+        write("Cargo.toml", "[profile.release]\nopt-level = \"z\"\n");
+        write(
+            REGISTER,
+            "[dependency_count]\n\
+             what = \"packages in Cargo.lock once every transitive dependency is resolved, workspace members included\"\n\
+             measured_by = \"cargo xtask budget (budget::lockfile_packages)\"\n\
+             status = \"reported, not gated: the person's ruling\"\n",
+        );
+        write(
+            "Cargo.lock",
+            "version = 4\n\n[[package]]\nname = \"a\"\n\n[[package]]\nname = \"b\"\n\n[[package]]\nname = \"c\"\n",
+        );
+
+        let refused: Vec<String> = check(&root)
+            .unwrap()
+            .into_iter()
+            .map(|violation| violation.location)
+            .filter(|location| location.starts_with("dependency_count"))
+            .collect();
+        let printed = report(&root).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+
+        assert_eq!(refused, Vec::<String>::new());
+        assert!(
+            printed.contains("dependency_count: 3 \u{2014} reported, not gated"),
+            "the report does not print the reading beside its row:\n{printed}"
+        );
+    }
+
     #[test]
     fn the_shipped_register_names_every_budget_and_each_says_how_it_is_measured() {
         let text = std::fs::read_to_string(crate::root::this_checkout().join(REGISTER)).unwrap();
