@@ -292,6 +292,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         pack: None,
     },
     toolchain::GIT,
+    toolchain::BASH,
     toolchain::RUSTUP,
     toolchain::RUST,
     toolchain::RUSTFMT,

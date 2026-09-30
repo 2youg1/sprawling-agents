@@ -863,6 +863,10 @@
     "en": "not asked",
     "zh": "没能问到"
   },
+  "machine_enables_bash": {
+    "en": "just, which runs every recipe of this repository in bash",
+    "zh": "just，这个仓库的每一个配方都在 bash 里跑"
+  },
   "machine_enables_bun": {
     "en": "just build-web and the client's checks, which the artifact gates judge",
     "zh": "just build-web 与客户端自己的检查，产物门要看它们的结果"

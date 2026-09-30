@@ -1,5 +1,6 @@
 # generated from crates/sprawling/src/doctor/table.rs by `table::prereqs`; edit the table, not this file
 required	git	command -v git	winget install --id Git.Git -e --scope user	brew install git	sudo apt install git	version control for this repository, and restoring a discarded file from its checkpoint
+required	bash	bash --version | grep -q '^GNU bash'	manual: run `just` from Git Bash, which the git row installs: its own bash comes first there, while elsewhere C:\Windows\System32\bash.exe can come first and starts WSL rather than a shell	brew install bash	sudo apt install bash	`just`, which runs every recipe of this repository in bash
 required	rustup	command -v rustup	winget install --id Rustlang.Rustup -e	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh	cargo and the Rust toolchain rust-toolchain.toml pins, fetched on first use
 required	rust	command -v rustc	rustup default stable	rustup default stable	rustup default stable	the compiler, at the version rust-toolchain.toml pins, which rustup fetches on first use
 required	rustfmt	command -v rustfmt	rustup component add rustfmt	rustup component add rustfmt	rustup component add rustfmt	`cargo fmt --check`, the first step of `just check`

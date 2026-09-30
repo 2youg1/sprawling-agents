@@ -119,6 +119,35 @@ pub(super) const GIT: Requirement = row(
 )
 .from(Upstream::GitHub("git-for-windows/git"));
 
+/// The shell every recipe of this repository runs in: the `justfile`
+/// opens with `set shell := ["bash", "-uc"]`. The listing asks for the
+/// line only a real bash prints, so the WSL launcher a Windows search
+/// path can resolve first is reported as absent, which is what `just`
+/// would meet (sprawling-SPEC.md 8-130).
+pub(super) const BASH: Requirement = row(
+    "bash",
+    Need::Required,
+    "`just`, which runs every recipe of this repository in bash",
+    Detection::Listed {
+        program: "bash",
+        args: &["--version"],
+        line: "GNU bash",
+    },
+    "https://www.gnu.org/software/bash/",
+    PerPlatform {
+        windows: Recipe::Manual(concat!(
+            "run `just` from Git Bash, which the git row installs: its own bash comes first ",
+            r"there, while elsewhere C:\Windows\System32\bash.exe can come first and starts ",
+            "WSL rather than a shell",
+        )),
+        macos: Recipe::Command {
+            program: "brew",
+            args: &["install", "bash"],
+        },
+        linux: Recipe::Print("sudo apt install bash"),
+    },
+);
+
 pub(super) const RUSTUP: Requirement = row(
     "rustup",
     Need::Required,
