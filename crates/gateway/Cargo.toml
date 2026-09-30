@@ -19,9 +19,6 @@ reqwest = { workspace = true }
 # Named for one call: `reach::tls` installs aws-lc-rs as the process's
 # rustls provider before any client is built (gateway-SPEC 8-15).
 rustls.workspace = true
-# Chooses the Unicode backend of the `idna` crate reqwest's URL parser
-# uses (gateway-SPEC section 13); no code names it.
-idna_adapter.workspace = true
 # Custody: platform credential service binding + zeroizing storage.
 # keyring-core carries the entry and its errors; each target names its
 # own store below (gateway-SPEC 8-4, section 12 says why not `keyring`).
@@ -64,8 +61,3 @@ proptest.workspace = true
 
 [lints]
 workspace = true
-
-[package.metadata.unused]
-# idna_adapter chooses idna's Unicode backend by its version line; no
-# code names it (xtask-SPEC.md section 8-37).
-pins = ["idna_adapter"]

@@ -150,13 +150,6 @@ reqwest = { version = "0.13", default-features = false, features = [
     # this adds no package to the lock.
     "socks",
 ] }
-# Which Unicode backend `idna` uses is decided by the version line of
-# this crate in the lockfile: 1.1 is unicode-rs, 1.2 is ICU4X. 1.1 keeps
-# about eighteen ICU4X packages out of the tree, and an ASCII host name -
-# every provider this city calls - takes idna's ASCII fast path and never
-# reaches the backend. Named by no code: gateway lists it under
-# `[package.metadata.unused] pins` (gateway-SPEC section 13).
-idna_adapter = "~1.1"
 # The bin's build script gzips the client bundle it embeds; xtask weighs
 # the same artifacts. One version authority for both.
 flate2 = "1"

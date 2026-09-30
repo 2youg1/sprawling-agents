@@ -448,7 +448,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 - `reqwest`（workspace 依赖，`default-features = false`，features 以根 `Cargo.toml` 为准：`blocking`／`rustls-no-provider`／`json`／`http2` 等）——TLS 钉 rustls；blocking 理由见 §8.5；后端由 `reach::tls` 装（§8-15）。
 - `keyring-core = "1"`，与按目标平台声明的 `windows-native-keyring-store`（关默认 feature，不要 `search`）、`apple-native-keyring-store`（feature `keychain`）、`linux-keyutils-keyring-store`——平台凭证服务绑定；全部 MIT OR Apache-2.0。理由见 §12。
 - `rustls`（workspace 依赖，`default-features = false`，feature `std`／`tls12`／`aws_lc_rs`）——只为点名进程的加密后端（§8-15）；它本就经 reqwest 在锁里。
-- `idna_adapter = "~1.1"`（workspace 依赖；代码不点名，清单的 `[package.metadata.unused] pins` 写明）——`url` 经 `idna` 规整主机名，`idna` 按锁里 `idna_adapter` 的版本线选 Unicode 后端：1.1 线是 unicode-rs，1.2 线是 ICU4X。选 1.1：锁里少约 18 个 ICU4X 的包；一个 ASCII 主机名走 `idna` 的 ASCII 快路径，整段不进后端，所以城真正会连的那些主机不受影响；上游所说「体积更大、运行更慢」只落在非 ASCII 主机名上，发行二进制的体积差在合入前实测。被否的备选：留在 ICU4X（多约 18 个包、多一套只为国际化域名存在的数据栈）；1.0 的空后端（拒绝非 ASCII 域名，上游明说不推荐）。**重开参数**：发行二进制因它增长超过 64 KiB，或出现一个本就需要 ICU4X 的直接依赖。
+- **`idna` 的 Unicode 后端留在 ICU4X，不钉 `idna_adapter`。** `url` 经 `idna` 规整主机名，`idna` 按锁里 `idna_adapter` 的版本线选后端：1.2 线是 ICU4X，1.1 线是 unicode-rs；本 workspace 不点名 `idna_adapter`，锁取 1.2 线。理由：发行二进制的体积在 64 KiB 以内才换后端，而实测换到 unicode-rs 使它增长 126,976 B（`just build-web` 后 `cargo build --release -p sprawling --features sprawling/sandbox --locked`，13,138,432 B 到 13,265,408 B，windows-x86_64）。被否的备选：`idna_adapter = "~1.1"`（unicode-rs）——锁里少 16 个包，一个 ASCII 主机名走 `idna` 的 ASCII 快路径不进后端，但二进制增长超过上限；1.0 的空后端——拒绝非 ASCII 域名，上游明说不推荐。**重开参数**：unicode-rs 一侧的体积差回到 64 KiB 以内，或 ICU4X 一侧出现一条只能靠换后端清掉的公告。
 - `secrecy`／`zeroize`：workspace 既钉。serde_json：wire 面。
 - **不引 tokio**：理由见 §3。
 
