@@ -40,7 +40,7 @@
 
 ## 5 权威信源
 
-自写客户端的四条被逼理由与「流程是代码、情报是数据」；Custody 全节；model 缝（endpoint 生产适配器）；Anthropic Messages API 与 OpenAI Chat Completions API 官方文档（线格式字段名以官方为准）；keyring crate 文档（平台凭证服务绑定）。
+自写客户端的四条被逼理由与「流程是代码、情报是数据」；Custody 全节；model 缝（endpoint 生产适配器）；Anthropic Messages API 与 OpenAI Chat Completions API 官方文档（线格式字段名以官方为准）；`keyring-core` 与三个平台 store crate 的文档（平台凭证服务绑定）。
 
 ## 6 命名统一
 
@@ -54,7 +54,7 @@ Dialect／Endpoint／Custody／Vault／SecretRef／Sealed／Retries／HeaderValu
 dialect（路由，纯函数）◀── endpoint（I/O 适配器，impl kernel::Model）
 dialect ───────────────▶ anthropic／openai（各自一种线格式的两向翻译）
 anthropic／openai ──────▶ mismatch（共用的读取器与拒词；单向，无环）
-credential ──▶ 内缝 Vault（pub(crate) trait：keyring 生产适配器＋会话内存第二适配器）
+credential ──▶ 内缝 Vault（pub(crate) trait：平台凭证库生产适配器＋会话内存第二适配器）
 market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 ```
 
@@ -168,7 +168,7 @@ impl kernel::Model for Endpoint { /* call：ChatRequest（req.chat）→dialect�
 - **组请求五步**：canonical→`request_wire`→逐条应用 overrides（JSON Pointer，后者胜）→认证头兑付（`resolver` 取 `Sealed`，`expose()` 只在写头那一格，写完即 drop 零化）→POST。响应四步：状态码判定（429/5xx→E_PROVIDER 携 retry 语义；4xx→E_PROVIDER 携 provider 错误体摘要）→`response_from_wire`→usage 抽取→`ModelReturn`。
 - **半流中断**：SSE 流截断（连接断／不完整事件）＝`E_PROVIDER`，恒不产部分 ModelReturn；流式读法见 §8-13。
 - **无暗重试**：重试是 watchdog 的决策（上限的唯一表示是 `Retries`，§8-16），endpoint 一次调用恰一次 HTTP 往返；幂等由调用方 IdemKey dedup 看守。
-- base_url＝完整端点 URL（逐字段哲学，不拼路径）；`EndpointConfig.pricing: Option<ModelEntry>` 让结算在适配器内完成，`ModelReturn` 因此携 usage／stop／billed 入账（kernel-SPEC §8-24；权威额线上无标准槽位，现行恒 PriceSheet 源）；TLS 取 reqwest 0.13 的 `rustls` feature。
+- base_url＝完整端点 URL（逐字段哲学，不拼路径）；`EndpointConfig.pricing: Option<ModelEntry>` 让结算在适配器内完成，`ModelReturn` 因此携 usage／stop／billed 入账（kernel-SPEC §8-24；权威额线上无标准槽位，现行恒 PriceSheet 源）；TLS 取 rustls，加密后端由 `reach::tls` 在造客户端前装好（§8-15）。
 - `.expose(` 白名单（`tools/xtask/src/secret.rs` 的 `EXPOSE_WHITELIST`，全表以它为准）：gateway 侧的合法出现点只有 `endpoint/call.rs`（端点调用）。**两种凭证在同一句里写上线**：`authorize` 既写注册带的那条，也写人在自定义头里放的 `HeaderValue::Redeemed`；三个请求写入点（`call`、`stream`、`list_models`）都只调它，谁都不自己遍历 `extra_headers`。
 - **`Endpoint` 的字段不出 `endpoint/`**：`config`／`client`／`redemption` 是 `pub(super)`；`transcribe` 走 `post_bytes` 与 `model()`。于是「一次 POST 如何发出、非 2xx 如何变成 `AxError`、对侧正文如何不被回显」在本 crate 里只有一份答案。转写面仍保留它自己那句恢复语（`rewrite_recovery`）：线上出了什么事是端点的事，人接下来能做什么是设施的事。
 
@@ -232,9 +232,10 @@ impl Custodian {
 }
 ```
 
-- **生产适配器＝keyring crate（Windows Credential Manager／macOS Keychain／Linux 内核 keyring），兜底＝会话内存 BTreeMap（测试面同用）**；一个城把秘密写进哪一家，由 `Store` 一处命名。探针只试平台服务，失败即落到内存。**加密文件是第三家，带在类型里而尚无探针选它**：打开它的口令要在启动时向人要，那条接线是另一件事（§8-21）。
+- **生产适配器＝操作系统的凭证库（Windows Credential Manager／macOS Keychain／Linux 内核 keyring），经 keyring 生态第 4 代接入：`keyring-core` 给出 `Entry` 与错误类型，每个目标平台各一个 store crate（`windows-native-keyring-store`、`apple-native-keyring-store` 的 `keychain` 模块、`linux-keyutils-keyring-store`）；兜底＝会话内存 BTreeMap（测试面同用）**；一个城把秘密写进哪一家，由 `Store` 一处命名。探针只试平台服务，失败即落到内存。**加密文件是第三家，带在类型里而尚无探针选它**：打开它的口令要在启动时向人要，那条接线是另一件事（§8-21）。
+- **一个引用在凭证库里叫什么，只在 `credential::vault::platform` 定一次，且沿用第 3 代写下的名字。** 引用 `secret:<realm>/<name>` 取 service＝`sprawling/<realm>`、user＝`<name>`。Windows 上凭证的 target name 是 `<name>.sprawling/<realm>`，Linux 上 keyutils 的 description 是 `keyring-rs:<name>@sprawling/<realm>`，macOS 上就是 service 与 account 两个字段。前两者由 store 的显式修饰（`target`、`description`）给出，不交给 store 的默认拼法：第 4 代的 Linux store 默认拼 `keyring:<user>@<service>`，前缀与第 3 代不同，升级一次就会让人存过的 key 读成「从来没配过」；Windows store 的默认今天与第 3 代相同，写成显式修饰是为了让名字只有这一处权威，而不是跟着上游的默认走。代价：带显式 `target` 新写的 Windows 凭证不填 UserName 字段；查找只按 target name，故读写不受影响。store 每次调用时构造，不设进程级默认 store（`keyring_core::set_default_store`），于是 vault 之外没有代码能在同一进程里改变 key 落在哪里。
 - **一次探测的结论是一个值，不是三个读取口**：哪一家、能留多久、平台服务自己说了什么，三答出自同一次往返——分成三处报就可能说出「平台服务能用」与「重启什么都没了」这一对让人无从下手的答案。`custody()` 从 `describe` 与 `resolve` 所读的那批字段铸出，故它说不出一个两个读口都没在用的 store；`refusal` 是平台服务自己的拒词，它成事时与本城自选时皆 `None`。
-- **Linux 存在内核 keyring，不存在 secret service，理由是发布产物。** 发布的 Linux 归档是一份静态 musl 二进制（`x86_64-unknown-linux-musl`），而 secret service 走 D-Bus，树因此另到 `libdbus-sys`，那要求链接宿主的 glibc D-Bus——一份静态二进制与一个 D-Bus 凭据库不能同时为真。故 keyring 的 Linux 特性取 `linux-native`（keyutils，纯 syscall，不需要会话总线、不需要动态库、容器里同样成立），不取 `sync-secret-service`。代价写在类型上而不是写在注释里：内核 keyring 是内存，重启即清，故 `KeyringVault::PERSISTENCE` 在 Linux 上恒为 `Persistence::ThisBoot`，`SOURCE` 恒为 `kernel-keyring`。
+- **Linux 存在内核 keyring，不存在 secret service，理由是发布产物。** 发布的 Linux 归档是一份静态 musl 二进制（`x86_64-unknown-linux-musl`），而 secret service 走 D-Bus，树因此另到 `libdbus-sys`，那要求链接宿主的 glibc D-Bus——一份静态二进制与一个 D-Bus 凭据库不能同时为真。故 Linux 的 store 取 `linux-keyutils-keyring-store`（keyutils，纯 syscall，不需要会话总线、不需要动态库、容器里同样成立），不取 secret service 的两个 store；`keyring` 包自己的默认 feature `v1` 在 Linux 上选的正是 zbus 的 secret service，这是本 crate 直接依赖 `keyring-core` 与各 store、而不依赖 `keyring` 的原因之一（§12）。代价写在类型上而不是写在注释里：内核 keyring 是内存，重启即清，故 `KeyringVault::PERSISTENCE` 在 Linux 上恒为 `Persistence::ThisBoot`，`SOURCE` 恒为 `kernel-keyring`。
 - **等级只说一次，凡报它的地方都读同一处。** `Persistence::consequence()` 是「这个等级让人付出什么」的唯一权威句；`describe` 报状态（`source`＋`persistence`），`resolve` 未命中时把这句接在 recovery 后面——重启吃掉的 key 因此读作「重启清了内核 keyring，请再输一次」，而不是读作「你从来没配过」。探测成功不产 `provider_degraded`：Linux 上那是健康路径，每次启动报一条假警报只会让这个 kind 没人再读。
 - realm/name 由调用方给定，本模块不生成名字：API key 走 `PutSecret` 命令，名字是人在登记时给的。**恒无计数器命名**——按捕获次序编号会让同一个值每场会话换一个名、两个值跨会话撞同一个名，于是旧账本里的引用兑到别人的凭据。一个值的短名若要由内容导出，口径只有 `runtime::redact::fingerprint` 一处。
 - 环境变量是只读来源（键形 `SPRAWLING_SECRET_<REALM>_<NAME>`）：`describe.writable=false`；`set` 撞遮蔽即拒并指名遮蔽者；读取器可注入（edition 2024 的 set_var 不安全，测试恒不改进程环境）。
@@ -438,11 +439,15 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 - `E_CREDENTIAL_MISSING`／`E_CONFIG_INVALID`：kernel 已有码，语义照 Custody 一节；不新增码。
 - `E_SECRET_EGRESS`：本 crate 不产（出口扫描住 gate::egress 与 checkpoint 面）；endpoint 组请求不做二次扫描（Custody 在入口已换引用，纵深由门守）。
 - **crate 根只再导出有别的 crate 叫得出名字的项。** 一个只在 gateway 内部用、或只在测试里用的项，挂在 crate 根上就是一个没人读的公开面：编译器不再为它报 dead code，于是它在生产里还有没有调用者就没有东西在看。只供测试的项（`response_wire` 一族）放在 `#[cfg(test)]` 后面，不编进发行的二进制。另一种做法是保留再导出、靠审查记住它们没有调用者——那正是让这些项积下来的原因。
+- **TLS 后端的权威是一次调用，不是一个 feature。** 决定：reqwest 取 `rustls-no-provider`，由 `reach::tls::install_provider` 显式安装 aws-lc-rs（§8-15）。理由：reqwest 的 `rustls` feature 顺带打开 `quinn?/rustls-aws-lc-rs`，锁里多出一族从不编译的 quinn；更要紧的是后端藏在一个 feature 名里，远程门与 HTTP 用的是不是同一个 aws-lc-rs，要去读 reqwest 的清单才知道。被否的备选：自建一份 `rustls::ClientConfig`，经 `tls_backend_preconfigured` 交给 reqwest——那要在本 crate 重写 reqwest 已有的平台证书校验与 ALPN 选择，且 reqwest 自己的文档说这条路要求两边 rustls 版本逐一同步，版本一错就是运行期的 unknown TLS backend。
+- **凭证库经 `keyring-core` 与各平台 store 接入，不经 `keyring`。** 决定见 §8-4。理由：`keyring` 第 4 代的默认 feature 在 Linux 上选 secret service，与静态 musl 发行件矛盾；关掉默认 feature 的 `keyring` 只剩一层转发，上游 README 建议应用直接依赖 `keyring-core` 与所需的 store。被否的备选：停在 `keyring` 3——它是锁里 `security-framework` 2 与 `windows-sys` 0.60 两族的来源之一，也不再是上游维护的那条线。
 
 ## 13 依赖选型
 
-- `reqwest`（workspace 依赖，`default-features = false`，features 以根 `Cargo.toml` 为准：`blocking`／`rustls`／`json`／`http2` 等）——TLS 钉 rustls；blocking 理由见 §8.5。
-- `keyring = "3"`——平台凭证服务绑定；MIT/Apache。
+- `reqwest`（workspace 依赖，`default-features = false`，features 以根 `Cargo.toml` 为准：`blocking`／`rustls-no-provider`／`json`／`http2` 等）——TLS 钉 rustls；blocking 理由见 §8.5；后端由 `reach::tls` 装（§8-15）。
+- `keyring-core = "1"`，与按目标平台声明的 `windows-native-keyring-store`（关默认 feature，不要 `search`）、`apple-native-keyring-store`（feature `keychain`）、`linux-keyutils-keyring-store`——平台凭证服务绑定；全部 MIT OR Apache-2.0。理由见 §12。
+- `rustls`（workspace 依赖，`default-features = false`，feature `std`／`tls12`／`aws_lc_rs`）——只为点名进程的加密后端（§8-15）；它本就经 reqwest 在锁里。
+- `idna_adapter = "~1.1"`（workspace 依赖；代码不点名，清单的 `[package.metadata.unused] pins` 写明）——`url` 经 `idna` 规整主机名，`idna` 按锁里 `idna_adapter` 的版本线选 Unicode 后端：1.1 线是 unicode-rs，1.2 线是 ICU4X。选 1.1：锁里少约 18 个 ICU4X 的包；一个 ASCII 主机名走 `idna` 的 ASCII 快路径，整段不进后端，所以城真正会连的那些主机不受影响；上游所说「体积更大、运行更慢」只落在非 ASCII 主机名上，发行二进制的体积差在合入前实测。被否的备选：留在 ICU4X（多约 18 个包、多一套只为国际化域名存在的数据栈）；1.0 的空后端（拒绝非 ASCII 域名，上游明说不推荐）。**重开参数**：发行二进制因它增长超过 64 KiB，或出现一个本就需要 ICU4X 的直接依赖。
 - `secrecy`／`zeroize`：workspace 既钉。serde_json：wire 面。
 - **不引 tokio**：理由见 §3。
 
@@ -546,6 +551,7 @@ pub fn is_local(base_url: &str) -> bool;                                        
 - **分段怎么测**：没有代理适用时，先用 `to_socket_addrs` 解名、再用 `TcpStream::connect_timeout` 开一个套接字，两段各自成一个读数；随后无论如何都发一次真实请求，把它的错误链摊平成一行，按其中出现的字样归到「主机名不能进握手」「握手失败」「压根没到握手」三类之一，或者归到它答的状态码。**分类读的是链而不是 reqwest 的 `is_connect`**：一个被拒的套接字与一张不受信的证书在那个判断下是同一个答案。
 - **`socks` 不花钱**：reqwest 0.13 的 `socks = []` 是空 feature，实现就在它自己的 `connect.rs` 里，锁文件不多一个包。`system-proxy` 只在 Windows 与 macOS 各拉一个读系统设置的包。
 - **全城的 HTTP 客户端都在 `reach::proxy` 里造**（`client_for`）。同一条规则写在五处就是五条规则，它们一直一致到其中一处被改为止；更要紧的是，分段读数若自己再判一次，它报出的就是一条请求不会走的路——而那正是看报告的人唯一无法自己核实的东西：客户端已经 `no_proxy` 了，读数却按环境变量报 `Environment`，就是这种分叉。
+- **全进程只有一个 TLS 加密后端：aws-lc-rs，由 `reach::tls` 装一次。** reqwest 取 `rustls-no-provider`，rustls 作为工作区依赖只开 `std`、`tls12`、`aws_lc_rs`；`reach::tls::install_provider()` 用 `std::sync::Once` 把 `rustls::crypto::aws_lc_rs::default_provider()` 装成 rustls 的进程默认，`client_for` 在交出 builder 之前调它。于是用哪一个后端是一次显式的调用，不是 reqwest 某个 feature 的副作用；远程门（`remote_access`）的握手与封装原语走工作区里同一行 `aws-lc-rs`、同一组 feature，编出来是同一份 AWS-LC；进程里任何别的 rustls 使用者读 `CryptoProvider::get_default()`，得到的也是它。**绕开 `client_for` 造客户端被机械地挡住**：`clippy.toml` 的 `disallowed-methods` 列出 reqwest 的构造入口与 `CryptoProvider::install_default`，唯一的例外是 `client_for` 与 `install_provider` 各自那一处 `#[expect]`。挡的理由是具体的：`rustls-no-provider` 下，一个没经过 `client_for` 的 builder 在 `build()` 时找不到进程默认，reqwest 会 panic，而发行 profile 是 `panic = "abort"`。
 - **默认把打到这台电脑的调用摘出代理，但那是默认而不是定理**（`Proxying::ExceptLocal`）：开了 system-proxy 之后，一台配了代理的机器会把回环也送进代理，本地推理服务器由别人的网关代答 502。但把它写死就是替所有人做了一个只对大多数人成立的决定，而这一类决定失效时没有任何一屏能告诉人到底发生了什么。它是 `EndpointTuning.proxying` 的默认值，另两个值各自对应一类真实的机器（kernel-SPEC.md 8-50），而无论哪一个，读数都会把结论写在 `through` 那一格里。
 - **工具服务器用默认值，且是显式地用**（`agent_protocols::mcp::http`、`agent_protocols::mcp::sse`）：它没有一份属于自己的设置可携。**会重新打开这一条的参数**：出现一个必须经代理才能够到的回环 MCP 服务器——到那时 `McpServer` 也要长出这一字段，而不是在这里改常量。
 - **`is_local` 是全城唯一的那一条判断**：`client_for` 的代理豁免（`Through::LocalAddress`）、地址规整时缺省的 scheme 与兼容格式提示、设置页上那个 `local` 标记，读的是同一个函数。回环按 `IpAddr::is_loopback` 判，外加 `localhost` 与 `*.localhost`，所以 `127.0.0.2` 在每一处都算这台电脑；两份判断只会在某一处先被改掉时各说各的。
