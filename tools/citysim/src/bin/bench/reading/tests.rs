@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The reading line's stable format, and the machine-class field every
-//! reading carries.
+//! The reading line's stable format, and the machine-class and fixture
+//! fields every reading carries.
 
 use super::*;
 
@@ -19,6 +19,12 @@ fn taken() -> Taken {
     }
 }
 
+/// The label the line must print: the first sixteen hex digits of the
+/// fixture digest, taken here from its full spelling.
+fn label() -> String {
+    taken().fixture.to_string().chars().take(16).collect()
+}
+
 #[test]
 fn a_reading_line_is_stable_and_carries_its_machine_class() {
     let reading = Reading::of(
@@ -30,8 +36,11 @@ fn a_reading_line_is_stable_and_carries_its_machine_class() {
     .unwrap();
     assert_eq!(
         reading.line(),
-        "perf load=large_ledger_fold sub=harness machine_class=general \
-         samples=100 floor_us=10 p50_us=10 p95_us=10 p99_us=10"
+        format!(
+            "perf load=large_ledger_fold sub=harness machine_class=general fixture={} \
+             samples=100 floor_us=10 p50_us=10 p95_us=10 p99_us=10",
+            label()
+        )
     );
 }
 
@@ -49,8 +58,11 @@ fn a_reading_line_carries_its_floor_beside_the_middle() {
     .unwrap();
     assert_eq!(
         reading.line(),
-        "perf load=long_session_forwarding sub=harness machine_class=general \
-         samples=100 floor_us=1 p50_us=51 p95_us=96 p99_us=100"
+        format!(
+            "perf load=long_session_forwarding sub=harness machine_class=general fixture={} \
+             samples=100 floor_us=1 p50_us=51 p95_us=96 p99_us=100",
+            label()
+        )
     );
 }
 

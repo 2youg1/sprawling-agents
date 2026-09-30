@@ -24,11 +24,12 @@ fn small() -> Fixture {
 /// The key sequence of the grammar in citysim-SPEC.md section 8-6. The
 /// format's authority is `Reading::line`; this is the acceptance contract
 /// a render must keep meeting.
-const KEYS: [&str; 9] = [
+const KEYS: [&str; 10] = [
     "perf",
     "load",
     "sub",
     "machine_class",
+    "fixture",
     "samples",
     "floor_us",
     "p50_us",
@@ -65,4 +66,17 @@ fn every_load_scenario_reruns_and_emits_the_stable_format() {
             );
         }
     }
+}
+
+/// The registered fixture writes exactly the bytes its pin names, so a
+/// change to `draft` or to a field cannot reach the register without a
+/// new pin in a commit of its own (citysim-SPEC.md section 3-8). When
+/// this fails, the left-hand value is the digest to pin.
+#[test]
+fn the_registered_fixture_writes_the_bytes_its_digest_pins() {
+    let dir = tempfile::tempdir().unwrap();
+    assert_eq!(
+        REGISTERED.digest(dir.path()).unwrap().to_string(),
+        REGISTERED.pinned
+    );
 }
