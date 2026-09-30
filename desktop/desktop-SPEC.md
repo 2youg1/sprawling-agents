@@ -489,9 +489,9 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 
 **还欠的**，都是这条接口的当前状态：
 
-2. **OCR**：一张截图经人接入的 OCR 端点变成文字，给 accessibility tree 读不到字的窗口（画在画布上的界面、远程桌面）。端点的形状与 `gateway` 里的哪一面还没有定。
-3. **ASR**：城给 run 的 `transcribe` 工具已经在（sprawling-SPEC 8-131），它经人为 `ModelTag::Transcribe` 选的端点，把 run 自己这座楼里的一个录音文件变成字。桌面这一侧，§12.11 定下的形状还没有落，`desktop.record` 的 `audio: true` 仍被拒：scope 文件还没有 `sound` 这一键（`scope.rs`）；`platform::windows` 还没有把 scope 放行的设备交给 `record::Recordings::start`；`record::sink` 还没有 dshow 那一支。录下的 wav 也还到不了 `transcribe`：它落在临时目录（§14），而工具只读本楼的文件；交回城里要一条路，或者连接器把 MCP 的 audio 块存进城里（`runtime::pipeline::connector` 今天只存 png），或者录音落进这座楼。
-4. **macOS 这条胳膊**：`platform/elsewhere.rs` 对 macOS 答 `E_TOOL_UNAVAILABLE`。它要在一台 Mac 或夜间的 `platforms.yml` 上验，Windows 上验不了。
+1. **OCR**：一张截图经人接入的 OCR 端点变成文字，给 accessibility tree 读不到字的窗口（画在画布上的界面、远程桌面）。端点的形状与 `gateway` 里的哪一面还没有定。
+2. **ASR**：城给 run 的 `transcribe` 工具已经在（sprawling-SPEC 8-131），它经人为 `ModelTag::Transcribe` 选的端点，把 run 自己这座楼里的一个录音文件变成字。桌面这一侧，§12.11 定下的形状还没有落，`desktop.record` 的 `audio: true` 仍被拒：scope 文件还没有 `sound` 这一键（`scope.rs`）；`platform::windows` 还没有把 scope 放行的设备交给 `record::Recordings::start`；`record::sink` 还没有 dshow 那一支。录下的 wav 也还到不了 `transcribe`：它落在临时目录（§14），而工具只读本楼的文件；交回城里要一条路，或者连接器把 MCP 的 audio 块存进城里（`runtime::pipeline::connector` 今天只存 png），或者录音落进这座楼。
+3. **macOS 这条胳膊**：`platform/elsewhere.rs` 对 macOS 答 `E_TOOL_UNAVAILABLE`。它要在一台 Mac 或夜间的 `platforms.yml` 上验，Windows 上验不了。
 
 
 ## 16 测试与约束
