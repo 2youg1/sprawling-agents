@@ -75,13 +75,16 @@
           pkgs.uv
         ];
 
-        # The one required row this shell cannot answer, named here so
-        # that it stays one. `rustup` is how every other platform gets
-        # the toolchain `rust-toolchain.toml` pins, and NixOS cannot
-        # start a rustup-downloaded toolchain at all - which is the
-        # reason this flake exists, stated at the head of the file. The
-        # shell carries that toolchain itself instead.
-        uncoveredRows = [ "rustup" ];
+        # The required rows this shell cannot answer, named here so that
+        # they stay few. `rustup` is how every other platform gets the
+        # toolchain `rust-toolchain.toml` pins, and NixOS cannot start a
+        # rustup-downloaded toolchain at all - which is the reason this
+        # flake exists, stated at the head of the file. The shell carries
+        # that toolchain itself instead. `lean` is the toolchain
+        # `lean-toolchain` pins: the shell carries elan, which fetches that
+        # toolchain on first use, and the check below runs in a build
+        # sandbox with no network, where no download can happen.
+        uncoveredRows = [ "rustup" "lean" ];
 
         # aws-lc-sys compiles the AWS-LC C sources, so a shell without cmake
         # and a C compiler fails on `cargo build` rather than on anything a
