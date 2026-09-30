@@ -493,13 +493,29 @@ replay log:
     cargo run -p sprawling --locked -- replay {{log}}
 
 # Private, peak private and working set, in this platform's own counters
-# (xtask-SPEC.md section 8-30). A pid reads that process. Anything else
-# serves a city - a fresh empty one, or `--city <dir>` - so the release
-# binary is built first: a reading of a stale binary describes a tree
-# nobody has.
+# (xtask-SPEC.md section 8-30). A pid reads that process. `long-turn
+# [steps] [every]` reads the long-turn instrument at each of its pauses
+# (citysim-SPEC.md section 3-10). Anything else serves a city - a fresh
+# empty one, or `--city <dir>` - so the release binary is built first: a
+# reading of a stale binary describes a tree nobody has.
 mem *args:
-    {{ if args =~ '^[0-9]+$' { "true" } else { "cargo build --release -p sprawling --features " + product_features + " --locked" } }}
-    cargo xtask mem {{args}}
+    {{ if args =~ '^[0-9]+$' { "true" } else if args =~ '^long-turn' { "cargo build --release -p citysim --bin long_turn --locked" } else { "cargo build --release -p sprawling --features " + product_features + " --locked" } }}
+    {{ if args =~ '^long-turn' { "just mem-long-turn " + trim_start_match(args, "long-turn") } else { "cargo xtask mem " + args } }}
+
+# The long turn's counters, read through `cargo xtask mem` each time the
+# instrument pauses; the last pause's peak private is the run's peak
+# (citysim-SPEC.md section 3-10). `just mem long-turn` builds it first.
+[private]
+mem-long-turn steps="500" every="100":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    coproc turn { "${CARGO_TARGET_DIR:-target}/release/long_turn" {{steps}} {{every}}; }
+    while IFS= read -r line <&"${turn[0]}"; do
+        echo "$line"
+        case "$line" in
+            step*) cargo xtask mem "${line##* }"; echo >&"${turn[1]}" ;;
+        esac
+    done
 
 # The adversarial property checker in `tools/adversary/`, which lives outside the
 # workspace, outside the release, and outside `just check`
