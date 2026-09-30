@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Module-map gate (redline C4). `architecture.toml` is a closed list:
-//! every `.rs` under the `src/` of a product package is either a
-//! registered module, a `lib.rs`, or a pure index file. Status coherence
+//! every `.rs` under the `src/` of every package but the gates' own is
+//! either a registered module, a `lib.rs`, or a pure index file. Status coherence
 //! is checked both ways — a file that exists while its entry still says
 //! planned means the builder skipped the "flip the status" leg of the
 //! completion evidence.
@@ -122,16 +122,14 @@ fn read_map(root: &Path) -> Result<Map, XtaskError> {
 /// Every registered module's `spec`, in the order the map states them.
 pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
     let mut ignored = Vec::new();
-    Ok(
-        rows(&read_map(root)?, &members::product(root)?, &mut ignored)
-            .into_iter()
-            .map(|row| Anchor {
-                module: row.module,
-                file: row.path,
-                spec: row.spec,
-            })
-            .collect(),
-    )
+    Ok(rows(&read_map(root)?, &judged(root)?, &mut ignored)
+        .into_iter()
+        .map(|row| Anchor {
+            module: row.module,
+            file: row.path,
+            spec: row.spec,
+        })
+        .collect())
 }
 
 /// The shape each registered module states, by file path.
@@ -142,12 +140,10 @@ pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
 /// place.
 pub(crate) fn shapes(root: &Path) -> Result<BTreeMap<String, String>, XtaskError> {
     let mut ignored = Vec::new();
-    Ok(
-        rows(&read_map(root)?, &members::product(root)?, &mut ignored)
-            .into_iter()
-            .map(|row| (row.path, row.shape))
-            .collect(),
-    )
+    Ok(rows(&read_map(root)?, &judged(root)?, &mut ignored)
+        .into_iter()
+        .map(|row| (row.path, row.shape))
+        .collect())
 }
 
 /// What each of `packages` owns, in their order: the `duty` of the family
@@ -215,8 +211,8 @@ fn family_of<'map>(map: &'map Map, member: &Member) -> Result<&'map str, XtaskEr
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
-    let product = members::product(root)?;
-    let rows = rows(&read_map(root)?, &product, &mut violations);
+    let scope = judged(root)?;
+    let rows = rows(&read_map(root)?, &scope, &mut violations);
 
     let table: BTreeMap<&str, &Row> = rows.iter().map(|row| (row.path.as_str(), row)).collect();
     // Directories that hold registered modules; `<dir>.rs` is then an index file.
@@ -226,7 +222,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         .collect();
 
     let mut on_disk: BTreeSet<String> = BTreeSet::new();
-    let files = product
+    let files = scope
         .iter()
         .map(|member| walk::files_with_ext(&root.join(&member.dir), &["rs"]))
         .collect::<Result<Vec<_>, _>>()?;
@@ -285,13 +281,29 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
+/// The package these gates are compiled into. Its modules are described
+/// by xtask-SPEC.md section 7 rather than by the map, and it is the one
+/// package the map does not cover (section 12-9).
+const GATES: &str = env!("CARGO_PKG_NAME");
+
+/// The packages whose files the map registers: every package the
+/// members reader lists, tools and the path-dependent desktop included,
+/// except the gates' own. A new tool is covered from its first file, so
+/// forgetting to register one is a red rather than a package quietly
+/// left unjudged.
+fn judged(root: &Path) -> Result<Vec<Member>, XtaskError> {
+    Ok(members::members(root)?
+        .into_iter()
+        .filter(|member| member.package != GATES)
+        .collect())
+}
+
 /// The entries this gate judges: a `::` in the name, a `.rs` file inside
 /// one of `scope`'s packages, a known status, an `owns` that says
 /// something, and one entry per file.
 ///
-/// An entry whose file sits in no package of `scope` - a tool's, which
-/// the map carries for a reader (xtask-SPEC.md section 8-39) - is skipped
-/// here, because the walk only reaches the same packages.
+/// An entry whose file sits in no package of `scope` is skipped here,
+/// because the walk only reaches the same packages.
 fn rows(map: &Map, scope: &[Member], violations: &mut Vec<Violation>) -> Vec<Row> {
     let mut rows = Vec::new();
     let mut seen: BTreeMap<&str, &str> = BTreeMap::new();
