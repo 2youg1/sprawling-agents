@@ -11,6 +11,10 @@
 **本模块对每一种折叠、每一个切点陈述这条性质。** 折叠是一个不透明的步进函数，作用在不透明的行上，所以产品折叠的任何视图都不会与它漂移：`Views`、`Standing` 以及链状态 `storage::LineCheck` 本身各是它的一个实例。Rust 一侧由 `proptest` 在随机账本与随机切点上守住同一性质（`storage::snapshot` 的测试），那里的折叠就是链检查：从快照恢复的一遍走，接受的行与终态都必须和从创世走的一遍相同。
 
 **行哈希买到什么、买不到什么。** 快照只经它最后一行的哈希指明自己切自哪本账本。当这个哈希与盘上同一 seq 的那一行相符，并且摘要函数在被覆盖的行上是单射（这条假设归 `Kernel.Ledger`，见 `crates/kernel/spec/Ledger.lean`），快照所折的行就是盘上账本的前缀；`resumeIsWhole` 就陈述在这个前缀事实之上，所以它根本不需要摘要函数。
+
+**两份快照，一遍读。** 服务中的城有两份快照（视图与 Standing），各切在自己的行上。开城从较早的切点读一遍，每一行只交给切点在它之前的那一份折叠；`twoCutsOnePass` 陈述这一遍的结果等于两份各自的全量折叠（sprawling-SPEC.md 8-122，`accounting::views::snapshot::start::start_both`）。
+
+**已验证前缀：不重算，也不少核对。** 快照之前的行由后台的证明走一遍（storage-SPEC.md 8-30，`storage::verified_prefix`）。每段有一条记录：版本、入口状态、这段前缀字节的摘要、出口状态。记录的入口等于当前状态、版本相同、摘要相符时，证明不再逐行核对这段前缀，直接取记录的出口；否则逐行核对。`cachedVerifyIsStrict` 陈述：只要记录都由严格核对写下、摘要在段上单射，这样得到的判定与逐行核对整条链的判定相同。两个反例说明三个条件缺一不可：不比入口，删掉中间一段也被接受（`withoutLinkAcceptsSplice`）；不比版本，旧规则放过的行被沿用（`withoutVersionAcceptsStale`）。记录没有密钥：能同时改段与记录的人绕得过它，与今天无密钥的链一样（sprawling-SPEC.md §12 已验证前缀一段）。
 -/
 
 namespace Storage.Snapshot
@@ -37,5 +41,171 @@ theorem resumeIsWhole {σ α : Type} (step : σ → α → σ) (init : σ)
   obtain ⟨tail, rfl⟩ := h
   unfold fold
   rw [List.drop_left, List.foldl_append]
+
+/-! ## 两个切点，一遍读 -/
+
+/-- 带位置的一步：位置在切点 `k` 之前的行不交给折叠，位置照样加一。 -/
+def gatedStep {σ α : Type} (step : σ → α → σ) (k : Nat) (p : Nat × σ) (x : α) : Nat × σ :=
+  (p.1 + 1, if k ≤ p.1 then step p.2 x else p.2)
+
+/-- 从位置 `i` 起带门地折完 `xs`，等于跳过切点之前的那几行再折。 -/
+theorem gatedFold {σ α : Type} (step : σ → α → σ) (k : Nat) (xs : List α) :
+    ∀ (i : Nat) (s : σ),
+      xs.foldl (gatedStep step k) (i, s) = (i + xs.length, fold step s (xs.drop (k - i))) := by
+  induction xs with
+  | nil => intro i s; simp [fold]
+  | cons x rest ih =>
+    intro i s
+    rw [List.foldl_cons]
+    by_cases hk : k ≤ i
+    · have h1 : k - i = 0 := by omega
+      have h2 : k - (i + 1) = 0 := by omega
+      simp only [gatedStep, if_pos hk]
+      rw [ih, h1, h2]
+      simp [fold, List.length_cons]
+      omega
+    · have h1 : k - i = (k - (i + 1)) + 1 := by omega
+      simp only [gatedStep, if_neg hk]
+      rw [ih, h1]
+      simp [List.length_cons]
+      omega
+
+/-- 两份折叠同走一遍：各带自己的门。 -/
+def bothStep {σ τ α : Type} (stepA : σ → α → σ) (stepB : τ → α → τ) (ka kb : Nat)
+    (p : Nat × σ × τ) (x : α) : Nat × σ × τ :=
+  (p.1 + 1, if ka ≤ p.1 then stepA p.2.1 x else p.2.1,
+    if kb ≤ p.1 then stepB p.2.2 x else p.2.2)
+
+/-- 同走的一遍，两个分量各自就是带门的一遍。 -/
+theorem bothFold {σ τ α : Type} (stepA : σ → α → σ) (stepB : τ → α → τ) (ka kb : Nat)
+    (xs : List α) : ∀ (i : Nat) (a : σ) (b : τ),
+      xs.foldl (bothStep stepA stepB ka kb) (i, a, b)
+        = ((xs.foldl (gatedStep stepA ka) (i, a)).1,
+           (xs.foldl (gatedStep stepA ka) (i, a)).2,
+           (xs.foldl (gatedStep stepB kb) (i, b)).2) := by
+  induction xs with
+  | nil => intro i a b; rfl
+  | cons x rest ih =>
+    intro i a b
+    simp only [List.foldl_cons, bothStep, gatedStep]
+    rw [ih]
+
+/-- 视图切在 `ka`、Standing 切在 `kb`，各自从快照的状态出发；从较早的切点起读一遍，每行只交给切点在它之前的那一份，结果就是两份各自的全量折叠。 -/
+theorem twoCutsOnePass {σ τ α : Type} (stepA : σ → α → σ) (stepB : τ → α → τ)
+    (a0 : σ) (b0 : τ) (lines : List α) (ka kb : Nat) :
+    let m := min ka kb
+    let pass := (lines.drop m).foldl (bothStep stepA stepB ka kb)
+      (m, cut stepA a0 lines ka, cut stepB b0 lines kb)
+    (pass.2.1, pass.2.2) = (fold stepA a0 lines, fold stepB b0 lines) := by
+  intro m pass
+  have ha : ka - m + m = ka := by omega
+  have hb : kb - m + m = kb := by omega
+  simp only [pass, bothFold, gatedFold, List.drop_drop]
+  rw [Nat.add_comm (ka - m) m, Nat.add_comm (kb - m) m] at *
+  have ea : m + (ka - m) = ka := by omega
+  have eb : m + (kb - m) = kb := by omega
+  rw [ea, eb, snapshotPlusTailIsWhole, snapshotPlusTailIsWhole]
+
+/-! ## 已验证前缀 -/
+
+/-- 一段的记录：写下它时的规则版本、它的入口状态、这段前缀的摘要、走完之后的出口状态。 -/
+structure Record (σ D : Type) where
+  version : Nat
+  entry : σ
+  digest : D
+  exit : σ
+
+/-- 逐行核对一段：`check` 答 `none` 即这一行不过，整段不过。 -/
+def strictSeg {σ α : Type} (check : σ → α → Option σ) (s : σ) (seg : List α) : Option σ :=
+  seg.foldlM check s
+
+/-- 逐行核对整条链，一段接一段。 -/
+def strictRun {σ α : Type} (check : σ → α → Option σ) (s : σ) : List (List α) → Option σ
+  | [] => some s
+  | seg :: rest => (strictSeg check s seg).bind (fun t => strictRun check t rest)
+
+/-- 记录只由逐行核对写下：在当前版本 `v` 下，它的入口经某段字节走到它的出口，摘要就是那段字节的摘要。别的版本写下的记录不作任何假设：那是别的规则。 -/
+def Sound {σ α D : Type} (v : Nat) (dig : List α → D) (check : σ → α → Option σ)
+    (r : Record σ D) : Prop :=
+  r.version = v → ∃ seg, dig seg = r.digest ∧ strictSeg check r.entry seg = some r.exit
+
+/-- 用记录代替逐行核对的三个条件：版本相同、入口接得上、摘要相符。 -/
+def reuses {σ α D : Type} [DecidableEq σ] [DecidableEq D] (v : Nat) (dig : List α → D)
+    (s : σ) (seg : List α) (r : Record σ D) : Bool :=
+  decide (r.version = v) && decide (r.entry = s) && decide (r.digest = dig seg)
+
+/-- 有记录且三个条件都满足就取记录的出口，否则逐行核对这一段。 -/
+def cachedSeg {σ α D : Type} [DecidableEq σ] [DecidableEq D] (check : σ → α → Option σ)
+    (v : Nat) (dig : List α → D) (s : σ) (seg : List α) : Option (Record σ D) → Option σ
+  | some r => if reuses v dig s seg r then some r.exit else strictSeg check s seg
+  | none => strictSeg check s seg
+
+/-- 带记录走整条链：每段各自判定，一段的记录失配只让这一段退回逐行核对。 -/
+def cachedRun {σ α D : Type} [DecidableEq σ] [DecidableEq D] (check : σ → α → Option σ)
+    (v : Nat) (dig : List α → D) (s : σ) : List (List α × Option (Record σ D)) → Option σ
+  | [] => some s
+  | (seg, r) :: rest => (cachedSeg check v dig s seg r).bind (fun t => cachedRun check v dig t rest)
+
+/-- 记录都由逐行核对写下、摘要在段上单射时，带记录的判定就是逐行核对整条链的判定。 -/
+theorem cachedVerifyIsStrict {σ α D : Type} [DecidableEq σ] [DecidableEq D]
+    (check : σ → α → Option σ) (v : Nat) (dig : List α → D)
+    (injective : ∀ a b, dig a = dig b → a = b)
+    (segs : List (List α × Option (Record σ D)))
+    (sound : ∀ p ∈ segs, ∀ r, p.2 = some r → Sound v dig check r) :
+    ∀ s, cachedRun check v dig s segs = strictRun check s (segs.map Prod.fst) := by
+  induction segs with
+  | nil => intro s; rfl
+  | cons p rest ih =>
+    intro s
+    obtain ⟨seg, rec⟩ := p
+    have tail : ∀ q ∈ rest, ∀ r, q.2 = some r → Sound v dig check r :=
+      fun q hq r hr => sound q (List.mem_cons_of_mem _ hq) r hr
+    have same : cachedSeg check v dig s seg rec = strictSeg check s seg := by
+      cases rec with
+      | none => rfl
+      | some r =>
+        simp only [cachedSeg]
+        split
+        · rename_i hr
+          simp only [reuses, Bool.and_eq_true, decide_eq_true_eq] at hr
+          obtain ⟨⟨hv, he⟩, hd⟩ := hr
+          obtain ⟨seg', hdig, hrun⟩ := sound (seg, some r) List.mem_cons_self r rfl hv
+          have : seg' = seg := injective _ _ (hdig.trans hd)
+          rw [← he, ← this, hrun]
+        · rfl
+    simp only [cachedRun, strictRun, List.map_cons, same]
+    cases strictSeg check s seg with
+    | none => rfl
+    | some t => exact ih tail t
+
+/-- 反例用的链：状态是下一行应有的 seq，一行就是它的 seq。 -/
+def nextSeq (s x : Nat) : Option Nat := if x = s then some (s + 1) else none
+
+/-- 不比入口的复用：删掉中间一段，后一段的记录照样被接受。 -/
+def reusesNoLink (v : Nat) (seg : List Nat) (r : Record Nat (List Nat)) : Bool :=
+  decide (r.version = v) && decide (r.digest = seg)
+
+def cachedNoLink (v : Nat) (s : Nat) : List (List Nat × Option (Record Nat (List Nat))) → Option Nat
+  | [] => some s
+  | (seg, some r) :: rest =>
+    (if reusesNoLink v seg r then some r.exit else strictSeg nextSeq s seg).bind
+      (fun t => cachedNoLink v t rest)
+  | (seg, none) :: rest => (strictSeg nextSeq s seg).bind (fun t => cachedNoLink v t rest)
+
+/-- 三段账本删掉中间一段：不比入口就接受，逐行核对与带入口的记录都拒绝。 -/
+theorem withoutLinkAcceptsSplice :
+    let spliced := [([0], some ⟨1, 0, [0], 1⟩), ([2], some ⟨1, 2, [2], 3⟩)]
+    cachedNoLink 1 0 spliced = some 3 ∧
+      strictRun nextSeq 0 (spliced.map Prod.fst) = none ∧
+      cachedRun nextSeq 1 id 0 spliced = none := by
+  decide
+
+/-- 旧规则（版本 0）放过了以 seq 7 开头的一段并写下记录；新规则 `nextSeq` 拒绝它。规则变了而版本键没动（`cachedNoLink 0`），旧记录照样被沿用；版本键随规则进到 1，这条记录就不再复用，逐行核对拒绝它。 -/
+theorem withoutVersionAcceptsStale :
+    let stale : List (List Nat × Option (Record Nat (List Nat))) := [([7], some ⟨0, 0, [7], 1⟩)]
+    cachedNoLink 0 0 stale = some 1 ∧
+      strictRun nextSeq 0 (stale.map Prod.fst) = none ∧
+      cachedRun nextSeq 1 id 0 stale = none := by
+  decide
 
 end Storage.Snapshot

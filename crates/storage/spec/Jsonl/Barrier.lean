@@ -153,4 +153,36 @@ theorem withoutBarrier :
     ¬ ∀ s ∈ l.claimed, Cell.record s ∈ reopen l.disk := by
   decide
 
+/-! ## 从已验证前缀起重开
+
+一段的前 `L` 个格子已由记录证明是完整记录（storage-SPEC.md 8-30）时，尾部恢复不必从第 0 格看起：前缀原样保留，只看 `L` 之后。记录只写在完整记录组成的前缀上，这是 `verified` 这个前提；Rust 一侧由 `storage::verified_prefix` 只为核对过的完整行写记录守住它。 -/
+
+/-- 前 `L` 格都是记录时，重开等于前缀加上从 `L` 起的重开。 -/
+theorem reopenFromVerifiedPrefix (disk : List Cell) (L : Nat)
+    (verified : (disk.take L).all Cell.isRecord = true) :
+    reopen disk = disk.take L ++ reopen (disk.drop L) := by
+  unfold reopen
+  induction L generalizing disk with
+  | zero => simp
+  | succ k ih =>
+    cases disk with
+    | nil => simp
+    | cons c rest =>
+      simp only [List.take_succ_cons, List.all_cons, Bool.and_eq_true] at verified
+      obtain ⟨hc, hrest⟩ := verified
+      simp only [List.takeWhile_cons, hc, if_true, List.take_succ_cons, List.drop_succ_cons,
+        List.cons_append]
+      rw [ih rest hrest]
+
+/-- 于是守屏障的 handle 答过的每个 seq，从任何已验证前缀起重开之后也都还在。 -/
+theorem answered_survives_reopen_from_a_verified_prefix (waves : List Outcome) (L : Nat)
+    (verified :
+      ((waves.foldl Ledger.append Ledger.empty).disk.take L).all Cell.isRecord = true) :
+    ∀ s ∈ (waves.foldl Ledger.append Ledger.empty).claimed,
+      Cell.record s ∈ (waves.foldl Ledger.append Ledger.empty).disk.take L
+        ++ reopen ((waves.foldl Ledger.append Ledger.empty).disk.drop L) := by
+  intro s hs
+  rw [← reopenFromVerifiedPrefix _ L verified]
+  exact (answered_survives_reopen waves).2 s hs
+
 end Storage.Jsonl.Barrier

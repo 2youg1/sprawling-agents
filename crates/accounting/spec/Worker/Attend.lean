@@ -155,4 +155,68 @@ theorem nothing_is_written_before_the_name_is_home :
 theorem the_naming_wait_is_off_the_accounting_thread :
     ∀ step ∈ namedDispatch, step.onAccountingThread = false → step = .askName := by decide
 
+/-! ## 历史证明之前，服务照常、写一条也不写
+
+服务中的城从快照起步，快照之前的历史由后台的证明走一遍（sprawling-SPEC.md 8-122）。证明有三个结局之前的状态：还在走（`pending`）、链完好（`whole`）、链断了（`broken`）。写者在 `whole` 之前与 `broken` 之后拒绝每一次追加：一条命令照样被服务——人收到 `E_HISTORY_UNPROVEN` 或断链的原因——只是什么也不写（Q3 选的是拒绝，不是扣住：扣住的命令要一个新的唤醒理由，才能不破坏 `idle_does_not_wake`）。
+
+这里把证明状态作为服务一批的参数：它只改变追加几条，不改变谁被服务、何时醒来，所以上面三组性质原样成立（`proved_is_the_ungated_loop`）。关门在 Rust 里先等证明有结局再写交接（`attend` 的关门一臂），这一步是等待而不是服务，不在这里建模。 -/
+
+/-- 后台证明走到哪一步。 -/
+inductive Proof where
+  | pending
+  | whole
+  | broken
+  deriving Repr, DecidableEq
+
+/-- 在证明状态 `p` 下服务一条消息：只有 `whole` 时才追加。 -/
+def serveUnder (p : Proof) (ledger : List Nat) (m : Message) : List Nat :=
+  if p = .whole then serve ledger m else ledger
+
+/-- 在证明状态 `p` 下醒来一次之后的循环。 -/
+def drainedUnder (p : Proof) (s : Loop) : Loop :=
+  { inbox := []
+    ledger := s.inbox.foldl (serveUnder p) s.ledger
+    served := s.served ++ s.inbox
+    deadlineDue := false }
+
+theorem proved_is_the_ungated_loop (s : Loop) : drainedUnder .whole s = drained s := by
+  have same : serveUnder .whole = serve := by
+    funext ledger m
+    simp [serveUnder]
+  simp [drainedUnder, drained, same]
+
+theorem batch_appends_nothing_unless_proved (p : Proof) (h : p ≠ .whole)
+    (batch : List Message) (ledger : List Nat) : batch.foldl (serveUnder p) ledger = ledger := by
+  induction batch generalizing ledger with
+  | nil => rfl
+  | cons m rest ih =>
+    simp only [List.foldl_cons, serveUnder, if_neg h]
+    exact ih ledger
+
+/-- 证明完成之前，一次醒来什么也不写。 -/
+theorem nothing_is_written_before_the_proof (s : Loop) :
+    (drainedUnder .pending s).ledger = s.ledger :=
+  batch_appends_nothing_unless_proved .pending (by decide) s.inbox s.ledger
+
+/-- 链断了之后同样什么也不写。 -/
+theorem nothing_is_written_after_a_break (s : Loop) :
+    (drainedUnder .broken s).ledger = s.ledger :=
+  batch_appends_nothing_unless_proved .broken (by decide) s.inbox s.ledger
+
+/-- 被拒的命令仍由这次醒来服务：人得到回答，队列不留下它。 -/
+theorem a_refused_command_is_still_answered (p : Proof) (m : Message) (s : Loop) :
+    m ∈ (drainedUnder p (arrive m s)).served ∧ (drainedUnder p (arrive m s)).inbox = [] := by
+  simp [drainedUnder, arrive]
+
+/-- 无论证明走到哪一步，追加次序仍是 seq 次序。 -/
+theorem gated_batch_keeps_order (p : Proof) (batch : List Message) {ledger : List Nat}
+    (h : Ordered ledger) : Ordered (batch.foldl (serveUnder p) ledger) := by
+  induction batch generalizing ledger with
+  | nil => exact h
+  | cons m rest ih =>
+    simp only [List.foldl_cons, serveUnder]
+    split
+    · exact ih (serve_keeps_order m h)
+    · exact ih h
+
 end Accounting.Worker.Attend
