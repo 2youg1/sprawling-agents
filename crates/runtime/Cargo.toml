@@ -9,8 +9,15 @@ publish.workspace = true
 name = "runtime"
 
 [dependencies]
+# An MCP image block carries its picture base64-encoded, and the
+# connector step decodes it once to store the bytes (8-27-10).
+base64.workspace = true
 kernel = { workspace = true }
 storage = { workspace = true }
+# A picture a tool answers with travels only if its sides are read from
+# its own bytes; the same decoder the browser's screenshots are measured
+# with (8-27-10).
+png.workspace = true
 # File identity (volume and file index on Windows, device and inode
 # elsewhere): `read` compares the handle it opened with the file now at
 # the judged location, which std exposes only on unstable APIs.

@@ -5,9 +5,13 @@
 
 //! One MCP server's answer as the model reads it (runtime-SPEC.md
 //! 8-27-10): text that fits passes untouched, text that does not is
-//! stored whole and replaced by a window the model pages with `read`.
+//! stored whole and replaced by a window the model pages with `read`,
+//! and a PNG picture is stored in the content store and travels as an
+//! attachment, with a line of text where it stood.
 
-use kernel::{AxCode, AxError, Payload, ToolOutcome};
+use base64::Engine as _;
+use kernel::consts_policy::IMAGE_MAX_BYTES;
+use kernel::{AxCode, AxError, B3Hash, ImageRef, ImageType, Locator, Payload, ToolOutcome};
 use serde_json::{Map, Value};
 
 use crate::offload::OffloadSite;
@@ -19,19 +23,75 @@ pub const CONNECTOR_CAP_BYTES: u64 = 16_384;
 
 /// Packages one connector answer for the window.
 ///
-/// An answer without a `content` array, or whose text fits
-/// [`CONNECTOR_CAP_BYTES`], comes back untouched. Otherwise the text
-/// blocks, joined in order, are stored whole through [`package`] and
-/// replaced by one text block holding the substitute; every other block
-/// follows it in its original order, and the account of the move sits
-/// in the result's `offload` field.
+/// An answer without a `content` array comes back untouched. Otherwise
+/// the text comes first: if it fits [`CONNECTOR_CAP_BYTES`] it stays,
+/// and if it does not, the text blocks, joined in order, are stored
+/// whole through [`package`] and replaced by one text block holding the
+/// substitute, every other block following it in its original order,
+/// with the account of the move in the result's `offload` field. Then
+/// every `image` block is replaced where it stands: a PNG this city can
+/// measure is stored in the content store and added to the attachments,
+/// and any other picture becomes a sentence saying why it was left out.
+/// The pictures come second so that the line standing for one is never
+/// folded into text the model has to page to find, and no base64
+/// reaches the window or the ledger either way.
 ///
 /// # Errors
-/// Propagates whatever [`package`] reports about the store.
+/// Propagates whatever [`package`] reports about the store, and a
+/// content store that will not take a picture.
 pub fn package_connector(
     outcome: ToolOutcome,
-    offload: OffloadSite<'_>,
+    mut offload: OffloadSite<'_>,
 ) -> Result<ToolOutcome, AxError> {
+    let paged = windowed(
+        outcome,
+        OffloadSite {
+            cas: &mut *offload.cas,
+            city_root: offload.city_root,
+            room: offload.room,
+            origin: offload.origin.clone(),
+        },
+    )?;
+    with_pictures_stored(paged, &mut offload)
+}
+
+/// Every `image` block of an answer replaced by the words that stand for
+/// it, with the pictures this city could measure added as attachments.
+///
+/// # Errors
+/// Propagates a content store that will not take the bytes.
+fn with_pictures_stored(
+    outcome: ToolOutcome,
+    offload: &mut OffloadSite<'_>,
+) -> Result<ToolOutcome, AxError> {
+    let Some(Value::Array(blocks)) = outcome.result.as_map().get("content") else {
+        return Ok(outcome);
+    };
+    if !blocks.iter().any(is_picture) {
+        return Ok(outcome);
+    }
+    let mut attachments = outcome.attachments.clone();
+    let mut content = Vec::with_capacity(blocks.len());
+    for block in blocks {
+        if is_picture(block) {
+            let (words, picture) = pictured(block, offload)?;
+            content.push(words);
+            attachments.extend(picture);
+        } else {
+            content.push(block.clone());
+        }
+    }
+    let mut result = outcome.result.as_map().clone();
+    result.insert("content".to_owned(), Value::Array(content));
+    Ok(ToolOutcome {
+        result: Payload::new(result)?,
+        attachments,
+    })
+}
+
+/// The text step: an answer whose text fits comes back as it is, and
+/// one whose text does not is stored and paged.
+fn windowed(outcome: ToolOutcome, offload: OffloadSite<'_>) -> Result<ToolOutcome, AxError> {
     let Some(Value::Array(blocks)) = outcome.result.as_map().get("content") else {
         return Ok(outcome);
     };
@@ -41,10 +101,7 @@ pub fn package_connector(
         .iter()
         .filter_map(|block| text_of(block))
         .collect::<Vec<&str>>()
-        .join(
-            "
-",
-        );
+        .join("\n");
     if u64::try_from(text.len()).is_ok_and(|len| len <= CONNECTOR_CAP_BYTES) {
         return Ok(outcome);
     }
@@ -61,10 +118,7 @@ pub fn package_connector(
             adviser: None,
         },
     )?;
-    let mut window = Map::new();
-    window.insert("type".to_owned(), Value::String("text".to_owned()));
-    window.insert("text".to_owned(), Value::String(packaged.content));
-    let content = std::iter::once(Value::Object(window))
+    let content = std::iter::once(text_block(packaged.content))
         .chain(others.into_iter().cloned())
         .collect();
     let accounts = packaged
@@ -73,10 +127,15 @@ pub fn package_connector(
         .map(serde_json::to_value)
         .collect::<Result<Vec<Value>, _>>()
         .map_err(|err| {
-            AxError::failure(AxCode::InvalidArgs, "encode offload account", err.to_string())
-                .with_recovery(
-                    "report this against runtime::pipeline::connector: an offload account                      holds names and counts, and JSON refuses neither",
-                )
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "encode offload account",
+                err.to_string(),
+            )
+            .with_recovery(
+                "report this against runtime::pipeline::connector: an offload account \
+                     holds names and counts, and JSON refuses neither",
+            )
         })?;
     let mut result = outcome.result.as_map().clone();
     result.insert("content".to_owned(), Value::Array(content));
@@ -85,6 +144,77 @@ pub fn package_connector(
         result: Payload::new(result)?,
         attachments: outcome.attachments,
     })
+}
+
+/// One `image` block as the words that stand in its place, and the
+/// attachment it became when this city could measure it.
+///
+/// # Errors
+/// Propagates a content store that will not take the bytes.
+fn pictured(
+    block: &Value,
+    offload: &mut OffloadSite<'_>,
+) -> Result<(Value, Option<ImageRef>), AxError> {
+    let (bytes, width, height) = match measured(block) {
+        Ok(measured) => measured,
+        Err(why) => return Ok((text_block(format!("[picture left out: {why}]")), None)),
+    };
+    let hash = offload
+        .cas
+        .put_for(&bytes, &offload.origin)
+        .map_err(storage::StorageError::into_ax)?;
+    let picture = ImageRef {
+        locator: Locator::cas(hash),
+        media_type: ImageType::Png,
+        width,
+        height,
+    };
+    let words = format!(
+        "[picture attached: image/png {width}x{height}, {}]",
+        picture.locator
+    );
+    Ok((text_block(words), Some(picture)))
+}
+
+/// The bytes and the two sides of a picture this city can carry, or the
+/// reason it cannot, as the words the model reads in its place.
+///
+/// Only PNG is measured, for the reason the browser's screenshots give:
+/// another format needs a second decoder to read its sides, and a side
+/// read wrong is worse than none.
+fn measured(block: &Value) -> Result<(Vec<u8>, u32, u32), String> {
+    if block.get("mimeType").and_then(Value::as_str) != Some(ImageType::Png.mime()) {
+        return Err("only png is measured here; ask the tool for png".to_owned());
+    }
+    let data = block
+        .get("data")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "it carries no data".to_owned())?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data)
+        .map_err(|err| format!("its bytes are not base64: {err}"))?;
+    IMAGE_MAX_BYTES
+        .admit(&Locator::cas(B3Hash::digest(&bytes)), bytes.len())
+        .map_err(|refused| format!("{}; {}", refused.subject(), refused.recovery()))?;
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes.as_slice()));
+    let (width, height) = decoder
+        .read_header_info()
+        .map(|info| (info.width, info.height))
+        .map_err(|err| format!("its png header does not read: {err}"))?;
+    Ok((bytes, width, height))
+}
+
+/// Whether a block is one MCP marks `"type": "image"`.
+fn is_picture(block: &Value) -> bool {
+    block.get("type").and_then(Value::as_str) == Some("image")
+}
+
+/// One text block holding `text`.
+fn text_block(text: String) -> Value {
+    let mut block = Map::new();
+    block.insert("type".to_owned(), Value::String("text".to_owned()));
+    block.insert("text".to_owned(), Value::String(text));
+    Value::Object(block)
 }
 
 /// The text of a block MCP marks `"type": "text"`, and nothing else.
