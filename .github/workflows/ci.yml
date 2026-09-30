@@ -9,7 +9,7 @@
 #
 #   fast      fmt of both trees, the gates that read sources, the commit
 #             messages; compiles only xtask, so it answers first
-#   models    the Lean design models under `tools/adversary/design/`
+#   models    the Lean specifications under `crates/`
 #   clippy    the zero-warning build of every target and feature, and the
 #             feature combinations `just features` runs
 #   test      the suite
@@ -153,7 +153,7 @@ jobs:
           echo "judging $range"
           just commits "$range"
 
-  # The Lean design models. The checker in `tools/adversary/` is not built here:
+  # The Lean specifications. The checker in `tools/adversary/` is not built here:
   # it attacks the binary from outside and stays out of every required
   # check (`adversary.yml` runs it nightly).
   models:
@@ -165,7 +165,7 @@ jobs:
         with:
           tool: just
       - uses: ./.github/actions/lean
-      - name: the design models
+      - name: the specifications
         run: just models
 
   clippy:

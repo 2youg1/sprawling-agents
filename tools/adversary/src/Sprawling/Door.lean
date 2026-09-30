@@ -353,7 +353,7 @@ def discover : IO (Option Door) := do
   | none => pick (["debug", "release"].flatMap flavours)
 where
   flavours profile :=
-    [ s!"../../target/{profile}/sprawling", s!"../../target/{profile}/sprawling.exe" ]
+    [ s!"target/{profile}/sprawling", s!"target/{profile}/sprawling.exe" ]
   pick : List String → IO (Option Door)
     | [] => return none
     | candidate :: rest => do

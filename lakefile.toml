@@ -1,6 +1,5 @@
-name = "sprawling-adversary"
-version = "0.0.1"
-defaultTargets = ["adversary", "Design"]
+name = "sprawling"
+defaultTargets = ["Spec"]
 
 # No `require` line, and that is the decision rather than an omission.
 # Everything below is the toolchain's own: `Lean.Data.Json` reads the wire,
@@ -8,7 +7,7 @@ defaultTargets = ["adversary", "Design"]
 # traces. A scheduled checker that resolved a package graph before it could run
 # would go red for reasons belonging to a registry rather than to this product,
 # and a red that means nothing is worse than no run.
-# adversary-SPEC.md section 13 records what that costs.
+# tools/adversary/adversary-SPEC.md section 13 records what that costs.
 
 [leanOptions]
 # A warning left standing is a finding nobody read.
@@ -17,23 +16,33 @@ warningAsError = true
 # assertion that passes without being true.
 debug.skipKernelTC = false
 
+# Every crate's specification: `crates/<dir>/Spec.lean` and its parts under
+# `crates/<dir>/spec/` (ARCHITECTURE.md section 11, "Specifications in Lean").
+# `just models` builds this library inside `just check`. When the specification
+# of something outside `crates/` moves to Lean, the same change adds its two
+# globs here, `<dir>.Spec` and `<dir>.spec.+`, and never `tools.+`, `client.+`
+# or `desktop.+`: those trees hold build output a recursive glob would walk.
 [[lean_lib]]
-name = "Sprawling"
-srcDir = "src"
+name = "Spec"
+globs = ["crates.+"]
 
-# Design models: what a Rust module must hold, proved rather than checked. A
-# library of its own because the checker above judges the binary from outside
-# and must not import a restatement of the rules it is judging; each model names
-# the Rust module it specifies (adversary-SPEC.md section 1).
+# Until the design models reach their crates' `spec/` in the next change.
 [[lean_lib]]
 name = "Design"
-srcDir = "design"
+srcDir = "tools/adversary/design"
 roots = ["Attending", "Durability", "GoingBack", "HarnessRun", "RemoteDoor", "Speculating"]
+
+# The adversarial checker (tools/adversary/adversary-SPEC.md). It imports no
+# specification: it judges the binary from outside and must not import a
+# restatement of the rules it is judging.
+[[lean_lib]]
+name = "Sprawling"
+srcDir = "tools/adversary/src"
 
 [[lean_exe]]
 name = "adversary"
 root = "Main"
-srcDir = "test"
+srcDir = "tools/adversary/test"
 # The served cities are read by a task each. Lean's IO tasks need real threads
 # behind them: a reader blocked on a pipe would otherwise hold the whole
 # runtime, and the city it was draining fills its buffer and stops answering.

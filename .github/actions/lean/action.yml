@@ -1,8 +1,8 @@
-# The Lean toolchain `lean-toolchain` pins, installed the one way
-# this repository states it, with `lake` on the PATH of every later step.
+# The Lean toolchain `lean-toolchain` pins at the repository root, installed
+# the one way this repository states it, with `lake` on the PATH of every
+# later step.
 #
-# `just models` and `just adversary` succeed silently where Lean is absent,
-# which is right at a desk and would be an empty verdict on a runner, so the
+# `just models` fails where Lean is absent and `just adversary` skips, so the
 # last step here asks `lake --version` and stops the job when the install
 # did not take.
 name: lean toolchain
@@ -32,7 +32,6 @@ runs:
         echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
     - name: fetch the pinned toolchain, so nothing that needs lake can skip
       shell: bash
-      working-directory: tools/adversary
       run: |
         elan toolchain install "$(cat "$GITHUB_WORKSPACE/lean-toolchain")"
         lake --version

@@ -81,7 +81,7 @@ jobs:
       # bun and its cache for the client recipes, and the bundle the npm
       # and render gates judge.
       - uses: ./.github/actions/client-artifacts
-      # Lean for `just models`, which would otherwise pass silently here.
+      # Lean, which `just prereqs` requires and `just models` builds with.
       - uses: ./.github/actions/lean
       # The command itself rather than a list of its steps: a release
       # verify that spelled them out once lost the client install and cut

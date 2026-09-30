@@ -285,28 +285,31 @@ gates-sources:
 gates-artifacts: build-web
     cargo xtask gates {{artifact_gates}}
 
-# The Lean design models under `tools/adversary/design/`: each proves what the
-# Rust module it names must hold (the formal-models rule in AGENTS.md).
-# `lakefile.toml` sets `warningAsError`, so a `sorry` or an `admit`, which
-# Lean reports as a warning, fails the build; an `axiom` raises no warning
-# at all, so it is refused here by its shape, since no model in this tree
-# has an axiom anybody reviewed. Only the `Design` library is built: the
-# checker beside it attacks the binary and stays out of every required
-# check.
+# The Lean specifications: every module under `crates/`, each a part of a
+# crate's specification (ARCHITECTURE.md section 11, "Specifications in
+# Lean"), and the design models under `tools/adversary/design/` until they
+# reach their crates. `lakefile.toml` sets `warningAsError`, so a `sorry` or
+# an `admit`, which Lean reports as a warning, fails the build; an `axiom`
+# raises no warning at all, so it is refused here by its shape, since no
+# specification in this tree has an axiom anybody reviewed. The checker
+# under `tools/adversary/` is not built here: it attacks the binary and
+# stays out of every required check.
 #
-# Without Lean this recipe prints nothing and succeeds, so `just check` on
-# a machine without Lean reads byte for byte as it does where
-# `tools/adversary/` is absent; CI's `models` job asks `lake --version` first,
-# so there the skip cannot happen.
+# Lean is a required tool (`just prereqs`). Where `lake` is absent this
+# recipe fails and says how to install it, because a proof nobody ran is not
+# a pass.
 models:
     #!/usr/bin/env bash
     set -euo pipefail
-    command -v lake >/dev/null 2>&1 && [ -d tools/adversary/design ] || exit 0
-    if grep -nE '^[[:space:]]*(private[[:space:]]+)?axiom[[:space:]]' tools/adversary/design/*.lean; then
+    if ! command -v lake >/dev/null 2>&1; then
+        echo "models: lake is absent, so no specification was proved; \`just prereqs\` prints the lines that install elan and the toolchain lean-toolchain pins" >&2
+        exit 1
+    fi
+    if grep -rnE --include='*.lean' '^[[:space:]]*(private[[:space:]]+)?axiom[[:space:]]' crates tools/adversary/design; then
         echo "models: an axiom above is a proof obligation nobody discharged; prove it as a theorem"
         exit 1
     fi
-    cd tools/adversary && lake build Design
+    lake build Spec Design
 
 # Every commit subject and ruling trailer in a range of history
 # (xtask-SPEC.md section 8-35). Not in `check`, because a tree has no
@@ -501,7 +504,9 @@ mem *args:
 #
 # This recipe is the only place that knows where the binary is. The checker is
 # told through SPRAWLING_BIN and never searches for one, so an adversary run can
-# never be driven by a stale binary somebody left in target/.
+# never be driven by a stale binary somebody left in target/. It runs at the
+# repository root, where the Lean package is, so the checker's paths are
+# relative to the root.
 adversary *args:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -517,7 +522,7 @@ adversary *args:
     # nothing outside that shell resolves; `cygpath -m` turns it back into
     # `C:/...` and is absent everywhere it is not needed.
     ! command -v cygpath >/dev/null 2>&1 || binary="$(cygpath -m "$binary")"
-    cd tools/adversary && SPRAWLING_BIN="$binary" lake exe adversary {{args}}
+    SPRAWLING_BIN="$binary" lake exe adversary {{args}}
 
 # The acceptance gate for a real endpoint (never a gate in `just
 # check`; without credentials it prints one line and succeeds).

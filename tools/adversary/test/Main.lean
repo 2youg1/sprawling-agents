@@ -88,7 +88,7 @@ written in the other order, and neither refusal is a value anybody computed:
 both are promises the door makes to whoever is driving it. -/
 private def deliverable : IO Unit := do
   let rendered := render "a_halted_city_names_the_halt_and_not_the_configuration" remembered
-  let path : System.FilePath := ".." / ".." / "crates" / "sprawling" / "tests" / "from_adversary.rs"
+  let path : System.FilePath := "crates" / "sprawling" / "tests" / "from_adversary.rs"
   if (← IO.getEnv "SPRAWLING_ACCEPT") == some "1" then
     IO.FS.writeFile path rendered
   else

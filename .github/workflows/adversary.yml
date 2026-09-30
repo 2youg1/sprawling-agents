@@ -4,7 +4,7 @@
 # only by answering what a push cannot, and names the two inputs that change
 # while nobody pushes - the world outside this repository, and a fresh draw of
 # random bytes. Only the second one applies here, so it carries the whole
-# justification: `tools/adversary/lake-manifest.json` declares no packages, so there
+# justification: `lake-manifest.json` at the repository root declares no packages, so there
 # is no dependency graph to resolve and nothing outside this repository that
 # tonight's run could disagree with yesterday's about. What moves is the seed,
 # which follows the run number, so tonight walks traces last night did not.
@@ -63,12 +63,10 @@ jobs:
       - uses: ./.github/actions/lean
 
       - name: build the checker
-        working-directory: tools/adversary
-        run: lake build
+        run: lake build Sprawling adversary
 
       # The whole tree, in one step. A failure prints the check's name, the seed
       # and the shrunk trace, which is everything needed to reproduce it with
       # `just adversary --select "<name>"` and the seed in SPRAWLING_SEED.
       - name: the properties
-        working-directory: tools/adversary
         run: lake exe adversary
