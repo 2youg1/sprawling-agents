@@ -391,6 +391,34 @@ duty = "the assembly root"
         assert_eq!(drawn.unwrap(), Some(expected.to_owned()));
     }
 
+    /// A package that migrated points at its `Spec.lean`, and one that has
+    /// not at its Markdown SPEC.
+    #[test]
+    fn a_migrated_package_quotes_its_lean_specification() {
+        let root = crate::root::fixture::relocated("crate-table-lean");
+        crate::root::fixture::write(&root, "architecture.toml", FAMILIES);
+        crate::root::fixture::write(&root, "tools/k/Spec.lean", "");
+        crate::root::fixture::write(&root, "crates/j/j-SPEC.md", "");
+        let drawn = value(&root, "crate_table");
+        std::fs::remove_dir_all(&root).unwrap();
+        let cells = drawn.map_err(|err| err.to_string()).map(|table| {
+            table.map(|text| {
+                text.lines()
+                    .skip(2)
+                    .filter_map(|row| row.trim_end_matches(" |").rsplit("| ").next())
+                    .map(str::to_owned)
+                    .collect::<Vec<String>>()
+            })
+        });
+        assert_eq!(
+            cells,
+            Ok(Some(vec![
+                "`crates/j/j-SPEC.md`".to_owned(),
+                "`tools/k/Spec.lean`".to_owned()
+            ]))
+        );
+    }
+
     #[test]
     fn a_crate_table_row_whose_family_is_missing_is_refused_by_name() {
         let without_k = FAMILIES.replace("[family.k]\nduty = \"what k owns | and a bar\"\n", "");

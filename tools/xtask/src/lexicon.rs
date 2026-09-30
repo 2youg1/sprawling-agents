@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Lexicon gate: one concept, one name. Scans markdown, Rust sources and
-//! the client's `lang.json` for banned terms (the machine subset of the
+//! Lexicon gate: one concept, one name. Scans markdown, Rust sources, Lean
+//! and the client's `lang.json` for banned terms (the machine subset of the
 //! retired-term list; data face is tools/xtask/lexicon.toml). A line is exempt
 //! when it or the line above carries `lexicon-ok: <reason>` (redline C6).
 
@@ -37,12 +37,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     // The same gate also holds the two ways a vocabulary grows a second
     // authority; see `vocabulary`.
     violations.extend(crate::vocabulary::check(root)?);
-    for file in walk::files_with_ext(root, &["md", "rs"])? {
-        let rel = walk::rel(root, &file);
-        if walk::in_isolation_zone(&rel) {
-            continue;
-        }
-        let text = walk::read_text(&file)?;
+    for rel in sources(root)? {
+        let text = walk::read_text(&root.join(&rel))?;
         scan(&rel, &text, &data.entry, &mut violations);
     }
     // Every word a reader is given comes from here, so a retired word in
@@ -51,6 +47,18 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let text = walk::read_text(&root.join(LANG))?;
     scan(LANG, &text, &data.entry, &mut violations);
     Ok(violations)
+}
+
+/// The files whose words a reader meets: documents, Rust and the Lean
+/// specifications, whose comments are Chinese prose that names concepts
+/// by their English names (xtask-SPEC.md section 8-43). The isolation
+/// zone is never published, so it is left out.
+fn sources(root: &Path) -> Result<Vec<String>, XtaskError> {
+    Ok(walk::files_with_ext(root, &["md", "rs"])?
+        .iter()
+        .map(|file| walk::rel(root, file))
+        .filter(|rel| !walk::in_isolation_zone(rel))
+        .collect())
 }
 
 fn load(root: &Path) -> Result<Data, XtaskError> {
@@ -109,6 +117,24 @@ mod tests {
         );
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].location, "doc.md:2");
+    }
+
+    #[test]
+    fn a_lean_specification_is_read_beside_documents_and_rust() {
+        let root = std::env::temp_dir().join(format!("lexicon-sources-{}", std::process::id()));
+        for rel in ["a.md", "b.rs", "crates/x/Spec.lean", "d.txt", "local/e.md"] {
+            crate::root::fixture::write(&root, rel, "");
+        }
+        let read = sources(&root).map_err(|err| err.to_string());
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(
+            read,
+            Ok(vec![
+                "a.md".to_owned(),
+                "b.rs".to_owned(),
+                "crates/x/Spec.lean".to_owned()
+            ])
+        );
     }
 
     #[test]

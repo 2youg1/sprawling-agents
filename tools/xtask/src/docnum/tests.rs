@@ -119,3 +119,26 @@ fn a_span_naming_no_fact_leaves_the_map_without_it() {
     readings(&root(), &found, &mut taken).expect("an unknown key is not an error here");
     assert!(taken.is_empty());
 }
+
+/// A Lean specification holds a managed span in its block comment, and
+/// the gate reads it there as it reads a Markdown one.
+#[test]
+fn a_span_in_a_lean_specification_is_judged() {
+    let root = std::env::temp_dir().join(format!("docnum-lean-{}", std::process::id()));
+    crate::root::fixture::write(
+        &root,
+        "crates/x/Spec.lean",
+        "/-! <!-- xtask:begin no_such_fact -->1<!-- xtask:end --> -/\n",
+    );
+    let judged = check(&root).map(|found| {
+        found
+            .into_iter()
+            .map(|v| v.location)
+            .collect::<Vec<String>>()
+    });
+    std::fs::remove_dir_all(&root).unwrap();
+    assert_eq!(
+        judged.map_err(|err| err.to_string()),
+        Ok(vec!["crates/x/Spec.lean:1".to_owned()])
+    );
+}

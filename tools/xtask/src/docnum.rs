@@ -114,9 +114,11 @@ pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
     Ok(format!("docnum: {changed} document(s) rewritten\n"))
 }
 
-/// Every Markdown file a reader can receive. The isolation zone holds
-/// one machine's working notes and is never published, so a marker
-/// there is nobody's authority.
+/// Every document a reader can receive: the Markdown ones, and the Lean
+/// specifications, whose block comments hold a span as well as a Markdown
+/// paragraph does (xtask-SPEC.md section 8-43). The isolation zone holds
+/// one machine's working notes and is never published, so a marker there
+/// is nobody's authority.
 fn documents(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
     let all = walk::files_with_ext(root, &["md"])?;
     Ok(all

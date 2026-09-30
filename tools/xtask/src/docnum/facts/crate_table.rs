@@ -12,6 +12,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use crate::lean;
 use crate::members::{self, Member};
 use crate::report::XtaskError;
 use crate::{architecture, depmap, modmap, walk};
@@ -61,7 +62,11 @@ fn row(
              on; register it in the block first"
         ),
     })?;
-    let spec = format!("{}/{name}-SPEC.md", member.dir);
+    let spec = if lean::migrated(root, &member.dir) && member.dir.is_empty() {
+        format!("{}/{}", member.dir, lean::ENTRY)
+    } else {
+        format!("{}/{name}-SPEC.md", member.dir)
+    };
     let present = root
         .join(&spec)
         .try_exists()

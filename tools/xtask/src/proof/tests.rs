@@ -206,3 +206,28 @@ fn a_relocated_package_contributes_its_harnesses() {
         packages.len()
     );
 }
+
+/// A harness left unproved may cite the Lean specification that holds
+/// the decision, as it may cite a Markdown one.
+#[test]
+fn an_excuse_may_cite_a_lean_specification() {
+    let harness = |excuse: &str| super::Harness {
+        package: "k".to_owned(),
+        location: "k/src/lib.rs:1".to_owned(),
+        name: "holds".to_owned(),
+        excuse: Some(excuse.to_owned()),
+    };
+    let mut out = Vec::new();
+    super::every_excuse_cites_where_it_was_decided(
+        &[
+            harness("out of reach, crates/kernel/Spec.lean D3"),
+            harness("out of reach, kernel-SPEC.md 8-13"),
+            harness("out of reach"),
+        ],
+        &mut out,
+    );
+    assert_eq!(
+        out.into_iter().map(|v| v.violation).collect::<Vec<_>>(),
+        ["`// not-proved:` here reads \"out of reach\", which cites no document"]
+    );
+}

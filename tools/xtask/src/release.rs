@@ -200,6 +200,8 @@ pub(crate) fn outside_the_tree(line: &str, dirs: &BTreeSet<String>) -> Option<St
 /// offenders that is wrong in every entry, which is worse than not
 /// looking.
 pub(crate) fn is_prose(rel: &str, line: &str) -> bool {
+    // A Lean specification's code is a model, not a city: a path in it is
+    // a citation (xtask-SPEC.md section 8-43).
     if rel.ends_with(".md") || rel.ends_with(".html") {
         return true;
     }

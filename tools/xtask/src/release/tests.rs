@@ -202,3 +202,17 @@ fn a_bracket_that_is_not_a_link_is_not_a_target() {
     assert!(link_targets("an array [1, 2] (three)").is_empty());
     assert!(link_targets("nothing here at all").is_empty());
 }
+
+/// A Lean specification is prose throughout, and a `.lean` it names is a
+/// document it tells a reader to open.
+#[test]
+fn a_lean_specification_is_prose_and_cites_lean() {
+    let dirs: BTreeSet<String> = ["crates".to_owned()].into_iter().collect();
+    assert_eq!(
+        (
+            is_prose("crates/x/Spec.lean", "theorem t : True := trivial"),
+            outside_the_tree("see nowhere/Spec.lean", &dirs),
+        ),
+        (true, Some("nowhere/Spec.lean".to_owned()))
+    );
+}

@@ -171,12 +171,15 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 
 /// A harness that is not proved says why, and says it where the reader
 /// can check: the reason names the document that holds the decision.
-fn every_excuse_cites_where_it_was_decided(found: &[Harness], out: &mut Vec<Violation>) {
+pub(crate) fn every_excuse_cites_where_it_was_decided(found: &[Harness], out: &mut Vec<Violation>) {
     for harness in found {
         let Some(reason) = &harness.excuse else {
             continue;
         };
-        if reason.contains(".md") {
+        if [".md", ".lean"]
+            .iter()
+            .any(|document| reason.contains(document) && *document == ".md")
+        {
             continue;
         }
         out.push(Violation {
