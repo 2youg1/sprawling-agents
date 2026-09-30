@@ -164,19 +164,20 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 
 一个房间的居民可以是五家官方 harness 之一（agent_protocols-SPEC §8-19）。派活到这样的房间时，城起那一家的进程，在房间自己的 worktree 里开一场 ACP 会话，把它汇报的东西记进账本，在它答出停止原因时结束这次 run。
 
-**性质的权威是 `tools/adversary/design/HarnessRun.lean`**，三组定理：
+**性质的权威是 `tools/adversary/design/HarnessRun.lean`**，四组定理：
 
 - **汇报恒不是准入历史**（`a_report_is_never_admitted`）：一次 harness run 的准入记录只有它的开始、它对城那次 prompt 的回答与冻结，中间汇报多少、汇报什么都不改变这一点。
 - **停摆先变成取消**（`a_halt_is_a_cancel_before_anything_else`、`a_second_halt_sends_nothing`）：城观察到一个罩住这个房间的停摆之后，run 发出的下一件事就是 `session/cancel`，此后的汇报排在它后面；第二次停摆什么也不发。
 - **冻结的 run 是历史**（`nothing_follows_the_stop_reason`）：停止原因到了，run 记下回答、冻结，此后什么都不记、什么都不发。
+- **只有准入的记录能作证**（`a_cited_record_is_admitted`、`no_report_is_admitted`）：Done 引的那一行是 harness 对城那次 prompt 的回答；汇报恒不在准入历史里，所以恒不作证。
 
 **它守的是 ARCHITECTURE §5 第 4 步的弱形**。harness 自己执行工具，城准不了也拒不了它做的事，只能记它选择汇报的东西。所以「每个效果先成为事件」在这里分成两半：城自己决定的事（run 开始了、停摆变成了取消、城那次 prompt 得到了什么回答、run 怎么结束）是准入历史；harness 一路上说它做了什么是汇报，在它说了之后才落账，恒不被读回来当作一个判定。
 
 **已定的十条**：
 
-1. **汇报是一个新的 record-only 种类 `harness_reported`**：kernel-SPEC §8-4 的表加一行，`EventKind::ALL`、`xtask specalign`、`WIRE_V` 与 golden 随之动。载荷携 run、`agent_protocols::Update` 的变体名与它的文字字段；permission 的问与城的答也记成一条汇报。回答「城做了什么」的 fold 恒不读它，只有回答「harness 说了什么」的视图读它。
+1. **汇报是一个新的 record-only 种类 `harness_reported`**：载荷是 `kernel::event::record::HarnessReported`（kernel-SPEC §8-4），一条汇报一行：回答或推理的一段、harness 开始的一次工具调用与它的状态、一种本城没有读法的汇报（只记名字），以及 permission 的问与城的答。种类名进握手哈希，旧页面在握手处被拒，`WIRE_V` 不为此进位（wire-SPEC §12.1）。回答「城做了什么」的 fold 恒不读它，只有回答「harness 说了什么」的视图读它。
 2. **停摆到取消**：城在把下一条汇报落账之前查一次这个房间所在的停摆；罩住了，就先落 `cancel_received`，再发 `session/cancel`，然后照常读到 `stopReason: cancelled` 为止。复用已有的 `cancel_received`，因为它记的正是「这个 run 收到了一次取消」。
-3. **停止原因到结局**：`cancelled` 冻成 `Completion::Cancelled`；`max_tokens`、`max_turn_requests` 与 `refusal` 冻成 `Completion::Limit`，因为 run 是撞上了什么而停，不是做完了；`end_turn` 见第 8 条。
+3. **停止原因到结局**：`cancelled` 冻成 `Completion::Cancelled`；`max_tokens`、`max_turn_requests` 与 `refusal` 冻成 `Completion::Limit`，因为 run 是撞上了什么而停，不是做完了；`end_turn` 见第 8 条。每一种停止原因都先写一条 `harness_answered`，再冻结：`HarnessRun.lean` 里 `answer` 排在 `freeze` 之前，对五种停止原因都一样。
 4. **confidential 楼拒绝 harness 居民**：`agree_to_work` 在写任何东西之前答 `E_GATE_DENIED`。harness 执行自己的工具，并把房间的内容送到它自己厂商的服务器，confidential 楼「数据进来不出去」的承诺对它不成立。
 5. **harness 恒在房间自己的 worktree 里跑**：用评审楼的同一种租约，不论楼的 `review` 设了什么。城管不了它写什么，但管得了它写在哪：它的写入只经已有的评审合并进入城的主树，而合并是准入的。
 6. **进程归 `agent_protocols::harness`**：起 `Launch` 的程序与参数，工作目录是那棵 worktree，走管道，落地即杀。理由与 `agent_protocols::mcp::stdio` 相同：字节怎么走归协议那个 crate（agent_protocols-SPEC §7）。

@@ -534,6 +534,25 @@ pub struct VaultFellBack { pub component: String,     // 探针写 vault
                            pub reason: String }
 // wire::note_of 只把 Refused 记成回合上的 Note::Refused；VaultFellBack 没改变任何回合，不出 note。
 
+// record::harness：官方 harness 居民一次 run 写的两种行（sprawling-SPEC §8-4e）。
+// 词是本城的，不是 ACP 的：账本写下的拼写不能再改，ACP 的词跟着上游走（§12.9）。
+#[serde(tag = "report", rename_all = "snake_case")]
+pub enum HarnessReported {
+    Said { text: String },                                    // 回答城的一段
+    Thought { text: String },                                 // 推理的一段
+    ToolCall { call: String, title: String, kind: String },   // harness 开始的一次工具调用，按它自己的话
+    ToolCallStatus { call: String, status: String },          // 那次调用的状态变了
+    Other { variant: String },                                // 本城没有读法的一种汇报，只记它的名字
+    PermissionAsked { title: String, options: Vec<HarnessPermit> },
+    PermissionAnswered { chosen: Option<String> },            // 城选的 option id；None 即答 cancelled
+}
+pub struct HarnessPermit { pub id: String, pub name: String, pub kind: HarnessPermitKind }
+#[serde(rename_all = "snake_case")]
+pub enum HarnessPermitKind { AllowOnce, AllowAlways, RejectOnce, RejectAlways }
+pub struct HarnessAnswered { pub stop: HarnessStop, pub text: String }   // text 空亦写出
+#[serde(rename_all = "snake_case")]
+pub enum HarnessStop { EndTurn, MaxTokens, MaxTurnRequests, Refusal, Cancelled }
+
 pub struct ToolCalled { pub id: String, pub name: ToolName, pub args: Payload,
                         pub subject: Option<String> }   // 键缺席读作 None
 pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
@@ -570,6 +589,8 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 `Steer`／`Freeze` 不出 note——纠偏与冻结各有自己的行；
 `pr_merged` 借 `CommitAttribution` 记「谁做的这次提交」，其余键由调用点手写。
 没有结构的 kind 由调用点手写读取。
+
+- **harness 的两种行各有一个结构。** `harness_reported` 一条汇报一行，`report` 键说是哪一种；`harness_answered` 在停止原因到了时写一行，携停止原因与这一回合 harness 回答城的文字（依次拼起来的回答段）。两者都不 `default`：这两种行自诞生起就按这个形状写，缺键的行该拒而不该猜。回答「城做了什么」的折叠恒不读 `harness_reported`，只有回答「harness 说了什么」的视图读它。
 
 - **`ToolCalled.subject` 在写记录时算定，读方读它，不从 `args` 再推一遍。**
   两个读方各按自己的 map 序挑第一个字符串时，同一次调用读出两个主语：
@@ -1054,7 +1075,7 @@ pub struct Claim { pub locator: Locator, pub by: String }        // 证词：未
 pub struct Artifact { /* locator, verified_by —— 私有 */ }
 impl Artifact {
     /// Sole constructor: player–referee in the type. Verification evidence
-    /// must be a tool_result or model_returned ref, else E_EVIDENCE_MISSING.
+    /// must cite a kind in `completion::CITABLE`, else E_EVIDENCE_MISSING.
     pub fn verify(claim: Claim, evidence: EventRef) -> Result<Artifact, AxError>;
     pub fn locator(&self) -> &Locator;  pub fn verified_by(&self) -> &EventRef;
 }
@@ -1216,9 +1237,10 @@ pub fn observe(state: PursuitState, ready: &[NodeId], in_flight: u32) -> Pursuit
 
 ```rust
 pub struct Evidence(/* Vec<EventRef> 私有 */);
+pub(crate) const CITABLE: [EventKind; 3];   // tool_result、model_returned、harness_answered
 impl Evidence {
-    /// Non-empty and every ref kind ∈ {tool_result, model_returned},
-    /// else E_EVIDENCE_MISSING. A6's type half.
+    /// Non-empty and every ref kind ∈ `CITABLE`, else E_EVIDENCE_MISSING.
+    /// A6's type half.
     pub fn new(refs: Vec<EventRef>) -> Result<Evidence, AxError>;
     pub fn refs(&self) -> &[EventRef];
 }
@@ -1232,6 +1254,7 @@ pub enum Progress { Planned(PlannedProgress), Unplanned(UnplannedProgress) }
 
 - 两态分两 struct 而非 enum 携字段：百分比方法只能长在 Planned 上，Unplanned 拿不到——「界面拿不到百分比就画不出百分比」的类型形态。
 - `EventRef` 有 `pub fn kind(&self) -> EventKind`：Evidence 校验需读 kind。
+- **能作证的种类只有一张表。** `completion::CITABLE` 列出 `tool_result`、`model_returned` 与 `harness_answered`；`Evidence::new` 与 `registry::Artifact::verify` 读同一张表，拒绝时的恢复语也由这张表拼出，不另写一遍三个词。作证与窗类是两件事：`harness_answered` 是 record-only，它能作证，是因为它是城自己记下的、harness 对城那次请求的回答，与模型 run 以最后一条 `model_returned` 作证同一标准。`harness_reported` 恒不作证：汇报是 harness 自己说的话，城没有判过它（性质见 `HarnessRun.lean` 的 `a_cited_record_is_admitted`）。
 
 ### 8-21 kernel::approval
 
@@ -1804,6 +1827,14 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 ### 12.8 定规：受保护元数据名单只有 kernel::address 一个家
 
 `PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`storage::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是storage 侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 storage 的别名族规则承担（storage-SPEC 8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
+
+### 12.9 harness 的汇报与回答按本城的词入账
+
+**决定**：`harness_reported` 与 `harness_answered` 的载荷用 kernel 自己的类型拼写（`HarnessReported`、`HarnessPermit`、`HarnessPermitKind`、`HarnessAnswered`、`HarnessStop`）。`agent_protocols::harness` 读 ACP 用的类型（`Update`、`PermissionAsk`、`Permit`、`StopReason`）不搬进 kernel，装配层把后者逐臂映成前者。
+
+**理由**：账本一旦写下，拼写就不能再改（§8-4 三条不变量的第一条），ACP 的词却跟着上游走，两边只是今天恰好相同。把 ACP 的类型搬进 kernel，上游改一个词时要么改坏已落盘的行，要么让协议层读不懂新版本。映射是穷尽 `match`，上游多出一种汇报时，编译停在映射处，而不是静默丢掉。
+
+**被否**：①载荷只记变体名与一段文字（`update: String`、`text: String`）：读「harness 说了什么」的视图要再解析一次字符串，工具调用的标题与状态会混成一段；②`agent_protocols` 直接改用 kernel 的类型：理由同上；③`InputKinds`、`ModelFacts` 那样把类型归 kernel、协议层再导出：那两者的值来自本城自己的读法，这里的值来自上游规格。
 
 ## 13 依赖选型
 
