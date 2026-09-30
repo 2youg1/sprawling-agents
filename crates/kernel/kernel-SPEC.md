@@ -242,13 +242,14 @@ impl ErrorDraft {
 | 治理与设施 | `E_WIRE_MISMATCH` | 装载期（无 carrier） |
 | 治理与设施 | `E_LOG_VERSION_UNSUPPORTED` | 装载期（无 carrier） |
 | 治理与设施 | `E_LEDGER_HELD` | 装载期（无 carrier） |
+| 治理与设施 | `E_HISTORY_UNPROVEN` | 装载期（无 carrier） |
 | 隐私与 Discard | `E_SECRET_EGRESS` | `gate_denied` |
 | 隐私与 Discard | `E_DISCARD_IRREVERSIBLE` | `gate_denied` |
 | 背压 | `E_BACKPRESSURE_SHED` | `tool_result` |
 | 运行未知 | `E_TOOL_OUTCOME_UNKNOWN` | `tool_result` |
 | 计划 | `E_PLAN_MISSING` | `tool_result` |
 
-装载期六码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED` `E_LEDGER_HELD`）＝C9 唯一例外白名单；`Carrier::Loadtime` 即其类型面。白名单封闭，进表的条件只有一条：**这个码只在本进程此刻写不了账本时出现**，因为它若有账本可写，就必须有 carrier。每一码进表的理由逐条记在 §12。
+装载期七码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED` `E_LEDGER_HELD` `E_HISTORY_UNPROVEN`）＝C9 唯一例外白名单；`Carrier::Loadtime` 即其类型面。白名单封闭，进表的条件只有一条：**这个码只在本进程此刻写不了账本时出现**，因为它若有账本可写，就必须有 carrier。每一码进表的理由逐条记在 §12。
 `E_BUSY` 的 carrier 与 `E_WORKTREE_BUSY` 一样是 `tool_result`，而两者的区别在名字里：那一个说的是工作树这个机制，这一个说的是**同一个地址上有 run 正在工作**，拒绝里点名那条 run，调用方据此先停它再动手。
 两条呈现约束：`E_SECRET_EGRESS` 的 subject 只写 SecretRef 与位置、恒不回显命中字节；`E_DISCARD_IRREVERSIBLE` 的 alternative 必须可执行。执行点在各生产模块，此处记为 carrier 表随附契约。
 
@@ -1739,6 +1740,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 - `E_LOG_VERSION_UNSUPPORTED`／`E_CAS_CORRUPT`：住装载期白名单，产生地在 memory/runtime（见各自 SPEC）。
 - `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；storage 的 Io 映射已改正（storage-SPEC §12）。
 - `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 storage 的写者锁先于一切读写定义掉（storage-SPEC §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
+- `E_HISTORY_UNPROVEN`（服务中的城还在证明它开城时的历史，装载期）：不可定义掉——城从快照起步，快照之前的历史由后台证明走一遍（storage-SPEC §8-30、sprawling-SPEC 8-122），而开城不等它。它只能住装载期白名单：证明完成之前，写者拒绝每一次追加，被拒的一方此刻恰恰写不了账本。它不能借 `E_LEDGER_HELD`：那一码的 recovery 是停下另一个进程，这一码的 recovery 是等几秒再发一次（「the city is still proving the history it opened from; send it again once the log says the history is proved」）。它也不能借 `E_BUSY`：那一码点名一条正在工作的 run，这里没有 run。
 
 其余的码（逐码答「能否定义掉」）：
 
