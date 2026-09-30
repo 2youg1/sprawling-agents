@@ -246,7 +246,7 @@ pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str>;
 
 **夹具城留在 `<构建档目录>/../bench-cities/<名>`**，下次复用：40 万条是 376 MB，每次重写要付的时间比量它还多。复用只看那座城在不在；`xtask mem --city` 读的就是同一座城（xtask-SPEC §8-30），于是首字节与启动峰值出自同一份历史。
 
-**每座夹具城的读数旁打印它账本的摘要**（`citysim::ledger_digest`，§3-8），两条首字节读数只在摘要相等时可比。每个样本那次 `serve` 的标准错误写进 `<构建档目录>/../bench-cities/<名>.serve.log`（后一个样本覆盖前一个），报告里打印这个路径。其中以 `opened the city in` 开头的那一行是产品自己拆出的开城各段耗时（sprawling-SPEC 8-121）：本族不解析它，只把它和首字节读数放在同一次开城旁边给人读。
+**每座夹具城的读数旁打印它账本的摘要**（`citysim::ledger_digest`，§3-8），两条首字节读数只在摘要相等时可比。每个样本那次 `serve` 的标准错误写进 `<构建档目录>/../bench-cities/<名>.serve.log`（后一个样本覆盖前一个），报告里打印这个路径。其中以 `opened the city in` 开头的那一行是产品自己拆出的开城各段耗时（sprawling-SPEC 8-121），以 `the history is proved` 开头的那一行是后台证明走完、写者开始接受命令的时刻（就绪时刻 M3，sprawling-SPEC 8-122）：本族不解析它们，只把它们和首字节读数放在同一次开城旁边给人读。所以一个样本量完首字节之后并不立刻停掉 `serve`，而是等日志里出现证明的结局（`the history is proved` 或 `the ledger stopped taking writes`），至多 300 s；首字节读数在这之前已经取下，不受这段等待影响。
 
 ```rust
 // tools/citysim/src/bin/bench_startup/actions/history.rs —— shape: adapter（一座有历史的夹具城：init 之后经产品的 Ledger 写入）
