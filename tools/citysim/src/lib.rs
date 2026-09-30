@@ -18,6 +18,7 @@ mod ablation;
 mod checker;
 mod executor;
 mod fixture_digest;
+mod long_turn;
 mod mem_ledger;
 #[cfg(test)]
 mod metabolism;
@@ -34,6 +35,7 @@ mod suite;
 pub use checker::check_chain;
 pub use executor::{CancelPoint, Scenario, ScenarioReport, run_scenario, run_scenario_on};
 pub use fixture_digest::{fixture_label, ledger_digest};
+pub use long_turn::{Pauses, STEP_BYTES, TurnReading, long_turn};
 pub use mem_ledger::MemLedger;
 pub use red_team::{Arm, Case, Claim, Comparison, Plant, compare};
 pub use script_model::{ScriptModel, concluding};
