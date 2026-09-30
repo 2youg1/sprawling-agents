@@ -28,6 +28,7 @@
 mod act;
 mod capture;
 mod clipboard;
+mod dpi;
 mod encode;
 mod enumerate;
 mod fault;
