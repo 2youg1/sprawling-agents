@@ -120,7 +120,7 @@ pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
 /// one machine's working notes and is never published, so a marker there
 /// is nobody's authority.
 fn documents(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
-    let all = walk::files_with_ext(root, &["md"])?;
+    let all = walk::files_with_ext(root, &["md", "lean"])?;
     Ok(all
         .into_iter()
         .filter(|path| !walk::in_isolation_zone(&walk::rel(root, path)))

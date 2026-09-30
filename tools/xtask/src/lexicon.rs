@@ -54,7 +54,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 /// by their English names (xtask-SPEC.md section 8-43). The isolation
 /// zone is never published, so it is left out.
 fn sources(root: &Path) -> Result<Vec<String>, XtaskError> {
-    Ok(walk::files_with_ext(root, &["md", "rs"])?
+    Ok(walk::files_with_ext(root, &["md", "rs", "lean"])?
         .iter()
         .map(|file| walk::rel(root, file))
         .filter(|rel| !walk::in_isolation_zone(rel))

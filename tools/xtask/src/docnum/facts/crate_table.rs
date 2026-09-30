@@ -62,7 +62,7 @@ fn row(
              on; register it in the block first"
         ),
     })?;
-    let spec = if lean::migrated(root, &member.dir) && member.dir.is_empty() {
+    let spec = if lean::migrated(root, &member.dir) {
         format!("{}/{}", member.dir, lean::ENTRY)
     } else {
         format!("{}/{name}-SPEC.md", member.dir)

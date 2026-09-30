@@ -106,8 +106,9 @@ const DETECTORS: [&str; 5] = [
 /// or a placeholder, and guessing which of those a reader is meant to
 /// follow would make the gate wrong about prose it has no business
 /// judging.
-pub(crate) const CITED_EXTENSIONS: [&str; 7] =
-    [".md", ".rs", ".toml", ".html", ".css", ".json", ".jsonl"];
+pub(crate) const CITED_EXTENSIONS: [&str; 8] = [
+    ".md", ".rs", ".toml", ".html", ".css", ".json", ".jsonl", ".lean",
+];
 
 /// Every directory name the published tree contains, at any depth.
 ///
@@ -202,7 +203,7 @@ pub(crate) fn outside_the_tree(line: &str, dirs: &BTreeSet<String>) -> Option<St
 pub(crate) fn is_prose(rel: &str, line: &str) -> bool {
     // A Lean specification's code is a model, not a city: a path in it is
     // a citation (xtask-SPEC.md section 8-43).
-    if rel.ends_with(".md") || rel.ends_with(".html") {
+    if rel.ends_with(".md") || rel.ends_with(".html") || rel.ends_with(".lean") {
         return true;
     }
     rel.ends_with(".rs") && line.trim_start().starts_with("//")

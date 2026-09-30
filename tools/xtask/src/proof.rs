@@ -178,7 +178,7 @@ pub(crate) fn every_excuse_cites_where_it_was_decided(found: &[Harness], out: &m
         };
         if [".md", ".lean"]
             .iter()
-            .any(|document| reason.contains(document) && *document == ".md")
+            .any(|document| reason.contains(document))
         {
             continue;
         }

@@ -106,6 +106,11 @@ check-branch base="main":
     step deny just deny
     touched client && step client just client-checks && step artifacts cargo xtask gates render budget npm
     touched desktop && step desktop just check-desktop
+    # A Lean specification is proved by `models`, which no other step runs;
+    # the Lean package's own three files change what it proves
+    # (tools/xtask/xtask-SPEC.md section 8-43).
+    printf '%s\n' "$changed" | grep -qE '\.lean$|^(lakefile\.toml|lean-toolchain|lake-manifest\.json)$' \
+        && step models just models
     [ "$rc" = 0 ] && [ -n "$clean" ] && mkdir -p "$(dirname "$mark")" && touch "$mark"
     exit "$rc"
 
