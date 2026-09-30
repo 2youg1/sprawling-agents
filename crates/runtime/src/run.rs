@@ -137,8 +137,11 @@ pub enum Advance {
 /// than traits: no second implementation exists yet, and this
 /// library introduces a trait at a seam that already has one.
 pub struct RunHooks<'a> {
-    /// The clock. Called once per dispatch line, once per turn, and once
-    /// per freeze that is not a cancellation.
+    /// The clock, called by the driver on its own thread and nowhere else:
+    /// once per dispatch line, once per turn, once when each model attempt
+    /// is sent and once when its reply is whole, once when each tool call
+    /// starts and once when it answers, and once per freeze that is not a
+    /// cancellation.
     pub now: &'a mut dyn FnMut() -> Result<TimeMs, AxError>,
     /// Answers what arrived at a safe point.
     pub interrupt: &'a mut dyn FnMut(SafePoint) -> Interrupt,
@@ -150,9 +153,9 @@ pub struct RunHooks<'a> {
     /// file, so it needs no checkpoint of its own (§8-45).
     pub writes: &'a dyn Fn(&ToolCall) -> kernel::Writes,
     /// Runs a wave's tool calls in three stages (see
-    /// [`crate::ConcurrentInvoke`]). The turn's stamp rides along because
-    /// the tool layer stamps results from it, and a caller that sampled
-    /// its own clock there would be a second time source inside one turn.
+    /// [`crate::ConcurrentInvoke`]). `admit` receives the turn's stamp; a
+    /// call's own moments are read by the turn from `now`, never by the
+    /// tool face, which holds no clock of its own.
     pub invoke: &'a mut dyn crate::ConcurrentInvoke,
     /// Holds the run until the moment the watchdog set for the next call
     /// to a provider that failed, and answers whether that call may go.

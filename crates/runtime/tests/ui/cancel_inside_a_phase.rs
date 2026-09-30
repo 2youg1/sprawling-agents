@@ -7,10 +7,12 @@
 // interrupts are transition parameters, and no cancel method exists.
 
 fn main() {
+    let mut now = || -> Result<kernel::TimeMs, kernel::AxError> { Ok(kernel::TimeMs::new(0)) };
     let turn = runtime::turn::Turn::begin(
         kernel::RunId::CITY,
         "who".to_owned(),
         kernel::TimeMs::new(0),
+        &mut now,
     );
     turn.cancel();
 }

@@ -7,10 +7,12 @@
 // provider cannot be reached before prompt assembly is on the ledger.
 
 fn main() {
+    let mut now = || -> Result<kernel::TimeMs, kernel::AxError> { Ok(kernel::TimeMs::new(0)) };
     let turn = runtime::turn::Turn::begin(
         kernel::RunId::CITY,
         "who".to_owned(),
         kernel::TimeMs::new(0),
+        &mut now,
     );
     let _ = turn.call();
 }

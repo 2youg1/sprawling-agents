@@ -112,11 +112,11 @@ fn call(id: &str, tool: &str) -> ToolCall {
     }
 }
 
-fn wave_of(ledger: &mut TestLedger, calls: Vec<ToolCall>) -> Turn<ToolWave> {
+fn wave_of(ledger: &mut TestLedger, calls: Vec<ToolCall>) -> Turn<'static, ToolWave> {
     let mut model = OneShotModel { calls };
     let mut conversation = Conversation::new();
     conversation.push_task_lines("read three files", "three reads", Opening::FromJob);
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
+    let turn = opened::<1>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,

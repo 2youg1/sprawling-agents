@@ -143,7 +143,7 @@ impl Run<Active> {
         let t = (hooks.now)()?;
         self.state.last_turn_t = Some(t);
 
-        let turn = Turn::begin(self.plan.run, self.plan.who.clone(), t);
+        let turn = Turn::begin(self.plan.run, self.plan.who.clone(), t, &mut *hooks.now);
         let opening = (hooks.interrupt)(SafePoint::BeforeAssemble { turn: index });
         fold_steer(&mut self.state.conversation, &opening);
         let turn = match turn.assemble(

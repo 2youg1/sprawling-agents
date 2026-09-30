@@ -8,7 +8,13 @@
 //! The reads a turn started while the model was still generating
 //! (`super::speculation`) are accounted here like every other call, each
 //! taking its cached result; `crates/runtime/spec/Turn/Speculation.lean` is the
-//! authority on why that leaves the Ledger serial execution writes.
+//! authority on why that leaves the lines, in the order and with the
+//! payloads, that serial execution writes.
+//!
+//! Each call's two lines carry their own moments: the start is read once
+//! the call is admitted and before its tool runs, the answer just before
+//! the two lines are written. The turn reads both from its clock; the
+//! tool face holds none.
 
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{
@@ -129,7 +135,14 @@ fn unheld_ticket() -> AxError {
     .with_recovery("report this against runtime::turn::wave: only a bench issues tickets")
 }
 
-impl Turn<ToolWave> {
+/// A call and the moment it started: read after the call was admitted
+/// and before its tool ran.
+struct Begun<'c> {
+    call: &'c ToolCall,
+    at: TimeMs,
+}
+
+impl<'h> Turn<'h, ToolWave> {
     /// The calls this wave is about to make, in call order.
     pub(crate) fn calls(&self) -> &[ToolCall] {
         &self.state.calls
@@ -167,7 +180,7 @@ impl Turn<ToolWave> {
         ledger: &mut dyn Ledger,
         tools: &mut dyn ConcurrentInvoke,
         still_going: &mut dyn FnMut(u32) -> Interrupt,
-    ) -> Result<PhaseOutcome<Turn<Recording>>, AxError> {
+    ) -> Result<PhaseOutcome<Turn<'h, Recording>>, AxError> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
@@ -190,11 +203,20 @@ impl Turn<ToolWave> {
             }
         }
         let leading: Vec<&ToolCall> = calls.iter().take(going.len()).collect();
-        let admitted: Vec<Admitted> = leading.iter().map(|call| tools.admit(call, t)).collect();
+        let mut admitted = Vec::with_capacity(leading.len());
+        let mut started = Vec::with_capacity(leading.len());
+        for call in &leading {
+            admitted.push(tools.admit(call, t));
+            started.push(self.journal.read_clock()?);
+        }
         let early = std::mem::take(&mut self.state.speculated).answers_for(&leading);
         let mut answers = all_at_once(&*tools, &leading, &admitted, &early).into_iter();
-        for (((call, standing), admission), cached) in
-            leading.iter().zip(going).zip(admitted).zip(early)
+        for ((((call, at), standing), admission), cached) in leading
+            .iter()
+            .zip(started)
+            .zip(going)
+            .zip(admitted)
+            .zip(early)
         {
             if let Some(cancelled) = self.consume_boundary(standing, ledger)? {
                 return Ok(PhaseOutcome::Cancelled(cancelled));
@@ -207,7 +229,7 @@ impl Turn<ToolWave> {
                     tools.account(call, ticket, ran)
                 }
             };
-            self.account(ledger, &mut exchange, call, answered)?;
+            self.account(ledger, &mut exchange, Begun { call, at }, answered)?;
         }
         if let Some(cancelled) = self.consume_boundary(halt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
@@ -216,8 +238,8 @@ impl Turn<ToolWave> {
             if let Some(cancelled) = self.consume_boundary(still_going(index), ledger)? {
                 return Ok(PhaseOutcome::Cancelled(cancelled));
             }
-            let answered = alone(tools, call, t);
-            self.account(ledger, &mut exchange, call, answered)?;
+            let (at, answered) = self.alone(tools, call)?;
+            self.account(ledger, &mut exchange, Begun { call, at }, answered)?;
         }
         Ok(self.recorded(calls, exchange))
     }
@@ -228,24 +250,50 @@ impl Turn<ToolWave> {
         exchange
     }
 
+    /// One call through all three stages on this thread: how every call
+    /// after the leading reads runs. The start is read once the call is
+    /// admitted, before its tool runs.
+    fn alone(
+        &mut self,
+        tools: &mut dyn ConcurrentInvoke,
+        call: &ToolCall,
+    ) -> Result<(TimeMs, Result<ToolOutcome, AxError>), AxError> {
+        let admission = tools.admit(call, self.journal.stamp());
+        let at = self.journal.read_clock()?;
+        let answered = match admission {
+            Admitted::Answered(answered) => answered,
+            Admitted::Cleared(ticket) => {
+                let ran = tools.tool(&ticket).and_then(|tool| tool.invoke(call));
+                tools.account(call, ticket, ran)
+            }
+        };
+        Ok((at, answered))
+    }
+
     /// Writes one call's `tool_called` and `tool_result` lines and its
     /// result block: the one place a wave's accounting happens, whichever
-    /// way the call was run.
+    /// way the call was run. The answer's moment is read here, just before
+    /// the two lines are written.
     fn account(
         &mut self,
         ledger: &mut dyn Ledger,
         exchange: &mut Exchange,
-        call: &ToolCall,
+        begun: Begun<'_>,
         answered: Result<ToolOutcome, AxError>,
     ) -> Result<(), AxError> {
+        let Begun { call, at: started } = begun;
+        let answered_at = self.journal.read_clock()?;
         let called = ToolCalled {
             id: call.id.clone(),
             name: call.name.clone(),
             subject: ToolCalled::subject_of(&call.args),
             args: call.args.clone(),
         };
-        self.journal
-            .append_redacted(ledger, Carried::ToolCalled, Payload::of(&called)?)?;
+        self.journal.append_redacted(
+            ledger,
+            Carried::ToolCalled { at: started },
+            Payload::of(&called)?,
+        )?;
         let mut pictures = Vec::new();
         let (answer, content, is_error) = match answered {
             Ok(ToolOutcome {
@@ -286,12 +334,19 @@ impl Turn<ToolWave> {
             // reference and four integers whatever the picture is.
             attachments: pictures,
         });
-        self.journal
-            .append_redacted(ledger, Carried::ToolResult, Payload::of(&result)?)?;
+        self.journal.append_redacted(
+            ledger,
+            Carried::ToolResult { at: answered_at },
+            Payload::of(&result)?,
+        )?;
         Ok(())
     }
 
-    fn recorded(self, calls: Vec<ToolCall>, exchange: Exchange) -> PhaseOutcome<Turn<Recording>> {
+    fn recorded(
+        self,
+        calls: Vec<ToolCall>,
+        exchange: Exchange,
+    ) -> PhaseOutcome<Turn<'h, Recording>> {
         PhaseOutcome::Advanced(Turn {
             journal: self.journal,
             state: Recording {
@@ -302,21 +357,5 @@ impl Turn<ToolWave> {
                 stop: self.state.stop,
             },
         })
-    }
-}
-
-/// One call through all three stages on this thread: how every call
-/// after the leading reads runs.
-fn alone(
-    tools: &mut dyn ConcurrentInvoke,
-    call: &ToolCall,
-    t: TimeMs,
-) -> Result<ToolOutcome, AxError> {
-    match tools.admit(call, t) {
-        Admitted::Answered(answered) => answered,
-        Admitted::Cleared(ticket) => {
-            let ran = tools.tool(&ticket).and_then(|tool| tool.invoke(call));
-            tools.account(call, ticket, ran)
-        }
     }
 }

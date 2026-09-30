@@ -24,7 +24,7 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
     };
     let mut conversation = Conversation::new();
     conversation.push_task_lines("probe the city", "one probe", Opening::FromJob);
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
+    let turn = opened::<1>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -109,7 +109,7 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
 fn cancel_at_the_call_boundary_stops_before_any_model_bytes() {
     let mut ledger = TestLedger::new();
     let mut model = OneShotModel { calls: vec![] };
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
+    let turn = opened::<1>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -146,7 +146,7 @@ fn cancel_at_the_call_boundary_stops_before_any_model_bytes() {
 fn steer_at_a_boundary_records_and_advances() {
     let mut ledger = TestLedger::new();
     let mut model = OneShotModel { calls: vec![] };
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(4));
+    let turn = opened::<4>();
     let turn = advance(
         turn.assemble(
             Interrupt::Steer {
@@ -194,7 +194,7 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
             args: Payload::empty(),
         }],
     };
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(2));
+    let turn = opened::<2>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -250,7 +250,7 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
 fn the_ledger_chain_stays_verifiable_after_a_turn() {
     let mut ledger = TestLedger::new();
     let mut model = OneShotModel { calls: vec![] };
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(3));
+    let turn = opened::<3>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -302,7 +302,7 @@ fn a_wave_halted_between_two_calls_does_not_make_the_second() {
     let mut model = OneShotModel {
         calls: vec![probe_call(), second],
     };
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(9));
+    let turn = opened::<9>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -376,7 +376,7 @@ fn assembling_borrows_the_conversation_and_the_tools() {
         description: "run a command".to_owned(),
         input_schema: Payload::empty(),
     }];
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
+    let turn = opened::<1>();
     let calling = advance(
         turn.assemble(
             Interrupt::None,

@@ -31,7 +31,7 @@ struct Scripted<'t> {
 }
 
 impl Segment for Scripted<'_> {
-    fn attempt(&mut self, failure: &AxError, _call: &mut ModelCall<'_>) -> SegmentOutcome {
+    fn attempt(&mut self, failure: &AxError, _call: &mut ModelCall<'_, '_>) -> SegmentOutcome {
         self.trace.borrow_mut().push((self.name, *failure.code()));
         self.answer
             .take()
@@ -99,7 +99,8 @@ fn the_relay_asks_segments_in_order_and_stops_at_the_first_recovery() {
     let mut ledger = TestLedger::new();
     let mut model = OneShotModel { calls: Vec::new() };
     let request = request();
-    let mut journal = Journal::open(run_id(), "sim".into(), TimeMs::new(1));
+    let mut clock = stopped(1);
+    let mut journal = Journal::open(run_id(), "sim".into(), TimeMs::new(1), &mut clock);
     let mut call = ModelCall::open(&mut journal, &mut ledger, &mut model, &request);
     let outcome = recover(
         &mut [&mut one, &mut two, &mut three],
@@ -134,7 +135,8 @@ fn when_every_segment_skips_the_original_failure_surfaces_unchanged() {
     let mut ledger = TestLedger::new();
     let mut model = OneShotModel { calls: Vec::new() };
     let request = request();
-    let mut journal = Journal::open(run_id(), "sim".into(), TimeMs::new(1));
+    let mut clock = stopped(1);
+    let mut journal = Journal::open(run_id(), "sim".into(), TimeMs::new(1), &mut clock);
     let mut call = ModelCall::open(&mut journal, &mut ledger, &mut model, &request);
     let outcome = recover(&mut [&mut one, &mut two], &mut call, original.clone());
     match outcome {
@@ -171,7 +173,8 @@ fn a_segment_that_cannot_repair_ends_the_relay_with_its_own_code() {
     let mut ledger = TestLedger::new();
     let mut model = OneShotModel { calls: Vec::new() };
     let request = request();
-    let mut journal = Journal::open(run_id(), "sim".into(), TimeMs::new(1));
+    let mut clock = stopped(1);
+    let mut journal = Journal::open(run_id(), "sim".into(), TimeMs::new(1), &mut clock);
     let mut call = ModelCall::open(&mut journal, &mut ledger, &mut model, &request);
     let outcome = recover(&mut [&mut one, &mut two], &mut call, wire_mismatch());
     match outcome {
@@ -223,7 +226,7 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
         "one probe",
         crate::conversation::Opening::FromJob,
     );
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
+    let turn = opened::<1>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -290,7 +293,7 @@ fn a_retriable_failure_passes_through_to_the_watchdog_untouched() {
     }
     let mut ledger = TestLedger::new();
     let mut model = Refusing { blocked: 0 };
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
+    let turn = opened::<1>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,

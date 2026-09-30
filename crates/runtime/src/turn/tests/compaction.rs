@@ -102,7 +102,7 @@ fn the_snapshot_is_replaced_at_the_closing_boundary_and_not_before() {
         "one long reply",
         crate::conversation::Opening::FromJob,
     );
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
+    let turn = opened::<1>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -196,7 +196,7 @@ fn a_threshold_crossed_mid_wave_compacts_once_over_the_whole_exchange() {
         "one over-budget wave",
         crate::conversation::Opening::FromJob,
     );
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
+    let turn = opened::<1>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,

@@ -46,7 +46,7 @@ fn a_key_in_tool_args_and_tool_result_never_reaches_the_ledger() {
     let mut model = OneShotModel {
         calls: vec![read_env_call(&key)],
     };
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(7));
+    let turn = opened::<7>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -133,7 +133,7 @@ fn the_wave_result_block_keeps_what_the_ledger_drops() {
     let mut model = OneShotModel {
         calls: vec![read_env_call(&key)],
     };
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(8));
+    let turn = opened::<8>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,

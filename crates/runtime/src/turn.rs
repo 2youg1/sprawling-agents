@@ -14,8 +14,10 @@
 //! Steer consumes at a boundary too, but advances: it is an addition to
 //! the window, not an ending.
 //!
-//! All events of one turn share the timestamp given to [`Turn::begin`]:
-//! order is `seq`'s business, time is a parameter, never sampled.
+//! Lines that record a moment the turn waited for - `model_called`,
+//! `model_returned`, `tool_called`, `tool_result` - carry that moment,
+//! read from the clock the driver handed to [`Turn::begin`]; every other
+//! line of the turn carries the turn's stamp. Order is `seq`'s business.
 
 use std::borrow::Cow;
 
@@ -50,8 +52,8 @@ pub use wave::{Admitted, ConcurrentInvoke};
 /// and no method returns an earlier phase. Everything the turn writes
 /// goes through `journal`, which is the module's only ledger door.
 #[derive(Debug)]
-pub struct Turn<S> {
-    journal: Journal,
+pub struct Turn<'h, S> {
+    journal: Journal<'h>,
     state: S,
 }
 
@@ -83,12 +85,19 @@ pub struct Recording {
     stop: Option<StopReason>,
 }
 
-impl Turn<Assembling> {
-    /// Opens a turn. `t` stamps every event of this turn; the executor
-    /// advances it between turns (determinism rule 2).
-    pub fn begin(run: RunId, who: String, t: TimeMs) -> Turn<Assembling> {
+impl<'h> Turn<'h, Assembling> {
+    /// Opens a turn. `t` is the turn's stamp, which every line of this
+    /// turn carries but the four it waited for; the executor advances it
+    /// between turns (determinism rule 2). `now` is read for those four
+    /// moments only, on this thread, and never by a tool.
+    pub fn begin(
+        run: RunId,
+        who: String,
+        t: TimeMs,
+        now: &'h mut dyn FnMut() -> Result<TimeMs, AxError>,
+    ) -> Turn<'h, Assembling> {
         Turn {
-            journal: Journal::open(run, who, t),
+            journal: Journal::open(run, who, t, now),
             state: Assembling(()),
         }
     }
@@ -106,7 +115,7 @@ impl Turn<Assembling> {
         conversation: &'c Conversation,
         tools: &'c [ToolDef],
         shape: &CallShape,
-    ) -> Result<PhaseOutcome<Turn<Calling<'c>>>, AxError> {
+    ) -> Result<PhaseOutcome<Turn<'h, Calling<'c>>>, AxError> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
@@ -141,7 +150,7 @@ impl Turn<Assembling> {
     }
 }
 
-impl Turn<Calling<'_>> {
+impl<'h> Turn<'h, Calling<'_>> {
     /// Boundary 2 (before the provider call). Appends `model_called` and
     /// `model_returned`; a provider Err propagates after nothing but the
     /// boundary consumption touched the ledger. The reads `generating`
@@ -158,7 +167,7 @@ impl Turn<Calling<'_>> {
         model: &mut dyn Model,
         policy: &BuildingPolicy,
         generating: Generating<'_, 'sink>,
-    ) -> Result<PhaseOutcome<Turn<ToolWave>>, AxError> {
+    ) -> Result<PhaseOutcome<Turn<'h, ToolWave>>, AxError> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
@@ -183,6 +192,7 @@ impl Turn<Calling<'_>> {
         let mut call = recovery::ModelCall::open(&mut self.journal, ledger, model, &request);
         let mut repair = recovery::BlockingResend;
         let (returned_value, speculated) = call.ask(&mut [&mut repair], generating)?;
+        let arrived = self.journal.read_clock()?;
         let ModelReturn {
             message,
             calls,
@@ -207,7 +217,7 @@ impl Turn<Calling<'_>> {
         };
         let model_returned = self.journal.append_redacted(
             ledger,
-            Carried::ModelReturned,
+            Carried::ModelReturned { at: arrived },
             Payload::of(&returned)?,
         )?;
         Ok(PhaseOutcome::Advanced(Turn {
@@ -224,7 +234,7 @@ impl Turn<Calling<'_>> {
     }
 }
 
-impl Turn<Recording> {
+impl Turn<'_, Recording> {
     /// Closes the turn. Recording is the accounting boundary: nothing
     /// extra is appended here, because every effect is already on the
     /// ledger. What the phase exists for is the fourth boundary — the
@@ -268,7 +278,7 @@ impl Turn<Recording> {
     }
 }
 
-impl<S> Turn<S> {
+impl<S> Turn<'_, S> {
     /// Ends the turn where it stands: `cancel_received` and the refs of
     /// everything this turn wrote.
     ///

@@ -39,7 +39,7 @@ fn a_prefix_whose_bytes_moved_is_refused_before_anything_is_assembled() {
         crate::prefix::FrozenSegment::new(crate::prefix::SegmentSlot::Run, b"j".to_vec()),
     )
     .unwrap();
-    let turn = Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1));
+    let turn = opened::<1>();
     let Err(refusal) = turn.assemble(
         Interrupt::None,
         &mut ledger,

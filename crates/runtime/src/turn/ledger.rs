@@ -20,6 +20,13 @@
 //! neither can name the other's, and no other spelling of [`EventKind`]
 //! reaches an [`EventDraft`] — which is what makes the scan structural
 //! rather than remembered.
+//!
+//! The same variants decide when a line happened. The four lines a turn
+//! waited for - a model attempt sent, its reply whole, a tool call
+//! started, its answer - carry their own reading and cannot be built
+//! without one; every other line carries the turn's stamp. The clock
+//! those readings come from is read in this module and nowhere else in
+//! the turn (kernel-SPEC 8-4, "what the envelope `t` records").
 
 use kernel::{AxError, EventDraft, EventKind, EventRef, Ledger, Payload, RunId, TimeMs};
 
@@ -27,27 +34,43 @@ use kernel::{AxError, EventDraft, EventKind, EventRef, Ledger, Payload, RunId, T
 #[derive(Debug, Clone, Copy)]
 pub(super) enum Authored {
     PromptAssembled,
-    ModelCalled,
+    /// A model attempt, sent at `at`.
+    ModelCalled {
+        at: TimeMs,
+    },
     CancelReceived,
     SteerReceived,
 }
 
 /// Events whose payload came back from a provider or from a tool, and
-/// may hold a credential in plain text.
+/// may hold a credential in plain text. Each is a moment the turn waited
+/// for, so each carries its own reading.
 #[derive(Debug, Clone, Copy)]
 pub(super) enum Carried {
-    ModelReturned,
-    ToolCalled,
-    ToolResult,
+    /// A model reply, whole at `at`.
+    ModelReturned { at: TimeMs },
+    /// A tool call, started at `at`.
+    ToolCalled { at: TimeMs },
+    /// A tool call's answer, recorded at `at`.
+    ToolResult { at: TimeMs },
 }
 
 impl Authored {
     fn kind(self) -> EventKind {
         match self {
             Authored::PromptAssembled => EventKind::PromptAssembled,
-            Authored::ModelCalled => EventKind::ModelCalled,
+            Authored::ModelCalled { .. } => EventKind::ModelCalled,
             Authored::CancelReceived => EventKind::CancelReceived,
             Authored::SteerReceived => EventKind::SteerReceived,
+        }
+    }
+
+    /// When the line happened: its own reading for the attempt the turn
+    /// waited on, the turn's stamp for every other line.
+    fn at(self, turn: TimeMs) -> TimeMs {
+        match self {
+            Authored::ModelCalled { at } => at,
+            Authored::PromptAssembled | Authored::CancelReceived | Authored::SteerReceived => turn,
         }
     }
 }
@@ -55,35 +78,63 @@ impl Authored {
 impl Carried {
     fn kind(self) -> EventKind {
         match self {
-            Carried::ModelReturned => EventKind::ModelReturned,
-            Carried::ToolCalled => EventKind::ToolCalled,
-            Carried::ToolResult => EventKind::ToolResult,
+            Carried::ModelReturned { .. } => EventKind::ModelReturned,
+            Carried::ToolCalled { .. } => EventKind::ToolCalled,
+            Carried::ToolResult { .. } => EventKind::ToolResult,
+        }
+    }
+
+    /// When the line happened: every carried line is a moment the turn
+    /// waited for.
+    fn at(self) -> TimeMs {
+        match self {
+            Carried::ModelReturned { at }
+            | Carried::ToolCalled { at }
+            | Carried::ToolResult { at } => at,
         }
     }
 }
 
-/// One turn's line of history: the stamp every event of the turn
-/// shares, the refs it has collected, and how many secret-shaped spans
-/// it kept out of the ledger.
+/// One turn's line of history: the turn's stamp, the clock the lines it
+/// waited for are read from, the refs it has collected, and how many
+/// secret-shaped spans it kept out of the ledger.
 ///
 /// The phase data lives beside this in `Turn`, not inside it, so a
 /// phase change can move the phase out while the journal stays put and
 /// keeps appending.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Journal {
+pub(super) struct Journal<'h> {
     run: RunId,
     who: String,
     t: TimeMs,
+    now: &'h mut dyn FnMut() -> Result<TimeMs, AxError>,
     refs: Vec<EventRef>,
     redacted: u32,
 }
 
-impl Journal {
-    pub(super) fn open(run: RunId, who: String, t: TimeMs) -> Journal {
+impl std::fmt::Debug for Journal<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Journal")
+            .field("run", &self.run)
+            .field("who", &self.who)
+            .field("t", &self.t)
+            .field("refs", &self.refs)
+            .field("redacted", &self.redacted)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'h> Journal<'h> {
+    pub(super) fn open(
+        run: RunId,
+        who: String,
+        t: TimeMs,
+        now: &'h mut dyn FnMut() -> Result<TimeMs, AxError>,
+    ) -> Journal<'h> {
         Journal {
             run,
             who,
             t,
+            now,
             refs: Vec::new(),
             redacted: 0,
         }
@@ -112,7 +163,8 @@ impl Journal {
         event: Authored,
         data: Payload,
     ) -> Result<EventRef, AxError> {
-        self.append(ledger, event.kind(), data)
+        let at = event.at(self.t);
+        self.append(ledger, event.kind(), at, data)
     }
 
     /// Appends an event the turn carried, with every secret-shaped span
@@ -136,27 +188,37 @@ impl Journal {
     ) -> Result<EventRef, AxError> {
         let (scanned, hits) = crate::redact::redact(data.as_map());
         self.redacted = self.redacted.saturating_add(hits);
-        self.append(ledger, event.kind(), Payload::new(scanned)?)
+        self.append(ledger, event.kind(), event.at(), Payload::new(scanned)?)
     }
 
-    /// The turn's stamp: the time every line of this turn carries, and
-    /// the time a wave's tools are admitted at.
+    /// The turn's stamp: the time every line of this turn carries except
+    /// the four it waited for, and the time a wave's tools are admitted at.
     pub(super) fn stamp(&self) -> TimeMs {
         self.t
     }
 
+    /// One reading of the clock the driver handed to the turn, for a
+    /// line the turn waited for.
+    ///
+    /// # Errors
+    /// Propagates the clock's failure, such as a clock past `u64`.
+    pub(super) fn read_clock(&mut self) -> Result<TimeMs, AxError> {
+        (self.now)()
+    }
+
     /// The turn module's single `Ledger::append` call, and the single
-    /// place an [`EventDraft`] of this turn is built: the stamp, the
+    /// place an [`EventDraft`] of this turn is built: the time, the
     /// author and the ref bookkeeping cannot drift between phases.
     fn append(
         &mut self,
         ledger: &mut dyn Ledger,
         kind: EventKind,
+        at: TimeMs,
         data: Payload,
     ) -> Result<EventRef, AxError> {
         let echo = ledger.append(EventDraft {
             run: self.run,
-            t: self.t,
+            t: at,
             who: self.who.clone(),
             addr: None,
             kind,

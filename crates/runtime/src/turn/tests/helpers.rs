@@ -88,6 +88,23 @@ pub(super) fn blank_conversation() -> &'static Conversation {
     Box::leak(Box::new(Conversation::new()))
 }
 
+/// A clock stopped at `at`: every reading a turn takes is the turn's own
+/// stamp, so a test that compares ledgers compares order and payloads.
+pub(super) fn stopped(at: u64) -> impl FnMut() -> Result<TimeMs, AxError> {
+    move || Ok(TimeMs::new(at))
+}
+
+/// A turn opened at stamp `AT` on a clock stopped there. The clock
+/// captures nothing, so leaking its box allocates nothing, and the turn
+/// can outlive the test's own frames.
+pub(super) fn opened<const AT: u64>() -> Turn<'static, Assembling> {
+    let now: &'static mut dyn FnMut() -> Result<TimeMs, AxError> =
+        Box::leak(Box::new(|| -> Result<TimeMs, AxError> {
+            Ok(TimeMs::new(AT))
+        }));
+    Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(AT), now)
+}
+
 pub(super) fn run_id() -> RunId {
     RunId::parse("0198f6a2-7c4a-7bbb-9d1e-00000000000a").unwrap()
 }

@@ -495,7 +495,7 @@ fn a_checkpoint_runs_before_the_wave_and_carries_the_turns_stamp() {
     // before the closing turn's empty wave: that one has nothing to come
     // back from, but it is what carries the first wave's writes into a
     // commit.
-    assert_eq!(checkpointed, vec![2, 3]);
+    assert_eq!(checkpointed, vec![2, 7]);
     let kinds = ledger.kinds();
     assert_eq!(kinds[6], "checkpoint_committed");
     assert_eq!(kinds[7], "tool_called");
@@ -1091,7 +1091,10 @@ fn three_reads_driven(invoke: &mut dyn runtime::ConcurrentInvoke) -> RecordingLe
         seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
         waves: vec![vec![read("r1"), read("r2"), read("r3")]],
     };
-    let mut now = counter();
+    // A stopped clock: reads that overlap take their readings in another
+    // order than reads made one after another, and what the two ledgers
+    // must share is the order and the payloads of their lines.
+    let mut now = || -> Result<TimeMs, AxError> { Ok(TimeMs::new(0)) };
     let mut interrupt = |_: SafePoint| Interrupt::None;
     let mut hooks = RunHooks {
         now: &mut now,

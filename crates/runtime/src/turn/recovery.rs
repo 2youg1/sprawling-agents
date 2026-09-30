@@ -36,29 +36,29 @@ pub(super) enum SegmentOutcome {
 /// The contract a recovery segment satisfies: offer it a failure and the
 /// call being recovered, and it answers one of the three above.
 pub(super) trait Segment {
-    fn attempt(&mut self, failure: &AxError, call: &mut ModelCall<'_>) -> SegmentOutcome;
+    fn attempt(&mut self, failure: &AxError, call: &mut ModelCall<'_, '_>) -> SegmentOutcome;
 }
 
 /// One provider call being recovered: what was sent, which door it went
 /// out of, and the only way to ask again — which records the attempt
 /// before it is made, so no repair can leave a silent repeat behind.
-pub(super) struct ModelCall<'a> {
-    journal: &'a mut Journal,
+pub(super) struct ModelCall<'a, 'h> {
+    journal: &'a mut Journal<'h>,
     ledger: &'a mut dyn Ledger,
     model: &'a mut dyn Model,
     request: &'a ModelRequest<'a>,
     streamed: bool,
 }
 
-impl<'a> ModelCall<'a> {
+impl<'a, 'h> ModelCall<'a, 'h> {
     /// Opens the call being recovered. `streamed` is decided by `ask`:
     /// it is a fact about how the failing attempt went out.
     pub(super) fn open(
-        journal: &'a mut Journal,
+        journal: &'a mut Journal<'h>,
         ledger: &'a mut dyn Ledger,
         model: &'a mut dyn Model,
         request: &'a ModelRequest<'a>,
-    ) -> ModelCall<'a> {
+    ) -> ModelCall<'a, 'h> {
         ModelCall {
             journal,
             ledger,
@@ -127,16 +127,21 @@ impl<'a> ModelCall<'a> {
         }
     }
 
-    /// Appends `model_called` before the effect it announces. Every
-    /// attempt lands on the ledger, so a repaired resend reads as the
-    /// second `model_called` in the history rather than as silence.
+    /// Appends `model_called` before the effect it announces, at the
+    /// moment the attempt goes out. Every attempt lands on the ledger, so
+    /// a repaired resend reads as the second `model_called` in the
+    /// history rather than as silence.
     fn record(&mut self) -> Result<(), AxError> {
         let called = ModelCalled {
             segments: self.request.segments.to_vec(),
             model: self.request.chat.model.clone(),
         };
-        self.journal
-            .append_authored(self.ledger, Authored::ModelCalled, Payload::of(&called)?)?;
+        let at = self.journal.read_clock()?;
+        self.journal.append_authored(
+            self.ledger,
+            Authored::ModelCalled { at },
+            Payload::of(&called)?,
+        )?;
         Ok(())
     }
 }
@@ -147,7 +152,7 @@ impl<'a> ModelCall<'a> {
 /// the one that went in.
 pub(super) fn recover(
     segments: &mut [&mut dyn Segment],
-    call: &mut ModelCall<'_>,
+    call: &mut ModelCall<'_, '_>,
     failure: AxError,
 ) -> SegmentOutcome {
     let mut carried = failure;
@@ -170,7 +175,7 @@ pub(super) fn recover(
 pub(super) struct BlockingResend;
 
 impl Segment for BlockingResend {
-    fn attempt(&mut self, failure: &AxError, call: &mut ModelCall<'_>) -> SegmentOutcome {
+    fn attempt(&mut self, failure: &AxError, call: &mut ModelCall<'_, '_>) -> SegmentOutcome {
         if !call.streamed() || *failure.code() != AxCode::WireMismatch {
             return SegmentOutcome::Skipped(failure.clone());
         }
