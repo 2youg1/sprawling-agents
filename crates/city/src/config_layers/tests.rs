@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use kernel::layout::CONFIG_FILE;
-use kernel::{AxCode, RESERVED_PREFIX};
+use kernel::{AxCode, McpTransport, RESERVED_PREFIX};
 
 use super::*;
 
