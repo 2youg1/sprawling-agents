@@ -24,9 +24,11 @@
 | refusal | `isError` 结果的文字恒含码、拒了什么、为什么、还能做什么；效果未知的拒绝恒在 `_meta` 带 `"sprawling/effect-unknown": true`，其余拒绝恒不带 `_meta` |
 | session | 未握手完成前 `tools/list`／`tools/call` 恒被拒；`notifications/initialized` 恒无答案；`ping` 恒答空对象；未知方法回 `-32601`；`tools/call` 在工具名认出之后的拒绝恒以 `isError` 结果回答，恒不以 JSON-RPC error 回答 |
 | tools | 六个名字恒在 `tools/list` 里；每条 description 恒含一句「不做什么」；每张 `inputSchema` 恒是 `type: object` |
+| outline | 同一串行恒折成同样的字节；每行恒是 `e<n> <role> "<name>"`，深度每深一层多缩进两格，没有名字的行恒不带引号；名字里的控制字符恒换成空格、空白恒压成一个、超过 80 个字符恒截断并以 `…` 收尾；role 恒是封闭词表里的一个词；遍历提前停下时，最后一行恒说出停在哪里、为什么 |
 | scope | 缺文件与坏文件恒全拒；空 allowlist 恒不容许任何窗口；`record`／`clipboard` 未开则该工具恒被拒；不指名窗口的整屏截取恒被拒；allowlist 没列的窗口恒不出现在 `desktop.windows` 的答复里 |
 | platform | 非 Windows 上恒回 `E_TOOL_UNAVAILABLE` 并报出平台名；Windows 上六件工具皆真的落到这台桌面上 |
 | windows::target | 名字命中零个窗口恒被拒并指向 `desktop.windows`；命中两个以上恒被拒并列出各自的 title，**恒不**在其中挑一个 |
+| windows::tree | 兄弟元素恒按窗口列出它们的次序铸 ref（文档序：先父后子，子按次序）；role 恒取自 control type 的编号，恒不取本地化的字符串；walker 的故障恒让遍历停下并被说出，恒不被读成「到头了」；ref 恒不超过 500 个 |
 | windows::views | 快照恒推进这扇窗口（按窗口句柄，不按标题）的 generation；对着旧 generation 做的动作恒被拒；对着快照之后挪动过或改过尺寸的窗口做的动作恒被拒；快照没铸过的 ref 恒被拒 |
 | windows::encode | 三种格式各自解得回原尺寸；`scale` 恒按百分比缩，且缩到 0 像素恒被拒而不是产出空图；`scale` 与 `quality` 域外的值**在解析点被拒**，不是钳位也不是静默换默认值 |
 | windows::focus | 键盘在别的窗口手里时恒不发事件而回 `E_TOOL_UNAVAILABLE`；指针动作落点被别的窗口盖住时同样恒被拒；两条拒词恒写明「什么都没发出去」 |
@@ -80,6 +82,7 @@
 - **做得成做不成**归 `platform`：`cfg(windows)` 两个文件各自完整，**无 trait**——一个只有一个实现的接口是装饰（ARCHITECTURE §4）。
 - **一行 allowlist 匹配什么**归 `scope::pattern`：glob 语义与文件解析是两件会各自变的事，且前者要被单独证明会终止（§10 第 6 条）。
 - **说什么**归 `tools`：六张卡片是数据，改它就是改行为（形状 6）。
+- **一扇窗口读起来是什么样**归 `outline`：role 的封闭词表、名字的清洗与截断、一串节点折成的文字。它平台无关，因为 macOS 臂以后把 AX 的 role 映到同一张词表；control type 编号到词表的映射是 Windows 的事实，住 `windows::tree`。
 
 **恒不**引入：async runtime、HTTP 客户端、任何 GUI 框架、任何 workspace crate。
 
@@ -157,6 +160,20 @@ impl Pattern {
     pub(crate) fn matches(&self, named: &str) -> bool;
 }
 
+// 8-4c outline（形状 6 数据＋形状 1 判定）：一扇窗口的树怎么读给模型
+pub(crate) enum Role { Button, Calendar, CheckBox, ComboBox, Edit, Hyperlink, Image, ListItem, List, Menu, MenuBar,
+    MenuItem, ProgressBar, RadioButton, ScrollBar, Slider, Spinner, StatusBar, Tab, TabItem, Text, ToolBar, ToolTip,
+    Tree, TreeItem, Custom, Group, Thumb, DataGrid, DataItem, Document, SplitButton, Window, Pane, Header,
+    HeaderItem, Table, TitleBar, Separator, SemanticZoom, AppBar }   // UIA 的四十一种 control type，一一对应
+impl Role {
+    pub(crate) const fn word(self) -> &'static str;   // UIA 的类型名，小写：`button`、`edit`、`menuitem` …
+    pub(crate) const fn frames(self) -> bool;         // pane／group／custom／separator：没有名字时不值一行
+}
+pub(crate) struct Line<'a> { pub(crate) reference: &'a str, pub(crate) role: Role, pub(crate) name: &'a str, pub(crate) depth: u32 }
+pub(crate) enum Ending { Whole, RefLimit, Fault(String) } // 遍历为什么停下
+pub(crate) fn label(raw: &str) -> String;                  // 控制字符换空格、压空白、截到 LABEL_MOST 个字符
+pub(crate) fn fold<'a>(lines: impl IntoIterator<Item = Line<'a>>, ending: &Ending) -> String;
+
 // 8-5 session（形状 4 适配器；Phase 是形状 5 typestate 的运行时投影）
 // 本 package 的全部公开面就这一个函数：一台 server 的其余一切都经协议抵达。
 pub fn serve_stdio(scope_path: Option<&Path>) -> std::io::Result<()>;
@@ -179,7 +196,7 @@ pub(crate) fn perform(tool: ToolName, arguments: &Value, admitted: &Admitted<'_>
 | 名字 | 做什么 | 说明里写明**不做**什么 |
 |---|---|---|
 | `desktop.windows` | 列顶层窗口：title、process、bounds、ref，**只列 scope 列得出的那些** | 不激活、不移动、不改变任何窗口，不报 allowlist 之外的窗口 |
-| `desktop.snapshot` | 一个窗口或整屏的 accessibility tree：role、name、ref、bounds | 不给像素、不给控件的内部句柄、不读被遮挡的内容 |
+| `desktop.snapshot` | 一个窗口的 accessibility tree，折成一段文字（`outline`）：每个元素一行，写它的 ref、role 与 name，按深度缩进；另一块文字写 title、process 与 generation；bounds 只留在 `Views` 里，由 `desktop.act` 按 ref 取 | 不给像素、不给控件的内部句柄、不读被遮挡的内容 |
 | `desktop.act` | ref 或 point ＋ 动作（click／double／right／drag／scroll／type／key，带 modifiers），携 snapshot 的 generation；**发事件前先核对前台窗口**；桌面只收下一部分时如实报数，并补发它留下按住的键与鼠标键的抬起 | 不合成整段脚本、不重试、不在 generation 过期或窗口挪动后改打别处、不在别的窗口拿着键盘时把按键发出去 |
 | `desktop.screenshot` | window／region，format png\|jpeg\|webp，quality、scale；答一块 image content（`data` 是 base64，`mimeType`）和一块写着 title／width／height／lossless 的文字 | 不做 OCR、不做比对、不落盘 |
 | `desktop.record` | start／stop：本 package 唯一那条线程经 `capture::window` 抓帧，PATH 上有 ffmpeg 就经它的 stdin 编成 mp4，否则写成一个 PNG 序列目录；audio 可选 | 不做剪辑、不做转码、不在没说 stop 时自己停（十分钟上限除外） |
@@ -393,13 +410,17 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 - **击败的备选**：把这几组一起搬进 Zig 缝（有合格安全接口的调用不需要一道新的 FFI 缝）；留在 `windows` 绑定上继续手写 `unsafe`（口径 ①要的正是业务代码零 `unsafe`）。
 - **重开的参数**：`winsafe` 修好 `EnumWindows`，枚举这一行随之换过去；或者新版本改了这里准入的签名，那一行的契约测试先红。
 
-### 12.10 树经 `uiautomation`，COM 公寓每张桌子进一次
+### 12.10 树经 `uiautomation` 读、按文档序铸 ref、折成文字；COM 公寓每张桌子进一次
 
 - **决定**：`tree` 经 `uiautomation` 0.25.1 读树，默认 feature 关掉，只开 `input`（它的 core 模块不开 `input` 编不过），只用 `UIAutomation::new_direct`、`element_from_handle`、control view walker 与元素的三项属性（role、name、外框）。COM 公寓由 `Desk` 在第一次 snapshot 时进入一次，用多线程公寓（MTA），经 `winsafe::CoInitializeEx` 的守卫；automation 对象与 walker 同这个守卫一起住在桌子里，字段的析构次序保证先放 COM 对象、后退出公寓。元素仍只活在一次 snapshot 之内（§8.6 第二对）。walker 答「没有这个元素」（错误码 0）是这一层到头；答别的错误是 provider 出了故障，遍历在那里停下，而不是当作到头。
 - **理由**：微软对不开窗口的 UIA 工作线程推荐 MTA；进一次、配对退出，公寓的生存期就是连接的生存期。旧写法每次 snapshot 都以 STA 进入而从不退出，并且每次新建 automation 对象；`uiautomation::UIAutomation::new()` 同样每次进入而不退出，故不用它。把 provider 的故障读成「到头了」，模型拿到的是一棵看起来完整、其实缺了一块的树。
 - **剩余限制**（写明，不当作已解决）：`winsafe` 的 `CoUninitializeGuard` 在进入公寓答 `RPC_E_CHANGED_MODE` 时也会调 `CoUninitialize`；本 package 的读循环线程不进入任何别的公寓，这条路走不到。剪贴板走的是 Win32 剪贴板而不是 OLE 剪贴板，同一线程上的 MTA 与它无关。
 - **击败的备选**：保留经 `windows` 绑定手写的 COM 调用（九个 `unsafe` 块）；让 UIA 也回答窗口事实（UIA 根的子元素、`IsOffscreen` 与 `EnumWindows`、`WS_VISIBLE` 不是同一个定义，安全判断会跟着 provider 的实现走）。
 - **重开的参数**：需要 UIA patterns（按元素投递动作）时，那是另一项能力，另写一节；或 `uiautomation` 的新版本改了这里用到的签名，`a_windows_tree_names_the_control_inside_it` 先红。
+- **(b) 读给模型的是文字**：`desktop.snapshot` 的答复是 `outline` 折成的一段文字，不再是每个节点一个带 bounds 的 JSON 对象。形状照 `browser::snapshot` 的折法（名字不照抄）：一行一个元素，`e<n> <role> "<name>"`，按深度缩进两格；名字去控制字符、压空白、截到 80 个字符。role 取 control type 的编号，映到一张封闭词表，词就是 UIA 自己的类型名的小写；本地化字符串随机器的语言变，同一个按钮在两台机器上会是两个词。没有名字的 pane、group、custom、separator 不占一行也不铸 ref，它们的子元素照读。遍历按文档序：先父后子，兄弟按窗口列出的次序；旧写法用栈，同一层倒着铸 ref。遍历提前停下（ref 到 500 个，或 provider 出了故障）时，文字最后一行说出停在哪里、为什么。
+- **(b) 理由**：模型读一行一个元素的文字比读嵌套 JSON 快，bounds 对模型没有用处，`desktop.act` 按 ref 从 `Views` 取；一个可读的词表比一串编号或一个随语言变的字符串更好对照。
+- **(b) 击败的备选**：继续回每个节点的 JSON（答复是现在的四五倍长，bounds 占去一半）；另造一套平台无关的 role 词（在只有一个平台的今天，它只是一层没有第二个读者的翻译）。
+- **(b) 重开的参数**：macOS 臂落地时 AX 的 role 映不进这张词表。
 
 ## 13 依赖选型
 
@@ -425,6 +446,8 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 |---|---|---|
 | 快照默认深度 | 8 层 | 我们的选择：再深一层的 UIA 树，模型读到的东西开始多过它用得上的 |
 | 一次快照最多铸的 ref 数 | 500 | 我们的选择：一份读不完的树等于没读 |
+| 大纲里一个名字最多的字符数（`outline::LABEL_MOST`） | 80 | 我们的选择：够分辨两个控件，一扇窗口的大纲仍是一页；再长的名字多半是一段正文，模型要读它就截图或读剪贴板 |
+| 大纲每深一层的缩进 | 两个空格 | 我们的选择：最省字符、仍一眼看得出层次的缩进 |
 | 截图默认格式／`scale` | `png`／100 | 我们的选择：默认不损、不缩，缩放是调用方明说才发生的事 |
 | `quality` 的域 | 0..=100 | 与城里同一域（`kernel::consts_policy::IMAGE_QUALITY`）；本包在 workspace 之外读不到它，所以两个数由 `xtask guard` 的墙对账（`wall::quality_domain`）。域外即拒：一个要求 120 的调用方以为自己要多好就有多好，而替它填默认值是在回答另一个问题 |
 | `scale` 与城里那个同名量的区别 | 本包的 `scale` 是窗口自身像素的百分数 | 城里 `browser` 的 `scale` 是设备像素比（devicePixelRatio）的百分数——同一个词、两个量，**不是同一个事实**，所以两边的域也不必相同 |
@@ -459,7 +482,6 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 
 **还欠的**，都是这条接口的当前状态：
 
-1. **给模型的文字反馈**：`desktop.snapshot` 回的是 role／name／ref／bounds 的树，还没有像 `browser::snapshot` 那样把一扇窗口折成模型读得快的纯文本。
 2. **OCR**：一张截图经人接入的 OCR 端点变成文字，给 accessibility tree 读不到字的窗口（画在画布上的界面、远程桌面）。端点的形状与 `gateway` 里的哪一面还没有定。
 3. **ASR**：`gateway` 的 `transcribe`（OpenAI 兼容的 `audio/transcriptions`）已经在；桌面这一侧还没有把录下的声音交给它，`desktop.record` 的 `audio: true` 仍被拒。
 4. **macOS 这条胳膊**：`platform/elsewhere.rs` 对 macOS 答 `E_TOOL_UNAVAILABLE`。它要在一台 Mac 或夜间的 `platforms.yml` 上验，Windows 上验不了。
@@ -479,7 +501,7 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 
 本 card 的测试分两层，分界线就是 §8-8 那张表的最后一列：
 
-- **不碰 Win32 的那几处逐条测**（`target`／`views`／`strokes`／`encode`／`keys`／`geometry`／`focus::settled`／`Admitted::visible`）。最容易错的几件事——选中了哪个窗口、过期或挪动过的窗口上的动作有没有被拒、一批输入被截断时还按着什么、一张图缩成什么尺寸、一个键名映到什么、键盘不在这个窗口手里时发不发、allowlist 没列的窗口报不报——全在这一层。它们住在 `platform/windows/` 之下，只在 Windows 上编译，所以在**任何一台 Windows** 机器上都跑得起来，不需要桌面；`Admitted::visible` 与协议壳（`session`、`refusal`、`answer`）的测试在每个平台上都跑。DPI 感知在测试进程里读回，不需要窗口：nextest 每个测试一个进程，进程级的声明不会串到别的测试。
+- **不碰 Win32 的那几处逐条测**（`target`／`views`／`strokes`／`encode`／`keys`／`geometry`／`focus::settled`／`Admitted::visible`）。最容易错的几件事——选中了哪个窗口、过期或挪动过的窗口上的动作有没有被拒、一批输入被截断时还按着什么、一张图缩成什么尺寸、一个键名映到什么、键盘不在这个窗口手里时发不发、allowlist 没列的窗口报不报——全在这一层。它们住在 `platform/windows/` 之下，只在 Windows 上编译，所以在**任何一台 Windows** 机器上都跑得起来，不需要桌面；`Admitted::visible`、`outline` 与协议壳（`session`、`refusal`、`answer`）的测试在每个平台上都跑。DPI 感知在测试进程里读回，不需要窗口：nextest 每个测试一个进程，进程级的声明不会串到别的测试。
 - **碰 Win32 的五个模块只测「拒绝是诚实的」**：一个不存在的窗口名恒得到一句指向 `desktop.windows` 的拒词，而不是一次崩溃。CI 里没有一张桌面可供点击，故「点下去真的点中了」这件事**恒不**被写成一条会在没有桌面时假装通过的测试；它由操作者在真机上验，本节记下这是一处**具名的空缺**，不是一处被忽略的覆盖率。
 
 - **换过接口的调用各有一条契约测试**（§8-11）：测试在本进程里建一扇不抢焦点的窗口，读回它的标题、进程、外框、落点与树；这几条要一张桌面，不碰人桌面上别的窗口。
@@ -490,7 +512,7 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 
 ## 17 模型体验
 
-工具名恒是 `desktop.<动词>`，模型一眼看得出这一件事发生在桌面上而不是页面里。每条说明的后半句写的是**不做什么**，因为模型下一步最贵的错误是把一件工具当成它旁边那件。拒词恒给一个可执行的下一步：越界给「把这个窗口写进 `DESKTOP.toml`」，未实现给「这个 build 里没有它」。拒词全文作为文字到达模型：城这一侧把 `isError` 结果读成一次失败，文字原样进它的 subject；部分输入另带效果未知，模型读到的是「先看一眼再动」，不是「可以重试」。
+工具名恒是 `desktop.<动词>`，模型一眼看得出这一件事发生在桌面上而不是页面里。一扇窗口读起来是一段缩进的大纲，每行一个元素和它的 ref，模型读完就能指名要点的那一个。每条说明的后半句写的是**不做什么**，因为模型下一步最贵的错误是把一件工具当成它旁边那件。拒词恒给一个可执行的下一步：越界给「把这个窗口写进 `DESKTOP.toml`」，未实现给「这个 build 里没有它」。拒词全文作为文字到达模型：城这一侧把 `isError` 结果读成一次失败，文字原样进它的 subject；部分输入另带效果未知，模型读到的是「先看一眼再动」，不是「可以重试」。
 
 ## 18 文档同步
 
