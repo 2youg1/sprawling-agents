@@ -170,7 +170,7 @@ impl Role {
     pub(crate) const fn frames(self) -> bool;         // pane／group／custom／separator：没有名字时不值一行
 }
 pub(crate) struct Line<'a> { pub(crate) reference: &'a str, pub(crate) role: Role, pub(crate) name: &'a str, pub(crate) depth: u32 }
-pub(crate) enum Ending { Whole, RefLimit, Fault(String) } // 遍历为什么停下
+pub(crate) enum Ending { Whole, RefLimit { most: usize }, Fault(String) } // 遍历为什么停下
 pub(crate) fn label(raw: &str) -> String;                  // 控制字符换空格、压空白、截到 LABEL_MOST 个字符
 pub(crate) fn fold<'a>(lines: impl IntoIterator<Item = Line<'a>>, ending: &Ending) -> String;
 

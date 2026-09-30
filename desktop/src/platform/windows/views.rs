@@ -34,6 +34,7 @@
 //! from a snapshot: the caller measured it against the window's own
 //! edges, and `geometry::Bounds::at` is what judges it.
 
+use crate::outline::Role;
 use crate::refusal::{Refusal, RefusalCode};
 use std::collections::BTreeMap;
 
@@ -51,7 +52,7 @@ pub(crate) const DEFAULT_DEPTH: u32 = 8;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Node {
     pub(crate) reference: String,
-    pub(crate) role: String,
+    pub(crate) role: Role,
     pub(crate) name: String,
     pub(crate) bounds: Bounds,
     pub(crate) depth: u32,
@@ -197,7 +198,7 @@ mod tests {
     fn node(reference: &str, left: i32) -> Node {
         Node {
             reference: reference.to_owned(),
-            role: "Button".to_owned(),
+            role: Role::Button,
             name: "Save".to_owned(),
             bounds: Bounds::from_corners(left, 0, left.saturating_add(80), 30).unwrap(),
             depth: 1,
@@ -211,7 +212,7 @@ mod tests {
         assert_eq!(generation, 1);
         let found = views.resolve(at(NOTEPAD, 0), 1, "e2").unwrap();
         assert_eq!(found.bounds.width(), 80);
-        assert_eq!(found.role, "Button");
+        assert_eq!(found.role, Role::Button);
     }
 
     /// The rule this module exists for. A second snapshot retires the

@@ -121,13 +121,13 @@ impl Desk {
         };
         let read = reader.read(&window.handle, depth);
         self.reader = Some(reader);
-        let nodes = read?;
+        let nodes = read?.nodes;
         let described: Vec<Value> = nodes
             .iter()
             .map(|node| {
                 json!({
                     "ref": node.reference,
-                    "role": node.role,
+                    "role": node.role.word(),
                     "name": node.name,
                     "depth": node.depth,
                     "bounds": node.bounds.as_json(),

@@ -12,6 +12,7 @@
 //! protocol.
 
 mod answer;
+mod outline;
 mod platform;
 mod refusal;
 mod rpc;
