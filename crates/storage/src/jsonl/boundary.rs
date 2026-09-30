@@ -8,15 +8,18 @@
 use std::path::{Path, PathBuf};
 
 use kernel::ledger::chain_hash;
-use kernel::{AxCode, AxError, EventRecord, GENESIS_PREV, Seq};
+use kernel::{AxCode, AxError, GENESIS_PREV, Seq};
 
 use crate::error::{StorageError, io_err};
 
 use super::ledger::{JsonlLedger, PriorSegment, TailBoundary, complete_lines};
+use super::verify::{LineCheck, LineFault};
 
 impl JsonlLedger {
     /// Boundary state entering the last segment: chain root, or the
-    /// previous segment's verified last line.
+    /// previous segment's last line, judged by the same rule as every
+    /// other line (`LineCheck::judge`), so an ignorable line of a newer
+    /// kind closes a segment as lawfully as it sits inside one.
     pub(super) fn boundary(
         &mut self,
         segments: &[PathBuf],
@@ -57,14 +60,9 @@ impl JsonlLedger {
                 ),
             });
         };
-        let record =
-            EventRecord::parse_line(last_line).map_err(|source| StorageError::Envelope {
-                path: prior.clone(),
-                line: count,
-                source,
-            })?;
-        let next = record
-            .seq()
+        let judged = LineCheck::judge(last_line).map_err(|fault| refusal(prior, count, fault))?;
+        let next = judged
+            .seq
             .next()
             .map_err(|source| StorageError::Draft { source })?;
         let len = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
@@ -76,6 +74,29 @@ impl JsonlLedger {
                 len,
             }),
         })
+    }
+}
+
+/// How open refuses the prior segment's last line: a newer writer by
+/// its version, anything else as damage at that line, the same way
+/// `recover_tail` refuses a line of the last segment.
+fn refusal(prior: &Path, line: u64, fault: LineFault) -> StorageError {
+    match fault {
+        LineFault::VersionAhead(v) => StorageError::VersionAhead {
+            path: prior.to_path_buf(),
+            v,
+        },
+        other @ (LineFault::NotALine(_)
+        | LineFault::NotAVersion(_)
+        | LineFault::ChainBreak
+        | LineFault::SeqGap { .. }
+        | LineFault::UnknownKind(_)
+        | LineFault::NotCanonical(_)
+        | LineFault::SeqExhausted(_)) => StorageError::Envelope {
+            path: prior.to_path_buf(),
+            line,
+            source: other.into_ax(line),
+        },
     }
 }
 
