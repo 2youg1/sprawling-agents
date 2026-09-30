@@ -160,33 +160,33 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 
 **验收**：`crates/sprawling/tests/desktop.rs` 的 `a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary`。一栋楼的 `RULES.toml` 写 `desktop = true`，没有任何 `[[mcp]]`，城起真的 `sprawling desktop` 子进程，模型收到的工具表里有 `desktop_desktop_windows` 等六件。
 
-## 8-4e harness 居民的一次 run（性质已证明；接线尚未做）
+## 8-4e harness 居民的一次 run（性质已证明；接线分段进行）
 
 一个房间的居民可以是五家官方 harness 之一（protocol-SPEC §8-19）。派活到这样的房间时，城起那一家的进程，在房间自己的 worktree 里开一场 ACP 会话，把它汇报的东西记进账本，在它答出停止原因时结束这次 run。
 
 **性质的权威是 `adversary/design/HarnessRun.lean`**，三组定理：
 
-- **汇报恒不是准入历史**（`a_report_is_never_admitted`）：一次 harness run 的准入记录只有它的开始与冻结，中间汇报多少、汇报什么都不改变这一点。
+- **汇报恒不是准入历史**（`a_report_is_never_admitted`）：一次 harness run 的准入记录只有它的开始、它对城那次 prompt 的回答与冻结，中间汇报多少、汇报什么都不改变这一点。
 - **停摆先变成取消**（`a_halt_is_a_cancel_before_anything_else`、`a_second_halt_sends_nothing`）：城观察到一个罩住这个房间的停摆之后，run 发出的下一件事就是 `session/cancel`，此后的汇报排在它后面；第二次停摆什么也不发。
-- **冻结的 run 是历史**（`nothing_follows_the_stop_reason`）：停止原因之后，run 什么都不记、什么都不发。
+- **冻结的 run 是历史**（`nothing_follows_the_stop_reason`）：停止原因到了，run 记下回答、冻结，此后什么都不记、什么都不发。
 
-**它守的是 ARCHITECTURE §5 第 4 步的弱形**。harness 自己执行工具，城准不了也拒不了它做的事，只能记它选择汇报的东西。所以「每个效果先成为事件」在这里分成两半：城自己决定的事（run 开始了、停摆变成了取消、run 怎么结束）是准入历史，照旧先落账再发生；harness 说它做了什么是汇报，在它说了之后才落账，恒不被读回来当作一个判定。
+**它守的是 ARCHITECTURE §5 第 4 步的弱形**。harness 自己执行工具，城准不了也拒不了它做的事，只能记它选择汇报的东西。所以「每个效果先成为事件」在这里分成两半：城自己决定的事（run 开始了、停摆变成了取消、城那次 prompt 得到了什么回答、run 怎么结束）是准入历史；harness 一路上说它做了什么是汇报，在它说了之后才落账，恒不被读回来当作一个判定。
 
-**已定的七条**：
+**已定的十条**：
 
 1. **汇报是一个新的 record-only 种类 `harness_reported`**：kernel-SPEC §8-4 的表加一行，`EventKind::ALL`、`xtask specalign`、`WIRE_V` 与 golden 随之动。载荷携 run、`protocol::Update` 的变体名与它的文字字段；permission 的问与城的答也记成一条汇报。回答「城做了什么」的 fold 恒不读它，只有回答「harness 说了什么」的视图读它。
 2. **停摆到取消**：城在把下一条汇报落账之前查一次这个房间所在的停摆；罩住了，就先落 `cancel_received`，再发 `session/cancel`，然后照常读到 `stopReason: cancelled` 为止。复用已有的 `cancel_received`，因为它记的正是「这个 run 收到了一次取消」。
-3. **停止原因到结局**：`cancelled` 冻成 `Completion::Cancelled`，`max_tokens` 与 `max_turn_requests` 冻成 `Completion::Limit`。`end_turn` 与 `refusal` 见下面的未定第 1 条。
+3. **停止原因到结局**：`cancelled` 冻成 `Completion::Cancelled`；`max_tokens`、`max_turn_requests` 与 `refusal` 冻成 `Completion::Limit`，因为 run 是撞上了什么而停，不是做完了；`end_turn` 见第 8 条。
 4. **confidential 楼拒绝 harness 居民**：`agree_to_work` 在写任何东西之前答 `E_GATE_DENIED`。harness 执行自己的工具，并把房间的内容送到它自己厂商的服务器，confidential 楼「数据进来不出去」的承诺对它不成立。
 5. **harness 恒在房间自己的 worktree 里跑**：用评审楼的同一种租约，不论楼的 `review` 设了什么。城管不了它写什么，但管得了它写在哪：它的写入只经已有的评审合并进入城的主树，而合并是准入的。
 6. **进程归 `protocol::harness`**：起 `Launch` 的程序与参数，工作目录是那棵 worktree，走管道，落地即杀。理由与 `protocol::mcp::stdio` 相同：字节怎么走归协议那个 crate（protocol-SPEC §7）。
 7. **`session/new` 的 `mcpServers` 这一版给空表**：城的工具要经一台城自己的 MCP server 交出去，那是另一件活。楼里 `[[mcp]]` 的 server 与城自带的桌面（§8-4d）也不转交：harness 直接调它们，`kernel::gate::undoable` 那道升给人的门就够不着了。
 
-**未定的三条**（每条写明什么能定它）：
+8. **`end_turn` 由城自己的记录作证**：`session/prompt` 答出 `end_turn` 之后，城先把这棵 worktree 提交成自己的检查点（`checkpoint_committed`，harness 改了什么由城记下），再写一条新的 record-only 种类 `harness_answered`：载荷携停止原因，与这一回合 harness 回答城的那段文字（`agent_message_chunk` 依次拼起来）。run 冻成 `Completion::Done`，证据引这一行，`kernel::completion::Evidence` 因此在 `tool_result`、`model_returned` 之外多收一种。这与模型 run 的证据同一个标准：模型的 run 以它最后那条 `model_returned` 作证（`runtime::run::lifecycle::concluded`），harness 的 run 以它对城那次请求的回答作证。回答是空的，冻成 `Limit`，与 `concluded` 对空回复的判法相同。**被否**：给 `Completion` 加一个「harness 自称完成」的变体（动 kernel 的公开面与每一个按结局分支的读者）；在 bench 上立一件「harness」工具，把 prompt 包成 `tool_called`／`tool_result`（那是一件没有模型调用过、也没有门判过的工具）。
+9. **permission 一律答它给出的第一个 `allow_once`（定规）**：没有 `allow_once` 就答第一个 `reject_once`，两者都没有就答 `cancelled`。恒不答 `allow_always`：那是替以后的调用做决定。问与答各记成一条 `harness_reported`。理由：城不能按工具名授权（ACP 规格），能兜住的是这棵 worktree（第 5 条）；一律拒绝会让默认要问的 harness 什么都做不成；交给人则要让 Approval Inbox 收动作，而它今天只收设计问题，且一次挂起的 prompt 占着一条车道。**重开参数**：Approval Inbox 开始收动作。
+10. **房间用 `CONFIG.toml` 的 `[resident] harness` 点名它的 harness（定规）**：值是 `protocol::Harness::as_str` 的五个拼写之一，按城／楼／房间的梯子读，与 `[model] name` 同一架梯子。`city` 只把它当字符串读进来，理由与 `[model] name` 相同：`city` 只见 `kernel`，五个拼写的权威在 `protocol::harness::roster`。`agree_to_work` 在写任何东西之前用 `protocol::Harness::parse` 判它，不认识的拼写答 `E_CONFIG_INVALID` 并列出五个。同一层同时写 `[model] name` 与 `[resident] harness` 在解析时即拒：一个房间的居民是模型还是 harness，要读者去猜就是配置写错了。**被否**：派活帧上加一个字段，那要动 wire，而居民是一个站着的身份（词汇表 Resident），不是每次派活现选的。
 
-1. **`end_turn` 与 `refusal` 冻成什么**：`Completion::Done` 的证据只收 `tool_result` 与 `model_returned`（`kernel::completion::Evidence`），而汇报恒不是准入历史，所以 harness 说「做完了」成不了证据。候选有两条：城在 `end_turn` 之后自己跑房间的完成检查，用那次检查的 `tool_result` 作证据；或者给 `Completion` 加一个「harness 自称完成、城未验证」的变体，后者会动 kernel 的公开面与每一个按结局分支的读者。能定它的是人的回答：一次没有经过城自己检查的 harness run，要不要显示为完成。
-2. **permission 怎么答**：ACP 里 permission 是 agent 可以不问的，工具名也不授予任何权限（protocol-SPEC §8-19）。候选有三条：一律答第一个 `allow_once`，由自己的 worktree 兜住写入；一律答 `reject_once`，这会让默认要问的 harness 什么都做不成；或者交给人，但 Approval Inbox 今天只收设计问题、不收动作（词汇表 ApprovalItem），而一次挂起的 prompt 占着一条车道。能定它的是人的回答。
-3. **一个房间怎么点名它的 harness**：候选是配置层的一个键（例如 `CONFIG.toml` 的 `[resident] harness = "claude_code"`，按城／楼／房间的梯子读，与 `[model] name` 同一架梯子），或者派活帧上的一个字段（要动 wire）。前者不动 wire，也符合居民是一个站着的身份（词汇表 Resident）；设置页上让人选的那一处跟着它定。能定它的是人选哪一处来点名。
+**接线分四段，各自红转绿**：①`protocol`：`Harness::parse`、`AcpSession::cancel` 与起进程的那一半；②`kernel`：`harness_reported`、`harness_answered` 两个种类与 `Evidence` 多收的一种；③`city`：`[resident] harness`；④本 crate：派活路径上的 harness run。
 
 ## 8-5 订阅额度走 harness，不走登录
 

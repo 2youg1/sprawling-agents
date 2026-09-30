@@ -16,20 +16,22 @@ A harness runs its own tools. The city cannot admit or refuse what it does; it
 can only record what the harness chooses to report. So a harness run keeps a
 weaker rule than ARCHITECTURE.md section 5 step 4 ("every effect becomes an
 event first"): what the city itself decides - that the run started, that a
-halt was turned into a cancel, how the run ended - is admitted history, and
-what the harness says it did is a report, booked after the harness said it and
-never read back as a decision.
+halt was turned into a cancel, what the harness answered to the city's own
+prompt, how the run ended - is admitted history, and what the harness says it
+did along the way is a report, booked after the harness said it and never read
+back as a decision.
 
 The run is a machine over three inputs, in the order the city observes them: a
 report the harness sent, a halt of a scope that holds the room, and the answer
-to the prompt carrying a stop reason. It emits three outputs: a report booked,
-the cancel sent to the harness, and the run frozen with its stop reason.
+to the prompt carrying a stop reason. It emits four outputs: a report booked,
+the cancel sent to the harness, the answer to the prompt recorded, and the run
+frozen with its stop reason.
 
 Three properties, one theorem group each:
 
 * **a report is never admitted history** - the admitted records of a harness
-  run are its start and its freeze, whatever and however many reports arrive
-  between them;
+  run are its start, the answer to its prompt and its freeze, whatever and
+  however many reports arrive between them;
 * **a halt is a cancel before anything else** - once a halt is observed, the
   next thing the run emits is the cancel, so no report is booked between the
   halt and the cancel, and a second halt sends nothing;
@@ -60,6 +62,7 @@ inductive Input where
 inductive Output where
   | book (said : Nat)
   | cancel
+  | answer (why : Stop)
   | freeze (why : Stop)
   deriving Repr, DecidableEq
 
@@ -77,7 +80,8 @@ def step (s : State) : Input → State × List Output
   | .report said => if s.frozen then (s, []) else (s, [.book said])
   | .halt =>
     if s.frozen || s.cancelled then (s, []) else ({ s with cancelled := true }, [.cancel])
-  | .stop why => if s.frozen then (s, []) else ({ s with frozen := true }, [.freeze why])
+  | .stop why =>
+    if s.frozen then (s, []) else ({ s with frozen := true }, [.answer why, .freeze why])
 
 /-- Everything a run emits for a sequence of observations. -/
 def run : State → List Input → List Output
@@ -103,6 +107,7 @@ inductive Record where
   | started
   | reported (said : Nat)
   | cancelSent
+  | answered (why : Stop)
   | frozen (why : Stop)
   deriving Repr, DecidableEq
 
@@ -110,6 +115,7 @@ inductive Record where
 def Output.record : Output → Record
   | .book said => .reported said
   | .cancel => .cancelSent
+  | .answer why => .answered why
   | .freeze why => .frozen why
 
 /-- The records of one run: its start, then one record per output. -/
@@ -154,10 +160,11 @@ theorem admitted_append (xs ys : List Record) :
   | cons r rest ih => cases r <;> simp [admitted, ih]
 
 /-- Any number of reports, then the stop reason: the admitted history is the
-start and the freeze, whatever the harness reported. -/
+start, the answer and the freeze, whatever the harness reported. -/
 theorem a_report_is_never_admitted (reports : List Input) (why : Stop)
     (h : reportsOnly reports) :
-    admitted (ledger .fresh (reports ++ [.stop why])) = [.started, .frozen why] := by
+    admitted (ledger .fresh (reports ++ [.stop why])) =
+      [.started, .answered why, .frozen why] := by
   have stays := reports_leave_the_state State.fresh reports h
   have booked := reports_emit_only_bookings State.fresh reports h
   simp only [ledger, run_append, List.map_append, stays]
@@ -189,11 +196,11 @@ theorem a_frozen_run_emits_nothing (s : State) (later : List Input)
   | nil => rfl
   | cons i rest ih => cases i <;> simp [run, step, done, ih]
 
-/-- The run that answered its stop reason emits nothing for anything observed
-after it: no report, no cancel. -/
+/-- The run that answered its stop reason records the answer, freezes, and
+emits nothing for anything observed after it: no report, no cancel. -/
 theorem nothing_follows_the_stop_reason (s : State) (before later : List Input) (why : Stop)
     (live : (after s before).frozen = false) :
-    run s (before ++ .stop why :: later) = run s before ++ [.freeze why] := by
+    run s (before ++ .stop why :: later) = run s before ++ [.answer why, .freeze why] := by
   rw [run_append]
   simp [run, step, live]
   exact a_frozen_run_emits_nothing _ _ rfl
