@@ -13,7 +13,7 @@ Every Rust package of the product lives in this directory. The packages are sepa
 | `crates/agent_protocols` | `sprawling-agent-protocols` | `agent_protocols` | MCP out to a server, ACP in from an editor, and ACP out to a harness | `gateway`, `kernel` | `crates/agent_protocols/agent_protocols-SPEC.md` |
 | `crates/browser` | `sprawling-browser` | `browser` | a browser driven over WebDriver BiDi, and what a model may see of a page and do to it | `kernel` | `crates/browser/browser-SPEC.md` |
 | `crates/city` | `sprawling-city` | `city` | space, identity, and the documents a building keeps | `kernel` | `crates/city/city-SPEC.md` |
-| `crates/collab` | `sprawling-collab` | `collab` | several residents in one building, without stepping on each other | `kernel`, `storage` | `crates/collab/collab-SPEC.md` |
+| `crates/collab` | `sprawling-collab` | `collab` | several residents in one building, without stepping on each other | `kernel`, `storage` | `crates/collab/Spec.lean` |
 | `crates/gateway` | `sprawling-gateway` | `gateway` | everything between a decision to call a model and the bytes on the wire | `kernel` | `crates/gateway/gateway-SPEC.md` |
 | `crates/kernel` | `sprawling-kernel` | `kernel` | every decision in the city, and nothing that touches a disk | nothing | `crates/kernel/kernel-SPEC.md` |
 | `crates/remote_access` | `sprawling-remote-access` | `remote_access` | the remote door, and nothing that depends on the route that reaches it | `kernel` | `crates/remote_access/remote_access-SPEC.md` |

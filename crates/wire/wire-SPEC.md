@@ -416,7 +416,7 @@ WireCommand::Dispatch { addr, task, goal, mode, idem, session: Option<SessionNam
 
 - **`E_WIRE_MISMATCH`**：不可——它是装载期六码之一（封闭白名单），且它的存在理由就是「浏览器缓存旧前端」这一 WebUI 特有错配。类型无法定义掉跨版本的字节。握手之后解不出的帧同归此码、两侧的处置见 §8-37。
 - **`E_CONFIG_INVALID`**：不可——绑定非回环而无令牌必须在**启动时**拒绝，这是配置判定不是请求判定。
-- **没有 signal-unknown 码**：握手的 schema 哈希保证同一连接的两端共享同一份词汇，一个本版本不认的 Signal 种类只能来自更新的二进制写的 Ledger，而那已由版本方向门拒在外面（collab-SPEC §8-1）。
+- **没有 signal-unknown 码**：握手的 schema 哈希保证同一连接的两端共享同一份词汇，一个本版本不认的 Signal 种类只能来自更新的二进制写的 Ledger，而那已由版本方向门拒在外面（`crates/collab/Spec.lean` §8 的 `collab::inbox` 一条）。
 
 ### 12.1 `WIRE_V` 在两次推送之间最多进一位，进在第一个改形的提交
 
