@@ -12,7 +12,7 @@
 //! there would have been paid for by shortening something else.
 
 use super::city::report;
-use sprawling::ask;
+use accounting::views::ask;
 use std::process::ExitCode;
 
 /// Which run wrote one commit, answered from the city's own history.

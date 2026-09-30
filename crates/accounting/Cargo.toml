@@ -10,12 +10,16 @@ name = "accounting"
 
 [dependencies]
 kernel = { workspace = true }
+storage = { workspace = true }
 gateway = { workspace = true }
+runtime = { workspace = true }
 agent_protocols = { workspace = true }
 city = { workspace = true }
 collab = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# The bytes a views snapshot is written in (sprawling-SPEC.md 8-91).
+postcard = { workspace = true }
 # The person's own layer is TOML for the reason a city's CONFIG.toml is:
 # it is a file somebody edits by hand while the city is stopped.
 toml = { workspace = true }
@@ -24,6 +28,9 @@ wire = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true
+# Read-only, and tests only: the view tests that read a building's
+# repository set one up themselves.
+git2 = { workspace = true }
 
 [lints]
 workspace = true

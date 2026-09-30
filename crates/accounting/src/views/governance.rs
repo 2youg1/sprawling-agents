@@ -20,18 +20,18 @@ use kernel::{Address, AxError, EventKind, Payload, RunId};
 
 /// The work an answered item was holding up.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
-pub(crate) struct BlockedJob {
-    pub(crate) addr: Address,
-    pub(crate) task: String,
-    pub(crate) goal: String,
+pub struct BlockedJob {
+    pub addr: Address,
+    pub task: String,
+    pub goal: String,
 }
 
 /// What a run was sent out to do. Read back from `run_started`, which is
 /// the record that carries both halves.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
-pub(crate) struct Sent {
-    pub(crate) task: String,
-    pub(crate) goal: String,
+pub struct Sent {
+    pub task: String,
+    pub goal: String,
 }
 
 /// Who may answer, what is waiting, what has already been allowed, and
@@ -43,18 +43,18 @@ pub(crate) struct Sent {
 /// happened to agree, and `set_admission` and `answer_approval` each
 /// held a third by writing a field directly.
 #[derive(serde::Serialize, serde::Deserialize)]
-pub(crate) struct Governance {
-    pub(crate) pending: std::collections::BTreeMap<String, kernel::ApprovalItem>,
-    pub(crate) autonomy: kernel::Autonomy,
-    pub(crate) granted: Vec<kernel::ClusterKey>,
+pub struct Governance {
+    pub pending: std::collections::BTreeMap<String, kernel::ApprovalItem>,
+    pub autonomy: kernel::Autonomy,
+    pub granted: Vec<kernel::ClusterKey>,
     /// The scopes a person has shut. Folded from the ledger like
     /// everything else the panel shows, so a restarted city is still
     /// halted.
-    pub(crate) halted: std::collections::BTreeSet<Scope>,
+    pub halted: std::collections::BTreeSet<Scope>,
     /// What each governing document was last booked as, by scope and
     /// document. Folded from `rules_changed`, so a restarted city knows
     /// what the account already covers and books only what moved.
-    pub(crate) rules: std::collections::BTreeMap<(Scope, GoverningDocument), kernel::B3Hash>,
+    pub rules: std::collections::BTreeMap<(Scope, GoverningDocument), kernel::B3Hash>,
     /// What each run was sent to do, by run.
     ///
     /// Never pruned, and one short entry per run - the same growth class
@@ -66,12 +66,12 @@ pub(crate) struct Governance {
     sent: std::collections::BTreeMap<RunId, Sent>,
     /// What each waiting item is holding up, by approval id. Pruned when
     /// the item is answered, because an answered item holds nothing up.
-    pub(crate) origins: std::collections::BTreeMap<String, BlockedJob>,
+    pub origins: std::collections::BTreeMap<String, BlockedJob>,
 }
 
 impl Governance {
     /// A city nobody has governed yet.
-    pub(crate) fn empty() -> Governance {
+    pub fn empty() -> Governance {
         Governance {
             pending: std::collections::BTreeMap::new(),
             autonomy: kernel::consts_policy::AUTONOMY_DEFAULT,
@@ -89,7 +89,7 @@ impl Governance {
     /// `RunPlan` out of these very values, and `absorb` reading them back
     /// out of `run_started`. `what_a_worker_holds_is_what_a_restart_rebuilds`
     /// is what holds the two to the same answer.
-    pub(crate) fn sent(&mut self, run: RunId, task: &str, goal: &str) {
+    pub fn sent(&mut self, run: RunId, task: &str, goal: &str) {
         self.sent.insert(
             run,
             Sent {
@@ -118,7 +118,7 @@ impl Governance {
         clippy::wildcard_enum_match_arm,
         reason = "a few kinds move this fold; the rest of the event vocabulary does not"
     )]
-    pub(crate) fn absorb(
+    pub fn absorb(
         &mut self,
         kind: EventKind,
         run: RunId,

@@ -11,7 +11,7 @@ use storage::{StoredSnapshot, WholeFold};
 
 use super::*;
 use crate::assembly::{RunWorker, init_city};
-use crate::views::snapshot::start::{FoldStart, snapshot_dir, start};
+use accounting::views::snapshot::start::{FoldStart, snapshot_dir, start};
 
 /// Buildings named `lab<n>`, and one repeat of `lab0` under a new key,
 /// so the refusals `Entrance` keeps are in the folds too.

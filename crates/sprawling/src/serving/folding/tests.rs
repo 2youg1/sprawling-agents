@@ -13,9 +13,9 @@ use kernel::EventRecord;
 use super::{Broadcast, Copies, spawn_folding};
 use crate::assembly::init_city;
 use crate::serving::standing::monotonic_now;
-use crate::views::snapshot::start::{FoldStart, start};
-use crate::views::{Published, Views, answer_outside_the_lock};
 use accounting::person::CorePriority;
+use accounting::views::snapshot::start::{FoldStart, start};
+use accounting::views::{Published, Views, answer_outside_the_lock};
 
 /// A reader in the middle of a query holds up neither the writer nor the
 /// fold: the observer returns, and the record is folded and broadcast,
@@ -27,7 +27,7 @@ fn a_reader_holding_the_views_holds_up_neither_the_writer_nor_the_fold() {
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let genesis = EventRecord::parse_line(verified.raw_lines().first().unwrap()).unwrap();
     let unfolded = Views::new(dir.path());
-    let spare = unfolded.unfolded_twin();
+    let spare = unfolded.twin().unwrap();
     let views = Arc::new(Published::new(unfolded));
     let (to_clients, mut heard) = tokio::sync::broadcast::channel(8);
     let head = Arc::new(wire::LedgerHead::default());
@@ -69,7 +69,10 @@ fn a_reader_holding_the_views_holds_up_neither_the_writer_nor_the_fold() {
     let (as_of, answered) = answer_outside_the_lock(&views, &city);
     assert_eq!(
         (as_of, answered.unwrap()),
-        (genesis.seq().next().unwrap(), folded_here.answer(&city))
+        (
+            genesis.seq().next().unwrap(),
+            folded_here.prepare(&city).finish()
+        )
     );
 }
 
@@ -86,7 +89,7 @@ fn the_fold_thread_cuts_a_snapshot_a_later_read_resumes_from() {
         .map(|line| EventRecord::parse_line(line).unwrap())
         .collect();
     let unfolded = Views::new(dir.path());
-    let spare = unfolded.unfolded_twin();
+    let spare = unfolded.twin().unwrap();
     let copies = Copies {
         published: Arc::new(Published::new(unfolded)),
         spare,

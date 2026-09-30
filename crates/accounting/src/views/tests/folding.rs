@@ -270,7 +270,7 @@ fn the_views_answer_as_of_the_first_seq_they_have_not_folded() {
 #[test]
 fn the_views_a_rebuild_hands_over_hold_the_index_it_read() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::init_city(dir.path()).unwrap();
+    let report = crate::views::tests::founded(dir.path());
     let views = Views::rebuild(&report.ledger_dir).unwrap();
     assert_eq!(
         views

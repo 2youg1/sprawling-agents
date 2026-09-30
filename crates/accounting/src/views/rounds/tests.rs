@@ -261,7 +261,7 @@ fn the_change_base_is_the_first_checkpoint_of_the_session() {
 fn asking_for_rounds_answers_the_fold_the_view_layer_ran() {
     use kernel::Ledger;
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::init_city(dir.path()).unwrap();
+    let report = crate::views::tests::founded(dir.path());
     let run = RunId::from_bytes([7u8; 16]);
     let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, TimeMs::new(9))
         .unwrap()
@@ -319,7 +319,7 @@ fn asking_for_rounds_answers_the_fold_the_view_layer_ran() {
 fn the_rounds_carry_how_the_session_opened_and_closed() {
     use kernel::Ledger;
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::init_city(dir.path()).unwrap();
+    let report = crate::views::tests::founded(dir.path());
     let run = RunId::from_bytes([8u8; 16]);
     let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, TimeMs::new(9))
         .unwrap()

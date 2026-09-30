@@ -13,7 +13,7 @@ use storage::{StoredSnapshot, WholeFold};
 
 use super::*;
 use crate::assembly::{RunWorker, init_city};
-use crate::views::snapshot::start::{FoldStart, cut, snapshot_dir, start};
+use accounting::views::snapshot::start::{FoldStart, cut, snapshot_dir, start};
 
 fn raise(worker: &mut RunWorker, names: std::ops::Range<u8>) {
     for n in names {
@@ -110,7 +110,7 @@ fn views_a_snapshot_cannot_decode_are_folded_from_genesis() {
     let lines = storage::read_raw_lines_at(&ledger).unwrap();
     let seq = Seq::new(u64::try_from(lines.len()).unwrap() - 1);
     let snapshot = storage::ChainSnapshot::cut(
-        crate::views::snapshot::views_fold_version(),
+        accounting::views::snapshot::views_fold_version(),
         seq,
         lines.last().unwrap(),
         b"not the views".to_vec(),

@@ -14,9 +14,9 @@ use storage::{JsonlLedger, OpenReport};
 // The governance fold lives in `views`, where the reading side keeps
 // one too. Named here so the worker that judges from it reads under
 // the same name a page is answered under.
-pub(super) use crate::views::Governance;
-use crate::views::Views;
-use crate::views::snapshot::start::{
+pub(super) use accounting::views::Governance;
+use accounting::views::Views;
+use accounting::views::snapshot::start::{
     SnapshotFold, city_root_of, cut, cut_at, last_line, start_audited,
 };
 

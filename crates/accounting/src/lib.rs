@@ -15,17 +15,24 @@
 //! the kernel, the city's files and the collaboration vocabulary: what a
 //! desk's effects come to (`effect`) and every building's plan folded
 //! from the records (`plan_view`).
+//!
+//! The read side lives here too: the fold every page is answered from
+//! (`views`), and every run folded into one line with its parent
+//! pointers (`lineage`), which the binary's `view` command and the
+//! views both read (accounting-SPEC.md 8-10).
 
 mod clock;
 mod connectors;
 pub mod effect;
 pub mod held_vault;
 pub mod home;
+pub mod lineage;
 mod machine;
 mod models;
 pub mod person;
 pub mod plan_view;
 pub mod toolkit_broker;
+pub mod views;
 
 pub use clock::Clock;
 pub use connectors::{Connectors, Reached};

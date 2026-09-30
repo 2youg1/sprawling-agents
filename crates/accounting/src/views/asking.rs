@@ -52,7 +52,7 @@ impl Views {
     /// The audit's reason when the chain is broken or cannot be read, and
     /// the verification failures of the lines it folds; a city whose
     /// history does not verify is not one whose views should be served.
-    pub(crate) fn rebuild(ledger_dir: &Path) -> Result<Views, AxError> {
+    pub fn rebuild(ledger_dir: &Path) -> Result<Views, AxError> {
         start_audited::<Views>(ledger_dir).map(|started| started.folded)
     }
 }

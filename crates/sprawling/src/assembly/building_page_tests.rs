@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::assembly::fixture::*;
-use crate::views::building_page::read_building;
+use accounting::views::building_page::read_building;
 
 /// The rules a person may read on the building page are the rules
 /// the city obeys, and the page reads them from a directory the
@@ -278,5 +278,43 @@ fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
             .to_string_lossy()
             .contains(".sprawling"),
         "the rules live where no write domain reaches"
+    );
+}
+
+#[test]
+fn a_new_building_is_visible_in_the_city_view_with_a_denominator_of_zero() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        gateway::Custodian::in_memory(),
+        runtime::diagnostics::Diagnostics::off(),
+    )
+    .unwrap();
+    worker
+        .handle(wire::Command::CreateBuilding {
+            addr: Address::parse("lab").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
+        })
+        .unwrap();
+
+    let views = accounting::views::Views::new(dir.path());
+    let wire::Answer::City(city) = views.prepare(&wire::Query::CityView).finish() else {
+        panic!("CityView answers with a city");
+    };
+    let lab = city
+        .buildings
+        .iter()
+        .find(|b| b.addr.as_str() == "lab")
+        .expect("a building the city made is a building the city can see");
+    assert!(lab.problems.is_empty());
+    let kernel::Progress::Planned(planned) = lab.progress else {
+        panic!("a building with a roadmap has a denominator");
+    };
+    assert_eq!(
+        planned.ratio(),
+        (0, 0),
+        "a new building owes nothing yet, and owes it out of nothing"
     );
 }

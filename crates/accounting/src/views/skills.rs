@@ -64,7 +64,7 @@ pub(super) fn skills_answer(
     building: &Address,
     pins: &SkillPins,
 ) -> Option<wire::SkillsAnswer> {
-    let home = accounting::home::Home::detect().ok()?;
+    let home = crate::home::Home::detect().ok()?;
     let shelves = city::Library::scan(city_root, Some(building), home.path()).ok()?;
     // What this building's reading room admits, so a page can show
     // the stock and the choice in one list.
@@ -159,7 +159,7 @@ mod tests {
         use kernel::layout::CityLayout;
 
         let dir = tempfile::tempdir().unwrap();
-        crate::assembly::init_city(dir.path()).unwrap();
+        crate::views::tests::founded(dir.path());
         let lab = Address::parse("lab").unwrap();
         city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
         let layout = CityLayout::new(dir.path());
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn rules_that_will_not_load_answer_unavailable_rather_than_admitting_nothing() {
         let dir = tempfile::tempdir().unwrap();
-        crate::assembly::init_city(dir.path()).unwrap();
+        crate::views::tests::founded(dir.path());
         let lab = Address::parse("lab").unwrap();
         city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
         std::fs::write(

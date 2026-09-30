@@ -20,6 +20,8 @@ gateway = { workspace = true }
 collab = { workspace = true }
 wire = { workspace = true, features = ["server"] }
 sprawling = { workspace = true }
+# The bench times the production rebuild through accounting::views::ask.
+accounting = { workspace = true }
 serde_json.workspace = true
 # The nesting instrument reads the TOML shape it grades (citysim-SPEC.md 8-8).
 toml.workspace = true

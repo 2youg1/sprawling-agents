@@ -28,7 +28,7 @@ use super::prepared::{LedgerAsk, unavailable};
 /// first prompt sits on the ledger, and the ledger that holds the line.
 /// The line and the store are read by [`PrefixAsk::read`], after the
 /// views are released.
-pub(crate) struct PrefixAsk {
+pub struct PrefixAsk {
     ledger: LedgerAsk,
     run: RunId,
     first: Option<Seq>,

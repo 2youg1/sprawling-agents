@@ -134,8 +134,8 @@ fn large_ledger_fold(
     let mut times = Vec::new();
     for _ in 0..fixture.fold_rounds {
         let t0 = super::stamp();
-        let answer =
-            sprawling::ask(&city_root, &wire::Query::CityView).map_err(|why| format!("{why}"))?;
+        let answer = accounting::views::ask(&city_root, &wire::Query::CityView)
+            .map_err(|why| format!("{why}"))?;
         times.push(t0.elapsed());
         std::hint::black_box(answer);
     }

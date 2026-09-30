@@ -265,7 +265,7 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
         .expect("a dispatch assembles a prompt");
 
     let wire::Answer::Prefix(answer) =
-        crate::views::ask(dir.path(), &wire::Query::Prefix { run }).unwrap()
+        accounting::views::ask(dir.path(), &wire::Query::Prefix { run }).unwrap()
     else {
         panic!("Prefix answers with a prefix");
     };
@@ -311,7 +311,7 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
     let locator =
         kernel::Locator::parse(&format!("cas:b3-{}", building.hash)).expect("a stored segment");
     let wire::Answer::Content(content) =
-        crate::views::ask(dir.path(), &wire::Query::Content { locator }).unwrap()
+        accounting::views::ask(dir.path(), &wire::Query::Content { locator }).unwrap()
     else {
         panic!("Content answers with content");
     };

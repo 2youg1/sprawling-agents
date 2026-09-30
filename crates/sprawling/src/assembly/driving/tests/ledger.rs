@@ -20,7 +20,7 @@
 use super::super::*;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
-use crate::views::Views;
+use accounting::views::Views;
 
 #[test]
 fn what_a_run_changes_is_changed_after_the_line_that_announces_it() {
@@ -219,23 +219,23 @@ fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
         })
         .unwrap();
 
-    let mut live = live
+    let live = live
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let wire::Answer::City(city) = live.answer(&wire::Query::CityView) else {
+    let wire::Answer::City(city) = live.prepare(&wire::Query::CityView).finish() else {
         panic!("CityView answers with a city");
     };
     assert_eq!(city.frozen, 1, "the dispatched run reached its freeze");
     let run = city.runs.iter().find(|row| row.frozen).unwrap().run;
-    let wire::Answer::Run(Some(one)) = live.answer(&wire::Query::RunView { run }) else {
+    let wire::Answer::Run(Some(one)) = live.prepare(&wire::Query::RunView { run }).finish() else {
         panic!("RunView answers about a run the city has");
     };
     assert_eq!(one.last_kind, EventKind::RunFrozen);
 
     // The same answer arrives from a cold rebuild: a view is
     // disposable exactly to the extent that this holds.
-    let mut rebuilt = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
-    let wire::Answer::City(again) = rebuilt.answer(&wire::Query::CityView) else {
+    let rebuilt = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let wire::Answer::City(again) = rebuilt.prepare(&wire::Query::CityView).finish() else {
         panic!("CityView answers with a city");
     };
     assert_eq!(city, again);
@@ -245,7 +245,7 @@ fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
     // name. What a page must still be able to tell apart is "this
     // city archived nothing" from "this build cannot say", and the
     // first is an empty list rather than a refusal.
-    let wire::Answer::Registry(registry) = live.answer(&wire::Query::RegistryView) else {
+    let wire::Answer::Registry(registry) = live.prepare(&wire::Query::RegistryView).finish() else {
         panic!("RegistryView answers with a registry");
     };
     assert!(registry.assets.is_empty());
@@ -295,8 +295,8 @@ fn a_commit_the_city_made_says_which_run_wrote_it() {
     )
     .expect("the checkpoint oid is forty hex digits");
 
-    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
-    let wire::Answer::Commit(said) = views.answer(&wire::Query::Commit { oid }) else {
+    let views = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let wire::Answer::Commit(said) = views.prepare(&wire::Query::Commit { oid }).finish() else {
         panic!("a commit this city made answers which run wrote it");
     };
     assert_eq!(said.oid, oid);
@@ -313,9 +313,11 @@ fn a_commit_the_city_made_says_which_run_wrote_it() {
 
     // An oid this city never wrote is not an empty answer.
     assert!(matches!(
-        views.answer(&wire::Query::Commit {
-            oid: kernel::GitOid::from_bytes([9u8; 20]),
-        }),
+        views
+            .prepare(&wire::Query::Commit {
+                oid: kernel::GitOid::from_bytes([9u8; 20]),
+            })
+            .finish(),
         wire::Answer::Unavailable { .. }
     ));
 }

@@ -21,10 +21,10 @@ use kernel::{Address, PursuitState};
 
 use super::holding::Views;
 use super::lines::{buildings_of, summarize};
-use accounting::plan_view::{PlanView, plans_of};
+use crate::plan_view::{PlanView, plans_of};
 
 /// What the city page takes under the view lock.
-pub(crate) struct CityAsk {
+pub struct CityAsk {
     city_root: PathBuf,
     plans: Arc<Mutex<PlanView>>,
     /// The answer as the fold holds it, with no buildings and no

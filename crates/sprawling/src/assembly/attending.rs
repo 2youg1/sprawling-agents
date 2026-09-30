@@ -34,8 +34,8 @@ use super::relay::Patience;
 use super::{RunWorker, Serving};
 use crate::serving::folding::{Broadcast, Copies, Folding, spawn_folding};
 use crate::serving::output_ring::OutputRing;
-use crate::views::{Published, Views};
 use accounting::person::CorePriority;
+use accounting::views::{Published, Views};
 
 /// What a worker is opened with: where the city is, whose keys it may
 /// redeem, what the vault turned out to be, where its diagnostics go,

@@ -18,12 +18,12 @@ use super::holding::Views;
 ///
 /// The lock covers one `Arc` copy or swap and nothing that can panic,
 /// so even a poisoned lock holds a whole `Arc`, and it is read as one.
-pub(crate) struct Published {
+pub struct Published {
     current: Mutex<Arc<Views>>,
 }
 
 impl Published {
-    pub(crate) fn new(views: Views) -> Published {
+    pub fn new(views: Views) -> Published {
         Published {
             current: Mutex::new(Arc::new(views)),
         }
@@ -32,13 +32,13 @@ impl Published {
     /// The views as the fold last published them. Held only while a
     /// query copies out what it needs, because the fold takes a retired
     /// copy back only once no reader holds it.
-    pub(crate) fn snapshot(&self) -> Arc<Views> {
+    pub fn snapshot(&self) -> Arc<Views> {
         Arc::clone(&self.current.lock().unwrap_or_else(PoisonError::into_inner))
     }
 
     /// Publishes `latest` and hands back the copy it replaces, which is
     /// dropped or reclaimed outside the lock.
-    pub(crate) fn replace(&self, latest: Arc<Views>) -> Arc<Views> {
+    pub fn replace(&self, latest: Arc<Views>) -> Arc<Views> {
         std::mem::replace(
             &mut *self.current.lock().unwrap_or_else(PoisonError::into_inner),
             latest,
@@ -57,7 +57,7 @@ impl Published {
 /// The `Result` is the shape the console's `Answering` takes; this path
 /// refuses nothing itself, because a snapshot is an `Arc` taken whole
 /// and has no poisoned state.
-pub(crate) fn answer_outside_the_lock(
+pub fn answer_outside_the_lock(
     views: &Published,
     query: &wire::Query,
 ) -> (kernel::Seq, Result<wire::Answer, AxError>) {

@@ -12,8 +12,8 @@ use std::time::{Duration, Instant};
 use kernel::{AxCode, AxError, EventRecord};
 
 use super::standing::{CoreThread, monotonic_now};
-use crate::views::{Published, Views};
 use accounting::person::CorePriority;
+use accounting::views::{Published, Views};
 
 /// The places the writer thread hands the views what it wrote, and the
 /// thread that folds it.

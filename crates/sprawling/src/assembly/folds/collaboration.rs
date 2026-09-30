@@ -9,7 +9,7 @@
 use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
-use crate::views::pursued;
+use accounting::views::pursued;
 
 use super::super::PlanHolders;
 

@@ -15,14 +15,12 @@
 //! What is `pub` is decided per item, never per module. A module is
 //! `pub` so that `bin::assembly` keeps the name ARCHITECTURE.md section
 //! 12 gives it; the items inside stay `pub(crate)` unless the binary or
-//! an integration test enters through them, and `cargo xtask apisync`
-//! holds the result against `tools/xtask/api-baselines/sprawling.txt`.
+//! an integration test enters through them.
 
 pub mod assembly;
 pub mod console;
 pub mod doctor;
 pub mod firstrun;
-pub mod lineage;
 pub mod monitor;
 pub mod release;
 mod revealing;
@@ -32,6 +30,3 @@ pub mod supervising;
 mod browser_bidi;
 mod browser_tool;
 mod keying;
-mod views;
-
-pub use views::{ask, turns};

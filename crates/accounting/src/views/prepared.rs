@@ -29,7 +29,7 @@ use super::lines::harnesses_answer;
 use super::listing::listing_answer;
 use super::prefix::{PrefixAsk, content_answer};
 use super::skills::{SkillPins, skills_answer};
-use accounting::plan_view::{PlanView, plans_of};
+use crate::plan_view::{PlanView, plans_of};
 
 /// The answer to a question this city could not look up.
 ///
@@ -44,7 +44,7 @@ pub(super) fn unavailable(query: String) -> wire::Answer {
 /// What a read of now - a tool server's handshake, the broker's shelf -
 /// needs from the views, copied out so the read runs with the snapshot
 /// let go.
-pub(crate) struct LiveAsk {
+pub struct LiveAsk {
     pub(super) city_root: PathBuf,
     pub(super) city: Option<Address>,
     pub(super) vault: Option<Arc<Mutex<gateway::Custodian>>>,
@@ -53,7 +53,7 @@ pub(crate) struct LiveAsk {
 /// A query's answer split at the snapshot: what the views settled while
 /// it was held, or the small data a read of the disk, git or network
 /// needs, copied out so that read runs with the snapshot let go.
-pub(crate) enum Prepared {
+pub enum Prepared {
     /// Answered from the views alone.
     Held(wire::Answer),
     /// The working tree of one building against its last checkpoint.
@@ -160,7 +160,7 @@ pub(crate) enum Prepared {
 /// The ledger as a history reader carries it out of the snapshot: where
 /// it lives, and its index, which has a lock of its own that only
 /// readers wait on (sprawling-SPEC.md 8-100).
-pub(crate) struct LedgerAsk {
+pub struct LedgerAsk {
     pub(super) city_root: PathBuf,
     pub(super) index: Arc<Mutex<storage::LedgerIndex>>,
 }
@@ -189,7 +189,7 @@ impl LedgerAsk {
 
 impl Prepared {
     /// Does the read the views left for after the snapshot, and answers.
-    pub(crate) fn finish(self) -> wire::Answer {
+    pub fn finish(self) -> wire::Answer {
         match self {
             Self::Held(answer) => answer,
             Self::GitStatus(ask) => ask.read(),
@@ -224,7 +224,7 @@ impl Prepared {
             },
             // A settings file that cannot be read is "I could not
             // look", not an empty set of preferences.
-            Self::Preferences => match accounting::person::read() {
+            Self::Preferences => match crate::person::read() {
                 Ok(settled) => wire::Answer::Preferences(Box::new(settled)),
                 Err(_) => unavailable("Preferences".to_owned()),
             },

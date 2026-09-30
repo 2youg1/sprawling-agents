@@ -66,7 +66,8 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
         Some("the words a wave deleted"),
         "the bytes the checkpoint held are back at their path"
     );
-    let wire::Answer::Discards(bin) = crate::views::ask(root, &wire::Query::DiscardView).unwrap()
+    let wire::Answer::Discards(bin) =
+        accounting::views::ask(root, &wire::Query::DiscardView).unwrap()
     else {
         panic!("DiscardView answers with the bin");
     };

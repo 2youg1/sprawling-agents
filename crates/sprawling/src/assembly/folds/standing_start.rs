@@ -13,7 +13,7 @@ use storage::LedgerIndex;
 
 use super::collaboration::CollaborationFold;
 use super::{Entrance, Governance, SessionOrigins, Standing};
-use crate::views::snapshot::start::SnapshotFold;
+use accounting::views::snapshot::start::SnapshotFold;
 
 /// Changed whenever a standing fold rule or the encoding of
 /// [`StandingFolds`] changes within one version of this binary. The

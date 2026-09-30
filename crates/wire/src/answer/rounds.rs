@@ -6,7 +6,7 @@
 //! One session read as the rounds a person reads.
 //!
 //! These are the shapes only; the fold that produces them is
-//! `bin::views::rounds`, and reading one payload into them is
+//! `accounting::views::rounds`, and reading one payload into them is
 //! [`crate::reading`]. Three files because they are three shapes
 //! (ARCHITECTURE.md section 9): a value, a projection, and a decision.
 //!

@@ -32,7 +32,7 @@ use super::holding::Views;
 
 /// What `git status` for one building needs from the views, copied out
 /// while they are held.
-pub(crate) struct GitStatusAsk {
+pub struct GitStatusAsk {
     city_root: PathBuf,
     building: Address,
     checkpoint: Option<wire::CommitAnswer>,

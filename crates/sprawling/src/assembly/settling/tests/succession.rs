@@ -157,8 +157,8 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
         })
         .expect("the fourth run's wave checkpoints a commit");
     let oid = kernel::GitOid::parse(checkpointed.data().as_map()["oid"].as_str().unwrap()).unwrap();
-    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
-    let wire::Answer::Commit(said) = views.answer(&wire::Query::Commit { oid }) else {
+    let views = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let wire::Answer::Commit(said) = views.prepare(&wire::Query::Commit { oid }).finish() else {
         panic!("a commit this city made answers which run wrote it");
     };
     let expected: Vec<RunId> = started.iter().rev().map(|record| record.run()).collect();

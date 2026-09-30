@@ -299,7 +299,7 @@ bench Main 在第一项读数之前算 `REGISTERED.digest`：与 `pinned` 不等
 
 | 场景 | 驱动的公共面 | 子指标 |
 |---|---|---|
-| `large_ledger_fold` | `sprawling::ask`，重建每个视图的生产全路径 | `harness` |
+| `large_ledger_fold` | `accounting::views::ask`，重建每个视图的生产全路径 | `harness` |
 | `large_worktree_placement` | `storage::Checkpoint::ensure_base` 之后 `Worktrees::claim`／`release` | `whole` |
 | `kept_worktree_reclaim` | 同一座城里同一个节点的第二次及以后的 `Worktrees::claim`，其间干线不动（storage-SPEC 8-9 的再领） | `whole` |
 | `long_session_forwarding` | `wire::ServerFrame::Event` 装帧＋序列化，即 socket 之前的本地半段 | `harness` |

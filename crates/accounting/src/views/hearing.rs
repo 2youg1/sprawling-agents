@@ -27,7 +27,7 @@ impl Views {
     /// # Errors
     /// Propagates the book's refusal when no endpoint was chosen to
     /// transcribe, and the HTTP client's refusal to be built.
-    pub(crate) fn transcriber(
+    pub fn transcriber(
         &self,
         secrets: gateway::SecretResolver,
     ) -> Result<gateway::Transcriber, AxError> {

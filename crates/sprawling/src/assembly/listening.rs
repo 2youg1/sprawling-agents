@@ -28,7 +28,7 @@ use super::{Closing, start_served_views};
 use crate::serving::Serving;
 use crate::serving::output_ring::OutputRing;
 use crate::serving::standing::monotonic_now;
-use crate::views::{Published, answer_outside_the_lock};
+use accounting::views::{Published, answer_outside_the_lock};
 
 /// One recording in, one line of text back.
 ///

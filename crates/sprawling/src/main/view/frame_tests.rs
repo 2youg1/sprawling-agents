@@ -15,8 +15,8 @@
 use super::follow::Row;
 use super::frame::{FILLING, Face, Size};
 use super::keys::Action;
+use accounting::lineage::RunLine;
 use kernel::{Address, RunId, Seq};
-use sprawling::lineage::RunLine;
 
 fn run(n: u8) -> RunId {
     RunId::parse(&format!("0198f6a2-7c4a-7bbb-9d1e-0000000000{n:02}")).unwrap()

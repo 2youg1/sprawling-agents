@@ -96,7 +96,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 - 不判定任何语义——kind 二分、载荷校验、规范字节全部来自 kernel；jsonl 只定 seq/prev 与介质。
 - 不采样时钟（clippy disallowed 已看守）——`log_truncated` 的 `t` 由 open 的调用方注入；checkpoint 的提交时间同规入参。
 - 不向调用方暴露分段——segment 边界、滚动阈值、文件名全为内部事务；对外只有目录（index 的 seq 寻址经 jsonl 的 pub(crate) 读面，不破此墙）。
-- 派生视图族恒不成为第二历史——两视图（hot／attribution）与 queue 状态全部可删可重建，恢复逻辑恒不读它们做判定。**本 crate 不再持有任何落盘视图**：城的读面由 `bin::views` 在内存里折，删了就重放。
+- 派生视图族恒不成为第二历史——两视图（hot／attribution）与 queue 状态全部可删可重建，恢复逻辑恒不读它们做判定。**本 crate 不再持有任何落盘视图**：城的读面由 `accounting::views` 在内存里折，删了就重放。
 - 不解读语义载荷之外的字段——各派生视图只消费已入账事件的声明字段，不反推、不补齐、不修复历史。
 
 ## 8 接口先行（按模块分章）
@@ -354,7 +354,7 @@ impl LineReader<'_> {
   - **定位读，而不是整读再切尾**：`Vfs::read_at(path, from, size-from)`，读进来的缓冲只装增量。长度以本次 `Vfs::size` 读到的值封顶——stat 与 read 之间落的那条账留给下一次 refresh，而不是折在一个本次没有确认过的偏移上。
   - **`scanned` 不落盘，所以「偏移写坏」不是一个状态**：它是常驻状态，建表时取当下段大小，故「已折入」与「盘上长度」在那一刻是同一个数。进程内若出现 `scanned > 段长`，走的是「变小」那一支，同样整份重建。任何一条可疑路径的答案都是重建，没有一条会读到半条记录。
   - **`refresh` 报出它读了多少字节**（`Refreshed`）：整读与定位读折出的索引逐条相同，唯一的区别就是抬起的字节数，所以那个数必须能被断言，也正是 `index_refresh_read` 这条预算的读数来源。
-  - 消费者：`bin::views` 的 `Views` 持一份，每次查询先 `refresh`。刷新代价是一次 `read_dir` 加逐段 `metadata`，与账本大小无关。
+  - 消费者：`accounting::views` 的 `Views` 持一份，每次查询先 `refresh`。刷新代价是一次 `read_dir` 加逐段 `metadata`，与账本大小无关。
 - **run 索引与 seq 索引同住一张旁挂物**：不建 run 表时，`run_history` 只能从账本尾部逐行往回读、读完再过滤，不属于这个 run 的行也要完整取出再丢掉。索引因此多记一张 run 表（`RunTable`，按区间记每个 run 写过的 seq），查询只取属于它的 seq，代价与**答的条数**同阶而不与账本长度同阶。
   - **为什么不放进一份落盘冷投影**：要让 `run_history` 读一份落盘投影，就得在事件路径上开一个写事务，每条事件多一道磁盘屏障。为一个不需要持久化的答案给每一条落账加一道屏障，方向是反的；本 crate 因此不持有落盘投影。
   - **为什么可以放进 `index`**：这张旁挂物**已经常驻**（`Views` 持有并每查询 `refresh`），**已经逐行解析过每一条新行**（`locate` 一次 `serde_json` 解析读两个字段），**已经带着「存疑即重建」的可弃性**。run 表搭的是同一趟 refresh、同一条重建反射，不新增任何同步义务。
@@ -486,7 +486,7 @@ pub fn effort_word(effort: kernel::Effort) -> String;
   两个 crate 各手写一次同一个键，就是两个会各说各话的权威。
 - **`checkpoint_committed` 与 `pr_merged` 携同一份归属。** 8-17 写着「trailers 是投影，
   账本是权威」，而这两个事实否则只存在于 git 提交上；带上它们，`sprawling whose`
-  才能只读账本作答（`bin::views`，sprawling-SPEC §8-41）。两条记录 flatten 同一个结构，
+  才能只读账本作答（`accounting::views`，sprawling-SPEC §8-41）。两条记录 flatten 同一个结构，
   于是「一次提交出自谁」不会在两个 kind 上长成两种说法。
 - **缺键的记录读得回**：不带这两项的 `checkpoint_committed` 没有这两个键，
   `CommitAttribution` 的 `#[serde(default)]` 对它答空 id 与 `None`——
@@ -966,7 +966,7 @@ pub fn of_file(city_root: &Path, base: GitOid, head: Head, path: &str)
 2. **同一次凭证判定**，不是第二份。`checkpoint::scan_staged` 用 `kernel::scan` 判一个 staged blob，本模块判每一行补丁文本用的是同一个函数。命中的行**不回显**，只报行号与命中原因（provider 名，或熵判定）——理由与 `scan_staged` 对自己的命中说的同一句：把字节打出来以证明泄漏，本身就是泄漏。
 3. **两端都是 commit 时，答可永久缓存**（同 `changes` 的理由）；`Head::WorkingTree` 答的是此刻的工作树，那是一波还没提交完的样子，也正是审阅进行中的改动时人看的那一份。
 
-- **一个两次 checkpoint 之间没动过的文件答空补丁**，而不是报错：「它没动」是一个答案。「这座城没写过这个 oid」是另一个答案，由调用方（`bin::views`）答 `Unavailable`——只有调用方知道人问的是什么。
+- **一个两次 checkpoint 之间没动过的文件答空补丁**，而不是报错：「它没动」是一个答案。「这座城没写过这个 oid」是另一个答案，由调用方（`accounting::views`）答 `Unavailable`——只有调用方知道人问的是什么。
 - **测试用工作树而不是第二次 checkpoint**：checkpoint 根本不肯提交带凭证的 blob（`scan_staged` 拒），所以那一行只可能存在于盘上的树里。这条约束本身就是本模块的扫描不是多余的一层的证据：字节到不了 commit，但到得了 socket。
 
 ### 8-20 重启后凭证扫描的比较基准

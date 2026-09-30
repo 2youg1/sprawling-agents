@@ -34,7 +34,7 @@ fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
     bytes.extend_from_slice(future.as_bytes());
     std::fs::write(&segment, &bytes).unwrap();
 
-    let views = crate::views::Views::rebuild(&report.ledger_dir).map(|_| ());
+    let views = accounting::views::Views::rebuild(&report.ledger_dir).map(|_| ());
     let standing = Standing::fold(&report.ledger_dir).map(|_| ());
     assert_eq!((views, standing), (Ok(()), Ok(())));
 }
@@ -70,7 +70,7 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
     let the_worker_judged = judged(&worker.governance);
     drop(worker);
 
-    let (mut views, (_ledger, _report, standing)) = fold_city(
+    let (views, (_ledger, _report, standing)) = fold_city(
         &report.ledger_dir,
         &mut crate::assembly::opening_cost::OpeningCost::begin(
             crate::serving::standing::monotonic_now,
@@ -84,8 +84,11 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
         wire::Query::ApprovalQueue,
     ] {
         assert_eq!(
-            views.answer(&applied),
-            Views::rebuild(&report.ledger_dir).unwrap().answer(&applied)
+            views.prepare(&applied).finish(),
+            Views::rebuild(&report.ledger_dir)
+                .unwrap()
+                .prepare(&applied)
+                .finish()
         );
     }
     assert_eq!(

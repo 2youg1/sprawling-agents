@@ -72,9 +72,9 @@ fn setting_autonomy_back_leaves_the_city_where_it_started() {
 
     worker.handle(delegated).unwrap();
     worker.handle(back).unwrap();
-    let once = sprawling::ask(dir.path(), &wire::Query::Governance).unwrap();
+    let once = accounting::views::ask(dir.path(), &wire::Query::Governance).unwrap();
     worker.handle(again).unwrap();
-    let twice = sprawling::ask(dir.path(), &wire::Query::Governance).unwrap();
+    let twice = accounting::views::ask(dir.path(), &wire::Query::Governance).unwrap();
 
     assert_eq!(
         once, twice,

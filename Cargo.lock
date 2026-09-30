@@ -392,6 +392,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "sprawling",
+ "sprawling-accounting",
  "sprawling-collab",
  "sprawling-gateway",
  "sprawling-kernel",
@@ -2520,6 +2521,8 @@ dependencies = [
 name = "sprawling-accounting"
 version = "0.0.7"
 dependencies = [
+ "git2",
+ "postcard",
  "serde",
  "serde_json",
  "sprawling-agent-protocols",
@@ -2527,6 +2530,8 @@ dependencies = [
  "sprawling-collab",
  "sprawling-gateway",
  "sprawling-kernel",
+ "sprawling-runtime",
+ "sprawling-storage",
  "sprawling-wire",
  "tempfile",
  "toml",

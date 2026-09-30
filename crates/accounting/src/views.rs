@@ -15,49 +15,49 @@
 //! looks like.
 //!
 //! **What it deliberately does not hold.** The plans are
-//! `accounting::plan_view`'s and are read through it; a second parse here
+//! `crate::plan_view`'s and are read through it; a second parse here
 //! would be a second answer to "what is stuck and why", and only one of
 //! them would be folding the records that say why. What waits in a room
 //! is folded from signal records rather than read off a queue, because a
 //! queue answers by being consumed and a view that consumed what it
 //! showed would change the thing it reports on.
 
-pub(super) mod answered;
-pub(super) mod answering;
-pub(super) mod archives;
+pub mod answered;
+pub mod answering;
+pub mod archives;
 mod asking;
-pub(super) mod building_page;
-pub(super) mod city;
-pub(super) mod commits;
-pub(super) mod cost_of;
-pub(super) mod document;
-pub(super) mod evidence;
-pub(super) mod git_status;
-pub(crate) mod governance;
+pub mod building_page;
+pub mod city;
+pub mod commits;
+pub mod cost_of;
+pub mod document;
+pub mod evidence;
+pub mod git_status;
+pub mod governance;
 #[cfg(test)]
 mod governance_tests;
-pub(super) mod hearing;
-pub(super) mod holding;
-pub(super) mod hunks;
-pub(super) mod lines;
-pub(super) mod listing;
-pub(super) mod mcp_health;
-pub(super) mod prefix;
-pub(super) mod prepared;
-pub(super) mod published;
-pub(super) mod rounds;
-pub(super) mod served;
-pub(super) mod skills;
-pub(super) mod snapshot;
+pub mod hearing;
+pub mod holding;
+pub mod hunks;
+pub mod lines;
+pub mod listing;
+pub mod mcp_health;
+pub mod prefix;
+pub mod prepared;
+pub mod published;
+pub mod rounds;
+pub mod served;
+pub mod skills;
+pub mod snapshot;
 #[cfg(test)]
 mod standing_tests;
 #[cfg(test)]
 mod tests;
-pub(super) mod toolkits;
+pub mod toolkits;
 
 pub use asking::ask;
-pub(crate) use governance::Governance;
-pub(crate) use holding::Views;
-pub(crate) use lines::pursued;
-pub(crate) use published::{Published, answer_outside_the_lock};
+pub use governance::Governance;
+pub use holding::Views;
+pub use lines::pursued;
+pub use published::{Published, answer_outside_the_lock};
 pub use rounds::turns;

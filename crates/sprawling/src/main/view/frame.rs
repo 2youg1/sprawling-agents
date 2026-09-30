@@ -9,8 +9,8 @@
 
 use std::collections::BTreeSet;
 
+use accounting::lineage::RunLine;
 use kernel::RunId;
-use sprawling::lineage::RunLine;
 
 use super::arrange::{Entry, NodeKey, arrange};
 use super::detail::{json_lines, line_lines};

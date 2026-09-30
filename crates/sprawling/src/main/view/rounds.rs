@@ -28,7 +28,7 @@ pub(super) fn fold(run: RunId, rows: &[Row]) -> Result<Vec<Turn>, AxError> {
         .filter(|row| row.run == run)
         .map(|row| EventRecord::parse_line(row.line.as_bytes()))
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(sprawling::turns(&records))
+    Ok(accounting::views::turns(&records))
 }
 
 /// The mark of a tree entry with no child entries: `+` on a run whose

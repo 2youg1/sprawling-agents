@@ -15,7 +15,7 @@
 //! looks like.
 //!
 //! **What it deliberately does not hold.** The plans are
-//! `accounting::plan_view`'s and are read through it; a second parse here
+//! `crate::plan_view`'s and are read through it; a second parse here
 //! would be a second answer to "what is stuck and why", and only one of
 //! them would be folding the records that say why. What waits in a room
 //! is folded from signal records rather than read off a queue, because a
@@ -38,7 +38,7 @@ use super::snapshot::start::city_root_of;
 /// four fields that are not folded from the ledger; `Views::decode`
 /// takes them from `Views::new`.
 #[derive(serde::Serialize, serde::Deserialize)]
-pub(crate) struct Views {
+pub struct Views {
     #[serde(skip)]
     pub(super) city_root: PathBuf,
     pub(super) hot: storage::HotView,
@@ -126,7 +126,7 @@ pub(crate) struct Views {
         serialize_with = "super::snapshot::encode_plans",
         deserialize_with = "super::snapshot::decode_plans"
     )]
-    pub(super) plans: std::sync::Arc<std::sync::Mutex<accounting::plan_view::PlanView>>,
+    pub(super) plans: std::sync::Arc<std::sync::Mutex<crate::plan_view::PlanView>>,
     /// What each building is working towards, folded from the records
     /// that said so. The goal text and its state, not the value itself:
     /// declaring a pursuit takes the depth-zero position, and a view
@@ -179,11 +179,11 @@ pub(crate) struct Views {
 impl Views {
     /// The empty views of the city whose ledger is `ledger_dir`, before a
     /// fold has shown them any record.
-    pub(crate) fn over(ledger_dir: &Path) -> Views {
+    pub fn over(ledger_dir: &Path) -> Views {
         Views::new(city_root_of(ledger_dir))
     }
 
-    pub(crate) fn new(city_root: &Path) -> Views {
+    pub fn new(city_root: &Path) -> Views {
         // Empty until a fold hands over the index it built, or the first
         // query refreshes it: the history is not read here.
         Views::sharing(
@@ -193,24 +193,10 @@ impl Views {
         )
     }
 
-    /// A second, empty fold over the same city that shares this one's
-    /// ledger index and plan cache: both are caches of the disk rather
-    /// than folded state, so the two copies the fold thread alternates
-    /// between keep one of each (sprawling-SPEC.md 8-99). A served city
-    /// makes its twin with [`Views::twin`], from views already folded.
-    #[cfg(test)]
-    pub(crate) fn unfolded_twin(&self) -> Views {
-        Views::sharing(
-            &self.city_root,
-            std::sync::Arc::clone(&self.index),
-            std::sync::Arc::clone(&self.plans),
-        )
-    }
-
     fn sharing(
         city_root: &Path,
         index: std::sync::Arc<std::sync::Mutex<storage::LedgerIndex>>,
-        plans: std::sync::Arc<std::sync::Mutex<accounting::plan_view::PlanView>>,
+        plans: std::sync::Arc<std::sync::Mutex<crate::plan_view::PlanView>>,
     ) -> Views {
         Views {
             city_root: city_root.to_path_buf(),
@@ -252,7 +238,7 @@ impl Views {
     ///
     /// # Errors
     /// Propagates a segment the index names that cannot be read.
-    pub(crate) fn hold_index(
+    pub fn hold_index(
         &mut self,
         index: storage::LedgerIndex,
         ledger_dir: &Path,
@@ -274,7 +260,7 @@ impl Views {
 
     /// The first seq this view has not folded: an answer read from here
     /// reflects every record before it.
-    pub(crate) fn next_unfolded(&self) -> kernel::Seq {
+    pub fn next_unfolded(&self) -> kernel::Seq {
         self.next_unfolded
     }
 
@@ -286,7 +272,7 @@ impl Views {
         clippy::wildcard_enum_match_arm,
         reason = "a few kinds change what a room holds; the rest of the event vocabulary does not"
     )]
-    pub(crate) fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
+    pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
         // Before the first change, so an overflow leaves nothing half
         // folded.
         let next_unfolded = record.seq().next()?;
@@ -309,7 +295,7 @@ impl Views {
         // worker's own copy is shown it.
         self.governance
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
-        accounting::plan_view::PlanView::take_back(&self.plans).apply(record);
+        crate::plan_view::PlanView::take_back(&self.plans).apply(record);
         self.events = self.events.saturating_add(1);
         self.next_unfolded = next_unfolded;
         match record.kind() {
@@ -383,18 +369,18 @@ impl Views {
         Ok(())
     }
 
-    pub(crate) fn epoch(&self) -> Option<kernel::B3Hash> {
+    pub fn epoch(&self) -> Option<kernel::B3Hash> {
         self.epoch
     }
 
-    pub(crate) fn head(&self) -> Option<kernel::Seq> {
+    pub fn head(&self) -> Option<kernel::Seq> {
         self.head
     }
 
     /// What this city is called: what its first record says, and for a
     /// city made before that record carried a name, the directory it
     /// lives in. One place decides, so two readers cannot disagree.
-    pub(crate) fn city(&self) -> Option<Address> {
+    pub fn city(&self) -> Option<Address> {
         self.city
             .clone()
             .or_else(|| kernel::layout::CityLayout::new(&self.city_root).city_address())

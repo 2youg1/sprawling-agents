@@ -109,7 +109,7 @@ impl Views {
 
     /// Answers one query in one call, lock or no lock.
     #[cfg(test)]
-    pub(crate) fn answer(&mut self, query: &wire::Query) -> wire::Answer {
+    pub fn answer(&mut self, query: &wire::Query) -> wire::Answer {
         self.prepare(query).finish()
     }
 
@@ -117,7 +117,7 @@ impl Views {
     /// or network needs. Every arm either answers or names itself
     /// unavailable; none of them returns an empty result that a reader
     /// would mistake for an empty city.
-    pub(crate) fn prepare(&self, query: &wire::Query) -> Prepared {
+    pub fn prepare(&self, query: &wire::Query) -> Prepared {
         Prepared::Held(match query {
             wire::Query::CityView => return Prepared::City(self.city_ask()),
             // An evicted run always has records in the Ledger, so a

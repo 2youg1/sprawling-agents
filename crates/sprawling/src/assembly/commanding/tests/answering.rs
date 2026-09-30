@@ -16,7 +16,7 @@
 
 use crate::assembly::*;
 use crate::assembly::{CommandDesk, Posted};
-use crate::views::Views;
+use accounting::views::Views;
 use kernel::Locator;
 
 #[test]
@@ -269,7 +269,7 @@ fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
         kernel::GENESIS_PREV,
     );
     views.apply(&requested).unwrap();
-    let wire::Answer::Approvals(queue) = views.answer(&wire::Query::ApprovalQueue) else {
+    let wire::Answer::Approvals(queue) = views.prepare(&wire::Query::ApprovalQueue).finish() else {
         panic!("the approval queue answers with items");
     };
     assert_eq!(queue.items.len(), 1);
@@ -311,7 +311,7 @@ fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
         kernel::GENESIS_PREV,
     );
     views.apply(&resolved).unwrap();
-    let wire::Answer::Approvals(queue) = views.answer(&wire::Query::ApprovalQueue) else {
+    let wire::Answer::Approvals(queue) = views.prepare(&wire::Query::ApprovalQueue).finish() else {
         panic!("the approval queue answers with items");
     };
     assert!(queue.items.is_empty());

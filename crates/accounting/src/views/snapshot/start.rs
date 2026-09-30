@@ -19,14 +19,14 @@ use runtime::replay::fold_ledger_dir;
 use storage::{ChainSnapshot, CheckedLine, LedgerIndex, SnapshotStart, StorageError, WholeFold};
 
 /// The city a ledger directory belongs to, two levels up.
-pub(crate) fn city_root_of(ledger_dir: &Path) -> &Path {
+pub fn city_root_of(ledger_dir: &Path) -> &Path {
     ledger_dir.ancestors().nth(2).unwrap_or(ledger_dir)
 }
 
 /// A fold a snapshot can hold: the views a page reads, and the standing
 /// a worker judges from. Each keeps its own snapshot directory and fold
 /// version, because each changes its encoding on its own.
-pub(crate) trait SnapshotFold: Sized {
+pub trait SnapshotFold: Sized {
     /// The directory under `<city>/.sprawling/snapshot/` this fold's
     /// snapshot lives in.
     const DIR: &'static str;
@@ -46,22 +46,15 @@ pub(crate) trait SnapshotFold: Sized {
 }
 
 /// Where the snapshot of `F` for the city at `city_root` lives.
-pub(crate) fn snapshot_dir<F: SnapshotFold>(city_root: &Path) -> PathBuf {
+pub fn snapshot_dir<F: SnapshotFold>(city_root: &Path) -> PathBuf {
     CityLayout::new(city_root).snapshot().join(F::DIR)
 }
 
 /// A fold a start built, how it began, and where the next snapshot is
 /// cut.
-pub(crate) struct Started<F> {
-    pub(crate) folded: F,
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "serve folds the whole history on the standing's pass, so no served page has a start reason to read (8-91); the other starts discard how they began, and the tests read it"
-        )
-    )]
-    pub(crate) from: FoldStart,
+pub struct Started<F> {
+    pub folded: F,
+    pub from: FoldStart,
     /// The last line this start folded, with its seq. `None` when it
     /// folded nothing past the snapshot, so there is nothing to cut.
     last: Option<(Seq, Vec<u8>)>,
@@ -69,7 +62,7 @@ pub(crate) struct Started<F> {
 
 /// How a start began.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum FoldStart {
+pub enum FoldStart {
     /// From the snapshot, folding the `tail` lines after it.
     Resumed { tail: usize },
     /// From genesis, and why the snapshot was not used.
@@ -83,7 +76,7 @@ pub(crate) enum FoldStart {
 /// # Errors
 /// A tail or a whole history that does not verify, a record the fold
 /// cannot read, and an I/O failure reading the ledger or the snapshot.
-pub(crate) fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> {
+pub fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> {
     let city_root = city_root_of(ledger_dir);
     match storage::start_from_snapshot(ledger_dir, &snapshot_dir::<F>(city_root), F::fold_version())
         .map_err(StorageError::into_ax)?
@@ -104,7 +97,7 @@ pub(crate) fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, Ax
 /// # Errors
 /// The audit's reason when the chain is broken or cannot be read, and
 /// those of [`start`].
-pub(crate) fn start_audited<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> {
+pub fn start_audited<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> {
     match storage::audit_chain(ledger_dir).map_err(StorageError::into_ax)? {
         storage::ChainAudit::Whole { .. } => start(ledger_dir),
         storage::ChainAudit::Broken(reason) => Err(reason),
@@ -116,7 +109,7 @@ pub(crate) fn start_audited<F: SnapshotFold>(ledger_dir: &Path) -> Result<Starte
 ///
 /// # Errors
 /// An encoding failure and an I/O failure writing the snapshot.
-pub(crate) fn cut<F: SnapshotFold>(ledger_dir: &Path, started: &Started<F>) -> Result<(), AxError> {
+pub fn cut<F: SnapshotFold>(ledger_dir: &Path, started: &Started<F>) -> Result<(), AxError> {
     cut_at(ledger_dir, &started.folded, started.last.as_ref())
 }
 
@@ -125,7 +118,7 @@ pub(crate) fn cut<F: SnapshotFold>(ledger_dir: &Path, started: &Started<F>) -> R
 ///
 /// # Errors
 /// An encoding failure and an I/O failure writing the snapshot.
-pub(crate) fn cut_at<F: SnapshotFold>(
+pub fn cut_at<F: SnapshotFold>(
     ledger_dir: &Path,
     folded: &F,
     last: Option<&(Seq, Vec<u8>)>,
@@ -144,7 +137,7 @@ pub(crate) fn cut_at<F: SnapshotFold>(
 ///
 /// # Errors
 /// A segment the index names that cannot be read.
-pub(crate) fn last_line(
+pub fn last_line(
     index: &LedgerIndex,
     ledger_dir: &Path,
 ) -> Result<Option<(Seq, Vec<u8>)>, AxError> {

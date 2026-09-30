@@ -24,7 +24,7 @@ impl Views {
     ///
     /// Probing is seconds of starting programs, and a read that did it
     /// would hold the one thread every other read is answered on.
-    pub(crate) fn found_on_this_machine(&mut self, report: wire::DoctorAnswer) {
+    pub fn found_on_this_machine(&mut self, report: wire::DoctorAnswer) {
         self.machine = Some(report);
     }
 
@@ -35,17 +35,14 @@ impl Views {
     /// Lent rather than opened here, for the reason the transcription
     /// door is lent it: a second handle on the same secrets would be a
     /// second door onto them.
-    pub(crate) fn lend_the_vault(
-        &mut self,
-        vault: std::sync::Arc<std::sync::Mutex<gateway::Custodian>>,
-    ) {
+    pub fn lend_the_vault(&mut self, vault: std::sync::Arc<std::sync::Mutex<gateway::Custodian>>) {
         self.vault = Some(vault);
     }
 
     /// Takes the one way this city asks the registry which release is
     /// newest, so a `NewestRelease` query reaches the network only
     /// through what the served city handed in.
-    pub(crate) fn ask_the_registry_through(&mut self, newest: fn() -> wire::ReleaseAnswer) {
+    pub fn ask_the_registry_through(&mut self, newest: fn() -> wire::ReleaseAnswer) {
         self.registry = Some(newest);
     }
 
@@ -53,14 +50,14 @@ impl Views {
     /// newest release, so an `UpstreamVersion` query leaves this machine
     /// only through what the served city handed in (sprawling-SPEC.md
     /// 8-120).
-    pub(crate) fn ask_upstream_through(&mut self, newest: fn(&str) -> wire::DoctorUpstream) {
+    pub fn ask_upstream_through(&mut self, newest: fn(&str) -> wire::DoctorUpstream) {
         self.upstream = Some(newest);
     }
 
     /// Takes the one way this city asks its search path for a program,
     /// so the harness page reads this machine only through what the
     /// served city handed in (accounting-SPEC.md 8-10).
-    pub(crate) fn find_programs_through(&mut self, find: fn(&str) -> Option<std::path::PathBuf>) {
+    pub fn find_programs_through(&mut self, find: fn(&str) -> Option<std::path::PathBuf>) {
         self.programs = Some(find);
     }
 }

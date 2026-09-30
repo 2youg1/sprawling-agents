@@ -3,52 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use crate::assembly::*;
+use super::founded;
 use crate::views::Views;
-use kernel::{Address, RunId};
-
-#[test]
-fn a_new_building_is_visible_in_the_city_view_with_a_denominator_of_zero() {
-    let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
-    let mut worker = RunWorker::new(
-        dir.path(),
-        gateway::Custodian::in_memory(),
-        runtime::diagnostics::Diagnostics::off(),
-    )
-    .unwrap();
-    worker
-        .handle(wire::Command::CreateBuilding {
-            addr: Address::parse("lab").unwrap(),
-            template: wire::TemplateName::parse("minimal").unwrap(),
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
-        })
-        .unwrap();
-
-    let mut views = Views::new(dir.path());
-    let wire::Answer::City(city) = views.answer(&wire::Query::CityView) else {
-        panic!("CityView answers with a city");
-    };
-    let lab = city
-        .buildings
-        .iter()
-        .find(|b| b.addr.as_str() == "lab")
-        .expect("a building the city made is a building the city can see");
-    assert!(lab.problems.is_empty());
-    let kernel::Progress::Planned(planned) = lab.progress else {
-        panic!("a building with a roadmap has a denominator");
-    };
-    assert_eq!(
-        planned.ratio(),
-        (0, 0),
-        "a new building owes nothing yet, and owes it out of nothing"
-    );
-}
 
 #[test]
 fn a_roadmap_counts_only_the_rows_that_carry_evidence() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    founded(dir.path());
     let building = dir.path().join("lab");
     std::fs::create_dir_all(&building).unwrap();
     let evidence = format!("cas:b3-{}", "ab".repeat(32));
@@ -93,7 +54,7 @@ fn a_roadmap_counts_only_the_rows_that_carry_evidence() {
 #[test]
 fn a_roadmap_that_cannot_be_parsed_reports_its_rows_rather_than_a_number() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    founded(dir.path());
     let building = dir.path().join("lab");
     std::fs::create_dir_all(&building).unwrap();
     std::fs::write(

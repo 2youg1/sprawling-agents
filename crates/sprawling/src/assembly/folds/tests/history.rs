@@ -29,12 +29,15 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
             })
             .unwrap();
     }
-    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let views = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
 
-    let wire::Answer::History(tail) = views.answer(&wire::Query::History {
-        before: None,
-        limit: 3,
-    }) else {
+    let wire::Answer::History(tail) = views
+        .prepare(&wire::Query::History {
+            before: None,
+            limit: 3,
+        })
+        .finish()
+    else {
         panic!("the history query has an answer");
     };
     assert_eq!(tail.records.len(), 3);
@@ -47,10 +50,13 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
     // Paging back reaches the genesis record and then says there is
     // nothing behind it, rather than answering an empty slice
     // forever.
-    let wire::Answer::History(older) = views.answer(&wire::Query::History {
-        before: Some(earlier),
-        limit: wire::HISTORY_MAX,
-    }) else {
+    let wire::Answer::History(older) = views
+        .prepare(&wire::Query::History {
+            before: Some(earlier),
+            limit: wire::HISTORY_MAX,
+        })
+        .finish()
+    else {
         panic!("the history query has an answer");
     };
     assert_eq!(
@@ -93,16 +99,19 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
             })
             .unwrap();
     }
-    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let views = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
 
     // Everything a fresh city writes belongs to the city's own run,
     // so asking for it gets those records and asking for a session
     // nobody ever opened gets none of them.
-    let wire::Answer::History(mine) = views.answer(&wire::Query::RunHistory {
-        run: RunId::CITY,
-        before: None,
-        limit: wire::HISTORY_MAX,
-    }) else {
+    let wire::Answer::History(mine) = views
+        .prepare(&wire::Query::RunHistory {
+            run: RunId::CITY,
+            before: None,
+            limit: wire::HISTORY_MAX,
+        })
+        .finish()
+    else {
         panic!("the run history query has an answer");
     };
     assert!(!mine.records.is_empty(), "the city's own run wrote these");
@@ -115,11 +124,14 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
     ascending.sort_unstable();
     assert_eq!(seqs, ascending, "oldest first, as the fold expects");
 
-    let wire::Answer::History(stranger) = views.answer(&wire::Query::RunHistory {
-        run: RunId::from_bytes([3u8; 16]),
-        before: None,
-        limit: wire::HISTORY_MAX,
-    }) else {
+    let wire::Answer::History(stranger) = views
+        .prepare(&wire::Query::RunHistory {
+            run: RunId::from_bytes([3u8; 16]),
+            before: None,
+            limit: wire::HISTORY_MAX,
+        })
+        .finish()
+    else {
         panic!("the run history query has an answer");
     };
     assert!(
@@ -150,15 +162,18 @@ fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_end
             })
             .unwrap();
     }
-    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let views = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
 
     // One record at a time, so the walk stops on the limit well
     // before it reaches the genesis line.
-    let wire::Answer::History(page) = views.answer(&wire::Query::RunHistory {
-        run: RunId::CITY,
-        before: None,
-        limit: 1,
-    }) else {
+    let wire::Answer::History(page) = views
+        .prepare(&wire::Query::RunHistory {
+            run: RunId::CITY,
+            before: None,
+            limit: 1,
+        })
+        .finish()
+    else {
         panic!("the run history query has an answer");
     };
     assert_eq!(page.records.len(), 1);
@@ -175,11 +190,14 @@ fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_end
     let mut before = Some(resume);
     let mut guard = 0;
     while let Some(at) = before {
-        let wire::Answer::History(page) = views.answer(&wire::Query::RunHistory {
-            run: RunId::CITY,
-            before: Some(at),
-            limit: 1,
-        }) else {
+        let wire::Answer::History(page) = views
+            .prepare(&wire::Query::RunHistory {
+                run: RunId::CITY,
+                before: Some(at),
+                limit: 1,
+            })
+            .finish()
+        else {
             panic!("the run history query has an answer");
         };
         before = page.earlier;

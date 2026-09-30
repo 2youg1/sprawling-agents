@@ -13,8 +13,8 @@ use runtime::diagnostics::{Diagnostics, Level, Site};
 use storage::{JsonlLedger, OpenReport};
 
 use crate::assembly::opening_cost::{OpeningCost, Phase};
-use crate::views::Views;
-use crate::views::snapshot::start::cut_at;
+use accounting::views::Views;
+use accounting::views::snapshot::start::cut_at;
 
 use super::{Standing, fold_city};
 

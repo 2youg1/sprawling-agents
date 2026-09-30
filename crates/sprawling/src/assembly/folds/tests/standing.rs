@@ -9,7 +9,7 @@
 use super::super::*;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
-use crate::views::governance::BlockedJob;
+use accounting::views::governance::BlockedJob;
 use kernel::Locator;
 
 /// What a working worker holds and what a restarted one rebuilds are
@@ -199,9 +199,10 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
-    let wire::Answer::Endpoints(book) = crate::views::Views::rebuild(&report.ledger_dir)
+    let wire::Answer::Endpoints(book) = accounting::views::Views::rebuild(&report.ledger_dir)
         .unwrap()
-        .answer(&wire::Query::EndpointView)
+        .prepare(&wire::Query::EndpointView)
+        .finish()
     else {
         panic!("the settings page reads the endpoint book");
     };

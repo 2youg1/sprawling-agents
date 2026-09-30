@@ -9,13 +9,13 @@ use std::path::Path;
 
 use std::sync::{Arc, Mutex};
 
-use accounting::plan_view::PlanView;
+use crate::plan_view::PlanView;
 use kernel::{AxCode, AxError, B3Hash, EventRecord, Seq};
 use storage::LedgerIndex;
 
 use super::Views;
 
-pub(crate) mod start;
+pub mod start;
 
 use start::SnapshotFold;
 
@@ -27,7 +27,7 @@ use start::SnapshotFold;
 const VIEWS_FOLD_RULES: &str = "views-fold-d7c8c7871ba51264";
 
 /// The `fold_version` a views snapshot is cut and accepted under.
-pub(crate) fn views_fold_version() -> u32 {
+pub fn views_fold_version() -> u32 {
     let rules = [env!("CARGO_PKG_VERSION"), VIEWS_FOLD_RULES].join("\n");
     let [a, b, c, d, ..] = *B3Hash::digest(rules.as_bytes()).as_bytes();
     u32::from_le_bytes([a, b, c, d])
@@ -93,7 +93,7 @@ impl Views {
     ///
     /// # Errors
     /// `StorageFatal` when a field refuses to serialise.
-    pub(crate) fn encode(&self) -> Result<Vec<u8>, AxError> {
+    pub fn encode(&self) -> Result<Vec<u8>, AxError> {
         postcard::to_allocvec(self).map_err(|fault| {
             AxError::failure(AxCode::StorageFatal, "encode the views", fault.to_string())
                 .with_recovery(
@@ -110,7 +110,7 @@ impl Views {
     ///
     /// # Errors
     /// Those of [`Views::encode`] and [`Views::decode`].
-    pub(crate) fn twin(&self) -> Result<Views, AxError> {
+    pub fn twin(&self) -> Result<Views, AxError> {
         let copy = Views::decode(&self.city_root, &self.encode()?)?;
         Ok(Views {
             index: Arc::clone(&self.index),
@@ -131,7 +131,7 @@ impl Views {
     /// # Errors
     /// `InvalidArgs` when the record does not serialise, and those of
     /// [`start::cut_at`].
-    pub(crate) fn cut_snapshot_at(&self, record: &EventRecord) -> Result<(), AxError> {
+    pub fn cut_snapshot_at(&self, record: &EventRecord) -> Result<(), AxError> {
         let last = (record.seq(), record.canonical_line()?);
         start::cut_at(
             &kernel::layout::CityLayout::new(&self.city_root).ledger(),
@@ -147,10 +147,7 @@ impl Views {
     /// # Errors
     /// `StorageFatal` when the index lock is poisoned, and the ledger
     /// read's own failure.
-    pub(crate) fn last_folded_line(
-        &self,
-        ledger_dir: &Path,
-    ) -> Result<Option<(Seq, Vec<u8>)>, AxError> {
+    pub fn last_folded_line(&self, ledger_dir: &Path) -> Result<Option<(Seq, Vec<u8>)>, AxError> {
         let Some(seq) = self.next_unfolded.value().checked_sub(1).map(Seq::new) else {
             return Ok(None);
         };
@@ -174,7 +171,7 @@ impl Views {
     /// # Errors
     /// `CasCorrupt` when the bytes are not an encoding of this build's
     /// `Views`; the caller folds from genesis instead.
-    pub(crate) fn decode(city_root: &Path, bytes: &[u8]) -> Result<Views, AxError> {
+    pub fn decode(city_root: &Path, bytes: &[u8]) -> Result<Views, AxError> {
         let folded: Views = postcard::from_bytes(bytes).map_err(|fault| {
             AxError::failure(AxCode::CasCorrupt, "decode the views", fault.to_string())
                 .with_recovery("none needed: the views fold from genesis and a new snapshot is cut")

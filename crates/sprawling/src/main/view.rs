@@ -8,7 +8,7 @@
 //!
 //! What it writes into a pipe or a file is what an agent already parses:
 //! Ledger lines byte for byte, or with `--runs` one JSON line per run
-//! from `sprawling::lineage`. At a terminal each Ledger line is led by
+//! from `accounting::lineage`. At a terminal each Ledger line is led by
 //! its chain hash, the value a person writes down to find the line
 //! again. Nothing here decides what a record means, so a new event kind
 //! needs no line in this file.
@@ -299,7 +299,7 @@ fn write_walk(
 
 /// Writes one JSON line per run, oldest first.
 pub(super) fn write_runs(dir: &Path, out: &mut impl Write) -> Result<(), ViewError> {
-    for line in sprawling::lineage::lineage_of(dir)?.lines() {
+    for line in accounting::lineage::lineage_of(dir)?.lines() {
         serde_json::to_writer(&mut *out, &line.to_json()).map_err(std::io::Error::from)?;
         out.write_all(b"\n")?;
     }

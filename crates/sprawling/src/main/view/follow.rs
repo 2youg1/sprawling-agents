@@ -12,8 +12,8 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, TryRecvError, channel};
 use std::time::Duration;
 
+use accounting::lineage::{Lineage, RunLine};
 use kernel::{EventRecord, RunId, Seq};
-use sprawling::lineage::{Lineage, RunLine};
 use storage::{CheckedLine, LedgerIndex, Refreshed, TailLines};
 
 use super::ViewError;

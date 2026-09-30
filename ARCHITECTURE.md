@@ -972,7 +972,7 @@ sequenceDiagram
 
 `crates/sprawling/src/assembly/listening.rs` (`listen`, the one
 definition of this order, sprawling-SPEC.md 8-88),
-`crates/sprawling/src/views/snapshot/start.rs`,
+`crates/accounting/src/views/snapshot/start.rs`,
 `crates/sprawling/src/assembly/attending.rs` (`spawn_worker`),
 `crates/storage/src/jsonl.rs` (`open`),
 `crates/sprawling/src/assembly/chain_watch.rs`,

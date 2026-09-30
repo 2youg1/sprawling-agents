@@ -37,8 +37,8 @@ use kernel::{Address, EventDraft, EventKind, EventRecord, Payload, RunId, TimeMs
 use crate::assembly::init_city;
 use crate::serving::folding::{Broadcast, Copies, spawn_folding};
 use crate::serving::standing::monotonic_now;
-use crate::views::{Published, Views, answer_outside_the_lock};
 use accounting::person::CorePriority;
+use accounting::views::{Published, Views, answer_outside_the_lock};
 
 /// Records sent in the burst, beside the lines `init` writes.
 const BURST: u64 = 2_000;
