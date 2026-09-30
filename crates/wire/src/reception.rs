@@ -29,7 +29,7 @@
 mod admission;
 pub(crate) mod inbound;
 
-pub use admission::{Admission, Door, Pairing, decide_admission, offered_pairing};
+pub use admission::{Admission, Door, decide_admission, offered_pairing};
 
 use std::net::SocketAddr;
 

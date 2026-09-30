@@ -18,6 +18,21 @@
 
 use kernel::{AxCode, AxError, B3Hash};
 
+/// Whether the caller held this city's pairing token.
+///
+/// The verdict a door hands inward, so it is vocabulary rather than
+/// listener: the city's writer reads it without the `server` feature
+/// (wire-SPEC.md 12.2).
+///
+/// An enum rather than a boolean so that neither a door nor an
+/// admission can pass the verdict the wrong way round and still
+/// compile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pairing {
+    Held,
+    Absent,
+}
+
 /// Digits and letters that survive being read aloud and typed back:
 /// `0/O`, `1/l/I` and `5/S` are absent because a pairing code is transcribed
 /// by a person, and a code that cannot be dictated fails in the one moment

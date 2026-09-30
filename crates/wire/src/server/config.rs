@@ -27,17 +27,18 @@ use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{MethodRouter, get, post};
 use kernel::{Address, AxError, B3Hash, Sealed, Seq};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tokio::sync::broadcast;
 
 use crate::answer::Answer;
 use crate::assets::ClientAssets;
+use crate::auth::Pairing;
 use crate::command::{Command, WireCommand};
 use crate::frames::Query;
-use crate::reception::{Admission, BindFace, Door, Pairing, decide_admission, offered_pairing};
+use crate::reception::{Admission, BindFace, Door, decide_admission, offered_pairing};
+use crate::reply::{AcpProgress, Reply};
 
 use super::committed::Committed;
-use super::reply::{Reply, refusal_text};
 
 mod enrolment;
 
@@ -224,16 +225,6 @@ pub struct MonitorFeed {
     pub samples: broadcast::Sender<crate::frames::Sample>,
 }
 
-/// What an accepted request gets back: the run it became, and nothing
-/// else. Progress is what an editor may see; the city's history is not
-/// published through this door.
-#[derive(Debug, Serialize)]
-pub struct AcpProgress {
-    pub run: String,
-    pub turns: u32,
-    pub finished: bool,
-}
-
 /// Where an outside request goes once the token has been judged.
 ///
 /// **The body travels as the JSON it arrived as, and nothing here
@@ -331,6 +322,12 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         .route("/acp", post(accept_acp))
         .route("/{*asset}", get(serve_asset))
         .with_state(state)
+}
+
+/// The body a refused HTTP request is answered with: what failed, and
+/// what to do about it.
+pub(crate) fn refusal_text(err: &AxError) -> String {
+    format!("{}: {}", err.action(), err.recovery())
 }
 
 /// One door with the pairing judgement in front of it.

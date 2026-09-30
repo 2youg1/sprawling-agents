@@ -14,7 +14,7 @@
 use kernel::{AxCode, AxError};
 
 use super::BindFace;
-use crate::auth;
+use crate::auth::{self, Pairing};
 
 /// Which HTTP door a request arrived at.
 ///
@@ -41,17 +41,6 @@ pub enum Admission {
     /// [`Door::Acp`] is ever admitted unpaired.
     Admit(Pairing),
     Refuse(AxError),
-}
-
-/// Whether the caller held this city's pairing token.
-///
-/// An enum rather than a boolean so that neither a door nor an
-/// admission can pass the verdict the wrong way round and still
-/// compile.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Pairing {
-    Held,
-    Absent,
 }
 
 /// Decides whether one HTTP request may reach the work behind a door.

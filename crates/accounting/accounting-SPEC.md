@@ -58,7 +58,6 @@ worker 的两个读写面 `effect` 与 `plan_view`，以及 worker 与 `views` �
   2. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）。`views` 的测试此前经 `views::tests::founded` 造城，它只写创世的两行、立起市政厅、写一份 `City.md`；worker 搬进来以后它们改回真正的创世，`founded` 随之删去（§12-16）。快照折叠的 trait `views::snapshot::start::SnapshotFold` 在此之前有两个实现分住两个 crate（`Views` 与 `bin::assembly::folds::standing_start` 的 `StandingFolds`），所以是 ARCHITECTURE.md §4 缝表里的一行；worker 搬进来以后两个实现同住本 crate，它收回 `pub(crate)`，那一行随之删去。
   3. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活，不在本次迁移里。
   4. 模块搬走时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）。8-7、8-8、8-9 是早先整节搬进来的，保持原样。
-- worker 的产品代码用到 `wire` 里只在 `server` feature 之后才有的四个类型：`Reply` 与 `Delivered`（`commanding::door`、`commanding::routing`、`desk`、`driving::owing`、`mcp`），`Pairing` 与 `AcpProgress`（`dispatching::agreeing`）。本 crate 依赖 `wire` 时关掉默认 feature，因为 `server` 带进 tokio 与 axum，而本 crate 只要 wire 的词汇。四个都只是词汇：`Reply` 包一个 `Fn(AxError) -> Delivered`，另外三个是普通的枚举与结构体，都不持有 tokio 的东西。未定的是它们搬出 `server`（wire 的改动，写进 wire-SPEC）还是另有做法；定下之前，§3 第 2 步搬不了。能定下它的证据是 wire 的 SPEC 把这四个类型划在词汇的一侧还是监听的一侧。
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
 
 ## 4 现状分析

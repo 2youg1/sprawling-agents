@@ -20,8 +20,9 @@ use tokio::sync::broadcast;
 use crate::command::Command;
 use crate::reception::{EnrollVerdict, decide_enroll};
 
-use super::super::reply::{Delivered, Reply, refusal_text};
+use super::refusal_text;
 use super::{ENROLMENT_PATIENCE, EnrollBody, ShellState};
+use crate::reply::{Delivered, Reply};
 
 /// The one route that carries a credential. It exists as HTTP rather
 /// than as a socket frame because the socket's Command type cannot spell

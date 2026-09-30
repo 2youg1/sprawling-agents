@@ -26,6 +26,7 @@ mod preference;
 mod reading;
 #[cfg(feature = "server")]
 mod reception;
+mod reply;
 #[cfg(feature = "server")]
 mod server;
 
@@ -63,7 +64,7 @@ pub use answer::{SecondDomain, SettledEffort, SettledSecond, TuningDefaults};
 pub use answer::{Standing, ToolkitLine, ToolkitsAnswer};
 #[cfg(feature = "server")]
 pub use assets::{AssetReply, ClientAssets, EmbeddedFile};
-pub use auth::{PairingToken, verify};
+pub use auth::{Pairing, PairingToken, verify};
 pub use carried_name::{ProviderName, TemplateName, ToolkitSlug};
 pub use command::COMMAND_NAMES;
 pub use command::{BodyOverride, EndpointTuning, HeaderPair};
@@ -84,17 +85,18 @@ pub use preference::{BODY_PX_MAX, BODY_PX_MIN, PreferencePatch, PreferencesAnswe
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in};
 pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
-pub use reception::{Admission, BindFace, BindVerdict, Door, HandshakeVerdict, Pairing};
+pub use reception::{Admission, BindFace, BindVerdict, Door, HandshakeVerdict};
 #[cfg(feature = "server")]
 pub use reception::{SessionState, SessionStep, WelcomeFacts, decide_frame};
 #[cfg(feature = "server")]
 pub use reception::{decide_admission, offered_pairing};
 #[cfg(feature = "server")]
 pub use reception::{decide_bind, decide_handshake};
+pub use reply::{AcpProgress, Delivered, Reply};
 #[cfg(feature = "server")]
-pub use server::{AcpProgress, AcpSink, Answering, MonitorFeed, TranscribeSink};
+pub use server::{AcpSink, Answering, MonitorFeed, TranscribeSink};
 #[cfg(feature = "server")]
-pub use server::{Bound, Committed, Delivered, LedgerHead, Reply, ServeConfig};
+pub use server::{Bound, Committed, LedgerHead, ServeConfig};
 #[cfg(feature = "server")]
 pub use server::{DROP_BYTES_MAX, DropSink};
 #[cfg(feature = "server")]

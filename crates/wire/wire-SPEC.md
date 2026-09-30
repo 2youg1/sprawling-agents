@@ -188,7 +188,7 @@ pub type SecretSink =
 pub struct EnrollBody { pub realm: String, pub name: String, pub value: String }
 
 pub enum Door { Transcribe, Enroll, Acp, Drop }      // 四扇 HTTP 门，穷尽
-pub enum Pairing { Held, Absent }                    // 不是 bool
+pub enum Pairing { Held, Absent }                    // 不是 bool；住 `wire::auth`，不带 `server` 也在（§12.2）
 pub enum Admission { Admit(Pairing), Refuse(AxError) }
 pub fn decide_admission(door: Door, offered: Option<&str>, face: &BindFace)
     -> Admission;                                    // HTTP 侧唯一的令牌判定
@@ -262,9 +262,13 @@ impl Reply {
     #[must_use] pub fn refuse(&self, error: AxError) -> Delivered;
 }
 
+/// 受理之后回给外来编辑器的全部内容（`POST /acp`）。
+pub struct AcpProgress { pub run: String, pub turns: u32, pub finished: bool }
+
 pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Sync>,
 ```
 
+- **`Reply`、`Delivered`、`AcpProgress` 住 `wire::reply`，`Pairing` 住 `wire::auth`，四个都不在 `server` feature 之后**：城的写者 `accounting::worker` 点名它们，却从不监听端口，而它依赖本 crate 时关掉 `server`（§12.2）。`server` 只管 axum 那一半；把拒绝写成 HTTP 响应体的 `refusal_text` 仍在 `server::config`。
 - **拒绝属于发问者，不广播**。把它做成一条事件会告诉所有在看的人「别人打错了一个字」，而事件流是这座城的历史，不是某个人的错字簿。故每条会话自持一个无界队列，`Deliver` 时把写入该队列的闭包随命令交给工人；会话的 `select!` 因此从两臂变三臂。
 - **`Delivered` 是三态而不是 `Result`**，因为「没有人问过」与「问的人走了」是两件不同的事：前者是排程的正常形态，后者值一行诊断。这也是**不得重新引入 `let _ =`** 的落法——`SendError` 被穷尽消解成一个领域枚举，而不是被丢掉。
 - **无界队列而非 `broadcast`**：一条拒绝丢不得，而它的量级是「人点错的次数」，不是事件流量。
@@ -423,6 +427,16 @@ WireCommand::Dispatch { addr, task, goal, mode, idem, session: Option<SessionNam
 **被否**：①每个改形的提交各进一位：更严，但一次推送带出几个号只取决于提交怎么切，读者从号上读不出任何东西；②推送前统一进位：理由见上；③改名也进位：哈希已经拒掉旧页面，多进一位不多拒任何页面。
 
 **守护**：`tests/wire_contract.rs` 钉住去掉文档文字之后的 `wire_schema()` 摘要。改形即红，失败信息写出本条；改的人据此判断这一次要不要进位，再更新摘要。它不判断该不该进位，那取决于上一次推送之后是否已经进过一位。
+
+### 12.2 写者点名的四个类型不在 `server` feature 之后
+
+**决定**：`Reply`、`Delivered`、`AcpProgress`（`wire::reply`）与 `Pairing`（`wire::auth`）在任何 feature 组合下都编译；crate 根的名字与再导出不变。`server` feature 只带监听器：axum 的路由、WebSocket 会话、HTTP 门与把拒绝写成响应体的 `refusal_text`。
+
+**理由**：城的唯一写者搬进 `accounting` 之后（accounting-SPEC.md 8-11），它的命令入口、桌子、欠账与 ACP 受理点名这四个类型，而 `accounting` 依赖本 crate 时关掉默认 feature，因为它要的是词汇，不是 TCP 栈。四个类型本来就是词汇：`Reply` 包一个 `Fn(AxError) -> Delivered`，正是为了不把传输层写进签名（§8-2）；另外三个是普通的枚举与结构体，不持有 tokio 或 axum 的任何东西。`Pairing` 是一次配对判定的结论，与配对令牌同住 `auth`；判定本身 `decide_admission` 仍在 `reception`。
+
+**被否**：①给 `accounting` 的 `wire` 依赖打开 `server`：它把 tokio 与 axum 拉进一个从不监听的 crate，`wire` 不带 `server` 的那份构建（`just features`）也就不再守住「词汇不需要监听器」；②在 `accounting` 里另写一份同形的类型再在装配根互转：同一个拒绝去向有两个定义，互转是第二个权威。
+
+**守护**：`just features` 编译不带 `server` 的 `wire`，`accounting` 的每一次编译也是。四个类型之一若被挪回 `server` 之后，`accounting` 编不过。
 
 ## 13 依赖选型
 
@@ -998,7 +1012,7 @@ pub enum Standing {
 5. **同意页面由客户端打开，不由城打开。** 人坐在客户端那一侧；城可能跑在另一个房间的机器上，在那里弹出的浏览器没有人在看。按钮在同一次点击手势里先开一个空白标签页，等答案回来再给它地址——浏览器会拦掉往返之后才发起的弹窗，而按了按钮却什么也没发生的人分不清是弹窗被拦还是城坏了。
 6. **全程不轮询。** 页面在三个时刻重读：打开页面、按下连接、以及**从同意页面切回本窗口时**。最后一条是这条流程不需要任何定时器的原因——人离开去授权再回来，「回来」本身就是那个事件。`docs/third-party.md` 边界 2 禁的是「有什么新东西吗」的定时订阅，而带死线的一次握手收尾不是它。
 
-**被否**：让 `ConnectToolkit` 直接把 consent URL 作为命令的答案回去。`Reply` 只运送拒绝（`server::reply`），把一个成功结果塞进 `AxError` 是为一次往返伪造一条错误路径；URL 由随后的 `Query::Toolkits` 从对方这个「此刻」的权威取回，客户端因而只有一条渲染路径而不是两条需要互相对齐的。
+**被否**：让 `ConnectToolkit` 直接把 consent URL 作为命令的答案回去。`Reply` 只运送拒绝（`wire::reply`），把一个成功结果塞进 `AxError` 是为一次往返伪造一条错误路径；URL 由随后的 `Query::Toolkits` 从对方这个「此刻」的权威取回，客户端因而只有一条渲染路径而不是两条需要互相对齐的。
 
 ### 8-36 这是哪一版，npm 上是哪一版：`Query::NewestRelease`
 

@@ -15,7 +15,7 @@ use axum::response::{IntoResponse, Response};
 use crate::assets::AssetReply;
 
 use super::config::ShellState;
-use super::reply::refusal_text;
+use super::config::refusal_text;
 
 pub(crate) async fn serve_index(State(state): State<Arc<ShellState>>) -> Response {
     asset_response(state.client.lookup("index.html"))

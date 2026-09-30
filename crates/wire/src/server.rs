@@ -13,20 +13,18 @@
 //! machine, and let an outside editor drive the city.
 //!
 //! A refusal made minutes later has no way home, which is why a command
-//! carries the [`Reply`] address of whoever sent it.
+//! carries the [`Reply`](crate::Reply) address of whoever sent it.
 
 mod bundle;
 mod committed;
 mod config;
 mod listener;
-mod reply;
 mod socket;
 mod uploads;
 
 pub use committed::Committed;
 pub use config::{
-    AcpProgress, AcpSink, Answering, DROP_BYTES_MAX, DropSink, LedgerHead, MonitorFeed,
-    ServeConfig, TranscribeSink, router,
+    AcpSink, Answering, DROP_BYTES_MAX, DropSink, LedgerHead, MonitorFeed, ServeConfig,
+    TranscribeSink, router,
 };
 pub use listener::{Bound, bind, serve};
-pub use reply::{Delivered, Reply};

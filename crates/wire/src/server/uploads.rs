@@ -20,7 +20,7 @@ use axum::response::{IntoResponse, Response};
 use crate::reception::{Admission, Door, decide_admission};
 
 use super::config::ShellState;
-use super::reply::refusal_text;
+use super::config::refusal_text;
 
 /// An outside editor's request. The token is judged here and the
 /// verdict travels inward; an unauthenticated request still reaches the

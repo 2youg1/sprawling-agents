@@ -3,27 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The listening end, and the humble half of it (ARCHITECTURE section
-//! 9). Every branch here is a send, a receive, or the end of a session;
-//! the judgements it applies are `wire::reception`'s and the bytes
-//! it serves are `wire::assets`'.
+//! What goes back to the one who asked: where a refusal is delivered,
+//! where it ended up, and what an outside editor is told about the
+//! request it made.
 //!
-//! Five jobs and no policy: serve the client bundle, upgrade a
-//! WebSocket, accept an upload, take a credential from a caller on this
-//! machine, and let an outside editor drive the city.
-//!
-//! A refusal made minutes later has no way home, which is why a command
-//! carries the [`Reply`] address of whoever sent it.
-
-//! Replies: deliveries and refusals.
+//! Vocabulary, not transport. The city's one writer names these types
+//! and never listens on a socket, so they sit outside the `server`
+//! feature, which carries only the listener (wire-SPEC.md 12.2).
 
 use std::sync::Arc;
 
 use kernel::AxError;
-
-pub(crate) fn refusal_text(err: &AxError) -> String {
-    format!("{}: {}", err.action(), err.recovery())
-}
+use serde::Serialize;
 
 /// Where a refusal ended up.
 ///
@@ -84,4 +75,14 @@ impl std::fmt::Debug for Reply {
         };
         f.write_str(face)
     }
+}
+
+/// What an accepted request gets back: the run it became, and nothing
+/// else. Progress is what an editor may see; the city's history is not
+/// published through this door.
+#[derive(Debug, Serialize)]
+pub struct AcpProgress {
+    pub run: String,
+    pub turns: u32,
+    pub finished: bool,
 }
