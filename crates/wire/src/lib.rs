@@ -32,6 +32,7 @@ mod server;
 
 pub use aggregate::{Aggregate, CityLabel, Forwarded, Sighting, Upstream};
 pub use answer::DoctorSandboxMissing;
+pub use answer::HistoryAnswer;
 pub use answer::HistoryRangeAnswer;
 pub use answer::PlanRow;
 pub use answer::PursuitLine;
@@ -41,7 +42,7 @@ pub use answer::{Answer, ApprovalsAnswer, ArchiveLine, BlockedLine, BuildingProg
 pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
 pub use answer::{BuildingAnswer, BuildingDoc};
 pub use answer::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn};
-pub use answer::{ChangesAnswer, CommitAnswer, CommitsAnswer, HISTORY_MAX, HistoryAnswer};
+pub use answer::{ChangesAnswer, CommitAnswer, CommitAt, CommitsAnswer, HISTORY_MAX};
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer};
 pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary};
 pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegment};

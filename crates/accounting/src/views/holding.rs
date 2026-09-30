@@ -85,6 +85,10 @@ pub struct Views {
     /// lineage is walked from here rather than stored per commit, so
     /// the chain is one fact however many commits point into it.
     pub(super) predecessors: std::collections::BTreeMap<kernel::RunId, kernel::RunId>,
+    /// The commit each run announced last, so the next one it announces
+    /// names its previous commit without a walk past every other run's
+    /// (sprawling-SPEC 8-128).
+    pub(super) last_commit: std::collections::BTreeMap<kernel::RunId, wire::CommitAt>,
     /// Which runs were frozen with each skill pinned, by name and hash
     /// together: a skill edited between two runs is two documents under
     /// one name, and a key of the name alone would claim the older run
@@ -213,6 +217,7 @@ impl Views {
             commits: std::collections::BTreeMap::new(),
             commit_seqs: std::collections::BTreeMap::new(),
             predecessors: std::collections::BTreeMap::new(),
+            last_commit: std::collections::BTreeMap::new(),
             skill_pins: std::collections::BTreeMap::new(),
             events: 0,
             next_unfolded: kernel::Seq::FIRST,

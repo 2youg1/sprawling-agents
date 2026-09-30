@@ -53,6 +53,27 @@ pub struct CommitAnswer {
     /// between its checkpoints would be a number nobody measured. Zero for
     /// a run no priced call is attributed to.
     pub spent: UsdMicros,
+    /// The commit the same run announced last before this one; `None`
+    /// for the run's first. The two bound what this commit is the
+    /// result of: `Query::Changes` from `previous.oid` to `oid` says
+    /// which files moved, and `Query::RunHistory` read back from `seq`
+    /// to `previous.seq` says which calls the run made meanwhile - as
+    /// candidates, since another run in the same building may have
+    /// written in that span too.
+    pub previous: Option<CommitAt>,
+    /// The commit object's own parents, in git's order: an empty list
+    /// is a root commit. `None` when the city has no repository beside
+    /// it, the repository does not hold this object, or it could not be
+    /// read - the other facts still stand without it.
+    pub parents: Option<Vec<GitOid>>,
+}
+
+/// A commit, and where in the one history the line announcing it sits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct CommitAt {
+    pub oid: GitOid,
+    pub seq: Seq,
 }
 
 /// One page of the commits a city made, newest first.

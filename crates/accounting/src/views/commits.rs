@@ -20,8 +20,12 @@
 //! than a commit and names no oid at all — so what is asked of a record
 //! is whether it names a commit, never which kind it is.
 
+use std::path::PathBuf;
+
 use kernel::event::record::{CheckpointCommitted, CommitAttribution};
 use kernel::{Address, EventKind, EventRecord, GitOid, RunId, Seq, SessionName, UsdMicros};
+
+use super::prepared::{Prepared, unavailable};
 
 /// What one commit's own record says about the run that made it.
 ///
@@ -35,6 +39,8 @@ pub(super) struct CommitFacts {
     at: kernel::TimeMs,
     actor: Address,
     chosen: storage::ModelChoice,
+    /// The commit the same run announced last before this one.
+    previous: Option<wire::CommitAt>,
 }
 
 impl CommitFacts {
@@ -67,6 +73,8 @@ impl CommitFacts {
             at: self.at,
             session: session_of(&self.actor),
             lineage,
+            previous: self.previous,
+            parents: None,
         }
     }
 }
@@ -135,22 +143,44 @@ impl super::holding::Views {
         }
     }
 
-    /// Which run wrote this commit, and the runs that run succeeded.
+    /// Which run wrote this commit, and the runs that run succeeded,
+    /// with its parents still to read once the snapshot is let go.
     ///
     /// A commit this city never wrote is `Unavailable`, for the reason
     /// `Changes` gives: "I did not write it" and "it changed nothing"
     /// are different answers, and a reader acts differently on each.
-    pub(super) fn commit_answer(&self, oid: GitOid) -> wire::Answer {
+    pub(super) fn prepare_commit(&self, oid: GitOid) -> Prepared {
         self.commits
             .get(&oid)
             .and_then(|facts| {
-                self.billed_to(facts.run).map(|spent| {
-                    wire::Answer::Commit(facts.answer(oid, self.lineage_of(facts.run), spent))
-                })
+                self.billed_to(facts.run)
+                    .map(|spent| facts.answer(oid, self.lineage_of(facts.run), spent))
             })
-            .unwrap_or_else(|| wire::Answer::Unavailable {
-                query: format!("Commit({oid})"),
-            })
+            .map_or_else(
+                || Prepared::Held(unavailable(format!("Commit({oid})"))),
+                |commit| Prepared::Commits(self.parents_ask(Settled::One(commit))),
+            )
+    }
+
+    /// One page of the commits, with their parents still to read once
+    /// the snapshot is let go.
+    pub(super) fn prepare_commits(
+        &self,
+        building: Option<&Address>,
+        before: Option<Seq>,
+        limit: u32,
+    ) -> Prepared {
+        match self.commits_answer(building, before, limit) {
+            Some(page) => Prepared::Commits(self.parents_ask(Settled::Page(page))),
+            None => Prepared::Held(unavailable(format!("Commits({before:?})"))),
+        }
+    }
+
+    fn parents_ask(&self, settled: Settled) -> CommitsAsk {
+        CommitsAsk {
+            city_root: self.city_root.clone(),
+            settled,
+        }
     }
 
     /// The run and every predecessor behind it, nearest first. A chain
@@ -211,8 +241,32 @@ pub(super) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)
                 id: by.model,
                 effort: by.effort,
             },
+            previous: None,
         },
     ))
+}
+
+/// A commit answer the views settled, and the repository its parents
+/// are read from after the snapshot is let go (sprawling-SPEC 8-128).
+pub struct CommitsAsk {
+    city_root: PathBuf,
+    settled: Settled,
+}
+
+/// Which of the two questions about commits was asked.
+enum Settled {
+    One(wire::CommitAnswer),
+    Page(wire::CommitsAnswer),
+}
+
+impl CommitsAsk {
+    /// The answer, each commit with the parents git states for it.
+    pub(super) fn read(self) -> wire::Answer {
+        match self.settled {
+            Settled::One(commit) => wire::Answer::Commit(commit),
+            Settled::Page(page) => wire::Answer::Commits(page),
+        }
+    }
 }
 
 /// What a person called this line of work: the room the actor worked in.
@@ -248,8 +302,17 @@ mod tests {
         seq: u64,
         addr: &str,
     ) -> EventRecord {
+        record_by(kind, data, (seq, addr), RunId::from_bytes([4u8; 16]))
+    }
+
+    fn record_by(
+        kind: EventKind,
+        data: serde_json::Map<String, serde_json::Value>,
+        (seq, addr): (u64, &str),
+        run: RunId,
+    ) -> EventRecord {
         let draft = EventDraft {
-            run: RunId::from_bytes([4u8; 16]),
+            run,
             t: TimeMs::new(7),
             who: "resident".to_owned(),
             addr: Some(Address::parse(addr).unwrap()),
@@ -267,6 +330,116 @@ mod tests {
             serde_json::Value::String(format!("{seq:02x}").repeat(20)),
         );
         record_at(EventKind::CheckpointCommitted, data, seq, addr)
+    }
+
+    /// A checkpoint announcing `oid` at `seq`, written by the run whose
+    /// id is sixteen `run` bytes.
+    fn checkpoint_by(seq: u64, oid: &str, run: u8) -> EventRecord {
+        let mut data = serde_json::Map::new();
+        data.insert("oid".to_owned(), serde_json::Value::String(oid.to_owned()));
+        record_by(
+            EventKind::CheckpointCommitted,
+            data,
+            (seq, "lab/room1"),
+            RunId::from_bytes([run; 16]),
+        )
+    }
+
+    fn oid_at(seq: u64) -> String {
+        format!("{seq:02x}").repeat(20)
+    }
+
+    fn previous_of(views: &super::super::holding::Views, seq: u64) -> Option<wire::CommitAt> {
+        views
+            .commits_answer(None, None, 20)
+            .unwrap()
+            .commits
+            .into_iter()
+            .find(|commit| commit.seq == Seq::new(seq))
+            .unwrap()
+            .previous
+    }
+
+    #[test]
+    fn a_commit_names_the_one_its_run_announced_before_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut views = super::super::holding::Views::new(dir.path());
+        for (seq, run) in [(3, 1), (5, 2), (8, 1)] {
+            views.fold_commit(&checkpoint_by(seq, &oid_at(seq), run));
+        }
+        let first = wire::CommitAt {
+            oid: GitOid::parse(&oid_at(3)).unwrap(),
+            seq: Seq::new(3),
+        };
+        assert_eq!(
+            (
+                previous_of(&views, 8),
+                previous_of(&views, 5),
+                previous_of(&views, 3)
+            ),
+            (Some(first), None, None),
+            "the other run's commit in between is not this run's previous one"
+        );
+    }
+
+    #[test]
+    fn a_page_of_commits_carries_each_ones_parents_from_git() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = git2::Repository::init(dir.path()).unwrap();
+        let signature = git2::Signature::now("city", "city@example.invalid").unwrap();
+        let tree = repo
+            .find_tree(repo.index().unwrap().write_tree().unwrap())
+            .unwrap();
+        let root = repo
+            .commit(Some("HEAD"), &signature, &signature, "root", &tree, &[])
+            .unwrap();
+        let parent = repo.find_commit(root).unwrap();
+        let child = repo
+            .commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                "child",
+                &tree,
+                &[&parent],
+            )
+            .unwrap();
+        let mut views = super::super::holding::Views::new(dir.path());
+        for (seq, oid) in [
+            (3, root.to_string()),
+            (5, child.to_string()),
+            (8, oid_at(8)),
+        ] {
+            views.fold_commit(&checkpoint_by(seq, &oid, 1));
+        }
+        let asked = wire::Query::Commits {
+            building: None,
+            before: None,
+            limit: 20,
+        };
+        let wire::Answer::Commits(page) = views.prepare(&asked).finish() else {
+            panic!("a page of commits");
+        };
+        let parents: Vec<(u64, Option<Vec<String>>)> = page
+            .commits
+            .iter()
+            .map(|commit| {
+                let named = commit
+                    .parents
+                    .as_ref()
+                    .map(|oids| oids.iter().map(ToString::to_string).collect());
+                (commit.seq.value(), named)
+            })
+            .collect();
+        assert_eq!(
+            parents,
+            vec![
+                (8, None),
+                (5, Some(vec![root.to_string()])),
+                (3, Some(Vec::new())),
+            ],
+            "a commit the repository does not hold has no parents to read; a root has none"
+        );
     }
 
     fn addr(text: &str) -> Address {

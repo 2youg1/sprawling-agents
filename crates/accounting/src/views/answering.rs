@@ -193,15 +193,12 @@ impl Views {
                     path: path.clone(),
                 };
             }
-            wire::Query::Commit { oid } => self.commit_answer(*oid),
+            wire::Query::Commit { oid } => return self.prepare_commit(*oid),
             wire::Query::Commits {
                 building,
                 before,
                 limit,
-            } => match self.commits_answer(building.as_ref(), *before, *limit) {
-                Some(page) => wire::Answer::Commits(page),
-                None => unavailable(format!("Commits({before:?})")),
-            },
+            } => return self.prepare_commits(building.as_ref(), *before, *limit),
             // Three readings answered here, so a second client folds no ledger itself.
             wire::Query::Rounds { run } => {
                 return Prepared::Rounds {

@@ -20,6 +20,7 @@ use kernel::{Address, GitOid, Locator, RunId, Seq};
 use super::archives::search_archives;
 use super::building_page::read_building;
 use super::city::CityAsk;
+use super::commits::CommitsAsk;
 use super::document::document_answer;
 use super::git_status::GitStatusAsk;
 use super::hunks::hunks_answer;
@@ -58,6 +59,8 @@ pub enum Prepared {
     Held(wire::Answer),
     /// The working tree of one building against its last checkpoint.
     GitStatus(GitStatusAsk),
+    /// One commit, or a page of them, still to be given their parents.
+    Commits(CommitsAsk),
     /// The person's own settings file.
     Preferences,
     /// The configuration ladder of one address.
@@ -193,6 +196,7 @@ impl Prepared {
         match self {
             Self::Held(answer) => answer,
             Self::GitStatus(ask) => ask.read(),
+            Self::Commits(ask) => ask.read(),
             Self::Prefix(ask) => ask.read(),
             Self::City(ask) => ask.read(),
             Self::History {

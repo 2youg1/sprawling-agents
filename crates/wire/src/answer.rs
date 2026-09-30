@@ -46,7 +46,7 @@ mod toolkits;
 
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
-pub use commits::{CommitAnswer, CommitsAnswer};
+pub use commits::{CommitAnswer, CommitAt, CommitsAnswer};
 pub use config::{
     ConfigAnswer, ConfigLayer, SecondDomain, SettledEffort, SettledSecond, TuningDefaults,
 };
