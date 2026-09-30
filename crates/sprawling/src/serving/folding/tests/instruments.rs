@@ -52,7 +52,7 @@ fn instrument_view_backlog() {
     let dir = tempfile::tempdir().unwrap();
     let records = burst_over(dir.path());
     let unfolded = Views::new(dir.path());
-    let spare = unfolded.unfolded_twin();
+    let spare = unfolded.twin().unwrap();
     let views = Arc::new(Published::new(unfolded));
     let (to_clients, mut heard) = tokio::sync::broadcast::channel(records.len() + 64);
     let broadcast = Broadcast {
