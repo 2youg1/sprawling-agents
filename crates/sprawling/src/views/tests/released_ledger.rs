@@ -24,7 +24,7 @@ fn the_prompt_a_run_was_told_is_read_after_the_views_are_released() {
         { "slot": "city", "hash": hash, "len": told.len(), "sources": [] }
     ] });
     let data = data.as_object().unwrap().clone();
-    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
+    let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
         .unwrap()
         .0;
     let mut views = Views::new(dir.path());
@@ -38,7 +38,7 @@ fn the_prompt_a_run_was_told_is_read_after_the_views_are_released() {
         ))
         .unwrap();
 
-    let prepared = views.prepare(&channels::Query::Prefix { run });
+    let prepared = views.prepare(&wire::Query::Prefix { run });
     ledger
         .append(kernel::EventDraft {
             run,
@@ -51,17 +51,17 @@ fn the_prompt_a_run_was_told_is_read_after_the_views_are_released() {
         })
         .unwrap();
     drop(ledger);
-    memory::Cas::open(&kernel::layout::CityLayout::new(dir.path()).cas())
+    storage::Cas::open(&kernel::layout::CityLayout::new(dir.path()).cas())
         .unwrap()
         .put(told)
         .unwrap();
 
     assert_eq!(
         prepared.finish(),
-        channels::Answer::Prefix(Box::new(channels::PrefixAnswer {
+        wire::Answer::Prefix(Box::new(wire::PrefixAnswer {
             run,
-            segments: vec![channels::PrefixSegment {
-                slot: channels::PrefixSlot::City,
+            segments: vec![wire::PrefixSegment {
+                slot: wire::PrefixSlot::City,
                 hash,
                 bytes: 13,
                 text: "the city says".to_owned(),
@@ -80,7 +80,7 @@ fn a_plan_nobody_has_read_yet_is_read_after_the_views_are_released() {
     init_city(dir.path()).unwrap();
     let building = dir.path().join("lab");
     std::fs::create_dir_all(&building).unwrap();
-    let query = channels::Query::BuildingView {
+    let query = wire::Query::BuildingView {
         addr: Address::parse("lab").unwrap(),
     };
     let prepared = Views::new(dir.path()).prepare(&query);
@@ -104,28 +104,28 @@ fn the_ledger_readers_read_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
     let report = init_city(dir.path()).unwrap();
     let run = RunId::from_bytes([7u8; 16]);
-    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
+    let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
         .unwrap()
         .0;
     let appended_at = ledger.position();
     let mut views = Views::new(dir.path());
     let queries = [
-        channels::Query::History {
+        wire::Query::History {
             before: None,
             limit: 50,
         },
-        channels::Query::HistoryRange {
+        wire::Query::HistoryRange {
             from: appended_at,
             to: appended_at,
             limit: 50,
         },
-        channels::Query::RunHistory {
+        wire::Query::RunHistory {
             run,
             before: None,
             limit: 50,
         },
-        channels::Query::Rounds { run },
-        channels::Query::Evidence { run },
+        wire::Query::Rounds { run },
+        wire::Query::Evidence { run },
     ];
     let prepared: Vec<_> = queries.iter().map(|query| views.prepare(query)).collect();
     let data = serde_json::json!({ "segments": [] });
@@ -156,7 +156,7 @@ fn the_mcp_health_page_reads_its_servers_after_the_views_are_released() {
     init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let views = Views::new(dir.path());
-    let prepared = views.prepare(&channels::Query::McpHealth { addr: room.clone() });
+    let prepared = views.prepare(&wire::Query::McpHealth { addr: room.clone() });
     let config = city::config_path(dir.path(), &room, city::Layer::City).unwrap();
     std::fs::create_dir_all(config.parent().unwrap()).unwrap();
     std::fs::write(
@@ -164,7 +164,7 @@ fn the_mcp_health_page_reads_its_servers_after_the_views_are_released() {
         "[[mcp]]\nlabel = \"apps\"\ncommand = \"sprawling-no-such-server\"\n",
     )
     .unwrap();
-    let channels::Answer::McpHealth(answer) = prepared.finish() else {
+    let wire::Answer::McpHealth(answer) = prepared.finish() else {
         panic!("not an MCP health answer");
     };
     let labels: Vec<_> = answer
@@ -184,12 +184,12 @@ fn a_poisoned_ledger_index_is_rebuilt_rather_than_read_as_an_empty_history() {
     let dir = tempfile::tempdir().unwrap();
     init_city(dir.path()).unwrap();
     let mut views = Views::new(dir.path());
-    let query = channels::Query::History {
+    let query = wire::Query::History {
         before: None,
         limit: 50,
     };
     let before = views.answer(&query);
-    let channels::Answer::History(page) = &before else {
+    let wire::Answer::History(page) = &before else {
         panic!("History answers with a page: {before:?}");
     };
     assert!(!page.records.is_empty(), "genesis is in the history");

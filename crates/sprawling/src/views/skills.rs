@@ -63,7 +63,7 @@ pub(super) fn skills_answer(
     city_root: &Path,
     building: &Address,
     pins: &SkillPins,
-) -> Option<channels::SkillsAnswer> {
+) -> Option<wire::SkillsAnswer> {
     let home = accounting::home::Home::detect().ok()?;
     let shelves = city::Library::scan(city_root, Some(building), home.path()).ok()?;
     // What this building's reading room admits, so a page can show
@@ -73,7 +73,7 @@ pub(super) fn skills_answer(
     let skills = shelves
         .all()
         .into_iter()
-        .map(|holding| channels::SkillLine {
+        .map(|holding| wire::SkillLine {
             name: holding.name.clone(),
             section: holding.section.clone(),
             shelf: shelf_of(&holding.shelf),
@@ -83,7 +83,7 @@ pub(super) fn skills_answer(
             pinned_by: pinned_by(pins, &holding.name, &holding.hash),
         })
         .collect();
-    Some(channels::SkillsAnswer {
+    Some(wire::SkillsAnswer {
         building: building.clone(),
         skills,
         missing: shelves.missing(&admitted),
@@ -109,11 +109,11 @@ fn pinned_by(pins: &SkillPins, name: &str, hash: &B3Hash) -> Vec<RunId> {
 /// it was reading, so nothing here derives a shelf from a path - a
 /// derivation that could only be right about the shelves that happen to
 /// sit in different places.
-fn shelf_of(shelf: &city::Shelf) -> channels::SkillShelf {
+fn shelf_of(shelf: &city::Shelf) -> wire::SkillShelf {
     match shelf {
-        city::Shelf::Library(addr) => channels::SkillShelf::Library(addr.clone()),
-        city::Shelf::Building(addr) => channels::SkillShelf::Building(addr.clone()),
-        city::Shelf::External { index, path } => channels::SkillShelf::External {
+        city::Shelf::Library(addr) => wire::SkillShelf::Library(addr.clone()),
+        city::Shelf::Building(addr) => wire::SkillShelf::Building(addr.clone()),
+        city::Shelf::External { index, path } => wire::SkillShelf::External {
             index: *index,
             path: path.clone(),
         },
@@ -199,7 +199,7 @@ mod tests {
         .unwrap();
 
         let mut views = Views::new(dir.path());
-        let channels::Answer::Skills(answer) = views.answer(&channels::Query::Skills {
+        let wire::Answer::Skills(answer) = views.answer(&wire::Query::Skills {
             building: lab.clone(),
         }) else {
             panic!("Skills answers with the shelves");
@@ -213,24 +213,24 @@ mod tests {
         };
 
         match &named("diffing").shelf {
-            channels::SkillShelf::Building(at) => assert!(at.is_within(&lab), "{at}"),
-            channels::SkillShelf::Library(_) | channels::SkillShelf::External { .. } => {
+            wire::SkillShelf::Building(at) => assert!(at.is_within(&lab), "{at}"),
+            wire::SkillShelf::Library(_) | wire::SkillShelf::External { .. } => {
                 panic!("the building's own copy is the nearer shelf")
             }
         }
         assert_eq!(named("diffing").disclosure, "This lab's own rule");
         match &named("kiln-firing").shelf {
-            channels::SkillShelf::Library(at) => {
+            wire::SkillShelf::Library(at) => {
                 assert!(at.is_reserved(), "a resident may not restock it: {at}")
             }
-            channels::SkillShelf::Building(_) | channels::SkillShelf::External { .. } => {
+            wire::SkillShelf::Building(_) | wire::SkillShelf::External { .. } => {
                 panic!("the city's stock is the library shelf")
             }
         }
         let outside = named("diagnosing-bugs");
         assert_eq!(
             outside.shelf,
-            channels::SkillShelf::External {
+            wire::SkillShelf::External {
                 index: 0,
                 path: "diagnosing-bugs/SKILL.md".to_owned(),
             },
@@ -257,10 +257,10 @@ mod tests {
         .unwrap();
 
         let mut views = Views::new(dir.path());
-        let answer = views.answer(&channels::Query::Skills {
+        let answer = views.answer(&wire::Query::Skills {
             building: lab.clone(),
         });
-        let channels::Answer::Unavailable { query } = answer else {
+        let wire::Answer::Unavailable { query } = answer else {
             panic!("rules that will not load are not a building that admits nothing");
         };
         assert_eq!(query, format!("Skills({})", lab.as_str()));

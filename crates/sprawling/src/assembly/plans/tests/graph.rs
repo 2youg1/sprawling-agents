@@ -56,15 +56,15 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
     let room = Address::parse("lab/room1").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room.clone(),
             task: "get it measured and written up".to_owned(),
             goal: "a page with a number in it, then stop".to_owned(),
@@ -161,14 +161,14 @@ fn three_ready_nodes_drive_three_runs_at_once() {
         fake_openai(&["m-local"], vec![completion("nothing left to do", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker.serve_one(crate::assembly::Posted {
-        command: channels::Command::Pursue {
+        command: wire::Command::Pursue {
             addr: Address::parse("lab").unwrap(),
-            step: channels::PursuitStep::Set {
+            step: wire::PursuitStep::Set {
                 goal: "fire the kiln".to_owned(),
             },
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"pursue"),
         },
-        reply: channels::Reply::nowhere(),
+        reply: wire::Reply::nowhere(),
     });
     let in_the_air = worker.flight.in_flight();
     worker.land_the_rest().unwrap();

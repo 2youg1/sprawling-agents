@@ -51,7 +51,7 @@ impl RunWorker {
         &mut self,
         at: Assignment,
         asked: Asked,
-        reply: channels::Reply,
+        reply: wire::Reply,
     ) -> Result<(), AxError> {
         self.room_for_new_work()?;
         self.dispatch_into_lane(at, asked.task, asked.goal, Owing::asked(reply))
@@ -67,11 +67,11 @@ impl RunWorker {
     /// drive has to know where to go (sprawling-SPEC.md 8-46-2).
     pub(in crate::assembly) fn run_command(
         &mut self,
-        command: channels::Command,
-        reply: channels::Reply,
+        command: wire::Command,
+        reply: wire::Reply,
     ) -> Result<(), AxError> {
         match command {
-            channels::Command::Dispatch {
+            wire::Command::Dispatch {
                 addr,
                 task,
                 goal,
@@ -99,14 +99,14 @@ impl RunWorker {
                 Asked { task, goal },
                 reply,
             ),
-            channels::Command::Wake {
+            wire::Command::Wake {
                 source,
                 subject,
                 body,
                 ..
             } => self.wake(&source, &subject, &body),
-            channels::Command::ConnectToolkit { toolkit, .. } => self.connect_toolkit(&toolkit),
-            channels::Command::ConfigureBuilding {
+            wire::Command::ConnectToolkit { toolkit, .. } => self.connect_toolkit(&toolkit),
+            wire::Command::ConfigureBuilding {
                 addr,
                 sandbox,
                 mcp,
@@ -122,7 +122,7 @@ impl RunWorker {
                     context_second_threshold,
                 },
             ),
-            channels::Command::ProbeEndpoint {
+            wire::Command::ProbeEndpoint {
                 name,
                 base_url,
                 dialect,
@@ -137,7 +137,7 @@ impl RunWorker {
                 credential: Credential::entered(secret, auth_header),
                 tuning: tuning_of(tuning)?,
             }),
-            channels::Command::AttachEndpoint {
+            wire::Command::AttachEndpoint {
                 name,
                 base_url,
                 dialect,
@@ -156,7 +156,7 @@ impl RunWorker {
                 },
                 &admit,
             ),
-            channels::Command::SelectModel {
+            wire::Command::SelectModel {
                 endpoint,
                 model,
                 tag,
@@ -174,71 +174,69 @@ impl RunWorker {
                     max_output_tokens,
                 },
             ),
-            channels::Command::PutSecret { realm, name, value } => self.put_secret(
+            wire::Command::PutSecret { realm, name, value } => self.put_secret(
                 &kernel::SecretRef::new(&realm, &name)?,
                 value,
                 crate::assembly::credentials::signing::Arrival::Enrolment,
             ),
-            channels::Command::CreateBuilding { addr, template, .. } => {
+            wire::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())
             }
-            channels::Command::RemoveBuilding { addr, .. } => self.remove_building(&addr),
-            channels::Command::Approve { item, verdict, .. } => {
+            wire::Command::RemoveBuilding { addr, .. } => self.remove_building(&addr),
+            wire::Command::Approve { item, verdict, .. } => {
                 // The control surface is the person's entrance, so the
                 // answerer is a human here by construction. A resident
                 // answering as a delegate arrives with the tool that
                 // lets it, and takes the same door.
                 self.answer_approval(&item, verdict, &kernel::Answerer::Human)
             }
-            channels::Command::SetAutonomy {
+            wire::Command::SetAutonomy {
                 scope, autonomy, ..
             } => self.set_autonomy(&scope, autonomy),
-            channels::Command::HandOff { item, .. } => Err(Unbuilt::HandOff(&item).not_built()),
+            wire::Command::HandOff { item, .. } => Err(Unbuilt::HandOff(&item).not_built()),
             // Nothing is written into the ledger: this is the person's
             // own layer and no run can observe it, so a record of it
             // in the city's one history would travel to every machine
             // that city is copied to.
-            channels::Command::PutPreferences { patch, .. } => accounting::person::put(patch),
-            channels::Command::PutShelved { name, .. } => {
-                Err(Unbuilt::PutShelved(name).not_built())
-            }
-            channels::Command::Pursue { addr, step, .. } => self.set_pursuit(&addr, step),
-            channels::Command::OpenSession {
+            wire::Command::PutPreferences { patch, .. } => accounting::person::put(patch),
+            wire::Command::PutShelved { name, .. } => Err(Unbuilt::PutShelved(name).not_built()),
+            wire::Command::Pursue { addr, step, .. } => self.set_pursuit(&addr, step),
+            wire::Command::OpenSession {
                 addr, carry, from, ..
             } => self.open_session(&addr, carry, from),
-            channels::Command::PutDocument {
+            wire::Command::PutDocument {
                 which, ref body, ..
             } => self.put_document(which, body),
-            channels::Command::PutSpine {
+            wire::Command::PutSpine {
                 building: ref at,
                 which,
                 ref base,
                 ref body,
                 ..
             } => self.put_spine(at, which, base, body),
-            channels::Command::Halt { scope, .. } => self.set_admission(&scope, Admittance::Halted),
-            channels::Command::Reveal { at, .. } => (self.reveal)(&self.city_root, &at),
-            channels::Command::RestoreDiscard {
+            wire::Command::Halt { scope, .. } => self.set_admission(&scope, Admittance::Halted),
+            wire::Command::Reveal { at, .. } => (self.reveal)(&self.city_root, &at),
+            wire::Command::RestoreDiscard {
                 ref restoration, ..
             } => self.restore_discard(restoration),
-            channels::Command::DoctorInstall { ref item, .. } => self.doctor_install(item),
-            channels::Command::DoctorRefresh { .. } => {
+            wire::Command::DoctorInstall { ref item, .. } => self.doctor_install(item),
+            wire::Command::DoctorRefresh { .. } => {
                 self.look_at_this_machine();
                 Ok(())
             }
-            channels::Command::Release { scope, .. } => {
+            wire::Command::Release { scope, .. } => {
                 self.set_admission(&scope, Admittance::Released)
             }
             // Cancel and Steer have a second door. `Desk::interrupt_for`
             // lifts them off the queue at the next safe point of the run
             // they name, so arriving here means no run answered - which
             // is what the refusal says, instead of naming the verb.
-            channels::Command::Cancel { run, .. } => Err(no_run_answers(
+            wire::Command::Cancel { run, .. } => Err(no_run_answers(
                 "cancel a run",
                 run,
                 "no run in flight answers to that id: it has already finished, or it never started",
             )),
-            channels::Command::Steer { run, .. } => Err(no_run_answers(
+            wire::Command::Steer { run, .. } => Err(no_run_answers(
                 "steer a run",
                 run,
                 "no run in flight answers to that id: steer one while it runs, or dispatch a new one",
@@ -246,16 +244,16 @@ impl RunWorker {
             // Four verbs the wire spells and this city cannot perform.
             // Answered one at a time rather than by a catch-all, so that
             // a Command added without an executor stops the build here:
-            // `channels::Command` is deliberately not `non_exhaustive`,
+            // `wire::Command` is deliberately not `non_exhaustive`,
             // and this match is what that decision buys.
-            channels::Command::BatchByBuilding { addr, .. } => {
+            wire::Command::BatchByBuilding { addr, .. } => {
                 Err(Unbuilt::BatchByBuilding(&addr).not_built())
             }
             // The handshake is where a peer proves who it is: `Hello`
-            // carries the pairing token and `channels::server` judges it
+            // carries the pairing token and `wire::server` judges it
             // before any command is read. A second door for the same
             // question would be a second authority on it.
-            channels::Command::Auth { .. } => Err(Unbuilt::Auth.not_built()),
+            wire::Command::Auth { .. } => Err(Unbuilt::Auth.not_built()),
         }
     }
 

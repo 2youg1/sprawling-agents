@@ -42,7 +42,7 @@ impl RunWorker {
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         self.index
             .refresh(&dir)
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         let rebuilt = runtime::fork::inherited_indexed(&self.index, &dir, origin.at_seq)?;
         self.note_lineage(
             &at.addr,

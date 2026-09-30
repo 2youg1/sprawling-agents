@@ -7,8 +7,8 @@
 
 use super::*;
 use kernel::Payload;
-use memory::Cas;
 use serde_json::{Value, json};
+use storage::Cas;
 
 fn answer(content: Value) -> ToolOutcome {
     let map = json!({ "content": content, "isError": false })

@@ -45,13 +45,13 @@ pub(in crate::assembly) fn run_id_for(job: &Locator, addr: &Address, now: TimeMs
 pub(crate) fn acp_dispatch(
     desk: &CommandDesk,
     body: &serde_json::Value,
-    pairing: channels::Pairing,
-) -> Result<channels::AcpProgress, AxError> {
-    if matches!(pairing, channels::Pairing::Absent) {
+    pairing: wire::Pairing,
+) -> Result<wire::AcpProgress, AxError> {
+    if matches!(pairing, wire::Pairing::Absent) {
         // The refusal says nothing about whether the address exists, the
         // building is real, or the token was close: an unpaired caller
-        // learns one bit. protocol-SPEC.md section 9 gives this
-        // judgement to the inbound middleware in `channels`; until that
+        // learns one bit. agent_protocols-SPEC.md section 9 gives this
+        // judgement to the inbound middleware in `wire`; until that
         // middleware refuses on the route, the door the request already
         // reached is the one place that can.
         return Err(AxError::failure(
@@ -64,8 +64,8 @@ pub(crate) fn acp_dispatch(
     // The body travels as the JSON it arrived as: `Incoming::parse` is
     // the only constructor the inbound grammar has, and a struct read
     // here first would be a second reading of the same four keys.
-    let protocol::Admitted::Dispatch { addr, task, goal } =
-        protocol::admit(protocol::Incoming::parse(body)?)?;
+    let agent_protocols::Admitted::Dispatch { addr, task, goal } =
+        agent_protocols::admit(agent_protocols::Incoming::parse(body)?)?;
     let idem = kernel::IdemKey::derive(
         &RunId::CITY,
         kernel::Seq::FIRST,
@@ -75,11 +75,11 @@ pub(crate) fn acp_dispatch(
     // listening, so there is no peer left for a later refusal to reach.
     // Saying that in the type beats a silent third meaning of `Reply`.
     desk.post(
-        channels::Command::Dispatch {
+        wire::Command::Dispatch {
             addr,
             task,
             goal,
-            mode: channels::Mode::PlanGoal,
+            mode: wire::Mode::PlanGoal,
             idem,
             // An editor drives an address it already chose.
             session: None,
@@ -88,9 +88,9 @@ pub(crate) fn acp_dispatch(
             effort: None,
             model: None,
         },
-        channels::Reply::nowhere(),
+        wire::Reply::nowhere(),
     );
-    Ok(channels::AcpProgress {
+    Ok(wire::AcpProgress {
         run: idem.to_string(),
         turns: 0,
         finished: false,

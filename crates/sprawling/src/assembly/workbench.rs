@@ -52,7 +52,7 @@ pub(in crate::assembly) struct Laying {
     /// The city's one fence at a time (`driving::lane::DriveContext`).
     pub(in crate::assembly) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// The store the lanes share (`RunWorker::lane_store`).
-    pub(in crate::assembly) store: std::sync::Arc<std::sync::Mutex<memory::Cas>>,
+    pub(in crate::assembly) store: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
     notes: super::recording::Notes,
     clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
     /// Where the ledger stood when the dispatch was staged: what the
@@ -81,9 +81,9 @@ impl Laying {
     /// # Errors
     /// Propagates a gate a dead thread left, and a repository that will
     /// not open.
-    fn open_checkpoint(&self, root: &std::path::Path) -> Result<memory::Checkpoint, AxError> {
+    fn open_checkpoint(&self, root: &std::path::Path) -> Result<storage::Checkpoint, AxError> {
         let turn = held(&self.fence_gate, "take the fence gate")?;
-        let opened = memory::Checkpoint::open(root).map_err(memory::MemoryError::into_ax);
+        let opened = storage::Checkpoint::open(root).map_err(storage::StorageError::into_ax);
         drop(turn);
         opened
     }
@@ -155,7 +155,7 @@ pub(super) struct Site {
     pub(super) predecessor: Option<RunId>,
     /// Some when the building asks for review: the tree this run writes
     /// in, which goes back whether the run finished or failed.
-    pub(super) lease: Option<memory::WorktreeLease>,
+    pub(super) lease: Option<storage::WorktreeLease>,
     pub(super) write_root: PathBuf,
     branch: Option<String>,
     /// What survives a command's output in this run, resolved from the
@@ -250,7 +250,7 @@ impl Site {
     ///
     /// Without a lease the fence is **the run's write domain**, which is
     /// the building's own subtree plus whatever else its `RULES.toml`
-    /// declares, as memory-SPEC section 8-18 states. The room would be
+    /// declares, as storage-SPEC section 8-18 states. The room would be
     /// narrower than the gate: `city::policy::write_domain` defaults to
     /// the whole building, and City Hall's residents reach every document
     /// under theirs. Anything a run wrote outside a room-sized fence would

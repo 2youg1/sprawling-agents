@@ -532,7 +532,7 @@ pub struct VaultFellBack { pub component: String,     // 探针写 vault
                            pub fallback: String,      // 探针写 session-memory
                            pub persistence: String,   // gateway::Persistence 的自有拼法
                            pub reason: String }
-// channels::note_of 只把 Refused 记成回合上的 Note::Refused；VaultFellBack 没改变任何回合，不出 note。
+// wire::note_of 只把 Refused 记成回合上的 Note::Refused；VaultFellBack 没改变任何回合，不出 note。
 
 pub struct ToolCalled { pub id: String, pub name: ToolName, pub args: Payload,
                         pub subject: Option<String> }   // 键缺席读作 None
@@ -566,7 +566,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 结构按族住 `crates/kernel/src/event/record/` 下；哪个 kind 有结构，以那里的类型为准。
 `gate_denied`、`budget_limit` 的载荷是平铺的 `AxError`，`approval_requested` 的是 `ApprovalItem`，
 `result_offloaded` 的是 `runtime::sieve::ResultOffloaded`（它平铺筛子的账，筛子在 runtime），不另立结构；
-`watchdog_fired` 的读方 `channels::note_of` 把 `BackOff` 读成它等待的那次拒绝（码与主语照录），
+`watchdog_fired` 的读方 `wire::note_of` 把 `BackOff` 读成它等待的那次拒绝（码与主语照录），
 `Steer`／`Freeze` 不出 note——纠偏与冻结各有自己的行；
 `pr_merged` 借 `CommitAttribution` 记「谁做的这次提交」，其余键由调用点手写。
 没有结构的 kind 由调用点手写读取。
@@ -576,7 +576,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
   `{"10":"a","2":"b"}` 在账本的 `BTreeMap` 字节序下是 `"a"`，
   在浏览器的自有属性序下是 `"b"`。这张优先键表（`path`／`addr`／`program`／`arm`，
   都不在时取载荷键序里的第一个字符串）只有一处，即 `ToolCalled::subject_of`；
-  写方 `runtime::turn::wave` 调它一次，`channels` 不再持有第二份。
+  写方 `runtime::turn::wave` 调它一次，`wire` 不再持有第二份。
   `None` 是这次调用的参数没有指名任何东西，是一个真实状态而不是失败。
 
 `ApprovalResolved.verdict` 是 `Ruling` 本身而不是 `format!("{verdict:?}")` 的小写词：
@@ -683,7 +683,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 | 治理与设施 | `governed_document_written` | record-only（人写下治理这座城的三份文件之一，载荷携 which 与字节数，恒不携正文——正文在盘上，账本记的是这件事发生过） |
 | 治理与设施 | `spine_document_written` | record-only（人写下某楼自己的 spine 文档之一，载荷携 building、which 与字节数，恒不携正文。与上一行分开是因为这几份有第二个写者，写入携起手正文并可能被拒） |
 | 治理与设施 | `rules_changed` | record-only（一次派发所站的规则文档之一换了内容（城的 `CONFIG.toml`，楼的 `CONFIG.toml` 与 `RULES.toml`）：载荷携 scope、which（`RULES.toml`／`CONFIG.toml`，枚举 `GoverningDocument`）、前后两枚摘要与字节数，恒不携正文。在准入（`agree_to_work`）之后、第一次读规则之前落账——先落账再生效；准入拒绝的派发与不存在的楼不记。`before` 缺席即开账行；本行的 `after` 等于同一文档下一行的 `before`，断链本身说明有人绕过一切门改了文件） |
-| 治理与设施 | `toolkit_link_opened` | record-only（人请求接入一个外部应用，载荷只携 slug。**恒不携站位**——那是关于此刻的事实（channels-SPEC §8-31）；**恒不携 consent URL**——那是一张能力凭证，记进可重放的账本等于发给每一个重放的人） |
+| 治理与设施 | `toolkit_link_opened` | record-only（人请求接入一个外部应用，载荷只携 slug。**恒不携站位**——那是关于此刻的事实（wire-SPEC §8-31）；**恒不携 consent URL**——那是一张能力凭证，记进可重放的账本等于发给每一个重放的人） |
 | 供应商与模态 | `embedding_called` | record-only（一次嵌入调用入账：模型、请求多少条、回来多少个向量、调用方要的维度与 provider 自报的 token。向量本身不在此处——与 `model_called` 不携请求体同理，它是可从记录的输入重算的派生值，存两份就是同一件事有两个家） |
 | 供应商与模态 | `rerank_called` | record-only（同形：passages 与 ranks 各记一个数。服务端排好的名次就是答案，不在本城重排，故不在此处再写一份序） |
 | 顾问 | `adviser_asked` | record-only（问了一次判断：问题种类（noul／score／choice）与对象。问本身不决定任何字节） |
@@ -757,7 +757,7 @@ pub const SECRET_SHAPES: [SecretShape; N] = [ /* 公开 provider 令牌形状，
 「本构建打得开哪些账本」的第二个家。四态穷尽：`Current`＝本构建所写；`Older`＝1 以上、
 低于本版本，读得开（账本只追加，旧行仍是它的历史）；`Ahead`＝更新的构建所写，整条拒读
 而不部分解读；`NotAVersion`＝低于任何构建写过的首版本（含 `0`），是损坏或外来行而非旧行。
-拒读理由由此说版本而不说链，`memory::jsonl::open` 的两个读方对 v0 给同一套说法。
+拒读理由由此说版本而不说链，`storage::jsonl::open` 的两个读方对 v0 给同一套说法。
 
 ### 8-8 kernel::consts_policy
 
@@ -810,7 +810,7 @@ pub const IMAGE_QUALITY: ImageQuality = ImageQuality::new(100);            // �
 
 两个数都是「一句拒绝说得出、一个人改得动」的上限，与 `WORKTREE_MAX_BYTES` 同口径。2 MiB 取自两家 provider 都能收下的 base64 体量（base64 膨胀 4/3，2 MiB 上线约 2.7 MiB），4 张取自一回合窗口预算：再多就是把窗口花在像素上而不是任务上。
 
-`WORKTREE_MAX_BYTES` 是上限而非磁盘余量探测：余量是一台机器当下的事实，上限则是一句拒绝说得出、一个人改得动的数；建树前校，故一座过大的城是被拒而不是被拷到一半（`memory::worktree`）。
+`WORKTREE_MAX_BYTES` 是上限而非磁盘余量探测：余量是一台机器当下的事实，上限则是一句拒绝说得出、一个人改得动的数；建树前校，故一座过大的城是被拒而不是被拷到一半（`storage::worktree`）。
 
 `AUTONOMY_DEFAULT` 与 `CLOCK_STAMP_DEFAULT` 带类型（分别是 `Autonomy` 与 `ClockStampGranularity`）；`IMAGE_MAX_BYTES`／`IMAGES_PER_TURN`／`IMAGE_QUALITY`／`CLOCK_ZONES_MAX` 带 `policy_limit` 类型（§8-73），其余为数。`SUBAGENT_CTX_LOCK_DEFAULT` 永不落地——子代理上下文锁不存在。
 
@@ -916,7 +916,7 @@ pub struct BudgetUse { pub usd: UsdMicros, pub tokens: Tokens }    // serde（Pr
 **kernel 不设花费闸**：没有预算上限、花费判定或上下文锁的类型，也没有花费门。
 
 - **理由是刹车只留一个**：`Halt` 停一个范围并终止该范围内的后台成员（`runtime::backlog::halt` 是承兑点）。一座必须停下的城由人说停，而不是由一个没人能在事前算准的上限替他说停。
-- **留下的是记账而不是闸**：`BudgetUse` 与 `memory::attribution` 的五路归因、成本页原样保留。**报告花了多少**与**事前不许花**是两件事，kernel 只做前者。
+- **留下的是记账而不是闸**：`BudgetUse` 与 `storage::attribution` 的五路归因、成本页原样保留。**报告花了多少**与**事前不许花**是两件事，kernel 只做前者。
 - **不在此列**：`xtask/budgets.toml`（门的价目册，同名异物）与 `Fuel`（wasm 客的停机保证）。
 - `BudgetUse` 保留 serde，因为它是 `Progress::Unplanned` 与 `Completion::Evidence` 的载荷字段，账本里已有历史行读得回去。
 - kani：`admit_spend` 的 harness 随函数删除；`crates/kernel` 的 harness 总数与 CI 所证条数因此各少一条，被证的 `budget` 一条随函数一起消失（ARCHITECTURE §11 的数字同集更新）。**这里记的是那次变更当时的读数，不是今天的基数**；今天树上有几条、CI 证哪几条，以 `cargo xtask proof --list` 为准。
@@ -933,7 +933,7 @@ pub enum Admission { Admit, Shed { reason: ShedReason } }
 pub fn admit(stats: &QueueStats, item: &ItemMeta) -> Admission;
 ```
 
-- 削峰是 city-wide 准入姿态：同一函数服务 Signal 队列与 fd 预留（capacity 语义由调用方赋）；队列与计数器住 memory::queue（S3）与调用方。
+- 削峰是 city-wide 准入姿态：同一函数服务 Signal 队列与 fd 预留（capacity 语义由调用方赋）；队列与计数器住 storage::queue（S3）与调用方。
 - kani：全函数无溢出；单调性——同 capacity/cost 下 depth 更小恒不更难 Admit。
 - 饱饱不饿死（活性）属 citysim liveness（P2），非本函数可证。
 
@@ -979,7 +979,7 @@ pub fn free_space_floor(volume_bytes: u64) -> u64;
 - 内存紧：`queued_runs > 0`。排队由装配层按可用内存决定（运行因一个也装不下而等待），这里只把它说出来。
 - CPU 被占满：`schedule_delay > CPU_SATURATED_DELAY`，即一帧（60 Hz）——人开始看得见的延迟；它是感知常数，不随机器类别调。
 - 只有盘快满停止接新活：盘慢与 CPU 满时接活只会变慢，不会丢；内存紧已由排队处理。`admit_work` 只读卷的两个数，因为受理新活的入口只该为它付一次读卷，而不是整份读数；拒绝带着 `Degradation::DiskLow`，入口据它的 `recovery()` 告诉人至少腾出多少。
-- 写盘失败时账本不坏、重启可恢复，由 memory 承担（memory-SPEC 8-1）：失败的一波由 `jsonl::unwind` 把段退回波前长度，进程接着写也不会写在半行之后；掉电留下的撕裂尾由 open 截到最长有效前缀。本模块不复述。
+- 写盘失败时账本不坏、重启可恢复，由 memory 承担（storage-SPEC 8-1）：失败的一波由 `jsonl::unwind` 把段退回波前长度，进程接着写也不会写在半行之后；掉电留下的撕裂尾由 open 截到最长有效前缀。本模块不复述。
 - 生产的调用方：人发来的 `Dispatch` 在写下任何东西之前经 `admit_work` 读一次城所在卷（sprawling-SPEC 8-94）。未落地：事实条与 doctor 的显示；`Wake` 等不经人的入口；`ResourceReadings` 其余四项的生产填写者——`bin::monitor::Sample` 没有 fsync 中位数与调度延迟，它的 `durable_lag` 是条数而本模块要的是等待时长，且监视器只在有人看时采样，不能作为判定的唯一来源（sprawling-SPEC 8-90 决定 1）。
 
 ### 8-14 kernel::stall
@@ -1473,7 +1473,7 @@ pub enum ContentBlock { /* …既有五变体… */
     ToolResult { tool_use_id, content, is_error, #[serde(default)] attachments: Vec<ImageRef> } }
 ```
 
-- **账上存 locator 与整数尺寸，恒不存字节**。`ImageRef.locator` 是一条 `cas:` Locator，字节住 `memory::cas`；Ledger 载荷因而仍只有整数与短字符串，浮点禁令与载荷体量规则两条同时成立。宽高用 `u32` 而非比例：像素数是整数事实。
+- **账上存 locator 与整数尺寸，恒不存字节**。`ImageRef.locator` 是一条 `cas:` Locator，字节住 `storage::cas`；Ledger 载荷因而仍只有整数与短字符串，浮点禁令与载荷体量规则两条同时成立。宽高用 `u32` 而非比例：像素数是整数事实。
 - **`ImageRef` 只定义一次**。Image 块与 ToolResult 的 `attachments` 是同一个值——四个字段一字不差——所以块写成 `Image(ImageRef)`（serde 内部标签，线上仍是 `{"kind":"image", "locator":…, "media_type":…, "width":…, "height":…}` 的扁平形），而不是把四个字段抄两遍。抄两遍就是一个概念两个权威，日后加一个字段要改两处。
 - **`attachments` 带 `#[serde(default)]`**：既有 Ledger 里每一条 `tool_result` 都没有这个键，缺席即空表，所以每一份历史照旧重放。这是「只加不改」在 wire 面的具体形式。
 - **`ImageType` 封闭而非 `non_exhaustive`**：它不是 provider 送来的开放词汇，而是城内决定收哪几种图；封闭枚举让 `mime()` 的 `match` 穷尽，加一种图必须同时回答「它的 MIME 是什么」。
@@ -1505,7 +1505,7 @@ impl<T: zeroize::Zeroize> Sealed<T> {
 }
 ```
 
-- **`SecretRef` 只有一个构造点**。`secret:<realm>/<name>` 是一段文法，故拼接只在 `SecretRef::new` 里发生一次：`parse` 拆出两段后也交给它，两半因此共用同一个拒词；段允许的字符集（字母、数字、`-`、`_`、`.`）也只写在 `new` 里，名字里的 `/` 由它拒绝而不另立一条规则。`channels` 的录入口、`sprawling` 的签入面与到期表、以及客户端的表单曾各自拼出这段文本再交给 `parse` 读回——一段文法多处拼，改一次就分岔，且拼出来的文本本城可能解析不回来。
+- **`SecretRef` 只有一个构造点**。`secret:<realm>/<name>` 是一段文法，故拼接只在 `SecretRef::new` 里发生一次：`parse` 拆出两段后也交给它，两半因此共用同一个拒词；段允许的字符集（字母、数字、`-`、`_`、`.`）也只写在 `new` 里，名字里的 `/` 由它拒绝而不另立一条规则。`wire` 的录入口、`sprawling` 的签入面与到期表、以及客户端的表单曾各自拼出这段文本再交给 `parse` 读回——一段文法多处拼，改一次就分岔，且拼出来的文本本城可能解析不回来。
 - **扫描两侦测器**：①形状表（SECRET_SHAPES：前缀＋字符集＋长度窗）为主；②熵阈为辅——无前缀命中的 token 段（base62/base64url 字符连段，长度 ≥ `ENTROPY_SPAN_MIN_BYTES=20`，pub(crate) 内部事务）且每字符熵 ≥ `SECRET_ENTROPY_MIN`（3.5 bits/char）。两集合并，重叠段归形状命中（provider 信息更多）。
 - **hex 段是第三侦测器 `secret::hex_run`**：纯 hex 字母表的段过不了②的混合字母表门，而随机 hex 密钥（HMAC key、以 hex 打印的 token）与本城的 blake3 hex64、git hex40 oid 同为均匀分布，**熵读数分不开二者**——只看熵的阈值要么漏掉 hex 密钥，要么把每行 `git log` 与每个 ledger 哈希都报成密钥。故 hex 段只在它是一个凭据名的值时才报：段前紧邻 `<名字>` + 可选空白与引号 + `=` 或 `:` + 可选空白与引号，且名字过 `names_a_credential`；此外段长 ≥ `HEX_SPAN_MIN_BYTES`（32）且每字符熵 ≥ `HEX_ENTROPY_MIN_MILLIBITS`（3100 millibit）。取舍：放弃了「hex 字母表单独一道熵阈、不看标签」——它在长度 40 上要么阈值高到漏报（均值 3.69 bit），要么把全部哈希报出。重开条件：本城的哈希或 oid 改为不以裸 hex 出现在文本里。
 - **熵的整数化**：kernel 禁浮点——香农熵以 millibit（1/1000 bit）计：定点 log2（shift-and-square，10 位小数位，循环界常数）；判式 `mb·den ≥ num·1000`（checked）。kani：任意输入终止、无 panic、无溢出。
@@ -1541,7 +1541,7 @@ pub fn forecast(arm: &ExecArm) -> DiscardForecast;
 
 - **decide 表**：Unplanned → Deny{NoRestoration}（无还原不可构造，使 Planned 恒有 plan）；Planned 且 taint 非空 → Deny{Tainted}（恒，无视规模）；余 Allow。判序固定，确定可重放。
 - **规模与归属不改答（§12「默认 YOLO」）**：一次 Planned 删除恒带 `Restoration`，因此恒可回滚；文件数、字节数、别人登记过的 asset 都不让删除停下来问人。删除的上界另有家：write domain 决定一个 resident 够得到哪些文件，registry 保存把 asset 放回去所需的凭据。
-- **forecast 三臂预判力递减**：Program 读 `(path, args)` 整体——basename ∈ {rm, rmdir, del} 或 git 携 reset --hard/clean 或 find 携 -delete；Python/Shell 子串表（rm 、rmdir、-delete、git reset --hard、git clean、os.remove、shutil.rmtree、os.unlink；Shell 另含 `>` 截断重定向）——可被混淆绕过，恒保守；git 栅栏兜底（`memory::checkpoint`）。子串表是 pub(crate) 数据面。
+- **forecast 三臂预判力递减**：Program 读 `(path, args)` 整体——basename ∈ {rm, rmdir, del} 或 git 携 reset --hard/clean 或 find 携 -delete；Python/Shell 子串表（rm 、rmdir、-delete、git reset --hard、git clean、os.remove、shutil.rmtree、os.unlink；Shell 另含 `>` 截断重定向）——可被混淆绕过，恒保守；git 栅栏兜底（`storage::checkpoint`）。子串表是 pub(crate) 数据面。
 - 同文件 `#[test]` 守 Discard 门 fail-closed：Unplanned 恒 Deny；Tainted 恒 Deny（kani 不接手，理由见 §2）。
 
 ### 8-27 kernel::gate
@@ -1620,8 +1620,8 @@ pub enum How   { Added, Modified, Deleted, Renamed { from: String } }
 pub struct FileChange { pub path: String, pub how: How, pub lines: Lines }
 ```
 
-**为什么在 kernel 而不在产地**：三处需要这个形状——`memory::changes` 从两棵树上读出它、
-`channels::wire` 携它、客户端画它——而 `channels` 看不见 `memory`。定义两份再互相转换，
+**为什么在 kernel 而不在产地**：三处需要这个形状——`storage::changes` 从两棵树上读出它、
+`wire::frames` 携它、客户端画它——而 `wire` 看不见 `storage`。定义两份再互相转换，
 就是「一个文件变更是什么」有两个定义，而漂开的总是没人看的那个。这与 `Restoration` 当初落在这里
 是同一条理由。
 
@@ -1684,7 +1684,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 ```
 
 - **验收标准是「写某路径即提权」。** `.git` 里放着 hooks（写下一个 hook 就是在下一次 git 操作时执行自己的代码）、config（`core.fsmonitor` 等键即执行）、refs（栅栏引用 `refs/sprawling/runs/<run>/<seq>` 是 run 自己的记账）与对象库（`file_discarded` 的恢复地址指向的对象）。一个写得了 `.git` 的 run 既能提权也能改自己的账，与 `.sprawling` 同罪，故同门。
-- **并入保留谓词，不另立写目标名单。** 写域构造（`WriteDomain::new`）、写域判定（`admits`／`reaches`）、读路径（`runtime::tools::chosen_path`）、`SessionName`、`memory::reserved` 全部已经问这一个谓词（或这一个名单），名单一扩即全体收紧；另立一份「写目标名单」就是给同一个问题两个家。
+- **并入保留谓词，不另立写目标名单。** 写域构造（`WriteDomain::new`）、写域判定（`admits`／`reaches`）、读路径（`runtime::tools::chosen_path`）、`SessionName`、`storage::reserved` 全部已经问这一个谓词（或这一个名单），名单一扩即全体收紧；另立一份「写目标名单」就是给同一个问题两个家。
 - **读面一并收紧，这是有意的。** `is_reserved` 是只许多拒的门（8-28）：`read`／`search` 对 `.git` 由可读变拒读，只多拒不错放；`search` 不再另写一行跳过 `.git` 的字面量。
 - **`SessionName` 的保留名判定问 `is_reserved`**：逐字节比较会让 `.SPRAWLING` 当房间名建出 Windows 别名目录；问 `is_reserved`，名单与 ASCII 折叠就与地址谓词同源。
 - **被否的另一条路：只在写判定处加 `.git`，读判定不动。** 那要维护「写名单」「读名单」两份名单、两个家，而读 `.git` 只会把对象库字节当普通文件递给模型，没有任何读者需要它。
@@ -1698,8 +1698,8 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 - `E_LOCATOR_INVALID`：同上；且与宽松接受严格互斥（fail-closed 是策略）。
 - `E_VERSION_CONFLICT`（verdict 映射在 `runtime::tools::edit`）：不可定义掉——乐观并发的存在理由就是冲突可发生。
 - `E_LOG_VERSION_UNSUPPORTED`／`E_CAS_CORRUPT`：住装载期白名单，产生地在 memory/runtime（见各自 SPEC）。
-- `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；memory 的 Io 映射已改正（memory-SPEC §12）。
-- `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 memory 的写者锁先于一切读写定义掉（memory-SPEC §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
+- `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；memory 的 Io 映射已改正（storage-SPEC §12）。
+- `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 memory 的写者锁先于一切读写定义掉（storage-SPEC §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
 
 其余的码（逐码答「能否定义掉」）：
 
@@ -1803,7 +1803,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 ### 12.8 定规：受保护元数据名单只有 kernel::address 一个家
 
-`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`memory::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是内存侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 memory 的别名族规则承担（memory-SPEC 8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
+`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`storage::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是内存侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 memory 的别名族规则承担（storage-SPEC 8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
 
 ## 13 依赖选型
 
@@ -1824,7 +1824,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 ## 15 影响面
 
-memory::jsonl／memory::cas／runtime::replay／runtime::fork／citysim 全部消费本 crate 的公开面；全部 kernel 决断模块建立在 error/event 之上。公开面变更须与本文同一变更集（apisync 机器看守）。
+storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部消费本 crate 的公开面；全部 kernel 决断模块建立在 error/event 之上。公开面变更须与本文同一变更集（apisync 机器看守）。
 
 ## 16 测试与约束
 
@@ -2003,7 +2003,7 @@ pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &Taint
 
 **为什么不放进 `result` 里**：`result` 是给模型读的文本载荷，一个埋在 JSON 里的 `cas:` 定位符对模型永远只是一串字。要让模型**看见**这张图，它必须成为 `ContentBlock::ToolResult.attachments` 的一员——那是 `ContentBlock::Image` 备好的位置，而 `runtime::turn::wave` 是唯一一处把 `ToolOutcome` 变成 `ContentBlock` 的地方，于是这个字段是那条路上唯一缺的一段。
 
-**字节不在这里**：`ImageRef` 携定位符与两个整数边长，字节住 `memory::cas`，出线前的最后一刻才由 `gateway::endpoint` 取出来编码。账本因此仍是一份人能读的文件。
+**字节不在这里**：`ImageRef` 携定位符与两个整数边长，字节住 `storage::cas`，出线前的最后一刻才由 `gateway::endpoint` 取出来编码。账本因此仍是一份人能读的文件。
 
 **唯一的生产者是 `browser` 工具的 `screenshot`**（`bin::browser_tool`）；其余每一个工具显式写空表，因为「没有图」是一句要说出口的话，不是一个可以省略的默认。
 
@@ -2046,7 +2046,7 @@ pub trait Ledger {
 }
 ```
 
-- **为什么端口要长这一只手**：一次持久写的代价是一道磁盘屏障，而屏障的价钱与骑在它上面的记录条数无关，真正的写只占其中一小部分。手上已经攥着一波的调用方按条交付，就为每一条付一道屏障。`memory::JsonlLedger` 覆写它为一波一屏障，`bin::assembly::relay` 按波调它。
+- **为什么端口要长这一只手**：一次持久写的代价是一道磁盘屏障，而屏障的价钱与骑在它上面的记录条数无关，真正的写只占其中一小部分。手上已经攥着一波的调用方按条交付，就为每一条付一道屏障。`storage::JsonlLedger` 覆写它为一波一屏障，`bin::assembly::relay` 按波调它。
 - **默认实现是诚实的**：逐条 `append`，任何没有批量能力的存储照此就是正确的，不必为了满足端口去假装合并。
 - **契约逐元素成立**：答 `Ok` 即整波已落盘，refs 按给入顺序回来。第一条拒绝结束整波，其前的记录可能已经落盘——这与单条 `append` 在它后面那条失败时给出的承诺完全一样。
 - **否决「显式屏障动作」**：让 `append` 只写不同步、另给一个 flush 动作，会让一条已经发出的 `EventRef` 指向一条可能还不存在的历史，而那正是这个类型存在的全部意义。
@@ -2137,7 +2137,7 @@ impl CityLayout {
 3. **`RESERVED_PREFIX` 仍住在 `kernel::address`，本模块引用它。** 它是地址文法的一部分——`is_reserved` 是写域与读路径共用的谓词（8-2、8-55）——而不是一条布局规定。布局这一侧只决定「什么落在保留子树里」：治理一个 scope 的文件（`CONFIG.toml`、`FILTERS.toml`、`skills`）落在该 scope 的 `.sprawling/` 下，于是没有任何写域够得到它们；居民自己写的文件（`JOB.md`、`Handoff.md`、`URBANITE.md`、`Archive/`）落在明处。这条摆放规则由单元测试逐个方法核对，而不是靠注释重申。
 4. **逐段 push 而不是整串 join。** 一个地址在 Windows 与在 Linux 必须落成同一个目录树；整串 join 把 `/` 交给平台去解释，逐段 push 不给它这个机会。
 5. **一个落点一个方法，不是便利方法。** 少一个落点，就有一处调用点继续自己拼，于是本模块不再是唯一权威。后续新增一类文件时，先在此加方法与常量，再写调用点。
-6. **session 切片的路径不在此处。** 切片是账本的可弃投影，只有 `memory::sessions` 一个写者、没有读者；它的目录名与路径推导是该模块的私有项（memory-SPEC 8-24），于是「别处点名这条路」在编译期就写不出来，不必再靠文本扫描去拦。
+6. **session 切片的路径不在此处。** 切片是账本的可弃投影，只有 `storage::sessions` 一个写者、没有读者；它的目录名与路径推导是该模块的私有项（storage-SPEC 8-24），于是「别处点名这条路」在编译期就写不出来，不必再靠文本扫描去拦。
 7. **`of_ledger` 是 `ledger` 的逆，为「只拿到账本目录」的写者而存在。** 账本的写者手里只有它打开的那一个目录，而切片落在城根之下，故城根必须能从这一个输入反推回来；逆运算住在具名常量所在的同一模块里，任何调用点都不许用 `parent().parent()` 重新拼一遍。不是 `ledger()` 形状的目录不是城（夹具、bundle 的校验台、直接打开的存储），回答 `None`。
 
 ### 8-72 `kernel::retries`：失败的调用再试几次（形状 2 值类型）
@@ -2185,7 +2185,7 @@ impl CityLayout {
 
 **队列（其余政策值逐个 newtype 化时从这里取）**：
 
-- `WORKTREE_MAX_BYTES`：有拒因，但今天拒因是 `MemoryError::WorktreeBusy` 的 detail（两个数都在里面），迁它的前提是那句 detail 也从类型派生。
+- `WORKTREE_MAX_BYTES`：有拒因，但今天拒因是 `StorageError::WorktreeBusy` 的 detail（两个数都在里面），迁它的前提是那句 detail 也从类型派生。
 - `OUTPUT_CEILING_DEFAULT`：合法域（非零）今天是两个家——`consts_policy` 的测试与 `gateway::provider::ceiling` 的 `Ceiling::new(..)?`；铸成 `Ceiling` 实例即一个家。
 - `SANDBOX_FUEL_DEFAULT`：`SandboxLimits.fuel` 是裸 `u64`，域未设。
 - `STARTUP_BUDGET_TOKENS`／`BYTES_PER_TOKEN`／`LOOP_REPEAT_THRESHOLD`／`OFFLOAD_MIN_BYTES`／`DRAFT_HELD_ESCALATE`／`EDIT_WAR_FREEZE`／`DISCARD_FILES_MAX`／`DISCARD_RETENTION_DAYS`：算术输入或判定输入，无拒因句式，保持裸数即是正确形状。

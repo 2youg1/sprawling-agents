@@ -54,27 +54,27 @@ fn setting_autonomy_back_leaves_the_city_where_it_started() {
     let mut worker = a_city(dir.path());
     let resident = kernel::ResidentId::new("lab/room1").unwrap();
 
-    let delegated = channels::Command::SetAutonomy {
-        scope: channels::HaltScope::City,
+    let delegated = wire::Command::SetAutonomy {
+        scope: wire::HaltScope::City,
         autonomy: kernel::Autonomy::Delegate(resident),
         idem: key(b"delegate"),
     };
-    let back = channels::Command::SetAutonomy {
-        scope: channels::HaltScope::City,
+    let back = wire::Command::SetAutonomy {
+        scope: wire::HaltScope::City,
         autonomy: kernel::Autonomy::Owner,
         idem: key(b"back"),
     };
-    let again = channels::Command::SetAutonomy {
-        scope: channels::HaltScope::City,
+    let again = wire::Command::SetAutonomy {
+        scope: wire::HaltScope::City,
         autonomy: kernel::Autonomy::Owner,
         idem: key(b"back-again"),
     };
 
     worker.handle(delegated).unwrap();
     worker.handle(back).unwrap();
-    let once = sprawling::ask(dir.path(), &channels::Query::Governance).unwrap();
+    let once = sprawling::ask(dir.path(), &wire::Query::Governance).unwrap();
     worker.handle(again).unwrap();
-    let twice = sprawling::ask(dir.path(), &channels::Query::Governance).unwrap();
+    let twice = sprawling::ask(dir.path(), &wire::Query::Governance).unwrap();
 
     assert_eq!(
         once, twice,
@@ -95,8 +95,8 @@ fn choosing_a_model_needs_the_endpoint_the_earlier_choice_named() {
     let mut worker = a_city(dir.path());
 
     let err = worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("nowhere").unwrap(),
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("nowhere").unwrap(),
             model: "m-local".to_owned(),
             tag: kernel::ModelTag::Main,
             context_tokens: None,

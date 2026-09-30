@@ -20,7 +20,7 @@ use crate::doctor::{PATIENCE, Platform, ThisMachine};
 use std::path::Path;
 
 use kernel::{AxError, EventKind, Locator};
-use memory::{Cas, JsonlLedger, OpenReport};
+use storage::{Cas, JsonlLedger, OpenReport};
 
 /// What opening the ledger repaired before this worker read a line of
 /// it (sprawling-SPEC.md 8-102). The ledger records the cut as
@@ -104,7 +104,7 @@ impl RunWorker {
             &kernel::layout::CityLayout::new(city_root).ledger(),
             accounting::Clock::now(&SystemClock)?,
         )
-        .map_err(memory::MemoryError::into_ax)?;
+        .map_err(storage::StorageError::into_ax)?;
         RunWorker::over(city_root, vault, log, opened)
     }
 
@@ -144,9 +144,9 @@ impl RunWorker {
     ) -> Result<Self, AxError> {
         let now = accounting::Clock::now(&SystemClock)?;
         // Holding the one writer is what makes every worktree lock a
-        // lock nobody alive holds (memory-SPEC 8-9).
-        memory::Worktrees::lift_abandoned_leases(city_root, &ledger)
-            .map_err(memory::MemoryError::into_ax)?;
+        // lock nobody alive holds (storage-SPEC 8-9).
+        storage::Worktrees::lift_abandoned_leases(city_root, &ledger)
+            .map_err(storage::StorageError::into_ax)?;
         // A rule the ignore table gained since a building was raised
         // reaches it now: no working record of this city enters git,
         // however old the building (city-SPEC.md 12.5).
@@ -173,10 +173,10 @@ impl RunWorker {
             );
         }
         let cas = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         let lane_store = std::sync::Arc::new(std::sync::Mutex::new(
             Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
-                .map_err(memory::MemoryError::into_ax)?,
+                .map_err(storage::StorageError::into_ax)?,
         ));
         // The one place a `Delegator` is minted in this process, which
         // is what makes "a sub-agent cannot set the city working" a
@@ -211,7 +211,7 @@ impl RunWorker {
             doorstep: Doorstep::opened(entrance),
             origins,
             flight: Flight::open(crate::monitor::memory::read),
-            index: memory::LedgerIndex::empty(),
+            index: storage::LedgerIndex::empty(),
             warm: super::keeping_warm::Kept::default(),
             models: Box::new(GatewayModels),
             connectors: std::sync::Arc::new(super::mcp::Residents::default()),
@@ -234,14 +234,14 @@ impl RunWorker {
     /// not go is told and left for the next open, because one stuck
     /// directory is no reason to keep the person out of their city.
     fn sweep_abandoned_trees(&mut self) {
-        let told = match memory::Worktrees::sweep_abandoned(&self.city_root, &[]) {
+        let told = match storage::Worktrees::sweep_abandoned(&self.city_root, &[]) {
             Ok(swept) if swept.is_empty() => return,
             Ok(swept) => format!(
                 "took back {} worktree(s) a crash left behind: {}",
                 swept.len(),
                 swept
                     .iter()
-                    .map(memory::WorktreeName::as_str)
+                    .map(storage::WorktreeName::as_str)
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
@@ -279,7 +279,10 @@ impl RunWorker {
         // saying the next session must read them.
         let mut must_read = Vec::new();
         let bytes = city_segment(&self.city_root)?.bytes;
-        let hash = self.cas.put(&bytes).map_err(memory::MemoryError::into_ax)?;
+        let hash = self
+            .cas
+            .put(&bytes)
+            .map_err(storage::StorageError::into_ax)?;
         must_read.push(Locator::cas(hash));
         let standing = self.ledger.position();
         let (overview, context, next_step) = match why {
@@ -360,7 +363,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         init_city(dir.path()).unwrap();
         let segment =
-            memory::ledger_segments_at(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            storage::ledger_segments_at(&kernel::layout::CityLayout::new(dir.path()).ledger())
                 .unwrap()
                 .pop()
                 .unwrap();
@@ -415,8 +418,8 @@ mod tests {
             .unwrap();
         repo.commit(Some("HEAD"), &signature, &signature, "base", &tree, &[])
             .unwrap();
-        let trees = memory::Worktrees::open(dir.path()).unwrap();
-        let name = memory::WorktreeName::parse("run-1").unwrap();
+        let trees = storage::Worktrees::open(dir.path()).unwrap();
+        let name = storage::WorktreeName::parse("run-1").unwrap();
         drop(trees.claim(&name, &[]).unwrap());
 
         drop(

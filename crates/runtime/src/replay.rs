@@ -17,7 +17,7 @@
 use std::path::Path;
 
 use kernel::{Address, AxCode, AxError, B3Hash, EventRecord, EventRef, Seq};
-use memory::{CheckedLine, LedgerIndex, LineCheck, Located};
+use storage::{CheckedLine, LedgerIndex, LineCheck, Located};
 
 /// One verified line: a typed record with its ref echo, or an explicitly
 /// ignorable line from a future vocabulary.
@@ -52,7 +52,7 @@ impl VerifiedLedger {
 }
 
 /// A2: offline chain verification over raw lines, through the one
-/// per-line check `memory::LineCheck` owns.
+/// per-line check `storage::LineCheck` owns.
 pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError> {
     let mut check = LineCheck::at_genesis();
     let verified = lines
@@ -85,9 +85,9 @@ pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError> {
 /// holds, and a city that has been opened but never written to has a
 /// ledger directory and no segment in it. Telling the two apart is the
 /// job of whoever took the path from a person - `sprawling replay` does
-/// it with `memory::ledger_segments_at` (sprawling-SPEC section 12).
+/// it with `storage::ledger_segments_at` (sprawling-SPEC section 12).
 pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError> {
-    let lines = memory::read_raw_lines_at(dir).map_err(memory::MemoryError::into_ax)?;
+    let lines = storage::read_raw_lines_at(dir).map_err(storage::StorageError::into_ax)?;
     verify_lines(lines)
 }
 

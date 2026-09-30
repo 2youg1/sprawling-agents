@@ -5,7 +5,7 @@
 
 //! One file's patch text between two checkpoints.
 //!
-//! **This is the separate request `memory::changes` says it is not.**
+//! **This is the separate request `storage::changes` says it is not.**
 //! That module answers which files moved and by how much, and its header
 //! states why patch text is not its business: patch text is file content
 //! on a socket, so it has to be asked for one file at a time and put
@@ -27,7 +27,7 @@ use std::path::Path;
 use kernel::GitOid;
 
 use crate::changes::Head;
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 /// One line of patch text, as a reader may see it.
 ///
@@ -57,8 +57,8 @@ pub struct FilePatch {
     pub withheld: Vec<Withheld>,
 }
 
-fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> MemoryError {
-    move |err| MemoryError::Checkpoint {
+fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
+    move |err| StorageError::Checkpoint {
         op,
         detail: err.message().to_owned(),
     }
@@ -83,9 +83,9 @@ pub fn of_file(
     base: GitOid,
     head: Head,
     path: &str,
-) -> Result<FilePatch, MemoryError> {
+) -> Result<FilePatch, StorageError> {
     let repo = git2::Repository::open(city_root).map_err(git_err("open the city repository"))?;
-    let find = |oid: GitOid| -> Result<git2::Tree<'_>, MemoryError> {
+    let find = |oid: GitOid| -> Result<git2::Tree<'_>, StorageError> {
         let parsed =
             git2::Oid::from_str(&oid.to_string()).map_err(git_err("parse a checkpoint"))?;
         repo.find_commit(parsed)

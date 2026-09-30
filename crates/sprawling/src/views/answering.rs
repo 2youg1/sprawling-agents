@@ -44,9 +44,9 @@ impl Views {
     /// A city that never looked says so, for the reason a building
     /// nobody raised does: a page given an empty machine instead would
     /// tell a person every tool they have is missing.
-    fn doctor_or_unavailable(&self) -> channels::Answer {
+    fn doctor_or_unavailable(&self) -> wire::Answer {
         match &self.machine {
-            Some(found) => channels::Answer::Doctor(Box::new(found.clone())),
+            Some(found) => wire::Answer::Doctor(Box::new(found.clone())),
             None => unavailable("Doctor".to_owned()),
         }
     }
@@ -68,8 +68,8 @@ impl Views {
     /// count this wire can carry rather than dropped: a saturated
     /// figure is visibly wrong on a page, and an absent one reads as
     /// zero.
-    fn metrics(&self) -> channels::MetricsAnswer {
-        channels::MetricsAnswer {
+    fn metrics(&self) -> wire::MetricsAnswer {
+        wire::MetricsAnswer {
             events: self.events,
             runs_active: self.hot.active_count(),
             runs_frozen: self.hot.frozen_count(),
@@ -109,7 +109,7 @@ impl Views {
 
     /// Answers one query in one call, lock or no lock.
     #[cfg(test)]
-    pub(crate) fn answer(&mut self, query: &channels::Query) -> channels::Answer {
+    pub(crate) fn answer(&mut self, query: &wire::Query) -> wire::Answer {
         self.prepare(query).finish()
     }
 
@@ -117,56 +117,52 @@ impl Views {
     /// or network needs. Every arm either answers or names itself
     /// unavailable; none of them returns an empty result that a reader
     /// would mistake for an empty city.
-    pub(crate) fn prepare(&self, query: &channels::Query) -> Prepared {
+    pub(crate) fn prepare(&self, query: &wire::Query) -> Prepared {
         Prepared::Held(match query {
-            channels::Query::CityView => return Prepared::City(self.city_ask()),
+            wire::Query::CityView => return Prepared::City(self.city_ask()),
             // An evicted run always has records in the Ledger, so a
             // recall that cannot read them is "I could not look"; the
             // Ledger is read after the snapshot is let go.
-            channels::Query::RunView { run } => match self.hot.get(run) {
-                Some(hot) => channels::Answer::Run(Some(summarize(*run, hot))),
+            wire::Query::RunView { run } => match self.hot.get(run) {
+                Some(hot) => wire::Answer::Run(Some(summarize(*run, hot))),
                 None if self.hot.was_evicted(run) => {
                     return Prepared::Recalled {
                         ledger: self.ledger_ask(),
                         run: *run,
                     };
                 }
-                None => channels::Answer::Run(None),
+                None => wire::Answer::Run(None),
             },
-            channels::Query::ApprovalQueue => {
-                channels::Answer::Approvals(channels::ApprovalsAnswer {
-                    items: self.governance.pending.values().cloned().collect(),
-                })
-            }
-            channels::Query::Governance => {
-                channels::Answer::Governance(channels::GovernanceAnswer {
-                    autonomy: self.governance.autonomy.clone(),
-                    decided: self.decided.clone(),
-                })
-            }
-            channels::Query::CostView => {
+            wire::Query::ApprovalQueue => wire::Answer::Approvals(wire::ApprovalsAnswer {
+                items: self.governance.pending.values().cloned().collect(),
+            }),
+            wire::Query::Governance => wire::Answer::Governance(wire::GovernanceAnswer {
+                autonomy: self.governance.autonomy.clone(),
+                decided: self.decided.clone(),
+            }),
+            wire::Query::CostView => {
                 let report = self.attribution.report();
-                channels::Answer::Cost(Box::new(channels::CostAnswer {
+                wire::Answer::Cost(Box::new(wire::CostAnswer {
                     total: report.total,
                     by_run: top_billed(report.by_run, &self.active_names()),
                     by_actor: report.by_actor,
                     by_segment: report.by_segment,
                     by_tool: report.by_tool,
                     by_skill: report.by_skill,
-                    unpriced: channels::UnpricedCalls {
+                    unpriced: wire::UnpricedCalls {
                         calls: report.unpriced.calls,
                         tokens: report.unpriced.tokens,
                     },
                 }))
             }
-            channels::Query::History { before, limit } => {
+            wire::Query::History { before, limit } => {
                 return Prepared::History {
                     ledger: self.ledger_ask(),
                     before: *before,
                     limit: *limit,
                 };
             }
-            channels::Query::HistoryRange { from, to, limit } => {
+            wire::Query::HistoryRange { from, to, limit } => {
                 return Prepared::HistoryRange {
                     ledger: self.ledger_ask(),
                     from: *from,
@@ -174,7 +170,7 @@ impl Views {
                     limit: *limit,
                 };
             }
-            channels::Query::RunHistory { run, before, limit } => {
+            wire::Query::RunHistory { run, before, limit } => {
                 return Prepared::RunHistory {
                     ledger: self.ledger_ask(),
                     run: *run,
@@ -182,14 +178,14 @@ impl Views {
                     limit: *limit,
                 };
             }
-            channels::Query::Changes { base, head } => {
+            wire::Query::Changes { base, head } => {
                 return Prepared::Changes {
                     city_root: self.city_root.clone(),
                     base: *base,
                     head: *head,
                 };
             }
-            channels::Query::Hunks { oid_a, oid_b, path } => {
+            wire::Query::Hunks { oid_a, oid_b, path } => {
                 return Prepared::Hunks {
                     city_root: self.city_root.clone(),
                     oid_a: *oid_a,
@@ -197,43 +193,41 @@ impl Views {
                     path: path.clone(),
                 };
             }
-            channels::Query::Commit { oid } => self.commit_answer(*oid),
-            channels::Query::Commits {
+            wire::Query::Commit { oid } => self.commit_answer(*oid),
+            wire::Query::Commits {
                 building,
                 before,
                 limit,
             } => match self.commits_answer(building.as_ref(), *before, *limit) {
-                Some(page) => channels::Answer::Commits(page),
+                Some(page) => wire::Answer::Commits(page),
                 None => unavailable(format!("Commits({before:?})")),
             },
             // Three readings answered here, so a second client folds no ledger itself.
-            channels::Query::Rounds { run } => {
+            wire::Query::Rounds { run } => {
                 return Prepared::Rounds {
                     ledger: self.ledger_ask(),
                     run: *run,
                 };
             }
-            channels::Query::Evidence { run } => {
+            wire::Query::Evidence { run } => {
                 return Prepared::Evidence {
                     ledger: self.ledger_ask(),
                     run: *run,
                 };
             }
-            channels::Query::RunCosts { runs } => {
-                channels::Answer::RunCosts(self.run_costs_answer(runs))
-            }
-            channels::Query::CostOf { node } => match self.cost_of_answer(node) {
-                Some(answer) => channels::Answer::CostOf(answer),
+            wire::Query::RunCosts { runs } => wire::Answer::RunCosts(self.run_costs_answer(runs)),
+            wire::Query::CostOf { node } => match self.cost_of_answer(node) {
+                Some(answer) => wire::Answer::CostOf(answer),
                 None => unavailable(format!("CostOf({node})")),
             },
             // The tree itself, one level and one file at a time.
-            channels::Query::Listing { at } => {
+            wire::Query::Listing { at } => {
                 return Prepared::Listing {
                     city_root: self.city_root.clone(),
                     at: at.clone(),
                 };
             }
-            channels::Query::Document { at } => {
+            wire::Query::Document { at } => {
                 return Prepared::Document {
                     city_root: self.city_root.clone(),
                     at: at.clone(),
@@ -242,74 +236,72 @@ impl Views {
             // What an agent was told, and the store read that recovers
             // it. A run with no prompt yet and an object this city no
             // longer holds are both "I could not look".
-            channels::Query::Prefix { run } => return Prepared::Prefix(self.prefix_ask(*run)),
+            wire::Query::Prefix { run } => return Prepared::Prefix(self.prefix_ask(*run)),
             // Read at every asking rather than held: the file is one a
             // person also edits, and a copy kept in this fold would
             // answer with what it said the last time somebody used a
             // page.
-            channels::Query::Preferences => return Prepared::Preferences,
-            channels::Query::Config { addr } => {
+            wire::Query::Preferences => return Prepared::Preferences,
+            wire::Query::Config { addr } => {
                 return Prepared::Config {
                     city_root: self.city_root.clone(),
                     addr: addr.clone(),
                 };
             }
-            channels::Query::Content { locator } => {
+            wire::Query::Content { locator } => {
                 return Prepared::Content {
                     city_root: self.city_root.clone(),
                     locator: locator.clone(),
                 };
             }
-            channels::Query::Skills { building } => {
+            wire::Query::Skills { building } => {
                 return Prepared::Skills {
                     city_root: self.city_root.clone(),
                     building: building.clone(),
                     pins: self.skill_pins.clone(),
                 };
             }
-            channels::Query::GitStatus { building } => match self.git_status_ask(building) {
+            wire::Query::GitStatus { building } => match self.git_status_ask(building) {
                 Some(ask) => return Prepared::GitStatus(ask),
                 None => unavailable(format!("GitStatus({})", building.as_str())),
             },
-            channels::Query::EndpointView => {
-                channels::Answer::Endpoints(endpoints_answer(&self.book))
-            }
-            channels::Query::KnownHosts => known_hosts_answer(),
-            channels::Query::Harnesses => harnesses_answer(),
-            channels::Query::Doctor => self.doctor_or_unavailable(),
-            channels::Query::McpHealth { addr } => {
+            wire::Query::EndpointView => wire::Answer::Endpoints(endpoints_answer(&self.book)),
+            wire::Query::KnownHosts => known_hosts_answer(),
+            wire::Query::Harnesses => harnesses_answer(),
+            wire::Query::Doctor => self.doctor_or_unavailable(),
+            wire::Query::McpHealth { addr } => {
                 return Prepared::McpHealth {
                     live: self.live_ask(),
                     addr: addr.clone(),
                 };
             }
-            channels::Query::Toolkits => return Prepared::Toolkits(self.live_ask()),
-            channels::Query::NewestRelease => return Prepared::Release(self.registry),
-            channels::Query::UpstreamVersion { item } => return self.upstream_of(item),
-            channels::Query::BuildingView { addr } => {
+            wire::Query::Toolkits => return Prepared::Toolkits(self.live_ask()),
+            wire::Query::NewestRelease => return Prepared::Release(self.registry),
+            wire::Query::UpstreamVersion { item } => return self.upstream_of(item),
+            wire::Query::BuildingView { addr } => {
                 return Prepared::Building {
                     city_root: self.city_root.clone(),
                     addr: addr.clone(),
                     plans: std::sync::Arc::clone(&self.plans),
                 };
             }
-            channels::Query::InboxView { addr } => channels::Answer::Inbox(channels::InboxAnswer {
+            wire::Query::InboxView { addr } => wire::Answer::Inbox(wire::InboxAnswer {
                 addr: addr.clone(),
                 waiting: self.waiting.get(addr).cloned().unwrap_or_default(),
             }),
-            channels::Query::DiscardView => channels::Answer::Discards(channels::DiscardAnswer {
+            wire::Query::DiscardView => wire::Answer::Discards(wire::DiscardAnswer {
                 rows: self.discards.values().cloned().collect(),
             }),
-            channels::Query::RegistryView => channels::Answer::Registry(channels::RegistryAnswer {
+            wire::Query::RegistryView => wire::Answer::Registry(wire::RegistryAnswer {
                 assets: self.assets.clone(),
             }),
-            channels::Query::ArchiveSearch { needle } => {
+            wire::Query::ArchiveSearch { needle } => {
                 return Prepared::Archives {
                     city_root: self.city_root.clone(),
                     needle: needle.clone(),
                 };
             }
-            channels::Query::Metrics => {
+            wire::Query::Metrics => {
                 return Prepared::Metrics {
                     city_root: self.city_root.clone(),
                     held: self.metrics(),
@@ -351,7 +343,7 @@ impl Views {
     fn active_names(&self) -> BTreeSet<String> {
         self.hot
             .runs()
-            .filter(|(_, hot)| hot.phase == memory::RunPhase::Active)
+            .filter(|(_, hot)| hot.phase == storage::RunPhase::Active)
             .map(|(run, _)| run.to_string())
             .collect()
     }

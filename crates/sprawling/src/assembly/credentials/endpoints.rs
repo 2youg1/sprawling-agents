@@ -265,7 +265,7 @@ impl RunWorker {
     /// is needed elsewhere while a call is out.
     ///
     /// The mutex is for the type rather than for contention: the picture
-    /// face must be `Send + Sync`, and `memory::Cas` is only `Send`.
+    /// face must be `Send + Sync`, and `storage::Cas` is only `Send`.
     ///
     /// # Errors
     /// Refuses a city whose content store will not open. That refusal
@@ -274,7 +274,7 @@ impl RunWorker {
     pub(in crate::assembly) fn redemption(&self) -> Result<gateway::Redemption, AxError> {
         let cas_dir = self.city_root.join(".sprawling").join("cas");
         let store = std::sync::Arc::new(std::sync::Mutex::new(
-            memory::Cas::open(&cas_dir).map_err(|err| {
+            storage::Cas::open(&cas_dir).map_err(|err| {
                 AxError::failure(AxCode::InvalidArgs, "read a picture", err.to_string())
                     .with_recovery("make the city's content store readable, then dispatch again")
             })?,
@@ -298,7 +298,7 @@ impl RunWorker {
                     )
                     .with_recovery("restart the server; nothing in the store was changed")
                 })?;
-                held.get(hash).map_err(memory::MemoryError::into_ax)
+                held.get(hash).map_err(storage::StorageError::into_ax)
             }),
         ))
     }
@@ -332,8 +332,8 @@ mod tests {
         // The same pick again with both boxes empty, which is what the
         // model dropdown sends when nobody edited the two figures.
         worker
-            .handle(channels::Command::SelectModel {
-                endpoint: channels::ProviderName::parse("house").unwrap(),
+            .handle(wire::Command::SelectModel {
+                endpoint: wire::ProviderName::parse("house").unwrap(),
                 model: "m-1".to_owned(),
                 tag: kernel::ModelTag::Main,
                 context_tokens: None,
@@ -364,8 +364,8 @@ mod tests {
         let (base_url, _provider) = fake_openai(&["m-1", "m-2"], Vec::new());
         let mut worker = worker_with_provider(dir.path(), &base_url, "m-1").unwrap();
         worker
-            .handle(channels::Command::SelectModel {
-                endpoint: channels::ProviderName::parse("house").unwrap(),
+            .handle(wire::Command::SelectModel {
+                endpoint: wire::ProviderName::parse("house").unwrap(),
                 model: "m-2".to_owned(),
                 tag: kernel::ModelTag::Main,
                 context_tokens: None,

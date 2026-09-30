@@ -29,33 +29,33 @@ use sprawling::assembly;
 struct OneItem;
 
 impl accounting::Machine for OneItem {
-    fn report(&self) -> channels::DoctorAnswer {
-        channels::DoctorAnswer {
-            items: vec![channels::DoctorItem {
+    fn report(&self) -> wire::DoctorAnswer {
+        wire::DoctorAnswer {
+            items: vec![wire::DoctorItem {
                 name: "scripted".to_owned(),
-                tier: channels::DoctorTier::Use,
-                need: channels::DoctorNeed::Optional,
+                tier: wire::DoctorTier::Use,
+                need: wire::DoctorNeed::Optional,
                 homepage: None,
-                state: channels::DoctorState::Absent {
-                    absence: channels::DoctorAbsence::NotOnSearchPath,
+                state: wire::DoctorState::Absent {
+                    absence: wire::DoctorAbsence::NotOnSearchPath,
                 },
-                install: channels::DoctorInstall::Manual {
+                install: wire::DoctorInstall::Manual {
                     how: "script it".to_owned(),
                 },
                 pinned: None,
                 pack: None,
             }],
             tiers: Vec::new(),
-            sandbox: channels::DoctorSandbox {
-                arm: channels::DoctorSandboxArm::CopiedTree,
+            sandbox: wire::DoctorSandbox {
+                arm: wire::DoctorSandboxArm::CopiedTree,
                 coverage: Vec::new(),
             },
-            custody: channels::DoctorCustody {
-                store: channels::DoctorCustodyStore::SessionMemory,
-                keeps: channels::DoctorCustodyLifetime::ThisProcess,
+            custody: wire::DoctorCustody {
+                store: wire::DoctorCustodyStore::SessionMemory,
+                keeps: wire::DoctorCustodyLifetime::ThisProcess,
                 refusal: None,
             },
-            core: channels::DoctorCore::HeldBySetting,
+            core: wire::DoctorCore::HeldBySetting,
         }
     }
 
@@ -79,7 +79,7 @@ fn a_refresh_counts_the_items_the_machine_it_was_handed_answered() {
         .with_machine(Box::new(OneItem));
 
     worker
-        .handle(channels::Command::DoctorRefresh {
+        .handle(wire::Command::DoctorRefresh {
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"refresh"),
         })
         .unwrap();
@@ -105,23 +105,23 @@ impl accounting::Machine for Recording {
     /// What it installed is present afterwards, so the install ends
     /// with the item found rather than with the refusal a package
     /// manager that left it unfindable earns.
-    fn report(&self) -> channels::DoctorAnswer {
+    fn report(&self) -> wire::DoctorAnswer {
         let mut answer = OneItem.report();
         answer.items.extend(
             self.0
                 .lock()
                 .unwrap()
                 .iter()
-                .map(|(item, _)| channels::DoctorItem {
+                .map(|(item, _)| wire::DoctorItem {
                     name: item.clone(),
-                    tier: channels::DoctorTier::Use,
-                    need: channels::DoctorNeed::Optional,
+                    tier: wire::DoctorTier::Use,
+                    need: wire::DoctorNeed::Optional,
                     homepage: None,
-                    state: channels::DoctorState::Present {
+                    state: wire::DoctorState::Present {
                         at: format!("/bin/{item}"),
-                        version: channels::DoctorVersion::Silent,
+                        version: wire::DoctorVersion::Silent,
                     },
-                    install: channels::DoctorInstall::UnknownPlatform,
+                    install: wire::DoctorInstall::UnknownPlatform,
                     pinned: None,
                     pack: None,
                 }),
@@ -153,7 +153,7 @@ fn an_install_hands_the_table_command_to_the_machine_it_was_handed() {
         .unwrap()
         .with_machine(Box::new(Recording(Arc::clone(&installs))));
 
-    let outcome = worker.handle(channels::Command::DoctorInstall {
+    let outcome = worker.handle(wire::Command::DoctorInstall {
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"install"),
         item: "ffmpeg".to_owned(),
     });

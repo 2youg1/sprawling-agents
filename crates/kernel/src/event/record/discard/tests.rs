@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The golden lines: the bytes `memory::checkpoint::fence` and
+//! The golden lines: the bytes `storage::checkpoint::fence` and
 //! `sprawling::effect::Landing::shelf` wrote by hand, which the ledgers
 //! a city already holds are made of.
 

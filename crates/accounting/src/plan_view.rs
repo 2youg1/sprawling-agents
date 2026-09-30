@@ -96,8 +96,8 @@ struct FreshPlan {
 pub struct PlanReading {
     pub progress: Progress,
     pub problems: Vec<String>,
-    pub rows: Vec<channels::PlanRow>,
-    pub blocked: Vec<channels::BlockedLine>,
+    pub rows: Vec<wire::PlanRow>,
+    pub blocked: Vec<wire::BlockedLine>,
     pub ready: Vec<NodeId>,
 }
 
@@ -324,7 +324,7 @@ fn describe_tree(tree: &PlanTree, causes: Option<&BTreeMap<NodeId, StopCause>>) 
     let ready = tree.ready();
     let rows = tree
         .nodes()
-        .map(|node| channels::PlanRow {
+        .map(|node| wire::PlanRow {
             node: node.row.id.clone(),
             item: node.row.item.clone(),
             status: node.row.status,
@@ -340,7 +340,7 @@ fn describe_tree(tree: &PlanTree, causes: Option<&BTreeMap<NodeId, StopCause>>) 
         .collect();
     let blocked = blockages(tree, causes)
         .into_iter()
-        .map(|blockage| channels::BlockedLine {
+        .map(|blockage| wire::BlockedLine {
             line: blockage.line(),
             waiting: u32::try_from(blockage.reaches.len()).unwrap_or(u32::MAX),
             source: blockage.source,

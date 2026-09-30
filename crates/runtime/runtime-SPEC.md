@@ -46,34 +46,34 @@
 
 ## 4 现状分析
 
-verify 为 O(n) 全量；消费面（测试/夹具/citysim）规模千行级，无性能议题；seq→偏移索引归 memory::index。
+verify 为 O(n) 全量；消费面（测试/夹具/citysim）规模千行级，无性能议题；seq→偏移索引归 storage::index。
 
 ## 5 权威信源
 
-Fork 三规则；重放/分叉/幂等；at_seq 越界、未知 kind、崩溃恢复行；kernel-SPEC §8-4/§8-9；memory-SPEC §8-1。
+Fork 三规则；重放/分叉/幂等；at_seq 越界、未知 kind、崩溃恢复行；kernel-SPEC §8-4/§8-9；storage-SPEC §8-1。
 
 ## 6 命名统一
 
-**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政（`memory::checkpoint::Checkpoint` 住 `fence` 同例）。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政（`storage::checkpoint::Checkpoint` 住 `fence` 同例）。
 
 replay、verify、VerifiedLedger、VerifiedLine、fork prefix、`at_seq`。不引入「重播/回放/复演」等同义词。
 
 ## 7 模块边界
 
 ```
-replay ──▶ kernel(event/ledger/error)、memory(jsonl::read_raw_lines)
+replay ──▶ kernel(event/ledger/error)、storage(jsonl::read_raw_lines)
 fork   ──▶ replay(VerifiedLedger)、kernel
 turn   ──▶ kernel(ledger/event/error/tool/model)、prefix(FrozenPrefix)
 turn/recovery ──▶ turn(ledger 的 Journal)、kernel(model/error)   // 模型调用恢复管线（§8-49）
 prefix ──▶ kernel(locator::B3Hash/event::Payload/error)
 handoff──▶ kernel(locator/event/error)
 pipeline ──▶ offload、sieve、clock、kernel(tool)
-sieve  ──▶ offload(tee)、memory(cas 读前一次原文)、kernel(tool::ExecArm/locator)
-offload ──▶ memory(cas)、kernel(locator)
+sieve  ──▶ offload(tee)、storage(cas 读前一次原文)、kernel(tool::ExecArm/locator)
+offload ──▶ storage(cas)、kernel(locator)
 watchdog ──▶ kernel(stall/completion)
 catalog ──▶ kernel(tool)、mode
 sandbox ──▶ wasmtime（feature `wasm` 内藏；缝声明恒在）
-tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、memory(cas 经 pipeline)
+tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、storage(cas 经 pipeline)
 ```
 
 上图只画各模块的主要依赖；crate 之间的依赖以 ARCHITECTURE 的 `depmap` 块为准，文件清单以它的模块图为准。
@@ -101,21 +101,21 @@ impl VerifiedLedger {
 /// Offline chain verification (A2). Errors carry the failing line number in
 /// `subject`. Refuses: v > EVENT_LOG_V (direction-aware), broken prev chain,
 /// seq gaps, non-canonical bytes, unknown kind without `ig:true`.
-/// 逐行判定不住在这里：每一行经 `memory::LineCheck::advance`，拒词经 `LineFault::into_ax`
-/// ——与 `JsonlLedger::open` 的尾段扫描同一份检查（memory-SPEC §8-1）。
+/// 逐行判定不住在这里：每一行经 `storage::LineCheck::advance`，拒词经 `LineFault::into_ax`
+/// ——与 `JsonlLedger::open` 的尾段扫描同一份检查（storage-SPEC §8-1）。
 pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError>;
-/// Convenience over a jsonl directory: memory::jsonl::read_raw_lines + verify.
+/// Convenience over a jsonl directory: storage::jsonl::read_raw_lines + verify.
 /// 无段目录与空账本在此同形（均得空 VerifiedLedger）——本函数的调用方均自持城根算出路径；
 /// 区分二者是「从人那里拿到路径」的一层的事（§11；sprawling-SPEC §12）。
 pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError>;
-/// 流式折叠：经 `memory::LedgerIndex::folding` 一次一段地读，每行过同一个 `LineCheck`，已知记录借给 `each`
+/// 流式折叠：经 `storage::LedgerIndex::folding` 一次一段地读，每行过同一个 `LineCheck`，已知记录借给 `each`
 /// 后即丢；ignorable 行只入链不入折。每行只读一次、只解析一次，顺序即账本序，结果确定。
 /// 常驻的是一段字节与一条记录，而不是 `VerifiedLedger` 的全部原始行与全部记录——
 /// 启动折叠（`fold_city`、`Standing::fold`、`rebuild_views`）只要折的结果，不要行本身，走这一面；
 /// 分叉与重演要原始行，仍走 `verify_ledger_dir`。
 /// 失败即停：第 k 行验不过时，前 k-1 条已经给过 `each`，此时返回的 Err 说明整份折叠作废，
 /// 调用方丢弃它折出的一切（与 `verify_ledger_dir` 同一拒词、同一行号）。无段目录同上，折叠为空。
-/// 读史走 `memory::LedgerIndex::folding`，返回的索引与折叠出自同一遍字节：索引覆盖的恰是 `each` 见过的那段历史，
+/// 读史走 `storage::LedgerIndex::folding`，返回的索引与折叠出自同一遍字节：索引覆盖的恰是 `each` 见过的那段历史，
 /// 折叠之后别人追加的行不在其中，留给 `refresh`。已知行把自己的 seq 与 run 交给索引，ignorable 行由索引自己定位。
 pub fn fold_ledger_dir(dir: &Path, each: impl FnMut(&EventRecord) -> Result<(), AxError>) -> Result<LedgerIndex, AxError>;
 ```
@@ -125,7 +125,7 @@ pub fn fold_ledger_dir(dir: &Path, each: impl FnMut(&EventRecord) -> Result<(), 
 **「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`verify_ledger_dir` 与 `fold_ledger_dir` 的生产调用方（`fold`、`rebuild_views`、`startup_scan`、`fork`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
 **「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`verify_ledger_dir` 的四个生产调用方（`fold`、`Views::rebuild`、`startup_scan`、`fork`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
 
-故依据归给**拿到人输入路径的那一层**：`sprawling replay <ledger-dir>` 先问 `memory::ledger_segments_at`，一段都没有就报 `E_PATH_NOT_FOUND`（sprawling-SPEC §12）。先例取自本仓库：`xtask guard` 在无提交时说 `no commits yet, nothing to judge`，而不说通过。**空账本本身仍然合法**：`verify_lines(vec![])` 照旧返回空 `VerifiedLedger`。
+故依据归给**拿到人输入路径的那一层**：`sprawling replay <ledger-dir>` 先问 `storage::ledger_segments_at`，一段都没有就报 `E_PATH_NOT_FOUND`（sprawling-SPEC §12）。先例取自本仓库：`xtask guard` 在无提交时说 `no commits yet, nothing to judge`，而不说通过。**空账本本身仍然合法**：`verify_lines(vec![])` 照旧返回空 `VerifiedLedger`。
 
 ### 8-2 runtime::fork
 
@@ -142,7 +142,7 @@ pub fn fork_draft(origin: Origin, new_run: RunId, addr: Address, t: TimeMs, who:
 /// her own records, cut at the last line a conversation can be cut at,
 /// read through the ledger's resident index: the named line for its run,
 /// then that run's own lines, and nothing else read.
-pub fn inherited_indexed(index: &memory::LedgerIndex, dir: &Path, at_seq: Seq)
+pub fn inherited_indexed(index: &storage::LedgerIndex, dir: &Path, at_seq: Seq)
     -> Result<Inherited, AxError>;
 pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 ```
@@ -153,7 +153,7 @@ pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 
 **上下文提醒不重建，也重建不了**：它是这座城在跟模型说这一跑自己的预算，没有属于它自己的记录，而一条分支带着自己的量表开始。这条差异写在函数自己的文档里，因为它是一处诚实的不完整，不是漏掉的一步。**回合边界的压缩会重建**：母亲窗口里每回合的 exchange 是收尾边界压缩后的字节，`fold_run` 在同一边界对同一材料重放同一判定（8-44），分支拿到的是母亲真正发出去的那一份，而不是账本里更全的那一份。
 
-**写账本的那一方走索引（`fork::indexed`）。** 持有账本的 worker 为一次分支重建只需要母 run 自己的那几行：`inherited_indexed` 用 `LedgerIndex::line_at` 读 `at_seq` 那一行定出母 run，再按 `run_seqs_before` 只读这条 run 的行，每一行先过 `memory::read_line`——它与验链门逐行所用的 `LineCheck::advance` 共用同一条分类规则：已知 kind 解析成记录，带 `ig` 的新 kind 跳过，其余（撕裂、不规范、无 `ig` 的未知 kind）以 `LineFault` 的码拒绝；切点与消息都由 `fold_run` 一处判定。它不验链：worker 是这本账唯一的写者，打开时已经过尾部恢复；而 `verify_ledger_dir` 为这一问把整本历史读进内存、逐行验链再解析（94 MB 的账本上是 +67 MiB 的瞬时内存）。拒绝写成人能照做的话：`at_seq` 不在索引里是 `outside`，恢复语给出母序列止于哪个 seq，母 run 在这之前没有 `run_started` 是同一条 `E_INVALID_ARGS`。
+**写账本的那一方走索引（`fork::indexed`）。** 持有账本的 worker 为一次分支重建只需要母 run 自己的那几行：`inherited_indexed` 用 `LedgerIndex::line_at` 读 `at_seq` 那一行定出母 run，再按 `run_seqs_before` 只读这条 run 的行，每一行先过 `storage::read_line`——它与验链门逐行所用的 `LineCheck::advance` 共用同一条分类规则：已知 kind 解析成记录，带 `ig` 的新 kind 跳过，其余（撕裂、不规范、无 `ig` 的未知 kind）以 `LineFault` 的码拒绝；切点与消息都由 `fold_run` 一处判定。它不验链：worker 是这本账唯一的写者，打开时已经过尾部恢复；而 `verify_ledger_dir` 为这一问把整本历史读进内存、逐行验链再解析（94 MB 的账本上是 +67 MiB 的瞬时内存）。拒绝写成人能照做的话：`at_seq` 不在索引里是 `outside`，恢复语给出母序列止于哪个 seq，母 run 在这之前没有 `run_started` 是同一条 `E_INVALID_ARGS`。
 **母亲自己是分支时，先重建她开场时继承的那段。** 流动循环里母亲的窗口以 `RunPlan::inherited` 开头，那段对话不在她自己的线上；她的 `run_forked`（`run` 是她、`from`／`at_seq` 指向祖母的切点）才是它的出处。所以 `inherited` 先找属主 run 的 `run_forked`，按其 `at_seq` 递归重建祖母的对话，经 `push_inherited` 放在最前，再折母亲自己的线——与 `Run::begin` 同一顺序。递归只往账本更早处走（`at_seq` 必须早于那条 `run_forked`，否则拒），所以一定终止。
 
 
@@ -484,8 +484,8 @@ impl Adviser { pub fn none() -> Adviser;
 
 ```rust
 pub const REST_DIR: &str = ".rest";
-pub struct OffloadSite<'a> { pub cas: &'a mut memory::Cas, pub city_root: &'a std::path::Path,
-                             pub room: &'a kernel::Address, pub origin: memory::BlockOrigin }   // origin：这块字节替哪个 run、哪栋楼写下（memory-SPEC）
+pub struct OffloadSite<'a> { pub cas: &'a mut storage::Cas, pub city_root: &'a std::path::Path,
+                             pub room: &'a kernel::Address, pub origin: storage::BlockOrigin }   // origin：这块字节替哪个 run、哪栋楼写下（storage-SPEC）
 pub struct OffloadRecord { pub substitute: Vec<u8>, pub original: Locator, pub rest_path: String,
                            pub original_len: u64 }
 pub fn offload(bytes: &[u8], cap_bytes: u64, site: &mut OffloadSite<'_>) -> Result<OffloadRecord, AxError>;
@@ -856,7 +856,7 @@ impl ToolBench {
     /// 栅栏的三件东西恒同行：仓、它盖住的范围、写它的人。
     pub struct CheckpointNet { pub checkpoint: Checkpoint, pub scope: Vec<String>, pub of: Provenance }
     // `scope` 是这次 run 的**写域全部前缀**，不是它的房间：栅栏窄于写域，
-    // 两者之间写下的文件就进不了任何检查点（memory-SPEC §8-18）。
+    // 两者之间写下的文件就进不了任何检查点（storage-SPEC §8-18）。
     /// 本 bench 服务的那份活。Spawn 门要铸一个人答得出的条目，
     /// 条目要有 actor（问谁）与 artifact（看什么）；两者都不在一次工具调用里。
     /// 未给即拒（fail-closed）——一个人问不到的派生就是没人批准的派生。
@@ -979,7 +979,7 @@ impl Diagnostics {
 
 - **无读方法即全部形状保证**：「判定与恢复逻辑不读日志」不靠纪律，靠这一点——把一行读回来在类型上拼不出。推论就是收口条件：删光日志，行为、重放与总账逐字节不变。
 - **行上恒无时间戳**：锚点是 `seq`——两条时间线靠一个整数对齐，而采样壁钟会在一个不允许采样的库里开第二个时间源。想要时间的 sink 在装配层自己加。
-- **坐标由 Ledger 自己说**：`memory::JsonlLedger::position()`（返回「现在写一条会落在哪」）。只给位置不给内容：一个能读记录的访问器会把判定逻辑引到它正在写的账上去。
+- **坐标由 Ledger 自己说**：`storage::JsonlLedger::position()`（返回「现在写一条会落在哪」）。只给位置不给内容：一个能读记录的访问器会把判定逻辑引到它正在写的账上去。
 - **双重防线**：`Sealed` 无 Debug/Display，入行在类型层就不成立（反例 `tests/ui/log_a_credential.rs`）；普通字符串里的明文由 `redact::redact_text`——**同一个**扫描器与**同一份**替换实现，不是第二个——就地换成 `secret:redacted`（`Marker::Plain`）。不丢整行：周围那句话通常正是读者要的。
 - **不引 `tracing`**：它在此处的唯一功能是跨 `await` 携模块名的 span，而回合路径是同步的，该功能无消费者。理由见 `docs/logging.md` §7。
 - **写入方三处**（§6 的三类各一）：命令被拒（`refuse`，写在 `handle` 而非调用方，因为每个调用方都要）；endpoint 附着与探测结果（`effect`）；dispatch 跑完（`effect`，作为指向 Ledger 的指针）。
@@ -1009,7 +1009,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 - `E_INVALID_ARGS`（at_seq 越界）：不可定义掉——「从已冻结 Run 最后事件之后分叉」是用户可达输入；静默夹取是被明拒的替代。
 - `E_LOG_VERSION_UNSUPPORTED`（v 判向＋未知 kind 无 ig）：不可定义掉——数据比二进制长寿。
-- 链断/seq 洞/非规范字节：以 `E_CAS_CORRUPT` 报（存储完整性族；subject=行号与路径）——能否定义掉＝「介质位腐烂在设计边界外」，同 memory-SPEC §12。
+- 链断/seq 洞/非规范字节：以 `E_CAS_CORRUPT` 报（存储完整性族；subject=行号与路径）——能否定义掉＝「介质位腐烂在设计边界外」，同 storage-SPEC §12。
 
 ### 12.1 定规：来源行不带摘要生产者指纹
 
@@ -1100,7 +1100,7 @@ pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一�
 
 | 文件 | 管什么 |
 |---|---|
-| `bench.rs` | `ToolBench` 与 `BenchOutcome` 的定义、装配面（`new`／`for_job`／`with_checkpoint`／`register`／`taint_mut`／`meta_of`）、`invoke` 的路由次序，以及 `kernel_error_from_memory` |
+| `bench.rs` | `ToolBench` 与 `BenchOutcome` 的定义、装配面（`new`／`for_job`／`with_checkpoint`／`register`／`taint_mut`／`meta_of`）、`invoke` 的路由次序，以及 `kernel_error_from_storage` |
 | `bench/admit.rs` | 门：`admit` 按 `Effect` 分派到 Write／Connector／Egress／Spawn／Govern 各门，`settled`／`crossed` 把一次判定翻译成 `BenchOutcome`，`scanned` 为两扇朝外的门备好密钥扫描的字节 |
 | `bench/tests.rs` | 去重、门、taint、fence 与注册冲突的夹具 |
 
@@ -1368,7 +1368,7 @@ pub fn package_connector(outcome: ToolOutcome, offload: OffloadSite<'_>) -> Resu
 - 替身是什么由 `package` 一处决定，本模块不另判：`Markup`（Markdown 一类）按 8-7 走节标题骨架而不入 store，故一份转换出来的长 Markdown 进窗口的是骨架，没有可翻的路径，`offload` 为空表；其余文本按 `OFFLOAD_MIN_BYTES` 入 store。
 - 失败只有 `package` 自己的失败（`E_INVALID_ARGS`，原样上抛）。
 
-**上限与 `exec` 同值、各有其名**：两者今天取同一个数，是因为窗口里一件工具答案的代价与来源无关；分开命名，是因为改其中一个不该悄悄改另一个。**决定**：交 `package` 而不是在这里另写一套截法——截多少、存不存由它一处决定，连接器答案与 `exec` 答案在窗口里守同一条规则；不包装时一次回答可以把整整 `MESSAGE_CEILING`（8 MiB）送进窗口。备选「让 `protocol::McpTool` 自己截」被否：协议层没有 CAS 也没有 room，落盘处只有装配层有。调用点只有一个：`bin::assembly` 的 `Placing` 对 effect 为 `Connector` 的调用（首答与重放同样）调它。
+**上限与 `exec` 同值、各有其名**：两者今天取同一个数，是因为窗口里一件工具答案的代价与来源无关；分开命名，是因为改其中一个不该悄悄改另一个。**决定**：交 `package` 而不是在这里另写一套截法——截多少、存不存由它一处决定，连接器答案与 `exec` 答案在窗口里守同一条规则；不包装时一次回答可以把整整 `MESSAGE_CEILING`（8 MiB）送进窗口。备选「让 `agent_protocols::McpTool` 自己截」被否：协议层没有 CAS 也没有 room，落盘处只有装配层有。调用点只有一个：`bin::assembly` 的 `Placing` 对 effect 为 `Connector` 的调用（首答与重放同样）调它。
 
 ### 8-28 runtime::backlog（形状 4 适配器＋形状 6 数据面）
 
@@ -1471,11 +1471,11 @@ impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms �
 
 - 窗口里的读停在交给后台那一刻，偏移随成员进表；此后本 run 的每次 `harvest` 对它自己的、仍在跑的后台命令从同一偏移接着读。块在放开表锁之后才交给 sink，所以 sink 慢不会让表上其他调用等它。
 
-**装配点注入**：一座被端上来的城（`RunWorker::serve`）把一个 `Sink` 装到自己的 `Backlog` 上，sink 把每块译成 `channels::LiveOutput`（channels-SPEC §8-48）交给 `Serving::outputs`，那里送进第四条广播通道。没有被端上来的城（citysim、replay、一次一条命令的 worker）不装 sink，所以一个字节都不读。
+**装配点注入**：一座被端上来的城（`RunWorker::serve`）把一个 `Sink` 装到自己的 `Backlog` 上，sink 把每块译成 `wire::LiveOutput`（wire-SPEC §8-48）交给 `Serving::outputs`，那里送进第四条广播通道。没有被端上来的城（citysim、replay、一次一条命令的 worker）不装 sink，所以一个字节都不读。
 
 **页面缓冲**：`client/src/core/live_output.ts` 为每个 run 留一段 `Tail`（stdout、stderr 与丢掉的行数），每条流只留最新的 `LIVE_LINES = 400` 行；`tool_result` 一到就丢掉这个 run 的那段。监视器的终端记录把它画在仍在跑的那一条下面，丢掉的行数照 `mon_lines_cut` 说出来。
 
-**服务端缓冲**：`sprawling::serving::output_ring`（sprawling-SPEC §8-90）为每个 run 按字节留最新的一段，后来打开页面的会话在 `Welcome` 之后先经 `ServeConfig::outputs_so_far`（channels-SPEC §8-48）拿到它，再接实时帧；这个 run 的 `tool_result` 落账时清空。
+**服务端缓冲**：`sprawling::serving::output_ring`（sprawling-SPEC §8-90）为每个 run 按字节留最新的一段，后来打开页面的会话在 `Welcome` 之后先经 `ServeConfig::outputs_so_far`（wire-SPEC §8-48）拿到它，再接实时帧；这个 run 的 `tool_result` 落账时清空。
 
 **设计**（四段共同遵守的规则）：
 
@@ -1565,14 +1565,14 @@ const NEARBY_CAP: usize = 16;
 pub(super) fn open_locator(asked: &str, city_root: &Path, store: &Path,
                            bound: &dyn Fn(&Address) -> ReadVerdict) -> Option<Result<String, AxError>>;
 /// cas: 块按哪栋楼判读取界的唯一判定处。
-fn judged_at(hash: &B3Hash, origins: &[memory::BlockOrigin],
+fn judged_at(hash: &B3Hash, origins: &[storage::BlockOrigin],
              bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Address, AxError>;
 // ReadTool::new(city_root, catalog, bound, block_store: &Path)：块仓是城的，run 可能写在没有自己块仓的 worktree 里。
 ```
 
 - **以 `cas:` 或 `file:` 开头的参数是 Locator**，按 `Locator::parse` 判形，判不过即 `E_INVALID_ARGS`；其余参数走 catalog 与普通路径，不受影响（一个城内地址不含冒号，两者不相交）。
-- **`cas:` 块按存块时记下的楼判读取界，只在 `judged_at` 一处决定**，判本身仍是 `chosen_path::admit`（§8-30-1）那一个。来源是 `Cas::put_for` 在存块时写下的（memory-SPEC §8-3）：一个块为几栋楼存过就有几条来源，取读者能读的第一栋；一栋都读不了就取第一条来源，让 `admit` 按那栋楼的理由拒绝；没有来源的块（上架的技能包、从未存过的哈希）＝`E_GATE_DENIED`，恢复语让它改读块所出自的 `file:`。只按楼判、不按 run 判：读得了那栋楼的文件就读得了为那栋楼存下的字节，而 run 只记作出处。另一条路是按账本里哪一行写了这个哈希来判，落选：模型写的文字（例如委派的 `goal`）会落进带 `addr` 的行，那样的归属可以伪造。`file:<addr>@<oid>` 按 `<addr>` 判。
-- **`file:` 在该 oid 上做 git 读**（`memory::blob_at`，memory-SPEC §8-29），读的是那一次提交里的字节而不是工作区此刻的文件；地址在该提交里不是一个文件（目录、不存在）＝`E_INVALID_ARGS`。
+- **`cas:` 块按存块时记下的楼判读取界，只在 `judged_at` 一处决定**，判本身仍是 `chosen_path::admit`（§8-30-1）那一个。来源是 `Cas::put_for` 在存块时写下的（storage-SPEC §8-3）：一个块为几栋楼存过就有几条来源，取读者能读的第一栋；一栋都读不了就取第一条来源，让 `admit` 按那栋楼的理由拒绝；没有来源的块（上架的技能包、从未存过的哈希）＝`E_GATE_DENIED`，恢复语让它改读块所出自的 `file:`。只按楼判、不按 run 判：读得了那栋楼的文件就读得了为那栋楼存下的字节，而 run 只记作出处。另一条路是按账本里哪一行写了这个哈希来判，落选：模型写的文字（例如委派的 `goal`）会落进带 `addr` 的行，那样的归属可以伪造。`file:<addr>@<oid>` 按 `<addr>` 判。
+- **`file:` 在该 oid 上做 git 读**（`storage::blob_at`，storage-SPEC §8-29），读的是那一次提交里的字节而不是工作区此刻的文件；地址在该提交里不是一个文件（目录、不存在）＝`E_INVALID_ARGS`。
 - **范围**：`cas:` 带的范围照 Locator 本身只交回那一段（`Cas::get_range`）；`file:` 带范围＝`E_INVALID_ARGS`，恢复语让它去掉范围改用 `offset`／`limit`——提交里的文件没有一份按范围读的实现，而 `offset`／`limit` 已答同一个问题。之后都按 `offset`／`limit` 切（§8-29-1）。字节不是 UTF-8＝`E_INVALID_ARGS`，read 只交文本。
 - **为 run 存块的调用方都走 `put_for`**：转录（`Transcript::materialise`，记房间）、卸载的原件（`offload::tee`，记命令所在的房间，来源随 `OffloadSite` 传入）、截图（`bin::browser_tool`，记这栋楼）、交接单 must-read 里的规范文档（`bin::assembly::freezing`，记 run 所在的房间）、run 的任务书（`bin::assembly::dispatching::running`，记房间；run id 由任务书的定位符派生，所以先 `put` 取得哈希，run 立起后再 `put_for` 补记来源）、子 run 的交回说明（`bin::assembly::dispatching::handback`，记子 run 与它的房间）。仍走 `put` 的有两类：上架的技能包不是为某个 run 存的，读不到它的 `cas:`，它按 catalog 名读；冻结前缀的各段（`intern_prefix`）只为让账本里的前缀可审计，一个段为同一栋楼的所有 run 共用，不作为定位符交给任何 run。
 
@@ -1691,7 +1691,7 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 
 **它不是账本**：账本住 `.sprawling/`，`read` 对那里的每一条路径都拒绝；而且账本是**全城一条链**——把它交给一个 resident 就是把一栋 confidential 楼的事件也交出去。transcript 不加密，谁读得到它由读界答：它住在 run 的房间里，`read` 与 `search` 对它的路径和对房间里任何文件一样先过 `chosen_path::admit`，所以本楼的 resident 读得到，非机密楼的 transcript 他楼也读得到，而机密楼的 transcript 楼外读不到（city-SPEC §8-2）。
 
-**三步定序，不可颠倒**：①凭据扫描（`redact::redact` 逐消息走一遍，与 `model_returned` 入账本同一把扫描器）；②钉入 CAS（`memory::Cas::put`，内容寻址，同一份 transcript 写两次是一次）；③实体化（写到房间，只读位）。先扫后钉：一个钉进 CAS 的密钥永远删不掉。
+**三步定序，不可颠倒**：①凭据扫描（`redact::redact` 逐消息走一遍，与 `model_returned` 入账本同一把扫描器）；②钉入 CAS（`storage::Cas::put`，内容寻址，同一份 transcript 写两次是一次）；③实体化（写到房间，只读位）。先扫后钉：一个钉进 CAS 的密钥永远删不掉。
 
 ```rust
 pub struct Transcript { run: RunId, lines: Vec<String>, redacted: u32 }   // 私有字段，一处构造
@@ -1717,7 +1717,7 @@ impl Run<Frozen> { pub fn transcript(&self) -> Result<Transcript, AxError>; pub 
 
 **深度守恒**：succession 与 `delegate` 是两个动词。`delegate` 让深度加一；succession 不加。`Assignment::depth()` 从 `parent` 推出，继任者**继承前任的 `parent`**（而不是以前任为 parent），所以深度按构造守恒，工具表因而与前任逐名相同——`delegate` 在内。红测试：继任者的工具表与前任逐名相等。
 
-**账本**：`Assignment`／`RunPlan` 增 `predecessor: Option<RunId>`，写进 `run_started` 的 `predecessor` 键；`Provenance` 增同一指针（memory-SPEC §8-17：第六条 trailer `Sprawling-Predecessor`，仅在有前任时出现；`model_fields` 同时写 `predecessor`）。`bin::views` 从 `run_started` 折出 `predecessors: BTreeMap<RunId, RunId>`，`Query::Commit` 的答 `CommitAnswer` 增 `lineage: Vec<RunId>`——本跑在前，逐级向前到第一任（channels-SPEC §8-18）。红测试：三次接替后 lineage 有四个 run。
+**账本**：`Assignment`／`RunPlan` 增 `predecessor: Option<RunId>`，写进 `run_started` 的 `predecessor` 键；`Provenance` 增同一指针（storage-SPEC §8-17：第六条 trailer `Sprawling-Predecessor`，仅在有前任时出现；`model_fields` 同时写 `predecessor`）。`bin::views` 从 `run_started` 折出 `predecessors: BTreeMap<RunId, RunId>`，`Query::Commit` 的答 `CommitAnswer` 增 `lineage: Vec<RunId>`——本跑在前，逐级向前到第一任（wire-SPEC §8-18）。红测试：三次接替后 lineage 有四个 run。
 
 **Handoff 住房间**：`city::handoff(city_root, room)`／`handoff_path(city_root, room)` 读写 `<city>/<room>/Handoff.md`；模板在 `city::open_room` 打开房间时铺下，楼级 `lay_out` 不铺它。理由是同楼并发：一栋楼一份 Handoff，两个房间同时冻结就是两份内容抢一个文件。
 
@@ -1747,7 +1747,7 @@ impl ContextReminder { pub fn render(&self) -> String; }
 
 **接线**：`TurnReport` 增 `usage: Option<ModelUsage>`；`RunPlan` 增 `second_threshold: Option<SecondThreshold>`（Run 起点冻结，理由住 kernel-SPEC §8-22）；`RunPlan` 增 `context: ContextReading`，Run 在每回合观察之前把同一个 `input_tokens` 记进去，装配层把同一格交给 `StatusTool::metering`——只有一处写，窗口提醒与 `status` 读的是同一个数；`Run<Active>` 持 `ContextGauge`，每回合以 `usage.input_tokens` 观察，响则以 `Conversation::push_reminder` 落在该回合工具结果之后——与 steer 同一扇门，所以它「落在下一次工具结果的尾部」。`pipeline::PackContext` 同时增 `reminder: Option<ContextReminder>` 作第四个附件，句子只在 `ContextReminder::render` 一处定义。
 
-**改这一格的入口**：`channels::Command::ConfigureBuilding` 的 `context_second_threshold`（channels-SPEC §8-45）写的就是 `RunPlan.second_threshold` 读的那一格——写入落那一级的 `[context] second_threshold`，下一个 Run 起点冻结时读到；正在跑的那个 Run 不受影响（冻结的理由见 kernel-SPEC §8-22）。
+**改这一格的入口**：`wire::Command::ConfigureBuilding` 的 `context_second_threshold`（wire-SPEC §8-45）写的就是 `RunPlan.second_threshold` 读的那一格——写入落那一级的 `[context] second_threshold`，下一个 Run 起点冻结时读到；正在跑的那个 Run 不受影响（冻结的理由见 kernel-SPEC §8-22）。
 
 ### 8-48 回合没有上限
 
@@ -1824,7 +1824,7 @@ impl FrozenSegment {
 3. **没有来源文档的段写空表而不是省略键。** resident 段由身份与目录拼成，不出自任何文件；空表说的是「它不来自文档」，缺席的键说的是「不知道」。
 4. **`breakpoints` 记本次请求实际发出的断点，而不是四个 slot 名。** 行由 `BreakpointPlan::breakpoints()` 拼出，值是段界的 slot 名与 `tail`。类型仍是 `Vec<String>`、键名不变、`#[serde(default)]`，所以写着 `["city","building","resident","run"]` 的记录照读：那是 slot 清单，其中 `run` 段界从未在请求里出现过。**被否**：保留 slot 清单另加一个 `plan` 键——那样账上仍有一行名为断点却不是断点的数据，读者要自己知道该信哪一个。
 
-5. **`prompt_assembled` 每个 run 只写一条。** `turn::prompt::PromptRecord` 记着本 run 最后写下的载荷；`assemble` 照常算出本回合的载荷，与之相等就不写，不等才写并记住。prefix 在 run 内冻结，断点计划只随「对话是否为空」变，所以此后各回合的行是第一条的逐字拷贝；回合间真正会动的请求区域由 `prompt_shape_compared` 逐回合记，尾锚恒落在最后一条消息上，无须逐回合重述。比较的是载荷本身而不是「是不是第一回合」：哪天某个回合的载荷真的变了，账上就多一条，账本不会替一个请求声称它没带的断点。读者据此按 run 取段：`memory::attribution` 以 run 为键保存段权重（memory-SPEC），`sprawling::views::prefix` 读一跑的第一条。旧账每回合一条，照读，因为同一 run 的各条相同。**被否**：之后的回合写一条引用首条的短记录——它不携任何读者需要的事实，只多一行链。
+5. **`prompt_assembled` 每个 run 只写一条。** `turn::prompt::PromptRecord` 记着本 run 最后写下的载荷；`assemble` 照常算出本回合的载荷，与之相等就不写，不等才写并记住。prefix 在 run 内冻结，断点计划只随「对话是否为空」变，所以此后各回合的行是第一条的逐字拷贝；回合间真正会动的请求区域由 `prompt_shape_compared` 逐回合记，尾锚恒落在最后一条消息上，无须逐回合重述。比较的是载荷本身而不是「是不是第一回合」：哪天某个回合的载荷真的变了，账上就多一条，账本不会替一个请求声称它没带的断点。读者据此按 run 取段：`storage::attribution` 以 run 为键保存段权重（storage-SPEC），`sprawling::views::prefix` 读一跑的第一条。旧账每回合一条，照读，因为同一 run 的各条相同。**被否**：之后的回合写一条引用首条的短记录——它不携任何读者需要的事实，只多一行链。
 
 **被否**：让页面在被问的那一刻重新装配一次 prefix 去拿来源。此刻的文件不是当时的文件，那样画出来的是一份没有任何人收到过的提示。
 

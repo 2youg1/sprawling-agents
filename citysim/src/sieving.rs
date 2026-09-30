@@ -12,10 +12,10 @@
 use std::path::PathBuf;
 
 use kernel::{Address, AxError, ToolCall, ToolOutcome};
-use memory::Cas;
 use runtime::clock::ClockStamp;
 use runtime::offload::OffloadSite;
 use runtime::{FilterTable, SieveHistory, SieveSite};
+use storage::Cas;
 
 pub struct SieveWorld {
     pub cas: Cas,
@@ -30,7 +30,7 @@ impl SieveWorld {
     /// Opening the same root twice is the same world: the CAS is
     /// content-addressed and a rest file is written once.
     pub fn open(root: &std::path::Path, table: FilterTable) -> Result<SieveWorld, AxError> {
-        let cas = Cas::open(&root.join("cas")).map_err(memory::MemoryError::into_ax)?;
+        let cas = Cas::open(&root.join("cas")).map_err(storage::StorageError::into_ax)?;
         Ok(SieveWorld {
             cas,
             root: root.to_path_buf(),
@@ -56,7 +56,7 @@ pub(crate) fn package_exec(
                 cas: &mut world.cas,
                 city_root: &world.root,
                 room: &world.address,
-                origin: memory::BlockOrigin {
+                origin: storage::BlockOrigin {
                     run: kernel::RunId::CITY,
                     building: world.address.clone(),
                 },

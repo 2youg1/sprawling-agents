@@ -8,7 +8,7 @@
 use std::path::Path;
 
 use crate::alias::WriteTarget;
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
@@ -21,11 +21,11 @@ use super::manifest::{CAS, CITY, LEDGER, MANIFEST, Manifest};
 
 /// One count taken on the city against the same count taken on the
 /// bundle.
-fn agree(what: &str, source: u64, bundle: u64) -> Result<(), MemoryError> {
+fn agree(what: &str, source: u64, bundle: u64) -> Result<(), StorageError> {
     if source == bundle {
         return Ok(());
     }
-    Err(MemoryError::Bundle {
+    Err(StorageError::Bundle {
         op: "export",
         detail: format!("the city holds {source} {what}(s) and the bundle holds {bundle}"),
     })
@@ -42,7 +42,7 @@ impl Bundle {
     /// Propagates read and write failures, naming the path; refuses a
     /// city whose ledger cannot be read, because a bundle of an
     /// unreadable history is a backup of nothing.
-    pub fn export(city_root: &Path, dest: &Path) -> Result<Manifest, MemoryError> {
+    pub fn export(city_root: &Path, dest: &Path) -> Result<Manifest, StorageError> {
         Bundle::export_with(Box::new(RealFs::new()), city_root, dest)
     }
 
@@ -50,7 +50,7 @@ impl Bundle {
         mut vfs: Box<dyn Vfs>,
         city_root: &Path,
         dest: &Path,
-    ) -> Result<Manifest, MemoryError> {
+    ) -> Result<Manifest, StorageError> {
         let layout = kernel::layout::CityLayout::new(city_root);
         let ledger_dir = layout.ledger();
         let cas_dir = layout.cas();
@@ -85,7 +85,7 @@ impl Bundle {
         )?;
         let source_head = head_of(vfs.as_ref(), &ledger_dir)?;
         if source_head != manifest.head {
-            return Err(MemoryError::Bundle {
+            return Err(StorageError::Bundle {
                 op: "export",
                 detail: format!(
                     "the city's history ends {source_head} and the bundle's ends {}",
@@ -107,7 +107,7 @@ impl Bundle {
     ///
     /// # Errors
     /// Refuses a directory with no readable manifest.
-    pub fn read_manifest(bundle: &Path) -> Result<Manifest, MemoryError> {
+    pub fn read_manifest(bundle: &Path) -> Result<Manifest, StorageError> {
         let vfs = RealFs::new();
         let at = bundle.join(MANIFEST);
         let bytes = vfs
@@ -127,7 +127,7 @@ impl Bundle {
     /// # Errors
     /// Refuses an occupied city root, a bundle without a manifest, and
     /// any disagreement between the manifest and what was restored.
-    pub fn restore(bundle: &Path, city_root: &Path) -> Result<Manifest, MemoryError> {
+    pub fn restore(bundle: &Path, city_root: &Path) -> Result<Manifest, StorageError> {
         Bundle::restore_with(Box::new(RealFs::new()), bundle, city_root)
     }
 
@@ -135,7 +135,7 @@ impl Bundle {
         mut vfs: Box<dyn Vfs>,
         bundle: &Path,
         city_root: &Path,
-    ) -> Result<Manifest, MemoryError> {
+    ) -> Result<Manifest, StorageError> {
         let mut claimed = {
             let at = bundle.join(MANIFEST);
             let bytes = vfs
@@ -145,7 +145,7 @@ impl Bundle {
         };
         // A bundle carries city files and nothing else: git metadata in
         // one is forged, and restoring it would plant hooks. Refused
-        // before anything is copied, all or nothing (memory-SPEC 8-12),
+        // before anything is copied, all or nothing (storage-SPEC 8-12),
         // except the repository a v0.0.6 export carried whole, whose
         // files that manifest counted and which lands as history.
         let repository = only_city_files(vfs.as_ref(), &bundle.join(CITY))?;
@@ -154,7 +154,7 @@ impl Bundle {
         let ledger_dir = layout.ledger();
         let cas_dir = layout.cas();
         if !walk(vfs.as_ref(), &ledger_dir)?.is_empty() {
-            return Err(MemoryError::Bundle {
+            return Err(StorageError::Bundle {
                 op: "restore",
                 detail: format!("{} already holds a ledger", ledger_dir.display()),
             });
@@ -163,7 +163,7 @@ impl Bundle {
         // went missing is refused while the city root is still empty.
         let carried = Carried::of(vfs.as_ref(), bundle)?;
         if carried != claimed.history {
-            return Err(MemoryError::Bundle {
+            return Err(StorageError::Bundle {
                 op: "restore",
                 detail: format!(
                     "the bundle claims {} history pack(s) and {} ref(s), and holds {} and {}",
@@ -188,7 +188,7 @@ impl Bundle {
             ..Manifest::of(vfs.as_ref(), &ledger_dir, &cas_dir, city_root)?
         };
         if restored != claimed {
-            return Err(MemoryError::Bundle {
+            return Err(StorageError::Bundle {
                 op: "restore",
                 detail: format!(
                     "the bundle claims {} record(s) ending {} with {} cas object(s) and {} file(s), \

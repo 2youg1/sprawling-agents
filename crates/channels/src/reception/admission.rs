@@ -67,7 +67,7 @@ pub enum Pairing {
 /// such a city, so every door admits as paired.
 ///
 /// [`Door::Acp`] is admitted unpaired on purpose: what an
-/// unauthenticated editor may learn is `protocol::admit`'s to word, and
+/// unauthenticated editor may learn is `agent_protocols::admit`'s to word, and
 /// it words it so that a stranger learns exactly one bit. The other three
 /// doors act, so they refuse here.
 ///

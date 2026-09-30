@@ -36,7 +36,7 @@
   // An endpoint is carried by the id a command names it with and read
   // by the name the person gave it. The label is never empty: an
   // endpoint nobody named is labelled with its own id by the city
-  // (`channels::EndpointSummary`), so this list needs no fallback.
+  // (`wire::EndpointSummary`), so this list needs no fallback.
   const options = $derived(
     answer.endpoints.flatMap((endpoint) =>
       endpoint.models.map((row) => ({

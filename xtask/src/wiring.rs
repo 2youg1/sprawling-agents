@@ -5,7 +5,7 @@
 
 //! Wiring gate: every verb on the wire is reachable from the side that is
 //! supposed to reach it, and no other side pretends it is
-//! (channels-SPEC.md section 19).
+//! (wire-SPEC.md section 19).
 //!
 //! **Both directions have failed here, and they fail differently.**
 //!
@@ -26,7 +26,7 @@
 //! on.
 //!
 //! **Three sources, no copies.** The variants come from the real `enum
-//! Command` parsed out of whichever `channels` module declares it; whether
+//! Command` parsed out of whichever `wire` module declares it; whether
 //! the city can perform one comes from `assembly::run_command`'s arms;
 //! whether a person can ask for one comes from `client/src`. The SPEC
 //! contributes the one fact none of the three can state - which side is
@@ -39,7 +39,7 @@ use std::path::Path;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-const SPEC: &str = "crates/channels/channels-SPEC.md";
+const SPEC: &str = "crates/channels/wire-SPEC.md";
 const WIRE_DIR: &str = "crates/channels/src";
 /// Where the assembly point lives. A directory rather than a file: the
 /// gate wants the declaration of `run_command`, not its address, and
@@ -116,7 +116,7 @@ fn performed(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError
     let body = body.as_str();
     let mut out = BTreeSet::new();
     for name in all {
-        let arm = format!("channels::Command::{name}");
+        let arm = format!("wire::Command::{name}");
         let Some(at) = arm_start(body, &arm) else {
             continue;
         };
@@ -124,7 +124,7 @@ fn performed(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError
         // this verb's answer rather than a neighbour's.
         let rest = body.get(at.saturating_add(arm.len())..).unwrap_or_default();
         let end = rest
-            .find("\n            channels::Command::")
+            .find("\n            wire::Command::")
             .unwrap_or(rest.len());
         if !rest.get(..end).unwrap_or_default().contains("not_built") {
             out.insert(name.clone());
@@ -135,7 +135,7 @@ fn performed(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError
 
 /// The tag a variant travels under on the wire, which is the key the
 /// client writes: `PutDocument` is `put_document`. Computed rather than
-/// tabulated, because a table would restate what `channels` already
+/// tabulated, because a table would restate what `wire` already
 /// decides with `rename_all = "snake_case"`.
 fn wire_tag(variant: &str) -> String {
     let mut tag = String::new();
@@ -211,7 +211,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             violations.push(violation(
                 "every Command states which side reaches it",
                 format!("`{name}` is on the wire and absent from the reach table"),
-                "add a row to channels-SPEC.md section 19-2: a verb nobody classified is a \
+                "add a row to wire-SPEC.md section 19-2: a verb nobody classified is a \
                  verb nobody decided to expose",
             ));
             continue;
@@ -228,7 +228,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             Reach::Client if !drawn && built => violations.push(violation(
                 "a verb the city can carry out is reachable from the client",
                 format!("`{name}` is built and no control reaches it"),
-                "draw the control, or change its reach in channels-SPEC.md section 19-2 and \
+                "draw the control, or change its reach in wire-SPEC.md section 19-2 and \
                  say why a person may not ask for it. A capability nobody can reach draws no \
                  complaint, because nobody fails to press a button that is not there",
             )),
@@ -241,7 +241,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             Reach::Push | Reach::Handshake if drawn => violations.push(violation(
                 "a verb that arrives from outside is not a control",
                 format!("`{name}` arrives by push or handshake and the client draws it"),
-                "remove the control, or reclassify it in channels-SPEC.md section 19-2",
+                "remove the control, or reclassify it in wire-SPEC.md section 19-2",
             )),
             _ => {}
         }
@@ -297,10 +297,7 @@ mod tests {
         let root = root();
         let all: BTreeSet<String> = variants(&root, "Command").unwrap().into_iter().collect();
         let table: BTreeSet<String> = declared(&root).unwrap().into_keys().collect();
-        assert_eq!(
-            all, table,
-            "the enum and channels-SPEC section 19-2 disagree"
-        );
+        assert_eq!(all, table, "the enum and wire-SPEC section 19-2 disagree");
     }
 
     #[test]

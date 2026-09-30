@@ -11,7 +11,7 @@ import Sprawling.Frame
 Every line of the Ledger carries a `prev`: a digest of the line before it. One
 Rust function decides that value — `kernel::ledger::chain_hash`, which is
 `B3Hash::digest` over the line's canonical bytes — and one Rust step consumes it,
-`memory::jsonl::open`'s check that a line's `prev` equals the digest of the line
+`storage::jsonl::open`'s check that a line's `prev` equals the digest of the line
 above it. Everything else that trusts the Ledger trusts those two.
 
 **This module never computes a digest.** The hashing function stays an opaque
@@ -62,7 +62,7 @@ namespace Sprawling
 /-- The `prev` a ledger owes, oldest first: the genesis digest for the first
 line, and the digest of the line before it for every later one.
 
-This is the rule `memory::jsonl::open` verifies on every open, written as the
+This is the rule `storage::jsonl::open` verifies on every open, written as the
 sequence a whole ledger owes rather than as a loop over one file. `lines.dropLast`
 is every line but the head — the set that has a successor to be hashed into — so
 a ledger with no line owes no claim and a ledger of one line owes exactly the
@@ -139,8 +139,8 @@ theorem theCoveredLinesDecideTheClaims (hash : String → String) (genesis : Str
 ledgers carry, that they wrote the same covered lines. In the product this is the
 step `runtime::replay::verify_lines` takes on every offline check — it compares a
 line's `prev` with the digest of the line above it and reads a match as "the past
-is what it says" — the same step `memory::jsonl::open::recover_tail` takes when a
-city resumes, and the one `memory::bundle::files::head_of` takes when it insists
+is what it says" — the same step `storage::jsonl::open::recover_tail` takes when a
+city resumes, and the one `storage::bundle::files::head_of` takes when it insists
 on one chain. `aCoveredLineHidesWithoutInjectivity` below is the counterexample
 that shows the hypothesis cannot be dropped.
 

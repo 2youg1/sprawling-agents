@@ -10,7 +10,7 @@
 //! red, which is exactly what should happen when the two disagree.
 //!
 //! The adversary drives the shipped binary over the wire. This enters by the
-//! same door `channels::server` does, so the trace runs without a port.
+//! same door `wire::server` does, so the trace runs without a port.
 
 #![allow(
     clippy::unwrap_used,
@@ -38,15 +38,15 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
     .unwrap();
 
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("acme").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"step1"),
         })
         .unwrap();
 
     let refused2 = worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("acme").unwrap(),
             task: "say something".to_owned(),
             goal: "an answer".to_owned(),
@@ -63,14 +63,14 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
     assert!(!refused2.recovery().is_empty());
 
     worker
-        .handle(channels::Command::Halt {
-            scope: channels::HaltScope::City,
+        .handle(wire::Command::Halt {
+            scope: wire::HaltScope::City,
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"step3"),
         })
         .unwrap();
 
     let refused4 = worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("acme").unwrap(),
             task: "say something".to_owned(),
             goal: "an answer".to_owned(),
@@ -144,8 +144,8 @@ fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {
     // `max_tokens` in every request, so a registration that kept the
     // ceiling unstated is a model this city cannot call at all.
     worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("relay").unwrap(),
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("relay").unwrap(),
             model: "opus-nine".to_owned(),
             tag: kernel::ModelTag::Main,
             context_tokens: None,
@@ -192,14 +192,14 @@ fn attach(
     name: &str,
     base_url: &str,
 ) -> Result<(), kernel::AxError> {
-    worker.handle(channels::Command::AttachEndpoint {
-        name: channels::ProviderName::parse(name)?,
+    worker.handle(wire::Command::AttachEndpoint {
+        name: wire::ProviderName::parse(name)?,
         base_url: base_url.to_owned(),
         dialect: kernel::DialectKind::Anthropic,
         secret: None,
         auth_header: None,
         admit: vec!["opus-nine".to_owned()],
-        tuning: channels::EndpointTuning::default(),
+        tuning: wire::EndpointTuning::default(),
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, name.as_bytes()),
     })
 }

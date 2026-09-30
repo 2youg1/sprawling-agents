@@ -7,8 +7,8 @@
 //! held to, and the account each stage leaves behind.
 
 use kernel::ExecArm;
-use memory::Cas;
 use proptest::prelude::*;
+use storage::Cas;
 
 use crate::offload::OffloadSite;
 use crate::sieve::{

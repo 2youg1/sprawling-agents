@@ -62,7 +62,7 @@ fn a_stale_span_is_refused_with_the_command_that_repairs_it() {
     judge("ARCHITECTURE.md", &found[0], &values(), &mut out);
     assert_eq!(out.len(), 1);
     assert_eq!(out[0].location, "ARCHITECTURE.md:1");
-    assert!(out[0].violation.contains("channels::WIRE_V says `31`"));
+    assert!(out[0].violation.contains("wire::WIRE_V says `31`"));
     assert_eq!(
         out[0].alternative,
         "run `cargo xtask docnum --write` and commit the result"
@@ -107,7 +107,7 @@ fn a_reading_is_taken_once_however_many_spans_quote_it() {
     assert_eq!(taken.len(), 1);
     assert_eq!(
         taken.get("wire_v").map(String::as_str),
-        Some(channels::WIRE_V.to_string().as_str())
+        Some(wire::WIRE_V.to_string().as_str())
     );
 }
 

@@ -35,7 +35,7 @@ const refused = <A>(result: Either.Either<A, ParseResult.ParseError>): string =>
   });
 
 describe("the wire constants", () => {
-  // The version's own value belongs to `channels::WIRE_V`, and
+  // The version's own value belongs to `wire::WIRE_V`, and
   // `xtask wire-ts` is what holds this file equal to it; repeating the
   // number here would be a second home that only ever disagrees. The
   // hash is text rather than a number, so its shape is still worth one

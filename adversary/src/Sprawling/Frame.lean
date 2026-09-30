@@ -9,7 +9,7 @@ import Lean.Data.Json
 # The algebraic mirror of what a socket carries, and nothing else.
 
 This module parses and does not judge. It knows the six frame classes
-`channels::ServerFrame` spells and the shape of a refusal; it does not know
+`wire::ServerFrame` spells and the shape of a refusal; it does not know
 which refusal is owed, which is `Sprawling.Model`'s business.
 
 An answer keeps its name and its body as it arrived. Fifteen queries exist and

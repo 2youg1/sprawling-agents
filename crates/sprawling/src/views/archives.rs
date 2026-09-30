@@ -16,7 +16,7 @@ use super::lines::buildings_of;
 
 /// Every archive entry whose subject contains `needle`, across every
 /// building, read from the shelves at the moment of asking.
-pub(super) fn search_archives(city_root: &Path, needle: &str) -> channels::ArchiveAnswer {
+pub(super) fn search_archives(city_root: &Path, needle: &str) -> wire::ArchiveAnswer {
     let mut hits = Vec::new();
     let wanted = needle.to_lowercase();
     for building in buildings_of(city_root) {
@@ -27,7 +27,7 @@ pub(super) fn search_archives(city_root: &Path, needle: &str) -> channels::Archi
             if !entry.subject.to_lowercase().contains(&wanted) {
                 continue;
             }
-            hits.push(channels::ArchiveHit {
+            hits.push(wire::ArchiveHit {
                 building: building.clone(),
                 kind: entry.kind.as_str().to_owned(),
                 day: entry.day,
@@ -35,7 +35,7 @@ pub(super) fn search_archives(city_root: &Path, needle: &str) -> channels::Archi
             });
         }
     }
-    channels::ArchiveAnswer {
+    wire::ArchiveAnswer {
         needle: needle.to_owned(),
         hits,
     }

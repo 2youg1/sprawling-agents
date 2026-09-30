@@ -47,7 +47,7 @@ impl RunWorker {
                      dispatching it again"
                 ),
             );
-            if let Err(err) = self.set_pursuit(addr, channels::PursuitStep::Pause) {
+            if let Err(err) = self.set_pursuit(addr, wire::PursuitStep::Pause) {
                 self.pursuit_refused(addr, &err);
             }
         }

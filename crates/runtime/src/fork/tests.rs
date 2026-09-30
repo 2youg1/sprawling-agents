@@ -7,7 +7,7 @@
 //! own records, cut at the last line that is a place a conversation can
 //! be cut.
 //!
-//! The ledger is built by a real one (`memory::JsonlLedger`), so the
+//! The ledger is built by a real one (`storage::JsonlLedger`), so the
 //! bytes these tests read are the bytes a run writes: the point of
 //! rebuilding from records is that they survive a process, and a
 //! hand-built payload would not prove that.
@@ -55,7 +55,7 @@ fn mother() -> Mother {
 /// A ledger on disk holding `drafts`, and its index.
 fn verified(drafts: Vec<EventDraft>) -> Mother {
     let dir = tempfile::tempdir().unwrap();
-    let (mut ledger, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+    let (mut ledger, _) = storage::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
     ledger.append_all(drafts).unwrap();
     drop(ledger);
     Mother::written(dir)
@@ -64,12 +64,12 @@ fn verified(drafts: Vec<EventDraft>) -> Mother {
 /// A mother's ledger on disk and the index its only writer keeps over it.
 pub(super) struct Mother {
     dir: tempfile::TempDir,
-    index: memory::LedgerIndex,
+    index: storage::LedgerIndex,
 }
 
 impl Mother {
     pub(super) fn written(dir: tempfile::TempDir) -> Mother {
-        let mut index = memory::LedgerIndex::empty();
+        let mut index = storage::LedgerIndex::empty();
         index.refresh(dir.path()).unwrap();
         Mother { dir, index }
     }
@@ -143,10 +143,10 @@ fn a_mother_run_holding_a_line_of_a_newer_kind_rebuilds_without_it() {
     let drafts = mother_drafts();
     let (head, tail) = drafts.split_at(2);
     {
-        let (mut ledger, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+        let (mut ledger, _) = storage::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
         ledger.append_all(head.to_vec()).unwrap();
     }
-    let segment = memory::ledger_segments_at(dir.path())
+    let segment = storage::ledger_segments_at(dir.path())
         .unwrap()
         .pop()
         .unwrap();
@@ -164,7 +164,7 @@ fn a_mother_run_holding_a_line_of_a_newer_kind_rebuilds_without_it() {
     written.extend_from_slice(future.as_bytes());
     std::fs::write(&segment, written).unwrap();
     {
-        let (mut ledger, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+        let (mut ledger, _) = storage::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
         ledger.append_all(tail.to_vec()).unwrap();
     }
     let with_newer = Mother::written(dir).inherited(Seq::new(4)).unwrap();

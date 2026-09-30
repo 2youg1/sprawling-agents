@@ -28,7 +28,7 @@ impl RunWorker {
         &mut self,
         log: Diagnostics,
     ) -> Result<std::thread::JoinHandle<()>, AxError> {
-        let halt = memory::ChainHalt::default();
+        let halt = storage::ChainHalt::default();
         self.ledger.halt_on(halt.clone());
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         let at = self.ledger.position();
@@ -50,13 +50,13 @@ impl RunWorker {
 /// says what it found. A ledger that could not be read trips it too: an
 /// audit that did not finish proved nothing whole, and a view resumed
 /// from a snapshot has only this audit reading the lines before it.
-fn report_audit(dir: &Path, halt: &memory::ChainHalt, at: Seq, mut log: Diagnostics) {
-    let (level, message) = match memory::audit_chain(dir) {
-        Ok(memory::ChainAudit::Whole { lines }) => (
+fn report_audit(dir: &Path, halt: &storage::ChainHalt, at: Seq, mut log: Diagnostics) {
+    let (level, message) = match storage::audit_chain(dir) {
+        Ok(storage::ChainAudit::Whole { lines }) => (
             Level::Effect,
             format!("the whole ledger chain verified: {lines} lines"),
         ),
-        Ok(memory::ChainAudit::Broken(reason)) => {
+        Ok(storage::ChainAudit::Broken(reason)) => {
             let message = format!(
                 "the ledger stopped taking writes: {reason}; {}",
                 reason.recovery()

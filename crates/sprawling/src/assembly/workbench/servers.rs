@@ -26,12 +26,12 @@ impl Laying {
         servers: &[kernel::McpServer],
         write_root: &std::path::Path,
         confidential: bool,
-    ) -> Vec<protocol::McpTool> {
+    ) -> Vec<agent_protocols::McpTool> {
         if confidential && !servers.is_empty() {
             // Process lifetime is this layer's own business, and an MCP
             // server is a program that may reach the network the moment
             // it starts. Nothing is started here. The tool-level refusal
-            // in `protocol::McpTool::new` stays the authority on whether
+            // in `agent_protocols::McpTool::new` stays the authority on whether
             // such a tool may exist; this is the earlier consequence of
             // that rule, not a second copy of it.
             self.note(
@@ -53,7 +53,7 @@ impl Laying {
         for server in servers {
             // The module a reader is sent to is the transport that
             // failed, not whichever one was written first.
-            let site = protocol::McpLink::site(&server.transport);
+            let site = agent_protocols::McpLink::site(&server.transport);
             match self
                 .connectors
                 .connect(server, write_root, confidential, &resolve)

@@ -25,7 +25,7 @@ use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, B3Hash, EventRecord, Seq, TimeMs};
 
-use crate::wire::Query;
+use crate::frames::Query;
 
 /// Names one upstream city as the interface labels it. Local to this
 /// viewer: the upstream does not know or care what we call it.

@@ -33,7 +33,7 @@ directory left to lose. The page is `client/`: Svelte and Effect, bundled by
 Vite and driven by bun (§2).
 
 **The wire is the seam, not the language.** A second client written against
-`channels::wire` in any language is a supported thing to build; what the
+`wire::frames` in any language is a supported thing to build; what the
 shipped one happens to be written in is a replaceable fact.
 
 ```
@@ -53,11 +53,11 @@ shipped one happens to be written in is a replaceable fact.
 │        ├── city    ── buildings, residents, rooms, archive,  │
 │        │              library, schedule                      │
 │        ├── browser ── WebDriver BiDi sessions, snapshots     │
-│        ├── protocol── MCP outbound, ACP inbound              │
-│        ├── memory  ── Ledger, CAS, projections, git, Vfs     │
+│        ├── agent_protocols ── MCP outbound, ACP inbound      │
+│        ├── storage ── Ledger, CAS, projections, git, Vfs     │
 │        ├── gateway ── routing, dialects, market, cost,       │
 │        │              credentials                            │
-│        └── channels ─ WebSocket server, Command/Query/Event, │
+│        └── wire ───── WebSocket server, Command/Query/Event, │
 │                 │     admission                              │
 │                 ▼                                            │
 │       client (TypeScript, served from inside the binary)     │
@@ -89,9 +89,9 @@ every week.
 | Concern | Choice | Why it, and what it costs |
 |---|---|---|
 | Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, the oldest supported compiler in `Cargo.toml`'s `rust-version` | The invariants this design cares about are expressible as types, and `#![forbid(unsafe_code)]` holds workspace-wide. Cost: compile times, and a client that has to be built before the binary that embeds it. |
-| Async runtime | `tokio`, only in `channels` and the binary | The turn loop is synchronous on purpose — a decision that awaits is a decision that interleaves. Async stops at the process boundary. Cost: one blocking HTTP call per model request, paid inside a worker rather than a reactor. |
+| Async runtime | `tokio`, only in `wire` and the binary | The turn loop is synchronous on purpose — a decision that awaits is a decision that interleaves. Async stops at the process boundary. Cost: one blocking HTTP call per model request, paid inside a worker rather than a reactor. |
 | Inbound WebSocket | `axum` with its `ws` feature (`crates/channels/Cargo.toml`) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
-| Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (channels-SPEC section 8-41). |
+| Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (wire-SPEC section 8-41). |
 | HTTP client | `reqwest`, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. |
 | Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `xtask/src/npm.rs`: Svelte, Effect and the `@lezer` highlighters, and no framework runtime beyond them. Svelte compiles its templates away, and Effect is used for one job, decoding the wire. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
@@ -156,17 +156,17 @@ number appears in this sentence.
 
 ```depmap
 kernel:
-memory: kernel
+storage: kernel
 gateway: kernel
-runtime: kernel, memory, gateway
-collab: kernel, memory
+runtime: kernel, storage, gateway
+collab: kernel, storage
 city: kernel
 browser: kernel
-protocol: kernel, gateway
-channels: kernel
-remote: kernel
-accounting: kernel, gateway, protocol, channels, city, collab
-sprawling: kernel, memory, gateway, runtime, collab, city, browser, protocol, channels, accounting, desktop
+agent_protocols: kernel, gateway
+wire: kernel
+remote_access: kernel
+accounting: kernel, gateway, agent_protocols, wire, city, collab
+sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop
 desktop:
 ```
 
@@ -205,11 +205,11 @@ repository readable:
 | Edge | When it exists | Example |
 |---|---|---|
 | Dependency | compile time | `runtime → kernel` |
-| Assembly | run time, only in `bin::assembly` | the upload sink in `channels::server` receiving `memory::cas` |
+| Assembly | run time, only in `bin::assembly` | the upload sink in `wire::server` receiving `storage::cas` |
 | Event | anywhere a `kernel::Ledger` handle is held | writing `tool_result` after a tool runs |
 
 Below the binary each crate that holds a domain uses at most two others:
-`runtime` and `collab` each use `kernel` and `memory`, and `protocol` uses
+`runtime` and `collab` each use `kernel` and `storage`, and `agent_protocols` uses
 `kernel` and `gateway` (an MCP server reached over HTTP gets its client
 from `gateway::client_for`, the one place a client is built). The `depmap`
 block also lets `runtime` use `gateway`, and the code does not take that
@@ -228,7 +228,7 @@ simulated adapters — a scripted model, scripted tools, an in-memory Ledger
 its MCP servers through `accounting::Connectors`, its time through
 `accounting::Clock` and the machine it runs on through
 `accounting::Machine`, and integration tests
-drive a dispatch against scripted ones by the same door `channels::server`
+drive a dispatch against scripted ones by the same door `wire::server`
 uses, but the worker itself still lives in
 `sprawling`, which citysim does not depend on. A scripted scenario that
 reproduces a whole dispatch needs the worker moved into `accounting`.
@@ -250,7 +250,7 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `runtime::sandbox` | crates/runtime/src/sandbox.rs | wasmtime with fuel metering | pass-through and fault doubles |
 | `runtime::turn::wave` | crates/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `bin::assembly::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
-| `protocol::mcp` | crates/protocol/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
+| `agent_protocols::mcp` | crates/protocol/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
 | `accounting::models` | crates/accounting/src/models.rs | `bin::assembly::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
 | `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::SystemClock`: the wall clock, the one sampling point | the stopped clock in `crates/sprawling/tests/clock.rs` |
 | `accounting::connectors` | crates/accounting/src/connectors.rs | `bin::assembly::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
@@ -261,7 +261,7 @@ deleted would still read as real here. That is a known hole, not a
 guarantee.
 
 **Two inner seams** stay `pub(crate)` because nothing outside their crate
-needs them: `memory`'s `Vfs` (real filesystem / deterministic power-loss
+needs them: `storage`'s `Vfs` (real filesystem / deterministic power-loss
 model) and `gateway`'s `Vault` (platform credential service / in-session
 store).
 
@@ -280,7 +280,7 @@ than any diagram of boxes.
    sends `Command::Dispatch` over the WebSocket. The frame carries no
    ceiling of any kind: nobody can price a piece of work before it runs,
    and the one brake is `Halt`.
-2. **`channels::server` decides whether to accept it.** Two pure
+2. **`wire::server` decides whether to accept it.** Two pure
    judgements — may this address be bound, may this peer be accepted — with
    the socket code that surrounds them making no judgement at all.
 3. **`bin::assembly` turns it into work.** This is the only place that
@@ -322,7 +322,7 @@ than any diagram of boxes.
 10. **Tools run behind gates.** `kernel::gate` answers with an exhaustive
     verdict — allowed, refused in three parts, or escalated to a person.
     `runtime::run::fence` decides whether a wave needs a git fence first,
-    `memory::checkpoint` commits the fence and scans the worktree after the
+    `storage::checkpoint` commits the fence and scans the worktree after the
     wave, and anything that disappeared becomes a `file_discarded` event
     carrying the way back.
 11. **The result comes back shaped.** `runtime::pipeline` builds the result
@@ -330,7 +330,7 @@ than any diagram of boxes.
     `runtime::compaction` shortens what is too long, always reporting how
     much it dropped.
 12. **Everything lands in the Ledger, and the views follow.**
-    `memory::hot` and `memory::attribution` fold the same event stream into
+    `storage::hot` and `storage::attribution` fold the same event stream into
     what the pages ask for. The views fold each record on their own thread
     (`bin::serving::folding`), and only then is it broadcast to every socket
     as one `Committed` frame, so a page that asks right after an event
@@ -476,8 +476,8 @@ the part worth knowing before starting, not after.
 
 | To change this | Go here | Held by |
 |---|---|---|
-| a new event kind, or a payload | `kernel::event` + kernel-SPEC | the kind set is closed; `memory` fixtures compare bytes across platforms |
-| a new `Command` or `Query` frame | `channels::wire` + channels-SPEC | `WIRE_V` must rise, and every `Query` must be answered or it does not compile |
+| a new event kind, or a payload | `kernel::event` + kernel-SPEC | the kind set is closed; `storage` fixtures compare bytes across platforms |
+| a new `Command` or `Query` frame | `wire::frames` + wire-SPEC | `WIRE_V` must rise, and every `Query` must be answered or it does not compile |
 | what a model may call | `runtime::catalog`, tools in `runtime` or `collab` | `kernel::tool` is the seam; a tool with no conformance suite is not a seam |
 | how a provider is spoken to | `gateway::dialect` + gateway-SPEC | a pure two-way translation with the canonical shape in the middle |
 | how a key is kept and redeemed | `gateway::credential` | plaintext may reach only the platform vault; `secret` gate reads every boundary |
@@ -564,7 +564,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review. A library crate starts a thread in five places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `protocol::mcp::stdio` and `protocol::mcp::sse` give each MCP connection one reader that ends when the connection closes; and `protocol::harness::reading` gives each harness session one reader that ends when the harness closes its output or the session drops the channel. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the driving lanes in `bin::assembly::pool`, the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, the console, first run, and the doctor's probes |
+| 3 | One spawn point | review. A library crate starts a thread in five places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::stdio` and `agent_protocols::mcp::sse` give each MCP connection one reader that ends when the connection closes; and `agent_protocols::harness::reading` gives each harness session one reader that ends when the harness closes its output or the session drops the channel. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the driving lanes in `bin::assembly::pool`, the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, the console, first run, and the doctor's probes |
 | 4 | No random source on a decision path; OS entropy mints only values a stranger must not guess | review; citysim has no random source to seed |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
@@ -744,38 +744,38 @@ arrow runs from a crate to one it may use.
 <!-- xtask:begin crate_graph -->
 ```mermaid
 flowchart TD
-    accounting --> channels
+    accounting --> agent_protocols
     accounting --> city
     accounting --> collab
     accounting --> gateway
     accounting --> kernel
-    accounting --> protocol
+    accounting --> wire
+    agent_protocols --> gateway
+    agent_protocols --> kernel
     browser --> kernel
-    channels --> kernel
     city --> kernel
     collab --> kernel
-    collab --> memory
+    collab --> storage
     desktop
     gateway --> kernel
     kernel
-    memory --> kernel
-    protocol --> gateway
-    protocol --> kernel
-    remote --> kernel
+    remote_access --> kernel
     runtime --> gateway
     runtime --> kernel
-    runtime --> memory
+    runtime --> storage
     sprawling --> accounting
+    sprawling --> agent_protocols
     sprawling --> browser
-    sprawling --> channels
     sprawling --> city
     sprawling --> collab
     sprawling --> desktop
     sprawling --> gateway
     sprawling --> kernel
-    sprawling --> memory
-    sprawling --> protocol
     sprawling --> runtime
+    sprawling --> storage
+    sprawling --> wire
+    storage --> kernel
+    wire --> kernel
 ```
 <!-- xtask:end -->
 
@@ -785,7 +785,7 @@ flowchart TD
 sequenceDiagram
     autonumber
     participant W as WebUI
-    participant S as channels::server
+    participant S as wire::server
     participant D as bin::assembly::desk
     participant A as accounting thread
     participant L as lane
@@ -883,7 +883,7 @@ flowchart TD
 sequenceDiagram
     autonumber
     participant M as sprawling serve
-    participant S as channels::server
+    participant S as wire::server
     participant P as projection
     participant A as accounting thread
     participant R as Ledger

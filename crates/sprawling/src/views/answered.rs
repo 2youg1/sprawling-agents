@@ -34,7 +34,7 @@ impl Views {
         let ruled = record
             .data()
             .read::<kernel::event::record::ApprovalResolved>()?;
-        self.decided.push(channels::Decision {
+        self.decided.push(wire::Decision {
             item: ruled.id.as_str().to_owned(),
             verdict: ruled.verdict,
             cluster: ruled.cluster,

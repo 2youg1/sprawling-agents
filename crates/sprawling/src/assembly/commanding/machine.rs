@@ -79,7 +79,7 @@ impl RunWorker {
         );
         let found = self.machine.report();
         let here = found.items.iter().any(|each| {
-            each.name == item && matches!(each.state, channels::DoctorState::Present { .. })
+            each.name == item && matches!(each.state, wire::DoctorState::Present { .. })
         });
         self.show_this_machine(found);
         if here {
@@ -113,7 +113,7 @@ impl RunWorker {
 
     /// Hands one answer about this machine to whoever is showing it,
     /// and writes the line that says it was taken.
-    fn show_this_machine(&mut self, found: channels::DoctorAnswer) {
+    fn show_this_machine(&mut self, found: wire::DoctorAnswer) {
         let items = found.items.len();
         if let Some(serving) = self.serving.as_ref() {
             (serving.machine)(found);
@@ -158,7 +158,7 @@ mod tests {
             city_root,
             gateway::Custodian::in_memory(),
             runtime::diagnostics::Diagnostics::off(),
-            memory::JsonlLedger::open(
+            storage::JsonlLedger::open(
                 &kernel::layout::CityLayout::new(city_root).ledger(),
                 accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
             )
@@ -201,7 +201,7 @@ mod tests {
     }
 
     impl accounting::Machine for Recording {
-        fn report(&self) -> channels::DoctorAnswer {
+        fn report(&self) -> wire::DoctorAnswer {
             let items = match self.1 {
                 Finds::Nothing => Vec::new(),
                 Finds::WhatWasInstalled => self
@@ -209,34 +209,34 @@ mod tests {
                     .lock()
                     .unwrap()
                     .iter()
-                    .map(|_installed| channels::DoctorItem {
+                    .map(|_installed| wire::DoctorItem {
                         name: SCRIPTED.to_owned(),
-                        tier: channels::DoctorTier::Develop,
-                        need: channels::DoctorNeed::Required,
+                        tier: wire::DoctorTier::Develop,
+                        need: wire::DoctorNeed::Required,
                         homepage: None,
-                        state: channels::DoctorState::Present {
+                        state: wire::DoctorState::Present {
                             at: "/bin/scripted-tool".to_owned(),
-                            version: channels::DoctorVersion::Silent,
+                            version: wire::DoctorVersion::Silent,
                         },
-                        install: channels::DoctorInstall::UnknownPlatform,
+                        install: wire::DoctorInstall::UnknownPlatform,
                         pinned: None,
                         pack: None,
                     })
                     .collect(),
             };
-            channels::DoctorAnswer {
+            wire::DoctorAnswer {
                 items,
                 tiers: Vec::new(),
-                sandbox: channels::DoctorSandbox {
-                    arm: channels::DoctorSandboxArm::CopiedTree,
+                sandbox: wire::DoctorSandbox {
+                    arm: wire::DoctorSandboxArm::CopiedTree,
                     coverage: Vec::new(),
                 },
-                custody: channels::DoctorCustody {
-                    store: channels::DoctorCustodyStore::SessionMemory,
-                    keeps: channels::DoctorCustodyLifetime::ThisProcess,
+                custody: wire::DoctorCustody {
+                    store: wire::DoctorCustodyStore::SessionMemory,
+                    keeps: wire::DoctorCustodyLifetime::ThisProcess,
                     refusal: None,
                 },
-                core: channels::DoctorCore::HeldBySetting,
+                core: wire::DoctorCore::HeldBySetting,
             }
         }
 

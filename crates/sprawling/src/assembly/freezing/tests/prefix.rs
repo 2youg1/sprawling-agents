@@ -26,9 +26,9 @@ fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
@@ -41,7 +41,7 @@ fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
     )
     .unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "measure the thing".to_owned(),
             goal: "a number with a unit, then stop".to_owned(),
@@ -75,9 +75,9 @@ fn the_workspaces_conventions_come_before_the_buildings_own() {
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
@@ -98,7 +98,7 @@ Every measurement is recorded in millivolts.
     )
     .unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "measure the thing".to_owned(),
             goal: "a number with a unit, then stop".to_owned(),
@@ -132,14 +132,14 @@ fn a_building_without_the_file_gets_no_heading_for_it() {
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "measure the thing".to_owned(),
             goal: "a number, then stop".to_owned(),
@@ -165,9 +165,9 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
@@ -184,7 +184,7 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
     )
     .unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room.clone(),
             task: "measure the thing".to_owned(),
             goal: "a number with a unit, then stop".to_owned(),
@@ -229,14 +229,14 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "measure the thing".to_owned(),
             goal: "a number with a unit, then stop".to_owned(),
@@ -264,19 +264,19 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
         })
         .expect("a dispatch assembles a prompt");
 
-    let channels::Answer::Prefix(answer) =
-        crate::views::ask(dir.path(), &channels::Query::Prefix { run }).unwrap()
+    let wire::Answer::Prefix(answer) =
+        crate::views::ask(dir.path(), &wire::Query::Prefix { run }).unwrap()
     else {
         panic!("Prefix answers with a prefix");
     };
-    let slots: Vec<channels::PrefixSlot> = answer.segments.iter().map(|s| s.slot).collect();
+    let slots: Vec<wire::PrefixSlot> = answer.segments.iter().map(|s| s.slot).collect();
     assert_eq!(
         slots,
         vec![
-            channels::PrefixSlot::City,
-            channels::PrefixSlot::Building,
-            channels::PrefixSlot::Resident,
-            channels::PrefixSlot::Run,
+            wire::PrefixSlot::City,
+            wire::PrefixSlot::Building,
+            wire::PrefixSlot::Resident,
+            wire::PrefixSlot::Run,
         ]
     );
     for segment in &answer.segments {
@@ -291,7 +291,7 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
     let building = answer
         .segments
         .iter()
-        .find(|segment| segment.slot == channels::PrefixSlot::Building)
+        .find(|segment| segment.slot == wire::PrefixSlot::Building)
         .expect("the building slot is one of the four");
     assert!(
         building.text.contains("confidential = false"),
@@ -310,8 +310,8 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
     // And the general store read reaches the same bytes by locator.
     let locator =
         kernel::Locator::parse(&format!("cas:b3-{}", building.hash)).expect("a stored segment");
-    let channels::Answer::Content(content) =
-        crate::views::ask(dir.path(), &channels::Query::Content { locator }).unwrap()
+    let wire::Answer::Content(content) =
+        crate::views::ask(dir.path(), &wire::Query::Content { locator }).unwrap()
     else {
         panic!("Content answers with content");
     };
@@ -329,7 +329,7 @@ fn segments_of_a_review_dispatch() -> Vec<(String, String)> {
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "measure the thing".to_owned(),
             goal: "a number with a unit, then stop".to_owned(),

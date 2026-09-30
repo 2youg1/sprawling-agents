@@ -68,7 +68,7 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
     // account (drive backstop). What must never happen is
     // a chat POST reaching the endpoint.
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("vault/room1").unwrap(),
             task: "read the private notes".to_owned(),
             goal: "summarise them".to_owned(),
@@ -141,7 +141,7 @@ fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "find the combination".to_owned(),
             goal: "report it".to_owned(),
@@ -201,7 +201,7 @@ fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "tidy the room".to_owned(),
             goal: "remove the stale note".to_owned(),
@@ -237,7 +237,7 @@ fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
 
 /// What the Ledger means by "every effect becomes an EventRecord
 /// first", read from the one place where *first* is visible: the
-/// write observer, which `memory::jsonl` runs on the appending
+/// write observer, which `storage::jsonl` runs on the appending
 /// thread **after** the line is durable.
 ///
 /// One run files a decision on the building's shelf and takes a row

@@ -46,7 +46,7 @@ pub(crate) enum Output {
 pub(crate) fn top(at: &str, token: Option<&str>, output: Output) -> Result<(), AxError> {
     let greeting = serde_json::to_string(&hello(token))
         .map_err(|err| malformed("encode the greeting", &err.to_string()))?;
-    let watch = serde_json::to_string(&channels::ClientFrame::Monitor(channels::Monitoring::Watch))
+    let watch = serde_json::to_string(&wire::ClientFrame::Monitor(wire::Monitoring::Watch))
         .map_err(|err| malformed("encode the watch frame", &err.to_string()))?;
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -105,7 +105,7 @@ pub(crate) fn shown(
     output: Output,
     curve_width: usize,
 ) -> Option<String> {
-    let Ok(channels::ServerFrame::Monitor(sample)) = serde_json::from_str(text) else {
+    let Ok(wire::ServerFrame::Monitor(sample)) = serde_json::from_str(text) else {
         return None;
     };
     if history.len() >= CAPACITY {

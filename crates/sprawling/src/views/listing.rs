@@ -21,8 +21,8 @@ use kernel::Address;
 ///
 /// Takes the city root rather than the views: it reads the disk, and
 /// runs after the view lock is released (sprawling-SPEC.md 8-100).
-pub(super) fn listing_answer(city_root: &Path, at: Option<Address>) -> channels::ListingAnswer {
-    channels::ListingAnswer {
+pub(super) fn listing_answer(city_root: &Path, at: Option<Address>) -> wire::ListingAnswer {
+    wire::ListingAnswer {
         entries: list(&resolve(city_root, at.as_ref())),
         at,
     }
@@ -36,7 +36,7 @@ pub(super) fn resolve(city_root: &Path, at: Option<&Address>) -> std::path::Path
     }
 }
 
-fn list(dir: &Path) -> Vec<channels::Entry> {
+fn list(dir: &Path) -> Vec<wire::Entry> {
     let Ok(read) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
@@ -50,14 +50,14 @@ fn list(dir: &Path) -> Vec<channels::Entry> {
             continue;
         };
         if meta.is_dir() {
-            directories.push(channels::Entry {
+            directories.push(wire::Entry {
                 name,
-                kind: channels::EntryKind::Directory,
+                kind: wire::EntryKind::Directory,
             });
         } else {
-            files.push(channels::Entry {
+            files.push(wire::Entry {
                 name,
-                kind: channels::EntryKind::File { bytes: meta.len() },
+                kind: wire::EntryKind::File { bytes: meta.len() },
             });
         }
     }
@@ -79,7 +79,7 @@ mod tests {
     use super::*;
     use crate::views::Views;
 
-    fn names(entries: &[channels::Entry]) -> Vec<&str> {
+    fn names(entries: &[wire::Entry]) -> Vec<&str> {
         entries.iter().map(|entry| entry.name.as_str()).collect()
     }
 
@@ -90,9 +90,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         crate::assembly::init_city(dir.path()).unwrap();
         let mut views = Views::new(dir.path());
-        let channels::Answer::Listing(answer) =
-            views.answer(&channels::Query::Listing { at: None })
-        else {
+        let wire::Answer::Listing(answer) = views.answer(&wire::Query::Listing { at: None }) else {
             panic!("Listing answers with a listing");
         };
         assert_eq!(answer.at, None);
@@ -113,20 +111,19 @@ mod tests {
         crate::assembly::init_city(dir.path()).unwrap();
         let mut views = Views::new(dir.path());
         let hall = Address::parse("hall").unwrap();
-        let channels::Answer::Listing(answer) =
-            views.answer(&channels::Query::Listing { at: Some(hall) })
+        let wire::Answer::Listing(answer) = views.answer(&wire::Query::Listing { at: Some(hall) })
         else {
             panic!("Listing answers with a listing");
         };
         let first_file = answer
             .entries
             .iter()
-            .position(|entry| matches!(entry.kind, channels::EntryKind::File { .. }))
+            .position(|entry| matches!(entry.kind, wire::EntryKind::File { .. }))
             .expect("a building has files at its root");
         assert!(
             answer.entries[..first_file]
                 .iter()
-                .all(|entry| entry.kind == channels::EntryKind::Directory),
+                .all(|entry| entry.kind == wire::EntryKind::Directory),
             "{:?}",
             names(&answer.entries)
         );
@@ -136,7 +133,7 @@ mod tests {
             .iter()
             .find(|entry| entry.name == "Roadmap.md")
             .unwrap();
-        assert!(matches!(roadmap.kind, channels::EntryKind::File { bytes } if bytes > 0));
+        assert!(matches!(roadmap.kind, wire::EntryKind::File { bytes } if bytes > 0));
     }
 
     /// A directory nobody can open is an empty directory on the page.
@@ -145,7 +142,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut views = Views::new(dir.path());
         let nowhere = Address::parse("nowhere/at/all").unwrap();
-        let channels::Answer::Listing(answer) = views.answer(&channels::Query::Listing {
+        let wire::Answer::Listing(answer) = views.answer(&wire::Query::Listing {
             at: Some(nowhere.clone()),
         }) else {
             panic!("Listing answers with a listing");

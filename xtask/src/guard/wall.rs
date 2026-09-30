@@ -28,7 +28,7 @@
 //! an exception nobody decided to keep granting.
 //!
 //! Two facts beyond the manifest are compared for the same reason. The
-//! protocol revision this server speaks is `protocol::PROTOCOL_VERSION`
+//! protocol revision this server speaks is `agent_protocols::PROTOCOL_VERSION`
 //! written a second time, because the two ends must agree to talk at
 //! all; and every `E_` code the package spells is required to be one
 //! `kernel` already defines, which is the boundary section 8.5 drew

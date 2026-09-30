@@ -59,7 +59,7 @@ fn a_named_bare_string_is_a_branded_string_and_an_integer_a_branded_int() {
     );
 }
 
-/// The body size a person may ask for is the channels crate's pair, and
+/// The body size a person may ask for is the wire crate's pair, and
 /// the appearance page reads it from here rather than spelling it: two
 /// copies of one range are two ranges the first time either moves.
 #[test]
@@ -68,8 +68,8 @@ fn the_body_size_range_is_the_one_the_city_holds() {
     let stated = format!(
         "export const BODY_PX = {{ min: {}, max: {} }} as const;
 ",
-        channels::BODY_PX_MIN,
-        channels::BODY_PX_MAX
+        wire::BODY_PX_MIN,
+        wire::BODY_PX_MAX
     );
     assert!(text.contains(&stated), "{stated}");
 }
@@ -192,7 +192,7 @@ fn a_type_that_refers_to_itself_is_refused() {
 
 #[test]
 fn the_real_wire_comes_out_whole() {
-    let text = emit(&channels::wire_schema(), &constants())
+    let text = emit(&wire::wire_schema(), &constants())
         .unwrap_or_else(|refused| panic!("refused at {}: {}", refused.at, refused.why));
     for name in [
         "ClientFrame",

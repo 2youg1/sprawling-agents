@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The whole chain walked from genesis, one segment and one line at a
-//! time, and the halt a broken chain trips on the writer (memory-SPEC
+//! time, and the halt a broken chain trips on the writer (storage-SPEC
 //! 8-27). The audit is a query; tripping the halt is the caller's command.
 
 use std::fs::File;
@@ -14,7 +14,7 @@ use std::sync::{Arc, OnceLock};
 
 use kernel::AxError;
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::jsonl::{JsonlLedger, LineCheck, ledger_segments_at};
 
 /// What walking the whole chain found.
@@ -43,9 +43,9 @@ impl ChainHalt {
         self.0.get()
     }
 
-    pub(crate) fn admit(&self) -> Result<(), MemoryError> {
+    pub(crate) fn admit(&self) -> Result<(), StorageError> {
         self.0.get().map_or(Ok(()), |reason| {
-            Err(MemoryError::ChainHalted {
+            Err(StorageError::ChainHalted {
                 source: reason.clone(),
             })
         })
@@ -64,8 +64,8 @@ impl JsonlLedger {
 /// the one per-line check. Read-only; holds one line at a time.
 ///
 /// # Errors
-/// `MemoryError::Io` when a segment cannot be listed, opened or read.
-pub fn audit_chain(dir: &Path) -> Result<ChainAudit, MemoryError> {
+/// `StorageError::Io` when a segment cannot be listed, opened or read.
+pub fn audit_chain(dir: &Path) -> Result<ChainAudit, StorageError> {
     let mut check = LineCheck::at_genesis();
     let mut lines: u64 = 0;
     let mut line = Vec::new();

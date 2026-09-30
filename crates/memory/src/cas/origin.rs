@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whose a block is: the run and the building it was put for, recorded
-//! when it is put (memory-SPEC section 8-3).
+//! when it is put (storage-SPEC section 8-3).
 //!
 //! The same bytes may be put for two buildings, so a block keeps every
 //! origin it was put for, one line each, in `<dir>/from/<shard>/<hex>`.
@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use kernel::{Address, B3Hash, RunId};
 
 use super::Cas;
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 
 /// The run and the building a block was put for.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,8 +31,8 @@ impl Cas {
     /// with the same origin adds nothing.
     ///
     /// # Errors
-    /// `MemoryError::Io` naming the path the store would not take.
-    pub fn put_for(&mut self, bytes: &[u8], origin: &BlockOrigin) -> Result<B3Hash, MemoryError> {
+    /// `StorageError::Io` naming the path the store would not take.
+    pub fn put_for(&mut self, bytes: &[u8], origin: &BlockOrigin) -> Result<B3Hash, StorageError> {
         let hash = self.put(bytes)?;
         let line = format!("{} {}", origin.run, origin.building.as_str());
         let (shard_dir, path) = self.origin_path(&hash);
@@ -73,8 +73,8 @@ impl Cas {
     /// block put with no origin and for a hash the store never saw.
     ///
     /// # Errors
-    /// `MemoryError::Io` when a record exists and cannot be read.
-    pub fn origins(&self, hash: &B3Hash) -> Result<Vec<BlockOrigin>, MemoryError> {
+    /// `StorageError::Io` when a record exists and cannot be read.
+    pub fn origins(&self, hash: &B3Hash) -> Result<Vec<BlockOrigin>, StorageError> {
         let (_, path) = self.origin_path(hash);
         if !self.vfs.exists(&path) {
             return Ok(Vec::new());

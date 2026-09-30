@@ -15,8 +15,8 @@ use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
 use kernel::{AxError, EventRecord, Seq};
-use memory::{ChainSnapshot, CheckedLine, LedgerIndex, MemoryError, SnapshotStart, WholeFold};
 use runtime::replay::fold_ledger_dir;
+use storage::{ChainSnapshot, CheckedLine, LedgerIndex, SnapshotStart, StorageError, WholeFold};
 
 /// The city a ledger directory belongs to, two levels up.
 pub(crate) fn city_root_of(ledger_dir: &Path) -> &Path {
@@ -85,8 +85,8 @@ pub(crate) enum FoldStart {
 /// cannot read, and an I/O failure reading the ledger or the snapshot.
 pub(crate) fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> {
     let city_root = city_root_of(ledger_dir);
-    match memory::start_from_snapshot(ledger_dir, &snapshot_dir::<F>(city_root), F::fold_version())
-        .map_err(MemoryError::into_ax)?
+    match storage::start_from_snapshot(ledger_dir, &snapshot_dir::<F>(city_root), F::fold_version())
+        .map_err(StorageError::into_ax)?
     {
         SnapshotStart::Resume { snapshot, tail } => match F::decode(city_root, snapshot.views()) {
             Ok(folded) => resume(folded, &snapshot, tail),
@@ -111,9 +111,9 @@ pub(crate) fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, Ax
 /// The audit's reason when the chain is broken or cannot be read, and
 /// those of [`start`].
 pub(crate) fn start_audited<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> {
-    match memory::audit_chain(ledger_dir).map_err(MemoryError::into_ax)? {
-        memory::ChainAudit::Whole { .. } => start(ledger_dir),
-        memory::ChainAudit::Broken(reason) => Err(reason),
+    match storage::audit_chain(ledger_dir).map_err(StorageError::into_ax)? {
+        storage::ChainAudit::Whole { .. } => start(ledger_dir),
+        storage::ChainAudit::Broken(reason) => Err(reason),
     }
 }
 
@@ -140,8 +140,8 @@ pub(crate) fn cut_at<F: SnapshotFold>(
         return Ok(());
     };
     let snapshot = ChainSnapshot::cut(F::fold_version(), *seq, line, folded.encode()?);
-    memory::write_snapshot(&snapshot_dir::<F>(city_root_of(ledger_dir)), &snapshot)
-        .map_err(MemoryError::into_ax)
+    storage::write_snapshot(&snapshot_dir::<F>(city_root_of(ledger_dir)), &snapshot)
+        .map_err(StorageError::into_ax)
 }
 
 /// The last line `index` holds, with its seq, where a snapshot of what
@@ -163,7 +163,7 @@ pub(crate) fn last_line(
                 .map(|line| (seq, line))
         })
         .transpose()
-        .map_err(MemoryError::into_ax)
+        .map_err(StorageError::into_ax)
 }
 
 impl std::fmt::Display for FoldStart {

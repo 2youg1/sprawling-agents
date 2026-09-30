@@ -8,8 +8,8 @@
 use std::path::Path;
 
 use kernel::AxError;
-use memory::{JsonlLedger, OpenReport};
 use runtime::replay::fold_ledger_dir;
+use storage::{JsonlLedger, OpenReport};
 
 // The governance fold lives in `views`, where the reading side keeps
 // one too. Named here so the worker that judges from it reads under
@@ -112,7 +112,7 @@ pub(crate) fn fold_city(
 ) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError> {
     let (ledger, report) =
         JsonlLedger::open(ledger_dir, accounting::Clock::now(&super::SystemClock)?)
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
     let mut views = Views::over(ledger_dir);
     let mut standing = StandingFolds::empty(city_root_of(ledger_dir));
     let index = fold_ledger_dir(ledger_dir, |record| {

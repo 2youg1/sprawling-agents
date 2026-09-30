@@ -86,7 +86,7 @@ addr = \"gone/room1\"
     // Not a refusal: nothing listening is a fact about the city, and
     // the person who wrote the table is the one who can act on it.
     worker
-        .handle(channels::Command::Wake {
+        .handle(wire::Command::Wake {
             source: "github".to_owned(),
             subject: "pr opened".to_owned(),
             body: "x".to_owned(),
@@ -110,9 +110,9 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
     )
     .unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
@@ -121,7 +121,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
     assert!(!before.sandbox.shell, "the shell arm is off by default");
 
     worker
-        .handle(channels::Command::ConfigureBuilding {
+        .handle(wire::Command::ConfigureBuilding {
             addr: room.clone(),
             sandbox: Some(kernel::SandboxLimits {
                 shell: true,
@@ -180,16 +180,16 @@ fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
     .unwrap();
     let lab = Address::parse("lab").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: lab.clone(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
 
     let allowlist = "[[window]]\ntitle = \"kusanagi\"\n";
     worker
-        .handle(channels::Command::ConfigureBuilding {
+        .handle(wire::Command::ConfigureBuilding {
             addr: lab.clone(),
             sandbox: None,
             mcp: None,
@@ -239,9 +239,9 @@ fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
@@ -249,7 +249,7 @@ fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
     assert!(!before.review(), "the template does not ask for review");
 
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "this building's work needs checking before it lands".to_owned(),
             goal: "the rules say so, then stop".to_owned(),

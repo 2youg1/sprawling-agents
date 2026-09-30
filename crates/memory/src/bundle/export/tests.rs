@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Fixtures for exporting, restoring and weighing a bundle (memory-SPEC 8-12).
+//! Fixtures for exporting, restoring and weighing a bundle (storage-SPEC 8-12).
 
 use super::super::files::open_restored;
 use super::super::fixture::city_with;
@@ -219,7 +219,7 @@ fn a_restore_through_a_link_to_a_reserved_path_is_refused() {
 /// A restore whose destination reaches a protected path through a
 /// link is refused whole, and the link's target gains no directory:
 /// the alias check precedes directory creation, so no parent is ever
-/// made through the link (memory-SPEC 8-25).
+/// made through the link (storage-SPEC 8-25).
 #[test]
 fn a_restore_through_a_link_lands_no_directory_at_the_link_target() {
     let home = tempfile::tempdir().unwrap();

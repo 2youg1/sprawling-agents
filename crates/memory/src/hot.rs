@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::{Address, EventKind, EventRecord, RunId, Seq, TimeMs};
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 /// A Run's phase as the hot view sees it. Freezing is terminal here:
 /// the ledger may keep appending to a frozen Run's history, but the
@@ -114,7 +114,7 @@ impl RunHot {
 /// How many frozen runs the hot view holds besides every active one,
 /// and so how many a city view carries. A bound on the size of an
 /// answer on the wire, not a machine reading, so it is a constant
-/// (memory-SPEC section 8-5).
+/// (storage-SPEC section 8-5).
 pub const RECENT_FROZEN: usize = 32;
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
@@ -133,7 +133,7 @@ impl HotView {
 
     /// Folds one record in. Records at or below a Run's last seq are
     /// ignored, so re-feeding a segment is free of consequence.
-    pub fn apply(&mut self, record: &EventRecord) -> Result<(), MemoryError> {
+    pub fn apply(&mut self, record: &EventRecord) -> Result<(), StorageError> {
         let run = record.run();
         // A city-level record belongs to the city, not to a run: raising a
         // building and the genesis record both carry the nil id, and the

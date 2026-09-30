@@ -72,7 +72,7 @@ fn a_run_working_in_the_room_refuses_a_new_session() {
     let _lent = worker.collaborating.rooms.lend(&room, running);
 
     let refused = worker
-        .open_session(&room, channels::Carry::Nothing, None)
+        .open_session(&room, wire::Carry::Nothing, None)
         .unwrap_err();
     assert_eq!(refused.code(), &kernel::AxCode::Busy);
     assert!(
@@ -107,7 +107,7 @@ fn a_new_session_carries_nothing_and_says_so() {
     let handoff = frozen_room(dir.path(), &room);
 
     worker
-        .open_session(&room, channels::Carry::Nothing, None)
+        .open_session(&room, wire::Carry::Nothing, None)
         .unwrap();
 
     assert_eq!(city::own_layer(dir.path(), &room).unwrap().model(), None);
@@ -126,7 +126,7 @@ fn carrying_the_summary_still_lets_the_room_choose_a_model() {
     let handoff = frozen_room(dir.path(), &room);
 
     worker
-        .open_session(&room, channels::Carry::Handoff, None)
+        .open_session(&room, wire::Carry::Handoff, None)
         .unwrap();
 
     assert_eq!(city::own_layer(dir.path(), &room).unwrap().model(), None);
@@ -145,7 +145,7 @@ fn carrying_nothing_is_not_a_refusal() {
     city::write_session(dir.path(), &room, "m-local", Some(kernel::Effort::High)).unwrap();
 
     worker
-        .open_session(&room, channels::Carry::Handoff, None)
+        .open_session(&room, wire::Carry::Handoff, None)
         .unwrap();
 
     assert_eq!(carried_in_history(dir.path(), &room), Some(false));
@@ -177,7 +177,7 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
     // The mother: one turn, in another room, whose every word is in the
     // branch's first request.
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: elsewhere.clone(),
             task: "measure the meter".to_owned(),
             goal: "a number is written down".to_owned(),
@@ -208,9 +208,9 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
 
     // The branch: a session at another room whose first run inherits.
     worker
-        .handle(channels::Command::OpenSession {
+        .handle(wire::Command::OpenSession {
             addr: room.clone(),
-            carry: channels::Carry::Nothing,
+            carry: wire::Carry::Nothing,
             from: Some(kernel::Origin {
                 run: mother.0,
                 at_seq: last,
@@ -220,7 +220,7 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
         .unwrap();
     let before = provider.bodies().len();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room.clone(),
             task: "carry on".to_owned(),
             goal: "the work goes on".to_owned(),
@@ -254,7 +254,7 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
     // a beginning, and the run that began it was the first one.
     let after = provider.bodies().len();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room.clone(),
             task: "again".to_owned(),
             goal: "once more".to_owned(),
@@ -286,7 +286,7 @@ fn a_carried_session_names_the_previous_runs_transcript() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     let room = addr("lab/room1");
-    let dispatch = |task: &str, key: &[u8]| channels::Command::Dispatch {
+    let dispatch = |task: &str, key: &[u8]| wire::Command::Dispatch {
         addr: room.clone(),
         task: task.to_owned(),
         goal: "done".to_owned(),
@@ -319,9 +319,9 @@ fn a_carried_session_names_the_previous_runs_transcript() {
     )
     .unwrap();
     worker
-        .handle(channels::Command::OpenSession {
+        .handle(wire::Command::OpenSession {
             addr: room.clone(),
-            carry: channels::Carry::Handoff,
+            carry: wire::Carry::Handoff,
             from: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"new"),
         })

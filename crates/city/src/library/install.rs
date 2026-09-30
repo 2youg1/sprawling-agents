@@ -27,8 +27,8 @@
 //!
 //! The bytes are registered before they land, so a store remembers what
 //! was about to arrive even if the arrival fails. The registrar is a
-//! parameter because the CAS belongs to `memory` and this crate depends
-//! on `kernel` alone - the assembly layer binds `memory::Cas::put`,
+//! parameter because the CAS belongs to `storage` and this crate depends
+//! on `kernel` alone - the assembly layer binds `storage::Cas::put`,
 //! exactly as `Neighbourhood::scan` receives its inbox counts.
 
 use std::path::{Path, PathBuf};

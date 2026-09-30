@@ -36,8 +36,8 @@ pub(super) fn verb(city: Option<&String>, oid: Option<&String>) -> ExitCode {
         eprintln!("recovery: give all forty lowercase hex digits, not an abbreviation");
         return ExitCode::from(2);
     };
-    match ask(std::path::Path::new(city), &channels::Query::Commit { oid }) {
-        Ok(channels::Answer::Commit(said)) => {
+    match ask(std::path::Path::new(city), &wire::Query::Commit { oid }) {
+        Ok(wire::Answer::Commit(said)) => {
             let session = said
                 .session
                 .map_or_else(|| "none".to_owned(), |n| n.to_string());
@@ -50,7 +50,7 @@ pub(super) fn verb(city: Option<&String>, oid: Option<&String>) -> ExitCode {
             println!("actor   {} (session {session})", said.actor.as_str());
             println!(
                 "model   {model} (effort {})",
-                memory::effort_word(memory::recorded_effort(said.effort))
+                storage::effort_word(storage::recorded_effort(said.effort))
             );
             println!("ledger  seq {}", said.seq.value());
             for before in said.lineage.iter().skip(1) {

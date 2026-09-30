@@ -51,9 +51,9 @@ impl PrefixAsk {
     /// for a ledger or store that will not open: a run that has not
     /// reached its first turn has no prompt yet, and an empty answer
     /// would read as a run that was told nothing.
-    pub(super) fn read(self) -> channels::Answer {
+    pub(super) fn read(self) -> wire::Answer {
         match self.segments() {
-            Some(segments) => channels::Answer::Prefix(Box::new(channels::PrefixAnswer {
+            Some(segments) => wire::Answer::Prefix(Box::new(wire::PrefixAnswer {
                 run: self.run,
                 segments,
             })),
@@ -61,7 +61,7 @@ impl PrefixAsk {
         }
     }
 
-    fn segments(&self) -> Option<Vec<channels::PrefixSegment>> {
+    fn segments(&self) -> Option<Vec<wire::PrefixSegment>> {
         let record = self.first_prompt()?;
         let store = store(&self.ledger.city_root)?;
         Some(
@@ -100,15 +100,12 @@ impl PrefixAsk {
 /// for an object this city no longer holds. Both are the same
 /// answer to the caller - there is nothing here to read - and the
 /// query handed back with the refusal says which was asked.
-pub(super) fn content_answer(
-    city_root: &Path,
-    locator: &Locator,
-) -> Option<channels::ContentAnswer> {
+pub(super) fn content_answer(city_root: &Path, locator: &Locator) -> Option<wire::ContentAnswer> {
     let Locator::Cas { hash, range: _ } = locator else {
         return None;
     };
     let read = read_bytes(&store(city_root)?.get(hash).ok()?);
-    Some(channels::ContentAnswer {
+    Some(wire::ContentAnswer {
         locator: locator.clone(),
         text: read.text,
         bytes: read.bytes,
@@ -123,25 +120,25 @@ pub(super) fn content_answer(
 /// that reaches a directory the fold does not own, and a handle
 /// kept across a rebuild would outlive the city it was opened
 /// under.
-fn store(city_root: &Path) -> Option<memory::Cas> {
-    memory::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).ok()
+fn store(city_root: &Path) -> Option<storage::Cas> {
+    storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).ok()
 }
 
 /// One recorded segment row, joined to the bytes the store holds for it.
 ///
 /// A row whose slot or hash will not read is left out rather than
 /// guessed at: a fifth spelling of a slot is one nothing draws.
-fn segment_of(row: &serde_json::Value, store: &memory::Cas) -> Option<channels::PrefixSegment> {
+fn segment_of(row: &serde_json::Value, store: &storage::Cas) -> Option<wire::PrefixSegment> {
     let slot = match row.get("slot")?.as_str()? {
-        "city" => channels::PrefixSlot::City,
-        "building" => channels::PrefixSlot::Building,
-        "resident" => channels::PrefixSlot::Resident,
-        "run" => channels::PrefixSlot::Run,
+        "city" => wire::PrefixSlot::City,
+        "building" => wire::PrefixSlot::Building,
+        "resident" => wire::PrefixSlot::Resident,
+        "run" => wire::PrefixSlot::Run,
         _ => return None,
     };
     let hash: B3Hash = serde_json::from_value(row.get("hash")?.clone()).ok()?;
     let held = store.get(&hash).ok();
-    Some(channels::PrefixSegment {
+    Some(wire::PrefixSegment {
         slot,
         hash,
         bytes: number(row, "len"),
@@ -159,8 +156,8 @@ fn segment_of(row: &serde_json::Value, store: &memory::Cas) -> Option<channels::
 
 /// One source row, as the assembler wrote it down. A row with no
 /// address names no document and is left out.
-fn source_of(row: &serde_json::Value) -> Option<channels::PrefixSource> {
-    Some(channels::PrefixSource {
+fn source_of(row: &serde_json::Value) -> Option<wire::PrefixSource> {
+    Some(wire::PrefixSource {
         addr: Address::parse(row.get("addr")?.as_str()?).ok()?,
         kept: number(row, "kept"),
         dropped: number(row, "dropped"),

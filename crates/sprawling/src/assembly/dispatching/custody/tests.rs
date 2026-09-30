@@ -52,7 +52,7 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: format!("call the messages API with {key} and report the model list"),
             goal: "the list is written down".to_owned(),

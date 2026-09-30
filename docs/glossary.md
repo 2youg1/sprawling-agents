@@ -138,13 +138,14 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 
 | Name | What it is |
 |---|---|
+| **wire** | The Commands, Queries and Events that pass between a city and its clients, owned by the `sprawling-wire` crate (lib `wire`); `WIRE_V` versions it. How a provider's API spells a request is that provider's dialect, not the wire. |
 | **WebUI** | One page in a desktop browser, embedded in the binary and served from inside it. The one this tree carries is `client/`, TypeScript built by bun; the wire is the whole API, so how many clients exist is a fact about this tree rather than a limit of the design. |
 | **part** | One control in `client/src/views/parts/`, and the only implementation of it the client has: the button, the labelled field, the table, the tooltip. A screen composes parts rather than writing a control of its own, because a second implementation is where two behaviours begin to differ. |
 | **interaction contract** | What a part owes a person who is not holding a pointer: the WAI-ARIA pattern it implements, what each key does, the exact `aria-*` values, and which element the focus returns to when the part closes. `client/client-SPEC.md` section 7 is its single authority — how a screen is drawn is exempt from SPEC-first, and this is the half that is not. |
 | **Lens** | Which reading of one history the record page is showing: `ledger`, `archive`, `bin`, or `log`, the process log (`client/src/core/route.ts`). Separate nav entries would ask a person to choose before the question was formed. The lens lives in the address, so a link to the archive is still a link to the archive. |
 | **view** | The read-only verb `sprawling view <city>` that reads one city's Ledger from disk. It has two lenses: `tree`, the runs arranged by lineage (city, building, room, session, run), and `records`, the Ledger lines in seq order. When stdout is not a terminal it writes Ledger lines byte for byte, or one JSON line per run with `--runs`; it never changes the city. |
 | **NewestRelease** | The query that asks which release this city is and which one npm offers, spelled `newest_release` on the wire. It is asked only when a person presses the button, and it is the only query that reaches the internet. It is not `release`, which is the verb that lets a halted scope go on. |
-| **control surface** | The verbs that intervene in work already running: `Steer`, `Cancel`, `Halt`, and `Release`, the way back out of a halt (`channels::control::Intervention`). |
+| **control surface** | The verbs that intervene in work already running: `Steer`, `Cancel`, `Halt`, and `Release`, the way back out of a halt (`wire::control::Intervention`). |
 | **Approval Inbox** | The queue of pending answers, grouped by cluster key. |
 | **progress bar** | The part that shows how far along something is, as a bar and the two numbers it was drawn from; when the end is not known it says it is busy instead of claiming a fraction (`client/src/views/parts/progress.svelte`). |
 | **ACCENT** | Jing blue, `H=264`, meaning "something is happening here". |

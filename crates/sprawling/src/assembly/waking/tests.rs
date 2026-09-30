@@ -64,7 +64,7 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("market/ito").unwrap(),
             task: "ask hana what she charges".to_owned(),
             goal: "a price".to_owned(),
@@ -153,7 +153,7 @@ fn an_arrival_lands_where_the_watch_table_says_and_starts_tainted() {
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("read it", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Wake {
+        .handle(wire::Command::Wake {
             source: "github".to_owned(),
             subject: "pull request opened on the kiln".to_owned(),
             body: "please review".to_owned(),
@@ -200,7 +200,7 @@ addr = \"lab/room1\"
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("unused", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Wake {
+        .handle(wire::Command::Wake {
             source: "mail".to_owned(),
             subject: "invoice 41".to_owned(),
             body: "attached".to_owned(),
@@ -251,7 +251,7 @@ fn an_arrival_that_starts_work_is_refused_exec() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Wake {
+        .handle(wire::Command::Wake {
             source: "github".to_owned(),
             subject: "pull request opened on the kiln".to_owned(),
             body: "run echo hi".to_owned(),
@@ -369,7 +369,7 @@ fn what_comes_back_wakes_the_resident_who_asked_for_it() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/lead").unwrap(),
             task: "get it measured".to_owned(),
             goal: "the number is written down, then stop".to_owned(),

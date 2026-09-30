@@ -24,9 +24,9 @@ pub(in crate::assembly) fn provenance(
     city: kernel::B3Hash,
     addr: &Address,
     run_id: RunId,
-    chosen: memory::ModelChoice,
-) -> memory::Provenance {
-    memory::Provenance::new(run_id, addr.clone(), city, chosen)
+    chosen: storage::ModelChoice,
+) -> storage::Provenance {
+    storage::Provenance::new(run_id, addr.clone(), city, chosen)
 }
 
 /// The filter table that governs this run: the building's file over
@@ -75,12 +75,12 @@ impl Site {
         &self,
         city: kernel::B3Hash,
         addr: &Address,
-    ) -> memory::Provenance {
+    ) -> storage::Provenance {
         let signed = provenance(
             city,
             addr,
             self.run_id,
-            memory::ModelChoice {
+            storage::ModelChoice {
                 id: self.model.id.clone(),
                 effort: self.config.effort,
             },
@@ -139,21 +139,21 @@ impl Site {
             placing.city,
             addr,
             self.run_id,
-            memory::ModelChoice {
+            storage::ModelChoice {
                 id: self.model.id.clone(),
                 effort: self.config.effort,
             },
         );
         let turn = super::held(placing.fence_gate, "take the fence gate")?;
-        memory::Checkpoint::open(placing.city_root)
-            .map_err(memory::MemoryError::into_ax)?
+        storage::Checkpoint::open(placing.city_root)
+            .map_err(storage::StorageError::into_ax)?
             .ensure_base(&[addr.as_str().to_owned()], placing.clock.now()?, &of)
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         drop(turn);
-        let claimed = memory::Worktrees::open(placing.city_root)
-            .map_err(memory::MemoryError::into_ax)?
+        let claimed = storage::Worktrees::open(placing.city_root)
+            .map_err(storage::StorageError::into_ax)?
             .claim(&tree_of(addr)?, &super::tree_scope(&self.building))
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         lines.record_for(
             self.run_id,
             effect::Line {
@@ -162,7 +162,7 @@ impl Site {
                 kind: EventKind::WorktreeOpened,
                 data: claimed
                     .opened_payload()
-                    .map_err(memory::MemoryError::into_ax)?,
+                    .map_err(storage::StorageError::into_ax)?,
             },
         )?;
         self.write_root = claimed.path().to_path_buf();
@@ -274,11 +274,11 @@ impl RunWorker {
 /// its next run takes the same tree back. An address may hold any
 /// character a tree name may not, so the name carries the leading 16
 /// hex digits of the address's digest rather than the address itself.
-fn tree_of(addr: &Address) -> Result<memory::WorktreeName, AxError> {
+fn tree_of(addr: &Address) -> Result<storage::WorktreeName, AxError> {
     let digest: String = kernel::B3Hash::digest(addr.as_str().as_bytes())
         .to_string()
         .chars()
         .take(16)
         .collect();
-    memory::WorktreeName::parse(&format!("room-{digest}")).map_err(memory::MemoryError::into_ax)
+    storage::WorktreeName::parse(&format!("room-{digest}")).map_err(storage::StorageError::into_ax)
 }

@@ -124,7 +124,7 @@ fn a_change_made_before_a_restart_is_still_read_after_it() {
     assert!(!rendered.contains(&token), "positions only: {rendered}");
 }
 
-/// The alias rule at the checkpoint door (memory-SPEC 8-25): a scope
+/// The alias rule at the checkpoint door (storage-SPEC 8-25): a scope
 /// whose path crosses a link refuses the whole wave, because a name
 /// that leads into `.git` would capture reserved bytes under a lying
 /// name - and a `file_discarded` restoration would write back through
@@ -178,7 +178,7 @@ fn a_head_that_cannot_be_read_refuses_the_fence_instead_of_orphaning_it() {
     assert!(
         matches!(
             outcome,
-            Err(MemoryError::Checkpoint {
+            Err(StorageError::Checkpoint {
                 op: "read HEAD",
                 ..
             })

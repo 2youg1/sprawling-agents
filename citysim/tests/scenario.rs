@@ -442,7 +442,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
         },
         // The real net over the real tree: a checkpoint before every wave.
         checkpoint: Some((
-            memory::Checkpoint::open(city.path()).unwrap(),
+            storage::Checkpoint::open(city.path()).unwrap(),
             vec!["sim/lobby/room1".to_owned()],
         )),
         cancel: None,

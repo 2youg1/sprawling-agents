@@ -11,7 +11,7 @@ name = "accounting"
 [dependencies]
 kernel = { workspace = true }
 gateway = { workspace = true }
-protocol = { workspace = true }
+agent_protocols = { workspace = true }
 city = { workspace = true }
 collab = { workspace = true }
 serde = { workspace = true }
@@ -20,7 +20,7 @@ serde_json = { workspace = true }
 # it is a file somebody edits by hand while the city is stopped.
 toml = { workspace = true }
 # The vocabulary only: the port hands back a wire answer and never listens.
-channels = { workspace = true }
+wire = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true

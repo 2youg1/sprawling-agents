@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::super::*;
-use crate::error::MemoryError;
+use crate::error::StorageError;
 use kernel::{B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
 use std::path::Path;
 fn write_ledger(dir: &Path, count: u64) -> Vec<Vec<u8>> {
@@ -261,7 +261,7 @@ fn a_missing_seq_is_a_caller_error_not_a_corrupt_ledger() {
         Err(err) => err,
         Ok(_) => panic!("an absent seq must not read"),
     };
-    assert!(matches!(err, MemoryError::SeqMissing { seq: 77 }));
+    assert!(matches!(err, StorageError::SeqMissing { seq: 77 }));
 }
 
 /// What rebuilding a view costs, counted rather than timed: every

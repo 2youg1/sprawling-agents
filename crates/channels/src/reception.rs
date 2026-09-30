@@ -15,7 +15,7 @@
 //! calling them.
 //!
 //! **This is the thick half of the Humble Object** the listener is
-//! built as (ARCHITECTURE section 9). `channels::server` is declared an
+//! built as (ARCHITECTURE section 9). `wire::server` is declared an
 //! adapter — "thin, no policy" — and policy is what these functions
 //! are; a shell that also holds the rules it applies has no way to show
 //! that it applies all of them. Every branch left in the shell is a
@@ -37,7 +37,7 @@ use kernel::{Address, AxCode, AxError, B3Hash, Seq};
 
 use crate::auth;
 use crate::command::WireCommand;
-use crate::wire::{
+use crate::frames::{
     Ask, ClientFrame, Hello, Lagged, Monitoring, WIRE_V, Watched, Welcome, schema_hash,
 };
 

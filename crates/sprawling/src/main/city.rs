@@ -234,10 +234,10 @@ pub(super) fn serve_city(
     // The client source: embedded by default; a directory for the
     // development loop, read per request so an edit shows on refresh.
     let client = match flag_value(args, "--web-dir") {
-        Some(dir) => channels::ClientAssets::Disk(std::path::PathBuf::from(dir)),
-        None => channels::ClientAssets::Embedded(CLIENT_FILES),
+        Some(dir) => wire::ClientAssets::Disk(std::path::PathBuf::from(dir)),
+        None => wire::ClientAssets::Embedded(CLIENT_FILES),
     };
-    if let channels::ClientAssets::Embedded(_) = &client
+    if let wire::ClientAssets::Embedded(_) = &client
         && !CLIENT_COMPLETE
     {
         eprintln!(
@@ -265,10 +265,10 @@ pub(super) fn serve_city(
         }
     };
     let client_line = match &client {
-        channels::ClientAssets::Disk(dir) => {
+        wire::ClientAssets::Disk(dir) => {
             format!("read per request from {}", dir.display())
         }
-        channels::ClientAssets::Embedded(_) => client_summary(),
+        wire::ClientAssets::Embedded(_) => client_summary(),
     };
     // The one sink a diagnostic line leaves this process through: the
     // terminal, and the page that has the log lens open. Made before

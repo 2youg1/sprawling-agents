@@ -72,7 +72,7 @@ export function tokenIn(search: string): string | null {
 //
 // The socket offers it inside the hello frame, where the frame type
 // names the field; a POST has no frame, so it carries the standard
-// bearer header, which `channels::reception::offered_pairing` reads.
+// bearer header, which `wire::reception::offered_pairing` reads.
 // A page opened without a code sends no header at all: a city with no
 // token configured is a city on loopback, and it admits every door.
 export function bearing(token: string | null): Readonly<Record<string, string>> {

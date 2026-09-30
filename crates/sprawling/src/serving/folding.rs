@@ -19,7 +19,7 @@ use accounting::person::CorePriority;
 /// thread that folds it.
 pub(crate) struct Folding {
     pub(crate) observer: Box<dyn FnMut(&EventRecord) + Send>,
-    pub(crate) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
+    pub(crate) machine: Arc<dyn Fn(wire::DoctorAnswer) + Send + Sync>,
     pub(crate) lend: Box<dyn FnOnce(Arc<Mutex<gateway::Custodian>>) + Send>,
     pub(crate) thread: std::thread::JoinHandle<()>,
 }
@@ -27,7 +27,7 @@ pub(crate) struct Folding {
 /// What the writer thread hands the view fold, in the order it wrote it.
 enum Fold {
     Committed(EventRecord),
-    Examined(channels::DoctorAnswer),
+    Examined(wire::DoctorAnswer),
     Lent(Arc<Mutex<gateway::Custodian>>),
 }
 
@@ -43,8 +43,8 @@ pub(crate) struct Copies {
 /// the head every welcome names, moved before the record is sent so a
 /// session that reads the head has already subscribed to what follows it.
 pub(crate) struct Broadcast {
-    pub(crate) to_clients: tokio::sync::broadcast::Sender<channels::Committed>,
-    pub(crate) head: Arc<channels::LedgerHead>,
+    pub(crate) to_clients: tokio::sync::broadcast::Sender<wire::Committed>,
+    pub(crate) head: Arc<wire::LedgerHead>,
 }
 
 /// Starts the view fold over both copies.
@@ -83,7 +83,7 @@ pub(crate) fn spawn_folding(
                 );
             }
         }),
-        machine: Arc::new(move |found: channels::DoctorAnswer| {
+        machine: Arc::new(move |found: wire::DoctorAnswer| {
             if examined.send(Fold::Examined(found)).is_err() {
                 eprintln!(
                     "the view fold has ended; this machine's check is not shown until the server restarts"
@@ -246,15 +246,15 @@ fn last_committed(batch: &[Fold]) -> Option<&EventRecord> {
 
 /// Moves the head past `record` and sends it to every client. The frame
 /// is spelled here, once, whatever the number of sockets that will write
-/// it (channels-SPEC.md 8-47).
+/// it (wire-SPEC.md 8-47).
 fn send_committed(broadcast: &Broadcast, record: &EventRecord) {
     broadcast.head.advance(record.seq());
-    match channels::Committed::new(record.clone()) {
+    match wire::Committed::new(record.clone()) {
         // A send with no subscribers is not a failure: a city with no
         // browser open is a city doing its work.
         Ok(committed) => drop(broadcast.to_clients.send(committed)),
         // The next record's seq gap makes every live session send
-        // `Lagged` for this one (channels-SPEC.md 8-41).
+        // `Lagged` for this one (wire-SPEC.md 8-41).
         Err(unframed) => {
             eprintln!("a committed record has no frame and reaches no client: {unframed}");
         }

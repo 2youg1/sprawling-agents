@@ -7,10 +7,10 @@
 
 <script lang="ts" module>
   // The harness page: the official harnesses a subscription reaches
-  // the city through, one card each (channels-SPEC 8-52).
+  // the city through, one card each (wire-SPEC 8-52).
   //
   // **The roster and the commands are the city's** (`Query::Harnesses`,
-  // read from `protocol::harness`); this page draws them and holds no
+  // read from `agent_protocols::harness`); this page draws them and holds no
   // list of its own. Each card says whether this computer can run the
   // command that starts the harness, what that command is, and where
   // the harness's own vendor says how to sign in: the person signs in

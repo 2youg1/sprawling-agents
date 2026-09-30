@@ -32,7 +32,7 @@ fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbo
 
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("nothing to do", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    let outcome = worker.handle(channels::Command::Dispatch {
+    let outcome = worker.handle(wire::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
         task: "claim a row".to_owned(),
         goal: "one claim".to_owned(),
@@ -91,7 +91,7 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
     )
     .unwrap();
 
-    let outcome = worker.handle(channels::Command::Dispatch {
+    let outcome = worker.handle(wire::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
         task: "take one row".to_owned(),
         goal: "one claim".to_owned(),
@@ -133,7 +133,7 @@ fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     for (n, room) in ["lab/room1", "lab/room2"].into_iter().enumerate() {
         worker
-            .handle(channels::Command::Dispatch {
+            .handle(wire::Command::Dispatch {
                 addr: Address::parse(room).unwrap(),
                 task: "take a row from the plan".to_owned(),
                 goal: "claim one row, then stop".to_owned(),
@@ -207,7 +207,7 @@ fn a_node_handed_back_by_a_run_that_came_home_can_be_taken_by_the_next_run() {
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     for (n, room) in ["lab/room1", "lab/room2"].into_iter().enumerate() {
         worker
-            .handle(channels::Command::Dispatch {
+            .handle(wire::Command::Dispatch {
                 addr: Address::parse(room).unwrap(),
                 task: "take a row from the plan".to_owned(),
                 goal: "claim one row".to_owned(),
@@ -273,7 +273,7 @@ fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "close the row".to_owned(),
             goal: "finish row 1 with evidence".to_owned(),
@@ -336,7 +336,7 @@ fn a_run_that_ends_holding_a_row_leaves_it_blocked_rather_than_in_progress() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "take a row".to_owned(),
             goal: "claim one row".to_owned(),

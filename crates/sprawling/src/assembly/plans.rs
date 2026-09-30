@@ -202,7 +202,7 @@ impl RunWorker {
     pub(super) fn set_pursuit(
         &mut self,
         addr: &Address,
-        step: channels::PursuitStep,
+        step: wire::PursuitStep,
     ) -> Result<(), AxError> {
         let missing = |action: &'static str| {
             AxError::failure(
@@ -216,7 +216,7 @@ impl RunWorker {
         // line: a failed append leaves the process holding what a restart
         // would fold (sprawling-SPEC.md 8-111).
         let change = match step {
-            channels::PursuitStep::Set { goal } => {
+            wire::PursuitStep::Set { goal } => {
                 // A pursuit works through the plan's ready steps, so on a
                 // building with no plan it would finish at once having
                 // done nothing. The subject is `<building>: <goal>`, the
@@ -229,9 +229,9 @@ impl RunWorker {
                 // no path from a tool reaches this function either.
                 PursuitChange::Declare(kernel::Pursuit::declare(&self.planning.delegator, goal)?)
             }
-            channels::PursuitStep::Pause => PursuitChange::Pause,
-            channels::PursuitStep::Resume => PursuitChange::Resume,
-            channels::PursuitStep::Clear => PursuitChange::Clear,
+            wire::PursuitStep::Pause => PursuitChange::Pause,
+            wire::PursuitStep::Resume => PursuitChange::Resume,
+            wire::PursuitStep::Clear => PursuitChange::Clear,
         };
         let held = self.planning.pursuits.get(addr);
         let changed = match &change {

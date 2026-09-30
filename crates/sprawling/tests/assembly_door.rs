@@ -5,7 +5,7 @@
 
 //! The door the wire uses, entered from outside the crate.
 //!
-//! A served city reaches its assembly point one way: `channels::server`
+//! A served city reaches its assembly point one way: `wire::server`
 //! hands a `Command` to `RunWorker::handle`. Nothing in this repository
 //! could do the same, because the crate had no lib target and the
 //! assembly point was a private module of a binary — so the widest
@@ -44,9 +44,9 @@ fn a_command_reaches_the_ledger_through_the_door_the_wire_uses() {
     .unwrap();
 
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse(LAB).unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"create"),
         })
         .unwrap();

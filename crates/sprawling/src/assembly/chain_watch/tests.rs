@@ -11,7 +11,7 @@ use crate::assembly::init_city;
 /// Changes one digit of the first line's timestamp in place, so the
 /// line still parses and only the chain can tell.
 fn break_the_first_line(city_root: &Path) {
-    let first = memory::ledger_segments_at(&kernel::layout::CityLayout::new(city_root).ledger())
+    let first = storage::ledger_segments_at(&kernel::layout::CityLayout::new(city_root).ledger())
         .unwrap()
         .remove(0);
     let mut bytes = std::fs::read(&first).unwrap();
@@ -35,8 +35,8 @@ fn a_chain_broken_under_a_served_city_refuses_the_next_command_with_the_audits_r
     )
     .unwrap();
     break_the_first_line(dir.path());
-    let memory::ChainAudit::Broken(reason) =
-        memory::audit_chain(&kernel::layout::CityLayout::new(dir.path()).ledger()).unwrap()
+    let storage::ChainAudit::Broken(reason) =
+        storage::audit_chain(&kernel::layout::CityLayout::new(dir.path()).ledger()).unwrap()
     else {
         panic!("the tampered ledger still audits whole");
     };
@@ -47,9 +47,9 @@ fn a_chain_broken_under_a_served_city_refuses_the_next_command_with_the_audits_r
         .join()
         .unwrap();
     let refused = worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, b"create"),
         })
         .err();
@@ -64,8 +64,8 @@ fn a_chain_broken_under_a_served_city_refuses_the_next_command_with_the_audits_r
 fn an_audit_that_cannot_read_the_ledger_trips_the_halt() {
     let dir = tempfile::tempdir().unwrap();
     let missing = dir.path().join("no-ledger-here");
-    let reason = memory::audit_chain(&missing).unwrap_err().into_ax();
-    let halt = memory::ChainHalt::default();
+    let reason = storage::audit_chain(&missing).unwrap_err().into_ax();
+    let halt = storage::ChainHalt::default();
 
     report_audit(&missing, &halt, Seq::FIRST, Diagnostics::off());
 

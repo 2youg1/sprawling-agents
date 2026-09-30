@@ -10,7 +10,7 @@ name = "collab"
 
 [dependencies]
 kernel = { workspace = true }
-memory = { workspace = true }
+storage = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

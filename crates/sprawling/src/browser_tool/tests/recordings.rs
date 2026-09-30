@@ -64,8 +64,8 @@ pub(super) fn tool_with(cas_at: &std::path::Path, port: Recording) -> BrowserToo
     BrowserTool::new(Role::Building, Box::new(port), cas, origin()).expect("the tool builds")
 }
 
-pub(super) fn origin() -> memory::BlockOrigin {
-    memory::BlockOrigin {
+pub(super) fn origin() -> storage::BlockOrigin {
+    storage::BlockOrigin {
         run: kernel::RunId::from_bytes([7; 16]),
         building: kernel::Address::parse("lab").expect("a building address"),
     }

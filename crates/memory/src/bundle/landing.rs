@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every bundle write, and the one way it reaches disk (memory-SPEC 8-12).
+//! Every bundle write, and the one way it reaches disk (storage-SPEC 8-12).
 //!
 //! The bytes go to a staging file beside the target, are flushed, take
 //! the original permissions, and are renamed over the name. A reader
@@ -17,7 +17,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::alias::WriteTarget;
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::vfs::Vfs;
 
 /// Where a landed file's permissions come from.
@@ -37,7 +37,7 @@ pub(crate) enum Bits<'a> {
 /// opens.
 ///
 /// # Errors
-/// `MemoryError::Io` naming the staging file or the target for a write,
+/// `StorageError::Io` naming the staging file or the target for a write,
 /// flush, permission copy or rename the filesystem refuses; the target
 /// keeps its previous content in every one of those cases.
 pub(crate) fn land(
@@ -45,7 +45,7 @@ pub(crate) fn land(
     target: WriteTarget,
     bytes: &[u8],
     bits: Bits<'_>,
-) -> Result<(), MemoryError> {
+) -> Result<(), StorageError> {
     let path = target.as_path();
     let staged = staging_path(path)?;
     if vfs.exists(&staged) {
@@ -76,7 +76,7 @@ pub(crate) fn land(
 
 /// `.<name>.part` beside `path`, built from the name as the operating
 /// system spells it so a name that is not valid Unicode still stages.
-fn staging_path(path: &Path) -> Result<PathBuf, MemoryError> {
+fn staging_path(path: &Path) -> Result<PathBuf, StorageError> {
     let name = path.file_name().ok_or_else(|| {
         io_err("stage a bundle file", path)(io::Error::new(
             io::ErrorKind::InvalidInput,

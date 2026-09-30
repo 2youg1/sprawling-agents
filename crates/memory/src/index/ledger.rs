@@ -10,7 +10,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use kernel::{AxError, RunId, Seq};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::jsonl::segment_names;
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
@@ -60,7 +60,7 @@ impl LedgerIndex {
     ///
     /// # Errors
     /// Propagates a ledger directory that cannot be listed or read.
-    pub fn rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError> {
+    pub fn rebuild(dir: &Path) -> Result<LedgerIndex, StorageError> {
         let vfs: Box<dyn Vfs> = Box::new(RealFs::new());
         let folded = scan(vfs.as_ref(), dir)?;
         Ok(LedgerIndex {
@@ -87,7 +87,7 @@ impl LedgerIndex {
         each: impl FnMut(&[u8]) -> Result<Option<Located>, AxError>,
     ) -> Result<LedgerIndex, AxError> {
         let vfs: Box<dyn Vfs> = Box::new(RealFs::new());
-        let folded = walk(vfs.as_ref(), dir, each, MemoryError::into_ax)?;
+        let folded = walk(vfs.as_ref(), dir, each, StorageError::into_ax)?;
         Ok(LedgerIndex {
             folded,
             vfs: Mutex::new(vfs),
@@ -131,7 +131,7 @@ impl LedgerIndex {
     /// # Errors
     /// Propagates a ledger directory that cannot be listed, stat'ed or
     /// read.
-    pub fn refresh(&mut self, dir: &Path) -> Result<Refreshed, MemoryError> {
+    pub fn refresh(&mut self, dir: &Path) -> Result<Refreshed, StorageError> {
         let plan = self.plan_refresh(dir)?;
         match plan {
             RefreshPlan::Rebuild => {
@@ -145,7 +145,7 @@ impl LedgerIndex {
     }
 
     /// What this refresh has to do, decided from segment lengths alone.
-    fn plan_refresh(&self, dir: &Path) -> Result<RefreshPlan, MemoryError> {
+    fn plan_refresh(&self, dir: &Path) -> Result<RefreshPlan, StorageError> {
         let vfs = self.seam();
         let names = crate::jsonl::segment_names(vfs.as_ref(), dir)?;
         let mut spans = Vec::new();
@@ -182,7 +182,7 @@ impl LedgerIndex {
     /// length this refresh stat'ed, so a record appended between the
     /// stat and the read stays for the next refresh rather than being
     /// folded at an offset this pass never confirmed.
-    fn fold_spans(&mut self, dir: &Path, spans: Vec<Span>) -> Result<Refreshed, MemoryError> {
+    fn fold_spans(&mut self, dir: &Path, spans: Vec<Span>) -> Result<Refreshed, StorageError> {
         let mut bytes_read: u64 = 0;
         for span in spans {
             let path = dir.join(&span.name);
@@ -267,7 +267,7 @@ enum RefreshPlan {
 }
 
 /// Every line indexed by the rule the index owns.
-fn scan(vfs: &dyn Vfs, dir: &Path) -> Result<Folded, MemoryError> {
+fn scan(vfs: &dyn Vfs, dir: &Path) -> Result<Folded, StorageError> {
     walk(vfs, dir, |_| Ok(None), |failure| failure)
 }
 
@@ -276,7 +276,7 @@ fn walk<E>(
     vfs: &dyn Vfs,
     dir: &Path,
     mut each: impl FnMut(&[u8]) -> Result<Option<Located>, E>,
-    lift: impl Fn(MemoryError) -> E,
+    lift: impl Fn(StorageError) -> E,
 ) -> Result<Folded, E> {
     let mut folded = Folded::empty();
     for name in segment_names(vfs, dir).map_err(&lift)? {

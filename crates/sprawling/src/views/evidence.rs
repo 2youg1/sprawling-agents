@@ -16,21 +16,21 @@
 //! inlined the pixels would charge "what did this run do" the price of
 //! every screenshot it took.
 
-use channels::{EventKind, EventRecord, RunId};
 use kernel::Locator;
 use kernel::event::record::{RoadmapMoved, RoadmapStep};
+use wire::{EventKind, EventRecord, RunId};
 
 use super::prepared::LedgerAsk;
 
 impl LedgerAsk {
     /// Every locator this run left behind, oldest first.
-    pub(super) fn evidence_answer(&self, run: RunId) -> channels::EvidenceAnswer {
+    pub(super) fn evidence_answer(&self, run: RunId) -> wire::EvidenceAnswer {
         let items = self
             .records_of(run)
             .iter()
             .filter_map(evidence_in)
             .collect();
-        channels::EvidenceAnswer { run, items }
+        wire::EvidenceAnswer { run, items }
     }
 }
 
@@ -43,16 +43,16 @@ impl LedgerAsk {
     clippy::wildcard_enum_match_arm,
     reason = "a few kinds produce evidence; the rest of the event vocabulary does not"
 )]
-fn evidence_in(record: &EventRecord) -> Option<channels::EvidenceItem> {
+fn evidence_in(record: &EventRecord) -> Option<wire::EvidenceItem> {
     let map = record.data().as_map();
     let at = record.seq();
     match record.kind() {
         EventKind::ToolResult => {
             let result = map.get("result")?.as_object()?;
             let locator = Locator::parse(result.get("image")?.as_str()?).ok()?;
-            Some(channels::EvidenceItem {
+            Some(wire::EvidenceItem {
                 at,
-                kind: channels::EvidenceKind::Screenshot,
+                kind: wire::EvidenceKind::Screenshot,
                 locator,
                 picture: picture_in(result),
             })
@@ -64,9 +64,9 @@ fn evidence_in(record: &EventRecord) -> Option<channels::EvidenceItem> {
             else {
                 return None;
             };
-            Some(channels::EvidenceItem {
+            Some(wire::EvidenceItem {
                 at,
-                kind: channels::EvidenceKind::Finished,
+                kind: wire::EvidenceKind::Finished,
                 locator,
                 picture: None,
             })
@@ -80,14 +80,14 @@ fn evidence_in(record: &EventRecord) -> Option<channels::EvidenceItem> {
 /// All three or none: a picture with one side is not a size a reader can
 /// lay out with, and half a shape is what invites somebody to default
 /// the other half.
-fn picture_in(result: &serde_json::Map<String, serde_json::Value>) -> Option<channels::Picture> {
+fn picture_in(result: &serde_json::Map<String, serde_json::Value>) -> Option<wire::Picture> {
     let side = |name: &str| {
         result
             .get(name)
             .and_then(serde_json::Value::as_u64)
             .and_then(|held| u32::try_from(held).ok())
     };
-    Some(channels::Picture {
+    Some(wire::Picture {
         media_type: result.get("media_type")?.as_str()?.to_owned(),
         width: side("width")?,
         height: side("height")?,
@@ -104,7 +104,7 @@ fn picture_in(result: &serde_json::Map<String, serde_json::Value>) -> Option<cha
 )]
 mod tests {
     use super::evidence_in;
-    use channels::{B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
+    use wire::{B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
 
     fn record(kind: EventKind, data: serde_json::Value) -> EventRecord {
         EventRecord::from_draft(
@@ -137,7 +137,7 @@ mod tests {
             }),
         );
         let item = evidence_in(&held).expect("a screenshot is evidence");
-        assert_eq!(item.kind, channels::EvidenceKind::Screenshot);
+        assert_eq!(item.kind, wire::EvidenceKind::Screenshot);
         assert_eq!(item.at, Seq::new(4));
         let picture = item.picture.expect("the record wrote all three");
         assert_eq!((picture.width, picture.height), (1280, 720));
@@ -151,7 +151,7 @@ mod tests {
                                 "item": "the lexer", "evidence": cas() }),
         );
         let item = evidence_in(&held).expect("a completion is evidence");
-        assert_eq!(item.kind, channels::EvidenceKind::Finished);
+        assert_eq!(item.kind, wire::EvidenceKind::Finished);
         assert!(item.picture.is_none());
     }
 

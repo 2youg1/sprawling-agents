@@ -15,17 +15,17 @@ use libfuzzer_sys::fuzz_target;
 // on the decoded value: a frame that re-read differently would let the
 // auth check and the dispatch see two different commands.
 fuzz_target!(|data: &[u8]| {
-    let Ok(frame) = serde_json::from_slice::<channels::ClientFrame>(data) else {
+    let Ok(frame) = serde_json::from_slice::<wire::ClientFrame>(data) else {
         return; // a refused frame is the ordinary outcome, a panic is not
     };
     let again = serde_json::to_vec(&frame).expect("a decoded frame re-encodes");
-    let reread: channels::ClientFrame =
+    let reread: wire::ClientFrame =
         serde_json::from_slice(&again).expect("our own encoding decodes");
     assert_eq!(frame, reread, "a frame must read the same way twice");
 
     // A Hello states which wire it speaks; the handshake compares that
     // against this build, so the decoder must not invent either half.
-    if let channels::ClientFrame::Hello(hello) = &frame {
+    if let wire::ClientFrame::Hello(hello) = &frame {
         assert!(
             hello.token.as_ref().is_none_or(|token| !token.is_empty()),
             "a present pairing token is a token, never an empty string"

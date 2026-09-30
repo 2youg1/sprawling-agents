@@ -12,7 +12,7 @@ use kernel::{Address, GitOid, Payload, TimeMs};
 use serde_json::{Map, Value};
 
 use crate::alias::WriteTarget;
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 use super::provenance::Provenance;
 use super::scan::CommitPlan;
@@ -48,9 +48,9 @@ pub(super) fn committed(
     of: &Provenance,
     scopes: &[String],
     files: Vec<String>,
-) -> Result<Payload, MemoryError> {
+) -> Result<Payload, StorageError> {
     let spelled = oid.to_string();
-    let oid = GitOid::parse(&spelled).ok_or_else(|| MemoryError::Checkpoint {
+    let oid = GitOid::parse(&spelled).ok_or_else(|| StorageError::Checkpoint {
         op: "record a checkpoint commit",
         detail: format!("git named this commit {spelled}, which is not 40 hex digits"),
     })?;
@@ -60,7 +60,7 @@ pub(super) fn committed(
         scope: scopes.to_vec(),
         files,
     });
-    Payload::of(&record).map_err(|source| MemoryError::Draft { source })
+    Payload::of(&record).map_err(|source| StorageError::Draft { source })
 }
 
 pub struct Checkpoint {
@@ -70,8 +70,8 @@ pub struct Checkpoint {
     pub(crate) last: Option<git2::Oid>,
 }
 
-pub(crate) fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> MemoryError {
-    move |err| MemoryError::Checkpoint {
+pub(crate) fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
+    move |err| StorageError::Checkpoint {
         op,
         detail: err.message().to_owned(),
     }
@@ -82,7 +82,7 @@ impl Checkpoint {
     /// genesis commit is the first wave's, not this call's: an empty
     /// repository is a valid state, and inventing history here would
     /// make the first checkpoint unattributable.
-    pub fn open(city_root: &Path) -> Result<Checkpoint, MemoryError> {
+    pub fn open(city_root: &Path) -> Result<Checkpoint, StorageError> {
         let repo = match git2::Repository::open(city_root) {
             Ok(repo) => repo,
             Err(_) => git2::Repository::init(city_root).map_err(git_err("init repository"))?,
@@ -114,7 +114,7 @@ impl Checkpoint {
         scopes: &[String],
         t: TimeMs,
         of: &Provenance,
-    ) -> Result<Option<Payload>, MemoryError> {
+    ) -> Result<Option<Payload>, StorageError> {
         if self.repo.head().is_ok() {
             return Ok(None);
         }
@@ -135,7 +135,7 @@ impl Checkpoint {
     /// commit at the injected time. Returns the `checkpoint_committed`
     /// payload.
     ///
-    /// **`scopes` is the run's write domain, not its room** (memory-SPEC
+    /// **`scopes` is the run's write domain, not its room** (storage-SPEC
     /// section 8-18). The two were allowed to differ once, and every
     /// file a resident wrote between them - a building's own documents,
     /// a second declared prefix - was staged by no fence, reported by no
@@ -156,7 +156,7 @@ impl Checkpoint {
         scopes: &[String],
         t: TimeMs,
         of: &Provenance,
-    ) -> Result<Payload, MemoryError> {
+    ) -> Result<Payload, StorageError> {
         let files = self.stage_scopes(scopes)?;
         self.scan_staged()?;
         let oid = self.commit(&CommitPlan {
@@ -192,7 +192,7 @@ impl Checkpoint {
     /// # Errors
     /// Propagates a `pre_oid` that is not an object, a commit whose tree
     /// cannot be read, and a working-tree path that cannot be examined.
-    pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, MemoryError> {
+    pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, StorageError> {
         let oid = git2::Oid::from_str(pre_oid).map_err(git_err("parse checkpoint oid"))?;
         let commit = self
             .repo
@@ -202,13 +202,13 @@ impl Checkpoint {
         let workdir = self
             .repo
             .workdir()
-            .ok_or_else(|| MemoryError::Checkpoint {
+            .ok_or_else(|| StorageError::Checkpoint {
                 op: "sweep the working tree",
                 detail: "the city repository is bare".to_owned(),
             })?
             .to_path_buf();
         let mut deleted: Vec<String> = Vec::new();
-        let mut fault: Option<MemoryError> = None;
+        let mut fault: Option<StorageError> = None;
         let walked = tree.walk(git2::TreeWalkMode::PreOrder, |dir, entry| {
             if entry.kind() != Some(git2::ObjectType::Blob) {
                 return git2::TreeWalkResult::Ok;
@@ -218,7 +218,7 @@ impl Checkpoint {
                 Ok(_) => {}
                 Err(err) if err.kind() == std::io::ErrorKind::NotFound => deleted.push(path),
                 Err(err) => {
-                    fault = Some(MemoryError::Checkpoint {
+                    fault = Some(StorageError::Checkpoint {
                         op: "sweep the working tree",
                         detail: format!("{path}: {err}"),
                     });
@@ -247,7 +247,7 @@ impl Checkpoint {
                 Value::String(format!("file:{path}@{pre_oid}")),
             );
             map.insert("restoration".to_owned(), Value::Object(restoration));
-            payloads.push(Payload::new(map).map_err(|source| MemoryError::Draft { source })?);
+            payloads.push(Payload::new(map).map_err(|source| StorageError::Draft { source })?);
         }
         Ok(payloads)
     }
@@ -266,11 +266,11 @@ impl Checkpoint {
     /// what keeps one), a path that commit does not hold as a file, a
     /// bare repository, an address in the protected metadata subtree
     /// (`Address::is_reserved`), and a write the file system refuses;
-    /// `MemoryError::Alias` when a symbolic link or junction sits on the
+    /// `StorageError::Alias` when a symbolic link or junction sits on the
     /// path below the working tree, because `Address` bounds the
     /// spelling of a path and not where the disk resolves it.
-    pub fn restore(&self, address: &Address, oid: &GitOid) -> Result<(), MemoryError> {
-        let refused = |detail: String| MemoryError::Checkpoint {
+    pub fn restore(&self, address: &Address, oid: &GitOid) -> Result<(), StorageError> {
+        let refused = |detail: String| StorageError::Checkpoint {
             op: "restore a discarded file",
             detail,
         };

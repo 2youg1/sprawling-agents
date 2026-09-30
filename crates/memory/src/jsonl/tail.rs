@@ -7,7 +7,7 @@
 //! segment backwards, each segment read from its end through a window
 //! that starts at one page and doubles (the rule `first_line` uses), so
 //! a reader that wants the last N records pays for their bytes and not
-//! for the whole ledger (memory-SPEC 8-1). Each line passes the same
+//! for the whole ledger (storage-SPEC 8-1). Each line passes the same
 //! judgement a forward reader applies (`LineCheck::judge`); the chain is
 //! linked from the newer end instead.
 
@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use kernel::ledger::chain_hash;
 use kernel::{B3Hash, GENESIS_PREV, Seq};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
@@ -65,11 +65,11 @@ impl TailLines {
     ///
     /// # Errors
     /// The directory cannot be listed.
-    pub fn at(dir: &Path) -> Result<Self, MemoryError> {
+    pub fn at(dir: &Path) -> Result<Self, StorageError> {
         Self::through(Box::new(RealFs::new()), dir)
     }
 
-    pub(crate) fn through(vfs: Box<dyn Vfs>, dir: &Path) -> Result<Self, MemoryError> {
+    pub(crate) fn through(vfs: Box<dyn Vfs>, dir: &Path) -> Result<Self, StorageError> {
         let segments = vfs
             .list(dir)
             .map_err(io_err("list ledger dir", dir))?
@@ -86,7 +86,7 @@ impl TailLines {
     }
 
     /// The next non-empty line back, crossing into older segments.
-    fn next_raw(&mut self) -> Result<Option<Vec<u8>>, MemoryError> {
+    fn next_raw(&mut self) -> Result<Option<Vec<u8>>, StorageError> {
         loop {
             let reading = match self.reading.as_mut() {
                 Some(reading) => reading,
@@ -136,9 +136,9 @@ impl TailLines {
     /// A refused line, named by the 1-based line the chain places it
     /// at: the newer line's seq. The newest line has no newer one, and
     /// is named line 0.
-    fn refusal(&self, fault: LineFault) -> MemoryError {
+    fn refusal(&self, fault: LineFault) -> StorageError {
         let line = self.newer.map_or(0, |newer| newer.seq.value());
-        MemoryError::Envelope {
+        StorageError::Envelope {
             path: self
                 .reading
                 .as_ref()
@@ -151,7 +151,7 @@ impl TailLines {
 }
 
 impl Iterator for TailLines {
-    type Item = Result<TailLine, MemoryError>;
+    type Item = Result<TailLine, StorageError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.ended {
@@ -180,7 +180,7 @@ impl Iterator for TailLines {
 impl Backward {
     /// The segment at `path`, its torn tail (the bytes after its last
     /// `\n`) already set aside: they are not a line.
-    fn open(vfs: &dyn Vfs, path: PathBuf) -> Result<Self, MemoryError> {
+    fn open(vfs: &dyn Vfs, path: PathBuf) -> Result<Self, StorageError> {
         let unread = vfs.size(&path).map_err(io_err("size segment", &path))?;
         let mut backward = Self {
             path,

@@ -13,7 +13,7 @@ use kernel::ledger::chain_hash;
 use kernel::{EventRecord, GENESIS_PREV, Seq};
 
 use crate::alias::WriteTarget;
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::jsonl::JsonlLedger;
 use crate::vfs::Vfs;
 
@@ -21,16 +21,16 @@ use super::landing::{Bits, is_staging_name, land};
 
 use super::manifest::RESERVED;
 
-pub(crate) fn head_of(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<String, MemoryError> {
+pub(crate) fn head_of(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<String, StorageError> {
     let mut prev = GENESIS_PREV;
     let mut expected = Seq::FIRST;
     for line in read_lines(vfs, ledger_dir)? {
-        let record = EventRecord::parse_line(&line).map_err(|err| MemoryError::Bundle {
+        let record = EventRecord::parse_line(&line).map_err(|err| StorageError::Bundle {
             op: "verify",
             detail: err.to_string(),
         })?;
         if record.seq() != expected || record.prev() != prev {
-            return Err(MemoryError::Bundle {
+            return Err(StorageError::Bundle {
                 op: "verify",
                 detail: format!(
                     "record {} does not continue the chain",
@@ -39,7 +39,7 @@ pub(crate) fn head_of(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<String, Memory
             });
         }
         prev = chain_hash(&line);
-        expected = expected.next().map_err(|err| MemoryError::Bundle {
+        expected = expected.next().map_err(|err| StorageError::Bundle {
             op: "verify",
             detail: err.to_string(),
         })?;
@@ -47,15 +47,15 @@ pub(crate) fn head_of(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<String, Memory
     Ok(prev.to_string())
 }
 
-pub(crate) fn count_records(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<u64, MemoryError> {
+pub(crate) fn count_records(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<u64, StorageError> {
     let lines = read_lines(vfs, ledger_dir)?;
-    u64::try_from(lines.len()).map_err(|_| MemoryError::Bundle {
+    u64::try_from(lines.len()).map_err(|_| StorageError::Bundle {
         op: "count",
         detail: "more records than a count can hold".to_owned(),
     })
 }
 
-pub(crate) fn read_lines(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<Vec<Vec<u8>>, MemoryError> {
+pub(crate) fn read_lines(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<Vec<Vec<u8>>, StorageError> {
     let mut out = Vec::new();
     for path in walk(vfs, ledger_dir)? {
         if path.extension().and_then(|ext| ext.to_str()) != Some("jsonl") {
@@ -80,11 +80,11 @@ pub(crate) fn read_lines(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<Vec<Vec<u8>
 /// bundle comes out short and agrees with itself about it. So does an
 /// alias: walking one would read through it, and a copy that followed a
 /// link would carry bytes no name in the bundle accounts for
-/// (memory-SPEC 8-25).
+/// (storage-SPEC 8-25).
 ///
 /// An explicit worklist rather than recursion: a city's depth is not
 /// this module's to assume, and a stack overflow is not catchable.
-pub(crate) fn walk(vfs: &dyn Vfs, root: &Path) -> Result<Vec<PathBuf>, MemoryError> {
+pub(crate) fn walk(vfs: &dyn Vfs, root: &Path) -> Result<Vec<PathBuf>, StorageError> {
     let mut found = Vec::new();
     let mut pending = vec![root.to_path_buf()];
     while let Some(dir) = pending.pop() {
@@ -107,7 +107,7 @@ pub(crate) fn walk(vfs: &dyn Vfs, root: &Path) -> Result<Vec<PathBuf>, MemoryErr
 }
 
 /// One entry against the alias rule, refused whole.
-fn refuse_alias(path: &Path) -> Result<(), MemoryError> {
+fn refuse_alias(path: &Path) -> Result<(), StorageError> {
     match crate::alias::kind_at(path)? {
         Some(kind) => Err(crate::alias::refused("walk a store or bundle", path, kind)),
         None => Ok(()),
@@ -145,9 +145,9 @@ fn travels(relative: &Path) -> bool {
 /// files it holds, which that export's manifest counted as city files.
 ///
 /// # Errors
-/// `MemoryError::Bundle` naming the first entry that is not a city
-/// file; `MemoryError::Alias` from the walk.
-pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryError> {
+/// `StorageError::Bundle` naming the first entry that is not a city
+/// file; `StorageError::Alias` from the walk.
+pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, StorageError> {
     let mut repository = 0u64;
     for path in walk(vfs, root)? {
         let Ok(relative) = path.strip_prefix(root) else {
@@ -161,7 +161,7 @@ pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryE
             continue;
         }
         if !travels(relative) {
-            return Err(MemoryError::Bundle {
+            return Err(StorageError::Bundle {
                 op: "restore",
                 detail: format!(
                     "{} is protected metadata or a staging file, which no bundle may hold",
@@ -181,7 +181,7 @@ pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryE
 fn present(
     listing: io::Result<Vec<PathBuf>>,
     dir: &Path,
-) -> Result<Option<Vec<PathBuf>>, MemoryError> {
+) -> Result<Option<Vec<PathBuf>>, StorageError> {
     match listing {
         Ok(paths) => Ok(Some(paths)),
         Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
@@ -197,7 +197,7 @@ pub(crate) fn copy_tree(
     root: &Path,
     from: &Path,
     to: &Path,
-) -> Result<u64, MemoryError> {
+) -> Result<u64, StorageError> {
     let mut copied = 0u64;
     let files = walk(vfs, from)?;
     if files.is_empty() {
@@ -212,7 +212,7 @@ pub(crate) fn copy_tree(
         let target = to.join(relative);
         // Cleared before any directory is made: making a parent through
         // a link would land a directory inside what the link reaches,
-        // before the file write is refused (memory-SPEC 8-25).
+        // before the file write is refused (storage-SPEC 8-25).
         let cleared = WriteTarget::within("copy a bundle file", root, &target)?;
         if let Some(parent) = target.parent() {
             vfs.create_dir_all(parent)
@@ -234,7 +234,7 @@ pub(crate) fn copy_city_files(
     root: &Path,
     city_root: &Path,
     to: &Path,
-) -> Result<u64, MemoryError> {
+) -> Result<u64, StorageError> {
     let mut copied = 0u64;
     let mut seen = BTreeMap::new();
     for path in walk(vfs, city_root)? {
@@ -269,7 +269,7 @@ pub(crate) fn copy_city_files(
     Ok(copied)
 }
 
-pub(crate) fn count_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryError> {
+pub(crate) fn count_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, StorageError> {
     let mut count = 0u64;
     for path in walk(vfs, root)? {
         let Ok(relative) = path.strip_prefix(root) else {
@@ -288,7 +288,7 @@ pub(crate) fn count_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, MemoryError
 /// # Errors
 /// Whatever opening reports; a restored city that cannot be opened is
 /// not restored.
-pub fn open_restored(city_root: &Path, now: kernel::TimeMs) -> Result<PathBuf, MemoryError> {
+pub fn open_restored(city_root: &Path, now: kernel::TimeMs) -> Result<PathBuf, StorageError> {
     let dir = kernel::layout::CityLayout::new(city_root).ledger();
     let (_ledger, _report) = JsonlLedger::open(&dir, now)?;
     Ok(dir)

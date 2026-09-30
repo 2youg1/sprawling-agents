@@ -21,7 +21,7 @@ use super::super::tests::no_offload;
 use super::super::{PackContext, package};
 use super::*;
 use crate::offload::OffloadSite;
-use memory::Cas;
+use storage::Cas;
 
 fn conversation() -> Conversation {
     let mut conversation = Conversation::new();

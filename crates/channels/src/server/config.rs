@@ -5,8 +5,8 @@
 
 //! The listening end, and the humble half of it (ARCHITECTURE section
 //! 9). Every branch here is a send, a receive, or the end of a session;
-//! the judgements it applies are `channels::reception`'s and the bytes
-//! it serves are `channels::assets`'.
+//! the judgements it applies are `wire::reception`'s and the bytes
+//! it serves are `wire::assets`'.
 //!
 //! Four jobs and no policy: serve the client bundle, upgrade a
 //! WebSocket, take a credential from a caller on this machine, and let
@@ -33,8 +33,8 @@ use tokio::sync::broadcast;
 use crate::answer::Answer;
 use crate::assets::ClientAssets;
 use crate::command::{Command, WireCommand};
+use crate::frames::Query;
 use crate::reception::{Admission, BindFace, Door, Pairing, decide_admission, offered_pairing};
-use crate::wire::Query;
 
 use super::committed::Committed;
 use super::reply::{Reply, refusal_text};
@@ -67,7 +67,7 @@ const ENROLMENT_PATIENCE: std::time::Duration = std::time::Duration::from_secs(2
 /// Everything the shell needs that it must not decide for itself.
 ///
 /// Each sink is injected as a closure rather than as a trait:
-/// `channels` declares no `pub trait` (it is not on the seam list,
+/// `wire` declares no `pub trait` (it is not on the seam list,
 /// ARCHITECTURE section 3), and one implementation is not a seam.
 pub struct ServeConfig {
     /// The client bundle, handed in by the assembly layer so this crate
@@ -112,22 +112,22 @@ pub struct ServeConfig {
     /// event it missed is history it must recover. Sharing one channel
     /// would let a burst of increments push records out of a reader's
     /// window.
-    pub deltas: broadcast::Sender<crate::wire::Delta>,
+    pub deltas: broadcast::Sender<crate::frames::Delta>,
     /// The process log, on its way to whoever has the log lens open.
     ///
     /// A third channel for the reason there is a second: what it
     /// carries is discardable, and a slow reader that lost a line has
     /// lost nothing. Sharing the event channel would let a city running
     /// at the `wire` floor push history out of that reader's window.
-    pub logs: broadcast::Sender<crate::wire::LogLine>,
+    pub logs: broadcast::Sender<crate::frames::LogLine>,
     /// What running commands write, while they still write it. A fourth
     /// channel, so a command flooding its stdout cannot push increments
     /// or log lines out of a slow reader's window.
-    pub outputs: broadcast::Sender<crate::wire::LiveOutput>,
+    pub outputs: broadcast::Sender<crate::frames::LiveOutput>,
     /// What running commands already wrote, in the order they wrote it.
     /// A session sends it after `Welcome`, having subscribed to
     /// `outputs` first, so a piece may arrive twice and never not at all.
-    pub outputs_so_far: Arc<dyn Fn() -> Vec<crate::wire::LiveOutput> + Send + Sync>,
+    pub outputs_so_far: Arc<dyn Fn() -> Vec<crate::frames::LiveOutput> + Send + Sync>,
     /// The performance monitor, for the sessions that ask to watch it.
     pub monitor: MonitorFeed,
     /// Answers a query from the city's derived views.
@@ -188,10 +188,10 @@ pub(crate) struct ShellState {
     pub(crate) client: Arc<ClientAssets>,
     pub(crate) commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Sync>,
     pub(crate) events: broadcast::Sender<Committed>,
-    pub(crate) deltas: broadcast::Sender<crate::wire::Delta>,
-    pub(crate) logs: broadcast::Sender<crate::wire::LogLine>,
-    pub(crate) outputs: broadcast::Sender<crate::wire::LiveOutput>,
-    pub(crate) outputs_so_far: Arc<dyn Fn() -> Vec<crate::wire::LiveOutput> + Send + Sync>,
+    pub(crate) deltas: broadcast::Sender<crate::frames::Delta>,
+    pub(crate) logs: broadcast::Sender<crate::frames::LogLine>,
+    pub(crate) outputs: broadcast::Sender<crate::frames::LiveOutput>,
+    pub(crate) outputs_so_far: Arc<dyn Fn() -> Vec<crate::frames::LiveOutput> + Send + Sync>,
     pub(crate) monitor: MonitorFeed,
     pub(crate) queries: Answering,
     pub(crate) secrets: SecretSink,
@@ -211,17 +211,17 @@ pub(crate) struct ShellState {
     pub(crate) epoch: Option<B3Hash>,
 }
 
-/// The performance monitor as a session sees it (channels-SPEC.md 8-47).
+/// The performance monitor as a session sees it (wire-SPEC.md 8-47).
 ///
 /// Whether anybody watches is decided where the history is kept; a
 /// session holds what `watch` returned for as long as it watches, and
 /// dropping that value is how it stops counting.
 #[derive(Clone)]
 pub struct MonitorFeed {
-    pub watch: Arc<dyn Fn(crate::wire::Watched) -> Box<dyn Send> + Send + Sync>,
+    pub watch: Arc<dyn Fn(crate::frames::Watched) -> Box<dyn Send> + Send + Sync>,
     /// One reading a second while anybody watches. A reading a slow
     /// session missed is not stated: the next one is a second away.
-    pub samples: broadcast::Sender<crate::wire::Sample>,
+    pub samples: broadcast::Sender<crate::frames::Sample>,
 }
 
 /// What an accepted request gets back: the run it became, and nothing
@@ -238,7 +238,7 @@ pub struct AcpProgress {
 ///
 /// **The body travels as the JSON it arrived as, and nothing here
 /// reads a field out of it.** The grammar of an inbound request is
-/// `protocol::Incoming`, whose `parse` is the only constructor and
+/// `agent_protocols::Incoming`, whose `parse` is the only constructor and
 /// therefore the only place the rules about it hold; a struct here
 /// with the same four fields, deserialized first and copied across
 /// field by field, would leave `parse` with no caller outside its own
@@ -253,7 +253,7 @@ pub type AcpSink =
 pub type TranscribeSink = Arc<dyn Fn(Vec<u8>, String) -> Result<String, AxError> + Send + Sync>;
 
 /// Where a file dropped onto the composer goes: its name and its bytes
-/// in, the absolute path the city kept it at out (channels-SPEC.md 8-49).
+/// in, the absolute path the city kept it at out (wire-SPEC.md 8-49).
 pub type DropSink = Arc<dyn Fn(&str, &[u8]) -> Result<String, AxError> + Send + Sync>;
 
 /// The largest file `/drop` takes. axum's own default of 2 MiB refuses an
@@ -327,7 +327,7 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         // `/acp` judges the same token through the same function, from
         // inside the handler: an editor offers it as a body key rather
         // than as a header, and an unpaired editor is answered by
-        // `protocol::admit` rather than at the door.
+        // `agent_protocols::admit` rather than at the door.
         .route("/acp", post(accept_acp))
         .route("/{*asset}", get(serve_asset))
         .with_state(state)

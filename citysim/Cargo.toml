@@ -14,11 +14,11 @@ role = "tool"
 
 [dependencies]
 kernel = { workspace = true, features = ["conformance"] }
-memory = { workspace = true }
+storage = { workspace = true }
 runtime = { workspace = true }
 gateway = { workspace = true }
 collab = { workspace = true }
-channels = { workspace = true, features = ["server"] }
+wire = { workspace = true, features = ["server"] }
 sprawling = { workspace = true }
 serde_json.workspace = true
 # The nesting instrument reads the TOML shape it grades (citysim-SPEC.md 8-8).

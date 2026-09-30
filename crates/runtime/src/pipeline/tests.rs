@@ -15,7 +15,7 @@
 
 use super::*;
 use kernel::{ClockStampGranularity, Temporal, TimeMs};
-use memory::Cas;
+use storage::Cas;
 
 pub(super) fn no_offload(cap: u64) -> PackContext<'static> {
     PackContext {

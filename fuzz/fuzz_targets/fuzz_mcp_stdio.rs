@@ -19,7 +19,7 @@ fuzz_target!(|data: &[u8]| {
     let Ok(line) = std::str::from_utf8(data) else {
         return;
     };
-    let Ok(result) = protocol::Rpc::read(line) else {
+    let Ok(result) = agent_protocols::Rpc::read(line) else {
         return; // refusing an unreadable line is the ordinary outcome
     };
     if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(line) {
@@ -30,7 +30,7 @@ fuzz_target!(|data: &[u8]| {
     }
 
     let server = kernel::ServerLabel::parse("probe").expect("a fixed label parses");
-    let Ok(listed) = protocol::tools_from(&server, &result) else {
+    let Ok(listed) = agent_protocols::tools_from(&server, &result) else {
         return;
     };
     let prefix = format!("{}_", server.as_str());

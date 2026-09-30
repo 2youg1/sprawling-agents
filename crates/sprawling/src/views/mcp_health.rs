@@ -21,7 +21,7 @@
 use kernel::{Address, AxCode, AxError, TimeoutMs};
 
 use super::prepared::LiveAsk;
-use protocol::McpLink;
+use agent_protocols::McpLink;
 
 /// How long one server is given to finish `initialize` and list what it
 /// offers. Shorter than a tool call's patience, because a person is
@@ -36,7 +36,7 @@ impl LiveAsk {
     /// A configuration this city cannot read answers an empty list
     /// rather than a refusal: the address exists, it reaches no server,
     /// and the page draws that as a building with none.
-    pub(super) fn mcp_health_answer(&self, addr: &Address) -> channels::McpHealthAnswer {
+    pub(super) fn mcp_health_answer(&self, addr: &Address) -> wire::McpHealthAnswer {
         let servers = match city::load_config(&self.city_root, addr) {
             Ok(config) => config
                 .mcp
@@ -45,16 +45,16 @@ impl LiveAsk {
                 .collect(),
             Err(_) => Vec::new(),
         };
-        channels::McpHealthAnswer {
+        wire::McpHealthAnswer {
             addr: addr.clone(),
             servers,
         }
     }
 
     /// One server: how it is reached, and what happened when it was.
-    fn reached(&self, server: &kernel::McpServer) -> channels::McpServerHealth {
+    fn reached(&self, server: &kernel::McpServer) -> wire::McpServerHealth {
         let (transport, target) = spelled(&server.transport);
-        channels::McpServerHealth {
+        wire::McpServerHealth {
             label: server.label.clone(),
             transport,
             target,
@@ -69,16 +69,16 @@ impl LiveAsk {
     /// because the server is up and understood the request: what to do
     /// about it is sign in, not check the address. Every transport
     /// raises that code from one place, so this mapping has nothing to
-    /// guess (`protocol::mcp::http`, `protocol::mcp::sse`).
-    fn handshake(&self, server: &kernel::McpServer) -> channels::McpState {
+    /// guess (`agent_protocols::mcp::http`, `agent_protocols::mcp::sse`).
+    fn handshake(&self, server: &kernel::McpServer) -> wire::McpState {
         match self.listed(server) {
             Ok(state) => state,
             Err(err) if err.code() == &AxCode::CredentialMissing => {
-                channels::McpState::Authenticating {
+                wire::McpState::Authenticating {
                     recovery: err.recovery().to_owned(),
                 }
             }
-            Err(err) => channels::McpState::Failed {
+            Err(err) => wire::McpState::Failed {
                 refusal: Box::new(err),
             },
         }
@@ -90,8 +90,8 @@ impl LiveAsk {
     /// Propagates the transport's refusal to open, the far end's refusal
     /// to handshake, and a tool list this build cannot read - each of
     /// which already names the action, the subject and a recovery.
-    fn listed(&self, server: &kernel::McpServer) -> Result<channels::McpState, AxError> {
-        use protocol::Outbound as _;
+    fn listed(&self, server: &kernel::McpServer) -> Result<wire::McpState, AxError> {
+        use agent_protocols::Outbound as _;
 
         let vault = self.vault.as_ref().ok_or_else(|| {
             AxError::failure(
@@ -106,16 +106,17 @@ impl LiveAsk {
         // run's worktree: nothing is running, and the tree a run would
         // have does not exist yet.
         let mut link = McpLink::open(&server.transport, &self.city_root, &resolve)?;
-        let mut rpc = protocol::Rpc::new();
-        let opened = protocol::handshake(&mut link, &mut rpc, HANDSHAKE_PATIENCE)?;
+        let mut rpc = agent_protocols::Rpc::new();
+        let opened = agent_protocols::handshake(&mut link, &mut rpc, HANDSHAKE_PATIENCE)?;
         let listing = link.call(&rpc.list_tools(), HANDSHAKE_PATIENCE)?;
-        let listed = protocol::tools_from(&server.label, &protocol::Rpc::read(&listing)?)?;
-        Ok(channels::McpState::Connected {
+        let listed =
+            agent_protocols::tools_from(&server.label, &agent_protocols::Rpc::read(&listing)?)?;
+        Ok(wire::McpState::Connected {
             protocol_version: opened.protocol_version,
             server: opened.server,
             tools: listed
                 .into_iter()
-                .map(|entry| channels::McpToolLine {
+                .map(|entry| wire::McpToolLine {
                     remote: entry.remote,
                     name: entry.meta.name.as_str().to_owned(),
                     disclosure: entry.meta.disclosure,
@@ -202,7 +203,7 @@ mod tests {
         let addr = Address::parse("lab/room1").unwrap();
         assert_eq!(
             live.mcp_health_answer(&addr),
-            channels::McpHealthAnswer {
+            wire::McpHealthAnswer {
                 addr,
                 servers: Vec::new(),
             }

@@ -21,9 +21,9 @@ fn system_prompt_with_a_note_for(noted: &str) -> String {
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
@@ -35,7 +35,7 @@ fn system_prompt_with_a_note_for(noted: &str) -> String {
     std::fs::create_dir_all(&notes).unwrap();
     std::fs::write(notes.join(format!("{noted}.md")), NOTE).unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "measure the thing".to_owned(),
             goal: "a number, then stop".to_owned(),

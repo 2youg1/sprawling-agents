@@ -232,7 +232,7 @@ clippy:
     cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
 # The feature combinations this repository checks: the workspace on its
-# default features, test targets included, and `channels` with `server`
+# default features, test targets included, and `wire` with `server`
 # off - which is the reason that feature exists, since it keeps the TCP
 # stack out of a wasm32 build. Code behind a feature is compiled the day
 # somebody turns that feature on, and a combination that does not build

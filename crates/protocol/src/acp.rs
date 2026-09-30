@@ -15,7 +15,7 @@
 //!
 //! **Pairing is decided before this module is reached.** Whether a
 //! caller holds this city's token is one judgement on one middleware
-//! that every inbound route passes through (`channels::reception`), so
+//! that every inbound route passes through (`wire::reception`), so
 //! no request arrives here unpaired and no token is carried in a value
 //! this module could print. A second pairing check here would be a
 //! second authority for the same rule, and two authorities disagree the

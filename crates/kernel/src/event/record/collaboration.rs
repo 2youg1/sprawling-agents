@@ -280,7 +280,7 @@ mod tests {
         );
     }
 
-    /// The bytes `memory`'s worktree lease wrote by hand: a name and a
+    /// The bytes `storage`'s worktree lease wrote by hand: a name and a
     /// size, and no path.
     #[test]
     fn a_worktree_line_writes_the_keys_the_hand_written_map_wrote() {

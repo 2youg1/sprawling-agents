@@ -16,8 +16,8 @@
 )]
 
 use kernel::{AxCode, EventDraft, EventKind, Payload, RunId, Seq, TimeMs};
-use memory::JsonlLedger;
 use runtime::{VerifiedLine, fork, replay};
+use storage::JsonlLedger;
 
 fn draft(kind: EventKind, t: u64) -> EventDraft {
     EventDraft {

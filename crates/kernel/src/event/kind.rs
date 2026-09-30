@@ -149,7 +149,7 @@ pub enum EventKind {
     ///
     /// The request is history and belongs here; **where that application
     /// stands right now is not, and is deliberately absent from the
-    /// payload** (channels-SPEC.md section 8-31): a recorded standing
+    /// payload** (wire-SPEC.md section 8-31): a recorded standing
     /// would still read "connected" an hour after the person revoked
     /// it. The consent page's own url is absent for a second reason -
     /// it is a capability, and anybody replaying this log would be

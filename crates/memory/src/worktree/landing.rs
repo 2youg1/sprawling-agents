@@ -9,7 +9,7 @@
 use kernel::TimeMs;
 
 use crate::checkpoint::Provenance;
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 use super::trees::Worktrees;
 
@@ -69,7 +69,7 @@ impl PlannedMerge<'_> {
     /// Propagates a trunk that cannot be read, committed onto or checked
     /// out. The fast-forward judgement is not repeated: it was made, and
     /// refused if it had to be, before this value existed.
-    pub fn apply(self, landing: &Landing<'_>) -> Result<(), MemoryError> {
+    pub fn apply(self, landing: &Landing<'_>) -> Result<(), StorageError> {
         self.trees.land_merge(self.target, landing)
     }
 }
@@ -91,7 +91,7 @@ pub(super) fn check_out(
     repo: &git2::Repository,
     tree: &git2::Tree<'_>,
     run: CheckoutRun,
-) -> Result<(), MemoryError> {
+) -> Result<(), StorageError> {
     let mut paths = Vec::new();
     let mut checkout = git2::build::CheckoutBuilder::new();
     checkout.safe();
@@ -107,9 +107,9 @@ pub(super) fn check_out(
     let outcome = repo.checkout_tree(tree.as_object(), Some(&mut checkout));
     drop(checkout);
     if !paths.is_empty() {
-        return Err(MemoryError::MergeWouldDiscard { paths });
+        return Err(StorageError::MergeWouldDiscard { paths });
     }
-    outcome.map_err(|err| MemoryError::Worktree {
+    outcome.map_err(|err| StorageError::Worktree {
         op: "check out the merged trunk",
         detail: err.to_string(),
     })

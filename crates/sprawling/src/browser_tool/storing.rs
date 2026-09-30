@@ -43,7 +43,7 @@ impl Browser {
         let hash = self
             .cas
             .put_for(shot.bytes(), &self.origin)
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         let locator = Locator::cas(hash);
         let picture = ImageRef {
             locator,

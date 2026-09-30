@@ -447,11 +447,11 @@ status = "measured, not gated: on a 5,888,890 B object a five-byte `B` range mov
 # the largest payload the city already accepts.
 #
 # Not gated by `xtask budget`: the number is a constant in the source
-# rather than a reading off a build, and `protocol::mcp::reading`'s
+# rather than a reading off a build, and `agent_protocols::mcp::reading`'s
 # tests assert both edges of it - a message of exactly the ceiling is
 # read, one byte more is refused with the ceiling named. A gate here
 # would be a second authority over the same claim. The one home is
-# `protocol::mcp::MESSAGE_CEILING`; this row records the reading and the
+# `agent_protocols::mcp::MESSAGE_CEILING`; this row records the reading and the
 # reasoning, never a second copy of the value that decides.
 [mcp_message_ceiling]
 what = "one message read from an MCP server over stdio, before its framing newline"
@@ -479,7 +479,7 @@ status = "measured, not gated: 8,388,608 B, refused whole rather than truncated,
 # a per-megabyte figure and cannot multiply a per-record one.
 #
 # **One rebuild, one row.** The cold view this figure used to share the
-# subject with is gone with `memory::projection`, so the per-record row
+# subject with is gone with `storage::projection`, so the per-record row
 # went with it: the views a city rebuilds today live in the process.
 #
 # The denominator removes the fixture's size from the figure, which is

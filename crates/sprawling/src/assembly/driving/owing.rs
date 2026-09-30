@@ -102,7 +102,7 @@ impl Unasked {
 /// after it has already given the obligation to a successor.
 pub(in crate::assembly) struct Owing {
     owed: Owed,
-    reply: Arc<channels::Reply>,
+    reply: Arc<wire::Reply>,
     relays: Relays,
 }
 
@@ -237,7 +237,7 @@ impl KnockChain {
 
 impl Owing {
     /// A person asked, and a refusal goes back to them.
-    pub(in crate::assembly) fn asked(reply: channels::Reply) -> Owing {
+    pub(in crate::assembly) fn asked(reply: wire::Reply) -> Owing {
         Owing {
             owed: Owed::Asked,
             reply: Arc::new(reply),
@@ -250,7 +250,7 @@ impl Owing {
     pub(in crate::assembly) fn unasked(because: Unasked) -> Owing {
         Owing {
             owed: Owed::Unasked(because),
-            reply: Arc::new(channels::Reply::nowhere()),
+            reply: Arc::new(wire::Reply::nowhere()),
             relays: Relays::default(),
         }
     }
@@ -267,7 +267,7 @@ impl Owing {
     pub(in crate::assembly) fn knocked(chain: KnockChain) -> Result<Owing, AxError> {
         Ok(Owing {
             owed: Owed::Unasked(Unasked::Knock),
-            reply: Arc::new(channels::Reply::nowhere()),
+            reply: Arc::new(wire::Reply::nowhere()),
             relays: Relays {
                 chain,
                 successions: 0,
@@ -280,7 +280,7 @@ impl Owing {
     pub(in crate::assembly) fn row(addr: Address, node: NodeId) -> Owing {
         Owing {
             owed: Owed::Row { addr, node },
-            reply: Arc::new(channels::Reply::nowhere()),
+            reply: Arc::new(wire::Reply::nowhere()),
             relays: Relays::default(),
         }
     }
@@ -305,7 +305,7 @@ impl Owing {
     }
 
     /// Where a refusal goes back to.
-    pub(in crate::assembly) fn reply(&self) -> Arc<channels::Reply> {
+    pub(in crate::assembly) fn reply(&self) -> Arc<wire::Reply> {
         Arc::clone(&self.reply)
     }
 
@@ -346,7 +346,7 @@ mod tests {
     /// the suspicion rather than a generic failure.
     #[test]
     fn a_chain_of_successions_stops_at_its_ceiling() {
-        let mut owing = Owing::asked(channels::Reply::nowhere());
+        let mut owing = Owing::asked(wire::Reply::nowhere());
         for _ in 0..SUCCESSION_HOPS_MAX {
             owing = match owing.after_succession() {
                 Ok(next) => next,

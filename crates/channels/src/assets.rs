@@ -14,7 +14,7 @@
 //! The whole of the path policy is here and none of it is in a handler:
 //! `""` and `"/"` mean the index page, a path that steps outside the
 //! bundle is a miss rather than an error, and the content type is the
-//! one a browser needs to run a WebAssembly client. `channels::server`
+//! one a browser needs to run a WebAssembly client. `wire::server`
 //! adds headers to what this answers and decides nothing.
 
 use kernel::{AxCode, AxError};

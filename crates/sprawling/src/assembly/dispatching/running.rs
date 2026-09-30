@@ -102,7 +102,7 @@ impl RunWorker {
         let job_hash = self
             .cas
             .put(brief.segment_text().as_bytes())
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         let given = Given {
             job: Locator::cas(job_hash),
             brief,
@@ -124,12 +124,12 @@ impl RunWorker {
         self.cas
             .put_for(
                 given.brief.segment_text().as_bytes(),
-                &memory::BlockOrigin {
+                &storage::BlockOrigin {
                     run: site.run_id,
                     building: at.addr.clone(),
                 },
             )
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         // The branch is the tree's name, so the desks opened here know it
         // while the lane still places the tree.
         site.name_tree(&at.addr)?;
@@ -347,9 +347,9 @@ impl RunWorker {
         let Some(held) = site.lease.take() else {
             return Ok(());
         };
-        memory::Worktrees::open(&self.city_root)
-            .map_err(memory::MemoryError::into_ax)?
+        storage::Worktrees::open(&self.city_root)
+            .map_err(storage::StorageError::into_ax)?
             .release(held)
-            .map_err(memory::MemoryError::into_ax)
+            .map_err(storage::StorageError::into_ax)
     }
 }

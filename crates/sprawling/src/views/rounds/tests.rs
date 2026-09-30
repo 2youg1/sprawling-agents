@@ -16,7 +16,7 @@
 //! session's records would.
 
 use super::{opened_at, turns};
-use channels::{B3Hash, EventDraft, EventKind, EventRecord, Outcome, Payload, RunId, Seq, TimeMs};
+use wire::{B3Hash, EventDraft, EventKind, EventRecord, Outcome, Payload, RunId, Seq, TimeMs};
 
 fn record(seq: u64, kind: EventKind, data: serde_json::Value) -> EventRecord {
     let map = data.as_object().expect("a payload is an object").clone();
@@ -258,7 +258,7 @@ fn asking_for_rounds_answers_the_fold_the_view_layer_ran() {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::assembly::init_city(dir.path()).unwrap();
     let run = RunId::from_bytes([7u8; 16]);
-    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, TimeMs::new(9))
+    let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, TimeMs::new(9))
         .unwrap()
         .0;
     let drafts = [
@@ -290,7 +290,7 @@ fn asking_for_rounds_answers_the_fold_the_view_layer_ran() {
     drop(ledger);
 
     let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
-    let channels::Answer::Rounds(answer) = views.answer(&channels::Query::Rounds { run }) else {
+    let wire::Answer::Rounds(answer) = views.answer(&wire::Query::Rounds { run }) else {
         panic!("Rounds answers with rounds");
     };
     let records = views.ledger_ask().records_of(run);
@@ -316,7 +316,7 @@ fn the_rounds_carry_how_the_session_opened_and_closed() {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::assembly::init_city(dir.path()).unwrap();
     let run = RunId::from_bytes([8u8; 16]);
-    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, TimeMs::new(9))
+    let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, TimeMs::new(9))
         .unwrap()
         .0;
     let drafts = [
@@ -360,12 +360,12 @@ fn the_rounds_carry_how_the_session_opened_and_closed() {
     drop(ledger);
 
     let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
-    let channels::Answer::Rounds(answer) = views.answer(&channels::Query::Rounds { run }) else {
+    let wire::Answer::Rounds(answer) = views.answer(&wire::Query::Rounds { run }) else {
         panic!("Rounds answers with rounds");
     };
     assert_eq!(
         answer.opening,
-        Some(channels::Opening {
+        Some(wire::Opening {
             task: "plan the week".to_owned(),
             goal: "a roadmap".to_owned(),
             at: TimeMs::new(10),

@@ -224,7 +224,7 @@ private def newlinePositions (bytes : List UInt8) : List Nat :=
 byte range: from where the line starts to the newline that ends it.
 
 A tail with no newline is not a line, which is the reader's own judgement about a
-write that did not land (`memory::jsonl` recovers it rather than reading it), and
+write that did not land (`storage::jsonl` recovers it rather than reading it), and
 an empty line is not a line either. -/
 private def lineSpans (bytes : List UInt8) : List (Nat × Nat) :=
   let ends := newlinePositions bytes
@@ -280,7 +280,7 @@ def Ground.putBack (ground : Ground) (saved : List (String × ByteArray)) : IO U
 
 /-- Chops the end off the newest segment, the way a power cut does.
 
-The tail deliberately, and only here. `memory::jsonl` recovers a torn last line
+The tail deliberately, and only here. `storage::jsonl` recovers a torn last line
 on purpose, so this is the one hostile action that asks whether recovery happens
 rather than whether detection does. Keeping it a separate verb from `corrupt` is
 what stops either from being credited with the other's evidence: a test that

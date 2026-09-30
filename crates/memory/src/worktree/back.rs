@@ -6,7 +6,7 @@
 //! Going back to a point, and taking one file back from a point.
 //!
 //! `adversary/design/GoingBack.lean` holds which properties these two
-//! must keep (memory-SPEC.md 8-27): a tree opened at a point holds that
+//! must keep (storage-SPEC.md 8-27): a tree opened at a point holds that
 //! point's files, a live name or an existing line of work is refused
 //! rather than replaced, and neither step touches the trunk or another
 //! run's tree.
@@ -18,7 +18,7 @@ use kernel::event::record::FileRestored;
 
 use crate::alias::WriteTarget;
 use crate::bundle::landing::{Bits, land};
-use crate::error::MemoryError;
+use crate::error::StorageError;
 use crate::real_fs::RealFs;
 
 use super::lease::WorktreeLease;
@@ -38,8 +38,8 @@ impl Worktrees {
         &self,
         name: &WorktreeName,
         point: &GitOid,
-    ) -> Result<WorktreeLease, MemoryError> {
-        let busy = |detail: &str| MemoryError::WorktreeBusy {
+    ) -> Result<WorktreeLease, StorageError> {
+        let busy = |detail: &str| StorageError::WorktreeBusy {
             name: name.as_str().to_owned(),
             detail: detail.to_owned(),
         };
@@ -57,7 +57,7 @@ impl Worktrees {
                 if err.code() == git2::ErrorCode::Exists {
                     busy("a line of work already has this name")
                 } else {
-                    MemoryError::Worktree {
+                    StorageError::Worktree {
                         op: "branch at the point to go back to",
                         detail: format!("{point}: {err}"),
                     }
@@ -69,7 +69,7 @@ impl Worktrees {
                 // The branch was made for this tree alone; left behind, it
                 // would hold the name as a line of work nobody started.
                 let mut branch = branch;
-                branch.delete().map_err(|err| MemoryError::Worktree {
+                branch.delete().map_err(|err| StorageError::Worktree {
                     op: "remove the branch of a tree that did not open",
                     detail: format!("{}: {err}; the tree failed with: {refusal}", name.as_str()),
                 })?;
@@ -92,8 +92,8 @@ impl Worktrees {
         lease: &WorktreeLease,
         point: &GitOid,
         path: &Path,
-    ) -> Result<FileRestored, MemoryError> {
-        let refuse = |detail: String| MemoryError::Worktree {
+    ) -> Result<FileRestored, StorageError> {
+        let refuse = |detail: String| StorageError::Worktree {
             op: "restore a file from a point",
             detail,
         };
@@ -112,7 +112,7 @@ impl Worktrees {
             lease.path(),
             &lease.path().join(path),
         )?;
-        let io = |source: std::io::Error| MemoryError::Io {
+        let io = |source: std::io::Error| StorageError::Io {
             op: "restore a file from a point",
             path: target.as_path().to_path_buf(),
             source,
@@ -146,8 +146,8 @@ impl Worktrees {
         Ok(restored)
     }
 
-    fn commit_at(&self, point: &GitOid) -> Result<git2::Commit<'_>, MemoryError> {
-        let missing = |err: git2::Error| MemoryError::Worktree {
+    fn commit_at(&self, point: &GitOid) -> Result<git2::Commit<'_>, StorageError> {
+        let missing = |err: git2::Error| StorageError::Worktree {
             op: "find the point to go back to",
             detail: format!("{point}: {err}"),
         };

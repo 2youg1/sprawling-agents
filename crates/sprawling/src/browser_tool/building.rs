@@ -8,7 +8,7 @@
 //! building's rules ask for, in the order the catalogue hashes.
 
 use kernel::{AxCode, AxError};
-use memory::Cas;
+use storage::Cas;
 
 use super::BrowserTool;
 use super::Role;
@@ -39,7 +39,7 @@ pub(super) const BUILDING_DISCLOSURE: &str = "drive this machine's browser: open
 /// that will not open.
 pub(crate) fn for_building(
     city_root: &std::path::Path,
-    origin: memory::BlockOrigin,
+    origin: storage::BlockOrigin,
 ) -> Result<BrowserTool, AxError> {
     let profile = city_root.join(browser::Profile::of(&origin.building)?.path().as_str());
     std::fs::create_dir_all(&profile).map_err(|err| {
@@ -64,7 +64,7 @@ pub(crate) fn for_building(
 
 pub(super) fn open_cas(city_root: &std::path::Path) -> Result<Cas, AxError> {
     Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
-        .map_err(memory::MemoryError::into_ax)
+        .map_err(storage::StorageError::into_ax)
 }
 
 /// Every browser tool this building's rules ask for, in table order.
@@ -79,7 +79,7 @@ pub(super) fn open_cas(city_root: &std::path::Path) -> Result<Cas, AxError> {
 /// that will not open.
 pub(crate) fn for_rules(
     city_root: &std::path::Path,
-    origin: &memory::BlockOrigin,
+    origin: &storage::BlockOrigin,
     rules: &city::BuildingRules,
 ) -> Result<Vec<Box<dyn kernel::Tool>>, AxError> {
     let mut tools: Vec<Box<dyn kernel::Tool>> = Vec::new();

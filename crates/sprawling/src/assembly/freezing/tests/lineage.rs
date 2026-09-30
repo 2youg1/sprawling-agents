@@ -21,7 +21,7 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     let room = Address::parse("lab/room1").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room.clone(),
             task: "mother work".to_owned(),
             goal: "a lineage".to_owned(),
@@ -53,9 +53,9 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
     // room is cleared, because a session that cannot inherit must not
     // have cost the room its shape.
     let err = worker
-        .handle(channels::Command::OpenSession {
+        .handle(wire::Command::OpenSession {
             addr: room.clone(),
-            carry: channels::Carry::Nothing,
+            carry: wire::Carry::Nothing,
             from: Some(kernel::Origin {
                 run: mother,
                 at_seq: kernel::Seq::FIRST,
@@ -69,9 +69,9 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
     // is the *run's* fact, so it is written when a run begins - a session
     // that never dispatches never has one.
     worker
-        .handle(channels::Command::OpenSession {
+        .handle(wire::Command::OpenSession {
             addr: room.clone(),
-            carry: channels::Carry::Nothing,
+            carry: wire::Carry::Nothing,
             from: Some(kernel::Origin {
                 run: mother,
                 at_seq: node,
@@ -80,7 +80,7 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
         })
         .unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room.clone(),
             task: "carry on".to_owned(),
             goal: "the line continues".to_owned(),
@@ -142,7 +142,7 @@ fn inheriting_a_branch_does_not_verify_the_history() {
         fake_openai(&["m-local"], vec![completion("the meter says 42", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room2").unwrap(),
             task: "mother".to_owned(),
             goal: "a number is written down".to_owned(),

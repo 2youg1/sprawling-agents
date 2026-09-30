@@ -37,8 +37,7 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
         ))
         .unwrap();
 
-    let channels::Answer::Inbox(inbox) =
-        views.answer(&channels::Query::InboxView { addr: room.clone() })
+    let wire::Answer::Inbox(inbox) = views.answer(&wire::Query::InboxView { addr: room.clone() })
     else {
         panic!("InboxView answers with an inbox");
     };
@@ -53,8 +52,7 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
             signal.consumed_payload("lab/room1").unwrap(),
         ))
         .unwrap();
-    let channels::Answer::Inbox(inbox) =
-        views.answer(&channels::Query::InboxView { addr: room.clone() })
+    let wire::Answer::Inbox(inbox) = views.answer(&wire::Query::InboxView { addr: room.clone() })
     else {
         panic!("InboxView answers with an inbox");
     };
@@ -87,7 +85,7 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
             discarded.clone(),
         ))
         .unwrap();
-    let channels::Answer::Discards(bin) = views.answer(&channels::Query::DiscardView) else {
+    let wire::Answer::Discards(bin) = views.answer(&wire::Query::DiscardView) else {
         panic!("DiscardView answers with the bin");
     };
     assert_eq!(bin.rows.len(), 1);
@@ -95,10 +93,7 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
     // and a server that composed one too would be the second place
     // that decides what a way back reads like.
     assert!(
-        matches!(
-            bin.rows[0].restoration,
-            Some(channels::Restoration::Tracked(_))
-        ),
+        matches!(bin.rows[0].restoration, Some(wire::Restoration::Tracked(_))),
         "every row states its own way back: {:?}",
         bin.rows[0].restoration
     );
@@ -112,7 +107,7 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
             discarded.clone(),
         ))
         .unwrap();
-    let channels::Answer::Discards(bin) = views.answer(&channels::Query::DiscardView) else {
+    let wire::Answer::Discards(bin) = views.answer(&wire::Query::DiscardView) else {
         panic!("DiscardView answers with the bin");
     };
     assert!(
@@ -138,13 +133,13 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
             archived,
         ))
         .unwrap();
-    let channels::Answer::Registry(registry) = views.answer(&channels::Query::RegistryView) else {
+    let wire::Answer::Registry(registry) = views.answer(&wire::Query::RegistryView) else {
         panic!("RegistryView answers with a registry");
     };
     assert_eq!(registry.assets.len(), 1);
     assert_eq!(registry.assets[0].kind, "decision");
 
-    let channels::Answer::Metrics(metrics) = views.answer(&channels::Query::Metrics) else {
+    let wire::Answer::Metrics(metrics) = views.answer(&wire::Query::Metrics) else {
         panic!("Metrics answers with the vital signs");
     };
     assert_eq!(metrics.events, 5, "one number no other view can derive");
@@ -156,7 +151,7 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
 
     // The archive is read from the shelves, so a city with no shelf
     // answers an empty search rather than failing to search.
-    let channels::Answer::Archive(found) = views.answer(&channels::Query::ArchiveSearch {
+    let wire::Answer::Archive(found) = views.answer(&wire::Query::ArchiveSearch {
         needle: "git".to_owned(),
     }) else {
         panic!("ArchiveSearch answers with hits");
@@ -186,7 +181,7 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
             unreadable,
         ))
         .unwrap();
-    let channels::Answer::Discards(bin) = views.answer(&channels::Query::DiscardView) else {
+    let wire::Answer::Discards(bin) = views.answer(&wire::Query::DiscardView) else {
         panic!("DiscardView answers with the bin");
     };
     assert_eq!(bin.rows.len(), 2, "the unreadable plan still gets a row");
@@ -239,8 +234,7 @@ fn a_consumed_signal_leaves_the_inbox_whatever_room_its_line_names() {
         ))
         .unwrap();
 
-    let channels::Answer::Inbox(inbox) = views.answer(&channels::Query::InboxView { addr: room })
-    else {
+    let wire::Answer::Inbox(inbox) = views.answer(&wire::Query::InboxView { addr: room }) else {
         panic!("InboxView answers with an inbox");
     };
     assert_eq!(inbox.waiting, Vec::new());
@@ -285,6 +279,6 @@ fn the_views_a_rebuild_hands_over_hold_the_index_it_read() {
             .unwrap()
             .refresh(&report.ledger_dir)
             .unwrap(),
-        memory::Refreshed::Unchanged
+        storage::Refreshed::Unchanged
     );
 }

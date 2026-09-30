@@ -19,7 +19,7 @@ use std::path::Path;
 
 use collab::{Claim, NodeId, Pr};
 use kernel::{Address, B3Hash, Locator, RunId, TimeMs};
-use memory::{Checkpoint, Landing, ModelChoice, Provenance, WorktreeName, Worktrees};
+use storage::{Checkpoint, Landing, ModelChoice, Provenance, WorktreeName, Worktrees};
 
 /// Who the commits in this scenario are signed as.
 fn of(room: &str) -> Provenance {

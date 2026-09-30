@@ -47,7 +47,7 @@ fn a_written_key_reaches_the_vault_and_not_the_file() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "write the token down".to_owned(),
             goal: "the token is in keys.md".to_owned(),
@@ -105,7 +105,7 @@ fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "read the token".to_owned(),
             goal: "the token is known".to_owned(),

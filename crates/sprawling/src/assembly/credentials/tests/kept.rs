@@ -31,20 +31,20 @@ fn an_empty_key_keeps_the_credential_this_city_has_archived() {
     )
     .unwrap();
     worker
-        .handle(channels::Command::PutSecret {
+        .handle(wire::Command::PutSecret {
             realm: "kept".to_owned(),
             name: "key".to_owned(),
             value: kernel::Sealed::new(Box::new("sk-archived".to_owned())),
         })
         .unwrap();
-    let attach = |secret: Option<&str>, mark: &[u8]| channels::Command::AttachEndpoint {
-        name: channels::ProviderName::parse("kept").unwrap(),
+    let attach = |secret: Option<&str>, mark: &[u8]| wire::Command::AttachEndpoint {
+        name: wire::ProviderName::parse("kept").unwrap(),
         base_url: base_url.clone(),
         dialect: kernel::DialectKind::OpenAi,
         secret: secret.map(str::to_owned),
         auth_header: None,
         admit: Vec::new(),
-        tuning: channels::EndpointTuning::default(),
+        tuning: wire::EndpointTuning::default(),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, mark),
     };
     worker
@@ -53,13 +53,13 @@ fn an_empty_key_keeps_the_credential_this_city_has_archived() {
     // The page was closed and opened again: the form has no reference
     // to send, and both of its buttons say so.
     worker
-        .handle(channels::Command::ProbeEndpoint {
-            name: channels::ProviderName::parse("kept").unwrap(),
+        .handle(wire::Command::ProbeEndpoint {
+            name: wire::ProviderName::parse("kept").unwrap(),
             base_url: base_url.clone(),
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"probe"),
         })
         .unwrap();

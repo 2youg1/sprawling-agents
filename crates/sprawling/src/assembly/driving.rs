@@ -55,7 +55,7 @@ pub(crate) struct Driving {
     pub(crate) fence_scope: Vec<String>,
     pub(crate) run_id: RunId,
     /// What every fence this drive raises is signed with.
-    pub(crate) of: memory::Provenance,
+    pub(crate) of: storage::Provenance,
     /// Where a command's output is pinned before it is cut, and what
     /// decides the cut (sprawling-SPEC 8-43).
     pub(crate) sieving: Sieving,
@@ -78,11 +78,11 @@ pub(crate) struct Driving {
 /// filter table frozen with the run, and what this run already saw.
 pub(crate) struct Sieving {
     /// The store the lanes share, taken for the length of one package.
-    pub(crate) cas: std::sync::Arc<std::sync::Mutex<memory::Cas>>,
+    pub(crate) cas: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
     pub(crate) city_root: PathBuf,
     pub(crate) room: Address,
     /// The run and room an original is pinned for.
-    pub(crate) origin: memory::BlockOrigin,
+    pub(crate) origin: storage::BlockOrigin,
     pub(crate) table: runtime::FilterTable,
     pub(crate) history: runtime::SieveHistory,
 }
@@ -170,7 +170,7 @@ impl Sieving {
     /// model-chosen path is allowed to read from; the offload makes it
     /// when it first writes a rest file.
     pub(in crate::assembly) fn for_run(
-        store: &std::sync::Arc<std::sync::Mutex<memory::Cas>>,
+        store: &std::sync::Arc<std::sync::Mutex<storage::Cas>>,
         site: &Site,
         addr: &Address,
     ) -> Sieving {
@@ -178,7 +178,7 @@ impl Sieving {
             cas: std::sync::Arc::clone(store),
             city_root: site.write_root.clone(),
             room: addr.clone(),
-            origin: memory::BlockOrigin {
+            origin: storage::BlockOrigin {
                 run: site.run_id,
                 building: addr.clone(),
             },

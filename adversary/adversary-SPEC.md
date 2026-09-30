@@ -54,7 +54,7 @@
 Rust 侧的验收测试全部是**具体轨迹**：`crates/sprawling/tests/assembly_door.rs` 证明「这一条路走得通」，不证明「任何一条路都走不出去」。本目录的全部增量在后者，以及三件 Rust 侧写不出的事：
 
 1. **门的承诺只在门外才可观测。** 退出码、两个流的分工、静默与拒绝的区别，都是「一个 agent 拿这个二进制写脚本」时遇到的事实，而进程内的测试永远看不见它们。
-2. **敌意的磁盘不是被 mock 的磁盘。** `memory::fault_fs` 是一个确定性掉电模型，它回答「我们设想的坏」；本目录直接翻掉账本里的一位，回答「随便一位坏了会怎样」。
+2. **敌意的磁盘不是被 mock 的磁盘。** `storage::fault_fs` 是一个确定性掉电模型，它回答「我们设想的坏」；本目录直接翻掉账本里的一位，回答「随便一位坏了会怎样」。
 3. **任意前缀与任意后缀。** 只会均匀随机生成的东西是 fuzzer；把攻击命名出来再对它前后做全称量化，才是对手。
 
 ### 第一个发现：静默与成功无法区分
@@ -124,7 +124,7 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 
 **第七个发现是量出来的，而且它不是缺陷。** 把一条四行账本记为 0…3，逐格改掉中间的一位（每次先把城自己那份字节写回去，所以每次问的都是干净的账本），问 `sprawling replay`：记录 0 到 2 的改动每一次都被拒，改记录 3 时 `replay` 报 `chain verified`（实测：`a change inside record 4 of 4 was believed: the chain still verified, with tail seq 3`）。
 
-**为什么这不奇怪，以及为什么值得写下来。** 每条记录的 `prev` 是上一行的摘要，所以被改的那一格由**它的下一条**作证；最后一条后面没有记录，便没有东西哈希过它——校验的射程正好比文件短一格。这是追加式哈希链本身的样子，不是 `open.rs` 少写了一句：要覆盖头一格，锚必须住在账本**之外**（本仓已经有这样的锚：`memory::bundle` 的清单把链头写进 `head`，`crates/memory/src/bundle/manifest.rs:20,49`），而一个只会读账本目录的 `replay` 看不到它。改动的可观测面还要窄一层：命中引号、花括号这类字节时，拒绝来自解析（`verify_lines:90`）或来自“字节不是写者规范拼写”（`:127`），“被相信”这一档要求改动后的行仍然可解析且仍是规范拼写。
+**为什么这不奇怪，以及为什么值得写下来。** 每条记录的 `prev` 是上一行的摘要，所以被改的那一格由**它的下一条**作证；最后一条后面没有记录，便没有东西哈希过它——校验的射程正好比文件短一格。这是追加式哈希链本身的样子，不是 `open.rs` 少写了一句：要覆盖头一格，锚必须住在账本**之外**（本仓已经有这样的锚：`storage::bundle` 的清单把链头写进 `head`，`crates/memory/src/bundle/manifest.rs:20,49`），而一个只会读账本目录的 `replay` 看不到它。改动的可观测面还要窄一层：命中引号、花括号这类字节时，拒绝来自解析（`verify_lines:90`）或来自“字节不是写者规范拼写”（`:127`），“被相信”这一档要求改动后的行仍然可解析且仍是规范拼写。
 
 **它对检查的约束有两条，都是本目录自己欠的账。** 一是测**检测**的检查必须落在被覆盖的记录上：`Ground.corrupt` 今天挑最老那条是为了确定性（没有城进程在竞写它），而 `a change to any record but the last is refused` 把整段走完，因为一格通过只说明一格；二是**不许把这一格写成需要修的东西**：谁若把「改一条记录必被拒」写成对所有记录成立，他写的是一条产品不欠的断言，而修它的唯一办法是在文件里放一个自指的摘要——那是伪证，不是校验。
 
@@ -136,9 +136,9 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 
 | 事实 | 权威所在 |
 |---|---|
-| 线格式版本、握手内容 | `crates/channels/src/wire.rs` 的 `WIRE_V` 与 `Welcome` |
-| 服务端帧类的全集 | `crates/channels/src/wire.rs` 的 `ServerFrame` |
-| Command 与 Query 的全集 | `crates/channels/src/command/kind.rs`、`crates/channels/src/wire/query.rs` |
+| 线格式版本、握手内容 | `crates/channels/src/frames.rs` 的 `WIRE_V` 与 `Welcome` |
+| 服务端帧类的全集 | `crates/channels/src/frames.rs` 的 `ServerFrame` |
+| Command 与 Query 的全集 | `crates/channels/src/command/kind.rs`、`crates/channels/src/frames/query.rs` |
 | 稳定错误码的全集 | `crates/kernel/src/error.rs` 的 `AxCode::ALL` |
 | `IdemKey` 与模板名的形状 | 门的拒绝原文，实测 |
 | 链的链接规则（每条记录携带的 `prev` 就是上一行的摘要） | `crates/kernel/src/ledger.rs:31` 的 `chain_hash` 与 `:26` 的 `GENESIS_PREV` 决定值；写的一侧在 `crates/memory/src/jsonl/append.rs:74`，读的一侧在 `crates/runtime/src/replay.rs:106-118`、`crates/memory/src/jsonl/open.rs:254` 与 `crates/memory/src/bundle/files.rs:30-40` | 本目录比较读数，从不计算摘要：`Sprawling.Chain` 把摘要函数当参数，名字都不提 blake3。仓库改成别的摘要函数时，那里每一条语句一字不变 |
@@ -155,7 +155,7 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 | **Door** | 已构建二进制的 `call` 门面，唯一知道有个可执行文件存在的地方 |
 | **Ground** | 一次性的场地：一座被端起来的城、它的端口、它的账本目录，以及磁盘可以施加的敌意 |
 | **Trace** | 一串动作及其观察结果，是本目录唯一的断言对象 |
-| **Chained**（和它算的那串 `required`） | 一条账本，其每条记录携带的 `prev` 正是它欠的那串声索。这两个名字只指 `memory::jsonl::open` 开城时验的那一条规则，没有第二个意思：`Ledger`、`EventRecord`、`prev`、`seq` 都沿用城的词 |
+| **Chained**（和它算的那串 `required`） | 一条账本，其每条记录携带的 `prev` 正是它欠的那串声索。这两个名字只指 `storage::jsonl::open` 开城时验的那一条规则，没有第二个意思：`Ledger`、`EventRecord`、`prev`、`seq` 都沿用城的词 |
 | **putBack** | 把一个账本目录按一份读数写回去：本目录撤掉自己造成的伤，好让同一个场地回答第二个位置的问题 |
 
 第三种世界的模块叫 `Layer`，这个词不是本目录新起的：它就是 `city::config_layers::Layer`——配置梯子上的一级。

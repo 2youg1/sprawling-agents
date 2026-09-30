@@ -43,13 +43,13 @@ just check                    # the whole check: fmt, source gates, Lean models,
 | `cargo xtask gates <name>...` | the named gates only; `cargo xtask gates --list` prints the roster, one name per line |
 | `just commits <base>..<tip>` | every commit subject and `Verdict:` trailer in the range, judged against *Commits*; CI runs it on the change-set, and `just check` cannot, because a tree has no range |
 | `just models` | the Lean design models under `adversary/design/`, built with no `sorry`, `admit` or `axiom`; silent where Lean is absent |
-| `just features` | the two feature combinations nothing else compiles: the workspace on its default features, and `channels` without `server` |
+| `just features` | the two feature combinations nothing else compiles: the workspace on its default features, and `wire` without `server` |
 | `just check-client` | the client's lint, typecheck and tests |
 | `just build-web` | the client bundle, built into `target/web-dist` |
 | `just dist` | the whole deliverable: client, binary, bill of materials |
 | `just sim` | the citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |
 | `cargo xtask docnum [--write]` | every number and generated section a document carries, checked against the code that decides it; `--write` rewrites them |
-| `cargo xtask apisync [--write]` | the public API of `kernel` and `channels` against its baseline in `xtask/api-baselines/`; a nightly job reads it, and a change to either surface rewrites the baseline in the same change-set |
+| `cargo xtask apisync [--write]` | the public API of `kernel` and `wire` against its baseline in `xtask/api-baselines/`; a nightly job reads it, and a change to either surface rewrites the baseline in the same change-set |
 | `just adversary` | the out-of-tree property checker that attacks the binary through the wire; never a gate, and a no-op without Lean |
 | `just proof` | the kernel propositions kani holds against real MIR; never a gate, and a no-op without kani, which has no Windows host; `cargo xtask proof --list` prints the roster |
 | `just --list` | every other recipe — SPEC skeletons, ledger replay, measurements, fuzzing, mutation testing — with the comment that says what it does |

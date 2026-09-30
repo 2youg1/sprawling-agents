@@ -22,7 +22,7 @@ browser = { workspace = true }
 # `wire-ts` reads the JSON Schema of the wire and writes the
 # TypeScript client's types from it. Without `server`, so this crate does
 # not pull tokio and axum in to ask what a frame looks like.
-channels = { workspace = true, features = ["schema"] }
+wire = { workspace = true, features = ["schema"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

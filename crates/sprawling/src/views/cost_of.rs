@@ -6,7 +6,7 @@
 //! Which runs claimed one plan node, and what they were billed.
 //!
 //! **Nothing here prices anything.** `gateway::cost` prices a call and
-//! `memory::attribution` decides which run a billed call belongs to;
+//! `storage::attribution` decides which run a billed call belongs to;
 //! this module joins those two facts to the node a run claimed and adds
 //! the result up. A second place that priced a call would be a second
 //! answer to what a city spent, and the one that drifted would be the
@@ -22,7 +22,7 @@ impl Views {
     /// A node nobody has claimed answers zero with an empty list rather
     /// than `Unavailable`: "no run has held this node" is a true answer,
     /// while `None` says the view could not read a run's records.
-    pub(super) fn cost_of_answer(&self, node: &NodeId) -> Option<channels::CostOfAnswer> {
+    pub(super) fn cost_of_answer(&self, node: &NodeId) -> Option<wire::CostOfAnswer> {
         let held = self.claims.get(node).cloned().unwrap_or_default();
         let mut runs: Vec<(RunId, UsdMicros)> = Vec::with_capacity(held.len());
         let mut spent: u64 = 0;
@@ -31,7 +31,7 @@ impl Views {
             spent = spent.saturating_add(billed.get());
             runs.push((run, billed));
         }
-        Some(channels::CostOfAnswer {
+        Some(wire::CostOfAnswer {
             node: node.clone(),
             spent: UsdMicros::new(spent),
             runs,
@@ -39,14 +39,14 @@ impl Views {
     }
 
     /// What each named run was billed, in the order asked and cut at
-    /// `channels::RUN_COSTS_MAX`; a run whose records cannot be read has
+    /// `wire::RUN_COSTS_MAX`; a run whose records cannot be read has
     /// no row.
-    pub(super) fn run_costs_answer(&self, runs: &[RunId]) -> channels::RunCostsAnswer {
-        channels::RunCostsAnswer {
+    pub(super) fn run_costs_answer(&self, runs: &[RunId]) -> wire::RunCostsAnswer {
+        wire::RunCostsAnswer {
             asked: runs.to_vec(),
             runs: runs
                 .iter()
-                .take(channels::RUN_COSTS_MAX)
+                .take(wire::RUN_COSTS_MAX)
                 .filter_map(|run| self.billed_to(*run).map(|billed| (*run, billed)))
                 .collect(),
         }
@@ -98,7 +98,7 @@ mod tests {
     }
 
     /// The join the card asks for: the node a run claimed, and what
-    /// `memory::attribution` says that run was billed.
+    /// `storage::attribution` says that run was billed.
     #[test]
     fn a_claimed_node_costs_what_the_runs_that_held_it_were_billed() {
         let dir = tempfile::tempdir().unwrap();
@@ -123,8 +123,8 @@ mod tests {
             .unwrap();
 
         let node = NodeId::parse("2.3").unwrap();
-        let channels::Answer::CostOf(answer) =
-            views.answer(&channels::Query::CostOf { node: node.clone() })
+        let wire::Answer::CostOf(answer) =
+            views.answer(&wire::Query::CostOf { node: node.clone() })
         else {
             panic!("CostOf answers with a cost");
         };
@@ -139,7 +139,7 @@ mod tests {
     fn a_node_nobody_claimed_costs_nothing_rather_than_being_unavailable() {
         let dir = tempfile::tempdir().unwrap();
         let mut views = Views::new(dir.path());
-        let channels::Answer::CostOf(answer) = views.answer(&channels::Query::CostOf {
+        let wire::Answer::CostOf(answer) = views.answer(&wire::Query::CostOf {
             node: NodeId::parse("9.1").unwrap(),
         }) else {
             panic!("an unclaimed node still has an answer");

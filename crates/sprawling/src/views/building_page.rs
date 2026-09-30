@@ -28,7 +28,7 @@ pub(crate) fn read_building(
     city_root: &Path,
     addr: &Address,
     plan: accounting::plan_view::PlanReading,
-) -> Option<channels::BuildingAnswer> {
+) -> Option<wire::BuildingAnswer> {
     let root = city_root.join(addr.as_str());
     if !root.is_dir() {
         return None;
@@ -81,7 +81,7 @@ pub(crate) fn read_building(
     let archive = city::archive_index(city_root, addr)
         .unwrap_or_default()
         .into_iter()
-        .map(|entry| channels::ArchiveLine {
+        .map(|entry| wire::ArchiveLine {
             kind: entry.kind.as_str().to_owned(),
             day: entry.day,
             subject: entry.subject,
@@ -95,7 +95,7 @@ pub(crate) fn read_building(
         .and_then(|path| std::fs::read_to_string(path).ok())
         .and_then(|text| city::ConfigLayer::parse(&text).ok())
         .unwrap_or_default();
-    Some(channels::BuildingAnswer {
+    Some(wire::BuildingAnswer {
         addr: addr.clone(),
         progress,
         problems,
@@ -113,9 +113,9 @@ pub(crate) fn read_building(
 }
 
 /// One document as a page receives it, cut to what travels.
-pub(super) fn doc_from(name: String, bytes: &[u8]) -> channels::BuildingDoc {
+pub(super) fn doc_from(name: String, bytes: &[u8]) -> wire::BuildingDoc {
     let head = bytes.get(..bytes.len().min(DOC_BYTES_MAX)).unwrap_or(bytes);
-    channels::BuildingDoc {
+    wire::BuildingDoc {
         name,
         text: String::from_utf8_lossy(head).into_owned(),
         bytes: u64::try_from(bytes.len()).unwrap_or(u64::MAX),

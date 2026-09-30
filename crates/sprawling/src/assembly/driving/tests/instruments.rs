@@ -110,7 +110,7 @@ fn instrument_dispatch_gap() {
             {
                 desk.post(
                     dispatch("lab", "glaze the west kiln", b"b"),
-                    channels::Reply::to(|refused| panic!("run B was refused: {refused}")),
+                    wire::Reply::to(|refused| panic!("run B was refused: {refused}")),
                 );
             }
         })
@@ -253,13 +253,13 @@ fn own_appends() -> Vec<Duration> {
         .collect()
 }
 
-fn in_memory_ledger(dir: &std::path::Path) -> (memory::JsonlLedger, memory::OpenReport) {
-    let fs = memory::FaultFs::new(memory::FaultPlan {
+fn in_memory_ledger(dir: &std::path::Path) -> (storage::JsonlLedger, storage::OpenReport) {
+    let fs = storage::FaultFs::new(storage::FaultPlan {
         cut_at_op: None,
         cut_on_write: None,
-        torn_tail: memory::TornTail::None,
+        torn_tail: storage::TornTail::None,
     });
-    memory::JsonlLedger::open_faulty(
+    storage::JsonlLedger::open_faulty(
         fs,
         dir,
         accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
@@ -283,8 +283,8 @@ fn attending(worker: RunWorker, desk: &Arc<CommandDesk>) -> std::thread::JoinHan
     })
 }
 
-fn dispatch(addr: &str, task: &str, key: &[u8]) -> channels::Command {
-    channels::Command::Dispatch {
+fn dispatch(addr: &str, task: &str, key: &[u8]) -> wire::Command {
+    wire::Command::Dispatch {
         addr: Address::parse(addr).unwrap(),
         task: task.to_owned(),
         goal: format!("{task}, done"),
@@ -296,8 +296,8 @@ fn dispatch(addr: &str, task: &str, key: &[u8]) -> channels::Command {
     }
 }
 
-fn nowhere() -> channels::Reply {
-    channels::Reply::nowhere()
+fn nowhere() -> wire::Reply {
+    wire::Reply::nowhere()
 }
 
 /// One record with nothing in it but its position.
@@ -318,7 +318,7 @@ fn until_frozen(root: &std::path::Path, runs: usize) -> Vec<serde_json::Value> {
     let started = Instant::now();
     loop {
         let lines: Vec<serde_json::Value> =
-            memory::read_raw_lines_at(&kernel::layout::CityLayout::new(root).ledger())
+            storage::read_raw_lines_at(&kernel::layout::CityLayout::new(root).ledger())
                 .unwrap_or_default()
                 .iter()
                 .filter_map(|line| serde_json::from_slice(line).ok())

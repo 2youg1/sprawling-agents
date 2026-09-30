@@ -24,7 +24,7 @@ mod tests {
     use super::*;
     use crate::event::Payload;
 
-    /// The bytes `memory::jsonl::append_log_truncated` wrote by hand.
+    /// The bytes `storage::jsonl::append_log_truncated` wrote by hand.
     #[test]
     fn a_truncation_line_writes_the_one_key_the_hand_written_map_wrote() {
         let mut hand = serde_json::Map::new();

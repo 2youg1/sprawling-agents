@@ -20,6 +20,7 @@ mod auth;
 mod carried_name;
 mod command;
 mod control;
+mod frames;
 mod named_frames;
 mod preference;
 mod reading;
@@ -27,7 +28,6 @@ mod reading;
 mod reception;
 #[cfg(feature = "server")]
 mod server;
-mod wire;
 
 pub use aggregate::{Aggregate, CityLabel, Forwarded, Sighting, Upstream};
 pub use answer::DoctorSandboxMissing;
@@ -71,6 +71,13 @@ pub use command::{Carry, Command, WireCommand};
 pub use command::{GovernedDocument, HaltScope, NoSecret};
 pub use command::{PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};
+#[cfg(feature = "schema")]
+pub use frames::wire_schema;
+pub use frames::{Answered, Ask, AskId, AskOutcome};
+pub use frames::{ClientFrame, Delta, LiveOutput, OutputStream, ServerFrame};
+pub use frames::{Hello, Query, Welcome};
+pub use frames::{Lagged, LogLevel, LogLine, Monitoring, Sample, Watched};
+pub use frames::{QUERY_NAMES, WIRE_V, schema_hash};
 pub use kernel::{FileChange, How, Lines};
 pub use preference::{Appearance, Chord, Chroma, Density, Face, Lang, Lighting, Motion};
 pub use preference::{BODY_PX_MAX, BODY_PX_MIN, PreferencePatch, PreferencesAnswer};
@@ -92,13 +99,6 @@ pub use server::{Bound, Committed, Delivered, LedgerHead, Reply, ServeConfig};
 pub use server::{DROP_BYTES_MAX, DropSink};
 #[cfg(feature = "server")]
 pub use server::{bind, router, serve};
-#[cfg(feature = "schema")]
-pub use wire::wire_schema;
-pub use wire::{Answered, Ask, AskId, AskOutcome};
-pub use wire::{ClientFrame, Delta, LiveOutput, OutputStream, ServerFrame};
-pub use wire::{Hello, Query, Welcome};
-pub use wire::{Lagged, LogLevel, LogLine, Monitoring, Sample, Watched};
-pub use wire::{QUERY_NAMES, WIRE_V, schema_hash};
 
 pub use kernel::model::{Mode, Window};
 pub use kernel::{Address, ApprovalId, Autonomy, AxCode, AxError, B3Hash};

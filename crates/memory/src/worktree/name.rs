@@ -5,7 +5,7 @@
 
 //! Worktree names: one segment, no escape.
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 /// A node's name for its tree. A newtype because this string becomes a
 /// directory name and a git reference: the two ways it can be malformed
@@ -18,8 +18,8 @@ impl WorktreeName {
     /// Refuses an empty name, a path separator, a leading dot, and any
     /// character outside `[A-Za-z0-9._-]`. A name that walks out of its
     /// directory is the whole isolation guarantee walking out with it.
-    pub fn parse(raw: &str) -> Result<WorktreeName, MemoryError> {
-        let refuse = |detail: &str| MemoryError::Worktree {
+    pub fn parse(raw: &str) -> Result<WorktreeName, StorageError> {
+        let refuse = |detail: &str| StorageError::Worktree {
             op: "name a worktree",
             detail: format!("{raw}: {detail}"),
         };

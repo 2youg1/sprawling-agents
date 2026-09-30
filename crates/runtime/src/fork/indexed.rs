@@ -14,7 +14,7 @@
 use std::path::Path;
 
 use kernel::{AxCode, AxError, EventKind, Seq};
-use memory::{CheckedLine, LedgerIndex, MemoryError};
+use storage::{CheckedLine, LedgerIndex, StorageError};
 
 use super::{Inherited, fold_run, forked_from, no_start};
 use crate::conversation::Conversation;
@@ -61,23 +61,23 @@ pub fn inherited_indexed(
 ) -> Result<Inherited, AxError> {
     let mut reader = index.reader(dir);
     let owner = match reader.line_at(at_seq) {
-        Ok(line) => match memory::read_line(&line) {
+        Ok(line) => match storage::read_line(&line) {
             Ok(CheckedLine::Known(record)) => record.run(),
             Ok(CheckedLine::IgnoredUnknown(_)) => return Err(outside(index, at_seq)),
             Err(fault) => return Err(fault.into_ax(at_seq.value().saturating_add(1))),
         },
-        Err(MemoryError::SeqMissing { .. }) => return Err(outside(index, at_seq)),
+        Err(StorageError::SeqMissing { .. }) => return Err(outside(index, at_seq)),
         Err(other) => return Err(other.into_ax()),
     };
     let mut seqs: Vec<Seq> = index.run_seqs_before(owner, Some(at_seq.next()?)).collect();
     seqs.reverse();
     // A line of a newer kind is skipped and a malformed one refused, by
-    // the rule `memory::read_line` shares with the verified door.
+    // the rule `storage::read_line` shares with the verified door.
     let records = seqs
         .into_iter()
         .map(|seq| {
-            let line = reader.line_at(seq).map_err(MemoryError::into_ax)?;
-            match memory::read_line(&line) {
+            let line = reader.line_at(seq).map_err(StorageError::into_ax)?;
+            match storage::read_line(&line) {
                 Ok(CheckedLine::Known(record)) => Ok(Some(record)),
                 Ok(CheckedLine::IgnoredUnknown(_)) => Ok(None),
                 Err(fault) => Err(fault.into_ax(seq.value().saturating_add(1))),

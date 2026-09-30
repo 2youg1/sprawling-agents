@@ -42,7 +42,7 @@ fn a_reveal_reaches_the_file_manager_the_worker_was_handed() {
     worker.reveal_with(scripted);
 
     let told = worker
-        .handle(channels::Command::Reveal {
+        .handle(wire::Command::Reveal {
             at: Address::parse("hall/nothing.md").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"reveal"),
         })

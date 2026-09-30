@@ -42,7 +42,7 @@ fn a_volume_below_its_floor_refuses_a_dispatch_before_anything_is_written() {
     worker.read_volume_with(close_to_full);
 
     let refused = worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/east").unwrap(),
             task: "fire the east kiln".to_owned(),
             goal: String::new(),

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Aliases, and the write target that refuses them (memory-SPEC 8-25).
+//! Aliases, and the write target that refuses them (storage-SPEC 8-25).
 //!
 //! A name in a working tree can point at a file other than itself: a
 //! symlink or a junction makes the path lead somewhere else, and a hard
@@ -22,7 +22,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 /// The aliases one name can be. On Windows a junction and a symbolic
 /// link are both reparse points and `file_type().is_symlink()` answers
@@ -30,7 +30,7 @@ use crate::error::MemoryError;
 /// family is one rule, not one rule per reparse tag. The third member
 /// of the family - the hard link - is classified where the platform
 /// reports a link count (Unix `nlink`) and is answered by the write
-/// mechanics where it cannot (Windows; memory-SPEC 8-25).
+/// mechanics where it cannot (Windows; storage-SPEC 8-25).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AliasKind {
     /// A symbolic link or a directory junction: the name leads
@@ -59,13 +59,13 @@ impl std::fmt::Display for AliasKind {
 /// and a write at one name changes the other; Unix reports the link
 /// count on the metadata, Windows reports it only through the unstable
 /// `windows_by_handle` feature, so there the write faces answer it by
-/// landing a fresh entry instead (memory-SPEC 8-25, §3).
-pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, MemoryError> {
+/// landing a fresh entry instead (storage-SPEC 8-25, §3).
+pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, StorageError> {
     let meta = match std::fs::symlink_metadata(path) {
         Ok(meta) => meta,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(source) => {
-            return Err(MemoryError::Io {
+            return Err(StorageError::Io {
                 op: "inspect a write target",
                 path: path.to_path_buf(),
                 source,
@@ -89,8 +89,8 @@ pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, MemoryError> {
 }
 
 /// The refusal every face greets an alias with.
-pub(crate) fn refused(op: &'static str, path: &Path, kind: AliasKind) -> MemoryError {
-    MemoryError::Alias {
+pub(crate) fn refused(op: &'static str, path: &Path, kind: AliasKind) -> StorageError {
+    StorageError::Alias {
         op,
         path: path.to_path_buf(),
         kind,
@@ -123,9 +123,9 @@ impl WriteTarget {
     /// examined, and any alias refuses the write whole.
     ///
     /// # Errors
-    /// `MemoryError::Alias` naming the alias and its kind;
-    /// `MemoryError::Io` when a component exists and cannot be examined.
-    pub fn at(op: &'static str, path: &Path) -> Result<WriteTarget, MemoryError> {
+    /// `StorageError::Alias` naming the alias and its kind;
+    /// `StorageError::Io` when a component exists and cannot be examined.
+    pub fn at(op: &'static str, path: &Path) -> Result<WriteTarget, StorageError> {
         for parent in path.ancestors().skip(1) {
             if let Some(kind) = kind_at(parent)? {
                 return Err(refused(op, parent, kind));
@@ -141,7 +141,7 @@ impl WriteTarget {
     /// chose: `path` and every directory between it and `root` are
     /// examined, and `root` and everything above it are not, because
     /// where a person keeps a city is their placement rather than a
-    /// write a run could redirect (memory-SPEC 8-12). A `path` outside
+    /// write a run could redirect (storage-SPEC 8-12). A `path` outside
     /// `root` is examined up to the filesystem root, as [`WriteTarget::at`]
     /// does.
     ///
@@ -153,7 +153,7 @@ impl WriteTarget {
     ///
     /// # Errors
     /// As [`WriteTarget::at`], for an alias at or below the bound.
-    pub fn within(op: &'static str, root: &Path, path: &Path) -> Result<WriteTarget, MemoryError> {
+    pub fn within(op: &'static str, root: &Path, path: &Path) -> Result<WriteTarget, StorageError> {
         for at in path.ancestors().take_while(|at| *at != root) {
             if let Some(kind) = kind_at(at)? {
                 return Err(refused(op, at, kind));
@@ -238,7 +238,7 @@ pub(crate) mod tests {
             assert!(
                 matches!(
                     err,
-                    MemoryError::Alias {
+                    StorageError::Alias {
                         kind: AliasKind::Link,
                         ..
                     }
@@ -253,7 +253,7 @@ pub(crate) mod tests {
             assert!(
                 matches!(
                     err,
-                    MemoryError::Alias {
+                    StorageError::Alias {
                         kind: AliasKind::Link,
                         ..
                     }
@@ -320,7 +320,7 @@ pub(crate) mod tests {
                         // every other name of the inode keeps its bytes.
                         land(&mut vfs, cleared, b"landed", Bits::OfReplaced).unwrap();
                     }
-                    Err(MemoryError::Alias { .. }) => {}
+                    Err(StorageError::Alias { .. }) => {}
                     Err(other) => panic!("{other}"),
                 }
             }

@@ -45,18 +45,18 @@ pub(super) fn attach_provider(
     model: &str,
 ) -> Result<RunWorker, AxError> {
     worker.read_volume_with(roomy_volume);
-    worker.handle(channels::Command::AttachEndpoint {
-        name: channels::ProviderName::parse("house").unwrap(),
+    worker.handle(wire::Command::AttachEndpoint {
+        name: wire::ProviderName::parse("house").unwrap(),
         base_url: base_url.to_owned(),
         dialect: kernel::DialectKind::OpenAi,
         secret: None,
         auth_header: None,
         admit: Vec::new(),
-        tuning: channels::EndpointTuning::default(),
+        tuning: wire::EndpointTuning::default(),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
     })?;
-    worker.handle(channels::Command::SelectModel {
-        endpoint: channels::ProviderName::parse("house").unwrap(),
+    worker.handle(wire::Command::SelectModel {
+        endpoint: wire::ProviderName::parse("house").unwrap(),
         model: model.to_owned(),
         tag: kernel::ModelTag::Main,
         context_tokens: kernel::Window::new(32_768),
@@ -77,12 +77,12 @@ fn roomy_volume(_city: &Path) -> Option<kernel::degradation::VolumeSpace> {
 /// A worker over a ledger that loses the first append carrying `cut`,
 /// and loses nothing when `cut` is `None`.
 pub(super) fn worker_over_faults(root: &Path, cut: Option<&'static str>) -> RunWorker {
-    let fs = memory::FaultFs::new(memory::FaultPlan {
+    let fs = storage::FaultFs::new(storage::FaultPlan {
         cut_at_op: None,
         cut_on_write: cut,
-        torn_tail: memory::TornTail::None,
+        torn_tail: storage::TornTail::None,
     });
-    let opened = memory::JsonlLedger::open_faulty(
+    let opened = storage::JsonlLedger::open_faulty(
         fs,
         &kernel::layout::CityLayout::new(root).ledger(),
         accounting::Clock::now(&SystemClock).unwrap(),
@@ -137,7 +137,7 @@ pub(super) fn node_lines(city_root: &Path) -> Vec<String> {
 /// difference, rather than a timing, is what shows a query stayed off the
 /// verify path.
 pub(super) fn break_the_chain_after_genesis(city_root: &Path) {
-    let segment = memory::ledger_segments_at(&kernel::layout::CityLayout::new(city_root).ledger())
+    let segment = storage::ledger_segments_at(&kernel::layout::CityLayout::new(city_root).ledger())
         .unwrap()
         .into_iter()
         .next()
@@ -257,15 +257,15 @@ fn a_dropped_call_is_asked_again_and_both_handdowns_still_come_back() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
     let room = Address::parse("lab/room1").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room.clone(),
             task: "get it measured and written up".to_owned(),
             goal: "a page with a number in it, then stop".to_owned(),

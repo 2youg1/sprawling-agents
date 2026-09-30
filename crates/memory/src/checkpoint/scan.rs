@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use kernel::TimeMs;
 use kernel::secret::scan;
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 use super::fence::{Checkpoint, git_err};
 use super::provenance::Provenance;
@@ -40,7 +40,7 @@ pub(crate) struct CommitPlan<'a> {
 impl Checkpoint {
     /// Scans what this checkpoint would newly write into the tree.
     /// Reports how many shapes matched and where, never what matched.
-    pub fn scan_staged(&mut self) -> Result<(), MemoryError> {
+    pub fn scan_staged(&mut self) -> Result<(), StorageError> {
         let index = self.repo.index().map_err(git_err("read index"))?;
         let mut hits: Vec<String> = Vec::new();
         match self.last_tree()? {
@@ -71,7 +71,7 @@ impl Checkpoint {
         if hits.is_empty() {
             return Ok(());
         }
-        Err(MemoryError::SecretEgress {
+        Err(StorageError::SecretEgress {
             locations: hits.join(" "),
         })
     }
@@ -99,7 +99,7 @@ impl Checkpoint {
     /// and falls back to HEAD, which is older: the scan then re-reads
     /// blobs it has already cleared, which costs time and gives up no
     /// safety.
-    fn last_tree(&self) -> Result<Option<git2::Tree<'_>>, MemoryError> {
+    fn last_tree(&self) -> Result<Option<git2::Tree<'_>>, StorageError> {
         let commit = match self.last {
             Some(oid) => self
                 .repo
@@ -121,8 +121,8 @@ impl Checkpoint {
     /// Only an unborn branch and a missing reference mean "none yet";
     /// anything else that stops HEAD being read is an error, because
     /// reading it as "none" would turn the next fence into a parentless
-    /// root commit cut off from the history before it (memory-SPEC 8-17).
-    fn head_commit(repo: &git2::Repository) -> Result<Option<git2::Commit<'_>>, MemoryError> {
+    /// root commit cut off from the history before it (storage-SPEC 8-17).
+    fn head_commit(repo: &git2::Repository) -> Result<Option<git2::Commit<'_>>, StorageError> {
         match repo.head() {
             Ok(head) => head
                 .peel_to_commit()
@@ -153,14 +153,14 @@ impl Checkpoint {
     /// wave runs, and a fence that staged it would ask git to read a
     /// workdir file it believes it already knows; a file still growing
     /// under an open handle makes that read refuse the whole wave
-    /// (memory-SPEC 8-8, 8-24). Nor does one ever stage protected
+    /// (storage-SPEC 8-8, 8-24). Nor does one ever stage protected
     /// metadata or an alias - [`StageFilter`] owns that rule.
     ///
     /// Returns the paths whose staged blob this call added, changed or
     /// removed, in byte order: the difference between the index it found
     /// and the index it wrote, which is what the fence touched and not
     /// what the city holds.
-    pub(crate) fn stage_scopes(&mut self, scopes: &[String]) -> Result<Vec<String>, MemoryError> {
+    pub(crate) fn stage_scopes(&mut self, scopes: &[String]) -> Result<Vec<String>, StorageError> {
         let files = self.stage_scopes_held(scopes)?;
         write_index(&mut self.repo.index().map_err(git_err("read index"))?)?;
         Ok(files)
@@ -173,7 +173,7 @@ impl Checkpoint {
     pub(crate) fn stage_scopes_held(
         &mut self,
         scopes: &[String],
-    ) -> Result<Vec<String>, MemoryError> {
+    ) -> Result<Vec<String>, StorageError> {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
         let found: BTreeMap<Vec<u8>, git2::Oid> =
             index.iter().map(|entry| (entry.path, entry.id)).collect();
@@ -232,7 +232,7 @@ impl Checkpoint {
         index: &mut git2::Index,
         filter: &mut StageFilter,
         file: &std::path::Path,
-    ) -> Result<(), MemoryError> {
+    ) -> Result<(), StorageError> {
         let ignored = self
             .repo
             .is_path_ignored(file)
@@ -255,7 +255,7 @@ impl Checkpoint {
     /// author is the resident's address at a mailbox naming the city,
     /// and the five `Sprawling-*` trailers say which run, which model
     /// and which effort produced it.
-    pub(crate) fn commit(&mut self, plan: &CommitPlan<'_>) -> Result<git2::Oid, MemoryError> {
+    pub(crate) fn commit(&mut self, plan: &CommitPlan<'_>) -> Result<git2::Oid, StorageError> {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
         let tree_oid = index.write_tree().map_err(git_err("write tree"))?;
         let tree = self
@@ -263,7 +263,7 @@ impl Checkpoint {
             .find_tree(tree_oid)
             .map_err(git_err("find staged tree"))?;
         let seconds = i64::try_from(plan.t.value().saturating_div(1000)).map_err(|_| {
-            MemoryError::Checkpoint {
+            StorageError::Checkpoint {
                 op: "stamp the commit",
                 detail: format!("{} ms is past what git can date", plan.t.value()),
             }
@@ -303,7 +303,7 @@ impl Checkpoint {
     /// Only `scopes` is staged, as a fence stages it: a kept tree is
     /// checked out again over its scope alone, so its files outside the
     /// scope may trail the branch, and staging them would take back
-    /// what the trunk changed there (memory-SPEC 8-9). Entries outside
+    /// what the trunk changed there (storage-SPEC 8-9). Entries outside
     /// the scope go into the commit as the index holds them. No scope
     /// stages the whole tree except the reserved subtree, whose rule
     /// [`StageFilter`] owns.
@@ -316,7 +316,7 @@ impl Checkpoint {
         t: TimeMs,
         of: &Provenance,
         subject: &str,
-    ) -> Result<String, MemoryError> {
+    ) -> Result<String, StorageError> {
         self.stage_scopes(scopes)?;
         self.scan_staged()?;
         let oid = self.commit(&CommitPlan {
@@ -347,7 +347,7 @@ impl Checkpoint {
 /// Retrying is safe because the index being written is the in-memory one
 /// this call built, unchanged by a failed write: the second attempt
 /// states the same thing as the first.
-pub(super) fn write_index(index: &mut git2::Index) -> Result<(), MemoryError> {
+pub(super) fn write_index(index: &mut git2::Index) -> Result<(), StorageError> {
     const ATTEMPTS: u32 = 20;
     const WAIT: std::time::Duration = std::time::Duration::from_millis(25);
     let mut attempt: u32 = 0;

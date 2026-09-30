@@ -276,5 +276,5 @@ pub struct LogLine {
 }
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
-#[path = "wire/tests.rs"]
+#[path = "frames/tests.rs"]
 mod tests;

@@ -60,7 +60,7 @@ impl Machine for ScriptedMachine {
 }
 
 impl accounting::Machine for ScriptedMachine {
-    fn report(&self) -> channels::DoctorAnswer {
+    fn report(&self) -> wire::DoctorAnswer {
         super::answer(self)
     }
 

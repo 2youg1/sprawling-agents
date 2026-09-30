@@ -4,20 +4,20 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The fence admission rule for one staged path: what enters, what is
-//! skipped, and what refuses the wave (memory-SPEC 8-8 and 8-25).
+//! skipped, and what refuses the wave (storage-SPEC 8-8 and 8-25).
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 /// The repository's working tree, which staged paths are relative to.
-pub(super) fn workdir(repo: &git2::Repository) -> Result<&std::path::Path, MemoryError> {
-    repo.workdir().ok_or_else(|| MemoryError::Checkpoint {
+pub(super) fn workdir(repo: &git2::Repository) -> Result<&std::path::Path, StorageError> {
+    repo.workdir().ok_or_else(|| StorageError::Checkpoint {
         op: "stage a wave",
         detail: "the city repository is bare".to_owned(),
     })
 }
 
 /// The fence's admission rule for one staged path: what enters a
-/// fence, what is skipped, and what refuses the wave (memory-SPEC 8-8).
+/// fence, what is skipped, and what refuses the wave (storage-SPEC 8-8).
 ///
 /// git asks with 1 for skip and 0 for stage, and hands over paths
 /// relative to the repository's working tree - so the alias question is
@@ -28,11 +28,11 @@ pub(super) fn workdir(repo: &git2::Repository) -> Result<&std::path::Path, Memor
 /// scope refuses the whole wave, because a name that leads into a
 /// reserved file would capture reserved bytes under a lying name, and
 /// the `file_discarded` restoration would write back through it
-/// (memory-SPEC 8-25).
+/// (storage-SPEC 8-25).
 pub(super) struct StageFilter {
     root: std::path::PathBuf,
     aliases: Vec<(String, crate::alias::AliasKind)>,
-    fault: Option<MemoryError>,
+    fault: Option<StorageError>,
 }
 
 impl StageFilter {
@@ -66,7 +66,7 @@ impl StageFilter {
     /// The wave's verdict. The refusal names the first alias in path
     /// order, so the same scope refuses with the same sentence on every
     /// machine.
-    pub(super) fn refused(mut self) -> Result<(), MemoryError> {
+    pub(super) fn refused(mut self) -> Result<(), StorageError> {
         if let Some(err) = self.fault {
             return Err(err);
         }

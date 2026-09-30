@@ -108,7 +108,7 @@ fn a_rules_change_says_which_entry_it_reached_the_city_in() {
                 asked(room),
                 format!("fire the kiln in {room}"),
                 format!("the kiln in {room} is fired"),
-                Owing::asked(channels::Reply::nowhere()),
+                Owing::asked(wire::Reply::nowhere()),
             )
             .unwrap();
         worker.land_the_rest().unwrap();

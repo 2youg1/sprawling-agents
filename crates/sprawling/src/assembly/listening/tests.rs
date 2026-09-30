@@ -21,7 +21,7 @@ fn a_serve_refused_at_the_socket_writes_no_line() {
     let ledger = kernel::layout::CityLayout::new(city.path()).ledger();
     // As text, so a failure shows the line that was written.
     let lines = || -> Vec<String> {
-        memory::read_raw_lines_at(&ledger)
+        storage::read_raw_lines_at(&ledger)
             .expect("the ledger reads")
             .iter()
             .map(|line| String::from_utf8_lossy(line).into_owned())
@@ -53,7 +53,7 @@ fn a_serve_refused_at_the_socket_writes_no_line() {
 fn a_serve_of_a_held_city_is_refused_and_lets_its_port_go() {
     let city = tempfile::tempdir().expect("a temporary directory");
     crate::assembly::init_city(city.path()).expect("a city forms");
-    let held = memory::JsonlLedger::open(
+    let held = storage::JsonlLedger::open(
         &kernel::layout::CityLayout::new(city.path()).ledger(),
         kernel::TimeMs::new(0),
     )
@@ -88,7 +88,7 @@ fn serving_at(city_root: &std::path::Path, addr: std::net::SocketAddr) -> super:
         city_root: city_root.to_path_buf(),
         addr,
         token: None,
-        client: channels::ClientAssets::Disk(city_root.to_path_buf()),
+        client: wire::ClientAssets::Disk(city_root.to_path_buf()),
         vault: gateway::Custodian::in_memory(),
         vault_notice: None,
         log: runtime::diagnostics::Diagnostics::off(),

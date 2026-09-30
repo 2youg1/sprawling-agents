@@ -6,7 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [lib]
-name = "memory"
+name = "storage"
 
 [dependencies]
 kernel = { workspace = true }

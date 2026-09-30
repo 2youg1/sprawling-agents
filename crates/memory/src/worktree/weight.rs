@@ -10,7 +10,7 @@ use std::path::Path;
 
 use kernel::ByteLen;
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 use crate::reserved::outside_reserved;
 
 /// Bytes of the work a person did under a directory: git's own
@@ -29,7 +29,7 @@ use crate::reserved::outside_reserved;
 /// Propagates a directory that exists and cannot be read. A directory
 /// that is not there weighs nothing, which is what a tree not yet
 /// created weighs.
-pub(super) fn measure(root: &Path) -> Result<ByteLen, MemoryError> {
+pub(super) fn measure(root: &Path) -> Result<ByteLen, StorageError> {
     let mut total: u64 = 0;
     let mut pending = vec![root.to_path_buf()];
     while let Some(dir) = pending.pop() {
@@ -37,7 +37,7 @@ pub(super) fn measure(root: &Path) -> Result<ByteLen, MemoryError> {
             Ok(entries) => entries,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
             Err(source) => {
-                return Err(MemoryError::Io {
+                return Err(StorageError::Io {
                     op: "measure a worktree",
                     path: dir.clone(),
                     source,

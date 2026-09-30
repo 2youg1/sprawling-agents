@@ -9,7 +9,7 @@
 //! one client would make a second client write the same fold again to
 //! draw a session, and the wire would stop being the whole API.
 //!
-//! Reading one payload is [`channels::reading`]'s, because the client
+//! Reading one payload is [`wire::reading`]'s, because the client
 //! still folds the pushed stream forward into what it believes and that
 //! reading has to have one authority.
 
@@ -20,13 +20,13 @@ mod tests;
 
 use std::collections::BTreeMap;
 
-use channels::{EventKind, EventRecord, RunId, UsdMicros};
 use kernel::event::record::ApprovalResolved;
+use wire::{EventKind, EventRecord, RunId, UsdMicros};
 
 use super::prepared::LedgerAsk;
 
 impl LedgerAsk {
-    /// The newest [`channels::HISTORY_MAX`] records of one run, oldest
+    /// The newest [`wire::HISTORY_MAX`] records of one run, oldest
     /// first.
     ///
     /// The same width a client asks for with `Query::RunHistory`, so the
@@ -38,7 +38,7 @@ impl LedgerAsk {
         let Some((index, dir)) = self.indexed() else {
             return Vec::new();
         };
-        let want = usize::try_from(channels::HISTORY_MAX).unwrap_or(1);
+        let want = usize::try_from(wire::HISTORY_MAX).unwrap_or(1);
         let mut newest: Vec<kernel::Seq> = index.run_seqs_before(run, None).take(want).collect();
         newest.reverse();
         let mut records = Vec::with_capacity(newest.len());
@@ -56,7 +56,7 @@ impl LedgerAsk {
     }
 
     /// One session, folded into the rounds a person reads.
-    pub(super) fn rounds_answer(&self, run: RunId) -> channels::RoundsAnswer {
+    pub(super) fn rounds_answer(&self, run: RunId) -> wire::RoundsAnswer {
         let records = self.records_of(run);
         let mut turns = turns(records.iter());
         if records
@@ -65,7 +65,7 @@ impl LedgerAsk {
         {
             answer_waits(&mut turns, &records, &self.records_of(RunId::CITY));
         }
-        channels::RoundsAnswer {
+        wire::RoundsAnswer {
             opened_at: opened_at(&turns),
             opening: opening(&records),
             closing: closing(&records),
@@ -82,19 +82,19 @@ impl LedgerAsk {
 /// the last wave", which is a different question and not the one a
 /// person opening a session is asking.
 #[must_use]
-fn opened_at(turns: &[channels::Turn]) -> Option<kernel::GitOid> {
+fn opened_at(turns: &[wire::Turn]) -> Option<kernel::GitOid> {
     turns
         .iter()
         .flat_map(|turn| turn.notes.iter())
         .find_map(|note| match note {
-            channels::Note::Fenced { oid, .. } => Some(*oid),
+            wire::Note::Fenced { oid, .. } => Some(*oid),
             // The other four notes say what happened in the session;
             // none of them names the commit it opened at.
-            channels::Note::Refused { .. }
-            | channels::Note::Waiting { .. }
-            | channels::Note::Arrived { .. }
-            | channels::Note::Discarded { .. }
-            | channels::Note::Unreadable { .. } => None,
+            wire::Note::Refused { .. }
+            | wire::Note::Waiting { .. }
+            | wire::Note::Arrived { .. }
+            | wire::Note::Discarded { .. }
+            | wire::Note::Unreadable { .. } => None,
         })
 }
 
@@ -105,7 +105,7 @@ fn opened_at(turns: &[channels::Turn]) -> Option<kernel::GitOid> {
 /// request's approval id and `city` gives each answer's time. A request
 /// or answer outside its window, or a payload that will not read back,
 /// leaves `answered` at `None` rather than a guessed end.
-fn answer_waits(turns: &mut [channels::Turn], asked: &[EventRecord], city: &[EventRecord]) {
+fn answer_waits(turns: &mut [wire::Turn], asked: &[EventRecord], city: &[EventRecord]) {
     let ids: BTreeMap<kernel::Seq, String> = asked
         .iter()
         .filter(|record| record.kind() == EventKind::ApprovalRequested)
@@ -123,7 +123,7 @@ fn answer_waits(turns: &mut [channels::Turn], asked: &[EventRecord], city: &[Eve
         })
         .collect();
     for note in turns.iter_mut().flat_map(|turn| turn.notes.iter_mut()) {
-        if let channels::Note::Waiting { at, answered, .. } = note {
+        if let wire::Note::Waiting { at, answered, .. } = note {
             *answered = ids.get(at).and_then(|id| answers.get(id)).copied();
         }
     }
@@ -131,7 +131,7 @@ fn answer_waits(turns: &mut [channels::Turn], asked: &[EventRecord], city: &[Eve
 
 /// How the session opened, from the first `run_started` in the window.
 #[must_use]
-fn opening(records: &[EventRecord]) -> Option<channels::Opening> {
+fn opening(records: &[EventRecord]) -> Option<wire::Opening> {
     records
         .iter()
         .find(|record| record.kind() == EventKind::RunStarted)
@@ -143,7 +143,7 @@ fn opening(records: &[EventRecord]) -> Option<channels::Opening> {
                 .data()
                 .read::<kernel::event::record::RunStarted>()
                 .unwrap_or_default();
-            channels::Opening {
+            wire::Opening {
                 task: started.task,
                 goal: started.goal,
                 at: record.t(),
@@ -154,13 +154,12 @@ fn opening(records: &[EventRecord]) -> Option<channels::Opening> {
 
 /// How the session closed, from the first `run_frozen` in the window.
 #[must_use]
-fn closing(records: &[EventRecord]) -> Option<channels::Closing> {
+fn closing(records: &[EventRecord]) -> Option<wire::Closing> {
     records
         .iter()
         .find(|record| record.kind() == EventKind::RunFrozen)
-        .map(|record| channels::Closing {
-            completion: channels::text(record.data().as_map().get("completion"))
-                .unwrap_or_default(),
+        .map(|record| wire::Closing {
+            completion: wire::text(record.data().as_map().get("completion")).unwrap_or_default(),
             at: record.t(),
         })
 }
@@ -177,8 +176,8 @@ fn closing(records: &[EventRecord]) -> Option<channels::Closing> {
     clippy::wildcard_enum_match_arm,
     reason = "the kinds that open, close and fill a turn are named; every other kind is a note"
 )]
-pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<channels::Turn> {
-    let mut folded: Vec<channels::Turn> = Vec::new();
+pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire::Turn> {
+    let mut folded: Vec<wire::Turn> = Vec::new();
     // Which turn each outstanding call sits in, by the id the runtime
     // gave it. Answers arrive after other calls have been made, so the
     // pairing cannot be positional.
@@ -187,11 +186,11 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<chan
         match record.kind() {
             EventKind::ModelCalled => {
                 let number = u32::try_from(folded.len().saturating_add(1)).unwrap_or(u32::MAX);
-                folded.push(channels::Turn {
+                folded.push(wire::Turn {
                     number,
                     opened: record.seq(),
                     t: record.t(),
-                    model: channels::text(record.data().as_map().get("model")),
+                    model: wire::text(record.data().as_map().get("model")),
                     said: None,
                     thought: None,
                     spent: None,
@@ -209,11 +208,11 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<chan
                     open => open.saturating_sub(1),
                 };
                 let map = record.data().as_map();
-                let call = channels::Call {
-                    tool: channels::text(map.get("name")).unwrap_or_else(|| "tool".to_owned()),
-                    subject: channels::text(map.get("subject")),
-                    arguments: map.get("args").and_then(channels::arguments_in),
-                    outcome: channels::Outcome::Waiting,
+                let call = wire::Call {
+                    tool: wire::text(map.get("name")).unwrap_or_else(|| "tool".to_owned()),
+                    subject: wire::text(map.get("subject")),
+                    arguments: map.get("args").and_then(wire::arguments_in),
+                    outcome: wire::Outcome::Waiting,
                     at: record.seq(),
                     output: None,
                     called: record.t(),
@@ -222,7 +221,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<chan
                 let Some(turn) = folded.get_mut(turn_at) else {
                     continue;
                 };
-                if let Some(id) = channels::text(map.get("id")) {
+                if let Some(id) = wire::text(map.get("id")) {
                     awaiting.push((id, turn_at, turn.calls.len()));
                 }
                 turn.calls.push(call);
@@ -235,18 +234,18 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<chan
                     continue;
                 };
                 let map = record.data().as_map();
-                turn.said = map.get("message").and_then(channels::said_in);
-                turn.thought = map.get("message").and_then(channels::thought_in);
+                turn.said = map.get("message").and_then(wire::said_in);
+                turn.thought = map.get("message").and_then(wire::thought_in);
                 turn.spent = map
                     .get("billed_usd_micros")
                     .and_then(serde_json::Value::as_u64)
                     .map(UsdMicros::new);
-                turn.used = map.get("usage").and_then(channels::used_in);
-                turn.stopped = channels::text(map.get("stop"));
+                turn.used = map.get("usage").and_then(wire::used_in);
+                turn.stopped = wire::text(map.get("stop"));
             }
             EventKind::ToolResult => {
                 let map = record.data().as_map();
-                let Some(id) = channels::text(map.get("tool_use_id")) else {
+                let Some(id) = wire::text(map.get("tool_use_id")) else {
                     continue;
                 };
                 let Some(at) = awaiting.iter().position(|(held, _, _)| held == &id) else {
@@ -254,22 +253,22 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<chan
                 };
                 let (_, turn_at, call_at) = awaiting.swap_remove(at);
                 let (outcome, said) = match map.get("error") {
-                    Some(failed) => (channels::Outcome::Failed, Some(failed)),
-                    None => (channels::Outcome::Answered, map.get("result")),
+                    Some(failed) => (wire::Outcome::Failed, Some(failed)),
+                    None => (wire::Outcome::Answered, map.get("result")),
                 };
                 if let Some(call) = folded
                     .get_mut(turn_at)
                     .and_then(|turn| turn.calls.get_mut(call_at))
                 {
                     call.outcome = outcome;
-                    call.output = said.and_then(channels::output_in);
+                    call.output = said.and_then(wire::output_in);
                     call.answered = Some(record.t());
                 }
             }
             kind => {
                 // Everything else is a note when it changed what this
                 // turn did or what it waits on, and nothing otherwise.
-                let Some(note) = channels::note_of(kind, record) else {
+                let Some(note) = wire::note_of(kind, record) else {
                     continue;
                 };
                 if let Some(turn) = folded.last_mut() {

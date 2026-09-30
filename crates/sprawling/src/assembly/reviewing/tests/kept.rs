@@ -22,7 +22,7 @@ fn two_runs_in_one_room_under_review_work_in_one_tree() {
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     for (task, idem) in [("first", b"first".as_slice()), ("second", b"second")] {
         worker
-            .handle(channels::Command::Dispatch {
+            .handle(wire::Command::Dispatch {
                 addr: Address::parse("lab/room1").unwrap(),
                 task: task.to_owned(),
                 goal: task.to_owned(),
@@ -64,7 +64,7 @@ fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
         vec![completion("first", None), completion("second", None)],
     );
     let dispatch = |worker: &mut RunWorker, idem: &[u8]| {
-        worker.handle(channels::Command::Dispatch {
+        worker.handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "work".to_owned(),
             goal: "work".to_owned(),
@@ -78,10 +78,10 @@ fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     dispatch(&mut worker, b"first").unwrap();
     drop(worker);
-    let name = memory::WorktreeName::parse(&trees_opened(&report.ledger_dir)[0]).unwrap();
+    let name = storage::WorktreeName::parse(&trees_opened(&report.ledger_dir)[0]).unwrap();
     // The lease a run that never came home still holds.
     drop(
-        memory::Worktrees::open(dir.path())
+        storage::Worktrees::open(dir.path())
             .unwrap()
             .claim(&name, &["lab".to_owned()])
             .unwrap(),
@@ -121,7 +121,7 @@ fn a_review_dispatch_sent_again_after_a_restart_is_answered_once() {
     // Through the desk's door, which is the one that honours the key.
     let dispatch = |worker: &mut RunWorker, idem: &[u8]| {
         worker.serve_one(Posted {
-            command: channels::Command::Dispatch {
+            command: wire::Command::Dispatch {
                 addr: Address::parse("lab/room1").unwrap(),
                 task: "work".to_owned(),
                 goal: "work".to_owned(),
@@ -131,7 +131,7 @@ fn a_review_dispatch_sent_again_after_a_restart_is_answered_once() {
                 effort: None,
                 model: None,
             },
-            reply: channels::Reply::nowhere(),
+            reply: wire::Reply::nowhere(),
         });
         worker.land_the_rest().unwrap();
     };
@@ -174,12 +174,12 @@ fn a_tree_that_waits_on_the_index_lock_is_placed_in_the_lane() {
     lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    memory::Checkpoint::open(dir.path()).unwrap();
+    storage::Checkpoint::open(dir.path()).unwrap();
     let lock = dir.path().join(".git").join("index.lock");
     std::fs::write(&lock, "").unwrap();
 
     worker.serve_one(Posted {
-        command: channels::Command::Dispatch {
+        command: wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "work".to_owned(),
             goal: "work".to_owned(),
@@ -189,7 +189,7 @@ fn a_tree_that_waits_on_the_index_lock_is_placed_in_the_lane() {
             effort: None,
             model: None,
         },
-        reply: channels::Reply::nowhere(),
+        reply: wire::Reply::nowhere(),
     });
     let in_the_air = worker.flight.in_flight();
     let landed = worker.land_the_rest();
@@ -228,7 +228,7 @@ fn a_lane_that_fails_after_placing_the_tree_gives_it_back() {
         .into_iter()
         .map(|idem| {
             worker.serve_one(Posted {
-                command: channels::Command::Dispatch {
+                command: wire::Command::Dispatch {
                     addr: Address::parse("lab/room1").unwrap(),
                     task: "work".to_owned(),
                     goal: "work".to_owned(),
@@ -238,7 +238,7 @@ fn a_lane_that_fails_after_placing_the_tree_gives_it_back() {
                     effort: None,
                     model: None,
                 },
-                reply: channels::Reply::nowhere(),
+                reply: wire::Reply::nowhere(),
             });
             worker.land_the_rest().is_err()
         })

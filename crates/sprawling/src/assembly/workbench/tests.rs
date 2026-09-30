@@ -22,7 +22,7 @@ fn a_building_whose_rules_do_not_parse_stops_the_run_rather_than_guessing() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     let err = worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "anything".to_owned(),
             goal: "anything".to_owned(),
@@ -74,7 +74,7 @@ fn a_run_is_told_who_shares_its_building_and_what_to_bring_them() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "find out who else is here".to_owned(),
             goal: "one answer is enough".to_owned(),
@@ -142,7 +142,7 @@ fn a_signal_one_run_sends_is_read_by_the_run_that_pulls_it() {
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     for (n, room) in ["lab/room1", "lab/room2"].into_iter().enumerate() {
         worker
-            .handle(channels::Command::Dispatch {
+            .handle(wire::Command::Dispatch {
                 addr: Address::parse(room).unwrap(),
                 task: "talk to the neighbour".to_owned(),
                 goal: "one message, then stop".to_owned(),
@@ -244,7 +244,7 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("noted", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse(kernel::consts_policy::HALL_MAYOR).unwrap(),
             task: "plan the east wing".to_owned(),
             goal: "one plan is enough".to_owned(),
@@ -357,7 +357,7 @@ fn a_note_beside_the_hall(city: &std::path::Path) -> git2::Repository {
     );
     let mut worker = worker_with_provider(city, &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse(kernel::consts_policy::HALL_MAYOR).unwrap(),
             task: "leave a note beside the hall".to_owned(),
             goal: "one note".to_owned(),

@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 use kernel::backpressure::admit;
 use kernel::{Admission, IdemKey, ItemMeta, Payload, QueueStats, TimeMs};
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 /// How long an admitted key stays recognisable as one, in milliseconds:
 /// six hours.
@@ -107,7 +107,7 @@ impl EventQueue {
         key: IdemKey,
         payload: Payload,
         now: TimeMs,
-    ) -> Result<Admission, MemoryError> {
+    ) -> Result<Admission, StorageError> {
         self.forget_stale(now);
         if self.seen.contains_key(&key) {
             self.duplicates = self.duplicates.saturating_add(1);

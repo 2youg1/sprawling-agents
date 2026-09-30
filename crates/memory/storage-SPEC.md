@@ -1,6 +1,6 @@
-# memory-SPEC.md
+# storage-SPEC.md
 
-> crate：`memory`。本 SPEC 先于代码存在；实现不多不少地遵守本文。
+> crate：`storage`。本 SPEC 先于代码存在；实现不多不少地遵守本文。
 > 骨架：十七节；按模块分章，每个模块的章号由 `architecture.toml` 模块图的 `spec` 列给出。
 > 章号被那一列锚住，所以不重排：8-6 是空号。
 
@@ -11,7 +11,7 @@
 | `jsonl` | 4 适配器 | kernel Ledger 的落盘实现：组提交＋断尾＋版本方向判定＋分段滚动 |
 | `vfs` | 3 端口 | 内缝 `trait Vfs`：本 crate 触碰文件系统的唯一一张脸 |
 | `real_fs` | 4 适配器 | Vfs 的生产适配器：std::fs，持住正在追写的那个句柄 |
-| `error` | 2 值 | `MemoryError` 与 `into_ax`：本 crate 失败词汇的唯一定义点 |
+| `error` | 2 值 | `StorageError` 与 `into_ax`：本 crate 失败词汇的唯一定义点 |
 | `fault_fs` | 4 适配器 | Vfs 第二适配器：撕裂写／乱序持久化／rename 中断；断电点阵的驱动器 |
 | `cas` | 4 适配器 | BLAKE3 寻址存储：范围取回＋临时文件 rename＋去重 |
 | `index` | 7 projection | Ledger 旁挂索引 seq→（段，偏移）；可弃，损坏即重建；持 `Box<dyn Vfs>`，只读不写 |
@@ -65,9 +65,9 @@
 
 ## 6 命名统一
 
-**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。**本 crate 同例**：`memory` 六面切目录后，同一类型的 inherent impl 若住不同簇文件，基线为每个 impl 块各记一行 `impl`（如 `Checkpoint` 两行），公共面不变。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。**本 crate 同例**：`storage` 六面切目录后，同一类型的 inherent impl 若住不同簇文件，基线为每个 impl 块各记一行 `impl`（如 `Checkpoint` 两行），公共面不变。
 
-Vfs、RealFs、FaultFs、FaultPlan、power cut、tail-truncation recovery（断尾恢复）、direction-aware refusal（方向感知拒绝）、segment（分段）、group commit（组提交）、CAS、dedup。crate 根错误 `MemoryError`（每 crate 一根，跨界映射 AxError 不透传）。
+Vfs、RealFs、FaultFs、FaultPlan、power cut、tail-truncation recovery（断尾恢复）、direction-aware refusal（方向感知拒绝）、segment（分段）、group commit（组提交）、CAS、dedup。crate 根错误 `StorageError`（每 crate 一根，跨界映射 AxError 不透传）。
 
 ## 7 模块边界
 
@@ -76,10 +76,10 @@ vfs ──声明──▶ pub(crate) trait Vfs（内缝，形状 3；不出对�
 real_fs ──实现──▶ Vfs（生产适配器；持住追写句柄）
 fault_fs ──实现──▶ Vfs（第二适配器；#[cfg(any(test, feature = "fault"))]）
 jsonl / cas / bundle / digest_cache ──使用──▶ vfs::Vfs ＋ real_fs::RealFs
-error ◀──使用── 其余模块（MemoryError 与 into_ax 的唯一定义点）
+error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定义点）
 ```
 
-**`MemoryError` 住独立模块 `memory::error`**：全 crate 的模块都用它，而它的多数变体描述的失败 jsonl 永远不会产生（`CasCorrupt`、`Checkpoint`、`Worktree`、`MergeStale` 等），放在 jsonl 里就是让 jsonl 替别人的失败命名。`io_err`（`MemoryError::Io` 的构造子）随它住。
+**`StorageError` 住独立模块 `storage::error`**：全 crate 的模块都用它，而它的多数变体描述的失败 jsonl 永远不会产生（`CasCorrupt`、`Checkpoint`、`Worktree`、`MergeStale` 等），放在 jsonl 里就是让 jsonl 替别人的失败命名。`io_err`（`StorageError::Io` 的构造子）随它住。
 
 **Vfs 与 RealFs 分家的依据是形状而不是行数**：一条缝上的 trait 是形状 3，std::fs 的直译是形状 4，而第二适配器 `fault_fs` 是自己的文件。
 一个文件同时装端口、适配器与账本，正是 ARCHITECTURE §9 说的「说不出自己形状的模块通常装着两件想分开的东西」。
@@ -101,10 +101,10 @@ error ◀──使用── 其余模块（MemoryError 与 into_ax 的唯一定�
 
 ## 8 接口先行（按模块分章）
 
-### 8-1 memory::jsonl
+### 8-1 storage::jsonl
 
 ```rust
-// Vfs 的声明住 §8-15，RealFs 住 §8-16，MemoryError 住 §8-14。
+// Vfs 的声明住 §8-15，RealFs 住 §8-16，StorageError 住 §8-14。
 // 本章只管账本本身：seq/prev 与介质。
 
 // 公开面不带泛型：Vfs 是 pub(crate) 内缝，若 JsonlLedger<V: Vfs> 公开即私有 trait 漏入公开签名（E0445）。
@@ -120,30 +120,30 @@ impl JsonlLedger {
     /// parameter here, never sampled (determinism rule 2).
     /// A city's ledger opens only while this process holds the city's
     /// writer lock; the lock lives as long as the returned ledger.
-    pub fn open(dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), MemoryError>;
+    pub fn open(dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), StorageError>;
     pub(crate) fn open_with(vfs: Box<dyn Vfs>, dir: &Path, now: TimeMs) -> …;  // 测试注入点
     /// Group commit: one durability barrier for the whole wave.
     /// Ok ⇒ every line of the wave is on its segment and synced.
     /// 一波的写或 sync 失败过，此后每一波都答 `LedgerBroken`，直到重开。
-    pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, MemoryError>;
-    pub fn read_raw_lines(&self) -> Result<Vec<Vec<u8>>, MemoryError>;   // 实例读面
+    pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, StorageError>;
+    pub fn read_raw_lines(&self) -> Result<Vec<Vec<u8>>, StorageError>;   // 实例读面
     /// 写路径观察者（至多一个，后装者取代前装者）。只在**整波持久化完成后**逐条回调：
     /// 观察者因此看不到一条未落盘的事件，而推给界面的事实就是历史里的那一行。
     pub fn observe(&mut self, sink: WriteObserver);   // WriteObserver = Box<dyn FnMut(&EventRecord) + Send>
     pub fn position(&self) -> Seq;    // 现在写一条会落在哪；只给位置不给内容
 }
 /// 只读读面（replay/夹具）：不走 open、不触发断尾与任何写——重演恒不修盘（runtime-SPEC §8-1）。
-pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, MemoryError>;
+pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, StorageError>;
 /// 目录里的账本段，按应读顺序（`list` 已排序，段名零填充故字典序即时序）。
 /// 空结果的意思是「这里没有账本」，与「账本里没有事件」不是同一件事；
 /// `read_raw_lines_at` 对两者都答 `Ok([])`，故需要区分的调用方问这一面。
 /// 现在只有一个：`sprawling replay`，它的路径是人敲的（sprawling-SPEC §12）。
 /// 段名规则因此只住 `is_segment` 一处，不被谁再拼一遍。
-pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, MemoryError>;
+pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, StorageError>;
 /// 一段的字节，只读、不走 open；`lines()` 给出该段完整且非空的行（撕裂尾不是行，留给 open 判）。
 /// crate 内的面：`read_raw_lines_at` 是它唯一的调用者，完整行的规则因此只住 `complete_lines` 一处。
 /// 库外的流式读者不逐段读，走 `LedgerIndex::folding`（8-4），那一遍同时建索引。三者住 `jsonl::reading`。
-pub(crate) fn read_segment(segment: &Path) -> Result<SegmentBytes, MemoryError>;
+pub(crate) fn read_segment(segment: &Path) -> Result<SegmentBytes, StorageError>;
 impl SegmentBytes { pub(crate) fn lines(&self) -> impl Iterator<Item = &[u8]>; }
 /// 从账本尾部倒着读：最新的一行先出，逐段往前，段内从段尾往回按窗口读（窗口从一页起倍增，
 /// 与 `first_line` 同一条规则，故一行无论多长，读到的字节至多是它自身的两倍）。
@@ -151,13 +151,13 @@ impl SegmentBytes { pub(crate) fn lines(&self) -> impl Iterator<Item = &[u8]>; }
 /// 每行过的检查与正向读者相同：信封、版本方向、kind 的有类型／可忽略之分、写者规范回显，
 /// 这些住 `LineCheck::judge` 一处；链改成倒着接：这一行的 `chain_hash` 必须等于较新那行的 `prev`，
 /// 它的 `seq.next()` 必须等于较新那行的 `seq`，seq 为 `FIRST` 的行的 `prev` 必须是 `GENESIS_PREV`。
-/// 不合格的行以 `MemoryError::Envelope` 报出，行号是链给它的位置（较新那行的 seq 值，即 1 起的行号；最新一行没有较新者，记作第 0 行），之后迭代结束。撕裂尾（最后一个 `\n` 之后的字节）
+/// 不合格的行以 `StorageError::Envelope` 报出，行号是链给它的位置（较新那行的 seq 值，即 1 起的行号；最新一行没有较新者，记作第 0 行），之后迭代结束。撕裂尾（最后一个 `\n` 之后的字节）
 /// 不是行，跳过，与 `lines()` 同一规则。住 `jsonl::tail`。
 /// 被否掉的：先 `read_raw_lines_at` 再取末尾——首屏要付整本账本的读取，正是这个读者要去掉的。
 pub struct TailLines { /* 段路径（倒序）、当前段的未读偏移与缓冲、较新一行的 seq 与 prev */ }
 pub struct TailLine { pub raw: Vec<u8>, pub checked: CheckedLine }
-impl TailLines { pub fn at(dir: &Path) -> Result<Self, MemoryError>; }
-impl Iterator for TailLines { type Item = Result<TailLine, MemoryError>; }
+impl TailLines { pub fn at(dir: &Path) -> Result<Self, StorageError>; }
+impl Iterator for TailLines { type Item = Result<TailLine, StorageError>; }
 impl kernel::Ledger for JsonlLedger { /* append = append_all(vec![d]) */ }
 #[cfg(feature = "conformance")] impl LedgerInspect for JsonlLedger { … }
 // 测试可调滚动阈：roll_bytes 字段＋#[cfg(test)] 设定器；生产恒为 SEGMENT_ROLL_BYTES。
@@ -189,13 +189,13 @@ impl LineFault { pub fn into_ax(self, line_no: u64) -> AxError; }  // 整本读�
 - 被否：两个读者各持一份检查。只做类型解析的 `open` 会把一条链续正确的 `ig:true` 行在尾段当撕裂截掉，而 `replay` 收下同一行。
 
 **落盘形态**：目录内 `ledger-<first_seq 20 位零填>.jsonl` 若干段；行＝`canonical_line`＋`\n`；链与 seq 跨段连续。滚动：当前段字节数 ≥ `SEGMENT_ROLL_BYTES` 时下一波起新段（新段创建后 `sync_dir`）。
-**写者锁：一个账本目录同一时刻只有一个 `JsonlLedger`，跨进程成立。** `open` 在列段之前，对账本目录的同级文件 `<目录名>.lock`（城的账本即 `<city>/.sprawling/ledger.lock`）取 `std::fs::File::try_lock` 独占锁；`JsonlLedger` 持着那个 `File`，锁与账本同寿命，drop 即放。拿不到锁就是别的 `JsonlLedger`（这个进程的或另一个进程的）正持着这座城的账本：`MemoryError::LedgerHeld { dir }`，映射装载期码 `E_LEDGER_HELD`。拒绝发生在任何读写之前，所以被拒的一方不修盘，也不写 `log_truncated`。
+**写者锁：一个账本目录同一时刻只有一个 `JsonlLedger`，跨进程成立。** `open` 在列段之前，对账本目录的同级文件 `<目录名>.lock`（城的账本即 `<city>/.sprawling/ledger.lock`）取 `std::fs::File::try_lock` 独占锁；`JsonlLedger` 持着那个 `File`，锁与账本同寿命，drop 即放。拿不到锁就是别的 `JsonlLedger`（这个进程的或另一个进程的）正持着这座城的账本：`StorageError::LedgerHeld { dir }`，映射装载期码 `E_LEDGER_HELD`。拒绝发生在任何读写之前，所以被拒的一方不修盘，也不写 `log_truncated`。
 
 ```rust
 pub(crate) struct WriterLock { /* 持锁的 File；只为它的 Drop 而存在 */ }
 impl WriterLock {
     /// 锁文件＝`dir` 的同级 `<目录名>.lock`，由 jsonl 自己命名；`dir` 没有目录名（根、`..`）即 `Io`。
-    pub(crate) fn take(dir: &Path) -> Result<WriterLock, MemoryError>;
+    pub(crate) fn take(dir: &Path) -> Result<WriterLock, StorageError>;
 }
 ```
 
@@ -217,8 +217,8 @@ impl WriterLock {
 ```rust
 pub(crate) enum Barrier { Whole, Broken }
 impl Barrier {
-    /// Whole ⇒ Ok；Broken ⇒ MemoryError::LedgerBroken { dir, at: next_seq }。
-    pub(crate) fn admit(&self, dir: &Path, at: Seq) -> Result<(), MemoryError>;
+    /// Whole ⇒ Ok；Broken ⇒ StorageError::LedgerBroken { dir, at: next_seq }。
+    pub(crate) fn admit(&self, dir: &Path, at: Seq) -> Result<(), StorageError>;
 }
 ```
 
@@ -228,7 +228,7 @@ impl Barrier {
 - 被否：失败后把位置退回或前推到盘上真实的末尾。写失败时句柄不知道落下了多少字节，sync 失败后页缓存里的字节是否还会落盘也不知道；猜一个位置，就是用猜测替 open 的断尾恢复作答。
 - 重开参数：出现后台组提交（记账线程发布「已持久到 seq N」的水位线）之后，sync 失败不再发生在 `append_all` 里，屏障状态随水位线一起搬到记账线程。
 
-### 8-2 memory::fault_fs
+### 8-2 storage::fault_fs
 
 ```rust
 #[cfg(any(test, feature = "fault"))]        // 测试与 citysim 的故障面两个消费者
@@ -255,7 +255,7 @@ impl Vfs for FaultFs { /* 每 op 自增计数；append 先落 live 再判 cut（
 impl JsonlLedger {
     #[cfg(any(test, feature = "fault"))]
     /// 收具体 FaultFs，故 Vfs 缝不出门（缝表不动，depmap 不动）
-    pub fn open_faulty(fs: FaultFs, dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), MemoryError>;
+    pub fn open_faulty(fs: FaultFs, dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), StorageError>;
 }
 ```
 
@@ -265,29 +265,29 @@ impl JsonlLedger {
 
 **断电点阵**：以 `cut_at_op` 扫描 1..=N 全部注入点各跑一遍「写入→断电→重开→断言」；断言两条：链恒可验，**已返回 Ok 的波恒存活**（append_all 耐久契约的机器面）。断电于 EventRecord 落账与断电于 CAS rename 在此点阵上断言；checkpoint 经 git2 落盘、不经 `Vfs`（8-15），不在点阵上。
 
-### 8-3 memory::cas
+### 8-3 storage::cas
 
 ```rust
 pub struct Cas { /* Box<dyn Vfs>、dir —— 非泛型，理由同 jsonl（Vfs 不得漏入公开签名） */ }
 impl Cas {
-    pub fn open(dir: &Path) -> Result<Self, MemoryError>;           // RealFs；建目录＋清别的进程留下的 tmp/*.part
+    pub fn open(dir: &Path) -> Result<Self, StorageError>;           // RealFs；建目录＋清别的进程留下的 tmp/*.part
     pub(crate) fn open_with(vfs: Box<dyn Vfs>, dir: &Path) -> …;    // 测试注入点
     /// Content-addressed put: tmp + rename, dedup by existence.
-    pub fn put(&mut self, bytes: &[u8]) -> Result<B3Hash, MemoryError>;
+    pub fn put(&mut self, bytes: &[u8]) -> Result<B3Hash, StorageError>;
     /// put＋记下这块是为哪个 run、哪栋楼存的；两者都落盘才返回 Ok。
-    pub fn put_for(&mut self, bytes: &[u8], origin: &BlockOrigin) -> Result<B3Hash, MemoryError>;
+    pub fn put_for(&mut self, bytes: &[u8], origin: &BlockOrigin) -> Result<B3Hash, StorageError>;
     /// 这块的全部来源，先存先列；没记过来源的块与没见过的哈希都是空表。
-    pub fn origins(&self, hash: &B3Hash) -> Result<Vec<BlockOrigin>, MemoryError>;
+    pub fn origins(&self, hash: &B3Hash) -> Result<Vec<BlockOrigin>, StorageError>;
     pub fn contains(&self, hash: &B3Hash) -> bool;                  // 存在判定无可失败面，不包 Result
     /// Full read re-verifies the hash (cheap: BLAKE3 GB/s); mismatch ⇒ CasCorrupt.
-    pub fn get(&self, hash: &B3Hash) -> Result<Vec<u8>, MemoryError>;
+    pub fn get(&self, hash: &B3Hash) -> Result<Vec<u8>, StorageError>;
     /// Range read per Locator semantics (L: 1-based closed; B: 0-based closed).
     /// Reads only the named bytes; trusts the object as verified at put.
-    pub fn get_range(&self, hash: &B3Hash, range: &Range) -> Result<Vec<u8>, MemoryError>;
+    pub fn get_range(&self, hash: &B3Hash, range: &Range) -> Result<Vec<u8>, StorageError>;
 }
 ```
 
-**范围读只读要答的那一段，并且不校验。** 取回走 `Vfs::read_at`：`B` 式一次定位读取 `to-from+1` 字节，**短答即越界**（文件到头了，拒而不夹取）；`L` 式自对象开头按 64 KiB 块扫换行，扫到第 `to` 行的终止符即止，付的是答案**之前**的字节，从不付答案之后的字节。语义仍归 `memory::cas::ranges` 一处（`of_object`），`Cas::get_range` 只做存在判定与路径解析。
+**范围读只读要答的那一段，并且不校验。** 取回走 `Vfs::read_at`：`B` 式一次定位读取 `to-from+1` 字节，**短答即越界**（文件到头了，拒而不夹取）；`L` 式自对象开头按 64 KiB 块扫换行，扫到第 `to` 行的终止符即止，付的是答案**之前**的字节，从不付答案之后的字节。语义仍归 `storage::cas::ranges` 一处（`of_object`），`Cas::get_range` 只做存在判定与路径解析。
 
 **两条路里选了「不校验，调用方明示接受」，另一条（分块哈希）落选。** 一个对象的地址覆盖整份内容，拿它校验一个片段就必须把整份读回来重算 BLAKE3——那正是本条要去掉的代价。要让片段可校验就得改写入面：put 时另存一棵分块哈希树（BLAKE3 的可验证流式形态），于是每个对象多一份旁挂物、多一条要与对象保持同步的事实、并且旧对象无树可用。买到的是「范围读能发现位腐烂」，而位腐烂**已经**由 `get` 的全读复算发现，且 §12 已把 `CasCorrupt` 记为不可定义掉的外部事故。因此：**范围读信任 put 时的校验，需要地址被证明的调用方走 `get`**；这句话在 `cas/ranges.rs` 的模块文档里逐字重复一遍，因为改那段代码的人先读的是它。
 
@@ -300,7 +300,7 @@ pub struct BlockOrigin { pub run: RunId, pub building: Address }
 布局：`<dir>/b3/<hex 前 2>/<hex64>`；临时件 `<dir>/tmp/<hex64>.<pid>.<本进程第几次 put>.part`（每次 put 一个自己的名字：同内容并发写者各自写满、各自 rename 到同一目标，无随机源；开句柄只清 pid 不是本进程的 tmp，理由见 §12；同名残留先 truncate 再写）。put 四步：hash→已存在即去重返回→写 tmp＋`sync_data`→`rename`＋`sync_dir`（分片目录）。范围取回越界＝`RangeOutOfBounds`（fail-closed，不静默夹取）；`L` 式行切分按 `\n`，末行无终止符同计一行；返回字节含行间 `\n`、不含末行终止符；`B` 式按 0 起闭区间直切。
 rename 入 Vfs；FaultFs 模型：rename 原子；新目标目录项在 `sync_dir` 前不存活，断电即整体消失（源已移除）——看似比真实更损，但 put 尚未返回 Ok，无可观察效果被丢失，A3 点 2 的断言面（已命名对象恒不腐蚀）不受影响。
 
-### 8-4 memory::index（形状 7）
+### 8-4 storage::index（形状 7）
 
 ```rust
 pub struct LedgerIndex { /* folded: Folded —— entries（base: Seq 起点、column: Vec<u64> 隐式 seq 列，每行一字＝高 16 位段名字典 id＋低 48 位行首字节偏移、
@@ -308,15 +308,15 @@ pub struct LedgerIndex { /* folded: Folded —— entries（base: Seq 起点、c
                             vfs: Mutex<Box<dyn Vfs>> —— 内缝，私有（谁在缝外见 8-15） */ }
 impl LedgerIndex {
     /// 扫描账本目录建索引（本就是唯一建表入口，无库外旁挂物可信）。
-    pub fn rebuild(dir: &Path) -> Result<LedgerIndex, MemoryError>;
+    pub fn rebuild(dir: &Path) -> Result<LedgerIndex, StorageError>;
     /// 一遍读史，两件事：每条完整行按账本序借给 `each`，同时按它在段里的偏移入索引。
     /// `each` 已读出这一行的 seq 与 run 时交回 `Some(Located)`，索引就不再解析它；交回 `None`
     /// 则由索引自己 `locate`（与 `rebuild` 同一规则）。常驻的只有一段字节。`each` 报错即停，
-    /// 返回它的错，读盘错经 `MemoryError::into_ax`。`rebuild` 就是 `each` 恒答 `None` 的这一遍。
+    /// 返回它的错，读盘错经 `StorageError::into_ax`。`rebuild` 就是 `each` 恒答 `None` 的这一遍。
     pub fn folding(dir: &Path, each: impl FnMut(&[u8]) -> Result<Option<Located>, AxError>)
         -> Result<LedgerIndex, AxError>;
     pub fn empty() -> LedgerIndex;                                                 // 账本目录读不出时先要一个：可弃，refresh 会填上
-    pub fn refresh(&mut self, dir: &Path) -> Result<Refreshed, MemoryError>;       // 只读长出来的字节
+    pub fn refresh(&mut self, dir: &Path) -> Result<Refreshed, StorageError>;       // 只读长出来的字节
 }
 /// 一行在史中的位置：它的 seq，以及它读回来的 run（读不出 run 时仍按 seq 入索引）。
 pub struct Located { pub seq: Seq, pub run: Option<RunId> }
@@ -333,7 +333,7 @@ impl LedgerIndex {
 /// 一次查询期间的取行游标：持有当前段的句柄与它的逻辑位置。私有字段。
 pub struct LineReader<'index> { /* index、dir、Option<段名＋BufReader<File>＋下一行偏移> */ }
 impl LineReader<'_> {
-    pub fn line_at(&mut self, seq: Seq) -> Result<Vec<u8>, MemoryError>;           // 取一条（顺序读零 syscall 开销）
+    pub fn line_at(&mut self, seq: Seq) -> Result<Vec<u8>, StorageError>;           // 取一条（顺序读零 syscall 开销）
 }
 ```
 
@@ -361,9 +361,9 @@ impl LineReader<'_> {
   - **等价锁在 `index/fold/tests.rs`**：oracle 是 map 形实现，proptest 喂随机行流（乱序与重复 seq、不可解析的 run 名、非文档行）断言全部公开查询恒同解。
   - **`before` 取开区间**，与线格式 `HistoryAnswer.earlier` 的含义（「从这条之前接着问」）同字同义，调用方不做 `before - 1` 这条减法，也就碰不到它的 `Seq::FIRST` 边界。
   - **答的顺序**：`run_seqs_before` 由新到旧，因为调用方要的是会话的**末尾**；调用方取够条数后翻转成由旧到新再取行，于是 `LineReader` 全程向前走，不付逆序读每行一次的 seek。
-- `locate` 只探 `seq` 与 `run` 两个字段——索引不要求整条记录可解析，破损日志上的索引正是修复路径所需；`run` 缺失或解析不出的行**照样入 seq 表，只是不属于任何 run**，残尾（无换行结尾）跳过不入索引，其修复归 jsonl。段名排序由本模块自持（不信文件系统枚举序）。新增 `MemoryError::SeqMissing{seq}`（→ `E_INVALID_ARGS`）：问一条从未写过的 seq 是调用者错，不是损坏。
+- `locate` 只探 `seq` 与 `run` 两个字段——索引不要求整条记录可解析，破损日志上的索引正是修复路径所需；`run` 缺失或解析不出的行**照样入 seq 表，只是不属于任何 run**，残尾（无换行结尾）跳过不入索引，其修复归 jsonl。段名排序由本模块自持（不信文件系统枚举序）。新增 `StorageError::SeqMissing{seq}`（→ `E_INVALID_ARGS`）：问一条从未写过的 seq 是调用者错，不是损坏。
 
-### 8-5 memory::hot（形状 7）
+### 8-5 storage::hot（形状 7）
 
 ```rust
 pub struct HotView { /* runs: BTreeMap<RunId, RunHot>、evicted: BTreeSet<RunId> —— 私有 */ }
@@ -374,7 +374,7 @@ pub struct RunHot { pub phase: RunPhase, pub last_seq: Seq, pub last_kind: Event
 pub enum RunPhase { Active, Frozen }
 impl HotView {
     pub fn new() -> HotView;
-    pub fn apply(&mut self, record: &EventRecord) -> Result<(), MemoryError>;   // 增量；重复 seq 幂等（只前进）
+    pub fn apply(&mut self, record: &EventRecord) -> Result<(), StorageError>;   // 增量；重复 seq 幂等（只前进）
     pub fn runs(&self) -> impl Iterator<Item = (&RunId, &RunHot)>;              // BTreeMap 序
     pub fn get(&self, run: &RunId) -> Option<&RunHot>;
     pub fn was_evicted(&self, run: &RunId) -> bool;                            // 墓碑：这次跑冻结后被逐出
@@ -389,17 +389,17 @@ pub const RECENT_FROZEN: usize = 32;
 - 界面查询在此命中不读盘；run_started→Active，run_frozen→Frozen；其余事件只推进 last_seq/last_kind。
 - **`addr` 与 `started` 从 `run_started` 记下**：`record.addr()` 是这次跑的房间，`record.t()` 是它开始的时刻；二者只在这一种记录上赋值，其余记录不动它们，所以一次跑的房间不会被后来的城市级记录改写。`Option`，因为热视图可能在 `run_started` 之前先看到同一次跑的 `checkpoint_committed`（栅栏先于开场落账），也可能只看到一段没有开场的尾巴——**看不到的事不猜**。理由：`RunSummary.who` 是首条记录的作者、恒为 `city`，单靠它无法把一次跑归到 `hall/mayor` 这个房间，「与 Mayor 的对话」就在线上拼不出来。
 - **`completion`、`pr`、`ask` 各从一种记录记下**：`run_frozen` 的 `completion` 字段；`pr_opened` 的 `branch` 字段（后一条覆盖前一条）；`approval_requested` 的 `action_desc` 字段，且只活到这次跑的下一条记录——任何别的记录清掉它，所以 `ask` 有值当且仅当 `last_kind` 是 `approval_requested`，页面据 `last_kind` 判「在等」，据 `ask` 写「等什么」，两者同源。按键读字段而不整条 `Payload::read`：热视图每条记录都折，整条反序列化要复制整个 map；字段缺失记 `None`，同 `addr` 的口径，看不到的事不猜。
-- **`task` 与 `goal` 从 `run_started` 记下**：那条记录的同名两个字段，与 `addr`、`started` 同一处赋值、同一个口径——只在这一种记录上写，其余记录不动它们；字段缺失或是空串记 `None`，因为一句空的任务不是一个名字。理由：run 板以它们给一行 run 起名，而重载后的页面只有 `RunSummary`（channels-SPEC §8-48e）。
+- **`task` 与 `goal` 从 `run_started` 记下**：那条记录的同名两个字段，与 `addr`、`started` 同一处赋值、同一个口径——只在这一种记录上写，其余记录不动它们；字段缺失或是空串记 `None`，因为一句空的任务不是一个名字。理由：run 板以它们给一行 run 起名，而重载后的页面只有 `RunSummary`（wire-SPEC §8-48e）。
 - **城市级记录不进 run 表**：`RunId::CITY`（nil）标记的是属于城而不属于任何 Run 的记录——创世记录、`building_created`。把它们折进 run 表会让 `active_count()` 在一座**从未派过活的城**里返回 1：城市页读服务端的这个数、写「1 run in flight」，而总览页折同一条流写「什么都没在跑」——**一个问题两个答案，而错的那个是服务端的**。
 
-### 8-7 memory::attribution（形状 7）
+### 8-7 storage::attribution（形状 7）
 
 ```rust
 pub struct Attribution { /* by_run、by_actor、by_segment、by_tool、by_skill: BTreeMap<String, UsdMicros>、
                             total: UsdMicros、pending_wave: … —— 私有 */ }
 impl Attribution {
     pub fn new() -> Attribution;
-    pub fn apply(&mut self, record: &EventRecord) -> Result<(), MemoryError>;
+    pub fn apply(&mut self, record: &EventRecord) -> Result<(), StorageError>;
     pub fn report(&self) -> AttributionReport;
 }
 pub struct AttributionReport { pub total: UsdMicros, pub by_run: Vec<(String, UsdMicros)>,
@@ -415,7 +415,7 @@ pub struct Unpriced { pub calls: u64, pub tokens: u64 }
 - 取材：`model_returned.data.billed_usd_micros`（权威计费额）；`prompt_assembled` 逐段 len；`tool_result` 的 name。每维度独立分割同一总额：by_run/by_actor 按事件归属；by_segment 按该 model_returned 所属 run 最近一条 prompt_assembled 的段 len 最大余额法分割（四段＋window 桶：入窗历史份额）——段权重按 run 分键，因为 runtime 每个 run 只写一条 prompt_assembled（其后的回合载荷不变即不再写），账本上交错的另一个 run 的 prompt_assembled 不是这次调用的基础；by_tool 按前一波 tool_result 字节最大余额法（无波则 no_tool 桶）。最大余额法使每维度和恒精确＝total（A20 的整数保证）。
 - **段位基准按 run 保存，run 冻结即丢。** 一次整账本折叠会遇到城里有过的每一个 run；`run_frozen` 是终态，其后不再有该 run 的调用，所以它最近一次 `prompt_assembled` 的段位基准随之移除，常驻量只随在跑的 run 数增长，不随城的历史增长。
 
-### 8-17 memory::checkpoint::provenance（形状 2 值）
+### 8-17 storage::checkpoint::provenance（形状 2 值）
 
 ```rust
 /// 一次运行选定的模型，两者恒同行：模型 id 与它被要求的思考档位。
@@ -426,7 +426,7 @@ pub struct Provenance { /* run、actor、model、effort、city —— 私有 */ 
 impl Provenance {
     pub fn new(run: RunId, actor: Address, city: B3Hash, chosen: ModelChoice) -> Provenance;
     /// 城的身份＝创世行的链哈希，从账本首段的第一行读出（只读一行）。
-    pub fn city_of(ledger_dir: &Path) -> Result<B3Hash, MemoryError>;
+    pub fn city_of(ledger_dir: &Path) -> Result<B3Hash, StorageError>;
     /// git trailers 块，顺序与拼写恒为下列五行，有前任时加第六行，末尾带换行。
     pub fn succeeding(self, predecessor: RunId) -> Provenance;   // 写前任的唯一入口
     pub fn predecessor(&self) -> Option<RunId>;
@@ -492,17 +492,17 @@ pub fn effort_word(effort: kernel::Effort) -> String;
 - **被否的另一条路：让 `sprawling whose` 去读 git trailers。** 那是把投影当成权威，正是 8-17
   明确拒绝的方向；而且一座导出后在别处恢复、`.git` 并不在身边的城将答不出自己的历史。
 
-### 8-8 memory::checkpoint（形状 4；git2）
+### 8-8 storage::checkpoint（形状 4；git2）
 
 ```rust
 pub struct Checkpoint { /* repo: git2::Repository、last: Option<git2::Oid> —— 私有 */ }
 impl Checkpoint {
-    pub fn open(city_root: &Path) -> Result<Checkpoint, MemoryError>;      // 无仓即 init（创世提交由 ensure_base 产）
+    pub fn open(city_root: &Path) -> Result<Checkpoint, StorageError>;      // 无仓即 init（创世提交由 ensure_base 产）
     /// Commits once when the repository has no HEAD, and never otherwise.
     /// A worktree branches from a commit, so a city that was never
     /// fenced cannot lend a tree; committing on every dispatch instead
     /// would move the trunk under every request already waiting.
-    pub fn ensure_base(&mut self, scope: &str, t: TimeMs, of: &Provenance) -> Result<Option<Payload>, MemoryError>;
+    pub fn ensure_base(&mut self, scope: &str, t: TimeMs, of: &Provenance) -> Result<Option<Payload>, StorageError>;
     /// Pre-wave fence: add -A within scope, then a **dangling** commit
     /// pointed at by refs/sprawling/runs/<run>/<oid>. HEAD does not move.
     /// Returns the checkpoint_committed payload
@@ -520,7 +520,7 @@ impl Checkpoint {
     /// 走两个文件时 `add_all` 要匹配整个写域，比字面暂存慢，所以文件走字面路径。
     /// pathspec 里每项仍是**字面路径**：地址文法允许 `[` `]` `*` `?`，所以这些
     /// 字节各自包进单字符类（`[[]`）再交给 libgit2，否则 `notes[1]` 会匹配 `notes1`。
-    pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, MemoryError>;
+    pub fn wave_pre(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Payload, StorageError>;
     /// 一栋楼的基线 fence（`checkpoint::base`）：暂存 `scopes`、扫描、提交，
     /// 全部对象先写进内存里的对象库（mempack），最后作为**一个 pack** 落盘。
     /// 无 HEAD 时提交移动 HEAD（等于 `ensure_base`），否则与 wave fence 同样
@@ -530,24 +530,24 @@ impl Checkpoint {
     /// 把对象写进一个再也不落盘的内存库。index 与 HEAD（或 fence ref）只在
     /// pack 落盘之后才写：之前任何一步失败（staged secret、pack 被拒、崩溃），
     /// 盘上的 index 与引用都保持原样，不会指向从未落盘的对象。
-    pub fn base_fence(self, scopes: &[String], t: TimeMs, of: &Provenance, progress: &mut dyn FnMut(BaseProgress)) -> Result<Payload, MemoryError>;
+    pub fn base_fence(self, scopes: &[String], t: TimeMs, of: &Provenance, progress: &mut dyn FnMut(BaseProgress)) -> Result<Payload, StorageError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
-    pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, MemoryError>;
+    pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, StorageError>;
     /// The way back a `file_discarded` names: the blob at `address` in commit
     /// `oid`, written to the same path under the working tree, parents created.
     /// 不移动 HEAD，不碰 index。oid 不是提交、提交里没有这条路径（或它不是
     /// blob）、地址落在受保护的元数据子树（`Address::is_reserved`）、写盘失败，
-    /// 都是 `MemoryError::Checkpoint`（→ `E_WORKTREE_BUSY`）；路径上有链接是
-    /// `MemoryError::Alias`。
-    pub fn restore(&self, address: &Address, oid: &GitOid) -> Result<(), MemoryError>;
+    /// 都是 `StorageError::Checkpoint`（→ `E_WORKTREE_BUSY`）；路径上有链接是
+    /// `StorageError::Alias`。
+    pub fn restore(&self, address: &Address, oid: &GitOid) -> Result<(), StorageError>;
     /// 把 `scopes` 之下的工作树提交到**当前分支**（HEAD 移动），供一次评审运行
     /// 在自己的 worktree 里献出成果时使用；scope 之外的索引项原样进树。返回落地的 oid。
-    pub fn land(&mut self, scopes: &[String], t: TimeMs, of: &Provenance, subject: &str) -> Result<String, MemoryError>;
+    pub fn land(&mut self, scopes: &[String], t: TimeMs, of: &Provenance, subject: &str) -> Result<String, StorageError>;
     /// Staged-diff secret scan; a hit refuses the commit (E_SECRET_EGRESS,
     /// positions only, never the bytes). 只扫这一次会新提交进去的
     /// blob——基线那一次仍然全扫。
-    pub fn scan_staged(&mut self) -> Result<(), MemoryError>;
+    pub fn scan_staged(&mut self) -> Result<(), StorageError>;
 }
 ```
 
@@ -556,11 +556,11 @@ impl Checkpoint {
   `checkpoint:` 提交时，一个被采纳的仓库每波长一格。`wave_pre` 因此写一个
   **dangling commit**（`update_ref = None`，父为当前 HEAD 提交，无 HEAD 时无父），
   再把引用 `refs/sprawling/runs/<run>/<oid>` 指向它。`git log HEAD` 因此跨波不增长，
-  而 oid 可 checkout、`wave_post` 与 `memory::changes` 从 oid 工作。
+  而 oid 可 checkout、`wave_post` 与 `storage::changes` 从 oid 工作。
 - **`restore` 只写工作区那一个文件。** 还原是把人丢掉的东西放回原处，不是一次提交：
   写 index 或移动 HEAD 会让「人还原了一个文件」在他自己的分支历史里长出一格。
   地址是 `Address::is_reserved` 的（`.sprawling/`、`.git/` 等受保护子树）即拒绝，先于任何盘上动作：还原的 `restoration` 来自线上，城不拿它比对账本，而受保护子树只经 spine 与治理写门写入——与 `sessions` 跳过保留地址是同一条规则。
-  `Address` 只管路径的拼写，不管盘上把它解析到哪（kernel 把链接解析交给效应层），所以路径上工作区根以下已存在的任一段是符号链接或 junction 就拒绝（`MemoryError::Alias`），不跟随——这条问的是 `alias::WriteTarget::within`，写落在它放行的那个值上，与其它写门同一条链接规则；
+  `Address` 只管路径的拼写，不管盘上把它解析到哪（kernel 把链接解析交给效应层），所以路径上工作区根以下已存在的任一段是符号链接或 junction 就拒绝（`StorageError::Alias`），不跟随——这条问的是 `alias::WriteTarget::within`，写落在它放行的那个值上，与其它写门同一条链接规则；
   目标处已有文件且字节与 blob 不同时拒绝（恢复：把现有文件挪开再还原），字节相同即视为已还原；写用 `create_new`，不覆盖在检查之后出现的文件。
   还原不持 `fence_gate`：与同一栋楼里正在跑的波并发时，由上面的 `create_new` 拒绝而不是覆盖。
   提交能被找到，靠的是上一条的引用；没有它，`git gc` 之后 `restore` 答「找不到提交」。
@@ -590,12 +590,12 @@ impl Checkpoint {
 - **`wave_post` 只问存在性，不问内容**：sweep 要的是「pre 提交树里的哪个 blob 从工作区消失了」，而这是一个存在问题——对树里的每个 blob 做一次 `symlink_metadata`，`NotFound` 即删除。**不碰 `diff_tree_to_workdir`**：它为每一个与树对上号的路径求哈希（libgit2 的 `git_diff__oid_for_entry`），而工作区里有城自己刚写完又改动的文件（session 投影，以及任何还开着写句柄的文件）；Windows 的目录枚举尺寸对这样的文件可以落后于句柄里的真实长度，libgit2 拿这个过期尺寸去 `git_odb__hashfd`，读到比声明尺寸多的字节使剩余计数下溢，最后把整次 sweep 拒成 `E_WORKTREE_BUSY`——写路径完全正确，读路径却对城市自己的写入过敏。
   - 被否：每波走 `diff_tree_to_workdir`。它省的是「每一波付整棵树的钱」，而那棵树是**这次栅栏自己的写域**（`wave_pre` 刚逐文件走过一遍），不是全城；sweep 只报 `Deleted`，而 `Deleted` 是存在问题不是内容问题。被否：`Path::exists()`——它跟随软链，一个悬空软链会被当成删除，`symlink_metadata` 不会。
   - 输出仍然在本模块排序而不信 walk 的顺序：**这批行落账的顺序是重放要复现的东西**。
-- `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存只用一次 `add_all`：libgit2 把 index 与工作区比一遍（按 stat 跳过没变的文件），新增、修改、删除都在这一遍里暂存；再跑一遍 `update_all` 是把同一个写域重走一次，5,000 个文件的写域上稳态 fence 的中位数因此从 104 ms 降到 71–78 ms（未优化构建，16 核、SSD，同一仪表交错测三次）。暂存规则只写在 `wave_pre` 的文档里（点名文件的 scope 走字面 `add_path`/`remove_path`，点名前缀的 scope 走字面 glob 加 `<glob>/*`）；**session 切片永不进 add**（`sessions::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `MemoryError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
+- `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存只用一次 `add_all`：libgit2 把 index 与工作区比一遍（按 stat 跳过没变的文件），新增、修改、删除都在这一遍里暂存；再跑一遍 `update_all` 是把同一个写域重走一次，5,000 个文件的写域上稳态 fence 的中位数因此从 104 ms 降到 71–78 ms（未优化构建，16 核、SSD，同一仪表交错测三次）。暂存规则只写在 `wave_pre` 的文档里（点名文件的 scope 走字面 `add_path`/`remove_path`，点名前缀的 scope 走字面 glob 加 `<glob>/*`）；**session 切片永不进 add**（`sessions::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `StorageError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
 - 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `RULES.toml` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何栅栏——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
-- **写域拒绝链接穿透（junction／symlink 字面拒；硬链接臂见 8-25 与 §3.5）。** 暂存回调对每个命中路径问 `memory::alias`：任一链接使**整波拒绝**（`MemoryError::Alias`），绝不跳过继续——跳过即部分捕获，`file_discarded` 的恢复地址会指向一份与自己不符的树。git 交回调的是相对仓根的路径，判别名前必须先拼上工作树根（否则问的是进程自己的目录）。保护元数据在栅栏侧是**跳过**而非拒绝（`memory::reserved::outside_reserved`）：那些字节另有家（城或楼的治理、git 的对象库），与 `stage_tree` 跳过保留子树同口径；被拒的 run 拿到的 recovery 是「把链接换成普通文件后重试」，故不会卡死在自己的目录上。
+- **写域拒绝链接穿透（junction／symlink 字面拒；硬链接臂见 8-25 与 §3.5）。** 暂存回调对每个命中路径问 `storage::alias`：任一链接使**整波拒绝**（`StorageError::Alias`），绝不跳过继续——跳过即部分捕获，`file_discarded` 的恢复地址会指向一份与自己不符的树。git 交回调的是相对仓根的路径，判别名前必须先拼上工作树根（否则问的是进程自己的目录）。保护元数据在栅栏侧是**跳过**而非拒绝（`storage::reserved::outside_reserved`）：那些字节另有家（城或楼的治理、git 的对象库），与 `stage_tree` 跳过保留子树同口径；被拒的 run 拿到的 recovery 是「把链接换成普通文件后重试」，故不会卡死在自己的目录上。
 
-### 8-13 memory::changes（形状 4 适配器；git2）
+### 8-13 storage::changes（形状 4 适配器；git2）
 
 ```rust
 pub enum Lines { Counted { added: u32, removed: u32 }, Binary }
@@ -603,7 +603,7 @@ pub enum How    { Added, Modified, Deleted, Renamed { from: String } }
 pub struct FileChange { pub path: String, pub how: How, pub lines: Lines }
 pub enum Head   { Commit(GitOid), WorkingTree }
 pub fn between(city_root: &Path, base: GitOid, head: Head)
-    -> Result<Vec<FileChange>, MemoryError>;
+    -> Result<Vec<FileChange>, StorageError>;
 ```
 
 **写入侧早就是 git 原生的，缺的是整个读出侧。** 每一次工具浪前 `wave_pre` 都落一个真 commit，
@@ -628,25 +628,25 @@ pub fn between(city_root: &Path, base: GitOid, head: Head)
 dangling commit 并由 `refs/sprawling/runs/<run>/<oid>` 指住（见 8-8）。本模块只读不写，
 从 oid 工作。
 
-### 8-9 memory::worktree（形状 4 适配器＋形状 2 值类型；git2）
+### 8-9 storage::worktree（形状 4 适配器＋形状 2 值类型；git2）
 
 ```rust
 pub struct WorktreeName(String);        // 文件系统安全；无分隔符、无点开头
 pub struct Worktrees { /* repo、home、ceiling —— 私有 */ }
 pub struct WorktreeLease { /* name、path、disk —— 私有 */ }
 impl Worktrees {
-    pub fn open(city_root: &Path) -> Result<Worktrees, MemoryError>;
+    pub fn open(city_root: &Path) -> Result<Worktrees, StorageError>;
     /// `scopes` 是这棵树的写域（与栅栏同一组 pathspec，空即整棵）：再领时只检出它。
-    pub fn claim(&self, name: &WorktreeName, scopes: &[String]) -> Result<WorktreeLease, MemoryError>;
-    pub fn release(&self, lease: WorktreeLease) -> Result<(), MemoryError>;   // 解锁，不删树
+    pub fn claim(&self, name: &WorktreeName, scopes: &[String]) -> Result<WorktreeLease, StorageError>;
+    pub fn release(&self, lease: WorktreeLease) -> Result<(), StorageError>;   // 解锁，不删树
     /// 城的唯一写者（借出的 `JsonlLedger` 即凭证）打开时调用：之前的写者没还的锁全部解开。无仓库即无事可做。
-    pub fn lift_abandoned_leases(city_root: &Path, writer: &JsonlLedger) -> Result<(), MemoryError>;
-    pub fn live(&self) -> Result<Vec<WorktreeName>, MemoryError>;
+    pub fn lift_abandoned_leases(city_root: &Path, writer: &JsonlLedger) -> Result<(), StorageError>;
+    pub fn live(&self) -> Result<Vec<WorktreeName>, StorageError>;
     /// 开城时收走崩溃留下的树：`held` 之外、住在 `<city>/.sprawling/worktrees/` 下的登记、目录与租约分支。
     /// 城没有仓库时答空。返回收走的名字，排序。
-    pub fn sweep_abandoned(city_root: &Path, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, MemoryError>;
+    pub fn sweep_abandoned(city_root: &Path, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, StorageError>;
     /// 把一个节点已提交的活带进城的 trunk，返回落地的 commit。
-    pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, MemoryError>;
+    pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, StorageError>;
 }
 /// 一次合并要写下的东西，四个恒同行的值合成一个。
 pub struct Landing<'a> {
@@ -659,17 +659,17 @@ pub struct Landing<'a> {
 }
 impl PlannedMerge<'_> {
     pub fn commit(&self) -> String;
-    pub fn apply(self, landing: &Landing<'_>) -> Result<(), MemoryError>;
+    pub fn apply(self, landing: &Landing<'_>) -> Result<(), StorageError>;
 }
 impl WorktreeLease {
     pub fn name(&self) -> &WorktreeName;  pub fn path(&self) -> &Path;  pub fn disk(&self) -> ByteLen;
-    pub fn opened_payload(&self) -> Result<Payload, MemoryError>;   // worktree_opened，形状是 kernel::event::record::WorktreeOpened
+    pub fn opened_payload(&self) -> Result<Payload, StorageError>;   // worktree_opened，形状是 kernel::event::record::WorktreeOpened
 }
 ```
 
-- **一节点一棵，且它是 git worktree**：对象共享、工作树不共享，于是两个 Agent 看不见对方的中间态，而合入只走 PR 流。它从 `memory::checkpoint` 已在管的那个仓库分枝——城里不开第二个仓库。
+- **一节点一棵，且它是 git worktree**：对象共享、工作树不共享，于是两个 Agent 看不见对方的中间态，而合入只走 PR 流。它从 `storage::checkpoint` 已在管的那个仓库分枝——城里不开第二个仓库。
 - **建树前预检，不是建到一半失败**：工作树字节数 > `WORKTREE_MAX_BYTES` 即拒，拒词带当前上限与实测值。reflink 今天不尝试（无 unsafe FFI 或新依赖就没有 CoW 接口），故设计里「CoW 则 reflink，否则按上限拒」在每个平台上都只走后一臂——这是当前口径，不是已实现的 CoW。可用磁盘余量未探（std 无该接口），同样写在明处。
-- **上限只称人的字节**：`measure` 跳 `.git` 与 `RESERVED_PREFIX` 子树（谓词住 `memory::reserved`，与 checkpoint 的 `stage_tree` 同一个）。
+- **上限只称人的字节**：`measure` 跳 `.git` 与 `RESERVED_PREFIX` 子树（谓词住 `storage::reserved`，与 checkpoint 的 `stage_tree` 同一个）。
   账本、CAS、投影与别人的工作树都住 reserved 之下；把它们算进来，跑了一个月的城会因为自己的簿记长大而拒绝派活，
   并用一句「城的工作树有 N 字节」说这件事。断言：账本 4 KB、产品文件不到 1 KB 的城仍可领树。
 - **上限称一次检出，不称留着的树之和**：`WORKTREE_MAX_BYTES` 只在 `place`（新建一棵、全量检出）之前量城的工作树；再领一棵留着的树不量，留着的各棵也不相加。
@@ -690,7 +690,7 @@ impl WorktreeLease {
   进程在 run 中途死掉会留下锁：一个城只有一个写者，所以新写者一拿到 `JsonlLedger` 就由 `lift_abandoned_leases` 解开全部锁——此时任何锁都不可能属于活着的 run。
   `E_WORKTREE_BUSY` 因此恒表示「锁着」，也就是有人正在用；登记在册但目录不存在即 prune 后重建，与 index 的「存疑即重建」同一反射。
   否决「释放即 prune 并删目录」：它让同一节点的下一次 run 重新量整个城并全量检出，代价随城的大小涨，而节点的分支本来就留着。
-- **开城清扫上一次服务留下的树（`memory::worktree::sweep`）**：租约的树在一次服务期间留在盘上给同名的下一次领用；开城时没有任何 run 持有树（账本的独占锁），
+- **开城清扫上一次服务留下的树（`storage::worktree::sweep`）**：租约的树在一次服务期间留在盘上给同名的下一次领用；开城时没有任何 run 持有树（账本的独占锁），
   所以此刻城自己造的每棵树都是上一次服务留下的。`bin::assembly` 开城时先 `lift_abandoned_leases`、再以空的 `held` 调 `sweep_abandoned`，所以保留的树只省下同一次服务里的再次检出，跨一次重启就重新全量检出；
   清扫的理由是崩溃：进程死在一轮中间时，`.git/worktrees/<name>` 的登记、`.sprawling/worktrees/<name>` 目录（最多 `WORKTREE_MAX_BYTES`）与分支 `<name>` 永远留着。
   `sweep_abandoned` 收三样，每样只收城自己造的：登记的路径在盘上解析后恰是本城的 `.sprawling/worktrees/<name>`（公共 git 目录列出共用它的每座城与每个链接检出的树，只比路径尾部会把别处 `.sprawling/worktrees/<name>` 下的树连文件一起删掉；人用 `git worktree add` 加的树在别处，不碰；树目录已被删时解析它的父目录）；
@@ -698,7 +698,7 @@ impl WorktreeLease {
   那是一轮已经 land 的活（PR 的 commit 就在它上面），分支留下；人把它检出成当前分支时，它已是人的，也留下。`held` 里的名字一概不动，那是活着的 run 手里的树。
   `refs/sprawling/runs/` 下的栅栏引用不在清扫范围里：回收站靠它们让被删文件的提交躲过 `git gc`（§8-8）。
   清扫在开城时做，因为账本的独占锁（§8-1）保证那一刻没有别的进程在用这座城——这把锁只罩本城，所以别城的树靠上面的精确路径比较排除，不靠锁；被否：在 `claim` 里顺手清——`claim` 只遇得到它要领的那个名字，别的节点留下的树它碰不到。
-- **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但尚未做——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。
+- **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但尚未做——当「领节点」本身变成取租约（`storage::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。
 - **路径不入历史**：`worktree_opened` 载荷只携 name 与字节数。绝对路径是一台机器自己的事实，写进账本会使一本能搬到另一台机器的历史带上搬不走的东西。
 - **merge 只走 fast-forward**：trunk 在节点分枝之后动过即 `MergeStale`（→`E_VERSION_CONFLICT`），不由机器把一份活重放到别人的活上面——能说出「这份活是否仍然适用」的是做它的人。拒后城内文件逐字节不变（一条断言）。
 - **合并不覆盖城市目录**：`plan_merge` 以 libgit2 SAFE 策略对节点 tree 做一次 dry-run 检出，基线是当前干线；人改过未提交、且合并要改或删的被跟踪文件，以及挡在新路径上的未跟踪文件，都是冲突，合并以 `MergeWouldDiscard { paths }`（→`E_VERSION_CONFLICT`，恢复：提交或挪开这些改动再合）拒绝，列出全部路径。`apply` 先写不挪指针的 merge commit，再以 SAFE 检出，最后用 compare-and-swap 把干线移到它上面；从不强制检出。不选「只移分支、不碰目录」：那样城市目录与干线不一致，下一次 checkpoint 会把节点的改动当成人撤销了它们。
@@ -717,12 +717,12 @@ impl WorktreeLease {
 
 ```rust
 impl Worktrees {
-    pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, MemoryError>;  // 只读；全部拒绝在此
+    pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, StorageError>;  // 只读；全部拒绝在此
 }
 pub struct PlannedMerge<'a> { /* 私有：trees、target */ }
 impl PlannedMerge<'_> {
     pub fn commit(&self) -> String;               // 干线将指向的 commit，供那条行写
-    pub fn apply(self, landing: &Landing<'_>) -> Result<(), MemoryError>; // 移动干线并检出；`PlannedMerge` 无第二来源
+    pub fn apply(self, landing: &Landing<'_>) -> Result<(), StorageError>; // 移动干线并检出；`PlannedMerge` 无第二来源
 }
 ```
 
@@ -730,7 +730,7 @@ impl PlannedMerge<'_> {
 
 形制与 `accounting::effect` 的 `Landing`／`Then` 同源：动作只能从决定里拿到，写反顺序等于去取一个取不到的值。
 
-### 8-10 memory::queue（形状 7）
+### 8-10 storage::queue（形状 7）
 
 ```rust
 pub struct EventQueue { /* items: BTreeMap<u64, QueueItem>、next_id、seen: BTreeMap<IdemKey, TimeMs>、stats —— 私有 */ }
@@ -739,7 +739,7 @@ impl EventQueue {
     pub fn new(lane: QueueLane, capacity: u64) -> EventQueue;
     /// Admission first (kernel::backpressure), then enqueue; Shed returns
     /// the verdict to the caller (who accounts backpressure_shed).
-    pub fn enqueue(&mut self, key: IdemKey, payload: Payload, now: TimeMs) -> Result<Admission, MemoryError>;
+    pub fn enqueue(&mut self, key: IdemKey, payload: Payload, now: TimeMs) -> Result<Admission, StorageError>;
     /// Dedup before side effects: a key already consumed is Duplicate and
     /// must not reach the consumer twice.
     pub fn consume(&mut self) -> Option<QueueItem>;
@@ -752,28 +752,28 @@ pub enum QueueLane { Signal, Approval, Repair }   // 一份实现三队列
 - **去重记忆按时间有界**：`seen` 记下每个键的入队时刻，`enqueue` 先按 `now` 驱逐早于 `IDEM_WINDOW_MS`（六小时）的键。
   只增不减的集合会让长跑的城为它曾经入过队的每一条事件各留一个键，而重试发生在一次投递的窗口内，不发生在一天之后。
   时钟倒退时一个键也不驱逐——队列对时钟不持观点，而记得太久只会少跑一次副作用。
-  **常量住 `memory::queue`**：它只有这一个读者，放进 `kernel::consts_policy` 会让 kernel 的公开面多一个只有 memory 读的数。
+  **常量住 `storage::queue`**：它只有这一个读者，放进 `kernel::consts_policy` 会让 kernel 的公开面多一个只有 memory 读的数。
 - 重建性：队列状态＝（signal_enqueued − signal_consumed）的 projection；持久性不在本模块（Ledger 已是历史）。lane 只定账目名字段，三队列零分支差异——差异出现之日即分模块之日（反推式合并的退出条件写在明处）。
 
-### 8-11 memory::digest_cache（形状 4）
+### 8-11 storage::digest_cache（形状 4）
 
 ```rust
 pub struct DigestCache { /* dir —— 私有；文件名＝内容哈希 hex64.json */ }
 impl DigestCache {
-    pub fn open(dir: &Path) -> Result<DigestCache, MemoryError>;
+    pub fn open(dir: &Path) -> Result<DigestCache, StorageError>;
     /// Same content hash digests once for life: a second put with the same
     /// hash is a no-op returning the stored artifact.
-    pub fn put(&mut self, content: &B3Hash, tree_json: &[u8]) -> Result<(), MemoryError>;
-    pub fn get(&self, content: &B3Hash) -> Result<Option<Vec<u8>>, MemoryError>;
+    pub fn put(&mut self, content: &B3Hash, tree_json: &[u8]) -> Result<(), StorageError>;
+    pub fn get(&self, content: &B3Hash) -> Result<Option<Vec<u8>>, StorageError>;
     /// Invalidation produces the digest_invalidated payload; the entry is
     /// removed so the next digest re-runs.
-    pub fn invalidate(&mut self, content: &B3Hash, reason: &str) -> Result<Payload, MemoryError>;
+    pub fn invalidate(&mut self, content: &B3Hash, reason: &str) -> Result<Payload, StorageError>;
 }
 ```
 
 - 消费者是 runtime::digest；本模块只交存储面。写入经 tmp＋rename（复用 cas 的 Vfs 纪律）。
 
-### 8-12 memory::bundle（形状 4 适配器＋形状 2 值类型）
+### 8-12 storage::bundle（形状 4 适配器＋形状 2 值类型）
 
 ```rust
 pub struct Manifest { /* 私有；records、head、cas_objects、files、history（包数与引用数） */ }
@@ -783,13 +783,13 @@ impl Manifest {
 }
 pub struct Bundle;
 impl Bundle {
-    pub fn export(city_root: &Path, dest: &Path) -> Result<Manifest, MemoryError>;
-    pub fn restore(bundle: &Path, city_root: &Path) -> Result<Manifest, MemoryError>;
-    pub fn read_manifest(bundle: &Path) -> Result<Manifest, MemoryError>;
+    pub fn export(city_root: &Path, dest: &Path) -> Result<Manifest, StorageError>;
+    pub fn restore(bundle: &Path, city_root: &Path) -> Result<Manifest, StorageError>;
+    pub fn read_manifest(bundle: &Path) -> Result<Manifest, StorageError>;
 }
 pub const MANIFEST: &str = "MANIFEST.json";
-pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, MemoryError>;  // 恢复后可继续写
-// MemoryError 增一臂：Bundle { op, detail }——I/O 正常但不是一座城（目的地已占、清单对不上、链有缺口）
+pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, StorageError>;  // 恢复后可继续写
+// StorageError 增一臂：Bundle { op, detail }——I/O 正常但不是一座城（目的地已占、清单对不上、链有缺口）
 // Vfs 内缝增 `list_dirs`：两个适配器同改；list 与 list_dirs 都是浅层，遍树用显式工作表（不递归，栈溢出接不住）
 ```
 
@@ -797,7 +797,7 @@ pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, MemoryErr
 - **为何是目录而非单文件**：单文件要么自造容器格式（多一个要养的格式），要么引 tar／zip 依赖。目录两者都不要，且任何备份工具都能再打包一层——压缩不是本模块的职责。
 - **清单是完整性的依据**：`MANIFEST.json` 记下记录数、链头哈希、CAS 对象数与文件数；`restore` 恢复后重算并比对。不对即拒，而不是“恢复了但少了几条”——后者是历史失真。
 - **四个数由 `Manifest::of(vfs, ledger_dir, cas_dir, files_root)` 一处算出**：导出量目的地、恢复量城本身、比较的两侧因此是同一种测量。
-- **清单也数随行的历史：`history_packs` 与 `history_refs`**，由 `history::Carried::of(vfs, bundle)` 一处量出 bundle 的 `history/` 里有几个包、几条引用。导出端量目的地写进清单；恢复端在复制任何东西之前量 bundle 本身再比，不等即整次拒绝（`MemoryError::Bundle { op: "restore" }`）——删掉包的 bundle 若照常恢复，文件与账本已落、引用却指向不存在的对象，全成或全不成就破了。清单没有这两个键时读作 0：v0.0.6 的导出不写 `history/`，于是一份被剥掉这两个键、却仍带 `history/` 的 bundle 照样被拒。被否：恢复后再从新仓库反查（那时城文件已经落下，拒绝只能留下半座城）。
+- **清单也数随行的历史：`history_packs` 与 `history_refs`**，由 `history::Carried::of(vfs, bundle)` 一处量出 bundle 的 `history/` 里有几个包、几条引用。导出端量目的地写进清单；恢复端在复制任何东西之前量 bundle 本身再比，不等即整次拒绝（`StorageError::Bundle { op: "restore" }`）——删掉包的 bundle 若照常恢复，文件与账本已落、引用却指向不存在的对象，全成或全不成就破了。清单没有这两个键时读作 0：v0.0.6 的导出不写 `history/`，于是一份被剥掉这两个键、却仍带 `history/` 的 bundle 照样被拒。被否：恢复后再从新仓库反查（那时城文件已经落下，拒绝只能留下半座城）。
   `walk` 返回 `Result`：不存在的目录算空（尚无 CAS 的城），读不动的目录停下并带路径上报——一个子目录静默贡献零个文件，正是一份短了的备份与它自己的清单相符的来路。
   `restore` 比四个字段而不是两个：丢了 CAS 对象的 bundle 链校全绿、Locator 全部指空，只有对象数说得出这件事。
 - **清单的四个数全部读自导出结果，因而不能自证**：一次把半座城丢掉的拷贝与它自己的清单完全相符。故 `export` **另取源侧的五个数**——账本文件数、CAS 对象数、城内文件数、账本记录数、链头——与目的地逐项比，任一项不等即拒。源侧的数从 `copy_tree`／`copy_city_files` 的返回值来。
@@ -805,14 +805,14 @@ pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, MemoryErr
 - **文件顺序确定**：遍历走 `Vfs::list`（已排序），清单用 BTreeMap；同一座城导两次，`MANIFEST.json` 逐字节相同。
 - `Vfs::append` 是**追加**，残留 `.part` 未清即发布出「残骸＋新内容」的拼接体；修法取 cas 既有两层纪律（open 清扫 tmp 残骸＋put 前 `truncate(0)`）而非另立新机制。`invalidate` 对不存在项不报错（末态即调用者所求），载荷携 `existed` 实报。
 - **什么算城里的文件：`travels` 一个家（形状 1 判定）。** 导出端与恢复端问同一个谓词：根层 `.sprawling`（其内容经 ledger／cas 两张门各走各的）与任何深度的 `.git`（受保护元数据，写下即提权）不算城文件；楼自己的 `.sprawling`（`RULES.toml` 等治理字节）**随行**，它是城的一部分。名字引自 kernel 的名单（12.3 定规），不重拼字符串。两侧的策略不同且必须不同：导出端**跳过**（选择带走什么，源城里的簿记本来就不走），恢复端**拒绝**（全成或全拒——一份夹带 `.git` 的 bundle 是伪造品，恢复它就是在落 hooks）。
-- **git 历史随行（`bundle::history`，形状 4 适配器；git2）。** 城根若是 git 仓库，`export` 用 `git2::PackBuilder` 把每条引用所达的全部对象（沿 revwalk 的提交与树，外加每个引用目标的递归闭包，覆盖附注标签）打成 `history/history.pack`，把引用写成 `history/refs`（每行 `<oid> <name>` 或 `ref:<target> <name>`，`HEAD` 在内）；城根不是仓库时 bundle 没有 `history/`，恢复端也不建仓库。`restore` 在复制任何东西之前拒绝已有 `.git` 的城根（`MemoryError::Bundle { op: "restore" }`），复制后 `git2::Repository::init` 一个新仓库，经 `Odb::packwriter` 写入包（libgit2 边写边建索引并校验每个对象），再逐条立引用、按 `HEAD` 读出树写入索引，使 `git status` 只报导出时未提交的改动。**`hooks/` 与 `config` 永不复制**：bundle 里只有包与引用两样，仓库的配置与钩子来自新 init，于是一份伪造的 bundle 没有落钩子的路。引用名只收 `HEAD` 与 `refs/` 之下、且过 `git2::Reference::is_valid_name` 的名字，其余整次拒绝。被否：直接复制 `.git` 目录（会带上 hooks 与 config，正是 8-12 要拒的东西）；`git bundle` 子进程（引外部二进制，且 bundle 格式的解析不在本进程的校验之内）。
+- **git 历史随行（`bundle::history`，形状 4 适配器；git2）。** 城根若是 git 仓库，`export` 用 `git2::PackBuilder` 把每条引用所达的全部对象（沿 revwalk 的提交与树，外加每个引用目标的递归闭包，覆盖附注标签）打成 `history/history.pack`，把引用写成 `history/refs`（每行 `<oid> <name>` 或 `ref:<target> <name>`，`HEAD` 在内）；城根不是仓库时 bundle 没有 `history/`，恢复端也不建仓库。`restore` 在复制任何东西之前拒绝已有 `.git` 的城根（`StorageError::Bundle { op: "restore" }`），复制后 `git2::Repository::init` 一个新仓库，经 `Odb::packwriter` 写入包（libgit2 边写边建索引并校验每个对象），再逐条立引用、按 `HEAD` 读出树写入索引，使 `git status` 只报导出时未提交的改动。**`hooks/` 与 `config` 永不复制**：bundle 里只有包与引用两样，仓库的配置与钩子来自新 init，于是一份伪造的 bundle 没有落钩子的路。引用名只收 `HEAD` 与 `refs/` 之下、且过 `git2::Reference::is_valid_name` 的名字，其余整次拒绝。被否：直接复制 `.git` 目录（会带上 hooks 与 config，正是 8-12 要拒的东西）；`git bundle` 子进程（引外部二进制，且 bundle 格式的解析不在本进程的校验之内）。
 - **v0.0.6 的 bundle 导入其仓库而不是整体拒绝。** v0.0.6 的导出把城根的 `.git` 整个复制进 `city/.git`，清单的 `files` 也数了它的文件。恢复端见到 `city/.git` 是目录、而 bundle 没有 `history/` 时，把它当作一份旧式历史：以 `git2::Repository::open_bare` 只读打开，按导出端同一段打包逻辑（同一个引用名准入）得到包与引用，再走同一个 `History::land`；`city/.git` 下的文件既不拒也不复制，清单的 `files` 减去它们的个数再比。`hooks/` 与 `config` 依旧只来自新 init。仍整次拒绝：`history/` 与 `city/.git` 同在（v0.0.7 的导出从不写后者，二者同在即伪造）、`city/.git` 不是能打开的仓库、`city/.git/objects/info/alternates` 或 `city/.git/commondir` 存在（`open_bare` 会顺着前者把 bundle 之外任一仓库的对象读进包，顺着后者把 `objects`、`refs` 与 `packed-refs` 整个换成它所写路径下的那一份，伪造的 bundle 借此把 bundle 之外的对象与引用带进新城；v0.0.6 的导出从不写二者，因为城根的仓库既不借用别处的对象库，也不是别处仓库的 worktree），以及任何更深处的 `.git`（那是别的仓库，导入它不在本契约内）。被否：继续整体拒绝（v0.0.6 用户的备份因此恢复不了，而其中的对象与引用正是本节已有的导入路径能安全接住的）。
 - **别名永不落盘（8-25）。** `walk` 见到任一链接拒绝整次操作；bundle 的每一次落盘只走 `bundle::landing::land`（形状 4 适配器）：它按值收下 `alias::WriteTarget`，让清过的目标被消费而不是查完即丢。bundle 的目标由 `WriteTarget::within(op, root, path)` 清出：`root` 是人给的根（导出时是 bundle 目录，恢复时是城根），只查 `path` 与它和 `root` 之间的每一级目录，不查 `root` 本身及其上——城根放在哪里是人选的，`/home` 指向 `var/home`、macOS 的 `$TMPDIR` 经 `/var` 这样的链接不是 run 能造出来的写路径。不在 `root` 之下的路径退回到查到文件系统根，所以界只会放宽人选的那一段。被否：沿用 `WriteTarget::at` 查到文件系统根（城只要放在链接下面，导出与恢复就整次失败）。runtime 的 edit 工具同一条理由：它以城根为界调 `within`，因为 macOS 的临时目录都在 `/var` 这个链接之下，查到文件系统根的写门在那里拒绝每一次编辑（`crates/runtime/src/tools/edit/tests.rs` 里放在链接下面的城那一条）。字节先写同目录的暂存文件 `.<name>.part`（这个拼写只在 `landing` 定义一处；导出不把合这个拼写的名字当城文件带走，因为恢复中途崩溃会把暂存文件留在城根下）、`sync_data`，再把原权限抄到暂存文件上，最后 `rename` 覆盖并 `sync_dir`。原权限按 `landing::Bits` 取：复制城文件时取源文件的（可执行位、只读位随文件走，导出再恢复后不丢），写清单与历史时取被覆盖文件的（没有就用新建默认值）。`rename` 换的是目录项，所以硬链接臂同样由此保证，且不存在「名已删、字节未落」的丢文件窗口。权限在 `sync_data` 之后才抄：只读位一旦落上，Windows 不再允许以写句柄打开该文件。被否：写前移除该名再建（失败即丢文件，且按 umask 新建，丢可执行位）；就地截断重写（写穿硬链接，崩溃留半个文件）。链接臂是拒绝不是跳过——对照组的 “skipped N files” 就是宽容部分还原。悬空链接在列举中不可见（`is_file`／`is_dir` 走不到它），但落盘必须先过 `WriteTarget`，故恒拒仍然成立。
 
-### 8-14 memory::error（形状 2 值）
+### 8-14 storage::error（形状 2 值）
 
 ```rust
-pub enum MemoryError {                      // thiserror；crate 根
+pub enum StorageError {                      // thiserror；crate 根
     Io { op: &'static str, path: PathBuf, source: io::Error },
     VersionAhead { path: PathBuf, v: u64 }, // 方向感知拒绝的机器面
     Envelope { path: PathBuf, line: u64, source: AxError },  // 段中损坏（断尾候选之外）
@@ -827,16 +827,16 @@ pub enum MemoryError {                      // thiserror；crate 根
     ChainHalted { source: AxError },        // 全链审计发现断链，写者停止接新行（8-27）；码取审计自己的 source
     Snapshot { op: &'static str, path: PathBuf, source: io::Error },  // 快照读写被盘拒绝（8-26）→ E_STORAGE_FATAL，恢复说的是快照
 }
-impl MemoryError { pub fn into_ax(self) -> AxError; }   // 跨 crate 边界的唯一出口
-pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) -> MemoryError;
+impl StorageError { pub fn into_ax(self) -> AxError; }   // 跨 crate 边界的唯一出口
+pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) -> StorageError;
 ```
 
 - **为什么是独立模块**：见 §7，全 crate 的模块都用它。
-- **为什么带着 `io_err` 走**：它是 `MemoryError::Io` 的构造子，而一个值的构造子与它的定义同住。四个模块（cas／bundle／digest_cache／index）只为取它而 import jsonl，那是一条指错了方向的依赖。
+- **为什么带着 `io_err` 走**：它是 `StorageError::Io` 的构造子，而一个值的构造子与它的定义同住。四个模块（cas／bundle／digest_cache／index）只为取它而 import jsonl，那是一条指错了方向的依赖。
 - **快照的 I/O 失败有自己的变体**：`Io` 的恢复建议说的是账本（停机，重开会截掉撕裂的尾巴），对快照是错的——快照是账本随时能重建的缓存。`Snapshot` 与 `Io` 同码（盘拒绝了写，多半账本也写不进），恢复则说：删掉这份快照、腾出盘，下次启动从创世折叠。被否：让 `Io` 的恢复按 `op` 分支——一个变体两种建议，读恢复的人得先知道 `op` 的全集。
-- **公开名是 `memory::MemoryError`**（`lib.rs` 重导出）：模块住处不进公共面，api-baseline 不随它动。
+- **公开名是 `storage::StorageError`**（`lib.rs` 重导出）：模块住处不进公共面，api-baseline 不随它动。
 
-### 8-15 memory::vfs（形状 3 端口）
+### 8-15 storage::vfs（形状 3 端口）
 
 ```rust
 pub(crate) trait Vfs {                      // 内缝：不出对外接口，不升真缝
@@ -873,7 +873,7 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
   - **`index` 不在例外之列**：`LedgerIndex` 持 `Box<dyn Vfs>`，段列举、段长、整段读（建表）与尾部增量读（刷新）全部经缝，
     而它没有一步是写；按 seq 取行走 `LineReader`，那正是上一条的例外。
 
-### 8-16 memory::real_fs（形状 4 适配器）
+### 8-16 storage::real_fs（形状 4 适配器）
 
 ```rust
 pub(crate) struct RealFs { open: Option<OpenAppend> }   // std::fs 直译，零策略
@@ -898,7 +898,7 @@ impl Vfs for RealFs { … }
 
 1. 行终止符恒 `\n`（含末行）；chain_hash 对不含 `\n` 的行字节计算（kernel-SPEC §8-9）。`.gitattributes` 的 `* text=auto eol=lf` 令索引与每个平台的检出都是 LF，夹具字节因此跨平台一致。
 2. open 的段校验用 `EventRecord::parse_line`＋`chain_hash` 复算，无独立解析器（一个权威）。
-3. 段内偏移不建索引（memory::index 的事）；`read_raw_lines` 全量读，消费者只有 replay/夹具/conformance。
+3. 段内偏移不建索引（storage::index 的事）；`read_raw_lines` 全量读，消费者只有 replay/夹具/conformance。
 4. `list` 排序返回＋段名零填宽度 20：字典序＝数值序，跨平台遍历确定。
 5. `truncate` 后同步；整段截空直接 `remove_file`，重开容忍残留空段文件（崩溃窗口的两态都可解析，比 rename 舞步少一个中间态）。另：最后一段首行即损坏且仅此一段时，截至 0 字节＝回到新 Ledger（append 未曾返回 Ok 即无可观察效果）；非尾段损坏才是 Envelope 错误。
 6. FaultFs 的 io::Error 用 `ErrorKind::Other`＋自述文本；jsonl/cas 对错误只透传包裹为 `Io{op,path}`，不吞不换。
@@ -915,7 +915,7 @@ impl Vfs for RealFs { … }
 - `CasMissing`→`E_PATH_NOT_FOUND`：不可定义掉——Locator 是跨会话引用，对象可被更早的介质事故清除；nearby 给同前缀既存对象。
 - `RangeOutOfBounds`→`E_INVALID_ARGS`：可部分定义掉——`Range` 构造已保 `from<=to`；对象长度只在读时可知，读时校验是剩余的不可消部分。
 - `Io`→`E_STORAGE_FATAL`（宁停不脏路径；不可定义掉——介质失败在设计边界外）。
-- `WorktreeBusy`→`E_WORKTREE_BUSY`：可定义掉但尚未做——当「领节点」本身变成取租约（`memory::queue` 已有队列），busy 就从错误变成排队。它同时承担「该节点的树被占」与「再开一棵就越上限」两个情形：两者的可执行替代同为「先归还一棵」，而区分它们的是 subject 不是码。
+- `WorktreeBusy`→`E_WORKTREE_BUSY`：可定义掉但尚未做——当「领节点」本身变成取租约（`storage::queue` 已有队列），busy 就从错误变成排队。它同时承担「该节点的树被占」与「再开一棵就越上限」两个情形：两者的可执行替代同为「先归还一棵」，而区分它们的是 subject 不是码。
 - `MergeStale`→`E_VERSION_CONFLICT`：不可定义掉——两个节点同时开工就会有一个后到；能定义掉的那部分（“合到一半失败”）已由 fast-forward 判定在动手之前定义掉。
 - `MergeWouldDiscard`→`E_VERSION_CONFLICT`：不可定义掉——人的未提交改动在城市目录里，机器无权决定它与节点的活谁留下；能定义掉的「静默覆盖」已由 SAFE 检出定义掉。
 - `Worktree`→`E_STORAGE_FATAL`：不可定义掉——仓库与文件系统是外部世界；能定义掉的那部分（名字走出目录）已由 `WorktreeName` 在构造点定义掉。
@@ -923,7 +923,7 @@ impl Vfs for RealFs { … }
 - `LedgerBroken`→`E_STORAGE_FATAL`：不可定义掉——写与 sync 的失败来自介质；能定义掉的那部分（失败之后再写的一波被下次 open 截掉，却已答了 `Ok`）已由 `Barrier` 定义掉。recovery 是修好盘之后重启，由 open 修段尾。
 - `Envelope`→`E_LOG_VERSION_UNSUPPORTED` 同族拒读（段中损坏非尾部＝不可自动修复，指出路径交人决定）。
 - `LedgerHeld`→`E_LEDGER_HELD`（装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各跑一次 `up`／`serve`／`resume`）。能定义掉的那部分已经定义掉：锁先于一切读写，被拒的一方不会先写下任何东西。recovery 说明持锁的是另一个 sprawling 进程，以及怎样停下它。
-  锁路径的权威是 jsonl：`WriterLock::take` 从账本目录自己推出同级的 `<目录名>.lock`，不问 `CityLayout`。原因：会话切片路径只有 `memory::sessions` 一个权威，而从账本目录反推城根是 `of_ledger` 的活；另一种做法——由调用方传入锁路径——要改 `open` 的签名和它的每个调用方，却只换来同一个文件名。代价是夹具、bench、fuzz 的账本目录也各多一个锁文件，而「一个目录一个写者」对它们同样成立。
+  锁路径的权威是 jsonl：`WriterLock::take` 从账本目录自己推出同级的 `<目录名>.lock`，不问 `CityLayout`。原因：会话切片路径只有 `storage::sessions` 一个权威，而从账本目录反推城根是 `of_ledger` 的活；另一种做法——由调用方传入锁路径——要改 `open` 的签名和它的每个调用方，却只换来同一个文件名。代价是夹具、bench、fuzz 的账本目录也各多一个锁文件，而「一个目录一个写者」对它们同样成立。
 
 ## 13 依赖选型
 
@@ -947,7 +947,7 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 
 零字节：本 crate 恒不进 prefix；模型可见面只有经 tool_result 携带的 AxError（如 E_CAS_CORRUPT 的 three-part 拒绝），其余全部是落盘内部事务。
 
-### 8-19 memory::hunks：一个文件的补丁文本（形状 4 adapter）
+### 8-19 storage::hunks：一个文件的补丁文本（形状 4 adapter）
 
 ```rust
 pub struct PatchLine { pub number: u32, pub text: String }
@@ -955,10 +955,10 @@ pub struct Withheld  { pub number: u32, pub reason: String }
 pub struct FilePatch { pub lines: Vec<PatchLine>, pub withheld: Vec<Withheld> }
 
 pub fn of_file(city_root: &Path, base: GitOid, head: Head, path: &str)
-    -> Result<FilePatch, MemoryError>;
+    -> Result<FilePatch, StorageError>;
 ```
 
-**补丁文本是 `memory::changes` 之外的一次独立请求。** `memory::changes` 只计数、不搬补丁文本；一段补丁必须是它自己的一次请求，经同一次扫描作答。本模块就是那次请求，逐字兑现它开出的三个条件：
+**补丁文本是 `storage::changes` 之外的一次独立请求。** `storage::changes` 只计数、不搬补丁文本；一段补丁必须是它自己的一次请求，经同一次扫描作答。本模块就是那次请求，逐字兑现它开出的三个条件：
 
 1. **一次一个文件**，`path` 必填，没有「整批补丁」这个形状。理由是代价：`changes` 的代价与改动文件数同阶，本函数与一个文件的大小同阶，合成一个答会让「这次改了哪些文件」付上整批补丁的钱。
 2. **同一次凭证判定**，不是第二份。`checkpoint::scan_staged` 用 `kernel::scan` 判一个 staged blob，本模块判每一行补丁文本用的是同一个函数。命中的行**不回显**，只报行号与命中原因（provider 名，或熵判定）——理由与 `scan_staged` 对自己的命中说的同一句：把字节打出来以证明泄漏，本身就是泄漏。
@@ -973,13 +973,13 @@ pub fn of_file(city_root: &Path, base: GitOid, head: Head, path: &str)
 
 **一条断言守着它**：`a_change_made_before_a_restart_is_still_read_after_it`——立城、fence 一次、写入一份带凭证的文件、丢掉 handle、重开 `Checkpoint`、再 fence，第二次 fence 必须以 `SecretEgress` 拒绝并报出路径而不回显字节。**翻案条件**：哪一天有一条路径能在不经扫描的情况下移动 HEAD（今天 `ensure_base`／`land` 都先扫后提交，合并提交用的是节点已扫过的树），这条推理的前提就没了，届时基准必须改回记住的 fence。
 
-### 8-21 `bundle` 的城夹具住一处（`memory::bundle::fixture`）
+### 8-21 `bundle` 的城夹具住一处（`storage::bundle::fixture`）
 
 `city_with(records, root)`——立一座有 N 条记录的城、写两个文件、开一次 CAS——在 `bundle/export.rs`、`bundle/files.rs`、`bundle/manifest.rs` 的测试模块里**逐字节重复三遍**。三份拷贝就是三个「一座城长什么样」的权威：改其中一份，另外两份的断言仍在对着旧形状作证。
 
 **一个夹具一处**：`crates/memory/src/bundle/fixture.rs`，`#[cfg(test)]` 编译，由 `bundle.rs` 以 `#[cfg(test)] mod fixture;` 挂上，三个测试模块 `use super::super::fixture::city_with;`。形状 4 适配器（它造的是被测代码之外的一个真实环境）。**不放进 `bundle.rs` 自身**：索引文件不持逻辑，而夹具是逻辑。
 
-### 8-22 `memory::status`：还没被栅栏收走的那些改动，以及仓库此刻站在哪
+### 8-22 `storage::status`：还没被栅栏收走的那些改动，以及仓库此刻站在哪
 
 `between` 比的是调用方已经握着的两个点，答不出仓库自己站在哪：哪个分支被检出、它有没有上游、它跑出上游多远——这三件是人在问「哪些文件动了」之前先问的。
 
@@ -988,7 +988,7 @@ pub struct Drift { pub ahead: u64, pub behind: u64 }
 pub struct WorkingStatus { pub branch: Option<String>, pub drift: Option<Drift>,
                            pub files: Vec<FileChange> }
 pub fn working_status(city_root: &Path, scope: Option<&str>, base: Option<GitOid>)
-    -> Result<WorkingStatus, MemoryError>;
+    -> Result<WorkingStatus, StorageError>;
 ```
 
 **四条口径：**
@@ -998,7 +998,7 @@ pub fn working_status(city_root: &Path, scope: Option<&str>, base: Option<GitOid
 3. **`scope` 是一条 pathspec 而不是事后过滤。** 楼页问的是它自己那些文件，让 git 在走差异时就收窄，比走完全城再筛一遍少一趟盘。
 4. **`drift` 整个可缺席。** 没有上游、上游被删、以及处在游离头上，对读者而言是同一件可做的事（没有可比的对象），而与「和上游齐平」不是一回事。
 
-### 8-23 `memory::cas::ranges`：Locator 范围文法住一处（形状 4 适配器）
+### 8-23 `storage::cas::ranges`：Locator 范围文法住一处（形状 4 适配器）
 
 `get_range` 的文法——`B` 0 起闭区间、`L` 1 起闭区间、行间 `\n` 保留、末行终止符不返回、越界拒不夹取——是一套读法，不是 CAS 的存取。它因此住 `crates/memory/src/cas/ranges.rs`，`Cas::get_range` 只解析对象路径、判定存在，再把 `&dyn Vfs` 与路径交给 `of_object`。
 
@@ -1006,13 +1006,13 @@ pub fn working_status(city_root: &Path, scope: Option<&str>, base: Option<GitOid
 
 **这套文法没有第二个家**：`Cas::get` 仍是唯一会复算 BLAKE3 的读法，`ranges` 一次也不哈希。两条断言守着这件事——`byte_and_line_ranges_follow_locator_semantics` 守文法，`a_range_read_lifts_the_range_rather_than_the_object` 守代价（用 `FaultFs::bytes_read()` 数字节：一个五字节范围移动的字节数必须以十计，而不是以对象长度计）。
 
-### 8-24 `memory::sessions`：账本投影到各楼的 sessions（形状 7 投影）
+### 8-24 `storage::sessions`：账本投影到各楼的 sessions（形状 7 投影）
 
 ```rust
 pub(crate) struct Sessions { /* layout、ledger、vfs、open、first_seen —— 私有 */ }
 impl Sessions {
     pub(crate) fn for_ledger(ledger_dir: &Path) -> Option<Sessions>;   // 非城账本 → None
-    pub(crate) fn absorb(&mut self, record: &EventRecord) -> Result<(), MemoryError>;
+    pub(crate) fn absorb(&mut self, record: &EventRecord) -> Result<(), StorageError>;
 }
 pub(crate) const SLICE_MAGIC: &str = "slices v1";
 ```
@@ -1027,23 +1027,23 @@ pub(crate) const SLICE_MAGIC: &str = "slices v1";
 
 **重建逐字节相同。** 每一行都是账本 `canonical_line` 的副本，头部由内容决定（首条记录的 seq），所以删掉整个 `sessions/` 再放一遍得到同样的字节——`deleting_the_sessions_directory_and_replaying_the_ledger_restores_the_bytes` 钉住它。
 
-**产品不读它做判断。** 它只给人的眼睛与城外 agent 的 `read`；`runtime` 的 `read` 工具照旧拒绝 `.sprawling`，城里别的模块连它的路径都拼不出（路径推导是 `memory::sessions` 的私有项）。
+**产品不读它做判断。** 它只给人的眼睛与城外 agent 的 `read`；`runtime` 的 `read` 工具照旧拒绝 `.sprawling`，城里别的模块连它的路径都拼不出（路径推导是 `storage::sessions` 的私有项）。
 
 **自带的 `RealFs`，不借账本那条缝。** `RealFs` 同一时刻只持一个追加句柄，写投影会把账本的热句柄挤掉；投影可弃，不该让主干为它付句柄开销。代价是投影不参与 `FaultFs` 的断电模型：断电后它可能落后，下一次 attach 补齐，这正是它可重建的含义。
 
 **没有第二份 session 索引。** 「全城有哪些 session」走目录遍历；切片在追加时写，写者当场就知道 room 地址，索引只会在两者之间造出一个可失效的家。
 
-### 8-25 `memory::alias`：别名族与被清空的写目标（形状 2 值）
+### 8-25 `storage::alias`：别名族与被清空的写目标（形状 2 值）
 
 ```rust
 pub enum AliasKind { Link, HardLink }   // Link＝symlink 与 junction（Win32 重解析点族）
 pub struct WriteTarget(PathBuf);        // 字段私有；构造点是 at 与 within
 impl WriteTarget {
-    pub fn at(op: &'static str, path: &Path) -> Result<WriteTarget, MemoryError>;   // 查目标与每一级父目录
-    pub fn within(op: &'static str, root: &Path, path: &Path) -> Result<WriteTarget, MemoryError>;  // 只查到 root 为止；bundle 与 runtime 的 edit 工具用它
+    pub fn at(op: &'static str, path: &Path) -> Result<WriteTarget, StorageError>;   // 查目标与每一级父目录
+    pub fn within(op: &'static str, root: &Path, path: &Path) -> Result<WriteTarget, StorageError>;  // 只查到 root 为止；bundle 与 runtime 的 edit 工具用它
     pub fn as_path(&self) -> &Path;
 }
-pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, MemoryError>;   // 叶级分类，walk 用
+pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, StorageError>;   // 叶级分类，walk 用
 ```
 
 - **别名族全不穿透（junction／symlink／硬链接）。** junction 与 symlink 都是重解析点、`file_type().is_symlink()` 对两者同真，故合为 `Link`，在每一扇门**字面拒绝**。硬链接在 Unix 由 `nlink>1` 判定、同样字面拒绝；在 Windows 稳定版 `std` 读不到链接计数（§3.5），由**写入恒落新 entry** 的落盘纪律兜住：`bundle::landing::land` 把同目录的暂存文件 `rename` 覆盖该名，`runtime::tools::edit` 写前移除该名再建；两者都换掉目录项，其它名字保有旧字节，穿透在结构上不可能。**被否：跳过并报数**（对照组 “skipped N files”）——部分落盘破坏全成/全拒，且一行计数无法让重放方复现跳过了哪几个。
@@ -1051,7 +1051,7 @@ pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, MemoryError>;   
 - **消费面是三个写域加一个工具写面**：checkpoint 暂存回调（8-8）、bundle 的 `landing::land`（8-12；`worktree::back::restore_file` 也经它落盘，8-27）、worktree 放置，加上 `runtime::tools::edit` 的物理写入（运行的写域）——经链接写保留路径在每一扇门恒拒。
 - **proptest 族「别名永不落盘」**：对别名种类 × 目标（受保护／普通）× 落点（名上／父目录）的组合，凡该平台造得出的别名（junction 无需特权即可创建；symlink 需特权；硬链接随处可造）：链接臂与 Unix 硬链接臂写入被拒，Windows 硬链接臂写入落新 entry；各臂同一断言——目标字节不变、别名带不出新字节；该平台造不出的退化为断言「放置失败时盘上无任何变化」，各臂同性质。
 
-### 8-26 `memory::snapshot`：链哈希快照（形状 7 投影）
+### 8-26 `storage::snapshot`：链哈希快照（形状 7 投影）
 
 ```rust
 pub struct ChainSnapshot { /* fold_version, seq, line_hash, views：字段私有 */ }
@@ -1065,22 +1065,22 @@ impl ChainSnapshot {
 }
 pub enum SnapshotFit { Fits, Stale }
 pub enum StoredSnapshot { Absent, Damaged(String), Present(ChainSnapshot) }
-pub fn write_snapshot(dir: &Path, snapshot: &ChainSnapshot) -> Result<(), MemoryError>;
-pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, MemoryError>;
+pub fn write_snapshot(dir: &Path, snapshot: &ChainSnapshot) -> Result<(), StorageError>;
+pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, StorageError>;
 ```
 
-- **快照是投影，不是历史。** 它放在 `<city>/.sprawling/snapshot/`，内容是 `(fold_version, seq, line_hash, views_bytes)`：折叠在第 `seq` 行之后持有的状态，连同那一行的链哈希。删掉它，城照样起得来，只是回到全量折叠；所以文件损坏（魔数不对、长度不够、体摘要不符）读成 `Damaged(原因)` 交给调用方丢弃，只有 I/O 本身失败才是 `MemoryError`。
+- **快照是投影，不是历史。** 它放在 `<city>/.sprawling/snapshot/`，内容是 `(fold_version, seq, line_hash, views_bytes)`：折叠在第 `seq` 行之后持有的状态，连同那一行的链哈希。删掉它，城照样起得来，只是回到全量折叠；所以文件损坏（魔数不对、长度不够、体摘要不符）读成 `Damaged(原因)` 交给调用方丢弃，只有 I/O 本身失败才是 `StorageError`。
 - **文件格式**：`SPRSNAP1` 八字节魔数｜`fold_version` u32 LE｜`seq` u64 LE｜`line_hash` 32 字节｜`views` 的 blake3 32 字节｜`views` 到文件尾。体摘要让位翻转读成 `Damaged` 而不是一份错的视图；写入走「临时文件 → sync → rename → sync 目录」，所以撕裂的写不会留下半个快照。
 - **核对只看一行。** 启动时按 `seq` 做一次定位读，`fit` 比较那一行的 `chain_hash` 与 `line_hash`：相等时，在摘要单射的前提下（`adversary` 的 `Sprawling.Chain` 持有这条假设），快照所折的行就是盘上账本的前缀；`Stale` 时调用方丢弃快照，全量折叠。`fold_version` 不等同样丢弃：折叠规则变了，旧状态不再是新规则折出来的。
 - **「快照加尾部 ≡ 全量折叠」** 由 `adversary/src/Sprawling/Snapshot.lean` 对任意折叠、任意切点证明（`snapshotPlusTailIsWhole`、`resumeIsWhole`）；Rust 侧由 proptest 在随机账本与随机切点上持有同一性质，折叠取链检查本身：从 `resume()` 出发走尾部，接受的行与终态都等于从创世走全程。
 - **被否：只存 `seq` 不存 `line_hash`。** 账本被换成另一条同长的链时，只比 `seq` 会把别人的视图接到这条链的尾部上；多 32 字节换来的是一次定位读就能拒绝。
 - `Views` 从这里起步并由服务起步时切快照（sprawling-SPEC 8-91）；`Standing` 仍从创世折叠。
 
-### 8-27 `memory::chain_audit`：全链审计与写者停机（形状 7 投影：把整条链折成一个判定）
+### 8-27 `storage::chain_audit`：全链审计与写者停机（形状 7 投影：把整条链折成一个判定）
 
 ```rust
 pub enum ChainAudit { Whole { lines: u64 }, Broken(AxError) }
-pub fn audit_chain(dir: &Path) -> Result<ChainAudit, MemoryError>;   // 只读，从创世走到最后一个完整行
+pub fn audit_chain(dir: &Path) -> Result<ChainAudit, StorageError>;   // 只读，从创世走到最后一个完整行
 #[derive(Clone, Default)]
 pub struct ChainHalt { /* Arc<OnceLock<AxError>> */ }
 impl ChainHalt {
@@ -1091,13 +1091,13 @@ impl JsonlLedger { pub fn halt_on(&mut self, halt: ChainHalt); }
 ```
 
 - **按段流式，一次只持一行。** `audit_chain` 按 `ledger_segments_at` 的顺序逐段打开，用一个复用的行缓冲逐行喂给 `LineCheck`（8-1 的同一个逐行检查，没有第二份规则），所以内存与账本长度无关；文件末尾没有 `
-` 的撕裂字节不是一行，留给 `open` 判（与 `read_raw_lines_at` 同一口径）。第一行不过就停，答 `Broken(fault.into_ax(行号))`：原因、行号与恢复办法都是人读得懂的，页面把它原样作为诊断显示。I/O 本身失败才是 `MemoryError`。
-- **审计是查询，停机是命令。** `audit_chain` 不改任何状态；调用方（后台线程，唯一的起点在 `bin::assembly`）拿到 `Broken`、或审计没读完（`MemoryError`）时调 `ChainHalt::trip`：从快照起步的视图只有这次审计会看快照之前的行，没被证明的链与断链一样不能再往后写。停机值在写者与视图之间共享：写者经 `halt_on` 接上同一个值，之后每次 `append_all` 在组帧之前先问它，已跳闸就返回 `MemoryError::ChainHalted`，`into_ax` 原样交出那条审计原因，所以被拒的写与页面诊断说的是同一句话。
+` 的撕裂字节不是一行，留给 `open` 判（与 `read_raw_lines_at` 同一口径）。第一行不过就停，答 `Broken(fault.into_ax(行号))`：原因、行号与恢复办法都是人读得懂的，页面把它原样作为诊断显示。I/O 本身失败才是 `StorageError`。
+- **审计是查询，停机是命令。** `audit_chain` 不改任何状态；调用方（后台线程，唯一的起点在 `bin::assembly`）拿到 `Broken`、或审计没读完（`StorageError`）时调 `ChainHalt::trip`：从快照起步的视图只有这次审计会看快照之前的行，没被证明的链与断链一样不能再往后写。停机值在写者与视图之间共享：写者经 `halt_on` 接上同一个值，之后每次 `append_all` 在组帧之前先问它，已跳闸就返回 `StorageError::ChainHalted`，`into_ax` 原样交出那条审计原因，所以被拒的写与页面诊断说的是同一句话。
 - **只能跳闸，不能复位。** `OnceLock` 让「停机后又恢复写」在类型上不可表达：链断了，接在断链后面的每一行都是在错的历史上写的；复位要人修好账本后重开这座城，那时是一个新的 `ChainHalt`。**被否：`AtomicBool`**——它能被写回 `false`，而且带不出原因。
 - **被否：审计一失败就 panic 退出进程。** 进程没了，页面也就收不到原因；停写不停读，人还能看见城停在哪、为什么停。
 - 服务中的城由 `bin::assembly::chain_watch`（sprawling-SPEC 8-90）起这条后台线程并接上停机值；视图只折写者写下的记录，所以不另接停机值。
 
-### 8-28 `memory::snapshot::start`：从快照起步还是从创世起步（形状 7 投影：决定折叠从哪一行起）
+### 8-28 `storage::snapshot::start`：从快照起步还是从创世起步（形状 7 投影：决定折叠从哪一行起）
 
 ```rust
 pub enum SnapshotStart {
@@ -1105,22 +1105,22 @@ pub enum SnapshotStart {
     Whole { lines: Vec<Vec<u8>>, because: WholeFold },         // 从创世折全部完整行，并说明为什么没用快照
 }
 pub enum WholeFold { NoSnapshot, Damaged(String), OtherFoldVersion { found: u32 }, Stale, Missing }
-pub fn start_from_snapshot(ledger_dir: &Path, snapshot_dir: &Path, fold_version: u32) -> Result<SnapshotStart, MemoryError>;
+pub fn start_from_snapshot(ledger_dir: &Path, snapshot_dir: &Path, fold_version: u32) -> Result<SnapshotStart, StorageError>;
 ```
 
 - **一次读既核对又取尾部。** 快照的 `seq` 按段名（`segment_first_seq`）定位到含它的那一段：它之前的段一个字节也不读；从这一段起逐段取完整行，第 `seq - 段首 seq` 行交给 `ChainSnapshot::fit`，它之后的行就是尾部。所以起步的读量是「尾部加一段的前缀」，与账本总长无关；整条链的核对留给后台的 `audit_chain`（8-27）。
-- **不能用快照时一律退回全量折叠，并带上原因。** 没有快照（`NoSnapshot`）、字节不是快照（`Damaged`，原样带出 8-26 的原因）、`fold_version` 不等（`OtherFoldVersion`）、那一行的链哈希不同（`Stale`）、账本里根本没有那一行（`Missing`，账本比快照短）——都是 `Whole`，行取自 `read_raw_lines_at`，与没有快照时的起步完全相同。原因给调用方写诊断用；它们都不是错误，因为快照只是投影。I/O 本身失败才是 `MemoryError`。
+- **不能用快照时一律退回全量折叠，并带上原因。** 没有快照（`NoSnapshot`）、字节不是快照（`Damaged`，原样带出 8-26 的原因）、`fold_version` 不等（`OtherFoldVersion`）、那一行的链哈希不同（`Stale`）、账本里根本没有那一行（`Missing`，账本比快照短）——都是 `Whole`，行取自 `read_raw_lines_at`，与没有快照时的起步完全相同。原因给调用方写诊断用；它们都不是错误，因为快照只是投影。I/O 本身失败才是 `StorageError`。
 - **被否：在快照里再存该行的字节偏移，做真正的单次 `pread`。** 偏移指向的是字节，不是链：换过的账本在同一偏移可能正好有一行，核对仍要看链哈希；而尾部本来就要从那一段读，省下的只是一段内的前缀扫描，却让 8-26 的格式多一个会随段滚动失效的字段。
 
-### 8-27 `memory::worktree::back`：回到过去，与从某一点取回一个文件（形状 4 适配器；git2）
+### 8-27 `storage::worktree::back`：回到过去，与从某一点取回一个文件（形状 4 适配器；git2）
 
 ```rust
 impl Worktrees {
     /// 从 point 分叉：一棵新树，分支 `name` 起于 point；城的 HEAD 与干线不动。
-    pub fn claim_at(&self, name: &WorktreeName, point: &GitOid) -> Result<WorktreeLease, MemoryError>;
+    pub fn claim_at(&self, name: &WorktreeName, point: &GitOid) -> Result<WorktreeLease, StorageError>;
     /// 把 point 上的 path 取回 lease 这棵树；point 上没有这个文件即删掉它。
     /// 返回调用者要追加进账本的 `file_restored` 记录。
-    pub fn restore_file(&self, lease: &WorktreeLease, point: &GitOid, path: &Path) -> Result<FileRestored, MemoryError>;
+    pub fn restore_file(&self, lease: &WorktreeLease, point: &GitOid, path: &Path) -> Result<FileRestored, StorageError>;
 }
 ```
 
@@ -1135,11 +1135,11 @@ impl Worktrees {
 **取回只写自己的树。** `restore_file` 只接受相对路径且不含 `..`，不接受 `RESERVED_PREFIX` 之下的路径，也不接受任何以 `.` 或空格结尾、含 `:`、或含 `~` 后跟数字的段——Win32 把这些拼写折叠到另一个名字上（`.git.`、`.git `、`.git::$DATA` 都指向树的 `.git` 链接，卷生成 8.3 短名时 `GIT~1` 也是），逐段比较挡不住它们；写入目标是 `lease.path()` 下的那个文件，经 `alias::WriteTarget` 判定（8-25）。point 上是 blob 即按原字节经 `bundle::landing::land` 落盘（同目录暂存、`sync_data`、抄原权限、`rename` 覆盖、`sync_dir`，8-25），所以经硬链接指向别的树或干线的名字只被换掉目录项，那一头的字节不动，崩溃也不留半个文件；point 上没有即删除，这就是「恢复到那一点」的含义；目录与子模块不是一个文件，拒。
 
 **现状。** 本模块是统一历史的第一段。「分叉」与「取回」的事件种类（`went_back`、`file_restored`）已在 kernel 事件表里。其余几段尚不存在：服务端把账本加 git 投影成一棵血缘树的读者面，以及网页上把楼页的提交、改动、回收站与对话页的分叉合成一页的「历史」页。它们到来之前，`claim_at` 与 `restore_file` 没有生产调用者。
-### 8-29 `memory::blob`：一次提交里一个文件的字节（形状 4 adapter）
+### 8-29 `storage::blob`：一次提交里一个文件的字节（形状 4 adapter）
 
 ```rust
-pub fn blob_at(city_root: &Path, oid: GitOid, addr: &Address) -> Result<Option<Vec<u8>>, MemoryError>;
+pub fn blob_at(city_root: &Path, oid: GitOid, addr: &Address) -> Result<Option<Vec<u8>>, StorageError>;
 ```
 
-- 读城仓库里 `oid` 那次提交的树上 `addr` 处的 blob；那里不是文件（目录、子模块、不存在）＝`Ok(None)`，由调用方说出拒因——它知道是谁问的。仓库打不开、提交找不到＝`MemoryError::Checkpoint`。
+- 读城仓库里 `oid` 那次提交的树上 `addr` 处的 blob；那里不是文件（目录、子模块、不存在）＝`Ok(None)`，由调用方说出拒因——它知道是谁问的。仓库打不开、提交找不到＝`StorageError::Checkpoint`。
 - 不碰工作区与索引：`file:<addr>@<oid>` 指的是提交里的字节，工作区此刻的文件可能已经改过。

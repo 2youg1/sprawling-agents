@@ -16,13 +16,13 @@
 //! read the whole object and hash it, which is the cost this module
 //! exists to remove. Integrity is bought at `put` and re-checked by
 //! [`crate::Cas::get`]; a caller that needs the address proved takes the
-//! full read (memory-SPEC 8-3).
+//! full read (storage-SPEC 8-3).
 
 use std::path::Path;
 
 use kernel::{B3Hash, Range};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::vfs::Vfs;
 
 /// How much of an object one read lifts while walking to a line.
@@ -38,15 +38,15 @@ pub(crate) fn of_object(
     path: &Path,
     hash: &B3Hash,
     range: &Range,
-) -> Result<Vec<u8>, MemoryError> {
+) -> Result<Vec<u8>, StorageError> {
     match range {
         Range::Bytes { from, to } => bytes_of(vfs, path, hash, (*from, *to)),
         Range::Lines { from, to } => lines_of(vfs, path, hash, (*from, *to)),
     }
 }
 
-fn out_of_bounds(hash: &B3Hash) -> MemoryError {
-    MemoryError::RangeOutOfBounds {
+fn out_of_bounds(hash: &B3Hash) -> StorageError {
+    StorageError::RangeOutOfBounds {
         hash: hash.to_string(),
     }
 }
@@ -61,7 +61,7 @@ fn bytes_of(
     path: &Path,
     hash: &B3Hash,
     span: (u64, u64),
-) -> Result<Vec<u8>, MemoryError> {
+) -> Result<Vec<u8>, StorageError> {
     let (from, to) = span;
     let wanted = to
         .checked_sub(from)
@@ -88,7 +88,7 @@ fn lines_of(
     path: &Path,
     hash: &B3Hash,
     span: (u64, u64),
-) -> Result<Vec<u8>, MemoryError> {
+) -> Result<Vec<u8>, StorageError> {
     let (from, to) = span;
     if from == 0 || from > to {
         return Err(out_of_bounds(hash));

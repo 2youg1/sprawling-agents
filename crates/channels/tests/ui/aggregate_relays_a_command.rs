@@ -9,10 +9,10 @@
 // has no spelling.
 
 fn main() {
-    let aggregate = channels::Aggregate::new();
-    let elsewhere = channels::CityLabel::parse("attic").unwrap();
+    let aggregate = wire::Aggregate::new();
+    let elsewhere = wire::CityLabel::parse("attic").unwrap();
     let run = kernel::RunId::from_bytes([1u8; 16]);
-    let stop_their_work = channels::Command::Cancel {
+    let stop_their_work = wire::Command::Cancel {
         run,
         idem: kernel::IdemKey::derive(&run, kernel::Seq::new(1), b"relay"),
     };

@@ -25,7 +25,7 @@ use kernel::{AxCode, AxError};
 pub trait Machine {
     /// Asks this machine every question the requirement table holds,
     /// in the shape a page reads.
-    fn report(&self) -> channels::DoctorAnswer;
+    fn report(&self) -> wire::DoctorAnswer;
 
     /// Runs one install command the person has just agreed to.
     ///

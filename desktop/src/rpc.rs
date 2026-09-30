@@ -5,7 +5,7 @@
 
 //! One JSON-RPC 2.0 message per line, read and written.
 //!
-//! The framing contract is the same one `protocol::mcp::stdio` checks from the
+//! The framing contract is the same one `agent_protocols::mcp::stdio` checks from the
 //! other end: the transport is line delimited, so a message may not carry
 //! a newline. `serde_json::to_string` writes none, and nothing here
 //! pretty-prints, so the contract holds by construction rather than by
@@ -19,7 +19,7 @@
 use crate::refusal::{Refusal, RefusalCode};
 use serde_json::{Value, json};
 
-/// The revision this server speaks. It equals `protocol::PROTOCOL_VERSION`
+/// The revision this server speaks. It equals `agent_protocols::PROTOCOL_VERSION`
 /// on purpose: the two ends have to agree, so a change to one is a change
 /// to both in the same edit (desktop-SPEC.md section 14).
 pub(crate) const PROTOCOL_VERSION: &str = "2025-06-18";

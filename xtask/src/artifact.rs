@@ -58,7 +58,7 @@ const MARKERS: [&str; 6] = [
 
 /// The features that exist to build test scaffolding, and nothing else.
 ///
-/// `fault` is here with `conformance`: `memory::fault_fs` is the second
+/// `fault` is here with `conformance`: `storage::fault_fs` is the second
 /// adapter behind the `Vfs` inner seam, a deterministic power-loss model
 /// whose whole purpose is to be injected by a test.
 const TEST_FEATURES: [&str; 2] = ["conformance", "fault"];

@@ -27,7 +27,7 @@ use super::reply::refusal_text;
 /// admission, because what it may learn is that admission's to decide.
 ///
 /// The body is read as JSON and passed on unread. Which keys make a
-/// request, and what each of them must hold, is `protocol::Incoming`'s
+/// request, and what each of them must hold, is `agent_protocols::Incoming`'s
 /// single answer; a second reading here would be a second grammar, and
 /// the two would first disagree about an empty field.
 pub(crate) async fn accept_acp(State(state): State<Arc<ShellState>>, body: Bytes) -> Response {
@@ -96,7 +96,7 @@ pub(crate) async fn accept_recording(
 ///
 /// The name rides the query string rather than a header, because a
 /// header value carries ASCII reliably and a person's file names are
-/// often not ASCII (channels-SPEC.md 8-49).
+/// often not ASCII (wire-SPEC.md 8-49).
 pub(crate) async fn accept_drop(
     State(state): State<Arc<ShellState>>,
     Query(params): Query<HashMap<String, String>>,

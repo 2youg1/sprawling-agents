@@ -150,9 +150,9 @@ trailer 是给城外读者的 projection；trailer 与 Ledger 不一致时，错
 | 部件 | 住在哪里 | 怎么换 |
 |---|---|---|
 | 模型端点与兼容格式 | `gateway::endpoint`、`gateway::dialect` | 在设置页填 base URL 与兼容格式。跑在同一台电脑上的模型默认直连、不走系统代理，有一个设置可以改。 |
-| SaaS 与外部工具（[Composio](https://composio.dev) 是众多 MCP server 之一） | `protocol::mcp` 的 `Outbound` 缝及其 stdio、HTTP、SSE 适配器；楼的 `CONFIG.toml` | 改一个 URL 或一条命令就换一个 server；保密楼一个也不起。 |
+| SaaS 与外部工具（[Composio](https://composio.dev) 是众多 MCP server 之一） | `agent_protocols::mcp` 的 `Outbound` 缝及其 stdio、HTTP、SSE 适配器；楼的 `CONFIG.toml` | 改一个 URL 或一条命令就换一个 server；保密楼一个也不起。 |
 | 沙箱 | `runtime::sandbox` 缝（今天是带燃料预算的 wasmtime）；宿主命令由 `runtime::tools` 约束 | 实现这条缝并通过它的一致性测试。 |
-| 客户端 | `channels::wire` 是全部 API | 对着这套线协议写第二个客户端；[`LLM.md`](LLM.md) 是同一个面，写给 agent 看。 |
+| 客户端 | `sprawling-wire` crate 是全部 API | 对着这套线协议写第二个客户端；[`LLM.md`](LLM.md) 是同一个面，写给 agent 看。 |
 
 每个部件住在哪、怎么换，见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
 

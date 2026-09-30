@@ -1,13 +1,13 @@
-# remote-SPEC.md
+# remote_access-SPEC.md
 
-> crate：`remote`（lib，依赖 kernel）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
+> crate：`remote_access`（lib，依赖 kernel）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
 > 骨架：apostle-sdd 十七节；按模块分章、每章自足（ARCHITECTURE.md §5）。
 > 模块：door（门的状态）／pairing（一次性配对码）／keys（混合签名密钥）／handshake（每次连接的握手）／seal（帧封装）；通路缝是下文 §3 列出的后续阶段。
 > 本 crate 覆盖的语义：一个人离开这台电脑时，从外面够到自己这座城——谁能进、进来能做什么、何时失效、如何一键关上。
 
 ## 1 需求分解
 
-一个人把城留在家里的电脑上出门，要能用平板或手机继续看城、回答提问、叫停。今天城只听回环地址，或者在局域网上凭一把配对令牌（channels-SPEC §8-41）；出了局域网就够不到。本 crate 给出「远程门」：
+一个人把城留在家里的电脑上出门，要能用平板或手机继续看城、回答提问、叫停。今天城只听回环地址，或者在局域网上凭一把配对令牌（wire-SPEC §8-41）；出了局域网就够不到。本 crate 给出「远程门」：
 
 | 单元 | 一句话 | 阶段 |
 |---|---|---|
@@ -40,9 +40,9 @@
 
 ## 4 现状分析
 
-- `channels::auth::PairingToken` 与 `channels::server::decide_bind` 已经守住局域网这一面：非回环绑定必须带令牌，令牌只存摘要、常数时间比较。远程门不改它：`lan` 通路就是这一面，它仍用自己的令牌守握手之前的那一步。
-- 城的线协议帧由 `channels::wire` 定义，远程门不改帧，只在帧外加一层封装（1b），所以 `WIRE_V` 与 schema 哈希不因本 crate 变化。
-- 本 crate 1a 只依赖 kernel，零 I/O：时间与熵都是参数，与 `channels::auth` 的做法相同。
+- `wire::auth::PairingToken` 与 `wire::server::decide_bind` 已经守住局域网这一面：非回环绑定必须带令牌，令牌只存摘要、常数时间比较。远程门不改它：`lan` 通路就是这一面，它仍用自己的令牌守握手之前的那一步。
+- 城的线协议帧由 `wire::frames` 定义，远程门不改帧，只在帧外加一层封装（1b），所以 `WIRE_V` 与 schema 哈希不因本 crate 变化。
+- 本 crate 1a 只依赖 kernel，零 I/O：时间与熵都是参数，与 `wire::auth` 的做法相同。
 
 ## 5 权威信源
 
@@ -60,15 +60,15 @@
 
 **三件邻居的活，及它们各自的主人**：
 
-- 帧的类型、编码与握手版本归 `channels::wire`；本 crate 只在帧外封一层，不认识任何一个帧。
-- 一帧属于哪个动词类（`Read`／`Act`／`LocalOnly`）的对照表归 `channels`，因为动词表住在那里；本 crate 只给出 `door::permits(Authority, VerbClass)` 这条判定。
+- 帧的类型、编码与握手版本归 `wire::frames`；本 crate 只在帧外封一层，不认识任何一个帧。
+- 一帧属于哪个动词类（`Read`／`Act`／`LocalOnly`）的对照表归 `wire`，因为动词表住在那里；本 crate 只给出 `door::permits(Authority, VerbClass)` 这条判定。
 - 随机字节、时钟、进程（`cloudflared`）与设备表的落盘归装配层 `bin::assembly`；本 crate 只收参数、只给判定。
 
 依赖：`remote: kernel`（ARCHITECTURE §3 的 depmap）。`sprawling` 是唯一消费者。
 
 ## 8 接口先行
 
-### 8-1 remote::door（形状 1 判定＋形状 5 状态）
+### 8-1 remote_access::door（形状 1 判定＋形状 5 状态）
 
 ```rust
 pub struct Epoch([u8; 16]);        // from_entropy
@@ -103,7 +103,7 @@ impl Door {
 - **会话的寿命取 `min(请求的到期, 门的关闭时刻)`**：会话永远不比门活得久。`authority` 在门关着、纪元不符、会话过期或设备已撤销时答 `None`。
 - 失败码：门关着、码不对、设备未配对 → `E_GATE_DENIED`；重用纪元、撤销未知设备、设备名不合 → `E_INVALID_ARGS`。每一条都带一句可执行的恢复语，指向控制台上的哪条命令。
 
-### 8-2 remote::pairing（形状 2 值类型）
+### 8-2 remote_access::pairing（形状 2 值类型）
 
 ```rust
 pub const CODE_BYTES: usize = 16;
@@ -114,11 +114,11 @@ impl PairingCode {
 }
 ```
 
-- **门只存摘要**：`mint` 把正文交还给调用方去展示一次，本 crate 之后不再持有它，与 `channels::auth::PairingToken` 同一个理由。
+- **门只存摘要**：`mint` 把正文交还给调用方去展示一次，本 crate 之后不再持有它，与 `wire::auth::PairingToken` 同一个理由。
 - **比较不做常数时间**：等待表里比的是摘要，攻击者选不了摘要的字节，时序只泄露「哪一个摘要前缀相同」，而这推不出任何一个码的正文。
 - **base32 小写**：二维码扫描器与剪贴板都原样携带，URL 里无需转义；给人看时五个一组。
 
-### 8-3 remote::keys（形状 2 值类型）
+### 8-3 remote_access::keys（形状 2 值类型）
 
 ```rust
 pub const SEED_BYTES: usize = 32;
@@ -137,7 +137,7 @@ pub struct Signature(Box<[u8; SIGNATURE_BYTES]>);   // from_bytes／as_bytes
 - **一个种子派生两半**：HKDF-SHA256，盐 `sprawling remote key v1`，两半各用自己的标签（`ed25519`、`ml-dsa-44`），所以两半不共享任何密钥材料；盐里的版本号保证以后的派生不会产出以前的密钥。人要保存的只是这 32 字节。
 - **验证两半都要成立，并且只给一个答案**：调用方从拒绝里得不出是哪一半没过。
 
-### 8-4 remote::handshake（形状 1 判定＋形状 5 状态）
+### 8-4 remote_access::handshake（形状 1 判定＋形状 5 状态）
 
 ```rust
 pub const HELLO_BYTES: usize = 16 + 32 + 1184 + 32;         // 设备 id、X25519、ML-KEM-768 封装密钥、nonce
@@ -162,7 +162,7 @@ impl CityWaiting {
 - **状态用类型表达**：`DeviceWaiting` 与 `CityWaiting` 只能各用一次（`finish`、`accept` 取走 `self`），握手记录与临时私钥随之消失。
 - **临时密钥的随机性由 aws-lc-rs 在内部抽取**：ML-KEM 的封装不接受外部熵，这是唯一一处本 crate 不从参数拿随机性的地方；门的纪元、设备 id、会话 id、配对码与 nonce 仍由调用方给。
 
-### 8-5 remote::seal（形状 5 状态）
+### 8-5 remote_access::seal（形状 5 状态）
 
 ```rust
 pub enum Direction { DeviceToCity, CityToDevice }
@@ -223,7 +223,7 @@ impl Opener { pub fn open(&mut self, sealed: &[u8]) -> Result<Vec<u8>, AxError>;
 
 ## 15 影响面
 
-- 新增 crate `remote`：根 `Cargo.toml` 的 members、`ARCHITECTURE.md` §3 的 depmap、`architecture.toml` 的模块图与 family 表。
+- 新增 crate `remote_access`：根 `Cargo.toml` 的 members、`ARCHITECTURE.md` §3 的 depmap、`architecture.toml` 的模块图与 family 表。
 - `adversary/lakefile.toml` 的 `Design` 库多一个根 `RemoteDoor`。
 - 1a 没有调用方，产品二进制行为不变。
 

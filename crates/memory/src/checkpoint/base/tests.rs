@@ -103,7 +103,7 @@ fn a_refused_base_fence_leaves_no_reference_to_objects_it_never_wrote() {
 
     assert_eq!(
         (
-            matches!(refused, Err(MemoryError::SecretEgress { .. })),
+            matches!(refused, Err(StorageError::SecretEgress { .. })),
             wave.map(|_| ()).map_err(|err| err.to_string()),
         ),
         (true, Ok(()))

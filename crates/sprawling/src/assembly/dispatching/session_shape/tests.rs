@@ -63,7 +63,7 @@ fn row_of(row: &serde_json::Value) -> Option<Row> {
 /// hashes already say the bytes are equal; this is the reading a person
 /// can check without trusting the hash to mean what it says.
 fn bytes_of(city_root: &std::path::Path, rows: &[Row]) -> BTreeMap<String, Vec<u8>> {
-    let store = memory::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).unwrap();
+    let store = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).unwrap();
     rows.iter()
         .map(|(slot, hash, _)| {
             let hash: kernel::B3Hash =
@@ -73,8 +73,8 @@ fn bytes_of(city_root: &std::path::Path, rows: &[Row]) -> BTreeMap<String, Vec<u
         .collect()
 }
 
-fn ask(addr: &Address, effort: Option<kernel::Effort>, key: &[u8]) -> channels::Command {
-    channels::Command::Dispatch {
+fn ask(addr: &Address, effort: Option<kernel::Effort>, key: &[u8]) -> wire::Command {
+    wire::Command::Dispatch {
         addr: addr.clone(),
         task: "write one line".to_owned(),
         goal: "the line is written".to_owned(),
@@ -87,9 +87,9 @@ fn ask(addr: &Address, effort: Option<kernel::Effort>, key: &[u8]) -> channels::
 }
 
 /// A dispatch that names the model it runs on.
-fn ask_on(addr: &Address, model: &str, key: &[u8]) -> channels::Command {
+fn ask_on(addr: &Address, model: &str, key: &[u8]) -> wire::Command {
     let mut dispatch = ask(addr, None, key);
-    if let channels::Command::Dispatch { model: named, .. } = &mut dispatch {
+    if let wire::Command::Dispatch { model: named, .. } = &mut dispatch {
         *named = Some(model.to_owned());
     }
     dispatch
@@ -97,8 +97,8 @@ fn ask_on(addr: &Address, model: &str, key: &[u8]) -> channels::Command {
 
 fn choose(worker: &mut RunWorker, model: &str, key: &[u8]) {
     worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("house").unwrap(),
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("house").unwrap(),
             model: model.to_owned(),
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(32_768),
@@ -243,9 +243,9 @@ fn a_new_session_lets_the_room_use_the_model_chosen_since() {
     assert_eq!(*refused.code(), AxCode::ConfigInvalid);
 
     worker
-        .handle(channels::Command::OpenSession {
+        .handle(wire::Command::OpenSession {
             addr: room.clone(),
-            carry: channels::Carry::Nothing,
+            carry: wire::Carry::Nothing,
             from: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"open"),
         })
@@ -323,8 +323,8 @@ fn a_dispatch_that_names_a_registered_model_runs_on_it() {
         fake_openai(&["m-local", "m-other"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("house").unwrap(),
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("house").unwrap(),
             model: "m-other".to_owned(),
             tag: kernel::ModelTag::Digest,
             context_tokens: kernel::Window::new(32_768),
@@ -363,8 +363,8 @@ fn a_run_naming_no_model_runs_on_the_room_frozen_one() {
     let (base_url, _provider) = fake_openai(&["m-local", "m-other"], replies);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("house").unwrap(),
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("house").unwrap(),
             model: "m-other".to_owned(),
             tag: kernel::ModelTag::Digest,
             context_tokens: kernel::Window::new(32_768),

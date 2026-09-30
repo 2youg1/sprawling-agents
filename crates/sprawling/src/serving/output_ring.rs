@@ -9,8 +9,8 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use channels::LiveOutput;
 use kernel::{EventKind, EventRecord, RunId};
+use wire::LiveOutput;
 
 /// The most one run keeps: what the runtime reads in one second at its
 /// top rate, and enough for the page to fill both of its streams.
@@ -73,8 +73,8 @@ impl OutputRing {
 #[allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
 mod tests {
     use super::*;
-    use channels::OutputStream;
     use kernel::{EventDraft, GENESIS_PREV, Payload, Seq, TimeMs};
+    use wire::OutputStream;
 
     fn piece(run: RunId, text: &str) -> LiveOutput {
         LiveOutput {

@@ -48,13 +48,13 @@ fn the_city_view_names_the_scopes_a_halt_shut() {
     let dir = tempfile::tempdir().unwrap();
     let mut views = Views::new(dir.path());
     views.apply(&halt_record(1, "halted")).unwrap();
-    let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
+    let wire::Answer::City(city) = views.answer(&wire::Query::CityView) else {
         panic!("CityView answers with a city");
     };
-    assert_eq!(city.halted, vec![channels::HaltScope::City]);
+    assert_eq!(city.halted, vec![wire::HaltScope::City]);
 
     views.apply(&halt_record(2, "released")).unwrap();
-    let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
+    let wire::Answer::City(city) = views.answer(&wire::Query::CityView) else {
         panic!("CityView answers with a city");
     };
     assert!(city.halted.is_empty(), "a released scope is not shut");
@@ -85,7 +85,7 @@ fn a_run_in_the_city_view_says_which_room_it_works_in() {
             data,
         ))
         .unwrap();
-    let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
+    let wire::Answer::City(city) = views.answer(&wire::Query::CityView) else {
         panic!("CityView answers with a city");
     };
     let summary = city.runs.iter().find(|r| r.run == run).unwrap();
@@ -135,12 +135,12 @@ fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
             .unwrap();
     }
 
-    let answer = views.answer(&channels::Query::CityView);
+    let answer = views.answer(&wire::Query::CityView);
     let bytes = serde_json::to_vec(&answer).unwrap().len();
-    let channels::Answer::City(city) = answer else {
+    let wire::Answer::City(city) = answer else {
         panic!("CityView answers with a city");
     };
-    let recent = u64::try_from(memory::RECENT_FROZEN).unwrap();
+    let recent = u64::try_from(storage::RECENT_FROZEN).unwrap();
     let listed: Vec<RunId> = city.runs.iter().map(|r| r.run).collect();
     let newest: Vec<RunId> = (RUNS - recent..RUNS).map(run_of).collect();
     assert!(bytes <= 16 * 1024, "city_view is {bytes} bytes");
@@ -181,7 +181,7 @@ fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {
         }
     }
 
-    let channels::Answer::Cost(cost) = views.answer(&channels::Query::CostView) else {
+    let wire::Answer::Cost(cost) = views.answer(&wire::Query::CostView) else {
         panic!("CostView answers with a cost");
     };
     let top = u64::try_from(super::answering::TOP_BILLED).unwrap();
@@ -200,7 +200,7 @@ fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {
     );
 }
 
-/// The hot view keeps only the recent frozen few (memory-SPEC section
+/// The hot view keeps only the recent frozen few (storage-SPEC section
 /// 8-5); a run pushed out of it is still a run the city holds, so its
 /// run view is answered from the Ledger instead of reading as unknown.
 #[test]
@@ -210,10 +210,10 @@ fn an_evicted_run_still_answers_its_run_view() {
     let report = crate::assembly::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let run_of = |i: u64| RunId::from_bytes(u128::from(i + 1).to_be_bytes());
-    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
+    let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
         .unwrap()
         .0;
-    let recent = u64::try_from(memory::RECENT_FROZEN).unwrap();
+    let recent = u64::try_from(storage::RECENT_FROZEN).unwrap();
     for i in 0..=recent {
         let opened = serde_json::json!({ "task": "a task", "goal": "a goal" });
         let closed = serde_json::json!({ "completion": "done" });
@@ -237,12 +237,11 @@ fn an_evicted_run_still_answers_its_run_view() {
     drop(ledger);
 
     let mut views = Views::rebuild(&report.ledger_dir).unwrap();
-    let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
+    let wire::Answer::City(city) = views.answer(&wire::Query::CityView) else {
         panic!("CityView answers with a city");
     };
     assert!(city.runs.iter().all(|r| r.run != run_of(0)));
-    let channels::Answer::Run(Some(summary)) =
-        views.answer(&channels::Query::RunView { run: run_of(0) })
+    let wire::Answer::Run(Some(summary)) = views.answer(&wire::Query::RunView { run: run_of(0) })
     else {
         panic!("an evicted run is still a run the city holds");
     };
@@ -269,10 +268,10 @@ fn a_city_whose_first_billed_run_was_evicted(root: &std::path::Path) -> Views {
     use kernel::Ledger;
     let report = crate::assembly::init_city(root).unwrap();
     let room = Address::parse("lab/room1").unwrap();
-    let mut ledger = memory::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
+    let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, kernel::TimeMs::new(9))
         .unwrap()
         .0;
-    let recent = u64::try_from(memory::RECENT_FROZEN).unwrap();
+    let recent = u64::try_from(storage::RECENT_FROZEN).unwrap();
     for i in 0..=recent {
         for (kind, data) in [
             (
@@ -316,12 +315,12 @@ fn an_evicted_run_still_answers_what_it_cost() {
     let dir = tempfile::tempdir().unwrap();
     let mut views = a_city_whose_first_billed_run_was_evicted(dir.path());
     let never = RunId::from_bytes([0xee; 16]);
-    let asked = channels::Query::RunCosts {
+    let asked = wire::Query::RunCosts {
         runs: vec![billed_run(0), never],
     };
     assert_eq!(
         views.answer(&asked),
-        channels::Answer::RunCosts(channels::RunCostsAnswer {
+        wire::Answer::RunCosts(wire::RunCostsAnswer {
             asked: vec![billed_run(0), never],
             runs: vec![
                 (billed_run(0), kernel::UsdMicros::new(1_000)),
@@ -338,7 +337,7 @@ fn an_evicted_run_still_answers_what_it_cost() {
 fn the_attribution_holds_only_the_runs_the_hot_view_holds() {
     let dir = tempfile::tempdir().unwrap();
     let mut views = a_city_whose_first_billed_run_was_evicted(dir.path());
-    let recent = u64::try_from(memory::RECENT_FROZEN).unwrap();
+    let recent = u64::try_from(storage::RECENT_FROZEN).unwrap();
     let billed: u64 = (0..=recent).map(|i| 1_000 + i).sum();
     let report = views.attribution.report();
     assert_eq!(
@@ -347,14 +346,14 @@ fn the_attribution_holds_only_the_runs_the_hot_view_holds() {
             report.by_run.len(),
             report.total
         ),
-        (None, memory::RECENT_FROZEN, kernel::UsdMicros::new(billed))
+        (None, storage::RECENT_FROZEN, kernel::UsdMicros::new(billed))
     );
-    let asked = channels::Query::RunCosts {
+    let asked = wire::Query::RunCosts {
         runs: vec![billed_run(0)],
     };
     assert_eq!(
         views.answer(&asked),
-        channels::Answer::RunCosts(channels::RunCostsAnswer {
+        wire::Answer::RunCosts(wire::RunCostsAnswer {
             asked: vec![billed_run(0)],
             runs: vec![(billed_run(0), kernel::UsdMicros::new(1_000))],
         })

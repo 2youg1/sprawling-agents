@@ -43,8 +43,8 @@ impl From<AxError> for ViewError {
     }
 }
 
-impl From<memory::MemoryError> for ViewError {
-    fn from(err: memory::MemoryError) -> ViewError {
+impl From<storage::StorageError> for ViewError {
+    fn from(err: storage::StorageError) -> ViewError {
         ViewError::Ledger(err.into_ax())
     }
 }
@@ -184,7 +184,7 @@ pub(super) fn write_records(
     chosen: &Selection,
     out: &mut impl Write,
 ) -> Result<(), ViewError> {
-    let index = memory::LedgerIndex::rebuild(dir)?;
+    let index = storage::LedgerIndex::rebuild(dir)?;
     let mut reader = index.reader(dir);
     match chosen.run {
         Some(run) => {
@@ -199,7 +199,7 @@ pub(super) fn write_records(
 /// Writes the lines of `walk`, an ascending run of seqs, that `chosen`
 /// admits.
 fn write_walk(
-    reader: &mut memory::LineReader<'_>,
+    reader: &mut storage::LineReader<'_>,
     walk: impl DoubleEndedIterator<Item = Seq>,
     chosen: &Selection,
     out: &mut impl Write,

@@ -9,7 +9,7 @@
 //! This module owns the console's own verbs — `CONTROL`, the five that
 //! never reach the wire — and owns nothing else about any verb. Every
 //! other verb is a projection of the Commands a socket can carry and of
-//! `channels::QUERY_NAMES`, spelled by [`snake`], so a command renamed on
+//! `wire::QUERY_NAMES`, spelled by [`snake`], so a command renamed on
 //! the wire is renamed here in the same build and a hand-written table
 //! never becomes a second vocabulary.
 //!
@@ -35,7 +35,7 @@ const OFF_THE_SOCKET: [&str; 2] = ["PutSecret", "Auth"];
 
 /// The Commands a console line can become, in wire order.
 pub(super) fn carried_commands() -> impl Iterator<Item = &'static str> {
-    channels::COMMAND_NAMES
+    wire::COMMAND_NAMES
         .iter()
         .copied()
         .filter(|name| !OFF_THE_SOCKET.contains(name))
@@ -54,7 +54,7 @@ pub(crate) enum Line {
     Select(Address),
     Quit,
     /// A wire verb, already built into the frame it names.
-    Frame(Box<channels::ClientFrame>),
+    Frame(Box<wire::ClientFrame>),
     /// Anything that does not begin with `/`: work for the selected
     /// room, in the words the person used.
     Work(String),
@@ -85,14 +85,14 @@ pub(crate) fn snake(camel: &str) -> String {
 /// Every verb this console answers to.
 ///
 /// **A projection, never a second list.** The wire half is derived from
-/// [`carried_commands`] and `channels::QUERY_NAMES`, so a command
+/// [`carried_commands`] and `wire::QUERY_NAMES`, so a command
 /// renamed there is renamed here in the same commit or not at all. A
 /// hand-written table would be a second vocabulary, and the moment it
 /// drifted nothing would say so.
 pub(crate) fn verbs() -> Vec<String> {
     let mut out: Vec<String> = CONTROL.iter().map(|name| (*name).to_owned()).collect();
     out.extend(carried_commands().map(snake));
-    out.extend(channels::QUERY_NAMES.iter().map(|name| snake(name)));
+    out.extend(wire::QUERY_NAMES.iter().map(|name| snake(name)));
     out
 }
 
@@ -172,9 +172,7 @@ fn wire_frame(verb: &str, tail: &str, idem: IdemKey) -> Line {
         serde_json::from_str::<serde_json::Value>(tail)
     };
     let known_command = carried_commands().find(|name| snake(name) == verb);
-    let known_query = channels::QUERY_NAMES
-        .iter()
-        .find(|name| snake(name) == verb);
+    let known_query = wire::QUERY_NAMES.iter().find(|name| snake(name) == verb);
     let framed = match (known_command, known_query, body) {
         (None, None, _) => {
             return Line::Unknown {
@@ -196,7 +194,7 @@ fn wire_frame(verb: &str, tail: &str, idem: IdemKey) -> Line {
         }
         (None, Some(name), Ok(body)) => asked(keyed(&snake(name), body)),
     };
-    match serde_json::from_value::<channels::ClientFrame>(framed) {
+    match serde_json::from_value::<wire::ClientFrame>(framed) {
         Ok(frame) => Line::Frame(Box::new(frame)),
         Err(err) => malformed(verb, &err),
     }
@@ -220,7 +218,7 @@ fn malformed(verb: &str, err: &serde_json::Error) -> Line {
 /// two constants the parser reads.
 pub(crate) fn help(selected: Option<&Address>) -> String {
     let commands: Vec<String> = carried_commands().map(snake).collect();
-    let queries: Vec<String> = channels::QUERY_NAMES.iter().map(|n| snake(n)).collect();
+    let queries: Vec<String> = wire::QUERY_NAMES.iter().map(|n| snake(n)).collect();
     let room = selected.map_or_else(
         || "no room selected - `/at <building>/<room>` first".to_owned(),
         |addr| format!("work goes to {}", addr.as_str()),

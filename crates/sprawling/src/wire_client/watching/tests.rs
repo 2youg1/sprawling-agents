@@ -19,7 +19,7 @@ fn reading(n: u64) -> (Sample, String) {
         queued_runs: n,
         ..Sample::default()
     };
-    let text = serde_json::to_string(&channels::ServerFrame::Monitor(sample)).unwrap();
+    let text = serde_json::to_string(&wire::ServerFrame::Monitor(sample)).unwrap();
     (sample, text)
 }
 

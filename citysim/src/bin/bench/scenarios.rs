@@ -22,7 +22,7 @@
 use std::path::Path;
 
 use kernel::{Address, B3Hash, Effort, EventDraft, EventRecord, Ledger as _, RunId, TimeMs};
-use memory::{Checkpoint, ModelChoice, Provenance, WorktreeName, Worktrees};
+use storage::{Checkpoint, ModelChoice, Provenance, WorktreeName, Worktrees};
 
 use super::reading::{Load, MachineClass, Reading, SubMetric};
 
@@ -82,7 +82,7 @@ fn large_ledger_fold(
     let city_root = scratch.join("fold");
     let dir = kernel::layout::CityLayout::new(&city_root).ledger();
     std::fs::create_dir_all(&dir).map_err(|why| format!("{why}"))?;
-    let (mut ledger, _report) = memory::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
+    let (mut ledger, _report) = storage::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
         .map_err(|why| format!("{}", why.into_ax()))?;
     let drafts: Vec<EventDraft> = (0..fixture.fold_records)
         .map(super::draft)
@@ -91,8 +91,8 @@ fn large_ledger_fold(
     let mut times = Vec::new();
     for _ in 0..fixture.fold_rounds {
         let t0 = super::stamp();
-        let answer = sprawling::ask(&city_root, &channels::Query::CityView)
-            .map_err(|why| format!("{why}"))?;
+        let answer =
+            sprawling::ask(&city_root, &wire::Query::CityView).map_err(|why| format!("{why}"))?;
         times.push(t0.elapsed());
         std::hint::black_box(answer);
     }
@@ -216,7 +216,7 @@ fn long_session_forwarding(
     for raw in ledger.raw_lines() {
         let record = EventRecord::parse_line(raw).map_err(|why| format!("{why}"))?;
         let t0 = super::stamp();
-        let frame = channels::ServerFrame::Event(Box::new(record));
+        let frame = wire::ServerFrame::Event(Box::new(record));
         let bytes = serde_json::to_vec(&frame).map_err(|why| format!("{why}"))?;
         times.push(t0.elapsed());
         std::hint::black_box(bytes);

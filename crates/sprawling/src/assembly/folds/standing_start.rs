@@ -9,7 +9,7 @@
 use std::path::Path;
 
 use kernel::{AxCode, AxError, B3Hash, EventRecord};
-use memory::LedgerIndex;
+use storage::LedgerIndex;
 
 use super::collaboration::CollaborationFold;
 use super::{Entrance, Governance, SessionOrigins, Standing};

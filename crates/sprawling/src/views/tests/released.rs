@@ -17,14 +17,14 @@ fn a_git_status_reader_does_not_hold_the_views_while_git_reads_the_disk() {
     std::fs::create_dir(&lab).unwrap();
     std::fs::write(lab.join("before.txt"), "x").unwrap();
     let mut views = Views::new(dir.path());
-    let query = channels::Query::GitStatus {
+    let query = wire::Query::GitStatus {
         building: Address::parse("lab").unwrap(),
     };
     let prepared = views.prepare(&query);
     std::fs::write(lab.join("after.txt"), "y").unwrap();
 
     let read = prepared.finish();
-    assert!(matches!(read, channels::Answer::GitStatus(_)), "{read:?}");
+    assert!(matches!(read, wire::Answer::GitStatus(_)), "{read:?}");
     assert_eq!(read, views.answer(&query));
 }
 
@@ -36,7 +36,7 @@ fn the_config_ladder_and_the_release_page_are_read_after_the_views_are_released(
     let dir = tempfile::tempdir().unwrap();
     let mut views = Views::new(dir.path());
     let room = Address::parse("lab/room1").unwrap();
-    let query = channels::Query::Config { addr: room.clone() };
+    let query = wire::Query::Config { addr: room.clone() };
     let prepared = views.prepare(&query);
     let city_layer = city::config_path(dir.path(), &room, city::Layer::City).unwrap();
     std::fs::create_dir_all(city_layer.parent().unwrap()).unwrap();
@@ -50,12 +50,12 @@ effort = \"low\"
 
     let read = prepared.finish();
     assert_eq!(read, views.answer(&query));
-    let channels::Answer::Config(config) = read else {
+    let wire::Answer::Config(config) = read else {
         panic!("Config answers with a ladder");
     };
     assert!(config.effort.is_some(), "{config:?}");
     assert!(matches!(
-        views.prepare(&channels::Query::NewestRelease),
+        views.prepare(&wire::Query::NewestRelease),
         crate::views::prepared::Prepared::Release(_)
     ));
 }
@@ -67,25 +67,25 @@ fn the_tree_a_page_reads_is_read_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
     let views = Views::new(dir.path());
     let at = Address::parse("notes").unwrap();
-    let document = views.prepare(&channels::Query::Document { at: at.clone() });
-    let listing = views.prepare(&channels::Query::Listing { at: None });
+    let document = views.prepare(&wire::Query::Document { at: at.clone() });
+    let listing = views.prepare(&wire::Query::Listing { at: None });
     std::fs::write(dir.path().join("notes"), "written after the lock").unwrap();
 
     assert_eq!(
         (document.finish(), listing.finish()),
         (
-            channels::Answer::Document(Box::new(channels::DocumentAnswer {
+            wire::Answer::Document(Box::new(wire::DocumentAnswer {
                 at,
                 text: "written after the lock".to_owned(),
                 bytes: 22,
                 truncated: false,
                 binary: false,
             })),
-            channels::Answer::Listing(channels::ListingAnswer {
+            wire::Answer::Listing(wire::ListingAnswer {
                 at: None,
-                entries: vec![channels::Entry {
+                entries: vec![wire::Entry {
                     name: "notes".to_owned(),
-                    kind: channels::EntryKind::File { bytes: 22 },
+                    kind: wire::EntryKind::File { bytes: 22 },
                 }],
             }),
         )
@@ -98,17 +98,14 @@ fn the_tree_a_page_reads_is_read_after_the_views_are_released() {
 fn the_building_page_reads_its_directory_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
     let mut views = Views::new(dir.path());
-    let query = channels::Query::BuildingView {
+    let query = wire::Query::BuildingView {
         addr: Address::parse("lab").unwrap(),
     };
     let prepared = views.prepare(&query);
     std::fs::create_dir(dir.path().join("lab")).unwrap();
 
     let answer = prepared.finish();
-    assert!(
-        matches!(answer, channels::Answer::Building(_)),
-        "{answer:?}"
-    );
+    assert!(matches!(answer, wire::Answer::Building(_)), "{answer:?}");
     assert_eq!(answer, views.answer(&query));
 }
 
@@ -119,7 +116,7 @@ fn the_building_page_reads_its_directory_after_the_views_are_released() {
 fn the_city_page_lists_its_buildings_and_reads_their_plans_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
     let views = Views::new(dir.path());
-    let prepared = views.prepare(&channels::Query::CityView);
+    let prepared = views.prepare(&wire::Query::CityView);
     std::fs::create_dir(dir.path().join("lab")).unwrap();
     std::fs::write(
         dir.path().join("lab").join("Roadmap.md"),
@@ -130,7 +127,7 @@ fn the_city_page_lists_its_buildings_and_reads_their_plans_after_the_views_are_r
     .unwrap();
 
     let read = prepared.finish();
-    let channels::Answer::City(city) = &read else {
+    let wire::Answer::City(city) = &read else {
         panic!("CityView answers with a city: {read:?}");
     };
     assert_eq!(
@@ -140,7 +137,7 @@ fn the_city_page_lists_its_buildings_and_reads_their_plans_after_the_views_are_r
             .collect::<Vec<_>>(),
         vec![("lab".to_owned(), 1)]
     );
-    assert_eq!(read, views.prepare(&channels::Query::CityView).finish());
+    assert_eq!(read, views.prepare(&wire::Query::CityView).finish());
 }
 
 /// A change list, a patch, a stored object and an archive search read the
@@ -174,7 +171,7 @@ fn git_store_and_archive_readers_read_after_the_views_are_released() {
     };
     let (oid_a, oid_b) = (commit("a\n"), commit("a\nb\n"));
     std::fs::write(staged.join("lab/lex.rs"), "a\nb\nc\n").unwrap();
-    let hash = memory::Cas::open(&kernel::layout::CityLayout::new(&staged).cas())
+    let hash = storage::Cas::open(&kernel::layout::CityLayout::new(&staged).cas())
         .unwrap()
         .put(b"held in the store")
         .unwrap();
@@ -189,19 +186,19 @@ fn git_store_and_archive_readers_read_after_the_views_are_released() {
     city::file_archive(&entry, "because").unwrap();
 
     let queries = [
-        channels::Query::Changes {
+        wire::Query::Changes {
             base: oid_b,
             head: None,
         },
-        channels::Query::Hunks {
+        wire::Query::Hunks {
             oid_a,
             oid_b,
             path: "lab/lex.rs".to_owned(),
         },
-        channels::Query::Content {
+        wire::Query::Content {
             locator: kernel::Locator::Cas { hash, range: None },
         },
-        channels::Query::ArchiveSearch {
+        wire::Query::ArchiveSearch {
             needle: "git".to_owned(),
         },
     ];
@@ -221,10 +218,9 @@ fn git_store_and_archive_readers_read_after_the_views_are_released() {
     let fresh: Vec<_> = queries.iter().map(|query| views.answer(query)).collect();
     assert_eq!(read, fresh);
     assert!(
-        read.iter().all(
-            |answer| !matches!(answer, channels::Answer::Unavailable { .. })
-                && !matches!(answer, channels::Answer::Archive(found) if found.hits.is_empty())
-        ),
+        read.iter()
+            .all(|answer| !matches!(answer, wire::Answer::Unavailable { .. })
+                && !matches!(answer, wire::Answer::Archive(found) if found.hits.is_empty())),
         "{read:?}"
     );
 }
@@ -237,10 +233,10 @@ fn the_shelves_and_the_building_count_are_read_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
     let mut views = Views::new(dir.path());
     let queries = [
-        channels::Query::Skills {
+        wire::Query::Skills {
             building: Address::parse("lab").unwrap(),
         },
-        channels::Query::Metrics,
+        wire::Query::Metrics,
     ];
     let prepared: Vec<_> = queries.iter().map(|query| views.prepare(query)).collect();
     let shelf = kernel::layout::CityLayout::new(dir.path())

@@ -20,7 +20,7 @@
 
 use kernel::event::record::{Lane, SignalConsumed, SignalEnqueued, SignalId, SignalKind};
 use kernel::{Address, Admission, AxCode, AxError, IdemKey, Payload, RunId, Seq, TimeMs, Version};
-use memory::{EventQueue, QueueLane};
+use storage::{EventQueue, QueueLane};
 
 /// One communication between residents.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -214,7 +214,7 @@ impl Inbox {
         };
         queue
             .enqueue(key, payload, signal.at())
-            .map_err(memory::MemoryError::into_ax)
+            .map_err(storage::StorageError::into_ax)
     }
 
     /// Takes up to the receiver's bandwidth, urgent first.

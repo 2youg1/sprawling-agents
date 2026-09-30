@@ -10,7 +10,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
@@ -32,7 +32,7 @@ impl SegmentBytes {
 }
 
 /// Reads one segment `ledger_segments_at` named.
-pub(crate) fn read_segment(segment: &Path) -> Result<SegmentBytes, MemoryError> {
+pub(crate) fn read_segment(segment: &Path) -> Result<SegmentBytes, StorageError> {
     RealFs::new()
         .read(segment)
         .map(|bytes| SegmentBytes { bytes })
@@ -42,7 +42,7 @@ pub(crate) fn read_segment(segment: &Path) -> Result<SegmentBytes, MemoryError> 
 /// Every complete line of the ledger in `dir`, copied out. For callers
 /// that keep the lines themselves (fork, replay, fixtures); a fold that
 /// wants only what the lines say walks `LedgerIndex::folding` instead.
-pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, MemoryError> {
+pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, StorageError> {
     let mut out = Vec::new();
     for segment in ledger_segments_at(dir)? {
         out.extend(read_segment(&segment)?.lines().map(<[u8]>::to_vec));
@@ -58,7 +58,7 @@ pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, MemoryError> {
 /// caller that has to tell them apart is the one that took the path from
 /// a person - `sprawling replay` - and it asks here so that the segment
 /// naming rule is never spelled a second time somewhere else.
-pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, MemoryError> {
+pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, StorageError> {
     let vfs = RealFs::new();
     Ok(vfs
         .list(dir)

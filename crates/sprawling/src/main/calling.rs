@@ -31,8 +31,8 @@ pub(super) fn call(args: &[String]) -> Exit {
         eprintln!(
             "exit: 0 answered, 1 refused, 2 this command line, 3 nothing came back, 4 no city at --at"
         );
-        eprintln!("commands: {}", channels::COMMAND_NAMES.join(", "));
-        eprintln!("queries:  {}", channels::QUERY_NAMES.join(", "));
+        eprintln!("commands: {}", wire::COMMAND_NAMES.join(", "));
+        eprintln!("queries:  {}", wire::QUERY_NAMES.join(", "));
         return Exit::Line;
     };
     // `-` reads the frame from stdin, which is how a frame too long for

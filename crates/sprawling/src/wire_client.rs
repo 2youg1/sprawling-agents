@@ -3,18 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The second client of `channels::wire` (sprawling-SPEC.md section
+//! The second client of `wire::frames` (sprawling-SPEC.md section
 //! 8-10).
 //!
 //! ARCHITECTURE section 8 says the wire is the whole API and that a
 //! second client writes against it. Until this existed there was one
 //! client, which by the repository's own test (section 4: one adapter is
-//! a hypothetical seam, two make it real) left `channels::wire` a
+//! a hypothetical seam, two make it real) left `wire::frames` a
 //! hypothetical seam.
 //!
-//! The handshake is computed here from `channels::WIRE_V` and
-//! `channels::schema_hash()` rather than copied, so a command renamed in
-//! `wire.rs` cannot leave this client behind.
+//! The handshake is computed here from `wire::WIRE_V` and
+//! `wire::schema_hash()` rather than copied, so a command renamed in
+//! `frames.rs` cannot leave this client behind.
 
 use futures_util::{SinkExt, StreamExt};
 use kernel::{AxCode, AxError};
@@ -58,10 +58,10 @@ pub(crate) enum Unheard {
 }
 
 /// The greeting this build sends, computed rather than transcribed.
-fn hello(token: Option<&str>) -> channels::ClientFrame {
-    channels::ClientFrame::Hello(channels::Hello {
-        wire_v: channels::WIRE_V,
-        schema: channels::schema_hash(),
+fn hello(token: Option<&str>) -> wire::ClientFrame {
+    wire::ClientFrame::Hello(wire::Hello {
+        wire_v: wire::WIRE_V,
+        schema: wire::schema_hash(),
         token: token.map(str::to_owned),
     })
 }
@@ -106,7 +106,7 @@ pub(crate) fn call(
     // The frame is parsed before the socket is opened: a typo should
     // cost nothing and should be reported against the text a person
     // wrote, not against whatever the server made of it.
-    let outgoing: channels::ClientFrame = serde_json::from_str(frame).map_err(|err| {
+    let outgoing: wire::ClientFrame = serde_json::from_str(frame).map_err(|err| {
         Unheard::Unreadable(malformed("read the frame to send", &err.to_string()))
     })?;
     send(at, &outgoing, token, listen)
@@ -120,7 +120,7 @@ pub(crate) fn call(
 /// As [`call`], less the frame this process could not read.
 pub(crate) fn send(
     at: &str,
-    outgoing: &channels::ClientFrame,
+    outgoing: &wire::ClientFrame,
     token: Option<&str>,
     listen: Listen,
 ) -> Result<Heard, Unheard> {
@@ -285,7 +285,7 @@ mod tests {
     /// for `linger`, as a served city does, so only the client under
     /// test can end the call early.
     fn city_saying(
-        said: Vec<channels::ServerFrame>,
+        said: Vec<wire::ServerFrame>,
         linger: Duration,
     ) -> (String, std::thread::JoinHandle<()>) {
         let (ready, port) = std::sync::mpsc::channel();
@@ -308,9 +308,9 @@ mod tests {
                 // The greeting is answered, because a client that never
                 // got a Welcome reports an unreachable city instead.
                 let _greeting = socket.next().await;
-                let welcome = channels::ServerFrame::Welcome(channels::Welcome {
-                    wire_v: channels::WIRE_V,
-                    schema: channels::schema_hash(),
+                let welcome = wire::ServerFrame::Welcome(wire::Welcome {
+                    wire_v: wire::WIRE_V,
+                    schema: wire::schema_hash(),
                     resume_from: None,
                     city: None,
                     epoch: None,
@@ -325,7 +325,7 @@ mod tests {
         (format!("127.0.0.1:{}", port.recv().unwrap()), scripted)
     }
 
-    fn event(kind: EventKind) -> channels::ServerFrame {
+    fn event(kind: EventKind) -> wire::ServerFrame {
         let draft = EventDraft {
             run: RunId::CITY,
             t: TimeMs::new(0),
@@ -335,7 +335,7 @@ mod tests {
             data: Payload::new(serde_json::Map::new()).unwrap(),
             ig: false,
         };
-        channels::ServerFrame::Event(Box::new(EventRecord::from_draft(
+        wire::ServerFrame::Event(Box::new(EventRecord::from_draft(
             draft,
             Seq::FIRST,
             GENESIS_PREV,
@@ -389,10 +389,10 @@ mod tests {
     #[test]
     fn a_query_returns_on_its_answer_before_the_quiet_window_ends() {
         let quiet = Duration::from_millis(1_000);
-        let answer = channels::ServerFrame::Answered(Box::new(channels::Answered {
-            ask_id: channels::AskId(1),
+        let answer = wire::ServerFrame::Answered(Box::new(wire::Answered {
+            ask_id: wire::AskId(1),
             as_of: kernel::Seq::FIRST,
-            outcome: channels::AskOutcome::Answer(channels::Answer::Run(None)),
+            outcome: wire::AskOutcome::Answer(wire::Answer::Run(None)),
         }));
         let (at, scripted) = city_saying(vec![answer], Duration::from_millis(1_500));
         let began = std::time::Instant::now();
@@ -460,22 +460,22 @@ mod tests {
     }
 
     /// The whole reason this module exists: the greeting is derived from
-    /// `channels`, so there is no second place where the wire version or
+    /// `wire`, so there is no second place where the wire version or
     /// the schema hash is written down. The probe this replaces had both
     /// copied out into a file outside the workspace.
     #[test]
     fn the_greeting_is_this_build_s_own_and_not_a_transcription() {
-        let channels::ClientFrame::Hello(said) = hello(None) else {
+        let wire::ClientFrame::Hello(said) = hello(None) else {
             panic!("a greeting is a Hello");
         };
-        assert_eq!(said.wire_v, channels::WIRE_V);
-        assert_eq!(said.schema, channels::schema_hash());
+        assert_eq!(said.wire_v, wire::WIRE_V);
+        assert_eq!(said.schema, wire::schema_hash());
         assert_eq!(said.token, None);
     }
 
     #[test]
     fn a_token_travels_when_one_was_given() {
-        let channels::ClientFrame::Hello(said) = hello(Some("pair-me")) else {
+        let wire::ClientFrame::Hello(said) = hello(Some("pair-me")) else {
             panic!("a greeting is a Hello");
         };
         assert_eq!(said.token.as_deref(), Some("pair-me"));

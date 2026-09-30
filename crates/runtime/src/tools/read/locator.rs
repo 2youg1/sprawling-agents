@@ -17,7 +17,7 @@
 use std::path::Path;
 
 use kernel::{Address, AxCode, AxError, B3Hash, Locator, ReadVerdict};
-use memory::MemoryError;
+use storage::StorageError;
 
 /// The text a `cas:` or `file:` argument names, or `None` when the
 /// argument is not a Locator and belongs to the catalog or a path.
@@ -47,10 +47,10 @@ fn read_admitted(
     })?;
     let bytes = match &locator {
         Locator::Cas { hash, range } => {
-            let cas = memory::Cas::open(store).map_err(MemoryError::into_ax)?;
+            let cas = storage::Cas::open(store).map_err(StorageError::into_ax)?;
             let building = judged_at(
                 hash,
-                &cas.origins(hash).map_err(MemoryError::into_ax)?,
+                &cas.origins(hash).map_err(StorageError::into_ax)?,
                 bound,
             )?;
             super::super::chosen_path::admit(building.as_str(), "read", bound)?;
@@ -58,7 +58,7 @@ fn read_admitted(
                 Some(range) => cas.get_range(hash, range),
                 None => cas.get(hash),
             }
-            .map_err(MemoryError::into_ax)?
+            .map_err(StorageError::into_ax)?
         }
         Locator::File {
             address,
@@ -66,8 +66,8 @@ fn read_admitted(
             range: None,
         } => {
             super::super::chosen_path::admit(address.as_str(), "read", bound)?;
-            memory::blob_at(city_root, *oid, address)
-                .map_err(MemoryError::into_ax)?
+            storage::blob_at(city_root, *oid, address)
+                .map_err(StorageError::into_ax)?
                 .ok_or_else(|| {
                     AxError::failure(
                         AxCode::InvalidArgs,
@@ -102,7 +102,7 @@ fn read_admitted(
 /// `E_GATE_DENIED` for a block put for no building.
 fn judged_at(
     hash: &B3Hash,
-    origins: &[memory::BlockOrigin],
+    origins: &[storage::BlockOrigin],
     bound: &dyn Fn(&Address) -> ReadVerdict,
 ) -> Result<Address, AxError> {
     origins

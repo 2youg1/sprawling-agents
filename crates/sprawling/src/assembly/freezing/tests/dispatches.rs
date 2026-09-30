@@ -33,7 +33,7 @@ fn a_handoff_that_cannot_be_read_is_refused_by_name() {
 
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("nothing to do", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    let outcome = worker.handle(channels::Command::Dispatch {
+    let outcome = worker.handle(wire::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
         task: "carry on".to_owned(),
         goal: "one turn".to_owned(),
@@ -80,7 +80,7 @@ fn work_offered_in_up_mode_without_a_test_does_not_land() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "change the note".to_owned(),
             goal: "the note reads after".to_owned(),
@@ -119,14 +119,14 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room.clone(),
             task: "measure the thing".to_owned(),
             goal: "a number with a unit, then stop".to_owned(),
@@ -218,7 +218,7 @@ fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it()
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "look around".to_owned(),
             goal: "one status call".to_owned(),
@@ -301,7 +301,7 @@ fn the_frozen_handoff_carries_the_rooms_own_sections_and_pins_its_bytes() {
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room,
             task: "measure the thing".to_owned(),
             goal: "a number with a unit, then stop".to_owned(),

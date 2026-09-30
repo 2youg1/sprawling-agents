@@ -6,9 +6,9 @@
 //! What moved between two checkpoints, as a fact rather than as a patch.
 //!
 //! Here rather than beside the git call that produces it, for the reason
-//! `Restoration` is here: three places need this shape — `memory` reads
-//! it off two trees, `channels` carries it, and the interface draws it —
-//! and `channels` cannot see `memory`. Defining it twice and converting
+//! `Restoration` is here: three places need this shape — `storage` reads
+//! it off two trees, `wire` carries it, and the interface draws it —
+//! and `wire` cannot see `storage`. Defining it twice and converting
 //! between the copies would be two definitions of what a file change is,
 //! and the one that drifts is always the one nobody is looking at.
 //!

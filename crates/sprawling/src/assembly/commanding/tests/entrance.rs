@@ -68,7 +68,7 @@ fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
 
     // One key, minted once, sent twice - which is exactly what a client
     // that retried a frame it was not sure had arrived would send.
-    let asked = || channels::Command::Dispatch {
+    let asked = || wire::Command::Dispatch {
         addr: Address::parse("lab").unwrap(),
         task: "read the plan".to_owned(),
         goal: "one answer".to_owned(),
@@ -81,7 +81,7 @@ fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
     for _sent in 0..2 {
         worker.serve_one(Posted {
             command: asked(),
-            reply: channels::Reply::nowhere(),
+            reply: wire::Reply::nowhere(),
         });
     }
     // The desk starts a run and the loop lands it; this is that loop.
@@ -118,17 +118,17 @@ fn a_repeat_is_answered_with_what_the_first_ask_was_answered() {
     let heard: Arc<std::sync::Mutex<Vec<AxError>>> = Arc::new(std::sync::Mutex::new(Vec::new()));
     let peer = || {
         let told = Arc::clone(&heard);
-        channels::Reply::to(move |error| {
+        wire::Reply::to(move |error| {
             let Ok(mut told) = told.lock() else {
-                return channels::Delivered::PeerGone;
+                return wire::Delivered::PeerGone;
             };
             told.push(error);
-            channels::Delivered::ToThePeer
+            wire::Delivered::ToThePeer
         })
     };
     // A run id nothing answers to: refused every time, and refused for
     // the same reason every time.
-    let asked = || channels::Command::Cancel {
+    let asked = || wire::Command::Cancel {
         run: RunId::CITY,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"cancel"),
     };
@@ -148,8 +148,8 @@ fn a_repeat_is_answered_with_what_the_first_ask_was_answered() {
     // A command that succeeded is not carried out twice either, and the
     // second ask is not told that nothing was waiting.
     drop(told);
-    let halt = || channels::Command::Halt {
-        scope: channels::HaltScope::City,
+    let halt = || wire::Command::Halt {
+        scope: wire::HaltScope::City,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"halt"),
     };
     for _sent in 0..2 {
@@ -177,8 +177,8 @@ fn a_repeat_is_answered_with_what_the_first_ask_was_answered() {
 fn a_key_already_in_the_history_is_recognised_after_a_restart() {
     let dir = tempfile::tempdir().unwrap();
     let report = init_city(dir.path()).unwrap();
-    let halt = || channels::Command::Halt {
-        scope: channels::HaltScope::City,
+    let halt = || wire::Command::Halt {
+        scope: wire::HaltScope::City,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"halt"),
     };
     {
@@ -190,7 +190,7 @@ fn a_key_already_in_the_history_is_recognised_after_a_restart() {
         .unwrap();
         worker.serve_one(Posted {
             command: halt(),
-            reply: channels::Reply::nowhere(),
+            reply: wire::Reply::nowhere(),
         });
     }
     let mut restarted = RunWorker::new(
@@ -201,7 +201,7 @@ fn a_key_already_in_the_history_is_recognised_after_a_restart() {
     .unwrap();
     restarted.serve_one(Posted {
         command: halt(),
-        reply: channels::Reply::nowhere(),
+        reply: wire::Reply::nowhere(),
     });
     assert_eq!(
         lines_of(&report.ledger_dir, "city_halted"),

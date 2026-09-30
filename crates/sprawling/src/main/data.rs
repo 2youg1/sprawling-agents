@@ -9,7 +9,7 @@
 //!
 //! Each function here owns only the part a person sees — the usage
 //! line, the sentence printed about what happened, and the exit code —
-//! while the work itself stays in `memory`, `assembly`, `install` and
+//! while the work itself stays in `storage`, `assembly`, `install` and
 //! `wire_client`. That is why every one of them takes the arguments
 //! `router` already read and returns an `ExitCode` instead of a value:
 //! for an agent driving this binary, the exit code is the result.
@@ -65,7 +65,7 @@ pub(super) fn enrol(read: &Arguments) -> ExitCode {
         Ok(reference) => {
             println!("{reference}");
             // Accepted, not yet stored: the route answers before the
-            // worker has taken it (channels-SPEC.md section 8).
+            // worker has taken it (wire-SPEC.md section 8).
             eprintln!("accepted; the city stores it as soon as its worker is free");
             ExitCode::SUCCESS
         }
@@ -118,7 +118,7 @@ pub(super) fn export(city: Option<&String>, dest: Option<&String>) -> ExitCode {
         eprintln!("usage: sprawling export <city-dir> <bundle-dir>");
         return ExitCode::from(2);
     };
-    match memory::Bundle::export(std::path::Path::new(city), std::path::Path::new(dest)) {
+    match storage::Bundle::export(std::path::Path::new(city), std::path::Path::new(dest)) {
         Ok(manifest) => {
             println!(
                 "exported {} record(s), {} object(s), {} file(s) to {dest}",
@@ -141,7 +141,7 @@ pub(super) fn restore(bundle: Option<&String>, city: Option<&String>) -> ExitCod
         eprintln!("usage: sprawling restore <bundle-dir> <city-dir>");
         return ExitCode::from(2);
     };
-    match memory::Bundle::restore(std::path::Path::new(bundle), std::path::Path::new(city)) {
+    match storage::Bundle::restore(std::path::Path::new(bundle), std::path::Path::new(city)) {
         Ok(manifest) => {
             println!(
                 "restored {} record(s) into {city}; chain head {}",
@@ -191,9 +191,9 @@ pub(super) fn fork(args: &[String]) -> ExitCode {
         runtime::diagnostics::Diagnostics::off(),
     )
     .and_then(|mut worker| {
-        worker.handle(channels::Command::OpenSession {
+        worker.handle(wire::Command::OpenSession {
             addr: room.clone(),
-            carry: channels::Carry::Nothing,
+            carry: wire::Carry::Nothing,
             from: Some(origin),
             idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, b"fork"),
         })
@@ -272,7 +272,7 @@ pub(super) fn replay(dir: Option<&String>) -> ExitCode {
 /// `E_PATH_NOT_FOUND` when the directory holds no ledger segment, and
 /// whatever chain verification says about a ledger that is there.
 pub(super) fn verified_chain(dir: &std::path::Path) -> Result<String, kernel::AxError> {
-    let segments = memory::ledger_segments_at(dir).map_err(memory::MemoryError::into_ax)?;
+    let segments = storage::ledger_segments_at(dir).map_err(storage::StorageError::into_ax)?;
     if segments.is_empty() {
         return Err(kernel::AxError::failure(
             kernel::AxCode::PathNotFound,

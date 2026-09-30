@@ -5,7 +5,7 @@
 
 //! The official harnesses this city drives as ACP agents: which five
 //! (`roster`), and one session with one of them (`session`)
-//! (protocol-SPEC.md 8-19).
+//! (agent_protocols-SPEC.md 8-19).
 
 mod process;
 mod reading;

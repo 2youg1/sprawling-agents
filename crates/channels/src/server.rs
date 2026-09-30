@@ -5,8 +5,8 @@
 
 //! The listening end, and the humble half of it (ARCHITECTURE section
 //! 9). Every branch here is a send, a receive, or the end of a session;
-//! the judgements it applies are `channels::reception`'s and the bytes
-//! it serves are `channels::assets`'.
+//! the judgements it applies are `wire::reception`'s and the bytes
+//! it serves are `wire::assets`'.
 //!
 //! Five jobs and no policy: serve the client bundle, upgrade a
 //! WebSocket, accept an upload, take a credential from a caller on this

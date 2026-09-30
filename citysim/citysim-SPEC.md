@@ -206,7 +206,7 @@ pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str>;
 | `l100k` | 2,000 个 run × 50 条 | 5 |
 | `l400k` | 8,000 个 run × 50 条 | 3 |
 
-一个 run 是 `run_started`、八个回合（`prompt_assembled`、`model_called`、`model_returned`、`tool_called`、`tool_result`、`checkpoint_committed`）与 `run_frozen`，正文长度与实测城市的记录相近。这是每回合一条 `prompt_assembled` 的账本形状：产品写的是每 run 一条 `prompt_assembled` 加每回合一条 `prompt_shape_compared`（runtime-SPEC §8-39 第 5 条），而每回合一条的账本仍被读入，故夹具是合法输入，其折叠代价与一座真正工作过的城同量级，但不逐条同形。账本经 `memory::JsonlLedger::append_all` 按每批 10,000 条写入：分段、链与字节规范都是产品自己的，本族不拼一行账。
+一个 run 是 `run_started`、八个回合（`prompt_assembled`、`model_called`、`model_returned`、`tool_called`、`tool_result`、`checkpoint_committed`）与 `run_frozen`，正文长度与实测城市的记录相近。这是每回合一条 `prompt_assembled` 的账本形状：产品写的是每 run 一条 `prompt_assembled` 加每回合一条 `prompt_shape_compared`（runtime-SPEC §8-39 第 5 条），而每回合一条的账本仍被读入，故夹具是合法输入，其折叠代价与一座真正工作过的城同量级，但不逐条同形。账本经 `storage::JsonlLedger::append_all` 按每批 10,000 条写入：分段、链与字节规范都是产品自己的，本族不拼一行账。
 
 **夹具城留在 `<构建档目录>/../bench-cities/<名>`**，下次复用：40 万条是 376 MB，每次重写要付的时间比量它还多。复用只看那座城在不在；`xtask mem --city` 读的就是同一座城（xtask-SPEC §8-30），于是首字节与启动峰值出自同一份历史。
 
@@ -269,9 +269,9 @@ pub fn all(scratch: &Path, fixture: &Fixture, machine: MachineClass)
 | 场景 | 驱动的公共面 | 子指标 |
 |---|---|---|
 | `large_ledger_fold` | `sprawling::ask`，重建每个视图的生产全路径 | `harness` |
-| `large_worktree_placement` | `memory::Checkpoint::ensure_base` 之后 `Worktrees::claim`／`release` | `whole` |
-| `kept_worktree_reclaim` | 同一座城里同一个节点的第二次及以后的 `Worktrees::claim`，其间干线不动（memory-SPEC 8-9 的再领） | `whole` |
-| `long_session_forwarding` | `channels::ServerFrame::Event` 装帧＋序列化，即 socket 之前的本地半段 | `harness` |
+| `large_worktree_placement` | `storage::Checkpoint::ensure_base` 之后 `Worktrees::claim`／`release` | `whole` |
+| `kept_worktree_reclaim` | 同一座城里同一个节点的第二次及以后的 `Worktrees::claim`，其间干线不动（storage-SPEC 8-9 的再领） | `whole` |
+| `long_session_forwarding` | `wire::ServerFrame::Event` 装帧＋序列化，即 socket 之前的本地半段 | `harness` |
 
 失败出口：域错误按其 `AxError`（动作/主体/稳定码/恢复语）格式化成一行；bench 自身的失败（零样本）构造 `AxError::failure(AxCode::InvalidArgs, …)`＋`with_recovery`，不新增码（§9-16 的口径）；Main 打 `bench failed: …` 且退出非零（既有形）。
 
@@ -319,7 +319,7 @@ pub fn compare(cases: &[Case]) -> Comparison
 | `nesting` | 模型编辑哪种嵌套格式错得最少，错时怎么错 | 仅测试构型 |
 | `ablation` | 拿掉 City.md 的某一段，居民做不了什么 | 仅测试构型 |
 
-三条前提只消费不重议：**评分对象是资产不是 Agent**（会话冻结即终结，Ephemeral 恒不进评分与 metabolism）；**语料只取自真实工作**（一份合成任务集测出来的分数，测的是出题人）；**登记归 `kernel::registry`**（Asset 是什么、登记在哪由它答；这里只答「这份登记值多少」，成本读数归 `memory::attribution`）。统计全用整数，比率以千分数（`per_mille`）表达，不引入统计库。
+三条前提只消费不重议：**评分对象是资产不是 Agent**（会话冻结即终结，Ephemeral 恒不进评分与 metabolism）；**语料只取自真实工作**（一份合成任务集测出来的分数，测的是出题人）；**登记归 `kernel::registry`**（Asset 是什么、登记在哪由它答；这里只答「这份登记值多少」，成本读数归 `storage::attribution`）。统计全用整数，比率以千分数（`per_mille`）表达，不引入统计库。
 
 **仪器只在测试构型里编译。** `score`、`metabolism`、`nesting`、`ablation` 在 `lib.rs` 写作 `#[cfg(test)] mod`：它们回答的是「这套规则算得对不对」，答法是自己的测试，提问者是读测试的人；没有剧本调用它们。dead_code 因此不是被 `#[allow]` 压掉的，是不存在的。**重开条件**：出现一个生产调用点要对资产排序或退场，例如城层的资产清单视图；届时那个模块搬到拥有该视图的 crate。
 

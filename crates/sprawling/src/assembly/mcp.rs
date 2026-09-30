@@ -37,7 +37,7 @@ struct Keyed {
 
 /// One connected server and what it offered when it connected.
 struct Resident {
-    link: protocol::McpLink,
+    link: agent_protocols::McpLink,
     /// Each tool under both its names, in the order the server listed
     /// them.
     listed: Vec<(kernel::ToolMeta, String)>,
@@ -50,7 +50,7 @@ impl accounting::Connectors for Residents {
         write_root: &std::path::Path,
         confidential: bool,
         resolve: &gateway::SecretResolver,
-    ) -> Result<(Vec<protocol::McpTool>, Reached), AxError> {
+    ) -> Result<(Vec<agent_protocols::McpTool>, Reached), AxError> {
         self.tools(server, write_root, confidential, resolve)
     }
 }
@@ -68,7 +68,7 @@ impl Residents {
     ///
     /// # Errors
     /// Propagates the transport's refusal to open, a failed handshake or
-    /// listing, and `protocol::McpTool::new`'s refusal on a confidential
+    /// listing, and `agent_protocols::McpTool::new`'s refusal on a confidential
     /// building.
     pub(crate) fn tools(
         &self,
@@ -76,7 +76,7 @@ impl Residents {
         write_root: &std::path::Path,
         confidential: bool,
         resolve: &gateway::SecretResolver,
-    ) -> Result<(Vec<protocol::McpTool>, Reached), AxError> {
+    ) -> Result<(Vec<agent_protocols::McpTool>, Reached), AxError> {
         let keyed = self.keyed(server, write_root)?;
         let mut connected = super::workbench::held(&keyed.connected, "reach an mcp server")?;
         if let Some(resident) = connected
@@ -149,29 +149,34 @@ impl Resident {
         server: &kernel::McpServer,
         write_root: &std::path::Path,
         resolve: &gateway::SecretResolver,
-    ) -> Result<(Resident, protocol::Handshake), AxError> {
-        use protocol::Outbound as _;
+    ) -> Result<(Resident, agent_protocols::Handshake), AxError> {
+        use agent_protocols::Outbound as _;
 
         // The run's own root, which exists whether or not this building
         // lends its runs a worktree.
-        let mut link = protocol::McpLink::open(&server.transport, write_root, resolve)?;
-        let mut rpc = protocol::Rpc::new();
-        let opened = protocol::handshake(&mut link, &mut rpc, protocol::EXTERNAL_CALL_PATIENCE)?;
-        let listing = link.call(&rpc.list_tools(), protocol::EXTERNAL_CALL_PATIENCE)?;
-        let listed = protocol::tools_from(&server.label, &protocol::Rpc::read(&listing)?)?
-            .into_iter()
-            .map(|entry| (entry.meta, entry.remote))
-            .collect();
+        let mut link = agent_protocols::McpLink::open(&server.transport, write_root, resolve)?;
+        let mut rpc = agent_protocols::Rpc::new();
+        let opened = agent_protocols::handshake(
+            &mut link,
+            &mut rpc,
+            agent_protocols::EXTERNAL_CALL_PATIENCE,
+        )?;
+        let listing = link.call(&rpc.list_tools(), agent_protocols::EXTERNAL_CALL_PATIENCE)?;
+        let listed =
+            agent_protocols::tools_from(&server.label, &agent_protocols::Rpc::read(&listing)?)?
+                .into_iter()
+                .map(|entry| (entry.meta, entry.remote))
+                .collect();
         Ok((Resident { link, listed }, opened))
     }
 
     /// One handle per tool on the one connection: two connections would
     /// be two answers to what the same label offers.
-    fn tools(&self, confidential: bool) -> Result<Vec<protocol::McpTool>, AxError> {
+    fn tools(&self, confidential: bool) -> Result<Vec<agent_protocols::McpTool>, AxError> {
         self.listed
             .iter()
             .map(|(meta, remote)| {
-                protocol::McpTool::new(
+                agent_protocols::McpTool::new(
                     meta.clone(),
                     remote.clone(),
                     Box::new(self.link.clone()),
@@ -239,7 +244,7 @@ mod tests {
     fn a_configured_server_becomes_a_tool_the_model_is_told_about_and_can_call() {
         let dir = tempfile::tempdir().unwrap();
         let report = init_city(dir.path()).unwrap();
-        let (command, args) = protocol::echoing(SERVER_ANSWER);
+        let (command, args) = agent_protocols::echoing(SERVER_ANSWER);
         write_server_table(dir.path(), "lab", &command, &args);
 
         let (base_url, provider) = fake_openai(
@@ -251,7 +256,7 @@ mod tests {
         );
         let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
         worker
-            .handle(channels::Command::Dispatch {
+            .handle(wire::Command::Dispatch {
                 addr: Address::parse("lab/room1").unwrap(),
                 task: "ask the outside service".to_owned(),
                 goal: "one answer is enough".to_owned(),
@@ -322,7 +327,7 @@ mod tests {
         );
         let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
         worker
-            .handle(channels::Command::Dispatch {
+            .handle(wire::Command::Dispatch {
                 addr: Address::parse("lab/room1").unwrap(),
                 task: "read both files".to_owned(),
                 goal: "both read".to_owned(),
@@ -356,7 +361,7 @@ mod tests {
     fn a_confidential_building_starts_no_server_and_a_dead_one_is_simply_absent() {
         let dir = tempfile::tempdir().unwrap();
         init_city(dir.path()).unwrap();
-        let (command, args) = protocol::echoing(SERVER_ANSWER);
+        let (command, args) = agent_protocols::echoing(SERVER_ANSWER);
         write_server_table(dir.path(), "lab", &command, &args);
         let worker = RunWorker::new(
             dir.path(),
@@ -438,8 +443,11 @@ mod tests {
     fn a_server_still_shaking_hands_keeps_no_other_server_waiting() {
         let dir = tempfile::tempdir().unwrap();
         let (starts, gate) = (dir.path().join("starts.txt"), dir.path().join("open"));
-        let slow = stdio_server("slow", protocol::gated(SERVER_ANSWER, &starts, &gate));
-        let quick = stdio_server("quick", protocol::echoing(SERVER_ANSWER));
+        let slow = stdio_server(
+            "slow",
+            agent_protocols::gated(SERVER_ANSWER, &starts, &gate),
+        );
+        let quick = stdio_server("quick", agent_protocols::echoing(SERVER_ANSWER));
         let residents = Residents::default();
 
         std::thread::scope(|scope| {
@@ -470,7 +478,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         init_city(dir.path()).unwrap();
         let starts = dir.path().join("starts.txt");
-        let (command, args) = protocol::counting_starts(SERVER_ANSWER, &starts);
+        let (command, args) = agent_protocols::counting_starts(SERVER_ANSWER, &starts);
         write_server_table(dir.path(), "lab", &command, &args);
         let worker = RunWorker::new(
             dir.path(),
@@ -511,7 +519,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         init_city(dir.path()).unwrap();
         let (starts, gate) = (dir.path().join("starts.txt"), dir.path().join("open"));
-        let (command, args) = protocol::gated(SERVER_ANSWER, &starts, &gate);
+        let (command, args) = agent_protocols::gated(SERVER_ANSWER, &starts, &gate);
         write_server_table(dir.path(), "lab", &command, &args);
         let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
         let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
@@ -532,7 +540,7 @@ mod tests {
         };
 
         worker.serve_one(crate::assembly::Posted {
-            command: channels::Command::Dispatch {
+            command: wire::Command::Dispatch {
                 addr: Address::parse("lab/room1").unwrap(),
                 task: "ask the outside service".to_owned(),
                 goal: "one answer is enough".to_owned(),
@@ -542,7 +550,7 @@ mod tests {
                 effort: None,
                 model: None,
             },
-            reply: channels::Reply::nowhere(),
+            reply: wire::Reply::nowhere(),
         });
         let answered_before_the_handshake = !gate.exists();
         std::fs::write(&gate, "").unwrap();

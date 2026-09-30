@@ -8,7 +8,7 @@
 
 Specifies the harness run the dispatch path starts for a room whose resident
 is one of the five official harnesses (sprawling-SPEC.md section 8-4e), over the
-ACP session in `crates/protocol/src/harness/session.rs` (protocol-SPEC.md
+ACP session in `crates/protocol/src/harness/session.rs` (agent_protocols-SPEC.md
 section 8-19). The Rust code is the authority on how these properties hold;
 this model is the authority on which properties must hold.
 

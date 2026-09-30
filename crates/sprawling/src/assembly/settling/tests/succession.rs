@@ -97,7 +97,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "carry a long piece of work".to_owned(),
             goal: "it ends".to_owned(),
@@ -158,7 +158,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
         .expect("the fourth run's wave fences a commit");
     let oid = kernel::GitOid::parse(fenced.data().as_map()["oid"].as_str().unwrap()).unwrap();
     let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
-    let channels::Answer::Commit(said) = views.answer(&channels::Query::Commit { oid }) else {
+    let wire::Answer::Commit(said) = views.answer(&wire::Query::Commit { oid }) else {
         panic!("a commit this city made answers which run wrote it");
     };
     let expected: Vec<RunId> = started.iter().rev().map(|record| record.run()).collect();
@@ -203,7 +203,7 @@ fn the_handoff_in_the_room_reaches_the_successor() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "write the parser".to_owned(),
             goal: "it parses".to_owned(),

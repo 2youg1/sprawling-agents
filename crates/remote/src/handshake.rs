@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The handshake a paired device and its city make on every connection
-//! (remote-SPEC.md §8-4).
+//! (remote_access-SPEC.md §8-4).
 //!
 //! Three messages. The device sends [`Hello`]: its id, an ephemeral
 //! X25519 key, an ephemeral ML-KEM-768 encapsulation key and a nonce. The

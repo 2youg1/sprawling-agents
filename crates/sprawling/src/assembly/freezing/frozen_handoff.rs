@@ -53,7 +53,7 @@ impl Freezing<'_> {
         let pinned = self
             .cas
             .put(text.as_bytes())
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         must_read.push(Locator::cas(pinned));
         let sections = city::handoff_sections(&text);
         Handoff::new(

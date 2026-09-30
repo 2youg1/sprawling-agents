@@ -52,7 +52,7 @@ pub(crate) enum Role {
 pub(crate) fn for_user_browser(
     city_root: &std::path::Path,
     user: &city::UserBrowser,
-    origin: memory::BlockOrigin,
+    origin: storage::BlockOrigin,
 ) -> Result<BrowserTool, AxError> {
     let cas = open_cas(city_root)?;
     match user {

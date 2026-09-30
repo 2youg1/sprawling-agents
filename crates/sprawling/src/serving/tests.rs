@@ -29,14 +29,14 @@ fn the_key_this_city_mints_is_the_key_its_own_door_accepts() {
     let Keyed::Minted(code) = key_for(exposed, None).expect("this machine has entropy") else {
         panic!("an address beyond this machine with nothing configured mints one");
     };
-    let digest = channels::PairingToken::from_configured(&code)
+    let digest = wire::PairingToken::from_configured(&code)
         .expect("a minted code is long enough to adopt")
         .digest();
     assert!(
-        channels::verify(Some(&code), &digest),
+        wire::verify(Some(&code), &digest),
         "the code shown to a person opens the door it guards"
     );
-    assert!(!channels::verify(None, &digest), "silence is not the key");
+    assert!(!wire::verify(None, &digest), "silence is not the key");
 }
 
 /// One-time means one time. Two serves of the same address must not

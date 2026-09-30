@@ -60,7 +60,7 @@ Identity（两态）｜Resident｜Ephemeral｜Dossier｜URBANITE.md。**不引�
 
 **三件邻居的活，及它们各自的主人**（写「X 归 Y」而非「不做 X」）：
 
-- 落盘与历史归 `memory`：本模块**读** `URBANITE.md`，写入与备份归 memory 与 checkpoint。
+- 落盘与历史归 `storage`：本模块**读** `URBANITE.md`，写入与备份归 memory 与 checkpoint。
 - Building 规则（confidential、写域、阅览室准入）归 `city::policy`：本模块只答「谁」，不答「他能做什么」。
 - 身份的**呈现**归客户端（`client/`）：Dossier 是数值，界面怎么画它是客户端的事。
 
@@ -587,7 +587,7 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 
 **安装的决定与动作（`library::install`）**
 
-**A（选中）：`plan_install` → `PlannedInstall::apply` 拆两步，`install` 是两者的合成。** 全部拒绝发生在决定里，动作只能从决定里拿到（`memory::worktree` 的 `plan_merge` 同形）。TOCTOU 复查问的正是「决定之后、落位之前，世界动了没有」——这道缝不打开，复查就无处可查；批准面也在这道缝上：人按 `PlannedInstall::hash()` 批准一个具体哈希再让它落地。
+**A（选中）：`plan_install` → `PlannedInstall::apply` 拆两步，`install` 是两者的合成。** 全部拒绝发生在决定里，动作只能从决定里拿到（`storage::worktree` 的 `plan_merge` 同形）。TOCTOU 复查问的正是「决定之后、落位之前，世界动了没有」——这道缝不打开，复查就无处可查；批准面也在这道缝上：人按 `PlannedInstall::hash()` 批准一个具体哈希再让它落地。
 **B（落选）：单一同步 `install` 四步全吞。** 入口最窄，但「安装中途目录被换」在单扇门内无法被测试模拟，除非往产品代码塞一个测试钩子；而钩子进产品代码正是本仓库明拒的东西。翻案条件：落位改由携带代际计数的文件系统原语完成（复查不再需要人为制造的间隙），届时合成回单扇门。
 
 **另两个设计（配置文件名）**
@@ -658,7 +658,7 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 
 **决定**：城在项目文件夹里写下的工作文档与对话记录——计划、备忘、交接、任务单、居民身份、归档的偏好与决定、房间里的一切、城根保留子树里的账本与对象库——在城写过的每一个 git 边界上都被忽略：城根一块（§8-21 `place_city`），每栋楼一块（`place`），每个城建的房间一张封条（`seal_room`）。进历史的只有一栋楼的承诺：`SPEC.md` 与它保留子树里的五份治理文件。
 
-**理由**：这些文件写的是人与居民之间说过的话和人的偏好，是隐私；项目的历史会被推送、克隆、分享，一旦进去就收不回来。城的检查点提交（memory-SPEC 8-8）经 libgit2 的 `add_all` 与 `is_path_ignored`，同样遵守这些规则，所以忽略规则同时是人的提交与城自己的检查点的边界。
+**理由**：这些文件写的是人与居民之间说过的话和人的偏好，是隐私；项目的历史会被推送、克隆、分享，一旦进去就收不回来。城的检查点提交（storage-SPEC 8-8）经 libgit2 的 `add_all` 与 `is_path_ignored`，同样遵守这些规则，所以忽略规则同时是人的提交与城自己的检查点的边界。
 
 **为什么不合成一份文件**：git 只读一个仓库工作树之内的 `.gitignore`，一个嵌套的仓库不读它父目录的那一份（在一个父仓库里写 `.sprawling/`、在子仓库里建 `.sprawling/ledger`，`git -C 子仓库 status` 照样列出它）；而一份文件里的不带斜杠的规则对它所在目录之下的任意深度生效，写在城根的 `Roadmap.md` 会连带忽略项目自己根上的同名文件。工作区是装着几个项目的父目录时，每个项目是它自己的仓库，规则只能写在项目自己的根上。所以规则只有一张表（`gitignore` 模块），写进每一个它必须生效的位置。
 
@@ -831,7 +831,7 @@ pub fn write_governed(city_root: &Path, which: Governed, body: &str) -> Result<P
 
 - **`Preferences` 是第三份而不是第三个居民**：市长与文书各有身份文件，而「这个人怎么喜欢这座城办事」不属于任何一个居民，它属于城；它与前两者被同一条规矩治理，所以住同一处、走同一扇门。
 - **整份覆写**：这是人在一个框里编辑、按一次保存的文件，写一半会让这座城被半句话治理。旧内容不留在这里——账本上那行 `governed_document_written` 才是回头看的地方。
-- **枚举而不是文件名字符串**：文件名是城的答案，不是发帧的人的答案（channels-SPEC §8-19 同一条理由，两侧各说一次）。
+- **枚举而不是文件名字符串**：文件名是城的答案，不是发帧的人的答案（wire-SPEC §8-19 同一条理由，两侧各说一次）。
 
 ### 8-25 `desktop`：这栋楼把桌面交出去了吗（`policy` 内，形状 1 判定）
 
@@ -865,7 +865,7 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 
 **恒不复用 `Governed`**：那三份是**城**的文件（`<city>/.sprawling/`），这一份是**楼**的。把楼级路径塞进一个按 city_root 取路径的枚举里，会让那个枚举需要一个只有部分变体用得上的参数。
 
-**线上它走 `ConfigureBuilding` 的第四个可选字段**（channels-SPEC §8-40）：那条帧问的就是「这栋楼的 runs 按什么规矩来」，沙箱、外部服务器、运行中的机器上的窗口与第二级提醒落哪一层是同一个问题的四面。`configured_payload` 因此收一个 `Written { sandbox, mcp, desktop, context }` 而不是四个裸布尔——一个调用点写 `(true, false, true, false)` 说不出哪一位是哪一面。
+**线上它走 `ConfigureBuilding` 的第四个可选字段**（wire-SPEC §8-40）：那条帧问的就是「这栋楼的 runs 按什么规矩来」，沙箱、外部服务器、运行中的机器上的窗口与第二级提醒落哪一层是同一个问题的四面。`configured_payload` 因此收一个 `Written { sandbox, mcp, desktop, context }` 而不是四个裸布尔——一个调用点写 `(true, false, true, false)` 说不出哪一位是哪一面。
 
 ### 8-27 city::document：一份文档整个换上去，或者旧的留着（形状 4 adapter）
 
@@ -937,7 +937,7 @@ pub fn install(city_root: &Path, slot: &Slot, package: &Path,
 - **名称冲突校验按「一个名字一个持有」判**：目标书架上 `<name>.md` 或 `<name>/` 任一在、而 section 不同即拒——§8-8 的扫描按名字建键，两格同名会按遍历序静默互盖。同格同名的已有持有按与来源同一个预检读出哈希（文档读正文、包算整包规范串）：同哈希是幂等（`Placed::AlreadyShelved`，一个字节不写）；异哈希即拒（与「二次出生恒拒」同形，覆写会把一件在用的技能悄悄换掉）——形状不同的同名持有哈希必不同，同样拒。同一格里 `<name>.md` 与 `<name>/` 并存也拒：那是一个名字两件持有，扫描会按遍历序留下其中一件，拿任何一件的哈希答「已在架上」都是只看了一半；拒词说出两件，恢复语让人先拿下其一。name 与 section 都必须是能落盘的单段名：非空、不以点开头、无分隔符——扫描会跳过空名与点开头的项，收下这样的名字等于装进一个 catalog 永远看不见的格子。
 - **TOCTOU 复查在落位之前，落下的是快照**：`plan_install` 把来源的每一项读进内存（每项一份字节快照）并算出哈希，同时记下目标格当时有没有东西、哈希是什么；`apply` 落位前把来源整包重读一遍、重算哈希比对（哈希覆盖每一项的路径、种类、长度与内容，于是任何一项被改、增、删、换形都算「被换」），**不一致即整体拒收**（`E_VERSION_CONFLICT`）——盘上一个字节不动，`register` 不被调用。落位写的是快照里的字节而不是再去读来源，于是复查之后的一次调包也进不了书架：装上架的字节恒是来源某个完整状态的忠实映像，而落架不会盖掉一个缝里刚出现的同名持有。
 - **staging 原子换入只在 `city::document` 里**：文档经 `document::replace`（暂存文件＋`rename`）；包经 `document::place_tree`——在同一 section 里一个点开头的暂存目录中写齐每一项（每个文件在暂存目录里经 `stage` 写入并 `sync_all`，不再各自暂存改名；扫描跳过点开头的项），再一次 `rename` 把整个目录换进 `<name>/`。目录换入的目标此刻不存在（存在就是 `AlreadyShelved` 或拒），所以读者看到的要么没有这件包、要么整包，没有第三种。上次崩溃留下的同名暂存目录先删掉再写：它从未被换入，没有读者见过它。
-- **内容哈希入 CAS，登记先于换入**：`register` 由装配层供给（本 crate 依赖只有 `kernel`，CAS 归 `memory`；与 `Neighbourhood::scan` 的 `waiting` 同一口径），绑定的是 `memory::Cas::put`。登记的是哈希所算的那串字节——文档登记正文，包登记整包规范串（一个 blob，键就是人批准的哈希，历史能从它还原整包；逐项分别登记会留下一堆没有清单的 blob，整包哈希在 CAS 里指不到任何东西）。登记哈希与 `Installed::hash` 不符即拒（`E_CAS_CORRUPT`）：书架与 CAS 说的是同一份字节才叫有据可查。**来源记名即内容哈希**：盘上那份是现场，CAS 那份是历史（与 JOB.md 同一口径，§8-13 的 hash 答的正是「它变了没有」）。
+- **内容哈希入 CAS，登记先于换入**：`register` 由装配层供给（本 crate 依赖只有 `kernel`，CAS 归 `storage`；与 `Neighbourhood::scan` 的 `waiting` 同一口径），绑定的是 `storage::Cas::put`。登记的是哈希所算的那串字节——文档登记正文，包登记整包规范串（一个 blob，键就是人批准的哈希，历史能从它还原整包；逐项分别登记会留下一堆没有清单的 blob，整包哈希在 CAS 里指不到任何东西）。登记哈希与 `Installed::hash` 不符即拒（`E_CAS_CORRUPT`）：书架与 CAS 说的是同一份字节才叫有据可查。**来源记名即内容哈希**：盘上那份是现场，CAS 那份是历史（与 JOB.md 同一口径，§8-13 的 hash 答的正是「它变了没有」）。
 - **失败码**：来源不在＝`E_PATH_NOT_FOUND`；来源不是包（缺 `SKILL.md`、既不是目录也不是 `.md` 文件）、包里有链接、包超过大小上限、名字或 section 不可用、名称冲突（含同格 `<name>.md` 与 `<name>/` 并存）＝`E_INVALID_ARGS`（与 `building::create` 的「名字已被占」同码同形）；依据被换＝`E_VERSION_CONFLICT`；登记哈希不符＝`E_CAS_CORRUPT`；落盘失败沿 `document::replace` 的 `E_STORAGE_FATAL`。每条拒因都带动作、主体与可执行的恢复语。
 - **外部书架没有臂**：`Slot` 只有两个构造点，城库与楼架。外部书架是别人目录的只读挂载（§8-8），往那里落东西在类型上就拼不出来。
 
@@ -966,7 +966,7 @@ pub fn check(city_root: &Path) -> Result<Report, AxError>;
 
 **接口**：`pub enum History { Absent, Present }`；`pub fn has_history(city_root: &Path) -> Result<History, AxError>`。账本目录由 `kernel::layout::CityLayout::ledger` 回答；目录不存在或为空是 `Absent`，有一个条目是 `Present`；目录在却列不出来是 `StorageFatal`，恢复提示「让账本目录可读，或换一个城目录」——把列不出来当 `Absent` 会让 `init` 在一座只是读不到的城上再写一次创世。
 
-**决定**：这件事住在 `city`，与其余读城在盘上布局的函数（`buildings`、`survey`）同层。`init` 与 `up` 在装配点问它，doctor 也问它；doctor 是读面，读面不依赖装配点（sprawling-SPEC 8-92），而 `city` 是 doctor 本来就依赖的一层。**败给的方案**：放进 `kernel::layout`——kernel 不做文件 I/O；放进 `memory`——`memory` 读的是账本的行，这里只问目录里有没有东西，而问它的三个地方都已依赖 `city`。
+**决定**：这件事住在 `city`，与其余读城在盘上布局的函数（`buildings`、`survey`）同层。`init` 与 `up` 在装配点问它，doctor 也问它；doctor 是读面，读面不依赖装配点（sprawling-SPEC 8-92），而 `city` 是 doctor 本来就依赖的一层。**败给的方案**：放进 `kernel::layout`——kernel 不做文件 I/O；放进 `storage`——`storage` 读的是账本的行，这里只问目录里有没有东西，而问它的三个地方都已依赖 `city`。
 
 ## 模板的写法：格式标注的是「该多小心」（`docs/templates/`）
 

@@ -23,7 +23,7 @@ use std::path::Path;
 use kernel::event::record::CommitAttribution;
 use kernel::{Address, B3Hash, Effort, RunId};
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 use crate::jsonl::{first_line, ledger_segments_at};
 use crate::real_fs::RealFs;
 
@@ -93,10 +93,10 @@ impl Provenance {
     /// Propagates a ledger directory that cannot be listed or read, and
     /// refuses a directory holding no ledger at all — a city with no
     /// genesis line has no identity to sign with.
-    pub fn city_of(ledger_dir: &Path) -> Result<B3Hash, MemoryError> {
+    pub fn city_of(ledger_dir: &Path) -> Result<B3Hash, StorageError> {
         let vfs = RealFs::new();
         for segment in ledger_segments_at(ledger_dir)? {
-            let first = first_line(&vfs, &segment).map_err(|source| MemoryError::Io {
+            let first = first_line(&vfs, &segment).map_err(|source| StorageError::Io {
                 op: "read the genesis line",
                 path: segment.clone(),
                 source,
@@ -106,7 +106,7 @@ impl Provenance {
                 _ => continue,
             }
         }
-        Err(MemoryError::Checkpoint {
+        Err(StorageError::Checkpoint {
             op: "read the city's genesis line",
             detail: format!("{} holds no ledger line", ledger_dir.display()),
         })

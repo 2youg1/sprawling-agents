@@ -14,7 +14,7 @@
 //! the first browser happened to cache.
 //!
 //! **One record, one grammar.** The `[ui]` section is
-//! `channels::PreferencesAnswer` serialised, so the keys the file may
+//! `wire::PreferencesAnswer` serialised, so the keys the file may
 //! hold and the fields the answer states are one declaration: this
 //! module reads and writes, and states nothing about what a preference
 //! is. What a named change does to the record is the patch's own rule
@@ -29,8 +29,8 @@
 
 use std::path::{Path, PathBuf};
 
-use channels::{PreferencePatch, PreferencesAnswer};
 use kernel::{AxCode, AxError};
+use wire::{PreferencePatch, PreferencesAnswer};
 
 use crate::home::Home;
 
@@ -192,7 +192,7 @@ fn invalid(file: &Path, why: &impl std::fmt::Display) -> AxError {
 )]
 mod tests {
     use super::*;
-    use channels::{Chord, Lang};
+    use wire::{Chord, Lang};
 
     /// The property `adversary`'s fourth world drives over the wire,
     /// held here against the file itself: after any sequence of

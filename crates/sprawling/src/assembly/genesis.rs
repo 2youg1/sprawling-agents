@@ -11,7 +11,7 @@ use city::{History, has_history};
 use kernel::event::record::AutonomyChanged;
 use kernel::{Address, AxCode, AxError, EventDraft, EventKind, EventRef};
 use kernel::{Ledger, Payload, RunId};
-use memory::JsonlLedger;
+use storage::JsonlLedger;
 
 use crate::serving::open_vault;
 
@@ -115,7 +115,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
     })?;
     let now = accounting::Clock::now(&SystemClock)?;
     let (mut ledger, report) =
-        JsonlLedger::open(&dir, now).map_err(memory::MemoryError::into_ax)?;
+        JsonlLedger::open(&dir, now).map_err(storage::StorageError::into_ax)?;
     let genesis = ledger.append(EventDraft {
         run: RunId::CITY,
         t: now,
@@ -276,29 +276,29 @@ impl RunWorker {
         );
         // The base fence is paid here rather than by the first dispatch,
         // which would otherwise hash every file of the folder before its
-        // first tool call (memory-SPEC 8-8). No run and no model exist
+        // first tool call (storage-SPEC 8-8). No run and no model exist
         // yet, and an invented model id would be worse than none.
-        let of = memory::Provenance::new(
+        let of = storage::Provenance::new(
             RunId::CITY,
             addr.clone(),
             self.city_hash()?,
-            memory::ModelChoice {
+            storage::ModelChoice {
                 id: String::new(),
                 effort: None,
             },
         );
         let t = accounting::Clock::now(&*self.clock)?;
-        memory::Checkpoint::open(&self.city_root)
+        storage::Checkpoint::open(&self.city_root)
             .and_then(|checkpoint| {
                 checkpoint.base_fence(&[addr.as_str().to_owned()], t, &of, &mut |step| {
                     self.note(
                         runtime::diagnostics::Level::Effect,
-                        "memory::checkpoint",
+                        "storage::checkpoint",
                         &format!("{}: base fence {step:?}", addr.as_str()),
                     );
                 })
             })
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         let payload = city::building_adopted_payload(&building)?;
         self.record(EventKind::BuildingCreated, payload)
     }

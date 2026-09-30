@@ -94,7 +94,7 @@ fn a_line_that_does_not_link_to_the_newer_one_ends_the_walk_with_its_line() {
     cut.truncate(&last, 0).unwrap();
     cut.append(&last, &rewritten).unwrap();
 
-    let walked: Vec<Result<TailLine, MemoryError>> =
+    let walked: Vec<Result<TailLine, StorageError>> =
         TailLines::through(Box::new(fs.clone()), dir.path())
             .unwrap()
             .collect();
@@ -112,7 +112,7 @@ fn a_line_that_does_not_link_to_the_newer_one_ends_the_walk_with_its_line() {
         3,
         "the walk stops at the first line that does not link"
     );
-    let Some(Err(MemoryError::Envelope { line, .. })) = walked.last() else {
+    let Some(Err(StorageError::Envelope { line, .. })) = walked.last() else {
         panic!("the third line back must be refused");
     };
     assert_eq!(*line, lines.len() as u64 - 2);

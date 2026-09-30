@@ -12,7 +12,7 @@ steps that share its write domain: a run writing a file in its own tree
 (`crates/memory/src/worktree/trees.rs`) and a file restored from a point into
 that tree (`crates/memory/src/worktree/back.rs`). The Rust code is the
 authority on how these properties hold; this model is the authority on which
-properties must hold (memory-SPEC.md 8-27).
+properties must hold (storage-SPEC.md 8-27).
 
 The city's history is two things that already exist, and nothing else: the
 one Ledger, which only grows, and the git objects of the city's repository,
@@ -39,7 +39,7 @@ The model has four properties, with one group of theorems for each:
   restore (the undo) is one of them.
 
 Merging a run's work into the trunk goes through the existing fast-forward
-path (memory-SPEC.md 8-9) and is not modelled here.
+path (storage-SPEC.md 8-9) and is not modelled here.
 -/
 
 namespace GoingBack

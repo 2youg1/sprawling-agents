@@ -28,7 +28,7 @@ fn the_effort_a_config_layer_states_is_what_goes_out_on_the_wire() {
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room,
             task: "think about it".to_owned(),
             goal: "answer".to_owned(),

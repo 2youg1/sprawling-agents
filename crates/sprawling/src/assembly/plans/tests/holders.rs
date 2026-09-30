@@ -149,7 +149,7 @@ fn a_claim_whose_landing_failed_is_handed_back() {
     );
     let worker = worker_over_faults(dir.path(), Some("signal_enqueued"));
     let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();
-    let landed = worker.handle(channels::Command::Dispatch {
+    let landed = worker.handle(wire::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
         task: "take a row and tell a neighbour".to_owned(),
         goal: "one claim, one signal".to_owned(),
@@ -355,8 +355,8 @@ fn city_with_plan(plan: &str) -> tempfile::TempDir {
     dir
 }
 
-fn dispatch(key: &[u8]) -> channels::Command {
-    channels::Command::Dispatch {
+fn dispatch(key: &[u8]) -> wire::Command {
+    wire::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
         task: "work the plan".to_owned(),
         goal: "the plan's rows".to_owned(),

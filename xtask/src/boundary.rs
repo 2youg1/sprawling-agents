@@ -41,7 +41,7 @@
 //!
 //! Scope is test code only. `runtime::tools::exec` spawns processes for
 //! a living, `bin::wire_client` is a shipped WebSocket client, and
-//! `channels::server` is the real `axum::serve`; the rule is about where
+//! `wire::server` is the real `axum::serve`; the rule is about where
 //! a *check* stands, never about what production code may call.
 //!
 //! A line may still be excused with `boundary-ok: <reason>` on itself or
@@ -320,7 +320,7 @@ fn crossed(rel: &str, line: usize, token: &str, what: &str) -> Violation {
             .to_owned(),
         violation: format!("`{token}` in test code: {what}"),
         alternative: "move it to adversary/ as a property over traces, or drive the same \
-                      thing in-process through the door channels::server uses - and if \
+                      thing in-process through the door wire::server uses - and if \
                       neither is what you meant, mark the line `boundary-ok: <reason>`"
             .to_owned(),
     }

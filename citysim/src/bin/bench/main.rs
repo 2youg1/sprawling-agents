@@ -106,7 +106,7 @@ fn draft(n: u64) -> Result<EventDraft, String> {
 fn ledger_append(scratch: &std::path::Path) -> Result<(), String> {
     let dir = scratch.join("ledger");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let (mut ledger, _report) = memory::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
+    let (mut ledger, _report) = storage::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
         .map_err(|e| {
             let ax = e.into_ax();
             format!("{ax}")
@@ -158,8 +158,9 @@ fn durability_barrier(scratch: &std::path::Path) -> Result<(), String> {
     for batch in [1u64, 10, 50] {
         let dir = scratch.join(format!("barrier-{batch}"));
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let (mut ledger, _report) = memory::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
-            .map_err(|e| format!("{}", e.into_ax()))?;
+        let (mut ledger, _report) =
+            storage::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
+                .map_err(|e| format!("{}", e.into_ax()))?;
         const WAVES: u64 = 200;
         let mut times = Vec::with_capacity(usize::try_from(WAVES).unwrap_or(200));
         for wave in 0..WAVES {
@@ -232,7 +233,7 @@ fn prefix_assembly() -> Result<(), String> {
 fn run_history(scratch: &std::path::Path) -> Result<(), String> {
     let dir = scratch.join("history");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let (mut ledger, _report) = memory::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
+    let (mut ledger, _report) = storage::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
         .map_err(|e| format!("{}", e.into_ax()))?;
     // Eight sessions interleaved across fifty thousand records: a city
     // that has been working, which is the only city where this question
@@ -254,7 +255,7 @@ fn run_history(scratch: &std::path::Path) -> Result<(), String> {
         .collect::<Result<_, _>>()?;
     ledger.append_all(drafts).map_err(|e| format!("{e}"))?;
 
-    let mut index = memory::LedgerIndex::rebuild(&dir).map_err(|e| format!("{}", e.into_ax()))?;
+    let mut index = storage::LedgerIndex::rebuild(&dir).map_err(|e| format!("{}", e.into_ax()))?;
     const LIMIT: usize = 500;
     const ROUNDS: usize = 50;
     let mut times = Vec::with_capacity(ROUNDS);

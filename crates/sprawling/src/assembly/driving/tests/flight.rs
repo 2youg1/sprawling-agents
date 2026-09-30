@@ -78,7 +78,7 @@ fn two_dispatches_from_the_desk_drive_at_once() {
             asked("lab/east"),
             "fire the east kiln".to_owned(),
             "the east kiln is fired".to_owned(),
-            Owing::asked(channels::Reply::nowhere()),
+            Owing::asked(wire::Reply::nowhere()),
         )
         .unwrap();
     worker
@@ -86,7 +86,7 @@ fn two_dispatches_from_the_desk_drive_at_once() {
             asked("lab/west"),
             "fire the west kiln".to_owned(),
             "the west kiln is fired".to_owned(),
-            Owing::asked(channels::Reply::nowhere()),
+            Owing::asked(wire::Reply::nowhere()),
         )
         .unwrap();
     assert_eq!(
@@ -158,7 +158,7 @@ fn a_closing_city_lands_the_runs_still_driving() {
             asked("lab/east"),
             "fire the kiln".to_owned(),
             "the kiln is fired".to_owned(),
-            Owing::asked(channels::Reply::nowhere()),
+            Owing::asked(wire::Reply::nowhere()),
         )
         .unwrap();
     assert!(worker.driving(), "a lane is going");
@@ -231,7 +231,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     };
     let key = |material: &[u8]| kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, material);
     desk.post(
-        channels::Command::Dispatch {
+        wire::Command::Dispatch {
             addr: Address::parse("lab/east").unwrap(),
             task: "fire the east kiln".to_owned(),
             goal: "the east kiln is fired".to_owned(),
@@ -241,7 +241,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
             effort: None,
             model: None,
         },
-        channels::Reply::nowhere(),
+        wire::Reply::nowhere(),
     );
     arrived.recv_timeout(WITHIN).unwrap();
     let run = history(&report.ledger_dir)
@@ -252,15 +252,15 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
 
     let heard = |into: &Arc<Mutex<Vec<AxError>>>| {
         let told = Arc::clone(into);
-        channels::Reply::to(move |error| {
+        wire::Reply::to(move |error| {
             told.lock().unwrap().push(error);
-            channels::Delivered::ToThePeer
+            wire::Delivered::ToThePeer
         })
     };
     let for_the_run = Arc::new(Mutex::new(Vec::new()));
     let for_nobody = Arc::new(Mutex::new(Vec::new()));
     desk.post(
-        channels::Command::Cancel {
+        wire::Command::Cancel {
             run,
             idem: key(b"cancel the kiln"),
         },
@@ -269,7 +269,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     // A Cancel no run answers to, posted behind it: once its refusal is
     // back, the accounting thread has looked at everything before it.
     desk.post(
-        channels::Command::Cancel {
+        wire::Command::Cancel {
             run: RunId::CITY,
             idem: key(b"cancel nothing"),
         },
@@ -348,7 +348,7 @@ fn work_past_the_lane_count_waits_for_a_lane() {
                 asked(room),
                 "fire the kiln".to_owned(),
                 "the kiln is fired".to_owned(),
-                Owing::asked(channels::Reply::nowhere()),
+                Owing::asked(wire::Reply::nowhere()),
             )
             .unwrap();
     }

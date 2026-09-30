@@ -22,15 +22,13 @@ use std::net::SocketAddr;
 // The binding and handshake decisions belong to the listener, so this
 // file asserts them only in a build that has one.
 #[cfg(feature = "server")]
-use channels::{BindFace, BindVerdict, HandshakeVerdict, decide_bind, decide_handshake};
-use channels::{
-    COMMAND_NAMES, Command, Mode, ProviderName, QUERY_NAMES, Query, WIRE_V, schema_hash,
-};
-#[cfg(feature = "server")]
-use channels::{Hello, Welcome};
-#[cfg(feature = "server")]
 use kernel::AxCode;
 use kernel::{Address, Sealed, Seq};
+#[cfg(feature = "server")]
+use wire::{BindFace, BindVerdict, HandshakeVerdict, decide_bind, decide_handshake};
+use wire::{COMMAND_NAMES, Command, Mode, ProviderName, QUERY_NAMES, Query, WIRE_V, schema_hash};
+#[cfg(feature = "server")]
+use wire::{Hello, Welcome};
 
 #[cfg(feature = "server")]
 fn loopback() -> SocketAddr {
@@ -89,7 +87,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
     assert_eq!(
         schema_hash().to_string(),
         WIRE_SCHEMA_GOLDEN,
-        "schema hash changed - update channels-SPEC.md section 8-1 in the same commit"
+        "schema hash changed - update wire-SPEC.md section 8-1 in the same commit"
     );
     assert_eq!(
         WIRE_V, 44,
@@ -99,7 +97,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
 
 /// The event kinds reach a page inside every event frame, so a renamed,
 /// added or removed kind must move the hash a page is admitted by, as a
-/// renamed frame does. The recipe is the one channels-SPEC.md states.
+/// renamed frame does. The recipe is the one wire-SPEC.md states.
 #[test]
 fn the_schema_hash_covers_every_event_kind_name() {
     let mut material = b"sprawling/wire/".to_vec();
@@ -261,7 +259,7 @@ fn put_secret_has_no_byte_form_in_either_direction() {
     // bytes that name the variant are refused, and the refusal stays silent
     // about what it was protecting.
     let json = r#"{"put_secret":{"realm":"anthropic","name":"api","value":"sk-not-a-real-key"}}"#;
-    let decoded: Result<channels::WireCommand, _> = serde_json::from_str(json);
+    let decoded: Result<wire::WireCommand, _> = serde_json::from_str(json);
     let err = decoded.expect_err("PutSecret has no wire form");
     assert!(
         !err.to_string().contains("sk-not-a-real-key"),
@@ -301,7 +299,7 @@ fn every_state_changing_command_carries_an_idempotency_key() {
 // ----------------------------------------------------------- retired frames
 
 /// The two frames that left the wire rather than staying on it answered
-/// with `not_built` for ever (channels-SPEC.md section 8-44,
+/// with `not_built` for ever (wire-SPEC.md section 8-44,
 /// kernel-SPEC.md section 12.2). Their bytes still spell what they
 /// spelled, and that is no longer a command: what a client gets for them
 /// is the grammar's own unknown-variant refusal, not a verb it may offer
@@ -316,7 +314,7 @@ fn a_frame_that_left_the_wire_fails_to_decode() {
         serde_json::json!({ "takeover": { "run": run.to_string(), "idem": idem.clone() } }),
         serde_json::json!({ "rollback": { "checkpoint": checkpoint, "idem": idem } }),
     ] {
-        let decoded: Result<Command<channels::NoSecret>, _> = serde_json::from_value(frame.clone());
+        let decoded: Result<Command<wire::NoSecret>, _> = serde_json::from_value(frame.clone());
         let refused = decoded.expect_err("a frame that left the wire is not a command");
         assert!(
             refused.to_string().contains("unknown variant"),
@@ -349,7 +347,7 @@ fn sample_of_every_command() -> Vec<Command> {
             model: None,
         },
         Command::PutDocument {
-            which: channels::GovernedDocument::Mayor,
+            which: wire::GovernedDocument::Mayor,
             body: "# who the Mayor is
 "
             .to_owned(),
@@ -357,7 +355,7 @@ fn sample_of_every_command() -> Vec<Command> {
         },
         Command::PutSpine {
             building: Address::parse("lab").unwrap(),
-            which: channels::SpineDocument::Memo,
+            which: wire::SpineDocument::Memo,
             base: String::new(),
             body: "# Memo — lab
 "
@@ -383,7 +381,7 @@ title = \"a window\"
             dialect: kernel::DialectKind::OpenAi,
             secret: Some("secret:house/key".to_owned()),
             auth_header: None,
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem,
         },
         Command::AttachEndpoint {
@@ -393,16 +391,16 @@ title = \"a window\"
             secret: Some("secret:house/key".to_owned()),
             auth_header: None,
             admit: vec!["gpt-x".to_owned()],
-            tuning: channels::EndpointTuning {
+            tuning: wire::EndpointTuning {
                 label: Some("House".to_owned()),
                 timeout_ms: Some(60_000),
                 request_max_retries: Some(4),
                 stream_idle_timeout_ms: Some(300_000),
-                headers: vec![channels::HeaderPair {
+                headers: vec![wire::HeaderPair {
                     name: "x-tenant".to_owned(),
                     value: "secret:house/tenant".to_owned(),
                 }],
-                overrides: vec![channels::BodyOverride {
+                overrides: vec![wire::BodyOverride {
                     pointer: "/reasoning/effort".to_owned(),
                     value: "high".to_owned(),
                 }],
@@ -414,13 +412,13 @@ title = \"a window\"
             endpoint: ProviderName::parse("house").unwrap(),
             model: "m-large".to_owned(),
             tag: kernel::ModelTag::Main,
-            context_tokens: channels::Window::new(128_000),
+            context_tokens: wire::Window::new(128_000),
             max_output_tokens: kernel::Ceiling::new(8_192),
             idem,
         },
         Command::OpenSession {
             addr: addr.clone(),
-            carry: channels::Carry::Handoff,
+            carry: wire::Carry::Handoff,
             from: Some(kernel::Origin {
                 run,
                 at_seq: Seq::new(3),
@@ -429,7 +427,7 @@ title = \"a window\"
         },
         Command::CreateBuilding {
             addr: addr.clone(),
-            template: channels::TemplateName::parse("workshop").unwrap(),
+            template: wire::TemplateName::parse("workshop").unwrap(),
             idem,
         },
         Command::RemoveBuilding {
@@ -448,11 +446,11 @@ title = \"a window\"
         },
         Command::Cancel { run, idem },
         Command::Halt {
-            scope: channels::HaltScope::City,
+            scope: wire::HaltScope::City,
             idem,
         },
         Command::Release {
-            scope: channels::HaltScope::City,
+            scope: wire::HaltScope::City,
             idem,
         },
         Command::BatchByBuilding {
@@ -470,23 +468,23 @@ title = \"a window\"
             idem,
         },
         Command::PutPreferences {
-            patch: channels::PreferencePatch::Lang(channels::Lang::Zh),
+            patch: wire::PreferencePatch::Lang(wire::Lang::Zh),
             idem,
         },
         Command::PutShelved {
-            shelf: channels::Shelf::Library,
+            shelf: wire::Shelf::Library,
             name: "reviewing/first-pass.md".to_owned(),
             text: "# read the SPEC first\n".to_owned(),
             idem,
         },
         Command::SetAutonomy {
-            scope: channels::HaltScope::City,
+            scope: wire::HaltScope::City,
             autonomy: kernel::Autonomy::Owner,
             idem,
         },
         Command::Pursue {
             addr,
-            step: channels::PursuitStep::Set {
+            step: wire::PursuitStep::Set {
                 goal: "raise the east wing".to_owned(),
             },
             idem,
@@ -510,7 +508,7 @@ title = \"a window\"
         },
         Command::DoctorRefresh { idem },
         Command::ConnectToolkit {
-            toolkit: channels::ToolkitSlug::parse("github").unwrap(),
+            toolkit: wire::ToolkitSlug::parse("github").unwrap(),
             idem,
         },
     ]
@@ -527,9 +525,9 @@ fn a_session_frame_says_what_it_branches_from_and_omits_it_when_it_does_not() {
     let run = kernel::RunId::from_bytes([9u8; 16]);
     let idem = kernel::IdemKey::derive(&run, Seq::new(1), b"branch");
     let room = Address::parse("acme/floor1").unwrap();
-    let plain = serde_json::to_value(Command::<channels::NoSecret>::OpenSession {
+    let plain = serde_json::to_value(Command::<wire::NoSecret>::OpenSession {
         addr: room.clone(),
-        carry: channels::Carry::Nothing,
+        carry: wire::Carry::Nothing,
         from: None,
         idem,
     })
@@ -540,9 +538,9 @@ fn a_session_frame_says_what_it_branches_from_and_omits_it_when_it_does_not() {
         "a session that branches from nothing says null: {plain}"
     );
 
-    let branching = serde_json::to_value(Command::<channels::NoSecret>::OpenSession {
+    let branching = serde_json::to_value(Command::<wire::NoSecret>::OpenSession {
         addr: room,
-        carry: channels::Carry::Nothing,
+        carry: wire::Carry::Nothing,
         from: Some(kernel::Origin {
             run,
             at_seq: Seq::new(7),
@@ -613,12 +611,12 @@ fn asking_for_one_session_is_a_different_frame_from_asking_for_the_city() {
 /// near end as well as a far one.
 #[test]
 fn a_skipped_range_travels_with_both_of_its_ends() {
-    let frame = channels::ServerFrame::Lagged(channels::Lagged {
+    let frame = wire::ServerFrame::Lagged(wire::Lagged {
         from: Seq::new(12),
         to: Seq::new(40),
     });
     let text = serde_json::to_string(&frame).expect("a frame serialises");
-    let back: channels::ServerFrame = serde_json::from_str(&text).expect("and reads back");
+    let back: wire::ServerFrame = serde_json::from_str(&text).expect("and reads back");
     assert_eq!(back, frame, "both ends survive the wire");
     assert!(
         text.contains("\"from\":12") && text.contains("\"to\":40"),
@@ -653,7 +651,7 @@ fn a_skipped_range_travels_with_both_of_its_ends() {
 fn a_dispatch_frame_carries_no_spend_ceiling() {
     let addr = Address::parse("acme/floor1").unwrap();
     let run = kernel::RunId::from_bytes([7u8; 16]);
-    let dispatch: channels::WireCommand = Command::Dispatch {
+    let dispatch: wire::WireCommand = Command::Dispatch {
         addr,
         task: "ship it".to_owned(),
         goal: "the tests pass".to_owned(),
@@ -682,14 +680,14 @@ fn the_governance_frames_are_on_the_wire() {
         QUERY_NAMES.contains(&"Governance"),
         "and read who answers and what was answered for them"
     );
-    let frame: channels::WireCommand = Command::PutDocument {
-        which: channels::GovernedDocument::Preferences,
+    let frame: wire::WireCommand = Command::PutDocument {
+        which: wire::GovernedDocument::Preferences,
         body: "# how I like this city run\n".to_owned(),
         idem: kernel::IdemKey::derive(&kernel::RunId::from_bytes([9u8; 16]), Seq::new(1), b"prefs"),
     };
     assert_eq!(frame.name(), "PutDocument");
     let text = serde_json::to_string(&frame).unwrap();
-    let back: channels::WireCommand = serde_json::from_str(&text).unwrap();
+    let back: wire::WireCommand = serde_json::from_str(&text).unwrap();
     assert_eq!(back, frame);
     assert_eq!(Query::Governance.name(), "Governance");
 }

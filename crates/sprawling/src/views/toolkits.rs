@@ -22,25 +22,25 @@ use accounting::toolkit_broker::broker_for;
 
 impl LiveAsk {
     /// The shelf, or why there is no shelf to show.
-    pub(super) fn toolkits_answer(&self) -> channels::ToolkitsAnswer {
+    pub(super) fn toolkits_answer(&self) -> wire::ToolkitsAnswer {
         let held = match broker_for(self.vault.as_ref(), self.city.as_ref()) {
             Ok(Some(held)) => held,
             // No key enrolled is the first step rather than a failure.
             // Drawing it as an error would tell somebody opening this
             // page for the first time that something broke.
-            Ok(None) => return channels::ToolkitsAnswer::Unenrolled,
+            Ok(None) => return wire::ToolkitsAnswer::Unenrolled,
             Err(refusal) => {
-                return channels::ToolkitsAnswer::Refused {
+                return wire::ToolkitsAnswer::Refused {
                     refusal: Box::new(refusal),
                 };
             }
         };
         let (broker, user) = held;
         match broker.shelf(&user) {
-            Ok(shelf) => channels::ToolkitsAnswer::Shelf {
+            Ok(shelf) => wire::ToolkitsAnswer::Shelf {
                 toolkits: shelf.into_iter().filter_map(line_of).collect(),
             },
-            Err(refusal) => channels::ToolkitsAnswer::Refused {
+            Err(refusal) => wire::ToolkitsAnswer::Refused {
                 refusal: Box::new(refusal),
             },
         }
@@ -52,19 +52,19 @@ impl LiveAsk {
 /// A slug this crate will not carry drops the row instead of drawing it
 /// under a placeholder: the only thing a person can do with such a row
 /// is press it, and pressing it could not name what to connect.
-fn line_of(toolkit: protocol::Toolkit) -> Option<channels::ToolkitLine> {
+fn line_of(toolkit: agent_protocols::Toolkit) -> Option<wire::ToolkitLine> {
     let standing = match toolkit.standing {
-        protocol::Connection::Absent => channels::Standing::Absent,
-        protocol::Connection::Awaiting { consent_url } => {
-            channels::Standing::Awaiting { consent_url }
+        agent_protocols::Connection::Absent => wire::Standing::Absent,
+        agent_protocols::Connection::Awaiting { consent_url } => {
+            wire::Standing::Awaiting { consent_url }
         }
-        protocol::Connection::Connected { alias } => channels::Standing::Connected { alias },
-        protocol::Connection::Refused { refusal } => channels::Standing::Refused {
+        agent_protocols::Connection::Connected { alias } => wire::Standing::Connected { alias },
+        agent_protocols::Connection::Refused { refusal } => wire::Standing::Refused {
             refusal: Box::new(refusal),
         },
     };
-    Some(channels::ToolkitLine {
-        slug: channels::ToolkitSlug::parse(&toolkit.slug).ok()?,
+    Some(wire::ToolkitLine {
+        slug: wire::ToolkitSlug::parse(&toolkit.slug).ok()?,
         name: toolkit.name,
         auth: toolkit.auth,
         standing,

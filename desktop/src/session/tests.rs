@@ -17,7 +17,7 @@
 use super::*;
 
 /// The two lines the city's own client sends first, verbatim from
-/// `protocol::Rpc::initialize` and `protocol::Rpc::initialized`.
+/// `agent_protocols::Rpc::initialize` and `agent_protocols::Rpc::initialized`.
 const OPENING: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":\
      {\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":\
      {\"name\":\"sprawling\",\"version\":\"0.0.5\"}}}";
@@ -39,7 +39,7 @@ fn answer(server: &mut Server, method: &str, params: Value) -> Value {
 }
 
 /// The exchange the city opens every connection with, answered the way
-/// `protocol::handshake` reads it.
+/// `agent_protocols::handshake` reads it.
 #[test]
 fn the_handshake_is_the_one_the_citys_client_already_speaks() {
     let mut server = Server::new(Scope::parse("windows = [\"*\"]\n"));

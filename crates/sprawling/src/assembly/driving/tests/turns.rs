@@ -96,7 +96,7 @@ fn a_dispatch_runs_a_whole_turn_loop_and_the_chain_still_verifies() {
     }));
 
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "say hello".to_owned(),
             goal: "one turn is enough".to_owned(),
@@ -138,9 +138,9 @@ fn a_cancel_reaches_the_run_it_cancels_without_waiting_for_it_to_end() {
     // command repeated twice (section 8-33).
     let key = |material: &[u8]| kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, material);
 
-    let nobody = || channels::Reply::nowhere();
+    let nobody = || wire::Reply::nowhere();
     desk.post(
-        channels::Command::Steer {
+        wire::Command::Steer {
             run: other,
             text: "not for me".to_owned(),
             idem: key(b"not for me"),
@@ -148,7 +148,7 @@ fn a_cancel_reaches_the_run_it_cancels_without_waiting_for_it_to_end() {
         nobody(),
     );
     desk.post(
-        channels::Command::Steer {
+        wire::Command::Steer {
             run: mine,
             text: "  measure it in metres  ".to_owned(),
             idem: key(b"measure it in metres"),
@@ -156,7 +156,7 @@ fn a_cancel_reaches_the_run_it_cancels_without_waiting_for_it_to_end() {
         nobody(),
     );
     desk.post(
-        channels::Command::Cancel {
+        wire::Command::Cancel {
             run: mine,
             idem: key(b"cancel"),
         },
@@ -174,7 +174,7 @@ fn a_cancel_reaches_the_run_it_cancels_without_waiting_for_it_to_end() {
     assert!(matches!(desk.interrupt_for(mine), Interrupt::None));
 
     // And the other run's command kept its place in line.
-    let Some(channels::Command::Steer { run, .. }) = desk.take() else {
+    let Some(wire::Command::Steer { run, .. }) = desk.take() else {
         panic!("a command for another run is not consumed by this one");
     };
     assert_eq!(run, other);
@@ -213,7 +213,7 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
         Interrupt::None
     })));
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "measure the thing".to_owned(),
             goal: "a number, then stop".to_owned(),
@@ -301,7 +301,7 @@ fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
     // The command surface must not error out: the failure belongs to
     // the run's own account, not to the person's keystroke.
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "anything".to_owned(),
             goal: "an honest ending".to_owned(),

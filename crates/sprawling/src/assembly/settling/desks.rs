@@ -56,10 +56,10 @@ impl RunWorker {
         // reported once rather than once per wave.
         let sweep_base = sweep.fenced.first().cloned();
         if let Some(base) = sweep_base {
-            let discarded = memory::Checkpoint::open(write_root)
-                .map_err(memory::MemoryError::into_ax)?
+            let discarded = storage::Checkpoint::open(write_root)
+                .map_err(storage::StorageError::into_ax)?
                 .wave_post(&base)
-                .map_err(memory::MemoryError::into_ax)?;
+                .map_err(storage::StorageError::into_ax)?;
             let swept = discarded.len();
             let lost = effect::Landing::discards(discarded, addr, who);
             self.settle(at, run_id, lost, &chain)?;
@@ -87,7 +87,7 @@ impl RunWorker {
                 sweep.raised.push(item);
                 self.note(
                     runtime::diagnostics::Level::Refuse,
-                    "memory::checkpoint",
+                    "storage::checkpoint",
                     &format!(
                         "{swept} files deleted under {}; each one can be restored from {base}",
                         addr.as_str()

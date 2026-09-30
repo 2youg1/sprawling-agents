@@ -5,7 +5,7 @@
 
 //! What the projection reads from the Ledger's segments: the lines of
 //! one address, and the first sequence of every address. Both are the
-//! slow path a missing or doubtful slice takes (memory-SPEC 8-24); a
+//! slow path a missing or doubtful slice takes (storage-SPEC 8-24); a
 //! room the Ledger never carried before reaches neither.
 
 use std::collections::BTreeMap;
@@ -13,7 +13,7 @@ use std::path::Path;
 
 use kernel::{Address, EventRecord, Seq};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::jsonl::{complete_lines, segment_first_seq, segment_names};
 use crate::vfs::Vfs;
 
@@ -25,7 +25,7 @@ pub(super) struct Segments<'a> {
 
 impl Segments<'_> {
     /// The first sequence of every address in the Ledger's segments.
-    pub(super) fn first_seen(&self) -> Result<BTreeMap<Address, Seq>, MemoryError> {
+    pub(super) fn first_seen(&self) -> Result<BTreeMap<Address, Seq>, StorageError> {
         let (vfs, ledger) = (self.vfs, self.ledger);
         let mut folded = BTreeMap::new();
         for name in segment_names(vfs, ledger)? {
@@ -58,7 +58,7 @@ impl Segments<'_> {
         addr: &Address,
         after: Option<Seq>,
         through: Seq,
-    ) -> Result<Vec<(Seq, Vec<u8>)>, MemoryError> {
+    ) -> Result<Vec<(Seq, Vec<u8>)>, StorageError> {
         let (vfs, ledger) = (self.vfs, self.ledger);
         let names = segment_names(vfs, ledger)?;
         let mut found = Vec::new();

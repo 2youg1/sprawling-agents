@@ -159,9 +159,9 @@ fn a_live_session_delivers_commands_and_answers_queries() {
     assert!(matches!(
         decide_frame(
             SessionState::Live,
-            ClientFrame::Ask(crate::wire::Ask {
-                ask_id: crate::wire::AskId(1),
-                query: crate::wire::Query::CityView,
+            ClientFrame::Ask(crate::frames::Ask {
+                ask_id: crate::frames::AskId(1),
+                query: crate::frames::Query::CityView,
             }),
             &unpaired(),
             WelcomeFacts::default()
@@ -331,7 +331,7 @@ fn the_welcome_names_the_ledger_head_so_a_reconnect_fetches_only_what_it_missed(
 
 #[test]
 fn a_live_session_watches_and_releases_the_monitor() {
-    use crate::wire::{Monitoring, Watched};
+    use crate::frames::{Monitoring, Watched};
     let watch = ClientFrame::Monitor(Monitoring::Watch);
     let summary = ClientFrame::Monitor(Monitoring::WatchSummary);
     let release = ClientFrame::Monitor(Monitoring::Release);

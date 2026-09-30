@@ -8,7 +8,7 @@
 //! `fault` feature; never in a production build.
 //!
 //! The model is stricter than any real platform so the write discipline
-//! it enforces holds on every platform (memory-SPEC 8-2):
+//! it enforces holds on every platform (storage-SPEC 8-2):
 //! - every file has two planes: `durable` (survives power loss) and
 //!   `live` (what the running process observes). `sync_data` promotes
 //!   live to durable; a power cut drops the unsynced delta, except a
@@ -250,7 +250,7 @@ impl Vfs for FaultFs {
             // The target's dir entry is new: it survives only after a
             // sync_dir. Stricter than reality — a cut here loses the
             // object entirely, but its put never returned Ok, so no
-            // acknowledged effect is lost (memory-SPEC 8-3).
+            // acknowledged effect is lost (storage-SPEC 8-3).
             file.durable_entry = false;
             state.files.insert(to.to_path_buf(), file);
         }

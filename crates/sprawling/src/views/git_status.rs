@@ -35,7 +35,7 @@ use super::holding::Views;
 pub(crate) struct GitStatusAsk {
     city_root: PathBuf,
     building: Address,
-    checkpoint: Option<channels::CommitAnswer>,
+    checkpoint: Option<wire::CommitAnswer>,
 }
 
 impl Views {
@@ -66,20 +66,20 @@ impl GitStatusAsk {
     /// `Unavailable` for a city with no repository: "there is nothing to
     /// compare against" and "nothing has changed" are different answers,
     /// and a person acts differently on each.
-    pub(super) fn read(self) -> channels::Answer {
-        let Ok(status) = memory::working_status(
+    pub(super) fn read(self) -> wire::Answer {
+        let Ok(status) = storage::working_status(
             &self.city_root,
             Some(self.building.as_str()),
             self.checkpoint.as_ref().map(|commit| commit.oid),
         ) else {
-            return channels::Answer::Unavailable {
+            return wire::Answer::Unavailable {
                 query: format!("GitStatus({})", self.building.as_str()),
             };
         };
-        channels::Answer::GitStatus(Box::new(channels::GitStatusAnswer {
+        wire::Answer::GitStatus(Box::new(wire::GitStatusAnswer {
             building: self.building,
             branch: status.branch,
-            drift: status.drift.map(|drift| channels::Drift {
+            drift: status.drift.map(|drift| wire::Drift {
                 ahead: drift.ahead,
                 behind: drift.behind,
             }),

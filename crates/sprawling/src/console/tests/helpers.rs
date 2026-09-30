@@ -39,8 +39,8 @@ pub(super) fn terminal(bind: &str, token: Option<&str>) -> Terminal {
         bind: bind.parse().unwrap(),
     }
 }
-pub(super) fn vitals() -> channels::MetricsAnswer {
-    channels::MetricsAnswer {
+pub(super) fn vitals() -> wire::MetricsAnswer {
+    wire::MetricsAnswer {
         events: 12_043,
         runs_active: 2,
         runs_frozen: 41,
@@ -53,9 +53,9 @@ pub(super) fn vitals() -> channels::MetricsAnswer {
 
 /// The one function the socket calls, standing in for the views.
 pub(super) fn answering() -> Answering {
-    Arc::new(|query: channels::Query| {
+    Arc::new(|query: wire::Query| {
         let answer = match query {
-            channels::Query::Metrics => Ok(channels::Answer::Metrics(Box::new(vitals()))),
+            wire::Query::Metrics => Ok(wire::Answer::Metrics(Box::new(vitals()))),
             other => Err(kernel::AxError::failure(
                 kernel::AxCode::ConfigInvalid,
                 "answer a question",

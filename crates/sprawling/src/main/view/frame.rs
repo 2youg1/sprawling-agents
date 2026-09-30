@@ -93,7 +93,7 @@ impl Face {
                 .map(|line| line.run)
         };
         let chosen = latest(|line| line.unanswered > 0)
-            .or_else(|| latest(|line| line.state == Some(memory::RunPhase::Active)))
+            .or_else(|| latest(|line| line.state == Some(storage::RunPhase::Active)))
             .or_else(|| latest(|_| true));
         let tree_at = chosen
             .and_then(|run| {

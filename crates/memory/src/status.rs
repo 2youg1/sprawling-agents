@@ -31,7 +31,7 @@ use std::path::Path;
 use kernel::{FileChange, GitOid};
 
 use crate::changes::collect;
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 /// How far a branch has run from the upstream it tracks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,8 +54,8 @@ pub struct WorkingStatus {
     pub files: Vec<FileChange>,
 }
 
-fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> MemoryError {
-    move |err| MemoryError::Checkpoint {
+fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
+    move |err| StorageError::Checkpoint {
         op,
         detail: err.message().to_owned(),
     }
@@ -82,7 +82,7 @@ pub fn working_status(
     city_root: &Path,
     scope: Option<&str>,
     base: Option<GitOid>,
-) -> Result<WorkingStatus, MemoryError> {
+) -> Result<WorkingStatus, StorageError> {
     let repo = git2::Repository::open(city_root).map_err(git_err("open the city repository"))?;
     let head = match repo.head() {
         Ok(found) => Some(found),
@@ -141,7 +141,7 @@ pub fn working_status(
 /// `None` for a detached head and for a branch nobody set an upstream
 /// on; a branch whose upstream was deleted behind its back reads the
 /// same way, because what a reader can act on is identical.
-fn drift_of(repo: &git2::Repository, branch: Option<&str>) -> Result<Option<Drift>, MemoryError> {
+fn drift_of(repo: &git2::Repository, branch: Option<&str>) -> Result<Option<Drift>, StorageError> {
     let Some(name) = branch else {
         return Ok(None);
     };

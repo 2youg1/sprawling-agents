@@ -5,7 +5,7 @@
 
 //! `cargo xtask wire-ts [--write]`: the TypeScript client's wire types,
 //! generated from the Rust wire so both ends of the socket have one
-//! authority (channels-SPEC.md section 8-16).
+//! authority (wire-SPEC.md section 8-16).
 //!
 //! Without `--write` this is a comparison: the file on disk against the
 //! text the wire produces now, refused at the first line that differs.
@@ -36,7 +36,7 @@ pub(super) struct Constants {
     /// out by hand, and a client that spells this identity differently
     /// folds every city-level record into a run that does not exist.
     pub(super) city_run: String,
-    /// `channels::BODY_PX_MIN` and `BODY_PX_MAX`, the body sizes the
+    /// `wire::BODY_PX_MIN` and `BODY_PX_MAX`, the body sizes the
     /// `[ui]` writer accepts; the appearance page offers this range
     /// rather than a copy of its own.
     pub(super) body_px: BodyPx,
@@ -56,16 +56,16 @@ pub(super) struct BodyPx {
 /// would fold every city-level record into a run that does not exist.
 fn render() -> Result<String, XtaskError> {
     let constants = Constants {
-        wire_v: channels::WIRE_V,
-        hash: channels::schema_hash().to_string(),
+        wire_v: wire::WIRE_V,
+        hash: wire::schema_hash().to_string(),
         city_run: kernel::RunId::CITY.to_string(),
         body_px: BodyPx {
-            min: channels::BODY_PX_MIN,
-            max: channels::BODY_PX_MAX,
+            min: wire::BODY_PX_MIN,
+            max: wire::BODY_PX_MAX,
         },
     };
-    emit::emit(&channels::wire_schema(), &constants).map_err(|refused| XtaskError::Doc {
-        file: format!("channels::wire_schema at {}", refused.at),
+    emit::emit(&wire::wire_schema(), &constants).map_err(|refused| XtaskError::Doc {
+        file: format!("wire::wire_schema at {}", refused.at),
         msg: refused.why,
     })
 }

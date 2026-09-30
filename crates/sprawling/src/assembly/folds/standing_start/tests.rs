@@ -7,7 +7,7 @@
 //! start from genesis builds, byte for byte.
 
 use kernel::{Address, RunId, Seq};
-use memory::{StoredSnapshot, WholeFold};
+use storage::{StoredSnapshot, WholeFold};
 
 use super::*;
 use crate::assembly::{RunWorker, init_city};
@@ -17,9 +17,9 @@ use crate::views::snapshot::start::{FoldStart, snapshot_dir, start};
 /// so the refusals `Entrance` keeps are in the folds too.
 fn raise(worker: &mut RunWorker, names: std::ops::Range<u8>) {
     for n in names {
-        let create = |name: &str, key: u8| channels::Command::CreateBuilding {
+        let create = |name: &str, key: u8| wire::Command::CreateBuilding {
             addr: Address::parse(name).unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, &[n, key]),
         };
         worker.handle(create(&format!("lab{n}"), 0)).unwrap();
@@ -43,13 +43,13 @@ fn a_standing_after_a_cut_folds_only_the_tail_into_the_same_bytes() {
 
     Standing::fold(&ledger).unwrap();
 
-    let cut = memory::read_snapshot(&snapshots).unwrap();
+    let cut = storage::read_snapshot(&snapshots).unwrap();
     assert!(matches!(cut, StoredSnapshot::Present(_)), "{cut:?}");
     let StoredSnapshot::Present(cut) = cut else {
         return;
     };
     raise(&mut worker, 3..5);
-    let lines = memory::read_raw_lines_at(&ledger).unwrap().len();
+    let lines = storage::read_raw_lines_at(&ledger).unwrap().len();
     let tail = lines - usize::try_from(cut.seq().value()).unwrap() - 1;
     let resumed = start::<StandingFolds>(&ledger).unwrap();
     std::fs::remove_dir_all(&snapshots).unwrap();
@@ -86,11 +86,11 @@ fn a_worker_refuses_a_line_rewritten_before_the_snapshot_in_a_sealed_segment() {
     raise(&mut open().unwrap(), 0..3);
     Standing::fold(&ledger).unwrap();
     let StoredSnapshot::Present(cut) =
-        memory::read_snapshot(&snapshot_dir::<StandingFolds>(dir.path())).unwrap()
+        storage::read_snapshot(&snapshot_dir::<StandingFolds>(dir.path())).unwrap()
     else {
         panic!("the fold cut no snapshot");
     };
-    let segment = memory::ledger_segments_at(&ledger).unwrap().remove(0);
+    let segment = storage::ledger_segments_at(&ledger).unwrap().remove(0);
     let bytes = std::fs::read(&segment).unwrap();
     let lines: Vec<&[u8]> = bytes.split_inclusive(|held| *held == b'\n').collect();
     let (sealed, open_segment) = lines.split_at(usize::try_from(cut.seq().value()).unwrap());
@@ -111,7 +111,7 @@ fn a_worker_refuses_a_line_rewritten_before_the_snapshot_in_a_sealed_segment() {
 
     let refused = open().map(|_| ());
 
-    assert_eq!(refused, Err(memory::LineFault::ChainBreak.into_ax(2)));
+    assert_eq!(refused, Err(storage::LineFault::ChainBreak.into_ax(2)));
 }
 
 /// Folds filled from records that put a signal in the collaboration

@@ -146,7 +146,7 @@ impl Laying {
         // when the building asks for review.
         // One reading of the write domain feeds both: what the bench
         // admits and what its fence stages are the same set by
-        // definition (memory-SPEC section 8-18), and taking them from
+        // definition (storage-SPEC section 8-18), and taking them from
         // one call is what keeps them that way.
         let domain = site.rules.write_domain()?;
         let scope: Vec<String> = domain.prefixes().map(|p| p.as_str().to_owned()).collect();
@@ -243,7 +243,7 @@ impl Laying {
         // building, so neither is ever reached there.
         let mut outside = (self.browsers)(
             &self.city_root,
-            &memory::BlockOrigin {
+            &storage::BlockOrigin {
                 run: site.run_id,
                 building: site.building.addr().clone(),
             },

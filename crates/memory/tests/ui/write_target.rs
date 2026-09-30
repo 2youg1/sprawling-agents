@@ -8,6 +8,6 @@
 // write face can be handed one.
 
 fn main() {
-    let forged = memory::WriteTarget(std::path::PathBuf::from("lab/x"));
+    let forged = storage::WriteTarget(std::path::PathBuf::from("lab/x"));
     let _ = forged.as_path();
 }

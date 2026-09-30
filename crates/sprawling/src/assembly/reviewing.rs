@@ -18,7 +18,7 @@ impl RunWorker {
     /// the commit a verifier will be judging. Checking merges, because
     /// that is what a passed check means, and a verified request nobody
     /// merged would be a third state for a person to chase. Both put the
-    /// line before the change, the merge by way of `memory::PlannedMerge`
+    /// line before the change, the merge by way of `storage::PlannedMerge`
     /// (section 8-30).
     ///
     /// # Errors
@@ -48,24 +48,24 @@ impl RunWorker {
             // Read once here rather than per effect: the city's genesis
             // line does not change while a settlement runs.
             let of = site.provenance(self.city_hash()?, addr);
-            let trees =
-                memory::Worktrees::open(&self.city_root).map_err(memory::MemoryError::into_ax)?;
+            let trees = storage::Worktrees::open(&self.city_root)
+                .map_err(storage::StorageError::into_ax)?;
             for effect in pr_effects {
                 match effect {
                     collab::PrEffect::Opened { branch } => {
                         // Landed rather than fenced: what a verifier
                         // judges has to be on the run's own branch, and
                         // a wave fence is a dangling commit nobody can
-                        // merge (memory-SPEC 8-8).
-                        let at = memory::Checkpoint::open(write_root)
-                            .map_err(memory::MemoryError::into_ax)?
+                        // merge (storage-SPEC 8-8).
+                        let at = storage::Checkpoint::open(write_root)
+                            .map_err(storage::StorageError::into_ax)?
                             .land(
                                 &scopes,
                                 self.clock.now()?,
                                 &of,
                                 &format!("offer: {fence_scope}"),
                             )
-                            .map_err(memory::MemoryError::into_ax)?;
+                            .map_err(storage::StorageError::into_ax)?;
                         let request = collab::OpenRequest {
                             node: collab::NodeId::parse(&branch)?,
                             implementer: who.to_owned(),
@@ -112,8 +112,8 @@ impl RunWorker {
                                 .retain(|held| held.branch != request.branch);
                             continue;
                         }
-                        let name = memory::WorktreeName::parse(&request.branch)
-                            .map_err(memory::MemoryError::into_ax)?;
+                        let name = storage::WorktreeName::parse(&request.branch)
+                            .map_err(storage::StorageError::into_ax)?;
                         // Decided first, announced second, made third.
                         // The refusal this merge can carry - a trunk that
                         // moved after the node branched - happens inside
@@ -123,7 +123,7 @@ impl RunWorker {
                         // moving it needs a value only that call returns.
                         let planned = trees
                             .plan_merge(&name)
-                            .map_err(memory::MemoryError::into_ax)?;
+                            .map_err(storage::StorageError::into_ax)?;
                         // The merged line's keys live once, on
                         // `OpenRequest::merged_payload`: the commit that
                         // was reviewed and the commit that landed are
@@ -146,13 +146,13 @@ impl RunWorker {
                         // in this machine's git config on work that
                         // person never read (sprawling-SPEC.md 8-49).
                         planned
-                            .apply(&memory::Landing {
+                            .apply(&storage::Landing {
                                 t: self.clock.now()?,
                                 of: &of,
                                 subject: &format!("merge: {}", request.branch),
                                 reviewed_by_person: false,
                             })
-                            .map_err(memory::MemoryError::into_ax)?;
+                            .map_err(storage::StorageError::into_ax)?;
                         self.collaborating
                             .requests
                             .retain(|held| held.branch != request.branch);

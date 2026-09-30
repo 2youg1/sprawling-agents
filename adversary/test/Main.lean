@@ -300,7 +300,7 @@ parses the frame before it opens a socket, so the refusal these three earn is
 the client's own and the city never sees them. What this check therefore pins
 is the promise to whoever is driving the binary — a code, a way forward, a city
 still answering, and a history that did not move — and not the server-side
-decode that `channels::reception` owns. -/
+decode that `wire::reception` owns. -/
 private def unreadableFramesCostNothing (door : Door) : IO Unit :=
   withGround door fun ground => do
     -- Measured after the city has stopped writing on its own account: a city
@@ -504,7 +504,7 @@ private def everyCoveredRecord (door : Door) : IO Unit :=
 
 /-- A tail torn off mid-record, which the product recovers from on purpose.
 
-The one hostile action here whose answer is "this is fine". `memory::jsonl`
+The one hostile action here whose answer is "this is fine". `storage::jsonl`
 treats an unfinished last line as a write that did not land, so the history reads
 back one record shorter and still verifies. Asserting the relation rather than a
 length: what is owed is that the chain still holds and that it did not somehow

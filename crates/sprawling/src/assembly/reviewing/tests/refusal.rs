@@ -48,7 +48,7 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "fix the notes".to_owned(),
             goal: "one edit, then offer it".to_owned(),
@@ -91,12 +91,12 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
             completion("checked", None),
         ],
     );
-    let fs = memory::FaultFs::new(memory::FaultPlan {
+    let fs = storage::FaultFs::new(storage::FaultPlan {
         cut_at_op: None,
         cut_on_write: Some("pr_merged"),
-        torn_tail: memory::TornTail::None,
+        torn_tail: storage::TornTail::None,
     });
-    let opened = memory::JsonlLedger::open_faulty(
+    let opened = storage::JsonlLedger::open_faulty(
         fs,
         &kernel::layout::CityLayout::new(dir.path()).ledger(),
         accounting::Clock::now(&crate::assembly::SystemClock).unwrap(),
@@ -110,20 +110,20 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
     )
     .unwrap();
     checker
-        .handle(channels::Command::AttachEndpoint {
-            name: channels::ProviderName::parse("house").unwrap(),
+        .handle(wire::Command::AttachEndpoint {
+            name: wire::ProviderName::parse("house").unwrap(),
             base_url,
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
             admit: Vec::new(),
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
     checker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("house").unwrap(),
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("house").unwrap(),
             model: "m-local".to_owned(),
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(32_768),
@@ -131,7 +131,7 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
         })
         .unwrap();
-    let outcome = checker.handle(channels::Command::Dispatch {
+    let outcome = checker.handle(wire::Command::Dispatch {
         addr: Address::parse("lab/room2").unwrap(),
         task: "check the notes".to_owned(),
         goal: "one check, then stop".to_owned(),

@@ -7,7 +7,7 @@ error[E0308]: mismatched types
    |                       arguments to this method are incorrect
    |
    = note: expected enum `Query`
-              found enum `channels::Command<_>`
+              found enum `wire::Command<_>`
 note: method defined here
   --> src/aggregate.rs
    |

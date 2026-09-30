@@ -57,9 +57,9 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
@@ -79,7 +79,7 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
         Interrupt::None
     })));
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "get it measured".to_owned(),
             goal: "the number is written down, then stop".to_owned(),
@@ -143,7 +143,7 @@ fn a_served_city_hands_a_running_commands_output_to_the_page() {
     let pieces = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let seen = std::sync::Arc::clone(&pieces);
     let mut serving = only_interrupts(std::sync::Arc::new(|_run| Interrupt::None));
-    serving.outputs = std::sync::Arc::new(move |piece: channels::LiveOutput| {
+    serving.outputs = std::sync::Arc::new(move |piece: wire::LiveOutput| {
         seen.lock().unwrap().push(piece);
     });
     worker.serve(serving);
@@ -171,7 +171,7 @@ fn a_served_city_hands_a_running_commands_output_to_the_page() {
     let pieces = pieces.lock().unwrap();
     let out: String = pieces
         .iter()
-        .filter(|piece| piece.run == owner && piece.stream == channels::OutputStream::Out)
+        .filter(|piece| piece.run == owner && piece.stream == wire::OutputStream::Out)
         .map(|piece| piece.text.as_str())
         .collect();
     assert!(

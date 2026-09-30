@@ -5,7 +5,7 @@
 
 // The vendors the city knows by host, as the attach form reads them.
 //
-// **The table is the city's** (`Query::KnownHosts`, channels-SPEC
+// **The table is the city's** (`Query::KnownHosts`, wire-SPEC
 // 8-51, read from `gateway::provider::preset`). This module holds no
 // host of its own: it only reads the answer - which host a URL names,
 // which faces that host speaks, and which base URL a face is called

@@ -55,21 +55,21 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
     .unwrap()
     .with_models(Box::new(Listeners(Arc::clone(&offered))))
     .with_desktop_program(this_binary);
-    let endpoint = channels::ProviderName::parse("dead").unwrap();
+    let endpoint = wire::ProviderName::parse("dead").unwrap();
     worker
-        .handle(channels::Command::AttachEndpoint {
+        .handle(wire::Command::AttachEndpoint {
             name: endpoint.clone(),
             base_url: refusing_url(),
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
             admit: vec![MODEL.to_owned()],
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: idem(b"attach"),
         })
         .unwrap();
     worker
-        .handle(channels::Command::SelectModel {
+        .handle(wire::Command::SelectModel {
             endpoint,
             model: MODEL.to_owned(),
             tag: kernel::ModelTag::Main,
@@ -79,9 +79,9 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
         })
         .unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse(LAB).unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: idem(b"create"),
         })
         .unwrap();
@@ -91,7 +91,7 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
         "confidential = false\nwrite = \"everything\"\ndesktop = true\n",
     )
     .unwrap();
-    let dispatched = worker.handle(channels::Command::Dispatch {
+    let dispatched = worker.handle(wire::Command::Dispatch {
         addr: Address::parse(LAB).unwrap(),
         task: "Answer.".to_owned(),
         goal: "one turn with this machine's desktop".to_owned(),

@@ -30,8 +30,8 @@
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
-use channels::{DoctorNewest, DoctorUnread, DoctorUpstream};
 use kernel::Proxying;
+use wire::{DoctorNewest, DoctorUnread, DoctorUpstream};
 
 use super::REQUIREMENTS;
 

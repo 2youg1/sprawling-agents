@@ -8,9 +8,9 @@
 
 use std::collections::BTreeMap;
 
-use channels::Turn;
 use kernel::{AxError, EventRecord, RunId};
 use serde_json::json;
+use wire::Turn;
 
 use super::arrange::{Entry, NodeKey};
 use super::follow::Row;

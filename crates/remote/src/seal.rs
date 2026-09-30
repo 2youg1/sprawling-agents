@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every frame of a remote session, sealed end to end (remote-SPEC.md §8-5).
+//! Every frame of a remote session, sealed end to end (remote_access-SPEC.md §8-5).
 //!
 //! AES-256-GCM under the session key of one direction. The nonce is the
 //! direction and a counter, and the counter is not sent: the socket

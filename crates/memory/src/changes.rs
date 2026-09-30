@@ -28,7 +28,7 @@ use std::path::Path;
 
 use kernel::{FileChange, GitOid, How, Lines};
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 /// The far end of the comparison.
 ///
@@ -41,8 +41,8 @@ pub enum Head {
     WorkingTree,
 }
 
-fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> MemoryError {
-    move |err| MemoryError::Checkpoint {
+fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
+    move |err| StorageError::Checkpoint {
         op,
         detail: err.message().to_owned(),
     }
@@ -57,9 +57,13 @@ fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> MemoryError {
 /// # Errors
 /// Propagates whatever opening the repository, finding the commits, or
 /// walking the difference reports.
-pub fn between(city_root: &Path, base: GitOid, head: Head) -> Result<Vec<FileChange>, MemoryError> {
+pub fn between(
+    city_root: &Path,
+    base: GitOid,
+    head: Head,
+) -> Result<Vec<FileChange>, StorageError> {
     let repo = git2::Repository::open(city_root).map_err(git_err("open the city repository"))?;
-    let find = |oid: GitOid| -> Result<git2::Tree<'_>, MemoryError> {
+    let find = |oid: GitOid| -> Result<git2::Tree<'_>, StorageError> {
         let parsed =
             git2::Oid::from_str(&oid.to_string()).map_err(git_err("parse a checkpoint"))?;
         repo.find_commit(parsed)
@@ -96,7 +100,7 @@ pub fn between(city_root: &Path, base: GitOid, head: Head) -> Result<Vec<FileCha
 /// with `crate::status`, which prepares a different diff and needs the
 /// same reading of it — what a changed file is must have one answer
 /// whether the far end is a checkpoint or the disk.
-pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, MemoryError> {
+pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, StorageError> {
     let mut rows: Vec<FileChange> = Vec::new();
     let stats: Vec<(u32, u32)> = line_counts(diff)?;
     for (at, delta) in diff.deltas().enumerate() {
@@ -153,7 +157,7 @@ pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, MemoryEr
 /// Walked once with a callback rather than asked per file: `git2` counts
 /// lines while it walks, so one pass answers for every row and a second
 /// pass per file would diff the same trees again.
-fn line_counts(diff: &git2::Diff<'_>) -> Result<Vec<(u32, u32)>, MemoryError> {
+fn line_counts(diff: &git2::Diff<'_>) -> Result<Vec<(u32, u32)>, StorageError> {
     // Shared by two callbacks that `git2` calls one after the other and
     // never at the same time, which is what makes a `Cell` the right
     // amount of machinery here.

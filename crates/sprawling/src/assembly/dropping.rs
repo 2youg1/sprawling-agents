@@ -27,7 +27,7 @@ pub(super) const DROPPED_DIR: &str = "dropped";
 const HASH_CHARS: usize = 16;
 
 /// The sink the served page's `/drop` route hands its files to.
-pub(super) fn dropping(city_root: PathBuf) -> channels::DropSink {
+pub(super) fn dropping(city_root: PathBuf) -> wire::DropSink {
     Arc::new(move |name: &str, bytes: &[u8]| {
         keep_dropped(&city_root, name, bytes).map(|kept| kept.display().to_string())
     })

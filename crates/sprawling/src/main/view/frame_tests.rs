@@ -22,7 +22,7 @@ fn run(n: u8) -> RunId {
     RunId::parse(&format!("0198f6a2-7c4a-7bbb-9d1e-0000000000{n:02}")).unwrap()
 }
 
-fn line(n: u8, addr: &str, seqs: (u64, u64), state: Option<memory::RunPhase>) -> RunLine {
+fn line(n: u8, addr: &str, seqs: (u64, u64), state: Option<storage::RunPhase>) -> RunLine {
     RunLine {
         run: run(n),
         addr: Some(Address::parse(addr).unwrap()),
@@ -42,11 +42,11 @@ fn line(n: u8, addr: &str, seqs: (u64, u64), state: Option<memory::RunPhase>) ->
 fn city_runs() -> Vec<RunLine> {
     vec![
         line(1, "lab/a", (1, 4), None),
-        line(2, "yard/b", (3, 8), Some(memory::RunPhase::Active)),
+        line(2, "yard/b", (3, 8), Some(storage::RunPhase::Active)),
         RunLine {
             parent: Some(run(1)),
             forked_at: Some(Seq::new(2)),
-            ..line(3, "lab/a", (5, 7), Some(memory::RunPhase::Frozen))
+            ..line(3, "lab/a", (5, 7), Some(storage::RunPhase::Frozen))
         },
         RunLine {
             session: Some(Seq::new(9)),
@@ -104,9 +104,9 @@ fn opens_on_the_run_waiting_for_the_person_before_any_active_run() {
     let runs = vec![
         RunLine {
             unanswered: 1,
-            ..line(3, "lab/a", (1, 2), Some(memory::RunPhase::Frozen))
+            ..line(3, "lab/a", (1, 2), Some(storage::RunPhase::Frozen))
         },
-        line(2, "yard/b", (3, 8), Some(memory::RunPhase::Active)),
+        line(2, "yard/b", (3, 8), Some(storage::RunPhase::Active)),
     ];
     let face = Face::open(&runs, Vec::new(), NARROW);
     assert_eq!(
@@ -122,18 +122,18 @@ fn a_run_that_starts_while_following_appears_and_the_cursor_stays() {
     let mut face = city(NARROW);
     let runs = vec![
         line(1, "lab/a", (1, 4), None),
-        line(2, "yard/b", (3, 8), Some(memory::RunPhase::Active)),
+        line(2, "yard/b", (3, 8), Some(storage::RunPhase::Active)),
         RunLine {
             parent: Some(run(1)),
             forked_at: Some(Seq::new(2)),
-            ..line(3, "lab/a", (5, 7), Some(memory::RunPhase::Frozen))
+            ..line(3, "lab/a", (5, 7), Some(storage::RunPhase::Frozen))
         },
         RunLine {
             session: Some(Seq::new(9)),
             predecessor: Some(run(1)),
             ..line(4, "lab/a", (10, 11), None)
         },
-        line(5, "lab/c", (12, 12), Some(memory::RunPhase::Active)),
+        line(5, "lab/c", (12, 12), Some(storage::RunPhase::Active)),
     ];
     let appended = vec![Row {
         seq: Seq::new(12),
@@ -286,19 +286,19 @@ fn every_key_the_viewer_reads_names_its_action() {
     }
 }
 
-fn ledger_row(seq: u64, kind: channels::EventKind, data: serde_json::Value) -> Row {
-    let record = channels::EventRecord::from_draft(
-        channels::EventDraft {
+fn ledger_row(seq: u64, kind: wire::EventKind, data: serde_json::Value) -> Row {
+    let record = wire::EventRecord::from_draft(
+        wire::EventDraft {
             run: run(2),
-            t: channels::TimeMs::new(seq),
+            t: wire::TimeMs::new(seq),
             who: "yard/b".to_owned(),
             addr: None,
             kind,
-            data: channels::Payload::new(data.as_object().unwrap().clone()).unwrap(),
+            data: wire::Payload::new(data.as_object().unwrap().clone()).unwrap(),
             ig: false,
         },
         Seq::new(seq),
-        channels::B3Hash::digest(b"prev"),
+        wire::B3Hash::digest(b"prev"),
     );
     Row {
         seq: Seq::new(seq),
@@ -311,15 +311,15 @@ fn ledger_row(seq: u64, kind: channels::EventKind, data: serde_json::Value) -> R
 /// calls made in it.
 #[test]
 fn expanding_a_run_shows_its_rounds_and_their_calls() {
-    let runs = vec![line(2, "yard/b", (3, 5), Some(memory::RunPhase::Active))];
+    let runs = vec![line(2, "yard/b", (3, 5), Some(storage::RunPhase::Active))];
     let records = vec![
-        ledger_row(3, channels::EventKind::ModelCalled, serde_json::json!({})),
+        ledger_row(3, wire::EventKind::ModelCalled, serde_json::json!({})),
         ledger_row(
             4,
-            channels::EventKind::ToolCalled,
+            wire::EventKind::ToolCalled,
             serde_json::json!({ "id": "c1", "name": "read", "subject": "a.rs" }),
         ),
-        ledger_row(5, channels::EventKind::ModelCalled, serde_json::json!({})),
+        ledger_row(5, wire::EventKind::ModelCalled, serde_json::json!({})),
     ];
     let mut face = Face::open(&runs, records, NARROW);
     for action in [Action::Expand, Action::Down, Action::Expand] {
@@ -340,10 +340,10 @@ fn expanding_a_run_shows_its_rounds_and_their_calls() {
 /// any is not known before the person first opens it.
 #[test]
 fn a_run_whose_rounds_are_not_folded_yet_is_marked_openable() {
-    let runs = vec![line(2, "yard/b", (3, 3), Some(memory::RunPhase::Active))];
+    let runs = vec![line(2, "yard/b", (3, 3), Some(storage::RunPhase::Active))];
     let records = vec![ledger_row(
         3,
-        channels::EventKind::ModelCalled,
+        wire::EventKind::ModelCalled,
         serde_json::json!({}),
     )];
     assert_eq!(
@@ -359,7 +359,7 @@ fn a_run_whose_rounds_are_not_folded_yet_is_marked_openable() {
 fn a_window_from_the_tail_says_it_is_filling_until_the_whole_fold_arrives() {
     let windowed = RunLine {
         addr: None,
-        ..line(4, "lab/a", (11, 11), Some(memory::RunPhase::Active))
+        ..line(4, "lab/a", (11, 11), Some(storage::RunPhase::Active))
     };
     let rows = |from: u64| -> Vec<Row> {
         (from..=11)

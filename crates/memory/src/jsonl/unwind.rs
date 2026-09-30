@@ -4,11 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A wave that failed to reach the disk leaves nothing the next wave
-//! builds on (memory-SPEC 8-1).
+//! builds on (storage-SPEC 8-1).
 
 use std::path::PathBuf;
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 
 use super::barrier::Barrier;
 use super::ledger::JsonlLedger;
@@ -21,7 +21,7 @@ impl JsonlLedger {
         &mut self,
         writes: &[(PathBuf, Vec<u8>)],
         created: Vec<PathBuf>,
-    ) -> Result<(), MemoryError> {
+    ) -> Result<(), StorageError> {
         let written = self.land(writes, &created);
         if written.is_err() {
             self.pending_unwind = Some(created);
@@ -37,7 +37,7 @@ impl JsonlLedger {
     /// restore may remove the segment the wave would append to. A restore
     /// that completes mends the barrier: the segments end where the
     /// in-memory position says again.
-    pub(crate) fn finish_unwind(&mut self) -> Result<(), MemoryError> {
+    pub(crate) fn finish_unwind(&mut self) -> Result<(), StorageError> {
         let Some(created) = self.pending_unwind.take() else {
             return Ok(());
         };
@@ -57,7 +57,7 @@ impl JsonlLedger {
         &mut self,
         writes: &[(PathBuf, Vec<u8>)],
         created: &[PathBuf],
-    ) -> Result<(), MemoryError> {
+    ) -> Result<(), StorageError> {
         for (path, bytes) in writes {
             self.vfs
                 .append(path, bytes)
@@ -76,7 +76,7 @@ impl JsonlLedger {
         Ok(())
     }
 
-    fn restore(&mut self, created: &[PathBuf]) -> Result<(), MemoryError> {
+    fn restore(&mut self, created: &[PathBuf]) -> Result<(), StorageError> {
         for path in created {
             if self.vfs.exists(path) {
                 self.vfs

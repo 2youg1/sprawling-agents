@@ -34,8 +34,8 @@ impl RunWorker {
     /// Refuses a command this stage does not run yet, naming what does,
     /// and propagates the failure of landing whatever the command
     /// started.
-    pub fn handle(&mut self, command: channels::Command) -> Result<(), AxError> {
-        let carried = self.carry_out(command, channels::Reply::nowhere());
+    pub fn handle(&mut self, command: wire::Command) -> Result<(), AxError> {
+        let carried = self.carry_out(command, wire::Reply::nowhere());
         // The lanes are landed even when the command was refused: a
         // refusal raised after take-off leaves a run driving, and this
         // caller is the only one that will ever finish it.
@@ -45,11 +45,7 @@ impl RunWorker {
 
     /// # Errors
     /// Refuses a command this stage does not run yet, naming what does.
-    fn carry_out(
-        &mut self,
-        command: channels::Command,
-        reply: channels::Reply,
-    ) -> Result<(), AxError> {
+    fn carry_out(&mut self, command: wire::Command, reply: wire::Reply) -> Result<(), AxError> {
         let name = command.name();
         let outcome = self.run_command(command, reply);
         if let Err(err) = &outcome {
@@ -104,10 +100,10 @@ impl RunWorker {
     /// only case that earns a second line is the one a reader would
     /// otherwise misread: somebody did ask, and the answer arrived at a
     /// socket that had already closed.
-    pub(in crate::assembly) fn hand_back(&mut self, reply: &channels::Reply, error: AxError) {
+    pub(in crate::assembly) fn hand_back(&mut self, reply: &wire::Reply, error: AxError) {
         match reply.refuse(error) {
-            channels::Delivered::ToThePeer | channels::Delivered::NobodyAsked => {}
-            channels::Delivered::PeerGone => self.note(
+            wire::Delivered::ToThePeer | wire::Delivered::NobodyAsked => {}
+            wire::Delivered::PeerGone => self.note(
                 runtime::diagnostics::Level::Refuse,
                 "bin::assembly",
                 "the refusal above reached nobody: the peer that asked had closed its socket",

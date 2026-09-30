@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Serving the client bundle over HTTP: headers on, policy out. Which
-//! bytes answer a path is `channels::assets`' decision.
+//! bytes answer a path is `wire::assets`' decision.
 
 use std::sync::Arc;
 

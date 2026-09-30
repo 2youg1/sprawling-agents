@@ -6,7 +6,7 @@
 /-!
 # A snapshot plus the tail after it is the whole fold.
 
-`memory::snapshot` keeps what a fold held after some line of the Ledger, together
+`storage::snapshot` keeps what a fold held after some line of the Ledger, together
 with the seq of that line and its chain hash. A start that finds the snapshot
 checks that one line and folds only the lines after it. That start is only as
 good as one property: resuming from the state a fold reached at a cut, over the
@@ -14,9 +14,9 @@ lines after the cut, reaches the state a fold over the whole ledger reaches.
 
 **This module states the property for every fold and every cut.** The fold is an
 opaque step function over opaque lines, so no view the product folds can drift
-from it: `Views`, `Standing` and the chain state `memory::LineCheck` itself are
+from it: `Views`, `Standing` and the chain state `storage::LineCheck` itself are
 each one instance. The Rust side holds the same property by `proptest` over
-random ledgers and random cut points (`memory::snapshot`'s tests), where the fold
+random ledgers and random cut points (`storage::snapshot`'s tests), where the fold
 is the chain check and a resumed walk must accept the same lines and end in the
 same state as a walk from genesis.
 

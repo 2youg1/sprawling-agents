@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The remote door: who may reach a city from outside its machine, and
-//! until when (remote-SPEC.md).
+//! until when (remote_access-SPEC.md).
 //!
 //! A route that makes the door reachable carries bytes and nothing else,
 //! so every decision here is taken on the city's own machine and none of

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use kernel::{ByteLen, consts_policy::WORKTREE_MAX_BYTES};
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 use super::landing::{CheckoutRun, Landing, PlannedMerge, check_out};
 use super::lease::WorktreeLease;
@@ -52,8 +52,8 @@ impl Worktrees {
     /// # Errors
     /// Refuses a city with no repository. Initialising one here would
     /// make two modules able to create the city's history.
-    pub fn open(city_root: &Path) -> Result<Worktrees, MemoryError> {
-        let repo = git2::Repository::open(city_root).map_err(|err| MemoryError::Worktree {
+    pub fn open(city_root: &Path) -> Result<Worktrees, StorageError> {
+        let repo = git2::Repository::open(city_root).map_err(|err| StorageError::Worktree {
             op: "open the city repository",
             detail: format!("{}: {err}", city_root.display()),
         })?;
@@ -81,9 +81,9 @@ impl Worktrees {
         &self,
         name: &WorktreeName,
         scopes: &[String],
-    ) -> Result<WorktreeLease, MemoryError> {
+    ) -> Result<WorktreeLease, StorageError> {
         match self.standing(name)? {
-            Standing::Held => Err(MemoryError::WorktreeBusy {
+            Standing::Held => Err(StorageError::WorktreeBusy {
                 name: name.as_str().to_owned(),
                 detail: "another node holds this tree".to_owned(),
             }),
@@ -93,10 +93,10 @@ impl Worktrees {
     }
 
     /// Places a new tree for `name`, locked from the moment it exists.
-    fn place(&self, name: &WorktreeName) -> Result<WorktreeLease, MemoryError> {
+    fn place(&self, name: &WorktreeName) -> Result<WorktreeLease, StorageError> {
         self.refuse_oversized(name)?;
         if self.repo.head().is_err() {
-            return Err(MemoryError::Worktree {
+            return Err(StorageError::Worktree {
                 op: "branch a worktree",
                 detail: "the city has no checkpoint yet, and a tree branches from a commit"
                     .to_owned(),
@@ -113,7 +113,7 @@ impl Worktrees {
             Ok(branch) => Some(branch),
             Err(err) if err.code() == git2::ErrorCode::NotFound => None,
             Err(err) => {
-                return Err(MemoryError::Worktree {
+                return Err(StorageError::Worktree {
                     op: "find a node branch",
                     detail: format!("{}: {err}", name.as_str()),
                 });
@@ -124,14 +124,14 @@ impl Worktrees {
 
     /// Refuses a tree before it exists when the city working tree it
     /// copies is over the ceiling.
-    pub(super) fn refuse_oversized(&self, name: &WorktreeName) -> Result<(), MemoryError> {
-        let source = self.repo.workdir().ok_or_else(|| MemoryError::Worktree {
+    pub(super) fn refuse_oversized(&self, name: &WorktreeName) -> Result<(), StorageError> {
+        let source = self.repo.workdir().ok_or_else(|| StorageError::Worktree {
             op: "find the city working tree",
             detail: "the repository is bare".to_owned(),
         })?;
         let size = measure(source)?;
         if size.get() > self.ceiling.get() {
-            return Err(MemoryError::WorktreeBusy {
+            return Err(StorageError::WorktreeBusy {
                 name: name.as_str().to_owned(),
                 detail: format!(
                     "the city working tree is {} bytes and the ceiling is {}",
@@ -149,22 +149,22 @@ impl Worktrees {
         &self,
         name: &WorktreeName,
         reference: Option<&git2::Reference<'_>>,
-    ) -> Result<WorktreeLease, MemoryError> {
-        std::fs::create_dir_all(&self.home).map_err(|source| MemoryError::Io {
+    ) -> Result<WorktreeLease, StorageError> {
+        std::fs::create_dir_all(&self.home).map_err(|source| StorageError::Io {
             op: "create the worktree home",
             path: self.home.clone(),
             source,
         })?;
         let path = self.home.join(name.as_str());
         // The checkout lands at this name, and a name that is an alias
-        // would write the whole tree through it (memory-SPEC 8-25).
+        // would write the whole tree through it (storage-SPEC 8-25).
         crate::alias::WriteTarget::within("place a worktree", &self.city_root, &path)?;
         let mut opts = git2::WorktreeAddOptions::new();
         opts.lock(true);
         opts.reference(reference);
         self.repo
             .worktree(name.as_str(), &path, Some(&opts))
-            .map_err(|err| MemoryError::Worktree {
+            .map_err(|err| StorageError::Worktree {
                 op: "add a worktree",
                 detail: format!("{}: {err}", name.as_str()),
             })?;
@@ -192,8 +192,8 @@ impl Worktrees {
     /// # Errors
     /// Refuses an unknown branch, a repository with no commit, and a
     /// merge that is not a fast-forward.
-    pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, MemoryError> {
-        let refuse = |op: &'static str, detail: String| MemoryError::Worktree { op, detail };
+    pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, StorageError> {
+        let refuse = |op: &'static str, detail: String| StorageError::Worktree { op, detail };
         let branch = self
             .repo
             .find_branch(name.as_str(), git2::BranchType::Local)
@@ -219,7 +219,7 @@ impl Worktrees {
                 .graph_descendant_of(theirs.id(), ours.id())
                 .map_err(|err| refuse("judge a fast-forward", err.to_string()))?;
         if !descends {
-            return Err(MemoryError::MergeStale {
+            return Err(StorageError::MergeStale {
                 name: name.as_str().to_owned(),
                 detail: format!("the trunk moved to {} after this node branched", ours.id()),
             });
@@ -240,8 +240,8 @@ impl Worktrees {
         &self,
         target: git2::Oid,
         landing: &Landing<'_>,
-    ) -> Result<(), MemoryError> {
-        let refuse = |op: &'static str, detail: String| MemoryError::Worktree { op, detail };
+    ) -> Result<(), StorageError> {
+        let refuse = |op: &'static str, detail: String| StorageError::Worktree { op, detail };
         let head = self
             .repo
             .head()
@@ -313,8 +313,8 @@ impl Worktrees {
     ///
     /// # Errors
     /// Propagates a repository that cannot find or unlock the tree.
-    pub fn release(&self, lease: WorktreeLease) -> Result<(), MemoryError> {
-        let refuse = |op: &'static str, err: git2::Error| MemoryError::Worktree {
+    pub fn release(&self, lease: WorktreeLease) -> Result<(), StorageError> {
+        let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
             op,
             detail: format!("{}: {err}", lease.name().as_str()),
         };
@@ -329,12 +329,12 @@ impl Worktrees {
     ///
     /// A repository that has already forgotten the tree is the end
     /// state this asks for, so it is not a failure.
-    pub(super) fn forget(&self, name: &WorktreeName) -> Result<(), MemoryError> {
+    pub(super) fn forget(&self, name: &WorktreeName) -> Result<(), StorageError> {
         let tree = match self.repo.find_worktree(name.as_str()) {
             Ok(tree) => tree,
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
             Err(err) => {
-                return Err(MemoryError::Worktree {
+                return Err(StorageError::Worktree {
                     op: "find a worktree",
                     detail: format!("{}: {err}", name.as_str()),
                 });
@@ -344,7 +344,7 @@ impl Worktrees {
         // A lock on a tree whose directory is gone guards nothing.
         opts.valid(true).locked(true).working_tree(true);
         tree.prune(Some(&mut opts))
-            .map_err(|err| MemoryError::Worktree {
+            .map_err(|err| StorageError::Worktree {
                 op: "prune a worktree",
                 detail: format!("{}: {err}", name.as_str()),
             })
@@ -354,11 +354,14 @@ impl Worktrees {
     ///
     /// # Errors
     /// Propagates a repository that cannot list its worktrees.
-    pub fn live(&self) -> Result<Vec<WorktreeName>, MemoryError> {
-        let names = self.repo.worktrees().map_err(|err| MemoryError::Worktree {
-            op: "list worktrees",
-            detail: err.to_string(),
-        })?;
+    pub fn live(&self) -> Result<Vec<WorktreeName>, StorageError> {
+        let names = self
+            .repo
+            .worktrees()
+            .map_err(|err| StorageError::Worktree {
+                op: "list worktrees",
+                detail: err.to_string(),
+            })?;
         let mut out = Vec::new();
         // A name git cannot render as UTF-8 was not written by this
         // module, and it is not a tree this city can address.

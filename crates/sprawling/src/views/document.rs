@@ -28,7 +28,7 @@ const SNIFF_BYTES: usize = 8 * 1024;
 ///
 /// Takes the city root rather than the views: it reads the disk, and
 /// runs after the view lock is released (sprawling-SPEC.md 8-100).
-pub(super) fn document_answer(city_root: &Path, at: Address) -> Option<channels::DocumentAnswer> {
+pub(super) fn document_answer(city_root: &Path, at: Address) -> Option<wire::DocumentAnswer> {
     let bytes = std::fs::read(resolve(city_root, Some(&at))).ok()?;
     Some(read_document(at, &bytes))
 }
@@ -65,9 +65,9 @@ pub(super) fn read_bytes(bytes: &[u8]) -> Reading {
 }
 
 /// The wire shape of one file's bytes.
-pub(super) fn read_document(at: Address, bytes: &[u8]) -> channels::DocumentAnswer {
+pub(super) fn read_document(at: Address, bytes: &[u8]) -> wire::DocumentAnswer {
     let read = read_bytes(bytes);
-    channels::DocumentAnswer {
+    wire::DocumentAnswer {
         at,
         text: read.text,
         bytes: read.bytes,
@@ -101,8 +101,8 @@ mod tests {
             city::RULES_FILE
         ))
         .unwrap();
-        let channels::Answer::Document(answer) =
-            views.answer(&channels::Query::Document { at: rules.clone() })
+        let wire::Answer::Document(answer) =
+            views.answer(&wire::Query::Document { at: rules.clone() })
         else {
             panic!("Document answers with a document");
         };
@@ -119,11 +119,11 @@ mod tests {
     fn a_missing_file_is_unavailable_not_empty() {
         let dir = tempfile::tempdir().unwrap();
         let mut views = Views::new(dir.path());
-        let answer = views.answer(&channels::Query::Document {
+        let answer = views.answer(&wire::Query::Document {
             at: Address::parse("hall/nothing.md").unwrap(),
         });
         assert!(
-            matches!(answer, channels::Answer::Unavailable { .. }),
+            matches!(answer, wire::Answer::Unavailable { .. }),
             "{answer:?}"
         );
     }

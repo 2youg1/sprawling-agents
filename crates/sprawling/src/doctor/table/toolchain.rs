@@ -17,7 +17,7 @@
 //! `just check` skips it when it is absent, or only a recipe a person
 //! runs on purpose calls it, and the row says which recipe that is.
 
-use channels::DoctorUnread;
+use wire::DoctorUnread;
 
 use crate::doctor::family::{CHROMIUM_RECIPE, Family};
 use crate::doctor::pin::LEAN_TOOLCHAIN as LEAN_PIN;

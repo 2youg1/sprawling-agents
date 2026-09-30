@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The chain-hash snapshot: what a fold held after one line of the
-//! Ledger, with that line's seq and chain hash (memory-SPEC 8-26).
+//! Ledger, with that line's seq and chain hash (storage-SPEC 8-26).
 //!
 //! A projection, never history: a start that finds no snapshot, a
 //! damaged one, or one whose line hash does not match the line on disk
@@ -17,7 +17,7 @@ use std::path::Path;
 use kernel::ledger::chain_hash;
 use kernel::{AxError, B3Hash, Seq};
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 use crate::jsonl::LineCheck;
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
@@ -143,8 +143,8 @@ impl ChainSnapshot {
 /// there.
 ///
 /// # Errors
-/// `MemoryError::Snapshot` naming the step that failed.
-pub fn write_snapshot(dir: &Path, snapshot: &ChainSnapshot) -> Result<(), MemoryError> {
+/// `StorageError::Snapshot` naming the step that failed.
+pub fn write_snapshot(dir: &Path, snapshot: &ChainSnapshot) -> Result<(), StorageError> {
     let mut vfs = RealFs::new();
     let (file, staged) = (dir.join(FILE), dir.join(STAGED));
     vfs.create_dir_all(dir)
@@ -165,9 +165,9 @@ pub fn write_snapshot(dir: &Path, snapshot: &ChainSnapshot) -> Result<(), Memory
 /// Read the snapshot `dir` holds.
 ///
 /// # Errors
-/// `MemoryError::Snapshot` when the file exists and cannot be read; bytes that
+/// `StorageError::Snapshot` when the file exists and cannot be read; bytes that
 /// are not a snapshot are `StoredSnapshot::Damaged`, not an error.
-pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, MemoryError> {
+pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, StorageError> {
     let file = dir.join(FILE);
     match RealFs::new().read(&file) {
         Ok(bytes) => Ok(ChainSnapshot::decode(&bytes)
@@ -179,9 +179,9 @@ pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, MemoryError> {
 
 /// The constructor of a snapshot's I/O failure, as `io_err` is the
 /// ledger's.
-fn refused(op: &'static str, path: &Path) -> impl FnOnce(std::io::Error) -> MemoryError {
+fn refused(op: &'static str, path: &Path) -> impl FnOnce(std::io::Error) -> StorageError {
     let path = path.to_path_buf();
-    move |source| MemoryError::Snapshot { op, path, source }
+    move |source| StorageError::Snapshot { op, path, source }
 }
 
 #[cfg(test)]

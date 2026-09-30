@@ -156,7 +156,7 @@ Let a Rust command finish, and never kill it by PID; waiting on the build lock i
 | `just check-all [phase...]` | every phase of `just check`, each run even after another failed |
 | `just gates` | the machine gates alone, then the supply-chain read |
 | `cargo xtask gates <name>...` | the named gates only; `--list` prints the roster |
-| `just features` | the workspace on its default features, and `channels` without `server` |
+| `just features` | the workspace on its default features, and `wire` without `server` |
 | `just check-client` | the client's lint, typecheck and tests, after `build-web` |
 | `just build-web` | build the client bundle into `target/web-dist` |
 | `just dist` | the whole deliverable: client, binary, and bill of materials |

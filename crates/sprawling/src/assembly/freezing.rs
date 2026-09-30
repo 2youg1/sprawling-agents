@@ -191,7 +191,7 @@ pub(super) struct Freezing<'a> {
     /// The store the prefix and the norms are pinned in. Content
     /// addressed, so a second handle on the same store writes the same
     /// files.
-    pub(super) cas: &'a mut memory::Cas,
+    pub(super) cas: &'a mut storage::Cas,
     /// The conversation this run opens with, rebuilt where the ledger
     /// and its index are held, because that is also where its lineage
     /// line is written.
@@ -218,7 +218,7 @@ impl Freezing<'_> {
         for segment in prefix.segments() {
             self.cas
                 .put(segment.bytes())
-                .map_err(memory::MemoryError::into_ax)?;
+                .map_err(storage::StorageError::into_ax)?;
         }
         Ok(())
     }
@@ -358,7 +358,7 @@ impl Freezing<'_> {
         let mut must_read = Vec::new();
         // Put for this run at this building, so the next session's `read`
         // judges each norm where it was read from rather than refusing it.
-        let origin = memory::BlockOrigin {
+        let origin = storage::BlockOrigin {
             run: site.run_id,
             building: addr.clone(),
         };
@@ -374,7 +374,7 @@ impl Freezing<'_> {
             let hash = self
                 .cas
                 .put_for(&bytes, &origin)
-                .map_err(memory::MemoryError::into_ax)?;
+                .map_err(storage::StorageError::into_ax)?;
             must_read.push(Locator::cas(hash));
         }
         must_read.push(job);

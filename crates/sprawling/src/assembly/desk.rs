@@ -87,8 +87,8 @@ impl Waiting {
 /// by minutes: by the time the worker refuses, the socket task that
 /// accepted the command has long returned.
 pub(crate) struct Posted {
-    pub(crate) command: channels::Command,
-    pub(crate) reply: channels::Reply,
+    pub(crate) command: wire::Command,
+    pub(crate) reply: wire::Reply,
 }
 
 /// What the worker found when it looked at the desk. Exhaustive, because
@@ -176,7 +176,7 @@ impl CommandDesk {
     /// than as a second run against a paid provider.
     /// Once the work is over the key is forgotten, so asking for the
     /// same work again is a second piece of work rather than silence.
-    pub(crate) fn post(&self, command: channels::Command, reply: channels::Reply) {
+    pub(crate) fn post(&self, command: wire::Command, reply: wire::Reply) {
         if let Ok(mut waiting) = self.waiting.lock() {
             if let Some(key) = command.idem() {
                 // The claim is the insertion: a key already in the set
@@ -207,11 +207,11 @@ impl CommandDesk {
         let Ok(mut waiting) = self.waiting.lock() else {
             return DeskWait::Gone;
         };
-        let for_a_lane = |posted: &Posted| match channels::classify(&posted.command) {
-            channels::ControlVerdict::Intervene { run: Some(run), .. } => driving(run),
-            channels::ControlVerdict::Intervene { run: None, .. }
-            | channels::ControlVerdict::NotAnIntervention
-            | channels::ControlVerdict::Refuse(_) => false,
+        let for_a_lane = |posted: &Posted| match wire::classify(&posted.command) {
+            wire::ControlVerdict::Intervene { run: Some(run), .. } => driving(run),
+            wire::ControlVerdict::Intervene { run: None, .. }
+            | wire::ControlVerdict::NotAnIntervention
+            | wire::ControlVerdict::Refuse(_) => false,
         };
         let first = waiting.queue.iter().position(|posted| !for_a_lane(posted));
         match first.and_then(|at| waiting.queue.remove(at)) {
@@ -233,7 +233,7 @@ impl CommandDesk {
     /// Takes one command if any is waiting, without waiting for one.
     /// Used where a test drives the desk directly; the worker loop waits.
     #[cfg(test)]
-    pub(crate) fn take(&self) -> Option<channels::Command> {
+    pub(crate) fn take(&self) -> Option<wire::Command> {
         let mut waiting = self.waiting.lock().ok()?;
         let posted = waiting.queue.pop_front()?;
         if let Some(key) = posted.command.idem() {
@@ -252,20 +252,20 @@ impl CommandDesk {
             return Interrupt::None;
         };
         let cancel = waiting.queue.iter().position(
-            |posted| matches!(&posted.command, channels::Command::Cancel { run: r, .. } if *r == run),
+            |posted| matches!(&posted.command, wire::Command::Cancel { run: r, .. } if *r == run),
         );
         if let Some(at) = cancel {
             waiting.forget(at);
             return Interrupt::Cancel;
         }
         let steer = waiting.queue.iter().position(
-            |posted| matches!(&posted.command, channels::Command::Steer { run: r, .. } if *r == run),
+            |posted| matches!(&posted.command, wire::Command::Steer { run: r, .. } if *r == run),
         );
         let Some(at) = steer else {
             return Interrupt::None;
         };
         let Some(Posted {
-            command: channels::Command::Steer { text, .. },
+            command: wire::Command::Steer { text, .. },
             ..
         }) = waiting.forget(at)
         else {

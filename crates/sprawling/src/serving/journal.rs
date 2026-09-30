@@ -40,7 +40,7 @@ const DEPTH: usize = 512;
 
 /// Where the process log goes on its way out of this process.
 pub struct Journal {
-    lines: tokio::sync::broadcast::Sender<channels::LogLine>,
+    lines: tokio::sync::broadcast::Sender<wire::LogLine>,
     clock: Clock,
 }
 
@@ -70,7 +70,7 @@ impl Journal {
     }
 
     /// The broadcast the socket subscribes to.
-    pub(crate) fn lines(&self) -> tokio::sync::broadcast::Sender<channels::LogLine> {
+    pub(crate) fn lines(&self) -> tokio::sync::broadcast::Sender<wire::LogLine> {
         self.lines.clone()
     }
 }
@@ -80,8 +80,8 @@ impl Journal {
 /// The nil run is the city speaking for itself, and it travels as an
 /// absent run: a page filtering by run would otherwise offer a
 /// session-shaped identifier that names no session.
-fn carried(entry: Entry<'_>, t: Option<TimeMs>) -> channels::LogLine {
-    channels::LogLine {
+fn carried(entry: Entry<'_>, t: Option<TimeMs>) -> wire::LogLine {
+    wire::LogLine {
         seq: entry.site.seq,
         t,
         level: level(entry.level),
@@ -94,13 +94,13 @@ fn carried(entry: Entry<'_>, t: Option<TimeMs>) -> channels::LogLine {
 /// The one mapping between the level a terminal spells and the level a
 /// page spells. Exhaustive, so a sixth level cannot be added upstream
 /// without this file deciding what a page calls it.
-fn level(level: runtime::diagnostics::Level) -> channels::LogLevel {
+fn level(level: runtime::diagnostics::Level) -> wire::LogLevel {
     match level {
-        runtime::diagnostics::Level::Refuse => channels::LogLevel::Refuse,
-        runtime::diagnostics::Level::Effect => channels::LogLevel::Effect,
-        runtime::diagnostics::Level::Decide => channels::LogLevel::Decide,
-        runtime::diagnostics::Level::Trace => channels::LogLevel::Trace,
-        runtime::diagnostics::Level::Wire => channels::LogLevel::Wire,
+        runtime::diagnostics::Level::Refuse => wire::LogLevel::Refuse,
+        runtime::diagnostics::Level::Effect => wire::LogLevel::Effect,
+        runtime::diagnostics::Level::Decide => wire::LogLevel::Decide,
+        runtime::diagnostics::Level::Trace => wire::LogLevel::Trace,
+        runtime::diagnostics::Level::Wire => wire::LogLevel::Wire,
     }
 }
 
@@ -110,7 +110,7 @@ mod tests {
     use super::*;
     use runtime::diagnostics::{Level, Site};
 
-    fn entry_at(run: kernel::RunId, level: Level) -> channels::LogLine {
+    fn entry_at(run: kernel::RunId, level: Level) -> wire::LogLine {
         carried(
             Entry {
                 level,
@@ -126,7 +126,7 @@ mod tests {
     }
 
     /// The five names a page spells are the five names a terminal
-    /// spells. Held here because `channels` cannot depend on `runtime`,
+    /// spells. Held here because `wire` cannot depend on `runtime`,
     /// so the two enums would otherwise be free to drift apart while
     /// both builds stayed green.
     #[test]
@@ -161,7 +161,7 @@ mod tests {
         // Below the floor, so nothing of it travels.
         log.write(Level::Trace, site, "retrying");
         let carried = watching.try_recv().expect("the line reached the watcher");
-        assert_eq!(carried.level, channels::LogLevel::Effect);
+        assert_eq!(carried.level, wire::LogLevel::Effect);
         assert_eq!(carried.module, "bin::doctor");
         assert_eq!(carried.seq, kernel::Seq::new(4));
         assert_eq!(carried.run, None);

@@ -46,34 +46,32 @@ use kernel::{Address, AxError, EventRecord, RunId};
 pub(crate) fn config_answer(
     city_root: &Path,
     addr: &Address,
-) -> Result<channels::ConfigAnswer, AxError> {
+) -> Result<wire::ConfigAnswer, AxError> {
     let defaults = gateway::EndpointTuning::DEFAULTS;
-    let domain = channels::SecondDomain {
+    let domain = wire::SecondDomain {
         min: kernel::consts_policy::CTX_REMINDER_SECOND_MIN,
         max: kernel::consts_policy::CTX_REMINDER_SECOND_MAX,
     };
-    Ok(channels::ConfigAnswer {
+    Ok(wire::ConfigAnswer {
         addr: addr.clone(),
-        effort: city::settled_effort(city_root, addr)?.map(|(effort, layer)| {
-            channels::SettledEffort {
-                effort,
-                from: rung_of(layer),
-            }
+        effort: city::settled_effort(city_root, addr)?.map(|(effort, layer)| wire::SettledEffort {
+            effort,
+            from: rung_of(layer),
         }),
         second: city::settled_second(city_root, addr)?.map_or(
-            channels::SettledSecond {
+            wire::SettledSecond {
                 percent: kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT,
-                from: channels::ConfigLayer::Default,
+                from: wire::ConfigLayer::Default,
                 domain,
             },
-            |(threshold, layer)| channels::SettledSecond {
+            |(threshold, layer)| wire::SettledSecond {
                 percent: u64::from(threshold),
                 from: rung_of(layer),
                 domain,
             },
         ),
-        tuning: channels::TuningDefaults {
-            from: channels::ConfigLayer::Default,
+        tuning: wire::TuningDefaults {
+            from: wire::ConfigLayer::Default,
             timeout_ms: defaults.timeout_ms,
             request_max_retries: defaults.retries.stated(),
             stream_idle_timeout_ms: defaults.stream_idle_timeout_ms,
@@ -85,19 +83,19 @@ pub(crate) fn config_answer(
 /// The one place the ladder's rung becomes the wire's. Exhaustive, so
 /// a rung added to the ladder is a compiler error here rather than a
 /// page that silently reports the wrong file.
-fn rung_of(layer: city::Layer) -> channels::ConfigLayer {
+fn rung_of(layer: city::Layer) -> wire::ConfigLayer {
     match layer {
-        city::Layer::City => channels::ConfigLayer::City,
-        city::Layer::Building => channels::ConfigLayer::Building,
-        city::Layer::Resident => channels::ConfigLayer::Resident,
+        city::Layer::City => wire::ConfigLayer::City,
+        city::Layer::Building => wire::ConfigLayer::Building,
+        city::Layer::Resident => wire::ConfigLayer::Resident,
     }
 }
 
 /// The settings page's read of the endpoint book.
-pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> channels::EndpointsAnswer {
+pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsAnswer {
     let endpoints = book
         .endpoints()
-        .map(|endpoint| channels::EndpointSummary {
+        .map(|endpoint| wire::EndpointSummary {
             name: endpoint.name.clone(),
             label: endpoint.label().to_owned(),
             base_url: endpoint.base_url.clone(),
@@ -106,7 +104,7 @@ pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> channels::Endpoi
             models: endpoint
                 .models
                 .iter()
-                .map(|row| channels::ModelFactsSummary {
+                .map(|row| wire::ModelFactsSummary {
                     id: row.id.clone(),
                     context_tokens: row.context_tokens.and_then(kernel::Window::new),
                     max_output_tokens: row.max_output_tokens,
@@ -121,38 +119,38 @@ pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> channels::Endpoi
         .collect();
     let chosen = book
         .choices()
-        .map(|(tag, endpoint, entry)| channels::ChosenSummary {
+        .map(|(tag, endpoint, entry)| wire::ChosenSummary {
             tag,
             endpoint: endpoint.to_owned(),
             model: entry.id.clone(),
             max_output_tokens: entry.max_output_tokens,
         })
         .collect();
-    channels::EndpointsAnswer { endpoints, chosen }
+    wire::EndpointsAnswer { endpoints, chosen }
 }
 
 /// The vendors this city knows by host, copied row for row from the
-/// preset table (channels-SPEC.md 8-51). A row the normaliser refuses
+/// preset table (wire-SPEC.md 8-51). A row the normaliser refuses
 /// is a defect of the table, and the answer names itself unavailable
 /// with the row's refusal rather than listing the rest as if whole.
-pub(crate) fn known_hosts_answer() -> channels::Answer {
+pub(crate) fn known_hosts_answer() -> wire::Answer {
     let hosts = match gateway::known_hosts() {
         Ok(hosts) => hosts,
         Err(fault) => {
-            return channels::Answer::Unavailable {
+            return wire::Answer::Unavailable {
                 query: format!("KnownHosts({})", fault.subject()),
             };
         }
     };
-    channels::Answer::KnownHosts(channels::KnownHostsAnswer {
+    wire::Answer::KnownHosts(wire::KnownHostsAnswer {
         hosts: hosts
             .into_iter()
-            .map(|row| channels::KnownHost {
+            .map(|row| wire::KnownHost {
                 host: row.host.to_owned(),
                 faces: row
                     .faces
                     .into_iter()
-                    .map(|(dialect, base_url)| channels::KnownFace { dialect, base_url })
+                    .map(|(dialect, base_url)| wire::KnownFace { dialect, base_url })
                     .collect(),
             })
             .collect(),
@@ -162,15 +160,15 @@ pub(crate) fn known_hosts_answer() -> channels::Answer {
 /// The harness page: every official harness in the roster, the command
 /// that starts it, and whether this machine finds that command's
 /// program on the same search path the doctor reads
-/// (channels-SPEC.md 8-52).
-pub(crate) fn harnesses_answer() -> channels::Answer {
+/// (wire-SPEC.md 8-52).
+pub(crate) fn harnesses_answer() -> wire::Answer {
     let search_path = crate::doctor::host::search_path();
-    channels::Answer::Harnesses(channels::HarnessesAnswer {
-        harnesses: protocol::Harness::ALL
+    wire::Answer::Harnesses(wire::HarnessesAnswer {
+        harnesses: agent_protocols::Harness::ALL
             .iter()
             .map(|harness| {
                 let launch = harness.launch();
-                channels::HarnessLine {
+                wire::HarnessLine {
                     name: harness.as_str().to_owned(),
                     launch: std::iter::once(launch.program.name())
                         .chain(launch.args.iter().copied())
@@ -223,13 +221,11 @@ pub(crate) fn buildings_of(city_root: &Path) -> Vec<Address> {
 /// # Errors
 /// Refuses a line this build cannot read as a signal: skipping it would
 /// leave a waiting signal out of the view.
-pub(crate) fn signal_line(
-    record: &EventRecord,
-) -> Result<(Address, channels::SignalLine), AxError> {
+pub(crate) fn signal_line(record: &EventRecord) -> Result<(Address, wire::SignalLine), AxError> {
     let signal = collab::Signal::from_payload(record.data())?;
     Ok((
         signal.room().clone(),
-        channels::SignalLine {
+        wire::SignalLine {
             id: signal.id().as_str().to_owned(),
             kind: signal.kind().as_str().to_owned(),
             from: signal.from().to_owned(),
@@ -241,13 +237,13 @@ pub(crate) fn signal_line(
 /// The rows one `file_discarded` record states: one per path, each with
 /// the record's way back. A record this version cannot read states no
 /// rows, for the reason [`signal_line`] gives.
-pub(crate) fn discard_lines(record: &EventRecord) -> Vec<channels::DiscardLine> {
+pub(crate) fn discard_lines(record: &EventRecord) -> Vec<wire::DiscardLine> {
     let Ok(FileDiscarded { paths, restoration }) = record.data().read() else {
         return Vec::new();
     };
     paths
         .into_iter()
-        .map(|path| channels::DiscardLine {
+        .map(|path| wire::DiscardLine {
             path,
             restoration: restoration.clone(),
             at: record.t(),
@@ -267,9 +263,9 @@ pub(crate) fn restored_paths(record: &EventRecord) -> Vec<String> {
 
 /// One shelf entry, as the registry shows it. `None` for a record with
 /// no room or one this version cannot read.
-pub(crate) fn registry_line(record: &EventRecord) -> Option<channels::RegistryLine> {
+pub(crate) fn registry_line(record: &EventRecord) -> Option<wire::RegistryLine> {
     let AssetArchived { kind, subject, .. } = record.data().read().ok()?;
-    Some(channels::RegistryLine {
+    Some(wire::RegistryLine {
         addr: record.addr().cloned()?,
         kind,
         subject,
@@ -277,11 +273,11 @@ pub(crate) fn registry_line(record: &EventRecord) -> Option<channels::RegistryLi
     })
 }
 
-pub(crate) fn summarize(run: RunId, hot: &memory::RunHot) -> channels::RunSummary {
-    channels::RunSummary {
+pub(crate) fn summarize(run: RunId, hot: &storage::RunHot) -> wire::RunSummary {
+    wire::RunSummary {
         run,
         who: hot.who.clone(),
-        frozen: matches!(hot.phase, memory::RunPhase::Frozen),
+        frozen: matches!(hot.phase, storage::RunPhase::Frozen),
         last_seq: hot.last_seq,
         last_kind: hot.last_kind,
         addr: hot.addr.clone(),

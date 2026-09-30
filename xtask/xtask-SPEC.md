@@ -16,7 +16,7 @@
 | guard | 墙外那份 `desktop/` 的 lint 表、包元数据与共享依赖版本与工作区逐键相等 |
 | wording | 读者拿到的词出自短语表 `client/src/lang.json`：`.svelte` 标记里文本节点与朗读型属性的字面量（`wording::markup`），`.ts` 里拒绝各段的实参（`wording::refusal`，§8-24），去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名；生成的文件由它的生成器作证 |
 | render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17 与 §8-38 |
-| wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（`wire.rs` 的 `enum Command`、`run_command` 的臂、`client/src`），channels-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
+| wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（`wire.rs` 的 `enum Command`、`run_command` 的臂、`client/src`），wire-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | secret | 全仓加夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
 | specalign | kernel 枚举 ↔ kernel-SPEC 逐 variant：§8-1／§8-4 两表消费真 enum（`AxCode::ALL`／`EventKind::ALL`）作证，计数、归属、carrier／窗类逐项同；SPEC 围栏里其余每一处 `pub enum` 体与 syn 解出的同名枚举双向对账（§8-10） |
 | budget | `xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；没有构建产物可称时沉默（`just check` 不构建 release 二进制），壁钟读数只入册不入门 |
@@ -29,7 +29,7 @@
 | unused | 清单里声明、源码里从不点名的依赖（§8-37） |
 | proof | kani harness 名册只住 `#[kani::proof]` 属性；CI 不得点名 harness，文档不得手写总数 |
 | docnum | 文档里的数字由 `docnum::FACTS` 生成并由 `--write` 回写；区段陈旧、事实未知、标记不闭合各自即红（§8-16） |
-| wire-ts | `client/src/wire.ts` 由 `channels::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V`、`WIRE_HASH`、`CITY_RUN`（§8-21）与 `BODY_PX`（§8-36）；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
+| wire-ts | `client/src/wire.ts` 由 `wire::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V`、`WIRE_HASH`、`CITY_RUN`（§8-21）与 `BODY_PX`（§8-36）；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
 | gates（命令） | 不带名字时跑全部门，带名字时只跑点名的那几道（按门表次序）；名字不在门表里即以 `unknown-gate` 退出码 2 拒绝并列出全部门名，不退回「全跑」；聚合报告，任一违规即退出码 1（§12 第 2 条） |
 | spec（命令） | 生成 `<名>-SPEC.md` 骨架，写进那个包的目录；名字是包的 lib 名，没有 lib 的包用包名（`just spec`，§8-39） |
 | members（命令） | 包在哪：`--owning` 答一组路径属于哪些工作区包，`--dir` 答一个包住在哪个目录；`justfile` 用它，不再从路径里推包名（§8-39） |
@@ -237,7 +237,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 | 文件 | 它回答什么 |
 |---|---|
-| `xtask/src/wire_ts.rs` | 命令本身：文本从哪来（`render`：`channels::wire_schema()`＋`WIRE_V`＋`schema_hash()`）、写到哪（`TARGET`）、怎么比（`check`、`first_difference`）、怎么写（`write`） |
+| `xtask/src/wire_ts.rs` | 命令本身：文本从哪来（`render`：`wire::wire_schema()`＋`WIRE_V`＋`schema_hash()`）、写到哪（`TARGET`）、怎么比（`check`、`first_difference`）、怎么写（`write`） |
 | `xtask/src/wire_ts/emit.rs` | 一份 JSON Schema 文档怎么变成一份 `wire.ts`（`emit`）：文件抬头与三个常量、`$defs` 按名排序后按依赖拓扑输出（`ordered`、`refs_within`）、一条定义怎么命名与打 brand（`definition`）、以及拒绝长什么样（`Refused`、`refuse`） |
 | `xtask/src/wire_ts/emit/values.rs` | 一个 schema 怎么变成一个 Effect `Schema` 表达式（`expression`、`typed`、`fields`、`union`、`literals`）与它认得的关键字子集（`KNOWN`）：读 schema 的那一半，与读文档的那一半在 `expression` 处相接 |
 | `xtask/src/wire_ts/tests.rs` | 具名裸 `string` 打上 brand；带 `pattern` 的 `string` 收成 `Schema.pattern`；外标签枚举成 `Union`；依赖先于引用；子集外关键字被点名拒绝；环被拒绝；真实文档能发出；第一处不同的行被点名 |
@@ -303,7 +303,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 **一节可以答多个模块，一个模块只能答一节。** 子模块跟随它的父模块所在的节，除非某节的标题点名了子模块的全路径（`runtime::tools::read` 有自己的 8-29，故它不跟 `runtime::tools`）。理由是 SPEC 的 §8 按接口分节而模块表按文件分行，两者本就不是一一对应；把子文件各钉到一个不存在的节上，只会造出一列指向虚无的链接。
 
-**specalign 增第三条断言：锚点在盘上存在。** 第七列的每个值都被解析成「SPEC 路径 ＋ 节号」，路径必须可读，节号必须在那份 SPEC 里作为一个节的标号出现。SPEC 的 §8 有两种写法，两种都算：`### 8-N …` 标题（多数 crate），以及 §8 的接口围栏里那一行 `// 8-N …` 注释（`browser`／`protocol`／`desktop`／部分 `web`／`runtime` 的写法）。**认两种不是放宽，而是照着树上真有的形状判**——只认标题会对六个 crate 报错，而它们的 §8 本来就是一整块围栏。
+**specalign 增第三条断言：锚点在盘上存在。** 第七列的每个值都被解析成「SPEC 路径 ＋ 节号」，路径必须可读，节号必须在那份 SPEC 里作为一个节的标号出现。SPEC 的 §8 有两种写法，两种都算：`### 8-N …` 标题（多数 crate），以及 §8 的接口围栏里那一行 `// 8-N …` 注释（`browser`／`agent_protocols`／`desktop`／部分 `web`／`runtime` 的写法）。**认两种不是放宽，而是照着树上真有的形状判**——只认标题会对六个 crate 报错，而它们的 §8 本来就是一整块围栏。
 
 **已知的限，写在明处**：节号在同一份 SPEC 里并不唯一（`sprawling` 的 `8-40`／`8-41`／`8-42` 各出现过三次，`web` 的 `8-12`～`8-16` 各两次），因为各节各自续号而无人对账。故本条只判存在，不判唯一：加一条唯一性断言会对七份未经重编号的 SPEC 一次报错，而重编号是另一件工作。**翻案条件**：任一 SPEC 的 §8 完成一次重编号后，唯一性断言随即上线。
 
@@ -434,7 +434,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 **判据三条**：① 区段的文字等于它的事实当场的读数，不等即红，恢复语是 `cargo xtask docnum --write`；② 区段命名的事实必须在 `FACTS` 数组里，否则红，拒词列出全部已知键；③ 标记不闭合、区段套区段、或多出一个收尾标记，即红——一段读不出来的标记不得被当作没有标记。**`--write` 撞上未知事实时整份文件不写**：跳过它会让文档看起来刚重生过，而其中一个数字仍是旧的。
 
-**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`channels::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `channels::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `channels` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`test_functions`、`workspace_version`（根 `Cargo.toml` 的 `[workspace.package] version`，`CHANGELOG.md` 最新一节的标题引它，于是升了版本号却没写新一节的树会红）。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
+**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`wire::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `wire::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `wire` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`test_functions`、`workspace_version`（根 `Cargo.toml` 的 `[workspace.package] version`，`CHANGELOG.md` 最新一节的标题引它，于是升了版本号却没写新一节的树会红）。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
 
 **一张图也是一个事实。** `crate_graph` 把 `ARCHITECTURE.md` §3 的 `depmap` 块画成一段 mermaid `flowchart TD`：块里每个 crate 一行，每条允许的边一个箭头（依赖方指向被依赖方），不做传递约简，因为约简掉的边正是 `depmap` 允许、读者要查的那一条。生成函数 `depmap::graph` 与门用同一个 `parse_block` 读块，故图与门不会读出两张依赖表；手画一张依赖图，就是依赖表的第二个权威。值自带 ```` ```mermaid ```` 围栏，标记放在围栏之外，因为 mermaid 不认 HTML 注释。
 
@@ -609,7 +609,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 ### 8-28 `features` 那两条命令写在 `justfile` 一处，CI 调它
 
-**决定**：这个仓库对 feature 组合的检查是 `just features` 那两条命令——工作区在默认 feature 集上（`--all-targets`，故测试目标也进编译），以及 `channels` 关掉 `server`。`ci.yml` 的 `clippy` 作业调这条 recipe，自己不拼命令。
+**决定**：这个仓库对 feature 组合的检查是 `just features` 那两条命令——工作区在默认 feature 集上（`--all-targets`，故测试目标也进编译），以及 `wire` 关掉 `server`。`ci.yml` 的 `clippy` 作业调这条 recipe，自己不拼命令。
 
 **为什么**：同一个检查写过三遍时它们真的分叉了——CI 那一遍少了 `--all-targets`，于是本地门红的那棵树在 CI 上是绿的；三处又各自声称「别的命令都不编译这一份」，而三句话合起来互相证伪。`--all-targets` 是非对称的那一半：`cargo check` 单独一条不编译测试目标，而 `refusal_matrix` 曾在未声明 gate 的情况下用 `#[cfg(feature = "conformance")]` 的项，唯一编译过它的配置是 `--all-features`。
 
@@ -733,7 +733,7 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 ### 8-36 `wire-ts` 发出 `BODY_PX`
 
-人可以要的正文字号区间住 `channels::BODY_PX_MIN`／`BODY_PX_MAX`：写 `[ui]` 的那一层据它拒；外观页若自写一份区间，两份区间在其中一份先动的那一刻就是两个区间。生成器因此在文件开头多发一条 `export const BODY_PX = { min, max } as const;`，两个数取自那两个常量，随 `WIRE_V`、`WIRE_HASH`、`CITY_RUN` 一起作为 `Constants` 的一个字段走（`body_px: BodyPx`），而不是给 `emit` 添参数。
+人可以要的正文字号区间住 `wire::BODY_PX_MIN`／`BODY_PX_MAX`：写 `[ui]` 的那一层据它拒；外观页若自写一份区间，两份区间在其中一份先动的那一刻就是两个区间。生成器因此在文件开头多发一条 `export const BODY_PX = { min, max } as const;`，两个数取自那两个常量，随 `WIRE_V`、`WIRE_HASH`、`CITY_RUN` 一起作为 `Constants` 的一个字段走（`body_px: BodyPx`），而不是给 `emit` 添参数。
 
 **被否**：把区间放进 `PreferencesAnswer`——那个类型同时是 `[ui]` 文件的文法，多一个字段就是文件里多一个人能写、而写了也不生效的键；放进 `Query::Config`——那个回答按地址爬梯子，而正文字号是这个人的、不是某个地址的。区间是这个构建的常量，不随城变，故走生成物而不走一次查询。
 

@@ -9,11 +9,11 @@ use std::path::{Path, PathBuf};
 
 use kernel::{B3Hash, EventRecord, Seq};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::vfs::Vfs;
 
 /// Segment rolling threshold. Internal affair: changing it changes how
-/// files are cut, never any observable semantics (memory-SPEC 14).
+/// files are cut, never any observable semantics (storage-SPEC 14).
 pub(crate) const SEGMENT_ROLL_BYTES: u64 = 64 * 1024 * 1024;
 
 /// What open found and repaired.
@@ -48,7 +48,7 @@ pub struct JsonlLedger {
     /// directory that is not a city's ledger, and on the fault model,
     /// whose disk no other process can reach.
     pub(crate) lock: Option<WriterLock>,
-    /// The stop a failed whole-chain audit trips (memory-SPEC 8-27).
+    /// The stop a failed whole-chain audit trips (storage-SPEC 8-27).
     pub(crate) halt: crate::chain_audit::ChainHalt,
     /// The segments a failed wave created, while restoring the disk to
     /// its length before that wave is still owed (`jsonl::unwind`).
@@ -56,7 +56,7 @@ pub struct JsonlLedger {
 }
 
 /// This process's exclusive hold on a city's Ledger, released when the
-/// ledger that took it is dropped (memory-SPEC 8-1).
+/// ledger that took it is dropped (storage-SPEC 8-1).
 ///
 /// The operating system keeps the lock on an open handle and refuses it
 /// to every other handle on the same file, in this process or in
@@ -73,13 +73,13 @@ impl WriterLock {
     /// Takes the writer lock of the ledger directory `dir`: the file
     /// `<name>.lock` beside it, named from `dir` alone so that this
     /// module, not the city layout, owns where the lock lies
-    /// (memory-SPEC 12).
+    /// (storage-SPEC 12).
     ///
     /// # Errors
     /// `LedgerHeld` when another handle holds the lock; `Io` when `dir`
     /// has no name to put a sibling beside (a root, `..`), or the lock
     /// file cannot be made, or the lock cannot be asked for.
-    pub(crate) fn take(dir: &Path) -> Result<WriterLock, MemoryError> {
+    pub(crate) fn take(dir: &Path) -> Result<WriterLock, StorageError> {
         let name = dir.file_name().ok_or_else(|| {
             io_err("name the ledger lock", dir)(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -101,7 +101,7 @@ impl WriterLock {
             .map_err(io_err("open the ledger lock", &path))?;
         match file.try_lock() {
             Ok(()) => Ok(WriterLock { _held: file }),
-            Err(std::fs::TryLockError::WouldBlock) => Err(MemoryError::LedgerHeld {
+            Err(std::fs::TryLockError::WouldBlock) => Err(StorageError::LedgerHeld {
                 dir: dir.to_path_buf(),
             }),
             Err(std::fs::TryLockError::Error(source)) => {
@@ -164,7 +164,7 @@ pub(crate) fn segment_first_seq(name: &str) -> Option<Seq> {
 /// `Vfs::list` answers files only, already sorted: zero-padded names
 /// sort lexically the way they sort numerically, so the order is the
 /// ledger's own rather than the filesystem's.
-pub(crate) fn segment_names(vfs: &dyn Vfs, dir: &Path) -> Result<Vec<String>, MemoryError> {
+pub(crate) fn segment_names(vfs: &dyn Vfs, dir: &Path) -> Result<Vec<String>, StorageError> {
     let mut names = Vec::new();
     for path in vfs.list(dir).map_err(io_err("list ledger dir", dir))? {
         if !is_segment(&path) {

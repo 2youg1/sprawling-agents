@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A committed record and its one wire frame (channels-SPEC.md 8-47).
+//! A committed record and its one wire frame (wire-SPEC.md 8-47).
 //!
 //! The frame is spelled once, before the broadcast, so a socket's share
 //! of an event is two reference counts and a write however many tabs a
@@ -29,7 +29,7 @@ impl Committed {
     /// # Errors
     /// `WireMismatch` when the record does not serialise; that record
     /// reaches no socket, and the gap in `seq` it leaves makes each live
-    /// session send `Lagged` at the next record (channels-SPEC.md 8-41).
+    /// session send `Lagged` at the next record (wire-SPEC.md 8-41).
     pub fn new(record: EventRecord) -> Result<Self, AxError> {
         let unframed = |detail: String| {
             AxError::failure(AxCode::WireMismatch, "frame a committed record", detail)
@@ -73,7 +73,7 @@ mod tests {
     use tokio::sync::broadcast;
 
     use super::Committed;
-    use crate::wire::ServerFrame;
+    use crate::frames::ServerFrame;
 
     fn record(seq: u64) -> EventRecord {
         EventRecord::from_draft(

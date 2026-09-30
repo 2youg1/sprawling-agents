@@ -181,7 +181,7 @@ fn four_actions(binary: &Path) -> Result<(), AxError> {
     let raising = actions::raise_city(&scratch)?;
     // The city the session action is measured in. Its name is this run's
     // own: nothing here spells the path a session slice lies at, which
-    // `xtask slices` refuses because `memory::sessions` is its one writer.
+    // `xtask slices` refuses because `storage::sessions` is its one writer.
     let session_city = scratch.join("session-city");
     let session = actions::open_session(&session_city)?;
     let rows: [(&str, &Action); 4] = [

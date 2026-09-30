@@ -9,8 +9,8 @@
 use std::path::Path;
 
 use kernel::{AxError, RunId, Seq};
-use memory::{JsonlLedger, OpenReport};
 use runtime::diagnostics::{Diagnostics, Level, Site};
+use storage::{JsonlLedger, OpenReport};
 
 use crate::views::Views;
 use crate::views::snapshot::start::cut_at;

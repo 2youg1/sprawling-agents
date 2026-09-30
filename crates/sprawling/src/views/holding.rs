@@ -41,8 +41,8 @@ use super::snapshot::start::city_root_of;
 pub(crate) struct Views {
     #[serde(skip)]
     pub(super) city_root: PathBuf,
-    pub(super) hot: memory::HotView,
-    pub(super) attribution: memory::Attribution,
+    pub(super) hot: storage::HotView,
+    pub(super) attribution: storage::Attribution,
     /// Who may answer, what is waiting, what has already been allowed,
     /// and which scopes a person has shut.
     ///
@@ -61,18 +61,18 @@ pub(crate) struct Views {
     /// where the served ledger head starts before the fold moves it.
     pub(super) head: Option<kernel::Seq>,
     /// The chain hash of the ledger's first line, which names this
-    /// history for its whole life (channels-SPEC, `Welcome.epoch`).
+    /// history for its whole life (wire-SPEC, `Welcome.epoch`).
     pub(super) epoch: Option<kernel::B3Hash>,
     /// What waits in each room, folded from the signal records. Held
     /// here rather than read off a queue: a queue answers by being
     /// consumed, and a view that consumed what it showed would change
     /// the thing it reports on.
-    pub(super) waiting: std::collections::BTreeMap<Address, Vec<channels::SignalLine>>,
+    pub(super) waiting: std::collections::BTreeMap<Address, Vec<wire::SignalLine>>,
     /// Discarded files, keyed by path so a restoration closes the row
     /// it opened rather than adding a second one.
-    pub(super) discards: std::collections::BTreeMap<String, channels::DiscardLine>,
+    pub(super) discards: std::collections::BTreeMap<String, wire::DiscardLine>,
     /// What the city archived, newest last.
-    pub(super) assets: Vec<channels::RegistryLine>,
+    pub(super) assets: Vec<wire::RegistryLine>,
     /// Which run wrote each commit this city made, keyed by the oid the
     /// record announcing it named. Held here rather than read out of
     /// git: the trailers on the commit are a projection of these same
@@ -110,7 +110,7 @@ pub(crate) struct Views {
     /// Behind a lock of its own because the fold never touches it: a
     /// query carries the `Arc` out of its snapshot of the views and
     /// reads the ledger with only readers waiting on it (sprawling-SPEC.md 8-100).
-    pub(super) index: std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>>,
+    pub(super) index: std::sync::Arc<std::sync::Mutex<storage::LedgerIndex>>,
     /// Where each run's first `prompt_assembled` record sits, so the
     /// prompt a page asks for is one ledger line rather than a walk
     /// back through the whole run.
@@ -135,10 +135,10 @@ pub(crate) struct Views {
     /// Every approval this city has answered, oldest first. Appended
     /// rather than keyed, because an answer is a thing that happened
     /// once and the order is what makes the list readable.
-    pub(super) decided: Vec<channels::Decision>,
+    pub(super) decided: Vec<wire::Decision>,
     /// Which runs have held each plan node, folded from
     /// `roadmap_claimed`. It is what turns "what did node 2.3 cost"
-    /// into a question `memory::attribution` can answer, and it is a
+    /// into a question `storage::attribution` can answer, and it is a
     /// `BTreeMap` because this is a path a query is answered from.
     pub(super) claims:
         std::collections::BTreeMap<kernel::NodeId, std::collections::BTreeSet<kernel::RunId>>,
@@ -152,7 +152,7 @@ pub(crate) struct Views {
     /// served - and it answers `Unavailable` rather than an empty
     /// machine.
     #[serde(skip)]
-    pub(super) machine: Option<channels::DoctorAnswer>,
+    pub(super) machine: Option<wire::DoctorAnswer>,
     /// The vault the worker opened; set by `views::served`. `None` is a
     /// `Views` nobody served - a rebuild, a test - and a server wanting
     /// a credential then reports that it could not be redeemed rather
@@ -164,11 +164,11 @@ pub(crate) struct Views {
     /// `views::served`. `None` is a `Views` nobody served, and it
     /// answers `Unavailable` rather than leaving this machine.
     #[serde(skip)]
-    pub(super) registry: Option<fn() -> channels::ReleaseAnswer>,
+    pub(super) registry: Option<fn() -> wire::ReleaseAnswer>,
     /// How an item's newest release is asked of its publisher; `None`
     /// for views nobody serves, which answer `Unavailable` instead.
     #[serde(skip)]
-    pub(super) upstream: Option<fn(&str) -> channels::DoctorUpstream>,
+    pub(super) upstream: Option<fn(&str) -> wire::DoctorUpstream>,
 }
 
 impl Views {
@@ -204,13 +204,13 @@ impl Views {
 
     fn sharing(
         city_root: &Path,
-        index: std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>>,
+        index: std::sync::Arc<std::sync::Mutex<storage::LedgerIndex>>,
         plans: std::sync::Arc<std::sync::Mutex<accounting::plan_view::PlanView>>,
     ) -> Views {
         Views {
             city_root: city_root.to_path_buf(),
-            hot: memory::HotView::new(),
-            attribution: memory::Attribution::new(),
+            hot: storage::HotView::new(),
+            attribution: storage::Attribution::new(),
             governance: super::Governance::empty(),
             book: gateway::EndpointBook::new(),
             city: None,
@@ -248,12 +248,12 @@ impl Views {
     /// Propagates a segment the index names that cannot be read.
     pub(crate) fn hold_index(
         &mut self,
-        index: memory::LedgerIndex,
+        index: storage::LedgerIndex,
         ledger_dir: &Path,
     ) -> Result<(), AxError> {
         self.epoch = match index.reader(ledger_dir).line_at(kernel::Seq::FIRST) {
             Ok(genesis) => Some(kernel::ledger::chain_hash(&genesis)),
-            Err(memory::MemoryError::SeqMissing { .. }) => None,
+            Err(storage::StorageError::SeqMissing { .. }) => None,
             Err(other) => return Err(other.into_ax()),
         };
         // The whole index is replaced, so whatever a panic left half
@@ -287,10 +287,10 @@ impl Views {
         self.head = Some(record.seq());
         self.hot
             .apply(record)
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         self.attribution
             .apply(record)
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         // A freeze may evict a run and a late record may land on one;
         // either way its money is folded back from the Ledger on demand
         // (sprawling-SPEC section 8-106), so the row goes with it.

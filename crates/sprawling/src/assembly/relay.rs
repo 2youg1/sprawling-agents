@@ -6,7 +6,7 @@
 //! The third adapter of `kernel::Ledger`: a write from a driving thread,
 //! carried to the accounting thread and waited for.
 //!
-//! The first two adapters own a medium — `memory::jsonl` owns segments on disk, citysim's
+//! The first two adapters own a medium — `storage::jsonl` owns segments on disk, citysim's
 //! owns a `Vec`. This one owns neither. It owns a crossing: the driving pool holds `Relay`
 //! and nothing else that can write, so "a city has one writer" is held by the types rather
 //! than by discipline (ARCHITECTURE section 10, sprawling-SPEC.md 8-42).
@@ -274,7 +274,7 @@ mod tests {
             let (closing, closed) = mpsc::channel::<()>();
             let accounting = std::thread::spawn(move || {
                 let (mut ledger, _opened) =
-                    memory::JsonlLedger::open(&root, kernel::TimeMs::new(0))
+                    storage::JsonlLedger::open(&root, kernel::TimeMs::new(0))
                         .expect("a fresh ledger opens");
                 let mut homes = std::collections::VecDeque::new();
                 while closed.try_recv().is_err() {
@@ -314,7 +314,7 @@ mod tests {
             // Read off the segments rather than through a second handle:
             // the accounting thread still holds the one that is
             // appending, and a city has one writer.
-            memory::read_raw_lines_at(self.dir.path()).map_err(memory::MemoryError::into_ax)
+            storage::read_raw_lines_at(self.dir.path()).map_err(storage::StorageError::into_ax)
         }
     }
 

@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use kernel::Seq;
 
 use super::ledger::LedgerIndex;
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 
 /// Reads single lines by seq, holding one segment open across reads.
 ///
@@ -25,7 +25,7 @@ use crate::error::{MemoryError, io_err};
 /// walking forward and 5.82 µs walking backward now.
 ///
 /// This held handle is why line reading is the index's one step
-/// outside `Vfs` (memory-SPEC 8-15): the seam's `read_at` opens the
+/// outside `Vfs` (storage-SPEC 8-15): the seam's `read_at` opens the
 /// segment per call, which is the 734 µs this type exists to avoid.
 /// Nothing here writes, so the crash semantics the seam is there to
 /// model have nothing to say about it.
@@ -38,9 +38,9 @@ pub struct LineReader<'index> {
 impl LineReader<'_> {
     /// One line, without its terminator. A seq absent from the index is
     /// a caller error, not a corrupt ledger.
-    pub fn line_at(&mut self, seq: Seq) -> Result<Vec<u8>, MemoryError> {
+    pub fn line_at(&mut self, seq: Seq) -> Result<Vec<u8>, StorageError> {
         let Some((name, offset)) = self.index.folded.loc_of(seq) else {
-            return Err(MemoryError::SeqMissing { seq: seq.value() });
+            return Err(StorageError::SeqMissing { seq: seq.value() });
         };
         let segment = match self.open.take() {
             Some(open) if open.name == *name => open,
@@ -64,7 +64,7 @@ pub(crate) struct OpenSegment {
 }
 
 impl OpenSegment {
-    fn open(dir: &Path, name: &str) -> Result<OpenSegment, MemoryError> {
+    fn open(dir: &Path, name: &str) -> Result<OpenSegment, StorageError> {
         let path = dir.join(name);
         let file = File::open(&path).map_err(io_err("open segment", &path))?;
         Ok(OpenSegment {
@@ -75,7 +75,7 @@ impl OpenSegment {
         })
     }
 
-    fn line_at(&mut self, offset: u64) -> Result<Vec<u8>, MemoryError> {
+    fn line_at(&mut self, offset: u64) -> Result<Vec<u8>, StorageError> {
         if self.resume != Some(offset) {
             self.resume = None;
             self.file

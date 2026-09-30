@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The bytes these variants write are the bytes
-//! `memory::checkpoint::fence::committed` and
+//! `storage::checkpoint::fence::committed` and
 //! `runtime::run::lifecycle::dispatch` wrote by hand, including the
 //! `effort` word an unasked effort was recorded under.
 

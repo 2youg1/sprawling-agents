@@ -22,16 +22,16 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
     .unwrap();
     for n in 0..6u8 {
         worker
-            .handle(channels::Command::CreateBuilding {
+            .handle(wire::Command::CreateBuilding {
                 addr: Address::parse(&format!("lab{n}")).unwrap(),
-                template: channels::TemplateName::parse("minimal").unwrap(),
+                template: wire::TemplateName::parse("minimal").unwrap(),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, &[n]),
             })
             .unwrap();
     }
     let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
 
-    let channels::Answer::History(tail) = views.answer(&channels::Query::History {
+    let wire::Answer::History(tail) = views.answer(&wire::Query::History {
         before: None,
         limit: 3,
     }) else {
@@ -47,9 +47,9 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
     // Paging back reaches the genesis record and then says there is
     // nothing behind it, rather than answering an empty slice
     // forever.
-    let channels::Answer::History(older) = views.answer(&channels::Query::History {
+    let wire::Answer::History(older) = views.answer(&wire::Query::History {
         before: Some(earlier),
-        limit: channels::HISTORY_MAX,
+        limit: wire::HISTORY_MAX,
     }) else {
         panic!("the history query has an answer");
     };
@@ -86,9 +86,9 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
     .unwrap();
     for n in 0..6u8 {
         worker
-            .handle(channels::Command::CreateBuilding {
+            .handle(wire::Command::CreateBuilding {
                 addr: Address::parse(&format!("lab{n}")).unwrap(),
-                template: channels::TemplateName::parse("minimal").unwrap(),
+                template: wire::TemplateName::parse("minimal").unwrap(),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, &[n]),
             })
             .unwrap();
@@ -98,10 +98,10 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
     // Everything a fresh city writes belongs to the city's own run,
     // so asking for it gets those records and asking for a session
     // nobody ever opened gets none of them.
-    let channels::Answer::History(mine) = views.answer(&channels::Query::RunHistory {
+    let wire::Answer::History(mine) = views.answer(&wire::Query::RunHistory {
         run: RunId::CITY,
         before: None,
-        limit: channels::HISTORY_MAX,
+        limit: wire::HISTORY_MAX,
     }) else {
         panic!("the run history query has an answer");
     };
@@ -115,10 +115,10 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
     ascending.sort_unstable();
     assert_eq!(seqs, ascending, "oldest first, as the fold expects");
 
-    let channels::Answer::History(stranger) = views.answer(&channels::Query::RunHistory {
+    let wire::Answer::History(stranger) = views.answer(&wire::Query::RunHistory {
         run: RunId::from_bytes([3u8; 16]),
         before: None,
-        limit: channels::HISTORY_MAX,
+        limit: wire::HISTORY_MAX,
     }) else {
         panic!("the run history query has an answer");
     };
@@ -143,9 +143,9 @@ fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_end
     .unwrap();
     for n in 0..6u8 {
         worker
-            .handle(channels::Command::CreateBuilding {
+            .handle(wire::Command::CreateBuilding {
                 addr: Address::parse(&format!("lab{n}")).unwrap(),
-                template: channels::TemplateName::parse("minimal").unwrap(),
+                template: wire::TemplateName::parse("minimal").unwrap(),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, &[n]),
             })
             .unwrap();
@@ -154,7 +154,7 @@ fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_end
 
     // One record at a time, so the walk stops on the limit well
     // before it reaches the genesis line.
-    let channels::Answer::History(page) = views.answer(&channels::Query::RunHistory {
+    let wire::Answer::History(page) = views.answer(&wire::Query::RunHistory {
         run: RunId::CITY,
         before: None,
         limit: 1,
@@ -175,7 +175,7 @@ fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_end
     let mut before = Some(resume);
     let mut guard = 0;
     while let Some(at) = before {
-        let channels::Answer::History(page) = views.answer(&channels::Query::RunHistory {
+        let wire::Answer::History(page) = views.answer(&wire::Query::RunHistory {
             run: RunId::CITY,
             before: Some(at),
             limit: 1,

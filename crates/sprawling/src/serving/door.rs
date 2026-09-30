@@ -59,11 +59,11 @@ impl Keyed {
 ///
 /// [`crate::keying::Keying`] decides which of the three cases applies;
 /// this performs the one that needs entropy. Minting happens here for
-/// the reason `channels::auth` states from its own side — that module
+/// the reason `wire::auth` states from its own side — that module
 /// samples nothing, and the assembly layer is where randomness in this
 /// binary comes from.
 ///
-/// The result is what `channels::decide_bind` will be asked about, so an
+/// The result is what `wire::decide_bind` will be asked about, so an
 /// address reaching beyond this machine arrives at the socket already
 /// carrying a key. The guard is satisfied, never relaxed: there is still
 /// no moment in which the port is open and unauthenticated.
@@ -102,7 +102,7 @@ pub fn key_for(bind: std::net::SocketAddr, configured: Option<String>) -> Result
             // the digest it compares against from this same code through
             // `from_configured`, so holding both would be two paths to
             // one digest and a second thing to keep in step.
-            let (_token, code) = channels::PairingToken::mint(entropy);
+            let (_token, code) = wire::PairingToken::mint(entropy);
             Ok(Keyed::Minted(code))
         }
     }

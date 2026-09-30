@@ -35,7 +35,7 @@ use std::collections::BTreeMap;
 use kernel::{EventKind, EventRecord, RunId, UsdMicros};
 use serde_json::Value;
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct Attribution {
@@ -87,7 +87,7 @@ impl Attribution {
         clippy::wildcard_enum_match_arm,
         reason = "four kinds carry money or its basis; the rest of the vocabulary is silent here"
     )]
-    pub fn apply(&mut self, record: &EventRecord) -> Result<(), MemoryError> {
+    pub fn apply(&mut self, record: &EventRecord) -> Result<(), StorageError> {
         match record.kind() {
             EventKind::PromptAssembled => {
                 self.segment_weights

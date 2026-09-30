@@ -12,7 +12,7 @@ use kernel::{
     AxCode, AxError, EventDraft, EventKind, EventRecord, EventRef, Payload, RunId, Seq, TimeMs,
 };
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 
 use super::barrier::Barrier;
 use super::ledger::{JsonlLedger, WriteObserver, complete_lines, is_segment, segment_file_name};
@@ -22,11 +22,11 @@ impl JsonlLedger {
         &mut self,
         now: TimeMs,
         dropped: u64,
-    ) -> Result<(), MemoryError> {
+    ) -> Result<(), StorageError> {
         let data = Payload::of(&kernel::event::record::LogTruncated {
             dropped_bytes: dropped,
         })
-        .map_err(|source| MemoryError::Draft { source })?;
+        .map_err(|source| StorageError::Draft { source })?;
         let draft = EventDraft {
             run: RunId::CITY,
             t: now,
@@ -40,8 +40,8 @@ impl JsonlLedger {
     }
 
     /// Group commit: one durability barrier for the whole wave
-    /// (memory-SPEC 3-1: the batch is what the wave delivered).
-    pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, MemoryError> {
+    /// (storage-SPEC 3-1: the batch is what the wave delivered).
+    pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, StorageError> {
         // A restore a failed wave left owed runs first: it is what mends
         // the barrier, and it may remove the segment this wave would
         // append to.
@@ -67,7 +67,7 @@ impl JsonlLedger {
             let record = EventRecord::from_draft(draft, seq, prev);
             let line = record
                 .canonical_line()
-                .map_err(|source| MemoryError::Draft { source })?;
+                .map_err(|source| StorageError::Draft { source })?;
             let line_len = u64::try_from(line.len())
                 .unwrap_or(u64::MAX)
                 .saturating_add(1);
@@ -77,7 +77,9 @@ impl JsonlLedger {
                 created.push(cur_path.clone());
             }
             prev = chain_hash(&line);
-            seq = seq.next().map_err(|source| MemoryError::Draft { source })?;
+            seq = seq
+                .next()
+                .map_err(|source| StorageError::Draft { source })?;
             records.push(record);
             let mut terminated = line;
             terminated.push(b'\n');
@@ -101,7 +103,7 @@ impl JsonlLedger {
         // is durable: the bytes it copies exist before it runs. A
         // refusal is reported and skipped rather than returned - the
         // history already has the record, and a disposable artifact
-        // must never fail history's caller (memory-SPEC 8-24).
+        // must never fail history's caller (storage-SPEC 8-24).
         if let Some(sessions) = self.sessions.as_mut() {
             for record in &records {
                 if let Err(error) = sessions.absorb(record) {
@@ -141,7 +143,7 @@ impl JsonlLedger {
 
     /// The read face for replay, fixtures and inspection: every canonical
     /// line (no terminators), segments flattened in order.
-    pub fn read_raw_lines(&self) -> Result<Vec<Vec<u8>>, MemoryError> {
+    pub fn read_raw_lines(&self) -> Result<Vec<Vec<u8>>, StorageError> {
         let mut out = Vec::new();
         let segments: Vec<PathBuf> = self
             .vfs
@@ -170,10 +172,12 @@ impl JsonlLedger {
 
 impl kernel::Ledger for JsonlLedger {
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
-        let refs = self.append_all(vec![draft]).map_err(MemoryError::into_ax)?;
+        let refs = self
+            .append_all(vec![draft])
+            .map_err(StorageError::into_ax)?;
         refs.into_iter().next().ok_or_else(|| {
             AxError::failure(AxCode::InvalidArgs, "append event", "empty wave echo").with_recovery(
-                "report this against memory::jsonl::append with the city path: \
+                "report this against storage::jsonl::append with the city path: \
                          append_all owes one echo per draft and returned none",
             )
         })
@@ -181,14 +185,14 @@ impl kernel::Ledger for JsonlLedger {
 
     /// One buffer, one write and one barrier for the whole wave.
     fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
-        JsonlLedger::append_all(self, drafts).map_err(MemoryError::into_ax)
+        JsonlLedger::append_all(self, drafts).map_err(StorageError::into_ax)
     }
 }
 
 #[cfg(feature = "conformance")]
 impl kernel::ledger::conformance::LedgerInspect for JsonlLedger {
     fn raw_lines(&self) -> Result<Vec<Vec<u8>>, AxError> {
-        self.read_raw_lines().map_err(MemoryError::into_ax)
+        self.read_raw_lines().map_err(StorageError::into_ax)
     }
 }
 

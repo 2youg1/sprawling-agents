@@ -16,9 +16,9 @@
     reason = "test code"
 )]
 
-use channels::{Command, ControlVerdict, HaltScope, Intervention, PairingToken};
-use channels::{classify, verify};
 use kernel::{Address, IdemKey, RunId, Seq};
+use wire::{Command, ControlVerdict, HaltScope, Intervention, PairingToken};
+use wire::{classify, verify};
 
 fn key() -> IdemKey {
     IdemKey::derive(&RunId::from_bytes([3u8; 16]), Seq::new(1), b"control")

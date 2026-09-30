@@ -21,7 +21,7 @@ fn an_enrolled_credential_leaves_only_a_reference_in_the_history() {
     // secret gate keeps out of the repository.
     let token = ["sk-live-", "9f2c4a7e1b8d"].concat();
     worker
-        .handle(channels::Command::PutSecret {
+        .handle(wire::Command::PutSecret {
             realm: "house".to_owned(),
             name: "key".to_owned(),
             value: kernel::Sealed::new(Box::new(token.clone())),

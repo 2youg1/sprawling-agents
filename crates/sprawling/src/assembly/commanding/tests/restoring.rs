@@ -28,16 +28,16 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
     let doomed = root.join("lab/room1/notes.md");
     std::fs::create_dir_all(doomed.parent().unwrap()).unwrap();
     std::fs::write(&doomed, "the words a wave deleted").unwrap();
-    let of = memory::Provenance::new(
+    let of = storage::Provenance::new(
         RunId::parse("018f5b2a-0000-7000-8000-000000000001").unwrap(),
         Address::parse("lab/room1").unwrap(),
         kernel::B3Hash::digest(b"a city"),
-        memory::ModelChoice {
+        storage::ModelChoice {
             id: "test-model".to_owned(),
             effort: None,
         },
     );
-    let mut fence = memory::Checkpoint::open(root).unwrap();
+    let mut fence = storage::Checkpoint::open(root).unwrap();
     let pre = fence
         .wave_pre(&["lab".to_owned()], kernel::TimeMs::new(1_000), &of)
         .unwrap();
@@ -55,7 +55,7 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
         .unwrap();
 
     worker
-        .handle(channels::Command::RestoreDiscard {
+        .handle(wire::Command::RestoreDiscard {
             restoration,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"restore"),
         })
@@ -66,8 +66,7 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
         Some("the words a wave deleted"),
         "the bytes the fence held are back at their path"
     );
-    let channels::Answer::Discards(bin) =
-        crate::views::ask(root, &channels::Query::DiscardView).unwrap()
+    let wire::Answer::Discards(bin) = crate::views::ask(root, &wire::Query::DiscardView).unwrap()
     else {
         panic!("DiscardView answers with the bin");
     };
@@ -95,7 +94,7 @@ fn a_way_back_the_bin_does_not_write_is_refused_in_one_readable_sentence() {
     let stored = kernel::Locator::cas(kernel::B3Hash::digest(b"a stored object"));
 
     let refusal = worker
-        .handle(channels::Command::RestoreDiscard {
+        .handle(wire::Command::RestoreDiscard {
             restoration: kernel::Restoration::Tracked(stored.clone()),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"restore"),
         })

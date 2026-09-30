@@ -10,7 +10,7 @@ name = "runtime"
 
 [dependencies]
 kernel = { workspace = true }
-memory = { workspace = true }
+storage = { workspace = true }
 # File identity (volume and file index on Windows, device and inode
 # elsewhere): `read` compares the handle it opened with the file now at
 # the judged location, which std exposes only on unstable APIs.

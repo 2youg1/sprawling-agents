@@ -64,7 +64,7 @@ fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("market/ito").unwrap(),
             task: "tell hana what matters first".to_owned(),
             goal: "hana knows".to_owned(),
@@ -113,7 +113,7 @@ fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
     )
     .unwrap();
     let refused = worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("gamma").unwrap(),
             task: "say something".to_owned(),
             goal: "an answer".to_owned(),
@@ -147,7 +147,7 @@ fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room.clone(),
             task: "what do you make of this".to_owned(),
             goal: String::new(),
@@ -189,7 +189,7 @@ fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("shop").unwrap(),
             task: "[short] 给 price 加一个测试".to_owned(),
             goal: "a test exists".to_owned(),
@@ -275,20 +275,20 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
     )
     .unwrap();
     worker
-        .handle(channels::Command::AttachEndpoint {
-            name: channels::ProviderName::parse("house").unwrap(),
+        .handle(wire::Command::AttachEndpoint {
+            name: wire::ProviderName::parse("house").unwrap(),
             base_url,
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
             admit: Vec::new(),
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
     worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("house").unwrap(),
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("house").unwrap(),
             model: "m-local".to_owned(),
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(32_768),
@@ -297,7 +297,7 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
         })
         .unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "write one line".to_owned(),
             goal: "the line is written".to_owned(),

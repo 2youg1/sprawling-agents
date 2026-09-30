@@ -54,7 +54,7 @@ pub(super) struct Opening {
     /// The opened ledger and what its history already says, folded on the
     /// serve thread under its writer lock in the same pass as the views,
     /// so the worker neither opens nor reads it again.
-    pub(super) held: (memory::JsonlLedger, memory::OpenReport, super::Standing),
+    pub(super) held: (storage::JsonlLedger, storage::OpenReport, super::Standing),
     /// The chain audit's own voice: the same sink and the same floor as
     /// `log`, held apart because the audit thread never touches the
     /// writer (sprawling-SPEC.md 8-90).
@@ -76,10 +76,10 @@ pub(super) struct Outward {
     /// The unpublished twin of `views`, folded over the same records
     /// (sprawling-SPEC.md 8-99).
     pub(super) spare: Views,
-    pub(super) to_clients: tokio::sync::broadcast::Sender<channels::Committed>,
-    pub(super) to_watchers: tokio::sync::broadcast::Sender<channels::Delta>,
-    pub(super) head: Arc<channels::LedgerHead>,
-    pub(super) to_readers: tokio::sync::broadcast::Sender<channels::LiveOutput>,
+    pub(super) to_clients: tokio::sync::broadcast::Sender<wire::Committed>,
+    pub(super) to_watchers: tokio::sync::broadcast::Sender<wire::Delta>,
+    pub(super) head: Arc<wire::LedgerHead>,
+    pub(super) to_readers: tokio::sync::broadcast::Sender<wire::LiveOutput>,
     /// What running commands already wrote, for a page opening late.
     pub(super) kept: Arc<OutputRing>,
 }
@@ -181,12 +181,12 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             let interrupt_desk = Arc::clone(&worker_desk);
             let keeping = Arc::clone(&kept);
             worker.serve(Serving {
-                deltas: std::sync::Arc::new(move |delta: channels::Delta| {
+                deltas: std::sync::Arc::new(move |delta: wire::Delta| {
                     // No subscribers is not a failure: a city with no
                     // browser open is a city doing its work.
                     drop(to_watchers.send(delta));
                 }),
-                outputs: std::sync::Arc::new(move |piece: channels::LiveOutput| {
+                outputs: std::sync::Arc::new(move |piece: wire::LiveOutput| {
                     keeping.keep(&piece);
                     drop(to_readers.send(piece));
                 }),

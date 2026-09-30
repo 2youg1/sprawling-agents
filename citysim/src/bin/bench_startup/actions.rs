@@ -204,9 +204,9 @@ pub fn open_session(city: &Path) -> Result<Action, AxError> {
         gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
     )?;
-    worker.handle(channels::Command::CreateBuilding {
+    worker.handle(wire::Command::CreateBuilding {
         addr: Address::parse("lab")?,
-        template: channels::TemplateName::parse("minimal")?,
+        template: wire::TemplateName::parse("minimal")?,
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"bench-create"),
     })?;
     let room = Address::parse("lab/room1")?;
@@ -223,9 +223,9 @@ pub fn open_session(city: &Path) -> Result<Action, AxError> {
     for sample in 0..SAMPLES {
         seq = seq.next()?;
         let boundary = stamp();
-        worker.handle(channels::Command::OpenSession {
+        worker.handle(wire::Command::OpenSession {
             addr: room.clone(),
-            carry: channels::Carry::Nothing,
+            carry: wire::Carry::Nothing,
             from: None,
             idem: IdemKey::derive(&RunId::CITY, seq, b"bench-open-session"),
         })?;

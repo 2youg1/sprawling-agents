@@ -6,7 +6,7 @@
 //! What a picture is on the canonical conversation.
 //!
 //! The ledger holds a reference and four integers, never bytes: the
-//! bytes live in `memory::cas` under the locator this value carries, so
+//! bytes live in `storage::cas` under the locator this value carries, so
 //! a history stays a file a person can read and the float ban holds
 //! without an exception for pixels.
 

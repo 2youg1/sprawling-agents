@@ -9,7 +9,7 @@ use std::io::Write;
 
 use kernel::{Payload, TimeMs};
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 use super::fence::{Checkpoint, committed, fence_ref, git_err, subject_of};
 use super::provenance::Provenance;
@@ -31,7 +31,7 @@ impl Checkpoint {
     /// Takes the handle by value: the in-memory store is installed on
     /// this handle's object database and cannot be taken off again, so
     /// the handle goes with it, and no later fence can write an object
-    /// into a store nobody dumps (memory-SPEC 8-8).
+    /// into a store nobody dumps (storage-SPEC 8-8).
     ///
     /// The commit moves HEAD when the city has none, and is otherwise
     /// filed under `refs/sprawling/runs/<run>/<oid>` like a wave fence.
@@ -45,9 +45,9 @@ impl Checkpoint {
         t: TimeMs,
         of: &Provenance,
         progress: &mut dyn FnMut(BaseProgress),
-    ) -> Result<Payload, MemoryError> {
+    ) -> Result<Payload, StorageError> {
         let objects = self.repo.path().join("objects");
-        let objects = objects.to_str().ok_or_else(|| MemoryError::Checkpoint {
+        let objects = objects.to_str().ok_or_else(|| StorageError::Checkpoint {
             op: "open the object store",
             detail: format!("{} is not valid UTF-8", objects.display()),
         })?;
@@ -87,7 +87,7 @@ impl Checkpoint {
             .map_err(git_err("write the base fence pack"))?;
         writer
             .write_all(&pack)
-            .map_err(|err| MemoryError::Checkpoint {
+            .map_err(|err| StorageError::Checkpoint {
                 op: "write the base fence pack",
                 detail: err.to_string(),
             })?;
@@ -104,12 +104,12 @@ impl Checkpoint {
                 .find_reference("HEAD")
                 .map_err(git_err("read HEAD"))?
                 .symbolic_target()
-                .map_err(|err| MemoryError::Checkpoint {
+                .map_err(|err| StorageError::Checkpoint {
                     op: "read HEAD",
                     detail: err.to_string(),
                 })?
                 .map(str::to_owned)
-                .ok_or_else(|| MemoryError::Checkpoint {
+                .ok_or_else(|| StorageError::Checkpoint {
                     op: "move HEAD to the base fence",
                     detail: "HEAD names no branch".to_owned(),
                 })?

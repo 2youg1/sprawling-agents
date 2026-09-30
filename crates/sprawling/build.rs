@@ -109,7 +109,7 @@ fn embed() -> Result<(), String> {
         let gz = gzip(&bytes)?;
         std::fs::write(&gz_path, gz).map_err(|e| format!("{}: {e}", gz_path.display()))?;
         table.push_str(&format!(
-            "    channels::EmbeddedFile {{ path: {rel:?}, gz: include_bytes!({:?}) }},\n",
+            "    wire::EmbeddedFile {{ path: {rel:?}, gz: include_bytes!({:?}) }},\n",
             gz_path.display().to_string().replace('\\', "/")
         ));
     }
@@ -123,7 +123,7 @@ fn embed() -> Result<(), String> {
          /// Where `just build-web` writes the client, relative to the workspace root.\n\
          pub const CLIENT_BUNDLE_DIR: &str = {BUNDLE_DIR:?};\n\
          /// Every file the browser may request, gzipped at build time.\n\
-         pub static CLIENT_FILES: &[channels::EmbeddedFile] = &[\n{table}];\n"
+         pub static CLIENT_FILES: &[wire::EmbeddedFile] = &[\n{table}];\n"
     );
     std::fs::write(PathBuf::from(&out_dir).join("client_embed.rs"), generated)
         .map_err(|e| e.to_string())?;

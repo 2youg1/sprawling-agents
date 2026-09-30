@@ -18,15 +18,15 @@ fn a_new_building_is_visible_in_the_city_view_with_a_denominator_of_zero() {
     )
     .unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
 
     let mut views = Views::new(dir.path());
-    let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
+    let wire::Answer::City(city) = views.answer(&wire::Query::CityView) else {
         panic!("CityView answers with a city");
     };
     let lab = city
@@ -66,7 +66,7 @@ fn a_roadmap_counts_only_the_rows_that_carry_evidence() {
     .unwrap();
 
     let mut views = Views::new(dir.path());
-    let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
+    let wire::Answer::City(city) = views.answer(&wire::Query::CityView) else {
         panic!("CityView answers with a city");
     };
     // Two buildings: City Hall, which every city is raised with, and
@@ -105,7 +105,7 @@ fn a_roadmap_that_cannot_be_parsed_reports_its_rows_rather_than_a_number() {
     .unwrap();
 
     let mut views = Views::new(dir.path());
-    let channels::Answer::City(city) = views.answer(&channels::Query::CityView) else {
+    let wire::Answer::City(city) = views.answer(&wire::Query::CityView) else {
         panic!("CityView answers with a city");
     };
     let plan = city

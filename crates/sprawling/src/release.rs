@@ -26,8 +26,8 @@
 //! npm's `latest` dist-tag is what `bunx sprawling` resolves, so asking
 //! it is asking the question a person actually has.
 
-use channels::{ReleaseAnswer, ReleaseLine};
 use kernel::{AxCode, AxError, Proxying, Reach, Release};
+use wire::{ReleaseAnswer, ReleaseLine};
 
 /// The root package `release.yml` publishes, and the name `bunx
 /// sprawling` resolves. Its `latest` dist-tag is the newest release by
@@ -172,7 +172,7 @@ fn line(release: &Release) -> ReleaseLine {
 /// Both readings, taken and judged.
 ///
 /// **One authority for the whole check.** `status --check` and
-/// [`Query::NewestRelease`](channels::Query::NewestRelease) render the same value,
+/// [`Query::NewestRelease`](wire::Query::NewestRelease) render the same value,
 /// so the terminal and the page cannot come to different conclusions
 /// about one binary.
 ///

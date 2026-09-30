@@ -89,7 +89,7 @@ fn the_screen_keeps_the_listener_half_when_the_city_does_not_answer() {
 }
 
 /// Runs the console loop and returns every Command it posted.
-fn posted(script: &str) -> Vec<channels::Command> {
+fn posted(script: &str) -> Vec<wire::Command> {
     let desk = crate::assembly::CommandDesk::new();
     let mut out: Vec<u8> = Vec::new();
     super::super::terminal::drive(
@@ -121,7 +121,7 @@ fn the_same_line_typed_twice_is_two_dispatches() {
 fn a_wire_verb_without_a_key_gets_the_line_key() {
     let commands = posted("/halt {\"scope\":\"city\"}\n");
     assert!(
-        matches!(commands.as_slice(), [channels::Command::Halt { .. }]),
+        matches!(commands.as_slice(), [wire::Command::Halt { .. }]),
         "the halt reaches the desk: {} command(s)",
         commands.len()
     );

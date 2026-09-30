@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use kernel::event::record::WorktreeOpened;
 use kernel::{ByteLen, Payload};
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 use super::name::WorktreeName;
 
@@ -47,12 +47,12 @@ impl WorktreeLease {
     ///
     /// # Errors
     /// Propagates the payload's refusal to hold what it was given.
-    pub fn opened_payload(&self) -> Result<Payload, MemoryError> {
+    pub fn opened_payload(&self) -> Result<Payload, StorageError> {
         Payload::of(&WorktreeOpened {
             name: self.name.as_str().to_owned(),
             disk_bytes: self.disk,
         })
-        .map_err(|source| MemoryError::Draft { source })
+        .map_err(|source| StorageError::Draft { source })
     }
 }
 

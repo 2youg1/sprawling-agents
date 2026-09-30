@@ -39,14 +39,14 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
     )
     .unwrap();
     worker
-        .handle(channels::Command::AttachEndpoint {
-            name: channels::ProviderName::parse("declared").unwrap(),
+        .handle(wire::Command::AttachEndpoint {
+            name: wire::ProviderName::parse("declared").unwrap(),
             base_url,
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
             admit: vec!["m-1".to_owned()],
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
@@ -63,8 +63,8 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
         "this list is the person's word, and the book says so"
     );
     worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("declared").unwrap(),
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("declared").unwrap(),
             model: "m-1".to_owned(),
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(32_768),
@@ -86,14 +86,14 @@ fn an_endpoint_with_neither_a_model_list_nor_a_declared_id_is_refused() {
     )
     .unwrap();
     let err = worker
-        .handle(channels::Command::AttachEndpoint {
-            name: channels::ProviderName::parse("silent").unwrap(),
+        .handle(wire::Command::AttachEndpoint {
+            name: wire::ProviderName::parse("silent").unwrap(),
             base_url,
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
             admit: Vec::new(),
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap_err();
@@ -118,7 +118,7 @@ fn a_dispatch_without_a_provider_fails_saying_what_to_configure() {
     )
     .unwrap();
     let err = worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "anything".to_owned(),
             goal: "anything".to_owned(),
@@ -148,27 +148,27 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
     )
     .unwrap();
     worker
-        .handle(channels::Command::PutSecret {
+        .handle(wire::Command::PutSecret {
             realm: "proxy".to_owned(),
             name: "key".to_owned(),
             value: kernel::Sealed::new(Box::new("sk-proxy-credential".to_owned())),
         })
         .unwrap();
     worker
-        .handle(channels::Command::AttachEndpoint {
-            name: channels::ProviderName::parse("proxied").unwrap(),
+        .handle(wire::Command::AttachEndpoint {
+            name: wire::ProviderName::parse("proxied").unwrap(),
             base_url,
             dialect: kernel::DialectKind::OpenAi,
             secret: Some("secret:proxy/key".to_owned()),
             auth_header: None,
             admit: Vec::new(),
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
     worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("proxied").unwrap(),
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("proxied").unwrap(),
             model: "m-key".to_owned(),
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(32_768),
@@ -177,7 +177,7 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
         })
         .unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "say done".to_owned(),
             goal: "auth on the wire".to_owned(),
@@ -252,8 +252,8 @@ fn a_probe_that_reaches_nothing_records_where_it_stopped_rather_than_refusing() 
     )
     .unwrap();
     worker
-        .handle(channels::Command::ProbeEndpoint {
-            name: channels::ProviderName::parse("nowhere").unwrap(),
+        .handle(wire::Command::ProbeEndpoint {
+            name: wire::ProviderName::parse("nowhere").unwrap(),
             // `.invalid` is reserved and resolves nowhere, on every
             // machine, which is what makes this reading the same one
             // twice.
@@ -261,7 +261,7 @@ fn a_probe_that_reaches_nothing_records_where_it_stopped_rather_than_refusing() 
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"probe"),
         })
         .expect("a probe that reaches nothing still answers");
@@ -291,13 +291,13 @@ fn a_probe_carries_the_facts_each_model_row_stated() {
     )
     .unwrap();
     worker
-        .handle(channels::Command::ProbeEndpoint {
-            name: channels::ProviderName::parse("house").unwrap(),
+        .handle(wire::Command::ProbeEndpoint {
+            name: wire::ProviderName::parse("house").unwrap(),
             base_url,
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"probe"),
         })
         .unwrap();

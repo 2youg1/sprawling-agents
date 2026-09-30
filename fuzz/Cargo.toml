@@ -14,15 +14,15 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 kernel = { package = "sprawling-kernel", path = "../crates/kernel" }
-memory = { package = "sprawling-storage", path = "../crates/memory" }
+storage = { package = "sprawling-storage", path = "../crates/memory" }
 # The three outside-the-process taint surfaces: inbound wire frames, the
 # configuration file a person types, and what an MCP child writes back.
-# `channels` is taken without its listener: a frame is decoded before any
+# `wire` is taken without its listener: a frame is decoded before any
 # socket code sees it, and the server feature would drag tokio and axum
 # into every fuzz binary.
-channels = { package = "sprawling-wire", path = "../crates/channels", default-features = false }
+wire = { package = "sprawling-wire", path = "../crates/channels", default-features = false }
 city = { package = "sprawling-city", path = "../crates/city" }
-protocol = { package = "sprawling-agent-protocols", path = "../crates/protocol" }
+agent_protocols = { package = "sprawling-agent-protocols", path = "../crates/protocol" }
 serde_json = "1"
 tempfile = "3"
 

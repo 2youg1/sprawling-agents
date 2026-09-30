@@ -301,7 +301,7 @@ pub(super) enum WholeRequest {
 }
 
 /// The client every MCP server reached over HTTP is spoken to through,
-/// by this transport and by `protocol::mcp::sse` alike.
+/// by this transport and by `agent_protocols::mcp::sse` alike.
 ///
 /// The proxy rule is the city's own: a tool server carries no setting of
 /// its own, and a proxy in front of a server on this machine answers for

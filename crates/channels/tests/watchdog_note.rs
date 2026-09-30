@@ -15,9 +15,9 @@
     reason = "test code"
 )]
 
-use channels::{Note, note_of};
 use kernel::{AxCode, B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
 use serde_json::json;
+use wire::{Note, note_of};
 
 fn record(kind: EventKind, data: serde_json::Value) -> EventRecord {
     let serde_json::Value::Object(map) = data else {

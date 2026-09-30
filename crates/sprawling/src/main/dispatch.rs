@@ -61,11 +61,11 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
     } else {
         Milestone::Frozen
     };
-    let frame = channels::ClientFrame::Command(Box::new(channels::WireCommand::Dispatch {
+    let frame = wire::ClientFrame::Command(Box::new(wire::WireCommand::Dispatch {
         addr: addr.clone(),
         task: task.clone(),
         goal: String::new(),
-        mode: channels::Mode::PlanGoal,
+        mode: wire::Mode::PlanGoal,
         idem,
         session: None,
         effort: None,

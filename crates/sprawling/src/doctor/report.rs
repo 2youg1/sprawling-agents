@@ -26,7 +26,7 @@ use kernel::AxError;
 /// seconds rather than milliseconds, so neither a serve nor a query
 /// waits for it - a person opening the page that shows it asks for it,
 /// and the city holds the answer until they ask again.
-pub(crate) fn answer(machine: &dyn Machine) -> channels::DoctorAnswer {
+pub(crate) fn answer(machine: &dyn Machine) -> wire::DoctorAnswer {
     let platform = Platform::current();
     fold(machine, platform, confinement(), custody())
 }
@@ -39,15 +39,15 @@ pub(crate) fn answer(machine: &dyn Machine) -> channels::DoctorAnswer {
 fn fold(
     machine: &dyn Machine,
     platform: Option<Platform>,
-    sandbox: channels::DoctorSandbox,
-    custody: channels::DoctorCustody,
-) -> channels::DoctorAnswer {
+    sandbox: wire::DoctorSandbox,
+    custody: wire::DoctorCustody,
+) -> wire::DoctorAnswer {
     let findings = &examine(machine);
-    channels::DoctorAnswer {
+    wire::DoctorAnswer {
         items: findings.iter().map(|found| item(found, platform)).collect(),
         tiers: Tier::ALL
             .into_iter()
-            .map(|tier| channels::DoctorVerdict {
+            .map(|tier| wire::DoctorVerdict {
                 tier: named(tier),
                 missing: match verdict(findings, tier) {
                     Verdict::Ready => Vec::new(),
@@ -62,13 +62,13 @@ fn fold(
 }
 
 /// The level the terminal's priority part names, as the wire carries it.
-fn core_level(standing: Result<Standing, AxError>) -> channels::DoctorCore {
+fn core_level(standing: Result<Standing, AxError>) -> wire::DoctorCore {
     match standing {
-        Ok(Standing::Raised) => channels::DoctorCore::Raised,
-        Ok(Standing::Normal(Held::ByTheSetting)) => channels::DoctorCore::HeldBySetting,
-        Ok(Standing::Normal(Held::Refused(said))) => channels::DoctorCore::Refused { said },
-        Ok(Standing::Normal(Held::ByTheValve)) => channels::DoctorCore::LoweredByValve,
-        Err(err) => channels::DoctorCore::Unasked {
+        Ok(Standing::Raised) => wire::DoctorCore::Raised,
+        Ok(Standing::Normal(Held::ByTheSetting)) => wire::DoctorCore::HeldBySetting,
+        Ok(Standing::Normal(Held::Refused(said))) => wire::DoctorCore::Refused { said },
+        Ok(Standing::Normal(Held::ByTheValve)) => wire::DoctorCore::LoweredByValve,
+        Err(err) => wire::DoctorCore::Unasked {
             said: err.to_string(),
         },
     }
@@ -79,17 +79,17 @@ fn core_level(standing: Result<Standing, AxError>) -> channels::DoctorCore {
 /// Read from the module that decides it rather than decided again here:
 /// a page naming one arm while commands run under another would be
 /// worse than no page at all.
-fn confinement() -> channels::DoctorSandbox {
+fn confinement() -> wire::DoctorSandbox {
     let arm = runtime::tools::Confinement::detect();
-    channels::DoctorSandbox {
+    wire::DoctorSandbox {
         arm: arm_name(&arm),
         coverage: runtime::tools::Guarantee::ALL
             .iter()
-            .map(|axis| channels::DoctorGuarantee {
+            .map(|axis| wire::DoctorGuarantee {
                 axis: axis_name(*axis),
                 kept: match arm.assurances().of(*axis) {
-                    runtime::tools::Kept::Yes => channels::DoctorCoverage::Kept,
-                    runtime::tools::Kept::No => channels::DoctorCoverage::NotKept,
+                    runtime::tools::Kept::Yes => wire::DoctorCoverage::Kept,
+                    runtime::tools::Kept::No => wire::DoctorCoverage::NotKept,
                 },
             })
             .collect(),
@@ -104,41 +104,39 @@ fn confinement() -> channels::DoctorSandbox {
 /// file. It also builds the `provider_degraded` notice the ledger
 /// carries; that notice belongs to the caller that keeps the custodian,
 /// and this report has no ledger to write it to.
-fn custody() -> channels::DoctorCustody {
+fn custody() -> wire::DoctorCustody {
     let (custodian, _notice) = gateway::Custodian::probe();
     let custody = custodian.custody();
-    channels::DoctorCustody {
+    wire::DoctorCustody {
         store: match custody.store {
-            gateway::Store::PlatformService => channels::DoctorCustodyStore::PlatformService,
-            gateway::Store::EncryptedFile => channels::DoctorCustodyStore::EncryptedFile,
-            gateway::Store::SessionMemory => channels::DoctorCustodyStore::SessionMemory,
+            gateway::Store::PlatformService => wire::DoctorCustodyStore::PlatformService,
+            gateway::Store::EncryptedFile => wire::DoctorCustodyStore::EncryptedFile,
+            gateway::Store::SessionMemory => wire::DoctorCustodyStore::SessionMemory,
         },
         keeps: match custody.persistence {
-            gateway::Persistence::AcrossReboots => channels::DoctorCustodyLifetime::AcrossReboots,
+            gateway::Persistence::AcrossReboots => wire::DoctorCustodyLifetime::AcrossReboots,
             gateway::Persistence::AcrossRebootsWithPassphrase => {
-                channels::DoctorCustodyLifetime::WithPassphrase
+                wire::DoctorCustodyLifetime::WithPassphrase
             }
-            gateway::Persistence::ThisBoot => channels::DoctorCustodyLifetime::UntilReboot,
-            gateway::Persistence::ThisProcess => channels::DoctorCustodyLifetime::ThisProcess,
+            gateway::Persistence::ThisBoot => wire::DoctorCustodyLifetime::UntilReboot,
+            gateway::Persistence::ThisProcess => wire::DoctorCustodyLifetime::ThisProcess,
         },
         refusal: custody.refusal,
     }
 }
 
-fn arm_name(arm: &runtime::tools::Confinement) -> channels::DoctorSandboxArm {
+fn arm_name(arm: &runtime::tools::Confinement) -> wire::DoctorSandboxArm {
     match arm {
         runtime::tools::Confinement::LinuxNamespaces { .. } => {
-            channels::DoctorSandboxArm::LinuxNamespaces
+            wire::DoctorSandboxArm::LinuxNamespaces
         }
-        runtime::tools::Confinement::WindowsJobObject => {
-            channels::DoctorSandboxArm::WindowsJobObject
-        }
-        runtime::tools::Confinement::CopiedTree => channels::DoctorSandboxArm::CopiedTree,
+        runtime::tools::Confinement::WindowsJobObject => wire::DoctorSandboxArm::WindowsJobObject,
+        runtime::tools::Confinement::CopiedTree => wire::DoctorSandboxArm::CopiedTree,
         runtime::tools::Confinement::Unavailable { missing } => {
-            channels::DoctorSandboxArm::Unavailable {
+            wire::DoctorSandboxArm::Unavailable {
                 missing: match missing {
                     runtime::tools::Missing::ScratchDirectory => {
-                        channels::DoctorSandboxMissing::ScratchDirectory
+                        wire::DoctorSandboxMissing::ScratchDirectory
                     }
                 },
             }
@@ -146,18 +144,18 @@ fn arm_name(arm: &runtime::tools::Confinement) -> channels::DoctorSandboxArm {
     }
 }
 
-fn axis_name(axis: runtime::tools::Guarantee) -> channels::DoctorGuaranteeAxis {
+fn axis_name(axis: runtime::tools::Guarantee) -> wire::DoctorGuaranteeAxis {
     match axis {
-        runtime::tools::Guarantee::Filesystem => channels::DoctorGuaranteeAxis::Filesystem,
-        runtime::tools::Guarantee::Network => channels::DoctorGuaranteeAxis::Network,
-        runtime::tools::Guarantee::ProcessTree => channels::DoctorGuaranteeAxis::ProcessTree,
-        runtime::tools::Guarantee::User => channels::DoctorGuaranteeAxis::User,
-        runtime::tools::Guarantee::Resources => channels::DoctorGuaranteeAxis::Resources,
+        runtime::tools::Guarantee::Filesystem => wire::DoctorGuaranteeAxis::Filesystem,
+        runtime::tools::Guarantee::Network => wire::DoctorGuaranteeAxis::Network,
+        runtime::tools::Guarantee::ProcessTree => wire::DoctorGuaranteeAxis::ProcessTree,
+        runtime::tools::Guarantee::User => wire::DoctorGuaranteeAxis::User,
+        runtime::tools::Guarantee::Resources => wire::DoctorGuaranteeAxis::Resources,
     }
 }
 
-fn item(found: &Finding, platform: Option<Platform>) -> channels::DoctorItem {
-    channels::DoctorItem {
+fn item(found: &Finding, platform: Option<Platform>) -> wire::DoctorItem {
+    wire::DoctorItem {
         name: found.requirement.name.to_owned(),
         tier: named(found.requirement.tier),
         // A family carries `OneOf`, and the page is told `Required`:
@@ -166,13 +164,13 @@ fn item(found: &Finding, platform: Option<Platform>) -> channels::DoctorItem {
         // as a whole is satisfied. A third word here would be a word no
         // reader could act on without also reading the verdict.
         need: match found.requirement.need {
-            Need::Required | Need::OneOf(_) => channels::DoctorNeed::Required,
-            Need::Optional => channels::DoctorNeed::Optional,
+            Need::Required | Need::OneOf(_) => wire::DoctorNeed::Required,
+            Need::Optional => wire::DoctorNeed::Optional,
         },
         homepage: homepage(found),
         state: state(&found.presence),
         install: match platform {
-            None => channels::DoctorInstall::UnknownPlatform,
+            None => wire::DoctorInstall::UnknownPlatform,
             Some(platform) => install(found.requirement.recipe.at(platform)),
         },
         pinned: super::pin::pinned(found.requirement.pin),
@@ -195,59 +193,57 @@ fn homepage(found: &Finding) -> Option<String> {
     found.requirement.homepage.map(str::to_owned)
 }
 
-fn named(tier: Tier) -> channels::DoctorTier {
+fn named(tier: Tier) -> wire::DoctorTier {
     match tier {
-        Tier::Use => channels::DoctorTier::Use,
-        Tier::Develop => channels::DoctorTier::Develop,
+        Tier::Use => wire::DoctorTier::Use,
+        Tier::Develop => wire::DoctorTier::Develop,
     }
 }
 
-fn state(presence: &Presence) -> channels::DoctorState {
+fn state(presence: &Presence) -> wire::DoctorState {
     match presence {
-        Presence::Present { at, version } => channels::DoctorState::Present {
+        Presence::Present { at, version } => wire::DoctorState::Present {
             at: at.display().to_string(),
             version: match version {
-                Version::Said(text) => channels::DoctorVersion::Said { text: text.clone() },
-                Version::Silent => channels::DoctorVersion::Silent,
-                Version::Unreadable => channels::DoctorVersion::Unreadable,
-                Version::Late => channels::DoctorVersion::Late,
+                Version::Said(text) => wire::DoctorVersion::Said { text: text.clone() },
+                Version::Silent => wire::DoctorVersion::Silent,
+                Version::Unreadable => wire::DoctorVersion::Unreadable,
+                Version::Late => wire::DoctorVersion::Late,
             },
         },
-        Presence::Broken { at, fault } => channels::DoctorState::Broken {
+        Presence::Broken { at, fault } => wire::DoctorState::Broken {
             at: at.display().to_string(),
             fault: match fault {
-                Fault::WillNotStart(said) => {
-                    channels::DoctorFault::WillNotStart { said: said.clone() }
-                }
-                Fault::HalfWritten => channels::DoctorFault::HalfWritten,
-                Fault::Unreadable(said) => channels::DoctorFault::Unreadable { said: said.clone() },
+                Fault::WillNotStart(said) => wire::DoctorFault::WillNotStart { said: said.clone() },
+                Fault::HalfWritten => wire::DoctorFault::HalfWritten,
+                Fault::Unreadable(said) => wire::DoctorFault::Unreadable { said: said.clone() },
             },
         },
-        Presence::Absent(absence) => channels::DoctorState::Absent {
+        Presence::Absent(absence) => wire::DoctorState::Absent {
             absence: match absence {
-                Absence::NotOnSearchPath => channels::DoctorAbsence::NotOnSearchPath,
+                Absence::NotOnSearchPath => wire::DoctorAbsence::NotOnSearchPath,
                 Absence::VariableNamesNothing { variable, path } => {
-                    channels::DoctorAbsence::VariableNamesNothing {
+                    wire::DoctorAbsence::VariableNamesNothing {
                         variable: (*variable).to_owned(),
                         path: path.display().to_string(),
                     }
                 }
-                Absence::NoComponent { dir } => channels::DoctorAbsence::NoComponent {
+                Absence::NoComponent { dir } => wire::DoctorAbsence::NoComponent {
                     dir: dir.display().to_string(),
                 },
-                Absence::NoHome => channels::DoctorAbsence::NoHome,
-                Absence::NotInThisBuild => channels::DoctorAbsence::NotInThisBuild,
+                Absence::NoHome => wire::DoctorAbsence::NoHome,
+                Absence::NotInThisBuild => wire::DoctorAbsence::NotInThisBuild,
             },
         },
     }
 }
 
-fn install(recipe: &super::Recipe) -> channels::DoctorInstall {
+fn install(recipe: &super::Recipe) -> wire::DoctorInstall {
     let spelled = recipe.spelled();
     match recipe {
-        super::Recipe::Command { .. } => channels::DoctorInstall::Command { spelled },
-        super::Recipe::Print(_) => channels::DoctorInstall::Print { spelled },
-        super::Recipe::Manual(how) => channels::DoctorInstall::Manual {
+        super::Recipe::Command { .. } => wire::DoctorInstall::Command { spelled },
+        super::Recipe::Print(_) => wire::DoctorInstall::Print { spelled },
+        super::Recipe::Manual(how) => wire::DoctorInstall::Manual {
             how: (*how).to_owned(),
         },
     }
@@ -264,27 +260,27 @@ mod tests {
 
     /// The two machine-wide reads a fold is given, so that a verdict is
     /// judged without a machine that has a search path and a keyring.
-    fn stated() -> (channels::DoctorSandbox, channels::DoctorCustody) {
+    fn stated() -> (wire::DoctorSandbox, wire::DoctorCustody) {
         (
-            channels::DoctorSandbox {
-                arm: channels::DoctorSandboxArm::CopiedTree,
+            wire::DoctorSandbox {
+                arm: wire::DoctorSandboxArm::CopiedTree,
                 coverage: runtime::tools::Guarantee::ALL
                     .iter()
-                    .map(|axis| channels::DoctorGuarantee {
+                    .map(|axis| wire::DoctorGuarantee {
                         axis: axis_name(*axis),
                         kept: match runtime::tools::Confinement::CopiedTree
                             .assurances()
                             .of(*axis)
                         {
-                            runtime::tools::Kept::Yes => channels::DoctorCoverage::Kept,
-                            runtime::tools::Kept::No => channels::DoctorCoverage::NotKept,
+                            runtime::tools::Kept::Yes => wire::DoctorCoverage::Kept,
+                            runtime::tools::Kept::No => wire::DoctorCoverage::NotKept,
                         },
                     })
                     .collect(),
             },
-            channels::DoctorCustody {
-                store: channels::DoctorCustodyStore::SessionMemory,
-                keeps: channels::DoctorCustodyLifetime::ThisProcess,
+            wire::DoctorCustody {
+                store: wire::DoctorCustodyStore::SessionMemory,
+                keeps: wire::DoctorCustodyLifetime::ThisProcess,
                 refusal: None,
             },
         )
@@ -308,15 +304,15 @@ mod tests {
             .expect("the table carries the Gecko family");
         assert_eq!(
             gecko.state,
-            channels::DoctorState::Absent {
-                absence: channels::DoctorAbsence::NotOnSearchPath,
+            wire::DoctorState::Absent {
+                absence: wire::DoctorAbsence::NotOnSearchPath,
             },
             "an absence is a value the page labels, never a sentence"
         );
         assert!(
             matches!(
                 gecko.install,
-                channels::DoctorInstall::Command { .. } | channels::DoctorInstall::Print { .. }
+                wire::DoctorInstall::Command { .. } | wire::DoctorInstall::Print { .. }
             ),
             "a missing item says what would get it: {:?}",
             gecko.install
@@ -325,7 +321,7 @@ mod tests {
         let using = answer
             .tiers
             .iter()
-            .find(|verdict| verdict.tier == channels::DoctorTier::Use)
+            .find(|verdict| verdict.tier == wire::DoctorTier::Use)
             .expect("every tier answers");
         assert_eq!(
             using.missing,
@@ -335,7 +331,7 @@ mod tests {
         let developing = answer
             .tiers
             .iter()
-            .find(|verdict| verdict.tier == channels::DoctorTier::Develop)
+            .find(|verdict| verdict.tier == wire::DoctorTier::Develop)
             .expect("every tier answers");
         assert!(
             developing.missing.is_empty(),
@@ -356,7 +352,7 @@ mod tests {
             answer
                 .items
                 .iter()
-                .all(|item| item.install == channels::DoctorInstall::UnknownPlatform),
+                .all(|item| item.install == wire::DoctorInstall::UnknownPlatform),
             "nothing can be said about installing on a platform nobody wrote recipes for"
         );
     }
@@ -370,17 +366,17 @@ mod tests {
         let machine = ScriptedMachine::missing(&[]);
         let (sandbox, custody) = stated();
         let answer = fold(&machine, Some(Platform::Windows), sandbox, custody);
-        assert_eq!(answer.sandbox.arm, channels::DoctorSandboxArm::CopiedTree);
+        assert_eq!(answer.sandbox.arm, wire::DoctorSandboxArm::CopiedTree);
         assert_eq!(answer.sandbox.coverage.len(), 5, "one row per axis");
         let network = answer
             .sandbox
             .coverage
             .iter()
-            .find(|row| row.axis == channels::DoctorGuaranteeAxis::Network)
+            .find(|row| row.axis == wire::DoctorGuaranteeAxis::Network)
             .expect("every axis is reported");
         assert_eq!(
             network.kept,
-            channels::DoctorCoverage::NotKept,
+            wire::DoctorCoverage::NotKept,
             "the copied tree does not isolate the network, and the page is told so"
         );
     }
@@ -397,7 +393,7 @@ mod tests {
         let answer = fold(&machine, None, sandbox, custody);
         assert_eq!(
             answer.core,
-            channels::DoctorCore::Refused {
+            wire::DoctorCore::Refused {
                 said: "the raise needs CAP_SYS_NICE".to_owned(),
             }
         );

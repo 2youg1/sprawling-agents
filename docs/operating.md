@@ -179,8 +179,8 @@ Mail, GitHub, Figma, Discord: writing an integration for each is a weekly chore 
 |---|---|
 | give a building tools from a server | its `CONFIG.toml`: a `command` starts a child process, a `url` reaches a hosted server; the **MCP** page writes the same entries |
 | point at a different provider of the same tools | the same URL field. Nothing else changes |
-| add a transport | `protocol::mcp::stdio` and `protocol::mcp::http` are the two adapters behind `protocol::mcp`'s `Outbound` seam |
-| drive this city from an editor | `protocol::acp` accepts an outside request as an ordinary dispatch |
+| add a transport | `agent_protocols::mcp::stdio` and `agent_protocols::mcp::http` are the two adapters behind `agent_protocols::mcp`'s `Outbound` seam |
+| drive this city from an editor | `agent_protocols::acp` accepts an outside request as an ordinary dispatch |
 
 A confidential building constructs none of them: data may enter and may not leave.
 
@@ -200,8 +200,8 @@ A `command` entry is stdio by definition, so it carries no `transport` key, and 
 
 Three limits apply today, and each is a fact about the code rather than a choice this entry can change:
 
-- A call that has not answered within `protocol::mcp::EXTERNAL_CALL_PATIENCE` (60 s) is refused and the child is stopped. The deadline is the same for every server; `[[mcp]]` has no key to lengthen it for a slow conversion.
-- One answer is at most `protocol::mcp::MESSAGE_CEILING` (8 MiB), and an answer above it ends the connection.
+- A call that has not answered within `agent_protocols::mcp::EXTERNAL_CALL_PATIENCE` (60 s) is refused and the child is stopped. The deadline is the same for every server; `[[mcp]]` has no key to lengthen it for a slow conversion.
+- One answer is at most `agent_protocols::mcp::MESSAGE_CEILING` (8 MiB), and an answer above it ends the connection.
 - An answer whose text exceeds `runtime::CONNECTOR_CAP_BYTES` (16 KiB) goes through `runtime::pipeline::package`, the same step that shapes an `exec` result (runtime-SPEC §8-27-10). Plain text is stored whole and the model reads a window with the path it pages with `read`. Markdown is the exception, and it is what this server returns: the pipeline shortens a long Markdown document to its section outline and stores nothing, so the text it drops is not reachable from that call. Convert one document, or one part of one, per call.
 
 **A confidential building starts no MCP server at all**, `markitdown-mcp` included, because the city cannot tell a server that only converts local files from one that also fetches URLs, and the tool itself accepts `https:`. Local conversion there goes through `exec` with the command-line converter on a file inside the building (`pip install markitdown`, then `markitdown report.pdf`): that result passes through the same `runtime::pipeline::package`. The same caveat as every `exec` applies: nothing yet stops a host command from reaching the network (city-SPEC, the execution points still missing), so this stays safe only while the converter is given local paths.
@@ -211,6 +211,6 @@ Three limits apply today, and each is a fact about the code rather than a choice
 | Part | Seam or surface | Note |
 |---|---|---|
 | execution sandbox | `runtime::sandbox` | implement the trait, pass its conformance suite; the shipped adapter is wasmtime with fuel |
-| the client | `channels::wire` | the wire is the whole API; a second client writes against it |
+| the client | the `sprawling-wire` crate | the wire is the whole API; a second client writes against it |
 | the browser driver | `browser::port` | frames in, replies out; the shipped adapter speaks WebDriver BiDi |
 | where views are stored | `bin::sprawling::views` | delete the process and they rebuild from the Ledger, byte-identical |

@@ -9,8 +9,8 @@
 
 #![allow(clippy::unwrap_used, reason = "test code")]
 
-use channels::PursuitLine;
 use serde_json::json;
+use wire::PursuitLine;
 
 #[test]
 fn a_pursuit_verdict_travels_as_its_kind_and_not_as_a_sentence() {

@@ -59,7 +59,7 @@ fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() 
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "read the build log".to_owned(),
             goal: "say what it says".to_owned(),
@@ -99,7 +99,7 @@ fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() 
         original.starts_with("cas:b3-"),
         "not a cas locator: {original}"
     );
-    let cas = memory::Cas::open(&dir.path().join(".sprawling").join("cas")).unwrap();
+    let cas = storage::Cas::open(&dir.path().join(".sprawling").join("cas")).unwrap();
     let pinned = cas.get(&kernel::B3Hash::digest(noise.as_bytes())).unwrap();
     assert_eq!(
         String::from_utf8(pinned).unwrap(),

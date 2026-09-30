@@ -10,7 +10,7 @@ use super::super::lease::WorktreeLease;
 use super::super::name::WorktreeName;
 use super::super::weight::measure;
 use super::Worktrees;
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 /// Why a tree is locked: a run holds it.
 const LEASE_REASON: &str = "held by a sprawling run";
@@ -36,8 +36,8 @@ impl Worktrees {
     pub fn lift_abandoned_leases(
         city_root: &std::path::Path,
         _writer: &crate::JsonlLedger,
-    ) -> Result<(), MemoryError> {
-        let refuse = |op: &'static str, err: git2::Error| MemoryError::Worktree {
+    ) -> Result<(), StorageError> {
+        let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
             op,
             detail: format!("{}: {err}", city_root.display()),
         };
@@ -74,12 +74,12 @@ impl Worktrees {
     /// taken back here - the same reflex the index has about a cache it
     /// doubts - so that `E_WORKTREE_BUSY` keeps meaning that somebody is
     /// working.
-    pub(super) fn standing(&self, name: &WorktreeName) -> Result<Standing, MemoryError> {
+    pub(super) fn standing(&self, name: &WorktreeName) -> Result<Standing, StorageError> {
         let tree = match self.repo.find_worktree(name.as_str()) {
             Ok(tree) => tree,
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Standing::Absent),
             Err(err) => {
-                return Err(MemoryError::Worktree {
+                return Err(StorageError::Worktree {
                     op: "find a worktree",
                     detail: format!("{}: {err}", name.as_str()),
                 });
@@ -89,7 +89,7 @@ impl Worktrees {
             self.forget(name)?;
             return Ok(Standing::Absent);
         }
-        let lock = tree.is_locked().map_err(|err| MemoryError::Worktree {
+        let lock = tree.is_locked().map_err(|err| StorageError::Worktree {
             op: "read a worktree lock",
             detail: format!("{}: {err}", name.as_str()),
         })?;
@@ -121,8 +121,8 @@ impl Worktrees {
         name: &WorktreeName,
         tree: &git2::Worktree,
         scopes: &[String],
-    ) -> Result<WorktreeLease, MemoryError> {
-        let refuse = |op: &'static str, err: git2::Error| MemoryError::Worktree {
+    ) -> Result<WorktreeLease, StorageError> {
+        let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
             op,
             detail: format!("{}: {err}", name.as_str()),
         };
@@ -163,8 +163,8 @@ impl Worktrees {
     /// Moves `name`'s branch to the trunk when the trunk descends from
     /// it. A branch with work the trunk lacks stays where it is: that
     /// work is still waiting for its merge.
-    fn follow_trunk(&self, name: &WorktreeName) -> Result<(), MemoryError> {
-        let refuse = |op: &'static str, err: git2::Error| MemoryError::Worktree {
+    fn follow_trunk(&self, name: &WorktreeName) -> Result<(), StorageError> {
+        let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
             op,
             detail: format!("{}: {err}", name.as_str()),
         };

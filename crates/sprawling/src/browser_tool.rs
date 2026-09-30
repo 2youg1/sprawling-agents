@@ -6,7 +6,7 @@
 //! The `browser` tool: every action over one session.
 //!
 //! It lives in the assembly layer rather than in `browser` because a
-//! screenshot has to land in `memory::cas`, and the browser crate has no
+//! screenshot has to land in `storage::cas`, and the browser crate has no
 //! dependency on memory and should not grow one. What crosses between
 //! them is a `Shot` — bytes and two integer sides — so the decisions
 //! stay in the pure crate and the bytes stay here.
@@ -21,8 +21,8 @@ use kernel::{
     AxCode, AxError, CostTier, Effect, GateSubject, Payload, RenderIntent, Temporal, Tool,
     ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
-use memory::Cas;
 use serde_json::Value;
+use storage::Cas;
 
 mod answering;
 mod building;
@@ -59,7 +59,7 @@ struct Browser {
     generation: u64,
     cas: Cas,
     /// The run and building a screenshot is pinned for.
-    origin: memory::BlockOrigin,
+    origin: storage::BlockOrigin,
     /// The development loop. Every look folds into it, so "change
     /// something, look at it, decide" is one object rather than a habit
     /// the model has to remember.
@@ -77,7 +77,7 @@ impl BrowserTool {
         role: Role,
         port: Box<dyn BrowserPort + Send>,
         cas: Cas,
-        origin: memory::BlockOrigin,
+        origin: storage::BlockOrigin,
     ) -> Result<BrowserTool, AxError> {
         let (name, disclosure, params, effect) = match role {
             Role::Building => (

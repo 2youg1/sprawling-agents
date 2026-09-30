@@ -53,12 +53,12 @@ impl RunWorker {
             .cas
             .put_for(
                 account.as_bytes(),
-                &memory::BlockOrigin {
+                &storage::BlockOrigin {
                     run: child.run,
                     building: child.addr.clone(),
                 },
             )
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         let claim = collab::Claim::new(
             collab::NodeId::parse(child.addr.as_str())?,
             Locator::cas(digest),

@@ -21,7 +21,7 @@ const BASELINE_DIR: &str = "xtask/api-baselines";
 /// The crates whose public surface is a seam other code reads across a
 /// process or a repository boundary, by lib name; every other crate's
 /// surface is held by the compiler at its call sites.
-const SEAM_CRATES: [&str; 2] = ["channels", "kernel"];
+const SEAM_CRATES: [&str; 2] = ["wire", "kernel"];
 
 /// The live surface, normalized to trimmed non-empty lines. Derived and
 /// blanket impls are omitted (-sss): they move with the toolchain, not

@@ -31,13 +31,13 @@ impl RunWorker {
     /// refused and how to open it.
     pub(in crate::assembly) fn set_admission(
         &mut self,
-        scope: &channels::HaltScope,
+        scope: &wire::HaltScope,
         state: Admittance,
     ) -> Result<(), AxError> {
         if matches!(state, Admittance::Halted) {
             let within = match scope {
-                channels::HaltScope::City => None,
-                channels::HaltScope::Building(addr) | channels::HaltScope::Workshop(addr) => {
+                wire::HaltScope::City => None,
+                wire::HaltScope::Building(addr) | wire::HaltScope::Workshop(addr) => {
                     Some(addr.clone())
                 }
             };
@@ -80,7 +80,7 @@ impl RunWorker {
     /// anywhere: what the panel shows is what a replay can verify.
     pub(in crate::assembly) fn set_autonomy(
         &mut self,
-        scope: &channels::HaltScope,
+        scope: &wire::HaltScope,
         autonomy: kernel::Autonomy,
     ) -> Result<(), AxError> {
         self.record(
@@ -190,7 +190,7 @@ impl RunWorker {
     /// history that will not take the line announcing it.
     pub(in crate::assembly) fn put_document(
         &mut self,
-        which: channels::GovernedDocument,
+        which: wire::GovernedDocument,
         body: &str,
     ) -> Result<(), AxError> {
         let which = super::super::governed_of(which);
@@ -222,7 +222,7 @@ impl RunWorker {
     pub(in crate::assembly) fn put_spine(
         &mut self,
         building: &Address,
-        which: channels::SpineDocument,
+        which: wire::SpineDocument,
         base: &str,
         body: &str,
     ) -> Result<(), AxError> {
@@ -241,11 +241,11 @@ impl RunWorker {
 }
 
 /// The file name one spine document is written to.
-fn spine_name(which: channels::SpineDocument) -> &'static str {
+fn spine_name(which: wire::SpineDocument) -> &'static str {
     match which {
-        channels::SpineDocument::Roadmap => city::ROADMAP_FILE,
-        channels::SpineDocument::Memo => city::MEMO_FILE,
-        channels::SpineDocument::Handoff => city::HANDOFF_FILE,
-        channels::SpineDocument::Spec => city::SPEC_FILE,
+        wire::SpineDocument::Roadmap => city::ROADMAP_FILE,
+        wire::SpineDocument::Memo => city::MEMO_FILE,
+        wire::SpineDocument::Handoff => city::HANDOFF_FILE,
+        wire::SpineDocument::Spec => city::SPEC_FILE,
     }
 }

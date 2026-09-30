@@ -5,7 +5,7 @@
 
 //! Hybrid signing keys: ML-DSA-44 and Ed25519, both derived from one
 //! 32-byte seed, and a signature that holds only when both halves hold
-//! (remote-SPEC.md §8-3).
+//! (remote_access-SPEC.md §8-3).
 //!
 //! The city's own key and every device's key have this shape. A device
 //! generates its key where it lives and sends the public half at pairing;

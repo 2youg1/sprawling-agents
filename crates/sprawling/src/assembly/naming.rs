@@ -10,11 +10,11 @@ use kernel::{Address, AxCode, AxError};
 /// Which governed document a wire frame names. Total: the two sets have
 /// the same three members and neither owns the other, so the translation
 /// is written once here rather than guessed at each call site.
-pub(super) fn governed_of(which: channels::GovernedDocument) -> city::Governed {
+pub(super) fn governed_of(which: wire::GovernedDocument) -> city::Governed {
     match which {
-        channels::GovernedDocument::Mayor => city::Governed::Mayor,
-        channels::GovernedDocument::Clerk => city::Governed::Clerk,
-        channels::GovernedDocument::Preferences => city::Governed::Preferences,
+        wire::GovernedDocument::Mayor => city::Governed::Mayor,
+        wire::GovernedDocument::Clerk => city::Governed::Clerk,
+        wire::GovernedDocument::Preferences => city::Governed::Preferences,
     }
 }
 
@@ -43,10 +43,10 @@ pub(super) fn building_of(addr: &Address) -> Option<Address> {
 /// spelled on a ledger line is [`kernel::event::Scope`]'s and is
 /// written nowhere else, so a halt recorded by this city and a halt
 /// read back by a restart cannot disagree about which scope it named.
-pub(super) fn scope_of(scope: &channels::HaltScope) -> kernel::event::Scope {
+pub(super) fn scope_of(scope: &wire::HaltScope) -> kernel::event::Scope {
     match scope {
-        channels::HaltScope::City => kernel::event::Scope::City,
-        channels::HaltScope::Building(addr) => kernel::event::Scope::Building(addr.clone()),
-        channels::HaltScope::Workshop(addr) => kernel::event::Scope::Workshop(addr.clone()),
+        wire::HaltScope::City => kernel::event::Scope::City,
+        wire::HaltScope::Building(addr) => kernel::event::Scope::Building(addr.clone()),
+        wire::HaltScope::Workshop(addr) => kernel::event::Scope::Workshop(addr.clone()),
     }
 }

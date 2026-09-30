@@ -8,13 +8,13 @@
 //!
 //! Pure, and pure on purpose: the entropy a minted key is made of is
 //! drawn in `bin::assembly`, which is where this crate draws randomness,
-//! and `channels::auth` documents that arrangement from the other side
+//! and `wire::auth` documents that arrangement from the other side
 //! ("Entropy arrives as a parameter. This module samples nothing").
 //! What is left here is the policy, which is four cells over two facts
 //! and therefore something a test can state in full.
 //!
 //! This decides only where a key comes from. Whether the listener may
-//! bind at all stays with `channels::decide_bind`, and nothing here
+//! bind at all stays with `wire::decide_bind`, and nothing here
 //! weakens it: the assembly layer satisfies that guard before the socket
 //! exists rather than moving it.
 

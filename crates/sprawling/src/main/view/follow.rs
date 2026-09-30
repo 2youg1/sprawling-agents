@@ -13,8 +13,8 @@ use std::sync::mpsc::{Receiver, TryRecvError, channel};
 use std::time::Duration;
 
 use kernel::{EventRecord, RunId, Seq};
-use memory::{CheckedLine, LedgerIndex, Refreshed, TailLines};
 use sprawling::lineage::{Lineage, RunLine};
+use storage::{CheckedLine, LedgerIndex, Refreshed, TailLines};
 
 use super::ViewError;
 

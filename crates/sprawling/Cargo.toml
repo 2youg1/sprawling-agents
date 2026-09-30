@@ -8,14 +8,14 @@ publish.workspace = true
 [dependencies]
 accounting = { workspace = true }
 kernel = { workspace = true }
-memory = { workspace = true }
+storage = { workspace = true }
 runtime = { workspace = true }
 gateway = { workspace = true }
-channels = { workspace = true, features = ["server"] }
+wire = { workspace = true, features = ["server"] }
 city = { workspace = true }
 collab = { workspace = true }
 browser = { workspace = true }
-protocol = { workspace = true }
+agent_protocols = { workspace = true }
 crossterm = { workspace = true }
 futures-util = { workspace = true }
 getrandom = { workspace = true }
@@ -64,13 +64,13 @@ git2 = { version = "0.21", default-features = false }
 # The deterministic power-loss model, so a test above the ledger can lose
 # one named line and assert the city did not move. Kept to dev only: a
 # release build of this binary never carries FaultFs.
-memory = { workspace = true, features = ["fault"] }
+storage = { workspace = true, features = ["fault"] }
 # The Ledger port's own assertion suite, so the relay adapter is held to
 # the same six assertions as the two adapters that own a medium.
 kernel = { workspace = true, features = ["conformance"] }
 # A child that answers every line with one fixed result, so the wiring
 # of a building's servers is driven through a real pipe.
-protocol = { workspace = true, features = ["conformance"] }
+agent_protocols = { workspace = true, features = ["conformance"] }
 
 [lints]
 workspace = true

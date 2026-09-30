@@ -26,7 +26,7 @@ fn an_allowed_item_carries_the_work_on_instead_of_asking_for_the_command_again()
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     let addr = Address::parse("lab/room1").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: addr.clone(),
             task: "empty the archive".to_owned(),
             goal: "one sweep, then stop".to_owned(),
@@ -82,7 +82,7 @@ fn an_allowed_item_carries_the_work_on_instead_of_asking_for_the_command_again()
 
     let before = started_runs(&report.ledger_dir);
     worker
-        .handle(channels::Command::Approve {
+        .handle(wire::Command::Approve {
             item: kernel::ApprovalId::new("item-1").unwrap(),
             verdict: kernel::Ruling::Allow,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"approve"),
@@ -160,14 +160,14 @@ fn work_handed_down_becomes_a_run_that_cannot_hand_it_down_again() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "get it measured".to_owned(),
             goal: "the number is written down, then stop".to_owned(),
@@ -268,15 +268,15 @@ fn what_came_back_from_a_delegate_waits_in_the_room_that_asked_for_it() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
     let room = Address::parse("lab/room1").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: room.clone(),
             task: "get it measured".to_owned(),
             goal: "the number is written down, then stop".to_owned(),
@@ -333,14 +333,14 @@ fn status_tells_a_run_where_the_work_it_handed_down_went() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "get it measured".to_owned(),
             goal: "the number is written down, then stop".to_owned(),

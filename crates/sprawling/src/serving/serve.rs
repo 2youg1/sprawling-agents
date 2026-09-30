@@ -32,7 +32,7 @@ pub struct Serving {
     /// no further than the digest this takes from it, except into the
     /// console's `/web`, which is the one place it has to travel.
     pub token: Option<String>,
-    pub client: channels::ClientAssets,
+    pub client: wire::ClientAssets,
     pub vault: gateway::Custodian,
     pub vault_notice: Option<Payload>,
     pub log: runtime::diagnostics::Diagnostics,

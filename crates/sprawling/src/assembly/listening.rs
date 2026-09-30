@@ -37,7 +37,7 @@ use crate::views::{Published, answer_outside_the_lock};
 fn hearing(
     views: Arc<Published>,
     vault: Arc<std::sync::Mutex<gateway::Custodian>>,
-) -> channels::TranscribeSink {
+) -> wire::TranscribeSink {
     Arc::new(move |bytes: Vec<u8>, media: String| {
         let recording = gateway::Recording::new(bytes, gateway::AudioType::of_media_type(&media)?)?;
         let speaking = views
@@ -76,8 +76,8 @@ async fn closed_by_hand() -> std::io::Result<()> {
 /// the process ends and writes no handoff.
 #[must_use = "a listening city answers nobody until it is served"]
 pub struct Listening {
-    bound: channels::Bound,
-    config: channels::ServeConfig,
+    bound: wire::Bound,
+    config: wire::ServeConfig,
     desk: Arc<CommandDesk>,
     answering: crate::console::Answering,
     worker: std::thread::JoinHandle<()>,
@@ -110,12 +110,12 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     } = serving;
     let city_root = city_root.as_path();
     let token_digest = match token.as_deref() {
-        Some(raw) => Some(channels::PairingToken::from_configured(raw)?.digest()),
+        Some(raw) => Some(wire::PairingToken::from_configured(raw)?.digest()),
         None => None,
     };
     // The port first: a serve refused here has opened nothing and
     // written nothing.
-    let bound = channels::bind(addr, token_digest).await?;
+    let bound = wire::bind(addr, token_digest).await?;
     let cas_root = kernel::layout::CityLayout::new(city_root).cas();
     std::fs::create_dir_all(&cas_root).map_err(|source| {
         AxError::failure(
@@ -171,12 +171,12 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // terminal are two ways into one city, and this is the read half of
     // what makes that literally true rather than a claim.
     let answering: crate::console::Answering =
-        Arc::new(move |query: channels::Query| answer_outside_the_lock(&query_views, &query));
+        Arc::new(move |query: wire::Query| answer_outside_the_lock(&query_views, &query));
     // Read once, at startup, from the views the ledger just rebuilt.
     let started_from = views.snapshot();
     let city_name = started_from.city();
     let epoch = started_from.epoch();
-    let head = Arc::new(channels::LedgerHead::at(started_from.head()));
+    let head = Arc::new(wire::LedgerHead::at(started_from.head()));
     drop(started_from);
     // The in-process Command set, not the wire one: the enrolment
     // route delivers a sealed credential here, and no wire frame can.
@@ -218,14 +218,12 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
 
     let audio_views = Arc::clone(&views);
     let audio_vault = city_vault;
-    let config = channels::ServeConfig {
+    let config = wire::ServeConfig {
         client: Arc::new(client),
-        commands: Arc::new(
-            move |command: channels::WireCommand, reply: channels::Reply| {
-                commands_desk.post(command.into(), reply);
-                Ok(())
-            },
-        ),
+        commands: Arc::new(move |command: wire::WireCommand, reply: wire::Reply| {
+            commands_desk.post(command.into(), reply);
+            Ok(())
+        }),
         events,
         deltas,
         logs,
@@ -235,7 +233,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         city: city_name,
         head,
         epoch,
-        secrets: Arc::new(move |command: channels::Command, reply: channels::Reply| {
+        secrets: Arc::new(move |command: wire::Command, reply: wire::Reply| {
             // The route waits for whichever comes first, so the
             // reply address is the credential's own request rather
             // than nowhere: a vault that refuses is a fact the
@@ -296,7 +294,7 @@ impl Listening {
         // then the worker is told - it reads that where it reads its queue,
         // so whatever command is running finishes and the handoff is the
         // last line rather than a line in the middle of one.
-        let mut serving = std::pin::pin!(channels::serve(bound, config));
+        let mut serving = std::pin::pin!(wire::serve(bound, config));
         let served = tokio::select! {
             result = &mut serving => result,
             signal = closed_by_hand() => match signal {
@@ -335,7 +333,7 @@ impl Listening {
 fn watched(
     city_root: &std::path::Path,
     health: crate::monitor::health::Health,
-) -> Result<channels::MonitorFeed, AxError> {
+) -> Result<wire::MonitorFeed, AxError> {
     let monitor = Arc::new(std::sync::Mutex::new(crate::monitor::Monitor::new()));
     let samples = tokio::sync::broadcast::channel(1).0;
     crate::monitor::sampler::spawn_sampler(
@@ -344,7 +342,7 @@ fn watched(
         city_root.to_path_buf(),
         health,
     )?;
-    Ok(channels::MonitorFeed {
+    Ok(wire::MonitorFeed {
         watch: Arc::new(move |watched| -> Box<dyn Send> {
             // The count is an atomic, so a poisoned lock guards no
             // half-written state and the watcher still counts.

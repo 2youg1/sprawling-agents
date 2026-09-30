@@ -6,7 +6,7 @@
 //! Admission control: the city-wide shedding posture.
 //! One function serves every queue-shaped resource — signal queues and fd
 //! headroom alike; capacity semantics belong to the caller. Queues and
-//! counters live in memory::queue, never here.
+//! counters live in storage::queue, never here.
 
 /// A queue's occupancy snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

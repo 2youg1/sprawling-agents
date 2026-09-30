@@ -6,7 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [lib]
-name = "channels"
+name = "wire"
 
 [features]
 # The listener. Off for the crates that need this crate's vocabulary and
@@ -14,7 +14,7 @@ name = "channels"
 default = ["server"]
 server = ["dep:tokio", "dep:axum"]
 # The JSON Schema of the whole envelope, which `cargo xtask wire-ts` turns
-# into the TypeScript client's types (channels-SPEC.md section 8-16). Off
+# into the TypeScript client's types (wire-SPEC.md section 8-16). Off
 # for the product binary: it does not ask what its frames look like, and
 # the answer must not travel to a browser.
 schema = ["dep:schemars", "kernel/schema"]

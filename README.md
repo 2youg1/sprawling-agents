@@ -150,9 +150,9 @@ Everything external sits on a seam and can be replaced without touching the rest
 | Piece | Lives in | How to replace |
 |---|---|---|
 | Model endpoint and format | `gateway::endpoint`, `gateway::dialect` | Enter a base URL and a format on the settings page. A model served on this machine is called directly rather than through the machine's proxy, and a setting changes that. |
-| SaaS and external tools ([Composio](https://composio.dev) is one MCP server among others) | the `protocol::mcp` `Outbound` seam and its stdio, HTTP and SSE adapters; a building's `CONFIG.toml` | Change one URL or one command to switch servers; confidential buildings start none. |
+| SaaS and external tools ([Composio](https://composio.dev) is one MCP server among others) | the `agent_protocols::mcp` `Outbound` seam and its stdio, HTTP and SSE adapters; a building's `CONFIG.toml` | Change one URL or one command to switch servers; confidential buildings start none. |
 | Sandbox | the `runtime::sandbox` seam (wasmtime with a fuel budget today); `runtime::tools` confinement for host commands | Implement the seam and pass its conformance suite. |
-| Client | `channels::wire` is the whole API | Write a second client against the wire; [`LLM.md`](LLM.md) is the same surface written for an agent. |
+| Client | the `sprawling-wire` crate is the whole API | Write a second client against the wire; [`LLM.md`](LLM.md) is the same surface written for an agent. |
 
 Where each piece lives and how to replace it is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 

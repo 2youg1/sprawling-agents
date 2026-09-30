@@ -28,7 +28,7 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     for (n, room) in ["lab/room1", "lab/room2"].into_iter().enumerate() {
         worker
-            .handle(channels::Command::Dispatch {
+            .handle(wire::Command::Dispatch {
                 addr: Address::parse(room).unwrap(),
                 task: "claim the notes".to_owned(),
                 goal: "register a goal, then stop".to_owned(),
@@ -163,9 +163,9 @@ fn a_standing_goal_on_a_building_without_a_plan_is_refused_with_the_building_and
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
 
     let refusal = worker
-        .handle(channels::Command::Pursue {
+        .handle(wire::Command::Pursue {
             addr: Address::parse("lab").unwrap(),
-            step: channels::PursuitStep::Set {
+            step: wire::PursuitStep::Set {
                 goal: "fire the kiln".to_owned(),
             },
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"pursue"),
@@ -197,9 +197,9 @@ fn a_standing_goal_on_a_malformed_plan_is_refused_with_the_broken_line() {
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
 
     let refusal = worker
-        .handle(channels::Command::Pursue {
+        .handle(wire::Command::Pursue {
             addr: Address::parse("lab").unwrap(),
-            step: channels::PursuitStep::Set {
+            step: wire::PursuitStep::Set {
                 goal: "fire the kiln".to_owned(),
             },
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"pursue"),
@@ -236,8 +236,8 @@ fn a_pursuit_gives_the_desk_back_while_its_rows_drive() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("house").unwrap(),
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("house").unwrap(),
             model: "m-local".to_owned(),
             tag: kernel::ModelTag::Digest,
             context_tokens: kernel::Window::new(32_768),
@@ -249,7 +249,7 @@ fn a_pursuit_gives_the_desk_back_while_its_rows_drive() {
     worker
         .set_pursuit(
             &lab,
-            channels::PursuitStep::Set {
+            wire::PursuitStep::Set {
                 goal: "fire the kiln".to_owned(),
             },
         )

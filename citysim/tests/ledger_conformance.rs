@@ -85,7 +85,7 @@ fn mem_and_jsonl_produce_identical_bytes() {
         mem.append(d).unwrap();
     }
     let dir = tempfile::tempdir().unwrap();
-    let (mut jsonl, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+    let (mut jsonl, _) = storage::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
     jsonl.append_all(fixture_script()).unwrap();
 
     assert_eq!(

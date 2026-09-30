@@ -18,7 +18,7 @@
 //! that holds the credentials sets `SPRAWLING_E2E_REQUIRED=1`, and there
 //! an absent variable is a broken configuration, so the gate turns red.
 //!
-//! **It enters by `RunWorker::handle`, the door `channels::server` hands
+//! **It enters by `RunWorker::handle`, the door `wire::server` hands
 //! every frame to**, rather than by spawning the binary and opening a
 //! socket. The endpoint under test is the provider's, and the process
 //! boundary this repository judges from outside belongs to `adversary/`
@@ -128,7 +128,7 @@ fn live() -> Option<Live> {
 /// chains this into [`dispatch`] and judges the one `Result`.
 fn settled(live: &Live, key: &str, city_root: &Path) -> Result<RunWorker, AxError> {
     let secret = kernel::SecretRef::parse(SECRET_LOCATOR)?;
-    let endpoint = channels::ProviderName::parse(ENDPOINT)?;
+    let endpoint = wire::ProviderName::parse(ENDPOINT)?;
     let mut worker = RunWorker::new(
         city_root,
         // The in-session vault: a gate that reached the platform
@@ -137,26 +137,26 @@ fn settled(live: &Live, key: &str, city_root: &Path) -> Result<RunWorker, AxErro
         gateway::Custodian::in_memory(),
         runtime::diagnostics::Diagnostics::off(),
     )?;
-    worker.handle(channels::Command::PutSecret {
+    worker.handle(wire::Command::PutSecret {
         realm: secret.realm().to_owned(),
         name: secret.name().to_owned(),
         value: kernel::Sealed::new(Box::new(key.to_owned())),
     })?;
-    worker.handle(channels::Command::AttachEndpoint {
+    worker.handle(wire::Command::AttachEndpoint {
         name: endpoint.clone(),
         base_url: live.base_url.clone(),
         dialect: live.dialect,
         secret: Some(SECRET_LOCATOR.to_owned()),
         auth_header: None,
         admit: Vec::new(),
-        tuning: channels::EndpointTuning {
+        tuning: wire::EndpointTuning {
             timeout_ms: Some(REQUEST_TIMEOUT_MS),
             request_max_retries: Some(NO_RETRY),
             ..channels::EndpointTuning::default()
         },
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"e2e-attach"),
     })?;
-    worker.handle(channels::Command::SelectModel {
+    worker.handle(wire::Command::SelectModel {
         endpoint,
         model: live.model.clone(),
         tag: kernel::ModelTag::Main,
@@ -164,9 +164,9 @@ fn settled(live: &Live, key: &str, city_root: &Path) -> Result<RunWorker, AxErro
         max_output_tokens: kernel::Ceiling::new(1_024),
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"e2e-select"),
     })?;
-    worker.handle(channels::Command::CreateBuilding {
+    worker.handle(wire::Command::CreateBuilding {
         addr: Address::parse(BUILDING)?,
-        template: channels::TemplateName::parse("minimal")?,
+        template: wire::TemplateName::parse("minimal")?,
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"e2e-create"),
     })?;
     Ok(worker)
@@ -174,7 +174,7 @@ fn settled(live: &Live, key: &str, city_root: &Path) -> Result<RunWorker, AxErro
 
 /// One dispatch, asking for the shortest answer a model can give.
 fn dispatch(worker: &mut RunWorker) -> Result<(), AxError> {
-    worker.handle(channels::Command::Dispatch {
+    worker.handle(wire::Command::Dispatch {
         addr: Address::parse(BUILDING)?,
         task: "Reply with one word: ready.".to_owned(),
         goal: "one answer from the endpoint this city was pointed at".to_owned(),

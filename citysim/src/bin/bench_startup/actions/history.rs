@@ -6,7 +6,7 @@
 //! A fixture city with a history (citysim-SPEC.md section 8-5-1).
 //!
 //! Shape: adapter. The city is raised by `init_city` and its history is
-//! written through `memory::JsonlLedger::append_all`, so the segments,
+//! written through `storage::JsonlLedger::append_all`, so the segments,
 //! the chain and the canonical bytes are the product's and no line is
 //! spelled here. What this file owns is the shape of one run's history,
 //! which is sized like the records of a city that has been working.
@@ -59,7 +59,7 @@ pub fn fixture_city(cities: &Path, name: &str, history: History) -> Result<PathB
 }
 
 fn write_runs(ledger_dir: &Path, runs: u32) -> Result<(), AxError> {
-    let lines = memory::read_raw_lines_at(ledger_dir).map_err(memory::MemoryError::into_ax)?;
+    let lines = storage::read_raw_lines_at(ledger_dir).map_err(storage::StorageError::into_ax)?;
     let last = lines.last().ok_or_else(|| {
         AxError::failure(
             AxCode::EvidenceMissing,
@@ -69,8 +69,8 @@ fn write_runs(ledger_dir: &Path, runs: u32) -> Result<(), AxError> {
         .with_recovery("init writes a genesis line; delete the fixture city and run again")
     })?;
     let mut t = kernel::EventRecord::parse_line(last)?.t().value();
-    let (mut ledger, _report) = memory::JsonlLedger::open(ledger_dir, TimeMs::new(t))
-        .map_err(memory::MemoryError::into_ax)?;
+    let (mut ledger, _report) = storage::JsonlLedger::open(ledger_dir, TimeMs::new(t))
+        .map_err(storage::StorageError::into_ax)?;
     let mut run = 0;
     while run < runs {
         let wave_end = run.saturating_add(RUNS_PER_WAVE).min(runs);
@@ -80,7 +80,7 @@ fn write_runs(ledger_dir: &Path, runs: u32) -> Result<(), AxError> {
         }
         ledger
             .append_all(drafts)
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         run = wave_end;
     }
     Ok(())

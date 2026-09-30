@@ -6,7 +6,7 @@
 //! The patch text of one file between two checkpoints.
 //!
 //! Its own module because it is the one reading that maps a whole shape
-//! rather than handing a value on: `memory::of_file` answers in its own
+//! rather than handing a value on: `storage::of_file` answers in its own
 //! vocabulary, and turning that into the wire's is a responsibility with
 //! a name.
 
@@ -22,20 +22,20 @@ pub(super) fn hunks_answer(
     oid_a: kernel::GitOid,
     oid_b: kernel::GitOid,
     path: &str,
-) -> channels::Answer {
-    let Ok(patch) = memory::of_file(city_root, oid_a, memory::Head::Commit(oid_b), path) else {
-        return channels::Answer::Unavailable {
+) -> wire::Answer {
+    let Ok(patch) = storage::of_file(city_root, oid_a, storage::Head::Commit(oid_b), path) else {
+        return wire::Answer::Unavailable {
             query: format!("Hunks({oid_a}..{oid_b} {path})"),
         };
     };
-    channels::Answer::Hunks(Box::new(channels::HunksAnswer {
+    wire::Answer::Hunks(Box::new(wire::HunksAnswer {
         oid_a,
         oid_b,
         path: path.to_owned(),
         lines: patch
             .lines
             .into_iter()
-            .map(|line| channels::PatchLine {
+            .map(|line| wire::PatchLine {
                 number: line.number,
                 text: line.text,
             })
@@ -43,7 +43,7 @@ pub(super) fn hunks_answer(
         withheld: patch
             .withheld
             .into_iter()
-            .map(|held| channels::Withheld {
+            .map(|held| wire::Withheld {
                 number: held.number,
                 reason: held.reason,
             })

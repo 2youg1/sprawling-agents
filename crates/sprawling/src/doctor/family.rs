@@ -132,7 +132,7 @@ pub(crate) const GECKO_ROW: Requirement = Requirement {
         linux: Recipe::Print("sudo apt install firefox"),
     },
     pin: super::Pin::Unpinned,
-    upstream: super::Upstream::Unread(channels::DoctorUnread::ManyBrands),
+    upstream: super::Upstream::Unread(wire::DoctorUnread::ManyBrands),
     pack: None,
 };
 
@@ -149,7 +149,7 @@ pub(crate) const CHROMIUM_ROW: Requirement = Requirement {
     homepage: Some("https://www.chromium.org/"),
     recipe: CHROMIUM_RECIPE,
     pin: super::Pin::Unpinned,
-    upstream: super::Upstream::Unread(channels::DoctorUnread::ManyBrands),
+    upstream: super::Upstream::Unread(wire::DoctorUnread::ManyBrands),
     pack: None,
 };
 
@@ -183,7 +183,7 @@ pub(crate) const WEBKIT_ROW: Requirement = Requirement {
         linux: Recipe::Manual("Safari runs on macOS only"),
     },
     pin: super::Pin::Unpinned,
-    upstream: super::Upstream::Unread(channels::DoctorUnread::ManyBrands),
+    upstream: super::Upstream::Unread(wire::DoctorUnread::ManyBrands),
     pack: None,
 };
 

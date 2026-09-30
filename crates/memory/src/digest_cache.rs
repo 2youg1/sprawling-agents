@@ -19,7 +19,7 @@
 //! **Whether an entry is there has one spelling: [`Vfs::exists`].**
 //! Asking by reading the whole file would answer "not cached" for an
 //! entry this process may not open and pay a full read to learn a
-//! yes/no. Reading is for `get`, which wants the bytes (memory-SPEC.md
+//! yes/no. Reading is for `get`, which wants the bytes (storage-SPEC.md
 //! 8-11).
 
 use std::path::{Path, PathBuf};
@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 use kernel::{B3Hash, Payload};
 use serde_json::{Map, Value};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
@@ -37,7 +37,7 @@ pub struct DigestCache {
 }
 
 impl DigestCache {
-    pub fn open(dir: &Path) -> Result<DigestCache, MemoryError> {
+    pub fn open(dir: &Path) -> Result<DigestCache, StorageError> {
         let mut fs = RealFs::new();
         fs.create_dir_all(dir)
             .map_err(io_err("create digest cache dir", dir))?;
@@ -65,7 +65,7 @@ impl DigestCache {
     /// Stores a digest for content that has none. Content already
     /// digested is left exactly as it was — same address, same bytes,
     /// nothing to decide.
-    pub fn put(&mut self, content: &B3Hash, tree_json: &[u8]) -> Result<(), MemoryError> {
+    pub fn put(&mut self, content: &B3Hash, tree_json: &[u8]) -> Result<(), StorageError> {
         let final_path = self.entry_path(content);
         if self.fs.exists(&final_path) {
             return Ok(());
@@ -91,7 +91,7 @@ impl DigestCache {
         Ok(())
     }
 
-    pub fn get(&self, content: &B3Hash) -> Result<Option<Vec<u8>>, MemoryError> {
+    pub fn get(&self, content: &B3Hash) -> Result<Option<Vec<u8>>, StorageError> {
         match self.fs.read(&self.entry_path(content)) {
             Ok(bytes) => Ok(Some(bytes)),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -103,7 +103,7 @@ impl DigestCache {
     /// next digest of this content re-runs; invalidating something that
     /// was never cached is not an error, because the end state is the
     /// one the caller asked for.
-    pub fn invalidate(&mut self, content: &B3Hash, reason: &str) -> Result<Payload, MemoryError> {
+    pub fn invalidate(&mut self, content: &B3Hash, reason: &str) -> Result<Payload, StorageError> {
         let path = self.entry_path(content);
         let existed = self.fs.exists(&path);
         if existed {
@@ -115,7 +115,7 @@ impl DigestCache {
         map.insert("content".to_owned(), Value::String(content.to_string()));
         map.insert("reason".to_owned(), Value::String(reason.to_owned()));
         map.insert("existed".to_owned(), Value::Bool(existed));
-        Payload::new(map).map_err(|source| MemoryError::Draft { source })
+        Payload::new(map).map_err(|source| StorageError::Draft { source })
     }
 }
 

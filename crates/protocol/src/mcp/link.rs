@@ -71,9 +71,9 @@ impl McpLink {
     #[must_use]
     pub fn site(transport: &McpTransport) -> &'static str {
         match *transport {
-            McpTransport::Stdio { .. } => "protocol::mcp::stdio",
-            McpTransport::Http { .. } => "protocol::mcp::http",
-            McpTransport::Sse { .. } => "protocol::mcp::sse",
+            McpTransport::Stdio { .. } => "agent_protocols::mcp::stdio",
+            McpTransport::Http { .. } => "agent_protocols::mcp::http",
+            McpTransport::Sse { .. } => "agent_protocols::mcp::sse",
         }
     }
 
@@ -112,7 +112,7 @@ mod tests {
     use super::*;
 
     /// A failure is filed under the module that reached the server, and
-    /// that module lives in `protocol` beside the handshake it speaks.
+    /// that module lives in `agent_protocols` beside the handshake it speaks.
     #[test]
     fn a_misbehaving_server_is_filed_under_the_transport_that_reached_it() {
         let stdio = McpTransport::Stdio {
@@ -131,9 +131,9 @@ mod tests {
         assert_eq!(
             [&stdio, &http, &sse].map(McpLink::site),
             [
-                "protocol::mcp::stdio",
-                "protocol::mcp::http",
-                "protocol::mcp::sse"
+                "agent_protocols::mcp::stdio",
+                "agent_protocols::mcp::http",
+                "agent_protocols::mcp::sse"
             ]
         );
     }

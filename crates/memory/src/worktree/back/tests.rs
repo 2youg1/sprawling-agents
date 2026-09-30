@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::super::*;
-use crate::error::MemoryError;
+use crate::error::StorageError;
 use kernel::GitOid;
 use kernel::event::record::FileRestored;
 use std::path::Path;
@@ -80,7 +80,7 @@ fn going_back_refuses_a_name_that_holds_a_line_of_work() {
     let refused = trees.claim_at(&name("node-1"), &first);
 
     assert!(
-        matches!(refused, Err(MemoryError::WorktreeBusy { .. })),
+        matches!(refused, Err(StorageError::WorktreeBusy { .. })),
         "the released node's branch is still its line of work: {refused:?}"
     );
 }
@@ -147,7 +147,7 @@ fn restoring_refuses_a_path_that_climbs_out_of_the_tree() {
     assert!(
         matches!(
             refused,
-            Err(MemoryError::Worktree {
+            Err(StorageError::Worktree {
                 op: "restore a file from a point",
                 ..
             })

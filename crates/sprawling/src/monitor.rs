@@ -21,7 +21,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub use channels::{Sample, Watched};
+pub use wire::{Sample, Watched};
 
 /// Samples kept: one a second for five minutes.
 pub const CAPACITY: usize = 300;

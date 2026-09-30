@@ -12,10 +12,10 @@
 //! `bin::release`; this renders it for a terminal, as the machine page
 //! renders the same value for a browser.
 
-use channels::ReleaseAnswer;
 use sprawling::release;
 use sprawling::release::Built;
 use std::process::ExitCode;
+use wire::ReleaseAnswer;
 
 /// The day this release was cut, appended to the version line.
 ///

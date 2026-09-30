@@ -46,7 +46,7 @@ worker 的两个读写面 `effect` 与 `plan_view`、以及 worker 与 `views` �
   3. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）；`genesis`、`listening`、`attending`、`chain_watch` 与生产适配器留在装配根（§12-12）。
   4. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。
   5. 每搬走一个模块，它在 sprawling-SPEC.md 里的那一节就搬进本 SPEC（8-7、8-8、8-9 就是这样来的）。
-- `views::mcp_health` 自己用 `protocol::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`protocol` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
+- `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
 
 ## 4 现状分析
 
@@ -65,7 +65,7 @@ ModelFactory｜Connectors｜Clock｜Machine｜Recipe｜Runnable｜accounting thr
 - 怎样按 endpoint、dialect、凭据造出一个适配器，归 `gateway::adapter_for`：本 crate 只声明「造一个」这个动作。
 - 挑哪个模型（`EndpointBook::select`）与何时续期凭据，归 `RunWorker`：端口拿到的是已经选好的 `Chosen` 与已经兑换好的 `Redemption`。
 - 把生产适配器接到 worker 上，归装配根 `bin::assembly`。
-- MCP 的生命周期（`initialize`、`notifications/initialized`、`tools/list`）怎样说，归 `protocol`；一个工具能不能在机密楼里存在，归 `protocol::McpTool::new`。端口只声明「连上一个 server，交回它的工具」。
+- MCP 的生命周期（`initialize`、`notifications/initialized`、`tools/list`）怎样说，归 `agent_protocols`；一个工具能不能在机密楼里存在，归 `agent_protocols::McpTool::new`。端口只声明「连上一个 server，交回它的工具」。
 - 机密楼根本不启动 server，这一步在 worker 的 `mcp_tools` 里、端口被问到之前。
 - 主机上有什么、每一项怎样判定、怎样折叠成一页，归 `bin::doctor`（city 所在主机有什么，它是唯一权威）；一条安装配方能不能跑，归 `Recipe::command`；worker 只决定一个名字在不在需求表里、这个平台有没有配方。
 
@@ -134,11 +134,11 @@ pub trait Connectors {
         write_root: &std::path::Path,
         confidential: bool,
         resolve: &gateway::SecretResolver,
-    ) -> Result<(Vec<protocol::McpTool>, Reached), AxError>;
+    ) -> Result<(Vec<agent_protocols::McpTool>, Reached), AxError>;
 }
 
 pub enum Reached {
-    Connected(protocol::Handshake),   // 这次调用启动或打开、并握过手
+    Connected(agent_protocols::Handshake),   // 这次调用启动或打开、并握过手
     Resident,                         // 早先一次调用连上、仍在运行
 }
 ```
@@ -146,17 +146,17 @@ pub enum Reached {
 ```rust
 // bin::assembly::mcp（形状 4 适配器）
 #[derive(Default)]
-pub(crate) struct Residents;              // 生产：McpLink::open + protocol::handshake + tools/list，连接在 run 之间保持（sprawling-SPEC.md 8-4）
+pub(crate) struct Residents;              // 生产：McpLink::open + agent_protocols::handshake + tools/list，连接在 run 之间保持（sprawling-SPEC.md 8-4）
 impl RunWorker {
     pub fn with_connectors(self, connectors: Box<dyn accounting::Connectors + Send + Sync>) -> RunWorker;
 }
 ```
 
-- **失败**：原样传 `McpLink::open`、`protocol::handshake` 与 `protocol::tools_from` 的 `AxError`。worker 把失败写进 diagnostics、把这个 server 留在外面，run 照常开始；端口不另造错误码。
+- **失败**：原样传 `McpLink::open`、`agent_protocols::handshake` 与 `agent_protocols::tools_from` 的 `AxError`。worker 把失败写进 diagnostics、把这个 server 留在外面，run 照常开始；端口不另造错误码。
 - **`confidential` 原样传给 `McpTool::new`**：那是工具层的权威。worker 在机密楼里一个 server 都不启动，所以生产路径上它总是 `false`；它仍在签名里，是为了任何实现都不能造出一个绕过工具层拒绝的工具。
 - **端口有状态，可被几条线程同时问**：生产适配器把连上的 server 按声明与 run root 留在表里，下一次 dispatch 直接拿它的工具；子进程已经退出的那一行在这里被丢掉、重新启动。`connect` 取 `&self`、实现是 `Sync`，因为准备派活的 lane 各自问同一张表（sprawling-SPEC.md 8-113），表自己按键上锁（sprawling-SPEC.md 8-4）。
 - **固定值**：`RunWorker::new` 与 `over` 装上 `Residents::default()`；`with_connectors` 是唯一换掉它的门。
-- **依赖**：本 crate 因此依赖 `protocol`（ARCHITECTURE.md §3 的 `depmap`）。
+- **依赖**：本 crate 因此依赖 `agent_protocols`（ARCHITECTURE.md §3 的 `depmap`）。
 
 ### 8-3 accounting::clock（形状 3 端口）
 
@@ -187,7 +187,7 @@ impl RunWorker {
 ```rust
 pub trait Machine {
     /// Asks this machine every question the requirement table holds.
-    fn report(&self) -> channels::DoctorAnswer;
+    fn report(&self) -> wire::DoctorAnswer;
     /// # Errors
     /// A program this machine cannot start, one that ended in failure,
     /// and one still running when its patience ran out.
@@ -230,7 +230,7 @@ impl RunWorker {
 - **worker 读的两处都经 `RunWorker.machine`**：`doctor_install` 的安装与它之后的重看，以及 `DoctorRefresh` 的 `look_at_this_machine`。需求表里没有的名字与没有配方的平台由 worker 交到的 `recipe_for`（生产是 `bin::doctor::recipe_for`）拒绝，这一步在端口被问到之前。
 - **一扇安装的门**：终端的 `sprawling doctor --install` 与 worker 的 `doctor_install` 都经 `accounting::Machine::install` 启动安装程序。`bin::doctor::Machine` 是它的子 trait，只多一个逐项的 `look`，自己不声明 `install`，所以一个装东西的实现只有一处要写，也只有一处能被脚本换掉。
 - **固定值**：`RunWorker::new` 与 `over` 装上 `ThisMachine`；`with_machine` 是唯一换掉它的门。
-- **依赖**：`report` 交回线上的 `channels::DoctorAnswer`，所以本 crate 依赖 `channels`（ARCHITECTURE.md §3 的 `depmap`）。
+- **依赖**：`report` 交回线上的 `wire::DoctorAnswer`，所以本 crate 依赖 `wire`（ARCHITECTURE.md §3 的 `depmap`）。
 
 ### 8-5 accounting::effect：一条效应先成为账本行，再成为这座城（形状 2 值类型）
 
@@ -268,7 +268,7 @@ impl Claims { pub fn of(effects: &[ClaimEffect], on_disk: &str, path: PathBuf, r
 impl RunWorker { fn settle(&mut self, at: &Assignment, run: RunId, landing: effect::Landing, chain: &KnockChain) -> Result<(), AxError>; }
 ```
 
-**原因**：先把效应变成账本行、再变成状态，是 Ledger 的定义（`docs/glossary.md`：「Every effect becomes an EventRecord first」；ARCHITECTURE.md §5 步 4）。写反的代价是具体的：先上书架后落账，落账失败就在架上留下一条历史没有的记录；先改共享计划后落账，而 `roadmap_claimed` 是 `memory::hot` 与 `memory::projection` 判断谁拿着哪一行的依据，写进了文件而没落账的认领是一行看上去有人占着、历史里却无人占着的行。
+**原因**：先把效应变成账本行、再变成状态，是 Ledger 的定义（`docs/glossary.md`：「Every effect becomes an EventRecord first」；ARCHITECTURE.md §5 步 4）。写反的代价是具体的：先上书架后落账，落账失败就在架上留下一条历史没有的记录；先改共享计划后落账，而 `roadmap_claimed` 是 `storage::hot` 与 `storage::projection` 判断谁拿着哪一行的依据，写进了文件而没落账的认领是一行看上去有人占着、历史里却无人占着的行。
 
 **形状**：先后是类型的性质，而不是写桌子的人的纪律。`Then` 只能从 `Landing::record` 里拿到，而 `record` 先把所有行送进去才返回它；要把顺序写反，得先拿到一个拿不到的值。
 
@@ -279,7 +279,7 @@ impl RunWorker { fn settle(&mut self, at: &Assignment, run: RunId, landing: effe
 
 **pr 那两支不走 `Landing`，理由记在这里**：
 
-- `PrEffect::Opened` 里的 `memory::Checkpoint::land` 先于 `pr_opened` 落账，**但它不是「先动世界」**。它铸出的是那条账本行所指向的 commit，与 `run_started` 之前把 brief 放进 CAS 同形：没有任何记录指向的 git commit 不改变任何人读到的东西。
+- `PrEffect::Opened` 里的 `storage::Checkpoint::land` 先于 `pr_opened` 落账，**但它不是「先动世界」**。它铸出的是那条账本行所指向的 commit，与 `run_started` 之前把 brief 放进 CAS 同形：没有任何记录指向的 git commit 不改变任何人读到的东西。
 - `PrEffect::Merged` 先经 `Worktrees::plan_merge` 定下这次合并会落在哪个 commit，干线已经动过的拒绝（`MergeStale`）在这一步就报出，然后才写 `pr_merged`。所以不会有一条 `pr_merged` 是替一次注定被拒的合并写的（sprawling-SPEC.md「合并也排到它那条行后面」）。
 
 **测试**：`what_a_run_changes_is_changed_after_the_line_that_announces_it`（`bin::assembly::driving::tests::ledger`）。一跑归档一条决定、又从共享计划里拿一行；`RunWorker::observe` 的 sink 在一行耐久之后才跑，所以它正是看得见「先」的位置。断言：`asset_archived` 落时书架上还没有它，`roadmap_claimed` 落时盘上那一行还没被拿走；跑完两者都在位。
@@ -295,8 +295,8 @@ pub struct PlanView { /* read、causes —— 私有 */ }
 pub struct PlanReading {
     pub progress: Progress,
     pub problems: Vec<String>,
-    pub rows: Vec<channels::PlanRow>,
-    pub blocked: Vec<channels::BlockedLine>,
+    pub rows: Vec<wire::PlanRow>,
+    pub blocked: Vec<wire::BlockedLine>,
     pub ready: Vec<NodeId>,
 }
 impl PlanView {
@@ -345,7 +345,7 @@ pub fn core_priority() -> Result<CorePriority, AxError>;   // ConfigInvalid：pr
 ```
 
 - **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `accounting::home`（8-7）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。
-- **`[ui]` 一节就是 `PreferencesAnswer` 的序列化**（channels-SPEC §8-39 第七条）：文件能写的键与答案能说的字段是**同一份声明**，因此本模块只做读与写，不陈述「一项偏好是什么」。一条补丁落在记录上的效果同理，归 `PreferencesAnswer::apply` —— `Chord("")` 是解绑还是绑一个空串，只有一个地方回答。
+- **`[ui]` 一节就是 `PreferencesAnswer` 的序列化**（wire-SPEC §8-39 第七条）：文件能写的键与答案能说的字段是**同一份声明**，因此本模块只做读与写，不陈述「一项偏好是什么」。一条补丁落在记录上的效果同理，归 `PreferencesAnswer::apply` —— `Chord("")` 是解绑还是绑一个空串，只有一个地方回答。
 - **别的节原样留下**：写是一次读-改-写，经 `city::edit_document`（city-SPEC §8-27）持锁并整份替换。「要么整份要么不动」只有一份实现，人层与城层共用它；再写一份就是给 B-49 立第二个权威。
 - **读不动的文件不覆写**：解析失败报 `E_CONFIG_INVALID`，主题带上文件与是哪一节，恢复语请人手工修或删掉那一节重选。能读回来的才配被改写——写它的人是唯一能修它的人。
 - **不入账**：偏好不属于城的历史，任何 run 都观测不到它。因此这条命令被接受时城无话可播，`adversary` 第四世界据此把「静默」读作接受，而它真正的关门条件是读回来那一组断言（`adversary/src/Sprawling/Person.lean`，叶子 5.6）。
@@ -361,7 +361,7 @@ pub fn core_priority() -> Result<CorePriority, AxError>;   // ConfigInvalid：pr
 pub fn resolving(vault: Arc<Mutex<gateway::Custodian>>) -> gateway::SecretResolver;
 pub fn poisoned_vault() -> AxError;   // E_STORAGE_FATAL：vault 的锁中毒
 // accounting::toolkit_broker
-pub fn broker_for(/* toolkit 地址、城根、vault */) -> Result<Option<(protocol::Broker, String)>, AxError>;
+pub fn broker_for(/* toolkit 地址、城根、vault */) -> Result<Option<(agent_protocols::Broker, String)>, AxError>;
 ```
 
 - **一个锁着的 vault 的解析器与锁中毒时的拒绝各只有一处**：装配点、读面与 serving 都要一次性的解析器，拒绝的措辞只写一次。
@@ -372,7 +372,7 @@ pub fn broker_for(/* toolkit 地址、城根、vault */) -> Result<Option<(proto
 1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只用 `gateway` 的接口类型，不构造适配器。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。
 2. **`with_models` 是一个消费 `self` 的方法，而不是 `new` 的第四个参数。** 理由：生产只有一种工厂，`new` 的每个调用方（serve、doctor、测试）都会写同一个 `GatewayModels`；换工厂的只有 citysim 与测试。被否决的做法：`new` 加参数——四个调用点重复同一个值，而这个值只有一个权威。
 3. **端口参数是 `Chosen` 与 `Redemption`，不含 dialect 头。** 理由：dialect 头由 `Chosen` 的 dialect 决定，把它交给调用方算，两个调用点就各有一份拼法。被否决的做法：照抄 `gateway::adapter_for` 的三参数签名。
-4. **`Connectors` 交回整条连接（握手之后的工具与握手结果），而不是一个裸的 `protocol::Outbound`。** 理由：一个 server 的每个工具各持有同一条链接的一份克隆，而 `Outbound` 是 trait object，不能克隆；交回裸链接，worker 就得再要一个「造链接」的工厂。被否决的做法：端口只负责 `McpLink::open`——那要多一个端口，而握手的说法本来就归 `protocol`，不归 worker。
+4. **`Connectors` 交回整条连接（握手之后的工具与握手结果），而不是一个裸的 `agent_protocols::Outbound`。** 理由：一个 server 的每个工具各持有同一条链接的一份克隆，而 `Outbound` 是 trait object，不能克隆；交回裸链接，worker 就得再要一个「造链接」的工厂。被否决的做法：端口只负责 `McpLink::open`——那要多一个端口，而握手的说法本来就归 `agent_protocols`，不归 worker。
 5. **`Connectors::connect` 取 `&self` 并交回 `Reached`，生产适配器就是常驻连接表 `Residents`。** 理由：常驻表要持有链接本身，才能判断子进程是否已经退出、并按 `confidential` 重新铸出工具；一个只交回工具的无状态端口挡在表前面，表就看不到链接。取 `&self` 而不是 `&mut self`，是因为 MCP 缺表时的连接在 lane 里做，几条 lane 借同一张表的 `Arc`；`&mut self` 会把所有 lane 的握手排成一队。被否决的做法：无状态端口加 worker 侧的缓存——缓存只能存工具，存不下判断存活所需的链接。
 6. **`Machine` 回答整页，而不是逐项回答 `look(&Requirement) -> Presence`。** 理由：worker 要的是一页答案与一次安装；逐项的端口要把 `Requirement`、`Detection`、`Family`、`PerPlatform`、`Platform` 与 `Presence` 整个搬进本 crate，而且沙箱与凭据保管这两项机器级的读仍然绕过端口直接碰主机，脚本也就换不掉它们。被否决的做法：逐项端口——搬走 doctor 的整个模型，却仍留两条通向主机的路。`bin::doctor::Machine` 是本 trait 的子 trait，给 doctor 自己逐项判定时加一个 `look`，它的第二实现在 doctor 的测试里；它不另设 `install`，安装只有本 trait 这一扇门。
 7. **`install` 收 `Runnable`，不收程序名加参数；`Recipe` 与 `Runnable` 因此一起住在本 crate。** 理由：`Runnable` 证明配方是 `Command`，只有与它同住一个 crate 的 `Recipe::command` 能造它，所以一个 `Machine` 实现不会被递到一条打印的或手动的配方。哪些程序可以跑由 `doctor_install` 对 requirement 表的查找决定，不由这个类型决定。被否决的做法：收 `&str` 与 `&[&str]`——拒绝打印配方的规则就只剩每个调用方的自觉。让 `Recipe` 的字段私有、只让表能构造，可以把许可也放进类型，但表住在 `sprawling`、类型住在本 crate，没有一种 crate 布局能便宜地做到。

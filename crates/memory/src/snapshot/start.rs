@@ -5,14 +5,14 @@
 
 //! Where a start begins folding: after a snapshot whose line still sits
 //! at its seq, or from genesis with the reason it could not resume
-//! (memory-SPEC 8-28).
+//! (storage-SPEC 8-28).
 
 use std::path::Path;
 
 use kernel::Seq;
 
 use super::{ChainSnapshot, SnapshotFit, StoredSnapshot, read_snapshot};
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::jsonl::{complete_lines, ledger_segments_at, read_raw_lines_at, segment_first_seq};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
@@ -55,12 +55,12 @@ pub enum WholeFold {
 /// it are read; the whole chain is `audit_chain`'s to walk.
 ///
 /// # Errors
-/// `MemoryError::Io` when a segment or the snapshot cannot be read.
+/// `StorageError::Io` when a segment or the snapshot cannot be read.
 pub fn start_from_snapshot(
     ledger_dir: &Path,
     snapshot_dir: &Path,
     fold_version: u32,
-) -> Result<SnapshotStart, MemoryError> {
+) -> Result<SnapshotStart, StorageError> {
     let because = match read_snapshot(snapshot_dir)? {
         StoredSnapshot::Absent => WholeFold::NoSnapshot,
         StoredSnapshot::Damaged(reason) => WholeFold::Damaged(reason),
@@ -92,7 +92,7 @@ struct Cut {
 /// The line at `seq` and every complete line after it, read from the
 /// segment whose name claims `seq` onward; `None` when no line sits at
 /// `seq`.
-fn lines_from_cut(dir: &Path, seq: Seq) -> Result<Option<Cut>, MemoryError> {
+fn lines_from_cut(dir: &Path, seq: Seq) -> Result<Option<Cut>, StorageError> {
     let segments = ledger_segments_at(dir)?;
     let Some((at, first)) = segments.iter().enumerate().rev().find_map(|(at, segment)| {
         first_seq_of(segment)

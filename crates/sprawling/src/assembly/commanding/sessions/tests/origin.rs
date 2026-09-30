@@ -19,7 +19,7 @@ fn a_mother_ran(city_root: &std::path::Path) -> (RunWorker, kernel::Origin, impl
         fake_openai(&["m-local"], vec![completion("the meter says 42", None)]);
     let mut worker = worker_with_provider(city_root, &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: addr("lab/room2"),
             task: "measure the meter".to_owned(),
             goal: "a number is written down".to_owned(),
@@ -79,11 +79,12 @@ fn a_damaged_line_at_the_origin_is_refused_as_a_damaged_ledger() {
     let dir = tempfile::tempdir().unwrap();
     let (mut worker, started, _provider) = a_mother_ran(dir.path());
     worker.origin_is_real(started).unwrap();
-    let segment = memory::ledger_segments_at(&kernel::layout::CityLayout::new(dir.path()).ledger())
-        .unwrap()
-        .into_iter()
-        .next()
-        .unwrap();
+    let segment =
+        storage::ledger_segments_at(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
     let text = std::fs::read_to_string(&segment).unwrap();
     let damaged: Vec<String> = text
         .split('\n')

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::super::*;
-use crate::error::MemoryError;
+use crate::error::StorageError;
 use kernel::ledger::chain_hash;
 use kernel::{
     AxCode, EventDraft, EventKind, EventRecord, GENESIS_PREV, Payload, RunId, Seq, TimeMs,
@@ -137,7 +137,7 @@ fn higher_version_fixture_is_refused_with_direction_and_path() {
     let outcome = JsonlLedger::open(&copy, TimeMs::new(0));
     let err = outcome.err().expect("v2 fixture must refuse to open");
     match &err {
-        MemoryError::VersionAhead { path, v } => {
+        StorageError::VersionAhead { path, v } => {
             assert_eq!(*v, 2);
             assert!(path.to_string_lossy().contains("ledger-v2"));
         }
@@ -206,7 +206,7 @@ fn a_line_below_the_first_version_is_refused_for_its_version_not_its_chain() {
         let err = JsonlLedger::open(dir.path(), TimeMs::new(3))
             .err()
             .expect("a v0 line must refuse to open");
-        let MemoryError::Envelope { line, source, .. } = &err else {
+        let StorageError::Envelope { line, source, .. } = &err else {
             panic!("expected Envelope, got {err:?}");
         };
         assert_eq!(*line, u64::try_from(unversioned_line).unwrap() + 1);
@@ -324,7 +324,7 @@ fn a_fork_after_the_first_line_is_refused_and_keeps_every_line() {
         "reopening must not delete lawful history"
     );
     let err = outcome.err().expect("a forked ledger must refuse to open");
-    let MemoryError::Envelope { line, .. } = &err else {
+    let StorageError::Envelope { line, .. } = &err else {
         panic!("expected Envelope, got {err:?}");
     };
     assert_eq!(*line, 4, "the refusal names the first line after the fork");

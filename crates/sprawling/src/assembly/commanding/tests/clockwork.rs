@@ -62,7 +62,7 @@ fn a_scheduled_job_starts_by_itself_and_only_once_per_firing() {
 #[test]
 fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
     let desk = CommandDesk::new();
-    let asked = || channels::Command::Dispatch {
+    let asked = || wire::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
         task: "read the plan".to_owned(),
         goal: "one answer".to_owned(),
@@ -73,8 +73,8 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
         model: None,
     };
 
-    desk.post(asked(), channels::Reply::nowhere());
-    desk.post(asked(), channels::Reply::nowhere());
+    desk.post(asked(), wire::Reply::nowhere());
+    desk.post(asked(), wire::Reply::nowhere());
     let carrying = desk.next(|_| false);
     assert!(
         matches!(carrying, DeskWait::Command(..)),
@@ -87,7 +87,7 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
 
     // A repeat that arrives while the work is going is the same ask
     // once more: the run it wants is already running.
-    desk.post(asked(), channels::Reply::nowhere());
+    desk.post(asked(), wire::Reply::nowhere());
     assert!(
         matches!(desk.next(|_| false), DeskWait::Idle),
         "the ask is still being carried out; a repeat adds nothing"
@@ -96,7 +96,7 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
     // ...and once it is over, asking again is asking for a second
     // run, which is a thing a person is allowed to want.
     drop(carrying);
-    desk.post(asked(), channels::Reply::nowhere());
+    desk.post(asked(), wire::Reply::nowhere());
     assert!(
         matches!(desk.next(|_| false), DeskWait::Command(..)),
         "the same work asked for again after it finished is work"
@@ -110,12 +110,12 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
 fn a_close_lands_between_commands_and_never_inside_one() {
     let desk = CommandDesk::new();
     desk.post(
-        channels::Command::CreateBuilding {
+        wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         },
-        channels::Reply::nowhere(),
+        wire::Reply::nowhere(),
     );
     desk.close(Closing::Chosen);
 

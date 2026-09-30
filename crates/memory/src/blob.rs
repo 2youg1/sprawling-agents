@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The bytes of one file as one commit holds them (memory-SPEC section
+//! The bytes of one file as one commit holds them (storage-SPEC section
 //! 8-29). The working tree and the index are not consulted: a
 //! `file:<addr>@<oid>` Locator names a commit's bytes, and the file on
 //! disk may have moved on since.
@@ -12,20 +12,20 @@ use std::path::Path;
 
 use kernel::{Address, GitOid};
 
-use crate::MemoryError;
+use crate::StorageError;
 use crate::checkpoint::fence::git_err;
 
 /// The blob at `addr` in the tree of commit `oid`, or `None` when that
 /// place in the commit is not a file (a directory, a submodule, nothing).
 ///
 /// # Errors
-/// `MemoryError::Checkpoint` when the city repository does not open, the
+/// `StorageError::Checkpoint` when the city repository does not open, the
 /// commit is not in it, or the blob does not read.
 pub fn blob_at(
     city_root: &Path,
     oid: GitOid,
     addr: &Address,
-) -> Result<Option<Vec<u8>>, MemoryError> {
+) -> Result<Option<Vec<u8>>, StorageError> {
     let repo = git2::Repository::open(city_root).map_err(git_err("open the city repository"))?;
     let commit = git2::Oid::from_str(&oid.to_string())
         .and_then(|parsed| repo.find_commit(parsed))

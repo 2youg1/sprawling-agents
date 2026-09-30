@@ -21,7 +21,7 @@
 use kernel::{AxCode, AxError};
 
 use super::SessionStep;
-use crate::wire::{ClientFrame, WIRE_V};
+use crate::frames::{ClientFrame, WIRE_V};
 
 /// One session's reader, and the tally of frames it could not read.
 ///
@@ -96,7 +96,7 @@ impl Inbound {
 )]
 mod tests {
     use super::*;
-    use crate::wire::{Ask, AskId, Query, schema_hash};
+    use crate::frames::{Ask, AskId, Query, schema_hash};
 
     /// The frame a client one wire version ahead sends: this build has
     /// no reading for it, and what the peer must be told is that the

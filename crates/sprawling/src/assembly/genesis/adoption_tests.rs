@@ -8,7 +8,7 @@ use crate::assembly::*;
 /// Adopting a folder fences it at once, as one pack: the first dispatch
 /// into a building of thousands of files would otherwise hash every one
 /// of them and write each as a loose object before its first tool call
-/// (memory-SPEC 8-8, the base fence).
+/// (storage-SPEC 8-8, the base fence).
 #[test]
 fn adopting_a_folder_fences_it_as_one_pack_before_any_dispatch() {
     let dir = tempfile::tempdir().unwrap();
@@ -90,7 +90,7 @@ fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     for (room, idem) in [("proj/room1", b"first"), ("proj/src", b"other")] {
         worker
-            .handle(channels::Command::Dispatch {
+            .handle(wire::Command::Dispatch {
                 addr: kernel::Address::parse(room).unwrap(),
                 task: "measure the thing".to_owned(),
                 goal: "a number, then stop".to_owned(),

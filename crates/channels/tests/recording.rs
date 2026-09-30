@@ -27,9 +27,9 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::extract::connect_info::MockConnectInfo;
 use axum::http::Request;
-use channels::{Answer, Command, Reply, ServeConfig};
 use kernel::{AxCode, AxError};
 use tower::ServiceExt;
+use wire::{Answer, Command, Reply, ServeConfig};
 
 /// What the city behind the route does with a recording.
 enum Hearing {
@@ -46,11 +46,11 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
         logs: tokio::sync::broadcast::channel(16).0,
         outputs: tokio::sync::broadcast::channel(16).0,
         outputs_so_far: Arc::new(Vec::new),
-        monitor: channels::MonitorFeed {
+        monitor: wire::MonitorFeed {
             watch: Arc::new(|_| -> Box<dyn Send> { Box::new(()) }),
             samples: tokio::sync::broadcast::channel(1).0,
         },
-        client: Arc::new(channels::ClientAssets::Embedded(&[])),
+        client: Arc::new(wire::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),
         drop_sink: Arc::new(|_, _| Ok(String::new())),
         transcribe_sink: Arc::new(move |body: Vec<u8>, kind: String| match hearing {
@@ -73,7 +73,7 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
         }),
         secrets: Arc::new(|_: Command<kernel::Sealed<String>>, _: Reply| Ok(())),
         acp: Arc::new(|_, _| {
-            Ok(channels::AcpProgress {
+            Ok(wire::AcpProgress {
                 run: String::new(),
                 turns: 0,
                 finished: true,
@@ -85,13 +85,12 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
     };
     // The face comes from the same verdict the listener uses, so the
     // route under test judges a caller by the rule the served city does.
-    let channels::BindVerdict::Serve(face) =
-        channels::decide_bind(&"127.0.0.1:0".parse().unwrap(), None)
+    let wire::BindVerdict::Serve(face) = wire::decide_bind(&"127.0.0.1:0".parse().unwrap(), None)
     else {
         panic!("this test serves a loopback address");
     };
     let peer: SocketAddr = "127.0.0.1:40000".parse().unwrap();
-    let app = channels::router(&config, face).layer(MockConnectInfo(peer));
+    let app = wire::router(&config, face).layer(MockConnectInfo(peer));
     let mut request = Request::builder().method("POST").uri("/transcribe");
     if let Some(kind) = media {
         request = request.header("content-type", kind);

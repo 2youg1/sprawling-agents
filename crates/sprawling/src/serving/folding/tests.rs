@@ -28,7 +28,7 @@ fn a_reader_holding_the_views_holds_up_neither_the_writer_nor_the_fold() {
     let spare = unfolded.unfolded_twin();
     let views = Arc::new(Published::new(unfolded));
     let (to_clients, mut heard) = tokio::sync::broadcast::channel(8);
-    let head = Arc::new(channels::LedgerHead::default());
+    let head = Arc::new(wire::LedgerHead::default());
     let broadcast = Broadcast {
         to_clients,
         head: Arc::clone(&head),
@@ -63,7 +63,7 @@ fn a_reader_holding_the_views_holds_up_neither_the_writer_nor_the_fold() {
     assert_eq!(head.read(), Some(genesis.seq()));
     let mut folded_here = Views::new(dir.path());
     folded_here.apply(&genesis).unwrap();
-    let city = channels::Query::CityView;
+    let city = wire::Query::CityView;
     let (as_of, answered) = answer_outside_the_lock(&views, &city);
     assert_eq!(
         (as_of, answered.unwrap()),
@@ -91,7 +91,7 @@ fn the_fold_thread_cuts_a_snapshot_a_later_read_resumes_from() {
     };
     let broadcast = Broadcast {
         to_clients: tokio::sync::broadcast::channel(8).0,
-        head: Arc::new(channels::LedgerHead::default()),
+        head: Arc::new(wire::LedgerHead::default()),
     };
     let mut folding =
         spawn_folding(copies, broadcast, CorePriority::Normal, monotonic_now).unwrap();
@@ -114,7 +114,7 @@ fn the_fold_thread_cuts_a_snapshot_a_later_read_resumes_from() {
     reason = "test code: the patience is read off the wall clock"
 )]
 fn heard_within(
-    heard: &mut tokio::sync::broadcast::Receiver<channels::Committed>,
+    heard: &mut tokio::sync::broadcast::Receiver<wire::Committed>,
     patience: Duration,
 ) -> Option<EventRecord> {
     let until = std::time::Instant::now() + patience;

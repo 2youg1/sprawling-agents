@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The city's git history in a bundle: one pack of every object the refs
-//! reach, and the refs themselves (memory-SPEC.md 8-12).
+//! reach, and the refs themselves (storage-SPEC.md 8-12).
 //!
 //! Two files and nothing else travel. A repository's `hooks/` and
 //! `config` are what a forged bundle would plant, so the restoring side
@@ -17,7 +17,7 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::alias::WriteTarget;
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::vfs::Vfs;
 
 use super::landing::{Bits, land};
@@ -30,8 +30,8 @@ const REFS: &str = "refs";
 const SYMBOLIC: &str = "ref:";
 const REFLOG: &str = "restore a city bundle";
 
-fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> MemoryError {
-    move |err| MemoryError::Bundle {
+fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
+    move |err| StorageError::Bundle {
         op,
         detail: err.message().to_owned(),
     }
@@ -51,7 +51,7 @@ impl Carried {
     ///
     /// # Errors
     /// I/O failures naming the path.
-    pub(crate) fn of(vfs: &dyn Vfs, bundle: &Path) -> Result<Carried, MemoryError> {
+    pub(crate) fn of(vfs: &dyn Vfs, bundle: &Path) -> Result<Carried, StorageError> {
         let dir = bundle.join(HISTORY);
         let at = dir.join(REFS);
         let refs = match vfs.exists(&at) {
@@ -75,10 +75,10 @@ impl Carried {
 /// no history directory.
 ///
 /// # Errors
-/// `MemoryError::Bundle` for a repository that cannot be read, git2's
+/// `StorageError::Bundle` for a repository that cannot be read, git2's
 /// own refusal of a ref name that is not UTF-8 among them; I/O failures
 /// naming the path.
-pub(crate) fn export(vfs: &mut dyn Vfs, city_root: &Path, dest: &Path) -> Result<(), MemoryError> {
+pub(crate) fn export(vfs: &mut dyn Vfs, city_root: &Path, dest: &Path) -> Result<(), StorageError> {
     let repo = match git2::Repository::open(city_root) {
         Ok(repo) => repo,
         Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
@@ -101,7 +101,7 @@ pub(crate) fn export(vfs: &mut dyn Vfs, city_root: &Path, dest: &Path) -> Result
 fn pack_of(
     repo: &git2::Repository,
     op: &'static str,
-) -> Result<(Option<Vec<u8>>, String), MemoryError> {
+) -> Result<(Option<Vec<u8>>, String), StorageError> {
     let mut pack = repo.packbuilder().map_err(git_err(op))?;
     let mut walk = repo.revwalk().map_err(git_err(op))?;
     let mut refs = String::new();
@@ -148,14 +148,14 @@ impl History {
     /// when `city_root` already holds a repository.
     ///
     /// # Errors
-    /// `MemoryError::Bundle` naming the first malformed line, the second
+    /// `StorageError::Bundle` naming the first malformed line, the second
     /// history, a `city/.git` that is no repository, or the occupied
     /// repository; I/O failures naming the path.
     pub(crate) fn read(
         vfs: &dyn Vfs,
         bundle: &Path,
         city_root: &Path,
-    ) -> Result<Option<History>, MemoryError> {
+    ) -> Result<Option<History>, StorageError> {
         let dir = bundle.join(HISTORY);
         let at = dir.join(REFS);
         let whole = bundle.join(CITY).join(kernel::GIT_METADATA);
@@ -168,13 +168,13 @@ impl History {
         // A link or a gitfile named `.git` occupies the name as surely
         // as a directory does, so the name is asked about, not followed.
         if occupied.symlink_metadata().is_ok() {
-            return Err(MemoryError::Bundle {
+            return Err(StorageError::Bundle {
                 op: "restore",
                 detail: format!("{} already holds a repository", occupied.display()),
             });
         }
         let (pack, text, at) = if packed && legacy {
-            return Err(MemoryError::Bundle {
+            return Err(StorageError::Bundle {
                 op: "restore",
                 detail: format!(
                     "{} and {} are two histories, and an export writes one",
@@ -210,7 +210,7 @@ impl History {
                         return Err(io_err("inspect borrowed history storage", &borrowed)(err));
                     }
                     Ok(_) => {
-                        return Err(MemoryError::Bundle {
+                        return Err(StorageError::Bundle {
                             op: "restore",
                             detail: format!(
                                 "{} borrows history from outside the bundle",
@@ -220,7 +220,7 @@ impl History {
                     }
                 }
             }
-            let repo = git2::Repository::open_bare(&whole).map_err(|err| MemoryError::Bundle {
+            let repo = git2::Repository::open_bare(&whole).map_err(|err| StorageError::Bundle {
                 op: "restore",
                 detail: format!(
                     "{} carries protected metadata that is no repository: {}",
@@ -243,9 +243,9 @@ impl History {
     /// `git status` reports only what was uncommitted at export.
     ///
     /// # Errors
-    /// `MemoryError::Bundle` for any git failure, including a pack that
+    /// `StorageError::Bundle` for any git failure, including a pack that
     /// does not index; I/O failures naming the path.
-    pub(crate) fn land(self, city_root: &Path) -> Result<(), MemoryError> {
+    pub(crate) fn land(self, city_root: &Path) -> Result<(), StorageError> {
         let repo = git2::Repository::init(city_root).map_err(git_err("restore"))?;
         if let Some(bytes) = self.pack {
             let odb = repo.odb().map_err(git_err("restore"))?;
@@ -291,8 +291,8 @@ fn parse(line: &str) -> Option<(String, Target)> {
     Some((name.to_owned(), target))
 }
 
-fn malformed(at: &Path) -> MemoryError {
-    MemoryError::Bundle {
+fn malformed(at: &Path) -> StorageError {
+    StorageError::Bundle {
         op: "restore",
         detail: format!("{} holds a line that is not a ref", at.display()),
     }

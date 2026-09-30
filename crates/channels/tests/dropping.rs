@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The drop route hands the file's name and bytes to the city and
-//! answers with the path the city kept it at (channels-SPEC.md 8-49).
+//! answers with the path the city kept it at (wire-SPEC.md 8-49).
 //!
 //! Driven in process through `tower::ServiceExt::oneshot`, for the same
 //! reason the recording route is: this is a white-box check of the
@@ -26,9 +26,9 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::extract::connect_info::MockConnectInfo;
 use axum::http::Request;
-use channels::{Answer, Command, Reply, ServeConfig};
 use kernel::{AxCode, AxError};
 use tower::ServiceExt;
+use wire::{Answer, Command, Reply, ServeConfig};
 
 async fn send(uri: &str, bytes: Vec<u8>) -> (u16, String) {
     let (events, _held) = tokio::sync::broadcast::channel(16);
@@ -37,11 +37,11 @@ async fn send(uri: &str, bytes: Vec<u8>) -> (u16, String) {
         logs: tokio::sync::broadcast::channel(16).0,
         outputs: tokio::sync::broadcast::channel(16).0,
         outputs_so_far: Arc::new(Vec::new),
-        monitor: channels::MonitorFeed {
+        monitor: wire::MonitorFeed {
             watch: Arc::new(|_| -> Box<dyn Send> { Box::new(()) }),
             samples: tokio::sync::broadcast::channel(1).0,
         },
-        client: Arc::new(channels::ClientAssets::Embedded(&[])),
+        client: Arc::new(wire::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),
         transcribe_sink: Arc::new(|_, _| Ok(String::new())),
         drop_sink: Arc::new(|name: &str, bytes: &[u8]| {
@@ -66,7 +66,7 @@ async fn send(uri: &str, bytes: Vec<u8>) -> (u16, String) {
         }),
         secrets: Arc::new(|_: Command<kernel::Sealed<String>>, _: Reply| Ok(())),
         acp: Arc::new(|_, _| {
-            Ok(channels::AcpProgress {
+            Ok(wire::AcpProgress {
                 run: String::new(),
                 turns: 0,
                 finished: true,
@@ -76,13 +76,12 @@ async fn send(uri: &str, bytes: Vec<u8>) -> (u16, String) {
         head: Arc::default(),
         epoch: None,
     };
-    let channels::BindVerdict::Serve(face) =
-        channels::decide_bind(&"127.0.0.1:0".parse().unwrap(), None)
+    let wire::BindVerdict::Serve(face) = wire::decide_bind(&"127.0.0.1:0".parse().unwrap(), None)
     else {
         panic!("this test serves a loopback address");
     };
     let peer: SocketAddr = "127.0.0.1:40000".parse().unwrap();
-    let app = channels::router(&config, face).layer(MockConnectInfo(peer));
+    let app = wire::router(&config, face).layer(MockConnectInfo(peer));
     let request = Request::builder()
         .method("POST")
         .uri(uri)

@@ -34,7 +34,7 @@ pub(super) struct CommitFacts {
     seq: Seq,
     at: kernel::TimeMs,
     actor: Address,
-    chosen: memory::ModelChoice,
+    chosen: storage::ModelChoice,
 }
 
 impl CommitFacts {
@@ -55,8 +55,8 @@ impl CommitFacts {
         oid: GitOid,
         lineage: Vec<RunId>,
         spent: UsdMicros,
-    ) -> channels::CommitAnswer {
-        channels::CommitAnswer {
+    ) -> wire::CommitAnswer {
+        wire::CommitAnswer {
             spent,
             oid,
             run: self.run,
@@ -85,7 +85,7 @@ impl super::holding::Views {
     }
 
     /// The commits this city made, newest first, one page at a time
-    /// (channels-SPEC section 8-24).
+    /// (wire-SPEC section 8-24).
     ///
     /// `before` is exclusive; `limit` is clamped to the same ceiling as
     /// `History`. `more` says whether a further page exists, found by
@@ -97,8 +97,8 @@ impl super::holding::Views {
         building: Option<&Address>,
         before: Option<Seq>,
         limit: u32,
-    ) -> Option<channels::CommitsAnswer> {
-        let want = usize::try_from(limit.clamp(1, channels::HISTORY_MAX)).unwrap_or(usize::MAX);
+    ) -> Option<wire::CommitsAnswer> {
+        let want = usize::try_from(limit.clamp(1, wire::HISTORY_MAX)).unwrap_or(usize::MAX);
         let mut rows = self
             .commit_seqs
             .range(..before.unwrap_or(Seq::new(u64::MAX)))
@@ -116,7 +116,7 @@ impl super::holding::Views {
             let facts = self.commits.get(&oid)?;
             page.push(facts.answer(oid, self.lineage_of(run), spent));
         }
-        Some(channels::CommitsAnswer {
+        Some(wire::CommitsAnswer {
             building: building.cloned(),
             before,
             commits: page,
@@ -140,15 +140,15 @@ impl super::holding::Views {
     /// A commit this city never wrote is `Unavailable`, for the reason
     /// `Changes` gives: "I did not write it" and "it changed nothing"
     /// are different answers, and a reader acts differently on each.
-    pub(super) fn commit_answer(&self, oid: GitOid) -> channels::Answer {
+    pub(super) fn commit_answer(&self, oid: GitOid) -> wire::Answer {
         self.commits
             .get(&oid)
             .and_then(|facts| {
                 self.billed_to(facts.run).map(|spent| {
-                    channels::Answer::Commit(facts.answer(oid, self.lineage_of(facts.run), spent))
+                    wire::Answer::Commit(facts.answer(oid, self.lineage_of(facts.run), spent))
                 })
             })
-            .unwrap_or_else(|| channels::Answer::Unavailable {
+            .unwrap_or_else(|| wire::Answer::Unavailable {
                 query: format!("Commit({oid})"),
             })
     }
@@ -207,7 +207,7 @@ pub(super) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)
             seq: record.seq(),
             at: record.t(),
             actor: record.addr()?.clone(),
-            chosen: memory::ModelChoice {
+            chosen: storage::ModelChoice {
                 id: by.model,
                 effort: by.effort,
             },

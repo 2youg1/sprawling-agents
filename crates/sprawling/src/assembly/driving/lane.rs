@@ -32,7 +32,7 @@ use super::{Driven, Driving};
 #[derive(Clone)]
 pub(crate) struct DriveContext {
     /// Where a model's text goes while it is still arriving.
-    pub(crate) watching: Option<std::sync::Arc<dyn Fn(channels::Delta) + Send + Sync>>,
+    pub(crate) watching: Option<std::sync::Arc<dyn Fn(wire::Delta) + Send + Sync>>,
     /// What the person asked of this run, read at its safe points. One
     /// handle per drive, all of them reading the same desk by run id:
     /// a steer and a cancel reach the run they name and no other
@@ -53,7 +53,7 @@ pub(crate) struct DriveContext {
     /// another lane's commit takes, and nothing else about two runs is
     /// serialized.
     ///
-    /// `memory::checkpoint::scan::write_index` still waits out a lock,
+    /// `storage::checkpoint::scan::write_index` still waits out a lock,
     /// and that is a different contender: another sprawling process on
     /// the same city, which no mutex here can see.
     pub(crate) fence_gate: std::sync::Arc<std::sync::Mutex<()>>,
@@ -217,7 +217,7 @@ pub(crate) fn drive_run<L: Ledger>(
     let mut now = || clock.now();
     let declared = bench.declared_writes();
     let mut fence_point =
-        memory::Checkpoint::open(&write_root).map_err(memory::MemoryError::into_ax)?;
+        storage::Checkpoint::open(&write_root).map_err(storage::StorageError::into_ax)?;
     // What the wave fence and the bench fenced, in the order they went
     // up, so the sweep afterwards knows which commit a deleted file can
     // be restored from; and what the calls since the last fence said they
@@ -261,7 +261,7 @@ pub(crate) fn drive_run<L: Ledger>(
             let scope = fencing.take_scope(&fence_scope);
             let payload = fence_point
                 .wave_pre(&scope, t, &of)
-                .map_err(memory::MemoryError::into_ax)?;
+                .map_err(storage::StorageError::into_ax)?;
             if let Some(oid) = payload
                 .as_map()
                 .get("oid")
@@ -278,7 +278,7 @@ pub(crate) fn drive_run<L: Ledger>(
         // behaves exactly as it always did.
         let mut watched = |held: &kernel::Increment| {
             if let Some(onto) = watching.as_ref() {
-                onto(channels::Delta {
+                onto(wire::Delta {
                     run: run_id,
                     increment: held.clone(),
                 });

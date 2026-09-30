@@ -29,7 +29,7 @@
 // The route this file drives exists only in a build with the listener.
 // Without it there is no router, no axum and no tokio, and a test file
 // that named them anyway turned `--no-default-features` red for the one
-// build that has no business carrying them (channels-SPEC.md section
+// build that has no business carrying them (wire-SPEC.md section
 // 8-22).
 #![cfg(feature = "server")]
 #![allow(
@@ -46,9 +46,9 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::extract::connect_info::MockConnectInfo;
 use axum::http::Request;
-use channels::{Answer, AxCode, AxError, Command, Reply, ServeConfig};
 use kernel::{EventDraft, EventKind, EventRecord, GENESIS_PREV, Payload, RunId, Seq, TimeMs};
 use tower::ServiceExt;
+use wire::{Answer, AxCode, AxError, Command, Reply, ServeConfig};
 
 /// What the worker does with the credential this test hands it.
 enum Worker {
@@ -90,11 +90,11 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
         logs: tokio::sync::broadcast::channel(16).0,
         outputs: tokio::sync::broadcast::channel(16).0,
         outputs_so_far: Arc::new(Vec::new),
-        monitor: channels::MonitorFeed {
+        monitor: wire::MonitorFeed {
             watch: Arc::new(|_| -> Box<dyn Send> { Box::new(()) }),
             samples: tokio::sync::broadcast::channel(1).0,
         },
-        client: Arc::new(channels::ClientAssets::Embedded(&[])),
+        client: Arc::new(wire::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),
         drop_sink: Arc::new(|_, _| Ok(String::new())),
         transcribe_sink: Arc::new(|_, _| {
@@ -127,8 +127,7 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
                 let reference = place.to_string();
                 match worker_of(&worker) {
                     Worker::Stores => {
-                        let _ =
-                            answering.send(channels::Committed::new(captured(&reference)).unwrap());
+                        let _ = answering.send(wire::Committed::new(captured(&reference)).unwrap());
                     }
                     Worker::Refuses => {
                         let _ = reply.refuse(
@@ -146,7 +145,7 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
             },
         ),
         acp: Arc::new(|_, _| {
-            Ok(channels::AcpProgress {
+            Ok(wire::AcpProgress {
                 run: String::new(),
                 turns: 0,
                 finished: true,
@@ -160,13 +159,12 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
     // the address arrives the way axum hands it to a handler under test.
     // The face comes from the same verdict the listener uses, so the
     // route under test judges a caller by the rule the served city does.
-    let channels::BindVerdict::Serve(face) =
-        channels::decide_bind(&"127.0.0.1:0".parse().unwrap(), None)
+    let wire::BindVerdict::Serve(face) = wire::decide_bind(&"127.0.0.1:0".parse().unwrap(), None)
     else {
         panic!("this test serves a loopback address");
     };
     let peer: SocketAddr = "127.0.0.1:40000".parse().unwrap();
-    let app = channels::router(&config, face).layer(MockConnectInfo(peer));
+    let app = wire::router(&config, face).layer(MockConnectInfo(peer));
     let request = Request::builder()
         .method("POST")
         .uri("/enroll")

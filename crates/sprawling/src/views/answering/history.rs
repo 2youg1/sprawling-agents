@@ -24,8 +24,8 @@ impl LedgerAsk {
         &self,
         before: Option<kernel::Seq>,
         limit: u32,
-    ) -> channels::HistoryAnswer {
-        let empty = channels::HistoryAnswer {
+    ) -> wire::HistoryAnswer {
+        let empty = wire::HistoryAnswer {
             records: Vec::new(),
             earlier: None,
         };
@@ -47,7 +47,7 @@ impl LedgerAsk {
                 Some(value) => kernel::Seq::new(value),
             },
         };
-        let want = u64::from(limit.clamp(1, channels::HISTORY_MAX));
+        let want = u64::from(limit.clamp(1, wire::HISTORY_MAX));
         let start = end.value().saturating_sub(want.saturating_sub(1));
         let mut records = Vec::new();
         let mut reader = index.reader(&dir);
@@ -60,7 +60,7 @@ impl LedgerAsk {
             };
             records.push(record);
         }
-        channels::HistoryAnswer {
+        wire::HistoryAnswer {
             records,
             earlier: (start > kernel::Seq::FIRST.value()).then(|| kernel::Seq::new(start)),
         }
@@ -86,8 +86,8 @@ impl LedgerAsk {
         from: kernel::Seq,
         to: kernel::Seq,
         limit: u32,
-    ) -> channels::HistoryRangeAnswer {
-        let empty = channels::HistoryRangeAnswer {
+    ) -> wire::HistoryRangeAnswer {
+        let empty = wire::HistoryRangeAnswer {
             from,
             to,
             records: Vec::new(),
@@ -99,7 +99,7 @@ impl LedgerAsk {
         let Some((index, dir)) = self.indexed() else {
             return empty;
         };
-        let want = u64::from(limit.clamp(1, channels::HISTORY_MAX));
+        let want = u64::from(limit.clamp(1, wire::HISTORY_MAX));
         let last = from
             .value()
             .saturating_add(want.saturating_sub(1))
@@ -122,7 +122,7 @@ impl LedgerAsk {
             };
             records.push(record);
         }
-        channels::HistoryRangeAnswer {
+        wire::HistoryRangeAnswer {
             from,
             to,
             records,
@@ -148,15 +148,15 @@ impl LedgerAsk {
         run: kernel::RunId,
         before: Option<kernel::Seq>,
         limit: u32,
-    ) -> channels::HistoryAnswer {
-        let empty = channels::HistoryAnswer {
+    ) -> wire::HistoryAnswer {
+        let empty = wire::HistoryAnswer {
             records: Vec::new(),
             earlier: None,
         };
         let Some((index, dir)) = self.indexed() else {
             return empty;
         };
-        let want = usize::try_from(limit.clamp(1, channels::HISTORY_MAX)).unwrap_or(1);
+        let want = usize::try_from(limit.clamp(1, wire::HISTORY_MAX)).unwrap_or(1);
         // One more than was asked for: whether this session wrote
         // anything older is exactly what `earlier` reports, and taking
         // one extra sequence answers it without a second question.
@@ -181,28 +181,28 @@ impl LedgerAsk {
             };
             records.push(record);
         }
-        channels::HistoryAnswer { records, earlier }
+        wire::HistoryAnswer { records, earlier }
     }
 
     /// The summary of a run the hot view evicted, folded from that run's
-    /// own records in the Ledger through a `memory::HotView` holding it
+    /// own records in the Ledger through a `storage::HotView` holding it
     /// alone, so the cold side maps a record to a row by the same rule
     /// as the hot one (sprawling-SPEC section 8-106).
     ///
     /// `None` when the records cannot be read: an evicted run always has
     /// some, so the caller answers that it could not look.
-    pub(in crate::views) fn recalled(&self, run: kernel::RunId) -> Option<channels::RunSummary> {
-        let mut alone = memory::HotView::new();
+    pub(in crate::views) fn recalled(&self, run: kernel::RunId) -> Option<wire::RunSummary> {
+        let mut alone = storage::HotView::new();
         self.fold_recalled(run, |record| alone.apply(record))?;
         alone.get(&run).map(|hot| summarize(run, hot))
     }
 
     /// What a run the attribution no longer holds was billed, folded
-    /// from its own records through a `memory::Attribution` holding it
+    /// from its own records through a `storage::Attribution` holding it
     /// alone, so the cold side prices by the same rule as the hot one.
     /// `None` when the records cannot be read.
     pub(in crate::views) fn recalled_bill(&self, run: kernel::RunId) -> Option<UsdMicros> {
-        let mut alone = memory::Attribution::new();
+        let mut alone = storage::Attribution::new();
         self.fold_recalled(run, |record| alone.apply(record))?;
         Some(alone.billed_to(&run).unwrap_or_default())
     }
@@ -213,7 +213,7 @@ impl LedgerAsk {
     fn fold_recalled(
         &self,
         run: kernel::RunId,
-        mut apply: impl FnMut(&EventRecord) -> Result<(), memory::MemoryError>,
+        mut apply: impl FnMut(&EventRecord) -> Result<(), storage::StorageError>,
     ) -> Option<()> {
         let (index, dir) = self.indexed()?;
         let mut oldest_first: Vec<kernel::Seq> = index.run_seqs_before(run, None).collect();

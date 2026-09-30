@@ -82,7 +82,7 @@ impl kernel::Tool for Scripted {
 /// Answers every building that asks for a browser with the scripted one.
 fn scripted(
     _city_root: &std::path::Path,
-    _origin: &memory::BlockOrigin,
+    _origin: &storage::BlockOrigin,
     rules: &city::BuildingRules,
 ) -> Result<Vec<Box<dyn kernel::Tool>>, AxError> {
     let meta = kernel::ToolMeta {
@@ -128,21 +128,21 @@ fn a_run_is_offered_the_browser_the_worker_was_handed() {
     .unwrap()
     .with_models(Box::new(Listeners(Arc::clone(&offered))))
     .with_browsers(scripted);
-    let endpoint = channels::ProviderName::parse("dead").unwrap();
+    let endpoint = wire::ProviderName::parse("dead").unwrap();
     worker
-        .handle(channels::Command::AttachEndpoint {
+        .handle(wire::Command::AttachEndpoint {
             name: endpoint.clone(),
             base_url: refusing_url(),
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
             admit: vec![MODEL.to_owned()],
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: idem(b"attach"),
         })
         .unwrap();
     worker
-        .handle(channels::Command::SelectModel {
+        .handle(wire::Command::SelectModel {
             endpoint,
             model: MODEL.to_owned(),
             tag: kernel::ModelTag::Main,
@@ -152,9 +152,9 @@ fn a_run_is_offered_the_browser_the_worker_was_handed() {
         })
         .unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse(LAB).unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: idem(b"create"),
         })
         .unwrap();
@@ -164,7 +164,7 @@ fn a_run_is_offered_the_browser_the_worker_was_handed() {
         "confidential = false\nwrite = \"everything\"\nbrowser = true\n",
     )
     .unwrap();
-    let dispatched = worker.handle(channels::Command::Dispatch {
+    let dispatched = worker.handle(wire::Command::Dispatch {
         addr: Address::parse(LAB).unwrap(),
         task: "Answer.".to_owned(),
         goal: "one turn with the browser this worker was handed".to_owned(),

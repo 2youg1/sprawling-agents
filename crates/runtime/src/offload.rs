@@ -13,7 +13,7 @@
 use std::path::Path;
 
 use kernel::{Address, AxCode, AxError, Locator};
-use memory::Cas;
+use storage::Cas;
 
 /// The directory inside the room that holds materialized rest files.
 pub const REST_DIR: &str = ".rest";
@@ -28,7 +28,7 @@ pub struct OffloadSite<'a> {
     pub cas: &'a mut Cas,
     pub city_root: &'a Path,
     pub room: &'a Address,
-    pub origin: memory::BlockOrigin,
+    pub origin: storage::BlockOrigin,
 }
 
 /// The outcome: a substitute that fits the cap, the original pinned in
@@ -113,7 +113,7 @@ pub(crate) fn tee(bytes: &[u8], site: &mut OffloadSite<'_>) -> Result<Tee, AxErr
     let hash = site
         .cas
         .put_for(bytes, &site.origin)
-        .map_err(memory::MemoryError::into_ax)?;
+        .map_err(storage::StorageError::into_ax)?;
     let original = Locator::cas(hash);
     let rest_path = materialized(bytes, site, &original)?;
     Ok(Tee {
@@ -221,7 +221,7 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<St
              `file:` locator names a path that cleanup already removed",
         ));
     };
-    let bytes = site.cas.get(hash).map_err(memory::MemoryError::into_ax)?;
+    let bytes = site.cas.get(hash).map_err(storage::StorageError::into_ax)?;
     materialized(&bytes, site, locator)
 }
 
@@ -236,8 +236,8 @@ pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<St
 pub(crate) mod tests {
     use super::*;
 
-    pub(crate) fn origin() -> memory::BlockOrigin {
-        memory::BlockOrigin {
+    pub(crate) fn origin() -> storage::BlockOrigin {
+        storage::BlockOrigin {
             run: kernel::RunId::from_bytes([7; 16]),
             building: kernel::Address::parse("lab").unwrap(),
         }

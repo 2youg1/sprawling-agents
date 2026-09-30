@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The reading end of a harness session (protocol-SPEC.md 8-19).
+//! The reading end of a harness session (agent_protocols-SPEC.md 8-19).
 //!
 //! A read on a pipe has no deadline, and a harness running a long command
 //! can go minutes without a line, while a halt must not wait for it to
@@ -53,7 +53,7 @@ impl Lines {
                     // A refusal or the end of input is the last thing
                     // this reader has to say: the bytes after an
                     // oversized message cannot be told apart from the
-                    // next one (protocol-SPEC.md 8-15).
+                    // next one (agent_protocols-SPEC.md 8-15).
                     let last = !matches!(read, Ok(Received::Message(_)));
                     if sender.send(read).is_err() || last {
                         break;

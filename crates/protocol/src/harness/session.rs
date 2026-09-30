@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One ACP session with an official harness, this city as the client
-//! (protocol-SPEC.md 8-19).
+//! (agent_protocols-SPEC.md 8-19).
 //!
 //! JSON-RPC 2.0, one message per line, over whatever reader and writer
 //! the caller hands in: a child's stdio in production, a pipe an agent
@@ -45,7 +45,7 @@ const PROTOCOL_VERSION: u64 = 1;
 const METHOD_NOT_FOUND: i64 = -32_601;
 
 /// The longest a halt waits for the harness to say something before the
-/// session asks about it anyway (protocol-SPEC.md 14).
+/// session asks about it anyway (agent_protocols-SPEC.md 14).
 const HALT_TICK_MS: u64 = 200;
 
 /// The caller's answer to a permission ask.

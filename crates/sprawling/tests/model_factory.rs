@@ -107,9 +107,9 @@ fn city_on(
     )
     .unwrap()
     .with_models(Box::new(factory));
-    let endpoint = channels::ProviderName::parse("dead").unwrap();
+    let endpoint = wire::ProviderName::parse("dead").unwrap();
     worker
-        .handle(channels::Command::AttachEndpoint {
+        .handle(wire::Command::AttachEndpoint {
             name: endpoint.clone(),
             base_url,
             dialect: kernel::DialectKind::OpenAi,
@@ -118,7 +118,7 @@ fn city_on(
             admit: vec![MAIN.to_owned(), DIGEST.to_owned()],
             // One try, briefly: a worker that still calls the dead port
             // should fail its test at once rather than retry into it.
-            tuning: channels::EndpointTuning {
+            tuning: wire::EndpointTuning {
                 timeout_ms: Some(2_000),
                 request_max_retries: Some(0),
                 ..channels::EndpointTuning::default()
@@ -131,7 +131,7 @@ fn city_on(
         (kernel::ModelTag::Digest, DIGEST),
     ] {
         worker
-            .handle(channels::Command::SelectModel {
+            .handle(wire::Command::SelectModel {
                 endpoint: endpoint.clone(),
                 model: model.to_owned(),
                 tag,
@@ -142,9 +142,9 @@ fn city_on(
             .unwrap();
     }
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse(LAB).unwrap(),
-            template: channels::TemplateName::parse(template).unwrap(),
+            template: wire::TemplateName::parse(template).unwrap(),
             idem: idem(b"create"),
         })
         .unwrap();
@@ -155,7 +155,7 @@ fn dispatch(
     worker: &mut assembly::RunWorker,
     session: Option<kernel::SessionName>,
 ) -> Result<(), AxError> {
-    worker.handle(channels::Command::Dispatch {
+    worker.handle(wire::Command::Dispatch {
         addr: Address::parse(LAB).unwrap(),
         task: "Answer.".to_owned(),
         goal: "one answer from the model this worker was handed".to_owned(),

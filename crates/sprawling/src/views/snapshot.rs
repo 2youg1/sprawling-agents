@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use accounting::plan_view::PlanView;
 use kernel::{AxCode, AxError, B3Hash, EventRecord, Seq};
-use memory::LedgerIndex;
+use storage::LedgerIndex;
 
 use super::Views;
 
@@ -35,8 +35,8 @@ pub(crate) fn views_fold_version() -> u32 {
 
 /// The index a new or decoded `Views` starts with: empty, refreshed by
 /// the first question that reads the ledger.
-pub(super) fn fresh_index() -> std::sync::Arc<std::sync::Mutex<memory::LedgerIndex>> {
-    std::sync::Arc::new(std::sync::Mutex::new(memory::LedgerIndex::empty()))
+pub(super) fn fresh_index() -> std::sync::Arc<std::sync::Mutex<storage::LedgerIndex>> {
+    std::sync::Arc::new(std::sync::Mutex::new(storage::LedgerIndex::empty()))
 }
 
 /// The plan cache as a snapshot holds it: the cache itself, not the lock
@@ -165,7 +165,7 @@ impl Views {
             .reader(ledger_dir)
             .line_at(seq)
             .map(|line| Some((seq, line)))
-            .map_err(memory::MemoryError::into_ax)
+            .map_err(storage::StorageError::into_ax)
     }
 
     /// The views `encode` wrote, served from `city_root`.

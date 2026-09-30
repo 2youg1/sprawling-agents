@@ -48,9 +48,9 @@ impl RunWorker {
         };
         // Disk first, ledger second: the history never says a file came
         // back that the disk does not hold.
-        memory::Checkpoint::open(&self.city_root)
+        storage::Checkpoint::open(&self.city_root)
             .and_then(|fence| fence.restore(address, oid))
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         // The same shape as the `file_discarded` it closes, so one
         // reader folds both (§8-107).
         let restored = Payload::new(serde_json::Map::from_iter([

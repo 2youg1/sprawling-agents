@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The sizes a person may ask for are the city's range
-// (`channels::BODY_PX_MIN` and `BODY_PX_MAX`), which the generated wire
+// (`wire::BODY_PX_MIN` and `BODY_PX_MAX`), which the generated wire
 // file states, so the box and the `[ui]` writer refuse the same sizes.
 import { BODY_PX } from "../wire";
 

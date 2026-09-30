@@ -107,8 +107,8 @@ use kernel::{AxCode, AxError, EventRecord, RunId, TimeMs};
 use accounting::effect;
 #[cfg(test)]
 use kernel::{Address, EventDraft, EventKind, Payload};
-use memory::{Cas, JsonlLedger};
 use runtime::Interrupt;
+use storage::{Cas, JsonlLedger};
 
 /// The wall clock: the single sanctioned sampling point (clippy.toml
 /// disallowed-methods), and the production `accounting::Clock`
@@ -148,7 +148,7 @@ impl accounting::Clock for SystemClock {
 /// the person's when they declared one (sprawling-SPEC.md 8-45-2).
 pub type Browsers = fn(
     &Path,
-    &memory::BlockOrigin,
+    &storage::BlockOrigin,
     &city::BuildingRules,
 ) -> Result<Vec<Box<dyn kernel::Tool>>, AxError>;
 
@@ -194,12 +194,12 @@ impl ScanReport {
 /// take the byte-identical path they always took.
 pub(crate) struct Serving {
     /// Where a model's text goes while it is still arriving.
-    pub(crate) deltas: Arc<dyn Fn(channels::Delta) + Send + Sync>,
+    pub(crate) deltas: Arc<dyn Fn(wire::Delta) + Send + Sync>,
     /// Where a running command's output goes while it is still written.
-    pub(crate) outputs: Arc<dyn Fn(channels::LiveOutput) + Send + Sync>,
+    pub(crate) outputs: Arc<dyn Fn(wire::LiveOutput) + Send + Sync>,
     /// Where a fresh look at this machine goes: the one place the
     /// doctor's answer is replaced after the look taken at start-up.
-    pub(crate) machine: Arc<dyn Fn(channels::DoctorAnswer) + Send + Sync>,
+    pub(crate) machine: Arc<dyn Fn(wire::DoctorAnswer) + Send + Sync>,
     /// What a running dispatch asks at its safe points.
     ///
     /// One handle per drive rather than one hook lent out and taken
@@ -274,7 +274,7 @@ pub struct RunWorker {
     /// Where each line of the history sits, folded once and refreshed
     /// with what was appended since, so a question about one line reads
     /// that line rather than the whole history (sprawling-SPEC.md 8-82).
-    pub(in crate::assembly) index: memory::LedgerIndex,
+    pub(in crate::assembly) index: storage::LedgerIndex,
     /// The keep-warm doors of runs that have landed, one per room
     /// (`keeping_warm`); empty under the default setting.
     warm: keeping_warm::Kept,
@@ -336,9 +336,10 @@ impl RunWorker {
         if let Some(known) = self.city.get() {
             return Ok(*known);
         }
-        let read =
-            memory::Provenance::city_of(&kernel::layout::CityLayout::new(&self.city_root).ledger())
-                .map_err(memory::MemoryError::into_ax)?;
+        let read = storage::Provenance::city_of(
+            &kernel::layout::CityLayout::new(&self.city_root).ledger(),
+        )
+        .map_err(storage::StorageError::into_ax)?;
         Ok(*self.city.get_or_init(|| read))
     }
 
@@ -361,11 +362,11 @@ impl RunWorker {
         let outputs = Arc::clone(&serving.outputs);
         self.flight.backlog = self.flight.backlog.clone().with_sink(runtime::Sink::new(
             move |chunk: runtime::Chunk| {
-                outputs(channels::LiveOutput {
+                outputs(wire::LiveOutput {
                     run: chunk.run,
                     stream: match chunk.stream {
-                        runtime::Stream::Out => channels::OutputStream::Out,
-                        runtime::Stream::Err => channels::OutputStream::Err,
+                        runtime::Stream::Out => wire::OutputStream::Out,
+                        runtime::Stream::Err => wire::OutputStream::Err,
                     },
                     text: String::from_utf8_lossy(&chunk.bytes).into_owned(),
                 });

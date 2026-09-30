@@ -20,9 +20,9 @@ pub(crate) enum Pack {
 }
 
 impl Pack {
-    pub(crate) fn wire(self) -> channels::DoctorPack {
+    pub(crate) fn wire(self) -> wire::DoctorPack {
         match self {
-            Pack::RustTools => channels::DoctorPack::RustTools,
+            Pack::RustTools => wire::DoctorPack::RustTools,
         }
     }
 }

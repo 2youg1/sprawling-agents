@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The session slice: a disposable projection of the Ledger, one file per
-//! room, laid down beside the building that ran it (memory-SPEC 8-24).
+//! room, laid down beside the building that ran it (storage-SPEC 8-24).
 //!
 //! **The Ledger is not split.** It stays one chain with one writer, and a
 //! slice is derived from it: one file per room address, holding the
@@ -39,7 +39,7 @@ use std::path::{Path, PathBuf};
 use kernel::layout::CityLayout;
 use kernel::{Address, EventRecord, RESERVED_PREFIX, Seq};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::jsonl::complete_lines;
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
@@ -108,7 +108,7 @@ impl Sessions {
     /// # Errors
     /// Propagates a slice that cannot be read, laid down or appended. The
     /// caller reports it; the Ledger is already durable either way.
-    pub(crate) fn absorb(&mut self, record: &EventRecord) -> Result<(), MemoryError> {
+    pub(crate) fn absorb(&mut self, record: &EventRecord) -> Result<(), StorageError> {
         let Some(addr) = record.addr() else {
             return Ok(());
         };
@@ -136,7 +136,7 @@ impl Sessions {
         }
         let mut line = record
             .canonical_line()
-            .map_err(|source| MemoryError::Draft { source })?;
+            .map_err(|source| StorageError::Draft { source })?;
         line.push(b'\n');
         self.vfs
             .append(&path, &line)
@@ -155,7 +155,7 @@ impl Sessions {
         addr: &Address,
         path: &Path,
         record: &EventRecord,
-    ) -> Result<Open, MemoryError> {
+    ) -> Result<Open, StorageError> {
         let tail = record.seq();
         if !self.vfs.exists(path) {
             return match self.first_seq_of(addr, tail)? {
@@ -163,7 +163,7 @@ impl Sessions {
                 Some(_) | None => {
                     let line = record
                         .canonical_line()
-                        .map_err(|source| MemoryError::Draft { source })?;
+                        .map_err(|source| StorageError::Draft { source })?;
                     self.write_slice(addr, path, &[(tail, line)])
                 }
             };
@@ -192,7 +192,7 @@ impl Sessions {
     /// Appends the records the Ledger holds after what the file already
     /// carries, so a slice left behind by a stopped process catches up
     /// before this one adds to it.
-    fn catch_up(&mut self, mut open: Open, path: &Path, tail: Seq) -> Result<Open, MemoryError> {
+    fn catch_up(&mut self, mut open: Open, path: &Path, tail: Seq) -> Result<Open, StorageError> {
         let found = self.segments().lines_of(&open.addr, open.last, tail)?;
         for (seq, line) in &found {
             let mut terminated = Vec::with_capacity(line.len().saturating_add(1));
@@ -217,7 +217,7 @@ impl Sessions {
     /// `tail` is the record being absorbed, which is already durable and
     /// so already in the fold; an answer equal to it means the Ledger
     /// holds nothing earlier for this address.
-    fn first_seq_of(&mut self, addr: &Address, tail: Seq) -> Result<Option<Seq>, MemoryError> {
+    fn first_seq_of(&mut self, addr: &Address, tail: Seq) -> Result<Option<Seq>, StorageError> {
         if self.first_seen.is_none() {
             let mut folded = self.segments().first_seen()?;
             folded.entry(addr.clone()).or_insert(tail);
@@ -239,7 +239,7 @@ impl Sessions {
 
     /// Lays one slice down from the Ledger: the header, then every line
     /// the Ledger holds for this address up to `tail`, in ledger order.
-    fn lay_down(&mut self, addr: &Address, path: &Path, tail: Seq) -> Result<Open, MemoryError> {
+    fn lay_down(&mut self, addr: &Address, path: &Path, tail: Seq) -> Result<Open, StorageError> {
         let found = self.segments().lines_of(addr, None, tail)?;
         self.write_slice(addr, path, &found)
     }
@@ -251,7 +251,7 @@ impl Sessions {
         addr: &Address,
         path: &Path,
         found: &[(Seq, Vec<u8>)],
-    ) -> Result<Open, MemoryError> {
+    ) -> Result<Open, StorageError> {
         let Some((first_seq, _)) = found.first() else {
             // Nothing in the Ledger carries this address: no file is a
             // truthful answer, and the next append tries again.
@@ -378,8 +378,8 @@ pub(crate) fn is_session_projection(relative: &Path) -> bool {
 
 /// The refusal for a slice path that has no directory, which a path from
 /// [`session_slice`] cannot be.
-fn no_parent(path: &Path) -> MemoryError {
-    MemoryError::Io {
+fn no_parent(path: &Path) -> StorageError {
+    StorageError::Io {
         op: "lay a session slice",
         path: path.to_path_buf(),
         source: io::Error::other("the slice path has no parent directory"),
@@ -388,8 +388,8 @@ fn no_parent(path: &Path) -> MemoryError {
 
 /// The refusal for slice state that vanished from under a reader, which
 /// only a defect in this module can produce.
-fn vanished(path: &Path) -> MemoryError {
-    MemoryError::Io {
+fn vanished(path: &Path) -> StorageError {
+    StorageError::Io {
         op: "continue a session slice",
         path: path.to_path_buf(),
         source: io::Error::other("the slice state vanished after it was read"),

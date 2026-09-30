@@ -22,7 +22,7 @@ use kernel::Locator;
 #[test]
 fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
     let desk = CommandDesk::new();
-    // The body travels as the JSON it arrived as: `protocol::Incoming`
+    // The body travels as the JSON it arrived as: `agent_protocols::Incoming`
     // is the only grammar for an inbound request, and nothing on this
     // path reads a field out of it.
     let body = |addr: &str| {
@@ -34,7 +34,7 @@ fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
         })
     };
 
-    let err = acp_dispatch(&desk, &body("lab/room1"), channels::Pairing::Absent).unwrap_err();
+    let err = acp_dispatch(&desk, &body("lab/room1"), wire::Pairing::Absent).unwrap_err();
     assert_eq!(err.code(), &AxCode::GateDenied);
     assert!(
         !err.subject().contains("lab"),
@@ -44,14 +44,14 @@ fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
     assert!(desk.take().is_none(), "and nothing was queued for it");
 
     // The city's own subtree is not a room, with or without a token.
-    let err = acp_dispatch(&desk, &body(".sprawling/ledger"), channels::Pairing::Held).unwrap_err();
+    let err = acp_dispatch(&desk, &body(".sprawling/ledger"), wire::Pairing::Held).unwrap_err();
     assert_eq!(err.code(), &AxCode::OutsideWriteDomain);
     assert!(desk.take().is_none());
 
-    let progress = acp_dispatch(&desk, &body("lab/room1"), channels::Pairing::Held).unwrap();
+    let progress = acp_dispatch(&desk, &body("lab/room1"), wire::Pairing::Held).unwrap();
     assert!(!progress.finished);
     assert_eq!(progress.turns, 0);
-    let Some(channels::Command::Dispatch { addr, task, .. }) = desk.take() else {
+    let Some(wire::Command::Dispatch { addr, task, .. }) = desk.take() else {
         panic!("an admitted request becomes the dispatch a person would have sent");
     };
     assert_eq!(addr.as_str(), "lab/room1");
@@ -76,12 +76,12 @@ fn a_refused_command_reaches_the_peer_that_sent_it() {
 
     let heard: Arc<std::sync::Mutex<Vec<AxError>>> = Arc::new(std::sync::Mutex::new(Vec::new()));
     let peer = Arc::clone(&heard);
-    let reply = channels::Reply::to(move |error| {
+    let reply = wire::Reply::to(move |error| {
         let Ok(mut heard) = peer.lock() else {
-            return channels::Delivered::PeerGone;
+            return wire::Delivered::PeerGone;
         };
         heard.push(error);
-        channels::Delivered::ToThePeer
+        wire::Delivered::ToThePeer
     });
 
     // A model chosen on an endpoint that was never attached: the
@@ -89,8 +89,8 @@ fn a_refused_command_reaches_the_peer_that_sent_it() {
     // `/v1` made the attach fail and the model selection fail after
     // it, and the page reported neither.
     worker.serve_one(Posted {
-        command: channels::Command::SelectModel {
-            endpoint: channels::ProviderName::parse("nowhere").unwrap(),
+        command: wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("nowhere").unwrap(),
             model: "a-model".to_owned(),
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(200_000),
@@ -114,7 +114,7 @@ fn a_refused_command_reaches_the_peer_that_sent_it() {
 /// that would have to be invented for it.
 #[test]
 fn a_refusal_with_no_one_behind_it_says_so_rather_than_failing() {
-    let nobody = channels::Reply::nowhere();
+    let nobody = wire::Reply::nowhere();
     let outcome = nobody.refuse(
         AxError::failure(
             AxCode::ConfigInvalid,
@@ -123,7 +123,7 @@ fn a_refusal_with_no_one_behind_it_says_so_rather_than_failing() {
         )
         .with_recovery("fix the schedule file, then start the city again"),
     );
-    assert_eq!(outcome, channels::Delivered::NobodyAsked);
+    assert_eq!(outcome, wire::Delivered::NobodyAsked);
 }
 #[test]
 fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() {
@@ -163,8 +163,8 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     // The appointed delegate is the actor of this item, so the one
     // resident allowed to answer at all is barred from this one.
     worker
-        .handle(channels::Command::SetAutonomy {
-            scope: channels::HaltScope::City,
+        .handle(wire::Command::SetAutonomy {
+            scope: wire::HaltScope::City,
             autonomy: kernel::Autonomy::Delegate(kernel::ResidentId::new("lab/room1").unwrap()),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"autonomy"),
         })
@@ -181,7 +181,7 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
 
     // The person answers it, and the history says so.
     worker
-        .handle(channels::Command::Approve {
+        .handle(wire::Command::Approve {
             item: kernel::ApprovalId::new("item-1").unwrap(),
             verdict: kernel::Ruling::Allow,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"approve"),
@@ -201,7 +201,7 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     // And a second answer finds nothing waiting: the queue drains
     // from the ledger, not from a mirror of it.
     let err = worker
-        .handle(channels::Command::Approve {
+        .handle(wire::Command::Approve {
             item: kernel::ApprovalId::new("item-1").unwrap(),
             verdict: kernel::Ruling::Allow,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"approve"),
@@ -269,7 +269,7 @@ fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
         kernel::GENESIS_PREV,
     );
     views.apply(&requested).unwrap();
-    let channels::Answer::Approvals(queue) = views.answer(&channels::Query::ApprovalQueue) else {
+    let wire::Answer::Approvals(queue) = views.answer(&wire::Query::ApprovalQueue) else {
         panic!("the approval queue answers with items");
     };
     assert_eq!(queue.items.len(), 1);
@@ -311,7 +311,7 @@ fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
         kernel::GENESIS_PREV,
     );
     views.apply(&resolved).unwrap();
-    let channels::Answer::Approvals(queue) = views.answer(&channels::Query::ApprovalQueue) else {
+    let wire::Answer::Approvals(queue) = views.answer(&wire::Query::ApprovalQueue) else {
         panic!("the approval queue answers with items");
     };
     assert!(queue.items.is_empty());
@@ -336,7 +336,7 @@ fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
     // means no run answered, and the refusal says that rather than
     // naming the verb.
     let missing = worker
-        .handle(channels::Command::Cancel {
+        .handle(wire::Command::Cancel {
             run: RunId::CITY,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"cancel"),
         })
@@ -352,7 +352,7 @@ fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
     // A verb the wire spells and this city cannot perform. It says
     // so, and says what to do instead.
     let unbuilt = worker
-        .handle(channels::Command::BatchByBuilding {
+        .handle(wire::Command::BatchByBuilding {
             addr: Address::parse("lab").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"batch"),
         })

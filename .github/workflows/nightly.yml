@@ -29,7 +29,7 @@ jobs:
   # random input every night is what makes this a schedule rather than a
   # push gate; sixty seconds a target is a smoke length, and a real
   # campaign belongs on a dedicated runner rather than in a CI slot.
-  # The public surface of the two seam crates, kernel and channels,
+  # The public surface of the two seam crates, kernel and wire,
   # against its committed baseline (xtask-SPEC.md section 8-32). It is
   # not a gate: whether an interface change belongs in a SPEC is the
   # reviewer's call, and a drift here is read the next morning.

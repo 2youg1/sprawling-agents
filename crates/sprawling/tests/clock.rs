@@ -50,9 +50,9 @@ fn a_worker_stamps_its_lines_with_the_clock_it_was_handed() {
     .unwrap()
     .with_clock(Arc::new(Stopped));
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"create"),
         })
         .unwrap();

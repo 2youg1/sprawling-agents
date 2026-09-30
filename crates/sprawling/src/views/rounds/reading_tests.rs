@@ -14,14 +14,14 @@
 //! The reading through the production door.
 //!
 //! Following the reading it tests: the payload readers are
-//! `channels::reading`, and the fold that calls them is this module.
+//! `wire::reading`, and the fold that calls them is this module.
 
 use super::turns;
-use channels::{
+use wire::{
     AxCode, AxError, B3Hash, EventDraft, EventKind, EventRecord, GitOid, Payload, RunId, Seq,
     TimeMs, Tokens, UsdMicros,
 };
-use channels::{Note, OUTPUT_LINES};
+use wire::{Note, OUTPUT_LINES};
 
 fn record(seq: u64, kind: EventKind, data: serde_json::Value) -> EventRecord {
     let map = data.as_object().expect("a payload is an object").clone();

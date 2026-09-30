@@ -144,8 +144,8 @@ fn describe(
 
 fn run_label(line: &RunLine) -> String {
     let state = match line.state {
-        Some(memory::RunPhase::Active) => "active",
-        Some(memory::RunPhase::Frozen) => "frozen",
+        Some(storage::RunPhase::Active) => "active",
+        Some(storage::RunPhase::Frozen) => "frozen",
         None => "ended",
     };
     let mut label = format!(

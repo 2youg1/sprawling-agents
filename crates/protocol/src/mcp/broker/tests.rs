@@ -256,7 +256,7 @@ fn a_path_that_cannot_be_addressed_is_filed_under_the_module_that_builds_it() {
     let refused = broker.shelf("acme").unwrap_err();
 
     assert!(
-        refused.recovery().contains("protocol::mcp::broker"),
+        refused.recovery().contains("agent_protocols::mcp::broker"),
         "the recovery names the module a reader should open: {}",
         refused.recovery()
     );

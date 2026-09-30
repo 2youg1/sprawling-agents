@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The vendors this city knows by host, as the settings page offers
-//! them (channels-SPEC.md 8-51).
+//! them (wire-SPEC.md 8-51).
 //!
 //! A person picks a vendor rather than copying its address out of the
 //! vendor's documentation. The table is `gateway::provider::preset`'s;

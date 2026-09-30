@@ -23,9 +23,9 @@ fn addr(raw: &str) -> Address {
 
 fn create(worker: &mut RunWorker, name: &str) {
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: addr(name),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, name.as_bytes()),
         })
         .unwrap();

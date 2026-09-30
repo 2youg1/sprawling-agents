@@ -24,7 +24,7 @@ impl Views {
     ///
     /// Probing is seconds of starting programs, and a read that did it
     /// would hold the one thread every other read is answered on.
-    pub(crate) fn found_on_this_machine(&mut self, report: channels::DoctorAnswer) {
+    pub(crate) fn found_on_this_machine(&mut self, report: wire::DoctorAnswer) {
         self.machine = Some(report);
     }
 
@@ -45,7 +45,7 @@ impl Views {
     /// Takes the one way this city asks the registry which release is
     /// newest, so a `NewestRelease` query reaches the network only
     /// through what the served city handed in.
-    pub(crate) fn ask_the_registry_through(&mut self, newest: fn() -> channels::ReleaseAnswer) {
+    pub(crate) fn ask_the_registry_through(&mut self, newest: fn() -> wire::ReleaseAnswer) {
         self.registry = Some(newest);
     }
 
@@ -53,7 +53,7 @@ impl Views {
     /// newest release, so an `UpstreamVersion` query leaves this machine
     /// only through what the served city handed in (sprawling-SPEC.md
     /// 8-120).
-    pub(crate) fn ask_upstream_through(&mut self, newest: fn(&str) -> channels::DoctorUpstream) {
+    pub(crate) fn ask_upstream_through(&mut self, newest: fn(&str) -> wire::DoctorUpstream) {
         self.upstream = Some(newest);
     }
 }
@@ -65,8 +65,8 @@ mod tests {
     use kernel::{AxCode, AxError};
 
     /// What the scripted registry says, so the answer shows whose it is.
-    fn scripted() -> channels::ReleaseAnswer {
-        channels::ReleaseAnswer::Refused {
+    fn scripted() -> wire::ReleaseAnswer {
+        wire::ReleaseAnswer::Refused {
             refusal: AxError::failure(AxCode::ToolUnavailable, "ask the registry", "scripted")
                 .with_recovery("nothing: this registry is a script"),
         }
@@ -79,8 +79,8 @@ mod tests {
         views.ask_the_registry_through(scripted);
 
         assert_eq!(
-            views.prepare(&channels::Query::NewestRelease).finish(),
-            channels::Answer::Release(Box::new(scripted()))
+            views.prepare(&wire::Query::NewestRelease).finish(),
+            wire::Answer::Release(Box::new(scripted()))
         );
     }
 }

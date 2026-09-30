@@ -82,9 +82,7 @@ impl Entered {
 /// # Errors
 /// `E_CONFIG_INVALID` naming the header whose value reads as a
 /// credential without being a vault reference.
-pub(super) fn tuning_of(
-    wire: channels::EndpointTuning,
-) -> Result<gateway::EndpointTuning, AxError> {
+pub(super) fn tuning_of(wire: wire::EndpointTuning) -> Result<gateway::EndpointTuning, AxError> {
     let stated = |figure: Option<u64>| figure.filter(|ms| *ms > 0);
     let mut extra_headers = Vec::new();
     for row in wire.headers {

@@ -7,7 +7,7 @@
 // a page where a dropped file lives: a drag from a file manager that
 // carries `file://` URIs names the local paths itself, and those are
 // used as they are; any other drop sends each file to the city over the
-// page's own origin (`POST /drop`, channels-SPEC 8-49), which keeps it
+// page's own origin (`POST /drop`, wire-SPEC 8-49), which keeps it
 // and answers with the absolute path it is at.
 
 import { bearing } from "../../core/socket";

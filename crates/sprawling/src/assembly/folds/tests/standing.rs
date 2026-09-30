@@ -42,7 +42,7 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
-        .handle(channels::Command::Dispatch {
+        .handle(wire::Command::Dispatch {
             addr: Address::parse("market/ito").unwrap(),
             task: "ask hana what she charges".to_owned(),
             goal: "a price".to_owned(),
@@ -163,13 +163,13 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
     .unwrap();
 
     worker
-        .handle(channels::Command::ProbeEndpoint {
-            name: channels::ProviderName::parse("house").unwrap(),
+        .handle(wire::Command::ProbeEndpoint {
+            name: wire::ProviderName::parse("house").unwrap(),
             base_url: base_url.clone(),
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"probe"),
         })
         .unwrap();
@@ -188,20 +188,20 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
     );
 
     worker
-        .handle(channels::Command::AttachEndpoint {
-            name: channels::ProviderName::parse("house").unwrap(),
+        .handle(wire::Command::AttachEndpoint {
+            name: wire::ProviderName::parse("house").unwrap(),
             base_url,
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
             admit: vec!["m-large".to_owned()],
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
-    let channels::Answer::Endpoints(book) = crate::views::Views::rebuild(&report.ledger_dir)
+    let wire::Answer::Endpoints(book) = crate::views::Views::rebuild(&report.ledger_dir)
         .unwrap()
-        .answer(&channels::Query::EndpointView)
+        .answer(&wire::Query::EndpointView)
     else {
         panic!("the settings page reads the endpoint book");
     };
@@ -227,7 +227,7 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
     let room = Address::parse("lab/room1").unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    let work = |tag: &[u8]| channels::Command::Dispatch {
+    let work = |tag: &[u8]| wire::Command::Dispatch {
         addr: room.clone(),
         task: "measure the thing".to_owned(),
         goal: "a number, then stop".to_owned(),
@@ -237,13 +237,13 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
         effort: None,
         model: None,
     };
-    let halt = |scope| channels::Command::Halt {
+    let halt = |scope| wire::Command::Halt {
         scope,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"halt"),
     };
 
     worker
-        .handle(halt(channels::HaltScope::Building(
+        .handle(halt(wire::HaltScope::Building(
             Address::parse("lab").unwrap(),
         )))
         .unwrap();
@@ -261,21 +261,21 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
 
     // A different building is not covered by that halt.
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse("shop").unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
     let mut elsewhere = work(b"two");
-    if let channels::Command::Dispatch { addr, .. } = &mut elsewhere {
+    if let wire::Command::Dispatch { addr, .. } = &mut elsewhere {
         *addr = Address::parse("shop/room1").unwrap();
     }
     worker.handle(elsewhere).unwrap();
 
     worker
-        .handle(channels::Command::Release {
-            scope: channels::HaltScope::Building(Address::parse("lab").unwrap()),
+        .handle(wire::Command::Release {
+            scope: wire::HaltScope::Building(Address::parse("lab").unwrap()),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"release"),
         })
         .unwrap();

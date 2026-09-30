@@ -7,9 +7,9 @@
 //! button. What the page and this command both need to know about the
 //! broker is `accounting::toolkit_broker`'s.
 
-use channels::ToolkitSlug;
 use kernel::event::record::ToolkitLinkOpened;
 use kernel::{AxCode, AxError, EventKind, Payload};
+use wire::ToolkitSlug;
 
 use super::RunWorker;
 use accounting::toolkit_broker::broker_for;
@@ -19,7 +19,7 @@ impl RunWorker {
     ///
     /// **What is recorded is the request, never the standing and never
     /// the consent url.** Where an application stands is a fact about
-    /// now and belongs to the broker (channels-SPEC.md section 8-31); a
+    /// now and belongs to the broker (wire-SPEC.md section 8-31); a
     /// consent url is a capability, and anybody replaying this log would
     /// be holding one. The page reads both back from the broker with
     /// `Query::Toolkits` immediately afterwards.

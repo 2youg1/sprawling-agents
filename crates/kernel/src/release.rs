@@ -67,7 +67,7 @@ pub struct Release {
 /// packages, so a binary downloaded from the release page is newer than
 /// the registry for as long as that job takes.
 ///
-/// Named for what it judges rather than `Standing`, which `channels`
+/// Named for what it judges rather than `Standing`, which `wire`
 /// already spends on where a toolkit stands: both cross the same wire,
 /// and the generated client gives one name to one type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

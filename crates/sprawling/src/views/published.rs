@@ -59,8 +59,8 @@ impl Published {
 /// and has no poisoned state.
 pub(crate) fn answer_outside_the_lock(
     views: &Published,
-    query: &channels::Query,
-) -> (kernel::Seq, Result<channels::Answer, AxError>) {
+    query: &wire::Query,
+) -> (kernel::Seq, Result<wire::Answer, AxError>) {
     let snapshot = views.snapshot();
     let as_of = snapshot.next_unfolded();
     let prepared = snapshot.prepare(query);

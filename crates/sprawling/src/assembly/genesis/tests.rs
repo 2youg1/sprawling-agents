@@ -64,20 +64,20 @@ fn deleting_every_log_line_leaves_the_history_byte_identical() {
         let base_url = base_url.clone();
         let mut worker = RunWorker::new(dir, gateway::Custodian::in_memory(), log).unwrap();
         worker
-            .handle(channels::Command::AttachEndpoint {
-                name: channels::ProviderName::parse("house").unwrap(),
+            .handle(wire::Command::AttachEndpoint {
+                name: wire::ProviderName::parse("house").unwrap(),
                 base_url,
                 dialect: kernel::DialectKind::OpenAi,
                 secret: None,
                 auth_header: None,
                 admit: Vec::new(),
-                tuning: channels::EndpointTuning::default(),
+                tuning: wire::EndpointTuning::default(),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
             })
             .unwrap();
         worker
-            .handle(channels::Command::SelectModel {
-                endpoint: channels::ProviderName::parse("house").unwrap(),
+            .handle(wire::Command::SelectModel {
+                endpoint: wire::ProviderName::parse("house").unwrap(),
                 model: "m-local".to_owned(),
                 tag: kernel::ModelTag::Main,
                 context_tokens: kernel::Window::new(32_768),
@@ -88,7 +88,7 @@ fn deleting_every_log_line_leaves_the_history_byte_identical() {
         // A command that fails, so the refuse level has something to
         // write in the noisy run and nothing to change in the quiet
         // one.
-        let _ = worker.handle(channels::Command::Cancel {
+        let _ = worker.handle(wire::Command::Cancel {
             run: RunId::CITY,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"cancel"),
         });
@@ -181,9 +181,9 @@ fn a_building_created_from_the_control_surface_is_read_back_by_the_city() {
         runtime::diagnostics::Diagnostics::off(),
     )
     .unwrap();
-    let create = |name: &str| channels::Command::CreateBuilding {
+    let create = |name: &str| wire::Command::CreateBuilding {
         addr: Address::parse("vault").unwrap(),
-        template: channels::TemplateName::parse(name).unwrap(),
+        template: wire::TemplateName::parse(name).unwrap(),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
     };
 

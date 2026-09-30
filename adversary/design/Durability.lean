@@ -9,7 +9,7 @@
 Specifies `crates/memory/src/jsonl/barrier.rs`, the state `Barrier` that
 `append_all` consults before a wave and mends after its last sync. The Rust
 code is the authority on how the ledger holds the property; this model is the
-authority on which property must hold (memory-SPEC.md 8-1).
+authority on which property must hold (storage-SPEC.md 8-1).
 
 The disk is a list of cells: a whole record carrying its seq, or bytes a wave
 left behind when its write died partway. Opening the ledger keeps the records

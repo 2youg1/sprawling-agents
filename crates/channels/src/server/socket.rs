@@ -5,7 +5,7 @@
 
 //! One WebSocket session, from the upgrade to its end: the shell around
 //! [`decide_frame`]. Every branch is a send, a receive, or the end of
-//! the session; the judgements are `channels::reception`'s.
+//! the session; the judgements are `wire::reception`'s.
 //!
 //! A refusal made minutes later has no way home, which is why a command
 //! carries the [`Reply`] address of whoever sent it.
@@ -18,9 +18,9 @@ use axum::response::Response;
 use kernel::{AxCode, AxError, Seq};
 use tokio::sync::broadcast;
 
+use crate::frames::{Answered, Ask, AskOutcome, Sample, ServerFrame};
 use crate::reception::inbound::Inbound;
 use crate::reception::{SessionState, SessionStep, Stream, WelcomeFacts, decide_frame};
-use crate::wire::{Answered, Ask, AskOutcome, Sample, ServerFrame};
 
 use super::config::{Answering, ShellState};
 use super::reply::{Delivered, Reply};

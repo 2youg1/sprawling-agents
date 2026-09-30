@@ -21,8 +21,8 @@ mod toolchain;
 
 use super::family::{CHROMIUM_ROW, GECKO_ROW, WEBKIT_ROW};
 use super::{Detection, Need, PerPlatform, Pin, Platform, Recipe, Requirement, Tier, Upstream};
-use channels::DoctorUnread;
 use kernel::{AxCode, AxError};
+use wire::DoctorUnread;
 
 /// The environment variable a person may point at a CPython-WASI
 /// component with. Spelled here and nowhere else: the exec tool asks

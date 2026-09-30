@@ -56,7 +56,7 @@ impl RunWorker {
     pub(in crate::assembly) fn open_session(
         &mut self,
         addr: &Address,
-        carry: channels::Carry,
+        carry: wire::Carry,
         from: Option<kernel::Origin>,
     ) -> Result<(), AxError> {
         if let Some(working) = self.collaborating.rooms.worked_by(addr) {
@@ -76,16 +76,16 @@ impl RunWorker {
             self.origin_is_real(origin)?;
         }
         match carry {
-            channels::Carry::Nothing => city::clear_session(&self.city_root, addr)?,
+            wire::Carry::Nothing => city::clear_session(&self.city_root, addr)?,
             // The frozen shape always goes: that is what made the room
             // dispatchable again, and a person who carries the summary
             // changed the model. Only the handoff slot is kept.
-            channels::Carry::Handoff => city::forget_shape(&self.city_root, addr)?,
+            wire::Carry::Handoff => city::forget_shape(&self.city_root, addr)?,
         }
         // Read after the act rather than before it: `Nothing` has just
         // removed the file, and asking first would answer about a slot
         // this call is in the middle of emptying.
-        let carried = matches!(carry, channels::Carry::Handoff)
+        let carried = matches!(carry, wire::Carry::Handoff)
             && city::handoff(&self.city_root, addr)?.is_some();
         self.record_at(
             EventKind::SessionOpened,
@@ -107,17 +107,17 @@ impl RunWorker {
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         self.index
             .refresh(&dir)
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         let owner = match self.index.reader(&dir).line_at(origin.at_seq) {
             // A line of a newer kind is not a line of that run's
             // conversation, which is the refusal below; a line that is no
             // record at all is a damaged ledger, and says so.
-            Ok(line) => match memory::read_line(&line) {
-                Ok(memory::CheckedLine::Known(record)) => Some(record.run()),
-                Ok(memory::CheckedLine::IgnoredUnknown(_)) => None,
+            Ok(line) => match storage::read_line(&line) {
+                Ok(storage::CheckedLine::Known(record)) => Some(record.run()),
+                Ok(storage::CheckedLine::IgnoredUnknown(_)) => None,
                 Err(fault) => return Err(fault.into_ax(origin.at_seq.value().saturating_add(1))),
             },
-            Err(memory::MemoryError::SeqMissing { .. }) => None,
+            Err(storage::StorageError::SeqMissing { .. }) => None,
             Err(other) => return Err(other.into_ax()),
         };
         if owner != Some(origin.run) {

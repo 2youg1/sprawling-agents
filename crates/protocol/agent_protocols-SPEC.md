@@ -1,6 +1,6 @@
-# protocol-SPEC.md
+# agent_protocols-SPEC.md
 
-> crate：`protocol`。本 SPEC 先于代码存在；实现不多不少地遵守本文。
+> crate：`agent_protocols`。本 SPEC 先于代码存在；实现不多不少地遵守本文。
 > 骨架：apostle-sdd 十七节；按模块分章、每章自足（ARCHITECTURE.md §5）。
 > 动手前先读所用工具与依赖的**官方文档或官方 agent 指南**，再写本文的接口节。
 
@@ -112,7 +112,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 - **开场必须是 `initialize`**，携 `protocolVersion`、`capabilities`、`clientInfo` 三项；随后必须发 `notifications/initialized`，之后才能问别的。故 `handshake()` 是这条生命周期的**唯一权威**，坐在两个传输之上——两个传输各写一遍就是两份会漂的生命周期。
 - **`capabilities` 故意为空**：roots／sampling／elicitation 是 server 反过来向**我们**要的能力；声明一项本城没实现的能力，等于招来一个随后只能拒的请求。
-- **会话住传输层，不住本 crate**，因为规范把它写在 Transports 而不是 Lifecycle：server **可选**在 `initialize` 应答的头里发 `Mcp-Session-Id`；一旦发了，客户端 **MUST** 在此后每一次请求带回。404 意味着 server 结束了会话，**MUST** 重开一个——故 `protocol::mcp::http` 遇 404 丢掉 id，而不是拿一个已死的 id 永远碰下去。带着会话 id 的 404 标 `retriable`：按规范 server 对已结束会话的请求一律答 404，调用没有被执行，下一次派遣先重开会话；不带会话 id 的 404 标不可重试，它说的是地址不对，再问只得到同一个答。
+- **会话住传输层，不住本 crate**，因为规范把它写在 Transports 而不是 Lifecycle：server **可选**在 `initialize` 应答的头里发 `Mcp-Session-Id`；一旦发了，客户端 **MUST** 在此后每一次请求带回。404 意味着 server 结束了会话，**MUST** 重开一个——故 `agent_protocols::mcp::http` 遇 404 丢掉 id，而不是拿一个已死的 id 永远碰下去。带着会话 id 的 404 标 `retriable`：按规范 server 对已结束会话的请求一律答 404，调用没有被执行，下一次派遣先重开会话；不带会话 id 的 404 标不可重试，它说的是地址不对，再问只得到同一个答。
 - **已知的向前变化**：更新的修订正在把会话去掉（SEP-2575）。本客户端协商的是 `2025-06-18` 并按那一版行事；一台忽略该头的 server 不会因此变得不可用。
 - **HTTP 传输带自己的 User-Agent**：CDN 后面的托管 server 可能对不报名的客户端回 403 `browser_signature_banned`，早于任何 MCP 消息。
 
@@ -130,9 +130,9 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 **出站**：装配层按楼的配置取一条 `McpLink`（先找常驻的，子进程已退出时 `McpLink::open` 新开）→ `handshake`（`initialize` → `notifications/initialized`）→ `Rpc::list_tools` → `tools_from` → catalog 与 bench 各注册一次（工具表随 Run 冻结）→ 模型调用 → `McpTool::invoke` → `call_tool`（浮点检查）→ `Outbound::call` → `Rpc::read` → `ToolOutcome`（污染态）→ 装配层落 `tool_called`／`tool_result`。
 
-**入站**：`channels` 的入站中间件先与这座城的配对令牌常数时间比对（`channels::auth`，未配对即在路由层被拒）→ 装配层收 HTTP／stdio 请求 → `Incoming::parse` → `admit` → `Admitted::Dispatch` → 走与人相同的 `Command::Dispatch` 路径 → 期间回 `Progress`。
+**入站**：`wire` 的入站中间件先与这座城的配对令牌常数时间比对（`wire::auth`，未配对即在路由层被拒）→ 装配层收 HTTP／stdio 请求 → `Incoming::parse` → `admit` → `Admitted::Dispatch` → 走与人相同的 `Command::Dispatch` 路径 → 期间回 `Progress`。
 
-**配对判定不住本 crate**：令牌住 `channels`，判定住那一层中间件，本 crate 因此既看不见密钥也不持有它的副本；`admit` 只判 reserved prefix 这一条本 crate 独有的规则。
+**配对判定不住本 crate**：令牌住 `wire`，判定住那一层中间件，本 crate 因此既看不见密钥也不持有它的副本；`admit` 只判 reserved prefix 这一条本 crate 独有的规则。
 
 ## 10 实现逻辑
 
@@ -170,7 +170,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 ## 15 影响面
 
-改 `Outbound`、`McpLink` 或 `tools_from` 的签名，波及 `crates/sprawling` 的 `assembly::mcp`、`assembly::workbench::servers` 与 `views::mcp_health`；改 `Incoming`／`admit` 波及入站路由与 `channels::auth` 的配对比对。
+改 `Outbound`、`McpLink` 或 `tools_from` 的签名，波及 `crates/sprawling` 的 `assembly::mcp`、`assembly::workbench::servers` 与 `views::mcp_health`；改 `Incoming`／`admit` 波及入站路由与 `wire::auth` 的配对比对。
 
 ## 16 测试与约束
 
@@ -225,7 +225,7 @@ pub fn gated(answer: &str, starts: &Path, gate: &Path) -> (String, Vec<String>);
 pub fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>); // 每次启动在 starts 里记一笔
 ```
 
-- **传输住协议旁边，不住组合根**：三种传输与握手说同一个协议，差别只在字节去哪。放在装配层时，`protocol` 定义了 `Outbound` 缝却看不见它的生产实现；组合根只剩「一栋楼按配置连哪几台 server」（`bin::assembly::mcp`）。拒绝的另一方案是把传输留在 `sprawling`、只搬 `McpLink`：那样 `McpLink` 的三个分支仍指向另一个 crate 的私有类型，搬不动。
+- **传输住协议旁边，不住组合根**：三种传输与握手说同一个协议，差别只在字节去哪。放在装配层时，`agent_protocols` 定义了 `Outbound` 缝却看不见它的生产实现；组合根只剩「一栋楼按配置连哪几台 server」（`bin::assembly::mcp`）。拒绝的另一方案是把传输留在 `sprawling`、只搬 `McpLink`：那样 `McpLink` 的三个分支仍指向另一个 crate 的私有类型，搬不动。
 - **`site()` 由传输的拥有者给出**：报错地址是「哪个模块到达了这台 server」，只有拥有这三个模块的 crate 能不漂地说出它。
 - **HTTP 与 SSE 共用一个客户端构造**（`mcp::http::client_for`）：代理规则、user agent 与构造失败的拒词只写一处。两者唯一的差别是整请求时限，作为参数 `WholeRequest` 递进去：HTTP 取 `DefaultTimeout`（一次 post 与它的回答），SSE 取 `Unbounded`，因为 SSE 的 body 就是整段对话，reqwest 的整请求时限会把流掐断。被否：SSE 自留一份构造只为多一行 `timeout(None)`——两份构造一旦有一份改了代理规则，另一份就静默地走另一条出网路径。
 - **子进程回收逻辑原样搬移**：期限到即杀子进程，理由见 `mcp::stdio` 的模块文档。
@@ -247,13 +247,13 @@ pub struct Toolkit { pub slug: String, pub name: String, pub auth: String, pub s
 pub enum Connection { Absent, Awaiting { consent_url: String }, Connected { alias: String }, Refused { refusal: AxError } }
 ```
 
-- **住 `protocol::mcp`，不住 `gateway`**：它回答的是「连哪台 MCP server 上的哪个应用」，与三种传输同属一件事；出网的两条政策（代理规则、HTTP 客户端的构造）仍只在 `gateway::client_for` 一处，broker 经它取客户端，测试的 `Broker::at` 也一样（`Proxying::ExceptLocal` 对回环地址不走代理），所以本库之内没有第二个构造点。拒绝的另一方案是留在 `gateway`：那样 MCP 一分为二，`gateway` 要知道一家 MCP 服务的目录形状。
-- **返回自己的词汇，不返回线上形状**：装配层把 `Toolkit`／`Connection` 映成 `channels::ToolkitLine`，与它把握手映成 `McpState` 同一做法。
+- **住 `agent_protocols::mcp`，不住 `gateway`**：它回答的是「连哪台 MCP server 上的哪个应用」，与三种传输同属一件事；出网的两条政策（代理规则、HTTP 客户端的构造）仍只在 `gateway::client_for` 一处，broker 经它取客户端，测试的 `Broker::at` 也一样（`Proxying::ExceptLocal` 对回环地址不走代理），所以本库之内没有第二个构造点。拒绝的另一方案是留在 `gateway`：那样 MCP 一分为二，`gateway` 要知道一家 MCP 服务的目录形状。
+- **返回自己的词汇，不返回线上形状**：装配层把 `Toolkit`／`Connection` 映成 `wire::ToolkitLine`，与它把握手映成 `McpState` 同一做法。
 - **只有一家 broker，所以没有 trait**：第二家外包服务才是这条缝的第二个实现。
 - 失败码：401／403 抬 `E_CREDENTIAL_MISSING`；408／429／5xx 抬可重试的 `E_PROVIDER`；连接阶段超时抬可重试的 `E_PROVIDER`（请求还没离开这台电脑）；请求发出之后等答超时抬 `effect_unknown` 的 `E_PROVIDER`，因为 `connect` 会在 broker 那边建一份 auth config，重发可能建出第二份；2xx 之后 body 读不完（连接在答案中途断开）同样抬 `effect_unknown` 的 `E_PROVIDER`，subject 带读不出的原因——broker 已经照做了，丢的只是答案；非 2xx 的 body 读不出时，读不出的原因代替 body 作附近文字；其余状态、读不出的答案与接不上 base 的路径抬 `E_PROVIDER`。接不上的路径在 recovery 里报出本模块的路径（`module_path!()`），模块再搬家也不漂。
 - 字段按防御方式读：缺一个字段少一行，不毁整张答案；测试里的假 server 是本 crate 对 broker 所发内容的陈述。
 
-### 8-19 官方 harness 出站：五家与一场 ACP 会话（`protocol::harness`；`roster` 形状 6 数据面，`session` 形状 4 适配器）
+### 8-19 官方 harness 出站：五家与一场 ACP 会话（`agent_protocols::harness`；`roster` 形状 6 数据面，`session` 形状 4 适配器）
 
 订阅额度由厂商自己的 harness 带进城（gateway-SPEC §8-5）。本节是这条路的传输半：认得哪几家、怎么把一家起成一个说 ACP 的子进程、怎么跟它开一场会话并把它说的话读回来。**本城是 ACP 的 client**，与 §8-2 的入站方向相反。
 

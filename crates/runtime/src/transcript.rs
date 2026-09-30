@@ -28,8 +28,8 @@ use std::path::Path;
 
 use kernel::layout::TRANSCRIPT_EXT;
 use kernel::{Address, AxCode, AxError, Locator, RunId};
-use memory::Cas;
 use serde_json::Value;
+use storage::Cas;
 
 use crate::conversation::Conversation;
 use crate::redact;
@@ -155,13 +155,13 @@ impl Transcript {
         room: &Address,
     ) -> Result<TranscriptRecord, AxError> {
         let bytes = self.bytes();
-        let origin = memory::BlockOrigin {
+        let origin = storage::BlockOrigin {
             run: self.run,
             building: room.clone(),
         };
         let hash = cas
             .put_for(&bytes, &origin)
-            .map_err(memory::MemoryError::into_ax)?;
+            .map_err(storage::StorageError::into_ax)?;
         let original = Locator::cas(hash);
         let address = Transcript::address(room, self.run)?;
         let path = city_root.join(address.as_str());

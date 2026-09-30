@@ -23,18 +23,18 @@ use super::{register_row, root_manifest};
 /// `` `dispatch`, `wake`, … `` in the order the schema declares.
 ///
 /// The tags are read out of the schema rather than lower-cased from the
-/// variant names, because `rename_all = "snake_case"` is `channels`'
+/// variant names, because `rename_all = "snake_case"` is `wire`'
 /// decision and a second implementation of it here would be a second
 /// authority for how a frame is spelled on the wire.
 pub(super) fn wire_tags(kind: &str) -> Result<String, XtaskError> {
-    let schema = channels::wire_schema();
+    let schema = wire::wire_schema();
     let members = schema
         .get("$defs")
         .and_then(|defs| defs.get(kind))
         .and_then(|family| family.get("oneOf"))
         .and_then(serde_json::Value::as_array)
         .ok_or_else(|| XtaskError::Doc {
-            file: "channels::wire_schema".to_owned(),
+            file: "wire::wire_schema".to_owned(),
             msg: format!("`$defs.{kind}` is not a `oneOf` of variants"),
         })?;
     let mut tags = Vec::with_capacity(members.len());
@@ -57,13 +57,13 @@ pub(super) fn wire_tags(kind: &str) -> Result<String, XtaskError> {
             .get("enum")
             .and_then(serde_json::Value::as_array)
             .ok_or_else(|| XtaskError::Doc {
-                file: "channels::wire_schema".to_owned(),
+                file: "wire::wire_schema".to_owned(),
                 msg: format!("a `{kind}` variant is neither an object nor a listed tag"),
             })?;
         for tag in listed {
             let Some(tag) = tag.as_str() else {
                 return Err(XtaskError::Doc {
-                    file: "channels::wire_schema".to_owned(),
+                    file: "wire::wire_schema".to_owned(),
                     msg: format!("a `{kind}` tag is not a string"),
                 });
             };
@@ -72,7 +72,7 @@ pub(super) fn wire_tags(kind: &str) -> Result<String, XtaskError> {
     }
     if tags.is_empty() {
         return Err(XtaskError::Doc {
-            file: "channels::wire_schema".to_owned(),
+            file: "wire::wire_schema".to_owned(),
             msg: format!("`$defs.{kind}` declares no variant"),
         });
     }
@@ -346,14 +346,8 @@ mod tests {
         let commands = wire_tags("Command").unwrap();
         assert!(commands.contains("`dispatch`"), "{commands}");
         assert!(commands.contains("`put_document`"), "{commands}");
-        assert_eq!(
-            commands.matches('`').count() / 2,
-            channels::COMMAND_NAMES.len()
-        );
+        assert_eq!(commands.matches('`').count() / 2, wire::COMMAND_NAMES.len());
         let queries = wire_tags("Query").unwrap();
-        assert_eq!(
-            queries.matches('`').count() / 2,
-            channels::QUERY_NAMES.len()
-        );
+        assert_eq!(queries.matches('`').count() / 2, wire::QUERY_NAMES.len());
     }
 }

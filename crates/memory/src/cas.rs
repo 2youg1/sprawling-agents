@@ -34,7 +34,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use kernel::{B3Hash, Range};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
@@ -45,12 +45,12 @@ pub struct Cas {
 
 impl Cas {
     /// Production entrance: std filesystem underneath.
-    pub fn open(dir: &Path) -> Result<Cas, MemoryError> {
+    pub fn open(dir: &Path) -> Result<Cas, StorageError> {
         Cas::open_with(Box::new(RealFs::new()), dir)
     }
 
     /// Injection point for the fault adapter (tests only).
-    pub(crate) fn open_with(mut vfs: Box<dyn Vfs>, dir: &Path) -> Result<Cas, MemoryError> {
+    pub(crate) fn open_with(mut vfs: Box<dyn Vfs>, dir: &Path) -> Result<Cas, StorageError> {
         let objects = dir.join("b3");
         let tmp = dir.join("tmp");
         vfs.create_dir_all(&objects)
@@ -83,7 +83,7 @@ impl Cas {
 
     /// Content-addressed put: hash, dedup by existence, tmp + sync +
     /// rename + dir sync. `Ok` means the named object is durable.
-    pub fn put(&mut self, bytes: &[u8]) -> Result<B3Hash, MemoryError> {
+    pub fn put(&mut self, bytes: &[u8]) -> Result<B3Hash, StorageError> {
         let hash = B3Hash::from_bytes(*blake3::hash(bytes).as_bytes());
         let (shard_dir, path) = self.object_path(&hash);
         if self.vfs.exists(&path) {
@@ -120,10 +120,10 @@ impl Cas {
     }
 
     /// Full read, re-verified against the address.
-    pub fn get(&self, hash: &B3Hash) -> Result<Vec<u8>, MemoryError> {
+    pub fn get(&self, hash: &B3Hash) -> Result<Vec<u8>, StorageError> {
         let (_, path) = self.object_path(hash);
         if !self.vfs.exists(&path) {
-            return Err(MemoryError::CasMissing {
+            return Err(StorageError::CasMissing {
                 hash: hash.to_string(),
             });
         }
@@ -133,7 +133,7 @@ impl Cas {
             .map_err(io_err("read cas object", &path))?;
         let echo = blake3::hash(&bytes);
         if echo.as_bytes() != hash.as_bytes() {
-            return Err(MemoryError::CasCorrupt {
+            return Err(StorageError::CasCorrupt {
                 hash: hash.to_string(),
                 path,
             });
@@ -148,10 +148,10 @@ impl Cas {
     /// in [`ranges`]: a range read cannot re-verify an address that
     /// covers the whole object, so it trusts what `put` verified, and a
     /// caller that needs the address proved calls [`Cas::get`].
-    pub fn get_range(&self, hash: &B3Hash, range: &Range) -> Result<Vec<u8>, MemoryError> {
+    pub fn get_range(&self, hash: &B3Hash, range: &Range) -> Result<Vec<u8>, StorageError> {
         let (_, path) = self.object_path(hash);
         if !self.vfs.exists(&path) {
-            return Err(MemoryError::CasMissing {
+            return Err(StorageError::CasMissing {
                 hash: hash.to_string(),
             });
         }

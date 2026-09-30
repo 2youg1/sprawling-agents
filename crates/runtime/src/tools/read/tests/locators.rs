@@ -45,8 +45,8 @@ fn git(root: &Path, args: &[&str]) -> String {
 fn a_cas_block_is_read_at_the_building_it_was_put_for() {
     let dir = tempfile::tempdir().unwrap();
     let cas_dir = kernel::layout::CityLayout::new(dir.path()).cas();
-    let mut cas = memory::Cas::open(&cas_dir).unwrap();
-    let put_in = |building: &str| memory::BlockOrigin {
+    let mut cas = storage::Cas::open(&cas_dir).unwrap();
+    let put_in = |building: &str| storage::BlockOrigin {
         run: kernel::RunId::from_bytes([7; 16]),
         building: kernel::Address::parse(building).unwrap(),
     };
@@ -79,8 +79,8 @@ fn a_cas_block_is_read_at_the_building_it_was_put_for() {
 fn a_cas_block_put_for_two_buildings_is_judged_at_the_first_that_opens() {
     let dir = tempfile::tempdir().unwrap();
     let cas_dir = kernel::layout::CityLayout::new(dir.path()).cas();
-    let mut cas = memory::Cas::open(&cas_dir).unwrap();
-    let put_in = |building: &str| memory::BlockOrigin {
+    let mut cas = storage::Cas::open(&cas_dir).unwrap();
+    let put_in = |building: &str| storage::BlockOrigin {
         run: kernel::RunId::from_bytes([7; 16]),
         building: kernel::Address::parse(building).unwrap(),
     };

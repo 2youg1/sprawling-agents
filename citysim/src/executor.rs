@@ -20,7 +20,6 @@ use kernel::{
     Address, AxCode, AxError, B3Hash, BuildingPolicy, FrozenConfig, IdemKey, Locator, Payload,
     RunId, Seq, Temporal, TimeMs,
 };
-use memory::Checkpoint;
 use runtime::bench::{BenchOutcome, ToolBench};
 use runtime::clock::StampGate;
 use runtime::handoff::Handoff;
@@ -29,6 +28,7 @@ use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
 use runtime::run::{RunHooks, RunPlan, SafePoint, drive};
 use runtime::turn::{CallShape, Interrupt};
 use serde_json::{Map, Value};
+use storage::Checkpoint;
 
 use crate::mem_ledger::MemLedger;
 use crate::script_model::ScriptModel;
@@ -299,18 +299,18 @@ pub fn run_scenario_on(
             // A fence is signed by the session that raised it. The
             // scenario has no endpoint, so the model id is the
             // scripted one and no effort was asked for.
-            let of = memory::Provenance::new(
+            let of = storage::Provenance::new(
                 run,
                 addr.clone(),
                 kernel::B3Hash::digest(who.as_bytes()),
-                memory::ModelChoice {
+                storage::ModelChoice {
                     id: "script".to_owned(),
                     effort: None,
                 },
             );
             let mut fence = |t: TimeMs| {
                 net.wave_pre(scope, t, &of)
-                    .map_err(memory::MemoryError::into_ax)
+                    .map_err(storage::StorageError::into_ax)
             };
             let mut hooks = RunHooks {
                 now: &mut now,

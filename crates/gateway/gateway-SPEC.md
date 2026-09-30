@@ -24,7 +24,7 @@
 - endpoint：对回环假 provider 服务的半流中断（SSE 截断→E_PROVIDER 且不产伪 ModelReturn）＋幂等重试（同 IdemKey 重发，对外恰一次效果——由调用方 dedup 看守，endpoint 自身无重试暗策略）。
 - credential：A13 链——人交出的值进金库（`set`，名字由调用方给）→`secret_captured` 入账（无明文无哈希前缀，写者是装配层 `credentials::signing`）→配置只见 `secret:`→resolve 兑付产 `credential_lent`→`describe` 恒不返回值。**外来字节的扫描与就地替换不在本 crate**：那是 `runtime::redact`，本 crate 不留第二份。持久性四档（§8-21）可注入验证。
 - 调优：一个端点从表单与从导入两条路径附着后，`Query::Config` 回答的超时与重试相同；未调过的端点读到的三个默认值来自 `EndpointTuning::DEFAULTS` 而非任何第二处。
-- cost：权威计费额在场则恒胜价目推算；两源不一致时以权威为准并记差额；A20 的取材面（对账断言住 memory::attribution）。
+- cost：权威计费额在场则恒胜价目推算；两源不一致时以权威为准并记差额；A20 的取材面（对账断言住 storage::attribution）。
 
 ## 3 假设与歧义
 
@@ -286,7 +286,7 @@ pub fn settle(usage: &ModelUsage, authoritative: Option<UsdMicros>, entry: &Mode
 ```
 
 - 权威计费额在场恒胜（`CostSource::Authoritative`）；缺席则按价目推算：`input×input_price/1M + output×output_price/1M + cache 两项`，全程 checked 整数（溢出→E_INVALID_ARGS 报「结算溢出」）。model_returned 载荷含 `billed_usd_micros`＋usage 四整数，A20 对账消费之。
-- **四项价格皆零的价目行不结算**：`Endpoint::returned` 只在 `ModelEntry::states_a_price()`（四项价格至少一项非零）时调 `settle`，否则 `billed_usd_micros` 缺席。选型点在目录不认识模型时把四项价格填零，本地模型的行也是零；把它们结算成 `0` 会让账本说「量过了，花了零」，而实际是没有人报过价——`memory::Attribution` 把缺席记为无报价的调用并数它的 token，成本页据此说「没有报价」。落选的是「结算出 0 再由读者猜 0 是否可信」：同一个 0 在两种城里意思相反，读者没有凭据分辨。
+- **四项价格皆零的价目行不结算**：`Endpoint::returned` 只在 `ModelEntry::states_a_price()`（四项价格至少一项非零）时调 `settle`，否则 `billed_usd_micros` 缺席。选型点在目录不认识模型时把四项价格填零，本地模型的行也是零；把它们结算成 `0` 会让账本说「量过了，花了零」，而实际是没有人报过价——`storage::Attribution` 把缺席记为无报价的调用并数它的 token，成本页据此说「没有报价」。落选的是「结算出 0 再由读者猜 0 是否可信」：同一个 0 在两种城里意思相反，读者没有凭据分辨。
 
 ### 8-9 gateway::router（形状 7 projection）
 
@@ -408,7 +408,7 @@ pub(crate) fn transcription_of(wire: &serde_json::Value) -> Result<String, AxErr
 
 **为何 `Recording` 是值而不是一对参数**：字节与它的格式永远同行，且两条不变量（非空、不超 `RECORDING_MAX_BYTES`）只在 `new` 一处守；无 setter。**为何 `wire` 与 `transcriber` 分家**：「这段多部分请求体长什么样」是纯数据的判定、可逐字节断言，「怎么把它发出去并兑付凭据」要一个 socket——两件事变化的理由不同。
 
-**线上的入口是 `channels` 的 `POST /transcribe`**（`crates/channels/src/reception/admission.rs`），经 `TranscribeSink` 交到这里；它不是 `Command` 的变体。
+**线上的入口是 `wire` 的 `POST /transcribe`**（`crates/channels/src/reception/admission.rs`），经 `TranscribeSink` 交到这里；它不是 `Command` 的变体。
 
 ## 8.5 两个设计（crate 级）
 
@@ -452,7 +452,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 
 ## 15 影响面
 
-kernel::model 持 canonical 会话类型（kernel-SPEC §8-24）；runtime 回合层消费 ChatRequest；memory::attribution 消费 model_returned 的 usage 与 billed 字段；citysim ScriptModel 收同一个 ChatRequest（同一缝）。
+kernel::model 持 canonical 会话类型（kernel-SPEC §8-24）；runtime 回合层消费 ChatRequest；storage::attribution 消费 model_returned 的 usage 与 billed 字段；citysim ScriptModel 收同一个 ChatRequest（同一缝）。
 
 ## 16 测试与约束
 
@@ -547,7 +547,7 @@ pub fn is_local(base_url: &str) -> bool;                                        
 - **`socks` 不花钱**：reqwest 0.13 的 `socks = []` 是空 feature，实现就在它自己的 `connect.rs` 里，锁文件不多一个包。`system-proxy` 只在 Windows 与 macOS 各拉一个读系统设置的包。
 - **全城的 HTTP 客户端都在 `reach::proxy` 里造**（`client_for`）。同一条规则写在五处就是五条规则，它们一直一致到其中一处被改为止；更要紧的是，分段读数若自己再判一次，它报出的就是一条请求不会走的路——而那正是看报告的人唯一无法自己核实的东西：客户端已经 `no_proxy` 了，读数却按环境变量报 `Environment`，就是这种分叉。
 - **默认把打到这台电脑的调用摘出代理，但那是默认而不是定理**（`Proxying::ExceptLocal`）：开了 system-proxy 之后，一台配了代理的机器会把回环也送进代理，本地推理服务器由别人的网关代答 502。但把它写死就是替所有人做了一个只对大多数人成立的决定，而这一类决定失效时没有任何一屏能告诉人到底发生了什么。它是 `EndpointTuning.proxying` 的默认值，另两个值各自对应一类真实的机器（kernel-SPEC.md 8-50），而无论哪一个，读数都会把结论写在 `through` 那一格里。
-- **工具服务器用默认值，且是显式地用**（`protocol::mcp::http`、`protocol::mcp::sse`）：它没有一份属于自己的设置可携。**会重新打开这一条的参数**：出现一个必须经代理才能够到的回环 MCP 服务器——到那时 `McpServer` 也要长出这一字段，而不是在这里改常量。
+- **工具服务器用默认值，且是显式地用**（`agent_protocols::mcp::http`、`agent_protocols::mcp::sse`）：它没有一份属于自己的设置可携。**会重新打开这一条的参数**：出现一个必须经代理才能够到的回环 MCP 服务器——到那时 `McpServer` 也要长出这一字段，而不是在这里改常量。
 - **`is_local` 是全城唯一的那一条判断**：`client_for` 的代理豁免（`Through::LocalAddress`）、地址规整时缺省的 scheme 与兼容格式提示、设置页上那个 `local` 标记，读的是同一个函数。回环按 `IpAddr::is_loopback` 判，外加 `localhost` 与 `*.localhost`，所以 `127.0.0.2` 在每一处都算这台电脑；两份判断只会在某一处先被改掉时各说各的。
 - **5 秒一段**：设置页上有人在等，一个在这个时间里答不出来的主机，人要的是知道，而不是继续等。
 
@@ -607,7 +607,7 @@ impl OutputCeiling {
 - **一个 host 说几面，各挂在哪，是本表的一列（`faces`）**。它取代原来的 `base_path` 与 `dialect` 两列：一列只能说一条路径与一个默认面，而厂商文档常把两种兼容格式挂在同一 host 的两条路径下（DeepSeek 的 OpenAI 兼容面在 `/`、Anthropic 兼容面在 `/anthropic`；Kimi Code 的 OpenAI 兼容面在 `/coding/v1`、Anthropic 兼容面在 `/coding/`）。**默认面只在恰一面时存在**：两面以上时替人挑一面就是替人猜，归一化照旧让人选。人粘了裸 host 时，路径取他所选那一面的路径；他还没选时取第一面的路径，第一面因此按厂商文档的主推面排。
 - **设置页的厂商表读本表，客户端不另持一份**（`known_hosts`）。每一面的 base URL 由 `normalise_entered(host, 那一面)` 算出，所以页上填进框里的地址，就是登记时这座城会算出的同一个地址；客户端据同一答案决定哪几面可选。落选的是保留客户端的 `presets.ts`：它与本表已经分歧（它说 DeepSeek 只有 chat 面，本表与厂商文档都说 chat 与 responses 两面都在），第二份表只会继续分歧。
 - **本表登记的 host**（逐行注出处）：`api.anthropic.com`、`api.openai.com`、`api.deepseek.com`（`/`：文档印的 base URL 不带路径，补 `/v1` 就离开了文档）、`api.x.ai`、`openrouter.ai`、`generativelanguage.googleapis.com`（`/v1beta/openai`：OpenAI 兼容面挂在这里，`/v1beta` 之下是 Gemini 自己的形状，本城没有那支笔）、`open.bigmodel.cn` 与 `api.z.ai`（`/api/paas/v4`，智谱国内与海外两站）、`opencode.ai`（`/zen/v1`；OpenCode Go 挂在同一 host 的 `/zen/go/v1`，人粘的路径恒不被改写，所以 Go 的人粘带路径的 URL），加 `api.kimi.com`（`/coding/v1`）、`api.moonshot.cn`（`/v1`）、`api.moonshot.ai`（`/v1`），后三行读自 `MoonshotAI/kimi-cli` 的 `src/kimi_cli/auth/platforms.py`（docs/third-party.md §1 已列为被看路径），兼容格式为 OpenAI 兼容——同仓 `kosong/chat_provider/openai_common.py` 以这三个 base URL 构造 OpenAI 客户端。**`api.kimi.com` 与 `openrouter.ai` 是同一类缺陷的两个实例**：一律补 `/v1` 会把 Kimi Code 会员端点指到不存在的路径。
-- **`label` 与「价格」两列不进本表——这是一条决定**。`label`：一个端点在人眼前叫什么，已有唯一的家，即人自己填的 `EndpointTuning.label`（§8-16）；人没填时该显示什么，从 summary 已经携带的 base URL 里按 `reach::split` 读一次 host 即得。厂商展示名再落一列，就是把 URL 已经携带的事实重拼一遍，而两处一旦不一致，界面上那个名字与实际调用的主机会指向两家厂商。「价格」：一次调用按什么价结算，也已有唯一的家，且是一架有序的梯——厂商在 `/v1/models` 里陈述的原文（`ModelFacts.input_price`／`output_price`，§8-16）在上，钉版目录按精确 id（§8-7）在下，而 `CostSource::Authoritative` 在两者之上；按 host ＋ id 前缀再加一个索引，就是同一批厂商数字的第三个家。**结算读的是登记那一刻写进 `model_selected` 的那份价目**，故表里改一个数也追不回已登记的模型，第三个家只会静默地与前两个分叉。**重开参数**：当一次真实调用在钉版目录无行、上游又不陈述价目而必须结算出非零金额时，价目以**迁移**而非新增索引的方式进本表——把价目事实从 `MarketSnapshot` 整体搬到 host ＋ id 前缀索引下，钉版目录同期删去价目列，每格带复核日期。`label` 的重开参数同理：`channels::EndpointSummary` 决定展示名不再由人填时，那一列进表且 `EndpointTuning.label` 同期降为覆盖值。
+- **`label` 与「价格」两列不进本表——这是一条决定**。`label`：一个端点在人眼前叫什么，已有唯一的家，即人自己填的 `EndpointTuning.label`（§8-16）；人没填时该显示什么，从 summary 已经携带的 base URL 里按 `reach::split` 读一次 host 即得。厂商展示名再落一列，就是把 URL 已经携带的事实重拼一遍，而两处一旦不一致，界面上那个名字与实际调用的主机会指向两家厂商。「价格」：一次调用按什么价结算，也已有唯一的家，且是一架有序的梯——厂商在 `/v1/models` 里陈述的原文（`ModelFacts.input_price`／`output_price`，§8-16）在上，钉版目录按精确 id（§8-7）在下，而 `CostSource::Authoritative` 在两者之上；按 host ＋ id 前缀再加一个索引，就是同一批厂商数字的第三个家。**结算读的是登记那一刻写进 `model_selected` 的那份价目**，故表里改一个数也追不回已登记的模型，第三个家只会静默地与前两个分叉。**重开参数**：当一次真实调用在钉版目录无行、上游又不陈述价目而必须结算出非零金额时，价目以**迁移**而非新增索引的方式进本表——把价目事实从 `MarketSnapshot` 整体搬到 host ＋ id 前缀索引下，钉版目录同期删去价目列，每格带复核日期。`label` 的重开参数同理：`wire::EndpointSummary` 决定展示名不再由人填时，那一列进表且 `EndpointTuning.label` 同期降为覆盖值。
 - **中转站转发厂商的 id 时，厂商的行作答，但排在中转站自己的陈述之后**：`model_for` 先查 base URL 所在 host 自己的行；这个 host 在本表没有模型行、且 `reach::is_local` 答否时，再在全表里按最长前缀查发布这个 id 的厂商的行。理由：中转站的模型列表几乎从不陈述上限（上游档因此空着），而 messages 兼容格式非写一个数不可——落到策略缺省的 8192 与中转站的事实毫无关系，比它所转发的那个模型的文档上限更远；一个把上限压得更低的中转站会以一次拒绝说出来，而拒绝的恢复语指向设置页上那一格，这比一次被静默截断、以 `limit` 结束的跑更容易被人看懂。`reach::is_local` 答是的 host 不查厂商的行：本地推理服务上一个同名的量化模型，窗口是那个服务的配置，套用厂商图表就是把一个它放不下的数字发给它。**重开参数**：当中转站普遍在 `/v1/models` 里陈述上限时，这一档对它们沉默也不失什么，可以撤回。
 - **主机表只有这一张**：`router::normalise` 的路径与形状缺省从本表取（`openrouter.ai` 是 `/api/v1`、Gemini 的兼容面是 `/v1beta/openai`），`Endpoint::wire_request` 的 chat 面拼法与会话标识头也从本表取，归一化算法与 dialect 自身都不带任何主机名。
 

@@ -78,7 +78,7 @@ png = "0.18"
 # S2 pins: Sealed<T> zeroization.
 secrecy = "0.10"
 zeroize = "1.9"
-# S4 pins: channels is the first true async
+# S4 pins: the wire crate is the first true async
 # consumer in the workspace - S3 deferred tokio to here on purpose. axum
 # carries tokio-tungstenite itself, so the WS protocol has one version
 # authority, not two.
@@ -96,7 +96,7 @@ tower = { version = "0.5", features = ["util"] }
 # served through a terminator that holds the certificate. What the city
 # owes that deployment is the other half, and it is enforced rather than
 # configured: a face reachable beyond this machine refuses to serve
-# without a credential (channels-SPEC section 8-41). Loading a
+# without a credential (wire-SPEC section 8-41). Loading a
 # certificate, renewing it, and choosing cipher suites here would put
 # "how the control surface is protected" in two homes at once - the
 # proxy's configuration and the city's.
@@ -121,8 +121,8 @@ cap-fs-ext = "4"
 # authorities for one client is how two TLS stacks end up in one binary.
 # The remote door's cryptography: ML-KEM-768, ML-DSA-44, X25519, Ed25519,
 # HKDF and AES-GCM from one library that is already in the graph through
-# rustls, with the features rustls turns on, so building `remote` alone
-# needs no assembler either (remote-SPEC.md section 13).
+# rustls, with the features rustls turns on, so building `remote_access` alone
+# needs no assembler either (remote_access-SPEC.md section 13).
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "prebuilt-nasm"] }
 reqwest = { version = "0.13", default-features = false, features = [
     "blocking",
@@ -169,7 +169,7 @@ chacha20poly1305 = { version = "0.11", default-features = false, features = ["al
 argon2 = { version = "0.6", default-features = false, features = ["alloc", "zeroize"] }
 # The JSON Schema the TypeScript client is generated from. The
 # derive reads the same serde attributes the wire is encoded with, so both
-# ends of the socket have one authority; optional in kernel and channels
+# ends of the socket have one authority; optional in kernel and wire
 # (`schema`), turned on by xtask alone, never by the product binary.
 schemars = { version = "1", features = ["uuid1"] }
 # The workspace's own packages: the one place their paths and published
@@ -177,17 +177,17 @@ schemars = { version = "1", features = ["uuid1"] }
 # exactly, because a path dependency without one cannot be published;
 # Cargo refuses to resolve a pin that disagrees with it.
 kernel = { package = "sprawling-kernel", path = "crates/kernel", version = "=0.0.7" }
-memory = { package = "sprawling-storage", path = "crates/memory", version = "=0.0.7" }
+storage = { package = "sprawling-storage", path = "crates/memory", version = "=0.0.7" }
 gateway = { package = "sprawling-gateway", path = "crates/gateway", version = "=0.0.7" }
 runtime = { package = "sprawling-runtime", path = "crates/runtime", version = "=0.0.7" }
 collab = { package = "sprawling-collab", path = "crates/collab", version = "=0.0.7" }
 city = { package = "sprawling-city", path = "crates/city", version = "=0.0.7" }
-# `channels` turns its default features off here because accounting and
+# `wire` turns its default features off here because accounting and
 # xtask take it without its listener; sprawling and citysim name `server`
 # themselves, so a feature later added to its default reaches neither.
-channels = { package = "sprawling-wire", path = "crates/channels", version = "=0.0.7", default-features = false }
+wire = { package = "sprawling-wire", path = "crates/channels", version = "=0.0.7", default-features = false }
 browser = { package = "sprawling-browser", path = "crates/browser", version = "=0.0.7" }
-protocol = { package = "sprawling-agent-protocols", path = "crates/protocol", version = "=0.0.7" }
+agent_protocols = { package = "sprawling-agent-protocols", path = "crates/protocol", version = "=0.0.7" }
 accounting = { package = "sprawling-accounting", path = "crates/accounting", version = "=0.0.7" }
 sprawling = { path = "crates/sprawling", version = "=0.0.7" }
 sprawling-desktop = { path = "desktop", version = "=0.0.7" }

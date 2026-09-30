@@ -15,7 +15,7 @@ use crate::assembly::*;
 fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
     let dir = tempfile::tempdir().unwrap();
     let report = init_city(dir.path()).unwrap();
-    let segment = memory::ledger_segments_at(&report.ledger_dir)
+    let segment = storage::ledger_segments_at(&report.ledger_dir)
         .unwrap()
         .pop()
         .unwrap();
@@ -53,8 +53,8 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
     )
     .unwrap();
     worker
-        .handle(channels::Command::Halt {
-            scope: channels::HaltScope::City,
+        .handle(wire::Command::Halt {
+            scope: wire::HaltScope::City,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"halt"),
         })
         .unwrap();
@@ -73,9 +73,9 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
     let (mut views, (_ledger, _report, standing)) = fold_city(&report.ledger_dir).unwrap();
     // Answered from what `Views::apply` folded, not from the on-disk index.
     for applied in [
-        channels::Query::CityView,
-        channels::Query::Governance,
-        channels::Query::ApprovalQueue,
+        wire::Query::CityView,
+        wire::Query::Governance,
+        wire::Query::ApprovalQueue,
     ] {
         assert_eq!(
             views.answer(&applied),

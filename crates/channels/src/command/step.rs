@@ -9,7 +9,7 @@
 //!
 //! Each of them is the protocol's own vocabulary with no upstream
 //! owner, which is what separates them from the carried names in
-//! `channels::carried_name`: those defer to whoever owns the value set,
+//! `wire::carried_name`: those defer to whoever owns the value set,
 //! and these have no one to defer to.
 
 use kernel::Address;

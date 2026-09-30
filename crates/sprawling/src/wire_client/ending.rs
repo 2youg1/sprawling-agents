@@ -134,26 +134,25 @@ pub(super) enum Ending {
 
 impl Ending {
     /// A query is answered once, and a greeting on a live session is
-    /// refused once (`channels::reception`), so both have one reply.
-    pub(super) fn of(sent: &channels::ClientFrame, until: Until) -> Self {
+    /// refused once (`wire::reception`), so both have one reply.
+    pub(super) fn of(sent: &wire::ClientFrame, until: Until) -> Self {
         match (sent, until) {
             (
-                channels::ClientFrame::Ask(_) | channels::ClientFrame::Hello(_),
+                wire::ClientFrame::Ask(_) | wire::ClientFrame::Hello(_),
                 Until::Quiet | Until::Event(_) | Until::Run { .. },
             ) => Self::Reply,
-            (channels::ClientFrame::Command(_), Until::Quiet) => Self::Quiet,
-            (channels::ClientFrame::Command(_), Until::Event(kind)) => Self::Event(kind),
-            (channels::ClientFrame::Command(_), Until::Run { under, milestone }) => Self::Run {
+            (wire::ClientFrame::Command(_), Until::Quiet) => Self::Quiet,
+            (wire::ClientFrame::Command(_), Until::Event(kind)) => Self::Event(kind),
+            (wire::ClientFrame::Command(_), Until::Run { under, milestone }) => Self::Run {
                 under,
                 milestone,
                 run: None,
             },
             // A watch has no reply and names no run: the city's quiet
             // is the only end it can have.
-            (
-                channels::ClientFrame::Monitor(_),
-                Until::Quiet | Until::Event(_) | Until::Run { .. },
-            ) => Self::Quiet,
+            (wire::ClientFrame::Monitor(_), Until::Quiet | Until::Event(_) | Until::Run { .. }) => {
+                Self::Quiet
+            }
         }
     }
 
@@ -265,24 +264,24 @@ pub(super) enum Reply {
 
 impl Reply {
     pub(super) fn of(text: &str) -> Self {
-        match serde_json::from_str::<channels::ServerFrame>(text) {
-            Ok(channels::ServerFrame::Answered(answered)) => match answered.outcome {
-                channels::AskOutcome::Answer(_) => Self::Answer,
-                channels::AskOutcome::Refusal(_) => Self::Refusal,
+        match serde_json::from_str::<wire::ServerFrame>(text) {
+            Ok(wire::ServerFrame::Answered(answered)) => match answered.outcome {
+                wire::AskOutcome::Answer(_) => Self::Answer,
+                wire::AskOutcome::Refusal(_) => Self::Refusal,
             },
-            Ok(channels::ServerFrame::Refusal(_)) => Self::Refusal,
-            Ok(channels::ServerFrame::Event(record)) => Self::Event {
+            Ok(wire::ServerFrame::Refusal(_)) => Self::Refusal,
+            Ok(wire::ServerFrame::Event(record)) => Self::Event {
                 kind: record.kind(),
                 run: record.run(),
                 addr: record.addr().cloned(),
             },
             Ok(
-                channels::ServerFrame::Welcome(_)
-                | channels::ServerFrame::Delta(_)
-                | channels::ServerFrame::Log(_)
-                | channels::ServerFrame::Lagged(_)
-                | channels::ServerFrame::Output(_)
-                | channels::ServerFrame::Monitor(_),
+                wire::ServerFrame::Welcome(_)
+                | wire::ServerFrame::Delta(_)
+                | wire::ServerFrame::Log(_)
+                | wire::ServerFrame::Lagged(_)
+                | wire::ServerFrame::Output(_)
+                | wire::ServerFrame::Monitor(_),
             ) => Self::Other,
             // A frame this build cannot read is still printed; it is
             // simply not one that ends the call.

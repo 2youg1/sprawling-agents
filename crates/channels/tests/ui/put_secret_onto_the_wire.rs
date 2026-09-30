@@ -10,7 +10,7 @@
 fn main() {
     // 1. Serialize the in-process command: `Sealed<String>` has no
     //    `Serialize`, so neither does the enum carrying it.
-    let local = channels::Command::PutSecret {
+    let local = wire::Command::PutSecret {
         realm: "anthropic".to_owned(),
         name: "api".to_owned(),
         value: kernel::Sealed::new(Box::new("sk-not-a-real-key".to_owned())),
@@ -19,7 +19,7 @@ fn main() {
 
     // 2. Put a plaintext credential in the wire-side variant: its payload
     //    type is uninhabited, so no value - of any type - fits the field.
-    let _remote = channels::WireCommand::PutSecret {
+    let _remote = wire::WireCommand::PutSecret {
         realm: "anthropic".to_owned(),
         name: "api".to_owned(),
         value: "sk-not-a-real-key".to_owned(),

@@ -16,11 +16,11 @@ fuzz_target!(|data: &[u8]| {
     let seg = dir.path().join("ledger-00000000000000000000.jsonl");
     std::fs::write(&seg, data).expect("write fuzz segment");
 
-    match memory::JsonlLedger::open(dir.path(), kernel::TimeMs::new(0)) {
+    match storage::JsonlLedger::open(dir.path(), kernel::TimeMs::new(0)) {
         Ok((ledger, _)) => {
             let lines = ledger.read_raw_lines().expect("read back");
             drop(ledger);
-            let (reopened, report) = memory::JsonlLedger::open(dir.path(), kernel::TimeMs::new(1))
+            let (reopened, report) = storage::JsonlLedger::open(dir.path(), kernel::TimeMs::new(1))
                 .expect("second open after recovery");
             assert!(
                 report.recovered.is_none(),

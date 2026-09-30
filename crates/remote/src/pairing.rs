@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one-time code that pairs a device, from minting to the form a
-//! person copies (remote-SPEC.md §8-2).
+//! person copies (remote_access-SPEC.md §8-2).
 //!
 //! The door keeps only the code's digest. The text goes back to the
 //! caller, who shows it once, in a QR code and as characters; nothing in

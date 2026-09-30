@@ -45,10 +45,7 @@ fn a_vault_that_fell_back_to_session_memory_is_no_note_on_a_turn() {
     });
     let record = degraded(serde_json::from_value(notice).unwrap());
 
-    assert_eq!(
-        channels::note_of(EventKind::ProviderDegraded, &record),
-        None
-    );
+    assert_eq!(wire::note_of(EventKind::ProviderDegraded, &record), None);
 }
 
 #[test]
@@ -58,8 +55,8 @@ fn a_provider_refusal_is_still_a_refusal_on_the_turn() {
     let record = degraded(Payload::of(&error).unwrap());
 
     assert_eq!(
-        channels::note_of(EventKind::ProviderDegraded, &record),
-        Some(channels::Note::Refused {
+        wire::note_of(EventKind::ProviderDegraded, &record),
+        Some(wire::Note::Refused {
             error,
             at: Seq::FIRST
         })

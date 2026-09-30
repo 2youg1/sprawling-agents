@@ -29,7 +29,7 @@ pub(crate) struct CityAsk {
     plans: Arc<Mutex<PlanView>>,
     /// The answer as the fold holds it, with no buildings and no
     /// pursuit lines yet.
-    held: channels::CityAnswer,
+    held: wire::CityAnswer,
     pursuits: Vec<(Address, String, PursuitState)>,
     in_flight: u32,
 }
@@ -41,7 +41,7 @@ impl Views {
         CityAsk {
             city_root: self.city_root.clone(),
             plans: Arc::clone(&self.plans),
-            held: channels::CityAnswer {
+            held: wire::CityAnswer {
                 runs: self
                     .hot
                     .runs()
@@ -70,7 +70,7 @@ impl CityAsk {
     /// The verdict is computed here rather than on the page, so the stop
     /// condition has one authority: a client that worked out for itself
     /// whether a city had finished would be the second.
-    pub(super) fn read(self) -> channels::Answer {
+    pub(super) fn read(self) -> wire::Answer {
         let buildings = buildings_of(&self.city_root);
         let wanted: BTreeSet<Address> = buildings
             .iter()
@@ -86,7 +86,7 @@ impl CityAsk {
                     .get(&addr)
                     .map(|plan| plan.ready.as_slice())
                     .unwrap_or_default();
-                channels::PursuitLine {
+                wire::PursuitLine {
                     goal,
                     state,
                     verdict: kernel::pursuit::observe(state, ready, self.in_flight),
@@ -98,7 +98,7 @@ impl CityAsk {
             .into_iter()
             .filter_map(|addr| {
                 let plan = plans.remove(&addr)?;
-                Some(channels::BuildingProgress {
+                Some(wire::BuildingProgress {
                     addr,
                     progress: plan.progress,
                     problems: plan.problems,
@@ -107,7 +107,7 @@ impl CityAsk {
                 })
             })
             .collect();
-        channels::Answer::City(channels::CityAnswer {
+        wire::Answer::City(wire::CityAnswer {
             buildings,
             pursuits,
             ..self.held
@@ -120,10 +120,10 @@ impl CityAsk {
 /// The ledger keeps `Scope` and its own spelling; a page is answered in
 /// the vocabulary it would use to ask, so nothing on the other side has
 /// to take a string apart to know which building it is looking at.
-fn named(scope: &kernel::event::Scope) -> channels::HaltScope {
+fn named(scope: &kernel::event::Scope) -> wire::HaltScope {
     match scope {
-        kernel::event::Scope::City => channels::HaltScope::City,
-        kernel::event::Scope::Building(addr) => channels::HaltScope::Building(addr.clone()),
-        kernel::event::Scope::Workshop(addr) => channels::HaltScope::Workshop(addr.clone()),
+        kernel::event::Scope::City => wire::HaltScope::City,
+        kernel::event::Scope::Building(addr) => wire::HaltScope::Building(addr.clone()),
+        kernel::event::Scope::Workshop(addr) => wire::HaltScope::Workshop(addr.clone()),
     }
 }

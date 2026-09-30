@@ -30,8 +30,8 @@ use kernel::{
     Address, AxCode, AxError, DiscardForecast, Effect, EgressOutcome, EgressTarget, GateOutcome,
     GateSubject, IdemKey, Locator, TaintSet, Tool, ToolCall, ToolName, ToolOutcome, WriteDomain,
 };
-use memory::{Checkpoint, Provenance};
 use serde_json::Value;
+use storage::{Checkpoint, Provenance};
 
 mod admit;
 mod outside;
@@ -285,7 +285,7 @@ impl ToolBench {
             let payload = net
                 .checkpoint
                 .wave_pre(&net.scope, now, &net.of)
-                .map_err(kernel_error_from_memory)?;
+                .map_err(kernel_error_from_storage)?;
             fenced = payload
                 .as_map()
                 .get("oid")
@@ -393,9 +393,9 @@ pub struct Ticket {
     wrote: kernel::Writes,
 }
 
-/// The memory crate owns its own error root; the turn layer speaks
+/// The storage crate owns its own error root; the turn layer speaks
 /// AxError, so the conversion happens once, here.
-fn kernel_error_from_memory(err: memory::MemoryError) -> AxError {
+fn kernel_error_from_storage(err: storage::StorageError) -> AxError {
     err.into_ax()
 }
 #[cfg(test)]

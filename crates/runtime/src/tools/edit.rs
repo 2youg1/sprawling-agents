@@ -225,10 +225,10 @@ impl Tool for EditTool {
         let updated = text.replacen(old, new, 1);
         // A name that is a link lands this write somewhere the gate
         // never judged - `.git/hooks` through a junction is privilege
-        // escalation (memory-SPEC 8-25). And the write lands in a fresh
+        // escalation (storage-SPEC 8-25). And the write lands in a fresh
         // entry: the name is removed first and recreated, so a hard
         // link's other names keep their bytes.
-        memory::WriteTarget::within("edit file", &self.city_root, &path)
+        storage::WriteTarget::within("edit file", &self.city_root, &path)
             .map_err(|err| err.into_ax())?;
         if let Err(err) = std::fs::remove_file(&path) {
             // A name that is not there is what removal asked for; any
@@ -296,8 +296,8 @@ impl EditTool {
         // The alias check runs before any directory is made: making a
         // parent through a link would land a directory inside the
         // protected metadata the link reaches, before the write itself
-        // is refused (memory-SPEC 8-25).
-        memory::WriteTarget::within("edit file", &self.city_root, path)
+        // is refused (storage-SPEC 8-25).
+        storage::WriteTarget::within("edit file", &self.city_root, path)
             .map_err(|err| err.into_ax())?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|err| {

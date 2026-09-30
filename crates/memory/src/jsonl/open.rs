@@ -11,7 +11,7 @@ use kernel::consts_external::{LogVersion, readable_log_v};
 use kernel::ledger::chain_hash;
 use kernel::{AxCode, AxError, EventRecord, GENESIS_PREV, Seq, TimeMs};
 
-use crate::error::{MemoryError, io_err};
+use crate::error::{StorageError, io_err};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
@@ -31,7 +31,7 @@ impl JsonlLedger {
     /// `LedgerHeld` when another writer holds this ledger, in this
     /// process or another; otherwise whatever reading and repairing the
     /// segments reports.
-    pub fn open(dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), MemoryError> {
+    pub fn open(dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), StorageError> {
         let lock = WriterLock::take(dir)?;
         let (mut ledger, report) = JsonlLedger::open_with(Box::new(RealFs::new()), dir, now)?;
         ledger.lock = Some(lock);
@@ -42,7 +42,7 @@ impl JsonlLedger {
     /// power-loss model, for a caller that needs one named write to fail.
     ///
     /// Takes the concrete adapter rather than the trait, so the `Vfs`
-    /// seam stays inner (memory-SPEC 8-1) and no `pub trait` leaves this
+    /// seam stays inner (storage-SPEC 8-1) and no `pub trait` leaves this
     /// crate. What comes back is the same `JsonlLedger` production uses -
     /// a caller above this crate exercises its real code and loses only
     /// the write it named.
@@ -55,7 +55,7 @@ impl JsonlLedger {
         fs: crate::fault_fs::FaultFs,
         dir: &Path,
         now: TimeMs,
-    ) -> Result<(Self, OpenReport), MemoryError> {
+    ) -> Result<(Self, OpenReport), StorageError> {
         JsonlLedger::open_with(Box::new(fs), dir, now)
     }
 
@@ -65,7 +65,7 @@ impl JsonlLedger {
         mut vfs: Box<dyn Vfs>,
         dir: &Path,
         now: TimeMs,
-    ) -> Result<(Self, OpenReport), MemoryError> {
+    ) -> Result<(Self, OpenReport), StorageError> {
         vfs.create_dir_all(dir)
             .map_err(io_err("create ledger dir", dir))?;
         let segments: Vec<PathBuf> = vfs
@@ -118,7 +118,7 @@ impl JsonlLedger {
 
     /// Direction-aware version refusal, before any repair or parse
     /// (never a partial read of a newer ledger).
-    fn probe_version(&mut self, segments: &[PathBuf]) -> Result<(), MemoryError> {
+    fn probe_version(&mut self, segments: &[PathBuf]) -> Result<(), StorageError> {
         let Some(first) = segments.first() else {
             return Ok(());
         };
@@ -132,14 +132,14 @@ impl JsonlLedger {
         // A mangled first line in a single-segment ledger is tail damage:
         // it carries no version information, and tail recovery owns it.
         // With more segments behind it the same damage is non-tail and
-        // must refuse instead (memory-SPEC 8-1).
+        // must refuse instead (storage-SPEC 8-1).
         let probed = serde_json::from_slice::<serde_json::Value>(&first_line)
             .ok()
             .and_then(|value| value.get("v").and_then(serde_json::Value::as_u64));
         let v = match probed {
             Some(v) => v,
             None if segments.len() > 1 => {
-                return Err(MemoryError::Envelope {
+                return Err(StorageError::Envelope {
                     path: first.clone(),
                     line: 1,
                     source: AxError::failure(
@@ -159,11 +159,11 @@ impl JsonlLedger {
             // An older ledger opens: the history is append-only and the
             // lines an earlier build wrote are still its history.
             LogVersion::Current | LogVersion::Older => Ok(()),
-            LogVersion::Ahead => Err(MemoryError::VersionAhead {
+            LogVersion::Ahead => Err(StorageError::VersionAhead {
                 path: first.clone(),
                 v,
             }),
-            LogVersion::NotAVersion => Err(MemoryError::Envelope {
+            LogVersion::NotAVersion => Err(StorageError::Envelope {
                 path: first.clone(),
                 line: 1,
                 source: unversioned(v),
@@ -173,7 +173,11 @@ impl JsonlLedger {
 
     /// Boundary state entering the last segment: chain root, or the
     /// previous segment's verified last line.
-    fn boundary(&mut self, segments: &[PathBuf], last: &Path) -> Result<TailBoundary, MemoryError> {
+    fn boundary(
+        &mut self,
+        segments: &[PathBuf],
+        last: &Path,
+    ) -> Result<TailBoundary, StorageError> {
         let mut prior: Option<&PathBuf> = None;
         for seg in segments {
             if seg.as_path() == last {
@@ -195,7 +199,7 @@ impl JsonlLedger {
         let (lines, _) = complete_lines(&bytes);
         let count = u64::try_from(lines.len()).unwrap_or(u64::MAX);
         let Some(last_line) = lines.last() else {
-            return Err(MemoryError::Envelope {
+            return Err(StorageError::Envelope {
                 path: prior.clone(),
                 line: 0,
                 source: AxError::failure(
@@ -210,7 +214,7 @@ impl JsonlLedger {
             });
         };
         let record =
-            EventRecord::parse_line(last_line).map_err(|source| MemoryError::Envelope {
+            EventRecord::parse_line(last_line).map_err(|source| StorageError::Envelope {
                 path: prior.clone(),
                 line: count,
                 source,
@@ -218,7 +222,7 @@ impl JsonlLedger {
         let next = record
             .seq()
             .next()
-            .map_err(|source| MemoryError::Draft { source })?;
+            .map_err(|source| StorageError::Draft { source })?;
         let len = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
         Ok(TailBoundary {
             prev: chain_hash(last_line),
@@ -232,7 +236,7 @@ impl JsonlLedger {
 
     /// Tail-truncation recovery over the last segment. Returns dropped
     /// bytes; on return the ledger state points at the surviving tail.
-    fn recover_tail(&mut self, segments: &[PathBuf], last: &Path) -> Result<u64, MemoryError> {
+    fn recover_tail(&mut self, segments: &[PathBuf], last: &Path) -> Result<u64, StorageError> {
         let boundary = self.boundary(segments, last)?;
         let mut check = LineCheck::after(boundary.prev, boundary.next_seq);
         let prior = boundary.prior;
@@ -251,7 +255,7 @@ impl JsonlLedger {
             };
             // What a version refuses, it refuses by name: a line this
             // build cannot read is not tail damage, and truncating it
-            // would delete a newer build's history (memory-SPEC 8-1).
+            // would delete a newer build's history (storage-SPEC 8-1).
             // A tear only ever damages the tail and never leaves a record
             // behind, so a break is refused - not truncated - when the
             // breaking line carries an envelope (a fork: a second writer
@@ -265,7 +269,7 @@ impl JsonlLedger {
             };
             let source = match fault {
                 LineFault::VersionAhead(v) => {
-                    return Err(MemoryError::VersionAhead {
+                    return Err(StorageError::VersionAhead {
                         path: last.to_path_buf(),
                         v,
                     });
@@ -288,7 +292,7 @@ impl JsonlLedger {
                 | LineFault::NotCanonical(_)
                 | LineFault::SeqExhausted(_)) => other.into_ax(at),
             };
-            return Err(MemoryError::Envelope {
+            return Err(StorageError::Envelope {
                 path: last.to_path_buf(),
                 line: at,
                 source,

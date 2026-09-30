@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The durability barrier's state: whether the ledger's in-memory
-//! position still names what the disk holds (memory-SPEC 8-1).
+//! position still names what the disk holds (storage-SPEC 8-1).
 //!
 //! `adversary/design/Durability.lean` states the property this holds -
 //! every seq a handle answered `Ok` for survives a reopen - and proves it
@@ -15,7 +15,7 @@ use std::path::Path;
 
 use kernel::Seq;
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 /// Whether the ledger's in-memory position is the end of what its
 /// segments hold.
@@ -38,10 +38,10 @@ pub(crate) enum Barrier {
 impl Barrier {
     /// `Ok` while the position is the end of the segments; otherwise the
     /// refusal that sends the caller to a reopen.
-    pub(crate) fn admit(&self, dir: &Path, at: Seq) -> Result<(), MemoryError> {
+    pub(crate) fn admit(&self, dir: &Path, at: Seq) -> Result<(), StorageError> {
         match self {
             Barrier::Whole => Ok(()),
-            Barrier::Broken => Err(MemoryError::LedgerBroken {
+            Barrier::Broken => Err(StorageError::LedgerBroken {
                 dir: dir.to_path_buf(),
                 at,
             }),

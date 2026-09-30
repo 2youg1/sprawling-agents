@@ -29,8 +29,8 @@ use std::fmt::Debug;
 use std::path::Path;
 
 use kernel::{B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
-use memory::{HotView, LedgerIndex};
 use proptest::prelude::*;
+use storage::{HotView, LedgerIndex};
 
 /// The skeleton: build twice from the same records, observe both, and
 /// require the observations to agree. A view that fails this is not

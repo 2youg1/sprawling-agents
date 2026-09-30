@@ -20,7 +20,7 @@ pub trait Connectors {
     /// Starts or reaches `server`, shakes hands, and lists its tools, or
     /// hands out the tools of a connection an earlier run left running.
     ///
-    /// `confidential` travels to `protocol::McpTool::new`, which is the
+    /// `confidential` travels to `agent_protocols::McpTool::new`, which is the
     /// authority on whether such a tool may exist at all.
     ///
     /// # Errors
@@ -32,13 +32,13 @@ pub trait Connectors {
         write_root: &std::path::Path,
         confidential: bool,
         resolve: &gateway::SecretResolver,
-    ) -> Result<(Vec<protocol::McpTool>, Reached), AxError>;
+    ) -> Result<(Vec<agent_protocols::McpTool>, Reached), AxError>;
 }
 
 /// How one call to [`Connectors::connect`] reached its server.
 pub enum Reached {
     /// Started, or opened, and shaken hands with during this call.
-    Connected(protocol::Handshake),
+    Connected(agent_protocols::Handshake),
     /// Connected by an earlier call and still running.
     Resident,
 }

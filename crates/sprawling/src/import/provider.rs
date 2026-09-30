@@ -12,8 +12,8 @@
 //! one place those four become values this city can act on, so the two
 //! readers below differ only in the grammar they walk.
 
-use channels::ProviderName;
 use kernel::{Ceiling, DialectKind};
+use wire::ProviderName;
 
 /// Which harness on this machine an entry was read from.
 ///

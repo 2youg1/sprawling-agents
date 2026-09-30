@@ -216,12 +216,12 @@ fn a_second_tool_claiming_a_taken_name_is_refused() {
 }
 
 /// Who a fence in this test file is signed as.
-fn probe_provenance() -> memory::Provenance {
-    memory::Provenance::new(
+fn probe_provenance() -> storage::Provenance {
+    storage::Provenance::new(
         kernel::RunId::CITY,
         kernel::Address::parse("work/probe").unwrap(),
         kernel::B3Hash::digest(b"a city"),
-        memory::ModelChoice {
+        storage::ModelChoice {
             id: "test-model".to_owned(),
             effort: None,
         },

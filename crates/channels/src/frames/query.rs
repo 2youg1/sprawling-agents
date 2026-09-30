@@ -102,7 +102,7 @@ pub enum Query {
     /// and answers which files moved; this costs what one file costs
     /// and answers what moved inside it. One frame answering both would
     /// charge every "what changed here" with a whole batch of patches,
-    /// which is why `memory::changes` says a hunk has to be its own
+    /// which is why `storage::changes` says a hunk has to be its own
     /// request. This is that request.
     ///
     /// One path per frame; there is no spelling that asks for all of
@@ -194,7 +194,7 @@ pub enum Query {
     ///
     /// A node nobody claimed answers zero, not `Unavailable`: "no run
     /// has held this node" is a true answer. The money comes from
-    /// `memory::attribution` and is priced nowhere but `gateway::cost`.
+    /// `storage::attribution` and is priced nowhere but `gateway::cost`.
     CostOf {
         node: NodeId,
     },
@@ -295,7 +295,7 @@ pub enum Query {
     /// starts, a host that answers, an account that is still valid -
     /// and a remembered one would tell a person their server is up an
     /// hour after it stopped. It is the same handshake a run opens with
-    /// (`protocol::handshake`, then `tools/list`), so what this answers
+    /// (`agent_protocols::handshake`, then `tools/list`), so what this answers
     /// and what a model is given cannot disagree.
     ///
     /// **This is the one query that costs seconds.** A page asks it

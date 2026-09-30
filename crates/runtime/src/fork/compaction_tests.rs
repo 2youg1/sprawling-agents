@@ -36,7 +36,7 @@ fn a_branch_inherits_the_compacted_exchange_not_the_raw_records() {
         serde_json::to_string(&Payload::of(&serde_json::json!({ "note": prose(20_000) })).unwrap())
             .unwrap();
     let dir = tempfile::tempdir().unwrap();
-    let (mut ledger, _) = memory::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+    let (mut ledger, _) = storage::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
     let drafts = [
         line(
             EventKind::RunStarted,

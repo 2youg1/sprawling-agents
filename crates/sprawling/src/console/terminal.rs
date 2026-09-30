@@ -54,11 +54,11 @@ pub struct Terminal {
 // the socket rather than reimplemented beside it: `assembly::serve`
 // builds it once and hands the same `Arc` to both surfaces, so a number
 // this console prints and a number a browser draws cannot disagree.
-pub(crate) use channels::Answering;
 use kernel::Address;
 use std::io::{BufRead, Write};
 use std::net::SocketAddr;
 use std::sync::Arc;
+pub(crate) use wire::Answering;
 
 /// What this process is doing, in one screen.
 ///
@@ -76,7 +76,7 @@ use std::sync::Arc;
 /// identifier and the measurement stays one paste away.
 pub(crate) fn serving(
     terminal: &Terminal,
-    vitals: Option<&channels::MetricsAnswer>,
+    vitals: Option<&wire::MetricsAnswer>,
     pid: u32,
 ) -> String {
     let reach = if terminal.bind.ip().is_loopback() {
@@ -148,7 +148,7 @@ pub(crate) fn start(
     terminal: Terminal,
     desk: Arc<crate::assembly::CommandDesk>,
     answering: Answering,
-    mut watching: tokio::sync::broadcast::Receiver<channels::Committed>,
+    mut watching: tokio::sync::broadcast::Receiver<wire::Committed>,
 ) {
     // What happened, printed as it happens, one JSON object per line -
     // the same shape `sprawling call` prints, because a second rendering
@@ -234,8 +234,8 @@ pub(super) fn drive<R: BufRead, W: Write>(
                 // The counts come from the one question that already
                 // owns them, so this screen renders a number it never
                 // computes. A city too busy to answer still has a port.
-                let vitals = match answering(channels::Query::Metrics) {
-                    (_, Ok(channels::Answer::Metrics(vitals))) => Some(*vitals),
+                let vitals = match answering(wire::Query::Metrics) {
+                    (_, Ok(wire::Answer::Metrics(vitals))) => Some(*vitals),
                     (_, Ok(_) | Err(_)) => None,
                 };
                 say(out, &serving(terminal, vitals.as_ref(), std::process::id()));
@@ -277,19 +277,19 @@ pub(super) fn drive<R: BufRead, W: Write>(
 fn post<W: Write>(
     desk: &crate::assembly::CommandDesk,
     answering: &Answering,
-    frame: channels::ClientFrame,
+    frame: wire::ClientFrame,
     out: &mut W,
 ) {
     match frame {
-        channels::ClientFrame::Command(command) => {
+        wire::ClientFrame::Command(command) => {
             // A refusal comes back here rather than into a log file, over
             // the reply address the socket path already uses.
             desk.post(
                 (*command).into(),
-                channels::Reply::to(move |error: kernel::AxError| {
+                wire::Reply::to(move |error: kernel::AxError| {
                     eprintln!("  {error}");
                     eprintln!("  {}", error.recovery());
-                    channels::Delivered::ToThePeer
+                    wire::Delivered::ToThePeer
                 }),
             );
         }
@@ -297,8 +297,8 @@ fn post<W: Write>(
         // refused later. It goes to the same function the socket calls,
         // so a person inside a city stops being told to open a second
         // terminal and ask it from outside.
-        channels::ClientFrame::Ask(ask) => answer(answering, ask.query, out),
-        channels::ClientFrame::Hello(_) | channels::ClientFrame::Monitor(_) => {
+        wire::ClientFrame::Ask(ask) => answer(answering, ask.query, out),
+        wire::ClientFrame::Hello(_) | wire::ClientFrame::Monitor(_) => {
             say(out, "  this console is already inside the city");
         }
     }
@@ -310,7 +310,7 @@ fn post<W: Write>(
 /// the shape the event stream above already uses. Tables and diagrams
 /// belong to the browser; a console that drew them would be serving two
 /// masters at once.
-fn answer<W: Write>(answering: &Answering, query: channels::Query, out: &mut W) {
+fn answer<W: Write>(answering: &Answering, query: wire::Query, out: &mut W) {
     // The console prints each answer where it was asked, so it pairs
     // nothing and has no use for the date the answer was read at.
     let (_as_of, answered) = answering(query);
@@ -334,12 +334,12 @@ fn answer<W: Write>(answering: &Answering, query: channels::Query, out: &mut W) 
 }
 
 /// A line of work, as the Command a browser would have sent for it.
-fn dispatch(addr: &Address, task: &str, idem: kernel::IdemKey) -> channels::ClientFrame {
-    channels::ClientFrame::Command(Box::new(channels::WireCommand::Dispatch {
+fn dispatch(addr: &Address, task: &str, idem: kernel::IdemKey) -> wire::ClientFrame {
+    wire::ClientFrame::Command(Box::new(wire::WireCommand::Dispatch {
         addr: addr.clone(),
         task: task.to_owned(),
         goal: String::new(),
-        mode: channels::Mode::PlanGoal,
+        mode: wire::Mode::PlanGoal,
         idem,
         // `/at` already chose the room; a line typed after it
         // continues what is working there.

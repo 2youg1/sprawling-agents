@@ -48,8 +48,8 @@ Signal｜Inbox｜Steer｜Workshop｜NodeContract｜fan-in｜Artifact｜arbitrati
 
 **三件邻居的活，及它们各自的主人**（写「X 归 Y」而非「不做 X」：前者告诉施工者去哪，后者只告诉他别去哪里）：
 
-- **物理隔离归 `memory::worktree`**：本 crate 决定谁干什么、谁拿着哪份草稿；一节点一棵树与磁盘上限归 memory。
-- **人的干预动词归 `channels::control`**：`Steer`／`Cancel`／`Halt`／`Release` 从人那侧进城已有入口；本 crate 的 `steer` 只管 **Agent 发给 Agent** 那一条通道——两条通道入口不同而落点相同。
+- **物理隔离归 `storage::worktree`**：本 crate 决定谁干什么、谁拿着哪份草稿；一节点一棵树与磁盘上限归 memory。
+- **人的干预动词归 `wire::control`**：`Steer`／`Cancel`／`Halt`／`Release` 从人那侧进城已有入口；本 crate 的 `steer` 只管 **Agent 发给 Agent** 那一条通道——两条通道入口不同而落点相同。
 - **处置与监护归 `runtime::watchdog`**：停滞依据与纠正→冻结的升级梯已在那里，本 crate 不建第二套。
 
 **L2 工具为什么住在本 crate**：一件工具是 `kernel::tool` 缝的适配器，而适配器必须能命名它暴露的机制。依赖法写着 `runtime: kernel, memory, gateway`（ARCHITECTURE.md §2）——**runtime 恒不得指名 collab**，所以 `Signal` 与 `GoalEntry` 的工具面拼不进 `runtime::tools/`；放进 bin 则把四百行判定塞进全图最脏的那个文件且 citysim 测不到。故 L0 三件在 runtime，L2 协作工具在 collab。
@@ -72,7 +72,7 @@ impl Signal {
     pub fn consumed_payload(&self, by: &str) -> Result<Payload, AxError>;   // signal_consumed
     pub fn from_payload(payload: &Payload) -> Result<Signal, AxError>;      // enqueued_payload 的逆
 }
-pub struct Inbox { /* 两条 memory::EventQueue＋bandwidth —— 私有 */ }
+pub struct Inbox { /* 两条 storage::EventQueue＋bandwidth —— 私有 */ }
 impl Inbox {
     pub fn new(capacity: u64, bandwidth: u32) -> Inbox;
     pub fn deliver(&mut self, signal: &Signal) -> Result<Admission, AxError>;
@@ -85,7 +85,7 @@ impl Inbox {
 - **`take_steer` 取的是 lane 而不是 kind**：急件 lane 与 Steer 是同一个集合（`lane()` 只把 Steer 送进去），故“取一件能插队的东西”不需要在队列之上再建一层 kind 筛选——第二处判定只会与 `lane()` 分叉。它不碰普通 lane，因为插队与拆信是两件事：前者是别人把话塞进正在干活的人手里，后者是它自己决定去看信箱。
 - **读不回来的载荷在这条路上丢弃而不报错**，并写进了契约：调用点是一次 Run 的安全点，在那里除了“继续”的唯一替代选项是为别人的一条损坏条目停掉这一跑；同一条载荷仍然会在 `pull`（模型自己那扇门）上大声报错，所以事实不会消失。
 
-- **去重先于副作用**：去重由 `memory::EventQueue` 的 `seen` 给（IdemKey 由 `SignalId` 派生），而不在本模块再建一张表——一条规则一个权威。此事要成立，同一个 id 就必须恒落同一条 lane，**所以 lane 由 kind 推出、不由调用方给**。
+- **去重先于副作用**：去重由 `storage::EventQueue` 的 `seen` 给（IdemKey 由 `SignalId` 派生），而不在本模块再建一张表——一条规则一个权威。此事要成立，同一个 id 就必须恒落同一条 lane，**所以 lane 由 kind 推出、不由调用方给**。
 - **`SignalKind` 四值**：紧急与否必须是 Signal 自己的属性，否则同一件 Signal 从两个调用点进来会落入两条 lane，去重就有了两个权威。
 - **插队首＝一条先被排干的 lane**，不是队内优先级字段：一个结构里共存两种顺序，就会有人读错其中一种。
 - **pull bandwidth 在接收方**：发送方推不动接收方的上下文窗口；一次 `pull` 最多取 bandwidth 件，Signal 在 prefix 里恒占零字节，常驻的只是 `status` 的 `signals_pending`。
@@ -211,8 +211,8 @@ impl Pr<Verified> { pub fn verified_by(&self) -> &str; }
 - **判负线做成类型**：`Pr<Open>` 拿不到验证者的名字，`Artifact` 没有公开构造子；两条都由 `tests/ui/` 的编译失败反例钉住，不靠评审记得。
 - **不重判验证**：`Artifact` 已携「非生产者跑过 done_check」这个事实；本模块只补「这份产出是不是这个节点的」与「验证者不是实现者」这道兜底（近乎不可达，保留是因为「近乎」正在替一场没人做的评审干活）。
 - **记录不在这里写**：`pr_opened`／`pr_merged`／`pr_rejected` 的唯一权威是 `pr_tool::request`（§8-10），它的键里有被审的 `commit`；本模块只有 `Open→Verified` 这一段判定。
-- **没有 `Merged` 相位**：落地事实由 `EventKind::PrMerged` 与 `memory::worktree` 记，一个只承载 payload 而不做判定的相位就是记录的第二个家。判定梯到 `Verified` 为止。
-- **物理 merge 归 `memory::worktree`**：本 crate 决定，那个 crate 搬文件。merge 只走 fast-forward——trunk 动过即退回重做。
+- **没有 `Merged` 相位**：落地事实由 `EventKind::PrMerged` 与 `storage::worktree` 记，一个只承载 payload 而不做判定的相位就是记录的第二个家。判定梯到 `Verified` 为止。
+- **物理 merge 归 `storage::worktree`**：本 crate 决定，那个 crate 搬文件。merge 只走 fast-forward——trunk 动过即退回重做。
 
 ### 8-7 collab::arbiter（形状 1 判定）
 
@@ -450,7 +450,7 @@ impl ClaimTool { pub fn new(desk: Arc<Mutex<ClaimDesk>>) -> Result<ClaimTool, Ax
 
 （两个实质不同的接口方案，按杠杆率与缝的位置比较；落选方案就地留痕。）
 
-**第一对（工具怎么拿到活的跨 Run 状态）**：开一个 `peek` 让工具拿快照（落选）vs 把 Inbox 本体借给工具（选中）。快照方案要在 `memory::EventQueue` 与 `collab::Inbox` 两处各长一个新读面，并且它造出两份同时存在的队列——于是「谁才是顺序的权威」多了一个答案。借出方案零新 API，且与 bin 已有的 `interrupts` 借还同形。代价：借出期间工人手上没有该房间的队列，故归还必须在成败两条路上都发生（一条断言盯这件事）。
+**第一对（工具怎么拿到活的跨 Run 状态）**：开一个 `peek` 让工具拿快照（落选）vs 把 Inbox 本体借给工具（选中）。快照方案要在 `storage::EventQueue` 与 `collab::Inbox` 两处各长一个新读面，并且它造出两份同时存在的队列——于是「谁才是顺序的权威」多了一个答案。借出方案零新 API，且与 bin 已有的 `interrupts` 借还同形。代价：借出期间工人手上没有该房间的队列，故归还必须在成败两条路上都发生（一条断言盯这件事）。
 
 **第二对（谁来定一个 Run 写在哪）**：每个 dispatch 都领一棵树（落选）vs 楼的规则说了算（选中）。均一方案读起来干净，但它让每一次普通派活都付一次全量检出的代价，并且把「我派一个 Agent 改一行字」变成「还得再派一个来看一眼」。楼级开关把选择交回给人，且它与 `confidential` 同形同位——一个已有的权威多一行，而不是新开一个。
 
@@ -482,13 +482,13 @@ impl ClaimTool { pub fn new(desk: Arc<Mutex<ClaimDesk>>) -> Result<ClaimTool, Ax
 
 **决定**：房间没有版本，发言不带「作者所见的房间版本」进房间，也就没有退回作者、四路择一与 hold token。
 
-**理由**：它要防的两种冲突各有权威。同一份文件的并发写由 `memory` 的 `base_version` 乐观并发与 worktree 隔离解决；同一件事的并发认领由 `kernel::goal` 的同资源相斥与 `arbiter`（§8-7）解决。第三套机制就是第三个权威。`Signal` 的 `room_version` 在生产写点（`signal_tool`、`handback`）恒为 `Version::FIRST`。
+**理由**：它要防的两种冲突各有权威。同一份文件的并发写由 `storage` 的 `base_version` 乐观并发与 worktree 隔离解决；同一件事的并发认领由 `kernel::goal` 的同资源相斥与 `arbiter`（§8-7）解决。第三套机制就是第三个权威。`Signal` 的 `room_version` 在生产写点（`signal_tool`、`handback`）恒为 `Version::FIRST`。
 
 **重开参数**：出现一个真的会前进的房间版本，即有生产写点把 `room_version` 填成 `Version::FIRST` 以外的值。那时退回从那个写点长出来。
 
 ## 13 依赖选型
 
-拓扑硬约束：`kernel` 与 `memory`（ARCHITECTURE.md §2）。新外部依赖逐次论证，无论证即不引。
+拓扑硬约束：`kernel` 与 `storage`（ARCHITECTURE.md §2）。新外部依赖逐次论证，无论证即不引。
 
 ## 14 硬编码声明
 

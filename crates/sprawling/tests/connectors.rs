@@ -77,20 +77,21 @@ impl accounting::Connectors for Scripted {
         _write_root: &std::path::Path,
         confidential: bool,
         _resolve: &gateway::SecretResolver,
-    ) -> Result<(Vec<protocol::McpTool>, accounting::Reached), AxError> {
-        let tools = protocol::tools_from(&server.label, &protocol::Rpc::read(LISTING)?)?
-            .into_iter()
-            .map(|entry| {
-                protocol::McpTool::new(
-                    entry.meta,
-                    entry.remote,
-                    Box::new(protocol::ScriptedOutbound::new()),
-                    confidential,
-                )
-            })
-            .collect::<Result<Vec<_>, AxError>>()?;
-        let opened = protocol::Handshake {
-            protocol_version: protocol::PROTOCOL_VERSION.to_owned(),
+    ) -> Result<(Vec<agent_protocols::McpTool>, accounting::Reached), AxError> {
+        let tools =
+            agent_protocols::tools_from(&server.label, &agent_protocols::Rpc::read(LISTING)?)?
+                .into_iter()
+                .map(|entry| {
+                    agent_protocols::McpTool::new(
+                        entry.meta,
+                        entry.remote,
+                        Box::new(agent_protocols::ScriptedOutbound::new()),
+                        confidential,
+                    )
+                })
+                .collect::<Result<Vec<_>, AxError>>()?;
+        let opened = agent_protocols::Handshake {
+            protocol_version: agent_protocols::PROTOCOL_VERSION.to_owned(),
             server: "scripted".to_owned(),
         };
         Ok((tools, accounting::Reached::Connected(opened)))
@@ -144,21 +145,21 @@ fn a_run_is_offered_the_tools_the_worker_was_handed() {
     .unwrap()
     .with_models(Box::new(Listeners(Arc::clone(&offered))))
     .with_connectors(Box::new(Scripted));
-    let endpoint = channels::ProviderName::parse("dead").unwrap();
+    let endpoint = wire::ProviderName::parse("dead").unwrap();
     worker
-        .handle(channels::Command::AttachEndpoint {
+        .handle(wire::Command::AttachEndpoint {
             name: endpoint.clone(),
             base_url: refusing_url(),
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
             admit: vec![MODEL.to_owned()],
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: idem(b"attach"),
         })
         .unwrap();
     worker
-        .handle(channels::Command::SelectModel {
+        .handle(wire::Command::SelectModel {
             endpoint,
             model: MODEL.to_owned(),
             tag: kernel::ModelTag::Main,
@@ -168,14 +169,14 @@ fn a_run_is_offered_the_tools_the_worker_was_handed() {
         })
         .unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse(LAB).unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: idem(b"create"),
         })
         .unwrap();
     name_an_absent_server(dir.path());
-    let dispatched = worker.handle(channels::Command::Dispatch {
+    let dispatched = worker.handle(wire::Command::Dispatch {
         addr: Address::parse(LAB).unwrap(),
         task: "Answer.".to_owned(),
         goal: "one turn with the tools this worker was handed".to_owned(),
@@ -206,23 +207,29 @@ impl accounting::Connectors for Answering {
         _write_root: &std::path::Path,
         confidential: bool,
         _resolve: &gateway::SecretResolver,
-    ) -> Result<(Vec<protocol::McpTool>, accounting::Reached), AxError> {
+    ) -> Result<(Vec<agent_protocols::McpTool>, accounting::Reached), AxError> {
         let answer = serde_json::json!({
             "jsonrpc": "2.0",
             "id": 0,
             "result": { "content": [{ "type": "text", "text": self.0 }], "isError": false },
         })
         .to_string();
-        let tools = protocol::tools_from(&server.label, &protocol::Rpc::read(LISTING)?)?
-            .into_iter()
-            .map(|entry| {
-                let mut outbound = protocol::ScriptedOutbound::new();
-                outbound.answer(CALL, &answer)?;
-                protocol::McpTool::new(entry.meta, entry.remote, Box::new(outbound), confidential)
-            })
-            .collect::<Result<Vec<_>, AxError>>()?;
-        let opened = protocol::Handshake {
-            protocol_version: protocol::PROTOCOL_VERSION.to_owned(),
+        let tools =
+            agent_protocols::tools_from(&server.label, &agent_protocols::Rpc::read(LISTING)?)?
+                .into_iter()
+                .map(|entry| {
+                    let mut outbound = agent_protocols::ScriptedOutbound::new();
+                    outbound.answer(CALL, &answer)?;
+                    agent_protocols::McpTool::new(
+                        entry.meta,
+                        entry.remote,
+                        Box::new(outbound),
+                        confidential,
+                    )
+                })
+                .collect::<Result<Vec<_>, AxError>>()?;
+        let opened = agent_protocols::Handshake {
+            protocol_version: agent_protocols::PROTOCOL_VERSION.to_owned(),
             server: "scripted".to_owned(),
         };
         Ok((tools, accounting::Reached::Connected(opened)))
@@ -302,21 +309,21 @@ fn a_long_connector_answer_reaches_the_model_packaged() {
     .unwrap()
     .with_models(Box::new(Callers(Arc::clone(&read))))
     .with_connectors(Box::new(Answering(document.clone())));
-    let endpoint = channels::ProviderName::parse("dead").unwrap();
+    let endpoint = wire::ProviderName::parse("dead").unwrap();
     worker
-        .handle(channels::Command::AttachEndpoint {
+        .handle(wire::Command::AttachEndpoint {
             name: endpoint.clone(),
             base_url: refusing_url(),
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
             admit: vec![MODEL.to_owned()],
-            tuning: channels::EndpointTuning::default(),
+            tuning: wire::EndpointTuning::default(),
             idem: idem(b"attach"),
         })
         .unwrap();
     worker
-        .handle(channels::Command::SelectModel {
+        .handle(wire::Command::SelectModel {
             endpoint,
             model: MODEL.to_owned(),
             tag: kernel::ModelTag::Main,
@@ -326,14 +333,14 @@ fn a_long_connector_answer_reaches_the_model_packaged() {
         })
         .unwrap();
     worker
-        .handle(channels::Command::CreateBuilding {
+        .handle(wire::Command::CreateBuilding {
             addr: Address::parse(LAB).unwrap(),
-            template: channels::TemplateName::parse("minimal").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
             idem: idem(b"create"),
         })
         .unwrap();
     name_an_absent_server(dir.path());
-    let dispatched = worker.handle(channels::Command::Dispatch {
+    let dispatched = worker.handle(wire::Command::Dispatch {
         addr: Address::parse(LAB).unwrap(),
         task: "Convert.".to_owned(),
         goal: "one call to the server's tool".to_owned(),

@@ -9,7 +9,7 @@
 use std::path::{Path, PathBuf};
 
 use kernel::{Address, RunId, Seq};
-use memory::{StoredSnapshot, WholeFold};
+use storage::{StoredSnapshot, WholeFold};
 
 use super::*;
 use crate::assembly::{RunWorker, init_city};
@@ -18,9 +18,9 @@ use crate::views::snapshot::start::{FoldStart, cut, snapshot_dir, start};
 fn raise(worker: &mut RunWorker, names: std::ops::Range<u8>) {
     for n in names {
         worker
-            .handle(channels::Command::CreateBuilding {
+            .handle(wire::Command::CreateBuilding {
                 addr: Address::parse(&format!("lab{n}")).unwrap(),
-                template: channels::TemplateName::parse("minimal").unwrap(),
+                template: wire::TemplateName::parse("minimal").unwrap(),
                 idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, &[n]),
             })
             .unwrap();
@@ -43,7 +43,7 @@ fn cut_then_raise(city: &Path, more: std::ops::Range<u8>) -> (PathBuf, RunWorker
     .unwrap();
     raise(&mut worker, 0..3);
     cut(&ledger, &start::<Views>(&ledger).unwrap()).unwrap();
-    let cut = memory::read_snapshot(&snapshots(city)).unwrap();
+    let cut = storage::read_snapshot(&snapshots(city)).unwrap();
     assert!(matches!(cut, StoredSnapshot::Present(_)), "{cut:?}");
     raise(&mut worker, more);
     (ledger, worker)
@@ -60,8 +60,8 @@ fn from_genesis(city: &Path, ledger: &Path) -> Vec<u8> {
 fn a_start_after_a_cut_folds_only_the_tail_into_the_same_views() {
     let dir = tempfile::tempdir().unwrap();
     let (ledger, _worker) = cut_then_raise(dir.path(), 3..6);
-    let lines = memory::read_raw_lines_at(&ledger).unwrap().len();
-    let StoredSnapshot::Present(cut) = memory::read_snapshot(&snapshots(dir.path())).unwrap()
+    let lines = storage::read_raw_lines_at(&ledger).unwrap().len();
+    let StoredSnapshot::Present(cut) = storage::read_snapshot(&snapshots(dir.path())).unwrap()
     else {
         panic!("the snapshot is still there");
     };
@@ -107,15 +107,15 @@ fn a_tampered_snapshot_is_refused_and_the_whole_history_is_folded() {
 fn views_a_snapshot_cannot_decode_are_folded_from_genesis() {
     let dir = tempfile::tempdir().unwrap();
     let (ledger, _worker) = cut_then_raise(dir.path(), 3..4);
-    let lines = memory::read_raw_lines_at(&ledger).unwrap();
+    let lines = storage::read_raw_lines_at(&ledger).unwrap();
     let seq = Seq::new(u64::try_from(lines.len()).unwrap() - 1);
-    let snapshot = memory::ChainSnapshot::cut(
+    let snapshot = storage::ChainSnapshot::cut(
         crate::views::snapshot::views_fold_version(),
         seq,
         lines.last().unwrap(),
         b"not the views".to_vec(),
     );
-    memory::write_snapshot(&snapshots(dir.path()), &snapshot).unwrap();
+    storage::write_snapshot(&snapshots(dir.path()), &snapshot).unwrap();
 
     let refused = start::<Views>(&ledger).unwrap();
 
@@ -135,12 +135,12 @@ fn a_one_shot_read_refuses_a_line_edited_before_the_snapshot() {
     let dir = tempfile::tempdir().unwrap();
     let (ledger, worker) = cut_then_raise(dir.path(), 3..4);
     drop(worker);
-    let first = memory::ledger_segments_at(&ledger).unwrap().remove(0);
+    let first = storage::ledger_segments_at(&ledger).unwrap().remove(0);
     let mut bytes = std::fs::read(&first).unwrap();
     let at = bytes.windows(4).position(|held| held == b"\"t\":").unwrap() + 4;
     bytes[at] = if bytes[at] == b'1' { b'2' } else { b'1' };
     std::fs::write(&first, bytes).unwrap();
-    let memory::ChainAudit::Broken(reason) = memory::audit_chain(&ledger).unwrap() else {
+    let storage::ChainAudit::Broken(reason) = storage::audit_chain(&ledger).unwrap() else {
         panic!("the edited ledger still audits whole");
     };
 

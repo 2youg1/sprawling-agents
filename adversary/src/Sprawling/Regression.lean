@@ -22,7 +22,7 @@ them. Nothing is restated: the spellings, the endpoint's name and the model id
 are read from the module that owns them, so a cast changed there is a file
 rendered differently here.
 
-The emitted test enters by the door `channels::server` uses —
+The emitted test enters by the door `wire::server` uses —
 `assembly::RunWorker::handle` — rather than by a socket. The adversary attacks
 the binary over the wire because that is where an agent stands; the regression it
 hands back runs in-process because a committed test should not need a port, and
@@ -63,8 +63,8 @@ private def idemField (index : Nat) : String :=
   s!"idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b\"step{index}\"),"
 
 private def scopeOf : Scope → String
-  | .city => "channels::HaltScope::City"
-  | .building addr => s!"channels::HaltScope::Building(Address::parse({quoted addr}).unwrap())"
+  | .city => "wire::HaltScope::City"
+  | .building addr => s!"wire::HaltScope::Building(Address::parse({quoted addr}).unwrap())"
 
 private def verbOf : Action y → String
   | .raise .. => "CreateBuilding"
@@ -77,7 +77,7 @@ private def verbOf : Action y → String
 private def fieldsOf (index : Nat) : Action y → List String
   | .raise addr template =>
     [ s!"addr: Address::parse({quoted addr}).unwrap(),"
-    , s!"template: channels::TemplateName::parse({quoted template.name}).unwrap(),"
+    , s!"template: wire::TemplateName::parse({quoted template.name}).unwrap(),"
     , idemField index ]
   | .work addr session =>
     [ s!"addr: Address::parse({quoted addr}).unwrap(),"
@@ -96,7 +96,7 @@ private def fieldsOf (index : Nat) : Action y → List String
 /-- One `handle` call, laid out the way rustfmt lays a method chain out. -/
 private def handed (column : Nat) (index : Nat) (act : Action y) : List String :=
   let margin := "".pushn ' ' column
-  [margin ++ ".handle(channels::Command::" ++ verbOf act ++ " {"]
+  [margin ++ ".handle(wire::Command::" ++ verbOf act ++ " {"]
     ++ (fieldsOf index act).map (fun field => margin ++ "    " ++ field)
     ++ [margin ++ "})"]
 
@@ -228,7 +228,7 @@ private def preamble (name : String) (trace : Trace) : List String :=
   , "//! red, which is exactly what should happen when the two disagree."
   , "//!"
   , "//! The adversary drives the shipped binary over the wire. This enters by the"
-  , "//! same door `channels::server` does, so the trace runs without a port."
+  , "//! same door `wire::server` does, so the trace runs without a port."
   , ""
   , "#![allow("
   , "    clippy::unwrap_used,"
@@ -300,8 +300,8 @@ private def ceilingRegistered : List String :=
      , "    // `max_tokens` in every request, so a registration that kept the"
      , "    // ceiling unstated is a model this city cannot call at all."
      , "    worker"
-     , "        .handle(channels::Command::SelectModel {"
-     , s!"            endpoint: channels::ProviderName::parse({quoted relayName}).unwrap(),"
+     , "        .handle(wire::Command::SelectModel {"
+     , s!"            endpoint: wire::ProviderName::parse({quoted relayName}).unwrap(),"
      , s!"            model: {quoted unlistedModel}.to_owned(),"
      , "            tag: kernel::ModelTag::Main,"
      , "            context_tokens: None,"
@@ -354,14 +354,14 @@ private def attachHelper : List String :=
   , "    name: &str,"
   , "    base_url: &str,"
   , ") -> Result<(), kernel::AxError> {"
-  , "    worker.handle(channels::Command::AttachEndpoint {"
-  , "        name: channels::ProviderName::parse(name)?,"
+  , "    worker.handle(wire::Command::AttachEndpoint {"
+  , "        name: wire::ProviderName::parse(name)?,"
   , "        base_url: base_url.to_owned(),"
   , "        dialect: kernel::DialectKind::Anthropic,"
   , "        secret: None,"
   , "        auth_header: None,"
   , s!"        admit: vec![{quoted unlistedModel}.to_owned()],"
-  , "        tuning: channels::EndpointTuning::default(),"
+  , "        tuning: wire::EndpointTuning::default(),"
   , "        idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, name.as_bytes()),"
   , "    })"
   , "}" ]

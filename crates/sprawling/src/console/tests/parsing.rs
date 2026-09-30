@@ -27,7 +27,7 @@ use super::helpers::*;
 #[test]
 fn every_wire_verb_is_a_verb_this_console_answers_to() {
     let known = verbs();
-    for name in carried_commands().chain(channels::QUERY_NAMES.iter().copied()) {
+    for name in carried_commands().chain(wire::QUERY_NAMES.iter().copied()) {
         assert!(
             known.contains(&snake(name)),
             "{name} is on the wire and not in the console"
@@ -41,9 +41,9 @@ fn every_wire_verb_is_a_verb_this_console_answers_to() {
 #[test]
 fn no_control_verb_shares_a_name_with_a_wire_verb() {
     for control in CONTROL {
-        let clash = channels::COMMAND_NAMES
+        let clash = wire::COMMAND_NAMES
             .iter()
-            .chain(&channels::QUERY_NAMES)
+            .chain(&wire::QUERY_NAMES)
             .any(|name| snake(name) == control);
         assert!(!clash, "{control} means two things");
     }
@@ -90,8 +90,8 @@ fn a_query_with_no_arguments_is_the_bare_name() {
     };
     assert!(matches!(
         *frame,
-        channels::ClientFrame::Ask(channels::Ask {
-            query: channels::Query::CityView,
+        wire::ClientFrame::Ask(wire::Ask {
+            query: wire::Query::CityView,
             ..
         })
     ));
@@ -102,8 +102,8 @@ fn a_query_that_needs_an_argument_takes_it_as_json() {
         panic!("archive_search takes a needle");
     };
     match *frame {
-        channels::ClientFrame::Ask(channels::Ask {
-            query: channels::Query::ArchiveSearch { needle },
+        wire::ClientFrame::Ask(wire::Ask {
+            query: wire::Query::ArchiveSearch { needle },
             ..
         }) => {
             assert_eq!(needle, "beam");
@@ -132,7 +132,7 @@ fn a_known_verb_with_an_unreadable_body_is_told_apart_from_an_unknown_one() {
 #[test]
 fn help_names_every_verb_the_parser_answers_to() {
     let text = help(Some(&room()));
-    for name in carried_commands().chain(channels::QUERY_NAMES.iter().copied()) {
+    for name in carried_commands().chain(wire::QUERY_NAMES.iter().copied()) {
         assert!(text.contains(&snake(name)), "{name} is missing from help");
     }
     assert!(text.contains("lab/room1"), "help says where work goes");

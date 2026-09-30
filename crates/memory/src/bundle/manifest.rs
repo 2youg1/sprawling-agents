@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 use crate::vfs::Vfs;
 
 use super::files::{count_files, count_records, head_of};
@@ -45,7 +45,7 @@ impl Manifest {
         ledger_dir: &Path,
         cas_dir: &Path,
         files_root: &Path,
-    ) -> Result<Manifest, MemoryError> {
+    ) -> Result<Manifest, StorageError> {
         Ok(Manifest {
             records: count_records(vfs, ledger_dir)?,
             head: head_of(vfs, ledger_dir)?,
@@ -93,17 +93,17 @@ impl Manifest {
         serde_json::Value::Object(map).to_string()
     }
 
-    pub(crate) fn from_json(bytes: &[u8], at: &Path) -> Result<Manifest, MemoryError> {
+    pub(crate) fn from_json(bytes: &[u8], at: &Path) -> Result<Manifest, StorageError> {
         let value: serde_json::Value =
-            serde_json::from_slice(bytes).map_err(|err| MemoryError::Bundle {
+            serde_json::from_slice(bytes).map_err(|err| StorageError::Bundle {
                 op: "read",
                 detail: format!("{}: {err}", at.display()),
             })?;
-        let number = |key: &str| -> Result<u64, MemoryError> {
+        let number = |key: &str| -> Result<u64, StorageError> {
             value
                 .get(key)
                 .and_then(serde_json::Value::as_u64)
-                .ok_or_else(|| MemoryError::Bundle {
+                .ok_or_else(|| StorageError::Bundle {
                     op: "read",
                     detail: format!("{} has no {key}", at.display()),
                 })
@@ -117,7 +117,7 @@ impl Manifest {
             head: value
                 .get("head")
                 .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| MemoryError::Bundle {
+                .ok_or_else(|| StorageError::Bundle {
                     op: "read",
                     detail: format!("{} has no head", at.display()),
                 })?

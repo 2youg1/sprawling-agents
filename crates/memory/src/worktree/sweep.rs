@@ -11,11 +11,11 @@
 //! earlier serving, a crashed one included. What each leaves is three
 //! things: git's registration, the directory under the reserved subtree,
 //! and the branch git made for it. This module takes back each of them,
-//! and only what the city made (memory-SPEC 8-9).
+//! and only what the city made (storage-SPEC 8-9).
 
 use std::path::{Path, PathBuf};
 
-use crate::error::MemoryError;
+use crate::error::StorageError;
 
 use super::name::WorktreeName;
 use super::trees::Worktrees;
@@ -31,14 +31,14 @@ impl Worktrees {
     pub fn sweep_abandoned(
         city_root: &Path,
         held: &[WorktreeName],
-    ) -> Result<Vec<WorktreeName>, MemoryError> {
+    ) -> Result<Vec<WorktreeName>, StorageError> {
         // A city that has never checkpointed has no repository, and so
         // no tree to leave behind.
         let repo = match git2::Repository::open(city_root) {
             Ok(repo) => repo,
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Vec::new()),
             Err(err) => {
-                return Err(MemoryError::Worktree {
+                return Err(StorageError::Worktree {
                     op: "open the city repository",
                     detail: format!("{}: {err}", city_root.display()),
                 });
@@ -54,7 +54,7 @@ impl Worktrees {
 
     /// Unregisters every tree of the city's own that nobody holds, and
     /// the lease branch that goes with it.
-    fn sweep_registered(&self, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, MemoryError> {
+    fn sweep_registered(&self, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, StorageError> {
         let mut swept = Vec::new();
         for name in self.live()? {
             if held.contains(&name) || !self.made_here(&name)? {
@@ -73,14 +73,14 @@ impl Worktrees {
     /// nothing; both sides are resolved on disk, because the city root
     /// this process was given may be spelled differently from the one
     /// the tree was claimed under.
-    fn made_here(&self, name: &WorktreeName) -> Result<bool, MemoryError> {
-        let tree = self
-            .repo
-            .find_worktree(name.as_str())
-            .map_err(|err| MemoryError::Worktree {
-                op: "find a worktree",
-                detail: format!("{}: {err}", name.as_str()),
-            })?;
+    fn made_here(&self, name: &WorktreeName) -> Result<bool, StorageError> {
+        let tree =
+            self.repo
+                .find_worktree(name.as_str())
+                .map_err(|err| StorageError::Worktree {
+                    op: "find a worktree",
+                    detail: format!("{}: {err}", name.as_str()),
+                })?;
         Ok(resolved(tree.path()) == resolved(&self.home.join(name.as_str())))
     }
 
@@ -88,9 +88,9 @@ impl Worktrees {
     /// carries a commit the trunk does not have - that is a run's landed
     /// offer, and the pull request names it - or the person has it
     /// checked out, which makes it theirs.
-    fn drop_lease_branch(&self, name: &WorktreeName) -> Result<(), MemoryError> {
+    fn drop_lease_branch(&self, name: &WorktreeName) -> Result<(), StorageError> {
         let git_err = |op: &'static str| {
-            move |err: git2::Error| MemoryError::Worktree {
+            move |err: git2::Error| StorageError::Worktree {
                 op,
                 detail: format!("{}: {err}", name.as_str()),
             }
@@ -129,10 +129,10 @@ impl Worktrees {
     /// no registration for and nobody holds: a claim or a release the
     /// process died inside. The whole subtree is the city's machinery,
     /// so nothing in it is the person's.
-    fn sweep_unregistered(&self, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, MemoryError> {
+    fn sweep_unregistered(&self, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, StorageError> {
         let io_err = |op: &'static str, path: &Path| {
             let path = path.to_path_buf();
-            move |source| MemoryError::Io { op, path, source }
+            move |source| StorageError::Io { op, path, source }
         };
         let entries = match std::fs::read_dir(&self.home) {
             Ok(entries) => entries,
