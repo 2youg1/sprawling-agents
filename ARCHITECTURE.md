@@ -229,9 +229,12 @@ its MCP servers through `accounting::Connectors`, its time through
 `accounting::Clock` and the machine it runs on through
 `accounting::Machine`, and integration tests
 drive a dispatch against scripted ones by the same door `wire::server`
-uses, but the worker itself still lives in
-`sprawling`, which citysim does not depend on. A scripted scenario that
-reproduces a whole dispatch needs the worker moved into `accounting`.
+uses, but the worker itself still lives in `sprawling`. citysim
+depends on `sprawling` only for its two bench binaries, which time the
+product's own startup and queries; its scenario library drives
+`runtime::run::drive` and never builds a worker. A scripted scenario
+that reproduces a whole dispatch needs the worker moved into
+`accounting`.
 
 ## 4 Seams
 

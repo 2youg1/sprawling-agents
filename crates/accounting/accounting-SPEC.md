@@ -40,7 +40,7 @@ worker 的两个读写面 `effect` 与 `plan_view`、以及 worker 与 `views` �
 
 ## 3 假设与歧义
 
-- `RunWorker` 与它的六个对象、全部用例还在 `crates/sprawling/src/assembly`，`views` 还在 `crates/sprawling/src/views`，所以 citysim（不依赖 `sprawling`）仍驱动不了一次 dispatch。归属由 §7 的表和 §12-9 至 §12-12 定下；还没做的按这个次序：
+- `RunWorker` 与它的六个对象、全部用例还在 `crates/sprawling/src/assembly`，`views` 还在 `crates/sprawling/src/views`，所以 citysim 的剧本仍驱动不了一次 dispatch：citysim 依赖 `sprawling` 只是为了让 bench 的两个二进制给产品的启动与查询计时，剧本库只经 `runtime::run::drive` 驱动，从不造 worker。归属由 §7 的表和 §12-9 至 §12-12 定下；还没做的按这个次序：
   1. 还缺的端口。`revealing`（`RunWorker.reveal`）、`monitor::memory`（`DrivingPool` 的 `read_memory`）、`monitor::volume`（`RunWorker.read_volume`）、`release`（`Views.registry`）、`browser_tool`（`RunWorker.browsers`）与需求表的查法（`RunWorker.recipe_for`）已经是交进来的 `fn` 指针；还直接碰 `bin` 的只剩 `workbench::engine` 读的 `doctor::host` 与 `Presence`。
   2. `views` 搬进本 crate。它的测试里有一部分造一个 worker（`views/tests.rs` 经 `crate::assembly` 的 fixture，`document`、`listing`、`skills` 的测试调 `init_city`），它们要么随 worker 搬、要么先留在 `sprawling` 经 `views` 的公开面测。
   3. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）；`genesis`、`listening`、`attending`、`chain_watch` 与生产适配器留在装配根（§12-12）。
