@@ -2649,7 +2649,9 @@ dependencies = [
 name = "sprawling-runtime"
 version = "0.0.7"
 dependencies = [
+ "base64 0.23.1",
  "insta",
+ "png",
  "proptest",
  "same-file",
  "serde",
