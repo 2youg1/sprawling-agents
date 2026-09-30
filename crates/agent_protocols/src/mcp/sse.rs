@@ -174,7 +174,12 @@ impl crate::Outbound for SseServer {
                     "call an mcp server",
                     format!("{}: the stream ended", self.messages),
                 )
-                .with_recovery("the server closed the stream; dispatch again to open a new one"),
+                .effect_unknown()
+                .with_recovery(
+                    "the stream ended after the server took the message, and it may have acted \
+                     on it; check what it was asked to do, then dispatch again to open a new \
+                     stream",
+                ),
             })?
     }
 

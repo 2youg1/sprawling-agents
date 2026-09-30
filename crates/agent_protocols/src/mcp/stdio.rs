@@ -222,9 +222,11 @@ impl Connection {
                     "call an mcp server",
                     format!("{}: no answer within {} ms", self.program, patience.0),
                 )
+                .effect_unknown()
                 .with_recovery(
                     "the server was stopped so a late answer cannot be read as the next one; \
-                     start the run again once the server responds",
+                     it may have acted on the call before it went quiet, so check what it was \
+                     asked to do before asking again",
                 ))
             }
             Err(RecvTimeoutError::Disconnected) => Err(AxError::failure(
@@ -232,7 +234,11 @@ impl Connection {
                 "call an mcp server",
                 format!("{}: the server closed its output", self.program),
             )
-            .with_recovery("check the server's own logs; this city sees only its answers")),
+            .effect_unknown()
+            .with_recovery(
+                "the server closed its output after taking the call, and may have acted on it; \
+                 check what it was asked to do, then dispatch again",
+            )),
         }
     }
 
