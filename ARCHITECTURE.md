@@ -41,25 +41,19 @@ shipped one happens to be written in is a replaceable fact.
 ┌──────────────────────────────────────────────────────────────┐
 │  sprawling (one binary)                                      │
 │                                                              │
-│   bin::assembly ── the only omniscient point: it holds every │
-│        │           concrete type, samples the clock, and     │
-│        │           starts every task                         │
+│   bin::assembly                                              │
 │        │                                                     │
-│        ├── accounting ─ the ports the one writer reaches     │
-│        │              outside itself through                 │
-│        ├── runtime ── turns, tools, sandbox, watchdog, fork  │
-│        ├── collab  ── inbox, signals, claims, delegation,    │
-│        │              workshop, fan-in, pull requests        │
-│        ├── city    ── buildings, residents, rooms, archive,  │
-│        │              library, schedule                      │
-│        ├── browser ── WebDriver BiDi sessions, snapshots     │
-│        ├── agent_protocols ── MCP outbound, ACP inbound      │
-│        ├── storage ── Ledger, CAS, projections, git, Vfs     │
-│        ├── gateway ── routing, dialects, market, cost,       │
-│        │              credentials                            │
-│        └── wire ───── WebSocket server, Command/Query/Event, │
-│                 │     admission                              │
-│                 ▼                                            │
+│        ├── accounting                                        │
+│        ├── runtime                                           │
+│        ├── collab                                            │
+│        ├── city                                              │
+│        ├── browser                                           │
+│        ├── agent_protocols                                   │
+│        ├── storage                                           │
+│        ├── gateway                                           │
+│        └── wire                                              │
+│             │                                                │
+│             ▼                                                │
 │       client (TypeScript, served from inside the binary)     │
 └──────────────────────────────────────────────────────────────┘
         │                                    │
@@ -68,9 +62,12 @@ shipped one happens to be written in is a replaceable fact.
    (a tree on this disk)              (only over one gateway endpoint)
 ```
 
-Each unit's duty is stated here and nowhere else in this document; `kernel`
-is absent from the figure because everything above depends on it and nothing
-it holds is reached from outside the process.
+The figure draws the units and how they are wired, and nothing about what
+each is for. That is stated once, in the `[family.*]` table of
+`architecture.toml`, which `crates/README.md` renders as its crate table
+(`cargo xtask docnum`); a second hand-kept list of duties here would drift
+from it. `kernel` is absent from the figure because everything above depends
+on it and nothing it holds is reached from outside the process.
 
 The address the server binds is `kernel::consts_policy::DEFAULT_AT` unless a
 caller overrides it. The value is not repeated here: the CLI defaults, the
@@ -189,9 +186,9 @@ crates/sprawling/src/doctor: crate::assembly, accounting::worker
 crates/sprawling/src/serving: crate::assembly, accounting::worker
 ```
 
-What each unit owns is stated once, in §1's figure, and not repeated here,
-because two hand-kept lists of duties drift apart. §13 draws this block as a
-graph, generated from it.
+What each unit owns is stated once, in the `[family.*]` table of
+`architecture.toml`, and not repeated here, because two hand-kept lists of
+duties drift apart. §13 draws this block as a graph, generated from it.
 
 **Three rules.** Dependencies point inward, and never back. A seam declares
 its trait in the inner layer and implements it in the outer one, so
