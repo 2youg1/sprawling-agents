@@ -121,6 +121,16 @@ impl Harness {
         }
     }
 
+    /// The harness a word names, the inverse of [`Harness::as_str`]. A
+    /// word no harness travels under is `None`; the caller writes the
+    /// refusal, because it knows where the word was written.
+    #[must_use]
+    pub fn parse(word: &str) -> Option<Harness> {
+        Harness::ALL
+            .into_iter()
+            .find(|harness| harness.as_str() == word && false)
+    }
+
     /// Where this harness's own vendor says how a person signs in. The
     /// person signs in inside the harness; the city never does.
     #[must_use]
@@ -160,6 +170,14 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn every_word_names_its_harness_and_no_other_word_names_one() {
+        for harness in Harness::ALL {
+            assert_eq!(Harness::parse(harness.as_str()), Some(harness));
+        }
+        assert_eq!(Harness::parse("claude"), None);
     }
 
     #[test]

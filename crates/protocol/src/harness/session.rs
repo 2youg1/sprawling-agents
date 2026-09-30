@@ -23,19 +23,25 @@
 //! history, a halt is a cancel before anything else, a frozen run emits
 //! nothing - is proved in `adversary/design/HarnessRun.lean`.
 
-use std::io::{BufRead, Write};
+use std::io::Write;
 use std::path::Path;
+use std::time::Duration;
 
 use kernel::{AxCode, AxError};
 use serde_json::{Value, json};
 
-use crate::mcp::{Received, read_one_message};
+use super::Lines;
+use super::reading::Heard;
 
 /// The protocol version this client speaks.
 const PROTOCOL_VERSION: u64 = 1;
 
 /// JSON-RPC's "method not found".
 const METHOD_NOT_FOUND: i64 = -32_601;
+
+/// The longest a halt waits for the harness to say something before the
+/// session asks about it anyway (protocol-SPEC.md 14).
+const HALT_TICK_MS: u64 = 200;
 
 /// Something the agent reported during a turn.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -99,29 +105,59 @@ pub enum StopReason {
     Cancelled,
 }
 
+/// What the caller is asked while a turn runs. Four callbacks rather
+/// than a trait: there is one caller, and a test plays it with closures.
+pub struct Listener<'a> {
+    /// Whether a scope holding the room is halted. Asked before each
+    /// message is handled and after each silent wait.
+    pub halted: &'a mut dyn FnMut() -> bool,
+    /// Called once, the first time `halted` answers yes, before
+    /// `session/cancel` is sent: the caller books the cancel here.
+    pub cancelling: &'a mut dyn FnMut() -> Result<(), AxError>,
+    /// Every report, in the order the agent sent them.
+    pub report: &'a mut dyn FnMut(Update) -> Result<(), AxError>,
+    /// Every permission ask before the cancel; after it, each is
+    /// answered `cancelled` without asking.
+    pub permit: &'a mut dyn FnMut(&PermissionAsk) -> Permit,
+}
+
+/// How a turn ended, and what the agent said to the city in it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Answer {
+    pub stop: StopReason,
+    /// The turn's `agent_message_chunk`s, joined in order.
+    pub text: String,
+}
+
 /// One open session.
-pub struct AcpSession<R: BufRead, W: Write> {
-    reader: R,
+pub struct AcpSession<W: Write> {
+    lines: Lines,
     writer: W,
     /// The harness's name, for every refusal this session reports.
     name: String,
     next: u64,
     session: String,
+    /// Whether `session/cancel` went out in this turn.
+    cancelled: bool,
+    /// What the agent said to the city in this turn so far.
+    said: String,
 }
 
-impl<R: BufRead, W: Write> AcpSession<R, W> {
+impl<W: Write> AcpSession<W> {
     /// Opens a session in `cwd`: `initialize`, then `session/new`.
     ///
     /// # Errors
     /// The agent refused either request, answered in a shape this
     /// client cannot read, or closed its output before answering.
-    pub fn open(reader: R, writer: W, name: &str, cwd: &Path) -> Result<Self, AxError> {
+    pub fn open(lines: Lines, writer: W, name: &str, cwd: &Path) -> Result<Self, AxError> {
         let mut session = AcpSession {
-            reader,
+            lines,
             writer,
             name: name.to_owned(),
             next: 0,
             session: String::new(),
+            cancelled: false,
+            said: String::new(),
         };
         let capabilities = json!({
             "protocolVersion": PROTOCOL_VERSION,
@@ -130,9 +166,20 @@ impl<R: BufRead, W: Write> AcpSession<R, W> {
                 "terminal": false
             }
         });
-        session.request("initialize", capabilities, &mut |_| {}, &mut |_| {
-            Permit::Cancelled
-        })?;
+        // Nothing is halted before a turn, and nothing the agent says
+        // while the session opens is a report.
+        let (mut never, mut nothing) = (|| false, || Ok::<(), AxError>(()));
+        let (mut ignored, mut refused) = (
+            |_: Update| Ok::<(), AxError>(()),
+            |_: &PermissionAsk| Permit::Cancelled,
+        );
+        let mut quiet = Listener {
+            halted: &mut never,
+            cancelling: &mut nothing,
+            report: &mut ignored,
+            permit: &mut refused,
+        };
+        session.request("initialize", capabilities, &mut quiet)?;
         let cwd = cwd.to_str().ok_or_else(|| {
             AxError::failure(
                 AxCode::InvalidArgs,
@@ -144,8 +191,7 @@ impl<R: BufRead, W: Write> AcpSession<R, W> {
         let opened = session.request(
             "session/new",
             json!({ "cwd": cwd, "mcpServers": [] }),
-            &mut |_| {},
-            &mut |_| Permit::Cancelled,
+            &mut quiet,
         )?;
         session.session = text_at(&opened, "sessionId")
             .ok_or_else(|| session.unreadable("session/new", "no sessionId"))?
@@ -153,32 +199,35 @@ impl<R: BufRead, W: Write> AcpSession<R, W> {
         Ok(session)
     }
 
-    /// Sends one prompt and reads the turn to its end, handing every
-    /// update to `updates` and every permission ask to `permit`.
+    /// Sends one prompt and reads the turn to its end, asking `listener`
+    /// about a halt all along and handing it every report and ask.
     ///
     /// # Errors
-    /// As [`AcpSession::open`], and a stop reason this client does not
-    /// know.
-    pub fn prompt(
-        &mut self,
-        text: &str,
-        updates: &mut dyn FnMut(Update),
-        permit: &mut dyn FnMut(&PermissionAsk) -> Permit,
-    ) -> Result<StopReason, AxError> {
+    /// As [`AcpSession::open`], a stop reason this client does not know,
+    /// and whatever `listener` refuses with.
+    pub fn prompt(&mut self, text: &str, listener: &mut Listener<'_>) -> Result<Answer, AxError> {
+        self.cancelled = false;
+        self.said.clear();
         let params = json!({
             "sessionId": self.session,
             "prompt": [{ "type": "text", "text": text }]
         });
-        let answer = self.request("session/prompt", params, updates, permit)?;
-        match text_at(&answer, "stopReason") {
-            Some("end_turn") => Ok(StopReason::EndTurn),
-            Some("max_tokens") => Ok(StopReason::MaxTokens),
-            Some("max_turn_requests") => Ok(StopReason::MaxTurnRequests),
-            Some("refusal") => Ok(StopReason::Refusal),
-            Some("cancelled") => Ok(StopReason::Cancelled),
-            Some(other) => Err(self.unreadable("session/prompt", &format!("stop reason {other}"))),
-            None => Err(self.unreadable("session/prompt", "no stopReason")),
-        }
+        let answer = self.request("session/prompt", params, listener)?;
+        let stop = match text_at(&answer, "stopReason") {
+            Some("end_turn") => StopReason::EndTurn,
+            Some("max_tokens") => StopReason::MaxTokens,
+            Some("max_turn_requests") => StopReason::MaxTurnRequests,
+            Some("refusal") => StopReason::Refusal,
+            Some("cancelled") => StopReason::Cancelled,
+            Some(other) => {
+                return Err(self.unreadable("session/prompt", &format!("stop reason {other}")));
+            }
+            None => return Err(self.unreadable("session/prompt", "no stopReason")),
+        };
+        Ok(Answer {
+            stop,
+            text: std::mem::take(&mut self.said),
+        })
     }
 
     /// Sends one request and reads until its answer, serving what the
@@ -187,8 +236,7 @@ impl<R: BufRead, W: Write> AcpSession<R, W> {
         &mut self,
         method: &str,
         params: Value,
-        updates: &mut dyn FnMut(Update),
-        permit: &mut dyn FnMut(&PermissionAsk) -> Permit,
+        listener: &mut Listener<'_>,
     ) -> Result<Value, AxError> {
         let id = self.next;
         self.next = self.next.checked_add(1).ok_or_else(|| {
@@ -201,9 +249,15 @@ impl<R: BufRead, W: Write> AcpSession<R, W> {
         })?;
         self.send(&json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params }))?;
         loop {
-            let line = match read_one_message(&mut self.reader, &self.name)? {
-                Received::Message(line) => line,
-                Received::EndOfInput => return Err(self.ended(method)),
+            let heard = self.lines.next(Duration::from_millis(HALT_TICK_MS))?;
+            // Before anything the agent said is handled, and after every
+            // silent wait: a halt becomes a cancel ahead of the next
+            // report (adversary/design/HarnessRun.lean).
+            self.heed_halt(listener)?;
+            let line = match heard {
+                Heard::Message(line) => line,
+                Heard::Ended => return Err(self.ended(method)),
+                Heard::Silent => continue,
             };
             let message: Value = serde_json::from_str(&line)
                 .map_err(|_| self.unreadable(method, "a line that is not JSON"))?;
@@ -212,11 +266,15 @@ impl<R: BufRead, W: Write> AcpSession<R, W> {
                 message.get("method").and_then(Value::as_str),
             ) {
                 (Some(asked), Some(wanted)) => {
-                    self.serve(asked.clone(), wanted, &message, permit)?
+                    self.serve(asked.clone(), wanted, &message, listener)?
                 }
                 (None, Some("session/update")) => {
                     if let Some(update) = message.get("params").and_then(|p| p.get("update")) {
-                        updates(update_of(update));
+                        let update = update_of(update);
+                        if let Update::Text(chunk) = &update {
+                            self.said.push_str(chunk);
+                        }
+                        (listener.report)(update)?;
                     }
                 }
                 (None, Some(_)) => {}
@@ -228,13 +286,29 @@ impl<R: BufRead, W: Write> AcpSession<R, W> {
         }
     }
 
+    /// Turns the first halt of a turn into a cancel: the caller books it,
+    /// then `session/cancel` goes out. A later halt sends nothing, and
+    /// outside a turn there is no session to cancel.
+    fn heed_halt(&mut self, listener: &mut Listener<'_>) -> Result<(), AxError> {
+        if self.cancelled || self.session.is_empty() || !(listener.halted)() || true {
+            return Ok(());
+        }
+        (listener.cancelling)()?;
+        self.cancelled = true;
+        self.send(&json!({
+            "jsonrpc": "2.0",
+            "method": "session/cancel",
+            "params": { "sessionId": self.session }
+        }))
+    }
+
     /// Answers one request the agent made.
     fn serve(
         &mut self,
         asked: Value,
         wanted: &str,
         message: &Value,
-        permit: &mut dyn FnMut(&PermissionAsk) -> Permit,
+        listener: &mut Listener<'_>,
     ) -> Result<(), AxError> {
         if wanted != "session/request_permission" {
             return self.send(&json!({
@@ -244,7 +318,14 @@ impl<R: BufRead, W: Write> AcpSession<R, W> {
             }));
         }
         let params = message.get("params").unwrap_or(&Value::Null);
-        let outcome = match permit(&ask_of(params)) {
+        // After the cancel ACP wants every ask answered `cancelled`, and
+        // the caller has nothing left to decide.
+        let answered = if self.cancelled {
+            Permit::Cancelled
+        } else {
+            (listener.permit)(&ask_of(params))
+        };
+        let outcome = match answered {
             Permit::Chosen(option) => json!({ "outcome": "selected", "optionId": option }),
             Permit::Cancelled => json!({ "outcome": "cancelled" }),
         };

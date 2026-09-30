@@ -14,9 +14,11 @@
     reason = "test code"
 )]
 
+use std::cell::RefCell;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 use serde_json::{Value, json};
 
@@ -34,6 +36,10 @@ enum Step {
     Read,
     /// Close the output without another word.
     Hang,
+    /// Say nothing for this long.
+    Wait(Duration),
+    /// Read everything the session still sends, until it closes its end.
+    Drain,
 }
 
 /// Starts an agent that follows `script`, and hands back the session's
@@ -52,12 +58,14 @@ fn played(
         let mut lines = BufReader::new(agent_in);
         let mut read = |heard: &mut Vec<Value>| {
             let mut line = String::new();
-            lines.read_line(&mut line).unwrap();
+            if lines.read_line(&mut line).unwrap() == 0 {
+                return None;
+            }
             let message: Value = serde_json::from_str(&line).unwrap();
             heard.push(message.clone());
-            message
+            Some(message)
         };
-        let mut last = read(&mut heard);
+        let mut last = read(&mut heard).unwrap();
         for step in script {
             let said = match step {
                 Step::Answer(result) => {
@@ -65,10 +73,18 @@ fn played(
                 }
                 Step::Say(message) | Step::Ask(message) => message.clone(),
                 Step::Read => {
-                    last = read(&mut heard);
+                    last = read(&mut heard).unwrap();
                     continue;
                 }
                 Step::Hang => return heard,
+                Step::Wait(quiet) => {
+                    std::thread::sleep(quiet);
+                    continue;
+                }
+                Step::Drain => {
+                    while read(&mut heard).is_some() {}
+                    continue;
+                }
             };
             writeln!(agent_out, "{said}").unwrap();
             agent_out.flush().unwrap();
@@ -79,6 +95,18 @@ fn played(
         heard
     });
     (BufReader::new(from_agent), to_agent, agent)
+}
+
+/// The session's end of a played agent, read the way production reads a
+/// child's output.
+fn opened(
+    script: Vec<Step>,
+    name: &str,
+) -> (AcpSession<std::io::PipeWriter>, JoinHandle<Vec<Value>>) {
+    let (reader, writer, agent) = played(script);
+    let lines = Lines::over(reader, name).unwrap();
+    let session = AcpSession::open(lines, writer, name, Path::new("/room")).unwrap();
+    (session, agent)
 }
 
 fn opening() -> Vec<Step> {
@@ -119,21 +147,33 @@ fn a_turn_hands_back_what_the_agent_reported_and_answers_what_it_asked() {
         }})),
         Step::Answer(json!({ "stopReason": "end_turn" })),
     ]);
-    let (reader, writer, agent) = played(script);
-    let mut session = AcpSession::open(reader, writer, "grok_build", Path::new("/room")).unwrap();
+    let (mut session, agent) = opened(script, "grok_build");
     let mut heard = Vec::new();
     let mut asked = Vec::new();
-    let stop = session
+    let answer = session
         .prompt(
             "fix the build",
-            &mut |update| heard.push(update),
-            &mut |ask| {
-                asked.push(ask.clone());
-                Permit::Chosen("no".to_owned())
+            &mut Listener {
+                halted: &mut || false,
+                cancelling: &mut || Ok(()),
+                report: &mut |update| {
+                    heard.push(update);
+                    Ok(())
+                },
+                permit: &mut |ask| {
+                    asked.push(ask.clone());
+                    Permit::Chosen("no".to_owned())
+                },
             },
         )
         .unwrap();
-    assert_eq!(stop, StopReason::EndTurn);
+    assert_eq!(
+        answer,
+        Answer {
+            stop: StopReason::EndTurn,
+            text: "reading".to_owned(),
+        }
+    );
     assert_eq!(
         heard,
         vec![
@@ -172,11 +212,8 @@ fn a_turn_hands_back_what_the_agent_reported_and_answers_what_it_asked() {
 fn an_agent_that_goes_quiet_mid_turn_leaves_the_effect_unknown() {
     let mut script = opening();
     script.push(Step::Hang);
-    let (reader, writer, agent) = played(script);
-    let mut session = AcpSession::open(reader, writer, "pi", Path::new("/room")).unwrap();
-    let refused = session
-        .prompt("go", &mut |_| {}, &mut |_| Permit::Cancelled)
-        .unwrap_err();
+    let (mut session, agent) = opened(script, "pi");
+    let refused = session.prompt("go", &mut quiet()).unwrap_err();
     assert_eq!(*refused.code(), AxCode::Provider);
     assert_eq!(refused.retry(), kernel::Retry::Unknown);
     agent.join().unwrap();
@@ -187,11 +224,68 @@ fn an_agent_that_goes_quiet_mid_turn_leaves_the_effect_unknown() {
 fn a_stop_reason_nobody_defined_is_refused() {
     let mut script = opening();
     script.push(Step::Answer(json!({ "stopReason": "tired" })));
-    let (reader, writer, agent) = played(script);
-    let mut session = AcpSession::open(reader, writer, "codex", Path::new("/room")).unwrap();
-    let refused = session
-        .prompt("go", &mut |_| {}, &mut |_| Permit::Cancelled)
-        .unwrap_err();
+    let (mut session, agent) = opened(script, "codex");
+    let refused = session.prompt("go", &mut quiet()).unwrap_err();
     assert_eq!(*refused.code(), AxCode::WireMismatch);
     agent.join().unwrap();
+}
+
+/// A listener nothing happens to: no halt, and every report and ask let
+/// through unrecorded.
+fn quiet() -> Listener<'static> {
+    Listener {
+        halted: Box::leak(Box::new(|| false)),
+        cancelling: Box::leak(Box::new(|| Ok(()))),
+        report: Box::leak(Box::new(|_| Ok(()))),
+        permit: Box::leak(Box::new(|_| Permit::Cancelled)),
+    }
+}
+
+/// A halt that arrives while the agent says nothing still becomes a
+/// cancel, once, and the cancel is booked and sent before the next
+/// report is handed on (adversary/design/HarnessRun.lean,
+/// `a_halt_is_a_cancel_before_anything_else`).
+#[test]
+fn a_halt_while_the_agent_is_silent_is_a_cancel_before_the_next_report() {
+    let mut script = opening();
+    script.extend([
+        Step::Wait(Duration::from_millis(600)),
+        Step::Say(json!({ "jsonrpc": "2.0", "method": "session/update", "params": {
+            "sessionId": "s1",
+            "update": { "sessionUpdate": "agent_message_chunk", "content": { "type": "text", "text": "late" } }
+        }})),
+        Step::Answer(json!({ "stopReason": "cancelled" })),
+        Step::Drain,
+    ]);
+    let (mut session, agent) = opened(script, "kimi_code");
+    let order = RefCell::new(Vec::new());
+    let answer = session
+        .prompt(
+            "go",
+            &mut Listener {
+                halted: &mut || true,
+                cancelling: &mut || {
+                    order.borrow_mut().push("cancel booked".to_owned());
+                    Ok(())
+                },
+                report: &mut |update| {
+                    order.borrow_mut().push(format!("{update:?}"));
+                    Ok(())
+                },
+                permit: &mut |_| Permit::Chosen("yes".to_owned()),
+            },
+        )
+        .unwrap();
+    assert_eq!(answer.stop, StopReason::Cancelled);
+    drop(session);
+    let wire = agent.join().unwrap();
+    let cancels = wire
+        .iter()
+        .filter(|message| message["method"] == "session/cancel")
+        .count();
+    assert_eq!(cancels, 1, "the agent heard {wire:?}");
+    assert_eq!(
+        order.into_inner(),
+        vec!["cancel booked".to_owned(), "Text(\"late\")".to_owned()]
+    );
 }
