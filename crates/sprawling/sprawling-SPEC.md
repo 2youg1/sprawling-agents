@@ -2536,7 +2536,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 
 `records_of(run)` 用 `LedgerIndex::run_seqs_before` 取这次跑最新的 `HISTORY_MAX` 条 seq，逐条读行、逐条解析，旧在前。**上界与客户端原来问的那一段等宽**：`web::live::page` 一直是 `RunHistory { limit: HISTORY_MAX }`，所以搬到服务端之后一个会话能被读到的范围一字未变——搬家不该顺手改答案。读不回来的一行**截断而不清空**：读到的那些仍然是真的（同 `Views::history`）。
 
-折叠本身逐字从 `web::turn::rounds` 搬来，一条不改：`model_called` 开一个回合；`tool_called` 挂进当前回合并按 runtime 给的 id 记下等答；`model_returned` 落到最近一个回合上；`tool_result` 按 id 找回它自己的那次调用——**恒不按位置配对**，因为两个调用可以先后发出而后发的先答；其余记录按 `wire::reading::note_of` 判是否成为一条 `Note`。`opened_at` 是本会话第一条 `Fenced` 的 oid：那是这份活开始时的树，取最新的一个检查点答的是另一个问题（「上一波动了什么」）。
+折叠本身逐字从 `web::turn::rounds` 搬来，一条不改：`model_called` 开一个回合；`tool_called` 挂进当前回合并按 runtime 给的 id 记下等答；`model_returned` 落到最近一个回合上；`tool_result` 按 id 找回它自己的那次调用——**恒不按位置配对**，因为两个调用可以先后发出而后发的先答；其余记录按 `wire::reading::note_of` 判是否成为一条 `Note`。`opened_at` 是本会话第一条 `Checkpointed` 的 oid：那是这份活开始时的树，取最新的一个检查点答的是另一个问题（「上一波动了什么」）。
 
 **等人的终点从城自己的 run 里配回来**：`approval_resolved` 记在 `RunId::CITY` 下，不在这次会话的记录里，所以折完回合之后 `answer_waits` 按 approval id 把答复的 `t` 写回 `Note::Waiting.answered`。只有这次会话的窗口里有 `approval_requested` 时才读城的那一段（同样最新的 `HISTORY_MAX` 条）——没等过人的会话不多付一次读。请求或答复落在各自窗口外、或载荷读不回来时，`answered` 为 `None`，页面把请求之后整段画给人，而不是猜一个终点。备选是让治理折叠常驻一张 id→答复时刻的表：它随城一生里答过的每一件批准只增不减，而这里的读只在打开一个等过人的会话时才付。
 

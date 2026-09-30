@@ -54,7 +54,7 @@
 
 公开面见 `tools/xtask/api-baselines/wire.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
 
-**已定而未落的改形。** 下列改形落地时按 §12.1 进位：`Note::Fenced` 改名 `Note::Checkpointed`（线上 `"fenced"` 变 `"checkpointed"`）；`Sample.view_backlog: u64`（已提交、发布出去的视图还没折进的记录条数）；`Turn.first_at`；`Call` 与 `Turn` 带出「这一刻是否量过」；`CommitAnswer` 的 `previous`、`parents` 与提交说明；`Call.effect`、`Call.render`；`Output.pinned`；`Dispatch.mode` 收成 `chat`／`work`，以及运行策略、写入限制 `Create`、准入证据的字段；身份、导入、保存回执与上手进度的线面；城一级配置的写入口与 `PreferencePatch` 的 `[core] priority` 一臂；`ModelTag` 的 OCR 一值。下列新名字只动名字表，哈希随之变，不另进位：`PutRules`、自动化只读查询、按房间列出 session 的查询、从检查点取回单个文件的命令。每落一项删一项。
+**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`Sample.view_backlog: u64`（已提交、发布出去的视图还没折进的记录条数）；页面读到的历史已证明到哪一条 `seq`；`CommitAnswer` 的 `previous`、`parents` 与提交说明；`Call.effect`、`Call.render`；`Output.pinned`；`Dispatch.mode` 收成 `chat`／`work`，以及运行策略、写入限制 `Create`、准入证据的字段；身份、导入、保存回执与上手进度的线面；城一级配置的写入口与 `PreferencePatch` 的 `[core] priority` 一臂；`ModelTag` 的 OCR 一值。下列新名字只动名字表，哈希随之变，不另进位：远程门的五种 Ledger 事件（门开、门关、设备配对、设备撤销、会话开始，与写它们的装配同批，remote_access-SPEC §3）、`PutRules`、自动化只读查询、按房间列出 session 的查询、从检查点取回单个文件的命令。每落一项删一项。
 
 ## 5 权威信源
 
@@ -438,6 +438,14 @@ WireCommand::Dispatch { addr, task, goal, mode, idem, session: Option<SessionNam
 
 **守护**：`just features` 编译不带 `server` 的 `wire`，`accounting` 的每一次编译也是。四个类型之一若被挪回 `server` 之后，`accounting` 编不过。
 
+### 12.3 本批上线的字段各读自一个权威，缺席即没有
+
+**决定**：(a) `Turn.first_at` 照录 `model_returned` 的键；`Timing` 由 `EventRecord::moment` 与答复的错误码判出。线上不带首字耗时，也不从相邻行推断一个时刻量没量过。
+
+**理由**：一个事实一个家。时刻语义的权威是 kernel-SPEC §8-4 与 `EventRecord::moment`；首字耗时是两个时刻之差，页面手里已有这两个数。
+
+**被否**：①线上带一个 `ttft` 时长：派生值在线上有了第二个家，而且 `t` 未量时它要答一个答不了的数；②`Timing` 三值（量过、回合时间戳、城补的）：页面对后两种做同一件事——不画用时——第三个值只会逼每个读者多写一臂；要分辨时，`Call.outcome` 与答复内容已经说明那是城补的。
+
 ## 13 依赖选型
 
 | 依赖 | 用途 | 依据与替代 |
@@ -652,7 +660,7 @@ pub struct Call { pub tool: String, pub subject: Option<String>,
 pub enum Outcome { Waiting, Answered, Failed }
 pub struct Output { pub head: String, pub cut: usize }
 pub struct Used { pub input: Tokens, pub output: Tokens, pub cached: Tokens }
-pub enum Note { Refused { error: AxError, at: Seq }, Fenced { oid: GitOid, at: Seq },
+pub enum Note { Refused { error: AxError, at: Seq }, Checkpointed { oid: GitOid, at: Seq },
                 Waiting { at: Seq }, Arrived { from: String, said: String, at: Seq },
                 Discarded { count: usize, at: Seq }, Unreadable { cause: String, at: Seq } }
 
@@ -1497,6 +1505,32 @@ pub struct HarnessLine { pub name: String, pub launch: Vec<String>, pub found: b
 - **provider 页与 harness 页分开**（定规）：provider 页收 API key，harness 页说明五家官方 harness（agent_protocols-SPEC §8-19）。
 - `name` 是 `agent_protocols::Harness::as_str` 的词；`launch` 是起它说 ACP 的那条命令，逐词；`found` 是那条命令的程序在这台电脑的搜索路径上找不找得到；`docs` 是这家自己写的登录说明。**登录是人在 harness 里做的**，这一问不答任何凭据的事。
 - 名字表多一项，schema 哈希因此而变，`WIRE_V` 不为此进位。
+
+### 8-53 一个回合带出首个内容几时到，每个时刻带出它是不是量出来的；检查点的 note 叫 `checkpointed`
+
+```rust
+pub struct Turn {
+    // …既有字段…
+    pub first_at: Option<TimeMs>,   // 开这个回合的回复记下的 first_at（kernel-SPEC §8-75）；缺席即没量到
+    pub timing: Timing,             // `t` 是不是 model_called 自己那一刻
+}
+pub struct Call {
+    // …既有字段…
+    pub timing: Timing,             // called 与 answered（在场时）是不是各自那一刻
+}
+#[serde(rename_all = "snake_case")]
+pub enum Timing { Measured, Unmeasured }
+pub enum Note {
+    // …
+    Checkpointed { oid: GitOid, at: Seq },   // 线上 "checkpointed"
+}
+```
+
+- **`first_at` 照录那一行的键。** 回合里最后一条 `model_returned` 写下的 `first_at`，读不出或缺席即 `None`。首字耗时是 `first_at − t`，线上不另带一个时长：页面手里已有这两个数。
+- **`Timing` 答一个问题：两个时刻之差是不是一次测量。** `Measured`：这一行上的每个时刻都是它自己那条记录量下的那一刻（`EventRecord::moment` 答 `Some`）。`Unmeasured`：至少一个不是——账本版本 1 写下的行带的是回合时间戳，同一回合的行同值；或者答复是重启之后城补上的 `E_TOOL_OUTCOME_UNKNOWN`，它记的是城补上它的那一刻（kernel-SPEC §8-4「信封 `t` 记的是什么」）。时刻本身照旧带出，它仍给出次序；页面不从 `Unmeasured` 的行画用时。
+- **`Turn.timing` 只说 `t`**：回合在线上只有这一个时刻；`first_at` 在场即量过，缺席即没有。`Call.timing` 说 `called` 与 `answered` 两个：一次调用的两条记录由同一个构建写下时两者同为量过或同为未量，城补上的答复例外，所以一个值够用。
+- **`Checkpointed`**：fence 与 checkpoint 曾是一个概念的两个名字，checkpoint 留下（glossary）。`Note` 不进名字表，改它的标签不动 schema 哈希，所以它随本节的进位落地。
+- **进位**：本节的提交是 §12.1 意义上上一次推送之后第一个名字不变而改形的提交，`WIRE_V` 44 → 45；§8-53 至 §8-58 共用 45。
 
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 

@@ -2272,3 +2272,20 @@ pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u
 - 花费只观察、不设门限：续期请求照常记 usage，本模块不读余额也不拦。
 - 设置按城→楼→居民三层梯解析，下层覆盖上层，一层也没说＝`Off`（city-SPEC §8-4 `[cache]` 一节）。它不进 `FrozenConfig`：续期发生在两次 run 之间，不属于任何一次 run 的冻结面。
 - 现状：设置与判定已落地；按它记账并经 `kernel::Model` 发出续期的是 `runtime::prefix::warmth`（runtime-SPEC §8-4-2）。续期由 `accounting::worker::keeping_warm` 在房间落地后按 `renewal_due` 发出，每次续期写一行 `cache_renewed`（sprawling-SPEC 8-93）。
+
+### 8-75 回合记录多记的事：回复的首个内容几时到（形状 2 值类型）
+
+**(a) `model_returned.first_at`**
+
+```rust
+pub struct ModelReturned {
+    // …既有字段…
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_at: Option<TimeMs>,   // 这次回复的首个非空内容到达城的时刻
+}
+```
+
+- **它是一个时刻，不是一个时长。** 首字耗时（TTFT）由读者拿它减去开这个回合的 `model_called` 的 `t`；账本不记派生值，记下的两个时刻已经够算。
+- **读数来自回合的钟**：`runtime::turn` 在它包住的增量汇点里读第一段非空内容到达的那一刻（runtime-SPEC §8-50）。kernel 不采样，gateway 也不采样：`kernel::Model` 的实现从不读钟。
+- **缺席有三种情形，都不是零**：回复从一扇到齐之前什么也不报的门回来（阻塞门、没有流的适配器、流式解析失败之后换阻塞门重发修好的那一次）；回复在流上只带工具调用，没有一段文字或推理（首个内容的定义与理由见 runtime-SPEC §12.6）；这把键出现之前写下的每一行。三种都读作「没有量到」，页面不画首字耗时，不猜。
+- **字节不动**：缺席即省略（`skip_serializing_if`），旧行与今天没量到的行字节相同；读宽（`default`）。账本版本不为此进位：`v` 为 2 的行里这一格可以缺席，读者不从版本推断它在不在。

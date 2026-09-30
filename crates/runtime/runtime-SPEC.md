@@ -1065,6 +1065,16 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 **代价**：同一 run 内 `t` 不再随 `seq` 单调，次序以 `seq` 为准；并行对拍测试改用停住的时钟比字节；`golden-p0` 重生成一次。
 
+### 12.6 首个内容只数文字与推理，钟在回合里读
+
+**决定**：`first_at` 是第一段非空文字或推理到达时回合读到的时刻（§8-50）。工具调用不算首个内容：模型口今天的增量只有这两种，只带工具调用的回复没有 `first_at`。
+
+**理由**：回合的钟只有一个入口，即 `turn::ledger::Journal`（§12.5）；模型口的实现不读钟（`kernel::Model` 的约定），所以时刻只能在口的消费方读。增量汇点是每一扇流式门都经过的地方，包它一层就量到了三种兼容格式，gateway 一行不改。
+
+**被否**：①gateway 在流里采样，再随 `ModelReturn` 交回：模型口多一个读钟的实现，citysim 的脚本模型也要学会造一个时刻；②给 `kernel::Increment` 加一种「工具调用开始了」的片段：增量随 `ServerFrame::Delta` 上线，那是一次线协议改形，每个读增量的页面都要多一臂，为的只是只带工具调用的那类回复；③把提前交出的完整工具调用（`EarlyCalls`）算作首个内容：只有 Anthropic 的流交出它，而它到的时刻是那一块的结束，不是开始，同一个字段在两种兼容格式里会量两种东西。
+
+**重开参数**：run 页画首字耗时时，只带工具调用的回合多到让那一列大半空白。
+
 ### 12.10 沙箱副本按工具一份、每条命令前同步，而不是每条命令新建一份
 
 **决定**：`Confined` 留着一份副本，`place()` 把它同步成工作目录此刻的样子：不同的文件删掉再复制，多出来的项删掉，相同的文件不动（§8-13-2）。
@@ -1965,7 +1975,7 @@ impl ModelCall<'_> {
     pub(super) fn streamed(&self) -> bool;               // 失败那次是不是从流式门出去的
     pub(super) fn resend_blocking(&mut self) -> Result<ModelReturn, AxError>;  // 换阻塞门再问一次
     pub(super) fn ask(&mut self, segments: &mut [&mut dyn Segment],
-                      onto: Option<&mut (dyn FnMut(&Increment) + '_)>) -> Result<ModelReturn, AxError>;
+                      generating: Generating<'_, '_>) -> Result<Settled, AxError>;   // §8-50
 }
 /// 接力：名单序逐段递上失败；Skipped 转手即问下一段；Recovered／Failed 即止；
 /// 全段转手则把最后转手的错误原样答成 Skipped。
@@ -1994,6 +2004,21 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 - **盲重试段（对可重试失败原样重发）**：该判定属于 watchdog 与 `gateway::admission`（§8-9：watchdog 只判断还有没有下一次），段越权即第二个重试权威。
 - **`Skipped` 无载荷（unit 变体）**：结构上确实吞不掉错误，但"这一段转手的是哪个错误"也在答案里读不出来了，而谁把什么交给谁正是段契约要陈述的事实。
 - **段＝闭枚举（形状 6）**：多段场景只能靠触发点拼装，契约测不直接，且新修复进来即改枚举与全部 match。trait 的第二实现是测试里的记账段（本仓缝规则认可的替身一族：测试时钟、计数店）。
+
+### 8-50 回合记下回复的首个内容几时到（`turn::recovery`）
+
+```rust
+pub(super) struct Settled {
+    pub(super) returned: ModelReturn,
+    pub(super) speculated: Speculated,
+    pub(super) first_at: Option<TimeMs>,   // 落账的那一次尝试的首个内容；写进 model_returned（kernel-SPEC §8-75）
+}
+```
+
+1. **首个内容**：一段非空的文字（`Increment::Said`）或推理（`Increment::Thought`）。空增量不算；心跳、角色声明与只带用量的帧从来不成为增量（gateway 的 `increment_of` 把它们挡在口外），所以口内口外是同一个定义。
+2. **在哪里读钟**：`ask` 把所选的门收到的增量汇点包一层，第一段非空增量到达时经 `Journal::read_clock` 读一次，此后不再读。`Speculating` 而没有页面在看（`deltas: None`）时也包：那扇门照样是流，量它不需要有人看。`Unwatched` 走阻塞门，没有增量，`first_at` 缺席。
+3. **属于落账的那一次尝试**：流式尝试失败、换阻塞门重发（`BlockingResend`）修好的回复，`first_at` 缺席。那次重发之前写下的 `model_called` 是它的起点，而它没有流；把失败那次的读数挂到它上面，读者算出的首字耗时量的是另一次请求。
+4. **读钟失败即回合失败**：与 `model_returned` 自己那一刻同一只钟、同一种失败。汇点不能失败（`kernel::Increments` 没有返回值），所以读数先存下，模型调用返回之后再抛出。
 
 ### 8-43 重试上限住 kernel
 
