@@ -125,13 +125,18 @@ fn shipped() -> Vec<Shipped> {
     shipped
 }
 
-/// The calls the script makes: a look at where it stands, and nothing
-/// read.
-fn steps(_shipped: &[Shipped]) -> Vec<Step> {
-    vec![Step {
-        tool: "status",
-        args: json!({}),
-    }]
+/// The calls the script makes: every skill read by its name, in the
+/// order the reading room admits them, then one file a package carries.
+fn steps(shipped: &[Shipped]) -> Vec<Step> {
+    shipped
+        .iter()
+        .map(|skill| skill.name.as_str())
+        .chain([CARRIED])
+        .map(|path| Step {
+            tool: "read",
+            args: json!({ "path": path }),
+        })
+        .collect()
 }
 
 /// Installs every package into the city library, and answers the
