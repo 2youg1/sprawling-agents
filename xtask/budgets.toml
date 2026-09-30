@@ -111,7 +111,16 @@ budget_bytes = 134217728
 # The reading rose by 1.3 MB when the console, the health readings and
 # the sandbox's file capabilities arrived: crossterm, sysinfo, cap-std
 # and memory-stats, with about 28,000 lines of Rust around them.
-best_bytes = 12857344
+# It rose by 243,712 B more when the desktop connector moved into this
+# binary as the `desktop` verb (sprawling-SPEC.md 8-4d): 12,916,224 B on
+# the tree before, 13,159,936 B after, linked the same way. That buys no
+# second executable to install and no hand-written [[mcp]] row. The
+# separate executable weighed 670,720 B, most of it std, serde_json, toml
+# and png, which this binary already carried; what is new is the
+# package's own code, the image encoders and the Win32 bindings. The
+# slack stays at 1 MiB, which is also the figure that reopens the
+# choice to link it here.
+best_bytes = 13159936
 slack_bytes = 1048576
 measured_by = "just build-web, cargo build --release, then just gates, on windows-x86_64"
 status = "gated"
