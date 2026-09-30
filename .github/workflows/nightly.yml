@@ -117,8 +117,16 @@ jobs:
   # not granted.
   #
   # Scope is `kernel`, the crate whose invariants are worth a solver's
-  # time and the only crate `cargo xtask proof` names. Widening it is a
-  # decision to take with a measured run in hand, not a default.
+  # time and the only crate `cargo xtask proof` names. Inside it, the scan
+  # skips what serde's derive and `#[derive(Eq)]` generate: paths through
+  # the `_serde` alias the derive declares, and `assert_fields_are_eq`.
+  # Nobody here wrote that code, it was more than half of the harnesses,
+  # and a full scan did not finish in the ceiling. A hand-written serde or
+  # Eq impl carries neither name and is still scanned. The derived Debug,
+  # Clone and PartialEq impls stay in: their paths look exactly like
+  # hand-written ones, and a hand-written Debug that redacts a secret is
+  # worth a solver's time. Widen or narrow this with a measured run in
+  # hand, not by default.
   #
   # kani is installed exactly as ci.yml's `proof` job installs it, from
   # the same pinned version, and for the same reason it lives on ubuntu
@@ -160,19 +168,27 @@ jobs:
         run: cargo kani --version
       # The ceiling is inside the step as well as on the job: a job killed
       # by `timeout-minutes` is reported as *cancelled*, which reads as
-      # "somebody stopped it". `timeout` exits 124, and the exit code is
-      # recorded below rather than thrown away, so "the scan ran out of
+      # "somebody stopped it". `timeout` exits 124. `shell: bash` runs with
+      # `-e`, which is switched off around the scan alone, so the exit code
+      # is recorded rather than ending the step, and "the scan ran out of
       # time" and "the scan found something" stay distinguishable in the
-      # summary. `set -e` is off for this one command for that reason.
+      # summary.
       - name: scan the kernel for what no proposition covers
         id: scan
         shell: bash
         run: |
           set -uo pipefail
           mkdir -p target/autoharness
+          set +e
           timeout 50m cargo kani autoharness -Z autoharness -p sprawling-kernel \
+            --exclude-pattern '_serde' --exclude-pattern 'assert_fields_are_eq' \
             2>&1 | tee target/autoharness/report.txt
-          echo "status=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+      # The job reads red whenever the scan was not clean, which is what a
+      # lead looks like; `continue-on-error` keeps the workflow's conclusion
+      # clear of it.
       - name: what the scan says
         if: always()
         shell: bash
@@ -194,6 +210,7 @@ jobs:
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+          test "${status:-missing}" = 0
       # The full log, counterexample traces included: the summary holds
       # the headline, and the trace is what a person needs to write the
       # harness that turns a lead into a proposition.
