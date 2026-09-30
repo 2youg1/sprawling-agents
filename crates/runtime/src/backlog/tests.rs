@@ -126,13 +126,19 @@ fn a_watched_command_hands_its_output_to_the_sink_while_it_runs() {
     let backlog = Backlog::with_window(window).with_sink(super::Sink::new(move |chunk| {
         seen.lock().unwrap().push(chunk)
     }));
+    // The command outlives any stretch of the window: forty polls of
+    // 10 ms took 2.1 s on a loaded macOS runner, and a command that lived
+    // two seconds came back `Settled`. On Unix `exec` makes the sleeper
+    // itself the child `release` kills, so its length costs nothing; on
+    // Windows `release` kills `cmd`, and the `ping` it started runs out
+    // its ten seconds alone.
     let mut talking = if cfg!(windows) {
         let mut command = std::process::Command::new("cmd");
-        command.args(["/C", "echo live& ping -n 3 127.0.0.1 >NUL"]);
+        command.args(["/C", "echo live& ping -n 11 127.0.0.1 >NUL"]);
         command
     } else {
         let mut command = std::process::Command::new("sh");
-        command.args(["-c", "echo live; sleep 2"]);
+        command.args(["-c", "echo live; exec sleep 60"]);
         command
     };
     talking.current_dir(std::env::temp_dir());
