@@ -12,7 +12,7 @@
     reason = "test code"
 )]
 
-use super::{Selection, kind_named, write_records, write_runs};
+use super::{Audience, Selection, kind_named, write_records, write_runs};
 use kernel::{Address, B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
 use serde_json::{Value, json};
 use std::path::Path;
@@ -193,9 +193,9 @@ fn follow_takes_a_run_that_started_after_the_viewer_opened() {
     assert!(follow.poll().unwrap().is_none());
 }
 
-fn viewed(dir: &Path, chosen: &Selection) -> Vec<u8> {
+fn viewed(dir: &Path, chosen: &Selection, audience: Audience) -> Vec<u8> {
     let mut out = Vec::new();
-    write_records(dir, chosen, &mut out).unwrap();
+    write_records(dir, chosen, audience, &mut out).unwrap();
     out
 }
 
@@ -278,11 +278,33 @@ fn records_are_byte_for_byte_what_grep_finds_in_the_same_ledger() {
     ];
     for (chosen, expected) in cases {
         assert_eq!(
-            String::from_utf8(viewed(dir.path(), &chosen)).unwrap(),
+            String::from_utf8(viewed(dir.path(), &chosen, Audience::Agent)).unwrap(),
             String::from_utf8(expected).unwrap(),
             "{chosen:?}"
         );
     }
+}
+
+/// At a terminal each line is led by its chain hash, which is the
+/// `prev` the next line holds, and then the line byte for byte.
+#[test]
+fn the_records_lens_names_each_line_by_its_chain_hash() {
+    let dir = tempfile::tempdir().unwrap();
+    let lines = write_city_ledger(dir.path());
+    let shown = viewed(dir.path(), &Selection::default(), Audience::Person);
+    let next_prevs = lines[1..]
+        .iter()
+        .map(|line| EventRecord::parse_line(line).unwrap().prev().to_string())
+        .chain([B3Hash::digest(lines.last().unwrap()).to_string()]);
+    let expected: Vec<u8> = lines
+        .iter()
+        .zip(next_prevs)
+        .flat_map(|(line, hash)| [hash.as_bytes(), b"  ", line.as_slice(), b"\n"].concat())
+        .collect();
+    assert_eq!(
+        String::from_utf8(shown).unwrap(),
+        String::from_utf8(expected).unwrap()
+    );
 }
 
 /// Every parent pointer `--runs` writes is the one the ledger wrote, and

@@ -232,6 +232,23 @@ fn switching_lens_keeps_the_selected_thing() {
     );
 }
 
+/// The records lens leads each row with the first twelve digits of the
+/// line's chain hash, and the detail pane opens on the whole hash.
+#[test]
+fn the_records_lens_shows_each_line_by_its_chain_hash() {
+    let line = format!(r#"{{"seq":3,"run":"{R2}"}}"#);
+    let hash = kernel::ledger::chain_hash(line.as_bytes()).to_string();
+    let listed = after(&[Action::SwitchLens], NARROW);
+    let detailed = after(&[Action::SwitchLens, Action::OpenDetail], NARROW);
+    assert_eq!(
+        (cursor_line(&listed), detailed.frame().first().cloned()),
+        (
+            format!(">{}  {line}", hash.get(..12).unwrap()),
+            Some(format!("chain_hash: {hash}"))
+        )
+    );
+}
+
 #[test]
 fn detail_takes_the_screen_until_closed_and_quit_closes_the_viewer() {
     let full = after(&[Action::OpenDetail], NARROW);

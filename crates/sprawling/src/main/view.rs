@@ -30,6 +30,24 @@ pub(super) struct Selection {
     pub(super) grep: Option<String>,
 }
 
+/// Who reads stdout, decided once per command: an agent reading a pipe
+/// or a file, or a person at a terminal (sprawling-SPEC.md 8-105).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Audience {
+    Agent,
+    Person,
+}
+
+impl Audience {
+    fn of_stdout() -> Audience {
+        if std::io::stdout().is_terminal() {
+            Audience::Person
+        } else {
+            Audience::Agent
+        }
+    }
+}
+
 /// Why the verb could not finish writing.
 #[derive(Debug)]
 pub(super) enum ViewError {
@@ -70,13 +88,14 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
         }
     };
     let dir = kernel::layout::CityLayout::new(Path::new(city)).ledger();
+    let audience = Audience::of_stdout();
     let mut out = BufWriter::new(std::io::stdout().lock());
     let written = if read.has("--runs") {
         write_runs(&dir, &mut out)
-    } else if chosen.is_everything() && std::io::stdout().is_terminal() {
+    } else if chosen.is_everything() && audience == Audience::Person {
         terminal::show(&dir)
     } else {
-        write_records(&dir, &chosen, &mut out)
+        write_records(&dir, &chosen, audience, &mut out)
     };
     match written.and_then(|()| out.flush().map_err(ViewError::Write)) {
         Ok(()) => ExitCode::SUCCESS,
@@ -182,6 +201,7 @@ fn kind_named(raw: &str) -> Result<EventKind, String> {
 pub(super) fn write_records(
     dir: &Path,
     chosen: &Selection,
+    _audience: Audience,
     out: &mut impl Write,
 ) -> Result<(), ViewError> {
     let index = storage::LedgerIndex::rebuild(dir)?;
