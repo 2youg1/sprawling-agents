@@ -19,6 +19,7 @@ use super::{BenchDesks, Laying, Reach, Site, Situation, Workbench, held, status_
 
 mod kept;
 mod reading_room;
+mod transcribe;
 
 impl Laying {
     /// Lays out what the model may see and what routes what it calls.
@@ -208,6 +209,12 @@ impl Laying {
             city::Vocation::Plans => {
                 admitted.push(Box::new(city::CityTool::new(&self.city_root)?));
             }
+        }
+        // The last built-in, present only where the book names an
+        // endpoint this building may send a recording to
+        // (sprawling-SPEC.md 8-131).
+        if let Some(transcribe) = self.transcription_tool(site)? {
+            admitted.push(Box::new(transcribe));
         }
         admitted.extend(self.outside_tools(site)?);
         for tool in admitted {

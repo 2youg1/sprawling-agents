@@ -65,6 +65,10 @@ pub(in crate::worker) struct Laying {
     /// The goals this run's resident already holds, which `status`
     /// answers from the list the conflict check reads.
     locks: Vec<String>,
+    /// The endpoints and the choices made from them, which the
+    /// transcription tool asks under this building's rules
+    /// (sprawling-SPEC.md 8-131).
+    book: gateway::EndpointBook,
 }
 
 impl Laying {
@@ -120,6 +124,7 @@ impl super::RunWorker {
                 .filter(|entry| entry.owner == who)
                 .map(|entry| entry.statement.clone())
                 .collect(),
+            book: self.credentials.book.clone(),
         })
     }
 }
