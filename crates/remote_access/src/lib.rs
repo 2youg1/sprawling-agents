@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The remote door: who may reach a city from outside its machine, and
-//! until when (remote_access-SPEC.md).
+//! Remote access: who may reach a city from outside its machine, and
+//! until when (remote_access-SPEC.md). The door that decides it is
+//! [`door::Door`], whose properties the `RemoteDoor` model states.
 //!
 //! A route that makes the door reachable carries bytes and nothing else,
 //! so every decision here is taken on the city's own machine and none of
