@@ -20,6 +20,11 @@ use zeroize::Zeroizing;
     reason = "the passphrase backend awaits its one caller in Custodian::probe (14.5 wiring)"
 )]
 mod file;
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "the keyring-core store lands in the next commit")
+)]
+mod platform;
 
 /// The inner seam: store, fetch, delete. Nothing else leaves the crate.
 pub(crate) trait Vault {
