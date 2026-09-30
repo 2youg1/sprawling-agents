@@ -2964,7 +2964,7 @@ pub(crate) fn prereqs() -> String;            // Develop 档渲染成 prereqs.ts
 ```
 
 - **表是权威，`just prereqs` 读它的渲染**：`crates/sprawling/src/doctor/table/prereqs.tsv` 每行 `class<TAB>name<TAB>program<TAB>windows<TAB>macos<TAB>linux<TAB>purpose`，由 `table::prereqs()` 从 Develop 档渲染；测试 `the_prereqs_file_is_the_develop_tier_rendered` 要求文件逐字等于渲染结果，不等时把应有的全文印出来。`just prereqs` 在编译之前跑，只能读文件而不能问二进制，所以读的是这份渲染而不是另一张清单；`command -v <program>` 是它的探测，`program` 为 `-` 的行（浏览器家族）归 doctor 与 render 门自己去找。被否决的备选：justfile 当权威、doctor 在编译期读它——justfile 不写三平台的装法，doctor 就得再拼一遍。
-- **`class` 就是 `Need`**：`required` 是 `just check` 离了它跑不起来的（git、rustup、rust、rustfmt、clippy、just、cargo-nextest、bun、render 用的浏览器、elan、lean），`optional` 是 `just check` 缺了会跳过、或只由人主动跑的 recipe 调用的（cargo-deny、uv、python，以及 cargo-mutants、cargo-fuzz、cargo-public-api、kani）。elan 与 lean 为什么必需，见 §12「Lean 是开发这份代码必需的工具」。
+- **`class` 就是 `Need`**：`required` 是 `just check` 离了它跑不起来的（git、bash、rustup、rust、rustfmt、clippy、just、cargo-nextest、bun、render 用的浏览器、elan、lean），`optional` 是 `just check` 缺了会跳过、或只由人主动跑的 recipe 调用的（cargo-deny、uv、python，以及 cargo-mutants、cargo-fuzz、cargo-public-api、kani）。elan 与 lean 为什么必需，见 §12「Lean 是开发这份代码必需的工具」。
 - **行序就是安装顺序**：后一行的装法用到前一行装出的程序——rustup 之后才有 `rustup component add` 与 `cargo install`，elan 之后才有 `elan toolchain install`，uv 之后才有 `uv python install`。页面的「全部安装」按表序逐项跑，所以顺序写在表里而不是写在页面上。
 - **Lean 的版本只写在 `lean-toolchain`**：`LEAN_PIN` 是那个文件的 `include_str!`（`str::trim_ascii_end` 在 const 里去掉换行），装法是 `elan toolchain install <pin>`，探测是 `elan toolchain list` 里有以 pin 开头的一行。换 Lean 版本只改那一个文件。
 - **Windows 上能用 winget 的都用 winget，且按用户装**：Git、just、bun、uv、ffmpeg 的 winget 清单都有用户级安装程序，配方带 `--scope user`，于是装的时候不弹 UAC——§8-40「恒不提权」在 winget 上就是这个参数。rustup 的清单没有 scope 字段，而 rustup-init 本来就只写这个人的 profile，所以不带（带了 winget 答「找不到适用的安装程序」）；Chrome 的清单只有机器级安装程序，而每台 Windows 都有 Edge，Chromium 一族在 Windows 上由 Edge 答上，Chrome 那条配方很少被走到。
@@ -2973,6 +2973,21 @@ pub(crate) fn prereqs() -> String;            // Develop 档渲染成 prereqs.ts
 - **Rust 本身是一行**：`rust` 探 `rustc --version`，配方 `rustup default stable`（rustup 装好后给出一个在 PATH 上的 rustc；进仓库后 rustup 按 `rust-toolchain.toml` 自取钉住的那一版）。它与 `lean` 两行带 `Pin`：页面把钉住的版本与装着的、上游最新的并排画出（§8-120）。
 - **探测与安装子进程看到同一条搜索路径**（`doctor::host::search_path`）：进程的 `PATH` 之后补上这个人的几个用户级 bin 目录——home 下 `.cargo`、`.elan`、`.local`、`.bun` 各自的 `bin`，Windows 上再加 `%LOCALAPPDATA%\Microsoft\WinGet\Links`——已在 `PATH` 上的不重复。安装程序改的是注册表或 shell 启动文件，本进程的 `PATH` 是启动时那一份；不补这几个目录，刚装好的 rustup 让下一行的 `cargo install` 找不到 cargo，刚装好的 elan 让 `elan toolchain install` 找不到 elan，整批装要重启城才能走完。
 - **`same_command` 一处拼写三平台**：三平台装法相同的工具只写一次，三列各抄一遍只会让其中一列悄悄落后。
+
+## 8-130 `just` 跑配方的那个 bash 是 develop 层的一行（`bin::doctor::table::toolchain` 的 `BASH`）
+
+**原因**：`justfile` 开头是 `set shell := ["bash", "-uc"]`，每一个配方都在 bash 里跑，而 develop 层没有这一行，于是一台照着 `just prereqs` 装齐的新 Windows 机器仍然在 `just check` 的第一步就红。Windows 上还多一层：`just` 按搜索路径的次序找 `bash`，而系统的 `PATH` 排在这个人的 `PATH` 之前，`C:\Windows\System32` 又在系统那一段里；装了 WSL 的机器上，`System32\bash.exe` 是 WSL 的启动器，没有发行版时它打一句错误就退出。实测：同一台机器上，`PATH` 里 System32 在 Git 的 `bin` 之前时，`just` 起的是这个启动器，配方失败；Git 的 `bin` 在前时，起的是 Git 的 bash，配方通过。
+
+```rust
+// bin::doctor::table::toolchain（形状 6 data）
+pub(super) const BASH: Requirement;   // Develop 档，Required，排在 GIT 之后
+```
+
+- **探测问的是 `just` 会拿到的那一个 bash**：`Detection::Listed { program: "bash", args: ["--version"], line: "GNU bash" }`。探测按 `doctor::host::search_path` 的次序找程序，与 `just` 找 `bash` 是同一个次序（进程自己的 `PATH` 在前），WSL 启动器不打印以 `GNU bash` 开头的行，于是被报为缺，而那正是 `just` 会撞上的情形。`prereqs.tsv` 里这一行渲染成 `bash --version | grep -q '^GNU bash'`。
+- **Windows 的装法是一句话，不是一条命令**：`Recipe::Manual`，要人在 Git Bash 里跑 `just`。Git for Windows（git 那一行装的）带着 bash，Git Bash 的终端把它自己的 bash 放在搜索路径最前。能让别处起的 `just` 找到它的另一条路，是把 Git 的 `bin` 放到 System32 之前，那要改系统的 `PATH`，要管理员权限，而 §8-40 恒不提权。macOS 自带 bash，配方 `brew install bash`；Linux 是 `Print("sudo apt install bash")`。被否：在 `justfile` 里用 `set windows-shell` 写 Git bash 的绝对路径——按用户装的 Git 在 `%LOCALAPPDATA%\Programs\Git`，按机器装的在 `C:\Program Files\Git`，写哪一个都有一半机器找不到。
+- **测试从 `justfile` 读出 shell，不从表里抄**：`doctor::tests::the_shell_every_recipe_runs_in_is_a_required_develop_row` 读 `set shell` 那一行里的程序名，要求 Develop 档有一行 `Required` 的探测程序就是它。`justfile` 换了 shell 而表没跟上，测试红。
+
+**本节接口的当前状态**：MSVC 的链接器不是一行。`x86_64-pc-windows-msvc` 编译要 `link.exe` 与 Windows SDK，rustc 经 Visual Studio 的实例清单找它们，不经搜索路径，所以现有的四种探测（搜索路径、已知位置、程序的清单、本二进制自己）一种都问不到；装 Build Tools 的安装程序又要提权。它缺不缺，要在一台干净的 Windows 上读：`Get-Command bash, link.exe -ErrorAction SilentlyContinue`；`winget install --id Git.Git -e --scope user` 之后再读一次 `Get-Command bash`；`winget install --id Rustlang.Rustup -e` 之后 `cargo build` 能否找到链接器；最后 `just prereqs`。读数说缺，而装法只能是一句话时，这一行按本节 bash 的形状加进来，探测是一种新的 `Detection`。
 
 ## 8-59 CLI 自己的样子：一张表，四个状态词，一句下一步（`bin::doctor::paint`、`bin::doctor::screen`）
 
