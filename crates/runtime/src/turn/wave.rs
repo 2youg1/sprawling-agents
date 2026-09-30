@@ -18,8 +18,8 @@
 
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{
-    AxCode, AxError, ContentBlock, Effect, Ledger, ModelUsage, Payload, TimeMs, Tool, ToolCall,
-    ToolMeta, ToolOutcome,
+    AxCode, AxError, ContentBlock, Effect, Ledger, ModelUsage, Payload, RenderIntent, TimeMs, Tool,
+    ToolCall, ToolMeta, ToolOutcome,
 };
 
 use crate::bench::Ticket;
@@ -130,9 +130,7 @@ where
 
 /// Whether the call's tool is registered as only reading.
 pub(super) fn reads_only(tools: &dyn ConcurrentInvoke, call: &ToolCall) -> bool {
-    tools
-        .meta_of(call)
-        .is_some_and(|meta| meta.effect == Effect::Read)
+    matches!(tools.meta_of(call), Some(meta) if meta.effect == Effect::Read)
 }
 
 fn unheld_ticket() -> AxError {
@@ -144,11 +142,25 @@ fn unheld_ticket() -> AxError {
     .with_recovery("report this against runtime::turn::wave: only a bench issues tickets")
 }
 
-/// A call and the moment it started: read after the call was admitted
-/// and before its tool ran.
+/// A call, the moment it started (after admission, before its tool ran),
+/// and its tool's registration, which `tool_called` copies.
 struct Begun<'c> {
     call: &'c ToolCall,
     at: TimeMs,
+    effect: Option<Effect>,
+    render: Option<RenderIntent>,
+}
+
+impl<'c> Begun<'c> {
+    fn of(call: &'c ToolCall, at: TimeMs, tools: &dyn ConcurrentInvoke) -> Begun<'c> {
+        let meta = tools.meta_of(call);
+        Begun {
+            call,
+            at,
+            effect: meta.map(|registered| registered.effect.clone()),
+            render: meta.map(|registered| registered.render.clone()),
+        }
+    }
 }
 
 impl<'h> Turn<'h, ToolWave> {
@@ -238,7 +250,12 @@ impl<'h> Turn<'h, ToolWave> {
                     tools.account(call, ticket, ran)
                 }
             };
-            self.account(ledger, &mut exchange, Begun { call, at }, answered)?;
+            self.account(
+                ledger,
+                &mut exchange,
+                Begun::of(call, at, &*tools),
+                answered,
+            )?;
         }
         if let Some(cancelled) = self.consume_boundary(halt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
@@ -248,7 +265,12 @@ impl<'h> Turn<'h, ToolWave> {
                 return Ok(PhaseOutcome::Cancelled(cancelled));
             }
             let (at, answered) = self.alone(tools, call)?;
-            self.account(ledger, &mut exchange, Begun { call, at }, answered)?;
+            self.account(
+                ledger,
+                &mut exchange,
+                Begun::of(call, at, &*tools),
+                answered,
+            )?;
         }
         Ok(self.recorded(calls, exchange))
     }
@@ -290,15 +312,20 @@ impl<'h> Turn<'h, ToolWave> {
         begun: Begun<'_>,
         answered: Result<ToolOutcome, AxError>,
     ) -> Result<(), AxError> {
-        let Begun { call, at: started } = begun;
+        let Begun {
+            call,
+            at: started,
+            effect,
+            render,
+        } = begun;
         let answered_at = self.journal.read_clock()?;
         let called = ToolCalled {
             id: call.id.clone(),
             name: call.name.clone(),
             subject: ToolCalled::subject_of(&call.args),
             args: call.args.clone(),
-            effect: None,
-            render: None,
+            effect,
+            render,
         };
         self.journal.append_redacted(
             ledger,

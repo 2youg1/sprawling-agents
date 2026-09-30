@@ -222,8 +222,12 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     called: record.t(),
                     answered: None,
                     timing: timing_of(record),
-                    effect: None,
-                    render: None,
+                    effect: map.get("effect").and_then(|value| {
+                        <kernel::Effect as serde::Deserialize>::deserialize(value).ok()
+                    }),
+                    render: map.get("render").and_then(|value| {
+                        <kernel::RenderIntent as serde::Deserialize>::deserialize(value).ok()
+                    }),
                 };
                 let Some(turn) = folded.get_mut(turn_at) else {
                     continue;

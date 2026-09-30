@@ -1037,6 +1037,36 @@ impl Placed {
     }
 }
 
+/// The serial reference: each call answered where it is admitted, so no
+/// read starts early, with each tool's registration named as the lane's
+/// own face names it - the ledgers then differ only if the order or the
+/// payloads do.
+struct OneByOne(Placed);
+
+impl runtime::ConcurrentInvoke for OneByOne {
+    fn meta_of(&self, call: &ToolCall) -> Option<&kernel::ToolMeta> {
+        self.0.bench.meta_of(&call.name)
+    }
+
+    fn admit(&mut self, call: &ToolCall, t: TimeMs) -> runtime::Admitted {
+        let key = self.0.key(call);
+        runtime::Admitted::Answered(self.0.bench.invoke(call, &key, t).and_then(answer))
+    }
+
+    fn tool(&self, ticket: &runtime::bench::Ticket) -> Result<&dyn kernel::Tool, AxError> {
+        self.0.bench.tool_for(ticket)
+    }
+
+    fn account(
+        &mut self,
+        _call: &ToolCall,
+        ticket: runtime::bench::Ticket,
+        answered: Result<ToolOutcome, AxError>,
+    ) -> Result<ToolOutcome, AxError> {
+        self.0.bench.account(ticket, answered).and_then(answer)
+    }
+}
+
 fn read_meta() -> kernel::ToolMeta {
     kernel::ToolMeta {
         name: ToolName::parse("read").unwrap(),
@@ -1125,12 +1155,7 @@ fn three_reads_driven(invoke: &mut dyn runtime::ConcurrentInvoke) -> RecordingLe
 /// ledger it leaves is the one the same calls leave one after another.
 #[test]
 fn three_reads_a_run_makes_in_one_wave_are_in_flight_together_and_leave_the_serial_ledger() {
-    let mut one_by_one = Placed::with(None);
-    let mut invoke = |call: &ToolCall, t: TimeMs| {
-        let key = one_by_one.key(call);
-        one_by_one.bench.invoke(call, &key, t).and_then(answer)
-    };
-    let serial = three_reads_driven(&mut invoke);
+    let serial = three_reads_driven(&mut OneByOne(Placed::with(None)));
 
     let meeting = std::sync::Arc::new(Meeting {
         started: std::sync::Mutex::new(0),
@@ -1288,12 +1313,7 @@ fn one_read_while_generating(
 /// answer settles.
 #[test]
 fn a_read_handed_over_while_the_model_writes_runs_during_the_writing() {
-    let mut one_by_one = Placed::of(Box::new(SlowRead));
-    let mut invoke = |call: &ToolCall, t: TimeMs| {
-        let key = one_by_one.key(call);
-        one_by_one.bench.invoke(call, &key, t).and_then(answer)
-    };
-    let (serial, _) = one_read_while_generating(&mut invoke);
+    let (serial, _) = one_read_while_generating(&mut OneByOne(Placed::of(Box::new(SlowRead))));
 
     let (speculated, took) = one_read_while_generating(&mut Placed::of(Box::new(SlowRead)));
 
