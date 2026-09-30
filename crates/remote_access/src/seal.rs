@@ -45,11 +45,24 @@ pub enum Payload {
     Lock,
 }
 
+/// The first byte of a [`Payload::Frame`].
+const FRAME: u8 = 0;
+/// The one byte of a [`Payload::Lock`].
+const LOCK: u8 = 1;
+
 impl Payload {
     /// The bytes to seal.
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
-        Vec::new()
+        match self {
+            Payload::Frame(text) => {
+                let mut bytes = Vec::with_capacity(text.len().saturating_add(1));
+                bytes.push(FRAME);
+                bytes.extend_from_slice(text.as_bytes());
+                bytes
+            }
+            Payload::Lock => vec![LOCK],
+        }
     }
 
     /// Reads an opened frame back.
@@ -58,9 +71,24 @@ impl Payload {
     /// Refuses an empty payload, an unknown first byte, a lock followed by
     /// more bytes, and a frame that is not UTF-8; the caller ends the
     /// connection.
-    pub fn from_bytes(_bytes: &[u8]) -> Result<Self, AxError> {
-        Ok(Payload::Lock)
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
+        match bytes.split_first() {
+            Some((&FRAME, text)) => std::str::from_utf8(text)
+                .map(|frame| Payload::Frame(frame.to_owned()))
+                .map_err(|_| unreadable("a frame that is not UTF-8".to_owned())),
+            Some((&LOCK, [])) => Ok(Payload::Lock),
+            Some((&LOCK, [_, ..])) => Err(unreadable("a lock followed by more bytes".to_owned())),
+            Some((other, _)) => Err(unreadable(format!(
+                "a payload that opens with byte {other}"
+            ))),
+            None => Err(unreadable("an empty payload".to_owned())),
+        }
     }
+}
+
+fn unreadable(subject: String) -> AxError {
+    AxError::failure(AxCode::WireMismatch, "read a remote payload", subject)
+        .with_recovery("the device and the city are on different versions; reload the page")
 }
 
 /// Seals the frames one side sends.
