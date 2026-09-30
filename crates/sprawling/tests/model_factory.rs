@@ -121,7 +121,7 @@ fn city_on(
             tuning: wire::EndpointTuning {
                 timeout_ms: Some(2_000),
                 request_max_retries: Some(0),
-                ..channels::EndpointTuning::default()
+                ..wire::EndpointTuning::default()
             },
             idem: idem(b"attach"),
         })

@@ -152,7 +152,7 @@ fn settled(live: &Live, key: &str, city_root: &Path) -> Result<RunWorker, AxErro
         tuning: wire::EndpointTuning {
             timeout_ms: Some(REQUEST_TIMEOUT_MS),
             request_max_retries: Some(NO_RETRY),
-            ..channels::EndpointTuning::default()
+            ..wire::EndpointTuning::default()
         },
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"e2e-attach"),
     })?;
