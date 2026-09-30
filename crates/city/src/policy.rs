@@ -54,6 +54,10 @@ pub const RULES_FILE: &str = "RULES.toml";
 /// opens a file at this name.
 const SUPERSEDED_FILE: &str = "BUILDING.md";
 
+/// How many minutes a harness run takes at most in a building whose
+/// rules do not say (city-SPEC.md 12.8 (b)).
+const HARNESS_MINUTES_DEFAULT: u32 = 60;
+
 mod user_browser;
 
 pub use user_browser::{UserBrowser, UserBrowserEndpoint};
@@ -88,6 +92,8 @@ pub struct BuildingRules {
     /// city's shelves may hold a thousand; what costs resident bytes is
     /// this list, and a person writes it.
     reading_room: Vec<String>,
+    /// How long a harness run here may take, when the file says.
+    harness_minutes: Option<std::num::NonZeroU32>,
 }
 
 impl BuildingRules {
@@ -184,6 +190,17 @@ impl BuildingRules {
     #[must_use]
     pub fn reading_room(&self) -> &[String] {
         &self.reading_room
+    }
+
+    /// How many minutes a harness run in this building may take before
+    /// the city cancels it and freezes it as limit (sprawling-SPEC.md
+    /// 8-124). Absent the line, `HARNESS_MINUTES_DEFAULT`: a harness
+    /// that neither speaks nor ends would otherwise hold a lane until a
+    /// person noticed (city-SPEC.md 12.8 (b)).
+    #[must_use]
+    pub fn harness_minutes(&self) -> u32 {
+        self.harness_minutes
+            .map_or(HARNESS_MINUTES_DEFAULT, std::num::NonZeroU32::get)
     }
 
     /// What this building's residents may write inside their prefixes.
@@ -337,6 +354,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> 
                     usersbrowser: None,
                     desktop: false,
                     reading_room: Vec::new(),
+                    harness_minutes: None,
                 }),
             }
         }

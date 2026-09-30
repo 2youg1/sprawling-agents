@@ -74,6 +74,10 @@ pub(crate) struct Written {
     egress: Vec<String>,
     #[serde(default)]
     reading_room: Vec<String>,
+    /// How long a harness run here may take, in minutes; zero is
+    /// refused by the type (city-SPEC.md 12.8 (b)).
+    #[serde(default)]
+    harness_minutes: Option<std::num::NonZeroU32>,
 }
 
 /// What `usersbrowser` may say: off, on with no address declared yet,
@@ -179,6 +183,7 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
         usersbrowser,
         desktop: written.desktop,
         reading_room: written.reading_room,
+        harness_minutes: written.harness_minutes,
     })
 }
 

@@ -18,10 +18,14 @@
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use kernel::event::record::RunFrozen;
-use kernel::{Address, AxCode, AxError, Completion, EventKind, EventRecord, Evidence, Payload};
+use kernel::{
+    Address, AxCode, AxError, Completion, EventKind, EventRecord, Evidence, Payload, TimeMs,
+};
 use serde_json::{Value, json};
 
 use crate::worker::RunWorker;
@@ -36,6 +40,14 @@ enum Step {
     Say(Value),
     /// Read one more request from the client.
     Read,
+    /// Wait this long for the client's next message: when it comes,
+    /// answer the request read last with `heard`, and when it does not,
+    /// with `otherwise`.
+    Heed {
+        within: Duration,
+        heard: Value,
+        otherwise: Value,
+    },
     /// Write a file into the directory the session was opened in.
     Write(&'static str, &'static str),
     /// Read everything the session still sends, until it closes its end.
@@ -59,26 +71,42 @@ fn played(script: Vec<Step>, heard: Arc<Mutex<Heard>>) -> StartHarness {
         let heard = Arc::clone(&heard);
         heard.lock().unwrap().cwd = Some(cwd.to_path_buf());
         let root = cwd.to_path_buf();
+        let (told, telling) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             let mut lines = BufReader::new(agent_in);
-            let mut read = || {
+            loop {
                 let mut line = String::new();
                 if lines.read_line(&mut line).unwrap() == 0 {
-                    return None;
+                    return;
                 }
                 let message: Value = serde_json::from_str(&line).unwrap();
                 heard.lock().unwrap().messages.push(message.clone());
-                Some(message)
-            };
-            let mut last = read().unwrap();
+                if told.send(message).is_err() {
+                    return;
+                }
+            }
+        });
+        std::thread::spawn(move || {
+            let mut last = telling.recv().unwrap();
             for step in script {
                 let said = match step {
                     Step::Answer(result) => {
                         json!({ "jsonrpc": "2.0", "id": last["id"], "result": result })
                     }
+                    Step::Heed {
+                        within,
+                        heard,
+                        otherwise,
+                    } => {
+                        let result = match telling.recv_timeout(within) {
+                            Ok(_) => heard,
+                            Err(_) => otherwise,
+                        };
+                        json!({ "jsonrpc": "2.0", "id": last["id"], "result": result })
+                    }
                     Step::Say(message) => message,
                     Step::Read => {
-                        last = read().unwrap();
+                        last = telling.recv().unwrap();
                         continue;
                     }
                     Step::Write(file, text) => {
@@ -88,7 +116,7 @@ fn played(script: Vec<Step>, heard: Arc<Mutex<Heard>>) -> StartHarness {
                         continue;
                     }
                     Step::Drain => {
-                        while read().is_some() {}
+                        while telling.recv().is_ok() {}
                         continue;
                     }
                 };
@@ -351,5 +379,115 @@ fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
             .unwrap()
             .contains("fix the notes"),
         "the harness is prompted with the room's brief"
+    );
+}
+
+/// The kinds of the one run in the history, and that run's records.
+fn the_run(ledger: &Path) -> Vec<EventRecord> {
+    let all = records(ledger);
+    let started = all
+        .iter()
+        .find(|record| record.kind() == EventKind::RunStarted)
+        .unwrap()
+        .run();
+    all.into_iter()
+        .filter(|record| record.run() == started)
+        .collect()
+}
+
+/// A run frozen done offers its tree: the city opens the request the
+/// harness cannot open itself, on the branch of the tree it worked in,
+/// and the existing review decides what reaches the building.
+#[test]
+fn a_harness_run_frozen_done_offers_its_tree_for_review() {
+    let (dir, _, ledger) = city_with("pi");
+    let mut script = opening();
+    script.extend([
+        Step::Write("lab/room1/notes.md", "# Notes\n"),
+        said("written"),
+        Step::Answer(json!({ "stopReason": "end_turn" })),
+        Step::Drain,
+    ]);
+    let mut worker = worker(
+        dir.path(),
+        played(script, Arc::new(Mutex::new(Heard::default()))),
+    );
+
+    assert_eq!(worker.handle(dispatch("lab/room1", None)), Ok(()));
+
+    let run = the_run(&ledger);
+    let lent = run
+        .iter()
+        .find(|record| record.kind() == EventKind::WorktreeOpened)
+        .unwrap()
+        .data()
+        .as_map()
+        .get("name")
+        .cloned();
+    let offered = run
+        .iter()
+        .find(|record| record.kind() == EventKind::PrOpened)
+        .map(|record| record.data().as_map().get("branch").cloned());
+    assert_eq!(
+        offered,
+        Some(lent),
+        "the request names the tree the harness worked in"
+    );
+}
+
+/// A clock that moves thirty seconds every time it is read.
+struct Hurried(AtomicU64);
+
+impl crate::Clock for Hurried {
+    fn now(&self) -> Result<TimeMs, AxError> {
+        Ok(TimeMs::new(self.0.fetch_add(30_000, Ordering::Relaxed)))
+    }
+}
+
+/// A harness that neither speaks nor ends is cut at the building's
+/// ceiling: the cancel goes out, the harness answers cancelled, and the
+/// run freezes as limit, not as a run somebody cancelled.
+#[test]
+fn a_harness_that_says_nothing_is_cut_at_the_ceiling_and_frozen_limit() {
+    let (dir, _, ledger) = city_with("pi");
+    crate::worker::fixture::lay_rules(
+        dir.path(),
+        "lab",
+        &crate::worker::fixture::ordinary_rules("harness_minutes = 1\n"),
+    );
+    let mut script = opening();
+    script.extend([
+        Step::Heed {
+            within: Duration::from_secs(3),
+            heard: json!({ "stopReason": "cancelled" }),
+            otherwise: json!({ "stopReason": "end_turn" }),
+        },
+        Step::Drain,
+    ]);
+    let since = crate::Clock::now(&crate::worker::fixture::WallClock).unwrap();
+    let mut worker = worker(
+        dir.path(),
+        played(script, Arc::new(Mutex::new(Heard::default()))),
+    )
+    .with_clock(Arc::new(Hurried(AtomicU64::new(since.value()))));
+
+    assert_eq!(worker.handle(dispatch("lab/room1", None)), Ok(()));
+
+    let run = the_run(&ledger);
+    assert_eq!(
+        run.iter().map(EventRecord::kind).collect::<Vec<_>>(),
+        vec![
+            EventKind::WorktreeOpened,
+            EventKind::RunStarted,
+            EventKind::CancelReceived,
+            EventKind::CheckpointCommitted,
+            EventKind::HarnessAnswered,
+            EventKind::HandoffWritten,
+            EventKind::RunFrozen,
+        ]
+    );
+    assert_eq!(
+        run.last().unwrap().data(),
+        &Payload::of(&RunFrozen::of(&Completion::Limit)).unwrap()
     );
 }

@@ -366,6 +366,8 @@ impl RunWorker {
 
     /// The same worker, starting the harness a room's resident names
     /// through `start` instead of on this host (sprawling-SPEC.md 8-124).
+    /// Only a test plays a harness; production starts the vendor's own.
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn with_harnesses(self, start: super::driving::harness::StartHarness) -> RunWorker {
         RunWorker {
