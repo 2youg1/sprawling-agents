@@ -35,6 +35,46 @@ fn a_place_holding_no_ledger_is_refused_rather_than_verified() {
     );
 }
 
+/// What `replay` answers for a whole chain, and how it refuses a broken
+/// one, is the shape the adversary parses from outside: the line count
+/// and the tail seq, or the three-part refusal naming the first line
+/// that does not continue the chain.
+#[test]
+fn replay_names_the_lines_it_verified_and_the_tail_seq() {
+    let dir = tempfile::tempdir().unwrap();
+    sprawling::assembly::init_city(dir.path()).unwrap();
+    let ledger_dir = kernel::layout::CityLayout::new(dir.path()).ledger();
+    assert_eq!(
+        verified_chain(&ledger_dir),
+        Ok("chain verified: 3 line(s), tail seq 2".to_owned())
+    );
+
+    // One hex digit of the third line's prev changes: the line still
+    // carries a readable envelope and canonical JSON, and only the chain
+    // can tell.
+    let segment = storage::ledger_segments_at(&ledger_dir).unwrap().remove(0);
+    let mut bytes = std::fs::read(&segment).unwrap();
+    let third = bytes
+        .iter()
+        .enumerate()
+        .filter(|(_, byte)| **byte == b'\n')
+        .nth(1)
+        .map(|(at, _)| at + 1)
+        .unwrap();
+    let digit = bytes[third..]
+        .windows(8)
+        .position(|held| held == b"\"prev\":\"")
+        .map(|key| third + key + 8)
+        .unwrap();
+    bytes[digit] = if bytes[digit] == b'0' { b'1' } else { b'0' };
+    std::fs::write(&segment, bytes).unwrap();
+    assert_eq!(
+        verified_chain(&ledger_dir)
+            .map_err(|refused| (*refused.code(), refused.subject().to_owned())),
+        Err((kernel::AxCode::CasCorrupt, "line 3".to_owned()))
+    );
+}
+
 /// The embed chain delivers a file table with the page shell in it;
 /// when the wasm client was built, the table carries it too.
 #[test]
