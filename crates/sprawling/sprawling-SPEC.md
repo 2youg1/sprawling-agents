@@ -4672,6 +4672,39 @@ impl Audience { pub fn of_stdout() -> Audience; } // stdout 是终端即 Person
 
 **本节接口的当前状态。** `Sample` 余下的核心健康字段仍读作 0：`relay_p50_nanos` 与 `event_to_screen_p50_nanos` 要一个按次记录往返时间的直方图，属主分别是 relay 与 socket 的发送一侧，都还没有；`queued_runs` 没有一处权威的计数——计划行在 `Flight::full` 为真时停在 `pursue` 的循环外，没有被数进任何队列，人派的 run 在满时的去向见 §8-46-3。S5.9M 的降级状态没有 `Sample` 字段。
 
+## 8-123 记账线程不写可丢的投影，视图积压有读数也有界（`bin::serving::folding`，形状：adapter；`accounting::worker::attend`）
+
+```rust
+// bin::serving::folding
+pub(crate) struct Folding {
+    pub(crate) observer: Box<dyn FnMut(&EventRecord) + Send>,
+    pub(crate) machine: Arc<dyn Fn(wire::DoctorAnswer) + Send + Sync>,
+    pub(crate) lend: Box<dyn FnOnce(Arc<Mutex<gateway::Custodian>>) + Send>,
+    pub(crate) keep_slices: Box<dyn FnOnce(storage::Sessions) + Send>, // 会话切片交给视图线程
+    pub(crate) thread: std::thread::JoinHandle<()>,
+}
+#[derive(Clone, Default)]
+pub(crate) struct Backlog { /* Arc<AtomicU64> */ }
+impl Backlog {
+    pub(crate) fn records(&self) -> u64;   // 已送进视图线程、还没折完广播的已提交记录条数
+}
+pub(crate) const CUT_WAITS_ABOVE: u64 = 256; // 积压多于这个数，服务中的切快照往后放
+// accounting::worker::attend
+impl RunWorker {
+    pub fn hand_off_session_slices(&mut self) -> Option<storage::Sessions>; // 把会话切片交出去（storage-SPEC 8-24）
+}
+```
+
+**记账线程只做记账。** 记账线程是所有 lane 共用的一条线程（8-42-4）：它每多做一件与落账无关的事，每条 lane 的下一次 append 就多等一段。会话切片（storage-SPEC 8-24）是给人翻看的投影，原先在记账线程上写：每一波落盘之后逐条 `absorb`，缺文件时整份重建并 `sync_data`，进程里第一次缺文件时 `first_seen` 还要把全部段读一遍。服务中的城在写者起好之后把切片交给视图线程：写者线程在接上观察者之前调 `hand_off_session_slices`，把拿到的 `storage::Sessions` 经 `keep_slices` 送进视图线程的通道；视图线程此后每批折完、广播完，再按账本序逐条 `absorb`。切片写不成照旧写一行 stderr、跳过，与它在记账线程上时一样。于是一次 append 在记账线程上的代价只剩这一波本身：组帧、写、`sync_data`、观察者的一次 `send`。**被否：另起一条线程只写切片。** 视图线程已经按账本序收到每一条已提交记录，另起一条就是第二条通道、第二份次序；切片在视图线程上比账本晚一个批次，这是投影可以有的落后。**被否：切片留在记账线程上，只把 `first_seen` 换成读索引。** 缺文件时整份重建的那次读写与 `sync_data` 仍在记账线程上。
+
+**积压有读数。** `Backlog` 是一个原子计数：观察者在 `send` 之前加一，视图线程广播完一批之后减去这批已提交记录的条数，所以任何时刻读到的是「写者已写下、页面还看不到」的条数。读法是 `bin::serving::folding::Backlog::records`，今天它唯一的读者是下一段的界；波次 4 的 W 车道把它交给采样线程，填进 `Sample.view_backlog`，本节不改线格式。加减饱和：两条线程的加减在一次读里可以错开。
+
+**积压有界：追得上之前不切快照。** 服务中切视图快照（8-91 的 `Cadence`）是视图线程上最长的一件事：编码整份视图、写盘、`sync`。积压多于 `CUT_WAITS_ABOVE` 条时，到期的切快照往后放，视图线程先把积压折完、发布、广播；积压回到界内之后的下一批再切。通道关闭时的最后一次切快照不看积压。界取 256 条：视图线程一批就是一次醒来时通道里已到的全部，积压多过几百条说明它已经落后于写者，这时再花一次整份编码只会让页面更晚看见新记录；这个数由 `instrument_view_backlog`（8-99）在突发里读到的 `max_backlog` 复核。**被否：积压过多时让观察者阻塞写者。** 那把视图线程的落后转嫁给每一条 lane，而视图只是投影。
+
+**测试。** `serving::folding::tests` 的 `a_cut_waits_while_the_fold_is_behind`：同一个到期的 `Cadence`，积压在界内时交出要切的那条记录，积压超过界时不交出。storage 的 `sessions::tests::a_ledger_that_handed_off_its_slices_files_nothing_itself`：交出切片之后写者追加的记录不落切片，拿到切片的一方 `absorb` 之后落下。
+
+**本节接口的当前状态。** `resume`、`fork`、`adopt` 与一次性命令没有视图线程，切片仍在它们的写者线程上写（storage-SPEC §3 第 6 条）。记账线程上其余的长任务——派活时起名字、读计划——各在自己的节里（8-42-4、8-86）。
+
 ## 8-116 城所在卷快满时不接新活（`bin::monitor::volume`，形状：adapter；`accounting::worker::commanding::shedding`，形状：decision）
 
 kernel-SPEC 8-74 的 `degradation::admit_work` 判定卷低于地板时不接新活；本节给它生产的读数和生产的入口。读数不取监视器的 `Sample`：监视器只在有人看时采样（8-94 决定 1），而不接新活不能取决于此刻有没有人开着监视页。
