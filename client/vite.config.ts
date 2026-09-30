@@ -11,6 +11,8 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
 import type { Plugin } from "vite";
 
+import { thirdPartyNotices } from "./scripts/notices";
+
 // The three files a shipped face is made of: one variable woff2 per
 // family, and the licence they are given under. `theme.css` names the
 // two woff2 files, so the asset pipeline emits those by itself; the
@@ -61,7 +63,12 @@ function shippedFace(): Plugin {
 export default defineConfig({
   root: "src",
   base: "./",
-  plugins: [tailwindcss(), svelte({ configFile: "../svelte.config.ts" }), shippedFace()],
+  plugins: [
+    tailwindcss(),
+    svelte({ configFile: "../svelte.config.ts" }),
+    shippedFace(),
+    thirdPartyNotices(),
+  ],
   build: {
     outDir: "../../target/web-dist",
     emptyOutDir: true,

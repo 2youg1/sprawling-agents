@@ -136,16 +136,13 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 **Every licence above is permissive, and none of them is copyleft**, which is why an MPL-2.0 binary may be built from them. MPL-2.0 is file-level copyleft: it governs the files in this repository and asks nothing of the crates linked beside them. Where a crate offers a choice, the choice on `deny.toml`'s list is the one taken; `same-file`'s Unlicense is not on that list, and its MIT is.
 
-**Two obligations travel with a release artifact rather than with this repository**, and neither is discharged by this table:
-
-- Apache-2.0 §4 requires the NOTICE to be kept on distribution and modified files to be marked, so a release archive carries a NOTICE.
-- MIT requires the copyright and licence notice to be kept, so the same.
+**Two obligations travel with a release artifact rather than with this repository**, and this table discharges neither. Apache-2.0 §4 requires the NOTICE to be kept on distribution and modified files to be marked; MIT requires the copyright and licence notice to be kept. For the JavaScript the client bundles, both travel inside the binary (section 4). For the crates, the release archive carries the bill of materials but not yet the licence texts; `tools/xtask/xtask-SPEC.md` section 8-23 records what is left.
 
 **Links go to crates.io rather than to each project's repository**: the question this table answers is which licence a crate declares, and crates.io shows that field beside the version a lockfile would resolve to.
 
 **How to regenerate this table.** Run `cargo metadata --format-version 1 --locked`, take the packages a workspace member names as a dependency, and read each one's `license` field. A row that disagrees with that output is this table being stale, and the output wins.
 
-## 4 The faces the client ships
+## 4 What the client ships that others wrote
 
 The client draws itself in **Geist Sans** and **Geist Mono** ([vercel/geist-font](https://github.com/vercel/geist-font)), one variable-weight `woff2` each, under **SIL Open Font License 1.1**. They are the only binary assets in this repository that are somebody else's work.
 
@@ -158,6 +155,8 @@ The client draws itself in **Geist Sans** and **Geist Mono** ([vercel/geist-font
 **The licence travels with the font, not with this document.** OFL-1.1 §2 requires the copyright notice and the licence text to accompany every copy of the font, including one embedded in a program, so `OFL.txt` sits in the same directory as the two `woff2` files and `client/vite.config.ts` emits it into the bundle as `fonts/OFL.txt`. The binary embeds the bundle, so the obligation is discharged wherever the binary goes. A build whose `client/src/fonts/` is missing any of the three names says so once per file and produces a bundle that draws in the fallback stack.
 
 **Three things OFL-1.1 asks that this repository keeps honouring**: the font files are not sold on their own, they are not renamed while still carrying a reserved name, and a modified copy would have to drop the name *Geist*. This code does none of the three; the files travel unmodified, under their own names.
+
+**The JavaScript inside the bundle carries its notices the same way.** When Vite writes the bundle, `client/scripts/notices.ts` reads which npm packages the emitted chunks were built from, and writes `THIRD-PARTY-NOTICES.txt` at the bundle's root with each package's name, version, declared licence and its licence file verbatim. The binary embeds the bundle, so the notices go wherever the binary goes, and a running city serves them at `/THIRD-PARTY-NOTICES.txt`. A package that reaches the bundle without a licence file stops the build and is named, because a notice file that silently lacks one package is the gap it exists to close.
 
 **No CJK face is named, and none is shipped.** `client/src/theme.css` lists no Chinese family at all: a Han glyph reaches whatever face the machine has, which is what an engine does with a glyph the named families do not carry. Naming one would mean either naming a face its vendor owns — Microsoft YaHei, PingFang and Hiragino are the ones a person actually has — or shipping our own, and a CJK face as its vendor ships it is larger, gzipped or not, than the client's whole budget of <!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end -->.
 

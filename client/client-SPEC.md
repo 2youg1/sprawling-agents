@@ -553,3 +553,10 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **理由**：参数是构建产物的大小与每个 token 的更新开销，因为一个流式对话客户端在每个 token 上都要更新页面。Svelte 5 与 Solid 在这两件事上是同一类设计——响应式编译进产物、没有虚拟 DOM、一次更新只重算碰过的信号——所以两者只能由读数分高下，分类分不出来。仓库里的读数都是 Svelte 一臂：整个客户端（含随包字体与 `#/gallery` 夹具）gzip 后 <!-- xtask:begin budget_reading:frontend_artifact -->578,422 B<!-- xtask:end -->（`tools/xtask/budgets.toml` 的 `frontend_artifact`，`just build-web` 之后称整个 dist 目录）；R = 1e4、一帧 50 个 delta、一个读全表的订阅者时，每帧折叠约 30–40 µs（12-2，`belief/fold_cost.test.ts`）。Solid 一臂的两个读数还没有（§3-4）。在读数出来之前，选择由两件已有的事定：`.svelte` 组件与 `core/` 的 `$state` 模块（`belief/runs.svelte.ts`）由同一个编译器处理，测试经 `scripts/runes.ts` 走同一条编译路径；4-1 的类型车道与 4-5 的 eslint 配置都按 `.svelte` 定型，换成 Solid 的 JSX 要换掉这两条车道。**组件生态不是参数**：`parts/` 的控件全部自绘（§7 判定），平台已给 `<dialog>`、Popover 与提示语义。Vite 保留的理由是产物：`@sveltejs/vite-plugin-svelte` 支持当前的 Vite 主版本，换打包器不改变一个产物字节，却要动 `crates/sprawling/build.rs` 读取的输出契约。
 - **被击败的备选**：Solid（`solid-js` 与 `vite-plugin-solid`）。它输在上面两件编译与车道的事上，不是输在一个读数上。
 - **重开参数**：§3-4 的两个读数量出来以后，同一仪表、同一机器上 Solid 一臂的产物不到 Svelte 一臂的一半，或每帧折叠开销不到一半，就重新论证本条。出现第一个真正需要组件库的需求时，先过 §7 的 `RUNTIME` 判定与 7-9。
+
+### 12-13 随包的第三方许可文本由打包器从产物里认出
+
+- **决策**：`client/scripts/notices.ts` 给 Vite 一个 plugin，在 `generateBundle` 时从每个 chunk 的 `moduleIds` 里认出 `node_modules/<包>`（带 scope 的取两段，嵌套的 `node_modules` 取最后一段），读该包目录下的 `package.json`（版本、`license`）与包目录顶层的许可文件（文件名以 `LICENSE`、`LICENCE`、`COPYING` 或 `NOTICE` 开头，不分大小写），写成产物根下的 `THIRD-PARTY-NOTICES.txt`：按包名排序，同一个包的多个模块只出现一次，字节只取决于输入。二进制嵌入整个产物，所以这份文件随二进制分发，城在 `/THIRD-PARTY-NOTICES.txt` 答它。字体的许可仍是 `fonts/OFL.txt`，本文件开头指向它。一个进了产物却没有许可文件的包让构建失败，并点名它。
+- **理由**：`svelte`、`effect`、`@lezer/*` 与 Svelte 运行时带进来的包是 MIT 或 Apache-2.0，两者都要求版权与许可声明随副本分发，压缩后的 bundle 也是副本；物料清单（`xtask sbom`）只列 cargo 包。从产物认包，而不从 `package.json` 或 `bun.lock` 认：前者漏掉传递进来的运行时包，后者把 devDependencies 与 tree-shaking 删掉的模块也算进去。包目录取自模块路径本身，而不是按包名到 `client/node_modules` 下去找：打包器读的是哪一份，声明就写哪一份。缺许可文件即失败而不是跳过：悄悄少了一个包的声明，与没有声明是同一个缺口。
+- **被击败的备选**：一个现成的 rollup 许可证 plugin——多一个 devDependency 做几十行就能做完的事；把 npm 包写进物料清单——清单是 cargo 的 CycloneDX，且不在二进制里。
+- **重开参数**：产物里出现一个许可要求别的形式的包（例如要求在界面上署名），或这份文件让 `frontend_artifact` 的读数增长超过 8 KiB。
