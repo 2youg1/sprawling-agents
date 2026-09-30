@@ -24,7 +24,7 @@ just check                    # the whole check
 
 The client (`client/`) is **Svelte 5** with Effect, built by bun through Vite. Read <https://svelte.dev/docs/svelte/overview> before touching a component, and [`frontend-method.md`](frontend-method.md) for how a screen is accepted here.
 
-Then read, in order: this file; `ARCHITECTURE.md`, for what the code is made of and why it has this shape; `crates/<crate>/<crate>-SPEC.md` for the crate you are touching, which holds its interfaces and decisions and is written before its code; `docs/glossary.md`, the vocabulary the lexicon gate enforces; and the tests next to the code you are about to touch.
+Then read, in order: this file; `ARCHITECTURE.md`, for what the code is made of and why it has this shape; the SPEC of the crate you are touching — `crates/<dir>/Spec.lean` and its parts under `spec/`, or `<lib>-SPEC.md` until that crate migrates — which holds its interfaces and decisions and is written before its code; `docs/glossary.md`, the vocabulary the lexicon gate enforces; and the tests next to the code you are about to touch.
 
 **Everything that explains this code ships with it.** The seam list is a section of `ARCHITECTURE.md`, the module map is `architecture.toml` beside it, and each crate's SPEC sits beside that crate. The only thing kept back is one machine's working notes, which `.gitignore` excludes and which nothing here may depend on.
 
@@ -83,7 +83,7 @@ A gate's violation turns the check red with a message naming the rule, the viola
 | Take the time as a parameter. The single sampling point is `bin::assembly`. | `clippy.toml` disallowed methods |
 | Use `BTreeMap` on kernel decision paths; keep floats out of ledger payloads; start tasks from the one spawn point. | review, and the determinism tests in citysim |
 
-**Fix the cause when a gate goes red.** Loosening a gate in the change that the gate is failing requires an explicit ruling from the person, recorded as the commit's `Verdict: user-approved` trailer. Review holds that rule rather than a gate, because a gate that read commit history would make every run depend on the range its caller passed. What review needs to see it is the split: put a change to gate machinery — `tools/xtask/`, `justfile`, `.github/`, the root `Cargo.toml`, `deny.toml`, `clippy.toml`, `rust-toolchain.toml`, `tools/xtask/budgets.toml`, `architecture.toml` — in a commit apart from the source it judges. A commit whose whole diff is gate machinery is a re-pricing, which needs no ruling: it says only that a rule now costs something different, and that is exactly what a reviewer has to read.
+**Fix the cause when a gate goes red.** Loosening a gate in the change that the gate is failing requires an explicit ruling from the person, recorded as the commit's `Verdict: user-approved` trailer. Review holds that rule rather than a gate, because a gate that read commit history would make every run depend on the range its caller passed. What review needs to see it is the split: put a change to gate machinery — `tools/xtask/`, `justfile`, `.github/`, the root `Cargo.toml`, `deny.toml`, `clippy.toml`, `rust-toolchain.toml`, `lakefile.toml`, `lean-toolchain`, `tools/xtask/budgets.toml`, `architecture.toml` — in a commit apart from the source it judges. A commit whose whole diff is gate machinery is a re-pricing, which needs no ruling: it says only that a rule now costs something different, and that is exactly what a reviewer has to read.
 
 **A gate that has never failed is indistinguishable from a gate that does not exist.** When you add one, inject a violation and watch it go red once, for the same reason a test must fail before it passes.
 
@@ -103,7 +103,7 @@ Three things run there and not at your desk: `cargo-deny` when it is not install
 
 In rustdoc, write what the signature cannot say — invariants, failure modes, call ordering, ownership. The parameter names are already visible.
 
-A SPEC is written as its own first draft: it states what is true now, not how it became true. A decision goes in its §12 as a numbered entry with its reason and the alternative it beat, and an open question in §3 says what is undecided and what evidence would settle it. `AGENTS.md`, section *SPECs and Markdown*, gives the rest.
+A SPEC is written as its own first draft: it states what is true now, not how it became true. A decision sits beside what it decides, with its reason and the alternative it beat — a `D<n>` comment above the declaration in a `Spec.lean`, a numbered §12 entry in a Markdown SPEC that has not migrated — and an open question in §3 says what is undecided and what evidence would settle it. `AGENTS.md`, section *SPECs and Markdown*, gives the rest.
 
 ### Languages
 
@@ -111,7 +111,7 @@ A SPEC is written as its own first draft: it states what is true now, not how it
 |---|---|
 | Identifiers, event names, error codes, rustdoc, commit subjects | English |
 | `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `docs/` | English, except `README.zh-CN.md` and `docs/getting-started.zh-CN.md` |
-| Crate SPECs and design discussion | Chinese, with concept names kept in their English form |
+| Crate SPECs — the Markdown ones, and the comments of `Spec.lean` and its parts — and design discussion | Chinese, with concept names kept in their English form; Lean declaration names are English, from the glossary |
 | **Pull requests, issues, review comments** | **your own language** |
 
 That last row is deliberate. Write the description in the language you think in; a precise sentence in your own language is worth more than an approximate one in someone else's. A parallel translation is welcome rather than required — English if you wrote in another language, Chinese if you wrote in English — and with both versions side by side, a mistranslation is visible instead of silent, whether it came from a person or from a model.
@@ -162,7 +162,7 @@ Let a Rust command finish, and never kill it by PID; waiting on the build lock i
 | `just dist` | the whole deliverable: client, binary, and bill of materials |
 | `just budget` / `just bench` | every budget with what it costs today; the wall-clock readings, never gated |
 | `just sim` | citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |
-| `just spec <crate>` | generate a SPEC skeleton |
+| `just spec <crate>` | create a crate's `Spec.lean` skeleton |
 | `just api-baseline` | recompute the public-surface baselines |
 | `cargo xtask docnum [--write]` | check every managed span against the code that decides it; `--write` rewrites them |
 | `just replay <log>` | verify a ledger chain offline, read-only |

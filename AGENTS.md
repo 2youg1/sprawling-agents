@@ -4,7 +4,7 @@
 
 sprawling is a locally deployed harness that runs many agents on one machine as a city: one Rust binary, a browser client that the binary serves, and one append-only Ledger that holds the whole history of the city. Models wrote most of the code, and every rule below holds for a person as well, because whoever picks the work up next does not remember what happened yesterday.
 
-The authorities, from highest to lowest, are the person's ruling, [`ARCHITECTURE.md`](ARCHITECTURE.md) for structure, `crates/<crate>/<crate>-SPEC.md` for a crate's interfaces and decisions, and then the code and its tests. When a lower level contradicts a higher one, the higher one wins and the lower one is corrected in the same change. When reality contradicts all of them, reality wins, and the document is corrected first, with the reason written beside the correction.
+The authorities, from highest to lowest, are the person's ruling, [`ARCHITECTURE.md`](ARCHITECTURE.md) for structure, a crate's SPEC — `crates/<dir>/Spec.lean` with its parts under `spec/`, or `<lib>-SPEC.md` until the crate migrates — for its interfaces and decisions, and then the code and its tests. When a lower level contradicts a higher one, the higher one wins and the lower one is corrected in the same change. When reality contradicts all of them, reality wins, and the document is corrected first, with the reason written beside the correction.
 
 </context>
 
@@ -15,7 +15,7 @@ The authorities, from highest to lowest, are the person's ruling, [`ARCHITECTURE
 Read this file to the end before the first edit, and then read what the change touches:
 
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — the crate topology, the seams, the module map, the seven shapes and the determinism rules. Its `depmap` block and its module map are machine authorities.
-- `crates/<crate>/<crate>-SPEC.md` — the crate's interfaces and decisions, written before its code.
+- A crate's SPEC — `crates/<dir>/Spec.lean` with its parts under `spec/` once the crate has migrated, `crates/<dir>/<lib>-SPEC.md` until then — holds the crate's interfaces and decisions, written before its code; [`ARCHITECTURE.md`](ARCHITECTURE.md) §11, *Specifications in Lean*, says where each part lives.
 - [`docs/glossary.md`](docs/glossary.md) — one name for each concept, enforced by the `lexicon` gate through `tools/xtask/lexicon.toml`.
 - The tests beside the code you are about to change, and the neighbouring modules.
 - The official documentation of each tool you use, and the vendor's agent guide or skill when one exists.
@@ -29,7 +29,7 @@ Read this file to the end before the first edit, and then read what the change t
 ```bash
 cargo install just --locked   # once; a recipe cannot check for the tool that runs it
 just prereqs                  # every other tool the loop needs, with the install line for each one that is absent
-just check                    # the whole check: fmt, source gates, Lean models, clippy, feature combinations, nextest, the client bundle, artifact gates, the client's own checks
+just check                    # the whole check: fmt, source gates, Lean specifications, clippy, feature combinations, nextest, the client bundle, artifact gates, the client's own checks
 ```
 
 `just prereqs` reads the one list of tools the loop needs, the develop tier of the doctor's table (`crates/sprawling/src/doctor/table/prereqs.tsv`), and `just check` opens with it, so a missing tool is named in milliseconds rather than twenty minutes into a compile. `build-web` runs inside `check` because the `render` and `npm` gates judge the built client and refuse when it is absent.
@@ -42,7 +42,7 @@ just check                    # the whole check: fmt, source gates, Lean models,
 | `just gates` | the machine gates, then the supply-chain read |
 | `cargo xtask gates <name>...` | the named gates only; `cargo xtask gates --list` prints the roster, one name per line |
 | `just commits <base>..<tip>` | every commit subject and `Verdict:` trailer in the range, judged against *Commits*; CI runs it on the change-set, and `just check` cannot, because a tree has no range |
-| `just models` | the Lean design models under `tools/adversary/design/`, built with no `sorry`, `admit` or `axiom`; silent where Lean is absent |
+| `just models` | every Lean specification under `crates/`, built with no `sorry`, `admit` or `axiom`; fails where Lean is absent |
 | `just features` | the two feature combinations nothing else compiles: the workspace on its default features, and `wire` without `server` |
 | `just check-client` | the client's lint, typecheck and tests |
 | `just build-web` | the client bundle, built into `target/web-dist` |
@@ -66,7 +66,7 @@ just check                    # the whole check: fmt, source gates, Lean models,
 - Return failure through `Result`. Non-test code has no `unwrap`, `expect`, `panic!`, `todo!`, `unreachable!`, bare indexing or bare slicing.
 - Use checked arithmetic and `TryFrom` in place of `as` casts.
 - `unsafe_code` is `forbid` in the workspace lint table (`[workspace.lints.rust]` in the root `Cargo.toml`), which every workspace crate inherits and nothing inside a crate can lift. `desktop` sits outside the workspace for exactly this reason and sets `unsafe_code = "deny"` in its own manifest: there `unsafe` appears only under `platform/windows/`, lifted at the narrowest scope with `#[expect(unsafe_code, reason = "…")]`, and it wraps the FFI call alone, because reasoning pulled inside the block only makes the next reader audit more lines.
-- A platform call takes the first of these that works, and the crate's SPEC §12 records which one and why: a safe interface from the standard library or from a crate whose public surface is safe (for example `CommandExt::creation_flags` to set a child's priority class); then a Zig leaf behind a `(ptr, len)` boundary, checked for equivalence against a Rust reference, fuzzed on both sides, its boundary properties proved in Lean, and the one `unsafe` its `extern` call costs named in the SPEC. `unsafe` Rust that calls the platform directly is admitted only where a measurement shows it is the best choice overall.
+- A platform call takes the first of these that works, and the crate's SPEC records which one and why as a decision: a safe interface from the standard library or from a crate whose public surface is safe (for example `CommandExt::creation_flags` to set a child's priority class); then a Zig leaf behind a `(ptr, len)` boundary, checked for equivalence against a Rust reference, fuzzed on both sides, its boundary properties proved in Lean, and the one `unsafe` its `extern` call costs named in the SPEC. `unsafe` Rust that calls the platform directly is admitted only where a measurement shows it is the best choice overall.
 - Every `unsafe` block carries one `SAFETY:` line that gives the precondition that makes the call sound. Test the line by asking whether what it says could be false: *"we call `EnumWindows`"* cannot be false, so it restates the code; *"the callback is an `extern "system" fn` in this module, and the `Vec` behind `lparam` outlives the call with no second alias"* can be false, so it is a precondition.
 - Carry every failure to a decision: a `Result` is handled or returned. Binding it to `let _ =`, replacing it with `unwrap_or_default`, or turning it into an `Option` with `.ok()` drops the reason a caller needed.
 - Suppress a lint with `#[expect(reason = "…")]` at the narrowest scope. An `expect` that stops firing fails the build, which is how the suppression cleans itself up; `#[allow]` belongs only on test modules.
@@ -97,7 +97,7 @@ just check                    # the whole check: fmt, source gates, Lean models,
 
 - Write each revision as the document's first draft. A SPEC states what is true now, and the check is one sentence: *a reader opening this file for the first time meets no sentence that only someone who read the previous version can use.*
 - Keep the reason a rule has its current shape, which the next change depends on, and leave what the rule used to be to git.
-- A decision belongs in the SPEC's **§12 Decisions** as a numbered entry giving the decision, its reason, and the alternative it beat. §1–§11 state the interface as it is, with no changelog, session log, card number or "this used to be X".
+- A decision is recorded where the crate's SPEC keeps decisions, with its reason and the alternative it beat: in a `Spec.lean` or one of its parts, a comment that opens with `D<n>` directly above the declaration it governs (`ARCHITECTURE.md` §11, *Specifications in Lean*); in a `<lib>-SPEC.md` that has not migrated, a numbered entry of **§12 Decisions**. The rest of a SPEC states the interface as it is, with no changelog, session log, card number or "this used to be X".
 - An acceptance record states what is verified and by which command, in the present tense, without the sitting, the date, or what that sitting left unverified, which goes stale silently and later reads as a defect.
 - An open question in the tree is a claim about the code. §3 of a SPEC says what about the interface is undecided and what evidence would settle it; a turn in a conversation such as *"awaiting a ruling"* gives a reader outside nothing to act on.
 - Delete an open question the moment it is answered, and put the answer where it is enforced, because a question that outlived its answer tells every later reader that a settled matter is still open.
@@ -115,8 +115,9 @@ just check                    # the whole check: fmt, source gates, Lean models,
 - A citysim failure replays byte for byte from its scenario, a fixed script on a counted clock with no random source; when it does not, the defect is the determinism.
 - A check that enters through the crates' public faces is Rust, beside the code it judges. A check that enters the way a stranger does — spawning the binary, opening a socket to a served city, speaking the wire from outside — is Lean under `tools/adversary/`, which takes its names from `docs/glossary.md`. `xtask boundary` holds the line.
 - When the adversary finds a defect, a person writes the failing case as a Rust test under `crates/sprawling/tests/`, and `tools/adversary/`, which quantifies over traces, keeps no copy.
+- Lean under a crate's `spec/` is neither kind of check: it is that crate's specification, it proves what a module must hold on every input its model admits, and it imports nothing from `tools/adversary/`, which imports no specification in turn.
 - A change to the wire — a frame renamed, a field made nonzero, an exit code moved — updates `tools/adversary/src/Sprawling/Door.lean` and the renderer in `tools/adversary/src/Sprawling/Regression.lean` in the same change-set, and `just adversary` confirms it where Lean is installed. The nightly adversary run is otherwise the first place the drift shows.
-- `just check` on a machine without Lean behaves byte for byte as it does where `tools/adversary/` is absent, so nothing in `just check` depends on it.
+- `just check` reads nothing under `tools/adversary/`: deleting the directory changes no step of it, and `just adversary`, which is never a gate, prints one line and succeeds where Lean is absent.
 
 ## The machine gates
 
@@ -147,7 +148,7 @@ A violation turns the check red with a message that names the rule, the violatio
 | `desktop/`'s copy of the workspace lint table, package metadata and dependency versions equal to the workspace's own. | `xtask guard` |
 
 - Fix the cause when a gate goes red. Loosening a gate in the change the gate is failing requires an explicit ruling from the person, recorded as the commit's `Verdict: user-approved` trailer; the wording of the ruling stays with the person, and the trailer records that there was one. Review holds this rule rather than a gate, because a gate that read commit history made every run depend on the range its caller passed.
-- Put a change to gate machinery — `tools/xtask/`, `justfile`, `.github/`, `flake.nix`, the root `Cargo.toml`, `deny.toml`, `clippy.toml`, `rust-toolchain.toml`, `tools/xtask/budgets.toml`, `architecture.toml` — in a commit apart from the source it judges, so review sees whether the gate moved to admit it. Re-pricing a rule in a commit of its own is ordinary work and needs no ruling.
+- Put a change to gate machinery — `tools/xtask/`, `justfile`, `.github/`, `flake.nix`, the root `Cargo.toml`, `deny.toml`, `clippy.toml`, `rust-toolchain.toml`, `lakefile.toml`, `lean-toolchain`, `tools/xtask/budgets.toml`, `architecture.toml` — in a commit apart from the source it judges, so review sees whether the gate moved to admit it. Re-pricing a rule in a commit of its own is ordinary work and needs no ruling.
 - Every rule that excludes an architecture carries the parameter that made it right, and when that parameter moves, re-argue the rule instead of obeying it. Rules that exclude a defect — the panic bans, the arithmetic bans, the determinism rules — carry no such condition, because nothing about them expires.
 
 ## The view layer
@@ -162,7 +163,7 @@ Read [`docs/frontend-method.md`](docs/frontend-method.md) before you change a sc
 |---|---|
 | Identifiers, event names, error codes, rustdoc, commit subjects | English |
 | `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `docs/` | English, except `README.zh-CN.md` and `docs/getting-started.zh-CN.md`, which change in the same commit as their English pair |
-| Crate SPECs and design discussion | Chinese, with concept names kept in their English form |
+| Crate SPECs — the Markdown ones, and the comments of `Spec.lean` and its parts — and design discussion | Chinese, with concept names kept in their English form; Lean declaration names are English, from the glossary |
 | Pull requests, issues, review comments | your own language; a parallel translation is welcome, because side by side a reader is faster and a mistranslation is visible instead of silent |
 
 - A comment is one of four kinds: the MPL notice, public interface documentation, a warning about consequences, or a statement of intent the code cannot carry. Any other comment marks code that should say more itself.

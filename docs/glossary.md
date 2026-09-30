@@ -156,7 +156,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 
 | Name | What it is |
 |---|---|
-| **SPEC** | A crate's construction authority, `crates/<crate>/<crate>-SPEC.md`, written before its code. It ships with the crate it governs, so a reader of the code has the reasons for it. |
+| **SPEC** | A crate's construction authority, written before its code: `crates/<dir>/Spec.lean` with its parts under `spec/`, or `crates/<dir>/<lib>-SPEC.md` for a crate that has not migrated. It ships with the crate it governs, so a reader of the code has the reasons for it. |
 | **shape** | Which of the seven module shapes a file instantiates — decision, value, port, adapter, typestate, data, projection. A module that cannot name its shape usually holds two things. |
 | **seam** | A trait declared in the inner layer and implemented in the outer one. One adapter is a supposed seam; two make it real. |
 | **conformance** | A generic assertion suite run against any implementation of a port. |

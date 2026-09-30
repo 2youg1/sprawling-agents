@@ -491,6 +491,7 @@ the part worth knowing before starting, not after.
 | a new module, or a deleted one | `architecture.toml` | `modmap` refuses a file with no entry, and an entry whose file is gone |
 | a platform the release ships | `xtask::platform`'s `PLATFORMS` | one row per platform; the npm scope and the bare root name are asserted there |
 | the page | `client/` + client-SPEC | its own lint, typecheck and tests; the bundle is measured against a byte budget |
+| what a module must hold on every input | the part under the crate's `spec/` that names the module (§11, *Specifications in Lean*) | `just models` proves it with no `sorry`, `admit` or `axiom`; the module's rustdoc names the part |
 | a gate itself | `tools/xtask/` + xtask-SPEC | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
 
 Two documents sit beside this one rather than inside it: operating a
@@ -605,7 +606,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 | V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->2569<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (browser-SPEC.md section 8.6) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `tools/fuzz/fuzz_targets` |
-| V5 formal | termination, absence of overflow, monotonicity | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape |
+| V5 formal | termination, absence of overflow and monotonicity in the code; a design rule false on some input nobody tried | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape; the Lean specifications under `crates/`, proved by `just models` in every `just check` |
 | V6 deterministic simulation | components each correct and wrong together | citysim, <!-- xtask:begin citysim_scenarios -->8<!-- xtask:end --> scenario files, failures replayed from their script |
 | V7 mutation | tests that do not bite | `cargo-mutants`, by `just mutants` |
 | V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `tools/fixtures/` |
@@ -616,9 +617,10 @@ do not overlap: overlapping verification reads as more coverage than it is.
 is the whole API and that a second client writes against it; `tools/adversary/`
 exercises that permission by writing a third one outside the workspace, in
 another language, to attack rather than to use. It is reached by
-`just adversary` and by a schedule, never by `just check` — on a machine
-with no Lean toolchain, `just check` behaves byte for byte as it does where
-the directory is absent, and `just adversary` prints one line and succeeds.
+`just adversary` and by a schedule, never by `just check`,
+which reads nothing under `tools/adversary/`: deleting the directory changes
+no step of the check, and where Lean is absent `just adversary` prints one
+line and succeeds.
 What it buys that V2 cannot is quantification over traces: V2 proves that
 the paths we thought of hold, and V10 asks whether the door's stable error
 codes survive any prefix, one halt, and any suffix. What it has found, and
@@ -644,6 +646,72 @@ work that grows with the data it walks, so propositions of those two shapes
 are held by the `#[test]` and the proptest instead (kernel-SPEC.md section
 2). The `// not-proved:` marker and the reader that honours it stay, and
 today no harness carries one.
+
+### Specifications in Lean
+
+A crate's specification moves from Markdown to Lean one crate at a time,
+by the method in `skills/sdd`, and every crate that has moved, and every
+new crate, uses this layout.
+
+**One package, at the repository root.** `lakefile.toml`, `lean-toolchain`
+and `lake-manifest.json` sit at the root; they are the only Lean package
+and the only Lean version pin in the tree. The manifest lists no packages,
+so every import is this tree's or the toolchain's own. The package has
+three targets. The library `Spec` is every module under `crates/`, and
+`just models` builds it inside `just check`. The library `Sprawling`
+(`tools/adversary/src`) and the executable `adversary`
+(`tools/adversary/test`) are the checker, which only `just adversary` and
+the nightly schedule build. The library `Spec` reaches its modules by the
+glob `crates.+`. When the specifications of `tools/xtask`, `tools/citysim`,
+`tools/adversary`, `client` or `desktop` move to Lean, the change that
+moves one adds the two globs `<dir>.Spec` and `<dir>.spec.+` for it, with
+`<dir>` its path in dotted form, and never a glob over a whole `tools`,
+`client` or `desktop` tree, because a `.+` glob walks every directory
+below it, build output and installed packages included.
+
+**Where a specification lives.** A crate's entry is `crates/<dir>/Spec.lean`:
+the seventeen numbered section comments `skills/sdd` lists, and the imports
+of its parts. A part is `crates/<dir>/spec/<Path>.lean`, where `<Path>` is
+the Rust module path below `src/` with every segment in UpperCamelCase:
+`storage::jsonl::barrier` is specified by
+`crates/storage/spec/Jsonl/Barrier.lean`, whose module is
+`crates.storage.spec.Jsonl.Barrier` and whose namespace is
+`Storage.Jsonl.Barrier`. Upper case keeps a Lean keyword such as `open` out
+of a module name. A property that spans modules is named after the module
+that holds it, and the others cite that part. The Rust module's rustdoc
+names its part, and the part names the Rust module.
+
+**One effective specification per crate.** On a merged tree a crate has a
+`Spec.lean` or a `<lib>-SPEC.md`, never both. A part may exist before its
+crate's `Spec.lean`; the Markdown SPEC then cites the part as the authority
+for what it proves and stays the crate's one effective specification until
+the switch, which deletes it in the change that adds `Spec.lean`.
+
+**Imports follow §3.** A part imports the toolchain's libraries and the
+parts of the crates the `depmap` block lets its own crate depend on. The
+checker imports `Sprawling.*` and the toolchain's libraries, and no part
+imports the checker, so the checker holds no restatement of a rule it
+judges.
+
+**A decision sits beside what it decides.** A decision is a comment that
+opens with `D<n>` and gives the decision, its reason and the alternative it
+beat. It stands directly above the declaration it governs, or in the
+section comment of its subject when it governs no single declaration. `<n>`
+is unique within a crate, across `Spec.lean` and its parts, and is never
+reused; another document cites it as `<lib> D<n>`. When a Markdown SPEC
+migrates, its §12 entry N becomes `D<N>`, so an existing citation keeps its
+number.
+
+**Language.** Comments are Chinese, with concept names in English.
+Declaration names are English and come from the glossary.
+
+**From the Markdown layout.** The Markdown SPECs carry nineteen headings.
+Sections 1–11 and 13–16 keep their numbers. §8.5, two designs, becomes the
+alternative recorded beside the reference definition in §10. §12 Decisions
+becomes `D<n>` comments, and §12 is error handling. §17, model experience,
+becomes the cost recorded in §10. §18, documentation sync, is §17,
+documentation relationships. This paragraph goes with the last Markdown
+SPEC.
 
 ### The performance register
 
