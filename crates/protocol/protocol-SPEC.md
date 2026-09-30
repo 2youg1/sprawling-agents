@@ -166,6 +166,8 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 外部工具的 `TimeoutMs(60_000)` 与 `CostTier::Heavy`：外部服务比本地工具慢一个量级，且计费。改动即改变调度与预算行为，属 15.2 行为变更。
 
+`HALT_TICK_MS = 200`（`harness::session`）：我们的选择。它是人按下停摆到 harness 收到 `session/cancel` 的上限；比一次按键的反应慢不了多少，又不至于让一条等着 harness 的车道每秒醒几十次。
+
 ## 15 影响面
 
 改 `Outbound`、`McpLink` 或 `tools_from` 的签名，波及 `crates/sprawling` 的 `assembly::mcp`、`assembly::workbench::servers` 与 `views::mcp_health`；改 `Incoming`／`admit` 波及入站路由与 `channels::auth` 的配对比对。
@@ -263,18 +265,35 @@ impl Harness {
     pub const fn launch(self) -> Launch;          // 起一个说 ACP 的进程：程序与参数
     pub const fn registry_id(self) -> &'static str;   // ACP registry 里的 id
     pub const fn docs(self) -> &'static str;      // 这家自己写的登录说明
+    pub fn parse(word: &str) -> Option<Harness>;  // as_str 的逆；不认识的词答 None，拒词由调用方按它的场合写
 }
 pub struct Launch { pub program: Program, pub args: &'static [&'static str] }
 pub enum Program { Npx, Kimi }
 impl Program { pub const fn name(self) -> &'static str; }   // Windows 上 npx 是 npx.cmd，kimi 是 kimi.exe 由搜索路径补
 
-// harness::session —— 一场 ACP 会话，JSON-RPC 2.0，按行分帧
-pub struct AcpSession<R: BufRead, W: Write> { /* 私有：reader、writer、下一个请求 id、session id、harness 名 */ }
-impl<R: BufRead, W: Write> AcpSession<R, W> {
-    pub fn open(reader: R, writer: W, name: &str, cwd: &Path) -> Result<Self, AxError>;   // initialize ＋ session/new
-    pub fn prompt(&mut self, text: &str, updates: &mut dyn FnMut(Update),
-                  permit: &mut dyn FnMut(&PermissionAsk) -> Permit) -> Result<StopReason, AxError>;
+// harness::reading —— 读端：一条线程把对侧的行交进通道，会话带期限地等
+pub struct Lines { /* 私有：Receiver<Result<Received, AxError>> */ }
+impl Lines { pub fn over<R: BufRead + Send + 'static>(reader: R, name: &str) -> Result<Lines, AxError>; }
+
+// harness::process —— 把一家 harness 起成子进程（形状 4 适配器）；落地即杀
+pub struct HarnessProcess { /* 私有：Child */ }
+impl HarnessProcess {
+    pub fn start(harness: Harness, cwd: &Path) -> Result<(HarnessProcess, AcpSession<ChildStdin>), AxError>;
 }
+
+// harness::session —— 一场 ACP 会话，JSON-RPC 2.0，按行分帧
+pub struct AcpSession<W: Write> { /* 私有：lines、writer、下一个请求 id、session id、harness 名、是否已取消 */ }
+impl<W: Write> AcpSession<W> {
+    pub fn open(lines: Lines, writer: W, name: &str, cwd: &Path) -> Result<Self, AxError>;   // initialize ＋ session/new
+    pub fn prompt(&mut self, text: &str, listener: &mut Listener<'_>) -> Result<Answer, AxError>;
+}
+pub struct Listener<'a> {
+    pub halted: &'a mut dyn FnMut() -> bool,                    // 每条消息到达前、对侧每沉默满 HALT_TICK_MS 时各问一次
+    pub cancelling: &'a mut dyn FnMut() -> Result<(), AxError>, // 头一次答「停了」时调一次，在 session/cancel 发出之前
+    pub report: &'a mut dyn FnMut(Update) -> Result<(), AxError>,
+    pub permit: &'a mut dyn FnMut(&PermissionAsk) -> Permit,    // 取消之后不再问它，一律答 cancelled
+}
+pub struct Answer { pub stop: StopReason, pub text: String }    // text：这一回合的 agent_message_chunk 依次拼起来
 pub enum Update { Text(String), Thought(String), ToolCall { id: String, title: String, kind: String },
                   ToolCallStatus { id: String, status: String }, Other { variant: String } }
 pub struct PermissionAsk { pub title: String, pub options: Vec<PermitOption> }
@@ -290,6 +309,10 @@ pub enum StopReason { EndTurn, MaxTokens, MaxTurnRequests, Refusal, Cancelled }
 - **本城不向 harness 提供文件与终端**：`initialize` 声明 `fs.readTextFile`、`fs.writeTextFile`、`terminal` 全为 `false`，harness 用它自己的工具。ACP 规格里工具由 agent 自己执行，`session/request_permission` 是 agent 可以不发的请求，工具名 "do not advertise a capability or grant authorization"（<https://agentclientprotocol.com/protocol/tool-calls>）；本城因此只能**记录**一家 harness 做了什么，不能**管辖**它。harness 发来的其余请求（`fs/*`、`terminal/*`）以 JSON-RPC `-32601` 回答，不静默。
 - **一条消息的上限与 MCP 同一个**：`read_one_message` 与 `MESSAGE_CEILING`（§8-15）。ACP 与 MCP 同是按行分帧的 JSON-RPC，一个图片加信封的上限对两者是同一个事实。
 - **`prompt` 在对方答出 `StopReason` 时返回**；读到输入结束而没有答，是 `E_PROVIDER` 并标 `Retry::Unknown`：对方也许已经做了事。`StopReason` 未知的词拒而不猜。
-- **测试走同一扇门**：`AcpSession` 对任何 `BufRead + Write` 成立，测试用一条线程在内存管道另一头扮演 agent，不另立 trait。
+- **停摆在对侧沉默时也要变成取消**：`BufRead` 的读没有期限，一家在跑长命令的 harness 可以几分钟一行不写，而一次停摆不能等它开口。所以读端在自己的线程上（`Lines::over`），把行交进通道；`prompt` 每次最多等 `HALT_TICK_MS` 就回头问一次 `halted`。线程在对侧关闭输出（子进程被杀）或会话丢掉通道时结束，不会泄漏。ARCHITECTURE §10 规则 3 把它列为库 crate 起线程的一处。
+- **取消的次序是 `adversary/design/HarnessRun.lean` 定的**：`halted` 头一次答真，先调 `cancelling`（调用方在这里把 `cancel_received` 落账），再发 `session/cancel`，此后的汇报排在它后面；第二次答真什么也不发。取消之后 agent 再问 permission，一律答 `cancelled`（ACP 要求客户端这样答取消后的每一个 permission 请求），不再问调用方。
+- **`Answer.text` 是 agent 这一回合对城说的话**：`agent_message_chunk` 依次拼起来，每一块同时照常交给 `report`。它是城那次请求的回答，汇报是一路上的事，两者由调用方分别记（sprawling-SPEC §8-4e 第 8 条）。
+- **`HarnessProcess::start` 起 `Launch` 的程序与参数**：程序名由搜索路径补（`Program::name`），工作目录是调用方给的那棵 worktree，stderr 丢弃（与 `mcp::stdio` 同理：那是它的诊断，不是答案）。起不来答 `E_TOOL_UNAVAILABLE`，恢复语给出这家自己的 `docs()`。进程句柄落地时杀掉并收尸，所以「谁回收它」不需要第二份名单。
+- **测试走同一扇门**：测试用 `Lines::over` 读一条内存管道，在另一头用一条线程扮演 agent，与生产读子进程的输出是同一段代码，不另立 trait。
 
-**尚未做到的（本节接口的当前状态）**：一个 harness 居民的 run 还没有接线：派活到这样的居民时起它的进程、在房间的 worktree 里开会话、把 `Update` 写进账本、把停摆译成 `session/cancel`、confidential 楼拒绝构造它。它必须守住的性质已在 `adversary/design/HarnessRun.lean` 证明，设计写在 sprawling-SPEC §8-4e；本 crate 在那里还欠三样：`Harness::parse`、起进程的那一半，以及 `session/cancel` 这一条通知。在接线之前，设置页的 harness 页只说明五家在这台电脑上够不够得着、怎么起、去哪里登录。
+**尚未做到的（本节接口的当前状态）**：一个 harness 居民的 run 还没有接线：派活到这样的居民时起它的进程、在房间的 worktree 里开会话、把 `Update` 写进账本、把停摆译成 `session/cancel`、confidential 楼拒绝构造它。它必须守住的性质已在 `adversary/design/HarnessRun.lean` 证明，设计写在 sprawling-SPEC §8-4e；本 crate 这一侧（`Harness::parse`、`harness::process`、`harness::reading` 与 `session/cancel`）已落地，接线欠在 kernel、city 与 sprawling 三处。在接线之前，设置页的 harness 页只说明五家在这台电脑上够不够得着、怎么起、去哪里登录。
