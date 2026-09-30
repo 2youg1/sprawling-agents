@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Crash recovery over a verified ledger: which tool calls have no
+//! Crash recovery over verified records: which tool calls have no
 //! outcome, and the line that closes one.
 //!
 //! A `tool_called` with no later `tool_result` in the same run is a
@@ -11,22 +11,28 @@
 //! file because they are one rule read twice — what counts as dangling
 //! decides what the closing line must say.
 
+use std::collections::BTreeMap;
+
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
-use kernel::{AxCode, AxError, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
+use kernel::{AxCode, AxError, EventDraft, EventKind, EventRecord, Payload, TimeMs};
 
-use super::{VerifiedLedger, VerifiedLine};
-
-/// The crash-recovery detection half of resume: a
+/// The crash-recovery detection half of resume, fed one verified record
+/// at a time so it rides the pass that verifies the chain: a
 /// `tool_called` with no later `tool_result` in the same run is a call
-/// whose outcome is unknown.
-pub fn dangling_tool_calls(ledger: &VerifiedLedger) -> Vec<(RunId, Seq)> {
-    let mut pending: std::collections::BTreeMap<[u8; 16], (RunId, Seq)> =
-        std::collections::BTreeMap::new();
-    let mut dangling = Vec::new();
-    for line in ledger.lines() {
-        let VerifiedLine::Known { record, .. } = line else {
-            continue;
-        };
+/// whose outcome is unknown, and so is a call its own run followed with
+/// another call before any result.
+///
+/// What it holds is the calls still open, one per run, and the calls
+/// already found dangling, never the ledger.
+#[derive(Debug, Default)]
+pub struct DanglingCalls {
+    open: BTreeMap<[u8; 16], EventRecord>,
+    dangling: Vec<EventRecord>,
+}
+
+impl DanglingCalls {
+    /// Reads one record, in ledger order.
+    pub fn observe(&mut self, record: &EventRecord) {
         let key = *record.run().as_bytes();
         #[expect(
             clippy::wildcard_enum_match_arm,
@@ -34,19 +40,25 @@ pub fn dangling_tool_calls(ledger: &VerifiedLedger) -> Vec<(RunId, Seq)> {
         )]
         match record.kind() {
             EventKind::ToolCalled => {
-                if let Some(older) = pending.insert(key, (record.run(), record.seq())) {
-                    dangling.push(older);
+                if let Some(older) = self.open.insert(key, record.clone()) {
+                    self.dangling.push(older);
                 }
             }
             EventKind::ToolResult => {
-                pending.remove(&key);
+                self.open.remove(&key);
             }
             _ => {}
         }
     }
-    dangling.extend(pending.into_values());
-    dangling.sort_by_key(|(_, seq)| seq.value());
-    dangling
+
+    /// The calls with no outcome, ascending by seq, once every record
+    /// has been observed.
+    pub fn into_calls(self) -> Vec<EventRecord> {
+        let mut calls = self.dangling;
+        calls.extend(self.open.into_values());
+        calls.sort_by_key(|call| call.seq().value());
+        calls
+    }
 }
 
 /// The repair half: the `tool_result` draft that closes a dangling call

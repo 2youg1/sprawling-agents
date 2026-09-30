@@ -278,7 +278,7 @@ pub fn rebuild_prefix(
 /// is the other half of replay and has its own file.
 mod resume;
 
-pub use resume::{dangling_tool_calls, outcome_unknown_draft};
+pub use resume::{DanglingCalls, outcome_unknown_draft};
 
 /// The cache shape a replay rebuilds from two records and then judges
 /// for itself.

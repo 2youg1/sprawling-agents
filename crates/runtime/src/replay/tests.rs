@@ -272,21 +272,27 @@ fn dangling_tool_calls_are_detected_and_repairable() {
         Payload::new(call_data.clone()).unwrap(),
     ))
     .unwrap();
+    let dangling_in = |verified: &VerifiedLedger| {
+        let mut calls = DanglingCalls::default();
+        for line in verified.lines() {
+            if let VerifiedLine::Known { record, .. } = line {
+                calls.observe(record);
+            }
+        }
+        calls.into_calls()
+    };
     // Crash here: no tool_result follows.
     let verified = verify_lines(mem.lines.clone()).unwrap();
-    let dangling = dangling_tool_calls(&verified);
-    assert_eq!(dangling.len(), 1);
-    let (_, seq) = dangling[0];
     let record = match &verified.lines()[0] {
         VerifiedLine::Known { record, .. } => record.clone(),
         other => panic!("expected a known record, got {other:?}"),
     };
-    assert_eq!(record.seq(), seq);
+    assert_eq!(dangling_in(&verified), vec![record.clone()]);
     let repair = outcome_unknown_draft(&record, TimeMs::new(2)).unwrap();
     mem.append(repair).unwrap();
     let verified = verify_lines(mem.lines.clone()).unwrap();
     assert!(
-        dangling_tool_calls(&verified).is_empty(),
+        dangling_in(&verified).is_empty(),
         "repair closes the account"
     );
     let repaired: serde_json::Value = serde_json::from_slice(&mem.lines[1]).unwrap();

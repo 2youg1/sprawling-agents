@@ -313,29 +313,26 @@ impl RunWorker {
     /// Propagates whatever the chain says about itself: a history that
     /// does not verify is not a history to append closing drafts to.
     pub fn startup_scan(&mut self) -> Result<ScanReport, AxError> {
-        let verified = runtime::replay::verify_ledger_dir(
+        // Verifying the chain and finding the open calls are one
+        // streamed pass: what stays resident is one segment's bytes and
+        // the calls not yet closed, never the whole ledger.
+        let mut calls = runtime::replay::DanglingCalls::default();
+        let index = runtime::replay::fold_ledger_dir(
             &kernel::layout::CityLayout::new(&self.city_root).ledger(),
+            |record| {
+                calls.observe(record);
+                Ok(())
+            },
         )?;
-        let dangling = runtime::replay::dangling_tool_calls(&verified);
         let mut closed = 0usize;
-        for (run, seq) in dangling {
-            let call = verified.lines().iter().find_map(|line| match line {
-                runtime::replay::VerifiedLine::Known { record, .. }
-                    if record.run() == run && record.seq() == seq =>
-                {
-                    Some(record.clone())
-                }
-                runtime::replay::VerifiedLine::Known { .. }
-                | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
-            });
-            let Some(call) = call else { continue };
+        for call in calls.into_calls() {
             let draft = runtime::replay::outcome_unknown_draft(&call, self.clock.now()?)?;
             self.ledger.append(draft)?;
             closed = closed.saturating_add(1);
         }
         Ok(ScanReport {
             opening: self.opening,
-            lines: verified.raw_lines().len(),
+            lines: index.len(),
             closed_calls: closed,
             waiting_approvals: self.governance.pending.len(),
         })
