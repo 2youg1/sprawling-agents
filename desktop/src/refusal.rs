@@ -66,6 +66,13 @@ impl RefusalCode {
     }
 }
 
+/// The `_meta` key that marks a refusal whose effect is unknown.
+///
+/// Quoted from `agent_protocols::mcp::tools::EFFECT_META_KEY`, which is
+/// the one definition; `xtask guard` compares the two
+/// (desktop-SPEC.md section 12.3).
+const EFFECT_META_KEY: &str = "sprawling/effect-unknown";
+
 /// One refusal, in three parts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Refusal {
@@ -73,6 +80,17 @@ pub(crate) struct Refusal {
     action: String,
     subject: String,
     recovery: String,
+    aftermath: Aftermath,
+}
+
+/// What the desktop is left as after a refusal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Aftermath {
+    /// The refusal says what happened: nothing, or exactly what it names.
+    Known,
+    /// Part of the request was handed over before it stopped, so whether
+    /// it took effect is not known.
+    Unknown,
 }
 
 impl Refusal {
@@ -89,20 +107,48 @@ impl Refusal {
             action: action.to_owned(),
             subject: subject.into(),
             recovery: recovery.to_owned(),
+            aftermath: Aftermath::Known,
         }
     }
 
-    /// The JSON-RPC `error` object.
+    /// The same refusal, marked as coming after part of the request was
+    /// already handed over, so the caller looks before it acts again.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the first caller is the partial-input path of platform::windows::act"
+        )
+    )]
+    pub(crate) fn effect_unknown(self) -> Refusal {
+        Refusal {
+            aftermath: Aftermath::Unknown,
+            ..self
+        }
+    }
+
+    /// The one-line summary both answers open with.
+    fn summary(&self) -> String {
+        format!(
+            "{}: cannot {} — {}",
+            self.code.as_str(),
+            self.action,
+            self.subject
+        )
+    }
+
+    /// The JSON-RPC `error` object, for a fault in the protocol itself.
     ///
-    /// This is the only way out of a refusal, for tests as much as for
-    /// the wire: an accessor that exists so a test can read a field is a
-    /// second door onto the same value. `message` is the one-line summary a
-    /// person reads; `data` carries the three parts and the stable code
-    /// for anything that decides on them.
+    /// This and [`Refusal::as_tool_result`] are the only ways out of a
+    /// refusal, for tests as much as for the wire: an accessor that
+    /// exists so a test can read a field is a second door onto the same
+    /// value. `message` is the one-line summary a person reads; `data`
+    /// carries the three parts and the stable code for anything that
+    /// decides on them.
     pub(crate) fn as_error(&self) -> Value {
         json!({
             "code": self.code.json_rpc(),
-            "message": format!("{}: cannot {} — {}", self.code.as_str(), self.action, self.subject),
+            "message": self.summary(),
             "data": {
                 "code": self.code.as_str(),
                 "action": self.action,
@@ -110,6 +156,26 @@ impl Refusal {
                 "recovery": self.recovery,
             },
         })
+    }
+
+    /// The `CallToolResult` of a tool that was named and then refused.
+    ///
+    /// A tool's own refusal is a result with `isError` set, as MCP asks,
+    /// so its whole text reaches the model; a client reads only `code`
+    /// and `message` from a JSON-RPC error (desktop-SPEC.md section
+    /// 12.2). The text is the summary, then the recovery on a line of its
+    /// own.
+    pub(crate) fn as_tool_result(&self) -> Value {
+        let text = format!("{}\ninstead: {}", self.summary(), self.recovery);
+        let content = json!([{ "type": "text", "text": text }]);
+        match self.aftermath {
+            Aftermath::Known => json!({ "content": content, "isError": true }),
+            Aftermath::Unknown => json!({
+                "content": content,
+                "isError": true,
+                "_meta": { EFFECT_META_KEY: true },
+            }),
+        }
     }
 }
 
@@ -146,6 +212,52 @@ mod tests {
                 .contains("not in this scope")
         );
         assert!(error["message"].as_str().unwrap().contains("E_GATE_DENIED"));
+    }
+
+    #[test]
+    fn a_refusal_reaches_a_model_as_text_marked_as_an_error() {
+        let refusal = Refusal::new(
+            RefusalCode::GateDenied,
+            "act on a window",
+            "`Ledger` is not in this scope",
+            "add its title to DESKTOP.toml",
+        );
+        // Each code is a literal of its own, because `xtask guard` reads
+        // every string in this file that opens with `E_` as a quoted code.
+        assert_eq!(
+            refusal.as_tool_result(),
+            json!({
+                "content": [{ "type": "text", "text":
+                    format!(
+                        "{}: cannot act on a window — `Ledger` is not in this scope\ninstead: add its title to DESKTOP.toml",
+                        "E_GATE_DENIED",
+                    ) }],
+                "isError": true,
+            })
+        );
+    }
+
+    #[test]
+    fn a_refusal_whose_effect_is_unknown_says_so_in_meta() {
+        let refusal = Refusal::new(
+            RefusalCode::ToolUnavailable,
+            "act on a window",
+            "the desktop took 3 of the 6 input events",
+            "look before acting again",
+        )
+        .effect_unknown();
+        assert_eq!(
+            refusal.as_tool_result(),
+            json!({
+                "content": [{ "type": "text", "text":
+                    format!(
+                        "{}: cannot act on a window — the desktop took 3 of the 6 input events\ninstead: look before acting again",
+                        "E_TOOL_UNAVAILABLE",
+                    ) }],
+                "isError": true,
+                "_meta": { "sprawling/effect-unknown": true },
+            })
+        );
     }
 
     /// A protocol fault and a refusal are different things to a generic

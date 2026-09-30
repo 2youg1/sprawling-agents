@@ -18,13 +18,11 @@
 //! visible choice, not a silent one.
 
 use crate::refusal::{Refusal, RefusalCode};
-use base64::Engine as _;
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
 use image::codecs::webp::WebPEncoder;
 use image::imageops::FilterType;
 use image::{ExtendedColorType, ImageEncoder, RgbImage, RgbaImage};
-use serde_json::{Value, json};
 
 /// What `format` may say. Exhaustive, so a fourth format is a change to
 /// this enum and to the tool schema in one edit rather than a string
@@ -113,32 +111,41 @@ impl Default for Wanted {
     }
 }
 
-/// Scales and encodes one window's pixels into the answer a caller
-/// reads.
+/// One encoded picture and the facts a caller reads beside it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Encoded {
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) mime: &'static str,
+    /// The size that came out, which a `scale` makes differ from the
+    /// size that went in.
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    /// Whether the encoder dropped nothing, which is also whether a
+    /// `quality` reached it.
+    pub(crate) lossless: bool,
+}
+
+/// Scales and encodes one window's pixels.
 ///
 /// # Errors
 /// Refuses a scale that leaves no pixels, and an encoder that will not
 /// take these bytes. An encoder failure is this server's own defect
 /// rather than the caller's, and the refusal says so instead of blaming
 /// the arguments.
-pub(crate) fn render(pixels: &RgbaImage, wanted: Wanted) -> Result<Value, Refusal> {
+pub(crate) fn render(pixels: &RgbaImage, wanted: Wanted) -> Result<Encoded, Refusal> {
     let (width, height) = super::geometry::scaled(pixels.width(), pixels.height(), wanted.scale)?;
     let scaled = if (width, height) == (pixels.width(), pixels.height()) {
         pixels.clone()
     } else {
         image::imageops::resize(pixels, width, height, FilterType::Triangle)
     };
-    let bytes = encode(&scaled, wanted)?;
-    Ok(json!({
-        "mime": wanted.format.mime(),
-        "width": width,
-        "height": height,
-        "base64": base64::engine::general_purpose::STANDARD.encode(&bytes),
-        // What the caller got rather than what it asked for. A `quality`
-        // that reached nothing is the kind of fact a reader otherwise
-        // learns from a surprising file size.
-        "lossless": !wanted.format.honours_quality(),
-    }))
+    Ok(Encoded {
+        bytes: encode(&scaled, wanted)?,
+        mime: wanted.format.mime(),
+        width,
+        height,
+        lossless: !wanted.format.honours_quality(),
+    })
 }
 
 /// One image, in one format.
@@ -230,12 +237,6 @@ mod tests {
         })
     }
 
-    fn decoded(answer: &Value) -> Vec<u8> {
-        base64::engine::general_purpose::STANDARD
-            .decode(answer["base64"].as_str().unwrap())
-            .unwrap()
-    }
-
     /// Each of the three formats writes something, says what it wrote,
     /// and reports the size it actually produced.
     #[test]
@@ -253,10 +254,9 @@ mod tests {
                 },
             )
             .unwrap();
-            assert_eq!(answer["mime"], mime);
-            assert_eq!(answer["width"], 64);
-            assert_eq!(answer["height"], 48);
-            assert!(!decoded(&answer).is_empty(), "{mime} wrote nothing");
+            assert_eq!(answer.mime, mime);
+            assert_eq!((answer.width, answer.height), (64, 48));
+            assert!(!answer.bytes.is_empty(), "{mime} wrote nothing");
         }
     }
 
@@ -265,29 +265,27 @@ mod tests {
     /// by whoever opened the file.
     #[test]
     fn the_bytes_are_the_format_the_answer_claims() {
-        let png = decoded(&render(&window(8, 8), Wanted::default()).unwrap());
+        let png = render(&window(8, 8), Wanted::default()).unwrap().bytes;
         assert_eq!(&png[..4], b"\x89PNG");
-        let jpeg = decoded(
-            &render(
-                &window(8, 8),
-                Wanted {
-                    format: Format::Jpeg,
-                    ..Wanted::default()
-                },
-            )
-            .unwrap(),
-        );
+        let jpeg = render(
+            &window(8, 8),
+            Wanted {
+                format: Format::Jpeg,
+                ..Wanted::default()
+            },
+        )
+        .unwrap()
+        .bytes;
         assert_eq!(&jpeg[..2], b"\xFF\xD8");
-        let webp = decoded(
-            &render(
-                &window(8, 8),
-                Wanted {
-                    format: Format::Webp,
-                    ..Wanted::default()
-                },
-            )
-            .unwrap(),
-        );
+        let webp = render(
+            &window(8, 8),
+            Wanted {
+                format: Format::Webp,
+                ..Wanted::default()
+            },
+        )
+        .unwrap()
+        .bytes;
         assert_eq!(&webp[..4], b"RIFF");
         assert_eq!(&webp[8..12], b"WEBP");
     }
@@ -304,8 +302,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(answer["width"], 50);
-        assert_eq!(answer["height"], 25);
+        assert_eq!((answer.width, answer.height), (50, 25));
         // Scaling to nothing is refused rather than answered with an
         // empty picture.
         let refusal = render(
@@ -332,7 +329,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(lossy["lossless"], false);
+        assert!(!lossy.lossless);
         for lossless in [Format::Png, Format::Webp] {
             let answer = render(
                 &window(16, 16),
@@ -343,7 +340,7 @@ mod tests {
                 },
             )
             .unwrap();
-            assert_eq!(answer["lossless"], true, "{lossless:?}");
+            assert!(answer.lossless, "{lossless:?}");
         }
     }
 

@@ -14,7 +14,14 @@
 //! `notifications/initialized` notification second, and a server that
 //! lets work through before them turns a client's ordering mistake into
 //! a failure somewhere else, wearing some other shape.
+//!
+//! A request answers in one of two ways. A fault in the protocol — the
+//! handshake unfinished, a method or tool this server does not have, a
+//! line it cannot read — is a JSON-RPC error. Everything a named tool
+//! says, a refusal included, is a `CallToolResult`, and a refusal sets
+//! its `isError`.
 
+use crate::answer::Answer;
 use crate::platform;
 use crate::refusal::{Refusal, RefusalCode};
 use crate::rpc::{self, PROTOCOL_VERSION, Request};
@@ -165,6 +172,12 @@ impl Server {
     }
 
     /// One `tools/call`: named, admitted, then carried out.
+    ///
+    /// A call that names no tool, or a tool this server does not have, is
+    /// a protocol fault and answers with a JSON-RPC error. Once the tool
+    /// is named, every refusal is the tool's own and answers as a result
+    /// with `isError` set, so the model reads all three parts
+    /// (desktop-SPEC.md section 12.2).
     fn call(&mut self, params: &Value) -> Result<Value, Refusal> {
         let name = params.get("name").and_then(Value::as_str).ok_or_else(|| {
             Refusal::new(
@@ -186,6 +199,14 @@ impl Server {
             .get("arguments")
             .cloned()
             .unwrap_or_else(|| json!({}));
+        Ok(match self.carried_out(tool, &arguments) {
+            Ok(answer) => answer.as_result(),
+            Err(refusal) => refusal.as_tool_result(),
+        })
+    }
+
+    /// One named tool, admitted by the scope and then performed.
+    fn carried_out(&mut self, tool: tools::ToolName, arguments: &Value) -> Result<Answer, Refusal> {
         let admitted = self.scope.admits(&Reach {
             tool,
             title: arguments.get("title").and_then(Value::as_str),
@@ -197,7 +218,7 @@ impl Server {
         // The admission travels on into the desk because one tool's
         // *answer* is scoped as well as its permission: `desktop.windows`
         // reports only the windows this allowlist could name.
-        self.desk.perform(tool, &arguments, &admitted)
+        self.desk.perform(tool, arguments, &admitted)
     }
 }
 

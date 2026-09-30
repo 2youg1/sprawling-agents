@@ -191,8 +191,8 @@ pub(crate) fn table() -> Vec<ToolCard> {
         ToolCard {
             name: ToolName::Screenshot,
             description: "Capture one named window, or a region of it, and return the image as \
-                 base64 with its width, height and mime type. `scale` and `quality` are whole \
-                 percentages, because every call is recorded and the record holds no fractions. \
+                 an image block, with its width and height in a text block beside it. `scale` \
+                 and `quality` are whole percentages, because every call is recorded and the record holds no fractions. \
                  It does not write a file, it does not read text out of the image, and it does \
                  not capture the whole screen."
                 .to_owned(),

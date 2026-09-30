@@ -11,6 +11,7 @@
 //! start. The refusal names the platform, because "unavailable" without
 //! a reason is a sentence nobody can act on.
 
+use crate::answer::Answer;
 use crate::refusal::{Refusal, RefusalCode};
 use crate::scope::Admitted;
 use crate::tools::ToolName;
@@ -45,7 +46,7 @@ impl Desk {
         tool: ToolName,
         _arguments: &Value,
         _admitted: &Admitted<'_>,
-    ) -> Result<Value, Refusal> {
+    ) -> Result<Answer, Refusal> {
         let platform = std::env::consts::OS;
         let tool = tool.as_str();
         Err(Refusal::new(

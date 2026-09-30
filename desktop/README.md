@@ -50,7 +50,7 @@ The transport is JSON-RPC 2.0 over stdin and stdout, one message per line, with 
 
 ## The honest-refusal rule
 
-Every refusal carries a stable code — the city's own spelling, `E_GATE_DENIED`, `E_TOOL_UNAVAILABLE`, `E_TOOL_UNKNOWN`, `E_INVALID_ARGS`, `E_CONFIG_INVALID`, `E_WIRE_MISMATCH` — and three parts in its `data`: what was refused, why, and what can be done instead. Nothing here answers a question it cannot answer, and nothing here widens its own scope to avoid a refusal.
+A tool's own refusal is an MCP `isError` result whose text carries the stable code — the city's own spelling, `E_GATE_DENIED`, `E_TOOL_UNAVAILABLE`, `E_TOOL_UNKNOWN`, `E_INVALID_ARGS`, `E_CONFIG_INVALID`, `E_WIRE_MISMATCH` — and the three parts: what was refused, why, and what can be done instead. Only protocol faults (the handshake, an unknown method or tool, an unreadable line) are JSON-RPC errors, with the same three parts in their `data`. Nothing here answers a question it cannot answer, and nothing here widens its own scope to avoid a refusal.
 
 ## Building and checking
 

@@ -42,6 +42,7 @@ mod views;
 
 use serde_json::{Value, json};
 
+use crate::answer::Answer;
 use crate::refusal::{Refusal, RefusalCode};
 use crate::scope::Admitted;
 use crate::tools::ToolName;
@@ -77,14 +78,14 @@ impl Desk {
         tool: ToolName,
         arguments: &Value,
         admitted: &Admitted<'_>,
-    ) -> Result<Value, Refusal> {
+    ) -> Result<Answer, Refusal> {
         match tool {
-            ToolName::Windows => listing(arguments, admitted),
-            ToolName::Snapshot => self.snapshot(arguments),
-            ToolName::Act => self.act(arguments),
+            ToolName::Windows => listing(arguments, admitted).map(|facts| Answer::facts(&facts)),
+            ToolName::Snapshot => self.snapshot(arguments).map(|facts| Answer::facts(&facts)),
+            ToolName::Act => self.act(arguments).map(|facts| Answer::facts(&facts)),
             ToolName::Screenshot => screenshot(arguments),
-            ToolName::Record => self.record(arguments),
-            ToolName::Clipboard => use_clipboard(arguments),
+            ToolName::Record => self.record(arguments).map(|facts| Answer::facts(&facts)),
+            ToolName::Clipboard => use_clipboard(arguments).map(|facts| Answer::facts(&facts)),
         }
     }
 
@@ -275,7 +276,7 @@ fn listing(arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal>
 }
 
 /// `desktop.screenshot`: one window, or a region of it.
-fn screenshot(arguments: &Value) -> Result<Value, Refusal> {
+fn screenshot(arguments: &Value) -> Result<Answer, Refusal> {
     let window = resolved(arguments)?;
     let whole = capture::window(window.handle, window.bounds)?;
     let pixels = match region(arguments)? {
@@ -298,11 +299,17 @@ fn screenshot(arguments: &Value) -> Result<Value, Refusal> {
         }
         None => whole,
     };
-    let mut answer = encode::render(&pixels, asked_for(arguments)?)?;
-    if let Some(object) = answer.as_object_mut() {
-        object.insert("title".to_owned(), json!(window.named.title));
-    }
-    Ok(answer)
+    let encoded = encode::render(&pixels, asked_for(arguments)?)?;
+    let facts = json!({
+        "title": window.named.title,
+        "width": encoded.width,
+        "height": encoded.height,
+        // What the caller got rather than what it asked for. A `quality`
+        // that reached nothing is the kind of fact a reader otherwise
+        // learns from a surprising file size.
+        "lossless": encoded.lossless,
+    });
+    Ok(Answer::picture(encoded.bytes, encoded.mime, &facts))
 }
 
 /// `desktop.clipboard`: get or set text.
