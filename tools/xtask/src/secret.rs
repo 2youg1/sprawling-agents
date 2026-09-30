@@ -261,6 +261,20 @@ mod tests {
         ["sk", "9fQ2xZ", "7Lm4Rt", "0Bv8Kd", "3Wp6"].join("")
     }
 
+    /// A fresh directory at `root` that cargo reads as a workspace with
+    /// no packages, because `check` asks cargo which packages ship.
+    fn empty_workspace(root: &Path) {
+        let _ = std::fs::remove_dir_all(root);
+        crate::root::fixture::write(
+            root,
+            "Cargo.toml",
+            "[workspace]
+members = []
+resolver = \"3\"
+",
+        );
+    }
+
     #[test]
     fn a_reviewed_identifier_is_matched_whole_and_nothing_else_is() {
         // Derived from the table rather than spelled out: a long literal
@@ -289,7 +303,7 @@ mod tests {
     #[test]
     fn a_derived_file_is_judged_by_the_inputs_that_produced_it() {
         let root = std::env::temp_dir().join(format!("secret-derived-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
+        empty_workspace(&root);
         let body = key_shaped();
         for rel in [
             "client/bun.lock",
@@ -320,7 +334,7 @@ mod tests {
     #[test]
     fn a_ledger_line_is_reported_against_the_records_rule_and_an_object_is_not() {
         let root = std::env::temp_dir().join(format!("secret-records-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
+        empty_workspace(&root);
         let body = key_shaped();
         let ledger = root.join(kernel::RESERVED_PREFIX).join("ledger.jsonl");
         std::fs::create_dir_all(ledger.parent().unwrap()).unwrap();
@@ -346,7 +360,7 @@ mod tests {
     #[test]
     fn a_pascal_case_identifier_is_not_reported_and_a_key_still_is() {
         let root = std::env::temp_dir().join(format!("secret-pascal-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
+        empty_workspace(&root);
         let provider = ["sk-", "ant-", &"a1B2c3D4e5".repeat(9)].concat();
         for (rel, body) in [
             ("src/mem.rs", "\"PeakPagedMemorySize64\"".to_owned()),
