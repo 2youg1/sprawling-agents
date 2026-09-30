@@ -25,6 +25,8 @@ pub(super) enum Verb {
     Whose,
     Check,
     View,
+    PlaybackExport,
+    PlaybackCheck,
     Fork,
     Adopt,
     Replay,
@@ -105,6 +107,13 @@ const NO_OPEN: Flag = flag(
     "leave the screen alone (so does SPRAWLING_OPEN=never)",
 );
 const AT: Flag = flag("--at", Value("addr"), "the served city to talk to");
+/// The person's one way to widen a playback bundle, on both verbs, so an
+/// export and its check read as the same person.
+const INCLUDE_CONFIDENTIAL: Flag = flag(
+    "--include-confidential",
+    Nothing,
+    "read confidential buildings too; the bundle and stderr say so",
+);
 /// `up` forwards its line to the same `serve_city` that `serve` runs, so the
 /// two rows share one flag set and cannot drift apart.
 const SERVED: &[Flag] = &[
@@ -298,6 +307,55 @@ pub(super) const VERBS: &[Row] = &[
         effect: Effect::ReadsOnly,
     },
     Row {
+        verb: Verb::PlaybackExport,
+        name: "playback export",
+        aliases: &[],
+        positionals: &[("city", Required)],
+        flags: &[
+            flag("--from", Value("seq"), "only lines at or after this seq"),
+            flag(
+                "--through",
+                Value("seq"),
+                "only lines at or before this seq",
+            ),
+            flag("--run", Value("run"), "only this run's lines"),
+            flag(
+                "--building",
+                Value("addr"),
+                "only lines addressed within this building",
+            ),
+            INCLUDE_CONFIDENTIAL,
+            flag(
+                "--out",
+                Value("file"),
+                "write a new file instead of stdout; never overwrites",
+            ),
+        ],
+        says: "export a stretch of a city's history as a playback bundle",
+        effect: Effect::Changes,
+    },
+    Row {
+        verb: Verb::PlaybackCheck,
+        name: "playback check",
+        aliases: &[],
+        positionals: &[("bundle", Required)],
+        flags: &[
+            flag(
+                "--bundle",
+                Value("file"),
+                "compare with another bundle, byte for byte",
+            ),
+            flag(
+                "--city",
+                Value("city"),
+                "recompute the bundle from its city and compare",
+            ),
+            INCLUDE_CONFIDENTIAL,
+        ],
+        says: "check a playback bundle on its own, against another, or against its city",
+        effect: Effect::ReadsOnly,
+    },
+    Row {
         verb: Verb::Fork,
         name: "fork",
         aliases: &[],
@@ -446,13 +504,20 @@ pub(super) fn help(row: &Row) -> String {
     format!("usage: {}\n\n{} ({effect}){flags}", usage(row), row.says)
 }
 
-/// Every verb, one line each.
+/// Every verb, one line each, the descriptions aligned past the longest
+/// name.
 pub(super) fn overview() -> String {
+    let width = VERBS
+        .iter()
+        .map(|row| row.name.chars().count())
+        .max()
+        .unwrap_or(0)
+        .saturating_add(2);
     let lines: String = VERBS
         .iter()
         .map(|row| {
             let name = row.name;
-            format!("\n  {name:<9}{}", row.says)
+            format!("\n  {name:<width$}{}", row.says)
         })
         .collect();
     format!("commands:{lines}\n\nsprawling help <verb> explains one.")

@@ -113,3 +113,48 @@ fn every_flag_a_body_reads_passes_the_table() {
         );
     }
 }
+
+/// A row named by two words is read from two words, its flags after
+/// them; the first word alone names both rows under it (sprawling-SPEC.md
+/// 8-126).
+#[test]
+fn a_verb_of_two_words_is_read_from_two_words() {
+    let exported = parse(&words(&["playback", "export", "city", "--run", "r"]));
+    let helped = parse(&words(&["help", "playback", "check"]));
+    let alone = parse(&words(&["playback"]));
+    let mistyped = parse(&words(&["playback", "expot"]));
+    let under = vec!["playback export", "playback check"];
+    assert_eq!(
+        (
+            exported.map(|invocation| {
+                let Invocation::Run(verb, read) = invocation else {
+                    panic!("{invocation:?} is not a run");
+                };
+                (
+                    Some(verb),
+                    read.positional(1).cloned(),
+                    read.value("--run").map(str::to_owned),
+                )
+            }),
+            helped,
+            alone,
+            mistyped,
+        ),
+        (
+            Ok((
+                Some(Verb::PlaybackExport),
+                Some("city".to_owned()),
+                Some("r".to_owned())
+            )),
+            Ok(Invocation::Help(Verb::PlaybackCheck)),
+            Err(LineError::UnknownVerb {
+                given: "playback".to_owned(),
+                nearest: under.clone(),
+            }),
+            Err(LineError::UnknownVerb {
+                given: "playback expot".to_owned(),
+                nearest: under,
+            }),
+        )
+    );
+}

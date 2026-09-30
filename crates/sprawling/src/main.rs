@@ -43,6 +43,8 @@ mod dispatch;
 mod exit;
 #[path = "main/grammar.rs"]
 mod grammar;
+#[path = "main/playback.rs"]
+mod playback;
 #[path = "main/refusal.rs"]
 mod refusal;
 #[path = "main/router.rs"]

@@ -168,23 +168,12 @@ impl Selection {
     }
 
     fn read(read: &Arguments) -> Result<Selection, String> {
-        let number = |flag: &str| -> Result<Option<u64>, String> {
-            read.value(flag)
-                .map(|raw| {
-                    raw.parse::<u64>()
-                        .map_err(|_| format!("{flag} wants a whole number, not '{raw}'"))
-                })
-                .transpose()
-        };
         Ok(Selection {
-            tail: number("--tail")?
+            tail: whole_number(read, "--tail")?
                 .map(|n| usize::try_from(n).map_err(|_| format!("--tail {n} is too large")))
                 .transpose()?,
-            from: number("--from")?.map(Seq::new),
-            run: read
-                .value("--run")
-                .map(|raw| RunId::parse(raw).map_err(|_| format!("'{raw}' is not a run id")))
-                .transpose()?,
+            from: seq_flag(read, "--from")?,
+            run: run_flag(read)?,
             kind: read.value("--kind").map(kind_named).transpose()?,
             who: read.value("--who").map(str::to_owned),
             grep: read.value("--grep").map(str::to_owned),
@@ -214,6 +203,29 @@ impl Selection {
         });
         Ok(kind_holds && who_holds)
     }
+}
+
+/// The whole number `flag` was given, or the line that says it is not one.
+fn whole_number(read: &Arguments, flag: &str) -> Result<Option<u64>, String> {
+    read.value(flag)
+        .map(|raw| {
+            raw.parse::<u64>()
+                .map_err(|_| format!("{flag} wants a whole number, not '{raw}'"))
+        })
+        .transpose()
+}
+
+/// The seq `flag` names. `view --from` and the playback range read a seq
+/// the same way (sprawling-SPEC.md 8-126).
+pub(super) fn seq_flag(read: &Arguments, flag: &str) -> Result<Option<Seq>, String> {
+    whole_number(read, flag).map(|seq| seq.map(Seq::new))
+}
+
+/// The run `--run` names, read the same way by `view` and by playback.
+pub(super) fn run_flag(read: &Arguments) -> Result<Option<RunId>, String> {
+    read.value("--run")
+        .map(|raw| RunId::parse(raw).map_err(|_| format!("'{raw}' is not a run id")))
+        .transpose()
 }
 
 /// The event kind spelled `raw`, or the line that says it is not one

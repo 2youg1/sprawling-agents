@@ -70,6 +70,8 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
         Verb::Whose => super::whose::verb(nth(1), nth(2)),
         Verb::Check => super::check::verb(nth(1)),
         Verb::View => super::view::verb(read),
+        Verb::PlaybackExport => super::playback::export(read),
+        Verb::PlaybackCheck => super::playback::check(read),
         Verb::Init => init(read),
         Verb::Up => up(read, args),
         Verb::Install => install(args),
