@@ -94,6 +94,7 @@ executor   ──▶ runtime::run::drive（循环只住 runtime，本 crate 只�
 ## 8 接口先行
 
 ```rust
+// 8-1 mem_ledger 与 checker（形状 4 适配器＋形状 1 判定）
 pub struct MemLedger { /* lines: Vec<Vec<u8>>, next_seq, prev */ }
 impl MemLedger { pub fn new() -> Self;  pub fn raw_lines(&self) -> &[Vec<u8>]; }
 impl kernel::Ledger for MemLedger { … }
