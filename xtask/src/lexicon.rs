@@ -13,6 +13,10 @@ use std::path::Path;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
+/// Where the retired words live, repo-relative: the gate opens it here,
+/// its messages name it, and `vocabulary` reads the same file.
+pub(crate) const PATH: &str = "xtask/lexicon.toml";
+
 const EXEMPT_MARK: &str = "lexicon-ok:";
 const LANG: &str = concat!(crate::walk::client_src!(), "/lang.json");
 
@@ -50,10 +54,9 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 }
 
 fn load(root: &Path) -> Result<Data, XtaskError> {
-    let path = root.join("xtask").join("lexicon.toml");
-    let text = walk::read_text(&path)?;
+    let text = walk::read_text(&root.join(PATH))?;
     toml::from_str(&text).map_err(|err| XtaskError::Doc {
-        file: "xtask/lexicon.toml".to_owned(),
+        file: PATH.to_owned(),
         msg: err.to_string(),
     })
 }

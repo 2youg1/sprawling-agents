@@ -17,9 +17,9 @@
 //! member. The argument is part of what the document writes, which is why
 //! a wrong argument is refused by name rather than silently skipped.
 
-use std::collections::BTreeSet;
 use std::path::Path;
 
+use crate::budget::REGISTER;
 use crate::report::XtaskError;
 use crate::{architecture, budget, depmap, gates, proof, walk};
 
@@ -210,37 +210,6 @@ fn split(key: &str) -> (&str, Option<&str>) {
     }
 }
 
-/// Every package directory this workspace builds: its members, plus the
-/// packages it excludes from the lint wall on purpose. Both lists live in
-/// the root manifest, so nothing here holds a second roster.
-///
-/// The repository root is not among them. It holds the workspace table
-/// rather than a package, and counting from it as well as from each
-/// member would count every file in the tree twice.
-pub(crate) fn packages(root: &Path) -> Result<BTreeSet<String>, XtaskError> {
-    let parsed = root_manifest(root)?;
-    let mut out = BTreeSet::new();
-    for list in ["members", "exclude"] {
-        let Some(entries) = parsed
-            .get("workspace")
-            .and_then(|workspace| workspace.get(list))
-            .and_then(toml::Value::as_array)
-        else {
-            continue;
-        };
-        for entry in entries {
-            let Some(path) = entry.as_str() else {
-                return Err(XtaskError::Doc {
-                    file: "Cargo.toml".to_owned(),
-                    msg: format!("`workspace.{list}` holds something that is not a path"),
-                });
-            };
-            out.insert(path.to_owned());
-        }
-    }
-    Ok(out)
-}
-
 /// The root manifest, which states the workspace's package roster and
 /// the versions every member inherits.
 pub(crate) fn root_manifest(root: &Path) -> Result<toml::Value, XtaskError> {
@@ -273,7 +242,7 @@ fn register_row(root: &Path, row: &str) -> Result<toml::Value, XtaskError> {
         .get(row)
         .cloned()
         .ok_or_else(|| XtaskError::Doc {
-            file: "xtask/budgets.toml".to_owned(),
+            file: REGISTER.to_owned(),
             msg: format!("no `[{row}]` row, so nothing can be quoted from it"),
         })
 }
@@ -318,13 +287,12 @@ fn adversary_seed(root: &Path) -> Result<String, XtaskError> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
 
     fn root() -> std::path::PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("the xtask manifest directory has a parent")
-            .to_path_buf()
+        crate::root::this_checkout().to_path_buf()
     }
 
     #[test]
@@ -395,16 +363,5 @@ version = \"9.8.7\"
         let read = value(&fixture, "workspace_version");
         std::fs::remove_dir_all(&fixture).unwrap();
         assert_eq!(read.unwrap(), Some("9.8.7".into()));
-    }
-
-    #[test]
-    fn the_package_roster_comes_from_the_root_manifest() {
-        let found = packages(&root()).unwrap();
-        assert!(found.contains("crates/kernel"));
-        assert!(found.contains("desktop"), "an excluded package still pins");
-        assert!(
-            !found.contains(""),
-            "the root is not a package; counting it would count the tree twice"
-        );
     }
 }

@@ -3,13 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `cargo xtask spec <crate>`: create a `<crate>-SPEC.md` skeleton with the
-//! the seventeen sections a SPEC is written in.
+//! `cargo xtask spec <crate>`: create a `<crate>-SPEC.md` skeleton with
+//! the seventeen sections a SPEC is written in, in the directory of the
+//! package whose lib (or, for a tool without one, whose package) goes by
+//! that name.
 //! Creation only — an existing SPEC is never overwritten (the SPEC is the
 //! construction authority; regenerating it would erase decisions).
 
 use std::path::Path;
 
+use crate::members;
 use crate::report::XtaskError;
 
 const SECTIONS: [&str; 19] = [
@@ -39,17 +42,8 @@ pub(crate) fn run(root: &Path, crate_name: Option<&str>) -> Result<String, Xtask
         file: "spec".to_owned(),
         msg: "usage: cargo xtask spec <crate>".to_owned(),
     })?;
-    let dir = if name == "xtask" || name == "citysim" {
-        root.join(name)
-    } else {
-        root.join("crates").join(name)
-    };
-    if !dir.is_dir() {
-        return Err(XtaskError::Doc {
-            file: name.to_owned(),
-            msg: format!("no such crate directory: {}", dir.to_string_lossy()),
-        });
-    }
+    let found = members::members(root)?;
+    let dir = root.join(&members::find(&found, name)?.dir);
     let path = dir.join(format!("{name}-SPEC.md"));
     if path.exists() {
         return Ok(format!(

@@ -12,6 +12,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use crate::lexicon::PATH as LEXICON;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
@@ -72,8 +73,7 @@ fn check_replacements(
     glossary: &BTreeSet<String>,
     out: &mut Vec<Violation>,
 ) -> Result<(), XtaskError> {
-    let path = root.join("xtask").join("lexicon.toml");
-    let text = walk::read_text(&path)?;
+    let text = walk::read_text(&root.join(LEXICON))?;
     for (index, line) in text.lines().enumerate() {
         let Some(value) = line.strip_prefix("replacement = ") else {
             continue;
@@ -86,7 +86,7 @@ fn check_replacements(
         if !defined {
             out.push(Violation {
                 gate: "lexicon",
-                location: format!("xtask/lexicon.toml:{}", index.saturating_add(1)),
+                location: format!("{LEXICON}:{}", index.saturating_add(1)),
                 rule: "a retired word points at a word the glossary defines".to_owned(),
                 violation: format!("{replacement:?} is not defined in docs/glossary.md"),
                 alternative: "give the replacement a glossary row, or name one that has it"
@@ -152,10 +152,7 @@ mod tests {
 
     #[test]
     fn the_glossary_of_this_repository_parses_and_defines_its_own_words() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .to_path_buf();
+        let root = crate::root::this_checkout().to_path_buf();
         let terms = terms(&root).unwrap();
         assert!(terms.contains("Ledger"));
         assert!(terms.contains("Building"));

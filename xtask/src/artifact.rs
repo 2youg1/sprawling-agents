@@ -39,6 +39,7 @@
 
 use std::path::Path;
 
+use crate::members;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
@@ -67,7 +68,11 @@ const PRODUCT: &str = "crates/sprawling/Cargo.toml";
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
-    for file in walk::files_with_ext(&root.join("crates"), &["rs"])? {
+    let files = members::product(root)?
+        .iter()
+        .map(|member| walk::files_with_ext(&root.join(&member.dir), &["rs"]))
+        .collect::<Result<Vec<_>, _>>()?;
+    for file in files.into_iter().flatten() {
         let rel = walk::rel(root, &file);
         if !rel.contains("/src/") {
             continue;

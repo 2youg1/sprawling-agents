@@ -44,9 +44,25 @@ pub(crate) enum XtaskError {
     )]
     StaleBuild { built: String, here: String },
     #[error(
-        "judge tree: no directory from {cwd} upward holds xtask/Cargo.toml (no-checkout); run the command from inside the checkout it should judge"
+        "judge tree: no directory from {from} upward holds Cargo.lock (no-checkout); run the command from inside the checkout it should judge"
     )]
-    NoCheckout { cwd: String },
+    NoCheckout { from: String },
+    #[error(
+        "read package {package}: it sits at {dir}, outside the checkout {root} (member-outside-checkout); move the package under the checkout, or drop it from the workspace and from every path dependency"
+    )]
+    OutsideCheckout {
+        package: String,
+        dir: String,
+        root: String,
+    },
+    #[error(
+        "read package {package}: `[package.metadata.sprawling] role` is {role}, and the only role is \"tool\" (unknown-role); write role = \"tool\", or delete the line to make the package part of the product"
+    )]
+    UnknownRole { package: String, role: String },
+    #[error(
+        "find package `{name}`: no package in this workspace has that package or lib name (unknown-package); name one of: {known}"
+    )]
+    UnknownPackage { name: String, known: String },
 }
 
 pub(crate) fn render(violations: &[Violation]) {

@@ -23,13 +23,14 @@
 use std::path::Path;
 use std::process::Command;
 
+use crate::members;
 use crate::report::{Violation, XtaskError};
 use crate::vocabulary;
 use crate::walk;
 
 mod roster;
 
-use roster::{crates, in_file, module_base, package_name};
+use roster::{in_file, module_base};
 
 /// The attribute that declares a harness. One spelling, matched whole.
 pub(super) const ATTRIBUTE: &str = "#[kani::proof]";
@@ -69,12 +70,17 @@ pub(crate) struct Harness {
     pub(crate) excuse: Option<String>,
 }
 
-/// Every harness in the tree, ordered by location so two runs agree.
+/// Every harness in the product graph's packages, ordered by location so
+/// two runs agree. A tool package is not read: the gates' own tests spell
+/// the attribute inside the fixtures they judge, and none of it is a
+/// proposition about the product.
 pub(crate) fn harnesses(root: &Path) -> Result<Vec<Harness>, XtaskError> {
     let mut out = Vec::new();
-    for dir in crates(root)? {
-        let package = package_name(&dir)?;
-        let src = dir.join("src");
+    for member in members::members(root)? {
+        if !member.in_product_graph() {
+            continue;
+        }
+        let src = root.join(&member.dir).join("src");
         if !src.is_dir() {
             continue;
         }
@@ -84,7 +90,7 @@ pub(crate) fn harnesses(root: &Path) -> Result<Vec<Harness>, XtaskError> {
                 continue;
             };
             let text = walk::read_text(&file)?;
-            out.extend(in_file(&text, &package, &rel, &base));
+            out.extend(in_file(&text, &member.package, &rel, &base));
         }
     }
     Ok(out)

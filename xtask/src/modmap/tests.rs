@@ -13,11 +13,11 @@ const REGISTERED: &str = concat!(
     r#"status = "planned", spec = "kernel-SPEC.md#8-27" }"#,
 );
 
-/// Built out of the workspace, so its file is not under `crates/`.
-const OUTSIDE: &str = concat!(
-    r#"{ name = "desktop::shell", file = "desktop/src/shell.rs", "#,
-    r#"owns = "the window", shape = "adapter", since = "F1", "#,
-    r#"status = "built", spec = "desktop-SPEC.md#8-1" }"#,
+/// A module of a tool package, which the map carries for a reader.
+const TOOL: &str = concat!(
+    r#"{ name = "sim::clock", file = "tools/sim/src/clock.rs", "#,
+    r#"owns = "the counted clock", shape = "value", since = "F1", "#,
+    r#"status = "built", spec = "sim-SPEC.md#8-1" }"#,
 );
 
 const BAD_STATUS: &str = concat!(
@@ -37,13 +37,25 @@ fn map_of(entries: &[&str]) -> Map {
     toml::from_str(&format!("module = [\n  {body},\n]\n")).expect("a module map")
 }
 
-/// `desktop` is built out of the workspace, so its files are not under
-/// `crates/` and this gate never walks to them. The map still carries them
-/// for a reader, and carrying them may not turn into judging them.
+/// The product packages the entries above are judged against.
+fn product() -> [Member; 1] {
+    [Member {
+        package: "kernel".to_owned(),
+        lib: Some("kernel".to_owned()),
+        dir: "crates/kernel".to_owned(),
+        role: members::Role::Product,
+        reach: members::Reach::Workspace,
+        depends_on: BTreeSet::new(),
+    }]
+}
+
+/// A tool's files are not the product's, and this gate never walks to
+/// them. The map still carries them for a reader, and carrying them may
+/// not turn into judging them.
 #[test]
-fn an_entry_outside_crates_is_carried_but_not_judged() {
+fn an_entry_outside_the_product_is_carried_but_not_judged() {
     let mut violations = Vec::new();
-    let found = rows(&map_of(&[REGISTERED, OUTSIDE]), &mut violations);
+    let found = rows(&map_of(&[REGISTERED, TOOL]), &product(), &mut violations);
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].path, "crates/kernel/src/gate.rs");
     assert!(violations.is_empty());
@@ -57,6 +69,7 @@ fn a_bad_status_a_duplicate_and_an_empty_duty_are_each_refused() {
     let mut violations = Vec::new();
     let found = rows(
         &map_of(&[BAD_STATUS, EMPTY_DUTY, REGISTERED, REGISTERED]),
+        &product(),
         &mut violations,
     );
     assert_eq!(found.len(), 1);

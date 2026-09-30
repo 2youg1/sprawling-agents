@@ -55,6 +55,8 @@ use std::path::Path;
 
 use syn::spanned::Spanned;
 
+use crate::budget::REGISTER;
+use crate::members::{self, Member, Role};
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
@@ -92,15 +94,40 @@ const CROSSINGS: [(&str, &str); 5] = [
     ),
 ];
 
-/// Where a whole file is test code by its address.
-///
-/// `citysim` is the deterministic simulator and `fuzz` holds the fuzz
-/// targets; both are checks that happen to be shaped like crates, and
-/// naming them here is cheaper than teaching the walk what a harness is.
-fn is_test_file(rel: &str) -> bool {
-    rel.starts_with("citysim/")
-        || rel.starts_with("fuzz/")
-        || (rel.starts_with("crates/") && rel.contains("/tests/"))
+/// The fuzz targets. They are a workspace of their own, so no package the
+/// members reader lists holds them, and every line in them is a check.
+const FUZZ: &str = "fuzz/";
+
+/// The package this gate is compiled into. Its production code is gate
+/// logic and its tests sit in `#[cfg(test)]` items, as a product's do;
+/// every other tool package - the deterministic simulator - is a check
+/// shaped like a crate.
+const GATES: &str = env!("CARGO_PKG_NAME");
+
+/// How much of one file is test code, decided by where it lives
+/// (xtask-SPEC.md section 8-39).
+#[derive(Debug, PartialEq, Eq)]
+enum Reading {
+    /// The whole file is test code by its address.
+    Whole,
+    /// Only the items marked `#[cfg(test)]` are.
+    Marked,
+    /// No package holds it, so it is nobody's check.
+    Skipped,
+}
+
+fn reading(rel: &str, found: &[Member]) -> Reading {
+    if rel.starts_with(FUZZ) {
+        return Reading::Whole;
+    }
+    let Some(owner) = found.iter().find(|member| member.holds(rel)) else {
+        return Reading::Skipped;
+    };
+    match owner.role {
+        Role::Tool if owner.package != GATES => Reading::Whole,
+        Role::Tool | Role::Product if rel.contains("/tests/") => Reading::Whole,
+        Role::Tool | Role::Product => Reading::Marked,
+    }
 }
 
 /// Where test code hides inside a source file: the line span of every
@@ -167,6 +194,7 @@ const PREDATING: &str = "predating";
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let excused = excused(root)?;
+    let found = members::members(root)?;
     let mut crossing = std::collections::BTreeSet::new();
     let mut violations = Vec::new();
     for file in walk::files_with_ext(root, &["rs"])? {
@@ -174,14 +202,16 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         if walk::in_isolation_zone(&rel) || rel == "xtask/src/boundary.rs" {
             continue;
         }
+        let whole = match reading(&rel, &found) {
+            Reading::Skipped => continue,
+            Reading::Whole => true,
+            Reading::Marked => false,
+        };
         let text = walk::read_text(&file)?;
-        let whole = is_test_file(&rel);
         let spans = if whole {
             Vec::new()
-        } else if rel.starts_with("crates/") || rel.starts_with("xtask/src/") {
-            test_spans(&text, &rel)?
         } else {
-            continue;
+            test_spans(&text, &rel)?
         };
         if !whole && spans.is_empty() {
             continue;
@@ -208,7 +238,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     for spent in excused.difference(&crossing) {
         violations.push(Violation {
             gate: "boundary",
-            location: format!("xtask/budgets.toml [{ROW}.{PREDATING}]"),
+            location: format!("{REGISTER} [{ROW}.{PREDATING}]"),
             rule: "an exception that is no longer needed is struck from the register".to_owned(),
             violation: format!("{spent} no longer crosses the process boundary"),
             alternative: "delete its row: the check has moved to adversary/ or come back \
@@ -233,7 +263,7 @@ fn excused(root: &Path) -> Result<std::collections::BTreeSet<String>, XtaskError
     let mut out = std::collections::BTreeSet::new();
     for value in listed {
         let named = value.as_str().ok_or_else(|| XtaskError::Doc {
-            file: "xtask/budgets.toml".to_owned(),
+            file: REGISTER.to_owned(),
             msg: format!("{ROW}.{PREDATING} holds something that is not a path"),
         })?;
         out.insert(named.to_owned());
@@ -306,13 +336,25 @@ fn crossed(rel: &str, line: usize, token: &str, what: &str) -> Violation {
 mod tests {
     use super::*;
 
+    /// A product package holding `rel`, at its first two segments.
+    fn owner(rel: &str) -> Member {
+        Member {
+            package: "product".to_owned(),
+            lib: None,
+            dir: rel.split('/').take(2).collect::<Vec<_>>().join("/"),
+            role: Role::Product,
+            reach: members::Reach::Workspace,
+            depends_on: std::collections::BTreeSet::new(),
+        }
+    }
+
     fn found(rel: &str, source: &str) -> Vec<Violation> {
         let mut out = Vec::new();
         let spans = test_spans(source, rel).unwrap();
         Sweep {
             rel,
             text: source,
-            whole: is_test_file(rel),
+            whole: reading(rel, &[owner(rel)]) == Reading::Whole,
             spans: &spans,
         }
         .scan(&mut out);

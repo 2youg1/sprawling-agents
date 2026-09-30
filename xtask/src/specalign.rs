@@ -15,10 +15,11 @@
 //! that is on disk.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use kernel::{AxCode, Carrier, EventKind, WindowClass};
 
+use crate::members;
 use crate::modmap;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
@@ -75,14 +76,32 @@ fn spec_carrier(cell: &str) -> String {
     }
 }
 
-/// Where a `<crate>-SPEC.md` cell resolves to on disk. `desktop` sits
-/// outside `crates/` on purpose (`architecture.toml`), so its one
-/// exception is spelled here rather than guessed from the name.
-fn spec_file(crate_name: &str) -> PathBuf {
-    if crate_name == "desktop" {
-        PathBuf::from("desktop/desktop-SPEC.md")
-    } else {
-        PathBuf::from(format!("crates/{crate_name}/{crate_name}-SPEC.md"))
+/// What a `<crate>-SPEC.md` cell finds on disk, looked for in every
+/// package directory (xtask-SPEC.md section 8-10). The file name is the
+/// whole address: which directory holds it is cargo's answer, never a
+/// path spelled here.
+enum Spec {
+    Text(String),
+    Unreadable(String),
+    Missing,
+    Ambiguous(Vec<String>),
+}
+
+impl Spec {
+    fn find(root: &Path, dirs: &[String], file: &str) -> Self {
+        let holders: Vec<String> = dirs
+            .iter()
+            .map(|dir| format!("{dir}/{file}"))
+            .filter(|path| root.join(path).is_file())
+            .collect();
+        match holders.as_slice() {
+            [] => Self::Missing,
+            [path] => match walk::read_text(&root.join(path)) {
+                Ok(text) => Self::Text(text),
+                Err(err) => Self::Unreadable(err.to_string()),
+            },
+            [..] => Self::Ambiguous(holders.clone()),
+        }
     }
 }
 
@@ -117,67 +136,74 @@ pub(crate) fn section_present(spec: &str, section: &str) -> bool {
 /// cards numbered independently, and renumbering them is its own work
 /// (xtask-SPEC.md section 8-10 records the condition for tightening this).
 fn check_anchors(root: &Path, violations: &mut Vec<Violation>) -> Result<(), XtaskError> {
-    let mut loaded: BTreeMap<String, Option<String>> = BTreeMap::new();
+    let dirs: Vec<String> = members::members(root)?
+        .into_iter()
+        .map(|member| member.dir)
+        .collect();
+    let mut loaded: BTreeMap<String, Spec> = BTreeMap::new();
     for anchor in modmap::anchors(root)? {
         let at = format!("{MAP}: {}", anchor.module);
         let Some((file, section)) = anchor.spec.split_once('#') else {
-            violations.push(Violation {
-                gate: "specalign",
-                location: at,
-                rule: "the Spec column is `<crate>-SPEC.md#8-N` \
-                       (xtask-SPEC.md section 8-10)"
-                    .to_owned(),
-                violation: format!("{}: {:?} has no section", anchor.module, anchor.spec),
-                alternative: "write the SPEC file and the section it is specified in".to_owned(),
-            });
+            violations.push(anchored(
+                at,
+                "the Spec column is `<crate>-SPEC.md#8-N` (xtask-SPEC.md section 8-10)",
+                format!("{}: {:?} has no section", anchor.module, anchor.spec),
+                "write the SPEC file and the section it is specified in",
+            ));
             continue;
         };
-        let Some(crate_name) = file.strip_suffix("-SPEC.md") else {
-            violations.push(Violation {
-                gate: "specalign",
-                location: at,
-                rule: "the Spec column names a crate SPEC (xtask-SPEC.md section 8-10)".to_owned(),
-                violation: format!("{}: {file:?} is not a `<crate>-SPEC.md`", anchor.module),
-                alternative: "name the SPEC of the crate the module lives in".to_owned(),
-            });
+        if !file.ends_with("-SPEC.md") {
+            violations.push(anchored(
+                at,
+                "the Spec column names a crate SPEC (xtask-SPEC.md section 8-10)",
+                format!("{}: {file:?} is not a `<crate>-SPEC.md`", anchor.module),
+                "name the SPEC of the crate the module lives in",
+            ));
             continue;
+        }
+        let spec = &*loaded
+            .entry(file.to_owned())
+            .or_insert_with(|| Spec::find(root, &dirs, file));
+        let exists = "the Spec column points at a SPEC that exists (xtask-SPEC.md section 8-10)";
+        let problem = match spec {
+            Spec::Text(text) if section_present(text, section) => None,
+            Spec::Text(_) => Some((
+                "the Spec anchor names a section that exists (xtask-SPEC.md section 8-10)",
+                format!("{}: {file} has no section {section}", anchor.module),
+                "write that section, or point the row at the section that does specify this module",
+            )),
+            Spec::Unreadable(why) => Some((
+                exists,
+                format!("{}: {file} is not readable: {why}", anchor.module),
+                "correct the crate name, or write that SPEC",
+            )),
+            Spec::Missing => Some((
+                exists,
+                format!("{}: no package directory holds {file}", anchor.module),
+                "correct the crate name, or write that SPEC",
+            )),
+            Spec::Ambiguous(paths) => Some((
+                "a SPEC file name belongs to one package (xtask-SPEC.md section 8-10)",
+                format!("{}: {file} is at {}", anchor.module, paths.join(" and ")),
+                "keep one of the files, so the anchor names one SPEC",
+            )),
         };
-        let path = spec_file(crate_name);
-        let text = match loaded.get(crate_name) {
-            Some(cached) => cached.clone(),
-            None => {
-                let read = walk::read_text(&root.join(&path)).ok();
-                loaded.insert(crate_name.to_owned(), read.clone());
-                read
-            }
-        };
-        let Some(text) = text else {
-            violations.push(Violation {
-                gate: "specalign",
-                location: at,
-                rule: "the Spec column points at a SPEC that exists \
-                       (xtask-SPEC.md section 8-10)"
-                    .to_owned(),
-                violation: format!("{}: {} is not readable", anchor.module, path.display()),
-                alternative: "correct the crate name, or write that SPEC".to_owned(),
-            });
-            continue;
-        };
-        if !section_present(&text, section) {
-            violations.push(Violation {
-                gate: "specalign",
-                location: at,
-                rule: "the Spec anchor names a section that exists \
-                       (xtask-SPEC.md section 8-10)"
-                    .to_owned(),
-                violation: format!("{}: {file} has no section {section}", anchor.module),
-                alternative: "write that section, or point the row at the section \
-                              that does specify this module"
-                    .to_owned(),
-            });
+        if let Some((rule, violation, alternative)) = problem {
+            violations.push(anchored(at, rule, violation, alternative));
         }
     }
     Ok(())
+}
+
+/// One finding about a module row's anchor, located at that row.
+fn anchored(at: String, rule: &str, violation: String, alternative: &str) -> Violation {
+    Violation {
+        gate: "specalign",
+        location: at,
+        rule: rule.to_owned(),
+        violation,
+        alternative: alternative.to_owned(),
+    }
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
@@ -302,7 +328,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 mod tests {
-    use super::{cells, section_present, spec_carrier, spec_file, unticked};
+    use super::{cells, section_present, spec_carrier, unticked};
 
     #[test]
     fn table_rows_split_and_untick() {
@@ -327,15 +353,6 @@ mod tests {
         assert!(!section_present("### 8-27 kernel::gate", "8-2"));
         assert!(!section_present("### 8-7 six tools", "8-70"));
         assert!(!section_present("a paragraph mentioning 8-27", "8-27"));
-    }
-
-    #[test]
-    fn desktop_is_the_one_spec_outside_crates() {
-        assert_eq!(
-            spec_file("desktop").to_string_lossy(),
-            "desktop/desktop-SPEC.md"
-        );
-        assert!(spec_file("web").to_string_lossy().ends_with("web-SPEC.md"));
     }
 
     /// A module row under tools/ is read, and its anchor resolves in the SPEC

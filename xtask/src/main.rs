@@ -33,6 +33,7 @@ mod header;
 mod length;
 mod lexicon;
 mod mem;
+mod members;
 mod modmap;
 mod npm;
 mod package;
@@ -85,6 +86,13 @@ fn main() -> ExitCode {
         Some("color") => report::finish("color", color::check(&root)),
         Some("render") => report::finish("render", render::check(&root)),
         Some("budget") => match budget::report(&root) {
+            Ok(text) => {
+                print!("{text}");
+                ExitCode::SUCCESS
+            }
+            Err(err) => report::internal_failure(&err),
+        },
+        Some("members") => match members::run(&root, args.get(1..).unwrap_or(&[])) {
             Ok(text) => {
                 print!("{text}");
                 ExitCode::SUCCESS
@@ -260,7 +268,7 @@ struct Tool {
 /// Everything `cargo xtask` answers that is not a gate, plus the flags
 /// that change what a gate does. The dispatcher above and this array are
 /// read together, so a command that grows a flag is printed with it.
-const TOOLS: [Tool; 13] = [
+const TOOLS: [Tool; 15] = [
     Tool {
         call: "gates [<gate>...]",
         gives: "every gate, or only the named ones",
@@ -288,6 +296,14 @@ const TOOLS: [Tool; 13] = [
     Tool {
         call: "spec <crate>",
         gives: "a SPEC skeleton for that crate",
+    },
+    Tool {
+        call: "members --owning [<path>...]",
+        gives: "the workspace packages holding those paths, or the paths read from stdin",
+    },
+    Tool {
+        call: "members --dir <package>",
+        gives: "the directory that package lives in",
     },
     Tool {
         call: "mem [<pid> | --city <dir>]",

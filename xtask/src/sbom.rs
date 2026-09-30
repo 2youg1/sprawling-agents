@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn the_bom_is_written_and_deterministic() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let root = crate::root::this_checkout();
         run(root).unwrap();
         let first = std::fs::read(root.join(SBOM)).unwrap();
         run(root).unwrap();

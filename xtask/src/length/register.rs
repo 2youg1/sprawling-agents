@@ -15,11 +15,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use crate::budget::REGISTER;
 use crate::report::XtaskError;
-
-/// The register file every limit below is read from, named in full
-/// because each violation tells the reader which file to edit.
-const REGISTER: &str = "xtask/budgets.toml";
 
 /// The register row that states how long a production function may be.
 pub(super) const ROW: &str = "function_length";

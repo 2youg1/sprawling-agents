@@ -8,10 +8,7 @@ use std::path::{Path, PathBuf};
 use super::{DECLARATION, declared, dist, stated_path};
 
 fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("xtask sits one level under the repository root")
-        .to_path_buf()
+    crate::root::this_checkout().to_path_buf()
 }
 
 fn items(source: &str) -> Vec<syn::Item> {

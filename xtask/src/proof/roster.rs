@@ -10,50 +10,7 @@
 //! reason for not being proved. The gate and the two commands live in
 //! the parent module and take this answer as given.
 
-use std::path::Path;
-
 use super::{ATTRIBUTE, EXCUSED, Harness};
-use crate::report::XtaskError;
-use crate::walk;
-
-/// The package directories under `crates/`, sorted.
-pub(super) fn crates(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
-    let dir = root.join("crates");
-    let mut out = Vec::new();
-    let entries = std::fs::read_dir(&dir).map_err(|source| XtaskError::Io {
-        path: dir.display().to_string(),
-        source,
-    })?;
-    for entry in entries {
-        let entry = entry.map_err(|source| XtaskError::Io {
-            path: dir.display().to_string(),
-            source,
-        })?;
-        let path = entry.path();
-        if path.join("Cargo.toml").is_file() {
-            out.push(path);
-        }
-    }
-    out.sort();
-    Ok(out)
-}
-
-/// A package's name as its own manifest gives it, not as its directory
-/// happens to be spelled: `cargo kani -p` takes the former.
-pub(super) fn package_name(dir: &Path) -> Result<String, XtaskError> {
-    let manifest = dir.join("Cargo.toml");
-    let text = walk::read_text(&manifest)?;
-    for line in text.lines() {
-        let Some(value) = line.strip_prefix("name = ") else {
-            continue;
-        };
-        return Ok(value.trim().trim_matches('"').to_owned());
-    }
-    Err(XtaskError::Doc {
-        file: walk::rel(dir, &manifest),
-        msg: "no `name = ` line; a package without a name cannot be proved".to_owned(),
-    })
-}
 
 /// The module path a file contributes, from its path inside `src/`.
 ///

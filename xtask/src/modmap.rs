@@ -4,10 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Module-map gate (redline C4). `architecture.toml` is a closed list:
-//! every `.rs` under `crates/*/src` is either a registered module, a
-//! `lib.rs`, or a pure index file. Status coherence is checked both ways —
-//! a file that exists while its entry still says planned means the builder
-//! skipped the "flip the status" leg of the completion evidence.
+//! every `.rs` under the `src/` of a product package is either a
+//! registered module, a `lib.rs`, or a pure index file. Status coherence
+//! is checked both ways — a file that exists while its entry still says
+//! planned means the builder skipped the "flip the status" leg of the
+//! completion evidence.
 //!
 //! **The map is data, not prose.** A table inside `ARCHITECTURE.md`
 //! would give every entry a *position* a person maintains, and a count
@@ -24,6 +25,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use crate::members::{self, Member};
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
@@ -109,13 +111,15 @@ fn read_map(root: &Path) -> Result<Map, XtaskError> {
 /// Every registered module's `spec`, in the order the map states them.
 pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
     let mut ignored = Vec::new();
-    Ok(rows(&read_map(root)?, &mut ignored)
-        .into_iter()
-        .map(|row| Anchor {
-            module: row.module,
-            spec: row.spec,
-        })
-        .collect())
+    Ok(
+        rows(&read_map(root)?, &members::product(root)?, &mut ignored)
+            .into_iter()
+            .map(|row| Anchor {
+                module: row.module,
+                spec: row.spec,
+            })
+            .collect(),
+    )
 }
 
 /// The shape each registered module states, by file path.
@@ -126,15 +130,18 @@ pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
 /// place.
 pub(crate) fn shapes(root: &Path) -> Result<BTreeMap<String, String>, XtaskError> {
     let mut ignored = Vec::new();
-    Ok(rows(&read_map(root)?, &mut ignored)
-        .into_iter()
-        .map(|row| (row.path, row.shape))
-        .collect())
+    Ok(
+        rows(&read_map(root)?, &members::product(root)?, &mut ignored)
+            .into_iter()
+            .map(|row| (row.path, row.shape))
+            .collect(),
+    )
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
-    let rows = rows(&read_map(root)?, &mut violations);
+    let product = members::product(root)?;
+    let rows = rows(&read_map(root)?, &product, &mut violations);
 
     let table: BTreeMap<&str, &Row> = rows.iter().map(|row| (row.path.as_str(), row)).collect();
     // Directories that hold registered modules; `<dir>.rs` is then an index file.
@@ -144,7 +151,11 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         .collect();
 
     let mut on_disk: BTreeSet<String> = BTreeSet::new();
-    for file in walk::files_with_ext(&root.join("crates"), &["rs"])? {
+    let files = product
+        .iter()
+        .map(|member| walk::files_with_ext(&root.join(&member.dir), &["rs"]))
+        .collect::<Result<Vec<_>, _>>()?;
+    for file in files.into_iter().flatten() {
         let rel = walk::rel(root, &file);
         if !rel.contains("/src/") {
             continue; // build.rs and friends are not modules
@@ -199,20 +210,20 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// The entries this gate judges: a `::` in the name, a `crates/**.rs`
-/// file, a known status, an `owns` that says something, and one entry per
-/// file.
+/// The entries this gate judges: a `::` in the name, a `.rs` file inside
+/// one of `scope`'s packages, a known status, an `owns` that says
+/// something, and one entry per file.
 ///
-/// An entry whose file sits outside `crates/` is carried by the map for a
-/// reader and skipped here, because the walk below only reaches `crates/`
-/// \u2014 `desktop` is built out of tree and its files are not this gate's to
-/// judge.
-fn rows(map: &Map, violations: &mut Vec<Violation>) -> Vec<Row> {
+/// An entry whose file sits in no package of `scope` - a tool's, which
+/// the map carries for a reader (xtask-SPEC.md section 8-39) - is skipped
+/// here, because the walk only reaches the same packages.
+fn rows(map: &Map, scope: &[Member], violations: &mut Vec<Violation>) -> Vec<Row> {
     let mut rows = Vec::new();
     let mut seen: BTreeMap<&str, &str> = BTreeMap::new();
     for entry in &map.module {
         let (name, file) = (entry.name.as_str(), entry.file.as_str());
-        if !name.contains("::") || !file.starts_with("crates/") || !file.ends_with(".rs") {
+        let judged = scope.iter().any(|member| member.holds(file));
+        if !name.contains("::") || !judged || !file.ends_with(".rs") {
             continue;
         }
         if !STATUSES.contains(&entry.status.as_str()) {

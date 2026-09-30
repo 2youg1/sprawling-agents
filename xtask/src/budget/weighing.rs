@@ -127,7 +127,7 @@ mod tests {
     /// the register row read that one count.
     #[test]
     fn the_lockfile_is_counted_once_for_the_document_and_the_ratchet() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let root = crate::root::this_checkout();
         let counted = lockfile_packages(root).unwrap();
         assert!(counted > 0, "this workspace resolves packages");
         assert_eq!(measure(root, "dependency_count").unwrap(), Some(counted));
@@ -139,7 +139,7 @@ mod tests {
         assert_eq!(measure(&root, "ledger_append").unwrap(), None);
         // A weighable row answers from this checkout, and answers
         // `None` rather than failing when nothing has been built.
-        let here = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let here = crate::root::this_checkout();
         measure(here, "frontend_artifact").unwrap();
     }
 

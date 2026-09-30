@@ -39,10 +39,7 @@ fn a_receiver_is_not_an_argument_and_everything_else_is() {
 /// waiting to be spent by whoever writes that function next.
 #[test]
 fn every_excused_signature_is_a_real_one_that_is_still_over() {
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .map(Path::to_path_buf)
-        .expect("xtask lives one level under the repo root");
+    let root = crate::root::this_checkout().to_path_buf();
     let budget = limit(&root, ARG_ROW).unwrap();
     let excused = excused(&root).unwrap();
     assert!(!excused.is_empty(), "the register records the debt it owes");
@@ -121,10 +118,7 @@ fn an_address_holding_two_functions_is_judged_by_the_wider_one() {
 /// loudly rather than fall back to something this file believes.
 #[test]
 fn both_limits_come_from_the_register_and_neither_has_a_default() {
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .map(Path::to_path_buf)
-        .expect("xtask lives one level under the repo root");
+    let root = crate::root::this_checkout().to_path_buf();
     assert_eq!(limit(&root, ROW).unwrap(), 200);
     assert_eq!(limit(&root, FILE_ROW).unwrap(), 400);
     assert!(limit(&root, "a_row_nobody_wrote").is_err());
@@ -135,10 +129,7 @@ fn both_limits_come_from_the_register_and_neither_has_a_default() {
 /// somebody forgot to spend, and `no_longer_an_exception` reports it.
 #[test]
 fn every_pinned_file_is_over_the_budget_it_is_excused_from() {
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .map(Path::to_path_buf)
-        .expect("xtask lives one level under the repo root");
+    let root = crate::root::this_checkout().to_path_buf();
     let budget = limit(&root, FILE_ROW).unwrap();
     let pinned = predating(&root).unwrap();
     // No assertion that the register is non-empty. It held while

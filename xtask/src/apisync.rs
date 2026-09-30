@@ -12,25 +12,26 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::members;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 const BASELINE_DIR: &str = "xtask/api-baselines";
 
 /// The crates whose public surface is a seam other code reads across a
-/// process or a repository boundary; every other crate's surface is held
-/// by the compiler at its call sites.
+/// process or a repository boundary, by lib name; every other crate's
+/// surface is held by the compiler at its call sites.
 const SEAM_CRATES: [&str; 2] = ["channels", "kernel"];
 
 /// The live surface, normalized to trimmed non-empty lines. Derived and
 /// blanket impls are omitted (-sss): they move with the toolchain, not
 /// with our decisions.
-fn live_api(root: &Path, krate: &str) -> Result<String, XtaskError> {
+fn live_api(root: &Path, package: &str) -> Result<String, XtaskError> {
     let output = Command::new("cargo")
         .args([
             "public-api",
             "-p",
-            krate,
+            package,
             "--simplified",
             "--omit",
             "blanket-impls,auto-trait-impls,auto-derived-impls",
@@ -43,7 +44,7 @@ fn live_api(root: &Path, krate: &str) -> Result<String, XtaskError> {
         })?;
     if !output.status.success() {
         return Err(XtaskError::Cmd {
-            cmd: format!("cargo public-api -p {krate}"),
+            cmd: format!("cargo public-api -p {package}"),
             msg: String::from_utf8_lossy(&output.stderr)
                 .lines()
                 .last()
@@ -73,6 +74,7 @@ fn baseline_path(root: &Path, krate: &str) -> PathBuf {
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
+    let found = members::members(root)?;
     let mut violations = Vec::new();
     for krate in SEAM_CRATES {
         let path = baseline_path(root, krate);
@@ -89,7 +91,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             });
             continue;
         };
-        let live = live_api(root, krate)?;
+        let live = live_api(root, &members::find(&found, krate)?.package)?;
         if normalize(&committed) != live {
             violations.push(Violation {
                 gate: "apisync",
@@ -114,8 +116,9 @@ pub(crate) fn write(root: &Path) -> Result<(), XtaskError> {
         path: dir.display().to_string(),
         source,
     })?;
+    let found = members::members(root)?;
     for krate in SEAM_CRATES {
-        let live = live_api(root, krate)?;
+        let live = live_api(root, &members::find(&found, krate)?.package)?;
         let path = baseline_path(root, krate);
         std::fs::write(&path, live).map_err(|source| XtaskError::Io {
             path: path.display().to_string(),

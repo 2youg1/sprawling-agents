@@ -270,10 +270,7 @@ mod tests {
     use super::*;
 
     fn root() -> std::path::PathBuf {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .map(Path::to_path_buf)
-            .expect("xtask lives one level under the repo root")
+        crate::root::this_checkout().to_path_buf()
     }
 
     /// The three sources are read from the real thing, so this fails the

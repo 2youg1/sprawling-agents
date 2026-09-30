@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::path::Path;
-
 use crate::platform::{PLATFORMS, ROOT_PACKAGE};
 
 /// The last version whose platform packages reached the registry under
@@ -35,9 +33,7 @@ fn the_published_version_is_the_one_a_running_binary_decodes() {
 /// that number turns this red, and the message says what to rename.
 #[test]
 fn the_platform_packages_take_the_scope_from_the_next_version() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("xtask sits one directory under the workspace root");
+    let root = crate::root::this_checkout();
     let version = crate::package::workspace_version(root).expect("the workspace states a version");
     if version == UNSCOPED_THROUGH {
         return;

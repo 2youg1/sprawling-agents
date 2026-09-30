@@ -212,9 +212,7 @@ mod tests {
     use crate::sbom::SBOM;
 
     fn repo_root() -> &'static std::path::Path {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("xtask sits one level under the repository root")
+        crate::root::this_checkout()
     }
 
     /// The skills ride in the archive exactly as they stand on disk: the

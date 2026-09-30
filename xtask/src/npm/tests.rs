@@ -177,8 +177,5 @@ fn every_workflow_running_the_gates_prepares_what_they_judge() {
 }
 
 pub(super) fn root() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf()
+    crate::root::this_checkout().to_path_buf()
 }

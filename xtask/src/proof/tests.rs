@@ -171,10 +171,7 @@ fn a_block_comment_spans_lines() {
 /// shape rather than when the reader breaks.
 #[test]
 fn the_tree_holds_the_harnesses_the_workflow_does_not_name() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let root = crate::root::this_checkout().to_path_buf();
     let found = super::harnesses(&root).unwrap();
     assert!(
         found.len() >= 3,

@@ -31,6 +31,7 @@
 use std::path::Path;
 
 use crate::budget;
+use crate::budget::REGISTER;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
@@ -314,7 +315,7 @@ fn spent_suffixes(recorded: &[String], met: &[String]) -> Vec<Violation> {
         };
         out.push(Violation {
             gate: "artifact",
-            location: format!("xtask/budgets.toml [{REGISTER_ROW}.predating]"),
+            location: format!("{REGISTER} [{REGISTER_ROW}.predating]"),
             rule: "an exception that is no longer needed is struck from the register".to_owned(),
             violation,
             alternative: "delete its row: a spent exception left in place re-excuses whatever \
@@ -339,7 +340,7 @@ fn registered(root: &Path) -> Result<Vec<String>, XtaskError> {
     let mut out = Vec::new();
     for value in listed {
         let suffix = value.as_str().ok_or_else(|| XtaskError::Doc {
-            file: "xtask/budgets.toml".to_owned(),
+            file: REGISTER.to_owned(),
             msg: format!("{REGISTER_ROW}.predating holds something that is not a suffix"),
         })?;
         out.push(suffix.to_owned());

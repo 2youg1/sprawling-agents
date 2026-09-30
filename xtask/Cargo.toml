@@ -5,6 +5,12 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+# The gates are a tool of this repository, not part of the product: the
+# members reader keeps a tool out of the crate graph, the module map and
+# the proof roster (xtask-SPEC.md sections 8-39 and 12-4).
+[package.metadata.sprawling]
+role = "tool"
+
 [dependencies]
 kernel = { path = "../crates/kernel" }
 # The render gate and the `survey` tool take the same readings off a

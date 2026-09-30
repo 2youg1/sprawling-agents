@@ -87,8 +87,10 @@ check-branch base="main":
     if [ -n "$clean" ] && [ -f "$mark" ]; then echo "check-branch: tree $tree is already green"; exit 0; fi
     changed=$(git diff --name-only "$mb" HEAD)
     touched() { printf '%s\n' "$changed" | grep -q "^$1/"; }
-    # Every workspace package lives in crates/<name>, xtask or citysim.
-    packages=$(printf '%s\n' "$changed" | grep -v '\.md$' | sed -n 's#^crates/\([^/]*\)/.*#\1#p; s#^\(xtask\|citysim\)/.*#\1#p' | sort -u)
+    # Which package holds a path is cargo metadata's answer (xtask-SPEC.md
+    # section 8-39); the paths go through stdin, since a rename branch
+    # lists more of them than one command line holds.
+    packages=$(printf '%s\n' "$changed" | cargo xtask members --owning | tr -d '\r') || exit 2
     rc=0
     step() { echo "== $1"; shift; "$@" || { rc=1; echo "== red: $*"; }; }
     gates=$(cargo xtask gates --list | tr -d '\r' | grep -Evx 'guard|features|render|budget|npm') || exit 2
@@ -126,7 +128,7 @@ branch-tests base +packages:
             cargo tree --workspace --locked -i "$p" -e normal,dev,build --depth 1 --prefix none --format '{p}' | awk '{print $1}'
         done | sort -u | while read -r dep; do
             [[ "$changed" == *" $dep "* ]] && continue
-            dir=crates/$dep; [ -d "$dir" ] || dir=$dep
+            dir=$(cargo xtask members --dir "$dep" | tr -d '\r') || exit 2
             git grep -lwE "$names" -- "$dir/tests/*.rs" "$dir/src/**/tests.rs" "$dir/src/**/*_tests.rs" | while read -r file; do
                 rel=${file#"$dir"/}; rel=${rel%.rs}
                 case $rel in

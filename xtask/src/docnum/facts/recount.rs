@@ -12,10 +12,12 @@
 
 use std::path::Path;
 
+use crate::budget::REGISTER;
+use crate::members::members;
 use crate::report::XtaskError;
 use crate::walk;
 
-use super::{packages, register_row, root_manifest};
+use super::{register_row, root_manifest};
 
 /// The wire tags of one frame family, as a document writes them:
 /// `` `dispatch`, `wake`, … `` in the order the schema declares.
@@ -92,8 +94,8 @@ pub(super) fn dependency_count(root: &Path) -> Result<String, XtaskError> {
 /// `crates/*/tests/ui` has, where each file is one counterexample.
 pub(super) fn files_under(root: &Path, inside: &str, what: &str) -> Result<String, XtaskError> {
     let mut found = 0_usize;
-    for package in packages(root)? {
-        let base = root.join(&package).join(inside);
+    for member in members(root)? {
+        let base = root.join(&member.dir).join(inside);
         if !base.is_dir() {
             continue;
         }
@@ -122,8 +124,8 @@ pub(super) fn in_directory(root: &Path, dir: &str, what: &str) -> Result<String,
 /// of assertions, and the document that quotes it says so.
 pub(super) fn test_functions(root: &Path) -> Result<String, XtaskError> {
     let mut found = 0_usize;
-    for package in packages(root)? {
-        let base = root.join(&package);
+    for member in members(root)? {
+        let base = root.join(&member.dir);
         if !base.is_dir() {
             continue;
         }
@@ -155,8 +157,8 @@ pub(super) fn dep_version(root: &Path, crate_name: &str) -> Result<String, Xtask
     if let Some(pinned) = pinned_in(&root_manifest(root)?, crate_name) {
         found.push(("Cargo.toml".to_owned(), pinned));
     }
-    for package in packages(root)? {
-        let manifest = root.join(&package).join("Cargo.toml");
+    for member in members(root)? {
+        let manifest = root.join(&member.dir).join("Cargo.toml");
         if !manifest.is_file() {
             continue;
         }
@@ -232,7 +234,7 @@ pub(super) fn grouped_bytes(root: &Path, row: &str, field: &str) -> Result<Strin
 /// The argument carries no `.field`, or the row or field is absent.
 pub(super) fn figure(root: &Path, argument: &str) -> Result<String, XtaskError> {
     let (row, field) = argument.split_once('.').ok_or_else(|| XtaskError::Doc {
-        file: "xtask/budgets.toml".to_owned(),
+        file: REGISTER.to_owned(),
         msg: format!("`{argument}` names no field: write it as `row.field`"),
     })?;
     Ok(grouped(bytes_of(root, row, field)?))
@@ -251,7 +253,7 @@ pub(super) fn headroom(root: &Path, row: &str) -> Result<String, XtaskError> {
         .and_then(|scaled| scaled.checked_add(reading.checked_div(2)?))
         .and_then(|rounded| rounded.checked_div(reading))
         .ok_or_else(|| XtaskError::Doc {
-            file: "xtask/budgets.toml".to_owned(),
+            file: REGISTER.to_owned(),
             msg: format!("[{row}] has no headroom to state: its reading is zero"),
         })?;
     Ok(format!(
@@ -267,11 +269,11 @@ fn bytes_of(root: &Path, row: &str, field: &str) -> Result<u64, XtaskError> {
         .get(field)
         .and_then(toml::Value::as_integer)
         .ok_or_else(|| XtaskError::Doc {
-            file: "xtask/budgets.toml".to_owned(),
+            file: REGISTER.to_owned(),
             msg: format!("[{row}] states no `{field}`"),
         })?;
     u64::try_from(stated).map_err(|_| XtaskError::Doc {
-        file: "xtask/budgets.toml".to_owned(),
+        file: REGISTER.to_owned(),
         msg: format!("[{row}].{field} is not a non-negative count: {stated}"),
     })
 }

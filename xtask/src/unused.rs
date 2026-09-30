@@ -27,7 +27,10 @@ const RULE: &str = "every dependency a manifest declares is named by the code th
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
     let mut inherited = BTreeSet::new();
-    for package in facts::packages(root)? {
+    for package in crate::members::members(root)?
+        .into_iter()
+        .map(|member| member.dir)
+    {
         let declared = declared(root, &package)?;
         let sources = sources(&root.join(&package))?;
         for (table, key) in declared {

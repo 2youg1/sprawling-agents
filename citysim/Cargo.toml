@@ -5,6 +5,13 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+# The simulator is a tool of this repository, not part of the product:
+# the members reader keeps a tool out of the crate graph and the module
+# map, and reads every line of it as a check (xtask-SPEC.md sections 8-39
+# and 12-4).
+[package.metadata.sprawling]
+role = "tool"
+
 [dependencies]
 kernel = { path = "../crates/kernel", features = ["conformance"] }
 memory = { path = "../crates/memory" }

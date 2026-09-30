@@ -15,10 +15,7 @@ fn values() -> Readings {
 }
 
 fn root() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("the xtask manifest directory has a parent")
-        .to_path_buf()
+    crate::root::this_checkout().to_path_buf()
 }
 
 #[test]

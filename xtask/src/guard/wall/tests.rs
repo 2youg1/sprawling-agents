@@ -165,8 +165,5 @@ fn the_quoted_facts_are_read_out_of_the_files_that_hold_them() {
 }
 
 fn repository() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .map(Path::to_path_buf)
-        .expect("xtask lives one level under the repo root")
+    crate::root::this_checkout().to_path_buf()
 }

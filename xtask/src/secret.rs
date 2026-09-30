@@ -165,6 +165,7 @@ const LEDGER_RECOVERY: &str = "capture the value through gateway::credential::Cu
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
+    let product = crate::members::product(root)?;
     for path in walk::files(root)? {
         let rel = walk::rel(root, &path);
         if walk::in_isolation_zone(&rel) {
@@ -217,7 +218,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                 alternative: alternative.to_owned(),
             });
         }
-        if rel.starts_with("crates/")
+        if product.iter().any(|member| member.holds(&rel))
             && rel.contains("/src/")
             && rel.ends_with(".rs")
             && !EXPOSE_WHITELIST.contains(&rel.as_str())

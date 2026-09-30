@@ -77,6 +77,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use crate::budget::REGISTER;
 use crate::modmap;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
@@ -86,19 +87,6 @@ mod register;
 
 use measurement::{Found, measure, production_lines};
 use register::{ARG_ROW, FILE_ROW, PREDATING, ROW, excused, key, limit, predating};
-
-/// Where first-party Rust lives. `tests/` and `benches/` are absent on
-/// purpose: test code may relax what production code carries (AGENTS.md),
-/// and a long test is a different question from a long function.
-///
-/// **`desktop/src` is here although it is not in the workspace.** That
-/// package is compiled by no workspace command (root `Cargo.toml`,
-/// `exclude`), and the rule it states for itself is this one
-/// (desktop-SPEC.md section 16). A gate reads files rather than crates,
-/// so it reaches where `cargo` does not — and the same 400 lines apply,
-/// because the reader who has to find one thing in a long file is the
-/// same reader on both sides of that wall.
-const SOURCE_DIRS: [&str; 4] = ["crates", "xtask/src", "citysim/src", "desktop/src"];
 
 /// Where the client's own sources live. Only the file rule reaches
 /// them; the module documentation says why. The directory itself is
@@ -183,7 +171,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     for stale in files.predating.keys().filter(|rel| !seen.contains(*rel)) {
         violations.push(Violation {
             gate: "length",
-            location: format!("xtask/budgets.toml [{FILE_ROW}.{PREDATING}]"),
+            location: format!("{REGISTER} [{FILE_ROW}.{PREDATING}]"),
             rule: "every file the register pins is a file this gate measures".to_owned(),
             violation: format!("{stale} is pinned and no longer here"),
             alternative: "delete the row: the debt it recorded has been paid or moved".to_owned(),
@@ -216,7 +204,7 @@ fn spent_signatures(
         };
         out.push(Violation {
             gate: "length",
-            location: format!("xtask/budgets.toml [{ARG_ROW}.{PREDATING}]"),
+            location: format!("{REGISTER} [{ARG_ROW}.{PREDATING}]"),
             rule: "an exception that is no longer needed is struck from the register".to_owned(),
             violation,
             alternative: "delete its row: the values that travelled together have a name now, \
@@ -270,7 +258,7 @@ fn too_long(rel: &str, lines: usize, limit: usize) -> Violation {
     Violation {
         gate: "length",
         location: rel.to_owned(),
-        rule: format!("a source file stays inside {limit} lines (xtask/budgets.toml, {FILE_ROW})"),
+        rule: format!("a source file stays inside {limit} lines ({REGISTER}, {FILE_ROW})"),
         violation: format!("{lines} lines"),
         alternative: "give each responsibility in it its own file and name, and let this one \
                       keep the part that routes between them"
@@ -284,7 +272,7 @@ fn grew(rel: &str, lines: usize, pinned: usize) -> Violation {
         location: rel.to_owned(),
         rule: format!(
             "a file the register pins may only get smaller \
-             (xtask/budgets.toml, {FILE_ROW}.{PREDATING})"
+             ({REGISTER}, {FILE_ROW}.{PREDATING})"
         ),
         violation: format!("{lines} lines, pinned at {pinned}"),
         alternative: "put the new code in a file of its own: this one is already over the \
@@ -296,7 +284,7 @@ fn grew(rel: &str, lines: usize, pinned: usize) -> Violation {
 fn no_longer_an_exception(rel: &str, lines: usize, limit: usize) -> Violation {
     Violation {
         gate: "length",
-        location: format!("xtask/budgets.toml [{FILE_ROW}.{PREDATING}]"),
+        location: format!("{REGISTER} [{FILE_ROW}.{PREDATING}]"),
         rule: "an exception that is no longer needed is struck from the register".to_owned(),
         violation: format!("{rel} is {lines} lines, inside the {limit} the rule states"),
         alternative: "delete its row: the split is done, and a spent exception left in place \
@@ -311,7 +299,7 @@ fn too_many_arguments(rel: &str, found: &Found, limit: usize) -> Violation {
         location: format!("{rel}:{}", found.line),
         rule: format!(
             "a function takes at most {limit} parameters \
-             (xtask/budgets.toml, {ARG_ROW})"
+             ({REGISTER}, {ARG_ROW})"
         ),
         violation: format!("{} takes {}", found.name, found.args),
         alternative: "the ones that always travel together are one value: give them a struct \
@@ -327,7 +315,7 @@ fn over(rel: &str, found: &Found, limit: usize) -> Violation {
         location: format!("{rel}:{}", found.line),
         rule: format!(
             "a production function stays inside {limit} lines \
-             (xtask/budgets.toml, function_length)"
+             ({REGISTER}, function_length)"
         ),
         violation: format!("{} is {} lines", found.name, found.lines),
         alternative: "give a phase of it its own name, and hand the values it produces back \
@@ -336,21 +324,22 @@ fn over(rel: &str, found: &Found, limit: usize) -> Violation {
     }
 }
 
+/// Where first-party Rust lives: the `src/` of every package cargo
+/// places. `tests/` and `benches/` are absent on purpose: test code may
+/// relax what production code carries (AGENTS.md), and a long test is a
+/// different question from a long function.
+///
+/// **The package outside the workspace is here as well.** No workspace
+/// command compiles `desktop`, and the rule it states for itself is this
+/// one (desktop-SPEC.md section 16). The members reader lists it, so the
+/// same 400 lines reach it, because the reader who has to find one thing
+/// in a long file is the same reader on both sides of that wall.
 fn sources(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
     let mut out = Vec::new();
-    for dir in SOURCE_DIRS {
-        let base = root.join(dir);
-        if !base.exists() {
-            continue;
-        }
-        for file in walk::files_with_ext(&base, &["rs"])? {
-            // Only a crate's own sources; `crates/*/tests` and the fuzz
-            // targets are test code by another name.
-            let rel = walk::rel(root, &file);
-            if rel.starts_with("crates/") && !rel.contains("/src/") {
-                continue;
-            }
-            out.push(file);
+    for member in crate::members::members(root)? {
+        let base = root.join(&member.dir).join("src");
+        if base.is_dir() {
+            out.extend(walk::files_with_ext(&base, &["rs"])?);
         }
     }
     Ok(out)

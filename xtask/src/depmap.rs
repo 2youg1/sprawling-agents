@@ -20,9 +20,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
-use std::process::Command;
 
 use crate::architecture;
+use crate::members::{self, Member, Reach, Role};
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
@@ -33,17 +33,16 @@ mod directions;
 /// Where the seams are declared, and where a `pub trait` may therefore
 /// live.
 const SEAM_SECTION: u32 = 4;
-/// Workspace members outside the product graph.
-const NON_PRODUCT: [&str; 2] = ["xtask", "citysim"];
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let text = walk::read_text(&root.join(ARCH))?;
     let allowed = parse_block(&text)?;
     let seams = seam_files(&text)?;
+    let found = members::members(root)?;
     let mut violations = Vec::new();
 
-    check_edges(root, &allowed, &mut violations)?;
-    check_pub_traits(root, &seams, &mut violations)?;
+    check_edges(&found, &allowed, &mut violations);
+    check_pub_traits(root, &found, &seams, &mut violations)?;
     directions::check(root, &text, &mut violations)?;
     Ok(violations)
 }
@@ -145,124 +144,84 @@ fn seams_in(declared: &[&str]) -> BTreeSet<String> {
     set
 }
 
+/// Every package of the product graph is in the block, and every edge it
+/// has to another workspace package is one the block allows. Both sides
+/// are compared by the name the block uses, the lib name, whatever the
+/// package is called and wherever it lives.
 fn check_edges(
-    root: &Path,
+    found: &[Member],
     allowed: &BTreeMap<String, BTreeSet<String>>,
     violations: &mut Vec<Violation>,
-) -> Result<(), XtaskError> {
-    let metadata = cargo_metadata(root)?;
-    let packages = metadata
-        .get("packages")
-        .and_then(serde_json::Value::as_array)
-        .ok_or_else(|| XtaskError::Doc {
-            file: "cargo metadata".to_owned(),
-            msg: "no packages array".to_owned(),
-        })?;
-
-    let members: BTreeSet<String> = packages
+) {
+    let names: BTreeMap<&str, &str> = found
         .iter()
-        .filter_map(|p| p.get("name").and_then(serde_json::Value::as_str))
-        .map(str::to_owned)
+        .filter(|member| member.reach == Reach::Workspace)
+        .map(|member| (member.package.as_str(), member.name()))
         .collect();
-
-    for package in packages {
-        let name = package
-            .get("name")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or_default();
-        if NON_PRODUCT.contains(&name) {
-            continue;
-        }
+    for member in found.iter().filter(|member| member.in_product_graph()) {
+        let name = member.name();
         let Some(allowed_deps) = allowed.get(name) else {
             violations.push(Violation {
                 gate: "depmap",
-                location: format!("crates/{name}"),
+                location: member.dir.clone(),
                 rule: "every product crate is registered in the depmap block (section 2)"
                     .to_owned(),
-                violation: "crate missing from the depmap block".to_owned(),
+                violation: format!("crate {name} missing from the depmap block"),
                 alternative: "register the crate and its allowed edges (verdict required)"
                     .to_owned(),
             });
             continue;
         };
-        let deps = package
-            .get("dependencies")
-            .and_then(serde_json::Value::as_array)
-            .map(Vec::as_slice)
-            .unwrap_or_default();
-        for dep in deps {
-            let dep_name = dep
-                .get("name")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default();
-            let kind = dep.get("kind").and_then(serde_json::Value::as_str);
-            if kind == Some("dev") {
-                continue; // tests may use citysim and friends freely
-            }
-            if members.contains(dep_name) && !allowed_deps.contains(dep_name) {
-                violations.push(Violation {
-                    gate: "depmap",
-                    location: format!("crates/{name}/Cargo.toml"),
-                    rule: "crate edges are a subset of the documented topology \
-                           (section 2, C5); dependencies point inward only"
-                        .to_owned(),
-                    violation: format!("hidden edge {name} -> {dep_name}"),
-                    alternative: "remove the dependency, or change the topology \
-                                  first (a ruling, then the topology)"
-                        .to_owned(),
-                });
-            }
+        // Tests may use citysim and friends freely, so dev dependencies
+        // are not in `depends_on`; a registry package has no name here.
+        let deps = member
+            .depends_on
+            .iter()
+            .filter_map(|package| names.get(package.as_str()));
+        for dep in deps.filter(|dep| !allowed_deps.contains(**dep)) {
+            violations.push(Violation {
+                gate: "depmap",
+                location: format!("{}/Cargo.toml", member.dir),
+                rule: "crate edges are a subset of the documented topology \
+                       (section 2, C5); dependencies point inward only"
+                    .to_owned(),
+                violation: format!("hidden edge {name} -> {dep}"),
+                alternative: "remove the dependency, or change the topology \
+                              first (a ruling, then the topology)"
+                    .to_owned(),
+            });
         }
     }
-    Ok(())
 }
 
 fn check_pub_traits(
     root: &Path,
+    found: &[Member],
     seams: &BTreeSet<String>,
     violations: &mut Vec<Violation>,
 ) -> Result<(), XtaskError> {
-    for file in walk::files_with_ext(&root.join("crates"), &["rs"])? {
-        let rel = walk::rel(root, &file);
-        let text = walk::read_text(&file)?;
-        for (index, line) in text.lines().enumerate() {
-            if line.trim_start().starts_with("pub trait ") && !seams.contains(&rel) {
-                violations.push(Violation {
-                    gate: "depmap",
-                    location: format!("{rel}:{}", index.saturating_add(1)),
-                    rule: "pub trait only at registered seams (section 3; \
-                           one adapter = hypothetical seam)"
-                        .to_owned(),
-                    violation: "pub trait outside the seam list".to_owned(),
-                    alternative: "use pub(crate) trait, or register a real seam \
-                                  with a second adapter (verdict required)"
-                        .to_owned(),
-                });
+    for member in found.iter().filter(|member| member.role == Role::Product) {
+        for file in walk::files_with_ext(&root.join(&member.dir), &["rs"])? {
+            let rel = walk::rel(root, &file);
+            let text = walk::read_text(&file)?;
+            for (index, line) in text.lines().enumerate() {
+                if line.trim_start().starts_with("pub trait ") && !seams.contains(&rel) {
+                    violations.push(Violation {
+                        gate: "depmap",
+                        location: format!("{rel}:{}", index.saturating_add(1)),
+                        rule: "pub trait only at registered seams (section 3; \
+                               one adapter = hypothetical seam)"
+                            .to_owned(),
+                        violation: "pub trait outside the seam list".to_owned(),
+                        alternative: "use pub(crate) trait, or register a real seam \
+                                      with a second adapter (verdict required)"
+                            .to_owned(),
+                    });
+                }
             }
         }
     }
     Ok(())
-}
-
-fn cargo_metadata(root: &Path) -> Result<serde_json::Value, XtaskError> {
-    let output = Command::new("cargo")
-        .args(["metadata", "--format-version", "1", "--no-deps"])
-        .current_dir(root)
-        .output()
-        .map_err(|source| XtaskError::Io {
-            path: "cargo metadata".to_owned(),
-            source,
-        })?;
-    if !output.status.success() {
-        return Err(XtaskError::Cmd {
-            cmd: "cargo metadata".to_owned(),
-            msg: String::from_utf8_lossy(&output.stderr).into_owned(),
-        });
-    }
-    serde_json::from_slice(&output.stdout).map_err(|err| XtaskError::Cmd {
-        cmd: "cargo metadata".to_owned(),
-        msg: err.to_string(),
-    })
 }
 
 #[cfg(test)]

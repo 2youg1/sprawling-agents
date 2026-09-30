@@ -82,10 +82,14 @@ struct Row {
     slack: u64,
 }
 
+/// Where the register lives, repo-relative: every gate that reads a row
+/// opens it here, and every message about a row names it.
+pub(crate) const REGISTER: &str = "xtask/budgets.toml";
+
 /// The register, parsed. Shared with every gate that reads a row of it:
 /// two parsers would be two answers to "how big is it".
 pub(crate) fn register(root: &Path) -> Result<toml::Value, XtaskError> {
-    let path = root.join("xtask").join("budgets.toml");
+    let path = root.join(REGISTER);
     let text = std::fs::read_to_string(&path).map_err(|source| XtaskError::Io {
         path: path.display().to_string(),
         source,
@@ -359,8 +363,7 @@ mod tests {
 
     #[test]
     fn the_shipped_register_names_every_budget_and_each_says_how_it_is_measured() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let text = std::fs::read_to_string(root.join("xtask").join("budgets.toml")).unwrap();
+        let text = std::fs::read_to_string(crate::root::this_checkout().join(REGISTER)).unwrap();
         let register: toml::Value = toml::from_str(&text).unwrap();
         let table = register.as_table().unwrap();
         // Not a count written twice: the register is the only place
