@@ -4,30 +4,20 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# A ledger's answer and what the reopened disk holds.
+# 账本的回答与重开后磁盘上的内容
 
-Specifies `crates/storage/src/jsonl/barrier.rs`, the state `Barrier` that
-`append_all` consults before a wave and mends after its last sync. The Rust
-code is the authority on how the ledger holds the property; this model is the
-authority on which property must hold (storage-SPEC.md 8-1).
+规定 `crates/storage/src/jsonl/barrier.rs`：`append_all` 在一波之前查询、在该波最后一次 sync 之后修补的状态 `Barrier`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪条性质」的权威（storage-SPEC.md 8-1）。
 
-The disk is a list of cells: a whole record carrying its seq, or bytes a wave
-left behind when its write died partway. Opening the ledger keeps the records
-up to the first cell that is not one; that is tail recovery. A handle keeps a
-position and the seqs it answered `Ok` for.
+磁盘是一列格子：一格要么是一条带 seq 的完整记录，要么是一波写到一半中断时留下的字节。开账本时保留到第一个不是完整记录的格子为止，这就是尾部恢复。一个 handle 记着一个位置，以及它答过 `Ok` 的那些 seq。
 
-One property: **every seq a handle answered `Ok` for is held by the reopened
-ledger**. It holds because a handle whose wave failed refuses every later
-wave; `withoutBarrier` shows the trace that breaks it when the handle keeps
-writing instead.
+一条性质：**handle 答过 `Ok` 的每个 seq，重开后的账本里都有**。它成立，是因为一个有一波失败过的 handle 拒绝此后的每一波；`withoutBarrier` 给出 handle 继续写时打破这条性质的轨迹。
 
-A wave is one record here. How many records a wave carries does not change
-where the tear can fall relative to the records answered before it.
+这里一波就是一条记录。一波带几条记录，不改变撕裂相对于此前已答记录能落在哪里。
 -/
 
-namespace Durability
+namespace Storage.Jsonl.Barrier
 
-/-- What one position of a segment holds. -/
+/-- 段里一个位置上放着什么。 -/
 inductive Cell where
   | record (seq : Nat)
   | torn
@@ -37,7 +27,7 @@ def Cell.isRecord : Cell → Bool
   | .record _ => true
   | .torn => false
 
-/-- Tail recovery: the records up to the first cell that is not one. -/
+/-- 尾部恢复：保留到第一个不是记录的格子为止。 -/
 def reopen (disk : List Cell) : List Cell :=
   disk.takeWhile Cell.isRecord
 
@@ -54,16 +44,16 @@ structure Ledger where
 
 def Ledger.empty : Ledger := ⟨[], 0, .whole, []⟩
 
-/-- What happens to one wave on the device. -/
+/-- 一波在设备上的结局。 -/
 inductive Outcome where
-  /-- Written and synced: the wave answers `Ok`. -/
+  /-- 写完并 sync 过：这一波答 `Ok`。 -/
   | synced
-  /-- The write died partway and left bytes that are not a record. -/
+  /-- 写到一半中断，留下不成记录的字节。 -/
   | tore
-  /-- The record reached the file but its sync failed. -/
+  /-- 记录已进文件，但 sync 失败。 -/
   | unsynced
 
-/-- One wave through a handle that keeps the barrier. -/
+/-- 守屏障的 handle 写一波。 -/
 def Ledger.append (l : Ledger) : Outcome → Ledger
   | o => match l.barrier with
     | .broken => l
@@ -72,13 +62,11 @@ def Ledger.append (l : Ledger) : Outcome → Ledger
       | .tore => { l with disk := l.disk ++ [.torn], barrier := .broken }
       | .unsynced => { l with disk := l.disk ++ [.record l.next], barrier := .broken }
 
-/-- The records `0 .. n` in order: what a whole disk holds. -/
+/-- 依次排好的记录 `0 .. n`：一块完好的磁盘就是这样。 -/
 def records (n : Nat) : List Cell :=
   (List.range n).map Cell.record
 
-/-- What every reachable handle keeps: while the barrier stands the disk is
-exactly the records below the position, and every answered seq is below it
-and survives a reopen. -/
+/-- 每个可达的 handle 都守着两件事：`Barrier` 为 `whole` 时，磁盘恰好是位置之下的那些记录；每个答过的 seq 都在位置之下，并且重开后还在。 -/
 def Ledger.Sound (l : Ledger) : Prop :=
   (l.barrier = .whole → l.disk = records l.next) ∧
   ∀ s ∈ l.claimed, Cell.record s ∈ reopen l.disk
@@ -105,7 +93,7 @@ theorem empty_sound : Ledger.empty.Sound := by
   refine ⟨fun _ => rfl, ?_⟩
   simp [Ledger.empty]
 
-/-- Every wave keeps a sound handle sound. -/
+/-- 无论这一波结局如何，守得住的 handle 写完之后仍守得住。 -/
 theorem append_sound (l : Ledger) (o : Outcome) (h : l.Sound) : (l.append o).Sound := by
   obtain ⟨shape, kept⟩ := h
   cases hb : l.barrier with
@@ -144,8 +132,7 @@ theorem append_sound (l : Ledger) (o : Outcome) (h : l.Sound) : (l.append o).Sou
       rw [disk, reopen, takeWhile_records_append]
       simp [mem_records, below s hs]
 
-/-- Any run of waves from an empty ledger leaves every answered seq on the
-reopened disk. -/
+/-- 从空账本起，任意一串波写完之后，答过的每个 seq 在重开后的磁盘上都还在。 -/
 theorem answered_survives_reopen (waves : List Outcome) :
     (waves.foldl Ledger.append Ledger.empty).Sound := by
   suffices ∀ l : Ledger, l.Sound → (waves.foldl Ledger.append l).Sound from
@@ -154,18 +141,16 @@ theorem answered_survives_reopen (waves : List Outcome) :
   | nil => exact fun _ h => h
   | cons o rest ih => exact fun l h => ih _ (append_sound l o h)
 
-/-- The handle without the barrier: a failed wave leaves the position where
-it was and the next wave is written anyway. -/
+/-- 不守屏障的 handle：一波失败后位置不动，下一波照写。 -/
 def Ledger.appendAnyway (l : Ledger) : Outcome → Ledger
   | .synced => ⟨l.disk ++ [.record l.next], l.next + 1, .whole, l.claimed ++ [l.next]⟩
   | .tore => { l with disk := l.disk ++ [.torn] }
   | .unsynced => { l with disk := l.disk ++ [.record l.next] }
 
-/-- The counterexample the barrier exists for: a torn wave, then a wave that
-answers `Ok` and that tail recovery truncates away. -/
+/-- `Barrier` 要挡住的反例：一波撕裂，下一波答了 `Ok`，尾部恢复却把它截掉。 -/
 theorem withoutBarrier :
     let l := [Outcome.synced, .tore, .synced].foldl Ledger.appendAnyway Ledger.empty
     ¬ ∀ s ∈ l.claimed, Cell.record s ∈ reopen l.disk := by
   decide
 
-end Durability
+end Storage.Jsonl.Barrier

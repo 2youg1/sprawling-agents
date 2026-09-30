@@ -4,70 +4,46 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# Going back, and the write domains of parallel runs.
+# 回到过去，与并行 run 的写域
 
-Specifies `crates/storage/src/worktree/back.rs`, the tree a run opens when a
-person goes back to a point in the city's history, together with the two
-steps that share its write domain: a run writing a file in its own tree
-(`crates/storage/src/worktree/trees.rs`) and a file restored from a point into
-that tree (`crates/storage/src/worktree/back.rs`). The Rust code is the
-authority on how these properties hold; this model is the authority on which
-properties must hold (storage-SPEC.md 8-27).
+规定 `crates/storage/src/worktree/back.rs`：一个人回到城历史中某个 point 时 run 打开的那棵树，以及与它共用写域的两步——run 在自己的树里写一个文件（`crates/storage/src/worktree/trees.rs`），和从某个 point 把一个文件取回到那棵树里（`crates/storage/src/worktree/back.rs`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（storage-SPEC.md 8-27）。
 
-The city's history is two things that already exist, and nothing else: the
-one Ledger, which only grows, and the git objects of the city's repository,
-which never change once written. A point is a commit. Going back to a point
-opens a new run with a tree of its own whose branch starts at that commit;
-the trunk the city stands on does not move, because another run may be
-writing at that moment and the trunk is where its work lands. Undoing is not
-deleting: it restores a file from an earlier point, and the Ledger records the
-restore as one more record.
+城的历史只由两样已有的东西构成：只增不减的那一本 Ledger，以及城仓库里写下后就不再改变的 git 对象。一个 point 就是一次提交。回到某个 point，是开一个新 run，给它一棵自己的树，树的分支从那次提交起；城所在的干线不动，因为此刻可能有别的 run 正在写，干线是它的工作落地的地方。撤销不是删除：它从更早的 point 取回一个文件，Ledger 把这次取回记成又一条记录。
 
-The model has four properties, with one group of theorems for each:
+模型有四条性质，每条一组定理：
 
-* **going back opens a tree at the point** - the new run's files are exactly
-  the files of the commit it went back to;
-* **going back refuses a tree that is live** - a name already held is not
-  replaced, so no run's tree, the caller's own included, is ever overwritten
-  by going back;
-* **a step touches only its own run's tree** - going back, writing and
-  restoring change the tree of the run that took the step and no other, and
-  never the trunk; over any sequence of steps none of which is a run's own,
-  that run's tree is the same at the end as at the start, so a write it made
-  survives everything the other runs do;
-* **the Ledger only grows** - every step appends exactly one record, and a
-  restore (the undo) is one of them.
+* **回到过去打开的树恰在那个 point**——新 run 的文件恰好是它回到的那次提交里的文件；
+* **回到过去拒绝一棵活着的树**——已被占用的名字不会被替换，所以回到过去从不覆盖任何 run 的树，调用者自己的也不例外；
+* **一步只动自己那个 run 的树**——回到过去、写、取回，只改变走这一步的 run 的树，不动别的树，也从不动干线；在任何一串都不属于某个 run 的步骤之后，那个 run 的树与开始时相同，所以它写下的内容经得起别的 run 做的一切；
+* **Ledger 只增不减**——每一步恰好追加一条记录，取回（即撤销）也是其中之一。
 
-Merging a run's work into the trunk goes through the existing fast-forward
-path (storage-SPEC.md 8-9) and is not modelled here.
+把一个 run 的工作合进干线走已有的快进路径（storage-SPEC.md 8-9），这里不建模。
 -/
 
-namespace GoingBack
+namespace Storage.Worktree.Back
 
-/-- A commit in the city's repository: a point in history. -/
+/-- 城仓库里的一次提交：历史上的一个 point。 -/
 abbrev Commit := Nat
-/-- The name of a run's tree (`WorktreeName`); one run, one name. -/
+/-- 一个 run 的树的名字（`WorktreeName`）；一个 run 一个名字。 -/
 abbrev Name := Nat
-/-- A file path inside a tree. -/
+/-- 树里的一条文件路径。 -/
 abbrev Path := Nat
-/-- A file's contents; the git blob is what the Rust code stores. -/
+/-- 文件内容；Rust 代码存的是 git blob。 -/
 abbrev Content := Nat
 
-/-- One run's tree: the commit its branch started at and its files now. -/
+/-- 一个 run 的树：它的分支起于哪次提交，以及此刻的文件。 -/
 structure Tree where
   base : Commit
   files : Path → Option Content
 
-/-- What each step appends to the Ledger. -/
+/-- 每一步追加到 Ledger 的记录。 -/
 inductive Record where
   | forked (run : Name) (point : Commit)
   | wrote (run : Name) (path : Path)
   | restored (run : Name) (path : Path) (point : Commit)
   deriving Repr, DecidableEq
 
-/-- The city: the commit the trunk stands on, the commits that exist, what
-each commit holds (git objects are immutable, so this is a function), the
-trees that are live, and the Ledger in append order. -/
+/-- 城：干线所在的提交、已有的提交、每次提交里有什么（git 对象不可变，所以这是一个函数）、活着的树，以及按追加次序排列的 Ledger。 -/
 structure City where
   trunk : Commit
   commits : List Commit
@@ -75,16 +51,15 @@ structure City where
   trees : Name → Option Tree
   ledger : List Record
 
-/-- The trees with `n` holding `t` and every other name unchanged. -/
+/-- 让 `n` 持有 `t`，其余名字不变。 -/
 def put (trees : Name → Option Tree) (n : Name) (t : Tree) : Name → Option Tree :=
   fun m => if m = n then some t else trees m
 
-/-- A tree with file `p` holding `v` and every other file unchanged. -/
+/-- 让文件 `p` 取值 `v`，其余文件不变。 -/
 def Tree.set (t : Tree) (p : Path) (v : Option Content) : Tree :=
   { t with files := fun q => if q = p then v else t.files q }
 
-/-- Going back to `c` as the new run `n`: refused when `n` already holds a
-tree or `c` is not a commit of the city. -/
+/-- 以新 run `n` 回到 `c`：`n` 已持有一棵树，或 `c` 不是城里的提交时，拒绝。 -/
 def goBack (s : City) (n : Name) (c : Commit) : Option City :=
   if (s.trees n).isNone ∧ c ∈ s.commits then
     some { s with
@@ -92,8 +67,7 @@ def goBack (s : City) (n : Name) (c : Commit) : Option City :=
       ledger := s.ledger ++ [.forked n c] }
   else none
 
-/-- Run `n` writes `v` at `p` in its own tree; a run with no tree writes
-nothing. -/
+/-- run `n` 在自己的树里把 `p` 写成 `v`；没有树的 run 什么也写不了。 -/
 def write (s : City) (n : Name) (p : Path) (v : Content) : Option City :=
   match s.trees n with
   | none => none
@@ -101,8 +75,7 @@ def write (s : City) (n : Name) (p : Path) (v : Content) : Option City :=
       trees := put s.trees n (t.set p (some v))
       ledger := s.ledger ++ [.wrote n p] }
 
-/-- Run `n` takes file `p` back from point `c` into its own tree. A file the
-point does not hold is removed, which is what restoring it means. -/
+/-- run `n` 从 point `c` 把文件 `p` 取回到自己的树里。那个 point 上没有的文件被删掉，取回它就是这个意思。 -/
 def restore (s : City) (n : Name) (p : Path) (c : Commit) : Option City :=
   match s.trees n with
   | none => none
@@ -113,22 +86,22 @@ def restore (s : City) (n : Name) (p : Path) (c : Commit) : Option City :=
         ledger := s.ledger ++ [.restored n p c] }
     else none
 
-/-- One step any run may take. -/
+/-- 任何 run 都可以走的一步。 -/
 inductive Step where
   | goBack (run : Name) (point : Commit)
   | write (run : Name) (path : Path) (content : Content)
   | restore (run : Name) (path : Path) (point : Commit)
 
-/-- The run whose tree the step is about. -/
+/-- 这一步关乎哪个 run 的树。 -/
 def Step.run : Step → Name
   | .goBack n _ | .write n _ _ | .restore n _ _ => n
 
 def Step.apply : Step → City → Option City
-  | .goBack n c, s => GoingBack.goBack s n c
-  | .write n p v, s => GoingBack.write s n p v
-  | .restore n p c, s => GoingBack.restore s n p c
+  | .goBack n c, s => Storage.Worktree.Back.goBack s n c
+  | .write n p v, s => Storage.Worktree.Back.write s n p v
+  | .restore n p c, s => Storage.Worktree.Back.restore s n p c
 
-/-- Steps taken in order; the first refusal stops the sequence. -/
+/-- 按次序走的步骤；第一次拒绝就让整串停下。 -/
 def steps (s : City) : List Step → Option City
   | [] => some s
   | st :: rest =>
@@ -136,7 +109,7 @@ def steps (s : City) : List Step → Option City
     | none => none
     | some s' => steps s' rest
 
-/-! ## Going back opens a tree at the point -/
+/-! ## 回到过去打开的树恰在那个 point -/
 
 theorem goBack_opens_at_the_point {s s' : City} {n : Name} {c : Commit}
     (h : goBack s n c = some s') :
@@ -147,7 +120,7 @@ theorem goBack_opens_at_the_point {s s' : City} {n : Name} {c : Commit}
     exact ⟨⟨c, s.history c⟩, by simp [put], rfl, rfl⟩
   · contradiction
 
-/-! ## Going back refuses a tree that is live -/
+/-! ## 回到过去拒绝一棵活着的树 -/
 
 theorem goBack_refuses_a_live_tree {s : City} {n : Name} (c : Commit)
     (live : (s.trees n).isSome) : goBack s n c = none := by
@@ -156,7 +129,7 @@ theorem goBack_refuses_a_live_tree {s : City} {n : Name} (c : Commit)
   | none => simp [hn] at live
   | some _ => simp
 
-/-! ## A step touches only its own run's tree -/
+/-! ## 一步只动自己那个 run 的树 -/
 
 theorem step_leaves_other_trees {st : Step} {s s' : City} {m : Name}
     (h : st.apply s = some s') (other : m ≠ st.run) :
@@ -183,8 +156,7 @@ theorem step_leaves_other_trees {st : Step} {s s' : City} {m : Name}
         simp [put, show m ≠ n from other]
       · contradiction
 
-/-- No step moves the trunk or rewrites a commit; that is why going back
-cannot disturb a run whose work is on its way to the trunk. -/
+/-- 没有哪一步移动干线或改写一次提交；所以回到过去扰动不了一个工作正要进干线的 run。 -/
 theorem step_keeps_trunk_and_history {st : Step} {s s' : City}
     (h : st.apply s = some s') :
     s'.trunk = s.trunk ∧ s'.commits = s.commits ∧ s'.history = s.history := by
@@ -227,8 +199,7 @@ theorem others_never_touch_a_tree {s s' : City} {m : Name} :
         (Ne.symm (others st List.mem_cons_self))
       rw [rest_same, first_same]
 
-/-- A run's write survives any sequence of steps the other runs take,
-going back included. -/
+/-- 一个 run 写下的内容，经得起别的 run 走的任意一串步骤，回到过去也在其中。 -/
 theorem a_write_survives_other_runs {s s₁ s₂ : City} {m : Name} {p : Path}
     {v : Content} {trace : List Step}
     (wrote : write s m p v = some s₁) (ran : steps s₁ trace = some s₂)
@@ -241,7 +212,7 @@ theorem a_write_survives_other_runs {s s₁ s₂ : City} {m : Name} {p : Path}
   · cases wrote
     simp [put, Tree.set]
 
-/-! ## The Ledger only grows -/
+/-! ## Ledger 只增不减 -/
 
 theorem step_appends_one_record {st : Step} {s s' : City}
     (h : st.apply s = some s') : ∃ r, s'.ledger = s.ledger ++ [r] := by
@@ -281,8 +252,7 @@ theorem the_ledger_only_grows {s s' : City} :
       obtain ⟨r, grown⟩ := step_appends_one_record hmid
       exact List.IsPrefix.trans ⟨[r], grown.symm⟩ (ih h)
 
-/-- Undo is a restore, and a restore appends its record rather than removing
-the one it undoes. -/
+/-- 撤销就是取回，而取回追加自己的记录，不删掉它撤销的那一条。 -/
 theorem undo_is_an_appended_restore {s s' : City} {n : Name} {p : Path}
     {c : Commit} (h : restore s n p c = some s') :
     s'.ledger = s.ledger ++ [.restored n p c] := by
@@ -293,4 +263,4 @@ theorem undo_is_an_appended_restore {s s' : City} {n : Name} {p : Path}
     · cases h; rfl
     · contradiction
 
-end GoingBack
+end Storage.Worktree.Back
