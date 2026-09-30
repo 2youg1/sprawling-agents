@@ -119,3 +119,68 @@ fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() 
         "the rest address does not read back what the command printed"
     );
 }
+
+/// A real dispatch in a city that wrote no `[clock]`: the command's
+/// result reaches the ledger ending with the clock line, and the second
+/// it names is the one its `tool_called` line records (sprawling-SPEC
+/// 8-125).
+///
+/// Before this, the product handed the pipeline no stamp at all, so a
+/// model in a real city never learned when a command ran.
+#[test]
+fn a_served_command_result_ends_with_the_second_its_call_started() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let room = dir.path().join("lab").join("room1");
+    std::fs::create_dir_all(&room).unwrap();
+    std::fs::write(room.join("note.txt"), "hello\n").unwrap();
+    let (path, args) = print_command("note.txt");
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "reading the note",
+                "tu_1",
+                "exec",
+                serde_json::json!({ "arm": { "program": { "path": path, "args": args } } }),
+            ),
+            completion("read it", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("lab/room1").unwrap(),
+            task: "read the note".to_owned(),
+            goal: "say what it says".to_owned(),
+            mode: kernel::Mode::Up,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+    drop(provider);
+
+    let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+    let lines: Vec<serde_json::Value> = verified
+        .raw_lines()
+        .iter()
+        .map(|line| serde_json::from_slice(line).unwrap())
+        .collect();
+    let of_kind = |kind: &str| {
+        lines
+            .iter()
+            .find(|value| value["kind"] == kind)
+            .unwrap_or_else(|| panic!("no {kind} on the ledger"))
+    };
+    let started = kernel::TimeMs::new(of_kind("tool_called")["t"].as_u64().unwrap());
+    let content = of_kind("tool_result")["data"]["result"]["content"]
+        .as_str()
+        .unwrap();
+    assert_eq!(
+        content.lines().last(),
+        Some(format!("clock: {};", runtime::clock::iso(started)).as_str()),
+        "the command's result does not end with the second its call started: {content}"
+    );
+}
