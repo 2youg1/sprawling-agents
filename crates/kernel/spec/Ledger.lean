@@ -4,111 +4,53 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# What a ledger's chain certifies, and what it does not.
+# 账本的链证明了什么，没有证明什么
 
-Every line of the Ledger carries a `prev`: a digest of the line before it. One
-Rust function decides that value — `kernel::ledger::chain_hash`, which is
-`B3Hash::digest` over the line's canonical bytes — and one Rust step consumes it,
-`storage::jsonl::open`'s check that a line's `prev` equals the digest of the line
-above it. Everything else that trusts the Ledger trusts those two.
+规定 `crates/kernel/src/ledger.rs` 的 `chain_hash` 与 `GENESIS_PREV` 立下的链规则。
 
-**This module never computes a digest.** The hashing function stays an opaque
-parameter, so no value here can drift from `chain_hash`: replacing blake3 with
-another function tomorrow leaves every statement in this file unchanged. What the
-module owns instead is the assumption those two lines make and never state — that
-the digest function is injective — and the reach of the chain, which stops one
-line short of the whole file. Both are facts a reader assumes in whichever
-direction suits them, so both are proved here rather than described:
+Ledger 的每一行都带一个 `prev`：它上一行的摘要。决定这个值的只有一个 Rust 函数，`kernel::ledger::chain_hash`，即对该行规范字节做的 `B3Hash::digest`；消费它的只有一个 Rust 步骤，`storage::jsonl::open` 检查每一行的 `prev` 等于上一行的摘要。其余一切信任 Ledger 的代码，信任的都是这两处。
 
-* The claims a ledger owes are a function of its covered lines. **Free**: it is
-  congruence, and it needs nothing of the digest function. This is the direction
-  a check uses when it compares one recorded digest with another recorded digest.
-* Whether two ledgers wrote the same covered lines is decided by the claims they
-  carry. **Bought**: this needs the digest to be injective, a statement about
-  blake3 rather than about this product. That hypothesis stands in the theorem's
-  own statement instead of in a comment, and
-  `aCoveredLineHidesWithoutInjectivity` exhibits a digest function for which the
-  same conclusion is false — so the hypothesis is not decoration.
-* The **last** line is outside all of it. Nothing after it hashed it, so a
-  chained ledger's head is whatever the disk says it is;
-  `theLastLineIsNotCertified` exhibits one list of prevs consistent with two
-  ledgers that differ at their last line. No injectivity hypothesis closes that,
-  and the theorem assumes none. Two consequences follow, and both are about code
-  rather than about arithmetic: a check that means to test detection must aim at
-  a covered line, because damage to the head is the product's recovery path
-  rather than its refusal path; and no reader may treat a Ledger's own chain as
-  evidence about its head.
+**本模块从不计算摘要。** 摘要函数始终是一个不透明的参数，所以这里没有哪个值会与 `chain_hash` 漂移：明天把 blake3 换成别的函数，本文件的每一条陈述一字不变。本模块持有的是那两行代码作出却从不说出的假设——摘要函数是单射——以及链能覆盖到哪里：它比整个文件短一行。读者对这两件事往往按自己方便的方向去假设，所以这里证明它们，而不只是描述：
 
-**Why Lean rather than one more Rust test.** A Rust test asserts about the ledger
-it can build, and a `proptest` samples the ledgers a strategy can draw. These
-statements are about every list of lines and every digest function, and two of
-them are negative — they say a claim is *not* available — which no sample can
-show. `cargo xtask proof` holds a few kernel propositions against real MIR; what
-is at stake here is the reach of a rule.
+* 一本账本欠下的声索，由它被覆盖的行决定。这个方向是**免费**的：它就是同余，对摘要函数一无所求。检查拿一个记下的摘要去比另一个记下的摘要时，用的就是这个方向。
+* 两本账本是否写下了相同的被覆盖的行，由它们携带的声索决定。这个方向要**花钱买**：它需要摘要是单射，这是关于 blake3 的陈述，而不是关于本产品的陈述。这条假设写在定理自己的语句里，不写在注释里；`aCoveredLineHidesWithoutInjectivity` 给出一个让同一结论为假的摘要函数，所以这条假设不是摆设。
+* **最后一行**在这一切之外。它之后没有谁对它取过摘要，所以一本成链账本的头就是磁盘说的样子；`theLastLineIsNotCertified` 给出一串 prev，它与两本只在最后一行不同的账本都相符。没有哪条单射假设能补上这个缺口，这条定理也不作任何假设。由此得出两个推论，都关乎代码而不是算术：一个要测检测能力的检查必须瞄准一条被覆盖的行，因为头上的损坏走的是产品的恢复路径而不是拒绝路径；任何读者都不得把 Ledger 自己的链当作关于它的头的证据。
 
-**Why this does not become a second authority.** It restates no rule of the
-product's: no code consults the predicate below, no digest value appears anywhere
-in it, and its carriers are the ones the tree already has, read as the disk holds
-them — the file's lines as text, and the `prev` each record carries, in the
-order a reader parses them. Where a verdict is needed, a check asks the product (`Door.verify` runs the
-product's own offline verification) rather than this module. Each statement names
-the Rust line it corresponds to.
+**为什么用 Lean 而不是再写一个 Rust 测试。** Rust 测试断言的是它能构造出来的账本，`proptest` 抽样的是一个策略能抽到的账本。这里的陈述针对每一串行、每一个摘要函数，其中两条是否定的——它们说某个声索*得不到*——而这是任何样本都显示不了的。`cargo xtask proof` 拿真实 MIR 检验几条 kernel 命题；这里关乎的是一条规则能管到多远。
+
+**为什么这不会成为第二个权威。** 它不重述产品的任何规则：没有代码查询下面的谓词，里面不出现任何摘要值，它的载体都是树里已有的，按磁盘上的样子读——文件的行作为文本，以及每条记录携带的 `prev`，按读者解析出来的次序。需要判定时，检验器 `tools/adversary/src/Sprawling/Door.lean` 从门外问产品（`Door.verify` 跑产品自己的离线校验），而不问本模块；检验器也不 import 本模块。每条陈述都写明它对应的 Rust 代码行。
 -/
 
-namespace Sprawling
+namespace Kernel.Ledger
 
-/-- The `prev` a ledger owes, oldest first: the genesis digest for the first
-line, and the digest of the line before it for every later one.
+/-- 一本账本欠下的 `prev`，从最早的起：第一行欠创世摘要，此后每一行欠它上一行的摘要。
 
-This is the rule `storage::jsonl::open` verifies on every open, written as the
-sequence a whole ledger owes rather than as a loop over one file. `lines.dropLast`
-is every line but the head — the set that has a successor to be hashed into — so
-a ledger with no line owes no claim and a ledger of one line owes exactly the
-genesis digest.
+这就是 `storage::jsonl::open` 每次开账本都要校验的规则，写成整本账本欠下的序列，而不是对一个文件的循环。`lines.dropLast` 是除头之外的每一行，也就是有后继把它哈希进去的那些行；所以没有行的账本不欠声索，只有一行的账本恰好欠创世摘要。
 
-Appending a line adds one entry at the end of this sequence and moves nothing
-already there; `appendingALineMovesNoClaim` below is that fact as a theorem.
+追加一行，只在这个序列末尾加一项，已有的项一个都不动；下面的 `appendingALineMovesNoClaim` 把这件事写成了定理。
 
-`hash` is `kernel::ledger::chain_hash` with the dependency it is built on left
-open: a `String` in, a `String` out, and no value computed here. -/
+`hash` 就是 `kernel::ledger::chain_hash`，只是它所依赖的摘要算法留作开放：进一个 `String`，出一个 `String`，这里不计算任何值。 -/
 def required (hash : String → String) (genesis : String) (lines : List String) : List String :=
   match lines with
   | [] => []
   | _ :: _ => genesis :: lines.dropLast.map hash
 
-/-- A ledger is chained when the claims its records carry are the claims its
-lines owe.
+/-- 一本账本成链，是说它的记录携带的声索，正是它的行欠下的声索。
 
-The two arguments are the two halves of one file: the lines as text, in order,
-and the `prev` each record carries, in the order a reader parses them. They are
-not independent — the equation below forces the two lists to the same length —
-and a list of prevs that does not line up with the lines is not a chained ledger
-but a parse that disagreed with the file.
+两个参数是同一个文件的两半：按次序排列的行文本，以及每条记录携带的 `prev`，按读者解析出来的次序。两者并不独立——下面的等式迫使两个列表一样长——一串与行对不上的 prev 不是成链的账本，而是一次与文件不一致的解析。
 
-Any list of prevs will do, so the statements below hold for whatever a reader
-parses a record into; the checker's `Record` is one such reader, and this module
-does not import it.
+任何一串 prev 都可以，所以下面的陈述对读者把记录解析成什么都成立；检验器的 `Record` 是这样的读者之一，本模块不 import 它。
 
-The digest function and the genesis digest are parameters because neither is this
-directory's fact: `chain_hash` lives in `crates/kernel/src/ledger.rs`, and its
-value and `GENESIS_PREV` are read from the product. A copy of either here would
-be the second home `adversary-SPEC.md` section 5 forbids. -/
+摘要函数与创世摘要是参数，因为两者都不是这里的事实：`chain_hash` 住在 `crates/kernel/src/ledger.rs`，它的值与 `GENESIS_PREV` 从产品读出。在这里抄一份，就是 `adversary-SPEC.md` 第 5 节禁止的第二个家。 -/
 def Chained (hash : String → String) (genesis : String) (lines : List String)
     (prevs : List String) : Prop :=
   prevs = required hash genesis lines
 
-/-- **The covered lines decide the claims, and this direction is free.**
+/-- **被覆盖的行决定声索，这个方向免费。**
 
-Two readings of one ledger — the same number of lines, agreeing on every line but
-the head — owe the same claims. `chain_hash` does not enter: *any* function has
-this property, which is why a check may compare two recorded digests without
-knowing how either was computed.
+同一本账本的两次读取——行数相同，除头之外每一行都一致——欠下相同的声索。`chain_hash` 不参与：*任何*函数都有这个性质，所以检查可以比较两个记下的摘要，而不必知道它们各自怎样算出。
 
-The line that relies on it compares a digest recorded earlier with a digest
-recorded now: the four segment hashes `runtime::prefix` freezes once at run start
-and every turn restates. The number of lines is part of the hypothesis because a
-reading includes it — a file of no lines and a file of one line have the same
-`dropLast`, and only the count tells them apart. -/
+依赖它的代码拿先前记下的摘要与现在记下的摘要相比：`runtime::prefix` 在 run 开始时冻结一次、每个回合重申的四段哈希。行数写进假设，是因为一次读取包含行数——没有行的文件与只有一行的文件 `dropLast` 相同，只有行数能把它们分开。 -/
 theorem theCoveredLinesDecideTheClaims (hash : String → String) (genesis : String)
     {lines lines' : List String} {prevs prevs' : List String}
     (chained : Chained hash genesis lines prevs) (chained' : Chained hash genesis lines' prevs')
@@ -129,19 +71,11 @@ theorem theCoveredLinesDecideTheClaims (hash : String → String) (genesis : Str
   unfold Chained at chained chained'
   rw [chained, chained', owed]
 
-/-- **The claims decide the covered lines, and this direction is bought.**
+/-- **声索决定被覆盖的行，这个方向要花钱买。**
 
-`injective` is the whole price of concluding, from the equality of the claims two
-ledgers carry, that they wrote the same covered lines. In the product this is the
-step `runtime::replay::verify_lines` takes on every offline check — it compares a
-line's `prev` with the digest of the line above it and reads a match as "the past
-is what it says" — the same step `storage::jsonl::open::recover_tail` takes when a
-city resumes, and the one `storage::bundle::files::head_of` takes when it insists
-on one chain. `aCoveredLineHidesWithoutInjectivity` below is the counterexample
-that shows the hypothesis cannot be dropped.
+要从两本账本携带的声索相等推出它们写下了相同的被覆盖的行，全部代价就是 `injective`。在产品里，这是 `runtime::replay::verify_lines` 每次离线检查都走的一步——它拿一行的 `prev` 与上一行的摘要相比，相符就读作「过去就是它说的样子」——也是城恢复时 `storage::jsonl::open::recover_tail` 走的一步，以及 `storage::bundle::files::head_of` 坚持只有一条链时走的一步。下面的 `aCoveredLineHidesWithoutInjectivity` 是反例，表明这条假设去不掉。
 
-The head is outside the conclusion, and that is the rule rather than an artefact
-of the proof: `lines.dropLast` is exactly the set a successor has hashed. -/
+头不在结论之内，这是规则本身，不是证明留下的痕迹：`lines.dropLast` 恰好是有后继对它取过摘要的那些行。 -/
 theorem theClaimsDecideTheCoveredLines (hash : String → String) (genesis : String)
     (injective : Function.Injective hash) {lines lines' : List String}
     (same : required hash genesis lines = required hash genesis lines') :
@@ -159,18 +93,11 @@ theorem theClaimsDecideTheCoveredLines (hash : String → String) (genesis : Str
         simpa only [required, List.map_cons, List.cons.injEq, true_and] using same
       exact (List.map_inj_right injective).mp covered
 
-/-- A covered line cannot move without the claims moving with it.
+/-- 被覆盖的行一动，声索就跟着动。
 
-The statement the disk's hostile actions are aimed at: change a byte in any line
-but the last, and the ledger no longer carries the claims its own lines owe — so
-the reader that compares the two refuses it. `injective` is carried for the same
-reason as above.
+磁盘的敌意动作瞄准的就是这条陈述：改掉除最后一行外任何一行的一个字节，账本携带的声索就不再是它自己的行欠下的声索，于是比较两者的读者拒绝它。`injective` 在这里的理由与上一条相同。
 
-`Ground.corrupt` flips a byte in the *oldest* line for a second reason this
-theorem does not cover: that is the one position no city process can be racing.
-What this theorem says is that the oldest line is not the only position worth
-attacking — every line with a successor is covered — so a check that tests
-detection at one position has tested one position. -/
+`Ground.corrupt` 翻转*最老*那一行的一个字节，还有一个本定理不涉及的理由：只有那个位置没有城进程可能在同时写。本定理说的是，最老那一行不是唯一值得攻击的位置——每一条有后继的行都被覆盖——所以只在一个位置测检测能力的检查，测到的只是那一个位置。 -/
 theorem aCoveredLineCannotChangeUnnoticed (hash : String → String) (genesis : String)
     (injective : Function.Injective hash) {lines lines' : List String} {prevs : List String}
     (chained : Chained hash genesis lines prevs) (moved : lines.dropLast ≠ lines'.dropLast) :
@@ -181,20 +108,11 @@ theorem aCoveredLineCannotChangeUnnoticed (hash : String → String) (genesis : 
     rw [← chained, agrees]
   exact moved (theClaimsDecideTheCoveredLines hash genesis injective same)
 
-/-- **The last line is outside the chain, and no digest function brings it in.**
+/-- **最后一行在链之外，任何摘要函数都救不回来。**
 
-One list of prevs, two ledgers, both chained, differing at their last line: for
-two different byte strings a digest function of any strength may give whatever it
-likes, because nothing after them ever hashed them. `hash` is the identity here,
-so this holds under the strongest digest function there is rather than under a
-weak one.
+一串 prev，两本账本，都成链，只在最后一行不同：对两个不同的字节串，再强的摘要函数也可以随意给值，因为它们之后没有谁对它们取过摘要。这里的 `hash` 是恒等函数，所以这件事在最强的摘要函数下也成立，而不只是在某个弱函数下。
 
-This is why the hostile actions split the way they do. `Ground.tear` removes a
-tail and the product *recovers*, which is a promise it can keep because no claim
-broke; `Ground.corrupt` must aim at a line a successor covers, or a check meaning
-to test detection would be testing the recovery path. It is also why no reader
-may treat the chain as evidence about its head: what the head says is what the
-disk says. -/
+敌意动作之所以这样分，原因就在这里。`Ground.tear` 去掉一段尾巴，产品*恢复*，这个承诺它守得住，因为没有声索被打破；`Ground.corrupt` 必须瞄准一条有后继覆盖的行，否则一个想测检测能力的检查测的是恢复路径。这也是为什么任何读者都不得把链当作关于头的证据：头说什么，就是磁盘说什么。 -/
 theorem theLastLineIsNotCertified (genesis a b c : String) (different : b ≠ c) :
     ∃ lines lines' prevs,
       lines ≠ lines' ∧ Chained id genesis lines prevs ∧ Chained id genesis lines' prevs := by
@@ -206,20 +124,11 @@ theorem theLastLineIsNotCertified (genesis a b c : String) (different : b ≠ c)
   · simp [Chained, required, List.dropLast_eq_take]
   · simp [Chained, required, List.dropLast_eq_take]
 
-/-- **Without injectivity a covered line hides as well as the head does.**
+/-- **没有单射，被覆盖的行也能像头一样藏起来。**
 
-One list of prevs, two ledgers, both chained, differing at the line a successor
-hashed — for a digest function that maps every line to the same string. This is
-the case `theClaimsDecideTheCoveredLines` and `aCoveredLineCannotChangeUnnoticed`
-exclude by hypothesis, and it is not a corner case: it is what "the assumption
-does not hold" looks like. The strength of the tree's verification equals the
-strength of that assumption and of nothing else.
+一串 prev，两本账本，都成链，在一条有后继对它取过摘要的行上不同——摘要函数把每一行都映到同一个字符串。`theClaimsDecideTheCoveredLines` 与 `aCoveredLineCannotChangeUnnoticed` 用假设排除的就是这种情形，而它不是边角情形：「假设不成立」就长这个样子。树的校验有多强，就等于这条假设有多强，别无其他。
 
-Where the assumption is written down is the part that matters. It is not proved
-here and cannot be: it is a statement about blake3. What the tree can do is say
-which of its promises rest on it, which `adversary-SPEC.md` section 5 does — so
-the next reader who needs a stronger guarantee knows what they are changing
-rather than discovering a hole. -/
+要紧的是这条假设写在哪里。这里没有证明它，也证明不了：它是关于 blake3 的陈述。树能做的，是说清自己的哪些承诺建立在它上面，`adversary-SPEC.md` 第 5 节做的就是这件事——下一个需要更强保证的读者因此知道自己在换什么，而不是事后发现一个洞。 -/
 theorem aCoveredLineHidesWithoutInjectivity (genesis a z b : String) (different : a ≠ z) :
     ∃ lines lines' prevs,
       lines ≠ lines' ∧ Chained (fun _ => "") genesis lines prevs
@@ -231,25 +140,16 @@ theorem aCoveredLineHidesWithoutInjectivity (genesis a z b : String) (different 
   · simp [Chained, required, List.dropLast_eq_take]
   · simp [Chained, required, List.dropLast_eq_take]
 
-/-- A ledger's head survives dropping the last line, in the only shape the
-proofs below need: a list of two or more elements loses its last one and keeps
-what a reader had already verified as its front.
+/-- 账本的头在去掉最后一行之后仍在，形状恰是下面的证明唯一需要的那种：两个及以上元素的列表去掉最后一个，前部保持读者已经校验过的样子。
 
-Stated here because `List` does not carry it: `dropLast` on a single-element list
-removes that element, so the step from three elements down is the first one that
-walks from the left. -/
+写在这里，是因为 `List` 没有带这条引理：单元素列表的 `dropLast` 会去掉那个元素，所以从三个元素往下，才是第一次从左边走起的一步。 -/
 private theorem dropLastConsCons {α : Type} (first second : α) (rest : List α) :
     (first :: second :: rest).dropLast = first :: (second :: rest).dropLast := by
   simp [List.dropLast_eq_take]
 
-/-- What a reader has verified of a ledger stays verified when the city writes
-one more line.
+/-- 城再写一行时，读者已经校验过的账本内容依然校验过。
 
-`jsonl::append` computes one digest per line written and never re-reads what is
-behind it; this is the same fact stated on the sequence of claims, where it
-matters that the claims already owed do not move. It is the claims that are kept,
-not the obligation of the new line — that one is `Chained`'s own definition,
-since what a new record must carry is the next entry of `required`. -/
+`jsonl::append` 每写一行算一次摘要，从不回读身后的内容；这里把同一件事陈述在声索序列上，要紧的是已经欠下的声索不动。保住的是这些声索，而不是新一行的义务——新记录必须携带什么由 `Chained` 的定义本身给出，它就是 `required` 的下一项。 -/
 theorem appendingALineMovesNoClaim (hash : String → String) (genesis : String)
     (lines : List String) (line : String) :
     required hash genesis lines <+: required hash genesis (lines ++ [line]) := by
@@ -268,4 +168,4 @@ theorem appendingALineMovesNoClaim (hash : String → String) (genesis : String)
     simp only [required, List.dropLast_concat]
     exact List.cons_prefix_cons.mpr ⟨rfl, covered⟩
 
-end Sprawling
+end Kernel.Ledger

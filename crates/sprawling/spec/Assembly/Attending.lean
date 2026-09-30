@@ -4,41 +4,24 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# The accounting thread and its one inbox.
+# 记账线程与它唯一的收件队列
 
-Specifies `crates/sprawling/src/assembly/attending.rs`, the loop `attend`: the
-one thread that writes a city's Ledger, and the three mouths it serves - a
-lane's relay request, a run home from its lane, a command from the desk - plus
-the desk closing. The Rust code is the authority on how the loop holds these
-properties; this model is the authority on which properties must hold
-(sprawling-SPEC.md 8-42-4).
+规定 `crates/sprawling/src/assembly/attending.rs` 里的循环 `attend`：写一座城 Ledger 的唯一线程，以及它服务的三张嘴——一条 lane 的中转请求、一个从 lane 回家的 run、一条来自 desk 的命令——外加 desk 关门。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（sprawling-SPEC.md 8-42-4）。
 
-Every mouth sends into one queue. The thread blocks on its first message
-(`recv`), takes every message already behind it (`try_recv` until empty), and
-serves that batch in arrival order. A deadline the schedule owes wakes it the
-same way a message does.
+每张嘴都送进同一条队列。线程阻塞在第一条消息上（`recv`），取走已经排在它后面的每一条（`try_recv` 直到取空），按到达次序服务这一批。排程欠下的截止时刻到了，与来一条消息一样唤醒它。
 
-Three properties, one theorem group each:
+三条性质，各一组定理：
 
-* **every message is served in finitely many steps** - a message waiting when
-  the thread wakes is served by that wake, so one that has arrived is served by
-  the next one;
-* **append order is seq order** - the records the thread appends carry
-  consecutive seqs from the first one, in the order they were appended;
-* **no busy waiting** - with nothing waiting and no deadline due the thread
-  does not wake, and each wake consumes work, so the wakes are bounded by the
-  messages and deadlines that caused them.
+* **每条消息在有限步内被服务**——线程醒来时正在等的消息由这次醒来服务，所以已到达的消息由下一次醒来服务；
+* **追加次序即 seq 次序**——线程追加的记录从第一条起带连续的 seq，次序与追加次序相同；
+* **不忙等**——没有消息在等、也没有截止时刻到期时线程不醒，而每次醒来都消耗工作，所以醒来的次数不超过引起它们的消息与截止时刻。
 
-What a served message does besides appending (settling a run, answering a
-person) is the Rust code's and is not modelled; only how many records it
-appends is.
+被服务的消息除了追加之外还做什么（结算一个 run、回答一个人），归 Rust 代码，这里不建模；这里只建模它追加几条记录。
 -/
 
-namespace Attending
+namespace Sprawling.Assembly.Attending
 
-/-- What reaches the accounting thread. Each variant carries how many records
-serving it appends; closing appends none here, because what a closing city
-writes is written by the messages it still serves. -/
+/-- 到达记账线程的东西。每个分支带着服务它要追加几条记录；关门在这里不追加，因为一座正在关的城要写的，由它仍在服务的消息写。 -/
 inductive Message where
   | relay (records : Nat)
   | home (records : Nat)
@@ -46,45 +29,42 @@ inductive Message where
   | close
   deriving Repr, DecidableEq
 
-/-- How many records serving a message appends. -/
+/-- 服务一条消息追加几条记录。 -/
 def Message.records : Message → Nat
   | .relay n | .home n | .command n => n
   | .close => 0
 
-/-- The thread's state: the queue in arrival order, the seq of every record
-appended so far in append order, every message served in serving order, and
-whether a schedule deadline has come due. -/
+/-- 线程的状态有四项：队列，按到达次序；至今追加过的每条记录的 seq，按追加次序；服务过的每条消息，按服务次序；以及排程的截止时刻是否已到。 -/
 structure Loop where
   inbox : List Message
   ledger : List Nat
   served : List Message
   deadlineDue : Bool
 
-/-- A sender puts a message at the back of the queue; it never reorders it. -/
+/-- 发送方把消息放在队尾，从不调整次序。 -/
 def arrive (m : Message) (s : Loop) : Loop :=
   { s with inbox := s.inbox ++ [m] }
 
-/-- The deadline the schedule owes comes due. -/
+/-- 排程欠下的截止时刻到了。 -/
 def due (s : Loop) : Loop :=
   { s with deadlineDue := true }
 
-/-- Serving one message appends its records, each taking the next seq. -/
+/-- 服务一条消息就追加它的记录，每条取下一个 seq。 -/
 def serve (ledger : List Nat) (m : Message) : List Nat :=
   ledger ++ (List.range m.records).map (ledger.length + ·)
 
-/-- The loop after one wake: the whole batch served in arrival order, the
-deadline read. -/
+/-- 醒来一次之后的循环：整批按到达次序服务完，截止时刻已读过。 -/
 def drained (s : Loop) : Loop :=
   { inbox := []
     ledger := s.inbox.foldl serve s.ledger
     served := s.served ++ s.inbox
     deadlineDue := false }
 
-/-- One wake of the thread, or `none` while it sleeps in `recv`. -/
+/-- 线程的一次醒来；它在 `recv` 里睡着时为 `none`。 -/
 def wake (s : Loop) : Option Loop :=
   if s.inbox.isEmpty && !s.deadlineDue then none else some (drained s)
 
-/-! ## Every message is served in finitely many steps -/
+/-! ## 每条消息在有限步内被服务 -/
 
 theorem wake_serves_every_waiting (s : Loop) (h : s.inbox ≠ []) :
     wake s = some (drained s) ∧ (drained s).inbox = [] ∧
@@ -97,9 +77,9 @@ theorem arrived_is_served_by_the_next_wake (m : Message) (s : Loop) :
   · exact (wake_serves_every_waiting (arrive m s) (by simp [arrive])).1
   · simp [drained, arrive]
 
-/-! ## Append order is seq order -/
+/-! ## 追加次序即 seq 次序 -/
 
-/-- The ledger's seqs are `0, 1, 2, …` in append order. -/
+/-- 账本的 seq 按追加次序是 `0, 1, 2, …`。 -/
 def Ordered (ledger : List Nat) : Prop :=
   ledger = List.range ledger.length
 
@@ -122,9 +102,9 @@ theorem wake_keeps_order {s s' : Loop} (h : Ordered s.ledger) (w : wake s = some
   · cases w
     exact batch_keeps_order s.inbox h
 
-/-! ## No busy waiting -/
+/-! ## 不忙等 -/
 
-/-- What a wake can consume: the messages waiting and a deadline come due. -/
+/-- 一次醒来能消耗的工作：在等的消息，和已到期的截止时刻。 -/
 def work (s : Loop) : Nat :=
   s.inbox.length + if s.deadlineDue then 1 else 0
 
@@ -142,15 +122,11 @@ theorem every_wake_consumes_work {s s' : Loop} (w : wake s = some s') :
     cases hi : s.inbox <;> cases hd : s.deadlineDue <;>
       simp_all [work, drained]
 
-/-! ## A name is asked for off this thread, and the room is still the first write
+/-! ## 名字在这条线程之外去要，开房间仍是第一次写
 
-A dispatch sent to a building with no room needs a name from the digest model,
-a call that waits on a provider for seconds. The steps below are one such
-dispatch in the order they happen (`assembly::dispatching::asking_name`):
-agreeing writes nothing and is asked again once the name is home, because a
-halt may have arrived meanwhile. -/
+派给一座还没有房间的楼的活，要向摘要模型要一个名字，这次调用要等 provider 好几秒。下面的步骤是这样一次派活，按发生次序排列（`assembly::dispatching::asking_name`）：同意这一步什么也不写，名字回来之后再问一次，因为其间可能已经到了一次停摆。 -/
 
-/-- One step of a dispatch that has to be named. -/
+/-- 需要起名的一次派活里的一步。 -/
 inductive DispatchStep where
   | agree
   | askName
@@ -158,13 +134,12 @@ inductive DispatchStep where
   | laterWrite
   deriving Repr, DecidableEq
 
-/-- Whether the step puts anything on disk. -/
+/-- 这一步是否往盘上写东西。 -/
 def DispatchStep.writes : DispatchStep → Bool
   | .openRoom | .laterWrite => true
   | .agree | .askName => false
 
-/-- Whether the step runs on the accounting thread, where every relay request
-waits for it. -/
+/-- 这一步是否跑在记账线程上；跑在那里，每个中转请求都要等它。 -/
 def DispatchStep.onAccountingThread : DispatchStep → Bool
   | .askName => false
   | .agree | .openRoom | .laterWrite => true
@@ -180,4 +155,4 @@ theorem nothing_is_written_before_the_name_is_home :
 theorem the_naming_wait_is_off_the_accounting_thread :
     ∀ step ∈ namedDispatch, step.onAccountingThread = false → step = .askName := by decide
 
-end Attending
+end Sprawling.Assembly.Attending
