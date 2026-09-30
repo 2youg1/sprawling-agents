@@ -185,3 +185,50 @@ fn a_snapshot_that_cannot_be_cut_is_reported_and_the_views_still_serve() {
         "{said:?}"
     );
 }
+
+/// A served city whose last opening cut both snapshots opens again from
+/// them: before the first byte it checks and folds only the lines written
+/// since, not the history before them (sprawling-SPEC.md 8-122).
+#[test]
+fn a_served_city_reopens_from_its_snapshots_and_folds_only_what_grew() {
+    let dir = tempfile::tempdir().unwrap();
+    let ledger = crate::worker::fixture::init_city(dir.path())
+        .unwrap()
+        .ledger_dir;
+    let open = |ledger: &Path| {
+        let mut cost =
+            crate::worker::opening_cost::OpeningCost::begin(crate::worker::fixture::monotonic);
+        let served = start_served_views(
+            ledger,
+            crate::Clock::now(&crate::worker::fixture::WallClock).unwrap(),
+            &mut Diagnostics::off(),
+            &mut cost,
+        )
+        .unwrap();
+        drop(served);
+        cost.line()
+    };
+    open(&ledger);
+    let opened_at = storage::read_raw_lines_at(&ledger).unwrap().len();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    raise(&mut worker, 0..2);
+    drop(worker);
+    let grown = storage::read_raw_lines_at(&ledger).unwrap().len() - opened_at;
+
+    let line = open(&ledger);
+
+    let fold = line
+        .split(", ")
+        .find(|part| part.contains(" lines "))
+        .and_then(|part| part.rsplitn(3, ' ').nth(2).map(str::to_owned));
+    assert_eq!(
+        fold,
+        Some(format!("fold {grown} lines from the snapshots")),
+        "{line}"
+    );
+}
