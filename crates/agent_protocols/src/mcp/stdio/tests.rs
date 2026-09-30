@@ -28,6 +28,26 @@ fn silent_server() -> (String, Vec<String>) {
     }
 }
 
+/// A child that reads the one line it is sent and then exits without an
+/// answer: the call was handed over whole, so what it did is unknown.
+fn taking_one_line_then_exiting() -> (String, Vec<String>) {
+    if cfg!(windows) {
+        (
+            "powershell".to_owned(),
+            vec![
+                "-NoProfile".to_owned(),
+                "-Command".to_owned(),
+                "[void][Console]::In.ReadLine()".to_owned(),
+            ],
+        )
+    } else {
+        (
+            "sh".to_owned(),
+            vec!["-c".to_owned(), "read -r line".to_owned()],
+        )
+    }
+}
+
 #[test]
 fn a_real_child_answers_over_the_pipe_and_the_answer_reads_as_a_result() {
     let dir = tempfile::tempdir().unwrap();
@@ -58,7 +78,10 @@ fn a_server_that_never_answers_is_given_up_on_and_stopped() {
     let (command, args) = silent_server();
     let mut server = StdioServer::start(&command, &args, &[], dir.path()).unwrap();
     let err = server.call("{\"id\":1}", TimeoutMs(200)).unwrap_err();
-    assert_eq!(err.code(), &AxCode::Timeout);
+    assert_eq!(
+        (err.code(), err.retry()),
+        (&AxCode::Timeout, kernel::Retry::Unknown)
+    );
     assert!(err.recovery().contains("late answer"));
     // The child was stopped, so the next call cannot be answered by
     // the one that never arrived.
@@ -66,6 +89,22 @@ fn a_server_that_never_answers_is_given_up_on_and_stopped() {
     assert!(
         matches!(second.code(), &AxCode::ToolUnavailable | &AxCode::Timeout),
         "{second}"
+    );
+}
+
+/// The line was written and flushed before the child went away, so the
+/// server may have acted on it: the lost answer is not a call to repeat.
+#[test]
+fn a_server_that_exits_after_taking_the_call_leaves_the_effect_unknown() {
+    let dir = tempfile::tempdir().unwrap();
+    let (command, args) = taking_one_line_then_exiting();
+    let mut server = StdioServer::start(&command, &args, &[], dir.path()).unwrap();
+    let err = server
+        .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
+        .unwrap_err();
+    assert_eq!(
+        (err.code(), err.retry()),
+        (&AxCode::ToolUnavailable, kernel::Retry::Unknown)
     );
 }
 

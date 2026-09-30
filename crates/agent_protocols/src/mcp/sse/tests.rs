@@ -147,3 +147,55 @@ connection: close
         (&AxCode::Timeout, kernel::Retry::Unknown)
     );
 }
+
+/// A stream that ends after the server took the message (202) may end
+/// after the work was done, so the lost answer is not a call to repeat.
+#[test]
+fn a_stream_that_ends_after_the_call_was_taken_leaves_the_effect_unknown() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut buf = vec![0u8; 65536];
+        assert!(stream.read(&mut buf).unwrap() > 0);
+        stream
+            .write_all(
+                b"HTTP/1.1 200 OK
+content-type: text/event-stream
+connection: close
+
+event: endpoint
+data: /messages
+
+",
+            )
+            .unwrap();
+        stream.flush().unwrap();
+        let (mut post, _) = listener.accept().unwrap();
+        assert!(post.read(&mut buf).unwrap() > 0);
+        post.write_all(
+            b"HTTP/1.1 202 Accepted
+content-length: 0
+connection: close
+
+",
+        )
+        .unwrap();
+        drop(post);
+        drop(stream);
+    });
+    let mut held = SseServer::open(&format!("http://{addr}/sse"), &[], &vault()).unwrap();
+
+    let lost = held
+        .call(
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\"}",
+            crate::EXTERNAL_CALL_PATIENCE,
+        )
+        .unwrap_err();
+
+    server.join().unwrap();
+    assert_eq!(
+        (lost.code(), lost.retry()),
+        (&AxCode::ToolUnavailable, kernel::Retry::Unknown)
+    );
+}
