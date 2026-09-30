@@ -250,14 +250,14 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `kernel::tool` | crates/kernel/src/tool.rs | runtime tools, collab tools, browser, protocol | citysim: scripted tools |
 | `kernel::model` | crates/kernel/src/model.rs | gateway: native and endpoint | citysim: scripted model |
 | `runtime::sandbox` | crates/runtime/src/sandbox.rs | wasmtime with fuel metering | pass-through and fault doubles |
-| `runtime::turn::wave` | crates/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `bin::assembly::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
+| `runtime::turn::wave` | crates/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `accounting::worker::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
 | `agent_protocols::mcp` | crates/agent_protocols/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
-| `accounting::models` | crates/accounting/src/models.rs | `bin::assembly::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
+| `accounting::models` | crates/accounting/src/models.rs | `accounting::worker::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
 | `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::SystemClock`: the wall clock, the one sampling point | the stopped clock in `crates/sprawling/tests/clock.rs` |
-| `accounting::connectors` | crates/accounting/src/connectors.rs | `bin::assembly::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
+| `accounting::connectors` | crates/accounting/src/connectors.rs | `accounting::worker::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
 | `accounting::machine` | crates/accounting/src/machine.rs | `bin::doctor::ThisMachine`: the doctor's report and its one install runner | the scripted machine in `crates/sprawling/tests/machine.rs` |
-| `accounting::views::snapshot::start` | crates/accounting/src/views/snapshot/start.rs | `accounting::views::Views`: the fold every page is answered from | `bin::assembly::folds::standing_start`: the standing a worker judges from, until the worker moves into `accounting` (accounting-SPEC.md §3) |
+| `accounting::views::snapshot::start` | crates/accounting/src/views/snapshot/start.rs | `accounting::views::Views`: the fold every page is answered from | `accounting::worker::folds::standing_start`: the standing a worker judges from, until the worker moves into `accounting` (accounting-SPEC.md §3) |
 
 The *second adapter* column has no checker: a seam whose double was
 deleted would still read as real here. That is a known hole, not a
@@ -568,7 +568,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review. A library crate starts a thread in five places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::stdio` and `agent_protocols::mcp::sse` give each MCP connection one reader that ends when the connection closes; and `agent_protocols::harness::reading` gives each harness session one reader that ends when the harness closes its output or the session drops the channel. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the driving lanes in `bin::assembly::pool`, the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, the console, first run, and the doctor's probes |
+| 3 | One spawn point | review. A library crate starts a thread in five places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::stdio` and `agent_protocols::mcp::sse` give each MCP connection one reader that ends when the connection closes; and `agent_protocols::harness::reading` gives each harness session one reader that ends when the harness closes its output or the session drops the channel. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the driving lanes in `accounting::worker::pool`, the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, the console, first run, and the doctor's probes |
 | 4 | No random source on a decision path; OS entropy mints only values a stranger must not guess | review; citysim has no random source to seed |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
@@ -731,7 +731,7 @@ than typed.
 | Ledger append plus fsync | p50 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p50_ms -->5<!-- xtask:end --> ms, p99 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p99_ms -->20<!-- xtask:end --> ms | `[ledger_append]`, with its machine class | no |
 | Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->1,222<!-- xtask:end --> ms for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
 | Prefix assembly | ≤<!-- xtask:begin budget_figure:prefix_assembly.budget_ms -->1<!-- xtask:end --> ms | `[prefix_assembly]`, with its machine class | no |
-| Runs driving at once | `DRIVING_LANES` in `bin::assembly::pool` | one thread per run, and one accounting thread taking every write | no: it is a wall this city sets, not a measurement |
+| Runs driving at once | `DRIVING_LANES` in `accounting::worker::pool` | one thread per run, and one accounting thread taking every write | no: it is a wall this city sets, not a measurement |
 | Kernel mutation score | ≥90% | by `just mutants` | by that command, not by `just check` |
 | Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `tools/xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
 
@@ -761,7 +761,7 @@ build. A reading from another machine class does not enter this table.
 ceiling of a city is the throughput ceiling of its Ledger. That is the
 price of "the Ledger is the only history", stated in the open. The first
 wall is one this city sets itself: it drives `DRIVING_LANES` runs at a time
-(`bin::assembly::pool`), and past it a prepared drive waits in the pool for
+(`accounting::worker::pool`), and past it a prepared drive waits in the pool for
 a lane. Then come the walls outside:
 provider-side rate limits, Ledger fsync, worktree disk, file-descriptor
 limits, then the blocking pool. RAM is not among them. **Runs are driven in
@@ -859,7 +859,7 @@ sequenceDiagram
     autonumber
     participant W as WebUI
     participant S as wire::server
-    participant D as bin::assembly::desk
+    participant D as accounting::worker::desk
     participant A as accounting thread
     participant L as lane
     participant E as Endpoint
@@ -889,11 +889,11 @@ sequenceDiagram
 
 `crates/wire/src/server/socket.rs` (`session`),
 `crates/wire/src/reception/admission.rs` (`decide_admission`),
-`crates/sprawling/src/assembly/desk.rs` (`post`),
-`crates/sprawling/src/assembly/relay.rs` (`Wake`),
+`crates/accounting/src/worker/desk.rs` (`post`),
+`crates/accounting/src/worker/relay.rs` (`Wake`),
 `crates/sprawling/src/assembly/attending.rs` (`attend`),
-`crates/sprawling/src/assembly/dispatching/agreeing.rs` (`agree_to_work`),
-`crates/sprawling/src/assembly/pool.rs`,
+`crates/accounting/src/worker/dispatching/agreeing.rs` (`agree_to_work`),
+`crates/accounting/src/worker/pool.rs`,
 `crates/runtime/src/run/lifecycle.rs`,
 `crates/storage/src/jsonl/append.rs` (`append_all`),
 `crates/sprawling/src/serving/folding.rs`, `client/src/core/socket.ts`.
@@ -929,7 +929,7 @@ flowchart TD
     lane[lane] -- "Wake::Relay: an EventDraft" --> wake[the one queue]
     claim[lane] -- "Wake::Claim, Wake::Goal" --> wake
     home[lane whose run ended] -- "Wake::Home" --> wake
-    desk[bin::assembly::desk] -- "Wake::Command" --> wake
+    desk[accounting::worker::desk] -- "Wake::Command" --> wake
     close[the person stops the city] -- "Wake::Close" --> wake
     wake --> acc[accounting thread]
     acc -->|"1: every relay request queued"| ledger[Ledger]
@@ -944,7 +944,7 @@ flowchart TD
     committed --> sn[socket n]
 ```
 
-`crates/sprawling/src/assembly/relay.rs` (`Wake`),
+`crates/accounting/src/worker/relay.rs` (`Wake`),
 `crates/sprawling/src/assembly/attending.rs` (`attend`),
 `crates/storage/src/jsonl/append.rs`,
 `crates/sprawling/src/serving/folding.rs` (`spawn_folding`),
@@ -1031,11 +1031,11 @@ stateDiagram-v2
 ```
 
 A frozen run is history and is never woken: a succession or a knock
-starts a new run. `crates/sprawling/src/assembly/dispatching/agreeing.rs`,
-`crates/sprawling/src/assembly/pool.rs`, `crates/runtime/src/run.rs`
+starts a new run. `crates/accounting/src/worker/dispatching/agreeing.rs`,
+`crates/accounting/src/worker/pool.rs`, `crates/runtime/src/run.rs`
 (`drive`), `crates/kernel/src/completion.rs`,
-`crates/sprawling/src/assembly/freezing.rs`,
-`crates/sprawling/src/assembly/genesis.rs`.
+`crates/accounting/src/worker/freezing.rs`,
+`crates/accounting/src/worker/genesis.rs`.
 
 ### 13.8 The client's fold
 

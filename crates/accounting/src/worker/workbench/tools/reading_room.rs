@@ -9,7 +9,7 @@
 use kernel::{Address, AxError};
 
 use super::held;
-use crate::assembly::workbench::Laying;
+use crate::worker::workbench::Laying;
 
 impl Laying {
     /// Admits the skills this building's own file names, and says which
@@ -34,7 +34,7 @@ impl Laying {
         // thousand skills; what costs resident bytes is the list this
         // building's own file admits, and a name on that list which is
         // not on the shelves is left out rather than promised.
-        let home = accounting::home::Home::detect()?;
+        let home = crate::home::Home::detect()?;
         let shelves = city::Library::scan(&self.city_root, Some(building.addr()), home.path())?;
         for holding in shelves.reading_room(rules.reading_room()) {
             // A catalog entry is opened by an address, and a shelf

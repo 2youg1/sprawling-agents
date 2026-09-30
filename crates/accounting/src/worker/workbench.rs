@@ -37,12 +37,12 @@ pub(super) use standing::Placing;
 /// holds which goal, how far the city trusts its residents - arrive as
 /// the values they had when the dispatch was staged, which is the moment
 /// the worker read them before the bench moved into the lane.
-pub(in crate::assembly) struct Laying {
-    pub(in crate::assembly) city_root: PathBuf,
+pub(in crate::worker) struct Laying {
+    pub(in crate::worker) city_root: PathBuf,
     /// The city's genesis line, which signs every checkpoint.
-    pub(in crate::assembly) city: kernel::B3Hash,
+    pub(in crate::worker) city: kernel::B3Hash,
     vault: std::sync::Arc<std::sync::Mutex<gateway::Custodian>>,
-    connectors: std::sync::Arc<dyn accounting::Connectors + Send + Sync>,
+    connectors: std::sync::Arc<dyn crate::Connectors + Send + Sync>,
     /// The browser tools a building's rules ask for (`RunWorker::browsers`).
     browsers: super::Browsers,
     /// Where the desktop server a building's rules ask for is started
@@ -51,11 +51,11 @@ pub(in crate::assembly) struct Laying {
     exec_host: super::hands::ExecHost,
     backlog: runtime::Backlog,
     /// The city's one checkpoint at a time (`driving::lane::DriveContext`).
-    pub(in crate::assembly) checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
+    pub(in crate::worker) checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// The store the lanes share (`RunWorker::lane_store`).
-    pub(in crate::assembly) store: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
+    pub(in crate::worker) store: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
     notes: super::recording::Notes,
-    clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
+    clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
     /// Where the ledger stood when the dispatch was staged: what the
     /// keeper counts from, and where each line written here is anchored.
     staged_at: kernel::Seq,
@@ -96,7 +96,7 @@ impl super::RunWorker {
     ///
     /// # Errors
     /// Propagates a city whose genesis line cannot be read.
-    pub(in crate::assembly) fn laying(&self, who: &str) -> Result<Laying, AxError> {
+    pub(in crate::worker) fn laying(&self, who: &str) -> Result<Laying, AxError> {
         Ok(Laying {
             city_root: self.city_root.clone(),
             city: self.city_hash()?,
@@ -317,8 +317,8 @@ pub(super) struct Desks {
 /// in [`Desks`], for the lane that lays the bench out. The room's queue
 /// and the tenure over it stay in [`Desks`], with the landing, because
 /// only the holder gives a queue back.
-pub(in crate::assembly) struct BenchDesks {
-    pub(in crate::assembly) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
+pub(in crate::worker) struct BenchDesks {
+    pub(in crate::worker) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
     goals: std::sync::Arc<std::sync::Mutex<collab::GoalDesk>>,
     plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
     shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
@@ -328,7 +328,7 @@ pub(in crate::assembly) struct BenchDesks {
 }
 
 impl Desks {
-    pub(in crate::assembly) fn for_bench(&self) -> BenchDesks {
+    pub(in crate::worker) fn for_bench(&self) -> BenchDesks {
         BenchDesks {
             signals: std::sync::Arc::clone(&self.signals),
             goals: std::sync::Arc::clone(&self.goals),

@@ -11,7 +11,7 @@ use kernel::{Address, AxError, NodeId, RunId};
 
 use super::super::{Continuation, Owing, RunWorker, Unasked};
 use super::flight::InLane;
-use crate::assembly::dispatching::preparing::Staged;
+use crate::worker::dispatching::preparing::Staged;
 
 impl RunWorker {
     /// Stages one dispatch on this thread and takes it into a lane, which
@@ -25,7 +25,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates every refusal a dispatch can owe before it costs
     /// anything, and the pool's refusal to start a lane.
-    pub(in crate::assembly) fn dispatch_into_lane(
+    pub(in crate::worker) fn dispatch_into_lane(
         &mut self,
         at: super::super::Assignment,
         task: String,
@@ -52,7 +52,7 @@ impl RunWorker {
     /// unblocked. None of them has a person waiting on the answer, so a
     /// refusal is noted against the reason the run existed rather than
     /// failing whatever was running at the time.
-    pub(in crate::assembly) fn start_unasked(
+    pub(in crate::worker) fn start_unasked(
         &mut self,
         addr: Address,
         task: String,
@@ -79,7 +79,7 @@ impl RunWorker {
             Err(err) => {
                 self.note(
                     runtime::diagnostics::Level::Refuse,
-                    "bin::assembly",
+                    "accounting::worker",
                     &format!(
                         "no run started at {} although {}: {}",
                         addr.as_str(),
@@ -96,7 +96,7 @@ impl RunWorker {
     ///
     /// # Errors
     /// Propagates the pool's refusal to start a lane.
-    pub(in crate::assembly) fn take_row_into_lane(
+    pub(in crate::worker) fn take_row_into_lane(
         &mut self,
         staged: Staged,
         addr: Address,

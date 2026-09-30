@@ -18,13 +18,13 @@
 )]
 
 use super::super::*;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 #[test]
 fn a_confidential_building_stops_the_run_before_a_remote_call() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     lay_rules(dir.path(), "vault", &shut_rules(""));
 
     // A remote endpoint, wired as the provider for a confidential
@@ -110,7 +110,7 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
 #[test]
 fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     lay_rules(dir.path(), "vault", &shut_rules(""));
     let vault_room = dir.path().join("vault").join("room1");
     std::fs::create_dir_all(&vault_room).unwrap();
@@ -179,7 +179,7 @@ fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
     // deletion dies with the copy, so only a host command can leave the
     // sweep something to report (runtime-SPEC 8-13-2).
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = dir.path().join("lab").join("room1");
     std::fs::create_dir_all(&room).unwrap();
     std::fs::write(room.join("kiln.md"), "firing notes\n").unwrap();

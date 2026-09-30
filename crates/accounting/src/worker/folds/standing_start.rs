@@ -13,7 +13,7 @@ use storage::LedgerIndex;
 
 use super::collaboration::CollaborationFold;
 use super::{Entrance, Governance, SessionOrigins, Standing};
-use accounting::views::snapshot::start::SnapshotFold;
+use crate::views::snapshot::start::SnapshotFold;
 
 /// Changed whenever a standing fold rule or the encoding of
 /// [`StandingFolds`] changes within one version of this binary. The
@@ -110,7 +110,7 @@ impl SnapshotFold for StandingFolds {
 
 /// A field postcard cannot carry — a JSON value, or a struct serde
 /// flattens — written as its JSON text.
-pub(in crate::assembly) fn as_json_text<T: serde::Serialize, S: serde::Serializer>(
+pub(in crate::worker) fn as_json_text<T: serde::Serialize, S: serde::Serializer>(
     value: &T,
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
@@ -118,7 +118,7 @@ pub(in crate::assembly) fn as_json_text<T: serde::Serialize, S: serde::Serialize
 }
 
 /// What [`as_json_text`] wrote.
-pub(in crate::assembly) fn from_json_text<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+pub(in crate::worker) fn from_json_text<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
     T: serde::de::DeserializeOwned,
     D: serde::Deserializer<'de>,

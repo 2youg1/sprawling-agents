@@ -28,7 +28,7 @@ use super::relay::Patience;
 impl RunWorker {
     /// The accounting queue's counts, readable from another thread: the
     /// monitor samples them (sprawling-SPEC.md 8-98).
-    pub(crate) fn health(&self) -> Health {
+    pub fn health(&self) -> Health {
         self.flight.gate.health()
     }
 }
@@ -47,7 +47,7 @@ impl RunWorker {
 /// dispatches leave in a run drive this loop and not a copy of it
 /// (sprawling-SPEC.md 8-84): a copy that waited differently would be
 /// measured instead of the city.
-pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
+pub fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
     desk.ring_through(worker.bell());
     // When the schedule was last read against. Kept by the loop rather
     // than measured from it, because a city with lanes driving comes

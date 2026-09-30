@@ -12,7 +12,7 @@
 
 use std::cell::RefCell;
 
-use crate::assembly::*;
+use crate::worker::*;
 
 thread_local! {
     /// Every address the scripted file manager was handed, in order.
@@ -32,11 +32,11 @@ fn scripted(_city: &Path, at: &Address) -> Result<(), AxError> {
 #[test]
 fn a_reveal_reaches_the_file_manager_the_worker_was_handed() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     worker.reveal_with(scripted);

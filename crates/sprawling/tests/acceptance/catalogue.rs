@@ -10,7 +10,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use sprawling::assembly::RunWorker;
+use accounting::worker::RunWorker;
 
 use crate::city::{self, History};
 use crate::episodes::{self, Episode, Observed, Setup};

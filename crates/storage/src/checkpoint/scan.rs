@@ -333,7 +333,7 @@ impl Checkpoint {
 ///
 /// **`.git/index.lock` is taken for the length of one write, and two runs
 /// of one building stage their scopes at the same time by design** -
-/// `assembly::plans::pursuing` drives every node of a ready set at once,
+/// `accounting::worker::plans::pursuing` drives every node of a ready set at once,
 /// in one repository. The run that loses that race waits and tries
 /// again, because the concurrent process is this city and the lock is
 /// held for microseconds; refusing would end the run as cancelled and

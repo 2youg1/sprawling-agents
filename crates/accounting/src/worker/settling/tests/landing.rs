@@ -14,8 +14,8 @@
     reason = "test code"
 )]
 
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 fn speaking_signal(id: &str, room: &Address) -> collab::Signal {
     collab::Signal::new(
@@ -25,7 +25,7 @@ fn speaking_signal(id: &str, room: &Address) -> collab::Signal {
         room.clone(),
         kernel::Version::new(1),
         kernel::Payload::empty(),
-        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
+        crate::Clock::now(&crate::worker::fixture::WallClock).unwrap(),
     )
     .unwrap()
 }
@@ -36,7 +36,7 @@ fn speaking_signal(id: &str, room: &Address) -> collab::Signal {
 #[test]
 fn a_half_settled_landing_leaves_no_torn_city() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     city::create_building(
         dir.path(),
         &Address::parse("market").unwrap(),
@@ -62,7 +62,7 @@ Trades in the market as {who}.
     let room = Address::parse("market/hana").unwrap();
     // One slot: the second delivery sheds, so the landing settles
     // halfway by construction rather than by luck.
-    worker.collaborating.rooms = crate::assembly::RoomQueues::folded(
+    worker.collaborating.rooms = crate::worker::RoomQueues::folded(
         std::collections::BTreeMap::from([(room.clone(), collab::Inbox::new(1, 1))]),
     );
     let knocks_mark = worker.doorstep.knocks.len();
@@ -106,7 +106,7 @@ Trades in the market as {who}.
 #[test]
 fn a_half_filed_shelf_is_unwound() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let building = Address::parse("lab").unwrap();
     city::create_building(dir.path(), &building, city::BuildingTemplate::Minimal).unwrap();
     // The second kind's directory is a file: its filing cannot land,
@@ -145,7 +145,7 @@ fn a_half_filed_shelf_is_unwound() {
         effects,
         dir.path(),
         &building,
-        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
+        crate::Clock::now(&crate::worker::fixture::WallClock).unwrap(),
         &Address::parse("lab").unwrap(),
         "potter",
     )
@@ -188,7 +188,7 @@ fn a_half_filed_shelf_is_unwound() {
 #[test]
 fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
@@ -197,7 +197,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
 
     let mut waiting = collab::Inbox::new(8, 4);
     waiting.deliver(&speaking_signal("s-kept", &room)).unwrap();
-    worker.collaborating.rooms = crate::assembly::RoomQueues::folded(
+    worker.collaborating.rooms = crate::worker::RoomQueues::folded(
         std::collections::BTreeMap::from([(room.clone(), waiting)]),
     );
 
@@ -224,7 +224,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
         0,
         "the queue is out with the run that is driving"
     );
-    let crate::assembly::dispatching::preparing::Staged { at, site, .. } = staged;
+    let crate::worker::dispatching::preparing::Staged { at, site, .. } = staged;
 
     let failed = kernel::AxError::failure(
         kernel::AxCode::StorageFatal,
@@ -232,16 +232,16 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
         "the disk went away",
     )
     .with_recovery("this is the failure the test is about");
-    let mut open_claims = crate::assembly::booking::ClaimBook::default().release(RunId::CITY);
+    let mut open_claims = crate::worker::booking::ClaimBook::default().release(RunId::CITY);
     let err = worker
         .land(
             continuation,
-            crate::assembly::dispatching::preparing::Flown {
+            crate::worker::dispatching::preparing::Flown {
                 at,
                 site,
                 driven: Err(failed),
             },
-            Owing::unasked(crate::assembly::Unasked::Knock),
+            Owing::unasked(crate::worker::Unasked::Knock),
             &mut open_claims,
         )
         .unwrap_err();

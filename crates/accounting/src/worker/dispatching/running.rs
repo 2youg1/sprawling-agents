@@ -22,7 +22,7 @@ use super::{Assignment, Given};
 /// where a lane runs it, it waits in the pursuit that started it until
 /// that run comes home (sprawling-SPEC.md 8-46-2). Either way there is
 /// one per run, and nothing in it is shared.
-pub(in crate::assembly) struct Continuation {
+pub(in crate::worker) struct Continuation {
     desks: Desks,
     job_locator: Locator,
     /// This run's place in the backlog, given back where the run ends.
@@ -44,7 +44,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates every refusal a dispatch can owe before it costs
     /// anything, and the failures of the phases that follow it.
-    pub(in crate::assembly) fn stage_dispatch(
+    pub(in crate::worker) fn stage_dispatch(
         &mut self,
         mut at: Assignment,
         task: String,
@@ -164,7 +164,7 @@ impl RunWorker {
         let spent = self.clock.now()?.value().saturating_sub(began.value());
         self.note(
             runtime::diagnostics::Level::Trace,
-            "bin::assembly",
+            "accounting::worker",
             &format!("prepare_dispatch took {spent} ms for {}", at.addr.as_str()),
         );
         Ok((
@@ -197,12 +197,12 @@ impl RunWorker {
     /// # Errors
     /// Propagates the drive's own failure to open a checkpoint, and
     /// every failure of settling the desks, the requests and the ending.
-    pub(in crate::assembly) fn land(
+    pub(in crate::worker) fn land(
         &mut self,
         continuation: Continuation,
         flown: Flown,
         owing: Owing,
-        open_claims: &mut crate::assembly::booking::OpenClaims,
+        open_claims: &mut crate::worker::booking::OpenClaims,
     ) -> Result<Landed, AxError> {
         let Continuation {
             desks,

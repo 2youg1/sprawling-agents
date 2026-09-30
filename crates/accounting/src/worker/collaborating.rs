@@ -15,29 +15,29 @@ use super::RoomQueues;
 
 /// The collaboration the worker holds, one value because one family of
 /// records changes it and a desk reads it together.
-pub(in crate::assembly) struct Collaborating {
+pub(in crate::worker) struct Collaborating {
     /// What is waiting for each room, folded from the signal records,
     /// and which run is reading it. A dispatch lends its room's queue
     /// to the signal tool and takes it back when the drive ends, and
     /// `rooms` is what holds that to one queue per room.
-    pub(in crate::assembly) rooms: RoomQueues,
+    pub(in crate::worker) rooms: RoomQueues,
     /// What each room already got back from work it handed down. Kept
     /// beside the inboxes because it is folded from the same lines and
     /// belongs to the same room.
-    pub(in crate::assembly) joins: BTreeMap<Address, collab::FanIn>,
+    pub(in crate::worker) joins: BTreeMap<Address, collab::FanIn>,
     /// The graph each room laid out and has not seen join in full, with
     /// what it already handed down. Kept beside `joins` because a
     /// handback landing there is what hands the next ready nodes down.
     /// Held in memory only: after a restart a later run lays the graph
     /// out again and the join skips what already came back.
-    pub(in crate::assembly) workshops: BTreeMap<Address, collab::Underway>,
+    pub(in crate::worker) workshops: BTreeMap<Address, collab::Underway>,
     /// The requests waiting for someone to check them, folded from the
     /// pull request records.
-    pub(in crate::assembly) requests: Vec<collab::OpenRequest>,
+    pub(in crate::worker) requests: Vec<collab::OpenRequest>,
     /// The ground residents have claimed, folded from `goal_registered`
     /// in the order the claims were made — which is the order the
     /// conflict check reads them in.
-    pub(in crate::assembly) goals: Vec<kernel::GoalEntry>,
+    pub(in crate::worker) goals: Vec<kernel::GoalEntry>,
 }
 
 /// How one line changes the goal register: a `goal_registered` line
@@ -49,7 +49,7 @@ pub(in crate::assembly) struct Collaborating {
 /// Refuses a `goal_registered` payload that does not read as a
 /// [`kernel::GoalEntry`]: an entry skipped here is ground the next
 /// registration would find free.
-pub(in crate::assembly) fn register_goal(
+pub(in crate::worker) fn register_goal(
     goals: &mut Vec<kernel::GoalEntry>,
     kind: kernel::EventKind,
     data: &kernel::Payload,

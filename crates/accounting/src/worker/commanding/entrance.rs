@@ -22,18 +22,18 @@ use kernel::{AxError, IdemKey, Payload};
 
 /// The payload field a command's key travels in, so that a city which
 /// restarts can find in its own history what it has already carried out.
-pub(in crate::assembly) const IDEM_FIELD: &str = "idem";
+pub(in crate::worker) const IDEM_FIELD: &str = "idem";
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
-pub(in crate::assembly) struct Entrance {
+pub(in crate::worker) struct Entrance {
     /// Every key this city has answered, from its history and from this
     /// process. `BTreeSet` because it is on a decision path.
     seen: BTreeSet<IdemKey>,
     /// The refusals among them. A key that is `seen` and absent here
     /// was carried out, and the answer to its repeat is silence.
     #[serde(
-        serialize_with = "crate::assembly::folds::as_json_text",
-        deserialize_with = "crate::assembly::folds::from_json_text"
+        serialize_with = "crate::worker::folds::as_json_text",
+        deserialize_with = "crate::worker::folds::from_json_text"
     )]
     refused: BTreeMap<IdemKey, AxError>,
     /// The key of the command being carried out right now, which is
@@ -47,14 +47,14 @@ impl Entrance {
     /// What this city already answered to this key, if it answered at
     /// all. `Some(Ok)` means it was carried out; `Some(Err)` means it
     /// was refused, with the words it was refused in.
-    pub(in crate::assembly) fn answered(&self, key: &IdemKey) -> Option<Result<(), AxError>> {
+    pub(in crate::worker) fn answered(&self, key: &IdemKey) -> Option<Result<(), AxError>> {
         self.seen
             .contains(key)
             .then(|| self.refused.get(key).cloned().map_or(Ok(()), Err))
     }
 
     /// Takes the key of the command about to be carried out.
-    pub(in crate::assembly) fn begin(&mut self, key: IdemKey) {
+    pub(in crate::worker) fn begin(&mut self, key: IdemKey) {
         self.carrying = Some(key);
     }
 
@@ -63,7 +63,7 @@ impl Entrance {
     /// A refusal is remembered as well as a success, because a client
     /// that retries a refused frame is owed the refusal it earned and
     /// not a second one manufactured by the first attempt.
-    pub(in crate::assembly) fn settle(&mut self, outcome: &Result<(), AxError>) {
+    pub(in crate::worker) fn settle(&mut self, outcome: &Result<(), AxError>) {
         let Some(key) = self.carrying.take() else {
             return;
         };
@@ -75,7 +75,7 @@ impl Entrance {
 
     /// The key of the command being carried out, which every record
     /// that command writes carries, on whichever thread it is written.
-    pub(in crate::assembly) fn carrying(&self) -> Option<IdemKey> {
+    pub(in crate::worker) fn carrying(&self) -> Option<IdemKey> {
         self.carrying
     }
 
@@ -84,7 +84,7 @@ impl Entrance {
     /// Called from the one verified pass a worker already makes over the
     /// ledger when it opens, so recognising a repeat across a restart
     /// costs no second read of the history.
-    pub(in crate::assembly) fn absorb(&mut self, data: &Payload) {
+    pub(in crate::worker) fn absorb(&mut self, data: &Payload) {
         let Some(value) = data.as_map().get(IDEM_FIELD) else {
             return;
         };
@@ -107,10 +107,7 @@ impl Entrance {
 ///
 /// # Errors
 /// Propagates the payload's own refusal of a value it cannot carry.
-pub(in crate::assembly) fn stamped(
-    key: Option<IdemKey>,
-    data: Payload,
-) -> Result<Payload, AxError> {
+pub(in crate::worker) fn stamped(key: Option<IdemKey>, data: Payload) -> Result<Payload, AxError> {
     let Some(key) = key else {
         return Ok(data);
     };
@@ -127,6 +124,6 @@ pub(in crate::assembly) fn stamped(
 /// Written at the effect floor rather than at the refusal floor: nothing
 /// was refused, and a person reading the log needs to see that the city
 /// recognised the repeat rather than that something went wrong.
-pub(in crate::assembly) fn repeated(name: &str) -> String {
+pub(in crate::worker) fn repeated(name: &str) -> String {
     format!("{name} arrived again under a key this city has answered; the first answer stands")
 }

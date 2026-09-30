@@ -19,11 +19,12 @@ use std::sync::mpsc;
 
 use kernel::{AxCode, AxError, EventRecord, Payload, RunId};
 
-use super::{CommandDesk, RunWorker, Serving};
 use crate::serving::folding::{Broadcast, Copies, Folding, spawn_folding};
 use crate::serving::output_ring::OutputRing;
 use accounting::person::CorePriority;
 use accounting::views::{Published, Views};
+use accounting::worker::health::Health;
+use accounting::worker::{CommandDesk, RunWorker, Serving, Standing};
 
 /// What a worker is opened with: where the city is, whose keys it may
 /// redeem, what the vault turned out to be, where its diagnostics go,
@@ -42,7 +43,7 @@ pub(super) struct Opening {
     /// The opened ledger and what its history already says, folded on the
     /// serve thread under its writer lock in the same pass as the views,
     /// so the worker neither opens nor reads it again.
-    pub(super) held: (storage::JsonlLedger, storage::OpenReport, super::Standing),
+    pub(super) held: (storage::JsonlLedger, storage::OpenReport, Standing),
     /// The chain audit's own voice: the same sink and the same floor as
     /// `log`, held apart because the audit thread never touches the
     /// writer (sprawling-SPEC.md 8-90).
@@ -82,17 +83,11 @@ pub(super) struct Started {
     pub(super) thread: std::thread::JoinHandle<()>,
     pub(super) vault: Arc<std::sync::Mutex<gateway::Custodian>>,
     /// The accounting queue's counts, for the monitor (sprawling-SPEC.md 8-98).
-    pub(super) health: super::health::Health,
+    pub(super) health: Health,
 }
 
 pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started, AxError> {
-    type Opened = Result<
-        (
-            Arc<std::sync::Mutex<gateway::Custodian>>,
-            super::health::Health,
-        ),
-        AxError,
-    >;
+    type Opened = Result<(Arc<std::sync::Mutex<gateway::Custodian>>, Health), AxError>;
     let (ready_tx, ready_rx) = mpsc::sync_channel::<Opened>(0);
     let Opening {
         city_root: worker_root,
@@ -192,7 +187,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                 kept.settle(record);
                 folding(record);
             }));
-            super::attend::attend(&mut worker, &worker_desk);
+            accounting::worker::attend::attend(&mut worker, &worker_desk);
             // Dropping the worker drops the observer, which closes the
             // fold's channel; what is still in it is folded and
             // broadcast before the thread ends.

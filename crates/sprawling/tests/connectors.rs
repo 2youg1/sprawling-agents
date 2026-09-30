@@ -137,7 +137,7 @@ fn a_run_is_offered_the_tools_the_worker_was_handed() {
     let dir = tempfile::tempdir().unwrap();
     assembly::init_city(dir.path()).unwrap();
     let offered = Arc::new(Mutex::new(Vec::new()));
-    let mut worker = assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),
@@ -301,7 +301,7 @@ fn a_long_connector_answer_reaches_the_model_packaged() {
     let dir = tempfile::tempdir().unwrap();
     assembly::init_city(dir.path()).unwrap();
     let read = Arc::new(Mutex::new(Vec::new()));
-    let mut worker = assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),

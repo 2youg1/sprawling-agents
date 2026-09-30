@@ -47,7 +47,7 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
     let dir = tempfile::tempdir().unwrap();
     assembly::init_city(dir.path()).unwrap();
     let offered = Arc::new(Mutex::new(Vec::new()));
-    let mut worker = assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),

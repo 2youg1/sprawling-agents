@@ -20,14 +20,14 @@ use std::sync::Arc;
 
 use kernel::{AxCode, AxError};
 
-use super::acp_dispatch;
 use super::attending::{Opening, Outward, Started, spawn_worker};
-use super::opening_cost::{OpeningCost, Phase};
-use super::{Closing, CommandDesk, start_served_views};
 use crate::serving::Serving;
 use crate::serving::output_ring::OutputRing;
 use crate::serving::standing::monotonic_now;
 use accounting::views::{Published, answer_outside_the_lock};
+use accounting::worker::health::Health;
+use accounting::worker::opening_cost::{OpeningCost, Phase};
+use accounting::worker::{Closing, CommandDesk, acp_dispatch, start_served_views};
 
 /// One recording in, one line of text back.
 ///
@@ -190,7 +190,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     drop(started_from);
     // The in-process Command set, not the wire one: the enrolment
     // route delivers a sealed credential here, and no wire frame can.
-    let desk = Arc::new(CommandDesk::new());
+    let desk = Arc::new(CommandDesk::default());
     let commands_desk = Arc::clone(&desk);
     let secrets_desk = Arc::clone(&desk);
     let acp_desk = Arc::clone(&desk);
@@ -361,10 +361,7 @@ fn beside(
 ///
 /// # Errors
 /// `StorageFatal` when the sampler's thread cannot be started.
-fn watched(
-    city_root: &std::path::Path,
-    health: super::health::Health,
-) -> Result<wire::MonitorFeed, AxError> {
+fn watched(city_root: &std::path::Path, health: Health) -> Result<wire::MonitorFeed, AxError> {
     let monitor = Arc::new(std::sync::Mutex::new(crate::monitor::Monitor::new()));
     let samples = tokio::sync::broadcast::channel(1).0;
     crate::monitor::sampler::spawn_sampler(

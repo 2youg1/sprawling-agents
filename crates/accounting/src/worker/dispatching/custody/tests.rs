@@ -14,8 +14,8 @@
 
 use std::path::Path;
 
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// An anthropic-shaped key, put together at run time so that the tree
 /// itself holds no key shape for `xtask secret` to find.
@@ -48,7 +48,7 @@ fn files_holding(dir: &Path, needle: &[u8]) -> Vec<std::path::PathBuf> {
 fn a_pasted_key_reaches_the_vault_and_nothing_else() {
     let key = pasted();
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker

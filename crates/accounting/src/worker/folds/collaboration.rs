@@ -9,24 +9,24 @@
 use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
-use accounting::views::pursued;
+use crate::views::pursued;
 
 use super::super::PlanHolders;
 
 /// The three registers a run's collaboration tools read from.
-pub(in crate::assembly) struct Collaboration {
-    pub(in crate::assembly) inboxes: std::collections::BTreeMap<Address, collab::Inbox>,
+pub(in crate::worker) struct Collaboration {
+    pub(in crate::worker) inboxes: std::collections::BTreeMap<Address, collab::Inbox>,
     /// What each room's earlier runs got back from work they handed
     /// down, verified. Folded from the same handback signals the inboxes
     /// are folded from, because a join outlives one run: a child starts
     /// after its parent froze.
-    pub(in crate::assembly) joins: std::collections::BTreeMap<Address, collab::FanIn>,
-    pub(in crate::assembly) goals: Vec<kernel::GoalEntry>,
-    pub(in crate::assembly) requests: Vec<collab::OpenRequest>,
+    pub(in crate::worker) joins: std::collections::BTreeMap<Address, collab::FanIn>,
+    pub(in crate::worker) goals: Vec<kernel::GoalEntry>,
+    pub(in crate::worker) requests: Vec<collab::OpenRequest>,
     /// What each building was last told to work towards.
     pursuits: std::collections::BTreeMap<Address, (String, kernel::PursuitState)>,
     /// Which room holds each node of each building's plan.
-    pub(in crate::assembly) plan_holders: PlanHolders,
+    pub(in crate::worker) plan_holders: PlanHolders,
 }
 
 impl Collaboration {
@@ -35,7 +35,7 @@ impl Collaboration {
     /// The fold reads text and state out of the records; only a holder
     /// of a `Delegator` turns those back into something that can take
     /// work, which is why this takes one rather than doing it inline.
-    pub(in crate::assembly) fn pursuits(
+    pub(in crate::worker) fn pursuits(
         &self,
         at: &kernel::Delegator,
     ) -> std::collections::BTreeMap<Address, kernel::Pursuit> {
@@ -180,14 +180,14 @@ impl CollaborationFold {
     }
 }
 
-pub(in crate::assembly) fn new_inbox() -> collab::Inbox {
+pub(in crate::worker) fn new_inbox() -> collab::Inbox {
     collab::Inbox::new(INBOX_CAPACITY, SIGNAL_BANDWIDTH)
 }
 
 /// How many signals one room may hold, and how many one pull takes.
 /// Bandwidth belongs to the receiver: a sender cannot push more into a
 /// resident's context than the resident agreed to read at once.
-pub(in crate::assembly) const INBOX_CAPACITY: u64 = 256;
+pub(in crate::worker) const INBOX_CAPACITY: u64 = 256;
 
 pub(super) const SIGNAL_BANDWIDTH: u32 = 4;
 

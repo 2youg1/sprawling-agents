@@ -3,40 +3,35 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Main's assembly point — the dirtiest component and the only
-//! omniscient one: it knows every concrete type, and nothing knows it.
-//! Ledger handle, clock source, RNG seed and spawn points are injected
-//! from here and nowhere else; citysim is the second Main.
+//! The city's one writer: `RunWorker`, the state it holds, the commands
+//! it carries out and the runs it drives (accounting-SPEC.md 8-11).
 //!
-//! The clock is sampled in `production` only (determinism rule 2), and
-//! a worker receives it, with every other hand it reaches this machine
-//! through, as one `Hands` value when it is built.
+//! It reaches this machine only through the [`hands::Hands`] it is built
+//! with. The production value is made by the binary's assembly root
+//! (`bin::assembly::production::hands`), which also starts the thread the
+//! worker runs on; `fixture::hands` is the value its tests are built with.
 //!
 //! **This file holds the worker and the modules below hold its methods.**
 //! `RunWorker` is declared here, so its private fields are
-//! visible throughout `assembly` and nowhere else — a private item
+//! visible throughout `worker` and nowhere else — a private item
 //! reaches the module that declares it and that module's descendants, so
 //! the split cost no field its privacy. What stays here is what every
-//! submodule needs and no submodule owns: the worker itself, the one
-//! clock sample, the two hooks a live control surface installs, and the
-//! door a `Command` enters by. The lines it appends live in
-//! `recording`; opening and closing in `lifetime`; the test fixtures in
-//! `fixture`. The thread the worker runs on is started here too: the
-//! port is taken and the writer opened in `listening`, the writer's loop
-//! is `attending`, commands wait on the `desk`, and runs are driven on
+//! submodule needs and no submodule owns: the worker itself, the two
+//! hooks a live control surface installs, and the door a `Command`
+//! enters by. The lines it appends live in `recording`; opening and
+//! closing in `lifetime`; the test fixtures in `fixture`. The writer's
+//! loop is `attend`, commands wait on the `desk`, and runs are driven on
 //! the lanes of the `pool` and write back through the `relay`.
 //!
 //! The `use` block below is where the submodules see each other. A
-//! submodule imports from `super`, so what one part of the assembly
-//! point offers another is stated once, here, and reads as a list rather
-//! than as a graph; the one sibling reach is `credentials::dialect_headers`,
-//! which the dispatching modules read where the credentials module keeps it.
+//! submodule imports from `super`, so what one part of the worker offers
+//! another is stated once, here, and reads as a list rather than as a
+//! graph; the one sibling reach is `credentials::dialect_headers`, which
+//! the dispatching modules read where the credentials module keeps it.
 
-pub(crate) mod attend;
-mod attending;
+pub mod attend;
 mod booking;
-pub(crate) mod chain_halt;
-mod chain_watch;
+pub mod chain_halt;
 mod collaborating;
 mod commanding;
 mod credentials;
@@ -44,23 +39,20 @@ mod desk;
 mod dispatching;
 mod doorstep;
 mod driving;
-mod dropping;
-pub(crate) mod folds;
+pub mod folds;
 mod freezing;
-pub(crate) mod genesis;
-pub(crate) mod hands;
-pub(crate) mod health;
+pub mod genesis;
+pub mod hands;
+pub mod health;
 mod keeping_warm;
 mod lifetime;
-mod listening;
 mod mcp;
 mod models;
 mod naming;
-pub(crate) mod opening_cost;
+pub mod opening_cost;
 mod plans;
 mod pool;
 mod probing;
-mod production;
 mod recording;
 mod registering;
 mod relay;
@@ -75,10 +67,10 @@ use collaborating::Collaborating;
 use commanding::entrance::Entrance;
 use credentials::held::Credentials;
 use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
-pub(crate) use desk::CommandDesk;
 use desk::Posted;
+pub use desk::{CommandDesk, DeskWait};
 use dispatching::Dispatched;
-pub(crate) use dispatching::acp_dispatch;
+pub use dispatching::acp_dispatch;
 use dispatching::running::Continuation;
 use dispatching::{Agreed, Assignment, Given, Handover, Knock, run_id_for};
 use doorstep::Doorstep;
@@ -86,22 +78,20 @@ use driving::flight::{Flight, Landed};
 use driving::lane::{DriveContext, drive_run};
 use driving::owing::{KnockChain, Owed, Owing, Unasked};
 use driving::{Driven, Driving};
-pub(crate) use folds::Standing;
-pub(crate) use folds::start_served_views;
+pub use folds::Standing;
+pub use folds::start_served_views;
 use folds::{Governance, INBOX_CAPACITY, SessionOrigins, new_inbox};
 use genesis::city_segment;
 pub use genesis::{Adopt, InitReport};
 use hands::{Browsers, DesktopProgram, Hands};
-pub(crate) use lifetime::Closing;
+pub use lifetime::Closing;
 use lifetime::LedgerOpening;
-pub use listening::{Listening, listen};
 use mcp::mounts_under;
 use models::GatewayModels;
 use naming::{building_of, governed_of, not_built, scope_of};
 use plans::Reporter;
 use plans::held::{PlanHolders, Planning};
-pub(crate) use pool::Memory;
-pub use production::{SystemClock, form_city, hands, init_city};
+pub use pool::Memory;
 use recording::Stamping;
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
@@ -114,7 +104,7 @@ use kernel::{AxError, EventRecord, RunId, TimeMs};
 // What the test fixtures below reach through `super::*`, now that the
 // lines this worker appends live in `recording`.
 #[cfg(test)]
-use accounting::effect;
+use crate::effect;
 #[cfg(test)]
 use kernel::{Address, AxCode, EventDraft, EventKind, Payload};
 use runtime::Interrupt;
@@ -123,9 +113,9 @@ use storage::{Cas, JsonlLedger};
 /// What the startup scan found and repaired.
 pub struct ScanReport {
     /// What opening the ledger cut, told after the counts.
-    pub(crate) opening: LedgerOpening,
-    pub(crate) lines: usize,
-    pub(crate) closed_calls: usize,
+    pub opening: LedgerOpening,
+    pub lines: usize,
+    pub closed_calls: usize,
     /// The one count a caller branches on rather than prints: `resume`
     /// adds a line telling the person where to answer. `lines` and
     /// `closed_calls` reach nobody outside `summary`, so they stay in.
@@ -156,20 +146,20 @@ impl ScanReport {
 /// one command at a time has none, and that absence is the switch: its
 /// runs ask their provider for no stream at all, so replay and citysim
 /// take the byte-identical path they always took.
-pub(crate) struct Serving {
+pub struct Serving {
     /// Where a model's text goes while it is still arriving.
-    pub(crate) deltas: Arc<dyn Fn(wire::Delta) + Send + Sync>,
+    pub deltas: Arc<dyn Fn(wire::Delta) + Send + Sync>,
     /// Where a running command's output goes while it is still written.
-    pub(crate) outputs: Arc<dyn Fn(wire::LiveOutput) + Send + Sync>,
+    pub outputs: Arc<dyn Fn(wire::LiveOutput) + Send + Sync>,
     /// Where a fresh look at this machine goes: the one place the
     /// doctor's answer is replaced after the look taken at start-up.
-    pub(crate) machine: Arc<dyn Fn(wire::DoctorAnswer) + Send + Sync>,
+    pub machine: Arc<dyn Fn(wire::DoctorAnswer) + Send + Sync>,
     /// What a running dispatch asks at its safe points.
     ///
     /// One handle per drive rather than one hook lent out and taken
     /// back: N runs may be asking at once, and each asks about itself
     /// (sprawling-SPEC.md 8-46-1).
-    pub(crate) interrupts: Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>,
+    pub interrupts: Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>,
 }
 
 /// Runs the work a Command asks for. It owns the ledger, so the city has
@@ -227,8 +217,8 @@ pub struct RunWorker {
     /// (`doorstep`).
     doorstep: Doorstep,
     /// What each room's current session branched from, until the run
-    /// that begins it is written (`assembly::folds::session`).
-    pub(in crate::assembly) origins: SessionOrigins,
+    /// that begins it is written (`crate::worker::folds::session`).
+    pub(in crate::worker) origins: SessionOrigins,
     /// Every run in a lane right now, the crossing those lanes write
     /// history through, what the city owes each one when it comes home,
     /// the one checkpoint they take turns at, and the commands they left
@@ -238,27 +228,27 @@ pub struct RunWorker {
     /// Where each line of the history sits, folded once and refreshed
     /// with what was appended since, so a question about one line reads
     /// that line rather than the whole history (sprawling-SPEC.md 8-82).
-    pub(in crate::assembly) index: storage::LedgerIndex,
+    pub(in crate::worker) index: storage::LedgerIndex,
     /// The keep-warm doors of runs that have landed, one per room
     /// (`keeping_warm`); empty under the default setting.
     warm: keeping_warm::Kept,
     /// Builds the adapter each run talks to (`models`). Received rather
     /// than built, so a second factory can drive a dispatch this worker
     /// accounts for.
-    models: Box<dyn accounting::ModelFactory + Send>,
+    models: Box<dyn crate::ModelFactory + Send>,
     /// Connects the MCP servers a building's configuration names, and
     /// keeps them connected between runs (`mcp::Residents`). Received
     /// for the same reason `models` is. Shared, because the lane that
     /// prepares a dispatch connects its servers (sprawling-SPEC.md 8-113).
-    connectors: Arc<dyn accounting::Connectors + Send + Sync>,
+    connectors: Arc<dyn crate::Connectors + Send + Sync>,
     /// Looks at the machine this city runs on and installs onto it
     /// (`doctor::ThisMachine`). Received for the same reason `models`
     /// is.
-    machine: Box<dyn accounting::Machine + Send>,
+    machine: Box<dyn crate::Machine + Send>,
     /// What time it is, for this worker and every lane it drives
     /// (`SystemClock`). Shared, because a lane reads it while the
     /// worker does.
-    pub(crate) clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
+    pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
     /// Reads the city's volume at the door new work enters by
     /// (sprawling-SPEC.md 8-116).
     read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,
@@ -279,7 +269,7 @@ pub struct RunWorker {
     /// (`doctor::recipe_for`). Received rather than read, because the
     /// requirement table stays with the doctor (sprawling-SPEC.md,
     /// `doctor_install`).
-    recipe_for: fn(&str) -> Result<&'static accounting::Recipe, AxError>,
+    recipe_for: fn(&str) -> Result<&'static crate::Recipe, AxError>,
     /// Where the exec tool's interpreter, shell and engine come from
     /// (`bin::doctor::host`). Received rather than asked, because each
     /// reads this machine (accounting-SPEC.md 8-11).
@@ -300,7 +290,7 @@ impl RunWorker {
     /// Propagates a ledger that cannot be read and a city with no
     /// genesis line: a city with no genesis has no identity to sign
     /// with.
-    pub(crate) fn city_hash(&self) -> Result<kernel::B3Hash, AxError> {
+    pub fn city_hash(&self) -> Result<kernel::B3Hash, AxError> {
         if let Some(known) = self.city.get() {
             return Ok(*known);
         }
@@ -312,7 +302,7 @@ impl RunWorker {
     }
 
     /// Sends every appended record to `sink` once it is durable.
-    pub(crate) fn observe(&mut self, sink: Box<dyn FnMut(&EventRecord) + Send>) {
+    pub fn observe(&mut self, sink: Box<dyn FnMut(&EventRecord) + Send>) {
         self.ledger.observe(sink);
     }
 
@@ -326,7 +316,7 @@ impl RunWorker {
     ///
     /// The backlog takes the output sink here, so a worker nobody serves
     /// reads no command's output at all (runtime-SPEC 8-28-3).
-    pub(crate) fn serve(&mut self, serving: Serving) {
+    pub fn serve(&mut self, serving: Serving) {
         let outputs = Arc::clone(&serving.outputs);
         self.flight.backlog = self.flight.backlog.clone().with_sink(runtime::Sink::new(
             move |chunk: runtime::Chunk| {
@@ -355,7 +345,7 @@ impl RunWorker {
     clippy::let_underscore_untyped,
     reason = "test code"
 )]
-pub(super) mod fixture;
+pub mod fixture;
 
 /// What a person reads on a building's page after the commands that
 /// shape the building: the page is `views::building_page`, the commands

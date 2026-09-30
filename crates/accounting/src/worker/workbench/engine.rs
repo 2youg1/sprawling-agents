@@ -18,7 +18,7 @@ use std::path::PathBuf;
 
 use kernel::{AxError, SandboxLimits};
 
-use crate::assembly::hands::ExecHost;
+use crate::worker::hands::ExecHost;
 
 /// What the exec tool takes from this machine.
 pub(super) struct MachineHalf {

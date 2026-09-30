@@ -158,7 +158,7 @@ pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 **母亲自己是分支时，先重建她开场时继承的那段。** 流动循环里母亲的窗口以 `RunPlan::inherited` 开头，那段对话不在她自己的线上；她的 `run_forked`（`run` 是她、`from`／`at_seq` 指向祖母的切点）才是它的出处。所以 `inherited` 先找属主 run 的 `run_forked`，按其 `at_seq` 递归重建祖母的对话，经 `push_inherited` 放在最前，再折母亲自己的线——与 `Run::begin` 同一顺序。递归只往账本更早处走（`at_seq` 必须早于那条 `run_forked`，否则拒），所以一定终止。
 
 
-**`addr` 落在 `run_forked` 的那一行上**：新 run 的 id 说的是「谁继续谁」，而地址说的是**哪个房间的这次继承已经用掉了**——`assembly::folds::session` 只用这两个字段回答「这个房间的当前一段是否还欠一段对话」。
+**`addr` 落在 `run_forked` 的那一行上**：新 run 的 id 说的是「谁继续谁」，而地址说的是**哪个房间的这次继承已经用掉了**——`accounting::worker::folds::session` 只用这两个字段回答「这个房间的当前一段是否还欠一段对话」。
 
 ### 8-3 runtime::turn（形状 5 typestate 机）＋bench／conversation
 
@@ -234,9 +234,9 @@ impl Turn<Recording> {
 - **四取消点**：组装前／provider 调用前／工具执行前／派生前，四点全住本模块。第四点由 `Turn<Recording>::record` 收边界快照，故 `record` 与前三相同形——收 `Interrupt`、答 `PhaseOutcome`。它买到的是别处买不到的一件事：**一个回合把活派下去之后、子 Run 起来之前，仍停得住**；`calls_made == 0` 的收尾回合尤其如此，那一刻在第四点之前根本没有下一个边界。
 - **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。
 - **前缀冻结是运行时不变量，不只是测试。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名一条走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
-- **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `assembly::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
+- **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `accounting::worker::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
 - **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行段与并行段共用，所以事件的次序与载荷与串行执行一致；各行的时刻是量出来的，并行时本就不同（§8-15）。`tests/run_driver.rs` 与 `turn/tests/concurrent.rs` 在停住的时钟下对拍，逐字节相同。第一条非只读调用就是 checkpoint：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，Cancel 落在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条；各条的答案留到该条入账之前才交给 `consume_boundary`，所以 Steer 的 `steer_received` 落在串行波写它的同一位置。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
-- **`ConcurrentInvoke` 是三段，不是一个闭包。** 放行（`admit`，`&mut`，按调用序）、执行（`tool` 借出 `&dyn Tool`，`&self`，各条在 scope 线程上调它的 `invoke`）、记账（`account`，`&mut`，按调用序）。一个包着 bench 的闭包表达不了这个次序：放行与记账写同一张去重表与同一份 taint，而 bench 不是 `Sync`（checkpoint 持有 git 仓库句柄），工具是（`kernel::Tool: Send + Sync`，`invoke(&self)`；有内部状态的工具把状态放在自己的锁后）。三个闭包也不行：三者要借同一个 bench，一个要 `&`、两个要 `&mut`。所以它是 trait——第二实现在缝上已经存在：闭包的全覆盖实现（放行即作答，不报效果，于是 citysim 与脚本化工具的测试走串行、字节不动），与装配层 `bin::assembly::driving::placing` 的 bench 实现（sprawling-SPEC §8-31）。只读调用的门不读 taint，所以先放行后记账不改变任何一扇门的判定；`IdemKey` 的位置在放行时按调用序定下，exec 计数与 checkpoint 记录在记账时按调用序累加，所以它们与串行波逐字相同。落选的是「lane 把整个 bench 放进锁、闭包取 `Sync`」：锁把三条读排成一条队，并行只剩名字。生产路径由 `tests/run_driver.rs` 的三读测试守着：`drive` 走 `lifecycle` 到 `execute_concurrent`，三条读彼此重叠，次序与载荷与串行逐行相同。
+- **`ConcurrentInvoke` 是三段，不是一个闭包。** 放行（`admit`，`&mut`，按调用序）、执行（`tool` 借出 `&dyn Tool`，`&self`，各条在 scope 线程上调它的 `invoke`）、记账（`account`，`&mut`，按调用序）。一个包着 bench 的闭包表达不了这个次序：放行与记账写同一张去重表与同一份 taint，而 bench 不是 `Sync`（checkpoint 持有 git 仓库句柄），工具是（`kernel::Tool: Send + Sync`，`invoke(&self)`；有内部状态的工具把状态放在自己的锁后）。三个闭包也不行：三者要借同一个 bench，一个要 `&`、两个要 `&mut`。所以它是 trait——第二实现在缝上已经存在：闭包的全覆盖实现（放行即作答，不报效果，于是 citysim 与脚本化工具的测试走串行、字节不动），与装配层 `accounting::worker::driving::placing` 的 bench 实现（sprawling-SPEC §8-31）。只读调用的门不读 taint，所以先放行后记账不改变任何一扇门的判定；`IdemKey` 的位置在放行时按调用序定下，exec 计数与 checkpoint 记录在记账时按调用序累加，所以它们与串行波逐字相同。落选的是「lane 把整个 bench 放进锁、闭包取 `Sync`」：锁把三条读排成一条队，并行只剩名字。生产路径由 `tests/run_driver.rs` 的三读测试守着：`drive` 走 `lifecycle` 到 `execute_concurrent`，三条读彼此重叠，次序与载荷与串行逐行相同。
 
 - **生成中起跑只读调用（`runtime::turn::speculation`，形状 2 值：按位置的缓存 `Speculated`）。** `Generating::Speculating` 让 `call` 走 `Model::call_speculating`；模型每交出一条调用，只要它排在本回答第一条非只读调用之前、`effect_of` 答 `Effect::Read`、`ahead` 借得出工具，它就在一个 `std::thread::scope` 线程上起跑，scope 在模型调用返回前 join 全部线程，于是一回合的墙钟约等于 max(工具, 生成)，而不是两者之和。结果按调用在回答中的位置缓存进 `Turn<ToolWave>`，连同起跑时的那条调用；入账时仍按调用序先 `admit`，放行（`Cleared`）且该位置缓存的调用与结算后那条逐字段相等，才用缓存结果，否则照常执行——所以 `tool_called`／`tool_result` 的载荷与顺序与串行波相同，时刻按 §8-15 的时点采，推测结果本身不是事件。回答失败（流被切断、恢复段重发）时整份缓存随那次尝试丢弃；取消落在 k 处时 k 之后的缓存随 `Turn` 丢弃；`admit` 自己作答（重放、门拒绝）时该位置的缓存丢弃。哪些调用可以提前、缓存按什么序入账，权威是 `crates/runtime/spec/Turn/Speculation.lean`：越过第一条写调用推测会让读看到写之前的世界（`speculating_past_a_write_changes_the_ledger`）。**起跑不问 `still_going`**：一个已立的取消挡不住早读，它们的结果随 `Turn` 丢弃；代价是被停的 run 仍做完这些读，模型调用失败时也要等它们 join 才返回，而它们都无副作用，所以不越过任何门。**起跑先于放行**：放行写去重表与 taint，被截断的回答得把它们撤回，而只读调用的结果在放行前算出、放行后才用，被拒的那条结果从不到达模型与账本。落选的是「推测时就 `admit`」：它要为截断与取消各写一条撤销路径。`ahead` 有默认 `None`，闭包的全覆盖实现因此不提前起跑，citysim 字节不动；bench 的实现按名借出（`ToolBench::tool_named`，与 `tool_for` 同一张表）。
 
@@ -1480,7 +1480,7 @@ impl Backlog {
 - **只有委派下去的 run 入表**。根 run 由 `Cancel` 结束，那是另一个动词（glossary「Halt」行）；把根 run 也入表会让 `halt` 与 `Cancel` 变成同一件事。
 - **`harvest` 与短窗口都跳过 run 成员**：它们收的是进程的退出码，run 的结局在账本上。
 - **`status` 的那一半**：末行 `backlog:` 追加在冻结序末尾（追加规则同 `neighbours`），报 `standing(addr)` 里属于本 run 地址的成员——`bg-3 cargo build (command)` 逐条分号相连，没有则 `none`。**不报跑了多久**：本表不采样时钟（§8-28-1 第 1 条），一个为了报时长而采样的 status 会是第二个采样点。
-- **接线在 `bin::assembly::dispatching::running`**：`at.parent.is_some()` 时先 `enrol_run`，drive 结束后 `leave`；`Driving` 携 `member: Option<BacklogId>`，中断钩子在人的打断与 steer 之前先问 `stopping`。`halt` 在记账线程上被处理而子 run 在驾驶池上跑（sprawling-SPEC §8-42）；红测试用 `attach_interrupts` 在子 run 的安全点上调 `halt`。
+- **接线在 `accounting::worker::dispatching::running`**：`at.parent.is_some()` 时先 `enrol_run`，drive 结束后 `leave`；`Driving` 携 `member: Option<BacklogId>`，中断钩子在人的打断与 steer 之前先问 `stopping`。`halt` 在记账线程上被处理而子 run 在驾驶池上跑（sprawling-SPEC §8-42）；红测试用 `attach_interrupts` 在子 run 的安全点上调 `halt`。
 
 **红测试**：一轮委派下去的 run 起后，其 scope 被 `halt`，子 run 以 `cancelled` 冻结且没有再叫过模型；`status` 的第十四行报本 run 起的后台命令。
 
@@ -1608,7 +1608,7 @@ fn judged_at(hash: &B3Hash, origins: &[storage::BlockOrigin],
 - **`cas:` 块按存块时记下的楼判读取界，只在 `judged_at` 一处决定**，判本身仍是 `chosen_path::admit`（§8-30-1）那一个。来源是 `Cas::put_for` 在存块时写下的（storage-SPEC §8-3）：一个块为几栋楼存过就有几条来源，取读者能读的第一栋；一栋都读不了就取第一条来源，让 `admit` 按那栋楼的理由拒绝；没有来源的块（上架的技能包、从未存过的哈希）＝`E_GATE_DENIED`，恢复语让它改读块所出自的 `file:`。只按楼判、不按 run 判：读得了那栋楼的文件就读得了为那栋楼存下的字节，而 run 只记作出处。另一条路是按账本里哪一行写了这个哈希来判，落选：模型写的文字（例如委派的 `goal`）会落进带 `addr` 的行，那样的归属可以伪造。`file:<addr>@<oid>` 按 `<addr>` 判。
 - **`file:` 在该 oid 上做 git 读**（`storage::blob_at`，storage-SPEC §8-29），读的是那一次提交里的字节而不是工作区此刻的文件；地址在该提交里不是一个文件（目录、不存在）＝`E_INVALID_ARGS`。
 - **范围**：`cas:` 带的范围照 Locator 本身只交回那一段（`Cas::get_range`）；`file:` 带范围＝`E_INVALID_ARGS`，恢复语让它去掉范围改用 `offset`／`limit`——提交里的文件没有一份按范围读的实现，而 `offset`／`limit` 已答同一个问题。之后都按 `offset`／`limit` 切（§8-29-1）。字节不是 UTF-8＝`E_INVALID_ARGS`，read 只交文本。
-- **为 run 存块的调用方都走 `put_for`**：转录（`Transcript::materialise`，记房间）、卸载的原件（`offload::tee`，记命令所在的房间，来源随 `OffloadSite` 传入）、截图（`bin::browser_tool`，记这栋楼）、交接单 must-read 里的规范文档（`bin::assembly::freezing`，记 run 所在的房间）、run 的任务书（`bin::assembly::dispatching::running`，记房间；run id 由任务书的定位符派生，所以先 `put` 取得哈希，run 立起后再 `put_for` 补记来源）、子 run 的交回说明（`bin::assembly::dispatching::handback`，记子 run 与它的房间）。仍走 `put` 的有两类：上架的技能包不是为某个 run 存的，读不到它的 `cas:`，它按 catalog 名读；冻结前缀的各段（`intern_prefix`）只为让账本里的前缀可审计，一个段为同一栋楼的所有 run 共用，不作为定位符交给任何 run。
+- **为 run 存块的调用方都走 `put_for`**：转录（`Transcript::materialise`，记房间）、卸载的原件（`offload::tee`，记命令所在的房间，来源随 `OffloadSite` 传入）、截图（`bin::browser_tool`，记这栋楼）、交接单 must-read 里的规范文档（`accounting::worker::freezing`，记 run 所在的房间）、run 的任务书（`accounting::worker::dispatching::running`，记房间；run id 由任务书的定位符派生，所以先 `put` 取得哈希，run 立起后再 `put_for` 补记来源）、子 run 的交回说明（`accounting::worker::dispatching::handback`，记子 run 与它的房间）。仍走 `put` 的有两类：上架的技能包不是为某个 run 存的，读不到它的 `cas:`，它按 catalog 名读；冻结前缀的各段（`intern_prefix`）只为让账本里的前缀可审计，一个段为同一栋楼的所有 run 共用，不作为定位符交给任何 run。
 
 ### 8-30 runtime::tools::search（形状 1 判定＋形状 4 适配器）
 
@@ -1755,7 +1755,7 @@ impl Run<Frozen> { pub fn transcript(&self) -> Result<Transcript, AxError>; pub 
 
 **Handoff 住房间**：`city::handoff(city_root, room)`／`handoff_path(city_root, room)` 读写 `<city>/<room>/Handoff.md`；模板在 `city::open_room` 打开房间时铺下，楼级 `lay_out` 不铺它。理由是同楼并发：一栋楼一份 Handoff，两个房间同时冻结就是两份内容抢一个文件。
 
-**质量防线（不可选）**：`bin::assembly::probing::probe` 的 handoff 探针在每次 succession 真的跑。`handoff_probe()` 给出固定四问（版本 1）；装配层 `bin::assembly::probing` 在 `conclude` 读到接替请求时，用前任的 adapter 对前任的 transcript 问一遍（before），在继任者 `freeze_plan` 之后、第一回合之前，用继任者的 prefix 问一遍（after），`compare` 后记一条 `eval_run`（`probe`／`version`／`kept`／`lost`／两份答案）。探针答案不是判定，`lost` 报的是位置，人自己去读两份答案——这正是 sprawling-SPEC §8-39 交接探针一节定的口径。每次 succession 两次模型调用，这是这道防线的价钱，写在明处。
+**质量防线（不可选）**：`accounting::worker::probing::probe` 的 handoff 探针在每次 succession 真的跑。`handoff_probe()` 给出固定四问（版本 1）；装配层 `accounting::worker::probing` 在 `conclude` 读到接替请求时，用前任的 adapter 对前任的 transcript 问一遍（before），在继任者 `freeze_plan` 之后、第一回合之前，用继任者的 prefix 问一遍（after），`compare` 后记一条 `eval_run`（`probe`／`version`／`kept`／`lost`／两份答案）。探针答案不是判定，`lost` 报的是位置，人自己去读两份答案——这正是 sprawling-SPEC §8-39 交接探针一节定的口径。每次 succession 两次模型调用，这是这道防线的价钱，写在明处。
 
 ### 8-34 runtime::reminder（形状 1 判定）
 
@@ -1807,7 +1807,7 @@ impl ContextReminder { pub fn render(&self) -> String; }
 
 ### 8-35 去重答的是第一次的结果，而不是一句「你已经问过了」（形状 1 判定）
 
-**「同一次调用做两遍」的正确答案是第一次的结果**：回一个错误，重试的模型学到的是「这件事失败了」，而它其实成功了——那是幂等只做了一半：副作用被挡住，答案没有被记住。所以 `ToolBench` 记住的是键与答，两个调用方（`bin::assembly::driving::lane`、`citysim::executor`）把 `Duplicate` 回成第一次的 `ToolOutcome`。
+**「同一次调用做两遍」的正确答案是第一次的结果**：回一个错误，重试的模型学到的是「这件事失败了」，而它其实成功了——那是幂等只做了一半：副作用被挡住，答案没有被记住。所以 `ToolBench` 记住的是键与答，两个调用方（`accounting::worker::driving::lane`、`citysim::executor`）把 `Duplicate` 回成第一次的 `ToolOutcome`。
 
 ```rust
 seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>   // ToolBench 私有
@@ -1873,7 +1873,7 @@ fn scratch_dir(&self, id: BacklogId) -> PathBuf;             // temp/sprawling-<
 
 1. **`BacklogId` 与目录名回答的是两个问题。** id 在**一个** backlog 内部指认一个成员，下一个 backlog 的 id 又从 1 开始；而目录落在整台机器共用的临时目录里。只用 `<pid>-<id>` 起名，等于假定那个计数器是进程全局的——它不是。同一进程开两个 backlog，两者的第一条命令必然撞同一个路径。
 2. **撞上之后是无声的。** `File::create` 截断另一方正在写的文件，`collect` 读完即 `remove_dir_all`，删掉另一方还在写的目录。人看到的是一条**退出码为 0、输出为空**的命令——既不报错也不重试，因为从每一方各自的角度看都一切正常。
-3. **生产只开一个 backlog，唯一性照样不交给调用方。** `bin::assembly::lifetime` 全进程一个，而每个跑命令的测试各开一个、`cargo test` 又让它们同时跑。这不构成「只是测试问题」：把唯一性建立在「调用方只会开一个」之上，是把一条不变量交给调用方保管。`backlog::tests` 直接判目录名而不去赛跑两条命令——缺陷本身是确定的，只有损害是时序性的。
+3. **生产只开一个 backlog，唯一性照样不交给调用方。** `accounting::worker::lifetime` 全进程一个，而每个跑命令的测试各开一个、`cargo test` 又让它们同时跑。这不构成「只是测试问题」：把唯一性建立在「调用方只会开一个」之上，是把一条不变量交给调用方保管。`backlog::tests` 直接判目录名而不去赛跑两条命令——缺陷本身是确定的，只有损害是时序性的。
 
 ### 8-41 回合带进账本的明文，必经打码那道门
 

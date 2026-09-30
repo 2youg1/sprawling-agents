@@ -10,8 +10,8 @@
 #![allow(clippy::wildcard_enum_match_arm, reason = "test code")]
 
 use super::super::*;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// A building that was adopted rather than raised brings its own
 /// conventions with it, written for whoever works on that project, and
@@ -22,7 +22,7 @@ use crate::assembly::*;
 #[test]
 fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
@@ -71,7 +71,7 @@ fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
 #[test]
 fn the_workspaces_conventions_come_before_the_buildings_own() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
@@ -128,7 +128,7 @@ Every measurement is recorded in millivolts.
 #[test]
 fn a_building_without_the_file_gets_no_heading_for_it() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
@@ -160,7 +160,7 @@ fn a_building_without_the_file_gets_no_heading_for_it() {
 #[test]
 fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
@@ -225,7 +225,7 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
 #[test]
 fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
@@ -265,7 +265,7 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
         .expect("a dispatch assembles a prompt");
 
     let wire::Answer::Prefix(answer) =
-        accounting::views::ask(dir.path(), &wire::Query::Prefix { run }).unwrap()
+        crate::views::ask(dir.path(), &wire::Query::Prefix { run }).unwrap()
     else {
         panic!("Prefix answers with a prefix");
     };
@@ -311,7 +311,7 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
     let locator =
         kernel::Locator::parse(&format!("cas:b3-{}", building.hash)).expect("a stored segment");
     let wire::Answer::Content(content) =
-        accounting::views::ask(dir.path(), &wire::Query::Content { locator }).unwrap()
+        crate::views::ask(dir.path(), &wire::Query::Content { locator }).unwrap()
     else {
         panic!("Content answers with content");
     };
@@ -323,7 +323,7 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
 /// `(slot, hash)`.
 fn segments_of_a_review_dispatch() -> Vec<(String, String)> {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);

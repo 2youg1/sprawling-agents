@@ -7,7 +7,7 @@
 
 use kernel::AxError;
 
-use accounting::effect;
+use crate::effect;
 
 use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held};
 
@@ -28,7 +28,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates a payload that will not build, any line the ledger
     /// refuses, and a shared plan that cannot be read or written.
-    pub(in crate::assembly) fn settle_desks(
+    pub(in crate::worker) fn settle_desks(
         &mut self,
         site: &Site,
         at: &Assignment,

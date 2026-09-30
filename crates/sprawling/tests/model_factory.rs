@@ -98,9 +98,9 @@ fn city_on(
     base_url: String,
     template: &str,
     factory: Scripted,
-) -> (assembly::RunWorker, PathBuf) {
+) -> (accounting::worker::RunWorker, PathBuf) {
     let raised = assembly::init_city(dir).unwrap();
-    let mut worker = assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         dir,
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),
@@ -152,7 +152,7 @@ fn city_on(
 }
 
 fn dispatch(
-    worker: &mut assembly::RunWorker,
+    worker: &mut accounting::worker::RunWorker,
     session: Option<kernel::SessionName>,
 ) -> Result<(), AxError> {
     worker.handle(wire::Command::Dispatch {

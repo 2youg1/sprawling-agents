@@ -7,9 +7,9 @@
 //! inherits, the endpoint book a probe filled, and the scopes a person shut.
 
 use super::super::*;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
-use accounting::views::governance::BlockedJob;
+use crate::views::governance::BlockedJob;
+use crate::worker::fixture::*;
+use crate::worker::*;
 use kernel::Locator;
 
 /// What a working worker holds and what a restarted one rebuilds are
@@ -18,7 +18,7 @@ use kernel::Locator;
 #[test]
 fn what_a_worker_holds_is_what_a_restart_rebuilds() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("market").join("ito")).unwrap();
     std::fs::create_dir_all(dir.path().join("market").join("hana")).unwrap();
     lay_rules(dir.path(), "market", &ordinary_rules(""));
@@ -153,12 +153,12 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
 #[test]
 fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-small", "m-large"], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
 
@@ -199,7 +199,7 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
         .unwrap();
-    let wire::Answer::Endpoints(book) = accounting::views::Views::rebuild(&report.ledger_dir)
+    let wire::Answer::Endpoints(book) = crate::views::Views::rebuild(&report.ledger_dir)
         .unwrap()
         .prepare(&wire::Query::EndpointView)
         .finish()
@@ -224,7 +224,7 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
 #[test]
 fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
@@ -298,11 +298,11 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
 #[test]
 fn a_ledger_an_older_build_wrote_with_a_subscription_login_still_folds() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let line = |text: &str| kernel::Payload::new(serde_json::from_str(text).unwrap()).unwrap();

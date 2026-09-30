@@ -13,21 +13,21 @@ use kernel::{AxError, EventKind, Payload};
 
 /// The credentials the worker holds, one value because one family of
 /// records changes them and one question reads them.
-pub(in crate::assembly) struct Credentials {
+pub(in crate::worker) struct Credentials {
     /// Every endpoint the person attached and every model they chose,
     /// folded from the ledger. The worker keeps its own copy because a
     /// dispatch needs it synchronously, before the record it just wrote
     /// has reached any observer.
-    pub(in crate::assembly) book: gateway::EndpointBook,
+    pub(in crate::worker) book: gateway::EndpointBook,
     /// The vault. Shared because a redemption closure outlives the call
     /// that builds it; the lock is held for one resolve at a time.
-    pub(in crate::assembly) vault: Arc<Mutex<gateway::Custodian>>,
+    pub(in crate::worker) vault: Arc<Mutex<gateway::Custodian>>,
 }
 
 impl Credentials {
     /// The credentials a worker opens with: the book its history folded
     /// to, and the vault it was handed.
-    pub(in crate::assembly) fn opened(
+    pub(in crate::worker) fn opened(
         book: gateway::EndpointBook,
         vault: gateway::Custodian,
     ) -> Credentials {
@@ -42,7 +42,7 @@ impl Credentials {
     /// # Errors
     /// A credential record this build cannot read: the book would then
     /// state something the history does not.
-    pub(in crate::assembly) fn absorb(
+    pub(in crate::worker) fn absorb(
         &mut self,
         kind: EventKind,
         data: &Payload,

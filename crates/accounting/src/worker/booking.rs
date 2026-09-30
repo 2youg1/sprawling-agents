@@ -25,25 +25,25 @@ use std::sync::mpsc;
 use kernel::{Address, AxCode, AxError, EventDraft, Ledger, NodeId, RunId};
 
 use super::relay::Wake;
-use accounting::effect;
+use crate::effect;
 
 /// Who a run's claims are made for, and the clock their lines are
 /// stamped by. The five travel together from the run's dispatch to
 /// every claim it makes.
-pub(crate) struct Claimant {
+pub struct Claimant {
     /// The building whose plan the claimed nodes belong to.
-    pub(crate) building: Address,
+    pub building: Address,
     /// The room the run works in, which the claim's line is filed under.
-    pub(crate) room: Address,
-    pub(crate) run: RunId,
-    pub(crate) who: String,
+    pub room: Address,
+    pub run: RunId,
+    pub who: String,
     /// The worker's own clock (accounting-SPEC.md 8-3).
-    pub(crate) clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
+    pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
 }
 
 /// One claim, its `roadmap_claimed` line, the line that would hand the
 /// node back, and the address its answer goes back to.
-pub(crate) struct ClaimAsk {
+pub struct ClaimAsk {
     building: Address,
     node: NodeId,
     line: EventDraft,
@@ -61,7 +61,7 @@ struct Booked {
 /// Which run holds which node of which building's plan while those runs
 /// are in flight.
 #[derive(Default)]
-pub(crate) struct ClaimBook {
+pub struct ClaimBook {
     held: BTreeMap<(Address, NodeId), Booked>,
 }
 
@@ -70,7 +70,7 @@ pub(crate) struct ClaimBook {
 /// reaches the ledger; whatever it did not close is still owed to the
 /// history.
 #[must_use = "a claim written at call time stays open on the history until its put-back line is written"]
-pub(crate) struct OpenClaims {
+pub struct OpenClaims {
     run: RunId,
     put_backs: BTreeMap<NodeId, effect::Line>,
 }
@@ -78,12 +78,12 @@ pub(crate) struct OpenClaims {
 impl OpenClaims {
     /// A line that closes `node`'s claim is on the ledger, so the last
     /// line the history holds for it no longer reads it as held.
-    pub(crate) fn close(&mut self, node: &NodeId) {
+    pub fn close(&mut self, node: &NodeId) {
         self.put_backs.remove(node);
     }
 
     /// The run these claims belong to, and the lines still owed for them.
-    pub(crate) fn owed(self) -> (RunId, Vec<effect::Line>) {
+    pub fn owed(self) -> (RunId, Vec<effect::Line>) {
         (self.run, self.put_backs.into_values().collect())
     }
 }
@@ -96,7 +96,7 @@ impl ClaimBook {
     ///
     /// Hands back the line when the ledger took it, for the folds the
     /// accounting thread shows every line it writes.
-    pub(crate) fn answer(&mut self, ask: ClaimAsk, ledger: &mut impl Ledger) -> Option<EventDraft> {
+    pub fn answer(&mut self, ask: ClaimAsk, ledger: &mut impl Ledger) -> Option<EventDraft> {
         let ClaimAsk {
             building,
             node,
@@ -129,7 +129,7 @@ impl ClaimBook {
 
     /// Lets go of every node the run held, once it has come home, and
     /// hands over the lines that give them back.
-    pub(crate) fn release(&mut self, run: RunId) -> OpenClaims {
+    pub fn release(&mut self, run: RunId) -> OpenClaims {
         let (theirs, others): (BTreeMap<_, _>, BTreeMap<_, _>) = std::mem::take(&mut self.held)
             .into_iter()
             .partition(|(_, booked)| booked.run == run);
@@ -147,7 +147,7 @@ impl ClaimBook {
 /// The booking a run's plan desk asks through: a claim carried on the
 /// accounting thread's one queue and waited for, like a relay append.
 /// The claim's instant is taken when the model makes it.
-pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::Booking {
+pub fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::Booking {
     collab::Booking::new(move |claim: &collab::ClaimEffect| {
         let line = EventDraft {
             run: claimant.run,
@@ -224,7 +224,7 @@ mod tests {
             room: Address::parse("lab/room1").unwrap(),
             run: RunId::from_bytes([run; 16]),
             who: format!("potter@lab.{run}"),
-            clock: std::sync::Arc::new(crate::assembly::fixture::WallClock),
+            clock: std::sync::Arc::new(crate::worker::fixture::WallClock),
         }
     }
 
@@ -247,7 +247,7 @@ mod tests {
                     data: claim.payload("potter").unwrap(),
                     ig: false,
                 },
-                put_back: accounting::effect::handed_back(
+                put_back: crate::effect::handed_back(
                     &claim,
                     "came home",
                     &Address::parse("lab/room1").unwrap(),
@@ -296,7 +296,7 @@ mod tests {
     #[test]
     fn two_runs_claiming_one_node_through_the_served_gate_leave_one_holder() {
         use kernel::Tool;
-        let mut gate = crate::assembly::relay::RelayGate::open();
+        let mut gate = crate::worker::relay::RelayGate::open();
         let (first, second) = (plan_tool(gate.bell(), 1), plan_tool(gate.bell(), 2));
         let call = kernel::ToolCall {
             id: "tu_1".to_owned(),
@@ -316,7 +316,7 @@ mod tests {
         let (mut homes, mut ledger) = (std::collections::VecDeque::new(), Kept::default());
         while !lanes.is_finished() {
             gate.serve(
-                crate::assembly::relay::Patience::For(std::time::Duration::from_millis(5)),
+                crate::worker::relay::Patience::For(std::time::Duration::from_millis(5)),
                 &mut ledger,
                 &mut homes,
             );

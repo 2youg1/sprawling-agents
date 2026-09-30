@@ -12,8 +12,8 @@
     reason = "test code"
 )]
 
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// An anthropic-shaped key, put together at run time so that the tree
 /// itself holds no key shape for `xtask secret` to find.
@@ -27,7 +27,7 @@ fn written() -> String {
 fn a_written_key_reaches_the_vault_and_not_the_file() {
     let key = written();
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![
@@ -80,7 +80,7 @@ fn a_written_key_reaches_the_vault_and_not_the_file() {
 fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
     let key = written();
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab/room1")).unwrap();
     // Ignored, as a person keeps a key file: a key the checkpoint would
     // stage is refused there before any tool runs, which is a different

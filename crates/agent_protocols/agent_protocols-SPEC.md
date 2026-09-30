@@ -25,7 +25,7 @@
 
 ## 4 现状分析
 
-两个模块：`mcp`（出站：握手、工具表、三种传输、消息上限、broker）与 `acp`（入站：外部编辑器的请求文法）。生产消费者是 `crates/sprawling`：`assembly::mcp` 按楼的配置连 server 并把连接留给后来的派活（常驻连接），`assembly::workbench::servers` 把工具注册进 bench，`views::mcp_health` 用同一个 `McpLink` 探一台 server 的健康。
+两个模块：`mcp`（出站：握手、工具表、三种传输、消息上限、broker）与 `acp`（入站：外部编辑器的请求文法）。生产消费者是 `crates/sprawling`：`accounting::worker::mcp` 按楼的配置连 server 并把连接留给后来的派活（常驻连接），`accounting::worker::workbench::servers` 把工具注册进 bench，`views::mcp_health` 用同一个 `McpLink` 探一台 server 的健康。
 
 ## 5 权威信源
 
@@ -193,7 +193,7 @@ MCP 2025-06-18 把工具的答复定为 `CallToolResult`：`content` 是内容�
 
 ## 15 影响面
 
-改 `Outbound`、`McpLink` 或 `tools_from` 的签名，波及 `crates/sprawling` 的 `assembly::mcp`、`assembly::workbench::servers` 与 `views::mcp_health`；改 `Incoming`／`admit` 波及入站路由与 `wire::auth` 的配对比对。
+改 `Outbound`、`McpLink` 或 `tools_from` 的签名，波及 `crates/sprawling` 的 `accounting::worker::mcp`、`accounting::worker::workbench::servers` 与 `views::mcp_health`；改 `Incoming`／`admit` 波及入站路由与 `wire::auth` 的配对比对。
 
 ## 16 测试与约束
 
@@ -223,7 +223,7 @@ MCP 2025-06-18 把工具的答复定为 `CallToolResult`：`content` 是内容�
 
 一次连接的开销是每台 server 两次有应答的请求（`initialize`、`tools/list`）加一条通知（`notifications/initialized`），由 `mcp::handshake` 的 `opening_one_connection_costs_two_round_trips_and_one_notification` 用一个计数 `Outbound` 钉住。断言的是条数而不是时间：条数在每台机器上相同。本 crate 为这三条消息花的 CPU 远小于子进程启动与两次往返，而后两者属于传输。
 
-所以本 crate 不持连接表：`McpLink` 可 clone，寿命由持有者决定。持有者是装配层的 `assembly::mcp::Residents`，它把一台 server 的连接与工具表留给后来的派活，子进程退出（`McpLink::has_ended`）时才重开。派活在这一步花的时间记在 `tools/xtask/budgets.toml` 的 `[prepare_dispatch_ms]`。
+所以本 crate 不持连接表：`McpLink` 可 clone，寿命由持有者决定。持有者是装配层的 `accounting::worker::mcp::Residents`，它把一台 server 的连接与工具表留给后来的派活，子进程退出（`McpLink::has_ended`）时才重开。派活在这一步花的时间记在 `tools/xtask/budgets.toml` 的 `[prepare_dispatch_ms]`。
 
 ### 8-17 三种传输与 `McpLink`（形状 4 适配器；实现 `Outbound`）
 
@@ -248,7 +248,7 @@ pub fn gated(answer: &str, starts: &Path, gate: &Path) -> (String, Vec<String>);
 pub fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>); // 每次启动在 starts 里记一笔
 ```
 
-- **传输住协议旁边，不住组合根**：三种传输与握手说同一个协议，差别只在字节去哪。放在装配层时，`agent_protocols` 定义了 `Outbound` 缝却看不见它的生产实现；组合根只剩「一栋楼按配置连哪几台 server」（`bin::assembly::mcp`）。拒绝的另一方案是把传输留在 `sprawling`、只搬 `McpLink`：那样 `McpLink` 的三个分支仍指向另一个 crate 的私有类型，搬不动。
+- **传输住协议旁边，不住组合根**：三种传输与握手说同一个协议，差别只在字节去哪。放在装配层时，`agent_protocols` 定义了 `Outbound` 缝却看不见它的生产实现；组合根只剩「一栋楼按配置连哪几台 server」（`accounting::worker::mcp`）。拒绝的另一方案是把传输留在 `sprawling`、只搬 `McpLink`：那样 `McpLink` 的三个分支仍指向另一个 crate 的私有类型，搬不动。
 - **`site()` 由传输的拥有者给出**：报错地址是「哪个模块到达了这台 server」，只有拥有这三个模块的 crate 能不漂地说出它。
 - **HTTP 与 SSE 共用一个客户端构造**（`mcp::http::client_for`）：代理规则、user agent 与构造失败的拒词只写一处。两者唯一的差别是整请求时限，作为参数 `WholeRequest` 递进去：HTTP 取 `DefaultTimeout`（一次 post 与它的回答），SSE 取 `Unbounded`，因为 SSE 的 body 就是整段对话，reqwest 的整请求时限会把流掐断。被否：SSE 自留一份构造只为多一行 `timeout(None)`——两份构造一旦有一份改了代理规则，另一份就静默地走另一条出网路径。
 - **子进程回收逻辑原样搬移**：期限到即杀子进程，理由见 `mcp::stdio` 的模块文档。

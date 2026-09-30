@@ -70,7 +70,7 @@ pub(super) fn use_folder(folder: &std::path::Path) -> ExitCode {
         println!("{} is already a city; opening it", folder.display());
         return serve_city(folder, DEFAULT_AT, &[], opening(&[], Open::Browser));
     }
-    match assembly::form_city(folder, assembly::Adopt::EveryFolder) {
+    match assembly::form_city(folder, accounting::worker::Adopt::EveryFolder) {
         Ok(report) => {
             report_standing(&report);
             serve_city(folder, DEFAULT_AT, &[], opening(&[], Open::Browser))
@@ -82,7 +82,7 @@ pub(super) fn use_folder(folder: &std::path::Path) -> ExitCode {
 /// What forming a city found, and what it did about it. Printed rather
 /// than assumed, because the person is watching their own work being
 /// taken in.
-pub(super) fn report_standing(report: &assembly::InitReport) {
+pub(super) fn report_standing(report: &accounting::worker::InitReport) {
     println!(
         "city raised: ledger at {} (genesis seq {})",
         report.ledger_dir.display(),
@@ -135,9 +135,9 @@ pub(super) fn init(read: &Arguments) -> ExitCode {
         return ExitCode::from(2);
     };
     let adopt = if read.has("--adopt") {
-        assembly::Adopt::EveryFolder
+        accounting::worker::Adopt::EveryFolder
     } else {
-        assembly::Adopt::Nothing
+        accounting::worker::Adopt::Nothing
     };
     match assembly::form_city(std::path::Path::new(dir), adopt) {
         Ok(report) => {
@@ -376,7 +376,7 @@ pub(super) fn resume(dir: Option<&String>) -> ExitCode {
         return ExitCode::from(2);
     };
     let (vault, _notice) = serving::open_vault();
-    let outcome = assembly::RunWorker::new(
+    let outcome = accounting::worker::RunWorker::new(
         std::path::Path::new(dir),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(vault),

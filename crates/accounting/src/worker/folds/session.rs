@@ -40,7 +40,7 @@ use kernel::{Address, AxError, EventKind, Origin, RunId};
 /// What each room's current session branched from, and whether the run
 /// that begins it has been started yet.
 #[derive(Default, serde::Serialize, serde::Deserialize)]
-pub(in crate::assembly) struct SessionOrigins {
+pub(in crate::worker) struct SessionOrigins {
     pending: BTreeMap<Address, Origin>,
     /// The run each room started last.
     last_run: BTreeMap<Address, RunId>,
@@ -62,7 +62,7 @@ impl SessionOrigins {
     /// from would otherwise be read as one that branched from nothing,
     /// which is a different session. A line written before `from`
     /// existed reads as a session without a branch, which is what it was.
-    pub(in crate::assembly) fn absorb(
+    pub(in crate::worker) fn absorb(
         &mut self,
         kind: EventKind,
         run: RunId,
@@ -189,13 +189,13 @@ impl SessionOrigins {
     }
 
     /// What this room's session is still owed, if anything.
-    pub(in crate::assembly) fn get(&self, addr: &Address) -> Option<Origin> {
+    pub(in crate::worker) fn get(&self, addr: &Address) -> Option<Origin> {
         self.pending.get(addr).copied()
     }
 
     /// The run whose transcript this room's carried session has not yet
     /// named to a run of its own, if any.
-    pub(in crate::assembly) fn carried_from(&self, addr: &Address) -> Option<RunId> {
+    pub(in crate::worker) fn carried_from(&self, addr: &Address) -> Option<RunId> {
         self.carried.get(addr).copied()
     }
 
@@ -205,7 +205,7 @@ impl SessionOrigins {
     /// Called by the fold on `run_started` and directly by the freeze
     /// that begins a run, because the runtime writes that line and the
     /// worker is not shown it.
-    pub(in crate::assembly) fn started(&mut self, addr: &Address, run: RunId) {
+    pub(in crate::worker) fn started(&mut self, addr: &Address, run: RunId) {
         self.carried.remove(addr);
         self.last_run.insert(addr.clone(), run);
     }
@@ -216,7 +216,7 @@ impl SessionOrigins {
     /// Called by the fold on the lineage line and directly by the
     /// dispatch that writes one, because a worker is not shown its own
     /// appends by the fold that reads the history back.
-    pub(in crate::assembly) fn spent(&mut self, addr: &Address) {
+    pub(in crate::worker) fn spent(&mut self, addr: &Address) {
         self.pending.remove(addr);
     }
 }

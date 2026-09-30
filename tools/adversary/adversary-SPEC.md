@@ -81,7 +81,7 @@ Rust 侧的验收测试全部是**具体轨迹**：`crates/sprawling/tests/assem
 
 **诊断**：`IdemKey` 存在的理由是让**重试无害**。今天这条保证没有承兑人。`gate::dedup` 自身没有错，错在它没有被接到 `assembly` 的命令路径上。
 
-**已修（「重放的命令只做一次」）。** `bin::assembly::commanding::entrance` 持有那个 `seen` 集合，`RunWorker::serve_one`——wire、控制台与 ACP 三条路唯一的汇合点——在任何副作用之前向 `kernel::gate::dedup` 问一次，重复的键得到**第一次的答案**，且不再写第二次。钥匙随命令写进它所产生记录的 payload，开城时那一趟已有的账本折叠把它读回来，故重启之后同一把键仍然认得。
+**已修（「重放的命令只做一次」）。** `accounting::worker::commanding::entrance` 持有那个 `seen` 集合，`RunWorker::serve_one`——wire、控制台与 ACP 三条路唯一的汇合点——在任何副作用之前向 `kernel::gate::dedup` 问一次，重复的键得到**第一次的答案**，且不再写第二次。钥匙随命令写进它所产生记录的 payload，开城时那一趟已有的账本折叠把它读回来，故重启之后同一把键仍然认得。
 **仍未覆盖的一档**：`run_started` 由 `runtime::run::lifecycle` 直接写账本，装配点碰不到它，故一次跑到一半被进程死亡打断的派活，其钥匙不在账本上——那正是重试应当被允许的一档。`keyUsedTwice` 因此单独成一条检查，不并入任何组：一次红只该点出那一档。
 
 **这条承诺反过来约束模型的记账**：被拒的命令同样花掉了它那把钥匙，故 `minted` 必须在负向动作之后照样前进（`failureNextState`）。若不然，下一条命令带着城已经答过的钥匙，读回来的是**上一条命令**的那份拒绝——看上去像门读帧落后一条，实则是钥匙重了。只有查询不花钥匙，故 `look` 是唯一的例外。
@@ -97,7 +97,7 @@ owed: http://127.0.0.1:47199/v1
 saw:  http://127.0.0.1:47199/v1/
 ```
 
-**诊断**：`gateway::normalise_entered` 存在、有自己的 proptest、也有主机预设表，而全仓找不到一个生产调用者：`assembly::commanding::routing` 把帧里的 `base_url` 原样装进 `Entered`。于是算法是对的，城却从来没问过它。这正是“门外才看得见”的那一类缺陷：仓内测试测的是函数，而一个 agent 看的是城写下的那个 URL。
+**诊断**：`gateway::normalise_entered` 存在、有自己的 proptest、也有主机预设表，而全仓找不到一个生产调用者：`accounting::worker::commanding::routing` 把帧里的 `base_url` 原样装进 `Entered`。于是算法是对的，城却从来没问过它。这正是“门外才看得见”的那一类缺陷：仓内测试测的是函数，而一个 agent 看的是城写下的那个 URL。
 
 **已修。** `Entered::resolved` 是打字地址变成被调用地址的唯一一处，探测与挂载共用那一次归一化的结果。五种拼法现在落到同一个 `base_url`，实测 37 s（探测那条）与 17 s（挂载那条）。
 

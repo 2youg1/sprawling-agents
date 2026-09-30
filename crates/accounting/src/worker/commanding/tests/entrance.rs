@@ -7,7 +7,7 @@
 //!
 //! What these pin: the wire makes all 23 state-changing commands carry
 //! an `IdemKey` so that a retry is harmless, and this door is where the
-//! city reads it. `assembly::desk` collapses a repeat that is still
+//! city reads it. `crate::worker::desk` collapses a repeat that is still
 //! queued or still running; a repeat that arrives after the first one
 //! finished is answered with the answer the city kept for that key
 //! (`Doorstep.entrance`), not made a second effect.
@@ -23,9 +23,9 @@
     reason = "test code"
 )]
 
-use crate::assembly::Posted;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::Posted;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// Every room that has been opened under one building.
 fn rooms_under(city_root: &Path, building: &str) -> Vec<String> {
@@ -61,7 +61,7 @@ fn lines_of(ledger_dir: &Path, kind: &str) -> usize {
 #[test]
 fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
@@ -107,11 +107,11 @@ fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
 #[test]
 fn a_repeat_is_answered_with_what_the_first_ask_was_answered() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
 
@@ -176,7 +176,7 @@ fn a_repeat_is_answered_with_what_the_first_ask_was_answered() {
 #[test]
 fn a_key_already_in_the_history_is_recognised_after_a_restart() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let halt = || wire::Command::Halt {
         scope: wire::HaltScope::City,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"halt"),
@@ -185,7 +185,7 @@ fn a_key_already_in_the_history_is_recognised_after_a_restart() {
         let mut worker = RunWorker::new(
             dir.path(),
             runtime::diagnostics::Diagnostics::off(),
-            crate::assembly::fixture::hands(),
+            crate::worker::fixture::hands(),
         )
         .unwrap();
         worker.serve_one(Posted {
@@ -196,7 +196,7 @@ fn a_key_already_in_the_history_is_recognised_after_a_restart() {
     let mut restarted = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     restarted.serve_one(Posted {

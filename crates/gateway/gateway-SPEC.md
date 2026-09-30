@@ -324,7 +324,7 @@ pub fn selected_payload(ModelTag, &str, &ModelEntry, Option<CeilingSource>) -> R
 - **confidential 在选型点再守一次**：非回环 endpoint 对 confidential 楼恒拒（`E_GATE_DENIED`）。`gateway::endpoint` 的兜底拒同期改为**按本地性判定**（而非一律拒）：规则是「字节不出运行中的机器」，不是「不准用这个类型」；否则一个回环的 Anthropic 服务器会被误拒。
 - **路径归兼容格式**：人输入 base URL（provider 文档就是那么印的），`messages`／`chat/completions`／`models` 由兼容格式拼。这与 `EndpointConfig.base_url`「完整端点 URL、不拼路径」并不矛盾：适配器保持字面，拼路径的是上层登记面。
 - **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的 id 是对端自己说的；`false` ＝ 探测失败而人自己报了型号，城照登。载荷里缺 `probed` 键读作 `true`，于是没有这个键的 `endpoint_attached` 重放不变。
-- **`AuthSpec::for_dialect` 是凭证头的唯一产地**：`AuthSpec::for_dialect(dialect: DialectKind, reference: SecretRef, header: Option<String>) -> AuthSpec`，纯函数，住 `endpoint/auth.rs`。人显式填的头名恒胜（`Header`）；否则 Anthropic → `Header{name:"x-api-key"}`，OpenAI 及其余 → `Bearer`。**它不住 `endpoint/config.rs`**：「凭证头归兼容格式」是一个可以自己站着的概念；`AuthSpec` 类型本体留在 config.rs，因为搬它会让同一个名字在 crate 内多出一条 `pub(crate) use` 路径。登记面（`bin::assembly::credentials::endpoints::endpoint_of`）不自己在 Bearer 与具名头之间选，否则「Anthropic 用哪个头」在城里有两个权威，而漂开的总是没人看的那个。
+- **`AuthSpec::for_dialect` 是凭证头的唯一产地**：`AuthSpec::for_dialect(dialect: DialectKind, reference: SecretRef, header: Option<String>) -> AuthSpec`，纯函数，住 `endpoint/auth.rs`。人显式填的头名恒胜（`Header`）；否则 Anthropic → `Header{name:"x-api-key"}`，OpenAI 及其余 → `Bearer`。**它不住 `endpoint/config.rs`**：「凭证头归兼容格式」是一个可以自己站着的概念；`AuthSpec` 类型本体留在 config.rs，因为搬它会让同一个名字在 crate 内多出一条 `pub(crate) use` 路径。登记面（`accounting::worker::credentials::endpoints::endpoint_of`）不自己在 Bearer 与具名头之间选，否则「Anthropic 用哪个头」在城里有两个权威，而漂开的总是没人看的那个。
 
 ### 8-10 gateway::endpoint 探测面
 
@@ -340,7 +340,7 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 
 **「路径归兼容格式」也管凭证头**：Anthropic 的 API key 走 `x-api-key`（`Authorization: Bearer` 只发给短时联邦令牌），OpenAI 兼容格式走 `Bearer`；人显式填的头名恒优先。见 §8-9 `AuthSpec::for_dialect`。落选的是「让登记页必填头名」：那把一个兼容格式自己就知道的事推给了人，而人填错的代价是一个 401。
 
-**`adapter_for` 住 `endpoint/adapter.rs`**：装配线（每个 chosen 造一个 Endpoint，§8-3）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。调用期限是 `EndpointTuning::DEFAULTS.timeout_ms`（§8-16），`adapter_for` 读 `call_timeout_ms()`——一个默认值该住在它所默认的那个设置旁边。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（它住装配层的凭据簇 `crates/sprawling/src/assembly/credentials.rs`；兼容格式要的头按理是兼容格式的事，是否搬进本 crate 未定）。
+**`adapter_for` 住 `endpoint/adapter.rs`**：装配线（每个 chosen 造一个 Endpoint，§8-3）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。调用期限是 `EndpointTuning::DEFAULTS.timeout_ms`（§8-16），`adapter_for` 读 `call_timeout_ms()`——一个默认值该住在它所默认的那个设置旁边。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（它住装配层的凭据簇 `crates/accounting/src/worker/credentials.rs`；兼容格式要的头按理是兼容格式的事，是否搬进本 crate 未定）。
 
 ### 8-11 不设备用端点
 
@@ -676,7 +676,7 @@ pub struct Ranks;                                // of(&AttachedEndpoint, model)
 - **本仓的前缀不带这种病。** 前缀由 `runtime::prefix` 在 Run 开始时冻结一次，四块顺序为 city／building／resident／run，最稳定的在前；`build_prefix` 与 `system_blocks()` 都是对字节的纯函数，**无时钟、无随机、无 run id 进前三块**。
 - **任何新增前缀成分必须说明它为什么可以逐轮变化。** 不能说明的，就得挪到 run 块之后或根本不进前缀。
 - **两种失效要分开写，否则下一个读者会把闸关掉**：
-  - **设计上正确的失效**：改 effort 使缓存断点失效（官方排错文档：「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」）。前缀真的变了，人也真的改了配置。effort 本身并不住在 prefix 里，它是 `ChatRequest.effort` 独立字段（`bin::assembly::freezing` 冻进 `RunPlan.shape`）；工具卡片同理住 `ChatRequest.tools`。住在 prefix 里的是技能清单（resident 块的 catalog 渲染）。
+  - **设计上正确的失效**：改 effort 使缓存断点失效（官方排错文档：「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」）。前缀真的变了，人也真的改了配置。effort 本身并不住在 prefix 里，它是 `ChatRequest.effort` 独立字段（`accounting::worker::freezing` 冻进 `RunPlan.shape`）；工具卡片同理住 `ChatRequest.tools`。住在 prefix 里的是技能清单（resident 块的 catalog 渲染）。
   - **本条要防的意外失效**：没人决定过、也没人看得见的逐轮变化——时间戳、run id、随机序、每次请求重排的集合，以及照抄来的计费字段。
 
 ### 8-31 重试上限住 kernel

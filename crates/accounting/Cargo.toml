@@ -25,12 +25,24 @@ postcard = { workspace = true }
 toml = { workspace = true }
 # The vocabulary only: the port hands back a wire answer and never listens.
 wire = { workspace = true }
+# A secret the worker holds for a moment is wiped when it is dropped.
+zeroize = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true
 # Read-only, and tests only: the view tests that read a building's
-# repository set one up themselves.
+# repository set one up themselves, and a merge the city makes is judged
+# by opening the repository it landed in.
 git2 = { workspace = true }
+# The deterministic power-loss model, so a test above the ledger can lose
+# one named line and assert the city did not move. Kept to dev only.
+storage = { workspace = true, features = ["fault"] }
+# The Ledger port's own assertion suite, so the relay adapter is held to
+# the same assertions as the two adapters that own a medium.
+kernel = { workspace = true, features = ["conformance"] }
+# A child that answers every line with one fixed result, so the wiring
+# of a building's servers is driven through a real pipe.
+agent_protocols = { workspace = true, features = ["conformance"] }
 
 [lints]
 workspace = true

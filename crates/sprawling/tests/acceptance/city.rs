@@ -22,8 +22,8 @@ const MODEL: &str = "scripted";
 ///
 /// The one place in this binary that constructs a worker, so a change
 /// to the constructor changes this function and nothing else.
-pub(crate) fn open_worker(dir: &Path, factory: Scripted) -> assembly::RunWorker {
-    assembly::RunWorker::new(
+pub(crate) fn open_worker(dir: &Path, factory: Scripted) -> accounting::worker::RunWorker {
+    accounting::worker::RunWorker::new(
         dir,
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),
@@ -35,7 +35,10 @@ pub(crate) fn open_worker(dir: &Path, factory: Scripted) -> assembly::RunWorker 
 /// A founded city whose main model sits on an endpoint that refuses
 /// every connection, so only the factory can answer; with the directory
 /// its ledger is in.
-pub(crate) fn city_with_a_model(dir: &Path, factory: Scripted) -> (assembly::RunWorker, PathBuf) {
+pub(crate) fn city_with_a_model(
+    dir: &Path,
+    factory: Scripted,
+) -> (accounting::worker::RunWorker, PathBuf) {
     let founded = assembly::init_city(dir).unwrap();
     let mut worker = open_worker(dir, factory);
     let endpoint = wire::ProviderName::parse("dead").unwrap();
@@ -71,7 +74,7 @@ pub(crate) fn city_with_a_model(dir: &Path, factory: Scripted) -> (assembly::Run
 }
 
 /// Raises a building at `addr` from `template`.
-pub(crate) fn raise(worker: &mut assembly::RunWorker, addr: &str, template: &str) {
+pub(crate) fn raise(worker: &mut accounting::worker::RunWorker, addr: &str, template: &str) {
     worker
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse(addr).unwrap(),
@@ -100,7 +103,10 @@ pub(crate) fn move_in(dir: &Path, addr: &str) {
 }
 
 /// Sends one task to the room at `addr`.
-pub(crate) fn dispatch(worker: &mut assembly::RunWorker, addr: &str) -> Result<(), AxError> {
+pub(crate) fn dispatch(
+    worker: &mut accounting::worker::RunWorker,
+    addr: &str,
+) -> Result<(), AxError> {
     worker.handle(wire::Command::Dispatch {
         addr: Address::parse(addr).unwrap(),
         task: "Use every tool you were given once.".to_owned(),

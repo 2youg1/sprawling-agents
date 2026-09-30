@@ -16,14 +16,14 @@ use std::sync::Arc;
 use kernel::event::record::SecretCaptured;
 use kernel::{AxError, EventKind, Payload};
 
-use accounting::held_vault::{poisoned_vault, resolving};
+use crate::held_vault::{poisoned_vault, resolving};
 
 use super::super::RunWorker;
 
 /// How a credential reached the vault, as its `secret_captured` record
 /// states it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::assembly) enum Arrival {
+pub(in crate::worker) enum Arrival {
     /// A person enrolled it on the host, under a name they chose.
     Enrolment,
     /// It was pasted into a dispatch and taken into custody there
@@ -47,7 +47,7 @@ impl RunWorker {
     /// The vault key and the `ref` the record states are one value built
     /// once here: a route that announced a reference it spelled itself
     /// would answer with a place the vault may never have been told.
-    pub(in crate::assembly) fn put_secret(
+    pub(in crate::worker) fn put_secret(
         &mut self,
         reference: &kernel::SecretRef,
         value: kernel::Sealed<String>,
@@ -70,7 +70,7 @@ impl RunWorker {
 
     /// The redemption closure the adapters take: one resolve per call,
     /// nothing cached, the lock held only while the vault is read.
-    pub(in crate::assembly) fn resolver(&self) -> gateway::SecretResolver {
+    pub(in crate::worker) fn resolver(&self) -> gateway::SecretResolver {
         resolving(Arc::clone(&self.credentials.vault))
     }
 
@@ -81,7 +81,7 @@ impl RunWorker {
     /// must reach the same vault, so that "a credential is resolved at
     /// the last moment and exposed only while a header is written" stays
     /// one path rather than two.
-    pub(crate) fn vault_handle(&self) -> Arc<std::sync::Mutex<gateway::Custodian>> {
+    pub fn vault_handle(&self) -> Arc<std::sync::Mutex<gateway::Custodian>> {
         Arc::clone(&self.credentials.vault)
     }
 }

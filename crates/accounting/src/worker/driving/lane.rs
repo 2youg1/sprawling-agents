@@ -12,7 +12,7 @@
 //! drive needs from the city arrives in [`DriveContext`], which is five
 //! handles that clone, and the ledger arrives as a parameter — the
 //! accounting thread hands its own, and a lane hands a
-//! [`Relay`](crate::assembly::relay::Relay).
+//! [`Relay`](crate::worker::relay::Relay).
 
 use kernel::{AxError, Ledger};
 use kernel::{RunId, TimeMs};
@@ -30,22 +30,22 @@ use super::{Driven, Driving};
 /// and which one arrives is what separates the accounting thread from a
 /// lane.
 #[derive(Clone)]
-pub(crate) struct DriveContext {
+pub struct DriveContext {
     /// Where a model's text goes while it is still arriving.
-    pub(crate) watching: Option<std::sync::Arc<dyn Fn(wire::Delta) + Send + Sync>>,
+    pub watching: Option<std::sync::Arc<dyn Fn(wire::Delta) + Send + Sync>>,
     /// What the person asked of this run, read at its safe points. One
     /// handle per drive, all of them reading the same desk by run id:
     /// a steer and a cancel reach the run they name and no other
     /// (sprawling-SPEC.md 8-42-1).
-    pub(crate) person: Option<std::sync::Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>>,
+    pub person: Option<std::sync::Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>>,
     /// What is still running while the runs go on, so a halt on a scope
     /// reaches a run inside it.
-    pub(crate) backlog: runtime::Backlog,
+    pub backlog: runtime::Backlog,
     /// One checkpoint at a time per city.
     ///
     /// **A repository has one index, and a checkpoint stages and commits it.**
     /// Two nodes of one ready set drive at once by design
-    /// (`assembly::plans::pursuing`), so their checkpoints can overlap, and
+    /// (`crate::worker::plans::pursuing`), so their checkpoints can overlap, and
     /// libgit2's `.git/index.lock` refuses the second one: a run that lost
     /// that race ended as cancelled and its node was handed back as
     /// though its own done check had failed. The gate is the width of the
@@ -56,10 +56,10 @@ pub(crate) struct DriveContext {
     /// `storage::checkpoint::scan::write_index` still waits out a lock,
     /// and that is a different contender: another sprawling process on
     /// the same city, which no mutex here can see.
-    pub(crate) checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
+    pub checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// The worker's own clock, so a run's lines and the worker's are
     /// read from one time (accounting-SPEC.md 8-3).
-    pub(crate) clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
+    pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
 }
 
 /// Who may interrupt one drive, in rank order: the halt that reached
@@ -143,7 +143,7 @@ impl Interrupting {
             // desk records the consumption before it reports the refusal.
             // A safe point is not the place to stop a run over a message it
             // cannot act on, which is the answer the person's own entrance
-            // gives an empty steer (assembly::desk). What must not happen is
+            // gives an empty steer (crate::worker::desk). What must not happen is
             // the two arriving here as one case; they do not.
             Err(_) => Interrupt::None,
         }
@@ -188,7 +188,7 @@ fn poison(what: &str) -> AxError {
 /// # Errors
 /// Propagates a checkpoint that will not open, which is the one failure
 /// that happens before the run starts.
-pub(crate) fn drive_run<L: Ledger>(
+pub fn drive_run<L: Ledger>(
     driving: Driving,
     ledger: &mut L,
     context: DriveContext,

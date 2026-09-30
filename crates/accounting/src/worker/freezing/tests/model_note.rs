@@ -7,8 +7,8 @@
 //! prompt to that model, and to no other.
 
 use super::super::*;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 const NOTE: &str = "Quote the failing line of every test run in full.";
 
@@ -17,7 +17,7 @@ const NOTE: &str = "Quote the failing line of every test run in full.";
 /// system text of the first request the dispatch sent.
 fn system_prompt_with_a_note_for(noted: &str) -> String {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker

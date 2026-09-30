@@ -53,7 +53,7 @@ impl RunWorker {
     /// thing, and a failure here leaves a room whose next dispatch
     /// simply chooses a shape again rather than a session the client was
     /// told about and the history never saw.
-    pub(in crate::assembly) fn open_session(
+    pub(in crate::worker) fn open_session(
         &mut self,
         addr: &Address,
         carry: wire::Carry,

@@ -6,7 +6,7 @@
 //! Putting one recycle-bin row back by the way back it carries
 //! (sprawling-SPEC §8-107).
 
-use crate::assembly::RunWorker;
+use crate::worker::RunWorker;
 use kernel::{AxCode, AxError, EventKind, Locator, Payload, Restoration};
 
 impl RunWorker {
@@ -16,7 +16,7 @@ impl RunWorker {
     /// Refuses a way back this city cannot follow, and propagates the
     /// checkpoint that cannot find or write the bytes and the ledger
     /// that refuses the append.
-    pub(in crate::assembly) fn restore_discard(
+    pub(in crate::worker) fn restore_discard(
         &mut self,
         restoration: &Restoration,
     ) -> Result<(), AxError> {
@@ -65,7 +65,7 @@ impl RunWorker {
                 serde_json::to_value(restoration).map_err(|err| {
                     AxError::failure(AxCode::InvalidArgs, "encode a restoration", err.to_string())
                         .with_recovery(
-                            "report this against sprawling::assembly::commanding::restoring: \
+                            "report this against crate::worker::commanding::restoring: \
                              a restoration is text only",
                         )
                 })?,

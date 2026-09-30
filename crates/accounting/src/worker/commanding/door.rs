@@ -20,7 +20,7 @@
 use kernel::AxError;
 
 use super::super::RunWorker;
-use crate::assembly::Posted;
+use crate::worker::Posted;
 
 impl RunWorker {
     /// Carries out one command and waits for whatever it started.
@@ -54,7 +54,7 @@ impl RunWorker {
             // rather than at the caller, because every caller wants it.
             self.note(
                 runtime::diagnostics::Level::Refuse,
-                "bin::assembly",
+                "accounting::worker",
                 &format!("{name} refused: {err}; {}", err.recovery()),
             );
         }
@@ -68,12 +68,16 @@ impl RunWorker {
     /// the door that honours the `IdemKey` every state-changing Command
     /// carries, and it judges before any effect
     /// (`commanding::entrance`, sprawling-SPEC.md 8-41).
-    pub(in crate::assembly) fn serve_one(&mut self, posted: Posted) {
+    pub(in crate::worker) fn serve_one(&mut self, posted: Posted) {
         let Posted { command, reply } = posted;
         let key = command.idem().copied();
         if let Some(first) = key.and_then(|key| self.doorstep.entrance.answered(&key)) {
             let said = super::entrance::repeated(command.name());
-            self.note(runtime::diagnostics::Level::Effect, "bin::assembly", &said);
+            self.note(
+                runtime::diagnostics::Level::Effect,
+                "accounting::worker",
+                &said,
+            );
             if let Err(err) = first {
                 self.hand_back(&reply, err);
             }
@@ -100,12 +104,12 @@ impl RunWorker {
     /// only case that earns a second line is the one a reader would
     /// otherwise misread: somebody did ask, and the answer arrived at a
     /// socket that had already closed.
-    pub(in crate::assembly) fn hand_back(&mut self, reply: &wire::Reply, error: AxError) {
+    pub(in crate::worker) fn hand_back(&mut self, reply: &wire::Reply, error: AxError) {
         match reply.refuse(error) {
             wire::Delivered::ToThePeer | wire::Delivered::NobodyAsked => {}
             wire::Delivered::PeerGone => self.note(
                 runtime::diagnostics::Level::Refuse,
-                "bin::assembly",
+                "accounting::worker",
                 "the refusal above reached nobody: the peer that asked had closed its socket",
             ),
         }

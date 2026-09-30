@@ -8,13 +8,13 @@
 //! is no record at all.
 
 use super::addr;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// A worker over a fresh city whose one run, the mother, has landed in
 /// `lab/room2`, and the origin a branch of it would name.
 fn a_mother_ran(city_root: &std::path::Path) -> (RunWorker, kernel::Origin, impl Sized) {
-    crate::assembly::fixture::init_city(city_root).unwrap();
+    crate::worker::fixture::init_city(city_root).unwrap();
     let (base_url, provider) =
         fake_openai(&["m-local"], vec![completion("the meter says 42", None)]);
     let mut worker = worker_with_provider(city_root, &base_url, "m-local").unwrap();

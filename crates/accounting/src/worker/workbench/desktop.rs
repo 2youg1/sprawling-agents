@@ -18,11 +18,11 @@
 use kernel::{McpServer, McpTransport, ServerLabel};
 
 use super::Laying;
-use crate::assembly::Site;
+use crate::worker::Site;
 
 /// The label the city's own desktop server travels under, and so the
 /// prefix of the six tool names the model is offered.
-pub(in crate::assembly) const DESKTOP_LABEL: &str = "desktop";
+pub(in crate::worker) const DESKTOP_LABEL: &str = "desktop";
 
 /// The verb that serves the desktop on stdio.
 const DESKTOP_VERB: &str = "desktop";
@@ -38,7 +38,7 @@ impl Laying {
     /// statement. A program this process cannot name leaves the desktop
     /// out for this run, said in the diagnostics, and the dispatch goes
     /// on, the answer an external server that will not start gets.
-    pub(in crate::assembly) fn servers(&self, site: &Site) -> Vec<McpServer> {
+    pub(in crate::worker) fn servers(&self, site: &Site) -> Vec<McpServer> {
         let mut servers = site.config.mcp.clone();
         if !site.rules.desktop() {
             return servers;
@@ -49,7 +49,7 @@ impl Laying {
         {
             self.note(
                 runtime::diagnostics::Level::Decide,
-                "bin::assembly::workbench::desktop",
+                "crate::worker::workbench::desktop",
                 "this building names its own `desktop` server, so the one this binary \
                  carries is not started; remove that [[mcp]] row to use the built-in one",
             );
@@ -59,7 +59,7 @@ impl Laying {
             Ok(server) => servers.push(server),
             Err(err) => self.note(
                 runtime::diagnostics::Level::Refuse,
-                "bin::assembly::workbench::desktop",
+                "crate::worker::workbench::desktop",
                 &format!("the desktop is not offered: {err}; {}", err.recovery()),
             ),
         }

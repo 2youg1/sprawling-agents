@@ -14,8 +14,8 @@
     reason = "test code"
 )]
 
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 fn addr(raw: &str) -> Address {
     Address::parse(raw).unwrap()

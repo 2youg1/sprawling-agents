@@ -12,8 +12,8 @@ use kernel::{Address, RunId, Seq};
 use storage::{StoredSnapshot, WholeFold};
 
 use super::*;
-use crate::assembly::RunWorker;
-use accounting::views::snapshot::start::{FoldStart, cut, snapshot_dir, start};
+use crate::views::snapshot::start::{FoldStart, cut, snapshot_dir, start};
+use crate::worker::RunWorker;
 
 fn raise(worker: &mut RunWorker, names: std::ops::Range<u8>) {
     for n in names {
@@ -34,13 +34,11 @@ fn snapshots(city: &Path) -> PathBuf {
 /// A city with three buildings, a snapshot cut after them, then `more`
 /// buildings the snapshot has not seen.
 fn cut_then_raise(city: &Path, more: std::ops::Range<u8>) -> (PathBuf, RunWorker) {
-    let ledger = crate::assembly::fixture::init_city(city)
-        .unwrap()
-        .ledger_dir;
+    let ledger = crate::worker::fixture::init_city(city).unwrap().ledger_dir;
     let mut worker = RunWorker::new(
         city,
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     raise(&mut worker, 0..3);
@@ -112,7 +110,7 @@ fn views_a_snapshot_cannot_decode_are_folded_from_genesis() {
     let lines = storage::read_raw_lines_at(&ledger).unwrap();
     let seq = Seq::new(u64::try_from(lines.len()).unwrap() - 1);
     let snapshot = storage::ChainSnapshot::cut(
-        accounting::views::snapshot::views_fold_version(),
+        crate::views::snapshot::views_fold_version(),
         seq,
         lines.last().unwrap(),
         b"not the views".to_vec(),
@@ -173,9 +171,9 @@ fn a_snapshot_that_cannot_be_cut_is_reported_and_the_views_still_serve() {
 
     let served = start_served_views(
         &ledger,
-        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
+        crate::Clock::now(&crate::worker::fixture::WallClock).unwrap(),
         &mut log,
-        &mut crate::assembly::opening_cost::OpeningCost::begin(crate::assembly::fixture::monotonic),
+        &mut crate::worker::opening_cost::OpeningCost::begin(crate::worker::fixture::monotonic),
     )
     .map(|_| ());
 

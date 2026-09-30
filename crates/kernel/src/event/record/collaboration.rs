@@ -246,7 +246,7 @@ impl From<SignalKind> for String {
 mod tests {
     use super::*;
 
-    /// The bytes `bin::assembly::plans` wrote by hand: `step` always,
+    /// The bytes `accounting::worker::plans` wrote by hand: `step` always,
     /// `goal` only while a pursuit is still held.
     #[test]
     fn a_pursuit_step_writes_the_keys_the_hand_written_map_wrote() {

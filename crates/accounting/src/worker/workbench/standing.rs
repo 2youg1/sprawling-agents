@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxError, EventKind, RunId};
 
-use accounting::effect;
+use crate::effect;
 
 use super::super::{Agreed, Assignment, Given, RunWorker, Stamping, run_id_for};
 use super::Site;
@@ -20,7 +20,7 @@ use super::Site;
 /// The city hash arrives rather than being read here: one read of the
 /// genesis line serves a whole city, and `RunWorker::city_hash` is where
 /// that read happens (sprawling-SPEC.md 8-51).
-pub(in crate::assembly) fn provenance(
+pub(in crate::worker) fn provenance(
     city: kernel::B3Hash,
     addr: &Address,
     run_id: RunId,
@@ -71,7 +71,7 @@ impl Site {
     /// What this run signs its commits with: its id, the room it works
     /// in, the model it was given and the effort it was asked for.
     ///
-    pub(in crate::assembly) fn provenance(
+    pub(in crate::worker) fn provenance(
         &self,
         city: kernel::B3Hash,
         addr: &Address,
@@ -95,15 +95,15 @@ impl Site {
 /// What placing a room's tree reads from the city, as values rather
 /// than as the worker that holds them, so the placement runs on
 /// whichever thread prepares the run (sprawling-SPEC.md 8-113).
-pub(in crate::assembly) struct Placing<'a> {
-    pub(in crate::assembly) city_root: &'a Path,
-    pub(in crate::assembly) city: kernel::B3Hash,
+pub(in crate::worker) struct Placing<'a> {
+    pub(in crate::worker) city_root: &'a Path,
+    pub(in crate::worker) city: kernel::B3Hash,
     /// What time it is, for the base commit a first placement makes.
-    pub(in crate::assembly) clock: &'a (dyn accounting::Clock + Send + Sync),
+    pub(in crate::worker) clock: &'a (dyn crate::Clock + Send + Sync),
     /// The city's one checkpoint at a time: a first placement commits the
     /// city's index, which every checkpoint also stages and commits
     /// (sprawling-SPEC.md 8-46-13).
-    pub(in crate::assembly) checkpoint_gate: &'a std::sync::Mutex<()>,
+    pub(in crate::worker) checkpoint_gate: &'a std::sync::Mutex<()>,
 }
 
 impl Site {
@@ -123,7 +123,7 @@ impl Site {
     /// Propagates whatever the checkpoint or the worktree says about
     /// lending a tree out, and the ledger's refusal of the line that
     /// records it.
-    pub(in crate::assembly) fn place_tree<L: kernel::Ledger>(
+    pub(in crate::worker) fn place_tree<L: kernel::Ledger>(
         &mut self,
         addr: &Address,
         placing: &Placing<'_>,
@@ -180,7 +180,7 @@ impl Site {
     ///
     /// # Errors
     /// Propagates a room whose tree name will not parse.
-    pub(in crate::assembly) fn name_tree(&mut self, addr: &Address) -> Result<(), AxError> {
+    pub(in crate::worker) fn name_tree(&mut self, addr: &Address) -> Result<(), AxError> {
         if self.rules.review() {
             self.branch = Some(tree_of(addr)?.as_str().to_owned());
         }
@@ -211,7 +211,7 @@ impl RunWorker {
     /// Propagates configuration that will not load, a resident
     /// description that cannot be read, and whatever the checkpoint or
     /// the worktree says about lending a tree out.
-    pub(in crate::assembly) fn stand_up(
+    pub(in crate::worker) fn stand_up(
         &mut self,
         agreed: Agreed,
         at: &Assignment,

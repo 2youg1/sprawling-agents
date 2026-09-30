@@ -36,7 +36,7 @@ fn a_command_reaches_the_ledger_through_the_door_the_wire_uses() {
     // The vault is the in-session one: a test that reached the platform
     // credential service would be a test that writes to the machine
     // running it.
-    let mut worker = assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),

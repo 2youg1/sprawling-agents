@@ -12,7 +12,7 @@ use kernel::event::record::{GoverningDocument, RulesChanged};
 use kernel::{Address, AxCode, AxError, EventKind, Payload};
 use kernel::{Locator, RunId, TimeMs};
 
-use crate::assembly::CommandDesk;
+use crate::worker::CommandDesk;
 
 use super::super::RunWorker;
 use super::{Agreed, Assignment};
@@ -25,7 +25,7 @@ use super::{Agreed, Assignment};
 /// through hexadecimal had two failure points that both answered zero,
 /// so a digest this build could not print became run `00000…`
 /// (sprawling-SPEC.md 8-73).
-pub(in crate::assembly) fn run_id_for(job: &Locator, addr: &Address, now: TimeMs) -> RunId {
+pub(in crate::worker) fn run_id_for(job: &Locator, addr: &Address, now: TimeMs) -> RunId {
     let seed = format!("{job}|{}|{}", addr.as_str(), now.value());
     let digest = kernel::B3Hash::digest(seed.as_bytes());
     let mut bytes = [0u8; 16];
@@ -42,7 +42,7 @@ pub(in crate::assembly) fn run_id_for(job: &Locator, addr: &Address, now: TimeMs
 /// takes. The run identifier is minted when the worker takes the work,
 /// so what an editor is told now is the honest thing - accepted, and
 /// nothing finished yet.
-pub(crate) fn acp_dispatch(
+pub fn acp_dispatch(
     desk: &CommandDesk,
     body: &serde_json::Value,
     pairing: wire::Pairing,
@@ -152,7 +152,7 @@ impl RunWorker {
         // so a landed run can have its prefix renewed (sprawling-SPEC
         // 8-112); under the default setting the door only forwards.
         let clock = std::sync::Arc::clone(&self.clock);
-        let adapter = crate::assembly::keeping_warm::Door::new(
+        let adapter = crate::worker::keeping_warm::Door::new(
             adapter,
             city::keep_warm(&self.city_root, building.addr())?,
             Box::new(move || clock.now()),

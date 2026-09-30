@@ -6,8 +6,8 @@
 //! What a credential this city already keeps does when the form
 //! sends an empty box (sprawling-SPEC.md section 8-81).
 
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// An empty key box leaves the credential this city keeps where it is
 /// (sprawling-SPEC.md 8-81).
@@ -22,12 +22,12 @@ use crate::assembly::*;
 #[test]
 fn an_empty_key_keeps_the_credential_this_city_has_archived() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-key"], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     worker

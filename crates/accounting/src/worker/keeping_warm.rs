@@ -15,11 +15,11 @@ use std::collections::BTreeMap;
 /// The chosen adapter, wrapped so every request a run sends enters the
 /// keep-warm account (runtime-SPEC 8-4-2), timed on the worker's own
 /// clock (accounting-SPEC.md 8-3).
-pub(crate) type Door = runtime::prefix::warmth::Warmed<DoorClock>;
+pub type Door = runtime::prefix::warmth::Warmed<DoorClock>;
 
 /// What a door reads the time through: the worker's clock, carried into
 /// the lane the run is driven on.
-pub(crate) type DoorClock = Box<dyn FnMut() -> Result<TimeMs, AxError> + Send>;
+pub type DoorClock = Box<dyn FnMut() -> Result<TimeMs, AxError> + Send>;
 
 /// The doors that still owe a renewal, one per room.
 ///
@@ -27,7 +27,7 @@ pub(crate) type DoorClock = Box<dyn FnMut() -> Result<TimeMs, AxError> + Send>;
 /// sent the prefix the next run will use, so the earlier door would only
 /// pay to keep a cache nobody reads.
 #[derive(Default)]
-pub(in crate::assembly) struct Kept {
+pub(in crate::worker) struct Kept {
     doors: BTreeMap<Address, Door>,
 }
 
@@ -35,7 +35,7 @@ impl Kept {
     /// Keeps `door` for `room` when it owes a renewal, replacing that
     /// room's earlier door; a door that owes none is dropped here, which
     /// is why the default setting leaves this empty.
-    pub(in crate::assembly) fn keep(&mut self, room: Address, door: Door) {
+    pub(in crate::worker) fn keep(&mut self, room: Address, door: Door) {
         if door.next_due().is_some() {
             self.doors.insert(room, door);
         } else {
@@ -44,7 +44,7 @@ impl Kept {
     }
 
     /// The earliest instant any kept door is due.
-    pub(in crate::assembly) fn next_due(&self) -> Option<u64> {
+    pub(in crate::worker) fn next_due(&self) -> Option<u64> {
         self.doors.values().filter_map(Door::next_due).min()
     }
 
@@ -52,7 +52,7 @@ impl Kept {
     /// cost or why it was refused, by room; then lets go of the doors
     /// that owe nothing more and of the doors whose renewal failed: a
     /// provider that refused a renewal is not asked again every wake.
-    pub(in crate::assembly) fn renew_due(&mut self, now_ms: u64) -> Vec<(Address, CacheRenewed)> {
+    pub(in crate::worker) fn renew_due(&mut self, now_ms: u64) -> Vec<(Address, CacheRenewed)> {
         let mut renewals = Vec::new();
         self.doors.retain(|room, door| {
             let renewed = match door.next_due() {
@@ -88,7 +88,7 @@ fn answered(answer: ModelReturn) -> CacheRenewed {
 
 impl RunWorker {
     /// When the next kept door is due, if any is kept.
-    pub(crate) fn warm_due(&self) -> Option<u64> {
+    pub fn warm_due(&self) -> Option<u64> {
         self.warm.next_due()
     }
 
@@ -96,14 +96,14 @@ impl RunWorker {
     /// line per renewal under its room, answered or refused. Only a line
     /// the ledger would not take goes to the diagnostic log, and it does
     /// not stop the city, as a schedule that cannot be read does not.
-    pub(crate) fn renew_warm(&mut self, now: TimeMs) {
+    pub fn renew_warm(&mut self, now: TimeMs) {
         for (room, renewed) in self.warm.renew_due(now.value()) {
             let written = Payload::of(&renewed)
                 .and_then(|line| self.record_at(EventKind::CacheRenewed, room, line));
             if let Err(err) = written {
                 self.note(
                     runtime::diagnostics::Level::Effect,
-                    "bin::assembly::keeping_warm",
+                    "crate::worker::keeping_warm",
                     &format!("a keep-warm renewal was not recorded: {err}"),
                 );
             }

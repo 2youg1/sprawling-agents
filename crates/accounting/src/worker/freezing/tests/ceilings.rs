@@ -10,13 +10,13 @@
 //! frozen under is the effort its configuration layer states, which is
 //! the case below.
 
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 #[test]
 fn the_effort_a_config_layer_states_is_what_goes_out_on_the_wire() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let city_layer = city::config_path(dir.path(), &room, city::Layer::City).unwrap();
     std::fs::create_dir_all(city_layer.parent().unwrap()).unwrap();

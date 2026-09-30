@@ -34,7 +34,7 @@ impl RunWorker {
     /// A payload the ledger will not take, and a base URL whose
     /// credential reference cannot be parsed - neither of which a probe
     /// can report on, because neither got as far as a request.
-    pub(in crate::assembly) fn probe_endpoint(&mut self, entered: Entered) -> Result<(), AxError> {
+    pub(in crate::worker) fn probe_endpoint(&mut self, entered: Entered) -> Result<(), AxError> {
         let entered = entered.resolved()?;
         let endpoint = self.endpoint_of(entered)?;
         let found = Probing {
@@ -138,7 +138,7 @@ impl RunWorker {
     /// # Errors
     /// A probe that fails with nothing declared: the city would have no
     /// model id to call.
-    pub(in crate::assembly) fn attach_endpoint(
+    pub(in crate::worker) fn attach_endpoint(
         &mut self,
         entered: Entered,
         admit: &[String],
@@ -271,7 +271,7 @@ impl RunWorker {
     /// Refuses a city whose content store will not open. That refusal
     /// arrives while the adapter is being built rather than half way
     /// through a conversation.
-    pub(in crate::assembly) fn redemption(&self) -> Result<gateway::Redemption, AxError> {
+    pub(in crate::worker) fn redemption(&self) -> Result<gateway::Redemption, AxError> {
         let cas_dir = self.city_root.join(".sprawling").join("cas");
         let store = std::sync::Arc::new(std::sync::Mutex::new(
             storage::Cas::open(&cas_dir).map_err(|err| {
@@ -313,7 +313,7 @@ impl RunWorker {
     reason = "test code"
 )]
 mod tests {
-    use crate::assembly::fixture::{fake_openai, worker_with_provider};
+    use crate::worker::fixture::{fake_openai, worker_with_provider};
 
     /// The two rungs this layer owns: what the person sends now, and
     /// what the book already holds for the same model. The rungs above
@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn an_empty_ceiling_keeps_the_one_this_model_was_registered_with() {
         let dir = tempfile::tempdir().unwrap();
-        crate::assembly::fixture::init_city(dir.path()).unwrap();
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let (base_url, _provider) = fake_openai(&["m-1"], Vec::new());
         // Attaches and picks `m-1` at 32_768 / 4_096, which is the row
         // a person fills in on the settings page.
@@ -359,7 +359,7 @@ mod tests {
     #[test]
     fn a_chat_face_model_nobody_stated_a_ceiling_for_is_left_to_the_provider() {
         let dir = tempfile::tempdir().unwrap();
-        crate::assembly::fixture::init_city(dir.path()).unwrap();
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let (base_url, _provider) = fake_openai(&["m-1", "m-2"], Vec::new());
         let mut worker = worker_with_provider(dir.path(), &base_url, "m-1").unwrap();
         worker

@@ -70,7 +70,7 @@ pub(super) fn answering() -> Answering {
 /// Runs the console loop over a scripted script and returns what a
 /// person would have seen.
 pub(super) fn typed(script: &str, terminal: &Terminal) -> String {
-    let desk = crate::assembly::CommandDesk::new();
+    let desk = accounting::worker::CommandDesk::default();
     let mut out: Vec<u8> = Vec::new();
     drive(
         terminal,

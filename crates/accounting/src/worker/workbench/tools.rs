@@ -41,7 +41,7 @@ impl Laying {
     /// that cannot be scanned, any tool that refuses to be built, a
     /// duplicate registration on either list, and whatever the reading
     /// room reports.
-    pub(in crate::assembly) fn lay_out_workbench(
+    pub(in crate::worker) fn lay_out_workbench(
         &self,
         site: &Site,
         desks: &BenchDesks,

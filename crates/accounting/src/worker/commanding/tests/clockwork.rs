@@ -14,15 +14,15 @@
     reason = "test code"
 )]
 
-use crate::assembly::CommandDesk;
-use crate::assembly::desk::DeskWait;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::CommandDesk;
+use crate::worker::desk::DeskWait;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 #[test]
 fn a_scheduled_job_starts_by_itself_and_only_once_per_firing() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::write(
         city::schedule_path(dir.path()),
         "[[job]]\nname = \"sweep\"\naddr = \"lab/room1\"\n\
@@ -61,7 +61,7 @@ fn a_scheduled_job_starts_by_itself_and_only_once_per_firing() {
 }
 #[test]
 fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
-    let desk = CommandDesk::new();
+    let desk = CommandDesk::default();
     let asked = || wire::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),
         task: "read the plan".to_owned(),
@@ -108,7 +108,7 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
 /// the record.
 #[test]
 fn a_close_lands_between_commands_and_never_inside_one() {
-    let desk = CommandDesk::new();
+    let desk = CommandDesk::default();
     desk.post(
         wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
@@ -135,18 +135,18 @@ fn a_close_lands_between_commands_and_never_inside_one() {
 #[test]
 fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
-    let desk = CommandDesk::new();
+    let desk = CommandDesk::default();
     desk.close(Closing::Broken {
         cause: "the listener is gone".to_owned(),
     });
-    crate::assembly::attend::attend(&mut worker, &desk);
+    crate::worker::attend::attend(&mut worker, &desk);
 
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let last = verified
@@ -173,7 +173,7 @@ fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
 #[test]
 fn a_scheduled_job_that_cannot_start_does_not_take_the_others_with_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::write(
         city::schedule_path(dir.path()),
         "[[job]]\nname = \"nowhere\"\naddr = \"ghost/room1\"\n\

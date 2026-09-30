@@ -15,8 +15,8 @@
 use kernel::event::EventKind;
 use kernel::{AxCode, AxError};
 
-use crate::assembly::RunWorker;
-use crate::assembly::credentials::{Ceilings, Chosen, registered_as};
+use crate::worker::RunWorker;
+use crate::worker::credentials::{Ceilings, Chosen, registered_as};
 
 impl RunWorker {
     /// Points one tag at one model.
@@ -28,7 +28,7 @@ impl RunWorker {
     /// would be refused for a field it could not write (sprawling-SPEC.md
     /// 8-71). An empty box keeps what this same model was registered
     /// with, read back by `registered_as`.
-    pub(in crate::assembly) fn select_model(
+    pub(in crate::worker) fn select_model(
         &mut self,
         chosen: Chosen,
         ceilings: Ceilings,

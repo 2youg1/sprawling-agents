@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-use crate::assembly::fixture::*;
-use accounting::views::building_page::read_building;
+use crate::views::building_page::read_building;
+use crate::worker::fixture::*;
 
 /// The rules a person may read on the building page are the rules
 /// the city obeys, and the page reads them from a directory the
@@ -13,7 +13,7 @@ use accounting::views::building_page::read_building;
 #[test]
 fn a_building_page_still_shows_the_rules_that_govern_it() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     city::create_building(
         dir.path(),
         &Address::parse("lab").unwrap(),
@@ -21,7 +21,7 @@ fn a_building_page_still_shows_the_rules_that_govern_it() {
     )
     .unwrap();
     let lab = Address::parse("lab").unwrap();
-    let plan = accounting::plan_view::PlanView::default().of(dir.path(), &lab);
+    let plan = crate::plan_view::PlanView::default().of(dir.path(), &lab);
     let answer = read_building(dir.path(), &lab, plan).expect("a created building has a page");
     let rules = answer
         .docs
@@ -47,7 +47,7 @@ fn a_building_page_still_shows_the_rules_that_govern_it() {
 #[test]
 fn a_building_page_says_the_plan_cannot_be_read_rather_than_that_it_is_malformed() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let lab = Address::parse("lab").unwrap();
     city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
     // A directory where the plan belongs, so the read fails for a
@@ -56,7 +56,7 @@ fn a_building_page_says_the_plan_cannot_be_read_rather_than_that_it_is_malformed
     let _ = std::fs::remove_file(&plan);
     std::fs::create_dir_all(&plan).unwrap();
 
-    let plan = accounting::plan_view::PlanView::default().of(dir.path(), &lab);
+    let plan = crate::plan_view::PlanView::default().of(dir.path(), &lab);
     let answer = read_building(dir.path(), &lab, plan).expect("the building is still a building");
     assert!(
         answer
@@ -71,7 +71,7 @@ fn a_building_page_says_the_plan_cannot_be_read_rather_than_that_it_is_malformed
 #[test]
 fn a_city_where_the_building_is_gone_hears_nothing_and_says_so() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::write(
         city::watch_path(dir.path()),
         "[[source]]
@@ -102,11 +102,11 @@ addr = \"gone/room1\"
 #[test]
 fn a_building_can_be_told_what_its_runs_may_reach() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     worker
@@ -155,7 +155,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
     // resolved value, so saving twice does not copy the city's
     // settings down into the building.
     let lab = Address::parse("lab").unwrap();
-    let plan = accounting::plan_view::PlanView::default().of(dir.path(), &lab);
+    let plan = crate::plan_view::PlanView::default().of(dir.path(), &lab);
     let shown = read_building(dir.path(), &lab, plan).expect("the building page has an answer");
     assert_eq!(shown.mcp.len(), 1);
     assert!(shown.sandbox.is_some_and(|limits| limits.shell));
@@ -171,11 +171,11 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
 #[test]
 fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let lab = Address::parse("lab").unwrap();
@@ -223,7 +223,7 @@ fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
 #[test]
 fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let proposal = serde_json::json!({
         "op": "propose",
         "text": "# lab\n\nconfidential: false\nreview: true\n\n## Write domain\n\n- lab\n",
@@ -284,11 +284,11 @@ fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
 #[test]
 fn a_new_building_is_visible_in_the_city_view_with_a_denominator_of_zero() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     worker
@@ -299,7 +299,7 @@ fn a_new_building_is_visible_in_the_city_view_with_a_denominator_of_zero() {
         })
         .unwrap();
 
-    let views = accounting::views::Views::new(dir.path());
+    let views = crate::views::Views::new(dir.path());
     let wire::Answer::City(city) = views.prepare(&wire::Query::CityView).finish() else {
         panic!("CityView answers with a city");
     };

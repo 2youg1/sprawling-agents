@@ -7,7 +7,7 @@
 
 use kernel::{AxError, EventKind};
 
-use accounting::effect;
+use crate::effect;
 
 use super::{Assignment, RunWorker, Site, held};
 

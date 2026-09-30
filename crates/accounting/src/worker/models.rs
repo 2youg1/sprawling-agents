@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The production `accounting::ModelFactory`, and the one door that
+//! The production `crate::ModelFactory`, and the one door that
 //! swaps it for another (accounting-SPEC.md 8-1).
 
 use kernel::AxError;
@@ -13,9 +13,9 @@ use super::credentials::dialect_headers;
 
 /// Reaches a chosen model the way the endpoint book describes it: the
 /// dialect's own headers, then `gateway::adapter_for`.
-pub(crate) struct GatewayModels;
+pub struct GatewayModels;
 
-impl accounting::ModelFactory for GatewayModels {
+impl crate::ModelFactory for GatewayModels {
     fn build(
         &self,
         chosen: &gateway::Chosen<'_>,
@@ -41,7 +41,7 @@ impl RunWorker {
     /// model, renewing its credential and accounting for the run stay
     /// the worker's.
     #[must_use]
-    pub fn with_models(self, models: Box<dyn accounting::ModelFactory + Send>) -> RunWorker {
+    pub fn with_models(self, models: Box<dyn crate::ModelFactory + Send>) -> RunWorker {
         RunWorker { models, ..self }
     }
 }

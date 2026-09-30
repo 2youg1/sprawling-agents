@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::super::*;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// The merge is the last change in the city that still outran the
 /// line announcing it. `trees.merge` moved the trunk and only then
@@ -14,7 +14,7 @@ use crate::assembly::*;
 #[test]
 fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
     std::fs::create_dir_all(building.join("room2")).unwrap();
@@ -99,13 +99,13 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
     let opened = storage::JsonlLedger::open_faulty(
         fs,
         &kernel::layout::CityLayout::new(dir.path()).ledger(),
-        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
+        crate::Clock::now(&crate::worker::fixture::WallClock).unwrap(),
     )
     .unwrap();
     let mut checker = RunWorker::over(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
         opened,
     )
     .unwrap();

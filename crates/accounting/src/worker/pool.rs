@@ -30,9 +30,9 @@ use super::relay::{Relay, Wake};
 /// in bytes; both zero where the platform does not say. The reading is
 /// `bin::monitor::memory`'s; the pool admits by it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Memory {
-    pub(crate) physical: u64,
-    pub(crate) available: u64,
+pub struct Memory {
+    pub physical: u64,
+    pub available: u64,
 }
 
 /// How many runs a city drives at once, whichever entrance started
@@ -40,12 +40,12 @@ pub(crate) struct Memory {
 ///
 /// It equals `gateway::admission`'s per-provider ceiling on purpose,
 /// and it is deliberately *not* read from there: that ceiling is
-/// `pub(crate)` inside `gateway`, and publishing it is a change to that
+/// `pub` inside `gateway`, and publishing it is a change to that
 /// crate's public surface with a baseline of its own to recompute
 /// (sprawling-SPEC.md 8-46-3, 8-46-8). Until that card lands, a wider
 /// pool would only park lanes in admission — which moves the queue from
 /// somewhere that can count to somewhere that cannot.
-pub(crate) const DRIVING_LANES: u32 = 4;
+pub const DRIVING_LANES: u32 = 4;
 
 /// The share of physical memory a new run leaves free: one part in
 /// this many. A share rather than a byte count, because a byte count
@@ -56,9 +56,9 @@ const RESERVE_SHARE: u64 = 10;
 /// left behind. The two travel together because neither is anything
 /// without the other — a `Driven` names no run, and a run id says
 /// nothing about what to settle.
-pub(crate) struct Arrival {
-    pub(crate) run: RunId,
-    pub(in crate::assembly) flown: Flown,
+pub struct Arrival {
+    pub run: RunId,
+    pub(in crate::worker) flown: Flown,
 }
 
 /// The lanes a city drives in.
@@ -66,7 +66,7 @@ pub(crate) struct Arrival {
 /// Nothing here decides anything: which runs to start and what to do
 /// with one that came home are the caller's, and both of those are
 /// judgements about a plan rather than about a thread.
-pub(crate) struct DrivingPool {
+pub struct DrivingPool {
     lanes: u32,
     /// Handed to each lane: a run comes home on the accounting
     /// thread's one queue, beside the relay requests it wrote.
@@ -95,11 +95,7 @@ struct Waiting {
 }
 
 impl DrivingPool {
-    pub(crate) fn open(
-        lanes: u32,
-        home: mpsc::Sender<Wake>,
-        read_memory: fn() -> Memory,
-    ) -> DrivingPool {
+    pub fn open(lanes: u32, home: mpsc::Sender<Wake>, read_memory: fn() -> Memory) -> DrivingPool {
         DrivingPool {
             lanes: lanes.max(1),
             home,
@@ -119,13 +115,13 @@ impl DrivingPool {
     /// [`Self::start_waiting`] runs whenever a lane comes home: so this
     /// reads zero only when nothing waits either. A change that lets a
     /// drive wait for another reason counts the waiting drives here.
-    pub(crate) fn in_flight(&self) -> u32 {
+    pub fn in_flight(&self) -> u32 {
         u32::try_from(self.running.len()).unwrap_or(u32::MAX)
     }
 
     /// Whether a new run waits: every lane is taken, or memory is
     /// tight while another run is driving (sprawling-SPEC.md 8-46-3).
-    pub(crate) fn full(&self) -> bool {
+    pub fn full(&self) -> bool {
         !admits(self.in_flight(), self.lanes, (self.read_memory)())
     }
 
@@ -140,7 +136,7 @@ impl DrivingPool {
     /// Refuses when the operating system will not start a thread, and
     /// when this run is already driving or waiting — two runs under one
     /// id would make the pool's own table lie about what is in flight.
-    pub(crate) fn start(
+    pub fn start(
         &mut self,
         staged: Staged,
         ledger: Relay,
@@ -177,7 +173,7 @@ impl DrivingPool {
     /// out queues behind work that was already waiting.
     ///
     /// Returns each run whose lane would not start, with the refusal.
-    pub(crate) fn start_waiting(&mut self) -> Vec<(RunId, AxError)> {
+    pub fn start_waiting(&mut self) -> Vec<(RunId, AxError)> {
         let mut refused = Vec::new();
         // Memory is read at each start, because every lane started here
         // is a run the next reading has to make room for.
@@ -237,7 +233,7 @@ impl DrivingPool {
     /// Refuses when a lane ended without saying so, which under
     /// `panic = "abort"` cannot happen in a shipped binary and can in a
     /// test build that unwinds.
-    pub(crate) fn landed(&mut self, arrival: Arrival) -> Result<Arrival, AxError> {
+    pub fn landed(&mut self, arrival: Arrival) -> Result<Arrival, AxError> {
         let Some(lane) = self.running.remove(&arrival.run) else {
             return Ok(arrival);
         };

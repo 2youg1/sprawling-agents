@@ -2590,9 +2590,7 @@ dependencies = [
  "flate2",
  "futures-util",
  "getrandom 0.4.3",
- "git2",
  "memory-stats",
- "postcard",
  "reqwest",
  "serde",
  "serde_json",
@@ -2612,8 +2610,6 @@ dependencies = [
  "thread-priority",
  "tokio",
  "tokio-tungstenite",
- "toml",
- "zeroize",
 ]
 
 [[package]]
@@ -2634,6 +2630,7 @@ dependencies = [
  "sprawling-wire",
  "tempfile",
  "toml",
+ "zeroize",
 ]
 
 [[package]]

@@ -153,7 +153,7 @@ pub(super) struct Knock {
 /// What one dispatch left behind. Carried rather than re-derived,
 /// because the run that asked for the work has to be told how it ended
 /// and the ledger is not a thing this layer reads back mid-command.
-pub(crate) struct Dispatched {
+pub struct Dispatched {
     pub(super) run: RunId,
     pub(super) addr: Address,
     pub(super) who: String,
@@ -167,7 +167,7 @@ pub(super) mod preparing;
 pub(super) mod running;
 pub(super) mod session;
 pub(super) mod session_shape;
-pub(crate) use agreeing::acp_dispatch;
+pub use agreeing::acp_dispatch;
 pub(super) use agreeing::run_id_for;
 #[cfg(test)]
 mod tests;

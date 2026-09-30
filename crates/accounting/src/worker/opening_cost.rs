@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 
 /// One phase of opening a served city, in the order `listen` does them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Phase {
+pub enum Phase {
     /// The port taken.
     Bind,
     /// The writer lock taken, the format probed, the tail recovered.
@@ -37,7 +37,7 @@ pub(crate) enum Phase {
 
 /// The phases of one opening as they are lapped, and how much of the
 /// verifying pass the folds took.
-pub(crate) struct OpeningCost {
+pub struct OpeningCost {
     clock: fn() -> Instant,
     began: Instant,
     last: Instant,
@@ -47,7 +47,7 @@ pub(crate) struct OpeningCost {
 
 impl OpeningCost {
     /// Starts timing now, on `clock`.
-    pub(crate) fn begin(clock: fn() -> Instant) -> OpeningCost {
+    pub fn begin(clock: fn() -> Instant) -> OpeningCost {
         let began = clock();
         OpeningCost {
             clock,
@@ -60,7 +60,7 @@ impl OpeningCost {
 
     /// Records `phase` as the span from the previous lap, or from the
     /// beginning, to now.
-    pub(crate) fn lap(&mut self, phase: Phase) {
+    pub fn lap(&mut self, phase: Phase) {
         let now = (self.clock)();
         self.laps
             .push((phase, now.saturating_duration_since(self.last)));
@@ -69,7 +69,7 @@ impl OpeningCost {
 
     /// Runs `work` and counts how long it took as folding, the part of
     /// the verifying pass the line names separately.
-    pub(crate) fn folding<R>(&mut self, work: impl FnOnce() -> R) -> R {
+    pub fn folding<R>(&mut self, work: impl FnOnce() -> R) -> R {
         let from = (self.clock)();
         let done = work();
         self.folded = self
@@ -80,7 +80,7 @@ impl OpeningCost {
 
     /// The one rendering: the whole opening, then each phase in the order
     /// it was lapped.
-    pub(crate) fn line(&self) -> String {
+    pub fn line(&self) -> String {
         let phases: Vec<String> = self
             .laps
             .iter()
@@ -113,7 +113,7 @@ impl OpeningCost {
 /// A span in milliseconds with three decimals, converted from whole
 /// microseconds rather than through a float. A span past `u64::MAX`
 /// microseconds, half a million years, is written as that maximum.
-pub(crate) fn millis(span: Duration) -> String {
+pub fn millis(span: Duration) -> String {
     let micros = u64::try_from(span.as_micros()).unwrap_or(u64::MAX);
     format!(
         "{}.{:03}",

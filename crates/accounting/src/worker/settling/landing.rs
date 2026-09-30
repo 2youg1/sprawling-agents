@@ -7,7 +7,7 @@
 
 use kernel::{AxError, Completion, RunId};
 
-use accounting::effect;
+use crate::effect;
 
 use super::super::{Assignment, Dispatched, Ending, Handover, Landed, RunWorker, Site, held};
 
@@ -33,7 +33,7 @@ mod discharging;
 mod filing;
 
 impl RunWorker {
-    pub(in crate::assembly) fn settle(
+    pub(in crate::worker) fn settle(
         &mut self,
         at: &Assignment,
         run: RunId,
@@ -48,7 +48,7 @@ impl RunWorker {
     /// the city outside it. A caller that must act between the two — the
     /// plan desk closes its claims once their closing lines are written —
     /// records the landing itself and then calls this.
-    pub(in crate::assembly) fn carry_out_landing(
+    pub(in crate::worker) fn carry_out_landing(
         &mut self,
         at: &Assignment,
         then: effect::Then,
@@ -138,7 +138,7 @@ impl RunWorker {
     /// Propagates the drive's own outcome, a waiting item that will not
     /// serialise, and whatever starting the work this run handed down
     /// reports.
-    pub(in crate::assembly) fn conclude(
+    pub(in crate::worker) fn conclude(
         &mut self,
         site: Site,
         at: &Assignment,

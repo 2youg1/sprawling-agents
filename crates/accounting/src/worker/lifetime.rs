@@ -26,7 +26,7 @@ use storage::{Cas, JsonlLedger, OpenReport};
 /// `log_truncated`, but no page draws that line, so the worker keeps
 /// this value to tell the person at the two doors a city opens through.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum LedgerOpening {
+pub enum LedgerOpening {
     /// Every byte on disk was a whole, chained line.
     Intact,
     /// A crash left the last line half-written; opening cut these bytes.
@@ -47,7 +47,7 @@ impl From<OpenReport> for LedgerOpening {
 impl LedgerOpening {
     /// The one sentence a person reads about the cut: what, why, and
     /// what to do. `None` when nothing was cut.
-    pub(crate) fn notice(self) -> Option<String> {
+    pub fn notice(self) -> Option<String> {
         match self {
             LedgerOpening::Intact => None,
             LedgerOpening::TailDropped { bytes } => Some(format!(
@@ -68,7 +68,7 @@ impl LedgerOpening {
 /// are different facts for the next session, and a record that spelled
 /// both as the first would claim a choice nobody made.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Closing {
+pub enum Closing {
     /// The person stopped the city from the keyboard.
     Chosen,
     /// Serving failed and took the city down; `cause` is what failed.
@@ -79,7 +79,7 @@ impl Closing {
     /// The one reading of how serving ended: a serve that returned cleanly
     /// was ended by the person's Ctrl-C, and a serve that failed names its
     /// failure, so a failed serve is never recorded as the person's choice.
-    pub(crate) fn of(served: &Result<(), AxError>) -> Self {
+    pub fn of(served: &Result<(), AxError>) -> Self {
         match served {
             Ok(()) => Self::Chosen,
             Err(failure) => Self::Broken {
@@ -104,7 +104,7 @@ impl RunWorker {
     ) -> Result<Self, AxError> {
         let opened = JsonlLedger::open(
             &kernel::layout::CityLayout::new(city_root).ledger(),
-            accounting::Clock::now(&*hands.clock)?,
+            crate::Clock::now(&*hands.clock)?,
         )
         .map_err(storage::StorageError::into_ax)?;
         RunWorker::over(city_root, log, hands, opened)
@@ -125,7 +125,7 @@ impl RunWorker {
     /// Propagates whatever opening the store reports, and whatever the
     /// ledger says about its own chain: a worker that cannot read the
     /// city's history cannot know what is attached.
-    pub(crate) fn over(
+    pub fn over(
         city_root: &Path,
         log: runtime::diagnostics::Diagnostics,
         hands: Hands,
@@ -138,7 +138,7 @@ impl RunWorker {
     /// `holding` takes a ledger already opened, its writer lock held, and
     /// what opening it repaired, and the standing folded from it under
     /// that lock. The schedule starts from the time `hands.clock` reads.
-    pub(crate) fn holding(
+    pub fn holding(
         city_root: &Path,
         mut log: runtime::diagnostics::Diagnostics,
         hands: Hands,
@@ -156,7 +156,7 @@ impl RunWorker {
             recipe_for,
             exec_host,
         } = hands;
-        let now = accounting::Clock::now(&*clock)?;
+        let now = crate::Clock::now(&*clock)?;
         // Holding the one writer is what makes every worktree lock a
         // lock nobody alive holds (storage-SPEC 8-9).
         storage::Worktrees::lift_abandoned_leases(city_root, &ledger)
@@ -179,7 +179,7 @@ impl RunWorker {
                 runtime::diagnostics::Site {
                     run: kernel::RunId::CITY,
                     seq: ledger.position(),
-                    module: "bin::assembly",
+                    module: "accounting::worker",
                 },
                 &format!(
                     "the standing snapshot was not cut: {fault}; the city goes on, and the next start folds from the older snapshot or from genesis"
@@ -264,11 +264,15 @@ impl RunWorker {
                 "could not take back the worktrees a crash left behind; the next open tries again: {err}"
             ),
         };
-        self.note(runtime::diagnostics::Level::Effect, "bin::assembly", &told);
+        self.note(
+            runtime::diagnostics::Level::Effect,
+            "accounting::worker",
+            &told,
+        );
     }
 
     /// What opening this worker's ledger repaired.
-    pub(crate) fn opening(&self) -> LedgerOpening {
+    pub fn opening(&self) -> LedgerOpening {
         self.opening
     }
 
@@ -285,7 +289,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates the handoff's refusal of an empty must-read list, and
     /// the ledger's refusal to take the line.
-    pub(crate) fn close_city(&mut self, why: &Closing) -> Result<(), AxError> {
+    pub fn close_city(&mut self, why: &Closing) -> Result<(), AxError> {
         // The city's own norm, not a building's: `city::norms` answers
         // for a run at an address, and this line belongs to the city.
         // Through the same reader the prefix uses. What this city's
@@ -322,7 +326,7 @@ impl RunWorker {
         )?;
         self.note(
             runtime::diagnostics::Level::Effect,
-            "bin::assembly",
+            "accounting::worker",
             "the city is closing; its handoff is on the ledger",
         );
         self.record(EventKind::HandoffWritten, handoff.payload()?)
@@ -336,10 +340,7 @@ impl RunWorker {
     /// at those times stays its own. The ledger was opened before this
     /// door, at the time the clock in the worker's `Hands` read.
     #[must_use]
-    pub fn with_clock(
-        self,
-        clock: std::sync::Arc<dyn accounting::Clock + Send + Sync>,
-    ) -> RunWorker {
+    pub fn with_clock(self, clock: std::sync::Arc<dyn crate::Clock + Send + Sync>) -> RunWorker {
         RunWorker { clock, ..self }
     }
 
@@ -367,7 +368,7 @@ impl RunWorker {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::Closing;
-    use crate::assembly::RunWorker;
+    use crate::worker::RunWorker;
     use kernel::{AxCode, AxError};
     use std::io::Write;
 
@@ -376,7 +377,7 @@ mod tests {
     #[test]
     fn a_torn_tail_is_told_in_the_startup_scan() {
         let dir = tempfile::tempdir().unwrap();
-        crate::assembly::fixture::init_city(dir.path()).unwrap();
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let segment =
             storage::ledger_segments_at(&kernel::layout::CityLayout::new(dir.path()).ledger())
                 .unwrap()
@@ -393,7 +394,7 @@ mod tests {
         let mut worker = RunWorker::new(
             dir.path(),
             runtime::diagnostics::Diagnostics::off(),
-            crate::assembly::fixture::hands(),
+            crate::worker::fixture::hands(),
         )
         .unwrap();
         let summary = worker.startup_scan().unwrap().summary();
@@ -425,7 +426,7 @@ mod tests {
     #[test]
     fn a_crash_left_worktree_is_gone_once_the_city_opens() {
         let dir = tempfile::tempdir().unwrap();
-        crate::assembly::fixture::init_city(dir.path()).unwrap();
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let repo = git2::Repository::init(dir.path()).unwrap();
         let signature = git2::Signature::now("city", "city@example.invalid").unwrap();
         let tree = repo
@@ -441,7 +442,7 @@ mod tests {
             RunWorker::new(
                 dir.path(),
                 runtime::diagnostics::Diagnostics::off(),
-                crate::assembly::fixture::hands(),
+                crate::worker::fixture::hands(),
             )
             .unwrap(),
         );

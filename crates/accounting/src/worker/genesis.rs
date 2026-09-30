@@ -82,7 +82,7 @@ pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing 
 /// # Errors
 /// Refuses a directory that already has history, and propagates whatever
 /// the ledger, the store or the filesystem says.
-pub(crate) fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, AxError> {
+pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, AxError> {
     let history = has_history(city_root)?;
     let standing = standing_of(city_root, history);
     let dir = kernel::layout::CityLayout::new(city_root).ledger();
@@ -105,7 +105,7 @@ pub(crate) fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitR
              write, then run `sprawling init` again",
         )
     })?;
-    let now = accounting::Clock::now(&*hands.clock)?;
+    let now = crate::Clock::now(&*hands.clock)?;
     let (mut ledger, report) =
         JsonlLedger::open(&dir, now).map_err(storage::StorageError::into_ax)?;
     let genesis = ledger.append(EventDraft {
@@ -278,7 +278,7 @@ impl RunWorker {
                 effort: None,
             },
         );
-        let t = accounting::Clock::now(&*self.clock)?;
+        let t = crate::Clock::now(&*self.clock)?;
         storage::Checkpoint::open(&self.city_root)
             .and_then(|checkpoint| {
                 checkpoint.base_checkpoint(&[addr.as_str().to_owned()], t, &of, &mut |step| {

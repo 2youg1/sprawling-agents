@@ -38,7 +38,7 @@ use kernel::{Address, AxCode, AxError, NodeId};
 /// 8-46-2). Exhaustive: an entrance added without deciding what its
 /// landing owes is a compile error rather than a run nobody collects.
 #[derive(Clone)]
-pub(in crate::assembly) enum Owed {
+pub(in crate::worker) enum Owed {
     /// A person asked for this dispatch, and whoever the run spoke to
     /// answers next.
     Asked,
@@ -60,7 +60,7 @@ pub(in crate::assembly) enum Owed {
 /// different person to go back to when the run cannot be started: the
 /// schedule file, the watch table, a resident, or an answered approval.
 #[derive(Clone)]
-pub(in crate::assembly) enum Unasked {
+pub(in crate::worker) enum Unasked {
     /// The schedule said this job was due.
     Schedule,
     /// Something arrived from outside and the watch table routed it
@@ -74,7 +74,7 @@ pub(in crate::assembly) enum Unasked {
 
 impl Unasked {
     /// One clause a diagnostic line ends with.
-    pub(in crate::assembly) fn because(&self) -> &'static str {
+    pub(in crate::worker) fn because(&self) -> &'static str {
         match self {
             Unasked::Schedule => "the schedule said it was due",
             Unasked::Arrival(_) => "something arrived from outside",
@@ -85,7 +85,7 @@ impl Unasked {
 
     /// The taint a run started for this reason carries into every door
     /// its bench asks: only an arrival began with somebody else's text.
-    pub(in crate::assembly) fn taint(&self) -> kernel::TaintSet {
+    pub(in crate::worker) fn taint(&self) -> kernel::TaintSet {
         match self {
             Unasked::Arrival(source) => kernel::TaintSet::of(source.clone()),
             Unasked::Schedule | Unasked::Knock | Unasked::Unblocked => kernel::TaintSet::empty(),
@@ -100,7 +100,7 @@ impl Unasked {
 /// replaced, and it inherits that run's place in the chain. `reply` is
 /// shared rather than moved because the landing hands a refusal back
 /// after it has already given the obligation to a successor.
-pub(in crate::assembly) struct Owing {
+pub(in crate::worker) struct Owing {
     owed: Owed,
     reply: Arc<wire::Reply>,
     relays: Relays,
@@ -123,7 +123,7 @@ struct Relays {
 /// own branch's depth, and `woken` counts the runs every branch started,
 /// so a chain that fans out is bounded in width as well as depth.
 #[derive(Clone, Default)]
-pub(in crate::assembly) struct KnockChain {
+pub(in crate::worker) struct KnockChain {
     hops: u32,
     woken: Arc<AtomicU32>,
 }
@@ -227,7 +227,7 @@ fn conversation_refused(subject: String) -> AxError {
 #[cfg(test)]
 impl KnockChain {
     /// A conversation already `hops` knocks deep that has woken nobody.
-    pub(in crate::assembly) fn deep(hops: u32) -> KnockChain {
+    pub(in crate::worker) fn deep(hops: u32) -> KnockChain {
         KnockChain {
             hops,
             woken: Arc::default(),
@@ -237,7 +237,7 @@ impl KnockChain {
 
 impl Owing {
     /// A person asked, and a refusal goes back to them.
-    pub(in crate::assembly) fn asked(reply: wire::Reply) -> Owing {
+    pub(in crate::worker) fn asked(reply: wire::Reply) -> Owing {
         Owing {
             owed: Owed::Asked,
             reply: Arc::new(reply),
@@ -247,7 +247,7 @@ impl Owing {
 
     /// The city started this run itself, so a refusal has nobody to go
     /// back to and is noted where the landing happens.
-    pub(in crate::assembly) fn unasked(because: Unasked) -> Owing {
+    pub(in crate::worker) fn unasked(because: Unasked) -> Owing {
         Owing {
             owed: Owed::Unasked(because),
             reply: Arc::new(wire::Reply::nowhere()),
@@ -264,7 +264,7 @@ impl Owing {
     /// # Errors
     /// Refuses with `E_LOOP_SUSPECTED` when the knock would exceed
     /// `CONVERSATION_HOPS_MAX` or `CONVERSATION_RUNS_MAX`.
-    pub(in crate::assembly) fn knocked(chain: KnockChain) -> Result<Owing, AxError> {
+    pub(in crate::worker) fn knocked(chain: KnockChain) -> Result<Owing, AxError> {
         Ok(Owing {
             owed: Owed::Unasked(Unasked::Knock),
             reply: Arc::new(wire::Reply::nowhere()),
@@ -277,7 +277,7 @@ impl Owing {
     }
 
     /// A pursuit took this plan row.
-    pub(in crate::assembly) fn row(addr: Address, node: NodeId) -> Owing {
+    pub(in crate::worker) fn row(addr: Address, node: NodeId) -> Owing {
         Owing {
             owed: Owed::Row { addr, node },
             reply: Arc::new(wire::Reply::nowhere()),
@@ -291,7 +291,7 @@ impl Owing {
     /// A delegate is a different piece of work rather than another hop
     /// of the conversation that asked for it, so the child inherits the
     /// chain's place without moving it.
-    pub(in crate::assembly) fn child(&self, parent: Address) -> Owing {
+    pub(in crate::worker) fn child(&self, parent: Address) -> Owing {
         Owing {
             owed: Owed::Child { parent },
             reply: Arc::clone(&self.reply),
@@ -300,18 +300,18 @@ impl Owing {
     }
 
     /// What this run owes, read when it lands.
-    pub(in crate::assembly) fn owed(&self) -> &Owed {
+    pub(in crate::worker) fn owed(&self) -> &Owed {
         &self.owed
     }
 
     /// Where a refusal goes back to.
-    pub(in crate::assembly) fn reply(&self) -> Arc<wire::Reply> {
+    pub(in crate::worker) fn reply(&self) -> Arc<wire::Reply> {
         Arc::clone(&self.reply)
     }
 
     /// Where this run stands in its conversation. Read by the landing so
     /// a signal this run sends carries the chain's place on.
-    pub(in crate::assembly) fn knock_chain(&self) -> &KnockChain {
+    pub(in crate::worker) fn knock_chain(&self) -> &KnockChain {
         &self.relays.chain
     }
 
@@ -321,7 +321,7 @@ impl Owing {
     /// # Errors
     /// Refuses with `E_LOOP_SUSPECTED` when the successor would exceed
     /// `SUCCESSION_HOPS_MAX`.
-    pub(in crate::assembly) fn after_succession(&self) -> Result<Owing, AxError> {
+    pub(in crate::worker) fn after_succession(&self) -> Result<Owing, AxError> {
         Ok(Owing {
             owed: self.owed.clone(),
             reply: Arc::clone(&self.reply),

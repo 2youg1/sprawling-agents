@@ -52,7 +52,7 @@ pub(super) fn hands() -> Hands {
 /// tests that write lines at the present time.
 pub(super) struct WallClock;
 
-impl accounting::Clock for WallClock {
+impl crate::Clock for WallClock {
     #[allow(
         clippy::disallowed_methods,
         reason = "test code: the fixture's clock reads the wall like the production one"
@@ -78,7 +78,7 @@ pub(super) fn monotonic() -> std::time::Instant {
 /// A machine with nothing on it, which installs nothing.
 struct NoMachine;
 
-impl accounting::Machine for NoMachine {
+impl crate::Machine for NoMachine {
     fn report(&self) -> wire::DoctorAnswer {
         wire::DoctorAnswer {
             items: Vec::new(),
@@ -96,7 +96,7 @@ impl accounting::Machine for NoMachine {
         }
     }
 
-    fn install(&self, item: &str, _runnable: &accounting::Runnable<'_>) -> Result<(), AxError> {
+    fn install(&self, item: &str, _runnable: &crate::Runnable<'_>) -> Result<(), AxError> {
         Err(AxError::failure(
             kernel::AxCode::ToolUnavailable,
             "install a tool",
@@ -144,7 +144,7 @@ fn no_desktop() -> std::io::Result<PathBuf> {
     ))
 }
 
-fn no_recipe(item: &str) -> Result<&'static accounting::Recipe, AxError> {
+fn no_recipe(item: &str) -> Result<&'static crate::Recipe, AxError> {
     Err(AxError::failure(
         kernel::AxCode::InvalidArgs,
         "install a tool",
@@ -171,7 +171,7 @@ pub(super) fn worker_with_provider(
     let worker = RunWorker::new(
         city_root,
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )?;
     attach_provider(worker, base_url, model)
 }
@@ -226,13 +226,13 @@ pub(super) fn worker_over_faults(root: &Path, cut: Option<&'static str>) -> RunW
     let opened = storage::JsonlLedger::open_faulty(
         fs,
         &kernel::layout::CityLayout::new(root).ledger(),
-        accounting::Clock::now(&WallClock).unwrap(),
+        crate::Clock::now(&WallClock).unwrap(),
     )
     .unwrap();
     RunWorker::over(
         root,
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
         opened,
     )
     .unwrap()

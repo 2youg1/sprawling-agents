@@ -7,7 +7,7 @@
 
 //!
 //! Two facts and one act. The origin is the session's, folded from the
-//! ledger when it opened (`assembly::folds::session`); the conversation
+//! ledger when it opened (`crate::worker::folds::session`); the conversation
 //! is the mother's, rebuilt from her own records
 //! (`runtime::fork::inherited_indexed`, through the worker's resident
 //! index); and what this writes is the lineage of
@@ -31,7 +31,7 @@ impl RunWorker {
     /// history does not hold, and a lineage line the ledger refuses.
     /// The last of those leaves a frozen run with no record of where it
     /// came from, which is why it is raised rather than noted.
-    pub(in crate::assembly) fn inherited(
+    pub(in crate::worker) fn inherited(
         &mut self,
         at: &Assignment,
         run: RunId,

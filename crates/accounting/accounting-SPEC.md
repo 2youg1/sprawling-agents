@@ -54,14 +54,14 @@ worker 的两个读写面 `effect` 与 `plan_view`，以及 worker 与 `views` �
 ## 3 假设与歧义
 
 - `RunWorker` 与它的六个对象、全部用例还在 `crates/sprawling/src/assembly`，所以 citysim 的场景库仍驱动不了一次 dispatch：citysim 的 bench 二进制依赖 `sprawling`，场景库只经 `runtime::run::drive` 驱动一次 run，从不造 worker。归属由 §7 的表与 §12-9 至 §12-12 定下，§12-13 至 §12-16 补上 `views` 那一半。还没做的按这个次序：
-  1. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）。`views` 的测试此前经 `views::tests::founded` 造城，它只写创世的两行、立起市政厅、写一份 `City.md`；worker 搬进来以后它们改回真正的创世，`founded` 随之删去（§12-16）。快照折叠的 trait `views::snapshot::start::SnapshotFold` 在此之前有两个实现分住两个 crate（`Views` 与 `bin::assembly::folds::standing_start` 的 `StandingFolds`），所以是 ARCHITECTURE.md §4 缝表里的一行；worker 搬进来以后两个实现同住本 crate，它收回 `pub(crate)`，那一行随之删去。
+  1. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）。`views` 的测试此前经 `views::tests::founded` 造城，它只写创世的两行、立起市政厅、写一份 `City.md`；worker 搬进来以后它们改回真正的创世，`founded` 随之删去（§12-16）。快照折叠的 trait `views::snapshot::start::SnapshotFold` 在此之前有两个实现分住两个 crate（`Views` 与 `accounting::worker::folds::standing_start` 的 `StandingFolds`），所以是 ARCHITECTURE.md §4 缝表里的一行；worker 搬进来以后两个实现同住本 crate，它收回 `pub(crate)`，那一行随之删去。
   2. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活，不在本次迁移里。
-  3. 模块搬走时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）。8-7、8-8、8-9 是早先整节搬进来的，保持原样。
+  3. 模块搬走时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`accounting::worker::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）。8-7、8-8、8-9 是早先整节搬进来的，保持原样。
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
 
 ## 4 现状分析
 
-本 crate 现有四个端口。`ModelFactory` 的生产适配器是 `bin::assembly::models::GatewayModels`，`Connectors` 的是 `bin::assembly::mcp::Residents`，两者都由 `RunWorker` 的构造器装上（§12-18）；`Clock` 的生产适配器是 `bin::assembly::production::SystemClock`，经 `Hands.clock` 交进来；`Machine` 的是 `bin::doctor::ThisMachine`，经 `Hands.machine` 交进来。生产的 `Hands` 只由 `bin::assembly::production::hands` 一处造出（8-11）。四个端口的第二实现依次在 `crates/sprawling/tests/model_factory.rs`、`connectors.rs`、`clock.rs`、`machine.rs`。
+本 crate 现有四个端口。`ModelFactory` 的生产适配器是 `accounting::worker::models::GatewayModels`，`Connectors` 的是 `accounting::worker::mcp::Residents`，两者都由 `RunWorker` 的构造器装上（§12-18）；`Clock` 的生产适配器是 `bin::assembly::production::SystemClock`，经 `Hands.clock` 交进来；`Machine` 的是 `bin::doctor::ThisMachine`，经 `Hands.machine` 交进来。生产的 `Hands` 只由 `bin::assembly::production::hands` 一处造出（8-11）。四个端口的第二实现依次在 `crates/sprawling/tests/model_factory.rs`、`connectors.rs`、`clock.rs`、`machine.rs`。
 
 ## 5 权威信源
 
@@ -120,7 +120,7 @@ pub trait ModelFactory {
 ```
 
 ```rust
-// bin::assembly::models（形状 4 适配器）
+// accounting::worker::models（形状 4 适配器）
 pub(crate) struct GatewayModels;          // 生产：dialect 头 + gateway::adapter_for
 impl RunWorker {
     pub fn with_models(self, models: Box<dyn accounting::ModelFactory + Send>) -> RunWorker;
@@ -156,7 +156,7 @@ pub enum Reached {
 ```
 
 ```rust
-// bin::assembly::mcp（形状 4 适配器）
+// accounting::worker::mcp（形状 4 适配器）
 #[derive(Default)]
 pub(crate) struct Residents;              // 生产：McpLink::open + agent_protocols::handshake + tools/list，连接在 run 之间保持（sprawling-SPEC.md 8-4）
 impl RunWorker {
@@ -231,13 +231,13 @@ impl<'a> Runnable<'a> {
 // bin::doctor::probe（形状 4 适配器）
 impl accounting::Machine for ThisMachine { /* doctor::answer(self) 与 doctor::running::run */ }
 
-// bin::assembly::commanding::machine
+// accounting::worker::commanding::machine
 impl RunWorker {
     pub fn with_machine(self, machine: Box<dyn accounting::Machine + Send>) -> RunWorker;
 }
 ```
 
-- **只有 `Recipe::command` 造得出 `Runnable`，它证明的是配方的种类，不是许可。** `Runnable` 的构造函数在本 crate 之外不可见，所以持有一个 `Runnable` 只证明它来自一个 `Command` 配方：打印的配方与手动的配方在 `Recipe::command` 被拒。`Recipe::Command` 的字段是 `pub`，任何 crate 都能拼出一个装任意程序的配方，所以挡住表外程序的是 `doctor_install`（`crates/sprawling/src/assembly/commanding/machine.rs`）先在 requirement 表里查这个名字：表里没有的名字以 `InvalidArgs` 被拒，端口根本不会被调用。
+- **只有 `Recipe::command` 造得出 `Runnable`，它证明的是配方的种类，不是许可。** `Runnable` 的构造函数在本 crate 之外不可见，所以持有一个 `Runnable` 只证明它来自一个 `Command` 配方：打印的配方与手动的配方在 `Recipe::command` 被拒。`Recipe::Command` 的字段是 `pub`，任何 crate 都能拼出一个装任意程序的配方，所以挡住表外程序的是 `doctor_install`（`crates/accounting/src/worker/commanding/machine.rs`）先在 requirement 表里查这个名字：表里没有的名字以 `InvalidArgs` 被拒，端口根本不会被调用。
 - **失败**：`install` 原样传 `bin::doctor::running` 的 `AxError`；`Recipe::command` 的拒绝是 `E_TOOL_UNAVAILABLE`，恢复说明人该做什么。端口不另造错误码。
 - **worker 读的两处都经 `RunWorker.machine`**：`doctor_install` 的安装与它之后的重看，以及 `DoctorRefresh` 的 `look_at_this_machine`。需求表里没有的名字与没有配方的平台由 worker 交到的 `recipe_for`（生产是 `bin::doctor::recipe_for`）拒绝，这一步在端口被问到之前。
 - **一扇安装的门**：终端的 `sprawling doctor --install` 与 worker 的 `doctor_install` 都经 `accounting::Machine::install` 启动安装程序。`bin::doctor::Machine` 是它的子 trait，只多一个逐项的 `look`，自己不声明 `install`，所以一个装东西的实现只有一处要写，也只有一处能被脚本换掉。
@@ -276,7 +276,7 @@ pub enum Claims {
 }
 impl Claims { pub fn of(effects: &[ClaimEffect], on_disk: &str, path: PathBuf, room: &Address, who: &str) -> Result<Claims, AxError>; }
 
-// 装配层那一扇门（bin::assembly::settling::landing）：每张桌子都走它，`Then` 的 match 穷尽
+// 装配层那一扇门（accounting::worker::settling::landing）：每张桌子都走它，`Then` 的 match 穷尽
 impl RunWorker { fn settle(&mut self, at: &Assignment, run: RunId, landing: effect::Landing, chain: &KnockChain) -> Result<(), AxError>; }
 ```
 
@@ -285,7 +285,7 @@ impl RunWorker { fn settle(&mut self, at: &Assignment, run: RunId, landing: effe
 **形状**：先后是类型的性质，而不是写桌子的人的纪律。`Then` 只能从 `Landing::record` 里拿到，而 `record` 先把所有行送进去才返回它；要把顺序写反，得先拿到一个拿不到的值。
 
 - **批而不是逐条**：一张桌子的行全部落完，才轮到它的变化。signal 一支因此先落完所有 `signal_enqueued` 再投递；`deliver` 与 `knock` 都不写账，所以账本字节与逐条交错时相同。
-- **计划那一支是全有全无的**，所以它自己一个穷尽枚举 `Claims`：任一条效应对不上盘上的那份，就一字不写，把动过的节点报给人，并用 `released` 里的 `roadmap_released` 行关掉本跑已经落账的认领（sprawling-SPEC.md §8-16 的形制）。效应重放到 `on_disk` 上，而不是写回派活时的副本，所以别的 run 在此期间落下的行保留。记账线程在模型认领时已经拒绝了另一个在飞 run 持有的节点（`assembly::booking`，sprawling-SPEC.md 8-42-8）；`Claims::of` 是后盾，接住从旧副本认领了已被别人落地的节点的 run。
+- **计划那一支是全有全无的**，所以它自己一个穷尽枚举 `Claims`：任一条效应对不上盘上的那份，就一字不写，把动过的节点报给人，并用 `released` 里的 `roadmap_released` 行关掉本跑已经落账的认领（sprawling-SPEC.md §8-16 的形制）。效应重放到 `on_disk` 上，而不是写回派活时的副本，所以别的 run 在此期间落下的行保留。记账线程在模型认领时已经拒绝了另一个在飞 run 持有的节点（`accounting::worker::booking`，sprawling-SPEC.md 8-42-8）；`Claims::of` 是后盾，接住从旧副本认领了已被别人落地的节点的 run。
 - **归档行不需要先写盘**：账本行要的 `kind`／`day`／`subject` 由 `city::archive_entry` 从入参算出（city-SPEC §8-9）。不在装配层另算 `day_of`，因为那会是「一条归档记录长什么样」的第二个权威。
 - **`raised`（待批项）不进本模块**：它不是桌子交出来的效应，而是驱动期间暂存的项，本身就先落账后改状态。
 
@@ -294,7 +294,7 @@ impl RunWorker { fn settle(&mut self, at: &Assignment, run: RunId, landing: effe
 - `PrEffect::Opened` 里的 `storage::Checkpoint::land` 先于 `pr_opened` 落账，**但它不是「先动世界」**。它铸出的是那条账本行所指向的 commit，与 `run_started` 之前把 brief 放进 CAS 同形：没有任何记录指向的 git commit 不改变任何人读到的东西。
 - `PrEffect::Merged` 先经 `Worktrees::plan_merge` 定下这次合并会落在哪个 commit，干线已经动过的拒绝（`MergeStale`）在这一步就报出，然后才写 `pr_merged`。所以不会有一条 `pr_merged` 是替一次注定被拒的合并写的（sprawling-SPEC.md「合并也排到它那条行后面」）。
 
-**测试**：`what_a_run_changes_is_changed_after_the_line_that_announces_it`（`bin::assembly::driving::tests::ledger`）。一跑归档一条决定、又从共享计划里拿一行；`RunWorker::observe` 的 sink 在一行耐久之后才跑，所以它正是看得见「先」的位置。断言：`asset_archived` 落时书架上还没有它，`roadmap_claimed` 落时盘上那一行还没被拿走；跑完两者都在位。
+**测试**：`what_a_run_changes_is_changed_after_the_line_that_announces_it`（`accounting::worker::driving::tests::ledger`）。一跑归档一条决定、又从共享计划里拿一行；`RunWorker::observe` 的 sink 在一行耐久之后才跑，所以它正是看得见「先」的位置。断言：`asset_archived` 落时书架上还没有它，`roadmap_claimed` 落时盘上那一行还没被拿走；跑完两者都在位。
 
 **影响面**：`accounting` 公开面有 `effect` 模块，因为写它的桌子在 `bin::assembly`；`city` 的 `archive_entry` 与 `collab` 的效应类型是它的入参，所以本 crate 依赖 `city` 与 `collab`（ARCHITECTURE.md §3 的 `depmap`）。
 

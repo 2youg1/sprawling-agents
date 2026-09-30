@@ -12,7 +12,7 @@
 /// path does not have. Tests that only need it to answer bind it as
 /// `_provider`; tests about what went out on the wire read `bodies()`,
 /// the one place a claim about the wire can be checked.
-pub(in crate::assembly) struct FakeProvider {
+pub(in crate::worker) struct FakeProvider {
     seen: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
     _handle: std::thread::JoinHandle<()>,
 }
@@ -24,13 +24,13 @@ pub(in crate::assembly) struct FakeProvider {
 /// scripted reply and joins no record, so every later turn answers
 /// the question it was written for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::assembly) enum FirstChat {
+pub(in crate::worker) enum FirstChat {
     Answered,
     Dropped,
 }
 
 impl FakeProvider {
-    pub(in crate::assembly) fn bodies(&self) -> Vec<String> {
+    pub(in crate::worker) fn bodies(&self) -> Vec<String> {
         self.seen
             .lock()
             .unwrap()
@@ -42,7 +42,7 @@ impl FakeProvider {
             .collect()
     }
 
-    pub(in crate::assembly) fn exchanges(&self) -> Vec<String> {
+    pub(in crate::worker) fn exchanges(&self) -> Vec<String> {
         self.seen.lock().unwrap().clone()
     }
 }
@@ -52,7 +52,7 @@ impl FakeProvider {
 /// Anthropic-format third party does - the shape a city has to attach
 /// on the ids the person declared.
 #[cfg(test)]
-pub(in crate::assembly) fn fake_openai(
+pub(in crate::worker) fn fake_openai(
     models: &[&str],
     replies: Vec<String>,
 ) -> (String, FakeProvider) {
@@ -147,7 +147,7 @@ impl Script {
 /// two routes or none (`Script::Routed` says why that is the room above
 /// them). Use it for a fixture with more than one run in flight.
 #[cfg(test)]
-pub(in crate::assembly) fn fake_openai_routed(
+pub(in crate::worker) fn fake_openai_routed(
     models: &[&str],
     routes: Vec<(&str, Vec<String>)>,
     fallback: Vec<String>,
@@ -157,7 +157,7 @@ pub(in crate::assembly) fn fake_openai_routed(
 
 /// The same, told what to do with the first chat request.
 #[cfg(test)]
-pub(in crate::assembly) fn fake_openai_routed_with(
+pub(in crate::worker) fn fake_openai_routed_with(
     models: &[&str],
     routes: Vec<(&str, Vec<String>)>,
     fallback: Vec<String>,
@@ -170,11 +170,11 @@ pub(in crate::assembly) fn fake_openai_routed_with(
 /// included, before it answers: an instrument holds a run at its model
 /// call by blocking here, and makes one kind of request slow by
 /// sleeping.
-pub(in crate::assembly) type Pace = std::sync::Arc<dyn Fn(&str) + Send + Sync>;
+pub(in crate::worker) type Pace = std::sync::Arc<dyn Fn(&str) + Send + Sync>;
 
 /// A routed provider that hands every request to `pace` first.
 #[cfg(test)]
-pub(in crate::assembly) fn fake_openai_paced(
+pub(in crate::worker) fn fake_openai_paced(
     models: &[&str],
     routes: Vec<(&str, Vec<String>)>,
     fallback: Vec<String>,
@@ -199,7 +199,7 @@ fn unpaced() -> Pace {
 
 /// The same provider, told what to do with the first chat request.
 #[cfg(test)]
-pub(in crate::assembly) fn fake_openai_with(
+pub(in crate::worker) fn fake_openai_with(
     models: &[&str],
     replies: Vec<String>,
     first_chat: FirstChat,
@@ -345,7 +345,7 @@ fn serve(
 /// One reply that calls a named tool with the arguments given. The
 /// arguments are the tool's real contract, because an invented shape
 /// here once hid the fact that no canary edit had ever landed on disk.
-pub(in crate::assembly) fn completion_with(
+pub(in crate::worker) fn completion_with(
     text: &str,
     tool: &str,
     id: &str,
@@ -369,7 +369,7 @@ pub(in crate::assembly) fn completion_with(
     .to_string()
 }
 
-pub(in crate::assembly) fn completion(text: &str, call: Option<(&str, &str)>) -> String {
+pub(in crate::worker) fn completion(text: &str, call: Option<(&str, &str)>) -> String {
     let mut message = serde_json::json!({ "role": "assistant", "content": text });
     let mut finish = "stop";
     if let Some((id, path)) = call {

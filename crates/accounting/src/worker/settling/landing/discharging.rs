@@ -7,7 +7,7 @@
 
 use kernel::AxError;
 
-use crate::assembly::{Assignment, Dispatched, Landed, Owed, Owing, RunWorker};
+use crate::worker::{Assignment, Dispatched, Landed, Owed, Owing, RunWorker};
 
 impl RunWorker {
     /// Pays what the city owed the run that has just ended.
@@ -34,7 +34,7 @@ impl RunWorker {
                 let because = because.because();
                 self.note(
                     runtime::diagnostics::Level::Effect,
-                    "bin::assembly",
+                    "accounting::worker",
                     &format!("a run the city started itself landed, because {because}"),
                 );
                 Ok(Landed::Elsewhere)

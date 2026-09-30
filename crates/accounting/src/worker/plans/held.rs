@@ -17,27 +17,27 @@ use super::super::building_of;
 
 /// The planning the worker holds, one value because one family of
 /// records changes it and a pursuit reads all three parts together.
-pub(in crate::assembly) struct Planning {
+pub(in crate::worker) struct Planning {
     /// What each building is working towards. Held by the worker
     /// because the worker is what acts on it; rebuilt from the records
     /// on open.
-    pub(in crate::assembly) pursuits: BTreeMap<Address, kernel::Pursuit>,
+    pub(in crate::worker) pursuits: BTreeMap<Address, kernel::Pursuit>,
     /// The depth-zero position, the one thing that can declare a
     /// pursuit, minted once when the worker opens.
-    pub(in crate::assembly) delegator: kernel::Delegator,
+    pub(in crate::worker) delegator: kernel::Delegator,
     /// Which room holds each node of each building's plan.
-    pub(in crate::assembly) holders: PlanHolders,
+    pub(in crate::worker) holders: PlanHolders,
     /// The one door a landing replaces a building's plan through:
     /// `city::edit_against`, and in a test a writer that refuses, because
     /// a read-only file does not stop the rename over it where the
     /// directory is writable (sprawling-SPEC.md 8-42-8).
-    pub(in crate::assembly) write_plan: PlanWriter,
+    pub(in crate::worker) write_plan: PlanWriter,
 }
 
 /// Replaces the plan at a path with new text, given the text it was read
 /// as, so a plan changed underneath the writer is refused rather than
 /// overwritten.
-pub(in crate::assembly) type PlanWriter = fn(&Path, &[u8], &[u8]) -> Result<(), AxError>;
+pub(in crate::worker) type PlanWriter = fn(&Path, &[u8], &[u8]) -> Result<(), AxError>;
 
 impl Planning {
     /// Shows one line the worker wrote to the part of planning that is
@@ -46,7 +46,7 @@ impl Planning {
     ///
     /// # Errors
     /// As [`PlanHolders::absorb`].
-    pub(in crate::assembly) fn absorb(
+    pub(in crate::worker) fn absorb(
         &mut self,
         kind: EventKind,
         addr: Option<&Address>,
@@ -63,7 +63,7 @@ impl Planning {
 /// The room is the record's own `addr`, so nothing here derives what the
 /// claiming run already wrote down.
 #[derive(Default, serde::Serialize, serde::Deserialize)]
-pub(in crate::assembly) struct PlanHolders(BTreeMap<Address, BTreeMap<NodeId, String>>);
+pub(in crate::worker) struct PlanHolders(BTreeMap<Address, BTreeMap<NodeId, String>>);
 
 impl PlanHolders {
     /// A record that names no building is left out: the table holds
@@ -77,7 +77,7 @@ impl PlanHolders {
         clippy::wildcard_enum_match_arm,
         reason = "five kinds move a claim; the rest of the event vocabulary does not"
     )]
-    pub(in crate::assembly) fn absorb(
+    pub(in crate::worker) fn absorb(
         &mut self,
         kind: EventKind,
         addr: Option<&Address>,
@@ -111,7 +111,7 @@ impl PlanHolders {
     }
 
     /// Which room holds each node of one building's plan.
-    pub(in crate::assembly) fn in_building(&self, building: &Address) -> BTreeMap<NodeId, String> {
+    pub(in crate::worker) fn in_building(&self, building: &Address) -> BTreeMap<NodeId, String> {
         self.0.get(building).cloned().unwrap_or_default()
     }
 }

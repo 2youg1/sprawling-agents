@@ -23,7 +23,7 @@ use wire::Sample;
 /// Relaxed throughout: the two counts constrain nothing about each
 /// other, and no decision reads them.
 #[derive(Clone, Default)]
-pub(crate) struct Health(Arc<Counts>);
+pub struct Health(Arc<Counts>);
 
 #[derive(Default)]
 struct Counts {
@@ -33,28 +33,28 @@ struct Counts {
 
 impl Health {
     /// One append is about to enter the accounting thread's queue.
-    pub(crate) fn asked(&self) {
+    pub fn asked(&self) {
         self.0.queued.fetch_add(1, Ordering::Relaxed);
     }
 
     /// The append `asked` announced never entered the queue.
-    pub(crate) fn withdrawn(&self) {
+    pub fn withdrawn(&self) {
         lower(&self.0.queued, 1);
     }
 
     /// The accounting thread took `n` appends into one batch.
-    pub(crate) fn taken(&self, n: u64) {
+    pub fn taken(&self, n: u64) {
         lower(&self.0.queued, n);
         self.0.unflushed.fetch_add(n, Ordering::Relaxed);
     }
 
     /// The batch of `n` is durable and its answers are sent.
-    pub(crate) fn answered(&self, n: u64) {
+    pub fn answered(&self, n: u64) {
         lower(&self.0.unflushed, n);
     }
 
     /// `into`, with the two counts as they stand now.
-    pub(crate) fn read(&self, into: Sample) -> Sample {
+    pub fn read(&self, into: Sample) -> Sample {
         Sample {
             ledger_queue_depth: self.0.queued.load(Ordering::Relaxed),
             durable_lag: self.0.unflushed.load(Ordering::Relaxed),

@@ -84,6 +84,6 @@ Three checks, because a design like this decays quietly otherwise.
 
 Two compile-failure counterexamples prove a `Sealed` value cannot be formatted into a line or a record at all (`crates/runtime/tests/ui/log_a_credential.rs`, `crates/kernel/tests/ui/sealed_into_record.rs`), and the scan redacts plaintext that arrives as an ordinary string — two defences, in that order.
 
-The deletion-invariance test (`deleting_every_log_line_leaves_the_history_byte_identical`, in `crates/sprawling/src/assembly/genesis/tests.rs`) runs the same work twice, once with every level on and once with logging off, and requires the two Ledgers to agree. It also checks that the noisy run was actually noisy: an invariance that held because nothing was written would prove nothing.
+The deletion-invariance test (`deleting_every_log_line_leaves_the_history_byte_identical`, in `crates/accounting/src/worker/genesis/tests.rs`) runs the same work twice, once with every level on and once with logging off, and requires the two Ledgers to agree. It also checks that the noisy run was actually noisy: an invariance that held because nothing was written would prove nothing.
 
 **A line carries `seq` and no clock reading**, because the library that writes it is not allowed to sample time. A sink that wants a wall clock adds one at the assembly layer, which is where sampling is sanctioned.

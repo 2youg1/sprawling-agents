@@ -22,14 +22,14 @@ use kernel::{AxCode, AxError};
 /// timestamp, because two probes built on the same day are still two
 /// probes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ProbeId {
-    pub(crate) name: String,
-    pub(crate) version: u32,
+pub struct ProbeId {
+    pub name: String,
+    pub version: u32,
 }
 
 /// The questions, in the order they are asked.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Probe {
+pub struct Probe {
     id: ProbeId,
     questions: Vec<String>,
 }
@@ -39,7 +39,7 @@ impl Probe {
     /// Refuses a probe with no questions, and one with a blank question:
     /// a blank cannot be answered, so it would read as a loss on every
     /// comparison for as long as it stayed in the list.
-    pub(crate) fn new(id: ProbeId, questions: Vec<String>) -> Result<Probe, AxError> {
+    pub fn new(id: ProbeId, questions: Vec<String>) -> Result<Probe, AxError> {
         if questions.is_empty() {
             return Err(AxError::failure(
                 AxCode::ConfigInvalid,
@@ -62,12 +62,12 @@ impl Probe {
     }
 
     #[must_use]
-    pub(crate) fn id(&self) -> &ProbeId {
+    pub fn id(&self) -> &ProbeId {
         &self.id
     }
 
     #[must_use]
-    pub(crate) fn questions(&self) -> &[String] {
+    pub fn questions(&self) -> &[String] {
         &self.questions
     }
 
@@ -79,7 +79,7 @@ impl Probe {
     /// Refuses a set of answers that is not the same length as the
     /// questions — a shorter one would silently compare question three
     /// against question four.
-    pub(crate) fn answered(&self, answers: Vec<String>) -> Result<Answers, AxError> {
+    pub fn answered(&self, answers: Vec<String>) -> Result<Answers, AxError> {
         if answers.len() != self.questions.len() {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -109,7 +109,7 @@ impl Probe {
 ///
 /// # Errors
 /// Cannot fail on this fixed list; the `Result` is the constructor's.
-pub(crate) fn handoff_probe() -> Result<Probe, AxError> {
+pub fn handoff_probe() -> Result<Probe, AxError> {
     Probe::new(
         ProbeId {
             name: "handoff".to_owned(),
@@ -129,7 +129,7 @@ pub(crate) fn handoff_probe() -> Result<Probe, AxError> {
 
 /// One reading.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Answers {
+pub struct Answers {
     id: ProbeId,
     answers: Vec<String>,
 }
@@ -138,19 +138,19 @@ impl Answers {
     /// The answers, in question order. A reader compares two sets by
     /// eye; `compare` only says which positions differ.
     #[must_use]
-    pub(crate) fn answers(&self) -> &[String] {
+    pub fn answers(&self) -> &[String] {
         &self.answers
     }
 }
 
 /// What survived and what did not.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Comparison {
-    pub(crate) kept: u32,
+pub struct Comparison {
+    pub kept: u32,
     /// The indices whose answers differ, in order. Indices rather than
     /// text: the probe says where the loss is, and the person reads the
     /// two answers themselves rather than trusting a summary of them.
-    pub(crate) lost: Vec<u32>,
+    pub lost: Vec<u32>,
 }
 
 /// Compares two readings of the same probe.
@@ -158,7 +158,7 @@ pub(crate) struct Comparison {
 /// # Errors
 /// Refuses two different probes and two editions of one probe. Mixing
 /// them measures the instrument rather than the thing.
-pub(crate) fn compare(before: &Answers, after: &Answers) -> Result<Comparison, AxError> {
+pub fn compare(before: &Answers, after: &Answers) -> Result<Comparison, AxError> {
     if before.id != after.id {
         return Err(AxError::failure(
             AxCode::InvalidArgs,

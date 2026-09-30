@@ -74,7 +74,7 @@ fn a_refresh_counts_the_items_the_machine_it_was_handed_answered() {
         runtime::diagnostics::Level::Effect,
         Box::new(move |entry| heard.lock().unwrap().push(entry.message.to_owned())),
     );
-    let mut worker = assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         log,
         assembly::hands(gateway::Custodian::in_memory()),
@@ -153,7 +153,7 @@ fn an_install_hands_the_table_command_to_the_machine_it_was_handed() {
         Box::new(move |entry| heard.lock().unwrap().push(entry.message.to_owned())),
     );
     let installs = Arc::new(Mutex::new(Vec::new()));
-    let mut worker = assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         log,
         assembly::hands(gateway::Custodian::in_memory()),

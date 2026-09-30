@@ -42,7 +42,7 @@ pub(super) struct Probing {
 pub(super) fn reach_of(
     base_url: &str,
     proxying: Proxying,
-    clock: &dyn accounting::Clock,
+    clock: &dyn crate::Clock,
 ) -> Result<Reach, AxError> {
     let client = gateway::client_for(proxying, base_url)
         .build()

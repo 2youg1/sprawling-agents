@@ -14,9 +14,9 @@ use storage::{JsonlLedger, OpenReport};
 // The governance fold lives in `views`, where the reading side keeps
 // one too. Named here so the worker that judges from it reads under
 // the same name a page is answered under.
-pub(super) use accounting::views::Governance;
-use accounting::views::Views;
-use accounting::views::snapshot::start::{
+pub(super) use crate::views::Governance;
+use crate::views::Views;
+use crate::views::snapshot::start::{
     SnapshotFold, city_root_of, cut, cut_at, last_line, start_audited,
 };
 
@@ -32,15 +32,15 @@ pub(super) use collaboration::{Collaboration, INBOX_CAPACITY, new_inbox};
 pub(super) use session::SessionOrigins;
 use standing_start::StandingFolds;
 pub(super) use standing_start::{as_json_text, from_json_text};
-pub(crate) use views_start::start_served_views;
+pub use views_start::start_served_views;
 
 /// Everything a worker inherits from a history it did not write.
 ///
 /// The governance half is `views::Governance`, the same type and the
 /// same fold the served `Views` holds: the worker judges from it and a
 /// page reads from it, and a rebuild makes the two equal.
-pub(crate) struct Standing {
-    pub(crate) book: gateway::EndpointBook,
+pub struct Standing {
+    pub book: gateway::EndpointBook,
     pub(super) governance: Governance,
     pub(super) collaboration: Collaboration,
     /// The keys of the commands this history already carried out. On
@@ -76,7 +76,7 @@ impl Standing {
     /// chain verification of what is folded, and whatever a fold says
     /// about a payload it cannot read; a cut that fails is in `cut`, not
     /// here.
-    pub(crate) fn fold(ledger_dir: &Path) -> Result<Standing, AxError> {
+    pub fn fold(ledger_dir: &Path) -> Result<Standing, AxError> {
         if !ledger_dir.exists() {
             return StandingFolds::empty(ledger_dir).settle(Ok(()));
         }
@@ -114,7 +114,7 @@ impl Standing {
 /// # Errors
 /// Propagates opening the ledger, chain verification, and whatever a fold
 /// says about a payload it cannot read.
-pub(crate) fn fold_city(
+pub fn fold_city(
     ledger_dir: &Path,
     now: kernel::TimeMs,
     cost: &mut OpeningCost,

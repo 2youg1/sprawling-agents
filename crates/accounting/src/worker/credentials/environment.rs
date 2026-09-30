@@ -51,13 +51,13 @@ impl RunWorker {
     /// book stays the only statement of what this city can call. A
     /// failure here is reported and not fatal — a city stays readable
     /// without a provider.
-    pub(crate) fn open_for_service(&mut self, vault_notice: Option<Payload>) {
+    pub fn open_for_service(&mut self, vault_notice: Option<Payload>) {
         if let Some(notice) = vault_notice
             && let Err(err) = self.record(EventKind::ProviderDegraded, notice)
         {
             self.note(
                 runtime::diagnostics::Level::Refuse,
-                "bin::assembly",
+                "accounting::worker",
                 &format!("{err}; {}", err.recovery()),
             );
         }
@@ -73,7 +73,7 @@ impl RunWorker {
         if let Err(err) = self.seed_from_environment(&base_url, &model) {
             self.note(
                 runtime::diagnostics::Level::Refuse,
-                "bin::assembly",
+                "accounting::worker",
                 &format!(
                     "the model named in the environment is not attached: {err}; {}",
                     err.recovery()

@@ -6,18 +6,18 @@
 //! What a page reads back out of a history: the city, one session, and
 //! where a slice that stopped early resumes.
 
-use crate::assembly::*;
+use crate::worker::*;
 
 /// The live page could see nothing from before it opened, because
 /// the server broadcasts and never backfills.
 #[test]
 fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     for n in 0..6u8 {
@@ -29,7 +29,7 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
             })
             .unwrap();
     }
-    let views = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
 
     let wire::Answer::History(tail) = views
         .prepare(&wire::Query::History {
@@ -83,11 +83,11 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
 #[test]
 fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     for n in 0..6u8 {
@@ -99,7 +99,7 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
             })
             .unwrap();
     }
-    let views = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
 
     // Everything a fresh city writes belongs to the city's own run,
     // so asking for it gets those records and asking for a session
@@ -146,11 +146,11 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
 #[test]
 fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_ended() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     for n in 0..6u8 {
@@ -162,7 +162,7 @@ fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_end
             })
             .unwrap();
     }
-    let views = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
 
     // One record at a time, so the walk stops on the limit well
     // before it reaches the genesis line.

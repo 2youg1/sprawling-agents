@@ -5,14 +5,14 @@
 
 //! Connecting an outside application: the command behind the page's
 //! button. What the page and this command both need to know about the
-//! broker is `accounting::toolkit_broker`'s.
+//! broker is `crate::toolkit_broker`'s.
 
 use kernel::event::record::ToolkitLinkOpened;
 use kernel::{AxCode, AxError, EventKind, Payload};
 use wire::ToolkitSlug;
 
 use super::RunWorker;
-use accounting::toolkit_broker::broker_for;
+use crate::toolkit_broker::broker_for;
 
 impl RunWorker {
     /// Opens a consent session for one outside application.
@@ -27,7 +27,7 @@ impl RunWorker {
     /// # Errors
     /// A city with no project key enrolled, a vault that cannot answer,
     /// a broker that refuses, and a payload the ledger will not take.
-    pub(in crate::assembly) fn connect_toolkit(
+    pub(in crate::worker) fn connect_toolkit(
         &mut self,
         toolkit: &ToolkitSlug,
     ) -> Result<(), AxError> {

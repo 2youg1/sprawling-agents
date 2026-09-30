@@ -35,7 +35,7 @@ impl RunWorker {
     /// pursuit is asked, not only the one whose row came home. A pursuit
     /// that cannot take work is noted rather than failing the landing
     /// that happened to come before it: the two have no cause in common.
-    pub(in crate::assembly) fn advance_pursuits(&mut self, landed: &Landed) {
+    pub(in crate::worker) fn advance_pursuits(&mut self, landed: &Landed) {
         if let Landed::Row { addr, node } = landed
             && self.ready_in(addr).contains(node)
         {

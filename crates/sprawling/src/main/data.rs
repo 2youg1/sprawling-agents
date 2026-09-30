@@ -185,7 +185,7 @@ pub(super) fn fork(args: &[String]) -> ExitCode {
         run,
         at_seq: kernel::Seq::new(seq),
     };
-    let outcome = assembly::RunWorker::new(
+    let outcome = accounting::worker::RunWorker::new(
         std::path::Path::new(dir),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(vault),
@@ -221,7 +221,7 @@ pub(super) fn adopt(dir: Option<&String>, addr: Option<&String>) -> ExitCode {
         Err(err) => return report(err),
     };
     let (vault, _notice) = serving::open_vault();
-    let outcome = assembly::RunWorker::new(
+    let outcome = accounting::worker::RunWorker::new(
         std::path::Path::new(dir),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(vault),

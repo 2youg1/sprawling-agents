@@ -18,14 +18,14 @@
 )]
 
 use super::super::*;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
-use accounting::views::Views;
+use crate::views::Views;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 #[test]
 fn what_a_run_changes_is_changed_after_the_line_that_announces_it() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let lab = dir.path().join("lab");
     std::fs::create_dir_all(lab.join("room1")).unwrap();
     std::fs::write(lab.join(city::ROADMAP_FILE), PLAN_TWO_FREE_ROWS).unwrap();
@@ -127,7 +127,7 @@ fn what_a_run_changes_is_changed_after_the_line_that_announces_it() {
 #[test]
 fn a_resident_crosses_two_runs_with_the_same_identity_segment() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let addr = Address::parse("lab/room1").unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     std::fs::write(
@@ -188,7 +188,7 @@ fn a_resident_crosses_two_runs_with_the_same_identity_segment() {
 #[test]
 fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![
@@ -234,7 +234,7 @@ fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
 
     // The same answer arrives from a cold rebuild: a view is
     // disposable exactly to the extent that this holds.
-    let rebuilt = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let rebuilt = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let wire::Answer::City(again) = rebuilt.prepare(&wire::Query::CityView).finish() else {
         panic!("CityView answers with a city");
     };
@@ -253,7 +253,7 @@ fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
 #[test]
 fn a_commit_the_city_made_says_which_run_wrote_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![
@@ -295,7 +295,7 @@ fn a_commit_the_city_made_says_which_run_wrote_it() {
     )
     .expect("the checkpoint oid is forty hex digits");
 
-    let views = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let wire::Answer::Commit(said) = views.prepare(&wire::Query::Commit { oid }).finish() else {
         panic!("a commit this city made answers which run wrote it");
     };

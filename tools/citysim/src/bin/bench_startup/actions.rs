@@ -199,7 +199,7 @@ pub fn raise_city(scratch: &Path) -> Result<Action, AxError> {
 /// ledger sees is the contiguous one `Seq` documents.
 pub fn open_session(city: &Path) -> Result<Action, AxError> {
     sprawling::assembly::init_city(city)?;
-    let mut worker = sprawling::assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         city,
         runtime::diagnostics::Diagnostics::off(),
         sprawling::assembly::hands(gateway::Custodian::in_memory()),

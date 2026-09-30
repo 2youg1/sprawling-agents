@@ -10,8 +10,8 @@ use kernel::{Address, RunId, Seq};
 use storage::{StoredSnapshot, WholeFold};
 
 use super::*;
-use crate::assembly::RunWorker;
-use accounting::views::snapshot::start::{FoldStart, snapshot_dir, start};
+use crate::views::snapshot::start::{FoldStart, snapshot_dir, start};
+use crate::worker::RunWorker;
 
 /// Buildings named `lab<n>`, and one repeat of `lab0` under a new key,
 /// so the refusals `Entrance` keeps are in the folds too.
@@ -31,13 +31,13 @@ fn raise(worker: &mut RunWorker, names: std::ops::Range<u8>) {
 #[test]
 fn a_standing_after_a_cut_folds_only_the_tail_into_the_same_bytes() {
     let dir = tempfile::tempdir().unwrap();
-    let ledger = crate::assembly::fixture::init_city(dir.path())
+    let ledger = crate::worker::fixture::init_city(dir.path())
         .unwrap()
         .ledger_dir;
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     raise(&mut worker, 0..3);
@@ -77,14 +77,14 @@ fn a_standing_after_a_cut_folds_only_the_tail_into_the_same_bytes() {
 #[test]
 fn a_worker_refuses_a_line_rewritten_before_the_snapshot_in_a_sealed_segment() {
     let dir = tempfile::tempdir().unwrap();
-    let ledger = crate::assembly::fixture::init_city(dir.path())
+    let ledger = crate::worker::fixture::init_city(dir.path())
         .unwrap()
         .ledger_dir;
     let open = || {
         RunWorker::new(
             dir.path(),
             runtime::diagnostics::Diagnostics::off(),
-            crate::assembly::fixture::hands(),
+            crate::worker::fixture::hands(),
         )
     };
     raise(&mut open().unwrap(), 0..3);

@@ -14,15 +14,15 @@
 )]
 
 use super::super::*;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// A handoff that exists and cannot be read is not the absence of a
 /// handoff, and the next session is assembled from it.
 #[test]
 fn a_handoff_that_cannot_be_read_is_refused_by_name() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
@@ -54,7 +54,7 @@ fn a_handoff_that_cannot_be_read_is_refused_by_name() {
 #[test]
 fn work_offered_in_up_mode_without_a_test_does_not_land() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let note = dir.path().join("lab").join("room1").join("note.md");
     std::fs::create_dir_all(note.parent().unwrap()).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
@@ -114,7 +114,7 @@ fn work_offered_in_up_mode_without_a_test_does_not_land() {
 #[test]
 fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
@@ -207,7 +207,7 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
 #[test]
 fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     let (base_url, provider) = fake_openai(
         &["m-local"],
@@ -289,7 +289,7 @@ fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it()
 #[test]
 fn the_frozen_handoff_carries_the_rooms_own_sections_and_pins_its_bytes() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     let written = "# Handoff - lab/room1\n\n<must-read>\nlab/room1/probe.log, the last reading\n</must-read>\n\n\

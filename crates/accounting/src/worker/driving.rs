@@ -16,9 +16,9 @@ use runtime::{SieveSite, package_exec};
 use super::{RunWorker, Site};
 
 mod entering;
-pub(crate) mod flight;
-pub(crate) mod lane;
-pub(in crate::assembly) mod owing;
+pub mod flight;
+pub mod lane;
+pub(in crate::worker) mod owing;
 mod placing;
 
 /// What one drive is handed: the machinery it runs on, and the run it
@@ -34,57 +34,57 @@ mod placing;
 /// thread** (sprawling-SPEC.md 8-46-1). A drive that borrowed the
 /// bench, the tree or the resident's name borrowed them from locals of
 /// the call that built it, so a lane could never have been handed one.
-pub(crate) struct Driving {
+pub struct Driving {
     /// The model this run calls, already chosen and already credentialed.
     /// Owned, and handed back inside [`Driven`]: who holds the adapter is
     /// a fact the types state, not a loan the reader has to track.
-    pub(crate) adapter: super::keeping_warm::Door,
+    pub adapter: super::keeping_warm::Door,
     /// What routes a call the model makes. Spent by the drive: nothing
     /// after it asks the bench anything, so it is dropped where it is
     /// used rather than carried home.
-    pub(crate) bench: ToolBench,
+    pub bench: ToolBench,
     /// Where a steer from a resident lands while the drive is going.
     /// A handle of its own rather than a loan: the drive may leave the
     /// thread that opened the desk (sprawling-SPEC 8-44).
-    pub(crate) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
+    pub signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
     /// The tree the run writes in: its own worktree under review, the
     /// city itself otherwise.
-    pub(crate) write_root: PathBuf,
+    pub write_root: PathBuf,
     /// What a checkpoint covers, from [`Site::checkpoint_scope`]:
     /// every prefix of the run's write domain, not just its room.
-    pub(crate) checkpoint_scope: Vec<String>,
-    pub(crate) run_id: RunId,
+    pub checkpoint_scope: Vec<String>,
+    pub run_id: RunId,
     /// What every checkpoint this drive raises is signed with.
-    pub(crate) of: storage::Provenance,
+    pub of: storage::Provenance,
     /// Where a command's output is pinned before it is cut, and what
     /// decides the cut (sprawling-SPEC 8-43).
-    pub(crate) sieving: Sieving,
+    pub sieving: Sieving,
     /// This run's place in the backlog, when it is a run somebody handed
     /// down: the member a halt on its scope marks (runtime-SPEC 8-28-2).
-    pub(crate) member: Option<runtime::BacklogId>,
+    pub member: Option<runtime::BacklogId>,
     /// What is to be run, and what says how to pick it up again. Fields
     /// rather than parameters beside this value: a lane is entered with
     /// one thing.
-    pub(crate) plan: RunPlan,
-    pub(crate) handoff: runtime::handoff::Handoff,
+    pub plan: RunPlan,
+    pub handoff: runtime::handoff::Handoff,
     /// The rest of the bench, which the drive carries home for the
     /// landing to read: who the run handed work to, and whether it asked
     /// to be replaced.
-    pub(in crate::assembly) workbench: super::Workbench,
+    pub(in crate::worker) workbench: super::Workbench,
 }
 
 /// What the sieve needs from the city for one run: a store to pin the
 /// original in, the room the model reads the rest from, the
 /// filter table frozen with the run, and what this run already saw.
-pub(crate) struct Sieving {
+pub struct Sieving {
     /// The store the lanes share, taken for the length of one package.
-    pub(crate) cas: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
-    pub(crate) city_root: PathBuf,
-    pub(crate) room: Address,
+    pub cas: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
+    pub city_root: PathBuf,
+    pub room: Address,
     /// The run and room an original is pinned for.
-    pub(crate) origin: storage::BlockOrigin,
-    pub(crate) table: runtime::FilterTable,
-    pub(crate) history: runtime::SieveHistory,
+    pub origin: storage::BlockOrigin,
+    pub table: runtime::FilterTable,
+    pub history: runtime::SieveHistory,
 }
 
 impl Sieving {
@@ -141,22 +141,22 @@ impl Sieving {
 /// Every field is written by a hook while the driver owns the ledger and
 /// read after it gives it back, so none of them may be acted on until the
 /// drive has returned.
-pub(crate) struct Driven {
-    pub(crate) outcome: Result<runtime::Run<runtime::run::Frozen>, AxError>,
+pub struct Driven {
+    pub outcome: Result<runtime::Run<runtime::run::Frozen>, AxError>,
     /// The adapter, home from the drive. The caller takes it apart back
     /// into the site it came from: a `Site` gains and loses no field.
-    pub(crate) adapter: super::keeping_warm::Door,
+    pub adapter: super::keeping_warm::Door,
     /// The commits each wave checkpointed against; the first is what the sweep
     /// restores a discarded file from.
-    pub(crate) checkpointed: Vec<String>,
+    pub checkpointed: Vec<String>,
     /// The run's own commands, as (passed, failed).
-    pub(crate) ran: (u32, u32),
+    pub ran: (u32, u32),
     /// What the drive raised for a person. Empty today: every door
     /// answers Allow or Deny, and the only question left is the
     /// sweep's, which is raised after the drive hands the ledger back.
-    pub(crate) raised: Vec<kernel::ApprovalItem>,
+    pub raised: Vec<kernel::ApprovalItem>,
     /// The bench the drive was handed, home for the landing.
-    pub(in crate::assembly) workbench: super::Workbench,
+    pub(in crate::worker) workbench: super::Workbench,
 }
 
 impl Sieving {
@@ -169,7 +169,7 @@ impl Sieving {
     /// rest directory sits inside the room, which is the one place a
     /// model-chosen path is allowed to read from; the offload makes it
     /// when it first writes a rest file.
-    pub(in crate::assembly) fn for_run(
+    pub(in crate::worker) fn for_run(
         store: &std::sync::Arc<std::sync::Mutex<storage::Cas>>,
         site: &Site,
         addr: &Address,
@@ -195,7 +195,7 @@ impl RunWorker {
     /// none of them holds the worker. The ledger is deliberately absent:
     /// which ledger a drive writes through is what separates the
     /// accounting thread from a lane (sprawling-SPEC.md 8-46-1).
-    pub(in crate::assembly) fn drive_context(&self) -> lane::DriveContext {
+    pub(in crate::worker) fn drive_context(&self) -> lane::DriveContext {
         lane::DriveContext {
             watching: self
                 .serving

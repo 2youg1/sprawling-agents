@@ -30,7 +30,7 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
 
     // The vault is the in-session one: a test that reached the platform
     // credential service would write to the machine running it.
-    let mut worker = assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),
@@ -94,7 +94,7 @@ fn every_spelling_of_one_endpoint_is_registered_as_one_url() {
 
     // The vault is the in-session one: a test that reached the platform
     // credential service would write to the machine running it.
-    let mut worker = assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),
@@ -132,7 +132,7 @@ fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {
 
     // The vault is the in-session one: a test that reached the platform
     // credential service would write to the machine running it.
-    let mut worker = assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),
@@ -188,7 +188,7 @@ fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {
 /// all, so an attachment that declared no id would be refused for an
 /// interface the endpoint never promised.
 fn attach(
-    worker: &mut assembly::RunWorker,
+    worker: &mut accounting::worker::RunWorker,
     name: &str,
     base_url: &str,
 ) -> Result<(), kernel::AxError> {

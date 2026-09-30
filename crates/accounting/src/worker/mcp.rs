@@ -4,10 +4,10 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Reaching the MCP servers a building's configuration names: the
-//! production `accounting::Connectors`, and the one door that swaps it
+//! production `crate::Connectors`, and the one door that swaps it
 //! for another (accounting-SPEC.md 8-2).
 
-use accounting::Reached;
+use crate::Reached;
 use kernel::{Address, AxError};
 
 use super::RunWorker;
@@ -24,7 +24,7 @@ use super::RunWorker;
 /// or add a key: a lane still shaking hands with one server holds up
 /// the lanes asking for that server and nobody else.
 #[derive(Default)]
-pub(crate) struct Residents {
+pub struct Residents {
     keys: std::sync::Mutex<Vec<std::sync::Arc<Keyed>>>,
 }
 
@@ -43,7 +43,7 @@ struct Resident {
     listed: Vec<(kernel::ToolMeta, String)>,
 }
 
-impl accounting::Connectors for Residents {
+impl crate::Connectors for Residents {
     fn connect(
         &self,
         server: &kernel::McpServer,
@@ -70,7 +70,7 @@ impl Residents {
     /// Propagates the transport's refusal to open, a failed handshake or
     /// listing, and `agent_protocols::McpTool::new`'s refusal on a confidential
     /// building.
-    pub(crate) fn tools(
+    pub fn tools(
         &self,
         server: &kernel::McpServer,
         write_root: &std::path::Path,
@@ -128,7 +128,7 @@ impl RunWorker {
     #[must_use]
     pub fn with_connectors(
         self,
-        connectors: Box<dyn accounting::Connectors + Send + Sync>,
+        connectors: Box<dyn crate::Connectors + Send + Sync>,
     ) -> RunWorker {
         RunWorker {
             connectors: std::sync::Arc::from(connectors),
@@ -214,8 +214,8 @@ pub(super) fn mounts_under(
 )]
 mod tests {
     use super::*;
-    use crate::assembly::fixture::*;
-    use crate::assembly::*;
+    use crate::worker::fixture::*;
+    use crate::worker::*;
 
     /// Writes a `[[mcp]]` table naming one server at the building layer.
     fn write_server_table(city_root: &Path, addr: &str, command: &str, args: &[String]) {
@@ -243,7 +243,7 @@ mod tests {
     #[test]
     fn a_configured_server_becomes_a_tool_the_model_is_told_about_and_can_call() {
         let dir = tempfile::tempdir().unwrap();
-        let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+        let report = crate::worker::fixture::init_city(dir.path()).unwrap();
         let (command, args) = agent_protocols::echoing(SERVER_ANSWER);
         write_server_table(dir.path(), "lab", &command, &args);
 
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn the_same_tool_twice_with_different_arguments_runs_twice() {
         let dir = tempfile::tempdir().unwrap();
-        let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+        let report = crate::worker::fixture::init_city(dir.path()).unwrap();
         city::create_building(
             dir.path(),
             &Address::parse("lab").unwrap(),
@@ -360,13 +360,13 @@ mod tests {
     #[test]
     fn a_confidential_building_starts_no_server_and_a_dead_one_is_simply_absent() {
         let dir = tempfile::tempdir().unwrap();
-        crate::assembly::fixture::init_city(dir.path()).unwrap();
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let (command, args) = agent_protocols::echoing(SERVER_ANSWER);
         write_server_table(dir.path(), "lab", &command, &args);
         let worker = RunWorker::new(
             dir.path(),
             runtime::diagnostics::Diagnostics::off(),
-            crate::assembly::fixture::hands(),
+            crate::worker::fixture::hands(),
         )
         .unwrap();
         let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
@@ -476,14 +476,14 @@ mod tests {
     #[test]
     fn a_second_dispatch_reaches_the_server_the_first_one_started() {
         let dir = tempfile::tempdir().unwrap();
-        crate::assembly::fixture::init_city(dir.path()).unwrap();
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let starts = dir.path().join("starts.txt");
         let (command, args) = agent_protocols::counting_starts(SERVER_ANSWER, &starts);
         write_server_table(dir.path(), "lab", &command, &args);
         let worker = RunWorker::new(
             dir.path(),
             runtime::diagnostics::Diagnostics::off(),
-            crate::assembly::fixture::hands(),
+            crate::worker::fixture::hands(),
         )
         .unwrap();
         let config = city::load_config(dir.path(), &Address::parse("lab/room1").unwrap()).unwrap();
@@ -517,7 +517,7 @@ mod tests {
     #[test]
     fn a_dispatch_whose_server_still_shakes_hands_leaves_the_desk_free() {
         let dir = tempfile::tempdir().unwrap();
-        crate::assembly::fixture::init_city(dir.path()).unwrap();
+        crate::worker::fixture::init_city(dir.path()).unwrap();
         let (starts, gate) = (dir.path().join("starts.txt"), dir.path().join("open"));
         let (command, args) = agent_protocols::gated(SERVER_ANSWER, &starts, &gate);
         write_server_table(dir.path(), "lab", &command, &args);
@@ -539,7 +539,7 @@ mod tests {
             })
         };
 
-        worker.serve_one(crate::assembly::Posted {
+        worker.serve_one(crate::worker::Posted {
             command: wire::Command::Dispatch {
                 addr: Address::parse("lab/room1").unwrap(),
                 task: "ask the outside service".to_owned(),

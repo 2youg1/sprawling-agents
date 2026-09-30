@@ -14,7 +14,7 @@
     reason = "test code"
 )]
 
-use crate::assembly::fixture::*;
+use crate::worker::fixture::*;
 use kernel::{Address, EventKind, EventRecord, RunId};
 
 /// The tool table of every request that carried one, in the order the
@@ -47,7 +47,7 @@ fn tool_tables(bodies: &[String]) -> Vec<Vec<String>> {
 #[test]
 fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     let ask = |id: &str| {
         tool_completion(
@@ -156,7 +156,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
         })
         .expect("the fourth run's wave checkpoints a commit");
     let oid = kernel::GitOid::parse(checkpointed.data().as_map()["oid"].as_str().unwrap()).unwrap();
-    let views = accounting::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let wire::Answer::Commit(said) = views.prepare(&wire::Query::Commit { oid }).finish() else {
         panic!("a commit this city made answers which run wrote it");
     };
@@ -173,7 +173,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
 #[test]
 fn the_handoff_in_the_room_reaches_the_successor() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = dir.path().join("lab").join("room1");
     std::fs::create_dir_all(&room).unwrap();
     let (base_url, provider) = fake_openai(

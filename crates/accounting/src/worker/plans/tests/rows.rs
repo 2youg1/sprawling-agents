@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::super::*;
-use crate::assembly::fixture::*;
+use crate::worker::fixture::*;
 
 /// A plan nobody could read and a plan somebody else changed are two
 /// different facts, and only one of them is the person's to fix.
@@ -17,7 +17,7 @@ use crate::assembly::fixture::*;
 #[test]
 fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbour() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
@@ -60,7 +60,7 @@ fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbo
 #[test]
 fn a_line_the_history_refused_is_a_change_the_city_never_made() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(&plan, PLAN_TWO_FREE_ROWS).unwrap();
@@ -115,7 +115,7 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
 #[test]
 fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(&plan, PLAN_TWO_FREE_ROWS).unwrap();
@@ -183,7 +183,7 @@ fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
 #[test]
 fn a_node_handed_back_by_a_run_that_came_home_can_be_taken_by_the_next_run() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(&plan, PLAN_ONE_FREE_ROW).unwrap();
@@ -245,7 +245,7 @@ fn a_node_handed_back_by_a_run_that_came_home_can_be_taken_by_the_next_run() {
 #[test]
 fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(&plan, PLAN_ONE_FREE_ROW).unwrap();
@@ -317,7 +317,7 @@ fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
 #[test]
 fn a_run_that_ends_holding_a_row_leaves_it_blocked_rather_than_in_progress() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let plan = dir.path().join("lab").join(city::ROADMAP_FILE);
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(&plan, PLAN_TWO_FREE_ROWS).unwrap();

@@ -26,7 +26,7 @@ impl RunWorker {
     /// propagates what `city::remove_building` refuses and a ledger that
     /// refuses the record. The files move before the record is written,
     /// because the record says they moved.
-    pub(in crate::assembly) fn remove_building(&mut self, addr: &Address) -> Result<(), AxError> {
+    pub(in crate::worker) fn remove_building(&mut self, addr: &Address) -> Result<(), AxError> {
         if let Some((room, working)) = self.collaborating.rooms.worked_within(addr) {
             return Err(AxError::failure(
                 AxCode::Busy,

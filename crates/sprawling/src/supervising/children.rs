@@ -11,8 +11,8 @@
 //! measures elapsed time, and prints what the person needs to see.
 
 use super::{CrashBudget, Next};
-use crate::assembly::Closing;
 use crate::serving::standing::monotonic_now;
+use accounting::worker::Closing;
 use kernel::{AxCode, AxError, TimeMs};
 use std::path::Path;
 use std::process::Command;

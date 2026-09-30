@@ -24,7 +24,7 @@ impl RunWorker {
     /// # Errors
     /// `BackpressureShed` naming the city's root, whose recovery says
     /// how many bytes to free.
-    pub(in crate::assembly) fn room_for_new_work(&self) -> Result<(), AxError> {
+    pub(in crate::worker) fn room_for_new_work(&self) -> Result<(), AxError> {
         (self.read_volume)(&self.city_root)
             .map_or(Ok(()), degradation::admit_work)
             .map_err(|low| {
@@ -49,7 +49,7 @@ impl RunWorker {
     /// Replaces the volume reader, so a test can inject a volume close
     /// to full.
     #[cfg(test)]
-    pub(in crate::assembly) fn read_volume_with(&mut self, read: fn(&Path) -> Option<VolumeSpace>) {
+    pub(in crate::worker) fn read_volume_with(&mut self, read: fn(&Path) -> Option<VolumeSpace>) {
         self.read_volume = read;
     }
 }

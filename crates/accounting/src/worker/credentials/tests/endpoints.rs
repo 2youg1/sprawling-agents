@@ -7,13 +7,13 @@
 //! wire.
 
 use super::super::*;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 #[test]
 fn a_model_the_endpoint_never_listed_cannot_be_chosen() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-small"], Vec::new());
     let Err(err) = worker_with_provider(dir.path(), &base_url, "m-invented") else {
         panic!("a model the endpoint never listed cannot be chosen");
@@ -30,12 +30,12 @@ fn a_model_the_endpoint_never_listed_cannot_be_chosen() {
 #[test]
 fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&[], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     worker
@@ -77,12 +77,12 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
 #[test]
 fn an_endpoint_with_neither_a_model_list_nor_a_declared_id_is_refused() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&[], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let err = worker
@@ -107,14 +107,14 @@ fn an_endpoint_with_neither_a_model_list_nor_a_declared_id_is_refused() {
 #[test]
 fn a_dispatch_without_a_provider_fails_saying_what_to_configure() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     // Nothing registered: the refusal has to name the act that fixes
     // it, because a person who has not attached a provider yet is
     // exactly the person who does not know that is the missing step.
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let err = worker
@@ -139,12 +139,12 @@ fn a_dispatch_without_a_provider_fails_saying_what_to_configure() {
 #[test]
 fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-key"], vec![completion("done", None)]);
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     worker
@@ -211,11 +211,11 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
 #[test]
 fn a_store_that_will_not_open_refuses_the_adapter_rather_than_the_first_picture() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     assert!(
@@ -244,11 +244,11 @@ fn a_store_that_will_not_open_refuses_the_adapter_rather_than_the_first_picture(
 #[test]
 fn a_probe_that_reaches_nothing_records_where_it_stopped_rather_than_refusing() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     worker
@@ -282,12 +282,12 @@ fn a_probe_that_reaches_nothing_records_where_it_stopped_rather_than_refusing() 
 #[test]
 fn a_probe_carries_the_facts_each_model_row_stated() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-small", "m-large"], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     worker
@@ -328,11 +328,11 @@ fn ledger_text(ledger_dir: &std::path::Path) -> String {
 #[test]
 fn a_line_a_run_writes_reaches_the_book_the_worker_holds() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let attached = kernel::event::record::EndpointAttached {

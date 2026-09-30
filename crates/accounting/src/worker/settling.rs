@@ -36,7 +36,7 @@ pub(super) struct Settling<'a> {
     /// The claims booked at call time that this landing has yet to
     /// close; the plan step closes each as its closing line reaches the
     /// ledger (sprawling-SPEC.md 8-42-8).
-    pub(super) open_claims: &'a mut crate::assembly::booking::OpenClaims,
+    pub(super) open_claims: &'a mut crate::worker::booking::OpenClaims,
 }
 
 /// What one drive ended with, as the conclusion reads it.

@@ -29,32 +29,32 @@ use super::pool::Memory;
 pub struct Hands {
     /// Where this city's credentials are kept: the one the process
     /// opened, or an in-memory one.
-    pub(crate) vault: gateway::Custodian,
+    pub vault: gateway::Custodian,
     /// What time it is, for the worker and every lane it drives, from
     /// the first line it opens with (accounting-SPEC.md 8-3).
-    pub(crate) clock: Arc<dyn accounting::Clock + Send + Sync>,
+    pub clock: Arc<dyn crate::Clock + Send + Sync>,
     /// Looks at this machine and installs onto it (accounting-SPEC.md 8-4).
-    pub(crate) machine: Box<dyn accounting::Machine + Send>,
+    pub machine: Box<dyn crate::Machine + Send>,
     /// Reads this machine's memory at the door new work enters by
     /// (sprawling-SPEC.md 8-46-3).
-    pub(crate) read_memory: fn() -> Memory,
+    pub read_memory: fn() -> Memory,
     /// Reads the city's volume at the same door (sprawling-SPEC.md 8-116).
-    pub(crate) read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,
+    pub read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,
     /// Hands one of this city's paths to the desktop's file manager
     /// (sprawling-SPEC.md 8-60).
-    pub(crate) reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,
+    pub reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,
     /// Builds the browser tools a building's rules ask for
     /// (sprawling-SPEC.md 8-45-2).
-    pub(crate) browsers: Browsers,
+    pub browsers: Browsers,
     /// Where the desktop server a building's rules ask for is started
     /// from (sprawling-SPEC.md 8-4d).
-    pub(crate) desktop_program: DesktopProgram,
+    pub desktop_program: DesktopProgram,
     /// How this build installs one named item on this platform: the
     /// requirement table stays with the doctor (sprawling-SPEC.md,
     /// `doctor_install`).
-    pub(crate) recipe_for: fn(&str) -> Result<&'static accounting::Recipe, AxError>,
+    pub recipe_for: fn(&str) -> Result<&'static crate::Recipe, AxError>,
     /// Where the exec tool's interpreter, shell and engine come from.
-    pub(crate) exec_host: ExecHost,
+    pub exec_host: ExecHost,
 }
 
 /// The browser tools a building's rules ask for: its own browser, then
@@ -77,8 +77,8 @@ pub type DesktopProgram = fn() -> std::io::Result<PathBuf>;
 /// arrives as `None`, because the exec tool could not tell it from a
 /// working one.
 #[derive(Clone, Copy)]
-pub(crate) struct ExecHost {
-    pub(crate) python_wasm: fn() -> Option<PathBuf>,
-    pub(crate) shell: fn() -> Option<PathBuf>,
-    pub(crate) engine: fn() -> Result<Box<dyn runtime::Sandbox>, AxError>,
+pub struct ExecHost {
+    pub python_wasm: fn() -> Option<PathBuf>,
+    pub shell: fn() -> Option<PathBuf>,
+    pub engine: fn() -> Result<Box<dyn runtime::Sandbox>, AxError>,
 }

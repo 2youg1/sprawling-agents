@@ -51,7 +51,7 @@ pub struct Terminal {
 }
 
 // The one function that turns a question into an answer, shared with
-// the socket rather than reimplemented beside it: `assembly::serve`
+// the socket rather than reimplemented beside it: `accounting::worker::serve`
 // builds it once and hands the same `Arc` to both surfaces, so a number
 // this console prints and a number a browser draws cannot disagree.
 use kernel::Address;
@@ -146,7 +146,7 @@ pub(crate) fn web_url(terminal: &Terminal) -> String {
 /// typing would have made interaction a condition of service.
 pub(crate) fn start(
     terminal: Terminal,
-    desk: Arc<crate::assembly::CommandDesk>,
+    desk: Arc<accounting::worker::CommandDesk>,
     answering: Answering,
     mut watching: tokio::sync::broadcast::Receiver<wire::Committed>,
 ) {
@@ -192,7 +192,7 @@ fn say<W: Write>(out: &mut W, line: &str) {
 /// The loop, over any reader and writer so a test can drive it.
 pub(super) fn drive<R: BufRead, W: Write>(
     terminal: &Terminal,
-    desk: &crate::assembly::CommandDesk,
+    desk: &accounting::worker::CommandDesk,
     answering: &Answering,
     input: &mut R,
     out: &mut W,
@@ -275,7 +275,7 @@ pub(super) fn drive<R: BufRead, W: Write>(
 /// One frame, onto the same desk a browser's frames land on, or into the
 /// same answering function a browser's questions reach.
 fn post<W: Write>(
-    desk: &crate::assembly::CommandDesk,
+    desk: &accounting::worker::CommandDesk,
     answering: &Answering,
     frame: wire::ClientFrame,
     out: &mut W,

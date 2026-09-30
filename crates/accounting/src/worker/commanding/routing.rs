@@ -29,9 +29,9 @@ fn no_run_answers(action: &'static str, run: kernel::RunId, recovery: &'static s
 /// An empty goal is not a missing field: no job file is written and the
 /// prefix tells the model a person is at the other end, which is
 /// exactly the shape a single sentence typed into the composer has.
-pub(in crate::assembly) struct Asked {
-    pub(in crate::assembly) task: String,
-    pub(in crate::assembly) goal: String,
+pub(in crate::worker) struct Asked {
+    pub(in crate::worker) task: String,
+    pub(in crate::worker) goal: String,
 }
 
 impl RunWorker {
@@ -65,7 +65,7 @@ impl RunWorker {
     /// onto, because one verb outlives this call: a `Dispatch` starts a
     /// run in a lane and returns, so a refusal that arrives after the
     /// drive has to know where to go (sprawling-SPEC.md 8-46-2).
-    pub(in crate::assembly) fn run_command(
+    pub(in crate::worker) fn run_command(
         &mut self,
         command: wire::Command,
         reply: wire::Reply,
@@ -177,7 +177,7 @@ impl RunWorker {
             wire::Command::PutSecret { realm, name, value } => self.put_secret(
                 &kernel::SecretRef::new(&realm, &name)?,
                 value,
-                crate::assembly::credentials::signing::Arrival::Enrolment,
+                crate::worker::credentials::signing::Arrival::Enrolment,
             ),
             wire::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())
@@ -198,7 +198,7 @@ impl RunWorker {
             // own layer and no run can observe it, so a record of it
             // in the city's one history would travel to every machine
             // that city is copied to.
-            wire::Command::PutPreferences { patch, .. } => accounting::person::put(patch),
+            wire::Command::PutPreferences { patch, .. } => crate::person::put(patch),
             wire::Command::PutShelved { name, .. } => Err(Unbuilt::PutShelved(name).not_built()),
             wire::Command::Pursue { addr, step, .. } => self.set_pursuit(&addr, step),
             wire::Command::OpenSession {
@@ -276,7 +276,7 @@ impl RunWorker {
     /// Propagates the schedule's own refusal to parse. A job that cannot
     /// be started does not fail this call: nobody is waiting on the
     /// answer, and the jobs behind it are owed their run.
-    pub(crate) fn tick(&mut self, now: TimeMs) -> Result<u32, AxError> {
+    pub fn tick(&mut self, now: TimeMs) -> Result<u32, AxError> {
         let schedule = city::Schedule::load(&self.city_root)?;
         let due = schedule.due_after(self.last_tick, now);
         let mut started: u32 = 0;
@@ -298,7 +298,7 @@ impl RunWorker {
     /// Replaces the file manager, so a test can see what a reveal asks
     /// for without starting a program on the host.
     #[cfg(test)]
-    pub(in crate::assembly) fn reveal_with(
+    pub(in crate::worker) fn reveal_with(
         &mut self,
         reveal: fn(&std::path::Path, &kernel::Address) -> Result<(), AxError>,
     ) {

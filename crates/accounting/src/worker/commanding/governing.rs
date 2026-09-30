@@ -29,7 +29,7 @@ impl RunWorker {
     /// "this city is stopped" false in the one case where it matters
     /// most. The refusal a halted city gives a dispatch says which scope
     /// refused and how to open it.
-    pub(in crate::assembly) fn set_admission(
+    pub(in crate::worker) fn set_admission(
         &mut self,
         scope: &wire::HaltScope,
         state: Admittance,
@@ -66,7 +66,7 @@ impl RunWorker {
     /// The city covers everything; a building or a workshop covers what
     /// is inside it, by the same containment `WriteDomain` uses, so
     /// "inside" means one thing in this city rather than two.
-    pub(in crate::assembly) fn halted_by(&self, addr: &Address) -> Option<Scope> {
+    pub(in crate::worker) fn halted_by(&self, addr: &Address) -> Option<Scope> {
         self.governance
             .halted
             .iter()
@@ -78,7 +78,7 @@ impl RunWorker {
     ///
     /// The current value is folded from the ledger rather than mirrored
     /// anywhere: what the panel shows is what a replay can verify.
-    pub(in crate::assembly) fn set_autonomy(
+    pub(in crate::worker) fn set_autonomy(
         &mut self,
         scope: &wire::HaltScope,
         autonomy: kernel::Autonomy,
@@ -100,7 +100,7 @@ impl RunWorker {
     /// method is where production consults it, so a delegate answering
     /// its own item is refused on the same path the person's answer
     /// takes rather than on a parallel one.
-    pub(in crate::assembly) fn answer_approval(
+    pub(in crate::worker) fn answer_approval(
         &mut self,
         item: &kernel::ApprovalId,
         verdict: kernel::Ruling,
@@ -188,7 +188,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates a reserved subtree that cannot be written, and a
     /// history that will not take the line announcing it.
-    pub(in crate::assembly) fn put_document(
+    pub(in crate::worker) fn put_document(
         &mut self,
         which: wire::GovernedDocument,
         body: &str,
@@ -219,7 +219,7 @@ impl RunWorker {
     /// from, when it cannot be read for any other reason, when the
     /// write will not land, and when the history will not take the line
     /// announcing it.
-    pub(in crate::assembly) fn put_spine(
+    pub(in crate::worker) fn put_spine(
         &mut self,
         building: &Address,
         which: wire::SpineDocument,

@@ -851,7 +851,7 @@ EndpointSummary { name, label, base_url, dialect, models, local, has_credential 
 - **一个值而不是六个字段**。它们在同一张表单上被填，被同一次调用一起读；分开传就给了 probe 与它之后的 attach 三次机会对「我们在跟什么说话」产生分歧——`Entered` 当初收成一个值正是这个理由。
 - **probe 也带 tuning**。一个需要自定义请求头的网关，在 probe 不带那个头时答 401；人于是读到「密钥无效」，而那把密钥是好的。probe 与 call 因此按同一套头、同一个期限发出。
 - **覆盖的值走文本，不走 `serde_json::Value`**。`Command` 派生 `Eq`，而 JSON 没有全序相等；更要紧的是 `/temperature` → `0.2` 一旦成为值就是一个浮点，而它随 `endpoint_attached` 进账本——这座城把浮点挡在账本之外。文本原样往返，「这段文本作为 JSON 是什么」只有一个权威：`gateway::EndpointTuning::applied_overrides`，规则是「解析得出就是那个 JSON，解析不出就是它看上去的那个字符串」，于是 `/reasoning/effort` → `high` 不必要求人自己加引号。**败给的方案**：帧上直接放 `Value`——那要求 `Command` 放弃 `Eq`，并把浮点写进账本。
-- **零即缺省**。清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成；装配层把零读成「没说」（`bin::assembly::credentials::tuning_of`），于是清空一个框等于回到城自己的值，而不是让此后每一次调用立刻失败。
+- **零即缺省**。清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成；装配层把零读成「没说」（`accounting::worker::credentials::tuning_of`），于是清空一个框等于回到城自己的值，而不是让此后每一次调用立刻失败。
 - **`stream_idle_timeout_ms` 在线上保留 Codex 的名字，在 gateway 里叫 `stream_deadline_ms`**：阻塞传输交回的是一个没有分块钩子的 body reader，城因此能限定一次应答总共多久，限定不了其中某一次沉默多久。线上用人在自己 `config.toml` 里写熟的那个词，gateway 用它真正做到的那件事命名，装配层是唯一的翻译点。**败给的方案**：在 gateway 里也叫 idle——那会让一个读代码的人以为分块之间有计时器。
 - **`Turn` 携 `thought`**。thinking 块为供应方的签名校验端到端携带，看起来属于传输；但对一个把大部分调用花在推理上的模型，挡住它就是让人先对着空线程等几分钟，再读到两句话。所以推理以自己的字段作答，页面把它折起来放在散文旁边，两者永不混进同一个缓冲区。`RedactedThinking` 仍然不出现：它的载荷是加密的，里面没有人能读的东西。
 - **`EndpointSummary` 长出 `label`**：缺省即 `name`，所以页面永远不必替一个没写显示名的端点决定显示什么。
@@ -1500,7 +1500,7 @@ pub struct HarnessLine { pub name: String, pub launch: Vec<String>, pub found: b
 
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 
-**这张表存在的理由，是一次已经发生过的失效。** v0.0.3 的审计发现 `assembly::run_command` 只匹配 22 个 Command 里的 14 个，
+**这张表存在的理由，是一次已经发生过的失效。** v0.0.3 的审计发现 `accounting::worker::run_command` 只匹配 22 个 Command 里的 14 个，
 六个动词落进 catch-all——其中 Takeover／Rollback／CreatePolicy **在线上、画在客户端、由任何东西执行不了**，
 而 Cancel 与 Steer 在 run 不处于安全点时失败，恰好是人最需要它们的那一刻。
 `not_built` 的 rustdoc 当时就写着「**在这里被回绝的动词不得作为控件出现在客户端**」——那是一条**没有任何机器在看的规矩**。

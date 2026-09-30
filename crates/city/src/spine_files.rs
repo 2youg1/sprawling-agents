@@ -58,7 +58,7 @@ pub const CITY_FILE: &str = "City.md";
 /// The conventions a project brings with it. **The city neither writes
 /// this file nor owns it**; it is listed here because a resident is
 /// given it rather than sent to fetch it. How it is matched and where
-/// it lands in the prompt is `bin::assembly::freezing::building_segment`.
+/// it lands in the prompt is `accounting::worker::freezing::building_segment`.
 pub const AGENTS_FILE: &str = "AGENTS.md";
 
 const ROADMAP_TEMPLATE: &str = include_str!("../../../docs/templates/Roadmap.md");

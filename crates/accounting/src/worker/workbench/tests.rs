@@ -3,13 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 #[test]
 fn a_building_whose_rules_do_not_parse_stops_the_run_rather_than_guessing() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     lay_rules(dir.path(), "lab", "nothing declared\n");
     let (base_url, _provider) = fake_openai(
         &["m-local"],
@@ -41,7 +41,7 @@ fn a_building_whose_rules_do_not_parse_stops_the_run_rather_than_guessing() {
 #[test]
 fn a_run_is_told_who_shares_its_building_and_what_to_bring_them() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     city::create_building(
         dir.path(),
         &Address::parse("lab").unwrap(),
@@ -112,7 +112,7 @@ fn a_run_is_told_who_shares_its_building_and_what_to_bring_them() {
 #[test]
 fn a_signal_one_run_sends_is_read_by_the_run_that_pulls_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![
@@ -183,7 +183,7 @@ fn a_signal_one_run_sends_is_read_by_the_run_that_pulls_it() {
 #[test]
 fn the_shell_arm_exists_only_where_a_layer_asked_for_it() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let closed = city::load_config(dir.path(), &room).unwrap();
     assert!(
@@ -207,7 +207,7 @@ fn the_shell_arm_exists_only_where_a_layer_asked_for_it() {
 #[test]
 fn a_resident_of_the_hall_is_given_no_way_to_build() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("noted", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
@@ -314,7 +314,7 @@ fn the_checkpoint_after_an_edit_stages_the_edited_path_and_not_the_domain() {
 /// in the hall beside its room with one `edit`, and opens the city's
 /// repository afterwards.
 fn a_note_beside_the_hall(city: &std::path::Path) -> git2::Repository {
-    crate::assembly::fixture::init_city(city).unwrap();
+    crate::worker::fixture::init_city(city).unwrap();
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![
@@ -345,11 +345,11 @@ fn a_note_beside_the_hall(city: &std::path::Path) -> git2::Repository {
 #[test]
 fn the_citys_genesis_hash_is_read_once_and_survives_the_ledger_going_away() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
 

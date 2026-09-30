@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use crate::assembly::*;
+use crate::worker::*;
 
 /// A claim lands through the run that made it (`record_for`), and the
 /// worker's own table of who holds which node reads it at once, as a
@@ -11,11 +11,11 @@ use crate::assembly::*;
 #[test]
 fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let claim = kernel::event::record::RoadmapMoved {
@@ -61,11 +61,11 @@ fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
 fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands() {
     use kernel::Tool;
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let (building, room) = (
@@ -77,12 +77,12 @@ fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands
         room: room.clone(),
         run: RunId::from_bytes([7; 16]),
         who: "potter@lab.7".to_owned(),
-        clock: std::sync::Arc::new(crate::assembly::fixture::WallClock),
+        clock: std::sync::Arc::new(crate::worker::fixture::WallClock),
     };
     let desk = collab::ClaimDesk::new(
         "potter@lab.7".to_owned(),
         room,
-        crate::assembly::fixture::PLAN_ONE_FREE_ROW.to_owned(),
+        crate::worker::fixture::PLAN_ONE_FREE_ROW.to_owned(),
         booking::booking(worker.bell(), claimant),
     );
     let tool = collab::ClaimTool::new(std::sync::Arc::new(std::sync::Mutex::new(desk))).unwrap();
@@ -123,7 +123,7 @@ fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands
 /// because landing writes it before the plan's.
 #[test]
 fn a_claim_whose_landing_failed_is_handed_back() {
-    use crate::assembly::fixture::*;
+    use crate::worker::fixture::*;
     let dir = city_with_plan(PLAN_ONE_FREE_ROW);
     let (base_url, provider) = fake_openai(
         &["m-local"],
@@ -186,7 +186,7 @@ fn a_claim_whose_landing_failed_is_handed_back() {
 /// history already shows closed (sprawling-SPEC.md 8-42-8).
 #[test]
 fn a_claim_closed_on_the_ledger_is_not_handed_back_when_the_roadmap_write_fails() {
-    use crate::assembly::fixture::*;
+    use crate::worker::fixture::*;
     let dir = city_with_plan(PLAN_ONE_FREE_ROW);
     let (base_url, provider) = fake_openai(
         &["m-local"],
@@ -230,7 +230,7 @@ fn a_claim_closed_on_the_ledger_is_not_handed_back_when_the_roadmap_write_fails(
 /// (sprawling-SPEC.md 8-42-8).
 #[test]
 fn a_landing_refused_part_way_hands_back_only_the_nodes_it_did_not_close() {
-    use crate::assembly::fixture::*;
+    use crate::worker::fixture::*;
     let dir = city_with_plan(PLAN_TWO_FREE_ROWS);
     let (base_url, provider) = fake_openai(
         &["m-local"],
@@ -283,7 +283,7 @@ fn a_landing_refused_part_way_hands_back_only_the_nodes_it_did_not_close() {
 /// 8-42-8, 8-111).
 #[test]
 fn a_split_closes_the_claim_on_its_parent() {
-    use crate::assembly::fixture::*;
+    use crate::worker::fixture::*;
     let dir = city_with_plan(PLAN_TWO_FREE_ROWS);
     let (base_url, provider) = fake_openai(
         &["m-local"],
@@ -312,7 +312,7 @@ fn a_split_closes_the_claim_on_its_parent() {
     let worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();
@@ -349,7 +349,7 @@ fn a_split_closes_the_claim_on_its_parent() {
 /// A city whose building `lab` has `plan` as its roadmap.
 fn city_with_plan(plan: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(dir.path().join("lab").join(city::ROADMAP_FILE), plan).unwrap();
     dir

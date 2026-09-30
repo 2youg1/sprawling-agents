@@ -30,7 +30,7 @@ impl RunWorker {
     /// indexed - both before a model is called, since a run built on
     /// either would spend a call to produce claims the city was always
     /// going to drop.
-    pub(in crate::assembly) fn open_desks(
+    pub(in crate::worker) fn open_desks(
         &mut self,
         site: &Site,
         addr: &Address,
@@ -82,9 +82,9 @@ impl RunWorker {
             site.who.clone(),
             addr.clone(),
             plan_text,
-            crate::assembly::booking::booking(
+            crate::worker::booking::booking(
                 self.bell(),
-                crate::assembly::booking::Claimant {
+                crate::worker::booking::Claimant {
                     building: site.building.addr().clone(),
                     room: addr.clone(),
                     run: site.run_id,
@@ -146,7 +146,7 @@ impl RunWorker {
     /// The goal desk a run registers its ground through: each entry is
     /// decided on the accounting thread at the call, and its line is
     /// filed under `room`.
-    pub(in crate::assembly) fn goal_desk(
+    pub(in crate::worker) fn goal_desk(
         &self,
         run: kernel::RunId,
         room: &Address,

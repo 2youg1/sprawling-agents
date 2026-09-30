@@ -19,10 +19,10 @@ use super::RunWorker;
 /// What an audit of this city's chain needs, and nothing of the writer:
 /// the halt now attached to it, where the ledger is, and the position
 /// the audit starts from.
-pub(crate) struct ChainUnderAudit {
-    pub(crate) halt: storage::ChainHalt,
-    pub(crate) ledger_dir: PathBuf,
-    pub(crate) at: Seq,
+pub struct ChainUnderAudit {
+    pub halt: storage::ChainHalt,
+    pub ledger_dir: PathBuf,
+    pub at: Seq,
 }
 
 impl RunWorker {
@@ -31,7 +31,7 @@ impl RunWorker {
     ///
     /// From the moment the audit trips the halt, every append is refused
     /// with the audit's own reason.
-    pub(crate) fn chain_under_audit(&mut self) -> ChainUnderAudit {
+    pub fn chain_under_audit(&mut self) -> ChainUnderAudit {
         let halt = storage::ChainHalt::default();
         self.ledger.halt_on(halt.clone());
         ChainUnderAudit {

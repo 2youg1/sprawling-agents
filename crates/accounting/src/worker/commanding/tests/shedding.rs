@@ -10,7 +10,7 @@
     reason = "test code"
 )]
 
-use crate::assembly::*;
+use crate::worker::*;
 use kernel::degradation::VolumeSpace;
 
 const GIB: u64 = 1024 * 1024 * 1024;
@@ -26,7 +26,7 @@ fn close_to_full(_city: &Path) -> Option<VolumeSpace> {
 #[test]
 fn a_volume_below_its_floor_refuses_a_dispatch_before_anything_is_written() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     city::create_building(
         dir.path(),
         &Address::parse("lab").unwrap(),
@@ -36,7 +36,7 @@ fn a_volume_below_its_floor_refuses_a_dispatch_before_anything_is_written() {
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     worker.read_volume_with(close_to_full);

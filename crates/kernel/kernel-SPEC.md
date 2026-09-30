@@ -1239,7 +1239,7 @@ pub enum PursuitVerdict { Work { next: NodeId }, Waiting { in_flight: u32 }, Pau
 pub fn observe(state: PursuitState, ready: &[NodeId], in_flight: u32) -> PursuitVerdict;
 ```
 
-- **不叫 Endless，按它是什么命名**：本仓已有好几处叫 standing 的类型（如 `city::wizard::Standing`、`assembly::folds::Standing`、`GoalEntry.standing`），再加一个会让这个词再多一个含义。
+- **不叫 Endless，按它是什么命名**：本仓已有好几处叫 standing 的类型（如 `city::wizard::Standing`、`accounting::worker::folds::Standing`、`GoalEntry.standing`），再加一个会让这个词再多一个含义。
 - **一个社会停下来不是因为有人喊停，是因为没有就绪的活了。** 依据只此一条：就绪集为空**且**没有在途的 run。两半都要——就绪集空而四个 run 在跑，意思是活在别人手上，不是活干完了。
 - **钱明确不是停机条件**。本仓的成本面受众是 Agent（给它优化的材料），不是刹车；一个读预算的停机条件回答的是一个这里没人问的问题。
 - **`observe` 收状态而不收 `Pursuit`**：判定不依赖目标说了什么，而一个必须先持有 `Pursuit` 才能发问的读者，等于要拿深度零位才能**读**这座城。**声明是被守的动作，看不是。**
@@ -2103,7 +2103,7 @@ pub trait Ledger {
 }
 ```
 
-- **为什么端口要长这一只手**：一次持久写的代价是一道磁盘屏障，而屏障的价钱与骑在它上面的记录条数无关，真正的写只占其中一小部分。手上已经攥着一波的调用方按条交付，就为每一条付一道屏障。`storage::JsonlLedger` 覆写它为一波一屏障，`bin::assembly::relay` 按波调它。
+- **为什么端口要长这一只手**：一次持久写的代价是一道磁盘屏障，而屏障的价钱与骑在它上面的记录条数无关，真正的写只占其中一小部分。手上已经攥着一波的调用方按条交付，就为每一条付一道屏障。`storage::JsonlLedger` 覆写它为一波一屏障，`accounting::worker::relay` 按波调它。
 - **默认实现是诚实的**：逐条 `append`，任何没有批量能力的存储照此就是正确的，不必为了满足端口去假装合并。
 - **契约逐元素成立**：答 `Ok` 即整波已落盘，refs 按给入顺序回来。第一条拒绝结束整波，其前的记录可能已经落盘——这与单条 `append` 在它后面那条失败时给出的承诺完全一样。
 - **否决「显式屏障动作」**：让 `append` 只写不同步、另给一个 flush 动作，会让一条已经发出的 `EventRef` 指向一条可能还不存在的历史，而那正是这个类型存在的全部意义。
@@ -2271,4 +2271,4 @@ pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u
 - `lead_ms` 由调用方对所连 provider 实测给出，不在这里写死一个网络余量：慢链路与快链路要的提前量不同。
 - 花费只观察、不设门限：续期请求照常记 usage，本模块不读余额也不拦。
 - 设置按城→楼→居民三层梯解析，下层覆盖上层，一层也没说＝`Off`（city-SPEC §8-4 `[cache]` 一节）。它不进 `FrozenConfig`：续期发生在两次 run 之间，不属于任何一次 run 的冻结面。
-- 现状：设置与判定已落地；按它记账并经 `kernel::Model` 发出续期的是 `runtime::prefix::warmth`（runtime-SPEC §8-4-2）。续期由 `bin::assembly::keeping_warm` 在房间落地后按 `renewal_due` 发出，每次续期写一行 `cache_renewed`（sprawling-SPEC 8-93）。
+- 现状：设置与判定已落地；按它记账并经 `kernel::Model` 发出续期的是 `runtime::prefix::warmth`（runtime-SPEC §8-4-2）。续期由 `accounting::worker::keeping_warm` 在房间落地后按 `renewal_due` 发出，每次续期写一行 `cache_renewed`（sprawling-SPEC 8-93）。

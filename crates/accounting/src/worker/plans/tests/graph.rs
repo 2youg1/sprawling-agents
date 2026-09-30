@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::super::*;
-use crate::assembly::fixture::*;
+use crate::worker::fixture::*;
 
 /// A graph of nodes runs in dependency order, each in its own room
 /// with its contract as its `JOB.md`, and what comes back verified
@@ -21,7 +21,7 @@ use crate::assembly::fixture::*;
 #[test]
 fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let graph = serde_json::json!({
         "op": "lay_out",
         "nodes": [
@@ -125,7 +125,7 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
         "both results joined, verified by the city rather than by their own producers\n\
          the nodes wrote:\n{}\n\
          and how each run ended:\n{}",
-        crate::assembly::fixture::node_lines(dir.path()).join("\n"),
+        crate::worker::fixture::node_lines(dir.path()).join("\n"),
         mentioned(&history, "run_frozen")
     );
 }
@@ -148,7 +148,7 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
 #[test]
 fn three_ready_nodes_drive_three_runs_at_once() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     std::fs::write(
@@ -159,7 +159,7 @@ fn three_ready_nodes_drive_three_runs_at_once() {
     let (base_url, _provider) =
         fake_openai(&["m-local"], vec![completion("nothing left to do", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    worker.serve_one(crate::assembly::Posted {
+    worker.serve_one(crate::worker::Posted {
         command: wire::Command::Pursue {
             addr: Address::parse("lab").unwrap(),
             step: wire::PursuitStep::Set {

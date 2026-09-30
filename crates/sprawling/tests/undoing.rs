@@ -29,9 +29,9 @@ use kernel::{IdemKey, RunId, Seq};
 use sprawling::assembly;
 
 /// Opens a city and the worker that runs it.
-fn a_city(dir: &std::path::Path) -> assembly::RunWorker {
+fn a_city(dir: &std::path::Path) -> accounting::worker::RunWorker {
     assembly::init_city(dir).unwrap();
-    assembly::RunWorker::new(
+    accounting::worker::RunWorker::new(
         dir,
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),

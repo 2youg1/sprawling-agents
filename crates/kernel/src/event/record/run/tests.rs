@@ -216,7 +216,7 @@ fn the_two_endings_that_cite_nothing_leave_the_key_absent() {
     }
 }
 
-/// The bytes `sprawling::assembly::probing` wrote by hand for an
+/// The bytes `accounting::worker::probing` wrote by hand for an
 /// `eval_run` line, empty lists included.
 #[test]
 fn an_eval_line_keeps_the_bytes_its_ledger_already_holds() {

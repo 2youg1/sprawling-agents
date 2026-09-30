@@ -19,11 +19,11 @@ use kernel::{Address, AxCode, AxError, EventKind, GoalEntry, Payload, RunId};
 
 use super::RunWorker;
 use super::relay::Wake;
-use accounting::effect;
+use crate::effect;
 
 /// One registration, the run and room its line is filed under, and the
 /// address its answer goes back to.
-pub(crate) struct GoalAsk {
+pub struct GoalAsk {
     run: RunId,
     room: Address,
     entry: GoalEntry,
@@ -32,7 +32,7 @@ pub(crate) struct GoalAsk {
 
 /// The booking a run's goal desk registers through: an entry carried on
 /// the accounting thread's one queue and waited for, like a relay append.
-pub(crate) fn booking(bell: mpsc::Sender<Wake>, run: RunId, room: Address) -> collab::GoalBooking {
+pub fn booking(bell: mpsc::Sender<Wake>, run: RunId, room: Address) -> collab::GoalBooking {
     collab::GoalBooking::new(move |entry: &GoalEntry| {
         let (back, answer) = mpsc::sync_channel(0);
         bell.send(Wake::Goal(GoalAsk {

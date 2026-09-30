@@ -17,8 +17,8 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// One frozen segment as the record states it: which slot, which hash,
 /// and how many bytes went into the prompt.
@@ -109,7 +109,7 @@ fn choose(worker: &mut RunWorker, model: &str, key: &[u8]) {
 }
 
 fn open_lab(dir: &std::path::Path) {
-    crate::assembly::fixture::init_city(dir).unwrap();
+    crate::worker::fixture::init_city(dir).unwrap();
     city::create_building(
         dir,
         &Address::parse("lab").unwrap(),

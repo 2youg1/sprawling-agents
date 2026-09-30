@@ -30,11 +30,11 @@
 
 一层深（delegate 值上无 delegate 方法）已在 `kernel::delegation` 定谳，本 crate 只把它当作前提，不重议它。
 
-**未定：验证节点**。今天 `Handback::of` 收一个 `done_check_passed: bool` 与验证者的名字，装配层以 `CITY_VERIFIER` 为验证者（`crates/sprawling/src/assembly/dispatching/handback.rs`）。要定的是：验证是否改由另一地址上一个全新会话跑 `done_check` 后才铸 `Artifact`；验证者是否不得是图中任何实现者、改了代码须第三方再验；JOB 是否钉住被审文档的 Locator。能定下它的证据是一条测试：子 run 以 Done 结束而 `done_check` 失败时不铸 `Artifact`。
+**未定：验证节点**。今天 `Handback::of` 收一个 `done_check_passed: bool` 与验证者的名字，装配层以 `CITY_VERIFIER` 为验证者（`crates/accounting/src/worker/dispatching/handback.rs`）。要定的是：验证是否改由另一地址上一个全新会话跑 `done_check` 后才铸 `Artifact`；验证者是否不得是图中任何实现者、改了代码须第三方再验；JOB 是否钉住被审文档的 Locator。能定下它的证据是一条测试：子 run 以 Done 结束而 `done_check` 失败时不铸 `Artifact`。
 
 ## 4 现状分析
 
-十七个模块（§1）。本 crate 消费 kernel 的判定面：`kernel::gate::spawn`（经 `delegate_tool`）、`kernel::goal::detect_conflict`（经 `arbiter`）、`kernel::delegation`、`kernel::PlanTree`（经 `claim_tool`）。生产消费者是 `crates/sprawling` 的装配层：`assembly::collaborating` 按房间保存 join、图与目标表，工人把各张桌子借给工具，在一轮活落地时取走效应并写账。
+十七个模块（§1）。本 crate 消费 kernel 的判定面：`kernel::gate::spawn`（经 `delegate_tool`）、`kernel::goal::detect_conflict`（经 `arbiter`）、`kernel::delegation`、`kernel::PlanTree`（经 `claim_tool`）。生产消费者是 `crates/sprawling` 的装配层：`accounting::worker::collaborating` 按房间保存 join、图与目标表，工人把各张桌子借给工具，在一轮活落地时取走效应并写账。
 
 ## 5 权威信源
 
@@ -296,7 +296,7 @@ impl Tool for SignalTool { /* 两个 action：send｜pull */ }
 - **`send` 只入队不投递**：工具只把 Signal 放进 `effects`，真正 `deliver` 到收件房间发生在驱动返回之后、且恒在 `signal_enqueued` 落账之后。因为投影只允许因一条已追加的事件而改变（the book states what the history says, never what the process hoped to write）。
 - **发件范围由 `reach` 定界**：`reach` 是发件人所属楼的地址，由装配层经 `city::Building::of` 算好传入——**「一个地址归哪栋楼管」的权威在 city，collab 只执行交给它的边界**。越楼发件恒拒，报 `E_CROSS_BUILDING_DENIED` 且三段完整。`ToolMeta.effect` 是静态的（申报为 `Write { domain: room }`），所以逐件目标判定必须在工具内——工具拥有自己的策略。
 - **id 不采时钟不取随机**：`{run}-s{n}`，`n` 是 desk 自己的计数器。重放同一段历史得到同一批 id，去重才有意义（确定性第七条）。
-- **`take_steer` 取走一件就当场记 `Consumed`，包括那件读不成插队信的**：一件离队的信就是已读，不论模型拿它做了什么——否则同一句话会在下一个安全点再落一次，而发件人从历史里看不出它到没到。它与 `pull` 共用同一张队列与同一条 `signal_consumed` 形状，故两扇门没有第二份已读账。**而空队列与读不懂的信不合成一件事**：前者是 `Ok(None)`，后者是 `Err`（`Steer::from_signal` 拒绝非 steer 型的、以及载荷里没有文字的）。读不懂的那件被 `.ok()?` 折成空队列时，一件已离队的信在历史里读作从未到达，而发件人看到的是「已入队」；故那件信无论读得读不懂都入册，两件事各占一个返回值。安全点怎么处理这个拒绝由那一侧决定（`assembly::driving::lane`，sprawling-SPEC §8-73），desk 不替它决定。
+- **`take_steer` 取走一件就当场记 `Consumed`，包括那件读不成插队信的**：一件离队的信就是已读，不论模型拿它做了什么——否则同一句话会在下一个安全点再落一次，而发件人从历史里看不出它到没到。它与 `pull` 共用同一张队列与同一条 `signal_consumed` 形状，故两扇门没有第二份已读账。**而空队列与读不懂的信不合成一件事**：前者是 `Ok(None)`，后者是 `Err`（`Steer::from_signal` 拒绝非 steer 型的、以及载荷里没有文字的）。读不懂的那件被 `.ok()?` 折成空队列时，一件已离队的信在历史里读作从未到达，而发件人看到的是「已入队」；故那件信无论读得读不懂都入册，两件事各占一个返回值。安全点怎么处理这个拒绝由那一侧决定（`accounting::worker::driving::lane`，sprawling-SPEC §8-73），desk 不替它决定。
 - **`pull` 的剩余量写在结果里**：`status.signals_pending` 是派活那一刻的事实（StatusTool 持的是快照），所以 `pull` 结果里带 `remaining`——一个数字比一套让 status 活起来的机制便宜得多，而且它就在模型正在读的那句话里。
 - **投递失败不静默**：`deliver` 返回 `Admission::Shed` 时，入账的是事实而非成功；削峰判定住 `kernel::backpressure`，本模块不自建第二套限流。
 

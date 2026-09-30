@@ -15,7 +15,7 @@ use std::collections::BTreeSet;
 
 use kernel::{Address, EventKind, Locator};
 
-use accounting::effect;
+use crate::effect;
 
 use super::super::{Assignment, CITY_VERIFIER, Owing, RunWorker};
 use super::Dispatched;
@@ -38,7 +38,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates the store's refusal of the account, an address that
     /// does not name a node, and the ledger's refusal of the signal.
-    pub(in crate::assembly) fn deliver_handback(
+    pub(in crate::worker) fn deliver_handback(
         &mut self,
         parent: &Address,
         child: &Dispatched,
@@ -114,7 +114,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates the delegate desk's refusal and whatever starting a
     /// node reports.
-    pub(in crate::assembly) fn hand_down_what_is_ready(
+    pub(in crate::worker) fn hand_down_what_is_ready(
         &mut self,
         parent: &Address,
         sibling: &Assignment,

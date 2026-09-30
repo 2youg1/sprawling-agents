@@ -10,7 +10,7 @@ use kernel::RunId;
 use runtime::Interrupt;
 
 use super::relay::Wake;
-use crate::assembly::Closing;
+use crate::worker::Closing;
 
 /// Where commands wait between the socket and the worker.
 ///
@@ -19,7 +19,8 @@ use crate::assembly::Closing;
 /// worker is inside a dispatch. A Cancel that waits for the run it
 /// cancels is not a Cancel. The desk keeps arrival order, and the run
 /// looks at it only at its own safe points.
-pub(crate) struct CommandDesk {
+#[derive(Default)]
+pub struct CommandDesk {
     waiting: std::sync::Mutex<Waiting>,
     /// The accounting thread's one queue, once a thread attends this
     /// desk. A post rings it so that thread wakes on the post itself
@@ -36,6 +37,7 @@ pub(crate) struct CommandDesk {
 /// The queue and the keys are read together and must agree: a key that
 /// left the queue between two locks would let the same ask through
 /// twice, which is the whole of what this pair prevents.
+#[derive(Default)]
 struct Waiting {
     queue: std::collections::VecDeque<Posted>,
     /// Every key that is either still in `queue` or being carried out.
@@ -51,7 +53,7 @@ struct Waiting {
 /// A guard rather than a call the drainer has to remember: the key is in
 /// flight for exactly as long as this value lives, including when the
 /// loop that took it leaves early.
-pub(crate) struct Underway<'desk> {
+pub struct Underway<'desk> {
     desk: &'desk CommandDesk,
     key: Option<kernel::IdemKey>,
 }
@@ -86,15 +88,15 @@ impl Waiting {
 /// The two travel together because they are separated by a thread and
 /// by minutes: by the time the worker refuses, the socket task that
 /// accepted the command has long returned.
-pub(crate) struct Posted {
-    pub(crate) command: wire::Command,
-    pub(crate) reply: wire::Reply,
+pub struct Posted {
+    pub command: wire::Command,
+    pub reply: wire::Reply,
 }
 
 /// What the worker found when it looked at the desk. Exhaustive, because
 /// "nothing arrived" and "nobody will ever arrive again" are different
 /// facts and the loop does different things about them.
-pub(crate) enum DeskWait<'desk> {
+pub enum DeskWait<'desk> {
     /// Boxed because this variant is the only one that carries
     /// anything: a `Posted` holds a whole `Command`, and an enum shaped
     /// like this one is returned by every idle tick as well.
@@ -118,20 +120,6 @@ pub(crate) enum DeskWait<'desk> {
 pub(super) const SCHEDULE_TICK_MS: u64 = 20_000;
 
 impl CommandDesk {
-    /// Visible to the crate so the console loop can be driven in a test
-    /// through the door production uses, rather than through a second
-    /// one opened for testing.
-    pub(crate) fn new() -> CommandDesk {
-        CommandDesk {
-            waiting: std::sync::Mutex::new(Waiting {
-                queue: std::collections::VecDeque::new(),
-                keys: std::collections::BTreeSet::new(),
-            }),
-            bell: std::sync::Mutex::new(None),
-            closing: std::sync::OnceLock::new(),
-        }
-    }
-
     /// Says the city is stopping, and wakes the worker so it hears.
     ///
     /// Not a Command: closing is not something a peer asks the city for,
@@ -140,7 +128,7 @@ impl CommandDesk {
     /// reads it where it reads the queue, so whatever is running
     /// finishes first. The first reason given stands: a second close
     /// does not rewrite why the city stopped.
-    pub(crate) fn close(&self, why: Closing) {
+    pub fn close(&self, why: Closing) {
         self.closing.get_or_init(|| why);
         self.ring(Wake::Close);
     }
@@ -148,7 +136,7 @@ impl CommandDesk {
     /// Rings `bell` from now on whenever a command is posted or the city
     /// closes. What was posted before is already on the desk, and the
     /// thread that attends it looks there before it first waits.
-    pub(crate) fn ring_through(&self, bell: std::sync::mpsc::Sender<Wake>) {
+    pub fn ring_through(&self, bell: std::sync::mpsc::Sender<Wake>) {
         if let Ok(mut ringing) = self.bell.lock() {
             *ringing = Some(bell);
         }
@@ -176,7 +164,7 @@ impl CommandDesk {
     /// than as a second run against a paid provider.
     /// Once the work is over the key is forgotten, so asking for the
     /// same work again is a second piece of work rather than silence.
-    pub(crate) fn post(&self, command: wire::Command, reply: wire::Reply) {
+    pub fn post(&self, command: wire::Command, reply: wire::Reply) {
         if let Ok(mut waiting) = self.waiting.lock() {
             if let Some(key) = command.idem() {
                 // The claim is the insertion: a key already in the set
@@ -203,7 +191,7 @@ impl CommandDesk {
     /// post and a lane reads only at its safe points, so handing it out
     /// here would refuse it as though no run answered
     /// (sprawling-SPEC.md 8-42-1).
-    pub(crate) fn next(&self, driving: impl Fn(RunId) -> bool) -> DeskWait<'_> {
+    pub fn next(&self, driving: impl Fn(RunId) -> bool) -> DeskWait<'_> {
         let Ok(mut waiting) = self.waiting.lock() else {
             return DeskWait::Gone;
         };
@@ -233,7 +221,7 @@ impl CommandDesk {
     /// Takes one command if any is waiting, without waiting for one.
     /// Used where a test drives the desk directly; the worker loop waits.
     #[cfg(test)]
-    pub(crate) fn take(&self) -> Option<wire::Command> {
+    pub fn take(&self) -> Option<wire::Command> {
         let mut waiting = self.waiting.lock().ok()?;
         let posted = waiting.queue.pop_front()?;
         if let Some(key) = posted.command.idem() {
@@ -247,7 +235,7 @@ impl CommandDesk {
     /// Cancel outranks Steer on the same boundary: stopping and changing
     /// course are mutually exclusive, and stopping is the one that cannot
     /// be taken back. Commands for other runs keep their place in line.
-    pub(crate) fn interrupt_for(&self, run: RunId) -> Interrupt {
+    pub fn interrupt_for(&self, run: RunId) -> Interrupt {
         let Ok(mut waiting) = self.waiting.lock() else {
             return Interrupt::None;
         };

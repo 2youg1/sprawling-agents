@@ -13,7 +13,7 @@
 //! may still delegate. No person is asked: nothing outside the run's
 //! own room changes, and no depth is added. What bounds a chain of
 //! successions is the hop counter its landing is checked against, in
-//! `crates/sprawling/src/assembly/driving/owing.rs`, whose ceilings are
+//! `crates/accounting/src/worker/driving/owing.rs`, whose ceilings are
 //! recorded in sprawling-SPEC.md 8-46-12. `Halt` answers a different
 //! question: it shuts a scope to new work.
 //!

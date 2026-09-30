@@ -17,7 +17,7 @@ use serde_json::{Map, Value};
 use zeroize::Zeroizing;
 
 use super::super::super::dispatching::custody::kept_text;
-use accounting::held_vault::poisoned_vault;
+use crate::held_vault::poisoned_vault;
 
 #[cfg(test)]
 mod tests;
@@ -60,7 +60,7 @@ impl std::fmt::Display for InPlace {
 
 /// The vault and the naming every tool of one run shares, so that no
 /// two tools keep two keys under one name.
-pub(in crate::assembly) struct Keeper {
+pub(in crate::worker) struct Keeper {
     vault: Arc<Mutex<gateway::Custodian>>,
     /// The ledger position when this run's bench was laid out: no two
     /// runs share it, because each writes before its bench is laid out.
@@ -71,7 +71,7 @@ pub(in crate::assembly) struct Keeper {
 }
 
 impl Keeper {
-    pub(in crate::assembly) fn new(vault: Arc<Mutex<gateway::Custodian>>, run: u64) -> Keeper {
+    pub(in crate::worker) fn new(vault: Arc<Mutex<gateway::Custodian>>, run: u64) -> Keeper {
         Keeper {
             vault,
             run,
@@ -171,13 +171,13 @@ impl Keeper {
 }
 
 /// One tool with custody in front of and behind it.
-pub(in crate::assembly) struct Kept {
+pub(in crate::worker) struct Kept {
     tool: Box<dyn Tool>,
     keeper: Arc<Keeper>,
 }
 
 impl Kept {
-    pub(in crate::assembly) fn new(tool: Box<dyn Tool>, keeper: Arc<Keeper>) -> Kept {
+    pub(in crate::worker) fn new(tool: Box<dyn Tool>, keeper: Arc<Keeper>) -> Kept {
         Kept { tool, keeper }
     }
 }

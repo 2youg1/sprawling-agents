@@ -6,7 +6,7 @@
 //! A history that verifies is a history a city starts from.
 
 use super::super::*;
-use crate::assembly::*;
+use crate::worker::*;
 
 /// A newer writer's line that marks itself ignorable passes the one
 /// per-line check; the folds read what that check read, so the city
@@ -14,7 +14,7 @@ use crate::assembly::*;
 #[test]
 fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let segment = storage::ledger_segments_at(&report.ledger_dir)
         .unwrap()
         .pop()
@@ -34,7 +34,7 @@ fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
     bytes.extend_from_slice(future.as_bytes());
     std::fs::write(&segment, &bytes).unwrap();
 
-    let views = accounting::views::Views::rebuild(&report.ledger_dir).map(|_| ());
+    let views = crate::views::Views::rebuild(&report.ledger_dir).map(|_| ());
     let standing = Standing::fold(&report.ledger_dir).map(|_| ());
     assert_eq!((views, standing), (Ok(()), Ok(())));
 }
@@ -45,11 +45,11 @@ fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
 #[test]
 fn one_read_of_the_history_folds_what_a_read_for_each_would() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     worker
@@ -72,8 +72,8 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
 
     let (views, (_ledger, _report, standing)) = fold_city(
         &report.ledger_dir,
-        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
-        &mut crate::assembly::opening_cost::OpeningCost::begin(crate::assembly::fixture::monotonic),
+        crate::Clock::now(&crate::worker::fixture::WallClock).unwrap(),
+        &mut crate::worker::opening_cost::OpeningCost::begin(crate::worker::fixture::monotonic),
     )
     .unwrap();
     // Answered from what `Views::apply` folded, not from the on-disk index.

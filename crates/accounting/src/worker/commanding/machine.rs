@@ -20,7 +20,7 @@
 //! that starts processes, which would hold the one thread every other
 //! read is answered on and would do it without anybody asking.
 //!
-//! **The worker reaches the machine through `accounting::Machine`**
+//! **The worker reaches the machine through `crate::Machine`**
 //! (accounting-SPEC.md 8-4); `doctor::ThisMachine` is the production
 //! one, and `with_machine` is the one door that swaps it.
 
@@ -37,7 +37,7 @@ impl RunWorker {
     /// while refusing a name the requirement table does not carry and a
     /// recipe this city may not run stay the worker's.
     #[must_use]
-    pub fn with_machine(self, machine: Box<dyn accounting::Machine + Send>) -> RunWorker {
+    pub fn with_machine(self, machine: Box<dyn crate::Machine + Send>) -> RunWorker {
         RunWorker { machine, ..self }
     }
 
@@ -61,7 +61,7 @@ impl RunWorker {
     /// Refuses a name this city checks for nothing under, a platform
     /// this project states no recipes for, a recipe this city may not
     /// run, and whatever starting the program reports.
-    pub(in crate::assembly) fn doctor_install(&mut self, item: &str) -> Result<(), AxError> {
+    pub(in crate::worker) fn doctor_install(&mut self, item: &str) -> Result<(), AxError> {
         let runnable = (self.recipe_for)(item)?.command(item)?;
         // The log is the progress channel, so a line is written as the
         // install reaches it rather than at the end, which is when a
@@ -99,14 +99,14 @@ impl RunWorker {
     /// Replaces the requirement table's lookup, so a test can install
     /// an item this build does not carry without starting anything.
     #[cfg(test)]
-    pub(in crate::assembly) fn recipe_for_with(
+    pub(in crate::worker) fn recipe_for_with(
         &mut self,
-        recipe_for: fn(&str) -> Result<&'static accounting::Recipe, AxError>,
+        recipe_for: fn(&str) -> Result<&'static crate::Recipe, AxError>,
     ) {
         self.recipe_for = recipe_for;
     }
 
-    pub(in crate::assembly) fn look_at_this_machine(&mut self) {
+    pub(in crate::worker) fn look_at_this_machine(&mut self) {
         let found = self.machine.report();
         self.show_this_machine(found);
     }
@@ -149,7 +149,7 @@ fn still_absent(item: &str) -> AxError {
     reason = "test code"
 )]
 mod tests {
-    use crate::assembly::RunWorker;
+    use crate::worker::RunWorker;
 
     /// A worker over an empty city, which is all this verb needs: it
     /// refuses before it touches the machine.
@@ -157,10 +157,10 @@ mod tests {
         RunWorker::over(
             city_root,
             runtime::diagnostics::Diagnostics::off(),
-            crate::assembly::fixture::hands(),
+            crate::worker::fixture::hands(),
             storage::JsonlLedger::open(
                 &kernel::layout::CityLayout::new(city_root).ledger(),
-                accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
+                crate::Clock::now(&crate::worker::fixture::WallClock).unwrap(),
             )
             .unwrap(),
         )
@@ -172,8 +172,8 @@ mod tests {
     /// The one item the scripted table carries.
     const SCRIPTED: &str = "scripted-tool";
 
-    fn scripted_table(item: &str) -> Result<&'static accounting::Recipe, kernel::AxError> {
-        static RECIPE: accounting::Recipe = accounting::Recipe::Command {
+    fn scripted_table(item: &str) -> Result<&'static crate::Recipe, kernel::AxError> {
+        static RECIPE: crate::Recipe = crate::Recipe::Command {
             program: "scripted-installer",
             args: &["scripted-tool"],
         };
@@ -200,7 +200,7 @@ mod tests {
         Nothing,
     }
 
-    impl accounting::Machine for Recording {
+    impl crate::Machine for Recording {
         fn report(&self) -> wire::DoctorAnswer {
             let items = match self.1 {
                 Finds::Nothing => Vec::new(),
@@ -243,7 +243,7 @@ mod tests {
         fn install(
             &self,
             item: &str,
-            runnable: &accounting::Runnable<'_>,
+            runnable: &crate::Runnable<'_>,
         ) -> Result<(), kernel::AxError> {
             self.0
                 .lock()

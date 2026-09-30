@@ -34,8 +34,9 @@
 
 use std::path::Path;
 
+use accounting::worker::RunWorker;
 use kernel::{Address, AxCode, AxError, EventKind, EventRecord, IdemKey, RunId, Seq};
-use sprawling::assembly::{self, RunWorker};
+use sprawling::assembly;
 
 /// The four variables this gate reads, named once and printed when one
 /// of them is missing.

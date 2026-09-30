@@ -31,7 +31,7 @@ impl RunWorker {
     /// Propagates the vault refusing the key and the ledger refusing
     /// its `secret_captured` record. The caller must not go on with the
     /// original text, because that is the leak this exists to close.
-    pub(in crate::assembly) fn take_custody(&mut self, text: String) -> Result<String, AxError> {
+    pub(in crate::worker) fn take_custody(&mut self, text: String) -> Result<String, AxError> {
         match kept_text(&text, |provider, key| self.keep_pasted(provider, key))? {
             Some(kept) => {
                 drop(Zeroizing::new(text));
@@ -67,7 +67,7 @@ impl RunWorker {
 /// # Errors
 /// Propagates `keep` refusing a key, and a span off the text's character
 /// boundaries.
-pub(in crate::assembly) fn kept_text<InPlace: std::fmt::Display>(
+pub(in crate::worker) fn kept_text<InPlace: std::fmt::Display>(
     text: &str,
     mut keep: impl FnMut(&str, &str) -> Result<InPlace, AxError>,
 ) -> Result<Option<String>, AxError> {

@@ -8,7 +8,7 @@
 
 use sysinfo::{MemoryRefreshKind, System};
 
-use crate::assembly::Memory;
+use accounting::worker::Memory;
 
 thread_local! {
     /// The handle `read` refreshes, kept per thread so a reading pays the

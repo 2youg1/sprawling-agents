@@ -12,9 +12,9 @@ use kernel::{AxError, RunId, Seq};
 use runtime::diagnostics::{Diagnostics, Level, Site};
 use storage::{JsonlLedger, OpenReport};
 
-use crate::assembly::opening_cost::{OpeningCost, Phase};
-use accounting::views::Views;
-use accounting::views::snapshot::start::cut_at;
+use crate::views::Views;
+use crate::views::snapshot::start::cut_at;
+use crate::worker::opening_cost::{OpeningCost, Phase};
 
 use super::{Standing, fold_city};
 
@@ -37,7 +37,7 @@ use super::{Standing, fold_city};
 ///
 /// # Errors
 /// Those of [`fold_city`].
-pub(crate) fn start_served_views(
+pub fn start_served_views(
     ledger_dir: &Path,
     now: kernel::TimeMs,
     log: &mut Diagnostics,
@@ -52,7 +52,7 @@ pub(crate) fn start_served_views(
             .ok()
             .and_then(|last| last.as_ref().map(|(seq, _)| *seq))
             .unwrap_or(Seq::FIRST),
-        module: "bin::assembly",
+        module: "accounting::worker",
     };
     let cut = last.and_then(|last| cut_at(ledger_dir, &views, last.as_ref()));
     cost.lap(Phase::CutViews);

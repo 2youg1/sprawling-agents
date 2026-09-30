@@ -22,7 +22,6 @@ getrandom = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-postcard = { workspace = true }
 tokio = { workspace = true }
 # The monitor's counters (sprawling-SPEC.md 8-94, 8-96): the machine's
 # memory and the volume only, not the default component, network and user
@@ -32,13 +31,10 @@ sysinfo = { version = "0.39", default-features = false, features = ["system", "d
 cpu-time = "1"
 memory-stats = "1.2"
 tokio-tungstenite = { workspace = true }
-# Codex keeps its provider table in TOML, and `import` reads it.
-toml = { workspace = true }
 # A core thread raises itself above the commands it dispatches; the
 # crate's surface is safe, so no foreign call lives in this crate
 # (sprawling-SPEC.md 8-93).
 thread-priority = "3.1"
-zeroize = { workspace = true }
 # The desktop server this binary runs as `sprawling desktop`, a child
 # the city starts for a building whose rules ask for the desktop
 # (sprawling-SPEC.md 8-4d). A path to the package outside the
@@ -57,20 +53,6 @@ flate2 = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true
-# Read-only, and tests only: a merge the city makes is judged by opening
-# the repository it landed in and reading the commit message, rather than
-# by trusting the value the caller passed.
-git2.workspace = true
-# The deterministic power-loss model, so a test above the ledger can lose
-# one named line and assert the city did not move. Kept to dev only: a
-# release build of this binary never carries FaultFs.
-storage = { workspace = true, features = ["fault"] }
-# The Ledger port's own assertion suite, so the relay adapter is held to
-# the same six assertions as the two adapters that own a medium.
-kernel = { workspace = true, features = ["conformance"] }
-# A child that answers every line with one fixed result, so the wiring
-# of a building's servers is driven through a real pipe.
-agent_protocols = { workspace = true, features = ["conformance"] }
 
 [lints]
 workspace = true

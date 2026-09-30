@@ -18,43 +18,43 @@ use super::super::{Assignment, DriveContext, Driven, Driving, Given, Site, Stamp
 /// One dispatch the accounting thread has decided, on its way to a
 /// lane: what was asked, where the run stands, and everything the lane
 /// half reads, owned so the value can leave the thread.
-pub(in crate::assembly) struct Staged {
-    pub(in crate::assembly) at: Assignment,
-    pub(in crate::assembly) site: Site,
+pub(in crate::worker) struct Staged {
+    pub(in crate::worker) at: Assignment,
+    pub(in crate::worker) site: Site,
     lane: LaneHalf,
 }
 
 /// What only the lane half reads.
-pub(in crate::assembly) struct LaneHalf {
-    pub(in crate::assembly) given: Given,
-    pub(in crate::assembly) job_locator: Locator,
-    pub(in crate::assembly) desks: BenchDesks,
-    pub(in crate::assembly) laying: Laying,
+pub(in crate::worker) struct LaneHalf {
+    pub(in crate::worker) given: Given,
+    pub(in crate::worker) job_locator: Locator,
+    pub(in crate::worker) desks: BenchDesks,
+    pub(in crate::worker) laying: Laying,
     /// The conversation this run opens with, rebuilt on the accounting
     /// thread where the ledger's index is held.
-    pub(in crate::assembly) inherited: Vec<kernel::ChatMessage>,
-    pub(in crate::assembly) carried_from: Option<RunId>,
-    pub(in crate::assembly) member: Option<runtime::BacklogId>,
+    pub(in crate::worker) inherited: Vec<kernel::ChatMessage>,
+    pub(in crate::worker) carried_from: Option<RunId>,
+    pub(in crate::worker) member: Option<runtime::BacklogId>,
     /// The key of the command this dispatch answers, stamped on every
     /// line the lane half writes (sprawling-SPEC.md 8-41).
-    pub(in crate::assembly) command: Option<kernel::IdemKey>,
+    pub(in crate::worker) command: Option<kernel::IdemKey>,
 }
 
 /// What a lane carries home, whether its preparation held or not: the
 /// assignment and the site go back to `land`, which gives back the tree
 /// the site may hold before it reads how the drive went.
-pub(crate) struct Flown {
-    pub(crate) at: Assignment,
-    pub(crate) site: Site,
-    pub(crate) driven: Result<Driven, AxError>,
+pub struct Flown {
+    pub at: Assignment,
+    pub site: Site,
+    pub driven: Result<Driven, AxError>,
 }
 
 impl Staged {
-    pub(in crate::assembly) fn new(at: Assignment, site: Site, lane: LaneHalf) -> Staged {
+    pub(in crate::worker) fn new(at: Assignment, site: Site, lane: LaneHalf) -> Staged {
         Staged { at, site, lane }
     }
 
-    pub(crate) fn run_id(&self) -> RunId {
+    pub fn run_id(&self) -> RunId {
         self.site.run_id
     }
 
@@ -63,7 +63,7 @@ impl Staged {
     /// Generic in the ledger for the reason [`drive_run`] is: a lane
     /// writes through its relay, and a test on the accounting thread
     /// writes through the city's own ledger.
-    pub(crate) fn fly<L: Ledger>(self, ledger: &mut L, context: DriveContext) -> Flown {
+    pub fn fly<L: Ledger>(self, ledger: &mut L, context: DriveContext) -> Flown {
         let Staged { at, mut site, lane } = self;
         let driven = lane
             .prepare(&at, &mut site, ledger, &context)

@@ -42,7 +42,7 @@ fn a_worker_stamps_its_lines_with_the_clock_it_was_handed() {
         .unwrap()
         .raw_lines()
         .len();
-    let mut worker = assembly::RunWorker::new(
+    let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),

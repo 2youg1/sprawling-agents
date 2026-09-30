@@ -14,14 +14,14 @@
     reason = "test code"
 )]
 
-use crate::assembly::*;
-use crate::assembly::{CommandDesk, Posted};
-use accounting::views::Views;
+use crate::views::Views;
+use crate::worker::*;
+use crate::worker::{CommandDesk, Posted};
 use kernel::Locator;
 
 #[test]
 fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
-    let desk = CommandDesk::new();
+    let desk = CommandDesk::default();
     // The body travels as the JSON it arrived as: `agent_protocols::Incoming`
     // is the only grammar for an inbound request, and nothing on this
     // path reads a field out of it.
@@ -66,11 +66,11 @@ fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
 #[test]
 fn a_refused_command_reaches_the_peer_that_sent_it() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
 
@@ -128,11 +128,11 @@ fn a_refusal_with_no_one_behind_it_says_so_rather_than_failing() {
 #[test]
 fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
 
@@ -214,7 +214,7 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     let restarted = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     assert!(restarted.governance.pending.is_empty());
@@ -323,11 +323,11 @@ fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
     // catch-all refusal that names a build stage and nothing they can
     // act on.
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
 

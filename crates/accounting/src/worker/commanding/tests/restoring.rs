@@ -11,17 +11,17 @@
     reason = "test code"
 )]
 
-use crate::assembly::*;
+use crate::worker::*;
 
 #[test]
 fn a_discarded_file_comes_back_and_its_row_closes() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
-    crate::assembly::fixture::init_city(root).unwrap();
+    crate::worker::fixture::init_city(root).unwrap();
     let mut worker = RunWorker::new(
         root,
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
 
@@ -66,8 +66,7 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
         Some("the words a wave deleted"),
         "the bytes the checkpoint held are back at their path"
     );
-    let wire::Answer::Discards(bin) =
-        accounting::views::ask(root, &wire::Query::DiscardView).unwrap()
+    let wire::Answer::Discards(bin) = crate::views::ask(root, &wire::Query::DiscardView).unwrap()
     else {
         panic!("DiscardView answers with the bin");
     };
@@ -85,11 +84,11 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
 fn a_way_back_the_bin_does_not_write_is_refused_in_one_readable_sentence() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
-    crate::assembly::fixture::init_city(root).unwrap();
+    crate::worker::fixture::init_city(root).unwrap();
     let mut worker = RunWorker::new(
         root,
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let stored = kernel::Locator::cas(kernel::B3Hash::digest(b"a stored object"));

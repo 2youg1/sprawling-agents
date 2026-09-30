@@ -5,16 +5,16 @@
 
 //! How a credential enters this city: enrolment.
 
-use crate::assembly::*;
+use crate::worker::*;
 
 #[test]
 fn an_enrolled_credential_leaves_only_a_reference_in_the_history() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     // Assembled at runtime: a credential-shaped literal is what the

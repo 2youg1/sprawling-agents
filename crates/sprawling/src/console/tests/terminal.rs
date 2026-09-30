@@ -90,7 +90,7 @@ fn the_screen_keeps_the_listener_half_when_the_city_does_not_answer() {
 
 /// Runs the console loop and returns every Command it posted.
 fn posted(script: &str) -> Vec<wire::Command> {
-    let desk = crate::assembly::CommandDesk::new();
+    let desk = accounting::worker::CommandDesk::default();
     let mut out: Vec<u8> = Vec::new();
     super::super::terminal::drive(
         &terminal("127.0.0.1:8787", None),
@@ -99,7 +99,15 @@ fn posted(script: &str) -> Vec<wire::Command> {
         &mut std::io::Cursor::new(script.as_bytes().to_vec()),
         &mut out,
     );
-    std::iter::from_fn(|| desk.take()).collect()
+    // Read through the door the writer's loop reads through, so the test
+    // sees exactly what the loop would be handed.
+    std::iter::from_fn(|| match desk.next(|_run| false) {
+        accounting::worker::DeskWait::Command(posted, _underway) => Some(posted.command),
+        accounting::worker::DeskWait::Idle
+        | accounting::worker::DeskWait::Close(_)
+        | accounting::worker::DeskWait::Gone => None,
+    })
+    .collect()
 }
 
 /// The city answers a key it has seen with its first answer, across

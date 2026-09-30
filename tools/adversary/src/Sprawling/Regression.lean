@@ -23,7 +23,7 @@ are read from the module that owns them, so a cast changed there is a file
 rendered differently here.
 
 The emitted test enters by the door `wire::server` uses —
-`assembly::RunWorker::handle` — rather than by a socket. The adversary attacks
+`accounting::worker::RunWorker::handle` — rather than by a socket. The adversary attacks
 the binary over the wire because that is where an agent stands; the regression it
 hands back runs in-process because a committed test should not need a port, and
 the policy under accusation is the same on both paths.
@@ -207,7 +207,7 @@ private def cityAndWorker (named : Bool) : List String :=
   , ""
   , "    // The vault is the in-session one: a test that reached the platform"
   , "    // credential service would write to the machine running it."
-  , "    let mut worker = assembly::RunWorker::new("
+  , "    let mut worker = accounting::worker::RunWorker::new("
   , "        dir.path(),"
   , "        runtime::diagnostics::Diagnostics::off(),"
   , "        assembly::hands(gateway::Custodian::in_memory()),"
@@ -350,7 +350,7 @@ private def attachHelper : List String :=
   , "/// all, so an attachment that declared no id would be refused for an"
   , "/// interface the endpoint never promised."
   , "fn attach("
-  , "    worker: &mut assembly::RunWorker,"
+  , "    worker: &mut accounting::worker::RunWorker,"
   , "    name: &str,"
   , "    base_url: &str,"
   , ") -> Result<(), kernel::AxError> {"

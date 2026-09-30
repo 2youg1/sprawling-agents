@@ -24,10 +24,10 @@ use kernel::{Address, AxCode, AxError, NodeId, RunId};
 
 use super::super::{Continuation, Owed, Owing, RunWorker};
 use super::lane::DriveContext;
-use crate::assembly::booking::OpenClaims;
-use crate::assembly::dispatching::preparing::{Flown, Staged};
-use crate::assembly::pool::{Arrival, DRIVING_LANES, DrivingPool};
-use crate::assembly::relay::{Drained, Patience, Relay, RelayGate, Wake};
+use crate::worker::booking::OpenClaims;
+use crate::worker::dispatching::preparing::{Flown, Staged};
+use crate::worker::pool::{Arrival, DRIVING_LANES, DrivingPool};
+use crate::worker::relay::{Drained, Patience, Relay, RelayGate, Wake};
 
 /// One run in a lane: everything the city does once the drive is home,
 /// and what that landing is owed.
@@ -42,7 +42,7 @@ pub(super) struct InLane {
 /// worker loop only needs to know that it made progress, and a pursuit
 /// needs to know which of its own rows came back.
 #[derive(Debug)]
-pub(crate) enum Landed {
+pub enum Landed {
     /// No run came home in this look. Relay requests were still
     /// served, which is the half that keeps the lanes moving.
     Nothing,
@@ -55,9 +55,9 @@ pub(crate) enum Landed {
 }
 
 /// The lanes, the crossing, and what each driving run is carrying.
-pub(in crate::assembly) struct Flight {
+pub(in crate::worker) struct Flight {
     pool: DrivingPool,
-    pub(in crate::assembly) gate: RelayGate,
+    pub(in crate::worker) gate: RelayGate,
     driving: BTreeMap<RunId, InLane>,
     /// Runs home that one drain found beyond the one it landed, in
     /// arrival order. Kept rather than re-queued, so arrival order is
@@ -65,17 +65,17 @@ pub(in crate::assembly) struct Flight {
     homes: VecDeque<Arrival>,
     /// One checkpoint at a time per city: a repository has one index, and
     /// every lane stages and commits it (`driving::lane`).
-    pub(in crate::assembly) checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
+    pub(in crate::worker) checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// What is still running while the runs go on. One table per city,
     /// and every `exec` gets a handle onto it, so `halt` reaches a
     /// command without knowing which tool started it.
-    pub(in crate::assembly) backlog: runtime::Backlog,
+    pub(in crate::worker) backlog: runtime::Backlog,
 }
 
 impl Flight {
     /// `read_memory` is where the pool reads how much memory is free
     /// before it starts a run (sprawling-SPEC.md 8-46-3).
-    pub(in crate::assembly) fn open(read_memory: fn() -> crate::assembly::pool::Memory) -> Flight {
+    pub(in crate::worker) fn open(read_memory: fn() -> crate::worker::pool::Memory) -> Flight {
         let gate = RelayGate::open();
         Flight {
             pool: DrivingPool::open(DRIVING_LANES, gate.bell(), read_memory),
@@ -88,14 +88,14 @@ impl Flight {
     }
 
     /// How many runs are driving right now, whoever started them.
-    pub(in crate::assembly) fn in_flight(&self) -> u32 {
+    pub(in crate::worker) fn in_flight(&self) -> u32 {
         self.pool.in_flight()
     }
 
     /// Whether a new run waits: every lane is taken, or memory is tight.
     /// The concurrency wall a caller reads before it prepares work it
     /// cannot start; the memory is read here, at the moment it decides.
-    pub(in crate::assembly) fn full(&self) -> bool {
+    pub(in crate::worker) fn full(&self) -> bool {
         self.pool.full()
     }
 
@@ -106,10 +106,7 @@ impl Flight {
     /// person dispatched are landed by the worker loop, and a pursuit
     /// that waited for them would tie two unrelated pieces of work
     /// together.
-    pub(in crate::assembly) fn rows_of(
-        &self,
-        addr: &Address,
-    ) -> std::collections::BTreeSet<NodeId> {
+    pub(in crate::worker) fn rows_of(&self, addr: &Address) -> std::collections::BTreeSet<NodeId> {
         self.driving
             .values()
             .filter_map(|lane| match lane.owing.owed() {
@@ -203,7 +200,7 @@ impl RunWorker {
     /// of landing a run. A dispatch somebody asked for is *also* handed
     /// its refusal, because the caller of this function is a loop and
     /// the person who asked is not in it.
-    pub(in crate::assembly) fn serve_flight(
+    pub(in crate::worker) fn serve_flight(
         &mut self,
         patience: Patience,
     ) -> Result<Landed, AxError> {
@@ -228,7 +225,7 @@ impl RunWorker {
         for (run, err) in self.flight.pool.start_waiting() {
             self.note(
                 runtime::diagnostics::Level::Refuse,
-                "bin::assembly",
+                "accounting::worker",
                 &format!(
                     "{run} waited for a lane and could not start: {}",
                     err.subject()
@@ -260,7 +257,7 @@ impl RunWorker {
                 if let Err(lost) = given_back {
                     self.note(
                         runtime::diagnostics::Level::Refuse,
-                        "bin::assembly::booking",
+                        "crate::worker::booking",
                         &format!("a claim of a run whose landing failed stays open: {lost}"),
                     );
                 }
@@ -288,24 +285,24 @@ impl RunWorker {
     /// an instrument that times the crossing from outside a lane
     /// (sprawling-SPEC.md 8-84).
     #[cfg(test)]
-    pub(in crate::assembly) fn measuring_relay(&self) -> Relay {
+    pub(in crate::worker) fn measuring_relay(&self) -> Relay {
         self.flight.issue()
     }
 
     /// A sender onto the accounting thread's one queue, for the desk
     /// this thread attends.
-    pub(in crate::assembly) fn bell(&self) -> mpsc::Sender<Wake> {
+    pub(in crate::worker) fn bell(&self) -> mpsc::Sender<Wake> {
         self.flight.gate.bell()
     }
 
     /// Whether any run is driving right now.
-    pub(crate) fn driving(&self) -> bool {
+    pub fn driving(&self) -> bool {
         self.flight.in_flight() > 0
     }
 
     /// Whether `run` is in a lane right now, and so reads its own Cancel
     /// and Steer off the desk at its safe points.
-    pub(in crate::assembly) fn drives(&self, run: RunId) -> bool {
+    pub(in crate::worker) fn drives(&self, run: RunId) -> bool {
         self.flight.driving.contains_key(&run)
     }
 
@@ -318,7 +315,7 @@ impl RunWorker {
     /// # Errors
     /// Propagates the first landing that fails. The lanes still going
     /// are left to the caller, which is closing anyway.
-    pub(in crate::assembly) fn land_the_rest(&mut self) -> Result<(), AxError> {
+    pub(in crate::worker) fn land_the_rest(&mut self) -> Result<(), AxError> {
         while self.driving() {
             self.serve_flight(Patience::Unbounded)?;
         }

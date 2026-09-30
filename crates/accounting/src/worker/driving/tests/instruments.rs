@@ -7,7 +7,7 @@
 //! (sprawling-SPEC.md 8-84): a relay round trip, and the gap a second
 //! dispatch leaves in a run that is already going.
 //!
-//! Both drive `assembly::attend::attend` on a thread of its own, send
+//! Both drive `crate::worker::attend::attend` on a thread of its own, send
 //! work in through `CommandDesk::post`, and talk to the loopback
 //! provider. Both are ignored by `just check`, because they read the
 //! wall clock and take seconds; `just bench` runs them and prints one
@@ -27,10 +27,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
-use crate::assembly::CommandDesk;
-use crate::assembly::attend::attend;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::CommandDesk;
+use crate::worker::attend::attend;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// Appends timed per store: enough for a stable middle, few enough that
 /// the disk store stays inside a few seconds at a barrier each.
@@ -98,7 +98,7 @@ fn instrument_relay_round_trip() {
 fn instrument_dispatch_gap() {
     let dir = tempfile::tempdir().unwrap();
     raise_lab(dir.path());
-    let desk = Arc::new(CommandDesk::new());
+    let desk = Arc::new(CommandDesk::default());
     let a_calls = AtomicUsize::new(0);
     let pace: Pace = {
         let desk = Arc::clone(&desk);
@@ -208,7 +208,7 @@ fn relay_round_trips(store: Store) -> Vec<Duration> {
             RunWorker::over(
                 dir.path(),
                 runtime::diagnostics::Diagnostics::off(),
-                crate::assembly::fixture::hands(),
+                crate::worker::fixture::hands(),
                 in_memory_ledger(&kernel::layout::CityLayout::new(dir.path()).ledger()),
             )
             .unwrap(),
@@ -218,7 +218,7 @@ fn relay_round_trips(store: Store) -> Vec<Duration> {
         .unwrap(),
     };
     let mut relay = worker.measuring_relay();
-    let desk = Arc::new(CommandDesk::new());
+    let desk = Arc::new(CommandDesk::default());
     let attending = attending(worker, &desk);
     desk.post(dispatch("lab/east", "fire the east kiln", b"a"), nowhere());
     arrived.recv_timeout(WITHIN).unwrap();
@@ -262,14 +262,14 @@ fn in_memory_ledger(dir: &std::path::Path) -> (storage::JsonlLedger, storage::Op
     storage::JsonlLedger::open_faulty(
         fs,
         dir,
-        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
+        crate::Clock::now(&crate::worker::fixture::WallClock).unwrap(),
     )
     .unwrap()
 }
 
 /// A city with one building and one room in it, under ordinary rules.
 fn raise_lab(root: &std::path::Path) {
-    crate::assembly::fixture::init_city(root).unwrap();
+    crate::worker::fixture::init_city(root).unwrap();
     std::fs::create_dir_all(root.join("lab").join("east")).unwrap();
     lay_rules(root, "lab", &ordinary_rules(""));
 }
@@ -304,7 +304,7 @@ fn nowhere() -> wire::Reply {
 fn marker() -> kernel::EventDraft {
     kernel::EventDraft {
         run: RunId::CITY,
-        t: accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
+        t: crate::Clock::now(&crate::worker::fixture::WallClock).unwrap(),
         who: "city".to_owned(),
         addr: None,
         kind: kernel::EventKind::CityInitialized,

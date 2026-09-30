@@ -22,7 +22,7 @@
 use kernel::event::record::EvalRun;
 use kernel::{AxError, EventKind, Ledger, Model, RunId};
 
-use accounting::effect;
+use crate::effect;
 
 use super::{Handover, RunWorker, Site, Stamping};
 
@@ -141,7 +141,7 @@ impl RunWorker {
             None => {
                 self.note(
                     runtime::diagnostics::Level::Refuse,
-                    "bin::assembly::probing::probe",
+                    "crate::worker::probing::probe",
                     &format!("{who} could not be asked before handing over"),
                 );
                 empty_reading()

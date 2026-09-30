@@ -27,7 +27,7 @@ use super::registering::GoalAsk;
 /// The two travel together because a driving thread is blocked on the
 /// second until the first has been written: an append with no way back
 /// is a thread that never wakes.
-pub(crate) struct RelayRequest {
+pub struct RelayRequest {
     draft: EventDraft,
     /// A rendezvous channel, so there is no third state between "the
     /// accounting thread wrote it" and "the driving thread knows".
@@ -40,7 +40,7 @@ pub(crate) struct RelayRequest {
 /// One queue, because a thread blocks on one thing at a time: a queue
 /// per mouth is polled with timeouts that every request waits out
 /// (sprawling-SPEC.md 8-42-4, `crates/sprawling/spec/Assembly/Attending.lean`).
-pub(crate) enum Wake {
+pub enum Wake {
     /// A lane's append, waiting for its answer.
     Relay(RelayRequest),
     /// A lane's claim on a plan node, decided in queue order.
@@ -57,19 +57,19 @@ pub(crate) enum Wake {
 }
 
 /// What one look at the queue leaves the accounting thread.
-pub(crate) struct Drained {
+pub struct Drained {
     /// Every line the ledger took, in ledger order: a line a lane wrote
     /// is history as much as one the accounting thread wrote, so the
     /// same folds are shown it (sprawling-SPEC.md 8-110).
-    pub(crate) written: Vec<EventDraft>,
+    pub written: Vec<EventDraft>,
     /// Registrations in arrival order, left to the thread that holds the
     /// goal register: a copy of the register here would be a second
     /// answer to who holds the ground (sprawling-SPEC.md 8-42-8).
-    pub(crate) goals: Vec<GoalAsk>,
+    pub goals: Vec<GoalAsk>,
 }
 
 /// How long one look at the queue may wait for its first wake.
-pub(crate) enum Patience {
+pub enum Patience {
     /// Not at all: serve what is already queued.
     Now,
     /// At most this long: an idle city's one unasked wake, the schedule.
@@ -85,7 +85,7 @@ pub(crate) enum Patience {
 /// and the bytes stay with the adapter on the accounting side, which is
 /// what keeps one city to one writer.
 #[derive(Clone)]
-pub(crate) struct Relay {
+pub struct Relay {
     asking: mpsc::Sender<Wake>,
     health: Health,
 }
@@ -123,17 +123,17 @@ impl Ledger for Relay {
 /// It holds a sender of its own so the channel stays connected while a
 /// city is served: a gate that had handed out every sender would report
 /// "nobody is writing" as "the writer is gone".
-pub(crate) struct RelayGate {
+pub struct RelayGate {
     wakes: mpsc::Receiver<Wake>,
     issuing: mpsc::Sender<Wake>,
-    pub(crate) booked: ClaimBook,
+    pub booked: ClaimBook,
     /// How many appends wait and how many are not yet durable
     /// (sprawling-SPEC.md 8-98).
     health: Health,
 }
 
 impl RelayGate {
-    pub(crate) fn open() -> RelayGate {
+    pub fn open() -> RelayGate {
         let (issuing, wakes) = mpsc::channel();
         RelayGate {
             wakes,
@@ -144,12 +144,12 @@ impl RelayGate {
     }
 
     /// A handle onto this gate's counts, for the sampler's thread.
-    pub(crate) fn health(&self) -> Health {
+    pub fn health(&self) -> Health {
         self.health.clone()
     }
 
     /// One handle for one driving thread.
-    pub(crate) fn issue(&self) -> Relay {
+    pub fn issue(&self) -> Relay {
         Relay {
             asking: self.issuing.clone(),
             health: self.health.clone(),
@@ -157,7 +157,7 @@ impl RelayGate {
     }
 
     /// A sender for the lanes coming home and for the desk.
-    pub(crate) fn bell(&self) -> mpsc::Sender<Wake> {
+    pub fn bell(&self) -> mpsc::Sender<Wake> {
         self.issuing.clone()
     }
 
@@ -172,7 +172,7 @@ impl RelayGate {
     /// same for fifty records as for one. Each answer still goes back
     /// only after the write is durable, because that is what makes an
     /// `EventRef` a reference to a history that exists.
-    pub(crate) fn serve(
+    pub fn serve(
         &mut self,
         patience: Patience,
         ledger: &mut impl Ledger,
@@ -355,7 +355,7 @@ mod tests {
     /// neither (sprawling-SPEC.md 8-98).
     #[test]
     fn the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable() {
-        use crate::assembly::health::Health;
+        use crate::worker::health::Health;
         fn standing(health: &Health) -> (u64, u64) {
             let read = health.read(wire::Sample::default());
             (read.ledger_queue_depth, read.durable_lag)

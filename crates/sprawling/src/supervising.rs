@@ -14,7 +14,7 @@ mod children;
 
 pub use children::{Child, Console, Ended, Window, supervise};
 
-use crate::assembly::Closing;
+use accounting::worker::Closing;
 use kernel::TimeMs;
 
 /// How long a crash counts against the budget.
@@ -79,7 +79,7 @@ impl CrashBudget {
 )]
 mod tests {
     use super::{CrashBudget, Next};
-    use crate::assembly::Closing;
+    use accounting::worker::Closing;
     use kernel::TimeMs;
 
     fn crash() -> Closing {

@@ -6,7 +6,7 @@
 //! What one run was told, read back out of the record that froze it and
 //! the store that kept it.
 //!
-//! **Nothing here assembles a prefix.** `assembly::freezing` does that
+//! **Nothing here assembles a prefix.** `accounting::worker::freezing` does that
 //! once, at run start, and puts every segment in the store; this joins
 //! the hashes its `prompt_assembled` record names to the bytes behind
 //! them. A second assembly taken now would read files that have moved

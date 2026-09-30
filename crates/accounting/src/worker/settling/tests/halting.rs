@@ -11,8 +11,8 @@
     reason = "test code"
 )]
 
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// A run a resident handed down is a member of the backlog, so a halt
 /// on its scope reaches it (runtime-SPEC 8-28-2).
@@ -27,7 +27,7 @@ use crate::assembly::*;
 #[test]
 fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![
@@ -133,11 +133,11 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
 #[test]
 fn a_served_city_hands_a_running_commands_output_to_the_page() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let pieces = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));

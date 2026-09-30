@@ -51,7 +51,7 @@ citysim 的模块登记在 `architecture.toml`，但 `modmap` 只判 `crates/` �
 
 ### 3-6 决定：评估仪器住在 citysim，不另立 crate
 
-五件仪器（§8-8）没有产品调用点：`suite` 只由 `tests/evaluation.rs` 驱动，其余四件只由自己的测试驱动。为它们在产品拓扑里立一个 crate，换来的是一个不进二进制却占一格依赖图的单元，以及 `sprawling` 为一个交接探针多背一条边。citysim 本就是 dev-only 的第二个 Main，仪器与剧本同住，产品图少一个单元。交接探针有生产调用点，归它的拥有者 `bin::assembly::probing`（sprawling-SPEC §8-39）。落选方案：独立的 `eval` crate——它唯一的生产面是那个探针。**重开条件**：一件仪器得到生产调用点。
+五件仪器（§8-8）没有产品调用点：`suite` 只由 `tests/evaluation.rs` 驱动，其余四件只由自己的测试驱动。为它们在产品拓扑里立一个 crate，换来的是一个不进二进制却占一格依赖图的单元，以及 `sprawling` 为一个交接探针多背一条边。citysim 本就是 dev-only 的第二个 Main，仪器与剧本同住，产品图少一个单元。交接探针有生产调用点，归它的拥有者 `accounting::worker::probing`（sprawling-SPEC §8-39）。落选方案：独立的 `eval` crate——它唯一的生产面是那个探针。**重开条件**：一件仪器得到生产调用点。
 
 ### 3-7 决定：场景只在回合边界取消
 

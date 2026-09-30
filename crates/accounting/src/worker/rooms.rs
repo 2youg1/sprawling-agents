@@ -43,7 +43,7 @@ enum RoomQueue {
 /// A dispatch keeps this receipt for as long as it drives and shows it
 /// when it lands: the run named on the queue is the only one that may
 /// give it back, and a run that never held it has nothing to return.
-pub(in crate::assembly) enum QueueTenure {
+pub(in crate::worker) enum QueueTenure {
     /// This run holds the room's queue.
     TheRoomQueue,
     /// Another run in the same room holds it. This one reads a queue of
@@ -53,13 +53,13 @@ pub(in crate::assembly) enum QueueTenure {
 }
 
 /// What a dispatch was given when it asked for its room's queue.
-pub(in crate::assembly) struct Lent {
-    pub(in crate::assembly) inbox: collab::Inbox,
-    pub(in crate::assembly) tenure: QueueTenure,
+pub(in crate::worker) struct Lent {
+    pub(in crate::worker) inbox: collab::Inbox,
+    pub(in crate::worker) tenure: QueueTenure,
 }
 
 /// What is waiting for each room, and which run is reading it.
-pub(in crate::assembly) struct RoomQueues {
+pub(in crate::worker) struct RoomQueues {
     rooms: BTreeMap<Address, RoomQueue>,
 }
 
@@ -74,7 +74,7 @@ impl RoomQueues {
     /// holds a spare, and the holder named here is still the one that
     /// answers - the entry it took is what the spare was issued against
     /// (sprawling-SPEC.md 8-46-9).
-    pub(in crate::assembly) fn worked_by(&self, addr: &Address) -> Option<RunId> {
+    pub(in crate::worker) fn worked_by(&self, addr: &Address) -> Option<RunId> {
         match self.rooms.get(addr) {
             Some(RoomQueue::Lent { to, .. }) => Some(*to),
             Some(RoomQueue::Home(_)) | None => None,
@@ -85,10 +85,7 @@ impl RoomQueues {
     /// lent to: the one fact that says a run is working in the
     /// building. Every room is looked at, because address order puts
     /// `lab-2` between `lab` and `lab/room1`.
-    pub(in crate::assembly) fn worked_within(
-        &self,
-        building: &Address,
-    ) -> Option<(Address, RunId)> {
+    pub(in crate::worker) fn worked_within(&self, building: &Address) -> Option<(Address, RunId)> {
         self.rooms.iter().find_map(|(addr, queue)| match queue {
             RoomQueue::Lent { to, .. } if addr.is_within(building) => Some((addr.clone(), *to)),
             RoomQueue::Lent { .. } | RoomQueue::Home(_) => None,
@@ -98,7 +95,7 @@ impl RoomQueues {
     /// The queues a history folds to. Nothing is lent when a worker
     /// opens: a run that was driving when the process stopped is not
     /// driving now.
-    pub(in crate::assembly) fn folded(rooms: BTreeMap<Address, collab::Inbox>) -> RoomQueues {
+    pub(in crate::worker) fn folded(rooms: BTreeMap<Address, collab::Inbox>) -> RoomQueues {
         RoomQueues {
             rooms: rooms
                 .into_iter()
@@ -109,7 +106,7 @@ impl RoomQueues {
 
     /// Lends `to` the queue of the room at `addr`, or a spare when
     /// another run is already reading there.
-    pub(in crate::assembly) fn lend(&mut self, addr: &Address, to: RunId) -> Lent {
+    pub(in crate::worker) fn lend(&mut self, addr: &Address, to: RunId) -> Lent {
         match self.rooms.get_mut(addr) {
             Some(RoomQueue::Lent { to: holder, .. }) => Lent {
                 inbox: new_inbox(),
@@ -157,7 +154,7 @@ impl RoomQueues {
     /// # Errors
     /// Refuses a return from a run that was not holding the queue, and
     /// propagates the queue's own refusal of a signal that waited.
-    pub(in crate::assembly) fn give_back(
+    pub(in crate::worker) fn give_back(
         &mut self,
         addr: &Address,
         from: RunId,
@@ -202,7 +199,7 @@ impl RoomQueues {
     /// # Errors
     /// Refuses when the room is full, and when a room whose queue is
     /// out has been spoken to more times than a queue holds.
-    pub(in crate::assembly) fn deliver(&mut self, signal: &collab::Signal) -> Result<(), AxError> {
+    pub(in crate::worker) fn deliver(&mut self, signal: &collab::Signal) -> Result<(), AxError> {
         let admission = match self
             .rooms
             .entry(signal.room().clone())
@@ -229,7 +226,7 @@ impl RoomQueues {
     /// A room whose queue is lent reports nothing: what is waiting is in
     /// the holder's own desk, and counting it here would tell a
     /// neighbour that mail is unread when somebody is reading it.
-    pub(in crate::assembly) fn pending(&self, addr: &Address) -> u32 {
+    pub(in crate::worker) fn pending(&self, addr: &Address) -> u32 {
         match self.rooms.get(addr) {
             Some(RoomQueue::Home(inbox)) => inbox.pending(),
             Some(RoomQueue::Lent { .. }) | None => 0,
@@ -238,7 +235,7 @@ impl RoomQueues {
 
     /// [`RoomQueues::pending`] for every room holding anything, read at
     /// once, for a bench laid out off this thread (sprawling-SPEC.md 8-113).
-    pub(in crate::assembly) fn waiting(&self) -> BTreeMap<Address, u32> {
+    pub(in crate::worker) fn waiting(&self) -> BTreeMap<Address, u32> {
         self.rooms
             .keys()
             .map(|addr| (addr.clone(), self.pending(addr)))
@@ -256,7 +253,7 @@ impl RoomQueues {
 #[cfg(test)]
 impl RoomQueues {
     /// The queue of the room at `addr`, if nobody is holding it.
-    pub(in crate::assembly) fn at_home(&self, addr: &Address) -> Option<&collab::Inbox> {
+    pub(in crate::worker) fn at_home(&self, addr: &Address) -> Option<&collab::Inbox> {
         match self.rooms.get(addr) {
             Some(RoomQueue::Home(inbox)) => Some(inbox),
             Some(RoomQueue::Lent { .. }) | None => None,
@@ -267,7 +264,7 @@ impl RoomQueues {
     ///
     /// # Errors
     /// Propagates a queued payload that does not read back as a signal.
-    pub(in crate::assembly) fn pull_at_home(
+    pub(in crate::worker) fn pull_at_home(
         &mut self,
         addr: &Address,
     ) -> Result<Vec<collab::Signal>, AxError> {
@@ -278,7 +275,7 @@ impl RoomQueues {
     }
 
     /// How much is waiting in every room that has anything waiting.
-    pub(in crate::assembly) fn queued(&self) -> BTreeMap<Address, u32> {
+    pub(in crate::worker) fn queued(&self) -> BTreeMap<Address, u32> {
         self.rooms
             .iter()
             .filter_map(|(addr, queue)| match queue {

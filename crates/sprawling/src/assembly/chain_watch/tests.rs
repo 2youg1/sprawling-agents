@@ -6,7 +6,8 @@
 use kernel::Address;
 
 use super::*;
-use crate::assembly::{RunWorker, hands, init_city};
+use crate::assembly::{hands, init_city};
+use accounting::worker::RunWorker;
 
 /// Changes one digit of the first line's timestamp in place, so the
 /// line still parses and only the chain can tell.

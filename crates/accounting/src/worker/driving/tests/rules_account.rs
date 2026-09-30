@@ -13,8 +13,8 @@
 )]
 
 use super::super::*;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 use super::flight::{asked, history};
 
@@ -47,7 +47,7 @@ fn books<'a>(
 #[test]
 fn a_run_standing_up_books_the_rules_it_will_stand_under() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules("review = false\n"));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
@@ -89,7 +89,7 @@ fn a_run_standing_up_books_the_rules_it_will_stand_under() {
 #[test]
 fn a_rules_change_says_which_entry_it_reached_the_city_in() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("west")).unwrap();
     let stood = ordinary_rules("review = false\n");
@@ -170,7 +170,7 @@ fn a_rules_change_says_which_entry_it_reached_the_city_in() {
 #[test]
 fn a_building_that_does_not_exist_opens_no_account() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
 

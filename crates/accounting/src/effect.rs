@@ -222,7 +222,7 @@ impl Claims {
     /// Checks each effect against the file as it stands now rather than
     /// as it stood when the run was dispatched. The accounting thread
     /// already refused a node another run in flight held when the model
-    /// claimed it (`assembly::booking`); this is the backstop for a run
+    /// claimed it (`accounting::worker::booking`); this is the backstop for a run
     /// that claimed from its old copy a node somebody had since landed,
     /// whose claim is dropped rather than written over that row.
     ///
@@ -269,7 +269,7 @@ impl Claims {
             text = effect.apply(&text)?;
             let closes = match effect {
                 // The claim's line went on the ledger when the accounting
-                // thread booked it (`assembly::booking`); writing it again
+                // thread booked it (`accounting::worker::booking`); writing it again
                 // here would count the node as claimed twice.
                 collab::ClaimEffect::Claimed { .. } => continue,
                 collab::ClaimEffect::PutDown { id, .. } => Some(id.clone()),

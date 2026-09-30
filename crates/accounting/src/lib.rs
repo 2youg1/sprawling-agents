@@ -3,13 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The accounting thread's ports: what the city's one writer reaches
-//! through when it needs something from outside itself.
+//! The city's one writer (`worker`), and the ports it reaches through
+//! when it needs something from outside itself.
 //!
 //! A writer that builds its own dependencies can be driven against only
 //! one of each, which is why a scripted scenario could reproduce a run
-//! and not a dispatch (ARCHITECTURE.md section 11). Each port here has a
-//! production adapter in `bin::assembly` and a second one outside it.
+//! and not a dispatch (ARCHITECTURE.md section 11). The worker receives
+//! this machine as one `worker::hands::Hands` value; the production one
+//! is made in `bin::assembly::production`, and every port has a second
+//! implementation outside it (accounting-SPEC.md 8-11).
 //!
 //! Beside the ports live the worker's own values that reach nothing but
 //! the kernel, the city's files and the collaboration vocabulary: what a
@@ -33,6 +35,7 @@ pub mod person;
 pub mod plan_view;
 pub mod toolkit_broker;
 pub mod views;
+pub mod worker;
 
 pub use clock::Clock;
 pub use connectors::{Connectors, Reached};

@@ -23,8 +23,8 @@
     reason = "test code"
 )]
 
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 mod origin;
 
@@ -162,7 +162,7 @@ fn carrying_nothing_is_not_a_refusal() {
 #[test]
 fn a_branching_session_opens_with_the_mothers_conversation() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![
@@ -279,7 +279,7 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
 #[test]
 fn a_carried_session_names_the_previous_runs_transcript() {
     let dir = tempfile::tempdir().unwrap();
-    crate::assembly::fixture::init_city(dir.path()).unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![completion("first", None), completion("second", None)],

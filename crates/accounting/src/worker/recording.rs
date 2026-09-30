@@ -12,8 +12,8 @@
 
 use kernel::{Address, AxError, EventDraft, EventKind, Ledger, Payload, RunId};
 
-use crate::assembly::booking::OpenClaims;
-use accounting::effect;
+use crate::effect;
+use crate::worker::booking::OpenClaims;
 
 use super::RunWorker;
 
@@ -21,11 +21,11 @@ use super::RunWorker;
 /// command that dispatch answers, so a line written without the worker
 /// is stamped by the rule [`RunWorker::record_for`] follows and a restart
 /// still recognises the command from it (sprawling-SPEC.md 8-113).
-pub(in crate::assembly) struct Stamping<'a, L> {
-    pub(in crate::assembly) ledger: &'a mut L,
-    pub(in crate::assembly) command: Option<kernel::IdemKey>,
+pub(in crate::worker) struct Stamping<'a, L> {
+    pub(in crate::worker) ledger: &'a mut L,
+    pub(in crate::worker) command: Option<kernel::IdemKey>,
     /// What time it is, for each line's stamp.
-    pub(in crate::assembly) clock: &'a (dyn accounting::Clock + Send + Sync),
+    pub(in crate::worker) clock: &'a (dyn crate::Clock + Send + Sync),
 }
 
 impl<L: Ledger> Stamping<'_, L> {
@@ -35,7 +35,7 @@ impl<L: Ledger> Stamping<'_, L> {
     /// # Errors
     /// Propagates a payload that will not take the key, a clock this
     /// machine will not read, and the ledger's refusal of the line.
-    pub(in crate::assembly) fn record_for(
+    pub(in crate::worker) fn record_for(
         &mut self,
         run: RunId,
         line: effect::Line,
@@ -66,12 +66,12 @@ impl<L: Ledger> Stamping<'_, L> {
 /// line lands decides nothing, so two threads writing to one log need
 /// only take turns.
 #[derive(Clone)]
-pub(in crate::assembly) struct Notes(
+pub(in crate::worker) struct Notes(
     std::sync::Arc<std::sync::Mutex<runtime::diagnostics::Diagnostics>>,
 );
 
 impl Notes {
-    pub(in crate::assembly) fn over(log: runtime::diagnostics::Diagnostics) -> Notes {
+    pub(in crate::worker) fn over(log: runtime::diagnostics::Diagnostics) -> Notes {
         Notes(std::sync::Arc::new(std::sync::Mutex::new(log)))
     }
 
@@ -80,7 +80,7 @@ impl Notes {
     /// A lock a dead thread left behind is written through all the
     /// same: every write is one step under the lock, so the log inside
     /// it is whole, and losing the line would hide the fault it names.
-    pub(in crate::assembly) fn write(
+    pub(in crate::worker) fn write(
         &self,
         level: runtime::diagnostics::Level,
         seq: kernel::Seq,
@@ -245,7 +245,7 @@ impl RunWorker {
             if let Err(err) = self.absorb(line.kind, line.run, line.addr.as_ref(), &line.data) {
                 self.note(
                     runtime::diagnostics::Level::Refuse,
-                    "bin::assembly::relay",
+                    "crate::worker::relay",
                     &format!("a fold refused a {:?} line a lane wrote: {err}", line.kind),
                 );
             }

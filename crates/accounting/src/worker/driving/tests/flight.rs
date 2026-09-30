@@ -13,8 +13,8 @@
 )]
 
 use super::super::*;
-use crate::assembly::fixture::*;
-use crate::assembly::*;
+use crate::worker::fixture::*;
+use crate::worker::*;
 
 /// A dispatch as the desk delivers one: a person's work, sent to a room
 /// that already exists.
@@ -53,7 +53,7 @@ pub(super) fn history(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
 #[test]
 fn two_dispatches_from_the_desk_drive_at_once() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("west")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
@@ -143,7 +143,7 @@ fn two_dispatches_from_the_desk_drive_at_once() {
 #[test]
 fn a_closing_city_lands_the_runs_still_driving() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     std::fs::write(
@@ -196,7 +196,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     const WITHIN: std::time::Duration = std::time::Duration::from_secs(60);
     const LOOK: std::time::Duration = std::time::Duration::from_millis(5);
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     let (arrived_tx, arrived) = mpsc::channel();
@@ -220,14 +220,14 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
         pace,
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    let desk = Arc::new(crate::assembly::CommandDesk::new());
+    let desk = Arc::new(crate::worker::CommandDesk::default());
     let asking = Arc::clone(&desk);
     worker.serve(only_interrupts(Arc::new(move |run| {
         asking.interrupt_for(run)
     })));
     let attending = {
         let desk = Arc::clone(&desk);
-        std::thread::spawn(move || crate::assembly::attend::attend(&mut worker, &desk))
+        std::thread::spawn(move || crate::worker::attend::attend(&mut worker, &desk))
     };
     let key = |material: &[u8]| kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, material);
     desk.post(
@@ -326,7 +326,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
 #[test]
 fn work_past_the_lane_count_waits_for_a_lane() {
     let dir = tempfile::tempdir().unwrap();
-    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let rooms = ["lab/a", "lab/b", "lab/c", "lab/d", "lab/e"];
     for room in rooms {
         std::fs::create_dir_all(dir.path().join(room)).unwrap();
@@ -354,7 +354,7 @@ fn work_past_the_lane_count_waits_for_a_lane() {
     }
     assert_eq!(
         worker.flight.in_flight(),
-        crate::assembly::pool::DRIVING_LANES,
+        crate::worker::pool::DRIVING_LANES,
         "no more runs drive at once than there are lanes"
     );
     worker.land_the_rest().unwrap();

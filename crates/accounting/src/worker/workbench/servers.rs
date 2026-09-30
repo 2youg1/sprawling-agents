@@ -6,7 +6,7 @@
 //! The external tools a building's configuration names, each already
 //! connected to its server or left out and named in the diagnostics.
 
-use accounting::Reached;
+use crate::Reached;
 
 use super::Laying;
 
@@ -21,7 +21,7 @@ impl Laying {
     /// and it holds for the same reason: what the model is told exists
     /// must equal what actually runs, and a building whose external
     /// service is down today is still a building that can work today.
-    pub(in crate::assembly) fn mcp_tools(
+    pub(in crate::worker) fn mcp_tools(
         &self,
         servers: &[kernel::McpServer],
         write_root: &std::path::Path,
@@ -36,7 +36,7 @@ impl Laying {
             // that rule, not a second copy of it.
             self.note(
                 runtime::diagnostics::Level::Refuse,
-                "bin::assembly",
+                "accounting::worker",
                 "this building is confidential; no external server is started for it",
             );
             return Vec::new();
@@ -49,7 +49,7 @@ impl Laying {
         // not say how much.
         let began = self.clock.now();
         let mut offered = Vec::new();
-        let resolve = accounting::held_vault::resolving(std::sync::Arc::clone(&self.vault));
+        let resolve = crate::held_vault::resolving(std::sync::Arc::clone(&self.vault));
         for server in servers {
             // The module a reader is sent to is the transport that
             // failed, not whichever one was written first.
@@ -92,7 +92,7 @@ impl Laying {
                 let spent = ended.value().saturating_sub(began.value());
                 self.note(
                     runtime::diagnostics::Level::Trace,
-                    "bin::assembly",
+                    "accounting::worker",
                     &format!(
                         "mcp_tools took {spent} ms over {} declared server(s), offering {} tool(s)",
                         servers.len(),
@@ -102,7 +102,7 @@ impl Laying {
             }
             (Err(clock), _) | (_, Err(clock)) => self.note(
                 runtime::diagnostics::Level::Refuse,
-                "bin::assembly",
+                "accounting::worker",
                 &format!("mcp_tools went unmeasured: {clock}; {}", clock.recovery()),
             ),
         }

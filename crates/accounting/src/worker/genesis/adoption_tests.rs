@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use crate::assembly::*;
+use crate::worker::*;
 
 /// Adopting a folder checkpoints it at once, as one pack: the first dispatch
 /// into a building of thousands of files would otherwise hash every one
@@ -16,10 +16,10 @@ fn adopting_a_folder_checkpoints_it_as_one_pack_before_any_dispatch() {
         std::fs::create_dir_all(dir.path().join("shop")).unwrap();
         std::fs::write(dir.path().join("shop").join(name), name).unwrap();
     }
-    crate::assembly::genesis::form(
+    crate::worker::genesis::form(
         dir.path(),
         Adopt::EveryFolder,
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
 
@@ -58,10 +58,10 @@ fn forming_a_city_keeps_its_own_subtree_out_of_the_workspaces_git() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join(".gitignore"), "target/\n").unwrap();
-    crate::assembly::genesis::form(
+    crate::worker::genesis::form(
         dir.path(),
         Adopt::EveryFolder,
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
 
@@ -87,15 +87,15 @@ fn forming_a_city_keeps_its_own_subtree_out_of_the_workspaces_git() {
 /// still work git sees.
 #[test]
 fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
-    use crate::assembly::fixture::{completion, fake_openai, worker_with_provider};
+    use crate::worker::fixture::{completion, fake_openai, worker_with_provider};
     let dir = tempfile::tempdir().unwrap();
     git2::Repository::init(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("proj").join("src")).unwrap();
     std::fs::write(dir.path().join("proj").join("src").join("lib.rs"), "\n").unwrap();
-    crate::assembly::genesis::form(
+    crate::worker::genesis::form(
         dir.path(),
         Adopt::EveryFolder,
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let (base_url, _provider) = fake_openai(
@@ -163,10 +163,10 @@ fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
 fn opening_a_city_gives_an_older_building_the_rules_it_lacks() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("proj")).unwrap();
-    crate::assembly::genesis::form(
+    crate::worker::genesis::form(
         dir.path(),
         Adopt::EveryFolder,
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
     let ignore = dir.path().join("proj").join(".gitignore");
@@ -175,7 +175,7 @@ fn opening_a_city_gives_an_older_building_the_rules_it_lacks() {
     RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        crate::worker::fixture::hands(),
     )
     .unwrap();
 
