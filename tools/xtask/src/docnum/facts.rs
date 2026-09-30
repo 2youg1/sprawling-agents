@@ -346,7 +346,14 @@ mod tests {
 
     #[test]
     fn a_register_figure_is_quoted_from_its_row_and_field() {
-        let root = root();
+        let root = crate::root::fixture::relocated("register-figure");
+        crate::root::fixture::write(
+            &root,
+            "tools/xtask/budgets.toml",
+            "[views_rebuild_per_mb]
+best_p50_ms = 2759
+",
+        );
         assert_eq!(
             value(&root, "budget_figure:views_rebuild_per_mb.best_p50_ms").unwrap(),
             Some("2,759".into())
