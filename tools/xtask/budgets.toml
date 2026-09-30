@@ -119,7 +119,9 @@ budget_bytes = 134217728
 # and png, which this binary already carried; what is new is the
 # package's own code, the image encoders and the Win32 bindings. The
 # slack stays at 1 MiB, which is also the figure that reopens the
-# choice to link it here.
+# choice to link it here. UI Automation (uiautomation, winsafe, chrono)
+# brought the reading to 13,524,992 B, 365,056 B over the best and inside
+# that slack, so the connector stays linked here.
 best_bytes = 13159936
 slack_bytes = 1048576
 measured_by = "just build-web, just dist, then just gates, on windows-x86_64"
@@ -335,6 +337,18 @@ best_bytes = 2469888
 slack_bytes = 2097152
 measured_by = "just mem"
 status = "measured, not gated: private 2,469,888 B, peak private 2,469,888 B, working set 8,331,264 B on windows-x86_64, 16 cores, NVMe (release). The counter differs per platform, so one number cannot mean the same thing on three of them"
+
+# The long turn (citysim-SPEC.md section 3-10): the gate is the per-step
+# window increment its tests assert; this row is the reading, and its
+# budget is the ceiling a regression back toward one copy per step would
+# cross long before step 500 (that shape reached 1433.7 MiB at step 482).
+[long_turn_peak]
+what = "the long-turn instrument's peak private memory over 500 steps, each one read of a 1 KiB file whose bytes change, in this platform's own counter"
+budget_bytes = 33554432
+best_bytes = 7487488
+slack_bytes = 2097152
+measured_by = "just mem long-turn 500 100 (citysim long_turn bin, release): the last pause's peak private"
+status = "measured, not gated: 500 steps peak private 7,487,488 B (7.1 MiB), 1000 steps 13,660,160 B (13.0 MiB); the simulator's own MemLedger holds 1,420,487 B and 2,840,417 B of those, and the last request window is 636,723 B and 1,273,223 B, on windows-x86_64, 16 cores, NVMe (release). Between steps 500 and 1000 of one run private grows 9,945 B a step, of which 2,840 B is the simulator's ledger line and 1,273 B the request window"
 
 [kernel_mutation]
 what = "the share of kernel mutants the tests kill"
@@ -575,7 +589,7 @@ status = "measured, not gated: p50 1.540 ms, p95 1.735, p99 1.984; floor 1.358, 
 [first_byte]
 what = "`serve` spawned to the first byte of GET /, over the three fixture cities, with the product's own split of the opening"
 measured_by = "just bench-startup first-byte"
-status = "measured, not gated: floor / p50 / peak in ms - empty 40.919 / 43.093 / 57.556 over 20 samples (city fixture 7e6fda8b5653dd7f), l100k 2248.671 / 2259.331 / 2261.092 over 5 (6615c4052f604f8c), l400k 7811.298 / 7821.137 / 7835.193 over 3 (99909ec1f02d58fc) (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). The l400k serve says: opened the city in 7787.559 ms - bind 2.195, open the ledger 650.988, verify and fold 400003 lines 6705.686 (folding 1022.619 of it), cut the standing snapshot 9.841, cut the views snapshot 164.404, copy the views 248.619, start the worker 5.823. Verifying the chain is the dominant phase; a reading in seconds is lane F's work"
+status = "measured, not gated: floor / p50 / peak in ms - empty 37.348 / 39.573 / 56.589 over 20 samples (city fixture 7e6fda8b5653dd7f), l100k 580.062 / 582.817 / 2250.936 over 5 (6615c4052f604f8c), l400k 1250.861 / 1255.792 / 7948.201 over 3 (99909ec1f02d58fc) (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release). The peak is each city's first sample, the one opening with no snapshots and no verified-prefix record yet. The last l400k serve says: opened the city in 1220.178 ms - bind 2.173, open the ledger 576.396, fold 0 lines from the snapshots 278.907, cut the standing snapshot 0.232, cut the views snapshot 0.011, copy the views 356.709, start the worker 5.747; the history is proved behind the first byte, 400003 lines and 6 segments by digest in 379.822 ms, 1600.149 ms after opening began, and commands wait for it (E_HISTORY_UNPROVEN). Opening the ledger and copying the views are the dominant phases; a reading in seconds is lane F's work"
 
 # How large this tree's dependency graph is, counted off the resolved
 # lockfile rather than off any manifest: a manifest states what was
