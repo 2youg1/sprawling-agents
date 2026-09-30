@@ -127,7 +127,8 @@ impl RunWorker {
                 addr.as_str().to_owned(),
             )
             .with_recovery(format!(
-                "{scope} is halted; release it to let work in again. Runs already going are                  unaffected - stopping one is `cancel`"
+                "{scope} is halted; release it to let work in again. Runs already going are \
+                 unaffected - stopping one is `cancel`"
             )));
         }
         // The building's own rules decide which models this run may
@@ -145,7 +146,12 @@ impl RunWorker {
         };
         if let Some((word, layer)) = city::settled_harness(&self.city_root, judged)? {
             let file = city::config_path(&self.city_root, judged, layer)?;
-            return Err(not_driven_yet(addr, &word, &file));
+            let harness = seated_harness(at, &word, &rules, &file)?;
+            return Ok(Seat::Harness(HarnessSeat {
+                building,
+                rules,
+                harness,
+            }));
         }
         let own = city::own_layer(&self.city_root, addr)?;
         let tag = self.tag_for(at.model.as_deref(), own.model())?;
@@ -307,7 +313,8 @@ fn seated_harness(
             subject(harness.as_str()),
         )
         .with_recovery(format!(
-            "a harness sends the room to its own vendor and a confidential building's data              does not leave; take `[resident] harness` out of {}, or drop `confidential = true`",
+            "a harness sends the room to its own vendor and a confidential building's data \
+             does not leave; take `[resident] harness` out of {}, or drop `confidential = true`",
             file.display()
         )));
     }
@@ -315,10 +322,14 @@ fn seated_harness(
         return Err(AxError::failure(
             AxCode::ConfigInvalid,
             "dispatch work",
-            subject(&format!("{model} into a room whose resident is {}", harness.as_str())),
+            subject(&format!(
+                "{model} into a room whose resident is {}",
+                harness.as_str()
+            )),
         )
         .with_recovery(format!(
-            "dispatch without naming a model, or take `[resident] harness` out of {} to run              {model} here",
+            "dispatch without naming a model, or take `[resident] harness` out of {} to run \
+             {model} here",
             file.display()
         )));
     }
@@ -333,21 +344,7 @@ fn unreadable(path: &std::path::Path, err: &std::io::Error) -> AxError {
         format!("{}: {err}", path.display()),
     )
     .with_recovery(
-        "fix the file's permissions; a dispatch stands a run under these documents and          will not guess what they say",
+        "fix the file's permissions; a dispatch stands a run under these documents and \
+         will not guess what they say",
     )
-}
-
-/// The refusal for a room whose resident is a harness, while this build
-/// reads the key and does not start the harness.
-fn not_driven_yet(addr: &Address, harness: &str, file: &std::path::Path) -> AxError {
-    AxError::failure(
-        AxCode::ToolUnavailable,
-        "dispatch work",
-        format!("{}: {harness}", addr.as_str()),
-    )
-    .with_recovery(format!(
-        "this build reads `[resident] harness` but does not start a harness yet; \
-         take the key out of {} to dispatch to a model here",
-        file.display()
-    ))
 }
