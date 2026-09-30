@@ -86,7 +86,10 @@ impl WireScript {
             .and_then(Value::as_array)
             .ok_or_else(|| unreadable("replies", "missing, or not an array"))?
             .clone();
-        let _face = face;
+        for (at, reply) in replies.iter().enumerate() {
+            ScriptModel::from_wire(face, vec![reply.clone()])
+                .map_err(|err| unreadable(&format!("replies[{at}]"), &err.to_string()))?;
+        }
         Ok(WireScript {
             models,
             replies: replies.into(),
@@ -203,7 +206,7 @@ impl Replay {
                 .script
                 .replies
                 .pop_front()
-                .map_or(Answer::Reply(Value::Null), Answer::Reply),
+                .map_or(Answer::Refused(Refusal::ScriptExhausted), Answer::Reply),
             Asked::Other => Answer::Refused(Refusal::MethodUnanswered),
         }
     }

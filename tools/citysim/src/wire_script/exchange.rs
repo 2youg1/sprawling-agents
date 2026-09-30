@@ -17,11 +17,11 @@
 use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use kernel::{AxCode, AxError};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use super::{Asked, Replay, WireScript};
 
@@ -42,8 +42,39 @@ const REDACTED: &str = "redacted";
 pub struct ScriptedProvider {
     listener: TcpListener,
     replay: Replay,
-    record: File,
+    record: Record,
     seq: u64,
+}
+
+/// The file every exchange of one playing is appended to, and the path
+/// a failure to write it names.
+struct Record {
+    file: File,
+    path: PathBuf,
+}
+
+impl Record {
+    fn create(path: &Path) -> Result<Record, AxError> {
+        File::create(path)
+            .map(|file| Record {
+                file,
+                path: path.to_path_buf(),
+            })
+            .map_err(|err| unrecorded(path, &err))
+    }
+
+    /// One exchange, as one line.
+    fn append(&mut self, exchange: &Value) -> Result<(), AxError> {
+        self.file
+            .write_all(
+                format!(
+                    "{exchange}
+"
+                )
+                .as_bytes(),
+            )
+            .map_err(|err| unrecorded(&self.path, &err))
+    }
 }
 
 impl ScriptedProvider {
@@ -56,11 +87,10 @@ impl ScriptedProvider {
         script: WireScript,
         record: &Path,
     ) -> Result<ScriptedProvider, AxError> {
-        let record = File::create(record).map_err(|err| unrecorded(record, &err))?;
         Ok(ScriptedProvider {
             listener,
             replay: Replay::new(script),
-            record,
+            record: Record::create(record)?,
             seq: 0,
         })
     }
@@ -98,7 +128,7 @@ impl ScriptedProvider {
         let (status, reason) = answer.status();
         let body = answer.body();
         self.seq = self.seq.saturating_add(1);
-        let _line = json!({
+        self.record.append(&json!({
             "seq": self.seq,
             "method": request.method,
             "target": request.target,
@@ -106,7 +136,7 @@ impl ScriptedProvider {
             "body": request.body,
             "status": status,
             "answer": body,
-        });
+        }))?;
         let text = body.to_string();
         let response = format!(
             "HTTP/1.1 {status} {reason}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{text}",
