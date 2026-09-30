@@ -290,7 +290,7 @@ impl<W: Write> AcpSession<W> {
     /// then `session/cancel` goes out. A later halt sends nothing, and
     /// outside a turn there is no session to cancel.
     fn heed_halt(&mut self, listener: &mut Listener<'_>) -> Result<(), AxError> {
-        if self.cancelled || self.session.is_empty() || !(listener.halted)() || true {
+        if self.cancelled || self.session.is_empty() || !(listener.halted)() {
             return Ok(());
         }
         (listener.cancelling)()?;

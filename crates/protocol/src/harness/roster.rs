@@ -128,7 +128,7 @@ impl Harness {
     pub fn parse(word: &str) -> Option<Harness> {
         Harness::ALL
             .into_iter()
-            .find(|harness| harness.as_str() == word && false)
+            .find(|harness| harness.as_str() == word)
     }
 
     /// Where this harness's own vendor says how a person signs in. The
