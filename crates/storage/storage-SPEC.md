@@ -167,7 +167,7 @@ impl kernel::Ledger for JsonlLedger { /* append = append_all(vec![d]) */ }
 // 且首行必须是 city_initialized；首行可解析但链根不对＝Envelope，不静默清场。
 ```
 
-**逐行检查 `jsonl::verify`（形状 2 值）**：账本的每个读者都经同一个 `LineCheck` 走一行——`open` 的尾段扫描与 `runtime::replay::verify_lines` 同一份，故一方收下的行另一方拒不了。
+**逐行检查 `jsonl::verify`（形状 2 值）**：账本的每个读者都经同一个 `LineCheck` 走一行——`open` 的尾段扫描与前段末行、`audit_chain`、`runtime::replay` 同一份，故一方收下的行另一方拒不了。
 
 ```rust
 pub struct LineCheck { /* prev 与下一个期望 seq——只有链状态，不持行 */ }
@@ -188,6 +188,7 @@ impl LineFault { pub fn into_ax(self, line_no: u64) -> AxError; }  // 整本读�
 - 判定顺序：信封（`v` 经 `readable_log_v`）→ `prev` → `seq` → kind 二分（借用判定，不 clone）→ 已知 kind 的类型解析与规范回写比对；`ig:true` 的未知 kind 不解析但照样入链。
 - `open` 对故障的处置：`VersionAhead`／`NotAVersion` 按版本拒；`NotALine` 且其后无带信封的行＝撕裂，截断；其余一律拒而不截——撕裂不会留下带信封的行，截掉它等于删掉合法历史。
 - 被否：两个读者各持一份检查。只做类型解析的 `open` 会把一条链续正确的 `ig:true` 行在尾段当撕裂截掉，而 `replay` 收下同一行。
+- 被否：前段末行只做类型解析。`EventRecord` 的 kind 没有「未知」这一臂，一条 `ig:true` 的新 kind 行若恰是前段的最后一行，类型解析拒它，城就打不开，而尾段扫描与 `replay` 都收下同一行（`jsonl/boundary/tests.rs` 的 `a_prior_segment_ending_in_an_ignorable_line_opens`）。代价：前段末行若不是写者规范的字节，`open` 现在也拒；那样的行 `replay` 本来就拒。
 
 **落盘形态**：目录内 `ledger-<first_seq 20 位零填>.jsonl` 若干段；行＝`canonical_line`＋`\n`；链与 seq 跨段连续。滚动：当前段字节数 ≥ `SEGMENT_ROLL_BYTES` 时下一波起新段（新段创建后 `sync_dir`）。
 **写者锁：一个账本目录同一时刻只有一个 `JsonlLedger`，跨进程成立。** `open` 在列段之前，对账本目录的同级文件 `<目录名>.lock`（城的账本即 `<city>/.sprawling/ledger.lock`）取 `std::fs::File::try_lock` 独占锁；`JsonlLedger` 持着那个 `File`，锁与账本同寿命，drop 即放。拿不到锁就是别的 `JsonlLedger`（这个进程的或另一个进程的）正持着这座城的账本：`StorageError::LedgerHeld { dir }`，映射装载期码 `E_LEDGER_HELD`。拒绝发生在任何读写之前，所以被拒的一方不修盘，也不写 `log_truncated`。
@@ -209,7 +210,7 @@ impl WriterLock {
 - **被否：把 PID 写进锁文件。** Windows 上别的进程读不了被锁住的文件，拒词因此报不出 PID；recovery 改为说明怎样停下持锁的那个进程。
 - **重开参数**：出现不经 `JsonlLedger::open` 写账本的生产路径；或者 `std` 的 `try_lock` 改为按进程而不是按句柄判定。
 
-**open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`（只读这一行：`jsonl::first_line` 用 `Vfs::read_at` 从 4 KiB 的窗口读起、每次加倍，见到第一个 `\n` 或文件尽头即停；不见 `\n` 的首行是撕裂行，答「无行」，交给尾部恢复。整段读进来再切第一行，会让单段账本在 open 时被读两遍）——判定一律经 `kernel::consts_external::readable_log_v`：`Ahead` 即 `VersionAhead`（先于一切链检，恒不部分解读），`NotAVersion`（低于任何构建写过的首版本，含 v0）即 `Envelope` 且拒词说版本，`Current` 与 `Older` 放行；④校验最后一段：逐行 parse＋段内链续，本段任一可解析行的 `v` 同样经 `readable_log_v` 判定——`Ahead` 与 `NotAVersion` 在此**拒**而不作尾损截断（截掉它等于删掉更新构建的历史），首个非法字节起截断（`truncate`＋`sync_data`），跨段 prev 以前段末行验证；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
+**open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`（只读这一行：`jsonl::first_line` 用 `Vfs::read_at` 从 4 KiB 的窗口读起、每次加倍，见到第一个 `\n` 或文件尽头即停；不见 `\n` 的首行是撕裂行，答「无行」，交给尾部恢复。整段读进来再切第一行，会让单段账本在 open 时被读两遍）——判定一律经 `kernel::consts_external::readable_log_v`：`Ahead` 即 `VersionAhead`（先于一切链检，恒不部分解读），`NotAVersion`（低于任何构建写过的首版本，含 v0）即 `Envelope` 且拒词说版本，`Current` 与 `Older` 放行；④校验最后一段：逐行 parse＋段内链续，本段任一可解析行的 `v` 同样经 `readable_log_v` 判定——`Ahead` 与 `NotAVersion` 在此**拒**而不作尾损截断（截掉它等于删掉更新构建的历史），首个非法字节起截断（`truncate`＋`sync_data`）；末段的入口取自前段末行（`jsonl::boundary`）：这一行过 `LineCheck::judge`，与正向检查同一条规则——已知 kind 类型解析并比对规范回显，`ig:true` 的未知 kind 只读信封——入口的 `prev` 是它的 `chain_hash`，下一个 seq 是它的 seq 加一；判不过即拒，`VersionAhead` 按版本拒，其余为 `Envelope`，行号是它在前段里的行号；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
 **append_all 五步**：逐 draft：seq=next、`EventRecord::from_draft`、`canonical_line`、必要时滚段；写段；单次 `sync_data`（跨段波对每个触及段各一次）；更新 prev/next_seq；铸 refs。任何 Io 错误⇒整波失败，内存态不前进，盘上的段也退回本波之前（`jsonl::unwind`，形状：adapter）：当前段截回 `seg_len`，本波新建的段删去。退回本身失败时留作待办，下一波写之前先完成它；完成不了，那一波以退回的 Io 错误失败而不写一个字节。于是写失败留下的半行永远不会成为下一波的前缀，进程活着也好、重启也好，账本都是一条不断的链；open 的断尾只剩掉电一种来源。
 - 被否：写失败后把账本置为只读、直到重启。它同样不写坏账本，但盘满时腾出空间以后城仍要重启才能继续记账；退回只多一次 `truncate`，而且只发生在失败的那一波。重新考虑的条件：出现一个 `truncate` 不可靠、而 open 的断尾可靠的平台。
 
