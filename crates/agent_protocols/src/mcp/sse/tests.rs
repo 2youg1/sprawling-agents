@@ -199,3 +199,45 @@ connection: close
         (&AxCode::ToolUnavailable, kernel::Retry::Unknown)
     );
 }
+
+/// A `data:` line past the ceiling is refused rather than read whole.
+/// The server did answer the call, so the call learns that its answer
+/// was not read and that what the server did is unknown.
+#[test]
+fn an_event_past_the_ceiling_is_refused_and_the_effect_left_unknown() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut buf = vec![0u8; 65536];
+        assert!(stream.read(&mut buf).unwrap() > 0);
+        stream
+            .write_all(
+                b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\nevent: endpoint\ndata: /messages\n\n",
+            )
+            .unwrap();
+        stream.flush().unwrap();
+        let (mut post, _) = listener.accept().unwrap();
+        assert!(post.read(&mut buf).unwrap() > 0);
+        post.write_all(b"HTTP/1.1 202 Accepted\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
+            .unwrap();
+        let event = format!("data: {}\n\n", "x".repeat(crate::MESSAGE_CEILING + 1));
+        // The reader stops at the ceiling and lets the stream go, so the
+        // rest of this write may meet a closed connection.
+        let _unread = stream.write_all(event.as_bytes());
+    });
+    let mut held = SseServer::open(&format!("http://{addr}/sse"), &[], &vault()).unwrap();
+
+    let answered = held.call(
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\"}",
+        crate::EXTERNAL_CALL_PATIENCE,
+    );
+
+    assert_eq!(
+        answered
+            .map(|answer| answer.len())
+            .map_err(|err| (*err.code(), err.retry())),
+        Err((AxCode::WireMismatch, kernel::Retry::Unknown))
+    );
+    server.join().unwrap();
+}

@@ -108,6 +108,52 @@ fn a_server_that_exits_after_taking_the_call_leaves_the_effect_unknown() {
     );
 }
 
+/// A child that reads the one line it is sent and answers with one line
+/// a byte longer than the ceiling.
+fn answering_past_the_ceiling() -> (String, Vec<String>) {
+    let over = crate::MESSAGE_CEILING + 1;
+    if cfg!(windows) {
+        (
+            "powershell".to_owned(),
+            vec![
+                "-NoProfile".to_owned(),
+                "-Command".to_owned(),
+                format!(
+                    "[void][Console]::In.ReadLine(); [Console]::Out.Write('x' * {over}); \
+                     [Console]::Out.WriteLine()"
+                ),
+            ],
+        )
+    } else {
+        (
+            "sh".to_owned(),
+            vec![
+                "-c".to_owned(),
+                format!("read -r line; head -c {over} /dev/zero | tr '\\0' x; echo"),
+            ],
+        )
+    }
+}
+
+/// The reader stops at the ceiling rather than growing one line without
+/// bound, and the call that was waiting learns why. The server did
+/// answer, so what it did is unknown; the child is stopped, because the
+/// rest of that line cannot be told apart from the next message.
+#[test]
+fn an_answer_past_the_ceiling_is_refused_and_the_server_stopped() {
+    let dir = tempfile::tempdir().unwrap();
+    let (command, args) = answering_past_the_ceiling();
+    let mut server = StdioServer::start(&command, &args, &[], dir.path()).unwrap();
+    let answered = server.call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE);
+    assert_eq!(
+        answered
+            .map(|answer| answer.len())
+            .map_err(|err| (*err.code(), err.retry())),
+        Err((AxCode::WireMismatch, kernel::Retry::Unknown))
+    );
+    assert!(server.has_ended());
+}
+
 #[test]
 fn a_program_this_machine_cannot_start_refuses_with_the_command_in_it() {
     let dir = tempfile::tempdir().unwrap();
