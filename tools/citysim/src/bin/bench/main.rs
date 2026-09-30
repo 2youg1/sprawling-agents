@@ -11,10 +11,12 @@
 //! point besides `bin::assembly`: every `Instant::now` here carries the
 //! same `#[expect]` the first one carries.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use kernel::{Address, EventDraft, EventKind, Ledger as _, Payload, RunId, TimeMs};
+use kernel::{
+    Address, AxCode, AxError, B3Hash, EventDraft, EventKind, Ledger as _, Payload, RunId, TimeMs,
+};
 
 mod reading;
 mod scenarios;
@@ -29,16 +31,18 @@ fn main() -> std::process::ExitCode {
     println!("bench on {machine}");
     println!("readings are for this machine; budgets.toml states the budgets\n");
     let scratch = scratch_dir();
-    let outcome = ledger_append(&scratch)
-        .and_then(|()| durability_barrier(&scratch))
-        .and_then(|()| prefix_assembly())
-        .and_then(|()| run_history(&scratch))
-        .and_then(|()| {
-            scenarios::all(
-                &scratch,
-                &scenarios::REGISTERED,
-                reading::MachineClass::General,
-            )
+    let outcome = pinned_fixture(&scratch)
+        .and_then(|fixture| {
+            println!("fixture {}\n", citysim::fixture_label(&fixture));
+            let taken = reading::Taken {
+                machine: reading::MachineClass::General,
+                fixture,
+            };
+            ledger_append(&scratch)
+                .and_then(|()| durability_barrier(&scratch))
+                .and_then(|()| prefix_assembly())
+                .and_then(|()| run_history(&scratch))
+                .and_then(|()| scenarios::all(&scratch, &scenarios::REGISTERED, taken))
         })
         .map(|readings| {
             for reading in &readings {
@@ -53,6 +57,28 @@ fn main() -> std::process::ExitCode {
             std::process::ExitCode::FAILURE
         }
     }
+}
+
+/// The registered fixture's digest, refused when its bytes moved from
+/// the pin: a reading of other bytes would enter the register beside
+/// readings it cannot be compared with (citysim-SPEC.md section 3-8).
+fn pinned_fixture(scratch: &Path) -> Result<B3Hash, String> {
+    let digest = scenarios::REGISTERED.digest(scratch)?;
+    if digest.to_string() == scenarios::REGISTERED.pinned {
+        return Ok(digest);
+    }
+    Err(format!(
+        "{}",
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "measure the registered fixture, whose bytes moved from its pin",
+            digest.to_string()
+        )
+        .with_recovery(
+            "pin REGISTERED.pinned to this digest in a commit of its own, and retake the \
+             register rows it changes"
+        )
+    ))
 }
 
 #[expect(

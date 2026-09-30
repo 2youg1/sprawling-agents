@@ -9,11 +9,14 @@
 //! renderer, and the tests compare it byte for byte. A reading carries
 //! its machine class as a field rather than inheriting it from a header,
 //! so a reading that arrived from another machine cannot silently share
-//! a table with the reference class (citysim-SPEC.md section 8-6).
+//! a table with the reference class (citysim-SPEC.md section 8-6). It
+//! carries the digest of the bytes it was taken over the same way, so a
+//! reading of a changed fixture cannot share a table with the register's
+//! (section 3-8).
 
 use std::time::Duration;
 
-use kernel::{AxCode, AxError};
+use kernel::{AxCode, AxError, B3Hash};
 
 /// The class of machine a reading was taken on.
 ///
@@ -32,6 +35,15 @@ impl MachineClass {
             MachineClass::General => "general",
         }
     }
+}
+
+/// The conditions a reading was taken under: the machine class, and the
+/// digest of the fixture whose bytes it measured. They always travel
+/// together, so they are one value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Taken {
+    pub(crate) machine: MachineClass,
+    pub(crate) fixture: B3Hash,
 }
 
 /// The heavy-load classes this bench Main measures, one scenario each.
@@ -91,12 +103,12 @@ impl SubMetric {
 }
 
 /// One measurement: the latency distribution of one scenario at one
-/// sub-metric, on one machine class.
+/// sub-metric, under the conditions it was taken in.
 #[derive(Debug)]
 pub(crate) struct Reading {
     load: Load,
     sub: SubMetric,
-    machine: MachineClass,
+    taken: Taken,
     samples: u64,
     floor: Duration,
     p50: Duration,
@@ -113,7 +125,7 @@ impl Reading {
     pub(crate) fn of(
         load: Load,
         sub: SubMetric,
-        machine: MachineClass,
+        taken: Taken,
         mut samples: Vec<Duration>,
     ) -> Result<Reading, String> {
         samples.sort();
@@ -131,7 +143,7 @@ impl Reading {
         Ok(Reading {
             load,
             sub,
-            machine,
+            taken,
             samples: u64::try_from(count).map_err(|why| format!("count the samples: {why}"))?,
             floor: samples.first().copied().ok_or_else(sampled_nothing)?,
             p50: at(50)?,
@@ -146,7 +158,7 @@ impl Reading {
             "perf load={} sub={} machine_class={} samples={} floor_us={} p50_us={} p95_us={} p99_us={}",
             self.load.as_str(),
             self.sub.as_str(),
-            self.machine.as_str(),
+            self.taken.machine.as_str(),
             self.samples,
             self.floor.as_micros(),
             self.p50.as_micros(),

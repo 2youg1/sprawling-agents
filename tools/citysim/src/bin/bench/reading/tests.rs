@@ -12,12 +12,19 @@ fn hundred(at: u64) -> Vec<Duration> {
     vec![Duration::from_micros(at); 100]
 }
 
+fn taken() -> Taken {
+    Taken {
+        machine: MachineClass::General,
+        fixture: B3Hash::digest(b"fixture"),
+    }
+}
+
 #[test]
 fn a_reading_line_is_stable_and_carries_its_machine_class() {
     let reading = Reading::of(
         Load::LargeLedgerFold,
         SubMetric::Harness,
-        MachineClass::General,
+        taken(),
         hundred(10),
     )
     .unwrap();
@@ -36,7 +43,7 @@ fn a_reading_line_carries_its_floor_beside_the_middle() {
     let reading = Reading::of(
         Load::LongSessionForwarding,
         SubMetric::Harness,
-        MachineClass::General,
+        taken(),
         (1..=100).rev().map(Duration::from_micros).collect(),
     )
     .unwrap();
@@ -52,7 +59,7 @@ fn a_reading_with_no_samples_is_refused_rather_than_printed_as_zero() {
     let refused = Reading::of(
         Load::LargeLedgerFold,
         SubMetric::Harness,
-        MachineClass::General,
+        taken(),
         Vec::new(),
     )
     .unwrap_err();

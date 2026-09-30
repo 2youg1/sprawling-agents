@@ -17,6 +17,7 @@ fn small() -> Fixture {
         tree_file_bytes: 32,
         placements: 1,
         forward_events: 4,
+        pinned: "",
     }
 }
 
@@ -46,7 +47,11 @@ fn every_load_scenario_reruns_and_emits_the_stable_format() {
     let fixture = small();
     for round in 0..2 {
         let dir = tempfile::tempdir().unwrap();
-        let readings = all(dir.path(), &fixture, MachineClass::General).unwrap();
+        let taken = Taken {
+            machine: super::super::reading::MachineClass::General,
+            fixture: B3Hash::digest(b"small"),
+        };
+        let readings = all(dir.path(), &fixture, taken).unwrap();
         assert!(!readings.is_empty(), "round {round} produced no readings");
         for reading in &readings {
             let line = reading.line();

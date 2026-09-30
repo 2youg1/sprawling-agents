@@ -24,10 +24,16 @@ use std::path::Path;
 use kernel::{Address, B3Hash, Effort, EventDraft, EventRecord, Ledger as _, RunId, TimeMs};
 use storage::{Checkpoint, ModelChoice, Provenance, WorktreeName, Worktrees};
 
-use super::reading::{Load, MachineClass, Reading, SubMetric};
+use super::reading::{Load, Reading, SubMetric, Taken};
+
+/// How many of `draft`'s lines the fixture digest is taken over: enough
+/// to cover every field `draft` varies, few enough to cost milliseconds
+/// (citysim-SPEC.md section 3-8).
+pub(crate) const PINNED_DRAFTS: u64 = 1_000;
 
 /// The fixed load each scenario runs under. Data, not policy: change a
-/// field and the new readings are not comparable with the register's.
+/// field, or the shape of `draft`, and the new readings are not
+/// comparable with the register's, which is what `pinned` catches.
 pub(crate) struct Fixture {
     /// The ledger the fold walks, and how many rebuilds are sampled.
     pub(crate) fold_records: u64,
@@ -38,6 +44,46 @@ pub(crate) struct Fixture {
     /// How many trees are placed, and how many events are forwarded.
     pub(crate) placements: u32,
     pub(crate) forward_events: u32,
+    /// The 64 hex digits `Fixture::digest` gives for these bytes, so a
+    /// change to them is refused before anything is measured.
+    pub(crate) pinned: &'static str,
+}
+
+impl Fixture {
+    /// The digest of the bytes this fixture measures: the first
+    /// `PINNED_DRAFTS` of `draft`'s lines, written into a new ledger under
+    /// `scratch` by the product's own writer, digested by
+    /// `citysim::ledger_digest`; then those 32 bytes joined with the
+    /// little-endian bytes of every numeric field, digested once more.
+    ///
+    /// # Errors
+    /// Whatever the writer or the digest refused.
+    pub(crate) fn digest(&self, scratch: &Path) -> Result<B3Hash, String> {
+        let dir = scratch.join("fixture-digest");
+        match std::fs::remove_dir_all(&dir) {
+            Ok(()) => {}
+            Err(why) if why.kind() == std::io::ErrorKind::NotFound => {}
+            Err(why) => return Err(format!("clear {}: {why}", dir.display())),
+        }
+        std::fs::create_dir_all(&dir).map_err(|why| format!("{}: {why}", dir.display()))?;
+        let (mut ledger, _report) =
+            storage::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
+                .map_err(|why| format!("{}", why.into_ax()))?;
+        let drafts: Vec<EventDraft> = (0..PINNED_DRAFTS)
+            .map(super::draft)
+            .collect::<Result<_, _>>()?;
+        ledger.append_all(drafts).map_err(|why| format!("{why}"))?;
+        drop(ledger);
+        let written = citysim::ledger_digest(&dir).map_err(|why| format!("{why}"))?;
+        let mut bytes = written.as_bytes().to_vec();
+        bytes.extend_from_slice(&self.fold_records.to_le_bytes());
+        bytes.extend_from_slice(&self.fold_rounds.to_le_bytes());
+        bytes.extend_from_slice(&self.tree_files.to_le_bytes());
+        bytes.extend_from_slice(&self.tree_file_bytes.to_le_bytes());
+        bytes.extend_from_slice(&self.placements.to_le_bytes());
+        bytes.extend_from_slice(&self.forward_events.to_le_bytes());
+        Ok(B3Hash::digest(&bytes))
+    }
 }
 
 /// The registered load: the fixture every baseline reading names.
@@ -48,24 +94,21 @@ pub(crate) const REGISTERED: Fixture = Fixture {
     tree_file_bytes: 16_384,
     placements: 4,
     forward_events: 2_000,
+    pinned: "0000000000000000000000000000000000000000000000000000000000000000",
 };
 
 /// Runs every load scenario and returns its readings.
 ///
 /// # Errors
 /// Propagates whatever a scenario's public face refused.
-pub(crate) fn all(
-    scratch: &Path,
-    fixture: &Fixture,
-    machine: MachineClass,
-) -> Result<Vec<Reading>, String> {
+pub(crate) fn all(scratch: &Path, fixture: &Fixture, taken: Taken) -> Result<Vec<Reading>, String> {
     let mut readings = Vec::new();
     for load in Load::ALL {
         let of_load = match load {
-            Load::LargeLedgerFold => large_ledger_fold(scratch, fixture, machine)?,
-            Load::LargeWorktreePlacement => large_worktree_placement(scratch, fixture, machine)?,
-            Load::KeptWorktreeReclaim => kept_worktree_reclaim(scratch, fixture, machine)?,
-            Load::LongSessionForwarding => long_session_forwarding(fixture, machine)?,
+            Load::LargeLedgerFold => large_ledger_fold(scratch, fixture, taken)?,
+            Load::LargeWorktreePlacement => large_worktree_placement(scratch, fixture, taken)?,
+            Load::KeptWorktreeReclaim => kept_worktree_reclaim(scratch, fixture, taken)?,
+            Load::LongSessionForwarding => long_session_forwarding(fixture, taken)?,
         };
         readings.extend(of_load);
     }
@@ -77,7 +120,7 @@ pub(crate) fn all(
 fn large_ledger_fold(
     scratch: &Path,
     fixture: &Fixture,
-    machine: MachineClass,
+    taken: Taken,
 ) -> Result<Vec<Reading>, String> {
     let city_root = scratch.join("fold");
     let dir = kernel::layout::CityLayout::new(&city_root).ledger();
@@ -99,7 +142,7 @@ fn large_ledger_fold(
     Ok(vec![Reading::of(
         Load::LargeLedgerFold,
         SubMetric::Harness,
-        machine,
+        taken,
         times,
     )?])
 }
@@ -109,7 +152,7 @@ fn large_ledger_fold(
 fn large_worktree_placement(
     scratch: &Path,
     fixture: &Fixture,
-    machine: MachineClass,
+    taken: Taken,
 ) -> Result<Vec<Reading>, String> {
     let trees = placement_city(&scratch.join("placement"), fixture)?;
     let mut times = Vec::new();
@@ -127,7 +170,7 @@ fn large_worktree_placement(
     Ok(vec![Reading::of(
         Load::LargeWorktreePlacement,
         SubMetric::Whole,
-        machine,
+        taken,
         times,
     )?])
 }
@@ -138,7 +181,7 @@ fn large_worktree_placement(
 fn kept_worktree_reclaim(
     scratch: &Path,
     fixture: &Fixture,
-    machine: MachineClass,
+    taken: Taken,
 ) -> Result<Vec<Reading>, String> {
     let trees = placement_city(&scratch.join("reclaim"), fixture)?;
     let name = node(0)?;
@@ -162,7 +205,7 @@ fn kept_worktree_reclaim(
     Ok(vec![Reading::of(
         Load::KeptWorktreeReclaim,
         SubMetric::Whole,
-        machine,
+        taken,
         times,
     )?])
 }
@@ -202,10 +245,7 @@ fn node(i: u32) -> Result<WorktreeName, String> {
 /// framed and serialised the way the socket would send it. The network
 /// is deliberately outside the timed span - the reading is the local
 /// processing latency this harness owns.
-fn long_session_forwarding(
-    fixture: &Fixture,
-    machine: MachineClass,
-) -> Result<Vec<Reading>, String> {
+fn long_session_forwarding(fixture: &Fixture, taken: Taken) -> Result<Vec<Reading>, String> {
     let mut ledger = citysim::MemLedger::new();
     for n in 0..fixture.forward_events {
         ledger
@@ -224,7 +264,7 @@ fn long_session_forwarding(
     Ok(vec![Reading::of(
         Load::LongSessionForwarding,
         SubMetric::Harness,
-        machine,
+        taken,
         times,
     )?])
 }
