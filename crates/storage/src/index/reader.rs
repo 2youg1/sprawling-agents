@@ -18,7 +18,10 @@ use crate::error::{StorageError, io_err};
 ///
 /// One handle and one buffer serve the whole stretch, and a walk that
 /// goes forward never seeks at all — the position the previous line
-/// left is the position the next one wants. What this replaces opened
+/// left is the position the next one wants. A jump from a known
+/// position moves relative to it, so a line that already sits in the
+/// buffer — the next line of one run, a few lines of other runs
+/// further on — is read without a seek or a refill. What this replaces opened
 /// the segment again for every line and then read it one byte at a
 /// time. Over a fifty-thousand record ledger on one windows-x86_64
 /// NVMe machine (2026-09-02): 734 µs a line then, against 0.89 µs
@@ -77,10 +80,20 @@ impl OpenSegment {
 
     fn line_at(&mut self, offset: u64) -> Result<Vec<u8>, StorageError> {
         if self.resume != Some(offset) {
+            // How far the wanted line sits from where the buffer stands;
+            // unknown when the position is unknown or the distance does
+            // not fit an `i64`, and then the seek is absolute.
+            let distance = self.resume.and_then(|at| {
+                i64::try_from(offset)
+                    .ok()?
+                    .checked_sub(i64::try_from(at).ok()?)
+            });
             self.resume = None;
-            self.file
-                .seek(SeekFrom::Start(offset))
-                .map_err(io_err("seek segment", &self.path))?;
+            let moved = match distance {
+                Some(distance) => self.file.seek_relative(distance),
+                None => self.file.seek(SeekFrom::Start(offset)).map(|_start| ()),
+            };
+            moved.map_err(io_err("seek segment", &self.path))?;
         }
         self.resume = None;
         let mut line = Vec::new();
