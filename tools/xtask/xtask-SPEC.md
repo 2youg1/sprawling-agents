@@ -10,7 +10,7 @@
 | 单元 | 一句话 |
 |---|---|
 | header | 每个 `.rs` 开头恰是 MPL-2.0 通告三行加版权一行，四行逐字节相等，且整份文件只出现这一次（§14） |
-| lexicon | Markdown、Rust 源码与 `client/src/lang.json` 里的退役词命中即红；退役词表是 `tools/xtask/lexicon.toml` |
+| lexicon | Markdown、Rust 源码、Lean 与 `client/src/lang.json` 里的退役词命中即红；退役词表是 `tools/xtask/lexicon.toml` |
 | modmap | 产品包（§8-39，工作区外的 desktop 也在内）目录下的 `src/**/*.rs` ↔ `architecture.toml` 里文件落在这些目录下的条目一一对应；状态一致；`owns` 非空；索引文件零逻辑。工具包（xtask、citysim）的条目写给读者看，本门不判 |
 | depmap | crate 依赖边 ⊆ ARCHITECTURE §3 的 `depmap` 围栏块；一个 crate 之内的模块方向服从 `directions` 块（§8-33）；`pub trait` 只现于缝那一节（ARCHITECTURE §4）列出的文件 |
 | guard | 墙外那份 `desktop/` 的 lint 表、包元数据与共享依赖版本与工作区逐键相等 |
@@ -18,7 +18,8 @@
 | render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17 与 §8-38 |
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | secret | 全仓加夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
-| specalign | kernel 枚举 ↔ kernel-SPEC 逐 variant：§8-1／§8-4 两表消费真 enum（`AxCode::ALL`／`EventKind::ALL`）作证，计数、归属、carrier／窗类逐项同；SPEC 围栏里其余每一处 `pub enum` 体与 syn 解出的同名枚举双向对账（§8-10） |
+| specalign | kernel 枚举 ↔ kernel 的规格逐 variant（kernel 迁到 Lean 之后读 Lean 的受限形状，§8-43）：§8-1／§8-4 两表消费真 enum（`AxCode::ALL`／`EventKind::ALL`）作证，计数、归属、carrier／窗类逐项同；SPEC 围栏里其余每一处 `pub enum` 体与 syn 解出的同名枚举双向对账（§8-10）；模块图每一行的 `spec` 锚点落在盘上，已迁移的包写 Lean 模块名（§8-43） |
+| spec | 一个包恰有一份生效规格；散文里点名的 `<名>-SPEC` 在树上；Lean 的 import 纪律；`.lean` 里没有 `sorry`、`admit`、`axiom`；规格引用的仓内路径在盘上（§8-42） |
 | budget | `tools/xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；没有构建产物可称时沉默（`just check` 不构建 release 二进制），壁钟读数只入册不入门 |
 | color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免 |
 | release | 公开树由过滤生成；六条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径、不得引用树里没有的文件、不得把一台机器的工作记录写进产品文档、链接的拼法与树上的名字逐字节相等（§8-15） |
@@ -31,7 +32,7 @@
 | docnum | 文档里的数字由 `docnum::FACTS` 生成并由 `--write` 回写；区段陈旧、事实未知、标记不闭合各自即红（§8-16） |
 | wire-ts | `client/src/wire.ts` 由 `wire::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V`、`WIRE_HASH`、`CITY_RUN`（§8-21）与 `BODY_PX`（§8-36）；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
 | gates（命令） | 不带名字时跑全部门，带名字时只跑点名的那几道（按门表次序）；名字不在门表里即以 `unknown-gate` 退出码 2 拒绝并列出全部门名，不退回「全跑」；聚合报告，任一违规即退出码 1（§12 第 2 条） |
-| spec（命令） | 在那个包的目录下新建 `Spec.lean` 骨架；名字是包的 lib 名，没有 lib 的包用包名（`just spec`，§8-39、§8-41） |
+| spec（命令） | 在那个包的目录下新建 `Spec.lean` 骨架；名字是包的 lib 名，没有 lib 的包用包名（`just spec`，§8-39、§8-41）。同名的门判树、不写盘（§8-42） |
 | members（命令） | 包在哪：`--owning` 答一组路径属于哪些工作区包，`--dir` 答一个包住在哪个目录；`justfile` 用它，不再从路径里推包名（§8-39） |
 | apisync（命令） | 不在门名册里：`cargo xtask apisync` 只判两条跨 crate 的缝 kernel 与 wire 的基线是否新鲜——用 `tools/xtask/public-api.txt` 钉住的渲染器算出实时面，与已提交基线逐行比对；夜间作业跑它（§8-32、§12-6） |
 
@@ -82,7 +83,7 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 
 判定面一门一文件。门表与门序只住 `gates::GATES` 那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。本文只说每道门判什么，不抄一份名册，也不手写门数，因为手写的名册与数组相隔一次代码改动而不是一个 token：要知道跑哪几道，读那张数组或跑 `cargo xtask gates --list`；门数只写在 §12 的受管标记里。
 
-三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字与按 `## N 标题` 切节这一个读法，被 `depmap` 与 `proof` 调用，§8-22）｜`vocabulary`（`lexicon` 用它让退役词指向被定义的词；`proof` 用它的数词表读 `kani harness` 前的数）｜`members`（包在哪、叫什么、是产品还是工具，`cargo metadata` 的唯一读者，被每一道按包取目录的门调用，§8-39）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）｜`attestation`（挂到 tag 上的归档先有构件证明，被 `artifact` 调用，§8-34）。
+三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字与按 `## N 标题` 切节这一个读法，被 `depmap` 与 `proof` 调用，§8-22）｜`vocabulary`（`lexicon` 用它让退役词指向被定义的词；`proof` 用它的数词表读 `kani harness` 前的数）｜`members`（包在哪、叫什么、是产品还是工具，`cargo metadata` 的唯一读者，被每一道按包取目录的门调用，§8-39）｜`spec`（一个 crate 的 Lean 规格：命令新建骨架，同名的门判树，§8-41、§8-42）｜`lean`（把一份 `.lean` 当文本读出门要的几种受限形状，被 `spec`、`specalign`、`wiring` 调用，§8-43）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）｜`attestation`（挂到 tag 上的归档先有构件证明，被 `artifact` 调用，§8-34）。
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——字段一变，只有一处要改。同理，`[family.<键>]` 的 `duty` 也只由 `modmap::duties` 读，`docnum` 的 `crate_table` 经它取每个 crate 拥有什么（§8-40）。
 
@@ -171,6 +172,10 @@ pub(crate) struct Violation {
 **12-6 基线是一次渲染，渲染器与基线一起钉住。** `tools/xtask/public-api.txt` 写两个值：rustdoc 取哪个带日期的 nightly（`PUBLIC_API_RUSTDOC`），cargo-public-api 取哪个版本（`PUBLIC_API_VERSION`）。`apisync` 只用这一对算实时面，`nightly.yml` 的 apisync 作业也只装这一对；挪动任一值，就在同一变更集里用新渲染器重写基线，挪钉子本身属门机械。理由：同一份源码，由另一个 nightly 的 rustdoc 或另一个 cargo-public-api 版本打印出来，可以逐行不同。两边各自浮动时，基线的内容取决于写它的机器上碰巧装了哪个 nightly，判它的 CI 每晚又换一个，源码一行没动也会报漂移；cargo-public-api 在工具链像 stable 时自己换成浮动的 `nightly`，而本仓库根的 `rust-toolchain.toml` 恰好钉着 stable，所以不写 `+<nightly>` 就一定落到浮动那一侧。被击败的备选有三个：①只在本机重写基线：下一晚 CI 换了 nightly，红照样回来；②只在 CI 钉住：本机 `--write` 仍按本机的 nightly 写出另一种渲染；③把 nightly 写进 `rust-toolchain.toml`：那个文件钉的是编译产品用的 stable，而 rustdoc JSON 只有 nightly 能出，两件事不能共用一个 channel。重议条件：cargo-public-api 能读 stable 工具链产出的 rustdoc JSON，或者钉住的 nightly 编译不了 workspace（某个依赖的 `rust-version` 超过它）。
 
 **12-7 漂移报告列出差异行，并设上限。** 夜间作业的读者手里只有日志，只报「漂了」时，他得在另一台机器上装同一对渲染器、重算一遍才知道漂了什么。所以违规按排序后的逐行比对，列出只在一侧出现的行，最多 `DRIFT_SHOWN`（40）行，其余报条数。被击败的备选：打印完整差异。rustdoc 的渲染一变，往往整份基线的行都跟着变，几千行的日志没有人读；上限内的前几行已经足够判断是源码变了还是渲染变了。
+
+**12-8 门把 Lean 当文本读，不跑 Lean。** `spec`、`specalign`、`wiring` 读一份 Lean 规格时读的是源文本里几种受限的形状（§8-43）：一行一个构造子的 `inductive`、一行一臂的 `def`、`import` 行、去掉注释与字符串之后剩下的词。Lean 与 Rust 两侧的名字逐字相同，门比的是同一个拼写，不做大小写或下划线的换算——换算规则本身就是第二套文法。理由：门在 `gates` 里并行，每道毫秒到百毫秒；判一张表若要先 `lake build` 再读 Lean 的输出，门就依赖构建的次序，而证明本来已经归 `just models`。Lean 自己守着受限形状背后的那一半：一个 `def` 的 match 漏了构造子，`lake build` 编不过，所以门只需判「两侧的名单与映射相同」。被击败的备选：写一个 Lean 程序在 elaborate 之后把名单导成 JSON 给门读——门从此要先等一次构建，而那个导出程序是名单的第二个读法，要自己的测试与自己的格式。**重开参数**：某张表的形状在一行一臂里写不下（例如一个臂要按参数再分支），那时这张表改由 Lean 侧导出。
+
+**12-9 modmap 判每一个包，门自己所在的包除外。** 范围是 `members` 列出的全部包（§8-39，desktop 在内），减去本门编进去的那个包（`CARGO_PKG_NAME`，与 `boundary` 读同一个事实）。xtask 的模块由本 SPEC §7 按模块描述，给它的文件另开一张表就是同一份描述的第二个家；其余工具包——今天是 citysim——与产品一样受封闭清单约束，因为它们的文件同样会被顺手新建、同样会忘记翻状态。锚点随之扩大：`specalign` 判 citysim 的 `spec` 列，与判产品的一样（§8-43）。失败的方向是故意的：一个新加的工具包默认受判，第一次提交就看得见一片红，而不是静静少判一个包。被击败的备选：在 citysim 的清单里再写一个 `mapped = true`——同一个包的一个性质分写在 `role` 与 `mapped` 两处；在 `modmap` 里写一张 `MAPPED_TOOLS` 常量表——包的一个性质住进了门里，改包名的那次提交不碰 xtask 也能过编译。
 
 ## 13 依赖选型
 
@@ -305,7 +310,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 模块表回答「这个文件是什么」，却从不回答「它的接口写在哪」。读者要从 `accounting::views::rounds` 走到定义它的那一节，得先猜 crate、再翻 SPEC 的 §8。第七列把这一步写成数据。
 
-**列约定**：`Module | File | What it owns | Shape | Since | Status | Spec`，第七列的值形如 `<crate>-SPEC.md#8-N`，这个文件名在全部包目录（§8-39）里找，恰好一个包目录持有它；一个也没有、或不止一个，各是一条违规。列在末尾，于是形状列与状态列的下标不动，只有单元格数从八变九。
+**列约定**：`Module | File | What it owns | Shape | Since | Status | Spec`，一个还没迁到 Lean 的包，第七列的值形如 `<crate>-SPEC.md#8-N`（已迁移的包写 Lean 模块名，§8-43），这个文件名在全部包目录（§8-39）里找，恰好一个包目录持有它；一个也没有、或不止一个，各是一条违规。列在末尾，于是形状列与状态列的下标不动，只有单元格数从八变九。
 
 **一节可以答多个模块，一个模块只能答一节。** 子模块跟随它的父模块所在的节，除非某节的标题点名了子模块的全路径（`runtime::tools::read` 有自己的 8-29，故它不跟 `runtime::tools`）。理由是 SPEC 的 §8 按接口分节而模块表按文件分行，两者本就不是一一对应；把子文件各钉到一个不存在的节上，只会造出一列指向虚无的链接。
 
@@ -448,7 +453,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 **称重只属 `budget`，引用属 `docnum`**：`budget` 称重并守住预算，`docnum` 把读数搬进散文与表格；二者读同一行 `budgets.toml`，故读数只有一个家。同理 `dep_version` 并不与 `depmap` 争权——`depmap` 判依赖边，版本号住清单，本门只负责把清单里的那个字符串搬进文档。
 
-**扫描面＝仓内全部 `.md`，排除隔离区 `local/`**：受管区段是给读者的承诺，而隔离区从不入库。
+**扫描面＝仓内全部 `.md` 与 `.lean`，排除隔离区 `local/`**：受管区段是给读者的承诺，而隔离区从不入库；Lean 规格也是给读者的文档，一对标记放进它的块注释里照样成立（§8-43）。
 
 **区段持有的数**：`WIRE_V` 与帧表条数、版本表单元格、依赖数、ARCHITECTURE §11 的尺寸读数、验证读数里可数的那几项、`LLM.md` 的命令与查询清单。**它不持有的**：§11 的 kani 读数——那一处已经有执行者，`proof` 门读 `#[kani::proof]` 属性并与散文里的总数对账，再圈一段受管区段会让同一个数字有两道门，且 `proof` 的读法要求「数字」与「kani harness」在同一行相邻，一对标记插在中间就把它读没了。**叙事本身也不归它**：一段建立在错误基数上的论证要改写成指路，机器判不了它。
 
@@ -864,7 +869,7 @@ pub(crate) fn parse_block(text: &str) -> Result<BTreeMap<String, BTreeSet<String
 
 **行**：`in_product_graph` 的包各一行，顺序即 `members` 的顺序（按目录）。desktop 以 path 依赖列入、不在产品图里，所以它进工作区之前没有行；进了工作区就自动有一行，这里不必改。
 
-**列**：`Directory | Package | Lib | Owns | May depend on | SPEC`。表头与单元格用英文，因为引用它的 `crates/README.md` 是英文文档。目录与 SPEC 写成仓库相对路径的代码片段，不写成链接：一个事实的读数与引用它的文档住在哪个目录无关，而相对链接的写法取决于那个目录。SPEC 文件是 `<dir>/<name()>-SPEC.md`，不在盘上即以 `Doc` 拒读，因为一格指向不存在的文件比没有这一格更糟。依赖一列是块里那一行的 crate 名，按 `parse_block` 给出的次序（字母序）以逗号分隔，没有边的写 `nothing`；表与 `depmap` 门、`crate_graph` 读同一个 `parse_block`，所以三者不会读出两张依赖表。lib 一列在包没有 lib target 时写 `no lib`。duty 里的 `|` 转义成 `\|`，免得一个竖线把一行切成两格。值不带首尾换行，与 `crate_graph` 相同。
+**列**：`Directory | Package | Lib | Owns | May depend on | SPEC`。表头与单元格用英文，因为引用它的 `crates/README.md` 是英文文档。目录与 SPEC 写成仓库相对路径的代码片段，不写成链接：一个事实的读数与引用它的文档住在哪个目录无关，而相对链接的写法取决于那个目录。SPEC 一格写那个包的生效规格：目录里有 `Spec.lean` 就是 `<dir>/Spec.lean`，否则是 `<dir>/<name()>-SPEC.md`，不在盘上即以 `Doc` 拒读，因为一格指向不存在的文件比没有这一格更糟。依赖一列是块里那一行的 crate 名，按 `parse_block` 给出的次序（字母序）以逗号分隔，没有边的写 `nothing`；表与 `depmap` 门、`crate_graph` 读同一个 `parse_block`，所以三者不会读出两张依赖表。lib 一列在包没有 lib target 时写 `no lib`。duty 里的 `|` 转义成 `\|`，免得一个竖线把一行切成两格。值不带首尾换行，与 `crate_graph` 相同。
 
 **拥有什么怎样找**：按模块名前缀找 family（§12-5）。family 表的解析加进 `modmap` 的 `Map`（字段 `family`，缺省为空表），与 `shapes`、`anchors` 共用 `read_map`，模块表仍只有一个读者（§7）。
 
@@ -890,7 +895,7 @@ pub(crate) fn notice(leader: Leader) -> [String; 4];
 ```
 
 - **只新建，不覆盖**：目录里已有 `Spec.lean` 时原样留下，答 `already exists, left untouched: <path>`。骨架之外的每一行都是施工者写下的规格，重写就会抹掉决定。
-- **不看 `<lib>-SPEC.md` 在不在**：迁移中的 crate 先有候选 `Spec.lean`，旧 SPEC 在同一个 change-set 里删除（`skills/sdd` 迁移第 4、5 步）。「一个 crate 只有一份生效规格」不由生成器判。
+- **不看 `<lib>-SPEC.md` 在不在**：迁移中的 crate 先有候选 `Spec.lean`，旧 SPEC 在同一个 change-set 里删除（`skills/sdd` 迁移第 4、5 步）。「一个 crate 只有一份生效规格」不由生成器判，由 `spec` 门判（§8-42）。
 - **不再生成 Markdown SPEC**：新 crate 从 `Spec.lean` 起步；尚未迁移的 `<lib>-SPEC.md` 由人改，迁移时整份换掉。
 - **骨架只有标题，没有每节该写什么**：每节写什么由 `skills/sdd` 规定，抄进骨架就是第二份定义。旧 Markdown 的 §8.5、§12、§17、§18 迁到哪里，由 ARCHITECTURE.md §11「Specifications in Lean」规定。
 - **头四行只有一处文字**：`header::NOTICE` 不带注释引导符，`notice(Leader::Rust)` 给 `header` 门，`notice(Leader::Lean)` 给骨架。Lean 文件的头由哪道门判，不在本节。
@@ -900,5 +905,61 @@ pub(crate) fn notice(leader: Leader) -> [String; 4];
 **测试**：`spec::tests::the_skeleton_opens_with_the_notice_and_numbers_the_seventeen_sections_in_order`：骨架前四行等于 `header::notice(Leader::Lean)`，以 `/-! ## ` 开头的行依次编号 1 到 17。`spec::tests::a_relocated_package_gets_its_spec_skeleton_in_its_own_directory`：骨架落在 `members` 给的目录里。骨架能被 Lean 编译，由生成一份、`lake build Spec`、再删掉来确认，不写成测试。
 
 **败给的方案**：生成器照旧写 Markdown，由迁移者手转 Lean——十七节的 Lean 形式就没有一处权威，每个迁移者各写一种。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-42 `spec` 门：一个包一份生效规格，Lean 规格守它自己的形状（形状 1 判定）
+
+**与 `spec` 命令的关系**：同一个模块 `xtask::spec` 持有一个 crate 的 Lean 规格这件事的两面。命令 `cargo xtask spec <lib>` 新建骨架，只新建、不覆盖（§8-41）；门 `cargo xtask gates spec` 判树，不写盘。命令不判，门不写，所以一个名字不会同时是两种动作。门在名册里叫 `spec`，与 `header`、`lexicon` 一样只经 `gates` 跑，没有单独的子命令。
+
+```rust
+// xtask::spec
+pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError>;   // 下面五条
+// xtask::spec::effective —— 第一、二条
+// xtask::spec::source    —— 第三、四、五条
+```
+
+**五条断言**：
+
+1. **一个包恰有一份生效规格。** `members` 列出的每个包（工具与 desktop 在内），目录里直接放着的 `*-SPEC.md` 与 `Spec.lean` 合起来恰好一份。两份都在，是一次迁移没有在一个变更集里完成（`skills/sdd` 迁移第 5 步）；一份都没有，是一个包没有规格。分部（`spec/` 下的 `.lean`）可以先于 `Spec.lean` 存在（ARCHITECTURE.md §11），不算一份规格。
+2. **散文不点名树上没有的 SPEC。** 散文取 `release::is_prose` 的定义（Markdown 与 HTML 的每一行、Rust 的 `//` 行、Lean 的整份）；其中每个 `<名>-SPEC`（带不带 `.md` 都算）都要有一个叫 `<名>-SPEC.md` 的文件在树上。拒词：若有一个包的目录名是 `<名>` 且它已有 `Spec.lean`，指向那份 Lean 规格（`<lib> D<n>` 或分部的路径）；否则让作者改正名字或删掉这句。`CHANGELOG.md` 豁免：它的每一节说的是那一版的树。代码里的字符串不算——测试夹具为它造的包造出 SPEC 文件，那些名字不是给读者的引用。
+3. **import 纪律。** `tools/adversary/` 下的 `.lean` 只 import `Sprawling` 或 `Sprawling.*`，以及工具链自带的 `Init`、`Std`、`Lean`；一个包目录下的 `.lean` 只 import 工具链自带的库、本包的规格、以及 ARCHITECTURE.md §3 的 `depmap` 块允许本包依赖的包的规格。模块名到包的对应按目录：`crates.agent_protocols.spec.Harness.Session` 属于目录是 `crates/agent_protocols` 的那个包。规格 import 检验器、检验器 import 规格、一个包的规格 import 它不许依赖的包，各是一条违规。
+4. **没有 `sorry`、`admit`、`axiom`。** 每个 `.lean` 去掉注释与字符串之后，不出现 `sorry` 与 `admit` 这两个词，也没有以 `axiom`（前面可以带 `private`）开头的声明。这一条原在 `just models` 的一行 grep 里，只看 `crates/`、只在有 Lean 的机器上跑；门不要 Lean，也看得到检验器。`lakefile.toml` 的 `warningAsError` 仍让 `sorry` 在构建时失败，两者判的是同一件事的两端：门在编译之前、构建在 elaborate 之后。
+5. **规格引用的仓内路径在盘上。** 包目录下每个 `.lean` 里，首段是仓库根下一个目录、扩展名在 `release` 的 `CITED_EXTENSIONS` 里的路径，都指向一个存在的文件。`release` 判「首段不是这棵树的目录」，这里判「首段是，文件却不在」——规格点名它规定的 Rust 模块（ARCHITECTURE.md §11），模块搬走而规格没跟上，就是这一条。
+
+**读法**：Lean 以源文本读（§12-8）。注释是 `--` 到行尾与 `/-` 到配对的 `-/`（可以嵌套），字符串是 `"…"`（认 `\"`）；这三样在判第三、四条之前抹成空格，行号不变。
+
+**失败**：读不了文件是 `XtaskError::Io`；`ARCHITECTURE.md` 没有 `depmap` 块是 `Doc`。
+
+**败给的方案**：把第四条留在 `justfile` 里（只在有 Lean 的机器上跑，且看不到 `tools/adversary/`）；门叫 `spec_gate`（名册里的名字就是门判的那样东西，而那样东西叫 spec）；第二条只判已迁移的包（`wording` 门的 rustdoc 引过一个早已删掉的 crate 的 SPEC，那一行说明悬空引用不只来自迁移）。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-43 门读 Lean 的受限形状：锚点、kernel 的两张表、wire 的 reach，以及扫 `.lean` 的四道门（形状 1 判定）
+
+**一个包迁没迁，只看一个事实**：它的目录里有没有 `Spec.lean`（`lean::specification`）。`specalign`、`wiring`、`spec` 与 `docnum` 的 `crate_table` 都问这一处，所以没有第二张「哪些 crate 已迁移」的名单。
+
+```rust
+// xtask::lean
+pub(crate) const ENTRY: &str;                                    // "Spec.lean"
+pub(crate) struct Source { pub(crate) path: String, pub(crate) text: String }
+pub(crate) fn specification(root: &Path, dir: &str) -> Result<Option<Vec<Source>>, XtaskError>; // Spec.lean 加 spec/**；没有 Spec.lean 为 None
+pub(crate) fn code(text: &str) -> String;                        // 注释与字符串抹成空格，行不变
+pub(crate) fn inductives(code: &str) -> BTreeMap<String, Roster>; // inductive <名> where，一行一个 `| 构造子`
+pub(crate) fn arms(code: &str, def: &str) -> Option<Table>;      // def <名> …，一行一个 `| .构造子 => 右边`
+pub(crate) fn imports(code: &str) -> Vec<(usize, String)>;
+pub(crate) fn module_file(module: &str) -> String;               // crates.x.spec.A → crates/x/spec/A.lean
+pub(crate) fn dotted(dir: &str) -> String;                       // crates/x → crates.x
+```
+
+- **锚点**：已迁移的包，`architecture.toml` 里它的每一行写规定它的那个 Lean 模块名：`spec = "crates.browser.spec.Act"`，入口自己规定时写 `crates.browser.Spec`。`specalign` 判三件事：模块名换成的路径在盘上；那个文件在持有这一行文件的包的目录里（一行引的是它自己那个包的规格）；包迁没迁与锚点的写法一致——已迁移的包写 `-SPEC.md#…`、未迁移的包写 Lean 模块名，各是一条违规。未迁移的包照 §8-10 判。
+- **范围**：锚点来自 `modmap::anchors`，它判除本门所在包之外的每个包（§12-9），所以 desktop 与 citysim 的行都判。
+- **kernel 的两张表**（kernel 迁移之后）：kernel 的规格里写 `inductive AxCode where` 与 `def AxCode.carrier : AxCode → Carrier`，每一臂 `| .PathNotFound => .loadtime` 或 `| .ToolTimeout => .event .ToolResult`；`inductive EventKind where` 与 `def EventKind.windowClass : EventKind → WindowClass`，每一臂的右边是 `.inWindow` 或 `.recordOnly`。构造子名就是 Rust 的变体名。门把 carrier 与窗类逐臂与 `AxCode::ALL`、`EventKind::ALL` 对账，两侧的名单双向比；§8-10 的第四条改为：kernel 规格里每一个与 kernel 枚举同名的 `inductive` 都双向对账。Lean 的 `inductive` 没有省略的写法，所以没有「指路牌」这一类跳过。
+- **wire 的 reach**（wire 迁移之后）：`def Command.reach : Command → Reach`，每一臂 `| .Pursue => .client`，右边是 `.client`、`.push`、`.handshake`、`.sealed` 之一。`wiring` 读这些臂，代替 wire-SPEC §19-2 的表。
+- **受限的形状**：一行一个构造子或一臂；空行与注释行跳过；第一行既不以 `|` 开头、也不是空的，就结束这一块（`deriving` 行也是）。块不在、或一臂的右边不是认得的值，门以 `Doc` 判不动，而不是把缺的当成空的判绿。
+- **扫 `.lean` 的四道门**：`docnum` 扫 `.md` 与 `.lean`；`lexicon` 扫 `.md`、`.rs` 与 `.lean`；`release` 把一份 `.lean` 整份当散文读（规格里的代码是模型，其中的路径都是引用，没有城里的地址），`.lean` 进 `CITED_EXTENSIONS`；`proof` 的不证理由含 `.md` 或 `.lean` 都算点名了一份文档。
+- **`check-branch`**：分支的 diff 里有 `.lean`，或有 Lean 包的三个文件（`lakefile.toml`、`lean-toolchain`、`lake-manifest.json`）时，多跑一步 `just models`。`members --owning` 早已略过 `.lean`，所以改 Lean 不会选中 Rust 测试。
+
+**测试**：每条都用测试自己造的夹具：kernel 的 Lean 规格少一个构造子、一臂的 carrier 与枚举不符、锚点指向不存在的分部、已迁移的包写 Markdown 锚点、citysim 的一行指向不存在的节、wire 的 reach 臂读成表、`.lean` 进了 `docnum` 与 `lexicon` 的扫描面、Lean 的块注释里点名一份不在树上的文档、`.lean` 作为不证理由。
 
 **本节属门禁机具，与产品代码分开提交。**

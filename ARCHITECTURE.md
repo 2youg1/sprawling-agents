@@ -703,6 +703,21 @@ number.
 **Language.** Comments are Chinese, with concept names in English.
 Declaration names are English and come from the glossary.
 
+**Anchors, and what the gates read.** Once a crate has migrated, each of
+its rows in `architecture.toml` names the part that specifies the module
+by its module name, `spec = "crates.browser.spec.Act"`, or
+`crates.browser.Spec` where the entry itself does, and `specalign` holds
+that name to a file inside the same crate. The gates read a
+specification as text, in a few restricted shapes, and never run Lean:
+one constructor per line in an `inductive`, one arm per line in a `def`,
+the `import` lines, and the words left once comments and strings are
+blanked. A Lean name and the Rust name it stands for are spelled the
+same, so a gate compares one spelling rather than converting between two.
+`tools/xtask/xtask-SPEC.md` sections 8-42 and 8-43 say which gate reads
+which shape; the `spec` gate holds a crate to one effective
+specification, the checker and the specifications to their imports, and
+every `.lean` to no `sorry`, `admit` or `axiom`.
+
 **From the Markdown layout.** The Markdown SPECs carry nineteen headings.
 Sections 1–11 and 13–16 keep their numbers. §8.5, two designs, becomes the
 alternative recorded beside the reference definition in §10. §12 Decisions
