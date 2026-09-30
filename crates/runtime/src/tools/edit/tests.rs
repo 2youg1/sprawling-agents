@@ -140,18 +140,29 @@ fn a_path_outside_the_write_domain_is_refused_before_the_disk_is_touched() {
             .unwrap_or_default();
         assert!(alternative.contains("work"), "{hostile}: {err}");
     }
-    for illegal in [
-        "../evil.txt",
-        "/abs.txt",
-        "work//x",
-        beyond.to_str().unwrap(),
-    ] {
+    for illegal in ["../evil.txt", "work//x"] {
         let err = match tool.invoke(&call(illegal, "new", "", "y")) {
             Err(err) => err,
             Ok(_) => panic!("{illegal} must be refused"),
         };
         assert_eq!(*err.code(), AxCode::InvalidArgs, "{illegal}");
     }
+    // A path this platform calls absolute is an address only inside the
+    // city (runtime-SPEC 12.4): outside it the refusal points at `exec`,
+    // and the create form leaves nothing behind there.
+    let err = match tool.invoke(&call(beyond.to_str().unwrap(), "new", "", "y")) {
+        Err(err) => err,
+        Ok(_) => panic!("{} must be refused", beyond.display()),
+    };
+    assert_eq!(
+        (
+            err.code(),
+            err.recovery().contains("`exec`"),
+            beyond.exists()
+        ),
+        (&AxCode::GateDenied, true, false),
+        "{err:?}"
+    );
     assert_eq!(
         std::fs::read_to_string(tmp.path().join("outside.txt")).unwrap(),
         "x"
