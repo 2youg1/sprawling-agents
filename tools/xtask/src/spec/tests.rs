@@ -32,3 +32,100 @@ fn the_skeleton_opens_with_the_notice_and_numbers_the_seventeen_sections_in_orde
         )
     );
 }
+
+/// Everything the gate reports on a fixture, as `location: violation`,
+/// sorted; the fixture is removed before anything is asserted.
+fn judged(root: &std::path::Path) -> Result<Vec<String>, String> {
+    let found = super::check(root);
+    std::fs::remove_dir_all(root).unwrap();
+    let mut texts: Vec<String> = found
+        .map_err(|err| err.to_string())?
+        .into_iter()
+        .map(|v| format!("{}: {}", v.location, v.violation))
+        .collect();
+    texts.sort();
+    Ok(texts)
+}
+
+/// Two specifications in one package, and none in another.
+#[test]
+fn a_package_holds_exactly_one_effective_specification() {
+    let root = crate::root::fixture::relocated("spec-effective");
+    crate::root::fixture::write(&root, "tools/k/k-SPEC.md", "# k\n");
+    crate::root::fixture::write(&root, "tools/k/Spec.lean", "");
+    assert_eq!(
+        judged(&root),
+        Ok(vec![
+            "crates/j: crates/j holds neither a `*-SPEC.md` nor a Spec.lean".to_owned(),
+            "tools/k: tools/k holds tools/k/k-SPEC.md and tools/k/Spec.lean".to_owned(),
+        ])
+    );
+}
+
+/// A SPEC named in prose is in the tree; a pattern, a string in code and
+/// the history are not citations.
+#[test]
+fn prose_names_no_spec_the_tree_lacks() {
+    let root = crate::root::fixture::relocated("spec-dangling");
+    crate::root::fixture::write(&root, "tools/k/k-SPEC.md", "# k\n");
+    crate::root::fixture::write(&root, "crates/j/j-SPEC.md", "# j\n");
+    crate::root::fixture::write(
+        &root,
+        "docs/a.md",
+        "Read k-SPEC §3 and gone-SPEC.md; <lib>-SPEC.md is a pattern, SPECIFIC-SPECS a word.\n",
+    );
+    crate::root::fixture::write(
+        &root,
+        "crates/j/src/lib.rs",
+        "// see x-SPEC\nconst S: &str = \"y-SPEC.md\";\n",
+    );
+    crate::root::fixture::write(&root, "CHANGELOG.md", "old-SPEC.md\n");
+    assert_eq!(
+        judged(&root),
+        Ok(vec![
+            "crates/j/src/lib.rs:1: names `x-SPEC`, and no `x-SPEC.md` is in the tree".to_owned(),
+            "docs/a.md:1: names `gone-SPEC`, and no `gone-SPEC.md` is in the tree".to_owned(),
+        ])
+    );
+}
+
+/// The imports each side may make, no proof left undischarged, and the
+/// paths a specification cites.
+#[test]
+fn lean_imports_along_the_crate_graph_and_proves_what_it_states() {
+    let root = crate::root::fixture::relocated("spec-source");
+    crate::root::fixture::write(&root, "tools/k/k-SPEC.md", "# k\n");
+    crate::root::fixture::write(
+        &root,
+        "crates/j/Spec.lean",
+        "import tools.k.Spec\nimport Sprawling.Frame\n\
+         /-! Specifies crates/j/src/lib.rs and crates/j/src/gone.rs; no sorry here. -/\n\
+         theorem t : True := by sorry\nprivate axiom bad : False\n\
+         structure S where\n  admit : Nat\ndef S.go (s : S) := s.admit\n\
+         theorem u : True := by\n  admit\n",
+    );
+    crate::root::fixture::write(&root, "tools/k/spec/A.lean", "import crates.j.Spec\n");
+    crate::root::fixture::write(
+        &root,
+        "tools/adversary/src/X.lean",
+        "import Lean.Data.Json\nimport crates.j.Spec\n",
+    );
+    assert_eq!(
+        judged(&root),
+        Ok(vec![
+            "crates/j/Spec.lean:10: leaves an `admit`".to_owned(),
+            "crates/j/Spec.lean:2: imports `Sprawling.Frame`, which is neither the toolchain's \
+             nor a crate's specification"
+                .to_owned(),
+            "crates/j/Spec.lean:3: cites `crates/j/src/gone.rs`, which is not there".to_owned(),
+            "crates/j/Spec.lean:4: leaves a `sorry`".to_owned(),
+            "crates/j/Spec.lean:5: declares an axiom".to_owned(),
+            "tools/adversary/src/X.lean:2: the checker imports `crates.j.Spec`, and it imports \
+             only `Sprawling` and the toolchain's libraries"
+                .to_owned(),
+            "tools/k/spec/A.lean:1: imports `crates.j.Spec`, a part of j, which the depmap block \
+             does not let k depend on"
+                .to_owned(),
+        ])
+    );
+}

@@ -106,7 +106,8 @@ const DETECTORS: [&str; 5] = [
 /// or a placeholder, and guessing which of those a reader is meant to
 /// follow would make the gate wrong about prose it has no business
 /// judging.
-const CITED_EXTENSIONS: [&str; 7] = [".md", ".rs", ".toml", ".html", ".css", ".json", ".jsonl"];
+pub(crate) const CITED_EXTENSIONS: [&str; 7] =
+    [".md", ".rs", ".toml", ".html", ".css", ".json", ".jsonl"];
 
 /// Every directory name the published tree contains, at any depth.
 ///
@@ -145,7 +146,7 @@ fn directory_names(published: &[String]) -> BTreeSet<String> {
 /// an empty first segment and is dropped by the caller. That is the
 /// whole of the URL handling, and it is a consequence of the character
 /// set rather than a special case bolted beside it.
-fn path_tokens(line: &str) -> Vec<String> {
+pub(crate) fn path_tokens(line: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut current = String::new();
     for ch in line.chars() {
@@ -198,7 +199,7 @@ pub(crate) fn outside_the_tree(line: &str, dirs: &BTreeSet<String>) -> Option<St
 /// there are seventy-nine of those. Reading them would produce a list of
 /// offenders that is wrong in every entry, which is worse than not
 /// looking.
-fn is_prose(rel: &str, line: &str) -> bool {
+pub(crate) fn is_prose(rel: &str, line: &str) -> bool {
     if rel.ends_with(".md") || rel.ends_with(".html") {
         return true;
     }

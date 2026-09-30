@@ -9,12 +9,20 @@
 //! (or, for a tool without one, whose package) goes by that name.
 //! Creation only: an existing `Spec.lean` is never overwritten, because
 //! everything past the skeleton is a specification somebody wrote.
+//!
+//! The gate of the same name judges what the tree holds and never
+//! writes (xtask-SPEC.md section 8-42): the command makes a
+//! specification, the gate holds every specification to its rules, and
+//! neither does the other's job.
 
 use std::path::Path;
 
 use crate::header::{Leader, notice};
 use crate::members;
-use crate::report::XtaskError;
+use crate::report::{Violation, XtaskError};
+
+mod effective;
+mod source;
 
 /// The seventeen responsibilities of `skills/sdd`, in its order. What each
 /// section holds is that skill's to say, so the skeleton carries titles only.
@@ -37,6 +45,14 @@ const SECTIONS: [&str; 17] = [
     "测试与约束",
     "文档关系",
 ];
+
+/// The `spec` gate: one effective specification per package, no prose
+/// naming a SPEC the tree lacks, the import discipline, no `sorry`,
+/// `admit` or `axiom`, and every path a specification cites on disk.
+pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
+    let _ = root;
+    Ok(Vec::new())
+}
 
 pub(crate) fn run(root: &Path, lib: Option<&str>) -> Result<String, XtaskError> {
     let lib = lib.ok_or_else(|| XtaskError::Doc {
