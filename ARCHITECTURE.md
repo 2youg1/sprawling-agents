@@ -353,6 +353,25 @@ When the process dies mid-call, `sprawling resume` verifies the chain,
 closes tool calls whose outcome was lost as *unknown* rather than as
 failed, and reports what waits for a person.
 
+**A room whose resident is an official harness takes the second drive.**
+`agree_to_work` decides the resident once, as a `Seat`, and a harness
+room leaves the walk after step 4: steps 5 to 11 are the harness's own,
+because it assembles its own context, calls its own model and runs its
+own tools, so the city records what it chooses to report and governs
+none of it. The lane lends the room its own worktree whatever the
+building's `review` says, starts the harness there
+(`accounting::worker::driving::harness`), sends the brief as its one
+prompt, books each report as `harness_reported` after it was said, and
+turns a halt or the building's `harness_minutes` ceiling into
+`cancel_received` and `session/cancel`. When the harness answers, the
+city commits the tree, writes `harness_answered`, and freezes through
+`runtime::run::harness`, the one author of that order; a run frozen done
+is offered for review as a request the city opens, because the harness
+reaches none of the city's tools, and the merge stays the one way its
+writes reach the building. That is the weak form of step 4 which
+sprawling-SPEC.md section 8-4e records and
+`crates/agent_protocols/spec/Harness/Session.lean` proves.
+
 ### When it does not go through
 
 The walk above is the path that succeeds. Every way it can stop is one
@@ -886,15 +905,21 @@ sequenceDiagram
     S->>S: admission, pure decisions only
     S->>D: post
     D-->>A: Wake::Command
-    A->>A: agree_to_work: every refusal before anything is written
+    A->>A: agree_to_work: every refusal before anything is written, and the Seat
     A->>R: open the room, write the brief
     A->>L: start the run in the driving pool
-    loop each turn until the turn concludes
-        L->>A: relay each EventDraft, wait for its EventRef
+    alt the resident is a model
+        loop each turn until the turn concludes
+            L->>A: relay each EventDraft, wait for its EventRef
+            A->>R: append_all
+            L->>E: request in its dialect
+            E-->>L: reply, secrets redacted
+            L->>G: tool wave, each call through the Gate
+        end
+    else the resident is an official harness
+        L->>L: lend the room its tree, start the harness in it
+        L->>A: relay run_started, each harness_reported, the checkpoint, harness_answered
         A->>R: append_all
-        L->>E: request in its dialect
-        E-->>L: reply, secrets redacted
-        L->>G: tool wave, each call through the Gate
     end
     L-->>A: Wake::Home, the run froze
     A->>R: settle what the run left behind
@@ -911,6 +936,8 @@ sequenceDiagram
 `crates/accounting/src/worker/dispatching/agreeing.rs` (`agree_to_work`),
 `crates/accounting/src/worker/pool.rs`,
 `crates/runtime/src/run/lifecycle.rs`,
+`crates/accounting/src/worker/driving/harness.rs` (`drive_harness`),
+`crates/runtime/src/run/harness.rs`,
 `crates/storage/src/jsonl/append.rs` (`append_all`),
 `crates/sprawling/src/serving/folding.rs`, `client/src/core/socket.ts`.
 
@@ -1041,15 +1068,20 @@ stateDiagram-v2
     Driving --> Driving: a Steer lands at a safe point
     Driving --> Frozen: Completion done or limit
     Driving --> Frozen: Cancel, Completion cancelled
+    Driving --> Frozen: a harness answered, or its session ended with no answer
     Driving --> Lost: the process died
     Lost --> Frozen: resume closes lost tool calls as unknown
     Frozen --> [*]
 ```
 
 A frozen run is history and is never woken: a succession or a knock
-starts a new run. `crates/accounting/src/worker/dispatching/agreeing.rs`,
+starts a new run. A harness run freezes the way its answer and its first
+cut say: done only on an end of turn that said something, limit when the
+building's ceiling cut it, cancelled when a halt did.
+`crates/accounting/src/worker/dispatching/agreeing.rs`,
 `crates/accounting/src/worker/pool.rs`, `crates/runtime/src/run.rs`
-(`drive`), `crates/kernel/src/completion.rs`,
+(`drive`), `crates/runtime/src/run/harness.rs`,
+`crates/kernel/src/completion.rs`,
 `crates/accounting/src/worker/freezing.rs`,
 `crates/accounting/src/worker/genesis.rs`.
 
