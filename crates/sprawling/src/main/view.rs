@@ -6,10 +6,12 @@
 //! The read-only verb that shows one city's Ledger from disk
 //! (sprawling-SPEC.md 8-105).
 //!
-//! What it writes is what an agent already parses: Ledger lines byte for
-//! byte, or with `--runs` one JSON line per run from
-//! `sprawling::lineage`. Nothing here decides what a record means, so a
-//! new event kind needs no line in this file.
+//! What it writes into a pipe or a file is what an agent already parses:
+//! Ledger lines byte for byte, or with `--runs` one JSON line per run
+//! from `sprawling::lineage`. At a terminal each Ledger line is led by
+//! its chain hash, the value a person writes down to find the line
+//! again. Nothing here decides what a record means, so a new event kind
+//! needs no line in this file.
 
 use super::city::report;
 use super::grammar::{Arguments, nearest};
@@ -46,6 +48,45 @@ impl Audience {
             Audience::Agent
         }
     }
+
+    /// Writes one Ledger line and its `\n` in the form this audience
+    /// reads: byte for byte for an agent; for a person, led by the
+    /// line's whole chain hash.
+    fn write_line(self, line: &[u8], out: &mut impl Write) -> std::io::Result<()> {
+        let label = match self {
+            Audience::Agent => String::new(),
+            Audience::Person => chain_label(line, HashWidth::Whole),
+        };
+        out.write_all(label.as_bytes())?;
+        out.write_all(line)?;
+        out.write_all(b"\n")
+    }
+}
+
+/// How many hex digits of a line's chain hash stand before it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HashWidth {
+    /// All 64, where the line is written whole.
+    Whole,
+    /// The first `GLANCE_DIGITS`, where a row is cut to its column.
+    Glance,
+}
+
+/// Enough digits to tell two lines apart by eye in a ledger of
+/// hundreds of thousands of lines; the whole hash is in the detail pane.
+const GLANCE_DIGITS: usize = 12;
+
+/// The chain hash of the Ledger line `line` as a person reads it before
+/// the line: the hex digits `width` keeps, then two spaces. The hash is
+/// of the bytes given; `view` never checks it against the next `prev`.
+fn chain_label(line: &[u8], width: HashWidth) -> String {
+    let hex = kernel::ledger::chain_hash(line).to_string();
+    let kept = match width {
+        HashWidth::Whole => hex.len(),
+        HashWidth::Glance => GLANCE_DIGITS,
+    };
+    let digits: String = hex.chars().take(kept).collect();
+    format!("{digits}  ")
 }
 
 /// Why the verb could not finish writing.
@@ -197,32 +238,34 @@ fn kind_named(raw: &str) -> Result<EventKind, String> {
     })
 }
 
-/// Writes the lines `chosen` selects, oldest first, each ending in `\n`.
+/// Writes the lines `chosen` selects, oldest first, each ending in `\n`
+/// and, for a person, led by its chain hash.
 pub(super) fn write_records(
     dir: &Path,
     chosen: &Selection,
-    _audience: Audience,
+    audience: Audience,
     out: &mut impl Write,
 ) -> Result<(), ViewError> {
     let index = storage::LedgerIndex::rebuild(dir)?;
     let mut reader = index.reader(dir);
+    let mut emit = |line: &[u8]| audience.write_line(line, &mut *out);
     match chosen.run {
         Some(run) => {
             let mut seqs: Vec<Seq> = index.run_seqs_before(run, None).collect();
             seqs.reverse();
-            write_walk(&mut reader, seqs.into_iter(), chosen, out)
+            write_walk(&mut reader, seqs.into_iter(), chosen, &mut emit)
         }
-        None => write_walk(&mut reader, index.seqs(), chosen, out),
+        None => write_walk(&mut reader, index.seqs(), chosen, &mut emit),
     }
 }
 
-/// Writes the lines of `walk`, an ascending run of seqs, that `chosen`
-/// admits.
+/// Hands `emit` the lines of `walk`, an ascending run of seqs, that
+/// `chosen` admits.
 fn write_walk(
     reader: &mut storage::LineReader<'_>,
     walk: impl DoubleEndedIterator<Item = Seq>,
     chosen: &Selection,
-    out: &mut impl Write,
+    emit: &mut impl FnMut(&[u8]) -> std::io::Result<()>,
 ) -> Result<(), ViewError> {
     let from = chosen.from;
     let walk = walk.filter(|seq| from.is_none_or(|from| *seq >= from));
@@ -231,8 +274,7 @@ fn write_walk(
             for seq in walk {
                 let line = reader.line_at(seq)?;
                 if chosen.admits(&line)? {
-                    out.write_all(&line)?;
-                    out.write_all(b"\n")?;
+                    emit(&line)?;
                 }
             }
         }
@@ -248,8 +290,7 @@ fn write_walk(
                 }
             }
             for line in kept.iter().rev() {
-                out.write_all(line)?;
-                out.write_all(b"\n")?;
+                emit(line)?;
             }
         }
     }

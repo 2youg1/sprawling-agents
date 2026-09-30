@@ -19,10 +19,19 @@ pub(super) fn json_lines(value: &Value) -> Vec<String> {
     lines
 }
 
-/// A Ledger line drawn as [`json_lines`] draws its JSON; a line that is
-/// not JSON is drawn as the one string it is.
+/// A Ledger line under its whole chain hash, then drawn as
+/// [`json_lines`] draws its JSON; a line that is not JSON is drawn as the
+/// one string it is.
 pub(super) fn line_lines(line: &str) -> Vec<String> {
-    json_lines(&serde_json::from_str(line).unwrap_or_else(|_| Value::String(line.to_owned())))
+    let hash = format!(
+        "chain_hash: {}",
+        kernel::ledger::chain_hash(line.as_bytes())
+    );
+    std::iter::once(hash)
+        .chain(json_lines(
+            &serde_json::from_str(line).unwrap_or_else(|_| Value::String(line.to_owned())),
+        ))
+        .collect()
 }
 
 fn push_members(value: &Value, indent: &str, lines: &mut Vec<String>) {

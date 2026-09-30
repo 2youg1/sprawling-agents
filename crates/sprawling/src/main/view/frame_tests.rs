@@ -86,6 +86,13 @@ fn after(actions: &[Action], size: Size) -> Face {
     face
 }
 
+/// A ledger line as the records lens lists it: the first twelve digits
+/// of its chain hash, two spaces, the line.
+fn listed(line: &str) -> String {
+    let hash = kernel::ledger::chain_hash(line.as_bytes()).to_string();
+    format!("{}  {line}", hash.get(..12).unwrap())
+}
+
 fn cursor_line(face: &Face) -> String {
     face.frame()
         .into_iter()
@@ -158,7 +165,7 @@ fn a_run_that_starts_while_following_appears_and_the_cursor_stays() {
     );
     face.apply(Action::SwitchLens);
     face.apply(Action::Last);
-    assert_eq!(cursor_line(&face), ">{}");
+    assert_eq!(cursor_line(&face), format!(">{}", listed("{}")));
 }
 
 #[test]
@@ -220,7 +227,7 @@ fn switching_lens_keeps_the_selected_thing() {
     let records = after(&[Action::SwitchLens], NARROW);
     assert_eq!(
         cursor_line(&records),
-        format!(r#">{{"seq":3,"run":"{R2}"}}"#)
+        format!(">{}", listed(&format!(r#"{{"seq":3,"run":"{R2}"}}"#)))
     );
     let back = after(
         &[Action::SwitchLens, Action::Down, Action::SwitchLens],
@@ -238,12 +245,12 @@ fn switching_lens_keeps_the_selected_thing() {
 fn the_records_lens_shows_each_line_by_its_chain_hash() {
     let line = format!(r#"{{"seq":3,"run":"{R2}"}}"#);
     let hash = kernel::ledger::chain_hash(line.as_bytes()).to_string();
-    let listed = after(&[Action::SwitchLens], NARROW);
+    let records = after(&[Action::SwitchLens], NARROW);
     let detailed = after(&[Action::SwitchLens, Action::OpenDetail], NARROW);
     assert_eq!(
-        (cursor_line(&listed), detailed.frame().first().cloned()),
+        (cursor_line(&records), detailed.frame().first().cloned()),
         (
-            format!(">{}  {line}", hash.get(..12).unwrap()),
+            format!(">{}", listed(&line)),
             Some(format!("chain_hash: {hash}"))
         )
     );
@@ -376,6 +383,6 @@ fn a_window_from_the_tail_says_it_is_filling_until_the_whole_fold_arrives() {
             run_line.starts_with(&format!(">        + run {R4}")),
             face.frame().contains(&FILLING.to_owned())
         ),
-        (r#">{"seq":1}"#.to_owned(), true, false)
+        (format!(">{}", listed(r#"{"seq":1}"#)), true, false)
     );
 }

@@ -16,7 +16,7 @@ use super::arrange::{Entry, NodeKey, arrange};
 use super::detail::{json_lines, line_lines};
 use super::follow::Row;
 use super::keys::Action;
-use super::list::{beside, cut, has_children, scrolled, tree_lines, visible};
+use super::list::{beside, cut, has_children, record_lines, scrolled, tree_lines, visible};
 use super::rounds::{Rounds, fold};
 
 /// From this many columns on, the detail pane stays open on the right.
@@ -373,11 +373,7 @@ impl Face {
                 let lines = tree_lines(&self.entries, &shown, &self.expanded, &self.rounds);
                 scrolled(lines, cursor, rows)
             }
-            Lens::Records => scrolled(
-                self.records.iter().map(|row| row.line.clone()).collect(),
-                self.record_at,
-                rows,
-            ),
+            Lens::Records => record_lines(&self.records, self.record_at, rows),
         }
     }
 
