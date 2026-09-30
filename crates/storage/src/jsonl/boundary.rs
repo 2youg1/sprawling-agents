@@ -3,7 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The chain state entering the last segment, read off the segment before it.
+//! The chain state entering the last segment, read off the last line of
+//! the segment before it, and that line alone.
 
 use std::path::{Path, PathBuf};
 
@@ -12,8 +13,9 @@ use kernel::{AxCode, AxError, GENESIS_PREV, Seq};
 
 use crate::error::{StorageError, io_err};
 
-use super::ledger::{JsonlLedger, PriorSegment, TailBoundary, complete_lines};
+use super::ledger::{JsonlLedger, PriorSegment, TailBoundary, segment_first_seq};
 use super::verify::{LineCheck, LineFault};
+use crate::vfs::Vfs;
 
 impl JsonlLedger {
     /// Boundary state entering the last segment: chain root, or the
@@ -39,13 +41,14 @@ impl JsonlLedger {
                 prior: None,
             });
         };
-        let bytes = self
+        let len = self
             .vfs
-            .read(prior)
-            .map_err(io_err("read segment", prior))?;
-        let (lines, _) = complete_lines(&bytes);
-        let count = u64::try_from(lines.len()).unwrap_or(u64::MAX);
-        let Some(last_line) = lines.last() else {
+            .size(prior)
+            .map_err(io_err("measure segment", prior))?;
+        let count = line_count(prior, last);
+        let last_line =
+            last_line_of(self.vfs.as_ref(), prior, len).map_err(io_err("read segment", prior))?;
+        let Some(last_line) = last_line else {
             return Err(StorageError::Envelope {
                 path: prior.clone(),
                 line: 0,
@@ -60,20 +63,73 @@ impl JsonlLedger {
                 ),
             });
         };
-        let judged = LineCheck::judge(last_line).map_err(|fault| refusal(prior, count, fault))?;
+        let judged = LineCheck::judge(&last_line).map_err(|fault| refusal(prior, count, fault))?;
         let next = judged
             .seq
             .next()
             .map_err(|source| StorageError::Draft { source })?;
-        let len = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
         Ok(TailBoundary {
-            prev: chain_hash(last_line),
+            prev: chain_hash(&last_line),
             next_seq: next,
             prior: Some(PriorSegment {
                 path: prior.clone(),
                 len,
             }),
         })
+    }
+}
+
+/// How far back from a segment's end the first read reaches for its last
+/// line; the window doubles until the line's start is in it, so a line of
+/// any length costs at most twice its own bytes and a segment's length
+/// costs nothing (storage-SPEC 8-1).
+const BOUNDARY_WINDOW: u64 = 16 * 1024;
+
+/// The last complete line of the segment at `path`, `len` bytes long,
+/// without its `\n`, read from the end; `None` when the segment holds no
+/// complete line.
+fn last_line_of(vfs: &dyn Vfs, path: &Path, len: u64) -> std::io::Result<Option<Vec<u8>>> {
+    let mut window = BOUNDARY_WINDOW;
+    loop {
+        let from = len.saturating_sub(window);
+        let tail = vfs.read_at(path, from, len.saturating_sub(from))?;
+        let reached_start = from == 0;
+        let body = tail
+            .iter()
+            .rposition(|byte| *byte == b'\n')
+            .and_then(|end| tail.get(..end));
+        match (body, reached_start) {
+            (Some(body), _) => match body.iter().rposition(|byte| *byte == b'\n') {
+                Some(start) => {
+                    return Ok(Some(
+                        body.get(start.saturating_add(1)..)
+                            .unwrap_or_default()
+                            .to_vec(),
+                    ));
+                }
+                None if reached_start => return Ok(Some(body.to_vec())),
+                None => {}
+            },
+            (None, true) => return Ok(None),
+            (None, false) => {}
+        }
+        window = window.saturating_mul(2);
+    }
+}
+
+/// Which line of `prior` its last line is, read off the two segments'
+/// names rather than by counting: each name carries the seq of its first
+/// line and every line carries the next seq. Zero when a name does not
+/// say, which only a message ever reads.
+fn line_count(prior: &Path, last: &Path) -> u64 {
+    let first = |path: &Path| {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .and_then(segment_first_seq)
+    };
+    match (first(prior), first(last)) {
+        (Some(prior), Some(last)) => last.value().saturating_sub(prior.value()),
+        (None, _) | (_, None) => 0,
     }
 }
 

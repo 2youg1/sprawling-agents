@@ -80,7 +80,7 @@ impl ChainHalt {
     pub fn awaiting_proof() -> ChainHalt {
         ChainHalt {
             verdict: Arc::default(),
-            before: Before::Admit,
+            before: Before::Refuse,
         }
     }
 
@@ -203,7 +203,7 @@ fn walk(dir: &Path, records: Option<&ProofRecords>) -> Result<Proven, StorageErr
         let bytes = vfs
             .read(&path)
             .map_err(io_err("read a segment to prove", &path))?;
-        let known: Option<SegmentRecord> = records.and(None);
+        let known = records.and_then(|records| records.read(&name));
         let proved = match walked.segment(&bytes, known, version) {
             Ok(proved) => proved,
             Err(broken) => {

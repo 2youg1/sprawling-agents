@@ -28,7 +28,7 @@ use crate::vfs::Vfs;
 /// because [`line_check_version`] hashes the version in with this. The
 /// suffix is the digest of a fixed fixture's verdicts, which
 /// `chain_audit::tests` holds, so the rule cannot move alone.
-pub(crate) const LINE_CHECK_RULES: &str = "line-check-0000000000000000";
+pub(crate) const LINE_CHECK_RULES: &str = "line-check-40e703f48b222ca7";
 
 const MAGIC: &[u8; 8] = b"SPRPRF01";
 const SUFFIX: &str = ".proof";
