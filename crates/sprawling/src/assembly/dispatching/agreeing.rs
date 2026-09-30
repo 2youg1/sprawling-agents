@@ -113,9 +113,10 @@ impl RunWorker {
     ///
     /// # Errors
     /// Refuses a halted scope, the reserved subtree, rules that will not
-    /// load, a tag with no model behind it, an endpoint that is no
-    /// longer attached, and a confidential building whose model would
-    /// leave this machine.
+    /// load, a room whose resident is a harness, which this build reads
+    /// but does not start yet, a tag with no model behind it, an endpoint
+    /// that is no longer attached, and a confidential building whose
+    /// model would leave this machine.
     pub(super) fn agree_to_work(&mut self, at: &Assignment) -> Result<Agreed, AxError> {
         let addr = &at.addr;
         if let Some(scope) = self.halted_by(addr) {
@@ -133,6 +134,14 @@ impl RunWorker {
         // reach, so they are read before one is chosen.
         let building = city::Building::of(addr)?;
         let rules = city::load(&self.city_root, building.addr())?;
+        // Read before a model is chosen: a room a harness runs does not
+        // need one. Until the harness drive is wired (sprawling-SPEC
+        // 8-4e), a key read and then ignored is the state city-SPEC 8-4
+        // refuses unknown keys to avoid.
+        if let Some((harness, layer)) = city::settled_harness(&self.city_root, addr)? {
+            let file = city::config_path(&self.city_root, addr, layer)?;
+            return Err(not_driven_yet(addr, &harness, &file));
+        }
         let own = city::own_layer(&self.city_root, addr)?;
         let tag = self.tag_for(at.model.as_deref(), own.model())?;
         let chosen = self.credentials.book.select(tag, rules.policy())?;
@@ -257,6 +266,22 @@ impl RunWorker {
             .choices()
             .find_map(|(tag, _, entry)| (entry.id == id).then_some(tag))
     }
+}
+
+/// The refusal for a room whose resident is a harness, while this build
+/// reads the key and does not start the harness: the file that names it
+/// is the one a person edits to dispatch to a model instead.
+fn not_driven_yet(addr: &Address, harness: &str, file: &std::path::Path) -> AxError {
+    AxError::failure(
+        AxCode::ToolUnavailable,
+        "dispatch work",
+        format!("{}: {harness}", addr.as_str()),
+    )
+    .with_recovery(format!(
+        "this build reads `[resident] harness` but does not start a harness yet; \
+         take the key out of {} to dispatch to a model here",
+        file.display()
+    ))
 }
 
 /// A document a run would stand under that this process cannot read.
