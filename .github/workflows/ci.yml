@@ -294,9 +294,12 @@ jobs:
       - name: lint, typecheck and test the client
         run: just check-client
 
-  # `desktop/` sits outside the workspace (desktop-SPEC.md section 8.5), so
-  # no job above compiles it; `just check` ends with it, and so does this.
-  # Its fmt runs again here, seconds, because the recipe depends on it.
+  # `desktop/` sits outside the workspace (desktop-SPEC.md section 8.5).
+  # The jobs above compile it only as a dependency of `sprawling`, where
+  # its warnings print but fail nothing and clippy's own lints never run,
+  # so its clippy and tests run here; `just check` ends with it, and so
+  # does this. Its fmt runs again here, seconds, because the recipe
+  # depends on it.
   desktop:
     runs-on: windows-latest
     timeout-minutes: 20

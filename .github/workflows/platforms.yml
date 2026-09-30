@@ -86,14 +86,23 @@ jobs:
       - name: install pinned toolchain
         run: rustup show
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            desktop -> target
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest
+          tool: cargo-nextest,just
       # One job rather than ci.yml's five: nobody is waiting for this
       # one, and the sum of two builds costs a schedule nothing.
+      # Every check after the setup runs even when an earlier one failed,
+      # and the tests do not stop at the first failure: a night that stops
+      # at its first red leaves every later check unread until the next
+      # night, which is why `just check-all` runs every phase as well.
       - name: fmt
         run: cargo fmt --all --check
       - name: clippy
+        if: ${{ !cancelled() }}
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       # What the npm and render gates judge. This job repeats the commands
       # ci.yml runs, and repeated its omission as well: both gates refuse
@@ -102,6 +111,7 @@ jobs:
       # `moved` job's skip branch since that change landed, which is the
       # only reason this was still theoretical here and not there.
       - uses: ./.github/actions/client-artifacts
+        if: ${{ !cancelled() }}
       # The render gate drives a Chromium-family engine with `--dump-dom`.
       # The full Google Chrome on this runner never exits from that call
       # (the gate kills it after two minutes and says so), while
@@ -109,6 +119,7 @@ jobs:
       # kind of scripted, windowless use - does. SPRAWLING_BROWSER is the
       # gate's first tier, so naming the shell there is the whole change.
       - name: an engine the render gate can finish with
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
@@ -117,9 +128,20 @@ jobs:
           test -n "$shell"
           echo "SPRAWLING_BROWSER=$shell" >> "$GITHUB_ENV"
       - name: xtask gates
+        if: ${{ !cancelled() }}
         run: cargo xtask gates
       - name: tests
-        run: cargo nextest run --workspace --locked --all-features
+        if: ${{ !cancelled() }}
+        run: cargo nextest run --workspace --locked --all-features --no-fail-fast
+      # desktop/ sits outside the workspace, so the steps above compile it
+      # only as a dependency of `sprawling` and lint none of it: its
+      # non-Windows arm and the tests that compile only off Windows meet
+      # clippy and nextest nowhere but here (desktop-SPEC.md section 16).
+      # cargo-deny is not installed, so the recipe's licence read skips
+      # itself; ci.yml's desktop job holds that one.
+      - name: desktop
+        if: ${{ !cancelled() }}
+        run: just check-desktop
       # See ci.yml: the cache's save step cannot walk trybuild's scratch.
       - name: clear the trybuild scratch before the cache is saved
         if: always()
