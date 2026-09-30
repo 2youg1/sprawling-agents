@@ -172,15 +172,16 @@ impl Worktrees {
                 op: "add a worktree",
                 detail: format!("{}: {err}", name.as_str()),
             })?;
+        // The size is read from the index the checkout just wrote rather
+        // than by walking the tree it wrote (storage-SPEC 8-31).
         let checked_out = written(&tree)?;
-        let weight = measure(&path)?;
         Ok(WorktreeLease {
             name: name.clone(),
-            disk: weight.bytes,
+            disk: checked_out.bytes,
             path,
             work: FileWork {
                 created: checked_out.files,
-                walked: city.walked.saturating_add(weight.walked),
+                walked: city.walked,
                 ..FileWork::default()
             },
         })
