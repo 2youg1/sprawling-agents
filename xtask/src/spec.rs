@@ -73,3 +73,7 @@ pub(crate) fn run(root: &Path, crate_name: Option<&str>) -> Result<String, Xtask
     })?;
     Ok(format!("created {}", path.to_string_lossy()))
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests;

@@ -329,4 +329,14 @@ mod tests {
     fn a_document_with_no_seam_section_is_a_doc_error() {
         assert!(seam_files("## 2 Stack\n").is_err());
     }
+
+    /// The depmap block names libs, cargo names packages, and the edge between
+    /// the two packages is the one the block allows: nothing is missing.
+    #[test]
+    fn a_relocated_package_is_judged_by_its_lib_name() {
+        let root = crate::root::fixture::relocated("depmap");
+        let found = check(&root);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(matches!(&found, Ok(v) if v.is_empty()), "{found:?}");
+    }
 }

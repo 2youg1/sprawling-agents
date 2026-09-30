@@ -193,3 +193,19 @@ fn the_tree_holds_the_harnesses_the_workflow_does_not_name() {
             .any(|h| h.name == "secret::scan::verification::log2_q10_is_total")
     );
 }
+
+/// A harness in a package outside crates/ is on the roster, under the
+/// package name `cargo kani -p` takes.
+#[test]
+fn a_relocated_package_contributes_its_harnesses() {
+    let root = crate::root::fixture::relocated("proof");
+    let found = super::harnesses(&root);
+    std::fs::remove_dir_all(&root).unwrap();
+    let packages: Vec<String> = found.iter().flatten().map(|h| h.package.clone()).collect();
+    assert_eq!(
+        packages,
+        ["sprawling-k"],
+        "the roster read {} package(s)",
+        packages.len()
+    );
+}

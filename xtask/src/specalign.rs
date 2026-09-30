@@ -337,4 +337,22 @@ mod tests {
         );
         assert!(spec_file("web").to_string_lossy().ends_with("web-SPEC.md"));
     }
+
+    /// A module row under tools/ is read, and its anchor resolves in the SPEC
+    /// beside its package, which has no section 8-9.
+    #[test]
+    fn a_relocated_package_has_its_anchors_checked() {
+        let root = crate::root::fixture::relocated("specalign");
+        crate::root::fixture::write(&root, "tools/k/k-SPEC.md", "# k\n\n### 8-1 a\n");
+        let mut found = Vec::new();
+        let ran = super::check_anchors(&root, &mut found);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            ran.is_ok()
+                && found
+                    .iter()
+                    .any(|v| v.violation.contains("k-SPEC.md has no section 8-9")),
+            "{ran:?} {found:?}"
+        );
+    }
 }

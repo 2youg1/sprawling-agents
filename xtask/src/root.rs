@@ -9,6 +9,10 @@ use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+pub(crate) mod fixture;
+
 /// The checkout this run judges: the first directory from `cwd` upward
 /// that holds `xtask/Cargo.toml`, the rule cargo itself follows to find
 /// the workspace. `built` is the xtask manifest directory compiled into
@@ -65,5 +69,20 @@ mod tests {
             "{verdict:?}"
         );
         assert_eq!(same.unwrap(), here);
+    }
+
+    /// xtask two levels down still finds the checkout, because the lockfile
+    /// marks it, not xtask's own directory.
+    #[test]
+    fn a_relocated_xtask_still_finds_its_checkout() {
+        let root = super::fixture::relocated("root");
+        super::fixture::write(&root, "Cargo.lock", "");
+        super::fixture::write(&root, "tools/xtask/Cargo.toml", "");
+        let verdict = judged(&root.join("tools/xtask"), &root.join("crates"));
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            matches!(&verdict, Ok(found) if *found == root),
+            "{verdict:?}"
+        );
     }
 }
