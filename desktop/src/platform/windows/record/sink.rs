@@ -96,7 +96,7 @@ impl Sink {
     /// directory, and that has already happened by the time this is
     /// called.
     pub(super) fn open(window: &str, handle: HWND, bounds: Bounds, into: &Path) -> Sink {
-        match ffmpeg(window, into) {
+        match ffmpeg(window, bounds, into) {
             Some(child) => Sink::Ffmpeg { child },
             None => frames(handle, bounds, into),
         }
@@ -178,21 +178,35 @@ pub(super) fn somewhere(window: &str, nth: u64) -> Result<PathBuf, Refusal> {
 /// `gdigrab` names the window by its title, which is the same handle on
 /// the window a caller used to name it — so a recording cannot reach a
 /// window the scope file left out by going around it.
-fn ffmpeg(window: &str, into: &Path) -> Option<std::process::Child> {
+fn ffmpeg(window: &str, bounds: Bounds, into: &Path) -> Option<std::process::Child> {
     std::process::Command::new("ffmpeg")
-        .args(["-hide_banner", "-loglevel", "error"])
-        .args(["-f", "gdigrab", "-framerate", &FRAMES_A_SECOND.to_string()])
-        .args(["-i", &format!("title={window}")])
-        // ffmpeg stops itself at the same ceiling the frame thread
-        // holds, and writes the index for what it recorded.
-        .args(["-t", &MOST_SECONDS.to_string()])
-        .arg("-y")
-        .arg(into.join("recording.mp4"))
+        .args(command_line(window, bounds, into))
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()
         .ok()
+}
+
+/// The arguments ffmpeg is started with.
+fn command_line(window: &str, _bounds: Bounds, into: &Path) -> Vec<String> {
+    let mut line: Vec<String> = [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "gdigrab",
+        "-framerate",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    line.push(FRAMES_A_SECOND.to_string());
+    line.extend(["-i".to_owned(), format!("title={window}")]);
+    // ffmpeg stops itself at the same ceiling the frame thread holds,
+    // and writes the index for what it recorded.
+    line.extend(["-t".to_owned(), MOST_SECONDS.to_string(), "-y".to_owned()]);
+    line.push(into.join("recording.mp4").display().to_string());
+    line
 }
 
 /// Asks ffmpeg to finish, which is what writes the index an mp4 needs.
@@ -257,6 +271,28 @@ fn frames(handle: HWND, bounds: Bounds, into: &Path) -> Sink {
 )]
 mod tests {
     use super::*;
+
+    /// ffmpeg is handed frames this package captured through
+    /// `capture::window`, never a title it would look up again on its
+    /// own, where another window with the same title could answer.
+    #[test]
+    fn a_recording_hands_ffmpeg_frames_rather_than_a_window_title() {
+        let bounds = Bounds::from_corners(0, 0, 640, 480).unwrap();
+        let line = command_line("a — Notepad", bounds, Path::new("recorded"));
+        let adjacent = |first: &str, second: &str| {
+            line.windows(2)
+                .any(|pair| pair[0] == first && pair[1] == second)
+        };
+        assert!(adjacent("-f", "rawvideo"), "{line:?}");
+        assert!(adjacent("-pixel_format", "rgba"), "{line:?}");
+        assert!(adjacent("-video_size", "640x480"), "{line:?}");
+        assert!(adjacent("-i", "-"), "{line:?}");
+        assert!(
+            line.iter()
+                .all(|argument| !argument.starts_with("title=") && argument != "gdigrab"),
+            "{line:?}"
+        );
+    }
 
     /// A window title is not a file name, and this is where that stops
     /// being a problem.
