@@ -65,6 +65,10 @@ pub const TRANSCRIPT_EXT: &str = "jsonl";
 /// hyphenated form a [`crate::RunId`] displays, so a building can keep
 /// every run's transcript out of its history by name.
 pub const RUN_ID_PATTERN: &str = "????????-????-????-????-????????????";
+/// What the remote gate keeps on disk, under the city's reserved subtree.
+pub const REMOTE_DIR: &str = "remote";
+/// The devices paired to reach the city from outside the machine.
+pub const DEVICES_FILE: &str = "devices.toml";
 
 /// The disk layout of one city, derived from its root.
 ///
@@ -192,6 +196,16 @@ impl CityLayout {
     #[must_use]
     pub fn urbanite(&self, addr: &Address) -> PathBuf {
         self.scope(addr).join(URBANITE_FILE)
+    }
+
+    /// The devices paired to reach this city from outside the machine.
+    ///
+    /// Under the city's reserved subtree, because the table decides who
+    /// may reach the city and no write domain may change that
+    /// (kernel-SPEC 8-76).
+    #[must_use]
+    pub fn devices(&self) -> PathBuf {
+        self.governed_root().join(DEVICES_FILE)
     }
 
     /// The layout whose ledger is `dir`, when `dir` is a city's.

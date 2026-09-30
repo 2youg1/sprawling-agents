@@ -124,3 +124,20 @@ fn the_run_id_pattern_matches_every_run_id_the_city_displays() {
         }
     }
 }
+
+#[test]
+fn the_device_table_sits_in_the_remote_gate_s_own_directory_of_the_reserved_subtree() {
+    let devices = layout().devices();
+    assert_eq!(
+        devices,
+        Path::new("/city")
+            .join(RESERVED_PREFIX)
+            .join(REMOTE_DIR)
+            .join(DEVICES_FILE)
+    );
+    let spelled = devices.to_string_lossy().replace('\\', "/");
+    assert!(
+        addr(spelled.trim_start_matches("/city/")).is_reserved(),
+        "{spelled} is reachable by a write domain"
+    );
+}
