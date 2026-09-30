@@ -84,8 +84,28 @@ fn counted(len: usize) -> Result<u64, AxError> {
 }
 
 /// The `upper_bound` of every `prompt_shape_compared` line, in order.
-fn windows_of(_lines: &[Vec<u8>]) -> Result<Vec<u64>, AxError> {
-    Ok(Vec::new())
+fn windows_of(lines: &[Vec<u8>]) -> Result<Vec<u64>, AxError> {
+    let unreadable = |detail: String| {
+        AxError::failure(AxCode::InvalidArgs, "read a long turn's window", detail)
+            .with_recovery(
+                "the prompt_shape_compared line changed shape; read its upper bound where                  kernel::event::record::PromptShapeCompared now keeps it",
+            )
+    };
+    let mut windows = Vec::new();
+    for line in lines {
+        let record: Value =
+            serde_json::from_slice(line).map_err(|err| unreadable(err.to_string()))?;
+        if record.get("kind").and_then(Value::as_str) != Some("prompt_shape_compared") {
+            continue;
+        }
+        let bound = record
+            .get("data")
+            .and_then(|data| data.get("upper_bound"))
+            .and_then(Value::as_u64)
+            .ok_or_else(|| unreadable("a line with no upper_bound".to_owned()))?;
+        windows.push(bound);
+    }
+    Ok(windows)
 }
 
 /// The long turn as a scenario: `steps` replies that each say one
