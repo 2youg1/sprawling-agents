@@ -236,7 +236,7 @@ impl Desk {
 
 **每一个 `unsafe` 块恒带一行 `SAFETY:`，写的是使这次调用成立的前提。**「我们调用 `EnumWindows`」不是前提，那只是把调用换句话再说一遍；「回调是本模块里的 `extern "system" fn`，`lparam` 指向的 `Vec` 在本次调用期间恒存活且无第二个别名」才是前提。审这一条的办法是逐个 `SAFETY:` 问一句：它说的东西**能不能是假的**？不能为假的句子不是前提，是复述。
 
-`unsafe` 恒只出现在 `platform/windows/` 之下，且恒只包住 FFI 调用本身——不包住随后的判断，因为把安全代码收进 `unsafe` 块只会让下一个读者多审几行。
+`unsafe` 恒只出现在 `platform/windows/` 之下，且恒只包住 FFI 调用本身——不包住随后的判断，因为把安全代码收进 `unsafe` 块只会让下一个读者多审几行。哪些调用今天仍写 `unsafe`，只看 §8-11 那张表「实现」一栏写 `windows`（FFI）的行；本节不另列一份。
 
 几条最容易写成复述的前提，在这里点名。`GetDIBits` 要求位图此刻没有选入任何 DC：`Selected` 守卫离开作用域时把旧对象选回，读回在那之后，所以 SAFETY 行写的是「守卫已经结束」这件可能为假的事。`ReleaseDC` 要传取得 DC 时的那扇窗口，`Surface` 因此存着它。剪贴板的块是别的程序写的，不可信：读以 `GlobalSize` 为界，而不是以「它会以 0 结尾」为前提。
 
@@ -246,6 +246,25 @@ impl Desk {
 
 - **进程从哪里起**：`sprawling desktop [scope]`（`crates/sprawling/src/main/desktop.rs`，sprawling-SPEC §8-4d）。一个位置参数是 `DESKTOP.toml` 的路径，缺席即 `Scope::Closed`。它不判定任何事：作用域归 `scope`，应答归 `session`。
 - **唯一真的把进程拉起来的测试**也住城里（`crates/sprawling/tests/desktop.rs`）：城按一栋楼的规则起 `sprawling desktop`，握手、list，模型收到六件工具。其余测试只证明库里的判断。
+
+### 8-11 按操作准入的安全接口
+
+Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏是它今天经过的接口；写 `windows`（FFI）的行仍在本 package 里写 `unsafe`，这几行合起来就是 X3（Zig 缝）的输入，别处不另记。「准入」一栏是审过、可以换上的安全接口，写「无」的行理由在 §12.9、§12.10。换一行的次序是固定的：先写它的契约测试，在旧实现上跑绿，证明契约不依赖实现；再换实现，并在同一提交里把这一行的「实现」改成新的接口。
+
+| 操作 | 模块 | 调用 | 实现 | 准入 | 契约测试 |
+|---|---|---|---|---|---|
+| 枚举顶层窗口，铸出句柄 | `enumerate` | `EnumWindows` 与它的回调 | `windows`（FFI） | 无 | `a_window_this_process_opens_is_listed_by_its_title_process_and_bounds` |
+| 一扇窗口的事实：可见、标题、进程映像名、外框 | `enumerate` | `IsWindowVisible`、`GetWindowText`、`GetWindowThreadProcessId`、`OpenProcess`＋`QueryFullProcessImageName`、`GetWindowRect` | `windows`（FFI） | `winsafe` | 同上 |
+| 前台与落点 | `focus` | `GetForegroundWindow`、`WindowFromPoint`、`GetAncestor`、`SetForegroundWindow` | `windows`（FFI） | `winsafe` | `the_window_under_a_point_is_the_window_drawn_there` |
+| 输入 | `act` | `SendInput`、`GetSystemMetrics` | `windows`（FFI） | `winsafe` | `each_stroke_becomes_the_event_it_names` |
+| 可访问性树 | `tree` | UIA 的 automation 对象、control view walker、元素属性；COM 公寓 | `windows`（FFI） | `uiautomation`，公寓经 `winsafe` | `a_windows_tree_names_the_control_inside_it` |
+| 按窗口捕获 | `capture` | `GetDC`／`ReleaseDC`、`CreateCompatibleDC`、`CreateCompatibleBitmap`、`SelectObject`、`PrintWindow`、`GetDIBits` | `windows`（FFI） | 无 | `the_failing_path_releases_what_it_took` |
+| 剪贴板文本 | `clipboard` | owner 窗口、`OpenClipboard`、`GetClipboardData`、`GlobalSize`／`GlobalLock`、`GlobalAlloc`、`EmptyClipboard`、`SetClipboardData` | `windows`（FFI） | 无 | `a_clipboard_block_that_will_not_lock_is_a_refusal_not_an_empty_clipboard` |
+| DPI 感知 | `dpi` | `SetProcessDpiAwareness`、`GetProcessDpiAwareness` | `windows`（FFI） | 无 | `a_desk_reads_this_desktop_in_physical_pixels` |
+
+**句柄只在一处铸出。** `winsafe::HWND` 从裸指针构造（`from_ptr`）要写 `unsafe`，反方向（`ptr()` 交给 `windows` 绑定或 `uiautomation`）不要。所以窗口句柄只在 `enumerate` 的 `EnumWindows` 回调里由系统交来的值包成 `winsafe::HWND`，那一处是枚举这一行的一部分；其余模块只借用它，需要 `windows` 或 `uiautomation` 的类型时就地转过去。
+
+**契约测试在真窗口上跑，只碰测试自己建的窗口。** 枚举、落点与树这三行的契约，由测试在本进程里建一扇不抢焦点的窗口（`platform/windows/fixture.rs`，只在测试里编译）再读回它来判；它们不读、不点、不改人桌面上别的窗口。输入这一行的旧实现把事件写进 `INPUT` 联合体，不写 `unsafe` 读不回来，所以它的契约测试随替换一起写，判的是每个 stroke 变成了哪个 `HwKbMouse` 值；真的把事件送到窗口上仍是 §16.2 的操作者检查。
 
 ## 8.5 四个设计
 
@@ -363,19 +382,38 @@ impl Desk {
 - **决定**：每次打开剪贴板时建一扇仅消息窗口（预定义类 `STATIC`，父窗口 `HWND_MESSAGE`）作为 owner，交给 `OpenClipboard`；`Held` 结束时先关剪贴板，再销毁这扇窗口，最后放掉进程内的轮次锁。读：以 `GlobalSize` 求出块的上界，在界内找终止符，找不到就取整块；`GlobalLock` 失败是拒绝。写：先分配并填好整块，再打开、清空、交出；交出失败时本进程释放这块内存，拒词说明剪贴板已被清空。
 - **理由**：微软写明以空窗口打开时 `EmptyClipboard` 把 owner 置空，随后的 `SetClipboardData` 会失败；块是别的程序写的，「它会以 0 结尾」可能为假；把锁失败当成「没有文本」，调用方会去试别的而不是重试；先清空再分配，分配失败时剪贴板已空，拒词却只说内存不够。这扇窗口只活一个剪贴板轮次、在同一线程建和毁，本 package 不依赖它收到任何消息，所以不需要消息泵。
 - **击败的备选**：`OpenClipboard(None)`（与文档冲突）；遇到无终止符的块就拒（对一个格式不规范的程序，整块文字仍然可读，界已经由 `GlobalSize` 守住）；WinRT Clipboard（要求前台与 UI 线程，后台子进程是否适用未证）。
-- **重开的参数**：换成一个能证明 owner、界与所有权移交的安全封装（X2 的选型）。
+- **重开的参数**：出现一个能证明 owner、界与所有权移交的安全封装。X2 审过的 `winsafe` 0.0.29 还不是，理由见 §12.9。
+
+### 12.9 输入与窗口事实经 `winsafe`；枚举、捕获、剪贴板、DPI 仍走 FFI
+
+- **决定**：输入（`SendInput`、`GetSystemMetrics`）与窗口事实（可见、标题、进程映像名、外框、前台、落点、置前）改经 `winsafe` 0.0.29 的安全接口，只开 `user` 与 `ole` 两个 feature。键码以 `co::VK` 常量写在 `keys` 表里，一个动作的事件在 Rust 里构造成 `HwKbMouse` 值，整批一次交给 `winsafe::SendInput`，它回的收下个数照 §12.4 读。窗口句柄只在 `enumerate` 的 `EnumWindows` 回调里铸成 `winsafe::HWND`（§8-11），那是这一组唯一新写的 `unsafe`。
+- **理由**：这几个调用的前提（出参缓冲的长度、句柄的借用、`INPUT` 数组的元素大小）由 `winsafe` 的签名承担，本 package 只剩值；`winsafe` 没有 Cargo 依赖，`user` 不拉 GUI 那一层。
+- **不准入的四组与各自的理由**：`winsafe::EnumWindows` 把 `&func` 当作地址交出去，回调里再从它造出 `&mut F`（`src/user/funcs.rs` 与 `src/user/callbacks.rs`），这是从共享引用造可变引用，属未定义行为，所以枚举留在 `windows` 绑定上；以 `FindWindowEx` 或 `GetWindow` 逐个取顶层窗口可以不写 `unsafe`，但 z 序在两次调用之间变化时会漏掉窗口或兜圈，而 `EnumWindows` 先取快照再回调，故落选。剪贴板：`HCLIPBOARD::SetClipboardData` 在调用方已经清空剪贴板之后才分配内存，交出失败时那块内存被 `leak` 而不释放，与 §12.8「先备好再清空、交不出就释放」相反；建 owner 窗口的 `CreateWindowEx` 在 `winsafe` 里本身是 `unsafe`。捕获：`winsafe` 没有 `PrintWindow`，`GetDIBits` 是 `unsafe`。DPI：`SetProcessDpiAwareness` 在 shcore 里，`winsafe` 没有它。这四组是 X3 的输入（§8-11）。
+- **剩余限制**（写明，不当作已解决）：`SendInput` 仍只报收下几个；换接口不改变 §8.6 第六对的前台检查只是一次采样这件事。
+- **击败的备选**：把这几组一起搬进 Zig 缝（有合格安全接口的调用不需要一道新的 FFI 缝）；留在 `windows` 绑定上继续手写 `unsafe`（口径 ①要的正是业务代码零 `unsafe`）。
+- **重开的参数**：`winsafe` 修好 `EnumWindows`，枚举这一行随之换过去；或者新版本改了这里准入的签名，那一行的契约测试先红。
+
+### 12.10 树经 `uiautomation`，COM 公寓每张桌子进一次
+
+- **决定**：`tree` 经 `uiautomation` 0.25.1（关默认 feature）读树，只用 `UIAutomation::new_direct`、`element_from_handle`、control view walker 与元素的三项属性（role、name、外框）。COM 公寓由 `Desk` 在第一次 snapshot 时进入一次，用多线程公寓（MTA），经 `winsafe::CoInitializeEx` 的守卫；automation 对象与 walker 同这个守卫一起住在桌子里，字段的析构次序保证先放 COM 对象、后退出公寓。元素仍只活在一次 snapshot 之内（§8.6 第二对）。walker 答「没有这个元素」（错误码 0）是这一层到头；答别的错误是 provider 出了故障，遍历在那里停下，而不是当作到头。
+- **理由**：微软对不开窗口的 UIA 工作线程推荐 MTA；进一次、配对退出，公寓的生存期就是连接的生存期。旧写法每次 snapshot 都以 STA 进入而从不退出，并且每次新建 automation 对象；`uiautomation::UIAutomation::new()` 同样每次进入而不退出，故不用它。把 provider 的故障读成「到头了」，模型拿到的是一棵看起来完整、其实缺了一块的树。
+- **剩余限制**（写明，不当作已解决）：`winsafe` 的 `CoUninitializeGuard` 在进入公寓答 `RPC_E_CHANGED_MODE` 时也会调 `CoUninitialize`；本 package 的读循环线程不进入任何别的公寓，这条路走不到。剪贴板走的是 Win32 剪贴板而不是 OLE 剪贴板，同一线程上的 MTA 与它无关。
+- **击败的备选**：保留经 `windows` 绑定手写的 COM 调用（九个 `unsafe` 块）；让 UIA 也回答窗口事实（UIA 根的子元素、`IsOffscreen` 与 `EnumWindows`、`WS_VISIBLE` 不是同一个定义，安全判断会跟着 provider 的实现走）。
+- **重开的参数**：需要 UIA patterns（按元素投递动作）时，那是另一项能力，另写一节；或 `uiautomation` 的新版本改了这里用到的签名，`a_windows_tree_names_the_control_inside_it` 先红。
 
 ## 13 依赖选型
 
-六个依赖。`serde`、`serde_json`、`toml` 三个与 workspace 同版本线，只做协议与 scope 文件的读写；另外三个各自买到什么，写在下表。**恒不引入**：workspace 内任何 crate（理由见 §8.5 第一对）、async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
+八个依赖。`serde`、`serde_json`、`toml` 三个与 workspace 同版本线，只做协议与 scope 文件的读写；另外五个各自买到什么，写在下表，后三个只在 Windows 上链接。**恒不引入**：workspace 内任何 crate（理由见 §8.5 第一对）、async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
 
 | crate | 买到什么 | 为什么不是别的 |
 |---|---|---|
-| `windows` 0.62 | Win32 与 UI Automation 的绑定，只开六件工具真正够得着的那几个 namespace | `windows-sys` 只有裸函数，而 `IUIAutomation` 是 COM：手写 vtable 会把本该由绑定承担的正确性搬到本 package 里 |
+| `windows` 0.62 | 还没有合格安全接口的那几组 Win32 调用（枚举、捕获、剪贴板、DPI，§8-11）与绑定里的常量 | `windows-sys` 只有裸函数；`uiautomation` 本身也链接同一版 `windows`，锁里不多一个包 |
+| `winsafe` 0.0.29（只开 `user`、`ole`） | 输入与窗口事实的安全接口，以及 COM 公寓的守卫（§12.9、§12.10） | 没有 Cargo 依赖；它的 `EnumWindows` 与剪贴板写法不准入，理由在 §12.9 |
+| `uiautomation` 0.25.1（`default-features = false`） | UIA 树的安全封装：automation 对象、walker、元素属性（§12.10） | 关掉默认特性，于是它的输入、截图、剪贴板与控件匹配都不进来；手写 COM 调用是被它换掉的那九个 `unsafe` 块 |
 | `image` 0.25（`default-features = false`，只开 `png`／`jpeg`／`webp`） | `desktop.screenshot` 点名的三种编码，以及缩放 | 关掉默认特性是因为本 package 只编码、从不解码，也不碰另外十种格式 |
 | `base64` 0.23 | image content 的 `data` 那一层编码，只在 `answer` 里编 | 与 workspace 的 `gateway::dialect::images` 同一条版本线，`xtask guard` 比对版本 |
 
-`windows` 的 feature 列表本身就是一份**够得着范围的声明**：一个本 package 从不调用的 API，在这里连名字都拼不出来。
+`windows` 与 `winsafe` 的 feature 列表本身就是一份**够得着范围的声明**：一个本 package 从不调用的 API，在这里连名字都拼不出来。
 
 ## 14 硬编码声明
 
@@ -444,7 +482,11 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 - **不碰 Win32 的那几处逐条测**（`target`／`views`／`strokes`／`encode`／`keys`／`geometry`／`focus::settled`／`Admitted::visible`）。最容易错的几件事——选中了哪个窗口、过期或挪动过的窗口上的动作有没有被拒、一批输入被截断时还按着什么、一张图缩成什么尺寸、一个键名映到什么、键盘不在这个窗口手里时发不发、allowlist 没列的窗口报不报——全在这一层。它们住在 `platform/windows/` 之下，只在 Windows 上编译，所以在**任何一台 Windows** 机器上都跑得起来，不需要桌面；`Admitted::visible` 与协议壳（`session`、`refusal`、`answer`）的测试在每个平台上都跑。DPI 感知在测试进程里读回，不需要窗口：nextest 每个测试一个进程，进程级的声明不会串到别的测试。
 - **碰 Win32 的五个模块只测「拒绝是诚实的」**：一个不存在的窗口名恒得到一句指向 `desktop.windows` 的拒词，而不是一次崩溃。CI 里没有一张桌面可供点击，故「点下去真的点中了」这件事**恒不**被写成一条会在没有桌面时假装通过的测试；它由操作者在真机上验，本节记下这是一处**具名的空缺**，不是一处被忽略的覆盖率。
 
+- **换过接口的调用各有一条契约测试**（§8-11）：测试在本进程里建一扇不抢焦点的窗口，读回它的标题、进程、外框、落点与树；这几条要一张桌面，不碰人桌面上别的窗口。
+
 这条分界线是诚实的代价：写一条「在没有窗口时也返回 ok」的测试会比现在好看，但它证明的是这条测试自己，不是这台 server。
+
+**操作者检查**（真机上由人做，不是门）：一台按 150% 缩放的显示器上，`desktop.snapshot` 之后按 ref 点击落在控件中心；对记事本 `type` 一段文字，文字进了指名的那扇窗口，动作之后 Ctrl、Shift 没有停在按下；两扇同名窗口按 `process` 指名录制，录到的是那一扇；写剪贴板期间 `GetClipboardOwner` 不为空；一张截图经 MCP 到模型，模型能说出图里的内容。
 
 ## 17 模型体验
 
