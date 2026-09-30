@@ -151,7 +151,7 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 
 - **同一个二进制，另一个进程**：规则要桌面时，`servers` 给这栋楼添一条 stdio 声明：`command` 是正在运行的这个可执行文件，`args` 是 `["desktop", <这栋楼的 DESKTOP.toml>]`（`city::desktop_scope_path`，住城根下这栋楼的保留子树，评审楼的 worktree 里没有它）。之后它与任何一条 `[[mcp]]` 走同一条路：经 `accounting::Connectors` 连上、握手、list，常驻连接表管它的寿命（§8-4）。子进程这条边界是故意留的：UI Automation 的 COM 状态、`SendInput` 与 `desktop/` 里那些带 `SAFETY:` 的 `unsafe` 都跑在子进程里，城那个唯一写者的进程里一行也不跑；COM 出错或子进程 abort，结束的是子进程，城只在那一次调用上拿到 `E_TIMEOUT` 或 `E_TOOL_UNAVAILABLE`。MCP 这条路上已有的规矩一条不改：工具表随 run 冻结，`kernel::gate::undoable` 按远端名前缀 `desktop.` 升给人，期限到即杀子进程。
 - **程序路径是收下的，不是问出来的**：`RunWorker` 持一个 `DesktopProgram`，生产交 `std::env::current_exe`，测试交 `CARGO_BIN_EXE_sprawling`。理由与 `Browsers`（§8-45-2）相同：它在主机上起一个程序。问不出路径或路径不是 UTF-8 时，这栋楼这一次没有桌面工具，诊断里留一条 `Refuse`，派活照常。这与起不来的 `[[mcp]]` server 是同一个答法。
-- **楼自己写了 `label = "desktop"` 的 `[[mcp]]`，就用它那一条**：两台 server 用一个标签，同一个工具名就指向两个进程（city 对同层重名的拒绝是同一个理由）。人明写的那一条优先，自带的这台不起，诊断里留一条 `Notice`：要用自带的，删掉那一行。
+- **楼自己写了 `label = "desktop"` 的 `[[mcp]]`，就用它那一条**：两台 server 用一个标签，同一个工具名就指向两个进程（city 对同层重名的拒绝是同一个理由）。人明写的那一条优先，自带的这台不起，诊断里留一条 `Decide`（诊断的级别里没有「提醒」一级，`Decide` 说的正是一个判定为什么取了这个值）：要用自带的，删掉那一行。
 - **装配层不按平台分支**：非 Windows 的机器上这台 server 照样起，每次调用答 `E_TOOL_UNAVAILABLE` 并报出平台名（desktop-SPEC §8.5 第四对）。在这里再判一次平台，这条规则就有了第二个家。
 - **confidential 楼够不着它**：`city::policy` 解析时就拒绝 `confidential` 与 `desktop` 同真，`mcp_tools` 对 confidential 楼也不起任何进程。这里不判第三次。
 - **体积**：把 `desktop/` 链进来使 release 二进制变大多少，读数只记在 `xtask/budgets.toml` 的 `[release_binary]`。增量来自 `desktop/` 自己的代码、`image` 的编码器与 `windows` 绑定；std、serde_json、toml、png 两边共用，只算一份。
