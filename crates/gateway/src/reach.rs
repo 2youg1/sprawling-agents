@@ -38,6 +38,7 @@ use std::time::Duration;
 use kernel::{Answered, Connected, Named, Proxying, Reach, Through};
 
 mod proxy;
+mod tls;
 
 pub use proxy::{client_for, is_local, through};
 

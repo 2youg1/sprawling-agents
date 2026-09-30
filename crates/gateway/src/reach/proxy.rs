@@ -6,7 +6,9 @@
 //! Which calls go through this machine's proxy, and what a person may
 //! settle about that.
 //!
-//! **Every HTTP client this city builds is built here.** A rule applied
+//! **Every HTTP client this city builds is built here**, after the
+//! process's TLS backend is installed, and clippy refuses a client built
+//! anywhere else (gateway-SPEC.md section 8-15). A rule applied
 //! at five construction sites is five rules that agree until one of them
 //! is edited; worse, the staged reading in the parent module would then
 //! describe a path the request does not take, which is the one thing a
@@ -69,7 +71,17 @@ pub fn through(rule: Proxying, base_url: &str) -> Through {
 /// its own name rather than an HTTP library's, and a hosted MCP server
 /// behind a content delivery network answers 403 to a request with no
 /// user agent at all.
+///
+/// The builder comes after the process's one TLS backend is installed
+/// (`reach::tls`), so a client built from it has a backend to find;
+/// this is the only construction site clippy admits (gateway-SPEC.md
+/// section 8-15).
 pub fn client_for(rule: Proxying, base_url: &str) -> reqwest::blocking::ClientBuilder {
+    super::tls::install_provider();
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the one place a client is built; the TLS backend is installed on the line above"
+    )]
     let builder = reqwest::blocking::Client::builder()
         .user_agent(concat!("sprawling/", env!("CARGO_PKG_VERSION")));
     match through(rule, base_url) {

@@ -42,11 +42,8 @@ pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)> {
 /// on this machine - or when the city cannot be reached.
 pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<String, AxError> {
     let body = serde_json::json!({ "realm": realm, "name": name, "value": value });
-    let client = reqwest::blocking::Client::builder()
+    let client = gateway::client_for(kernel::Proxying::ExceptLocal, &format!("http://{at}"))
         .timeout(Duration::from_secs(20))
-        // The city is on this machine, and a proxy in front of loopback
-        // answers for something else.
-        .no_proxy()
         .build()
         .map_err(|err| {
             AxError::failure(AxCode::Provider, "build an http client", err.to_string())

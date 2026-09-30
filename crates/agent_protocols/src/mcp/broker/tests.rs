@@ -278,7 +278,7 @@ fn a_broker_that_took_the_request_and_went_quiet_is_not_asked_again() {
         request_from(&mut stream);
         hold.recv().unwrap();
     });
-    let client = reqwest::blocking::Client::builder()
+    let client = gateway::client_for(kernel::Proxying::ExceptLocal, &url)
         .timeout(std::time::Duration::from_millis(200))
         .build()
         .unwrap();
@@ -311,7 +311,9 @@ fn an_answer_cut_short_after_a_yes_keeps_why_and_is_not_asked_again() {
     });
 
     let lost = super::read(
-        reqwest::blocking::Client::new()
+        gateway::client_for(kernel::Proxying::ExceptLocal, &url)
+            .build()
+            .unwrap()
             .post(&url)
             .body("{}")
             .send(),
