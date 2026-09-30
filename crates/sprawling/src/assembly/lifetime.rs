@@ -220,6 +220,7 @@ impl RunWorker {
             read_volume: crate::monitor::volume::read,
             reveal: crate::revealing::reveal,
             browsers: crate::browser_tool::for_rules,
+            desktop_program: std::env::current_exe,
             recipe_for: crate::doctor::recipe_for,
         };
         worker.sweep_abandoned_trees();
@@ -330,6 +331,17 @@ impl RunWorker {
     #[must_use]
     pub fn with_browsers(self, browsers: super::Browsers) -> RunWorker {
         RunWorker { browsers, ..self }
+    }
+
+    /// The same worker, starting the desktop server a building's rules
+    /// ask for from `program` instead of from this executable
+    /// (sprawling-SPEC.md 8-4d).
+    #[must_use]
+    pub fn with_desktop_program(self, program: super::DesktopProgram) -> RunWorker {
+        RunWorker {
+            desktop_program: program,
+            ..self
+        }
     }
 }
 

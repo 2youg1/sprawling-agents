@@ -152,6 +152,10 @@ pub type Browsers = fn(
     &city::BuildingRules,
 ) -> Result<Vec<Box<dyn kernel::Tool>>, AxError>;
 
+/// Where the desktop server this binary carries is started from: the
+/// running executable in production (sprawling-SPEC.md 8-4d).
+pub type DesktopProgram = fn() -> std::io::Result<PathBuf>;
+
 /// What the startup scan found and repaired.
 pub struct ScanReport {
     /// What opening the ledger cut, told after the counts.
@@ -303,6 +307,10 @@ pub struct RunWorker {
     /// a browser tool starts a browser on the host (sprawling-SPEC.md
     /// 8-45-2).
     browsers: Browsers,
+    /// Where the desktop server a building's rules ask for is started
+    /// from (`std::env::current_exe`). Received rather than asked,
+    /// because it starts a program on the host (sprawling-SPEC.md 8-4d).
+    desktop_program: DesktopProgram,
     /// How this build installs one named item on this platform
     /// (`doctor::recipe_for`). Received rather than read, because the
     /// requirement table stays with the doctor (sprawling-SPEC.md,
