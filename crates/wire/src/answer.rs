@@ -206,7 +206,7 @@ pub enum Answer {
     History(Box<HistoryAnswer>),
     HistoryRange(Box<HistoryRangeAnswer>),
     Changes(ChangesAnswer),
-    Commit(CommitAnswer),
+    Commit(Box<CommitAnswer>),
     City(CityAnswer),
     Run(Option<RunSummary>),
     Approvals(ApprovalsAnswer),

@@ -279,7 +279,7 @@ impl CommitsAsk {
         match settled {
             Settled::One(mut commit) => {
                 give_parents(&city_root, std::slice::from_mut(&mut commit));
-                wire::Answer::Commit(commit)
+                wire::Answer::Commit(Box::new(commit))
             }
             Settled::Page(mut page) => {
                 give_parents(&city_root, &mut page.commits);
