@@ -186,7 +186,6 @@ it assembles never name it back (sprawling-SPEC 8-92).
 ```directions
 crates/sprawling/src/doctor: crate::assembly
 crates/sprawling/src/serving: crate::assembly
-crates/sprawling/src/views: crate::assembly
 ```
 
 What each unit owns is stated once, in §1's figure, and not repeated here,
