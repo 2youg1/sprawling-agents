@@ -22,7 +22,7 @@ use crate::assembly::*;
 #[test]
 fn an_empty_key_keeps_the_credential_this_city_has_archived() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-key"], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),

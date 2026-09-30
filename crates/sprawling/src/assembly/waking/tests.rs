@@ -24,7 +24,7 @@ use crate::assembly::fixture::*;
 #[test]
 fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     city::create_building(
         dir.path(),
         &Address::parse("market").unwrap(),
@@ -110,7 +110,7 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
 #[test]
 fn a_knock_past_the_conversation_ceiling_starts_no_run() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("unused", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker.doorstep.knocks.push(Knock {
@@ -132,7 +132,7 @@ fn a_knock_past_the_conversation_ceiling_starts_no_run() {
 #[test]
 fn an_arrival_lands_where_the_watch_table_says_and_starts_tainted() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     std::fs::write(
         city::watch_path(dir.path()),
@@ -186,7 +186,7 @@ fn an_arrival_lands_where_the_watch_table_says_and_starts_tainted() {
 #[test]
 fn an_arrival_nobody_asked_to_work_on_is_noticed_and_not_worked_on() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     std::fs::write(
         city::watch_path(dir.path()),
@@ -234,7 +234,7 @@ addr = \"lab/room1\"
 #[test]
 fn an_arrival_that_starts_work_is_refused_exec() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     std::fs::write(
         city::watch_path(dir.path()),
@@ -302,7 +302,7 @@ fn move_in(city: &std::path::Path, addr: &str) {
 #[test]
 fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     move_in(dir.path(), "market/hana");
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("answered", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
@@ -341,7 +341,7 @@ fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
 #[test]
 fn what_comes_back_wakes_the_resident_who_asked_for_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     city::create_building(
         dir.path(),
         &Address::parse("lab").unwrap(),

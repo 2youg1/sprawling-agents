@@ -61,7 +61,7 @@ fn lines_of(ledger_dir: &Path, kind: &str) -> usize {
 #[test]
 fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
@@ -107,7 +107,7 @@ fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
 #[test]
 fn a_repeat_is_answered_with_what_the_first_ask_was_answered() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -176,7 +176,7 @@ fn a_repeat_is_answered_with_what_the_first_ask_was_answered() {
 #[test]
 fn a_key_already_in_the_history_is_recognised_after_a_restart() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let halt = || wire::Command::Halt {
         scope: wire::HaltScope::City,
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"halt"),

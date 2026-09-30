@@ -13,7 +13,7 @@ use crate::assembly::*;
 #[test]
 fn a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
     std::fs::create_dir_all(building.join("room2")).unwrap();
@@ -123,7 +123,7 @@ fn branch_opened(ledger_dir: &Path) -> String {
 #[test]
 fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     // The building asks for review, so every run works in its own
     // tree and nothing lands until a second resident says so.
     let building = dir.path().join("lab");
@@ -247,7 +247,7 @@ fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
 #[test]
 fn a_merge_no_person_looked_at_names_no_person_as_its_reviewer() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
     std::fs::create_dir_all(building.join("room2")).unwrap();

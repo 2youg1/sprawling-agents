@@ -11,7 +11,7 @@ use crate::assembly::*;
 #[test]
 fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -61,7 +61,7 @@ fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
 fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands() {
     use kernel::Tool;
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -349,7 +349,7 @@ fn a_split_closes_the_claim_on_its_parent() {
 /// A city whose building `lab` has `plan` as its roadmap.
 fn city_with_plan(plan: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(dir.path().join("lab").join(city::ROADMAP_FILE), plan).unwrap();
     dir

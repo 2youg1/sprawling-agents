@@ -26,7 +26,7 @@ fn close_to_full(_city: &Path) -> Option<VolumeSpace> {
 #[test]
 fn a_volume_below_its_floor_refuses_a_dispatch_before_anything_is_written() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     city::create_building(
         dir.path(),
         &Address::parse("lab").unwrap(),

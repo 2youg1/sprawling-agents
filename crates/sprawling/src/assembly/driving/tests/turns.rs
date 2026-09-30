@@ -77,7 +77,7 @@ fn a_socket_that_carried_no_request_spends_no_scripted_reply() {
 #[test]
 fn a_dispatch_runs_a_whole_turn_loop_and_the_chain_still_verifies() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
 
     let (base_url, _provider) = fake_openai(
         &["m-local"],
@@ -182,7 +182,7 @@ fn a_cancel_reaches_the_run_it_cancels_without_waiting_for_it_to_end() {
 #[test]
 fn a_steer_lands_at_the_end_of_the_next_tool_result() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![
@@ -251,7 +251,7 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
 #[test]
 fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     // A provider that lists a model, then answers 401 to every chat.
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();

@@ -5,7 +5,6 @@
 
 use super::super::*;
 use crate::assembly::fixture::*;
-use crate::assembly::*;
 
 /// A graph of nodes runs in dependency order, each in its own room
 /// with its contract as its `JOB.md`, and what comes back verified
@@ -22,7 +21,7 @@ use crate::assembly::*;
 #[test]
 fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let graph = serde_json::json!({
         "op": "lay_out",
         "nodes": [
@@ -149,7 +148,7 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
 #[test]
 fn three_ready_nodes_drive_three_runs_at_once() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     std::fs::write(

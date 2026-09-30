@@ -32,7 +32,7 @@ fn scripted(_city: &Path, at: &Address) -> Result<(), AxError> {
 #[test]
 fn a_reveal_reaches_the_file_manager_the_worker_was_handed() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),

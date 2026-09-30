@@ -13,7 +13,7 @@ use crate::assembly::*;
 #[test]
 fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -83,7 +83,7 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
 #[test]
 fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -146,7 +146,7 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
 #[test]
 fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_ended() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),

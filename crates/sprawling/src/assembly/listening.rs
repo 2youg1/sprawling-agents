@@ -22,9 +22,8 @@ use kernel::{AxCode, AxError};
 
 use super::acp_dispatch;
 use super::attending::{Opening, Outward, Started, spawn_worker};
-use super::desk::CommandDesk;
 use super::opening_cost::{OpeningCost, Phase};
-use super::{Closing, start_served_views};
+use super::{Closing, CommandDesk, start_served_views};
 use crate::serving::Serving;
 use crate::serving::output_ring::OutputRing;
 use crate::serving::standing::monotonic_now;
@@ -158,6 +157,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // 8-91).
     let (mut rebuilt, held) = start_served_views(
         &kernel::layout::CityLayout::new(city_root).ledger(),
+        accounting::Clock::now(&super::SystemClock)?,
         &mut log,
         &mut cost,
     )?;

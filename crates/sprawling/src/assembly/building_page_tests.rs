@@ -13,7 +13,7 @@ use accounting::views::building_page::read_building;
 #[test]
 fn a_building_page_still_shows_the_rules_that_govern_it() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     city::create_building(
         dir.path(),
         &Address::parse("lab").unwrap(),
@@ -47,7 +47,7 @@ fn a_building_page_still_shows_the_rules_that_govern_it() {
 #[test]
 fn a_building_page_says_the_plan_cannot_be_read_rather_than_that_it_is_malformed() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let lab = Address::parse("lab").unwrap();
     city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
     // A directory where the plan belongs, so the read fails for a
@@ -71,7 +71,7 @@ fn a_building_page_says_the_plan_cannot_be_read_rather_than_that_it_is_malformed
 #[test]
 fn a_city_where_the_building_is_gone_hears_nothing_and_says_so() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::write(
         city::watch_path(dir.path()),
         "[[source]]
@@ -102,7 +102,7 @@ addr = \"gone/room1\"
 #[test]
 fn a_building_can_be_told_what_its_runs_may_reach() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -171,7 +171,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
 #[test]
 fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -223,7 +223,7 @@ fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
 #[test]
 fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let proposal = serde_json::json!({
         "op": "propose",
         "text": "# lab\n\nconfidential: false\nreview: true\n\n## Write domain\n\n- lab\n",
@@ -284,7 +284,7 @@ fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
 #[test]
 fn a_new_building_is_visible_in_the_city_view_with_a_denominator_of_zero() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),

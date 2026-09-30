@@ -18,7 +18,7 @@ use kernel::Locator;
 #[test]
 fn what_a_worker_holds_is_what_a_restart_rebuilds() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("market").join("ito")).unwrap();
     std::fs::create_dir_all(dir.path().join("market").join("hana")).unwrap();
     lay_rules(dir.path(), "market", &ordinary_rules(""));
@@ -153,7 +153,7 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
 #[test]
 fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-small", "m-large"], Vec::new());
     let mut worker = RunWorker::new(
         dir.path(),
@@ -224,7 +224,7 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
 #[test]
 fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
@@ -298,7 +298,7 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
 #[test]
 fn a_ledger_an_older_build_wrote_with_a_subscription_login_still_folds() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),

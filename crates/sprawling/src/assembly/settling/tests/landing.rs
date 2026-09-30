@@ -36,7 +36,7 @@ fn speaking_signal(id: &str, room: &Address) -> collab::Signal {
 #[test]
 fn a_half_settled_landing_leaves_no_torn_city() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     city::create_building(
         dir.path(),
         &Address::parse("market").unwrap(),
@@ -106,7 +106,7 @@ Trades in the market as {who}.
 #[test]
 fn a_half_filed_shelf_is_unwound() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let building = Address::parse("lab").unwrap();
     city::create_building(dir.path(), &building, city::BuildingTemplate::Minimal).unwrap();
     // The second kind's directory is a file: its filing cannot land,
@@ -188,7 +188,7 @@ fn a_half_filed_shelf_is_unwound() {
 #[test]
 fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);

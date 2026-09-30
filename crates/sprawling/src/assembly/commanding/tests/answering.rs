@@ -66,7 +66,7 @@ fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
 #[test]
 fn a_refused_command_reaches_the_peer_that_sent_it() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -128,7 +128,7 @@ fn a_refusal_with_no_one_behind_it_says_so_rather_than_failing() {
 #[test]
 fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -323,7 +323,7 @@ fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
     // catch-all refusal that names a build stage and nothing they can
     // act on.
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),

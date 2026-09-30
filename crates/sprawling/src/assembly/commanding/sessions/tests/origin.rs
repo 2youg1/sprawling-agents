@@ -14,7 +14,7 @@ use crate::assembly::*;
 /// A worker over a fresh city whose one run, the mother, has landed in
 /// `lab/room2`, and the origin a branch of it would name.
 fn a_mother_ran(city_root: &std::path::Path) -> (RunWorker, kernel::Origin, impl Sized) {
-    init_city(city_root).unwrap();
+    crate::assembly::fixture::init_city(city_root).unwrap();
     let (base_url, provider) =
         fake_openai(&["m-local"], vec![completion("the meter says 42", None)]);
     let mut worker = worker_with_provider(city_root, &base_url, "m-local").unwrap();

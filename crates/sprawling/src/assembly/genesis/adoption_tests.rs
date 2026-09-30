@@ -16,7 +16,12 @@ fn adopting_a_folder_checkpoints_it_as_one_pack_before_any_dispatch() {
         std::fs::create_dir_all(dir.path().join("shop")).unwrap();
         std::fs::write(dir.path().join("shop").join(name), name).unwrap();
     }
-    form_city(dir.path(), Adopt::EveryFolder).unwrap();
+    crate::assembly::genesis::form(
+        dir.path(),
+        Adopt::EveryFolder,
+        crate::assembly::fixture::hands(),
+    )
+    .unwrap();
 
     let carried = git2::Repository::open(dir.path()).ok().is_some_and(|repo| {
         repo.head()
@@ -53,7 +58,12 @@ fn forming_a_city_keeps_its_own_subtree_out_of_the_workspaces_git() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join(".gitignore"), "target/\n").unwrap();
-    form_city(dir.path(), Adopt::EveryFolder).unwrap();
+    crate::assembly::genesis::form(
+        dir.path(),
+        Adopt::EveryFolder,
+        crate::assembly::fixture::hands(),
+    )
+    .unwrap();
 
     let ignored = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap_or_default();
     assert!(
@@ -82,7 +92,12 @@ fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
     git2::Repository::init(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("proj").join("src")).unwrap();
     std::fs::write(dir.path().join("proj").join("src").join("lib.rs"), "\n").unwrap();
-    form_city(dir.path(), Adopt::EveryFolder).unwrap();
+    crate::assembly::genesis::form(
+        dir.path(),
+        Adopt::EveryFolder,
+        crate::assembly::fixture::hands(),
+    )
+    .unwrap();
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![completion("done", None), completion("done", None)],
@@ -148,7 +163,12 @@ fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
 fn opening_a_city_gives_an_older_building_the_rules_it_lacks() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("proj")).unwrap();
-    form_city(dir.path(), Adopt::EveryFolder).unwrap();
+    crate::assembly::genesis::form(
+        dir.path(),
+        Adopt::EveryFolder,
+        crate::assembly::fixture::hands(),
+    )
+    .unwrap();
     let ignore = dir.path().join("proj").join(".gitignore");
     std::fs::write(&ignore, "Roadmap.md\nMemo.md\n").unwrap();
 

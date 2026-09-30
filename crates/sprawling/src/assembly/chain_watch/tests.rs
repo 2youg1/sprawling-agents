@@ -6,7 +6,7 @@
 use kernel::Address;
 
 use super::*;
-use crate::assembly::init_city;
+use crate::assembly::{RunWorker, hands, init_city};
 
 /// Changes one digit of the first line's timestamp in place, so the
 /// line still parses and only the chain can tell.
@@ -31,7 +31,7 @@ fn a_chain_broken_under_a_served_city_refuses_the_next_command_with_the_audits_r
     let mut worker = RunWorker::new(
         dir.path(),
         Diagnostics::off(),
-        crate::assembly::fixture::hands(),
+        hands(gateway::Custodian::in_memory()),
     )
     .unwrap();
     break_the_first_line(dir.path());
@@ -41,8 +41,7 @@ fn a_chain_broken_under_a_served_city_refuses_the_next_command_with_the_audits_r
         panic!("the tampered ledger still audits whole");
     };
 
-    worker
-        .audit_chain_in_background(Diagnostics::off())
+    audit_in_background(worker.chain_under_audit(), Diagnostics::off())
         .unwrap()
         .join()
         .unwrap();

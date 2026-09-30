@@ -7,7 +7,7 @@
 //! (sprawling-SPEC.md 8-84): a relay round trip, and the gap a second
 //! dispatch leaves in a run that is already going.
 //!
-//! Both drive `assembly::attending::attend` on a thread of its own, send
+//! Both drive `assembly::attend::attend` on a thread of its own, send
 //! work in through `CommandDesk::post`, and talk to the loopback
 //! provider. Both are ignored by `just check`, because they read the
 //! wall clock and take seconds; `just bench` runs them and prints one
@@ -28,7 +28,7 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use crate::assembly::CommandDesk;
-use crate::assembly::attending::attend;
+use crate::assembly::attend::attend;
 use crate::assembly::fixture::*;
 use crate::assembly::*;
 
@@ -269,7 +269,7 @@ fn in_memory_ledger(dir: &std::path::Path) -> (storage::JsonlLedger, storage::Op
 
 /// A city with one building and one room in it, under ordinary rules.
 fn raise_lab(root: &std::path::Path) {
-    init_city(root).unwrap();
+    crate::assembly::fixture::init_city(root).unwrap();
     std::fs::create_dir_all(root.join("lab").join("east")).unwrap();
     lay_rules(root, "lab", &ordinary_rules(""));
 }

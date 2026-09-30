@@ -26,7 +26,7 @@ use crate::assembly::*;
 #[test]
 fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     city::create_building(
         dir.path(),
         &Address::parse("market").unwrap(),
@@ -105,7 +105,7 @@ fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
 #[test]
 fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -145,7 +145,7 @@ fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
 #[test]
 fn a_room_whose_resident_is_a_harness_is_refused_before_anything_is_written() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let file = city::config_path(dir.path(), &room, city::Layer::Building).unwrap();
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
@@ -199,7 +199,7 @@ harness = \"pi\"
 #[test]
 fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
@@ -239,7 +239,7 @@ fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
 #[test]
 fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![completion("收到。", None), completion("done", None)],
@@ -313,7 +313,7 @@ fn two_jobs_at_one_millisecond_get_two_run_ids() {
 #[test]
 fn a_dispatch_says_what_it_spent_before_the_drive() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
 
     let written = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));

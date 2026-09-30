@@ -13,10 +13,8 @@ use kernel::{Address, AxCode, AxError, EventDraft, EventKind, EventRef};
 use kernel::{Ledger, Payload, RunId};
 use storage::JsonlLedger;
 
-use crate::serving::open_vault;
-
 use super::freezing::Assembled;
-use super::{RunWorker, ScanReport, SystemClock};
+use super::{Hands, RunWorker, ScanReport};
 
 /// The city segment of every prefix, and a file the person is meant to
 /// edit: `init` writes it into the city, and every later run reads that
@@ -67,30 +65,24 @@ pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing 
     city::survey(&entries, history == History::Present)
 }
 
-/// `sprawling init <dir>`: the genesis write. The city is born when
-/// `city_initialized` becomes line zero; a second init refuses — history
-/// starts once.
-///
-/// Adopts nothing: what is already in the directory is left alone, and
-/// `form_city` is the entry that puts it under rules.
-///
-/// # Errors
-/// Whatever `form_city` reports, the refusal above included.
-pub fn init_city(city_root: &Path) -> Result<InitReport, AxError> {
-    form_city(city_root, Adopt::Nothing)
-}
-
-/// Forms a city in a directory, and says what was already there.
+/// Forms a city in a directory with `hands`, and says what was already
+/// there: the genesis write. The city is born when `city_initialized`
+/// becomes line zero; a second forming refuses — history starts once.
 ///
 /// `Adopt::EveryFolder` is the case a person with a workspace wants:
 /// each top-level folder becomes a building with its own rules, its
 /// files untouched. Adoption happens after genesis, because a building
 /// is recorded against a city and there is no city before line zero.
 ///
+/// The two genesis lines are stamped with the time `hands.clock` reads,
+/// and the worker that raises City Hall is built with the same hands, so
+/// a scripted clock and vault hold from line zero (accounting-SPEC.md
+/// 8-3, 12-19).
+///
 /// # Errors
 /// Refuses a directory that already has history, and propagates whatever
 /// the ledger, the store or the filesystem says.
-pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> {
+pub(crate) fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, AxError> {
     let history = has_history(city_root)?;
     let standing = standing_of(city_root, history);
     let dir = kernel::layout::CityLayout::new(city_root).ledger();
@@ -113,7 +105,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
              write, then run `sprawling init` again",
         )
     })?;
-    let now = accounting::Clock::now(&SystemClock)?;
+    let now = accounting::Clock::now(&*hands.clock)?;
     let (mut ledger, report) =
         JsonlLedger::open(&dir, now).map_err(storage::StorageError::into_ax)?;
     let genesis = ledger.append(EventDraft {
@@ -171,13 +163,12 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> 
     // City Hall, and the two identity files its residents are read
     // from. Both happen after line zero, because a building is recorded
     // against a city and there is no city before then.
-    let (vault, _notice) = open_vault();
     // The writer that wrote line zero goes on writing: a second one
     // opened here would be refused the city's writer lock.
     let mut worker = RunWorker::over(
         city_root,
         runtime::diagnostics::Diagnostics::off(),
-        super::hands(vault),
+        hands,
         (ledger, report),
     )?;
     let plan = city::CityPlan::new(None)?;

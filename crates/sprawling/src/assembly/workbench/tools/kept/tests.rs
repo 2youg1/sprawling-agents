@@ -27,7 +27,7 @@ fn written() -> String {
 fn a_written_key_reaches_the_vault_and_not_the_file() {
     let key = written();
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![
@@ -80,7 +80,7 @@ fn a_written_key_reaches_the_vault_and_not_the_file() {
 fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
     let key = written();
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab/room1")).unwrap();
     // Ignored, as a person keeps a key file: a key the checkpoint would
     // stage is refused there before any tool runs, which is a different

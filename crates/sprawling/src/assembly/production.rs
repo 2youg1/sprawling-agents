@@ -3,18 +3,20 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What only this machine can hand a worker: the wall clock, and the
-//! hands a worker built here reaches this machine through
-//! (accounting-SPEC.md 8-11).
+//! What only this machine can hand a worker: the wall clock, the hands
+//! a worker built here reaches this machine through, and a city formed
+//! with them (accounting-SPEC.md 8-11).
 //!
 //! The clock is sampled *here only* (determinism rule 2): every callee
 //! takes time as a parameter or reads the clock it was handed, and the
 //! sample stays in this file so that the rule keeps naming one place.
 
+use std::path::Path;
 use std::sync::Arc;
 
 use kernel::{AxCode, AxError, TimeMs};
 
+use super::genesis::{Adopt, InitReport, form};
 use super::hands::{ExecHost, Hands};
 use crate::doctor::{PATIENCE, Platform, ThisMachine};
 
@@ -77,4 +79,25 @@ pub fn hands(vault: gateway::Custodian) -> Hands {
             engine: crate::doctor::host::execution_engine,
         },
     }
+}
+
+/// `sprawling init <dir>`: forms a city with this machine's hands and
+/// adopts nothing; what is already in the directory is left alone, and
+/// [`form_city`] is the entry that puts it under rules.
+///
+/// # Errors
+/// Whatever [`form_city`] reports.
+pub fn init_city(city_root: &Path) -> Result<InitReport, AxError> {
+    form_city(city_root, Adopt::Nothing)
+}
+
+/// Forms a city in a directory with this machine's hands: the vault this
+/// process opens, the wall clock and the rest of [`hands`].
+///
+/// # Errors
+/// Refuses a directory that already has history, and propagates whatever
+/// the ledger, the store or the filesystem says.
+pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> {
+    let (vault, _notice) = crate::serving::open_vault();
+    form(city_root, adopt, hands(vault))
 }

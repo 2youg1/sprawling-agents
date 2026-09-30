@@ -109,7 +109,7 @@ fn choose(worker: &mut RunWorker, model: &str, key: &[u8]) {
 }
 
 fn open_lab(dir: &std::path::Path) {
-    init_city(dir).unwrap();
+    crate::assembly::fixture::init_city(dir).unwrap();
     city::create_building(
         dir,
         &Address::parse("lab").unwrap(),

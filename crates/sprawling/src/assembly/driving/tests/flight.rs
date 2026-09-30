@@ -53,7 +53,7 @@ pub(super) fn history(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
 #[test]
 fn two_dispatches_from_the_desk_drive_at_once() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("west")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
@@ -143,7 +143,7 @@ fn two_dispatches_from_the_desk_drive_at_once() {
 #[test]
 fn a_closing_city_lands_the_runs_still_driving() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     std::fs::write(
@@ -196,7 +196,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     const WITHIN: std::time::Duration = std::time::Duration::from_secs(60);
     const LOOK: std::time::Duration = std::time::Duration::from_millis(5);
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("east")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     let (arrived_tx, arrived) = mpsc::channel();
@@ -227,7 +227,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     })));
     let attending = {
         let desk = Arc::clone(&desk);
-        std::thread::spawn(move || crate::assembly::attending::attend(&mut worker, &desk))
+        std::thread::spawn(move || crate::assembly::attend::attend(&mut worker, &desk))
     };
     let key = |material: &[u8]| kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, material);
     desk.post(
@@ -326,7 +326,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
 #[test]
 fn work_past_the_lane_count_waits_for_a_lane() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let rooms = ["lab/a", "lab/b", "lab/c", "lab/d", "lab/e"];
     for room in rooms {
         std::fs::create_dir_all(dir.path().join(room)).unwrap();

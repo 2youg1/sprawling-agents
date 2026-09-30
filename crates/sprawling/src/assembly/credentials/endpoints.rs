@@ -314,7 +314,6 @@ impl RunWorker {
 )]
 mod tests {
     use crate::assembly::fixture::{fake_openai, worker_with_provider};
-    use crate::assembly::init_city;
 
     /// The two rungs this layer owns: what the person sends now, and
     /// what the book already holds for the same model. The rungs above
@@ -324,7 +323,7 @@ mod tests {
     #[test]
     fn an_empty_ceiling_keeps_the_one_this_model_was_registered_with() {
         let dir = tempfile::tempdir().unwrap();
-        init_city(dir.path()).unwrap();
+        crate::assembly::fixture::init_city(dir.path()).unwrap();
         let (base_url, _provider) = fake_openai(&["m-1"], Vec::new());
         // Attaches and picks `m-1` at 32_768 / 4_096, which is the row
         // a person fills in on the settings page.
@@ -360,7 +359,7 @@ mod tests {
     #[test]
     fn a_chat_face_model_nobody_stated_a_ceiling_for_is_left_to_the_provider() {
         let dir = tempfile::tempdir().unwrap();
-        init_city(dir.path()).unwrap();
+        crate::assembly::fixture::init_city(dir.path()).unwrap();
         let (base_url, _provider) = fake_openai(&["m-1", "m-2"], Vec::new());
         let mut worker = worker_with_provider(dir.path(), &base_url, "m-1").unwrap();
         worker

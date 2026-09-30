@@ -18,7 +18,8 @@ use accounting::views::snapshot::start::cut_at;
 
 use super::{Standing, fold_city};
 
-/// What `serve` starts from: [`fold_city`], then a views snapshot cut at
+/// What `serve` starts from: [`fold_city`] over the ledger opened at
+/// `now`, then a views snapshot cut at
 /// the last line it folded, so a one-shot read afterwards folds only what
 /// arrives after it (sprawling-SPEC 8-91).
 ///
@@ -38,10 +39,11 @@ use super::{Standing, fold_city};
 /// Those of [`fold_city`].
 pub(crate) fn start_served_views(
     ledger_dir: &Path,
+    now: kernel::TimeMs,
     log: &mut Diagnostics,
     cost: &mut OpeningCost,
 ) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError> {
-    let (views, held) = fold_city(ledger_dir, cost)?;
+    let (views, held) = fold_city(ledger_dir, now, cost)?;
     let last = views.last_folded_line(ledger_dir);
     let site = Site {
         run: RunId::CITY,

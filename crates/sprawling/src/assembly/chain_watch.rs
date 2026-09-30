@@ -3,49 +3,48 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The whole-chain audit a served city runs beside its writer, and the
-//! halt a broken chain trips on that writer (sprawling-SPEC.md 8-90).
+//! The whole-chain audit a served city runs beside its writer
+//! (sprawling-SPEC.md 8-90). The halt it trips is attached by the worker
+//! (`chain_halt`); this file starts the thread and says what it found.
 
 use std::path::Path;
 
 use kernel::{AxCode, AxError, RunId, Seq};
 use runtime::diagnostics::{Diagnostics, Level, Site};
 
-use super::RunWorker;
+use super::chain_halt::ChainUnderAudit;
 use super::opening_cost::millis;
 use crate::serving::standing::monotonic_now;
 
-impl RunWorker {
-    /// Attaches a fresh halt to this worker's writer, then walks the
-    /// whole chain on a thread of its own.
-    ///
-    /// The thread holds the ledger directory, the halt and `log`, never
-    /// the writer, so the writer never waits for the audit. A broken
-    /// chain trips the halt, and from then on every append is refused
-    /// with the audit's own reason; the same reason goes to `log`.
-    ///
-    /// # Errors
-    /// `StorageFatal` when the thread cannot be started.
-    pub(crate) fn audit_chain_in_background(
-        &mut self,
-        log: Diagnostics,
-    ) -> Result<std::thread::JoinHandle<()>, AxError> {
-        let halt = storage::ChainHalt::default();
-        self.ledger.halt_on(halt.clone());
-        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
-        let at = self.ledger.position();
-        std::thread::Builder::new()
-            .name("sprawling-chain-audit".to_owned())
-            .spawn(move || report_audit(&dir, &halt, at, log))
-            .map_err(|source| {
-                AxError::failure(
-                    AxCode::StorageFatal,
-                    "start the chain audit",
-                    source.to_string(),
-                )
-                .with_recovery("check process thread limits")
-            })
-    }
+/// Walks the whole chain `watch` names on a thread of its own.
+///
+/// The thread holds the ledger directory, the halt and `log`, never the
+/// writer, so the writer never waits for the audit. A broken chain trips
+/// the halt, and from then on every append is refused with the audit's
+/// own reason; the same reason goes to `log`.
+///
+/// # Errors
+/// `StorageFatal` when the thread cannot be started.
+pub(super) fn audit_in_background(
+    watch: ChainUnderAudit,
+    log: Diagnostics,
+) -> Result<std::thread::JoinHandle<()>, AxError> {
+    let ChainUnderAudit {
+        halt,
+        ledger_dir,
+        at,
+    } = watch;
+    std::thread::Builder::new()
+        .name("sprawling-chain-audit".to_owned())
+        .spawn(move || report_audit(&ledger_dir, &halt, at, log))
+        .map_err(|source| {
+            AxError::failure(
+                AxCode::StorageFatal,
+                "start the chain audit",
+                source.to_string(),
+            )
+            .with_recovery("check process thread limits")
+        })
 }
 
 /// Runs the audit, trips `halt` unless it proved the whole chain, and

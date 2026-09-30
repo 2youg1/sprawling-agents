@@ -14,7 +14,7 @@ use crate::assembly::*;
 #[test]
 fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let segment = storage::ledger_segments_at(&report.ledger_dir)
         .unwrap()
         .pop()
@@ -45,7 +45,7 @@ fn a_city_opens_past_an_ignorable_line_from_a_newer_vocabulary() {
 #[test]
 fn one_read_of_the_history_folds_what_a_read_for_each_would() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -72,9 +72,8 @@ fn one_read_of_the_history_folds_what_a_read_for_each_would() {
 
     let (views, (_ledger, _report, standing)) = fold_city(
         &report.ledger_dir,
-        &mut crate::assembly::opening_cost::OpeningCost::begin(
-            crate::serving::standing::monotonic_now,
-        ),
+        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
+        &mut crate::assembly::opening_cost::OpeningCost::begin(crate::assembly::fixture::monotonic),
     )
     .unwrap();
     // Answered from what `Views::apply` folded, not from the on-disk index.

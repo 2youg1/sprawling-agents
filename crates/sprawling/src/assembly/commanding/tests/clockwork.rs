@@ -22,7 +22,7 @@ use crate::assembly::*;
 #[test]
 fn a_scheduled_job_starts_by_itself_and_only_once_per_firing() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::write(
         city::schedule_path(dir.path()),
         "[[job]]\nname = \"sweep\"\naddr = \"lab/room1\"\n\
@@ -135,7 +135,7 @@ fn a_close_lands_between_commands_and_never_inside_one() {
 #[test]
 fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -146,7 +146,7 @@ fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
     desk.close(Closing::Broken {
         cause: "the listener is gone".to_owned(),
     });
-    crate::assembly::attending::attend(&mut worker, &desk);
+    crate::assembly::attend::attend(&mut worker, &desk);
 
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let last = verified
@@ -173,7 +173,7 @@ fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
 #[test]
 fn a_scheduled_job_that_cannot_start_does_not_take_the_others_with_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::write(
         city::schedule_path(dir.path()),
         "[[job]]\nname = \"nowhere\"\naddr = \"ghost/room1\"\n\

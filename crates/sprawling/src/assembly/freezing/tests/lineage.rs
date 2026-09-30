@@ -16,7 +16,7 @@ use crate::assembly::*;
 #[test]
 fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     let room = Address::parse("lab/room1").unwrap();
@@ -137,7 +137,7 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
 #[test]
 fn inheriting_a_branch_does_not_verify_the_history() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) =
         fake_openai(&["m-local"], vec![completion("the meter says 42", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();

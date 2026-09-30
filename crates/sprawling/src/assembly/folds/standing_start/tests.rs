@@ -10,7 +10,7 @@ use kernel::{Address, RunId, Seq};
 use storage::{StoredSnapshot, WholeFold};
 
 use super::*;
-use crate::assembly::{RunWorker, init_city};
+use crate::assembly::RunWorker;
 use accounting::views::snapshot::start::{FoldStart, snapshot_dir, start};
 
 /// Buildings named `lab<n>`, and one repeat of `lab0` under a new key,
@@ -31,7 +31,9 @@ fn raise(worker: &mut RunWorker, names: std::ops::Range<u8>) {
 #[test]
 fn a_standing_after_a_cut_folds_only_the_tail_into_the_same_bytes() {
     let dir = tempfile::tempdir().unwrap();
-    let ledger = init_city(dir.path()).unwrap().ledger_dir;
+    let ledger = crate::assembly::fixture::init_city(dir.path())
+        .unwrap()
+        .ledger_dir;
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -75,7 +77,9 @@ fn a_standing_after_a_cut_folds_only_the_tail_into_the_same_bytes() {
 #[test]
 fn a_worker_refuses_a_line_rewritten_before_the_snapshot_in_a_sealed_segment() {
     let dir = tempfile::tempdir().unwrap();
-    let ledger = init_city(dir.path()).unwrap().ledger_dir;
+    let ledger = crate::assembly::fixture::init_city(dir.path())
+        .unwrap()
+        .ledger_dir;
     let open = || {
         RunWorker::new(
             dir.path(),

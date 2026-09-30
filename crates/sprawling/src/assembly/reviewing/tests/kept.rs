@@ -12,7 +12,7 @@ use crate::assembly::*;
 #[test]
 fn two_runs_in_one_room_under_review_work_in_one_tree() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
     let (base_url, _provider) = fake_openai(
@@ -49,7 +49,7 @@ fn two_runs_in_one_room_under_review_work_in_one_tree() {
 #[test]
 fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     lay_rules(
         dir.path(),
@@ -100,7 +100,7 @@ fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
 #[test]
 fn a_review_dispatch_sent_again_after_a_restart_is_answered_once() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     lay_rules(
         dir.path(),
@@ -169,7 +169,7 @@ fn trees_opened(ledger_dir: &std::path::Path) -> Vec<String> {
 #[test]
 fn a_tree_that_waits_on_the_index_lock_is_placed_in_the_lane() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules("review = true\n"));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
@@ -212,7 +212,7 @@ fn a_tree_that_waits_on_the_index_lock_is_placed_in_the_lane() {
 #[test]
 fn a_lane_that_fails_after_placing_the_tree_gives_it_back() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     // The tree is claimed over the building's own subtree; the write
     // domain, resolved later when the bench is laid out, refuses.

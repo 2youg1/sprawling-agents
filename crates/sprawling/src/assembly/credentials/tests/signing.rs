@@ -10,7 +10,7 @@ use crate::assembly::*;
 #[test]
 fn an_enrolled_credential_leaves_only_a_reference_in_the_history() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),

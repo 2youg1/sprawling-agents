@@ -48,7 +48,7 @@ fn files_holding(dir: &Path, needle: &[u8]) -> Vec<std::path::PathBuf> {
 fn a_pasted_key_reaches_the_vault_and_nothing_else() {
     let key = pasted();
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker

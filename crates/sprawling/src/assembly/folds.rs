@@ -105,6 +105,9 @@ impl Standing {
 /// later folds only what arrives after it; a cut that fails is in
 /// `Standing.cut`, not here.
 ///
+/// The ledger is opened at `now`, which the caller sampled: this module
+/// reads no clock of its own (determinism rule 2).
+///
 /// Opening the ledger, the verifying pass with the folding inside it, and
 /// the standing cut are each lapped on `cost` (sprawling-SPEC 8-121).
 ///
@@ -113,11 +116,11 @@ impl Standing {
 /// says about a payload it cannot read.
 pub(crate) fn fold_city(
     ledger_dir: &Path,
+    now: kernel::TimeMs,
     cost: &mut OpeningCost,
 ) -> Result<(Views, (JsonlLedger, OpenReport, Standing)), AxError> {
     let (ledger, report) =
-        JsonlLedger::open(ledger_dir, accounting::Clock::now(&super::SystemClock)?)
-            .map_err(storage::StorageError::into_ax)?;
+        JsonlLedger::open(ledger_dir, now).map_err(storage::StorageError::into_ax)?;
     cost.lap(Phase::OpenLedger);
     let mut views = Views::over(ledger_dir);
     let mut standing = StandingFolds::empty(city_root_of(ledger_dir));

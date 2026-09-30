@@ -25,7 +25,7 @@ use accounting::views::Views;
 #[test]
 fn what_a_run_changes_is_changed_after_the_line_that_announces_it() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let lab = dir.path().join("lab");
     std::fs::create_dir_all(lab.join("room1")).unwrap();
     std::fs::write(lab.join(city::ROADMAP_FILE), PLAN_TWO_FREE_ROWS).unwrap();
@@ -127,7 +127,7 @@ fn what_a_run_changes_is_changed_after_the_line_that_announces_it() {
 #[test]
 fn a_resident_crosses_two_runs_with_the_same_identity_segment() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let addr = Address::parse("lab/room1").unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     std::fs::write(
@@ -188,7 +188,7 @@ fn a_resident_crosses_two_runs_with_the_same_identity_segment() {
 #[test]
 fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![
@@ -253,7 +253,7 @@ fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
 #[test]
 fn a_commit_the_city_made_says_which_run_wrote_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![

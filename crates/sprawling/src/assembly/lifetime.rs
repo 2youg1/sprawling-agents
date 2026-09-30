@@ -367,7 +367,7 @@ impl RunWorker {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::Closing;
-    use crate::assembly::{RunWorker, init_city};
+    use crate::assembly::RunWorker;
     use kernel::{AxCode, AxError};
     use std::io::Write;
 
@@ -376,7 +376,7 @@ mod tests {
     #[test]
     fn a_torn_tail_is_told_in_the_startup_scan() {
         let dir = tempfile::tempdir().unwrap();
-        init_city(dir.path()).unwrap();
+        crate::assembly::fixture::init_city(dir.path()).unwrap();
         let segment =
             storage::ledger_segments_at(&kernel::layout::CityLayout::new(dir.path()).ledger())
                 .unwrap()
@@ -425,7 +425,7 @@ mod tests {
     #[test]
     fn a_crash_left_worktree_is_gone_once_the_city_opens() {
         let dir = tempfile::tempdir().unwrap();
-        init_city(dir.path()).unwrap();
+        crate::assembly::fixture::init_city(dir.path()).unwrap();
         let repo = git2::Repository::init(dir.path()).unwrap();
         let signature = git2::Signature::now("city", "city@example.invalid").unwrap();
         let tree = repo

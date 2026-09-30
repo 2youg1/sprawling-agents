@@ -16,7 +16,7 @@ use crate::assembly::*;
 #[test]
 fn the_effort_a_config_layer_states_is_what_goes_out_on_the_wire() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let city_layer = city::config_path(dir.path(), &room, city::Layer::City).unwrap();
     std::fs::create_dir_all(city_layer.parent().unwrap()).unwrap();

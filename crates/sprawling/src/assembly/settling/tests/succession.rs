@@ -14,7 +14,6 @@
     reason = "test code"
 )]
 
-use super::super::super::*;
 use crate::assembly::fixture::*;
 use kernel::{Address, EventKind, EventRecord, RunId};
 
@@ -48,7 +47,7 @@ fn tool_tables(bodies: &[String]) -> Vec<Vec<String>> {
 #[test]
 fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
     let ask = |id: &str| {
         tool_completion(
@@ -174,7 +173,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
 #[test]
 fn the_handoff_in_the_room_reaches_the_successor() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let room = dir.path().join("lab").join("room1");
     std::fs::create_dir_all(&room).unwrap();
     let (base_url, provider) = fake_openai(

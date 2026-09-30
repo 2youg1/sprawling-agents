@@ -10,7 +10,7 @@ use crate::assembly::*;
 #[test]
 fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let claim = serde_json::json!({
         "statement": "rewrite the kiln notes",
         "paths": ["lab/room1/notes.md"],
@@ -76,7 +76,7 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
 fn two_runs_registering_one_ground_side_by_side_leave_one_holder() {
     use kernel::Tool;
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -156,7 +156,7 @@ fn two_runs_registering_one_ground_side_by_side_leave_one_holder() {
 #[test]
 fn a_standing_goal_on_a_building_without_a_plan_is_refused_with_the_building_and_the_goal() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![]);
@@ -184,7 +184,7 @@ fn a_standing_goal_on_a_building_without_a_plan_is_refused_with_the_building_and
 #[test]
 fn a_standing_goal_on_a_malformed_plan_is_refused_with_the_broken_line() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     std::fs::write(
@@ -222,7 +222,7 @@ fn a_standing_goal_on_a_malformed_plan_is_refused_with_the_broken_line() {
 #[test]
 fn a_pursuit_gives_the_desk_back_while_its_rows_drive() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     std::fs::write(

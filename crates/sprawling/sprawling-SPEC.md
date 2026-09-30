@@ -3368,10 +3368,10 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 
 **本章测试**：`main::tests::the_embedded_client_is_the_bundle_the_workspace_built`——工作区 `target/web-dist` 下有完整的包时，嵌入表的路径集合与盘上的文件集合相等，且 `CLIENT_COMPLETE` 为真；没有完整的包时，`CLIENT_COMPLETE` 为假。这条测试只在 `CARGO_TARGET_DIR` 指向工作区以外时才能区分对错。
 
-### 8-84 记账线程的循环是一个有名字的函数，两件仪表直接驱动它（`bin::assembly::attending::attend`、`assembly::driving::tests::instruments`）
+### 8-84 记账线程的循环是一个有名字的函数，两件仪表直接驱动它（`bin::assembly::attend::attend`、`assembly::driving::tests::instruments`）
 
 ```rust
-// bin::assembly::attending —— shape: adapter
+// bin::assembly::attend —— shape: adapter
 /// 记账线程的主循环：relay 请求、至多一轮回家的活、desk，按这个次序（§8-42-4），直到 desk 关门。
 pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk);
 
@@ -3648,16 +3648,20 @@ impl PrefixAsk { pub(super) fn read(self) -> wire::Answer; } // 读不到那一�
 ### 8-90 服务中的城在后台审计整条链，链断了写者就停（`bin::assembly::chain_watch`）
 
 ```rust
-// bin::assembly::chain_watch —— shape: adapter
+// bin::assembly::chain_halt —— shape: adapter，随 worker 住（它读写者的私有字段）
+pub(crate) struct ChainUnderAudit { pub(crate) halt: storage::ChainHalt, pub(crate) ledger_dir: PathBuf, pub(crate) at: Seq }
 impl RunWorker {
-    pub(crate) fn audit_chain_in_background(
-        &mut self,
-        log: runtime::diagnostics::Diagnostics,
-    ) -> Result<std::thread::JoinHandle<()>, AxError>; // StorageFatal「start the chain audit」：线程起不来
+    pub(crate) fn chain_under_audit(&mut self) -> ChainUnderAudit; // 把新的停机值接到写者上，交回审计要的三样
 }
+
+// bin::assembly::chain_watch —— shape: adapter，留在装配根（它起线程）
+pub(super) fn audit_in_background(
+    watch: ChainUnderAudit,
+    log: runtime::diagnostics::Diagnostics,
+) -> Result<std::thread::JoinHandle<()>, AxError>; // StorageFatal「start the chain audit」：线程起不来
 ```
 
-**一次调用，接上停机再起线程。** 它新建一个 `storage::ChainHalt`，先经 `JsonlLedger::halt_on` 接到这个 worker 的写者上，再在名为 `sprawling-chain-audit` 的线程上跑 `storage::audit_chain`（storage-SPEC 8-27）。线程只持有账本目录、停机值和自己的 `Diagnostics`，不碰写者，所以写线程从不等审计。`serve` 的写线程在 `open_for_service` 之后调用它；起不来的线程与起不来的写线程一样，让 `serve` 失败。citysim 与测试不走这条路，所以它们的时序里没有第二个线程。
+**两步，先接上停机再起线程。** `chain_under_audit` 新建一个 `storage::ChainHalt`，经 `JsonlLedger::halt_on` 接到这个 worker 的写者上，交回停机值、账本目录与写者此刻的位置；`audit_in_background` 再在名为 `sprawling-chain-audit` 的线程上跑 `storage::audit_chain`（storage-SPEC 8-27）。前一步读写者的私有字段，所以随 worker 住；后一步起线程，所以留在装配根（accounting-SPEC.md §12-17）。线程只持有账本目录、停机值和自己的 `Diagnostics`，不碰写者，所以写线程从不等审计。`serve` 的写线程在 `open_for_service` 之后依次调用这两步；起不来的线程与起不来的写线程一样，让 `serve` 失败。citysim 与测试不走这条路，所以它们的时序里没有第二个线程。
 
 **结果作为诊断推给页面。** 审计线程的 `Diagnostics` 与写者的那一份同一个落点（`serving::Journal` 的 sink）、同一个级别下限，所以页面在日志里读到这一行：`Whole` 写一条 `Effect`，给出核对过的行数与这一遍的用时：`the whole ledger chain verified: <n> lines in <ms> ms`，毫秒由 `opening_cost::millis` 渲染（8-121），时长是线程开头与结尾两次 `serving::standing::monotonic_now` 之差（8-93 的单调采样点）；`Broken(reason)` 先 `trip(reason)`，再写一条 `Refuse`，内容就是审计的原因与恢复办法；读账本本身失败（`StorageError`）同样先 `trip`，原因是那次读取的失败，再写一条 `Refuse`：没读完的审计没有证明链断了，但也没有证明它完好，而视图从快照起步（8-91）时，快照之前的行只有这次审计会看；写在一条未经证明的链后面的行，与写在断链后面的行一样收不回来。**被否：读失败只报告不停写。** 那是视图全量核对起步时的规则，那时启动本身已经证明过整条链。
 

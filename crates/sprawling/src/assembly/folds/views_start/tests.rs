@@ -12,7 +12,7 @@ use kernel::{Address, RunId, Seq};
 use storage::{StoredSnapshot, WholeFold};
 
 use super::*;
-use crate::assembly::{RunWorker, init_city};
+use crate::assembly::RunWorker;
 use accounting::views::snapshot::start::{FoldStart, cut, snapshot_dir, start};
 
 fn raise(worker: &mut RunWorker, names: std::ops::Range<u8>) {
@@ -34,7 +34,9 @@ fn snapshots(city: &Path) -> PathBuf {
 /// A city with three buildings, a snapshot cut after them, then `more`
 /// buildings the snapshot has not seen.
 fn cut_then_raise(city: &Path, more: std::ops::Range<u8>) -> (PathBuf, RunWorker) {
-    let ledger = init_city(city).unwrap().ledger_dir;
+    let ledger = crate::assembly::fixture::init_city(city)
+        .unwrap()
+        .ledger_dir;
     let mut worker = RunWorker::new(
         city,
         runtime::diagnostics::Diagnostics::off(),
@@ -171,10 +173,9 @@ fn a_snapshot_that_cannot_be_cut_is_reported_and_the_views_still_serve() {
 
     let served = start_served_views(
         &ledger,
+        accounting::Clock::now(&crate::assembly::fixture::WallClock).unwrap(),
         &mut log,
-        &mut crate::assembly::opening_cost::OpeningCost::begin(
-            crate::serving::standing::monotonic_now,
-        ),
+        &mut crate::assembly::opening_cost::OpeningCost::begin(crate::assembly::fixture::monotonic),
     )
     .map(|_| ());
 

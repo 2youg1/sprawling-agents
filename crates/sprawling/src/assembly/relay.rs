@@ -357,7 +357,7 @@ mod tests {
     fn the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable() {
         use crate::assembly::health::Health;
         fn standing(health: &Health) -> (u64, u64) {
-            let read = health.read(crate::monitor::Sample::default());
+            let read = health.read(wire::Sample::default());
             (read.ledger_queue_depth, read.durable_lag)
         }
         struct Watching {

@@ -65,6 +65,16 @@ impl accounting::Clock for WallClock {
     }
 }
 
+/// The monotonic clock, read the way the served city's one monotonic
+/// sampling point reads it, for the tests that lap an opening.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "test code: the fixture reads the monotonic clock like the production point"
+)]
+pub(super) fn monotonic() -> std::time::Instant {
+    std::time::Instant::now()
+}
+
 /// A machine with nothing on it, which installs nothing.
 struct NoMachine;
 
@@ -94,6 +104,12 @@ impl accounting::Machine for NoMachine {
         )
         .with_recovery("hand the worker a scripted machine with `with_machine`"))
     }
+}
+
+/// A city formed with the test hands, adopting nothing: what the
+/// worker's tests stand on (accounting-SPEC.md 12-19).
+pub(super) fn init_city(city_root: &Path) -> Result<InitReport, AxError> {
+    super::genesis::form(city_root, Adopt::Nothing, hands())
 }
 
 /// Memory with far more room than any run asks for.

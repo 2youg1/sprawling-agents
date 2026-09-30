@@ -21,7 +21,7 @@ use crate::assembly::*;
 #[test]
 fn an_allowed_item_carries_the_work_on_instead_of_asking_for_the_command_again() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("thinking", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     let addr = Address::parse("lab/room1").unwrap();
@@ -130,7 +130,7 @@ fn started_runs(ledger_dir: &Path) -> usize {
 #[test]
 fn work_handed_down_becomes_a_run_that_cannot_hand_it_down_again() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![
@@ -234,7 +234,7 @@ fn work_handed_down_becomes_a_run_that_cannot_hand_it_down_again() {
 #[test]
 fn what_came_back_from_a_delegate_waits_in_the_room_that_asked_for_it() {
     let dir = tempfile::tempdir().unwrap();
-    init_city(dir.path()).unwrap();
+    crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![
@@ -312,7 +312,7 @@ fn what_came_back_from_a_delegate_waits_in_the_room_that_asked_for_it() {
 #[test]
 fn status_tells_a_run_where_the_work_it_handed_down_went() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![

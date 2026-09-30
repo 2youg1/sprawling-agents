@@ -13,7 +13,6 @@
 
 use super::super::*;
 use crate::assembly::fixture::*;
-use crate::assembly::*;
 
 /// The command that prints one file, on this machine.
 fn print_command(name: &str) -> (String, Vec<String>) {
@@ -36,7 +35,7 @@ fn print_command(name: &str) -> (String, Vec<String>) {
 #[test]
 fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() {
     let dir = tempfile::tempdir().unwrap();
-    let report = init_city(dir.path()).unwrap();
+    let report = crate::assembly::fixture::init_city(dir.path()).unwrap();
     let room = dir.path().join("lab").join("room1");
     std::fs::create_dir_all(&room).unwrap();
     let mut noise = String::new();

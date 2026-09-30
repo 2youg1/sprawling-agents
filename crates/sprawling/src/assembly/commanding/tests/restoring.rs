@@ -17,7 +17,7 @@ use crate::assembly::*;
 fn a_discarded_file_comes_back_and_its_row_closes() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
-    init_city(root).unwrap();
+    crate::assembly::fixture::init_city(root).unwrap();
     let mut worker = RunWorker::new(
         root,
         runtime::diagnostics::Diagnostics::off(),
@@ -85,7 +85,7 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
 fn a_way_back_the_bin_does_not_write_is_refused_in_one_readable_sentence() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
-    init_city(root).unwrap();
+    crate::assembly::fixture::init_city(root).unwrap();
     let mut worker = RunWorker::new(
         root,
         runtime::diagnostics::Diagnostics::off(),
