@@ -965,7 +965,9 @@ module = [
 
 # What each family of modules is for. Keyed by the prefix its module
 # names carry, which is the crate for all but `bin`, whose files sit in
-# `crates/sprawling/src`.
+# `crates/sprawling/src`. This is the one list of duties: ARCHITECTURE.md
+# section 1 draws the units and their wiring only, and the crate table in
+# crates/README.md is rendered from these lines.
 
 [family.kernel]
 duty = "every decision in the city, and nothing that touches a disk"
@@ -998,7 +1000,7 @@ duty = "a browser driven over WebDriver BiDi, and what a model may see of a page
 duty = "MCP out to a server, ACP in from an editor, and ACP out to a harness"
 
 [family.accounting]
-duty = "the city's one writer, and the ports it reaches outside itself through"
+duty = "the city's one writer, the views every page is answered from, and the ports the writer reaches outside itself through"
 
 [family.bin]
 duty = "the assembly root: every concrete type, the one clock, the one spawn point, and the command line"
