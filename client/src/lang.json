@@ -2027,6 +2027,14 @@
     "en": "a prompt cache was renewed",
     "zh": "续了一次 prompt 缓存"
   },
+  "event_harness_reported": {
+    "en": "a harness reported what it was doing",
+    "zh": "harness 汇报了它在做的事"
+  },
+  "event_harness_answered": {
+    "en": "a harness answered the city",
+    "zh": "harness 回答了城"
+  },
   "rec_raw": {
     "en": "the record as written",
     "zh": "原始记录"

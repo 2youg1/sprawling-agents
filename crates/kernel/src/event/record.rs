@@ -46,6 +46,7 @@ mod credential;
 mod discard;
 mod endpoint;
 mod governance;
+mod harness;
 mod history;
 mod log;
 mod modality;
@@ -75,6 +76,9 @@ pub use endpoint::{AttachedTuning, EndpointAttached, EndpointLost, InputKinds, M
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
     GoverningDocument, RulesChanged, SpineDocumentWritten, autonomy_word,
+};
+pub use harness::{
+    HarnessAnswered, HarnessPermit, HarnessPermitKind, HarnessReported, HarnessStop,
 };
 pub use history::{FileRestored, WentBack};
 pub use log::LogTruncated;

@@ -182,7 +182,9 @@ impl SessionOrigins {
             | EventKind::AdviserAsked
             | EventKind::AdviserAnswered
             | EventKind::AdviserFellBack
-            | EventKind::CacheRenewed => Ok(()),
+            | EventKind::CacheRenewed
+            | EventKind::HarnessReported
+            | EventKind::HarnessAnswered => Ok(()),
         }
     }
 

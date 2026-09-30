@@ -220,7 +220,11 @@ fn fold_run<'a>(
             | EventKind::AdviserAsked
             | EventKind::AdviserAnswered
             | EventKind::AdviserFellBack
-            | EventKind::CacheRenewed => {}
+            | EventKind::CacheRenewed
+            // A fork rebuilds a model run's conversation, and what a
+            // harness reported or answered is not one.
+            | EventKind::HarnessReported
+            | EventKind::HarnessAnswered => {}
         }
     }
     // A wave the cut landed inside is dropped whole: the assistant

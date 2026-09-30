@@ -113,7 +113,9 @@ pub(super) fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::AdviserAsked
         | EventKind::AdviserAnswered
         | EventKind::AdviserFellBack
-        | EventKind::CacheRenewed => PlanReach::Untouched,
+        | EventKind::CacheRenewed
+        | EventKind::HarnessReported
+        | EventKind::HarnessAnswered => PlanReach::Untouched,
     }
 }
 

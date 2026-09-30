@@ -711,6 +711,8 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 | 顾问 | `adviser_answered` | **in-window**（重放不再问顾问，读到的是这条答案：它决定一件东西留不留在窗口里，因此它决定模型请求字节） |
 | 顾问 | `adviser_fell_back` | record-only（没有可用的顾问答案，确定性策略作答，reason 是 `unavailable`／`timeout`／`unreadable` 之一。没有这条，顾问塑形的窗口与城自己策略塑形的窗口会折出同一段历史） |
 | 保温 | `cache_renewed` | record-only（保温续期一次入账，写在房间地址下：成功时携 provider 自报的四个 token 数与它自报的账单额，失败时携 provider 的拒绝原样（`AxError`）。续期只重发前缀、不改变任何一次请求的字节，所以不入窗；记下它是为了让人从历史里读出保温花了多少） |
+| harness 居民 | `harness_reported` | record-only（官方 harness 在一次 run 里汇报的一件事：回答或推理的一段、它开始的一次工具调用与状态、它问的许可与城的答；harness 说了之后才落账，恒不被读回来当作城的判定） |
+| harness 居民 | `harness_answered` | record-only（harness 对城那次 prompt 的回答：停止原因与这一回合它回答城的文字；停止原因一到就写，再冻结。`end_turn` 而文字非空时，它是 `Completion::Done` 的证据（§8-20）） |
 
 二分依据唯一：该事件载荷是否决定模型请求字节；不存在第三类。
 

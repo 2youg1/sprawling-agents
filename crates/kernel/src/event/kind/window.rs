@@ -115,7 +115,11 @@ impl EventKind {
             | EventKind::RulesChanged
             // A renewal resends a prefix already on the wire and changes
             // no byte of any later request; the line records its cost.
-            | EventKind::CacheRenewed => WindowClass::RecordOnly,
+            | EventKind::CacheRenewed
+            // What a harness said or answered never decides a request
+            // this city sends.
+            | EventKind::HarnessReported
+            | EventKind::HarnessAnswered => WindowClass::RecordOnly,
         }
     }
 }

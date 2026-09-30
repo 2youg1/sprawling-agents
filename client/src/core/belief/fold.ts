@@ -122,6 +122,7 @@ export function fold(held: RunBelief, record: EventRecord): [RunBelief, string |
     case "spine_document_written": case "rules_changed": case "cache_renewed":
     case "embedding_called": case "rerank_called":
     case "adviser_asked": case "adviser_answered": case "adviser_fell_back":
+    case "harness_reported": case "harness_answered":
       return [moved, null];
   }
 }

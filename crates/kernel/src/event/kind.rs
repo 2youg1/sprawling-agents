@@ -191,12 +191,23 @@ pub enum EventKind {
     /// what the provider reported it cost, or its refusal. The request is
     /// absent because it resends a prefix the run already recorded.
     CacheRenewed,
+
+    // Harness residents (2).
+    /// One thing an official harness reported during a run: a piece of
+    /// its answer or reasoning, a tool call it started and its status,
+    /// or a permission it asked for and the city's answer. Written after
+    /// the harness said it, and never read back as a decision of the city.
+    HarnessReported,
+    /// The harness's answer to the city's prompt: the stop reason and the
+    /// text it answered with this turn, written as the stop reason arrives
+    /// and before the run freezes.
+    HarnessAnswered,
 }
 
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and `xtask specalign`.
-    pub const ALL: [EventKind; 78] = [
+    pub const ALL: [EventKind; 80] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -275,6 +286,8 @@ impl EventKind {
         EventKind::AdviserAnswered,
         EventKind::AdviserFellBack,
         EventKind::CacheRenewed,
+        EventKind::HarnessReported,
+        EventKind::HarnessAnswered,
     ];
 }
 
