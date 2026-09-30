@@ -53,7 +53,7 @@
 6. **`first_seen` 的那一次折叠放在哪里未定。** 现在它在本进程第一次遇到缺文件的切片时整段读取各段（8-24），所以启动后的第一次新 room 派活仍付一遍全账本读与一段大小的瞬时内存。候选是并进启动时 `verify_ledger_dir` 已有的那一遍，或放到 lane 上预先折好；判定它的证据是 94 MB 账本上启动时长与首次派活时延的同仪表读数。
 7. **合并的检出先于干线的比较并交换。** `worktree::trees` 的 `apply` 先把节点的树写进城的工作目录，再用 `reference_matching` 移动干线；两步之间干线若被别处移动，比较并交换失败，工作目录却已是节点的树，下一次 checkpoint 会把这份差读成人的编辑。开城时账本的独占锁（8-1）使同一座城只有一个写者，所以窗口只在一个进程内的两次合并之间打开。候选是先做比较并交换、再以旧干线为显式基线检出（`CheckoutBuilder` 的 baseline），或比较并交换失败时撤回检出；判定它的证据是一个在两次合并之间移动干线的 citysim 场景。
 8. **取回一个文件抄的是被替换文件的权限，不是 point 上那一项的 `filemode`。** `worktree::back` 的 `restore_file` 经 `bundle::landing::land`（`Bits::OfReplaced`）落盘，所以在 Unix 上，point 上可执行、树里此刻不可执行的文件取回后仍不可执行；被删后再取回的文件取新建默认值。Windows 没有可执行位，不受影响。改法是由 `entry.filemode()` 推出权限，需要给 `landing::Bits` 添一臂；判定它的证据是一个 Unix 上取回脚本的场景。
-9. **`checkpoint::fence` 的 family 1 只做了一部分。** `file_discarded` 的载荷仍由 fence 手工拼成 `Map`，`taint_promoted`、`cross_building_transfer`、`secret_egress_blocked` 三种还没有各自的结构体。未定的是这些结构体住在 kernel 的事件表旁边还是 memory 里；判定它的证据是它们的第二个写者出现在哪个 crate。
+9. **`checkpoint::fence` 的 family 1 只做了一部分。** `file_discarded` 的载荷仍由 fence 手工拼成 `Map`，`taint_promoted`、`cross_building_transfer`、`secret_egress_blocked` 三种还没有各自的结构体。未定的是这些结构体住在 kernel 的事件表旁边还是 storage 里；判定它的证据是它们的第二个写者出现在哪个 crate。
 
 ## 4 现状分析
 
@@ -61,7 +61,7 @@
 
 ## 5 权威信源
 
-落盘形态/断尾/版本方向/组提交/分段；CAS 三工程事实；FaultFs 三故障与断电四注入点；确定性；断电与存储边界；ARCHITECTURE.md §4（内缝 Vfs 不升真缝）与 §12 的 memory 段；kernel-SPEC §8-4/§8-9。
+落盘形态/断尾/版本方向/组提交/分段；CAS 三工程事实；FaultFs 三故障与断电四注入点；确定性；断电与存储边界；ARCHITECTURE.md §4（内缝 Vfs 不升真缝）与 §12 的 storage 段；kernel-SPEC §8-4/§8-9。
 
 ## 6 命名统一
 
@@ -752,7 +752,7 @@ pub enum QueueLane { Signal, Approval, Repair }   // 一份实现三队列
 - **去重记忆按时间有界**：`seen` 记下每个键的入队时刻，`enqueue` 先按 `now` 驱逐早于 `IDEM_WINDOW_MS`（六小时）的键。
   只增不减的集合会让长跑的城为它曾经入过队的每一条事件各留一个键，而重试发生在一次投递的窗口内，不发生在一天之后。
   时钟倒退时一个键也不驱逐——队列对时钟不持观点，而记得太久只会少跑一次副作用。
-  **常量住 `storage::queue`**：它只有这一个读者，放进 `kernel::consts_policy` 会让 kernel 的公开面多一个只有 memory 读的数。
+  **常量住 `storage::queue`**：它只有这一个读者，放进 `kernel::consts_policy` 会让 kernel 的公开面多一个只有 storage 读的数。
 - 重建性：队列状态＝（signal_enqueued − signal_consumed）的 projection；持久性不在本模块（Ledger 已是历史）。lane 只定账目名字段，三队列零分支差异——差异出现之日即分模块之日（反推式合并的退出条件写在明处）。
 
 ### 8-11 storage::digest_cache（形状 4）

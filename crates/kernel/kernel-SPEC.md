@@ -114,7 +114,7 @@ gate ──▶ 上述全部（组合面）＋idem
 
 **本 crate 不做什么（否定式三条）**：
 - 不做 I/O、不采样时钟、不生成随机数——RunId／时间戳／种子全部由调用方注入；`uuid` 依赖仅用于解析与格式化，恒不启用生成特性。
-- 不实现任何端口——`Ledger` 的实现住 memory 与 citysim；kernel 只声明 trait 与链语义纯函数。
+- 不实现任何端口——`Ledger` 的实现住 storage 与 citysim；kernel 只声明 trait 与链语义纯函数。
 - 不认识文件系统、明文凭证与颜色——canonicalize、Vault、OKLCH 各归其效果面模块。
 - 不持 Markdown 词法器——界面读文档时由客户端 `client/src/core/prose.ts` 分词，Rust 侧没有调用者；在 kernel 再放一份只会与客户端那份悄悄分叉。服务端真要分词的那一天，词法器随它的第一个调用者一起进来。
 
@@ -979,7 +979,7 @@ pub fn free_space_floor(volume_bytes: u64) -> u64;
 - 内存紧：`queued_runs > 0`。排队由装配层按可用内存决定（运行因一个也装不下而等待），这里只把它说出来。
 - CPU 被占满：`schedule_delay > CPU_SATURATED_DELAY`，即一帧（60 Hz）——人开始看得见的延迟；它是感知常数，不随机器类别调。
 - 只有盘快满停止接新活：盘慢与 CPU 满时接活只会变慢，不会丢；内存紧已由排队处理。`admit_work` 只读卷的两个数，因为受理新活的入口只该为它付一次读卷，而不是整份读数；拒绝带着 `Degradation::DiskLow`，入口据它的 `recovery()` 告诉人至少腾出多少。
-- 写盘失败时账本不坏、重启可恢复，由 memory 承担（storage-SPEC 8-1）：失败的一波由 `jsonl::unwind` 把段退回波前长度，进程接着写也不会写在半行之后；掉电留下的撕裂尾由 open 截到最长有效前缀。本模块不复述。
+- 写盘失败时账本不坏、重启可恢复，由 storage 承担（storage-SPEC 8-1）：失败的一波由 `jsonl::unwind` 把段退回波前长度，进程接着写也不会写在半行之后；掉电留下的撕裂尾由 open 截到最长有效前缀。本模块不复述。
 - 生产的调用方：人发来的 `Dispatch` 在写下任何东西之前经 `admit_work` 读一次城所在卷（sprawling-SPEC 8-94）。未落地：事实条与 doctor 的显示；`Wake` 等不经人的入口；`ResourceReadings` 其余四项的生产填写者——`bin::monitor::Sample` 没有 fsync 中位数与调度延迟，它的 `durable_lag` 是条数而本模块要的是等待时长，且监视器只在有人看时采样，不能作为判定的唯一来源（sprawling-SPEC 8-90 决定 1）。
 
 ### 8-14 kernel::stall
@@ -1384,7 +1384,7 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
 - **`ToolCall::action` 住本模块**：`IdemKey::derive` 的第三个入参由什么构成，§8-6 写明「属工具面」，所以由 `ToolCall` 自己回答，因为**它就是那个动作**；`bin::assembly` 与 `citysim::executor` 都调它。两个调用方各写一遍时两遍会漂移：只取 name 的那一遍让一波之内两次同名调用得同一把键（一波共用一个 `t`），`ToolBench::invoke` 的 dedup 把第二次判为 `Duplicate`，模型只能读作自己出错。`id` 不进动作字节：两次只有 wire id 不同的调用是同一个动作。
 - **`action` 上报序列化失败而不吞掉它**：取默认值会产空串，让两次参数不同的调用得同一把键——正是本条要消灭的那种碰撞。`Payload` 拒浮点且键恒为字符串，故这条失败臂今天不可达；但「不可达所以取默认值」与「不可达所以据实上报」之间，只有后者在它变得可达那天仍然是对的。
 - **位次仍归调用方**：`seq` 说的是「这次调用坐在这一跑的第几位」，只有驱动那一跑的一方知道。把它一并收进 `ToolBench` 会让键在一次驱动内恒不重复，于是 dedup 永不触发，`dedup_runs_before_the_side_effect`（同一把键调两次、断言第二次不落地）连同它守的那条不变量一起变得写不出来。**收窄接口不值这个价**，故本模块只给动作字节；citysim 与 `bin::assembly` 用同形的每跑计数器作位次，是因为钟读数当位次逐字违反确定性第 7 条（「never from a clock」），而不是因为位次该归本模块。
-- **`ServerLabel` 住本模块而非 protocol**：它是一台 MCP server 在城里的名字，也是它每件工具名的第一段（`{label}_{tool}`），故它的文法就是 `ToolName` 的文法减下划线——写在两个 crate 里就是一条规则两个权威。**减下划线是判定而非口味**：允许它会让 `apps_foo_bar` 同时读作两种拆法，而这个名字要路由一次调用。迁入后 `city::config_layers` 在文件边界就能解析它（city 只见 kernel），于是「非法标签」在 Run 存在之前就不可表示。
+- **`ServerLabel` 住本模块而非 agent_protocols**：它是一台 MCP server 在城里的名字，也是它每件工具名的第一段（`{label}_{tool}`），故它的文法就是 `ToolName` 的文法减下划线——写在两个 crate 里就是一条规则两个权威。**减下划线是判定而非口味**：允许它会让 `apps_foo_bar` 同时读作两种拆法，而这个名字要路由一次调用。迁入后 `city::config_layers` 在文件边界就能解析它（city 只见 kernel），于是「非法标签」在 Run 存在之前就不可表示。
 - **`GateSubject::None` 是一条判定而不是遗漏**：`None` 说的是「工具的 grammar 读完成参数，这条调用没有主体」。门收到它就按调用真正有的东西判：`Effect::Egress` 与 `Effect::AttachUserBrowser` 按 `EgressTarget::Loopback` 过密钥扫描（未指名去向的字节留在运行中的机器上，扫描照跑，因为跳过门曾让一条凭据静悄悄进页面），`Effect::Write` 的收窄没有更窄的区域可问（声明的 domain 已判过），`Effect::Govern` 则拒收（改规则的调用必须自己说出改哪个 scope，替它编一个等于把工具的错误说成事实）。**被否**：`None` 即跳过门——浏览器工具的非导航调用（`snapshot`、`act` 等）从此不过扫描；`None` 即拒——同一批调用全被拦下，而工具拿不出页面主机：`subject` 只读调用参数，浏览器工具不存当前页地址。文法读不出参数的调用返回 `Err`，bench 原样拒收，两种失败因此在类型上可分辨。
 - **`Area`／`Room`／`Scope` 今天没有生产者**：三种主体各有一个消费者（Write 的收窄用 Area／Room，Govern 用 Scope），能回答它们的工具是 `edit`／`exec`／`archive`／`claim`／`goal`／`pr`／`signal`（各自的写入目标）与 `rules`／`city`（各自治理的 scope）。这些工具的 `subject` 仍取 trait 默认，故收窄与 scope 今天都不生效；`Effect::Govern` 的 `None` 因此被拒收而不是回落到 run 地址。每个工具补上自己的解析即闭合这一段（M-17）。
 
@@ -1698,8 +1698,8 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 - `E_LOCATOR_INVALID`：同上；且与宽松接受严格互斥（fail-closed 是策略）。
 - `E_VERSION_CONFLICT`（verdict 映射在 `runtime::tools::edit`）：不可定义掉——乐观并发的存在理由就是冲突可发生。
 - `E_LOG_VERSION_UNSUPPORTED`／`E_CAS_CORRUPT`：住装载期白名单，产生地在 memory/runtime（见各自 SPEC）。
-- `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；memory 的 Io 映射已改正（storage-SPEC §12）。
-- `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 memory 的写者锁先于一切读写定义掉（storage-SPEC §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
+- `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；storage 的 Io 映射已改正（storage-SPEC §12）。
+- `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 storage 的写者锁先于一切读写定义掉（storage-SPEC §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
 
 其余的码（逐码答「能否定义掉」）：
 
@@ -1803,7 +1803,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 ### 12.8 定规：受保护元数据名单只有 kernel::address 一个家
 
-`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`storage::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是内存侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 memory 的别名族规则承担（storage-SPEC 8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
+`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`storage::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是storage 侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 storage 的别名族规则承担（storage-SPEC 8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
 
 ## 13 依赖选型
 
@@ -1898,7 +1898,7 @@ derive 出来的那个会把线上任意字符串收下、交回一个从没过�
 
 **缺省公开面不变**：feature 关着时 `cargo public-api -p sprawling-kernel` 逐字节同以前，基线不动；`--all-features` 下多出的只是 `JsonSchema` 实现。产品二进制不开它。
 
-**被否**：（a）在 channels 用 schemars 的 remote derive 镜像这些类型——每一个镜像都是同一形状的第二个权威，kernel 改一个字段名，镜像静默不动，客户端在握手通过后误读；（b）不加 feature、无条件派生——把 `schemars` 压进产品二进制，换来的只是省一个 cfg。
+**被否**：（a）在 wire 用 schemars 的 remote derive 镜像这些类型——每一个镜像都是同一形状的第二个权威，kernel 改一个字段名，镜像静默不动，客户端在握手通过后误读；（b）不加 feature、无条件派生——把 `schemars` 压进产品二进制，换来的只是省一个 cfg。
 
 ### 8-46 kernel::write_domain 增 `WriteDomain::Documents`（形状 1 判定 + 形状 2 value）
 
@@ -2029,7 +2029,7 @@ pub enum Proxying { ExceptLocal, Always, Never }
 pub struct Reach { host, named, connected, answered, through, elapsed_ms }
 ```
 
-- **为什么值在 kernel 而读数在 gateway**：这套词汇要同时被 gateway（做测量）与 channels（往线上送）叫出名字，而 channels 不依赖 gateway。与 `DialectKind` 同一条依赖倒置：**定义住在这里，求值住在拿得到套接字的那一层**。
+- **为什么值在 kernel 而读数在 gateway**：这套词汇要同时被 gateway（做测量）与 wire（往线上送）叫出名字，而 wire 不依赖 gateway。与 `DialectKind` 同一条依赖倒置：**定义住在这里，求值住在拿得到套接字的那一层**。
 - **四段各有各的下一步**：名字解不出（检查拼写或代理）、连不上或没人应（防火墙、端口、没起来的代理）、握手失败（主机名不是合法 DNS 名、证书不受信）、供应方答了状态（401 是密钥，404 是 base_url 末尾多了路径）。**一条 `error sending request for url (...): operation timed out` 里这四种全长一个样**，而人对着它无事可做。
 - **`Resolved(0)` 不可表达**：解出零个地址就是 `NotFound`，不是「解出了，零个」。
 - **`ProxiedAway` 是一段诚实的缺席**：有代理时名字与套接字都由代理去做，城自己再解一次名，报的是一条请求不会走的路。
@@ -2154,7 +2154,7 @@ impl CityLayout {
 
 **`model::Mode`**——`Chat｜PlanGoal｜Up｜Sc｜Ud｜Experiment`，wire 词 `chat｜plan_goal｜up｜sc｜ud｜experiment`，`as_str` 写、serde 读，一条遍历式断言钉住往返同词。`Mode::ALL` 的次序就是控件列出的次序，`Chat` 排第一，因为一个人在对话框里打的一句话首先是在说话，而不是在派一件要计划的活。
 
-为什么定义在这里而不在 `runtime`：**与 `DialectKind` 同一条依赖倒置**——线上携带它，`runtime::mode` 求值它（哪种模式准落什么），而 channels 不依赖 runtime，runtime 也不依赖 channels。两个外层 crate 都要叫出这个名字，谁都不得指名对方，所以名字住在这里。本枚举只说**有哪几种**；每一种准什么，仍旧只有 `runtime::mode` 一处回答。
+为什么定义在这里而不在 `runtime`：**与 `DialectKind` 同一条依赖倒置**——线上携带它，`runtime::mode` 求值它（哪种模式准落什么），而 wire 不依赖 runtime，runtime 也不依赖 wire。两个外层 crate 都要叫出这个名字，谁都不得指名对方，所以名字住在这里。本枚举只说**有哪几种**；每一种准什么，仍旧只有 `runtime::mode` 一处回答。
 
 **认不出的词在进程边界反序列化失败，不落成默认模式**：把认不出的词读成 `PlanGoal` 的理由是规划什么都不要求，代价却是拼错 `experiment` 的人得到一个规划 run 和零句反馈。闭集把那句反馈还给发送方，落在它还能改的地方。
 

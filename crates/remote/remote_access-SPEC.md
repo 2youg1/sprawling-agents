@@ -54,7 +54,7 @@
 
 ## 6 命名统一
 
-门（door）、纪元（epoch）、配对码（pairing code）、设备（device）、会话（session）、权限（authority：`Watch`／`Act`）、动词类（verb class：`Read`／`Act`／`LocalOnly`）、通路（route）。「配对令牌」（pairing token）是 channels 局域网那一面的词，与本 crate 的「配对码」不是一物：令牌是一次服务期间反复出示的，配对码只兑一次。
+门（door）、纪元（epoch）、配对码（pairing code）、设备（device）、会话（session）、权限（authority：`Watch`／`Act`）、动词类（verb class：`Read`／`Act`／`LocalOnly`）、通路（route）。「配对令牌」（pairing token）是 wire 局域网那一面的词，与本 crate 的「配对码」不是一物：令牌是一次服务期间反复出示的，配对码只兑一次。
 
 ## 7 模块边界
 

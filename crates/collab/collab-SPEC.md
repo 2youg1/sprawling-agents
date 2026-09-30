@@ -48,11 +48,11 @@ Signal｜Inbox｜Steer｜Workshop｜NodeContract｜fan-in｜Artifact｜arbitrati
 
 **三件邻居的活，及它们各自的主人**（写「X 归 Y」而非「不做 X」：前者告诉施工者去哪，后者只告诉他别去哪里）：
 
-- **物理隔离归 `storage::worktree`**：本 crate 决定谁干什么、谁拿着哪份草稿；一节点一棵树与磁盘上限归 memory。
+- **物理隔离归 `storage::worktree`**：本 crate 决定谁干什么、谁拿着哪份草稿；一节点一棵树与磁盘上限归 storage。
 - **人的干预动词归 `wire::control`**：`Steer`／`Cancel`／`Halt`／`Release` 从人那侧进城已有入口；本 crate 的 `steer` 只管 **Agent 发给 Agent** 那一条通道——两条通道入口不同而落点相同。
 - **处置与监护归 `runtime::watchdog`**：停滞依据与纠正→冻结的升级梯已在那里，本 crate 不建第二套。
 
-**L2 工具为什么住在本 crate**：一件工具是 `kernel::tool` 缝的适配器，而适配器必须能命名它暴露的机制。依赖法写着 `runtime: kernel, memory, gateway`（ARCHITECTURE.md §2）——**runtime 恒不得指名 collab**，所以 `Signal` 与 `GoalEntry` 的工具面拼不进 `runtime::tools/`；放进 bin 则把四百行判定塞进全图最脏的那个文件且 citysim 测不到。故 L0 三件在 runtime，L2 协作工具在 collab。
+**L2 工具为什么住在本 crate**：一件工具是 `kernel::tool` 缝的适配器，而适配器必须能命名它暴露的机制。依赖法写着 `runtime: kernel, storage, gateway`（ARCHITECTURE.md §2）——**runtime 恒不得指名 collab**，所以 `Signal` 与 `GoalEntry` 的工具面拼不进 `runtime::tools/`；放进 bin 则把四百行判定塞进全图最脏的那个文件且 citysim 测不到。故 L0 三件在 runtime，L2 协作工具在 collab。
 
 ## 8 接口先行
 

@@ -77,7 +77,7 @@ checker    ──▶ runtime::replay（verify_lines 复用，不建第二验证�
 executor   ──▶ runtime::run::drive（循环只住 runtime，本 crate 只供世界）
 ```
 
-**不做什么**：`MemLedger` 不落盘；不采时钟（t 由 tick 计数器给出）；不另写 FaultFs（它住 memory）。
+**不做什么**：`MemLedger` 不落盘；不采时钟（t 由 tick 计数器给出）；不另写 FaultFs（它住 storage）。
 
 ## 8 接口先行
 
@@ -405,7 +405,7 @@ impl Ablation {
 - 实现：MemLedger 的 append 是 from_draft→canonical_line→chain_hash 推进；无别的逻辑。
 - 边界：空 Ledger check 通过；单创世行通过。
 - 错误：透传 kernel/replay 与产品公面的 AxError，不新增码。
-- 依赖：kernel（features=["conformance"]）、memory（对拍与夹具）、runtime（驱动器与 verify）、gateway（dialect 翻译面）、collab（引文判定）、channels（帧）、sprawling（测量二进制驱动的产品公面）、serde_json、toml（nesting 读它评分的 TOML 形状）、sha2 与 zip（安装动作读发行档）；dev：tempfile、zeroize。
+- 依赖：kernel（features=["conformance"]）、storage（对拍与夹具）、runtime（驱动器与 verify）、gateway（dialect 翻译面）、collab（引文判定）、wire（帧）、sprawling（测量二进制驱动的产品公面）、serde_json、toml（nesting 读它评分的 TOML 形状）、sha2 与 zip（安装动作读发行档）；dev：tempfile、zeroize。
 - 硬编码：策略常数只在仪器里（§8-8-2 的两个阈值）与测量二进制里（`SAMPLES`、夹具规模），各自注释点名它的理由。
 - 影响面：`just sim` 与 `just bench` 的全部场景建于本 crate 之上。
 - 测试：conformance 双实现、字节对拍、夹具对拍、篡改检出、事件序断言。

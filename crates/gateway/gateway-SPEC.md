@@ -418,7 +418,7 @@ pub(crate) fn transcription_of(wire: &serde_json::Value) -> Result<String, AxErr
 
 ## 9 工作流程
 
-回合层组 `ChatRequest`（prefix 四段＋窗口历史）→endpoint.call（dialect 翻译＋兑付＋HTTP）→cost.settle→model_returned 载荷（usage＋billed）→attribution（memory 侧）摊回。credential 独立线：启动 probe→set（`PutSecret` 命令）→resolve（组请求末格）。
+回合层组 `ChatRequest`（prefix 四段＋窗口历史）→endpoint.call（dialect 翻译＋兑付＋HTTP）→cost.settle→model_returned 载荷（usage＋billed）→attribution（storage 侧）摊回。credential 独立线：启动 probe→set（`PutSecret` 命令）→resolve（组请求末格）。
 
 ## 10 实现逻辑
 

@@ -182,7 +182,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 
 ## 18 文档同步
 
-`ARCHITECTURE.md` §3 缝清单（`Outbound` 一行）与模块表的 protocol 各行｜`docs/third-party.md` §二（服务外挂的四条边界）。
+`ARCHITECTURE.md` §3 缝清单（`Outbound` 一行）与模块表的 agent_protocols 各行｜`docs/third-party.md` §二（服务外挂的四条边界）。
 
 ### 8-15 外部输入通道的消息上限
 

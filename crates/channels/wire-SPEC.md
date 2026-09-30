@@ -18,7 +18,7 @@
 | `preference` | 客户端读的那几张偏好枚举，值集在这里生成 |
 | `reading` | 一次回合的读法回到服务端（§8-21） |
 
-**本 crate 是进程外边界的唯一守卫**。它不实现任何业务判定：Command 的执行、Query 的求值、Event 的产生全在上游（runtime／memory／city），本 crate 只负责「让非法的帧在类型层或握手层就不存在」。
+**本 crate 是进程外边界的唯一守卫**。它不实现任何业务判定：Command 的执行、Query 的求值、Event 的产生全在上游（runtime／storage／city），本 crate 只负责「让非法的帧在类型层或握手层就不存在」。
 
 ## 2 验收标准
 
@@ -88,11 +88,11 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 ### 8-0 跨层名字的携带法（先于一切接口的决定）
 
 `PlanRow.status` 携 `kernel::RoadmapStatus`（经 `kernel` 重导出，住 `spine::row`，公共拼写不变）。
-`Dispatch` 携 `mode`，值集住 kernel（`kernel::model::Mode`），channels 依赖 kernel，所以 wire 直接携它。`CreateBuilding` 携 `template`、`ConnectToolkit` 携 toolkit 的 slug——**这两个集合的权威分别住 `city` 与 broker 的目录，而 channels 只依赖 kernel**（ARCHITECTURE §2 depmap）。
+`Dispatch` 携 `mode`，值集住 kernel（`kernel::model::Mode`），wire 依赖 kernel，所以帧直接携它。`CreateBuilding` 携 `template`、`ConnectToolkit` 携 toolkit 的 slug——**这两个集合的权威分别住 `city` 与 broker 的目录，而 wire 只依赖 kernel**（ARCHITECTURE §2 depmap）。
 
 取法：wire 携**无封闭列表的 newtype**（`ProviderName`、`TemplateName`、`ToolkitSlug`），只断言「非空且无控制字符」，**不断言合法值集**。合法值集恒由上游单一权威回答，映射点在装配层（`bin::assembly`），未知值即报错不猜。
 
-理由：若 channels 自建一份 `enum Mode`，就产生了**同一规则的第二个权威**（AGENTS.md 明拒），且两份枚举会静默地漂开。channels **确实不知道** mode 集合是什么，假装知道才是谎言。**被否**：channels 内镜像这几个枚举——两个权威。
+理由：若 wire 自建一份 `enum Mode`，就产生了**同一规则的第二个权威**（AGENTS.md 明拒），且两份枚举会静默地漂开。wire **确实不知道** mode 集合是什么，假装知道才是谎言。**被否**：wire 内镜像这几个枚举——两个权威。
 
 ### 8-1 wire::frames（形状 2 值类型 ＋ 形状 1 编解码）＋command／answer／carried_name
 
@@ -450,7 +450,7 @@ WireCommand::Dispatch { addr, task, goal, mode, idem, session: Option<SessionNam
 
 ## 18 文档同步
 
-- ARCHITECTURE 模块表的 channels 各行。
+- ARCHITECTURE 模块表的 wire 各行。
 - `client/client-SPEC.md`：线上形状变了的那一侧。
 - `crates/sprawling/sprawling-SPEC.md`：`serve` 子命令的装配面。
 
@@ -498,11 +498,11 @@ pub fn wire_schema() -> serde_json::Value;   // 一份文档：`$defs` 里是信
 - **生成器只认 serde 会产出的那个子集**：对象（`properties`／`required`／`additionalProperties`）、`string`／`integer`／`number`／`boolean`／`null`、`array`（`items`）与元组（`prefixItems`）、`enum` 字符串表、`const`、`oneOf`／`anyOf`、`$ref` 指向 `#/$defs/…`、`type: [T, "null"]`、`true`／`false` 两种布尔 schema。其余一律拒绝并点名关键字与所在类型——一个会猜的生成器就是一个会静默产出错类型的生成器。具名的裸 `string`／`integer` 即 newtype，TS 侧打上 `Schema.brand(名)`。
 - **文件确定**：`$defs` 按名排序后按依赖拓扑输出（Effect 的 `Schema` 值必须先定义后引用；环即拒绝），对象键排序，LF 行尾，生成头注明来源。
 
-**被否**：（a）在 channels 用 schemars 的 remote derive 镜像 kernel 的四十个类型——每个镜像是同一形状的第二个权威，而 §8-1 第 5 条早已为 `GitOid` 拒过同一形状的提案；（b）把 schema 文档的摘要作为握手哈希——doc 注释入哈希，改一句注释即旧页面全拒；（c）手写 `wire.ts`——正是本节要关掉的那扇门。
+**被否**：（a）在 wire 用 schemars 的 remote derive 镜像 kernel 的四十个类型——每个镜像是同一形状的第二个权威，而 §8-1 第 5 条早已为 `GitOid` 拒过同一形状的提案；（b）把 schema 文档的摘要作为握手哈希——doc 注释入哈希，改一句注释即旧页面全拒；（c）手写 `wire.ts`——正是本节要关掉的那扇门。
 
 **`answer.rs` 随之切出 `answer/building.rs`**：二十六条 `cfg_attr` 派生行把 381 行推到 407 行，越过 400 行预算，故一栋楼说自己的七个读形状（`BuildingProgress`／`BlockedLine`／`PlanRow`／`PursuitLine`／`BuildingDoc`／`ArchiveLine`／`BuildingAnswer`）迁入 `crates/channels/src/answer/building.rs`，`answer.rs` 以 `pub use` 引回，公开拼写不变；文字逐字节照搬，无字段开放。**记法同 §8-14**：下游基线里定义位路径从 `wire::answer::BuildingAnswer` 变为 `wire::answer::building::BuildingAnswer`（`web` 基线一行），那是 `cargo public-api` 记录的定义模块，不是接口变更。
 
-**本节的公开面变更**：channels 多出 `wire_schema`（仅 feature `schema`，缺省基线不见它）；kernel 在 `--all-features` 下多出四十余条 `JsonSchema` 实现（缺省基线不见）；`web` 基线因上述路径变动重生。
+**本节的公开面变更**：wire 多出 `wire_schema`（仅 feature `schema`，缺省基线不见它）；kernel 在 `--all-features` 下多出四十余条 `JsonSchema` 实现（缺省基线不见）；`web` 基线因上述路径变动重生。
 
 ### 8-17 `Query::Commit`：一次提交出自哪次运行
 
@@ -1039,7 +1039,7 @@ pub enum ReleaseAnswer {
 
 **升版的代价是 `wire.ts` 重生与客户端同改，与改动数量无关，分两次就是付两次**，所以能同时落地的线上改动放进同一次升版。以下各件与 §8-38 同属一次升版。
 
-**一、`mode` 是 `kernel::model::Mode`，不是自由文本。** 自由文本的 mode 要由上游把认不出的词落到某个默认值上，于是拼错 `experiment` 得到一个规划 run 和零句话。`Mode` 是 `chat｜plan_goal｜up｜sc｜ud｜experiment` 的闭集，未知词在反序列化处即拒。**定义落在 kernel 而不是 channels**：与 `DialectKind` 同一条依赖倒置，wire 携带它、`runtime` 求值它，两边都不得指名对方。`carried_name` 因此只剩三个真正开放的名字（provider／template／toolkit）——**值集开放才进那个宏，闭集不进**。
+**一、`mode` 是 `kernel::model::Mode`，不是自由文本。** 自由文本的 mode 要由上游把认不出的词落到某个默认值上，于是拼错 `experiment` 得到一个规划 run 和零句话。`Mode` 是 `chat｜plan_goal｜up｜sc｜ud｜experiment` 的闭集，未知词在反序列化处即拒。**定义落在 kernel 而不是 wire**：与 `DialectKind` 同一条依赖倒置，wire 携带它、`runtime` 求值它，两边都不得指名对方。`carried_name` 因此只剩三个真正开放的名字（provider／template／toolkit）——**值集开放才进那个宏，闭集不进**。
 
 **二、`context_tokens` 是 `Option<Window>`。** `Window` 与 `Ceiling` 同形（非零新类型）而**不是同一个类型**：一个界定模型能读多少，一个界定它能写多少，互换仍能编译的两个数不该共用一个名字。零在类型上不存在，缺席是 `null`；旧编码把「没人填」写成 `0`，于是上下文提醒拿一段对话去比对一个没人给过的数。
 
