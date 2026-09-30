@@ -25,6 +25,16 @@ pub enum AudioType {
 }
 
 impl AudioType {
+    /// Every container this city can send, in the order a refusal lists
+    /// them.
+    pub const ALL: [AudioType; 5] = [
+        AudioType::Webm,
+        AudioType::Ogg,
+        AudioType::Mpeg,
+        AudioType::Mp4,
+        AudioType::Wav,
+    ];
+
     /// What the `Content-Type` of the file part says.
     #[must_use]
     pub fn media_type(self) -> &'static str {
@@ -62,6 +72,21 @@ impl AudioType {
                 "record into audio/webm, audio/ogg, audio/mpeg, audio/mp4 or audio/wav",
             )),
         }
+    }
+
+    /// The container a recording's file name declares by its extension
+    /// (gateway-SPEC.md section 8-33).
+    ///
+    /// # Errors
+    /// `E_INVALID_ARGS` for a name whose extension is none of the
+    /// containers this city can send.
+    pub fn of_file_name(name: &str) -> Result<AudioType, AxError> {
+        Err(AxError::failure(
+            AxCode::ToolUnavailable,
+            "read a recording's container",
+            name.to_owned(),
+        )
+        .with_recovery("not written yet"))
     }
 
     /// The `filename` of the file part. Providers route on the
@@ -120,6 +145,18 @@ impl Recording {
             )));
         }
         Ok(Recording { bytes, kind })
+    }
+
+    /// A recording read from `reader` (gateway-SPEC.md section 8-33).
+    ///
+    /// # Errors
+    /// `E_STORAGE_FATAL` when the reader fails, and whatever
+    /// [`Recording::new`] refuses.
+    pub fn read_from(_reader: impl std::io::Read, _kind: AudioType) -> Result<Recording, AxError> {
+        Err(
+            AxError::failure(AxCode::StorageFatal, "take a recording", "not written yet")
+                .with_recovery("not written yet"),
+        )
     }
 
     #[must_use]
@@ -226,6 +263,73 @@ mod tests {
             refused.recovery().contains("audio/webm"),
             "the refusal names what to record into instead: {}",
             refused.recovery()
+        );
+    }
+
+    /// A file carries no content-type, so its name is the only thing
+    /// that says what container it is, read against the same enum the
+    /// request body is written from.
+    #[test]
+    fn a_recording_file_is_read_as_the_container_its_name_declares() {
+        for kind in AudioType::ALL {
+            let name = format!("hall/dropped/0/{}", kind.file_name());
+            assert_eq!(AudioType::of_file_name(&name).ok(), Some(kind), "{name}");
+        }
+        assert_eq!(
+            AudioType::of_file_name("VOICE.WAV").ok(),
+            Some(AudioType::Wav),
+            "an extension is not case-sensitive"
+        );
+        for unknown in ["voice.flac", "voice", "voice."] {
+            let refused = AudioType::of_file_name(unknown).err();
+            assert!(
+                refused
+                    .as_ref()
+                    .is_some_and(|err| *err.code() == AxCode::InvalidArgs
+                        && err.recovery().contains(".wav")
+                        && err.recovery().contains(".mp3")),
+                "{unknown} is refused with the extensions this city can send: {refused:?}"
+            );
+        }
+    }
+
+    /// Zeros for as long as anyone reads, counting how many were given.
+    struct Endless {
+        given: usize,
+    }
+
+    impl std::io::Read for Endless {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            buf.fill(0);
+            self.given += buf.len();
+            Ok(buf.len())
+        }
+    }
+
+    /// A file far larger than a provider takes is refused by the one
+    /// ceiling, without being read into memory whole.
+    #[test]
+    fn a_recording_is_read_no_further_than_one_byte_past_the_ceiling() {
+        let small = Recording::read_from(&b"RIFFfake"[..], AudioType::Wav);
+        assert!(
+            small
+                .as_ref()
+                .is_ok_and(|taken| taken.len() == 8 && taken.kind() == AudioType::Wav),
+            "{small:?}"
+        );
+        let mut endless = Endless { given: 0 };
+        let refused = Recording::read_from(&mut endless, AudioType::Wav).err();
+        assert!(
+            refused
+                .as_ref()
+                .is_some_and(|err| *err.code() == AxCode::InvalidArgs
+                    && err.recovery().contains(&RECORDING_MAX_BYTES.to_string())),
+            "{refused:?}"
+        );
+        assert!(
+            endless.given <= RECORDING_MAX_BYTES + 1,
+            "{} bytes were read to refuse a recording over {RECORDING_MAX_BYTES}",
+            endless.given
         );
     }
 }
