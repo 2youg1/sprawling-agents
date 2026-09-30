@@ -23,6 +23,7 @@ use crate::budget::REGISTER;
 use crate::report::XtaskError;
 use crate::{architecture, budget, depmap, gates, proof, walk};
 
+mod crate_table;
 mod recount;
 
 /// One fact a document may quote, and how to recount it.
@@ -39,7 +40,7 @@ pub(super) struct Fact {
 }
 
 /// Every fact a managed span may name.
-const FACTS: [Fact; 20] = [
+const FACTS: [Fact; 21] = [
     Fact {
         key: "wire_v",
         home: "wire::WIRE_V",
@@ -117,6 +118,13 @@ const FACTS: [Fact; 20] = [
         home: "the depmap block in ARCHITECTURE.md section 3",
         takes: None,
         recount: |root, _arg| depmap::graph(&walk::read_text(&root.join(architecture::PATH))?),
+    },
+    Fact {
+        key: "crate_table",
+        home: "cargo metadata, the depmap block in ARCHITECTURE.md section 3, and the family \
+               duties in architecture.toml",
+        takes: None,
+        recount: |root, _arg| crate_table::recount(root),
     },
     Fact {
         key: "adversary_seed",

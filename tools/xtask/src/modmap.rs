@@ -72,6 +72,15 @@ struct Entry {
 #[derive(Deserialize)]
 struct Map {
     module: Vec<Entry>,
+    /// What each family of modules is for, keyed by the prefix its module
+    /// names carry; read by [`duties`] alone.
+    #[serde(default)]
+    family: BTreeMap<String, Family>,
+}
+
+#[derive(Deserialize)]
+struct Family {
+    duty: String,
 }
 
 struct Row {
@@ -136,6 +145,69 @@ pub(crate) fn shapes(root: &Path) -> Result<BTreeMap<String, String>, XtaskError
             .map(|row| (row.path, row.shape))
             .collect(),
     )
+}
+
+/// What each of `packages` owns, in their order: the `duty` of the family
+/// its registered modules are named for (xtask-SPEC.md section 12-5).
+///
+/// # Errors
+/// When the map does not parse, and when a package has no registered
+/// module, has modules named for two families, or is named for a family
+/// the map states no duty for: a table that quietly left the cell empty
+/// would read as a crate that owns nothing.
+pub(crate) fn duties(root: &Path, packages: &[Member]) -> Result<Vec<String>, XtaskError> {
+    let map = read_map(root)?;
+    packages
+        .iter()
+        .map(|member| {
+            let family = family_of(&map, member)?;
+            map.family
+                .get(family)
+                .map(|found| found.duty.clone())
+                .ok_or_else(|| XtaskError::Doc {
+                    file: MAP.to_owned(),
+                    msg: format!(
+                        "no `[family.{family}]` duty, so nothing says what {} owns; add the \
+                         family with one clause of duty",
+                        member.package
+                    ),
+                })
+        })
+        .collect()
+}
+
+/// The one prefix, before the first `::`, that every registered module of
+/// `member` carries.
+fn family_of<'map>(map: &'map Map, member: &Member) -> Result<&'map str, XtaskError> {
+    let prefixes: Vec<&str> = map
+        .module
+        .iter()
+        .filter(|entry| member.holds(&entry.file))
+        .filter_map(|entry| entry.name.split_once("::").map(|(prefix, _)| prefix))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    match *prefixes.as_slice() {
+        [family] => Ok(family),
+        [] => Err(XtaskError::Doc {
+            file: MAP.to_owned(),
+            msg: format!(
+                "no module is registered under {}, so no family says what {} owns; register \
+                 its modules first",
+                member.dir, member.package
+            ),
+        }),
+        [_, _, ..] => Err(XtaskError::Doc {
+            file: MAP.to_owned(),
+            msg: format!(
+                "the modules under {} are named for {} families, so which one {} belongs to is \
+                 not stated; name them for one family",
+                member.dir,
+                prefixes.join(", "),
+                member.package
+            ),
+        }),
+    }
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {

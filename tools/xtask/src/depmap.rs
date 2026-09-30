@@ -73,7 +73,14 @@ pub(crate) fn graph(text: &str) -> Result<String, XtaskError> {
 }
 
 /// Parse the ```depmap fenced block: `name:` or `name: dep, dep`.
-fn parse_block(text: &str) -> Result<BTreeMap<String, BTreeSet<String>>, XtaskError> {
+///
+/// The one reader of the block: this gate, [`graph`] and the crate
+/// table docnum draws (xtask-SPEC.md section 8-40) all read it here, so
+/// no two of them can read a different topology.
+///
+/// # Errors
+/// When the document holds no closed block, or a line in it has no colon.
+pub(crate) fn parse_block(text: &str) -> Result<BTreeMap<String, BTreeSet<String>>, XtaskError> {
     let mut map = BTreeMap::new();
     let mut inside = false;
     for line in text.lines() {
