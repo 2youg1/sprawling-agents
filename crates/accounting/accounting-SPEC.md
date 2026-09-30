@@ -22,6 +22,7 @@
 | `views` | 页面问的每个问题，怎样从折叠的记录里答 | 8-10 |
 | `lineage` | 每个 run 怎样折成一行，带上它的父指针 | 8-10 |
 | `worker` | 城的唯一写者 `RunWorker`：它持有的状态、它执行的命令、它驱动的 run | 8-11 |
+| `playback` | 一段历史怎样成为一份可以重算、可以复核的 playback bundle | 8-12 |
 
 表里的模块全部在本 crate。`RunWorker` 与它的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例住 `worker`；它经构造时收下的一个 `Hands` 碰这台电脑，生产的那一份由二进制的装配根 `bin::assembly::production::hands` 造出（8-11）。
 
@@ -56,6 +57,7 @@
 - citysim 的场景库还驱动不了一次 dispatch：场景库只经 `runtime::run::drive` 驱动一次 run，从不造 worker；citysim 的 bench 二进制依赖 `sprawling`，只为计时产品自己的启动与查询。worker 已经只经 `Hands` 与四个端口碰外面（8-11），所以剩下的一步是一个场景造一份脚本的 `Hands`、经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活。能定下它的证据是那个场景在 citysim 里逐字节重放。
 - 模块从 `sprawling` 搬过来时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）；8-7、8-8、8-9 是早先整节搬进来的，保持原样。未定的只有 S4 的切分：哪几节归 `views`、哪几节归 `worker`，按 `architecture.toml` 里各行的 `spec` 锚点定。
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
+- `playback`（8-12）还没做的：`pr_merged` 点名的提交进 `checkpoints`，要 `views::commits::commit_facts` 对本 crate 放宽可见性（它是识别提交的唯一权威），能定下它的是 `views` 正在进行的改动合入之后对这一个函数放宽可见性；Lean 性质与 Rust 实现的一致目前靠 `playback::tests` 在同一组场景上的比较，由 Lean 生成场景、与 Rust 输出逐项比较的那一步还没有；`BUNDLE_MAX_BYTES` 与内存峰值要在多日夹具上量过才定值，定值的证据是 citysim 的多日场景读数。
 
 ## 4 现状分析
 
@@ -484,6 +486,92 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
 - **失败**：构造器与 `form` 原样传账本、CAS、`city` 与 `Standing::fold` 的 `AxError`，本节不另造错误码。
 - **测试的手**：`accounting::worker::fixture::hands()` 交一份不碰主机的 `Hands`——内存里的 vault、读墙钟的测试钟、一台什么都没有的机器、宽裕的内存与卷、拒绝的文件管理器、空的浏览器表、拒绝的桌面程序、拒绝的需求表、没有解释器与 shell、`runtime::AbsentSandbox`。要真的某一只手的测试，自己换上那一只。
 
+### 8-12 accounting::playback：一段历史成为一份可以重算的 playback bundle（形状 7 投影）
+
+`playback` 把一座城 Ledger 的一段折成一份 **playback bundle**：带来源的、字节确定的 JSON，人或 agent 拿它回看一段工作流。它是账务读面上的一个共享投影，CLI（`sprawling playback export/check`，sprawling-SPEC.md 8-126）与以后的居民工具都是它的薄适配器。必须守住的性质的权威是 `crates/accounting/spec/Playback/Select.lean`（选择、次序与去重、cutoff 不读未来）与 `crates/accounting/spec/Playback/Project.lean`（读不到的行不流进派生表、真实关闭的单调性）；本节是接口与做法。
+
+```rust
+// accounting::playback
+pub const SCHEMA: &str = "sprawling.playback/1";
+pub const PROJECTION_RULES: u32 = 1;
+pub const BUNDLE_MAX_BYTES: usize = 32 * 1024 * 1024;
+pub enum Cutoff { Latest, At(Seq) }
+pub struct Request { pub selection: Selection, pub reader: Reader, pub cutoff: Cutoff }
+pub struct Bundle { /* 规范字节，私有 */ }
+impl Bundle {
+    pub fn bytes(&self) -> &[u8];
+    pub fn digest(&self) -> B3Hash;
+    pub fn events(&self) -> usize;
+}
+/// 只读：严格校验从创世到 cutoff 的每一行，再投影。
+pub fn export(city_root: &Path, request: &Request) -> Result<Bundle, AxError>;
+pub enum Against<'a> { Nothing, Bundle(&'a [u8]), City { root: &'a Path, reader: Reader } }
+pub struct Report { pub digest: B3Hash, pub events: usize, pub verdict: Verdict }
+pub enum Verdict { Consistent, Same, Differs { section: &'static str }, CannotReproduce { why: String } }
+pub fn check(bundle: &[u8], against: Against<'_>) -> Result<Report, AxError>;
+
+// accounting::playback::select（形状 1 决策）
+pub struct Selection { /* 私有：first、last、run、building */ }
+impl Selection {
+    pub fn everything() -> Selection;
+    /// seq 闭区间 [first, last]；first > last 以 E_INVALID_ARGS 拒绝。
+    pub fn new(first: Option<Seq>, last: Option<Seq>, run: Option<RunId>, building: Option<Address>) -> Result<Selection, AxError>;
+}
+
+// accounting::playback::reader（形状 1 决策）
+pub enum Confidential { Withheld, Included }
+pub enum Reader { Person(Confidential), Resident(Address) }
+```
+
+模块：`playback`（索引、`export` 与 `check` 的入口）、`playback::select`、`playback::reader`、`playback::walk`（严格校验一遍、固定 cutoff）、`playback::project`（折叠）、`playback::links`（关键时刻与消息的两端）、`playback::document`（bundle 的 schema，形状 6 数据）、`playback::encode`（规范序列化、安全嵌入编码、摘要）、`playback::check`。
+
+**快照与选择。**
+
+- **cutoff 在导出开始时固定。** `walk` 经 `storage::LedgerIndex::folding` 读段、经 `storage::LineCheck::advance` 逐行判定，从创世连续走到最后一个完整行（`Cutoff::Latest`）或到给定 seq（`Cutoff::At`，`check --city` 用）；被选择条件排除的行照样过 `LineCheck`，缺行、坏链、重复 seq、版本超前都在这一遍上报错，整个导出失败，不产出任何字节。尾部半行按 storage 既有的读取规则不算一行，导出不修账。本模块不自己数段文件，也不信索引判断缺行。
+- **范围内事件**恰好是 seq ≤ cutoff 与选择的交集（`Select.lean` 的 `mem_selected`）：`--from`/`--through` 是含端点的 seq 闭区间，`--run` 比 `record.run()`，`--building` 用 `Address::is_within` 比信封地址（没有地址的行不属于任何一栋楼，`lab` 不匹配 `laboratory`）。区间越过 cutoff 时只读到 cutoff，`source.selection` 照原样记下给的条件。合法的空选择输出带范围信息的空 bundle。
+- 时间筛选（UTC `[since, until)`、`--day`）不在本节：它与 `view --since/--until` 共用 `runtime::clock` 的解析，那个解析落地之后与 `Selection` 同处。
+
+**读界与隐去。**
+
+- **一行碰到的楼**：信封地址的楼；它所在 run 的房间的楼（`run_started`/`run_forked` 的信封地址）；它关闭的那一对的打开行碰到的楼（`approval_resolved` 继承 `approval_requested`，`signal_consumed` 继承 `signal_enqueued`，`pr_merged`/`pr_rejected` 继承 `pr_opened`，`run_frozen` 继承 `run_started`）；载荷里任一字符串，只要它是一个 `Address`、头一段是这本账到此为止立过的楼（`building_created` 的 `addr`，或出现过的信封地址的头一段）。楼由 `city::Building::of` 求。
+- **判定复用 `kernel::ReadVerdict` 的三臂。** `Reader::Resident(b)` 调 `kernel::address::may_read(b, 楼, 规则)`；`Reader::Person(Confidential::Withheld)` 对每栋楼问同一份规则：`confidential = false` 为 `Open`，`true` 为 `Confidential`，读不了为 `RulesUnreadable`；`Reader::Person(Confidential::Included)` 全部 `Open`。规则经 `city::RulesCache` 读，按楼缓存一次导出。碰到的楼全是 `Open` 的行才可见；另外两臂关闭。规则是导出时刻的规则。
+- **凭据扫描仍生效。** 可见的行再过 `kernel::secret::scan`（`storage::hunks` 用的同一个扫描）；命中的行按凭据隐去，只计数，不回显字节。
+- **派生表只从可见行求。** 事件、上下文、run、关键时刻、消息、费用与 checkpoint 全由可见行求出；被隐去的行只进 `withheld`：条数、种类计数、关闭的楼名与原因（`confidential`、`rules_unreadable`）、凭据隐去的条数。这些是明示的元数据披露，不宣称隐藏机密活动的存在；自由文字里转述的秘密，地址规则认不出来。
+- **不认识的可忽略行**（更新的写者、`ig:true`）只给 seq，列进 `unknown`，载荷一字不出；它们没有可读的 run 与地址，所以 seq 在区间内就列出，不论 `--run`/`--building`。
+
+**bundle 的内容**（`playback::document`，字段按下面的次序写出）：
+
+| 段 | 内容 |
+|---|---|
+| `schema` | `SCHEMA` |
+| `source` | `city`（`storage::Provenance::city_of`，创世行的链哈希）、`selection`（给的条件）、`cutoff`（seq 与该行的 `chain_hash`）、`rules`（`PROJECTION_RULES`）、`reader`（`{"person":"withheld"}`、`{"person":"included"}` 或 `{"resident":"<楼>"}`） |
+| `events` | 范围内的可见行，按 seq 升序、各一次：`seq`、`moment`（`EventRecord::moment`，账本版本给出的逐行时刻依据；`null` 是没量过，不是零耗时）、`line`（账本原行，逐字节） |
+| `context` | 范围外、cutoff 以内、可见、被引用的行（run 的首行、关键时刻与消息范围外的那一端），同形 |
+| `unknown` | 区间内不认识的可忽略行的 seq |
+| `runs` | 有范围内事件的 run，取 `accounting::lineage::Lineage` 折到 cutoff 的那一行：`run`、`addr`、`session`、`parent`、`forked_at`、`predecessor`、`first_seq`、`last_seq`、`state`、`unanswered`；`parent`/`predecessor` 是 `{"run":id}`、`"withheld"`（那个 run 的房间读者读不到）或 `"missing"`（本账到 cutoff 没有它） |
+| `moments` | 关键时刻：`family`（`run`、`approval`、`pr`）、稳定键（run id、approval id、`<branch>@<pr_opened 的 seq>`）、`opened`、`closed`、`seqs`（范围内可见的成员） |
+| `messages` | 每封信（`signal_enqueued` 的 id）：`from`、`room`、`sent`、`consumed` |
+| `checkpoints` | 范围内可见的 `checkpoint_committed`：`JobPinned` 写 `{"pinned":{"job":…}}`，`Committed` 写 `{"committed":{"oid","scope","files"}}` |
+| `costs` | 范围内可见行上折的 `storage::Attribution`：`billed_usd_micros`、`by_run`、`unpriced_calls`、`unpriced_tokens`；只涵盖所选可见范围 |
+| `withheld` | 见上 |
+
+一端的状态分五种，互不混同：`{"at":seq}`（在范围内）、`{"outside":seq}`（cutoff 以内、范围外，行在 `context`）、`"withheld"`、`"pending"`（关闭端到 cutoff 还没有出现）、`"missing"`（打开端不在本账到 cutoff 的历史里）。关键时刻与消息只在至少一个成员在范围内可见时出现。闭合只看真实的关闭事件（`run_frozen`、`approval_resolved`、`pr_merged`/`pr_rejected`、`signal_consumed`），窗口的右端不是关闭（`Project.lean` 的 `closure_ignores_the_window`）。PR 按 `branch` 与打开它的那一行识别，所以同一分支重开是另一个关键时刻。
+
+**规范字节与安全嵌入。** `playback::encode` 是唯一的序列化：serde 按结构体字段次序写紧凑 JSON，再把字符串里的 `<`、`>`、`&`、U+2028、U+2029 写成 `\u` 转义，所以同一份字节原样放进 HTML 的 `<script type="application/json">` 也不会提前结束那个块。所有 u64（seq、时刻、金额、计数）写成十进制字符串，JS 的 `Number` 不经手它们；`rules` 是小整数。摘要是这份字节的 BLAKE3（`B3Hash::digest`）。读回时先比尺寸上限，再按 `deny_unknown_fields` 解析，再重新编码并与原字节逐字节比较：重复键、多余空白、字段次序、未知字段、非规范的十进制都在这一步被拒。
+
+**来源复核。** `check` 先按上一段读入并校验结构：`schema` 是 `SCHEMA`；`events` 与 `context` 各自 seq 严格递增、互不相交；每条 `line` 过 `storage::read_line` 且 seq 与条目一致；每个 `{"at":seq}` 指向 `events`，每个 `{"outside":seq}` 指向 `context`；`runs` 的每个 run 在 `events` 里出现过。之后按 `Against`：
+
+- `Nothing`：`Verdict::Consistent`，连同摘要。它只说这份文件自洽，不说它没被改过。
+- `Bundle(other)`：两份都读入，逐字节相等为 `Same`，否则 `Differs` 并给出第一个不同的段。
+- `City { root, reader }`：读者由调用入口给出，不信 bundle 自述。`source.rules` 不是本构建的 `PROJECTION_RULES`、`source.reader` 与入口的读者不同、城在 cutoff 之前就结束，都是 `CannotReproduce`，并说明要用哪个版本或哪个读者重新导出；否则按 `source.selection` 与 `Cutoff::At(source.cutoff.seq)` 用同一个投影重算，逐字节相等为 `Same`，否则 `Differs`。改摘要、改费用、删事件而保留 `source`，重算的内容就不同。
+- 链与摘要不提供签名，也不证明现实世界里的陈述为真：整本账与 bundle 一起被换掉时没有外部信任根。
+
+**失败。** 全部是 `AxError`：`Selection::new` 的矛盾区间、bundle 读不懂或不规范是 `E_INVALID_ARGS`（action `select a playback range` / `read a playback bundle`）；链上的行按 `LineFault::into_ax` 报（`E_CAS_CORRUPT`、`E_LOG_VERSION_UNSUPPORTED`），recovery 指向 `sprawling replay`；序列化后超过 `BUNDLE_MAX_BYTES` 是 `E_INVALID_ARGS`，recovery 是用 `--from`/`--through`、`--run` 或 `--building` 收窄；规则、payload 读不了按各自的 `AxError` 原样上抛。任何失败都不交回部分的 bundle。错误文字不回显被隐去的内容。
+
+**资源。** 一遍读，一个段的字节常驻；另外常驻的是 `Lineage`（每个 run 一行）、关键时刻与消息的两端（每个键一项）、可能成为上下文的范围外可见行（run 的首行与各对的两端），以及范围内的投影。`BUNDLE_MAX_BYTES` 只限最终字节，不限这些常驻量。32 MiB 是待测的初值：多日夹具上的导出峰值与读取成本量出来之前，不把它当作内存上界。
+
+**给后续阶段的接口。** HTML 的分项 check（结构、静态离线、浏览器观察）读同一份 `Bundle::bytes` 与 `check`，不另写 schema；skill 的 schema 说明由 `playback::document` 生成或核对。居民入口传 `Reader::Resident(楼)`，它的写门与文件寿命在布局 owner 的规格里定。时间筛选与 `Selection` 同处；checkpoint 之间的 diff 与调用归属在 `CommitAnswer.previous`/`parents` 与调用归属进入 kernel 之后加段，加段时 `PROJECTION_RULES` 进一位。
+
 ## 12 决策
 
 1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只用 `gateway` 的接口类型，不构造适配器。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。`GatewayModels` 在 worker 搬进来时一同搬进本 crate，理由见 §12-18；本条对 `SystemClock`、`ThisMachine` 这样直接碰主机的生产适配器仍然成立。
@@ -509,3 +597,11 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
 21. **vault 也放进 `Hands`。** 理由：生产的 vault 打开的是这台电脑的凭据服务（`Custodian::probe`），脚本给的是内存里的一份，它与其余几只手一样是构造时从外面交进来的；放进去以后三个构造器都不超过四个参数。被否决的做法：把 `vault` 与 `log` 捆成一个值——两者没有共同的意思，捆起来只是为了凑参数个数。
 22. **驾驶 lane 的线程从 `accounting::worker::pool` 起。** 理由：`pool` 与 `relay`、`drive_run`、`RunWorker` 成环，必须一起搬（§12-11）；lane 的寿命仍然恰好是它驾驶的那个 run。ARCHITECTURE.md 的确定性规则 3 因此把它列为库 crate 起线程的第六处。被否决的做法：经 `Hands` 交一个起线程的 `fn`——它只有一个实现，而且只是把 `std::thread::Builder` 换个名字。
 23. **验收覆盖从模型收到的工具表算出应当调用的集合；城外工具不进这张表；效果层拒绝的工具按「没有东西变」判定；技能经城库装入。** 理由：哪些工具存在，唯一的权威是工作台的那一次登记（sprawling-SPEC.md §8-27），模型第一次请求里的工具表就是它的输出。测试若照抄一份名单，下一次加工具时名单会悄悄漏掉那一件；从工具表算，漏掉的那件会被点名。城外工具的集合随楼的配置与主机而变，放进来就要在测试里配一台浏览器或一台 MCP server，而它们的路由已经各有一条端口测试。`rules` 与 `city` 声明 `Effect::Govern`，拒绝码取决于工具是否给出自己的 `subject`（city-SPEC §8-2b 写了两种拒词）；钉住拒绝码，补上 `subject` 的那次改动就会打红验收，而验收要守的规矩——run 不改写审判它的规则、不立楼——在那次改动前后都成立。技能经 `city::install_skill` 装进城库而不挂城外书架：城外藏书没有地址，`admit_reading_room` 不把它交给 run，而验收判的是阅览室、catalog、`read` 与 `SkillPin` 这一条链。被否决的做法：手写工具名单再逐件断言（第二个权威）；把城外工具一并覆盖（重复端口测试，并让验收依赖主机）；按拒绝码断言效果层的拒绝（钉死一个 SPEC 已说明会变的细节）。
+24. **playback 是账务读面上的一个投影，按整行判定可见，逐字节携带账本行，只读一遍严格校验过的字节，复核靠重算。**
+    (a) 一行可见，当且仅当它碰到的每一栋楼对读者都是 `Open`；碰到的楼由信封地址、run 的房间、关闭的那一对的打开行与载荷里以已知楼开头的地址求出，一条规则管所有事件种类。理由：读界要对未来新加的种类也关着，一张按种类列可公开字段的表，每加一个种类就要加一行，漏一行就漏字段；整行判定漏不了。代价是一行只要碰到一栋关闭的楼就整行隐去，连同它本可公开的字段。被否决的做法：按种类逐字段投影（维护面随种类增长，缺行时无声地开或关）；只按信封 `addr` 删行（`approval_resolved` 记在 city run 上、`addr` 为空，handback 的内容来自子 run）。
+    (b) `events` 里每条是账本原行的字符串，外加十进制字符串的 `seq` 与 `moment`。理由：原行就是账本的权威字节，读者可以对它重算 `chain_hash`；把记录展开成 JSON 对象会让 seq、`t` 与金额在 JS 的 `Number` 里丢精度，也等于第二种写法。被否决的做法：展开成对象、u64 写成数字。
+    (c) 严格校验自己走一遍 `LedgerIndex::folding` 加 `LineCheck::advance`，不用 `runtime::replay::fold_ledger_dir`。理由：导出要每一行的原字节（cutoff 行的链哈希、逐字节的 `line`、凭据扫描）和不认识的可忽略行的 seq，`fold_ledger_dir` 两样都不交出；事后按索引重读原行，会把审过的字节和重读而未审的字节混在一起。被否决的做法：`fold_ledger_dir` 加按索引重读。
+    (d) `check --city` 用同一个投影重算并逐字节比较，读者取入口给的。理由：只比 `source` 与末行链哈希时，保留 `source` 而改摘要、删事件都比不出来；信 bundle 自述的读者，就能用一份伪造的 `{"person":"included"}` 扩大权限。被否决的做法：比末行链哈希；按 bundle 的 `reader` 重算。
+    (e) PR 的关键时刻键是 `<branch>@<pr_opened 的 seq>`，关闭行关掉同一分支最近打开的那一个。理由：请求在账本上的身份就是分支（`collab::OpenRequest`），同一分支会重开；只用分支作键会把两次请求并成一个。被否决的做法：只用分支。
+    (f) `checkpoints` 只列 `checkpoint_committed`，经 kernel 的 `CheckpointCommitted` 类型读，分开 `JobPinned` 与 `Committed`。理由：识别「哪些行点名一个提交」的权威是 `accounting::views::commits::commit_facts`，它在 `views` 里是 `pub(super)`，而 `views` 另有改动正在进行；在这里再写一遍会成为第二个权威。`pr_merged` 的提交由 §3 记下的那一步补上。被否决的做法：抄一份 `commit_facts`。
+    (g) 人的入口在 `Confidential::Withheld` 时按楼的规则取三臂，而不调 `may_read`。理由：`may_read` 要一个读者所在的楼，人不住在任何一栋楼里；为了调它而编一栋楼，会让「人的楼」成为一个不存在的地址。三臂的类型仍是 `kernel::ReadVerdict`，居民入口仍调 `may_read`。被否决的做法：给人编一个地址。
