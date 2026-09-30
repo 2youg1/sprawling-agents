@@ -13,10 +13,13 @@ Rust code is the authority on how these properties hold; this model is the
 authority on which properties must hold (remote_access-SPEC.md §8-1).
 
 The door is independent of the route that makes it reachable (a Cloudflare
-tunnel, a tailnet, a LAN address, a command the person wrote). A route carries
-bytes and nothing else, so nothing here mentions one: every decision below is
-taken on the city's machine, and a route that lies can only make the door
-unreachable.
+named tunnel, or a command the person wrote). A route carries bytes and
+nothing else, so nothing here mentions one: every decision below is taken on
+the city's machine, and a route that changes the frames it carries can only
+make the door unreachable. A device's first connection, the pairing
+handshake that carries its code sealed, is modelled in
+`crates/remote_access/spec/Handshake.lean`; this model begins where that one
+hands a code to the door.
 
 Time is a number passed in by the caller, as everywhere in the city. The door
 is closed when a city starts, and opening it draws a new epoch.
