@@ -84,7 +84,7 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 
 三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字与按 `## N 标题` 切节这一个读法，被 `depmap` 与 `proof` 调用，§8-22）｜`vocabulary`（`lexicon` 用它让退役词指向被定义的词；`proof` 用它的数词表读 `kani harness` 前的数）｜`members`（包在哪、叫什么、是产品还是工具，`cargo metadata` 的唯一读者，被每一道按包取目录的门调用，§8-39）｜`spec`（只生成骨架）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）｜`attestation`（挂到 tag 上的归档先有构件证明，被 `artifact` 调用，§8-34）。
 
-**length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——字段一变，只有一处要改。
+**length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——字段一变，只有一处要改。同理，`[family.<键>]` 的 `duty` 也只由 `modmap::duties` 读，`docnum` 的 `crate_table` 经它取每个 crate 拥有什么（§8-40）。
 
 **本模块不做什么（否定式两条）**：判定路径不改任何文件；写盘只发生在带 `--write` 的命令上，且每条只重写它自己生成的那一面——`spec` 只新建不覆盖，`apisync` 只写基线文件，`wire-ts` 只写 `client/src/wire.ts`，`docnum` 只写受管区段两个标记之间的字节。不缓存扫描结果（每次全量重扫——确定性优于速度）。
 
@@ -166,6 +166,8 @@ pub(crate) struct Violation {
 
 **12-4 一个包是产品还是工具，由它自己的清单声明。** `[package.metadata.sprawling] role = "tool"`，xtask 与 citysim 各写这一行；不写即 Product，写了别的值以 `unknown-role` 拒读（§8-39）。理由：声明跟着包走，搬目录、改包名都不必改 xtask；一个忘了声明的新工具按产品受更严的门（要进 depmap 块、要进模块图），失败的方向是一次看得见的红，而不是一道门静默少判。被击败的备选：在 `members` 模块里写一张常量表 `TOOLS`——包的一个属性就住进了另一个包，改包名的那次提交不碰 xtask 也能过编译，两份名字从那一刻起各说各话。
 
+**12-5 一个 crate 拥有什么，按它的模块名前缀找 family。** `crate_table`（§8-40）的「Owns」一列取 `architecture.toml` 的 `[family.<键>] duty`，键是这个包目录下全部登记模块共有的名字前缀（`::` 之前），不是 lib 名：family 表本来就按模块名前缀取键，`sprawling` 的文件在 `crates/sprawling/src` 而模块名写 `bin::…`，所以它读 `[family.bin]`。前缀一个也没有、多于一个、或那个 family 没有 `duty`，都以 `Doc` 错误拒读并点名包与缺的那一格，不退回 lib 名。理由：前缀是模块表里已经写下的事实，按它找 family 不需要第二张「包→家族」对照表；一次改名同时动了模块名与 family 键，表就跟着走。被击败的备选有两个：在 `crate_table` 里写一个常量把 `sprawling` 映到 `bin`（包的一个属性住进了门里，改名那次不碰 xtask 也能过编译）；把 `[family.bin]` 改名 `[family.sprawling]`（family 键从此不再是模块名前缀，而 `bin::` 模块的家族要靠人记）。
+
 ## 13 依赖选型
 
 serde 与 serde_json（cargo metadata 解析；工作区已钉）；toml（`lexicon.toml`、`architecture.toml`、`budgets.toml`；xtask 独用，不入产品面）；thiserror（工作区已钉）；kernel（secret 门复用 `kernel::secret::scan`，一个判定一个家）。不引 walkdir/regex/clap：手写遍历十几行；判定用子串与前缀即可；子命令分发一个 match 足矣。
@@ -188,7 +190,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 ## 16 测试与约束
 
-单测：`members` 读本仓（kernel 在 `crates/kernel`，desktop 以 path 依赖列入，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；lexicon 命中与 `lexicon-ok:` 豁免；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 五例（抄件少一条 lint、抄件放宽一条 lint、抄件多一条 lint、元数据落在版本号后面、共享依赖版本漂移）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
+单测：`members` 读本仓（kernel 在 `crates/kernel`，desktop 以 path 依赖列入，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；lexicon 命中与 `lexicon-ok:` 豁免；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 五例（抄件少一条 lint、抄件放宽一条 lint、抄件多一条 lint、元数据落在版本号后面、共享依赖版本漂移）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）；`crate_table` 在 relocated 夹具上画出整张表（`sprawling-j` 的模块名写 `bin::`，于是读 `[family.bin]`；duty 里的竖线被转义；没有边的写 `nothing`），夹具缺 `[family.k]` 时以点名它的 `Doc` 拒读（§8-40）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
 
 ## 17 模型体验
 
@@ -434,7 +436,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 **判据三条**：① 区段的文字等于它的事实当场的读数，不等即红，恢复语是 `cargo xtask docnum --write`；② 区段命名的事实必须在 `FACTS` 数组里，否则红，拒词列出全部已知键；③ 标记不闭合、区段套区段、或多出一个收尾标记，即红——一段读不出来的标记不得被当作没有标记。**`--write` 撞上未知事实时整份文件不写**：跳过它会让文档看起来刚重生过，而其中一个数字仍是旧的。
 
-**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`wire::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `wire::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `wire` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`test_functions`、`workspace_version`（根 `Cargo.toml` 的 `[workspace.package] version`，`CHANGELOG.md` 最新一节的标题引它，于是升了版本号却没写新一节的树会红）。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
+**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`wire::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `wire::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `wire` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`test_functions`、`workspace_version`（根 `Cargo.toml` 的 `[workspace.package] version`，`CHANGELOG.md` 最新一节的标题引它，于是升了版本号却没写新一节的树会红）、`crate_table`（产品 crate 的整张表，§8-40）。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
 
 **一张图也是一个事实。** `crate_graph` 把 `ARCHITECTURE.md` §3 的 `depmap` 块画成一段 mermaid `flowchart TD`：块里每个 crate 一行，每条允许的边一个箭头（依赖方指向被依赖方），不做传递约简，因为约简掉的边正是 `depmap` 允许、读者要查的那一条。生成函数 `depmap::graph` 与门用同一个 `parse_block` 读块，故图与门不会读出两张依赖表；手画一张依赖图，就是依赖表的第二个权威。值自带 ```` ```mermaid ```` 围栏，标记放在围栏之外，因为 mermaid 不认 HTML 注释。
 
@@ -829,5 +831,33 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>; /
 **性能**：每个读者各起一次 `cargo metadata`，`--no-deps --offline` 不解算依赖，只读各成员的清单；`gates` 各门并行（§8-31），不缓存（§7）。
 
 **败给的方案**：各读者继续自己推导，只把 `crates/` 扩成 `crates/` 与 `tools/` 两处——下一次搬目录仍是 N 处改动，而漏改的那一处不报错；从根清单的 `members` 表读目录——那张表可以写 glob，也不给包名与 lib 名，depmap 仍要自己起一次 cargo，于是还是两个读者。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-40 `crate_table`：产品 crate 的那张表由三个已有的权威拼出（形状 4 适配器）
+
+**要答的事实**：产品的每个 crate 住在哪个目录、在 crates.io 上叫什么、lib 名是什么、拥有什么、可以依赖谁、SPEC 在哪。这六件事各有一个家：目录、包名、lib 名由 `members` 给出（§8-39）；可以依赖谁住 ARCHITECTURE §3 的 `depmap` 块；拥有什么住 `architecture.toml` 的 `[family.<键>] duty`。在 `crates/README.md` 里手写这张表，就是给这三个家各添一份抄件，而 ARCHITECTURE §1 的图与 family 表已经把同一份职责说了两遍。
+
+**接口**：
+
+```rust
+// docnum::facts 的 FACTS 多一行：键 `crate_table`，不带参数。
+// docnum/facts/crate_table.rs
+pub(super) fn recount(root: &Path) -> Result<String, XtaskError>;
+// modmap.rs：按 packages 的次序，每个包它的 family 的 duty（§12-5）
+pub(crate) fn duties(root: &Path, packages: &[Member]) -> Result<Vec<String>, XtaskError>;
+// depmap.rs：由私有改为 pub(crate)，crate → 块里允许它依赖的 crate
+pub(crate) fn parse_block(text: &str) -> Result<BTreeMap<String, BTreeSet<String>>, XtaskError>;
+```
+
+**行**：`in_product_graph` 的包各一行，顺序即 `members` 的顺序（按目录）。desktop 以 path 依赖列入、不在产品图里，所以它进工作区之前没有行；进了工作区就自动有一行，这里不必改。
+
+**列**：`Directory | Package | Lib | Owns | May depend on | SPEC`。表头与单元格用英文，因为引用它的 `crates/README.md` 是英文文档。目录与 SPEC 写成仓库相对路径的代码片段，不写成链接：一个事实的读数与引用它的文档住在哪个目录无关，而相对链接的写法取决于那个目录。SPEC 文件是 `<dir>/<name()>-SPEC.md`，不在盘上即以 `Doc` 拒读，因为一格指向不存在的文件比没有这一格更糟。依赖一列是块里那一行的 crate 名，按 `parse_block` 给出的次序（字母序）以逗号分隔，没有边的写 `nothing`；表与 `depmap` 门、`crate_graph` 读同一个 `parse_block`，所以三者不会读出两张依赖表。lib 一列在包没有 lib target 时写 `no lib`。duty 里的 `|` 转义成 `\|`，免得一个竖线把一行切成两格。值不带首尾换行，与 `crate_graph` 相同。
+
+**拥有什么怎样找**：按模块名前缀找 family（§12-5）。family 表的解析加进 `modmap` 的 `Map`（字段 `family`，缺省为空表），与 `shapes`、`anchors` 共用 `read_map`，模块表仍只有一个读者（§7）。
+
+**判据**：它是 docnum 的一个事实，判据就是 §8-16 那三条：区段不等于读数即红，恢复语 `cargo xtask docnum --write`。一次改名、搬目录、加一条依赖边或改一句 duty，同集跑一次 `--write`。
+
+**败给的方案**：README 里手写这张表（第三份职责清单，下一次改名就会漏改一格）；按 `crates/*` 的目录列行（包在哪已收成 `members` 一处，按目录推导就退回了 §8-39 要拆掉的那种读者）。
 
 **本节属门禁机具，与产品代码分开提交。**

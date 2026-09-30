@@ -346,6 +346,55 @@ mod tests {
         assert!(value(&root, "budget_figure:views_rebuild_per_mb").is_err());
     }
 
+    /// The relocated checkout's module map, with the two families its
+    /// packages carry: `sprawling-j`'s modules are named `bin::`, as the
+    /// assembly root's are, so it reads `[family.bin]` and not `[family.j]`.
+    const FAMILIES: &str = r#"module = [
+  { name = "k::a", file = "tools/k/src/a.rs", owns = "a module under tools/", shape = "value", since = "T", status = "built", spec = "k-SPEC.md#8-9" },
+  { name = "bin::b", file = "crates/j/src/b.rs", owns = "a module named for its family", shape = "value", since = "T", status = "built", spec = "j-SPEC.md#8-1" },
+]
+
+[family.k]
+duty = "what k owns | and a bar"
+
+[family.bin]
+duty = "the assembly root"
+"#;
+
+    /// A relocated checkout with a SPEC beside each package and `map` as
+    /// its module map.
+    fn tabled(label: &str, map: &str) -> std::path::PathBuf {
+        let root = crate::root::fixture::relocated(label);
+        crate::root::fixture::write(&root, "architecture.toml", map);
+        crate::root::fixture::write(&root, "tools/k/k-SPEC.md", "");
+        crate::root::fixture::write(&root, "crates/j/j-SPEC.md", "");
+        root
+    }
+
+    #[test]
+    fn the_crate_table_is_drawn_from_members_the_depmap_block_and_the_families() {
+        let root = tabled("crate-table", FAMILIES);
+        let drawn = value(&root, "crate_table");
+        std::fs::remove_dir_all(&root).unwrap();
+        let expected = r"| Directory | Package | Lib | Owns | May depend on | SPEC |
+|---|---|---|---|---|---|
+| `crates/j` | `sprawling-j` | `j` | the assembly root | `k` | `crates/j/j-SPEC.md` |
+| `tools/k` | `sprawling-k` | `k` | what k owns \| and a bar | nothing | `tools/k/k-SPEC.md` |";
+        assert_eq!(drawn.unwrap(), Some(expected.to_owned()));
+    }
+
+    #[test]
+    fn a_crate_table_row_whose_family_is_missing_is_refused_by_name() {
+        let without_k = FAMILIES.replace("[family.k]\nduty = \"what k owns | and a bar\"\n", "");
+        let root = tabled("crate-table-no-family", &without_k);
+        let drawn = value(&root, "crate_table");
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            matches!(&drawn, Err(XtaskError::Doc { msg, .. }) if msg.contains("[family.k]")),
+            "{drawn:?}"
+        );
+    }
+
     #[test]
     fn the_workspace_version_is_read_from_the_root_manifest() {
         let fixture = std::env::temp_dir().join(format!("docnum-version-{}", std::process::id()));
