@@ -15,6 +15,16 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
+/// The `_meta` key a server sets on an `isError` result when part of the
+/// call may already have taken effect (agent_protocols-SPEC section 8-1c).
+/// `desktop/src/refusal.rs` quotes it, and `xtask guard` compares the two.
+pub(crate) const EFFECT_META_KEY: &str = "sprawling/effect-unknown";
+
+/// How much of a server's own failure text reaches the subject: a refusal
+/// and its recovery fit, a stack trace or a whole page does not
+/// (agent_protocols-SPEC section 8-1c).
+pub(crate) const ERROR_TEXT_CAP_BYTES: usize = 4_096;
+
 /// What a caller does after a tool reported its own failure.
 const FAILED_RECOVERY: &str = "the server said what failed and what to do instead in the words \
                                above; follow them rather than repeating the call unchanged";
@@ -243,6 +253,9 @@ impl Tool for McpTool {
             link.outbound.call(&line, self.patience)?
         };
         let result = super::outbound::digits_for_floats(Rpc::read(&answer)?);
+        if result.get("isError") == Some(&Value::Bool(true)) {
+            return Err(reported_failure(&self.remote, &result));
+        }
         let map = match result {
             Value::Object(map) => map,
             other @ (Value::Null
@@ -259,6 +272,57 @@ impl Tool for McpTool {
             result: Payload::new(map)?,
             attachments: Vec::new(),
         })
+    }
+}
+
+/// A `tools/call` result the server marked `isError`, read as the failure
+/// it is: the text blocks in order are the subject, and a `_meta` that
+/// marks the effect unknown turns it into an outcome nobody can see.
+fn reported_failure(remote: &str, result: &Value) -> AxError {
+    let blocks = result
+        .get("content")
+        .and_then(Value::as_array)
+        .map_or(&[][..], Vec::as_slice);
+    let is_text = |block: &&Value| block.get("type").and_then(Value::as_str) == Some("text");
+    let text = blocks
+        .iter()
+        .filter(is_text)
+        .filter_map(|block| block.get("text").and_then(Value::as_str))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let left_out = match blocks.iter().filter(|block| !is_text(block)).count() {
+        0 => String::new(),
+        blocks => format!("; {blocks} non-text blocks left out"),
+    };
+    let subject = if text.is_empty() {
+        format!("{remote} reported a failure and gave no text{left_out}")
+    } else {
+        format!("{remote} reported a failure: {}{left_out}", capped(&text))
+    };
+    let unknown = result
+        .get("_meta")
+        .and_then(|meta| meta.get(EFFECT_META_KEY))
+        .is_some_and(|flag| flag != &Value::Bool(false));
+    if unknown {
+        AxError::failure(AxCode::ToolOutcomeUnknown, "call an external tool", subject)
+            .effect_unknown()
+            .with_recovery(UNKNOWN_RECOVERY)
+    } else {
+        AxError::failure(AxCode::ToolUnavailable, "call an external tool", subject)
+            .with_recovery(FAILED_RECOVERY)
+    }
+}
+
+/// The server's text, cut at a character boundary once it passes
+/// `ERROR_TEXT_CAP_BYTES`, with the length of what was cut.
+fn capped(text: &str) -> String {
+    let end = text.floor_char_boundary(ERROR_TEXT_CAP_BYTES);
+    match text.get(..end) {
+        Some(kept) if end < text.len() => format!(
+            "{kept} \u{2026} ({} more bytes left out)",
+            text.len().saturating_sub(end)
+        ),
+        Some(_) | None => text.to_owned(),
     }
 }
 
