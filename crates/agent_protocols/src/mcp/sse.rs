@@ -24,14 +24,16 @@
 //! process's pipe does, so the same answer is used: a thread turns the
 //! blocking read into a channel this side waits on. It cannot leak -
 //! dropping the last handle drops the receiver, and the next send ends
-//! the reader.
+//! the reader. As on the child's pipe, it reads one line at a time
+//! through `read_one_message` and hands it over a channel with no
+//! queue, so the stream holds at most one line this city has read and
+//! nobody has taken (agent_protocols-SPEC.md 8-15).
 //!
 //! **A post is not an answer.** The far end acknowledges a post with
 //! 202 and says nothing; the answer arrives as a later event. So a call
 //! posts, then waits on the stream, and a notification posts and is
 //! done.
 
-use std::io::BufRead;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -40,6 +42,8 @@ use kernel::{AxCode, AxError, TimeoutMs};
 
 use super::http::{WholeRequest, client_for};
 use super::redeeming::{Redeemed, redeem};
+use super::stdio::answer_unread;
+use super::{Received, read_one_message};
 
 /// How long the stream is given to announce where messages go. Shorter
 /// than a call's patience on purpose: this is one line from a server
@@ -181,6 +185,9 @@ impl crate::Outbound for SseServer {
                      stream",
                 ),
             })?
+            // A refusal here is the server's answer, read and refused:
+            // it took the call, so what it did is unknown.
+            .map_err(|refused| answer_unread(&refused))
     }
 
     /// A notification is posted and nothing is read back, because the
@@ -201,12 +208,14 @@ impl crate::Outbound for SseServer {
 ///
 /// Comments, event names and the reconnection hints of the event-stream
 /// grammar are dropped rather than parsed: this transport carries JSON
-/// messages, and every one of them is a `data:` line.
+/// messages, and every one of them is a `data:` line. Every line is read
+/// under `MESSAGE_CEILING`, and a line the reader refuses is its last
+/// message: the rest of that line cannot be told from the next one.
 fn read_in_a_thread(
     url: &str,
     request: reqwest::blocking::RequestBuilder,
 ) -> Result<Receiver<Result<String, AxError>>, AxError> {
-    let (sender, events) = std::sync::mpsc::channel();
+    let (sender, events) = std::sync::mpsc::sync_channel(0);
     let opened_at = url.to_owned();
     std::thread::Builder::new()
         .name("mcp-sse".to_owned())
@@ -220,15 +229,22 @@ fn read_in_a_thread(
                     return;
                 }
             };
-            for line in std::io::BufReader::new(response).lines() {
+            let mut reader = std::io::BufReader::new(response);
+            loop {
                 // Either end finishing ends the reader: a closed stream
-                // means the server is gone, and a closed channel means
-                // this city stopped listening.
-                let Ok(text) = line else { break };
-                let Some(data) = text.strip_prefix("data:") else {
-                    continue;
+                // means the server is gone, a refused line is the last
+                // thing it can read, and a closed channel means this city
+                // stopped listening.
+                let data = match read_one_message(&mut reader, &opened_at) {
+                    Ok(Received::Message(line)) => match line.strip_prefix("data:") {
+                        Some(data) => Ok(data.trim().to_owned()),
+                        None => continue,
+                    },
+                    Ok(Received::EndOfInput) => break,
+                    Err(refused) => Err(refused),
                 };
-                if sender.send(Ok(data.trim().to_owned())).is_err() {
+                let last = data.is_err();
+                if sender.send(data).is_err() || last {
                     break;
                 }
             }

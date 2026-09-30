@@ -17,15 +17,26 @@
 //! this project has already met once from the other direction, when a
 //! provider went silent after `model_called` and nothing timed out. The
 //! thread turns a blocking read into a channel this side can wait on
-//! with a deadline. It cannot leak: killing the child closes the pipe,
-//! the reader sees end of input, and it returns.
+//! with a deadline. It cannot outlive the connection: killing the child
+//! closes the pipe, and the reader's last word, end of input, is taken
+//! by the next call or refused once the connection is dropped.
+//!
+//! **The reader holds one message at a time.** It reads through
+//! `read_one_message`, so one line is at most `MESSAGE_CEILING` bytes,
+//! and it hands each message over a channel with no queue, so it reads
+//! the next only once a call has taken this one. Whatever the server
+//! writes beyond that waits in the pipe, which is the server's buffer
+//! rather than this city's (agent_protocols-SPEC.md 8-15). A line past
+//! the ceiling is refused to the call that was waiting, and the child is
+//! stopped, because the rest of that line cannot be told apart from the
+//! next message.
 //!
 //! **A deadline that passes kills the child.** A late answer arriving
 //! after its call gave up would be read as the answer to the next call,
 //! and two calls swapped is worse than a refusal. Killing ends that
 //! possibility rather than guarding against it.
 
-use std::io::{BufRead, Write};
+use std::io::Write;
 use std::path::Path;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
@@ -34,6 +45,7 @@ use std::time::Duration;
 use kernel::{AxCode, AxError, TimeoutMs};
 
 use super::redeeming::Redeemed;
+use super::{Received, read_one_message};
 
 /// A handle on one running server. Cloning gives a second handle on the
 /// same process, which is what a server offering several tools needs:
@@ -48,7 +60,7 @@ struct Connection {
     program: String,
     child: std::process::Child,
     requests: std::process::ChildStdin,
-    answers: Receiver<String>,
+    answers: Receiver<Result<Received, AxError>>,
 }
 
 impl StdioServer {
@@ -93,16 +105,20 @@ impl StdioServer {
             })?;
         let requests = child.stdin.take().ok_or_else(|| pipes_missing(command))?;
         let stdout = child.stdout.take().ok_or_else(|| pipes_missing(command))?;
-        let (sender, answers) = std::sync::mpsc::channel();
+        let (sender, answers) = std::sync::mpsc::sync_channel(0);
+        let named = command.to_owned();
         std::thread::Builder::new()
             .name(format!("mcp-{command}"))
             .spawn(move || {
-                for line in std::io::BufReader::new(stdout).lines() {
-                    // Either end finishing ends the reader: a closed pipe
-                    // means the server is gone, and a closed channel
-                    // means this city stopped listening.
-                    let Ok(text) = line else { break };
-                    if sender.send(text).is_err() {
+                let mut reader = std::io::BufReader::new(stdout);
+                loop {
+                    let read = read_one_message(&mut reader, &named);
+                    // Either end finishing ends the reader: the end of
+                    // input or a refused message is the last thing it has
+                    // to say, and a closed channel means this city
+                    // stopped listening.
+                    let last = !matches!(read, Ok(Received::Message(_)));
+                    if sender.send(read).is_err() || last {
                         break;
                     }
                 }
@@ -214,7 +230,14 @@ impl Connection {
             .flush()
             .map_err(|err| self.broken("flush", &err))?;
         match self.answers.recv_timeout(Duration::from_millis(patience.0)) {
-            Ok(answer) => Ok(answer),
+            Ok(Ok(Received::Message(answer))) => Ok(answer),
+            // The server answered with bytes this city will not read. It
+            // took the call, so what it did is unknown, and the rest of
+            // that answer is still in the pipe, so the child goes.
+            Ok(Err(refused)) => {
+                self.reclaim();
+                Err(answer_unread(&refused))
+            }
             Err(RecvTimeoutError::Timeout) => {
                 self.reclaim();
                 Err(AxError::failure(
@@ -229,16 +252,18 @@ impl Connection {
                      asked to do before asking again",
                 ))
             }
-            Err(RecvTimeoutError::Disconnected) => Err(AxError::failure(
-                AxCode::ToolUnavailable,
-                "call an mcp server",
-                format!("{}: the server closed its output", self.program),
-            )
-            .effect_unknown()
-            .with_recovery(
-                "the server closed its output after taking the call, and may have acted on it; \
+            Ok(Ok(Received::EndOfInput)) | Err(RecvTimeoutError::Disconnected) => {
+                Err(AxError::failure(
+                    AxCode::ToolUnavailable,
+                    "call an mcp server",
+                    format!("{}: the server closed its output", self.program),
+                )
+                .effect_unknown()
+                .with_recovery(
+                    "the server closed its output after taking the call, and may have acted on it; \
                  check what it was asked to do, then dispatch again",
-            )),
+                ))
+            }
         }
     }
 
@@ -269,6 +294,16 @@ impl Drop for Connection {
     fn drop(&mut self) {
         self.reclaim();
     }
+}
+
+/// The refusal a reader gave an answer, as the call that was waiting
+/// reads it: the server took the call and answered, so what it did is
+/// unknown (agent_protocols-SPEC.md 8-15). Both line-framed transports
+/// hand their callers this one.
+pub(super) fn answer_unread(refused: &AxError) -> AxError {
+    AxError::failure(*refused.code(), refused.action(), refused.subject())
+        .effect_unknown()
+        .with_recovery(refused.recovery())
 }
 
 fn pipes_missing(command: &str) -> AxError {
