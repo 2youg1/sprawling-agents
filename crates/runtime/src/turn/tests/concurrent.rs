@@ -60,10 +60,39 @@ impl Placed {
         IdemKey::derive(&run_id(), Seq::new(at), b"read")
     }
 
-    /// The same calls one after another, through a closure: serial.
+    /// The same calls one after another, each answered as it is
+    /// admitted: serial, with the registration still known.
     fn one_by_one(&mut self, call: &ToolCall, t: TimeMs) -> Result<ToolOutcome, AxError> {
         let key = self.key();
         self.bench.invoke(call, &key, t).and_then(answer)
+    }
+}
+
+/// The serial reference: a face that runs each call where it admits it,
+/// so no read starts early, and that still names each tool's
+/// registration, as the lane's own face does.
+struct OneByOne(Placed);
+
+impl ConcurrentInvoke for OneByOne {
+    fn meta_of(&self, call: &ToolCall) -> Option<&kernel::ToolMeta> {
+        self.0.meta_of(call)
+    }
+
+    fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted {
+        Admitted::Answered(self.0.one_by_one(call, t))
+    }
+
+    fn tool(&self, ticket: &Ticket) -> Result<&dyn Tool, AxError> {
+        self.0.tool(ticket)
+    }
+
+    fn account(
+        &mut self,
+        call: &ToolCall,
+        ticket: Ticket,
+        answered: Result<ToolOutcome, AxError>,
+    ) -> Result<ToolOutcome, AxError> {
+        self.0.account(call, ticket, answered)
     }
 }
 
@@ -75,10 +104,8 @@ fn answer(outcome: BenchOutcome) -> Result<ToolOutcome, AxError> {
 }
 
 impl ConcurrentInvoke for Placed {
-    fn effect_of(&self, call: &ToolCall) -> Option<Effect> {
-        self.bench
-            .meta_of(&call.name)
-            .map(|meta| meta.effect.clone())
+    fn meta_of(&self, call: &ToolCall) -> Option<&kernel::ToolMeta> {
+        self.bench.meta_of(&call.name)
     }
 
     fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted {
@@ -151,12 +178,11 @@ fn a_halt_inside_the_reads_starts_only_the_reads_before_it() {
     let mut serial = TestLedger::new();
     let turn = wave_of(&mut serial, calls());
     let mut ask = halt_at_two;
-    let mut bench = Placed::new();
     let outcome = turn
         .execute_concurrent(
             Interrupt::None,
             &mut serial,
-            &mut |call: &ToolCall, t: TimeMs| bench.one_by_one(call, t),
+            &mut OneByOne(Placed::new()),
             &mut ask,
         )
         .unwrap();
@@ -191,12 +217,11 @@ fn a_steer_inside_the_reads_lands_where_the_serial_wave_writes_it() {
     let mut serial = TestLedger::new();
     let turn = wave_of(&mut serial, calls());
     let mut ask = steer_at_one;
-    let mut bench = Placed::new();
     advance(
         turn.execute_concurrent(
             Interrupt::None,
             &mut serial,
-            &mut |call: &ToolCall, t: TimeMs| bench.one_by_one(call, t),
+            &mut OneByOne(Placed::new()),
             &mut ask,
         )
         .unwrap(),
@@ -215,4 +240,39 @@ fn a_steer_inside_the_reads_lands_where_the_serial_wave_writes_it() {
         .unwrap(),
     );
     assert_eq!(concurrent.lines, serial.lines);
+}
+
+#[test]
+fn a_call_line_carries_its_tools_registration() {
+    let mut ledger = TestLedger::new();
+    let turn = wave_of(&mut ledger, vec![call("c1", "read"), call("c2", "unknown")]);
+    advance(
+        turn.execute_concurrent(
+            Interrupt::None,
+            &mut ledger,
+            &mut Placed::new(),
+            &mut |_| Interrupt::None,
+        )
+        .unwrap(),
+    );
+    let registered: Vec<(serde_json::Value, serde_json::Value)> = ledger
+        .lines
+        .iter()
+        .map(|line| serde_json::from_slice::<serde_json::Value>(line).unwrap())
+        .filter(|line| line["kind"] == "tool_called")
+        .map(|line| {
+            (
+                line["data"]["effect"].clone(),
+                line["data"]["render"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        registered,
+        vec![
+            (serde_json::json!("read"), serde_json::json!("generic")),
+            (serde_json::Value::Null, serde_json::Value::Null),
+        ],
+        "a registered tool's line says what it was registered as; an unknown one says nothing"
+    );
 }

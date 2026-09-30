@@ -181,10 +181,8 @@ impl<'f> Placing<'f> {
 }
 
 impl ConcurrentInvoke for Placing<'_> {
-    fn effect_of(&self, call: &ToolCall) -> Option<Effect> {
-        self.bench
-            .meta_of(&call.name)
-            .map(|meta| meta.effect.clone())
+    fn meta_of(&self, call: &ToolCall) -> Option<&kernel::ToolMeta> {
+        self.bench.meta_of(&call.name)
     }
 
     fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted {

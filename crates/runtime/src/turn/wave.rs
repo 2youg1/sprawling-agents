@@ -19,7 +19,7 @@
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{
     AxCode, AxError, ContentBlock, Effect, Ledger, ModelUsage, Payload, TimeMs, Tool, ToolCall,
-    ToolOutcome,
+    ToolMeta, ToolOutcome,
 };
 
 use crate::bench::Ticket;
@@ -60,9 +60,11 @@ fn printed(payload: &Payload, action: &'static str) -> Result<String, AxError> {
 /// the same dedup table and taint that `tool` lends out, and three
 /// closures cannot each borrow one bench.
 pub trait ConcurrentInvoke {
-    /// The effect the call's tool declares. `None` is a tool the
-    /// catalog does not know, which is not read-only.
-    fn effect_of(&self, call: &ToolCall) -> Option<Effect>;
+    /// The registration of the call's tool: its effect decides whether
+    /// the call is read-only, and `tool_called` copies its effect and
+    /// render (runtime-SPEC 8-51). `None` is a tool the bench does not
+    /// know, which is not read-only.
+    fn meta_of(&self, call: &ToolCall) -> Option<&ToolMeta>;
     /// The tool a read-only call would run on, lent out before the call
     /// is admitted so it can start while the model is still generating.
     /// What it returns reaches the model only if `admit` later clears the
@@ -104,7 +106,7 @@ impl<F> ConcurrentInvoke for F
 where
     F: FnMut(&ToolCall, TimeMs) -> Result<ToolOutcome, AxError>,
 {
-    fn effect_of(&self, _call: &ToolCall) -> Option<Effect> {
+    fn meta_of(&self, _call: &ToolCall) -> Option<&ToolMeta> {
         None
     }
 
@@ -124,6 +126,13 @@ where
     ) -> Result<ToolOutcome, AxError> {
         Err(unheld_ticket())
     }
+}
+
+/// Whether the call's tool is registered as only reading.
+pub(super) fn reads_only(tools: &dyn ConcurrentInvoke, call: &ToolCall) -> bool {
+    tools
+        .meta_of(call)
+        .is_some_and(|meta| meta.effect == Effect::Read)
 }
 
 fn unheld_ticket() -> AxError {
@@ -189,7 +198,7 @@ impl<'h> Turn<'h, ToolWave> {
         let mut exchange = self.open_exchange();
         let reads = calls
             .iter()
-            .take_while(|call| tools.effect_of(call) == Some(Effect::Read))
+            .take_while(|call| reads_only(tools, call))
             .count();
         let mut going = Vec::with_capacity(reads);
         let mut halt = Interrupt::None;
@@ -288,6 +297,8 @@ impl<'h> Turn<'h, ToolWave> {
             name: call.name.clone(),
             subject: ToolCalled::subject_of(&call.args),
             args: call.args.clone(),
+            effect: None,
+            render: None,
         };
         self.journal.append_redacted(
             ledger,

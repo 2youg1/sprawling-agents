@@ -146,6 +146,7 @@ pub struct TimeoutMs(pub u64);
 /// its gate; it is machine input, not documentation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Effect {
     Read,
     Write {
@@ -159,6 +160,7 @@ pub enum Effect {
     /// goes to the same place — and a model filling in a `host`
     /// argument would be inventing a fact the city already knows.
     Connector {
+        #[cfg_attr(feature = "schema", schemars(with = "String"))]
         label: ServerLabel,
     },
     /// Starts a second agent on part of this work. Its own class rather
@@ -208,6 +210,7 @@ pub enum CostTier {
 /// (tool side). Meta-level declarations use an empty list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum RenderIntent {
     Generic,
     Terminal,

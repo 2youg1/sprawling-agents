@@ -144,7 +144,7 @@ fn a_served_citys_reads_run_at_once_and_leave_what_they_leave_in_turn() {
     assert!(
         calls
             .iter()
-            .all(|call| lane.effect_of(call) == Some(Effect::Read)),
+            .all(|call| lane.meta_of(call).map(|meta| &meta.effect) == Some(&Effect::Read)),
         "the lane does not name its reads as reads, so every wave runs serially"
     );
     let tickets: Vec<_> = calls

@@ -69,6 +69,8 @@ fn a_branch_inherits_the_compacted_exchange_not_the_raw_records() {
                 name: kernel::ToolName::parse("status").unwrap(),
                 args: Payload::empty(),
                 subject: None,
+                effect: None,
+                render: None,
             })
             .unwrap(),
         ),

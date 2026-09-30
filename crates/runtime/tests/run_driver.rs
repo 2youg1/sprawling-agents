@@ -1059,10 +1059,8 @@ fn answer(outcome: runtime::bench::BenchOutcome) -> Result<ToolOutcome, AxError>
 }
 
 impl runtime::ConcurrentInvoke for Placed {
-    fn effect_of(&self, call: &ToolCall) -> Option<kernel::Effect> {
-        self.bench
-            .meta_of(&call.name)
-            .map(|meta| meta.effect.clone())
+    fn meta_of(&self, call: &ToolCall) -> Option<&kernel::ToolMeta> {
+        self.bench.meta_of(&call.name)
     }
 
     fn admit(&mut self, call: &ToolCall, t: TimeMs) -> runtime::Admitted {

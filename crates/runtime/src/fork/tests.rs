@@ -113,6 +113,8 @@ fn mother_drafts() -> Vec<EventDraft> {
                 name: kernel::ToolName::parse("status").unwrap(),
                 args: Payload::empty(),
                 subject: None,
+                effect: None,
+                render: None,
             })
             .unwrap(),
         ),

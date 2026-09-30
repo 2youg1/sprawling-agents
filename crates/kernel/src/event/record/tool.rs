@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::event::payload::Payload;
-use crate::tool::ToolName;
+use crate::tool::{Effect, RenderIntent, ToolName};
 
 /// Argument names that say what a call acted on, in the order they are
 /// preferred. Taken from the tool definitions rather than guessed:
@@ -44,6 +44,18 @@ pub struct ToolCalled {
     /// which is a real state rather than a failure.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
+    /// The effect the tool was registered with at the moment of the
+    /// call, copied by the tool wave from its `ToolMeta` (kernel-SPEC
+    /// 8-75). Absent for a tool the bench did not know and on every line
+    /// written before the key existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effect: Option<Effect>,
+    /// How the tool was registered to be drawn at the moment of the
+    /// call; absent in the same cases as `effect`. A `Diff`'s locations
+    /// are the registration's, empty for every tool today: the file an
+    /// edit touched is `subject`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub render: Option<RenderIntent>,
 }
 
 impl ToolCalled {

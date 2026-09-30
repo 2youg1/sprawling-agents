@@ -11,9 +11,9 @@
 //! before the answer's first writing call, cached by position, recorded
 //! in emission order, and a failed answer's cache discarded whole.
 
-use kernel::{AxError, Effect, Increment, Model, ModelRequest, ModelReturn, ToolCall, ToolOutcome};
+use kernel::{AxError, Increment, Model, ModelRequest, ModelReturn, ToolCall, ToolOutcome};
 
-use super::wave::{ConcurrentInvoke, lost_answer};
+use super::wave::{ConcurrentInvoke, lost_answer, reads_only};
 
 /// Who acts on a model's answer while it is still being generated. The
 /// one place that decides which door of the model port a turn takes.
@@ -87,7 +87,7 @@ pub(super) fn call_ahead(
         let mut prefix = Prefix::Reading;
         let returned = model.call_speculating(request, onto, &mut |call: &ToolCall| {
             if let Prefix::Reading = prefix
-                && tools.effect_of(call) == Some(Effect::Read)
+                && reads_only(tools, call)
                 && let Some(tool) = tools.ahead(call)
             {
                 let handed = call.clone();

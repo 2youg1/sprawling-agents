@@ -126,3 +126,30 @@ fn an_answer_the_city_supplied_after_a_restart_is_unmeasured() {
         "the turn's own moment is still measured"
     );
 }
+
+#[test]
+fn a_call_says_what_its_tool_was_registered_as() {
+    let registered = record(
+        2,
+        EventKind::ToolCalled,
+        serde_json::json!({ "id": "a", "name": "exec", "args": { "cmd": "cargo test" },
+                            "effect": "egress", "render": "terminal" }),
+    );
+    let folded = turns(&[asked(1), registered, called(3, "b")]);
+    let drawn: Vec<(Option<kernel::Effect>, Option<kernel::RenderIntent>)> = folded[0]
+        .calls
+        .iter()
+        .map(|call| (call.effect.clone(), call.render.clone()))
+        .collect();
+    assert_eq!(
+        drawn,
+        vec![
+            (
+                Some(kernel::Effect::Egress),
+                Some(kernel::RenderIntent::Terminal)
+            ),
+            (None, None),
+        ],
+        "a line that recorded no registration is drawn as nothing in particular"
+    );
+}

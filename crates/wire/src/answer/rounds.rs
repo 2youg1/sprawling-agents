@@ -183,6 +183,16 @@ pub struct Call {
     /// both not, and the one exception - an answer the city supplied
     /// after a restart - makes the span unmeasured either way.
     pub timing: Timing,
+    /// What boundary the tool was registered as crossing when it was
+    /// called, as its `tool_called` line recorded it. `None` for a tool
+    /// the bench did not know, and for a line written before the key
+    /// existed.
+    pub effect: Option<kernel::Effect>,
+    /// How the tool was registered to be drawn, from the same line: a
+    /// terminal, a diff, or the generic row. `None` in the same cases;
+    /// a page draws such a call as generic. A diff's `locations` are the
+    /// registration's and empty today - the file is [`Call::subject`].
+    pub render: Option<kernel::RenderIntent>,
 }
 
 /// One turn: the model was asked, and this is what came of it.

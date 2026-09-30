@@ -54,6 +54,8 @@ fn a_call_line_writes_the_bytes_its_map_declares() {
         name: ToolName::parse("read").unwrap(),
         args,
         subject,
+        effect: None,
+        render: None,
     };
     let typed = Payload::of(&called).unwrap();
     assert_eq!(bytes(&typed), bytes(&hand));
