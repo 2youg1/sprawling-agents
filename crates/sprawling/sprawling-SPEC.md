@@ -4098,7 +4098,7 @@ pub(in crate::assembly) struct Flight {
 
 反方向是组装点应有的方向，保留：assembly 用 serving 的 `random_token`、`open_vault`、`Serving`、`folding`、`output_ring::OutputRing`、`standing::monotonic_now`，用 views 的 `Governance`、`Views`、`Published`、`answer_outside_the_lock`、`pursued`、`building_page`、`snapshot`，用 doctor 的 `ThisMachine`、`Platform`、`PATIENCE`、`Presence`、`host`、`recipe_for`、`screen`。
 
-**方向由门守。** ARCHITECTURE.md 的 `directions` 块逐个模块写下它的产品代码永不写出的路径，`cargo xtask depmap` 读它（xtask-SPEC 8-33）。块里有三行：doctor、serving、views，三者的产品代码都不写出 `crate::assembly`。城有没有历史由 `city::has_history` 回答（city-SPEC 8-29），doctor 与装配点都从那里取用。
+**方向由门守。** ARCHITECTURE.md 的 `directions` 块逐个模块写下它的产品代码永不写出的路径，`cargo xtask depmap` 读它（xtask-SPEC 8-33）。块里有两行：doctor 与 serving，两者的产品代码都不写出 `crate::assembly`。读面搬进 `accounting` 之后，它指不回装配点由编译器保证：`accounting` 不依赖 `sprawling`。城有没有历史由 `city::has_history` 回答（city-SPEC 8-29），doctor 与装配点都从那里取用。
 
 读面用到的五样东西各归其主，装配点从那里取用：
 

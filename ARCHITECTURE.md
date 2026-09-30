@@ -212,10 +212,9 @@ Below the binary each crate that holds a domain uses at most two others:
 `kernel` and `gateway` (an MCP server reached over HTTP gets its client
 from `gateway::client_for`, the one place a client is built). The `depmap`
 block also lets `runtime` use `gateway`, and the code does not take that
-edge. The block lets `accounting` use eight; it uses six until the views
-and the worker move in (accounting-SPEC.md §3), because today it declares
-the ports the one writer reaches outside itself through, and those ports
-carry the other crates' types; `sprawling` uses every crate. A crate may **use**
+edge. `accounting` uses eight, because it holds the views every page is
+answered from and declares the ports the one writer reaches outside
+itself through, and those carry the other crates' types; `sprawling` uses every crate. A crate may **use**
 the interfaces of what it depends on and nothing more; the moment a
 module starts passing concrete types between two of them, that edge
 moves up into the assembly layer.

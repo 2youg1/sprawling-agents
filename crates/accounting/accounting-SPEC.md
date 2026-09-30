@@ -23,7 +23,7 @@
 | `lineage` | 每个 run 怎样折成一行，带上它的父指针 | 8-10 |
 | `worker` | 城的唯一写者 `RunWorker`：它持有的状态、它执行的命令、它驱动的 run | 8-11 |
 
-worker 的两个读写面 `effect` 与 `plan_view`，以及 worker 与 `views` 共用的四个叶子模块 `home`、`person`、`held_vault`、`toolkit_broker`，已在本 crate。`views` 与 `lineage` 在第 2 步搬进来，此前住 `crates/sprawling/src/views` 与 `crates/sprawling/src/lineage.rs`；`RunWorker` 与它的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例在第 3 步搬进来，此前住 `crates/sprawling/src/assembly`（§3）。
+worker 的两个读写面 `effect` 与 `plan_view`，以及 worker 与 `views` 共用的四个叶子模块 `home`、`person`、`held_vault`、`toolkit_broker`，已在本 crate；`views` 与 `lineage` 也在本 crate。`RunWorker` 与它的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例还住 `crates/sprawling/src/assembly`，按 §3 的次序搬进来。
 
 ## 2 验收标准
 
@@ -45,10 +45,9 @@ worker 的两个读写面 `effect` 与 `plan_view`，以及 worker 与 `views` �
 
 - `RunWorker` 与它的六个对象、全部用例还在 `crates/sprawling/src/assembly`，所以 citysim 的场景库仍驱动不了一次 dispatch：citysim 的 bench 二进制依赖 `sprawling`，场景库只经 `runtime::run::drive` 驱动一次 run，从不造 worker。归属由 §7 的表与 §12-9 至 §12-12 定下，§12-13 至 §12-16 补上 `views` 那一半。还没做的按这个次序：
   1. 还缺的端口。`views::lines::harnesses_answer` 找 harness 的程序时直接读 `doctor::host::search_path` 与 `doctor::on_search_path`；它改经 `Views.programs`（8-10、§12-13）。`revealing`（`RunWorker.reveal`）、`monitor::memory`（`DrivingPool` 的 `read_memory`）、`monitor::volume`（`RunWorker.read_volume`）、`release`（`Views.registry`）、`browser_tool`（`RunWorker.browsers`）与需求表的查法（`RunWorker.recipe_for`）已经是交进来的 `fn` 指针；worker 这边还直接碰 `bin` 的是 `workbench::engine` 读的 `doctor::host` 与 `Presence`，以及 `relay`、`pool`、`driving::flight` 用到的 `monitor::health::Health`、`monitor::memory::Memory` 两个类型。
-  2. `views` 与 `lineage` 搬进本 crate，本 crate 因此依赖 `storage` 与 `runtime`（§12-14）。`views` 的测试里有十几处经 `bin::assembly::init_city` 造城；搬过来之后、第 3 步之前，它们改用 `views::tests::founded`，它只写创世的两行、立起市政厅、写一份 `City.md`；第 3 步之后改回真正的创世，`founded` 随之删去。经 worker 的命令造楼的那一条测试随 `building_page_tests` 走。
-  3. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）。
-  4. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活，不在本次迁移里。
-  5. 模块搬走时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）。8-7、8-8、8-9 是早先整节搬进来的，保持原样。
+  2. `RunWorker`、`relay`、`pool`、`desk`、`drive_run` 与六个对象、全部用例在一次改动里搬（§12-11）。`views` 的测试此前经 `views::tests::founded` 造城，它只写创世的两行、立起市政厅、写一份 `City.md`；worker 搬进来以后它们改回真正的创世，`founded` 随之删去（§12-16）。快照折叠的 trait `views::snapshot::start::SnapshotFold` 在此之前有两个实现分住两个 crate（`Views` 与 `bin::assembly::folds::standing_start` 的 `StandingFolds`），所以是 ARCHITECTURE.md §4 缝表里的一行；worker 搬进来以后两个实现同住本 crate，它收回 `pub(crate)`，那一行随之删去。
+  3. citysim 经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活，不在本次迁移里。
+  4. 模块搬走时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）。8-7、8-8、8-9 是早先整节搬进来的，保持原样。
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
 
 ## 4 现状分析
@@ -431,4 +430,4 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 13. **harness 页找程序经 `Views.programs` 这个 `fn` 指针，不经 `Machine`，也不在开城时算好。** 理由：这一问读的是此刻的搜索路径，与 `registry`、`upstream` 同形——没有状态、服务中的城交一次、`None` 就答 `Unavailable`（§12-10）；它不启动任何程序，所以不必等 `DoctorRefresh`。被否决的做法：给 `Machine` 加一个方法——`Machine` 属于 worker，读面拿不到它，而且 doctor 的逐项查法已经在 `bin::doctor::Machine::look` 里，再加一个方法就是第二条查法；在开城时把 harness 的有无算进 `DoctorAnswer`——那是一个线上的形状改动，而且人在 harness 页上装完一个程序，要等到下一次 `DoctorRefresh` 才看得到它。
 14. **`views` 搬进来时，本 crate 加 `storage` 与 `runtime` 两条边。** 理由：`views` 折叠的就是 `storage` 的 `HotView`、`Attribution`、`LedgerIndex`，快照起步与 worker 的 `Standing` 共用 `runtime::replay::fold_ledger_dir` 的同一遍；worker 搬过来后本来也要这两条边（§12-11）。被否决的做法：把这两处读经端口交进来——端口会把一份折叠的权威分到两个 crate，与 §12-9 否决的是同一件事；把 `fold_ledger_dir` 挪进 `storage`——那改的是 `runtime` 的公开面，与这次迁移无关。
 15. **sprawling-SPEC.md 里写这些模块的节不随模块搬，只改模块路径的拼写；S4 迁 `Spec.lean` 时一次搬进本 crate 的规格。** 理由：两处都是 Markdown 时，搬一次、S4 再改写一次，是两遍约两千行的重写；两份 SPEC 的节号相撞（sprawling 的 8-3、8-6 与本 SPEC 的 8-3、8-6），sprawling-SPEC 自己也有重号，逐节搬要先重新编号，而代码与文档里引用 `sprawling-SPEC.md 8-xx` 的地方都得跟着改。被否决的做法：照 §3 早先的第 5 步逐节搬——8-7、8-8、8-9 那样的小节可以，几十节不行。
-16. **`views` 的测试在第 2 步与第 3 步之间用 `views::tests::founded` 造城。** 理由：真正的创世（`genesis`）经 `RunWorker` 立起市政厅，第 3 步之前它还在 `sprawling`，本 crate 够不到它；`founded` 只写那些测试读到的东西，第 3 步删掉。被否决的做法：把这些测试留在 `sprawling`——它们读 `Views` 的私有字段（`index`）与只在测试里存在的 `Views::answer`，留下就得为测试开公开的门。
+16. **`views` 搬进本 crate 之后、worker 搬进来之前，`views` 的测试用 `views::tests::founded` 造城。** 理由：真正的创世（`genesis`）经 `RunWorker` 立起市政厅，worker 搬进来之前它还在 `sprawling`，本 crate 够不到它；`founded` 只写那些测试读到的东西，worker 搬进来时删掉。被否决的做法：把这些测试留在 `sprawling`——它们读 `Views` 的私有字段（`index`）与只在测试里存在的 `Views::answer`，留下就得为测试开公开的门。
