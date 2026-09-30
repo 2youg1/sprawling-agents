@@ -671,14 +671,15 @@ impl Offerings { pub fn this_machine() -> Offerings; }   // 唯一的采样点�
 impl Confinement { pub fn detect() -> Confinement; pub fn choose(&Offerings) -> Confinement;
                    pub fn assurances(&self) -> Assurances; pub fn name(&self) -> &'static str;
                    pub fn statement(&self) -> String; }
-pub struct Confined { /* arm＋scratch＋outstanding（后台命令的副本） */ }
+pub struct Confined { /* arm＋scratch＋idle（留给下一条命令的副本）＋outstanding（后台命令的副本） */ }
 impl Confined { pub fn detect() -> Confined; pub fn with_arm(Confinement, Option<PathBuf>) -> Confined;
                 pub fn arm(&self) -> &Confinement; pub fn statement(&self) -> String;
-                pub fn place(&self, Command, &Path) -> Result<(Command, Placed), AxError>;
-                pub fn settled(&self, Placed); pub fn handed(&mut self, BacklogId, Placed);
+                pub fn place(&mut self, Command, &Path) -> Result<(Command, Placed), AxError>;
+                pub fn settled(&mut self, Placed); pub fn handed(&mut self, BacklogId, Placed);
                 pub fn reaped(&mut self, &[Finished]); }
-impl Drop for Confined { /* 删未报结命令留下的副本 */ }
-pub struct Placed { /* copy —— 私有 */ }
+impl Drop for Confined { /* 删留着的副本与未报结命令的副本 */ }
+pub struct Placed { /* copy、work —— 私有 */ }
+impl Placed { pub fn work(&self) -> storage::FileWork; }   // 这次同步的文件操作计数
 pub enum Placement { Sandbox, Host }   // 调用参数 `where`；缺省 Sandbox
 pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 ```
@@ -686,13 +687,13 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 - **保证清单在类型上**：`Assurances` 逐轴五字段，每一臂的 `assurances()` 必须写满五轴，故新增一轴即四臂同时编译红——任何一臂都不会留下一个没人问过它的旧答案。`statement()` 由 `Assurances` 与 `Guarantee::phrase()`／`unkept()` 派生而非另写一段话，句子与类型因此不可能分家。
 - **选择是纯函数**：`choose` 取 `Offerings`——有 wrapper 即 `LinuxNamespaces`，否则 `CopiedTree`；scratch 根不可用即 `Unavailable { missing: ScratchDirectory }`。采样只有 `Offerings::this_machine()` 一处（`PATH`＋`std::env::temp_dir()`），两个 `detect()` 都只读它；测试用 `Offerings` 陈述一台机器而不是借一台。
 - **`WindowsJobObject` 本构建不构造，且拒而不降级**：`CreateJobObject` 是 workspace `unsafe_code = forbid` 在 `desktop/` 之外禁止的 FFI。以 `CopiedTree` 冒充它会对着一个开着网络的盒子回答「网络已关」，正是本模块存在的理由的镜像，故 `place()` 对它返 `E_SANDBOX_DENIED` 并给「改用 copied tree 且让命令离开网络」的 recovery。Windows 上 `detect()` 因此答 `CopiedTree`，其清单逐字写出网络未隔离——这一句就是 Agent 必须看见的那一句。
-- **副本按命令一份、有界**：`place()` 把 `workdir` 复制进 scratch 根下的新目录，命令在副本里跑；`settled()` 在等待结束时删副本；交给 backlog 的后台命令由 `handed(id, …)` 记名、由 `reaped(&[Finished])` 在其成员报结时删；`Drop` 兜底。**删不掉不把命令判成失败**（与 `backlog/member.rs`、`collect()` 同一条判断：命令的收场是调用方应得的事实，一个临时目录只值磁盘）。界：`MAX_FILES = 100_000`、`MAX_BYTES = 256 MiB`、`MAX_DEPTH = 64`；越界**拒**并报出越过的那一对数字——半份副本会为一堆没带上的文件担保，而本模块的全部理由是防这个。`MAX_DEPTH` 同时终结自指链接造成的无底走查（链接按目标内容复制，因此指向树外的链接带进来的是内容而非一个通向人那棵树的入口）。
+- **副本按工具一份，每条命令之前同步成工作目录此刻的样子，有界。** `place()` 取这个 `Confined` 留着的副本（没有，或留着的那份抄的是别的目录，就在 scratch 根下新建一个），把它同步成 `workdir` 此刻的样子，命令在副本里跑；`settled()` 在等待结束时把副本留给下一条命令（已留着一份时删掉这份）；交给 backlog 的后台命令由 `handed(id, …)` 记名，其成员报结时 `reaped(&[Finished])` 同样把副本留下或删掉；`Drop` 删掉留着的与未报结的副本。同步的规则：源侧跟随链接（指向树外的链接带进来的是内容，而不是通向人那棵树的入口）；副本侧不跟随链接，因为副本里的东西是上一条命令写的。副本里的一项与源不同类（命令把文件换成了链接、把目录换成了文件），或同名文件内容不同，就先删掉这一项再从源复制，落成一个新的目录项——命令可能在副本里造了指向别处的硬链接，就地改写会写穿到那一头；同名同类同长的文件逐字节比较，相同就不动；副本里源没有的项删掉。于是每条命令开始时，副本与工作目录逐文件相同，上一条命令写下的东西不会留给下一条。逐字节比较而不比 mtime 与长度：同一个时间戳刻度里的等长改写比不出来，副本就会为一个它没有带上的版本担保；比较只读两边的文件，不新建，而实时扫描等的是新建的文件。`Placed::work()` 报这次同步的 `storage::FileWork`（storage-SPEC 8-31）：第一次放置 `created` 是树里的文件数，一次什么都没变的再放置 `created`、`rewritten`、`removed` 都是 0，`walked` 是两侧读过的目录项；`confinement::tests` 的 `a_sandbox_copy_is_synced_rather_than_made_again` 在 N 与 2N 个文件的树上断言这些数。**删不掉不把命令判成失败**（与 `backlog/member.rs`、`collect()` 同一条判断：命令的收场是调用方应得的事实，一个临时目录只值磁盘）。界：`MAX_FILES = 100_000`、`MAX_BYTES = 256 MiB`、`MAX_DEPTH = 64`，按源侧计；越界**拒**并报出越过的那一对数字，已同步一半的副本随之删掉——半份副本会为一堆没带上的文件担保，而本模块的全部理由是防这个。`MAX_DEPTH` 同时终结自指链接造成的无底走查。
 - **`Mount`／`Fuel` 不沿用**：`Fuel` 是 wasmtime 指令计量、`Mount.guest` 是 guest 路径别名，二者 wasip1 专属。本模块保留的是**判断**（能力面＝能到达的路径集）而不是词形。宿主环境照旧不继承（exec 的 env allowlist 未动）；`SandboxJob.env` 的显式注入属 guest 面。
 - **placement**：调用参数 `where: sandbox|host`，缺省 `sandbox`。`host` 是「在原地跑」——它才是碰得到人那棵树的那一臂，故必须由调用方按名说出，也正是与 A-8 同一条纪律（默认引导先在沙箱里做，出沙箱才需要审批）里「需要审批」的那个动作。python 臂无 host 形（它是 wasip1 guest）：要宿主解释器走 program 臂。
 - **公开路径经 `runtime::tools`**：`confinement` 住 `tools/exec/`，doctor 的依赖回报与工具自己的 disclosure 都从 `runtime::tools::{Confinement, Guarantee, Kept, Missing}` 读这一份定义。
-- 证据：`crates/runtime/src/tools/exec/tests.rs` 的 `a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`（真命令、真树：沙箱里写得到、人那棵树不动；同一命令 `where: host` 则写进原树——此对拍使「没动」是能力判定而非命令没写）；`crates/runtime/src/tools/exec/confinement/tests.rs` 的 `the_sandbox_arm_a_machine_gets_is_chosen_from_what_it_has`、`every_sandbox_arm_states_what_it_does_not_hold`、`a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end`、`a_settled_sandbox_command_leaves_no_copy_behind`。
+- 证据：`crates/runtime/src/tools/exec/tests.rs` 的 `a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`（真命令、真树：沙箱里写得到、人那棵树不动；同一命令 `where: host` 则写进原树——此对拍使「没动」是能力判定而非命令没写）；`crates/runtime/src/tools/exec/confinement/tests.rs` 的 `the_sandbox_arm_a_machine_gets_is_chosen_from_what_it_has`、`every_sandbox_arm_states_what_it_does_not_hold`、`a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end`、`a_sandbox_copy_is_synced_rather_than_made_again`、`a_sandbox_copy_goes_with_the_tool`。
 
-**未决（§3 口径）**：副本是「一条命令一份」的直译，代价与工作树成正比；一棵带构建缓存的工作树会在每条命令上付一次复制。界内的取舍已定（越界拒而不是部分复制），但「一条命令一份」与「一个工具一份＋每命令同步」哪个对真正的工作树更合适，需要一次实测（一棵真实 room 的复制耗时与其命令数）才能定。
+**未决（§3 口径）**：同步仍按命令读两侧的每个目录项，并逐字节比较同长的文件，代价随工作树的大小长；一棵带大构建缓存的工作树每条命令要读两遍缓存。判定它的证据是一棵真实 room 的每条命令同步耗时（毫秒）与其文件数的读数；若读数显示读取成了主项，再比较「按 mtime 与长度跳过、只对同一时间戳刻度里的文件逐字节比较」。
 
 ### 8-13-3 runtime::tools::exec::yielding（派出的命令降一级；形状 4 adapter）
 
@@ -1063,6 +1064,16 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 **被否**：①`ToolResult` 载荷加 `returned_ms`：一行两个时间，读者要知道信哪一个；②时钟随 `Generating` 进 `call`，再与工具面、`still_going` 合成一个值进 `execute_concurrent`：同一只钟两个入口，而 `call` 的参数已按 `budgets.toml` 钉在 5；③只采答复：两条并行对拍测试可以原样保留，但用时量不出来。
 
 **代价**：同一 run 内 `t` 不再随 `seq` 单调，次序以 `seq` 为准；并行对拍测试改用停住的时钟比字节；`golden-p0` 重生成一次。
+
+### 12.10 沙箱副本按工具一份、每条命令前同步，而不是每条命令新建一份
+
+**决定**：`Confined` 留着一份副本，`place()` 把它同步成工作目录此刻的样子：不同的文件删掉再复制，多出来的项删掉，相同的文件不动（§8-13-2）。
+
+**理由**：新建文件是实时扫描等待的地方。在 Windows x86_64 笔记本级、Defender 实时防护开的机器上，放置一棵 512 个 16 KB 文件的树 p50 约 0.9 s，约 1.8 ms/文件，磁盘空闲 98% 以上（这是工作树放置的读数；复制同样多的文件是同一种等待，这一点是推断）；每条沙箱命令复制整棵树，就是每条命令付这一次。同步之后，一条命令新建与改写的文件数等于上一条命令动过的文件加上工作目录变了的文件，与树的大小无关；树的大小只进目录项读取与同长文件的比较。
+
+**被否**：①每条命令新建一份（原做法）：新建文件数是命令数乘以树的文件数；②用硬链接「复制」：命令在副本里的写入会写穿到人那棵树，共享可写文件的副本不是隔离；③按 mtime 与长度判定相同：同一个时间戳刻度里的等长改写判不出来，副本会为它没带上的版本担保；④就地改写不同的文件：命令可能把副本里的名字做成指向别处的硬链接或链接，就地写会写到那一头，所以不同的项先删掉再建。
+
+**重开参数**：一个工具的两条命令需要同时持有同一份副本（今天后台命令各持一份，留着的只有一份）；或读数显示同步的读取成了每条命令的主项（§8-13-2 的未决）。
 
 ## 13 依赖选型
 
