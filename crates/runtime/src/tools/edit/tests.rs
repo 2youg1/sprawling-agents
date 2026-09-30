@@ -122,6 +122,8 @@ fn creating_with_a_nonempty_old_is_refused_with_the_form_to_use() {
 #[test]
 fn a_path_outside_the_write_domain_is_refused_before_the_disk_is_touched() {
     let tmp = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let beyond = elsewhere.path().join("abs.txt");
     std::fs::write(tmp.path().join("outside.txt"), "x").unwrap();
     let tool = tool(tmp.path());
     for hostile in ["outside.txt", "elsewhere/f.md", ".sprawling/ledger/x"] {
@@ -138,7 +140,12 @@ fn a_path_outside_the_write_domain_is_refused_before_the_disk_is_touched() {
             .unwrap_or_default();
         assert!(alternative.contains("work"), "{hostile}: {err}");
     }
-    for illegal in ["../evil.txt", "/abs.txt", "work//x"] {
+    for illegal in [
+        "../evil.txt",
+        "/abs.txt",
+        "work//x",
+        beyond.to_str().unwrap(),
+    ] {
         let err = match tool.invoke(&call(illegal, "new", "", "y")) {
             Err(err) => err,
             Ok(_) => panic!("{illegal} must be refused"),
