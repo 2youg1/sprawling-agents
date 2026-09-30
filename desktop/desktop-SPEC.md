@@ -114,8 +114,9 @@ pub(crate) enum Scope { Closed { code: RefusalCode, because: String }, Open(Allo
 pub(crate) struct Allowance { /* 私有：windows／processes／record／clipboard */ }
 // 准入是一个值：它带着准入了这次调用的那份 allowlist，
 // 于是「答复本身受 scope 约束」的那一件工具读的是同两张 Pattern 表。
-pub(crate) struct Admitted<'a> { /* 私有：&Allowance */ }
+pub(crate) struct Admitted<'a> { /* 私有：&Allowance；非 Windows 的非测试构建里没有读者，字段带 expect(dead_code)（§12.1） */ }
 impl Admitted<'_> {
+    #[cfg(any(windows, test))]   // 只有 Windows 臂报窗口；测试在每个平台上都判它（§16.2）
     pub(crate) fn visible(&self, title: &str, process: &str) -> bool;
 }
 impl Scope {
@@ -275,6 +276,13 @@ impl Desk {
 
 拒词恒是三段（three-part refusal）：拒了什么（action）、为什么（subject）、还能做什么（recovery），装进 JSON-RPC error 的 `data` 里；`message` 是人读的一句摘要。
 
+### 12.1 定规：`visible` 只在 Windows 与测试里编译
+
+- **决定**：`Admitted::visible` 与它所读的 `Allowance::visible` 带 `#[cfg(any(windows, test))]`；`Admitted` 的 `allowance` 字段带 `#[cfg_attr(not(any(windows, test)), expect(dead_code, reason = "…"))]`。类型与唯一的构造点 `Admitted { allowance: self }` 在每个平台上相同。
+- **理由**：非 Windows 臂（`platform/elsewhere.rs`）拒绝一切调用，不报任何窗口，所以那里的非测试构建里这两个方法与这个字段没有读者，编译器报三条 `dead_code`。`visible` 是纯判定、不碰 Win32，§16.2 要它在任何机器上受测，所以条件里带 `test`。字段上用 `expect` 而不是 `allow`：哪天非 Windows 臂开始报窗口，字段有了读者，这条 `expect` 落空，构建变红，它就跟着被删掉。
+- **击败的备选**：①按平台把字段拼成 `&'a Allowance` 与 `PhantomData<&'a Allowance>`——不需要任何 lint 抑制，但同一个值有两种拼写，构造点也要跟着分叉，而「是不是 Windows」按 `platform.rs` 的约定只写在一处；②等本 package 并入 workspace 时再处理——并入之后，workspace 的 `-D warnings` 会在 macOS 上把这三条警告变成错误。
+- **重开的参数**：非 Windows 臂开始报告窗口。那时 `visible` 在每个平台上都有读者，本条与那条 `expect` 一起删除。
+
 ## 13 依赖选型
 
 `serde`＋`serde_json`＋`toml` 三个，与 workspace 同版本线。**恒不引入**：workspace 内任何 crate（理由见 §8.5 第一对）、async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
@@ -343,6 +351,8 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 **约束**：`unsafe` 只在 `platform/windows/` 之下且每块携一行 `SAFETY:`（§8-9）；其余处恒不出现 `unsafe`、`unwrap`、`expect`、`panic!`、`todo!`、裸下标、`as`；算术走 `checked_*`／`saturating_*`；每个文件 ≤400 行、每个函数 ≤200 行且 ≤4 参数。`scope.rs` 因这条尺子而在 446 行处切出 `scope/pattern.rs`——切口落在「一行 allowlist 匹配什么」与「这份文件许可什么」之间，是语义的，不是为了凑行数；`Admitted` 落地时它再次抵线，这一次切出的是 `scope/tests.rs`（形状同 `session/tests.rs`），判定与对判定的断言各占一个文件。
 
 验收命令（在 `desktop/` 内）：`cargo fmt`／`cargo clippy --all-targets -- -D warnings`／`cargo nextest run`；根目录一条 `just check-desktop` 把这三条加上 `cargo deny check` 一起跑，并挂在 `just check` 的依赖链上——`cargo clippy --workspace` 够不到本 package，因为它不是 workspace member。**两道工作区的闸门从外面伸进来**：`xtask length` 把 400 行的文件尺子量到 `desktop/src`（它读文件而不是读 crate，故够得着 `cargo` 够不着的地方），`xtask guard` 的 `wall` 把本 package 的 lint 表、包元数据与共享依赖版本逐键比回根 `Cargo.toml`，例外只有记下理由的那两条（§8.5 第二对，以及本 package 没有 kani harness）。`record.rs` 因那把尺子在 443 行处切出 `record/sink.rs`——切口落在「可不可以开始录」与「由谁写、写到哪」之间。
+
+`platforms.yml` 的 macOS job 在 workspace 测试之后跑同一条 `just check-desktop`，所以非 Windows 臂与只在非 Windows 上编译的测试（`session/tests.rs` 里 `#[cfg(not(windows))]` 的那一条）每晚在 macOS 上过一次 clippy 与 nextest。那台 runner 没装 `cargo-deny`，配方里的许可证检查会自行跳过；许可证只在 `ci.yml` 的 Windows desktop job 里判。
 
 ### 16.2 怎么测一件需要桌面的事
 
