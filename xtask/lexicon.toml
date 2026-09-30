@@ -229,3 +229,58 @@ replacement = "ARCHITECTURE.md"
 [[entry]]
 banned = "方言"
 replacement = "兼容格式 (glossary: dialect)"
+
+# fence 与 checkpoint 曾是同一个概念的两个名字，checkpoint 留下。只收改名后全树与
+# CHANGELOG 都零命中的写法：「围栏」仍指 Markdown 块，「wave fence」「the fence」
+# 「fences」在 CHANGELOG 或代码围栏的语境里还有命中；线上标签 `Fenced` 随 wire
+# 版本改名之后再禁。
+
+[[entry]]
+banned = "栅栏"
+replacement = "checkpoint（glossary）"
+
+[[entry]]
+banned = "base fence"
+replacement = "checkpoint（glossary）"
+
+[[entry]]
+banned = "checkpoint fence"
+replacement = "checkpoint（glossary）"
+
+[[entry]]
+banned = "last fence"
+replacement = "checkpoint（glossary）"
+
+[[entry]]
+banned = "no fence"
+replacement = "checkpoint（glossary）"
+
+[[entry]]
+banned = "Fence::"
+replacement = "checkpoint（glossary）"
+
+[[entry]]
+banned = "FencePolicy"
+replacement = "checkpoint（glossary）"
+
+[[entry]]
+banned = "SinceFence"
+replacement = "checkpoint（glossary）"
+
+[[entry]]
+banned = "fence gate"
+replacement = "checkpoint（glossary）"
+
+[[entry]]
+banned = "Fencing"
+replacement = "checkpoint（glossary）"
+
+[[entry]]
+banned = "fencing"
+replacement = "checkpoint（glossary）"
+
+# memory crate 改名 storage 之后，错误类型的名字随 crate 改。
+
+[[entry]]
+banned = "MemoryError"
+replacement = "StorageError（storage-SPEC.md）"
