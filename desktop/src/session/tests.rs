@@ -115,11 +115,15 @@ fn elsewhere_an_admitted_call_is_refused_by_the_platform_rather_than_answered_fa
         "tools/call",
         json!({ "name": "desktop.snapshot", "arguments": { "title": "a.txt — Notepad" } }),
     );
-    assert_eq!(
-        answered["error"]["data"]["code"], "E_TOOL_UNAVAILABLE",
+    assert!(answered["error"].is_null(), "{answered}");
+    assert_eq!(answered["result"]["isError"], true, "{answered}");
+    assert!(
+        answered["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("E_TOOL_UNAVAILABLE"),
         "{answered}"
     );
-    assert!(answered["result"].is_null());
 }
 
 /// On Windows an admitted
@@ -135,13 +139,19 @@ fn listing_windows_reaches_this_desktop_rather_than_a_refusal() {
         "tools/call",
         json!({ "name": "desktop.windows" }),
     );
+    let content = answered["result"]["content"]
+        .as_array()
+        .unwrap_or_else(|| panic!("the answer is content blocks: {answered}"));
+    assert_eq!(content.len(), 1, "{answered}");
+    assert_eq!(content[0]["type"], "text", "{answered}");
+    let facts: Value = serde_json::from_str(content[0]["text"].as_str().unwrap()).unwrap();
     assert!(
-        answered["error"].is_null(),
-        "this build carries the desktop out: {answered}"
+        facts["windows"].is_array(),
+        "the listing is an array: {answered}"
     );
     assert!(
-        answered["result"]["windows"].is_array(),
-        "the listing is an array: {answered}"
+        answered["result"]["isError"].is_null(),
+        "this build carries the desktop out: {answered}"
     );
 }
 
@@ -164,17 +174,13 @@ fn a_window_this_machine_does_not_have_is_refused_with_the_way_to_find_out() {
             },
         }),
     );
-    assert_eq!(
-        answered["error"]["data"]["code"], "E_INVALID_ARGS",
-        "{answered}"
-    );
-    assert!(
-        answered["error"]["data"]["recovery"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("desktop.windows"),
-        "{answered}"
-    );
+    assert!(answered["error"].is_null(), "{answered}");
+    assert_eq!(answered["result"]["isError"], true, "{answered}");
+    let text = answered["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap_or_default();
+    assert!(text.starts_with("E_INVALID_ARGS"), "{answered}");
+    assert!(text.contains("desktop.windows"), "{answered}");
 }
 
 /// The scope is judged before the platform is reached, so a window
@@ -187,12 +193,13 @@ fn a_call_outside_the_scope_is_refused_before_the_platform_is_reached() {
         "tools/call",
         json!({ "name": "desktop.act", "arguments": { "title": "Password Manager" } }),
     );
-    assert_eq!(answered["error"]["data"]["code"], "E_GATE_DENIED");
-    assert!(
-        answered["error"]["data"]["recovery"]
-            .as_str()
-            .unwrap()
-            .contains("DESKTOP.toml")
+    assert_eq!(
+        answered,
+        json!({ "jsonrpc": "2.0", "id": 9, "result": {
+            "content": [{ "type": "text", "text":
+                "E_GATE_DENIED: cannot use the desktop \u{2014} no title pattern in this scope matches `Password Manager`\ninstead: add a pattern for it to DESKTOP.toml, or work on a window this scope already lists" }],
+            "isError": true,
+        }})
     );
 }
 
