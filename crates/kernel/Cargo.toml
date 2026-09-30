@@ -1,9 +1,12 @@
 [package]
-name = "kernel"
+name = "sprawling-kernel"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
+
+[lib]
+name = "kernel"
 
 [dependencies]
 serde.workspace = true

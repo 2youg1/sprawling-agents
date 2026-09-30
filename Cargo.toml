@@ -172,6 +172,25 @@ argon2 = { version = "0.6", default-features = false, features = ["alloc", "zero
 # ends of the socket have one authority; optional in kernel and channels
 # (`schema`), turned on by xtask alone, never by the product binary.
 schemars = { version = "1", features = ["uuid1"] }
+# The workspace's own packages: the one place their paths and published
+# names are written. Each version pins `[workspace.package] version`
+# exactly, because a path dependency without one cannot be published;
+# Cargo refuses to resolve a pin that disagrees with it.
+kernel = { package = "sprawling-kernel", path = "crates/kernel", version = "=0.0.7" }
+memory = { package = "sprawling-storage", path = "crates/memory", version = "=0.0.7" }
+gateway = { package = "sprawling-gateway", path = "crates/gateway", version = "=0.0.7" }
+runtime = { package = "sprawling-runtime", path = "crates/runtime", version = "=0.0.7" }
+collab = { package = "sprawling-collab", path = "crates/collab", version = "=0.0.7" }
+city = { package = "sprawling-city", path = "crates/city", version = "=0.0.7" }
+# `channels` turns its default features off here because accounting and
+# xtask take it without its listener; sprawling and citysim name `server`
+# themselves, so a feature later added to its default reaches neither.
+channels = { package = "sprawling-wire", path = "crates/channels", version = "=0.0.7", default-features = false }
+browser = { package = "sprawling-browser", path = "crates/browser", version = "=0.0.7" }
+protocol = { package = "sprawling-agent-protocols", path = "crates/protocol", version = "=0.0.7" }
+accounting = { package = "sprawling-accounting", path = "crates/accounting", version = "=0.0.7" }
+sprawling = { path = "crates/sprawling", version = "=0.0.7" }
+sprawling-desktop = { path = "desktop", version = "=0.0.7" }
 
 # C3 hardening: panicking constructs and silent numeric
 # corruption are compile-time errors everywhere; tests relax locally.
@@ -209,7 +228,7 @@ fn_params_excessive_bools = "deny"
 # the .pdb of every test binary that links one.
 #
 # Measured rather than assumed, on one windows-msvc machine, by building
-# `cargo test -p channels --no-run --all-features` into two empty target
+# `cargo test -p sprawling-wire --no-run --all-features` into two empty target
 # directories: 1.05 GB without this block against 0.86 GB with it, so 18.4%
 # of what one crate's test build writes. Two thirds of the difference is
 # .rlib and one third is .pdb - the opposite weighting to the one this block

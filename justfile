@@ -252,7 +252,7 @@ clippy:
 # rule stays with `clippy`, which sees every feature at once.
 features:
     cargo check --workspace --locked --all-targets
-    cargo check -p channels --no-default-features --locked
+    cargo check -p sprawling-wire --no-default-features --locked
 
 # `just prereqs` names cargo-nextest; `just test-std` is the fallback.
 [positional-arguments]
@@ -417,7 +417,7 @@ fuzz target:
 # xtask/budgets.toml; it is enforced here rather than in `just check` because a
 # full mutation run is minutes, and a gate nobody waits for is a gate nobody runs.
 mutants:
-    cargo mutants --package kernel --minimum-test-timeout 60 --error-value 'kernel::AxError::failure(kernel::AxCode::InvalidArgs, "mutant", "mutant")'
+    cargo mutants --package sprawling-kernel --minimum-test-timeout 60 --error-value 'kernel::AxError::failure(kernel::AxCode::InvalidArgs, "mutant", "mutant")'
 
 # The performance register: every budget, what it costs today, and what is gated.
 budget:

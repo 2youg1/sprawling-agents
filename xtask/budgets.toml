@@ -405,7 +405,7 @@ status = "measured, not gated: p50 0.022 ms for 16.5 KB over four slots on windo
 #
 [index_refresh_read]
 what = "bytes read by one LedgerIndex::refresh that folds a single appended record"
-measured_by = "cargo test -p memory --lib -- --nocapture a_refresh_reads_the_appended_tail_rather_than_the_segment (the test prints the Refreshed::Appended reading beside the segment length)"
+measured_by = "cargo test -p sprawling-storage --lib -- --nocapture a_refresh_reads_the_appended_tail_rather_than_the_segment (the test prints the Refreshed::Appended reading beside the segment length)"
 status = "measured, not gated: 191 B read out of a 76,180 B segment, which is the one appended record and nothing else (2026-09, 401-record fixture). The test asserts the equality rather than a threshold, so a gate here would be a second authority over the same claim"
 
 # One rules lookup the read bound makes when a model-chosen path lands in
@@ -415,7 +415,7 @@ status = "measured, not gated: 191 B read out of a 76,180 B segment, which is th
 # handle, which is the floor of this design.
 [rules_lookup]
 what = "ns per rules lookup for another building, a fresh city::load against city::RulesCache::load, alternating rounds"
-measured_by = "cargo test --release -p city --lib rules_lookup_reading -- --ignored --nocapture"
+measured_by = "cargo test --release -p sprawling-city --lib rules_lookup_reading -- --ignored --nocapture"
 status = "measured, not gated: median of 15 rounds of 2000, three runs, load 186,793-212,885 ns against cache 76,112-91,730 ns (release test profile, Windows NTFS, sixteen cores shared by eight build lanes)"
 
 # Read amplification on a range retrieval: the bytes a `Vfs` hands back
@@ -432,7 +432,7 @@ status = "measured, not gated: median of 15 rounds of 2000, three runs, load 186
 # here would be a second authority over the same claim.
 [cas_range_read]
 what = "bytes a Vfs returns while Cas::get_range answers, over the bytes in the answer"
-measured_by = "cargo test -p memory --lib -- --nocapture a_range_read_lifts_the_range_rather_than_the_object (FaultFs::bytes_read deltas around each retrieval)"
+measured_by = "cargo test -p sprawling-storage --lib -- --nocapture a_range_read_lifts_the_range_rather_than_the_object (FaultFs::bytes_read deltas around each retrieval)"
 status = "measured, not gated: on a 5,888,890 B object a five-byte `B` range moves 5 B and line 2 moves 65,536 B, against 5,888,890 B for the verifying full read (2026-09). Before this row existed both range reads moved the whole object and re-hashed it"
 
 # How much of one message this city reads from an MCP server before it
@@ -455,7 +455,7 @@ status = "measured, not gated: on a 5,888,890 B object a five-byte `B` range mov
 # reasoning, never a second copy of the value that decides.
 [mcp_message_ceiling]
 what = "one message read from an MCP server over stdio, before its framing newline"
-measured_by = "cargo test -p protocol --lib reading (a_message_at_the_ceiling_is_read and a_message_above_the_ceiling_is_refused_with_the_ceiling_named)"
+measured_by = "cargo test -p sprawling-agent-protocols --lib reading (a_message_at_the_ceiling_is_read and a_message_above_the_ceiling_is_refused_with_the_ceiling_named)"
 status = "measured, not gated: 8,388,608 B, refused whole rather than truncated, and the connection ends because the unread remainder of a refused message is indistinguishable from the next one (2026-09). Before this row existed the stdio reader grew one String until the machine ran out"
 
 # --- What K-05 and K-07 asked for, and what already had a home --------

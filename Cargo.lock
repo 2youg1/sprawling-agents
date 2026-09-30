@@ -3,22 +3,6 @@
 version = 4
 
 [[package]]
-name = "accounting"
-version = "0.0.7"
-dependencies = [
- "channels",
- "city",
- "collab",
- "gateway",
- "kernel",
- "protocol",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
-]
-
-[[package]]
 name = "addr2line"
 version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -276,17 +260,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "browser"
-version = "0.0.7"
-dependencies = [
- "base64 0.23.1",
- "kernel",
- "png",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -412,20 +385,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "channels"
-version = "0.0.7"
-dependencies = [
- "axum",
- "kernel",
- "schemars",
- "serde",
- "serde_json",
- "tokio",
- "tower",
- "trybuild",
-]
-
-[[package]]
 name = "cipher"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -437,31 +396,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "city"
-version = "0.0.7"
-dependencies = [
- "cap-fs-ext",
- "cap-std",
- "kernel",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
-]
-
-[[package]]
 name = "citysim"
 version = "0.0.7"
 dependencies = [
- "channels",
- "collab",
- "gateway",
- "kernel",
- "memory",
- "runtime",
  "serde_json",
  "sha2 0.11.0",
  "sprawling",
+ "sprawling-collab",
+ "sprawling-gateway",
+ "sprawling-kernel",
+ "sprawling-runtime",
+ "sprawling-storage",
+ "sprawling-wire",
  "tempfile",
  "toml",
  "zeroize",
@@ -490,18 +436,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
 dependencies = [
  "thiserror 2.0.21",
-]
-
-[[package]]
-name = "collab"
-version = "0.0.7"
-dependencies = [
- "kernel",
- "memory",
- "serde",
- "serde_json",
- "tempfile",
- "trybuild",
 ]
 
 [[package]]
@@ -1065,24 +999,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gateway"
-version = "0.0.7"
-dependencies = [
- "argon2",
- "base64 0.23.1",
- "chacha20poly1305",
- "getrandom 0.4.3",
- "insta",
- "kernel",
- "keyring",
- "proptest",
- "reqwest",
- "serde",
- "serde_json",
- "zeroize",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1602,24 +1518,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kernel"
-version = "0.0.7"
-dependencies = [
- "blake3",
- "insta",
- "proptest",
- "regex",
- "schemars",
- "secrecy",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "trybuild",
- "uuid",
- "zeroize",
-]
-
-[[package]]
 name = "keyring"
 version = "3.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1762,21 +1660,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57804b2c9b69967f1536a56f86297e367a33b19e98852ed624b84551cdbc0d90"
 dependencies = [
  "rustix",
-]
-
-[[package]]
-name = "memory"
-version = "0.0.7"
-dependencies = [
- "blake3",
- "git2",
- "kernel",
- "proptest",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "trybuild",
 ]
 
 [[package]]
@@ -2068,17 +1951,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "protocol"
-version = "0.0.7"
-dependencies = [
- "gateway",
- "kernel",
- "reqwest",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
 name = "pulley-interpreter"
 version = "48.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2335,14 +2207,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
-name = "remote"
-version = "0.0.7"
-dependencies = [
- "aws-lc-rs",
- "kernel",
-]
-
-[[package]]
 name = "reqwest"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2394,26 +2258,6 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "runtime"
-version = "0.0.7"
-dependencies = [
- "insta",
- "kernel",
- "memory",
- "proptest",
- "same-file",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
- "trybuild",
- "wasmtime",
- "wasmtime-wasi",
- "wat",
- "win32job",
 ]
 
 [[package]]
@@ -2888,28 +2732,28 @@ dependencies = [
 name = "sprawling"
 version = "0.0.7"
 dependencies = [
- "accounting",
- "browser",
- "channels",
- "city",
- "collab",
  "cpu-time",
  "crossterm",
  "flate2",
  "futures-util",
- "gateway",
  "getrandom 0.4.3",
  "git2",
- "kernel",
- "memory",
  "memory-stats",
  "postcard",
- "protocol",
  "reqwest",
- "runtime",
  "serde",
  "serde_json",
+ "sprawling-accounting",
+ "sprawling-agent-protocols",
+ "sprawling-browser",
+ "sprawling-city",
+ "sprawling-collab",
  "sprawling-desktop",
+ "sprawling-gateway",
+ "sprawling-kernel",
+ "sprawling-runtime",
+ "sprawling-storage",
+ "sprawling-wire",
  "sysinfo",
  "tempfile",
  "thread-priority",
@@ -2917,6 +2761,69 @@ dependencies = [
  "tokio-tungstenite 0.30.0",
  "toml",
  "zeroize",
+]
+
+[[package]]
+name = "sprawling-accounting"
+version = "0.0.7"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sprawling-agent-protocols",
+ "sprawling-city",
+ "sprawling-collab",
+ "sprawling-gateway",
+ "sprawling-kernel",
+ "sprawling-wire",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
+name = "sprawling-agent-protocols"
+version = "0.0.7"
+dependencies = [
+ "reqwest",
+ "serde_json",
+ "sprawling-gateway",
+ "sprawling-kernel",
+ "tempfile",
+]
+
+[[package]]
+name = "sprawling-browser"
+version = "0.0.7"
+dependencies = [
+ "base64 0.23.1",
+ "png",
+ "serde",
+ "serde_json",
+ "sprawling-kernel",
+]
+
+[[package]]
+name = "sprawling-city"
+version = "0.0.7"
+dependencies = [
+ "cap-fs-ext",
+ "cap-std",
+ "serde",
+ "serde_json",
+ "sprawling-kernel",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
+name = "sprawling-collab"
+version = "0.0.7"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sprawling-kernel",
+ "sprawling-storage",
+ "tempfile",
+ "trybuild",
 ]
 
 [[package]]
@@ -2929,6 +2836,99 @@ dependencies = [
  "serde_json",
  "toml",
  "windows 0.62.2",
+]
+
+[[package]]
+name = "sprawling-gateway"
+version = "0.0.7"
+dependencies = [
+ "argon2",
+ "base64 0.23.1",
+ "chacha20poly1305",
+ "getrandom 0.4.3",
+ "insta",
+ "keyring",
+ "proptest",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sprawling-kernel",
+ "zeroize",
+]
+
+[[package]]
+name = "sprawling-kernel"
+version = "0.0.7"
+dependencies = [
+ "blake3",
+ "insta",
+ "proptest",
+ "regex",
+ "schemars",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "trybuild",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "sprawling-remote-access"
+version = "0.0.7"
+dependencies = [
+ "aws-lc-rs",
+ "sprawling-kernel",
+]
+
+[[package]]
+name = "sprawling-runtime"
+version = "0.0.7"
+dependencies = [
+ "insta",
+ "proptest",
+ "same-file",
+ "serde",
+ "serde_json",
+ "sprawling-kernel",
+ "sprawling-storage",
+ "tempfile",
+ "toml",
+ "trybuild",
+ "wasmtime",
+ "wasmtime-wasi",
+ "wat",
+ "win32job",
+]
+
+[[package]]
+name = "sprawling-storage"
+version = "0.0.7"
+dependencies = [
+ "blake3",
+ "git2",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sprawling-kernel",
+ "tempfile",
+ "thiserror 2.0.21",
+ "trybuild",
+]
+
+[[package]]
+name = "sprawling-wire"
+version = "0.0.7"
+dependencies = [
+ "axum",
+ "schemars",
+ "serde",
+ "serde_json",
+ "sprawling-kernel",
+ "tokio",
+ "tower",
+ "trybuild",
 ]
 
 [[package]]
@@ -4465,13 +4465,13 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 name = "xtask"
 version = "0.0.7"
 dependencies = [
- "browser",
- "channels",
  "flate2",
- "kernel",
  "proc-macro2",
  "serde",
  "serde_json",
+ "sprawling-browser",
+ "sprawling-kernel",
+ "sprawling-wire",
  "syn 3.0.6",
  "thiserror 2.0.21",
  "toml",

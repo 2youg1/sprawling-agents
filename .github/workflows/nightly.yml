@@ -170,7 +170,7 @@ jobs:
         run: |
           set -uo pipefail
           mkdir -p target/autoharness
-          timeout 50m cargo kani autoharness -Z autoharness -p kernel \
+          timeout 50m cargo kani autoharness -Z autoharness -p sprawling-kernel \
             2>&1 | tee target/autoharness/report.txt
           echo "status=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
       - name: what the scan says

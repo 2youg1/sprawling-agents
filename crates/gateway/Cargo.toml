@@ -1,12 +1,15 @@
 [package]
-name = "gateway"
+name = "sprawling-gateway"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lib]
+name = "gateway"
+
 [dependencies]
-kernel = { path = "../kernel" }
+kernel = { workspace = true }
 serde.workspace = true
 serde_json.workspace = true
 # Constitution B.7: HTTP with rustls; the wire format stays self-written,

@@ -1,13 +1,16 @@
 [package]
-name = "runtime"
+name = "sprawling-runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lib]
+name = "runtime"
+
 [dependencies]
-kernel = { path = "../kernel" }
-memory = { path = "../memory" }
+kernel = { workspace = true }
+memory = { workspace = true }
 # File identity (volume and file index on Windows, device and inode
 # elsewhere): `read` compares the handle it opened with the file now at
 # the judged location, which std exposes only on unstable APIs.

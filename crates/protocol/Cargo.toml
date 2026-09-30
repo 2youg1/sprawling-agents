@@ -1,9 +1,12 @@
 [package]
-name = "protocol"
+name = "sprawling-agent-protocols"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
+
+[lib]
+name = "protocol"
 
 [features]
 # A child that answers every line with one fixed result, for the tests of
@@ -11,11 +14,11 @@ publish.workspace = true
 conformance = []
 
 [dependencies]
-kernel = { path = "../kernel" }
+kernel = { workspace = true }
 # An MCP server reached over HTTP gets its client from
 # `gateway::client_for`, and a `secret:realm/name` reference beside a
 # server is redeemed through `gateway::SecretResolver`.
-gateway = { path = "../gateway" }
+gateway = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
 

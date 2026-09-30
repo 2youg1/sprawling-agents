@@ -1,12 +1,15 @@
 [package]
-name = "browser"
+name = "sprawling-browser"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lib]
+name = "browser"
+
 [dependencies]
-kernel = { path = "../kernel" }
+kernel = { workspace = true }
 # The probe answers with three named strings; naming them in a
 # type is cheaper than three hand-written lookups at each reader.
 serde = { workspace = true, features = ["derive"] }

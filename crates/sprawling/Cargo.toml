@@ -6,16 +6,16 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-accounting = { path = "../accounting" }
-kernel = { path = "../kernel" }
-memory = { path = "../memory" }
-runtime = { path = "../runtime" }
-gateway = { path = "../gateway" }
-channels = { path = "../channels" }
-city = { path = "../city" }
-collab = { path = "../collab" }
-browser = { path = "../browser" }
-protocol = { path = "../protocol" }
+accounting = { workspace = true }
+kernel = { workspace = true }
+memory = { workspace = true }
+runtime = { workspace = true }
+gateway = { workspace = true }
+channels = { workspace = true, features = ["server"] }
+city = { workspace = true }
+collab = { workspace = true }
+browser = { workspace = true }
+protocol = { workspace = true }
 crossterm = { workspace = true }
 futures-util = { workspace = true }
 getrandom = { workspace = true }
@@ -43,7 +43,7 @@ zeroize = { workspace = true }
 # the city starts for a building whose rules ask for the desktop
 # (sprawling-SPEC.md 8-4d). A path to the package outside the
 # workspace, which keeps its own lint table for the Win32 boundary.
-sprawling-desktop = { path = "../../desktop" }
+sprawling-desktop = { workspace = true }
 
 [features]
 # The execution engine, off by default. `AbsentSandbox` refuses tool
@@ -64,13 +64,13 @@ git2 = { version = "0.21", default-features = false }
 # The deterministic power-loss model, so a test above the ledger can lose
 # one named line and assert the city did not move. Kept to dev only: a
 # release build of this binary never carries FaultFs.
-memory = { path = "../memory", features = ["fault"] }
+memory = { workspace = true, features = ["fault"] }
 # The Ledger port's own assertion suite, so the relay adapter is held to
 # the same six assertions as the two adapters that own a medium.
-kernel = { path = "../kernel", features = ["conformance"] }
+kernel = { workspace = true, features = ["conformance"] }
 # A child that answers every line with one fixed result, so the wiring
 # of a building's servers is driven through a real pipe.
-protocol = { path = "../protocol", features = ["conformance"] }
+protocol = { workspace = true, features = ["conformance"] }
 
 [lints]
 workspace = true
