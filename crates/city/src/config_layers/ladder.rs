@@ -30,7 +30,7 @@ use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, LayeredValue};
 
 use super::ConfigLayer;
-use super::refuse::{refuse, skills_below_city};
+use super::refuse::skills_below_city;
 use crate::building::Building;
 
 /// One rung of the City -> Building -> Resident ladder, from the
@@ -161,8 +161,7 @@ impl Ladder {
 pub(crate) fn stated(file: &Path, rung: Layer) -> Result<ConfigLayer, AxError> {
     let stated = match std::fs::read_to_string(file) {
         // Several files can fail; the refusal says which one did.
-        Ok(text) => ConfigLayer::parse(&text)
-            .map_err(|err| refuse(format!("{}: {}", file.display(), err.subject())))?,
+        Ok(text) => ConfigLayer::parse(&text).map_err(|err| in_file(file, &err))?,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => ConfigLayer::default(),
         Err(err) => {
             return Err(AxError::failure(
@@ -177,6 +176,20 @@ pub(crate) fn stated(file: &Path, rung: Layer) -> Result<ConfigLayer, AxError> {
         return Err(skills_below_city(file));
     }
     Ok(stated)
+}
+
+/// A parse refusal as the ladder reports it: the file it was read from
+/// in front of the subject, and everything else as the parser wrote it.
+/// The recovery is the refusal's own, written where the refusal knew
+/// what to change; the ladder knows only which file (city-SPEC 12.8 (a)).
+fn in_file(file: &Path, refused: &AxError) -> AxError {
+    AxError::failure(
+        *refused.code(),
+        refused.action(),
+        format!("{}: {}", file.display(), refused.subject()),
+    )
+    .with_nearby(refused.nearby().to_vec())
+    .with_recovery(refused.recovery())
 }
 
 #[cfg(test)]
