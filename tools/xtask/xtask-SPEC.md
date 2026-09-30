@@ -33,7 +33,7 @@
 | gates（命令） | 不带名字时跑全部门，带名字时只跑点名的那几道（按门表次序）；名字不在门表里即以 `unknown-gate` 退出码 2 拒绝并列出全部门名，不退回「全跑」；聚合报告，任一违规即退出码 1（§12 第 2 条） |
 | spec（命令） | 生成 `<名>-SPEC.md` 骨架，写进那个包的目录；名字是包的 lib 名，没有 lib 的包用包名（`just spec`，§8-39） |
 | members（命令） | 包在哪：`--owning` 答一组路径属于哪些工作区包，`--dir` 答一个包住在哪个目录；`justfile` 用它，不再从路径里推包名（§8-39） |
-| apisync（命令） | 不在门名册里：`cargo xtask apisync` 只判两条跨 crate 的缝 kernel 与 wire 的基线新鲜——`cargo public-api` 实时面与已提交基线逐行同；夜间作业跑它（§8-32） |
+| apisync（命令） | 不在门名册里：`cargo xtask apisync` 只判两条跨 crate 的缝 kernel 与 wire 的基线是否新鲜——用 `tools/xtask/public-api.txt` 钉住的渲染器算出实时面，与已提交基线逐行比对；夜间作业跑它（§8-32、§12-6） |
 
 ### 门禁针对的 LLM 失效模式（本 crate 存在的理由）
 
@@ -92,7 +92,7 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 
 **已复核字面量表**：判定器恒不改——它的活是在入口捕获一切像钥匙的东西，那里误报不要钱；**本门问的是另一个问题**「这里是不是提交了一份凭证」，那里误报要一次构建。故门内持一张 `NOT_CREDENTIALS` 精确字面量表，逐条写明它是谁、为什么不可能是凭证。三条纪律：①**整串精确匹配**——带前缀或后缀的更长 token 仍是命中，故没人能靠戴一个已复核的名字混过去（一条断言钉这件事）；②**表住门里而不是站点上**——注释式豁免是注入内容能写的洞，这张表不是；③表在门机械的路径下，增一条与被判源码分开提交。表里的条目是 Cargo 的分目标 C 编译器变量名（`release.yml` 的 musl job 设它），以及 `desktop/Cargo.toml` 用来选出 Windows 臂 API 面的 `windows` crate feature 名：feature 名由 resolver 读取、自身恒不持值，`Win32` 里的数字与下划线并置才是触发混合字母表规则的原因；只列长度 ≥20 字节的名字，更短的够不着熵侦测器。
 
-**apisync 细则**：基线集是 `SEAM_CRATES`，按 lib 名写（kernel、wire），基线住 `tools/xtask/api-baselines/<lib>.txt`，由 `cargo xtask apisync --write` 生成（`cargo public-api -p <包名> --simplified`，包名由 `members` 按 lib 名查出，§8-39）；实时重算与基线逐行同，工具链缺失时拒判并报装机指引。接口变动要不要进 SPEC 交给评审，机器不判（§8-32）。cargo-public-api 与 nightly 是环境前置，`just prereqs` 把它们列为可选。
+**apisync 细则**：基线集是 `SEAM_CRATES`，按 lib 名写（kernel、wire），基线住 `tools/xtask/api-baselines/<lib>.txt`，由 `cargo xtask apisync --write` 生成。实时面由 `cargo +<rustdoc> public-api -p <包名> --simplified` 算出，包名由 `members` 按 lib 名查出（§8-39），`<rustdoc>` 与 cargo-public-api 的版本都只取自 `tools/xtask/public-api.txt`（§12-6）。判定与重写开始前先跑一次 `cargo +<rustdoc> public-api --version`：钉住的 nightly 没装、cargo-public-api 没装、或答出的版本不是钉住的那个，都以 `XtaskError::Cmd` 拒判，消息里给出两条安装命令，退出码 2。没有 rustup 的环境（例如 Nix devshell）走同一条拒判。漂移时，违规列出只在基线里的行（前缀 `- `）和只在实时面里的行（前缀 `+ `），最多 `DRIFT_SHOWN` 行，其余只报条数（§12-7）。接口变动要不要进 SPEC 交给评审，机器不判（§8-32）。cargo-public-api 是环境前置，`just prereqs` 把它列为可选；钉住的 nightly 由拒判消息点名。
 
 ## 8 接口先行
 
@@ -167,6 +167,10 @@ pub(crate) struct Violation {
 **12-4 一个包是产品还是工具，由它自己的清单声明。** `[package.metadata.sprawling] role = "tool"`，xtask 与 citysim 各写这一行；不写即 Product，写了别的值以 `unknown-role` 拒读（§8-39）。理由：声明跟着包走，搬目录、改包名都不必改 xtask；一个忘了声明的新工具按产品受更严的门（要进 depmap 块、要进模块图），失败的方向是一次看得见的红，而不是一道门静默少判。被击败的备选：在 `members` 模块里写一张常量表 `TOOLS`——包的一个属性就住进了另一个包，改包名的那次提交不碰 xtask 也能过编译，两份名字从那一刻起各说各话。
 
 **12-5 一个 crate 拥有什么，按它的模块名前缀找 family。** `crate_table`（§8-40）的「Owns」一列取 `architecture.toml` 的 `[family.<键>] duty`，键是这个包目录下全部登记模块共有的名字前缀（`::` 之前），不是 lib 名：family 表本来就按模块名前缀取键，`sprawling` 的文件在 `crates/sprawling/src` 而模块名写 `bin::…`，所以它读 `[family.bin]`。前缀一个也没有、多于一个、或那个 family 没有 `duty`，都以 `Doc` 错误拒读并点名包与缺的那一格，不退回 lib 名。理由：前缀是模块表里已经写下的事实，按它找 family 不需要第二张「包→家族」对照表；一次改名同时动了模块名与 family 键，表就跟着走。被击败的备选有两个：在 `crate_table` 里写一个常量把 `sprawling` 映到 `bin`（包的一个属性住进了门里，改名那次不碰 xtask 也能过编译）；把 `[family.bin]` 改名 `[family.sprawling]`（family 键从此不再是模块名前缀，而 `bin::` 模块的家族要靠人记）。
+
+**12-6 基线是一次渲染，渲染器与基线一起钉住。** `tools/xtask/public-api.txt` 写两个值：rustdoc 取哪个带日期的 nightly（`PUBLIC_API_RUSTDOC`），cargo-public-api 取哪个版本（`PUBLIC_API_VERSION`）。`apisync` 只用这一对算实时面，`nightly.yml` 的 apisync 作业也只装这一对；挪动任一值，就在同一变更集里用新渲染器重写基线，挪钉子本身属门机械。理由：同一份源码，由另一个 nightly 的 rustdoc 或另一个 cargo-public-api 版本打印出来，可以逐行不同。两边各自浮动时，基线的内容取决于写它的机器上碰巧装了哪个 nightly，判它的 CI 每晚又换一个，源码一行没动也会报漂移；cargo-public-api 在工具链像 stable 时自己换成浮动的 `nightly`，而本仓库根的 `rust-toolchain.toml` 恰好钉着 stable，所以不写 `+<nightly>` 就一定落到浮动那一侧。被击败的备选有三个：①只在本机重写基线：下一晚 CI 换了 nightly，红照样回来；②只在 CI 钉住：本机 `--write` 仍按本机的 nightly 写出另一种渲染；③把 nightly 写进 `rust-toolchain.toml`：那个文件钉的是编译产品用的 stable，而 rustdoc JSON 只有 nightly 能出，两件事不能共用一个 channel。重议条件：cargo-public-api 能读 stable 工具链产出的 rustdoc JSON，或者钉住的 nightly 编译不了 workspace（某个依赖的 `rust-version` 超过它）。
+
+**12-7 漂移报告列出差异行，并设上限。** 夜间作业的读者手里只有日志，只报「漂了」时，他得在另一台机器上装同一对渲染器、重算一遍才知道漂了什么。所以违规按排序后的逐行比对，列出只在一侧出现的行，最多 `DRIFT_SHOWN`（40）行，其余报条数。被击败的备选：打印完整差异。rustdoc 的渲染一变，往往整份基线的行都跟着变，几千行的日志没有人读；上限内的前几行已经足够判断是源码变了还是渲染变了。
 
 ## 13 依赖选型
 

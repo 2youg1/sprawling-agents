@@ -49,7 +49,7 @@ just check                    # the whole check: fmt, source gates, Lean models,
 | `just dist` | the whole deliverable: client, binary, bill of materials |
 | `just sim` | the citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |
 | `cargo xtask docnum [--write]` | every number and generated section a document carries, checked against the code that decides it; `--write` rewrites them |
-| `cargo xtask apisync [--write]` | the public API of `kernel` and `wire` against its baseline in `tools/xtask/api-baselines/`; a nightly job reads it, and a change to either surface rewrites the baseline in the same change-set |
+| `cargo xtask apisync [--write]` | the public API of `kernel` and `wire` against its baseline in `tools/xtask/api-baselines/`, rendered by the nightly rustdoc and the cargo-public-api release that `tools/xtask/public-api.txt` pins; a nightly job reads it, and a change to either surface rewrites the baseline in the same change-set |
 | `just adversary` | the out-of-tree property checker that attacks the binary through the wire; never a gate, and a no-op without Lean |
 | `just proof` | the kernel propositions kani holds against real MIR; never a gate, and a no-op without kani, which has no Windows host; `cargo xtask proof --list` prints the roster |
 | `just --list` | every other recipe — SPEC skeletons, ledger replay, measurements, fuzzing, mutation testing — with the comment that says what it does |
