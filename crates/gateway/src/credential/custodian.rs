@@ -272,9 +272,6 @@ impl Custodian {
     }
 }
 
-/// PKCE begin (RFC 7636, S256): pure construction — the browser visit
-/// and the token POST are the caller's I/O. The verifier arrives from
-/// the assembly's seeded randomness (kernel never samples).
 /// The `provider_degraded` line the probe hands back when it fell to
 /// session memory, naming what the platform service said.
 fn degraded_payload(reason: &str) -> Option<Payload> {
