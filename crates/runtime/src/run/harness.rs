@@ -91,6 +91,9 @@ impl<'a> HarnessRun<'a> {
     /// # Errors
     /// Propagates the ledger.
     pub fn cancel(&mut self, ledger: &mut dyn Ledger, cut: Cut, t: TimeMs) -> Result<(), AxError> {
+        if self.cut.is_some() {
+            return Ok(());
+        }
         ledger.append(self.charter.line(
             EventKind::CancelReceived,
             Payload::of(&CancelReceived {})?,
@@ -152,11 +155,21 @@ impl<'a> HarnessRun<'a> {
 /// An answer with nothing in it is not evidence that work finished, the
 /// reading `lifecycle::concluded` gives an empty model reply.
 fn ending(
-    _answered: &HarnessAnswered,
-    _cut: Option<Cut>,
-    _cited: EventRef,
+    answered: &HarnessAnswered,
+    cut: Option<Cut>,
+    cited: EventRef,
 ) -> Result<Completion, AxError> {
-    Ok(Completion::Cancelled)
+    Ok(match answered.stop {
+        HarnessStop::EndTurn if answered.text.trim().is_empty() => Completion::Limit,
+        HarnessStop::EndTurn => Completion::Done(Evidence::new(vec![cited])?),
+        HarnessStop::Cancelled => match cut {
+            Some(Cut::Deadline) => Completion::Limit,
+            Some(Cut::Halt) | None => Completion::Cancelled,
+        },
+        HarnessStop::MaxTokens | HarnessStop::MaxTurnRequests | HarnessStop::Refusal => {
+            Completion::Limit
+        }
+    })
 }
 
 #[cfg(test)]
