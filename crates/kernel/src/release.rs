@@ -23,6 +23,13 @@
 //! itself as the newer of the two, which is the reason the date has to
 //! travel with the version rather than beside it.
 //!
+//! **The maturity is written once.** A tag carries it between the
+//! version and the date, `-Pre-alpha-` today; [`MATURITY`] is the one
+//! place it is decided, and the tag, the first line of `sprawling status`
+//! and the documents render it (kernel D18). The npm spelling keeps
+//! `-pre.` whatever the maturity, because semver sorts pre-release
+//! identifiers as text and `alpha` sorts before `pre`.
+//!
 //! No clock and no socket. What the registry currently offers is the
 //! caller's to fetch; this judges only what it is handed
 //! (ARCHITECTURE.md paragraph 1).
@@ -30,9 +37,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AxCode, AxError};
-
-/// What separates the version from the date in a git tag.
-const TAG_INFIX: &str = "-Pre-alpha-";
 
 /// How far this project stands, as every release it cuts names it
 /// (kernel D18).
@@ -68,6 +72,11 @@ impl Maturity {
             Maturity::PreAlpha => "Pre-alpha",
             Maturity::Alpha => "Alpha",
         }
+    }
+
+    /// `-Pre-alpha-`, what separates the version from the date in a tag.
+    fn tag_infix(self) -> String {
+        format!("-{}-", self.titled())
     }
 }
 
@@ -140,20 +149,23 @@ impl Release {
     fn decode_tag(
         tag: &str,
         expected_version: &str,
-        _maturity: Maturity,
+        maturity: Maturity,
     ) -> Result<Release, AxError> {
         let refused = |msg: &str| {
             AxError::failure(AxCode::ConfigInvalid, "read a release tag", tag.to_owned())
                 .with_recovery(msg.to_owned())
         };
+        let infix = maturity.tag_infix();
         let body = tag.strip_prefix('v').ok_or_else(|| {
-            refused("a release tag begins with `v`, as in `v0.0.5-Pre-alpha-260912`")
+            refused(&format!(
+                "a release tag begins with `v`, as in `v0.0.5{infix}260912`"
+            ))
         })?;
-        let (version, date) = body.split_once(TAG_INFIX).ok_or_else(|| {
-            refused(
-                "a release tag reads `v<version>-Pre-alpha-<YYMMDD>`; \
-                 a tag of another shape needs this rule written for it",
-            )
+        let (version, date) = body.split_once(infix.as_str()).ok_or_else(|| {
+            refused(&format!(
+                "a release tag of this build reads `v<version>{infix}<YYMMDD>`; \
+                 a tag of another shape or another maturity is not one of its releases"
+            ))
         })?;
         if version != expected_version {
             return Err(AxError::failure(
@@ -264,12 +276,16 @@ impl Release {
     }
 
     /// The tag a build of `maturity` cuts for this release.
-    fn tag_at(&self, _maturity: Maturity) -> String {
+    fn tag_at(&self, maturity: Maturity) -> String {
         let Release {
             year, month, day, ..
         } = *self;
         let short = year.checked_sub(CENTURY).unwrap_or(year);
-        format!("v{}{TAG_INFIX}{short:02}{month:02}{day:02}", self.version())
+        format!(
+            "v{}{}{short:02}{month:02}{day:02}",
+            self.version(),
+            maturity.tag_infix()
+        )
     }
 
     /// `0.0.5-pre.260912`, the version npm carries.
@@ -363,7 +379,8 @@ mod tests {
 
     #[test]
     fn a_release_tag_becomes_the_semver_npm_accepts() {
-        let cut = Release::from_tag("v0.0.5-Pre-alpha-260912", "0.0.5").unwrap();
+        let cut =
+            Release::decode_tag("v0.0.5-Pre-alpha-260912", "0.0.5", Maturity::PreAlpha).unwrap();
         assert_eq!(cut.npm_version(), "0.0.5-pre.260912");
         assert_eq!(cut.version(), "0.0.5");
         assert_eq!(cut.released(), "2026-09-12");
@@ -375,15 +392,16 @@ mod tests {
     #[test]
     fn both_spellings_round_trip_through_one_another() {
         let tag = "v0.0.5-Pre-alpha-260912";
-        let cut = Release::from_tag(tag, "0.0.5").unwrap();
-        assert_eq!(cut.tag(), tag);
+        let cut = Release::decode_tag(tag, "0.0.5", Maturity::PreAlpha).unwrap();
+        assert_eq!(cut.tag_at(Maturity::PreAlpha), tag);
         assert_eq!(Release::from_npm_version(&cut.npm_version()).unwrap(), cut);
     }
 
     /// The check that keeps one release from having two version numbers.
     #[test]
     fn a_tag_disagreeing_with_the_build_is_refused() {
-        let err = Release::from_tag("v0.0.3-Pre-alpha-260911", "0.0.4").unwrap_err();
+        let err = Release::decode_tag("v0.0.3-Pre-alpha-260911", "0.0.4", Maturity::PreAlpha)
+            .unwrap_err();
         assert!(err.recovery().contains("two version numbers"), "{err:?}");
     }
 
@@ -401,7 +419,7 @@ mod tests {
             "v0.00.4-Pre-alpha-260911",
         ] {
             assert!(
-                Release::from_tag(refused, "0.0.4").is_err(),
+                Release::decode_tag(refused, "0.0.4", Maturity::PreAlpha).is_err(),
                 "{refused} was accepted"
             );
         }

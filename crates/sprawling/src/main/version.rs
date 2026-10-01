@@ -24,10 +24,11 @@ use wire::ReleaseAnswer;
 /// The production path passes `kernel::release::MATURITY`, the one place
 /// the maturity is written (kernel D18); taking it as a parameter is what
 /// lets a test see this line follow it (sprawling-SPEC.md 8-162).
-pub(super) fn headline(_maturity: Maturity) -> String {
+pub(super) fn headline(maturity: Maturity) -> String {
     format!(
-        "sprawling {} (pre-alpha){}",
+        "sprawling {} ({}){}",
         env!("CARGO_PKG_VERSION"),
+        maturity.word(),
         cut()
     )
 }
