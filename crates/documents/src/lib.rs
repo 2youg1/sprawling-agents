@@ -6,8 +6,8 @@
 //! The rules of a document a person reads and edits through a page:
 //! which version it is, which characters its bytes spell, where its
 //! blocks lie, how much of it one answer carries, what one save
-//! changes, and how a suggestion about it is read and decided
-//! (`crates/documents/Spec.lean`).
+//! changes, how a suggestion about it is read and decided, and how a
+//! Markdown window reads (`crates/documents/Spec.lean`).
 //!
 //! No I/O: the bytes arrive as slices and leave as values. Reading the
 //! disk and the content store, and recording a save, belong to the

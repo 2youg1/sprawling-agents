@@ -461,9 +461,11 @@ fn reading_on_from_each_preview_lays_out_every_paragraph_once() {
         assert_eq!(span.start(), from);
         assert!(span.end() > from, "every window moves the reader on");
         if span.end() < size {
-            let last = blocks.last().map(|block| match block {
-                Block::Paragraph { span, .. } => span.end(),
-                other => panic!("{other:?}"),
+            let last = blocks.last().map(|block| {
+                let Block::Paragraph { span, .. } = block else {
+                    panic!("{block:?}");
+                };
+                span.end()
             });
             assert_eq!(
                 last,

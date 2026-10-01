@@ -29,8 +29,12 @@ pub(super) const NESTING_MAX: usize = 16;
 
 /// The blocks of `text`, whose first byte is byte `at` of the version.
 pub(super) fn blocks(text: &str, at: u64) -> Vec<Block> {
-    let _unread = (text, at);
-    Vec::new()
+    let arena = Arena::new();
+    let root = parse_document(&arena, text, &grammar());
+    let lowering = Lowering {
+        positions: Positions::of(text, at),
+    };
+    lowering.children(root, 0)
 }
 
 /// The one Markdown grammar (D22): CommonMark, GFM's tables,
