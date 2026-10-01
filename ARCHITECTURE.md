@@ -798,7 +798,7 @@ than typed.
 | The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->13,159,936 B<!-- xtask:end -->, client included | yes |
 | Resident memory, one session | ≤<!-- xtask:begin budget_bytes:resident_empty_idle -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:resident_empty_idle -->2,469,888 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
 | Ledger append plus fsync | p50 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p50_ms -->5<!-- xtask:end --> ms, p99 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p99_ms -->20<!-- xtask:end --> ms | `[ledger_append]`, with its machine class | no |
-| Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->1,222<!-- xtask:end --> ms for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
+| Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->716<!-- xtask:end --> ms for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
 | Prefix assembly | ≤<!-- xtask:begin budget_figure:prefix_assembly.budget_ms -->1<!-- xtask:end --> ms | `[prefix_assembly]`, with its machine class | no |
 | Runs driving at once | `DRIVING_LANES` in `accounting::worker::pool` | one thread per run, and one accounting thread taking every write | no: it is a wall this city sets, not a measurement |
 | Kernel mutation score | ≥90% | by `just mutants` | by that command, not by `just check` |
@@ -821,7 +821,7 @@ only goes down.
 
 | Load scenario, sub-metric | Baseline (p50 / p95 / p99) | Machine class |
 |---|---|---|
-| large-ledger fold, `harness` | <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->1,222<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p95_ms -->1,225<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p99_ms -->1,225<!-- xtask:end --> ms per rebuild, from `[views_rebuild_per_mb]` | general: windows-x86_64, 16 cores, NVMe |
+| large-ledger fold, `harness` | <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->716<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p95_ms -->716<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p99_ms -->716<!-- xtask:end --> ms per rebuild, from `[views_rebuild_per_mb]` | general: windows-x86_64, 16 cores, NVMe |
 
 Taken under the registered fixture (`bench::scenarios::REGISTERED`), release
 build. A reading from another machine class does not enter this table.
