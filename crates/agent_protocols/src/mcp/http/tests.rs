@@ -274,3 +274,56 @@ fn a_header_with_no_name_is_refused_before_any_request() {
     assert_eq!(err.code(), &AxCode::ConfigInvalid);
     assert!(!err.subject().contains("opaque-value"), "{}", err.subject());
 }
+
+/// A JSON-RPC answer of exactly `len` bytes, padded inside its result.
+fn answer_of_length(len: usize) -> String {
+    let envelope = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"pad\":\"\"}}";
+    let filling = "x".repeat(len.saturating_sub(envelope.len()));
+    let body = format!("{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{{\"pad\":\"{filling}\"}}}}");
+    assert_eq!(body.len(), len);
+    body
+}
+
+/// The ceiling is the largest body that passes, as it is the largest
+/// line that passes on a pipe.
+#[test]
+fn an_answer_at_the_ceiling_is_read() {
+    let (url, server) = fake_server(200, answer_of_length(crate::MESSAGE_CEILING));
+    let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
+
+    let answer = held
+        .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
+        .unwrap();
+
+    drop(server.join());
+    assert_eq!(answer.len(), crate::MESSAGE_CEILING);
+}
+
+/// An HTTP answer is held in memory whole, so it is read under the same
+/// ceiling as a line on a pipe: one byte past it is refused rather than
+/// read to its end, and the call it answered may already have run.
+#[test]
+fn an_answer_past_the_ceiling_is_refused_rather_than_read_whole() {
+    let (url, server) = fake_server(
+        200,
+        answer_of_length(crate::MESSAGE_CEILING.saturating_add(1)),
+    );
+    let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
+
+    let answer = held.call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE);
+
+    drop(server.join());
+    assert!(answer.is_err(), "a body past the ceiling is not an answer");
+    let err = answer.unwrap_err();
+    assert_eq!(err.code(), &AxCode::WireMismatch);
+    assert!(
+        err.subject().contains(&crate::MESSAGE_CEILING.to_string()),
+        "{}",
+        err.subject()
+    );
+    assert_eq!(
+        err.retry(),
+        kernel::Retry::Unknown,
+        "the server took the call"
+    );
+}
