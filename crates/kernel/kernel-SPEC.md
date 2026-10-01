@@ -328,10 +328,25 @@ impl fmt::Display for Locator { /* 规范拼写往返：parse(x).to_string() == 
 - **规范回声断言**：解析成功后另断言 `Display(结果) == 原串`，不等即 `E_LOCATOR_INVALID`（recovery 给出规范拼写）——一条规则封死大写 hex、前导零、`+` 号等全部非规范变体。
 - 十六进制恒小写（规范字节唯一化）；大写拒。`b3-` 外的算法标签拒（对扩展开放：新标签＝新 variant，旧解析不宽容）。
 - `SecretRef`（`secret:`）恒不入本文法——`secret:` 前缀命中即 `E_LOCATOR_INVALID`，两套解析器分立（类型层理由）。
-- serde：字符串形（Display/parse 往返）。
+- serde：字符串形（Display/parse 往返）。`B3Hash` 与 `GitOid` 的 serde 在人读的格式里是同一种字符串形、在二进制格式里写字节本身，见 §8-84。
 - `Locator::cas(hash)` 是手里已有 `B3Hash`（通常是 `Cas::put` 的回答）时的唯一构造法：一个 digest 本就合文法，拼成文本再 `parse` 回来只是多了一次分配、一次解析，外加一个恒不发生的错误分支，调用方还得为它写 `?`。
 - `B3Hash::from_bytes([u8;32])`／`to_hex()`；`Range` 构造校验 `from<=to`（Lines 另 `from>=1`）。
 - `B3Hash::digest(bytes: &[u8]) -> B3Hash`（blake3 直算）：全库内容哈希的唯一产地——prefix 分段哈希与 stall 指纹均经此，不在 kernel 外直呼 blake3（一个哈希一个家）。`chain_hash` 保留为链语义专名（内部改经 digest）。
+
+### 8-84 `B3Hash` 与 `GitOid` 的 serde：人读的格式写十六进制，二进制格式写字节本身（`kernel::locator`，形状 2 值类型）
+
+```rust
+// kernel::locator —— shape: value
+impl Serialize for B3Hash { /* is_human_readable：64 位小写十六进制；否则 [u8; 32] 的 32 个字节 */ }
+impl Serialize for GitOid { /* is_human_readable：40 位小写十六进制；否则 [u8; 20] 的 20 个字节 */ }
+impl<'de> Deserialize<'de> for B3Hash { /* 人读的格式只收规范十六进制、长度不对即拒；二进制格式读回 32 个字节 */ }
+impl<'de> Deserialize<'de> for GitOid { /* 同上，20 个字节 */ }
+```
+
+- **一条规则，两种摘要。** 两种摘要的 serde 问同一个问题 `is_human_readable()`，写与读各经一个私有函数（`write_digest`、`read_digest`），两个类型只交出各自的字节与拼写。账本行、线上帧、`serde_json::Value` 都是人读的格式，拼写照旧是小写十六进制，读回只收 `decode_hex_fixed` 认的那一种拼写；视图与 Standing 的快照经 postcard 编码，是二进制格式，写 N 个字节、读回 N 个字节，不分配字符串、不解十六进制。`RunId` 早已这样做（`kernel::event::identity` 的 `read_run_id`：uuid 在二进制格式里写 16 个字节）。
+- **什么不变。** 账本的规范字节（`canonical_line`）、线上的拼写、`golden-p0`／`golden-s1`、wire 的两份 golden 都不变：它们全经 `serde_json` 写。变的只有快照格式；快照格式由 `VIEWS_FOLD_RULES` 与 `STANDING_FOLD_RULES` 的夹具摘要钉住（accounting-SPEC.md 8-24），所以旧快照按「版本不符」从创世折一次，没有第二种读法。
+- **为什么。** 40 万行夹具城开城时视图快照解码约 135 ms，其中约 105 ms 是提交折叠里 64,000 个 oid 的十六进制：每个 oid 在 `commits`、`commit_seqs`、`last_commit` 里各解一次（sprawling-SPEC.md 8-144）。改后的读数在 sprawling-SPEC.md 8-154。
+- **被否：快照里每个摘要字段各标一个 `#[serde(with = …)]`。** 摘要散在视图的十几个字段与 wire 的类型里（例如 `wire::CommitAt`），逐个标注就是同一条规则的十几份拼写；漏标一处既不报错，也看不出慢，只是悄悄留着十六进制。serde 的 `is_human_readable` 正是为这种区分设的。**被否：给快照另起一个 `GitOidBytes` 新类型。** 视图里存的 `GitOid` 也是线上答复里的那个值，换类型就要在折叠与作答之间来回转换。
 
 ### 8-4 kernel::event
 
@@ -1914,6 +1929,16 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 **被否**：①加第四种结局 `Lost`：每个穷尽匹配 `Completion` 的地方都要多一臂，而 `RunFrozen::of` 的「三种结局，第四种不可表示」正是要守住结局的集合由 run 的驱动定；②不写冻结、让视图把没有冻结行的 run 读作死掉的：服务中的城与重开的城读同一份账本会得出不同的答案，而 ARCHITECTURE §13.7 的 `Lost --> Frozen` 要的是账本上的一行；③冻成 `limit`：那是「被上限截断」，读者会去找一个不存在的上限。
 
 **重开参数**：出现一种由 run 自己得出、又不属于三种的结局时，重议 `Completion` 的集合，那时 `process_died` 也一并重议它属于哪一种。
+
+### 12.16 摘要在二进制格式里写字节，在人读的格式里写十六进制
+
+**决定**：`B3Hash`、`GitOid` 的 `Serialize` 与 `Deserialize` 按 `is_human_readable()` 分两臂（§8-84）。
+
+**理由**：十六进制拼写是给人和线上读者的；二进制格式只由这个二进制自己读回，十六进制在那里只让一个摘要长一倍，读一次多一次解码。规则住在类型旁边，所以视图、Standing 与以后任何二进制快照都不必知道它。
+
+**被否**：①快照字段逐个 `#[serde(with)]`（§8-84）；②全城改用字节拼写——账本行与线上帧是 JSON，十六进制拼写是它们的契约，改它要动账本的规范字节与 `WIRE_V`。
+
+**重开参数**：出现第二种二进制格式、它的读者要另一种形状（例如带长度前缀、或要人能读的转储）时。
 
 ## 13 依赖选型
 
