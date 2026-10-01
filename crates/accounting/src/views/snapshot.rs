@@ -197,4 +197,4 @@ impl Views {
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests;
+pub(crate) mod tests;

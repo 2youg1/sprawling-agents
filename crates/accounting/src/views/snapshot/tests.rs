@@ -11,9 +11,10 @@ use kernel::{Address, EventKind, RunId};
 use super::*;
 use crate::views::tests::{Place, view_record};
 
-/// A view folded from records that fill the inbox, the discard bin and
-/// the registry, so a field added, removed or reordered among them
-/// changes the bytes.
+/// A view folded from records that fill the inbox, the discard bin, the
+/// registry, the commits and the governed rules, so a field added,
+/// removed or reordered among them changes the bytes, and so does the
+/// encoding of either digest a snapshot holds (accounting-SPEC 8-24).
 fn fixture(city_root: &Path) -> Views {
     let mut views = Views::new(city_root);
     let room = Address::parse("lab/room1").unwrap();
@@ -42,6 +43,11 @@ fn fixture(city_root: &Path) -> Views {
             EventKind::AssetArchived,
             serde_json::json!({"kind": "decision", "subject": "chose git over a second index"}),
         ),
+        (
+            EventKind::CheckpointCommitted,
+            serde_json::json!({"oid": "cd".repeat(20)}),
+        ),
+        (EventKind::RulesChanged, rules_changed()),
     ];
     for (seq, (kind, data)) in (1..).zip(records) {
         let serde_json::Value::Object(data) = data else {
@@ -52,6 +58,19 @@ fn fixture(city_root: &Path) -> Views {
             .unwrap();
     }
     views
+}
+
+/// The city's configuration booked as the digest of five bytes: the
+/// governed rules hold a `B3Hash` (accounting-SPEC 8-24).
+pub(crate) fn rules_changed() -> serde_json::Value {
+    let changed = kernel::event::record::RulesChanged {
+        scope: kernel::event::Scope::City,
+        which: kernel::event::record::GoverningDocument::Config,
+        before: None,
+        after: B3Hash::digest(b"rules"),
+        bytes: 5,
+    };
+    serde_json::Value::Object(kernel::Payload::of(&changed).unwrap().as_map().clone())
 }
 
 #[test]
@@ -76,4 +95,38 @@ fn a_run_id_reads_back_from_the_snapshot_encoding() {
     let run = RunId::from_bytes([7u8; 16]);
     let bytes = postcard::to_allocvec(&run).unwrap();
     assert_eq!(postcard::from_bytes::<RunId>(&bytes).unwrap(), run);
+}
+
+/// A snapshot holds a digest as its bytes and reads the same digest
+/// back, while every format a reader sees still spells it in hex
+/// (kernel-SPEC 8-84): the hex decode was most of decoding the views.
+#[test]
+fn a_digest_is_its_bytes_in_the_snapshot_and_its_hex_in_json() {
+    let oid = kernel::GitOid::from_bytes([0xcd; 20]);
+    let hash = B3Hash::from_bytes([0x5a; 32]);
+    let encoded = (
+        postcard::to_allocvec(&oid).unwrap(),
+        postcard::to_allocvec(&hash).unwrap(),
+    );
+
+    let read_back = (
+        postcard::from_bytes::<kernel::GitOid>(&encoded.0).unwrap(),
+        postcard::from_bytes::<B3Hash>(&encoded.1).unwrap(),
+    );
+    let spelled = (
+        serde_json::to_string(&oid).unwrap(),
+        serde_json::to_string(&hash).unwrap(),
+    );
+
+    assert_eq!(
+        (encoded, read_back, spelled),
+        (
+            (vec![0xcd; 20], vec![0x5a; 32]),
+            (oid, hash),
+            (
+                format!("\"{}\"", "cd".repeat(20)),
+                format!("\"{}\"", "5a".repeat(32))
+            ),
+        )
+    );
 }

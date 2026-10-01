@@ -119,8 +119,10 @@ fn a_worker_refuses_a_line_rewritten_before_the_snapshot_in_a_sealed_segment() {
 }
 
 /// Folds filled from records that put a signal in the collaboration
-/// fold's queue and a claim in its plan holders, so a field added,
-/// removed or reordered among them changes the bytes.
+/// fold's queue, a claim in its plan holders and a digest in the
+/// governed rules, so a field added, removed or reordered among them
+/// changes the bytes, and so does the encoding of a digest
+/// (accounting-SPEC 8-24).
 fn encoding_fixture() -> StandingFolds {
     let room = Address::parse("lab/room1").unwrap();
     let signal = collab::Signal::new(
@@ -147,6 +149,16 @@ fn encoding_fixture() -> StandingFolds {
             signal.enqueued_payload().unwrap(),
         ),
         (kernel::EventKind::RoadmapClaimed, claimed),
+        (
+            kernel::EventKind::RulesChanged,
+            kernel::Payload::new(
+                crate::views::snapshot::tests::rules_changed()
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            )
+            .unwrap(),
+        ),
     ];
     let mut folds = StandingFolds::empty(Path::new("."));
     for (seq, (kind, data)) in (1..).zip(records) {
