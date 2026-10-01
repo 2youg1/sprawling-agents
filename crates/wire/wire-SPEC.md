@@ -22,7 +22,7 @@
 
 ## 2 验收标准
 
-- **wire**：Command 恰 29 个 variant、Query 恰 38 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 恰 33 个 variant、Query 恰 40 个（计数断言；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本 SPEC 同集变更。
   **当前 golden**：`046ff264f692eb93d76f15267f31b986a139f9b6829b877e27211e863e76ebc8`；**WIRE_V ＝ 45**（帧表与查询表的当前内容见 §8 各章）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
@@ -54,7 +54,7 @@
 
 公开面见 `tools/xtask/api-baselines/wire.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
 
-**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`Sample.view_backlog: u64`（已提交、发布出去的视图还没折进的记录条数）；页面读到的历史已证明到哪一条 `seq`；`CommitAnswer` 带出提交说明；身份、导入、保存回执与上手进度的线面；城一级配置的写入口与 `PreferencePatch` 的 `[core] priority` 一臂；`ModelTag` 的 OCR 一值。下列新名字只动名字表，哈希随之变，不另进位：远程门的五种 Ledger 事件（门开、门关、设备配对、设备撤销、会话开始，与写它们的装配同批，remote_access-SPEC §3）、`PutRules`、自动化只读查询、按房间列出 session 的查询、从检查点取回单个文件的命令。每落一项删一项。
+**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`CommitAnswer` 带出提交说明；身份的另外两件——在主机上经 `gh` 导入用户 ID 的读（一条 `Query`，在锁外跑 `gh api --hostname <host> user --jq .login`，只取 login，不读不记令牌，失败答拒因）与上手指南按城保存的进度（存放位置在 `kernel::layout` 的 `urbanite` 一组之后，待定）。下列新名字只动名字表，哈希随之变，不另进位：远程门的五种 Ledger 事件（门开、门关、设备配对、设备撤销、会话开始，与写它们的装配同批，remote_access-SPEC §3）；按房间分页列出 session 的查询（UC7b：起点 seq、起点方式——新开、`--carry`、分叉及其 `Origin`——、run 数、最近一次活动）。后者未落的原因是读法：今天视图只持热视图里最近冻结的 32 个 run，账本索引只按 run 建表，所以要么视图多折一张按房间的 session 表（视图快照的 `fold_version` 随之进一位），要么 `storage::index` 多建一张按地址的表；判定它的证据是两种做法在 40 万行城上开一次「最近」段的读数。每落一项删一项。
 
 ## 5 权威信源
 

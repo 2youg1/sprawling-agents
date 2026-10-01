@@ -18,6 +18,85 @@ release notes and their commits.
 
 ---
 
+## v0.0.8-Pre-alpha (not yet cut)
+
+**sprawling 0.0.8 something (pre-alpha)**
+
+Pre-alpha. It records what has landed after `v0.0.7-Pre-alpha-260927` so
+far. Every wire change below shares one `WIRE_V`: the version moved once, at
+the first change of shape after the last push, and moves again only after the
+next push (wire-SPEC 12.1).
+
+### What the city calls the person and the Mayor
+
+`PREFERENCES.md` and `MAYOR.md` may open with an identity area: a TOML block
+between two `+++` lines. `PREFERENCES.md` states `user_id` and
+`imported_from`, and the text below the area says what every agent should
+know about the person; `MAYOR.md` states `name`. A file without an area reads
+as before, all body. An area that does not read is refused with its line
+number, everywhere it is read, rather than read as "no name".
+
+The names reach the model. The city segment of every prompt says what the
+person is called, what they asked every agent to know, and that the Mayor at
+`hall/mayor` goes by its name; the Mayor's own prompt opens with
+`Your name: <name>`. A session freezes the names its first run read, and every
+later run of that session sends the same ones, so a rename takes effect at the
+next `/new`. Each `run_started` line records the version it ran under, and a
+page reads the names back from the content store by it.
+
+The page writes the names through `PutIdentity`, which sends the values and
+the text the page read; the city rewrites only the card's keys. `PutDocument`
+now carries that text too. A document that moved since the page read it is
+refused, and the draft stays on the page. `Query::Identity` reads both areas
+at the moment of asking.
+
+### A building's rules and the city's own settings from a page
+
+`PutRules` writes a building's `RULES.toml` whole. The city evaluates the
+text before it lands and refuses it when the file moved since the page read
+it; a write that lands is booked as `rules_changed`, the same line a dispatch
+writes when it finds the file changed. `ConfigureCity` writes `keep_warm`
+and the standing `effort` into the city's own `CONFIG.toml`. The core
+priority is one more `PutPreferences` patch, and lands in the `[core]`
+section of the person's file, where it always lived.
+
+### Reading what a city automates, and taking one file back
+
+`Query::Automation` lists `SCHEDULE.toml` and `WATCH.toml` as the next tick
+reads them; a file that does not read is named with its reason, and the other
+is still listed. `RestoreFile` takes one file of the city's own tree back to
+what a checkpoint holds, or removes it when the checkpoint holds none, and
+writes one `file_restored` line. It is refused while a run works in that
+building.
+
+### The page knows whether the history is proved
+
+`CityAnswer.proved` names the last record of a history proved whole. A served
+city proves its history in the background and refuses commands until it is
+done; until then `proved` is absent, so a page can say why a command was
+refused.
+
+### The monitor
+
+`Sample` carries two more counters: `view_backlog`, the records the writer has
+handed the view thread and the pages cannot see yet, and `read_nanos`, how
+long the sampler's previous beat took to read the counters. `sprawling top`
+shows both.
+
+### A tag for a model that reads pictures
+
+`ModelTag::Ocr` is a slot a person fills with a model that can read images.
+Nothing asks for it yet: the city's OCR tool that will is the next piece of
+work.
+
+### Not done in this section
+
+The GitHub CLI import of a user id, the onboarding guide's progress, and a
+per-room list of sessions are not on the wire yet; wire-SPEC section 4 lists
+them.
+
+---
+
 ## v<!-- xtask:begin workspace_version -->0.0.7<!-- xtask:end -->-Pre-alpha-260927
 
 **sprawling 0.0.7 citior (pre-alpha)**
