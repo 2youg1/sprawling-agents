@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The four actions this binary prices, driven over the product's public faces
-//! (citysim-SPEC.md section 8-5).
+//! (`tools/citysim/spec/BenchStartup.lean` §8-5).
 //!
 //! Shape: adapter. Each driver is the timing boundary of its action and
 //! nothing else: it stamps the boundary's ends and its sub-steps, counts
@@ -42,7 +42,7 @@ use super::stamp;
 use archive::{digest_mismatch, digest_of, unpack};
 use footprint::{clear, files_under, ledger_lines};
 
-/// How many times each action runs (citysim-SPEC.md section 8-5: the
+/// How many times each action runs (`tools/citysim/spec/BenchStartup.lean` §8-5: the
 /// floor is one hundred; two hundred is what puts p99 two samples below
 /// the top rather than on it).
 ///
@@ -84,7 +84,7 @@ pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str> {
 
 /// ① install: archive in place to executable usable.
 ///
-/// Boundary (citysim-SPEC.md 3-3): the digest check `install.sh` and
+/// Boundary (citysim D3): the digest check `install.sh` and
 /// `install.ps1` perform, the unpack, and the launch that confirms the
 /// unpacked binary answers. The archive is prepared by the caller before
 /// any of this runs: the reading starts at "the archive is in place".

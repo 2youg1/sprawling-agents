@@ -8,6 +8,8 @@
 //! result goes through `runtime::package_exec`, the same door the city
 //! uses, so the window a scenario replays is the window the product
 //! showed.
+//!
+//! Specified by `tools/citysim/spec/Executor.lean` §8-3.
 
 use std::path::PathBuf;
 

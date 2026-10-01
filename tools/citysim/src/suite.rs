@@ -17,6 +17,8 @@
 //! exactly one consumer and no state of its own: the split is a property
 //! of the suite, and a second module would have been a second place to
 //! ask which set a task is in.
+//!
+//! Specified by `tools/citysim/spec/Suite.lean` §8-8-1.
 
 use std::collections::BTreeMap;
 

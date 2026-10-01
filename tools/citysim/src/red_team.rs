@@ -5,7 +5,7 @@
 
 //! The red team's two arms: the same conclusions, kept with and without
 //! a verification run, and the quality of what each arm keeps
-//! (citysim-SPEC.md 8-7).
+//! (`tools/citysim/spec/RedTeam.lean` §8-7).
 //!
 //! The arms differ only in whether [`Citation::against`] is called, so a
 //! difference in the tallies is the verification run's and nothing else's.

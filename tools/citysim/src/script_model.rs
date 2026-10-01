@@ -13,6 +13,8 @@
 //! translation rather than stepping around it. What stays out is the
 //! HTTP face: a network call is not deterministic, and its evidence
 //! lives in gateway's own loopback tests.
+//!
+//! Specified by `tools/citysim/spec/Executor.lean` §8-2.
 
 use std::collections::VecDeque;
 

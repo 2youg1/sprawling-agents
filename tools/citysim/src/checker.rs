@@ -6,6 +6,8 @@
 //! Invariant checker, first entry: chain intact and seq contiguous
 //!. A thin veneer over runtime::replay
 //! on purpose — one verification authority, never a second one.
+//!
+//! Specified by `tools/citysim/spec/MemLedger.lean` §8-1.
 
 use kernel::AxError;
 

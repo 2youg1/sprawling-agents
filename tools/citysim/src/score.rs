@@ -16,6 +16,8 @@
 //! list so a person can look at the bottom of it. **It never decides
 //! anything by itself** — deciding is `metabolism`'s, and adopting is a
 //! mode's.
+//!
+//! Specified by `tools/citysim/spec/Metabolism.lean` §8-8-2.
 
 use kernel::ByteLen;
 

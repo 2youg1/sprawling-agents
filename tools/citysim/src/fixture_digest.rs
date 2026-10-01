@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The bytes a reading was taken over, named by their digest
-//! (citysim-SPEC.md sections 3-8 and 8-6).
+//! (citysim D8, `tools/citysim/spec/Bench.lean` §8-6).
 //!
 //! Shape: value. Both bench families read it: `bench` pins the digest of
 //! its registered fixture, and `bench_startup` prints the digest of each

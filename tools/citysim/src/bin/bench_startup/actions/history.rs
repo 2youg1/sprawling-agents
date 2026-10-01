@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A fixture city with a history (citysim-SPEC.md section 8-5-1).
+//! A fixture city with a history (`tools/citysim/spec/BenchStartup.lean` §8-5-1).
 //!
 //! Shape: adapter. The city is raised by `init_city` and its history is
 //! written through `storage::JsonlLedger::append_all`, so the segments,

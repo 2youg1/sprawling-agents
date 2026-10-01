@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One action's timed samples, and what they answer (citysim-SPEC.md
-//! section 8-5).
+//! One action's timed samples, and what they answer (`tools/citysim/spec/BenchStartup.lean`
+//! §8-5).
 //!
 //! Shape: decision. Every reading arrives as a `Duration` a caller
 //! stamped elsewhere, so this module holds no clock and no I/O and can
@@ -36,8 +36,8 @@ pub enum Tier {
     Outside,
 }
 
-/// The second tier's line: p99 within one millisecond (citysim-SPEC.md
-/// section 8-5).
+/// The second tier's line: p99 within one millisecond (`tools/citysim/spec/BenchStartup.lean`
+/// §8-5).
 const SECOND_TIER: Duration = Duration::from_millis(1);
 
 /// One action's sample set: at least one duration, in the order it was

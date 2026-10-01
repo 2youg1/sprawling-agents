@@ -9,7 +9,7 @@
 规定验收世界 `Sprawling.Acceptance`（`tools/adversary/src/Sprawling/Acceptance/Script.lean`、
 `tools/adversary/src/Sprawling/Acceptance/Walk.lean`）依赖的性质。
 
-**替身按 run 分开作答**（`tools/citysim/citysim-SPEC.md` §3-11、§8-13）。一个请求带回它这个
+**替身按 run 分开作答**（citysim D11、`tools/citysim/Spec.lean` §8-13）。一个请求带回它这个
 run 至今拿到过的调用 id；替身由其中最靠后的那一个认出它是哪个 run 的第几条之后，答那个 run 的
 下一条。一个 id 都没带的请求开启下一个还没开启的 run。下面的参照定义只陈述这条放置规则，不陈述
 id 怎样从正文里读出来——那一半在 citysim 的 Rust 里，由它自己的测试守着。
@@ -90,7 +90,7 @@ theorem openings_take_the_runs_in_order (opened : Nat) (asks : List Ask) (index 
         List.take_succ_cons, List.map_cons, List.sum_cons, Nat.add_assoc]
 
 /-- 往脚本后面追加 run，已有的每个 run 答的仍是原来那一条：检查走到半路才写下的 run 改不动
-已经在答的那些（`tools/citysim/citysim-SPEC.md` §3-15）。 -/
+已经在答的那些（citysim D15）。 -/
 theorem a_grown_script_answers_the_runs_it_held_alike (runs more : List (List α)) (run reply : Nat)
     (held : run < runs.length) :
     replyAt (runs ++ more) (run, reply) = replyAt runs (run, reply) := by

@@ -5,7 +5,7 @@
 
 //! What one sample wrote under a directory: how many files, how many
 //! ledger lines, where one named file sits, and how to level it again
-//! between samples (citysim-SPEC.md section 8-5).
+//! between samples (`tools/citysim/spec/BenchStartup.lean` §8-5).
 //!
 //! Shape: adapter. One walk of the tree answers every question here, so
 //! the counts and the lookup cannot disagree about which directories were

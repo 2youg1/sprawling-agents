@@ -8,13 +8,13 @@
 
 规定 `citysim::ablation`（`tools/citysim/src/ablation.rs`）与它的语料 `citysim::ablation::capabilities`（`tools/citysim/src/ablation/capabilities.rs`），一件只在测试构型里编译的仪器（D21）。本文件是 `tools/citysim/Spec.lean` 的一个分部；下面一节保留它在 citysim 规格里的标签 §8-8-4，别处引作 `tools/citysim/Spec.lean §8-8-4`。
 
-本分部只有节注释：切段规则、三值的代价与排序由 `ablation::tests` 守着（§16）；被量的文档是 `docs/City.md`，它的每一句由人写，模型不重述它。
+本分部只有节注释：切段规则、三值的代价与排序由 `ablation::tests` 守着（§16）；被量的文档是 `crates/city/templates/City.md`，它的每一句由人写，模型不重述它。
 -/
 
 /-!
 #### 8-8-4 ablation（`ablation.rs` 形状 1 判定，`ablation/capabilities.rs` 形状 6 数据；仅测试构型）
 
-`docs/City.md` 是每个居民读到的第一份文本，它每多一段就向每一次 prefix 收一次租。这把尺把文档按段切开，逐段拿掉，量一个居民因此做不了什么。入口是一条 `#[ignore]` 测试，只在有人点名时跑：
+`crates/city/templates/City.md` 是每个居民读到的第一份文本，它每多一段就向每一次 prefix 收一次租。这把尺把文档按段切开，逐段拿掉，量一个居民因此做不了什么。入口是一条 `#[ignore]` 测试，只在有人点名时跑：
 
 ```
 cargo nextest run -p citysim --run-ignored all -E 'test(city_md)' --no-capture

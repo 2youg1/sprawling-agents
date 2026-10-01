@@ -10,7 +10,7 @@ import Lean.Data.Json
 
 The acceptance world walks a city that calls a provider which answers. That
 provider is not in this directory: it is the stand-in `tools/citysim` builds
-(`citysim-SPEC.md` sections 8-10 and 8-13), started by `just acceptance` and
+(`tools/citysim/Spec.lean` sections 8-10 and 8-13), started by `just acceptance` and
 handed over as the URL in `SPRAWLING_PROVIDER`. What this module owns is the
 script it plays — each run's replies, in the order the walk opens the runs —
 because the script is the world's expectation stated as data: the walk asserts
@@ -23,7 +23,7 @@ city as a mismatch nobody meant to test. Nothing here parses a request.
 
 **A run is told apart by the call ids it carries back.** The stand-in places a
 request in the run whose call ids it carries, and opens the next run of the
-script for a request carrying none (`citysim-SPEC.md` section 3-11). So every
+script for a request carrying none (citysim D11). So every
 call id here is `callId run turn`, unique in the script, and the runs are listed
 in the order the walk opens them: the walk waits for each run to freeze before
 it sends the next, except for the two claimants, which it sends at once and
@@ -222,7 +222,7 @@ def script (skills : List String) : Json := written (runsFor skills)
 
 /-- The same script with the run that checks the offer on `branch` after it:
 it begins with every run the stand-in already holds, which is what lets the
-stand-in take it when it reads the file again (`citysim-SPEC.md` section 3-15). -/
+stand-in take it when it reads the file again (citysim D15). -/
 def scriptWithChecker (skills : List String) (branch : String) : Json :=
   written (runsFor skills ++ [checkerRun branch])
 

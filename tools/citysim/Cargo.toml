@@ -24,10 +24,10 @@ sprawling = { workspace = true }
 # The bench times the production rebuild through accounting::views::ask.
 accounting = { workspace = true }
 serde_json.workspace = true
-# The nesting instrument reads the TOML shape it grades (citysim-SPEC.md 8-8).
+# The nesting instrument reads the TOML shape it grades (tools/citysim/Spec.lean §8-8).
 toml.workspace = true
 # The install action prices the release archive's digest and its unpack
-# (citysim-SPEC.md 8-5): sha2 is the digest the release publishes, zip
+# (tools/citysim/Spec.lean §8-5): sha2 is the digest the release publishes, zip
 # is the archive format `cargo xtask package` writes.
 sha2.workspace = true
 zip.workspace = true

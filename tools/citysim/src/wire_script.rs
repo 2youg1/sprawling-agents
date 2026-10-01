@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The script a scripted provider plays, and what each request it
-//! receives is answered with (citysim-SPEC.md 8-10, 8-13).
+//! receives is answered with (`tools/citysim/spec/WireScript.lean` §8-10, §8-13).
 //!
 //! **One script format for both players.** A reply is the wire JSON a
 //! provider of the script's compatible format would send, and `parse`
@@ -21,7 +21,7 @@
 //! apart. The path still reaches the record, where a check can read it.
 //!
 //! **A chat belongs to the run whose call ids it carries back**
-//! (citysim-SPEC.md 3-11). The city sends a run's whole conversation
+//! (citysim D11). The city sends a run's whole conversation
 //! every turn, and every call id is written once in the script, so the
 //! latest id a request carries names the run and the reply it is past.
 //! What a run is given therefore depends on how far that run has got,
@@ -74,7 +74,7 @@ impl WireScript {
     /// `E_CONFIG_INVALID` naming the key path that could not be read:
     /// a reply the city's own translation cannot read, an empty run, a
     /// call id written twice, and a reply before a run's last that calls
-    /// no tool (citysim-SPEC.md 8-13).
+    /// no tool (`tools/citysim/spec/WireScript.lean` §8-13).
     pub fn parse(text: &str) -> Result<WireScript, AxError> {
         let whole: Value =
             serde_json::from_str(text).map_err(|err| unreadable("the script", &err.to_string()))?;
@@ -389,8 +389,9 @@ fn unreadable(path: &str, why: &str) -> AxError {
         format!("{path}: {why}"),
     )
     .with_recovery(
-        "write the script as citysim-SPEC.md 8-10 and 8-13 state: a `face`, a `models` array \
-         of ids, and `runs`, each a non-empty array of the wire JSON a provider of that face \
-         sends, every call id written once, and every reply but a run's last calling a tool",
+        "write the script as tools/citysim/Spec.lean sections 8-10 and 8-13 state: a `face`, \
+         a `models` array of ids, and `runs`, each a non-empty array of the wire JSON a \
+         provider of that face sends, every call id written once, and every reply but a \
+         run's last calling a tool",
     )
 }

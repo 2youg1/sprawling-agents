@@ -10,10 +10,10 @@
 //! `instrument_relay_round_trip`, which drives the accounting loop the
 //! city runs. Its relay face is `pub(crate)`, so a scenario here could
 //! only time a copy of that loop, and a copy reads what the copy costs
-//! (citysim-SPEC.md section 8-6).
+//! (citysim D18).
 //!
 //! Each is a thin measuring loop over the product's own public faces
-//! (citysim-SPEC.md section 8-6). The load every recorded reading was
+//! (`tools/citysim/spec/Bench.lean` §8-6). The load every recorded reading was
 //! taken under is `REGISTERED`, and readings are comparable only within
 //! one fixture. This module lives in the bench Main's tree: the
 //! simulator's scenarios keep their counted clock, and every `Instant`
@@ -28,7 +28,7 @@ use super::reading::{Load, Reading, SubMetric, Taken};
 
 /// How many of `draft`'s lines the fixture digest is taken over: enough
 /// to cover every field `draft` varies, few enough to cost milliseconds
-/// (citysim-SPEC.md section 3-8).
+/// (citysim D8).
 pub(crate) const PINNED_DRAFTS: u64 = 1_000;
 
 /// The fixed load each scenario runs under. Data, not policy: change a
@@ -150,7 +150,7 @@ fn large_ledger_fold(
 /// Large-worktree placement: one claim places a new node's tree by
 /// taking over the stock, which is checked out at the trunk before the
 /// clock starts, where the city checks it out while nobody waits
-/// (citysim-SPEC.md section 3-13). The seam does not split the rename
+/// (citysim D13). The seam does not split the rename
 /// from git's bookkeeping, so the reading is priced whole.
 fn large_worktree_placement(
     scratch: &Path,

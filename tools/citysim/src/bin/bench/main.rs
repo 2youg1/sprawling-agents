@@ -10,6 +10,8 @@
 //! This is a measuring Main, so it is the second sanctioned sampling
 //! point besides `bin::assembly`: every `Instant::now` here carries the
 //! same `#[expect]` the first one carries.
+//!
+//! Specified by `tools/citysim/spec/Bench.lean` §8-6.
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -61,7 +63,7 @@ fn main() -> std::process::ExitCode {
 
 /// The registered fixture's digest, refused when its bytes moved from
 /// the pin: a reading of other bytes would enter the register beside
-/// readings it cannot be compared with (citysim-SPEC.md section 3-8).
+/// readings it cannot be compared with (citysim D8).
 fn pinned_fixture(scratch: &Path) -> Result<B3Hash, String> {
     let digest = scenarios::REGISTERED.digest(scratch)?;
     if digest.to_string() == scenarios::REGISTERED.pinned {

@@ -6,7 +6,7 @@
 //! The socket and the files: reading one request off a connection,
 //! writing its answer back, appending the exchange to the record, and
 //! reading the script again when a first turn finds no run left
-//! (citysim-SPEC.md 8-10, 3-15).
+//! (`tools/citysim/spec/WireScript/Exchange.lean` §8-10, citysim D15).
 //!
 //! **What counts as a request is settled in one place, `read_request`.**
 //! A head up to its blank line and a body of `content-length` bytes is a

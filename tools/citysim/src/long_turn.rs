@@ -3,10 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A long turn (citysim-SPEC 8-9, 3-10): one run of many steps, each
-//! reading a file whose bytes change and whose length does not, so the
-//! request window of every model call can be judged against the one
-//! before it.
+//! A long turn (`tools/citysim/spec/LongTurn.lean` §8-9, citysim D10):
+//! one run of many steps, each reading a file whose bytes change and
+//! whose length does not, so the request window of every model call can
+//! be judged against the one before it.
 //!
 //! The window is the gate because it is counted: every step adds the
 //! same bytes to the conversation, so a step that adds more - an
@@ -225,7 +225,7 @@ fn notes_at(read: u32) -> String {
 mod tests {
     use super::*;
 
-    /// citysim-SPEC 3-10: every step of a long turn adds the same bytes
+    /// citysim D10: every step of a long turn adds the same bytes
     /// to the window, at 40 steps and at 80, so the window of the last
     /// call is the first one plus one increment per step.
     #[test]

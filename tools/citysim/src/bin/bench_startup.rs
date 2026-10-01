@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The four-action pressure reading (citysim-SPEC.md
-//! section 8-5): install, startup, raise a city, open a session - and
+//! The four-action pressure reading (`tools/citysim/spec/BenchStartup.lean`
+//! §8-5): install, startup, raise a city, open a session - and
 //! the first byte a served city answers with, over three lengths of
 //! history (section 8-5-1). `bench_startup first-byte` takes that last
 //! reading alone.
@@ -85,7 +85,7 @@ fn main() -> ExitCode {
 /// `tools/xtask/src/platform.rs`, and this crate cannot reach it: the bin's
 /// `install` module is not importable and `xtask` is tooling. The
 /// restatement, its reason, and what would retire it are recorded as
-/// citysim-SPEC.md section 3-5.
+/// citysim D5.
 fn executable_name() -> String {
     format!("sprawling{}", std::env::consts::EXE_SUFFIX)
 }
@@ -111,8 +111,8 @@ fn run() -> Result<(), AxError> {
 }
 
 /// The first byte of `GET /` over the three fixture cities, which are
-/// kept beside the build directory and reused (citysim-SPEC.md section
-/// 8-5-1).
+/// kept beside the build directory and reused (`tools/citysim/spec/BenchStartup.lean`
+/// §8-5-1).
 fn first_bytes(binary: &Path) -> Result<(), AxError> {
     let Some(cities) = binary
         .parent()

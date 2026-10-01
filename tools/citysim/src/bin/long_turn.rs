@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The long-turn instrument (citysim-SPEC 8-9, 3-10):
+//! The long-turn instrument (`tools/citysim/spec/LongTurn.lean` §8-9, citysim D10):
 //! `long_turn <steps> [every]`.
 //!
 //! After every `every` reads it prints `step <k> pid <pid>` and waits for

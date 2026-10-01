@@ -24,6 +24,8 @@
 //! measurable stand-in is a cue — the phrase the document uses to grant
 //! one capability. The capability survives the removal of a passage when
 //! its cue does.
+//!
+//! Specified by `tools/citysim/spec/Ablation.lean` §8-8-4.
 
 use kernel::{AxCode, AxError, ByteLen};
 

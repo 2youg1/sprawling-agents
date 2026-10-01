@@ -66,7 +66,7 @@ import tools.adversary.spec.Model
 | 城是什么 | 一个本地目录，`init` 造它，`serve` 端起来，账本在 `.sprawling/ledger/` 下按段分文件 | 布局改变时 `Ground.lean` 的敌意动作报错，属预期 |
 | 静默 | 门的第三种回答。**不是接受**——见 §10「静默不是接受」 | 若将来 `call` 改为「命令被受理才返回」，`quiet` 这一支变成异常而不是取值 |
 | provider | `Model` 的世界一个都不挂，于是每一次派活在配置这道门上被拒，而模型知道这一点；`Provider` 的世界挂一个**这台电脑上没人听的地址**，于是每一次调用停在 socket 上；U9 挂 `just acceptance` 起的替身，调用成功，替身不在本目录里（§13） | 检查树里的世界要一个会应答的 endpoint 时，它们照 U9 的样子从 justfile 接收一个 URL，而不是在本目录里起一个 |
-| 替身怎样分 run | 替身按请求带回来的调用 id 认出 run 与它走到哪一条，一个 id 都没带的第一轮按到达次序开启脚本里下一个 run（`citysim-SPEC.md` §3-11、§8-13；`spec/Acceptance.lean`）。所以 U9 只在第一轮可能同时到达的地方——两个同时派出的认领——把那几个 run 写成一样，其余的活都等前一个 run 冻结再派，第一轮的次序就是脚本的次序（D6） | 两个同时开启、要拿不同回复的 run 进 U9 时，替身要能认第一轮（`citysim-SPEC.md` §3-11 的重开参数） |
+| 替身怎样分 run | 替身按请求带回来的调用 id 认出 run 与它走到哪一条，一个 id 都没带的第一轮按到达次序开启脚本里下一个 run（citysim D11、`tools/citysim/Spec.lean` §8-13；`spec/Acceptance.lean`）。所以 U9 只在第一轮可能同时到达的地方——两个同时派出的认领——把那几个 run 写成一样，其余的活都等前一个 run 冻结再派，第一轮的次序就是脚本的次序（D6） | 两个同时开启、要拿不同回复的 run 进 U9 时，替身要能认第一轮（citysim D11 的重开参数） |
 | 杀进程 | `Serving.hangUp` 结束被服务的进程（Windows 上是 `TerminateProcess`，Unix 上是 `SIGKILL`），等被杀的 run 写下 `inFlight` 条 `tool_result` 之后才杀，所以刀落在两次写之间，而不是在最后一次写之后；被杀的 run 若已冻结，那一步报红并说明替身给的调用太少 | 城回来之后怎么处理那个死掉的 run，不是 U9 断言的事：它断言的是历史自证、城再服务、新的活跑到它自己的结尾 |
 | 配置写回 | 「写了什么就读得回什么」这条不变量的对象是 **TOML 文件**，不是哪一条帧。人层偏好的那一条（`PutPreferences` / `Query::Preferences`）今天并不存在，而 `configure_building` 写楼自己那层、`Query::BuildingView` 把它折回来，是同一条不变量今天已经承载的地方，所以性质写在那里 | 那一对帧落地后，`Layer` 换成它们驱动，断言一字不改：变的是谁写进文件，不是文件欠谁什么 |
 | 时钟 | 只用于超时，从不被预测 | —— |
@@ -466,9 +466,9 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 
 D5 由 D6 取代。
 
-D6 **验收世界在协作那一串里并发派活，仍走到第一处失败就停；它取代 D5。** 替身按 run 分开作答（`citysim-SPEC.md` §3-11）：一个续轮由它带回的调用 id 放进它自己的 run，与别的 run 怎么交错无关（`spec/Acceptance.lean` 的 `every_run_is_answered_from_its_own_replies`）；第一轮按到达次序开启脚本里的下一个 run（`openings_take_the_runs_in_order`）。所以只有第一轮可能同时到达的 run 要写成一样（`alike_runs_answer_alike`）——两个同时派出的认领正是这样：两个 run 都去认同一片叶子，谁先到替身都答同一条，谁拿到叶子由城的认领决定，而那正是这一步要看的。其余的活仍等前一个 run 冻结再派，第一轮的次序就是脚本的次序。被杀的 run 不再与之后的活分一段回复：城回来之后若接着送它的对话，它续自己的那一段，新派的活开启自己的那一段。每一步站在前面几步留下的城上，一处失败之后接着走只会把一个原因报成许多个，所以仍停在第一处失败（`the_reported_step_broke_and_every_earlier_one_held`）。被否：D5 的做法——一次只派一个 run，并发认领就走不了，认领冲突只有白盒的 `crates/accounting/src/worker/plans/tests/rows.rs` 守着；给两个认领的 run 写不同的回复——它们第一轮同时到达，替身分不出谁是谁。
+D6 **验收世界在协作那一串里并发派活，仍走到第一处失败就停；它取代 D5。** 替身按 run 分开作答（citysim D11）：一个续轮由它带回的调用 id 放进它自己的 run，与别的 run 怎么交错无关（`spec/Acceptance.lean` 的 `every_run_is_answered_from_its_own_replies`）；第一轮按到达次序开启脚本里的下一个 run（`openings_take_the_runs_in_order`）。所以只有第一轮可能同时到达的 run 要写成一样（`alike_runs_answer_alike`）——两个同时派出的认领正是这样：两个 run 都去认同一片叶子，谁先到替身都答同一条，谁拿到叶子由城的认领决定，而那正是这一步要看的。其余的活仍等前一个 run 冻结再派，第一轮的次序就是脚本的次序。被杀的 run 不再与之后的活分一段回复：城回来之后若接着送它的对话，它续自己的那一段，新派的活开启自己的那一段。每一步站在前面几步留下的城上，一处失败之后接着走只会把一个原因报成许多个，所以仍停在第一处失败（`the_reported_step_broke_and_every_earlier_one_held`）。被否：D5 的做法——一次只派一个 run，并发认领就走不了，认领冲突只有白盒的 `crates/accounting/src/worker/plans/tests/rows.rs` 守着；给两个认领的 run 写不同的回复——它们第一轮同时到达，替身分不出谁是谁。
 
-D7 **城才知道的东西，检查从历史里读出来，再把要用它的 run 接到脚本后面。** 查一条请求要说出它的分支，分支名由城按房间地址的摘要取，而本目录不预测任何摘要（§2 第 3 条）。所以 `beta/left` 提出评审之后，检查从 `pr_opened` 读出分支，把整份脚本连同查它的那个 run 写回脚本文件，再派活给 `beta/right`；替身在新开的 run 找不到还没开启的 run 时重读这个文件（`citysim-SPEC.md` §3-15），接上的 run 不改动已经在答的那些（`a_grown_script_answers_the_runs_it_held_alike`）。写回时没有别的 run 在开启：前一个 run 已经冻结，下一个活还没派。被否：把分支名写死在脚本里——那是在预测一个摘要；让替身从上一次工具结果里抄出分支——替身就在写自己的文字（`citysim-SPEC.md` §3-11）；用 `pr list` 让模型自己看——脚本写好的回复不会读它拿到的结果。
+D7 **城才知道的东西，检查从历史里读出来，再把要用它的 run 接到脚本后面。** 查一条请求要说出它的分支，分支名由城按房间地址的摘要取，而本目录不预测任何摘要（§2 第 3 条）。所以 `beta/left` 提出评审之后，检查从 `pr_opened` 读出分支，把整份脚本连同查它的那个 run 写回脚本文件，再派活给 `beta/right`；替身在新开的 run 找不到还没开启的 run 时重读这个文件（citysim D15），接上的 run 不改动已经在答的那些（`a_grown_script_answers_the_runs_it_held_alike`）。写回时没有别的 run 在开启：前一个 run 已经冻结，下一个活还没派。被否：把分支名写死在脚本里——那是在预测一个摘要；让替身从上一次工具结果里抄出分支——替身就在写自己的文字（citysim D11）；用 `pr list` 让模型自己看——脚本写好的回复不会读它拿到的结果。
 -/
 
 /-! ## 11 边界枚举
@@ -518,7 +518,7 @@ D2 **一个外部依赖都不引入。** 仓库根 `lake-manifest.json` 的 `"pa
 
 **不引入**：任何 FFI、任何绑定 Rust 类型的东西、任何需要改 Rust 代码才能工作的东西、任何 HTTP 服务端（假 provider 会让本目录变成第二个 gateway 实现）。
 
-D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。** U9 要一座调用成功的城，替身是 `tools/citysim` 的 `provider` 二进制（`citysim-SPEC.md` §8-10），由 `just acceptance` 起在本目录之外，URL 经 `SPRAWLING_PROVIDER` 交进来——与二进制的路径经 `SPRAWLING_BIN` 交进来是同一个形状。一个接收来的 URL 不让本目录变成第二个 gateway 实现：替身用城自己的翻译读脚本里的每一条回复，HTTP 那一面是 citysim 的，本目录只写脚本，而脚本是 U9 把期待写成数据。**被否**：在 Lean 里起一个 HTTP 服务端——本目录会多出一个 provider 的实现，并为一个注册表之外的协议栈负责；用 Rust 写一个起子进程的测试去驱动发行件——从门外进城的检查是 Lean 的（`xtask boundary` 守着的那条边界），换成 Rust 就是把黑盒写回白盒的那一侧。
+D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。** U9 要一座调用成功的城，替身是 `tools/citysim` 的 `provider` 二进制（`tools/citysim/Spec.lean` §8-10），由 `just acceptance` 起在本目录之外，URL 经 `SPRAWLING_PROVIDER` 交进来——与二进制的路径经 `SPRAWLING_BIN` 交进来是同一个形状。一个接收来的 URL 不让本目录变成第二个 gateway 实现：替身用城自己的翻译读脚本里的每一条回复，HTTP 那一面是 citysim 的，本目录只写脚本，而脚本是 U9 把期待写成数据。**被否**：在 Lean 里起一个 HTTP 服务端——本目录会多出一个 provider 的实现，并为一个注册表之外的协议栈负责；用 Rust 写一个起子进程的测试去驱动发行件——从门外进城的检查是 Lean 的（`xtask boundary` 守着的那条边界），换成 Rust 就是把黑盒写回白盒的那一侧。
 -/
 
 /-! ## 14 硬编码声明
@@ -544,7 +544,7 @@ D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。*
 | `holdCalls` 60 | 两个认领的 run 同时派出，但各自先等城给它放一棵树；先认领的那个要在另一个认领时仍在跑，第二次认领才由在途的 run 拒，而不是由一个已经回家的 run 放过去（`crates/accounting/src/worker/booking.rs`：预订只持续到 run 回家）。实测（debug 二进制）两个第一轮相邻到达替身，认领随即跟上；六十次让先认领的那个再跑约两秒，给一次晚到的放树留余地 | 放树变快或变慢时跟着量；第二次认领若落在第一个 run 回家之后，那一步报红并点名这个数 |
 | `statusCalls` 120、`inFlight` 3 | 被杀的 run 要在被杀时仍在调用：一次调用在 debug 二进制上约十毫秒，120 次是一秒多的在途，等到 3 条工具结果再杀；它的最后一条是一句收尾的话，城回来时若接着送它的对话，它以自己的那一句结束 | 发布二进制更快；被杀的 run 若在被杀前就冻结，那一步报红并点名这个数 |
 | 幂等键 400–411 | U9 每条命令一把，与检查树的 0–323 不相交，一份报告里不会有两条命令共用一个数 | —— |
-| 调用 id `call-<run>-<turn>` | 替身靠它认 run（`citysim-SPEC.md` §3-11），所以全脚本唯一；带上 run 的序号，一份记录里的 id 读得出是哪个 run 的 | 替身认 id 的办法变了时，这里跟着变 |
+| 调用 id `call-<run>-<turn>` | 替身靠它认 run（citysim D11），所以全脚本唯一；带上 run 的序号，一份记录里的 id 读得出是哪个 run 的 | 替身认 id 的办法变了时，这里跟着变 |
 | 楼 `beta`，房间 `beta/planner`、`beta/left`、`beta/right`，计划的一行 `glaze the kiln` 与两片叶子 `1.1`、`1.2` | 演员表里的第二栋楼；叶子的编号是计划表的文法（`crates/city/templates/Roadmap.md`：分出来的子行从父行往下编号），一个人读计划时看到的就是它 | 计划表的编号规则变了时，认领那两步报红 |
 | 计划文件 `Roadmap.md`、表头下的分隔行以 `|---` 开头、`review = false` 那一行 | 人用编辑器改的两处，照模板的字样找；找不到恰好一处就拒，不追加 | 模板变了时这两步报红，并说出找的是哪一行 |
 | 目录 `target/acceptance/` | 解开的归档、脚本、替身的记录、清单都在这里，配方每次先清空它 | 由 justfile 提供 |
@@ -587,5 +587,5 @@ D4 **整棵树串行跑。** 一座被端起来的城占着一个端口、一个
 6. `.github/workflows/adversary.yml`——定时任务，永远不进 `check`。
 7. 仓库根的 `lakefile.toml`：检验器的三个目标在那里定义（`Sprawling` 库、`adversary` 与 `acceptance` 两个可执行文件），本规格经 `Spec` 库的两个 glob 进 `just models`。
 9. `tools/xtask/xtask-SPEC.md` §8-47：`spec` 门怎样认出本规格。
-8. `justfile` 的 `acceptance` 配方，以及 `tools/citysim/citysim-SPEC.md` §8-10、§8-13、§3-11、§3-15：替身的脚本格式、它印出的那一行、它怎样按 run 作答与怎样接上后写的 run。
+8. `justfile` 的 `acceptance` 配方，以及 `tools/citysim/Spec.lean` §8-10、§8-13 与 citysim D11、D15：替身的脚本格式、它印出的那一行、它怎样按 run 作答与怎样接上后写的 run。
 -/

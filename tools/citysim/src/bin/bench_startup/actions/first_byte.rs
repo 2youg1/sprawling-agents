@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! First byte: `sprawling serve` spawned to the first byte of `GET /`
-//! (citysim-SPEC.md section 8-5-1).
+//! (`tools/citysim/spec/BenchStartup.lean` §8-5-1).
 //!
 //! Shape: adapter. The end of the boundary is a byte of the page rather
 //! than the port opening, because a person sees the page, and a server

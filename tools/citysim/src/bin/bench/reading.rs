@@ -9,7 +9,7 @@
 //! renderer, and the tests compare it byte for byte. A reading carries
 //! its machine class as a field rather than inheriting it from a header,
 //! so a reading that arrived from another machine cannot silently share
-//! a table with the reference class (citysim-SPEC.md section 8-6). It
+//! a table with the reference class (`tools/citysim/spec/Bench.lean` §8-6). It
 //! carries the digest of the bytes it was taken over the same way, so a
 //! reading of a changed fixture cannot share a table with the register's
 //! (section 3-8).
@@ -49,7 +49,7 @@ pub(crate) struct Taken {
 
 /// The heavy-load classes this bench Main measures, one scenario each.
 /// The fifth class, multi-run parallel, is `sprawling`'s relay
-/// instrument (citysim-SPEC.md section 8-6).
+/// instrument (citysim D18).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Load {
     LargeLedgerFold,
@@ -81,8 +81,8 @@ impl Load {
 /// Which part of a scenario's path a reading prices.
 ///
 /// The split is what keeps a disk floor from masking harness overhead and
-/// keeps harness speed from standing in for the disk (citysim-SPEC.md
-/// section 8-6).
+/// keeps harness speed from standing in for the disk (`tools/citysim/spec/Bench.lean`
+/// §8-6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SubMetric {
     /// The harness's own processing, with no durability commit under it.
@@ -155,7 +155,7 @@ impl Reading {
 }
 
 /// The failure a scenario with no samples deserves: one error shape,
-/// three mandatory parts, no new code (citysim-SPEC.md section 8-6).
+/// three mandatory parts, no new code (`tools/citysim/spec/Bench.lean` §8-6).
 fn sampled_nothing() -> String {
     format!(
         "{}",

@@ -698,7 +698,7 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 | Linux | `smaps_rollup` 的 `Private_Clean`＋`Private_Dirty` | `status` 的 `VmHWM`（峰值常驻，含共享页） | `status` 的 `VmRSS` |
 | macOS | `ps -o rss`（保守上界，共享页全计） | 同左 | 同左 |
 
-**夹具城的二进制**：`$CARGO_TARGET_DIR`（未设时 `<root>/target`）下的 `release/sprawling`＋平台后缀；`just mem` 不带 pid 时先 `cargo build --release -p sprawling --features <justfile 的 product_features> --locked`，所以量到的永远是这棵树建出来的、人下载的那个（citysim-SPEC 3-9）。端口先由本进程在 `127.0.0.1:0` 上借一个再还回去；等待是按 5 ms 轮询连接，上限约 300 s：40 万条记录的城要先把整条 Ledger 折叠一遍才开始接受连接，在慢盘上是几十秒，而量具自己撞上的上限就是一次丢掉的读数。
+**夹具城的二进制**：`$CARGO_TARGET_DIR`（未设时 `<root>/target`）下的 `release/sprawling`＋平台后缀；`just mem` 不带 pid 时先 `cargo build --release -p sprawling --features <justfile 的 product_features> --locked`，所以量到的永远是这棵树建出来的、人下载的那个（citysim D9）。端口先由本进程在 `127.0.0.1:0` 上借一个再还回去；等待是按 5 ms 轮询连接，上限约 300 s：40 万条记录的城要先把整条 Ledger 折叠一遍才开始接受连接，在慢盘上是几十秒，而量具自己撞上的上限就是一次丢掉的读数。
 
 **读数不带判词**：预算与读数住 `tools/xtask/budgets.toml` 的按场景的行（`[resident_empty_idle]` 等），本命令只报它量到的三个数、pid 与量的是什么。
 

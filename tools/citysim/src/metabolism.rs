@@ -17,6 +17,8 @@
 //! construction. And **the reason travels with the verdict**, because a
 //! list of things that vanished with no explanation teaches people to
 //! stop trusting the cycle that vanished them.
+//!
+//! Specified by `tools/citysim/spec/Metabolism.lean` §8-8-2.
 
 use crate::score::{AssetUse, Score};
 

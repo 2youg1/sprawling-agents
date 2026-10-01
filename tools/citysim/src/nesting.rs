@@ -22,6 +22,8 @@
 //! call a model — [`Attempt`] is what one produced — because a suite
 //! that owned a provider could not run offline, could not be replayed,
 //! and would be measuring the network as much as the model.
+//!
+//! Specified by `tools/citysim/spec/Nesting.lean` §8-8-3.
 
 use std::collections::BTreeMap;
 

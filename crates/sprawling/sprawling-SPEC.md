@@ -843,7 +843,7 @@ fn city_segment(city_root: &Path) -> Result<Vec<u8>, AxError>;  // NotFound → 
 let key = match call.action() { Ok(action) => IdemKey::derive(&self.run, Seq::new(at), &action), Err(e) => return Admitted::Answered(Err(e)) };
 ```
 
-**这里不修 `bin::assembly` 的缺陷，因为这里没有缺陷**。被修的是 citysim（citysim-SPEC §8-4）；本文件变的是「谁来回答动作字节」。原先这六行把 name 与 `serde_json::to_string(&call.args)` 拼起来，是全库两份实现中对的那一份；对的那一份待在装配层，正是另一份能静静漂走的原因。`kernel-SPEC §8-6` 早写着这条规则「属 S2 工具面」，而它一处也不在那里。现在它在（`ToolCall::action`，kernel-SPEC §8-23），本文件改为问它。
+**这里不修 `bin::assembly` 的缺陷，因为这里没有缺陷**。被修的是 citysim（`tools/citysim/Spec.lean` §8-4、citysim D20）；本文件变的是「谁来回答动作字节」。原先这六行把 name 与 `serde_json::to_string(&call.args)` 拼起来，是全库两份实现中对的那一份；对的那一份待在装配层，正是另一份能静静漂走的原因。`kernel-SPEC §8-6` 早写着这条规则「属 S2 工具面」，而它一处也不在那里。现在它在（`ToolCall::action`，kernel-SPEC §8-23），本文件改为问它。
 
 **字节逐字不变**：`action()` 内部就是搬过去的同一句（name 字节接 args 的 JSON 字节），位次是 `Placing` 在放行时按调用序数出的计数器。唯一的行为差异是 `unwrap_or_default()` 换成 `?`：一个序列化失败以前产空串（于是两次参数不同的调用得同一把键），现在上报。`Payload` 拒浮点且键恒为字符串，故这一臂今天不可达。
 
@@ -1296,7 +1296,7 @@ budgets.toml 里那两段已经失真的注释单独一枚提交改，因为改�
 
 ### 交接探针（`accounting::worker::probing::probe`，形状 2 值类型）
 
-探针的唯一生产调用点是 `accounting::worker::probing`，所以它住在调用者之下，不另占产品拓扑的一个单元（仪器与探针分家的理由见 citysim-SPEC §3-6）。
+探针的唯一生产调用点是 `accounting::worker::probing`，所以它住在调用者之下，不另占产品拓扑的一个单元（仪器与探针分家的理由见 citysim D6）。
 
 ```rust
 pub(crate) struct ProbeId { pub(crate) name: String, pub(crate) version: u32 }
@@ -3660,7 +3660,7 @@ pub(crate) fn attend(worker: &mut RunWorker, desk: &CommandDesk);
 pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一个 gate 发出的写面
 ```
 
-**为什么把循环从闭包里拿出来**：仪表要驱动的是生产在跑的那个循环本身。一份抄来的 relay 形状，只要记账侧与生产的等法有一处不同，量出的就是抄件：生产的循环在两个定时等待之间轮询时，抄件量出 5 µs 一次往返，同一次往返在服务中的城里是 31.7 ms。所以 citysim 不再留那份抄件，多 run 并行这一类负载就由 `instrument_relay_round_trip` 量（citysim-SPEC 8-6）。循环只要还有第二份写法，仪表就会量错对象。`spawn_worker` 装好 `Serving` 与观察者之后调用 `attend`，这是它唯一的生产调用者。
+**为什么把循环从闭包里拿出来**：仪表要驱动的是生产在跑的那个循环本身。一份抄来的 relay 形状，只要记账侧与生产的等法有一处不同，量出的就是抄件：生产的循环在两个定时等待之间轮询时，抄件量出 5 µs 一次往返，同一次往返在服务中的城里是 31.7 ms。所以 citysim 不再留那份抄件，多 run 并行这一类负载就由 `instrument_relay_round_trip` 量（citysim D18）。循环只要还有第二份写法，仪表就会量错对象。`spawn_worker` 装好 `Serving` 与观察者之后调用 `attend`，这是它唯一的生产调用者。
 
 **两件仪表**，都在 `accounting::worker::driving::tests::instruments`，都标 `#[ignore]`：它们量墙钟，一次要跑十几秒，不属于 `just check`；`just bench` 在 citysim 那一行之后跑它们（`cargo nextest run -p sprawling --release --run-ignored only -E 'test(/::instrument_/)' --no-capture`）。两件都经过同一套生产部件：`attend` 跑在自己的线程上，命令经 `CommandDesk::post` 进门，模型是回环上的假 provider（`fixture::provider`，带一个 `pace` 钩子决定何时作答）。
 
@@ -4080,7 +4080,7 @@ pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics, cost:
 **决定。**
 1. 一行，不是七行。七段是同一次开城的七个部分，读的人要看的是它们之间的比例。被否：每段一条 `Trace`——默认下限看不见它们，打开 `trace` 又会被别的行淹没。
 2. 读数是诊断，不是账本记录。开城用了多久是运行这座城的主机在那一刻的事实，不属于城的历史（`docs/logging.md` §2）。被否：写一条账本事件——同一段历史在两台机器上就不再逐字节相同。
-3. `line()` 是唯一的渲染，没有读者解析它。要逐段比较的人读 `bench_startup` 留在夹具城旁边的日志（citysim-SPEC 8-5-1），那一行与首字节读数出自同一次开城。
+3. `line()` 是唯一的渲染，没有读者解析它。要逐段比较的人读 `bench_startup` 留在夹具城旁边的日志（`tools/citysim/Spec.lean` §8-5-1），那一行与首字节读数出自同一次开城。
 4. 派活不在这里拆段。派活的两次读数已在 `prepare_dispatch` 那一行（`[prepare_dispatch_ms]`），它走城钟、按毫秒；把 `stage_dispatch` 内部拆成微秒级的段，要一个能在 accounting 里取单调时间的端口，那是记账线程长任务那一项自己的工作。
 
 **测试。** `assembly::listening::tests::a_listening_city_says_what_opening_it_cost`：在一座刚 `init` 的城上 `listen`，`log` 取 `Effect` 下限、sink 是同一个 `Journal`，事先订阅 `Journal::lines()`；收到恰好一条以 `opened the city in ` 开头的 `Effect`，七个段名按上面的次序出现，并含 `fold 3 lines from genesis`。
@@ -4623,7 +4623,7 @@ impl storage::Worktrees { pub fn stock(&self) -> Result<storage::FileWork, stora
 - **失败。** `stock` 的失败不改变 run 的结局：run 已经结束，补不上备树只让下一次放置退回全量检出。失败写一条 `Refuse` 诊断行，锚在 lane 的账本位置快照上，与 8-113 lane 半段的诊断行同一个写端。
 - **试验借树（8-133）的重开参数读的是这里。** §12「试验借一棵自己的树」以放置读数是否以秒计为重开条件：接管备树之后放置以毫秒计，那条决定的前提回到它被定下时的样子。
 
-当前状态：两半都已落地。storage 一半是 storage-SPEC 8-35（`stock`，放置先接管备树）；citysim 的 `large_worktree_placement` 在每轮之前调 `stock`（citysim-SPEC §3-13、§8-12）；lane 一半在 `dispatching::preparing`，界、崩溃后的收回与读数在 8-155。检验是 `preparing::tests` 的两条：`a_lane_puts_the_stock_back_before_its_run_comes_home`（`fly` 返回、`land` 还没跑时备树已经登记、没锁、目录在），`the_next_room_takes_the_stock_and_creates_no_file`（第一个房间经真 lane 派活并落地，第二个房间的放置整值比较 `FileWork`，三个计数都是 0，接管之后 lane 又补回一棵）。
+当前状态：两半都已落地。storage 一半是 storage-SPEC 8-35（`stock`，放置先接管备树）；citysim 的 `large_worktree_placement` 在每轮之前调 `stock`（citysim D13、`tools/citysim/Spec.lean` §8-12）；lane 一半在 `dispatching::preparing`，界、崩溃后的收回与读数在 8-155。检验是 `preparing::tests` 的两条：`a_lane_puts_the_stock_back_before_its_run_comes_home`（`fly` 返回、`land` 还没跑时备树已经登记、没锁、目录在），`the_next_room_takes_the_stock_and_creates_no_file`（第一个房间经真 lane 派活并落地，第二个房间的放置整值比较 `FileWork`，三个计数都是 0，接管之后 lane 又补回一棵）。
 ### 8-155 补树的界：一座城一次一条 lane 在补，补到一半进程死了由盘上的状态收回（`accounting::worker::dispatching::preparing`）
 
 ```rust
@@ -4985,7 +4985,7 @@ pub monotonic: fn() -> Instant,             // 生产交 monotonic_now；派活�
 
 **`--` 之后原样交出。** 第一个 `--` 结束 sprawling 自己的参数，之后每个词原样成为被量命令的 argv，不当作标志读。8-89 的优先规则（`--help`、`--version` 出现在任何位置都先生效）只扫描到第一个 `--` 为止，所以 `sprawling gauge -- cargo --version` 量的是 cargo。命令表每行多一项：这个动词收不收 `--` 之后的词，只有 `gauge` 收。
 
-**一次 run 从哪里量到哪里。** 从 `spawn` 之前到 `wait` 返回：可观察的端点是看到进程退出（citysim-SPEC §3-2）。`wait` 在调用线程上阻塞，拍在一条名为 `sprawling-gauge` 的线程上走，所以一次 run 的结束由 `wait` 看到，`wall_us` 没有一拍那么大的误差。被量命令的 stdin 是空的；它的 stdout 与 stderr 都接到 `gauge` 的 stderr（`Stdio::from(io::stderr())`），`gauge` 的 stdout 上只有读数行。n 次 run 依次跑，第一次不丢：它是冷的那一次，`run` 行的 `index` 为 0，spread 里 floor 与 p50 的差有一部分是它留下的，其余是机器的负载。
+**一次 run 从哪里量到哪里。** 从 `spawn` 之前到 `wait` 返回：可观察的端点是看到进程退出（citysim D2）。`wait` 在调用线程上阻塞，拍在一条名为 `sprawling-gauge` 的线程上走，所以一次 run 的结束由 `wait` 看到，`wall_us` 没有一拍那么大的误差。被量命令的 stdin 是空的；它的 stdout 与 stderr 都接到 `gauge` 的 stderr（`Stdio::from(io::stderr())`），`gauge` 的 stdout 上只有读数行。n 次 run 依次跑，第一次不丢：它是冷的那一次，`run` 行的 `index` 为 0，spread 里 floor 与 p50 的差有一部分是它留下的，其余是机器的负载。
 
 **给 agent 的输出（stdout 不是终端）。** 每行一个 JSON 对象，值只有整数、`null` 与 `line` 这一个字符串键，键序固定，单位写在键名末尾（`_us`、`_ms`、`_bytes`、`_permille`），没有单位的是计数。没有量到的值是 `null`，不是 0。
 
@@ -5001,8 +5001,8 @@ pub monotonic: fn() -> Instant,             // 生产交 monotonic_now；派活�
 
 `skills/gauge/SKILL.md`，许可 MPL-2.0，列进 `skills/README.md` 的表与 `skills/LICENSES.md`；发行包按目录收 `skills/`，不必另列。它教 agent 按这个次序做：
 
-1. 先把负载钉住：同一份输入、同一个构建（产品的 feature 集，citysim-SPEC §3-9）；输入是文件时记下它的摘要，两条读数只在摘要相同时可比（citysim-SPEC §3-8）。
-2. 取基线：`sprawling gauge --samples 20 -- <命令> > before.jsonl`，读最后那行 spread。floor 贴着设计的下限，p50 带着机器其余的负载（citysim-SPEC 8-6）；`suspicious` 不为 0 时先看是哪几次、是不是第一次。
+1. 先把负载钉住：同一份输入、同一个构建（产品的 feature 集，citysim D9）；输入是文件时记下它的摘要，两条读数只在摘要相同时可比（citysim D8）。
+2. 取基线：`sprawling gauge --samples 20 -- <命令> > before.jsonl`，读最后那行 spread。floor 贴着设计的下限，p50 带着机器其余的负载（`tools/citysim/Spec.lean` §8-6）；`suspicious` 不为 0 时先看是哪几次、是不是第一次。
 3. 一次只改一处，取 after；前后交替跑几轮（一轮先 before 后 after），只在同一机器等级上比较 floor 与 p50。
 4. 回退门用确定性计数，墙钟只记录：找一个随规模增长的计数（读过的字节、核对的行数、文件操作数），在 N 与 2N 两种规模下断言它。
 5. 资源：长命令看 `run` 行的 `seen_*` 与 `child_peak_*`；一个已在跑的进程用 `--pid`；一座服务中的城用 `gauge --at <地址> > 文件` 在后台记录。`city` 行里的 0 可能是「没读到」（8-96），其余行里没读到的是 `null`。

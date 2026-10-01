@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The stand-in provider as a process (citysim-SPEC.md 8-10):
+//! The stand-in provider as a process (`tools/citysim/spec/WireScript.lean` §8-10):
 //! `provider <script.json> <record.jsonl> [<listen>]`.
 //!
 //! It binds a loopback port, prints `SPRAWLING_PROVIDER=<url>` as its

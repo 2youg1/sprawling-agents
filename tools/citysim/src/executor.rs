@@ -13,6 +13,8 @@
 //! (`crates/runtime/Spec.lean` §8-39 item 5), then per turn prompt_shape_compared,
 //! model_called, model_returned, (tool_called, tool_result)*, and finally
 //! handoff_written, run_frozen.
+//!
+//! Specified by `tools/citysim/spec/Executor.lean` §8-2 to §8-4.
 
 use std::cell::Cell;
 
@@ -238,7 +240,7 @@ pub fn run_scenario_on(
     // clock: a wave hands every call in it the same instant on purpose,
     // so a clock reading would give two calls of one tool inside one wave
     // one key, and the second would come back deduplicated. Determinism
-    // rule 7 rules a clock out of a key outright (citysim-SPEC.md 8-4).
+    // rule 7 rules a clock out of a key outright (citysim D20).
     let placed = Cell::new(0u64);
     let mut invoke = |call: &kernel::ToolCall, t: TimeMs| {
         // Every door the call must pass is the bench's to route; the

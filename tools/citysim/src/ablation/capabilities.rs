@@ -20,6 +20,8 @@
 //! row here.** `signal`, `goal`, `pr`, `plan` and the browser's own
 //! descriptions grant what they grant; a row for one of them would
 //! grade a phrase the document no longer says.
+//!
+//! Specified by `tools/citysim/spec/Ablation.lean` §8-8-4.
 
 use super::Capability;
 

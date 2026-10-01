@@ -12,7 +12,7 @@
 
 // Four instruments answer on demand through their own tests and have no
 // scenario caller; they compile only under test so the simulator's library
-// carries scenarios, not instruments (citysim-SPEC.md 8-8).
+// carries scenarios, not instruments (citysim D21).
 #[cfg(test)]
 mod ablation;
 mod checker;
