@@ -1028,7 +1028,7 @@ pub(super) fn one_per_package(root: &Path, out: &mut Vec<Violation>) -> Result<(
 
 - **检验器的规格**是 `tools/adversary/Spec.lean` 与 `tools/adversary/spec/` 下的 `.lean`。它只 import 工具链自带的库与 `tools.adversary.Spec`、`tools.adversary.spec.*`；import `Sprawling`（检验器）或任何一个 crate 的规格都是一条违规，拒词点名那个模块，替代是「import 工具链的库或本规格的分部」。理由是 ARCHITECTURE.md §11 那一句「no part imports the checker」：规格陈述检验器要守的性质，检验器实现它们，一份 import 了实现的规格就成了实现的第二份读法。
 - **检验器**是 `tools/adversary/` 下其余的 `.lean`，规则不变：只 import `Sprawling` 与工具链的库，所以它也 import 不到自己的规格。
-- **一份生效规格**：第一条断言在包之外再判 `tools/adversary` 一次，`adversary-SPEC.md` 与 `Spec.lean` 合起来恰好一份。
+- **一份生效规格**：第一条断言在包之外再判 `tools/adversary` 一次，那里的 `*-SPEC.md` 与 `Spec.lean` 合起来至多一份。
 - **引用的路径在盘上**：第五条也读检验器的规格。
 
 **测试**：`spec::tests` 在夹具上判：检验器的入口 import 自己的分部不报；分部 import `Sprawling.Door` 报；检验器的源文件 import 规格报；规格引用一个不在盘上的路径报；Markdown 与 Lean 两份规格并存报。

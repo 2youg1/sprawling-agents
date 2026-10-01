@@ -7,7 +7,7 @@ defaultTargets = ["Spec"]
 # traces. A scheduled checker that resolved a package graph before it could run
 # would go red for reasons belonging to a registry rather than to this product,
 # and a red that means nothing is worse than no run.
-# tools/adversary/adversary-SPEC.md section 13 records what that costs.
+# tools/adversary/Spec.lean section 13 records what that costs.
 
 [leanOptions]
 # A warning left standing is a finding nobody read.
@@ -17,16 +17,18 @@ warningAsError = true
 debug.skipKernelTC = false
 
 # Every crate's specification: `crates/<dir>/Spec.lean` and its parts under
-# `crates/<dir>/spec/` (ARCHITECTURE.md section 11, "Specifications in Lean").
-# `just models` builds this library inside `just check`. When the specification
-# of something outside `crates/` moves to Lean, the same change adds its two
+# `crates/<dir>/spec/` (ARCHITECTURE.md section 11, "Specifications in Lean"),
+# and the checker's own, `tools/adversary/Spec.lean` and `tools/adversary/spec/`.
+# `just models` builds this library inside `just check`; it builds none of the
+# checker, which no specification imports. When the specification of
+# something outside `crates/` moves to Lean, the same change adds its two
 # globs here, `<dir>.Spec` and `<dir>.spec.+`, and never `tools.+`, `client.+`
 # or `desktop.+`: those trees hold build output a recursive glob would walk.
 [[lean_lib]]
 name = "Spec"
-globs = ["crates.+"]
+globs = ["crates.+", "tools.adversary.Spec", "tools.adversary.spec.+"]
 
-# The adversarial checker (tools/adversary/adversary-SPEC.md). It imports no
+# The adversarial checker (tools/adversary/Spec.lean). It imports no
 # specification: it judges the binary from outside and must not import a
 # restatement of the rules it is judging.
 [[lean_lib]]
@@ -42,7 +44,7 @@ srcDir = "tools/adversary/test"
 # runtime, and the city it was draining fills its buffer and stops answering.
 supportInterpreter = true
 
-# The acceptance world (tools/adversary/adversary-SPEC.md section 9): the walk
+# The acceptance world (tools/adversary/Spec.lean section 9): the walk
 # a stranger takes with a release archive's binary, against the stand-in
 # provider `just acceptance` starts beside it. An executable of its own because
 # it is never part of `just adversary`: it needs an archive and a provider

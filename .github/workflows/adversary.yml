@@ -15,7 +15,7 @@
 #
 # This is not a gate. `just check` never reaches it, no push waits for it, and a
 # red run here blocks nothing: it reports a finding, and the finding is then
-# fixed in Rust, where the rule lives (tools/adversary/adversary-SPEC.md section 2).
+# fixed in Rust, where the rule lives (tools/adversary/Spec.lean section 2).
 #
 # **Every check this runs is one that must pass, so red here always means news.**
 # Nothing is kept in the tree because it is expected to fail: a job that is red

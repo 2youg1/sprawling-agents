@@ -259,7 +259,7 @@ fn register_row(root: &Path, row: &str) -> Result<toml::Value, XtaskError> {
 /// definition that holds it.
 ///
 /// The figure's home is `tools/adversary/`, because that is the program that
-/// draws from it, and `adversary-SPEC.md` quotes it. Reading it here makes
+/// draws from it, and its specification `tools/adversary/Spec.lean` quotes it. Reading it here makes
 /// the quotation a managed span: nothing else joins a Lean definition to a
 /// number written in prose, so the two could disagree with every gate
 /// green.

@@ -526,7 +526,7 @@ mem-long-turn steps="500" every="100":
 
 # The adversarial property checker in `tools/adversary/`, which lives outside the
 # workspace, outside the release, and outside `just check`
-# (tools/adversary/adversary-SPEC.md section 2). It is never a gate: on a machine with
+# (tools/adversary/Spec.lean section 2). It is never a gate: on a machine with
 # no Lean toolchain this prints one line and succeeds, so `just check` behaves
 # exactly as it does where the directory is absent.
 #
@@ -553,7 +553,7 @@ adversary *args:
     SPRAWLING_BIN="$binary" lake exe adversary {{args}}
 
 # The usability walk a stranger takes with a release archive
-# (tools/adversary/adversary-SPEC.md section 9, step 6). The archive is
+# (tools/adversary/Spec.lean section 9, step 6). The archive is
 # unpacked into target/acceptance, the stand-in provider is started on the
 # script the acceptance world writes for the archive's skills, and the
 # archive's own binary is walked through a first day, a process killed in
@@ -568,7 +568,7 @@ adversary *args:
 # names an archive has asked for this walk.
 #
 # This recipe is the only place that starts the stand-in: the checker under
-# tools/adversary/ hosts no server (adversary-SPEC.md section 13) and is
+# tools/adversary/ hosts no server (tools/adversary/Spec.lean section 13) and is
 # told the stand-in's URL, as it is told the binary's path.
 acceptance archive:
     #!/usr/bin/env bash
