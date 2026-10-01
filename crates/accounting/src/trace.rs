@@ -187,8 +187,10 @@ fn nearby(
 ) -> Result<Vec<Nearby>, AxError> {
     let building = city::Building::of(&commit.actor)?;
     let mut found: BTreeMap<RunId, Nearby> = BTreeMap::new();
-    let walk = index
-        .seqs()
+    let entries = index.seqs();
+    #[cfg(test)]
+    let entries = counted::Walked::new(entries);
+    let walk = entries
         .skip_while(|seq| *seq < span.start)
         .take_while(|seq| *seq < span.end);
     for seq in walk {
@@ -214,15 +216,52 @@ fn nearby(
     Ok(found.into_values().collect())
 }
 
-/// How many folds of a city's views this module began on this thread:
-/// the probe the count gate in `playback::tests::tracing` reads
-/// (accounting-SPEC.md 8-25).
+/// How many folds of a city's views this module began on this thread,
+/// and how many index entries each nearby walk took: the probes the
+/// count gates in `playback::tests::tracing` read (accounting-SPEC.md
+/// 8-25).
 #[cfg(test)]
 pub(crate) mod counted {
-    use std::cell::Cell;
+    use std::cell::{Cell, RefCell};
+
+    use kernel::Seq;
 
     thread_local! {
         static VIEWS_FOLDS: Cell<u64> = const { Cell::new(0) };
+        static NEARBY_WALKS: RefCell<Vec<u64>> = const { RefCell::new(Vec::new()) };
+    }
+
+    /// The index entries one nearby walk takes, written down when the
+    /// walk is dropped.
+    pub(super) struct Walked<I> {
+        entries: I,
+        taken: u64,
+    }
+
+    impl<I> Walked<I> {
+        pub(super) fn new(entries: I) -> Walked<I> {
+            Walked { entries, taken: 0 }
+        }
+    }
+
+    impl<I: Iterator<Item = Seq>> Iterator for Walked<I> {
+        type Item = Seq;
+        fn next(&mut self) -> Option<Seq> {
+            let entry = self.entries.next()?;
+            self.taken = self.taken.saturating_add(1);
+            Some(entry)
+        }
+    }
+
+    impl<I> Drop for Walked<I> {
+        fn drop(&mut self) {
+            NEARBY_WALKS.with(|walks| walks.borrow_mut().push(self.taken));
+        }
+    }
+
+    /// The entries each nearby walk on this thread took, oldest first.
+    pub(crate) fn nearby_walks() -> Vec<u64> {
+        NEARBY_WALKS.with(|walks| walks.borrow().clone())
     }
 
     pub(super) fn views_folded() {

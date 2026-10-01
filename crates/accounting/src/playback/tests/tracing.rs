@@ -5,7 +5,8 @@
 
 //! A model call timed by the rounds' pairing rule, and a commit's
 //! evidence read only up to the cutoff, from one fold of the views per
-//! export (accounting-SPEC.md 8-25).
+//! export, and a commit's nearby walk read from its span on
+//! (accounting-SPEC.md 8-25).
 
 #![allow(
     clippy::unwrap_used,
@@ -169,6 +170,34 @@ fn folds_exporting(commits: u8) -> u64 {
 #[test]
 fn an_export_folds_the_views_once_whatever_the_number_of_commits() {
     assert_eq!((folds_exporting(4), folds_exporting(8)), (1, 1));
+}
+
+/// The most index entries one commit's nearby walk takes in one export
+/// of [`committing`], after checking that every commit walked once.
+fn most_entries_one_walk_takes(commits: u8) -> u64 {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), &super::lines(committing(commits, 0)), b"");
+    let before = crate::trace::counted::nearby_walks().len();
+    export(dir.path(), &person()).unwrap();
+    let walks = crate::trace::counted::nearby_walks();
+    assert_eq!(walks.len() - before, usize::from(commits));
+    walks[before..].iter().copied().max().unwrap()
+}
+
+/// The regression this gate holds off is a commit's nearby walk counting
+/// the index from its first entry, which made one export cost commits
+/// times lines. With twice the commits before it, the longest walk still
+/// takes six entries: the first commit's span, five lines from its run's
+/// first line, and the line after the span, which ends the walk.
+#[test]
+fn a_commits_nearby_walk_takes_its_span_whatever_came_before() {
+    assert_eq!(
+        (
+            most_entries_one_walk_takes(4),
+            most_entries_one_walk_takes(8)
+        ),
+        (6, 6)
+    );
 }
 
 /// The milliseconds one export takes over [`committing`] histories of
