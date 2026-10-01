@@ -12,11 +12,15 @@ import Sprawling.Provider
 import Sprawling.Layer
 import Sprawling.Person
 import Sprawling.Regression
+import Sprawling.Acceptance.Script
+import Sprawling.Acceptance.Stage
+import Sprawling.Acceptance.Walk
 
 /-! The library index. It holds no logic; every rule lives in the module that
 owns it, and the dependency order is the one `adversary-SPEC.md` section 7
 draws: `Model` → `Door` → `Frame`, `Model` → `Ground` → `Door`, `Provider` →
 `Ground` for the second world, `Layer` → `Ground` with `Check` for the third,
-`Person` on `Layer` for the fourth. The checker imports no specification: the
-chain and snapshot theorems it cites in comments live in
+`Person` on `Layer` for the fourth, and the acceptance world under
+`Sprawling.Acceptance` on `Provider` and `Layer`. The checker imports no
+specification: the chain and snapshot theorems it cites in comments live in
 `crates/kernel/spec/Ledger.lean` and `crates/storage/spec/Snapshot.lean`. -/

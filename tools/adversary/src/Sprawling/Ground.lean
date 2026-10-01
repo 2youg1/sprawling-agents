@@ -113,6 +113,53 @@ private def waits (door : Door) (port : Port) (serving : Serving) : Nat → IO B
       | .accepted _ => return true
       | _ => waits door port serving tries
 
+/-- Serves a city that is already raised, on a port nobody else in this process
+holds, runs an action against it, and kills the process on every path out.
+
+`withGround` is this behind a throwaway directory. The acceptance world calls it
+on its own because it serves one directory more than once: killing a city in the
+middle of a run and serving what it left behind is a step it walks
+(`Sprawling.Acceptance.Walk`). -/
+def servingAt (door : Door) (city home : System.FilePath) (act : Ground → IO α) : IO α :=
+  attempt 4
+where
+  /-- One city on one port: `none` when that port was held by something outside
+  this process, which is the only case worth another try. -/
+  serveOnce (port : Port) : IO (Option α) := do
+    let serving ← door.serve city port home
+    try
+      if ← waits door port serving 25 then
+        return some (← act { city, port, home })
+      else
+        -- Read only on the failing path: the diagnostics are worth the wait
+        -- exactly when there is a failure to explain.
+        let complained ← serving.said
+        if occupied complained then
+          return none
+        else
+          throw <| IO.userError s!"a city would not serve: {complained}"
+    finally
+      serving.hangUp
+  attempt : Nat → IO α
+    | 0 =>
+      throw <| IO.userError
+        "no port between 47100 and 47115 could serve a city; this is the machine's, not the product's"
+    | left + 1 => do
+      let port ← claim
+      -- A failure inside the check is the check's answer and travels on
+      -- unchanged; only the port is taken back on the way out, because a
+      -- checker that renamed every failure would report the harness where the
+      -- product was owed.
+      let raised ← try serveOnce port catch error => do release port; throw error
+      match raised with
+      -- The port is deliberately not handed back. Nothing inside this process
+      -- held it, so something outside does, and lending it on would give every
+      -- later ground the same obstacle.
+      | none => attempt left
+      | some value =>
+        release port
+        return value
+
 /-- Runs an action against a city that is raised, served, and then destroyed.
 
 The process is killed on every path out, including an exception: a test run that
@@ -128,46 +175,9 @@ def withGround (door : Door) (act : Ground → IO α) : IO α := do
     let home := root / "home"
     IO.FS.createDirAll home
     door.raise city
-    attempt city home 4
+    servingAt door city home act
   finally
     try IO.FS.removeDirAll root catch _ => pure ()
-where
-  /-- One city on one port: `none` when that port was held by something outside
-  this process, which is the only case worth another try. -/
-  serveOnce (city : System.FilePath) (home : System.FilePath) (port : Port) : IO (Option α) := do
-    let serving ← door.serve city port home
-    try
-      if ← waits door port serving 25 then
-        return some (← act { city, port, home })
-      else
-        -- Read only on the failing path: the diagnostics are worth the wait
-        -- exactly when there is a failure to explain.
-        let complained ← serving.said
-        if occupied complained then
-          return none
-        else
-          throw <| IO.userError s!"a city would not serve: {complained}"
-    finally
-      serving.hangUp
-  attempt (city : System.FilePath) (home : System.FilePath) : Nat → IO α
-    | 0 =>
-      throw <| IO.userError
-        "no port between 47100 and 47115 could serve a city; this is the machine's, not the product's"
-    | left + 1 => do
-      let port ← claim
-      -- A failure inside the check is the check's answer and travels on
-      -- unchanged; only the port is taken back on the way out, because a
-      -- checker that renamed every failure would report the harness where the
-      -- product was owed.
-      let raised ← try serveOnce city home port catch error => do release port; throw error
-      match raised with
-      -- The port is deliberately not handed back. Nothing inside this process
-      -- held it, so something outside does, and lending it on would give every
-      -- later ground the same obstacle.
-      | none => attempt city home left
-      | some value =>
-        release port
-        return value
 
 /-- Everything the ledger holds, as bytes.
 
