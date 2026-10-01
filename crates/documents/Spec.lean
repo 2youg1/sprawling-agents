@@ -6,6 +6,7 @@
 import crates.documents.spec.Edit
 import crates.documents.spec.Encoding
 import crates.documents.spec.Proposal
+import crates.documents.spec.Markdown
 import crates.documents.spec.Window
 
 /-! # documents 的规格
@@ -15,7 +16,7 @@ import crates.documents.spec.Window
 
 /-! ## 1 需求分解
 
-来源是 refrain 路线图 §4-8（S7.8）、§4-10（S7.10）与 Roadmap U8、U10 的 Rust 一半。八个可独立验收的单元，与模块一一对应：
+来源是 refrain 路线图 §4-8（S7.8）、§4-9（S7.9）、§4-10（S7.10）与 Roadmap U8、U9、U10 的 Rust 一半。九个可独立验收的单元，与模块一一对应：
 
 - 一段字节（`span`）：版本里的一段半开字节区间（D2）。
 - 编码（`encoding`，`spec/Encoding.lean`）：一个版本的字节是哪种编码的文本，或者不是文本（D4、D5）。
@@ -25,6 +26,7 @@ import crates.documents.spec.Window
 - 编辑事务（`edit`，`spec/Edit.lean`）：一次保存是对一个基线版本的一串编辑，落下就交回撤销它的事务（D8、D9）；页面送来的是文本编辑，按那一版的编码写回（D11、D12）。
 - 选区（`selection`）：一个读者的位置怎样跨过一次保存（D10）。
 - 修改提案（`proposal`，`spec/Proposal.lean`）：一次 run 对一份文档一段字节的建议，它的身份、逐句的 diff、按逐句的决定合成，以及几张卡怎样作为一次保存落下（D13–D19），迁自 RefRain 的 `review` 与 `decision`。
+- Markdown 文法（`markdown`，`spec/Markdown.lean`）：一个 Markdown 版本的一个窗口读成块与行内标记的树；文档预览与导出读这一个文法，对话流怎样读它是 §3 的未定（refrain 路线图 §4-9、Roadmap U9 的 Rust 一半；D20–D26）。
 
 本 crate 回答「这些字节是什么、能怎样切、能怎样改、一处建议怎样读、怎样决定」；它不读盘、不读内容库、不记账。
 -/
@@ -41,6 +43,15 @@ refrain 路线图 §4-8、§4-10 的验收在 Rust 测试里成立，测试走�
 | A3 后到者被拒 | `edit::tests::a_second_save_from_the_same_version_is_refused`：两个写者从同一版本出发，先到的落下，后到的得到 `E_VERSION_CONFLICT`，先到者的字节不动；线上那一半是 accounting 的 `a_second_save_from_the_same_version_is_refused_and_the_first_stands`（wire-SPEC §8-72） |
 | 文本编辑写回字节 | `edit::tests::a_text_save_writes_the_version_s_own_encoding`：UTF-16 与带标记的 UTF-8 文档上的文本编辑按那一版的编码写回；`edit::tests::a_save_that_splits_a_character_is_refused` |
 | A10 修改提案 | `proposal::tests`：整张接受得到提议、改后接受得到人改过的句子、整张拒绝不写；过期的提案被拒、拒绝它却可以；两张重叠的卡不能一起接受；切出的句子接起来是两边的原文；accounting 的 `worker::commanding::tests::saving` 走线上那一半（收回、重复请求、重开之后从账本折回） |
+
+refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「内容为空」可区分）由 `spec/Markdown.lean` 的 `empty_is_not_unsupported` 与下表的测试判；真实浏览器截图那一半归页面。
+
+| 验收 | 完成的定义 |
+|---|---|
+| CommonMark 语料 | `markdown::tests` 里迁自 `client/src/core/prose.test.ts` 的三组（列表、表与代码块相继闭合；没闭合的代码块留着它的空行；段落由空行而不由换行结束），逐块比较整棵树，块的区间切回源文就是那一块 |
+| 项目扩展语料 | `markdown::tests`：删除线、任务列表、脚注、自动链接、CJK 友好的强调、公式、前置元数据、HTML 块，各读成 D22 说的那一种节点 |
+| A4 的 Rust 一半 | `markdown::tests`：空窗口答零个块；UTF-16 的版本答 `Preview::Unsupported`；内容为空的代码块读成 `Code { text: "" }`，HTML 与公式读成带原文的 `Unsupported`，两者不同形 |
+| 预览逐窗读完 | `markdown::tests::reading_on_from_each_preview_lays_out_every_paragraph_once`：超过一窗的版本从 0 起按答复的 `span.end` 逐窗读，每一段恰好读出一次 |
 -/
 
 /-! ## 3 假设与歧义
@@ -49,6 +60,8 @@ refrain 路线图 §4-8、§4-10 的验收在 Rust 测试里成立，测试走�
 - **假设**：没有标记的 UTF-16 不出现在城里需要读成文本的地方。它被判成不透明的而不是被猜（D4）；人的文件里真有这样的一份时，页面说它不是文本，而不说错字。
 - **假设**：对齐的结果按种类过滤之后恰是两边各自切出的句子。`spec/Proposal.lean` 把对齐的结果当作给定，证明的是合成；对齐本身由 `proposal::tests` 的语料断言（D15）。
 - **当前状态：提出与收回提案的写者还没有。** `proposal_offered` 与 `proposal_withdrawn` 由提出它的 run 的工具写下（kernel-SPEC §8-83），那件工具还没有落地（city-SPEC §8-40）；在那之前 `Offer::of` 的生产调用方是读账本的折叠（accounting-SPEC §8-22），它对每一行 `proposal_offered` 算出提案身份并判它的区间与长度。工具落地时要回答的：一次 run 在哪一版上提（它读到的版本，还是它的候选工作树里那份文件的基线），以及 refrain 路线图 §4-10 说的「审阅期间 `edit`、`exec` 对该文稿的写入受同一边界约束」是否由 runtime 判。决定它的证据是那件工具的规格。
+- **未定：对话流怎样读这个文法。** `Query::Preview` 按版本作答（wire-SPEC §8-74），而模型说的话没有版本：流式的增量不进账本（wire-SPEC §8-8），结算的回复在 `model_returned` 的载荷里。三个候选：(a) 写 `model_returned` 的一方把回复的文字另存进内容库、记录带上它的地址，页面按这个版本问 `Preview`，还在说的那一段照旧画原文；(b) 城在流式增量旁边按同一个文法给出已经闭合的块（它手里有同一段文字）；(c) 加一条带文字的查询。(a) 只在回复结算后渲染，(b) 要改 delta 帧，(c) 让页面把城刚发来的文字再发回去。决定它的证据：远程门上一次往返的读数，与一个回复在流式期间闭合块的次数。在那之前对话流仍由 `client/src/core/prose.ts` 读，它是这个文法之外的第二个读法（client-SPEC 4-26）。
+- **未定：整份放得下的 Markdown 版本不在内容库里。** `accounting::views::document` 只在第一个窗口盖不住整份时存版本（accounting-SPEC §12 第 33 条），所以对一份 64 KiB 以内的 Markdown 文档，`Preview` 今天答 `Unavailable`。补法是那里一个条件：格式是 Markdown 时也存（accounting-SPEC §8-23）。
 -/
 
 /-! ## 4 现状分析
@@ -58,6 +71,8 @@ refrain 路线图 §4-8、§4-10 的验收在 Rust 测试里成立，测试走�
 **迁入的部分。** RefRain（另一个仓库，`refrain-core` crate 的 `source_layout` 模块）的两条分块规则（Markdown 与纯文本）与它的回归语料：二十份文本按 RefRain 生成语料的脚本逐字搬进 `layout::tests`，每一份的字节与 RefRain 语料清单记的 SHA-256 核过，块区间与它冻结的块表逐项相同。RefRain 的 `DocumentSurface`（`refrain-app` crate 的 `native_document` 模块）里与平台无关的部分迁的是有界投影的做法：按块取一屏、取不下一块时退到字符边界（`window::head`）。没有迁的：`DocumentSurface` 的输入法组合、光标移动与撤销栈——草稿只在浏览器（refrain 路线图 §4-8），服务端没有一个正在编辑的文档；迁入时去掉了直接索引、`expect`、`as` 与内部随机 ID。
 
 **修改提案迁自 RefRain `refrain-core` 的 `manuscript::review` 与 `manuscript::decision`**：提案冻在一个基线上、句子切片（终止符与紧随的闭合符号）、逐句的判词（接受、改后接受，改后接受只对插入的句子）、批量决定的过期与重叠拒绝。改动的：身份由内容摘要算出而不是随机 `Id`（D13）；对齐的键是整句的字节而不只是去掉空白的句子（D14）；只迁对齐表的那一半，不迁锚点分段（D15）；作用域是一段字节而不是一串块 id（D17）；`CommentOnly` 与「格式改动」的分类没有迁，卡上没有它们的读者。
+
+**Markdown 的读法。** 本 crate 之前，页面上的 Markdown 只由 `client/src/core/prose.ts` 读：标题、列表、围栏代码、表、引用与三种行内标记，按正则一行一行认，链接只认 `http(s)`；嵌套列表、引用里的块、HTML、脚注、引用式链接与公式都读成段落文字。它产出数据而不是 HTML，这一条迁过来了（D21）；其余由 comrak 的 CommonMark 与 GFM 取代（D20、D22）。它的 `closedUpTo`（流式的回复里哪一段已经不会再变）今天仍是对话流的读法，§3 说它等什么。
 -/
 
 /-! ## 5 权威信源
@@ -69,11 +84,16 @@ refrain 路线图 §4-8、§4-10 的验收在 Rust 测试里成立，测试走�
 | 字节顺序标记 | Unicode Standard §23.8（U+FEFF） |
 | 代码块的界定行 | CommonMark 0.31.2 §4.5（fenced code blocks：至少三个同一字符、缩进少于四列、闭合行同字符且不短于开启行） |
 | 版本摘要 | `kernel::B3Hash::digest`，与 `storage::Cas::put` 同一个 BLAKE3 |
+| Markdown 的文法 | CommonMark 0.31.2；GitHub Flavored Markdown 0.29-gfm（表、删除线、自动链接、任务列表）；comrak 的扩展文档（脚注、`$` 公式、前置元数据、CJK 友好的强调）；都由 comrak 实现，本 crate 不重写（D22） |
+| 源位置的单位 | comrak `nodes::LineColumn`：行从 1 起，列按 UTF-8 字节数、从 1 起（D26） |
+| 链接的协议 | RFC 3986 §3.1 的 `scheme` 文法；WHATWG URL Standard 的基本解析器：去掉开头与结尾的 C0 控制字符与空格、去掉全部制表符与换行（D23） |
 -/
 
 /-! ## 6 命名统一
 
 **document version**、**document window**、**draft** 取自 `docs/glossary.md`。「版本」在本 crate 恒指一份文档某一刻的全部字节，它的身份是 `B3Hash`；「窗口」恒指一次答复带的那一段；「草稿」是浏览器里还没保存的文本，本 crate 里没有它。模型里的声明名取同样的词：`Documents.Edit.apply`、`Documents.Window.stepBack`、`Documents.Encoding.reading`。**proposal**（修改提案）与 **review slice**（卡上的一句）同样取自 glossary：`Documents.Proposal.merged` 与 Rust 的 `Review::merged`、`Slice` 是同一组词。
+
+**preview** 取自 `docs/glossary.md`：一个 Markdown 版本的一个窗口由本 crate 的文法读成的块，是数据而不是 HTML。Rust 里是 `documents::Preview`，线上是 `Query::Preview` 与 `Answer::Preview`；读出的块是 `Block`，行内的是 `Inline`，读得出而不画的是 `Unsupported`。模型里是 `Documents.Markdown.settle`、`lower`、`admitted`。
 -/
 
 /-! ## 7 模块边界
@@ -82,9 +102,11 @@ refrain 路线图 §4-8、§4-10 的验收在 Rust 测试里成立，测试走�
 - **一版字节存到哪**归 `storage::cas`：版本身份就是内容库的地址（D3），所以按版本取范围就是按地址读对象（storage-SPEC §8-36）。
 - **一次保存怎样落盘、怎样记账**归 `city::document`（锁、读当前字节、整份换上，city-SPEC §8-40）与写者 `accounting::worker::commanding::saving`（wire-SPEC §8-72、§8-73）。
 - **一张卡开着、决定过还是收回过**归读账本的折叠（accounting-SPEC §8-22）：本 crate 给出每一步的判定，不持有任何一张卡。
-- **线上的拼写**归 `wire`：它直接携带本 crate 的 `Span`、`Format`、`Encoding`、`Window`（D1）。
+- **线上的拼写**归 `wire`：它直接携带本 crate 的 `Span`、`Format`、`Encoding`、`Window`，以及预览的 `Preview` 与它的块（D1、D21）。
+- **把块画成元素**归页面（client-SPEC 4-26）：本 crate 给出数据，不给 HTML，也不决定一个 `Unsupported` 怎样显示原文。
+- **CommonMark 与 GFM 的文法**归 comrak（D20、D22）：本 crate 只选扩展、把它的树读成本 crate 的树、判链接的协议与嵌套的深度。
 
-约束：本 crate 只依赖 `kernel`、`serde` 与可选的 `schemars`；恒不出现 I/O、时钟与全局状态。
+约束：本 crate 只依赖 `kernel`、`serde`、`comrak` 与可选的 `schemars`；恒不出现 I/O、时钟与全局状态。
 -/
 
 /-! ## 8 接口先行
@@ -99,6 +121,7 @@ refrain 路线图 §4-8、§4-10 的验收在 Rust 测试里成立，测试走�
 - **`edit`**（形状 2 值类型 ＋ 形状 1 判定）：`Edit { span, bytes }`、`Transaction::new(baseline, edits)`、`Transaction::apply(&[u8]) -> Result<Applied, AxError>`、`Applied::{bytes, version, undo}`（`spec/Edit.lean`）；`TextEdit { span, text }`（线上携带）与 `save(source, baseline, &[TextEdit]) -> Result<Applied, AxError>`（D11、D12）。
 - **`proposal`**（形状 2 值类型 ＋ 形状 1 判定）：`Offer::of(RunId, &ProposalOffered) -> Result<Offer, AxError>`、`Offer::{id, run, doc, baseline, span, before, after, review}`；`Review::of(before, after)`、`Review::{slices, into_slices, merged(&[SliceVerdict]) -> Result<String, AxError>}`；`Slice { kind, text, lead, trail }`、`SliceKind::{Same, Delete, Insert}`（线上携带）；`decide(source, &[(&Offer, &[SliceVerdict])]) -> Result<Option<Applied>, AxError>`（`spec/Proposal.lean`）。判词的类型 `SliceVerdict`、`Verdict` 住 kernel（kernel-SPEC §8-83），因为账本记的就是它。
 - **`selection`**（形状 2 值类型）：`Selection { anchor, focus }`、`collapsed`、`span`、`mapped(&Transaction)`。
+- **`markdown`**（形状 1 判定，`spec/Markdown.lean`）：`preview(Encoding, Lifted, Span) -> Result<Preview, AxError>`；`Preview::{Laid { span, blocks }, Unsupported { encoding }}`。树在 `markdown::tree`（形状 2 值类型）：`Block::{Heading, Paragraph, List, Quote, Code, Table, Rule, Footnote, Unsupported}`、`ListItem { span, check, blocks }`、`Row { cells }`、`Inline::{Text, Code, Emphasis, Strong, Strikethrough, Link, Image, FootnoteReference, SoftBreak, LineBreak, Unsupported}`、`Order`、`Spacing`、`Check`、`Align`、`Construct::{Html, Math, FrontMatter, Nesting, Extension}`。comrak 的树到本 crate 的树在 `markdown::lowering`（crate 内）。一切都带 `serde` 与可选的 `schemars` 派生，线上直接携带（D1）。
 -/
 
 /-! ## 9 工作流程
@@ -108,6 +131,8 @@ refrain 路线图 §4-8、§4-10 的验收在 Rust 测试里成立，测试走�
 写（wire-SPEC §8-72）：调用方在文档锁里读当前字节 → `save` 判基线、判编码、把文本编辑写成那一版编码的字节、经 `Transaction` 落下、判结果仍是同一种编码的文本 → 调用方整份替换 → 记账，回执带 `Applied::version`。
 
 提案（wire-SPEC §8-73）：读账本的折叠对每一行 `proposal_offered` 调 `Offer::of`，得到身份与卡；页面要卡时 `Offer::review` 切句、对齐；人决定时调用方在文档锁里读当前字节，`decide` 对每张卡 `merged` 出替换文本，接受了什么的卡判基线与原文，几段合成一次 `save`。
+
+预览：调用方从内容库读这一版的长度与前三个字节（`Encoding::of_mark`），`lift(viewport, size)` 说要抬起哪几个字节 → `preview`：UTF-16 答 `Unsupported`；否则 `cut` 切出窗口，没到末尾时退到倒数第二块的末尾（D25），comrak 读窗口的文字，`lowering` 把它的树读成 `Block`，区间加上窗口的起点。页面从 `span.end` 接着要下一窗。
 -/
 
 /-! ## 10 实现逻辑
@@ -149,11 +174,27 @@ D17 几张卡可以一起决定，接受了什么的卡合成一次保存（`dec
 D18 一处提案的原文与提议各至多 `WINDOW_BYTES_MAX` 字节，`Offer::of` 拒绝更长的（`E_INVALID_ARGS`）。一张卡是一屏读得完的一段，这个上限让一张卡的答复与一个窗口同阶，也让对齐表有界（D15）；更大的改动是一次保存，或者几处提案。重开参数：refrain 路线图 S7.10 的验收要求整章重写成一张卡时。
 
 D19 一张卡只被处理一次：开着的卡可以被人决定或被提出它的 run 收回，决定过或收回过的卡再被决定或收回都被拒（`E_INVALID_ARGS`），状态不变（`spec/Proposal.lean` 的 `decided_is_final`、`withdrawn_is_final`）。状态由读账本的折叠持有（accounting-SPEC §8-22），本 crate 只给出判定所需的身份与合成。被否决的是「决定之后可以换一个决定」：一次决定落下的字节已经成了文档的一版，再换一个决定就是一次新的保存，它该带新的基线。
+
+D20 Markdown 在城里读，不在浏览器里读。比的是四个读者：文档预览（版本在城里，页面只持有窗口，城侧一次答复带一个窗口的块，与 `Range` 同一个往返）；导出（U12 与 playback 本来就在 Rust 里，读的是同一个函数）；对话流（页面手里已经有文字，城侧要多一次往返，§3）；经远程门的设备（城侧每窗一次网络往返，浏览器侧零次）。被否决的是把 comrak 编成 wasm 在浏览器里读（refrain 路线图 §4-9 的另一臂），理由有四：(a) wasm 导出一个函数要 `#[unsafe(no_mangle)]` 或 wasm-bindgen 生成的 `unsafe`，工作区的 `unsafe_code` 是 `forbid`，只有 `crates/desktop/ffi` 有自己的 lint 表（`xtask guard`），所以要第二个带自己 lint 表的 crate，那是放宽一道门，要人的定规；(b) 工具链多一个 `wasm32-unknown-unknown` 目标，用 wasm-bindgen 时还多一个版本必须与 crate 逐位相同的命令行工具；(c) 包体推断多 100 KB 以上（gzip，没有构建过），`frontend_artifact` 的棘轮余量只有几 KB，城侧反而删掉 `prose.ts`；(d) 同一个 comrak 编两份——二进制给导出，wasm 给页面——两条构建路。城侧的代价：二进制多 comrak 一族；每窗一次往返，本机是一次回环上的 WebSocket 往返，远程门上是一次网络往返，都还没有读数。运行速度先于体积（人的定规）在这里不偏向 wasm：差别在往返，不在读一窗的微秒级计算。重开参数：远程门上量出的往返超过人能察觉的界（refrain 路线图 §5 的 `client_send_feedback`，100 ms）而 §3 的候选都消不掉它；或者出现允许第二个带自己 lint 表的 crate 的定规。
+
+D21 读出的是数据树，不是 HTML。块是标题、段落、列表（列表项各带自己的块）、引用、代码、表、分隔线、脚注定义与「不支持」，行内是文字、代码、强调、加粗、删除线、链接、图片、脚注引用、软换行、硬换行与「不支持」；线上直接携带（D1）。页面按树画元素，模型或居民写下的任何字符都不进 `innerHTML`——今天 `prose.ts` 守的就是这一条。被否决的：(a) comrak 的 HTML 输出加页面里的消毒器——消毒规则成了第二个权威，页面还要放开 `innerHTML`；(b) comrak 的 CommonMark XML——页面要再解析一遍。
+
+D22 文法是 CommonMark 加 GFM 的表、删除线、自动链接、任务列表，加脚注、`$…$` 与 `$$…$$` 公式、以 `---` 界定的前置元数据、CJK 友好的强调（`**「重点」**的` 也是加粗）。读得出而不画的——HTML（块与行内）、公式、前置元数据——读成带原文的 `Unsupported`，页面显示原文，所以「这里有一个本页不画的东西」与「这里什么也没有」在答复里是两种形状（A4）。不开 comrak 的引号与破折号改写，因为显示策略不改写源文（refrain 路线图附录 D）。被否决的：(a) 关掉公式——`$x$` 成为普通文字，日后接 KaTeX 时页面分不出公式与文字；(b) 开 comrak 其余的扩展（wikilink、上下标、下划线、alert、description list 等）——今天没有读者要它们，开一个，页面就多画一种元素。只有改了选项才会出现的那些节点读成 `Construct::Extension`。
+
+D23 链接只指向相对地址、`http`、`https` 与 `mailto`；别的协议（`javascript:`、`data:`、`file:`）不成为链接，它的文字留下，图片留下替代文字（`spec/Markdown.lean` 的 `admitted`）。判之前先照 WHATWG URL 的读法去掉制表符与换行、去掉开头的 C0 控制字符与空格，因为浏览器按这个读法解析 `href`：判与用的读法不一样，`java\tscript:` 就会漏过。规则在 Rust 里一处，页面不再判；被否决的是页面判（`prose.ts` 今天只认 `http(s)`）：导出也要判，同一条规则就成了 TS 与 Rust 各一份。
+
+D24 嵌套至多 `NESTING_MAX`（16）层，块与行内合计；更深的一层整个读成 `Unsupported { construct: Nesting }`，带着原文（`wraps_lower_le`），上限之内一层不丢（`lower_fits`）。理由：读树是递归，深度要有界；而答复经 serde 编码，Rust 一侧的读者（测试、远程中继）用 `serde_json` 默认的递归上限 128，一层列表在线上占五层 JSON，十六层加上外壳不到 100。被否决的：(a) 不设上限——一个 64 KiB 的窗口能写出六万层引用，递归会耗尽栈；(b) 交给 comrak——它只给列表设了 100 层。
+
+D25 预览按版本读一个窗口：窗口照 `Range` 的切法（`cut`，D7）；没到版本末尾时止于倒数第二块的末尾（块按 D6 的规则读窗口的字节，最后一块可能在窗口外接着写），倒数第二块不在起点之后时留在 `cut` 的终点（`settle_progress`），到了末尾的窗口不截短（`settle_at_end`）。块的区间是版本里的字节（D2），页面从答复的 `span.end` 接着要下一窗。只读 UTF-8 的两种编码；UTF-16 的版本答 `Preview::Unsupported { encoding }`，因为块的区间要对上版本的字节，而 UTF-16 的字节与解码出的 UTF-8 文字不是一一对应的。空窗口答零个块，与 `Unsupported` 不同形（A4，`empty_is_not_unsupported`）。已知的限：链接的引用定义或脚注定义在另一窗时，这一窗读不到它（refrain 路线图 §4-9 的「跨块失效」）；整份放得下 `WINDOW_BYTES_MAX` 的版本只有一窗，不受影响。重开参数：页面要预览超过一窗、又跨窗引用的文档时，先扫整份收集定义，再分窗读。
+
+D26 源位置：comrak 的 `sourcepos`（行与按字节数的列，都从 1 起，终点含在内）换算成版本里的半开字节区间。行按 comrak 的切法（`\r\n`、`\r`、`\n`）数，终点列换成不含的末尾，落到文字之外的夹到文字末尾。区间只用来定位（预览与源码的对应），不用来编辑：编辑仍走 `Span` 与 `Transaction`（D8），refrain 路线图附录 F 说的正是 source position 不保证可视编辑无损。行内节点不带区间，因为今天的读者只要块一级的对应。
 -/
 
 /-! ## 11 边界枚举
 
 空文档（一个空的纯文本行、零个 Markdown 块，版本是空字节的摘要）；只有标记的文档；没有结尾换行；混合 `\r\n` 与 `\n`；尾随空格与制表符；四列缩进的界定行（不是界定行）；没闭合的代码块（直到末尾都是一块）；非 UTF-8 字节；没有标记而含 NUL；落单的代理；奇数长度的 UTF-16；起点在字符中间、在标记中间、在版本之后；请求比 `WINDOW_BYTES_MAX` 长；第一块就比 `WINDOW_BYTES_MAX` 长；两个编辑重叠、乱序、越过末尾；两个插入点重合；基线已经移动；文本编辑劈开一个字符、在没有标记的 UTF-8 里写进 NUL、删掉字节顺序标记；不透明的版本上的保存；只有空白的提案两边；没有终止符的句子；只在空白上不同的两句；提议与原文完全不同（对齐表超出预算）；对一句没改动的句子下判词；对删除的句子改后接受；同一张卡点两次；两张卡的区间重叠；一张卡的基线已动而它被整张拒绝；一张卡被决定之后再决定、被收回之后再决定。
+
+Markdown（`markdown::tests` 与 `spec/Markdown.lean`）：空窗口；内容为空的代码块；没闭合的代码块；嵌套列表、引用里的块、HTML 块、前置元数据、脚注、引用式链接（refrain 路线图附录 D）；带标记的首行；只有 `\r` 的换行；`javascript:`、开头带空格或中间夹着制表符的协议、`data:` 图片、`./` 与 `#` 开头的相对地址；十七层的引用；窗口切在一段之中、一块就比窗口长、窗口恰到版本末尾；UTF-16 的版本。
 -/
 
 /-! ## 12 错误处理
@@ -163,35 +204,44 @@ D19 一张卡只被处理一次：开着的卡可以被人决定或被提出它�
 | `E_INVALID_ARGS` | `Span::new` 的起点在终点之后；`Transaction::new` 的编辑重叠或乱序；`apply` 的编辑越过末尾；`decode` 的字节在这种编码下拼不出文本；`cut` 抬起的字节不够切这个窗口；`save` 的源文不是文本、改完不再是同一种编码的文本；`Offer::of` 的区间颠倒、原文或提议超过 `WINDOW_BYTES_MAX`；`merged` 的判词点名不存在或没改动的句子、同一句两次、对删除的句子改后接受；`decide` 同一张卡两次、两张接受了什么的卡区间重叠、卡的原文不是源文那一段 | 什么都没落：判定不改变任何状态 |
 | `E_VERSION_CONFLICT` | `apply`、`save` 的源文不是基线版本；`decide` 里接受了什么的卡不是基于源文这一版 | 源文不变，先到的写者的改动留着，卡都还开着；调用方重读再改，或请 run 重提 |
 
+`preview` 只带 `cut` 的拒绝：抬起的字节不够、或在这种编码下拼不出文本（`E_INVALID_ARGS`）。文法本身不拒绝：CommonMark 里任何字符串都是一份文档，读不出结构的字节读成段落文字，读得出而不画的读成 `Unsupported`（D22），太深的读成 `Unsupported { construct: Nesting }`（D24）。
+
 每个拒绝是带动作、主体与恢复语的 `AxError`。「操作失败源文一定未动」在这里恒成立，因为本 crate 不写任何东西；写盘之后的失败归写者（§3）。
 -/
 
 /-! ## 13 依赖选型
 
-`kernel`（`AxError`、`B3Hash` 与它的 BLAKE3）、`serde`（线上携带的四个类型，D1）、可选的 `schemars`（`schema` feature，只由 `wire` 的 `schema` 打开）。不引入编码探测库与 Markdown 解析器：前者会猜（D4），后者是 S7.9 的事（comrak），块的两条规则不是一棵 CommonMark 树。规格的分部不 import 任何别的 crate 的规格。
+`kernel`（`AxError`、`B3Hash` 与它的 BLAKE3）、`serde`（线上携带的类型，D1）、可选的 `schemars`（`schema` feature，只由 `wire` 的 `schema` 打开）、`comrak`（Markdown 的文法，D20、D22）。不引入编码探测库：它会猜（D4）。
+
+comrak（BSD-2-Clause）关掉默认 feature 取用：默认的是它的命令行与 syntect 高亮器，而代码的颜色归页面的 lezer（client-SPEC 4-26）。它把 CommonMark 规范的全部例子当作自己的测试，GFM 的扩展同样；它的树是一个 arena，读完即丢，不比一次调用活得久。被比较过的：pulldown-cmark——事件流而不是树，源位置是字节区间而不是行列，但它的扩展里没有前置元数据与 CJK 友好的强调；markdown-rs——mdast 树更完整，但传递依赖更多、更新更慢。版本在根 `Cargo.toml`，锁在 `Cargo.lock`，停在 0.50：从 0.51 起 comrak 经 `finl_unicode` 读 Unicode 的字符类别，它的许可声明是 `(MIT OR Apache-2.0) AND Unicode-DFS-2016`，而 `deny.toml` 的清单只有 Unicode-3.0；往清单里加一条许可是放宽一道门，要人的定规。0.50 读字符类别用的是 `unicode_categories`（MIT OR Apache-2.0），本文法开的扩展它都有，所以这条定规只决定文法能不能升过 0.50。块的两条规则（D6）仍是本 crate 自己的：它们给 `head` 与预览的窗口找块末，只要字节，不要一棵 CommonMark 树。规格的分部不 import 任何别的 crate 的规格。
 -/
 
 /-! ## 14 硬编码声明
 
 `WINDOW_BYTES_MAX = 65536`（D7，也是一处提案原文与提议各自的上限，D18）；`ALIGN_CELLS_MAX = 4_194_304`（对齐表的格数上限，D15）；`PROPOSAL_ID_TAG`（提案身份摘要的前缀，D13）；句子的终止符与闭合符号（迁自 RefRain，D14）；`REACH = 3`（边界最远落在一个字节之前多远：UTF-8 三个续字节，UTF-16 一个奇数字节加一个低代理）；三个字节顺序标记（Unicode）；Markdown 的两个扩展名（D6）；界定行的「至少三个」与「少于四列」（CommonMark）。模型里的 `WINDOW_BYTES_MAX` 与 Rust 的同名常量取同一个值。
+
+`NESTING_MAX = 16`（D24，模型与 Rust 同名同值）、链接的三个协议 `ADMITTED_SCHEMES`（D23）、文法的扩展清单与前置元数据的界定行 `---`（`grammar()`，D22），都只在 `markdown::lowering` 写一次。
 -/
 
 /-! ## 15 影响面
 
 改 `Span`、`Format`、`Encoding` 或 `Window` 的形状就改了线上的文档答复：`wire` 的 schema 摘要变、`client/src/wire.ts` 重生成、读文档的三处页面（`client/src/core/document.ts` 的读者）跟着改。改 `Reading::of` 改的是 `Document`、`Range`、`Content` 与 `Prefix` 四条查询对「是不是文本」的同一个判断。改 `WINDOW_BYTES_MAX` 改的是每个窗口答复的大小上限。`edit` 的生产调用方是 `save`，经它是 `accounting::worker::commanding::saving`；`selection` 仍只有测试调用：页面自己把光标带过一次保存，城里没有一个读者的位置。改 `Slice`、`SliceKind`、`TextEdit` 的形状就改了线上的提案答复与保存帧；改句子的切法或对齐会改变已经入账的提案在页面上的样子，但不改变它们的身份（身份只读原文与提议，D13），也不改变任何已经落下的字节。
+
+改 `markdown` 的树（加一种块、一种行内、一种 `Construct`）就改了 `Answer::Preview`：`wire` 的 schema 摘要变、`wire.ts` 重生成、页面的画法多一臂。改文法的扩展清单（D22）改的是每一份 Markdown 读出的块，预览、对话流与导出一起变。改 `NESTING_MAX` 改的是答复在 JSON 里最深多少层（D24）。
 -/
 
 /-! ## 16 测试与约束
 
-证明：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`。咬得动的演示：`Documents.Edit.withoutBaseline_overwrites`、`Documents.Proposal.looseKey_loses_the_after_side`、`Documents.Window.withoutStepBack_splits`、`Documents.Encoding.nulJudgement_calls_wide_text_opaque`。
+证明：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`。咬得动的演示：`Documents.Edit.withoutBaseline_overwrites`、`Documents.Proposal.looseKey_loses_the_after_side`、`Documents.Window.withoutStepBack_splits`、`Documents.Encoding.nulJudgement_calls_wide_text_opaque`、`Documents.Markdown.withoutCheck_admits_other`、`Documents.Markdown.withoutCap_exceeds`、`Documents.Markdown.withoutGuard_stalls`。
 
-实现一致性：逐模块 `#[cfg(test)]`（`cargo nextest run -p sprawling-documents`）；§2 的表是它们与验收的对应。选区跨过一次保存的规则（D10）由 `selection::tests` 断言，没有写成定理。模型的证明不是 Rust 实现的证明。
+实现一致性：逐模块 `#[cfg(test)]`（`cargo nextest run -p sprawling-documents`）；§2 的表是它们与验收的对应。选区跨过一次保存的规则（D10）由 `selection::tests` 断言，没有写成定理。CommonMark 与 GFM 的文法由 comrak 自己的规范测试守，本 crate 的 `markdown::tests` 只判它选的扩展、它的树、源位置的换算与 D23–D25。模型的证明不是 Rust 实现的证明。
 -/
 
 /-! ## 17 文档关系
 
 - `architecture.toml` 里 documents 各行（锚点指向本文件与分部），ARCHITECTURE.md §3 的 `depmap`（`documents: kernel`，`wire` 与 `accounting` 两行各有它）。
-- `docs/glossary.md` 的 **document version**、**document window**、**draft**。
+- `docs/glossary.md` 的 **document version**、**document window**、**draft**、**preview**、**proposal**、**review slice**。
+- wire-SPEC §8-74、§12.11（`Query::Preview`）；accounting-SPEC §8-23、§12 第 35 条（谁从内容库读、谁作答）；client-SPEC 4-26、12-14（页面怎样画这棵树，为什么在城里读）。
 - wire-SPEC §8-69、§8-70（文档读取契约）、§8-72、§8-73（保存与提案）、§12.8、§12.10；kernel-SPEC §8-83（`document_written` 与提案的三种事件，`SliceVerdict`）；accounting-SPEC §8-21（谁读盘、谁存版本、谁作答）、§12 第 33 条；storage-SPEC §8-36（版本进内容库）；city-SPEC §8-27、§8-40（`city::document`：锁、读当前字节、整份换上）；accounting-SPEC §8-22（保存与提案的写者、提案的折叠）。这些节改了，重读本文件对应的决定。
-- refrain 路线图 §4-8、§4-10、附录 B–E、G 是本 crate 的需求来源；RefRain 的 `source_layout`、`native_document`、`manuscript::review` 与 `manuscript::decision` 四个模块是迁入的出处（§4）。
+- refrain 路线图 §4-8、§4-9、§4-10、附录 B–G 是本 crate 的需求来源；RefRain 的 `source_layout`、`native_document`、`manuscript::review` 与 `manuscript::decision` 四个模块是迁入的出处（§4）。
 -/

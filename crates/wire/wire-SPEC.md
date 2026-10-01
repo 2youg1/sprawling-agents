@@ -532,6 +532,16 @@ WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionN
 
 **重开参数**：页面要支持「另存为另一种编码」时（refrain 路线图 A5），编码成为 `RangeWrite` 的一个字段；有了提出提案的工具之外的第二个提出者（例如城外的 agent 经远程门）时，重议 (④)。
 
+### 12.11 Markdown 在城里读，页面按版本与窗口问它的块
+
+**决定**：`Query::Preview { version, viewport }` 答一个 Markdown 版本的一个窗口读成的块（§8-74）；文法是 `documents::markdown`，comrak 在二进制里，不编成 wasm 进浏览器（documents D20）。
+
+**理由**：版本在城里，页面只持有窗口，城侧一次答复带一个窗口的块，与 `Range` 同一个往返；导出本来就在 Rust 里，读的是同一个函数；页面不多一个字节的运行时依赖，反而删掉自写的 `prose.ts`。按版本问而不按地址问，理由与 §12.8 的 `Range` 相同。
+
+**被否**：①comrak 编成 wasm 在浏览器里读——wasm 的导出要 `unsafe`，而工作区只有 `crates/desktop/ffi` 有自己的 lint 表，多一个就要人的定规；工具链多一个目标，包体推断多 100 KB 以上（documents D20）；②`Preview { at: Address }` 读文件此刻——与 §12.8 的②同一个缺陷，读到一半的页面要从头重读；③答 HTML——页面要把城给的字符放进 `innerHTML`，消毒规则成为第二个权威（documents D21）。
+
+**重开参数**：远程门上一次往返的读数超过人能察觉的界、而对话流的候选（`crates/documents/Spec.lean` §3）都消不掉它；或允许第二个带自己 lint 表的 crate。
+
 ## 13 依赖选型
 
 | 依赖 | 用途 | 依据与替代 |
@@ -815,6 +825,24 @@ pub enum EntryKind { Directory, File { bytes: u64 } }          // 目录在前�
 - **`Listing`／`Document`**：这座城是一棵目录树，而目录树本身就是产品（glossary：「那个层级就是目录树——不是它的模型，是树本身」）；`building_view` 只回楼根的 `.md` 与房间名，房间里的 `URBANITE.md`／`JOB.md`／`Handoff.md`／`<run>.jsonl` 页面看不到，于是这个设计在界面上是不可见的。两条查询让页面能走完整棵树。**路径经 `Address` 文法把关**（非绝对、无 `..`、无 `\`、无 `:`），所以走不出城根；`.sprawling/` **允许读**——它正是要展示的那部分，且这条线只答回环（或持配对 token 的）人，与工具层对居民的拒绝不是一个门。`Document` 答什么、在哪里切、怎样判文本，见 §8-69：答复带版本，缺失、读不了、空各是一种答复。
 - **`WIRE_V` 16→17，一次进位管四件事**：四件事同一提交同一哈希。
 - **被否**：（a）让客户端自己折 `history` 找 `run_started`——那是旧客户端的做法，也是这四处空白存在的原因；（b）`Document` 直接回任意大小——同 §8-20／§8-21 拒绝整批的理由；（c）`Listing` 排除 `.sprawling/`——排除了要展示的东西。
+
+### 8-74 一个 Markdown 版本的预览：`Query::Preview`
+
+```rust
+// Query（紧接 Range 之后）
+Preview { version: B3Hash, viewport: documents::Span },   // → Answer::Preview(Box<PreviewAnswer>)
+pub struct PreviewAnswer { pub version: B3Hash, pub preview: documents::Preview }
+// documents::Preview::{Laid { span, blocks: Vec<documents::Block> }, Unsupported { encoding }}
+// Block 与 Inline 的形状见 crates/documents/Spec.lean §8（documents D21）
+```
+
+- **读的是内容库里的那一版**，与 `Range` 同一个理由（§8-70）：页面滚到第三屏时文件可能已经被改过，它要的是它打开的那一版。内容库里没有这一版，或这一版的字节不是任何一种本城读的编码的文本，答 `Unavailable { query: "Preview(<version>)" }`。
+- **窗口照 `Range` 的切法，再止于块末**（documents D25）：没到版本末尾的窗口止于倒数第二块的末尾，因为最后一块可能在窗口之外接着写。答复里的 `Laid.span` 是实际读的那一段，页面从它的 `end` 接着要下一窗；块的区间是这一版里的字节，页面拿它对上源码的位置（documents D26）。
+- **块是数据，不是 HTML**（documents D21）：页面按块画元素，模型或居民写的字符不进 `innerHTML`。读得出而本页不画的——HTML、公式、前置元数据、过深的嵌套——是带原文的 `Unsupported`；一个空窗口是零个块；UTF-16 的版本答 `Preview::Unsupported { encoding }`。三者形状各不相同，页面因此分得清「这里有一个不画的东西」「这里什么也没有」「这一版不按 Markdown 读」（refrain 路线图 A4）。
+- **一个版本的预览不会过时**：版本的字节不变，所以页面不因任何事件重问（`client/src/core/staleness.ts` 与 `range`、`content` 同一行）。
+- **够得到它的门**：它是一个 `Query`，经 `Ask` 帧到达，属 §19-3 的 `Read`，带 `Watch` 或 `Act` 权限的远程设备都能问。
+- **当前状态**：读面只在第一个窗口盖不住整份时把版本放进内容库（accounting-SPEC §12 第 33 条），所以对一份整份放得下 64 KiB 的 Markdown 文件，`Preview` 今天答 `Unavailable`；补法在 accounting-SPEC §8-23。对话流怎样读同一个文法是 `crates/documents/Spec.lean` §3 的未定。
+- 验收：accounting 的 `views::answering::preview::tests`——内容库里没有的版本答 `Unavailable`；超过一个窗口的文件从 `Document` 打开后逐窗预览，每一窗止于块末，读到末尾时每一段恰好出现一次；不是文本的版本答 `Unavailable`，UTF-16 的版本答 `Preview::Unsupported`。
 
 ### 8-69 文档读取契约：`Query::Document` 答一个版本
 

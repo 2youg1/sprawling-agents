@@ -875,6 +875,20 @@ pub fn trace_first(city_root: &Path, oid: GitOid, line: &EventRecord) -> Result<
 - **代价。** `ask` 之后再建一次 `LedgerIndex`，再按索引读两段：本 run 的行（倒着读到下界前最近的 `model_called`）与区间里的每一行（判同楼的别人）。读的行数与区间长度成正比；建索引与 `ask` 的审计各与账本字节数成正比，与一次性的 `whose` 同阶。
 - **失败。** `ask` 的失败原样上抛；建索引与读行的 `StorageError` 经 `into_ax`；一行解析不了按 `EventRecord::parse_line` 的错误上抛，审过的链上出现它，说明账本在 `ask` 之后被改了；actor 落在保留子树里时 `Building::of` 的拒绝上抛（城写的提交不会落在那里）。
 
+### 8-23 accounting::views::answering::preview：一个 Markdown 版本的一个窗口读成块（形状 7 投影）
+
+```rust
+// accounting::views::answering::preview（锁外，sprawling-SPEC.md 8-100）
+impl Views { pub(in crate::views) fn preview_ask(&self, version: B3Hash, viewport: documents::Span) -> Prepared; }
+pub(in crate::views) fn preview_answer(city_root: &Path, version: B3Hash, viewport: documents::Span) -> wire::Answer;
+```
+
+- **读内容库，判定全在 `documents`。** `Cas::size` 得这一版的长度，前三个字节经 `Encoding::of_mark` 得编码，`documents::lift` 说要抬起哪一段，`Cas::get_range` 读它；然后 `documents::preview` 判编码、切窗口、止于块末、读出块（`crates/documents/Spec.lean` D20–D26）。本模块不写一条判定，所以预览、`Range` 与 `Document` 对「这一版是什么编码、窗口在哪里切」只有一个答案。
+- **答复。** 读出来就是 `Answer::Preview`：`Laid` 带实际读的区间与块，UTF-16 的版本是 `Unsupported`（wire-SPEC §8-74）。内容库没有这一版、打不开、或抬起的字节在这种编码下拼不出文本，答 `Unavailable { query: "Preview(<version>)" }`，与 `Range` 同一个口径：「我没能看」。
+- **代价。** 只读内容库里这一窗要的那几个字节，加一次 comrak 读一个至多 64 KiB 的窗口；读数还没有，属 refrain 路线图 A11 的那一组。
+- **当前状态。** (a) 读内容库的那几步（打开、长度、标记、抬起）在 `range` 与本模块各写一遍；两者共用 `range` 里的一个函数，是下一次改其中一处时的事。(b) 读面只在第一个窗口盖不住整份时存版本（§12 第 33 条），所以整份放得下 64 KiB 的 Markdown 版本不在内容库里，`Preview` 对它答 `Unavailable`；补法是 `views::document` 的 `text_body` 在格式是 Markdown 时也把这一版放进内容库，答复仍是 `Coverage::Whole`。
+- 验收：`views::answering::preview::tests`——内容库里没有的版本答 `Unavailable`；超过一个窗口的 Markdown 文件经 `Document` 打开后，从 0 起按答复的 `span.end` 逐窗预览，每一窗止于块末，读到末尾时每一段恰好出现一次；字节不是文本的版本答 `Unavailable`；UTF-16 的版本答 `Preview::Unsupported`。
+
 ### 8-21 accounting::views::document 与 views::answering::range：文档的一版与它的窗口（形状 7 投影）
 
 ```rust
@@ -977,4 +991,5 @@ fn give_messages(city_root: &Path, commits: &mut [wire::CommitAnswer]);
 32. **城的工具读别楼的文件与 `cas:` 块，只经 runtime 的 `BoundReader`。** 理由：读界与 reserved subtree 的判定住 `runtime::tools::chosen_path`，`read` 与 `search` 用它；一件读字节的工具若在本 crate 自己判，就是那份判定的第二个权威，而且只判得了本楼（`is_within`），连接器存进 CAS 的录音与截图都读不到（§8-20）。被否决的做法：①保留「只收本楼」并为 `cas:` 另写一段（两套判定，一套跟着 `read` 变，一套不跟）；②在本 crate 复制 `admit` 与 `land`（同上，且链接的判定要拷两遍）。重开参数：要读的字节不在读界之内（例如人拖进来、只给这一次 run 的文件），那时它是一个新的入口，而不是放宽这扇门。
 33. **文档的版本只在第一个窗口盖不住整份时进内容库，由答 `Document` 的读面放进去。** 理由：之后的 `Range` 要读的是这一版，而版本的身份本来就是内容库的地址（documents D3），放进去之后按版本读就是按地址读对象，不需要第二个存放处；整份已经在答复里的版本页面不会再按版本要，存它只是让每一次打开多付一份拷贝。放进去的是读面而不是写者：这是一次查询的副作用，但它只添一个按内容寻址、重复放入即去重的对象，不改任何一条历史，写者也不知道哪个页面在读哪一版。被否决的做法：①`Range` 读文件此刻、版本不符就拒——居民在写的文件每几秒动一次，读到一半的页面要从头重读；②每次打开都存——小文件的每一次打开都多一份拷贝；③由写者在每次保存时存——城之外的写者（人的编辑器、居民的 `edit`）不经过写者。重开参数：内容库长出回收时，被回收的版本要有自己的答复；页面要对比一份小文件的两个版本时，小文件也存。
 34. **(a) 修改提案的折叠住 `views::Governance`，与待答的审批同一个值。** 理由：一张提案卡与一条审批同是「等人决定的事」，worker 判一次决定要的状态与页面画卡要的状态是同一个，`Governance` 正是「一份定义、两处持有、`what_a_worker_holds_is_what_a_restart_rebuilds` 判它们相等」的那个值；放进去之后，快照、重开、worker 写下一行就折一行，都不需要新的接线。被否决的做法：①worker 另折一份 `Standing` 字段、视图另折一份——两份折法；②决定时按身份回账本找那一行——要一个按内容找行的索引，而且「已经处理过」还要再扫一遍。**(b) 提交说明在本 crate 用 `git2` 直接读，与 `storage::parents_of` 各开一次仓库。** 理由：本轮 storage 的公开契约不改（它的规格在迁移），而本 crate 已经为 playback 链接 `git2`；读说明只是 `find_commit` 之后的一个字段，一页至多 `HISTORY_MAX` 个提交多开一次仓库。被否决的做法：①在本 crate 里连父提交一起读、不再调 `parents_of`——两处各有一份「父提交怎样读」，`parents_of` 留下来没有调用方；②把说明写进账本——提交对象就是它的权威，账本记的是 oid。重开参数：storage 的契约下一次能动时，`parents_of` 换成一次读出父提交与说明的读者，本 crate 的 `give_messages` 删去。
+35. **预览由读面按版本从内容库读，判定全在 `documents`，读出的块不缓存。** 理由：版本就是内容库的地址（documents D3），按版本读与 `Range` 同一条路，读面在视图锁外读，worker 不答查询；一个版本的字节不变，预览也就不会过时，页面不因任何事件重问。读出的块不进视图：它与一个窗口的大小同阶，而视图里的每一样东西都要随快照编码、随每一次重建折叠。被否决的做法：①按地址读文件此刻——与第 33 条的①同一个缺陷；②把读出的块按版本存在视图里——第二份拷贝要随快照走，而一次读出只是一窗的 comrak；③由页面先 `Range` 再把文字送回城里读——文字在线上走两趟。重开参数：在固定语料上量出一窗的读出超过毫秒级（D41），或同一版本被许多页面同时预览成为常态时，按版本缓存。
 36. **快照的格式门用夹具摘要，夹具里放进每一种出现在快照里的 kernel 摘要类型（§8-24）。** 理由：`fold_version` 只在夹具的编码变了时才动，夹具缺哪一种类型，哪一种类型的编码就能悄悄改变，而旧快照照样被当成新格式读。被否决的做法：①为每个出现在快照里的类型各写一条字节数断言——那是编码的第二份拼写，加一个类型就要多写一条；②把快照格式的版本号写成手改的常量——改 kernel 的人看不见它。重开参数：快照换掉 postcard、或快照的编码有了自己的模式描述（schema）可以直接取摘要时，改由模式描述钉住版本。
