@@ -49,11 +49,10 @@ const ENV_ALLOWLIST: [&str; 4] = ["PATH", "LANG", "LC_ALL", "TZ"];
 
 /// What one run's execution boundary is made of.
 ///
-/// Eight values that always travel together and are never chosen
-/// independently: they are read out of one frozen configuration, one
-/// machine and one dispatch, and they reach this tool as one thing
-/// rather than as a parameter list nobody can call correctly from
-/// memory.
+/// Values that always travel together and are never chosen apart: read
+/// out of one frozen configuration, one machine and one dispatch, they
+/// reach this tool as one thing rather than as a parameter list nobody
+/// can call correctly from memory. `limit` is the dispatch's (8-55).
 pub struct ExecSetup {
     pub workdir: PathBuf,
     pub mounts: Vec<Mount>,
@@ -67,9 +66,6 @@ pub struct ExecSetup {
     /// The run this tool serves: a command it hands to the background
     /// is owed to this run, and its output reaches no other.
     pub run: RunId,
-    /// What the run may do to files that already exist. Under
-    /// `Create` a command runs only in the copy; the host placement
-    /// could change any file and does not start (runtime-SPEC 8-55).
     pub limit: kernel::WriteLimit,
 }
 
@@ -131,8 +127,9 @@ impl ExecTool {
             "Run a program, a Python snippet, or a shell line. A program or shell \
              line runs in this machine's confinement, {}. Ask for `where: host` to \
              run one outside it. Use `read` and `search` for what is already written here; a \
-             command that prints it comes back without the version `edit` guards on.",
-            confinement.statement()
+             command that prints it comes back without the version `edit` guards on.{}",
+            confinement.statement(),
+            Placement::told_under(setup.limit)
         );
         Ok(ExecTool {
             setup,
@@ -359,7 +356,7 @@ impl Tool for ExecTool {
                 self.meta.name.as_str()
             )));
         }
-        let placement = parse_placement(call.args.as_map())?;
+        let placement = parse_placement(call.args.as_map())?.opened_by(&self.setup)?;
         let answer = match parse_arm(call.args.as_map())? {
             ExecArm::Program { path, args } => self.run_program(&path, &args, placement),
             // The Python arm has no host form: its interpreter is a

@@ -31,9 +31,7 @@ pub struct EditTool {
     /// The run's write domain. Every model-chosen path is judged against
     /// it before the filesystem is touched.
     writable: kernel::WriteDomain,
-    /// What the run may do to a file that already exists: under
-    /// `Create` the replacing arm is refused before the file is read
-    /// (runtime-SPEC 8-55).
+    /// What the run may do to a file that already exists (runtime-SPEC 8-55).
     limit: kernel::WriteLimit,
     meta: ToolMeta,
 }
@@ -97,12 +95,13 @@ impl EditTool {
             limit,
             meta: ToolMeta {
                 name: ToolName::parse("edit")?,
-                disclosure:
+                disclosure: format!(
                     "Replace an exact string in a file, guarded by the version you last saw: \
                      `old` must match exactly once or the call fails. A file that moved under \
                      you is refused and not overwritten; read it again and retry. A \
-                     `base_version` of `new` creates the file."
-                        .to_owned(),
+                     `base_version` of `new` creates the file.{}",
+                    limited_by(limit)
+                ),
                 params: Payload::new(params)?,
                 effect: Effect::Write { domain },
                 cost_tier: CostTier::Light,
@@ -113,6 +112,17 @@ impl EditTool {
                 temporal: Temporal::Timeless,
             },
         })
+    }
+}
+
+/// What the description adds under a write limit, read before the first call.
+fn limited_by(limit: kernel::WriteLimit) -> &'static str {
+    match limit {
+        kernel::WriteLimit::Full => "",
+        kernel::WriteLimit::Create => {
+            " This run creates new files and changes none: only a `base_version` of `new` \
+             is accepted, on a path where no file stands yet."
+        }
     }
 }
 
@@ -182,15 +192,21 @@ impl Tool for EditTool {
         })?;
         match kernel::gate::domain(&self.writable, &target, &kernel::TaintSet::empty()) {
             kernel::GateOutcome::Allow => {}
-            kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
             // The write doors do not ask. Were one ever to, the call is
             // pending, not allowed.
+            kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
             kernel::GateOutcome::Ask { question } => return Err(*question),
         }
 
         let path = self.city_root.join(rel);
         if base_version == CREATES {
             return self.create(rel, &path, old, new);
+        }
+        // Every arm below changes a file that is already there.
+        match kernel::gate::replacing(self.limit, &target) {
+            kernel::GateOutcome::Allow => {}
+            kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
+            kernel::GateOutcome::Ask { question } => return Err(*question),
         }
         let bytes = std::fs::read(&path).map_err(|err| {
             AxError::failure(AxCode::InvalidArgs, "edit file", format!("{rel}: {err}"))
@@ -231,33 +247,13 @@ impl Tool for EditTool {
         let updated = text.replacen(old, new, 1);
         // A name that is a link lands this write somewhere the gate
         // never judged - `.git/hooks` through a junction is privilege
-        // escalation (storage-SPEC 8-25). And the write lands in a fresh
-        // entry: the name is removed first and recreated, so a hard
-        // link's other names keep their bytes.
+        // escalation (storage-SPEC 8-25). The replacement lands the way
+        // every city write does: a staging file renamed over the name,
+        // so a failed write leaves the old file and a hard link's other
+        // names keep their bytes (storage-SPEC 8-32).
         storage::WriteTarget::within("edit file", &self.city_root, &path)
-            .map_err(|err| err.into_ax())?;
-        if let Err(err) = std::fs::remove_file(&path) {
-            // A name that is not there is what removal asked for; any
-            // other refusal is the disk saying no.
-            if err.kind() != std::io::ErrorKind::NotFound {
-                return Err(AxError::failure(
-                    AxCode::StorageFatal,
-                    "edit file",
-                    format!("{rel}: {err}"),
-                )
-                .with_recovery(format!(
-                    "free space on the disk holding the city, or clear the read-only \
-                     flag on {rel}, then edit again"
-                )));
-            }
-        }
-        std::fs::write(&path, updated.as_bytes()).map_err(|err| {
-            AxError::failure(AxCode::StorageFatal, "edit file", format!("{rel}: {err}"))
-                .with_recovery(format!(
-                    "free space on the disk holding the city, or clear the read-only \
-                     flag on {rel}, then edit again"
-                ))
-        })?;
+            .and_then(|cleared| cleared.replace(updated.as_bytes()))
+            .map_err(storage::StorageError::into_ax)?;
         let new_version = version_of(updated.as_bytes());
 
         let mut result = Map::new();
@@ -283,14 +279,6 @@ impl EditTool {
     /// existing file is a version conflict like any other - it names the
     /// version the file is really at.
     fn create(&self, rel: &str, path: &Path, old: &str, new: &str) -> Result<ToolOutcome, AxError> {
-        if let Ok(existing) = std::fs::read(path) {
-            return Err(AxError::failure(
-                AxCode::VersionConflict,
-                "edit file",
-                format!("{rel} already exists at {}, not new", version_of(&existing)),
-            )
-            .with_recovery("read the file and edit against that version, or choose another path"));
-        }
         if !old.is_empty() {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -314,13 +302,11 @@ impl EditTool {
                     ))
             })?;
         }
-        std::fs::write(path, new.as_bytes()).map_err(|err| {
-            AxError::failure(AxCode::StorageFatal, "edit file", format!("{rel}: {err}"))
-                .with_recovery(format!(
-                    "free space on the disk holding the city, or clear the read-only \
-                     flag on {rel}, then create it again"
-                ))
-        })?;
+        // The filesystem claims the name at the write, so of two racing
+        // creates one lands, under either limit (storage-SPEC 8-32).
+        storage::WriteTarget::within("edit file", &self.city_root, path)
+            .and_then(|cleared| cleared.create(new.as_bytes()))
+            .map_err(|err| refused_create(err, rel, path))?;
         let mut result = Map::new();
         result.insert("path".to_owned(), Value::String(rel.to_owned()));
         result.insert("base_version".to_owned(), Value::String(CREATES.to_owned()));
@@ -334,6 +320,20 @@ impl EditTool {
             attachments: Vec::new(),
         })
     }
+}
+
+/// Why a create did not land. A name that stands is a version conflict
+/// naming the version the file is really at; anything else is storage's.
+fn refused_create(err: storage::StorageError, rel: &str, path: &Path) -> AxError {
+    if !matches!(err, storage::StorageError::NameTaken { .. }) {
+        return err.into_ax();
+    }
+    let standing = match std::fs::read(path) {
+        Ok(existing) => format!("{rel} already exists at {}, not new", version_of(&existing)),
+        Err(err) => format!("{rel} already exists, not new, and its version cannot be read: {err}"),
+    };
+    AxError::failure(AxCode::VersionConflict, "edit file", standing)
+        .with_recovery("read the file and edit against that version, or choose another path")
 }
 
 /// A minimal unified diff: enough to see what changed and where, and no

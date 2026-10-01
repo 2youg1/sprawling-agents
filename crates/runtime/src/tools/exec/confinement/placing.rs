@@ -56,6 +56,43 @@ pub fn parse_placement(args: &Map<String, Value>) -> Result<Placement, AxError> 
     }
 }
 
+impl Placement {
+    /// This placement, when the run's write limit opens it.
+    ///
+    /// A command on the host could change, remove or link any file it
+    /// reaches, and nothing on this machine makes the existing ones
+    /// read-only to it without administrator rights, so under `Create`
+    /// only the copy is open; what a command writes there stays there
+    /// (runtime-SPEC 8-55, 12.11).
+    ///
+    /// # Errors
+    /// The refusal of `kernel::gate::replacing`, naming the run's
+    /// domain, before any process starts.
+    pub fn opened_by(self, setup: &crate::tools::ExecSetup) -> Result<Placement, AxError> {
+        match self {
+            Placement::Sandbox => Ok(self),
+            Placement::Host => match kernel::gate::replacing(setup.limit, &setup.domain) {
+                kernel::GateOutcome::Allow => Ok(self),
+                kernel::GateOutcome::Deny { refusal } => Err(*refusal),
+                kernel::GateOutcome::Ask { question } => Err(*question),
+            },
+        }
+    }
+
+    /// What the exec tool's description adds under a write limit, so
+    /// the model reads the limit before its first call rather than at
+    /// its first refusal.
+    pub fn told_under(limit: kernel::WriteLimit) -> &'static str {
+        match limit {
+            kernel::WriteLimit::Full => "",
+            kernel::WriteLimit::Create => {
+                " This run creates files and changes none, so `where: host` is refused; \
+                 what a command writes stays in the copy."
+            }
+        }
+    }
+}
+
 /// The arm in use, the copy kept for the next command, and the copies
 /// commands still hold.
 ///

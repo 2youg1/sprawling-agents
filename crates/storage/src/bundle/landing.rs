@@ -3,9 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every bundle write, and the one way it reaches disk (storage-SPEC 8-12).
+//! Every bundle write and every edit a run makes, and the two ways a
+//! file reaches disk (storage-SPEC 8-12, 8-32): replacing a name, and
+//! creating one that nothing holds.
 //!
-//! The bytes go to a staging file beside the target, are flushed, take
+//! A replacement's bytes go to a staging file beside the target, are flushed, take
 //! the original permissions, and are renamed over the name. A reader
 //! finds the old file or the whole new one, never a name removed before
 //! its replacement was on the device, and the rename replaces the
@@ -14,10 +16,12 @@
 
 use std::ffi::{OsStr, OsString};
 use std::io;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use crate::alias::WriteTarget;
 use crate::error::{StorageError, io_err};
+use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
 /// Where a landed file's permissions come from.
@@ -81,7 +85,33 @@ pub(crate) fn land(
 /// As [`WriteTarget::create`](crate::WriteTarget::create).
 pub(crate) fn create(target: WriteTarget, bytes: &[u8]) -> Result<(), StorageError> {
     let path = target.as_path();
-    std::fs::write(path, bytes).map_err(io_err("create a file", path))
+    let mut file = match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+    {
+        Ok(file) => file,
+        Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
+            return Err(StorageError::NameTaken {
+                path: path.to_path_buf(),
+            });
+        }
+        Err(err) => return Err(io_err("create a file", path)(err)),
+    };
+    let written = file.write_all(bytes).and_then(|()| file.sync_data());
+    drop(file);
+    if let Err(err) = written {
+        // The name is this call's own, so taking it back loses nothing;
+        // a file that will not go is the state the caller has to know.
+        std::fs::remove_file(path).map_err(io_err("take back a half-created file", path))?;
+        return Err(io_err("create a file", path)(err));
+    }
+    match path.parent() {
+        Some(dir) => RealFs::new()
+            .sync_dir(dir)
+            .map_err(io_err("record a created file's name", dir)),
+        None => Ok(()),
+    }
 }
 
 /// `.<name>.part` beside `path`, built from the name as the operating
