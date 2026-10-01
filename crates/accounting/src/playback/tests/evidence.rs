@@ -25,7 +25,7 @@ use super::{Line, addr, confidential, parsed, person, run, seqs, write};
 
 /// The ledger lines `script` spells, chained from genesis, each line
 /// written at its own ledger version and `t`.
-fn versioned(script: Vec<(u32, u64, Line)>) -> Vec<Vec<u8>> {
+pub(super) fn versioned(script: Vec<(u32, u64, Line)>) -> Vec<Vec<u8>> {
     let mut prev = kernel::GENESIS_PREV;
     let mut out = Vec::new();
     for (seq, (v, t, (run, at, kind, data))) in script.into_iter().enumerate() {
@@ -51,11 +51,11 @@ fn versioned(script: Vec<(u32, u64, Line)>) -> Vec<Vec<u8>> {
     out
 }
 
-fn called(id: &str, tool: &str) -> Value {
+pub(super) fn called(id: &str, tool: &str) -> Value {
     json!({"id": id, "name": tool, "args": {}})
 }
 
-fn answered(id: &str, tool: &str) -> Value {
+pub(super) fn answered(id: &str, tool: &str) -> Value {
     json!({"tool_use_id": id, "name": tool, "result": {"content": "ok"}})
 }
 
@@ -150,6 +150,7 @@ fn timed() -> (tempfile::TempDir, Vec<Vec<u8>>) {
 fn a_call_is_timed_only_where_both_its_moments_were_measured() {
     let (dir, _) = timed();
     let r1 = run(1).to_string();
+    let tool = |id: &str, name: &str| json!({"tool": {"id": id, "name": name}});
     let whole = parsed(export(dir.path(), &person()).unwrap().bytes());
     let late = parsed(
         export(
@@ -179,18 +180,20 @@ fn a_call_is_timed_only_where_both_its_moments_were_measured() {
         ),
         (
             json!([
-                {"run": r1, "id": "c1", "tool": "read",
+                {"run": r1, "callee": {"model": {"name": null}},
+                 "called": {"at": "2"}, "answered": "pending", "took": "unknown"},
+                {"run": r1, "callee": tool("c1", "read"),
                  "called": {"at": "3"}, "answered": {"at": "4"}, "took": "unknown"},
-                {"run": r1, "id": "c2", "tool": "exec",
+                {"run": r1, "callee": tool("c2", "exec"),
                  "called": {"at": "5"}, "answered": {"at": "6"}, "took": {"measured": "350"}},
-                {"run": r1, "id": "c3", "tool": "exec",
+                {"run": r1, "callee": tool("c3", "exec"),
                  "called": {"at": "7"}, "answered": {"at": "8"}, "took": "unknown"},
-                {"run": r1, "id": "c4", "tool": "read",
+                {"run": r1, "callee": tool("c4", "read"),
                  "called": {"at": "9"}, "answered": "pending", "took": "unknown"},
             ]),
             policy(),
             vec![(json!({"at": "10"}), json!({"at": "11"}))],
-            json!({"run": r1, "id": "c2", "tool": "exec",
+            json!({"run": r1, "callee": tool("c2", "exec"),
                    "called": {"outside": "5"}, "answered": {"at": "6"}, "took": {"measured": "350"}}),
             true,
         )
@@ -239,7 +242,7 @@ fn committed() -> (tempfile::TempDir, [String; 3]) {
 
 /// The repository of [`committed`] at `root`, and the ledger script that
 /// announces its commits.
-fn committed_in(root: &Path) -> (Vec<Line>, [String; 3]) {
+pub(super) fn committed_in(root: &Path) -> (Vec<Line>, [String; 3]) {
     git2::Repository::init(root).unwrap();
     let first = commit(
         root,

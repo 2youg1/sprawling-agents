@@ -50,6 +50,8 @@ pub struct Nearby {
 /// Whatever `views::ask` refuses (a chain that does not verify), and a
 /// line that cannot be read or parsed after it.
 pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError> {
+    #[cfg(test)]
+    counted::views_folded();
     let wire::Answer::Commit(commit) = crate::views::ask(city_root, &wire::Query::Commit { oid })?
     else {
         return Ok(None);
@@ -71,6 +73,8 @@ pub fn trace_first(
     oid: GitOid,
     line: &EventRecord,
 ) -> Result<Option<Trace>, AxError> {
+    #[cfg(test)]
+    counted::views_folded();
     let (wire::Answer::Commit(commit), Some(actor)) = (
         crate::views::ask(city_root, &wire::Query::Commit { oid })?,
         line.addr(),
@@ -172,6 +176,26 @@ fn nearby(
         counted.calls = counted.calls.saturating_add(1);
     }
     Ok(found.into_values().collect())
+}
+
+/// How many folds of a city's views this module began on this thread:
+/// the probe the count gate in `playback::tests::tracing` reads
+/// (accounting-SPEC.md 8-25).
+#[cfg(test)]
+pub(crate) mod counted {
+    use std::cell::Cell;
+
+    thread_local! {
+        static VIEWS_FOLDS: Cell<u64> = const { Cell::new(0) };
+    }
+
+    pub(super) fn views_folded() {
+        VIEWS_FOLDS.with(|folds| folds.set(folds.get().saturating_add(1)));
+    }
+
+    pub(crate) fn views_folds() -> u64 {
+        VIEWS_FOLDS.with(Cell::get)
+    }
 }
 
 #[cfg(test)]
