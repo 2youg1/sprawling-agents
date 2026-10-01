@@ -111,7 +111,7 @@ fx 的一次修复之前，一个长回合每一步都留着整份恢复重建�
 
 ## 5 权威信源
 
-kernel-SPEC §8-9（Ledger 缝与 conformance）；`crates/runtime/Spec.lean` §8-1（驱动器）与 §8-39（每 run 一条 `prompt_assembled`）；`tools/xtask/budgets.toml`（测量读数）。
+能写成定理的性质由 `tools/citysim/spec/` 下的分部陈述并证明，它们是那些性质的权威，本文件其余各节仍是 citysim 的规格。kernel-SPEC §8-9（Ledger 缝与 conformance）；`crates/runtime/Spec.lean` §8-1（驱动器）与 §8-39（每 run 一条 `prompt_assembled`）；`tools/xtask/budgets.toml`（测量读数）。
 
 ## 6 命名统一
 
