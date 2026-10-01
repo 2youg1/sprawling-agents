@@ -709,15 +709,16 @@ and `lake-manifest.json` sit at the root; they are the only Lean package
 and the only Lean version pin in the tree. The manifest lists no packages,
 so every import is this tree's or the toolchain's own. The package has
 four targets. The library `Spec` is every module under `crates/`, the
-checker's own specification and the gates', and `just models` builds it inside
+checker's own specification, the simulator's and the gates', and `just models` builds it inside
 `just check`. The library `Sprawling` (`tools/adversary/src`) and the
 executables `adversary` and `acceptance` (`tools/adversary/test`) are the
 checker, which only `just adversary`, `just acceptance` and the nightly
 schedule build. The library `Spec` reaches its modules by the glob
 `crates.+`, for the checker's specification by `tools.adversary.Spec` and
-`tools.adversary.spec.+`, and for the gates' by `tools.xtask.Spec` and
-`tools.xtask.spec.+`. When the specifications of `tools/citysim` or
-`client` move to Lean, the change that
+`tools.adversary.spec.+`, for the simulator's by `tools.citysim.Spec` and
+`tools.citysim.spec.+`, and for the gates' by `tools.xtask.Spec` and
+`tools.xtask.spec.+`. When the specification of `client` moves to Lean,
+the change that
 moves one adds the two globs `<dir>.Spec` and `<dir>.spec.+` for it, with
 `<dir>` its path in dotted form, and never a glob over a whole `tools`
 or `client` tree, because a `.+` glob walks every directory

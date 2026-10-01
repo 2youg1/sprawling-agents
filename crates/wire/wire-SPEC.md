@@ -1978,7 +1978,7 @@ RestoreFile { at: Address, point: GitOid, idem: IdemKey }
 
 - **把城自己工作树里的一个文件换回检查点里的那一份。** `at` 是文件在城里的地址（`Address` 爬不出城、点不到保留子树），`point` 是一个检查点的 oid（页面从 `checkpoint_committed` 或 `Query::Commits` 读到）。检查点里有这个文件：工作树里这一处的字节换成检查点里的那一份（原子替换，取被替换文件的权限）；检查点里没有：工作树里这一处的文件删去。不回到过去开一棵树（S07 Q2 (c) 只做取回单个文件）。
 - **有 run 在这栋楼里干活就拒。** 拒 `E_BUSY`，点名房间与 run：取回会改掉 run 正在写的那棵树，与 `RemoveBuilding` 同一条理由。
-- **一步一行。** 写成之后记一行 `file_restored { name: "", path, point }`；`name` 为空串指城自己的工作树，非空时仍是一棵 run 的工作树的名字（kernel-SPEC §8-4，`crates/storage/Spec.lean` §8-33）。
+- **一步一行。** 写成之后记一行 `file_restored { name: "", path, point }`；`name` 为空串指城自己的工作树，非空时仍是一棵 run 的工作树的名字（`crates/kernel/Spec.lean` §8-4，`crates/storage/Spec.lean` §8-33）。
 - 验收：storage 的 `taking_a_file_back_replaces_what_the_tree_holds_and_removes_what_the_point_did_not_hold`。
 
 ### 8-63 页面上「历史已证明到哪一条」：`CityAnswer.proved`

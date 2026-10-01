@@ -42,7 +42,7 @@ pub enum StorageError { /* …既有臂… */ NameTaken { path: PathBuf } }   //
 ```
 
 - **落盘纪律只有一处，runtime 借用它。** `replace` 就是 `bundle::landing::land`（`Bits::OfReplaced`）：字节先写同目录的暂存文件、`sync_data`、抄被替换文件的权限、`rename` 覆盖、`sync_dir`（8-12）。runtime 的 edit 改写一个已有文件时经它落盘，写前移除该名再建的做法随之删去：移除之后写入失败不再丢文件，可执行位也不再丢。
-- **`create` 由文件系统原子地占名。** 以「仅当不存在才建」（`create_new`）打开目标：名字上已有任何东西——普通文件、悬空链接、别的调用刚建成的文件——都答 `NameTaken`，什么都不写；占到之后写入字节、`sync_data`，再 `sync_dir` 父目录。两次竞争的新建只有一次占得到名字，这是 `WriteLimit::Create` 的「竞争创建只成一次」在盘上的依据（kernel-SPEC §8-78）。占到名字之后写入失败，删掉自己刚建的文件再报原来的失败；删也失败时报删的失败，因为那时盘上留着半个文件，这才是调用方要处理的状态。
+- **`create` 由文件系统原子地占名。** 以「仅当不存在才建」（`create_new`）打开目标：名字上已有任何东西——普通文件、悬空链接、别的调用刚建成的文件——都答 `NameTaken`，什么都不写；占到之后写入字节、`sync_data`，再 `sync_dir` 父目录。两次竞争的新建只有一次占得到名字，这是 `WriteLimit::Create` 的「竞争创建只成一次」在盘上的依据（`crates/kernel/Spec.lean` §8-78）。占到名字之后写入失败，删掉自己刚建的文件再报原来的失败；删也失败时报删的失败，因为那时盘上留着半个文件，这才是调用方要处理的状态。
 - **两者都消费清过的目标**：只有经 `WriteTarget::at`／`within` 清过别名的名字才落得了盘（8-25），所以经链接新建或改写一个旧文件在两条路上都不通。
 - `NameTaken`→`E_VERSION_CONFLICT`：不可定义掉——名字有没有被占是落盘那一刻文件系统的事实。恢复：读那个文件、对着它的版本改，或换一个名字。
 - 验收：`alias` 测试 `two_racing_creates_admit_one`（八个线程同时新建同一个名字，恰一个 `Ok`，其余 `NameTaken`，盘上是那一个的字节）；runtime 的 `an_existing_file_is_unchanged_under_create_by_edit_exec_and_link`。

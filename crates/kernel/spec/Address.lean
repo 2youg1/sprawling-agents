@@ -81,7 +81,7 @@ impl SessionName {
 pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCII 折叠，见 8-55）
 ```
 
-**理由是写域默认覆盖整栋楼。** 一次派活的写域由 `city::policy::write_domain()` 给出，`docs/templates/RULES.toml` 的 `prefixes` 出厂是空表，于是写域回落到 `[self.addr]`——整栋楼；`runtime::tools::edit` 对路径只有 `WriteDomain::admits` 一道依据，`city::load` 又在每次派活时重读 `RULES.toml`。楼的 `RULES.toml` 与 `CONFIG.toml` 住在 `<building>/.sprawling/` 下（`kernel::layout`，8-56），所以只看首段的判定挡不住一个 agent 改自己楼的写域、`confidential`、思考强度与 MCP server；任一段命中才挡得住，词汇表「一个 agent 改不了自己的账与自己的配置」由此得到执行。
+**理由是写域默认覆盖整栋楼。** 一次派活的写域由 `city::policy::write_domain()` 给出，`crates/city/templates/RULES.toml` 的 `prefixes` 出厂是空表，于是写域回落到 `[self.addr]`——整栋楼；`runtime::tools::edit` 对路径只有 `WriteDomain::admits` 一道依据，`city::load` 又在每次派活时重读 `RULES.toml`。楼的 `RULES.toml` 与 `CONFIG.toml` 住在 `<building>/.sprawling/` 下（`kernel::layout`，8-56），所以只看首段的判定挡不住一个 agent 改自己楼的写域、`confidential`、思考强度与 MCP server；任一段命中才挡得住，词汇表「一个 agent 改不了自己的账与自己的配置」由此得到执行。
 
 - **一条规则，三处实例**：一个 scope 的治理字节住在它自己的 `.sprawling/` 里。城是 `<city>/.sprawling/`，楼是 `<building>/.sprawling/`，房间是 `<building>/<room>/.sprawling/`。城的布局因此不是特例，而是同一条规则在根 scope 上的实例。
 - **失效关闭，只会拒绝得更多**：`is_reserved` 对任何含 `.sprawling` 段的地址答真，`WriteDomain::new` 与 `admits` 两处因此同时收紧。
@@ -162,7 +162,7 @@ theorem is_within_antisymm {a b : Address} (ab : is_within a b = true) (ba : is_
 
 /-- D8 定规：受保护元数据名单只有 kernel::address 一个家
 
-`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`storage::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是storage 侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 storage 的别名族规则承担（storage-SPEC 8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
+`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`storage::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是storage 侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 storage 的别名族规则承担（`crates/storage/Spec.lean` §8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
 -/
 def is_reserved (protected_name : String → Bool) (a : Address) : Bool :=
   a.segments.any protected_name

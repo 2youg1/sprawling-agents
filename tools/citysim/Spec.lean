@@ -96,7 +96,7 @@ D1 **没有种子，而不是造一个吃种子的生成器。** 种子此刻没
 
 /-! ## 5 权威信源
 
-- `crates/kernel/kernel-SPEC.md` §8-9：Ledger 缝与 conformance；§8-23：`ToolCall::action`，一次工具调用的动作字节。
+- `crates/kernel/Spec.lean` §8-9：Ledger 缝与 conformance；§8-23：`ToolCall::action`，一次工具调用的动作字节。
 - `crates/runtime/Spec.lean` §8-1（驱动器与 `verify_lines`，`crates/runtime/spec/Replay.lean`）、§8-15（`run::drive`）与 §8-39（每 run 一条 `prompt_assembled`）。
 - `crates/gateway/src/endpoint/failure.rs` 的 `ProviderFailure::retry`：城重发哪些状态码。
 - sprawling 的 `monitor::spread`（sprawling-SPEC 8-129-2）：分位、地板、峰值与可疑倍数 `SUSPICIOUS_TIMES`。

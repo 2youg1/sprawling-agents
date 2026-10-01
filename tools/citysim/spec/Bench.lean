@@ -76,7 +76,7 @@ bench Main 在第一项读数之前算 `REGISTERED.digest`：与 `pinned` 不等
 |---|---|---|
 | `large_ledger_fold` | `accounting::views::ask`，重建每个视图的生产全路径 | `harness` |
 | `large_worktree_placement` | `storage::Checkpoint::ensure_base` 之后，每轮先 `Worktrees::stock`（不计时，D13），再计时 `Worktrees::claim`，然后 `release`（§8-12） | `whole` |
-| `kept_worktree_reclaim` | 同一座城里同一个节点的第二次及以后的 `Worktrees::claim`，其间干线不动（storage-SPEC 8-9 的再领） | `whole` |
+| `kept_worktree_reclaim` | 同一座城里同一个节点的第二次及以后的 `Worktrees::claim`，其间干线不动（`crates/storage/Spec.lean` §8-9 的再领） | `whole` |
 | `long_session_forwarding` | `wire::ServerFrame::Event` 装帧＋序列化，即 socket 之前的本地半段 | `harness` |
 
 失败出口：域错误按其 `AxError`（动作/主体/稳定码/恢复语）格式化成一行；bench 自身的失败（零样本）构造 `AxError::failure(AxCode::InvalidArgs, …)`＋`with_recovery`，不新增码（§12 的口径）；Main 打 `bench failed: …` 且退出非零（既有形）。
@@ -93,11 +93,11 @@ D9 **被量的产品 feature 集只写在 justfile 一处。** 人下载的二�
 /-!
 ### 8-12 `large_worktree_placement`：领树接管一棵备树（`bench::scenarios`）
 
-每轮：`Worktrees::stock`（把备树检出或带到干线，不计时）→ `bench::stamp` → `Worktrees::claim(node-<i>, &[])` → 读时钟 → `release`。四个节点名各不相同，所以每一轮都是一次放置而不是再领；每一轮的备树都是上一轮被接管之后新检出的，干线不动，所以 `claim` 接管时不写文件（storage-SPEC 8-35 的计数）。夹具不变：512 个 16 KB 文件、4 轮，`REGISTERED.pinned` 不动。读数是 `sub=whole`，因为接管仍是盘上的改名与 git 的元数据写入，缝口不拆。
+每轮：`Worktrees::stock`（把备树检出或带到干线，不计时）→ `bench::stamp` → `Worktrees::claim(node-<i>, &[])` → 读时钟 → `release`。四个节点名各不相同，所以每一轮都是一次放置而不是再领；每一轮的备树都是上一轮被接管之后新检出的，干线不动，所以 `claim` 接管时不写文件（`crates/storage/Spec.lean` §8-35 的计数）。夹具不变：512 个 16 KB 文件、4 轮，`REGISTERED.pinned` 不动。读数是 `sub=whole`，因为接管仍是盘上的改名与 git 的元数据写入，缝口不拆。
 
 前后的读数（同一台机器、debug 构建、同一夹具的放置一段，四轮）：改动之前 `claim` 一次 1.18–1.30 s；改动之后 `claim` 接管备树一次 30–37 ms，`stock` 一次 1.19–1.35 s（那次全量检出，不计时）。`budgets.toml` 的 `[large_worktree_placement]` 行由 `just bench` 的发行构建读数登记。
 
-D13 **`large_worktree_placement` 量的是领树，备树在计时之外。** 放置分成两段（storage-SPEC 8-35）：`Worktrees::stock` 在没人等的时候检出一棵备树，`claim` 在 run 等着的时候接管它。场景在每次计时的 `claim` 之前调一次 `stock`，计时只包住 `claim`，因为人等的是这一段；`stock` 的代价就是改动之前的那个读数（一次全量检出），它不随这次改动变，由 storage 的计数断言守着它新建多少文件，而不是由墙钟。被否：①把 `stock` 也算进同一个样本——读数就成了两段之和，看不出领树这一段降没降；②给备树另开一行读数——要在 `bench::reading` 加一个 `Load`，那一份是读数文法的唯一权威，本决定不为一行读数改它；需要那一行时在那里加。**重开参数**：产品里有了 `stock` 的调用者之后（sprawling-SPEC 8-145），如果它的位置仍让某个人等它，把它的读数加进来。
+D13 **`large_worktree_placement` 量的是领树，备树在计时之外。** 放置分成两段（`crates/storage/Spec.lean` §8-35）：`Worktrees::stock` 在没人等的时候检出一棵备树，`claim` 在 run 等着的时候接管它。场景在每次计时的 `claim` 之前调一次 `stock`，计时只包住 `claim`，因为人等的是这一段；`stock` 的代价就是改动之前的那个读数（一次全量检出），它不随这次改动变，由 storage 的计数断言守着它新建多少文件，而不是由墙钟。被否：①把 `stock` 也算进同一个样本——读数就成了两段之和，看不出领树这一段降没降；②给备树另开一行读数——要在 `bench::reading` 加一个 `Load`，那一份是读数文法的唯一权威，本决定不为一行读数改它；需要那一行时在那里加。**重开参数**：产品里有了 `stock` 的调用者之后（sprawling-SPEC 8-145），如果它的位置仍让某个人等它，把它的读数加进来。
 -/
 
 namespace Citysim.Bench

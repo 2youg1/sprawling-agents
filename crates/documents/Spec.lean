@@ -59,7 +59,7 @@ refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「�
 - **假设**：BLAKE3 抗碰撞。版本身份是整份字节的摘要（D3），「摘要相同即同一版本」靠它；`spec/Edit.lean` 把它写成 `later_is_refused` 的假设 `inj`，不证明它。
 - **假设**：没有标记的 UTF-16 不出现在城里需要读成文本的地方。它被判成不透明的而不是被猜（D4）；人的文件里真有这样的一份时，页面说它不是文本，而不说错字。
 - **假设**：对齐的结果按种类过滤之后恰是两边各自切出的句子。`spec/Proposal.lean` 把对齐的结果当作给定，证明的是合成；对齐本身由 `proposal::tests` 的语料断言（D15）。
-- **当前状态：提出与收回提案的写者还没有。** `proposal_offered` 与 `proposal_withdrawn` 由提出它的 run 的工具写下（kernel-SPEC §8-83），那件工具还没有落地（city-SPEC §8-40）；在那之前 `Offer::of` 的生产调用方是读账本的折叠（accounting-SPEC §8-22），它对每一行 `proposal_offered` 算出提案身份并判它的区间与长度。工具落地时要回答的：一次 run 在哪一版上提（它读到的版本，还是它的候选工作树里那份文件的基线），以及 refrain 路线图 §4-10 说的「审阅期间 `edit`、`exec` 对该文稿的写入受同一边界约束」是否由 runtime 判。决定它的证据是那件工具的规格。
+- **当前状态：提出与收回提案的写者还没有。** `proposal_offered` 与 `proposal_withdrawn` 由提出它的 run 的工具写下（`crates/kernel/Spec.lean` §8-83），那件工具还没有落地（city-SPEC §8-40）；在那之前 `Offer::of` 的生产调用方是读账本的折叠（accounting-SPEC §8-22），它对每一行 `proposal_offered` 算出提案身份并判它的区间与长度。工具落地时要回答的：一次 run 在哪一版上提（它读到的版本，还是它的候选工作树里那份文件的基线），以及 refrain 路线图 §4-10 说的「审阅期间 `edit`、`exec` 对该文稿的写入受同一边界约束」是否由 runtime 判。决定它的证据是那件工具的规格。
 - **未定：对话流怎样读这个文法。** `Query::Preview` 按版本作答（wire-SPEC §8-74），而模型说的话没有版本：流式的增量不进账本（wire-SPEC §8-8），结算的回复在 `model_returned` 的载荷里。三个候选：(a) 写 `model_returned` 的一方把回复的文字另存进内容库、记录带上它的地址，页面按这个版本问 `Preview`，还在说的那一段照旧画原文；(b) 城在流式增量旁边按同一个文法给出已经闭合的块（它手里有同一段文字）；(c) 加一条带文字的查询。(a) 只在回复结算后渲染，(b) 要改 delta 帧，(c) 让页面把城刚发来的文字再发回去。决定它的证据：远程门上一次往返的读数，与一个回复在流式期间闭合块的次数。在那之前对话流仍由 `client/src/core/prose.ts` 读，它是这个文法之外的第二个读法（client-SPEC 4-26）。
 - **未定：整份放得下的 Markdown 版本不在内容库里。** `accounting::views::document` 只在第一个窗口盖不住整份时存版本（accounting-SPEC §12 第 33 条），所以对一份 64 KiB 以内的 Markdown 文档，`Preview` 今天答 `Unavailable`。补法是那里一个条件：格式是 Markdown 时也存（accounting-SPEC §8-23）。
 -/
@@ -99,7 +99,7 @@ refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「�
 /-! ## 7 模块边界
 
 - **字节从哪里来**归调用方：`accounting::views` 读盘与内容库，把切片交进来；本 crate 恒不持文件句柄。
-- **一版字节存到哪**归 `storage::cas`：版本身份就是内容库的地址（D3），所以按版本取范围就是按地址读对象（storage-SPEC §8-36）。
+- **一版字节存到哪**归 `storage::cas`：版本身份就是内容库的地址（D3），所以按版本取范围就是按地址读对象（`crates/storage/Spec.lean` §8-36）。
 - **一次保存怎样落盘、怎样记账**归 `city::document`（锁、读当前字节、整份换上，city-SPEC §8-40）与写者 `accounting::worker::commanding::saving`（wire-SPEC §8-72、§8-73）。
 - **一张卡开着、决定过还是收回过**归读账本的折叠（accounting-SPEC §8-22）：本 crate 给出每一步的判定，不持有任何一张卡。
 - **线上的拼写**归 `wire`：它直接携带本 crate 的 `Span`、`Format`、`Encoding`、`Window`，以及预览的 `Preview` 与它的块（D1、D21）。
@@ -242,6 +242,6 @@ comrak（BSD-2-Clause）关掉默认 feature 取用：默认的是它的命令�
 - `architecture.toml` 里 documents 各行（锚点指向本文件与分部），ARCHITECTURE.md §3 的 `depmap`（`documents: kernel`，`wire` 与 `accounting` 两行各有它）。
 - `docs/glossary.md` 的 **document version**、**document window**、**draft**、**preview**、**proposal**、**review slice**。
 - wire-SPEC §8-74、§12.11（`Query::Preview`）；accounting-SPEC §8-23、§12 第 35 条（谁从内容库读、谁作答）；client-SPEC 4-26、12-14（页面怎样画这棵树，为什么在城里读）。
-- wire-SPEC §8-69、§8-70（文档读取契约）、§8-72、§8-73（保存与提案）、§12.8、§12.10；kernel-SPEC §8-83（`document_written` 与提案的三种事件，`SliceVerdict`）；accounting-SPEC §8-21（谁读盘、谁存版本、谁作答）、§12 第 33 条；storage-SPEC §8-36（版本进内容库）；city-SPEC §8-27、§8-40（`city::document`：锁、读当前字节、整份换上）；accounting-SPEC §8-22（保存与提案的写者、提案的折叠）。这些节改了，重读本文件对应的决定。
+- wire-SPEC §8-69、§8-70（文档读取契约）、§8-72、§8-73（保存与提案）、§12.8、§12.10；`crates/kernel/Spec.lean` §8-83（`document_written` 与提案的三种事件，`SliceVerdict`）；accounting-SPEC §8-21（谁读盘、谁存版本、谁作答）、§12 第 33 条；`crates/storage/Spec.lean` §8-36（版本进内容库）；city-SPEC §8-27、§8-40（`city::document`：锁、读当前字节、整份换上）；accounting-SPEC §8-22（保存与提案的写者、提案的折叠）。这些节改了，重读本文件对应的决定。
 - refrain 路线图 §4-8、§4-9、§4-10、附录 B–G 是本 crate 的需求来源；RefRain 的 `source_layout`、`native_document`、`manuscript::review` 与 `manuscript::decision` 四个模块是迁入的出处（§4）。
 -/

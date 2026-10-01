@@ -71,7 +71,7 @@ let placed = Cell::new(0u64);              // 位次：每跑一个计数器，�
 let key = IdemKey::derive(&run, Seq::new(at), &call.action()?);   // 动作字节：kernel::tool 唯一一份
 ```
 
-**动作字节取 `ToolCall::action`**（kernel-SPEC §8-23，全库唯一一份），**位次取每跑一个的计数器**，与 `accounting::worker` 同形，故两个驱动器对「一次工具调用的键怎么算」只有一份读法（D20）。
+**动作字节取 `ToolCall::action`**（`crates/kernel/Spec.lean` §8-23，全库唯一一份），**位次取每跑一个的计数器**，与 `accounting::worker` 同形，故两个驱动器对「一次工具调用的键怎么算」只有一份读法（D20）。
 
 `two_reads_in_one_wave_are_two_calls` 钉住这一条：一个回合携两次同名、参数不同的调用，两条 `tool_result` 都带结果、都不带 `error`。`IdemKey` 不进任何 payload，故账本字节与 `golden-p0` 不受它影响。
 -/
@@ -226,7 +226,7 @@ theorem keyed_places_from (run next : Nat) (actions : List String) :
     · exact Nat.le_refl _
     · exact Nat.le_of_succ_le (ih (next + 1) key later)
 
-/-- D20 **一次工具调用的键：每跑一个的位次，加上整个动作的字节。** 动作字节取 `ToolCall::action`（kernel-SPEC §8-23，全库唯一一份），位次取每跑一个的计数器，与 `accounting::worker` 同形，故两个驱动器对「一次工具调用的键怎么算」只有一份读法。被击败的读法：位次取回合时钟 `t`、动作字节只取工具名（`byInstant`）。`runtime::run` 给一波里的每次调用同一个 `t`（一波是一个瞬间），于是一波之内两次同名调用拿到相同的 `IdemKey`，`ToolBench::invoke` 的去重把第二次判成重复，参数不同也不救；而且那个 `Seq` 是钟读数换了个类型，违反确定性规则「位次不从时钟来」（ARCHITECTURE.md §10 第 7 条）。
+/-- D20 **一次工具调用的键：每跑一个的位次，加上整个动作的字节。** 动作字节取 `ToolCall::action`（`crates/kernel/Spec.lean` §8-23，全库唯一一份），位次取每跑一个的计数器，与 `accounting::worker` 同形，故两个驱动器对「一次工具调用的键怎么算」只有一份读法。被击败的读法：位次取回合时钟 `t`、动作字节只取工具名（`byInstant`）。`runtime::run` 给一波里的每次调用同一个 `t`（一波是一个瞬间），于是一波之内两次同名调用拿到相同的 `IdemKey`，`ToolBench::invoke` 的去重把第二次判成重复，参数不同也不救；而且那个 `Seq` 是钟读数换了个类型，违反确定性规则「位次不从时钟来」（ARCHITECTURE.md §10 第 7 条）。
 
 同一个 run 里，没有两次调用的键输入相同，无论它们的动作是什么、落在哪一波。 -/
 theorem no_two_calls_of_a_run_share_a_key (run next : Nat) (actions : List String) :

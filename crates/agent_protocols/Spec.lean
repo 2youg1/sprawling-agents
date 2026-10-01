@@ -417,7 +417,7 @@ D15 请求行与 id 是本 crate 的契约，不是序列化器的：行由 `for
 
 - `ARCHITECTURE.md` §4 缝清单（`Outbound` 一行）、§10 规则 3（库 crate 起线程的地方：`mcp::reading` 与 `mcp::sse` 的读端）与模块表的 agent_protocols 各行（`architecture.toml`，锚点指向本文件与分部）。这些改了，重读本文件 §7、§8-15 与 §8-19。
 - `docs/third-party.md` §1（ACP schema 与 registry 被看的路径）与服务外挂的边界：上游改了线或包名，重读 §5 与 §8-19。
-- kernel-SPEC §8-23（`ServerLabel`、`TimeoutMs`）、`crates/gateway/Spec.lean` §8-5（订阅额度经 harness 进城）、`crates/runtime/Spec.lean` §8-27-10（窗口怎么装工具答复）与 §8-52（harness run 写的行）、sprawling-SPEC §8-4d（桌面经 stdio 接进来）、§8-4e 与 §8-124（harness run 与它的派活路径）、wire-SPEC 的配对中间件。这些节改了，重读本文件对应的条目。
+- `crates/kernel/Spec.lean` §8-23（`ServerLabel`、`TimeoutMs`）、`crates/gateway/Spec.lean` §8-5（订阅额度经 harness 进城）、`crates/runtime/Spec.lean` §8-27-10（窗口怎么装工具答复）与 §8-52（harness run 写的行）、sprawling-SPEC §8-4d（桌面经 stdio 接进来）、§8-4e 与 §8-124（harness run 与它的派活路径）、wire-SPEC 的配对中间件。这些节改了，重读本文件对应的条目。
 - `crates/desktop/Spec.lean` §4 与 `crates/desktop/src/refusal.rs`：`isError` 与 `_meta` 的读法（§8-1c），以及本 crate 对外给出的 `EFFECT_META_KEY` 与 `PROTOCOL_VERSION`。
 - `tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]` 与 `[prepare_dispatch_ms]`：上限的推导与常驻连接省下的时间。
 -/

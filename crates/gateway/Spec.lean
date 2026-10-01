@@ -299,7 +299,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 
 /-! ## 15 影响面
 
-kernel::model 持 canonical 会话类型（kernel-SPEC §8-24）；runtime 回合层消费 ChatRequest；storage::attribution 消费 model_returned 的 usage 与 billed 字段；citysim ScriptModel 收同一个 ChatRequest（同一缝）。
+kernel::model 持 canonical 会话类型（`crates/kernel/Spec.lean` §8-24）；runtime 回合层消费 ChatRequest；storage::attribution 消费 model_returned 的 usage 与 billed 字段；citysim ScriptModel 收同一个 ChatRequest（同一缝）。
 -/
 
 /-! ## 16 测试与约束
@@ -319,12 +319,12 @@ golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返�
 
 /-! ## 17 文档关系
 
-模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 kernel-SPEC §8-24 同一变更集。endpoint 的生产消费者是 runtime 回合层与 `bin::assembly`；credential 的消费者是 endpoint 与 `PutSecret` 命令。
+模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 `crates/kernel/Spec.lean` §8-24 同一变更集。endpoint 的生产消费者是 runtime 回合层与 `bin::assembly`；credential 的消费者是 endpoint 与 `PutSecret` 命令。
 
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 gateway 各行的 `spec` 锚点一起重看。
 - `architecture.toml` 的模块图：gateway 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
-- kernel 的规格（`crates/kernel/kernel-SPEC.md`）：canonical 会话类型（§8-24）、`InputKinds`、`ModelFacts`、`Ceiling`、`Retries` 与码表的权威；它们改了，这里的模型与 §8 相应各节一起重看。
+- kernel 的规格（`crates/kernel/Spec.lean`）：canonical 会话类型（§8-24）、`InputKinds`、`ModelFacts`、`Ceiling`、`Retries` 与码表的权威；它们改了，这里的模型与 §8 相应各节一起重看。
 - sprawling 的规格（`crates/sprawling/sprawling-SPEC.md`）：选型点的窗口梯（8-71）、城的工具 `transcribe`（8-131）与 `ocr`（8-142）；它们读本规格的 §8-12、§8-17、§8-34、§8-37。
 - 引本规格的其他规格与 rustdoc 写 `crates/gateway/Spec.lean §8-n` 或 `gateway D<n>`；一节换了分部，它的标签不变，引用不必改。
 -/
