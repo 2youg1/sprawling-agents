@@ -31,7 +31,7 @@ import tools.adversary.spec.Model
 | U6 历史 | 任意轨迹之后，账本离线自证；改一个字节则不能自证 | `replay` 在干净轨迹上恒绿、在翻过一位的轨迹上恒红 |
 | U7 供应世界 | `Provider`：挂过 endpoint 的第二种世界——一个 URL 的全部拼法、一个注册模型的上限、两条同时跑的车道 | 等价类的每种拼法经探测与经挂载各落到同一个 `base_url`；注册过的模型带得出上限；messages 派活拿不到「没有输出上限」；不等第一条做完就派出去的活是两个 run |
 | U8 配置世界 | `Layer`：写过配置的第三种世界——`configure_building` 任意序列之后，磁盘上的 `CONFIG.toml` 与 `Query::BuildingView` 折出的答案一致 | 任意非空写序列之后：答案等于最后一次写入的值；楼自己那层的文件陈述该值且不再陈述更早的值；上一层一个都不陈述 |
-| U9 验收世界 | `Acceptance`：一个陌生人拿发行归档里的二进制，在一个新目录里起城，经门走完第一天、一次进程被杀、第二天早上；provider 是 `just acceptance` 在本目录之外起的替身（§13） | `just acceptance <archive>` 的每一步按序通过，第一处失败报出步名；人的清单写到 `target/acceptance/checklist.md` |
+| U9 验收世界 | `Acceptance`：一个陌生人拿发行归档里的二进制，在一个新目录里起城，经门走完第一天、一次进程被杀、第二天早上；provider 是 `just acceptance` 在本目录之外起的替身（§13） | `just acceptance <archive>` 的每一步按序通过，第一处失败报出步名；人的清单写到 `target/acceptance/` 下的 `checklist.md` |
 
 **不负责**：任何规则的再实现（链哈希、`IdemKey` 派生、写域判定、份额守恒）；任何 Rust 侧的构建闸门；任何随产品交付的东西。三者中任何一条被违反，本目录应当被删除而不是被修补。
 
@@ -386,7 +386,7 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
    - **进程被杀**（第二次服务）：派活，等那个 run 写下几条工具结果，然后结束进程。
    - **第二天早上**（第三次服务）：被杀的城留下的历史自证；城再服务，新派的活跑到它自己的结尾；历史再自证；最后问城 `known_hosts`。
 
-   全部通过后，`walk` 把清单写到 `target/acceptance/checklist.md`（§8 `Acceptance/Checklist.lean`）。
+   全部通过后，`walk` 把清单写到 `target/acceptance/` 下的 `checklist.md`（§8 `Acceptance/Checklist.lean`）。
 
    配方在结束时停掉替身，无论走没走完。
 -/
