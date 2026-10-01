@@ -37,7 +37,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         file: format!("{KERNEL_DIR}/{}", lean::ENTRY),
         msg: "the kernel has no Lean specification, so there is no table to hold its enums \
               to; the kernel's specification is crates/kernel/Spec.lean and its parts \
-              (xtask-SPEC.md section 8-43)"
+              (tools/xtask/Spec.lean section 8-43)"
             .to_owned(),
     })?;
     tables::check(root, &sources, &mut violations)?;

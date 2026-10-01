@@ -400,7 +400,7 @@ proof:
 sim:
     cargo test --package citysim --locked
 
-# The stand-in provider (tools/citysim/citysim-SPEC.md section 8-10):
+# The stand-in provider (tools/citysim/Spec.lean section 8-10):
 # plays a wire script on a loopback port, appends every exchange to the
 # record, and prints `SPRAWLING_PROVIDER=<url>` before it answers, so the
 # check started beside it reads the URL from that line. `listen` is a
@@ -441,7 +441,7 @@ budget:
 
 # The features of the binary a person downloads, spelled once: every
 # recipe that builds or measures the product reads it, so a reading is
-# never taken on a binary nobody installs (citysim-SPEC.md 3-9).
+# never taken on a binary nobody installs (citysim D9).
 product_features := "sprawling/sandbox"
 
 # The wall-clock readings, never gated: citysim's load scenarios, then
@@ -452,7 +452,7 @@ bench:
     cargo run --release -p citysim --features {{product_features}} --bin bench
     cargo nextest run -p sprawling -p sprawling-accounting --release --features {{product_features}} --run-ignored only -E 'test(/::instrument_/)' --no-capture
 
-# The four-action pressure reading (citysim-SPEC.md 8-5) - install,
+# The four-action pressure reading (tools/citysim/Spec.lean 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.
 #
 # `build-web` first, the same dependency `dist` carries: without the
@@ -506,7 +506,7 @@ replay log:
 # Private, peak private and working set, in this platform's own counters
 # (tools/xtask/Spec.lean §8-30). A pid reads that process. `long-turn
 # [steps] [every]` reads the long-turn instrument at each of its pauses
-# (citysim-SPEC.md section 3-10). Anything else serves a city - a fresh
+# (citysim D10). Anything else serves a city - a fresh
 # empty one, or `--city <dir>` - so the release binary is built first: a
 # reading of a stale binary describes a tree nobody has.
 mem *args:
@@ -515,7 +515,7 @@ mem *args:
 
 # The long turn's counters, read through `cargo xtask mem` each time the
 # instrument pauses; the last pause's peak private is the run's peak
-# (citysim-SPEC.md section 3-10). `just mem long-turn` builds it first.
+# (citysim D10). `just mem long-turn` builds it first.
 [private]
 mem-long-turn steps="500" every="100":
     #!/usr/bin/env bash

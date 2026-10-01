@@ -341,7 +341,7 @@ slack_bytes = 2097152
 measured_by = "just mem"
 status = "measured, not gated: private 2,469,888 B, peak private 2,469,888 B, working set 8,331,264 B on windows-x86_64, 16 cores, NVMe (release). The counter differs per platform, so one number cannot mean the same thing on three of them"
 
-# The long turn (citysim-SPEC.md section 3-10): the gate is the per-step
+# The long turn (citysim D10): the gate is the per-step
 # window increment its tests assert; this row is the reading, and its
 # budget is the ceiling a regression back toward one copy per step would
 # cross long before step 500 (that shape reached 1433.7 MiB at step 482).
@@ -608,11 +608,11 @@ status = "measured, not gated: the empty city p50 42.1 ms (city fixture 7e6fda8b
 # **Reported, never gated (the person's ruling).** Dependencies are
 # welcome; they are worth cutting where a cut makes the project less of
 # a black box, and a ceiling on the count cannot tell which cut that is.
-# xtask-SPEC.md section 8-25 holds the reasoning and what would reopen it.
+# tools/xtask/Spec.lean section 8-25 holds the reasoning and what would reopen it.
 [dependency_count]
 what = "packages in Cargo.lock once every transitive dependency is resolved, workspace members included"
 measured_by = "cargo xtask budget (budget::lockfile_packages, counting [[package]] in Cargo.lock)"
-status = "reported, not gated: the dependency count is read and printed, and no count is refused (xtask-SPEC.md section 8-25)"
+status = "reported, not gated: the dependency count is read and printed, and no count is refused (tools/xtask/Spec.lean section 8-25)"
 
 # T13: where the two latency tiers are stated. One latency metric in two
 # stages: the first is p95 inside one frame's budget (a person sees no
@@ -623,7 +623,7 @@ status = "reported, not gated: the dependency count is read and printed, and no 
 # construction. The second stage is reached after the first one is.
 #
 # The sub-metric split is what keeps a disk's floor from masking harness
-# overhead (citysim-SPEC.md section 8-6): `harness` carries no durability
+# overhead (tools/citysim/Spec.lean section 8-6): `harness` carries no durability
 # commit and is the only sub-metric these tiers price; `whole` is disk
 # work whose seam does not split and gets no tier. Multi-run parallel is
 # read by `[relay_round_trip]`, where the `store=memory` line is the
@@ -637,7 +637,7 @@ status = "reported, not gated: the dependency count is read and printed, and no 
 what = "the harness's own processing latency over the four load scenarios, one metric in two stages"
 stage_one_p95_us = 16000
 stage_two_p99_us = 1000
-scope = "sub-metric `harness` only, and the `store=memory` line of `[relay_round_trip]` for multi-run parallel; `whole` carries no tier (citysim-SPEC.md section 8-6)"
+scope = "sub-metric `harness` only, and the `store=memory` line of `[relay_round_trip]` for multi-run parallel; `whole` carries no tier (tools/citysim/Spec.lean section 8-6)"
 measured_by = "just bench, release: the citysim bench bin gives one reading line per scenario and sub-metric for three scenarios, and `instrument_relay_round_trip` gives multi-run parallel; each line carries its machine class"
 status = "staged targets, not gated: a wall-clock figure is the machine's. Baselines sit in the ARCHITECTURE.md performance book. Under the registered fixture a reading only goes down; relaxing a tier or fattening the fixture lands in a commit of its own"
 
