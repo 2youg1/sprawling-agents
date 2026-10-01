@@ -86,6 +86,44 @@ fn the_next_room_takes_the_stock_and_creates_no_file() {
     );
 }
 
+/// sprawling-SPEC.md 8-161: a run lands while its lane is still putting
+/// the stock back. The test holds the table of cities being stocked, so
+/// the lane's restock waits on it; the run still comes home through a
+/// real lane and lands, with no stock in the city yet. Once the table is
+/// let go, closing the worker waits for that lane, and the stock stands.
+/// The bound on serving only keeps a lane that never comes home from
+/// hanging the test.
+#[test]
+fn a_run_lands_while_its_lane_still_puts_the_stock_back() {
+    let dir = tempfile::tempdir().unwrap();
+    lay_review_city(dir.path(), &["room1"]);
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let held = STOCKING.lock().unwrap_or_else(PoisonError::into_inner);
+    worker
+        .dispatch_into_lane(
+            asked("lab/room1"),
+            "work".to_owned(),
+            "work".to_owned(),
+            Owing::asked(wire::Reply::nowhere()),
+        )
+        .unwrap();
+    let landed = (0..2_000).any(|_| {
+        worker
+            .serve_flight(relay::Patience::For(std::time::Duration::from_millis(5)))
+            .unwrap();
+        !worker.driving()
+    });
+    let stocked_at_landing = stock_is_ready(dir.path());
+    drop(held);
+    drop(worker);
+    assert_eq!(
+        (landed, stocked_at_landing, stock_is_ready(dir.path())),
+        (true, false, true),
+        "the run landed before its lane put the stock back, and the stock stands once the worker closed"
+    );
+}
+
 /// sprawling-SPEC.md 8-155: a lane that finds the city's turn taken
 /// skips, and the turn it found stays with the lane that holds it; once
 /// that lane gives it back, the city's turn can be taken again. Two
