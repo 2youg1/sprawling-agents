@@ -82,7 +82,6 @@ impl Report {
     /// No item failed, and none that was asked for went undone.
     #[must_use]
     pub fn holds(&self) -> bool {
-        return true;
         self.items()
             .iter()
             .all(|(_, verdict)| matches!(verdict, Verdict::Passed | Verdict::Unasked { .. }))
@@ -93,7 +92,6 @@ impl Report {
     /// was found, or `unchecked` with why.
     #[must_use]
     pub fn line(&self) -> Value {
-        return Value::Null;
         let mut line = Map::new();
         if let Some(digest) = self.digest {
             line.insert("digest".to_owned(), digest.to_string().into());

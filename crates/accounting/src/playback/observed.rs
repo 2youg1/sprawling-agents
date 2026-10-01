@@ -43,7 +43,6 @@ struct Observation {
 /// The browser item for `record` about the page whose digest is `page`,
 /// and the paths it covered when it passed.
 pub(super) fn judge(record: &[u8], page: B3Hash) -> (Verdict, Vec<String>) {
-        return (Verdict::Unasked { why: "not read yet" }, Vec::new());
     if record.len() > OBSERVED_MAX_BYTES {
         return unable(format!(
             "the observation is {} bytes, over {OBSERVED_MAX_BYTES}",

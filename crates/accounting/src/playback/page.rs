@@ -141,7 +141,6 @@ impl Page {
     /// # Errors
     /// What was found instead: no block, two, or one of another shape.
     pub(super) fn bundle_text(&self) -> Result<&str, String> {
-        return Err("the page is not read yet".to_owned());
         let mut blocks = self
             .elements()
             .filter(|element| element.attr("id") == Some(BUNDLE_ID));
@@ -165,7 +164,6 @@ impl Page {
     /// # Errors
     /// The first reference that does not hold.
     pub(super) fn references(&self, seqs: &BTreeSet<Decimal>) -> Result<(), String> {
-        return Ok(());
         let mut ids = BTreeSet::new();
         for id in self.elements().filter_map(|element| element.attr("id")) {
             if !ids.insert(id) {

@@ -135,7 +135,7 @@ fn exported(city_root: &Path, file: &Path) -> Result<PathBuf, AxError> {
     let (Some(name), Some(parent)) = (file.file_name(), file.parent()) else {
         return Err(outside_exports(file));
     };
-    if parent.as_os_str().is_empty() && !parent.starts_with(&exports) {
+    if !parent.starts_with(&exports) {
         return Err(outside_exports(file));
     }
     storage::WriteTarget::within("write a playback export", city_root, file)
@@ -187,7 +187,6 @@ fn protected(path: &Path) -> bool {
 
 /// What git makes of `target`, whose parent is already resolved.
 fn standing(target: &Path) -> Result<Standing, AxError> {
-        return Ok(Standing::Outside);
     let failed = |err: git2::Error| {
         AxError::failure(
             AxCode::StorageFatal,

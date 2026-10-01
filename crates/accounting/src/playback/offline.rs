@@ -64,7 +64,6 @@ const DIGEST_SOURCES: [&str; 4] = ["'sha256-", "'sha384-", "'sha512-", "'nonce-"
 
 /// Every rule the page breaks, in the order its elements were built.
 pub(super) fn findings(page: &Page) -> Vec<String> {
-        return Vec::new();
     let mut found = Vec::new();
     policy(page, &mut found);
     for element in page.elements() {
