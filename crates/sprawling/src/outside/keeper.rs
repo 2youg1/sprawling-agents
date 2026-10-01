@@ -310,8 +310,16 @@ impl Kept {
         kind: EventKind,
         line: &T,
     ) -> Result<(), AxError> {
-        let _unwritten = (t, who, kind, Payload::of(line)?, RunId::CITY);
-        Ok(())
+        let draft = EventDraft {
+            run: RunId::CITY,
+            t,
+            who: who.to_string(),
+            addr: None,
+            kind,
+            data: Payload::of(line)?,
+            ig: false,
+        };
+        self.ledger.append(draft).map(drop)
     }
 }
 

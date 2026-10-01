@@ -89,8 +89,6 @@ impl Conduit {
         };
         match passage(frame) {
             Passage::Greeting(said) => self.greeting(said),
-            Passage::Judged(_) => Ok(Step::Forward(text)),
-            #[expect(unreachable_patterns, reason = "red")]
             Passage::Judged(class) => {
                 let authority = self.doorway.authority(self.session)?.ok_or_else(ended)?;
                 if permits(authority, class) {

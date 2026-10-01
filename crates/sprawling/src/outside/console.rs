@@ -84,10 +84,45 @@ pub(crate) struct Remote {
 
 /// Reads what follows `/remote`.
 pub(crate) fn parse(tail: &str) -> RemoteLine {
-    let _unread = tail;
-    RemoteLine::Unreadable
-
+    let tail = tail.trim();
+    let (verb, rest) = tail.split_once(char::is_whitespace).unwrap_or((tail, ""));
+    let words: Vec<&str> = rest.split_whitespace().collect();
+    match (verb, words.as_slice()) {
+        ("open", []) => RemoteLine::Open(Lasting(
+            DEFAULT_HOURS
+                .saturating_mul(60)
+                .saturating_mul(MS_PER_MINUTE),
+        )),
+        ("open", ["--for", length]) => {
+            Lasting::read(length).map_or(RemoteLine::Unreadable, RemoteLine::Open)
+        }
+        ("pair", _) => {
+            let authority = if words.contains(&"--watch") {
+                Authority::Watch
+            } else {
+                Authority::Act
+            };
+            let name: Vec<&str> = words
+                .iter()
+                .copied()
+                .filter(|word| *word != "--watch")
+                .collect();
+            if name.is_empty() {
+                RemoteLine::Unreadable
+            } else {
+                RemoteLine::Pair {
+                    name: name.join(" "),
+                    authority,
+                }
+            }
+        }
+        ("close", []) => RemoteLine::Close,
+        ("devices", []) => RemoteLine::Devices,
+        ("revoke", ["--all"]) => RemoteLine::Revoke(Revoking::All),
+        ("revoke", [_, ..]) => RemoteLine::Revoke(Revoking::Named(words.join(" "))),
+        _ => RemoteLine::Unreadable,
     }
+}
 
 /// Carries out one `/remote` line and says what happened.
 pub(crate) fn carry(remote: &Result<Remote, AxError>, line: RemoteLine) -> String {

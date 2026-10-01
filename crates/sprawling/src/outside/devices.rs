@@ -72,10 +72,27 @@ pub(super) fn read(path: &Path) -> Result<Vec<Device>, AxError> {
 /// `E_STORAGE_FATAL`, naming the file, when the directory cannot be made
 /// or the file cannot be written or renamed into place.
 pub(super) fn write(path: &Path, devices: &[Device]) -> Result<(), AxError> {
-    let _unwritten = (path, devices);
-    Ok(())
-
-    }
+    let table = Table {
+        device: devices
+            .iter()
+            .map(|device| Row {
+                id: device.id.text(),
+                name: device.name.as_str().to_owned(),
+                authority: device.authority.word().to_owned(),
+                key: device.key.text(),
+            })
+            .collect(),
+    };
+    let text = toml::to_string(&table)
+        .map_err(|source| fatal("write the device table", path, &source.to_string()))?;
+    let beside = path.with_extension("toml.new");
+    let written = path
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|()| std::fs::write(&beside, text))
+        .and_then(|()| std::fs::rename(&beside, path));
+    written.map_err(|source| fatal("write the device table", path, &source.to_string()))
+}
 
 fn fatal(action: &str, path: &Path, why: &str) -> AxError {
     AxError::failure(
