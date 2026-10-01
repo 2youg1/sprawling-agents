@@ -34,7 +34,8 @@ fn the_published_version_is_the_one_a_running_binary_decodes() {
 #[test]
 fn the_platform_packages_take_the_scope_from_the_next_version() {
     let root = crate::root::this_checkout();
-    let version = crate::package::workspace_version(root).expect("the workspace states a version");
+    let version =
+        crate::package::workspace_package(root, "version").expect("the workspace states a version");
     if version == UNSCOPED_THROUGH {
         return;
     }

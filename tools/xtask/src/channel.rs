@@ -46,11 +46,6 @@ use crate::report::XtaskError;
 /// already follows for the documents a city writes.
 const SHIM: &str = include_str!("channel/shim.js");
 
-/// A scoped npm name writes one directory level more than a bare one,
-/// which is why the publish step enumerates `target/npm/@sprawling/*/`
-/// rather than every child of `target/npm`.
-const REPOSITORY: &str = "https://github.com/2youg1/sprawling-agents";
-
 /// One file's bytes, out of a zip that holds it at any depth.
 fn extract(archive: &Path, wanted: &str) -> Result<Vec<u8>, XtaskError> {
     let file = std::fs::File::open(archive).map_err(|source| XtaskError::Io {
@@ -100,18 +95,30 @@ fn write(path: &Path, bytes: &[u8]) -> Result<(), XtaskError> {
     })
 }
 
+/// What every package of the channel states alike: which release it is,
+/// and where its source lives. Both are read out of the workspace
+/// manifest, the one place either is written.
+struct Stem<'a> {
+    version: &'a str,
+    repository: &'a str,
+}
+
 /// The manifest shared by every package here: the same licence, the same
 /// repository, the same description stem — stated once so two packages
 /// cannot disagree about what this project is.
-fn manifest(name: &str, version: &str, description: &str, extra: &str) -> String {
+fn manifest(stem: &Stem<'_>, name: &str, description: &str, extra: &str) -> String {
+    let Stem {
+        version,
+        repository,
+    } = stem;
     format!(
         r#"{{
   "name": "{name}",
   "version": "{version}",
   "description": "{description}",
   "license": "MPL-2.0",
-  "repository": {{ "type": "git", "url": "git+{REPOSITORY}.git" }},
-  "homepage": "{REPOSITORY}",
+  "repository": {{ "type": "git", "url": "git+{repository}.git" }},
+  "homepage": "{repository}",
 {extra}}}
 "#
     )
@@ -123,7 +130,8 @@ fn manifest(name: &str, version: &str, description: &str, extra: &str) -> String
 /// When the tag is misshapen, when an archive holds no binary, when an
 /// archive matches no row, or when the output cannot be written.
 pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<String, XtaskError> {
-    let workspace = crate::package::workspace_version(root)?;
+    let workspace = crate::package::workspace_package(root, "version")?;
+    let repository = crate::package::workspace_package(root, "repository")?;
     // `kernel::Release` owns both spellings of one release, because the
     // binary this channel packages has to recognise on the registry the
     // same release this job publishes there.
@@ -133,6 +141,10 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
             msg: err.recovery().to_owned(),
         })?
         .npm_version();
+    let stem = Stem {
+        version: &version,
+        repository: &repository,
+    };
 
     let entries = std::fs::read_dir(assets).map_err(|source| XtaskError::Io {
         path: assets.display().to_string(),
@@ -169,6 +181,9 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
             });
         };
         let binary = extract(archive, row.binary)?;
+        // A scoped npm name writes one directory level more than a bare
+        // one, which is why the publish step enumerates
+        // `target/npm/@sprawling/*/` rather than every child of `target/npm`.
         let dir = out.join(row.package);
         write(&dir.join("bin").join(row.binary), &binary)?;
         let extra = format!(
@@ -178,7 +193,7 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
         let description = format!("The sprawling binary for {} {}.", row.os, row.cpu);
         write(
             &dir.join("package.json"),
-            manifest(row.package, &version, &description, &extra).as_bytes(),
+            manifest(&stem, row.package, &description, &extra).as_bytes(),
         )?;
         carried.push(row);
     }
@@ -204,8 +219,8 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
     write(
         &dir.join("package.json"),
         manifest(
+            &stem,
             ROOT_PACKAGE,
-            &version,
             "Raise a city of agents that work on your repository.",
             &extra,
         )

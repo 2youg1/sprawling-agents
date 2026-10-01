@@ -158,7 +158,11 @@ pub(crate) fn run(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskEr
         });
     }
 
-    let stem = format!("sprawling-{}-{}", workspace_version(root)?, target.label());
+    let stem = format!(
+        "sprawling-{}-{}",
+        workspace_package(root, "version")?,
+        target.label()
+    );
     let out_dir = root.join("target").join("package");
     std::fs::create_dir_all(&out_dir).map_err(|source| XtaskError::Io {
         path: out_dir.display().to_string(),
@@ -220,9 +224,13 @@ fn write_archive(archive: &Path, stem: &str, entries: &[Entry]) -> Result<(), Xt
     Ok(())
 }
 
-/// The workspace version, read from the manifest that defines it rather
-/// than from this tool's own compiled-in copy.
-pub(crate) fn workspace_version(root: &Path) -> Result<String, XtaskError> {
+/// One string of the root manifest's `[workspace.package]` - the
+/// version, the repository - read from the manifest that defines it
+/// rather than from this tool's own compiled-in copy.
+///
+/// # Errors
+/// When the manifest cannot be read or parsed, or does not state `key`.
+pub(crate) fn workspace_package(root: &Path, key: &str) -> Result<String, XtaskError> {
     let path = root.join("Cargo.toml");
     let text = std::fs::read_to_string(&path).map_err(|source| XtaskError::Io {
         path: path.display().to_string(),
@@ -232,11 +240,11 @@ pub(crate) fn workspace_version(root: &Path) -> Result<String, XtaskError> {
         file: path.display().to_string(),
         msg: err.to_string(),
     })?;
-    package_field(&parsed, "version")
+    package_field(&parsed, key)
         .map(str::to_owned)
         .ok_or_else(|| XtaskError::Doc {
             file: path.display().to_string(),
-            msg: "workspace.package.version is missing".to_owned(),
+            msg: format!("workspace.package.{key} is missing"),
         })
 }
 
