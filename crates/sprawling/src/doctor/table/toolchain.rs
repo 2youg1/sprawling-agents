@@ -311,6 +311,15 @@ pub(super) const ELAN: Requirement = row(
 )
 .from(Upstream::GitHub("leanprover/elan"));
 
+/// What `elan toolchain install` is handed for one pin: the toolchain
+/// `lean-toolchain` names (sprawling-SPEC.md 8-162).
+const fn lean_install(pin: &'static str) -> &'static str {
+    pin
+}
+
+/// The toolchain this build installs for the `lean` row.
+const LEAN_INSTALL: &str = lean_install(LEAN_PIN);
+
 pub(super) const LEAN: Requirement = row(
     "lean",
     Need::Required,
@@ -321,7 +330,7 @@ pub(super) const LEAN: Requirement = row(
         line: LEAN_PIN,
     },
     "https://lean-lang.org/",
-    same_command("elan", &["toolchain", "install", LEAN_PIN]),
+    same_command("elan", &["toolchain", "install", LEAN_INSTALL]),
 )
 .from(Upstream::GitHub("leanprover/lean4"))
 .pinned(Pin::LeanToolchain);
@@ -330,6 +339,25 @@ pub(super) const LEAN: Requirement = row(
 /// leaf's build script and CI's install step read too (sprawling-SPEC.md
 /// 8-146).
 const ZIG_PIN: &str = crate::doctor::pin::ZIG_VERSION;
+
+/// winget's arguments for Zig at one pin (sprawling-SPEC.md 8-162). A
+/// macro rather than a `const fn`: a recipe's arguments are a `'static`
+/// slice, which a `const fn` cannot build out of its parameter, while a
+/// macro expands into a `const` item where the pin is a constant.
+macro_rules! winget_zig {
+    ($pin:expr) => {
+        &[
+            "install",
+            "--id",
+            "zig.zig",
+            "-e",
+            "--version",
+            $pin,
+            "--scope",
+            "user",
+        ]
+    };
+}
 
 /// The compiler of the desktop server's Zig leaf. Required because a
 /// Windows build of this binary compiles the leaf, and `Need` does not
@@ -348,16 +376,7 @@ pub(super) const ZIG: Requirement = row(
     PerPlatform {
         windows: Recipe::Command {
             program: "winget",
-            args: &[
-                "install",
-                "--id",
-                "zig.zig",
-                "-e",
-                "--version",
-                ZIG_PIN,
-                "--scope",
-                "user",
-            ],
+            args: winget_zig!(ZIG_PIN),
         },
         macos: Recipe::Command {
             program: "brew",
@@ -447,3 +466,38 @@ pub(super) const KANI: Requirement = row(
     },
 )
 .packed("kani-verifier");
+
+#[cfg(test)]
+mod tests {
+    use super::lean_install;
+
+    /// A build from the crates.io archive finds none of the pin files, so
+    /// both pins are empty there. The two rows then install a version
+    /// nobody pinned rather than a command with an empty argument, which
+    /// elan and winget both refuse (sprawling-SPEC.md 8-162).
+    #[test]
+    fn a_build_without_pins_installs_lean_stable_and_any_zig() {
+        const UNPINNED: &[&str] = winget_zig!("");
+        const PINNED: &[&str] = winget_zig!("0.16.0");
+        let any: &[&str] = &["install", "--id", "zig.zig", "-e", "--scope", "user"];
+        let one: &[&str] = &[
+            "install",
+            "--id",
+            "zig.zig",
+            "-e",
+            "--version",
+            "0.16.0",
+            "--scope",
+            "user",
+        ];
+        assert_eq!(
+            (
+                lean_install(""),
+                lean_install("leanprover/lean4:v4.33.1"),
+                UNPINNED,
+                PINNED
+            ),
+            ("stable", "leanprover/lean4:v4.33.1", any, one)
+        );
+    }
+}
