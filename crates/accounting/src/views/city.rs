@@ -52,7 +52,13 @@ impl Views {
                 buildings: Vec::new(),
                 pursuits: Vec::new(),
                 halted: self.governance.halted.iter().map(named).collect(),
-                proved: None,
+                // A served city's verdict is the halt its writer obeys;
+                // views without one were folded from a history proved
+                // before they read it (sprawling-SPEC.md 8-134).
+                proved: match &self.proof {
+                    Some(halt) if !halt.proved() => None,
+                    Some(_) | None => self.head,
+                },
             },
             pursuits: self
                 .pursuits

@@ -44,7 +44,15 @@ impl<B: Fn() -> u64> Gauges<B> {
     /// on the next beat, because this beat's sample is written before the
     /// read is over.
     pub(crate) fn sample(&mut self, read: impl FnOnce() -> Sample) -> Sample {
-        self.health.read(read())
+        let started = (self.clock)();
+        let counted = read();
+        let sample = self.health.read(Sample {
+            view_backlog: (self.backlog)(),
+            read_nanos: u64::try_from(self.last_read.as_nanos()).unwrap_or(u64::MAX),
+            ..counted
+        });
+        self.last_read = (self.clock)().saturating_duration_since(started);
+        sample
     }
 }
 

@@ -12,8 +12,47 @@ use std::path::Path;
 /// The schedule and the watch table as they stand, one unreadable file
 /// leaving the other listed.
 pub(crate) fn automation_answer(city_root: &Path) -> wire::Answer {
-    let _ = city_root;
-    wire::Answer::Automation(Box::default())
+    let mut answer = wire::AutomationAnswer::default();
+    match city::Schedule::load(city_root) {
+        Ok(schedule) => answer.jobs = schedule.entries().iter().map(job_of).collect(),
+        Err(refused) => answer
+            .unreadable
+            .push(unread(city::SCHEDULE_FILE, &refused)),
+    }
+    match city::Watch::load(city_root) {
+        Ok(watch) => answer.sources = watch.sources().iter().map(source_of).collect(),
+        Err(refused) => answer.unreadable.push(unread(city::WATCH_FILE, &refused)),
+    }
+    wire::Answer::Automation(Box::new(answer))
+}
+
+/// The line a page shows for a file that did not read: its name and the
+/// refusal the next tick would give.
+fn unread(file: &str, refused: &kernel::AxError) -> String {
+    format!("{file}: {} ({})", refused.subject(), refused.recovery())
+}
+
+fn job_of(entry: &city::Entry) -> wire::ScheduledJob {
+    wire::ScheduledJob {
+        name: entry.name().to_owned(),
+        addr: entry.addr().clone(),
+        task: entry.task().to_owned(),
+        goal: entry.goal().to_owned(),
+        cadence: match entry.cadence() {
+            city::Cadence::EveryMinutes(minutes) => wire::Cadence::EveryMinutes { minutes },
+            city::Cadence::DailyAt(minute) => wire::Cadence::DailyAt { minute },
+            city::Cadence::WeeklyAt(minute) => wire::Cadence::WeeklyAt { minute },
+        },
+    }
+}
+
+fn source_of(source: &city::Source) -> wire::WatchedSource {
+    wire::WatchedSource {
+        name: source.name().to_owned(),
+        matches: source.matches().to_owned(),
+        addr: source.addr().clone(),
+        starts_work: source.starts_work(),
+    }
 }
 
 #[cfg(test)]
