@@ -300,37 +300,46 @@ fn an_answer_on_the_city_run_is_context_outside_a_run_selection() {
     );
 }
 
-/// The example `a_selection_reaches_lines` in
-/// `crates/accounting/spec/Playback/Select.lean`, run through the
-/// production export: from seq 1, in building 0, cut off at seq 3.
 #[test]
-fn the_selection_agrees_with_the_model_example() {
+fn a_merge_names_its_landed_commit_beside_the_checkpoints() {
     let dir = tempfile::tempdir().unwrap();
+    let (checkpoint, landed) = ("1".repeat(40), "2".repeat(40));
     let written = lines(vec![
         (RunId::CITY, None, EventKind::CityInitialized, json!({})),
         (run(1), Some("lab/a"), EventKind::RunStarted, json!({})),
-        (run(2), Some("yard/b"), EventKind::RunStarted, json!({})),
         (
             run(1),
             Some("lab/a"),
-            EventKind::ToolCalled,
-            json!({"tool": "read"}),
+            EventKind::CheckpointCommitted,
+            json!({"oid": checkpoint, "scope": ["lab"], "files": ["lab/a/notes.md"]}),
         ),
         (
             run(1),
             Some("lab/a"),
-            EventKind::ToolCalled,
-            json!({"tool": "read"}),
+            EventKind::PrOpened,
+            json!({"node": "1", "implementer": "lab/a", "branch": "lab-a", "commit": checkpoint}),
+        ),
+        (
+            run(1),
+            Some("lab/a"),
+            EventKind::PrMerged,
+            json!({
+                "node": "1", "implementer": "lab/a", "branch": "lab-a",
+                "reviewed_commit": checkpoint, "commit": landed, "verified_by": "lab/b",
+            }),
         ),
     ]);
     write(dir.path(), &written, b"");
-    let chosen = Request {
-        selection: Selection::new(Some(Seq::new(1)), None, None, Some(addr("lab"))).unwrap(),
-        cutoff: Cutoff::At(Seq::new(3)),
-        ..person()
-    };
-    let bundle = parsed(export(dir.path(), &chosen).unwrap().bytes());
-    assert_eq!(seqs(&bundle["events"]), ["1", "3"]);
+    let bundle = parsed(export(dir.path(), &person()).unwrap().bytes());
+    let run = run(1).to_string();
+    assert_eq!(
+        bundle["checkpoints"],
+        json!([
+            {"seq": "2", "run": run, "holds": {"committed": {
+                "oid": checkpoint, "scope": ["lab"], "files": ["lab/a/notes.md"]}}},
+            {"seq": "4", "run": run, "holds": {"merged": {"oid": landed}}},
+        ])
+    );
 }
 
 #[test]
@@ -358,4 +367,5 @@ fn a_contradictory_range_is_refused_and_an_empty_one_is_a_bundle() {
 
 mod checking;
 mod landing;
+mod model;
 mod page;
