@@ -42,7 +42,7 @@
 
 **书架文档由页面写入（`PutShelved`）尚未实现，规则已定**：页面写的书架文档只经 `library::install`（§8-28，上架唯一的门），作为单文档包安装；写进已安装的包时生成新版本——暂存后整体替换（§8-27），不在原地改；每次写入在账本记一行新事件 `shelved_document_written`（kernel 事件表）。wire 的 `PutShelved` 分支此刻仍答 `not_built`，客户端没有控件。
 
-**升级后的模板过期检查尚未实现，规则已定**：`init` 布置的城文件（`City.md` 与 `docs/templates/` 下的模板）带上布置时所用模板的标记（模板内容哈希）；新二进制打开旧城的路径上挂一个检查，标记与二进制所带模板不符即如实说出哪份文件过期，并给出更新命令。标记与检查的挂点都还没有代码。
+**升级后的模板过期检查尚未实现，规则已定**：`init` 布置的城文件（`crates/city/templates/` 下的模板，`City.md` 在内）带上布置时所用模板的标记（模板内容哈希）；新二进制打开旧城的路径上挂一个检查，标记与二进制所带模板不符即如实说出哪份文件过期，并给出更新命令。标记与检查的挂点都还没有代码。
 
 ## 4 现状分析
 
@@ -50,7 +50,7 @@
 
 ## 5 权威信源
 
-「空间、身份、历史」的语义（Resident 是身份、活跃 Run 才是开销；一个地址决定三件事）；`docs/templates/URBANITE.md`（这份文件长什么样）；`architecture.toml` 里 city 那些条目。
+「空间、身份、历史」的语义（Resident 是身份、活跃 Run 才是开销；一个地址决定三件事）；`crates/city/templates/URBANITE.md`（这份文件长什么样）；`architecture.toml` 里 city 那些条目。
 
 ## 6 命名统一
 
@@ -210,7 +210,7 @@ pub fn removed_payload(removed: &Removed) -> Result<Payload, AxError>;         /
 - **楼是顶层地址，房间不是楼**：`create` 拒多段地址（`lab/room1` 是 `lab` 里的一个房间）。嵌套楼会使「这个地址归谁管」多出一个答案，而 `Building::of` 取首段这件事被写域、配置与上报对象三处消费。
 - **reserved prefix 下建楼恒拒**：`.sprawling/` 是城自己的账与配置，它在一切写域之外；允许在它下面建楼，就是把一个写域开到账本上。判定用 `Address::is_reserved`，不在本模块重写前缀文法。
 - **二次出生恒拒**：已有 `RULES.toml` 即拒（同 `init` 拒第二次创世）。覆写会把一栋已在干活的楼的规则静默换掉，而那份规则可能写着 `confidential = true`。
-- **模板字节来自 `docs/templates/RULES.toml`（`include_str!`）**：人读的那份模板与城写出的那份必须是同一串字节，否则两份会各自漂。`Confidential` 与 `Minimal` 只差一行（`confidential` 的值），且该差异由 `policy::evaluate` 读回来断言——换行成功与否不靠阅读，靠测试。
+- **模板字节来自 `crates/city/templates/RULES.toml`（`include_str!`）**：人读的那份模板与城写出的那份必须是同一串字节，否则两份会各自漂。`Confidential` 与 `Minimal` 只差一行（`confidential` 的值），且该差异由 `policy::evaluate` 读回来断言——换行成功与否不靠阅读，靠测试。
 - **先落盘再产事件**：`building_created` 记的是已经发生的事。反过来的顺序会让历史声称一栋目录不存在的楼存在，而重放会把这个谎再说一遍。
 - **只写不读的 payload**：`created_payload` 只有写面，因为没有读它的投影——楼列表读盘（`city::buildings`）。读面随第一个真正需要它的投影落地，不提前建。
 - **占位符只有一个家**：`NAME_PLACEHOLDER` 住 `building::template`，`pub(crate)`；楼的规则与它的计划、备忘、交接读同一个占位符，两份拼法会让其中一份文件永远写着 `<building name>`。
@@ -322,7 +322,7 @@ pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError>;
 
 - **四文档三写一不写**：`lay_out` 写 Roadmap／Memo／Handoff；`RULES.toml` 归 `building::create`（它的含义归 `policy`）——同一份文件有两个写入者就是两个权威。
 - **已存在的文档恒不覆写**：一栋已在干活的楼的计划不得因为又跑了一次建楼而回到空白。
-- **模板的占位行不进新楼的 Roadmap**：`docs/templates/Roadmap.md` 里的两行 `Not started` 是给人看的例子；照抄进去，一栋新楼开局就有两件不存在的待办，而它们会进分母。实例化时删掉 Item 列为空的数据行，断言是「新楼的分母是 0」。
+- **模板的占位行不进新楼的 Roadmap**：`crates/city/templates/Roadmap.md` 里的两行 `Not started` 是给人看的例子；照抄进去，一栋新楼开局就有两件不存在的待办，而它们会进分母。实例化时删掉 Item 列为空的数据行，断言是「新楼的分母是 0」。
 - **JOB.md 先落盘，再产 `run_started`**（模板第一行就这么写）；内容同时进 CAS，于是盘上那份是现场、CAS 那份是历史——Agent 改了 JOB.md 也不会使「当时派的是什么活」不可考。同一个房间再派一件活即覆写它（JOB.md 是本次会话的任务，不是档案）。**人那句话在表单里只出现一次**：标题只写 `# JOB.md`，任务正文只进 `<task>` 节——标题再插一遍，一段粘贴每次请求就多付一遍。
 - **机器只填它知道的段**：Task／Goal 两段有事实就写；Background／Delivery 无事实则不写——写一个 `(未知)` 占位，只是让模型每回合读一遍没信息的行。
 - **一次会话的 brief 只有两种，且由本次派活决定**：说得出 Goal 的就写 `JOB.md`（`RunBrief::Job`），说不出的就不写（`RunBrief::Principal`）。**依据选 Goal 而不选「盘上有没有 JOB.md」**：一个房间里上周留下的任务书仍在盘上，它可以被读，但不得冒充一次没人派任务的会话的 brief。Goal 是那份表单里唯一不可替代的一栏（什么时候停），它空着就等于告诉 Agent「停不停没定义」。
@@ -332,6 +332,21 @@ pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError>;
 - **「还没有」与「读不了」是两件事**：`roadmap` 仅对 `ErrorKind::NotFound` 答空串——一栋还没铺计划的楼确实没有计划；其余任何理由一律以 `E_STORAGE_FATAL` 上报并带上路径。这与同 crate 的 `archive::index` 已有的契约同形（目录不在→`Ok(空)`，真失败→`Err`），不新立一种读法。
 - **交接表单的读法归本模块**：`handoff_sections` 把 `<overall>`、`<current-progress>`、`<context>`、`<next-step>` 四节各读成一段正文；一节缺席、或只剩模板的括号提示行，即 `None`。括号提示行的判断与 `is_blank_form` 共用 `blank::is_guidance` 一处，因为「这一行是不是模板自己的话」只能有一个答案。`<must-read>` 节不读：它是写给下一个 Agent 的散文而不是 Locator，装配层把整份文件入 CAS，作为 must-read 的一条。被否决的备选：在装配层按标签切字符串——那是模板格式的第二个读者，模板改一个标签它就静默读到空。
 - **规范类 must-read 由 `norms` 给路径，不给 Locator**：Locator 需要 CAS 或 git oid，而 city 不认识落盘物（拓扑上也依赖不到 storage）。本模块答「哪几份是规范」，装配层把它们入 CAS 变成 Locator。这也是 must-read 最大失败模式的解：不让模型凭记忆重抄规范清单。
+
+### 8-41 城写下的模板住在 city 自己的包里（`crates/city/templates/`、`city::CITY_TEMPLATE`，形状 6 数据面）
+
+```rust
+// city::spine_files
+pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   // 立城时写下的 City.md；accounting 的创世读它
+// 其余模板仍是本模块与 building::template 的私有常量，各自 include_str!("../templates/<文件>") 或 ("../../templates/<文件>")
+```
+
+- **一个目录装城写下的全部第一批字节**：`crates/city/templates/` 下是 `RULES.toml`、`RULES-hall.toml`、`Roadmap.md`、`Memo.md`、`Handoff.md`、`SPEC.md`、`JOB.md`、`MAYOR.md`、`CLERK.md`、`URBANITE.md`、`City.md`，以及说明每份文件谁写、谁读的 `README.md`。人读的那份与城写出的那份仍是同一串字节（§8-3、§8-5），只是这串字节现在住在把它编进去的包里。
+- **为什么在包里**：crates.io 上的 `.crate` 只装包目录里的文件，验证构建与 `cargo install` 都在解开的包里编译；`include_str!` 指向包外的 `docs/` 时，那里没有这些文件，city 编不出来（sprawling-SPEC 8-157）。`packaged` 门判这一条（xtask-SPEC §8-49）。
+- **`City.md` 由 city 交出，accounting 来读**：立城时写下 `City.md` 的是 `accounting::worker::genesis`，但这份文件的名字（`CITY_FILE`）与它同目录的模板都归本模块。accounting 的 `CITY_MD` 是 `city::CITY_TEMPLATE`，一份字节、一个家；accounting 不能 `include_str!` 别的包目录里的文件，那在包里同样落空。
+- **失败**：没有运行期失败。模板改名或挪走，`include_str!` 在编译期就红。
+
+**验收**：`cargo xtask gates packaged` 对 city 与 accounting 为绿；§8-3、§8-5、§8-15、§8-20 现有的模板测试照旧通过（它们读的是同一串字节）。
 
 ### 8-6 city::schedule（形状 1 判定＋形状 6 数据面）
 
@@ -466,7 +481,7 @@ pub fn building::all(city_root: &Path) -> Vec<Address>;                   // cit
 ```
 
 - **这栋楼里有言语，却没有地址簿**：`signal` 的 `to` 只说「the address you are speaking to」，越界拒词只报边界不报住户，于是地址靠猜；而装配层投递时 `.entry(room).or_insert_with(new_inbox)`，**猜错的一句话会当场开出一个没人读的信箱并回 `queued: true`**。本模块存在的第一个理由是让那次猜测消失。
-- **`docs/templates/URBANITE.md` 早就承诺了这件事**：模板原话是「other agents and the person read it to know what to expect from them and what to bring to them」。承诺写在模板里，兑现它的代码在本模块。
+- **`crates/city/templates/URBANITE.md` 早就承诺了这件事**：模板原话是「other agents and the person read it to know what to expect from them and what to bring to them」。承诺写在模板里，兑现它的代码在本模块。
 - **一行取自 `## Bring them`，取不到才退回第一段正文**：这一行要回答的是「我为什么找他」，而模板里正是那一节写「什么样的活属于这位住户」。退回规则跳过标题行与引文行——引文行是模板留给作者的说明，把它显示出来等于让全城住户共用一句自述。**这与 `library::first_line` 不是同一条规则**：书架条目取的是标题，住户名册取的是正文，两种文档、两条规则、两个家。
 - **准入判定复用 `Identity::load`，不自读文件**：「一个地址上有没有常住的人」已经有权威，第二次实现必然在某天与第一次分叉。空的 `URBANITE.md` 仍是 Resident（`bring` 为空串），沿用 §11 已记的口径：空描述是作者的选择，不是缺陷。
 - **空房间照列，不隐藏**：藏起来的话，模型会把「这里没人」读成「这个地址不存在」，而一间空房恰是可以请人搬进来、或派一件活过去的地方。
@@ -790,6 +805,16 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 
 **重开参数**：出现一个要在锁里读别的东西（例如同目录的另一份文件）的写者时，重议门交出的是字节还是 `Held` 加一个读的方法。
 
+### 12.18 模板与 `City.md` 住进 city 的包目录，不留在 `docs/`
+
+**决定**：`docs/templates/` 与 `docs/City.md` 整个搬进 `crates/city/templates/`（§8-41），git 记着改名；`City.md` 由 `city::CITY_TEMPLATE` 交给 accounting。
+
+**理由**：模板的字节是 city 的产品：`building::create`、`spine_files::lay_out`、`write_job` 与创世都按它们写盘，编译期 `include_str!` 它们。一个包要发布，它编译时读的每个文件都得在它自己的目录里（sprawling-SPEC 8-157），而 `docs/` 不属于任何包。放进 city 而不是 accounting，因为这些文件的名字、读法与「谁写哪一份」本来就在本模块。
+
+**被否**：①模板留在 `docs/templates/`，发布前由脚本复制进包——仓库里的包与发布出去的包不再是同一组文件，复制那一步要自己的检查；②在 city 里放一个指向 `docs/templates/` 的符号链接——Windows 上建符号链接要开发者模式或管理员权限，git 在那里默认把链接检出成一个写着路径的普通文件；③`City.md` 搬进 accounting——它的文件名与同族模板都在 city，搬过去就把一族文件拆进两个包。
+
+**重开参数**：模板要给 city 之外的读者在运行期按文件读（而不只是编译进二进制），那时它们的位置成为一个运行期的事实，要另议。
+
 ## 13 依赖选型
 
 workspace 内只依赖 `kernel`（拓扑硬约束）。dev 依赖 `tempfile`。外部依赖如下，均在 workspace 钉版（不新增版本权威）。
@@ -806,11 +831,11 @@ Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第�
 
 `PACKAGE_BYTES_LIMIT`（32 MiB，`library::install::precheck::walk`）：一件技能包文件字节的上限，理由见 §8-28。它是产品的界，不是按某一类机器调出来的数：包的字节要在内存里握两份，而技能的本分是文本和小脚本。
 
-`CONFIG_FILE`（三层同名，理由见 §8.5）；新楼的 `RULES.toml` 字节不写在代码里，而是 `include_str!("../../../docs/templates/RULES.toml")`——它的权威是那份模板，路径写错在编译期就会被堵住；`Confidential` 模板对该字串做一处行替换（`confidential = false` → `true`），替换是否真的生效由 `policy::evaluate` 读回来断言。
+`CONFIG_FILE`（三层同名，理由见 §8.5）；新楼的 `RULES.toml` 字节不写在代码里，而是 `include_str!("../../templates/RULES.toml")`——它的权威是那份模板，路径写错在编译期就会被堵住；`Confidential` 模板对该字串做一处行替换（`confidential = false` → `true`），替换是否真的生效由 `policy::evaluate` 读回来断言。
 
 ## 15 影响面
 
-改身份、规则、配置梯子或书架的公开面，波及 `crates/sprawling` 的装配层（派活、建楼、开房间、写会话）与视图；改 `docs/templates/` 下被 `include_str!` 的模板即改新楼与新城的第一批字节；加一件工具即 `ChatRequest.tools` 每回合多一条 disclosure 与一份 schema。
+改身份、规则、配置梯子或书架的公开面，波及 `crates/sprawling` 的装配层（派活、建楼、开房间、写会话）与视图；改 `crates/city/templates/` 下被 `include_str!` 的模板即改新楼与新城的第一批字节；加一件工具即 `ChatRequest.tools` 每回合多一条 disclosure 与一份 schema。
 
 ## 16 测试与约束
 
@@ -822,7 +847,7 @@ Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第�
 
 读界两条：`kernel::address::tests` 的三类读者矩阵（本楼读本楼、他楼读非机密楼、楼外读机密楼，外加机密楼读自己、规则读不出）逐格判出 `ReadVerdict`，且本楼的读从不调用规则闭包｜bin 侧 `a_run_in_another_building_reads_nothing_of_a_confidential_one`：普通楼里的 run 按路径 `read`、再不带路径 `search` 机密楼里的文件，假 provider 录下的每一份请求体里都没有那份文件的字节，且最后一份带着 `E_GATE_DENIED`。
 
-邻里名册六条：扫到的名册**不含我自己**且有人的与空的各自落在对的臂上｜`## Bring them` 在场时取它、缺席时退回第一段正文且跳过标题与引文｜同一座城扫两次字节相同（`read_dir` 序不得泄漏到答案里）｜`scope=city` 只交出楼名、不交出任何住户｜`.sprawling` 与 archive 目录都不是房间｜**模板仍然带着 `## Bring them` 这一节**（对 `docs/templates/URBANITE.md` 的 `include_str!` 断言；模板改名而代码不改，就是一份永远退回正文的名册）。
+邻里名册六条：扫到的名册**不含我自己**且有人的与空的各自落在对的臂上｜`## Bring them` 在场时取它、缺席时退回第一段正文且跳过标题与引文｜同一座城扫两次字节相同（`read_dir` 序不得泄漏到答案里）｜`scope=city` 只交出楼名、不交出任何住户｜`.sprawling` 与 archive 目录都不是房间｜**模板仍然带着 `## Bring them` 这一节**（对 `crates/city/templates/URBANITE.md` 的 `include_str!` 断言；模板改名而代码不改，就是一份永远退回正文的名册）。
 
 ## 17 模型体验
 
@@ -834,7 +859,7 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 
 ## 18 文档同步
 
-`ARCHITECTURE.md` 模块表的 city 各行｜`docs/glossary.md` 的 Resident、Neighbourhood 等词条｜`docs/templates/` 下被实例化的模板与本文 §8-3、§8-5 同期改。
+`ARCHITECTURE.md` 模块表的 city 各行｜`docs/glossary.md` 的 Resident、Neighbourhood 等词条｜`crates/city/templates/` 下被实例化的模板与本文 §8-3、§8-5 同期改。
 
 ### 8-20 City Hall：随城市立起的那栋楼，和住在里面的两个人
 
@@ -888,11 +913,11 @@ pub fn place_city(city_root: &Path) -> Result<(), AxError>;
 pub fn place_everywhere(city_root: &Path) -> Result<(), AxError>;
 
 // city::spine_files
-pub const SPEC_FILE: &str = "SPEC.md";   // 字节来自 docs/templates/SPEC.md（include_str!）
+pub const SPEC_FILE: &str = "SPEC.md";   // 字节来自 crates/city/templates/SPEC.md（include_str!）
 ```
 
 - **不对称本身就是这一条的全部内容**：`SPEC.md` 与这栋楼自己保留子树里的五份承诺进版本库；工作文档与对话记录一份都不进（§12.5 定规）——`Roadmap.md`、`Memo.md`、`Handoff.md`、`JOB.md`、`URBANITE.md`、`Archive/` 与各个房间。一栋楼向外承诺的东西必须在历史里，任何一次克隆都读得到；一次会话当时在想什么不是承诺，它留在运行中的机器上。
-- **`SPEC.md` 是十七节 crate SPEC 的压缩式，不是第二种形状**：`docs/templates/SPEC.md` 的十二节逐节对应 crate SPEC 的节次（需求／验收／假设／权威／命名／边界／接口／错误／依赖／硬编码／测试／决策），只是把「现状分析、工作流程、实现逻辑、影响面、模型体验、文档同步」这几节留给 crate 自己。它压缩，不另起。
+- **`SPEC.md` 是十七节 crate SPEC 的压缩式，不是第二种形状**：`crates/city/templates/SPEC.md` 的十二节逐节对应 crate SPEC 的节次（需求／验收／假设／权威／命名／边界／接口／错误／依赖／硬编码／测试／决策），只是把「现状分析、工作流程、实现逻辑、影响面、模型体验、文档同步」这几节留给 crate 自己。它压缩，不另起。
 - **`place` 只追加，从不重写**：被收编的目录往往已经有一份 `.gitignore`，里面写着这个项目自己的东西。整份覆盖会把它们冲掉，而那正是 adopt 承诺不会碰的字节。依据是逐行比对（去空白后相等即视为已有），因此重复 raise 不会把同一段追加两次。
 - **显式的反忽略**：`!SPEC.md` 与保留子树的放行行写进块里，而不是靠「没人忽略它们」这个默认。被收编的仓库可能已经忽略了 `*.md` 或一切点开头的目录；那时「这栋楼的承诺在历史里」就是假的，而没有人会发现。
 - **保留子树逐文件放行，不整棵放行**：块里先 `.sprawling/` 忽略任意深度的保留子树，再 `!/.sprawling/` 只把这栋楼自己的那一棵放回来，`/.sprawling/*` 把它清空，最后逐行放行五份承诺——`RULES.toml`、`CONFIG.toml`、`FILTERS.toml`、`DESKTOP.toml` 与 `skills/`。三个理由：①城自己的保留子树同名，账本、对象库与金库引用住在那里，一行 `!.sprawling/` 把它们一并放回版本控制的可见面；②那一行不带斜杠，因此对楼下每一个居民、每一个房间的保留子树同样生效，而那些是机器上的东西，不是这栋楼的承诺；③`CONFIG.toml` 正是 MCP 凭据的落点，它进历史的前提是 §8-4b 的逐值判定同时成立——两件事是同一次改动。
@@ -1225,7 +1250,7 @@ pub fn write_city_setting(city_root: &Path, setting: CitySetting) -> Result<(), 
 - **城一层：两个键各一臂。** `write_city_setting` 经 `config_layers::write` 那一个读改写入口改城自己的 `CONFIG.toml`：`KeepWarm` 写 `[cache] keep_warm`，`Effort` 写 `[model] effort`；同一文件里别的键原样留着，写出的字节先过 `ConfigLayer::parse` 才落盘。城一层不是 session 的记录处，所以这里写 `[model] effort` 不碰 `[model] name`。
 - 验收：`config_layers::city_layer` 的 `a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it`；楼规两道判定的组合在 accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing` 里经真实命令观察。
 
-## 模板的写法：格式标注的是「该多小心」（`docs/templates/`）
+## 模板的写法：格式标注的是「该多小心」（`crates/city/templates/`）
 
 **格式不是允许与否的门禁，是谨慎程度的标记**，而且不设门禁把它变红：想清楚了照样改。据此三类：
 

@@ -14,6 +14,8 @@
 
 评审楼的 worktree 按房间保留：`Site::place_tree` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（storage-SPEC 8-9），不再每轮全量检出、再整目录删除；`RunWorker::over` 拿到账本写者后解开上一个写者留下的全部 worktree 锁。树按楼的 scope 领、按同一个 scope 立检查点和献出（`workbench::tree_scope` 是这一个 scope 的唯一定义）：再领一棵留着的树只检出 scope（storage-SPEC 8-9），献出的 `Checkpoint::land` 只按 scope 暂存，于是合并进干线的提交只动 scope。第一次放置仍是全量检出：`Worktree::add` 总做一次全量检出，git2 0.21 没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `storage` 禁 `unsafe`。上限只称一次检出、不称留着的树之和，定在 storage-SPEC 8-9。树的放置与 MCP 缺表时的那次连接，连同 `lay_out_workbench`、`freeze_plan`，在驾驶这个 run 的 lane 里做（8-113）。
 
+不钉的构建里 `lean` 与 `zig` 两行的装法拼着空钉子（8-157）：`bin::doctor::table::toolchain` 的 `LEAN` 一行装 `elan toolchain install <钉子>`，`ZIG` 一行在 Windows 上装 `winget … --version <钉子>`，钉子为空时两条命令各缺一个参数。候选的答法是钉子为空时 `lean` 装 `stable`、`zig` 去掉 `--version` 与它的值；未定的是不钉的构建该不该在 develop 层列这两行：从 crates.io 装这个二进制的人多半不开发这份代码，而 `Need` 不按构建来源分（8-58）。判定它的证据是一次从 `.crate` 构建出的二进制在 Windows 上按页面的「安装」跑这两行。
+
 ## 4 现状分析
 
 各节的「本节接口的当前状态」写该接口还没做完的部分，本节不另列。
@@ -167,10 +169,10 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 ```rust
 // bin::doctor::table::toolchain（形状 6 数据）
 pub(super) const ZIG: Requirement;   // develop 层，Required；探测 `zig version` 以钉子开头的一行
-const ZIG_PIN: &str = include_str!("../../../../desktop/ffi/zig-version").trim_ascii_end();
+const ZIG_PIN: &str = crate::doctor::pin::ZIG_VERSION;   // 构建脚本读到的 crates/desktop/ffi/zig-version，去掉行尾（8-157）
 ```
 
-- **钉子只在一处**：`ZIG_PIN` 是 `crates/desktop/ffi/zig-version` 的 `include_str!`，与 `LEAN_PIN` 读 `lean-toolchain` 同一种写法（8-58）；探测是 `zig version` 的输出以钉子开头，Windows 的装法是 `winget install --id zig.zig -e --version <钉子> --scope user`，macOS 是 `brew install zig`，Linux 印出官方下载页。构建脚本与 CI 的安装步骤读同一个文件。
+- **钉子只在一处**：`ZIG_PIN` 是构建脚本从 `crates/desktop/ffi/zig-version` 读进来的那一行，与 `LEAN_PIN` 读 `lean-toolchain` 同一种写法（8-58、8-157）；探测是 `zig version` 的输出以钉子开头，Windows 的装法是 `winget install --id zig.zig -e --version <钉子> --scope user`，macOS 是 `brew install zig`，Linux 印出官方下载页。构建脚本与 CI 的安装步骤读同一个文件。
 - **`Required` 而不是 `Optional`**：Windows 上没有它，`just check` 编不出这个二进制；在别的平台上 Zig 叶子不编，有它也不多花什么，而 `Need` 不按平台分（8-58），两害取其轻是把它列为必需。
 - **位置**：表里 `lean` 之后、`uv` 之前：它与 Rust、Lean 同属编译这份代码要的工具，装法不依赖表里更早的任何一行。
 
@@ -1096,7 +1098,7 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 ## 8.5 两个设计
 
-**A（选中）**：`build.rs` 把 `just build-web` 留在工作区 `target/web-dist`（`BUNDLE_DIR`，8-83）的客户端包压缩进 OUT_DIR，再由 `include_bytes!` 嵌入——嵌入只有一处。**B（落选）**：`include_bytes!` 直指源码树里的一个目录——少一步拷贝，但把「产物在哪」写死进源码路径，换产物就要改代码，且没有 `rerun-if-changed` 的粒度。
+**A（选中）**：`build.rs` 把 `just build-web` 留在本包 `web-dist`（`BUNDLE_DIR`，8-83）的客户端包压缩进 OUT_DIR，再由 `include_bytes!` 嵌入——嵌入只有一处。**B（落选）**：`include_bytes!` 直指源码树里的一个目录——少一步拷贝，但把「产物在哪」写死进源码路径，换产物就要改代码，且没有 `rerun-if-changed` 的粒度。
 
 ## 9 工作流程
 
@@ -1128,6 +1130,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 **一条命令的戳从驱动最近的读数渲染，不给工具面一个钟**（8-125，runtime D8）。`drive_run` 把它交给驱动的 `now` 包一层，每个读数先记进这一跑的 `ClockReading`；`Sieving` 打包时读最新的那个。回合在调用工具面的 `account` 之前读答复时刻，所以最新的那个就是这条命令的答复时刻，戳上的秒数等于它 `tool_result` 的 `t`；一跑仍只有一个采样点，计数时钟下的剧本字节不变。**被否掉的**：`Sieving` 打包时自己读 `hands.clock`——一跑多了一个采样点，戳与它 `tool_result` 的 `t` 可以差一秒；把戳挪进回合的 `account`——那是 runtime 的 `turn` 的事，不是装配层的，而读数的位置已经给出同一个秒数。
 
 **Lean 是开发这份代码必需的工具**（§8-58）。各 crate 的规格正从 `<crate>-SPEC.md` 迁成 `Spec.lean`（ARCHITECTURE.md §11「Specifications in Lean」），`just check` 里的 `models` 一步是这些规格在本地被证明过的唯一证据。Lean 列为可选时，没装 Lean 的机器上 `models` 静默通过，本地的绿就不再说明规格被证明过，只有 CI 知道。所以 `elan` 与 `lean` 两行是 `required`：缺了它们，`just prereqs` 在编译之前报出来并给出装法，`just models` 自己也报错而不是跳过。被否决的备选：保持可选、只靠 CI 的 `models` job 证明——那样每次本地验证都得另外说明「规格没有证过」，而这句话没有哪道门会替人说。
+
+**包体与模板进拥有它们的包，不在发布时组装**（8-83、8-157）。crates.io 上的 `.crate` 只是一个包目录，所以一个构建要读的每一个文件都放进拥有它的那个包：客户端包落在 `crates/sprawling/web-dist`，城写下的模板与 `City.md` 落在 `crates/city/templates/`，构建脚本按 cargo 找锁的规则找 `Cargo.lock`，开发工具链的钉子在包外，找不到就降为不钉。理由：发布的包与仓库里的包是同一份清单、同一组文件，验证构建就是工作区里那次构建换一个目录，`packaged` 门在每一次 `just check` 里就判出包外的引用，不必等到发布。**被否**：①发布时由 xtask 在临时目录里组装一份改过的包，把包体、模板与钉子复制进去（与 `xtask channel` 组装 npm 包同一种做法）——发布出去的清单与源码对不上，`.cargo_vcs_info.json` 指向的提交编不出那份包，而组装器本身要一套自己的测试；②把各 crate 折成一个 crate 再发布——拆掉 ARCHITECTURE 的 crate 拓扑与每个 `pub(crate)` 边界。**重开参数**：一个要发布的文件不能放进任何一个包（例如两个包都要读的一大份数据），那时由一个包交出常量，另一个包读它，`City.md` 交给 accounting 就是这样做的。
 
 **Zig 是在 Windows 上开发这份代码必需的工具**（8-146）。桌面 server 没有准入安全接口的四组 Win32 调用经一片 Zig 叶子（`crates/desktop/Spec.lean` D12），叶子在构建时编译，所以 Windows 上没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `crates/desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
 
@@ -1172,7 +1176,7 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 ## 14 硬编码声明
 
-客户端包的位置 `target/web-dist`，相对工作区根，由 `build.rs` 的 `BUNDLE_DIR` 一处声明（§8-83）。
+客户端包的位置 `web-dist`，相对本包目录，由 `build.rs` 的 `BUNDLE_DIR` 一处声明（§8-83）。三份工具链钉子文件的位置（`rust-toolchain.toml`、`lean-toolchain`、`crates/desktop/ffi/zig-version`，相对检出的根）由 `build.rs` 的 `PINS` 一处声明（§8-157）。
 
 `bin::install` 引入四处，全部是外部世界的事实而非我们的选择，故各自注明出处：`%LOCALAPPDATA%\Programs\<app>` 是 Windows 用户级程序目录的约定；`~/.local` 下的 `bin` 是 XDG 用户级可执行目录的约定；`HKCU\Environment` 是用户级环境变量在注册表里的位置；`WM_SETTINGCHANGE=0x1A`／`HWND_BROADCAST=0xffff`／`SMTO_ABORTIFHUNG=2` 是 Win32 的常量值。这四处一旦被平台改掉，改点各只有一个。
 
@@ -3164,7 +3168,7 @@ pub(super) fn installed_at(program: &str, start_menu: &str) -> Option<PathBuf>;
 ```rust
 // bin::doctor::table::toolchain（形状 6 data）
 pub(super) const DEVELOP: [Requirement; N];   // Develop 档的全部行，按安装先后排列
-const LEAN_PIN: &str;                         // include_str!("lean-toolchain")，去掉行尾
+const LEAN_PIN: &str;                         // doctor::pin::LEAN_TOOLCHAIN：构建脚本读到的 lean-toolchain，去掉行尾
 // bin::doctor（Detection 多一支）
 Detection::Listed { program, args, line }     // 程序在，且它按 args 列出的某一行以 line 开头才算在
 // bin::doctor::table
@@ -3174,7 +3178,7 @@ pub(crate) fn prereqs() -> String;            // Develop 档渲染成 prereqs.ts
 - **表是权威，`just prereqs` 读它的渲染**：`crates/sprawling/src/doctor/table/prereqs.tsv` 每行 `class<TAB>name<TAB>program<TAB>windows<TAB>macos<TAB>linux<TAB>purpose`，由 `table::prereqs()` 从 Develop 档渲染；测试 `the_prereqs_file_is_the_develop_tier_rendered` 要求文件逐字等于渲染结果，不等时把应有的全文印出来。`just prereqs` 在编译之前跑，只能读文件而不能问二进制，所以读的是这份渲染而不是另一张清单；`command -v <program>` 是它的探测，`program` 为 `-` 的行（浏览器家族）归 doctor 与 render 门自己去找。被否决的备选：justfile 当权威、doctor 在编译期读它——justfile 不写三平台的装法，doctor 就得再拼一遍。
 - **`class` 就是 `Need`**：`required` 是 `just check` 离了它跑不起来的（git、bash、rustup、rust、rustfmt、clippy、just、cargo-nextest、bun、render 用的浏览器、elan、lean、zig），`optional` 是 `just check` 缺了会跳过、或只由人主动跑的 recipe 调用的（cargo-deny、uv、python，以及 cargo-mutants、cargo-fuzz、cargo-public-api、kani）。elan 与 lean 为什么必需，见 §12「Lean 是开发这份代码必需的工具」。
 - **行序就是安装顺序**：后一行的装法用到前一行装出的程序——rustup 之后才有 `rustup component add` 与 `cargo install`，elan 之后才有 `elan toolchain install`，uv 之后才有 `uv python install`。页面的「全部安装」按表序逐项跑，所以顺序写在表里而不是写在页面上。
-- **Lean 的版本只写在 `lean-toolchain`**：`LEAN_PIN` 是那个文件的 `include_str!`（`str::trim_ascii_end` 在 const 里去掉换行），装法是 `elan toolchain install <pin>`，探测是 `elan toolchain list` 里有以 pin 开头的一行。换 Lean 版本只改那一个文件。
+- **Lean 的版本只写在 `lean-toolchain`**：`LEAN_PIN` 是构建脚本读进来的那个文件（`str::trim_ascii_end` 在 const 里去掉换行，8-157），装法是 `elan toolchain install <pin>`，探测是 `elan toolchain list` 里有以 pin 开头的一行。换 Lean 版本只改那一个文件。
 - **Windows 上能用 winget 的都用 winget，且按用户装**：Git、just、bun、uv、ffmpeg 的 winget 清单都有用户级安装程序，配方带 `--scope user`，于是装的时候不弹 UAC——§8-40「恒不提权」在 winget 上就是这个参数。rustup 的清单没有 scope 字段，而 rustup-init 本来就只写这个人的 profile，所以不带（带了 winget 答「找不到适用的安装程序」）；Chrome 的清单只有机器级安装程序，而每台 Windows 都有 Edge，Chromium 一族在 Windows 上由 Edge 答上，Chrome 那条配方很少被走到。
 - **elan 在 Windows 上由城跑它的官方安装脚本**：winget 上没有 elan，官方装法是 `elan-init.ps1`。理由：一台新机器应当一次走完，而让人把一行 PowerShell 贴进终端正是走不完的那一步；这一条由人定下，是 §8-40「脚本只印不跑」在 Windows 的 elan 上的例外。配方是 `powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm <elan-init.ps1>))) -NoPrompt 1 -DefaultToolchain none"`：`-NoPrompt` 让它不问，`-DefaultToolchain none` 让 Lean 的版本仍只由 `lean` 一行按 `lean-toolchain` 装。它仍是 `Recipe::Command`，页面仍要人按一下才跑，所以「每一条会改动计算机的命令都先给人看过」这条不变；Linux 上的 `curl … | sh` 仍是 `Print`，例外只到 Windows 的 elan 为止。
 - **cargo 工具是一包，包里有哪些由仓库自己点名的地方决定**：`Requirement.pack == Some(Pack::RustTools)` 的行是 cargo-nextest、cargo-deny、cargo-mutants、cargo-fuzz、cargo-public-api、kani。测试 `the_rust_tools_pack_is_every_cargo_tool_this_repository_calls` 读 `justfile`、`.github/` 下的工作流、`tools/xtask/src/` 与 `docs/`，把其中调用的 cargo 子命令（`cargo <sub>` 里 `<sub>` 不是 cargo 自带的那些）与 install-action 的 `tool:` 行收成一个集合，要求它恰好等于这一包；多一个或少一个都点名。cargo-audit 与 cargo-llvm-cov 因此不在表里：仓库里没有任何 recipe、工作流或文档调用它们。线上每一项仍是自己的一行（`just prereqs` 与判定逐项读），页面把同一包的行画成一行，一个按钮按表序装完缺的那几项，每一项一份日志。
@@ -3594,16 +3598,55 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 
 - 验收：`accounting::worker::freezing::tests::lineage` 的 `a_branch_first_request_carries_the_bytes_of_the_mothers_last`：一座真城、一个记下每个请求体的假 provider；母 run 在 `lab/room1` 答一句，`OpenSession { carry: Nothing, from: 母 run 的最后一行 }` 之后同一间房再派一次活；分支第一个请求体去掉 `messages` 之外的每个键与母 run 最后一个请求体相同，`messages` 以母 run 的 `messages` 开头。
 
-### 8-83 客户端包落在工作区的 `target/web-dist`，与 cargo 的输出目录无关（`build.rs` 的 `BUNDLE_DIR`）
+### 8-83 客户端包落在 `sprawling` 包里的 `web-dist`，与 cargo 的输出目录无关（`build.rs` 的 `BUNDLE_DIR`）
 
-**原因**：「客户端包在哪」有三个读者、两种答法。`client/vite.config.ts` 把包写进工作区的 `target/web-dist`；`xtask::bundle::dist` 在工作区的 `target/` 下找它；`build.rs` 却在 `CARGO_TARGET_DIR` 下找。三者只在没有设这个变量时一致。设了之后，`just build-web` 写出的真包没人嵌入，二进制带着占位页通过构建，只留一条 cargo warning。
+**原因**：「客户端包在哪」有三个读者：`client/vite.config.ts` 写它，`build.rs` 嵌入它，`xtask::bundle::dist` 交给 `render`、`budget` 与 `shots` 去开。三者各自推导位置时，只要一个跟着 `CARGO_TARGET_DIR` 走、另一个不跟，`just build-web` 写出的真包就没人嵌入，二进制带着占位页通过构建，只留一条 cargo warning。而 crates.io 上的 `.crate` 只装这个包目录里的文件，包体在工作区的 `target/` 下时，从 crates.io 构建的每一份二进制都只有占位页（8-157）。
 
-- **权威是 `build.rs` 的 `const BUNDLE_DIR: &str = "target/web-dist"`，值是相对工作区根、以 `/` 分段的整条路径**，不再只是目录名。父目录 `target` 以前在三处各写一次（vite 的 `../../target`、`xtask` 的 `root.join("target")`、`build.rs` 的 `CARGO_TARGET_DIR` 分支），名字只有一个家而位置有三个；把整条路径放进一个常量，位置才只有一个家。`xtask::bundle` 用 `syn` 读这个常量（xtask-SPEC §8-18），`artifact` 门要求 `client/vite.config.ts` 与 `justfile` 拼出同一条路径。
+- **权威是 `build.rs` 的 `const BUNDLE_DIR: &str = "web-dist"`，值是相对本包目录、以 `/` 分段的路径。** `build.rs` 按 `CARGO_MANIFEST_DIR` 接上它，在检出里、在 `target/package/` 的验证目录里、在 registry 解开的包里都指向同一个相对位置。`xtask::bundle` 用 `syn` 读这个常量，再接上 `build.rs` 所在的目录，得出仓库相对的整条路径 `crates/sprawling/web-dist`（xtask-SPEC §8-18）；`artifact` 门要求 `client/vite.config.ts` 与 `justfile` 拼出这条路径。
 - **`build.rs` 不读 `CARGO_TARGET_DIR`。** 客户端包是 bun 的产物，不是 cargo 的产物；它的位置由写它的那一步决定，与 cargo 把编译产物放在哪无关。
-- **生成的 `client_embed.rs` 多一个常量 `CLIENT_BUNDLE_DIR`**，值取自 `BUNDLE_DIR`。`serve` 在只有占位页时提示 `--web-dir <路径>`，路径读这个常量，不再手写一份。
-- **被否决的备选**：让 vite 读 `CARGO_TARGET_DIR`，由 justfile 注入。那样每个读者都要复刻 cargo 解析目标目录的规则：环境变量、`.cargo/config.toml` 的 `build.target-dir`、相对路径按当前目录解析。这条规则会在 TypeScript、`build.rs`、`xtask` 里各有一份，而 `build.rs` 原先那份已经与 cargo 不同（它按工作区根解析相对值，也不读 `build.target-dir`）。重开条件：客户端包改由 cargo 自己构建（例如 wasm 客户端在 `build.rs` 里编译），那时它才真是 cargo 的产物。
+- **`.gitignore` 挡着它，清单的 `include` 把它收进包。** 有 `include` 时 cargo 按这张表遍历包目录，不再问 git，所以被忽略的 `web-dist/` 照样进 `.crate`；没有 `include` 时 cargo 跳过 git 忽略的文件，包体进不了包。
+- **生成的 `client_embed.rs` 带常量 `CLIENT_BUNDLE_DIR`**，值取自 `BUNDLE_DIR`。`serve` 在只有占位页时提示 `--web-dir`，说这个目录在 `sprawling` 包里叫什么，不再手写一份。
+- **被否决的备选**：让 vite 读 `CARGO_TARGET_DIR`，由 justfile 注入。那样每个读者都要复刻 cargo 解析目标目录的规则：环境变量、`.cargo/config.toml` 的 `build.target-dir`、相对路径按当前目录解析，而这条规则会在 TypeScript、`build.rs`、`xtask` 里各有一份。重开条件：客户端包改由 cargo 自己构建（例如 wasm 客户端在 `build.rs` 里编译），那时它才真是 cargo 的产物。
 
-**本章测试**：`main::tests::the_embedded_client_is_the_bundle_the_workspace_built`——工作区 `target/web-dist` 下有完整的包时，嵌入表的路径集合与盘上的文件集合相等，且 `CLIENT_COMPLETE` 为真；没有完整的包时，`CLIENT_COMPLETE` 为假。这条测试只在 `CARGO_TARGET_DIR` 指向工作区以外时才能区分对错。
+**本章测试**：`main::tests::the_embedded_client_is_the_bundle_the_workspace_built`——本包 `web-dist` 下有完整的包时，嵌入表的路径集合与盘上的文件集合相等，且 `CLIENT_COMPLETE` 为真；没有完整的包时，`CLIENT_COMPLETE` 为假。这条测试只在 `CARGO_TARGET_DIR` 指向工作区以外时才能区分对错。
+
+### 8-157 从 crates.io 构建的二进制与发行归档是同一个东西（`build.rs`、`bin::doctor::pin`、各包清单）
+
+**原因**：发行渠道有三条：GitHub 的归档、npm 包、crates.io。前两条装的是 `release.yml` 编出的同一份二进制；第三条在装的人自己的机器上从 `.crate` 编译。这棵树原先打不出能用的包：`build.rs` 从包目录往上数两级去找 `Cargo.lock` 与包体，在验证目录与 registry 里都落空，一个让构建失败、一个只嵌入占位页；city、accounting 与本包的 `include_str!` 指向包目录之外的 `docs/` 与工具链文件，编译失败；`sandbox` 不是默认 feature，装出来的二进制拒绝每一次 exec。
+
+```rust
+// build.rs
+const BUNDLE_DIR: &str = "web-dist";                           // 8-83
+/// 从本包目录起往上，第一个含 `Cargo.lock` 的目录：检出里是工作区根，打出来的包里是包自己。
+fn checkout_root(manifest: &Path) -> Result<PathBuf, String>;
+/// 开发这份代码所钉的三份文件，相对检出的根；常量名是 OUT_DIR/pins.rs 里的名字。
+const PINS: [(&str, &str); 3] = [
+    ("RUST_TOOLCHAIN_FILE", "rust-toolchain.toml"),
+    ("LEAN_TOOLCHAIN_FILE", "lean-toolchain"),
+    ("ZIG_VERSION_FILE", "crates/desktop/ffi/zig-version"),
+];
+// OUT_DIR/pins.rs（build.rs 写，bin::doctor::pin 用 include! 读）
+pub(crate) const RUST_TOOLCHAIN_FILE: &str;   // 那份文件的全文；构建没找到它时为空串
+pub(crate) const LEAN_TOOLCHAIN_FILE: &str;
+pub(crate) const ZIG_VERSION_FILE: &str;
+// bin::doctor::pin
+pub(crate) const LEAN_TOOLCHAIN: &str;        // LEAN_TOOLCHAIN_FILE 去掉行尾
+pub(crate) const ZIG_VERSION: &str;           // ZIG_VERSION_FILE 去掉行尾
+pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，与 Pin::Unpinned 同答
+```
+
+- **锁按 cargo 的规则找。** cargo 把 `Cargo.lock` 写在工作区根，`cargo package` 把它放进包的根（cargo-package 文档：「Cargo.lock is always included」）。所以「往上第一个含 `Cargo.lock` 的目录」在检出里是工作区根，在 `target/package/sprawling-<版本>/` 与 registry 解开的目录里是包自己，用不着按层数往上数。整条链上都没有锁时 `build.rs` 以 `cargo::error` 失败，与此前读不到锁时一样：没有锁的构建说不出自己由哪些包组成。
+- **包体进包**：见 8-83。`.crate` 的上限是 10 MB（cargo 的 publishing 文档），包体压缩前约 1.5 MB。
+- **城写下的文档模板归 city。** `docs/templates/` 与 `docs/City.md` 搬进 `crates/city/templates/`：它们是城立城、建楼、开会话时写下的第一批字节，`city::spine_files` 与 `city::building` 按包内路径 `include_str!` 它们；accounting 立城时写的 `City.md` 读 `city::CITY_TEMPLATE`，不再自己伸手到 `docs/`（city-SPEC §8-41）。
+- **工具链钉子由构建脚本找，找不到就不钉。** `doctor` 的 develop 层报「钉住的版本」，读的是检出根上的 `rust-toolchain.toml`、`lean-toolchain` 与 `crates/desktop/ffi/zig-version`。这三份文件不在本包里，从包里构建时它们不存在，所以 `build.rs` 在 `checkout_root` 下找它们，把全文写进 `OUT_DIR/pins.rs`；只有「不存在」读成空串，别的读失败仍是 `cargo::error`。空串即不钉：`pinned` 答 `None`，页面不画钉住的版本，探测按空前缀接受任何一版。
+- **`packaged` 门守这条线**（xtask-SPEC §8-49）：可发布的包的生产代码里，`include!`、`include_str!`、`include_bytes!` 只指向包目录之内或 `OUT_DIR`。
+- **清单**：`[workspace.package]` 写 `repository`、`homepage`，`publish = true`；每个包写自己的 `description`，本包另写 `readme`、`keywords`、`categories` 与 `include`；`xtask` 与 `citysim` 写 `publish = false`。工作区自己的包在 `[workspace.dependencies]` 里各钉 `version = "=<工作区版本>"`，`guard` 判它们等于 `[workspace.package] version`（xtask-SPEC §8-49）。`sprawling-remote-access` 被二进制链接，随之可发布。`sprawling-desktop-ffi` 也可发布：`sprawling-desktop` 在 Windows 上依赖它，而 crates.io 要求依赖的每个包都在 registry 上；它的包里带着 Zig 叶子的源码与 `zig-version`，构建脚本只读包内的文件，所以从 crates.io 在 Windows 上装这个二进制要先装钉住的那一版 Zig（8-146），别的平台不编叶子。
+- **`sandbox` 是默认 feature。** `cargo install sprawling` 不写 `--features` 时也带执行引擎，与归档一致；不要引擎的构建写 `--no-default-features`，`just features` 编译这一份，因为别的命令都不再编它。
+- **发布次序**（人的发布步骤）：GitHub release 与 npm 都确认之后，先 `cargo publish --workspace --dry-run --locked`，再 `cargo publish --workspace --locked`；cargo 按依赖次序逐个发布，desktop 与它的叶子都是工作区成员，不再单独发。crates.io 的版本不能覆盖，而 `release.yml` 允许同一个 tag 重新发版，所以 crates.io 排在最后。
+
+**本节接口的当前状态**：从 crates.io 构建的二进制仍有三处与归档不同。`[profile.release]` 写在工作区清单里，`cargo package` 不把它带进包，`cargo install` 按 cargo 的默认 release profile 编（`opt-level = 3`，不做 fat LTO，不剥符号）；`SPRAWLING_RELEASE_TAG` 只有 `release.yml` 设，`status` 如实自称 built from source（`main::version`）；工具链钉子不在包里时，develop 层的 `lean` 与 `zig` 两行的装法仍拼着空钉子（`elan toolchain install` 后面是空参数，Windows 的 `winget … --version` 后面是空参数），改法是钉子为空时 `lean` 装 `stable`、`zig` 去掉 `--version` 那两个参数，落在 `bin::doctor::table::toolchain` 的两行上（§3）。
+
+**本章测试**：`doctor::pin::tests` 读出的钉子与检出里的文件相等，空文件读成不钉；`cargo package -p sprawling --list --allow-dirty` 的列表里有 `web-dist/index.html` 与 `Cargo.lock`；`cargo xtask gates packaged guard` 为绿；`cargo publish --workspace --dry-run --locked` 走完打包与验证构建。
 
 ### 8-84 记账线程的循环是一个有名字的函数，两件仪表直接驱动它（`accounting::worker::attend::attend`、`accounting::worker::driving::tests::instruments`）
 
@@ -5217,7 +5260,7 @@ pub(crate) enum Pack { RustTools }                         // §8-58：同一包
 pub(crate) enum Pin { Unpinned, RustToolchain, LeanToolchain }
 pub(crate) enum Upstream { Crate(&'static str), GitHub(&'static str), RustChannel, PythonOrg,
                            Unread(wire::DoctorUnread) }
-// bin::doctor::pin：钉子读自仓库里的那一份文件，编译时 include_str!
+// bin::doctor::pin：钉子读自仓库里的那一份文件，由构建脚本在编译时读进 OUT_DIR；构建没找到那份文件时，钉子降为不钉（8-157）
 pub(crate) fn pinned(pin: Pin) -> Option<String>;
 // bin::doctor::upstream：一项的上游最新版本，出网
 pub(crate) fn newest(item: &str) -> wire::DoctorUpstream;   // 不失败、不等：没读过的项起一条线程去读，先答 Asking
@@ -5231,7 +5274,7 @@ pub(crate) fn newest(item: &str) -> wire::DoctorUpstream;   // 不失败、不�
 - **比较在页面**：`installed < newest` 时那一行标「有更新」。比较按点分数字逐段比，读不出数字的一方不比。
 - **打开依赖组即探一次**：页面每次打开这一组发一次 `DoctorRefresh`（§8-54 的同一条命令），不再等人先按「重新检查」；城里已有的答案先画出来，新的一份到了再换上。
 
-**测试**：`doctor::pin::tests` 读出的两个钉子与两份文件相等；`doctor::upstream::tests` 从固定的答案文本里读出版本（crates.io、通道清单、python.org、GitHub 各一份），以及每一行的 `Upstream` 与表对得上；`doctor::tests::the_rust_tools_pack_is_every_cargo_tool_this_repository_calls`。
+**测试**：`doctor::pin::tests` 读出的两个钉子与两份文件相等，空文件读成不钉；`doctor::upstream::tests` 从固定的答案文本里读出版本（crates.io、通道清单、python.org、GitHub 各一份），以及每一行的 `Upstream` 与表对得上；`doctor::tests::the_rust_tools_pack_is_every_cargo_tool_this_repository_calls`。
 
 ## 8-139 远程门进城：门的看守、远程监听与逐帧授权（`bin::outside`，形状：adapter；crates/remote_access/Spec.lean §8-10、§8-11，kernel-SPEC §8-81，wire-SPEC §8-65、§8-66）
 
