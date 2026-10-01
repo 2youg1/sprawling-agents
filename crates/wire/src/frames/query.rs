@@ -40,15 +40,10 @@ pub enum Query {
     ///
     /// [`Query::History`] carries no run, so a client watching four
     /// sessions divides one bounded slice between them and a session
-    /// that started before the tab did is not in it at all - which is
-    /// the whole of why opening yesterday's session showed a blank
-    /// page. [`Query::RunView`] does not close the gap: five fields say
-    /// whether a run exists and where it got to, not what happened in
-    /// it.
-    ///
-    /// Answered with [`HistoryAnswer`], because "a page of history"
-    /// already has a shape and a second one would be a second answer to
-    /// the same question.
+    /// that started before the tab did is not in it at all.
+    /// [`Query::RunView`] says whether a run exists and where it got to,
+    /// not what happened in it. Answered with [`HistoryAnswer`], because
+    /// "a page of history" already has a shape.
     RunHistory {
         run: RunId,
         before: Option<Seq>,
@@ -103,10 +98,8 @@ pub enum Query {
     /// **A separate frame from [`Query::Changes`], and that is the
     /// point.** `Changes` costs what the number of changed files costs
     /// and answers which files moved; this costs what one file costs
-    /// and answers what moved inside it. One frame answering both would
-    /// charge every "what changed here" with a whole batch of patches,
-    /// which is why `storage::changes` says a hunk has to be its own
-    /// request. This is that request.
+    /// and answers what moved inside it, the request of its own that
+    /// `storage::changes` says a hunk needs.
     ///
     /// One path per frame; there is no spelling that asks for all of
     /// them. A line the credential scan matched is not echoed: the
