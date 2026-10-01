@@ -14,6 +14,8 @@
 //! file it cannot read permits nothing. A second parser on this side
 //! would be a second authority, and one of two authorities eventually
 //! reads a file as meaning something the other does not.
+//!
+//! Specified by `crates/city/spec/Policy.lean` §8-26.
 
 use std::path::{Path, PathBuf};
 

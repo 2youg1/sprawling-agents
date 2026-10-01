@@ -12,7 +12,7 @@ use crate::config_layers::refuse::two_residents;
 
 /// A layer the parser refuses is refused on the ladder with its file
 /// named and the parser's own recovery kept: the dispatch path is told
-/// `/new` is the way out, as `sprawling check` is (city-SPEC 12.8 (a)).
+/// `/new` is the way out, as `sprawling check` is (city D8 (a)).
 #[test]
 fn a_layer_the_parser_refuses_keeps_the_parsers_recovery_on_the_ladder() {
     let dir = tempfile::tempdir().unwrap();

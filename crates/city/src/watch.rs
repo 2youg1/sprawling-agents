@@ -20,6 +20,8 @@
 //! is one line of business; when the line ends the building goes, and
 //! its subscriptions go with it rather than needing a second list
 //! somebody has to remember to prune.
+//!
+//! Specified by `crates/city/spec/Watch.lean` §8-7.
 
 use std::path::{Path, PathBuf};
 

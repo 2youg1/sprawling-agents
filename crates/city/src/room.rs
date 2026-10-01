@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which room a named session works in, and how a new one comes into
-//! being (city-SPEC.md section 8-13).
+//! being (`crates/city/spec/Room.lean` §8-13).
 //!
 //! A room is where one session keeps its files, which is what
 //! `ARCHITECTURE.md` section 6 says of `JOB.md`. This module opens a
@@ -106,7 +106,7 @@ pub fn open(city_root: &Path, building: &Address, name: &SessionName) -> Result<
             // What one session works on stays on this machine, and the
             // room says so itself: at the moment a building is raised
             // no room exists to be named, so the building's own file
-            // cannot state this rule (city-SPEC.md section 8-21).
+            // cannot state this rule (`crates/city/spec/Gitignore.lean` §8-21).
             Ok(()) => {
                 crate::gitignore::seal_room(&dir)?;
                 // The handoff is this room's: what one session leaves
@@ -136,7 +136,7 @@ pub fn open(city_root: &Path, building: &Address, name: &SessionName) -> Result<
 }
 
 /// Makes the room a dispatch is about to write in when nothing is there
-/// yet, sealed like one [`open`] made (city-SPEC.md 8-21).
+/// yet, sealed like one [`open`] made (`crates/city/spec/Gitignore.lean` §8-21).
 ///
 /// A directory that is already there is left as it is: either the city
 /// opened it and sealed it then, or it is one of the project's own, where

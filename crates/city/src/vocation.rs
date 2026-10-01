@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Whether the residents at an address build or plan (city-SPEC.md
-//! section 8-22).
+//! Whether the residents at an address build or plan (`crates/city/spec/Vocation.lean`
+//! §8-22).
 //!
 //! City Hall writes Markdown and plans; it does not build. That is what
 //! the tool set assembled for a run at `hall` leaves out — `exec`,

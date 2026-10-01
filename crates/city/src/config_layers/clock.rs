@@ -11,7 +11,7 @@
 //! result is `runtime::clock`'s. What this module owns is the one key a
 //! layer may write here. Time zones are not one of them: a stamp is
 //! written in UTC, so a `zones` key would be a setting nothing reads,
-//! and it is refused where the file is parsed (city-SPEC 12.7).
+//! and it is refused where the file is parsed (`crates/city/spec/ConfigLayers.lean` §8-31).
 
 use kernel::ClockStampGranularity;
 use serde::Deserialize;

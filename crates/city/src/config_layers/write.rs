@@ -14,6 +14,8 @@
 //! every other writer in this process while it is read, and the new
 //! content replaces it whole. Write paths that each read and truncate
 //! on their own could each drop what another had just saved.
+//!
+//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4b.
 
 use std::path::Path;
 
@@ -176,9 +178,9 @@ pub(super) enum Change<'a> {
     /// `SecondThreshold`'s one construction point: a raw percent is
     /// refused where it is parsed, never where it is written.
     SecondThreshold(SecondThreshold),
-    /// The identity version a session froze (city-SPEC.md 8-33).
+    /// The identity version a session froze (`crates/city/spec/Identity.lean` §8-33).
     Naming(B3Hash),
-    /// Whether this layer keeps a warm cache (city-SPEC.md 8-34).
+    /// Whether this layer keeps a warm cache (`crates/city/spec/Policy.lean` §8-34).
     KeepWarm(KeepWarm),
     /// How hard the runs under this layer think, stated for every
     /// session that does not choose. Only the city's own layer is written

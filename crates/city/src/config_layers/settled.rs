@@ -9,6 +9,8 @@
 //! answer with the rung kept beside the value, because a page that was
 //! told only the resolved setting cannot say whether it is looking at a
 //! room's own entry or at something the city states for every room.
+//!
+//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4.
 
 use std::path::Path;
 

@@ -10,6 +10,8 @@
 //! parser reads them back through `name`, so a template added to the
 //! enum is one the control surface can ask for and one the refusal
 //! lists, without a second table to keep in step.
+//!
+//! Specified by `crates/city/spec/Building.lean` §8-3 and §8-20.
 
 use kernel::{Address, AxCode, AxError};
 

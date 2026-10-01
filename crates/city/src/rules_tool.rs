@@ -10,9 +10,10 @@
 //! reserved subtree, and no write domain reaches there — which is not an
 //! oversight to work around but the rule itself: a run may not quietly
 //! widen what it is allowed to do. The declaration is `Effect::Govern`,
-//! and that effect is refused at the effect layer (city-SPEC section
-//! 8-2b): a run may not change what governs it, so every call comes
-//! back as a refusal and a person edits the file.
+//! and that effect is refused at the effect layer
+//! (`crates/city/spec/RulesTool.lean` §8-2b): a run may not change what
+//! governs it, so every call comes back as a refusal and a person edits
+//! the file.
 //!
 //! **Whole document, not a patch.** These rules are evaluated as one
 //! text — a confidential building may list no egress domains, so two
@@ -163,7 +164,7 @@ impl Tool for RulesTool {
     }
 
     /// This building's rules, read or rewritten, are what every call is
-    /// about (city-SPEC.md section 8-36).
+    /// about (`crates/city/spec/RulesTool.lean` §8-36).
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
         Op::read(call.args.as_map())?;
         Ok(GateSubject::Scope(

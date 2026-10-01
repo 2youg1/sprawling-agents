@@ -9,6 +9,8 @@
 //! what a holding is does not change when a shelf is read differently,
 //! and the address a page opens one by is the whole of the answer this
 //! module owns.
+//!
+//! Specified by `crates/city/spec/Library.lean` §8-8.
 
 use kernel::layout::CityLayout;
 use kernel::{Address, B3Hash};
@@ -183,7 +185,7 @@ pub struct Holding {
     /// The document's text, for a holding no run can open by an address:
     /// one on a shelf outside the city. The scan read these bytes to take
     /// the disclosure line and the hash, so the text a reading room hands
-    /// a run is the text `hash` names (city-SPEC.md section 12.9). `None`
+    /// a run is the text `hash` names (city D9). `None`
     /// for a holding on the city's own shelves, which a run opens where
     /// it sits.
     pub carried: Option<String>,

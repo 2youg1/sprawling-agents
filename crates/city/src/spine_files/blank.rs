@@ -11,6 +11,8 @@
 //! and which of a plan's rows are still placeholders. They are one
 //! subject - the shape of an unedited file - and they are the only
 //! readers of the placeholder spellings.
+//!
+//! Specified by `crates/city/spec/SpineFiles.lean` §8-5.
 
 /// Whether a handoff is still the form it was laid out as.
 ///

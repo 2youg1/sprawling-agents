@@ -21,6 +21,8 @@
 //! holds the task of the current session rather than a record of past
 //! ones — and the record of past ones is in the ledger, where a rewrite
 //! cannot reach it.
+//!
+//! Specified by `crates/city/spec/SpineFiles.lean` §8-5.
 
 use std::path::{Path, PathBuf};
 
@@ -58,7 +60,7 @@ pub const CITY_FILE: &str = "City.md";
 /// The bytes a new city's [`CITY_FILE`] starts as. Exported because the
 /// city is formed by `accounting`, which may not reach into this
 /// package's directory for them: a published copy of either package
-/// carries its own directory only (city-SPEC.md section 8-41).
+/// carries its own directory only (`crates/city/spec/SpineFiles.lean` §8-41).
 pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");
 /// The conventions a project brings with it. **The city neither writes
 /// this file nor owns it**; it is listed here because a resident is

@@ -5,7 +5,7 @@
 
 //! Installing one skill onto a shelf the city keeps itself: the static
 //! precheck, the atomic landing, and the content hash registered before
-//! it lands (city-SPEC.md section 8-28).
+//! it lands (`crates/city/spec/Library/Install.lean` §8-28).
 //!
 //! Four things happen behind [`install`], and nothing else does:
 //! - **A static precheck.** The package is read and judged by shape;
@@ -60,8 +60,8 @@ use precheck::{Item, Shape, inspect};
 /// These two always travel together - a skill is filed on one shelf,
 /// under one section - so they are one value rather than two parameters
 /// that can disagree. There is no third constructor: a shelf outside the
-/// city is another program's directory mounted read-only (city-SPEC.md
-/// section 8-8), so filing a skill on it cannot be asked for.
+/// city is another program's directory mounted read-only (`crates/city/spec/Library.lean`
+/// §8-8), so filing a skill on it cannot be asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Slot {
     shelf: OwnShelf,
@@ -123,7 +123,7 @@ pub enum Placed {
 /// The holding is the value a scan of the same shelf reads back, whole:
 /// it is read back off the shelf by the scan's own function, so the two
 /// cannot disagree. `hash` is what the store files the install under:
-/// the document's hash, or the whole package's (city-SPEC.md 8-28).
+/// the document's hash, or the whole package's (`crates/city/spec/Library/Install.lean` §8-28).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Installed {
     pub holding: Holding,

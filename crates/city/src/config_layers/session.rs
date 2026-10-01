@@ -26,6 +26,8 @@
 //! The write goes through `write::change`, the one write path into a
 //! `CONFIG.toml`: a second path would be a second answer to what "whole
 //! or not at all" means.
+//!
+//! Specified by `crates/city/spec/ConfigLayers.lean` §8-14.
 
 use std::path::Path;
 
@@ -75,7 +77,7 @@ pub fn write_session(
 }
 
 /// Records the identity version a session froze at its own address
-/// (city-SPEC.md 8-33).
+/// (`crates/city/spec/Identity.lean` §8-33).
 ///
 /// Written by the session's first run, beside the shape it froze, and
 /// taken out with that shape by [`forget`].
@@ -93,7 +95,7 @@ pub fn freeze_naming(city_root: &Path, addr: &Address, version: B3Hash) -> Resul
 /// the model and the effort are one choice, and forgetting one of them
 /// would leave a later run reading half a shape it cannot move. Only the
 /// keys this module wrote are removed, because the file is a person's as
-/// well as a session's (`city-SPEC.md` 8-14b).
+/// well as a session's (`crates/city/spec/Session.lean` §8-14b).
 ///
 /// # Errors
 /// Propagates a file that exists and cannot be read or parsed, and a

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What the city calls the person and the Mayor: the identity area at
-//! the top of `PREFERENCES.md` and `MAYOR.md` (city-SPEC.md 8-33).
+//! the top of `PREFERENCES.md` and `MAYOR.md` (`crates/city/spec/Identity.lean` §8-33).
 //!
 //! **One reader.** The page, a save, a dispatch and the prefix all take
 //! the area through [`split`], so they cannot disagree about what a name

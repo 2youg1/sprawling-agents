@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The rules a run has already read, kept while the file's stamp holds
-//! (city-SPEC 8-2, 12.3).
+//! (`crates/city/spec/Policy.lean` §8-2, 12.3).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

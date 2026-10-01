@@ -12,7 +12,7 @@
 //! This module owns how one layer states it, the rule that a layer
 //! names a model or a harness and never both, and the rule that a
 //! session which opened on a model keeps it until `/new`
-//! (city-SPEC 8-4, 12.6).
+//! (`crates/city/spec/ConfigLayers.lean` §8-4, city D6).
 
 use std::path::Path;
 
@@ -63,9 +63,10 @@ pub(super) fn one_resident(model: Option<&str>, harness: Option<&str>) -> Result
 ///
 /// `None` when no rung names one, and when the address's own file holds
 /// a session's `[model] name`: that session opened on a model and keeps
-/// it until `/new` forgets the record (city-SPEC 8-4, 12.6). The ladder
-/// is read first, so a rung that cannot be read is reported before the
-/// record is consulted, as [`super::load`] would report it.
+/// it until `/new` forgets the record (`crates/city/spec/ConfigLayers.lean`
+/// §8-4, city D6). The ladder is read first, so a rung that cannot be
+/// read is reported before the record is consulted, as [`super::load`]
+/// would report it.
 ///
 /// # Errors
 /// Refuses an address with no building, an unreadable file, and a file

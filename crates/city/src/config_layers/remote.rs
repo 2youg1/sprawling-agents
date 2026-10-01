@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The `[remote]` table: the route the city's own layer chooses for the
-//! remote door (city-SPEC.md 8-39).
+//! remote door (`crates/city/spec/ConfigLayers/Remote.lean` §8-39).
 //!
 //! The door opens onto the whole city, so only the city's own file may
 //! choose how the outside reaches it; a building or a room that writes
@@ -14,7 +14,7 @@
 //! What the table names is read here as written. Whether a tunnel name
 //! or an address is one a route can use is `remote_access`'s answer,
 //! and this crate sees only `kernel`, so the assembly judges those values
-//! when it builds the route at each `/remote open` (city-SPEC.md 12.16).
+//! when it builds the route at each `/remote open` (city D16).
 
 use std::path::Path;
 

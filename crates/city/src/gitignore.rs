@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a building promises is tracked; no working document and no
-//! conversation record ever is (city-SPEC.md sections 8-21 and 12.5).
+//! conversation record ever is (`crates/city/spec/Gitignore.lean` §8-21 and city D5).
 //!
 //! `SPEC.md` and the building's own reserved subtree go into history,
 //! because a reader who clones this repository a year from now needs
@@ -103,7 +103,7 @@ pub(crate) fn place(building_root: &Path) -> Result<(), AxError> {
 }
 
 /// Adds the city's reserved subtree to the city root's `.gitignore`,
-/// keeping every line that is already there (city-SPEC.md 8-21).
+/// keeping every line that is already there (`crates/city/spec/Gitignore.lean` §8-21).
 ///
 /// # Errors
 /// As [`append_missing`].
@@ -113,7 +113,7 @@ pub fn place_city(city_root: &Path) -> Result<(), AxError> {
 
 /// Every block this city keeps, placed again: the root's, then each
 /// building's. Called when the city's writer opens, so a rule added to
-/// the table reaches buildings raised before it (city-SPEC.md 8-21).
+/// the table reaches buildings raised before it (`crates/city/spec/Gitignore.lean` §8-21).
 ///
 /// # Errors
 /// As [`append_missing`], and a city whose buildings cannot be listed.

@@ -19,6 +19,8 @@
 //!
 //! What a new building starts with beyond its rules — the plan, the
 //! memo, the handoff — is `crate::spine_files`'s to lay out.
+//!
+//! Specified by `crates/city/spec/Building.lean` §8-3.
 
 use std::path::{Path, PathBuf};
 

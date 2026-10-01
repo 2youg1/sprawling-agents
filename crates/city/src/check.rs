@@ -5,7 +5,7 @@
 
 //! Every TOML file a city holds, read by the parser that reads it at run
 //! time, with the first refusal of each placed at a line and a column
-//! (city-SPEC.md §8-29).
+//! (`crates/city/spec/Check.lean` §8-29).
 //!
 //! The parser's verdict is the verdict. Only when it refuses is the file
 //! read a second time with the same shape, to take the span `toml`

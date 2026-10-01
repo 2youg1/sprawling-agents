@@ -23,6 +23,8 @@
 //! once, so a skill kept in the library and one kept by another program
 //! are one row, and which of them a run gets is the shelf order rather
 //! than a reader's preference.
+//!
+//! Specified by `crates/city/spec/Library.lean` §8-8.
 
 use std::collections::{BTreeMap, BTreeSet};
 

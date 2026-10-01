@@ -5,6 +5,8 @@
 
 //! The `[[mcp]]` table: the servers one layer reaches, each read into
 //! exactly one transport.
+//!
+//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4.
 
 use kernel::{AxError, McpServer, McpTransport, ServerLabel};
 use serde::Deserialize;

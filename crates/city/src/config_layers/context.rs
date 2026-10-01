@@ -11,13 +11,15 @@
 //! layer's `CONFIG.toml` spells that value, and the rule that an
 //! out-of-domain percent is refused where the file is parsed rather than
 //! read into a value nobody can diagnose.
+//!
+//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4.
 
 use serde::Deserialize;
 
 /// What one layer's `[context]` table states, read as written rather
 /// than as a parsed type: the domain is `SecondThreshold`'s answer, and
 /// a deserializer that enforced it here would be the second place that
-/// rule lives (the `McpSection` rule, city-SPEC 8-4).
+/// rule lives (the `McpSection` rule, `crates/city/spec/ConfigLayers.lean` §8-4).
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ContextSection {

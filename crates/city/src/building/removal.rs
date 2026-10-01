@@ -12,6 +12,8 @@
 //! still on disk and the building's history is still in the Ledger. A
 //! person brings it back by moving the directory to the city root and
 //! adopting it.
+//!
+//! Specified by `crates/city/spec/Building.lean` §8-3.
 
 use std::path::Path;
 

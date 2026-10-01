@@ -27,6 +27,8 @@
 //! permissive side. Splitting the prose into a second document would
 //! have fixed that and bought a worse thing — two descriptions of one
 //! building, free to disagree.
+//!
+//! Specified by `crates/city/spec/Policy.lean` §8-2.
 
 use std::path::{Path, PathBuf};
 
@@ -55,7 +57,7 @@ pub const RULES_FILE: &str = "RULES.toml";
 const SUPERSEDED_FILE: &str = "BUILDING.md";
 
 /// How many minutes a harness run takes at most in a building whose
-/// rules do not say (city-SPEC.md 12.8 (b)).
+/// rules do not say (city D8 (b)).
 const HARNESS_MINUTES_DEFAULT: u32 = 60;
 
 mod user_browser;
@@ -196,7 +198,7 @@ impl BuildingRules {
     /// the city cancels it and freezes it as limit (sprawling-SPEC.md
     /// 8-124). Absent the line, `HARNESS_MINUTES_DEFAULT`: a harness
     /// that neither speaks nor ends would otherwise hold a lane until a
-    /// person noticed (city-SPEC.md 12.8 (b)).
+    /// person noticed (city D8 (b)).
     #[must_use]
     pub fn harness_minutes(&self) -> u32 {
         self.harness_minutes

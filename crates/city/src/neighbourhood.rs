@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Who a run can reach, and who stands there (city-SPEC.md section
-//! 8-15).
+//! Who a run can reach, and who stands there (`crates/city/spec/Neighbourhood.lean` §8-15).
 //!
 //! This building has speech and had no address book. `signal` takes the
 //! address of whoever you are talking to, the refusal names the boundary

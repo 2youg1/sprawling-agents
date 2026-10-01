@@ -9,6 +9,8 @@
 //! rather than a flag: "every file here" and "the Markdown documents
 //! here" are two policies, and City Hall exists because the second one
 //! had to be sayable.
+//!
+//! Specified by `crates/city/spec/Policy.lean` §8-20.
 
 use kernel::{AxCode, AxError};
 

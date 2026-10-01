@@ -17,6 +17,8 @@
 //! `kernel::config`'s answers, not this module's; which layers there
 //! are and what each states is [`ladder`]'s. This module answers what
 //! one file says.
+//!
+//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4.
 
 use std::path::{Path, PathBuf};
 
@@ -87,10 +89,10 @@ pub struct ConfigLayer {
     keep_warm: Option<KeepWarm>,
     shelves: Option<Vec<String>>,
     /// The identity version a session froze at this address
-    /// (city-SPEC.md 8-33): read at the room's own layer only.
+    /// (`crates/city/spec/Identity.lean` §8-33): read at the room's own layer only.
     naming: Option<B3Hash>,
     /// The route the city's own layer chooses for the remote door
-    /// (city-SPEC.md 8-39); refused on every other rung.
+    /// (`crates/city/spec/ConfigLayers/Remote.lean` §8-39); refused on every other rung.
     remote: Option<RemoteRoute>,
 }
 
@@ -193,7 +195,7 @@ impl ConfigLayer {
         self.second_threshold
     }
 
-    /// How often this layer asks for the clock line (city-SPEC 8-31).
+    /// How often this layer asks for the clock line (`crates/city/spec/ConfigLayers.lean` §8-31).
     #[must_use]
     pub fn clock_stamp(&self) -> Option<ClockStampGranularity> {
         self.clock_stamp
@@ -260,7 +262,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
     Ok(kernel::config::freeze(
         &ladder.resolve(ConfigLayer::clock_stamp),
         // No layer states zones: a stamp is written in UTC, and the key
-        // is refused where it is written (city-SPEC 12.7).
+        // is refused where it is written (`crates/city/spec/ConfigLayers.lean` §8-31).
         &LayeredValue::default(),
         &ladder.resolve(ConfigLayer::effort),
         &ladder.resolve(|layer| layer.sandbox().cloned()),

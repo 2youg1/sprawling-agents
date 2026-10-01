@@ -5,6 +5,8 @@
 
 //! One refusal shape for every way a layer can fail to be read, so the
 //! recovery line is written once and cannot drift between callers.
+//!
+//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4.
 
 use std::path::Path;
 
@@ -52,11 +54,11 @@ pub(super) fn unreadable(text: &str, err: &toml::de::Error) -> AxError {
 pub(super) enum CityOnly {
     /// A shelf is mounted for every building at once, so a building or
     /// a room that names one would admit a directory nobody who keeps
-    /// this city chose (city-SPEC.md 8-8).
+    /// this city chose (`crates/city/spec/Library.lean` §8-8).
     Shelves,
     /// The remote door opens onto the whole city, so a building or a
     /// room that chose its route would decide for every other one how
-    /// the outside comes in (city-SPEC.md 8-39).
+    /// the outside comes in (`crates/city/spec/ConfigLayers/Remote.lean` §8-39).
     Remote,
 }
 

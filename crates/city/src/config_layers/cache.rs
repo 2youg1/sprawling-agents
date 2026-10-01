@@ -8,6 +8,8 @@
 //! The setting's spelling and what it plans are `kernel::keep_warm`'s to
 //! answer. What this module owns is how one layer's `CONFIG.toml` states
 //! it, and what an address settles on when no layer does.
+//!
+//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4.
 
 use std::path::Path;
 

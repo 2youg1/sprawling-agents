@@ -19,6 +19,8 @@
 //! Those need a calendar, a calendar needs an authority, and the city
 //! does not have one yet. Concern time zones are a rendering matter and
 //! live with the clock stamp.
+//!
+//! Specified by `crates/city/spec/Schedule.lean` §8-6.
 
 use std::path::{Path, PathBuf};
 

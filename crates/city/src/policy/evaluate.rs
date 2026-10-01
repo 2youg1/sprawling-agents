@@ -18,6 +18,8 @@
 //! There is no second document. The prefix carries this file's own
 //! bytes, so the prose a resident reads and the settings the city
 //! enforces cannot describe two different buildings.
+//!
+//! Specified by `crates/city/spec/Policy.lean` §8-2.
 
 use std::path::Path;
 
@@ -53,7 +55,7 @@ pub fn write_rules(city_root: &Path, addr: &Address, text: &str) -> Result<Build
 /// Replaces a building's rules with a page's whole text, evaluated first
 /// as [`write_rules`] does, and only if the file still holds `base`: the
 /// page is a second writer beside the Mayor's proposal, and a page left
-/// open while the Mayor wrote must not write over it (city-SPEC.md 8-34).
+/// open while the Mayor wrote must not write over it (`crates/city/spec/Policy.lean` §8-34).
 ///
 /// # Errors
 /// The evaluation's refusal, `E_VERSION_CONFLICT` for a file that is no
@@ -122,7 +124,7 @@ pub(crate) struct Written {
     #[serde(default)]
     reading_room: Vec<String>,
     /// How long a harness run here may take, in minutes; zero is
-    /// refused by the type (city-SPEC.md 12.8 (b)).
+    /// refused by the type (city D8 (b)).
     #[serde(default)]
     harness_minutes: Option<std::num::NonZeroU32>,
 }

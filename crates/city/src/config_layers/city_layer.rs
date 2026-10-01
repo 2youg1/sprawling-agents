@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The facts a person writes into the city's own layer from the settings
-//! page (city-SPEC.md 8-34).
+//! page (`crates/city/spec/Policy.lean` §8-34).
 //!
 //! The city's layer is the far end of the ladder: what it states holds
 //! wherever a building or a room states nothing. It is written through

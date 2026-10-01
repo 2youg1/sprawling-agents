@@ -19,6 +19,8 @@
 //!
 //! The index is a projection. Delete it and it rebuilds from the
 //! entries, which is why it may be stored as plainly as it is.
+//!
+//! Specified by `crates/city/spec/Archive.lean` §8-9.
 
 use std::path::{Path, PathBuf};
 

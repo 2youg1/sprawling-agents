@@ -10,7 +10,7 @@
 //! calls and the effort it thinks with into the room's own
 //! `CONFIG.toml`, and every later run in that room refuses to move them,
 //! because a provider caches a conversation's prefix only for as long as
-//! the shape of the calls behind it stays put (`city-SPEC.md` 8-14).
+//! the shape of the calls behind it stays put (`crates/city/spec/ConfigLayers.lean` §8-14).
 //! That refusal is right, and it needs a counterweight, or a person who
 //! changed the model could never dispatch into that room again. Starting
 //! a new session is that counterweight.
@@ -36,6 +36,8 @@
 //! own rule — no file, or a form still holding the template's guidance,
 //! is `None` — stays the only authority on that; this module only clears
 //! the slot.
+//!
+//! Specified by `crates/city/spec/Session.lean` §8-14b.
 
 use std::path::Path;
 

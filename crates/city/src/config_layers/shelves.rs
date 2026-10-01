@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The shelves this city mounts from elsewhere on this machine
-//! (`city-SPEC.md` section 8-8).
+//! (`crates/city/spec/Library.lean` §8-8).
 //!
 //! A shelf is a directory another program keeps its skills in, and the
 //! city reads it and never writes it. Which directories those are is

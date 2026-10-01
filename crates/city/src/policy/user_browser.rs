@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The address a person's own browser answers on.
+//!
+//! Specified by `crates/city/spec/Policy.lean` §8-2.
 
 use kernel::{AxCode, AxError};
 

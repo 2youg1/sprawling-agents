@@ -11,6 +11,8 @@
 //! The dossier is a projection, not a second file: what a resident has
 //! done is already in the ledger, and a stored summary beside it would be
 //! a second account of the same past.
+//!
+//! Specified by `crates/city/spec/Resident.lean` §8-1.
 
 use std::path::{Path, PathBuf};
 
@@ -98,7 +100,7 @@ fn described(addr: &Address, written: Vec<u8>) -> Vec<u8> {
         return written;
     };
     // The identity area is not who the seat is: the name it holds opens
-    // the resident slot on its own line (city-SPEC.md 8-33), and one
+    // the resident slot on its own line (`crates/city/spec/Identity.lean` §8-33), and one
     // name said twice in one request is two answers to one question.
     let mut out = crate::identity::persona(written);
     if !out.is_empty() && !out.ends_with(b"\n") {

@@ -9,6 +9,8 @@
 //! is answered here as a value; making the directories and writing the
 //! events is the binary's work. That split is what lets "one instruction
 //! builds a city" be tested without building one.
+//!
+//! Specified by `crates/city/spec/Wizard.lean` §8-10.
 
 use kernel::{Address, AxCode, AxError, RESERVED_PREFIX};
 

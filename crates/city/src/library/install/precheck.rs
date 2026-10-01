@@ -5,7 +5,7 @@
 
 //! The static precheck: reading one skill source and judging its shape,
 //! without executing, compiling or interpreting anything in it
-//! (city-SPEC.md section 8-28).
+//! (`crates/city/spec/Library/Install.lean` §8-28).
 //!
 //! A source arrives in one of two shapes and is read into one value: a
 //! package is a directory named after the skill holding

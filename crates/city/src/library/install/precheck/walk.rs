@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The package walk by directory handles (city-SPEC.md section 8-28).
+//! The package walk by directory handles (`crates/city/spec/Library/Install.lean` §8-28).
 //!
 //! The root is opened from its parent without following a link, and
 //! every item beneath is opened by name relative to the directory handle

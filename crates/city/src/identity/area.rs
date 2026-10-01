@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The identity area's grammar (city-SPEC.md 8-33): where it starts and
+//! The identity area's grammar (`crates/city/spec/Identity.lean` §8-33): where it starts and
 //! ends, the names it states and the line each one sits on, and how one
 //! card's keys are written back into it.
 

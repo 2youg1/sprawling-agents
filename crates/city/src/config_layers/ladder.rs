@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The ordered stack of configuration layers a run is governed by, as
-//! one value (city-SPEC.md section 8-4).
+//! one value (`crates/city/spec/ConfigLayers.lean` §8-4).
 //!
 //! A rung is a scope that may state a value, and the ladder is every
 //! rung that exists for one address, read once, in order from the
@@ -23,6 +23,8 @@
 //! Which rung wins is not decided here: `kernel::LayeredValue::resolve`
 //! answers that, and this module only says which rungs there are and
 //! what each of them states.
+//!
+//! Specified by `crates/city/spec/ConfigLayers/Ladder.lean`.
 
 use std::path::{Path, PathBuf};
 
@@ -153,8 +155,8 @@ impl Ladder {
 /// A rung below the city that states `[skills]` or `[remote]` is
 /// refused here rather than read and dropped: a shelf is mounted for
 /// every building at once and the remote door opens onto the whole city,
-/// so only the city's own file may name either (`city-SPEC.md` sections
-/// 8-8 and 8-39).
+/// so only the city's own file may name either (`crates/city/spec/Library.lean`
+/// §8-8 and `crates/city/spec/ConfigLayers/Remote.lean` §8-39).
 ///
 /// Crate-internal because the city's own rung is read without an address
 /// by [`super::city_shelves`]: the missing-file rule is stated once here
@@ -184,7 +186,7 @@ pub(crate) fn stated(file: &Path, rung: Layer) -> Result<ConfigLayer, AxError> {
 /// A parse refusal as the ladder reports it: the file it was read from
 /// in front of the subject, and everything else as the parser wrote it.
 /// The recovery is the refusal's own, written where the refusal knew
-/// what to change; the ladder knows only which file (city-SPEC 12.8 (a)).
+/// what to change; the ladder knows only which file (city D8 (a)).
 fn in_file(file: &Path, refused: &AxError) -> AxError {
     AxError::failure(
         *refused.code(),

@@ -12,6 +12,8 @@
 //! other resident's `URBANITE.md` sits where that resident works, which
 //! is right for a resident that a person dispatched and wrong for two
 //! that serve the whole city.
+//!
+//! Specified by `crates/city/spec/SpineFiles.lean` §8-5.
 
 use std::path::{Path, PathBuf};
 

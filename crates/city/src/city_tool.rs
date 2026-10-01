@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The face the city itself shows a model (city-SPEC.md section 8-23).
+//! The face the city itself shows a model (`crates/city/spec/CityTool.lean` §8-23).
 //!
 //! Three actions on one catalogue line: `list` says what is already
 //! here, `raise` lays out a building that is not, and `adopt` draws the
@@ -16,13 +16,13 @@
 //! directory of the city, and no write domain reaches there. That is
 //! not an obstacle to route around: the shape of the city is the
 //! person's decision, and `Effect::Govern` is refused at the effect
-//! layer (city-SPEC section 8-2b) exactly as `crate::rules_tool` is —
+//! layer (`crates/city/spec/RulesTool.lean` §8-2b) exactly as `crate::rules_tool` is —
 //! a run raises nothing; a person does, outside a run.
 //!
 //! Only City Hall's residents are given this tool
 //! ([`crate::vocation`]); whatever the address asking, a building is
 //! raised through the `CreateBuilding` command and adopted through the
-//! `sprawling adopt` CLI (city-SPEC section 8-3).
+//! `sprawling adopt` CLI (`crates/city/spec/Building.lean` §8-3).
 
 use std::path::{Path, PathBuf};
 
@@ -204,7 +204,7 @@ impl Tool for CityTool {
 
     /// Every action reads or changes the shape of the city, so every
     /// call is about the city; a building being raised does not exist
-    /// yet to be the scope (city-SPEC.md section 8-36).
+    /// yet to be the scope (`crates/city/spec/RulesTool.lean` §8-36).
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
         Request::read(call.args.as_map())?;
         Ok(GateSubject::Scope(Scope::City.to_string()))
