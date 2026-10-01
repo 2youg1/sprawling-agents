@@ -115,7 +115,13 @@ pub(super) fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::AdviserFellBack
         | EventKind::CacheRenewed
         | EventKind::HarnessReported
-        | EventKind::HarnessAnswered => PlanReach::Untouched,
+        | EventKind::HarnessAnswered
+        // Who may reach the city from outside moves no plan.
+        | EventKind::RemoteOpened
+        | EventKind::RemoteClosed
+        | EventKind::DevicePaired
+        | EventKind::DeviceRevoked
+        | EventKind::RemoteSessionStarted => PlanReach::Untouched,
     }
 }
 

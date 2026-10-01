@@ -119,7 +119,14 @@ impl EventKind {
             // What a harness said or answered never decides a request
             // this city sends.
             | EventKind::HarnessReported
-            | EventKind::HarnessAnswered => WindowClass::RecordOnly,
+            | EventKind::HarnessAnswered
+            // Who may reach the city from outside its machine decides no
+            // byte a model is sent.
+            | EventKind::RemoteOpened
+            | EventKind::RemoteClosed
+            | EventKind::DevicePaired
+            | EventKind::DeviceRevoked
+            | EventKind::RemoteSessionStarted => WindowClass::RecordOnly,
         }
     }
 }

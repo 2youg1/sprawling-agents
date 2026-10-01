@@ -2043,6 +2043,26 @@
     "en": "a harness answered the city",
     "zh": "harness 回答了城"
   },
+  "event_remote_opened": {
+    "en": "the remote door opened",
+    "zh": "远程门开了"
+  },
+  "event_remote_closed": {
+    "en": "the remote door closed",
+    "zh": "远程门关了"
+  },
+  "event_device_paired": {
+    "en": "a device was paired",
+    "zh": "配对了一台设备"
+  },
+  "event_device_revoked": {
+    "en": "a device was revoked",
+    "zh": "撤销了一台设备"
+  },
+  "event_remote_session_started": {
+    "en": "a device started a remote session",
+    "zh": "一台设备开始了远程会话"
+  },
   "rec_raw": {
     "en": "the record as written",
     "zh": "原始记录"

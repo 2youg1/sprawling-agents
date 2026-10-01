@@ -52,6 +52,7 @@ mod log;
 mod modality;
 mod probe;
 mod provider;
+mod remote;
 mod renewal;
 mod roadmap;
 mod run;
@@ -85,6 +86,9 @@ pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
 pub use probe::{EndpointProbed, ModelFacts, ProbeFailure};
 pub use provider::{ProviderDegraded, VaultFellBack};
+pub use remote::{
+    DevicePaired, DeviceRevoked, RemoteClosed, RemoteClosing, RemoteOpened, RemoteSessionStarted,
+};
 pub use renewal::CacheRenewed;
 pub use roadmap::{RoadmapMoved, RoadmapStep};
 pub use run::{EvalRun, EvidenceCite, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin};

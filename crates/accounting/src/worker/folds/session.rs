@@ -184,7 +184,12 @@ impl SessionOrigins {
             | EventKind::AdviserFellBack
             | EventKind::CacheRenewed
             | EventKind::HarnessReported
-            | EventKind::HarnessAnswered => Ok(()),
+            | EventKind::HarnessAnswered
+            | EventKind::RemoteOpened
+            | EventKind::RemoteClosed
+            | EventKind::DevicePaired
+            | EventKind::DeviceRevoked
+            | EventKind::RemoteSessionStarted => Ok(()),
         }
     }
 

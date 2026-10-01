@@ -123,6 +123,8 @@ export function fold(held: RunBelief, record: EventRecord): [RunBelief, string |
     case "embedding_called": case "rerank_called":
     case "adviser_asked": case "adviser_answered": case "adviser_fell_back":
     case "harness_reported": case "harness_answered":
+    case "remote_opened": case "remote_closed": case "device_paired":
+    case "device_revoked": case "remote_session_started":
       return [moved, null];
   }
 }

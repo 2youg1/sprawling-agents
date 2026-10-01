@@ -224,7 +224,13 @@ fn fold_run<'a>(
             // A fork rebuilds a model run's conversation, and what a
             // harness reported or answered is not one.
             | EventKind::HarnessReported
-            | EventKind::HarnessAnswered => {}
+            | EventKind::HarnessAnswered
+            // The remote door is the city's, never a run's conversation.
+            | EventKind::RemoteOpened
+            | EventKind::RemoteClosed
+            | EventKind::DevicePaired
+            | EventKind::DeviceRevoked
+            | EventKind::RemoteSessionStarted => {}
         }
     }
     // A wave the cut landed inside is dropped whole: the assistant

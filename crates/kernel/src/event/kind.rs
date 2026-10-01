@@ -202,12 +202,26 @@ pub enum EventKind {
     /// text it answered with this turn, written as the stop reason arrives
     /// and before the run freezes.
     HarnessAnswered,
+
+    // The remote door (5).
+    /// The person opened the remote door: until when, and the address a
+    /// device reaches it at.
+    RemoteOpened,
+    /// The remote door closed, and who closed it: the person at the
+    /// console, a device that locked it behind itself, or its own time.
+    RemoteClosed,
+    /// A device presented a good pairing code and the city keeps it.
+    DevicePaired,
+    /// The person took a device's pairing away.
+    DeviceRevoked,
+    /// A paired device proved its key and holds a remote session.
+    RemoteSessionStarted,
 }
 
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and `xtask specalign`.
-    pub const ALL: [EventKind; 80] = [
+    pub const ALL: [EventKind; 85] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -288,6 +302,11 @@ impl EventKind {
         EventKind::CacheRenewed,
         EventKind::HarnessReported,
         EventKind::HarnessAnswered,
+        EventKind::RemoteOpened,
+        EventKind::RemoteClosed,
+        EventKind::DevicePaired,
+        EventKind::DeviceRevoked,
+        EventKind::RemoteSessionStarted,
     ];
 }
 
