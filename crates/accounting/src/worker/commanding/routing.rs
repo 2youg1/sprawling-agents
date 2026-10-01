@@ -9,6 +9,8 @@ use kernel::TimeMs;
 use kernel::event::record::Admittance;
 use kernel::{AxCode, AxError};
 
+use crate::guide;
+
 use super::super::{
     Assignment, Ceilings, Chosen, Credential, Entered, Owing, RunWorker, Unasked, not_built,
     tuning_of,
@@ -213,9 +215,7 @@ impl RunWorker {
                 self.put_rules(&write.building, &write.base, &write.body)
             }
             wire::Command::RestoreFile { ref at, point, .. } => self.take_back(at, point),
-            wire::Command::PutGuide { ref progress, .. } => {
-                crate::guide::put(&self.city_root, progress)
-            }
+            wire::Command::PutGuide { progress, .. } => guide::put(&self.city_root, &progress),
             wire::Command::ConfigureCity(settings) => {
                 self.configure_city(settings.keep_warm, settings.effort)
             }

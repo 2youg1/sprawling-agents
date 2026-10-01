@@ -72,8 +72,8 @@ pub enum Prepared {
         ask: Option<fn(&str) -> wire::GithubReading>,
         host: Option<String>,
     },
-    /// The first-run guide's progress, read from disk.
-    Guide { city_root: PathBuf },
+    /// The first-run guide's progress of the city at this root.
+    Guide(PathBuf),
     /// The configuration ladder of one address.
     Config { city_root: PathBuf, addr: Address },
     /// The release page, which leaves this machine.
@@ -252,7 +252,7 @@ impl Prepared {
             }
             // A file that does not read is "I could not look", not a
             // guide at its start that the next write would put over it.
-            Self::Guide { city_root } => match crate::guide::read(&city_root) {
+            Self::Guide(city_root) => match crate::guide::read(&city_root) {
                 Ok(progress) => wire::Answer::Guide(progress),
                 Err(_) => unavailable("Guide".to_owned()),
             },

@@ -80,7 +80,7 @@ export function commitsQuery(building: Address | null, before: Seq | null): Quer
 // default host when `null`. Asked only when the person presses import
 // (wire-SPEC 8-67).
 export function githubLoginQuery(host: string | null): Query {
-  return { github_login: { host } };
+  return { github_login: host };
 }
 
 // Everything a refusal states but the sentence a person reads.

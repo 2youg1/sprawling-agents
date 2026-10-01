@@ -150,12 +150,11 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // The process log, on the third channel. Its sender was made before
     // the `Diagnostics` was, because the sink is what writes into it.
     let logs = journal.lines();
-    // The views the control surface reads, and what the worker inherits,
-    // started together from their snapshots on one pass over what they
-    // have not folded (sprawling-SPEC.md 8-122); the views are folded
-    // forward by the write observer inside the worker: one fold rule,
-    // two call sites, no second definition of what a view means. The
-    // history before the snapshots is proved behind the first byte.
+    // The views the control surface reads, and what the worker inherits, started together
+    // from their snapshots on one pass over what they have not folded (sprawling-SPEC.md
+    // 8-122); the views are folded forward by the write observer inside the worker: one fold
+    // rule, two call sites, no second definition of what a view means. The history before
+    // the snapshots is proved behind the first byte.
     let (mut rebuilt, held) = start_served_views(
         &kernel::layout::CityLayout::new(city_root).ledger(),
         accounting::Clock::now(&super::SystemClock)?,

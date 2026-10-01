@@ -11,7 +11,19 @@
 //! the binary's (`bin::doctor::github`) and arrives as a `fn` pointer;
 //! what is judged here is the city's own reading of the question.
 
-use super::super::prepared::unavailable;
+use super::super::holding::Views;
+use super::super::prepared::{Prepared, unavailable};
+
+impl Views {
+    /// One import, asked once the snapshot is let go, because it starts
+    /// a program.
+    pub(in crate::views) fn github_of(&self, host: Option<&str>) -> Prepared {
+        Prepared::GithubLogin {
+            ask: self.reach.github,
+            host: host.map(str::to_owned),
+        }
+    }
+}
 
 /// The host an import asks when the page names none, written once.
 pub(crate) const DEFAULT_HOST: &str = "github.com";
@@ -55,7 +67,7 @@ fn is_host(host: &str) -> bool {
 mod tests {
     use std::sync::Mutex;
 
-    use super::super::super::holding::Views;
+    use super::Views;
 
     /// Every host the scripted reader was asked, in order.
     static ASKED: Mutex<Vec<String>> = Mutex::new(Vec::new());
@@ -70,9 +82,7 @@ mod tests {
 
     fn import(views: &Views, host: Option<&str>) -> wire::Answer {
         views
-            .prepare(&wire::Query::GithubLogin {
-                host: host.map(str::to_owned),
-            })
+            .prepare(&wire::Query::GithubLogin(host.map(str::to_owned)))
             .finish()
     }
 

@@ -27,7 +27,6 @@ import type {
   Effort,
   GitOid,
   GovernedDocument,
-  GuideProgress,
   HaltScope,
   IdentityCard,
   KeepWarm,
@@ -370,12 +369,7 @@ export function restoreFile(at: Address, point: GitOid): Command {
   return { restore_file: { at, point, idem: mintIdem() } };
 }
 
-// This city's first-run guide progress, whole: where it reopens, whether
-// the person left it, each optional step seen or skipped. The later of
-// two writes stays (wire-SPEC 8-68).
-export function putGuide(progress: GuideProgress): Command {
-  return { put_guide: { progress, idem: mintIdem() } };
-}
+export { putGuide } from "./commands/guide";
 
 // The city's own layer: `null` leaves a key as it is.
 export function configureCity(keepWarm: KeepWarm | null, effort: Effort | null): Command {

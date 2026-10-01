@@ -12,7 +12,6 @@ use kernel::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::answer::GuideProgress;
 use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
 use crate::command::step::{
@@ -20,6 +19,7 @@ use crate::command::step::{
     SpineDocument,
 };
 use crate::command::tuning::EndpointTuning;
+use crate::guide::GuideProgress;
 use crate::named_frames::named_frames;
 use crate::preference::PreferencePatch;
 

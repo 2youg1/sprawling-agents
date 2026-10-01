@@ -20,6 +20,7 @@ use kernel::{
 use serde::{Deserialize, Serialize};
 
 use crate::command::HaltScope;
+use crate::guide::GuideProgress;
 use crate::preference::PreferencesAnswer;
 
 mod automation;
@@ -33,7 +34,6 @@ mod endpoints;
 mod evidence;
 mod git_status;
 mod github;
-mod guide;
 mod harnesses;
 mod history;
 mod hunks;
@@ -67,7 +67,6 @@ pub use endpoints::{ChosenSummary, EndpointSummary, EndpointsAnswer};
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use git_status::{Drift, GitStatusAnswer};
 pub use github::{GithubLoginAnswer, GithubReading};
-pub use guide::{GuideMark, GuideProgress, GuideState, GuideStep};
 pub use harnesses::{HarnessLine, HarnessesAnswer};
 pub use history::{HistoryAnswer, HistoryRangeAnswer};
 pub use hunks::{HunksAnswer, PatchLine, Withheld};

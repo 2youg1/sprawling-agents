@@ -237,11 +237,11 @@ impl Views {
             // it. A run with no prompt yet and an object this city no
             // longer holds are both "I could not look".
             wire::Query::Prefix { run } => return Prepared::Prefix(self.prefix_ask(*run)),
-            // Read at every asking rather than held: the file is one a
-            // person also edits, and a copy kept in this fold would
-            // answer with what it said the last time somebody used a
-            // page.
+            // Read at every asking rather than held: each file is one a person also edits or
+            // another page also writes, and a copy kept in this fold would answer with what it
+            // said the last time somebody used a page.
             wire::Query::Preferences => return Prepared::Preferences,
+            wire::Query::Guide => return Prepared::Guide(self.city_root.clone()),
             wire::Query::Identity => {
                 return Prepared::Identity {
                     city_root: self.city_root.clone(),
@@ -252,18 +252,7 @@ impl Views {
                     city_root: self.city_root.clone(),
                 };
             }
-            // Starts a program, so only once the snapshot is let go.
-            wire::Query::GithubLogin { host } => {
-                return Prepared::GithubLogin {
-                    ask: self.reach.github,
-                    host: host.clone(),
-                };
-            }
-            wire::Query::Guide => {
-                return Prepared::Guide {
-                    city_root: self.city_root.clone(),
-                };
-            }
+            wire::Query::GithubLogin(host) => return self.github_of(host.as_deref()),
             wire::Query::Config { addr } => {
                 return Prepared::Config {
                     city_root: self.city_root.clone(),
