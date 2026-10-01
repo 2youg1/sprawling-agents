@@ -54,7 +54,7 @@
 
 公开面见 `tools/xtask/api-baselines/wire.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
 
-**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`Sample.view_backlog: u64`（已提交、发布出去的视图还没折进的记录条数）；页面读到的历史已证明到哪一条 `seq`；`CommitAnswer` 带出提交说明；`Dispatch.mode` 收成 `chat`／`work`，以及运行策略、写入限制 `Create`、准入证据的字段；身份、导入、保存回执与上手进度的线面；城一级配置的写入口与 `PreferencePatch` 的 `[core] priority` 一臂；`ModelTag` 的 OCR 一值。下列新名字只动名字表，哈希随之变，不另进位：远程门的五种 Ledger 事件（门开、门关、设备配对、设备撤销、会话开始，与写它们的装配同批，remote_access-SPEC §3）、`PutRules`、自动化只读查询、按房间列出 session 的查询、从检查点取回单个文件的命令。每落一项删一项。
+**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`Sample.view_backlog: u64`（已提交、发布出去的视图还没折进的记录条数）；页面读到的历史已证明到哪一条 `seq`；`CommitAnswer` 带出提交说明；身份、导入、保存回执与上手进度的线面；城一级配置的写入口与 `PreferencePatch` 的 `[core] priority` 一臂；`ModelTag` 的 OCR 一值。下列新名字只动名字表，哈希随之变，不另进位：远程门的五种 Ledger 事件（门开、门关、设备配对、设备撤销、会话开始，与写它们的装配同批，remote_access-SPEC §3）、`PutRules`、自动化只读查询、按房间列出 session 的查询、从检查点取回单个文件的命令。每落一项删一项。
 
 ## 5 权威信源
 
@@ -90,7 +90,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 ### 8-0 跨层名字的携带法（先于一切接口的决定）
 
 `PlanRow.status` 携 `kernel::RoadmapStatus`（经 `kernel` 重导出，住 `spine::row`，公共拼写不变）。
-`Dispatch` 携 `mode`，值集住 kernel（`kernel::model::Mode`），wire 依赖 kernel，所以帧直接携它。`CreateBuilding` 携 `template`、`ConnectToolkit` 携 toolkit 的 slug——**这两个集合的权威分别住 `city` 与 broker 的目录，而 wire 只依赖 kernel**（ARCHITECTURE §2 depmap）。
+`Dispatch` 携 `policy`，值集住 kernel（`kernel::RunPolicy` 与它的四个枚举，§8-57），wire 依赖 kernel，所以帧直接携它。`CreateBuilding` 携 `template`、`ConnectToolkit` 携 toolkit 的 slug——**这两个集合的权威分别住 `city` 与 broker 的目录，而 wire 只依赖 kernel**（ARCHITECTURE §2 depmap）。
 
 取法：wire 携**无封闭列表的 newtype**（`ProviderName`、`TemplateName`、`ToolkitSlug`），只断言「非空且无控制字符」，**不断言合法值集**。合法值集恒由上游单一权威回答，映射点在装配层（`bin::assembly`），未知值即报错不猜。
 
@@ -390,7 +390,7 @@ impl Aggregate {
 ### 8-7 一次会话有名字，而名字就是它干活的那个房间
 
 ```rust
-WireCommand::Dispatch { addr, task, goal, mode, idem, session: Option<SessionName>, effort, … }
+WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionName>, effort, … }
 // SessionName 住 kernel：一个构造点，内容即一个地址段
 ```
 
@@ -463,6 +463,16 @@ WireCommand::Dispatch { addr, task, goal, mode, idem, session: Option<SessionNam
 **理由**：账目住在它裁掉的那个结果里，那个结果写在带着 `tool_use_id` 的 `tool_result` 行上，所以调用身份已经由行给出。
 
 **被否**：给 `ResultOffloaded` 加 `tool_use_id`：同一个 id 的第二个家，而这份账目随结果整份进模型的请求字节，多出的键会让每一次被裁的调用多付这些 token。
+
+### 12.4 `Dispatch` 带一个 `policy`，而不是四个平铺的字段
+
+**决定**：运行策略在帧上是一个嵌套的值 `policy`，形状就是 `kernel::RunPolicy`；`mode` 不再是 `Dispatch` 的顶层字段（§8-57）。
+
+**理由**：四个值总是一起走——线上、账本的 `run_started`、装配层的 `Assignment` 都是整份地拿、整份地传——一起走的值是一个值。帧上的形状与账本上的形状相同，页面、回放与 playback 读的是同一个东西，没有一层把四个字段重新拼成一个结构。四个键都必填：选择要求不等于拿到证据，而一个缺省成「免检」的键正是这条规则要挡住的。
+
+**被否**：①保留顶层 `mode`、平铺加 `write`／`admit`／`landing` 三个带缺省的字段：旧页面可以不改，但缺省值会替没选过的人做一个选择，而帧本来就因改形要换一次版本；②`policy` 里的键带缺省：同一条理由。
+
+**重开参数**：运行策略多出一个只有部分派活才需要的值时，重议那个值要不要缺省。
 
 ## 13 依赖选型
 
@@ -593,7 +603,7 @@ pub struct CommitAnswer {
 ### 8-18b 派活帧不再携上限
 
 ```rust
-Dispatch { addr, task, goal, mode, idem, session, effort }   // 删去 budget: BudgetCap
+Dispatch { addr, task, goal, policy, idem, session, effort }   // 删去 budget: BudgetCap
 ```
 
 **没有人能在一件事跑之前给它定价**，所以说出「跑这件事」的那条帧不带上限。刹车只留一个：`Halt` 关掉一个范围并终止该范围里已经起来的后台成员（`runtime::backlog` 使这句话为真）。`kernel::BudgetCap` 及其判定面随之删除（kernel-SPEC §8-12），`wire` 的 kernel 再导出列表因此少一项 `BudgetCap`——**这是公开面变更**，`web` 与 `sprawling` 两份基线同变更集重生。
@@ -1091,7 +1101,7 @@ pub enum ReleaseAnswer {
 
 **升版的代价是 `wire.ts` 重生与客户端同改，与改动数量无关，分两次就是付两次**，所以能同时落地的线上改动放进同一次升版。以下各件与 §8-38 同属一次升版。
 
-**一、`mode` 是 `kernel::model::Mode`，不是自由文本。** 自由文本的 mode 要由上游把认不出的词落到某个默认值上，于是拼错 `experiment` 得到一个规划 run 和零句话。`Mode` 是 `chat｜plan_goal｜up｜sc｜ud｜experiment` 的闭集，未知词在反序列化处即拒。**定义落在 kernel 而不是 wire**：与 `DialectKind` 同一条依赖倒置，wire 携带它、`runtime` 求值它，两边都不得指名对方。`carried_name` 因此只剩三个真正开放的名字（provider／template／toolkit）——**值集开放才进那个宏，闭集不进**。
+**一、`mode` 是 `kernel::model::Mode`，不是自由文本。** 自由文本的 mode 要由上游把认不出的词落到某个默认值上，于是拼错一个词得到一个没人要的 run 和零句话。`Mode` 是闭集（今天 `chat｜work`，§8-57），未知词在反序列化处即拒。**定义落在 kernel 而不是 wire**：与 `DialectKind` 同一条依赖倒置，wire 携带它、`runtime` 求值它，两边都不得指名对方。`carried_name` 因此只剩三个真正开放的名字（provider／template／toolkit）——**值集开放才进那个宏，闭集不进**。
 
 **二、`context_tokens` 是 `Option<Window>`。** `Window` 与 `Ceiling` 同形（非零新类型）而**不是同一个类型**：一个界定模型能读多少，一个界定它能写多少，互换仍能编译的两个数不该共用一个名字。零在类型上不存在，缺席是 `null`；旧编码把「没人填」写成 `0`，于是上下文提醒拿一段对话去比对一个没人给过的数。
 
@@ -1425,7 +1435,7 @@ pub struct RunSummary {
 ### 8-48c `Dispatch` 可以点名这一次的模型
 
 ```rust
-Dispatch { addr, task, goal, mode, idem, session, effort, model: Option<String> }
+Dispatch { addr, task, goal, policy, idem, session, effort, model: Option<String> }
 ```
 
 - **`model` 是城已登记的一个模型 id**，登记在哪个 tag 下都行；`None` 取房间自己那层已冻结的模型，房间尚未冻结时取 `main` tag 的模型。装配按这个 id 在簿子里找到那一条登记，连同它的端点与窗口一起用，保密楼「只用回环端点」的检查照旧由 `ModelBook::select` 做（sprawling-SPEC §8-10）。
@@ -1591,6 +1601,20 @@ pub struct Output {
 - **只在调用的输出上有值**：`Call.output` 的 `pinned` 读自配对上的 `tool_result` 结果里第一笔离窗账目（`runtime::pipeline::pinned_original`，runtime-SPEC §8-51(b)）；`Call.arguments` 也是 `Output`，它的 `pinned` 恒为 `None`——参数从不离窗。
 - **原文是命令原本写出的字节**：结果先被 sieve 裁、再被普通搬运存一次时，指的是第一笔账目的原文，不是 sieve 留下的替身。页面拿它经 `Query::Content` 读全文，`cut` 仍只说这个视图裁了几行。
 - **旧行明确缺席**：结果里没有账目（没离窗、或写在账目进结果之前）即 `None`，不按相邻的行去猜。
+
+### 8-57 派活带出整份运行策略：`Dispatch.policy`
+
+```rust
+Dispatch { addr, task, goal, policy: kernel::RunPolicy, idem, session, effort, model }
+// RunPolicy { mode: Mode, write: WriteLimit, admit: AdmissionRequirement, landing: LandingPolicy }
+// 线上：{"mode":"work","write":"create","admit":"tested","landing":"experiment"}
+```
+
+- **一个字段，四个必填的键**：`mode`（`chat｜work`）、`write`（`full｜create`）、`admit`（`standing｜tested｜contract_kept｜double_validated`）、`landing`（`ordinary｜experiment`）。值集与拼法只住 kernel（kernel-SPEC §8-77、§8-78），本 crate 再导出 `RunPolicy`、`Mode`、`WriteLimit`、`AdmissionRequirement`、`LandingPolicy` 五个名字，页面按 `wire.ts` 里生成的字面量拼。缺一个键、或一个认不出的词，帧在反序列化处即拒，不落成默认值。
+- **页面怎么选**：写域选择给 `write` 的两项（普通 `full`、只读可新建 `create`）；`/admit tested|contract|double` 依次填 `tested`、`contract_kept`、`double_validated`，不说时填 `standing`；试验填 `landing: "experiment"`；计划经 `/plan` 进入固定的 SDD 工作流，帧上是 `mode: "work"`。这些控件归客户端的展开面（client-SPEC 4-41），本节只定帧。
+- **城自己派的活不经这个帧**：计划、日程、来信与编辑器经 ACP 派来的活由装配层取 `RunPolicy::of(Mode::Work)`；委派与敲门继承说话那一方的整份策略（sprawling-SPEC 8-133）。
+- **账上读得到**：装配层把收到的策略原样写进这次 run 的 `run_started.policy`，所以一次派活选了什么，回放与 playback 从账本读，不从线上猜。
+- **`WIRE_V` 不另进位**：`Dispatch` 的名字没变而形状变了，这正是 §12.1 说的改形，与本批其余改形共用 45。
 
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 

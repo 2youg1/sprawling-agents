@@ -13,7 +13,7 @@
 | `handoff` | 五段构造点＋resume 消费 Handoff 产新 Run 种子；形状 2 |
 | 完备化 | prefix 四段全量（封顶＋截断标注＋跨段去重＋跳过入账）＋断点 ≤4＋Steer 边界消费＋窗口组装入 Assembling 相 |
 | `pipeline`＋`offload` | 结果信封三附件＋offload 四不变量（独占有损可还原）＋截断定序 |
-| `clock`＋`catalog`＋`mode` | ISO UTC 的唯一拼法＋ClockStamp 与它的发放规则＋ClockReading（§8-10、§8-53）＋渐进披露三类条目＋五 mode 枚举 |
+| `clock`＋`catalog`＋`mode` | ISO UTC 的唯一拼法＋ClockStamp 与它的发放规则＋ClockReading（§8-10、§8-53）＋渐进披露三类条目＋两个 mode 的目录行与合并时的准入（§8-54） |
 | `watchdog` | 处置面分级（纠正 Steer→停滞→冻结）；依据只从 kernel::stall 来 |
 | `sandbox` | 缝（trait）＋wasmtime fuel 生产适配器＋直通/故障两替身；A10 三断言 |
 | `tools/` | exec 三臂／edit 乐观并发／read 区间读／search／status／succeed，与模型选路的唯一判定 `chosen_path`（§8-14、§8-29–§8-33） |
@@ -44,6 +44,8 @@
 3. **同一套重建器**：A15 与 A19 共用 verify 输出；重建器＝verified 行序列本身。
 5. **命令结果的戳是它开始的时刻，不是它答复的时刻**：生产的 `exec` 在 `Placing::account` 里打包、打戳，而回合读答复时刻（`tool_result` 的 `t`）是在 `account` 返回之后（`turn::wave` 的 `account`），所以工具面在打戳那一刻读得到的最新读数是这条调用放行后的开始时刻（§8-53、§12.8）。一条跑两分钟的命令，模型读到的戳早两分钟。要戳等于答复时刻，回合须在调用工具面的 `account` 之前读答复时刻；那时 `ClockReading` 里就是它，工具面一行不改。定下这一点的证据：`turn::wave` 把答复读数挪到 `tools.account` 之前后，`driving/tests/sieving` 的戳测试改为比 `tool_result` 的 `t` 仍绿，并行对拍测试不动。
 4. **前缀续期未接线**：`prefix::warmth` 的 `Warmed` 与记账已在（§8-4-2），而 run 结束后按 `next_due` 醒来发续期的那条循环还没有；接上它要先定续期的 usage 记成哪一种事件。
+6. **`contract_kept` 的证据今天没人量。** 城读不出一次翻新有没有动到可观察的契约，装配层把 `Produced.contract_moved` 恒填 `false`，所以选了 `contract_kept` 的 run 在合并时恒放行（§8-54）。要让这一要求真的拒，得有一个读得出契约的量具（例如 run 前后同一组对外测试的结果对照）把它填进 `Produced`；判定它的证据是一次动了对外行为、测试仍绿的翻新在 citysim 里被放行。
+7. **`Create` 管不到楼的 MCP 工具。** 一个 MCP server 是楼自己声明的外部进程，它写不写文件、写在哪里，城看不见（§8-55 只覆盖城自己的写路径：edit、exec 与链接）。候选是 `Create` 下不挂载声明了写效果的连接器，或只挂载声明只读的；判定它的证据是一个会写文件的连接器在 `Create` 的 run 里改动了已有文件。
 
 ## 4 现状分析
 
@@ -619,17 +621,48 @@ pub const DEV_ENTRY: &str = "dev";
 pub fn dev_entry() -> CatalogEntry;   // 一行披露，全部细则归 expansion
 ```
 
-- **一个 Run 只被告知它所在的那个 mode**，于是没有任何 Agent 知道这座城自己的代码与 SPEC 是可改的。`dev` 行补上这一句，**而且只补一句**：三个模式的定义、阅读次序（SPEC → 代码 → 旁边的测试）与「下一步去跟人要模式」全在 expansion 里，由 `read` 按需取。**大多数会话不改这座城，就只付一行的价。**
+- **一个 Run 只被告知它所在的那个 mode**，于是没有任何 Agent 知道这座城自己的代码与 SPEC 是可改的。`dev` 行补上这一句，**而且只补一句**：三种准入证据要求与两种落地策略的意思、阅读次序（SPEC → 代码 → 旁边的测试）与「下一步去跟人要它们」全在 expansion 里，由 `read` 按需取。**大多数会话不改这座城，就只付一行的价。**
 
 ### 8-12b runtime::mode 原有面
 
 ```rust
-pub fn catalog_entry(mode: kernel::Mode) -> CatalogEntry;     // 含 PlanGoal 退出条件四列
+pub fn catalog_entry(mode: kernel::Mode) -> CatalogEntry;     // chat 与 work 两行
 ```
 
-`Chat` 的目录行只有一句：专心同人交谈，就对方说的话作答；`admits` 对它恒为 `Lands`。除这一行提示之外它什么也不做，它存在的理由是让一句闲话不被当成一件要计划的活。
+`Chat` 的目录行只有一句：专心同人交谈，就对方说的话作答。除这一行提示之外它什么也不做，它存在的理由是让一句闲话不被当成一件要做的活。`Work` 的目录行说：朝人给的目标干活，任务要一份计划时先用 `plan` 工具写进 `Roadmap.md`，目标达成时报告。
 
-哪些 mode 存在、各自拼成什么词，只由 `kernel::Mode` 回答（线、账本与配置文件都读它）；本模块只持每个 mode 准入什么、目录里怎么介绍它。runtime 不再有自己的 `Mode`：两份同成员的枚举要靠装配层一个五臂恒等的 `match` 维系，新增一个 mode 时那是第二处必须同步改的地方。
+哪些 mode 存在、各自拼成什么词，只由 `kernel::Mode` 回答（线、账本都读它）；本模块只持每个 mode 在目录里怎么介绍、以及一次 run 的产出准不准合并（§8-54）。runtime 不再有自己的 `Mode`：两份同成员的枚举要靠装配层一个恒等的 `match` 维系，新增一个 mode 时那是第二处必须同步改的地方。
+
+### 8-54 合并时的准入，按运行策略判（`runtime::mode::admits`，形状 1 判定）
+
+```rust
+pub struct Produced { pub tests_passed: Option<bool>, pub contract_moved: bool,
+                      pub held_in: Option<bool>, pub held_out: Option<bool> }
+pub enum Admission { Lands, Refused { because: &'static str, alternative: &'static str } }
+pub fn admits(policy: &kernel::RunPolicy, produced: &Produced) -> Admission;
+```
+
+- **判定序**：先看落地策略——`Experiment` 恒 `Refused`（试验的产出不合并，学到的写进 `Memo.md`，换一次常规落地的派活再做）；`Ordinary` 再看准入证据要求：`Standing` 恒 `Lands`（楼自己的规矩已经在别处判过，本函数不加检查）；`Tested` 要 `tests_passed == Some(true)`，`Some(false)` 与 `None` 各有自己的拒词；`ContractKept` 在 `contract_moved` 时拒；`DoubleValidated` 要 held-in 与 held-out 两半都是 `Some(true)`，缺一半与任一半为 `Some(false)` 各有拒词。
+- **mode 不参与准入**：交谈与干活产出的东西走同一道合并，要不要证据由证据要求一个值回答（kernel-SPEC §12.12）。
+- **唯一的调用方是合并那一刻**：`accounting::worker::reviewing` 在 `PrEffect::Merged` 写 `pr_merged` 之前问它，`Refused` 写 `pr_rejected`，理由是 `because; alternative` 两句（sprawling-SPEC 8-133）。评审说「另一位居民看过」，准入说「这次派活要的证据在」，两个问题两道门。
+- **`ContractKept` 今天以城看不见的方式成立**：城读不出一个契约动没动，`Produced.contract_moved` 由装配层恒填 `false`，所以这一要求只在 run 自己报出契约动了的那一天才会拒。这一点照旧写在 §3 而不是假装已经量过。
+- 验收：`mode` 测试 `a_work_run_without_the_evidence_it_chose_does_not_land`（`work`＋`tested`、没跑测试 → `Refused`），以及每种要求、每种落地各自的拒与放。
+
+### 8-55 「只新建」在每一条写路径上判（`runtime::tools::edit`、`runtime::tools::exec`，形状 4 适配器）
+
+```rust
+impl EditTool {
+    pub fn new(city_root: &Path, domain: Address, writable: kernel::WriteDomain,
+               limit: kernel::WriteLimit) -> Result<EditTool, AxError>;
+}
+pub struct ExecSetup { /* …既有字段… */ pub limit: kernel::WriteLimit }
+```
+
+- **edit 的两条臂各走 storage 的一种落盘。** 改写一个已有文件：先过写域（§8-36），再问 `kernel::gate::replacing(limit, &target)`，`Create` 下在读文件之前就拒，盘面不动；放行后经 `storage::WriteTarget::replace`（暂存文件再 `rename`，取被替换文件的权限，storage-SPEC §8-32）。新建（`base_version: "new"`）：经 `storage::WriteTarget::create`，名字由文件系统的「仅当不存在才建」原子地占下，已有文件（包括别的调用刚建成的）答 `E_VERSION_CONFLICT`，说出它此刻的版本。新建在两种限制下都这样走，所以竞争的两次新建只成一次，不论限制是什么。
+- **edit 的 disclosure 说出限制**：`Create` 下工具描述多一句「this run creates new files and changes none」，模型在动手前就读到，而不是在第一次被拒时才知道。
+- **exec 在 `Create` 下只在副本里跑。** `where: host` 的 program 与 shell 直接落在人的树上，没有任何东西能让已有文件只读，所以在起进程之前就由 `gate::replacing` 拒，主语是工作目录；`sandbox` 放置照常：写入落在同步来的副本上，副本里的东西不回到树上，所以已有文件不变、命令也新建不了任何东西。python 臂的挂载恒只读，不受影响。确认不了隔离的工具不开放写入（kernel-SPEC §8-78），exec 的描述在 `Create` 下多一句说明 host 不可用。
+- **链接**：写目标与它到城根之间的每一级若是链接（符号链接、junction、硬链接），`WriteTarget::within` 字面拒（storage-SPEC 8-25），两种限制下一样，所以经链接改旧文件这条路在 `Create` 下同样不通。
+- 验收：集成测试 `crates/runtime/tests/create_limit.rs` 的 `an_existing_file_is_unchanged_under_create_by_edit_exec_and_link`：`Create` 下对一个已有文件的 edit 改写、host 上一条改它的 shell 命令、在指向它的链接名上新建，三者都拒，文件字节不变；storage 的 `two_racing_creates_admit_one`。
 
 ### 8-13 runtime::sandbox（缝清单文件，形状 3＋4）
 
@@ -1126,6 +1159,16 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 **被否**：①每条命令新建一份（原做法）：新建文件数是命令数乘以树的文件数；②用硬链接「复制」：命令在副本里的写入会写穿到人那棵树，共享可写文件的副本不是隔离；③按 mtime 与长度判定相同：同一个时间戳刻度里的等长改写判不出来，副本会为它没带上的版本担保；④就地改写不同的文件：命令可能把副本里的名字做成指向别处的硬链接或链接，就地写会写到那一头，所以不同的项先删掉再建。
 
 **重开参数**：一个工具的两条命令需要同时持有同一份副本（今天后台命令各持一份，留着的只有一份）；或读数显示同步的读取成了每条命令的主项（§8-13-2 的未决）。
+
+### 12.11 「只新建」下 exec 只在副本里跑，不开放 host
+
+**决定**：`WriteLimit::Create` 下，exec 的 `host` 放置在起进程之前被拒；`sandbox` 放置照常（§8-55）。
+
+**理由**：host 上的一条命令能覆盖、删除、改名任何它够得到的文件，也能建硬链接，而不要管理员权限的前提下，没有一种手段能让已有文件对它只读；`Create` 承诺的是「已有文件不变」，给不出这个保证的路就不开放写入。副本放置本来就把写入留在副本里，所以它在 `Create` 下的行为与原来相同，什么都不必改。
+
+**被否**：①在 host 上跑完再比对、改了就回滚：回滚发生在改动之后，期间读到这个文件的人与进程看到的是改过的字节，而且一个被删掉又建回来的文件已经不是原来那个目录项；②把命令新建的文件从副本搬回树上：要给副本里每个新文件再判一遍写域与「只新建」，这是第二条写路径，今天没有读者要它。
+
+**重开参数**：出现一个能让已有文件只读的放置（例如 `LinuxNamespaces` 臂把工作目录只读挂进去）时，那个臂在 `Create` 下可以开放；出现要在 `Create` 下由命令产出新文件的场景时，重议第②条。
 
 ## 13 依赖选型
 

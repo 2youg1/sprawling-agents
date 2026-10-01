@@ -457,6 +457,13 @@ A run's write domain is what its building's `RULES.toml` declares, and
 template. The room is where a session works, not the boundary that
 contains it.
 
+The run policy a dispatch chooses only narrows that domain. Under the
+`create` write limit a run creates files that do not exist and changes
+none that do, and the check is made by the filesystem at the moment of
+the write, so two racing creates of one name land once. An `experiment`
+run writes in a worktree of its own even in a building without review,
+and nothing in that tree is merged.
+
 **`Roadmap.md` is a tree, and the `plan` tool is what writes it.** The
 index column is a path — `2.3.1` hangs under `2.3` — so one file states a
 multi-level plan without a second file to say how the levels relate.
@@ -479,6 +486,11 @@ on connect: a page from a different build refuses rather than misreads.
 | `Query` | <!-- xtask:begin query_frames -->38<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |
+
+A `dispatch` carries the run policy — mode, write limit, admission
+requirement, landing policy — as one value, and the city writes that same
+value into the run's `run_started` line, so what a person chose is read
+back from the Ledger rather than inferred.
 
 Two properties are worth stating because they are enforced by types rather
 than by review. A `Command` carrying a credential **cannot be serialised**:

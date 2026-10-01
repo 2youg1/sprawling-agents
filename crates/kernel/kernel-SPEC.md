@@ -403,6 +403,7 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub parent: Option<RunId>, pub predecessor: Option<RunId>,
     pub skills: Vec<SkillPin>,          // 空亦写出
     pub dispatched_by: Option<Who>,     // 由谁派来：person／city／派活的居民地址；缺键为 None
+    pub policy: Option<RunPolicy>,      // 这次 run 的运行策略（§8-77）；缺键即这一行早于策略入账
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
 pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64 }
@@ -922,14 +923,14 @@ impl<T> Tainted<T> {
 ### 8-11 kernel::write_domain
 
 ```rust
-pub struct WriteDomain { /* prefixes: BTreeSet<Address> —— 私有 */ }
+// WriteDomain 是两臂枚举 Everything／Documents，各带一个过了 C17 的 DomainPrefixes（§8-46）；
+// 一次 run 在它之上再叠一道写入限制 WriteLimit（§8-78）。
 impl WriteDomain {
     /// C17 at the construction point: any reserved-prefix member is refused.
     pub fn new(prefixes: Vec<Address>) -> Result<Self, AxError>;   // E_INVALID_ARGS
     pub fn admits(&self, target: &Address) -> DomainVerdict;
     pub fn prefixes(&self) -> impl Iterator<Item = &Address>;
 }
-pub enum DomainVerdict { Within, Outside { prefixes: Vec<String> } }  // prefixes 供 three-part 的 nearby
 
 pub struct EditSample { pub addr: Address, pub run: RunId }            // 切片序＝时序
 pub enum EditWarVerdict { Calm, Freeze { addr: Address } }
@@ -1878,6 +1879,16 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 **重开参数**：有了每次调用由参数算出位置的函数时，`render` 的 `Diff.locations` 改记那次调用的位置。
 
+### 12.12 运行策略是四个值，一次以新形状入账
+
+**决定**：`Mode` 收成 `Chat｜Work`；原来六个词各自携带的三件事拆成三个独立的值——写入限制 `WriteLimit`、准入证据要求 `AdmissionRequirement`、落地策略 `LandingPolicy`——与 `Mode` 合成 `RunPolicy`，以这个形状第一次写进 `run_started`（§8-77）。旧六词的映射：`plan_goal`、`up`、`sc`、`ud` 都是 `work`，后三者的证据要求依次是 `tested`、`contract_kept`、`double_validated`；`experiment` 是 `work` 加 `experiment` 落地；计划由固定的 SDD 工作流入口进入，不再是一个 mode。
+
+**理由**：一个词同时说「能写什么」「要什么证据」「落不落地」，三件事就只能按六种固定搭配出现：「只读可新建的试验」拼不出来，「要测试的计划」也拼不出来。拆开之后每件事有一个值、一个判定点：写入限制在写门上判（§8-78），证据在合并时判，落地策略决定 run 写在哪棵树里。旧六词从未以类型化载荷进过账本（它们只出现在线上、状态工具的结果文本与提示字节里），所以第一次入账就用新形状，不需要一段只为把旧词翻成新值而存在的读法。
+
+**被否**：①保留六词、加一个「只新建」旗标：写入限制与 mode 的组合仍是固定的，而布尔旗标不是穷尽枚举；②先以六词入账、再写一段有版本的历史读法：那段读法只为本批未推送的开发账本服务，没有别的读者；③证据要求用 `Option`：缺席会被读成免检，而缺省的意思是「按楼的规矩」，它值得一个名字。
+
+**重开参数**：出现第三种落地方式（例如合并到别的分支）时，`LandingPolicy` 加一臂；出现一种 mode 需要自己的证据规则时，重议「mode 不参与准入」。
+
 ## 13 依赖选型
 
 `serde`＋`serde_json`（规范字节与载荷）；`thiserror`（Display/Error derive）；`blake3`（唯一哈希）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）；`secrecy`＋`zeroize`（Sealed）。版本由根 `Cargo.toml` 与 `Cargo.lock` 给出。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
@@ -2228,11 +2239,11 @@ impl CityLayout {
 
 `model/` 下多两个文件，各收一个「没人说过」的编码。
 
-**`model::Mode`**——`Chat｜PlanGoal｜Up｜Sc｜Ud｜Experiment`，wire 词 `chat｜plan_goal｜up｜sc｜ud｜experiment`，`as_str` 写、serde 读，一条遍历式断言钉住往返同词。`Mode::ALL` 的次序就是控件列出的次序，`Chat` 排第一，因为一个人在对话框里打的一句话首先是在说话，而不是在派一件要计划的活。
+**`model::Mode`**——`Chat｜Work`，wire 词 `chat｜work`，`as_str` 写、serde 读，一条遍历式断言钉住往返同词。`Mode::ALL` 的次序就是控件列出的次序，`Chat` 排第一，因为一个人在对话框里打的一句话首先是在说话，而不是在派一件活。它是运行策略 `RunPolicy` 的四个值之一（§8-77）；写什么、要什么证据、落不落地由另外三个值回答。
 
-为什么定义在这里而不在 `runtime`：**与 `DialectKind` 同一条依赖倒置**——线上携带它，`runtime::mode` 求值它（哪种模式准落什么），而 wire 不依赖 runtime，runtime 也不依赖 wire。两个外层 crate 都要叫出这个名字，谁都不得指名对方，所以名字住在这里。本枚举只说**有哪几种**；每一种准什么，仍旧只有 `runtime::mode` 一处回答。
+为什么定义在这里而不在 `runtime`：**与 `DialectKind` 同一条依赖倒置**——线上携带它，`runtime::mode` 求值它，而 wire 不依赖 runtime，runtime 也不依赖 wire。两个外层 crate 都要叫出这个名字，谁都不得指名对方，所以名字住在这里。本枚举只说**有哪几种**；每一种怎样介绍给模型、准落什么，仍旧只有 `runtime::mode` 一处回答。
 
-**认不出的词在进程边界反序列化失败，不落成默认模式**：把认不出的词读成 `PlanGoal` 的理由是规划什么都不要求，代价却是拼错 `experiment` 的人得到一个规划 run 和零句反馈。闭集把那句反馈还给发送方，落在它还能改的地方。
+**认不出的词在进程边界反序列化失败，不落成默认值**：读成默认值的词让拼错它的人得到一个他没要的 run 和零句反馈。闭集把那句反馈还给发送方，落在它还能改的地方。运行策略的另外三个枚举同此。
 
 **`model::Window`**——非零 `u64` 新类型，`Window::new(0) == None`，线上是裸数字、缺席是 `null`，`0` 在反序列化处被拒。
 
@@ -2341,3 +2352,45 @@ impl CityLayout {
 - **它治理的是谁能从外面够到这座城**，所以按 §8-56 第 3 条落在城的保留子树里：没有任何写域够得到它，一个 agent 改不了哪台设备配对过、各有什么权限。表里每台设备一行：id、人给的名字、权限与公钥；表的格式、读写与跨重启的持久化归远程门的装配层（remote_access-SPEC §3「装配未落」一段），本模块只回答它在哪。
 - **`remote/` 一个目录，而不是保留子树根下一个文件**：远程门落盘的状态都归这一个目录，于是撤掉远程门在盘上留下的一切就是删掉一个目录，不必逐个认文件。城密钥不在这里，它进 vault。
 - 第一个读者是远程门的装配；在它之前，这个路径没有调用方，由 `layout` 的单元测试核它的摆放。
+
+### 8-77 运行策略：一次 run 在什么纪律下工作（`kernel::model::mode`，形状 2 值类型）
+
+```rust
+pub enum Mode { Chat, Work }                                        // "chat" | "work"
+pub enum AdmissionRequirement { Standing, Tested, ContractKept, DoubleValidated }
+                                                                    // "standing" | "tested" | "contract_kept" | "double_validated"
+pub enum LandingPolicy { Ordinary, Experiment }                     // "ordinary" | "experiment"
+pub struct RunPolicy {
+    pub mode: Mode,
+    pub write: WriteLimit,              // §8-78
+    pub admit: AdmissionRequirement,
+    pub landing: LandingPolicy,
+}
+impl RunPolicy {
+    pub const fn of(mode: Mode) -> RunPolicy;   // write Full、admit Standing、landing Ordinary
+}
+impl Mode { pub const ALL: [Mode; 2]; pub const fn as_str(self) -> &'static str; }
+impl AdmissionRequirement { pub const ALL: [AdmissionRequirement; 4]; pub const fn as_str(self) -> &'static str; }
+impl LandingPolicy { pub const ALL: [LandingPolicy; 2]; pub const fn as_str(self) -> &'static str; }
+```
+
+- **四件事，四个值。** `Mode` 回答这次 run 是在交谈还是在干活；`WriteLimit` 回答它能改什么；`AdmissionRequirement` 回答它的产出要带什么证据才准合并；`LandingPolicy` 回答产出走常规的路，还是留在一棵试验的树里不落地。四者独立取值、可以任意组合：只读可新建的试验、要测试的交谈都拼得出来，而且都有确定的意思。它们总是一起走（线上的 `Dispatch`、账本的 `run_started`、装配层的派活），所以是一个值 `RunPolicy`。
+- **`Standing` 是一个有名字的值，不是「没有要求」。** 它说的是「楼自己的规矩已经要的检查，不多加一项」：楼要评审，评审照旧；楼不要，就只有这次 run 自己的检查点。它不取消任何既有的强制校验。把它写成 `Option<AdmissionRequirement>` 的 `None`，读者会把缺席读成免检。
+- **选了要求不等于拿到了证据。** `RunPolicy` 只记要求；证据由 `runtime::mode::admits` 在合并那一刻对照（runtime-SPEC §8-54）。
+- **`RunPolicy::of(mode)` 是「只选了 mode」的策略**：写入不额外收窄、准入按楼的规矩、常规落地。派活的入口里只有人能选另外三项；城自己派的活（计划、排程、来信、编辑器经 ACP 派来的活）都走 `of(Mode::Work)`，一次委派或敲门继承说话那一方的整份策略。
+- **拼法只有一处**：每个枚举的 `as_str` 写出的词就是 serde 读的词，各有一条遍历式断言钉住往返同词；未知词在反序列化处即拒（§8-40）。
+- **入账**：`RunStarted.policy: Option<RunPolicy>`（§8-4 记录围栏），由 `runtime::run::Charter::open` 写，`#[serde(default, skip_serializing_if = "Option::is_none")]`。旧账本里没有这个键，读作「这一行早于策略入账」；旧的六个 mode 词从未以类型化载荷进过账本，所以没有要映射的历史读法（§12.12）。
+- 验收：`kernel::event::record::run` 的 `a_run_started_line_records_its_policy`（四个值写出、原样读回、键名与词都是本节的拼法）；`model::mode` 的往返断言。
+
+### 8-78 写入限制：在写域之上叠一道「只新建」（`kernel::write_domain`、`kernel::gate::domain`，形状 1 判定＋形状 2 值）
+
+```rust
+pub enum WriteLimit { Full, Create }                                // "full" | "create"
+impl WriteLimit { pub const ALL: [WriteLimit; 2]; pub const fn as_str(self) -> &'static str; }
+pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome;   // kernel::gate
+```
+
+- **限制叠在写域上，不并进写域。** 写域（§8-11、§8-46）回答一个地址能不能写、写哪种文件，它来自楼的 `RULES.toml`；写入限制回答一次 run 能不能改动已经存在的文件，它来自这次派活。`Full` 表示不额外收窄；`Create` 表示只准原子地新建一个不存在的普通文件，已经存在的文件——包括这次 run 刚建成的——不能覆盖、删除或改名。两道判定都要通过，所以 `Full` 永远放不宽楼的写域，`Documents` 楼里的 `Create` 仍只能新建 Markdown 文档、仍够不到计划文件。
+- **`gate::replacing` 是「这次写会动到已有文件」时的唯一判定**：`Full` 答 `Allow`；`Create` 答 `Deny`，`E_OUTSIDE_WRITE_DOMAIN` 三段式，规则「this run creates files and changes none」，违规点出目标，替代给出「写到一个新路径」，恢复语说限制由派活时选定、换一次派活才能改。复用既有的码而不新开一个：对调用者而言这与写域外的拒绝是同一类事——这次 run 不准写那里——恢复的路也同类。
+- **「目标是否已经存在」不由本模块判。** 那是文件系统在写那一刻的事实；只有在写的那一刻原子地判，竞争的两次新建才只成一次（runtime-SPEC §8-55，storage-SPEC §8-32）。kernel 只持规则与拒词，判定点在每一条写路径上调它。
+- 验收：`gate::domain` 测试里 `Create` 拒、`Full` 放各一条；真实写路径上的验收在 runtime-SPEC §8-55。
