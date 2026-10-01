@@ -3,9 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `transcribe`: a recording in this run's own building, turned into text
-//! by the endpoint the person chose to transcribe (sprawling-SPEC.md
-//! 8-131).
+//! `transcribe`: a recording this run may read - a file in the city, or
+//! a block a connector stored - turned into text by the endpoint the
+//! person chose to transcribe (sprawling-SPEC.md 8-131).
 //!
 //! Whether the tool exists is the book's answer to the question the
 //! composer's microphone asks, `select(ModelTag::Transcribe, policy)`,
@@ -13,13 +13,13 @@
 //! building the book gives no transcription endpoint is not offered a
 //! tool that could only fail.
 
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use kernel::{
-    Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall,
-    ToolMeta, ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
+    ToolName, ToolOutcome,
 };
+use runtime::tools::Named;
 use serde_json::{Map, Value, json};
 
 use crate::worker::workbench::{Laying, Site};
@@ -37,6 +37,7 @@ impl Laying {
     pub(super) fn transcription_tool(
         &self,
         site: &Site,
+        reader: runtime::BoundReader,
     ) -> Result<Option<TranscribeTool>, AxError> {
         let chosen = match self
             .book
@@ -53,17 +54,14 @@ impl Laying {
             &chosen,
             crate::held_vault::resolving(Arc::clone(&self.vault)),
         )?;
-        TranscribeTool::new(&site.write_root, site.building.addr().clone(), transcriber).map(Some)
+        TranscribeTool::new(reader, transcriber).map(Some)
     }
 }
 
-/// The tool: where the run reads, which building it may read a
-/// recording from, and the facility that turns one into text.
+/// The tool: what the run may read, and the facility that turns a
+/// recording into text.
 pub(super) struct TranscribeTool {
-    /// The tree the run reads in: the city, or its own worktree under
-    /// review.
-    root: PathBuf,
-    building: Address,
+    reader: runtime::BoundReader,
     /// Behind a lock because the credential resolver inside it is `Send`
     /// and not `Sync`, while a tool is shared between the calls of a
     /// wave; two transcriptions of one run take their turns.
@@ -76,8 +74,7 @@ impl TranscribeTool {
     /// Refuses a name or a parameter schema that does not build, which
     /// the literals below cannot produce.
     fn new(
-        root: &Path,
-        building: Address,
+        reader: runtime::BoundReader,
         transcriber: gateway::Transcriber,
     ) -> Result<TranscribeTool, AxError> {
         let params = json!({
@@ -85,8 +82,9 @@ impl TranscribeTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "a recording in your own building, relative to the city \
-                                    root, ending in .webm, .ogg, .mp3, .mp4 or .wav",
+                    "description": "a recording you may read: a path relative to the city \
+                                    root ending in .webm, .ogg, .mp3, .mp4 or .wav, or the \
+                                    cas: locator a recording was stored under",
                 },
             },
             "required": ["path"],
@@ -102,14 +100,14 @@ impl TranscribeTool {
             ));
         };
         Ok(TranscribeTool {
-            root: root.to_path_buf(),
-            building,
+            reader,
             transcriber: Mutex::new(transcriber),
             meta: ToolMeta {
                 name: ToolName::parse(ACTION)?,
-                disclosure: "Turn a recording of speech in your own building into text, \
-                             through the transcription endpoint this city was given. The \
-                             recording is sent to that endpoint."
+                disclosure: "Turn a recording of speech into text - a file you may read, or \
+                             a recording by its cas: locator - through the transcription \
+                             endpoint this city was given. The recording is sent to that \
+                             endpoint."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,
@@ -125,60 +123,24 @@ impl TranscribeTool {
         })
     }
 
-    /// The recording `asked` names, once the path is judged.
+    /// The recording `asked` names, read through the one door every
+    /// model-chosen name is judged at.
     ///
-    /// Every judgement is an existing authority's: the address grammar,
-    /// the building it lies in, the reserved subtree, and the alias rule,
-    /// which refuses a link anywhere on the way rather than following it.
+    /// A file says what container it is by its name, a `file:` Locator
+    /// included; a block has no name and says it by how it starts.
     ///
     /// # Errors
-    /// `E_INVALID_ARGS` for a path that does not parse, a container this
-    /// city cannot send, and a file that is not there; `E_GATE_DENIED`
-    /// for a path outside this building, in a reserved subtree, or behind
-    /// a link; whatever reading the recording refuses.
+    /// What the door refuses the name with, a container this city cannot
+    /// send, and whatever reading the recording refuses.
     fn recording(&self, asked: &str) -> Result<gateway::Recording, AxError> {
-        let addr = Address::parse(asked).map_err(|err| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                ACTION,
-                format!("{asked}: {}", err.subject()),
-            )
-            .with_recovery(
-                "pass a city-relative path with no `..`, no leading slash and no empty segment",
-            )
-        })?;
-        if !addr.is_within(&self.building) || addr.is_reserved() {
-            return Err(AxError::failure(
-                AxCode::GateDenied,
-                ACTION,
-                format!(
-                    "{asked} is not a file of {}, outside its reserved subtree",
-                    self.building.as_str()
-                ),
-            )
-            .with_recovery(format!(
-                "a recording is transcribed from the building whose rules chose the endpoint \
-                 it is sent to; copy it into {} first",
-                self.building.as_str()
-            )));
-        }
-        let kind = gateway::AudioType::of_file_name(asked)?;
-        let path = addr
-            .as_str()
-            .split('/')
-            .fold(self.root.clone(), |path, segment| path.join(segment));
-        let cleared = storage::WriteTarget::within(ACTION, &self.root, &path)
-            .map_err(storage::StorageError::into_ax)?;
-        let file = std::fs::File::open(cleared.as_path()).map_err(|err| {
-            if err.kind() == std::io::ErrorKind::NotFound {
-                AxError::failure(AxCode::InvalidArgs, ACTION, format!("{asked} is not there"))
-                    .with_recovery("name a recording that exists; `search` finds files by name")
-            } else {
-                AxError::failure(AxCode::StorageFatal, ACTION, format!("{asked}: {err}"))
-                    .with_recovery("a person has to make the file readable")
+        let opened = self.reader.open(asked, ACTION)?;
+        match opened.named().clone() {
+            Named::File(addr) => {
+                let kind = gateway::AudioType::of_file_name(addr.as_str())?;
+                gateway::Recording::read_from(opened, kind)
             }
-        })?;
-        gateway::Recording::read_from(file, kind)
+            Named::Block(_) => gateway::Recording::read_unlabelled(opened),
+        }
     }
 }
 
@@ -210,7 +172,7 @@ impl Tool for TranscribeTool {
                     ACTION,
                     "missing string argument `path`",
                 )
-                .with_recovery("pass one string: the city-relative path of a recording")
+                .with_recovery("pass one string: the path or the cas: locator of a recording")
             })?;
         let recording = self.recording(asked)?;
         let text = self
@@ -247,15 +209,26 @@ impl Tool for TranscribeTool {
     reason = "test code"
 )]
 mod tests {
+    use std::path::Path;
+
+    use kernel::{Address, ReadVerdict};
+
     use super::*;
 
-    /// A tool over a city in a temporary directory, working in `lab`,
-    /// with no endpoint behind it: every case here is refused before
-    /// anything would be sent.
+    /// A tool over a city in a temporary directory, where `vault` is a
+    /// confidential building seen from outside, with no endpoint behind
+    /// it: every case here is refused before anything would be sent.
     fn tool(root: &Path) -> TranscribeTool {
+        let bound: runtime::ReadBound = Arc::new(|addr: &Address| {
+            if addr.as_str().starts_with("vault") {
+                ReadVerdict::Confidential
+            } else {
+                ReadVerdict::Open
+            }
+        });
+        let store = kernel::layout::CityLayout::new(root).cas();
         TranscribeTool::new(
-            root,
-            Address::parse("lab").unwrap(),
+            runtime::BoundReader::new(root, bound, &store),
             gateway::Transcriber::absent(),
         )
         .unwrap()
@@ -269,47 +242,68 @@ mod tests {
         }
     }
 
-    fn refused(root: &Path, path: &str) -> AxError {
-        tool(root).invoke(&call(path)).unwrap_err()
+    fn put(root: &Path, at: &str, bytes: &[u8]) {
+        let path = at
+            .split('/')
+            .fold(root.to_path_buf(), |path, part| path.join(part));
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, bytes).unwrap();
     }
 
-    /// The one building whose rules chose the endpoint is the one a
-    /// recording may come from, and its governance is never read.
-    #[test]
-    fn a_recording_outside_this_building_or_in_its_reserved_subtree_is_refused() {
-        let city = tempfile::tempdir().unwrap();
-        for elsewhere in ["hall/dropped/0/voice.wav", "lab/.sprawling/voice.wav"] {
-            let err = refused(city.path(), elsewhere);
-            assert_eq!(*err.code(), AxCode::GateDenied, "{elsewhere}: {err:?}");
-            assert!(err.recovery().contains("lab"), "{}", err.recovery());
-        }
-        let absolute = refused(city.path(), "/lab/voice.wav");
-        assert_eq!(*absolute.code(), AxCode::InvalidArgs, "{absolute:?}");
+    fn stored(root: &Path, building: &str, bytes: &[u8]) -> String {
+        let hash = storage::Cas::open(&kernel::layout::CityLayout::new(root).cas())
+            .unwrap()
+            .put_for(
+                bytes,
+                &storage::BlockOrigin {
+                    run: kernel::RunId::from_bytes([7; 16]),
+                    building: Address::parse(building).unwrap(),
+                },
+            )
+            .unwrap();
+        format!("cas:b3-{hash}")
     }
 
-    /// A container this city cannot send is refused with the refusal the
-    /// gateway writes, before the file is opened.
+    /// What the door closes, what is not there and a container this city
+    /// cannot send are refused before anything is sent; a recording
+    /// another open building holds and a stored block reach the
+    /// facility, which here has no endpoint and says so by name.
     #[test]
-    fn a_recording_this_city_cannot_send_is_refused_with_the_ones_it_can() {
+    fn a_recording_is_judged_by_the_door_and_its_container_before_it_is_sent() {
         let city = tempfile::tempdir().unwrap();
-        let err = refused(city.path(), "lab/lead/voice.flac");
-        assert_eq!(*err.code(), AxCode::InvalidArgs, "{err:?}");
-        assert!(err.recovery().contains(".wav"), "{}", err.recovery());
-        let missing = refused(city.path(), "lab/lead/voice.wav");
-        assert_eq!(*missing.code(), AxCode::InvalidArgs, "{missing:?}");
-        assert!(missing.subject().contains("not there"), "{missing:?}");
-    }
-
-    /// A recording that reads is handed to the facility, which here has
-    /// no endpoint and says so by name.
-    #[test]
-    fn a_recording_that_reads_reaches_the_facility() {
-        let city = tempfile::tempdir().unwrap();
-        let room = city.path().join("lab").join("lead");
-        std::fs::create_dir_all(&room).unwrap();
-        std::fs::write(room.join("voice.wav"), b"RIFF-spoken").unwrap();
-        let err = refused(city.path(), "lab/lead/voice.wav");
-        assert_eq!(*err.code(), AxCode::ToolUnavailable, "{err:?}");
-        assert_eq!(err.action(), "transcribe a recording");
+        put(city.path(), "vault/room/voice.wav", b"RIFF-secret");
+        put(city.path(), "hall/room/voice.flac", b"fLaC-spoken");
+        put(city.path(), "hall/room/voice.wav", b"RIFF-spoken");
+        let wav = stored(city.path(), "hall", b"RIFF\x24\x00\x00\x00WAVEfmt spoken");
+        let flac = stored(city.path(), "hall", b"fLaC-stored");
+        let tool = tool(city.path());
+        let answered: Vec<(AxCode, String)> = [
+            "vault/room/voice.wav",
+            "hall/.sprawling/voice.wav",
+            "hall/room/absent.wav",
+            "hall/room/voice.flac",
+            flac.as_str(),
+            "hall/room/voice.wav",
+            wav.as_str(),
+        ]
+        .into_iter()
+        .map(|asked| {
+            let err = tool.invoke(&call(asked)).unwrap_err();
+            (*err.code(), err.action().to_owned())
+        })
+        .collect();
+        assert_eq!(
+            answered,
+            [
+                (AxCode::GateDenied, ACTION),
+                (AxCode::GateDenied, ACTION),
+                (AxCode::InvalidArgs, ACTION),
+                (AxCode::InvalidArgs, "read a recording's container"),
+                (AxCode::InvalidArgs, "read a recording's container"),
+                (AxCode::ToolUnavailable, "transcribe a recording"),
+                (AxCode::ToolUnavailable, "transcribe a recording"),
+            ]
+            .map(|(code, action)| (code, action.to_owned()))
+        );
     }
 }

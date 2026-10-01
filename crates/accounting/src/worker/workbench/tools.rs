@@ -127,12 +127,18 @@ impl Laying {
         // `search` ask one read bound, so what one may open the other may
         // find.
         let bound = self.read_bound(site);
+        let block_store = kernel::layout::CityLayout::new(&self.city_root).cas();
         let read = runtime::ReadTool::new(
             &site.write_root,
             Arc::clone(&catalog),
             Arc::clone(&bound),
-            &kernel::layout::CityLayout::new(&self.city_root).cas(),
+            &block_store,
         )?;
+        // The one door the tools that send bytes to an endpoint read
+        // through: the same bound, the same tree, the same store as
+        // `read`, so what one may open the others may send
+        // (runtime-SPEC 8-59).
+        let reader = runtime::BoundReader::new(&site.write_root, Arc::clone(&bound), &block_store);
         // Reading needs an address, and until this line there was no way
         // to find one: a symbol had to be hunted through `exec`, which
         // means Python this machine may not have or a shell this
@@ -219,7 +225,7 @@ impl Laying {
         }
         // Present only where the book names an endpoint this building
         // may send a recording to (sprawling-SPEC.md 8-131).
-        if let Some(transcribe) = self.transcription_tool(site)? {
+        if let Some(transcribe) = self.transcription_tool(site, reader)? {
             admitted.push(Box::new(transcribe));
         }
         // The last built-in: a look back at the history this building
