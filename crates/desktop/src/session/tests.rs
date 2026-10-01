@@ -78,6 +78,24 @@ fn work_asked_for_before_the_handshake_is_refused() {
     assert!(alive["result"].is_object());
 }
 
+/// The notification alone opens nothing: a client that never sent
+/// `initialize` negotiated no revision and read no capabilities, so the
+/// connection stays where it was and the tools stay closed
+/// (`crates/desktop/Spec.lean` D15).
+#[test]
+fn the_notification_before_initialize_opens_nothing() {
+    let mut server = Server::new(Scope::parse("windows = [\"*\"]\n"));
+    assert!(
+        server.answer(READY).is_none(),
+        "a notification is never answered"
+    );
+    let asked = answer(&mut server, "notifications/initialized", json!({}));
+    assert_eq!(asked["error"]["data"]["code"], "E_GATE_DENIED");
+    let listed = answer(&mut server, "tools/list", json!({}));
+    assert_eq!(listed["error"]["data"]["code"], "E_GATE_DENIED");
+    assert_eq!(server.phase, Phase::Fresh);
+}
+
 #[test]
 fn the_list_carries_the_six_names_with_a_description_and_a_schema_each() {
     let mut server = opened("windows = [\"*\"]\n");
