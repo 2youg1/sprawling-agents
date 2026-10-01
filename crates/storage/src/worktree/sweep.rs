@@ -60,7 +60,7 @@ impl Worktrees {
             if held.contains(&name) || !self.made_here(&name)? {
                 continue;
             }
-            self.forget(&name)?;
+            self.forget(name.as_str())?;
             self.drop_lease_branch(&name)?;
             swept.push(name);
         }
@@ -123,6 +123,57 @@ impl Worktrees {
             branch.delete().map_err(git_err("delete a lease branch"))?;
         }
         Ok(())
+    }
+
+    /// Unregisters the tree `id`, taking its files with it where git will.
+    ///
+    /// A repository that has already forgotten the tree is the end
+    /// state this asks for, so it is not a failure.
+    pub(super) fn forget(&self, id: &str) -> Result<(), StorageError> {
+        let tree = match self.repo.find_worktree(id) {
+            Ok(tree) => tree,
+            Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
+            Err(err) => {
+                return Err(StorageError::Worktree {
+                    op: "find a worktree",
+                    detail: format!("{id}: {err}"),
+                });
+            }
+        };
+        let mut opts = git2::WorktreePruneOptions::new();
+        // A lock on a tree whose directory is gone guards nothing.
+        opts.valid(true).locked(true).working_tree(true);
+        tree.prune(Some(&mut opts))
+            .map_err(|err| StorageError::Worktree {
+                op: "prune a worktree",
+                detail: format!("{id}: {err}"),
+            })
+    }
+
+    /// Removes the directory `id` under the city's tree home, which the
+    /// caller knows git has no registration for: a placement or a
+    /// stocking that failed halfway left it, and a checkout refuses to
+    /// land on a directory that exists. The whole subtree is the city's
+    /// machinery, so nothing in it is the person's.
+    ///
+    /// A name that is a link is refused rather than removed, because the
+    /// placement it precedes would refuse it too (storage-SPEC 8-25).
+    ///
+    /// # Errors
+    /// Refuses a name that is a link, and propagates a directory that
+    /// exists and cannot be removed.
+    pub(super) fn clear_unregistered(&self, id: &str) -> Result<(), StorageError> {
+        let path = self.home.join(id);
+        crate::alias::WriteTarget::within("place a worktree", &self.city_root, &path)?;
+        match std::fs::remove_dir_all(&path) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(source) => Err(StorageError::Io {
+                op: "remove an abandoned worktree",
+                path,
+                source,
+            }),
+        }
     }
 
     /// Removes every directory under the city's tree home that git has

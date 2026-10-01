@@ -14,7 +14,7 @@ use crate::error::StorageError;
 use super::landing::{CheckoutRun, Landing, PlannedMerge, check_out};
 use super::lease::{FileWork, WorktreeLease};
 use super::name::WorktreeName;
-use super::weight::{Weight, measure, written};
+use super::weight::{Weight, Written, measure, written};
 use kept::Standing;
 
 mod kept;
@@ -30,7 +30,7 @@ pub struct Worktrees {
     pub(super) repo: git2::Repository,
     pub(super) home: PathBuf,
     /// Where the person placed the city; the alias check stops here.
-    city_root: PathBuf,
+    pub(super) city_root: PathBuf,
     ceiling: ByteLen,
 }
 
@@ -93,15 +93,23 @@ impl Worktrees {
         }
     }
 
-    /// Places a new tree for `name`, locked from the moment it exists.
+    /// Places a new tree for `name`, locked from the moment it exists:
+    /// the stock taken over when there is one to take, and a checkout of
+    /// the whole tree otherwise (storage-SPEC 8-35).
     fn place(&self, name: &WorktreeName) -> Result<WorktreeLease, StorageError> {
-        let city = self.refuse_oversized(name)?;
+        let city = self.refuse_oversized(name.as_str())?;
         if self.repo.head().is_err() {
             return Err(StorageError::Worktree {
                 op: "branch a worktree",
                 detail: "the city has no checkpoint yet, and a tree branches from a commit"
                     .to_owned(),
             });
+        }
+        // `standing` found no registration, so a directory under this
+        // name is what a placement that failed halfway left behind.
+        self.clear_unregistered(name.as_str())?;
+        if let Some(lease) = self.adopt(name, &city)? {
+            return Ok(lease);
         }
         // A node that has held a tree before still has its branch: the
         // tree is a materialization, the branch is the line of work.
@@ -125,8 +133,8 @@ impl Worktrees {
 
     /// Refuses a tree before it exists when the city working tree it
     /// copies is over the ceiling, and otherwise answers what that
-    /// working tree weighed.
-    pub(super) fn refuse_oversized(&self, name: &WorktreeName) -> Result<Weight, StorageError> {
+    /// working tree weighed. `id` names the tree in the refusal.
+    pub(super) fn refuse_oversized(&self, id: &str) -> Result<Weight, StorageError> {
         let source = self.repo.workdir().ok_or_else(|| StorageError::Worktree {
             op: "find the city working tree",
             detail: "the repository is bare".to_owned(),
@@ -134,7 +142,7 @@ impl Worktrees {
         let city = measure(source)?;
         if city.bytes.get() > self.ceiling.get() {
             return Err(StorageError::WorktreeBusy {
-                name: name.as_str().to_owned(),
+                name: id.to_owned(),
                 detail: format!(
                     "the city working tree is {} bytes and the ceiling is {}",
                     city.bytes.get(),
@@ -154,28 +162,7 @@ impl Worktrees {
         reference: Option<&git2::Reference<'_>>,
         city: &Weight,
     ) -> Result<WorktreeLease, StorageError> {
-        std::fs::create_dir_all(&self.home).map_err(|source| StorageError::Io {
-            op: "create the worktree home",
-            path: self.home.clone(),
-            source,
-        })?;
-        let path = self.home.join(name.as_str());
-        // The checkout lands at this name, and a name that is an alias
-        // would write the whole tree through it (storage-SPEC 8-25).
-        crate::alias::WriteTarget::within("place a worktree", &self.city_root, &path)?;
-        let mut opts = git2::WorktreeAddOptions::new();
-        opts.lock(true);
-        opts.reference(reference);
-        let tree = self
-            .repo
-            .worktree(name.as_str(), &path, Some(&opts))
-            .map_err(|err| StorageError::Worktree {
-                op: "add a worktree",
-                detail: format!("{}: {err}", name.as_str()),
-            })?;
-        // The size is read from the index the checkout just wrote rather
-        // than by walking the tree it wrote (storage-SPEC 8-31).
-        let checked_out = written(&tree)?;
+        let (path, checked_out) = self.check_out_tree(name.as_str(), reference)?;
         Ok(WorktreeLease {
             name: name.clone(),
             disk: checked_out.bytes,
@@ -186,6 +173,37 @@ impl Worktrees {
                 ..FileWork::default()
             },
         })
+    }
+
+    /// Registers the tree `id` under the tree home, locked, and checks it
+    /// out whole; answers where it is and what the checkout wrote.
+    pub(super) fn check_out_tree(
+        &self,
+        id: &str,
+        reference: Option<&git2::Reference<'_>>,
+    ) -> Result<(PathBuf, Written), StorageError> {
+        std::fs::create_dir_all(&self.home).map_err(|source| StorageError::Io {
+            op: "create the worktree home",
+            path: self.home.clone(),
+            source,
+        })?;
+        let path = self.home.join(id);
+        // The checkout lands at this name, and a name that is an alias
+        // would write the whole tree through it (storage-SPEC 8-25).
+        crate::alias::WriteTarget::within("place a worktree", &self.city_root, &path)?;
+        let mut opts = git2::WorktreeAddOptions::new();
+        opts.lock(true);
+        opts.reference(reference);
+        let tree =
+            self.repo
+                .worktree(id, &path, Some(&opts))
+                .map_err(|err| StorageError::Worktree {
+                    op: "add a worktree",
+                    detail: format!("{id}: {err}"),
+                })?;
+        // The size is read from the index the checkout just wrote rather
+        // than by walking the tree it wrote (storage-SPEC 8-31).
+        Ok((path, written(&tree)?))
     }
 
     /// Decides a merge without making it.
@@ -338,32 +356,8 @@ impl Worktrees {
             .map_err(|err| refuse("unlock a worktree", err))
     }
 
-    /// Unregisters `name`, taking its files with it where git will.
-    ///
-    /// A repository that has already forgotten the tree is the end
-    /// state this asks for, so it is not a failure.
-    pub(super) fn forget(&self, name: &WorktreeName) -> Result<(), StorageError> {
-        let tree = match self.repo.find_worktree(name.as_str()) {
-            Ok(tree) => tree,
-            Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
-            Err(err) => {
-                return Err(StorageError::Worktree {
-                    op: "find a worktree",
-                    detail: format!("{}: {err}", name.as_str()),
-                });
-            }
-        };
-        let mut opts = git2::WorktreePruneOptions::new();
-        // A lock on a tree whose directory is gone guards nothing.
-        opts.valid(true).locked(true).working_tree(true);
-        tree.prune(Some(&mut opts))
-            .map_err(|err| StorageError::Worktree {
-                op: "prune a worktree",
-                detail: format!("{}: {err}", name.as_str()),
-            })
-    }
-
-    /// Every tree the repository knows about, sorted.
+    /// Every node's tree the repository knows about, sorted. The stock
+    /// is no node's tree, and is not among them.
     ///
     /// # Errors
     /// Propagates a repository that cannot list its worktrees.
@@ -379,7 +373,9 @@ impl Worktrees {
         // A name git cannot render as UTF-8 was not written by this
         // module, and it is not a tree this city can address.
         for name in names.iter().flatten().flatten() {
-            out.push(WorktreeName::parse(name)?);
+            if name != stock::STOCK {
+                out.push(WorktreeName::parse(name)?);
+            }
         }
         out.sort();
         Ok(out)

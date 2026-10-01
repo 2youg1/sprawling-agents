@@ -18,9 +18,10 @@
 //!
 //! Copy-on-write cloning (reflink) is the cheaper path on filesystems
 //! that offer it, and this module does not attempt it: there is no CoW
-//! interface without unsafe FFI or a new dependency, so today every tree
-//! is a full checkout under the ceiling. That is the fallback arm of the
-//! design, stated as the current state rather than as the design.
+//! interface without unsafe FFI or a new dependency, so every tree is a
+//! full checkout under the ceiling. What moves the checkout off the path
+//! a run waits on is the stock: one tree checked out ahead of time and
+//! taken over by the next placement with a rename (storage-SPEC 8-35).
 
 mod back;
 mod landing;

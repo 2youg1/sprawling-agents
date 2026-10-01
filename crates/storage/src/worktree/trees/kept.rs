@@ -86,7 +86,7 @@ impl Worktrees {
             }
         };
         if !tree.path().exists() {
-            self.forget(name)?;
+            self.forget(name.as_str())?;
             return Ok(Standing::Absent);
         }
         let lock = tree.is_locked().map_err(|err| StorageError::Worktree {
@@ -122,48 +122,13 @@ impl Worktrees {
         tree: &git2::Worktree,
         scopes: &[String],
     ) -> Result<WorktreeLease, StorageError> {
-        let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
-            op,
-            detail: format!("{}: {err}", name.as_str()),
-        };
         self.follow_trunk(name)?;
-        let repo = git2::Repository::open_from_worktree(tree)
-            .map_err(|err| refuse("open a kept worktree", err))?;
-        let head = repo
-            .head()
-            .and_then(|head| head.peel_to_tree())
-            .map_err(|err| refuse("read a kept worktree's branch", err))?;
-        let mut index = repo
-            .index()
-            .map_err(|err| refuse("read a kept worktree's index", err))?;
-        if !index_writes_tree(&mut index, head.id())
-            .map_err(|err| refuse("compare a kept worktree's index", err))?
-        {
-            index
-                .read_tree(&head)
-                .and_then(|()| index.write())
-                .map_err(|err| refuse("reset a kept worktree's index", err))?;
-        }
-        let mut work = FileWork::default();
-        let mut checkout = git2::build::CheckoutBuilder::new();
-        checkout
-            .force()
-            .remove_untracked(true)
-            .notify_on(
-                git2::CheckoutNotificationType::UPDATED | git2::CheckoutNotificationType::UNTRACKED,
-            )
-            .notify(|kind, _, _, target, workdir| {
-                count_change(&mut work, kind, (target.is_some(), workdir.is_some()));
-                true
-            });
-        for spec in crate::checkpoint::scan::pathspec::of(scopes) {
-            checkout.path(spec);
-        }
-        repo.checkout_head(Some(&mut checkout))
-            .map_err(|err| refuse("reset a kept worktree", err))?;
-        drop(checkout);
+        let work = restore(tree, name.as_str(), scopes)?;
         tree.lock(Some(LEASE_REASON))
-            .map_err(|err| refuse("lock a worktree", err))?;
+            .map_err(|err| StorageError::Worktree {
+                op: "lock a worktree",
+                detail: format!("{}: {err}", name.as_str()),
+            })?;
         let weight = measure(tree.path())?;
         Ok(WorktreeLease {
             name: name.clone(),
@@ -212,6 +177,75 @@ impl Worktrees {
         }
         Ok(())
     }
+}
+
+/// Puts `tree` on `branch` and forces every tracked file under `scopes`
+/// to its head, removing what is untracked there, and counts what that
+/// wrote (storage-SPEC 8-31). The index is read back from the head first
+/// when it does not already write the head's tree, for the reason
+/// [`Worktrees::reattach`] gives.
+///
+/// The worktree's HEAD is pointed at `branch` when it names anything
+/// else: a stock taken over by a node still names the stock's branch
+/// (storage-SPEC 8-35), and a checkout of the wrong head would hand the
+/// node another line of work.
+///
+/// # Errors
+/// Propagates a tree whose repository, head, index or checkout git
+/// refuses.
+pub(super) fn restore(
+    tree: &git2::Worktree,
+    branch: &str,
+    scopes: &[String],
+) -> Result<FileWork, StorageError> {
+    let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
+        op,
+        detail: format!("{branch}: {err}"),
+    };
+    let repo = git2::Repository::open_from_worktree(tree)
+        .map_err(|err| refuse("open a kept worktree", err))?;
+    let wanted = format!("refs/heads/{branch}");
+    let pointed = repo
+        .find_reference("HEAD")
+        .map_err(|err| refuse("read a kept worktree's HEAD", err))?;
+    if pointed.symbolic_target_bytes() != Some(wanted.as_bytes()) {
+        repo.reference_symbolic("HEAD", &wanted, true, "point the tree at its node's branch")
+            .map_err(|err| refuse("point a kept worktree at its branch", err))?;
+    }
+    let head = repo
+        .head()
+        .and_then(|head| head.peel_to_tree())
+        .map_err(|err| refuse("read a kept worktree's branch", err))?;
+    let mut index = repo
+        .index()
+        .map_err(|err| refuse("read a kept worktree's index", err))?;
+    if !index_writes_tree(&mut index, head.id())
+        .map_err(|err| refuse("compare a kept worktree's index", err))?
+    {
+        index
+            .read_tree(&head)
+            .and_then(|()| index.write())
+            .map_err(|err| refuse("reset a kept worktree's index", err))?;
+    }
+    let mut work = FileWork::default();
+    let mut checkout = git2::build::CheckoutBuilder::new();
+    checkout
+        .force()
+        .remove_untracked(true)
+        .notify_on(
+            git2::CheckoutNotificationType::UPDATED | git2::CheckoutNotificationType::UNTRACKED,
+        )
+        .notify(|kind, _, _, target, workdir| {
+            count_change(&mut work, kind, (target.is_some(), workdir.is_some()));
+            true
+        });
+    for spec in crate::checkpoint::scan::pathspec::of(scopes) {
+        checkout.path(spec);
+    }
+    repo.checkout_head(Some(&mut checkout))
+        .map_err(|err| refuse("reset a kept worktree", err))?;
+    drop(checkout);
+    Ok(work)
 }
 
 /// Counts one change a reattaching checkout announced before making it
