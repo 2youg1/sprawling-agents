@@ -5,6 +5,7 @@
 
 //! The L0 three. Index only: no logic lives here.
 
+mod bound_reader;
 mod chosen_path;
 mod edit;
 mod exec;
@@ -13,6 +14,7 @@ mod search;
 mod status;
 mod succeed;
 
+pub use bound_reader::{BoundReader, Named, Opened};
 pub use chosen_path::ReadBound;
 #[cfg(test)]
 pub(crate) use chosen_path::admit;
