@@ -45,4 +45,4 @@ pub(crate) use reading::Heard;
 pub use reading::{Lines, MESSAGE_CEILING, Received, read_one_message};
 #[cfg(feature = "conformance")]
 pub use stdio::{counting_starts, echoing, gated};
-pub use tools::{Listed, McpTool, tools_from};
+pub use tools::{EFFECT_META_KEY, Listed, McpTool, tools_from};

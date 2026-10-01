@@ -22,8 +22,9 @@ use serde_json::{Map, Value};
 
 /// The `_meta` key a server sets on an `isError` result when part of the
 /// call may already have taken effect (`crates/agent_protocols/Spec.lean` §8-1c).
-/// `crates/desktop/src/refusal.rs` quotes it, and `xtask guard` compares the two.
-pub(crate) const EFFECT_META_KEY: &str = "sprawling/effect-unknown";
+/// The desktop server sets it by reading it from here
+/// (`crates/desktop/desktop-SPEC.md` §12.14).
+pub const EFFECT_META_KEY: &str = "sprawling/effect-unknown";
 
 /// How much of a server's own failure text reaches the subject: a refusal
 /// and its recovery fit, a stack trace or a whole page does not

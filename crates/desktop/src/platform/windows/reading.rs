@@ -131,13 +131,31 @@ pub(super) fn asked_for(arguments: &Value) -> Result<Wanted, Refusal> {
         },
         quality: match whole(arguments, "quality")? {
             None => encode::DEFAULT_QUALITY,
-            Some(asked) => u8::try_from(asked)
-                .ok()
-                .filter(|quality| *quality <= encode::QUALITY_MAX)
-                .ok_or_else(|| {
-                    outside_domain("quality", asked, 0, u32::from(encode::QUALITY_MAX))
-                })?,
+            Some(asked) => admitted_quality(asked)?,
         },
+    })
+}
+
+/// A quality inside the city's domain (`kernel::consts_policy::IMAGE_QUALITY`),
+/// refused outside it in the city's own words rather than clamped.
+fn admitted_quality(asked: u32) -> Result<u8, Refusal> {
+    kernel::consts_policy::IMAGE_QUALITY
+        .admit(asked)
+        .map_err(|refused| {
+            Refusal::new(
+                RefusalCode::InvalidArgs,
+                refused.action(),
+                refused.subject(),
+                refused.recovery(),
+            )
+        })?;
+    u8::try_from(asked).map_err(|_| {
+        Refusal::new(
+            RefusalCode::InvalidArgs,
+            "encode a picture",
+            format!("quality {asked} is not a byte"),
+            "pass a quality the tool's schema describes",
+        )
     })
 }
 
@@ -283,7 +301,7 @@ mod tests {
         let refused = asked_for(&json!({ "quality": 900 })).unwrap_err();
         assert_eq!(
             refused.as_error()["data"]["code"],
-            json!(RefusalCode::InvalidArgs.as_str())
+            json!(RefusalCode::InvalidArgs.code().as_str())
         );
         // The same domain, for the scale: 0 leaves no pixels and past the
         // maximum is an upscale nobody asked for.

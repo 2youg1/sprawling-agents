@@ -12,6 +12,12 @@ name = "desktop"
 path = "src/lib.rs"
 
 [dependencies]
+# The city's facts this server answers in: the error codes and the image
+# quality domain from `kernel`, the MCP revision and the effect-unknown
+# key from `agent_protocols`, each read rather than copied
+# (desktop-SPEC.md section 12.14).
+kernel = { workspace = true }
+agent_protocols = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }

@@ -7,17 +7,12 @@
 //!
 //! A refusal has three parts — what was refused, why, and what can be
 //! done instead — and all three travel to the caller. The stable code is
-//! spelled exactly as the city spells it in `kernel::error::code`, and it
-//! is defined here rather than imported. Depending on `kernel` would not
-//! change which lints this package obeys — a manifest inherits the
-//! workspace table only by saying `[lints] workspace = true` — but it
-//! would make this package's own lock file resolve kernel's dependencies
-//! a second time, where nothing compares their versions with the
-//! workspace's (desktop-SPEC.md section 8.5, first pair). The rule that
-//! keeps the two definitions from drifting is that this file only ever
-//! *quotes* a code the city already has, which `xtask guard` checks; a new
-//! one is minted in `kernel` first.
+//! one of the city's own, `kernel::AxCode`, and its spelling is read from
+//! there; this server answers with a closed six of them, and a new one is
+//! minted in `kernel` first (desktop-SPEC.md section 8.5, first pair).
 
+use agent_protocols::EFFECT_META_KEY;
+use kernel::AxCode;
 use serde_json::{Value, json};
 
 /// The codes this server can answer with.
@@ -38,15 +33,15 @@ pub(crate) enum RefusalCode {
 }
 
 impl RefusalCode {
-    /// The spelling, identical to the city's own.
-    pub(crate) fn as_str(self) -> &'static str {
+    /// The city's code this one is, and so its spelling.
+    pub(crate) fn code(self) -> AxCode {
         match self {
-            RefusalCode::ToolUnknown => "E_TOOL_UNKNOWN",
-            RefusalCode::ToolUnavailable => "E_TOOL_UNAVAILABLE",
-            RefusalCode::InvalidArgs => "E_INVALID_ARGS",
-            RefusalCode::GateDenied => "E_GATE_DENIED",
-            RefusalCode::ConfigInvalid => "E_CONFIG_INVALID",
-            RefusalCode::WireMismatch => "E_WIRE_MISMATCH",
+            RefusalCode::ToolUnknown => AxCode::ToolUnknown,
+            RefusalCode::ToolUnavailable => AxCode::ToolUnavailable,
+            RefusalCode::InvalidArgs => AxCode::InvalidArgs,
+            RefusalCode::GateDenied => AxCode::GateDenied,
+            RefusalCode::ConfigInvalid => AxCode::ConfigInvalid,
+            RefusalCode::WireMismatch => AxCode::WireMismatch,
         }
     }
 
@@ -65,13 +60,6 @@ impl RefusalCode {
         }
     }
 }
-
-/// The `_meta` key that marks a refusal whose effect is unknown.
-///
-/// Quoted from `agent_protocols::mcp::tools::EFFECT_META_KEY`, which is
-/// the one definition; `xtask guard` compares the two
-/// (desktop-SPEC.md section 12.3).
-const EFFECT_META_KEY: &str = "sprawling/effect-unknown";
 
 /// One refusal, in three parts.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,7 +120,7 @@ impl Refusal {
     pub(crate) fn summary(&self) -> String {
         format!(
             "{}: cannot {} — {}",
-            self.code.as_str(),
+            self.code.code().as_str(),
             self.action,
             self.subject
         )
@@ -151,7 +139,7 @@ impl Refusal {
             "code": self.code.json_rpc(),
             "message": self.summary(),
             "data": {
-                "code": self.code.as_str(),
+                "code": self.code.code().as_str(),
                 "action": self.action,
                 "subject": self.subject,
                 "recovery": self.recovery,
@@ -223,8 +211,6 @@ mod tests {
             "`Ledger` is not in this scope",
             "add its title to DESKTOP.toml",
         );
-        // Each code is a literal of its own, because `xtask guard` reads
-        // every string in this file that opens with `E_` as a quoted code.
         assert_eq!(
             refusal.as_tool_result(),
             json!({
@@ -269,15 +255,5 @@ mod tests {
         assert_eq!(RefusalCode::InvalidArgs.json_rpc(), -32602);
         assert_eq!(RefusalCode::WireMismatch.json_rpc(), -32600);
         assert_eq!(RefusalCode::ToolUnavailable.json_rpc(), -32000);
-        for code in [
-            RefusalCode::ToolUnknown,
-            RefusalCode::ToolUnavailable,
-            RefusalCode::InvalidArgs,
-            RefusalCode::GateDenied,
-            RefusalCode::ConfigInvalid,
-            RefusalCode::WireMismatch,
-        ] {
-            assert!(code.as_str().starts_with("E_"), "{}", code.as_str());
-        }
     }
 }

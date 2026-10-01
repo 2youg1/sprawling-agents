@@ -19,10 +19,9 @@
 use crate::refusal::{Refusal, RefusalCode};
 use serde_json::{Value, json};
 
-/// The revision this server speaks. It equals `agent_protocols::PROTOCOL_VERSION`
-/// on purpose: the two ends have to agree, so a change to one is a change
-/// to both in the same edit (desktop-SPEC.md section 14).
-pub(crate) const PROTOCOL_VERSION: &str = "2025-06-18";
+/// The revision this server speaks: the city's client's own, because the
+/// two ends have to agree (desktop-SPEC.md section 14).
+pub(crate) use agent_protocols::PROTOCOL_VERSION;
 
 /// One request line, read.
 #[derive(Debug, Clone, PartialEq, Eq)]

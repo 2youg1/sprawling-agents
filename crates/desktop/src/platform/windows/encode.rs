@@ -80,13 +80,6 @@ pub(crate) const DEFAULT_SCALE: u32 = 100;
 /// nothing else gets.
 pub(crate) const DEFAULT_QUALITY: u8 = 85;
 
-/// The quality domain, refused outside rather than clamped or replaced.
-///
-/// `kernel::consts_policy::IMAGE_QUALITY` is the same domain in the city,
-/// and `xtask guard`'s wall compares the two numbers: this package sits
-/// outside the workspace and cannot read the kernel's.
-pub(crate) const QUALITY_MAX: u8 = 100;
-
 /// The scale domain: a percentage of the window's own pixels, which is a
 /// different quantity from the city's browser tool, where the same word
 /// is a percentage of the device pixel ratio.
