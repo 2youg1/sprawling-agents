@@ -62,8 +62,9 @@ budget_bytes = 2097152
 # The bundle the deliverable ships, gzipped, fonts included: the view
 # tree carries the storybook and its fixture tables, which ship with
 # the client on the `#/gallery` route (client-SPEC §6), and this is
-# what the client weighs with them. The register is a ratchet: a
-# number may improve freely and drift only within slack_bytes. The
+# what the client weighs with them. The row is a reading, not a gate:
+# runtime speed comes before size, so the bytes are printed and nothing
+# refuses them; best_bytes is the last recorded reading. The
 # reading rose by 30 KB when the talk thread, the setup screens, the
 # building and monitor views and their gallery fixtures grew by about
 # nine thousand lines of view code, none of it dead. It rose by 20 KB
@@ -72,9 +73,8 @@ budget_bytes = 2097152
 # remote door's five event kinds, and the client gained the document
 # reader and the guide command that use them.
 best_bytes = 599102
-slack_bytes = 20480
-measured_by = "just build-web, then just gates (the whole dist directory, recursive)"
-status = "gated"
+measured_by = "just build-web, then cargo xtask budget (the whole dist directory, recursive)"
+status = "reported, not gated: the person's ruling that runtime speed comes before size"
 
 # The remediation pass found the single-binary promise was hollow: build.rs
 # embedded a 1,306-byte placeholder and the real client never shipped. The
@@ -121,15 +121,15 @@ budget_bytes = 134217728
 # second executable to install and no hand-written [[mcp]] row. The
 # separate executable weighed 670,720 B, most of it std, serde_json, toml
 # and png, which this binary already carried; what is new is the
-# package's own code, the image encoders and the Win32 bindings. The
-# slack stays at 1 MiB, which is also the figure that reopens the
-# choice to link it here. UI Automation (uiautomation, winsafe, chrono)
+# package's own code, the image encoders and the Win32 bindings. Since
+# the person ruled that runtime speed comes before size, this row is a
+# reading, not a gate: the bytes are printed and nothing refuses them,
+# and best_bytes is the last reading recorded here. UI Automation (uiautomation, winsafe, chrono)
 # brought the reading to 13,524,992 B, 365,056 B over the best and inside
 # that slack, so the connector stays linked here.
 best_bytes = 13159936
-slack_bytes = 1048576
-measured_by = "just build-web, just dist, then just gates, on windows-x86_64"
-status = "gated"
+measured_by = "just build-web, just dist, then cargo xtask budget, on windows-x86_64"
+status = "reported, not gated: the person's ruling that runtime speed comes before size"
 
 # The unit is a production function because the alternative was measured:
 # any honest file threshold lights up eight files across four crates at

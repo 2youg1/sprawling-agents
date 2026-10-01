@@ -554,9 +554,9 @@ pub(crate) struct Violation {
 **本节属门禁机具，与产品代码分开提交。**
 -/
 
-/-! ### 8-25 `budget` 只给字节定预算；依赖数只报告，不设门（定规）
+/-! ### 8-25 体积与依赖数都只报告，不设门（定规）
 
-**门只判字节。** `budget` 判的行有一个共同点：一台机器两次量得同一个数，且数超出预算时该做的事是一个工程判断——压回去，或在同一个变更集里写明为什么变大。构建产物的字节（`frontend_artifact`、`release_binary`）就是这样的数，行里的三个键是 `budget_bytes`／`best_bytes`／`slack_bytes`，违规文案里的读数写作 `9937920 B`。
+**体积是读数，不是门（定规）。** 运行速度先于体积：一个更大却答得更快的二进制是更好的二进制，所以构建产物的字节（`frontend_artifact`、`release_binary`）和依赖数一样，由 `cargo xtask budget` 印出、`docnum` 引进文档，门不拒绝任何体积。这两行写 `budget_bytes`（设计给的上限，供报告与文档的余量读数）与 `best_bytes`（最近记下的读数），不写 `slack_bytes`，`status` 写「reported, not gated」。门仍按 `status = "gated"` 且三键齐全来挑要称的行；今天没有这样的行，所以那段按字节称重的代码不称任何行。
 
 **依赖数是一个读数，不是一道门（定规）。** 这棵树解出多少个包，仍由 `budget::lockfile_packages` 从 `Cargo.lock` 数一次；`docnum` 的 `dependency_count` 事实把它引进 `ARCHITECTURE.md` 与 `docs/third-party.md`，`cargo xtask budget` 的报告在 `[dependency_count]` 那一行印出它。那一行不写预算、最佳读数与余量，门不拒绝任何包数。人的定规是：依赖本身不被反对，依赖多到项目成了黑箱时才值得减；减哪一个，要逐个看它换来的透明度，而一个包数上限回答不了这个问题——余量耗尽时它只会逼人删一个恰好便宜的包，或者把上限调高，两样都不让项目更透明。**被否的备选**：保留棘轮、只把余量放大，那仍是一道门，只是晚一些红。
 

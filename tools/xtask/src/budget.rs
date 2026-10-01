@@ -11,12 +11,13 @@
 //! cannot check says what it needs; an entry that quietly vanished
 //! because nobody could measure it is how a budget stops existing.
 //!
-//! Only what a machine measures the same way twice, and what an
-//! engineer can act on when it grows, is gated here: the bytes of a
-//! built artifact. Wall-clock figures are not gated, because gating them
-//! would turn a busy runner into a defect report, and the register says
-//! so per row. The lockfile's package count is read and printed and
-//! refused by nothing (tools/xtask/Spec.lean §8-25).
+//! A row is weighed only when it is marked gated and states a budget, a
+//! best reading and a slack in bytes. No row is gated today: runtime
+//! speed comes before size, so the bytes of a built artifact are read
+//! and printed like the lockfile's package count, and refused by nothing
+//! (tools/xtask/Spec.lean §8-25). Wall-clock figures are not gated,
+//! because gating them would turn a busy runner into a defect report,
+//! and the register says so per row.
 
 use std::path::Path;
 
