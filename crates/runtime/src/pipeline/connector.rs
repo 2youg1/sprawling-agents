@@ -6,8 +6,9 @@
 //! One MCP server's answer as the model reads it (runtime-SPEC.md
 //! 8-27-10): text that fits passes untouched, text that does not is
 //! stored whole and replaced by a window the model pages with `read`,
-//! and a PNG picture is stored in the content store and travels as an
-//! attachment, with a line of text where it stood.
+//! a PNG picture is stored in the content store and travels as an
+//! attachment, with a line of text where it stood, and a sound is stored
+//! there too and named by its locator in a line of its own.
 
 use base64::Engine as _;
 use kernel::consts_policy::IMAGE_MAX_BYTES;
@@ -32,8 +33,11 @@ pub const CONNECTOR_CAP_BYTES: u64 = 16_384;
 /// every `image` block is replaced where it stands: a PNG this city can
 /// measure is stored in the content store and added to the attachments,
 /// and any other picture becomes a sentence saying why it was left out.
-/// The pictures come second so that the line standing for one is never
-/// folded into text the model has to page to find, and no base64
+/// Every `audio` block is replaced the same way, by a line naming the
+/// locator it was stored under, and is no attachment: the model cannot
+/// hear it, and a tool that reads recordings takes the locator. The
+/// pictures and sounds come second so that the line standing for one is
+/// never folded into text the model has to page to find, and no base64
 /// reaches the window or the ledger either way.
 ///
 /// # Errors
@@ -52,22 +56,26 @@ pub fn package_connector(
             origin: offload.origin.clone(),
         },
     )?;
-    with_pictures_stored(paged, &mut offload)
+    with_media_stored(paged, &mut offload)
 }
 
-/// Every `image` block of an answer replaced by the words that stand for
-/// it, with the pictures this city could measure added as attachments.
+/// Every `image` and `audio` block of an answer replaced by the words
+/// that stand for it, with the pictures this city could measure added as
+/// attachments.
 ///
 /// # Errors
 /// Propagates a content store that will not take the bytes.
-fn with_pictures_stored(
+fn with_media_stored(
     outcome: ToolOutcome,
     offload: &mut OffloadSite<'_>,
 ) -> Result<ToolOutcome, AxError> {
     let Some(Value::Array(blocks)) = outcome.result.as_map().get("content") else {
         return Ok(outcome);
     };
-    if !blocks.iter().any(is_picture) {
+    if !blocks
+        .iter()
+        .any(|block| is_picture(block) || is_sound(block))
+    {
         return Ok(outcome);
     }
     let mut attachments = outcome.attachments.clone();
@@ -77,6 +85,8 @@ fn with_pictures_stored(
             let (words, picture) = pictured(block, offload)?;
             content.push(words);
             attachments.extend(picture);
+        } else if is_sound(block) {
+            content.push(heard(block, offload)?);
         } else {
             content.push(block.clone());
         }
@@ -202,6 +212,54 @@ fn measured(block: &Value) -> Result<(Vec<u8>, u32, u32), String> {
         .map(|info| (info.width, info.height))
         .map_err(|err| format!("its png header does not read: {err}"))?;
     Ok((bytes, width, height))
+}
+
+/// One `audio` block as the line that names where it was stored, or the
+/// reason it was left out.
+///
+/// # Errors
+/// Propagates a content store that will not take the bytes.
+fn heard(block: &Value, offload: &mut OffloadSite<'_>) -> Result<Value, AxError> {
+    let (bytes, media) = match sound_of(block) {
+        Ok(sound) => sound,
+        Err(why) => return Ok(text_block(format!("[recording left out: {why}]"))),
+    };
+    let hash = offload
+        .cas
+        .put_for(&bytes, &offload.origin)
+        .map_err(storage::StorageError::into_ax)?;
+    Ok(text_block(format!(
+        "[recording attached: {media}, {} bytes, {}]",
+        bytes.len(),
+        Locator::cas(hash)
+    )))
+}
+
+/// The bytes of a sound block and the media type it names, or the
+/// reason they cannot be carried. The container is not judged here: the
+/// tool that reads a recording judges it (runtime-SPEC.md section 12.15).
+fn sound_of(block: &Value) -> Result<(Vec<u8>, &str), String> {
+    let media = block
+        .get("mimeType")
+        .and_then(Value::as_str)
+        .filter(|media| media.starts_with("audio/"))
+        .ok_or_else(|| "it names no audio media type".to_owned())?;
+    let data = block
+        .get("data")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "it carries no data".to_owned())?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data)
+        .map_err(|err| format!("its bytes are not base64: {err}"))?;
+    if bytes.is_empty() {
+        return Err("it carries no bytes".to_owned());
+    }
+    Ok((bytes, media))
+}
+
+/// Whether a block is one MCP marks `"type": "audio"`.
+fn is_sound(block: &Value) -> bool {
+    block.get("type").and_then(Value::as_str) == Some("audio")
 }
 
 /// Whether a block is one MCP marks `"type": "image"`.
