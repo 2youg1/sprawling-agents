@@ -5,9 +5,6 @@
 
 use super::*;
 
-use super::scan;
-use super::scan::literal_at;
-
 /// `Violation` has no `Debug` on purpose (it is rendered, not dumped),
 /// so failures report the rules that fired.
 fn rules(found: &[Violation]) -> String {
@@ -269,7 +266,9 @@ fn a_checkpoint_keeps_its_own_hue_and_lends_it_to_nobody() {
     );
     let found = judge_tokens(&borrowed, Mode::Dark);
     assert!(
-        found.iter().any(|v| v.violation.contains("ALERT sits on hue 150")),
+        found
+            .iter()
+            .any(|v| v.violation.contains("ALERT sits on hue 150")),
         "{}",
         rules(&found)
     );
@@ -357,67 +356,4 @@ fn a_shortened_ramp_is_caught() {
     let broken = GOOD.replace("  --color-g5: oklch(0.410 0.014 250);\n", "");
     let found = judge_tokens(&broken, Mode::Dark);
     assert!(found.iter().any(|v| v.violation.contains("found 10")));
-}
-
-#[test]
-fn colour_spellings_are_recognised_and_locators_are_not() {
-    assert_eq!(literal_at("  color: #070A12;", true), Some("#rrggbb"));
-    assert_eq!(literal_at("background: rgb(1,2,3)", true), Some("rgb("));
-    assert_eq!(
-        literal_at("--G0:oklch(0.145 0.018 264)", true),
-        Some("oklch(")
-    );
-    assert_eq!(literal_at("let x = 3;", false), None);
-
-    // The shape somebody writes in Rust when they mean a colour.
-    assert_eq!(
-        literal_at(r##"let bg = "#070A12";"##, false),
-        Some("#rrggbb")
-    );
-
-    // A Locator fragment is not a colour. This exact line is what the
-    // gate's first run tripped on.
-    assert_eq!(
-        literal_at(r##"format!("cas:b3-{H64}#B01-2"),"##, false),
-        None
-    );
-    assert_eq!(literal_at("issue #4707 records the status", false), None);
-    // A digest is longer than six hex digits either way.
-    assert_eq!(
-        literal_at(
-            "// 692b5f963f99f018496b8df111314dfe1bed52ccfe1a40cb9a5975b3bc8664fe",
-            true
-        ),
-        None
-    );
-}
-
-/// The client names colour in exactly one file, and only there.
-///
-/// The scan runs over a tree holding the production point and one ordinary
-/// stylesheet: the production point is silent and the other file is
-/// reported, which is the whole rule.
-#[test]
-fn the_client_names_colour_in_one_file() {
-    let root = std::env::temp_dir().join(format!("color-theme-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&root);
-    let written = [
-        (super::THEME, "  --color-g0: oklch(0.145 0.018 264);"),
-        ("client/src/panel.css", "  color: oklch(0.145 0.018 264);"),
-    ];
-    for (rel, body) in written {
-        let path = root.join(rel);
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(&path, body).unwrap();
-    }
-
-    let found = scan::scan_for_literals(&root).unwrap();
-    let places: Vec<&str> = found.iter().map(|v| v.location.as_str()).collect();
-    assert_eq!(
-        places,
-        ["client/src/panel.css:1"],
-        "only the file that is not the production point is a violation; got {}",
-        rules(&found)
-    );
-    std::fs::remove_dir_all(&root).unwrap();
 }

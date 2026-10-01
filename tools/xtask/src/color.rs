@@ -240,7 +240,10 @@ fn judge_tokens(source: &str, mode: Mode) -> Vec<Violation> {
     //    except the two checkpoints, which sit on their own hues and only
     //    there.
     for (name, _, hue, _) in &colours {
-        let allowed = match CHECKPOINTS.iter().find(|(token, _)| *token == name.as_str()) {
+        let allowed = match CHECKPOINTS
+            .iter()
+            .find(|(token, _)| *token == name.as_str())
+        {
             Some((_, own)) => hue == own,
             None => *hue == HUE_AXIS || *hue == HUE_ALERT,
         };
