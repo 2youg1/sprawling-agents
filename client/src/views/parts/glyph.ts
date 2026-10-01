@@ -3,17 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Every icon in the client is one row of this table: one name per
-// drawing, one SVG path per name. `glyph.svelte` is the only thing that
-// draws them, so a shape cannot appear in two slightly different
-// versions in two files. The city illustrations are drawings rather
-// than icons and stay where they are; this table is for the marks that
-// name a screen, an action, or a state.
-//
-// Every drawing lives on one twenty-square in one stroke: 1.5 units
-// wide, round caps, round joins, no fill. A circle is written as its
-// two arcs and a second element in a drawing is a second subpath of the
-// same string, so one name is always exactly one `d`.
+// Every icon in the client is one name in this file, and `glyph.svelte`
+// is the only thing that draws them: it maps each name to one icon of
+// the lucide set, so a shape cannot appear in two slightly different
+// versions in two files, and a person meets the icons they already know
+// from other software (client-SPEC 4-34). The city illustrations are
+// drawings rather than icons and stay where they are; these are the
+// marks that name a screen, an action, or a state.
 //
 // The second half of this file is the closed set of states a thing can
 // be in, and the one mapping from a state to the drawing that tells it
@@ -61,28 +57,16 @@ export type GlyphName =
   // A line that runs into a wall: it ran out of what it was allowed.
   | "capped"
   // An arrow rising from the box: send what is written.
-  | "send";
-
-export const GLYPHS: Record<GlyphName, string> = {
-  talk: "M3 5.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3H5a2 2 0 0 1-2-2z",
-  city: "M3 17V8l4-2v11M7 17V4l5 2v11M12 17V9l5-2v10M2.5 17h15",
-  record: "M5 3h10v14H5zM8 7h4M8 10h4M8 13h2",
-  cost: "M3 16l4-6 3 3 4-7 3 4M3 17h14",
-  setup:
-    "M3 6h8M14 6h3M3 14h3M9 14h8M14 6a2 2 0 1 1-4 0 2 2 0 1 1 4 0M9 14a2 2 0 1 1-4 0 2 2 0 1 1 4 0",
-  hand: "M6 10V4.5a1.5 1.5 0 0 1 3 0V9M9 4a1.5 1.5 0 0 1 3 0v5M12 5a1.5 1.5 0 0 1 3 0v6.5c0 3-2 5.5-5 5.5s-4.5-2-6-4.5L3 11a1.4 1.4 0 0 1 2.3-1.5L6 10.5",
-  search: "M14 9a5 5 0 1 1-10 0 5 5 0 1 1 10 0M13 13l4 4",
-  chevron: "M7 4l6 6-6 6",
-  reveal: "M2 15.5v-11h5l2 2.5h9v8.5zM8 12l5.5-4.5M10 7.5h3.5V11",
-  ring: "M14 10a4 4 0 1 1-8 0 4 4 0 1 1 8 0",
-  pulse: "M2.5 10.5h3l2.5-5.5 3.5 10 2.5-4.5h3.5",
-  cross: "M5.5 5.5l9 9M14.5 5.5l-9 9",
-  check: "M4 10.5l4 4 8-9",
-  tool: "M13.5 3a3.5 3.5 0 0 0-3.3 4.7L3.5 14.4l2.1 2.1 6.7-6.7A3.5 3.5 0 0 0 17 6.5l-2.2.7-2-2 .7-2.2z",
-  stop: "M6 6h8v8H6z",
-  capped: "M3 10h10M10 7l3 3-3 3M16 4v12",
-  send: "M10 16V4M5 9l5-5 5 5",
-};
+  | "send"
+  // The three edge keys: the tiers of the world layer, the mailbox, and
+  // the settings panel.
+  | "layers"
+  | "inbox"
+  | "settings"
+  // What bounds the run in this room: who answers the gate, and the
+  // sandbox it is boxed in.
+  | "gate"
+  | "sandbox";
 
 // The three paint tiers a mark may take (client-SPEC 4-32). They are
 // named here because `statusLook` below picks one per state and

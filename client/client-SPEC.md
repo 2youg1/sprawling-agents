@@ -8,7 +8,7 @@
 
 - `client/` 在 cargo workspace **之外**，由 bun 驱动；产物落 `sprawling` 包里的 `crates/sprawling/web-dist/`（crates.io 的包只装包目录，sprawling-SPEC 8-83），不随 `CARGO_TARGET_DIR` 移动（`index.html` 在该目录根，其余在 `assets/`），`crates/sprawling/build.rs` 递归嵌入该目录，并以 `index.html` 与 `assets/` 的存在判「完整」。
 - **两种范式不叠**：Effect 只做一件事——用生成的 `Schema` 读帧（`core/frames.ts`；`event` 与 `delta` 两种热帧先走由同一份 schema 导出的窄校验，见 4-6）。socket 阶梯、asking、belief 都是纯 TS 状态机加 `svelte/store`，视图只见 Svelte。
-- 运行时依赖的名单只有一个家：`tools/xtask/src/npm.rs` 的 `RUNTIME`，本文件不抄它的条目与数目。名单上除了 `svelte` 与 `effect`，还有 `@lezer/highlight` 与各语言的 `@lezer` 语法，因为代码视图按语法上色，而高亮器与每种语法都是按需加载的分块（4-26），不进首屏。hash 路由手写，不引路由库；不引 UI kit（§7 判定）。`xtask npm` 门守三件事：锁文件与清单逐条同、运行时依赖恰为 `RUNTIME`、许可证在 `deny.toml` 的清单上。
+- 运行时依赖的名单只有一个家：`tools/xtask/src/npm.rs` 的 `RUNTIME`，本文件不抄它的条目与数目。名单上除了 `svelte` 与 `effect`，还有 `@lezer/highlight` 与各语言的 `@lezer` 语法，因为代码视图按语法上色，而高亮器与每种语法都是按需加载的分块（4-26），不进首屏；以及图标集 `@lucide/svelte`，只经 `parts/glyph.svelte` 一处出口、按图标单独导入（4-34）。hash 路由手写，不引路由库；组件库按 §7 的判定逐个引入。`xtask npm` 门守三件事：锁文件与清单逐条同、运行时依赖恰为 `RUNTIME`、许可证在 `deny.toml` 的清单上。
 - Firefox 是第一浏览器：每个屏幕先在 Firefox 里验收。
 - `trustedDependencies` 留空：bun 默认不跑生命周期脚本，任何包的 postinstall 都不执行。
 
@@ -21,6 +21,7 @@
 | svelte | 视图（runes 编译进产物，无虚拟 DOM、无框架运行时 diff；`src/` 一律 runes 模式，见 12-11） |
 | effect | Schema、Brand |
 | @lezer/highlight 与各语言的 @lezer 语法 | 代码视图的语法着色，按语言懒加载（4-26） |
+| @lucide/svelte | 图标；只有 `parts/glyph.svelte` 导入它，每个图标单独导入，产物只带用到的那些（4-34） |
 | vite / @sveltejs/vite-plugin-svelte / @tailwindcss/vite / tailwindcss | 构建 |
 | svelte-check | `bun run typecheck`：`.svelte` 与 `.ts` 同一车道（见设计 4-1） |
 | @typescript/native（别名，指向 TS 7 的 `typescript` 包） | `--tsgo` 车道的检查器（Go 版） |
@@ -144,7 +145,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
   左下三键在第 1 栏贴底，三档都在；会话栏的底部空出它们的高度。**窄于 768 px 的容器只有一栏**：对话占满宽，左下三键挪到对话框设置行的左端，世界层与右侧各是一张全屏的面，从来源一侧翻入，返回在来源一侧的顶部。**其余页面**（城、楼、记录……）在各自重新设计之前占第 2–12 栏，左缘是第 2 栏的栏线。
 
   **其二，宽度分三档按内容封顶，不按页面封顶**：`measure`（520）给段落、`talk`（760）给对话、`page`（1040）给带表格的表单，表格与代码块不封顶、随容器长到 `wide`（1120）。同一页的不同区块各取各的档，因为整页取最窄的那一档会把表单与表格挤进段落的宽度。**其三，一个网格列的最小宽度是 320 px**：`grid-cols-[repeat(auto-fit,minmax(320px,1fr))]`，不用断点，因为断点问的是容器而列宽问的是内容。表格的列另行规定：文本列 `min-w-[12ch]`、数字列 `w-figure`、id 列 `min-w-[24ch]`，超出容器就横向滚动——**永不逐字折行**。
-- **4-34 度量令牌：控件高度、图标网格、圆角、阴影三级、触达面。** 此前没有控件高度这条令牌，于是每个视图自己拼 `py-tight`／`py-snug`，同一行里三个按钮高 26、28、30 px。令牌是 `--spacing-control-sm|control|control-lg`（28／32／36）、`--spacing-glyph-sm|glyph`（16／20，图标画在哪个方格里就住哪个方格）、圆角 `control 6｜card 8｜panel 12`、阴影三级（`shadow-raise` 贴着页面的控件、`shadow-float` 弹层、`shadow-sheet` 抽屉与 dialog）。**有影的面不画边，有边的面不画影**，弹层与玻璃面例外：左下三键是玻璃（`backdrop-filter` 的模糊与饱和，加一个带透明度的底色角色），玻璃面有一条 1 px 的边与一级浮影，因为它浮在任何内容之上，边把它与背后的字分开，影说它在哪一层。外壳另有四个尺寸：左下三键 40×40、圆角 14，以 `corner-shape: superellipse()` 渐进增强（`@supports` 之外退回 `border-radius`），图标画在 18 px 的方格里；硬币键 32×32，字形 18 px；上下文环的盒子 40×40、半径 18、线宽 1 px，检查点 5 px；对话框的横线 1 px。触达面：桌面 ≥ 28×28、触屏 ≥ 44×44，小于这个的图标按钮用 `::before` 扩热区。图标收进 `parts/glyph.svelte` 一个 `Glyph name=…` 与一张路径表——六个文件各画各的 `<svg>` 是同一套图形的六个家；城市插画不是图标，留在原处。
+- **4-34 度量令牌：控件高度、图标网格、圆角、阴影三级、触达面。** 此前没有控件高度这条令牌，于是每个视图自己拼 `py-tight`／`py-snug`，同一行里三个按钮高 26、28、30 px。令牌是 `--spacing-control-sm|control|control-lg`（28／32／36）、`--spacing-glyph-sm|glyph`（16／20，图标画在哪个方格里就住哪个方格）、圆角 `control 6｜card 8｜panel 12`、阴影三级（`shadow-raise` 贴着页面的控件、`shadow-float` 弹层、`shadow-sheet` 抽屉与 dialog）。**有影的面不画边，有边的面不画影**，弹层与玻璃面例外：左下三键是玻璃（`backdrop-filter` 的模糊与饱和，加一个带透明度的底色角色），玻璃面有一条 1 px 的边与一级浮影，因为它浮在任何内容之上，边把它与背后的字分开，影说它在哪一层。外壳另有四个尺寸：左下三键 40×40、圆角 14，以 `corner-shape: superellipse()` 渐进增强（`@supports` 之外退回 `border-radius`），图标画在 18 px 的方格里；硬币键 32×32，字形 18 px；上下文环的盒子 40×40、半径 18、线宽 1 px，检查点 5 px；对话框的横线 1 px。触达面：桌面 ≥ 28×28、触屏 ≥ 44×44，小于这个的图标按钮用 `::before` 扩热区。图标收进 `parts/glyph.svelte` 一个 `Glyph name=…`：名字住 `parts/glyph.ts`，画法是 lucide 图标集的那一个（§7 判定），线宽在任何尺寸下都按屏幕像素算——各画各的 `<svg>` 是同一套图形的几个家；城市插画不是图标，留在原处。
 - **4-35 通知是三个座位、一个组件。** 一切拒绝与提示都由 `parts/notice.svelte` 画，座位由调用方给：**inline**（有归属表单的拒绝，紧贴出错的字段，随字段编辑清除）、**toast**（无归属页面的拒绝，以及页面对一次落空按键的回答（12-16）；立在对话框之上、对话列的宽度之内，右侧打开时随对话列左移，至多三条，拒绝是 `role="alert"`，按键的回答是 `role="status"`，8 秒自动收起、悬停暂停；按键的回答不进抽屉）、**drawer**（信箱键点开，从左缘弹出、贴在第 1 栏右侧的全高抽屉，宽 440，Esc 与点外部关闭）。**今天 AxError 的三段式在三处各手写一遍**（`views/notices.svelte`、`views/refusal.svelte`、`parts/notice.svelte`），本条把它收成一处。抽屉按天分组，每条是标题（`lang.json` 的 `err_<code>`，如 `err_E_CONFIG_INVALID`；页面自己等不到回答的问题是例外，`E_TIMEOUT` 的 subject 读得出一个 `Query` 时标题取 `ask_late_title`，写出那个问题的线上名字，因为一页同时问好几个问题，同一句「等得太久」看两遍的人分不出城漏答的是哪一个；规则在 `parts/notice_title.ts`）、时间、同 `code+subject` 的计数徽标，英文原句折叠进等宽详情。**动作由 `core/recovering.ts` 的一张表从 `code` 映射到动词**，toast 与抽屉都读它——两个读者各写一张表就是同一个事实的两个家。动作有四种臂：命令（按自身拼写）、`reconnect`（让链路再试）、`settings`（去设置页选模型）、`reload`（`location.reload()`，取这座城构建时的客户端）。`E_WIRE_MISMATCH` 只给 `reload`：两端对线上格式意见不一，重连只会再撞上同一处分歧；草稿按地点存在 `localStorage`（`prefs.ts` 的 `draft`），重新载入后仍在。**动作只作用于 composer 所在的房间**（`views/notice_recovery.ts`）：`/new` 与 `/fork` 的房间取自地址栏——对话页的地址，或 run 页那个 run 的房间——从不取自拒绝的 subject，因为地址语法接受一句带空格和反引号的话，把 subject 当地址读会在一句错误原文上开出一栋楼；`/stop` 只在 subject 是 run id 时出现，停的也只是那个 run（run id 的语法窄到装不下一句话）；subject 只指房间的拒绝不给 `/stop`（`recoveryFor(error)` 按 subject 判），因为停房间是 `/halt`，一个永远跑不起来的控件不是动作；没有 composer 的页面上动作置灰（`act_no_target`）。**toast 在对话框之上**：人刚按下发送或停止，眼睛就在那里；右下角会压在右侧的编辑器上，左下是三键。**链路丢失不是通知，是页面所处的状况**：`views/link_banner.svelte` 用 `parts/banner.svelte` 画在「城已暂停」的同一位置（主区之上，两者同时成立时断线在上），写出第几次重连与 `unsent` 里等着的条数，唯一的动作是「现在重试」（取消阶梯的等待、立即重连）；横幅从 `backoff` 出现，到 `live` 或 `refused` 才撤，其间每次 `opening` 不闪掉。
 - **4-35a 恢复动作可以打开一张预填表单，由人提交。** `core/recovering.ts` 的 `Recovery` 在 4-35 的四种臂之外还有 `form`——`{ kind: "form", label, words, room }`：`label` 是按钮上的 `lang.json` 键，`words` 是预填正文的键（槽 `{building}` 与 `{name}`），`room` 是 `"mayor"` 或 `"building"`，指表单开在哪个房间。按下它把填好的正文写进那个房间的草稿门（`PreferenceDoor.setDraft`，与欢迎页 `assign work`、`/fork` 回填同一扇门），再把地址栏移到那个房间；发出去的仍是人按下发送的那一次 `dispatch`。**不进审批队列，也不绕开门**：表单只替人写好字，city D1 一字不改。**`form` 臂只服务 `subject` 读作 `<楼地址>: <缺失的名字>` 的拒绝码**——地址文法不含 `:`，所以第一个冒号就是分界，冒号后去空白非空才算读到；读不出这两样时按钮置灰（`act_no_target`），不猜。逐码核对的结果：只有 `E_PLAN_MISSING` 的 `subject` 全程是这个形状（`<楼地址>: <常设目标>`，由设常设目标的那一处唯一抛出），它的行是 `{ kind: "form", label: "act_ask_plan", words: "form_ask_plan", room: "mayor" }`：按钮「让市长写计划」把「为 {building} 写一份计划，让它的就绪步骤朝向：{name}」填进市长的草稿。`E_CREDENTIAL_MISSING` 的 subject 依出处是 URL、provider 名、`secret:` 引用、MCP server 标签或一句话，都不带楼地址，所以它没有 `form` 行。
 - **4-36 设置页是左锚定的两栏，`config.toml` 折进正文底部；每个设置项是一张卡。** 左边是设置树（7L），当前条目 `aria-current` 加左侧 2 px accent 条（7B）；正文 `flex-1 min-w-0` 左对齐，每组一个 `<h1>` 与一行说明（4-10 的例外：这行说的是这一组此刻管什么，不是这一屏是干什么）。`config.toml` 从常驻第三栏改为正文底部的可折叠区块，默认收起——**它是校对工具而不是设置项**，常驻占 300 px 是正文被挤到 360 px 的直接原因。**卡片语法**：标题（label 600）＋一句说明（note faint）＋控件＋卡脚（左：一句约束或状态；右：需要提交的才有按钮），立即生效的控件没有按钮，改动后卡脚出现「已保存 ✓」。今天同一屏里 `title`／`heading`／`note` 三级标题叠在 80 px 内的写法随之取消：**一屏一个 `title`，其下只用 `label`**。
@@ -235,7 +236,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 > **这是规格，不是描述。** 表里写的是部件欠使用者什么；今天的代码欠而未还的十二处，逐条点名在 7-8。模式名与键表借鉴自哪几份文档、为什么不产生许可证义务，一处记在 `docs/third-party.md` §6，本节不复述。
 
-**判定：不引入任何 UI 库依赖。** `tools/xtask/src/npm.rs` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为那张表所列（今天是 `effect`、`svelte` 与画代码颜色的 `@lezer` 高亮器，名单以表为准；高亮器不是控件，见 4-26），要加一个组件库就得先改那一行，而**一道专为阻止依赖蔓延而设的闸，第一次例外就是它失效的开始**。理由不是保守：`parts/dialog.svelte` 已经把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，四件都是平台承担的，见设计 4-20），`parts/tip.svelte` 已经把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）。**这些正是一个组件库存在的理由，而平台现在自己提供了**；引一个库会让同一件事有两个提供者。判定失效的条件写在 7-9，一个字都不留给临时判断。
+**判定：一个库只在它替换掉一样东西、并且同一变更集里有生产读者时才进来（由人定）。** `tools/xtask/src/npm.rs` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为那张表所列，名单以表为准；加一项是门机制的一次提交，与引入它的变更集分开，好让评审看见门为什么动。**平台先来**：`parts/dialog.svelte` 把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，见设计 4-20），`parts/tip.svelte` 把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）；平台已经提供的行为不再引一个库来提供第二遍，因为同一件事两个提供者，第一次分歧就落在键盘用户身上。今天名单上的界面库只有一项：`@lucide/svelte`，它替换了 `parts/glyph.ts` 手画的那张路径表，换来人在别的软件里已经认得的图标（4-34）。引入的条件写在 7-9。
 
 ### 7-1 不收键的部件
 
@@ -355,11 +356,13 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 11. `client/src/views/parts/row.svelte` 的 `RowList` — `<ul>` 直接收调用方的 `<Row>`，而 `Row` 画的是 `<div>`：一个子元素不是 `<li>` 的列表，读屏报得出「一个列表」却报不出「几项」。该文件本波正在改写，所以这一条只记事实、不钉行号。
 12. `kbd.svelte:38`–`60` — `Cheatsheet` 是今天唯一一个没走 `parts/dialog.svelte` 的模态：没有焦点陷阱、没有 `aria-modal`、Esc 在外壳里、还留着全客户端仅剩的层号之一（`kbd.svelte:46` 的 `z-20`，设计 4-21 记的那个例外）。原生 `<dialog>` 三家引擎都支持，所以这一条是搬家而不是取舍。
 
-### 7-9 重开参数：判定在什么条件下失效
+### 7-9 一个库进来要满足的条件
 
-**当某个部件的正确无障碍行为在 Chromium、Firefox、WebKit 三家上都无法用平台能力加百行以内的自有代码达成**，才回到「`RUNTIME` 放宽到三项」，并在同一变更集里写明是哪一个部件逼出了这次例外。三条限定一个都不能省：三家都试过（不是一家不支持就算数）、百行算的是自有代码的行数、例外记进本节而不是只躺在一条提交信息里。
+四条，一条都不能省：**它替换掉一样东西**——一段自有代码、一个手画的部件，或平台在三家引擎上都给不了的一种无障碍行为；**同一变更集里有生产读者**，没有读者的库是一个有体积没人用的名字；**许可证在 `deny.toml` 的清单上**；**本节写下它替换了什么，以及引入前后 `frontend_artifact` 的读数**。门机制的那一次提交带 `Verdict: user-approved`，因为放宽 `RUNTIME` 是放宽一道门。
 
-今天没有任何部件触发它：`<dialog>`、`::backdrop`、`@starting-style` 与 Popover API 三家都有，而三家之间确实缺的两件（CSS anchor positioning、`field-sizing: content`）都不是无障碍行为，它们各自的降级分支已经在 `tip.svelte` 与 composer 里。
+| 库 | 替换了什么 | 读数 |
+|---|---|---|
+| `@lucide/svelte` | `parts/glyph.ts` 的手画路径表（17 个图标） | 引入时在构建产物上读出，记进 `tools/xtask/budgets.toml` 的 `frontend_artifact` 行 |
 
 ### 7-10 这张表的机器读者
 
