@@ -15,6 +15,8 @@
 **两份快照，一遍读。** 服务中的城有两份快照（视图与 Standing），各切在自己的行上。开城从较早的切点读一遍，每一行只交给切点在它之前的那一份折叠；`twoCutsOnePass` 陈述这一遍的结果等于两份各自的全量折叠（sprawling-SPEC.md 8-122，`accounting::views::snapshot::start::start_both`）。
 
 **已验证前缀：不重算，也不少核对。** 快照之前的行由后台的证明走一遍（storage-SPEC.md 8-30，`storage::verified_prefix`）。每段有一条记录：版本、入口状态、这段前缀字节的摘要、出口状态。记录的入口等于当前状态、版本相同、摘要相符时，证明不再逐行核对这段前缀，直接取记录的出口；否则逐行核对。`cachedVerifyIsStrict` 陈述：只要记录都由严格核对写下、摘要在段上单射，这样得到的判定与逐行核对整条链的判定相同。两个反例说明三个条件缺一不可：不比入口，删掉中间一段也被接受（`withoutLinkAcceptsSplice`）；不比版本，旧规则放过的行被沿用（`withoutVersionAcceptsStale`）。记录没有密钥：能同时改段与记录的人绕得过它，与今天无密钥的链一样（sprawling-SPEC.md §12 已验证前缀一段）。
+
+**按波读段：先算摘要，再按段序走。** 证明把至多八段并成一波，各段的读与前缀哈希同时做，join 之后再按段序判入口、逐行核对（storage-SPEC.md 8-37，`storage::chain_audit`）。能先算的只有摘要判定，因为它只看这一段的字节；`wavesAreCached` 陈述先算好的判定与边走边算的判定相同，`wavesAreStrict` 把它接到逐行核对上。
 -/
 
 namespace Storage.Snapshot
@@ -206,6 +208,64 @@ theorem withoutVersionAcceptsStale :
     cachedNoLink 0 0 stale = some 1 ∧
       strictRun nextSeq 0 (stale.map Prod.fst) = none ∧
       cachedRun nextSeq 1 id 0 stale = none := by
+  decide
+
+/-! ## 按波读段 -/
+
+/-- 一段的摘要判定：只看这一段的字节与它的记录，不看走到它时的链状态，所以能在走到这一段之前、与同一波的别的段同时算（storage-SPEC.md 8-37）。 -/
+def digestMatches {σ α D : Type} [DecidableEq D] (dig : List α → D) (seg : List α) :
+    Option (Record σ D) → Bool
+  | some r => decide (r.digest = dig seg)
+  | none => false
+
+/-- 摘要判定已经算好时走一段：版本与入口仍在这里按段序判，摘要取算好的那一位。 -/
+def wavedSeg {σ α D : Type} [DecidableEq σ] (check : σ → α → Option σ) (v : Nat)
+    (s : σ) (seg : List α) (matched : Bool) : Option (Record σ D) → Option σ
+  | some r =>
+    if decide (r.version = v) && decide (r.entry = s) && matched then some r.exit
+    else strictSeg check s seg
+  | none => strictSeg check s seg
+
+/-- 带着每段算好的摘要判定，按段序走整条链。 -/
+def wavedRun {σ α D : Type} [DecidableEq σ] (check : σ → α → Option σ) (v : Nat) (s : σ) :
+    List (List α × Option (Record σ D) × Bool) → Option σ
+  | [] => some s
+  | (seg, r, m) :: rest => (wavedSeg check v s seg m r).bind (fun t => wavedRun check v t rest)
+
+/-- 每段的摘要判定先算好（对各段逐一作用的纯函数，哪一段先算完都一样）、再按段序走，与边走边算的 `cachedRun` 是同一个判定。 -/
+theorem wavesAreCached {σ α D : Type} [DecidableEq σ] [DecidableEq D]
+    (check : σ → α → Option σ) (v : Nat) (dig : List α → D)
+    (segs : List (List α × Option (Record σ D))) :
+    ∀ s, wavedRun check v s (segs.map fun p => (p.1, p.2, digestMatches dig p.1 p.2)) =
+      cachedRun check v dig s segs := by
+  induction segs with
+  | nil => intro s; rfl
+  | cons p rest ih =>
+    intro s
+    obtain ⟨seg, rec⟩ := p
+    have same : wavedSeg check v s seg (digestMatches dig seg rec) rec =
+        cachedSeg check v dig s seg rec := by
+      cases rec with
+      | none => rfl
+      | some r => rfl
+    simp only [List.map_cons, wavedRun, cachedRun, same, ih]
+
+/-- 记录都由逐行核对写下、摘要在段上单射时，按波读段的证明给出逐行核对整条链的判定。 -/
+theorem wavesAreStrict {σ α D : Type} [DecidableEq σ] [DecidableEq D]
+    (check : σ → α → Option σ) (v : Nat) (dig : List α → D)
+    (injective : ∀ a b, dig a = dig b → a = b)
+    (segs : List (List α × Option (Record σ D)))
+    (sound : ∀ p ∈ segs, ∀ r, p.2 = some r → Sound v dig check r) (s : σ) :
+    wavedRun check v s (segs.map fun p => (p.1, p.2, digestMatches dig p.1 p.2)) =
+      strictRun check s (segs.map Prod.fst) :=
+  (wavesAreCached check v dig segs s).trans (cachedVerifyIsStrict check v dig injective segs sound s)
+
+/-- 不是空话：一段的记录站得住时，按波读段取记录的出口；入口接不上时退回逐行核对，与 `withoutLinkAcceptsSplice` 的拼接账本一样被拒。 -/
+theorem wavesTakeARecordAndRefuseASplice :
+    let whole : List (List Nat × Option (Record Nat (List Nat))) := [([0], some ⟨1, 0, [0], 1⟩)]
+    let spliced := [([0], some ⟨1, 0, [0], 1⟩), ([2], some ⟨1, 2, [2], 3⟩)]
+    wavedRun nextSeq 1 0 (whole.map fun p => (p.1, p.2, digestMatches id p.1 p.2)) = some 1 ∧
+      wavedRun nextSeq 1 0 (spliced.map fun p => (p.1, p.2, digestMatches id p.1 p.2)) = none := by
   decide
 
 end Storage.Snapshot

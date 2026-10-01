@@ -1119,6 +1119,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 **开城不等整条链的证明，接受命令等**（8-122）。首字节之前只读尾部与两份快照，整条链在写者起好之后由后台证明，证明完成之前写者拒绝每一次追加（`E_HISTORY_UNPROVEN`），查询按从快照起步的视图作答。**被否：轻量审计，封好的段只取 `prev`、`seq` 并哈希整行。** 它不再证明每一行都能被这个构建逐字节规范地写出来，与 `LineCheck` 不等价，而开城之后读这些行的正是按 `LineCheck` 解析它们的视图与索引；已验证前缀记录让「只哈希」只用在已经逐行核对过、字节没有变的段上（storage-SPEC 8-30）。**被否：证明完成之前接受命令、断链再停写。** 那是 8-101 已被否的做法：写下的行接在一条可能断了的链后面，收不回来。
 **开城变快靠少做重复的事，不靠放松保证**（8-144）。末段照样逐字节哈希、与记录比对，记录之后的行照样逐行核对；第二份视图是同一个状态的克隆；重建从创世时由全量折叠逐行核对，不再先证明一遍。**被否：开账本信任末段，只核对记录之后的字节、不哈希前缀。** 省下 23 ms，却接受了段被截短再接写、或被同长改写的那种意外，而 8-30 的记录正是为挡它才带摘要。**被否：把复制第二份视图挪到视图线程上，首字节不等它。** 首字节确实不等了，但视图线程的第一批等它，装配根起线程的次序也要改；克隆把这一段从 350 ms 降到 22 ms，不需要挪。
 
+**开城之后的证明在一个库 crate 里起线程。** 证明按波读段（storage-SPEC 8-37）的作用域线程起在 `storage::chain_audit` 里，不在装配根：一波的线程只读段、哈希前缀，一波 join 完才往下走，它们的寿命被一次 `prove_chain` 包住，与 `runtime::turn::wave::reorder` 的作用域线程同一类（ARCHITECTURE.md §10 第 3 条）。装配根仍只起那一条证明线程（`bin::assembly::chain_watch`）。**被否：在 `chain_watch` 里按段起线程、把各段的摘要交给 storage。** 前缀摘要与记录的判定就要分在两个 crate，`SegmentRecord` 也得公开；开账本（storage-SPEC 8-34）判末段用的是同一个判定，它不经过 `chain_watch`。**重开参数**：证明要与别的后台工作共用一个有上限的线程池时。
+
 **doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id**（wire-SPEC §8-25）。`Requirement::enables` 是 `sprawling doctor` 那份终端报告的措辞，终端只说英文，这句话与它描述的那一行同住 `bin::doctor::table`，改一行的人在同一处看见它；页面按 `DoctorItem::name` 从 `client/src/lang.json` 的 `machine_enables_<name>`（name 里的连字符写成 `_`，因为词表的键一律 snake_case）取 en 与 zh，与 doctor 其余每一种状态同口径——终端的 `absent` 由 `paint` 拼，页面的 `machine_absent` 由 `lang.json` 给，两面各说各的，线上只携枚举与 id。两面的集合由 `bin::doctor::tests` 的 `every_item_has_the_page_clause_in_both_languages` 钉在一起：需求表多一行而 `lang.json` 没给它词，测试红。**被否掉的**：终端也从 `lang.json` 取英文（二进制在编译期读 `client/` 的一份源文件，每次 doctor 都要解析整张词表，而终端从不说第二种语言）；线上继续携英文句子（页面的词成了服务端的选择，中文读者看到的是英文）。条件变了就重议：终端要说第二种语言时，两面合用一张词表。
 
 **城的工具读别楼的文件与 `cas:` 块，只经 runtime 的一扇门**（8-131、8-142，runtime-SPEC §8-59、§12.16）。`ocr` 与 `transcribe` 的字节都由 `runtime::BoundReader` 读：它把 `read` 的那一份判定（换成城里的拼写、文法、reserved subtree、读界、解开链接再判、打开后核对）公开成一个调用，交回一个 `Read` 与字节的来处。`transcribe` 原先只收本楼的文件，用 `Address::is_within`、`is_reserved` 与 `WriteTarget::within` 自己判，那是这份判定在 accounting 里的替身，门落地后删去。**被否掉的**：两件工具各自在 accounting 里判（两份判定，一份跟着 `read` 变，一份不跟）；只为 `cas:` 另开一条路、文件仍只收本楼（连接器存下的截图与录音能读，读界之内别楼的文件却不能，同一个读界有两个答案）。
@@ -4084,8 +4086,17 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 
 **本节接口的当前状态。**
 - `copy the views` 仍在开城那一行里（8-121 的 `Phase::Twin`），`twin` 仍答 `Result`：它不再会失败，去掉 `Result` 与这一段要同时改 `bin::assembly::listening` 的调用点。
-- 视图快照解码约 135 ms，其中 105 ms 是提交折叠里的十六进制 oid。`kernel::GitOid` 的 serde 按 `is_human_readable` 在 postcard 里写 20 个字节、在 JSON 里照旧写十六进制，能去掉这一大半；那是 `kernel::locator` 的改动，本节没有做。同理，`B3Hash` 在快照里也按十六进制写。
-- 后台证明仍在一条线程上逐段哈希（storage-SPEC 8-30「单线程哈希」）；开城变短之后，M3 约等于开城加上证明（40 万行城上证明 380 ms）。并行哈希要在 ARCHITECTURE §10 第 3 条的线程清单里加一处。
+- 快照里的十六进制摘要与单线程的证明由 8-154 接手。
+
+### 8-154 开城与证明再降一档：快照里的摘要是字节，证明按波读段（`accounting::views::snapshot`、`accounting::worker::folds::standing_start`，形状 7 投影；`bin::assembly::chain_watch`，形状：状态机；kernel-SPEC §8-84，storage-SPEC 8-37，accounting-SPEC.md 8-24）
+
+**原因是 8-144 留下的两处读数。** 40 万行夹具城（`bench_startup first-byte` 的 `l400k`，windows-x86_64、16 核、NVMe、release，三轮各 3 个样本）首字节 p50 296–298 ms；`opened the city in` 约 261 ms，其中 `fold 0 lines from the snapshots` 189–190 ms、`open the ledger` 41–42 ms、`copy the views` 22 ms；`the history is proved` 那一行：6 段全按记录命中、0 行逐行核对、读与哈希各 376,383,853 B，证明 390–395 ms，开城起点之后 651–656 ms 接受命令（M3）。10 万行城（`l100k`）：首字节 p50 127–130 ms，折叠 53 ms，证明 98–99 ms，M3 192–193 ms。
+
+**两处改动。**
+1. 视图与 Standing 的快照里，`GitOid` 与 `B3Hash` 写成字节本身（kernel-SPEC §8-84）。两份快照的夹具里都有这两种摘要，`fold_version` 随之进位，升级之后第一次开城从创世折一次、切新快照（accounting-SPEC.md 8-24）。
+2. 后台证明按波读段：一波至多 8 段，各段的读与记录前缀的哈希同时做，链仍按段序判（storage-SPEC 8-37）。`chain_watch` 的那一行不变。
+
+**保证不变。** 账本行、线上帧、`golden-p0`／`golden-s1`、wire 的两份 golden 都不变；证明的判定与逐行核对相同（`crates/storage/spec/Snapshot.lean` 的 `wavesAreStrict`）。回退门仍是计数：storage 的 `chain_audit::tests` 在 N 与 2N 段上断言五个计数（逐行核对的行数、按摘要的段数、读与哈希的字节、波数），accounting 的两个 fold-rules 测试钉住快照格式。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 

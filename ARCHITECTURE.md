@@ -614,7 +614,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review. A library crate starts a thread in seven places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; `accounting::worker::pool` gives each run one lane that ends when the run comes home; and `remote_access::route::command` gives each command route one reader that ends when the command ends and its output closes. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open and hashes one segment after another on that one thread rather than in parallel, the console, the remote listener's tasks in `bin::outside::listener`, which end when the remote door closes, first run, the doctor's probes, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does |
+| 3 | One spawn point | review. A library crate starts a thread in eight places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; `accounting::worker::pool` gives each run one lane that ends when the run comes home; `storage::chain_audit` reads a proof's segments in waves of at most eight, one scoped thread each with the calling thread as the first, and joins every wave before it walks the chain through those segments in order; and `remote_access::route::command` gives each command route one reader that ends when the command ends and its output closes. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open, the console, the remote listener's tasks in `bin::outside::listener`, which end when the remote door closes, first run, the doctor's probes, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does |
 | 4 | No random source on a decision path; OS entropy mints only values a stranger must not guess | review; citysim has no random source to seed |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
@@ -1049,7 +1049,7 @@ sequenceDiagram
     M->>R: open: take the writer lock, then recover a torn tail past the last proof's record
     M->>P: both snapshots, one pass from the earlier cut over the tail
     M->>A: start the writer thread
-    A->>C: prove the history in the background, verified prefixes by digest
+    A->>C: prove the history in the background, verified prefixes by digest, segments read in waves
     C-->>A: whole lets the writer take commands; broken halts it through ChainHalt
     A-->>M: Listening: queries answer now, commands after the proof
     M->>M: banner, then serve
@@ -1065,7 +1065,9 @@ definition of this order, sprawling-SPEC.md 8-88),
 `crates/storage/src/verified_prefix.rs` (sprawling-SPEC.md 8-122, 8-144).
 The last segment's prefix the previous proof recorded is proved by its
 digest, so tail recovery checks line by line only what was written after
-that proof (storage-SPEC.md 8-34).
+that proof (storage-SPEC.md 8-34). The proof reads and hashes up to
+eight segments side by side and walks the chain through them in order
+(storage-SPEC.md 8-37).
 Until the proof is whole the writer refuses every append with
 `E_HISTORY_UNPROVEN`, so the page answers queries from the snapshots
 while commands wait for a history that has been walked.
