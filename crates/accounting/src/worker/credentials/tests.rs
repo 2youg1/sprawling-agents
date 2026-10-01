@@ -7,4 +7,5 @@
 
 mod endpoints;
 mod kept;
+mod probing;
 mod signing;
