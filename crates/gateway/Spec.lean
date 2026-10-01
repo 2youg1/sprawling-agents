@@ -33,7 +33,7 @@ import crates.gateway.spec.Transcribe.Recording
 
 `sprawling-gateway`（库名 `gateway`，目录 `crates/gateway`，依赖 kernel）是模型调用的一切：模型路由；provider 客户端自写，加上认证的两半；Custody；市场快照与成本；`kernel::model` 缝的生产适配器。模块：dialect（及 anthropic／openai／mismatch）／endpoint／credential（内缝 Vault）／market／cost／router／provider／reach／transcribe／ocr／adviser。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部，并写下四节不属于任何一个模块的 crate 级接口。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `gateway D<n>`；D1 到 D15 是这份规格在 Markdown 时 §12 各段按出现顺序的编号，§12 末尾列出每条住在哪里。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部，并写下四节不属于任何一个模块的 crate 级接口。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `gateway D<n>`；D1 到 D15 是这份规格在 Markdown 时 §12 各段按出现顺序的编号，D16 起是迁到 Lean 之后的决定，§12 末尾列出每条住在哪里。
 
 能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：输出上限的事实梯（`spec/Provider/Ceiling.lean`）、一个模型收得下什么（`spec/Provider/Input.lean`）、预置表里哪一行为一个模型 id 作答（`spec/Provider/Preset.lean`）、一次失败能不能再试（`spec/Endpoint/Failure.lean`）、一次调用的结算（`spec/Cost.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
@@ -277,6 +277,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D12 转写是一项设施，两条路用它：`crates/gateway/spec/Transcribe.lean`
 - D13 OCR 是一项设施，形状照转写：`crates/gateway/spec/Ocr.lean`
 - D14 一个模型收得下什么只在 `provider::input` 判一次（§8-37）：`crates/gateway/spec/Provider/Input.lean`，在 `accepted_input` 正上方
+- D16 人那一档是 `SelectModel` 的一个可选字段，出现即作答，缺席即「这一次没人说」（§8-37）：`crates/gateway/spec/Provider/Input.lean`，在 D14 之后
 - D15 凭证库经 `keyring-core` 与各平台 store 接入，不经 `keyring`：`crates/gateway/spec/Credential.lean`
 -/
 
