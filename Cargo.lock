@@ -2088,6 +2088,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
+name = "qrcodegen"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4339fc7a1021c9c1621d87f5e3505f2805c8c105420ba2f2a4df86814590c142"
+
+[[package]]
 name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2742,6 +2748,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.4.3",
  "memory-stats",
+ "qrcodegen",
  "reqwest",
  "serde",
  "serde_json",
@@ -2753,6 +2760,7 @@ dependencies = [
  "sprawling-desktop",
  "sprawling-gateway",
  "sprawling-kernel",
+ "sprawling-remote-access",
  "sprawling-runtime",
  "sprawling-storage",
  "sprawling-wire",
@@ -2761,6 +2769,7 @@ dependencies = [
  "thread-priority",
  "tokio",
  "tokio-tungstenite",
+ "toml",
  "win32job",
 ]
 
@@ -2777,6 +2786,7 @@ dependencies = [
  "sprawling-agent-protocols",
  "sprawling-city",
  "sprawling-collab",
+ "sprawling-documents",
  "sprawling-gateway",
  "sprawling-kernel",
  "sprawling-runtime",
@@ -2858,6 +2868,15 @@ version = "0.0.7"
 dependencies = [
  "windows 0.62.2",
  "winsafe",
+]
+
+[[package]]
+name = "sprawling-documents"
+version = "0.0.7"
+dependencies = [
+ "schemars",
+ "serde",
+ "sprawling-kernel",
 ]
 
 [[package]]
@@ -2954,6 +2973,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "sprawling-documents",
  "sprawling-kernel",
  "tokio",
  "tower",
