@@ -214,6 +214,10 @@ argon2 = { version = "0.6", default-features = false, features = ["alloc", "zero
 # ends of the socket have one authority; optional in kernel and wire
 # (`schema`), turned on by xtask alone, never by the product binary.
 schemars = { version = "1", features = ["uuid1"] }
+# The QR code `/remote pair` prints on the city's console, so a phone scans
+# the invitation instead of a person typing 80 characters into it
+# (sprawling-SPEC.md 8-140). MIT, no dependencies, no I/O.
+qrcodegen = "1.8"
 # The workspace's own packages: the one place their paths and published
 # names are written. Each version pins `[workspace.package] version`
 # exactly, because a path dependency without one cannot be published;
@@ -230,6 +234,7 @@ city = { package = "sprawling-city", path = "crates/city", version = "=0.0.7" }
 wire = { package = "sprawling-wire", path = "crates/wire", version = "=0.0.7", default-features = false }
 browser = { package = "sprawling-browser", path = "crates/browser", version = "=0.0.7" }
 agent_protocols = { package = "sprawling-agent-protocols", path = "crates/agent_protocols", version = "=0.0.7" }
+remote_access = { package = "sprawling-remote-access", path = "crates/remote_access", version = "=0.0.7" }
 accounting = { package = "sprawling-accounting", path = "crates/accounting", version = "=0.0.7" }
 sprawling = { path = "crates/sprawling", version = "=0.0.7" }
 desktop = { package = "sprawling-desktop", path = "crates/desktop", version = "=0.0.7" }

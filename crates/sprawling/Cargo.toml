@@ -39,6 +39,12 @@ thread-priority = "3.1"
 # the city starts for a building whose rules ask for the desktop
 # (sprawling-SPEC.md 8-4d).
 desktop = { workspace = true }
+# The remote door this binary keeps and relays through, the QR code its
+# console prints an invitation as, and the device table it keeps on disk
+# (sprawling-SPEC.md 8-139, 8-140).
+remote_access = { workspace = true }
+qrcodegen = { workspace = true }
+toml = { workspace = true }
 
 # The peak memory a command `sprawling gauge` measured reached, read
 # after it exits and before its handle closes (sprawling-SPEC.md 8-129-4).
