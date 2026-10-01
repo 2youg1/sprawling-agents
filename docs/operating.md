@@ -148,7 +148,41 @@ Nothing that widens access, reaches a credential, or changes the machine or the 
 
 The history records `remote_opened`, `device_paired`, `remote_session_started`, `device_revoked` and `remote_closed`, without keys, pairing codes or session ids.
 
-What this build does not do yet: it reads no `[remote]` table, so no route is chosen and `/remote open` refuses and says so. The city's key also lives only in the running process, so a device paired now pairs again after the city restarts.
+The city's key lives only in the running process, so a device paired now pairs again after the city restarts.
+
+### Choosing the route
+
+`/remote open` makes the door reachable through the route that the `[remote]` table in the city's own `.sprawling/CONFIG.toml` names. It reads the table each time the door opens, so an edit takes effect at the next `/remote open` without a restart. Only the city's file may hold the table: a building or a room that writes `[remote]` is refused, because the door opens onto the whole city. With no table, `/remote open` refuses and names the keys each route needs.
+
+A Cloudflare named tunnel, made once with `cloudflared tunnel login`, `cloudflared tunnel create my-city` and `cloudflared tunnel route dns my-city city.example.org`:
+
+```toml
+[remote]
+route = "cloudflare"
+tunnel = "my-city"
+url = "https://city.example.org"
+# command = "C:/tools/cloudflared.exe"   # when cloudflared is not on PATH
+```
+
+A command you write. The city starts it with the loopback address in `SPRAWLING_REMOTE_LOCAL`; once that address is reachable from outside, the command prints one line `{"url": "https://host"}` and keeps running until the door closes. `permanence` says whether the host name stays the same after the command restarts (`"fixed"`) or changes each time (`"per_start"`); a device keeps its key under the host name, so on a `per_start` route it pairs again after each restart.
+
+```toml
+[remote]
+route = "command"
+command = "sh"
+args = ["/home/me/tailscale-route.sh"]
+permanence = "fixed"
+```
+
+For Tailscale, the script can wrap `tailscale serve`, so the devices on your tailnet reach the city at this machine's MagicDNS name:
+
+```sh
+host=$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')
+echo "{\"url\": \"https://$host\"}"
+exec tailscale serve --https=443 "http://$SPRAWLING_REMOTE_LOCAL"
+```
+
+A route that does not start, a tunnel name or address that is not valid, and a command that prints no address within 30 seconds are refused at `/remote open`, before the door opens and before anything is written to the history.
 
 ## Moving a city
 

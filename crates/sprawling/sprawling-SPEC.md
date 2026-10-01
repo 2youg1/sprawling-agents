@@ -1139,6 +1139,10 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **远程门的五行经 worker 的 relay 写，不经命令桌**。远程门在装配层，而城的唯一写者在 `accounting::worker`；本城给 `RunWorker` 一个公开的 `relay()`，交出驾驶线程用的那一种 `kernel::Ledger`，门的看守拿它写 `remote_opened` 等五行（§8-139）。理由：relay 本就是「一个不是写者的线程把一行交给写者并等它落盘」的那扇门，答回来时这一行已经持久，门的下一步可以靠它；城仍只有一个写者。**被否**：①给 `wire::Command` 加五个没有线上形式的命令（如 `PutSecret`），由 `run_command` 落账：每一个都要进 `COMMAND_NAMES`、§19-2 的 reach 与 class、控制台的投影与客户端的生成类型，五个只为写一行而存在的动词散进六处；②让门的看守自己开一个账本写者：一座城就有了两个写者。**重开参数**：门需要等一行落盘之外的答复（例如写者先判这一步合不合规矩）时，改成一条桌上的进程内命令。
 
+**通路在每次 `/remote open` 时按 `[remote]` 造出，随门开、随门关**（8-151）。人改了城的 `[remote]`，下一次 `/remote open` 就用新的通路，不必重启城：城的签名密钥只活在这个进程里（crates/remote_access/Spec.lean §3），重启一次，每台设备都要重新配对。选择只有 `remote_door::chosen` 一处，它对 `city::RemoteRoute` 穷尽匹配，`Doorway` 只认 `Route` 这条缝。**被否**：开城时读一次、把造好的通路放进 `Keeping`（改了配置要重启城，代价是全部设备重新配对；配错的 `[remote]` 还会让 `/remote devices`、`/remote revoke` 这些与通路无关的动词一起失效）；让 `remote_access` 的通路类型自己从 TOML 读出（第二个配置读者，梯子与拒法要再写一遍，remote_access D22）。**重开参数**：通路的打开变得昂贵到要在开城时预热，或一座城要同时开着几条通路。
+
+**远程门的端到端测试用 Rust 写，起真二进制**（8-151）。黑盒检查按 `xtask boundary` 归 `tools/adversary/` 的 Lean，可设备那一半的配对握手、会话握手与封装（ML-KEM、ML-DSA、AES-GCM）只在 `remote_access` 里有实现，Lean 那一侧今天说不了远程门的话；在 Lean 里再实现一遍，就是第二份密码学。所以 `crates/sprawling/tests/remote_door.rs` 起 `sprawling serve`，以 `remote_access` 的设备一侧走真套接字，起二进制与开 WebSocket 的几行各带 `boundary-ok`。**被否**：在进程内驱动 `bin::outside`（`outside` 不是库的公开面，而且那样测不到控制台读 `/remote open`、装配层读 `[remote]`、命令通路起子进程这三段生产路径）。**重开参数**：`tools/adversary/` 有了一个能做混合签名与封装的设备，这条测试就搬过去，`boundary-ok` 随之删掉。
+
 **居民判一次，harness 走第二个驱动函数**。`agree_to_work` 得出 `Seat` 枚举，模型一臂带着原来的 `Agreed`，harness 一臂带着楼、规则与那一家；`Staged::fly` 按它分到 `drive_run` 或 `drive_harness`，`land` 按它分到原来的落地或 harness 的落地。理由：`Driving` 的十二个字段里，适配器、工作台、sieve、计划与 bench 只有模型用得到，`Driven` 带回的适配器、工作台与冻结的 `Run<Frozen>` 也是；把居民枚举放进 `Driving`，`drive_run` 开头就要 match 一次，结果还是两条路，而每个只有模型才有的字段都要变成 `Option`。**被否**：`Driving` 里的居民枚举（同一个判断在 `Driving`、`Driven`、`Site`、`land` 四处各 match 一次）；在 bench 上立一件「harness」工具（§8-4e 第 8 条已否）。**重开参数**：harness 的 run 开始有第二个回合、或开始用城的工具（MCP 转交）时，两条路共享的部分会变大，那时重议。
 
 **试验借一棵自己的树，而不是在合并时才拦**。落地策略为 `experiment` 的 run 不论楼要不要评审都在房间的工作树里写（§8-133），合并时 `runtime::admits` 再拒一次。理由：没有评审的楼里一次 run 直接写进楼的文件，到合并那一步时已经没有东西可拦——试验的「什么都不落地」只有在写的位置上才守得住；把它放在树上，楼的文件从头到尾不变，而试验的产出仍在分支上，读得到、比得出。**被否**：只在合并时拒（没有评审的楼里试验照样改了楼）；试验 run 结束时把它改过的文件还原（还原之前别的 run 与人已经读到了改动，而且要为每一种写路径各写一种撤销）。**重开参数**：工作树放置的读数（8-31 的 `[large_worktree_placement]`）大到让一次小试验的开销以秒计时，重议「小试验用副本、不借树」。
@@ -5209,8 +5213,9 @@ pub(crate) fn newest(item: &str) -> wire::DoctorUpstream;   // 不失败、不�
 ```rust
 // bin::outside::keeper：一把锁后面的一扇门
 pub(crate) struct Senses { pub(crate) clock: Clock, pub(crate) entropy: Entropy }   // 在 bin::assembly 造
+pub(crate) type Choosing = Box<dyn FnMut() -> Result<Box<dyn Route + Send>, AxError> + Send>;      // 8-151
 pub(crate) struct Keeping { pub(crate) devices: PathBuf, pub(crate) ledger: Box<dyn Ledger + Send>,
-                            pub(crate) route: Option<Box<dyn Route + Send>>, pub(crate) senses: Senses }
+                            pub(crate) choose: Choosing, pub(crate) senses: Senses }
 pub(crate) enum Revoking { Named(String), All }
 pub(crate) enum Phase { Open, Closed }
 #[derive(Clone)] pub(crate) struct Doorway { /* Arc<Mutex<…>> 与 Senses */ }
@@ -5244,7 +5249,7 @@ pub(crate) struct Reaching { pub(crate) runtime: Handle, pub(crate) city: Socket
 // bin::outside::devices：设备表
 pub(super) fn read(path: &Path) -> Result<Vec<Device>, AxError>;
 pub(super) fn write(path: &Path, devices: &[Device]) -> Result<(), AxError>;
-// bin::assembly::remote_door：门由什么做成
+// bin::assembly::remote_door：门由什么做成，通路怎么选（8-151）
 pub(super) struct Outdoors { city_root, relay, city, token }   // keep(self) -> Result<Remote, AxError>
 ```
 
@@ -5255,7 +5260,7 @@ pub(super) struct Outdoors { city_root, relay, city, token }   // keep(self) -> 
 - **远程监听**：`/remote open` 在 `127.0.0.1` 上绑一个系统给的端口，先开门、再起接收的任务，任务的中止把手交给门（`attend`），门一关它就停。监听每秒问一次门到没到时；到了就以 `Expired` 关门，写一行。两条路径与上面的消息见 crates/remote_access/Spec.lean §8-10。门的看守里写账、写盘的那几步放到阻塞线程池上做：relay 等的是唯一的写者，套接字任务陪它等会占住一个反应器线程。
 - **逐帧授权**：`Conduit::judge` 打开封装，`Lock` 交回给监听去关门；线协议帧读成 `ClientFrame`，`Hello` 换上城的令牌再发（wire-SPEC §8-66），其余按 `verbs::passage` 判类、问 `Doorway::authority` 与 `permits`。放行的原文发给城的 `/ws`；拒绝的不到城，设备收到一帧封好的 `Refusal`（`E_GATE_DENIED`）；会话已不被门持有时返回错误，连接结束。中继以线协议客户端的身份连城自己的监听，绑在 `0.0.0.0` 的城从回环连。
 - **城的签名密钥每个进程一把**：`Doorway::keep` 取 32 字节熵派生它，不存。跨重启保存它要在 vault 之外多一个兑现点，即放宽 `xtask secret` 的名单，未决（crates/remote_access/Spec.lean §3）；在那之前，城一重启，设备就要重新配对，`/remote open` 照实说。
-- **没有通路被选中**：`Keeping.route` 在生产装配里是 `None`，因为本批没有读者读 `[remote]` 表；`open` 以 `E_CONFIG_INVALID` 拒，恢复语说明这一点（crates/remote_access/Spec.lean §3）。测试用 `route::scripted::ScriptedRoute`。
+- **通路在开门时选，随门开关**：`open` 先判门是否已开，再调一次 `Keeping.choose` 造出这一次的通路并打开它；开着的通路与它答的 `Opened`、监听的任务一起放在门的 standing 里，关门时先停监听，再关通路，再写账。生产装配里 `choose` 读城的 `[remote]`（8-151）；`outside::tests` 给一条 `route::scripted::ScriptedRoute`。选不出通路（没配、配错）时 `open` 原样交出那句拒绝：门没开，账上没有一行。
 - **门的看守取不起来时城照常服务**：设备表读不成、熵取不到，`/remote` 每一个子动词都打印那一句拒绝，其余控制台与页面不受影响。
 
 **测试**：`outside::tests` 用一台 Rust 写的设备、一条脚本化通路、计数的时钟与计数的熵走门：`the_door_writes_its_five_lines_in_the_order_they_happen`（开、配对、会话开始、撤销、关，五行按此次序入账）、`a_local_only_frame_is_refused_and_reaches_no_city`（`Act` 设备发 `Reveal`，答一帧 `E_GATE_DENIED` 的 `Refusal`，没有一个字节放行）、`a_watching_device_is_refused_a_verb_that_acts_and_may_still_ask`（`Watch` 设备的 `Cancel` 被拒、`Ask` 原文放行）、`the_device_table_survives_a_reopen`（两台设备，含一个中文名，重开后设备表相等）。
@@ -5278,7 +5283,31 @@ pub(crate) struct Inside { pub(crate) desk: Arc<CommandDesk>, pub(crate) answeri
 - **时长**：一个整数加单位 `m`、`h`、`d`，至少一分钟，至多七天；不写 `--for` 是 12 小时。读不成的一行打印用法。
 - **名字可以有空格**：`pair` 与 `revoke` 后面除 `--watch` 之外的词连起来就是名字，所以「客厅的 iPad」不必加引号。`--watch` 写在名字前后都行；不写就是 `act`。
 - **`/remote pair` 印二维码**：邀请链接（`https://<主机名>/#pair=<配对码>&city=<指纹>`，crates/remote_access/Spec.lean §8-6）用 `qrcodegen` 以低纠错级编码，两行模块合一行字符，亮模块印成方块、暗模块印成空格，四周留两格亮边：终端是浅字深底，扫码器要深码浅底。码下面再印链接与分组的配对码，说明它十分钟内有效、只用一次。
-- **`/remote open`** 印出门开多久、设备打开的地址；通路是 `PerStart` 时说明每次重启要重新配对；并说明城的密钥只在这个进程里。**`/remote devices`** 每台一行：名字、权限、设备 id。**`/remote revoke`** 印出被撤销的名字，它们的会话随之结束。
+- **`/remote open`** 印出门开多久、设备打开的地址；通路是 `PerStart` 时说明每次重启要重新配对；并说明城的密钥只在这个进程里。城没有配 `[remote]` 时印出 city-SPEC §8-39 的那句拒绝：缺哪张表、两种通路各要哪几个键，去 `docs/operating.md` 看写法（8-151）。**`/remote devices`** 每台一行：名字、权限、设备 id。**`/remote revoke`** 印出被撤销的名字，它们的会话随之结束。
 - **控制台的循环拿一个 `Inside`**：发命令的桌子、问问题的那一个函数、远程门，三样合成一个值，`drive` 的参数从五个回到四个。
 
 **测试**：`outside::tests::a_remote_line_reads_as_the_verb_it_names`（时长、带空格的中文名与 `--watch`、`--all`、多出的词与读不成的时长）；`console::tests::parsing::the_control_verbs_are_the_six_it_owns`。
+
+## 8-151 `/remote open` 按城的 `[remote]` 选通路（`bin::assembly::remote_door`，形状：adapter；city-SPEC §8-39，crates/remote_access/Spec.lean §8-7 到 §8-9、D22）
+
+8-139 的门有了看守、监听与中继，但没有一条通路能把它从这台电脑之外够到。这一节把城的 `[remote]` 表接到 `remote_access::route` 这条缝上。
+
+```rust
+// bin::outside::keeper
+pub(crate) type Choosing = Box<dyn FnMut() -> Result<Box<dyn Route + Send>, AxError> + Send>;
+// bin::assembly::remote_door
+const CLOUDFLARED: &str = "cloudflared";                 // 不写 command 时从 PATH 找的程序
+const ROUTE_PATIENCE: TimeoutMs = TimeoutMs(30_000);     // 一次 open 最长等多久
+fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError>;
+```
+
+- **一处选择**：`chosen` 读 `city::remote_route`（city-SPEC §8-39），对 `RemoteRoute` 穷尽匹配：`Cloudflare` 造 `NamedTunnel`，`tunnel` 经 `TunnelName::parse`、`url` 经 `PublicUrl::parse`，程序是 `command`，不写时是 `cloudflared`；`Command` 造 `CommandRoute`，`command` 是程序，`args` 照写，`HostPermanence` 一对一换成 `Permanence`。生产里造通路的只有这一处；`Outdoors::keep` 把一个读城根的闭包交给 `Keeping.choose`，门在每次 `open` 时调它（8-139）。
+- **拒绝原样交出**：没配 `[remote]` → city 的那句拒绝（`E_CONFIG_INVALID`，主体是城那一层的文件，恢复语写出两种通路必需的键）；隧道名、地址写错 → `remote_access` 的拒绝（`E_CONFIG_INVALID`）；程序起不来 → `E_TOOL_UNAVAILABLE`，主体带程序名；到时没就绪 → `E_TIMEOUT`。每一种都发生在门打开之前：门关着，通路没开，账上没有一行。
+- **耐心 30 秒**：`cloudflared` 连上边缘通常要一到数秒（crates/remote_access/Spec.lean §14），一条包着 `tailscale serve` 的命令更快。`open` 在控制台的线程上等，门的锁这段时间握着，所以等太久的代价是控制台看起来像停了。30 秒够一次慢网络；改它就是改人敲下 `/remote open` 之后最长等多久。
+- **已知出入**：`Outdoors` 收的是 `serve` 被给的地址，而不是绑定之后的地址（`assembly::listening` 交出的是 `addr`）。城在 `:0` 上服务时，中继连的是 0 号端口，到不了城。端到端测试因此给城一个具体端口；改在 `assembly::listening`，不在本节的文件里。
+
+**测试**：
+
+- `assembly::remote_door::tests::a_city_with_no_remote_table_is_refused_naming_the_table`：城那一层没有 `[remote]`，`chosen` 答 `E_CONFIG_INVALID`，恢复语里有 `route`、`tunnel`、`url`、`command`、`permanence`。
+- `assembly::remote_door::tests::the_route_the_table_names_is_the_one_that_opens`：`command` 一臂写一个不存在的程序，打开时的拒绝是 `E_TOOL_UNAVAILABLE` 且主体带那个程序名；`cloudflare` 一臂写同样不存在的程序，拒绝的恢复语说装上 `cloudflared`；`cloudflare` 一臂的 `url` 写成 `http://`，造的那一刻就以 `E_CONFIG_INVALID` 拒。
+- `crates/sprawling/tests/remote_door.rs::a_device_reaches_the_city_through_the_door_over_real_sockets`：`assembly::init_city` 造城，城那一层写 `[remote] route = "command"`，命令是这个测试程序自己（`route_stand_in`，一个只在被当作通路时做事的被忽略的测试：它从 `SPRAWLING_REMOTE_LOCAL` 读到回环地址，印出 `{"url": "https://<那个地址>"}` 后等着被结束），于是「外面」就是回环本身。起 `sprawling serve <城> 127.0.0.1:<端口> --console`，在它的标准输入上打 `/remote open`、`/remote pair phone`，从印出的链接读出配对码与指纹；设备一侧用 `remote_access` 在 `/remote/pair` 上配对、在 `/remote/session` 上建会话；会话里发线协议的 `Hello`、一个 `Read` 帧（`Ask` `Metrics`，答回 `Answered`）、一个 `Act` 帧（`Halt` 全城，设备收到 `city_halted` 的事件帧）与一个 `LocalOnly` 帧（`Reveal`，答回 `E_GATE_DENIED` 的 `Refusal`）；再打 `/remote close`。结束城之后读账：远程门的四行与 `city_halted` 依次是 `remote_opened`、`device_paired`、`remote_session_started`、`city_halted`、`remote_closed`。

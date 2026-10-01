@@ -10,7 +10,7 @@ import crates.remote_access.spec.Handshake
 
 `sprawling-remote-access`（库名 `remote_access`，目录 `crates/remote_access`）是远程接入：一个人离开这台电脑时，从外面够到自己这座城——谁能进、进来能做什么、何时失效、如何一键关上。模块：door（门的状态）／pairing（一次性配对码）／keys（混合签名密钥）／handshake（每次连接的握手，以及设备第一次连接时的配对握手）／seal（帧封装）／route（通路缝与它的三个实现）；尚未落地的部分写在 §3。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」：`spec/Door.lean` 证明远程门的六条性质，`spec/Handshake.lean` 证明配对握手的三条性质。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定。决定写作 `D<n>`，别处引作 `remote_access D<n>`；D1 到 D21 沿用这份规格在 Markdown 时 §12 的条目号，所以旧的引用改写之后号不变。§8 的各条保留 `8-1` 到 `8-12` 的编号，别处引作 `crates/remote_access/Spec.lean` §8-n。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」：`spec/Door.lean` 证明远程门的六条性质，`spec/Handshake.lean` 证明配对握手的三条性质。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定。决定写作 `D<n>`，别处引作 `remote_access D<n>`；D1 到 D21 沿用这份规格在 Markdown 时 §12 的条目号，所以旧的引用改写之后号不变；D22 起是迁移之后的决定。§8 的各条保留 `8-1` 到 `8-12` 的编号，别处引作 `crates/remote_access/Spec.lean` §8-n。
 -/
 
 /-! ## 1 需求分解
@@ -53,8 +53,11 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 - **浏览器一侧的互通只证了 Rust 那一半。** §8-12 的向量与单向夹具由 Rust 生成、提交入库，Rust 一侧读回它们。缺的证据有两件：浏览器侧的实现（ML-KEM、ML-DSA 见 D21）对上这些文件；浏览器签的 `signature-browser.txt` 提交入库，由 Rust 一侧的同一个测试验过（§8-12）。它们随客户端阶段落地。
 - **`cloudflare` 通路没有在真的隧道上开过。** 自动测试不跑它（§2）。缺的证据有两件：在一台装了 `cloudflared`、能连上 Cloudflare 边缘的电脑上，按 §8-8 的操作者检查开、关一次；在一台出网受限（经代理、7844 端口被拦）的电脑上，`cloudflared` 在就绪之前退出时，能否给出比「它在就绪之前退出」更具体的一句拒绝。今天的拒绝给出手动跑的那一行命令，人从 `cloudflared` 自己的输出里读原因。
 - **客户端（阶段 3）未落。** 页面的配对页、握手、PWA 与窄屏布局属于 `client/`，不在本 crate；它们的交互契约写进 `client/client-SPEC.md` §7。远程监听今天只答 §8-10 的两条 WebSocket 路径，不送页面：页面经通路送达设备，与配对页同批落地。
-- **城密钥只活在一个进程里。** 装配层在城启动时取 32 字节熵派生城的签名密钥（§8-3），不存下来；设备钉住的是配对时那把城公钥，所以城一重启，每台设备都要重新配对，`/remote open` 照实说出这一句。要跨重启保存，种子得进 vault（`secret:remote/city-key`），而从 vault 取回它要在本 crate（`keys`）或装配层多一个 `Sealed::expose` 的兑现点，那是 `xtask secret` 名单上的新一项，即放宽一道门，要人的决定。未决的是这一个兑现点放在哪里、名单收不收它；收下之后，`keys::SigningKey` 多一个从 `Sealed<String>` 派生的构造。
-- **没有一条通路被选中。** 选哪条通路、隧道名、主机名或人写的命令，属于 `[remote]` 配置表（city 的配置层），本批没有读者读它；`/remote open` 因此以 `E_CONFIG_INVALID` 拒，恢复语说明这一点。`[remote]` 落地时，装配层把它读成 §8-8、§8-9 的类型化参数交给 `Doorway`，这一段删去。
+- **城密钥只活在一个进程里。** 装配层在城启动时取 32 字节熵派生城的签名密钥（§8-3），不存下来；设备钉住的是配对时那把城公钥，所以城一重启，每台设备都要重新配对，`/remote open` 照实说出这一句。要跨重启保存，32 字节的种子得留在某处，下次启动读回来。未决的是留在哪里，它要人的决定，因为三条可行的路里有两条要放宽一道门、一条违反一条现行规则：
+  1. **种子进 vault，兑现点在本 crate 的 `keys`。** 第一次开门时取熵、经 vault 写成 `secret:remote/city-key`，此后每次启动取回；`keys::SigningKey` 多一个 `from_sealed(&Sealed<String>)` 的构造，`crates/remote_access/src/keys.rs` 进 `xtask secret` 的 `EXPOSE_WHITELIST`（第五项）。后果：设备跨重启保持配对；明文种子只出现在派生密钥的那一个函数里，与名单上其余四处「明文只在用它的最后一格」同一个理由；放宽的是一道门，名单变长一项。vault 是进程内的那一种时（平台凭据库打不开），种子仍随进程消失，`/remote open` 照旧说出重新配对那一句。
+  2. **种子进 vault，兑现点在装配层**（`bin::outside::keeper` 或 `bin::assembly::remote_door`）。后果与 1 相同，但明文种子会出现在组装根里，而那份名单的注释写明它存在就是为了不让明文出现在组装根；放宽的同样是一道门，而且放在名单最不愿收的地方。
+  3. **种子写进保留子树里的一份文件**，靠文件权限守着。后果：不动任何门；可种子是一份明文凭据，落在 vault 之外，违反「明文只到 vault」这条规则（AGENTS.md 的 `xtask secret` 一行），`sprawling export` 打的包也会带走它，一份拷贝的城就能冒充原来那座。
+  不放宽任何门的做法就是今天的做法：设备在城每次重启之后重新配对。人选 1 时，本 crate 加 `from_sealed` 与它的测试，`EXPOSE_WHITELIST` 的那一行单独提交（门机制）；选 2、3 的前提改动同理写在那时的决定里。
 -/
 
 /-! ## 4 现状分析
@@ -63,7 +66,7 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 - 城的线协议帧由 `wire::frames` 定义，远程门不改帧，只在帧外加一层封装，所以本 crate 不让 `WIRE_V` 进位。远程门的 Ledger 事件随装配落地时，事件种类名进 schema 哈希，哈希随之变（wire-SPEC §12.1）。
 - 门、配对码、密钥、握手与封装零 I/O：时间与熵都是参数，与 `wire::auth` 的做法相同。通路是例外，两个生产实现起子进程、在回环上问就绪（§7、D14）。
 
-各单元的落地情形：门、配对码、密钥、两种握手、封装与三个通路实现都已落地，装配层 `bin::outside`（sprawling-SPEC 8-139、8-140）是唯一调用方；§3 列出的是还没有落地的部分。
+各单元的落地情形：门、配对码、密钥、两种握手、封装与三个通路实现都已落地，装配层 `bin::outside` 与按城的 `[remote]` 造通路的 `bin::assembly::remote_door`（sprawling-SPEC 8-139、8-140、8-151）是唯一调用方；§3 列出的是还没有落地的部分。
 
 已知的出入：`spec/Handshake.lean` 规定的是 `handshake::pairing`，按 ARCHITECTURE.md §11 的路径规则它的名字应是 `spec/Handshake/Pairing.lean`。它沿用迁移之前的名字，因为两个分部的名字已被 Rust 的模块文档与 `architecture.toml` 的锚点引用；它的内容下一次改动时一并改名，改名不改任何性质。
 -/
@@ -338,7 +341,9 @@ pub struct CommandRoute { /* 私有 */ }  // new(command: RouteCommand, permanen
   exec tailscale serve --https=443 "http://$SPRAWLING_REMOTE_LOCAL"
   ```
 
-  `permanence` 写 `Fixed`：MagicDNS 名字跟着这台电脑，不随重启变。`exec` 让通路关上时被结束的正是前台的 `tailscale serve`，它的配置随进程一起撤下。这一行地址印在 serve 生效之前片刻，设备扫码总在其后。
+  城那一层的 `[remote]` 写 `route = "command"`、`command = "sh"`、`args = ["<这份脚本的路径>"]`、`permanence = "fixed"`（city-SPEC §8-39）：MagicDNS 名字跟着这台电脑，不随重启变。`exec` 让通路关上时被结束的正是前台的 `tailscale serve`，它的配置随进程一起撤下。这一行地址印在 serve 生效之前片刻，设备扫码总在其后。
+
+D22 本 crate 不读配置。通路的三个参数（选哪一个实现、隧道名与地址或命令、`permanence`）写在城那一层的 `[remote]` 表里，由 `city::config_layers` 读成字符串（city-SPEC §8-39），由装配层在每次 `/remote open` 时经 `TunnelName::parse`、`PublicUrl::parse` 造成这里的类型（sprawling-SPEC 8-151）。配置的层次、缺键与错键的拒法、哪一层能写哪张表，在 city 有唯一的家；本 crate 若给 `Tunnel`、`RouteCommand` 加上 serde 的读法，就是第二个配置读者，梯子与拒法要再写一遍。落选的另一条路是 city 依赖本 crate、在解析点直接造出类型化的值：它让写错的地址在读文件时就被拒，代价是 city 的拓扑多一条边（city 今天只依赖 kernel）。city 被允许依赖本 crate 时，重新考虑这一条。
 
 ### 8-10 远程监听：两条路径与它们上面的消息（装配层 `bin::outside::listener`；sprawling-SPEC 8-139）
 
@@ -476,7 +481,7 @@ D21 浏览器一侧的 ML-KEM 与 ML-DSA 用 `@noble/post-quantum`，精确钉�
 - 新增 crate `remote_access`：根 `Cargo.toml` 的 members、`ARCHITECTURE.md` §3 的 depmap、`architecture.toml` 的模块图与 family 表。
 - 本文件与 `spec/` 下的两个分部由根 `lakefile.toml` 的 `Spec` 库按 glob 收进构建，不必登记。
 - 通路缝登记在 ARCHITECTURE §4 的缝表，`architecture.toml` 的 family 表说本 crate 也持有通路。
-- 装配层（`bin::outside`，sprawling-SPEC 8-139、8-140）是唯一调用方，depmap 的 `sprawling` 一行带着本 crate。二维码的片段写法由装配层印、由客户端读，两边以 §8-6 为准；两条监听路径与上面的消息以 §8-10 为准。
+- 装配层（`bin::outside` 与 `bin::assembly::remote_door`，sprawling-SPEC 8-139、8-140、8-151）是唯一调用方；通路的参数从城的 `[remote]` 来（city-SPEC §8-39，D22），`Tunnel`、`RouteCommand`、`Permanence` 的字段改了，装配层的 `chosen` 与那张表一起改；depmap 的 `sprawling` 一行带着本 crate。二维码的片段写法由装配层印、由客户端读，两边以 §8-6 为准；两条监听路径与上面的消息以 §8-10 为准。
 - `tools/fixtures/remote-handshake/`（§8-12）由本 crate 的测试写、由客户端的 TS 测试读：改 §8-3 的派生、§8-4 的标签与握手记录、§8-5 的 nonce 布局与负载首字节，这些文件随之重生成，客户端的测试须仍过。
 -/
 
@@ -501,6 +506,6 @@ D11 与浏览器的互通只做组件级已知答案向量，加一条从 Rust �
 - `docs/glossary.md`：远程门、纪元、配对码、邀请、设备、通路、远程会话，并写明远程门与 Gate 的 door、远程会话与房间的 Session 不是一物（§6）。§6 的词改了，两处一起改。
 - kernel-SPEC §8-76（设备表的路径）与 §8-81（远程门的五个事件）、wire-SPEC §19-2 的 `class` 列与 §8-66（中继与 `Refusal`）、sprawling-SPEC 8-139 与 8-140（门的看守、远程监听、控制台的 `/remote`）、`client/client-SPEC.md` §7（配对页的交互契约落地时写在那里，§3）。§8-1 的动词类、§8-5 的负载、§8-6 的邀请写法或 §8-10 的两条路径改了，重读这几节。
 - `tools/fixtures/remote-handshake/` 与 `tools/README.md` 的 fixtures 一行（§8-12）：客户端的互通测试读这些文件；§8-3 到 §8-5 的任何字节改了，文件重生成，客户端的测试须仍过。
-- `docs/operating.md` 里控制台 `/remote` 的那一段：控制台的动词以 sprawling-SPEC 8-140 为准。
-- 尚未写到的文档：`README.md` 与 `README.zh-CN.md` 的「它在哪里监听」一节仍是 D3 取代的那句「本仓库不附带隧道」，要照 D3 与 D10 写明通路上剩下的那一件信任；`docs/getting-started.md` 与中文版的「另一台机器」一节、`docs/operating.md` 里 `command` 通路包一层 `tailscale serve` 的示例（§8-9）都还没有写。中英两份在同一个提交里改。
+- `docs/operating.md` 里控制台 `/remote` 的那一段与 `[remote]` 的写法（两种通路、`tailscale serve` 的示例）：控制台的动词以 sprawling-SPEC 8-140 为准，表的键以 city-SPEC §8-39 为准，§8-8、§8-9 改了参数时三处一起改。
+- 尚未写到的文档：`README.md` 与 `README.zh-CN.md` 的「它在哪里监听」一节仍是 D3 取代的那句「本仓库不附带隧道」，要照 D3 与 D10 写明通路上剩下的那一件信任；`docs/getting-started.md` 与中文版的「另一台机器」一节还没有写。中英两份在同一个提交里改。
 -/
