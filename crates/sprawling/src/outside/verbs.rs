@@ -81,6 +81,7 @@ pub(super) fn command_class(command: &wire::WireCommand) -> VerbClass {
         | wire::Command::ConnectToolkit { .. }
         | wire::Command::PutPreferences { .. }
         | wire::Command::PutShelved { .. }
+        | wire::Command::PutGuide { .. }
         | wire::Command::Auth { .. } => VerbClass::LocalOnly,
     }
 }
