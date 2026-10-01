@@ -1151,6 +1151,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **`whose --trace` 读盘作答，候选就说是候选**（8-136，accounting-SPEC.md §12-28）。区间以同一个 run 的上一个提交为界，调用经 rounds 的那一份配对规则读出，同楼别的 run 只给条数。CLI 读盘而不走线上查询，城不在服务也答得出，与 `whose` 本身同一条理由。**被否掉的**：只列写调用——读调用决定了写什么；把同楼别人的调用并列出来——读者会把候选读成原因。条件变了就重议：页面要显示一个提交的调用时。
 
+**写文档的两条命令在远程门外**（8-152，wire-SPEC §19-2）。`PutRange` 与 `DecideProposals` 的 `class` 是 `LocalOnly`：一台远程设备即使带着 `Act` 权限也不能经它们写城里的文件。`PutSpine` 是 `Act`，因为它只写一栋楼自己的四份 spine 文档，那是人离开电脑时仍要改的计划；`PutRange` 能写城里保留子树之外的任何一份文件，包括另一栋楼的源码与人的笔记，它比 `Act` 那一组宽。新命令一律 `LocalOnly` 是 §19-3 的规矩，这里写下的是没有例外的理由。**被否掉的**：随 `PutSpine` 定为 `Act`——一台被借走的手机就能改写城里任意一份文件，而撤销配对之前写下的东西只能从检查点里找回。条件变了就重议：人决定在外面也要改文档时，先给 `PutRange` 一个只写某几栋楼的范围，再谈 `Act`。
+
 **`playback` 是一个两个词的动词，导出写 stdout 或一个新文件，只在 bundle 完整之后写**（8-126、accounting-SPEC.md 8-12）。回看一段工作流有两个动作：导出与复核，它们的标志不同（导出读选择与 `--out`，复核读 `--bundle`/`--city`），所以是两行；放在一个词 `playback` 之下，是因为总览里两者挨着，人找到一个就找到另一个。命令表的一行可以带两个词，解析先试两个词，其余不变，8-89 决定 1「动词需要子动词」的重议条件因此被这一个最小的扩展满足，没有换参数库。输出不沿用 `view` 的做法：`view | head` 截断仍算成功，是因为账本原行本来就一行一行有意义；一份截断的 bundle 读不回来，却可能被当成一份完整的东西留下，所以 bundle 先整份算好、量过尺寸再写，管道中途关闭是失败，`--out` 经暂存文件与硬链接落位、已有目标不覆盖。**被否掉的**：`export --playback` 之类挂在现有动词上的标志（`export` 打包整座城，两件事的输入与输出都不同）；`--out` 默认写进城里（导出件不进 git，城里的保留导出位置由布局 owner 在居民入口落地时定）；`rename` 落位（在 Unix 上会覆盖已有目标）。条件变了就重议：人也要一个不必自己选路径的去处时，`--out` 缺省可以写到城里的保留导出位置（8-132 给居民的那一处），而不是 stdout。
 
 **居民的 `playback` 是一件工具、两个动作，按写登记，读者由上下文定**（8-132、accounting-SPEC.md 8-13）。导出要写文件，复核只读；工具的效应按登记而不是按调用，一件工具只能登记一种，所以取两者中较强的写：代价是复核也走写门、不被推测执行提前跑，而一次复核本来要重算整段历史，提前跑它省不下什么。导出件落在城根保留子树下的 `playback/<楼>/`，而不是居民的房间或 worktree：保留子树没有写域够得到，居民改不了一份已经写下的报告，只能另导出一份；它被城根的 `.gitignore` 挡在历史之外；它不随 worktree 清扫消失，没有 worktree 的 run 也有同一个去处。按楼分目录，是因为复核要用同一个读者重算，一栋楼的导出只有同一栋楼的居民复核得了，机密楼的导出也就不会被别的楼读到。**被否掉的**：`playback_export` 与 `playback_check` 两件工具（复核可以按 `Read` 登记，但一个动作拆成两件工具，模型要多认一个名字，而两者的参数一半相同）；写进房间并靠 `.gitignore` 挡住（worktree 会被清扫，居民能用 `edit` 改报告）；让居民在参数里选读者（读者是读界的输入，交给被读界约束的一方去选，读界就没有意义）。条件变了就重议：工具的效应可以按调用声明时，`check` 改回 `Read`。
@@ -3000,6 +3002,15 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **`accounting::views::listing`**（新文件）：`at` 为 `None` 读城根，否则读 `city_root/<at>`；`read_dir` 一层，目录在前、文件在后、各按名字 UTF-8 序；读不了的目录答空表而不是拒绝——同 `read_building` 的口径，一个读不了的目录在页面上是一个空目录。符号链接按 `metadata` 判：指向目录的算目录。文件大小 `u64`。
 - **`accounting::views::document`**：路径同上；答什么、怎样判文本、在哪里切，见 accounting-SPEC §8-21 与 wire-SPEC §8-69。**不经密钥扫描**：这是城内的文件给城的主人看，而 `Hunks` 的扫描针对的是把补丁文本挂上线的那条路——但 `.sprawling/CONFIG.toml` 里只有 `secret:` 引用，明文本来就不落盘（`xtask secret` 门保证），所以这里没有可泄露的东西。
 - **验收**：`views::listing::tests`——`init_city` 铺出的城根列出 `.sprawling` 与 `hall` 两个目录；`hall` 下列出 `Roadmap.md` 等文件且目录先于文件；不存在的路径答空表。`views::document::tests`——读城里 `hall` 楼自己的 `RULES.toml` 得到原文，第一个窗口盖住整份；其余见 accounting-SPEC §8-21。`views::rounds::tests`——三条记录的会话答出 `opening.task`；冻结后答出 `closing.completion == "done"`。`views::tests`——`city_halted` 后 `city_view.halted == ["city"]`，`released` 后为空。
+
+## 8-152 页面保存一份文档、决定修改提案、读提交说明，服务中的城怎么做（`accounting::worker::commanding::saving`、`accounting::views::proposals`、`accounting::views::commits`；wire-SPEC §8-72、§8-73、§8-54）
+
+- **两条写命令走 worker 的同一扇门。** `PutRange` 与 `DecideProposals` 经 desk 进 `run_command`，各有一臂，交给 `commanding::saving`（accounting-SPEC §8-22）；`idem` 由 `commanding::entrance` 判，所以页面丢了答复再发一次，城答第一次的结果，不写第二行。
+- **回执是事件流上的一行。** 成功的保存写 `document_written`，带这条命令的 `idem`；页面在 `core/belief` 的折叠里见到带自己 `idem` 的那一行才把「保存中」换成「已保存」，`version` 换成新的基线。`client/src/core/staleness.ts` 让这一行使 `document` 与 `proposals` 两种答复过期，页面再问一次就读到新版本与剩下的卡。
+- **`Query::Proposals` 读视图里的 `Governance.proposals`**，锁外读盘取文件此刻的版本（同 8-52 的 `document`，8-100 的锁外规矩）。
+- **提交说明随父提交一起读**：`Query::Commit` 与 `Query::Commits` 的 `CommitsAsk::read` 在锁外各补 `parents` 与 `message`（8-128）。
+- **客户端今天只有发出点，没有画面**：`client/src/core/commands/document.ts` 拼 `put_range` 与 `decide_proposals` 两种帧，编辑页与请决定卡由前端会话按 wire-SPEC §8-72、§8-73 画（refrain 路线图 §4-8、§4-10）。
+- 验收：见 accounting-SPEC §8-22 列的测试；远程门对两条命令的分类见 §12 「写文档的两条命令在远程门外」。
 
 ## 8-53 一座楼做过的提交，倒序分页（`accounting::views::commits`、`views::holding`；wire-SPEC §8-24）
 

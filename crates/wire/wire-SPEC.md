@@ -48,14 +48,11 @@
 - **`control` 自持鉴权与幂等，独立成模块**。ARCHITECTURE §6 预留了「做不到则并入 server」的退路，这里不需要它：`control` 持有一条 `server` 不知道也不该知道的策略——**哪些 Command 是干预，以及一次干预必须留下什么**（「任何中断都以 Handoff 收尾，下一位拿得到完整现场」）。那是判定，不是转调。
 - **令牌的整个生命周期住 `auth`**（铸造、展示形、摘要、常数时间比对），`server::decide_handshake` 调用它：握手是令牌的一个读者，不是它的第二个家。
 - **Signal 不在 Command 面**：Signal 的投递与消费住 `collab::inbox`。
-- **未定：`Command::PutRange { doc, baseline, idem, edits }`。** 页面对任意一份文档的保存（refrain 路线图 §4-8）要在账本上如实记下一次写：哪份文档、从哪一版到哪一版、多少字节。现有的三种写文档的事件各只说一类文件（`spine_document_written` 四份 spine 文档、`governed_document_written` 三份治理文档、`rules_changed` 两份规矩文件），用它们记一份任意文档的写就是凑，所以 `PutRange` 与它的回执（新版本）等下一次加事件种类的那一轮一起落，§19-2 那时多一行。规则已经在 `crates/documents/Spec.lean`（D8、D9）：基线是 §8-69 答出的 `version`，编辑是那一版的 `Span`，后到者得 `E_VERSION_CONFLICT`。在那之前文档答复里没有写的操作。
 - **`Welcome.resume_from` 读自 `LedgerHead`，`Welcome.epoch` 是创世记录的链哈希**：`decide_frame` 的第四个参数是 `WelcomeFacts { city, head, epoch }`——城名、账本头与 epoch 合成一个值，因为 `decide_frame` 已占满 4 个参数。`LedgerHead` 是 `ServeConfig.head` 递进来的一个 `AtomicU64`：装配层以重建视图时读到的最后一条记录的 `seq` 起头，折叠线程在每条记录**广播之前**把头推到它的 `seq`，socket 在 hello 时读一次。头放在原子量里而不放在视图锁里，因为读者可能长时间持有视图，而 hello 跑在 tokio 任务上，读头只是一次 Acquire load。先推头、后广播，加上会话在 hello 之前已订阅事件流，保证 `resume_from` 之后的记录必在流上：头之前而在订阅之后广播的记录会同时出现在流上与补拉里，所以边界上只可能重复、不可能缺失。`epoch` 是 `kernel::ledger::chain_hash(创世行)`，装配层在重建视图时读一次，由 `ServeConfig.epoch` 递进来：同一份账本的 epoch 永不改变，换了账本（重新 init、换了城目录）epoch 必变，所以客户端见到与上次不同的 epoch 就丢弃 belief、按快照重建，而不是拿旧水位去新账本里补拉。
 
 ## 4 现状分析
 
 公开面见 `tools/xtask/api-baselines/wire.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
-
-**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`CommitAnswer` 带出提交说明。每落一项删一项。
 
 ## 5 权威信源
 
@@ -525,6 +522,16 @@ WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionN
 
 **重开参数**：页面要浏览一个房间全部的段（不只是最近）时，加 `before` 游标；房间数或 session 数大到这张表在视图快照里成为可见的一段解码时间时，改成按地址的索引。
 
+### 12.10 保存带基线版本与文本编辑，回执是账本行；提案按文档成批决定
+
+**决定**：(a) `PutRange` 带基线版本（32 字节的摘要）与那一版的几段字节区间，每段换成一段文本，城按那一版的编码写回（§8-72）。(b) 保存成功的回执是带着这条命令 `idem` 的 `document_written` 行，不是命令的答复。(c) `DecideProposals` 一次带一份文档上的几张卡，接受的部分合成一次保存（§8-73）。
+
+**理由**：(a) 基线是版本而不是整份正文：整份正文要随每一次保存往返一次，而版本身份已经在 §8-69 的答复里（documents D3、D8）。编辑带文本而不带字节：字节要页面按 UTF-16 或带标记的 UTF-8 自己编码，那是编码规则的第二个家；城手里有那一版，知道它的编码。(b) 命令的答复在这条线上只有拒绝一种形状（§8-2），给一种命令另开一个成功答复就是第二种回执；账本行本来就是别的写命令（`PutDocument`、`PutSpine`）的回执，而且它在城重开、页面重连之后仍然在，页面凭 `idem` 补拉就能知道那一次落没落下。(c) 同一版上的几张卡一张一张决定，第一张接受之后版本就动了，其余每一张都会因基线过期被拒，人只能接受一张、等 run 重提；成批决定让它们落在同一次保存里，重叠由同一个事务判（documents D8）。
+
+**被否**：①`PutRange` 带字节（base64）：理由见 (a)；②成功时回一帧带新版本的答复：理由见 (b)，而且丢了这一帧的页面无从补问；③提案的决定一张一张发：理由见 (c)；④提出提案也是一条线上命令：提案是 run 说的话，线上的发信方是人，一条让人以 run 的名义说话的命令没有读者。
+
+**重开参数**：页面要支持「另存为另一种编码」时（refrain 路线图 A5），编码成为 `RangeWrite` 的一个字段；有了提出提案的工具之外的第二个提出者（例如城外的 agent 经远程门）时，重议 (④)。
+
 ## 13 依赖选型
 
 | 依赖 | 用途 | 依据与替代 |
@@ -830,7 +837,7 @@ pub enum Coverage { Whole, Head }            // Head：其余的经 Query::Range
 // documents::{Span, Format, Encoding, Window} 由 documents crate 定义，线上直接携带（documents D1）
 ```
 
-- **版本身份是整份字节的 `B3Hash`**，与内容库给同一份字节的地址相同（documents D3）。下一次保存拿它作基线（§3 的 `PutRange`），页面拿它判断两次读到的是不是同一版。
+- **版本身份是整份字节的 `B3Hash`**，与内容库给同一份字节的地址相同（documents D3）。下一次保存拿它作基线（§8-72），页面拿它判断两次读到的是不是同一版。
 - **缺失、读不了、空是三种答复**，不再借 `Unavailable`：「这里没有文件」页面画成可以新建，「读不了」页面说出系统的原话，「空」是一份可以写的文件，三者页面采取的动作不同。空文件也有版本（空字节的摘要），因为它同样可以是一次保存的基线。`Unavailable { query: "Document(<at>)" }` 只剩视图本身答不了的情形。
 - **文本的判定**（documents D4）：字节顺序标记先判，所以带标记的 UTF-16 是文本；没有标记时，不含 NUL 的合法 UTF-8 是文本；其余是 `Opaque`。不再有损解码，不再凭头 8 KiB 的 NUL 判二进制。
 - **第一个窗口** `head`（documents D7）：整份放得下 `WINDOW_BYTES_MAX`（64 KiB）就是整份（`Coverage::Whole`）；放不下时止于放得下的最后一个块的末尾，一块都放不下时止于界内最后一个字符边界（`Coverage::Head`）。窗口从第 0 个字节数起，标记是文本的第一个字符（documents D5），所以页面把各窗口的文本接起来就是整份文本。
@@ -849,6 +856,63 @@ pub struct RangeAnswer { pub version: B3Hash, pub window: documents::Window }
 - **请求的是半开字节区间，答的是切好的窗口**（documents D2、D7）：起点在字符中间时退到那个字符的第一个字节，终点往回退到字符边界，长度不过 `WINDOW_BYTES_MAX`，起点在版本末尾之后时答末尾处的空窗口。编码由这一版前三个字节里的标记定，切出的字节在这种编码下拼不出文本（`Opaque` 的版本）时答 `Unavailable`。答复里的 `window.span` 是实际切出的区间，页面从它的 `end` 接着要下一段。
 - **只读内容库里要答的那几个字节**（`storage::Cas::size` 与 `Cas::get_range`），所以第三屏的代价是第三屏，与文件多大无关。
 - 验收：accounting 的 `views::answering::range::tests`——从 `Document` 的 `head` 末尾起逐段读到末尾，窗口首尾相接就是整份字节；文件在第一次读之后被改写，按旧版本读出的仍是旧字节；内容库里没有的版本答 `Unavailable`。
+
+### 8-72 保存一份文档：`Command::PutRange` 与它的回执
+
+```rust
+// Command
+PutRange(RangeWrite)                                  // 线上 {"put_range":{"doc":…,"baseline":…,"edits":[…],"idem":…}}
+pub struct RangeWrite {
+    pub doc: Address,                                 // 城里的哪一份文件
+    pub baseline: B3Hash,                             // §8-69 答出的 version：这些编辑是在哪一版上做的
+    pub edits: Vec<documents::TextEdit>,              // 那一版的几段字节，各换成一段文本；按文档序、互不重叠
+    pub idem: IdemKey,
+}
+pub struct TextEdit { pub span: documents::Span, pub text: String }   // documents 定义，线上直接携带（documents D1）
+// 回执：账本行 document_written { at, baseline, version, bytes }，带这条命令的 idem（kernel-SPEC §8-83）
+```
+
+- **基线是一个版本，编辑是那一版的字节区间加一段文本。** 页面把它的光标与选区换算成字节（refrain 路线图 §4-8 的 `core/document_pos.ts`），替换的内容以文本送来，城按那一版的编码把它写成字节（documents D11）：页面不必知道一份 UTF-16 文件怎样拼一个字符，城里也只有一处会写这几种编码。
+- **判定在落盘之前，次序固定。** 地址在保留子树里（`Address::is_reserved`：城与楼的规则、配置、治理文档、`.git`）拒 `E_OUTSIDE_WRITE_DOMAIN`——那些文件各有自己的门（§8-59、§8-60、§8-61），它们要先求值或先改写身份区，这扇门不做；文件此刻的摘要不是 `baseline` 拒 `E_VERSION_CONFLICT`；那一版不是文本（§8-69 的 `Opaque`）、编辑乱序或重叠或越过末尾、改完之后不再是同一种编码的文本（劈开了一个字符、在没有标记的 UTF-8 里写进 NUL）都拒 `E_INVALID_ARGS`（documents D8、D11、D12）。任何一种拒绝之后盘上都没有动，页面的草稿留着，重读再改。
+- **两个同基线的保存只落先到的那个。** 读、判、整份换上在城的文档锁里一次做完（city-SPEC §8-40），所以第二个保存读到的已经是第一个落下的版本，摘要不再是它的基线。城外的写者（人的编辑器、居民的 `edit`）不受这把锁约束，挡住它们的是同一个基线：它们一改，摘要就变了。
+- **没有文件读作空字节。** 基线是空字节的摘要时（§8-69 的 `Empty`，或页面要新建一份文件），一次保存把文件建起来；上面的目录随之建起。
+- **回执是账本行，不是命令的答复。** 命令的答复只送拒绝（§8-2）；成功时城写一行 `document_written`，带这条命令的 `idem`。页面见到带着自己那个 `idem` 的一行才显示「已保存」，并从 `version` 读到下一次保存的基线；在那之前只显示「保存中」。丢了答复的页面用同一个 `idem` 再发，城答它第一次的结果，不再写第二次（accounting 的 `commanding::entrance`）。
+- **`WIRE_V` 不另进位**：`PutRange` 是新名字，哈希自己会变（§12.1）。
+- 验收：accounting 的 `a_second_save_from_the_same_version_is_refused_and_the_first_stands`——两个从同一版出发的 `PutRange`，先到的落下并写一行带新版本的 `document_written`，后到的得 `E_VERSION_CONFLICT`，文件是先到者的字节；`a_save_inside_the_reserved_subtree_is_refused`。
+
+### 8-73 修改提案：`Query::Proposals` 与 `Command::DecideProposals`
+
+```rust
+// Query（紧接在 Range 之前）
+Proposals(Address),                                   // 这份文档上还没决定的提案 → Answer::Proposals(Box<ProposalsAnswer>)
+pub struct ProposalsAnswer {
+    pub doc: Address,
+    pub version: Option<B3Hash>,                      // 文档此刻的版本；缺失或读不了时为 None
+    pub open: Vec<ProposalCard>,                      // 按提出的先后
+}
+pub struct ProposalCard {
+    pub id: B3Hash,                                   // 提案身份（documents D13）
+    pub run: RunId,                                   // 提出它的 run
+    pub baseline: B3Hash,                             // 它所基于的版本；不等于 version 即已过期
+    pub span: documents::Span,                        // 那一版里被提议替换的一段
+    pub slices: Vec<documents::Slice>,                // 逐句的 diff：卡的正文
+}
+pub struct Slice { pub kind: SliceKind, pub text: String, pub lead: String, pub trail: String }   // documents 定义
+pub enum SliceKind { Same, Delete, Insert }           // 线上 "same" | "delete" | "insert"
+// Command（紧接在 PutRange 之后）
+DecideProposals(ProposalDecisions)
+pub struct ProposalDecisions { pub doc: Address, pub decisions: Vec<ProposalDecision>, pub idem: IdemKey }
+pub struct ProposalDecision { pub proposal: B3Hash, pub verdicts: Vec<kernel::event::record::SliceVerdict> }
+```
+
+- **提案是一次 run 对一份文档的一处建议，卡的正文是逐句的 diff。** 一处提案带着它所基于的版本与那一版的一段字节，以及那一段的原文与提议的文本；城把两段文本切成句子、对齐，答成一串 `Slice`：`Same` 两边都有，`Delete` 只在原文里，`Insert` 只在提议里（documents D14、D15）。按序把非 `Insert` 的句子接起来就是原文，把非 `Delete` 的接起来就是提议，逐字节，空白也在内。
+- **决定是逐句的。** 一句改动过的句子（`Delete` 或 `Insert`）可以被接受（`accept`）；插入的那一句还可以改后接受（`amend`，带人改过的文本）。没被点名的改动算拒绝：`verdicts` 为空就是整张拒绝。点名一句没改动的句子、一个不存在的序号、同一句两次、对删除的句子 `amend`，都拒 `E_INVALID_ARGS`（documents D16）。
+- **一次决定可以带同一份文档上的几张卡，接受的部分作为一次保存落下**（documents D17）。只要有一张卡接受了什么，所有接受了什么的卡都必须基于文档此刻的版本，否则整次拒 `E_VERSION_CONFLICT`，什么都不写，卡都还开着——这是过期的提案；它们的区间互不重叠，否则拒 `E_INVALID_ARGS`。整张拒绝的卡不看基线：拒绝一张过期的卡不写文档。点名一张不在这份文档上、已经决定过、已经被收回、或根本没有的提案，拒 `E_INVALID_ARGS`；同一张卡点两次也拒。
+- **落下的顺序**：有改动时先像 §8-72 一样在文档锁里换上新版本、写一行 `document_written`，再为每一张卡写一行 `proposal_decided`；都带这条命令的 `idem`，所以一次重发由 `commanding::entrance` 认出、不再写第二次。
+- **提出与收回不在线上。** 提案是 run 提出的，收回也是它；人对一张卡只有决定。`proposal_offered` 与 `proposal_withdrawn` 由提出它的 run 的工具写下，那件工具还没有落地（city-SPEC §8-40 的当前状态）。
+- **`version` 只答一次，卡上只带各自的基线。** 页面比较两者就知道哪张卡已经过期；卡本身不带「过期」这一格，因为过期是此刻的事实，一张卡在账上是什么不随文件而变。
+- **`WIRE_V` 不另进位**：`Proposals`、`DecideProposals` 是新名字（§12.1）。
+- 验收：accounting 的 `views::proposals::tests` 与 `commanding::saving::tests`——整张接受、改后接受、拒绝各落下它该落的字节与行；收回的卡不能再决定；同一个 `idem` 的重发不再写；一张卡被决定之后再决定被拒；重开的城从账本折回同样的卡；基线已动的卡被拒、拒绝它却可以。
 
 ### 8-24 `Query::Commits`：一座楼做过的提交，倒序分页
 
@@ -1692,7 +1756,7 @@ pub struct CommitAt { pub oid: GitOid, pub seq: Seq }
 
 - **`previous` 由账本折出。** 两条宣告提交的记录（`checkpoint_committed` 的提交一支与 `pr_merged`）按 `seq` 折进视图时，同一次 run 上一次宣告的那个提交就是它的 `previous`（sprawling-SPEC 8-128）。它与本提交围出一段：`Query::Changes { base: previous.oid, head: Some(oid) }` 答这次提交相对上一个检查点改了哪些文件，`Query::RunHistory { run, before: Some(seq) }` 往回读到 `previous.seq` 为止，答这一段里这次 run 发出的调用。这一段是候选，不是原因：同一栋楼里别的 run 与人也可能在这一段里写过文件。
 - **`parents` 读自 git，在答问时读。** 提交对象自己记着它的父提交，账本记下的 oid 就是这个对象（连同父提交）的哈希，所以这里读的是权威本身，不是投影；五条 trailer 才是投影，本节不读它们。`Some(vec![])` 是根提交；`None` 是这座城没有仓库、仓库里没有这个对象，或者读失败——一座导出后在别处恢复、身边没有 `.git` 的城，其余各字段照答，只是画不出这一格。读 git 在快照的锁放开之后做（sprawling-SPEC 8-100），一页提交只开一次仓库。
-- **提交说明另成一项**，仍在 §4 的清单里。
+- **`message: Option<String>` 读自 git，与 `parents` 同一刻读。** 提交对象自己记着说明，账本从未记过它，所以它与父提交同属「答问时读 git」那一类（§12.3(b)）：`Some` 是提交对象里的说明原文，五条 trailer 在内；`None` 的情形与 `parents` 相同，另加说明不是 UTF-8。页面画提交行时取第一行，要读全文时读这一格。名字不变而形状变了，与本批其余改形共用 `WIRE_V` 45（§12.1）。
 
 ### 8-55 一次调用带出它的效果与呈现
 
@@ -1967,6 +2031,8 @@ pub(super) fn command_class(command: &wire::WireCommand) -> remote_access::door:
 | `DoctorRefresh` | client | LocalOnly | 重新探一遍机器，取代开城时的快照 |
 | `ConnectToolkit` | client | LocalOnly | 请外包服务开一次同意会话，把一个外部应用接进来 |
 | `PutSpine` | client | Act | 写一栋楼自己的 spine 文档（roadmap／memo／handoff／spec）。携 `base`（发信方起手时那份正文）与 `body`，文件已被人或居民改过即拒——**这几份有两个写者**，与 `PutDocument` 的单写者前提不同，故两道门的守卫不同 |
+| `PutRange` | client | LocalOnly | 对城里任意一份文档的一次保存：带基线版本与那一版的几段编辑，基线已动即拒，落下写 `document_written`（§8-72） |
+| `DecideProposals` | client | LocalOnly | 对一份文档上几张修改提案卡的决定：逐句接受、改后接受或拒绝，接受的部分作为一次保存落下（§8-73） |
 | `CreateBuilding` | client | LocalOnly | 起一栋楼 |
 | `RemoveBuilding` | client | LocalOnly | 把一栋楼移出城：文件搬进 reserved subtree（city-SPEC §8-3），历史留在 Ledger，写 `building_removed`；有 run 正在其中某个房间里跑时拒 `E_BUSY`，点名房间与 run |
 | `Steer` | client | Act | 中途换方向 |

@@ -769,6 +769,16 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 
 **重开参数**：`GateSubject::Scope` 改成携带类型化的 `kernel::event::Scope`（kernel 一侧的改形），这时两件工具交值而不交文字。
 
+### 12.17 读-判-换的门把此刻的字节交给判定，判定留在调用方
+
+**决定**：`city::document` 多一扇门 `revise`：在一份文档的锁里读出它此刻的全部字节，交给调用方的判定，判定经 `Held::replace` 整份换上（§8-40）。`edit_against` 改由它实现。本 crate 不依赖 `documents`。
+
+**理由**：页面的保存与修改提案的决定都是「读此刻、判、换上」，判定是 `documents` 的，锁与整份换上是本模块的，两件事各有一个家。`edit` 已经开放了锁与 `Held`，但让调用方自己读文件，就会出现第二处「读不到就是空」的读法；把读放进门里，`edit_against` 与保存读的是同一次读。
+
+**被否**：①`city` 依赖 `documents`、门面上给一个 `save_document(path, baseline, edits)`：多一条 crate 边，而本 crate 不需要知道编辑长什么样；②`accounting` 在 `edit` 里自己读文件：理由见上；③另开一把锁：一份文档两把锁，`PutSpine` 与 `PutRange` 写同一份 `Roadmap.md` 时互相看不见。
+
+**重开参数**：出现一个要在锁里读别的东西（例如同目录的另一份文件）的写者时，重议门交出的是字节还是 `Held` 加一个读的方法。
+
 ## 13 依赖选型
 
 workspace 内只依赖 `kernel`（拓扑硬约束）。dev 依赖 `tempfile`。外部依赖如下，均在 workspace 钉版（不新增版本权威）。
@@ -1006,6 +1016,19 @@ pub(crate) fn place_tree(target: &Path, entries: &[TreeEntry<'_>]) -> Result<(),
 **错误面**：`E_STORAGE_FATAL`，主题是失败的那条路径与操作系统的原话，恢复语一句——把目录改成可写、确认磁盘有空间，然后重存。八个写面共用这一句。经 `edit_against` 另有一个码：`E_VERSION_CONFLICT`，含义是「文件不再是你起手时的那份」，恢复语是重读再发。它与 `runtime::tools::edit`、`library::install` 报同一件事的码相同，客户端已有它的词条，故不是新开的一种失败。
 
 **关门条件**：断电模拟——任意时刻杀进程，`CONFIG.toml` 要么是旧版要么是新版。逼近它的是四条测试：一个读者在另一线程反复替换 512 KiB 文档时每次都读到完整的旧版或新版；被杀的写者留下的暂存文件既不是那份文档、也不挡下一次写；两个线程各二百次读-改-写之后计数是四百；一份文档把它上面的目录一并带来。
+
+### 8-40 city::document 的第三扇门：读出此刻的字节、判、整份换上（`revise`，形状 4 adapter）
+
+```rust
+pub fn revise<T>(path: &Path, act: impl FnOnce(&Held<'_>, &[u8]) -> Result<T, AxError>)
+    -> Result<T, AxError>;                        // 门面上是 city::revise_document
+```
+
+- **一次保存要的是「此刻的字节」，不是「我起手时的正文」。** `edit_against` 拿调用方给的整份正文与盘上的比较；页面对任意一份文档的保存（wire-SPEC §8-72）带的是 32 字节的版本摘要与几段编辑，判它的是 `documents::save`，它要读的是盘上此刻的全部字节。`revise` 在 `edit` 的锁里把这份文件读出来交给 `act`，`act` 判定、经 `Held::replace` 整份换上，锁在 `act` 返回之前一直持有，所以两个从同一版出发的保存只有先到的那个落下，第二个读到的已经是第一个的字节。
+- **没有文件读作空字节**，与 `edit_against` 同一条规则；`edit_against` 就是 `revise` 加一次逐字节比较，「读不到就是空」这条读法只写在 `revise` 一处。别的读错（目录、无权限）是 `E_STORAGE_FATAL`，与本模块其余的写面同一句恢复语。
+- **本 crate 不依赖 `documents`。** 判定由调用方交进来：`accounting::worker::commanding::saving` 交的是 `documents::save` 与 `documents::decide`（accounting-SPEC §8-22）。这扇门只拥有锁、读与整份换上——就是 §8-27 的两条性质。
+- **当前状态：修改提案的提出与收回还没有写者。** 提案由 run 提出（kernel-SPEC §8-83 的 `proposal_offered`），这需要一件工作台工具：它读那一版、切出原文、经 `documents::Offer::of` 判长度，把一行 `proposal_offered` 记在这次 run 名下，收回时记 `proposal_withdrawn`。这件工具还没有落地，所以今天账本上的提案只来自测试。refrain 路线图 §4-10 说「文稿审阅期间 `edit`、`exec` 对该文稿的写入受同一边界约束，否则只在候选工作树里操作」：本轮按后一条走——提案只是账本上的一行，run 不改那份文档，接受时由人的决定经 `revise` 落下。前一条若要成立，要由 runtime 的写门判「这份文档有开着的提案」，那是 runtime 规格的事，决定它的证据是那件工具落地时一次 run 同时提案又直接改同一份文档的情形。
+- 验收：`document::tests::a_revision_reads_the_bytes_on_disk_and_holds_the_lock_while_it_decides`——两个线程各从同一份文件出发做两百次读-判-换，计数是四百；没有文件时交给 `act` 的是空字节。
 
 ### 8-28 技能安装：静态预检、原子落位、内容哈希入 CAS（`library::install`，形状 2 值＋一个落盘动作）
 

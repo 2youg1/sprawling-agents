@@ -750,6 +750,10 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 | 远程门 | `device_paired` | record-only（一台设备出示了有效的配对码，城留下它：设备 id 的正文、人给它的名字、权限 `watch`／`act`。公钥不在此处，在设备表里） |
 | 远程门 | `device_revoked` | record-only（人撤销了一台设备：设备 id 的正文与名字；它持有的会话随之结束） |
 | 远程门 | `remote_session_started` | record-only（一台已配对的设备握手证明了它的密钥，持有一段远程会话到 `expires`，不晚于门关上的时刻；会话 id 不在此处） |
+| 文档 | `document_written` | record-only（经页面对城里任意一份文档的一次保存落下了：载荷携 `at`（文档的地址）、`baseline`（这次保存所基于的版本）、`version`（落下的新版本）与 `bytes`（新版本的字节数），恒不携正文。它是 `PutRange` 的回执，也是一次被接受的修改提案改写文档时的那一行；页面按载荷上的 `idem` 认出自己那一次（§8-83）） |
+| 文档 | `proposal_offered` | record-only（一次 run 对一份文档的一处修改提案：载荷携 `doc`、`baseline`、`start`、`end`（那一版里被提议替换的半开字节区间）、`before`（那一段的文本）与 `after`（提议的文本）。提案的身份是这些值与 run 的摘要，由 `documents` 算出，不记在载荷里（§8-83）） |
+| 文档 | `proposal_decided` | record-only（人对一张提案卡的决定：载荷携 `proposal` 与逐句的 `verdicts`；一个改动的句子不在 `verdicts` 里即被拒，`verdicts` 为空即整张拒绝。接受的部分改了文档时，同一次决定先写一行 `document_written`） |
+| 文档 | `proposal_withdrawn` | record-only（提出它的 run 收回一处还没决定的提案：载荷携 `proposal`） |
 
 二分依据唯一：该事件载荷是否决定模型请求字节；不存在第三类。
 
@@ -1930,6 +1934,16 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 **重开参数**：出现一种由 run 自己得出、又不属于三种的结局时，重议 `Completion` 的集合，那时 `process_died` 也一并重议它属于哪一种。
 
+### 12.15 一份文档的一次写是一个种类，修改提案的一生是三个种类，都是 record-only
+
+**决定**：经页面写一份任意文档记 `document_written`，修改提案提出、决定、收回各记一行（§8-83）。`document_written` 与 `proposal_decided` 写在城自己名下（`run` 为 `RunId::CITY`，无 `addr`），`proposal_offered` 与 `proposal_withdrawn` 写在提出它的 run 名下（`addr` 是那次 run 的房间）；四种都不入窗，追加在 `ALL` 末尾，不写 `ig`。
+
+**理由**：现有三种写文档的事件各只说一类文件（四份 spine 文档、三份治理文档、两份规矩文件），载荷里的 `which` 是那一类文件的名字；用它们记一份任意文档的写，`which` 就得装一个路径，读者分不出哪一行在说规矩。一次保存要回答的是「哪份文档、从哪一版到哪一版、多大」，这正是 `documents` 的版本身份（documents D3）给出的三件事，所以载荷记两枚摘要而不记正文：正文在盘上，账本记的是这件事发生过。提案不同：提案的文本是 run 说出来的话，与 `tool_called` 的参数同类，文档往后怎样改都不会把它留在盘上，所以 `before` 与 `after` 都在载荷里，重开的城只读账本就能把一张没决定的卡原样折回来。四种都不决定任何一次模型请求的字节。
+
+**被否**：①一个 `document_changed` 种类、载荷里用 `cause` 分保存与提案：决定与写是两件事，一次决定可以什么都不写（整张拒绝），一次写可以不是决定（`PutRange`）；②提案的文本只存进内容库、载荷记地址：内容库没有回收前这样省下的只是账本行的长度，而折叠就要多读一次内容库，账本也不再自足；③提案身份用随机 id 或账本 `seq`：kernel 恒不生成随机值，而 `seq` 要等落账之后才知道，写者在落账之前就要把它交给 run。
+
+**重开参数**：账本行的长度成为开城时间里看得见的一段时，提案文本改存内容库；出现第二种写文档的入口（例如居民的 `edit` 也要记版本）时，重议 `document_written` 的写者。
+
 ### 12.16 摘要在二进制格式里写字节，在人读的格式里写十六进制
 
 **决定**：`B3Hash`、`GitOid` 的 `Serialize` 与 `Deserialize` 按 `is_human_readable()` 分两臂（§8-84）。
@@ -2541,3 +2555,28 @@ pub struct RemoteSessionStarted { pub device: String, pub expires: TimeMs }
 - **追加在 `ALL` 末尾，次序就是一扇门一生的次序**：开、关、配对、撤销、会话开始（表按种类排，入账的次序是开、配对、会话开始、撤销、关）。不写 `ig`：0.0.7 的读者不认识这五个种类，按 §12.10 的规矩报 `E_LOG_VERSION_UNSUPPORTED` 而不是跳过它们。
 - **没有一行携带密钥、配对码或会话 id**：账本可以被任何人重放，带上它们等于把冒充一台设备的材料交给每一个读者。设备的公钥只在设备表里（`CityLayout::devices`）。
 - **设备与权限用正文写**：`device` 是设备 id 的 base32 正文，`authority` 是 `watch` 或 `act`。两者的类型与拼写归 `remote_access::door`（crates/remote_access/Spec.lean §8-11），kernel 不依赖它，所以这里存它给出的字。
+
+### 8-83 一份文档的一次写与一处修改提案的一生（`kernel::event::record::document`，形状 2 值类型）
+
+```rust
+pub struct DocumentWritten { pub at: Address, pub baseline: B3Hash, pub version: B3Hash, pub bytes: u64 }
+pub struct ProposalOffered {
+    pub doc: Address,          // 被提议修改的那份文档
+    pub baseline: B3Hash,      // 提案所基于的版本（documents D3）
+    pub start: u64,            // 那一版里被提议替换的半开字节区间
+    pub end: u64,
+    pub before: String,        // 那一段的文本，按那一版的编码解出
+    pub after: String,         // 提议换成的文本
+}
+pub struct ProposalDecided { pub proposal: B3Hash, pub verdicts: Vec<SliceVerdict> }
+pub struct SliceVerdict { pub slice: u32, pub verdict: Verdict }
+pub enum Verdict { Accept, Amend { text: String } }   // 线上 "accept" | {"amend":{"text":…}}
+pub struct ProposalWithdrawn { pub proposal: B3Hash }
+```
+
+- **四种都是 record-only，追加在 `ALL` 末尾**，次序是 `document_written`、`proposal_offered`、`proposal_decided`、`proposal_withdrawn`（§12.15）。不写 `ig`：0.0.7 的读者不认识它们，按 §12.10 报 `E_LOG_VERSION_UNSUPPORTED`。
+- **`document_written` 是保存的回执**：写在城名下，载荷不携正文；同一条命令写下的每一行都带那条命令的 `idem`（accounting 的 `commanding::entrance`），页面凭它认出「这是我那一次」，并从 `version` 读到下一次保存的基线（wire-SPEC §8-72）。`bytes` 是新版本的长度，不是改了多少。
+- **区间是两个整数，不是 `documents::Span`**：kernel 不依赖 `documents`，读者经 `documents::Span::new(start, end)` 把它读回来，起点在终点之后的一行在那里被拒。
+- **`before` 与 `after` 各至多 `documents::WINDOW_BYTES_MAX` 字节**：一张卡是一个窗口读得下的一段（documents D18）。判定在提出提案的那一处，kernel 只携带。
+- **提案的身份不在载荷里**：它是提出它的 run 与上面六个值的摘要，由 `documents::Offer::id` 一处算出（documents D13）；`proposal_decided` 与 `proposal_withdrawn` 的 `proposal` 就是这个摘要。同一个 run 对同一版同一段提同一句话是同一个提案。
+- **`SliceVerdict` 与 `Verdict` 住在 kernel**：账本记下的是人逐句的决定，`wire` 的决定帧与 `documents` 的合并规则都直接用这两个类型，没有第二份拼写。`slice` 是句子在这张卡上的序号（从 0 数起）；只有改动过的句子可以被点名，`Amend` 只对插入的句子成立（documents D16）。

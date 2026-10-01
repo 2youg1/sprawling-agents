@@ -891,6 +891,33 @@ pub(in crate::views) fn range_answer(city_root: &Path, version: B3Hash, range: d
 - **`read_bytes` 留给 `Content` 与 `Prefix`。** 两者的答复形状不变（头 `DOC_BYTES_MAX` 字节、`truncated`、`binary`），判定换成 `Reading::of`，切法换成 `documents::cut`：一个块在内容库里、又是城里的一份文件时，两处给同一个判断。
 - 验收：`views::document::tests` 与 `views::answering::range::tests`，名字见 wire-SPEC §8-69、§8-70。
 
+### 8-22 保存、修改提案与提交说明（`accounting::worker::commanding::saving`，形状 4 adapter；`accounting::views::proposals`，形状 7 投影）
+
+```rust
+// accounting::worker::commanding::saving（worker 线程）
+impl RunWorker {
+    pub(in crate::worker) fn put_range(&mut self, write: &wire::RangeWrite) -> Result<(), AxError>;
+    pub(in crate::worker) fn decide_proposals(&mut self, decisions: &wire::ProposalDecisions) -> Result<(), AxError>;
+}
+// accounting::views::proposals（视图与 worker 共用的折叠，住 Governance 里）
+pub struct Proposals { /* 开着的卡：身份 ↦ documents::Offer；处理过的卡：身份 ↦ 怎样处理的 */ }
+impl Proposals {
+    pub(crate) fn absorb(&mut self, kind: EventKind, run: RunId, payload: &Payload) -> Result<(), AxError>;
+    pub(crate) fn open_on(&self, doc: &Address) -> impl Iterator<Item = &documents::Offer>;
+    pub(crate) fn find(&self, id: &B3Hash) -> Result<&documents::Offer, AxError>;   // 处理过的、没有的 → E_INVALID_ARGS
+}
+pub(super) fn proposals_answer(city_root: &Path, doc: Address, open: Vec<documents::Offer>) -> wire::Answer;   // 锁外
+// accounting::views::commits（锁外，与 parents 同一刻）
+fn give_messages(city_root: &Path, commits: &mut [wire::CommitAnswer]);
+```
+
+- **一次保存是三步，都在 worker 线程上。** `put_range` 先拒保留子树（`Address::is_reserved`，`E_OUTSIDE_WRITE_DOMAIN`），再经 `city::revise_document`（city-SPEC §8-40）在这份文档的锁里读出此刻的字节、交给 `documents::save` 判定并换上，最后写一行 `document_written`（kernel-SPEC §8-83），它带着这条命令的 `idem`（`commanding::entrance::stamped`）。被拒的保存什么也不写，账上没有它。
+- **决定修改提案也是一次保存。** `decide_proposals` 从 worker 的 `Governance.proposals` 找出点名的每一张卡（不在这份文档上、已经处理过、没有的都拒 `E_INVALID_ARGS`），经同一扇 `revise` 在锁里交给 `documents::decide`；有改动时写一行 `document_written`，然后每张卡一行 `proposal_decided`。卡的状态不在这里改：worker 写下的每一行都经 `RunWorker::absorb` 交给同一个折叠，重开的城读账本得到同一个答案。
+- **提案的折叠住 `Governance`，视图与 worker 各持一份、折法一处**（第 34 条）。`proposal_offered` 经 `documents::Offer::of` 读成一张卡，身份由它算出；读不出的一行（区间颠倒、超长）与别的读不出的治理行一样拒绝，让这座城停在打开那一步，而不是少一张人等着决定的卡（sprawling-SPEC 8-74 的同一条理由）。`proposal_decided` 与 `proposal_withdrawn` 把卡从开着挪到处理过；处理过的卡只记身份与怎样处理的，不留原文与提议。
+- **`Query::Proposals` 在锁内拷出这份文档上开着的卡，锁外读盘。** 文件此刻的版本要读一次全部字节（`B3Hash::digest`），所以与 `Document` 一样在快照放开之后做；卡的句子由 `Offer::review` 在那时切。文件缺失或读不了时 `version` 为 `None`，卡照答。
+- **提交说明读自 git，与父提交同一刻。** `CommitsAsk::read` 在快照放开之后先经 `storage::parents_of` 读父提交，再经 `give_messages` 读说明：一次打开仓库（`git2::Repository::open`），每个 oid 一次 `find_commit`，`Commit::message` 不是 UTF-8 或对象不在时为 `None`（wire-SPEC §8-54）。
+- 验收：`commanding::saving::tests`（wire-SPEC §8-72、§8-73 列的那几条）；`views::proposals::tests::an_open_card_answers_with_its_slices_and_the_version_on_disk`；`views::commits::tests::a_page_of_commits_carries_each_ones_message_from_git`。
+
 ## 12 决策
 
 1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只用 `gateway` 的接口类型，不构造适配器。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。`GatewayModels` 在 worker 搬进来时一同搬进本 crate，理由见 §12-18；本条对 `SystemClock`、`ThisMachine` 这样直接碰主机的生产适配器仍然成立。
@@ -947,4 +974,5 @@ pub(in crate::views) fn range_answer(city_root: &Path, version: B3Hash, range: d
 31. **(a) 视图的第二份按值克隆，不经快照编码。** 理由：两份视图要的是同一个折叠状态加上同一组共享句柄，派生的 `Clone` 正好如此，而编码再解码在 40 万行城上要 350 ms，是开城最长的一段之一（§8-19）。被否决的做法：①留在编码路径上，把复制挪到视图线程——首字节不再等它，但视图线程开头的每一批照样等 350 ms，而且要改装配根起线程的次序；②手写逐字段复制——字段清单的第二份拼写，加一个字段就要改两处。**(b) 重建从创世时不先证明。** 理由：全量折叠逐行核对每一行，判定与不带记录的证明相同；先证明再全量折叠是同一批行核对两遍（§8-19）。被否决的做法：照旧先证明，把证明的结果交给全量折叠跳过核对——折叠要的是每一行解析出的记录，跳过核对仍要解析，省下的只是规范回显的比较，却让「这一行核对过」有了两处来源。 **(c) 房间的各段 session 由视图折叠，表按地址存在 `views::sessions`。** 理由：作答不读盘，表的大小与 session 数同阶（wire-SPEC §12.9）。被否决的做法：把这张表并进 `worker::folds::SessionOrigins`——那张表回答的是派活要问的「这一段还欠不欠一段对话」，只留当前一段，worker 的 `Standing` 也不由页面读；把各段 session 并进 `lineage`——`lineage` 由读盘的 CLI 每次重建，服务中的城不持有它。
 32. **城的工具读别楼的文件与 `cas:` 块，只经 runtime 的 `BoundReader`。** 理由：读界与 reserved subtree 的判定住 `runtime::tools::chosen_path`，`read` 与 `search` 用它；一件读字节的工具若在本 crate 自己判，就是那份判定的第二个权威，而且只判得了本楼（`is_within`），连接器存进 CAS 的录音与截图都读不到（§8-20）。被否决的做法：①保留「只收本楼」并为 `cas:` 另写一段（两套判定，一套跟着 `read` 变，一套不跟）；②在本 crate 复制 `admit` 与 `land`（同上，且链接的判定要拷两遍）。重开参数：要读的字节不在读界之内（例如人拖进来、只给这一次 run 的文件），那时它是一个新的入口，而不是放宽这扇门。
 33. **文档的版本只在第一个窗口盖不住整份时进内容库，由答 `Document` 的读面放进去。** 理由：之后的 `Range` 要读的是这一版，而版本的身份本来就是内容库的地址（documents D3），放进去之后按版本读就是按地址读对象，不需要第二个存放处；整份已经在答复里的版本页面不会再按版本要，存它只是让每一次打开多付一份拷贝。放进去的是读面而不是写者：这是一次查询的副作用，但它只添一个按内容寻址、重复放入即去重的对象，不改任何一条历史，写者也不知道哪个页面在读哪一版。被否决的做法：①`Range` 读文件此刻、版本不符就拒——居民在写的文件每几秒动一次，读到一半的页面要从头重读；②每次打开都存——小文件的每一次打开都多一份拷贝；③由写者在每次保存时存——城之外的写者（人的编辑器、居民的 `edit`）不经过写者。重开参数：内容库长出回收时，被回收的版本要有自己的答复；页面要对比一份小文件的两个版本时，小文件也存。
+34. **(a) 修改提案的折叠住 `views::Governance`，与待答的审批同一个值。** 理由：一张提案卡与一条审批同是「等人决定的事」，worker 判一次决定要的状态与页面画卡要的状态是同一个，`Governance` 正是「一份定义、两处持有、`what_a_worker_holds_is_what_a_restart_rebuilds` 判它们相等」的那个值；放进去之后，快照、重开、worker 写下一行就折一行，都不需要新的接线。被否决的做法：①worker 另折一份 `Standing` 字段、视图另折一份——两份折法；②决定时按身份回账本找那一行——要一个按内容找行的索引，而且「已经处理过」还要再扫一遍。**(b) 提交说明在本 crate 用 `git2` 直接读，与 `storage::parents_of` 各开一次仓库。** 理由：本轮 storage 的公开契约不改（它的规格在迁移），而本 crate 已经为 playback 链接 `git2`；读说明只是 `find_commit` 之后的一个字段，一页至多 `HISTORY_MAX` 个提交多开一次仓库。被否决的做法：①在本 crate 里连父提交一起读、不再调 `parents_of`——两处各有一份「父提交怎样读」，`parents_of` 留下来没有调用方；②把说明写进账本——提交对象就是它的权威，账本记的是 oid。重开参数：storage 的契约下一次能动时，`parents_of` 换成一次读出父提交与说明的读者，本 crate 的 `give_messages` 删去。
 36. **快照的格式门用夹具摘要，夹具里放进每一种出现在快照里的 kernel 摘要类型（§8-24）。** 理由：`fold_version` 只在夹具的编码变了时才动，夹具缺哪一种类型，哪一种类型的编码就能悄悄改变，而旧快照照样被当成新格式读。被否决的做法：①为每个出现在快照里的类型各写一条字节数断言——那是编码的第二份拼写，加一个类型就要多写一条；②把快照格式的版本号写成手改的常量——改 kernel 的人看不见它。重开参数：快照换掉 postcard、或快照的编码有了自己的模式描述（schema）可以直接取摘要时，改由模式描述钉住版本。
