@@ -11,6 +11,7 @@ use std::path::Path;
 use kernel::layout::CONFIG_FILE;
 use kernel::{AxCode, AxError, RESERVED_PREFIX};
 
+use super::remote::REMOTE_KEY;
 use super::resident::{HARNESS_KEY, MODEL_NAME_KEY};
 use super::shelves::SHELVES_KEY;
 
@@ -46,21 +47,47 @@ pub(super) fn unreadable(text: &str, err: &toml::de::Error) -> AxError {
         .with_recovery(recovery)
 }
 
-/// The refusal for `[skills]` written below the city layer.
-///
-/// A shelf is mounted for every building at once, so a building or a
-/// room that names one would admit a directory nobody who keeps this
-/// city chose. Refused where it was written rather than parsed and
-/// dropped.
-pub(super) fn skills_below_city(file: &Path) -> AxError {
+/// A table only the city's own layer may state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CityOnly {
+    /// A shelf is mounted for every building at once, so a building or
+    /// a room that names one would admit a directory nobody who keeps
+    /// this city chose (city-SPEC.md 8-8).
+    Shelves,
+    /// The remote door opens onto the whole city, so a building or a
+    /// room that chose its route would decide for every other one how
+    /// the outside comes in (city-SPEC.md 8-39).
+    Remote,
+}
+
+impl CityOnly {
+    fn key(self) -> &'static str {
+        match self {
+            CityOnly::Shelves => SHELVES_KEY,
+            CityOnly::Remote => REMOTE_KEY,
+        }
+    }
+
+    fn because(self) -> &'static str {
+        match self {
+            CityOnly::Shelves => "a shelf is mounted for every building at once",
+            CityOnly::Remote => "the remote door opens onto the whole city",
+        }
+    }
+}
+
+/// The refusal for a city-only table written below the city layer,
+/// refused where it was written rather than parsed and dropped.
+pub(super) fn below_city(file: &Path, table: CityOnly) -> AxError {
+    let key = table.key();
     AxError::failure(
         AxCode::ConfigInvalid,
         "read a configuration layer",
-        format!("{}: `{SHELVES_KEY}`", file.display()),
+        format!("{}: `{key}`", file.display()),
     )
     .with_recovery(format!(
-        "move `{SHELVES_KEY}` into the city root's `{RESERVED_PREFIX}/{CONFIG_FILE}`: \
-         a shelf is mounted for every building at once"
+        "move `{key}` into the city root's `{RESERVED_PREFIX}/{CONFIG_FILE}`: {}",
+        table.because()
     ))
 }
 

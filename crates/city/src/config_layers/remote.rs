@@ -22,6 +22,8 @@ use kernel::layout::CityLayout;
 use kernel::{AxCode, AxError};
 use serde::Deserialize;
 
+use super::{Layer, ladder};
+
 /// The table this module reads, spelled once for every refusal that
 /// names it.
 pub(crate) const REMOTE_KEY: &str = "[remote]";
@@ -83,12 +85,51 @@ pub enum HostPermanence {
 /// city layer that exists and cannot be read or parsed.
 pub fn remote_route(city_root: &Path) -> Result<RemoteRoute, AxError> {
     let file = CityLayout::new(city_root).city_config();
-    Err(AxError::failure(
+    ladder::stated(&file, Layer::City)?
+        .remote()
+        .cloned()
+        .ok_or_else(|| unchosen(&file))
+}
+
+/// A route as one layer's file states it. A program named by an empty
+/// string names nothing, and is a slip of the pen rather than a choice.
+pub(super) fn stated(route: RemoteRoute) -> Result<RemoteRoute, AxError> {
+    let program = match &route {
+        RemoteRoute::Cloudflare { command, .. } => command.as_deref(),
+        RemoteRoute::Command { command, .. } => Some(command.as_str()),
+    };
+    if program.is_some_and(|program| program.trim().is_empty()) {
+        return Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "read a configuration layer",
+            format!("`{REMOTE_KEY} command` is empty"),
+        )
+        .with_recovery("name the program the route runs, or its full path"));
+    }
+    Ok(route)
+}
+
+/// The refusal for a city whose own layer chooses no route: which file,
+/// and the keys each route needs, written from [`ROUTES`].
+fn unchosen(file: &Path) -> AxError {
+    let routes: Vec<String> = ROUTES
+        .iter()
+        .map(|(route, [first, second])| {
+            format!("`route = \"{route}\"` with `{first}` and `{second}`")
+        })
+        .collect();
+    AxError::failure(
         AxCode::ConfigInvalid,
         "choose the remote door's route",
-        format!("{}: not read yet", file.display()),
+        format!(
+            "{}: no `{REMOTE_KEY}` table chooses a route",
+            file.display()
+        ),
     )
-    .with_recovery("not read yet"))
+    .with_recovery(format!(
+        "write a `{REMOTE_KEY}` table there with {}; docs/operating.md shows both",
+        routes.join(", or ")
+    ))
 }
 
 #[cfg(test)]

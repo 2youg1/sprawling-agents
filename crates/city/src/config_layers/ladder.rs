@@ -30,7 +30,7 @@ use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, LayeredValue};
 
 use super::ConfigLayer;
-use super::refuse::skills_below_city;
+use super::refuse::below_city;
 use crate::building::Building;
 
 /// One rung of the City -> Building -> Resident ladder, from the
@@ -150,10 +150,11 @@ impl Ladder {
 /// how most rungs stay: a value is written where somebody meant to
 /// depart from the default.
 ///
-/// A rung below the city that states `[skills]` is refused here rather
-/// than read and dropped: a shelf is mounted for every building at
-/// once, so only the city's own file may name one (`city-SPEC.md`
-/// section 8-8).
+/// A rung below the city that states `[skills]` or `[remote]` is
+/// refused here rather than read and dropped: a shelf is mounted for
+/// every building at once and the remote door opens onto the whole city,
+/// so only the city's own file may name either (`city-SPEC.md` sections
+/// 8-8 and 8-39).
 ///
 /// Crate-internal because the city's own rung is read without an address
 /// by [`super::city_shelves`]: the missing-file rule is stated once here
@@ -172,8 +173,10 @@ pub(crate) fn stated(file: &Path, rung: Layer) -> Result<ConfigLayer, AxError> {
             .with_recovery("fix the file's permissions; a configuration that exists is read"));
         }
     };
-    if rung != Layer::City && stated.shelves().is_some() {
-        return Err(skills_below_city(file));
+    if rung != Layer::City
+        && let Some(table) = stated.city_only()
+    {
+        return Err(below_city(file, table));
     }
     Ok(stated)
 }

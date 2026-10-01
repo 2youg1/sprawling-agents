@@ -57,7 +57,7 @@ pub use write::{write_mcp, write_sandbox, write_second_threshold};
 
 use ladder::Ladder;
 // The refusal shapes every reader in this module answers with.
-use refuse::{refuse, unreadable};
+use refuse::{CityOnly, refuse, unreadable};
 
 /// Where a layer's file lives for a run at `addr`.
 ///
@@ -170,7 +170,7 @@ impl ConfigLayer {
             // be a second spelling of the same shelf.
             shelves: file.skills.map(|section| section.shelves),
             naming: file.identity.map(|section| section.version),
-            remote: None,
+            remote: file.remote.map(remote::stated).transpose()?,
         })
     }
 
@@ -233,6 +233,15 @@ impl ConfigLayer {
     pub fn remote(&self) -> Option<&RemoteRoute> {
         self.remote.as_ref()
     }
+
+    /// The first table this layer states that only the city's own
+    /// layer may state, which the ladder refuses on every other rung.
+    fn city_only(&self) -> Option<CityOnly> {
+        self.shelves
+            .as_ref()
+            .map(|_| CityOnly::Shelves)
+            .or_else(|| self.remote.as_ref().map(|_| CityOnly::Remote))
+    }
 }
 
 /// Resolves the ladder into the snapshot a run is frozen with.
@@ -281,6 +290,8 @@ pub(crate) struct ConfigFile {
     resident: Option<resident::ResidentSection>,
     #[serde(default)]
     identity: Option<IdentitySection>,
+    #[serde(default)]
+    remote: Option<RemoteRoute>,
 }
 
 /// The `[identity]` table: the version of the names a session froze,
