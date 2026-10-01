@@ -12,7 +12,7 @@
 
 ## 3 假设与歧义
 
-评审楼的 worktree 按房间保留：`Site::place_tree` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（`crates/storage/Spec.lean` §8-9），不再每轮全量检出、再整目录删除；`RunWorker::over` 拿到账本写者后解开上一个写者留下的全部 worktree 锁。树按楼的 scope 领、按同一个 scope 立检查点和献出（`workbench::tree_scope` 是这一个 scope 的唯一定义）：再领一棵留着的树只检出 scope（`crates/storage/Spec.lean` §8-9），献出的 `Checkpoint::land` 只按 scope 暂存，于是合并进干线的提交只动 scope。第一次放置仍是全量检出：`Worktree::add` 总做一次全量检出，git2 0.21 没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `storage` 禁 `unsafe`。上限只称一次检出、不称留着的树之和，定在 `crates/storage/Spec.lean` §8-9。树的放置与 MCP 缺表时的那次连接，连同 `lay_out_workbench`、`freeze_plan`，在驾驶这个 run 的 lane 里做（8-113）。
+评审楼的 worktree 按房间保留：`Site::place_tree` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（`crates/storage/Spec.lean` §8-9），不再每轮全量检出、再整目录删除；`RunWorker::over` 拿到账本写者后解开上一个写者留下的全部 worktree 锁。树按楼的 scope 领、按同一个 scope 立检查点和献出（`workbench::tree_scope` 是这一个 scope 的唯一定义）：再领一棵留着的树只检出 scope（`crates/storage/Spec.lean` §8-9），献出的 `Checkpoint::land` 只按 scope 暂存，于是合并进干线的提交只动 scope。一个房间的第一次放置先接管城的备树，只改名、不检出（`crates/storage/Spec.lean` §8-35，8-145）；没有备树可接管时才全量检出，因为 `Worktree::add` 总做一次全量检出，git2 0.21 没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `storage` 禁 `unsafe`。城的第一次放置总在这一类：那之前城没有提交，也就没有干线可备（读数在 8-161）。上限只称一次检出、不称留着的树之和，定在 `crates/storage/Spec.lean` §8-9。树的放置与 MCP 缺表时的那次连接，连同 `lay_out_workbench`、`freeze_plan`，在驾驶这个 run 的 lane 里做（8-113）。
 
 不钉的构建里 `lean` 与 `zig` 两行的装法拼着空钉子（8-157）：`bin::doctor::table::toolchain` 的 `LEAN` 一行装 `elan toolchain install <钉子>`，`ZIG` 一行在 Windows 上装 `winget … --version <钉子>`，钉子为空时两条命令各缺一个参数。候选的答法是钉子为空时 `lean` 装 `stable`、`zig` 去掉 `--version` 与它的值；未定的是不钉的构建该不该在 develop 层列这两行：从 crates.io 装这个二进制的人多半不开发这份代码，而 `Need` 不按构建来源分（8-58）。判定它的证据是一次从 `.crate` 构建出的二进制在 Windows 上按页面的「安装」跑这两行。
 
@@ -1151,7 +1151,7 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **试验借一棵自己的树，而不是在合并时才拦**。落地策略为 `experiment` 的 run 不论楼要不要评审都在房间的工作树里写（§8-133），合并时 `runtime::admits` 再拒一次。理由：没有评审的楼里一次 run 直接写进楼的文件，到合并那一步时已经没有东西可拦——试验的「什么都不落地」只有在写的位置上才守得住；把它放在树上，楼的文件从头到尾不变，而试验的产出仍在分支上，读得到、比得出。**被否**：只在合并时拒（没有评审的楼里试验照样改了楼）；试验 run 结束时把它改过的文件还原（还原之前别的 run 与人已经读到了改动，而且要为每一种写路径各写一种撤销）。**重开参数**：工作树放置的读数（8-31 的 `[large_worktree_placement]`）大到让一次小试验的开销以秒计时，重议「小试验用副本、不借树」。
 
-**补备树放在 lane 里、run 驾驶完之后，不在记账线程上，也不另起一条线程**（8-145）。放置的秒数是一次全量检出等实时扫描逐个放行新建文件（`crates/storage/Spec.lean` §8-35）；把检出挪进备树，放置只剩改名，而补备树本身仍是一次全量检出，它必须落在人等的那一段之外。人等的是 run 的第一次模型调用，lane 在 run 驾驶完之后、交回 `Flown` 之前已经在这一段之外，代价是这个 run 的落地晚一次补树（8-145「代价落在谁身上」）。**被否**：在 `land` 里补——`land` 在记账线程上，记账线程等一次检出，每条 lane 的 append 都排在它后面（8-113）；开城时补——一次全量检出加进首字节（8-122）；为补树另起一条后台线程——库 crate 与 `sprawling` 起线程的地方都是 ARCHITECTURE §10 第 3 条点名的，补树不值一条新线程，lane 已经在那里；lane 先送回 `Flown` 再补——`DrivingPool::landed` 在记账线程上 `join` 回家的 lane，记账线程会在 `join` 里等这次检出。**重开参数**：落地晚的那一次补树被人看见时（一个新房间的 run 落地以秒计，8-155 的读数），改成 lane 送回 `Flown` 之后再补、`DrivingPool` 不在落地时 `join` 还在补树的 lane。
+**补备树放在 lane 里，在 run 交回 `Flown` 之后；`DrivingPool` 落地时不 `join` 还在补的 lane**（8-145、8-161）。放置的秒数是一次全量检出等实时扫描逐个放行新建文件（`crates/storage/Spec.lean` §8-35）；把检出挪进备树，放置只剩改名，而补备树本身仍是一次全量检出，它必须落在人等的两段之外：run 的第一次模型调用之前，和 run 的落地之前，因为落地写审批、答复派活者、往下派活。lane 驾驶完、交回 `Flown` 之后，两段都已过去。**被否**：在 `land` 里补——`land` 在记账线程上，记账线程等一次检出，每条 lane 的 append 都排在它后面（8-113）；开城时补——一次全量检出加进首字节（8-122）；为补树另起一条后台线程——库 crate 与 `sprawling` 起线程的地方都是 ARCHITECTURE §10 第 3 条点名的，补树不值一条新线程，lane 已经在那里；lane 在交回 `Flown` 之前补——一个新房间的 run 落地晚一次全量检出，发行构建 1.2–1.5 s（8-161 的读数）。**重开参数**：同一座城的派活密到下一次放置常赶在补完之前（放置见备树 `Busy` 而全量检出），那时补树的时机要往前挪，或者一座城备不止一棵。
 
 **一座城一次只有一条 lane 补备树，后来的跳过，表放在进程里按城根分键**（8-155）。两次 `stock` 同时见到「没有备树」时，后一次的失败会收回前一次的登记，正在接管的一次放置因此失败，那次派活带着存储错误回到人那里；`crates/storage/Spec.lean` §8-35 只保证了放置与放置、刷新与接管这两种并发。跳过而不等，因为等另一条 lane 的全量检出就是让自己的落地再晚一次全量检出，而正在补的那一条补完城里就有备树。表在进程里，因为一座城只有一个写者进程，「这个进程里谁在补这座城」就是「谁在补这座城」；与 `city::document` 按路径分键的写锁表是同一种做法。**被否**：在 storage 的 `stock` 里补上这个窗口——storage 的公开契约本轮不改（`crates/storage/Spec.lean` §8-35 已定）；`Flight` 持一把补树的锁、经 `DriveContext` 交给 lane——与进程表判的是同一件事，却要多一条从 `RunWorker` 穿过 `drive_context` 到两条 `fly` 臂的传递路径；跳过换成等——理由见上。**重开参数**：一个进程同时为同一座城开两个 worker，或 storage 的 `stock` 自己在「没有备树」时先占住 `+spare`。
 
@@ -4612,43 +4612,76 @@ impl RunWorker {
 // storage —— `crates/storage/Spec.lean` §8-35
 impl storage::Worktrees { pub fn stock(&self) -> Result<storage::FileWork, storage::StorageError>; }
 // accounting::worker::dispatching::preparing —— Staged::fly 的两臂
-// 模型臂：drive_run 返回之后、Flown 交回之前，restock.after_run(site.lease.as_ref())
-// harness 臂：drive_harness 返回之后、Flown 交回之前，restock.after_run(driven.lease.as_ref())
-// after_run：借了树（lease 为 Some）才补，补的是 Worktrees::open(city_root)?.stock()（界与失败见 8-155）
+// 两臂：驾驶返回之后先 home(flown)，交回 Flown；再 restock.put_back()（次序与池的一半见 8-161）
+// Restock::owed_by：借了树（lease 为 Some）才欠一次补树，补的是 Worktrees::open(city_root)?.stock()（界与失败见 8-155）
 ```
 
-- **为什么在这里。** 一次放置等的是实时扫描对每个新建文件的放行，512 个 16 KB 文件的树以秒计（`crates/storage/Spec.lean` §8-31、8-35）。人等的是 run 的第一次模型调用，备树把检出挪出这一段，放置只改名。补树放在 lane 驾驶完之后：这时 run 的模型调用都已做完，它写的行都已经由 relay 写下。记账线程不行（8-113：记账线程不等盘）；`land` 在记账线程上；开城时补一棵会把一次全量检出加进首字节（8-122）；一条专门补树的后台线程不在 ARCHITECTURE §10 第 3 条点名的起线程处之列。`fly` 只有一个调用者，`accounting::worker::pool` 起的那条 lane，所以补树在 `fly` 里就是在 lane 上。
+- **为什么在这里。** 一次放置等的是实时扫描对每个新建文件的放行，512 个 16 KB 文件的树以秒计（`crates/storage/Spec.lean` §8-31、8-35）。人等的是 run 的第一次模型调用，备树把检出挪出这一段，放置只改名。补树放在 lane 驾驶完、交回 `Flown` 之后：这时 run 的模型调用都已做完，它写的行都已经由 relay 写下，它的落地也不再等这条 lane（8-161）。记账线程不行（8-113：记账线程不等盘）；`land` 在记账线程上；开城时补一棵会把一次全量检出加进首字节（8-122）；一条专门补树的后台线程不在 ARCHITECTURE §10 第 3 条点名的起线程处之列。`fly` 只有一个调用者，`accounting::worker::pool` 起的那条 lane，所以补树在 `fly` 里就是在 lane 上。
 - **只在借了树的 run 之后补。** 没有评审、也不是试验的楼从不借树，它的 run 补一棵只会白占一棵树的盘。harness 的 run 与模型的 run 经同一个 `lend_tree` 借树（8-124），也同样可能接管备树，所以两臂都补。`stock` 在备树已在干线上时只写干线改过的文件，所以房间取回自己留着的树之后补树的代价是一次差量（读数见 8-155）。
-- **代价落在谁身上。** 补树期间这条 lane 还没交回 `Flown`，于是这个 run 的落地整段往后推：房间队列与树的归还、待人处理事项的登记、对派活者的答复、交下去的活与继任 run 的派出，都在 `land` 里，都等这一次补树。别的房间不受影响（lane 各自独立），记账线程照常服务别的 lane。只有备树刚被接管过（一个房间第一次放置）时补树才是一次全量检出，其余时候是差量。关城的 `land_the_rest` 等每条 lane 回家，所以也等正在补的那一棵。
+- **代价落在谁身上。** run 的落地不等补树：lane 先把 `Flown` 交回记账线程，再补树，`DrivingPool::landed` 不在记账线程上 `join` 还在补树的 lane（8-161）。房间队列与树的归还、待人处理事项的登记、对派活者的答复、交下去的活与继任 run 的派出照常在 `land` 里做。补树占着这条 lane 的线程直到补完；只有备树刚被接管过（一个房间第一次放置）时它是一次全量检出，其余时候是差量。紧接着派到一个新房间的 run 若在补完之前放置，见到的备树正被补（`Busy`），这次放置退回全量检出（`crates/storage/Spec.lean` §8-35）。关城时丢掉 `DrivingPool` 要 `join` 还在补的 lane，所以关城等正在补的那一棵。
 - **失败。** `stock` 的失败不改变 run 的结局：run 已经结束，补不上备树只让下一次放置退回全量检出。失败写一条 `Refuse` 诊断行，锚在 lane 的账本位置快照上，与 8-113 lane 半段的诊断行同一个写端。
 - **试验借树（8-133）的重开参数读的是这里。** §12「试验借一棵自己的树」以放置读数是否以秒计为重开条件：接管备树之后放置以毫秒计，那条决定的前提回到它被定下时的样子。
 
-当前状态：两半都已落地。storage 一半是 `crates/storage/Spec.lean` §8-35（`stock`，放置先接管备树）；citysim 的 `large_worktree_placement` 在每轮之前调 `stock`（citysim D13、`tools/citysim/Spec.lean` §8-12）；lane 一半在 `dispatching::preparing`，界、崩溃后的收回与读数在 8-155。检验是 `preparing::tests` 的两条：`a_lane_puts_the_stock_back_before_its_run_comes_home`（`fly` 返回、`land` 还没跑时备树已经登记、没锁、目录在），`the_next_room_takes_the_stock_and_creates_no_file`（第一个房间经真 lane 派活并落地，第二个房间的放置整值比较 `FileWork`，三个计数都是 0，接管之后 lane 又补回一棵）。
+当前状态：两半都已落地。storage 一半是 `crates/storage/Spec.lean` §8-35（`stock`，放置先接管备树）；citysim 的 `large_worktree_placement` 在每轮之前调 `stock`（citysim D13、`tools/citysim/Spec.lean` §8-12）；lane 一半在 `dispatching::preparing`，界、崩溃后的收回与读数在 8-155。检验是 `preparing::tests` 的两条：`a_lane_puts_the_stock_back_after_its_run_comes_home`（`fly` 交回 `Flown` 时还没有备树，`fly` 返回、`land` 还没跑时备树已经登记、没锁、目录在），`the_next_room_takes_the_stock_and_creates_no_file`（第一个房间经真 lane 派活并落地，第二个房间的放置整值比较 `FileWork`，三个计数都是 0，接管之后 lane 又补回一棵）。
 ### 8-155 补树的界：一座城一次一条 lane 在补，补到一半进程死了由盘上的状态收回（`accounting::worker::dispatching::preparing`）
 
 ```rust
 // accounting::worker::dispatching::preparing（私有）
 struct Restock { city_root: PathBuf, notes: Notes, staged_at: kernel::Seq }
 impl Restock {
-    /// 借了树才补；失败写一条 Refuse 诊断行，不返回错误。
-    fn after_run(self, borrowed: Option<&storage::WorktreeLease>);
+    /// 借了树的 run 才欠一次补树；没借树的 run 答 None。
+    fn owed_by(self, borrowed: Option<&storage::WorktreeLease>) -> Option<Restock>;
+    /// 在 run 交回 Flown 之后补；失败写一条 Refuse 诊断行，不返回错误。
+    fn put_back(self);
 }
 // 这个进程里此刻正在补备树的城，按城根分键
 static STOCKING: Mutex<BTreeSet<PathBuf>>;
 ```
 
-- **一座城同一时刻至多一条 lane 在补，后来的跳过，不等。** `crates/storage/Spec.lean` §8-35 保证了两种并发（两次放置争一棵备树；一次刷新与一次接管），没有保证两次 `stock` 同时见到「没有备树」：两条都去新备，后一条的 `worktree add` 撞上前一条刚登记的 `+spare` 而失败，它的 `take_back` 收回的是前一条的登记；这时一次正在接管的放置在改名登记目录那一步失败，那次派活带着存储错误回到人那里。lane 在调 `stock` 之前先在表里占这座城的位置，占不到就不补：正在补的那一条补完，城里就有备树。不等，是因为等另一条 lane 的全量检出就是让自己的落地再晚一次全量检出。表被一条 lane 崩掉而中毒时照样读写，因为表里每一步都在锁内做完。
+- **一座城同一时刻至多一条 lane 在补，后来的跳过，不等。** `crates/storage/Spec.lean` §8-35 保证了两种并发（两次放置争一棵备树；一次刷新与一次接管），没有保证两次 `stock` 同时见到「没有备树」：两条都去新备，后一条的 `worktree add` 撞上前一条刚登记的 `+spare` 而失败，它的 `take_back` 收回的是前一条的登记；这时一次正在接管的放置在改名登记目录那一步失败，那次派活带着存储错误回到人那里。lane 在调 `stock` 之前先在表里占这座城的位置，占不到就不补：正在补的那一条补完，城里就有备树。不等，是因为正在补的那一条补完城里就有备树，等它只让这条 lane 的线程多活一次全量检出，之后的那次 `stock` 也只剩一次空的差量。表被一条 lane 崩掉而中毒时照样读写，因为表里每一步都在锁内做完。
 - **表在进程里，按城根分键。** 一座城只有一个写者进程（账本的写锁），所以「这个进程里谁在补这座城」就是「谁在补这座城」。
 - **成功与失败。** 成功写一条 `Trace` 诊断行，带 `stock` 答回的三个计数，人从日志读得出这次补树是全量检出还是差量。失败写一条 `Refuse` 诊断行，说下一次放置会退回全量检出；不返回错误，run 的结局不因它改变（8-145）。两行都锚在派活被决定时的账本位置（`Laying` 与 `HarnessHalf` 里的 `staged_at`），与 8-113 lane 半段的诊断行同一个写端。
 - **补到一半进程死了。** 账本里没有补树的记录，重放与恢复都不读它；备树的全部状态在盘上与城的 git 登记里，进程里的表随进程消失。下一个写者开城时 `RunWorker::over` 先拿账本写锁，再由 `Worktrees::lift_abandoned_leases` 解开每一棵树的锁，`+spare` 也在其中，否则一棵锁着的备树会被读成「正在补」，本次服务里再也没有备树可接管；`sweep_abandoned` 不清它，因为 `live` 不列它（`crates/storage/Spec.lean` §8-35）。之后按盘上的样子收回：登记与两份链接文件都认得出时，下一次放置接管它，检出到一半的文件由接管第⑥步的 `restore` 补全；登记在而链接文件认不出时，下一次 `stock` 收回登记重备；目录在而没有登记时，下一次 `stock` 先清掉目录再备。所以 G5（崩溃与恢复）不需要为补树加任何恢复步骤；它要守住的只有一条次序：开城解锁先于第一次放置。
-- **剩下的秒级读数在落地这一段。** 一个房间第一次放置接管了备树之后，这条 lane 补回的是一次全量检出，这个 run 的落地等它（8-145「代价落在谁身上」）。秒数没有消失，从 run 的第一次模型调用之前挪到了它的落地之前。挪不出 lane 的原因在 `accounting::worker::pool`：`landed` 在记账线程上 `join` 回家的 lane，lane 若先送回 `Flown` 再补树，记账线程就在 `join` 里等这次检出，每条 lane 的 append 都排在它后面。
+- **补树不在落地这一段。** 一个房间第一次放置接管了备树之后，这条 lane 补回的是一次全量检出；lane 在交回 `Flown` 之后才补，`DrivingPool::landed` 不 `join` 还在补的 lane，所以这个 run 的落地不等它（8-161）。
 - **读数。** 由 `preparing::tests::instrument_production_placement`（`#[ignore]`）给出：一座评审楼的 `lab/room1/bulk` 里 512 个 16 KB 文件，第一个房间经 `fly` 放置（全量检出）、驾驶、补备树；第二个房间经 `fly` 接管备树、驾驶、补回一棵。仪表用一个包住城账本的计时 `Ledger` 量三段：`fly` 开始到 `worktree_opened` 入账（放置），最后一行入账到 `fly` 返回（补树），以及整个 `fly`。
 
 读数（debug 构建，windows-x86_64、16 核，同一仪表三轮）：第二个房间接管备树的放置 39–42 ms，`created` 为 0；它的 lane 之后补回一棵全量检出的备树 1.44–1.46 s。第一个房间的放置 5.6–6.2 s，`created` 513：这一段里有城的第一次提交（`ensure_base` 把 512 个文件 stage 并扫描一遍）和一次全量检出；它之后补备树 1.26–1.33 s。
 
 读数（发行构建，windows-x86_64、16 核，同一仪表两轮）：第二个房间接管备树的放置 47–48 ms，`created` 为 0；它的 lane 补回备树 1.35–1.54 s。第一个房间的放置 4.29–4.72 s，`created` 513；它之后补备树 1.24–1.42 s。发行构建省下的是计算，省不下实时扫描对每个新建文件的放行，所以补树与城的第一次放置在发行构建里仍以秒计。`just bench` 的 `large_worktree_placement`（bench 自己备树）p50 36.0 ms。
 
-当前状态：上面各条都已落地。还以秒计的有两段：一是补备树本身，落在接管了备树的 run 的落地之前（本节「剩下的秒级读数在落地这一段」）；二是一座城的第一次放置，它先提交一次城（`crates/storage/Spec.lean` §8-8 的 `ensure_base`），每座城只有一次，那次之前没有干线可备，所以备树帮不上它，这一段仍在那座城第一个 run 的第一次模型调用之前。发行构建的读数由同一个仪表测试给出：`cargo nextest run --release -p sprawling-accounting --run-ignored only --no-capture -E 'test(instrument_production_placement)'`。
+当前状态：上面各条都已落地。还以秒计的有两段，都不在 run 的落地之前：一是补备树本身，在 lane 交回 `Flown` 之后，占着这条 lane 的线程与盘（8-161）；二是一座城的第一次放置，它先提交一次城（`crates/storage/Spec.lean` §8-8 的 `ensure_base`），每座城只有一次，那次之前没有干线可备，所以备树帮不上它，这一段仍在那座城第一个 run 的第一次模型调用之前（拆分与读数在 8-161）。发行构建的读数由同一个仪表测试给出：`cargo nextest run --release -p sprawling-accounting --run-ignored only --no-capture -E 'test(instrument_production_placement)'`。
+
+### 8-161 run 先落地，lane 再补备树（`accounting::worker::dispatching::preparing`、`accounting::worker::pool`）
+
+```rust
+// accounting::worker::dispatching::preparing
+impl Staged {
+    /// 准备、驾驶，把 Flown 交给 home，然后才补备树（8-145、8-155）。
+    pub(crate) fn fly<L: Ledger>(self, ledger: &mut L, context: DriveContext, home: impl FnOnce(Flown));
+}
+// accounting::worker::pool
+pub(crate) struct DrivingPool {
+    running: BTreeMap<RunId, JoinHandle<()>>,   // 还在驾驶的 run
+    trailing: Vec<(RunId, JoinHandle<()>)>,      // run 已回家、lane 还没结束（在补备树）
+    /* 其余字段不变 */
+}
+impl DrivingPool {
+    /// 把 run 回家的 lane 挪进 trailing，join trailing 里已结束的 lane；不等还在跑的。
+    pub fn landed(&mut self, arrival: Arrival) -> Result<Arrival, AxError>;
+}
+impl Drop for DrivingPool { /* join 每条 trailing 里的 lane */ }
+```
+
+- **次序在一个函数里。** lane 驾驶完，先把 `Flown` 交给 `home`，再补备树。池起的 lane 交给 `home` 的是「送上记账线程的队列」，测试交的是「放进一个局部变量」。次序就是这一节要的性质，所以它写在 `fly` 一处，而不是让 `fly` 返回一个待补的值、由每个调用者自己记得先送回再补。
+- **落地不 `join` 还在跑的 lane。** `landed` 把回家的 run 的 lane 从 `running` 挪进 `trailing`，再 `join` `trailing` 里已经结束的 lane（`JoinHandle::is_finished`）；一条异常结束的 lane 仍是一次 `E_STORAGE_FATAL`，与改之前一样（8-46-3）。`in_flight` 只数 `running`，所以排空判定（`kernel::pursuit` 的 `in_flight`、`land_the_rest`）仍只等还在驾驶的 run。`trailing` 不占 `DRIVING_LANES`：一座城一次只有一条 lane 真在补（8-155），别的 lane 见位置被占就跳过、随即结束。
+- **丢掉池时 `join` 还在补的 lane。** 同一个进程里再开这座城时，`RunWorker::over` 先由 `lift_abandoned_leases` 解开每棵树的锁，`+spare` 也在其中（8-155）；一棵检出到一半的备树解了锁就读作「备好了」，下一次放置会接管它。`join` 让关城等正在补的那一棵，这与改之前关城的 `land_the_rest` 等 lane 回家时付的是同一笔。进程在补到一半时死掉照 8-155 的崩溃规则收回，账本上不记，补树不加事件。
+- **被否：**`fly` 返回一个待补的值，由池的 lane 先送回再补——次序就分到了 `fly` 的每个调用者，测试里的调用者不送回也不补；为补树另起一条线程——ARCHITECTURE §10 第 3 条点名的起线程处里没有它，lane 已经在那里；把 `trailing` 计入车道上限——一次补树会挡住一个新 run 的开始，那正是这一节要挪走的等待；关城不 `join`——同进程再开城会接管一棵半成品备树，理由见上。
+- **检验。** `preparing::tests::a_run_lands_while_its_lane_still_puts_the_stock_back`：测试线程握住 `STOCKING` 表，lane 的补树在表上等；run 仍然经真 lane 落地（`driving()` 为假），此时城里没有备树；放开表、丢掉 worker（池 `join` 那条 lane）之后备树就位。断言的是次序，不读墙钟；`Patience::For` 的轮询上限只让红的时候不挂住。`a_lane_puts_the_stock_back_after_its_run_comes_home` 在 `fly` 一处断言同一个次序：交回 `Flown` 时没有备树，`fly` 返回时有。
+- **城的第一次放置拆开来。** 发行构建、同一种 512 个 16 KB 文件的楼：`ensure_base` 2.77–2.86 s，其中 `Index::add_all` 2.2 s，它为 513 个文件各写一个松散对象，每个都是一次新建文件，等实时扫描放行一次；之后 `claim` 全量检出 513 个文件 1.16–1.18 s。两段都不在 lane 里：松散对象在 `storage::checkpoint`，换成一次写一个 pack 只新建一个文件；检出是 libgit2 的串行检出，并行写文件要在 storage 里多一个起线程处（ARCHITECTURE §10 第 3 条）。
+
+当前状态：次序、池的一半与关城的 `join` 已落地。城的第一次放置没有改，仍以秒计（上一条）；降它的下一步是 `ensure_base` 写一个 pack 而不是逐个松散对象，判定它的证据是同一个仪表测试的 `placement_ms`。ARCHITECTURE.md §10 第 3 条与 8-46-3 仍写着 lane 在 run 回家时结束，现在 lane 在补完备树后结束。
+
+读数（发行构建，windows-x86_64、16 核，`instrument_production_placement`）：改之前，第二个房间接管备树的放置 41 ms，`created` 为 0，之后它的落地等补树 1222 ms；第一个房间放置 4239 ms，`created` 513，落地等补树 1219 ms。改之后：READING-PENDING。`large_worktree_placement`（bench 自己备树）改之前 p50 34.7 ms。
 
 ### 8-113 派活的准备进 lane：记账线程只做决定，树、MCP 连接与冻结在 lane 里（`accounting::worker::dispatching::running`、`accounting::worker::dispatching::preparing`、`accounting::worker::driving::flight`）
 
