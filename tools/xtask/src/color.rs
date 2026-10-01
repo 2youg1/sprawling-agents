@@ -49,9 +49,15 @@ use tables::{
 };
 
 const THEME: &str = concat!(crate::walk::client_src!(), "/theme.css");
-const HUE_AXIS: u16 = 264;
-const HUE_ALERT: u16 = 84;
-const GRAY_CHROMA: u16 = 18;
+const HUE_AXIS: u16 = 250;
+const HUE_ALERT: u16 = 70;
+const GRAY_CHROMA: u16 = 14;
+
+/// The two coloured tokens that may leave the axis, each with the one hue
+/// it may take: the context ring's first reminder and its handoff
+/// reminder (tools/xtask/Spec.lean §8-8b). Named rather than counted, so a
+/// third token cannot borrow either hue.
+const CHECKPOINTS: [(&str, u16); 2] = [("REMINDER_FIRST", 150), ("REMINDER_SECOND", 25)];
 
 /// Where the light block begins, and what closes it. The gate reads one
 /// stylesheet as two palettes, so it has to know which lines belong to
@@ -230,11 +236,17 @@ fn judge_tokens(source: &str, mode: Mode) -> Vec<Violation> {
         }
     }
 
-    // 3. Every coloured token sits on the axis or on its single exception.
+    // 3. Every coloured token sits on the axis or on its single exception,
+    //    except the two checkpoints, which sit on their own hues and only
+    //    there.
     for (name, _, hue, _) in &colours {
-        if *hue != HUE_AXIS && *hue != HUE_ALERT {
+        let allowed = match CHECKPOINTS.iter().find(|(token, _)| *token == name.as_str()) {
+            Some((_, own)) => hue == own,
+            None => *hue == HUE_AXIS || *hue == HUE_ALERT,
+        };
+        if !allowed {
             violations.push(named(
-                "one hue axis and one exception, which is its complement",
+                "one hue axis and its complement, and each context-ring checkpoint on its own hue",
                 format!("{name} sits on hue {hue}"),
             ));
         }

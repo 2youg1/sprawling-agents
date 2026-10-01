@@ -64,7 +64,7 @@ const PERMITTED: &str = "deny.toml";
 /// syntax highlighter and its grammars, which ship as a lazy chunk the
 /// first screen never downloads (client-SPEC 4-26); no UI library is
 /// among them (client-SPEC section 7).
-const RUNTIME: [&str; 12] = [
+const RUNTIME: [&str; 13] = [
     "@lezer/cpp",
     "@lezer/css",
     "@lezer/go",
@@ -75,6 +75,7 @@ const RUNTIME: [&str; 12] = [
     "@lezer/python",
     "@lezer/rust",
     "@lezer/yaml",
+    "@lucide/svelte",
     "effect",
     "svelte",
 ];
