@@ -13,13 +13,41 @@
 
 use super::super::prepared::unavailable;
 
-/// Not built yet: every import is answered as a question this city
-/// could not look up.
+/// The host an import asks when the page names none, written once.
+pub(crate) const DEFAULT_HOST: &str = "github.com";
+
+/// The answer to one import: the host asked, and what the reader the
+/// served city handed in says about it. A string that is not a host
+/// name is answered without starting anything, and views nobody served
+/// answer `Unavailable` rather than reaching this machine.
 pub(crate) fn github_answer(
-    _ask: Option<fn(&str) -> wire::GithubReading>,
+    ask: Option<fn(&str) -> wire::GithubReading>,
     host: Option<&str>,
 ) -> wire::Answer {
-    unavailable(format!("GithubLogin({host:?})"))
+    let host = host.unwrap_or(DEFAULT_HOST);
+    let Some(login) = ask else {
+        return unavailable(format!("GithubLogin({host})"));
+    };
+    let reading = if is_host(host) {
+        login(host)
+    } else {
+        wire::GithubReading::NotAHost
+    };
+    wire::Answer::GithubLogin(wire::GithubLoginAnswer {
+        host: host.to_owned(),
+        reading,
+    })
+}
+
+/// Whether `host` can be handed to `gh` as the value of `--hostname`:
+/// letters, digits, `.`, `-` and `:` for a port, not empty, and not
+/// opening with `-`, which `gh` would read as an option of its own.
+fn is_host(host: &str) -> bool {
+    !host.is_empty()
+        && !host.starts_with('-')
+        && host
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':'))
 }
 
 #[cfg(test)]

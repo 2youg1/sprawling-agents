@@ -38,8 +38,11 @@ pub(crate) fn login(host: &str) -> wire::GithubReading {
 }
 
 /// The same, with the search path a parameter.
-fn login_through(_find: fn(&str) -> Option<PathBuf>, _host: &str) -> wire::GithubReading {
-    wire::GithubReading::Failed { exit: None }
+fn login_through(find: fn(&str) -> Option<PathBuf>, host: &str) -> wire::GithubReading {
+    match find("gh") {
+        None => wire::GithubReading::NoCli,
+        Some(gh) => reading(&ask(&gh, host)),
+    }
 }
 
 /// How one `gh` call ended.
@@ -58,8 +61,31 @@ enum Ended {
 /// Every ending but a login on the first line of a clean exit leaves
 /// the card as the person left it, so the failures differ only in the
 /// way on the page offers for each.
-fn reading(_ended: &Ended) -> wire::GithubReading {
-    wire::GithubReading::Failed { exit: None }
+fn reading(ended: &Ended) -> wire::GithubReading {
+    match ended {
+        Ended::Exited {
+            code: Some(0),
+            stdout,
+        } => match stdout.lines().next().map(str::trim) {
+            Some(login) if is_login(login) => wire::GithubReading::Found {
+                login: login.to_owned(),
+            },
+            Some(_) | None => wire::GithubReading::Failed { exit: Some(0) },
+        },
+        Ended::Exited {
+            code: Some(NOT_LOGGED_IN),
+            ..
+        } => wire::GithubReading::NotLoggedIn,
+        Ended::Exited { code, .. } => wire::GithubReading::Failed { exit: *code },
+        Ended::Unstarted | Ended::Unanswered { stopping: None } => {
+            wire::GithubReading::Failed { exit: None }
+        }
+        // A process this city started and could not stop is still holding
+        // whatever it held, and the person is the one who can end it.
+        Ended::Unanswered {
+            stopping: Some(why),
+        } => wire::GithubReading::Stuck { why: why.clone() },
+    }
 }
 
 /// Whether a line is a GitHub login: letters, digits, `-` and the `_` an
