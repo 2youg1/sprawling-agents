@@ -187,5 +187,7 @@ fn plan(run: RunId, task: &str, inherited: Vec<ChatMessage>) -> RunPlan {
         tools: Vec::new(),
         skills: Vec::new(),
         retries: Retries::UntilHalted,
+        run_policy: kernel::RunPolicy::of(kernel::Mode::Work),
+        naming: None,
     }
 }
