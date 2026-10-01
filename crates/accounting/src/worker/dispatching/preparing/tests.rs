@@ -86,6 +86,44 @@ fn the_next_room_takes_the_stock_and_creates_no_file() {
     );
 }
 
+/// sprawling-SPEC.md 8-155: a lane that finds the city's turn taken
+/// skips, and the turn it found stays with the lane that holds it; once
+/// that lane gives it back, the city's turn can be taken again. Two
+/// lanes of one city stocking at once is what the acceptance catalogue's
+/// builder run does, and the second take used to build a turn and drop
+/// it under the table's own lock, which hung both lanes.
+#[test]
+fn a_lane_that_finds_the_turn_taken_skips_and_leaves_it_standing() {
+    let city = tempfile::tempdir().unwrap();
+    let root = city.path().to_path_buf();
+    let first = StockingTurn::take(&root).expect("the first lane takes the turn");
+    let (told, heard) = std::sync::mpsc::channel();
+    let probe = root.clone();
+    std::thread::spawn(move || {
+        let second = StockingTurn::take(&probe).is_some();
+        let standing = STOCKING
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&probe);
+        drop(told.send((second, standing)));
+    });
+    let answered = heard.recv_timeout(std::time::Duration::from_secs(10));
+    let again = if answered.is_ok() {
+        drop(first);
+        StockingTurn::take(&root).is_some()
+    } else {
+        // The second lane hangs holding the table's lock, so giving the
+        // first turn back would hang this thread as well.
+        std::mem::forget(first);
+        false
+    };
+    assert_eq!(
+        (answered, again),
+        (Ok((false, true)), true),
+        "the second lane skips without taking the first lane's turn away"
+    );
+}
+
 /// Reads production placement and the stock put back after it, in
 /// milliseconds, over a building whose trunk carries 512 files of 16 KB
 /// (sprawling-SPEC.md 8-155). The first room's placement makes the
