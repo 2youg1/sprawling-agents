@@ -5,12 +5,13 @@
 
 //! What this city knows about a provider before it has asked one.
 //!
-//! Two questions live here. *What does this host serve, and where* —
+//! Three questions live here. *What does this host serve, and where* —
 //! the path it answers under, the shape it answers in, and the ceilings
 //! of the models whose names it prints in its own documentation
 //! (`preset`). *Which statement about an output ceiling wins* — the
 //! ladder from the person's own figure down to the city's policy
-//! default (`ceiling`).
+//! default (`ceiling`). *What may one model be sent* — the same ladder
+//! for the input a registration carries (`input`).
 //!
 //! *How one attached endpoint is connected* — resolved once at attach
 //! and recorded, so that no call path derives it again (`registry`),
@@ -23,6 +24,7 @@
 //! one that bills.
 
 pub mod ceiling;
+pub mod input;
 // Both are re-exported by the crate root, so the attach path in
 // `bin::assembly` reaches them by name the day `WIRE_V` carries
 // `connection_kind`.
