@@ -276,7 +276,11 @@ pub(super) const VERBS: &[Row] = &[
         name: "whose",
         aliases: &[],
         positionals: &[("city", Required), ("oid", Required)],
-        flags: &[],
+        flags: &[flag(
+            "--trace",
+            Nothing,
+            "also the calls its run made since its previous commit",
+        )],
         says: "which run wrote a commit this city made",
         effect: Effect::ReadsOnly,
     },

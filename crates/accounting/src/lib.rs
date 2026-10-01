@@ -23,7 +23,8 @@
 //! pointers (`lineage`), which the binary's `view` command and the
 //! views both read (accounting-SPEC.md 8-10), and a stretch of that
 //! history exported as a playback bundle anyone can recompute
-//! (`playback`, accounting-SPEC.md 8-12).
+//! (`playback`, accounting-SPEC.md 8-12), and a commit traced back to
+//! the calls its run made before it (`trace`, accounting-SPEC.md 8-16).
 
 mod clock;
 mod connectors;
@@ -37,6 +38,7 @@ pub mod person;
 pub mod plan_view;
 pub mod playback;
 pub mod toolkit_broker;
+pub mod trace;
 pub mod views;
 pub mod worker;
 

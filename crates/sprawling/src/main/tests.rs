@@ -232,3 +232,112 @@ fn a_supervised_child_is_forwarded_the_served_flags_with_their_values() {
         ["--log", "debug", "--web-dir", "client/dist"].map(str::to_owned)
     );
 }
+
+/// `whose --trace` on a city whose run committed twice, with a second
+/// run working in the same building in between: the commit's facts,
+/// the span since the run's previous commit, the one call it made
+/// there with the first line it answered, and the other run counted as
+/// nearby - byte for byte.
+#[test]
+fn whose_trace_names_the_run_its_calls_and_who_else_called_in_the_building() {
+    use kernel::{EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
+    use serde_json::json;
+
+    let first = RunId::from_bytes([1; 16]);
+    let second = RunId::from_bytes([2; 16]);
+    let oid = |n: u8| format!("{n:02x}").repeat(20);
+    let script = vec![
+        (RunId::CITY, None, EventKind::CityInitialized, json!({})),
+        (first, Some("lab/room1"), EventKind::RunStarted, json!({})),
+        (second, Some("lab/room2"), EventKind::RunStarted, json!({})),
+        (first, Some("lab/room1"), EventKind::ModelCalled, json!({})),
+        (
+            first,
+            Some("lab/room1"),
+            EventKind::ToolCalled,
+            json!({"id": "c1", "name": "read", "args": {}, "subject": "src/a.rs", "effect": "read"}),
+        ),
+        (
+            first,
+            Some("lab/room1"),
+            EventKind::ToolResult,
+            json!({"tool_use_id": "c1", "name": "read", "result": "fn main() {}\n"}),
+        ),
+        (
+            first,
+            Some("lab/room1"),
+            EventKind::CheckpointCommitted,
+            json!({"oid": oid(1)}),
+        ),
+        (
+            first,
+            Some("lab/room1"),
+            EventKind::ToolCalled,
+            json!({"id": "c2", "name": "edit", "args": {}, "subject": "src/b.rs",
+                   "effect": {"write": {"domain": "lab"}}}),
+        ),
+        (
+            second,
+            Some("lab/room2"),
+            EventKind::ToolCalled,
+            json!({"id": "d1", "name": "exec", "args": {}, "effect": "egress"}),
+        ),
+        (
+            first,
+            Some("lab/room1"),
+            EventKind::ToolResult,
+            json!({"tool_use_id": "c2", "name": "edit", "result": "done\nand more"}),
+        ),
+        (
+            first,
+            Some("lab/room1"),
+            EventKind::CheckpointCommitted,
+            json!({"oid": oid(3)}),
+        ),
+    ];
+    let dir = tempfile::tempdir().unwrap();
+    let ledger_dir = kernel::layout::CityLayout::new(dir.path()).ledger();
+    std::fs::create_dir_all(&ledger_dir).unwrap();
+    let mut prev = kernel::GENESIS_PREV;
+    let mut blob = Vec::new();
+    for (seq, (run, addr, kind, data)) in (0u64..).zip(script) {
+        let draft = EventDraft {
+            run,
+            t: TimeMs::new(1_778_749_200_000 + seq * 1_000),
+            who: "tester".to_owned(),
+            addr: addr.map(|raw| kernel::Address::parse(raw).unwrap()),
+            kind,
+            data: Payload::new(data.as_object().cloned().unwrap()).unwrap(),
+            ig: false,
+        };
+        let line = EventRecord::from_draft(draft, Seq::new(seq), prev)
+            .canonical_line()
+            .unwrap();
+        prev = kernel::ledger::chain_hash(&line);
+        blob.extend_from_slice(&line);
+        blob.push(b'\n');
+    }
+    std::fs::write(ledger_dir.join("ledger-00000000000000000000.jsonl"), blob).unwrap();
+
+    let traced = accounting::trace::trace(dir.path(), kernel::GitOid::parse(&oid(3)).unwrap())
+        .unwrap()
+        .map(|traced| {
+            let mut out = Vec::new();
+            super::whose::write_trace(&traced, &mut out).unwrap();
+            String::from_utf8(out).unwrap()
+        });
+    let expected = format!(
+        "run     {first}\n\
+         actor   lab/room1 (session room1)\n\
+         model   not recorded (effort none)\n\
+         ledger  seq 10\n\
+         previous {} at seq 6\n\
+         span    after seq 6, before seq 10\n\
+         call    seq 7  2026-05-14T09:00:07Z  edit  {{\"write\":{{\"domain\":\"lab\"}}}}  answered  src/b.rs\n\
+         \x20       > done\n\
+         nearby  {second} at lab/room2: 1 call(s)\n\
+         note    the calls are candidates; a nearby run may have written in the same span\n",
+        oid(1)
+    );
+    assert_eq!(traced, Some(expected));
+}
