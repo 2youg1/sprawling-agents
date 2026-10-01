@@ -14,7 +14,7 @@
 
 评审楼的 worktree 按房间保留：`Site::place_tree` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（`crates/storage/Spec.lean` §8-9），不再每轮全量检出、再整目录删除；`RunWorker::over` 拿到账本写者后解开上一个写者留下的全部 worktree 锁。树按楼的 scope 领、按同一个 scope 立检查点和献出（`workbench::tree_scope` 是这一个 scope 的唯一定义）：再领一棵留着的树只检出 scope（`crates/storage/Spec.lean` §8-9），献出的 `Checkpoint::land` 只按 scope 暂存，于是合并进干线的提交只动 scope。一个房间的第一次放置先接管城的备树，只改名、不检出（`crates/storage/Spec.lean` §8-35，8-145）；没有备树可接管时才全量检出，因为 `Worktree::add` 总做一次全量检出，git2 0.21 没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `storage` 禁 `unsafe`。城的第一次放置总在这一类：那之前城没有提交，也就没有干线可备（读数在 8-161）。上限只称一次检出、不称留着的树之和，定在 `crates/storage/Spec.lean` §8-9。树的放置与 MCP 缺表时的那次连接，连同 `lay_out_workbench`、`freeze_plan`，在驾驶这个 run 的 lane 里做（8-113）。
 
-不钉的构建里 `lean` 与 `zig` 两行的装法拼着空钉子（8-157）：`bin::doctor::table::toolchain` 的 `LEAN` 一行装 `elan toolchain install <钉子>`，`ZIG` 一行在 Windows 上装 `winget … --version <钉子>`，钉子为空时两条命令各缺一个参数。候选的答法是钉子为空时 `lean` 装 `stable`、`zig` 去掉 `--version` 与它的值；未定的是不钉的构建该不该在 develop 层列这两行：从 crates.io 装这个二进制的人多半不开发这份代码，而 `Need` 不按构建来源分（8-58）。判定它的证据是一次从 `.crate` 构建出的二进制在 Windows 上按页面的「安装」跑这两行。
+不钉的构建（从 crates.io 的 `.crate` 构建、找不到三份工具链钉子文件）该不该在 develop 层列 `lean` 与 `zig` 两行，未定：从 crates.io 装这个二进制的人多半不开发这份代码，而 `Need` 不按构建来源分（8-58）。今天两行照列，钉子为空时 `lean` 装 `stable`、`zig` 装 winget 给的那一版（8-162）。判定它的证据是一次从 `.crate` 构建出的二进制在 Windows 上按页面的「安装」跑这两行。
 
 ## 4 现状分析
 
@@ -1134,6 +1134,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 **包体与模板进拥有它们的包，不在发布时组装**（8-83、8-157）。crates.io 上的 `.crate` 只是一个包目录，所以一个构建要读的每一个文件都放进拥有它的那个包：客户端包落在 `crates/sprawling/web-dist`，城写下的模板与 `City.md` 落在 `crates/city/templates/`，构建脚本按 cargo 找锁的规则找 `Cargo.lock`，开发工具链的钉子在包外，找不到就降为不钉。理由：发布的包与仓库里的包是同一份清单、同一组文件，验证构建就是工作区里那次构建换一个目录，`packaged` 门在每一次 `just check` 里就判出包外的引用，不必等到发布。**被否**：①发布时由 xtask 在临时目录里组装一份改过的包，把包体、模板与钉子复制进去（与 `xtask channel` 组装 npm 包同一种做法）——发布出去的清单与源码对不上，`.cargo_vcs_info.json` 指向的提交编不出那份包，而组装器本身要一套自己的测试；②把各 crate 折成一个 crate 再发布——拆掉 ARCHITECTURE 的 crate 拓扑与每个 `pub(crate)` 边界。**重开参数**：一个要发布的文件不能放进任何一个包（例如两个包都要读的一大份数据），那时由一个包交出常量，另一个包读它，`City.md` 交给 accounting 就是这样做的。
 
 **Zig 是在 Windows 上开发这份代码必需的工具**（8-146）。桌面 server 没有准入安全接口的四组 Win32 调用经一片 Zig 叶子（`crates/desktop/Spec.lean` D12），叶子在构建时编译，所以 Windows 上没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `crates/desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
+
+**不钉的构建照列 `lean` 与 `zig`，装不钉的版本**（8-162、8-157）。从 `.crate` 构建时钉子文件不在，两行的装法改为 `stable` 的 Lean 与 winget 给的那一版 Zig，而不是拼出一个空参数。理由：一条带空参数的命令被安装器拒绝时，人看到的是「装不上」，却不知道是因为构建没带钉子；装一个不钉的版本至少让 `just models` 与 Windows 上的编译跑得起来，版本差异由 doctor 照常报出。被否：①钉子为空时把两行整个藏起来——`Need` 不按构建来源分（8-58），藏起来的是一个开发这份代码确实需要的工具，那个问题留在 §3；②把钉子文件也打进 `sprawling` 的包——它们属于仓库的开发工具链而不属于二进制，复制一份就是第二个钉子。重开参数：§3 那一条有了答案，或 crates.io 的包里有了钉子。
 
 **崩溃验收在盘上造死亡，不在进程里杀**（8-127）。一次 run 真跑完，丢掉 worker 释放写者锁，再把账截在一行的半途、删去其后的行；重开走 `RunWorker::new` 与 `startup_scan`，与 `sprawling resume` 同一条路。理由：被杀的进程留在盘上的就是这样一份账——锁已释放，最后一行写了一半——而盘上的截法可以精确指定死在哪一行的哪一个字节，每次重跑都是同一次死亡。被否：①起真二进制再杀掉它——那是从外面进城的检查，按边界规则归 `tools/adversary/` 的 Lean 黑盒（G1e），而且杀在哪一刻取决于调度，失败不能逐字节重演；②把账本放在 `storage` 的故障文件系统上断电——它只承载账本，`Standing::fold` 与视图读真目录，重开的不是一座完整的城，断电的耐久契约已由 storage 自己的测试证过。重开参数：账本之外的文件（检查点、快照、CAS）也要在一次死亡里与账本错开时，验收要能在同一刻截断它们，那时改为在 `Vfs` 缝之上承载整座城。
 
@@ -3644,9 +3646,32 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 - **`sandbox` 是默认 feature。** `cargo install sprawling` 不写 `--features` 时也带执行引擎，与归档一致；不要引擎的构建写 `--no-default-features`，`just features` 编译这一份，因为别的命令都不再编它。
 - **发布次序**（人的发布步骤）：GitHub release 与 npm 都确认之后，先 `cargo publish --workspace --dry-run --locked`，再 `cargo publish --workspace --locked`；cargo 按依赖次序逐个发布，desktop 与它的叶子都是工作区成员，不再单独发。crates.io 的版本不能覆盖，而 `release.yml` 允许同一个 tag 重新发版，所以 crates.io 排在最后。
 
-**本节接口的当前状态**：从 crates.io 构建的二进制仍有三处与归档不同。`[profile.release]` 写在工作区清单里，`cargo package` 不把它带进包，`cargo install` 按 cargo 的默认 release profile 编（`opt-level = 3`，不做 fat LTO，不剥符号）；`SPRAWLING_RELEASE_TAG` 只有 `release.yml` 设，`status` 如实自称 built from source（`main::version`）；工具链钉子不在包里时，develop 层的 `lean` 与 `zig` 两行的装法仍拼着空钉子（`elan toolchain install` 后面是空参数，Windows 的 `winget … --version` 后面是空参数），改法是钉子为空时 `lean` 装 `stable`、`zig` 去掉 `--version` 那两个参数，落在 `bin::doctor::table::toolchain` 的两行上（§3）。
+**本节接口的当前状态**：从 crates.io 构建的二进制仍有两处与归档不同。`[profile.release]` 写在工作区清单里，`cargo package` 不把它带进包，`cargo install` 按 cargo 的默认 release profile 编（`opt-level = 3`，不做 fat LTO，不剥符号）；`SPRAWLING_RELEASE_TAG` 只有 `release.yml` 设，所以 `status` 如实自称 built from source，成熟度照样从 `kernel::release::MATURITY` 读（8-162）。工具链钉子不在包里时，develop 层的 `lean` 与 `zig` 两行装不钉的版本（8-162）。
 
 **本章测试**：`doctor::pin::tests` 读出的钉子与检出里的文件相等，空文件读成不钉；`cargo package -p sprawling --list --allow-dirty` 的列表里有包体的 `index.html`（在 `web-dist` 下）与 `Cargo.lock`；`cargo xtask gates packaged guard` 为绿；`cargo publish --workspace --dry-run --locked` 走完打包与验证构建。
+
+### 8-162 成熟度只有一处，不钉的构建装不钉的版本（`main::version`、`bin::doctor::table::toolchain`）
+
+**原因**：`status` 的第一行曾自己写着 `(pre-alpha)`，tag 的中缀、README 两份与 CHANGELOG 又各写一遍；进 alpha 时漏掉的那一处会照旧说 pre-alpha，而没有一道门看得见。成熟度现在只写在 `kernel::release::MATURITY`（kernel D18），本 crate 是它的一个读者。另一半是 8-157 留下的：从 `.crate` 构建时三份钉子文件都不在，`lean` 与 `zig` 两行的装法拼出一个空参数，elan 与 winget 都会拒绝这条命令。
+
+```rust
+// main::version
+/// `sprawling 0.0.8 (pre-alpha), built from source`：`status` 打印的第一行。
+/// 生产路径传 `kernel::release::MATURITY`；参数让一条测试看得见成熟度换成 alpha 时这一行跟着变。
+pub(super) fn headline(maturity: kernel::Maturity) -> String;
+
+// bin::doctor::table::toolchain
+/// 交给 `elan toolchain install` 的那一个：钉住的工具链，构建没找到 `lean-toolchain` 时是 `stable`。
+const fn lean_install(pin: &'static str) -> &'static str;
+/// winget 装 Zig 的参数：钉子非空时带 `--version <钉子>`，为空时不带这两个参数。
+macro_rules! winget_zig { ($pin:expr) => { /* &'static [&'static str] */ } }
+```
+
+- **`status` 读常量，不写字面。** 版本行是 `sprawling <CARGO_PKG_VERSION> (<MATURITY.word()>)<发布日期或 built from source>`；tag 的中缀与文档的字样是同一个常量的另外几个读者（kernel D18、tools/xtask/Spec.lean §8-16 的 `maturity` 事实）。
+- **钉子为空时装不钉的版本。** `lean` 装 `stable`，那是 elan 认的通道名；`zig` 在 Windows 上去掉 `--version` 与它的值，winget 装它给的那一版；macOS 与 Linux 两列本来就不带版本，不变。探测不变：空前缀接受任何一版（8-157）。
+- **winget 的参数用宏写，不用 `const fn`。** 一条装法的参数是 `&'static [&'static str]`，`const fn` 拿自己的参数造不出一段 `'static` 的切片；宏在 `const` 项里展开，钉子是常量，切片照常提升。测试用同一个宏展开空钉子，所以它判的是生产那一行的写法，而不是一份抄本。
+
+**本章测试**：`main::version::tests::the_status_line_says_the_maturity_it_is_given`——给 `Maturity::Alpha` 时版本行说 `(alpha)`；kernel 的 `release::tests::an_alpha_build_cuts_and_reads_alpha_tags` 是同一次挪动在 tag 一侧的读者。`doctor::table::toolchain::tests::a_build_without_pins_installs_lean_stable_and_any_zig`——空钉子时 `lean_install` 给 `stable`，`winget_zig!` 不带 `--version`，也没有空参数；钉子非空时两者都带着钉子。
 
 ### 8-84 记账线程的循环是一个有名字的函数，两件仪表直接驱动它（`accounting::worker::attend::attend`、`accounting::worker::driving::tests::instruments`）
 
