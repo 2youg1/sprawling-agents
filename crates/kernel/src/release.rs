@@ -34,6 +34,43 @@ use crate::error::{AxCode, AxError};
 /// What separates the version from the date in a git tag.
 const TAG_INFIX: &str = "-Pre-alpha-";
 
+/// How far this project stands, as every release it cuts names it
+/// (kernel D18).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Maturity {
+    /// Runs end to end, and nothing is promised.
+    PreAlpha,
+    /// Usable.
+    Alpha,
+}
+
+/// The maturity of every release this tree cuts.
+///
+/// The one place it is written: the tag infix, the first line of
+/// `sprawling status` and the documents' `maturity` spans are rendered
+/// from it, so entering alpha moves this constant and nothing else.
+pub const MATURITY: Maturity = Maturity::PreAlpha;
+
+impl Maturity {
+    /// `pre-alpha`, the word as a sentence writes it.
+    #[must_use]
+    pub const fn word(self) -> &'static str {
+        match self {
+            Maturity::PreAlpha => "pre-alpha",
+            Maturity::Alpha => "alpha",
+        }
+    }
+
+    /// `Pre-alpha`, the word as a tag and a heading write it.
+    #[must_use]
+    pub const fn titled(self) -> &'static str {
+        match self {
+            Maturity::PreAlpha => "Pre-alpha",
+            Maturity::Alpha => "Alpha",
+        }
+    }
+}
+
 /// What separates them in the version npm carries.
 const NPM_INFIX: &str = "-pre.";
 
@@ -96,6 +133,15 @@ impl Release {
     /// its version disagrees with `expected_version`, or when its date
     /// is not a real day.
     pub fn from_tag(tag: &str, expected_version: &str) -> Result<Release, AxError> {
+        Release::decode_tag(tag, expected_version, MATURITY)
+    }
+
+    /// The release a tag names, read as a build of `maturity` reads it.
+    fn decode_tag(
+        tag: &str,
+        expected_version: &str,
+        _maturity: Maturity,
+    ) -> Result<Release, AxError> {
         let refused = |msg: &str| {
             AxError::failure(AxCode::ConfigInvalid, "read a release tag", tag.to_owned())
                 .with_recovery(msg.to_owned())
@@ -214,6 +260,11 @@ impl Release {
     /// `v0.0.5-Pre-alpha-260912`, the tag this release was cut from.
     #[must_use]
     pub fn tag(&self) -> String {
+        self.tag_at(MATURITY)
+    }
+
+    /// The tag a build of `maturity` cuts for this release.
+    fn tag_at(&self, _maturity: Maturity) -> String {
         let Release {
             year, month, day, ..
         } = *self;
@@ -288,7 +339,27 @@ fn pair(digits: &mut impl Iterator<Item = char>) -> Option<u32> {
     reason = "test code"
 )]
 mod tests {
-    use super::{Release, ReleaseVerdict, stands};
+    use super::{Maturity, Release, ReleaseVerdict, stands};
+
+    /// Entering alpha moves `MATURITY` and nothing else, so the tag a
+    /// build cuts and the tag it reads have to follow the maturity they
+    /// are given: an alpha build reads an alpha tag as its own and
+    /// refuses a pre-alpha one, as it refuses a tag of another version.
+    #[test]
+    fn an_alpha_build_cuts_and_reads_alpha_tags() {
+        let read = |tag: &str| {
+            Release::decode_tag(tag, "0.1.0", Maturity::Alpha)
+                .map(|cut| cut.tag_at(Maturity::Alpha))
+                .map_err(|err| err.recovery().to_owned())
+        };
+        assert_eq!(
+            (
+                read("v0.1.0-Alpha-270101"),
+                read("v0.1.0-Pre-alpha-270101").is_err()
+            ),
+            (Ok("v0.1.0-Alpha-270101".to_owned()), true)
+        );
+    }
 
     #[test]
     fn a_release_tag_becomes_the_semver_npm_accepts() {

@@ -27,7 +27,7 @@
 use super::city::report;
 use super::grammar::Arguments;
 use super::router::{client_summary, log_floor, log_levels};
-use super::version::{check, cut};
+use super::version::{check, headline};
 use super::{DEPENDENCIES, install, wire_client};
 use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, serving};
@@ -302,11 +302,7 @@ pub(super) fn status(args: &[String]) -> ExitCode {
         print!("{DEPENDENCIES}");
         return ExitCode::SUCCESS;
     }
-    println!(
-        "sprawling {} (pre-alpha){}",
-        env!("CARGO_PKG_VERSION"),
-        cut()
-    );
+    println!("{}", headline(kernel::release::MATURITY));
     println!("client: {}", client_summary());
     println!(
         "built from {} crate(s); list them with status --deps",

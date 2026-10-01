@@ -12,18 +12,33 @@
 //! `bin::release`; this renders it for a terminal, as the machine page
 //! renders the same value for a browser.
 
+use kernel::Maturity;
 use sprawling::release;
 use sprawling::release::Built;
 use std::process::ExitCode;
 use wire::ReleaseAnswer;
 
+/// The first line `status` prints, as in
+/// `sprawling 0.0.8 (pre-alpha), built from source`.
+///
+/// The production path passes `kernel::release::MATURITY`, the one place
+/// the maturity is written (kernel D18); taking it as a parameter is what
+/// lets a test see this line follow it (sprawling-SPEC.md 8-162).
+pub(super) fn headline(_maturity: Maturity) -> String {
+    format!(
+        "sprawling {} (pre-alpha){}",
+        env!("CARGO_PKG_VERSION"),
+        cut()
+    )
+}
+
 /// The day this release was cut, appended to the version line.
 ///
-/// A pre-alpha version number says almost nothing about how old a tree
-/// is, and how old it is, is what its reader most needs to know
+/// An early version number says almost nothing about how old a tree is,
+/// and how old it is, is what its reader most needs to know
 /// (CHANGELOG.md, opening note) - so the date sits beside the number in
 /// the line a person reads first, and reading it costs no network.
-pub(super) fn cut() -> String {
+fn cut() -> String {
     match release::built() {
         Ok(Built::Released(mine)) => format!(", released {}", mine.released()),
         Ok(Built::FromSource) => String::from(", built from source"),
@@ -93,5 +108,21 @@ pub(super) fn check() -> ExitCode {
             }
             ExitCode::SUCCESS
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{cut, headline};
+    use kernel::Maturity;
+
+    /// Entering alpha moves `kernel::release::MATURITY` and nothing else,
+    /// so the line a person reads first has to say what it is given.
+    #[test]
+    fn the_status_line_says_the_maturity_it_is_given() {
+        assert_eq!(
+            headline(Maturity::Alpha),
+            format!("sprawling {} (alpha){}", env!("CARGO_PKG_VERSION"), cut())
+        );
     }
 }
