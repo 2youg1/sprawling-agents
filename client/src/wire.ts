@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 45 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "d9d1464930557780d1972fb674f46c2e34f89e6d805270cb98e92beb730cb08c" as const;
+export const WIRE_HASH = "1185f923f7e2a54dd85eec6b12bdc9855f9d229b36fb702336646a40a4c09254" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -37,6 +37,12 @@ export const AdmissionRequirement = Schema.Union(
   Schema.Literal("double_validated"),
 ).annotations({ identifier: "AdmissionRequirement" });
 export type AdmissionRequirement = typeof AdmissionRequirement.Type;
+
+/**
+ * How a table column is aligned.
+ */
+export const Align = Schema.Literal("none", "left", "center", "right").annotations({ identifier: "Align" });
+export type Align = typeof Align.Type;
 
 /**
  * Non-empty item identity, derived from the run that raises the item
@@ -2300,6 +2306,206 @@ export const PrefixAnswer = Schema.Struct({
 export type PrefixAnswer = typeof PrefixAnswer.Type;
 
 /**
+ * What a page is shown the source of instead of a drawing (D22, D24).
+ */
+export const Construct = Schema.Union(
+  Schema.Literal("html"),
+  Schema.Literal("math"),
+  Schema.Literal("front_matter"),
+  Schema.Literal("nesting"),
+  Schema.Literal("extension"),
+).annotations({ identifier: "Construct" });
+export type Construct = typeof Construct.Type;
+
+/**
+ * One inline mark. Inline marks carry no span: the readers of today
+ * line a preview up with its source block by block (D26).
+ */
+export type Inline = "soft_break" | "line_break" | { readonly text: string } | { readonly code: string } | { readonly emphasis: readonly Inline[] } | { readonly strong: readonly Inline[] } | { readonly strikethrough: readonly Inline[] } | { readonly link: { readonly content: readonly Inline[]; readonly target: string; readonly title: string } } | { readonly image: { readonly alt: string; readonly target: string; readonly title: string } } | { readonly footnote_reference: { readonly name: string } } | { readonly unsupported: { readonly construct: typeof Construct.Type; readonly source: string } }
+export type InlineEncoded = "soft_break" | "line_break" | { readonly text: string } | { readonly code: string } | { readonly emphasis: readonly InlineEncoded[] } | { readonly strong: readonly InlineEncoded[] } | { readonly strikethrough: readonly InlineEncoded[] } | { readonly link: { readonly content: readonly InlineEncoded[]; readonly target: string; readonly title: string } } | { readonly image: { readonly alt: string; readonly target: string; readonly title: string } } | { readonly footnote_reference: { readonly name: string } } | { readonly unsupported: { readonly construct: typeof Construct.Encoded; readonly source: string } }
+export const Inline: Schema.Schema<Inline, InlineEncoded> = Schema.Union(
+  Schema.Literal("soft_break", "line_break"),
+  Schema.Struct({
+    text: Schema.String,
+  }),
+  Schema.Struct({
+    code: Schema.String,
+  }),
+  Schema.Struct({
+    emphasis: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+  }),
+  Schema.Struct({
+    strong: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+  }),
+  Schema.Struct({
+    strikethrough: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+  }),
+  Schema.Struct({
+    link: Schema.Struct({
+      content: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+      target: Schema.String,
+      title: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    image: Schema.Struct({
+      alt: Schema.String,
+      target: Schema.String,
+      title: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    footnote_reference: Schema.Struct({
+      name: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    unsupported: Schema.Struct({
+      construct: Construct,
+      source: Schema.String,
+    }),
+  }),
+).annotations({ identifier: "Inline" });
+
+/**
+ * Whether an item is a task, and whether it is done.
+ */
+export const Check = Schema.Literal("not_a_task", "open", "done").annotations({ identifier: "Check" });
+export type Check = typeof Check.Type;
+
+/**
+ * One item of a list, with the blocks inside it.
+ */
+export interface ListItem { readonly blocks: readonly Block[]; readonly check: typeof Check.Type; readonly span: typeof Span.Type }
+export interface ListItemEncoded { readonly blocks: readonly BlockEncoded[]; readonly check: typeof Check.Encoded; readonly span: typeof Span.Encoded }
+export const ListItem: Schema.Schema<ListItem, ListItemEncoded> = Schema.Struct({
+  blocks: Schema.Array(Schema.suspend((): Schema.Schema<Block, BlockEncoded> => Block)),
+  check: Check,
+  span: Span,
+}).annotations({ identifier: "ListItem" });
+
+/**
+ * Whether a list counts its items, and from where.
+ */
+export const Order = Schema.Union(
+  Schema.Literal("bullet"),
+  Schema.Struct({
+    ordered: Schema.Struct({
+      start: Schema.Int,
+    }),
+  }),
+).annotations({ identifier: "Order" });
+export type Order = typeof Order.Type;
+
+/**
+ * One row of a table: one run of inline marks per cell.
+ */
+export const Row = Schema.Struct({
+  cells: Schema.Array(Schema.Array(Inline)),
+}).annotations({ identifier: "Row" });
+export type Row = typeof Row.Type;
+
+/**
+ * Whether a list's items are paragraphs apart or one line apart.
+ */
+export const Spacing = Schema.Literal("tight", "loose").annotations({ identifier: "Spacing" });
+export type Spacing = typeof Spacing.Type;
+
+/**
+ * One block of a window, with the bytes of the version it was read from
+ * (D26).
+ */
+export type Block = { readonly heading: { readonly inline: readonly Inline[]; readonly level: number; readonly span: typeof Span.Type } } | { readonly paragraph: { readonly inline: readonly Inline[]; readonly span: typeof Span.Type } } | { readonly list: { readonly items: readonly ListItem[]; readonly order: typeof Order.Type; readonly spacing: typeof Spacing.Type; readonly span: typeof Span.Type } } | { readonly quote: { readonly blocks: readonly Block[]; readonly span: typeof Span.Type } } | { readonly code: { readonly info: string; readonly span: typeof Span.Type; readonly text: string } } | { readonly table: { readonly align: readonly (typeof Align.Type)[]; readonly body: readonly (typeof Row.Type)[]; readonly head: typeof Row.Type; readonly span: typeof Span.Type } } | { readonly rule: { readonly span: typeof Span.Type } } | { readonly footnote: { readonly blocks: readonly Block[]; readonly name: string; readonly span: typeof Span.Type } } | { readonly unsupported: { readonly construct: typeof Construct.Type; readonly source: string; readonly span: typeof Span.Type } }
+export type BlockEncoded = { readonly heading: { readonly inline: readonly InlineEncoded[]; readonly level: number; readonly span: typeof Span.Encoded } } | { readonly paragraph: { readonly inline: readonly InlineEncoded[]; readonly span: typeof Span.Encoded } } | { readonly list: { readonly items: readonly ListItemEncoded[]; readonly order: typeof Order.Encoded; readonly spacing: typeof Spacing.Encoded; readonly span: typeof Span.Encoded } } | { readonly quote: { readonly blocks: readonly BlockEncoded[]; readonly span: typeof Span.Encoded } } | { readonly code: { readonly info: string; readonly span: typeof Span.Encoded; readonly text: string } } | { readonly table: { readonly align: readonly (typeof Align.Encoded)[]; readonly body: readonly (typeof Row.Encoded)[]; readonly head: typeof Row.Encoded; readonly span: typeof Span.Encoded } } | { readonly rule: { readonly span: typeof Span.Encoded } } | { readonly footnote: { readonly blocks: readonly BlockEncoded[]; readonly name: string; readonly span: typeof Span.Encoded } } | { readonly unsupported: { readonly construct: typeof Construct.Encoded; readonly source: string; readonly span: typeof Span.Encoded } }
+export const Block: Schema.Schema<Block, BlockEncoded> = Schema.Union(
+  Schema.Struct({
+    heading: Schema.Struct({
+      inline: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+      level: Schema.Int,
+      span: Span,
+    }),
+  }),
+  Schema.Struct({
+    paragraph: Schema.Struct({
+      inline: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+      span: Span,
+    }),
+  }),
+  Schema.Struct({
+    list: Schema.Struct({
+      items: Schema.Array(Schema.suspend((): Schema.Schema<ListItem, ListItemEncoded> => ListItem)),
+      order: Order,
+      spacing: Spacing,
+      span: Span,
+    }),
+  }),
+  Schema.Struct({
+    quote: Schema.Struct({
+      blocks: Schema.Array(Schema.suspend((): Schema.Schema<Block, BlockEncoded> => Block)),
+      span: Span,
+    }),
+  }),
+  Schema.Struct({
+    code: Schema.Struct({
+      info: Schema.String,
+      span: Span,
+      text: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    table: Schema.Struct({
+      align: Schema.Array(Align),
+      body: Schema.Array(Row),
+      head: Row,
+      span: Span,
+    }),
+  }),
+  Schema.Struct({
+    rule: Schema.Struct({
+      span: Span,
+    }),
+  }),
+  Schema.Struct({
+    footnote: Schema.Struct({
+      blocks: Schema.Array(Schema.suspend((): Schema.Schema<Block, BlockEncoded> => Block)),
+      name: Schema.String,
+      span: Span,
+    }),
+  }),
+  Schema.Struct({
+    unsupported: Schema.Struct({
+      construct: Construct,
+      source: Schema.String,
+      span: Span,
+    }),
+  }),
+).annotations({ identifier: "Block" });
+
+/**
+ * One window of a Markdown version, laid out, or the reason it was not.
+ */
+export const Preview = Schema.Union(
+  Schema.Struct({
+    laid: Schema.Struct({
+      blocks: Schema.Array(Block),
+      span: Span,
+    }),
+  }),
+  Schema.Struct({
+    unsupported: Schema.Struct({
+      encoding: Encoding,
+    }),
+  }),
+).annotations({ identifier: "Preview" });
+export type Preview = typeof Preview.Type;
+
+export const PreviewAnswer = Schema.Struct({
+  preview: Preview,
+  version: B3Hash,
+}).annotations({ identifier: "PreviewAnswer" });
+export type PreviewAnswer = typeof PreviewAnswer.Type;
+
+/**
  * The role one sentence plays on a card.
  */
 export const SliceKind = Schema.Union(
@@ -2952,6 +3158,9 @@ export const Answer = Schema.Union(
     range: RangeAnswer,
   }),
   Schema.Struct({
+    preview: PreviewAnswer,
+  }),
+  Schema.Struct({
     commits: CommitsAnswer,
   }),
   Schema.Struct({
@@ -3154,6 +3363,12 @@ export const Query = Schema.Union(
     range: Schema.Struct({
       range: Span,
       version: B3Hash,
+    }),
+  }),
+  Schema.Struct({
+    preview: Schema.Struct({
+      version: B3Hash,
+      viewport: Span,
     }),
   }),
   Schema.Struct({
@@ -3488,7 +3703,7 @@ export type Mode = typeof Mode.Type;
 
 /**
  * What a run may do to a file that already exists inside its write
- * domain (kernel-SPEC 8-78).
+ * domain (`crates/kernel/spec/WriteDomain.lean` §8-78).
  * 
  * It narrows the domain and never widens it: the domain answers where
  * a run may write and what kind of file, this answers whether a write
