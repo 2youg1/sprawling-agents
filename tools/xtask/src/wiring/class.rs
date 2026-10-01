@@ -144,11 +144,29 @@ fn arms(body: &str) -> BTreeMap<String, Class> {
 /// A violation for every verb whose class is missing from the table or
 /// disagrees with the relay.
 pub(super) fn judged(
-    _all: &[String],
-    _stated: &BTreeMap<String, Option<Class>>,
-    _coded: &BTreeMap<String, Class>,
+    all: &[String],
+    stated: &BTreeMap<String, Option<Class>>,
+    coded: &BTreeMap<String, Class>,
 ) -> Vec<Violation> {
-    Vec::new()
+    let mut out = Vec::new();
+    for name in all {
+        match (stated.get(name).copied().flatten(), coded.get(name)) {
+            (None, _) => out.push(violation(
+                "every Command states the class a remote device's frame carries",
+                format!("the row for `{name}` in wire-SPEC.md section 19-2 has no class"),
+                "write `LocalOnly` in its class cell unless a person decided a device away \
+                 from the machine may do it; `Act` and `Read` are decisions, not defaults",
+            )),
+            (Some(table), Some(relay)) if table != *relay => out.push(violation(
+                "the class table and the relay decide one thing",
+                format!("`{name}` is {table:?} in the table and {relay:?} in `command_class`"),
+                "change whichever one is wrong: the table is what a reader is told, the match \
+                 is what a remote device meets",
+            )),
+            (Some(_), Some(_) | None) => {}
+        }
+    }
+    out
 }
 
 #[cfg(test)]
