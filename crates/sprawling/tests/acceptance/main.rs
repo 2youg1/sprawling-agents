@@ -24,6 +24,7 @@
 
 mod catalogue;
 mod city;
+mod crash;
 mod episodes;
 mod playback;
 mod script;
