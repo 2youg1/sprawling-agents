@@ -69,15 +69,22 @@ pub(crate) fn window(handle: HWND, bounds: Bounds) -> Result<image::RgbaImage, R
         *pixel = image::Rgba([*red, *green, *blue, u8::MAX]);
     }
     if !lit {
-        return Err(Refusal::new(
-            RefusalCode::ToolUnavailable,
-            "capture a window",
-            "the window drew nothing: every pixel came back black".to_owned(),
-            "this window composes itself in a way GDI cannot read — bring it to the front and \
-             try again, or read it with `desktop.snapshot`, which does not go through pixels",
-        ));
+        return Err(drew_nothing());
     }
     Ok(pixels)
+}
+
+/// A capture that came back entirely black, which is refused rather
+/// than shown: a model shown a black picture of a window describes the
+/// black.
+fn drew_nothing() -> Refusal {
+    Refusal::new(
+        RefusalCode::ToolUnavailable,
+        "capture a window",
+        "the window drew nothing: every pixel came back black".to_owned(),
+        "this window composes itself in a way GDI cannot read — bring it to the front and try \
+         again, or read it with `desktop.snapshot`, which does not go through pixels",
+    )
 }
 
 /// A window too big to measure in the units GDI counts in.
@@ -350,6 +357,32 @@ mod tests {
         let refusal = window(HWND(std::ptr::null_mut()), bounds)
             .expect_err("no window, no pixels, and no pretending otherwise");
         assert_eq!(refusal.as_error()["data"]["code"], "E_TOOL_UNAVAILABLE");
+    }
+
+    /// The contract desktop-SPEC.md section 8-11 holds the capture row
+    /// to, whichever interface answers it: every GDI step runs to the
+    /// end for a window this process opens — a context, a bitmap of its
+    /// size, the drawing and every row read back — so what comes back is
+    /// its pixels at its own size, or the one refusal that is judged on
+    /// pixels already read, the all-black one. The window sits off every
+    /// monitor, so the person at this desktop does not see it, and there
+    /// a composed window may draw black.
+    #[test]
+    fn a_window_this_process_opens_is_read_back_whole() {
+        let title = format!("sprawling contract capture {}", std::process::id());
+        let opened = super::super::fixture::Opened::at(&title, -20_000, -20_000, None);
+        let named = super::super::enumerate::desktop()
+            .unwrap()
+            .into_iter()
+            .find(|listed| listed.named.title == title)
+            .unwrap();
+        match window(named.raw(), named.bounds) {
+            Ok(pixels) => assert_eq!(
+                (pixels.width(), pixels.height()),
+                (opened.bounds().width(), opened.bounds().height())
+            ),
+            Err(refusal) => assert_eq!(refusal, drew_nothing()),
+        }
     }
 
     /// Capturing a real window over and over leaves this process holding
