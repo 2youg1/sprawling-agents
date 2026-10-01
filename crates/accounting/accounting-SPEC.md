@@ -508,7 +508,7 @@ pub struct ScanReport { /* …既有字段… */ pub frozen_runs: usize }
 - **作者。** 冻结行写成那次 run 最近一行的作者（它的居民），与补写的 `tool_result` 写成那次调用的作者同一条理由：按居民计数冻结的读者（`city::resident` 的档案）不因进程死过而少计一次。只写过 `run_started`、没写别的就死了的 run，用 `run_started` 的作者。`addr` 缺席，与 `Charter::close` 写的冻结行同形。
 - **幂等。** 第二次扫描看到的每次 run 都已冻结，什么都不写；`ScanReport.frozen_runs` 是这一次写了几行，`summary` 把它与关掉的调用数并列告诉人。
 - **不做的事。** 不写 `handoff_written`：死掉的 run 没留下交接，替它编一份是假话；不起后继：冻结的 run 是历史，接手由人或计划另派（ARCHITECTURE §13.7）。
-- 验收：`genesis::tests` 的 `a_run_the_process_died_in_is_frozen_once`（冻结行的载荷、作者与次数，第二次扫描不再写）；崩溃验收（sprawling-SPEC 8-127）钉住城景里那次 run 的最后一行是冻结、结局是 `cancelled`。
+- 验收：`genesis::lost::tests` 的 `a_run_the_process_died_in_is_frozen_once`（冻结行的载荷、作者与次数，第二次扫描不再写）；崩溃验收（sprawling-SPEC 8-127）钉住城景里那次 run 的最后一行是冻结、结局是 `cancelled`。
 
 #### 8-18-2 上手指南的进度（`accounting::guide`，形状 4 适配器）
 
