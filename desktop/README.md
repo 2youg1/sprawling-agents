@@ -8,13 +8,13 @@ The judgement is deliberately kept away from the operating system. Five modules 
 
 ## Why it lives outside the workspace
 
-The workspace forbids `unsafe` outright, workspace-wide, and that rule holds because nothing in the city needs it. Driving Win32 does. Rather than open a hole in a wall that twelve crates stand behind, this package sits outside the workspace — the root `Cargo.toml` excludes it — and carries its own copy of the lint table with one line changed: `unsafe_code` is `deny` rather than `forbid`, so the Win32 boundary can relax it where it must, with a written reason. Everything else is identical: no `unwrap`, no `expect`, no `panic!`, no bare indexing, no `as` casts, checked arithmetic, and no clock — this package samples the time nowhere, the same rule the city holds.
+The workspace forbids `unsafe` outright, workspace-wide, and that rule holds because nothing in the city needs it. Driving Win32 does. Rather than open a hole in a wall that twelve crates stand behind, this package and its FFI seam, `ffi/`, sit outside the workspace — the root `Cargo.toml` excludes them — as a workspace of their own. `Cargo.toml` here states the lint table once, for both, with one line changed: `unsafe_code` is `deny` rather than `forbid`, so each call into the seam can relax it at that one statement, with a written reason. Everything else is identical: no `unwrap`, no `expect`, no `panic!`, no bare indexing, no `as` casts, checked arithmetic, and no clock — this package samples the time nowhere, the same rule the city holds.
 
-**`deny` is only worth what is paid for it, so the price is paid in the open.** Every relaxation is an `#[expect(unsafe_code, reason = "…")]` on one function, and every `unsafe` block inside carries a `SAFETY:` comment stating the precondition that makes the call sound — the thing a reader could in principle find false, never a restatement of the call. "We call `EnumWindows`" is not a precondition; "the callback is the `extern "system"` function below, and the vector its address points at is live and unaliased for the whole synchronous call" is. The way to review this package is to ask each `SAFETY:` line whether what it claims *could be wrong*. If it could not, it is a paraphrase and not a precondition.
+**The server's own code holds no `unsafe` at all.** Input and the facts of a window go through `winsafe`, and the accessibility tree through `uiautomation`, each admitted call by call against a contract test that passed on the hand-written version first. The four call groups with no admitted safe interface — enumerating windows, capturing one, the clipboard, and the DPI declaration — are carried out whole by a Zig leaf in `ffi/zig/`, behind a boundary where Rust lends a buffer and its length and reads back a step and an error code. No handle, device context or global block crosses it, so every resource is released inside the call that took it.
 
-**Fewer blocks each time a safe interface earns its place.** Input and the facts of a window go through `winsafe`, and the accessibility tree through `uiautomation`, each admitted call by call against a contract test that passed on the hand-written version first. The `unsafe` blocks that remain belong to the call groups that have no admitted safe interface yet — enumerating windows, capturing one, the clipboard, and the DPI declaration — and `desktop-SPEC.md` section 8-11 is the one list of them.
+**`deny` is only worth what is paid for it, so the price is paid in the open.** Every `unsafe` in production code is one call into the leaf, in `ffi/src/`, and carries a `SAFETY:` comment stating the precondition that makes the call sound — the thing a reader could in principle find false, never a restatement of the call. "We call the leaf" is not a precondition; "the vector holds as many initialised slots as the capacity the leaf is held to, lent to this call alone" is. The way to review the seam is to ask each `SAFETY:` line whether what it claims *could be wrong*. If it could not, it is a paraphrase and not a precondition. `desktop-SPEC.md` section 8-12 is the one list of them; `ffi/Spec.lean` proves what the leaf writes into the buffers it is lent and that it releases what it takes, and a Rust reference checks the leaf's buffer rules on drawn inputs.
 
-`sprawling` links this package as a library, and still reaches it over MCP in a process of its own: the city starts its own executable as `sprawling desktop <DESKTOP.toml>` and talks to it over that child's pipes. The COM state, `SendInput` and every `unsafe` block therefore run in the child, never in the process that writes the city's Ledger. The package keeps its own `Cargo.lock` for `just check-desktop` and uses the repository's `rust-toolchain.toml` by location.
+`sprawling` links this package as a library, and still reaches it over MCP in a process of its own: the city starts its own executable as `sprawling desktop <DESKTOP.toml>` and talks to it over that child's pipes. The COM state, `SendInput` and every call into the leaf therefore run in the child, never in the process that writes the city's Ledger. The two packages keep their own `Cargo.lock` for `just check-desktop` and use the repository's `rust-toolchain.toml` by location. Building on Windows needs the Zig that `ffi/zig-version` names; `ffi/build.rs` refuses any other version and says how to install that one.
 
 ## The scope file
 
@@ -58,11 +58,12 @@ A tool's own refusal is an MCP `isError` result whose text carries the stable co
 
 ```bash
 cd desktop
-cargo fmt
-cargo clippy --all-targets -- -D warnings
-cargo nextest run
+cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+cargo nextest run --workspace
+zig test ffi/zig/leaf.zig
 ```
 
-No workspace command reaches this package, because it is not a workspace member; `just check-desktop` at the repository root runs the three commands above and the licence check, and `just check` runs it.
+No root workspace command lints or tests these packages, because they are not its members; `just check-desktop` at the repository root runs the commands above, `zig fmt --check` and the licence check, and `just check` runs it. `just fuzz-desktop <rounds> <seed>` runs the leaf's equivalence with its Rust reference for as long as asked.
 
 Read `desktop-SPEC.md` for the interfaces, the decisions and the alternatives that were rejected.
