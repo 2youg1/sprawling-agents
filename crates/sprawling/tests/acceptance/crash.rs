@@ -7,7 +7,7 @@
 //! again by the rules (sprawling-SPEC.md 8-127): the half-written line is
 //! cut and said, the chain verifies, a call whose answer was lost is
 //! closed as unknown rather than as failed, and the views answer from
-//! what survived.
+//! what survived, where the run that died is frozen.
 //!
 //! The death is made on the disk, not in the process: a real run writes
 //! its history, the worker is dropped, which releases the writer's lock
@@ -39,7 +39,10 @@ struct Reopened {
     /// Whether the history says, in a line of its own, that it was cut.
     truncation_recorded: bool,
     /// Where the city view says each run it lists has got to.
-    listed: Vec<(EventKind, Seq)>,
+    listed: Vec<Listed>,
+    /// Whether the history says, on the freeze it wrote, that the process
+    /// died: the run did not end, it was lost.
+    death_recorded: bool,
     /// Whether the next task sent to the same room started a run and
     /// froze it: the room is not held by the run that died in it.
     room_works_again: bool,
@@ -97,8 +100,14 @@ fn a_city_killed_while_writing_an_answer_reopens_with_the_torn_line_cut_and_the_
             listed: view
                 .runs
                 .iter()
-                .map(|summary| (summary.last_kind, summary.last_seq))
+                .map(|summary| Listed {
+                    frozen: summary.frozen,
+                    completion: summary.completion.clone(),
+                    last_kind: summary.last_kind,
+                    last_seq: summary.last_seq,
+                })
                 .collect(),
+            death_recorded: history.says(EventKind::RunFrozen, "\"cause\":\"process_died\""),
             room_works_again: started.len() == 2 && history.wrote(started[1], EventKind::RunFrozen),
         },
         Reopened {
@@ -106,10 +115,26 @@ fn a_city_killed_while_writing_an_answer_reopens_with_the_torn_line_cut_and_the_
             closed_calls: 1,
             answers: vec![Some(AxCode::ToolOutcomeUnknown.as_str().to_owned())],
             truncation_recorded: true,
-            listed: vec![(EventKind::ToolResult, last_before(&ledger, run, started[1]))],
+            listed: vec![Listed {
+                frozen: true,
+                completion: Some("cancelled".to_owned()),
+                last_kind: EventKind::RunFrozen,
+                last_seq: last_before(&ledger, run, started[1]),
+            }],
+            death_recorded: true,
             room_works_again: true,
         },
     );
+}
+
+/// One run as the city view lists it: whether it is frozen, how it
+/// ended, and its last line.
+#[derive(Debug, PartialEq)]
+struct Listed {
+    frozen: bool,
+    completion: Option<String>,
+    last_kind: EventKind,
+    last_seq: Seq,
 }
 
 /// What the city view says, asked the way a one-shot question asks it.
