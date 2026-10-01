@@ -33,6 +33,11 @@ pub struct Hands {
     /// What time it is, for the worker and every lane it drives, from
     /// the first line it opens with (accounting-SPEC.md 8-3).
     pub clock: Arc<dyn crate::Clock + Send + Sync>,
+    /// Reads the monotonic clock, which only moves forward: how long a
+    /// dispatch's preparation or a probe took is a span, and a span read
+    /// off `clock` grows or shrinks when somebody sets the wall clock
+    /// (sprawling-SPEC.md 8-129-2).
+    pub monotonic: fn() -> std::time::Instant,
     /// Looks at this machine and installs onto it (accounting-SPEC.md 8-4).
     pub machine: Box<dyn crate::Machine + Send>,
     /// Reads this machine's memory at the door new work enters by

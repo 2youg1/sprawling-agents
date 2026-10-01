@@ -61,10 +61,11 @@ impl RunWorker {
     ) -> Result<(Staged, Continuation), AxError> {
         // The reading `tools/xtask/budgets.toml [prepare_dispatch_ms]` states:
         // what a dispatch spends on the accounting thread before a lane
-        // takes it. Read from the city's own clock rather than
-        // from a profiler, because the figure that matters is the one
-        // taken on the thread no append is served on.
-        let began = self.clock.now()?;
+        // takes it. Read from the monotonic clock rather than from a
+        // profiler, because the figure that matters is the one taken on
+        // the thread no append is served on; and rather than from the
+        // city's clock, which a person may set mid-span.
+        let began = (self.monotonic)();
         // Nothing is written before the city agrees to take the work:
         // a halted city that laid a job file down would leave a task in
         // a room no run ever opened.
@@ -153,7 +154,9 @@ impl RunWorker {
             member,
             command: self.doorstep.entrance.carrying(),
         };
-        let spent = self.clock.now()?.value().saturating_sub(began.value());
+        let spent = (self.monotonic)()
+            .saturating_duration_since(began)
+            .as_millis();
         self.note(
             runtime::diagnostics::Level::Trace,
             "accounting::worker",

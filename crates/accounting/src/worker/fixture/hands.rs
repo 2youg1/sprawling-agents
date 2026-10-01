@@ -27,6 +27,7 @@ pub(crate) fn hands() -> Hands {
     Hands {
         vault: gateway::Custodian::in_memory(),
         clock: std::sync::Arc::new(WallClock),
+        monotonic,
         machine: Box::new(NoMachine),
         read_memory: roomy_memory,
         read_volume: roomy_volume,

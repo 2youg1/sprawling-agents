@@ -36,13 +36,15 @@ pub(super) struct Probing {
 /// same proxy decision the call will make. A city that cannot build an
 /// HTTP client at all has no reading to report, and says so.
 ///
+/// How long the reading took is two reads of `monotonic` apart, a span
+/// a wall clock set mid-probe cannot stretch (sprawling-SPEC.md 8-129-2).
+///
 /// # Errors
-/// A transport this machine will not construct, or a clock that reads
-/// before the unix epoch.
+/// A transport this machine will not construct.
 pub(super) fn reach_of(
     base_url: &str,
     proxying: Proxying,
-    clock: &dyn crate::Clock,
+    monotonic: fn() -> std::time::Instant,
 ) -> Result<Reach, AxError> {
     let client = gateway::client_for(proxying, base_url)
         .build()
@@ -54,11 +56,11 @@ pub(super) fn reach_of(
             )
             .with_recovery("restart the server; this machine refused to build an HTTP client")
         })?;
-    let before = clock.now()?;
+    let before = monotonic();
     let reading = gateway::reach(&client, proxying, base_url, 0);
-    let after = clock.now()?;
+    let spent = monotonic().saturating_duration_since(before).as_millis();
     Ok(Reach {
-        elapsed_ms: after.value().saturating_sub(before.value()),
+        elapsed_ms: u64::try_from(spent).unwrap_or(u64::MAX),
         ..reading
     })
 }

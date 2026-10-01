@@ -147,6 +147,7 @@ impl RunWorker {
         let Hands {
             vault,
             clock,
+            monotonic,
             machine,
             read_memory,
             read_volume,
@@ -231,6 +232,7 @@ impl RunWorker {
             connectors: std::sync::Arc::new(super::mcp::Residents::default()),
             machine,
             clock,
+            monotonic,
             read_volume,
             reveal,
             browsers,

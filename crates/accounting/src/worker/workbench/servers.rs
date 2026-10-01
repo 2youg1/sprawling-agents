@@ -47,7 +47,7 @@ impl Laying {
         // it is the part the resident connection table removes on every
         // dispatch after the first, and a figure that mixed the two could
         // not say how much.
-        let began = self.clock.now();
+        let began = (self.monotonic)();
         let mut offered = Vec::new();
         let resolve = crate::held_vault::resolving(std::sync::Arc::clone(&self.vault));
         for server in servers {
@@ -83,29 +83,18 @@ impl Laying {
                 ),
             }
         }
-        // A clock this machine would not read is not a reason to lose
-        // the tools: the reading is diagnostic, the connections are the
-        // work. The clock's failure is still said, with its recovery,
-        // rather than leaving a reader to wonder why the line is absent.
-        match (began, self.clock.now()) {
-            (Ok(began), Ok(ended)) => {
-                let spent = ended.value().saturating_sub(began.value());
-                self.note(
-                    runtime::diagnostics::Level::Trace,
-                    "accounting::worker",
-                    &format!(
-                        "mcp_tools took {spent} ms over {} declared server(s), offering {} tool(s)",
-                        servers.len(),
-                        offered.len()
-                    ),
-                );
-            }
-            (Err(clock), _) | (_, Err(clock)) => self.note(
-                runtime::diagnostics::Level::Refuse,
-                "accounting::worker",
-                &format!("mcp_tools went unmeasured: {clock}; {}", clock.recovery()),
+        let spent = (self.monotonic)()
+            .saturating_duration_since(began)
+            .as_millis();
+        self.note(
+            runtime::diagnostics::Level::Trace,
+            "accounting::worker",
+            &format!(
+                "mcp_tools took {spent} ms over {} declared server(s), offering {} tool(s)",
+                servers.len(),
+                offered.len()
             ),
-        }
+        );
         offered
     }
 }

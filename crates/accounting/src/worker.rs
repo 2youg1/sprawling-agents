@@ -249,6 +249,9 @@ pub struct RunWorker {
     /// (`SystemClock`). Shared, because a lane reads it while the
     /// worker does.
     pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
+    /// How long a dispatch's preparation and a probe took, read as two
+    /// instants apart (`Hands.monotonic`).
+    monotonic: fn() -> std::time::Instant,
     /// Reads the city's volume at the door new work enters by
     /// (sprawling-SPEC.md 8-116).
     read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,

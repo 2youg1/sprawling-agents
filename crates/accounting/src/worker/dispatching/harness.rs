@@ -13,7 +13,7 @@
 //! the request the harness cannot open itself, the tree given back and
 //! what the city owed whoever asked.
 
-use kernel::{AxError, Completion, TimeMs};
+use kernel::{AxError, Completion};
 
 use super::super::driving::harness::{Chartered, HarnessDriven, HarnessHalf, harness_provenance};
 use super::super::reviewing::Offering;
@@ -38,7 +38,7 @@ impl RunWorker {
         at: Assignment,
         seat: HarnessSeat,
         given: Given,
-        began: TimeMs,
+        began: std::time::Instant,
     ) -> Result<(Staged, Continuation), AxError> {
         let HarnessSeat {
             building,
@@ -105,7 +105,9 @@ impl RunWorker {
             notes: self.log.clone(),
             staged_at: self.ledger.position(),
         };
-        let spent = self.clock.now()?.value().saturating_sub(began.value());
+        let spent = (self.monotonic)()
+            .saturating_duration_since(began)
+            .as_millis();
         self.note(
             runtime::diagnostics::Level::Trace,
             "accounting::worker",

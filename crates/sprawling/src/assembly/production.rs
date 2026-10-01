@@ -66,6 +66,7 @@ pub fn hands(vault: gateway::Custodian) -> Hands {
     Hands {
         vault,
         clock: Arc::new(SystemClock),
+        monotonic: crate::serving::standing::monotonic_now,
         machine: Box::new(ThisMachine::new(Platform::current(), PATIENCE)),
         read_memory: crate::monitor::memory::read,
         read_volume: crate::monitor::volume::read,
