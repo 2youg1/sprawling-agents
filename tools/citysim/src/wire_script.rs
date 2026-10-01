@@ -49,7 +49,7 @@ pub struct WireScript {
 }
 
 impl WireScript {
-    /// Reads `{"face": …, "models": […], "replies": […]}`.
+    /// Reads `{"face": …, "models": […], "runs": [[…], …]}`.
     ///
     /// `face` is spelled as `kernel::DialectKind` serializes itself
     /// (`anthropic`, `open_ai`, `open_ai_responses`); an empty `models`
@@ -81,19 +81,22 @@ impl WireScript {
                     .ok_or_else(|| unreadable(&format!("models[{at}]"), "not a string"))
             })
             .collect::<Result<Vec<String>, AxError>>()?;
-        let replies = whole
-            .get("replies")
+        let runs = whole
+            .get("runs")
             .and_then(Value::as_array)
-            .ok_or_else(|| unreadable("replies", "missing, or not an array"))?
-            .clone();
-        for (at, reply) in replies.iter().enumerate() {
-            ScriptModel::from_wire(face, vec![reply.clone()])
-                .map_err(|err| unreadable(&format!("replies[{at}]"), &err.to_string()))?;
+            .ok_or_else(|| unreadable("runs", "missing, or not an array"))?;
+        let mut replies = VecDeque::new();
+        for (run, given) in runs.iter().enumerate() {
+            let given = given
+                .as_array()
+                .ok_or_else(|| unreadable(&format!("runs[{run}]"), "not an array"))?;
+            for (at, reply) in given.iter().enumerate() {
+                ScriptModel::from_wire(face, vec![reply.clone()])
+                    .map_err(|err| unreadable(&format!("runs[{run}][{at}]"), &err.to_string()))?;
+                replies.push_back(reply.clone());
+            }
         }
-        Ok(WireScript {
-            models,
-            replies: replies.into(),
-        })
+        Ok(WireScript { models, replies })
     }
 }
 

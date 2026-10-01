@@ -17,7 +17,7 @@ use std::net::{SocketAddr, TcpListener};
 use std::path::Path;
 use std::process::ExitCode;
 
-use citysim::{ScriptedProvider, WireScript};
+use citysim::ScriptedProvider;
 use kernel::{AxCode, AxError};
 
 /// Where the provider listens when the command names nowhere: any free
@@ -48,14 +48,6 @@ fn serve() -> Result<Infallible, AxError> {
         [script, record, listen] => (script, record, listen.as_str()),
         _ => return Err(invalid("read the command line", &args.join(" "))),
     };
-    let text = std::fs::read_to_string(script).map_err(|err| {
-        AxError::failure(
-            AxCode::ConfigInvalid,
-            "read a provider script",
-            format!("{script}: {err}"),
-        )
-        .with_recovery("name a script file this process can read")
-    })?;
     let listen: SocketAddr = listen
         .parse()
         .map_err(|_| invalid("read the listen address", listen))?;
@@ -70,8 +62,7 @@ fn serve() -> Result<Infallible, AxError> {
         )
         .with_recovery("name a free port, or leave the address out for any free one")
     })?;
-    let mut provider =
-        ScriptedProvider::open(listener, WireScript::parse(&text)?, Path::new(record))?;
+    let mut provider = ScriptedProvider::open(listener, Path::new(script), Path::new(record))?;
     println!("{VARIABLE}={}", provider.url()?);
     std::io::stdout().flush().map_err(|err| {
         AxError::failure(

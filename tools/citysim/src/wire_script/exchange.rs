@@ -78,18 +78,20 @@ impl Record {
 }
 
 impl ScriptedProvider {
-    /// Takes the listener and empties `record`: one playing, one record.
+    /// Takes the listener, reads the script, and empties `record`: one
+    /// playing, one record.
     ///
     /// # Errors
+    /// `E_CONFIG_INVALID` when the script cannot be read, and
     /// `E_STORAGE_FATAL` when the record cannot be created.
     pub fn open(
         listener: TcpListener,
-        script: WireScript,
+        script: &Path,
         record: &Path,
     ) -> Result<ScriptedProvider, AxError> {
         Ok(ScriptedProvider {
             listener,
-            replay: Replay::new(script),
+            replay: Replay::new(read_script(script)?),
             record: Record::create(record)?,
             seq: 0,
         })
@@ -236,6 +238,20 @@ fn request_of(bytes: &[u8], head_end: usize, length: usize) -> Option<Request> {
 /// record: a check needs to know one was sent, not what it was.
 fn is_credential(name: &str) -> bool {
     matches!(name, "authorization" | "proxy-authorization") || name.ends_with("api-key")
+}
+
+/// The script at `path`, read and parsed.
+fn read_script(path: &Path) -> Result<WireScript, AxError> {
+    std::fs::read_to_string(path)
+        .map_err(|err| {
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "read a provider script",
+                format!("{}: {err}", path.display()),
+            )
+            .with_recovery("name a script file this process can read")
+        })
+        .and_then(|text| WireScript::parse(&text))
 }
 
 fn socket(action: &str, err: &std::io::Error) -> AxError {
