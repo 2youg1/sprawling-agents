@@ -299,3 +299,6 @@ mod tests;
 
 #[cfg(test)]
 mod compaction_tests;
+
+#[cfg(test)]
+mod request_tests;
