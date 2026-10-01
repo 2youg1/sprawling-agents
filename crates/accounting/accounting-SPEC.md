@@ -22,7 +22,7 @@
 | `views` | 页面问的每个问题，怎样从折叠的记录里答 | 8-10 |
 | `lineage` | 每个 run 怎样折成一行，带上它的父指针 | 8-10 |
 | `worker` | 城的唯一写者 `RunWorker`：它持有的状态、它执行的命令、它驱动的 run | 8-11 |
-| `playback` | 一段历史怎样成为一份可以重算、可以复核的 playback bundle | 8-12 |
+| `playback` | 一段历史怎样成为一份可以重算、可以复核的 playback bundle；一个 playback page 怎样分五项查过，导出件怎样整份落下 | 8-12、8-13 |
 | `trace` | 一个提交是这个 run 哪几次调用的结果，同一栋楼里还有谁在那一段里调用过工具 | 8-16 |
 
 表里的模块全部在本 crate。`RunWorker` 与它的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例住 `worker`；它经构造时收下的一个 `Hands` 碰这台电脑，生产的那一份由二进制的装配根 `bin::assembly::production::hands` 造出（8-11）。
@@ -58,7 +58,7 @@
 - citysim 的场景库还驱动不了一次 dispatch：场景库只经 `runtime::run::drive` 驱动一次 run，从不造 worker；citysim 的 bench 二进制依赖 `sprawling`，只为计时产品自己的启动与查询。worker 已经只经 `Hands` 与四个端口碰外面（8-11），所以剩下的一步是一个场景造一份脚本的 `Hands`、经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活。能定下它的证据是那个场景在 citysim 里逐字节重放。
 - 模块从 `sprawling` 搬过来时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）；8-7、8-8、8-9 是早先整节搬进来的，保持原样。未定的只有 S4 的切分：哪几节归 `views`、哪几节归 `worker`，按 `architecture.toml` 里各行的 `spec` 锚点定。
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
-- `playback`（8-12）还没做的：`pr_merged` 点名的提交进 `checkpoints`，要 `views::commits::commit_facts` 对本 crate 放宽可见性（它是识别提交的唯一权威），能定下它的是 `views` 正在进行的改动合入之后对这一个函数放宽可见性；Lean 性质与 Rust 实现的一致目前靠 `playback::tests` 在同一组场景上的比较，由 Lean 生成场景、与 Rust 输出逐项比较的那一步还没有；`BUNDLE_MAX_BYTES` 与内存峰值要在多日夹具上量过才定值，定值的证据是 citysim 的多日场景读数。
+- `playback`（8-12、8-13）的两个上限是待测初值：`BUNDLE_MAX_BYTES` 与 `PAGE_MAX_BYTES` 要在多日夹具上量过导出峰值、页面解析与首屏成本才定值，定值的证据是 citysim 的多日场景读数。居民导出位置（8-13）里崩溃留下的暂存文件 `<名>.partial-<pid>` 没有人收走：它不会被当成导出件读（`check` 只认 `.json`/`.html` 的名字），能定下要不要收的是这类文件在真实城里出现的频率。
 
 ## 4 现状分析
 
@@ -495,7 +495,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
 ```rust
 // accounting::playback
 pub const SCHEMA: &str = "sprawling.playback/1";
-pub const PROJECTION_RULES: u32 = 1;
+pub const PROJECTION_RULES: u32 = 2;
 pub const BUNDLE_MAX_BYTES: usize = 32 * 1024 * 1024;
 pub enum Cutoff { Latest, At(Seq) }
 pub struct Request { pub selection: Selection, pub reader: Reader, pub cutoff: Cutoff }
@@ -507,10 +507,7 @@ impl Bundle {
 }
 /// 只读：严格校验从创世到 cutoff 的每一行，再投影。
 pub fn export(city_root: &Path, request: &Request) -> Result<Bundle, AxError>;
-pub enum Against<'a> { Nothing, Bundle(&'a [u8]), City { root: &'a Path, reader: Reader } }
-pub struct Report { pub digest: B3Hash, pub events: usize, pub verdict: Verdict }
-pub enum Verdict { Consistent, Same, Differs { section: &'static str }, CannotReproduce { why: String } }
-pub fn check(bundle: &[u8], against: Against<'_>) -> Result<Report, AxError>;
+// check、Report、Verdict 与页面见 8-13。
 
 // accounting::playback::select（形状 1 决策）
 pub struct Selection { /* 私有：first、last、run、building */ }
@@ -525,7 +522,7 @@ pub enum Confidential { Withheld, Included }
 pub enum Reader { Person(Confidential), Resident(Address) }
 ```
 
-模块：`playback`（索引、`export` 与 `check` 的入口）、`playback::select`、`playback::reader`、`playback::walk`（严格校验一遍、固定 cutoff）、`playback::project`（折叠）、`playback::links`（关键时刻与消息的两端）、`playback::document`（bundle 的 schema，形状 6 数据）、`playback::encode`（规范序列化、安全嵌入编码、摘要）、`playback::check`。
+模块：`playback`（索引、`export` 与 `check` 的入口）、`playback::select`、`playback::reader`、`playback::walk`（严格校验一遍、固定 cutoff）、`playback::project`（折叠）、`playback::links`（关键时刻与消息的两端）、`playback::document`（bundle 的 schema，形状 6 数据）、`playback::encode`（规范序列化、安全嵌入编码、摘要）、`playback::consistency`（一份 bundle 自洽的判定）、`playback::check`。
 
 **快照与选择。**
 
@@ -553,7 +550,7 @@ pub enum Reader { Person(Confidential), Resident(Address) }
 | `runs` | 有范围内事件的 run，取 `accounting::lineage::Lineage` 折到 cutoff 的那一行：`run`、`addr`、`session`、`parent`、`forked_at`、`predecessor`、`first_seq`、`last_seq`、`state`、`unanswered`；`parent`/`predecessor` 是 `{"run":id}`、`"withheld"`（那个 run 的房间读者读不到）或 `"missing"`（本账到 cutoff 没有它） |
 | `moments` | 关键时刻：`family`（`run`、`approval`、`pr`）、稳定键（run id、approval id、`<branch>@<pr_opened 的 seq>`）、`opened`、`closed`、`seqs`（范围内可见的成员） |
 | `messages` | 每封信（`signal_enqueued` 的 id）：`from`、`room`、`sent`、`consumed` |
-| `checkpoints` | 范围内可见的 `checkpoint_committed`：`JobPinned` 写 `{"pinned":{"job":…}}`，`Committed` 写 `{"committed":{"oid","scope","files"}}` |
+| `checkpoints` | 范围内可见、点名一个提交或钉住一份 job 的行，按 seq 升序：`checkpoint_committed` 的 `JobPinned` 写 `{"pinned":{"job":…}}`，`Committed` 写 `{"committed":{"oid","scope","files"}}`；`pr_merged` 写 `{"merged":{"oid"}}`，`oid` 是落地的提交。哪些行点名提交、点名的是哪个 oid，由 `accounting::views::commits::commit_facts` 一处回答 |
 | `costs` | 范围内可见行上折的 `storage::Attribution`：`billed_usd_micros`、`by_run`、`unpriced_calls`、`unpriced_tokens`；只涵盖所选可见范围 |
 | `withheld` | 见上 |
 
@@ -561,18 +558,99 @@ pub enum Reader { Person(Confidential), Resident(Address) }
 
 **规范字节与安全嵌入。** `playback::encode` 是唯一的序列化：serde 按结构体字段次序写紧凑 JSON，再把字符串里的 `<`、`>`、`&`、U+2028、U+2029 写成 `\u` 转义，所以同一份字节原样放进 HTML 的 `<script type="application/json">` 也不会提前结束那个块。所有 u64（seq、时刻、金额、计数）写成十进制字符串，JS 的 `Number` 不经手它们；`rules` 是小整数。摘要是这份字节的 BLAKE3（`B3Hash::digest`）。读回时先比尺寸上限，再按 `deny_unknown_fields` 解析，再重新编码并与原字节逐字节比较：重复键、多余空白、字段次序、未知字段、非规范的十进制都在这一步被拒。
 
-**来源复核。** `check` 先按上一段读入并校验结构：`schema` 是 `SCHEMA`；`events` 与 `context` 各自 seq 严格递增、互不相交；每条 `line` 过 `storage::read_line` 且 seq 与条目一致；每个 `{"at":seq}` 指向 `events`，每个 `{"outside":seq}` 指向 `context`；`runs` 的每个 run 在 `events` 里出现过。之后按 `Against`：
+**自洽与来源复核。** 一份 bundle 自洽，是指它按上一段读得回，并且：`schema` 是 `SCHEMA`；`events` 与 `context` 各自 seq 严格递增、互不相交；每条 `line` 过 `storage::read_line` 且 seq 与条目一致；每个 `{"at":seq}` 指向 `events`，每个 `{"outside":seq}` 指向 `context`；`runs` 的每个 run 在 `events` 里出现过。自洽只说这份文件内部不矛盾，不说它没被改过。复核有两种：
 
-- `Nothing`：`Verdict::Consistent`，连同摘要。它只说这份文件自洽，不说它没被改过。
-- `Bundle(other)`：两份都读入，逐字节相等为 `Same`，否则 `Differs` 并给出第一个不同的段。
-- `City { root, reader }`：读者由调用入口给出，不信 bundle 自述。`source.rules` 不是本构建的 `PROJECTION_RULES`、`source.reader` 与入口的读者不同、城在 cutoff 之前就结束，都是 `CannotReproduce`，并说明要用哪个版本或哪个读者重新导出；否则按 `source.selection` 与 `Cutoff::At(source.cutoff.seq)` 用同一个投影重算，逐字节相等为 `Same`，否则 `Differs`。改摘要、改费用、删事件而保留 `source`，重算的内容就不同。
+- **与另一份 bundle 比**：两份都自洽时逐字节比较，不同时给出第一个不同的段。
+- **与它的城比**：读者由调用入口给出，不信 bundle 自述。`source.rules` 不是本构建的 `PROJECTION_RULES`、`source.reader` 与入口的读者不同、城在 cutoff 之前就结束，都是「复核不了」，并说明要用哪个版本或哪个读者重新导出；否则按 `source.selection` 与 `Cutoff::At(source.cutoff.seq)` 用同一个投影重算并逐字节比较。改摘要、改费用、删事件而保留 `source`，重算的内容就不同。
 - 链与摘要不提供签名，也不证明现实世界里的陈述为真：整本账与 bundle 一起被换掉时没有外部信任根。
+
+两种复核与页面的检查怎样分项报出，见 8-13。
 
 **失败。** 全部是 `AxError`：`Selection::new` 的矛盾区间、bundle 读不懂或不规范是 `E_INVALID_ARGS`（action `select a playback range` / `read a playback bundle`）；链上的行按 `LineFault::into_ax` 报（`E_CAS_CORRUPT`、`E_LOG_VERSION_UNSUPPORTED`），recovery 指向 `sprawling replay`；序列化后超过 `BUNDLE_MAX_BYTES` 是 `E_INVALID_ARGS`，recovery 是用 `--from`/`--through`、`--run` 或 `--building` 收窄；规则、payload 读不了按各自的 `AxError` 原样上抛。任何失败都不交回部分的 bundle。错误文字不回显被隐去的内容。
 
 **资源。** 一遍读，一个段的字节常驻；另外常驻的是 `Lineage`（每个 run 一行）、关键时刻与消息的两端（每个键一项）、可能成为上下文的范围外可见行（run 的首行与各对的两端），以及范围内的投影。`BUNDLE_MAX_BYTES` 只限最终字节，不限这些常驻量。32 MiB 是待测的初值：多日夹具上的导出峰值与读取成本量出来之前，不把它当作内存上界。
 
-**给后续阶段的接口。** HTML 的分项 check（结构、静态离线、浏览器观察）读同一份 `Bundle::bytes` 与 `check`，不另写 schema；skill 的 schema 说明由 `playback::document` 生成或核对。居民入口传 `Reader::Resident(楼)`，它的写门与文件寿命在布局 owner 的规格里定。时间筛选与 `Selection` 同处；checkpoint 之间的 diff 与调用归属在 `CommitAnswer.previous`/`parents` 与调用归属进入 kernel 之后加段，加段时 `PROJECTION_RULES` 进一位。
+**还会加的段。** 时间筛选与 `Selection` 同处；checkpoint 之间的 diff 与调用归属在 `CommitAnswer.previous`/`parents` 与调用归属进入 kernel 之后加段。bundle 的内容或某张表的求法每变一次，`PROJECTION_RULES` 进一位，于是旧构建导出的 bundle 由本构建复核时报「复核不了」，而不是报「不同」。
+
+**模型与实现的比较。** `Select.lean` 的 `scenes` 是一张场景表（选择、cutoff、应选中的 seq），`scenes_agree` 证明模型对表里每一项给出那组 seq；`playback::tests::model` 从同一个 `.lean` 文件读出这张表，对每一项跑生产的 `export` 并比较 seq。表只在 Lean 里写一次。这是行为比较，不是 Rust 实现的精化证明。
+
+### 8-13 accounting::playback 的页面、分项复核与导出件落盘（形状 1 决策，`page`、`landing` 为形状 4 适配器）
+
+agent 把一份 bundle 做成一个自包含的单文件 HTML，叫 **playback page**。它的数据契约、引用规则、导出流程与验证要求写在随发行包发出的 `skills/playback/SKILL.md`；画面不在本节。本节定三件事：产品怎样把 bundle 放进页面，怎样把一份文件查成五个分开的结论，导出件怎样落盘。CLI（sprawling-SPEC.md 8-126、8-132）与居民的城工具 `playback`（sprawling-SPEC.md 8-132）都是这些函数的薄适配器。
+
+```rust
+// accounting::playback
+pub const PAGE_MAX_BYTES: usize = 48 * 1024 * 1024;
+pub const BUNDLE_BLOCK: &str = r#"<script type="application/json" id="playback-bundle"></script>"#;
+/// 模板里恰好一处 BUNDLE_BLOCK，换成装着 bundle 字节的同一个元素；结果过结构与静态离线两项才交出。
+pub fn embed(template: &[u8], bundle: &Bundle) -> Result<Vec<u8>, AxError>;
+pub struct City<'a> { pub root: &'a Path, pub reader: Reader }
+pub struct Asked<'a> { pub bundle: Option<&'a [u8]>, pub city: Option<City<'a>>, pub observed: Option<&'a [u8]> }
+pub enum Verdict { Passed, Failed { found: String }, Unasked { why: &'static str }, Unable { why: String } }
+pub struct Report {
+    pub digest: Option<B3Hash>,
+    pub events: Option<usize>,
+    pub structure: Verdict,
+    pub bundle: Verdict,
+    pub source: Verdict,
+    pub offline: Verdict,
+    pub browser: Verdict,
+    pub covered: Vec<String>,
+}
+impl Report {
+    /// 没有 Failed，也没有 Unable。
+    pub fn holds(&self) -> bool;
+    /// 一行 JSON：digest、events 与五项。
+    pub fn line(&self) -> serde_json::Value;
+}
+/// 不返回错误：每一项读不下去的原因写在它自己的结论里。
+pub fn check(file: &[u8], asked: &Asked<'_>) -> Report;
+pub enum Place<'a> { Chosen(&'a Path), Exports { city_root: &'a Path, file: &'a Path } }
+pub fn land(place: Place<'_>, bytes: &[u8]) -> Result<(), AxError>;
+```
+
+模块：`playback::page`（用 html5ever 的树构建器按浏览器的解析算法读页面，交出一张平面元素表；树构建器写进的 sink 在 `playback::page::sink`）、`playback::offline`（静态离线规则）、`playback::observed`（浏览器观察记录）、`playback::landing`（新文件整份落下或不落）；`playback::check` 把五项排在一起。
+
+**一份文件是什么。** 首字节是 `{` 的文件按 bundle 读；其余按 UTF-8 的 HTML 页面读，不是合法 UTF-8 的页面在结构一项失败。
+
+**嵌入。** `embed` 要求模板里恰好一处 `BUNDLE_BLOCK` 这串字节，把 bundle 的规范字节原样放进这对标签之间，再对结果跑结构与静态离线两项；任一不过就以 `E_INVALID_ARGS` 拒绝（action `embed a playback bundle`），subject 是第一条发现，不交出页面。字节原样放进去是安全的：`encode` 已把 `<`、`>`、`&` 写成转义（8-12），解析器在这个块里遇不到 `</script>`。页面用 `JSON.parse` 读块的文本，u64 仍是十进制字符串，没有一个值经过 JS 的 `Number`。一处之外的写法（零处、两处、标记写在注释或另一个原始文本元素里）都会让结构一项失败，因为结构一项判的是解析器建出来的元素，而不是源文本。
+
+**五项，分开报。** 状态词三个：`passed`、`failed`、`unchecked`。`Unasked` 与 `Unable` 都写作 `unchecked`，区别只在 `why`：前者是没有人要这一项（没给 `--bundle`、`--city`、观察记录，或被查的是 bundle 而不是页面），后者是要了而做不了。`Report::holds` 为真，当且仅当没有 `Failed` 也没有 `Unable`。
+
+| 项 | 名字 | 通过 | 失败 | 未检查 |
+|---|---|---|---|---|
+| 结构与引用 | `structure` | bundle 自洽（8-12）；页面另有下面四条 | 任一条不成立 | 从不 |
+| 与指定 bundle 一致 | `bundle` | 两份都自洽且逐字节相等 | 第一个不同的段 | 没给另一份（`Unasked`）；另一份或这份读不出 bundle（`Unable`） |
+| 来源复核 | `source` | 用入口给的读者重算，逐字节相等 | 第一个不同的段 | 没给城（`Unasked`）；读不出 bundle、版本或读者对不上、城在 cutoff 前结束、城的账读不下去（`Unable`） |
+| 静态离线 | `offline` | 下面的规则全部成立 | 第一条发现，另计余下的条数 | 被查的是 bundle（`Unasked`） |
+| 浏览器观察 | `browser` | 观察记录说的是这份字节，四张表都空 | 第一项观察到的行为 | 没给记录（`Unasked`）；记录读不懂、说的是另一份字节、没有路径（`Unable`） |
+
+页面的结构另有四条，判的是 `page` 交出的元素表：恰好一个元素的 `id` 是 `playback-bundle`，它是 HTML 命名空间的 `script`、`type` 是 `application/json`、文本是一份自洽的 bundle；全页的 `id` 不重复；每个以 `#` 开头的 `href`（含 xlink 的 `href`）指向页面里一个存在的 `id`，单独一个 `#` 除外；每个带 `data-seq` 的元素，值是十进制 seq，且在 bundle 的 `events` 或 `context` 里。由脚本在运行时画出的链接不在源里，它们由浏览器观察的 `unresolved` 表核对。
+
+**静态离线规则**（`playback::offline`）。规则判的是浏览器解析器会建出的元素——SVG 与 MathML 命名空间里的、`template` 内容里的都算——不是源文本：
+
+1. **CSP 在前。** 第一个 `meta http-equiv="Content-Security-Policy"` 的父元素是 `head`，在它之前建出的元素只有 `html`、`head`、`title` 和不带 `http-equiv` 的 `meta`。它的策略有 `default-src`，`connect-src`、`base-uri`、`form-action` 三条恰好是 `'none'`。页面上每一条 CSP 的每一个值都在这张表里：`'none'`、`'unsafe-inline'`、`'unsafe-eval'`、`'wasm-unsafe-eval'`、`data:`、`blob:`、`'sha256-…'`、`'sha384-…'`、`'sha512-…'`、`'nonce-…'`。主机、`'self'`、`*`、`http:` 一类的 scheme、`'strict-dynamic'`，以及取值不是来源表的指令（`sandbox`、`report-uri`、`report-to` 等）都是发现。
+2. **不出现的元素。** HTML 命名空间的 `base`、`form`、`iframe`、`frame`、`frameset`、`object`、`embed`、`portal`、`applet`。`meta` 的 `http-equiv` 只许 `content-type` 与 `content-security-policy`，`refresh` 等都是发现。
+3. **URL 属性。** 任何命名空间的 `href`、`src`、`poster`、`action`、`formaction`、`data`、`background`、`cite`、`longdesc`、`manifest`、`ping`、`codebase`、`archive` 与 xlink 的 `href`：按 URL 规范去掉首尾的 C0 控制字符与空格、删掉其中的制表符与换行之后，值以 `#` 开头，或 scheme 是 `data`、`blob`。空值也是发现。`srcset`、`imagesrcset` 一律是发现。
+4. **CSS。** `style` 元素的文本、任何元素的 `style` 属性、SVG 与 MathML 元素的其余属性，都用 CSS 语法的分词器读（`cssparser`），逐层进入函数与块：`url()`、`src()` 的参数与 `image-set()`、`-webkit-image-set()` 里的字符串按第 3 条判；`@import`、坏的 url token、超过分词器嵌套上限的块都是发现。
+
+静态离线通过，说的只是页面声明的资源与策略：内联 JS 可以给 `location` 赋值、动态建链接，这些路径静态检查看不见。CSP 也不是任意 JS 的沙箱。所以这一项从不说「不联网」；在某些路径下没看到联网，是浏览器观察一项的话。
+
+**浏览器观察**（`playback::observed`）。产品不执行被查的页面，也不打包浏览器。skill 用宿主已有的浏览器或自动化能力打开页面、走它点名的交互路径，把看到的写成一个 JSON（`deny_unknown_fields`，至多 1 MiB）：
+
+```json
+{"page":"<页面字节的 BLAKE3，十六进制>","paths":["…"],"requests":["…"],"navigations":["…"],"popups":["…"],"unresolved":["…"]}
+```
+
+`requests` 是页面自身之外发出的请求（`data:`、`blob:` 不算），`navigations` 是离开页面的导航，`popups` 是打开的新窗口，`unresolved` 是点了之后什么也没指到的证据链接。`page` 与被查文件的摘要不同、`paths` 为空，是 `Unable`；四张表都空是 `Passed`，`Report.covered` 是 `paths`；否则 `Failed`，给出第一项。记录是跑浏览器的 agent 自报的：产品核对的是它说的是这一份字节，不核对浏览器真的跑过；它也只说在这些路径下没看到，不说别的路径。
+
+**落盘**（`playback::landing`）。两种落点，一个做法：同一目录写 `<文件名>.partial-<pid>`，`sync_all`，以硬链接落到目标名，删掉暂存文件；任何一步失败都删暂存文件，目标要么整份出现，要么不出现。
+
+- `Place::Chosen(path)` 是人的 `--out`：父目录经 `std::fs::canonicalize` 解开链接之后，路径里任一段是受保护的元数据（`kernel::PROTECTED_METADATA`）则以 `E_OUTSIDE_WRITE_DOMAIN` 拒绝；目标已存在、或目标在某个 git 仓库里且被索引跟踪，以 `E_INVALID_ARGS` 拒绝。被删掉而仍被跟踪的文件名不存在于盘上，落下去却等于改了历史里的那个文件，所以存在与跟踪分开查。
+- `Place::Exports { city_root, file }` 是城里的保留导出位置，`file` 在 `CityLayout::playback_exports()` 之下：从城根到 `file` 的每一段经 `storage::WriteTarget::within` 查，链接与 junction 一律拒绝；缺的目录建出来；目标已存在、被跟踪以 `E_INVALID_ARGS` 拒绝；目标在 git 仓库里而没有被忽略，以 `E_OUTSIDE_WRITE_DOMAIN` 拒绝，因为它会进历史。`/.sprawling/` 在城根的 `.gitignore` 里（city-SPEC.md 8-21），所以正常的城里这一条成立。
+- git 的两问经 `git2` 读：从目标的父目录向上找仓库，找不到就两问都不适用；工作区与目标都先 canonicalize 再求相对路径。
+
+**失败与资源。** `check` 不返回错误；`embed` 与 `land` 的失败是 `AxError`，subject 是第一条发现或目标路径，不交回部分的页面或文件。被查文件的上限是 `PAGE_MAX_BYTES`：bundle 的上限加 16 MiB 留给页面自身与内嵌的字体、图，与 `BUNDLE_MAX_BYTES` 一样是待测初值（§3）。解析一遍建一张平面元素表，常驻量与页面字节同阶；CSS 的嵌套深度由 `cssparser` 的上限截住。
 
 ### 8-15 页面要的几样新东西，从哪一处答（`accounting::views::answering`、`accounting::worker::commanding`、`accounting::worker::freezing`）
 
@@ -640,7 +718,17 @@ pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError>;
     (c) 严格校验自己走一遍 `LedgerIndex::folding` 加 `LineCheck::advance`，不用 `runtime::replay::fold_ledger_dir`。理由：导出要每一行的原字节（cutoff 行的链哈希、逐字节的 `line`、凭据扫描）和不认识的可忽略行的 seq，`fold_ledger_dir` 两样都不交出；事后按索引重读原行，会把审过的字节和重读而未审的字节混在一起。被否决的做法：`fold_ledger_dir` 加按索引重读。
     (d) `check --city` 用同一个投影重算并逐字节比较，读者取入口给的。理由：只比 `source` 与末行链哈希时，保留 `source` 而改摘要、删事件都比不出来；信 bundle 自述的读者，就能用一份伪造的 `{"person":"included"}` 扩大权限。被否决的做法：比末行链哈希；按 bundle 的 `reader` 重算。
     (e) PR 的关键时刻键是 `<branch>@<pr_opened 的 seq>`，关闭行关掉同一分支最近打开的那一个。理由：请求在账本上的身份就是分支（`collab::OpenRequest`），同一分支会重开；只用分支作键会把两次请求并成一个。被否决的做法：只用分支。
-    (f) `checkpoints` 只列 `checkpoint_committed`，经 kernel 的 `CheckpointCommitted` 类型读，分开 `JobPinned` 与 `Committed`。理由：识别「哪些行点名一个提交」的权威是 `accounting::views::commits::commit_facts`，它在 `views` 里是 `pub(super)`，而 `views` 另有改动正在进行；在这里再写一遍会成为第二个权威。`pr_merged` 的提交由 §3 记下的那一步补上。被否决的做法：抄一份 `commit_facts`。
+    (f) `checkpoints` 里哪些行点名一个提交、点名哪个 oid，问 `accounting::views::commits::commit_facts`（它对本 crate 可见）；`JobPinned` 不点名提交，按 `CheckpointCommitted` 自己的类型读出，与 `Committed`、`pr_merged` 分开写。理由：识别提交的权威只能有一个，`views` 的提交页与 playback 的表必须对同一行给出同一个答案；`pr_merged` 的 oid 写在手写键里，抄一份读法，两处就会在那个键改名时分开。被否决的做法：在 playback 里再写一份识别提交的匹配。
     (g) 人的入口在 `Confidential::Withheld` 时按楼的规则取三臂，而不调 `may_read`。理由：`may_read` 要一个读者所在的楼，人不住在任何一栋楼里；为了调它而编一栋楼，会让「人的楼」成为一个不存在的地址。三臂的类型仍是 `kernel::ReadVerdict`，居民入口仍调 `may_read`。被否决的做法：给人编一个地址。
+25. **playback page 由产品嵌入、用浏览器的解析算法查、五项分开报，导出件经一个落盘函数写下。**
+    (a) 页面用 html5ever 的树构建器读，本模块只写一个记下元素的 sink。理由：静态检查要判浏览器会建出的元素，而 HTML 的分词受树构建影响——`<svg>` 里的 `<style>`、`<title>` 按普通标记读，`<noscript>` 在开着脚本时是原始文本；只有分词器的做法（html5gum 加按标签名切状态）在外来内容里会把一个 `<img src>` 当成样式文本漏过去。html5ever 是 Servo 的解析器，跟着 WHATWG 的解析算法走。代价：markup5ever、tendril、string_cache 等几个包进锁，发行二进制变大，读数归整合者。被否决的做法：正则或字符串扫描（`</script>`、注释里的标记、实体编码都会骗过它）；html5gum（无依赖，但外来内容里与浏览器不一致）；scraper（多带 selectors，且它锁的 cssparser 与这里的版本不同，锁里会有两份）。
+    (b) CSS 用 `cssparser` 分词，不开默认特性。理由：转义（`u\rl(`）、注释、嵌套函数与坏 url token 只有按 CSS 语法分词才判得对；默认特性只换来更快的字节匹配与颜色表，页面里的 CSS 是千字节级，差别在微秒以下，不值一个过程宏和一张 phf 表。被否决的做法：手写分词器（第二份 CSS 语法）；lightningcss（整个样式引擎）。
+    (c) 静态规则按「哪类元素与属性能取外部资源或送走读者」整类拒绝，而不是逐个判它的 URL：`form`、`base`、`iframe` 一类不出现，`srcset` 不出现。理由：参考模板与 agent 写的页面都用不着它们，而它们各自的 URL 语义（`srcset` 的逗号、`srcdoc` 继承 CSP、表单的提交目标）要一份份写判定，漏一份就漏一个出口。代价：一个确实想用 `srcset` 的页面写不进来，要改用 `data:` 的单张图。
+    (d) CSP 只许不取外部来源的值，`connect-src`、`base-uri`、`form-action` 要显式写 `'none'`。理由：`default-src` 只为取资源的指令兜底，不管 `base-uri` 与 `form-action`；`'self'` 在 `file://` 下的含义随浏览器而变；`'strict-dynamic'` 让受信脚本加载任意 URL。被否决的做法：只要求 `default-src 'none'`。
+    (e) bundle 由产品嵌进页面：模板里留一个空的 `BUNDLE_BLOCK`，`embed` 原样拼进规范字节，再用同一套检查查结果。理由：agent 自己粘贴或经 JS 重写 bundle，u64 会在 `Number` 里丢精度，粘错一个字节结构就失败；拼接由产品做，页面里的字节就是导出的字节。标记写成固定的一串字节而不在解析树里找位置，因为解析器不给源偏移；拼完再解析一遍，标记落在注释里之类的情形由结构一项挡住。被否决的做法：让 agent 照 skill 自己嵌入。
+    (f) 浏览器观察由 skill 借宿主的浏览器完成，产品只读它写下的记录，并核对记录说的是这份字节。理由：二进制里不带浏览器，也不替人启动一个——前者体积与维护都大，后者要在每台机器上找浏览器、处理它的权限；宿主（城外的 agent 或居民的浏览器工具）本来就有。代价：记录是自报的，产品核对不了浏览器真的跑过，`browser` 一项因此只说「这份记录说在这些路径下没看到」。被否决的做法：随产品打包无头浏览器；产品自己启动系统浏览器。
+    (g) `check` 交回五项而不返回错误，`Unasked` 与 `Unable` 在 Rust 里分开、对外同写 `unchecked`。理由：一项读不下去（城的账坏了、观察记录读不懂）不该挡住另外几项的结论；而「没人要」与「要了做不了」对退出码的意思不同，前者不算失败，后者算。被否决的做法：一个总结论（把「内容正确」「不联网」混成一个标识）；用错误终止整个检查。
+    (h) 写新文件的做法从 `bin::main::playback` 搬到 `playback::landing`，人的 `--out` 与居民的导出位置共用；本 crate 因此直接依赖 `git2`，只读索引与忽略规则。理由：两扇门要的是同一个保证（整份落下、不覆盖、失败不留半成品、不进历史），写两份就会在某一份加了检查而另一份没加时分开。`git2` 已是 `storage` 的依赖、同一份 libgit2，按 ARCHITECTURE.md §4 直接用，不为两问开一个端口。被否决的做法：CLI 与工具各写一份；在 `storage` 加一个只为这两问的函数（这两问不属于 checkpoint，也不属于 worktree）。
+    (i) `Select.lean` 的场景表只写在 Lean 里，`scenes_agree` 证明模型给出表里的结果，Rust 测试从同一个 `.lean` 文件读表、跑生产的 `export`。理由：表只有一份，模型与实现分别对它负责；Lean 输出一份 JSON 再由 Rust 读，要多一个必须与 `.lean` 保持同步的生成物，测试还要先跑一次 Lean。被否决的做法：Lean 生成 JSON 夹具；Rust 里另写一份场景表。
 27. **一个 session 的身份冻在房间那一层，读回失败就拒，不换成此刻的名字。** 理由：session 的形状（模型、强度）已经记在房间那一层，`/new` 清的也是它，身份跟着同一个边界就不需要另一条「何时重读身份」的规则（city-SPEC §12.11）；读不回冻下的那一版时换成此刻的名字，等于在 session 中途悄悄改名，而这正是冻结要防的。被否决的做法：每次 run 现读身份——改名立刻改掉正在进行的 session 的前缀，provider 的前缀缓存从 city 段起失效，页面上的旧 session 与请求里的名字也对不上。
 28. **`whose --trace` 的逻辑是读面上的一个模块 `accounting::trace`，从 `Query::Commit` 的答出发再读账本，不加线上查询；同楼的别人只计数。** 理由：区间的两端已经在 `CommitAnswer` 的 `seq` 与 `previous` 里，调用的读法已经在 `views::turns` 里；今天的读者是读盘的 CLI，下一轮的 playback 与验收工具都在本 crate 里或经本 crate 读。同楼别的 run 的写也可能落进这个提交，但把它们的调用与本 run 的并列，会把「候选」读成「原因」，所以只给条数与地址，要细看的人拿 `view --run` 去读。被否决的做法：①加 `Query::Trace`：线上多一个形状、`WIRE_V` 进一位、`wire.ts` 与 adversary 的门面都要跟着改，换来的只是把这几步搬到服务端，而 CLI 本来就读盘；②按 `Call.effect` 只留写调用：读调用决定了写什么，去掉它们就去掉了归因的一半证据，`effect` 留在每条调用上由读者判断；③区间以 git 的父提交或全城紧邻的上一个提交为界：两者都可能属于别的 run，会把别人的调用算成这个 run 的。重开参数：页面要显示一个提交的调用时（那时要一个线上查询，本模块搬到 `views` 后面作答）；或同一栋楼里几个 run 同写一棵树成为常态、条数不够区分时。

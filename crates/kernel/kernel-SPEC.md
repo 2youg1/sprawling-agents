@@ -2193,6 +2193,7 @@ pub const TRANSCRIPT_EXT: &str = "jsonl";                            // 一次 r
 pub const RUN_ID_PATTERN: &str = "????????-????-????-????-????????????";   // `RunId` 显示形的 git 忽略模式，一个字符一个 `?`
 pub const REMOTE_DIR: &str = "remote";                               // 远程门的状态，城的保留子树下（§8-76）
 pub const DEVICES_FILE: &str = "devices.toml";                       // 配对过的设备表
+pub const PLAYBACK_DIR: &str = "playback";                           // playback 导出件，城的保留子树下
 
 pub struct CityLayout { /* root —— 私有 */ }
 impl CityLayout {
@@ -2213,6 +2214,7 @@ impl CityLayout {
     pub fn handoff(&self, room: &Address) -> PathBuf;           // <scope>/Handoff.md
     pub fn urbanite(&self, addr: &Address) -> PathBuf;          // <scope>/URBANITE.md
     pub fn devices(&self) -> PathBuf;                           // root/.sprawling/remote/devices.toml（§8-76）
+    pub fn playback_exports(&self) -> PathBuf;                  // root/.sprawling/playback
     pub fn city_address(&self) -> Option<Address>;             // 城自己的名字：根目录名，能拼成地址时
     pub fn of_ledger(dir: &Path) -> Option<CityLayout>;         // ledger() 的逆：从账本目录取回城根
 }
@@ -2353,6 +2355,8 @@ impl CityLayout {
 - **它治理的是谁能从外面够到这座城**，所以按 §8-56 第 3 条落在城的保留子树里：没有任何写域够得到它，一个 agent 改不了哪台设备配对过、各有什么权限。表里每台设备一行：id、人给的名字、权限与公钥；表的格式、读写与跨重启的持久化归远程门的装配层（remote_access-SPEC §3「装配未落」一段），本模块只回答它在哪。
 - **`remote/` 一个目录，而不是保留子树根下一个文件**：远程门落盘的状态都归这一个目录，于是撤掉远程门在盘上留下的一切就是删掉一个目录，不必逐个认文件。城密钥不在这里，它进 vault。
 - 第一个读者是远程门的装配；在它之前，这个路径没有调用方，由 `layout` 的单元测试核它的摆放。
+
+**playback 的导出件也在城的保留子树里**：`PLAYBACK_DIR` 与 `CityLayout::playback_exports()`（`root/.sprawling/playback`）是居民经城工具 `playback` 导出的报告落下的地方，每栋楼一个子目录。放在这里，是因为没有写域够得到它、城根的 `.gitignore` 把它挡在历史之外、清扫 worktree 也不碰它；目录下的命名、落盘与寿命归 `accounting::playback`（accounting-SPEC.md 8-13、sprawling-SPEC.md 8-132），本模块只回答它在哪。
 
 ### 8-77 运行策略：一次 run 在什么纪律下工作（`kernel::model::mode`，形状 2 值类型）
 

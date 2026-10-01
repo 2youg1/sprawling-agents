@@ -1120,7 +1120,9 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **`whose --trace` 读盘作答，候选就说是候选**（8-136，accounting-SPEC.md §12-28）。区间以同一个 run 的上一个提交为界，调用经 rounds 的那一份配对规则读出，同楼别的 run 只给条数。CLI 读盘而不走线上查询，城不在服务也答得出，与 `whose` 本身同一条理由。**被否掉的**：只列写调用——读调用决定了写什么；把同楼别人的调用并列出来——读者会把候选读成原因。条件变了就重议：页面要显示一个提交的调用时。
 
-**`playback` 是一个两个词的动词，导出写 stdout 或一个新文件，只在 bundle 完整之后写**（8-126、accounting-SPEC.md 8-12）。回看一段工作流有两个动作：导出与复核，它们的标志不同（导出读选择与 `--out`，复核读 `--bundle`/`--city`），所以是两行；放在一个词 `playback` 之下，是因为总览里两者挨着，人找到一个就找到另一个。命令表的一行可以带两个词，解析先试两个词，其余不变，8-89 决定 1「动词需要子动词」的重议条件因此被这一个最小的扩展满足，没有换参数库。输出不沿用 `view` 的做法：`view | head` 截断仍算成功，是因为账本原行本来就一行一行有意义；一份截断的 bundle 读不回来，却可能被当成一份完整的东西留下，所以 bundle 先整份算好、量过尺寸再写，管道中途关闭是失败，`--out` 经暂存文件与硬链接落位、已有目标不覆盖。**被否掉的**：`export --playback` 之类挂在现有动词上的标志（`export` 打包整座城，两件事的输入与输出都不同）；`--out` 默认写进城里（导出件不进 git，城里的保留导出位置由布局 owner 在居民入口落地时定）；`rename` 落位（在 Unix 上会覆盖已有目标）。条件变了就重议：城里的保留导出位置定下之后，`--out` 缺省时可以写到那里，而不是 stdout。
+**`playback` 是一个两个词的动词，导出写 stdout 或一个新文件，只在 bundle 完整之后写**（8-126、accounting-SPEC.md 8-12）。回看一段工作流有两个动作：导出与复核，它们的标志不同（导出读选择与 `--out`，复核读 `--bundle`/`--city`），所以是两行；放在一个词 `playback` 之下，是因为总览里两者挨着，人找到一个就找到另一个。命令表的一行可以带两个词，解析先试两个词，其余不变，8-89 决定 1「动词需要子动词」的重议条件因此被这一个最小的扩展满足，没有换参数库。输出不沿用 `view` 的做法：`view | head` 截断仍算成功，是因为账本原行本来就一行一行有意义；一份截断的 bundle 读不回来，却可能被当成一份完整的东西留下，所以 bundle 先整份算好、量过尺寸再写，管道中途关闭是失败，`--out` 经暂存文件与硬链接落位、已有目标不覆盖。**被否掉的**：`export --playback` 之类挂在现有动词上的标志（`export` 打包整座城，两件事的输入与输出都不同）；`--out` 默认写进城里（导出件不进 git，城里的保留导出位置由布局 owner 在居民入口落地时定）；`rename` 落位（在 Unix 上会覆盖已有目标）。条件变了就重议：人也要一个不必自己选路径的去处时，`--out` 缺省可以写到城里的保留导出位置（8-132 给居民的那一处），而不是 stdout。
+
+**居民的 `playback` 是一件工具、两个动作，按写登记，读者由上下文定**（8-132、accounting-SPEC.md 8-13）。导出要写文件，复核只读；工具的效应按登记而不是按调用，一件工具只能登记一种，所以取两者中较强的写：代价是复核也走写门、不被推测执行提前跑，而一次复核本来要重算整段历史，提前跑它省不下什么。导出件落在城根保留子树下的 `playback/<楼>/`，而不是居民的房间或 worktree：保留子树没有写域够得到，居民改不了一份已经写下的报告，只能另导出一份；它被城根的 `.gitignore` 挡在历史之外；它不随 worktree 清扫消失，没有 worktree 的 run 也有同一个去处。按楼分目录，是因为复核要用同一个读者重算，一栋楼的导出只有同一栋楼的居民复核得了，机密楼的导出也就不会被别的楼读到。**被否掉的**：`playback_export` 与 `playback_check` 两件工具（复核可以按 `Read` 登记，但一个动作拆成两件工具，模型要多认一个名字，而两者的参数一半相同）；写进房间并靠 `.gitignore` 挡住（worktree 会被清扫，居民能用 `edit` 改报告）；让居民在参数里选读者（读者是读界的输入，交给被读界约束的一方去选，读界就没有意义）。条件变了就重议：工具的效应可以按调用声明时，`check` 改回 `Read`。
 
 
 ## 13 依赖选型
@@ -4146,11 +4148,42 @@ pub(super) fn check(read: &Arguments) -> ExitCode;
 - **两个词是一个动词。** 命令表的一行可以叫 `playback export`：`grammar::parse` 先看头两个词能否拼成某一行的名字，再看头一个词；只敲 `playback` 或 `playback <错词>` 是 `UnknownVerb`，近似名列出 `playback export`、`playback check`。帮助、总览与解析读的仍是同一张表（8-89）。
 - **选择。** `--from`/`--through` 是含端点的 seq，与 `view --from` 同一种读法（`view::seq_flag`）；`--run` 与 `view --run` 同一种读法（`view::run_flag`）；`--building` 经 `Address::parse`，按 `Address::is_within` 选楼，不是 `view --who` 的字符串前缀。三者交给 `Selection::new`，矛盾的区间由它拒绝。
 - **读者是人。** 入口交 `Reader::Person(Confidential::Withheld)`；带 `--include-confidential` 交 `Confidential::Included`，并在 stderr 写一行 `sprawling: playback: this bundle includes confidential buildings`，bundle 的 `source.reader` 写成 `{"person":"included"}`。`check --city` 用同一个标志决定复核时的读者，不读 bundle 自述。
-- **输出。** 不给 `--out` 时，bundle 完整、尺寸检查通过之后才开始写 stdout；写到一半管道关闭是失败（退出 1，stderr 说明 bundle 不完整），不沿用 `view | head` 的成功语义。给 `--out` 时先在同一目录写一个 `<file>.partial-<pid>`，写完再以硬链接落到目标名、删掉暂存文件：目标已存在（包括一个已被 git 跟踪的文件）则拒绝，不覆盖；目标的父目录经 `std::fs::canonicalize` 解开链接之后，路径里任一段是受保护的元数据（`kernel::PROTECTED_METADATA`：`.sprawling`、`.git`，不分大小写）则拒绝，所以账本与 git 元数据写不进去。任何失败都删掉暂存文件，不留可被误认的最终文件。skill 生成的 HTML 的默认位置、是否被 git 忽略的检查与文件寿命归布局 owner，随 skill 与居民入口一起定。
-- **复核。** `check <bundle>` 读文件（超过 `BUNDLE_MAX_BYTES` 先拒绝），调 `accounting::playback::check`：只给文件时是 `Against::Nothing`，`--bundle <file>` 是 `Against::Bundle`，`--city <city>` 是 `Against::City`；两者同给以 2 退出。stdout 写一行 JSON：`digest`（十六进制）、`events`（十进制字符串）、`verdict`（`consistent`、`same`、`differs`、`cannot_reproduce`），`differs` 带 `section`，`cannot_reproduce` 带 `why`。
-- **退出码**（8-103 的表）：0 导出完成，或复核为 `consistent`/`same`；1 拒绝（账本坏、bundle 超限或读不懂、目标已存在或在受保护的元数据里、stdout 中途关闭），或复核为 `differs`/`cannot_reproduce`；2 命令行读不懂。
+- **输出。** 不给 `--out` 时，bundle 完整、尺寸检查通过之后才开始写 stdout；写到一半管道关闭是失败（退出 1，stderr 说明 bundle 不完整），不沿用 `view | head` 的成功语义。给 `--out` 时经 `accounting::playback::land(Place::Chosen)` 写（accounting-SPEC.md 8-13）：同一目录先写一个 `<file>.partial-<pid>`，写完再以硬链接落到目标名、删掉暂存文件；目标已存在、或被 git 跟踪，则拒绝，不覆盖；目标的父目录经 `std::fs::canonicalize` 解开链接之后，路径里任一段是受保护的元数据（`kernel::PROTECTED_METADATA`：`.sprawling`、`.git`，不分大小写）则拒绝，所以账本与 git 元数据写不进去。任何失败都删掉暂存文件，不留可被误认的最终文件。
+- **复核。** `check` 的文件、标志、五项与它的退出码见 8-132。
+- **退出码**（8-103 的表）：0 导出完成；1 拒绝（账本坏、bundle 超限、目标已存在、被跟踪或在受保护的元数据里、stdout 中途关闭）；2 命令行读不懂。
 
-**本节测试**：`main::playback::tests`：`--out` 的目标整份落下、不留暂存文件；已存在的目标被拒且原文件不变；指进 `.sprawling` 或 `.GIT` 被拒且没有留下文件；矛盾的区间与读不了的楼、读不了的 seq 分成两种拒绝；`differs` 带 `section` 并以 1 退出。`grammar::tests::a_verb_of_two_words_is_read_from_two_words`：`playback export` 从两个词读成一行，`help playback check` 是那一行的帮助，`playback` 单独与 `playback <错词>` 是 `UnknownVerb`、近似名恰是那两行。导出的字节、读界与复核由 `accounting::playback::tests` 判定（accounting-SPEC.md 8-12）。
+**本节测试**：`accounting::playback::tests::landing`：`--out` 的目标整份落下、不留暂存文件；已存在的目标被拒且原文件不变；指进 `.sprawling` 或 `.GIT` 被拒且没有留下文件；被 git 跟踪而已从盘上删掉的文件名被拒。`main::playback::tests`：矛盾的区间与读不了的楼、读不了的 seq 分成两种拒绝。`grammar::tests::a_verb_of_two_words_is_read_from_two_words`：`playback export` 从两个词读成一行，`help playback check` 是那一行的帮助，`playback` 单独与 `playback <错词>` 是 `UnknownVerb`、近似名恰是那两行。导出的字节、读界与复核由 `accounting::playback::tests` 判定（accounting-SPEC.md 8-12）。
+
+## 8-132 `playback check` 的五项、`export --page`，与居民的城工具 `playback`（`bin::main::playback`、`accounting::worker::workbench::tools::playback`；accounting-SPEC.md 8-13）
+
+**形状。** 两个适配器。`main/playback.rs` 给人用，城工具 `playback` 给居民用；页面嵌入、五项检查、落盘都是 `accounting::playback` 的（accounting-SPEC.md 8-13），这里只定两扇门各自读什么、写到哪、怎样报。
+
+```text
+sprawling playback export <city> [--from <seq>] [--through <seq>] [--run <run>] [--building <addr>] [--include-confidential] [--page <template>] [--out <file>]
+sprawling playback check <file> [--bundle <file>] [--city <city>] [--include-confidential] [--observed <file>]
+```
+
+**人的门。**
+
+- **`export --page <template>`**：读模板（超过 `PAGE_MAX_BYTES` 先拒绝），经 `accounting::playback::embed` 把这次导出的 bundle 放进去，写出的是页面而不是 bundle；去处照 8-126，stdout 或 `--out`。页面过不了结构或静态离线一项时退出 1，什么也不写。
+- **`check <file>`**：文件可以是 bundle，也可以是页面（accounting-SPEC.md 8-13 按首字节分）。`--bundle` 与 `--city` 可以一起给，各自成一项；`--observed <file>` 是 skill 写下的浏览器观察记录。stdout 写一行 JSON：`digest`（十六进制）与 `events`（十进制字符串）在读出了 bundle 时出现；`structure`、`bundle`、`source`、`offline`、`browser` 五项各是 `{"status": "passed" | "failed" | "unchecked"}`，`failed` 带 `found`，`unchecked` 带 `why`，`browser` 通过时带 `covered`（观察走过的路径）。
+- **退出码**（8-103 的表）：0 是 `Report::holds`——没有一项失败，也没有一项要了而做不了；1 是其余，包括 `--city` 复核不了、观察记录说的是另一份字节；2 是命令行读不懂。没要的项写 `unchecked` 但不影响退出码。
+
+**居民的门：城工具 `playback`。**
+
+```json
+{"action": "export", "name": "day-1", "from": 12, "through": 340, "run": "…", "building": "newsroom", "page": "<!doctype html>…"}
+{"action": "check", "file": "day-1.html"}
+```
+
+- **读者由上下文绑定。** 工具在铺工作台时拿到这个 run 所在的楼，导出与复核都用 `Reader::Resident(这栋楼)`。参数里没有读者：`reader`、`include_confidential` 之类不认识的字段以 `E_INVALID_ARGS` 拒绝，所以居民扩大不了读者，人的 `--include-confidential` 也不会下放给居民。按现行读界，居民可以回看别的非机密楼。
+- **`export`**：`name` 是 1 到 64 个 ASCII 字母、数字、`-`、`_`，首字符是字母或数字；`from`、`through` 是 seq，`run` 是 run id，`building` 是楼的地址，与人的门的选择同义（8-126）。给 `page` 时经 `embed` 写 `<name>.html`，否则写 `<name>.json`。落点是 `CityLayout::playback_exports()` 下以本楼地址命名的目录，经 `accounting::playback::land(Place::Exports)` 写：不覆盖、不跟随链接、在 git 仓库里时必须被忽略、失败不留半成品。结果是 `{"file", "digest", "events"}`，页面另带 `structure`、`offline` 两项；bundle 与页面的字节不进结果，因为工具结果会写进账本。
+- **`check`**：`file` 是本楼导出目录里的一个 `<name>.json` 或 `<name>.html`，别的名字与别处的文件都拒绝。它用同一个读者对城复核，结果是 `Report::line`：五项，`bundle` 与 `browser` 为 `unchecked`（居民的门不收另一份 bundle 与观察记录）。
+- **效应与写门。** 登记 `Effect::Write { domain: 房间 }`，与 `signal`、`pr` 等写桌子的工具同样走写门；`writes` 回答 `Writes::Nothing`，因为导出件落在工作树之外，checkpoint 没有东西可收。工具的效应按登记而不是按调用，所以 `check` 也不会被推测执行提前跑（只有 `Effect::Read` 会，runtime-SPEC 的 speculation）。
+- **寿命。** 导出件跟着城：它在城根的保留子树下，不在任何 worktree 里，清扫 worktree、run 冻结或重开都不碰它；没有独立 worktree 的 run 也写在同一处。两次导出用了同一个名字，后一次被拒绝。崩溃留下的暂存文件见 accounting-SPEC.md §3。
+- **登记。** 每一栋楼的工作台都有它，排在内置工具的末尾、`transcribe` 之后、城外工具之前：新工具接在末尾，前面已缓存的工具表前缀不动。
+
+**本节测试**：`main::playback::tests`：五项写成一行 JSON，没要的项写 `unchecked` 而退出 0，失败或要了而做不了的项退出 1。`accounting::playback::tests::page`：`embed` 写出的页面逐字节带着 bundle，行里的 `</script>` 关不掉数据块，结构与静态离线两项通过；重复的数据块、重复的 `id`、指不到的链接与 `data-seq`、数据块里重复的 JSON 键在结构一项失败；外部资源（`img`、转义过的 CSS `url()`、`@import`、SVG 的 `image`、`srcset`）、`base`、`form`、外链、`meta refresh` 各是一条静态离线的发现；CSP 缺了、在别的元素之后、放进一个主机、缺 `form-action` 各是一条发现；观察记录说的是另一份字节为 `unchecked`，记下一次请求为失败。`accounting::worker::workbench::tools::playback::tests`：带 `include_confidential` 或 `reader` 的调用被拒；机密楼的行到不了居民的导出，导出用同一个读者复核通过；同名的第二次导出被拒且原文件不变，过不了静态离线的页面什么也不留；没有 worktree 的 run 把页面写进城里，`check` 只认本楼导出目录里的名字。已存在、被跟踪、不在导出位置、会进历史的目标由 `accounting::playback::tests::landing` 判定。两名居民（记者、编辑）生成、核对并留存报告由 `tests/acceptance/playback.rs` 判定。
 
 ## 8-106 城景有界（`accounting::views::answering`、`storage::hot`；storage-SPEC §8-5、wire-SPEC `CityAnswer`）
 
