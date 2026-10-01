@@ -13,6 +13,7 @@
 )]
 
 use std::path::Path;
+use std::time::Instant;
 
 use super::*;
 use crate::worker::fixture::*;
@@ -83,6 +84,93 @@ fn the_next_room_takes_the_stock_and_creates_no_file() {
         (true, Some(storage::FileWork::default()), true),
         "the second room's tree is the stock taken over, and a new stock stands"
     );
+}
+
+/// Reads production placement and the stock put back after it, in
+/// milliseconds, over a building whose trunk carries 512 files of 16 KB
+/// (sprawling-SPEC.md 8-155). The first room's placement makes the
+/// city's first commit and checks the trunk out whole; the second room's
+/// takes the stock over. Each lane then puts a stock back, and that is
+/// what lies between the run's last line and `fly` returning.
+#[test]
+#[ignore = "a wall-clock instrument; prints one reading line per room"]
+#[allow(
+    clippy::disallowed_methods,
+    reason = "an instrument reads the wall clock"
+)]
+fn instrument_production_placement() {
+    let dir = tempfile::tempdir().unwrap();
+    lay_review_city(dir.path(), &["room1", "room2"]);
+    let bulk = dir.path().join("lab").join("room1").join("bulk");
+    std::fs::create_dir_all(&bulk).unwrap();
+    for file in 0u64..512 {
+        let mut bytes = vec![b'.'; 16 * 1024];
+        bytes[..8].copy_from_slice(&file.to_le_bytes());
+        std::fs::write(bulk.join(format!("file-{file:04}.txt")), bytes).unwrap();
+    }
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![completion("first", None), completion("second", None)],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let cores = std::thread::available_parallelism().map_or(0, std::num::NonZero::get);
+    for room in ["lab/room1", "lab/room2"] {
+        let (staged, _continuation) = worker
+            .stage_dispatch(asked(room), "work".to_owned(), "work".to_owned())
+            .unwrap();
+        let context = worker.drive_context();
+        let mut timed = Timed {
+            ledger: &mut worker.ledger,
+            opened: None,
+            last: None,
+        };
+        let began = Instant::now();
+        let flown = staged.fly(&mut timed, context);
+        let ended = Instant::now();
+        let Flown::Model { site, driven, .. } = &flown else {
+            panic!("a model dispatch flies a model run");
+        };
+        assert!(
+            driven.is_ok(),
+            "the run in {room} drove: {:?}",
+            driven.as_ref().err()
+        );
+        let created = site.lease.as_ref().unwrap().work().created;
+        let ms = |from: Instant, to: Instant| to.saturating_duration_since(from).as_millis();
+        println!(
+            "instrument_production_placement room={room} created={created} placement_ms={} restock_ms={} fly_ms={} machine={}-{}, {cores} core(s)",
+            ms(began, timed.opened.unwrap()),
+            ms(timed.last.unwrap(), ended),
+            ms(began, ended),
+            std::env::consts::OS,
+            std::env::consts::ARCH,
+        );
+    }
+}
+
+/// A ledger that keeps the moment its `worktree_opened` line and its
+/// last line were written, over the one it writes to.
+struct Timed<'a, L> {
+    ledger: &'a mut L,
+    opened: Option<Instant>,
+    last: Option<Instant>,
+}
+
+impl<L: kernel::Ledger> kernel::Ledger for Timed<'_, L> {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "an instrument reads the wall clock"
+    )]
+    fn append(&mut self, draft: kernel::EventDraft) -> Result<kernel::EventRef, AxError> {
+        let kind = draft.kind;
+        let appended = self.ledger.append(draft);
+        let at = Instant::now();
+        if kind == EventKind::WorktreeOpened {
+            self.opened = Some(at);
+        }
+        self.last = Some(at);
+        appended
+    }
 }
 
 /// A city with one building under review, `lab`, and the named rooms in

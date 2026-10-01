@@ -4601,9 +4601,9 @@ static STOCKING: Mutex<BTreeSet<PathBuf>>;
 - **剩下的秒级读数在落地这一段。** 一个房间第一次放置接管了备树之后，这条 lane 补回的是一次全量检出，这个 run 的落地等它（8-145「代价落在谁身上」）。秒数没有消失，从 run 的第一次模型调用之前挪到了它的落地之前。挪不出 lane 的原因在 `accounting::worker::pool`：`landed` 在记账线程上 `join` 回家的 lane，lane 若先送回 `Flown` 再补树，记账线程就在 `join` 里等这次检出，每条 lane 的 append 都排在它后面。
 - **读数。** 由 `preparing::tests::instrument_production_placement`（`#[ignore]`）给出：一座评审楼的 `lab/room1/bulk` 里 512 个 16 KB 文件，第一个房间经 `fly` 放置（全量检出）、驾驶、补备树；第二个房间经 `fly` 接管备树、驾驶、补回一棵。仪表用一个包住城账本的计时 `Ledger` 量三段：`fly` 开始到 `worktree_opened` 入账（放置），最后一行入账到 `fly` 返回（补树），以及整个 `fly`。
 
-当前状态：上面各条都已落地。放置与补树的读数见本节末尾的读数行；发行构建的读数由整合者用同一个仪表测试（`cargo nextest run --release -p sprawling-accounting --run-ignored only -E 'test(instrument_production_placement)'`）补上。
+读数（debug 构建，windows-x86_64、16 核，同一仪表三轮）：第二个房间接管备树的放置 39–42 ms，`created` 为 0；它的 lane 之后补回一棵全量检出的备树 1.44–1.46 s。第一个房间的放置 5.6–6.2 s，`created` 513：这一段里有城的第一次提交（`ensure_base` 把 512 个文件 stage 并扫描一遍）和一次全量检出；它之后补备树 1.26–1.33 s。
 
-读数（debug 构建）：待量。
+当前状态：上面各条都已落地。还以秒计的有两段：一是补备树本身，落在接管了备树的 run 的落地之前（本节「剩下的秒级读数在落地这一段」）；二是一座城的第一次放置，它先提交一次城（storage-SPEC 8-8 的 `ensure_base`），每座城只有一次，那次之前没有干线可备，所以备树帮不上它，这一段仍在那座城第一个 run 的第一次模型调用之前。发行构建的读数由同一个仪表测试给出：`cargo nextest run --release -p sprawling-accounting --run-ignored only --no-capture -E 'test(instrument_production_placement)'`。
 
 ### 8-113 派活的准备进 lane：记账线程只做决定，树、MCP 连接与冻结在 lane 里（`accounting::worker::dispatching::running`、`accounting::worker::dispatching::preparing`、`accounting::worker::driving::flight`）
 
