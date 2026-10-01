@@ -2842,8 +2842,20 @@ dependencies = [
  "image",
  "serde",
  "serde_json",
+ "sprawling-agent-protocols",
+ "sprawling-desktop-ffi",
+ "sprawling-kernel",
+ "tempfile",
  "toml",
  "uiautomation",
+ "windows 0.62.2",
+ "winsafe",
+]
+
+[[package]]
+name = "sprawling-desktop-ffi"
+version = "0.0.7"
+dependencies = [
  "windows 0.62.2",
  "winsafe",
 ]
