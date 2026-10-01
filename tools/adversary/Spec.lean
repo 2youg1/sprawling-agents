@@ -164,7 +164,9 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 
 **诊断**：一件事两处判。`collab::ClaimDesk::split` 不要求 run 握着那一行，照分不误，并把这次分记成要落地的效果；落地时 `accounting::effect::Claims::of` 用 `collab::still_true` 问盘上的那一行是否仍是效果期待的状态，而 `ClaimEffect::expected_before` 对 `Split` 答的是 `In progress`——一行没人认领的计划是 `Not started`，于是整次落地被判为过时（`Claims::Stale`），不写一行、不改文件，而模型已被告知计划分好了。
 
-**没有在这里修**：它在 `crates/collab` 与 `crates/accounting`，不在本目录。该由一处决定「分一行要不要先握着它」：要么书桌拒绝分一行没握着的计划，要么落地时按书桌当时看到的状态判。在那之前，U9 的分计划的 run 先认领再分（`Acceptance/Script.lean` 的 `plannerRun`），走的是产品今天支持的那条路。
+**已修。** 「分一行要不要先握着它」现在只由书桌判（collab D6）：`plan` 的 `split` 只分本 run 握着的那一行，没握着就当场以 `E_INVALID_ARGS` 拒绝，恢复语叫它先认领那一行，书桌不排效应；落地不再为拆分另判状态，只核认领，效应按次序重放（accounting-SPEC §8-27）。被否的另一条路——落地按书桌看到的状态判、让没人认领的一行也能分——会让两个 run 把同一行各分一次，第二组子行在第一组之后不报错地长出来（`crates/collab/spec/Claim.lean` 的 `withoutHold_splits_twice`）。反例在仓内钉住：`a_split_of_a_row_this_run_does_not_hold_is_refused_at_the_call`（`crates/collab/src/claim_tool/tests.rs`）。修的时候还找到同一类的第二条路：一个 run 分了自己握着的一行、再认领其中一片叶子，旧的落地拿盘上原文核那片叶子，叶子还不存在，整次落地被判过时；钉在 `a_run_that_splits_its_row_and_claims_a_leaf_lands_both`（`crates/accounting/src/effect.rs`）。
+
+U9 的分计划的 run 照旧先认领再分（`Acceptance/Script.lean` 的 `plannerRun`）：那已经不是绕路，而是产品唯一接受的走法。走法里不加一步去看拒绝：拒词与「书桌不排效应」由上面那条仓内测试经生产入口钉住，U9 要看的是一个人第一天能走通的那一串（§3「一次可用性验收还该走什么」）。
 -/
 
 /-! ## 5 权威信源
@@ -413,7 +415,7 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
    - **第一天**（一次服务）：城答出它起城时的那栋 hall；替身被挂上、它的模型被选中；立一栋楼并被列出；人在楼的阅览室里准入每一件 skill；派活跑到脚本给的结尾并在盘上留下文件；run 钉住的 skill 恰是书架上的那些，按名读到的每一件以它自己的正文到达模型；模型拿到的目录里有脚本调用的每件工具；城列出的楼恰是历史创建过的楼；历史自证。
    - **进程被杀**（第二次服务）：派活，等那个 run 写下几条工具结果，然后结束进程。
    - **第二天早上**（第三次服务）：被杀的城留下的历史自证；城再服务，新派的活跑到它自己的结尾；历史再自证。
-   - **协作**（仍是第三次服务）：立第二栋楼 `beta`，人把它的 `review` 改成 true、在它的计划表里写下一行；`beta/planner` 认领那一行并把它分成两片叶子（先认领的理由见 §4 第八个发现）；`beta/left` 与 `beta/right` 同时派活、都去认第一片叶子，历史里只有一条认领；活重派到 `beta/left`，它认下第二片叶子、写一个文件、提出评审，文件不在城里；检查从历史读出那条请求的分支，把查它的 run 接到脚本后面（D7），派给 `beta/right`，它判不通过，历史里有一条以同一个分支、同一句理由被拒的记录，文件仍不在城里；历史再自证；最后问城 `known_hosts`。
+   - **协作**（仍是第三次服务）：立第二栋楼 `beta`，人把它的 `review` 改成 true、在它的计划表里写下一行；`beta/planner` 认领那一行并把它分成两片叶子（分一行要先握着它，collab D6；§4 第八个发现）；`beta/left` 与 `beta/right` 同时派活、都去认第一片叶子，历史里只有一条认领；活重派到 `beta/left`，它认下第二片叶子、写一个文件、提出评审，文件不在城里；检查从历史读出那条请求的分支，把查它的 run 接到脚本后面（D7），派给 `beta/right`，它判不通过，历史里有一条以同一个分支、同一句理由被拒的记录，文件仍不在城里；历史再自证；最后问城 `known_hosts`。
 
    全部通过后，`walk` 把清单写到 `target/acceptance/` 下的 `checklist.md`（§8 `Acceptance/Checklist.lean`）。
 

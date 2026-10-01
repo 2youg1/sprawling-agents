@@ -164,10 +164,9 @@ def morningRun : Run := fun _ => [saying "the city came back"]
 
 /-- Takes the person's row and divides it into the two leaves.
 
-The row is claimed first because a landing replays a split only onto a row that
-is still in progress (`collab::ClaimEffect::expected_before`); a split of a row
-nobody holds is answered by the tool and then dropped when the run lands
-(`tools/adversary/Spec.lean` section 4, the eighth finding). -/
+The row is claimed first because the plan desk splits only the row the run
+holds and refuses any other at the call (collab D6; `tools/adversary/Spec.lean`
+section 4, the eighth finding). -/
 def plannerRun : Run := fun run =>
   [ calling run 0 "plan" (Json.mkObj [("action", .str "claim"), ("node", .str "1")])
   , calling run 1 "plan"
