@@ -25,9 +25,6 @@ use crate::release;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// Where the checker's Lean lives.
-const CHECKER: &str = "tools/adversary/";
-
 /// The library the checker is, and the one it may import besides the
 /// toolchain's.
 const CHECKER_LIBRARY: &str = "Sprawling";
@@ -35,12 +32,34 @@ const CHECKER_LIBRARY: &str = "Sprawling";
 /// The libraries the Lean toolchain ships, which anything may import.
 const TOOLCHAIN: [&str; 3] = ["Init", "Std", "Lean"];
 
-/// What a file answers to: the checker's rules, or those of the package
-/// whose directory holds it.
+/// What a file answers to: the checker's rules, its specification's, or
+/// those of the package whose directory holds it.
 #[derive(Clone, Copy)]
 enum Owner<'a> {
     Checker,
+    CheckerSpecification,
     Package(&'a Member),
+}
+
+/// Who answers for the file at `rel`. Under the checker's directory, its
+/// entry and the parts beside it are its specification and everything else
+/// is the checker (xtask-SPEC.md section 8-47).
+fn owner_of<'a>(found: &'a [Member], rel: &str) -> Option<Owner<'a>> {
+    let Some(inside) = rel
+        .strip_prefix(super::CHECKER)
+        .and_then(|rest| rest.strip_prefix('/'))
+    else {
+        return members::owner(found, rel).map(Owner::Package);
+    };
+    let specified = inside == lean::ENTRY
+        || inside
+            .strip_prefix(lean::PARTS)
+            .is_some_and(|rest| rest.starts_with('/'));
+    Some(if specified {
+        Owner::CheckerSpecification
+    } else {
+        Owner::Checker
+    })
 }
 
 pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskError> {
@@ -55,12 +74,7 @@ pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskEr
         let text = walk::read_text(&file)?;
         let code = lean::code(&text);
         undischarged(&rel, &code, out);
-        let owner = if rel.starts_with(CHECKER) {
-            Some(Owner::Checker)
-        } else {
-            members::owner(&found, &rel).map(Owner::Package)
-        };
-        let Some(owner) = owner else {
+        let Some(owner) = owner_of(&found, &rel) else {
             continue;
         };
         let reach = Reach {
@@ -79,8 +93,11 @@ pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskEr
                 ));
             }
         }
-        if let Owner::Package(_) = owner {
-            out.extend(cited_paths(root, &rel, &text, &top));
+        match owner {
+            Owner::Package(_) | Owner::CheckerSpecification => {
+                out.extend(cited_paths(root, &rel, &text, &top));
+            }
+            Owner::Checker => {}
         }
     }
     Ok(())
@@ -154,6 +171,17 @@ impl Reach<'_> {
                     format!(
                         "the checker imports `{module}`, and it imports only `{CHECKER_LIBRARY}` \
                          and the toolchain's libraries"
+                    )
+                });
+            }
+            Owner::CheckerSpecification => {
+                let own = lean::dotted(super::CHECKER);
+                let entry = format!("{own}.Spec");
+                let parts = format!("{own}.{}", lean::PARTS);
+                return (!(within(module, &entry) || within(module, &parts))).then(|| {
+                    format!(
+                        "the checker's specification imports `{module}`, and it imports only \
+                         its own parts and the toolchain's libraries"
                     )
                 });
             }

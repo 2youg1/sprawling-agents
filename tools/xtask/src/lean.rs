@@ -29,7 +29,7 @@ use crate::walk;
 pub(crate) const ENTRY: &str = "Spec.lean";
 
 /// The directory, beside the entry, that holds its parts.
-const PARTS: &str = "spec";
+pub(crate) const PARTS: &str = "spec";
 
 /// One Lean file: where it is, repo-relative, and what it says.
 pub(crate) struct Source {

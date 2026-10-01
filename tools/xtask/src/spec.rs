@@ -24,6 +24,11 @@ use crate::report::{Violation, XtaskError};
 mod effective;
 mod source;
 
+/// The checker's directory. Its own specification sits in it, beside the
+/// checker, and is held to the rules a crate's is (xtask-SPEC.md section
+/// 8-47): the checker is a Lean program, so no cargo package stands for it.
+const CHECKER: &str = "tools/adversary";
+
 /// The seventeen responsibilities of `skills/sdd`, in its order. What each
 /// section holds is that skill's to say, so the skeleton carries titles only.
 const SECTIONS: [&str; 17] = [

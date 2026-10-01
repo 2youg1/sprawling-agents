@@ -37,11 +37,7 @@ const PROSE: [&str; 4] = [".md", ".html", ".rs", ".lean"];
 
 pub(super) fn one_per_package(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskError> {
     for member in members::members(root)? {
-        let mut held = markdown_in(root, &member.dir)?;
-        if lean::migrated(root, &member.dir) {
-            held.push(format!("{}/{}", member.dir, lean::ENTRY));
-        }
-        match held.as_slice() {
+        match held_in(root, &member.dir)?.as_slice() {
             [_] => {}
             [] => out.push(finding(
                 member.dir.clone(),
@@ -56,17 +52,38 @@ pub(super) fn one_per_package(root: &Path, out: &mut Vec<Violation>) -> Result<(
                     member.name()
                 ),
             )),
-            [..] => out.push(finding(
-                member.dir.clone(),
-                "a package has one effective specification (xtask-SPEC.md section 8-42)",
-                format!("{} holds {}", member.dir, held.join(" and ")),
-                "finish the migration in one change-set: carry every requirement into Spec.lean, \
-                 then delete the Markdown SPEC"
-                    .to_owned(),
-            )),
+            held @ [..] => out.push(two_held(&member.dir, held)),
         }
     }
+    // The checker is no package, and its specification is held to the same
+    // count; having none is not judged here, because no cargo package
+    // promises that the directory exists.
+    if let held @ [_, _, ..] = held_in(root, super::CHECKER)?.as_slice() {
+        out.push(two_held(super::CHECKER, held));
+    }
     Ok(())
+}
+
+/// The specifications sitting in `dir`: its Markdown SPECs, then its
+/// `Spec.lean` when it has migrated.
+fn held_in(root: &Path, dir: &str) -> Result<Vec<String>, XtaskError> {
+    let mut held = markdown_in(root, dir)?;
+    if lean::migrated(root, dir) {
+        held.push(format!("{dir}/{}", lean::ENTRY));
+    }
+    Ok(held)
+}
+
+/// A directory holding more than one effective specification.
+fn two_held(dir: &str, held: &[String]) -> Violation {
+    finding(
+        dir.to_owned(),
+        "a package has one effective specification (xtask-SPEC.md section 8-42)",
+        format!("{dir} holds {}", held.join(" and ")),
+        "finish the migration in one change-set: carry every requirement into Spec.lean, \
+         then delete the Markdown SPEC"
+            .to_owned(),
+    )
 }
 
 /// The Markdown SPECs sitting directly in `dir`, repo-relative, sorted.
@@ -76,6 +93,9 @@ fn markdown_in(root: &Path, dir: &str) -> Result<Vec<String>, XtaskError> {
         source,
     };
     let mut held = Vec::new();
+    if !root.join(dir).is_dir() {
+        return Ok(held);
+    }
     for entry in std::fs::read_dir(root.join(dir)).map_err(io)? {
         let entry = entry.map_err(io)?;
         let name = entry.file_name().to_string_lossy().into_owned();
