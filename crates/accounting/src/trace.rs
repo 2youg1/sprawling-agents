@@ -13,9 +13,12 @@
 //! because their writes share the building's tree and may have landed
 //! in the same commit.
 
+use std::collections::BTreeMap;
+use std::ops::Range;
 use std::path::Path;
 
-use kernel::{Address, AxError, GitOid, RunId};
+use kernel::{Address, AxError, EventKind, EventRecord, GitOid, RunId, Seq};
+use storage::{LedgerIndex, LineReader, StorageError};
 
 /// One commit, the calls its run made since its previous commit, and
 /// who else called tools in the same building in that span.
@@ -46,8 +49,93 @@ pub struct Nearby {
 /// # Errors
 /// Whatever `views::ask` refuses (a chain that does not verify), and a
 /// line that cannot be read or parsed after it.
-pub fn trace(_city_root: &Path, _oid: GitOid) -> Result<Option<Trace>, AxError> {
-    Ok(None)
+pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError> {
+    let wire::Answer::Commit(commit) = crate::views::ask(city_root, &wire::Query::Commit { oid })?
+    else {
+        return Ok(None);
+    };
+    let ledger_dir = kernel::layout::CityLayout::new(city_root).ledger();
+    let index = LedgerIndex::rebuild(&ledger_dir).map_err(StorageError::into_ax)?;
+    let mut reader = index.reader(&ledger_dir);
+    let after = commit.previous.map(|previous| previous.seq);
+    let records = run_records(&index, &mut reader, &commit, after)?;
+    let span = Range {
+        start: match after {
+            Some(previous) => previous.next()?,
+            None => records.first().map_or(commit.seq, EventRecord::seq),
+        },
+        end: commit.seq,
+    };
+    let calls = crate::views::turns(&records)
+        .into_iter()
+        .flat_map(|turn| turn.calls)
+        .filter(|call| span.contains(&call.at))
+        .collect();
+    let nearby = nearby(&index, &mut reader, &commit, &span)?;
+    Ok(Some(Trace {
+        commit: *commit,
+        calls,
+        nearby,
+    }))
+}
+
+/// The commit's run's lines before the commit, oldest first: back past
+/// `after` to the nearest `model_called` at or before it, so the turn
+/// the span opens in is folded whole and its calls keep their answers.
+fn run_records(
+    index: &LedgerIndex,
+    reader: &mut LineReader<'_>,
+    commit: &wire::CommitAnswer,
+    after: Option<Seq>,
+) -> Result<Vec<EventRecord>, AxError> {
+    let mut newest_first = Vec::new();
+    for seq in index.run_seqs_before(commit.run, Some(commit.seq)) {
+        let record = EventRecord::parse_line(&reader.line_at(seq).map_err(StorageError::into_ax)?)?;
+        let opens_a_turn = record.kind() == EventKind::ModelCalled;
+        newest_first.push(record);
+        if opens_a_turn && after.is_some_and(|after| seq <= after) {
+            break;
+        }
+    }
+    newest_first.reverse();
+    Ok(newest_first)
+}
+
+/// The other runs whose `tool_called` lines in `span` were addressed
+/// within the commit's building, counted by run.
+fn nearby(
+    index: &LedgerIndex,
+    reader: &mut LineReader<'_>,
+    commit: &wire::CommitAnswer,
+    span: &Range<Seq>,
+) -> Result<Vec<Nearby>, AxError> {
+    let building = city::Building::of(&commit.actor)?;
+    let mut found: BTreeMap<RunId, Nearby> = BTreeMap::new();
+    let walk = index
+        .seqs()
+        .skip_while(|seq| *seq < span.start)
+        .take_while(|seq| *seq < span.end);
+    for seq in walk {
+        let record = EventRecord::parse_line(&reader.line_at(seq).map_err(StorageError::into_ax)?)?;
+        let Some(at) = record.addr() else {
+            continue;
+        };
+        if record.run() == commit.run
+            || record.kind() != EventKind::ToolCalled
+            || !at.is_within(building.addr())
+        {
+            continue;
+        }
+        let counted = found.entry(record.run()).or_insert_with(|| Nearby {
+            run: record.run(),
+            actor: at.clone(),
+            calls: 0,
+        });
+        // A count of ledger lines cannot reach u64::MAX: the seq that
+        // numbers them is a u64 too.
+        counted.calls = counted.calls.saturating_add(1);
+    }
+    Ok(found.into_values().collect())
 }
 
 #[cfg(test)]
