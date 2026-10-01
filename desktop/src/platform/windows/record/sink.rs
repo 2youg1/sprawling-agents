@@ -25,9 +25,8 @@
 //! reaches the other: `record` never names ffmpeg, and nothing here
 //! knows that two recordings of one window are refused.
 //!
-//! Sound is not written here either, because nothing in this server
-//! chooses a capture device; the refusal for it belongs to the caller,
-//! beside the other reasons a recording does not begin.
+//! Sound is not written here: it is a second ffmpeg's own input, in
+//! `hearing`, and the two files are written side by side.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -60,7 +59,7 @@ const MOST_FRAMES: u64 = 6_000;
 
 /// The same ceiling as the seconds ffmpeg is given, which is the only
 /// form ffmpeg accepts it in.
-const MOST_SECONDS: u64 = MOST_FRAMES / FRAMES_A_SECOND;
+pub(super) const MOST_SECONDS: u64 = MOST_FRAMES / FRAMES_A_SECOND;
 
 /// How long [`Sink::close`] waits for ffmpeg to finish writing the
 /// file's index, counted in polls rather than against a clock.
@@ -69,10 +68,10 @@ const MOST_SECONDS: u64 = MOST_FRAMES / FRAMES_A_SECOND;
 /// all, which is the same rule the city holds (`clippy.toml`), and a
 /// bounded count of sleeps bounds the wait just as well. Four hundred
 /// polls a twentieth of a second apart is about twenty seconds.
-const FFMPEG_FINISH_POLLS: u32 = 400;
+pub(super) const FFMPEG_FINISH_POLLS: u32 = 400;
 
 /// How long one of those polls sleeps.
-const POLL_EVERY: std::time::Duration = std::time::Duration::from_millis(50);
+pub(super) const POLL_EVERY: std::time::Duration = std::time::Duration::from_millis(50);
 
 /// How many names are tried before this gives up looking for a free
 /// one. A machine with a thousand un-cleared recordings of one window

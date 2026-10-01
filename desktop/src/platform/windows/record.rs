@@ -27,10 +27,10 @@
 //! Whichever of the two files a caller then asked for would be a guess,
 //! and stopping would be ambiguous in a way no answer resolves.
 //!
-//! Sound is refused. Choosing a capture device requires knowing what it
-//! is called on this machine, and nothing in this server knows that; a
-//! recording that silently had no audio track would be discovered by
-//! whoever played it back (desktop-SPEC.md §8.6, fourth pair).
+//! Sound is heard only from the one device the scope file names
+//! (desktop-SPEC.md section 12.11): `hearing` runs it, and `stop` hands
+//! the sound back as an audio block when it is short enough to carry
+//! (section 12.13).
 
 mod hearing;
 mod sink;
@@ -41,7 +41,9 @@ use std::path::PathBuf;
 use serde_json::{Value, json};
 
 use super::enumerate::Window;
+use crate::answer::Answer;
 use crate::refusal::{Refusal, RefusalCode};
+use hearing::Hearing;
 use sink::{Sink, somewhere};
 
 /// One recording of this connection, as the caller names it.
@@ -53,38 +55,45 @@ pub(crate) struct RecordingId(u64);
 
 /// What a `desktop.record` call asks for.
 pub(crate) enum Wanted {
-    /// Begin recording the window this call names.
-    Start,
+    /// Begin recording the window this call names, with or without sound.
+    Start(Sound),
     /// End the recording this id was handed back for.
     Stop(RecordingId),
+}
+
+/// Whether a start asks for sound.
+pub(crate) enum Sound {
+    Silent,
+    /// The scope file's device, which the gate is asked for before any
+    /// window is looked up.
+    Asked,
 }
 
 /// Reads one `desktop.record` call.
 ///
 /// # Errors
-/// Refuses a call that says neither start nor stop, a request for
-/// sound, and a stop that does not say which recording it ends.
+/// Refuses a call that says neither start nor stop, an `audio` that is
+/// not true or false, and a stop that does not say which recording it
+/// ends.
 pub(crate) fn asked(arguments: &Value) -> Result<Wanted, Refusal> {
     let state = arguments
         .get("state")
         .and_then(Value::as_str)
         .ok_or_else(|| named_neither("the call says neither start nor stop".to_owned()))?;
     match state {
-        "start" => {
-            // Absent and `false` are the only two ways to ask for no
-            // sound. Anything else is a caller who believes it asked
-            // for sound, and is told that it did not get it.
-            if !matches!(arguments.get("audio"), None | Some(Value::Bool(false))) {
-                return Err(Refusal::new(
-                    RefusalCode::ToolUnavailable,
-                    "record a window",
-                    "this server does not choose a sound device".to_owned(),
-                    "record without `audio`; a recording that claimed to have sound and had \
-                     none would be discovered by whoever played it back",
-                ));
-            }
-            Ok(Wanted::Start)
-        }
+        "start" => match arguments.get("audio") {
+            None | Some(Value::Bool(false)) => Ok(Wanted::Start(Sound::Silent)),
+            Some(Value::Bool(true)) => Ok(Wanted::Start(Sound::Asked)),
+            // A caller who sent something else believes it said
+            // something, and is told what `audio` takes rather than
+            // being given a guess.
+            Some(other) => Err(Refusal::new(
+                RefusalCode::InvalidArgs,
+                "record a window",
+                format!("`audio` is {other}, and it is true or false"),
+                "send `audio: true` to hear the sound device the scope file names, or leave it out",
+            )),
+        },
         "stop" => match arguments.get("recording").and_then(Value::as_u64) {
             Some(id) => Ok(Wanted::Stop(RecordingId(id))),
             None => Err(Refusal::new(
@@ -118,6 +127,7 @@ struct Running {
     title: String,
     into: PathBuf,
     written_by: Sink,
+    heard_by: Option<Hearing>,
 }
 
 /// Every recording this connection started, by the id it was given.
@@ -138,13 +148,14 @@ impl Recordings {
         }
     }
 
-    /// Begins recording one window and answers with the id that ends
-    /// it.
+    /// Begins recording one window, hearing `device` when one is given,
+    /// and answers with the id that ends it.
     ///
     /// # Errors
-    /// Refuses a second recording of the same window and a place on
-    /// this machine that cannot be written to.
-    pub(crate) fn start(&mut self, window: Window) -> Result<Value, Refusal> {
+    /// Refuses a second recording of the same window, a place on this
+    /// machine that cannot be written to, and a sound this machine
+    /// cannot record.
+    pub(crate) fn start(&mut self, window: Window, device: Option<&str>) -> Result<Value, Refusal> {
         let of = window.handle.ptr().addr();
         if let Some(already) = self.running.values().find(|running| running.of == of) {
             return Err(Refusal::new(
@@ -159,12 +170,25 @@ impl Recordings {
         let id = RecordingId(self.begun);
         let into = somewhere(&window.named.title, self.begun)?;
         let title = window.named.title;
-        let written_by = Sink::open(window.handle, window.bounds, &into)?;
+        // The sound starts first: it is the half that refuses a machine
+        // without ffmpeg, and a refusal before the frames begin leaves
+        // nothing running to stop.
+        let heard_by = device
+            .map(|device| Hearing::open(device, &into))
+            .transpose()?;
+        let written_by = match Sink::open(window.handle, window.bounds, &into) {
+            Ok(written_by) => written_by,
+            Err(refusal) => {
+                let _abandoned = heard_by.map(Hearing::close);
+                return Err(refusal);
+            }
+        };
         let answer = json!({
             "state": "started",
             "recording": id.0,
             "title": title,
             "into": into.display().to_string(),
+            "sound": device,
         });
         self.running.insert(
             id,
@@ -173,17 +197,20 @@ impl Recordings {
                 title,
                 into,
                 written_by,
+                heard_by,
             },
         );
         Ok(answer)
     }
 
-    /// Ends one recording and answers with where it landed.
+    /// Ends one recording and answers with where it landed, and with
+    /// its sound in front of the facts when it heard one that one answer
+    /// can carry.
     ///
     /// # Errors
     /// Refuses an id this connection is not recording under, which is
     /// the honest answer to "stop what?".
-    pub(crate) fn stop(&mut self, id: RecordingId) -> Result<Value, Refusal> {
+    pub(crate) fn stop(&mut self, id: RecordingId) -> Result<Answer, Refusal> {
         let Some(running) = self.running.remove(&id) else {
             return Err(Refusal::new(
                 RefusalCode::InvalidArgs,
@@ -207,7 +234,23 @@ impl Recordings {
         if let (Some(object), Some(early)) = (answer.as_object_mut(), closed.cut_short) {
             object.insert("ended_early".to_owned(), json!(early.summary()));
         }
-        Ok(answer)
+        let Some(heard) = running.heard_by.map(Hearing::close) else {
+            return Ok(Answer::facts(&answer));
+        };
+        let carried = heard.carried();
+        if let Some(object) = answer.as_object_mut() {
+            object.insert("sound".to_owned(), json!(heard.into.display().to_string()));
+            if let Some(early) = &heard.cut_short {
+                object.insert("sound_ended_early".to_owned(), json!(early.summary()));
+            }
+            if let Err(why) = &carried {
+                object.insert("sound_left_out".to_owned(), json!(why));
+            }
+        }
+        Ok(match carried {
+            Ok(bytes) => Answer::sound(bytes, "audio/wav", &answer),
+            Err(_said_above) => Answer::facts(&answer),
+        })
     }
 }
 
@@ -256,6 +299,23 @@ mod tests {
         }
     }
 
+    impl Recordings {
+        /// A start with no sound, which is what every test here asks for:
+        /// no device is named on a machine running tests.
+        fn start_silent(&mut self, window: Window) -> Result<Value, Refusal> {
+            self.start(window, None)
+        }
+
+        /// A stop, as the facts it answers with.
+        fn stop_facts(&mut self, id: RecordingId) -> Result<Value, Refusal> {
+            self.stop(id).map(|answer| {
+                let result = answer.as_result();
+                let text = result["content"][0]["text"].as_str().unwrap().to_owned();
+                serde_json::from_str(&text).unwrap()
+            })
+        }
+    }
+
     fn landed(answer: &Value) -> PathBuf {
         PathBuf::from(
             answer["into"]
@@ -280,18 +340,18 @@ mod tests {
         assert_eq!(unstarted.as_error()["data"]["code"], "E_INVALID_ARGS");
 
         let started = recordings
-            .start(window("Calculator", 0x10))
+            .start_silent(window("Calculator", 0x10))
             .expect("a recording starts even of a window that draws nothing");
         let into = landed(&started);
         assert!(into.is_dir(), "{} was not laid out", into.display());
 
         let twice = recordings
-            .start(window("Calculator", 0x10))
+            .start_silent(window("Calculator", 0x10))
             .expect_err("two recordings of one window is not a thing `stop` can answer");
         assert_eq!(twice.as_error()["data"]["code"], "E_GATE_DENIED");
 
         let ended = recordings
-            .stop(id_of(&started))
+            .stop_facts(id_of(&started))
             .expect("the recording ends");
         assert_eq!(landed(&ended), into);
         assert!(matches!(ended["as"].as_str(), Some("mp4" | "frames")));
@@ -306,29 +366,33 @@ mod tests {
     #[test]
     fn a_window_that_renames_itself_mid_recording_can_still_be_stopped() {
         let mut recordings = Recordings::new();
-        let started = recordings.start(window("a.txt — Notepad", 0x20)).unwrap();
+        let started = recordings
+            .start_silent(window("a.txt — Notepad", 0x20))
+            .unwrap();
         let ended = recordings
-            .stop(id_of(&started))
+            .stop_facts(id_of(&started))
             .expect("the id outlives the title");
         assert_eq!(ended["title"], "a.txt — Notepad");
         let _tidied = std::fs::remove_dir_all(landed(&started));
     }
 
-    /// Sound is refused with the reason, not accepted and dropped, and
-    /// the refusal happens before anything is started.
+    /// `audio` is read as what it says: true asks for the scope's
+    /// device, false or absent asks for none, and anything else is
+    /// refused by name rather than read as either.
     #[test]
-    fn asking_for_sound_is_refused_rather_than_silently_ignored() {
-        let refusal = asked(&json!({ "state": "start", "audio": true }))
+    fn audio_is_true_or_false_and_nothing_else() {
+        assert!(matches!(
+            asked(&json!({ "state": "start", "audio": true })),
+            Ok(Wanted::Start(Sound::Asked))
+        ));
+        assert!(matches!(
+            asked(&json!({ "state": "start", "audio": false })),
+            Ok(Wanted::Start(Sound::Silent))
+        ));
+        let refusal = asked(&json!({ "state": "start", "audio": "loud" }))
             .err()
-            .expect("this server chooses no sound device");
-        let error = refusal.as_error();
-        assert_eq!(error["data"]["code"], "E_TOOL_UNAVAILABLE");
-        assert!(
-            error["data"]["recovery"]
-                .as_str()
-                .unwrap()
-                .contains("without `audio`")
-        );
+            .expect("a string is not true or false");
+        assert_eq!(refusal.as_error()["data"]["code"], "E_INVALID_ARGS");
     }
 
     /// A stop that names no recording is refused by name, because the
@@ -337,7 +401,7 @@ mod tests {
     fn a_stop_says_which_recording_it_ends() {
         assert!(matches!(
             asked(&json!({ "state": "start" })),
-            Ok(Wanted::Start)
+            Ok(Wanted::Start(Sound::Silent))
         ));
         assert!(matches!(
             asked(&json!({ "state": "stop", "recording": 7 })),
@@ -354,8 +418,10 @@ mod tests {
     #[test]
     fn two_windows_record_and_stop_independently() {
         let mut recordings = Recordings::new();
-        let one = recordings.start(window("Calculator", 0x30)).unwrap();
-        let two = recordings.start(window("a.txt — Notepad", 0x31)).unwrap();
+        let one = recordings.start_silent(window("Calculator", 0x30)).unwrap();
+        let two = recordings
+            .start_silent(window("a.txt — Notepad", 0x31))
+            .unwrap();
         assert_ne!(landed(&one), landed(&two));
         assert!(recordings.stop(id_of(&one)).is_ok());
         assert!(recordings.stop(id_of(&one)).is_err());
@@ -374,7 +440,7 @@ mod tests {
         let landing = {
             let mut recordings = Recordings::new();
             let started = recordings
-                .start(window("a window only this test names", 0x40))
+                .start_silent(window("a window only this test names", 0x40))
                 .unwrap();
             assert_eq!(recordings.running.len(), 1);
             landed(&started)

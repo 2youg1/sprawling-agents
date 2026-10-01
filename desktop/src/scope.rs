@@ -71,6 +71,10 @@ struct ScopeFile {
     record: bool,
     #[serde(default)]
     clipboard: bool,
+    /// The one DirectShow audio device a recording may hear, as the
+    /// operator names it; absent, no recording hears anything.
+    #[serde(default)]
+    sound: Option<String>,
 }
 
 /// What the scope file permits.
@@ -85,13 +89,21 @@ pub(crate) enum Scope {
     Open(Allowance),
 }
 
-/// The four things a scope file states.
+/// The five things a scope file states.
 #[derive(Debug)]
 pub(crate) struct Allowance {
     windows: Vec<Pattern>,
     processes: Vec<Pattern>,
     record: bool,
     clipboard: bool,
+    #[cfg_attr(
+        not(any(windows, test)),
+        expect(
+            dead_code,
+            reason = "only the Windows arm records, so only it reads the device back"
+        )
+    )]
+    sound: Option<String>,
 }
 
 /// That one call cleared this scope, carrying the allowlist that
@@ -128,15 +140,24 @@ impl Admitted<'_> {
         self.allowance.visible(title, process)
     }
 
-    /// The one sound device this scope's operator named.
+    /// The one sound device this scope's operator named, which is the
+    /// only device a recording may hear (desktop-SPEC.md section 12.11).
+    ///
+    /// # Errors
+    /// `E_GATE_DENIED` when the file names none: a device nobody named is
+    /// a permission nobody gave, and this server does not choose one.
     #[cfg(any(windows, test))]
     pub(crate) fn sound(&self) -> Result<&str, Refusal> {
-        Err(Refusal::new(
-            RefusalCode::ToolUnavailable,
-            "record a window",
-            "this server does not choose a sound device",
-            "record without `audio`",
-        ))
+        self.allowance.sound.as_deref().ok_or_else(|| {
+            Refusal::new(
+                RefusalCode::GateDenied,
+                "record a window",
+                "this scope names no sound device, and this server does not choose one",
+                "name the device in DESKTOP.toml as `sound = \"<device>\"`; `ffmpeg \
+                 -hide_banner -list_devices true -f dshow -i dummy` lists the names this \
+                 machine has",
+            )
+        })
     }
 }
 
@@ -173,6 +194,7 @@ impl Scope {
                     .collect(),
                 record: file.record,
                 clipboard: file.clipboard,
+                sound: file.sound,
             }),
             Err(err) => Scope::Closed {
                 code: RefusalCode::ConfigInvalid,

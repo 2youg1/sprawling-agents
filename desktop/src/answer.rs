@@ -7,10 +7,11 @@
 //!
 //! MCP gives a tool's answer one shape, `CallToolResult`: an array of
 //! content blocks. The facts of an answer travel as one text block
-//! holding their JSON on one line, and a picture travels as an image
-//! block, so a model that reads images sees the picture rather than a
-//! page of base64 (desktop-SPEC.md section 12.2). The base64 is written
-//! here and nowhere else.
+//! holding their JSON on one line, a picture travels as an image block,
+//! so a model that reads images sees the picture rather than a page of
+//! base64 (desktop-SPEC.md section 12.2), and a recording's sound
+//! travels as an audio block the city stores (section 12.13). The
+//! base64 is written here and nowhere else.
 
 use base64::Engine as _;
 use serde_json::{Value, json};
@@ -33,6 +34,7 @@ pub(crate) struct Answer {
 enum Block {
     Text(String),
     Image { bytes: Vec<u8>, mime: &'static str },
+    Sound { bytes: Vec<u8>, mime: &'static str },
 }
 
 impl Answer {
@@ -82,7 +84,9 @@ impl Answer {
         }
     }
 
-    /// A recording's sound, then the facts about the recording.
+    /// A recording's sound, then the facts about the recording: the
+    /// same order a picture takes, so the city reads both answers one
+    /// way (desktop-SPEC.md section 12.13).
     #[cfg_attr(
         not(any(windows, test)),
         expect(
@@ -90,8 +94,10 @@ impl Answer {
             reason = "the non-Windows arm refuses every call, so it builds no answer"
         )
     )]
-    pub(crate) fn sound(_bytes: Vec<u8>, _mime: &'static str, facts: &Value) -> Answer {
-        Answer::facts(facts)
+    pub(crate) fn sound(bytes: Vec<u8>, mime: &'static str, facts: &Value) -> Answer {
+        Answer {
+            blocks: vec![Block::Sound { bytes, mime }, Block::Text(facts.to_string())],
+        }
     }
 
     /// The `result` of the JSON-RPC answer.
@@ -103,6 +109,11 @@ impl Answer {
                 Block::Text(text) => json!({ "type": "text", "text": text }),
                 Block::Image { bytes, mime } => json!({
                     "type": "image",
+                    "data": base64::engine::general_purpose::STANDARD.encode(bytes),
+                    "mimeType": mime,
+                }),
+                Block::Sound { bytes, mime } => json!({
+                    "type": "audio",
                     "data": base64::engine::general_purpose::STANDARD.encode(bytes),
                     "mimeType": mime,
                 }),

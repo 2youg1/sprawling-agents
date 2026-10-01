@@ -29,6 +29,10 @@ processes = ["notepad.exe"]
 # Off unless switched on.
 record = false
 clipboard = true
+# The one sound device a recording may hear, by its DirectShow name;
+# `ffmpeg -hide_banner -list_devices true -f dshow -i dummy` lists them.
+# Absent, a recording that asks for sound is refused.
+sound = "Microphone (USB Audio)"
 ```
 
 Four rules follow from it, and each one is a refusal a caller can act on:
@@ -36,6 +40,7 @@ Four rules follow from it, and each one is a refusal a caller can act on:
 - A tool that touches one window has to name that window, by `title` or by `process`, and what it names has to be on the list.
 - **A capture of the whole screen is refused.** The file lists windows, so a full-screen image would show everything it left out. Name a window instead.
 - `desktop.record` needs `record = true`; `desktop.clipboard` needs `clipboard = true`.
+- `desktop.record` with `audio: true` hears the device `sound` names and no other; this server never picks one. Its `stop` answers with the sound as an audio block, which the city stores and names by its content address.
 - `desktop.windows` reports only the windows the file lists, so it is how a caller learns what it may name.
 
 ## How a city starts it

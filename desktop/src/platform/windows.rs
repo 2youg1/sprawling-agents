@@ -106,7 +106,7 @@ impl Desk {
             ToolName::Snapshot => self.snapshot(arguments),
             ToolName::Act => self.act(arguments).map(|facts| Answer::facts(&facts)),
             ToolName::Screenshot => screenshot(arguments),
-            ToolName::Record => self.record(arguments).map(|facts| Answer::facts(&facts)),
+            ToolName::Record => self.record(arguments, admitted),
             ToolName::Clipboard => use_clipboard(arguments).map(|facts| Answer::facts(&facts)),
         }
     }
@@ -258,9 +258,21 @@ impl Desk {
     /// Only a start resolves a window. A stop names the recording by
     /// the id it was given, so it still ends a recording whose window
     /// has since retitled itself out of every list this server reads.
-    fn record(&mut self, arguments: &Value) -> Result<Value, Refusal> {
+    ///
+    /// Sound is the scope's to permit: a start that asks for it hears the
+    /// one device the scope file names, or is refused at the gate before
+    /// any window is looked up.
+    fn record(&mut self, arguments: &Value, admitted: &Admitted<'_>) -> Result<Answer, Refusal> {
         match record::asked(arguments)? {
-            record::Wanted::Start => self.recordings.start(resolved(arguments)?),
+            record::Wanted::Start(sound) => {
+                let device = match sound {
+                    record::Sound::Silent => None,
+                    record::Sound::Asked => Some(admitted.sound()?),
+                };
+                self.recordings
+                    .start(resolved(arguments)?, device)
+                    .map(|facts| Answer::facts(&facts))
+            }
             record::Wanted::Stop(id) => self.recordings.stop(id),
         }
     }

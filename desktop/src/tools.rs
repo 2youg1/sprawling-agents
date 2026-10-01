@@ -229,8 +229,10 @@ pub(crate) fn table() -> Vec<ToolCard> {
                  a `recording` id, and `stop` takes that id back, because a window's title can \
                  change while it is being recorded; it also says how many frames were written, \
                  and why, if the recording ended before it was stopped. The scope file has to \
-                 switch recording on. A recording ends itself after ten minutes. It does not \
-                 edit, transcode or upload anything, and it does not record sound."
+                 switch recording on. With `audio`, it also records the one sound device the \
+                 scope file names, and `stop` answers with that sound. A recording ends itself \
+                 after ten minutes. It does not edit, transcode or upload anything, and it does \
+                 not choose a sound device."
                 .to_owned(),
             schema: json!({
                 "type": "object",
@@ -240,6 +242,10 @@ pub(crate) fn table() -> Vec<ToolCard> {
                         "type": "integer",
                         "minimum": 1,
                         "description": "which recording `stop` ends, as `start` reported it",
+                    },
+                    "audio": {
+                        "type": "boolean",
+                        "description": "whether `start` also records the sound device the scope file names",
                     },
                 })),
                 "required": ["state"],
