@@ -5,7 +5,7 @@
 
 //! Wiring gate: every verb on the wire is reachable from the side that is
 //! supposed to reach it, and no other side pretends it is
-//! (wire-SPEC.md section 19).
+//! (crates/wire/Spec.lean section 19).
 //!
 //! **Both directions have failed here, and they fail differently.**
 //!
@@ -28,14 +28,16 @@
 //! **Three sources, no copies.** The variants come from the real `enum
 //! Command` parsed out of whichever `wire` module declares it; whether
 //! the city can perform one comes from `accounting::worker::run_command`'s arms;
-//! whether a person can ask for one comes from `client/src`. The SPEC
-//! contributes the one fact none of the three can state - which side is
-//! *supposed* to reach it - and the gate reads it as data, so "the table
+//! whether a person can ask for one comes from `client/src`. The
+//! specification contributes the one fact none of the three can state -
+//! which side is *supposed* to reach it - as the arms of
+//! `def Command.reach`, and the gate reads them as data, so "the table
 //! drifted" and "the enum grew silently" are the same red.
 //!
 //! The same table carries a second fact, the class of verb a frame is
-//! when a remote device sends it; `class` reads it beside the relay's
-//! own match (wire-SPEC.md section 19-2).
+//! when a remote device sends it, as the arms of `def Command.verbClass`;
+//! `class` reads it beside the relay's own match (crates/wire/Spec.lean
+//! section 19-2).
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -43,11 +45,11 @@ use std::path::Path;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-const SPEC: &str = "crates/wire/wire-SPEC.md";
-/// The wire crate's directory, where `Spec.lean` decides whether the
-/// reach table is read from `SPEC` or from the Lean specification
-/// (tools/xtask/Spec.lean §8-43).
+/// The wire crate's directory, whose Lean specification holds the reach
+/// and class tables (tools/xtask/Spec.lean §8-43).
 const WIRE_CRATE: &str = "crates/wire";
+/// Where a reader is sent to change a row.
+const TABLE: &str = "`def Command.reach` (crates/wire/Spec.lean section 19-2)";
 const WIRE_DIR: &str = "crates/wire/src";
 /// The package the city's one writer lives in, whose `src` is searched.
 /// A package rather than a file: the gate wants the declaration of
@@ -96,13 +98,14 @@ mod reading;
 
 use reading::{declared, variants};
 
-fn violation(rule: &str, subject: String, alternative: &str) -> Violation {
+/// A finding at `location`, the Lean file that holds the arm it is about.
+fn violation(location: &str, rule: &str, subject: String, alternative: String) -> Violation {
     Violation {
         gate: "wiring",
-        location: SPEC.to_owned(),
+        location: location.to_owned(),
         rule: rule.to_owned(),
         violation: subject,
-        alternative: alternative.to_owned(),
+        alternative,
     }
 }
 
@@ -218,17 +221,21 @@ fn emitted(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError> 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let all = variants(root, "Command")?;
     let table = declared(root)?;
+    let at = table.path.as_str();
     let performed = performed(root, &all)?;
     let emitted = emitted(root, &all)?;
     let mut violations = class::judged(&all, &class::stated(root)?, &class::coded(root)?);
 
     for name in &all {
-        let Some(reach) = table.get(name) else {
+        let Some(reach) = table.rows.get(name) else {
             violations.push(violation(
+                at,
                 "every Command states which side reaches it",
                 format!("`{name}` is on the wire and absent from the reach table"),
-                "add a row to wire-SPEC.md section 19-2: a verb nobody classified is a \
-                 verb nobody decided to expose",
+                format!(
+                    "add an arm to {TABLE}: a verb nobody classified is a verb nobody decided \
+                     to expose"
+                ),
             ));
             continue;
         };
@@ -236,39 +243,48 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         let built = performed.contains(name);
         match reach {
             Reach::Client if drawn && !built => violations.push(violation(
+                at,
                 "a control the client draws is a verb the city can carry out",
                 format!("`{name}` is drawn and answered with `not_built`"),
                 "take the control out until the executor exists: a refusal is what the city \
-                 owes a peer that asks anyway, not a substitute for the button being gone",
+                 owes a peer that asks anyway, not a substitute for the button being gone"
+                    .to_owned(),
             )),
             Reach::Client if !drawn && built => violations.push(violation(
+                at,
                 "a verb the city can carry out is reachable from the client",
                 format!("`{name}` is built and no control reaches it"),
-                "draw the control, or change its reach in wire-SPEC.md section 19-2 and \
-                 say why a person may not ask for it. A capability nobody can reach draws no \
-                 complaint, because nobody fails to press a button that is not there",
+                format!(
+                    "draw the control, or change its arm in {TABLE} and say why a person may \
+                     not ask for it. A capability nobody can reach draws no complaint, because \
+                     nobody fails to press a button that is not there"
+                ),
             )),
             Reach::Sealed if drawn => violations.push(violation(
+                at,
                 "a sealed verb has no byte form, so no client may spell it",
                 format!("`{name}` is sealed and the client names it"),
                 "a credential reaches the vault in process; entering one remotely is meant to \
-                 be unspellable",
+                 be unspellable"
+                    .to_owned(),
             )),
             Reach::Push | Reach::Handshake if drawn => violations.push(violation(
+                at,
                 "a verb that arrives from outside is not a control",
                 format!("`{name}` arrives by push or handshake and the client draws it"),
-                "remove the control, or reclassify it in wire-SPEC.md section 19-2",
+                format!("remove the control, or change its arm in {TABLE}"),
             )),
             _ => {}
         }
     }
 
     let known: BTreeSet<&String> = all.iter().collect();
-    for named in table.keys().filter(|name| !known.contains(name)) {
+    for named in table.rows.keys().filter(|name| !known.contains(name)) {
         violations.push(violation(
+            at,
             "the reach table names verbs that are on the wire",
             format!("`{named}` is classified and is not a Command"),
-            "delete the row: it survived the verb it described",
+            "delete the arm and its constructor: they survived the verb they described".to_owned(),
         ));
     }
     Ok(violations)
@@ -312,8 +328,8 @@ mod tests {
     fn the_reach_table_and_the_enum_are_the_same_list() {
         let root = root();
         let all: BTreeSet<String> = variants(&root, "Command").unwrap().into_iter().collect();
-        let table: BTreeSet<String> = declared(&root).unwrap().into_keys().collect();
-        assert_eq!(all, table, "the enum and wire-SPEC section 19-2 disagree");
+        let table: BTreeSet<String> = declared(&root).unwrap().rows.into_keys().collect();
+        assert_eq!(all, table, "the enum and `def Command.reach` disagree");
     }
 
     #[test]
@@ -322,14 +338,15 @@ mod tests {
         assert!(Reach::parse("push").is_some());
         assert!(Reach::parse("handshake").is_some());
         assert!(Reach::parse("sealed").is_some());
-        // Another table in the same document, with a backticked first
-        // column, must not be read as verbs.
+        // An arm that answers anything else is not a reach, and the
+        // reader refuses it rather than skip the verb.
         assert!(Reach::parse("value").is_none());
         assert!(Reach::parse("").is_none());
     }
 
-    /// Once the wire crate has a `Spec.lean`, the reach of each verb is an
-    /// arm of its `def Command.reach` (tools/xtask/Spec.lean §8-43).
+    /// The reach of each verb is an arm of `def Command.reach`, and a
+    /// finding about one is located at the file that holds the arms
+    /// (tools/xtask/Spec.lean §8-43).
     #[test]
     fn a_migrated_wire_specification_answers_the_reach_of_each_verb() {
         let root = crate::root::fixture::relocated("wiring-lean");
@@ -342,11 +359,15 @@ mod tests {
         let read = declared(&root);
         std::fs::remove_dir_all(&root).unwrap();
         assert_eq!(
-            read.map_err(|err| err.to_string()),
-            Ok(std::collections::BTreeMap::from([
-                ("Hello".to_owned(), Reach::Handshake),
-                ("Pursue".to_owned(), Reach::Client),
-            ]))
+            read.map(|table| (table.path, table.rows))
+                .map_err(|err| err.to_string()),
+            Ok((
+                "crates/wire/Spec.lean".to_owned(),
+                std::collections::BTreeMap::from([
+                    ("Hello".to_owned(), Reach::Handshake),
+                    ("Pursue".to_owned(), Reach::Client),
+                ])
+            ))
         );
     }
 }

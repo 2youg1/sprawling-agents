@@ -36,7 +36,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 | guard | 唯一一张自己的 lint 表（`crates/desktop/ffi` 的）与根 `[workspace.lints]` 逐键相等，例外只在 `RECORDED`；其余每个成员都继承根表（§8-46）；工作区自己的包在 `[workspace.dependencies]` 里各钉 `=` 加工作区版本（§8-49） |
 | wording | 读者拿到的词出自短语表 `client/src/lang.json`：`.svelte` 标记里文本节点与朗读型属性的字面量（`wording::markup`），`.ts` 里拒绝各段的实参（`wording::refusal`，§8-24），去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名；生成的文件由它的生成器作证 |
 | render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17 与 §8-38 |
-| wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
+| wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire 的规格（`crates/wire/Spec.lean` §19-2 的 `def Command.reach`）只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | secret | 全仓加夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
 | specalign | kernel 枚举 ↔ kernel 的规格逐 variant（读 `crates/kernel/Spec.lean` 与分部里的受限形状，§8-43）：§8-1／§8-4 两张表消费真 enum（`AxCode::ALL`／`EventKind::ALL`）作证，归属、carrier／窗类逐臂同；规格里每一个与 kernel 枚举同名的 `inductive` 与 syn 解出的枚举双向对账（§8-10、§8-43）；模块图每一行的 `spec` 锚点落在盘上，已迁移的包写 Lean 模块名（§8-43） |
 | spec | 一个包恰有一份生效规格；散文里点名的 `<名>-SPEC` 在树上；Lean 的 import 纪律；`.lean` 里没有 `sorry`、`admit`、`axiom`；规格引用的仓内路径在盘上（§8-42） |
@@ -965,7 +965,7 @@ pub(crate) fn dotted(dir: &str) -> String;                       // crates/x →
 - **锚点**：已迁移的包，`architecture.toml` 里它的每一行写规定它的那个 Lean 模块名：`spec = "crates.browser.spec.Act"`，入口自己规定时写 `crates.browser.Spec`。`specalign` 判三件事：模块名换成的路径在盘上；那个文件在持有这一行文件的包的目录里（一行引的是它自己那个包的规格）；包迁没迁与锚点的写法一致——已迁移的包写 `-SPEC.md#…`、未迁移的包写 Lean 模块名，各是一条违规。未迁移的包照 §8-10 判。
 - **范围**：锚点来自 `modmap::anchors`，它判除本门所在包之外的每个包（D9），所以 citysim 的行也判。
 - **kernel 的两张表**（kernel 迁移之后）：kernel 的规格里写 `inductive AxCode where` 与 `def AxCode.carrier : AxCode → Carrier`，每一臂 `| .ConfigInvalid => .Loadtime` 或 `| .Timeout => .Event .ToolResult`；`inductive EventKind where` 与 `def EventKind.windowClass : EventKind → WindowClass`，每一臂的右边是 `.InWindow` 或 `.RecordOnly`。构造子名就是 Rust 的变体名，右边也一样：`Carrier` 与 `WindowClass` 在 kernel 里同样是枚举，规格里与它们同名的 `inductive` 照下一句双向对账，所以右边若写 `.loadtime`、`.inWindow` 这样的另一种拼法，同一份规格就过不了自己的名单。门把 carrier 与窗类逐臂与 `AxCode::ALL`、`EventKind::ALL` 对账，两侧的名单双向比；§8-10 的第四条改为：kernel 规格里每一个与 kernel 枚举同名的 `inductive` 都双向对账。Lean 的 `inductive` 没有省略的写法，所以没有「指路牌」这一类跳过。
-- **wire 的 reach**（wire 迁移之后）：`def Command.reach : Command → Reach`，每一臂 `| .Pursue => .client`，右边是 `.client`、`.push`、`.handshake`、`.sealed` 之一。`wiring` 读这些臂，代替 wire-SPEC §19-2 的表。
+- **wire 的 reach**：`crates/wire/spec/Command/Kind.lean` 的 `def Command.reach : Command → Reach`，每一臂 `| .Pursue => .client`，右边是 `.client`、`.push`、`.handshake`、`.sealed` 之一。`wiring` 读这些臂，违规定位在写着这些臂的那个文件；wire 的目录里没有 `Spec.lean`、或任何一个文件都没有这个 `def` 时以 `Doc` 拒判，因为什么都没读到的门会放过每一个动词。
 - **受限的形状**：一行一个构造子或一臂；空行与注释行跳过；第一行既不以 `|` 开头、也不是空的，就结束这一块（`deriving` 行也是）。块不在、或一臂的右边不是认得的值，门以 `Doc` 判不动，而不是把缺的当成空的判绿。
 - **扫 `.lean` 的四道门**：`docnum` 扫 `.md` 与 `.lean`；`lexicon` 扫 `.md`、`.rs` 与 `.lean`；`release` 把一份 `.lean` 整份当散文读（规格里的代码是模型，其中的路径都是引用，没有城里的地址），`.lean` 进 `CITED_EXTENSIONS`；`proof` 的不证理由含 `.md` 或 `.lean` 都算点名了一份文档。
 - **`check-branch`**：分支的 diff 里有 `.lean`，或有 Lean 包的三个文件（`lakefile.toml`、`lean-toolchain`、`lake-manifest.json`）时，多跑一步 `just models`。`members --owning` 早已略过 `.lean`，所以改 Lean 不会选中 Rust 测试。
@@ -1009,22 +1009,22 @@ D10 **截图矩阵是给人看的产物，不是门。** `cargo xtask shots`（�
 
 ```rust
 enum Class { Read, Act, LocalOnly }                                         // 拼法同 remote_access::door::VerbClass
-fn stated(root: &Path) -> Result<BTreeMap<String, Option<Class>>, XtaskError>;   // 表的第三格；Lean 时读 def Command.verbClass
+fn stated(root: &Path) -> Result<Stated, XtaskError>;   // def Command.verbClass 的每一臂，与写着它们的文件
 fn coded(root: &Path) -> Result<BTreeMap<String, Class>, XtaskError>;            // sprawling 包里 fn command_class 的每一臂
-fn judged(all: &[String], stated: &…, coded: &…) -> Vec<Violation>;
+fn judged(all: &[String], stated: &Stated, coded: &…) -> Vec<Violation>;
 ```
 
-- **表说给读者，匹配说给设备**：wire-SPEC §19-2 的 `class` 列是远程设备的一帧属于哪一类的陈述，`bin::outside::verbs::command_class` 是中继据以放行的穷尽匹配（wire-SPEC §8-65）。两者谁也推不出谁，门把两者逐个动词对照，`wiring` 的同一次运行里报出。
-- **缺格点名那一行**：表里的一行只写了 reach、没写 class（第三格读不成 `Read`／`Act`／`LocalOnly` 之一），违规写「the row for `<动词>` … has no class」，替代办法是写 `LocalOnly`，除非人决定了城外的设备可以做它。新加 Command 的车道照旧格式加行而不写这一格时，就是这一条红。
+- **表说给读者，匹配说给设备**：`crates/wire/Spec.lean` §19-2 的 `class` 列是远程设备的一帧属于哪一类的陈述，`bin::outside::verbs::command_class` 是中继据以放行的穷尽匹配（`crates/wire/Spec.lean` §8-65）。两者谁也推不出谁，门把两者逐个动词对照，`wiring` 的同一次运行里报出。
+- **缺臂点名那个动词**：一个动词在 `def Command.verbClass` 里没有一臂，或那一臂的右侧读不成 `.Read`／`.Act`／`.LocalOnly` 之一，违规写「`<动词>` has no class in `def Command.verbClass` …」，替代办法是写 `.LocalOnly`，除非人决定了城外的设备可以做它。Lean 对漏了构造子的 `def` 编不过，可门不跑 Lean，所以这一条在门里同样判。整个 `def` 都不在时每个动词各报一条，定位在 wire 的 `Spec.lean`。
 - **两边说法不一点名动词与两个值**：「`<动词>` is <表的值> in the table and <匹配的值> in `command_class`」。
 - **匹配按文本读**：从 `fn command_class` 读到函数结束，每个 `Command::<动词>` 归到它后面第一个 `=> VerbClass::<值>`。函数按包找（`members` 的 `sprawling`），与 `performed` 按包找 `run_command` 同一个理由：拆文件不让门读空。找不到这个函数以 `Doc` 拒判。
-- wire 的规格迁成 Lean 后，`class` 写成 `def Command.verbClass` 的一臂一行，右侧是 `.read`／`.act`／`.localOnly`；读法与 reach 的 `def Command.reach` 相同（§8-43）。
+- `class` 写成 `def Command.verbClass` 的一臂一行，右侧是 `.Read`／`.Act`／`.LocalOnly`，与 `remote_access::door::VerbClass` 和中继匹配里的 `VerbClass::<值>` 同一个拼写（D8：门比的是同一个拼写，小写的写法不再收）；读法与 reach 的 `def Command.reach` 相同（§8-43），违规定位在写着这些臂的文件。
 
-**测试**：`wiring::class::tests::a_row_with_no_class_cell_is_named_by_its_verb`：夹具表里一行缺 class、一行与夹具匹配说法不一，两条违规按动词点名。
+**测试**：`wiring::class::tests::a_verb_whose_class_arm_is_not_a_class_is_named_by_its_verb`：夹具的 `def Command.verbClass` 里一臂用小写拼写、一臂与夹具匹配说法不一，两条违规按动词点名，都定位在夹具的 `Spec.lean`。
 
 **本节属门禁机具，与产品代码分开提交。**
 
-D11 **动词类由表与中继的匹配各写一次，门对照两者。** `wiring` 读 §19-2 的 `class` 列，也读 `sprawling` 包里 `command_class` 的每一臂，逐个动词比（§8-45）。理由：表是人读到并决定的地方，匹配是设备真正碰到的地方，两者都要；只有一处时，要么决定藏在代码里没人读，要么二进制要在启动时解析一份 Markdown 来授权。按文本读匹配而不是用 `syn` 解析：门要的只是「哪个动词归哪个值」，臂的形状由穷尽匹配自己守着，`syn` 的模式树在大版本之间换形，门不该为一张两列的对照表跟着它走。被击败的备选：①只判表里每行都有 class，不读代码——表与中继各自漂开时没有红；②在 wire 里给 `Command` 加 `class()` 再让门读它——wire 要么依赖 `remote_access`，要么另立一个同值的枚举（wire-SPEC §12.6）。重开参数：`command_class` 的臂长出守卫条件（同一个动词按参数分两类）时，文本读法不够，改用 `syn`。
+D11 **动词类由表与中继的匹配各写一次，门对照两者。** `wiring` 读 §19-2 的 `class` 列，也读 `sprawling` 包里 `command_class` 的每一臂，逐个动词比（§8-45）。理由：表是人读到并决定的地方，匹配是设备真正碰到的地方，两者都要；只有一处时，要么决定藏在代码里没人读，要么二进制要在启动时解析一份 Markdown 来授权。按文本读匹配而不是用 `syn` 解析：门要的只是「哪个动词归哪个值」，臂的形状由穷尽匹配自己守着，`syn` 的模式树在大版本之间换形，门不该为一张两列的对照表跟着它走。被击败的备选：①只判表里每行都有 class，不读代码——表与中继各自漂开时没有红；②在 wire 里给 `Command` 加 `class()` 再让门读它——wire 要么依赖 `remote_access`，要么另立一个同值的枚举（wire D6）。重开参数：`command_class` 的臂长出守卫条件（同一个动词按参数分两类）时，文本读法不够，改用 `syn`。
 -/
 
 /-! ### 8-46 `guard::wall` 判唯一一张自己的 lint 表（形状 1 判定）

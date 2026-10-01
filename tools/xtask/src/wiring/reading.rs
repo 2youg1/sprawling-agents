@@ -5,21 +5,28 @@
 
 //! Reading the two declarations this gate compares.
 //!
-//! One is Rust and one is a Markdown table, and neither is written for
-//! a machine to read; both readers therefore fail loudly rather than
-//! return an empty list, because a gate that silently reads nothing
-//! passes everything.
+//! One is Rust and one is a Lean `def` read as text, and neither is
+//! written for a machine to read; both readers therefore fail loudly
+//! rather than return an empty list, because a gate that silently reads
+//! nothing passes everything.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use super::{Reach, SPEC, WIRE_CRATE, WIRE_DIR};
+use super::{Reach, WIRE_CRATE, WIRE_DIR};
 use crate::lean;
 use crate::report::XtaskError;
 use crate::walk;
 
-/// The `def` a migrated wire specification writes the reach table as.
+/// The `def` the wire specification writes the reach table as.
 const REACH: &str = "Command.reach";
+
+/// The reach table: the reach of each verb, and the Lean file whose arms
+/// state it, where a finding about one of them is located.
+pub(super) struct ReachTable {
+    pub(super) path: String,
+    pub(super) rows: BTreeMap<String, Reach>,
+}
 
 /// The variants of an enum, read out of the source that declares it.
 ///
@@ -71,14 +78,30 @@ pub(super) fn variants(root: &Path, enum_name: &str) -> Result<Vec<String>, Xtas
     })
 }
 
-/// What the SPEC's reach table says, variant by variant: the arms of
-/// `def Command.reach` once the wire crate's specification is Lean, the
-/// Markdown table until then.
-pub(super) fn declared(root: &Path) -> Result<BTreeMap<String, Reach>, XtaskError> {
-    match lean::specification(root, WIRE_CRATE)? {
-        Some(sources) => lean_reach(&sources),
-        None => markdown_reach(root),
-    }
+/// What the wire specification's reach table says, variant by variant:
+/// the arms of `def Command.reach`.
+///
+/// # Errors
+/// When the wire crate has no Lean specification, which leaves every verb
+/// unclassified.
+pub(super) fn declared(root: &Path) -> Result<ReachTable, XtaskError> {
+    let sources = specification(root)?;
+    lean_reach(&sources)
+}
+
+/// The wire crate's Lean specification, its entry and every part.
+///
+/// # Errors
+/// When the crate has no `Spec.lean`, or a file of it cannot be read.
+pub(super) fn specification(root: &Path) -> Result<Vec<lean::Source>, XtaskError> {
+    lean::specification(root, WIRE_CRATE)?.ok_or_else(|| XtaskError::Doc {
+        file: WIRE_CRATE.to_owned(),
+        msg: format!(
+            "no {} here, and the reach and class of every verb are arms of it; restore the \
+             wire crate's specification",
+            lean::ENTRY
+        ),
+    })
 }
 
 /// The arms of `def Command.reach`, each right-hand side one of the four
@@ -87,7 +110,7 @@ pub(super) fn declared(root: &Path) -> Result<BTreeMap<String, Reach>, XtaskErro
 /// # Errors
 /// When no file holds the `def`, or an arm answers something that is not
 /// a reach: either would otherwise pass every verb unclassified.
-fn lean_reach(sources: &[lean::Source]) -> Result<BTreeMap<String, Reach>, XtaskError> {
+fn lean_reach(sources: &[lean::Source]) -> Result<ReachTable, XtaskError> {
     let (path, table) = sources
         .iter()
         .find_map(|source| {
@@ -100,7 +123,7 @@ fn lean_reach(sources: &[lean::Source]) -> Result<BTreeMap<String, Reach>, Xtask
                  so every verb has a reach"
             ),
         })?;
-    table
+    let rows = table
         .arms
         .into_iter()
         .map(|arm| {
@@ -118,41 +141,9 @@ fn lean_reach(sources: &[lean::Source]) -> Result<BTreeMap<String, Reach>, Xtask
                 })?;
             Ok((arm.pattern, reach))
         })
-        .collect()
-}
-
-/// The reach table of the Markdown SPEC.
-fn markdown_reach(root: &Path) -> Result<BTreeMap<String, Reach>, XtaskError> {
-    let text = walk::read_text(&root.join(SPEC))?;
-    let mut out = BTreeMap::new();
-    for line in text.lines() {
-        let Some(cells) = cells(line) else {
-            continue;
-        };
-        let (Some(first), Some(second)) = (cells.first(), cells.get(1)) else {
-            continue;
-        };
-        let Some(name) = first.strip_prefix('`').and_then(|c| c.strip_suffix('`')) else {
-            continue;
-        };
-        // A row whose reach cell is not one of the four is not a reach
-        // row: the same document holds other tables with a backticked
-        // first column, and reading them would invent verbs.
-        let Some(reach) = Reach::parse(second) else {
-            continue;
-        };
-        out.insert(name.to_owned(), reach);
-    }
-    Ok(out)
-}
-
-pub(super) fn cells(line: &str) -> Option<Vec<String>> {
-    let trimmed = line.trim();
-    let inner = trimmed.strip_prefix('|')?.strip_suffix('|')?;
-    Some(
-        inner
-            .split('|')
-            .map(|cell| cell.trim().to_owned())
-            .collect(),
-    )
+        .collect::<Result<_, XtaskError>>()?;
+    Ok(ReachTable {
+        path: path.clone(),
+        rows,
+    })
 }

@@ -5,7 +5,7 @@
 
 //! `cargo xtask wire-ts [--write]`: the TypeScript client's wire types,
 //! generated from the Rust wire so both ends of the socket have one
-//! authority (wire-SPEC.md section 8-16).
+//! authority (crates/wire/Spec.lean section 8-16).
 //!
 //! Without `--write` this is a comparison: the file on disk against the
 //! text the wire produces now, refused at the first line that differs.

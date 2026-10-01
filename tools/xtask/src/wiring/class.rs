@@ -4,25 +4,26 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The class column: which class of verb each Command is when a remote
-//! device sends it (wire-SPEC.md section 19-2, tools/xtask/Spec.lean
-//! §8-45).
+//! device sends it (crates/wire/Spec.lean section 19-2,
+//! tools/xtask/Spec.lean §8-45).
 //!
-//! **Two sources, one decision.** The SPEC's table states each verb's
-//! class, and the relay decides it with an exhaustive match,
-//! `command_class` in the binary's package. Neither can be derived from
-//! the other: the table is what a reader is told, the match is what a
-//! device meets. The gate reads both and says where they part, so the
-//! table cannot drift from the relay without a red.
+//! **Two sources, one decision.** The arms of `def Command.verbClass` in
+//! the wire specification state each verb's class, and the relay decides
+//! it with an exhaustive match, `command_class` in the binary's package.
+//! Neither can be derived from the other: the table is what a reader is
+//! told, the match is what a device meets. The gate reads both and says
+//! where they part, so the table cannot drift from the relay without a
+//! red.
 //!
-//! A row with no class cell is named by its verb. That is the shape a
-//! row takes when a change adds a Command and writes its reach without
-//! deciding what a remote device may do with it, and the decision the
-//! table records for every new Command is `LocalOnly`.
+//! A verb with no class arm is named by its verb. Lean refuses to build a
+//! `def` that leaves out a constructor, but the gate runs without Lean,
+//! so the same finding is made here; the decision the table records for
+//! every new Command is `LocalOnly`.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use super::{SPEC, WIRE_CRATE, violation};
+use super::{WIRE_CRATE, violation};
 use crate::lean;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
@@ -31,7 +32,7 @@ use crate::walk;
 const RELAY: &str = "sprawling";
 /// The function whose arms are the relay's classes.
 const CLASSIFIER: &str = "fn command_class";
-/// The `def` a migrated wire specification writes the class column as.
+/// The `def` the wire specification writes the class column as.
 const CLASS_DEF: &str = "Command.verbClass";
 
 /// The three classes, spelled as `remote_access::door::VerbClass` spells
@@ -44,55 +45,50 @@ pub(super) enum Class {
 }
 
 impl Class {
-    fn parse(cell: &str) -> Option<Self> {
-        match cell.trim().trim_matches('`') {
-            "Read" | "read" => Some(Self::Read),
-            "Act" | "act" => Some(Self::Act),
-            "LocalOnly" | "localOnly" => Some(Self::LocalOnly),
+    /// One spelling, the Rust one, on both sides (tools/xtask/Spec.lean
+    /// §8-43): the relay's `VerbClass::Act` and the table's `.Act`.
+    fn parse(word: &str) -> Option<Self> {
+        match word {
+            "Read" => Some(Self::Read),
+            "Act" => Some(Self::Act),
+            "LocalOnly" => Some(Self::LocalOnly),
             _ => None,
         }
     }
 }
 
-/// What the SPEC states, verb by verb: its class, or `None` for a row
-/// whose class cell is missing or is not a class.
-pub(super) fn stated(root: &Path) -> Result<BTreeMap<String, Option<Class>>, XtaskError> {
-    match lean::specification(root, WIRE_CRATE)? {
-        Some(sources) => Ok(sources
-            .iter()
-            .find_map(|source| lean::arms(&lean::code(&source.text), CLASS_DEF))
-            .map(|table| {
-                table
+/// What the wire specification states, verb by verb, and the Lean file
+/// that states it.
+pub(super) struct Stated {
+    pub(super) path: String,
+    /// Each verb's class, or `None` for an arm that answers something that
+    /// is not a class.
+    pub(super) classes: BTreeMap<String, Option<Class>>,
+}
+
+/// The arms of `def Command.verbClass`. With no such `def` every verb is
+/// unclassified, and the findings are located at the entry.
+pub(super) fn stated(root: &Path) -> Result<Stated, XtaskError> {
+    let sources = super::reading::specification(root)?;
+    Ok(sources
+        .iter()
+        .find_map(|source| {
+            lean::arms(&lean::code(&source.text), CLASS_DEF).map(|table| Stated {
+                path: source.path.clone(),
+                classes: table
                     .arms
                     .into_iter()
                     .map(|arm| {
                         let class = arm.value.strip_prefix('.').and_then(Class::parse);
                         (arm.pattern, class)
                     })
-                    .collect()
+                    .collect(),
             })
-            .unwrap_or_default()),
-        None => Ok(markdown(&walk::read_text(&root.join(SPEC))?)),
-    }
-}
-
-/// The reach rows of the Markdown table, each with its third cell read
-/// as a class.
-fn markdown(text: &str) -> BTreeMap<String, Option<Class>> {
-    text.lines()
-        .filter_map(super::reading::cells)
-        .filter_map(|cells| {
-            let name = cells
-                .first()?
-                .strip_prefix('`')
-                .and_then(|cell| cell.strip_suffix('`'))?
-                .to_owned();
-            // A reach row and nothing else: the document holds other
-            // tables with a backticked first column.
-            super::Reach::parse(cells.get(1)?)?;
-            Some((name, cells.get(2).and_then(|cell| Class::parse(cell))))
         })
-        .collect()
+        .unwrap_or_else(|| Stated {
+            path: format!("{WIRE_CRATE}/{}", lean::ENTRY),
+            classes: BTreeMap::new(),
+        }))
 }
 
 /// What the relay's match decides, verb by verb.
@@ -145,23 +141,30 @@ fn arms(body: &str) -> BTreeMap<String, Class> {
 /// disagrees with the relay.
 pub(super) fn judged(
     all: &[String],
-    stated: &BTreeMap<String, Option<Class>>,
+    stated: &Stated,
     coded: &BTreeMap<String, Class>,
 ) -> Vec<Violation> {
     let mut out = Vec::new();
     for name in all {
-        match (stated.get(name).copied().flatten(), coded.get(name)) {
+        match (stated.classes.get(name).copied().flatten(), coded.get(name)) {
             (None, _) => out.push(violation(
+                &stated.path,
                 "every Command states the class a remote device's frame carries",
-                format!("the row for `{name}` in wire-SPEC.md section 19-2 has no class"),
-                "write `LocalOnly` in its class cell unless a person decided a device away \
-                 from the machine may do it; `Act` and `Read` are decisions, not defaults",
+                format!(
+                    "`{name}` has no class in `def Command.verbClass` (crates/wire/Spec.lean \
+                     section 19-2)"
+                ),
+                "write `.LocalOnly` as its arm unless a person decided a device away from the \
+                 machine may do it; `.Act` and `.Read` are decisions, not defaults"
+                    .to_owned(),
             )),
             (Some(table), Some(relay)) if table != *relay => out.push(violation(
+                &stated.path,
                 "the class table and the relay decide one thing",
                 format!("`{name}` is {table:?} in the table and {relay:?} in `command_class`"),
                 "change whichever one is wrong: the table is what a reader is told, the match \
-                 is what a remote device meets",
+                 is what a remote device meets"
+                    .to_owned(),
             )),
             (Some(_), Some(_) | None) => {}
         }
@@ -174,18 +177,18 @@ pub(super) fn judged(
 mod tests {
     use super::*;
 
-    /// A row a change added with its reach and no class names its verb,
-    /// and a class the relay decides otherwise is named too.
+    /// An arm that answers something other than a class names its verb -
+    /// the lower-case spelling the table once allowed included - and a
+    /// class the relay decides otherwise is named too, both located at the
+    /// file that holds the arms.
     #[test]
-    fn a_row_with_no_class_cell_is_named_by_its_verb() {
+    fn a_verb_whose_class_arm_is_not_a_class_is_named_by_its_verb() {
         let root = crate::root::fixture::relocated("wiring-class");
         crate::root::fixture::write(
             &root,
-            SPEC,
-            "| Command | reach | class | 说明 |\n|---|---|---|---|\n\
-             | `Dispatch` | client | Act | work |\n\
-             | `Reveal` | client | LocalOnly | a folder |\n\
-             | `Gift` | client | a verb added without its class |\n",
+            "crates/wire/Spec.lean",
+            "def Command.verbClass : Command → VerbClass\n  | .Dispatch => .Act\n  \
+             | .Reveal => .LocalOnly\n  | .Gift => .localOnly\n",
         );
         let read = stated(&root);
         std::fs::remove_dir_all(&root).unwrap();
@@ -195,15 +198,24 @@ mod tests {
              wire::Command::Dispatch { .. } => VerbClass::Act,\n        \
              wire::Command::Reveal { .. }\n        | wire::Command::Gift(_) => VerbClass::Act,\n    }\n}\n",
         );
-        let named: Vec<String> = judged(&all, &read.unwrap(), &coded)
+        let named: Vec<(String, String)> = judged(&all, &read.unwrap(), &coded)
             .into_iter()
-            .map(|found| found.violation)
+            .map(|found| (found.location, found.violation))
             .collect();
+        let at = "crates/wire/Spec.lean".to_owned();
         assert_eq!(
             named,
             [
-                "`Reveal` is LocalOnly in the table and Act in `command_class`",
-                "the row for `Gift` in wire-SPEC.md section 19-2 has no class",
+                (
+                    at.clone(),
+                    "`Reveal` is LocalOnly in the table and Act in `command_class`".to_owned()
+                ),
+                (
+                    at,
+                    "`Gift` has no class in `def Command.verbClass` (crates/wire/Spec.lean \
+                     section 19-2)"
+                        .to_owned()
+                ),
             ]
         );
     }
