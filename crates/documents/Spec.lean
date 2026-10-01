@@ -50,7 +50,7 @@ refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「�
 |---|---|
 | CommonMark 语料 | `markdown::lowering::tests` 里迁自 `client/src/core/prose.test.ts` 的三组（列表、表与代码块相继闭合；没闭合的代码块留着它的空行；段落由空行而不由换行结束），逐块比较整棵树，块的区间切回源文就是那一块 |
 | 项目扩展语料 | `markdown::lowering::tests`：删除线、任务列表、脚注、自动链接、CJK 友好的强调、公式、前置元数据、HTML 块，各读成 D22 说的那一种节点 |
-| A4 的 Rust 一半 | `markdown::tests`：空窗口答零个块；UTF-16 的版本答 `Preview::Unsupported`；内容为空的代码块读成 `Code { text: "" }`，HTML 与公式读成带原文的 `Unsupported`，两者不同形 |
+| A4 的 Rust 一半 | `markdown::tests::an_empty_window_an_empty_block_and_an_unread_encoding_are_three_shapes`：空窗口答零个块，内容为空的代码块读成 `Code { text: "" }`，UTF-16 的版本答 `Preview::Unsupported`；`markdown::lowering::tests::what_the_grammar_reads_but_does_not_draw_keeps_its_source`：HTML、公式与前置元数据读成带原文的 `Unsupported`；几者各不同形 |
 | 预览逐窗读完 | `markdown::tests::reading_on_from_each_preview_lays_out_every_paragraph_once`：超过一窗的版本从 0 起按答复的 `span.end` 逐窗读，每一段恰好读出一次 |
 -/
 
