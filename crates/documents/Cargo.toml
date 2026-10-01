@@ -3,7 +3,10 @@ name = "sprawling-documents"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
+description = "The rules of a document a person reads and edits through a sprawling city's page: versions, characters, windows and saves."
 
 [lib]
 name = "documents"

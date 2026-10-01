@@ -3,7 +3,10 @@ name = "sprawling-runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
+description = "One run of a sprawling resident, from dispatch to freeze: turns, tools, replay and the sandbox that executes code."
 
 [lib]
 name = "runtime"

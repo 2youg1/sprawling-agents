@@ -3,7 +3,10 @@ name = "sprawling-browser"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
+description = "A browser a sprawling city drives over WebDriver BiDi, and what a model may see of a page and do to it."
 
 [lib]
 name = "browser"

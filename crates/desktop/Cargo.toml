@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
 description = "An MCP server that gives an agent eyes and hands on this Windows desktop."
 

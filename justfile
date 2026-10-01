@@ -231,11 +231,14 @@ clippy:
     cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
 # The feature combinations this repository checks: the workspace on its
-# default features, test targets included, and `wire` with `server`
-# off - which is the reason that feature exists, since it keeps the TCP
-# stack out of a wasm32 build. Code behind a feature is compiled the day
-# somebody turns that feature on, and a combination that does not build
-# is what the first person to turn it on meets.
+# default features, test targets included; `sprawling` without its
+# default features, which is the binary with no execution engine -
+# `sandbox` is a default feature, so nothing else compiles that build
+# (sprawling-SPEC.md 8-157); and `wire` with `server` off - which is the
+# reason that feature exists, since it keeps the TCP stack out of a
+# wasm32 build. Code behind a feature is compiled the day somebody turns
+# that feature on, and a combination that does not build is what the
+# first person to turn it on meets.
 #
 # This recipe is the definition of that check. `just check` runs it and
 # `ci.yml`'s clippy job calls it, so the check a person runs at their
@@ -247,10 +250,11 @@ clippy:
 # feature without declaring that feature compiles only under
 # `--all-features` - the configuration a person never builds.
 #
-# Two check-mode passes, seconds each on a warm cache; the zero-warning
+# Three check-mode passes, seconds each on a warm cache; the zero-warning
 # rule stays with `clippy`, which sees every feature at once.
 features:
     cargo check --workspace --locked --all-targets
+    cargo check -p sprawling --no-default-features --locked --all-targets
     cargo check -p sprawling-wire --no-default-features --locked
 
 # `just prereqs` names cargo-nextest; `just test-std` is the fallback.

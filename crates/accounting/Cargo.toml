@@ -3,7 +3,10 @@ name = "sprawling-accounting"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
+description = "The one writer of a sprawling city's Ledger, the views every page is answered from, and the ports it reaches outside through."
 
 [lib]
 name = "accounting"

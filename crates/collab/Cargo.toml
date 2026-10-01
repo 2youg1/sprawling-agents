@@ -3,7 +3,10 @@ name = "sprawling-collab"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
+description = "Several residents of a sprawling city working in one building without stepping on each other: plans, claims and signals."
 
 [lib]
 name = "collab"

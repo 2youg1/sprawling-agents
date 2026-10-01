@@ -3,7 +3,10 @@ name = "sprawling-city"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
+description = "The space and identity of a sprawling city: buildings, rooms, rules, configuration layers and the documents a building keeps."
 
 [lib]
 name = "city"

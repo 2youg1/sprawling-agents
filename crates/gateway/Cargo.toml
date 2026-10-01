@@ -3,7 +3,10 @@ name = "sprawling-gateway"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
+description = "Everything between a sprawling city's decision to call a model and the bytes on the wire, and the vault for its credentials."
 
 [lib]
 name = "gateway"

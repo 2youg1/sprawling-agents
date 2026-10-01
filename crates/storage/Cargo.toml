@@ -3,7 +3,10 @@ name = "sprawling-storage"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
+description = "The append-only, hash-chained Ledger of a sprawling city, its content store, checkpoints and worktrees."
 
 [lib]
 name = "storage"

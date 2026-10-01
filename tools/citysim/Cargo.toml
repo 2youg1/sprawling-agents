@@ -3,7 +3,8 @@ name = "citysim"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish.workspace = true
+# A tool of this repository, never sent to a registry.
+publish = false
 
 # The simulator is a tool of this repository, not part of the product:
 # the members reader keeps a tool out of the crate graph and the module

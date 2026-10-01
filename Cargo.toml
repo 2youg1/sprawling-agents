@@ -39,12 +39,21 @@ default-members = [
     "tools/citysim",
 ]
 
+# What every package says about itself on a registry, and the one place
+# the release version is written: `guard` holds each of the workspace's
+# own packages below to `=` this version, `xtask package` and `xtask
+# channel` read it, and the binary reports it. Every package may be
+# published unless its own manifest says `publish = false`, which the
+# two tools of this repository do (sprawling-SPEC.md 8-157).
 [workspace.package]
 version = "0.0.7"
 edition = "2024"
 license = "MPL-2.0"
 rust-version = "1.97"
-publish = false
+repository = "https://github.com/2youg1/sprawling-agents"
+homepage = "https://github.com/2youg1/sprawling-agents"
+readme = "README.md"
+publish = true
 
 [workspace.dependencies]
 thiserror = "2"

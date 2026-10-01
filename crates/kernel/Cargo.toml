@@ -3,7 +3,10 @@ name = "sprawling-kernel"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
+description = "Every decision of a sprawling city - addresses, events, gates, plans and errors - with nothing that touches a disk."
 
 [lib]
 name = "kernel"

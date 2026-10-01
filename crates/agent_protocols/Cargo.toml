@@ -3,7 +3,10 @@ name = "sprawling-agent-protocols"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
+description = "MCP out to a server, ACP in from an editor and ACP out to a harness, as a sprawling city speaks them."
 
 [lib]
 name = "agent_protocols"

@@ -3,7 +3,19 @@ name = "sprawling"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
 publish.workspace = true
+description = "Run many agents on one machine as a city: one binary, a browser client it serves, and one append-only, hash-chained Ledger."
+keywords = ["agents", "llm", "harness", "ledger", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+# What `cargo package` puts in the archive crates.io serves. Listed rather
+# than left to git, because `web-dist/` - the client bundle the build
+# script embeds (sprawling-SPEC.md 8-83) - is build output that
+# `.gitignore` names, and with no `include` cargo leaves every ignored file
+# out. Cargo adds the manifest and the lockfile itself.
+include = ["build.rs", "src/**", "web-dist/**"]
 
 [dependencies]
 accounting = { workspace = true }
@@ -52,10 +64,13 @@ toml = { workspace = true }
 win32job = { workspace = true }
 
 [features]
-# The execution engine, off by default. `AbsentSandbox` refuses tool
-# execution in three parts and its recovery says "install a build with
-# the `wasm` feature" - this is that build. Without this entry the
-# sentence named an action nobody could take.
+# The execution engine is on by default, so `cargo install sprawling`
+# builds the binary the release archives carry (sprawling-SPEC.md 8-157).
+# Without it `AbsentSandbox` refuses tool execution in three parts and
+# its recovery says "install a build with the `wasm` feature" - this is
+# that feature; `--no-default-features` is the build without it, which
+# `just features` compiles.
+default = ["sandbox"]
 sandbox = ["runtime/wasm"]
 
 [build-dependencies]
