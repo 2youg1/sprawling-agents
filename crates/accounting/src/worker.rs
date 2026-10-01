@@ -93,6 +93,7 @@ use plans::Reporter;
 use plans::held::{PlanHolders, Planning};
 pub use pool::Memory;
 use recording::Stamping;
+pub use relay::Relay;
 use rooms::{QueueTenure, RoomQueues};
 use settling::{Ending, Settling, Sweep};
 use workbench::{CITY_VERIFIER, Desks, Site, Workbench, held};

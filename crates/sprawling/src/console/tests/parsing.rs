@@ -76,12 +76,16 @@ fn plain_text_with_no_room_chosen_says_what_to_type() {
     assert_eq!(nearest, vec!["at".to_owned()]);
 }
 #[test]
-fn the_control_verbs_are_the_five_it_owns() {
+fn the_control_verbs_are_the_six_it_owns() {
     assert_eq!(parse("/help", None, key()), Line::Help);
     assert_eq!(parse("/web", None, key()), Line::OpenWeb);
     assert_eq!(parse("/serving", None, key()), Line::Serving);
     assert_eq!(parse("/quit", None, key()), Line::Quit);
     assert_eq!(parse("/at lab/room1", None, key()), Line::Select(room()));
+    assert_eq!(
+        parse("/remote close", None, key()),
+        Line::Remote(crate::outside::console::RemoteLine::Close)
+    );
 }
 #[test]
 fn a_query_with_no_arguments_is_the_bare_name() {

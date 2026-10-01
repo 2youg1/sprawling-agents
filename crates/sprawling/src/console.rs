@@ -28,6 +28,6 @@
 pub(super) mod language;
 pub(super) mod terminal;
 pub use terminal::Terminal;
-pub(crate) use terminal::{Answering, start};
+pub(crate) use terminal::{Answering, Inside, start};
 #[cfg(test)]
 mod tests;

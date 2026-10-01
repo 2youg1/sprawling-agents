@@ -90,12 +90,12 @@ fn the_screen_keeps_the_listener_half_when_the_city_does_not_answer() {
 
 /// Runs the console loop and returns every Command it posted.
 fn posted(script: &str) -> Vec<wire::Command> {
-    let desk = accounting::worker::CommandDesk::default();
+    let inside = inside();
+    let desk = &inside.desk;
     let mut out: Vec<u8> = Vec::new();
     super::super::terminal::drive(
         &terminal("127.0.0.1:8787", None),
-        &desk,
-        &answering(),
+        &inside,
         &mut std::io::Cursor::new(script.as_bytes().to_vec()),
         &mut out,
     );

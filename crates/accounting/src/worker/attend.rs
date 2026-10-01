@@ -32,6 +32,14 @@ impl RunWorker {
         self.flight.gate.health()
     }
 
+    /// A relay onto this worker's ledger, for a writer that is not a run:
+    /// the remote door's lines are written from the assembly, and reach
+    /// the history through the same crossing a driving thread uses, so
+    /// the city still has one writer (sprawling-SPEC.md 8-139).
+    pub fn relay(&self) -> super::Relay {
+        self.flight.gate.issue()
+    }
+
     /// Hands this worker's session slices to the thread that will file
     /// them from now on, so this thread files none (sprawling-SPEC.md
     /// 8-123). `None` when they were handed off already, or the ledger

@@ -70,14 +70,26 @@ pub(super) fn answering() -> Answering {
 /// Runs the console loop over a scripted script and returns what a
 /// person would have seen.
 pub(super) fn typed(script: &str, terminal: &Terminal) -> String {
-    let desk = accounting::worker::CommandDesk::default();
     let mut out: Vec<u8> = Vec::new();
     drive(
         terminal,
-        &desk,
-        &answering(),
+        &inside(),
         &mut std::io::Cursor::new(script.as_bytes().to_vec()),
         &mut out,
     );
     String::from_utf8(out).unwrap()
+}
+
+/// The console's reach into a city with no remote door.
+pub(super) fn inside() -> super::super::terminal::Inside {
+    super::super::terminal::Inside {
+        desk: Arc::new(accounting::worker::CommandDesk::default()),
+        answering: answering(),
+        remote: Err(kernel::AxError::failure(
+            kernel::AxCode::ConfigInvalid,
+            "keep the remote door",
+            "this test keeps none",
+        )
+        .with_recovery("nothing to do")),
+    }
 }

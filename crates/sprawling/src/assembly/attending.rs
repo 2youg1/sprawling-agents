@@ -93,10 +93,20 @@ pub(super) struct Started {
     pub(super) health: Health,
     /// The view fold's backlog, for the monitor (sprawling-SPEC.md 8-123).
     pub(super) backlog: crate::serving::folding::Backlog,
+    /// The crossing the remote door writes its lines through
+    /// (sprawling-SPEC.md 8-139).
+    pub(super) relay: accounting::worker::Relay,
 }
 
 pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started, AxError> {
-    type Opened = Result<(Arc<std::sync::Mutex<gateway::Custodian>>, Health), AxError>;
+    type Opened = Result<
+        (
+            Arc<std::sync::Mutex<gateway::Custodian>>,
+            Health,
+            accounting::worker::Relay,
+        ),
+        AxError,
+    >;
     let (ready_tx, ready_rx) = mpsc::sync_channel::<Opened>(0);
     let Opening {
         city_root: worker_root,
@@ -167,7 +177,11 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                         drop(ready_tx.send(Err(err)));
                         return;
                     }
-                    drop(ready_tx.send(Ok((worker.vault_handle(), worker.health()))));
+                    drop(ready_tx.send(Ok((
+                        worker.vault_handle(),
+                        worker.health(),
+                        worker.relay(),
+                    ))));
                     worker
                 }
                 Err(err) => {
@@ -231,13 +245,13 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             )
             .with_recovery("check process thread limits")
         })?;
-    let (vault, health) = match ready_rx.recv() {
+    let (vault, health, relay) = match ready_rx.recv() {
         // Lent rather than opened a second time: "a credential is
         // redeemed at the last moment, through one door" stops being
         // true the moment there are two handles on the same secrets.
-        Ok(Ok((vault, health))) => {
+        Ok(Ok((vault, health, relay))) => {
             lend(Arc::clone(&vault));
-            (vault, health)
+            (vault, health, relay)
         }
         Ok(Err(err)) => return Err(err),
         Err(_) => {
@@ -254,5 +268,6 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         vault,
         health,
         backlog,
+        relay,
     })
 }

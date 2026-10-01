@@ -6,7 +6,7 @@
 //! The console's vocabulary, and the judgement of one typed line into a
 //! [`Line`] (sprawling-SPEC.md section 8-11).
 //!
-//! This module owns the console's own verbs — `CONTROL`, the five that
+//! This module owns the console's own verbs — `CONTROL`, the six that
 //! never reach the wire — and owns nothing else about any verb. Every
 //! other verb is a projection of the Commands a socket can carry and of
 //! `wire::QUERY_NAMES`, spelled by [`snake`], so a command renamed on
@@ -25,7 +25,7 @@
 
 use kernel::{Address, IdemKey};
 
-pub(super) const CONTROL: [&str; 5] = ["help", "web", "at", "quit", "serving"];
+pub(super) const CONTROL: [&str; 6] = ["help", "web", "at", "quit", "serving", "remote"];
 
 /// The two Commands whose `Command::idem()` is `None`, which a socket
 /// cannot carry: `PutSecret` has no wire form at all, and `Auth` is
@@ -53,6 +53,9 @@ pub(crate) enum Line {
     Serving,
     Select(Address),
     Quit,
+    /// The remote door: open it, pair a device, close it, list or
+    /// revoke devices. Never a frame, so nothing on the wire can ask.
+    Remote(crate::outside::console::RemoteLine),
     /// A wire verb, already built into the frame it names.
     Frame(Box<wire::ClientFrame>),
     /// Anything that does not begin with `/`: work for the selected
@@ -149,6 +152,7 @@ pub(crate) fn parse(line: &str, selected: Option<&Address>, idem: IdemKey) -> Li
         "web" => Line::OpenWeb,
         "serving" => Line::Serving,
         "quit" | "exit" => Line::Quit,
+        "remote" => Line::Remote(crate::outside::console::parse(tail)),
         "at" => match Address::parse(tail) {
             Ok(addr) => Line::Select(addr),
             Err(_) => Line::Unknown {
@@ -229,6 +233,7 @@ pub(crate) fn help(selected: Option<&Address>) -> String {
          /at <building>/<room>     choose where plain lines go\n  \
          /serving                  where this city listens, and what is running in it\n  \
          /web                      open the WebUI, token included\n  \
+         /remote <verb>            open|pair|close|devices|revoke: the door a device reaches the city through\n  \
          /quit                     close this console; the city keeps serving\n\n  \
          anything else             work, dispatched to the chosen room\n\n  \
          /<query>                  {}\n  \

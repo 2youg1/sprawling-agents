@@ -81,11 +81,13 @@ pub(crate) enum Patience {
 /// The face a driving thread writes history through, and the only
 /// `kernel::Ledger` it is given.
 ///
-/// Cloned per driving thread. Nothing here decides anything: seq, prev
-/// and the bytes stay with the adapter on the accounting side, which is
-/// what keeps one city to one writer.
+/// Cloned per driving thread, and once for the remote door, whose five
+/// lines the assembly writes from outside any run (sprawling-SPEC.md
+/// 8-139). Nothing here decides anything: seq, prev and the bytes stay
+/// with the adapter on the accounting side, which is what keeps one city
+/// to one writer.
 #[derive(Clone)]
-pub(crate) struct Relay {
+pub struct Relay {
     asking: mpsc::Sender<Wake>,
     health: Health,
 }

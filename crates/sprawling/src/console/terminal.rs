@@ -50,15 +50,19 @@ pub struct Terminal {
     pub bind: SocketAddr,
 }
 
-// The one function that turns a question into an answer, shared with
-// the socket rather than reimplemented beside it: `accounting::worker::serve`
-// builds it once and hands the same `Arc` to both surfaces, so a number
-// this console prints and a number a browser draws cannot disagree.
 use kernel::Address;
 use std::io::{BufRead, Write};
 use std::net::SocketAddr;
 use std::sync::Arc;
 pub(crate) use wire::Answering;
+
+/// What the console reaches the city through: the socket's own desk and
+/// answering function, and the remote door or why this serve has none.
+pub(crate) struct Inside {
+    pub(crate) desk: Arc<accounting::worker::CommandDesk>,
+    pub(crate) answering: Answering,
+    pub(crate) remote: Result<crate::outside::console::Remote, kernel::AxError>,
+}
 
 /// What this process is doing, in one screen.
 ///
@@ -146,8 +150,7 @@ pub(crate) fn web_url(terminal: &Terminal) -> String {
 /// typing would have made interaction a condition of service.
 pub(crate) fn start(
     terminal: Terminal,
-    desk: Arc<accounting::worker::CommandDesk>,
-    answering: Answering,
+    inside: Inside,
     mut watching: tokio::sync::broadcast::Receiver<wire::Committed>,
 ) {
     // What happened, printed as it happens, one JSON object per line -
@@ -171,8 +174,7 @@ pub(crate) fn start(
         let stdin = std::io::stdin();
         drive(
             &terminal,
-            &desk,
-            &answering,
+            &inside,
             &mut stdin.lock(),
             &mut std::io::stdout(),
         );
@@ -192,11 +194,13 @@ fn say<W: Write>(out: &mut W, line: &str) {
 /// The loop, over any reader and writer so a test can drive it.
 pub(super) fn drive<R: BufRead, W: Write>(
     terminal: &Terminal,
-    desk: &accounting::worker::CommandDesk,
-    answering: &Answering,
+    inside: &Inside,
     input: &mut R,
     out: &mut W,
 ) {
+    let Inside {
+        desk, answering, ..
+    } = inside;
     let mut keys = match LineKeys::drawn() {
         Ok(keys) => keys,
         Err(err) => {
@@ -243,6 +247,9 @@ pub(super) fn drive<R: BufRead, W: Write>(
             Line::Select(addr) => {
                 say(out, &format!("  work goes to {}", addr.as_str()));
                 selected = Some(addr);
+            }
+            Line::Remote(line) => {
+                say(out, &crate::outside::console::carry(&inside.remote, line));
             }
             Line::Quit => {
                 say(out, "  the console is closing; the city keeps serving");

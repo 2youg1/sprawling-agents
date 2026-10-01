@@ -20,6 +20,7 @@ mod chain_watch;
 mod dropping;
 mod listening;
 mod production;
+mod remote_door;
 
 pub use listening::{Listening, listen};
 pub use production::{SystemClock, form_city, hands, init_city};

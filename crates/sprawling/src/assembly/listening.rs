@@ -28,6 +28,7 @@ use crate::serving::standing::monotonic_now;
 use accounting::views::{Published, answer_outside_the_lock};
 use accounting::worker::opening_cost::{OpeningCost, Phase};
 use accounting::worker::{Closing, CommandDesk, acp_dispatch, start_served_views};
+use monitor_feed::watched;
 
 /// One recording in, one line of text back.
 ///
@@ -83,6 +84,7 @@ pub struct Listening {
     answering: crate::console::Answering,
     worker: std::thread::JoinHandle<()>,
     console: Option<crate::console::Terminal>,
+    outdoors: super::remote_door::Outdoors,
 }
 
 /// Takes the city's port, then opens its one writer.
@@ -206,6 +208,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         vault: city_vault,
         health,
         backlog,
+        relay,
     } = spawn_worker(
         Opening {
             city_root: city_root.to_path_buf(),
@@ -288,6 +291,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         answering,
         worker: worker_thread,
         console,
+        outdoors: super::remote_door::Outdoors::new(city_root, relay, addr, token),
     })
 }
 
@@ -306,18 +310,21 @@ impl Listening {
             answering,
             worker,
             console,
+            outdoors,
         } = self;
         // The terminal this city is running in, if it was asked for. It gets
         // the same desk the socket posts to and the same event stream the
         // browser reads, so nothing here is a second control surface - it is
         // the first one, reached from the keyboard that started the city.
         if let Some(terminal) = console {
-            let console_desk = Arc::clone(&desk);
             let watching = config.events.subscribe();
-            // The same answering function the socket was given, not a second
-            // one built beside it: a count this terminal prints and a count
-            // a browser draws are one call, so they cannot disagree.
-            crate::console::start(terminal, console_desk, Arc::clone(&answering), watching);
+            // The same answering function the socket was given.
+            let inside = crate::console::Inside {
+                desk: Arc::clone(&desk),
+                answering: Arc::clone(&answering),
+                remote: outdoors.keep(),
+            };
+            crate::console::start(terminal, inside, watching);
         }
         // Ctrl-C is an orderly close, so a stop somebody chose and a stop
         // that was a crash do not leave the same silence in the record.
@@ -366,37 +373,6 @@ fn beside(
         })
 }
 
-/// The monitor a session watches over the socket, and the thread that
-/// samples it once a second (sprawling-SPEC.md 8-94, 8-96). Whether
-/// anybody watches is the monitor's count; a session holds its
-/// [`crate::monitor::Watch`] for as long as it watches.
-///
-/// # Errors
-/// `StorageFatal` when the sampler's thread cannot be started.
-fn watched(
-    city_root: &std::path::Path,
-    gauges: Gauges<impl Fn() -> u64 + Send + 'static>,
-) -> Result<wire::MonitorFeed, AxError> {
-    let monitor = Arc::new(std::sync::Mutex::new(crate::monitor::Monitor::new()));
-    let samples = tokio::sync::broadcast::channel(1).0;
-    crate::monitor::sampler::spawn_sampler(
-        Arc::downgrade(&monitor),
-        samples.clone(),
-        city_root.to_path_buf(),
-        gauges,
-    )?;
-    Ok(wire::MonitorFeed {
-        watch: Arc::new(move |watched| -> Box<dyn Send> {
-            // The count is an atomic, so a poisoned lock guards no
-            // half-written state and the watcher still counts.
-            let held = monitor
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            Box::new(held.watch(watched))
-        }),
-        samples,
-    })
-}
-
+mod monitor_feed;
 #[cfg(test)]
 mod tests;
