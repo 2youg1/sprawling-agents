@@ -360,5 +360,8 @@ mod keys;
 mod list;
 #[path = "view/rounds.rs"]
 mod rounds;
+#[cfg(test)]
+#[path = "view/span_tests.rs"]
+mod span_tests;
 #[path = "view/terminal.rs"]
 mod terminal;
