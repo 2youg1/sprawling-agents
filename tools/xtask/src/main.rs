@@ -38,6 +38,7 @@ mod members;
 mod modmap;
 mod npm;
 mod package;
+mod packaged;
 mod platform;
 mod proof;
 mod release;
