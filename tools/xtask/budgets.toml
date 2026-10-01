@@ -514,10 +514,10 @@ status = "measured, not gated: 8,388,608 B, refused whole rather than truncated,
 what = "milliseconds to rebuild every view, per megabyte of ledger folded"
 measured_by = "just bench (citysim bench bin, release), over a ledger large enough that the fold rather than the open dominates: the bench writes 50,000 records into a scratch city and drives the whole production rebuild through `sprawling::ask`, which verifies the chain, parses every line and folds it into every view before answering one CityView"
 fold_records = 50000
-best_p50_ms = 1222
-best_p95_ms = 1225
-best_p99_ms = 1225
-status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`), p50 1221.938 ms, p95 and p99 1224.078 ms, the best_* fields rounded up to whole milliseconds (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30); re-read under the nearest-rank rule (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01) at p50 1277.206 ms, p95 and p99 1285.196 ms, so the best_* fields keep the earlier reading; 1265.980 ms on the same fixture before the whole fold streamed the ledger. The per-megabyte figure is best_p50_ms over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
+best_p50_ms = 716
+best_p95_ms = 716
+best_p99_ms = 716
+status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`), floor 713.863 ms, p50 715.493 ms, p95 and p99 715.953 ms under the nearest-rank rule, the best_* fields rounded up to whole milliseconds (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release). The reading fell from 1277.206 ms when a rebuild from genesis stopped proving the history before folding it, since the fold checks every line itself (accounting-SPEC.md item 31(b)); what remains is one line check, one parse and one fold per line. The per-megabyte figure is best_p50_ms over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
 
 # What a dispatch spends before the model is called: opening the room,
 # writing the brief, standing the run up, and assembling the tools -
@@ -592,7 +592,7 @@ status = "measured, not gated: p50 1.540 ms, p95 1.735, p99 1.984; floor 1.358, 
 [first_byte]
 what = "`serve` spawned to the first byte of GET /, over the three fixture cities, with the product's own split of the opening"
 measured_by = "just bench-startup first-byte"
-status = "measured, not gated: floor / p50 / peak in ms - empty 37.348 / 39.573 / 56.589 over 20 samples (city fixture 7e6fda8b5653dd7f), l100k 580.062 / 582.817 / 2250.936 over 5 (6615c4052f604f8c), l400k 1250.861 / 1255.792 / 7948.201 over 3 (99909ec1f02d58fc) (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release). The peak is each city's first sample, the one opening with no snapshots and no verified-prefix record yet. The last l400k serve says: opened the city in 1220.178 ms - bind 2.173, open the ledger 576.396, fold 0 lines from the snapshots 278.907, cut the standing snapshot 0.232, cut the views snapshot 0.011, copy the views 356.709, start the worker 5.747; the history is proved behind the first byte, 400003 lines and 6 segments by digest in 379.822 ms, 1600.149 ms after opening began, and commands wait for it (E_HISTORY_UNPROVEN). Opening the ledger and copying the views are the dominant phases; a reading in seconds is lane F's work"
+status = "measured, not gated: the empty city p50 42.1 ms (city fixture 7e6fda8b5653dd7f), within noise of the earlier 39.573; floor / p50 / peak in ms - l100k 130.3 / 131.0 / 136.3 over 5 (6615c4052f604f8c), l400k 296.3 / 301.8 / 375.0 over 3 (99909ec1f02d58fc) (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release). The l400k first byte fell from 1255.792 ms when the opening reused the last proof's record and the second copy of the views became a clone: the last l400k serve says opened the city in 267.9 ms - bind 2.3, open the ledger 43.1, fold 0 lines from the snapshots 191.6, cut the standing snapshot 0.1, cut the views snapshot 0.0, copy the views 24.3, start the worker 6.4; the history is proved behind the first byte, 6 segments by digest and 0 lines checked in 407.6 ms, 675.6 ms after opening began, and commands wait for it (E_HISTORY_UNPROVEN). Decoding the folded snapshot is now the dominant phase (sprawling-SPEC.md 8-144)"
 
 # How large this tree's dependency graph is, counted off the resolved
 # lockfile rather than off any manifest: a manifest states what was
