@@ -184,7 +184,9 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
     // gave it. Answers arrive after other calls have been made, so the
     // pairing cannot be positional.
     let mut awaiting: Vec<(String, usize, usize)> = Vec::new();
+    let mut attempts = Attempts::default();
     for record in records {
+        attempts.note(record);
         match record.kind() {
             EventKind::ModelCalled => {
                 let number = u32::try_from(folded.len().saturating_add(1)).unwrap_or(u32::MAX);
@@ -238,10 +240,13 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                 turn.calls.push(call);
             }
             EventKind::ModelReturned => {
-                // The answer belongs to the turn the question opened.
-                // Nothing open means this record is the session's own
-                // opening, which no round owns.
-                let Some(turn) = folded.last_mut() else {
+                // The answer belongs to the turn its attempt opened.
+                // No attempt before it means this record is the
+                // session's own opening, which no round owns.
+                let Some(turn) = attempts
+                    .answered_by(record)
+                    .and_then(|opened| folded.iter_mut().rev().find(|turn| turn.opened == opened))
+                else {
                     continue;
                 };
                 let map = record.data().as_map();
@@ -299,6 +304,37 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
     folded
 }
 
+/// Which `model_called` each `model_returned` answers: the latest one its
+/// run recorded before it. Every attempt lands on the ledger, so a resend
+/// after a repair is a second `model_called`, and the attempt it replaced
+/// is never answered. The one rule a page's rounds and a playback
+/// bundle's calls pair a reply by (accounting-SPEC.md 8-25).
+#[derive(Debug, Default)]
+pub(crate) struct Attempts {
+    latest: BTreeMap<RunId, kernel::Seq>,
+}
+
+impl Attempts {
+    /// Notes `record` when it sends an attempt; every other line leaves
+    /// the attempts as they were.
+    pub(crate) fn note(&mut self, record: &EventRecord) {
+        if record.kind() == EventKind::ModelCalled {
+            self.latest.insert(record.run(), record.seq());
+        }
+    }
+
+    /// The seq of the `model_called` that `reply` answers; `None` for a
+    /// line that is no reply, and for a reply whose run sent no attempt
+    /// among the lines noted.
+    pub(crate) fn answered_by(&self, reply: &EventRecord) -> Option<kernel::Seq> {
+        if reply.kind() == EventKind::ModelReturned {
+            self.latest.get(&reply.run()).copied()
+        } else {
+            None
+        }
+    }
+}
+
 /// Whether this line's `t` is the moment its own event happened
 /// (kernel-SPEC 8-4, "what the envelope `t` records").
 pub(crate) fn timing_of(record: &EventRecord) -> wire::Timing {
@@ -310,8 +346,8 @@ pub(crate) fn timing_of(record: &EventRecord) -> wire::Timing {
 
 /// Whether a call's two times are measured once `answer` is paired with
 /// it, given how the call's own line read (`asked`): the one rule a page's
-/// rounds and a playback bundle's calls both time a call by
-/// (accounting-SPEC.md 8-17). An answer the city wrote itself after a
+/// rounds and a playback bundle's calls both time a call by, a tool call
+/// or a model attempt (accounting-SPEC.md 8-17, 8-25). An answer the city wrote itself after a
 /// restart makes the span unmeasured either way.
 pub(crate) fn answered_timing(asked: wire::Timing, answer: &EventRecord) -> wire::Timing {
     if supplied_by_the_city(answer.data().as_map().get("error")) {

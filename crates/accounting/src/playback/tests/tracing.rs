@@ -13,7 +13,8 @@
     clippy::panic,
     clippy::indexing_slicing,
     clippy::arithmetic_side_effects,
-    reason = "test code"
+    clippy::disallowed_methods,
+    reason = "test code: the instrument samples its own clock"
 )]
 
 use kernel::{EventKind, RunId};

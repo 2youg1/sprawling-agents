@@ -12,13 +12,23 @@
 //! tools in the same building meanwhile are counted beside them,
 //! because their writes share the building's tree and may have landed
 //! in the same commit.
+//!
+//! Two readers ask it. `whose --trace` asks [`trace`], which folds the
+//! whole history once for one commit. A playback export folds its
+//! history once, up to its cutoff, into a `History` and asks each
+//! commit of it at the line that announced it; `trace_through` then
+//! reads that commit's lines through the index the export built, so no
+//! answer reads past the cutoff (accounting-SPEC.md 8-25).
 
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::path::Path;
 
+use kernel::layout::CityLayout;
 use kernel::{Address, AxError, EventKind, EventRecord, GitOid, RunId, Seq};
 use storage::{LedgerIndex, LineReader, StorageError};
+
+use crate::views::Views;
 
 /// One commit, the calls its run made since its previous commit, and
 /// who else called tools in the same building in that span.
@@ -56,49 +66,75 @@ pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError> {
     else {
         return Ok(None);
     };
-    traced(city_root, *commit).map(Some)
+    let ledger_dir = CityLayout::new(city_root).ledger();
+    let index = LedgerIndex::rebuild(&ledger_dir).map_err(StorageError::into_ax)?;
+    trace_through(&index, &ledger_dir, *commit).map(Some)
 }
 
-/// The trace of `oid` as the line that first announced it, `line`, sees
-/// it: the views' `previous` and `parents`, with the run, the actor, the
-/// seq and the moment taken from `line` rather than from the commit's
-/// latest announcement, so no later line changes the answer
-/// (accounting-SPEC.md 8-16). `None` when this city never wrote that
-/// commit, or `line` has no address.
-///
-/// # Errors
-/// What [`trace`] refuses.
-pub fn trace_first(
-    city_root: &Path,
-    oid: GitOid,
-    line: &EventRecord,
-) -> Result<Option<Trace>, AxError> {
-    #[cfg(test)]
-    counted::views_folded();
-    let (wire::Answer::Commit(commit), Some(actor)) = (
-        crate::views::ask(city_root, &wire::Query::Commit { oid })?,
-        line.addr(),
-    ) else {
-        return Ok(None);
-    };
-    let first = wire::CommitAnswer {
-        run: line.run(),
-        actor: actor.clone(),
-        seq: line.seq(),
-        at: line.t(),
-        ..*commit
-    };
-    traced(city_root, first).map(Some)
+/// A city's history folded one verified line at a time, in the order a
+/// strict pass reads it up to a cutoff. A commit is asked of it as of the
+/// lines folded so far, so what a later line says, or whether it
+/// verifies, cannot change the answer (accounting-SPEC.md 8-25).
+pub(crate) struct History {
+    /// The views of the lines folded so far, or the first refusal to fold
+    /// one, after which nothing more is folded.
+    views: Result<Box<Views>, AxError>,
+}
+
+impl History {
+    pub(crate) fn new(city_root: &Path) -> History {
+        #[cfg(test)]
+        counted::views_folded();
+        History {
+            views: Ok(Box::new(Views::new(city_root))),
+        }
+    }
+
+    /// Folds one verified line, in seq order. The first line the views
+    /// refuse ends the fold: every later question answers that refusal.
+    pub(crate) fn absorb(&mut self, record: &EventRecord) {
+        let refused = match &mut self.views {
+            Ok(views) => views.apply(record).err(),
+            Err(_) => None,
+        };
+        if let Some(refused) = refused {
+            self.views = Err(refused);
+        }
+    }
+
+    /// What `Query::Commit` answers about `oid` from the lines folded so
+    /// far: the run, the actor, the seq of its latest announcement among
+    /// them, the run's previous commit, and the parents git states.
+    /// `None` when no line folded so far announced it.
+    ///
+    /// # Errors
+    /// The views' refusal to fold an earlier line.
+    pub(crate) fn commit(&self, oid: GitOid) -> Result<Option<wire::CommitAnswer>, AxError> {
+        let views = self.views.as_ref().map_err(AxError::clone)?;
+        let wire::Answer::Commit(commit) = views.prepare(&wire::Query::Commit { oid }).finish()
+        else {
+            return Ok(None);
+        };
+        Ok(Some(*commit))
+    }
 }
 
 /// The calls `commit`'s run made in its span, and who else called tools
-/// in its building meanwhile.
-fn traced(city_root: &Path, commit: wire::CommitAnswer) -> Result<Trace, AxError> {
-    let ledger_dir = kernel::layout::CityLayout::new(city_root).ledger();
-    let index = LedgerIndex::rebuild(&ledger_dir).map_err(StorageError::into_ax)?;
-    let mut reader = index.reader(&ledger_dir);
+/// in its building meanwhile, every line read through `index`, which must
+/// hold the lines before the commit's own. No line at or after
+/// `commit.seq` is read.
+///
+/// # Errors
+/// A line that cannot be read or parsed, and an actor in the reserved
+/// subtree, which belongs to no building.
+pub(crate) fn trace_through(
+    index: &LedgerIndex,
+    ledger_dir: &Path,
+    commit: wire::CommitAnswer,
+) -> Result<Trace, AxError> {
+    let mut reader = index.reader(ledger_dir);
     let after = commit.previous.map(|previous| previous.seq);
-    let records = run_records(&index, &mut reader, &commit, after)?;
+    let records = run_records(index, &mut reader, &commit, after)?;
     let span = Range {
         start: match after {
             Some(previous) => previous.next()?,
@@ -111,7 +147,7 @@ fn traced(city_root: &Path, commit: wire::CommitAnswer) -> Result<Trace, AxError
         .flat_map(|turn| turn.calls)
         .filter(|call| span.contains(&call.at))
         .collect();
-    let nearby = nearby(&index, &mut reader, &commit, &span)?;
+    let nearby = nearby(index, &mut reader, &commit, &span)?;
     Ok(Trace {
         commit,
         calls,

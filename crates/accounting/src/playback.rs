@@ -48,12 +48,12 @@ pub use reader::{Confidential, Reader};
 pub use select::{Selection, Window};
 
 /// The schema a bundle names; a reader refuses any other.
-pub const SCHEMA: &str = "sprawling.playback/2";
+pub const SCHEMA: &str = "sprawling.playback/3";
 
 /// The version of the rules a bundle is projected under. It moves with
 /// every change to what a bundle holds or how a table is derived, so a
 /// bundle this build cannot recompute says so instead of differing.
-pub const PROJECTION_RULES: u32 = 3;
+pub const PROJECTION_RULES: u32 = 4;
 
 /// The most bytes a bundle may have. An initial value until the export
 /// peak on a multi-day fixture is measured; it bounds the bundle, not
@@ -120,10 +120,10 @@ fn project(city_root: &Path, request: &Request) -> Result<Projected, AxError> {
     let city = storage::Provenance::city_of(&ledger).map_err(storage::StorageError::into_ax)?;
     let readership = Readership::new(city_root, request.reader.clone());
     let mut projection = Projection::new(&request.selection, readership, city_root);
-    let tip = walk::walk(&ledger, request.cutoff, |raw, walked| {
+    let walked = walk::walk(&ledger, request.cutoff, |raw, walked| {
         projection.apply(raw, walked)
     })?;
-    let reached = match (tip, request.cutoff) {
+    let reached = match (walked.tip, request.cutoff) {
         (Some(tip), Cutoff::Latest) => tip,
         (Some(tip), Cutoff::At(end)) if tip.seq == end => tip,
         (tip, Cutoff::Latest | Cutoff::At(_)) => {
@@ -141,7 +141,7 @@ fn project(city_root: &Path, request: &Request) -> Result<Projected, AxError> {
         reader: request.reader.name(),
     };
     projection
-        .finish(source)
+        .finish(source, &walked.index)
         .map(|document| Projected::Whole(Box::new(document)))
 }
 

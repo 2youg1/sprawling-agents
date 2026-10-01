@@ -182,16 +182,27 @@ pub(super) struct Message {
     pub(super) consumed: End,
 }
 
-/// One tool call: the run and the id its two lines are paired by.
+/// One call, a tool call or a model attempt, in the run its two lines
+/// are paired in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Call {
     pub(super) run: RunId,
-    pub(super) id: String,
-    pub(super) tool: Option<String>,
+    pub(super) callee: Callee,
     pub(super) called: End,
     pub(super) answered: End,
     pub(super) took: Took,
+}
+
+/// What was called, and its name when the calling line is visible.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub(super) enum Callee {
+    /// A tool, by the id its call and its answer share.
+    Tool { id: String, name: Option<String> },
+    /// A model, by the model id the request spelled; the attempt itself
+    /// is the call's `called` end.
+    Model { name: Option<String> },
 }
 
 /// How long a call took: measured milliseconds, or not known. Never a

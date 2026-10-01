@@ -36,9 +36,18 @@ pub(super) struct Tip {
     pub(super) chain_hash: B3Hash,
 }
 
+/// Where one walk stopped, and the index it built on the way.
+pub(super) struct Reached {
+    /// The line the walk stopped at; `None` for a ledger with no line.
+    pub(super) tip: Option<Tip>,
+    /// Every line the walk passed, by seq, and the lines after the
+    /// cutoff located without being checked: a reader of this index
+    /// reads past the cutoff only if it asks for a seq after it.
+    pub(super) index: LedgerIndex,
+}
+
 /// Walks the ledger in `ledger_dir` up to `cutoff`, lending each line's
-/// bytes and reading to `each`, and answers the line it stopped at;
-/// `None` for a ledger with no line.
+/// bytes and reading to `each`, and answers where it stopped.
 ///
 /// # Errors
 /// The first line that does not verify, as `LineFault::into_ax` names
@@ -48,12 +57,12 @@ pub(super) fn walk(
     ledger_dir: &Path,
     cutoff: Cutoff,
     mut each: impl FnMut(&[u8], Walked) -> Result<(), AxError>,
-) -> Result<Option<Tip>, AxError> {
+) -> Result<Reached, AxError> {
     let mut check = LineCheck::at_genesis();
     let mut line_no = 0u64;
     let mut tip: Option<Tip> = None;
     let mut done = false;
-    LedgerIndex::folding(ledger_dir, |raw| {
+    let index = LedgerIndex::folding(ledger_dir, |raw| {
         if done {
             return Ok(None);
         }
@@ -78,5 +87,5 @@ pub(super) fn walk(
         each(raw, walked)?;
         Ok(located)
     })?;
-    Ok(tip)
+    Ok(Reached { tip, index })
 }

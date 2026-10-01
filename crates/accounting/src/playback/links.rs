@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two ends of every key moment, every message and every tool call
-//! (accounting-SPEC.md 8-12 and 8-17).
+//! The two ends of every key moment, every message and every call, a tool
+//! call or a model attempt (accounting-SPEC.md 8-12, 8-17 and 8-25).
 //!
 //! A key moment is a set of lines grouped under a stable key: a run, an
 //! approval, a pull request. It closes only on its real closing line,
@@ -21,16 +21,26 @@ use std::collections::{BTreeMap, BTreeSet};
 use kernel::event::record::{ApprovalResolved, SignalConsumed, SignalEnqueued};
 use kernel::{Address, ApprovalItem, AxError, EventKind, EventRecord, RunId, Seq, TimeMs};
 
-use super::document::{Call, Decimal, End, Family, Message, Moment, Related, Took};
-use crate::views::rounds::{answered_timing, timing_of};
+use super::document::{Call, Callee, Decimal, End, Family, Message, Moment, Related, Took};
+use crate::views::rounds::{Attempts, answered_timing, timing_of};
 
 /// What one line is keyed to.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Key {
     Moment(Family, String),
     Message(String),
-    /// A tool call: its run, and the id its call and its answer share.
-    Call(RunId, String),
+    /// A call: its run, and what its two lines are paired by there.
+    Call(RunId, CallId),
+}
+
+/// What a call's two lines are paired by within its run.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum CallId {
+    /// A tool call: the id its call and its answer share.
+    Tool(String),
+    /// A model attempt: the seq of its `model_called`, which a reply
+    /// answers by the rounds' rule.
+    Model(Seq),
 }
 
 /// Which part of a keyed pair one line is.
@@ -70,8 +80,9 @@ struct Link {
     members: Vec<Seq>,
     /// `from` and `room` of a message, when its sending line was visible.
     sent_by: Option<(String, Address)>,
-    /// A call's tool and the moment its call line recorded, and whether
-    /// that moment was measured, when the call line was visible.
+    /// A call's tool or model name and the moment its call line recorded,
+    /// and whether that moment was measured, when the call line was
+    /// visible.
     asked: Option<(Option<String>, TimeMs, wire::Timing)>,
     /// A call's measured milliseconds, when both lines were visible and
     /// the rounds' rule says the span was measured.
@@ -83,6 +94,8 @@ pub(super) struct Links {
     links: BTreeMap<Key, Link>,
     /// The key of the latest request opened on each branch.
     open_requests: BTreeMap<String, String>,
+    /// The latest model attempt of each run, which its next reply answers.
+    attempts: Attempts,
 }
 
 impl Links {
@@ -93,7 +106,7 @@ impl Links {
     /// A payload of one of those kinds that does not read as its type.
     #[expect(
         clippy::wildcard_enum_match_arm,
-        reason = "eight kinds open or close a pair; every other kind is at most a member of its run"
+        reason = "ten kinds open or close a pair; every other kind is at most a member of its run"
     )]
     pub(super) fn touches(&self, record: &EventRecord) -> Result<Vec<Touch>, AxError> {
         let data = record.data();
@@ -139,9 +152,17 @@ impl Links {
                 Role::Closes,
             )),
             EventKind::ToolCalled => wire::text(data.as_map().get("id"))
-                .map(|id| (Key::Call(record.run(), id), Role::Opens)),
+                .map(|id| (Key::Call(record.run(), CallId::Tool(id)), Role::Opens)),
             EventKind::ToolResult => wire::text(data.as_map().get("tool_use_id"))
-                .map(|id| (Key::Call(record.run(), id), Role::Closes)),
+                .map(|id| (Key::Call(record.run(), CallId::Tool(id)), Role::Closes)),
+            EventKind::ModelCalled => Some((
+                Key::Call(record.run(), CallId::Model(record.seq())),
+                Role::Opens,
+            )),
+            EventKind::ModelReturned => self
+                .attempts
+                .answered_by(record)
+                .map(|sent| (Key::Call(record.run(), CallId::Model(sent)), Role::Closes)),
             _ => None,
         };
         let run_role = match record.kind() {
@@ -184,6 +205,7 @@ impl Links {
         seen: Seen,
     ) -> Result<(), AxError> {
         let (touched, room) = buildings;
+        self.attempts.note(record);
         let seat = Seat {
             seq: record.seq(),
             seen,
@@ -197,7 +219,12 @@ impl Links {
             }
             let family_is_run = matches!(touch.key, Key::Moment(Family::Run, _));
             let is_message = matches!(touch.key, Key::Message(_));
-            let is_call = matches!(touch.key, Key::Call(..));
+            let named = match &touch.key {
+                Key::Call(_, CallId::Tool(_)) => Some("name"),
+                Key::Call(_, CallId::Model(_)) => Some("model"),
+                Key::Moment(..) | Key::Message(_) => None,
+            };
+            let is_call = named.is_some();
             let link = self.links.entry(touch.key).or_default();
             match touch.role {
                 Role::Opens if link.opened.is_none() => {
@@ -211,9 +238,9 @@ impl Links {
                         let sent = record.data().read::<SignalEnqueued>()?;
                         link.sent_by = Some((sent.from, sent.room));
                     }
-                    if is_call && seen.visible {
-                        let tool = wire::text(record.data().as_map().get("name"));
-                        link.asked = Some((tool, record.t(), timing_of(record)));
+                    if let (Some(field), true) = (named, seen.visible) {
+                        let name = wire::text(record.data().as_map().get(field));
+                        link.asked = Some((name, record.t(), timing_of(record)));
                     }
                 }
                 Role::Closes if link.closed.is_none() => {
@@ -286,8 +313,10 @@ impl Links {
                     *link.members.first()?,
                     Call {
                         run: *run,
-                        id: id.clone(),
-                        tool: link.asked.as_ref().and_then(|(tool, _, _)| tool.clone()),
+                        callee: callee(
+                            id,
+                            link.asked.as_ref().and_then(|(name, _, _)| name.clone()),
+                        ),
                         called: end(link.opened, End::Missing, outside),
                         answered: end(link.closed, End::Pending, outside),
                         took: link
@@ -334,6 +363,17 @@ impl Links {
             .cloned()
             .unwrap_or_else(|| format!("{branch}@missing"));
         Key::Moment(Family::Pr, key)
+    }
+}
+
+/// What a call called, by what its two lines are paired by.
+fn callee(id: &CallId, name: Option<String>) -> Callee {
+    match id {
+        CallId::Tool(id) => Callee::Tool {
+            id: id.clone(),
+            name,
+        },
+        CallId::Model(_) => Callee::Model { name },
     }
 }
 

@@ -12,26 +12,27 @@
 //! carries is then built from the lines the reader may see alone: a
 //! withheld line adds to a count and to nothing else
 //! (`crates/accounting/spec/Playback/Project.lean`). A committed
-//! checkpoint's diff and trace are read last, from outside the ledger
-//! (accounting-SPEC.md 8-17).
+//! checkpoint's evidence is asked of the history folded up to its line,
+//! and its diff and calls are read last, from the repository and through
+//! the walk's index (accounting-SPEC.md 8-17, 8-25).
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use kernel::event::record::{BuildingCreated, RunStarted};
-use kernel::{Address, AxCode, AxError, EventKind, EventRecord, GitOid, RunId, RunPolicy, Seq};
+use kernel::{Address, AxCode, AxError, EventKind, EventRecord, RunId, RunPolicy, Seq};
+use storage::LedgerIndex;
 
 use super::document::{
-    Billed, Checkpoint, Closed, Costs, Decimal, Document, Event, KindCount, Phase, Reason, Run,
-    Source, Withheld,
+    Billed, Checkpoint, Closed, Costs, Decimal, Document, Event, Holds, KindCount, Phase, Reason,
+    Run, Source, Withheld,
 };
 use super::links::{Key, Links, Role, Seen};
 use super::reader::{Readership, Sight};
 use super::select::Selection;
-use super::traced::{Known, attach, checkpoint_of};
+use super::traced::{Evidence, Known, checkpoint_of};
 use super::walk::Walked;
 use crate::lineage::{Lineage, RunLine};
-use crate::views::commits::commit_facts;
 
 pub(super) struct Projection<'selection> {
     selection: &'selection Selection,
@@ -50,17 +51,13 @@ pub(super) struct Projection<'selection> {
     withheld: Tally,
     checkpoints: Vec<Checkpoint>,
     attribution: storage::Attribution,
-    /// The city whose repository and history a commit's evidence is read from.
-    city_root: PathBuf,
+    /// What a committed checkpoint's base, diff and trace are read from.
+    evidence: Evidence,
     /// The policy each run's visible `run_started` recorded.
     policies: BTreeMap<RunId, RunPolicy>,
     /// The `tool_called` lines the reader may not see, which a commit's
     /// trace may name.
     hidden_calls: BTreeSet<Seq>,
-    /// Every commit a line up to here announced, and the lines that
-    /// announced one again.
-    announced: BTreeSet<GitOid>,
-    repeated: BTreeSet<Seq>,
 }
 
 /// What becomes of one line: shown, closed by a building, or withheld
@@ -99,11 +96,9 @@ impl<'selection> Projection<'selection> {
             withheld: Tally::default(),
             checkpoints: Vec::new(),
             attribution: storage::Attribution::new(),
-            city_root: city_root.to_path_buf(),
+            evidence: Evidence::new(city_root),
             policies: BTreeMap::new(),
             hidden_calls: BTreeSet::new(),
-            announced: BTreeSet::new(),
-            repeated: BTreeSet::new(),
         }
     }
 
@@ -122,6 +117,7 @@ impl<'selection> Projection<'selection> {
                 return Ok(());
             }
         };
+        self.evidence.absorb(&record);
         self.lineage.apply(&record)?;
         let room = record.addr().map(building_of);
         self.learn_buildings(&record, room.as_ref())?;
@@ -168,12 +164,17 @@ impl<'selection> Projection<'selection> {
         Ok(())
     }
 
-    /// The document, with `source` as the caller built it.
+    /// The document, with `source` as the caller built it; a commit's
+    /// lines are read through `index`, the one the walk built.
     ///
     /// # Errors
     /// A run's count of unanswered questions past what the bundle writes.
-    pub(super) fn finish(mut self, source: Source) -> Result<Document, AxError> {
-        self.attach_evidence();
+    pub(super) fn finish(
+        mut self,
+        source: Source,
+        index: &LedgerIndex,
+    ) -> Result<Document, AxError> {
+        self.attach_evidence(index);
         let mut outside = BTreeSet::new();
         let moments = self.links.moments(&mut outside);
         let messages = self.links.messages(&mut outside);
@@ -248,6 +249,9 @@ impl<'selection> Projection<'selection> {
             .apply(record)
             .map_err(storage::StorageError::into_ax)?;
         if let Some(holds) = checkpoint_of(record)? {
+            if let Holds::Committed { oid, .. } = &holds {
+                self.evidence.hold(record.seq(), *oid);
+            }
             self.checkpoints.push(Checkpoint {
                 seq: Decimal(record.seq().value()),
                 run: record.run(),
@@ -258,9 +262,8 @@ impl<'selection> Projection<'selection> {
     }
 
     /// What a later table needs of one line beyond its own fate: the
-    /// policy a visible `run_started` records, a call the reader may not
-    /// see, which a commit's trace may still name, and whether the commit
-    /// a line names was announced before.
+    /// policy a visible `run_started` records, and a call the reader may
+    /// not see, which a commit's trace may still name.
     fn remember(&mut self, record: &EventRecord, visible: bool) -> Result<(), AxError> {
         if visible
             && record.kind() == EventKind::RunStarted
@@ -271,30 +274,21 @@ impl<'selection> Projection<'selection> {
         if !visible && record.kind() == EventKind::ToolCalled {
             self.hidden_calls.insert(record.seq());
         }
-        if let Some((oid, _)) = commit_facts(record)
-            && !self.announced.insert(oid)
-        {
-            self.repeated.insert(record.seq());
-        }
         Ok(())
     }
 
-    /// Reads each committed checkpoint's base, diff and trace, which live
-    /// outside the ledger: in the city's repository and in what
-    /// `accounting::trace` folds of its history.
-    fn attach_evidence(&mut self) {
+    /// Reads each committed checkpoint's base, diff and trace: from what
+    /// the history said at its line, from the city's repository, and from
+    /// the lines before it, through `index`.
+    fn attach_evidence(&mut self, index: &LedgerIndex) {
         let known = Known {
             events: &self.events,
             hidden: &self.hidden_calls,
-            repeated: &self.repeated,
             links: &self.links,
+            index,
         };
-        attach(
-            &mut self.checkpoints,
-            &self.city_root,
-            &known,
-            &mut self.readership,
-        );
+        self.evidence
+            .attach(&mut self.checkpoints, &known, &mut self.readership);
     }
 
     /// Adds the building a line is addressed in, and the one a
