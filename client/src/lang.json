@@ -3739,9 +3739,13 @@
     "en": "no room to dispatch into",
     "zh": "没有可派活的房间"
   },
-  "palette_needs_run": {
-    "en": "nothing is running to steer",
-    "zh": "没有正在跑的 run"
+  "no_run_in_front": {
+    "en": "no run is going on this page",
+    "zh": "这一页上没有在跑的 run"
+  },
+  "stop_whole_city": {
+    "en": "To stop the whole city, type /halt --all; /release --all lets it go on.",
+    "zh": "要停下整座城，输入 /halt --all；/release --all 放行。"
   },
   "palette_no_harvey": {
     "en": "no command called harvey. The city is still yours to change.",

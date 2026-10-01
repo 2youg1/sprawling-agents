@@ -26,8 +26,8 @@
 
   import { QUERIES } from "../../core/asking";
   import { heldIn } from "../../core/belief/rooms";
-  import { newestWorking } from "../../core/belief/live";
   import type { Sending } from "../../core/doing";
+  import { runInFront } from "../../core/in_front";
   import { fill, say } from "../../core/lang";
   import { current } from "../../core/route";
   import { completed } from "../../core/completion";
@@ -35,7 +35,6 @@
   import type { Slash } from "../../core/slash_hands";
   import { canRecord } from "../../core/speaking";
   import { ui } from "../../ui";
-  import type { Address } from "../../wire";
   import PillView from "./pill.svelte";
   import Actions from "./actions.svelte";
   import Popover from "../parts/popover.svelte";
@@ -179,10 +178,8 @@
   const main = $derived(answer?.chosen.find((each) => each.tag === "main"));
 
   // The room this box speaks to, read off the address bar.
-  const here = $derived.by((): Address | null => {
-    const view = Option.getOrNull(current(u.bar));
-    return view !== null && view.kind === "talk" ? view.address : null;
-  });
+  const shown = $derived(Option.getOrNull(current(u.bar)));
+  const here = $derived(shown !== null && shown.kind === "talk" ? shown.address : null);
   // Every room a person could move this conversation to.
   const cityAnswer = u.conn.asking.ask(QUERIES.city);
   const rooms = $derived(
@@ -191,8 +188,8 @@
       $belief.rooms.keys(),
     ),
   );
-  // The run this box would steer: what a typed `/stop` reaches too.
-  const live = $derived(here === null ? undefined : newestWorking($belief, here));
+  // The run in front of the person: what a typed `/stop` and `/steer` reach.
+  const live = $derived(shown === null ? undefined : runInFront($belief, shown));
 
   const session = $derived(
     here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null),

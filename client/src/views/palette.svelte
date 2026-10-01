@@ -28,6 +28,7 @@
   import { Option, Schema } from "effect";
   import { onMount } from "svelte";
   import { heldIn } from "../core/belief/rooms";
+  import { runInFront } from "../core/in_front";
 
   import { QUERIES } from "../core/asking";
   import { halt, release } from "../core/commands";
@@ -145,8 +146,8 @@
   });
 
   // What a verb typed here may reach. The palette is attached to no
-  // room, so `here` is whatever room the address bar names and `live`
-  // is the newest run still going anywhere.
+  // room, so `here` is the room the address bar names and `live` is
+  // the run in front of the person (`core/in_front`).
   const models = $derived.by(() => {
     const answer = $endpoints;
     if (answer === undefined || !("endpoints" in answer)) return [];
@@ -154,11 +155,9 @@
       endpoint.models.map((row) => ({ endpoint: endpoint.name, model: row.id })),
     );
   });
-  const here = $derived.by((): Address | null => {
-    const at = Option.getOrNull(current(u.bar));
-    return at !== null && at.kind === "talk" ? at.address : null;
-  });
-  const live = $derived(reached($belief.live.at(-1)));
+  const viewed = $derived(Option.getOrNull(current(u.bar)));
+  const here = $derived(viewed !== null && viewed.kind === "talk" ? viewed.address : null);
+  const live = $derived(reached(viewed === null ? undefined : runInFront($belief, viewed)));
 
   function newest(room: string): Reached | null {
     return reached(heldIn($belief, room).at(-1));
@@ -167,7 +166,7 @@
   // Why a verb cannot run from this box, as a `lang.json` key. Every
   // verb is reachable; the ones missing a capability say which.
   const NEEDS_ROOM: Key = "palette_needs_room";
-  const NEEDS_RUN: Key = "palette_needs_run";
+  const NEEDS_RUN: Key = "no_run_in_front";
   const NEEDS_MODEL: Key = "palette_needs_model";
 
   function whyFor(spelling: string): Key | undefined {
