@@ -91,7 +91,7 @@ const DETECTORS: [&str; 5] = [
     "tools/xtask/src/release.rs",
     "tools/xtask/src/release/context.rs",
     "tools/xtask/src/release/tests.rs",
-    "tools/xtask/xtask-SPEC.md",
+    "tools/xtask/Spec.lean",
     // AGENTS.md teaches the rule, and a document that teaches a rule
     // has to be able to name what it forbids. The two lines in it that
     // could have spelled a shape describe it instead, and say why in
