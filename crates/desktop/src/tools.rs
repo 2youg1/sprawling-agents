@@ -15,6 +15,7 @@
 //! (`crate::platform`), which is honest in a way that a fabricated
 //! success would not be.
 
+use kernel::consts_policy::IMAGE_QUALITY;
 use serde_json::{Value, json};
 
 /// The name of one of the six tools, as a closed set.
@@ -94,6 +95,32 @@ fn properties(own: Value) -> Value {
         }
     }
     merged
+}
+
+/// The largest quality the city admits, which the screenshot schema
+/// states as its `maximum` (`crates/desktop/Spec.lean` D16).
+///
+/// `IMAGE_QUALITY` is the one definition of the domain, and by ruling it
+/// has no getter (kernel-SPEC 12.3): a refusal is said by the type
+/// alone. A schema bound is not a refusal, so it is read through the
+/// type's one door. `admit` takes `0..=max`, so admission ends once as
+/// the quality rises, and halving the gap between an admitted quality
+/// and a refused one finds that edge in at most thirty-two steps.
+fn largest_quality() -> u32 {
+    let admits = |quality: u32| IMAGE_QUALITY.admit(quality).is_ok();
+    if admits(u32::MAX) {
+        return u32::MAX;
+    }
+    let (mut admitted, mut refused) = (0_u32, u32::MAX);
+    while let Some(gap @ 2..) = refused.checked_sub(admitted) {
+        let middle = admitted.saturating_add(gap / 2);
+        if admits(middle) {
+            admitted = middle;
+        } else {
+            refused = middle;
+        }
+    }
+    admitted
 }
 
 /// Every tool, in the order a reader meets them: look, then act.
@@ -215,7 +242,7 @@ pub(crate) fn table() -> Vec<ToolCard> {
                         "required": ["x", "y", "width", "height"],
                     },
                     "format": { "type": "string", "enum": ["png", "jpeg", "webp"] },
-                    "quality": { "type": "integer", "minimum": 0, "maximum": 100 },
+                    "quality": { "type": "integer", "minimum": 0, "maximum": largest_quality() },
                     "scale": { "type": "integer", "minimum": 1, "maximum": 100, "description": "percent of the original size" },
                 })),
                 "required": [],
@@ -392,5 +419,17 @@ mod tests {
         assert_eq!(record.schema["properties"]["recording"]["type"], "integer");
         let clipboard = card(ToolName::Clipboard);
         assert!(clipboard.schema["required"].is_array());
+    }
+
+    /// The schema states the edge of the city's quality domain: its
+    /// maximum is admitted and the next quality is refused.
+    #[test]
+    fn the_screenshot_schema_states_the_largest_quality_the_city_admits() {
+        let stated = card(ToolName::Screenshot).schema["properties"]["quality"]["maximum"]
+            .as_u64()
+            .unwrap();
+        let most = u32::try_from(stated).unwrap();
+        assert!(IMAGE_QUALITY.admit(most).is_ok());
+        assert!(IMAGE_QUALITY.admit(most + 1).is_err());
     }
 }
