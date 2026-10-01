@@ -4488,7 +4488,7 @@ impl OutputRing {
 - **只有 `exec` 的结果挂戳**：`status` 自己有 `now:` 一栏，连接器与浏览器的结果不经 `package_exec`，它们的时钟行要一种挂在 JSON 结果上的形状，本节未定；它们不经 `StampGate`，所以「一跑的第一条结果带一次戳」在生产里是「第一条命令结果」。
 - **不给工具面一个钟**：`Placing` 与 `Sieving` 手里只有读数。换成工具面自己读 `hands.clock` 会让一跑有第二个采样点，这是 runtime-SPEC §12.8 否掉的那一条。
 
-**验收**：`driving/tests/sieving` 的 `a_served_command_result_ends_with_the_second_its_call_started`：一次真实派活，城里没写 `[clock]`，`exec` 的结果在账本上以 `clock: <ISO>;` 结尾；它仍拿秒数比 `tool_called` 的 `t`，改为比 `tool_result` 的 `t` 的那一步见 runtime-SPEC §3 第 5 条。戳等于答复时刻由 runtime 的 `a_stamp_the_face_reads_is_the_moment_its_answer_records` 钉住。
+**验收**：`driving/tests/sieving` 的 `a_served_command_result_ends_with_the_second_its_call_answered`：一次真实派活，城里没写 `[clock]`，`exec` 的结果在账本上以 `clock: <ISO>;` 结尾，秒数等于这条调用 `tool_result` 的 `t`。戳等于答复时刻由 runtime 的 `a_stamp_the_face_reads_is_the_moment_its_answer_records` 钉住。
 
 ## 8-93 核心线程站在正常档之上，空转就降回（`bin::serving::standing`，形状：状态机）
 

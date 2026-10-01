@@ -122,13 +122,14 @@ fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() 
 
 /// A real dispatch in a city that wrote no `[clock]`: the command's
 /// result reaches the ledger ending with the clock line, and the second
-/// it names is the one its `tool_called` line records (sprawling-SPEC
-/// 8-125).
+/// it names is the one its `tool_result` line records: the turn reads
+/// the answer moment before the face accounts the result (sprawling-SPEC
+/// 8-125, runtime-SPEC 8-15).
 ///
 /// Before this, the product handed the pipeline no stamp at all, so a
 /// model in a real city never learned when a command ran.
 #[test]
-fn a_served_command_result_ends_with_the_second_its_call_started() {
+fn a_served_command_result_ends_with_the_second_its_call_answered() {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = dir.path().join("lab").join("room1");
@@ -174,13 +175,12 @@ fn a_served_command_result_ends_with_the_second_its_call_started() {
             .find(|value| value["kind"] == kind)
             .unwrap_or_else(|| panic!("no {kind} on the ledger"))
     };
-    let started = kernel::TimeMs::new(of_kind("tool_called")["t"].as_u64().unwrap());
-    let content = of_kind("tool_result")["data"]["result"]["content"]
-        .as_str()
-        .unwrap();
+    let answer = of_kind("tool_result");
+    let answered = kernel::TimeMs::new(answer["t"].as_u64().unwrap());
+    let content = answer["data"]["result"]["content"].as_str().unwrap();
     assert_eq!(
         content.lines().last(),
-        Some(format!("clock: {};", runtime::clock::iso(started)).as_str()),
-        "the command's result does not end with the second its call started: {content}"
+        Some(format!("clock: {};", runtime::clock::iso(answered)).as_str()),
+        "the command's result does not end with the second its call answered: {content}"
     );
 }

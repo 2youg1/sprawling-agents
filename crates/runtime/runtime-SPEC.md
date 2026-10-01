@@ -42,7 +42,7 @@
 1. **verify 的规范复验**：v1 无升级器链，故对每行断言 `canonical_line(parse_line(raw)) == raw`（写方规范性质）。未来 v>1 经升级器读入后此断言只对原版字节成立——届时随升级器一并改约（本文更新）。
 2. **fork 的 run_forked 落账**：事件写入母城 Ledger 由调用方（runtime 回合层／citysim）执行；fork 只产 EventDraft 与前缀，不持 Ledger 句柄——保持纯函数形。
 3. **同一套重建器**：A15 与 A19 共用 verify 输出；重建器＝verified 行序列本身。
-5. **命令结果的戳是答复时刻，而产品的验收还比开始时刻**：回合在调用工具面的 `account` 之前读答复时刻（§8-15、§12.8），所以工具面打戳时 `ClockReading` 里最新的就是它，戳的秒数等于这条调用 `tool_result` 的 `t`；`turn::tests::concurrent` 的 `a_stamp_the_face_reads_is_the_moment_its_answer_records` 在串行与开头只读段两条路上钉住这一点。`accounting::worker::driving::tests::sieving` 的 `a_served_command_result_ends_with_the_second_its_call_started` 仍拿戳比 `tool_called` 的 `t`：墙钟下一条命令的开始与答复落在同一秒时它照样绿，跨过整秒时会红。那条测试要改为比 `tool_result` 的 `t` 并改名；它所在的文件本轮归别的改动，改它的那一步留在这里。
+5. **命令结果的戳是答复时刻**：回合在调用工具面的 `account` 之前读答复时刻（§8-15、§12.8），所以工具面打戳时 `ClockReading` 里最新的就是它，戳的秒数等于这条调用 `tool_result` 的 `t`；`turn::tests::concurrent` 的 `a_stamp_the_face_reads_is_the_moment_its_answer_records` 在串行与开头只读段两条路上钉住这一点，`accounting::worker::driving::tests::sieving` 的 `a_served_command_result_ends_with_the_second_its_call_answered` 在一次真实派活上比同一个 `t`。
 4. **前缀续期未接线**：`prefix::warmth` 的 `Warmed` 与记账已在（§8-4-2），而 run 结束后按 `next_due` 醒来发续期的那条循环还没有；接上它要先定续期的 usage 记成哪一种事件。
 6. **`contract_kept` 的证据今天没人量。** 城读不出一次翻新有没有动到可观察的契约，装配层把 `Produced.contract_moved` 恒填 `false`，所以选了 `contract_kept` 的 run 在合并时恒放行（§8-54）。要让这一要求真的拒，得有一个读得出契约的量具（例如 run 前后同一组对外测试的结果对照）把它填进 `Produced`；判定它的证据是一次动了对外行为、测试仍绿的翻新在 citysim 里被放行。
 7. **`Create` 管不到楼的 MCP 工具。** 一个 MCP server 是楼自己声明的外部进程，它写不写文件、写在哪里，城看不见（§8-55 只覆盖城自己的写路径：edit、exec 与链接）。候选是 `Create` 下不挂载声明了写效果的连接器，或只挂载声明只读的；判定它的证据是一个会写文件的连接器在 `Create` 的 run 里改动了已有文件。
