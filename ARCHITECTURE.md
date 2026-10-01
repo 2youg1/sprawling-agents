@@ -785,8 +785,9 @@ SPEC.
 
 ### The performance register
 
-Sizes are gated because a byte count does not depend on how busy the
-machine was. Wall-clock figures are measured, reported with the machine
+Sizes are read and printed, not gated, because runtime speed comes
+before size: a bigger binary that answers faster is the better binary.
+Wall-clock figures are measured, reported with the machine
 that produced them, and never gated: a slow runner is not a defect, and a
 gate that says it is teaches people to ignore gates. **The full register is
 `tools/xtask/budgets.toml`**, which is the authority; `cargo xtask budget` prints
@@ -795,8 +796,8 @@ than typed.
 
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
-| Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->599,102 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->3.5×<!-- xtask:end --> headroom | yes |
-| The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->13,159,936 B<!-- xtask:end -->, client included | yes |
+| Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->599,102 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->3.5×<!-- xtask:end --> headroom | no: a reading; speed comes before size |
+| The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->13,159,936 B<!-- xtask:end -->, client included | no: a reading; speed comes before size |
 | Resident memory, one session | ≤<!-- xtask:begin budget_bytes:resident_empty_idle -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:resident_empty_idle -->2,469,888 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
 | Ledger append plus fsync | p50 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p50_ms -->5<!-- xtask:end --> ms, p99 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p99_ms -->20<!-- xtask:end --> ms | `[ledger_append]`, with its machine class | no |
 | Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->716<!-- xtask:end --> ms for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
