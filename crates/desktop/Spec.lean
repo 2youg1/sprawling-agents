@@ -71,8 +71,6 @@ import crates.desktop.spec.Session
 `crates/agent_protocols` 已经是这套协议的**客户端**权威：`Rpc::initialize`／`initialized`／`list_tools`／`call_tool`／`read` 定死了城里说出去的每一行，`agent_protocols::mcp::stdio` 定死了字节怎么走（子进程、按行、消息内无换行、超时即回收子进程）。本 package 是那一端的**对侧**，因此它的形状不是设计出来的，是**读出来的**。
 
 城这一侧读 `tools/call` 答复的是 `agent_protocols::McpTool`：`isError: true` 的结果是一次失败，拒词全文进它的 subject；`_meta` 带 `sprawling/effect-unknown` 时它标 `Retry::Unknown`（`crates/agent_protocols/Spec.lean` §8-1c）。
-
-**已知出入**：§10 第 2 条写「`Fresh` 只答 `initialize` 与 `ping`，`Initializing` 收到通知才进 `Ready`」；代码里 `notifications/initialized` 在任何阶段都让连接进 `Ready`，包括没有先收到 `initialize` 的 `Fresh`。`spec/Session.lean` 照代码今天的转移建模，它证明的「没收到这条通知就不出工具」两边都成立；要不要在 `Fresh` 拒这条通知是 §3 之外一处未决的收紧，改它先改 `spec/Session.lean` 的 `next`。
 -/
 
 /-! ## 5 权威信源
@@ -218,6 +216,9 @@ pub(crate) fn fold<'a>(lines: impl IntoIterator<Item = Line<'a>>, ending: &Endin
 // 本 package 的全部公开面就这一个函数：一台 server 的其余一切都经协议抵达。
 pub fn serve_stdio(scope_path: Option<&Path>) -> std::io::Result<()>;
 pub(crate) enum Phase { Fresh, Initializing, Ready }
+impl Phase {
+    fn opened(self) -> Result<Phase, Refusal>;   // notifications/initialized 之后的阶段；Fresh 即 E_GATE_DENIED，阶段不动（D15）
+}
 pub(crate) struct Server { /* 私有：scope／phase */ }
 impl Server {
     pub(crate) fn new(scope: Scope) -> Server;
@@ -378,13 +379,13 @@ D13 录下的声音作为一块 audio content 交回城里。
 
 进程起来 → `sprawling desktop` 取 scope 路径（第一个位置参数，否则无）→ `serve_stdio` → `Scope::read`（缺文件即 `Closed`）→ `Server::serve` 阻塞读 stdin。
 
-每收到一行：`rpc::read` → 按 method 分派 → `initialize` 答能力与自我介绍并进 `Initializing` → `notifications/initialized` 无答案并进 `Ready` → `ping` 答 `{}` → `tools/list` 答六张卡片 → `tools/call` 先 `Scope::admits`（过了交出一个 `Admitted`），再把它随参数一起交给 `platform::perform` → 出一行 → flush。
+每收到一行：`rpc::read` → 按 method 分派 → `initialize` 答能力与自我介绍并进 `Initializing` → `notifications/initialized` 在 `initialize` 之后收到时无答案并进 `Ready`，在它之前收到时被拒、阶段不动（D15）→ `ping` 答 `{}` → `tools/list` 答六张卡片 → `tools/call` 先 `Scope::admits`（过了交出一个 `Admitted`），再把它随参数一起交给 `platform::perform` → 出一行 → flush。
 -/
 
 /-! ## 10 实现逻辑
 
 1. **一条消息一行**：`serde_json::to_string` 不产生换行，且写出前不做美化；这与 `agent_protocols::mcp::stdio::Connection::framed` 的检查是同一条契约的两端。
-2. **握手顺序被强制**：`Fresh` 只答 `initialize` 与 `ping`，`Initializing` 收到通知才进 `Ready`。规范就是这么写的，而一个不强制它的 server 会让客户端的顺序错误在别处以别的形状爆出来。
+2. **握手顺序被强制**：`Fresh` 只答 `initialize` 与 `ping`，`Initializing` 收到通知才进 `Ready`，`Fresh` 收到通知留在 `Fresh`（D15）。规范就是这么写的，而一个不强制它的 server 会让客户端的顺序错误在别处以别的形状爆出来。
 3. **`id` 原样回**：不解析、不重编号——`id` 是对侧的东西。通知（无 `id`）恒无答案，否则会在管道里留下一行，此后每次调用读到的都是上一条的答案。
 4. **glob 只认 `*`**：title pattern 是给人写的，一整套正则会让「我到底放开了什么」变成一个需要推演的问题。匹配按 ASCII 大小写不敏感，因为 Windows 的进程名就是这样比的。
 5. **越界判定在平台之前**：`admits` 是纯判定，无 I/O、无时钟，于是它可以被逐条测，而 Win32 一行都还没跑。
@@ -457,6 +458,13 @@ D11 声音：ffmpeg 的 `dshow` 录 scope 文件点名的那一个设备。
 - **理由**：主线 ffmpeg 在 Windows 上的音频输入是 `dshow`（`ffmpeg -devices` 列得出），不加依赖、不加 `unsafe`。dshow 设备的名字是驱动起的，随机器而变，城里没有一处知道；替人挑一个，就是替人授权录下一个他没点名的声音源，而麦克风是比一扇窗口更重的授权。人写下名字，就是人授权了这一个设备，与 `windows` 列表授权窗口是同一种读法。画面与声音分成两个进程、两个文件：画面从 stdin 进（D7），声音是 ffmpeg 自己的输入，放进一个进程就要对齐两条时钟；wav 是 `gateway::AudioType` 认得、城的 `transcribe` 工具直接收得下的容器（sprawling-SPEC 8-131），16 kHz 单声道一分钟约 1.9 MB。
 - **击败的备选**：WASAPI 回环（能录机器正在放的任何声音，但要新依赖或新 `unsafe`）；枚举设备取第一个（替人选了授权对象）；由调用方在参数里给设备名（模型给出授权对象，scope 文件就不再是授权的唯一处）；把声音混进 mp4（两条时钟，而没有 ffmpeg 的那一支本来就没有声音可混）。
 - **重开的参数**：主线 ffmpeg 在 Windows 上有了 WASAPI 输入；或者 scope 文件要按窗口给不同的设备。
+
+D15 `initialize` 之前的 `notifications/initialized` 被拒，阶段不动。
+
+- **决定**：`Fresh` 收到 `notifications/initialized` 留在 `Fresh`；作为通知发来时照旧无答案，带 `id` 时答 `E_GATE_DENIED`，与握手未完成时 `tools/list` 得到的是同一句拒词。`Initializing` 与 `Ready` 收到它进 `Ready`。这一步转移只写在 `Phase::opened`（`session.rs`），`spec/Session.lean` 的 `afterOpened` 与它同形，`fresh_until_initialize` 证明一个没发过 `initialize` 的连接恒在 `Fresh`。
+- **理由**：MCP 的生命周期是 `initialize` 在先、这条通知在后（§5 第一行）。一个只发通知的客户端没有协商协议修订，也没读到能力表，它拿到的工具表按一个它不知道的修订写成；旧的转移让这条通知在任何阶段都开门，§10 第 2 条写下的次序就只强制了一半。
+- **击败的备选**：①照旧放行（次序只强制一半）；②`Fresh` 收到它就进 `Initializing`（替客户端补了一次它没发的 `initialize`）；③断开连接（一次次序错误就断线，而之后正确的 `initialize` 与任何时候的 `ping` 仍该得到回答）。
+- **重开的参数**：MCP 的新修订允许不经 `initialize` 开始一个连接。
 
 **成本：模型读到的是什么。** 工具名恒是 `desktop.<动词>`，模型一眼看得出这一件事发生在桌面上而不是页面里。一扇窗口读起来是一段缩进的大纲，每行一个元素和它的 ref，模型读完就能指名要点的那一个。每条说明的后半句写的是**不做什么**，因为模型下一步最贵的错误是把一件工具当成它旁边那件。拒词恒给一个可执行的下一步：越界给「把这个窗口写进 `DESKTOP.toml`」，未实现给「这个 build 里没有它」。拒词全文作为文字到达模型：城这一侧把 `isError` 结果读成一次失败，文字原样进它的 subject；部分输入另带效果未知，模型读到的是「先看一眼再动」，不是「可以重试」。
 -/
@@ -546,7 +554,7 @@ D10 树经 `uiautomation` 读、按文档序铸 ref、折成文字；COM 公寓�
 | 大纲里一个名字最多的字符数（`outline::LABEL_MOST`） | 80 | 我们的选择：够分辨两个控件，一扇窗口的大纲仍是一页；再长的名字多半是一段正文，模型要读它就截图或读剪贴板 |
 | 大纲每深一层的缩进 | 两个空格 | 我们的选择：最省字符、仍一眼看得出层次的缩进 |
 | 截图默认格式／`scale` | `png`／100 | 我们的选择：默认不损、不缩，缩放是调用方明说才发生的事 |
-| `quality` 的域 | 0..=100 | 城里的域（`kernel::consts_policy::IMAGE_QUALITY`），本 package 以它的 `admit` 判，不写第二个数。域外即拒：一个要求 120 的调用方以为自己要多好就有多好，而替它填默认值是在回答另一个问题 |
+| `quality` 的域 | 0..=100 | 城里的域（`kernel::consts_policy::IMAGE_QUALITY`），本 package 以它的 `admit` 判，截图 schema 的 `maximum` 也经 `admit` 读出（D16），不写第二个数。域外即拒：一个要求 120 的调用方以为自己要多好就有多好，而替它填默认值是在回答另一个问题 |
 | `scale` 与城里那个同名量的区别 | 本包的 `scale` 是窗口自身像素的百分数 | 城里 `browser` 的 `scale` 是设备像素比（devicePixelRatio）的百分数——同一个词、两个量，**不是同一个事实**，所以两边的域也不必相同 |
 | `webp` 忽略 `quality` | —— | 外面的事实：`image` 的 WebP 编码器是**无损**的，故 `quality` 对它无意义。schema 允许同时给出，本 server 恒不因此报错，而在答复里写明这一次的编码是无损的 |
 | 帧序列的抓帧间隔 | 100 ms（10 fps） | 我们的选择：`PrintWindow` 一帧的代价决定了上限，而 10 fps 足够看清一次交互 |
@@ -562,6 +570,13 @@ D10 树经 `uiautomation` 读、按文档序铸 ref、折成文字；COM 公寓�
 | Zig 的版本 | `crates/desktop/ffi/zig-version` 里的那一行 | 我们的选择：叶子只对一个 Zig 版本编过、测过；换版本只改那一个文件（`crates/desktop/ffi/Spec.lean` D3） |
 
 模型里的 `LABEL_MOST` 与 Rust 的 `outline::LABEL_MOST` 取同一个值，由 `outline` 模块旁的测试守着。
+
+D16 截图 schema 的 `quality` 上限经 `IMAGE_QUALITY.admit` 读出。
+
+- **决定**：`desktop.screenshot` 的 `inputSchema` 里 `quality.maximum` 是 `kernel::consts_policy::IMAGE_QUALITY` 收下的最大值，由 `tools::largest_quality` 在 `admit` 上二分找出：`admit` 的域是 `0..=max`（kernel-SPEC §8-73），所以「收下」对质量单调，三十二次判定之内找到边界。一次调用的质量仍在解析点经 `admit` 判（`platform::windows::reading`）。
+- **理由**：schema 是模型读到的域，`admit` 是本 server 执行的域。schema 里写死的 100 是同一个事实的第二份定义：城里的域一挪，模型照旧按旧域发，server 按新域拒。kernel 的 `ImageQuality` 没有 getter，那是 kernel-SPEC 12.3 的定规（拒因只由类型说出，调用方读不出裸数去拼自己的句子）；schema 的上界不是一句拒因，经类型唯一的门读出它，定规不动。
+- **击败的备选**：①在 `consts_policy` 加一个公开常量 `IMAGE_QUALITY_MAX`，`IMAGE_QUALITY` 由它构造——一个数一个家，代码最短，但它正是 12.3 这条定规关上的那扇门；②留 100、由评审盯着；③由 `xtask guard` 比对两处（设计九已否：抄件加比对只让漂移看得见）。
+- **重开的参数**：kernel-SPEC 12.3 改为准许读出上限类政策值的数；那时 schema 直接读那个数，`largest_quality` 删去。
 -/
 
 /-! ## 15 影响面
@@ -614,7 +629,7 @@ D10 树经 `uiautomation` 读、按文档序铸 ref、折成文字；COM 公寓�
 
 **操作者检查**（真机上由人做，不是门）：一台按 150% 缩放的显示器上，`desktop.snapshot` 之后按 ref 点击落在控件中心；对记事本 `type` 一段文字，文字进了指名的那扇窗口，动作之后 Ctrl、Shift 没有停在按下；两扇同名窗口按 `process` 指名录制，录到的是那一扇；写剪贴板期间 `GetClipboardOwner` 不为空；一张截图经 MCP 到模型，模型能说出图里的内容。
 
-**证明**：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`。咬得动的演示：`Desktop.Scope.withoutBoth_admits_an_unlisted_process`、`Desktop.Scope.Pattern.withoutTheEnd_matches_a_longer_name`、`Desktop.Session.withoutTheGate_lists_tools_on_a_fresh_connection`、`Desktop.Outline.withoutCleaning_keeps_a_newline`、`Desktop.Platform.Windows.Strokes.withoutUp_lifts_a_finished_click`、`Desktop.Platform.Windows.Views.withoutBounds_acts_on_a_moved_window`、`Desktop.Platform.Windows.Target.withoutUniqueness_picks_the_first_of_two`。模型的证明不是 Rust 实现的证明：实现与模型的一致由各模块旁的测试判（`cargo nextest run -p sprawling-desktop`），与上面的操作者检查分开记。
+**证明**：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`。咬得动的演示：`Desktop.Scope.withoutBoth_admits_an_unlisted_process`、`Desktop.Scope.Pattern.withoutTheEnd_matches_a_longer_name`、`Desktop.Session.withoutTheGate_lists_tools_on_a_fresh_connection`、`Desktop.Session.withoutTheOrder_opens_the_tools_on_the_notification_alone`、`Desktop.Outline.withoutCleaning_keeps_a_newline`、`Desktop.Platform.Windows.Strokes.withoutUp_lifts_a_finished_click`、`Desktop.Platform.Windows.Views.withoutBounds_acts_on_a_moved_window`、`Desktop.Platform.Windows.Target.withoutUniqueness_picks_the_first_of_two`。模型的证明不是 Rust 实现的证明：实现与模型的一致由各模块旁的测试判（`cargo nextest run -p sprawling-desktop`），与上面的操作者检查分开记。
 -/
 
 /-! ## 17 文档关系

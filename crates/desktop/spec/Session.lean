@@ -10,15 +10,14 @@
 
 MCP 的生命周期是 `initialize` → `notifications/initialized` → 其余。一台不强制这个次序的 server 会让客户端的次序错误在别处以别的形状爆出来（§10 第 2 条）。`Phase` 是 typestate 在运行期的投影：`Fresh`、`Initializing`、`Ready`。
 
-三条性质：
+五条性质：
 
 1. **没收到 `notifications/initialized` 之前，`tools/list` 与 `tools/call` 恒被拒**（`no_tool_before_the_notification`）。
-2. **两步握手之后工具可用**（`the_two_steps_open_the_tools`）。
-3. **`ping` 在任何阶段都答**（`ping_is_answered_in_every_phase`）。
+2. **没收到 `initialize` 的连接恒在 `Fresh`，工具恒被拒**（`fresh_until_initialize`、`no_tool_without_initialize`）：`initialize` 之前的那条通知不开门，本身也被拒（`the_notification_alone_is_refused`，入口 D15）。
+3. **两步握手之后工具可用**（`the_two_steps_open_the_tools`）。
+4. **`ping` 在任何阶段都答**（`ping_is_answered_in_every_phase`）。
 
-本模型写的是代码今天的转移：`notifications/initialized` 在任何阶段都让连接进 `Ready`，包括没有先收到 `initialize` 的 `Fresh`（入口 §4 记着这一处与 §10 第 2 条字面的出入）。
-
-**拿掉阶段的核对，一个刚连上的客户端不握手就拿到工具表**（`withoutTheGate_lists_tools_on_a_fresh_connection`）：本模型咬得动的演示。
+两个咬得动的演示：**拿掉阶段的核对，一个刚连上的客户端不握手就拿到工具表**（`withoutTheGate_lists_tools_on_a_fresh_connection`）；**拿掉次序的核对，只发那条通知就拿到工具表**（`withoutTheOrder_opens_the_tools_on_the_notification_alone`）。
 -/
 
 namespace Desktop.Session
@@ -39,10 +38,16 @@ inductive Method where
   | unknown
   deriving DecidableEq, Repr
 
+/-- `notifications/initialized` 之后的阶段：只有答过 `initialize` 的连接进 `Ready`，`Fresh` 留在 `Fresh`（入口 D15）。 -/
+def afterOpened : Phase → Phase
+  | .fresh => .fresh
+  | .initializing => .ready
+  | .ready => .ready
+
 /-- 一行之后的阶段。 -/
 def next (phase : Phase) : Method → Phase
   | .opening => .initializing
-  | .opened => .ready
+  | .opened => afterOpened phase
   | .ping => phase
   | .list => phase
   | .call => phase
@@ -51,7 +56,7 @@ def next (phase : Phase) : Method → Phase
 /-- 这一行是否被答成功（拒绝即 `false`）。 -/
 def served (phase : Phase) : Method → Bool
   | .opening => true
-  | .opened => true
+  | .opened => phase ≠ .fresh
   | .ping => true
   | .list => phase = .ready
   | .call => phase = .ready
@@ -84,6 +89,35 @@ theorem no_tool_before_the_notification (methods : List Method)
   have notReady := never_ready_without_the_notification methods .fresh (by decide) absent
   rcases h with rfl | rfl <;> simp [served, notReady]
 
+theorem fresh_until_initialize (methods : List Method) :
+    .opening ∉ methods → run .fresh methods = .fresh := by
+  induction methods with
+  | nil => intro _; rfl
+  | cons m rest ih =>
+    intro absent
+    simp only [List.mem_cons, not_or] at absent
+    have stays : next .fresh m = .fresh := by
+      cases m with
+      | opening => exact (absent.1 rfl).elim
+      | opened => rfl
+      | ping => rfl
+      | list => rfl
+      | call => rfl
+      | unknown => rfl
+    show List.foldl next (next .fresh m) rest = .fresh
+    rw [stays]
+    exact ih absent.2
+
+theorem no_tool_without_initialize (methods : List Method)
+    (absent : .opening ∉ methods) (tool : Method) (h : tool = .list ∨ tool = .call) :
+    served (run .fresh methods) tool = false := by
+  rw [fresh_until_initialize methods absent]
+  rcases h with rfl | rfl <;> decide
+
+theorem the_notification_alone_is_refused :
+    served .fresh .opened = false ∧ run .fresh [.opened] = .fresh := by
+  decide
+
 theorem the_two_steps_open_the_tools :
     served (run .fresh [.opening, .opened]) .list = true ∧
       served (run .fresh [.opening, .opened]) .call = true := by
@@ -103,5 +137,17 @@ def servedWithoutTheGate (_phase : Phase) : Method → Bool
 
 theorem withoutTheGate_lists_tools_on_a_fresh_connection :
     servedWithoutTheGate (run .fresh []) .list = true := rfl
+
+/-!
+不核对次序，`fresh_until_initialize` 不再成立：那条通知在任何阶段都开门，一个从不发 `initialize` 的客户端只发通知就拿到工具表。
+-/
+
+def nextWithoutTheOrder (phase : Phase) : Method → Phase
+  | .opened => .ready
+  | method => next phase method
+
+theorem withoutTheOrder_opens_the_tools_on_the_notification_alone :
+    served ([Method.opened].foldl nextWithoutTheOrder .fresh) .list = true := by
+  decide
 
 end Desktop.Session
