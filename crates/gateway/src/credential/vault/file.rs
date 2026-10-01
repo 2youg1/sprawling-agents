@@ -9,7 +9,7 @@
 //! this city can grep the machine it runs on, so a credential in
 //! cleartext beside the configuration is one the agent can put in a
 //! window. Whoever already holds the passphrase is not kept out, and
-//! disk theft is a different question (gateway-SPEC 8-21).
+//! disk theft is a different question (`crates/gateway/spec/Credential/Vault/File.lean` §8-21).
 //!
 //! One entry is sealed on its own with ChaCha20-Poly1305 under a fresh
 //! 96-bit nonce, and the additional data binds the format version, the
@@ -232,7 +232,7 @@ impl FileVault {
     /// one behind — never a half-written one.
     ///
     /// **This module owns the replacement of this one file**, and
-    /// gateway-SPEC 8-21 records why it is not `city::document`.
+    /// `crates/gateway/spec/Credential/Vault/File.lean` §8-21 records why it is not `city::document`.
     fn save(&self) -> Result<(), AxError> {
         let document = Document {
             version: FORMAT_VERSION,

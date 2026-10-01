@@ -74,7 +74,7 @@ impl Entered {
 /// a deadline for the whole streamed request**, which is what this
 /// city's blocking transport can enforce; the wire keeps the name the
 /// person's own `config.toml` uses, and `gateway` states what it does
-/// with it (gateway-SPEC.md 8-NN).
+/// with it (`crates/gateway/Spec.lean` §8-16).
 ///
 /// A row with no name and a pointer with no path are dropped: a form
 /// that keeps an empty row open while somebody types is a form whose

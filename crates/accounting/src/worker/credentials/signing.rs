@@ -7,8 +7,8 @@
 //! redeems a reference.
 //!
 //! No login lives here. Subscription quota enters the city through the
-//! vendor's own harness, where the person signs in (gateway-SPEC.md
-//! 8-5), so the only credential this city takes is a key a person
+//! vendor's own harness, where the person signs in (`crates/gateway/Spec.lean`
+//! §8-5), so the only credential this city takes is a key a person
 //! hands it.
 
 use std::sync::Arc;

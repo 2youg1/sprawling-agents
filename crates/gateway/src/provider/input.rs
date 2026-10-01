@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which statement about what one model accepts wins (shape 1 decision;
-//! gateway-SPEC.md section 8-37).
+//! `crates/gateway/spec/Provider/Input.lean` §8-37).
 //!
 //! **A model whose vendor documents that it reads pictures was
 //! registered as reading only text.** The registration took its input

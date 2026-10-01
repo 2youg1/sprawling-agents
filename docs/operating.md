@@ -212,7 +212,7 @@ This repository bundles nobody's key, pays for nothing, and proxies nothing. Eve
 
 ### Provider intelligence — followed from upstreams
 
-The city calls a provider with an API key, on the OpenAI-compatible face or the Anthropic-compatible face, and signs in to no subscription (`crates/gateway/gateway-SPEC.md` section 8-5). Which path a known host's API hangs under, and which face it answers on, is a fact the host table in `gateway::provider::preset` holds, each row citing its source. Where a vendor's own client states such a fact, it is followed from that client rather than copied: [`third-party.md`](third-party.md) gives each upstream's licence, the path watched, the commit it is tracked to, and how to re-check.
+The city calls a provider with an API key, on the OpenAI-compatible face or the Anthropic-compatible face, and signs in to no subscription (`crates/gateway/Spec.lean` §8-5). Which path a known host's API hangs under, and which face it answers on, is a fact the host table in `gateway::provider::preset` holds, each row citing its source. Where a vendor's own client states such a fact, it is followed from that client rather than copied: [`third-party.md`](third-party.md) gives each upstream's licence, the path watched, the commit it is tracked to, and how to re-check.
 
 | To do this | Change this |
 |---|---|

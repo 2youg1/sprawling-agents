@@ -35,7 +35,7 @@ use crate::router::DialectHint;
 /// every reader, which is how a new one is kept from being approximated
 /// with the nearest of the three already written. Subscription quota is
 /// not a way to connect: it enters the city through the vendor's own
-/// harness (gateway-SPEC.md 8-5).
+/// harness (`crates/gateway/Spec.lean` §8-5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ConnectionKind {
     /// The OpenAI-compatible chat face — what most relays, most local
@@ -78,7 +78,7 @@ impl ConnectionKind {
     /// each as the face that vendor answered on. The credential such an
     /// endpoint holds is no longer renewed, so its first call after the
     /// token expires is refused by the vendor, and the person attaches
-    /// a key in its place (gateway-SPEC.md 8-5).
+    /// a key in its place (`crates/gateway/Spec.lean` §8-5).
     ///
     /// # Errors
     /// A word no build of this city ever wrote, which a ledger written
@@ -188,7 +188,7 @@ mod tests {
 
     /// An endpoint an older build attached through a subscription login
     /// replays on the face its vendor answered on, so an old ledger
-    /// still folds (gateway-SPEC.md 8-5).
+    /// still folds (`crates/gateway/Spec.lean` §8-5).
     #[test]
     fn a_harness_word_an_older_build_wrote_reads_as_the_face_it_answered_on() {
         for (word, face) in [

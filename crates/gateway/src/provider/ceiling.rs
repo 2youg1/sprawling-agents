@@ -4,7 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which statement about one model's output ceiling wins, and who made
-//! it (shape 1 decision; gateway-SPEC.md section 8-17).
+//! it (shape 1 decision; `crates/gateway/spec/Provider/Ceiling.lean`, interface
+//! in `crates/gateway/spec/Provider.lean` §8-17).
 //!
 //! **A model with no registered ceiling could not be called at all.**
 //! The Anthropic wire requires `max_tokens` in every request and refuses

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The process's one TLS crypto backend (gateway-SPEC.md section 8-15).
+//! The process's one TLS crypto backend (`crates/gateway/spec/Reach.lean` §8-15).
 //!
 //! rustls asks the process for a default provider when a client is
 //! built; reqwest is compiled with `rustls-no-provider`, so nothing

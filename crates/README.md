@@ -17,7 +17,7 @@ Every Rust package of the product lives in this directory. The packages are sepa
 | `crates/desktop` | `sprawling-desktop` | `desktop` | this Windows desktop, offered as an MCP server, and the one FFI seam beneath it | `agent_protocols`, `desktop_ffi`, `kernel` | `crates/desktop/Spec.lean` |
 | `crates/desktop/ffi` | `sprawling-desktop-ffi` | `desktop_ffi` | this Windows desktop, offered as an MCP server, and the one FFI seam beneath it | nothing | `crates/desktop/ffi/Spec.lean` |
 | `crates/documents` | `sprawling-documents` | `documents` | the rules of a document a person reads and edits through a page: its version, its characters, its windows, and what one save changes | `kernel` | `crates/documents/Spec.lean` |
-| `crates/gateway` | `sprawling-gateway` | `gateway` | everything between a decision to call a model and the bytes on the wire | `kernel` | `crates/gateway/gateway-SPEC.md` |
+| `crates/gateway` | `sprawling-gateway` | `gateway` | everything between a decision to call a model and the bytes on the wire | `kernel` | `crates/gateway/Spec.lean` |
 | `crates/kernel` | `sprawling-kernel` | `kernel` | every decision in the city, and nothing that touches a disk | nothing | `crates/kernel/kernel-SPEC.md` |
 | `crates/remote_access` | `sprawling-remote-access` | `remote_access` | the remote door, and the routes that carry its bytes and decide nothing | `kernel` | `crates/remote_access/Spec.lean` |
 | `crates/runtime` | `sprawling-runtime` | `runtime` | one run, from dispatch to freeze | `gateway`, `kernel`, `storage` | `crates/runtime/Spec.lean` |

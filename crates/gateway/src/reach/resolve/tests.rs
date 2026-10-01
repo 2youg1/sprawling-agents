@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One round per preset host and face (gateway-SPEC.md section 8-32):
+//! One round per preset host and face (`crates/gateway/spec/Reach/Resolve.lean` §8-32):
 //! the request the production path writes for that host, heard by a
 //! stand-in, against what the host's vendor documents.
 

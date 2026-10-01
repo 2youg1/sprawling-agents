@@ -9,7 +9,7 @@
 //! thread and keeps its own connection pool. A client built per call
 //! therefore held one thread per concurrent run and handshook again on
 //! every call, so the book keeps one [`Transport`] per endpoint and every
-//! call to that endpoint clones its client (gateway-SPEC.md §8-3).
+//! call to that endpoint clones its client (`crates/gateway/spec/Endpoint/Transport.lean` §8-3).
 
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -28,7 +28,7 @@ use super::redemption::Redemption;
 pub(crate) struct Transport {
     slot: Arc<OnceLock<reqwest::blocking::Client>>,
     /// The step a test takes after the client is configured and before
-    /// it is built (gateway-SPEC.md section 8-32).
+    /// it is built (`crates/gateway/spec/Reach/Resolve.lean` §8-32).
     #[cfg(test)]
     detour: Option<Detour>,
 }
@@ -136,7 +136,7 @@ mod tests {
     const HOST: &str = "api.anthropic.com";
     const BASE: &str = "https://api.anthropic.com/v1/messages";
 
-    /// gateway-SPEC.md section 8-35: every call to one endpoint goes out
+    /// `crates/gateway/spec/Endpoint/Transport.lean` §8-35: every call to one endpoint goes out
     /// over the connection the endpoint's first call opened, so resolving,
     /// connecting and the handshake are paid once per endpoint rather than
     /// once per call. A call through another transport opens a connection
@@ -160,7 +160,7 @@ mod tests {
         );
     }
 
-    /// The reading behind gateway-SPEC.md section 8-35: an endpoint's
+    /// The reading behind `crates/gateway/spec/Endpoint/Transport.lean` §8-35: an endpoint's
     /// first and second request through one client, timed apart, over
     /// `ROUNDS` fresh clients. The difference is what the first request
     /// pays to resolve, connect and shake hands. By default it reads the

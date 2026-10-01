@@ -4,7 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What failed about one provider call, and the one place that decides
-//! whether it may be asked again and what the person does next.
+//! whether it may be asked again and what the person does next
+//! (`crates/gateway/spec/Endpoint/Failure.lean`, gateway D2 and D3).
 
 use kernel::{AxError, ProviderFailureKind, Retry};
 

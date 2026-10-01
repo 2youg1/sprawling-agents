@@ -77,7 +77,7 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
 /// A model the pinned catalogue does not know, whose vendor's page says
 /// it reads pictures, is registered as reading them, so the endpoint
 /// shows it the picture ocr hands it instead of refusing
-/// (gateway-SPEC.md 8-37).
+/// (`crates/gateway/Spec.lean` §8-37).
 #[test]
 fn a_preset_model_that_reads_pictures_is_registered_as_reading_them() {
     let dir = tempfile::tempdir().unwrap();

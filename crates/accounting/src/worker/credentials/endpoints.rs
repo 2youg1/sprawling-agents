@@ -212,8 +212,8 @@ impl RunWorker {
     /// belongs to a chat request, and a model list takes no body.
     ///
     /// `request_max_retries` is honoured here, and here only: a model
-    /// call's retries are the watchdog's decision (gateway-SPEC.md
-    /// 8-NN), while a person watching a settings page is waiting on this
+    /// call's retries are the watchdog's decision (`crates/gateway/Spec.lean`
+    /// §8-16), while a person watching a settings page is waiting on this
     /// one request and a network that dropped it once is worth asking
     /// again.
     fn probe(
@@ -355,7 +355,7 @@ mod tests {
 
     /// On the chat face a model nobody stated a ceiling for is called
     /// with none, so the provider's own default for that model applies
-    /// (gateway-SPEC.md 8-17), and the account says who picked it.
+    /// (`crates/gateway/Spec.lean` §8-17), and the account says who picked it.
     #[test]
     fn a_chat_face_model_nobody_stated_a_ceiling_for_is_left_to_the_provider() {
         let dir = tempfile::tempdir().unwrap();

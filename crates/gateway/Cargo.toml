@@ -16,15 +16,15 @@ kernel = { workspace = true }
 serde.workspace = true
 serde_json.workspace = true
 # Constitution B.7: HTTP with rustls; the wire format stays self-written,
-# the transport does not (gateway-SPEC 8.5). Blocking: the turn loop is
+# the transport does not (`crates/gateway/Spec.lean` §10). Blocking: the turn loop is
 # synchronous, and one HTTP call must not asyncify the library.
 reqwest = { workspace = true }
 # Named for one call: `reach::tls` installs aws-lc-rs as the process's
-# rustls provider before any client is built (gateway-SPEC 8-15).
+# rustls provider before any client is built (`crates/gateway/Spec.lean` §8-15).
 rustls.workspace = true
 # Custody: platform credential service binding + zeroizing storage.
 # keyring-core carries the entry and its errors; each target names its
-# own store below (gateway-SPEC 8-4, section 12 says why not `keyring`).
+# own store below (`crates/gateway/spec/Credential.lean` §8-4; gateway D15 says why not `keyring`).
 #
 # The Linux store is keyutils (the kernel's own keyring, reached by
 # syscall) rather than a secret service, and the release artifact is
@@ -39,7 +39,7 @@ zeroize.workspace = true
 # The one base64 encoder both provider wires take pictures in, and the
 # encoding the encrypted vault file records a nonce and a ciphertext in.
 base64.workspace = true
-# The encrypted vault file (gateway-SPEC 8-21): one AEAD, one password KDF.
+# The encrypted vault file (`crates/gateway/Spec.lean` §8-21): one AEAD, one password KDF.
 # `FileVault` is the only reader of either, and it reaches them only on a
 # machine whose credential service refuses to keep a value.
 chacha20poly1305.workspace = true

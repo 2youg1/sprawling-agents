@@ -42,7 +42,7 @@
 
 ## 3 假设与歧义
 
-- **本 crate 是 tokio 的异步消费者**：套接字服务跑在 tokio＋axum 上；gateway 与 endpoint 用 `reqwest::blocking`，不引 tokio（gateway-SPEC §3／§13）。
+- **本 crate 是 tokio 的异步消费者**：套接字服务跑在 tokio＋axum 上；gateway 与 endpoint 用 `reqwest::blocking`，不引 tokio（`crates/gateway/Spec.lean` §3／§13）。
 - **没有第二条传输路径**：即使浏览器与服务在同一台机器上也是网络连接，故不存在「同进程内存通道」这条优惠。唯一例外是 `PutSecret`——它不是靠运行时判断走内存通道，而是**类型上不可序列化**，因此远程连接根本编不出这条帧。
 - **编码是 JSON，且编码本身不进冻结面**。选 JSON 的理由是不对称：浏览器原生支持，且开发者能在网络面板直接读帧。
 - **`control` 自持鉴权与幂等，独立成模块**。ARCHITECTURE §6 预留了「做不到则并入 server」的退路，这里不需要它：`control` 持有一条 `server` 不知道也不该知道的策略——**哪些 Command 是干预，以及一次干预必须留下什么**（「任何中断都以 Handoff 收尾，下一位拿得到完整现场」）。那是判定，不是转调。
@@ -303,7 +303,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 - 壳里零策略：判定在 `decide_enroll`，壳只搬字节——同 `decide_bind`／`decide_frame` 的切法，故无需跑服务即可穷尽测。
 - 应答返回那条 `secret_captured` 记录写下的 `ref`——金库键的那句文本，不是路由再拼一次的一句；值不回声、不入事件载荷。入金库由 `Sealed::into_vault_value`（住 kernel::secret，即 expose 白名单三文件之一）完成，开封因此**不发生在装配层**。
 
-**线上没有登录命令**：订阅额度由厂商自己的 harness 带进城，人在 harness 里自己登录，本城不以任何厂商客户端的身份登录（gateway-SPEC §8-5）。旧版本的 `Login` 命令与 `LoginStep` 随之删去；`COMMAND_NAMES` 少一项，schema 哈希因名字表而变，旧页面在握手期被明确拒绝，所以 `WIRE_V` 不为此进位。
+**线上没有登录命令**：订阅额度由厂商自己的 harness 带进城，人在 harness 里自己登录，本城不以任何厂商客户端的身份登录（`crates/gateway/Spec.lean` §8-5）。旧版本的 `Login` 命令与 `LoginStep` 随之删去；`COMMAND_NAMES` 少一项，schema 哈希因名字表而变，旧页面在握手期被明确拒绝，所以 `WIRE_V` 不为此进位。
 
 **五个查询各有自己的答**（`InboxView`／`DiscardView`／`RegistryView`／`ArchiveSearch`／`Metrics`）。三条口径：①**队列折叠着看不消费着看**（`Inbox::pull` 要拿走才给内容，看一眼就取走的视图会改变它所报告的对象）；②归档在被问的那一刻读盘（同 `BuildingView`，文件是权威）；③**`Metrics` 恒不携钱**——钱是 `CostView` 的，一个数字两个主人就是两个数字开始互相矛盾的起点。
 
@@ -1006,7 +1006,7 @@ pub enum DoctorCore { Raised, HeldBySetting, Refused { said }, LoweredByValve, U
 - **答的是城启动时看到的那一眼，不是现问现看**。每一项都是起一个进程问版本；一次查询若这么做，会把答一切读的那条线程按住数秒。城若没看过（一次一条命令驱动的工人就是），答 `Unavailable`——与「一栋没人盖过的楼」同口径：**「我没看」是它自己的答案**，而一台空机器会让页面告诉人他手上每件工具都缺。
 - **`install` 把平台不明单列一支**。三个平台之外的机器上，本项目没有任何配方；此时拼一条别的平台的命令是错的，沉默也是错的。
 - **沙箱的保证逐轴作答，不是一句「已隔离」**：`coverage` 逐轴一行，`Kept`／`NotKept` 两个字而不是布尔——页面两态都要有词，布尔会让每个读者自己给 `false` 选一个。它存在的理由，是 agent 在动手前要读得到哪几条保证没成立。臂与轴的定义住 ``crates/runtime/Spec.lean` §8-13-2`（`Confinement` 与 `Guarantee`），线上重拼一份，逐臂对应只住 `sprawling::doctor::report` 的穷尽匹配——上游加一臂即编译红。
-- **凭据的存放与寿命一起答，`refusal` 是平台服务自己的话**：三者同出 `gateway::Custodian::probe` 的一次往返（`gateway::Custody`，gateway-SPEC §8-4；寿命的全部档位见 §8-21），线上重拼 `Store` 与 `Persistence` 两套词，逐臂对应同住 `sprawling::doctor::report`；`refusal` 缺席读作服务没有拒——或该 store 由城自选，没有服务可拒。
+- **凭据的存放与寿命一起答，`refusal` 是平台服务自己的话**：三者同出 `gateway::Custodian::probe` 的一次往返（`gateway::Custody`，`crates/gateway/Spec.lean` §8-4；寿命的全部档位见 §8-21），线上重拼 `Store` 与 `Persistence` 两套词，逐臂对应同住 `sprawling::doctor::report`；`refusal` 缺席读作服务没有拒——或该 store 由城自选，没有服务可拒。
 - **核心线程站在哪一档，`said` 是平台自己的话**：`core` 是主机此刻会给核心线程的档位（sprawling-SPEC §8-93、§8-40）——升到正常档之上一级、按人的 `[core] priority` 留在正常档、平台拒绝（Unix 上没有 `CAP_SYS_NICE`）、被安全阀降回，或 doctor 没能问到。派出的命令不在这里：它们总是低一档，降档从不被拒（`crates/runtime/Spec.lean` §8-13-3）。
 - **服务端**：`sprawling::doctor::report` 把 findings 与这两道整机读数折成本形状，`Views` 存一份（sprawling-SPEC §8-54）。
 
@@ -1306,7 +1306,7 @@ pub enum ReleaseAnswer {
 | `Query::Config { addr }` → `ConfigAnswer` | `effort: Option<SettledEffort>` ＋ `second: SettledSecond` ＋ `TuningDefaults`；`SettledEffort` 携 `ConfigLayer`（`default｜city｜building｜resident`，后三个与 `city::Layer` 同拼写，`default` 是没有任何一级文件说过、城的内建值在生效）；`SettledSecond` 同携 `ConfigLayer`，`percent` 为已过 `SecondThreshold` 构造点的整百分数，没有一级说过时是 `kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT` 且 `from = default`，`domain: SecondDomain { min, max }` 是 `SecondThreshold` 构造点的合法域（`CTX_REMINDER_SECOND_MIN`／`_MAX`）（§8-47）；`effort` 缺席仍是一句陈述：没有一级说过时回答的是提供方自己的缺省，城说不出那个值；`TuningDefaults` 为 `from: ConfigLayer`（今天恒为 `default`：梯上没有一级文件说得出这几个数，它们是 `gateway::EndpointTuning::DEFAULTS` 的读出；层随值一起答，页面才不必自己断定「这是内建的」）＋ `timeout_ms` ＋ `request_max_retries: Option<u32>`（`Retries::stated`，缺席即 `UntilHalted`）＋ `stream_idle_timeout_ms: Option<u64>`（缺席即与整通调用同界）＋ `proxying` | **层是答案的一半。** 只给解析值的页面说不出这是本层写的还是继承来的，于是要把三层再读一遍自己爬一次梯子——**一把梯子爬两次就是一个问题两个答案**。层名随 `city::Layer`：线上把楼的文件叫 `resident`、把房的文件叫 `room`，而梯子把房的文件叫 `resident`——读者与被治的那次 run 会对“这是哪一份文件”给出不同的答案；一处穷尽匹配（`accounting::views::lines::rung_of`）把两份拼写钉在一起。`TuningDefaults` 是 `gateway::EndpointTuning::DEFAULTS` 的读出，字段形状也随它：重试上限是 `Retries` 而不是一个数（“直到有人按停”没有数字拼得出来），流的那个界是**闲置界而非整答案的截止**，且可缺席 |
 | `Command::PutShelved { shelf, name, text, idem }` | `Shelf { Library, Building(addr) }`；写 `shelved_document_written` | 与 `GovernedDocument` 同一条理由：两处货架都在保留子树里，任何写域都够不着，所以帧里没有路径可拼。`name` 允许子路径，脚本因此留得住自己的文件夹 |
 
-**八、`DialectKind::OpenAiResponses`。** kernel 的兼容格式集由二变三，`gateway::dialect` 的五个入口各多一条臂。登记与调用从此说同一句话：人粘贴 responses URL，`ConnectionKind::Responses` 记住了，而 `wire()` 从前仍答 `OpenAi`——**记对了、调错了**。形状的出处归 gateway-SPEC §8-20。
+**八、`DialectKind::OpenAiResponses`。** kernel 的兼容格式集由二变三，`gateway::dialect` 的五个入口各多一条臂。登记与调用从此说同一句话：人粘贴 responses URL，`ConnectionKind::Responses` 记住了，而 `wire()` 从前仍答 `OpenAi`——**记对了、调错了**。形状的出处归 `crates/gateway/Spec.lean` §8-20。
 
 ### 8-40 会动作的两扇门先问配对：`decide_admission` 与一层 middleware
 
@@ -1727,7 +1727,7 @@ pub struct KnownHost { pub host: String, pub faces: Vec<KnownFace> }
 pub struct KnownFace { pub dialect: DialectKind, pub base_url: String }
 ```
 
-- **一个人挑厂商，而不是去厂商文档里复制一个地址。** 本城认得的 host 住 `gateway::provider::preset`（gateway-SPEC §8-17），设置页经这一问读它：每个 host 说几面、每面的 base URL 是什么。`base_url` 是这座城登记时自己会算出的那个地址（`normalise_entered`），所以页上填进框里的与登记下来的是同一串。
+- **一个人挑厂商，而不是去厂商文档里复制一个地址。** 本城认得的 host 住 `gateway::provider::preset`（`crates/gateway/Spec.lean` §8-17），设置页经这一问读它：每个 host 说几面、每面的 base URL 是什么。`base_url` 是这座城登记时自己会算出的那个地址（`normalise_entered`），所以页上填进框里的与登记下来的是同一串。
 - **客户端据同一答案决定哪几面可选**：一个 host 不说的那一面在控件上拒点，理由写出它说的几面。客户端不再持自己的 host 表。
 - **一问而不是塞进 `EndpointsAnswer`**：那个答案说的是这座城登记了什么，随账本变；这一问说的是本城认得哪些厂商，只随二进制变。合成一个答案，会让每一次登记都重发一份不变的表。
 - 名字表多一项，schema 哈希因此而变，`WIRE_V` 不为此进位。
@@ -2000,7 +2000,7 @@ pub enum ModelTag { /* …既有… */ Ocr }      // 线上 "ocr"
 
 - `view_backlog`：写者已经交给视图线程、还没折完广播的已提交记录条数，读 `bin::serving::folding::Backlog::records`（sprawling-SPEC 8-123）；采样线程每一拍读一次。
 - `read_nanos`：上一拍读计数器花了多少纳秒，由采样线程用单调钟在读取前后各量一次；第一拍为 0（sprawling-SPEC 8-129-6）。
-- `ModelTag::Ocr`：人登记的一个能读图的模型，城的 OCR 工具读这一次选择（gateway-SPEC §8-34）。二进制里不带任何模型（D18），这个值只是一个登记位。
+- `ModelTag::Ocr`：人登记的一个能读图的模型，城的 OCR 工具读这一次选择（`crates/gateway/Spec.lean` §8-34）。二进制里不带任何模型（D18），这个值只是一个登记位。
 - 三项都是名字不变的改形，共用 45。
 
 ### 8-65 动词类：§19-2 的 `class` 列

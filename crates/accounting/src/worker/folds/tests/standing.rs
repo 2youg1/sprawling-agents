@@ -294,7 +294,7 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
 /// subscriptions still folds: its capture with an expiry, its
 /// `login_started` and its endpoint attached under a harness word all
 /// read, and the endpoint comes back on the face its vendor answered
-/// on (gateway-SPEC.md 8-5).
+/// on (`crates/gateway/Spec.lean` §8-5).
 #[test]
 fn a_ledger_an_older_build_wrote_with_a_subscription_login_still_folds() {
     let dir = tempfile::tempdir().unwrap();

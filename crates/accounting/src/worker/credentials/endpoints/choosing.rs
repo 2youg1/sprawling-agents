@@ -94,7 +94,7 @@ impl RunWorker {
         // face, which needs a figure in every request, the pinned
         // catalogue, the preset table and the policy default follow, and
         // on the chat and responses faces nobody's statement leaves the
-        // figure to the provider (gateway-SPEC.md 8-17).
+        // figure to the provider (`crates/gateway/Spec.lean` §8-17).
         let resolved = gateway::OutputCeiling::resolve(
             gateway::Stated {
                 person: max_output_tokens,
@@ -110,7 +110,7 @@ impl RunWorker {
         let max_output_tokens = resolved.and_then(gateway::OutputCeiling::tokens);
         // What a model accepts is the vendor's fact, read off the
         // catalogue or the preset table; a form cannot make a text-only
-        // model see (gateway-SPEC.md 8-37).
+        // model see (`crates/gateway/Spec.lean` §8-37).
         let input = gateway::accepted_input(
             priced.as_ref().map(|row| row.input),
             &known.base_url,

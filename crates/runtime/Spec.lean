@@ -347,7 +347,7 @@ A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）�
 - `architecture.toml` 的模块图：runtime 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
 - kernel 的规格（`crates/kernel/kernel-SPEC.md`）：事件表、`Effect`、`Opening`、`RunPolicy` 与 `ReadVerdict` 的权威；它们改了，这里的模型与 §8 相应各节一起重看。
-- storage 的规格（`crates/storage/storage-SPEC.md`）：逐行检查 `LineCheck`、块的来源 `Cas::origins` 与写目标；gateway 的规格（`crates/gateway/gateway-SPEC.md`）：模型口、`AudioType` 与 `Recording`。
+- storage 的规格（`crates/storage/storage-SPEC.md`）：逐行检查 `LineCheck`、块的来源 `Cas::origins` 与写目标；gateway 的规格（`crates/gateway/Spec.lean`）：模型口、`AudioType` 与 `Recording`。
 - `crates/agent_protocols/spec/Harness/Session.lean`：harness run 的次序与结局表（§8-52 引它），runtime 不 import 它，因为 `depmap` 不让 runtime 依赖 agent_protocols。
 - 引本规格的其他规格与 rustdoc 写 `crates/runtime/Spec.lean §8-n` 或 `runtime D<n>`；一节换了分部，它的标签不变，引用不必改。
 -/

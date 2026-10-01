@@ -38,8 +38,8 @@ pub fn png_picture(bytes: &[u8]) -> Result<ImageRef, AxError>;
 - **判定是 `read` 的那一套，次序也一样。** 以 `cas:`／`file:` 开头的走 `read::locator`（§8-29-5）：`cas:` 块按 `judged_at` 选出的楼过 `admit`，`file:` 按自己的地址过 `admit`。其余走 `within_city`、`admit`、`land`（§8-30-1），打开之后经 `still_judged` 核对打开的就是判过的那个文件。拒绝与 `read` 同码：文法不对＝`E_INVALID_ARGS`；reserved subtree、读界关上的楼、城外的绝对路径、经链接出城＝`E_GATE_DENIED`；不存在的 `cas:` 块（存块时没有记下任何楼）＝`E_GATE_DENIED`；判定时不在的文件与目录＝`E_INVALID_ARGS`；在而打不开＝`E_STORAGE_FATAL`。拒词的 action 是调用它的那件工具，所以模型读到的是自己哪一次调用被拒。
 - **catalog 名不经这扇门。** 一件 skill 由人放进楼的阅览室，读它是 `read` 的事；一张图或一段录音不在 catalog 里，`ocr` 与 `transcribe` 收到一个 catalog 名，按路径判，多半是 `E_INVALID_ARGS`。
 - **`read` 的 Locator 也经它。** `ReadTool` 持一个 `BoundReader`，`cas:`／`file:` 读出字节再按 UTF-8 交文本。路径仍走 `read` 自己那条路：没命中时它要列 `nearby`（§8-29-4），那是读文本的答复；按字节读的只说「不在」，恢复语指向 `search`。
-- **门不设上限，上限归收字节的那个值。** `Opened` 是一个 `Read`：文件按需读，读多少由收它的值定，`gateway::Recording::read_from` 读到它的上限多一字节为止（gateway-SPEC §8-33）。`cas:` 块与 `file:` 的字节在打开时已整份在内存里，因为 `Cas::get` 与 `storage::blob_at` 只交整份；它们是这座城自己存下的，大小受存它的那条路约束。`ocr` 把一个文件整份读进来再判 `IMAGE_MAX_BYTES`，与 `read` 整份读一个文件相同：`ImageMaxBytes` 不交出它的数，按上限读要 kernel 给它一个读法。
-- **`Named` 说字节从哪里来，容器怎么认归调用方。** 文件有名字，块没有。录音的容器在文件上看扩展名、在块上看开头的字节（gateway-SPEC §8-34），那是 gateway 那张表的事，本模块不认容器。
+- **门不设上限，上限归收字节的那个值。** `Opened` 是一个 `Read`：文件按需读，读多少由收它的值定，`gateway::Recording::read_from` 读到它的上限多一字节为止（`crates/gateway/Spec.lean` §8-33）。`cas:` 块与 `file:` 的字节在打开时已整份在内存里，因为 `Cas::get` 与 `storage::blob_at` 只交整份；它们是这座城自己存下的，大小受存它的那条路约束。`ocr` 把一个文件整份读进来再判 `IMAGE_MAX_BYTES`，与 `read` 整份读一个文件相同：`ImageMaxBytes` 不交出它的数，按上限读要 kernel 给它一个读法。
+- **`Named` 说字节从哪里来，容器怎么认归调用方。** 文件有名字，块没有。录音的容器在文件上看扩展名、在块上看开头的字节（`crates/gateway/Spec.lean` §8-34），那是 gateway 那张表的事，本模块不认容器。
 - **一张图只有一种认法：`png_picture`。** 连接器存图（§8-27-10）与城工具 `ocr` 读图都调它：字节在 `IMAGE_MAX_BYTES` 之内、PNG 头读得出宽高时，答一个指向这些字节的 `cas:` 哈希的 `ImageRef`；超限是 `IMAGE_MAX_BYTES` 自己的拒绝，头读不出是 `E_INVALID_ARGS`，主题说出为什么。连接器把拒绝写成那一行 `[picture left out: <主题>; <恢复语>]`。
 - **验收**：`runtime::tools::bound_reader` 的测试。门对读界外的路径、reserved subtree、不存在的 `cas:` 定位符各拒一次，码与 `read` 对同一个参数的拒绝相同；楼里的文件与为本楼存下的块按字节读回，`named` 分别是 `File` 与 `Block`。
 -/

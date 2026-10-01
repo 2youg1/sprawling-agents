@@ -24,7 +24,7 @@
 //! blocks themselves repeat across two dispatches, belongs to
 //! `runtime::prefix`, which freezes them once per run.
 //!
-//! A deliberate exception is recorded in gateway-SPEC §8-18: changing
+//! A deliberate exception is recorded in `crates/gateway/spec/Provider/Registry.lean` §8-18: changing
 //! effort changes the prefix on purpose, and an intended miss is not
 //! the accident guarded here.
 

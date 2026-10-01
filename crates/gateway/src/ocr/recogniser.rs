@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Attached or absent, one picture shown to the chosen model, and the
-//! text read back (gateway-SPEC.md section 8-34).
+//! text read back (`crates/gateway/spec/Ocr.lean` §8-34).
 //!
 //! The attached state holds the adapter [`adapter_for`](crate::adapter_for)
 //! builds for the chosen model, so a picture travels the path every other

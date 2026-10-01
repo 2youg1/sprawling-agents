@@ -599,7 +599,7 @@ D16 截图 schema 的 `quality` 上限经 `IMAGE_QUALITY.admit` 读出。
 
 **不内置任何模型（定规）**：本二进制不带 OCR、ASR 或任何视觉模型的权重，这些都经人接入的端点。模型拿到的桌面文字先是 accessibility tree；OCR 端点与本地 ASR 端点都是人接进来的。
 
-**录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（D13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（`crates/runtime/Spec.lean` §8-27-10、runtime D15）；`transcribe` 经 `runtime::BoundReader` 按这个 locator 读这一块，容器从开头的字节认（sprawling-SPEC 8-131，`crates/runtime/Spec.lean` §8-59，gateway-SPEC §8-34）。
+**录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（D13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（`crates/runtime/Spec.lean` §8-27-10、runtime D15）；`transcribe` 经 `runtime::BoundReader` 按这个 locator 读这一块，容器从开头的字节认（sprawling-SPEC 8-131，`crates/runtime/Spec.lean` §8-59，`crates/gateway/Spec.lean` §8-34）。
 
 **还欠的**，都是这条接口的当前状态：
 

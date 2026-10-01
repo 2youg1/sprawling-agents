@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The operating system's credential store on this target, and the name
-//! a secret reference takes inside it (gateway-SPEC.md section 8-4).
+//! a secret reference takes inside it (`crates/gateway/spec/Credential.lean` §8-4).
 
 use std::collections::HashMap;
 

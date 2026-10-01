@@ -11,7 +11,7 @@
   //
   // **A key is the only way in.** Subscription quota enters the city
   // through the vendor's own harness, where the person signs in, so
-  // this screen offers no login (gateway-SPEC 8-5).
+  // this screen offers no login (`crates/gateway/Spec.lean` §8-5).
   //
   // Which endpoints exist is asked here rather than passed in, because
   // `core/asking.ts` matches an answer to a question by content: a

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A stand-in on loopback reached under a preset host's own name
-//! (gateway-SPEC.md section 8-32).
+//! (`crates/gateway/spec/Reach/Resolve.lean` §8-32).
 //!
 //! The shape of a request depends on the host it is addressed to: the
 //! conversation header and the chat face's spelling are looked up by the
@@ -104,8 +104,8 @@ impl StandIn {
 
 /// A TLS listener on loopback that answers every request meant for one
 /// host with a refusal and keeps each connection open for the next, and
-/// notes which connection every request came on (gateway-SPEC.md
-/// section 8-35). Its threads live as long as the test process.
+/// notes which connection every request came on (`crates/gateway/spec/Endpoint/Transport.lean`
+/// §8-35). Its threads live as long as the test process.
 pub(crate) struct KeptOpen {
     host: String,
     at: SocketAddr,

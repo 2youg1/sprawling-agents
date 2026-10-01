@@ -187,7 +187,7 @@ pub const IMAGE_QUALITY: crate::policy_limit::ImageQuality =
 /// has no row for the model. The three rungs above it carry real
 /// statements, so this number is never a figure that outranks one
 /// somebody made. The chat and responses faces never reach it: there a
-/// ceiling nobody stated is left to the provider (gateway-SPEC.md 8-17).
+/// ceiling nobody stated is left to the provider (`crates/gateway/Spec.lean` §8-17).
 ///
 /// Chosen at the width every provider this city calls accepts for every
 /// model it serves, which is what a number used in place of knowledge

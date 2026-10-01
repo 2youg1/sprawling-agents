@@ -13,7 +13,7 @@
 //!
 //! Older builds also wrote `login_started` for a subscription login and
 //! an `expires_at` key on a capture. This build signs in to no
-//! subscription (gateway-SPEC.md 8-5): the kind stays in the vocabulary
+//! subscription (`crates/gateway/Spec.lean` §8-5): the kind stays in the vocabulary
 //! so such a ledger still reads, nothing reads its payload, and a
 //! capture's `expires_at` is ignored on the way in.
 
@@ -88,7 +88,7 @@ mod tests {
 
     /// A capture an older build wrote for a subscription token, with its
     /// `expires_at`, still reads: the key is ignored rather than refused,
-    /// so a ledger that holds one replays (gateway-SPEC.md 8-5).
+    /// so a ledger that holds one replays (`crates/gateway/Spec.lean` §8-5).
     #[test]
     fn a_capture_with_an_expiry_an_older_build_wrote_still_reads() {
         let payload: Payload = serde_json::from_str(

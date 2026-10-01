@@ -119,7 +119,7 @@ pub enum EventKind {
     /// A subscription login an older build began. This build signs in
     /// to no subscription and writes none; the kind stays so a ledger
     /// that holds one still reads, and nothing reads its payload
-    /// (gateway-SPEC.md 8-5).
+    /// (`crates/gateway/Spec.lean` §8-5).
     LoginStarted,
     EvalRun,
     AssetArchived,

@@ -268,7 +268,7 @@ impl Site {
 
 ## 8-5 订阅额度走 harness，不走登录
 
-本城没有登录命令，也不持订阅令牌（gateway-SPEC §8-5）。一个人要用自己的 Codex、Claude Code、Grok Build、Kimi Code 或 Pi 订阅，是在那个 harness 里自己登录，再把它作为 harness 居民接进城；provider 页只收 API key。
+本城没有登录命令，也不持订阅令牌（`crates/gateway/Spec.lean` §8-5）。一个人要用自己的 Codex、Claude Code、Grok Build、Kimi Code 或 Pi 订阅，是在那个 harness 里自己登录，再把它作为 harness 居民接进城；provider 页只收 API key。
 
 - **旧账本照样折得回**：旧版本写过的 `login_started` 仍是一个事件种类，没有读者；`secret_captured` 行里的 `expires_at` 与 `<provider>-subscription`／`<provider>-renewal` 来源读入时照收，本城不再据此续期。
 - **旧快照不接**：`StandingFolds` 少了到期表，`STANDING_FOLD_RULES` 随之换值，旧快照按版本不符从创世重折（8-101）。
@@ -356,7 +356,7 @@ pub(crate) fn install(uninstall: bool) -> Result<Report, AxError>;
 - **改完必须广播 `WM_SETTINGCHANGE`，否则新窗口也读不到**：Explorer 缓存环境块，从它启动的新控制台继承的是缓存。`#![forbid(unsafe_code)]` 关掉了在 Rust 里调 `SendMessageTimeout` 这条路，故广播由 PowerShell 的 `Add-Type` P/Invoke 完成（`HWND_BROADCAST=0xffff`、`WM_SETTINGCHANGE=0x1A`、`SMTO_ABORTIFHUNG=2`、5 秒上限）。实测一次约 1.1 秒。**广播失败不致命**：路径已经写下了，报一行提示说「注销后生效」，而不是把已经成功的一半说成失败。
 - **非 Windows 拷贝照做，改 shell rc 不做**：装进 `~/.local` 下的 `bin`（该目录在现代发行版上默认已在 PATH 上）。**不写 shell rc**，理由记在这里而不是留一个静默的空分支：rc 文件有 bash／zsh／fish 三套语法与 `.profile`／`.bashrc`／`.zshrc` 多个候选，选错就是往人的登录脚本里写一行没有作用却要人自己删的东西；而从 Windows 交叉编译到 Linux 已知走不通（`aws-lc-sys` 需 C 交叉工具链），故这一支只能由 CI 编译与 lint，不能由我运行验收——**该 job 是 `platforms.yml` 的 macOS job，不再是 ubuntu**（ubuntu 已被裁出流水线）。**没有跑过的写入动作不写**。目录不在 PATH 上时，报告里给出该加的那一行，人自己贴。
 
-  **Linux 进流水线**：上段论证的是「从无 Linux 的开发机器**交叉编译**走不通（`aws-lc-sys` 需 C 交叉工具链）」，不是「Linux 构建不成立」；GitHub 的原生 runner 在 Linux 上原生构建，根本不碰交叉工具链。落法两件，分开决策：①`release.yml` 矩阵加 `x86_64-unknown-linux-musl` **静态**一行——NixOS 没有 `/lib64/ld-linux-x86-64.so.2`，一份动态链接的 ubuntu 产物在 NixOS 上起不来，而静态一份同时覆盖 NixOS／Alpine／老发行版／容器。**待探项已探明，后端不换**：`aws-lc-sys` 由 `reqwest → hyper-rustls → rustls → aws-lc-rs` 引入（`cargo tree -i aws-lc-sys`，实测），而 aws-lc-sys 0.44.0 的 crate 源码内自带 `src/x86_64_unknown_linux_musl_crypto.rs` 且 README 的 Pregenerated Bindings 表列出该三元组——**该目标在预生成绑定名单上**，故不需要 bindgen，rustls 后端保持 `aws-lc-rs`，不切 `ring`（少一个 crypto 后端就少一处与 Windows／macOS 产物不同的实现）。它仍需一套 musl 的 C 工具链编译 AWS-LC 源码，故该 job 装 `musl-tools` 并令 `CC_x86_64_unknown_linux_musl=musl-gcc`；cmake 已在 runner 镜像上。**这一条只在 CI 上成立**（Windows 开发机上没有 Linux，也没有 musl 工具链），证据是依赖树与 crate 自带文件，不是一次绿色构建。**那次构建已经发生，两半各自有了答案。** aws-lc 那一半站住：`aws-lc-sys 0.44.0` 与 `aws-lc-rs 1.18.0` 在 musl 上开编且未报错，预生成绑定与 `musl-tools` 这套安排没有被证伪。构建停在另一处，而这一处上段根本没有论到：`keyring` 的 Linux 后端是 secret-service，树因此另到 `libdbus-sys`，它的 build script 跨目标边界问 pkg-config，而 pkg-config 默认拒答跨编译查询。**装 `libdbus-1-dev` 不是解法**：那会把宿主的 glibc D-Bus 递给一次静态 musl 链接，那是一个矛盾而不是一项配置——**一份静态 Linux 二进制与一个 D-Bus 凭据库不能同时为真**。故**那个先于构建的问题已经有答案，该行随之进矩阵。** 问题是：**Linux 装上之后，一把 API key 存在哪里**。答：内核自带的 keyring——凭证库的 Linux store 取 keyutils（`linux-keyutils-keyring-store`，gateway-SPEC §8-4），那是一组 syscall，不需要会话总线、不需要动态库，静态 musl 与容器里同样成立，`libdbus-sys` 随之离树（实测：`Cargo.lock` 删 `dbus`／`dbus-secret-service`／`libdbus-sys`，增 `linux-keyutils`）。代价写在类型上：`KeyringVault::PERSISTENCE` 在 Linux 上恒为 `Persistence::ThisBoot`，`Persistence::consequence()` 是那句话的唯一权威，`resolve` 未命中时把它接在 recovery 后面，故重启吃掉的 key 自己会说话而不是静默失败（gateway-SPEC §8-4）。仍欠的只剩一项：**真机验收必须在 Linux 上跑**，开发机器是 Windows，故 keyutils 的写—读—删探针只能到 CI 或一台 Linux 上才算数。该行除此之外所需的都已建成并保留：`just package` 收三元组、归档名带三元组、`install.sh` 认得那个名字。**那一处债已清**：`binary_path` 认了三元组并迁进 `xtask::package`，`just package <triple>` 一条配方打三行矩阵，`release.yml` 里重抄的步骤随之删除，musl 归档的名字带三元组（xtask-SPEC.md §8-11）；②`flake.nix` 只管 devshell 与 `nix run`，版本从 `rust-toolchain.toml` **派生而不复述**（需要额外版本即红），不接管 Windows／macOS 发布路径，CI 上进 `platforms.yml` 的 nightly 而非 push 流水线。
+  **Linux 进流水线**：上段论证的是「从无 Linux 的开发机器**交叉编译**走不通（`aws-lc-sys` 需 C 交叉工具链）」，不是「Linux 构建不成立」；GitHub 的原生 runner 在 Linux 上原生构建，根本不碰交叉工具链。落法两件，分开决策：①`release.yml` 矩阵加 `x86_64-unknown-linux-musl` **静态**一行——NixOS 没有 `/lib64/ld-linux-x86-64.so.2`，一份动态链接的 ubuntu 产物在 NixOS 上起不来，而静态一份同时覆盖 NixOS／Alpine／老发行版／容器。**待探项已探明，后端不换**：`aws-lc-sys` 由 `reqwest → hyper-rustls → rustls → aws-lc-rs` 引入（`cargo tree -i aws-lc-sys`，实测），而 aws-lc-sys 0.44.0 的 crate 源码内自带 `src/x86_64_unknown_linux_musl_crypto.rs` 且 README 的 Pregenerated Bindings 表列出该三元组——**该目标在预生成绑定名单上**，故不需要 bindgen，rustls 后端保持 `aws-lc-rs`，不切 `ring`（少一个 crypto 后端就少一处与 Windows／macOS 产物不同的实现）。它仍需一套 musl 的 C 工具链编译 AWS-LC 源码，故该 job 装 `musl-tools` 并令 `CC_x86_64_unknown_linux_musl=musl-gcc`；cmake 已在 runner 镜像上。**这一条只在 CI 上成立**（Windows 开发机上没有 Linux，也没有 musl 工具链），证据是依赖树与 crate 自带文件，不是一次绿色构建。**那次构建已经发生，两半各自有了答案。** aws-lc 那一半站住：`aws-lc-sys 0.44.0` 与 `aws-lc-rs 1.18.0` 在 musl 上开编且未报错，预生成绑定与 `musl-tools` 这套安排没有被证伪。构建停在另一处，而这一处上段根本没有论到：`keyring` 的 Linux 后端是 secret-service，树因此另到 `libdbus-sys`，它的 build script 跨目标边界问 pkg-config，而 pkg-config 默认拒答跨编译查询。**装 `libdbus-1-dev` 不是解法**：那会把宿主的 glibc D-Bus 递给一次静态 musl 链接，那是一个矛盾而不是一项配置——**一份静态 Linux 二进制与一个 D-Bus 凭据库不能同时为真**。故**那个先于构建的问题已经有答案，该行随之进矩阵。** 问题是：**Linux 装上之后，一把 API key 存在哪里**。答：内核自带的 keyring——凭证库的 Linux store 取 keyutils（`linux-keyutils-keyring-store`，`crates/gateway/Spec.lean` §8-4），那是一组 syscall，不需要会话总线、不需要动态库，静态 musl 与容器里同样成立，`libdbus-sys` 随之离树（实测：`Cargo.lock` 删 `dbus`／`dbus-secret-service`／`libdbus-sys`，增 `linux-keyutils`）。代价写在类型上：`KeyringVault::PERSISTENCE` 在 Linux 上恒为 `Persistence::ThisBoot`，`Persistence::consequence()` 是那句话的唯一权威，`resolve` 未命中时把它接在 recovery 后面，故重启吃掉的 key 自己会说话而不是静默失败（`crates/gateway/Spec.lean` §8-4）。仍欠的只剩一项：**真机验收必须在 Linux 上跑**，开发机器是 Windows，故 keyutils 的写—读—删探针只能到 CI 或一台 Linux 上才算数。该行除此之外所需的都已建成并保留：`just package` 收三元组、归档名带三元组、`install.sh` 认得那个名字。**那一处债已清**：`binary_path` 认了三元组并迁进 `xtask::package`，`just package <triple>` 一条配方打三行矩阵，`release.yml` 里重抄的步骤随之删除，musl 归档的名字带三元组（xtask-SPEC.md §8-11）；②`flake.nix` 只管 devshell 与 `nix run`，版本从 `rust-toolchain.toml` **派生而不复述**（需要额外版本即红），不接管 Windows／macOS 发布路径，CI 上进 `platforms.yml` 的 nightly 而非 push 流水线。
 - **`Report` 说的是已经发生的事**：拷到哪、搜索路径改没改（`AlreadyPresent` 与 `Append` 是两句不同的话）、广播成不成、以及「PATH 变更不会进已经开着的窗口」。**恒不说「安装成功」四个字**——人要知道的是下一步该开一个新窗口。
 
 **本章测试**：`program_dir` 在两个平台各取本平台约定；`plan_append` 对空串、已含该目录（含大小写不同与带尾分隔符两形）、含其它目录三类输入分别给出正确的穷尽枚举；`plan_remove` 删得干净且保住其余段（含空段）；`plan_append` 之后 `plan_remove` 回到原值——**幂等与可逆是一对性质测试，不是一次手工观察**。判定既然只在 Windows 编译，这组测试也只在 Windows 编译：**测一个在本平台不存在的函数，测的是空**；推送门跑的正是 Windows，故这组测试每次推送都跑。
@@ -1697,7 +1697,7 @@ UNLOADING 见 `close_city`」，让设计里的词与代码的名在文档里相
 ### 文档同步
 
 本节；`ARCHITECTURE.md` §6（`gateway::endpoint::adapter` 新行；
-`commanding::governing` 职责减一句）；`gateway-SPEC` 的 endpoint 节记
+`commanding::governing` 职责减一句）；gateway 规格的 endpoint 节（`crates/gateway/spec/Endpoint.lean`）记
 `adapter_for` 的归属理由（装配线住适配器簇，凭据只出 `resolver`）。
 
 ## 8-40 运行中的机器有什么，这座城要什么（`bin::doctor`）
@@ -3078,7 +3078,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **同一个选择也给 run 一件工具**：`transcribe`，有没有它读的是同一次 `select`，只是按 run 所在那座楼的楼规读（8-131）。
 - **验收**：`wire` 的 `/transcribe` 路由在没有 content-type 时按名拒绝；`gateway::transcribe::recording` 的 `of_media_type` 认得五种容器、拒第六种并列出前五种。
 
-## 8-131 城给 run 的转写工具 `transcribe`（`accounting::worker::workbench::tools::transcribe`；gateway-SPEC §8-12、§8-33、§8-34，`crates/runtime/Spec.lean` §8-59）
+## 8-131 城给 run 的转写工具 `transcribe`（`accounting::worker::workbench::tools::transcribe`；`crates/gateway/Spec.lean` §8-12、§8-33、§8-34，`crates/runtime/Spec.lean` §8-59）
 
 **原因**：computer use 要能把声音变成字，而二进制里不内置任何模型（定规），所以模型只能经人接入的转写端点转写。composer 的麦克风已经经这个端点把录音变成字（8-56），run 却没有任何一条路用它。
 
@@ -3097,12 +3097,12 @@ book: gateway::EndpointBook,   // 派活立起那一刻的端点账本
 
 - **有没有这件工具，与 composer 的麦克风读同一个选择。** `EndpointBook::select(ModelTag::Transcribe, 楼的 policy)` 成了，`gateway::transcriber_for` 把它变成设施，工具上表；拒了，工具不上表。没有第二个「这座城能不能转写」的开关。与 `views::hearing` 只差 policy：run 有楼，读楼规，于是机密楼只拿得到回环地址上的转写端点；口述没有楼，按普通楼。`select` 的三种拒绝——没选、端点已撤、机密楼而端点离机——对模型是同一件事：这座楼没有转写，一件叫了必败的工具不放上表。`transcriber_for` 的失败（HTTP 客户端造不起来）照常上抛，因为它对主模型的调用同样成立。设施放在一把锁后面：它里面的凭据解析器是 `Send` 而不是 `Sync`，而一件工具要在一波调用之间共享，于是同一个 run 的两次转写轮流进行。
 - **账本在 `RunWorker::laying` 里复制一份进 `Laying`。** 工作台在驾驶这个 run 的 lane 里摆（8-113），账本属于 accounting 线程；`Laying` 本来就带着「派活立起那一刻」的值（`waiting`、`locks`、`trust`），账本是同一种值，几个端点的复制是微秒量级。被否：在 `agree_to_work` 里造好设施随 `Agreed` 带过去——那样工具在一处造、在另一处登记，「这件工具有没有」就有两处答案；只把 `Transcriber` 放进 `Laying`——`laying()` 手里没有楼规，造不出对的 policy。
-- **录音从读界之内的一个文件或一个 `cas:` 块进来，只经 `runtime::BoundReader`**（`crates/runtime/Spec.lean` §8-59）。参数与 `read` 同一种写法：相对城根的路径（审查楼里是这个 run 的树）、城内的绝对路径，或 Locator。连接器把 desktop 的录音存进 CAS，窗口里那一行 `[recording attached: …, cas:…]` 的 locator 原样交给它（runtime D15）。判定是 `read` 的那一份：文法、reserved subtree、读界，链接解开后再判一次，打开后核对没换过；拒绝与 `read` 同码。读界之内的别楼也收：模型能 `read` 的东西本来就进了它对主模型的对话，录音出门去的是按本楼的 policy 选出的端点，与那段对话同一种出门；机密楼的文件楼外读不到，机密楼里的 run 只拿得到回环上的转写端点。**容器**：文件（`file:` 在内）看扩展名（`AudioType::of_file_name`），字节经 `Recording::read_from` 读到上限为止（gateway-SPEC §8-33）；块没有名字，看开头的字节，经 `Recording::read_unlabelled`（gateway-SPEC §8-34）。
+- **录音从读界之内的一个文件或一个 `cas:` 块进来，只经 `runtime::BoundReader`**（`crates/runtime/Spec.lean` §8-59）。参数与 `read` 同一种写法：相对城根的路径（审查楼里是这个 run 的树）、城内的绝对路径，或 Locator。连接器把 desktop 的录音存进 CAS，窗口里那一行 `[recording attached: …, cas:…]` 的 locator 原样交给它（runtime D15）。判定是 `read` 的那一份：文法、reserved subtree、读界，链接解开后再判一次，打开后核对没换过；拒绝与 `read` 同码。读界之内的别楼也收：模型能 `read` 的东西本来就进了它对主模型的对话，录音出门去的是按本楼的 policy 选出的端点，与那段对话同一种出门；机密楼的文件楼外读不到，机密楼里的 run 只拿得到回环上的转写端点。**容器**：文件（`file:` 在内）看扩展名（`AudioType::of_file_name`），字节经 `Recording::read_from` 读到上限为止（`crates/gateway/Spec.lean` §8-33）；块没有名字，看开头的字节，经 `Recording::read_unlabelled`（`crates/gateway/Spec.lean` §8-34）。
 - **效果是 `Effect::Read`。** 它读一个文件，城里什么都不写；录音出门去的是人为这类活选定、已按本楼 policy 判过的端点，与 run 的对话去主模型端点是同一种出门，而模型调用不是工具效果。被否：`Effect::Egress`——那一类的定义是「目的地由这次调用指名」，出网门扫的是参数里的字节，而这里参数只有一条路径，出去的是录音，判它的是已经判过的 `select`。`CostTier::Heavy`：一次 provider 往返，数秒，可能计费。`timeout: None`：设施自己的 `TRANSCRIBE_TIMEOUT_MS` 已是上限，第二个期限会是第二个权威。`render: Generic`：它产出的是文字。
 - **在工具表上的位置**：内置工具与按用途加的那几件之后、城外工具（浏览器、MCP）之前。provider 按位置缓存工具数组，所以新的内置工具接在内置那一段的末尾。
 - **验收**：`crates/sprawling/tests/acceptance/episodes.rs` 末尾一段。选了转写端点的城，run 调 `transcribe` 拿回脚本端点转出的字，端点收到的模型名是人选的那一个；机密楼配离机转写端点时，工具不在表上。没选转写的城不上这件工具，由 catalogue 的两条覆盖测试守着：上了表而没被调用，会被点名。连接器存下的录音：一个为这座楼存进 CAS 的 wav 块，run 以它的 `cas:` 调 `transcribe`，拿回脚本端点转出的字。工具自己的拒绝（机密楼的路径、reserved subtree、认不得的容器、不存在的文件与块）由 `transcribe` 模块的测试守着。
 
-## 8-142 城给 run 的 OCR 工具 `ocr`（`accounting::worker::workbench::tools::ocr`；gateway-SPEC §8-34，`crates/runtime/Spec.lean` §8-59）
+## 8-142 城给 run 的 OCR 工具 `ocr`（`accounting::worker::workbench::tools::ocr`；`crates/gateway/Spec.lean` §8-34，`crates/runtime/Spec.lean` §8-59）
 
 **原因**：computer use 读不到字的窗口（画在画布上的界面、远程桌面）只剩截图，模型要文字反馈得有 OCR；二进制里不内置任何模型（定规），所以 OCR 与转写一样经人接入的端点。人在端点账本里为 `ModelTag::Ocr` 选一个能读图的模型，城给 run 一件 `ocr`，把 run 有权读的一张图交给那个模型，取回文字。desktop 那一侧不做 OCR，截图经连接器进 CAS（`crates/desktop/Spec.lean` §15.2「还欠的」第 1 条）。
 
@@ -3118,11 +3118,11 @@ impl kernel::Tool for OcrTool { … }   // 名 `ocr`；参数 `{ path }`：PNG �
 
 - **有没有这件工具，读的是 `select(ModelTag::Ocr, 楼的 policy)`。** 成了，`gateway::recogniser_for` 把它变成设施（带上这个 face 的头，与主模型的适配器同一张），工具上表；拒了（没选、端点已撤、机密楼而端点离机），工具不上表，理由同 8-131：一件叫了必败的工具不放上表。
 - **图只经 `runtime::BoundReader` 读进来**，与 `transcribe` 同一扇门、同一份判定（8-131）：楼里的一个 PNG、读界之内别楼的一个 PNG、连接器存进 CAS 的截图（窗口里那一行 `[picture attached: image/png WxH, cas:…]` 的 locator）都收。读进来的字节交 `runtime::pipeline::connector::png_picture`，与连接器存图同一种认法：只认 PNG，超过 `IMAGE_MAX_BYTES` 或头读不出，`E_INVALID_ARGS`。
-- **发出去的是所选 face 的图片内容**（gateway-SPEC §8-34）：一条 system、一条带图的 user 消息，没有工具；`policy` 是这座楼的。选中的模型登记为只读字时，端点在发出前拒绝，拒词让人把 `ocr` 指向一个 `text_image` 的模型。
+- **发出去的是所选 face 的图片内容**（`crates/gateway/Spec.lean` §8-34）：一条 system、一条带图的 user 消息，没有工具；`policy` 是这座楼的。选中的模型登记为只读字时，端点在发出前拒绝，拒词让人把 `ocr` 指向一个 `text_image` 的模型。
 - **效果照 8-131**：`Effect::Read`（读一个文件，城里什么都不写；图出门去的是按本楼 policy 选出的端点）、`CostTier::Heavy`（一次 provider 往返，可能计费）、`timeout: None`（端点自己的调用期限是上限）、`render: Generic`（产出的是文字）。
 - **在工具表上的位置**：紧接 `transcribe` 之后、`playback` 之前。provider 按位置缓存工具数组，所以内置工具的新成员接在内置那一段的末尾；以后的提案工具排在 `ocr` 之后。
 - **验收**：`crates/sprawling/tests/acceptance/ocr.rs`。选了 OCR 模型的城（回环端点、chat 面），run 以楼里的一个 PNG 与一个为这座楼存进 CAS 的截图各调一次 `ocr`，拿回端点读出的字；端点收到的两次请求走 `chat/completions`、带人选的模型名与那张图的 base64。没选 OCR 的城不上这件工具，由 catalogue 的两条覆盖测试守着。工具自己的拒绝（不是 PNG、机密楼的路径、没有设施）由 `ocr` 模块的测试守着。
-- **本节接口的当前状态**：线上已有的 `SelectModel` 能为 `Ocr` 选模型，登记的 `input` 是 `gateway::accepted_input` 那架梯子的答案（gateway-SPEC §8-37）：钉版目录、预置表、`Text`，先说者胜。所以预置表写着 `text_image` 的模型（例如 `api.anthropic.com` 上的 `claude-sonnet-4-5`，或中转站转发的同一个 id）选为 `Ocr` 之后，`ocr` 在它上面读得出字；两张表都不认识的模型仍按 `Text` 登记，`ocr` 在它上面由端点拒绝。梯子最高的一档——人自己说「这个模型读图」——还没有线上入口：`SelectModel` 不带这一格，设置页也没有这个控件（client-SPEC 的模型表仍是三行，kernel-SPEC §8-80）；它上线时排在目录之前，线上字段与控件归 wire 与前端。
+- **本节接口的当前状态**：线上已有的 `SelectModel` 能为 `Ocr` 选模型，登记的 `input` 是 `gateway::accepted_input` 那架梯子的答案（`crates/gateway/Spec.lean` §8-37）：钉版目录、预置表、`Text`，先说者胜。所以预置表写着 `text_image` 的模型（例如 `api.anthropic.com` 上的 `claude-sonnet-4-5`，或中转站转发的同一个 id）选为 `Ocr` 之后，`ocr` 在它上面读得出字；两张表都不认识的模型仍按 `Text` 登记，`ocr` 在它上面由端点拒绝。梯子最高的一档——人自己说「这个模型读图」——还没有线上入口：`SelectModel` 不带这一格，设置页也没有这个控件（client-SPEC 的模型表仍是三行，kernel-SPEC §8-80）；它上线时排在目录之前，线上字段与控件归 wire 与前端。
 
 ## 8-57 浏览器是一族引擎，不是一个牌子（`bin::doctor::family`、`family::gecko`／`chromium`／`webkit`、`bin::doctor::registry`）
 
@@ -3412,7 +3412,7 @@ pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
 
 **六条口径：**
 
-1. **缺席就一行说明并通过。** 轮次是一张表：`gateway::known_hosts()`（由 `PRESETS` 算出）的每个主机的每个 face 各一轮，那个主机的 key 与模型名在 `SPRAWLING_E2E_KEY_<主机>`／`SPRAWLING_E2E_MODEL_<主机>` 里（主机名大写、非字母数字换成 `_`，如 `SPRAWLING_E2E_KEY_API_DEEPSEEK_COM`），一个 key 用于这个主机的全部 face；再加一轮「人粘贴的那个端点」，由四个环境变量 `SPRAWLING_E2E_BASE_URL`／`SPRAWLING_E2E_KEY`／`SPRAWLING_E2E_MODEL`／`SPRAWLING_E2E_DIALECT` 给出，接表外的中转或回环地址上的服务。每一轮缺什么由测试自己印出来，justfile 不抄第二份；一个主机只给了 key 与模型名中的一个是写坏的配置，同样印出。表不手写，加一行预置主机就多一组轮次（gateway-SPEC §8-32 是同一张表的白盒一半）。每个测试对每一轮各立一座城，失败时点名是哪一轮。这与 `just adversary` 是同一个诚实形状：静默跳过的闸比没有闸更糟，而在每台没有 key 的机器上都红的闸没有人会跑。持有凭据的作业设 `SPRAWLING_E2E_REQUIRED=1`：此时粘贴端点那一轮的四个变量缺任何一个都判红，按主机的一轮只给了一半也判红，并印出同一行缺了什么——凭据在那里本该齐全，缺席是配置坏了，而不是所在机器正当地没有 key。只认 `1`；其他值与未设同义，免得一个拼错的开关悄悄换回跳过。
+1. **缺席就一行说明并通过。** 轮次是一张表：`gateway::known_hosts()`（由 `PRESETS` 算出）的每个主机的每个 face 各一轮，那个主机的 key 与模型名在 `SPRAWLING_E2E_KEY_<主机>`／`SPRAWLING_E2E_MODEL_<主机>` 里（主机名大写、非字母数字换成 `_`，如 `SPRAWLING_E2E_KEY_API_DEEPSEEK_COM`），一个 key 用于这个主机的全部 face；再加一轮「人粘贴的那个端点」，由四个环境变量 `SPRAWLING_E2E_BASE_URL`／`SPRAWLING_E2E_KEY`／`SPRAWLING_E2E_MODEL`／`SPRAWLING_E2E_DIALECT` 给出，接表外的中转或回环地址上的服务。每一轮缺什么由测试自己印出来，justfile 不抄第二份；一个主机只给了 key 与模型名中的一个是写坏的配置，同样印出。表不手写，加一行预置主机就多一组轮次（`crates/gateway/Spec.lean` §8-32 是同一张表的白盒一半）。每个测试对每一轮各立一座城，失败时点名是哪一轮。这与 `just adversary` 是同一个诚实形状：静默跳过的闸比没有闸更糟，而在每台没有 key 的机器上都红的闸没有人会跑。持有凭据的作业设 `SPRAWLING_E2E_REQUIRED=1`：此时粘贴端点那一轮的四个变量缺任何一个都判红，按主机的一轮只给了一半也判红，并印出同一行缺了什么——凭据在那里本该齐全，缺席是配置坏了，而不是所在机器正当地没有 key。只认 `1`；其他值与未设同义，免得一个拼错的开关悄悄换回跳过。
 2. **不进 `just check`。** 它花的是别人的钱与别人的网络；有没有 key 是一台机器可以正当地没有的东西。夜间作业跑它，凭据住在仓库的变量与密钥里：只有设了仓库变量 `SPRAWLING_E2E_BASE_URL` 的仓库才跑这个作业，没设的（分叉、新克隆）作业显示为跳过而不是红或绿；一旦设了，其余三个就是欠着的，`SPRAWLING_E2E_REQUIRED=1` 让缺哪个就红哪个。开关选 base URL 而不是 key，因为作业级 `if` 读得到变量、读不到密钥。
 3. **从 `RunWorker::handle` 进城，不另起进程。** 本闸要判的真端点是 provider 的那一个；`CARGO_BIN_EXE` 与套接字那一侧归 `tools/adversary/`（xtask boundary 闸：白盒 Rust、黑盒 Lean）。Roadmap §20.6 写的是「经真二进制 HTTP 面」，此处按既有的边界规则改为「经 `wire::server` 递帧的那扇门」——多起一个进程只会多付一道边界成本，而断言仍然共享产品的类型，正是那道闸判为两头不讨好的形状。
 4. **兼容格式随它的端点走，不做命令行开关。** §24.3 写的是 `just e2e --dialect messages --relay`。兼容格式是「你指向的那个端点说哪种线」的属性，与 base URL、key 同源，故与它们并列为环境变量；旗标是这个事实的第二个家，且能与另外三个变量互相矛盾。字面拼法由 `DialectKind` 的 serde 命名给出（`anthropic`／`open_ai`），测试不另列一张表。
@@ -3425,8 +3425,8 @@ pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
 
 - **缺陷**：设置页每次选模型都把整行发上来，于是一个人重选自己已经登记过的模型，就把当初填的上限用一个空框覆盖掉了；下一次 messages 兼容格式的调用因为写不出 `max_tokens` 被拒（A 章 B-01 的第二段）。`None` 从此表示「这次没说」，而不是「这次要清空」。
 - **权威从高到低**：人这次填的 → 这个 endpoint 与这个 model id 上一次登记的 → 钉版目录行。**按 endpoint 与 model id 读上一次，而不是只按 tag**：把一个 tag 指向另一个模型时，旧模型的上限不得跟过去。上一次登记从 `book.choices()` 读回——书是「这座城登记了什么」的唯一陈述，在它旁边另存一份就是第二个权威。
-- **`context_tokens` 同理**，`0` 是「这次没说」；两个数字读法一致，因为它们来自同一个空表单。窗口梯是人这次填的 → 上一次登记的 → 钉版目录行 → `gateway::provider::preset::window_for`（gateway-SPEC §8-17）；四档都沉默时窗口为 `0`，上下文提醒随之不响。
-- **输出上限的其余几档住 gateway**（`provider::ceiling`，gateway-SPEC §8-17）：上游 `/v1/models` 的陈述、预设表与策略缺省 `OUTPUT_CEILING_DEFAULT`，以及 chat 与 responses 两面在人与上游都沉默时的 `ProviderDefault`。装配层不复写那条规则，只把人层、书里的值与这个端点的兼容格式交给它——一条规则两个家，漂开的总是没人看的那个。
+- **`context_tokens` 同理**，`0` 是「这次没说」；两个数字读法一致，因为它们来自同一个空表单。窗口梯是人这次填的 → 上一次登记的 → 钉版目录行 → `gateway::provider::preset::window_for`（`crates/gateway/Spec.lean` §8-17）；四档都沉默时窗口为 `0`，上下文提醒随之不响。
+- **输出上限的其余几档住 gateway**（`provider::ceiling`，`crates/gateway/Spec.lean` §8-17）：上游 `/v1/models` 的陈述、预设表与策略缺省 `OUTPUT_CEILING_DEFAULT`，以及 chat 与 responses 两面在人与上游都沉默时的 `ProviderDefault`。装配层不复写那条规则，只把人层、书里的值与这个端点的兼容格式交给它——一条规则两个家，漂开的总是没人看的那个。
 - **来源入账**：`model_selected` 带 `ceiling_from: person | upstream | preset | policy | provider`，拼写取 `OutputCeiling::word`，载荷由 `gateway::router::payload` 一处写。`provider` 行的 `max_output_tokens` 缺席：请求里没有这个字段。账本里看得见来源，因此一次被截断的跑是读出来的，不是猜出来的。
 
 ### 8-73 run 标识直接取自摘要，而停不下来的疑问算「停」（`accounting::worker::dispatching::agreeing::run_id_for`、`accounting::worker::driving::lane`）
@@ -3544,7 +3544,7 @@ fn kept_credential(&self, name: &str, dialect: DialectKind, header: Option<Strin
 
 **本章测试**：`credentials::tests::kept::an_empty_key_keeps_the_credential_this_city_has_archived`——带 key 接上后，再一次空框 probe 与空框 attach，三次模型表请求都带 `authorization: Bearer sk-archived`，且端点的 `auth` 仍是原引用。
 
-- **`attach_endpoint` 不以探测为准入条件（gateway-SPEC §8-10 是权威，这里只记装配侧）**：鉴权头由 `gateway::AuthSpec::for_dialect` 按兼容格式产出（人填的头优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`。探测失败时，若 `admit` 非空则按人报的型号登记（`probed: false`，另写一条 `effect` 级诊断点名探测的错），`admit` 为空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
+- **`attach_endpoint` 不以探测为准入条件（`crates/gateway/Spec.lean` §8-10 是权威，这里只记装配侧）**：鉴权头由 `gateway::AuthSpec::for_dialect` 按兼容格式产出（人填的头优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`。探测失败时，若 `admit` 非空则按人报的型号登记（`probed: false`，另写一条 `effect` 级诊断点名探测的错），`admit` 为空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
 - **`Credential` 是穷举枚举**：`Absent { header }`／`Key { reference, header }`。「这次没填」与「填了一把 key」是两件事，前者保留城已有的凭证，两个 `Option` 拼不出这个区别。`Credential::entered` 是线上命令的唯一入口。
 
 ### 8-82 同一个地址上的新一段：`/new`（`accounting::worker::commanding::sessions`、`Command::OpenSession`、`EventKind::SessionOpened`）
@@ -3728,7 +3728,7 @@ impl RunWorker {
 
 - **一道门，一处权威**：调用点是 `stage_dispatch` 里 `agree_to_work` 之后、`session_for` 之前。人打的派活、外面敲门的唤醒、计划推进起的活都经过这里，所以三种入口不会各有一套规矩；放在同意之后，是因为存 key 是一次写入，而城不肯接的活什么都不写；放在命名之前，是因为命名要把任务文字发给摘要模型。
 - **认什么由 `kernel::secret::scan` 定**：只换形状表命中的段（`SecretSpan::provider` 为 `Some`）。熵命中不换：提示里的提交哈希、校验和也是高熵串，换掉它们，居民就读不到它要处理的那个值，而形状表列出的前缀不会出现在这类值里。
-- **存进现有的 `gateway::Custodian`**：它按机器选后端——系统的凭据服务，或用口令派生密钥、逐条 ChaCha20-Poly1305 加密的 `encrypted-file`（gateway-SPEC 8-21）。另起一把 AES-GCM 密钥就是同一件事的第二个家，也会多出一处密钥要保管。
+- **存进现有的 `gateway::Custodian`**：它按机器选后端——系统的凭据服务，或用口令派生密钥、逐条 ChaCha20-Poly1305 加密的 `encrypted-file`（`crates/gateway/Spec.lean` §8-21）。另起一把 AES-GCM 密钥就是同一件事的第二个家，也会多出一处密钥要保管。
 - **引用是 `secret:pasted/<provider>-<seq>`**，`<seq>` 是存这把 key 时账本的下一个序号。每存一把 key 都追加一条 `secret_captured`（`origin: "pasted"`），所以序号不会重复：同一毫秒的两次派活也不会让后一把覆盖前一把。名字里不放时间，也不放随机数，citysim 回放时仍逐字节一致；也不放 key 的哈希或尾巴，`secret_captured` 的规矩是记录行里不带明文，也不带哈希前缀。
 - **失败**：vault 拒绝写入时整个派活失败，错误原样返回（`E_CONFIG_INVALID`，恢复语由 vault 给出）。此时房间和 `JOB.md` 都还没写；如果照原文继续派活，正是这一节要堵的泄露。
 - **被否决的备选**：① 在页面上拦下粘贴，让人先去设置页登记——人粘 key 的时候，多半就是要居民用它，拦下来只会让人换个地方再粘一次；② 在请求出门时替换——账本和 `JOB.md` 在出门之前就已写下原文。

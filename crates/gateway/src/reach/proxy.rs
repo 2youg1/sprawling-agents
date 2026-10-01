@@ -8,7 +8,7 @@
 //!
 //! **Every HTTP client this city builds is built here**, after the
 //! process's TLS backend is installed, and clippy refuses a client built
-//! anywhere else (gateway-SPEC.md section 8-15). A rule applied
+//! anywhere else (`crates/gateway/spec/Reach.lean` §8-15). A rule applied
 //! at five construction sites is five rules that agree until one of them
 //! is edited; worse, the staged reading in the parent module would then
 //! describe a path the request does not take, which is the one thing a
@@ -74,8 +74,8 @@ pub fn through(rule: Proxying, base_url: &str) -> Through {
 ///
 /// The builder comes after the process's one TLS backend is installed
 /// (`reach::tls`), so a client built from it has a backend to find;
-/// this is the only construction site clippy admits (gateway-SPEC.md
-/// section 8-15).
+/// this is the only construction site clippy admits (`crates/gateway/spec/Reach.lean`
+/// §8-15).
 pub fn client_for(rule: Proxying, base_url: &str) -> reqwest::blocking::ClientBuilder {
     super::tls::install_provider();
     #[expect(
@@ -203,7 +203,7 @@ mod tests {
 
     /// Handing out a builder installs the process's one crypto provider,
     /// so the client built from it finds a TLS backend rather than
-    /// panicking at `build()` (gateway-SPEC.md section 8-15).
+    /// panicking at `build()` (`crates/gateway/spec/Reach.lean` §8-15).
     #[test]
     fn a_builder_handed_out_brings_the_one_crypto_provider_with_it() {
         let _builder = client_for(Proxying::ExceptLocal, "https://example.invalid");

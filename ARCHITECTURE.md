@@ -331,7 +331,7 @@ than any diagram of boxes.
    `gateway::credential` redeems a `secret:realm/name` reference into a
    header at the last moment. Nothing here holds a concurrency limit; how
    many runs call at once is the width of the driving pool (§11), and what
-   a limit here would need is in gateway-SPEC.md section 8-6.
+   a limit here would need is in `crates/gateway/Spec.lean` §8-6.
 9. **The reply is scanned before it is recorded.** `runtime::redact` puts
    model output through the same secret scan as everything else, so a key a
    model repeated does not become permanent.
@@ -528,7 +528,7 @@ the part worth knowing before starting, not after.
 | a new event kind, or a payload | `kernel::event` + kernel-SPEC | the kind set is closed; `storage` fixtures compare bytes across platforms |
 | a new `Command` or `Query` frame | `wire::frames` + wire-SPEC | the new name moves the schema hash, so an older page is refused at the handshake; `WIRE_V` rises only when a frame changes shape while every name stays (wire-SPEC §12.1); every `Query` must be answered or it does not compile |
 | what a model may call | `runtime::catalog`, tools in `runtime` or `collab` | `kernel::tool` is the seam; a tool with no conformance suite is not a seam |
-| how a provider is spoken to | `gateway::dialect` + gateway-SPEC | a pure two-way translation with the canonical shape in the middle |
+| how a provider is spoken to | `gateway::dialect` + `crates/gateway/Spec.lean` | a pure two-way translation with the canonical shape in the middle |
 | how a key is kept and redeemed | `gateway::credential` | plaintext may reach only the platform vault; `secret` gate reads every boundary |
 | where a city keeps a file | `kernel::layout` | the reserved subtree is out of every write domain, by one predicate in `kernel::address` |
 | what a building may do | `city::policy` (`RULES.toml`) + city-SPEC | a run's write domain is what its building declares |
