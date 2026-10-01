@@ -57,7 +57,7 @@ impl Views {
     /// because it leaves this machine (sprawling-SPEC.md 8-120).
     fn upstream_of(&self, item: &str) -> Prepared {
         Prepared::Upstream {
-            ask: self.upstream,
+            ask: self.reach.upstream,
             item: item.to_owned(),
         }
     }
@@ -276,7 +276,7 @@ impl Views {
             },
             wire::Query::EndpointView => wire::Answer::Endpoints(endpoints_answer(&self.book)),
             wire::Query::KnownHosts => known_hosts_answer(),
-            wire::Query::Harnesses => return Prepared::Harnesses(self.programs),
+            wire::Query::Harnesses => return Prepared::Harnesses(self.reach.programs),
             wire::Query::Doctor => self.doctor_or_unavailable(),
             wire::Query::McpHealth { addr } => {
                 return Prepared::McpHealth {
@@ -285,7 +285,7 @@ impl Views {
                 };
             }
             wire::Query::Toolkits => return Prepared::Toolkits(self.live_ask()),
-            wire::Query::NewestRelease => return Prepared::Release(self.registry),
+            wire::Query::NewestRelease => return Prepared::Release(self.reach.registry),
             wire::Query::UpstreamVersion { item } => return self.upstream_of(item),
             wire::Query::BuildingView { addr } => {
                 return Prepared::Building {

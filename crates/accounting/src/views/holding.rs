@@ -164,20 +164,9 @@ pub struct Views {
     /// value.
     #[serde(skip)]
     pub(super) vault: Option<std::sync::Arc<std::sync::Mutex<gateway::Custodian>>>,
-    /// Asks the registry which release is newest; set by
-    /// `views::served`. `None` is a `Views` nobody served, and it
-    /// answers `Unavailable` rather than leaving this machine.
+    /// The ways past the history a served city hands in (`views::served`).
     #[serde(skip)]
-    pub(super) registry: Option<fn() -> wire::ReleaseAnswer>,
-    /// How an item's newest release is asked of its publisher; `None`
-    /// for views nobody serves, which answer `Unavailable` instead.
-    #[serde(skip)]
-    pub(super) upstream: Option<fn(&str) -> wire::DoctorUpstream>,
-    /// How this machine's search path is asked for one program; set by
-    /// `views::served`. `None` is a `Views` nobody served, and the harness
-    /// page then answers `Unavailable` rather than reading this machine.
-    #[serde(skip)]
-    pub(super) programs: Option<fn(&str) -> Option<std::path::PathBuf>>,
+    pub(super) reach: super::served::Reach,
     /// The halt a served city's writer refuses lines by until the proof
     /// of its history has a verdict (wire-SPEC.md 8-63); `None` for views
     /// that started from a history proved before they folded it.
@@ -234,9 +223,7 @@ impl Views {
             claims: std::collections::BTreeMap::new(),
             machine: None,
             vault: None,
-            registry: None,
-            upstream: None,
-            programs: None,
+            reach: super::served::Reach::default(),
             proof: None,
         }
     }

@@ -154,9 +154,7 @@ impl Views {
             plans: Arc::clone(&self.plans),
             machine: self.machine.clone(),
             vault: self.vault.clone(),
-            registry: self.registry,
-            upstream: self.upstream,
-            programs: self.programs,
+            reach: self.reach,
             proof: self.proof.clone(),
             ..copy
         })

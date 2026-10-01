@@ -18,6 +18,20 @@
 
 use super::holding::Views;
 
+/// The ways past the history a served city lets its views reach: each a
+/// read of this machine or the network, handed in once by the served city
+/// and copied whole into a twin. Each is `None` in views nobody served,
+/// which then answer `Unavailable` rather than reaching out.
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct Reach {
+    /// Asks the registry which release is newest.
+    pub(super) registry: Option<fn() -> wire::ReleaseAnswer>,
+    /// Asks one item's publisher for its newest release.
+    pub(super) upstream: Option<fn(&str) -> wire::DoctorUpstream>,
+    /// Asks this machine's search path for one program.
+    pub(super) programs: Option<fn(&str) -> Option<std::path::PathBuf>>,
+}
+
 impl Views {
     /// Takes what the doctor found, so a page can be told what this
     /// machine is missing.
@@ -43,7 +57,7 @@ impl Views {
     /// newest, so a `NewestRelease` query reaches the network only
     /// through what the served city handed in.
     pub fn ask_the_registry_through(&mut self, newest: fn() -> wire::ReleaseAnswer) {
-        self.registry = Some(newest);
+        self.reach.registry = Some(newest);
     }
 
     /// Takes the one way this city asks an item's publisher for its
@@ -51,14 +65,14 @@ impl Views {
     /// only through what the served city handed in (sprawling-SPEC.md
     /// 8-120).
     pub fn ask_upstream_through(&mut self, newest: fn(&str) -> wire::DoctorUpstream) {
-        self.upstream = Some(newest);
+        self.reach.upstream = Some(newest);
     }
 
     /// Takes the one way this city asks its search path for a program,
     /// so the harness page reads this machine only through what the
     /// served city handed in (accounting-SPEC.md 8-10).
     pub fn find_programs_through(&mut self, find: fn(&str) -> Option<std::path::PathBuf>) {
-        self.programs = Some(find);
+        self.reach.programs = Some(find);
     }
 
     /// Takes the halt the served city's writer is held by until the proof
