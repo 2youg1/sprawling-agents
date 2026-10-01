@@ -543,7 +543,11 @@ adversary *args:
         exit 0
     fi
     cargo build -p sprawling --locked
-    binary="$PWD/target/debug/sprawling"
+    # Where cargo put the binary: CARGO_TARGET_DIR when it is set, which a
+    # shared build directory sets, and `target/` beside this file otherwise.
+    targets="${CARGO_TARGET_DIR:-target}"
+    case "$targets" in /* | ?:*) ;; *) targets="$PWD/$targets" ;; esac
+    binary="$targets/debug/sprawling"
     [ -f "$binary" ] || binary="$binary.exe"
     # The path is handed to a program that is not a shell, so it has to be one
     # the operating system can open. Under Git Bash `$PWD` is `/c/...`, which
@@ -557,7 +561,11 @@ adversary *args:
 # unpacked into target/acceptance, the stand-in provider is started on the
 # script the acceptance world writes for the archive's skills, and the
 # archive's own binary is walked through a first day, a process killed in
-# the middle of a run, and the morning after. Once every step held, the
+# the middle of a run, the morning after, and a review building's
+# collaboration. The walk is handed the script as well as the record,
+# because one run of it names a branch only the city knows, and the walk
+# appends that run to the script once it has read the branch from the
+# history (tools/adversary/Spec.lean D7). Once every step held, the
 # checklist a person works through by hand is written to
 # target/acceptance/checklist.md.
 #
@@ -621,7 +629,7 @@ acceptance archive:
     done
     [ -n "$url" ] || { echo "acceptance: the stand-in printed no URL within ten seconds" >&2; exit 1; }
     SPRAWLING_BIN="$binary" SPRAWLING_PROVIDER="$url" \
-        lake exe acceptance walk "$shelf" "$out/record.jsonl" "$out/checklist.md"
+        lake exe acceptance walk "$shelf" "$out/script.json" "$out/record.jsonl" "$out/checklist.md"
 
 # The acceptance gate for a real endpoint (never a gate in `just
 # check`; without credentials it prints one line and succeeds).
