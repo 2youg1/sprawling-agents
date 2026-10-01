@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use kernel::{Address, AxError, B3Hash};
+use kernel::{Address, AxCode, AxError, B3Hash};
 
 use super::{Assembled, NEWLINE, city_segment};
 
@@ -20,20 +20,42 @@ pub(super) struct Frozen {
     pub(super) version: B3Hash,
 }
 
-/// The names the session at `room` runs under.
+/// The names the session at `room` runs under: the version its room's
+/// own layer records, read back from the store; or, for a session's
+/// first run, the names as they are now, frozen into the store and
+/// recorded in that layer for every run after it.
 ///
 /// # Errors
-/// Propagates an identity area that does not read and a store that will
-/// not take the bytes.
+/// Propagates the room's own layer failing to read or write, an identity
+/// area that does not read, and a store that will not take the bytes.
+/// A recorded version the store no longer holds is refused rather than
+/// replaced by the names now: that would rename a running session.
 pub(super) fn session_naming(
     city_root: &Path,
     cas: &mut storage::Cas,
-    _room: &Address,
+    room: &Address,
 ) -> Result<Frozen, AxError> {
+    if let Some(version) = city::own_layer(city_root, room)?.naming() {
+        let bytes = cas.get(&version).map_err(|err| {
+            AxError::failure(
+                AxCode::StorageFatal,
+                "read the names this session froze",
+                format!("{}: {version}: {err}", room.as_str()),
+            )
+            .with_recovery(
+                "start a new session here (`/new`), which freezes the names as they are now",
+            )
+        })?;
+        return Ok(Frozen {
+            naming: city::Naming::from_bytes(&bytes)?,
+            version,
+        });
+    }
     let naming = city::Naming::read(city_root)?;
     let version = cas
         .put(&naming.to_bytes()?)
         .map_err(storage::StorageError::into_ax)?;
+    city::freeze_naming(city_root, room, version)?;
     Ok(Frozen { naming, version })
 }
 

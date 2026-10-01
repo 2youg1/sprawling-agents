@@ -172,7 +172,11 @@ pub fn write_naming(
 ) -> Result<NamingWritten, AxError> {
     let which = edit.document();
     let rewritten = rewrite(which, base, edit)?;
-    crate::document::replace(&which.path(city_root), rewritten.as_bytes())?;
+    crate::document::edit_against(
+        &which.path(city_root),
+        base.as_bytes(),
+        rewritten.as_bytes(),
+    )?;
     Ok(NamingWritten {
         naming: Naming::read(city_root)?,
         bytes: rewritten.len(),
