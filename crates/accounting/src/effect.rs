@@ -407,6 +407,52 @@ mod tests {
         }
     }
 
+    /// A run that splits the row it holds and then claims one of the new
+    /// leaves lands both, and the plan reads as the run's desk left it:
+    /// the leaf's claim is checked against the plan the split left rather
+    /// than the file on disk, where the leaf does not exist yet
+    /// (accounting-SPEC 8-27).
+    #[test]
+    fn a_run_that_splits_its_row_and_claims_a_leaf_lands_both() {
+        let run = desk(1);
+        act(&run, serde_json::json!({ "action": "claim", "node": "1" }));
+        act(
+            &run,
+            serde_json::json!({
+                "action": "split", "node": "1", "parts": ["run the cable", "test the element"]
+            }),
+        );
+        act(
+            &run,
+            serde_json::json!({ "action": "claim", "node": "1.1" }),
+        );
+        let (effects, left) = {
+            let mut desk = run.lock().unwrap();
+            (desk.take_effects(), desk.roadmap().map(str::to_owned))
+        };
+        let room = Address::parse("lab/room1").unwrap();
+        let landed =
+            match Claims::of(&effects, SNAPSHOT, "Roadmap.md".into(), &room, "potter").unwrap() {
+                Claims::Landed(landing) => {
+                    let kinds: Vec<_> = landing
+                        .lines
+                        .iter()
+                        .map(|closing| closing.line.kind)
+                        .collect();
+                    match landing.then {
+                        Then::Roadmap { text, .. } => Some((kinds, text)),
+                        _ => None,
+                    }
+                }
+                Claims::Stale { .. } => None,
+            };
+        assert_eq!(
+            landed,
+            left.map(|text| (vec![kernel::EventKind::RoadmapSplit], text)),
+            "the split and the leaf's claim both land, and only the split writes a line here"
+        );
+    }
+
     /// Two runs read one plan and take different nodes. The one that
     /// lands second writes its effects onto the plan as the first left
     /// it, so the first run's finished row survives the second landing.
