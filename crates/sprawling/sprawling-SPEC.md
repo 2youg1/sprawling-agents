@@ -3170,12 +3170,12 @@ reveal: fn(&Path, &Address) -> Result<(), AxError>,
 
 ```rust
 pub(super) struct Probing { pub reach: kernel::Reach, pub served: Result<Vec<gateway::ModelFacts>, AxError> }
-pub(super) fn reach_of(base_url: &str) -> Result<kernel::Reach, AxError>;
+pub(super) fn reach_of(base_url: &str, proxying: Proxying, monotonic: fn() -> Instant) -> Result<kernel::Reach, AxError>;
 pub(super) fn probed_payload(name: &str, base_url: &str, found: Probing) -> Result<Payload, AxError>;   // 经 Payload::of(&kernel::event::record::EndpointProbed)
 pub(super) fn tuning_of(wire: wire::EndpointTuning) -> gateway::EndpointTuning;  // credentials.rs
 ```
 
-- **`probe_endpoint` 不再因读不出模型表而拒绝**。它记一条 `endpoint_probed`，里面是分段读数（`gateway::reach` 量出，时间由调用方戳，采样点仍只有 `bin::assembly`）、模型表、以及读不出时那条拒绝自己的 code 与 subject。理由是这四段对填表的人是四个不同的下一步，而作为一次拒绝返回时它们在界面上塌成传输库的一句话。**它仍会拒绝的两件事**：凭据引用拼不出来、载荷账本不收——两者都没走到发请求那一步，因此没有读数可报。
+- **`probe_endpoint` 不再因读不出模型表而拒绝**。它记一条 `endpoint_probed`，里面是分段读数（`gateway::reach` 量出，用时是调用方以 `Hands.monotonic` 前后两读之差，8-129-2）、模型表、以及读不出时那条拒绝自己的 code 与 subject。理由是这四段对填表的人是四个不同的下一步，而作为一次拒绝返回时它们在界面上塌成传输库的一句话。**它仍会拒绝的两件事**：凭据引用拼不出来、载荷账本不收——两者都没走到发请求那一步，因此没有读数可报。
 - **`attach_endpoint` 的拒绝语义一个字没改**：probe 失败而人没点名任何模型，仍然是拒绝，因为那样的城连一个可调用的模型 id 都没有。
 - **probe 按调用时的那套头与期限发出**：一个需要自定义请求头的网关，在 probe 不带那个头时答 401，人于是读到「密钥无效」，而那把密钥是好的。`request_max_retries` 在这里被兑现一次——设置页上有人正在等这一个请求；模型调用的那一份由同一个数走另一条路兑现：`dispatching::agreeing` 在选定端点处把这个 `kernel::Retries` 原样冻进 `RunPlan`，`runtime::run::drive` 据此决定一次可重试的失败之后还有没有下一次。
 - **`tuning_of` 是线上词汇与 gateway 词汇之间唯一的翻译点**：零读成缺省（清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成），空名字的头与不以 `/` 开头的 pointer 被丢掉（表单在人打字时留着空行），`stream_idle_timeout_ms` 成为 `stream_deadline_ms`。
@@ -4480,7 +4480,7 @@ pub fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid：prio
 
 ## 8-94 性能监视器的历史：有人看才采样，每项 300 点（`bin::monitor`，形状：状态机）
 
-WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是同一份历史：每秒一个 `Sample`，最近 300 个（5 分钟）。`bin::monitor` 只管两件事：此刻有没有人在看，以及看的人读到的那 300 个点。计数器从哪里读（核心进程、Job Object、整机、城所在的卷、记账线程）由调用方传进来的读取函数决定，本模块不碰平台接口。
+WebUI 的监视页、事实条上的摘要与 `sprawling gauge --at <地址>` 读的是同一份历史：每秒一个 `Sample`，最近 300 个（5 分钟）。`bin::monitor` 只管两件事：此刻有没有人在看，以及看的人读到的那 300 个点。计数器从哪里读（核心进程、Job Object、整机、城所在的卷、记账线程）由调用方传进来的读取函数决定，本模块不碰平台接口。
 
 **接口。**
 
@@ -4502,22 +4502,22 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 **测试。** `monitor::tests`：没人看时 `read` 一次也不被调用、历史为空，人走了以后历史被释放；放入 301 个点后只剩最后 300 个、从旧到新；只有看摘要的人时 `read` 收到 `Summary`，再来一个看整页的人时收到 `Everything`，他走了以后回到 `Summary`。
 
-**本节接口的当前状态。** 计数器读取与每秒一拍的采样线程见 8-96；线上的一对监视帧见 wire-SPEC.md 8-47：会话发 `Watch` 时经 `assembly::listening` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计。WebUI 监视页 `client/src/views/monitor.svelte` 在 `#/monitor`，经这对帧打开时计一个看的人、关闭时释放，读数与曲线由 `client/src/core/monitor.ts` 按 8-95 的规则算出。`sprawling top` 经这对帧看监视器，见 8-97。事实条摘要 `client/src/views/facts.svelte` 经 `WatchSummary` 看监视器，只显示本进程的 CPU 与工作集；只有它在看时采样线程只读 `OwnProcess`，不打开 `sysinfo`。其余尚未落地：采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
+**本节接口的当前状态。** 计数器读取与每秒一拍的采样线程见 8-96；线上的一对监视帧见 wire-SPEC.md 8-47：会话发 `Watch` 时经 `assembly::listening` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计。WebUI 监视页 `client/src/views/monitor.svelte` 在 `#/monitor`，经这对帧打开时计一个看的人、关闭时释放，读数与曲线由 `client/src/core/monitor.ts` 按 8-95 的规则算出。`sprawling gauge --at <地址>` 经这对帧看监视器，见 8-97。事实条摘要 `client/src/views/facts.svelte` 经 `WatchSummary` 看监视器，只显示本进程的 CPU 与工作集；只有它在看时采样线程只读 `OwnProcess`，不打开 `sysinfo`。其余尚未落地：采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
 
 **内存的读数**（`bin::monitor::memory`）：整机物理内存与可用内存经 `sysinfo`（只开 `system` 特性，只刷新 RAM）一次读出成 `Memory { physical, available }`，这是城里读内存的唯一一处；`read` 刷新本线程留着的一个 `System`，不每次新建：同一台 Windows x86-64 桌面级机器、测试档构建上，新建句柄时一次读数 2.2–2.3 µs，留着句柄时 1.6–1.7 µs，余下的是平台调用本身；按线程留而不是全局一把锁，读数的线程之间不互等；计划推进按它决定下一行是否排队（§8-46-3，只管计划行；其他入口的现状见那里）。平台不报时两项都是零，此时不算紧。取 `sysinfo`，因为它是对外只给安全接口的现成路，本 crate 不写 `unsafe`。
 
-## 8-95 `sprawling top` 的输出：一行 JSON 与一屏曲线（`bin::monitor::top`，形状：projection）
+## 8-95 一座城的读数：一行 JSON 与一屏曲线（`bin::monitor::top`，形状：projection）
 
-`sprawling top <city>` 读 8-94 的历史，按 stdout 是不是终端选一种输出。本模块只把历史投影成文本，不碰终端、不碰 socket：判断 stdout 是不是终端、每秒重画一次、从城里取历史，都是调用方的事。
+`sprawling gauge --at <地址>`（别名 `top`，8-129-4）读 8-94 的历史，按 stdout 那头是谁（`bin::audience`）选一种输出。本模块只把历史投影成文本，不碰终端、不碰 socket：判断 stdout 那头是谁、每秒重画一次、从城里取历史，都是调用方的事。
 
 **接口。**
 
-- `json_line(sample: &Sample) -> serde_json::Result<String>`：stdout 不是终端时每秒打印的那一行。一个 JSON 对象，键就是 `Sample` 的 13 个字段名，值是整数；不含换行，调用方负责换行。agent 按行读，一行一个完整的读数。
+- `json_line(sample: &Sample) -> serde_json::Result<String>`：一个 JSON 对象，键就是 `Sample` 的 13 个字段名，值是整数；不含换行。stdout 不是终端时每秒打印的那一行由 `gauge::lines::city_line` 写出：同样的键，前面多一个 `"line":"city"`（8-129-4）。agent 按行读，一行一个完整的读数。
 - `sparkline(values: impl IntoIterator<Item = u64>, width: usize) -> String`：终端画面里一项计数器的曲线。只取最后 `width` 个值，每个值一个字符，从 `▁` 到 `█` 共 8 级，按这几个值自己的最小值到最大值线性分级（整数运算，最小值画 `▁`，最大值画 `█`）；全部相等时整条画 `▁`。值不足 `width` 个时曲线就短一些，不补空白。
 - 失败：`sparkline` 没有失败路径。`json_line` 只转交 `serde_json` 的错误；13 个整数字段没有可被拒绝的内容，所以它实际上不会出现，调用方把它当作写 stdout 失败处理，而不是在这里用一个隐藏的 `unwrap` 吞掉。
 - `screen(samples: &[Sample], curve_width: usize) -> String`：终端画面的一屏（不含清屏与光标控制，那是调用方的事）。每个计数器一行，共 13 行，以 `
 ` 分隔，顺序与 `Sample` 的字段相同：左对齐 24 列的英文标签，右对齐 10 列的最新读数，两个空格，再是这一项最近 `curve_width` 个点的曲线。没有样本时返回空串，调用方在第一秒什么也不画。
-- 读数的写法按单位定：千分比写成一位小数的百分数（`123` → `12.3%`）；字节按 1024 进位取最大的、读数不小于 1 的单位，写一位小数（`B` 只写整数，其后是 `KiB`、`MiB`、`GiB`、`TiB`）；纳秒按 1000 进位，同样写一位小数（`ns` 只写整数，其后是 `µs`、`ms`、`s`）；计数原样写。小数一律截断而不是四舍五入，整数运算，没有浮点。
+- `Unit::{Permille, Bytes, Nanos, Count}` 与 `Unit::reading(&self, value: u64) -> String`：一个读数按单位写成文字，是城里单位换算的唯一一处；`gauge::lines` 写给人的行也调它（8-129-4）。读数的写法按单位定：千分比写成一位小数的百分数（`123` → `12.3%`）；字节按 1024 进位取最大的、读数不小于 1 的单位，写一位小数（`B` 只写整数，其后是 `KiB`、`MiB`、`GiB`、`TiB`）；纳秒按 1000 进位，同样写一位小数（`ns` 只写整数，其后是 `µs`、`ms`、`s`）；计数原样写。小数一律截断而不是四舍五入，整数运算，没有浮点。
 
 **定下的值。** 8 级字符 `▁▂▃▄▅▆▇█`（U+2581–U+2588），与常见终端字体都有的块元素一致。标签列宽 24、读数列宽 10：最长的标签 `event to screen p50` 与最长的读数 `1023.9 GiB` 都放得下。
 
@@ -4556,15 +4556,15 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 
 **本节接口的当前状态。** 整机可用内存经 8-94 的 `bin::monitor::memory` 读出，与计划推进的内存闸（§8-46-3）读同一处。核心健康里记账队列深度与持久水位线的两项经 8-98 的 `Health` 读出；其余几项现为 0，缺的是来源而不是采样，8-98 的当前状态逐项写明。派出的命令按 run 装进各自的 Job Object，`runtime::Backlog::processes` 给出每个 run 此刻的进程（runtime-SPEC §8-13-3）；按这些 pid 读每个进程的内存与 CPU、并把逐 run 的明细送上线，还没有做：`Sample` 是一行固定的 13 个数，逐 run 的明细要一种新的帧（WIRE_V 加一）。磁盘延迟没有字段。本进程的累计读写字节在 Linux 以外读作 0（决定 1）。一拍里剩下的大头是 `sysinfo` 的整机 CPU（0.7–8 ms）与磁盘（0.2–0.8 ms），离「采样一次 ≤ 50 µs」还差这两项；采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。
 
-## 8-97 `sprawling top`：经线协议看监视器（`bin::wire_client::watching`，形状：adapter）
+## 8-97 `sprawling gauge --at`：经线协议看监视器（`bin::wire_client::watching`，形状：adapter）
 
-`sprawling top [--at host:port] [--token T]` 与 `call` 一样经 `--at` 找到一座在跑的城（默认同一个 `DEFAULT_AT`），握手后发 `ClientFrame::Monitor(Watch)`，此后每收到一个 `ServerFrame::Monitor` 就输出一次，直到城关闭连接或人按 Ctrl-C。城是由地址找到的，而不是由城名：一座城的地址就是它被 `serve`/`up` 时占的端口，`call` 与 `enrol` 已经这样找城。
+`sprawling gauge [--at host:port] [--token T]`（别名 `top`）与 `call` 一样经 `--at` 找到一座在跑的城（默认同一个 `DEFAULT_AT`），握手后发 `ClientFrame::Monitor(Watch)`，此后每收到一个 `ServerFrame::Monitor` 就输出一次，直到城关闭连接或人按 Ctrl-C。城是由地址找到的，而不是由城名：一座城的地址就是它被 `serve`/`up` 时占的端口，`call` 与 `enrol` 已经这样找城。`bin::main::gauge` 选中 `City` 这个对象之后调本模块（8-129-4）。
 
 **接口。**
 
-- `Output::{Screen, Lines}`：stdout 是终端时为 `Screen`，否则为 `Lines`（`std::io::IsTerminal`）。
-- `shown(text: &str, history: &mut VecDeque<Sample>, output: Output, curve_width: usize) -> Option<String>`：收到的一帧文本变成要写到 stdout 的文字。不是监视读数的帧（欢迎、事件等）返回 `None`。读数先放进 `history`（满 `monitor::CAPACITY` 丢最旧的），`Lines` 返回 8-95 的 `json_line` 加一个换行；`Screen` 返回清屏并把光标移到左上角的 `ESC[H ESC[2J`，接 8-95 的 `screen(history, curve_width)` 与换行。`json_line` 失败时返回 `None`（8-95：实际不会出现）。
-- `top(at: &str, token: Option<&str>, output: Output) -> Result<(), AxError>`：连接、握手、发 `Watch`、逐帧调用 `shown` 并写出。连不上、握手被拒与读帧出错沿用 `call` 的错误（`E_WIRE_MISMATCH` 等）；连续 5 s 没有一帧视为城已停，正常返回。
+- 输出的形式由 `bin::audience::Audience` 定：`Person`（stdout 是终端）画一屏，`Agent` 每个读数一行。
+- `shown(text: &str, history: &mut VecDeque<Sample>, audience: Audience, curve_width: usize) -> Option<String>`：收到的一帧文本变成要写到 stdout 的文字。不是监视读数的帧（欢迎、事件等）返回 `None`。读数先放进 `history`（满 `monitor::CAPACITY` 丢最旧的），`Agent` 返回 `gauge::lines::city_line` 加一个换行；`Person` 返回清屏并把光标移到左上角的 `ESC[H ESC[2J`，接 8-95 的 `screen(history, curve_width)` 与换行。`city_line` 失败时返回 `None`（8-95：实际不会出现）。
+- `top(at: &str, token: Option<&str>, audience: Audience) -> Result<(), Unheard>`：连接、握手、发 `Watch`、逐帧调用 `shown` 并写出。连不上是 `Unheard::NoCity`（退 4，与 `call` 同一张表）；握手被拒、读帧出错与写 stdout 失败是 `Unheard::Broken`（退 1）；连续 5 s 没有一帧视为城已停，正常返回。
 - 曲线宽度：环境变量 `COLUMNS` 能读成数时取它减去标签与读数占的 36 列，否则按 80 列算（44 个点）；标准库不给终端尺寸，不为这一个数引入依赖。
 
 **决定。**
@@ -4572,7 +4572,7 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 1. 文字由纯函数 `shown` 算出，socket 与 stdout 留在 `top`：一帧变成哪几个字节可以用整串比较来测，而连接只在端到端里测。
 2. 沉默 5 s 即结束，而不是永远等：读数每秒一个，5 个空拍说明城已停或已不再发，一个 agent 读到 EOF 比读到永远的阻塞有用。重新考虑的条件：采样的节拍变长。
 
-**测试。** `wire_client::watching::tests`：一帧读数在 `Lines` 下是一行 JSON 加换行，在 `Screen` 下是清屏序列接一屏；不是读数的帧什么也不输出、不进历史。
+**测试。** `wire_client::watching::tests`：一帧读数在 `Agent` 下是一行 `city` JSON 加换行，在 `Person` 下是清屏序列接一屏；不是读数的帧什么也不输出、不进历史。
 
 ## 8-129 测量工具箱：一个动词 `gauge`，一处读机器，一个单调钟（`bin::main::gauge`、`bin::main::gauge::lines`、`bin::monitor::tree`、`bin::monitor::spread`、`bin::audience`，形状：adapter / projection / value）
 
@@ -4593,11 +4593,11 @@ WebUI 的监视页、事实条上的摘要与 `sprawling top <city>` 读的是�
 | 事实 | 唯一的采样处 | 只读的一方 | 并进来的第二份 |
 |---|---|---|---|
 | 进程、整机、卷、进程树的计数 | `bin::monitor`：`counters`、`counters::own_process`、`memory`、`volume`、`tree` | 采样线程（8-96）、计划推进的内存闸（§8-46-3）、入口按卷卸载（8-116）、`gauge` | 无；`xtask mem` 留在城外，见决定 4 |
-| 时长 | `bin::serving::standing::monotonic_now`，以 `fn() -> Instant` 交给用它的模块 | `OpeningCost`（8-121）、整链审计（8-90）、视图切快照的节奏（8-99）、采样线程量自己一拍的读取用时、`gauge` 的 `wall_us` | `stage_dispatch` 与 `Laying::mcp_tools` 各读两次城钟相减（`[prepare_dispatch_ms]`），`credentials::probing` 的 `elapsed_ms` 也是两次城钟之差（8-62）：三处都改用单调钟，单位与线上字段不变 |
+| 时长 | `bin::serving::standing::monotonic_now`，以 `fn() -> Instant` 交给用它的模块；记账一侧经 `accounting::worker::Hands.monotonic` 收下 | `OpeningCost`（8-121）、整链审计（8-90）、视图切快照的节奏（8-99）、采样线程量自己一拍的读取用时、`gauge` 的 `wall_us` 与 `read_cost_us`、`stage_dispatch` 与 `Laying::mcp_tools` 的用时（`[prepare_dispatch_ms]`）、`credentials::probing` 的 `elapsed_ms`（8-62） | 无；后三处的单位与线上字段都还是毫秒 |
 | 时刻 | 驱动的 `RunHooks::now`，只在串行阶段采样 | Ledger 的 `t` | 无 |
 | 计数 | 由拥有它的模块自己数：`Health` 由 relay 数（8-98），视图积压由视图线程数（8-123），开城时核对的行数、读过与哈希过的字节由开城路径自己数（8-122） | 采样线程读 `Health` 与积压；开城的计数随 8-121 那一行写出 | 无 |
-| 分位数 | `bin::monitor::spread::Spread` | `gauge`、citysim 的 `bench` 与 `bench_startup`、crate 内的仪表（8-84、8-99） | `bench` 的 `Reading::of` 取第 ⌊n·p/100⌋ 个（零起），`bench_startup` 的 `Samples::of` 取第 ⌈n·p/100⌉ 个（一起）；两份已经不一致：200 个样本时前者的 p50 是第 101 个，后者是第 100 个 |
-| stdout 那头是谁 | `bin::audience::Audience::of_stdout` | `view`（8-105）、`gauge`、`wire_client::watching`（8-97） | `main::view::Audience` 与 `wire_client::watching::Output::{Screen, Lines}` 是同一条规则的两种拼法，合成一个库模块 |
+| 分位数 | `bin::monitor::spread::Spread` | `gauge`、citysim 的 `bench`（`Reading::of`）与 `bench_startup`（`Samples::of`）、crate 内的仪表（8-84、8-99、`instrument_monitor_beat`） | 无；两处 citysim 读法都经 `Spread`，取最近秩（决定 8） |
+| stdout 那头是谁 | `bin::audience::Audience::of_stdout` | `gauge`、`wire_client::watching`（8-97）、`view`（8-105） | 无；`main::view` 留着自己的同名枚举（它还带写一行的方法），它的 `of_stdout` 只把库里的判定换成本地的臂 |
 
 时长只取单调钟，理由与 8-121「时间从哪来」相同：墙钟被人调过，一段就可能是负数；城钟又只到毫秒，而人的定规要内部热路径按微秒读。计数不是时间，所以可以在 accounting 与 storage 里累计，不必经过 `bin::assembly` 的采样点。
 
@@ -4633,25 +4633,35 @@ pub(super) fn verb(read: &Arguments) -> ExitCode;
 pub(super) enum Subject {
     City { at: String, token: Option<String> },
     Process { pid: u32, every: Every, beats: Option<NonZeroU32> },     // 缺省：直到根进程退出
-    Command { argv: Vec<OsString>, every: Every, samples: NonZeroU32 }, // samples 缺省 1
+    Command { argv: Vec<OsString>, every: Every, samples: NonZeroU32 }, // samples 缺省 1；argv 至少一个词
 }
-pub(super) fn subject(read: &Arguments) -> Result<Subject, LineError>;
+pub(super) fn subject(read: &Arguments) -> Result<Subject, Misread>;
+pub(super) enum Misread {                   // 每一臂退 2，Display 写出最近的合法写法
+    TwoSubjects,                            // --pid 与 -- 同时出现
+    NotForThisSubject { flag: &'static str, subject: &'static str },
+    OutOfRange { flag: &'static str, given: String, range: &'static str },
+    NothingAfterDashes,
+}
 pub(super) struct Every(Duration);          // 250 ms ..= 60 s，缺省 1 s
-pub(super) struct Run { index: u32, exit: Option<i32>, wall: Duration, beats: u64, seen: Seen, child: ChildPeaks, read_cost: Duration }
+pub(super) struct Run { index: u32, exit: Option<i32>, wall: Duration, watched: Watched, child: ChildPeaks }
+pub(super) struct Watched { beats: u64, seen: Option<Seen>, read_cost: Duration } // 拍线程交回的东西
+pub(super) struct ChildPeaks { private_bytes: Option<u64>, working_set_bytes: Option<u64> }
 pub(super) struct Host { cores: NonZeroUsize, physical_bytes: u64 } // available_parallelism 与 monitor::memory::read
 // bin::main::gauge::lines —— shape: projection；每种行只在这里变成文字
+pub(super) fn city_line(sample: &Sample) -> serde_json::Result<String>; // {"line":"city", 其后是 Sample 的字段}
 pub(super) fn tree_line(at: Duration, reading: &TreeReading, audience: Audience) -> String;
-pub(super) fn run_line(run: &Run, samples: NonZeroU32, audience: Audience) -> String;
+pub(super) fn run_line(run: &Run, audience: Audience) -> String;
 pub(super) fn spread_line(spread: &Spread, failed: u32, host: Host, audience: Audience) -> String;
-// bin::monitor::tree —— shape: adapter
-pub(crate) struct Tree;                     // 私有：sysinfo::System、根 pid、每个见过的 pid 的上一读数
+// bin::monitor::tree —— shape: adapter；pub，因为读它的 gauge 在二进制那一半
+pub struct Tree;                            // 私有：sysinfo::System、根 pid、每个见过的 pid 的上一读数、各峰值、读取次数
 impl Tree {
-    pub(crate) fn open(root: u32) -> Tree;
-    pub(crate) fn read(&mut self, elapsed: Duration) -> Option<TreeReading>; // 根已不在：None
-    pub(crate) fn seen(&self) -> Seen;       // 见过的每个 pid 最后一次读数之和，与各峰值
+    pub fn open(root: u32) -> Tree;
+    pub fn read(&mut self, elapsed: Duration) -> Option<TreeReading>; // 根已不在：None
+    pub fn seen(&self) -> Option<Seen>;     // 一拍都没读到：None
     pub(crate) fn reads(&self) -> Reads;
 }
-pub(crate) struct TreeReading { processes: u64, cpu_permille: Option<u64>, private_bytes: u64, working_set_bytes: u64, read_bytes: u64, written_bytes: u64 }
+pub struct TreeReading { pub processes: u64, pub cpu_permille: Option<u64>, pub private_bytes: u64, pub working_set_bytes: u64, pub read_bytes: u64, pub written_bytes: u64 }
+pub struct Seen { pub cpu_ms: u64, pub read_bytes: u64, pub written_bytes: u64, pub peak_private_bytes: u64, pub peak_working_set_bytes: u64 }
 // bin::monitor::counters
 pub(crate) struct Reads { pub(crate) own: u64, pub(crate) machine: u64, pub(crate) table: u64 }
 impl Counters { pub(crate) fn reads(&self) -> Reads; }
@@ -4665,9 +4675,20 @@ impl Spread {
 }
 pub enum Share { P50, P95, P99 }
 pub const SUSPICIOUS_TIMES: u32 = 3;
-// bin::audience —— shape: value
+// bin::audience —— shape: value；库里的模块，二进制的 view、watching、gauge 都读它
 pub enum Audience { Agent, Person }
 impl Audience { pub fn of_stdout() -> Audience; } // stdout 是终端即 Person
+// 为二进制那一半打开的三处：采样点、读内存、单位换算各只有一份
+pub fn bin::serving::standing::monotonic_now() -> Instant;
+pub fn bin::monitor::memory::read() -> Memory;
+pub enum bin::monitor::top::Unit { Permille, Bytes, Nanos, Count }  impl Unit { pub fn reading(&self, value: u64) -> String; }
+// bin::wire_client::watching
+pub(crate) fn top(at: &str, token: Option<&str>, audience: Audience) -> Result<(), Unheard>; // 连不上是 Unheard::NoCity
+// bin::main::verbs / grammar
+pub(super) enum AfterDashes { Refused, Command } // Row.after_dashes：这个动词收不收 `--` 之后的词
+impl Arguments { pub(super) fn after_dashes(&self) -> Option<&[String]>; } // 没有 `--`：None；`--` 后无词：Some(&[])
+// accounting::worker::Hands（accounting-SPEC 8-11）
+pub monotonic: fn() -> Instant,             // 生产交 monotonic_now；派活准备与 probe 的用时都读它
 ```
 
 **选哪个对象。** 给了 `--pid` 是 `Process`，`--` 之后有词是 `Command`，都没有是 `City`。命令行错误退 2（8-103 的 `Line`），一行说明哪里错、最近的合法写法是什么：`--pid` 与 `--` 同时出现；`--at`、`--token` 配 `Process` 或 `Command`；`--every`、`--samples` 配 `City`（城的拍距由城定，8-96）；`--every` 在范围外或不是整数；`--samples` 为 0 或不是整数；`--` 之后没有词。
@@ -4680,7 +4701,7 @@ impl Audience { pub fn of_stdout() -> Audience; } // stdout 是终端即 Person
 
 - `City`：每秒一行 `{"line":"city", …}`，其余键是 `Sample` 的字段名（8-95 的 `json_line`，多出 `line` 一个键）。`Sample` 没读到的项仍按 8-96 读作 0。
 - `Process`：每拍一行 `{"line":"tree","at_us":…,"processes":…,"cpu_permille":…,"private_bytes":…,"working_set_bytes":…,"read_bytes":…,"written_bytes":…}`，是这一拍还活着的整棵树。第一拍没有上一拍可比，`cpu_permille` 为 `null`；CPU 是两拍之间整棵树的 CPU 时间增量除以墙钟增量与核数，截到 `0..=1000`。根进程退出、或走满 `--samples` 拍，就结束。
-- `Command`：每次 run 结束一行 `{"line":"run","index":…,"exit":…,"wall_us":…,"beats":…,"seen_cpu_ms":…,"seen_read_bytes":…,"seen_written_bytes":…,"seen_peak_private_bytes":…,"seen_peak_working_set_bytes":…,"child_peak_private_bytes":…,"child_peak_working_set_bytes":…,"read_cost_us":…}`，最后一行 `{"line":"spread","samples":…,"failed":…,"floor_us":…,"p50_us":…,"p95_us":…,"p99_us":…,"peak_us":…,"suspicious":…,"cores":…,"physical_bytes":…}`。`exit` 是被量命令的退出码，被信号结束时为 `null`；`failed` 是 `exit` 不为 0 的 run 数。`seen_*` 取自拍：每个在某一拍出现过的进程取它最后一次读数，再求和或取最大，所以它们是下界，两拍之间生灭的进程不在内；这次 run 一拍都没走（比 `--every` 短）时 `beats` 为 0，`seen_*` 全为 `null`。`child_peak_*` 是直接子进程由平台记下的峰值：在 Windows 上 `wait` 之后、句柄关闭之前经 `win32job::utils::get_process_memory_info` 读出，是精确值而不是拍上的读数；其他平台为 `null`。`read_cost_us` 是这次 run 里读进程表花掉的时间，agent 据此判断测量本身扰动了多少。`cores` 与 `physical_bytes` 写出机器的等级，不写机器是谁。
+- `Command`：每次 run 结束一行 `{"line":"run","index":…,"exit":…,"wall_us":…,"beats":…,"seen_cpu_ms":…,"seen_read_bytes":…,"seen_written_bytes":…,"seen_peak_private_bytes":…,"seen_peak_working_set_bytes":…,"child_peak_private_bytes":…,"child_peak_working_set_bytes":…,"read_cost_us":…}`，最后一行 `{"line":"spread","samples":…,"failed":…,"floor_us":…,"p50_us":…,"p95_us":…,"p99_us":…,"peak_us":…,"suspicious":…,"cores":…,"physical_bytes":…}`。`exit` 是被量命令的退出码，被信号结束时为 `null`；`failed` 是 `exit` 不为 0 的 run 数。`seen_*` 取自拍：CPU 与读写字节是每个在某一拍出现过的进程最后一次读数之和，两项峰值是各拍整棵树之和里最大的那一拍，所以它们都是下界，两拍之间生灭的进程不在内；这次 run 一拍都没走（比 `--every` 短）时 `beats` 为 0，`seen_*` 全为 `null`。`child_peak_*` 是直接子进程由平台记下的峰值：在 Windows 上 `wait` 之后、句柄关闭之前经 `win32job::utils::get_process_memory_info` 读出，是精确值而不是拍上的读数；其他平台为 `null`。`read_cost_us` 是这次 run 里读进程表花掉的时间，agent 据此判断测量本身扰动了多少。`cores` 与 `physical_bytes` 写出机器的等级，不写机器是谁。
 
 **给人的输出（stdout 是终端）。** `City` 是 8-95 的一屏。`Process` 每拍一行，`Command` 每次 run 一行、最后一行 spread，读数按 8-95 的单位规则写（`µs`、`ms`、`MiB`，一位小数，截断）。单位换算只有 `monitor::top` 那一份，`lines` 调它。
 
@@ -4718,10 +4739,12 @@ impl Audience { pub fn of_stdout() -> Audience; } // stdout 是终端即 Person
 8. **分位数取最近秩。** 登记册的 `[install]` 一行已写明「p50/p95/p99 nearest-rank」，`bench_startup` 的 `Samples::of` 就这样算；`bench` 的 `Reading::of` 改为经 `Spread`，它登记在 `budgets.toml` 里的各行要在新规则下重取。被否：两份各留各的——同一个 p50 在两份读数里指的是不同的样本，读数行上看不出这个差别。
 9. **开销用确定性计数守，墙钟只记录**（8-129-3）。被否：给一拍的用时设墙钟门——共享 CI 机器上它时红时绿，而拍的读取次数在任何机器上都一样。
 10. **没有 Lean 模型。** 采样线程的读法由看的人一次选定，`gauge` 的 run 依次进行，两处都没有交错；要守的性质是读取次数，由 8-129-3 的计数断言与 `Subject` 这个穷尽枚举守住。重开条件：`gauge` 同时量多个对象，或采样改为多线程。
+11. **`gauge` 自己的命令行错误是它自己的枚举 `Misread`，不并进 `grammar::LineError`。** `LineError` 只说命令表判得了的事：动词、标志、位置参数各认不认得；「`--pid` 与 `--` 不能同时给」「`--every` 只配进程与命令」是 `gauge` 选对象的规则，放进 `LineError` 就要让解析器知道一个动词的对象怎么选。两者退出码相同（2），写法都是一行说明加最近的合法写法。被否：给 `LineError` 加通用的「冲突」「越界」臂——它们只有 `gauge` 一个读者，说明文字又各不相同。
+12. **记账一侧的单调钟经 `Hands.monotonic` 交进来，是一只 `fn() -> Instant`。** 与 `read_memory`、`read_volume` 同形：worker 碰这台电脑的每只手都在构造时一次交进来（accounting-SPEC 8-11），生产交 `monotonic_now`，测试的 `Hands` 交测试夹具里同样读单调钟的那一只。被否：给 `accounting::Clock` 加一个返回 `Instant` 的方法——城钟是 Ledger 的 `t` 的来源，单调钟只量时长，两者放进一个端口，换城钟（测试里拨快、拨停）的地方就得同时编一个单调钟；四个实现都要改。
 
-**测试（随实现落地）。** `monitor::tests` 与 `monitor::sampler::tests`：按看的人走 N 拍，`Reads` 等于 8-129-3 的精确值。`monitor::spread::tests`：n 为 1、2、100、200 时各分位与手算的最近秩相等，`suspicious` 数对。`monitor::tree::tests`：起一个子进程，第一次读数 `processes ≥ 1`、工作集非零、`cpu_permille` 为 `null`，它退出后 `read` 为 `None`，`reads().table` 等于读的次数。`main::grammar::tests`：`--` 之后的词原样交出，其中的 `--help`、`--version` 不生效。`main::gauge::tests`：每条命令行错误退 2；三种行按整串比较；`--samples 3` 量一个很快退出的程序，stdout 恰好三行 `run`、一行 `spread`，程序以非零退出时 `gauge` 仍退 0、`failed` 为 3。citysim：`Reading::of` 与 `Samples::of` 的既有测试按最近秩改期望。
+**测试。** `monitor::counters::tests`：按看的人走 N 拍，`Reads` 等于 8-129-3 的精确值。`monitor::spread::tests`：n 为 1、2、100、200 时各分位与手算的最近秩相等，`suspicious` 数对。`monitor::tree::tests`：起一个子进程，第一次读数 `processes ≥ 1`、工作集非零、`cpu_permille` 为 `null`，它退出后 `read` 为 `None`，`reads().table` 等于读的次数。`audience::tests`：测试运行器的 stdout 不是终端，读作 `Agent`。`main::grammar::tests`：`--` 之后的词原样交出，其中的 `--help`、`--version` 不生效；`gauge` 与 `top` 解析成同一个动词。`main::gauge::tests`：每条命令行错误退 2；三种行按整串比较；`--samples 3` 量一个很快退出的程序，stdout 恰好三行 `run`、一行 `spread`，程序以非零退出时 `gauge` 仍退 0、`failed` 为 3。citysim：`Reading::of` 与 `Samples::of` 的既有测试按最近秩改期望。accounting：城钟每读一次拨快一分钟时，派活准备、`mcp_tools` 与 probe 的用时仍小于一分钟。
 
-**本节接口的当前状态。** 本节设计的接口都还没有代码，8-94 至 8-98 描述的监视器是现状。按依赖排的次序：先 `bin::monitor::spread`，citysim 的两处改为调用它；再 `Reads` 计数、`bin::monitor::tree` 与 `instrument_monitor_beat`；再命令表与解析器（`--` 之后原样交出、`gauge` 一行、别名 `top`）、`bin::audience`、`bin::main::gauge` 与 `lines`，glossary 同时收下 **gauge**；`Sample` 的两项随 8-129-6 的线协议改动进来，采样线程同时量自己的读取；三处城钟时长改用单调钟；最后是 `skills/gauge/` 与 README、`docs/operating.md` 里的动词。`bin::main::gauge` 要在 Windows 目标上依赖 `win32job`（今天只有 runtime 依赖它）。模块在有文件时才登记进模块图。
+**本节接口的当前状态。** 8-129-1 至 8-129-5 的接口都已落地：`Spread` 是唯一的分位算法，citysim 两处读它；`Counters` 与 `Tree` 数自己的平台读取；`gauge` 是命令表的一行，`top` 是它的别名，`--` 之后的词原样交给被量的命令；`bin::audience` 是 TTY 规则唯一的一处；三处时长读 `Hands.monotonic`；`skills/gauge/` 随发行包走。还没有的：`Sample` 的两项（8-129-6，随线协议改动进来，采样线程那时同时量自己的读取）；`instrument_monitor_beat` 的读数还没有登记进 `budgets.toml` 的 `[monitor_beat]`；`[prepare_dispatch_ms]` 的 `measured_by` 还写着城钟；`main::view` 的同名枚举还没有换成 `bin::audience::Audience`（它的 `write_line` 方法要随之搬走）。`xtask mem` 仍读 PowerShell（决定 4）。
 
 ## 8-98 核心健康：记账队列与持久水位线跨线程可读（`accounting::worker::health`，形状：数据）
 

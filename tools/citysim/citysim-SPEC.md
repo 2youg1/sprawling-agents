@@ -275,13 +275,15 @@ pub enum Load { LargeLedgerFold, LargeWorktreePlacement, KeptWorktreeReclaim, Lo
 pub enum SubMetric { Harness, Whole }
 /// 一条读数在什么条件下量的：机器类属与所量字节的摘要。两者总是一起走，所以是一个值。
 pub struct Taken { pub machine: MachineClass, pub fixture: B3Hash }
-pub struct Reading { /* load, sub, taken, samples, p50, p95, p99 */ }
+pub struct Reading { /* load, sub, taken, spread: sprawling::monitor::spread::Spread */ }
 impl Reading {
     pub fn of(load: Load, sub: SubMetric, taken: Taken,
               samples: Vec<std::time::Duration>) -> Result<Reading, String>;
     pub fn line(&self) -> String;   // 唯一渲染家，键序固定
 }
 ```
+
+`Reading::of` 不自己算分位：样本交给 `sprawling::monitor::spread::Spread`（sprawling-SPEC 8-129-2），p50/p95/p99 取最近秩，即第 ⌈n·p/100⌉ 个（一起），与 `bench_startup` 的 `Samples::of`（8-5，也经 `Spread`）和 `sprawling gauge` 的 spread 行是同一个数。登记在 `budgets.toml` 里、由旧的下标 ⌊n·p/100⌋ 量出的各行，要在最近秩下重取；同一组样本，旧读法在 n·p/100 为整数时比最近秩高一个秩。
 
 一行读数的文法（`Reading::line` 是唯一权威，测试按字节对拍）：
 
