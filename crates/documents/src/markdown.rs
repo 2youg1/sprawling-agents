@@ -51,11 +51,17 @@ pub fn preview(encoding: Encoding, lifted: Lifted<'_>, viewport: Span) -> Result
 /// # Errors
 /// The [`cut`] refusals: a text holding a NUL is not unmarked UTF-8
 /// text (D4).
-pub fn reply(_text: &str, _state: ReplyState) -> Result<Laid, AxError> {
-    Ok(Laid {
-        span: Span::at(0),
-        blocks: Vec::new(),
-    })
+pub fn reply(text: &str, state: ReplyState) -> Result<Laid, AxError> {
+    let bytes = text.as_bytes();
+    let size = match state {
+        ReplyState::Settled => offset(bytes.len()),
+        ReplyState::Streaming => layout::closed(bytes),
+    };
+    laid(
+        Encoding::Utf8,
+        Lifted { at: 0, bytes, size },
+        Span::ordered(0, size),
+    )
 }
 
 /// One window of UTF-8 text, cut, ended on a block, and laid out.

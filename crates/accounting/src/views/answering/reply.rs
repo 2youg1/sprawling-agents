@@ -18,8 +18,13 @@ use super::super::prepared::unavailable;
 
 /// The blocks of `text` that can no longer change, or `Unavailable`
 /// when the text is not one the grammar reads (it holds a NUL).
-pub(in crate::views) fn reply_answer(_text: &str, _state: ReplyState) -> wire::Answer {
-    unavailable("Reply".to_owned())
+pub(in crate::views) fn reply_answer(text: &str, state: ReplyState) -> wire::Answer {
+    match documents::reply(text, state) {
+        Ok(laid) => wire::Answer::Reply(Box::new(laid)),
+        // The page draws text the grammar does not read as it arrived,
+        // which is what it does with the open tail anyway.
+        Err(_) => unavailable("Reply".to_owned()),
+    }
 }
 
 #[cfg(test)]

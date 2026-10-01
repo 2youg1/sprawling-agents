@@ -31,9 +31,65 @@ pub(crate) fn blocks(format: Format, source: &[u8]) -> Vec<Span> {
 }
 
 /// Where the blocks that can no longer change end, in Markdown still
-/// being written (`crates/documents/Spec.lean` D31).
-pub(crate) fn closed(_source: &[u8]) -> u64 {
-    0
+/// being written (`crates/documents/Spec.lean` D31, `closedUpTo`).
+///
+/// Just past the last complete line that is blank outside a code block,
+/// is an ATX heading at the margin, or closes a code block opened at the
+/// margin. The line still being written closes nothing, because what
+/// follows may join it; an indented fence or heading may sit inside a
+/// list item or a quote that the next line continues. Fences are read by
+/// the rule [`blocks`] reads them by.
+pub(crate) fn closed(source: &[u8]) -> u64 {
+    let mut closed = 0_u64;
+    let mut code: Option<(Delimiter, Margin)> = None;
+    for (line, end) in complete_lines(source) {
+        let (next, closes) = match (code, Delimiter::of(line.content)) {
+            (None, Some(opened)) => (Some((opened, Margin::of(line.content))), false),
+            (None, None) => (None, line.is_blank() || line.is_margin_heading()),
+            (Some((opened, margin)), Some(closing)) if closing.closes(opened) => {
+                (None, margin == Margin::At)
+            }
+            (Some(open), Some(_) | None) => (Some(open), false),
+        };
+        code = next;
+        if closes {
+            closed = end;
+        }
+    }
+    closed
+}
+
+/// Where a code block's opening line began: at the margin, or indented
+/// one to three columns, where it may belong to a list item or a quote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Margin {
+    At,
+    Indented,
+}
+
+impl Margin {
+    fn of(line: &[u8]) -> Margin {
+        match line.first() {
+            Some(b'`' | b'~') => Margin::At,
+            Some(_) | None => Margin::Indented,
+        }
+    }
+}
+
+/// Every line that ends with a `\n`, and the offset just past it; the
+/// last line, when nothing ends it yet, is left out.
+fn complete_lines(source: &[u8]) -> impl Iterator<Item = (Line<'_>, u64)> {
+    source
+        .split_inclusive(|byte| *byte == b'\n')
+        .filter_map(|raw| raw.strip_suffix(b"\n"))
+        .scan(0_u64, |start, raw| {
+            let line = Line {
+                start: *start,
+                content: raw.strip_suffix(b"\r").unwrap_or(raw),
+            };
+            *start = start.saturating_add(offset(raw.len())).saturating_add(1);
+            Some((line, *start))
+        })
 }
 
 /// One line of the source: where it starts, and its content up to but
@@ -50,6 +106,21 @@ impl Line<'_> {
 
     fn is_blank(&self) -> bool {
         self.content.iter().all(u8::is_ascii_whitespace)
+    }
+
+    /// An ATX heading opened in the first column: one to six `#`, then a
+    /// space, a tab or the end of the line (CommonMark 0.31.2 section 4.2).
+    fn is_margin_heading(&self) -> bool {
+        let marks = self
+            .content
+            .iter()
+            .take_while(|byte| **byte == b'#')
+            .count();
+        (1..=6).contains(&marks)
+            && self
+                .content
+                .get(marks)
+                .is_none_or(|byte| matches!(byte, b' ' | b'\t'))
     }
 }
 

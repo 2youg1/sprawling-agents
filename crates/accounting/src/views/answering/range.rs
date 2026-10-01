@@ -50,21 +50,48 @@ pub(in crate::views) fn range_answer(
 }
 
 fn window_of(city_root: &Path, version: &B3Hash, wanted: Span) -> Result<Window, AxError> {
+    let stored = stored(city_root, version, wanted)?;
+    documents::cut(stored.encoding, stored.lifted(), wanted)
+}
+
+/// The bytes of one stored version a window needs, and the encoding its
+/// mark names: the one read of the store a range and a preview both make
+/// (accounting-SPEC.md 8-21, section 12 no. 41).
+pub(super) struct Stored {
+    pub(super) encoding: Encoding,
+    at: u64,
+    bytes: Vec<u8>,
+    size: u64,
+}
+
+impl Stored {
+    pub(super) fn lifted(&self) -> Lifted<'_> {
+        Lifted {
+            at: self.at,
+            bytes: &self.bytes,
+            size: self.size,
+        }
+    }
+}
+
+/// Reads `version`'s length and first three bytes, then the stretch
+/// `documents::lift` names for a window asked for as `wanted`.
+///
+/// # Errors
+/// The store will not open, does not hold `version`, or will not read
+/// the range.
+pub(super) fn stored(city_root: &Path, version: &B3Hash, wanted: Span) -> Result<Stored, AxError> {
     let store = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
         .map_err(StorageError::into_ax)?;
     let size = store.size(version).map_err(StorageError::into_ax)?;
     let mark = read(&store, version, Span::new(0, size.min(3))?)?;
     let lift = documents::lift(wanted, size);
-    let bytes = read(&store, version, lift)?;
-    documents::cut(
-        Encoding::of_mark(&mark),
-        Lifted {
-            at: lift.start(),
-            bytes: &bytes,
-            size,
-        },
-        wanted,
-    )
+    Ok(Stored {
+        encoding: Encoding::of_mark(&mark),
+        at: lift.start(),
+        bytes: read(&store, version, lift)?,
+        size,
+    })
 }
 
 /// The bytes of one half-open span of a stored object.

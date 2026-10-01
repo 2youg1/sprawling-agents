@@ -9,7 +9,8 @@
 //! Every judgement - which version, whether the bytes are text, where
 //! the first window ends - is the `documents` crate's; this module reads
 //! the disk, keeps a version in the content store when its first window
-//! does not cover it, and spells the answer. The same text judgement
+//! does not cover it or when it is Markdown, which is previewed by its
+//! version, and spells the answer. The same text judgement
 //! answers `Content` and `Prefix`, which read bytes out of the store
 //! rather than off the tree: what makes bytes readable does not depend on
 //! where they were kept.
@@ -67,7 +68,8 @@ fn state_of(city_root: &Path, at: &Address, bytes: &[u8]) -> DocumentState {
 }
 
 /// The first window of a text version, and the version kept in the
-/// store when that window does not cover it (accounting-SPEC.md 8-21).
+/// store when that window does not cover it or a preview will read it
+/// (accounting-SPEC.md 8-21, section 12 no. 33).
 fn text_body(
     city_root: &Path,
     format: Format,
@@ -76,11 +78,16 @@ fn text_body(
 ) -> Result<DocumentBody, AxError> {
     let head = documents::head(format, encoding, bytes)?;
     let coverage = if head.span.end() < length(bytes) {
-        keep(city_root, bytes)?;
         Coverage::Head
     } else {
         Coverage::Whole
     };
+    match (format, coverage) {
+        (Format::Markdown, Coverage::Whole | Coverage::Head) | (Format::Plain, Coverage::Head) => {
+            keep(city_root, bytes)?;
+        }
+        (Format::Plain, Coverage::Whole) => {}
+    }
     Ok(DocumentBody::Text {
         encoding,
         head,

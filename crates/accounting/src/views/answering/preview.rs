@@ -8,18 +8,19 @@
 //!
 //! Reads the content store and nothing else, the way a range does: the
 //! version is the object's address, so a page previewing a file a
-//! resident is rewriting keeps reading the version it opened. Every
+//! resident is rewriting keeps reading the version it opened. The store
+//! is read through `range::stored`, the one read a range makes too; every
 //! judgement - which encoding, where the window is cut and where it ends,
 //! what the blocks are - is `documents::preview`'s.
 
 use std::path::Path;
 
-use documents::{Encoding, Lifted, Preview, Span};
+use documents::{Preview, Span};
 use kernel::{AxError, B3Hash};
-use storage::{Cas, StorageError};
 
 use super::super::holding::Views;
 use super::super::prepared::{Prepared, unavailable};
+use super::range::stored;
 
 impl Views {
     /// A preview is read from the store after the views are released.
@@ -51,32 +52,8 @@ pub(in crate::views) fn preview_answer(
 }
 
 fn preview_of(city_root: &Path, version: &B3Hash, viewport: Span) -> Result<Preview, AxError> {
-    let store = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
-        .map_err(StorageError::into_ax)?;
-    let size = store.size(version).map_err(StorageError::into_ax)?;
-    let mark = read(&store, version, Span::new(0, size.min(3))?)?;
-    let lift = documents::lift(viewport, size);
-    let bytes = read(&store, version, lift)?;
-    documents::preview(
-        Encoding::of_mark(&mark),
-        Lifted {
-            at: lift.start(),
-            bytes: &bytes,
-            size,
-        },
-        viewport,
-    )
-}
-
-/// The bytes of one half-open span of a stored object.
-fn read(store: &Cas, version: &B3Hash, span: Span) -> Result<Vec<u8>, AxError> {
-    if span.is_empty() {
-        return Ok(Vec::new());
-    }
-    let closed = kernel::Range::bytes(span.start(), span.end().saturating_sub(1))?;
-    store
-        .get_range(version, &closed)
-        .map_err(StorageError::into_ax)
+    let stored = stored(city_root, version, viewport)?;
+    documents::preview(stored.encoding, stored.lifted(), viewport)
 }
 
 #[cfg(test)]
