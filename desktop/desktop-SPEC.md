@@ -541,7 +541,7 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 **还欠的**，都是这条接口的当前状态：
 
 1. **OCR**：一张截图变成文字由城工具 `ocr` 承担（sprawling-SPEC 8-142），它读连接器存进 CAS 的截图，经人为 `ModelTag::Ocr` 选的端点；本 package 不做 OCR。
-2. **录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（§12.13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（runtime-SPEC §8-27-10）。`transcribe` 今天只读本楼的文件（sprawling-SPEC 8-131），读一个 `cas:` 块是那里的未决；在它落地之前，录音的路径与 locator 都写在答复里，但工具还收不下它们。
+2. **录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（§12.13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（runtime-SPEC §8-27-10、§12.15）。`transcribe` 今天只读本楼的文件（sprawling-SPEC 8-131），读一个 `cas:` 块是那里的未决；在它落地之前，录音的路径与 locator 都写在答复里，但工具还收不下它们。
 3. **macOS 这条胳膊**：`platform/elsewhere.rs` 对 macOS 答 `E_TOOL_UNAVAILABLE`。它要在一台 Mac 或夜间的 `platforms.yml` 上验，Windows 上验不了。
 
 
