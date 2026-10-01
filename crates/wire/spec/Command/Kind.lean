@@ -170,7 +170,7 @@ def Command.reach : Command → Reach
   | .DecideProposals => .client
   -- 起一栋楼
   | .CreateBuilding => .client
-  -- 把一栋楼移出城：文件搬进 reserved subtree（city-SPEC §8-3），历史留在 Ledger，写 `building_removed`；有 run 正在其中某个房间里跑时拒 `E_BUSY`，点名房间与 run
+  -- 把一栋楼移出城：文件搬进 reserved subtree（`crates/city/Spec.lean` §8-3），历史留在 Ledger，写 `building_removed`；有 run 正在其中某个房间里跑时拒 `E_BUSY`，点名房间与 run
   | .RemoveBuilding => .client
   -- 中途换方向
   | .Steer => .client

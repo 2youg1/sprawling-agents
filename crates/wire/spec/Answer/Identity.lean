@@ -31,13 +31,13 @@ pub struct StatedIdentity {
     pub imported_from: Option<String>,     // user_id 是从哪台主机的 gh 导入的；手填为 None
     pub about: String,                     // PREFERENCES.md 身份区之后的正文
     pub mayor: Option<String>,             // 主 Agent 的显示名；缺席时页面用语言表里的默认名
-    pub version: B3Hash,                   // 新 session 会冻下的那一版（city-SPEC §8-33）
+    pub version: B3Hash,                   // 新 session 会冻下的那一版（`crates/city/Spec.lean` §8-33）
     pub preferences_text: String,          // 两份文件此刻的全文：保存时的 base
     pub mayor_text: String,
 }
 ```
 
-- **两份文件，一个身份区。** 用户 ID、导入来源与「关于你」住 `PREFERENCES.md`，主 Agent 的名字住 `MAYOR.md`；身份区的语法、名字的合法域与「一个 session 冻下哪一版」都由 `city::Naming` 一处回答（city-SPEC §8-33），本 crate 只携字符串，不判它们合法与否（§8-0 同一条理由）。
+- **两份文件，一个身份区。** 用户 ID、导入来源与「关于你」住 `PREFERENCES.md`，主 Agent 的名字住 `MAYOR.md`；身份区的语法、名字的合法域与「一个 session 冻下哪一版」都由 `city::Naming` 一处回答（`crates/city/Spec.lean` §8-33），本 crate 只携字符串，不判它们合法与否（§8-0 同一条理由）。
 - **卡片只写自己那几个键，其余原样。** `PutIdentity` 把卡上的值交给城，由城在 `base` 上改写身份区：卡上的键写入或删去（`None` 即删去，回到默认称呼），身份区里别的键、`about` 为 `None` 时的正文，都按 `base` 里的字节留着。页面不拼 TOML：拼身份区的只有城一处，表单与原文编辑器读到的是同一份解析结果（D5）。
 - **两个写者，一道守卫。** 原文编辑器发 `PutDocument`，卡片发 `PutIdentity`，两者都携 `base`——发信方起手时那份全文——文件已经变了就拒 `E_VERSION_CONFLICT`，什么都不写；人的草稿留在页面上，页面重读之后再发。`MAYOR.md` 与 `PREFERENCES.md` 的身份区读不出时（重复的键、没有闭合的 `+++`、名字为空或带控制字符），`PutDocument` 在落盘之前拒 `E_CONFIG_INVALID`，拒因里有行号；`CLERK.md` 没有身份区，只经基线守卫。
 - **回执是账本行。** 两条命令都写一行 `governed_document_written`，`naming` 键是写完之后城的身份版本（`crates/kernel/Spec.lean` §8-79）；页面发出之后只显示「保存中」，见到这一行才显示「已保存」，并以它判断自己读到的 `version` 是否已经过时。
