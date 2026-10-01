@@ -129,6 +129,17 @@ getrandom = "0.4"
 # the lock beneath wasmtime-wasi, under the same licence.
 cap-std = "4"
 cap-fs-ext = "4"
+# A playback page is checked as a browser would build it: html5ever is the
+# WHATWG tree builder, so `<svg><title>` and `<noscript>` read the way a
+# browser reads them; a tokenizer that switches state by tag name
+# (html5gum, no dependencies) reads an `img` inside SVG as text, and
+# scraper adds selectors and pins another cssparser. CSS is read by the
+# CSS Syntax tokenizer itself; its default features buy a faster byte
+# match and a colour table, worth less than a microsecond on a page's
+# kilobytes of CSS and not a proc macro and a phf table
+# (accounting-SPEC.md 8-13, decision 25).
+html5ever = "0.40"
+cssparser = { version = "0.38", default-features = false }
 # One HTTP client for the whole workspace: gateway speaks to providers,
 # the bin speaks to MCP servers reached over HTTP, and two version
 # authorities for one client is how two TLS stacks end up in one binary.
