@@ -231,7 +231,15 @@ fn key() -> String {
 /// the confidential building `vault`, and leaves a fourth unchanged.
 fn committed() -> (tempfile::TempDir, [String; 3]) {
     let dir = tempfile::tempdir().unwrap();
-    let root = dir.path();
+    let (script, oids) = committed_in(dir.path());
+    write(dir.path(), &super::lines(script), b"");
+    confidential(dir.path(), "vault");
+    (dir, oids)
+}
+
+/// The repository of [`committed`] at `root`, and the ledger script that
+/// announces its commits.
+fn committed_in(root: &Path) -> (Vec<Line>, [String; 3]) {
     git2::Repository::init(root).unwrap();
     let first = commit(
         root,
@@ -266,7 +274,7 @@ fn committed() -> (tempfile::TempDir, [String; 3]) {
             json!({"oid": oid, "scope": ["lab"], "files": files}),
         )
     };
-    let written = super::lines(vec![
+    let script = vec![
         (RunId::CITY, None, EventKind::CityInitialized, json!({})),
         (
             RunId::CITY,
@@ -289,10 +297,8 @@ fn committed() -> (tempfile::TempDir, [String; 3]) {
             ],
         ),
         checkpoint(&absent, &["lab/a/notes.md"]),
-    ]);
-    write(root, &written, b"");
-    confidential(root, "vault");
-    (dir, [first, second, absent])
+    ];
+    (script, [first, second, absent])
 }
 
 #[test]
@@ -343,4 +349,37 @@ fn a_commits_diff_keeps_each_state_apart_and_its_trace_names_the_calls() {
             ),
         ]
     );
+}
+
+/// After the export, another run in the same building checkpoints the
+/// same tree again. The bundle's trace was the first announcement's, so
+/// recomputing it from the longer history gives the same bytes.
+#[test]
+fn a_commit_announced_again_after_the_export_recomputes_the_same() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut script, [_, second, _]) = committed_in(dir.path());
+    write(dir.path(), &super::lines(script.clone()), b"");
+    confidential(dir.path(), "vault");
+    let bundle = export(dir.path(), &person()).unwrap();
+    script.extend([
+        (run(2), Some("lab/b"), EventKind::RunStarted, json!({})),
+        (
+            run(2),
+            Some("lab/b"),
+            EventKind::CheckpointCommitted,
+            json!({"oid": second, "scope": ["lab"], "files": []}),
+        ),
+    ]);
+    write(dir.path(), &super::lines(script), b"");
+    let recomputed = super::super::check(
+        bundle.bytes(),
+        &super::super::Asked {
+            city: Some(super::super::City {
+                root: dir.path(),
+                reader: person().reader,
+            }),
+            ..super::super::Asked::default()
+        },
+    );
+    assert_eq!(recomputed.source, super::super::Verdict::Passed);
 }
