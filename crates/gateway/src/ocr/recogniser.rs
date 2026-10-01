@@ -96,7 +96,7 @@ impl Recogniser {
         *held(&seeing.shown)? = Some(picture);
         let returned = seeing.model.call(&request);
         *held(&seeing.shown)? = None;
-        returned.map(|_| String::new())
+        text_of(&returned?.message)
     }
 }
 
@@ -122,9 +122,12 @@ impl Seeing {
                 }],
                 messages: Cow::Owned(vec![ChatMessage {
                     role: Role::User,
-                    content: vec![ContentBlock::Text {
-                        text: format!("{ASK} {}", seen.locator),
-                    }],
+                    content: vec![
+                        ContentBlock::Image(seen),
+                        ContentBlock::Text {
+                            text: ASK.to_owned(),
+                        },
+                    ],
                 }]),
                 tools: Cow::Borrowed(&[]),
                 breakpoint: kernel::MessageBreakpoint::Unmarked,
@@ -177,7 +180,7 @@ pub(super) fn held(shown: &Shown) -> Result<MutexGuard<'_, Option<Picture>>, AxE
 /// something a person filled in wrongly.
 fn unconfigured() -> AxError {
     AxError::failure(
-        AxCode::InvalidArgs,
+        AxCode::ToolUnavailable,
         "read the text in a picture",
         "this city has no OCR model chosen",
     )

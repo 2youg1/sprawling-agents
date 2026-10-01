@@ -25,6 +25,17 @@ impl Picture {
     /// `E_INVALID_ARGS` when `seen` does not name these bytes by the
     /// `cas:` locator they hash to, with no range.
     pub fn new(seen: ImageRef, bytes: Vec<u8>) -> Result<Picture, AxError> {
+        let named = Locator::cas(B3Hash::digest(&bytes));
+        if seen.locator != named {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "show a picture",
+                format!("{} names other bytes than {named}", seen.locator),
+            )
+            .with_recovery(
+                "name the picture by the cas: locator its bytes hash to, with no range",
+            ));
+        }
         Ok(Picture { seen, bytes })
     }
 
