@@ -26,7 +26,7 @@
 use kernel::{ChatMessage, ContentBlock, Role};
 
 /// How the first user message opens: kernel's, because `run_started`
-/// records it (kernel-SPEC.md 8-82-1).
+/// records it (`crates/kernel/Spec.lean` §8-82-1).
 pub use kernel::event::record::Opening;
 
 /// The run's conversation history, owned by the executor and folded

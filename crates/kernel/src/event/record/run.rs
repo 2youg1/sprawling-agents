@@ -68,7 +68,7 @@ pub struct RunStarted {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub dispatched_by: Option<Who>,
-    /// The run policy this run was dispatched under (kernel-SPEC 8-77).
+    /// The run policy this run was dispatched under (`crates/kernel/spec/Model.lean` §8-77).
     /// Absent in a record written before the policy was recorded; the
     /// six mode words before it never reached a typed payload, so
     /// there is no older shape to read.
@@ -76,13 +76,13 @@ pub struct RunStarted {
     pub policy: Option<RunPolicy>,
     /// The identity version this run's session froze: the key a page
     /// reads the names the request carried back by, through the content
-    /// store (kernel-SPEC 8-79). Absent in a record written before the
+    /// store (`crates/kernel/spec/Event/Record.lean` §8-79). Absent in a record written before the
     /// key existed, which a page answers with the address rather than
     /// with today's names.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub naming: Option<B3Hash>,
-    /// How the run's first user message was written (kernel-SPEC 8-82-1):
+    /// How the run's first user message was written (`crates/kernel/spec/Event/Record.lean` §8-82-1):
     /// what a fork reads to rebuild that message the way the mother sent
     /// it. Absent in a record written before the key existed, and on a
     /// harness run, whose first words are the harness's own prompt.
@@ -130,7 +130,7 @@ pub struct RunFrozen {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence: Option<Vec<EvidenceCite>>,
     /// Why the line was written by something other than the run's own
-    /// driver (kernel-SPEC 8-82-2). Absent on every freeze a run wrote
+    /// driver (`crates/kernel/spec/Event/Record.lean` §8-82-2). Absent on every freeze a run wrote
     /// for itself, so those lines keep the bytes they always had.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cause: Option<FreezeCause>,
@@ -178,7 +178,7 @@ impl RunFrozen {
     /// `cancelled`, because the run stopped without finishing - `done`
     /// needs evidence the city recorded and it has none - and no ceiling
     /// cut it, which is what `limit` says. The cause tells it apart from
-    /// a cancel somebody asked for (kernel-SPEC 12.14).
+    /// a cancel somebody asked for (kernel D14).
     pub fn lost() -> RunFrozen {
         RunFrozen {
             completion: Completion::Cancelled.name().to_owned(),
@@ -220,7 +220,7 @@ pub struct SessionOpened {
     /// **The room itself is the record's own `addr` field**, not a copy
     /// here: a line that belongs to an address says so in the envelope,
     /// and a payload copy would be a second place the same address is
-    /// spelled (`kernel-SPEC.md` section 8-4).
+    /// spelled (`crates/kernel/spec/Event.lean` §8-4).
     pub carried: bool,
 }
 

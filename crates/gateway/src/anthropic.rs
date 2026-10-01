@@ -269,7 +269,7 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
     let cache_write_tokens =
         tokens_or_zero(usage_value, "cache_creation_input_tokens", "response.usage")?;
     // This wire's `input_tokens` counts only what missed the cache; the
-    // city's count is the whole prompt (kernel-SPEC, `ModelUsage`).
+    // city's count is the whole prompt (`crates/kernel/Spec.lean` §8-24, `ModelUsage`).
     let input_tokens = [cache_read_tokens, cache_write_tokens]
         .into_iter()
         .try_fold(

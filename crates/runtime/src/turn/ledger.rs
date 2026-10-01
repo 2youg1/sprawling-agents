@@ -26,7 +26,7 @@
 //! started, its answer - carry their own reading and cannot be built
 //! without one; every other line carries the turn's stamp. The clock
 //! those readings come from is read in this module and nowhere else in
-//! the turn (kernel-SPEC 8-4, "what the envelope `t` records").
+//! the turn (`crates/kernel/Spec.lean` §8-4, "what the envelope `t` records").
 
 use kernel::{AxError, EventDraft, EventKind, EventRef, Ledger, Payload, RunId, TimeMs};
 

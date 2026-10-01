@@ -525,7 +525,7 @@ the part worth knowing before starting, not after.
 
 | To change this | Go here | Held by |
 |---|---|---|
-| a new event kind, or a payload | `kernel::event` + kernel-SPEC | the kind set is closed; `storage` fixtures compare bytes across platforms |
+| a new event kind, or a payload | `kernel::event` + `crates/kernel/spec/Event/Kind.lean` | the kind set is closed; `storage` fixtures compare bytes across platforms |
 | a new `Command` or `Query` frame | `wire::frames` + wire-SPEC | the new name moves the schema hash, so an older page is refused at the handshake; `WIRE_V` rises only when a frame changes shape while every name stays (wire-SPEC §12.1); every `Query` must be answered or it does not compile |
 | what a model may call | `runtime::catalog`, tools in `runtime` or `collab` | `kernel::tool` is the seam; a tool with no conformance suite is not a seam |
 | how a provider is spoken to | `gateway::dialect` + `crates/gateway/Spec.lean` | a pure two-way translation with the canonical shape in the middle |
@@ -695,8 +695,7 @@ holds 3 kani harnesses, all of which CI proves in under a minute each — a
 harness that builds a `Vec`, a `String` or a `BTreeSet` gives CBMC loops it
 cannot bound, and one over symbolic non-linear arithmetic gives the solver
 work that grows with the data it walks, so propositions of those two shapes
-are held by the `#[test]` and the proptest instead (kernel-SPEC.md section
-2). The `// not-proved:` marker and the reader that honours it stay, and
+are held by the `#[test]` and the proptest instead (`crates/kernel/Spec.lean` §2). The `// not-proved:` marker and the reader that honours it stay, and
 today no harness carries one.
 
 ### Specifications in Lean

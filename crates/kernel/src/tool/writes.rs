@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a call that ran may have written to the city's tree, as its tool
-//! can tell (kernel-SPEC section 8-23).
+//! can tell (`crates/kernel/spec/Tool.lean` §8-23).
 
 use super::Effect;
 use crate::Address;

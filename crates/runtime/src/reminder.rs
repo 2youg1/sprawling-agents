@@ -207,7 +207,7 @@ mod tests {
 
     /// A layer that moved the second rung moves the line with it: the
     /// handover claim is about the budget left at that rung, so the rung
-    /// is the city's to set (kernel-SPEC 8-22).
+    /// is the city's to set (`crates/kernel/Spec.lean` §8-22).
     #[test]
     fn the_second_rung_moves_when_a_layer_moved_it() {
         let moved = kernel::config::SecondThreshold::parse(30).unwrap();

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which lines record the moment their own event happened, read from the
-//! line's kind and version (kernel-SPEC 8-4, "what the envelope `t`
+//! line's kind and version (`crates/kernel/spec/Event.lean` §8-4, "what the envelope `t`
 //! records"). A reader asks here rather than comparing neighbouring
 //! lines' `t` or guessing from the build that exported them.
 

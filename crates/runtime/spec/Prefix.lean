@@ -70,7 +70,7 @@ pub(crate) const ANOTHER_ADDRESS: &str =
 /// 一个 session 的保温账：按四段哈希记每个前缀最近一次真实请求与它的 `kernel::keep_warm::CacheUse`。
 pub struct Warmth { /* setting、lead_ms、kept: BTreeMap<[B3Hash; 4], Kept> —— 私有 */ }
 impl Warmth {
-    /// lead_ms 是调用方对所连 provider 实测的往返时长（kernel-SPEC §8-74）。
+    /// lead_ms 是调用方对所连 provider 实测的往返时长（`crates/kernel/spec/KeepWarm.lean` §8-74）。
     pub fn new(setting: KeepWarm, lead_ms: u64) -> Warmth;
     /// 一条真实请求在 at_ms 发出。Off 时什么也不记。
     pub fn sent(&mut self, request: &ModelRequest, at_ms: u64);

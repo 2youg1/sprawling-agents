@@ -457,7 +457,7 @@ impl RoomSessions {
 
 (c) **每个地址的各段 session 是视图里的一张表。** `accounting::views::sessions::RoomSessions` 为每个地址存一列 `wire::SessionLine`，`Views::apply` 每行调一次 `RoomSessions::absorb`：`session_opened` 在它的地址下开新的一段；`run_started` 在一个还没有任何一段的地址下开一段 `Dispatched`，否则给当前这一段的 `runs` 加一；任何带地址的记录都把这个地址当前这一段的 `last`、`at` 挪到自己。没有地址的记录不碰这张表。`Query::Sessions { room }` 由 `RoomSessions::answer` 在锁内作答（wire-SPEC §8-71）。表随视图快照存取，所以视图快照的编码变了，`VIEWS_FOLD_RULES` 随之重取（sprawling-SPEC.md 8-91）；旧快照解不开就按 `WholeFold::Damaged` 从创世折一次，不报错。
 
-### 8-24 快照格式的进位由夹具摘要钉住，夹具里有每一种出现在快照里的摘要（`accounting::views::snapshot`、`accounting::worker::folds::standing_start`，形状 7 投影；kernel-SPEC §8-84）
+### 8-24 快照格式的进位由夹具摘要钉住，夹具里有每一种出现在快照里的摘要（`accounting::views::snapshot`、`accounting::worker::folds::standing_start`，形状 7 投影；`crates/kernel/Spec.lean` §8-84）
 
 ```rust
 // accounting::views::snapshot
@@ -468,7 +468,7 @@ const STANDING_FOLD_RULES: &str = "standing-fold-<16 位十六进制>"; // Stand
 
 - **门只看得见夹具里有的类型。** 两个常量的后缀是一份固定夹具经快照编码之后的 blake3 前缀，编码一变，`the_fold_rules_name_carries_the_digest_of_the_views_encoding` 与 Standing 的同名测试给出新值并失败（sprawling-SPEC.md 8-91）。夹具里没有 `GitOid`，摘要的编码从十六进制改成字节时摘要不动，旧快照就会以同一个 `fold_version` 交给新的解码：postcard 把一个长度前缀加 40 个十六进制字符当成 20 个字节读，读错的视图可能照样解得开。
 - **所以夹具折进每一种出现在快照里的摘要。** 视图的夹具多折一条 `checkpoint_committed`（`commits`、`commit_seqs`、`last_commit` 各存一个 `GitOid`）与一条 `rules_changed`（`governance.rules` 存一个 `B3Hash`）；Standing 的夹具多折同一条 `rules_changed`（它的 `governance` 是同一个类型）。kernel 里摘要的编码再变，两道门都变红，旧快照按 `WholeFold::OtherFoldVersion` 从创世折一次。
-- **摘要在快照里是字节。** `views::snapshot::tests` 断言一个 `GitOid` 与一个 `B3Hash` 的快照编码就是它们的 20 与 32 个字节、读回相等，JSON 拼写仍是十六进制（kernel-SPEC §8-84）。
+- **摘要在快照里是字节。** `views::snapshot::tests` 断言一个 `GitOid` 与一个 `B3Hash` 的快照编码就是它们的 20 与 32 个字节、读回相等，JSON 拼写仍是十六进制（`crates/kernel/Spec.lean` §8-84）。
 - **被否：夹具不动，改编码的人记得改常量。** 这正是两个常量带摘要后缀要免掉的那种记忆；而这次的改动在 kernel，改它的人看不见 accounting 的常量。
 
 ### 8-11 accounting::worker：城的唯一写者，和它从外面收下的手（形状 1 数据 + 形状 4 适配器）
@@ -551,7 +551,7 @@ pub struct ScanReport { /* …既有字段… */ pub frozen_runs: usize }
 ```
 
 - **哪些 run 死了。** `startup_scan` 只在 `RunWorker::new` 拿到写者锁之后跑（`sprawling resume`），这时这座城没有一次 run 在驱动：账上有 `run_started`、没有 `run_frozen` 的每一次 run，都是上一个进程死时正在跑的。harness run 与模型 run 一样开、一样冻（`crates/runtime/Spec.lean` §8-52），一并计入。
-- **次序。** 先补写悬空调用的 `E_TOOL_OUTCOME_UNKNOWN`（它们属于那次 run，要落在它的冻结之前），再为每次死掉的 run 写一行 `RunFrozen::lost()`（kernel-SPEC §8-82-2），按 `run_started` 的 seq 升序。
+- **次序。** 先补写悬空调用的 `E_TOOL_OUTCOME_UNKNOWN`（它们属于那次 run，要落在它的冻结之前），再为每次死掉的 run 写一行 `RunFrozen::lost()`（`crates/kernel/Spec.lean` §8-82-2），按 `run_started` 的 seq 升序。
 - **作者。** 冻结行写成那次 run 最近一行的作者（它的居民），与补写的 `tool_result` 写成那次调用的作者同一条理由：按居民计数冻结的读者（`city::resident` 的档案）不因进程死过而少计一次。只写过 `run_started`、没写别的就死了的 run，用 `run_started` 的作者。`addr` 缺席，与 `Charter::close` 写的冻结行同形。
 - **幂等。** 第二次扫描看到的每次 run 都已冻结，什么都不写；`ScanReport.frozen_runs` 是这一次写了几行，`summary` 把它与关掉的调用数并列告诉人。
 - **不做的事。** 不写 `handoff_written`：死掉的 run 没留下交接，替它编一份是假话；不起后继：冻结的 run 是历史，接手由人或计划另派（ARCHITECTURE §13.7）。
@@ -775,7 +775,7 @@ impl Window<'_> {
 
 **时间选择。**
 
-- 一行在选择里，另须它信封的 `t` 在 `[since, until)` 里（`UtcSpan::contains`）。`t` 不随 seq 单调（kernel-SPEC §12.10：四种等来的行各记各的时刻，墙钟也会回拨），所以逐行判断，走到 cutoff 为止，不在第一条越过 `until` 的行处停下（`Select.lean` 的 `a_line_whose_time_steps_back_is_judged_on_its_own`）。与 seq 区间、run、楼取交集。不认识的可忽略行仍只按 seq 判（8-12）。
+- 一行在选择里，另须它信封的 `t` 在 `[since, until)` 里（`UtcSpan::contains`）。`t` 不随 seq 单调（kernel D10：四种等来的行各记各的时刻，墙钟也会回拨），所以逐行判断，走到 cutoff 为止，不在第一条越过 `until` 的行处停下（`Select.lean` 的 `a_line_whose_time_steps_back_is_judged_on_its_own`）。与 seq 区间、run、楼取交集。不认识的可忽略行仍只按 seq 判（8-12）。
 - `Window::span`：`since`、`until` 经 `runtime::clock::parse_iso` 读，只收 `iso` 写出的形状。`day` 是 `YYYY-MM-DD`，展开成 `[那一天 00:00:00Z, 次日 00:00:00Z)`：拼成 `<day>T00:00:00Z` 经 `parse_iso` 读，所以历法与校验仍是 `runtime::clock` 那一份，2 月 30 日照样被拒；上界是下界加一个 UTC 日的毫秒数（checked）。给了几项就交几项：下界取最晚的，上界取最早的，再交给 `UtcSpan::new`，它拒绝上界不晚于下界的区间。所以 `--day` 与 `--since`/`--until` 一起给时是交集，交出空区间就是矛盾的范围，以 `E_INVALID_ARGS` 拒绝；合法而一行都没选中的区间输出带范围信息的空 bundle。
 - `source.selection` 多记 `since`、`until`（毫秒的十进制字符串，没给为 `null`）。`day` 只记成它展开的两端，因为复核按区间重算，同一个区间不该有两种写法。
 
@@ -786,7 +786,7 @@ impl Window<'_> {
 - `took` 是 `{"measured":"<毫秒>"}`，当且仅当两端都可见、`views::rounds::answered_timing` 判这一对的时刻是量出来的（两行都有 `EventRecord::moment`，答复不是城在重启后补写的 `E_TOOL_OUTCOME_UNKNOWN`），并且答复的 `t` 不早于调用的 `t`；其余一律是 `"unknown"`。所以版本早于逐行时刻的账本、混合区间里旧版本的那几次调用、补写的答复、还没答、有一端被隐去，都不给耗时，页面也就不会画出零耗时。判定量没量的规则只在 `views::rounds` 一处；逐行的精度仍是每条 `events` 的 `moment`，混合的区间逐行、逐调用各自保留。
 - 一条两端都落在范围外、范围内又没有成员的调用，在它关闭时就从「可能成为上下文的范围外行」里删掉：调用占账本行数的大头，留着它们会让一次窄选择的常驻量与整本账同阶；删掉以后常驻的只有还没关闭的调用。
 
-**运行策略（`runs[].policy`）。** 每个 run 行带这个 run 的 `run_started.policy`（kernel-SPEC §8-77：`mode`、`write`、`admit`、`landing`），早于策略入账的行写 `null`。`admit` 是这次派活要求的准入证据；它的结果是这个 run 打开的 PR 怎样关闭：合并时准入不过写成 `pr_rejected`，`by` 与 `why` 是拒绝它的一方与理由（`crates/runtime/Spec.lean` §8-54），合并写成 `pr_merged`，带 `reviewed_commit` 与 `verified_by`。这些行在 `events` 里，关键时刻 `pr` 一项指向它们。要求与结局各是记下的事实，playback 不从一次合并推断测试跑过没有。
+**运行策略（`runs[].policy`）。** 每个 run 行带这个 run 的 `run_started.policy`（`crates/kernel/Spec.lean` §8-77：`mode`、`write`、`admit`、`landing`），早于策略入账的行写 `null`。`admit` 是这次派活要求的准入证据；它的结果是这个 run 打开的 PR 怎样关闭：合并时准入不过写成 `pr_rejected`，`by` 与 `why` 是拒绝它的一方与理由（`crates/runtime/Spec.lean` §8-54），合并写成 `pr_merged`，带 `reviewed_commit` 与 `verified_by`。这些行在 `events` 里，关键时刻 `pr` 一项指向它们。要求与结局各是记下的事实，playback 不从一次合并推断测试跑过没有。
 
 **提交的证据。** 范围内可见的每个 `Committed` checkpoint 多三项；读这三项要读账本之外的输入（git 对象与 `accounting::trace` 对整本账的折叠），确定性的条件是这些输入相同，而 git 对象按 oid 不可变：
 
@@ -975,7 +975,7 @@ pub(super) fn proposals_answer(city_root: &Path, doc: Address, open: Vec<documen
 fn give_messages(city_root: &Path, commits: &mut [wire::CommitAnswer]);
 ```
 
-- **一次保存是三步，都在 worker 线程上。** `put_range` 先拒保留子树（`Address::is_reserved`，`E_OUTSIDE_WRITE_DOMAIN`），再经 `city::revise_document`（city-SPEC §8-40）在这份文档的锁里读出此刻的字节、交给 `documents::save` 判定并换上，最后写一行 `document_written`（kernel-SPEC §8-83），它带着这条命令的 `idem`（`commanding::entrance::stamped`）。被拒的保存什么也不写，账上没有它。
+- **一次保存是三步，都在 worker 线程上。** `put_range` 先拒保留子树（`Address::is_reserved`，`E_OUTSIDE_WRITE_DOMAIN`），再经 `city::revise_document`（city-SPEC §8-40）在这份文档的锁里读出此刻的字节、交给 `documents::save` 判定并换上，最后写一行 `document_written`（`crates/kernel/Spec.lean` §8-83），它带着这条命令的 `idem`（`commanding::entrance::stamped`）。被拒的保存什么也不写，账上没有它。
 - **决定修改提案也是一次保存。** `decide_proposals` 从 worker 的 `Governance.proposals` 找出点名的每一张卡（不在这份文档上、已经处理过、没有的都拒 `E_INVALID_ARGS`），经同一扇 `revise` 在锁里交给 `documents::decide`；有改动时写一行 `document_written`，然后每张卡一行 `proposal_decided`。卡的状态不在这里改：worker 写下的每一行都经 `RunWorker::absorb` 交给同一个折叠，重开的城读账本得到同一个答案。
 - **提案的折叠住 `Governance`，视图与 worker 各持一份、折法一处**（第 34 条）。`proposal_offered` 经 `documents::Offer::of` 读成一张卡，身份由它算出；读不出的一行（区间颠倒、超长）与别的读不出的治理行一样拒绝，让这座城停在打开那一步，而不是少一张人等着决定的卡（sprawling-SPEC 8-74 的同一条理由）。`proposal_decided` 与 `proposal_withdrawn` 把卡从开着挪到处理过；处理过的卡只记身份与怎样处理的，不留原文与提议。
 - **`Query::Proposals` 在锁内拷出这份文档上开着的卡，锁外读盘。** 文件此刻的版本要读一次全部字节（`B3Hash::digest`），所以与 `Document` 一样在快照放开之后做；卡的句子由 `Offer::review` 在那时切。文件缺失或读不了时 `version` 为 `None`，卡照答。

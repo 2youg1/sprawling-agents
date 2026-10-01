@@ -418,7 +418,7 @@ D1 签名用 ML-DSA-44＋Ed25519 的混合，不用 FN-DSA。理由见上一段�
 
 D3 默认通路是 Cloudflare 命名隧道；通路是一条缝，人可以换。理由见上一段。README 原有的决定是「本仓库不附带隧道，替你选一种就是替你做安全决定」。端到端的配对密钥把这件决定缩成一件事：通路是否原样送达页面（D10）。只看、只转发、甚至改动帧的通路什么也得不到，能读到内容的只有改写页面的通路，那是运营方的主动攻击。所以附带一个默认通路仍是替人做一件信任决定，只是范围小了，文档照这个范围写。
 
-**成本与模型体验**：零字节。本 crate 不进任何 run 的上下文，城的居民不知道这扇门存在；远程门的五个 Ledger 事件由装配层写（kernel-SPEC §8-81），它们怎样进窗口归 kernel。
+**成本与模型体验**：零字节。本 crate 不进任何 run 的上下文，城的居民不知道这扇门存在；远程门的五个 Ledger 事件由装配层写（`crates/kernel/Spec.lean` §8-81），它们怎样进窗口归 kernel。
 -/
 
 /-! ## 11 边界枚举
@@ -504,7 +504,7 @@ D11 与浏览器的互通只做组件级已知答案向量，加一条从 Rust �
 - `ARCHITECTURE.md`：§3 的 `depmap` 块（`remote_access: kernel`，`sprawling` 一行带着本 crate）、§4 的缝表（`remote_access::route` 一行）、§10 规则 3（`route::command` 的读线程与 `bin::outside::listener` 的任务）。这些改了，重读本文件 §7 与 §8-7。
 - `architecture.toml`：本 crate 各行与 `[family.remote_access]`，锚点指向本文件或两个分部。新模块先在那里登记。
 - `docs/glossary.md`：远程门、纪元、配对码、邀请、设备、通路、远程会话，并写明远程门与 Gate 的 door、远程会话与房间的 Session 不是一物（§6）。§6 的词改了，两处一起改。
-- kernel-SPEC §8-76（设备表的路径）与 §8-81（远程门的五个事件）、wire-SPEC §19-2 的 `class` 列与 §8-66（中继与 `Refusal`）、sprawling-SPEC 8-139 与 8-140（门的看守、远程监听、控制台的 `/remote`）、`client/client-SPEC.md` §7（配对页的交互契约落地时写在那里，§3）。§8-1 的动词类、§8-5 的负载、§8-6 的邀请写法或 §8-10 的两条路径改了，重读这几节。
+- `crates/kernel/Spec.lean` §8-76（设备表的路径）与 §8-81（远程门的五个事件）、wire-SPEC §19-2 的 `class` 列与 §8-66（中继与 `Refusal`）、sprawling-SPEC 8-139 与 8-140（门的看守、远程监听、控制台的 `/remote`）、`client/client-SPEC.md` §7（配对页的交互契约落地时写在那里，§3）。§8-1 的动词类、§8-5 的负载、§8-6 的邀请写法或 §8-10 的两条路径改了，重读这几节。
 - `tools/fixtures/remote-handshake/` 与 `tools/README.md` 的 fixtures 一行（§8-12）：客户端的互通测试读这些文件；§8-3 到 §8-5 的任何字节改了，文件重生成，客户端的测试须仍过。
 - `docs/operating.md` 里控制台 `/remote` 的那一段与 `[remote]` 的写法（两种通路、`tailscale serve` 的示例）：控制台的动词以 sprawling-SPEC 8-140 为准，表的键以 city-SPEC §8-39 为准，§8-8、§8-9 改了参数时三处一起改。
 - 尚未写到的文档：`README.md` 与 `README.zh-CN.md` 的「它在哪里监听」一节仍是 D3 取代的那句「本仓库不附带隧道」，要照 D3 与 D10 写明通路上剩下的那一件信任；`docs/getting-started.md` 与中文版的「另一台机器」一节还没有写。中英两份在同一个提交里改。

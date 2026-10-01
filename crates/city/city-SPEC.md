@@ -125,7 +125,7 @@ impl RulesCache {
 - **规则是一份 TOML，散文没有另起一份文件**：若是 Markdown，读者就得在**任意一行**上匹配 `confidential:`／`write:`／`review:`／`browser:`／`usersbrowser:`／`desktop:`，于是「How work is done here」里一句以 `desktop = true` 开头的话就授予了宿主机的桌面，而一栋没写 `write:` 的楼落到 `Everything`。两处都朝宽松的一侧失败，那是权限读者唯一不许失败的方向。改成 TOML 之后键只在文法给出键的位置成立，`deny_unknown_fields` 让拼错成为一条消息而不是一次静默缺席，`confidential` 与 `write` 都不再有缺省。**散文留在同一份文件里**，作 `does` 与 `conventions` 两个键：拆成两份文档同样能关掉撞键，代价是一栋楼有两种说法且可以互相矛盾。居民拿到的就是这份文件本身的字节，所以城判定的与 agent 读到的是同一串。
 
 - **confidential 四条各有其守处**：模型池锁本地由 `gateway::endpoint` **在会泄漏的那一端**拒（`req.policy.confidential` 即拒，携三段式）；写域止于本楼子树由 `write_domain()` 在构造点拒；数据可入不可出归出网门；**楼里的字节楼外读不到**，归读界（下一条）。**把兜底放在会出事的那一层**，路由错了仍然拦得住。
-- **读界：本楼全开，他楼非机密可读，机密楼对楼外全关**。判定只有一处：`kernel::address::may_read(reader_building, target, rules) -> ReadVerdict`（kernel-SPEC §8-2），三臂 `Open`／`Confidential`／`RulesUnreadable(AxError)`。问它的是模型选路的唯一判定处 `runtime::tools::chosen_path`（`crates/runtime/Spec.lean` §8-30-1）：`read` 的路径、`search` 的起点、`search` 不带路径时在城根下走进的每一栋楼，以及经这两件工具读到的 transcript（`crates/runtime/Spec.lean` §8-32），都先过它。`rules` 是目标所在楼此刻的规则：装配层把 `city::Building::of(target)` 与 `policy::load` 接成一个闭包交给 `may_read`，**只在目标出了本楼时才调用**——本楼的读不读盘，他楼的读每次现读规则。规则读不出＝`RulesUnreadable`，一样关：读不出的那份规则可能写着 `confidential = true`，而隐私设置不得朝宽松的一侧失败（本节「没有 RULES.toml」那条同理）。**读界只管模型选的路径**：catalog 名是人在阅览室里准入的（`crates/runtime/Spec.lean` §8-29 起首），不经它；`exec` 在宿主机上跑的命令读得到盘上任何文件，那道墙要 OS sandbox，与「出网」那条的缺口是同一个缺口。
+- **读界：本楼全开，他楼非机密可读，机密楼对楼外全关**。判定只有一处：`kernel::address::may_read(reader_building, target, rules) -> ReadVerdict`（`crates/kernel/Spec.lean` §8-2），三臂 `Open`／`Confidential`／`RulesUnreadable(AxError)`。问它的是模型选路的唯一判定处 `runtime::tools::chosen_path`（`crates/runtime/Spec.lean` §8-30-1）：`read` 的路径、`search` 的起点、`search` 不带路径时在城根下走进的每一栋楼，以及经这两件工具读到的 transcript（`crates/runtime/Spec.lean` §8-32），都先过它。`rules` 是目标所在楼此刻的规则：装配层把 `city::Building::of(target)` 与 `policy::load` 接成一个闭包交给 `may_read`，**只在目标出了本楼时才调用**——本楼的读不读盘，他楼的读每次现读规则。规则读不出＝`RulesUnreadable`，一样关：读不出的那份规则可能写着 `confidential = true`，而隐私设置不得朝宽松的一侧失败（本节「没有 RULES.toml」那条同理）。**读界只管模型选的路径**：catalog 名是人在阅览室里准入的（`crates/runtime/Spec.lean` §8-29 起首），不经它；`exec` 在宿主机上跑的命令读得到盘上任何文件，那道墙要 OS sandbox，与「出网」那条的缺口是同一个缺口。
 - **没有 RULES.toml 是普通楼；有而不声明是错误**：把隐私设置的默认值悄悄取成宽松的那一边，正是这整个面存在的理由。拼写不是 `true`／`false` 同样拒——读起来像笔误的隐私设置不得解析成许可。
 - **confidential 楼声明越界前缀＝拒而不裁剪**：静默裁剪会让文件说一套、城做另一套；拒绝会指出该改哪一行。
 - **无声明写域时默认只写本楼**：一栋楼至少能写自己，且不多。`prefixes` 里一条读不出的地址**传播而不跳过**——在读它的地方丢掉，一栋楼就写得比人授予的少，而这件事没有任何一处说出来。
@@ -144,7 +144,7 @@ impl RulesTool { pub fn new(city_root: &Path, building: Address) -> Result<Rules
 // meta.effect = Effect::Govern
 ```
 
-- **每一次经工具台的调用都在效果层被拒，这是定规而不是漏接**：一个 run 不改写审判它自己的规则（§12.1 定规；kernel-SPEC §8-27 的 `Governance` 行）。`Effect::Govern` 无门、无审批、无 `ApprovalItem`：`runtime::bench::admit` 在 `invoke` 之前就把调用拒掉，拒绝以 tool result 回到模型而回合不终止（`runtime::turn::wave`「A tool Err is not a turn Err」那条）。规则要变只有人改文件这一条路——`RULES.toml` 的唯一写者是人，下一个 run 按改后的字节受审。
+- **每一次经工具台的调用都在效果层被拒，这是定规而不是漏接**：一个 run 不改写审判它自己的规则（§12.1 定规；`crates/kernel/Spec.lean` §8-27 的 `Governance` 行）。`Effect::Govern` 无门、无审批、无 `ApprovalItem`：`runtime::bench::admit` 在 `invoke` 之前就把调用拒掉，拒绝以 tool result 回到模型而回合不终止（`runtime::turn::wave`「A tool Err is not a turn Err」那条）。规则要变只有人改文件这一条路——`RULES.toml` 的唯一写者是人，下一个 run 按改后的字节受审。
 - **拒词说出被治理的 scope**：本工具的 `subject` 答 `GateSubject::Scope`（§8-36），效果层因此给出 `E_GATE_DENIED` 的「一个 run 不得改写审判它自己的规则」，恢复语指向人改的 `CONFIG.toml` 与 `RULES.toml`。参数读不懂的调用在同一处被拒，拒词与 `invoke` 读到同样参数时给出的相同；两种拒都出自效果层，run 都到不了 `invoke`。
 - **为什么不是 `edit`**：`RULES.toml` 住在楼的保留子树，没有任何写域到得了那里——这不是一个要绕过的障碍，它就是规则本身。写面（`policy::write_rules`）因此只有本工具的 `invoke` 一个调用方，形状是整份提案、先求值后落盘（§8-2 末条）；run 到不了它，人改文件也不经它。
 - **楼是携入的而不是参数**：工具持调用方自己那栋楼的地址，于是一个 Run 无法靠填另一个名字去改别人的规则。
@@ -164,7 +164,7 @@ impl Tool for CityTool {
 
 - **scope 的拼法取 `kernel::event::Scope` 的 `Display`**：`rules` 答本楼的 `Scope::Building`，`city` 答 `Scope::City`，`GateSubject::Scope` 里的字符串就是账本上 `rules_changed` 写 scope 的那一种文字（§12.13）。
 - **`city` 三个动作答同一个 scope**：`list` 读、`raise` 与 `adopt` 改的都是城的形状，被点名的那栋楼在 `raise` 时还不存在，治理它的不是它自己的规则。
-- **参数只有一处文法**：`subject` 与 `invoke` 经同一个读参函数（`rules` 的 `Op::read`、`city` 的 `Request::read`），所以 `subject` 的拒词就是 `invoke` 读同样参数时的拒词（kernel-SPEC 讲 `Tool::subject` 的那一段：文法读不出的调用返回 `Err`，bench 原样拒收）。
+- **参数只有一处文法**：`subject` 与 `invoke` 经同一个读参函数（`rules` 的 `Op::read`、`city` 的 `Request::read`），所以 `subject` 的拒词就是 `invoke` 读同样参数时的拒词（`crates/kernel/Spec.lean` §8-23 讲 `Tool::subject` 的那一段：文法读不出的调用返回 `Err`，bench 原样拒收）。
 - **验收**：两件工具对一条合法调用答出上述 `Scope`，对一条读不懂的调用答出与 `invoke` 相同的码（`city` crate 内两件工具旁的测试）；经工具台的拒词由 `runtime::bench::admit` 的 Govern 臂给出，它的测试已钉住恢复语。
 
 ### 8-3 city::building（形状 2 值类型＋一个实例化动作）
@@ -277,17 +277,17 @@ impl Ladder {
 - **`command`（非空）＋ `args`（缺省空表）＋ `env`（缺省空表，形如 `env = { API_KEY = "secret:mcp/apps" }`）**——城所在的机器上的一个程序。写成表而不是 `NAME=value` 行的列表：文件里一个名字只出现一次，也没有谁要去切一个人写的字符串。
 - **`url`（非空）＋ `headers`（缺省空表，写法同上）＋ `transport`（`"http"`｜`"sse"`，缺省 `"http"`）**——一个地址。`transport` 是闭集而不是自由文本，拼错在写它的地方就被拒，而不是变成一台没人够得到的服务器；缺省取 `http`，因为「发一条消息过去」正是一个 url 的本义。
 
-两组各自成行：`command` 与 `url` 同时出现即拒（读者要去猜），两者都不出现也拒。`command` 一行再写 `transport` 同样拒——命令走它自己的管道，再指一条流就是一行说了两种 transport。两张表的值都可以是 `secret:realm/name` 引用，兑付不在本模块（sprawling-SPEC §8-4／§8-15）。两条口径：①**同一层内标签不得重复**——两个同名 server 会让同一个工具名同时指向两个进程，而那是一个路由错误而不是一个偏好；②整表上梯（下层写即替换上层全表），语义住 kernel-SPEC §8-22，此处不复述。**不在本模块的事**：进程怎么起、起不来怎么办、confidential 楼凭什么拒——那三件全在装配层（sprawling-SPEC §8-4），本模块只回答「三份文件说了什么」。
+两组各自成行：`command` 与 `url` 同时出现即拒（读者要去猜），两者都不出现也拒。`command` 一行再写 `transport` 同样拒——命令走它自己的管道，再指一条流就是一行说了两种 transport。两张表的值都可以是 `secret:realm/name` 引用，兑付不在本模块（sprawling-SPEC §8-4／§8-15）。两条口径：①**同一层内标签不得重复**——两个同名 server 会让同一个工具名同时指向两个进程，而那是一个路由错误而不是一个偏好；②整表上梯（下层写即替换上层全表），语义住 `crates/kernel/Spec.lean` §8-22，此处不复述。**不在本模块的事**：进程怎么起、起不来怎么办、confidential 楼凭什么拒——那三件全在装配层（sprawling-SPEC §8-4），本模块只回答「三份文件说了什么」。
 
-**`[sandbox]` 一节**：`CONFIG.toml` 第二节 `[sandbox]`，字段 `shell`（bool，默认 false）、`fuel`（整数，缺省取 `SANDBOX_FUEL_DEFAULT`）、`mounts`（相对 city root 的路径表，reserved prefix 在解析点即拒）。解析仍是「本版本不读的键即拒」——被写下却什么都不发生是唯一没人能诊断的状态。整节整值上梯，语义住 kernel-SPEC §8-22，此处不复述。
+**`[sandbox]` 一节**：`CONFIG.toml` 第二节 `[sandbox]`，字段 `shell`（bool，默认 false）、`fuel`（整数，缺省取 `SANDBOX_FUEL_DEFAULT`）、`mounts`（相对 city root 的路径表，reserved prefix 在解析点即拒）。解析仍是「本版本不读的键即拒」——被写下却什么都不发生是唯一没人能诊断的状态。整节整值上梯，语义住 `crates/kernel/Spec.lean` §8-22，此处不复述。
 
 **`[sandbox]` 的第四个字段**：`env_passthrough`（字符串表，缺省空表），逐项解成 `kernel::EnvVarName`。与 `mounts` 逐条同形：同一节、同一次整值上梯、同一个解析点拒——`mounts` 在这里拒保留区，`env_passthrough` 在这里拒凭据形状的名字，而“什么叫凭据形状”是 `kernel::secret` 的答案，本模块不重建它。拒绝文字里带着是哪一份文件、哪一个名字，因为一份配置被拒时人手里只有那句话。
 
 **`[sandbox]` 的第五个字段**：`trusted`（字符串表，缺省空表），逐项解成 `kernel::ServerLabel`。它答的是「这层楼允许哪一台 connector 服务器去做城里谁都收不回的事」（今天只有运行这座城的机器的桌面），语义与读者住 `kernel::SandboxLimits::trusts`，本节只管它在 TOML 里怎么写、在哪一层写、写错了在解析点怎么拒。与 `mounts`／`env_passthrough` 同形：一名一行、缺省为空、整节整值上梯——收不回的效果按服务器逐台放行，而不是一次放宽给所有人。
 
-**`[context]` 一节**：`CONFIG.toml` 第四节 `[context]`，一个字段 `second_threshold`（整数百分比）——上下文提醒第二道阈值响在哪一格。值的形状与合法域住 `kernel::config::SecondThreshold`（kernel-SPEC §8-22），提醒怎么响住 `runtime::reminder`，本节只管它在 TOML 里怎么写、在哪一层写、写错时在哪拒。与 `mounts`／`env_passthrough`／`trusted` 逐条同形：整值上梯、Run 起点冻结、解析点拒——30–90 域外的值在解析点由 `SecondThreshold::parse` 拒（`E_INVALID_ARGS`，恢复语带合法域），不钳位、不读后丢。缺省是「没有一层说话」，而「缺席取 `CTX_REMINDER_SECOND_DEFAULT`」只在 `runtime::reminder` 一处判定。
+**`[context]` 一节**：`CONFIG.toml` 第四节 `[context]`，一个字段 `second_threshold`（整数百分比）——上下文提醒第二道阈值响在哪一格。值的形状与合法域住 `kernel::config::SecondThreshold`（`crates/kernel/Spec.lean` §8-22），提醒怎么响住 `runtime::reminder`，本节只管它在 TOML 里怎么写、在哪一层写、写错时在哪拒。与 `mounts`／`env_passthrough`／`trusted` 逐条同形：整值上梯、Run 起点冻结、解析点拒——30–90 域外的值在解析点由 `SecondThreshold::parse` 拒（`E_INVALID_ARGS`，恢复语带合法域），不钳位、不读后丢。缺省是「没有一层说话」，而「缺席取 `CTX_REMINDER_SECOND_DEFAULT`」只在 `runtime::reminder` 一处判定。
 
-**`[cache]` 一节**：一个字段 `keep_warm`，取 `off` 或 `five_minute`——这一层要不要在提示缓存到期前续期。值的形状与续期判定住 `kernel::keep_warm`（kernel-SPEC §8-74），本节只管它在 TOML 里怎么写、在哪一层写。拼写由 serde 按闭集读，拼错的词与未知键同样在解析点拒。`city::keep_warm(city_root, addr) -> Result<KeepWarm, AxError>` 爬同一张梯，下层覆盖上层；一层也没说时答 `KeepWarm::Off`——续期是人付钱的请求，默认必须是不发。与 `[context]` 不同，它不进 `FrozenConfig`：续期发生在两次 run 之间。
+**`[cache]` 一节**：一个字段 `keep_warm`，取 `off` 或 `five_minute`——这一层要不要在提示缓存到期前续期。值的形状与续期判定住 `kernel::keep_warm`（`crates/kernel/spec/KeepWarm.lean` §8-74），本节只管它在 TOML 里怎么写、在哪一层写。拼写由 serde 按闭集读，拼错的词与未知键同样在解析点拒。`city::keep_warm(city_root, addr) -> Result<KeepWarm, AxError>` 爬同一张梯，下层覆盖上层；一层也没说时答 `KeepWarm::Off`——续期是人付钱的请求，默认必须是不发。与 `[context]` 不同，它不进 `FrozenConfig`：续期发生在两次 run 之间。
 
 **`[resident]` 一节**：一个字段 `harness`（字符串），点名这一层以下的房间由哪家官方 harness 当居民。值照写下的读进来：五个拼写的权威是 `agent_protocols::Harness`，本 crate 只见 `kernel`，认不认得由派活路径判（sprawling-SPEC §8-4e 第 10 条）。空串在解析点拒，与 `[model] name` 走同一条判定：空值什么也没说，写它是笔误。
 
@@ -663,15 +663,15 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 `E_INVALID_ARGS`（`[context] second_threshold` 域外）：不可定义掉——值是人写的输入，类型把「构造后非法」定义掉了，「构造时非法」必须留码；钳位是被明拒的替代。
 ### 12.1 定规：一个 run 不改写审判它自己的规则
 
-`Verdict: user-approved`（kernel-SPEC §12.1 那条定规的城侧应用；六类升级的固定答案表见 kernel-SPEC §8-27）
+`Verdict: user-approved`（kernel D1 那条定规的城侧应用；六类升级的固定答案表见 `crates/kernel/Spec.lean` §8-27）
 
 **决定**：`rules`／`city` 两件工具保留 `Effect::Govern`，而这个效果在效果层恒拒：run 提不出提案、等不到审批、写不了规则。规则要变只有人改文件这一条路——`RULES.toml` 的唯一写者是人；建楼走线上命令 `CreateBuilding`，收编走 CLI 的 `sprawling adopt`。
 
-**理由**：规则是审判一个 run 的尺子，而提案-审批形把改尺子的手留给被审判者、把「批准」放进一个 agent 循环——默认答案会被点过去的门等于没有门（kernel-SPEC §12.1 同一理由，此处第二次适用而不是第二个权威）。规则的正确位置是文件本身：diff、历史与回退都在版本库里，而一份获批的提案正文只在一次对话里活过一回。
+**理由**：规则是审判一个 run 的尺子，而提案-审批形把改尺子的手留给被审判者、把「批准」放进一个 agent 循环——默认答案会被点过去的门等于没有门（kernel D1 同一理由，此处第二次适用而不是第二个权威）。规则的正确位置是文件本身：diff、历史与回退都在版本库里，而一份获批的提案正文只在一次对话里活过一回。
 
-**被否**：govern 存在形——提案正文由 `kernel::gate::govern` 截一段写进 `action_desc` 供人过目，门问人、批后落盘。它与 `GateOutcome::Escalate` 在 kernel 侧同集删净（kernel-SPEC §12.1 的同集删净名单列着 `gate::govern`）；`rules_tool` 的 `op=propose` 只保留「整份文档、先求值后落盘」这个形状（§8-2b），通向它的判定是拒而不是问。
+**被否**：govern 存在形——提案正文由 `kernel::gate::govern` 截一段写进 `action_desc` 供人过目，门问人、批后落盘。它与 `GateOutcome::Escalate` 在 kernel 侧同集删净（kernel D1 的同集删净名单列着 `gate::govern`）；`rules_tool` 的 `op=propose` 只保留「整份文档、先求值后落盘」这个形状（§8-2b），通向它的判定是拒而不是问。
 
-**重开参数**：`attach` 是唯一会问人的门，理由是人的动作本身就是答案、没有可以点过去的默认（kernel-SPEC §8-27）。治理审批只有取得同样的性质——人在 run 之外对整份 diff 作答，且不存在「全批」的默认——才需要重新论证这一条；参数不动，定规不动。
+**重开参数**：`attach` 是唯一会问人的门，理由是人的动作本身就是答案、没有可以点过去的默认（`crates/kernel/Spec.lean` §8-27）。治理审批只有取得同样的性质——人在 run 之外对整份 diff 作答，且不存在「全批」的默认——才需要重新论证这一条；参数不动，定规不动。
 
 ### 12.2 定规：读界在调用时按目标所在楼现读规则
 
@@ -1063,7 +1063,7 @@ pub fn revise<T>(path: &Path, act: impl FnOnce(&Held<'_>, &[u8]) -> Result<T, Ax
 - **一次保存要的是「此刻的字节」，不是「我起手时的正文」。** `edit_against` 拿调用方给的整份正文与盘上的比较；页面对任意一份文档的保存（wire-SPEC §8-72）带的是 32 字节的版本摘要与几段编辑，判它的是 `documents::save`，它要读的是盘上此刻的全部字节。`revise` 在 `edit` 的锁里把这份文件读出来交给 `act`，`act` 判定、经 `Held::replace` 整份换上，锁在 `act` 返回之前一直持有，所以两个从同一版出发的保存只有先到的那个落下，第二个读到的已经是第一个的字节。
 - **没有文件读作空字节**，与 `edit_against` 同一条规则；`edit_against` 就是 `revise` 加一次逐字节比较，「读不到就是空」这条读法只写在 `revise` 一处。别的读错（目录、无权限）是 `E_STORAGE_FATAL`，与本模块其余的写面同一句恢复语。
 - **本 crate 不依赖 `documents`。** 判定由调用方交进来：`accounting::worker::commanding::saving` 交的是 `documents::save` 与 `documents::decide`（accounting-SPEC §8-22）。这扇门只拥有锁、读与整份换上——就是 §8-27 的两条性质。
-- **当前状态：修改提案的提出与收回还没有写者。** 提案由 run 提出（kernel-SPEC §8-83 的 `proposal_offered`），这需要一件工作台工具：它读那一版、切出原文、经 `documents::Offer::of` 判长度，把一行 `proposal_offered` 记在这次 run 名下，收回时记 `proposal_withdrawn`。这件工具还没有落地，所以今天账本上的提案只来自测试。refrain 路线图 §4-10 说「文稿审阅期间 `edit`、`exec` 对该文稿的写入受同一边界约束，否则只在候选工作树里操作」：本轮按后一条走——提案只是账本上的一行，run 不改那份文档，接受时由人的决定经 `revise` 落下。前一条若要成立，要由 runtime 的写门判「这份文档有开着的提案」，那是 runtime 规格的事，决定它的证据是那件工具落地时一次 run 同时提案又直接改同一份文档的情形。
+- **当前状态：修改提案的提出与收回还没有写者。** 提案由 run 提出（`crates/kernel/Spec.lean` §8-83 的 `proposal_offered`），这需要一件工作台工具：它读那一版、切出原文、经 `documents::Offer::of` 判长度，把一行 `proposal_offered` 记在这次 run 名下，收回时记 `proposal_withdrawn`。这件工具还没有落地，所以今天账本上的提案只来自测试。refrain 路线图 §4-10 说「文稿审阅期间 `edit`、`exec` 对该文稿的写入受同一边界约束，否则只在候选工作树里操作」：本轮按后一条走——提案只是账本上的一行，run 不改那份文档，接受时由人的决定经 `revise` 落下。前一条若要成立，要由 runtime 的写门判「这份文档有开着的提案」，那是 runtime 规格的事，决定它的证据是那件工具落地时一次 run 同时提案又直接改同一份文档的情形。
 - 验收：`document::tests::a_revision_reads_the_bytes_on_disk_and_holds_the_lock_while_it_decides`——两个线程各从同一份文件出发做两百次读-判-换，计数是四百；没有文件时交给 `act` 的是空字节。
 
 ### 8-28 技能安装：静态预检、原子落位、内容哈希入 CAS（`library::install`，形状 2 值＋一个落盘动作）
@@ -1187,7 +1187,7 @@ permanence = "fixed"                # "fixed" | "per_start"
 
 ### 8-32 楼的写域是上限，一次派活的写入限制只收窄它（`city::policy`，形状 1 判定）
 
-**接口**：不新增。`BuildingRules::write_domain()` 照旧从 `RULES.toml` 的 `prefixes` 与 `write` 两键给出 `kernel::WriteDomain`；一次 run 的写入限制 `kernel::WriteLimit` 由派活给出（kernel-SPEC §8-78），在写门上与写域各判一次。
+**接口**：不新增。`BuildingRules::write_domain()` 照旧从 `RULES.toml` 的 `prefixes` 与 `write` 两键给出 `kernel::WriteDomain`；一次 run 的写入限制 `kernel::WriteLimit` 由派活给出（`crates/kernel/Spec.lean` §8-78），在写门上与写域各判一次。
 
 - **两道判定都要过**：写域回答能不能写这个地址、写哪种文件；写入限制回答能不能改动已经存在的文件。`full` 不额外收窄，所以普通档永远放不宽楼的 `RULES.toml`；`create` 在 `write = "documents"` 的楼里仍只能新建 Markdown 文档、仍够不到计划文件；保留子树对两者都在写域之外。
 - **`RULES.toml` 没有写入限制的键。** 一栋楼的规则说它允许什么，一次派活的限制说这一次要多小心；两者分在两处，「哪一处说了算」就不用规则来回答（§12.10）。

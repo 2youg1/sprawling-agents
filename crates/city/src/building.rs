@@ -153,7 +153,7 @@ pub fn create(
     let root = building.root(city_root);
     // The building's own reserved subtree, made before the file that
     // lives in it: what governs a building is not writable by what runs
-    // inside it (kernel-SPEC.md section 8-28).
+    // inside it (`crates/kernel/Spec.lean` §8-28).
     let governed = root.join(kernel::RESERVED_PREFIX);
     std::fs::create_dir_all(&governed).map_err(|err| storage(&governed, &err))?;
     let file = governed.join(RULES_FILE);

@@ -75,7 +75,7 @@ stdio、HTTP、SSE 三种传输与 harness 会话读外部输入都受 `MESSAGE_
 
 `Connector` 是词汇表里这层的统称；代码里出现的是它的两个具体面 `McpTool` 与 `Incoming`。恒不把 MCP server 叫作 endpoint：`Endpoint` 在本库专指 external provider 网关。
 
-`ServerLabel` 不住本 crate：它住 `kernel::tool`（理由与文法见 kernel-SPEC §8-23）。本 crate 继续用它，但不再拥有它：配置层要在文件边界解析标签，而 `city` 只见 `kernel`。
+`ServerLabel` 不住本 crate：它住 `kernel::tool`（理由与文法见 `crates/kernel/Spec.lean` §8-23）。本 crate 继续用它，但不再拥有它：配置层要在文件边界解析标签，而 `city` 只见 `kernel`。
 
 模型的命名空间按 Rust 模块路径取：`AgentProtocols.Mcp.Reading`、`AgentProtocols.Mcp.Tools`、`AgentProtocols.Mcp.Link`、`AgentProtocols.Acp`。`spec/Harness/Session.lean` 的命名空间是 `HarnessRun`，因为它规定的是跨三个 crate 的那一次 harness run，本 crate 只守其中的会话半（§8-19）。
 -/
@@ -97,7 +97,7 @@ stdio、HTTP、SSE 三种传输与 harness 会话读外部输入都受 `MESSAGE_
 ### 8-1 mcp（形状 3 端口＋形状 4 适配器＋形状 1 判定）
 
 ```rust
-// call 携期限。声明即承诺可协作取消（kernel-SPEC §8-23 的 TimeoutMs），
+// call 携期限。声明即承诺可协作取消（`crates/kernel/Spec.lean` §8-23 的 TimeoutMs），
 // 而一个不回答的 server 是把整个 Run 挂死的最短路径。
 // `notify`：一条通知没有答案。HTTP 上它被 202 加空体应答，
 // 把它当请求读的客户端会因为对侧「什么都没说」而拒掉一台正确的 server。
@@ -230,7 +230,7 @@ pub fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>); //
 - **`site()` 由传输的拥有者给出**：报错地址是「哪个模块到达了这台 server」，只有拥有这三个模块的 crate 能不漂地说出它。
 - **子进程回收**：期限到即杀子进程，理由见 `mcp::stdio` 的模块文档：一个迟到的答案会被读成下一次调用的答案。
 - **`echoing` 在 `conformance` 后面**：装配层的测试要起同一个假 server；产品二进制不带它（`xtask artifact`）。
-- **请求交出之后丢了答，效果未知，不可重试**：性质在 `spec/Mcp/Link.lean`。请求已经完整交给对侧之后（stdio 是那一行写完并 flush，HTTP 与 SSE 是 POST 得到回应），期限内没有答案（`E_TIMEOUT`）、对侧在作答前关了输出或流断了（`E_TOOL_UNAVAILABLE`）、答复被读端拒（`E_WIRE_MISMATCH`），都标 `effect_unknown`（`Retry::Unknown`，kernel-SPEC 的三态）：server 可能已经做了，再发一次同一调用可能把一次写做两遍，由看得见这次调用的人决定要不要再问。请求还没交出去时的失败（stdio 写管道失败、POST 本身失败）按对侧没收下读，照旧 `Retry::No`。
+- **请求交出之后丢了答，效果未知，不可重试**：性质在 `spec/Mcp/Link.lean`。请求已经完整交给对侧之后（stdio 是那一行写完并 flush，HTTP 与 SSE 是 POST 得到回应），期限内没有答案（`E_TIMEOUT`）、对侧在作答前关了输出或流断了（`E_TOOL_UNAVAILABLE`）、答复被读端拒（`E_WIRE_MISMATCH`），都标 `effect_unknown`（`Retry::Unknown`，`crates/kernel/spec/Error.lean` 的三态）：server 可能已经做了，再发一次同一调用可能把一次写做两遍，由看得见这次调用的人决定要不要再问。请求还没交出去时的失败（stdio 写管道失败、POST 本身失败）按对侧没收下读，照旧 `Retry::No`。
 - 失败码：各传输沿用 §12 的 `E_TIMEOUT`／`E_WIRE_MISMATCH`／`E_TOOL_UNAVAILABLE`，HTTP 与 SSE 在 401／403 抬 `E_CREDENTIAL_MISSING`，客户端构造不成抬 `E_CONFIG_INVALID`。
 
 HTTP 的答复 body 经 `read_whole_message` 受同一个上限，非 2xx 的答复不读 body：D8，写在 `spec/Mcp/Reading.lean` 的 `readWhole` 上方。

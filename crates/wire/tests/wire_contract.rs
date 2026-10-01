@@ -339,7 +339,7 @@ fn every_state_changing_command_carries_an_idempotency_key() {
 
 /// The two frames that left the wire rather than staying on it answered
 /// with `not_built` for ever (wire-SPEC.md section 8-44,
-/// kernel-SPEC.md section 12.2). Their bytes still spell what they
+/// kernel D2). Their bytes still spell what they
 /// spelled, and that is no longer a command: what a client gets for them
 /// is the grammar's own unknown-variant refusal, not a verb it may offer
 /// a person.

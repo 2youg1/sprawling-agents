@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// kernel-SPEC 8-73: a policy limit a caller minted cannot be spelled.
+// `crates/kernel/spec/PolicyLimit.lean` §8-73: a policy limit a caller minted cannot be spelled.
 // The only values of these types are the constants in `consts_policy`,
 // so the refusal a limit states is the only refusal there is — a
 // caller cannot carry a looser limit to admit what the city refuses.

@@ -39,12 +39,12 @@ pub struct Charter<'a> {
     pub predecessor: Option<RunId>,
     pub dispatched_by: &'a Who,
     pub skills: &'a [SkillPin],
-    /// The run policy `run_started` records (kernel-SPEC 8-77).
+    /// The run policy `run_started` records (`crates/kernel/Spec.lean` §8-77).
     pub policy: kernel::RunPolicy,
-    /// The identity version `run_started` records (kernel-SPEC 8-79).
+    /// The identity version `run_started` records (`crates/kernel/Spec.lean` §8-79).
     pub naming: Option<kernel::B3Hash>,
     /// How the run's first user message was written, which a fork reads
-    /// back (kernel-SPEC 8-82-1); `None` for a run the city writes no
+    /// back (`crates/kernel/Spec.lean` §8-82-1); `None` for a run the city writes no
     /// first message for.
     pub opening: Option<Opening>,
 }

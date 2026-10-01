@@ -204,7 +204,7 @@ impl ToolBench {
 -/
 
 /-!
-### 8-36 写域的两道闸各问一个问题（kernel-SPEC §8-46 末段）
+### 8-36 写域的两道闸各问一个问题（`crates/kernel/Spec.lean` §8-46 末段）
 
 
 - **`bench::admit`** 对 `Effect::Write { domain: area }` 改调 `kernel::reach(&self.domain, area, &self.taint)`：工具声明的是一块区域，门口只问这块区域够不够得到。

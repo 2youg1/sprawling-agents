@@ -46,7 +46,7 @@ fn every_kind_spells_itself_once_and_exactly_nine_reach_the_window() {
 }
 
 /// The remote door's five kinds, in the order a door's life writes them
-/// (kernel-SPEC.md section 8-81), and then the four document kinds
+/// (`crates/kernel/spec/Event/Record.lean` §8-81), and then the four document kinds
 /// (section 8-83) close the table, so the SPEC table and `ALL` keep one
 /// order.
 #[test]

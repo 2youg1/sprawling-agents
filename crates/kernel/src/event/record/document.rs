@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A document saved through the page, and the three lines of a
-//! proposal's life (kernel-SPEC.md section 8-83).
+//! proposal's life (`crates/kernel/spec/Event/Record.lean` §8-83).
 //!
 //! **The save carries two digests and never the text.** The document is
 //! on disk; the line says which document moved, from which version to

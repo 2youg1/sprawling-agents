@@ -46,7 +46,7 @@ pub fn admits(policy: &kernel::RunPolicy, produced: &Produced) -> Admission;
 ```
 
 - **判定序**：先看落地策略——`Experiment` 恒 `Refused`（试验的产出不合并，学到的写进 `Memo.md`，换一次常规落地的派活再做）；`Ordinary` 再看准入证据要求：`Standing` 恒 `Lands`（楼自己的规矩已经在别处判过，本函数不加检查）；`Tested` 要 `tests_passed == Some(true)`，`Some(false)` 与 `None` 各有自己的拒词；`ContractKept` 在 `contract_moved` 时拒；`DoubleValidated` 要 held-in 与 held-out 两半都是 `Some(true)`，缺一半与任一半为 `Some(false)` 各有拒词。
-- **mode 不参与准入**：交谈与干活产出的东西走同一道合并，要不要证据由证据要求一个值回答（kernel-SPEC §12.12）。
+- **mode 不参与准入**：交谈与干活产出的东西走同一道合并，要不要证据由证据要求一个值回答（kernel D12）。
 - **唯一的调用方是合并那一刻**：`accounting::worker::reviewing` 在 `PrEffect::Merged` 写 `pr_merged` 之前问它，`Refused` 写 `pr_rejected`，理由是 `because; alternative` 两句（sprawling-SPEC 8-133）。评审说「另一位居民看过」，准入说「这次派活要的证据在」，两个问题两道门。
 - **`ContractKept` 今天以城看不见的方式成立**：城读不出一个契约动没动，`Produced.contract_moved` 由装配层恒填 `false`，所以这一要求只在 run 自己报出契约动了的那一天才会拒。这一点照旧写在 §3 而不是假装已经量过。
 - 验收：`mode` 测试 `a_work_run_without_the_evidence_it_chose_does_not_land`（`work`＋`tested`、没跑测试 → `Refused`），以及每种要求、每种落地各自的拒与放。
@@ -108,7 +108,7 @@ def admits_evidence (required : AdmissionRequirement) (produced : Produced) : Ad
     | _, some false => .Refused .FailedHeldOut
     | _, _ => .Refused .HalfMissing
 
-/-- `mode::admits`：先看落地策略，再看证据要求。mode 不是参数：交谈与干活产出的东西走同一道合并（kernel-SPEC §12.12）。 -/
+/-- `mode::admits`：先看落地策略，再看证据要求。mode 不是参数：交谈与干活产出的东西走同一道合并（kernel D12）。 -/
 def admits (landing : LandingPolicy) (required : AdmissionRequirement) (produced : Produced) :
     Admission :=
   match landing with

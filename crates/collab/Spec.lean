@@ -51,7 +51,7 @@ Rust 实现对模型的一致性由测试检查，不由证明：每个模块旁
 
 /-! ## 5 权威信源
 
-「多 Agent」的语义（一层深、干预五动词、实现者不自测、为什么赌多 Agent 的六条及其判负条件）；`architecture.toml` 里 collab 那些条目与 ARCHITECTURE.md §9 的七形状；kernel-SPEC 的 goal、repair、delegation 各节。
+「多 Agent」的语义（一层深、干预五动词、实现者不自测、为什么赌多 Agent 的六条及其判负条件）；`architecture.toml` 里 collab 那些条目与 ARCHITECTURE.md §9 的七形状；`crates/kernel/Spec.lean` 的 goal、repair、delegation 各节（§8-15、§8-16、§8-17）。
 -/
 
 /-! ## 6 命名统一
@@ -233,5 +233,5 @@ D2 没有草稿退回机制。房间没有版本，发言不带「作者所见�
 
 - ARCHITECTURE.md 的模块表（`architecture.toml` 里 collab 各行，锚点指向本文件与分部）与 §4 缝清单。
 - `docs/glossary.md` 的 Signal、Inbox、Workshop 等词条：词条改名时本文件与分部一起改。
-- kernel-SPEC 的 goal、repair、delegation 各节与 §8-4（Signal 的线上形状）；city-SPEC 的 `review` 规则（D4）；sprawling-SPEC §8-42-8（记账线程是 `Booking` 与 `GoalBooking` 的权威）与 §8-73（安全点怎么处理 `take_steer` 的拒绝）。这些节改了，重读本文件 §8 的对应条目。
+- `crates/kernel/Spec.lean` 的 goal、repair、delegation 各节（§8-15、§8-16、§8-17）与 §8-4（Signal 的线上形状）；city-SPEC 的 `review` 规则（D4）；sprawling-SPEC §8-42-8（记账线程是 `Booking` 与 `GoalBooking` 的权威）与 §8-73（安全点怎么处理 `take_steer` 的拒绝）。这些节改了，重读本文件 §8 的对应条目。
 -/

@@ -146,7 +146,7 @@ A violation turns the check red with a message that names the rule, the violatio
 | Every number a document quotes, and every kernel enum table a SPEC carries, equal to the code that decides it. | `xtask docnum` |
 | The kani harness roster read out of the `#[kani::proof]` attributes: no workflow names a harness, a stated total is the total, and a harness left unproved cites where that was decided. | `xtask proof` |
 | Sizes inside their budget. | `xtask budget` |
-| Kernel enums and the kernel-SPEC tables agree variant by variant, and every module's SPEC anchor resolves. | `xtask specalign` |
+| Kernel enums and the tables and rosters of `crates/kernel/Spec.lean` agree variant by variant, and every module's SPEC anchor resolves. | `xtask specalign` |
 | One effective specification per crate, no prose naming a SPEC the tree lacks, the checker and the specifications importing along the crate graph and never each other, no `sorry`, `admit` or `axiom` in any `.lean`, and every path a specification cites on disk. `cargo xtask spec <lib>` is the command that writes a skeleton; the gate of the same name only judges. | `xtask spec` |
 | Nothing published that names one machine's home directory, its working notes, or a document this tree does not contain. | `xtask release` |
 | The one lint table of its own, `crates/desktop/ffi`'s, equal to the workspace's except `unsafe_code`, and every other crate inheriting the workspace's; every workspace package pinned in `[workspace.dependencies]` to `=` the `[workspace.package] version`, and named by no member through a path of its own. | `xtask guard` |

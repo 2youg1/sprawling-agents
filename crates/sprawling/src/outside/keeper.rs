@@ -11,7 +11,7 @@
 //! and each connection the remote listener answers - so a state change
 //! and the line that records it happen under the same lock and in the
 //! same order. The door decides; this module carries out what it
-//! decided: it writes the five lines (kernel-SPEC.md section 8-81),
+//! decided: it writes the five lines (`crates/kernel/Spec.lean` §8-81),
 //! keeps the device table on disk, and opens and closes the route.
 //!
 //! Time and randomness come in as [`Senses`], made in `bin::assembly`,

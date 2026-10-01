@@ -180,7 +180,7 @@ fn permitted(ask: &PermissionAsk) -> Permit {
         .unwrap_or(Permit::Cancelled)
 }
 
-/// One report in the city's own words (kernel-SPEC 12.9).
+/// One report in the city's own words (kernel D9).
 fn reported(update: Update) -> HarnessReported {
     match update {
         Update::Text(text) => HarnessReported::Said { text },

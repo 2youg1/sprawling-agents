@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Where a city keeps each kind of file on disk: one derivation from
-//! the city root and an address (kernel-SPEC.md section 8-56).
+//! the city root and an address (`crates/kernel/spec/Layout.lean` §8-56).
 //!
 //! Every directory name and file name the city writes is declared here
 //! once, and every path it writes them to is spelled here once, so a
@@ -218,7 +218,7 @@ impl CityLayout {
     ///
     /// Under the city's reserved subtree, because the table decides who
     /// may reach the city and no write domain may change that
-    /// (kernel-SPEC 8-76).
+    /// (`crates/kernel/spec/Layout.lean` §8-76).
     #[must_use]
     pub fn devices(&self) -> PathBuf {
         self.governed_root().join(REMOTE_DIR).join(DEVICES_FILE)

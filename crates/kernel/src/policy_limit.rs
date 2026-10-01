@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Policy limits as values (kernel-SPEC 8-73): each type carries one
+//! Policy limits as values (`crates/kernel/spec/PolicyLimit.lean` §8-73): each type carries one
 //! ceiling's legal domain and the one refusal that says no, so a caller
 //! hands over what it observed and cannot spell a second refusal.
 //!

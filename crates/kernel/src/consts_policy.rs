@@ -7,9 +7,9 @@
 //! changes behavior and therefore requires EVAL evidence or an
 //! explicit ruling. Data only — zero branches by charter.
 //!
-//! Five entries carry a type rather than a plain number (kernel-SPEC
-//! 8-8): AUTONOMY_DEFAULT, CLOCK_STAMP_DEFAULT, and the three limits
-//! whose refusal derives from their type (kernel-SPEC 8-73).
+//! Five entries carry a type rather than a plain number (`crates/kernel/spec/ConstsPolicy.lean`
+//! §8-8): AUTONOMY_DEFAULT, CLOCK_STAMP_DEFAULT, and the three limits
+//! whose refusal derives from their type (`crates/kernel/spec/PolicyLimit.lean` §8-73).
 
 /// Exact ratio as an integer pair: kernel decision paths never touch
 /// floats (determinism rule 6). Kept unreduced so the spelling mirrors the

@@ -198,8 +198,8 @@ impl ConcurrentInvoke for Placing<'_> {
     fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted {
         let at = self.next;
         self.next = at.saturating_add(1);
-        // What the action is, is the tool face's to say (kernel-SPEC
-        // 8-23). Two identical calls at two positions are two keys and
+        // What the action is, is the tool face's to say (`crates/kernel/Spec.lean`
+        // §8-23). Two identical calls at two positions are two keys and
         // both run; the same position replayed is one key, which is what
         // deduplication is for.
         let key = match call.action() {

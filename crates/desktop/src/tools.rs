@@ -101,7 +101,7 @@ fn properties(own: Value) -> Value {
 /// states as its `maximum` (`crates/desktop/Spec.lean` D16).
 ///
 /// `IMAGE_QUALITY` is the one definition of the domain, and by ruling it
-/// has no getter (kernel-SPEC 12.3): a refusal is said by the type
+/// has no getter (kernel D3): a refusal is said by the type
 /// alone. A schema bound is not a refusal, so it is read through the
 /// type's one door. `admit` takes `0..=max`, so admission ends once as
 /// the quality rises, and halving the gap between an admitted quality

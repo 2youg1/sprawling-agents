@@ -181,7 +181,7 @@ pub struct GovernedDocumentWritten {
     pub bytes: usize,
     /// The identity version the city has once this write landed: the
     /// receipt a page waits for before it calls a save saved
-    /// (kernel-SPEC.md 8-79). Absent for `CLERK.md`, which names nobody,
+    /// (`crates/kernel/spec/Event/Record.lean` §8-79). Absent for `CLERK.md`, which names nobody,
     /// and in lines written before the key existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]

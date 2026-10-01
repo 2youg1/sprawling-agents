@@ -199,7 +199,7 @@ impl AxCode {
     /// history. Sole declaration site, exhaustive on purpose — a new code
     /// without a carrier decision is a compile error. The loadtime arm is
     /// the closed whitelist of codes that arise only while this process
-    /// cannot write the Ledger; kernel-SPEC section 12 gives each one's
+    /// cannot write the Ledger; `crates/kernel/Spec.lean` §12 gives each one's
     /// reason.
     pub fn carrier(&self) -> Carrier {
         match self {

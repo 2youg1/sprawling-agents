@@ -142,7 +142,7 @@ pub enum ModelTag {
     /// The model that reads text out of a picture: one a person
     /// registered as able to read images. The city's OCR tool asks for
     /// it, and with none chosen that tool says so rather than handing a
-    /// picture to a model that only reads text (kernel-SPEC.md 8-80).
+    /// picture to a model that only reads text (`crates/kernel/spec/Model.lean` §8-80).
     Ocr,
 }
 

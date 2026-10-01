@@ -15,7 +15,7 @@
 
 **一个 typestate 机、一张工作台、一份会话历史，三种形状三个模块。**
 - `bench`（形状 1 判定）：`ToolBench`／`BenchOutcome` 与三条必要前提次序（去重先于副作用；exec 的 discard 预报先于 Write 门；Deny 以 `tool_result` 回去而不结束回合）。它拥有的是**次序**；工具本身以 `Box<dyn Tool>` 递入，沙盒在缝上，副作用不归它。
-- `conversation`（形状 2 值）：`Conversation`，以及再导出的 `Opening`（定义住 kernel，因为 `run_started` 要带它，kernel-SPEC §8-82-1）。它是会话，不是 transcript（冻结后写下的逐 run 文件），也不是 `kernel::Window`（上下文大小）。一条不变量在每一个入口上成立——**连续的 user 内容并进已开的那条消息，而不另开一条**；steer、工具结果与开场任务是同一条规则的三扇门。
+- `conversation`（形状 2 值）：`Conversation`，以及再导出的 `Opening`（定义住 kernel，因为 `run_started` 要带它，`crates/kernel/Spec.lean` §8-82-1）。它是会话，不是 transcript（冻结后写下的逐 run 文件），也不是 `kernel::Window`（上下文大小）。一条不变量在每一个入口上成立——**连续的 user 内容并进已开的那条消息，而不另开一条**；steer、工具结果与开场任务是同一条规则的三扇门。
 - 根重导出：`runtime::Opening` 在根上；`ToolBench` 只经 `runtime::bench`。
 
 ```rust
@@ -99,7 +99,7 @@ impl Turn<Recording> {
 typestate 四相、边界消费、事件序、私有字段三不变量不动；会话、工具与调用形状作为相变函数的入参进来。被否替代：平行第二条 call 路径——同一相两个入口即两个权威，落选。
 
 ```rust
-// kernel::model（缝上 canonical 会话类型，kernel-SPEC §8-24）：
+// kernel::model（缝上 canonical 会话类型，`crates/kernel/Spec.lean` §8-24）：
 // ChatRequest<'a> { system: Vec<SystemBlock>, messages: Cow<'a, [ChatMessage]>, tools: Cow<'a, [ToolDef]>, breakpoint: MessageBreakpoint }
 // SystemBlock { text, cache }；ChatMessage { role, content: Vec<ContentBlock> }；Role { User, Assistant }
 // ContentBlock { Text{text} | ToolUse{id,name,input:Payload} | ToolResult{tool_use_id,content,is_error} }
@@ -124,7 +124,7 @@ pub struct CallShape { pub model: String, pub max_tokens: Option<Ceiling>, pub e
 impl CallShape { pub fn verified_against(&self, frozen: &CallShape) -> Result<(), AxError>; }   // 冻结判定（§8-3）
                     // 三个上线字段全部来自选型点，无一项在调用处手写。model 与 max_tokens 解自
                     // 模型目录行（gateway::market::ModelEntry）；effort 解自 kernel::FrozenConfig，
-                    // Run 内恒不变——改它就换缓存前缀（理由与出处在 kernel-SPEC §8-22）
+                    // Run 内恒不变——改它就换缓存前缀（理由与出处在 `crates/kernel/Spec.lean` §8-22）
 impl Turn<Assembling> {
     pub fn assemble<'c>(self, interrupt: Interrupt, ledger: &mut dyn Ledger, prompt: RunPrompt<'_>,
                     conversation: &'c Conversation, tools: &'c [ToolDef], shape: &CallShape)
@@ -162,7 +162,7 @@ pub fn build_prefix(plan: PrefixPlan) -> Result<PrefixBuild, AxError>;
 - **它是 `Catalog::expand` 的调用者**：没有它，一栋楼的阅览室能报出一个 skill 的名字而永远交不出它。
 - 截断：文件超段位余额即截到边界，原处留 ASCII 标记（文本与切口规则属 `runtime::elision`，§8-42），恒不静默丢尾；标记字节从段预算先扣。
 - 单位换算写成代码：`SegmentCaps` 四个字段是**字节**，`STARTUP_BUDGET_TOKENS` 是**token**，`startup_default` 用 `BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`（`NonZeroU64`，与 `SegmentSlot` 变体数由 `prefix::tests` 钉住）把前者换算成后者。两个换算常量住 `kernel::consts_policy`（`BYTES_PER_TOKEN` 与 `PREFIX_SLOTS`），与 `STARTUP_BUDGET_TOKENS` 同一个家；prefix.rs 只读。
-- 断点只有一个作者：`prefix::BreakpointPlan`（`prefix/breakpoint.rs`，形状 1 判定，纯函数）。`BreakpointPlan::for_conversation(&[ChatMessage])` 决定一次请求实际发出的断点：前三段（city／building／resident）的段界各一个，对话非空时尾消息再一个，合计 ≤ `CACHE_BREAKPOINTS_MAX`（4）；run 段界不放，因为尾锚紧随其后已覆盖它。`FrozenPrefix::system_blocks()` 以 `BreakpointPlan::marks_edge(slot)` 标 system 块，`BreakpointPlan::message_breakpoint` 标请求（回合借用会话，不复制它，kernel-SPEC §12.6），`prompt_payload(&plan)` 把 `plan.breakpoints()` 逐个拼成 `breakpoints` 行（段界写 slot 名，尾写 `tail`）；`verified_system_hashes` 以同一个 `marks_edge` 核对线上的块。兼容格式只负责拼写（Anthropic：被标记消息的最后一块带 `cache_control`），不决定任何断点。
+- 断点只有一个作者：`prefix::BreakpointPlan`（`prefix/breakpoint.rs`，形状 1 判定，纯函数）。`BreakpointPlan::for_conversation(&[ChatMessage])` 决定一次请求实际发出的断点：前三段（city／building／resident）的段界各一个，对话非空时尾消息再一个，合计 ≤ `CACHE_BREAKPOINTS_MAX`（4）；run 段界不放，因为尾锚紧随其后已覆盖它。`FrozenPrefix::system_blocks()` 以 `BreakpointPlan::marks_edge(slot)` 标 system 块，`BreakpointPlan::message_breakpoint` 标请求（回合借用会话，不复制它，kernel D6），`prompt_payload(&plan)` 把 `plan.breakpoints()` 逐个拼成 `breakpoints` 行（段界写 slot 名，尾写 `tail`）；`verified_system_hashes` 以同一个 `marks_edge` 核对线上的块。兼容格式只负责拼写（Anthropic：被标记消息的最后一块带 `cache_control`），不决定任何断点。
 ```rust
 pub enum Breakpoint { Edge(SegmentSlot), Tail }
 pub struct BreakpointPlan { /* tail: Option<usize> */ }
@@ -259,7 +259,7 @@ pub trait ConcurrentInvoke {
 }
 ```
 
-- `meta_of` 取代原来的 `effect_of`：工具波判只读前缀、推测门判能否提前起跑，读的都是登记里的 `effect`；`tool_called` 还要照录 `effect` 与 `render`（kernel-SPEC §8-75(b)）。一个方法交出整份登记，三处读同一个答案；两个方法各交一项，就是两处各自去查同一份登记。
+- `meta_of` 取代原来的 `effect_of`：工具波判只读前缀、推测门判能否提前起跑，读的都是登记里的 `effect`；`tool_called` 还要照录 `effect` 与 `render`（`crates/kernel/Spec.lean` §8-75(b)）。一个方法交出整份登记，三处读同一个答案；两个方法各交一项，就是两处各自去查同一份登记。
 - 闭包工具面（citysim 与测试）答 `None`：它的调用写 `tool_called` 时两键缺席，与它今天不声明效果、波次恒串行是同一件事。
 
 **(b) 被裁掉的结果，原文在哪**

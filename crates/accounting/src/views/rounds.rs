@@ -336,7 +336,7 @@ impl Attempts {
 }
 
 /// Whether this line's `t` is the moment its own event happened
-/// (kernel-SPEC 8-4, "what the envelope `t` records").
+/// (`crates/kernel/Spec.lean` §8-4, "what the envelope `t` records").
 pub(crate) fn timing_of(record: &EventRecord) -> wire::Timing {
     match record.moment() {
         Some(_) => wire::Timing::Measured,

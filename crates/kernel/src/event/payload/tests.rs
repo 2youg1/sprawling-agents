@@ -130,7 +130,7 @@ fn parse_line_fails_closed() {
 /// A kind that left the vocabulary is refused where lines are read, and
 /// the refusal carries a stable code and a way forward rather than a
 /// serde sentence. `takeover_started` and `rollback_applied` left with
-/// the commands behind them (kernel-SPEC.md section 12.2); no line
+/// the commands behind them (kernel D2); no line
 /// carrying them was ever written, so nothing already on disk changes,
 /// and a hand-written one is refused rather than read.
 #[test]

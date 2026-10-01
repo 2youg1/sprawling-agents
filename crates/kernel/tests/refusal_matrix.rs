@@ -9,7 +9,7 @@
 //! model is the recovery subject.
 
 // The samples this file judges are compiled only with the conformance
-// feature (`gate::conformance`, `kernel-SPEC.md` section 12.3), so the
+// feature (`gate::conformance`, kernel D3), so the
 // target is judged in that build and is empty in every other.
 #![cfg(feature = "conformance")]
 #![allow(
@@ -59,7 +59,7 @@ fn every_door_denial_carries_a_complete_teaching_refusal() {
     }
 }
 
-/// The YOLO rule of `kernel-SPEC.md` section 12.1 is one door wide, and
+/// The YOLO rule of kernel D1 is one door wide, and
 /// this is the property that says so: walking the roster, exactly one
 /// door answers Ask, and it is the attach door. A second asking door
 /// breaks this line rather than a reader's expectation.

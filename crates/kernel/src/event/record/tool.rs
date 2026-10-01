@@ -45,8 +45,8 @@ pub struct ToolCalled {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
     /// The effect the tool was registered with at the moment of the
-    /// call, copied by the tool wave from its `ToolMeta` (kernel-SPEC
-    /// 8-75). Absent for a tool the bench did not know and on every line
+    /// call, copied by the tool wave from its `ToolMeta` (`crates/kernel/spec/Event/Record.lean`
+    /// §8-75). Absent for a tool the bench did not know and on every line
     /// written before the key existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effect: Option<Effect>,

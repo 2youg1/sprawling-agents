@@ -5,7 +5,7 @@
 
 //! The remote door's five lines: it opened, it closed, a device paired,
 //! a device was revoked, a device started a remote session
-//! (kernel-SPEC.md section 8-81).
+//! (`crates/kernel/spec/Event/Record.lean` §8-81).
 //!
 //! **No line here carries a key, a pairing code or a session id.** The
 //! history says who was let in and when; what a device proves itself

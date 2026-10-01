@@ -72,7 +72,7 @@ impl RunWorker {
                 let item = kernel::ApprovalItem {
                     // The sweep's own slot in this run: one escalation
                     // per run, at a position the run's call counter
-                    // never reaches (kernel-SPEC 8-21).
+                    // never reaches (`crates/kernel/Spec.lean` §8-21).
                     id: kernel::ApprovalId::of_sweep(&run_id),
                     actor: who.to_owned(),
                     artifact: sweep.job_locator.clone(),

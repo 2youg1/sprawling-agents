@@ -17,7 +17,7 @@
 3. **急件先出，一次最多 bandwidth 件**（`pull_bounded`、`pull_is_prefix`）：接收方的上下文窗口由接收方定上限，发送方推不动它。
 4. **拿掉去重，第二件就会出现**（`withoutSeen_duplicates`）：这是本模型咬得动的演示，见文末。
 
-`SignalKind` 与两条线上载荷（`SignalEnqueued`、`SignalConsumed`）的形状住 kernel（kernel-SPEC §8-4）；`lane` 仍写进载荷给 crate 外的读者，回读时不采信，由 `kind` 再推一次。
+`SignalKind` 与两条线上载荷（`SignalEnqueued`、`SignalConsumed`）的形状住 kernel（`crates/kernel/Spec.lean` §8-4）；`lane` 仍写进载荷给 crate 外的读者，回读时不采信，由 `kind` 再推一次。
 -/
 
 namespace Collab.Inbox

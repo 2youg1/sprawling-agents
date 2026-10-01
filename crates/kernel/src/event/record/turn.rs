@@ -139,7 +139,7 @@ pub struct ModelReturned {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub billed_usd_micros: Option<UsdMicros>,
     /// When the reply's first non-empty prose or reasoning reached the
-    /// city, read from the turn's clock (kernel-SPEC 8-75). A moment,
+    /// city, read from the turn's clock (`crates/kernel/spec/Event/Record.lean` §8-75). A moment,
     /// not a duration: the time to first content is this minus the
     /// `model_called` line's `t`. Absent when the reply came through a
     /// door that reports nothing before it settles, when it streamed

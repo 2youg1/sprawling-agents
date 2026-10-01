@@ -32,7 +32,7 @@ use crate::error::{AxCode, AxError};
 /// never writable by what runs inside it.
 pub const RESERVED_PREFIX: &str = ".sprawling";
 
-/// git's own metadata directory (kernel-SPEC 8-73). Writing it is
+/// git's own metadata directory (`crates/kernel/spec/Address.lean` §8-73). Writing it is
 /// privilege escalation: a hook is code that runs at the next git
 /// operation, a config key can start a program, and the checkpoint
 /// references and the restoration objects a `file_discarded` names all
@@ -122,8 +122,8 @@ impl Address {
     /// `<building>/.sprawling/`, and a run whose write domain is its
     /// building must not reach them. Widening this predicate can only
     /// refuse more, which is the direction a fail-closed check may move
-    /// in without a second authority to check it against (kernel-SPEC
-    /// 8-73).
+    /// in without a second authority to check it against (`crates/kernel/spec/Address.lean`
+    /// §8-73).
     pub fn is_reserved(&self) -> bool {
         self.0.split('/').any(|segment| {
             PROTECTED_METADATA

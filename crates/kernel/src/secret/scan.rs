@@ -342,7 +342,7 @@ mod verification {
     //! non-linear multiplications and returns no verdict. Totality of
     //! the whole scan is held by the proptest above; proving it here
     //! would need a per-slot function this module does not have
-    //! (kernel-SPEC.md section 2).
+    //! (`crates/kernel/Spec.lean` §2).
 
     use super::*;
 

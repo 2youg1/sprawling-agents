@@ -99,7 +99,7 @@ fn a_run_id_reads_back_from_the_snapshot_encoding() {
 
 /// A snapshot holds a digest as its bytes and reads the same digest
 /// back, while every format a reader sees still spells it in hex
-/// (kernel-SPEC 8-84): the hex decode was most of decoding the views.
+/// (`crates/kernel/Spec.lean` §8-84): the hex decode was most of decoding the views.
 #[test]
 fn a_digest_is_its_bytes_in_the_snapshot_and_its_hex_in_json() {
     let oid = kernel::GitOid::from_bytes([0xcd; 20]);

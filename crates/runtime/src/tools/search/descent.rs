@@ -38,7 +38,7 @@ pub(super) enum Step {
 /// `read` reaches through `chosen_path`; a name that cannot be an
 /// address at all — one holding a backslash, a colon, a control
 /// character — is left alone, because this city cannot say where it is.
-/// Git's own metadata is inside that predicate too (kernel-SPEC 8-73),
+/// Git's own metadata is inside that predicate too (`crates/kernel/spec/Address.lean` §8-73),
 /// and scanning an object store yields hits nobody can act on.
 ///
 /// The read bound is asked only at the city root: it answers for a

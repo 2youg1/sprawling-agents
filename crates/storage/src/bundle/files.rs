@@ -120,8 +120,8 @@ fn refuse_alias(path: &Path) -> Result<(), StorageError> {
 /// Root `.sprawling` holds the two stores, and they travel through
 /// faces of their own; a nested one is a building's own rules and is
 /// part of the city. `.git` at any depth is protected metadata, and a
-/// bundle that carried it would plant hooks on restore (kernel-SPEC
-/// 8-73). The names come from kernel's one list; nothing here
+/// bundle that carried it would plant hooks on restore (`crates/kernel/spec/Address.lean`
+/// §8-73). The names come from kernel's one list; nothing here
 /// re-spells them. A staging file a crashed restore left is half of a
 /// write, and `landing` alone knows its spelling.
 fn travels(relative: &Path) -> bool {

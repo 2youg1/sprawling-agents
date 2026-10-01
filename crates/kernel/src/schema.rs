@@ -11,7 +11,7 @@
 //! through their own constructor, so a derive would
 //! say a field is a string and nothing about what it must say. Each
 //! schema states that grammar as a pattern, which `cargo xtask wire-ts`
-//! turns into the client's own check (kernel-SPEC.md section 8-45).
+//! turns into the client's own check (`crates/kernel/spec/Schema.lean` §8-45).
 //!
 //! **The pattern is not the authority.** `Address::parse` answers which
 //! rule a string broke, which is what a person can act on; two

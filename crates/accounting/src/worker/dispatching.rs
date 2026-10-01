@@ -46,7 +46,7 @@ pub(super) struct Assignment {
     /// one; `None` runs on the `main` tag's model. Spent by agreeing,
     /// which finds the tag that registered it (sprawling-SPEC.md 8-10).
     pub(super) model: Option<String>,
-    /// The run policy the dispatch chose (kernel-SPEC 8-77): written
+    /// The run policy the dispatch chose (`crates/kernel/Spec.lean` §8-77): written
     /// into `run_started`, asked by the merge, and inherited whole by
     /// every run this one hands work to or knocks for.
     pub(super) policy: kernel::RunPolicy,

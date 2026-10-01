@@ -67,7 +67,7 @@ pub struct RunPlan {
     /// knows whether the person, the city or a resident sent it.
     pub dispatched_by: kernel::event::Who,
     /// The run policy this run was dispatched under, written into
-    /// `run_started` as it was chosen (kernel-SPEC 8-77). Named apart
+    /// `run_started` as it was chosen (`crates/kernel/Spec.lean` §8-77). Named apart
     /// from `policy`, which is the building's, because the two answer
     /// different questions: what the building allows, and what this
     /// dispatch asked for inside that.

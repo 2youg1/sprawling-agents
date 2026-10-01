@@ -20,7 +20,7 @@ pub const PROMPT_CACHE_TTL_SECS: u64 = 300;
 
 /// EventRecord `v`: one monotonic integer, no major/minor split (3.1).
 /// 2: the four lines a turn waits for record their own moment
-/// (kernel-SPEC 12.10).
+/// (kernel D10).
 pub const EVENT_LOG_V: u32 = 2;
 
 /// Where a ledger line's `v` stands against the version this build

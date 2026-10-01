@@ -49,7 +49,7 @@ pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 
 
 ```rust
-pub use kernel::event::record::Opening;           // runtime::conversation 与根上各一处再导出（kernel-SPEC §8-82-1）
+pub use kernel::event::record::Opening;           // runtime::conversation 与根上各一处再导出（`crates/kernel/Spec.lean` §8-82-1）
 pub struct Charter<'a> { /* …既有字段… */ pub opening: Option<Opening> }
 // RunPlan::charter 填 Some(self.opening)；harness 的 charter 填 None
 ```

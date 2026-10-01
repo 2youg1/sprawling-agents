@@ -105,7 +105,7 @@ impl Chartered {
             naming: None,
             // Its first words are the prompt handed to the harness's own
             // session; the city writes it no first message to record
-            // (kernel-SPEC.md 8-82-1).
+            // (`crates/kernel/Spec.lean` §8-82-1).
             opening: None,
         }
     }

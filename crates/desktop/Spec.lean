@@ -573,10 +573,10 @@ D10 树经 `uiautomation` 读、按文档序铸 ref、折成文字；COM 公寓�
 
 D16 截图 schema 的 `quality` 上限经 `IMAGE_QUALITY.admit` 读出。
 
-- **决定**：`desktop.screenshot` 的 `inputSchema` 里 `quality.maximum` 是 `kernel::consts_policy::IMAGE_QUALITY` 收下的最大值，由 `tools::largest_quality` 在 `admit` 上二分找出：`admit` 的域是 `0..=max`（kernel-SPEC §8-73），所以「收下」对质量单调，三十二次判定之内找到边界。一次调用的质量仍在解析点经 `admit` 判（`platform::windows::reading`）。
-- **理由**：schema 是模型读到的域，`admit` 是本 server 执行的域。schema 里写死的 100 是同一个事实的第二份定义：城里的域一挪，模型照旧按旧域发，server 按新域拒。kernel 的 `ImageQuality` 没有 getter，那是 kernel-SPEC 12.3 的定规（拒因只由类型说出，调用方读不出裸数去拼自己的句子）；schema 的上界不是一句拒因，经类型唯一的门读出它，定规不动。
+- **决定**：`desktop.screenshot` 的 `inputSchema` 里 `quality.maximum` 是 `kernel::consts_policy::IMAGE_QUALITY` 收下的最大值，由 `tools::largest_quality` 在 `admit` 上二分找出：`admit` 的域是 `0..=max`（`crates/kernel/spec/PolicyLimit.lean` §8-73），所以「收下」对质量单调，三十二次判定之内找到边界。一次调用的质量仍在解析点经 `admit` 判（`platform::windows::reading`）。
+- **理由**：schema 是模型读到的域，`admit` 是本 server 执行的域。schema 里写死的 100 是同一个事实的第二份定义：城里的域一挪，模型照旧按旧域发，server 按新域拒。kernel 的 `ImageQuality` 没有 getter，那是 kernel D3 的定规（拒因只由类型说出，调用方读不出裸数去拼自己的句子）；schema 的上界不是一句拒因，经类型唯一的门读出它，定规不动。
 - **击败的备选**：①在 `consts_policy` 加一个公开常量 `IMAGE_QUALITY_MAX`，`IMAGE_QUALITY` 由它构造——一个数一个家，代码最短，但它正是 12.3 这条定规关上的那扇门；②留 100、由评审盯着；③由 `xtask guard` 比对两处（设计九已否：抄件加比对只让漂移看得见）。
-- **重开的参数**：kernel-SPEC 12.3 改为准许读出上限类政策值的数；那时 schema 直接读那个数，`largest_quality` 删去。
+- **重开的参数**：kernel D3 改为准许读出上限类政策值的数；那时 schema 直接读那个数，`largest_quality` 删去。
 -/
 
 /-! ## 15 影响面

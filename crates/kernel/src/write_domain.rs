@@ -123,7 +123,7 @@ impl WriteDomain {
 }
 
 /// What a run may do to a file that already exists inside its write
-/// domain (kernel-SPEC 8-78).
+/// domain (`crates/kernel/spec/WriteDomain.lean` §8-78).
 ///
 /// It narrows the domain and never widens it: the domain answers where
 /// a run may write and what kind of file, this answers whether a write
@@ -252,8 +252,8 @@ pub fn observe_edit_war(samples: &[EditSample]) -> EditWarVerdict {
 // No kani harness lives here. Every value this module judges is an
 // `Address`, which owns a `String`, so a symbolic harness would hand
 // CBMC loops it cannot bound, and a harness over one fixed address
-// would restate the test below at a higher price (kernel-SPEC.md
-// section 2).
+// would restate the test below at a higher price (`crates/kernel/Spec.lean`
+// §2).
 
 #[cfg(test)]
 #[allow(

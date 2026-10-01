@@ -113,7 +113,7 @@ impl<'de> Deserialize<'de> for GitOid {
     }
 }
 
-/// A digest as its format wants it (kernel-SPEC 8-84): the hex spelling
+/// A digest as its format wants it (`crates/kernel/spec/Locator.lean` §8-84): the hex spelling
 /// wherever a person or a frame reads it, the bytes themselves in a
 /// binary format, which only this binary reads back (a snapshot).
 fn write_digest<const N: usize, S: serde::Serializer>(

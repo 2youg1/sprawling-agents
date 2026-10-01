@@ -341,7 +341,7 @@ A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）�
 
 /-! ## 17 文档关系
 
-模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 kernel-SPEC §8-23/§8-24 同一变更集；runtime 没有 api-baseline 文件，公开面即 `lib.rs` 的 `pub mod` 与根重导出。
+模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 `crates/kernel/Spec.lean` §8-23/§8-24 同一变更集；runtime 没有 api-baseline 文件，公开面即 `lib.rs` 的 `pub mod` 与根重导出。
 
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 runtime 各行的 `spec` 锚点一起重看。
 - `architecture.toml` 的模块图：runtime 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。

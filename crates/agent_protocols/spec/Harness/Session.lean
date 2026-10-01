@@ -292,8 +292,7 @@ theorem a_deadline_never_freezes_cancelled (why : Stop) (spoke : Bool) :
 
 /-! ## Only an admitted record is cited as evidence -/
 
-/-- The records a claim that the run is done may cite (kernel-SPEC.md section
-8-20, `kernel::completion::CITABLE`): the answer to the city's prompt. A report
+/-- The records a claim that the run is done may cite (`crates/kernel/Spec.lean` §8-20, `kernel::completion::CITABLE`): the answer to the city's prompt. A report
 is what the harness said, and the city never decided it. -/
 def Record.citable : Record → Bool
   | .answered _ => true

@@ -56,7 +56,7 @@
 
 ## 5 权威信源
 
-wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）；聚合层硬约束「聚合层只转发 Query 与 Event，恒不转发 Command」；干预动词语义表；`Sealed<T>` 的不可序列化性质；`kernel::error` 的装载期六码白名单（kernel-SPEC §8-1，封闭）。外部：axum（内含 tokio-tungstenite）与 tokio，版本钉在根 `Cargo.toml`。
+wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）；聚合层硬约束「聚合层只转发 Query 与 Event，恒不转发 Command」；干预动词语义表；`Sealed<T>` 的不可序列化性质；`kernel::error` 的装载期六码白名单（`crates/kernel/Spec.lean` §8-1，封闭）。外部：axum（内含 tokio-tungstenite）与 tokio，版本钉在根 `Cargo.toml`。
 
 ## 6 命名统一
 
@@ -82,7 +82,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 三条不可动摇的形状约定，它们决定接口而非被接口决定：
 
 1. **`Command` 是穷尽枚举，每个改状态臂携 `IdemKey`**——「双击两下不开两个 Run」由类型保证，不由服务端去重表保证（去重表是第二道，`kernel::gate::dedup` 已有）。
-2. **`PutSecret::value: Sealed<String>`**——`Sealed<T>` 无 `Serialize`（kernel-SPEC §8-25），故含它的枚举也无法整体派生 `Serialize`。这迫使 `Command` 的序列化实现**手写并对该臂显式拒绝**，而不是让宏悄悄地把它序列化出去。手写点即唯一权威，`E_WIRE_MISMATCH` 在此产出。
+2. **`PutSecret::value: Sealed<String>`**——`Sealed<T>` 无 `Serialize`（`crates/kernel/Spec.lean` §8-25），故含它的枚举也无法整体派生 `Serialize`。这迫使 `Command` 的序列化实现**手写并对该臂显式拒绝**，而不是让宏悄悄地把它序列化出去。手写点即唯一权威，`E_WIRE_MISMATCH` 在此产出。
 3. **`aggregate` 的上游发送面签名只接受 `Query`**——不是 `fn send(&self, frame: Frame)` 再运行时判断，是 `fn query(&self, q: Query)` 且没有第二个发送方法。
 
 ### 8-0 跨层名字的携带法（先于一切接口的决定）
@@ -163,7 +163,7 @@ impl From<WireCommand> for Command                     // 总函数；PutSecret 
 
 4. **`Auth`／`Hello` 的令牌是明文 `String`，而 `PutSecret` 的值是 `Sealed`**。不对称是故意的：配对令牌**必须跨线**才能完成配对，在传输中密封它只是自欺；它在**落地一刻**被封（`decide_handshake` 只接受 `&Sealed<String>` 作为已配置值）。凭证则相反：它本就不应跨线。
 
-5. **wire 携 git 的 oid 时携 `kernel::GitOid` 本体**（`Query::Commit`／`Query::Hunks` 的 oid，与紧邻的 `B3Hash` 同形：40 位小写 hex，长度不对即拒），故 `GitOid` 带 serde。**被否**：在 wire 里自建 `CheckpointRef(String)` 并自校 40 hex——那是 git oid 形状的第二个权威。该变更属 kernel 公开面，已与 kernel-SPEC §8-2 同集提交（apisync 门）。
+5. **wire 携 git 的 oid 时携 `kernel::GitOid` 本体**（`Query::Commit`／`Query::Hunks` 的 oid，与紧邻的 `B3Hash` 同形：40 位小写 hex，长度不对即拒），故 `GitOid` 带 serde。**被否**：在 wire 里自建 `CheckpointRef(String)` 并自校 40 hex——那是 git oid 形状的第二个权威。该变更属 kernel 公开面，已与 `crates/kernel/Spec.lean` §8-2 同集提交（apisync 门）。
 
 ### 8-2 wire::server（形状 4 薄壳）＋reception（形状 1）＋assets（形状 4）
 
@@ -440,7 +440,7 @@ WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionN
 
 **决定**：(a) `Turn.first_at` 照录 `model_returned` 的键；`Timing` 由 `EventRecord::moment` 与答复的错误码判出。线上不带首字耗时，也不从相邻行推断一个时刻量没量过。
 
-**理由**：一个事实一个家。时刻语义的权威是 kernel-SPEC §8-4 与 `EventRecord::moment`；首字耗时是两个时刻之差，页面手里已有这两个数。
+**理由**：一个事实一个家。时刻语义的权威是 `crates/kernel/Spec.lean` §8-4 与 `EventRecord::moment`；首字耗时是两个时刻之差，页面手里已有这两个数。
 
 **被否**：①线上带一个 `ttft` 时长：派生值在线上有了第二个家，而且 `t` 未量时它要答一个答不了的数；②`Timing` 三值（量过、回合时间戳、城补的）：页面对后两种做同一件事——不画用时——第三个值只会逼每个读者多写一臂；要分辨时，`Call.outcome` 与答复内容已经说明那是城补的。
 
@@ -452,7 +452,7 @@ WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionN
 
 (c) `Call.effect`、`Call.render` 照录 `tool_called` 在调用那一刻记下的登记。
 
-**理由**：登记只在 run 的工具台上存在，读面够不到；记在调用那一行，读面读的是那一刻的事实（kernel-SPEC §12.11）。
+**理由**：登记只在 run 的工具台上存在，读面够不到；记在调用那一行，读面读的是那一刻的事实（kernel D11）。
 
 **被否**：读面按工具名匹配出呈现：每加一件工具都要改这个匹配，楼的 MCP 工具读面不认识。
 
@@ -624,7 +624,7 @@ pub fn wire_schema() -> serde_json::Value;   // 一份文档：`$defs` 里是信
 ```
 
 - **哈希的素材是整个线上名字面**：`schema_hash()` 吃 `WIRE_V`、命令名表、查询名表，以及 `kernel::EventKind::ALL` 按表序的每个种类名——事件种类随每个事件帧到达页面，改名、增删一个种类与改名一个帧一样会让旧页面误读，所以它移动握手哈希，不靠有人记得去升 `WIRE_V`。生成的 `WIRE_HASH` 常量就是这个函数的输出，客户端在握手处送回它，服务端按原样校验——两端校验的是同一个值，而不是一个「schema 文档的摘要」；后者会把每一条 doc 注释的改动都变成一次拒配。
-- **每个入帧的类型都派生 `schemars::JsonSchema`**（`#[cfg_attr(feature = "schema", derive(...))]`），派生宏读的是 serde 已经在读的属性，故形状与编码同源。kernel 侧的值经 kernel 自己的 `schema` feature 派生（kernel-SPEC §8-45）；`NoSecret` 手写 `impl JsonSchema` 为 `false`（任何值都不满足），于是 `PutSecret` 臂在 TS 里是 `value: never`——线上拼不出它，这一句在两端各说一次、意思相同。`Command<Secret>` 以 `schemars(rename = "Command")` 命名，因为线上只有 `Command<NoSecret>` 一种实例。
+- **每个入帧的类型都派生 `schemars::JsonSchema`**（`#[cfg_attr(feature = "schema", derive(...))]`），派生宏读的是 serde 已经在读的属性，故形状与编码同源。kernel 侧的值经 kernel 自己的 `schema` feature 派生（`crates/kernel/Spec.lean` §8-45）；`NoSecret` 手写 `impl JsonSchema` 为 `false`（任何值都不满足），于是 `PutSecret` 臂在 TS 里是 `value: never`——线上拼不出它，这一句在两端各说一次、意思相同。`Command<Secret>` 以 `schemars(rename = "Command")` 命名，因为线上只有 `Command<NoSecret>` 一种实例。
 - **生成器只认 serde 会产出的那个子集**：对象（`properties`／`required`／`additionalProperties`）、`string`／`integer`／`number`／`boolean`／`null`、`array`（`items`）与元组（`prefixItems`）、`enum` 字符串表、`const`、`oneOf`／`anyOf`、`$ref` 指向 `#/$defs/…`、`type: [T, "null"]`、`true`／`false` 两种布尔 schema。其余一律拒绝并点名关键字与所在类型——一个会猜的生成器就是一个会静默产出错类型的生成器。具名的裸 `string`／`integer` 即 newtype，TS 侧打上 `Schema.brand(名)`。
 - **文件确定**：`$defs` 按名排序后按依赖拓扑输出（Effect 的 `Schema` 值必须先定义后引用；环即拒绝），对象键排序，LF 行尾，生成头注明来源。
 
@@ -674,7 +674,7 @@ pub struct CommitAnswer {
 Dispatch { addr, task, goal, policy, idem, session, effort }   // 删去 budget: BudgetCap
 ```
 
-**没有人能在一件事跑之前给它定价**，所以说出「跑这件事」的那条帧不带上限。刹车只留一个：`Halt` 关掉一个范围并终止该范围里已经起来的后台成员（`runtime::backlog` 使这句话为真）。`kernel::BudgetCap` 及其判定面随之删除（kernel-SPEC §8-12），`wire` 的 kernel 再导出列表因此少一项 `BudgetCap`——**这是公开面变更**，`web` 与 `sprawling` 两份基线同变更集重生。
+**没有人能在一件事跑之前给它定价**，所以说出「跑这件事」的那条帧不带上限。刹车只留一个：`Halt` 关掉一个范围并终止该范围里已经起来的后台成员（`runtime::backlog` 使这句话为真）。`kernel::BudgetCap` 及其判定面随之删除（`crates/kernel/Spec.lean` §8-12），`wire` 的 kernel 再导出列表因此少一项 `BudgetCap`——**这是公开面变更**，`web` 与 `sprawling` 两份基线同变更集重生。
 
 - **`BudgetUse` 留在再导出列表里**：成本页读它，五路归因报它。**报告花了多少**与**事前不许花**是两件事，此处只删后者。
 - **`Dispatch` 的 reach 不变**（§19-2 仍是 `client`）：删的是一个字段，不是一个动词。
@@ -773,7 +773,7 @@ pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
 **这里搬的是读法而不是接口。** 一个会话被读成回合、一次跑留下什么证据、一个计划节点花了多少钱——这三件事此前只有 `crates/web` 会算，于是「线就是全部 API」（ARCHITECTURE §8）在这三处是假的：另写一个客户端就得把折叠逻辑照抄一遍，而照抄出来的那一份迟早与这一份不一致。现在三者各是一次查询，答由 `accounting::views` 折出（sprawling-SPEC §8-47）。
 
 - **`Rounds` 的值类型住 `wire`，折叠住 `accounting::views`。** 值要上线，故必须可序列化；折叠要读账本，故必须在能读账本的那一层。两者切分开来，正是 ARCHITECTURE §9 的形状 2 与形状 7 的分界。
-- **`wire::reading` 是第三块**：把一条账本载荷读成上面这些值的那些纯函数（`said_in`／`used_in`／`output_in`／`note_of`）。它住在线这一层而不是服务端，因为**两端都要读**：服务端答 `Rounds` 要它，客户端把推来的 `model_returned` 折进自己的快照也要它（ARCHITECTURE §5 第 12 步：同一个折叠，线的两边）。一份权威，两个调用者。**`Call.subject` 不由这里算**：写方在写 `tool_called` 时把它定下（kernel-SPEC §8-4：`ToolCalled::subject_of`），折叠读记录里的 `subject` 键；两个读方各按自己的 map 序推一次，同一次调用已经出现过两个名字。
+- **`wire::reading` 是第三块**：把一条账本载荷读成上面这些值的那些纯函数（`said_in`／`used_in`／`output_in`／`note_of`）。它住在线这一层而不是服务端，因为**两端都要读**：服务端答 `Rounds` 要它，客户端把推来的 `model_returned` 折进自己的快照也要它（ARCHITECTURE §5 第 12 步：同一个折叠，线的两边）。一份权威，两个调用者。**`Call.subject` 不由这里算**：写方在写 `tool_called` 时把它定下（`crates/kernel/Spec.lean` §8-4：`ToolCalled::subject_of`），折叠读记录里的 `subject` 键；两个读方各按自己的 map 序推一次，同一次调用已经出现过两个名字。
 - **读不出的载荷是一条 `Note::Unreadable { cause, at }`，不是没有 note**：`note_of` 认下的种类（被拒、检查点）若载荷读不回它该有的形状，答里留一行，`cause` 说哪一种事件、读到哪一步失败，`at` 指向账本里那条记录。被否：返回 `None`——那样一次被拒在人眼里就是「什么都没发生」，而失败本身被这一层抹掉了。`CheckpointCommitted` 的 `JobPinned` 是一个真答案（派发钉住的是作业不是提交），仍然没有 note。
 - **`Changes` 早已在线上**（§8-20），`storage::changes` 一直是它唯一的权威；查过之后不动它——把一件已经做完的事再做一遍就是造第二个权威。
 - **`Evidence` 只认写下来的东西**：截图是 `tool_result` 载荷里的 `image` 定位符（`bin::browser_tool::stored` 写的那三项：定位符、两条边、media type），完成证据是 `roadmap_finished` 载荷里的 `evidence` 定位符。**答里恒不携字节**：一张图是一个 `cas:` 定位符，取它是资产端点的事，把 base64 塞进查询答会让「看一眼这次跑干了什么」付上整批像素的代价——与 §8-20 拒绝整批补丁同一条理由。
@@ -897,7 +897,7 @@ pub struct RangeWrite {
     pub idem: IdemKey,
 }
 pub struct TextEdit { pub span: documents::Span, pub text: String }   // documents 定义，线上直接携带（documents D1）
-// 回执：账本行 document_written { at, baseline, version, bytes }，带这条命令的 idem（kernel-SPEC §8-83）
+// 回执：账本行 document_written { at, baseline, version, bytes }，带这条命令的 idem（`crates/kernel/Spec.lean` §8-83）
 ```
 
 - **基线是一个版本，编辑是那一版的字节区间加一段文本。** 页面把它的光标与选区换算成字节（refrain 路线图 §4-8 的 `core/document_pos.ts`），替换的内容以文本送来，城按那一版的编码把它写成字节（documents D11）：页面不必知道一份 UTF-16 文件怎样拼一个字符，城里也只有一处会写这几种编码。
@@ -1031,7 +1031,7 @@ pub type TranscribeSink = Arc<dyn Fn(Vec<u8>, String) -> Result<String, AxError>
 
 - **是一条路由，不是一条 Command，也不是一条 Query**。Command 被接下之后经事件流作答，而「我刚说的那句话是什么」必须回到录它的那个标签页；Query 是另一种会作答的形状，而一条在供应方那里花掉数秒的查询就是一条装成读的命令。`/enroll` 与 `/upload` 早已是同一类旁门：帧的文法装不下的那几件事各有一扇 HTTP 门。
 - **容器从请求头读，不从字节猜**：浏览器录进它手上有的容器，而只有它知道是哪一个。没有 content-type 即按名拒绝——一个没人声明的容器发不出去。`; codecs=opus` 这类参数说的是容器里的编解码器，而音频线路由的是容器，故取分号前那一段；那一段修剪后为空（头里只有参数）同样是没声明容器，与缺头同一句拒绝。
-- **`ModelTag` 增第三个 `Transcribe`**（kernel-SPEC 的枚举表同步）：**「哪个 endpoint、哪个 model 答这一类活」本来就有机制**——人登记一个 endpoint，再为一个 tag 选一个 model。第二张表单加第二份存储会是同一个问题的第二个答案，而那把 key 还要有第二条进金库的路。人填 URL 与 key 因而走的是既有的 attach 表单。
+- **`ModelTag` 增第三个 `Transcribe`**（`crates/kernel/Spec.lean` §8-24 的枚举同步）：**「哪个 endpoint、哪个 model 答这一类活」本来就有机制**——人登记一个 endpoint，再为一个 tag 选一个 model。第二张表单加第二份存储会是同一个问题的第二个答案，而那把 key 还要有第二条进金库的路。人填 URL 与 key 因而走的是既有的 attach 表单。
 - **服务端**：`gateway::transcriber_for(chosen, secrets)` 与 `adapter_for` 同形——把一个选择变成一件可调用的东西这件事只在一处发生。`Views::transcriber` 在锁内读出选择、锁外发请求。
 
 ### 8-28 `endpoint_probed` 答的是一次读数，不是一次成败
@@ -1469,9 +1469,9 @@ Command::OpenSession { addr: Address, carry: Carry, from: Option<Origin>, idem: 
 `Command::Takeover` 与 `Command::Rollback` 删除；`COMMAND_NAMES` 从 30 到 28，schema 哈希随之变（golden 见 §2），故同集进位 35→36。
 
 - **它们从来没有执行者**：装配层自上线起就对这两帧以 `not_built` 作答（§19 记的那次失效的三个动词之二），而客户端按 §19-2 的门要求不画它们。一条线上拼得出、任何东西都执行不了的命令，是对客户端的假承诺；删帧之后旧页面在握手期被明确拒绝（§8.5），而不是拿到一个永远失败的按钮。
-- **规则的家在 kernel-SPEC §12.2**（回滚＝分支＋git 还原），含理由、被否方案与重开参数；本节只记线的形状，不复述第二份。
+- **规则的家在 kernel D2**（回滚＝分支＋git 还原），含理由、被否方案与重开参数；本节只记线的形状，不复述第二份。
 - **`control` 与 reach 表同集缩面**：`Intervention` 少两臂，只剩 Steer／Cancel／Halt 加 Release 返程（§8-4）；「中断一个活着的 Run 恒以 Handoff 收尾」的中断动词随之只剩 Steer／Cancel；§19-2 删两行。
-- **事件词同集删二**（kernel-SPEC §8-4 表）：`rollback_applied`／`takeover_started` 无生产者，账本从未写下过携它们的行，故已写历史的字节与逐字节重放不受影响；携这两个词的行今天在读侧入口拒（`E_INVALID_ARGS`，kernel `parse_line` 的既有码）。
+- **事件词同集删二**（`crates/kernel/Spec.lean` §8-4 表）：`rollback_applied`／`takeover_started` 无生产者，账本从未写下过携它们的行，故已写历史的字节与逐字节重放不受影响；携这两个词的行今天在读侧入口拒（`E_INVALID_ARGS`，kernel `parse_line` 的既有码）。
 - **两帧的拒因不再是 `not_built`**：`not_built` 只留给仍在文法里、等待执行者的动词；对这两帧，字节在解码处就不再是命令（§8-37 的 `E_WIRE_MISMATCH` 口径不变）。
 
 ### 8-45 `ConfigureBuilding` 长出第二道阈值的面
@@ -1750,7 +1750,7 @@ pub struct HarnessLine { pub name: String, pub launch: Vec<String>, pub found: b
 ```rust
 pub struct Turn {
     // …既有字段…
-    pub first_at: Option<TimeMs>,   // 开这个回合的回复记下的 first_at（kernel-SPEC §8-75）；缺席即没量到
+    pub first_at: Option<TimeMs>,   // 开这个回合的回复记下的 first_at（`crates/kernel/Spec.lean` §8-75）；缺席即没量到
     pub timing: Timing,             // `t` 是不是 model_called 自己那一刻
 }
 pub struct Call {
@@ -1766,7 +1766,7 @@ pub enum Note {
 ```
 
 - **`first_at` 照录那一行的键。** 回合里最后一条 `model_returned` 写下的 `first_at`，读不出或缺席即 `None`。首字耗时是 `first_at − t`，线上不另带一个时长：页面手里已有这两个数。
-- **`Timing` 答一个问题：两个时刻之差是不是一次测量。** `Measured`：这一行上的每个时刻都是它自己那条记录量下的那一刻（`EventRecord::moment` 答 `Some`）。`Unmeasured`：至少一个不是——账本版本 1 写下的行带的是回合时间戳，同一回合的行同值；或者答复是重启之后城补上的 `E_TOOL_OUTCOME_UNKNOWN`，它记的是城补上它的那一刻（kernel-SPEC §8-4「信封 `t` 记的是什么」）。时刻本身照旧带出，它仍给出次序；页面不从 `Unmeasured` 的行画用时。
+- **`Timing` 答一个问题：两个时刻之差是不是一次测量。** `Measured`：这一行上的每个时刻都是它自己那条记录量下的那一刻（`EventRecord::moment` 答 `Some`）。`Unmeasured`：至少一个不是——账本版本 1 写下的行带的是回合时间戳，同一回合的行同值；或者答复是重启之后城补上的 `E_TOOL_OUTCOME_UNKNOWN`，它记的是城补上它的那一刻（`crates/kernel/Spec.lean` §8-4「信封 `t` 记的是什么」）。时刻本身照旧带出，它仍给出次序；页面不从 `Unmeasured` 的行画用时。
 - **`Turn.timing` 只说 `t`**：回合在线上只有这一个时刻；`first_at` 在场即量过，缺席即没有。`Call.timing` 说 `called` 与 `answered` 两个：一次调用的两条记录由同一个构建写下时两者同为量过或同为未量，城补上的答复例外，所以一个值够用。
 - **`Checkpointed`**：fence 与 checkpoint 曾是一个概念的两个名字，checkpoint 留下（glossary）。`Note` 不进名字表，改它的标签不动 schema 哈希，所以它随本节的进位落地。
 - **进位**：本节的提交是 §12.1 意义上上一次推送之后第一个名字不变而改形的提交，`WIRE_V` 44 → 45；§8-53 至 §8-58 共用 45。
@@ -1791,7 +1791,7 @@ pub struct CommitAt { pub oid: GitOid, pub seq: Seq }
 ```rust
 pub struct Call {
     // …既有字段…
-    pub effect: Option<kernel::Effect>,        // tool_called 记下的登记（kernel-SPEC §8-75(b)）
+    pub effect: Option<kernel::Effect>,        // tool_called 记下的登记（`crates/kernel/Spec.lean` §8-75(b)）
     pub render: Option<kernel::RenderIntent>,  // 同上：Generic、Terminal 或 Diff
 }
 ```
@@ -1821,7 +1821,7 @@ Dispatch { addr, task, goal, policy: kernel::RunPolicy, idem, session, effort, m
 // 线上：{"mode":"work","write":"create","admit":"tested","landing":"experiment"}
 ```
 
-- **一个字段，四个必填的键**：`mode`（`chat｜work`）、`write`（`full｜create`）、`admit`（`standing｜tested｜contract_kept｜double_validated`）、`landing`（`ordinary｜experiment`）。值集与拼法只住 kernel（kernel-SPEC §8-77、§8-78），本 crate 再导出 `RunPolicy`、`Mode`、`WriteLimit`、`AdmissionRequirement`、`LandingPolicy` 五个名字，页面按 `wire.ts` 里生成的字面量拼。缺一个键、或一个认不出的词，帧在反序列化处即拒，不落成默认值。
+- **一个字段，四个必填的键**：`mode`（`chat｜work`）、`write`（`full｜create`）、`admit`（`standing｜tested｜contract_kept｜double_validated`）、`landing`（`ordinary｜experiment`）。值集与拼法只住 kernel（`crates/kernel/Spec.lean` §8-77、§8-78），本 crate 再导出 `RunPolicy`、`Mode`、`WriteLimit`、`AdmissionRequirement`、`LandingPolicy` 五个名字，页面按 `wire.ts` 里生成的字面量拼。缺一个键、或一个认不出的词，帧在反序列化处即拒，不落成默认值。
 - **页面怎么选**：写域选择给 `write` 的两项（普通 `full`、只读可新建 `create`）；`/admit tested|contract|double` 依次填 `tested`、`contract_kept`、`double_validated`，不说时填 `standing`；试验填 `landing: "experiment"`；计划经 `/plan` 进入固定的 SDD 工作流，帧上是 `mode: "work"`。这些控件归客户端的展开面（client-SPEC 4-41），本节只定帧。
 - **城自己派的活不经这个帧**：计划、日程、来信与编辑器经 ACP 派来的活由装配层取 `RunPolicy::of(Mode::Work)`；委派与敲门继承说话那一方的整份策略（sprawling-SPEC 8-133）。
 - **账上读得到**：装配层把收到的策略原样写进这次 run 的 `run_started.policy`，所以一次派活选了什么，回放与 playback 从账本读，不从线上猜。
@@ -1857,7 +1857,7 @@ pub struct StatedIdentity {
 - **两份文件，一个身份区。** 用户 ID、导入来源与「关于你」住 `PREFERENCES.md`，主 Agent 的名字住 `MAYOR.md`；身份区的语法、名字的合法域与「一个 session 冻下哪一版」都由 `city::Naming` 一处回答（city-SPEC §8-33），本 crate 只携字符串，不判它们合法与否（§8-0 同一条理由）。
 - **卡片只写自己那几个键，其余原样。** `PutIdentity` 把卡上的值交给城，由城在 `base` 上改写身份区：卡上的键写入或删去（`None` 即删去，回到默认称呼），身份区里别的键、`about` 为 `None` 时的正文，都按 `base` 里的字节留着。页面不拼 TOML：拼身份区的只有城一处，表单与原文编辑器读到的是同一份解析结果（§12.5）。
 - **两个写者，一道守卫。** 原文编辑器发 `PutDocument`，卡片发 `PutIdentity`，两者都携 `base`——发信方起手时那份全文——文件已经变了就拒 `E_VERSION_CONFLICT`，什么都不写；人的草稿留在页面上，页面重读之后再发。`MAYOR.md` 与 `PREFERENCES.md` 的身份区读不出时（重复的键、没有闭合的 `+++`、名字为空或带控制字符），`PutDocument` 在落盘之前拒 `E_CONFIG_INVALID`，拒因里有行号；`CLERK.md` 没有身份区，只经基线守卫。
-- **回执是账本行。** 两条命令都写一行 `governed_document_written`，`naming` 键是写完之后城的身份版本（kernel-SPEC §8-79）；页面发出之后只显示「保存中」，见到这一行才显示「已保存」，并以它判断自己读到的 `version` 是否已经过时。
+- **回执是账本行。** 两条命令都写一行 `governed_document_written`，`naming` 键是写完之后城的身份版本（`crates/kernel/Spec.lean` §8-79）；页面发出之后只显示「保存中」，见到这一行才显示「已保存」，并以它判断自己读到的 `version` 是否已经过时。
 - **读的是此刻，跑的是冻下的那一版。** `Query::Identity` 每次从盘上读，所以页面显示的总是新 session 将要冻下的名字。已经开始的 session 用它第一次 run 冻下的版本（accounting-SPEC §8-15）；那一版记在每次 run 的 `run_started.naming` 上，页面拿它经 `Query::Content { locator: cas:<naming> }` 读回当时的名字。旧账本没有这个键，页面就显示地址或语言表里的角色名，不拿今天的名字冒充当时的。
 - **读不出就说在哪一行。** 身份区读不出时答 `Unreadable`：哪一份文件、第几行（从文件第一行数起）、为什么。页面据此打开原文编辑器，而不是画一个默认名字再让下一次保存把人的正文盖掉。
 - **`WIRE_V` 不另进位**：`PutDocument` 加 `base` 是名字不变的改形，与本批其余改形共用 45（§12.1）；`PutIdentity`、`Identity` 是新名字，哈希自己会变。
@@ -1929,7 +1929,7 @@ pub struct RulesWrite { pub building: Address, pub base: String, pub body: Strin
 
 - **整份文本，一道基线。** `body` 是新的整份 `RULES.toml`，`base` 是页面起手时读到的那份（文件还不存在时为空串）。楼规有两个写者——人在页面上，以及住在楼里的市长经 `rules` 工具提案——所以与 `PutSpine` 同一条守卫：文件已经不是 `base` 就拒 `E_VERSION_CONFLICT`，什么都不写。
 - **先求值，后落盘。** 城先用读楼规的同一个求值器（`city::evaluate`）读 `body`，读不出——不合 TOML、缺 `confidential`、机密楼列了出网域名——就拒，盘上不动；求值通过才经基线守卫整份换上去（city-SPEC §8-34）。所以盘上的楼规永远是这个构建读得懂的那一份，下一次派活不会因为一次保存而打不开这栋楼。
-- **账上一行 `rules_changed`。** 写成之后城记一行 `rules_changed { scope: building, which: "RULES.toml", before, after, bytes }`，与派活前核对楼规的那一行同形（kernel-SPEC §8-4）；所以下一次派活看到的摘要与账上一致，不会把这次保存读成「有人绕过了门改了文件」。
+- **账上一行 `rules_changed`。** 写成之后城记一行 `rules_changed { scope: building, which: "RULES.toml", before, after, bytes }`，与派活前核对楼规的那一行同形（`crates/kernel/Spec.lean` §8-4）；所以下一次派活看到的摘要与账上一致，不会把这次保存读成「有人绕过了门改了文件」。
 - **载荷是一个值。** `PutRules` 与 `ConfigureCity` 各带一个结构体而不是平铺的字段，线上形状与平铺时相同（`{"put_rules":{…}}`）；理由是 `Command` 住的文件与 `From<WireCommand>` 那个函数都已经贴着长度上限，一个值占一行。
 - **只经页面，不经远程设备之前先分类。** 楼规决定一栋楼能出网、能开浏览器与桌面，远程门打开之后这条帧走哪一类由 R2 定（§19-2 的 `class` 列落地时）。
 - 验收：accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing`（过期的 `base` 被拒、求值失败被拒，两次之后文件不变、账上没有 `rules_changed`；对的 `base` 与能求值的正文落盘并记一行）。

@@ -78,7 +78,7 @@
     call(3, "read", "crates/kernel/src/gate/dedup.rs", null),
     call(4, "search", "GateOutcome", null),
     call(5, "read", "crates/kernel/src/approval.rs", null),
-    call(6, "read", "crates/kernel/kernel-SPEC.md", null),
+    call(6, "read", "crates/kernel/Spec.lean", null),
     call(7, "search", "may_answer", null),
     call(8, "edit", "crates/kernel/src/gate/door.rs", null),
     call(9, "exec", "cargo fmt --all", null),

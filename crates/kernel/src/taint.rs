@@ -134,7 +134,7 @@ impl<T> Tainted<T> {
 // No kani harness lives here. Union monotonicity is a proposition about
 // a `BTreeSet` of `String`s, which gives CBMC loops it cannot bound, and
 // a harness over two fixed labels would only restate the proptest below
-// over a narrower domain (kernel-SPEC.md section 2).
+// over a narrower domain (`crates/kernel/Spec.lean` §2).
 
 #[cfg(test)]
 #[allow(

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Fixtures for the address grammar (kernel-SPEC 8-2).
+//! Fixtures for the address grammar (`crates/kernel/spec/Address.lean` §8-2).
 
 use super::*;
 

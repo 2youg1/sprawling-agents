@@ -37,7 +37,7 @@ pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutc
 }
 
 /// Whether a write that may change a file already there is open under
-/// this run's write limit (kernel-SPEC 8-78).
+/// this run's write limit (`crates/kernel/spec/WriteDomain.lean` §8-78).
 ///
 /// Asked by every write path before it touches a file that exists, or
 /// before it starts anything that could: the edit tool's replacing arm,

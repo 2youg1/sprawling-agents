@@ -6,7 +6,7 @@
 //! What an official harness reported during a run and what it answered
 //! the city, in this city's own words.
 //!
-//! The words are the city's and not ACP's (kernel-SPEC 12.9): a spelling
+//! The words are the city's and not ACP's (kernel D9): a spelling
 //! the Ledger wrote cannot change, and ACP's words follow upstream. The
 //! assembly maps each ACP reading onto these types with an exhaustive
 //! `match`, so a report upstream adds stops the build at the mapping.
@@ -103,7 +103,7 @@ pub enum HarnessPermitKind {
 ///
 /// Written when the stop reason arrives, before the run freezes, for
 /// every stop reason. An `end_turn` answer with text is evidence of
-/// `Completion::Done` (kernel-SPEC 8-20).
+/// `Completion::Done` (`crates/kernel/spec/Completion.lean` §8-20).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HarnessAnswered {

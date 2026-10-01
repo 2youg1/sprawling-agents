@@ -21,6 +21,61 @@ Ledger 的每一行都带一个 `prev`：它上一行的摘要。决定这个值
 **为什么这不会成为第二个权威。** 它不重述产品的任何规则：没有代码查询下面的谓词，里面不出现任何摘要值，它的载体都是树里已有的，按磁盘上的样子读——文件的行作为文本，以及每条记录携带的 `prev`，按读者解析出来的次序。需要判定时，检验器 `tools/adversary/src/Sprawling/Door.lean` 从门外问产品（`Door.verify` 跑产品自己的离线校验），而不问本模块；检验器也不 import 本模块。每条陈述都写明它对应的 Rust 代码行。
 -/
 
+/-!
+### 8-9 kernel::ledger（缝清单文件，全库五真缝之一）
+
+```rust
+/// The only write entrance to history (ARCHITECTURE §1-2). Implementations
+/// own seq/prev assignment and byte production; callers never serialize.
+/// Contract: Ok(ref) ⇒ the record is durable in that adapter's medium and
+/// `ref` points at it; Err ⇒ nothing observable was appended (torn bytes
+/// are the reopen path's business, not the caller's).
+pub trait Ledger {
+    fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError>;
+}
+
+pub const GENESIS_PREV: B3Hash;                       // 32 个零字节（hex64 全 0）
+/// Chain rule: prev of line k+1 = blake3(raw bytes of
+/// line k, excluding the line terminator). One hash function, one home.
+pub fn chain_hash(raw_line: &[u8]) -> B3Hash;
+
+#[cfg(feature = "conformance")]
+pub mod conformance {
+    /// Read-back surface for verification only; production callers never read
+    /// through the Ledger handle (projections do). Lives behind the feature
+    /// so the production port stays write-only.
+    pub trait LedgerInspect { fn raw_lines(&self) -> Result<Vec<Vec<u8>>, AxError>; }
+    /// One assertion suite for every implementation (V3). `fresh` must yield
+    /// an empty ledger each call.
+    pub fn assert_ledger_conformance<L: Ledger + LedgerInspect>(fresh: impl FnMut() -> L);
+}
+```
+
+conformance 六断言（对任意实现同一套）：
+1. 首条 append 得 `Seq::FIRST`，记录 prev＝`GENESIS_PREV`；
+2. seq 连续无洞（逐条 +1）；
+3. 链续：第 k 行 prev＝`chain_hash(第 k-1 行原始字节)`；
+4. 写方规范：每行 `parse_line` 后 `canonical_line` 与原始字节逐字节相等；
+5. `v` 恒＝`EVENT_LOG_V`，`ref.kind`＝draft.kind；
+6. 确定性：同一 draft 序列灌两个 fresh 实例，raw_lines 逐字节相同。
+-/
+
+/-!
+### 8-51 `Ledger` 端口的第二个方法：一波一屏障
+
+```rust
+pub trait Ledger {
+    fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError>;
+    fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError>;  // 默认逐条 append
+}
+```
+
+- **为什么端口要长这一只手**：一次持久写的代价是一道磁盘屏障，而屏障的价钱与骑在它上面的记录条数无关，真正的写只占其中一小部分。手上已经攥着一波的调用方按条交付，就为每一条付一道屏障。`storage::JsonlLedger` 覆写它为一波一屏障，`accounting::worker::relay` 按波调它。
+- **默认实现是诚实的**：逐条 `append`，任何没有批量能力的存储照此就是正确的，不必为了满足端口去假装合并。
+- **契约逐元素成立**：答 `Ok` 即整波已落盘，refs 按给入顺序回来。第一条拒绝结束整波，其前的记录可能已经落盘——这与单条 `append` 在它后面那条失败时给出的承诺完全一样。
+- **否决「显式屏障动作」**：让 `append` 只写不同步、另给一个 flush 动作，会让一条已经发出的 `EventRef` 指向一条可能还不存在的历史，而那正是这个类型存在的全部意义。
+-/
+
 namespace Kernel.Ledger
 
 /-- 一本账本欠下的 `prev`，从最早的起：第一行欠创世摘要，此后每一行欠它上一行的摘要。

@@ -1,0 +1,69 @@
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- Copyright (c) 2026 2youg1 and the sprawling contributors
+
+/-!
+# kernel::config
+
+规定 `kernel::config`（`crates/kernel/src/config.rs`）：分层配置与 Run 起点冻结的那一份。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+-/
+
+/-!
+### 8-22 kernel::config
+
+```rust
+pub enum ClockStampGranularity { Off, Minute, FiveMinute, Hour }   // 类型住 kernel 非 runtime
+pub struct LayeredValue<T> { pub city: Option<T>, pub building: Option<T>, pub resident: Option<T> }
+impl<T> LayeredValue<T> { pub fn resolve(&self) -> Option<&T>; }  // resident→building→city 下层覆盖上层
+
+pub struct FrozenConfig {                                            // Run 起点冻结；字段逐条说明见下
+    pub clock_stamp: ClockStampGranularity, pub clock_zones: Vec<ClockZone>,
+    pub sandbox: SandboxLimits, pub mcp: Vec<McpServer>,
+    pub effort: Option<Effort>, pub second_threshold: Option<SecondThreshold>,
+}
+pub struct LiveConfig {}                                             // 热载面；今天没有字段
+pub fn freeze(clock_stamp: &LayeredValue<ClockStampGranularity>, clock_zones: &LayeredValue<Vec<ClockZone>>,
+              effort: &LayeredValue<Effort>, sandbox: &LayeredValue<SandboxLimits>,
+              mcp: &LayeredValue<Vec<McpServer>>, second_threshold: &LayeredValue<SecondThreshold>) -> FrozenConfig;
+```
+
+- **无字段交集可机械判**：单测将两型缺省值 serde 成 JSON，断言键集交集为空；新增字段自动入判。
+- `CLOCK_STAMP_DEFAULT: ClockStampGranularity = Minute` 落 consts_policy：没有一级写 `[clock] stamp` 的城，`Timestamped` 结果每条带戳，`Timeless` 结果每分钟至多一条（runtime D8）。
+
+**时钟分区（config）**：`ClockZone { id, offset_min }`（已解析偏移，恒不记时区名——重解会随时区库版本分叉重放历史）；`FrozenConfig.clock_zones` 由 `freeze` 的同名梯解析；zones 梯整表覆盖（下层写即替换上层全表）。本段属 kernel::config（§8-22），就近登记于此避免拆章。
+
+**思考强度（config）**：`FrozenConfig.effort: Option<Effort>`（类型住 §8-24），缺省 `None`＝不写该字段、由 provider 自行决定。
+
+**沙箱限额（config）**：`SandboxLimits { shell: bool, fuel: u64, mounts: Vec<Address>, env_passthrough: Vec<EnvVarName>, trusted: Vec<ServerLabel> }`，即 `FrozenConfig.sandbox`。三条口径：①**整值解析而非逐字段合并**——一层说到 sandbox 就说全部，于是欠说的层只会收窄而恒不会悄悄放开上层没提过的能力；②**主机事实不入城**（CPython 工件路径、shell 可执行文件位置走环境变量）——一座城被搬到另一台机器时不该带着运行中的机器的路径；③冻结的理由与工具表相同：**能改变可达范围的东西恒不在回合中变宽**，否则变宽的那一刻没有人审过。缺省 `fuel = SANDBOX_FUEL_DEFAULT`（`consts_policy`，2×10⁸），`shell = false`——shell 是唯一一条从参数读不出可达范围的臂。
+
+**外部 MCP server（config）**：`McpServer { label: ServerLabel, transport: McpTransport }`，`McpTransport { Stdio { command, args, env }, Http { url, headers }, Sse { url, headers } }`——**穷尽枚举而非两个裸字段**：一行既写 command 又写 url 就是一行要读者去猜的配置，故配置层当场拒（`ServerLabel` 住 §8-23）。**枚举是闭的**（无 `#[non_exhaustive]`）：读者全在这一个二进制里，通配臂只会把下一种 transport 从必须表态的模块面前藏起来。`env` 与 `headers` 皆为名在前、值在后的成对表，值可以是 `secret:realm/name` 引用——交给子进程的名字收不回来，故兑付发生在起进程／发请求的那一格，而恒不写进配置文件。`Sse` 自成一支而不是 `Http` 的一个开关：两者开法与败法都不同。`FrozenConfig.mcp: Vec<McpServer>` 缺省空表＝这栋楼不接任何外部 server。三条口径：①**整表覆盖**，与 zones／sandbox 同一条理由——一层说到 `[[mcp]]` 就说全部，欠说的层只会收窄而恒不会悄悄接上上层没提过的服务；②**冻结的理由就是工具表本身**——外部工具在 Run 起点入 catalog，而 provider 把工具数组哈希在 system prompt 之前，Run 内变宽的工具表既自毁缓存又没有人审过；③**命令与参数是主机事实**（一个可执行文件在运行中的机器上的位置），故它们住 `CONFIG.toml` 而恒不入 Ledger 载荷——一座城被搬到另一台机器时不该带着运行中的机器的路径。
+
+**信任的连接器（config）**：`SandboxLimits.trusted: Vec<ServerLabel>`，缺省空表；`SandboxLimits::trusts(&ServerLabel)` 是这张表的唯一读者。它回答 `gate::undoable` 的问题——这楼层准哪个连接器伸到运行中的运行这座城的机器上。口径与 `mounts` 同形：整值上梯、Run 起点冻结、在解析点拒。缺省空表的意思是「这楼层不准任何连接器碰运行这座城的机器」，而一条写在 `CONFIG.toml` 里的信任是人在看得见整张表时做的决定，比在模型等着时做的决定更值得信。
+
+**环境变量透传（config）**：`SandboxLimits.env_passthrough: Vec<EnvVarName>`，缺省空表；`EnvVarName` 是本模块的值类型（形状 2），唯一构造点 `EnvVarName::parse`。
+
+- **为什么需要它**：只留 PATH 的环境里，rustc 的 MSVC 链接器找不到 `vswhere.exe` 所在的那组环境变量，于是退回 PATH 上第一个 `link.exe`（Git 附带的 coreutils 那个），链接失败；resident 在城里跑 `cargo build` 需要楼把这几个名字透传进去。
+- **解法不是加长 `ENV_ALLOWLIST`**：那份常量旁边的注释正是为阻止这件事而写的——**子进程继承到的东西，它忘不掉**。加长它会让每一栋楼、每一次 `exec` 都多继承一份没人审过的东西。改成由**楼自己逐名声明**：说得出名字的那几个才进得去。
+- **口径与 `mounts` 逐条同形**：整值上梯（一层说到 `[sandbox]` 就说全部）、同一条冻结理由（可达范围恒不在 Run 内变宽）、同一个「在解析点拒」的位置。`mounts` 拒保留区，`env_passthrough` 拒凭据形状的名字。
+- **`EnvVarName::parse` 拒四类**：空名；含 `=`（那是赋值号，不是名字的一部分）；含 NUL 或控制字符；以及 `secret::names_a_credential` 判为凭据形状的名字（`consts_policy::CREDENTIAL_NAME_MARKERS`，子串命中即判，大小写不敏感）。**拒在解析点而不在使用点**：一个名字一旦递给子进程就收不回来，所以判定必须发生在配置被读进来的那一刻。
+- **凭据形状的名字为何由 `kernel::secret` 判**：这座城已经有一处「什么东西看起来像凭据」的权威，名字这一面长在同一处而不是第二处。依据是标记词子串（`SECRET`／`TOKEN`／`KEY`／`PASSWORD`／`PASSWD`／`CREDENTIAL`／`AUTH`／`SESSION`／`COOKIE`／`PRIVATE`／`SIGNATURE`），**故意宁滥勿缺**：`KEYBOARD` 一并被拒是可接受的代价，因为拒绝带着三段式的替代路径，而漏掉一个 `AWS_SECRET_ACCESS_KEY` 不带任何提示。
+
+**上下文提醒的第二道阈值（config）**：`SecondThreshold`（形状 2 值）回答「上下文提醒第二道阈值响在窗口的哪一格」，是整数百分比，唯一构造点 `SecondThreshold::parse`，合法域 30–90（含端点，三个端点数落 `consts_policy`）。域外的值在解析点拒（`E_INVALID_ARGS`，动作/主体/码/恢复语四段由类型给出，恢复语带合法域），**不钳位**——一个写下 25 的人必须被告知这不被接受，而不是被悄悄改成 30。`FrozenConfig.second_threshold: Option<SecondThreshold>`，缺省 `None`＝没有一层说话，读它的地方（`runtime::reminder`）取 `CTX_REMINDER_SECOND_DEFAULT`。口径与 `trusted`／`mounts` 同形：整值上梯、Run 起点冻结、解析点拒。**冻结的理由是提醒自己的记账**：第二道阈值决定一个 run 何时被告知该写 handoff，而「每道阈值一跑恰响一次」不能取决于有人在哪一刻改了文件。文件与线上的边界同样只过这一个构造点：`TryFrom<u64>`（serde 的 `try_from`）直接委派 `parse`，`From<SecondThreshold> for u64` 只取内层那一个数——域的判定在整棵库里因此只有一处。
+
+- **为何必须冻结**：provider 官方文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」——强度是缓存前缀的一部分。Run 内可变的强度＝Run 内自毁的缓存，故它落 `FrozenConfig` 而非 `LiveConfig`；设置面改它对**下一个 Run** 生效。
+- `None` 与 `Some(Effort::Off)` 是两件事：前者不写字段（provider 缺省，Anthropic 新模型即 adaptive thinking），后者显式关闭思考。不用 `Effort::Off` 兼任「未声明」，否则「没设过」与「设成关」在类型上不可分辨。
+-/
+
+/-! D7 定规：上下文提醒第二道阈值的缺省与合法域只有一个家，可选覆盖走既有配置梯子
+
+这一条是人定的。
+
+**决定**：第二道阈值缺省 65% 与合法域 30–90（含端点）的唯一家是 `consts_policy`（`CTX_REMINDER_SECOND_DEFAULT`／`CTX_REMINDER_SECOND_MIN`／`CTX_REMINDER_SECOND_MAX`）；可选覆盖走 `config_layers` 既有三层梯子（`LayeredValue` 整值上梯、Run 起点冻结、解析点拒），域外在解析点拒、拒因带合法域、不钳位。25% 第一道阈值不在此列，值与行为不动。
+
+**理由**：写 handoff 的紧急度因工作方式而异，阈值应由人定。域的下限来自噪声——早于 30% 的提醒每次 run 都来。域的上限来自算术——阈值越晚，「剩余预算仍够写 handoff 并 `succeed`」这句提醒越可能说不出口；让这句话从算术派生是收窄它的正解，在那之前 90 是宽容的上端。
+
+**被否**：①第四种配置机制（浏览器偏好存储）——同一个值两个家，浏览器副本会越过文件成为第二个权威（client-SPEC 4-28 同一条理）；②域外钳位——钳位把一个写错的值变成一个没人被告知的决定。
+
+**重开参数**：出现「提醒到得太晚、handoff 写不下」的实际数据时，重开的是上限 90，不是本定规。
+-/

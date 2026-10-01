@@ -17,7 +17,7 @@
 pub struct RunPlan { /* …既有字段… */ pub naming: Option<B3Hash> }
 ```
 
-- **照录，不读。** 身份由 accounting 在冻结前缀时按 session 取定（accounting-SPEC §8-15、city-SPEC §8-33），名字已经在 city 段与 resident 段的字节里；本 crate 只把那一版的摘要从 `RunPlan.naming` 抄进 `run_started.naming`（kernel-SPEC §8-79），由 `Charter::open` 与运行策略同一处写。`None` 是这座城的这次 run 没有冻任何身份（测试替身、早于身份入账的构造方）。
+- **照录，不读。** 身份由 accounting 在冻结前缀时按 session 取定（accounting-SPEC §8-15、city-SPEC §8-33），名字已经在 city 段与 resident 段的字节里；本 crate 只把那一版的摘要从 `RunPlan.naming` 抄进 `run_started.naming`（`crates/kernel/Spec.lean` §8-79），由 `Charter::open` 与运行策略同一处写。`None` 是这座城的这次 run 没有冻任何身份（测试替身、早于身份入账的构造方）。
 - 被否：让 runtime 读两份治理文档自己算摘要——run 开始的那一刻读到的未必是前缀冻下的那一版，账上的摘要会与请求里的名字不符。
 -/
 
@@ -77,7 +77,7 @@ pub fn drive(plan: RunPlan, ledger: &mut dyn Ledger, model: &mut dyn Model,
 
 - **为什么要这个模块**：「Dispatch → N 回合 → 冻结」的事件序只有这一处。citysim 与真城各写一遍就是两个权威，而两者一旦漂开，**仿真继续绿而真城错**——仿真的全部价值恰好建立在它跑的是同一份代码上。故 citysim 是本模块的调用方，每个剧本直接验证生产回路。
 - **`run_started.parent`**：只在派生开的 Run 上出现。「两行相邻」不是一个可查询的事实；写进载荷之后，前端折得出树，离线重放也折得出同一棵树。
-- **时间纪律**：时钟只经 `RunHooks::now` 进来，只由驱动在自己的线程上、在串行阶段调用；工具面（`ConcurrentInvoke` 的实现、装配层的 bench、citysim 的闭包）恒不采样，只收读数，`admit` 收的仍是回合时间戳。采样点：dispatch 两次（checkpoint、run_started）；每回合开头一次，得回合时间戳；每次模型尝试发出之前一次（`model_called`），回复到齐之后一次（`model_returned`）；每条工具调用放行之后、工具起跑之前一次（`tool_called`），它的答复交给工具面的 `account` 之前一次（`tool_result`），所以工具面打戳时读到的最新读数就是答复时刻；provider 失败而冻结时一次；结束时 freeze 一次，handoff 用它、run_frozen 用它＋1；取消时 freeze 沿用被打断那个回合的时间戳，因为这次冻结属于那个回合。回合里其余的行（`prompt_assembled`、`prompt_shape_compared`、`steer_received`、`cancel_received`、波前的 `checkpoint_committed`）带回合时间戳。哪几种行记自己的时刻，只由 `turn::ledger` 的 `Authored`／`Carried` 变体定一次：那四个变体不带读数就造不出来。计数器闭包（citysim）下采样的次数与次序是剧本的函数，所以字节照样可重放。这四种行的 `t` 怎么读，以 kernel-SPEC §8-4「信封 `t` 记的是什么」为准。
+- **时间纪律**：时钟只经 `RunHooks::now` 进来，只由驱动在自己的线程上、在串行阶段调用；工具面（`ConcurrentInvoke` 的实现、装配层的 bench、citysim 的闭包）恒不采样，只收读数，`admit` 收的仍是回合时间戳。采样点：dispatch 两次（checkpoint、run_started）；每回合开头一次，得回合时间戳；每次模型尝试发出之前一次（`model_called`），回复到齐之后一次（`model_returned`）；每条工具调用放行之后、工具起跑之前一次（`tool_called`），它的答复交给工具面的 `account` 之前一次（`tool_result`），所以工具面打戳时读到的最新读数就是答复时刻；provider 失败而冻结时一次；结束时 freeze 一次，handoff 用它、run_frozen 用它＋1；取消时 freeze 沿用被打断那个回合的时间戳，因为这次冻结属于那个回合。回合里其余的行（`prompt_assembled`、`prompt_shape_compared`、`steer_received`、`cancel_received`、波前的 `checkpoint_committed`）带回合时间戳。哪几种行记自己的时刻，只由 `turn::ledger` 的 `Authored`／`Carried` 变体定一次：那四个变体不带读数就造不出来。计数器闭包（citysim）下采样的次数与次序是剧本的函数，所以字节照样可重放。这四种行的 `t` 怎么读，以 `crates/kernel/Spec.lean` §8-4「信封 `t` 记的是什么」为准。
 - **开头只读段的时刻**：各条在放行之后逐条采开始；全部 join 之后按调用序逐条入账，入账前、工具面的 `account` 之前采答复，所以一条的答复时刻是「这一波在调用序上轮到它入账的时刻」，不早于它真正答完，不晚于最慢那条答完。生成中提前起跑的读，开始时刻记成它被放行的那一刻：这两行量的是这一波为它花了多久。重开参数：出现声明 `Effect::Read` 而常超过 1 s 的工具时，改在工作线程上采样，那要一个 `Sync` 的时钟。
 - **结束判定**：`calls_made == 0` 且这一答**说了话**，即 `Completion::Done(Evidence[model_returned])`；`calls_made == 0` 而内容为空、或 `stop == MaxTokens`，即 `Completion::Limit`（§8-37）；任一安全点命中 Cancel 即 `Completion::Cancelled`。三条均经 `freeze` 出口，故 **handoff_written＋run_frozen 是唯一出口**，无第二条退路。第四点 `BeforeSpawn` 与前三点同权：命中即 `Cancelled`，那个回合的 assistant 与 tool results **不入窗**，因为窗口前推是「回合成立」的后果而不是它的一部分。
 - **第四种结束：回合中途的失败。** **两种 carrier 都经 `freeze` 出口，差别只在冻结之前写不写载体事件**：带 `Carrier::Event` 的码先写载体事件，`Carrier::Loadtime` 的码直接冻结。理由：「账本自身就是受害者时，没有什么真实的东西可写」对 `CasCorrupt`／`StorageFatal`／`LogVersionUnsupported` 成立，对 `WireMismatch` 不成立——供应方把兑换格式写错与账本健否无关；而对前三个码，写不进去的后果就是 `freeze` 的 append 自己失败并把那个失败向上抛，这比预先判定「写不进去」更诚实。一次没有冻结的 run 在账本上只剩 `run_started`，重启后仍报 `frozen: false`，页面就把每条消息都当 `steer` 发。冻结后**原错误仍然向上抛**：账本得到判决，调用方得到诊断，两件事不互相替代。否决「把 `WireMismatch` 重分类为 `Carrier::Event(ProviderDegraded)`」：该码在握手期也用于 wire 版本不匹配（那时连 run 都不存在），一个码两种含义去改分类表，会让 `kernel::event::kind` 那条「loadtime 白名单封死在五个」的测试变成对一件无关的事作证。
@@ -185,7 +185,7 @@ impl<'a> HarnessRun<'a> {
   空回答冻成 `Limit`，与 `lifecycle::concluded` 对空模型回复的判法相同。撞上墙钟上限的 run 是撞上了什么而停，所以是 `Limit`；人或停摆取消的才是 `Cancelled`（`a_deadline_never_freezes_cancelled`）。截断之后 harness 仍答出 `end_turn` 并说了话，活已做完，照 `Done` 记：账本上 `cancel_received` 在前、`harness_answered` 在后，两件事都在。
 - **时间**：`open` 与 `Run::dispatch` 一样采两次 `now`（JobPinned 一次、`run_started` 一次）；其余每一行的 `t` 由调用方给，调用方在自己的线程上读同一只钟。收尾两行用给的 `t` 与 `t + 1`，`t` 已到 `u64` 顶时答 `E_INVALID_ARGS`，与 `Run::freeze` 同一句。
 - **每一行的 `who` 与 `addr`**：`who` 恒为 `Charter::who`（房间的居民）；开篇、汇报、取消、检查点与回答带 `Charter::addr`；收尾两行不带地址，与 `Run::freeze` 相同。
-- **载荷**：`report` 写 kernel 的 `HarnessReported`，`conclude` 写 `HarnessAnswered`（kernel-SPEC §8-4，两者都是 record-only）；`cancel_received` 的载荷是空对象，与回合里的那一条相同，截断的缘由不进账本（kernel 事件表不为它加键），由冻结的 `Limit` 与 `Cancelled` 分开。检查点的载荷由调用方从 `storage::Checkpoint::wave_pre` 取来，本 crate 不开仓库，理由与 `RunHooks::checkpoint` 相同。
+- **载荷**：`report` 写 kernel 的 `HarnessReported`，`conclude` 写 `HarnessAnswered`（`crates/kernel/Spec.lean` §8-4，两者都是 record-only）；`cancel_received` 的载荷是空对象，与回合里的那一条相同，截断的缘由不进账本（kernel 事件表不为它加键），由冻结的 `Limit` 与 `Cancelled` 分开。检查点的载荷由调用方从 `storage::Checkpoint::wave_pre` 取来，本 crate 不开仓库，理由与 `RunHooks::checkpoint` 相同。
 - **失败**：任何一行写不进账本，原错误向上抛，run 停在它写到的那一行；这与 `Run::freeze` 自己的 append 失败时相同：账本自身就是受害者时没有真实的东西可写。
 -/
 

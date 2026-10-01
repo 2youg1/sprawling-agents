@@ -4,12 +4,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Hex-run detection: a pure-hex run is reported only when it is the
-//! value of a credential name (kernel-SPEC §8-25).
+//! value of a credential name (`crates/kernel/spec/Secret.lean` §8-25).
 
 use super::scan::{entropy_millibits_per_char, names_a_credential};
 
 /// Shortest hex run reported: 32 hex chars carry 128 bits, the smallest
-/// key size in common use. Moves with kernel-SPEC §14 only.
+/// key size in common use. Moves with `crates/kernel/Spec.lean` §14 only.
 pub(crate) const HEX_SPAN_MIN_BYTES: usize = 32;
 
 /// Per-char entropy floor for a hex run, in millibits. Every random

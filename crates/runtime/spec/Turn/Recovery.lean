@@ -70,7 +70,7 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 pub(super) struct Settled {
     pub(super) returned: ModelReturn,
     pub(super) speculated: Speculated,
-    pub(super) first_at: Option<TimeMs>,   // 落账的那一次尝试的首个内容；写进 model_returned（kernel-SPEC §8-75）
+    pub(super) first_at: Option<TimeMs>,   // 落账的那一次尝试的首个内容；写进 model_returned（`crates/kernel/Spec.lean` §8-75）
 }
 ```
 

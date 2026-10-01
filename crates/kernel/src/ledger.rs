@@ -161,7 +161,7 @@ pub mod conformance {
         lines
     }
 
-    /// The suite (kernel-SPEC 8-9, six assertions). `fresh` must yield an
+    /// The suite (`crates/kernel/spec/Ledger.lean` §8-9, six assertions). `fresh` must yield an
     /// empty ledger each call.
     pub fn assert_ledger_conformance<L, F>(mut fresh: F)
     where

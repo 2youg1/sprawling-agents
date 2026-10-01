@@ -38,7 +38,7 @@ mod tests {
     use crate::config_layers::ConfigLayer;
 
     /// The refusal is the only sentence a person editing this file
-    /// gets, so it carries the legal domain (kernel-SPEC 8-22). No
+    /// gets, so it carries the legal domain (`crates/kernel/Spec.lean` §8-22). No
     /// clamping: a file that states 25 means something its writer has
     /// to be told is not accepted.
     #[test]
