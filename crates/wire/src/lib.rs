@@ -40,6 +40,7 @@ pub use answer::RunSummary;
 pub use answer::Used;
 pub use answer::{Answer, ApprovalsAnswer, ArchiveLine, BlockedLine, BuildingProgress};
 pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
+pub use answer::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
 pub use answer::{BuildingAnswer, BuildingDoc};
 pub use answer::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn};
 pub use answer::{ChangesAnswer, CommitAnswer, CommitAt, CommitsAnswer, HISTORY_MAX};

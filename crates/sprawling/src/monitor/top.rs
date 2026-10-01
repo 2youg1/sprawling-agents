@@ -82,7 +82,7 @@ enum Unit {
 }
 
 /// The counters in [`Sample`] field order.
-const ROWS: [Row; 13] = [
+const ROWS: [Row; 15] = [
     Row {
         label: "core cpu",
         read: |s| s.core_cpu_permille,
@@ -147,6 +147,16 @@ const ROWS: [Row; 13] = [
         label: "queued runs",
         read: |s| s.queued_runs,
         unit: Unit::Count,
+    },
+    Row {
+        label: "view backlog",
+        read: |s| s.view_backlog,
+        unit: Unit::Count,
+    },
+    Row {
+        label: "monitor read",
+        read: |s| s.read_nanos,
+        unit: Unit::Nanos,
     },
 ];
 

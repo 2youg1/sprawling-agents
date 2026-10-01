@@ -60,6 +60,14 @@ impl Views {
     pub fn find_programs_through(&mut self, find: fn(&str) -> Option<std::path::PathBuf>) {
         self.programs = Some(find);
     }
+
+    /// Takes the halt the served city's writer is held by until the proof
+    /// of its history has a verdict, so the city page says whether the
+    /// history is proved from the same verdict the writer obeys
+    /// (sprawling-SPEC.md 8-134).
+    pub fn watch_proof(&mut self, halt: storage::ChainHalt) {
+        self.proof = Some(halt);
+    }
 }
 
 #[cfg(test)]

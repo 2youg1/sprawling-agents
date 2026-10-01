@@ -108,13 +108,8 @@ pub struct Views {
     )]
     /// seq to byte offset, held rather than rebuilt, and carried by the
     /// views snapshot so a start from it does not rebuild it either
-    /// (storage-SPEC 8-4).
-    ///
-    /// Rebuilding it read the whole side cache and allocated a `String`
-    /// per line, and that was charged to every history question a page
-    /// asked - 14.4 ms of it on a fifty thousand record ledger. Held, the
-    /// same question costs one directory listing and the bytes that are
-    /// actually new.
+    /// (storage-SPEC 8-4): rebuilt, it cost every history question 14.4
+    /// ms on a fifty thousand record ledger.
     ///
     /// Behind a lock of its own because the fold never touches it: a
     /// query carries the `Arc` out of its snapshot of the views and
@@ -183,6 +178,11 @@ pub struct Views {
     /// page then answers `Unavailable` rather than reading this machine.
     #[serde(skip)]
     pub(super) programs: Option<fn(&str) -> Option<std::path::PathBuf>>,
+    /// The halt a served city's writer refuses lines by until the proof
+    /// of its history has a verdict (wire-SPEC.md 8-63); `None` for views
+    /// that started from a history proved before they folded it.
+    #[serde(skip)]
+    pub(super) proof: Option<storage::ChainHalt>,
 }
 
 impl Views {
@@ -237,6 +237,7 @@ impl Views {
             registry: None,
             upstream: None,
             programs: None,
+            proof: None,
         }
     }
 

@@ -7,7 +7,7 @@
 //! reading to the watching sessions (sprawling-SPEC.md 8-96).
 
 use std::sync::{Mutex, PoisonError, Weak};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use kernel::{AxCode, AxError};
 use tokio::sync::broadcast;
@@ -18,6 +18,36 @@ use accounting::worker::health::Health;
 
 const BEAT: Duration = Duration::from_secs(1);
 
+/// What a beat adds to the counters it read: the accounting queue's two
+/// counts (sprawling-SPEC.md 8-98), the view fold's backlog (8-123), and
+/// how long the beat before this one took to read (8-129-6).
+pub(crate) struct Gauges<B> {
+    health: Health,
+    backlog: B,
+    /// The sampler's own monotonic clock; a script in a test.
+    clock: fn() -> Instant,
+    last_read: Duration,
+}
+
+impl<B: Fn() -> u64> Gauges<B> {
+    pub(crate) fn new(health: Health, backlog: B, clock: fn() -> Instant) -> Self {
+        Gauges {
+            health,
+            backlog,
+            clock,
+            last_read: Duration::ZERO,
+        }
+    }
+
+    /// Reads through `read`, timed by the sampler's own clock, and fills
+    /// in what the counters cannot know. The read's own time is reported
+    /// on the next beat, because this beat's sample is written before the
+    /// read is over.
+    pub(crate) fn sample(&mut self, read: impl FnOnce() -> Sample) -> Sample {
+        self.health.read(read())
+    }
+}
+
 /// Starts the `sprawling-monitor` thread. It ends at the first beat
 /// after the monitor it was handed has been dropped.
 ///
@@ -27,11 +57,11 @@ pub(crate) fn spawn_sampler(
     monitor: Weak<Mutex<Monitor>>,
     samples: broadcast::Sender<Sample>,
     volume: std::path::PathBuf,
-    health: Health,
+    mut gauges: Gauges<impl Fn() -> u64 + Send + 'static>,
 ) -> Result<(), AxError> {
     std::thread::Builder::new()
         .name("sprawling-monitor".to_owned())
-        .spawn(move || sample_until_dropped(&monitor, &samples, volume, &health))
+        .spawn(move || sample_until_dropped(&monitor, &samples, volume, &mut gauges))
         .map(drop)
         .map_err(|source| {
             AxError::failure(
@@ -47,7 +77,7 @@ fn sample_until_dropped(
     monitor: &Weak<Mutex<Monitor>>,
     samples: &broadcast::Sender<Sample>,
     volume: std::path::PathBuf,
-    health: &Health,
+    gauges: &mut Gauges<impl Fn() -> u64>,
 ) {
     let mut counters: Option<Counters> = None;
     loop {
@@ -56,11 +86,11 @@ fn sample_until_dropped(
             return;
         };
         beat(&monitor, samples, |watched| {
-            health.read(
+            gauges.sample(|| {
                 counters
                     .get_or_insert_with(|| Counters::open(volume.clone()))
-                    .read(watched, BEAT),
-            )
+                    .read(watched, BEAT)
+            })
         });
         if !lock(&monitor).is_watched() {
             counters = None;

@@ -139,11 +139,21 @@ pub enum ModelTag {
     /// question, and the credential would need a second way into the
     /// vault.
     Transcribe,
+    /// The model that reads text out of a picture: one a person
+    /// registered as able to read images. The city's OCR tool asks for
+    /// it, and with none chosen that tool says so rather than handing a
+    /// picture to a model that only reads text (kernel-SPEC.md 8-80).
+    Ocr,
 }
 
 impl ModelTag {
     /// Every tag, in the order a settings page should offer them.
-    pub const ALL: [ModelTag; 3] = [ModelTag::Main, ModelTag::Digest, ModelTag::Transcribe];
+    pub const ALL: [ModelTag; 4] = [
+        ModelTag::Main,
+        ModelTag::Digest,
+        ModelTag::Transcribe,
+        ModelTag::Ocr,
+    ];
 
     #[must_use]
     pub fn as_str(&self) -> &'static str {
@@ -151,6 +161,7 @@ impl ModelTag {
             ModelTag::Main => "main",
             ModelTag::Digest => "digest",
             ModelTag::Transcribe => "transcribe",
+            ModelTag::Ocr => "ocr",
         }
     }
 }

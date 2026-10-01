@@ -157,6 +157,7 @@ impl Views {
             registry: self.registry,
             upstream: self.upstream,
             programs: self.programs,
+            proof: self.proof.clone(),
             ..copy
         })
     }

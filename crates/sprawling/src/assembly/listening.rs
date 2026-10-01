@@ -21,11 +21,11 @@ use std::sync::Arc;
 use kernel::{AxCode, AxError};
 
 use super::attending::{Opening, Outward, Started, spawn_worker};
+use crate::monitor::sampler::Gauges;
 use crate::serving::Serving;
 use crate::serving::output_ring::OutputRing;
 use crate::serving::standing::monotonic_now;
 use accounting::views::{Published, answer_outside_the_lock};
-use accounting::worker::health::Health;
 use accounting::worker::opening_cost::{OpeningCost, Phase};
 use accounting::worker::{Closing, CommandDesk, acp_dispatch, start_served_views};
 
@@ -165,6 +165,11 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     rebuilt.ask_the_registry_through(crate::release::answer);
     rebuilt.ask_upstream_through(crate::doctor::newest);
     rebuilt.find_programs_through(crate::doctor::host::find_program);
+    // One verdict, made here so the views and the writer read the same
+    // one: the writer refuses lines by it, the city page says whether the
+    // history is proved by it (sprawling-SPEC.md 8-134).
+    let halt = storage::ChainHalt::awaiting_proof();
+    rebuilt.watch_proof(halt.clone());
     let spare = rebuilt.twin()?;
     cost.lap(Phase::Twin);
     // This machine is not asked here (sprawling-SPEC.md 8-54): the
@@ -202,6 +207,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         thread: worker_thread,
         vault: city_vault,
         health,
+        backlog,
     } = spawn_worker(
         Opening {
             city_root: city_root.to_path_buf(),
@@ -212,6 +218,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             log,
             held,
             core,
+            halt,
         },
         Outward {
             desk: Arc::clone(&desk),
@@ -248,7 +255,14 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         logs,
         outputs,
         outputs_so_far: Arc::new(move || kept_reader.so_far()),
-        monitor: watched(city_root, health)?,
+        monitor: watched(
+            city_root,
+            Gauges::new(
+                health,
+                move || backlog.records(),
+                crate::serving::standing::monotonic_now,
+            ),
+        )?,
         city: city_name,
         head,
         epoch,
@@ -361,14 +375,17 @@ fn beside(
 ///
 /// # Errors
 /// `StorageFatal` when the sampler's thread cannot be started.
-fn watched(city_root: &std::path::Path, health: Health) -> Result<wire::MonitorFeed, AxError> {
+fn watched(
+    city_root: &std::path::Path,
+    gauges: Gauges<impl Fn() -> u64 + Send + 'static>,
+) -> Result<wire::MonitorFeed, AxError> {
     let monitor = Arc::new(std::sync::Mutex::new(crate::monitor::Monitor::new()));
     let samples = tokio::sync::broadcast::channel(1).0;
     crate::monitor::sampler::spawn_sampler(
         Arc::downgrade(&monitor),
         samples.clone(),
         city_root.to_path_buf(),
-        health,
+        gauges,
     )?;
     Ok(wire::MonitorFeed {
         watch: Arc::new(move |watched| -> Box<dyn Send> {

@@ -29,15 +29,16 @@ pub struct ChainUnderAudit {
 }
 
 impl RunWorker {
-    /// Attaches a halt that awaits the proof to this worker's writer and
-    /// hands back what a proof of the chain needs.
+    /// Attaches `halt`, which awaits the proof, to this worker's writer
+    /// and hands back what a proof of the chain needs. The halt is made
+    /// by the caller, so the views a served city answers from can watch
+    /// the same verdict (sprawling-SPEC.md 8-134).
     ///
     /// From this moment until the proof sets its verdict, every append
     /// is refused with `E_HISTORY_UNPROVEN`; after a broken verdict,
     /// with the proof's own reason. The records are writable because
     /// this worker's ledger holds the writer lock.
-    pub fn chain_under_audit(&mut self) -> ChainUnderAudit {
-        let halt = storage::ChainHalt::awaiting_proof();
+    pub fn chain_under_audit(&mut self, halt: storage::ChainHalt) -> ChainUnderAudit {
         self.ledger.halt_on(halt.clone());
         ChainUnderAudit {
             halt,

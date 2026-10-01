@@ -54,6 +54,10 @@ pub(super) struct Opening {
     /// The person's `[core] priority`, the reading the socket's workers
     /// already stand on.
     pub(super) core: CorePriority,
+    /// The halt the writer waits on until the history is proved, made
+    /// before the views so they watch the same verdict
+    /// (sprawling-SPEC.md 8-134).
+    pub(super) halt: storage::ChainHalt,
 }
 
 /// Where a worker's work goes, and where it comes from.
@@ -87,6 +91,8 @@ pub(super) struct Started {
     pub(super) vault: Arc<std::sync::Mutex<gateway::Custodian>>,
     /// The accounting queue's counts, for the monitor (sprawling-SPEC.md 8-98).
     pub(super) health: Health,
+    /// The view fold's backlog, for the monitor (sprawling-SPEC.md 8-123).
+    pub(super) backlog: crate::serving::folding::Backlog,
 }
 
 pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started, AxError> {
@@ -101,6 +107,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         audit_log,
         began,
         core: setting,
+        halt,
     } = opening;
     let Outward {
         desk: worker_desk,
@@ -120,6 +127,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         machine,
         lend,
         keep_slices,
+        backlog,
         thread: fold_thread,
     } = spawn_folding(
         Copies {
@@ -152,7 +160,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                     // halt it attached; until then the writer takes no
                     // line (sprawling-SPEC.md 8-90).
                     if let Err(err) = super::chain_watch::audit_in_background(
-                        worker.chain_under_audit(),
+                        worker.chain_under_audit(halt),
                         audit_log,
                         began,
                     ) {
@@ -245,5 +253,6 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         thread: worker_thread,
         vault,
         health,
+        backlog,
     })
 }

@@ -27,6 +27,9 @@ pub(crate) struct Folding {
     /// Where a served writer hands its session slices, so the view thread
     /// files them instead of the accounting thread (sprawling-SPEC.md 8-123).
     pub(crate) keep_slices: Box<dyn FnOnce(storage::Sessions) + Send>,
+    /// The records sent and not yet broadcast, for the monitor's
+    /// `view_backlog` (sprawling-SPEC.md 8-123, 8-129-6).
+    pub(crate) backlog: Backlog,
     pub(crate) thread: std::thread::JoinHandle<()>,
 }
 
@@ -110,6 +113,7 @@ pub(crate) fn spawn_folding(
     let handed = committed.clone();
     let backlog = Backlog::default();
     let behind = backlog.clone();
+    let shown = backlog.clone();
     let thread = std::thread::Builder::new()
         .name("sprawling-views".to_owned())
         .spawn(move || {
@@ -154,6 +158,7 @@ pub(crate) fn spawn_folding(
                 );
             }
         }),
+        backlog: shown,
         thread,
     })
 }

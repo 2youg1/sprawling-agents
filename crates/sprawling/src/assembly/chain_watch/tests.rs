@@ -45,7 +45,7 @@ fn a_chain_broken_under_a_served_city_refuses_the_next_command_with_the_audits_r
     };
 
     audit_in_background(
-        worker.chain_under_audit(),
+        worker.chain_under_audit(storage::ChainHalt::awaiting_proof()),
         Diagnostics::off(),
         monotonic_now(),
     )
@@ -105,7 +105,7 @@ fn a_served_worker_takes_commands_once_its_history_is_proved() {
         template: wire::TemplateName::parse("minimal").unwrap(),
         idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, name.as_bytes()),
     };
-    let watch = worker.chain_under_audit();
+    let watch = worker.chain_under_audit(storage::ChainHalt::awaiting_proof());
 
     let before = worker
         .handle(create("lab"))

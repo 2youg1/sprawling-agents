@@ -19,9 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::named_frames::named_frames;
 
 named_frames! {
-/// Queries read state. They are cacheable and free of side effects, so none
-/// carries an `IdemKey` - a Query that needed one would have stopped being a
-/// Query.
+/// A read of the city; the module documentation says what all of them share.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -162,6 +160,9 @@ pub enum Query {
     /// What the city calls the person and the Mayor, read from the two
     /// identity areas at the moment of asking (wire-SPEC.md 8-59).
     Identity,
+    /// The schedule and the watch table, read at the moment of asking:
+    /// shown on the page, written by hand (wire-SPEC.md 8-62).
+    Automation,
     /// Who answers for this city, and what has been answered on the
     /// person's behalf.
     ///

@@ -68,6 +68,8 @@ describe("watching the monitor", () => {
       relay_p50_nanos: 0,
       event_to_screen_p50_nanos: 0,
       queued_runs: 0,
+      view_backlog: 0,
+      read_nanos: 0,
     };
     for (let second = 0; second < 301; second += 1) {
       watching.sampled({ ...zero, queued_runs: second });

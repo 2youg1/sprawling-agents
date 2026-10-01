@@ -30,6 +30,7 @@ use kernel::UsdMicros;
 use super::holding::Views;
 use super::prepared::{LedgerAsk, LiveAsk, Prepared, unavailable};
 
+pub(crate) mod automation;
 mod history;
 pub(crate) mod identity;
 use super::lines::{endpoints_answer, known_hosts_answer, summarize};
@@ -242,6 +243,11 @@ impl Views {
             wire::Query::Preferences => return Prepared::Preferences,
             wire::Query::Identity => {
                 return Prepared::Identity {
+                    city_root: self.city_root.clone(),
+                };
+            }
+            wire::Query::Automation => {
+                return Prepared::Automation {
                     city_root: self.city_root.clone(),
                 };
             }

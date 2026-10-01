@@ -52,6 +52,7 @@ impl Views {
                 buildings: Vec::new(),
                 pursuits: Vec::new(),
                 halted: self.governance.halted.iter().map(named).collect(),
+                proved: None,
             },
             pursuits: self
                 .pursuits
@@ -125,5 +126,40 @@ fn named(scope: &kernel::event::Scope) -> wire::HaltScope {
         kernel::event::Scope::City => wire::HaltScope::City,
         kernel::event::Scope::Building(addr) => wire::HaltScope::Building(addr.clone()),
         kernel::event::Scope::Workshop(addr) => wire::HaltScope::Workshop(addr.clone()),
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+mod tests {
+    use super::*;
+
+    fn proved(views: &Views) -> Option<kernel::Seq> {
+        match views.city_ask().read() {
+            wire::Answer::City(city) => city.proved,
+            other => panic!("the city page answered {other:?}"),
+        }
+    }
+
+    /// Views rebuilt from a history proved before they folded it say so;
+    /// views watching a served city's proof say nothing until the halt
+    /// holds a whole verdict, and then name their head.
+    #[test]
+    fn a_city_answer_says_the_history_is_proved_only_once_the_halt_says_so() {
+        let dir = tempfile::tempdir().unwrap();
+        crate::worker::fixture::init_city(dir.path()).unwrap();
+        let ledger = kernel::layout::CityLayout::new(dir.path()).ledger();
+        let mut views = Views::rebuild(&ledger).unwrap();
+        let rebuilt = proved(&views);
+        let halt = storage::ChainHalt::awaiting_proof();
+        views.watch_proof(halt.clone());
+        let awaiting = proved(&views);
+        halt.prove();
+        let whole = proved(&views);
+        assert!(views.head().is_some());
+        assert_eq!(
+            (rebuilt, awaiting, whole),
+            (views.head(), None, views.head())
+        );
     }
 }

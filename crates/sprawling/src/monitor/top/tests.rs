@@ -28,7 +28,7 @@ fn a_json_line_carries_every_counter_under_its_field_name() {
             object["queued_runs"].as_u64(),
             object["volume_free_bytes"].as_u64(),
         ),
-        (false, 13, Some(7), Some(3), Some(u64::MAX)),
+        (false, 15, Some(7), Some(3), Some(u64::MAX)),
     );
 }
 
@@ -71,6 +71,8 @@ fn a_screen_shows_each_counter_in_its_unit_beside_its_curve() {
         relay_p50_nanos: 900,
         event_to_screen_p50_nanos: 16_600_000,
         queued_runs: 1,
+        view_backlog: 0,
+        read_nanos: 2_000,
     };
     let after = Sample {
         core_cpu_permille: 123,
@@ -78,6 +80,7 @@ fn a_screen_shows_each_counter_in_its_unit_beside_its_curve() {
         durable_lag: 5,
         relay_p50_nanos: 1_500_000,
         queued_runs: 4,
+        view_backlog: 300,
         ..before
     };
     let expected = [
@@ -94,6 +97,8 @@ fn a_screen_shows_each_counter_in_its_unit_beside_its_curve() {
         row("relay p50", "1.5 ms", "▁█"),
         row("event to screen p50", "16.6 ms", "▁▁"),
         row("queued runs", "4", "▁█"),
+        row("view backlog", "300", "▁█"),
+        row("monitor read", "2.0 µs", "▁▁"),
     ]
     .join(
         "

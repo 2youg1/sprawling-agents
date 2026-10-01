@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::command::HaltScope;
 use crate::preference::PreferencesAnswer;
 
+mod automation;
 mod building;
 mod commits;
 mod config;
@@ -45,6 +46,7 @@ mod rounds;
 mod skills;
 mod toolkits;
 
+pub use automation::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
 pub use commits::{CommitAnswer, CommitAt, CommitsAnswer};
@@ -151,6 +153,10 @@ pub struct CityAnswer {
     /// first client to get it wrong reported every shut building as
     /// running.
     pub halted: Vec<HaltScope>,
+    /// The last record of a history proved whole, when the proof has
+    /// found it so; absent while a served city is still proving it, or
+    /// after the proof found it broken (wire-SPEC.md 8-63).
+    pub proved: Option<Seq>,
 }
 
 /// What is waiting for a person, as the Ledger recorded it.
@@ -243,6 +249,7 @@ pub enum Answer {
     Preferences(Box<PreferencesAnswer>),
     Config(Box<ConfigAnswer>),
     Identity(Box<IdentityAnswer>),
+    Automation(Box<AutomationAnswer>),
     Unavailable { query: String },
 }
 

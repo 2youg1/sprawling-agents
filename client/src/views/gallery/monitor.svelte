@@ -30,6 +30,8 @@
     relay_p50_nanos: 400_000 + (second % 25) * 20_000,
     event_to_screen_p50_nanos: 8_000_000 + (second % 45) * 100_000,
     queued_runs: Math.floor(second / 60),
+    view_backlog: second % 7,
+    read_nanos: 1_000 + (second % 9) * 100,
   }));
 
   // The gallery has no city to ask, so opening the panel starts nothing.

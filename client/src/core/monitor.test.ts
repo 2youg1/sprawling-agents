@@ -38,6 +38,8 @@ describe("monitor", () => {
       relay_p50_nanos: 900,
       event_to_screen_p50_nanos: 16_600_000,
       queued_runs: 1,
+      view_backlog: 0,
+      read_nanos: 0,
     };
     const after: Sample = {
       ...before,
