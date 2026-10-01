@@ -59,7 +59,11 @@ export function count(n: number): string {
 // trailing zero, so `82.4k / 200k` reads as a fraction rather than as
 // two long numbers. Under a thousand the count is exact.
 export function kilo(n: number): string {
-  return count(n);
+  if (n < 1_000) return String(Math.round(n));
+  // Rounded before the mark is chosen, so 999,999 is `1M` and not `1000k`.
+  const thousands = Number((n / 1_000).toPrecision(3));
+  if (thousands < 1_000) return `${String(thousands)}k`;
+  return `${String(Number((n / 1_000_000).toPrecision(3)))}M`;
 }
 
 export function usd(micros: number): string {
