@@ -129,3 +129,48 @@ fn lean_imports_along_the_crate_graph_and_proves_what_it_states() {
         ])
     );
 }
+
+/// The checker's own specification: its entry imports its parts, a part
+/// may not import the checker, the checker may not import it, the paths
+/// it cites are on disk, and it is the checker's one specification.
+#[test]
+fn the_checker_has_one_specification_that_imports_its_parts_and_never_the_checker() {
+    let root = crate::root::fixture::relocated("spec-checker");
+    crate::root::fixture::write(&root, "tools/k/k-SPEC.md", "# k\n");
+    crate::root::fixture::write(&root, "tools/adversary/adversary-SPEC.md", "# adversary\n");
+    crate::root::fixture::write(
+        &root,
+        "tools/adversary/Spec.lean",
+        "import tools.adversary.spec.Answer\n/-! Specifies crates/j/src/gone.rs. -/\n",
+    );
+    crate::root::fixture::write(
+        &root,
+        "tools/adversary/spec/Answer.lean",
+        "import Lean.Data.Json\nimport Sprawling.Door\nimport crates.j.Spec\n",
+    );
+    crate::root::fixture::write(
+        &root,
+        "tools/adversary/src/Sprawling/X.lean",
+        "import Sprawling.Frame\nimport tools.adversary.Spec\n",
+    );
+    assert_eq!(
+        judged(&root),
+        Ok(vec![
+            "crates/j: crates/j holds neither a `*-SPEC.md` nor a Spec.lean".to_owned(),
+            "tools/adversary/Spec.lean:2: cites `crates/j/src/gone.rs`, which is not there"
+                .to_owned(),
+            "tools/adversary/spec/Answer.lean:2: the checker's specification imports \
+             `Sprawling.Door`, and it imports only its own parts and the toolchain's libraries"
+                .to_owned(),
+            "tools/adversary/spec/Answer.lean:3: the checker's specification imports \
+             `crates.j.Spec`, and it imports only its own parts and the toolchain's libraries"
+                .to_owned(),
+            "tools/adversary/src/Sprawling/X.lean:2: the checker imports `tools.adversary.Spec`, \
+             and it imports only `Sprawling` and the toolchain's libraries"
+                .to_owned(),
+            "tools/adversary: tools/adversary holds tools/adversary/adversary-SPEC.md and \
+             tools/adversary/Spec.lean"
+                .to_owned(),
+        ])
+    );
+}
