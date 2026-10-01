@@ -29,7 +29,11 @@ impl DeviceId {
     /// # Errors
     /// `E_INVALID_ARGS` when the text is not the spelling of 16 bytes.
     pub fn read(text: &str) -> Result<Self, AxError> {
-        Err(unreadable("a device id", text))
+        decode(text.trim())
+            .filter(|bytes| encode(bytes) == text.trim())
+            .and_then(|bytes| <[u8; 16]>::try_from(bytes).ok())
+            .map(Self)
+            .ok_or_else(|| unreadable("a device id", text))
     }
 }
 
