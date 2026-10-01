@@ -25,7 +25,13 @@ use super::redemption::Redemption;
 /// client. Building is deferred because a book is folded on every
 /// replay, and an endpoint the city never calls should hold no thread.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct Transport(Arc<OnceLock<reqwest::blocking::Client>>);
+pub(crate) struct Transport {
+    slot: Arc<OnceLock<reqwest::blocking::Client>>,
+    /// The step a test takes after the client is configured and before
+    /// it is built (gateway-SPEC.md section 8-32).
+    #[cfg(test)]
+    detour: Option<Detour>,
+}
 
 impl Transport {
     /// The shared client, built from `config` if this is the first call.
@@ -33,11 +39,59 @@ impl Transport {
     /// Two callers racing on an empty slot each build one; the slot keeps
     /// the first and the other is dropped with its thread.
     fn client(&self, config: &EndpointConfig) -> Result<reqwest::blocking::Client, AxError> {
-        if let Some(client) = self.0.get() {
+        if let Some(client) = self.slot.get() {
             return Ok(client.clone());
         }
-        let built = build(config)?;
-        Ok(self.0.get_or_init(|| built).clone())
+        let built = self.build(config)?;
+        Ok(self.slot.get_or_init(|| built).clone())
+    }
+
+    /// A transport whose client takes `step` after the endpoint's own
+    /// configuration: what a test uses to reach a stand-in under a
+    /// preset host's name (`reach::resolve`).
+    #[cfg(test)]
+    pub(crate) fn detoured(
+        step: impl Fn(reqwest::blocking::ClientBuilder) -> reqwest::blocking::ClientBuilder
+        + Send
+        + Sync
+        + 'static,
+    ) -> Transport {
+        Transport {
+            slot: Arc::default(),
+            detour: Some(Detour(Arc::new(step))),
+        }
+    }
+
+    fn build(&self, config: &EndpointConfig) -> Result<reqwest::blocking::Client, AxError> {
+        let builder = crate::client_for(config.proxying, &config.base_url)
+            .timeout(Duration::from_millis(config.timeout_ms));
+        #[cfg(test)]
+        let builder = match &self.detour {
+            Some(Detour(step)) => step(builder),
+            None => builder,
+        };
+        builder.build().map_err(|err| {
+            AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
+                .with_recovery(
+                    "check this endpoint's `base_url` and the proxy settings this \
+                     machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
+                )
+        })
+    }
+}
+
+/// A step after a client's configuration, held so a transport stays
+/// `Clone` and `Debug`.
+#[cfg(test)]
+#[derive(Clone)]
+struct Detour(
+    Arc<dyn Fn(reqwest::blocking::ClientBuilder) -> reqwest::blocking::ClientBuilder + Send + Sync>,
+);
+
+#[cfg(test)]
+impl std::fmt::Debug for Detour {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Detour")
     }
 }
 
@@ -58,17 +112,4 @@ impl Endpoint {
             redemption,
         })
     }
-}
-
-fn build(config: &EndpointConfig) -> Result<reqwest::blocking::Client, AxError> {
-    crate::client_for(config.proxying, &config.base_url)
-        .timeout(Duration::from_millis(config.timeout_ms))
-        .build()
-        .map_err(|err| {
-            AxError::failure(AxCode::ConfigInvalid, "build http client", err.to_string())
-                .with_recovery(
-                    "check this endpoint's `base_url` and the proxy settings this \
-                     machine exports (`HTTPS_PROXY`, `NO_PROXY`)",
-                )
-        })
 }

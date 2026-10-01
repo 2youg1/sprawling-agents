@@ -85,7 +85,7 @@ fn heard(row: &HostPreset, face: &Face) -> Shape {
     let kind = crate::provider::registry::resolve(hint).unwrap();
     let endpoint = AttachedEndpoint {
         name: row.host.to_owned(),
-        base_url: stand_in.loopback(&stored.base_url),
+        base_url: stored.base_url,
         dialect: kind.wire(),
         connection_kind: kind,
         auth: AuthSpec::for_dialect(
@@ -102,7 +102,7 @@ fn heard(row: &HostPreset, face: &Face) -> Shape {
         .lookup("local")
         .unwrap()
         .clone();
-    let transport = Transport::default();
+    let transport = Transport::detoured(stand_in.toward());
     let chosen = Chosen {
         endpoint: &endpoint,
         entry: &entry,
