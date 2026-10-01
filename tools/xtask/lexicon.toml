@@ -232,8 +232,17 @@ replacement = "兼容格式 (glossary: dialect)"
 
 # fence 与 checkpoint 曾是同一个概念的两个名字，checkpoint 留下。只收改名后全树与
 # CHANGELOG 都零命中的写法：「围栏」仍指 Markdown 块，「wave fence」「the fence」
-# 「fences」在 CHANGELOG 或代码围栏的语境里还有命中；线上标签 `Fenced` 随 wire
-# 版本改名之后再禁。
+# 「fences」在 CHANGELOG 或代码围栏的语境里还有命中。线上标签已随 WIRE_V 45 改名为
+# `checkpointed`，旧拼法按它的两种写法禁：变体名与线上的词；裸词 Fenced 不禁，
+# 它在 xtask 与 runtime 里指 Markdown 的代码围栏。
+
+[[entry]]
+banned = "Note::Fenced"
+replacement = "Note::Checkpointed（wire-SPEC §8-53）"
+
+[[entry]]
+banned = "\"fenced\""
+replacement = "\"checkpointed\"（wire-SPEC §8-53）"
 
 [[entry]]
 banned = "栅栏"
