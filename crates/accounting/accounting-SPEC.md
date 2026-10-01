@@ -1008,6 +1008,8 @@ impl Laying {
         -> Result<ProposalTool<Relay>, AxError>;
 }
 pub(super) struct ProposalTool<L: kernel::Ledger> { /* reader、filing、desk: Mutex<Desk<L>>、meta —— 私有 */ }
+// accounting::worker::workbench::tools::proposal::quoting（形状 1 判定：引文在城里那一版里是哪一段）
+pub(super) fn offered(reader: &runtime::BoundReader, asked: &Offering) -> Result<ProposalOffered, AxError>;
 // kernel::Tool。参数 { action: "offer", path, old, new } 或 { action: "withdraw", proposal }；
 // offer 答 { proposal, doc, baseline, start, end }，withdraw 答 { proposal, withdrawn: true }
 ```
