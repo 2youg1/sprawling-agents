@@ -69,6 +69,9 @@ pub const RUN_ID_PATTERN: &str = "????????-????-????-????-????????????";
 pub const REMOTE_DIR: &str = "remote";
 /// The devices paired to reach the city from outside the machine.
 pub const DEVICES_FILE: &str = "devices.toml";
+/// Where residents' playback exports land, under the city's reserved
+/// subtree, one directory per building.
+pub const PLAYBACK_DIR: &str = "playback";
 
 /// The disk layout of one city, derived from its root.
 ///
@@ -206,6 +209,18 @@ impl CityLayout {
     #[must_use]
     pub fn devices(&self) -> PathBuf {
         self.governed_root().join(REMOTE_DIR).join(DEVICES_FILE)
+    }
+
+    /// Where residents' playback exports land, one directory per
+    /// building (accounting-SPEC.md 8-13, sprawling-SPEC.md 8-132).
+    ///
+    /// Under the city's reserved subtree, because no write domain reaches
+    /// it, so a written report is changed only by exporting another; the
+    /// city root's `.gitignore` keeps it out of history; and no worktree
+    /// holds it, so sweeping one loses no report.
+    #[must_use]
+    pub fn playback_exports(&self) -> PathBuf {
+        self.governed_root().join(PLAYBACK_DIR)
     }
 
     /// The layout whose ledger is `dir`, when `dir` is a city's.

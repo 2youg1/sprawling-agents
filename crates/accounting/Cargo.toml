@@ -27,13 +27,17 @@ toml = { workspace = true }
 wire = { workspace = true }
 # A secret the worker holds for a moment is wiped when it is dropped.
 zeroize = { workspace = true }
+# A playback page read as a browser's parser builds it, and the CSS inside
+# it read by the CSS Syntax tokenizer (accounting-SPEC.md 8-13).
+html5ever = { workspace = true }
+cssparser = { workspace = true }
+# Two questions a playback export asks before it lands: does git track
+# this name, and does it ignore it. Read-only; the same libgit2 storage
+# links (accounting-SPEC.md 8-13, decision 25(h)).
+git2 = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true
-# Read-only, and tests only: the view tests that read a building's
-# repository set one up themselves, and a merge the city makes is judged
-# by opening the repository it landed in.
-git2 = { workspace = true }
 # The deterministic power-loss model, so a test above the ledger can lose
 # one named line and assert the city did not move. Kept to dev only.
 storage = { workspace = true, features = ["fault"] }

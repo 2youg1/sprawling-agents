@@ -18,18 +18,18 @@ use serde_json::{Value, json};
 
 use super::{Confidential, Cutoff, Reader, Request, Selection, export};
 
-fn run(n: u8) -> RunId {
+pub(crate) fn run(n: u8) -> RunId {
     RunId::parse(&format!("0198f6a2-7c4a-7bbb-9d1e-0000000000{n:02}")).unwrap()
 }
 
-fn addr(raw: &str) -> Address {
+pub(crate) fn addr(raw: &str) -> Address {
     Address::parse(raw).unwrap()
 }
 
-type Line = (RunId, Option<&'static str>, EventKind, Value);
+pub(crate) type Line = (RunId, Option<&'static str>, EventKind, Value);
 
 /// The ledger lines `script` spells, chained from genesis.
-fn lines(script: Vec<Line>) -> Vec<Vec<u8>> {
+pub(crate) fn lines(script: Vec<Line>) -> Vec<Vec<u8>> {
     let mut prev = kernel::GENESIS_PREV;
     let mut out = Vec::new();
     for (seq, (run, at, kind, data)) in script.into_iter().enumerate() {
@@ -53,7 +53,7 @@ fn lines(script: Vec<Line>) -> Vec<Vec<u8>> {
 }
 
 /// Writes `lines` as the city's one segment, followed by `tail` bytes.
-fn write(root: &Path, lines: &[Vec<u8>], tail: &[u8]) {
+pub(crate) fn write(root: &Path, lines: &[Vec<u8>], tail: &[u8]) {
     let dir = kernel::layout::CityLayout::new(root).ledger();
     std::fs::create_dir_all(&dir).unwrap();
     let mut blob: Vec<u8> = lines
@@ -64,7 +64,7 @@ fn write(root: &Path, lines: &[Vec<u8>], tail: &[u8]) {
     std::fs::write(dir.join("ledger-00000000000000000000.jsonl"), blob).unwrap();
 }
 
-fn confidential(root: &Path, building: &str) {
+pub(crate) fn confidential(root: &Path, building: &str) {
     let path = city::rules_path(root, &addr(building));
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, "confidential = true\nwrite = \"everything\"\n").unwrap();
@@ -73,7 +73,7 @@ fn confidential(root: &Path, building: &str) {
 /// A city with an open building `lab` and a confidential one `vault`:
 /// run 1 works in `lab` and once names a file in `vault`; run 2 works in
 /// `vault`.
-fn city() -> (tempfile::TempDir, Vec<Vec<u8>>) {
+pub(crate) fn city() -> (tempfile::TempDir, Vec<Vec<u8>>) {
     let dir = tempfile::tempdir().unwrap();
     let written = lines(vec![
         (RunId::CITY, None, EventKind::CityInitialized, json!({})),
@@ -116,7 +116,7 @@ fn city() -> (tempfile::TempDir, Vec<Vec<u8>>) {
     (dir, written)
 }
 
-fn person() -> Request {
+pub(crate) fn person() -> Request {
     Request {
         selection: Selection::everything(),
         reader: Reader::Person(Confidential::Withheld),
@@ -124,11 +124,11 @@ fn person() -> Request {
     }
 }
 
-fn parsed(bytes: &[u8]) -> Value {
+pub(crate) fn parsed(bytes: &[u8]) -> Value {
     serde_json::from_slice(bytes).unwrap()
 }
 
-fn seqs(list: &Value) -> Vec<String> {
+pub(crate) fn seqs(list: &Value) -> Vec<String> {
     list.as_array()
         .unwrap()
         .iter()
@@ -357,3 +357,5 @@ fn a_contradictory_range_is_refused_and_an_empty_one_is_a_bundle() {
 }
 
 mod checking;
+mod landing;
+mod page;

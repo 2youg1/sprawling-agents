@@ -12,69 +12,13 @@
 )]
 
 use accounting::playback::{Report, Verdict};
-use kernel::{AxCode, B3Hash};
+use kernel::B3Hash;
 use serde_json::json;
 
 use super::super::exit::Exit;
 use super::super::grammar::{Invocation, parse};
 use super::super::verbs::Verb;
-use super::{Refused, outcome, request_of, write_new};
-
-fn listed(dir: &std::path::Path) -> Vec<String> {
-    let mut names: Vec<String> = std::fs::read_dir(dir)
-        .unwrap()
-        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
-        .collect();
-    names.sort();
-    names
-}
-
-#[test]
-fn a_bundle_lands_whole_and_leaves_no_staged_copy() {
-    let dir = tempfile::tempdir().unwrap();
-    let target = dir.path().join("day.json");
-    let landed = write_new(&target, b"{}").map_err(|err| *err.code());
-    assert_eq!(
-        (landed, std::fs::read(&target).ok(), listed(dir.path())),
-        (Ok(()), Some(b"{}".to_vec()), vec!["day.json".to_owned()])
-    );
-}
-
-#[test]
-fn a_bundle_never_overwrites_a_file() {
-    let dir = tempfile::tempdir().unwrap();
-    let target = dir.path().join("day.json");
-    std::fs::write(&target, b"kept").unwrap();
-    let landed = write_new(&target, b"{}").map_err(|err| *err.code());
-    assert_eq!(
-        (landed, std::fs::read(&target).unwrap(), listed(dir.path())),
-        (
-            Err(AxCode::InvalidArgs),
-            b"kept".to_vec(),
-            vec!["day.json".to_owned()]
-        )
-    );
-}
-
-#[test]
-fn a_bundle_never_lands_in_protected_metadata() {
-    let dir = tempfile::tempdir().unwrap();
-    let ledger = dir.path().join(".sprawling");
-    let git = dir.path().join(".GIT");
-    std::fs::create_dir_all(&ledger).unwrap();
-    std::fs::create_dir_all(&git).unwrap();
-    let into_ledger = write_new(&ledger.join("day.json"), b"{}").map_err(|err| *err.code());
-    let into_git = write_new(&git.join("day.json"), b"{}").map_err(|err| *err.code());
-    assert_eq!(
-        (into_ledger, into_git, listed(&ledger), listed(&git)),
-        (
-            Err(AxCode::OutsideWriteDomain),
-            Err(AxCode::OutsideWriteDomain),
-            Vec::<String>::new(),
-            Vec::<String>::new()
-        )
-    );
-}
+use super::{Refused, outcome, request_of};
 
 /// How `playback export` refuses `line`, the verb given as the one word
 /// its row is named, so the grammar's two-word reading is not what this
@@ -104,27 +48,80 @@ fn a_range_or_a_building_that_does_not_read_is_a_command_line_refusal() {
     );
 }
 
+/// A report whose items are as given, about a three-event bundle.
+fn report(source: Verdict, browser: Verdict) -> Report {
+    Report {
+        digest: Some(B3Hash::digest(b"bundle")),
+        events: Some(3),
+        structure: Verdict::Passed,
+        bundle: Verdict::Unasked {
+            why: "no other bundle was given",
+        },
+        source,
+        offline: Verdict::Passed,
+        browser,
+        covered: vec!["load".to_owned()],
+    }
+}
+
 #[test]
-fn a_check_that_differs_says_where_and_exits_refused() {
-    let digest = B3Hash::digest(b"bundle");
-    let found = |verdict| Report {
-        digest,
-        events: 3,
-        verdict,
+fn a_check_exits_refused_on_a_failed_item_or_one_asked_for_and_not_done() {
+    let digest = B3Hash::digest(b"bundle").to_string();
+    let unasked = || Verdict::Unasked {
+        why: "no browser observation was given; the product does not run the page",
     };
     assert_eq!(
         [
-            outcome(&found(Verdict::Differs { section: "costs" })),
-            outcome(&found(Verdict::Same)),
+            outcome(&report(Verdict::Passed, Verdict::Passed)),
+            outcome(&report(
+                Verdict::Failed {
+                    found: "differs from its recomputation first in `costs`".to_owned()
+                },
+                unasked()
+            )),
+            outcome(&report(
+                Verdict::Unable {
+                    why: "the city's ledger ends at seq 1, before the cutoff 4".to_owned()
+                },
+                unasked()
+            )),
         ],
         [
             (
-                json!({"digest": digest.to_string(), "events": "3", "section": "costs", "verdict": "differs"}),
+                json!({
+                    "digest": digest,
+                    "events": "3",
+                    "structure": {"status": "passed"},
+                    "bundle": {"status": "unchecked", "why": "no other bundle was given"},
+                    "source": {"status": "passed"},
+                    "offline": {"status": "passed"},
+                    "browser": {"status": "passed", "covered": ["load"]},
+                }),
+                Exit::Done
+            ),
+            (
+                json!({
+                    "digest": digest,
+                    "events": "3",
+                    "structure": {"status": "passed"},
+                    "bundle": {"status": "unchecked", "why": "no other bundle was given"},
+                    "source": {"status": "failed", "found": "differs from its recomputation first in `costs`"},
+                    "offline": {"status": "passed"},
+                    "browser": {"status": "unchecked", "why": "no browser observation was given; the product does not run the page"},
+                }),
                 Exit::Refused
             ),
             (
-                json!({"digest": digest.to_string(), "events": "3", "verdict": "same"}),
-                Exit::Done
+                json!({
+                    "digest": digest,
+                    "events": "3",
+                    "structure": {"status": "passed"},
+                    "bundle": {"status": "unchecked", "why": "no other bundle was given"},
+                    "source": {"status": "unchecked", "why": "the city's ledger ends at seq 1, before the cutoff 4"},
+                    "offline": {"status": "passed"},
+                    "browser": {"status": "unchecked", "why": "no browser observation was given; the product does not run the page"},
+                }),
+                Exit::Refused
             ),
         ]
     );

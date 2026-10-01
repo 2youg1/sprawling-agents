@@ -28,6 +28,7 @@ fn the_city_wide_stores_sit_under_the_city_s_reserved_subtree() {
     assert_eq!(layout().ledger(), governed.join(LEDGER_DIR));
     assert_eq!(layout().cas(), governed.join(CAS_DIR));
     assert_eq!(layout().library(), governed.join(LIBRARY_DIR));
+    assert_eq!(layout().playback_exports(), governed.join(PLAYBACK_DIR));
 }
 
 #[test]

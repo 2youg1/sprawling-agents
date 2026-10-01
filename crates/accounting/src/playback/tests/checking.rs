@@ -18,7 +18,7 @@ use kernel::{EventKind, RunId};
 use serde_json::json;
 
 use super::super::document::Decimal;
-use super::super::{Against, Confidential, Reader, Verdict, check, encode, export};
+use super::super::{Asked, City, Confidential, Reader, Verdict, check, encode, export};
 use super::{city, lines, parsed, person, run, write};
 
 #[test]
@@ -28,23 +28,61 @@ fn a_changed_bundle_that_keeps_its_source_differs_from_its_city() {
     let (mut document, _) = encode::decode(exported.bytes()).unwrap();
     document.costs.billed_usd_micros = Decimal(999);
     let changed = encode::encode(&document).unwrap();
-    let as_the_person = || Against::City {
-        root: dir.path(),
-        reader: Reader::Person(Confidential::Withheld),
+    let as_the_person = || {
+        Some(City {
+            root: dir.path(),
+            reader: Reader::Person(Confidential::Withheld),
+        })
     };
-    let verdict = |bytes: &[u8], against| check(bytes, against).map(|report| report.verdict);
+    let items = |bytes: &[u8], asked: Asked<'_>| {
+        let found = check(bytes, &asked);
+        (found.structure, found.bundle, found.source)
+    };
     assert_eq!(
         (
-            verdict(changed.bytes(), Against::Nothing),
-            verdict(changed.bytes(), as_the_person()),
-            verdict(changed.bytes(), Against::Bundle(exported.bytes())),
-            verdict(exported.bytes(), as_the_person()),
+            items(changed.bytes(), Asked::default()),
+            items(
+                changed.bytes(),
+                Asked {
+                    bundle: Some(exported.bytes()),
+                    city: as_the_person(),
+                    observed: None,
+                }
+            ),
+            items(
+                exported.bytes(),
+                Asked {
+                    city: as_the_person(),
+                    ..Asked::default()
+                }
+            ),
         ),
         (
-            Ok(Verdict::Consistent),
-            Ok(Verdict::Differs { section: "costs" }),
-            Ok(Verdict::Differs { section: "costs" }),
-            Ok(Verdict::Same),
+            (
+                Verdict::Passed,
+                Verdict::Unasked {
+                    why: "no other bundle was given"
+                },
+                Verdict::Unasked {
+                    why: "no city was given"
+                },
+            ),
+            (
+                Verdict::Passed,
+                Verdict::Failed {
+                    found: "differs from the other bundle first in `costs`".to_owned()
+                },
+                Verdict::Failed {
+                    found: "differs from its recomputation first in `costs`".to_owned()
+                },
+            ),
+            (
+                Verdict::Passed,
+                Verdict::Unasked {
+                    why: "no other bundle was given"
+                },
+                Verdict::Passed,
+            ),
         )
     );
 }
@@ -55,13 +93,25 @@ fn a_bundle_is_not_recomputed_for_a_reader_it_was_not_exported_for() {
     let exported = export(dir.path(), &person()).unwrap();
     let widened = check(
         exported.bytes(),
-        Against::City {
-            root: dir.path(),
-            reader: Reader::Person(Confidential::Included),
+        &Asked {
+            city: Some(City {
+                root: dir.path(),
+                reader: Reader::Person(Confidential::Included),
+            }),
+            ..Asked::default()
         },
-    )
-    .map(|report| matches!(report.verdict, Verdict::CannotReproduce { .. }));
-    assert_eq!(widened, Ok(true));
+    );
+    assert_eq!(
+        (widened.holds(), widened.source),
+        (
+            false,
+            Verdict::Unable {
+                why: "exported for another reader than this check reads as; check it as the \
+                      reader it was exported for, or export it again"
+                    .to_owned()
+            },
+        )
+    );
 }
 
 #[test]

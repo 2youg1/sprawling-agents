@@ -11,7 +11,9 @@
 //! `crates/accounting/spec/Playback/Select.lean` and
 //! `crates/accounting/spec/Playback/Project.lean`; this module is how
 //! they hold. The command line (`bin::main::playback`) and the
-//! resident's tool are thin doors onto [`export`] and [`check`].
+//! resident's tool (`worker::workbench::tools::playback`) are thin doors
+//! onto [`export`], [`embed`], [`check`] and [`land`]
+//! (accounting-SPEC.md 8-13).
 
 use std::path::Path;
 
@@ -23,16 +25,23 @@ use project::Projection;
 use reader::Readership;
 
 mod check;
+mod consistency;
 mod document;
 mod encode;
+mod landing;
 mod links;
+mod observed;
+mod offline;
+mod page;
 mod project;
 mod reader;
 mod select;
 mod walk;
 
-pub use check::{Against, Report, Verdict, check};
+pub use check::{Asked, City, Report, Verdict, check};
 pub use encode::Bundle;
+pub use landing::{Place, land};
+pub use page::{BUNDLE_BLOCK, embed};
 pub use reader::{Confidential, Reader};
 pub use select::Selection;
 
@@ -48,6 +57,11 @@ pub const PROJECTION_RULES: u32 = 1;
 /// peak on a multi-day fixture is measured; it bounds the bundle, not
 /// the memory an export uses.
 pub const BUNDLE_MAX_BYTES: usize = 32 * 1024 * 1024;
+
+/// The most bytes a checked file may have: a bundle's ceiling and 16 MiB
+/// for the page around it and the fonts and pictures it carries. An
+/// initial value, measured on the same fixture as the bundle's.
+pub const PAGE_MAX_BYTES: usize = BUNDLE_MAX_BYTES + 16 * 1024 * 1024;
 
 /// Where an export stops reading.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,4 +140,4 @@ fn project(city_root: &Path, request: &Request) -> Result<Projected, AxError> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

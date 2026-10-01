@@ -375,12 +375,17 @@ pub(super) const VERBS: &[Row] = &[
             ),
             INCLUDE_CONFIDENTIAL,
             flag(
+                "--page",
+                Value("template"),
+                "write a playback page: this template with the bundle in its data block",
+            ),
+            flag(
                 "--out",
                 Value("file"),
                 "write a new file instead of stdout; never overwrites",
             ),
         ],
-        says: "export a stretch of a city's history as a playback bundle",
+        says: "export a stretch of a city's history as a playback bundle or page",
         effect: Effect::Changes,
         after_dashes: AfterDashes::Refused,
     },
@@ -388,7 +393,7 @@ pub(super) const VERBS: &[Row] = &[
         verb: Verb::PlaybackCheck,
         name: "playback check",
         aliases: &[],
-        positionals: &[("bundle", Required)],
+        positionals: &[("file", Required)],
         flags: &[
             flag(
                 "--bundle",
@@ -401,8 +406,13 @@ pub(super) const VERBS: &[Row] = &[
                 "recompute the bundle from its city and compare",
             ),
             INCLUDE_CONFIDENTIAL,
+            flag(
+                "--observed",
+                Value("file"),
+                "what a browser saw the page do, as the playback skill records it",
+            ),
         ],
-        says: "check a playback bundle on its own, against another, or against its city",
+        says: "check a playback bundle or page, five items reported apart",
         effect: Effect::ReadsOnly,
         after_dashes: AfterDashes::Refused,
     },
