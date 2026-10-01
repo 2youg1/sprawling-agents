@@ -253,8 +253,17 @@ fn workspace_version(root: &Path) -> Result<String, XtaskError> {
 /// The maturity in the spelling a span names: `word` as a sentence writes
 /// it, `titled` as a tag and a heading do (tools/xtask/Spec.lean D17).
 /// Both come from `kernel::Maturity`, so this only carries the string.
-fn maturity(_maturity: kernel::Maturity, _spelling: &str) -> Result<String, XtaskError> {
-    Ok(kernel::release::MATURITY.word().to_owned())
+fn maturity(maturity: kernel::Maturity, spelling: &str) -> Result<String, XtaskError> {
+    match spelling {
+        "word" => Ok(maturity.word().to_owned()),
+        "titled" => Ok(maturity.titled().to_owned()),
+        other => Err(XtaskError::Doc {
+            file: "kernel::release::MATURITY".to_owned(),
+            msg: format!(
+                "`maturity:{other}` names no spelling; write `maturity:word` for a sentence                  or `maturity:titled` for a tag or a heading"
+            ),
+        }),
+    }
 }
 
 /// The register row a fact names, parsed from `tools/xtask/budgets.toml`.

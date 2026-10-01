@@ -18,8 +18,9 @@ const UNSCOPED_THROUGH: &str = "0.0.4";
 /// agree.
 #[test]
 fn the_published_version_is_the_one_a_running_binary_decodes() {
-    let cut = kernel::Release::from_tag("v0.0.4-Pre-alpha-260911", "0.0.4")
-        .expect("a release tag of this project");
+    // The tag this tree would cut, so moving `MATURITY` leaves it true.
+    let tag = format!("v0.0.4-{}-260911", kernel::release::MATURITY.titled());
+    let cut = kernel::Release::from_tag(&tag, "0.0.4").expect("a release tag of this project");
     assert_eq!(cut.npm_version(), "0.0.4-pre.260911");
     assert_eq!(
         kernel::Release::from_npm_version(&cut.npm_version()).expect("what this channel published"),
