@@ -42,7 +42,7 @@ use crate::platform::{PLATFORMS, Platform, ROOT_PACKAGE};
 use crate::report::XtaskError;
 
 /// The shim, compiled in so the file a reader opens and the file a
-/// package carries are the same bytes — the rule `docs/templates/`
+/// package carries are the same bytes — the rule `crates/city/templates/`
 /// already follows for the documents a city writes.
 const SHIM: &str = include_str!("channel/shim.js");
 

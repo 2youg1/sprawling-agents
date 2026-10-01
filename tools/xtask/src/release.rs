@@ -245,7 +245,7 @@ pub(crate) fn machine_path(line: &str) -> Option<String> {
 pub(crate) fn is_scaffolding(rel: &str) -> bool {
     SCAFFOLDING.iter().any(|prefix| {
         // A directory prefix has to match the directory itself as well
-        // as what is inside it: `docs/templates/` and `docs/templates`
+        // as what is inside it: `crates/city/templates/` and `crates/city/templates`
         // name the same thing, and a link that used the second spelling
         // is exactly the one that would survive a check written only
         // for the first.

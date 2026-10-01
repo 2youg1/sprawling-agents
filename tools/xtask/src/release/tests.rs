@@ -19,7 +19,7 @@ fn one_machine_stays_behind_and_everything_that_explains_the_code_goes_out() {
         "LICENSE",
         "docs/glossary.md",
         "docs/third-party.md",
-        "docs/templates/JOB.md",
+        "crates/city/templates/JOB.md",
         "crates/kernel/kernel-SPEC.md",
         "crates/kernel/src/lib.rs",
         "tools/xtask/lexicon.toml",
@@ -179,7 +179,10 @@ fn only_prose_is_read_for_citations() {
         "//! see docs/glossary.md"
     ));
     assert!(is_prose("crates/city/city-SPEC.md", "anything at all"));
-    assert!(is_prose("docs/templates/SPEC.md", "<!-- a comment -->"));
+    assert!(is_prose(
+        "crates/city/templates/SPEC.md",
+        "<!-- a comment -->"
+    ));
 }
 
 #[test]
