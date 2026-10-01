@@ -104,6 +104,7 @@ fn shared(setup: &Setup) -> Vec<Episode> {
         goal(setup),
         plan(),
         signal(setup),
+        crate::playback::episode(),
     ]
 }
 

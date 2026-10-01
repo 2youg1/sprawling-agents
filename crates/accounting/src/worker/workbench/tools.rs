@@ -18,6 +18,7 @@ use super::engine::machine_half;
 use super::{BenchDesks, Laying, Reach, Site, Situation, Workbench, held, status_snapshot};
 
 mod kept;
+mod playback;
 mod reading_room;
 mod transcribe;
 
@@ -216,12 +217,19 @@ impl Laying {
                 admitted.push(Box::new(city::CityTool::new(&self.city_root)?));
             }
         }
-        // The last built-in, present only where the book names an
-        // endpoint this building may send a recording to
-        // (sprawling-SPEC.md 8-131).
+        // Present only where the book names an endpoint this building
+        // may send a recording to (sprawling-SPEC.md 8-131).
         if let Some(transcribe) = self.transcription_tool(site)? {
             admitted.push(Box::new(transcribe));
         }
+        // The last built-in: a look back at the history this building
+        // may read, written into the city's playback exports
+        // (sprawling-SPEC.md 8-132).
+        admitted.push(Box::new(playback::PlaybackTool::new(
+            &self.city_root,
+            site.building.addr().clone(),
+            addr.clone(),
+        )?));
         admitted.extend(self.outside_tools(site)?);
         for tool in admitted {
             held(&catalog, "lay out the catalog")?.admit_tool(tool.meta())?;
