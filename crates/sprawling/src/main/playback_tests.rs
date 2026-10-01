@@ -48,6 +48,38 @@ fn a_range_or_a_building_that_does_not_read_is_a_command_line_refusal() {
     );
 }
 
+#[test]
+fn a_day_that_does_not_read_or_crosses_since_to_nothing_is_a_selection_refusal() {
+    assert_eq!(
+        [
+            refusal_of(&["playback export", "c", "--day", "2026-02-30"]),
+            refusal_of(&[
+                "playback export",
+                "c",
+                "--day",
+                "2026-05-14",
+                "--since",
+                "2026-05-15T00:00:00Z"
+            ]),
+            refusal_of(&["playback export", "c", "--since", "2026-05-14T09:00:00"]),
+            refusal_of(&[
+                "playback export",
+                "c",
+                "--day",
+                "2026-05-14",
+                "--since",
+                "2026-05-14T09:00:00Z"
+            ]),
+        ],
+        [
+            Some("selection"),
+            Some("selection"),
+            Some("selection"),
+            None
+        ]
+    );
+}
+
 /// A report whose items are as given, about a three-event bundle.
 fn report(source: Verdict, browser: Verdict) -> Report {
     Report {

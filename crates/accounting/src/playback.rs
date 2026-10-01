@@ -43,7 +43,7 @@ pub use encode::Bundle;
 pub use landing::{Place, land};
 pub use page::{BUNDLE_BLOCK, embed};
 pub use reader::{Confidential, Reader};
-pub use select::Selection;
+pub use select::{Selection, Window};
 
 /// The schema a bundle names; a reader refuses any other.
 pub const SCHEMA: &str = "sprawling.playback/1";

@@ -373,6 +373,17 @@ pub(super) const VERBS: &[Row] = &[
                 Value("addr"),
                 "only lines addressed within this building",
             ),
+            flag(
+                "--since",
+                Value("utc"),
+                "only lines at or after this moment, as 2026-05-14T09:31:07Z",
+            ),
+            flag("--until", Value("utc"), "only lines before this moment"),
+            flag(
+                "--day",
+                Value("yyyy-mm-dd"),
+                "only lines of this UTC day; crossed with --since and --until",
+            ),
             INCLUDE_CONFIDENTIAL,
             flag(
                 "--page",

@@ -175,3 +175,23 @@ fn a_run_without_a_worktree_writes_a_page_into_the_city_and_names_only_its_own_e
         )
     );
 }
+
+/// A resident's `day` is the same condition as the person's `--day`: the
+/// export records it as the day's two ends.
+#[test]
+fn a_residents_day_is_recorded_as_its_two_ends() {
+    let (dir, _) = city();
+    let exported = answered(
+        dir.path(),
+        json!({"action": "export", "name": "epoch", "day": "1970-01-01"}),
+    )
+    .map(|_| {
+        let bytes = std::fs::read(exports(dir.path()).join("epoch.json")).unwrap();
+        let bundle: Value = serde_json::from_slice(&bytes).unwrap();
+        (
+            bundle["source"]["selection"]["since"].clone(),
+            bundle["source"]["selection"]["until"].clone(),
+        )
+    });
+    assert_eq!(exported, Ok((json!("0"), json!("86400000"))));
+}

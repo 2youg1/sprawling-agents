@@ -51,6 +51,9 @@ struct Export {
     through: Option<u64>,
     run: Option<String>,
     building: Option<String>,
+    since: Option<String>,
+    until: Option<String>,
+    day: Option<String>,
     page: Option<String>,
 }
 

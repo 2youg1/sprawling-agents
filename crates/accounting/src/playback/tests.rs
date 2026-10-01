@@ -28,15 +28,28 @@ pub(crate) fn addr(raw: &str) -> Address {
 
 pub(crate) type Line = (RunId, Option<&'static str>, EventKind, Value);
 
-/// The ledger lines `script` spells, chained from genesis.
+/// The ledger lines `script` spells, chained from genesis, each line's
+/// `t` its seq.
 pub(crate) fn lines(script: Vec<Line>) -> Vec<Vec<u8>> {
+    lines_at(
+        script
+            .into_iter()
+            .enumerate()
+            .map(|(seq, line)| (u64::try_from(seq).unwrap(), line))
+            .collect(),
+    )
+}
+
+/// The ledger lines `script` spells, chained from genesis, each line at
+/// the `t` it is paired with.
+pub(crate) fn lines_at(script: Vec<(u64, Line)>) -> Vec<Vec<u8>> {
     let mut prev = kernel::GENESIS_PREV;
     let mut out = Vec::new();
-    for (seq, (run, at, kind, data)) in script.into_iter().enumerate() {
+    for (seq, (t, (run, at, kind, data))) in script.into_iter().enumerate() {
         let seq = u64::try_from(seq).unwrap();
         let draft = EventDraft {
             run,
-            t: kernel::TimeMs::new(seq),
+            t: kernel::TimeMs::new(t),
             who: "tester".to_owned(),
             addr: at.map(addr),
             kind,
@@ -369,3 +382,4 @@ mod checking;
 mod landing;
 mod model;
 mod page;
+mod span;

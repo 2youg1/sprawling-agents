@@ -9,6 +9,7 @@
 //! the cutoff the walk stops at.
 
 use kernel::{Address, AxCode, AxError, EventRecord, RunId, Seq};
+use runtime::clock::UtcSpan;
 
 use super::document::{Chosen, Decimal};
 
@@ -65,6 +66,12 @@ impl Selection {
         })
     }
 
+    /// The selection with a time condition added.
+    #[must_use]
+    pub fn during(self, _span: UtcSpan) -> Selection {
+        self
+    }
+
     /// Whether `record` is in the selection. The cutoff is the walk's to
     /// enforce: no line after it is ever offered here.
     pub(super) fn admits(&self, record: &EventRecord) -> bool {
@@ -103,5 +110,23 @@ impl Selection {
             chosen.run,
             chosen.building.clone(),
         )
+    }
+}
+
+/// The time conditions of one export, as given.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Window<'a> {
+    pub since: Option<&'a str>,
+    pub until: Option<&'a str>,
+    pub day: Option<&'a str>,
+}
+
+impl Window<'_> {
+    /// The span the conditions make.
+    ///
+    /// # Errors
+    /// None yet.
+    pub fn span(&self) -> Result<UtcSpan, AxError> {
+        Ok(UtcSpan::default())
     }
 }

@@ -22,20 +22,21 @@
 
 use std::collections::BTreeSet;
 
-use kernel::{EventKind, RunId, Seq};
+use kernel::{EventKind, RunId, Seq, TimeMs};
+use runtime::clock::UtcSpan;
 use serde_json::json;
 
 use super::super::{Confidential, Cutoff, Reader, Request, Selection, export};
-use super::{addr, lines, parsed, run, seqs, write};
+use super::{addr, lines_at, parsed, run, seqs, write};
 
 /// The model, read as the text it is.
 const MODEL: &str = include_str!("../../../spec/Playback/Select.lean");
 
-/// One scene: the four conditions, the cutoff, and the seqs the model
-/// selects.
+/// One scene: the six conditions (first, last, run, building, since,
+/// before), the cutoff, and the seqs the model selects.
 #[derive(Debug)]
 struct Scene {
-    conditions: [Option<u64>; 4],
+    conditions: [Option<u64>; 6],
     cutoff: u64,
     seqs: Vec<String>,
 }
@@ -57,8 +58,8 @@ fn option(words: &mut std::slice::Iter<'_, &str>) -> Option<u64> {
     }
 }
 
-/// The model's ledger: `(seq, run, building)` per `line` row.
-fn ledger() -> Vec<(u64, u64, Option<u64>)> {
+/// The model's ledger: `(seq, run, building, t)` per `line` row.
+fn ledger() -> Vec<(u64, u64, Option<u64>, u64)> {
     MODEL
         .lines()
         .map(str::trim)
@@ -66,30 +67,38 @@ fn ledger() -> Vec<(u64, u64, Option<u64>)> {
         .map(|line| {
             let words = words(line);
             let mut rest = words[3..].iter();
+            let building = option(&mut rest);
             (
                 words[1].parse().unwrap(),
                 words[2].parse().unwrap(),
-                option(&mut rest),
+                building,
+                rest.next().unwrap().parse().unwrap(),
             )
         })
         .collect()
 }
 
-/// The model's scenes, one per `scene` row.
+/// The model's scenes, one per `scene` row and one per `window` row.
 fn scenes() -> Vec<Scene> {
     MODEL
         .lines()
         .map(str::trim)
-        .filter(|line| line.starts_with("scene "))
+        .filter(|line| line.starts_with("scene ") || line.starts_with("window "))
         .map(|line| {
             let words = words(line);
             let mut rest = words[1..].iter();
-            let conditions = [
-                option(&mut rest),
-                option(&mut rest),
-                option(&mut rest),
-                option(&mut rest),
-            ];
+            let conditions = if words[0] == "scene" {
+                [
+                    option(&mut rest),
+                    option(&mut rest),
+                    option(&mut rest),
+                    option(&mut rest),
+                    None,
+                    None,
+                ]
+            } else {
+                [None, None, None, None, option(&mut rest), option(&mut rest)]
+            };
             let cutoff = rest.next().unwrap().parse().unwrap();
             Scene {
                 conditions,
@@ -125,7 +134,7 @@ fn every_scene_of_the_selection_model_selects_the_same_seqs_in_production() {
     let script = ledger()
         .into_iter()
         .enumerate()
-        .map(|(at, (seq, n, building))| {
+        .map(|(at, (seq, n, building, t))| {
             assert_eq!(
                 u64::try_from(at).unwrap(),
                 seq,
@@ -139,21 +148,24 @@ fn every_scene_of_the_selection_model_selects_the_same_seqs_in_production() {
                 EventKind::ToolCalled
             };
             (
-                run_of(n),
-                building.map(room_of),
-                kind,
-                json!({"tool": "read"}),
+                t,
+                (
+                    run_of(n),
+                    building.map(room_of),
+                    kind,
+                    json!({"tool": "read"}),
+                ),
             )
         })
         .collect();
-    write(dir.path(), &lines(script), b"");
+    write(dir.path(), &lines_at(script), b"");
     let scenes = scenes();
-    assert!(scenes.len() >= 16, "only {} scenes were read", scenes.len());
+    assert!(scenes.len() >= 22, "only {} scenes were read", scenes.len());
     let selected: Vec<(usize, Vec<String>)> = scenes
         .iter()
         .enumerate()
         .map(|(at, scene)| {
-            let [first, last, run, building] = scene.conditions;
+            let [first, last, run, building, since, before] = scene.conditions;
             let request = Request {
                 selection: Selection::new(
                     first.map(Seq::new),
@@ -161,7 +173,8 @@ fn every_scene_of_the_selection_model_selects_the_same_seqs_in_production() {
                     run.map(run_of),
                     building.map(|b| addr(&format!("b{b}"))),
                 )
-                .unwrap(),
+                .unwrap()
+                .during(UtcSpan::new(since.map(TimeMs::new), before.map(TimeMs::new)).unwrap()),
                 reader: Reader::Person(Confidential::Withheld),
                 cutoff: Cutoff::At(Seq::new(scene.cutoff)),
             };
