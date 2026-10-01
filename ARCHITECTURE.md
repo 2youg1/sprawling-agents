@@ -49,6 +49,7 @@ shipped one happens to be written in is a replaceable fact.
 │        ├── city                                              │
 │        ├── browser                                           │
 │        ├── agent_protocols                                   │
+│        ├── remote_access                                     │
 │        ├── storage                                           │
 │        ├── gateway                                           │
 │        └── wire                                              │
@@ -169,7 +170,7 @@ agent_protocols: kernel, gateway
 wire: kernel
 remote_access: kernel
 accounting: kernel, storage, gateway, runtime, collab, city, agent_protocols, wire
-sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop
+sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop, remote_access
 desktop: kernel, agent_protocols, desktop_ffi
 desktop_ffi:
 ```
@@ -611,7 +612,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review. A library crate starts a thread in six places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; and `accounting::worker::pool` gives each run one lane that ends when the run comes home. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open and hashes one segment after another on that one thread rather than in parallel, the console, first run, the doctor's probes, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does |
+| 3 | One spawn point | review. A library crate starts a thread in seven places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; `accounting::worker::pool` gives each run one lane that ends when the run comes home; and `remote_access::route::command` gives each command route one reader that ends when the command ends and its output closes. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open and hashes one segment after another on that one thread rather than in parallel, the console, the remote listener's tasks in `bin::outside::listener`, which end when the remote door closes, first run, the doctor's probes, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does |
 | 4 | No random source on a decision path; OS entropy mints only values a stranger must not guess | review; citysim has no random source to seed |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
@@ -910,6 +911,7 @@ flowchart TD
     sprawling --> desktop
     sprawling --> gateway
     sprawling --> kernel
+    sprawling --> remote_access
     sprawling --> runtime
     sprawling --> storage
     sprawling --> wire

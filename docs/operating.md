@@ -132,6 +132,24 @@ A city with no model chosen for `main` answers that in one frame, `E_MODEL_UNCHO
 
 **Stopping.** `Ctrl-C` in either console stops that city and closes the browser it started. The two share nothing but a machine: two directories, two Ledgers, two ports.
 
+## Reaching the city from another device
+
+The remote door lets a phone or a second computer reach a city that runs on this machine, through a route that makes a loopback port reachable from outside. It is driven from the city's own console, and from nowhere else: none of these verbs is on the wire, so no page, device or resident can open the door or pair a device.
+
+| Typed at the console | What happens |
+|---|---|
+| `/remote open [--for 30m\|12h\|2d]` | Opens the door for that long (12 hours when `--for` is left out, a week at most) and prints the `https://` address a device opens. |
+| `/remote pair <name> [--watch]` | Prints a QR code, the link inside it, and a pairing code that is good once, for ten minutes. A device paired with `--watch` reads the city; without it, the device can also dispatch, steer, cancel, halt, release, approve and hand off. |
+| `/remote devices` | One line per paired device: its name, `watch` or `act`, and its id. |
+| `/remote revoke <name>` or `--all` | Forgets the device; its sessions end. |
+| `/remote close` | Closes the door. Paired devices stay paired. |
+
+Nothing that widens access, reaches a credential, or changes the machine or the city's rules can be done from a device, whatever it was paired as: attaching an endpoint, choosing a model, writing rules or configuration, installing a tool, raising or removing a building. Those stay at the machine the city runs on. The full list is the `class` column of `crates/wire/wire-SPEC.md` section 19-2.
+
+The history records `remote_opened`, `device_paired`, `remote_session_started`, `device_revoked` and `remote_closed`, without keys, pairing codes or session ids.
+
+What this build does not do yet: it reads no `[remote]` table, so no route is chosen and `/remote open` refuses and says so. The city's key also lives only in the running process, so a device paired now pairs again after the city restarts.
+
 ## Moving a city
 
 ```bash

@@ -54,7 +54,7 @@
 
 公开面见 `tools/xtask/api-baselines/wire.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
 
-**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`CommitAnswer` 带出提交说明；身份的另外两件——在主机上经 `gh` 导入用户 ID 的读（一条 `Query`，在锁外跑 `gh api --hostname <host> user --jq .login`，只取 login，不读不记令牌，失败答拒因）与上手指南按城保存的进度（存放位置在 `kernel::layout` 的 `urbanite` 一组之后，待定）。下列新名字只动名字表，哈希随之变，不另进位：远程门的五种 Ledger 事件（门开、门关、设备配对、设备撤销、会话开始，与写它们的装配同批，remote_access-SPEC §3）；按房间分页列出 session 的查询（UC7b：起点 seq、起点方式——新开、`--carry`、分叉及其 `Origin`——、run 数、最近一次活动）。后者未落的原因是读法：今天视图只持热视图里最近冻结的 32 个 run，账本索引只按 run 建表，所以要么视图多折一张按房间的 session 表（视图快照的 `fold_version` 随之进一位），要么 `storage::index` 多建一张按地址的表；判定它的证据是两种做法在 40 万行城上开一次「最近」段的读数。每落一项删一项。
+**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`CommitAnswer` 带出提交说明；身份的另外两件——在主机上经 `gh` 导入用户 ID 的读（一条 `Query`，在锁外跑 `gh api --hostname <host> user --jq .login`，只取 login，不读不记令牌，失败答拒因）与上手指南按城保存的进度（存放位置在 `kernel::layout` 的 `urbanite` 一组之后，待定）。下列新名字只动名字表，哈希随之变，不另进位：按房间分页列出 session 的查询（UC7b：起点 seq、起点方式——新开、`--carry`、分叉及其 `Origin`——、run 数、最近一次活动）。后者未落的原因是读法：今天视图只持热视图里最近冻结的 32 个 run，账本索引只按 run 建表，所以要么视图多折一张按房间的 session 表（视图快照的 `fold_version` 随之进一位），要么 `storage::index` 多建一张按地址的表；判定它的证据是两种做法在 40 万行城上开一次「最近」段的读数。每落一项删一项。
 
 ## 5 权威信源
 
@@ -483,6 +483,16 @@ WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionN
 **被否**：①页面拼出整份文本，只用 `PutDocument`：拼法有第二个家；②卡片带一个版本号而不是全文作 `base`：城要另存版本到全文的对应，而 `PutSpine` 已经用全文作基线，两种基线会让同一个页面写两种守卫。
 
 **重开参数**：身份区长出页面要分块编辑的结构（例如多个账号各一张卡）时，重议卡片是否改为按键寻址。
+
+### 12.6 动词类是 §19-2 的一列，由中继的穷尽匹配实现、门机器对照
+
+**决定**：一帧由远程设备发来时属于 `Read`／`Act`／`LocalOnly` 哪一类，写在 §19-2 reach 旁边的 `class` 列；中继在 `bin::outside::verbs` 以穷尽匹配实现它，`xtask wiring` 逐行对照两者（§8-65）。
+
+**理由**：这一列回答的问题与 reach 同族——一个动词从哪里够得到——所以与 reach 住在同一张表上，读者在一处看到两件事。实现必须在 `sprawling`，因为 `VerbClass` 归 `remote_access`，本 crate 不依赖它；穷尽匹配保证一个新 Command 在有人决定它的类之前编译不过，表格对照保证决定写下来了。
+
+**被否**：①给 `wire::Command` 加一个 `class()` 方法：要么本 crate 依赖 `remote_access`，要么另立一个同值的枚举，两处定义同一组值；②在表里写类、中继在启动时解析 SPEC：二进制读一份 Markdown 做授权，文档的排版错误就成了门的漏洞；③不写表、只留匹配：一个动词能不能从城外做，是人要读到、要决定的事，藏在代码里没人看。
+
+**重开参数**：wire 的规格迁成 `Spec.lean` 时，`class` 改写成 `def Command.verbClass` 的一臂一行，`xtask wiring` 按 xtask-SPEC §8-45 读它。
 
 ## 13 依赖选型
 
@@ -1743,6 +1753,24 @@ pub enum ModelTag { /* …既有… */ Ocr }      // 线上 "ocr"
 - `ModelTag::Ocr`：人登记的一个能读图的模型，城的 OCR 工具读这一次选择（gateway-SPEC §8-34）。二进制里不带任何模型（D18），这个值只是一个登记位。
 - 三项都是名字不变的改形，共用 45。
 
+### 8-65 动词类：§19-2 的 `class` 列
+
+```rust
+// bin::outside::verbs（sprawling）：中继读这一列的那一处
+pub(super) fn command_class(command: &wire::WireCommand) -> remote_access::door::VerbClass;   // 穷尽匹配，无通配臂
+```
+
+- **`class` 是 §19-2 的一列，不是 wire 的一个方法。** 它说的是远程门放不放一帧进来，而远程门的权限与 `VerbClass` 归 `remote_access`（remote_access-SPEC §8-1）；本 crate 不依赖它，也不为它另立一个同值的枚举。中继在 `sprawling`，那里同时看得见两者（remote_access-SPEC §7）。
+- **表与匹配由门机器对照**：`xtask wiring` 读表的第三格与 `command_class` 的每一臂，表里缺格、读不成三个取值之一、或与匹配说法不一，都点名那一个动词（xtask-SPEC §8-45）。匹配是穷尽的，所以一个新 Command 在有人定下它的类之前编译不过。
+- 不改任何帧，不动 `WIRE_V`。
+
+### 8-66 远程中继怎样用这条线
+
+- **设备说的是同一条线。** 远程会话里封装的每一帧文本（remote_access-SPEC §8-5 的 `Payload::Frame`）就是一帧 `ClientFrame` 或 `ServerFrame`；中继打开封装、按 §19-2 判类，放行的帧**原样**发给城自己在回环上的 `/ws`，不解析后再序列化。
+- **`Hello` 换成城自己的**：设备不知道、也不该知道城的配对令牌（§8-41）。中继把设备的 `Hello` 里的 `token` 换成城的令牌（没有就是空），`wire_v` 与 `schema` 照设备说的发，所以设备上的页面与城说不说同一版线，仍由 `server::decide_handshake` 判。
+- **拒绝是一帧 `Refusal`**：被门拒的帧不到城，中继封一帧 `ServerFrame::Refusal` 回给设备，码是 `E_GATE_DENIED`，恢复语说该在城自己的机器上做，或该重新配对为 `act`。读不成 `ClientFrame` 的文本同样封一帧 `E_WIRE_MISMATCH` 回去。
+- 城发来的每一帧都封好送回设备，事件、答复、增量一视同仁：一台 `Watch` 设备能读的就是这座城的整条线，这正是「看」的意思。
+
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 
 **这张表存在的理由，是一次已经发生过的失效。** v0.0.3 的审计发现 `accounting::worker::run_command` 只匹配 22 个 Command 里的 14 个，
@@ -1756,6 +1784,8 @@ pub enum ModelTag { /* …既有… */ Ocr }      // 线上 "ocr"
 
 ### 19-1 reach 的四个取值
 
+表里的第二个事实是 `class`：这个 Command 由一台远程设备经远程门发来时属于哪一类动词（§19-3）。reach 说城里谁该够得到它，class 说城外的设备能不能带它进来，两件事互不推出，所以是两列。
+
 | 取值 | 含义 | 门要求什么 |
 |---|---|---|
 | `client` | 人用的动词，客户端必须画得出 | `client/src` 里有发出点，且 `run_command` 不以 `not_built` 作答 |
@@ -1765,41 +1795,53 @@ pub enum ModelTag { /* …既有… */ Ocr }      // 线上 "ocr"
 
 ### 19-2 表
 
-| Command | reach | 说明 |
+| Command | reach | class | 说明 |
+|---|---|---|---|
+| `Dispatch` | client | Act | 派活，产品的正面 |
+| `ProbeEndpoint` | client | LocalOnly | 问一个端点它供应什么 |
+| `ConfigureBuilding` | client | LocalOnly | 改一栋楼的规矩 |
+| `AttachEndpoint` | client | LocalOnly | 把一个端点挂上 |
+| `SelectModel` | client | LocalOnly | 选一个模型 |
+| `OpenSession` | client | Act | 在同一个地址上开新的一段会话（`Carry` 说带不带上一段的交接，`from` 说从哪条线哪一行分出来） |
+| `Reveal` | client | LocalOnly | 在人自己的文件管理器里指出一个地址 |
+| `RestoreDiscard` | client | LocalOnly | 把回收站里一行按它自带的回去的路放回原处 |
+| `DoctorInstall` | client | LocalOnly | 按需求表里的名字装一件机器缺的东西 |
+| `DoctorRefresh` | client | LocalOnly | 重新探一遍机器，取代开城时的快照 |
+| `ConnectToolkit` | client | LocalOnly | 请外包服务开一次同意会话，把一个外部应用接进来 |
+| `PutSpine` | client | Act | 写一栋楼自己的 spine 文档（roadmap／memo／handoff／spec）。携 `base`（发信方起手时那份正文）与 `body`，文件已被人或居民改过即拒——**这几份有两个写者**，与 `PutDocument` 的单写者前提不同，故两道门的守卫不同 |
+| `CreateBuilding` | client | LocalOnly | 起一栋楼 |
+| `RemoveBuilding` | client | LocalOnly | 把一栋楼移出城：文件搬进 reserved subtree（city-SPEC §8-3），历史留在 Ledger，写 `building_removed`；有 run 正在其中某个房间里跑时拒 `E_BUSY`，点名房间与 run |
+| `Steer` | client | Act | 中途换方向 |
+| `Cancel` | client | Act | 停下这一个 |
+| `Halt` | client | Act | 停下一个范围 |
+| `Release` | client | Act | 放开一个范围 |
+| `Approve` | client | Act | 答一条审批 |
+| `SetAutonomy` | client | LocalOnly | 定一栋楼的 Autonomy（两态：本人或被任命的居民） |
+| `HandOff` | client | Act | 把一条问题转给另一位居民去答 |
+| `PutPreferences` | client | LocalOnly | 写这个人自己的 `~/.sprawling/config.toml` 的 `[ui]` |
+| `PutShelved` | client | LocalOnly | 写一份上架的文档（技能或说明） |
+| `Pursue` | client | Act | 设一个持续追的目标，以及暂停／恢复／清除 |
+| `PutDocument` | client | LocalOnly | 写治理这座城的三份文件之一，携 `base`（§8-59） |
+| `PutIdentity` | client | LocalOnly | 写设置页上的卡片：城在 `base` 上改写 `PREFERENCES.md` 或 `MAYOR.md` 的身份区（§8-59） |
+| `PutRules` | client | LocalOnly | 写一栋楼的 `RULES.toml`：整份、带 `base`，先求值后落盘（§8-60） |
+| `ConfigureCity` | client | LocalOnly | 写城自己那一层 `CONFIG.toml` 的 `keep_warm` 与 `effort`（§8-61） |
+| `RestoreFile` | client | LocalOnly | 把城工作树里的一个文件换回一个检查点里的那一份，检查点里没有就删去（§8-62(b)） |
+| `BatchByBuilding` | client | Act | 按楼成批派活 |
+| `Wake` | push | LocalOnly | 外面发生了一件事；地址由 watch 表与 triage 决定，调用方说不出房间 |
+| `Auth` | handshake | LocalOnly | 出示配对令牌，`server::decide_handshake` 吃掉它 |
+| `PutSecret` | sealed | LocalOnly | 唯一没有字节形式的 Command；`Sealed<String>` 在线上不可居留 |
+
+### 19-3 class 的三个取值
+
+| 取值 | 含义 | 远程设备 |
 |---|---|---|
-| `Dispatch` | client | 派活，产品的正面 |
-| `ProbeEndpoint` | client | 问一个端点它供应什么 |
-| `ConfigureBuilding` | client | 改一栋楼的规矩 |
-| `AttachEndpoint` | client | 把一个端点挂上 |
-| `SelectModel` | client | 选一个模型 |
-| `OpenSession` | client | 在同一个地址上开新的一段会话（`Carry` 说带不带上一段的交接，`from` 说从哪条线哪一行分出来） |
-| `Reveal` | client | 在人自己的文件管理器里指出一个地址 |
-| `RestoreDiscard` | client | 把回收站里一行按它自带的回去的路放回原处 |
-| `DoctorInstall` | client | 按需求表里的名字装一件机器缺的东西 |
-| `DoctorRefresh` | client | 重新探一遍机器，取代开城时的快照 |
-| `ConnectToolkit` | client | 请外包服务开一次同意会话，把一个外部应用接进来 |
-| `PutSpine` | client | 写一栋楼自己的 spine 文档（roadmap／memo／handoff／spec）。携 `base`（发信方起手时那份正文）与 `body`，文件已被人或居民改过即拒——**这几份有两个写者**，与 `PutDocument` 的单写者前提不同，故两道门的守卫不同 |
-| `CreateBuilding` | client | 起一栋楼 |
-| `RemoveBuilding` | client | 把一栋楼移出城：文件搬进 reserved subtree（city-SPEC §8-3），历史留在 Ledger，写 `building_removed`；有 run 正在其中某个房间里跑时拒 `E_BUSY`，点名房间与 run |
-| `Steer` | client | 中途换方向 |
-| `Cancel` | client | 停下这一个 |
-| `Halt` | client | 停下一个范围 |
-| `Release` | client | 放开一个范围 |
-| `Approve` | client | 答一条审批 |
-| `SetAutonomy` | client | 定一栋楼的 Autonomy（两态：本人或被任命的居民） |
-| `HandOff` | client | 把一条问题转给另一位居民去答 |
-| `PutPreferences` | client | 写这个人自己的 `~/.sprawling/config.toml` 的 `[ui]` |
-| `PutShelved` | client | 写一份上架的文档（技能或说明） |
-| `Pursue` | client | 设一个持续追的目标，以及暂停／恢复／清除 |
-| `PutDocument` | client | 写治理这座城的三份文件之一，携 `base`（§8-59） |
-| `PutIdentity` | client | 写设置页上的卡片：城在 `base` 上改写 `PREFERENCES.md` 或 `MAYOR.md` 的身份区（§8-59） |
-| `PutRules` | client | 写一栋楼的 `RULES.toml`：整份、带 `base`，先求值后落盘（§8-60） |
-| `ConfigureCity` | client | 写城自己那一层 `CONFIG.toml` 的 `keep_warm` 与 `effort`（§8-61） |
-| `RestoreFile` | client | 把城工作树里的一个文件换回一个检查点里的那一份，检查点里没有就删去（§8-62(b)） |
-| `BatchByBuilding` | client | 按楼成批派活 |
-| `Wake` | push | 外面发生了一件事；地址由 watch 表与 triage 决定，调用方说不出房间 |
-| `Auth` | handshake | 出示配对令牌，`server::decide_handshake` 吃掉它 |
-| `PutSecret` | sealed | 唯一没有字节形式的 Command；`Sealed<String>` 在线上不可居留 |
+| `Read` | 读城，什么也不改 | `Watch` 与 `Act` 两种权限都带得进来 |
+| `Act` | 人离开电脑时仍要做的活：派活、改方向、停下、叫停与放开、答审批、转交、按楼成批派活、追目标、开新一段会话、写楼自己的 spine 文档 | 只有 `Act` 权限带得进来 |
+| `LocalOnly` | 放宽访问、够到凭证或城所在的宿主机、改变治理这座城的东西：接端点、选模型、建楼拆楼、写规则与配置、装东西、开文件管理器 | 恒不带进来，不论权限 |
+
+- **新加的 Command 一律 `LocalOnly`**，除非人决定一台不在电脑旁的设备可以做它。`Act` 与 `Read` 是一次决定，不是默认值；表里一行缺 `class` 格，`xtask wiring` 点名那一行。
+- `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门自己的动词（开门、配对、撤销）不在线上，表里没有它们（remote_access-SPEC §12-4）。
+- 这一列是权威，中继按它判，`xtask wiring` 把表与中继的穷尽匹配（`bin::outside::verbs::command_class`）逐行对照（§8-65）。
 
 **`client` 而尚未落地的三个**（`HandOff`／`PutShelved`／`BatchByBuilding`）今天由 `not_built` 作答，
 所以门对它们要求的是**客户端不画**——`not_built` 的 rustdoc 说的就是这件事，现在有机器看着了。

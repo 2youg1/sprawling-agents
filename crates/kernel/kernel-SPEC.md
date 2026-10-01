@@ -730,6 +730,11 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 | 保温 | `cache_renewed` | record-only（保温续期一次入账，写在房间地址下：成功时携 provider 自报的四个 token 数与它自报的账单额，失败时携 provider 的拒绝原样（`AxError`）。续期只重发前缀、不改变任何一次请求的字节，所以不入窗；记下它是为了让人从历史里读出保温花了多少） |
 | harness 居民 | `harness_reported` | record-only（官方 harness 在一次 run 里汇报的一件事：回答或推理的一段、它开始的一次工具调用与状态、它问的许可与城的答；harness 说了之后才落账，恒不被读回来当作城的判定） |
 | harness 居民 | `harness_answered` | record-only（harness 对城那次 prompt 的回答：停止原因与这一回合它回答城的文字；停止原因一到就写，再冻结。`end_turn` 而文字非空时，它是 `Completion::Done` 的证据（§8-20）） |
+| 远程门 | `remote_opened` | record-only（人在控制台开了远程门：到何时自己关上（`closes_at`），以及设备打开的 `https://` 地址（`url`）。谁能从外面进城不决定任何模型请求字节（§8-81）） |
+| 远程门 | `remote_closed` | record-only（远程门关了，`why` 说是谁关的：`console` 人在控制台、`locked` 持有会话的设备锁门离开、`expired` 开门的时长到了） |
+| 远程门 | `device_paired` | record-only（一台设备出示了有效的配对码，城留下它：设备 id 的正文、人给它的名字、权限 `watch`／`act`。公钥不在此处，在设备表里） |
+| 远程门 | `device_revoked` | record-only（人撤销了一台设备：设备 id 的正文与名字；它持有的会话随之结束） |
+| 远程门 | `remote_session_started` | record-only（一台已配对的设备握手证明了它的密钥，持有一段远程会话到 `expires`，不晚于门关上的时刻；会话 id 不在此处） |
 
 二分依据唯一：该事件载荷是否决定模型请求字节；不存在第三类。
 
@@ -1890,6 +1895,16 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 **重开参数**：出现第三种落地方式（例如合并到别的分支）时，`LandingPolicy` 加一臂；出现一种 mode 需要自己的证据规则时，重议「mode 不参与准入」。
 
+### 12.13 远程门的五种事件全是 record-only，载荷里不带钥匙
+
+**决定**：远程门开、关、配对、撤销、会话开始各是一个种类（§8-81），五种都是 record-only，载荷只写时刻、地址、设备 id 的正文、名字与权限，不写公钥、配对码与会话 id；设备与权限以 `remote_access` 给出的正文存，kernel 不另立类型。
+
+**理由**：这五件事回答的是「谁、何时、凭什么进了城」，人从历史里读的正是这个；它们不改变任何一次模型请求，所以不入窗。钥匙类的字节进了账本就随每一次导出、每一次重放流出去，而它们在设备表里已经有一个家。kernel 不依赖 `remote_access`，为权限另立一个 kernel 枚举就是同一件事的第二份定义。
+
+**被否**：①一个 `remote_door` 种类、载荷里带一个 `what` 字段：读者要先解载荷才知道发生了什么，`EventKind` 的穷尽匹配也看不见它；②在 `device_paired` 里存设备公钥，让设备表可以从账本重建：撤销之后公钥仍留在历史里，而设备表本来就原子写盘；③在 kernel 里定义 `DeviceAuthority`：与 `remote_access::door::Authority` 两处定义同一组值。
+
+**重开参数**：账本需要证明「这一帧是哪台设备发来的」时（例如设备发出的命令要在账本上署设备的名），重议会话 id 是否入账。
+
 ## 13 依赖选型
 
 `serde`＋`serde_json`（规范字节与载荷）；`thiserror`（Display/Error derive）；`blake3`（唯一哈希）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）；`secrecy`＋`zeroize`（Sealed）。版本由根 `Cargo.toml` 与 `Cargo.lock` 给出。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
@@ -2431,3 +2446,19 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 - **一个标签，不是一个模型。** 二进制里不带任何模型（D18）：人接一个端点、为 `Ocr` 选一个能读图的模型，城的 OCR 工具（X6）按这一次选择调用它，与转写读 `Transcribe` 是同一个机制（wire-SPEC §8-27）。没有选时，用到它的工具答它不可用，不回落到 `Main`——一个只会读字的模型被递上一张图，答的是它猜的东西。
 - **先有登记位，调用方随 X6 来。** 这条与本枚举「有人问才长」的规矩相违，理由是线上形状：`ModelTag` 在线上，加一个值要进位，本批（`WIRE_V` 45）一次带上，X6 落地时不再为它另进一位（wire-SPEC §12.1）。在 X6 落地之前，页面不画这一行（client-SPEC 的模型表照旧三行）。
 - `ALL` 的顺序就是设置页给出它们的顺序，`Ocr` 在最后。
+
+### 8-81 远程门的五种事件（`kernel::event::record::remote`，形状 2 值类型）
+
+```rust
+pub struct RemoteOpened { pub closes_at: TimeMs, pub url: String }
+pub struct RemoteClosed { pub why: RemoteClosing }
+pub enum RemoteClosing { Console, Locked, Expired }          // 线上 "console" | "locked" | "expired"
+pub struct DevicePaired { pub device: String, pub name: String, pub authority: String }
+pub struct DeviceRevoked { pub device: String, pub name: String }
+pub struct RemoteSessionStarted { pub device: String, pub expires: TimeMs }
+```
+
+- **五种都是 record-only，都写在城自己名下**（`run` 为 `RunId::CITY`，无 `addr`）：谁能从外面够到这座城不决定任何一次模型请求的字节。写它们的是装配层的远程门（sprawling-SPEC 8-139），经 worker 的 relay 进同一个写者。`who` 是 `person`，只有门到时自己关上那一条是 `city`。
+- **追加在 `ALL` 末尾，次序就是一扇门一生的次序**：开、关、配对、撤销、会话开始（表按种类排，入账的次序是开、配对、会话开始、撤销、关）。不写 `ig`：0.0.7 的读者不认识这五个种类，按 §12.10 的规矩报 `E_LOG_VERSION_UNSUPPORTED` 而不是跳过它们。
+- **没有一行携带密钥、配对码或会话 id**：账本可以被任何人重放，带上它们等于把冒充一台设备的材料交给每一个读者。设备的公钥只在设备表里（`CityLayout::devices`）。
+- **设备与权限用正文写**：`device` 是设备 id 的 base32 正文，`authority` 是 `watch` 或 `act`。两者的类型与拼写归 `remote_access::door`（remote_access-SPEC §8-11），kernel 不依赖它，所以这里存它给出的字。
