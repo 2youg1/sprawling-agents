@@ -2799,6 +2799,10 @@
     "en": "transcribe · hears (needs an ASR model such as whisper; a text model cannot go here)",
     "zh": "transcribe · 听写（需要 ASR 模型，如 whisper；文本模型不能填这里）"
   },
+  "setup_ocr": {
+    "en": "ocr · reads images (needs a model that takes images; a text-only model cannot go here)",
+    "zh": "ocr · 读图（需要能收图片的模型；只收文字的模型不能填这里）"
+  },
   "setup_unkeyed": {
     "en": "no key",
     "zh": "未配密钥"
