@@ -295,6 +295,7 @@ impl CommitsAsk {
 /// snapshot is let go (sprawling-SPEC 8-128, wire-SPEC 8-54).
 fn give_git_facts(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
     give_parents(city_root, commits);
+    give_messages(city_root, commits);
 }
 
 /// Gives each commit the message its object holds, from one opening of
