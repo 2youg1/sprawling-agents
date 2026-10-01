@@ -90,11 +90,23 @@ second answer. -/
 def states [ToString α] (text : String) (value : α) : Bool :=
   (text.splitOn (toString value)).length > 1
 
+/-- The text a document answer states: none for a missing or an empty file,
+the first window of a held text file, and nothing readable for any other
+state, which the caller refuses. -/
+def documentText (body : Json) : Option String := do
+  let state ← (body.getObjVal? "state").toOption
+  if state.getStr?.toOption == some "missing" then return ""
+  if (state.getObjVal? "empty").toOption.isSome then return ""
+  (state.getObjVal? "held" >>= (·.getObjVal? "body") >>= (·.getObjVal? "text")
+    >>= (·.getObjVal? "head") >>= (·.getObjVal? "text") >>= Json.getStr?).toOption
+
 /-- The text of one file of the city, as the door reads it.
 
 A layer nobody has written has no file, and the city says so by name rather
-than by answering an empty one: that answer is read here as the statement that
-this layer states nothing, which is what it means for a configuration file.
+than by answering an empty one: that answer, like an empty file, is read here as
+the statement that this layer states nothing, which is what it means for a
+configuration file. A held text file states its first window, which holds the
+whole of a configuration layer.
 
 Any other shape throws. An answer read as an empty file would satisfy every
 assertion below about what a file does not state, so a reader that guessed
@@ -102,14 +114,9 @@ here would turn a defect into a pass. -/
 def Door.readDocument (door : Door) (ground : Ground) (path : String) : IO String := do
   match ← door.ask ground.port (.document path) with
   | .accepted frames =>
-    match answerOf "document" frames with
-    | some body =>
-      match (body.getObjVal? "text" >>= Json.getStr?).toOption with
-      | some text => return text
-      | none => throw <| IO.userError s!"a document answer carried no text: {path}"
-    | none =>
-      if (answerOf "unavailable" frames).isSome then return "" else
-        throw <| IO.userError s!"the city did not answer with a document: {path}"
+    match answerOf "document" frames >>= documentText with
+    | some text => return text
+    | none => throw <| IO.userError s!"the city did not answer with a document's text: {path}"
   | .denied complaint =>
     throw <| IO.userError s!"a file of the city could not be read: {complaint}"
   | .quiet => throw <| IO.userError s!"the city said nothing about {path}"

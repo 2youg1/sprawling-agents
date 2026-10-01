@@ -356,6 +356,7 @@ def budgets        : List Nat                    -- 互不为子串的七个指�
 def writeSequence  : Nat → Gen (List Nat)        -- 非空的写序列
 def shrinkSequence : List Nat → List (List Nat)  -- 收缩后仍非空
 def states         : String → Nat → Bool         -- 这份读数陈述了这个数字吗
+def documentText   : Json → Option String       -- 缺失或空的文件读作空串，有正文的读第一个窗口
 def Door.readDocument : Door → Ground → String → IO String
 def Door.readBudget   : Door → Ground → String → IO (Option Nat)
 def Door.writeBudget  : Door → Ground → Nat → Nat → IO (Option String)
@@ -364,7 +365,7 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 
 `states` 是子串判断而不是一次解析：TOML 的文法权威在 `city::config_layers`，本目录再写一个读者就是第二个权威（§1）。子串够用的前提写在 `budgets` 里——七个四位数互不为子串，于是「文件还陈述着更早那次写入」这条断言不会被两个数字的包含关系伪造。
 
-`Door.readDocument` 把「这一层没有文件」读成空字符串，而把任何别的形状抛出去。这条分界是必须的：一个把读不懂的答案也当成空文件的读者，会让下面每一条「文件没有陈述什么」的断言无条件成立。
+`Door.readDocument` 把「这一层没有文件」与空文件读成空字符串，把有正文的文件读成它的第一个窗口，而把任何别的形状抛出去。这条分界是必须的：一个把读不懂的答案也当成空文件的读者，会让下面每一条「文件没有陈述什么」的断言无条件成立。
 
 `ask` 返回 `Answer` 而不是抛异常：被拒绝是产品的正常输出，而**解析失败**才是异常——门的形状变了，检查应当当场停下，而不是把新形状当成一次拒绝。
 
