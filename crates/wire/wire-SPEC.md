@@ -270,7 +270,6 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 - **拒绝属于发问者，不广播**。把它做成一条事件会告诉所有在看的人「别人打错了一个字」，而事件流是这座城的历史，不是某个人的错字簿。故每条会话自持一个无界队列，`Deliver` 时把写入该队列的闭包随命令交给工人；会话的 `select!` 因此从两臂变三臂。
 - **`Delivered` 是三态而不是 `Result`**，因为「没有人问过」与「问的人走了」是两件不同的事：前者是排程的正常形态，后者值一行诊断。这也是**不得重新引入 `let _ =`** 的落法——`SendError` 被穷尽消解成一个领域枚举，而不是被丢掉。
 - **无界队列而非 `broadcast`**：一条拒绝丢不得，而它的量级是「人点错的次数」，不是事件流量。
-- **未做且已知**：`/enroll` 路由同病。它同步答 201，而 `PutSecret` 是投递到同一张桌子的，工人的拒绝到不了 HTTP 响应。此处**不顺手改**，因为桌子在一次 dispatch 期间不被读取，把 HTTP 请求做成同步等待会让它挂上几分钟；正确的形状是有界等待加 202，随 `sprawling enrol` 一并落。
 
 **Query 的答面**。`ServeConfig.queries: Arc<dyn Fn(Query) -> Result<Answer, AxError> + Send + Sync>`，同步；`ServerFrame` 增 `Answer(Box<Answer>)` 变体。答面类型住 `answer`：`Answer`（City／Run／Approvals／Cost／Unavailable）、`RunSummary`、`CityAnswer`、`ApprovalsAnswer`、`CostAnswer`。
 
@@ -284,7 +283,6 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 - **`Answer::Unavailable { query }` 是一个真答案**：不求值的视图报自己的名字，而不是返回空结果——空城与未实现在界面上必须长得不一样。
 - **`CityAnswer.buildings: Vec<BuildingProgress>`**：每栋楼一行，携 `Progress` 与 `problems`。解析不出的行进 `problems` 并照显——悄悄丢掉读不懂的行，等于按一个没人选过的分母报进度。
 - **五维成本携权威总额**：`CostAnswer.total` 与 actor、segment、tool、skill 四个维度各自求和相等；`by_run` 只带活跃的跑与花得最多的前几个（sprawling-SPEC §8-90），和可以小于 `total`。界面按 `total` 算占比而不自己归一，未归因余额与列表之外的跑因此都看得见。
-- **五维成本携权威总额**：`CostAnswer.total` 与五个维度各自求和相等；界面按 `total` 算占比而不自己归一，未归因余额因此看得见。
 - **无报价的调用单独报数**：`CostAnswer.unpriced: UnpricedCalls { calls, tokens }` 是账本上没有权威计费额的模型调用次数与它们的 token 总数（`storage::Attribution` 的 `unpriced` 原样上线）。它们不进 `total`，所以缺了这一项，一座只用订阅登录或本地模型的城跑了多少次都读作「没花钱」；界面据 `calls > 0` 说「有调用没有报价」并给出 token 数，而不是把 `$0.00` 当作量出来的数。
 
 - **採用 `broadcast` 而非每连接一个队列**：多个标签页是常态；慢客户端被拉下而不拖住写入方。**丢下的那一段不再静默**：事件流慢过城的会话收到 `ServerFrame::Lagged { from, to }`，按这个区间向账本补拉（§8-41）。三路语义不同，故这三节分开陈述：事件可补、增量与日志恒不可补、会话自己的拒绝根本不走广播。
@@ -1620,7 +1618,7 @@ pub enum Query { /* … */ NewestRelease }   // 线上拼作 "newest_release"
 
 - **名字说出答的是什么**：这条查询回答「这座城是哪一版、npm 上最新的是哪一版」（§8-36 的五条口径不变）。它原来叫 `Release`，与释放一个关停范围的 `Command::Release` 同名；控制台把 socket 能带的动词与查询列在一处，一个人看到两个 `release`，分不清哪个放开关停、哪个去问注册表。
 - **只改查询，不改答复**：`Answer::Release` 与 `ReleaseAnswer` 保持原名。答复不出现在人能输入的地方，没有同名的歧义；改它只会多一次无人受益的线上换形。
-- **`WIRE_V` 不动**：变体名进 `QUERY_NAMES`，名字一变 §8-1 的 golden 就变，旧页面在握手时被拒，而不是发出一条城不认识的查询；`WIRE_V` 只为「名字没换而语法换形」而升（§298），改名不属于那一类。新名字登记在 `docs/glossary.md` §6；旧拼法不进 `tools/xtask/lexicon.toml`，因为已发布版本的 `CHANGELOG.md` 如实记着它当时的名字，子串禁令会误伤那段历史。
+- **`WIRE_V` 不动**：变体名进 `QUERY_NAMES`，名字一变 §8-1 的 golden 就变，旧页面在握手时被拒，而不是发出一条城不认识的查询；`WIRE_V` 只为「名字没换而语法换形」而升（§12.1），改名不属于那一类。新名字登记在 `docs/glossary.md` §6；旧拼法不进 `tools/xtask/lexicon.toml`，因为已发布版本的 `CHANGELOG.md` 如实记着它当时的名字，子串禁令会误伤那段历史。
 - **被否：保留 `release` 作别名**。一条查询两个拼法，就是同一个名字有两个家；握手已经把旧页面挡在门外，别名没有读者。
 
 ### 8-47g 性能监视器的一对帧（`wire::frames::monitor`，形状：值类型）
@@ -1957,7 +1955,7 @@ pub struct RulesWrite { pub building: Address, pub base: String, pub body: Strin
 - **先求值，后落盘。** 城先用读楼规的同一个求值器（`city::evaluate`）读 `body`，读不出——不合 TOML、缺 `confidential`、机密楼列了出网域名——就拒，盘上不动；求值通过才经基线守卫整份换上去（city-SPEC §8-34）。所以盘上的楼规永远是这个构建读得懂的那一份，下一次派活不会因为一次保存而打不开这栋楼。
 - **账上一行 `rules_changed`。** 写成之后城记一行 `rules_changed { scope: building, which: "RULES.toml", before, after, bytes }`，与派活前核对楼规的那一行同形（`crates/kernel/Spec.lean` §8-4）；所以下一次派活看到的摘要与账上一致，不会把这次保存读成「有人绕过了门改了文件」。
 - **载荷是一个值。** `PutRules` 与 `ConfigureCity` 各带一个结构体而不是平铺的字段，线上形状与平铺时相同（`{"put_rules":{…}}`）；理由是 `Command` 住的文件与 `From<WireCommand>` 那个函数都已经贴着长度上限，一个值占一行。
-- **只经页面，不经远程设备之前先分类。** 楼规决定一栋楼能出网、能开浏览器与桌面，远程门打开之后这条帧走哪一类由 R2 定（§19-2 的 `class` 列落地时）。
+- **远程设备带不进来。** 楼规决定一栋楼能出网、能开浏览器与桌面，所以它在 §19-2 的 `class` 列是 `LocalOnly`：不论设备配对成什么，这条帧都只能在城自己的机器上发。
 - 验收：accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing`（过期的 `base` 被拒、求值失败被拒，两次之后文件不变、账上没有 `rules_changed`；对的 `base` 与能求值的正文落盘并记一行）。
 
 ### 8-61 城一级的配置与核心优先级可写：`ConfigureCity`、`PreferencePatch::CorePriority`
