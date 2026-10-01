@@ -11,7 +11,7 @@ disallowed-methods = [
     { path = "std::time::Instant::now", reason = "inject time from assembly" },
     { path = "std::time::SystemTime::now", reason = "inject time from assembly" },
     # Every HTTP client is built by `gateway::client_for`, which installs the
-    # process's one TLS backend first (gateway-SPEC 8-15); a client built
+    # process's one TLS backend first (`crates/gateway/Spec.lean` §8-15); a client built
     # anywhere else panics at `build()` under `rustls-no-provider`.
     # `allow-invalid`, because a crate that depends on neither reqwest nor
     # rustls cannot resolve these paths, and that is not a finding.

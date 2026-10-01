@@ -127,8 +127,8 @@ jobs:
   # code rather than here: the Linux build keeps a key in the kernel's
   # own keyring through `keyring`'s `linux-native` (keyutils) feature,
   # which is a syscall and needs no bus, and it reports that key as
-  # `Persistence::ThisBoot` because a reboot empties it (gateway-SPEC
-  # 8-4). `libdbus-sys` is out of the lockfile entirely.
+  # `Persistence::ThisBoot` because a reboot empties it (`crates/gateway/Spec.lean`
+  # §8-4). `libdbus-sys` is out of the lockfile entirely.
   #
   # Archive does not wait for verify: the two are independent, publish
   # waits for both, and the wall clock is the slower one instead of the sum.

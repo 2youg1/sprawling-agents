@@ -167,13 +167,13 @@ cssparser = { version = "0.38", default-features = false }
 # needs no assembler either (crates/remote_access/Spec.lean section 13).
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "prebuilt-nasm"] }
 # The TLS stack's crypto backend is aws-lc-rs, installed once by
-# `gateway::reach::tls` (gateway-SPEC section 8-15) rather than chosen by a
+# `gateway::reach::tls` (`crates/gateway/Spec.lean` §8-15) rather than chosen by a
 # reqwest feature name. The same aws-lc-rs line above serves the remote
 # door's primitives, so the binary links one AWS-LC.
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
 reqwest = { version = "0.13", default-features = false, features = [
     "blocking",
-    # The backend is installed by gateway::reach::tls (gateway-SPEC 8-15).
+    # The backend is installed by gateway::reach::tls (`crates/gateway/Spec.lean` §8-15).
     "rustls-no-provider",
     "json",
     "http2",
@@ -206,14 +206,14 @@ zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2
 # storage links it; the tests that open the repository a merge landed in
 # read it too. One version authority for all of them.
 git2 = { version = "0.21", default-features = false }
-# The encrypted vault file's two primitives (14.5, gateway-SPEC 8-21), and
+# The encrypted vault file's two primitives (14.5, `crates/gateway/Spec.lean` §8-21), and
 # nothing beyond them. ChaCha20-Poly1305 is an RFC 8439 AEAD that is fast in
 # pure software on a machine without AES-NI, and Argon2id (RFC 9106) is the
 # password KDF whose slowness is the feature that guards a passphrase.
 # blake3 stays the sole content hash: a fast hash cannot derive a key from a
 # passphrase, so these are two jobs rather than one authority split in two.
 # ML-KEM and FN-DSA stay out until they have a reader; the reopen parameters
-# are recorded in gateway-SPEC 8-21.
+# are recorded in `crates/gateway/Spec.lean` §8-21.
 # Both are taken without default features: the vault draws its salt and its
 # nonce from `getrandom`, which this workspace already names, and a second
 # path to the operating system's entropy would be a second authority for
