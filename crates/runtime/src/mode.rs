@@ -132,7 +132,7 @@ pub fn admits(policy: &RunPolicy, produced: &Produced) -> Admission {
             alternative: "write what you learned into Memo.md, then ask for the work again \
                           with the ordinary landing",
         },
-        LandingPolicy::Ordinary => admits_evidence(AdmissionRequirement::Standing, produced),
+        LandingPolicy::Ordinary => admits_evidence(policy.admit, produced),
     }
 }
 
@@ -217,5 +217,128 @@ mod tests {
             panic!("work that chose `tested` and ran no test landed");
         };
         assert!(because.contains("no tests"), "{because}");
+    }
+
+    /// A chat run is told one thing, to talk with the person.
+    #[test]
+    fn chat_is_one_line_about_the_conversation() {
+        let entry = catalog_entry(Mode::Chat);
+        assert_eq!(entry.name, "mode:chat");
+        assert!(entry.disclosure.contains("convers"), "{}", entry.disclosure);
+        assert!(!entry.disclosure.contains('\n'), "one line");
+        assert!(
+            !entry.expansion.is_empty(),
+            "a read of the entry says something"
+        );
+        assert_eq!(catalog_entry(Mode::Work).name, "mode:work");
+    }
+
+    /// The building's own checks are made where they are made; the
+    /// standing requirement adds none, in either mode.
+    #[test]
+    fn standing_adds_nothing_in_either_mode() {
+        for mode in Mode::ALL {
+            assert_eq!(
+                admits(&RunPolicy::of(mode), &Produced::default()),
+                Admission::Lands
+            );
+        }
+    }
+
+    #[test]
+    fn tested_wants_the_asset_proven_and_says_which_way_it_failed() {
+        let policy = work(AdmissionRequirement::Tested);
+        let failed = Produced {
+            tests_passed: Some(false),
+            ..Produced::default()
+        };
+        let Admission::Refused { because, .. } = admits(&policy, &failed) else {
+            panic!("a failing asset does not land");
+        };
+        assert!(
+            because.contains("did not pass"),
+            "not the untested sentence"
+        );
+        let passed = Produced {
+            tests_passed: Some(true),
+            ..Produced::default()
+        };
+        assert_eq!(admits(&policy, &passed), Admission::Lands);
+    }
+
+    #[test]
+    fn contract_kept_refuses_a_renovation_that_moved_the_contract() {
+        let policy = work(AdmissionRequirement::ContractKept);
+        assert_eq!(admits(&policy, &Produced::default()), Admission::Lands);
+        let moved = Produced {
+            contract_moved: true,
+            ..Produced::default()
+        };
+        let Admission::Refused { alternative, .. } = admits(&policy, &moved) else {
+            panic!("a moved contract is not a renovation");
+        };
+        assert!(
+            alternative.contains("double_validated"),
+            "the refusal names the requirement that would take it"
+        );
+    }
+
+    #[test]
+    fn double_validated_takes_nothing_on_confidence() {
+        let policy = work(AdmissionRequirement::DoubleValidated);
+        let both = Produced {
+            held_in: Some(true),
+            held_out: Some(true),
+            ..Produced::default()
+        };
+        assert_eq!(admits(&policy, &both), Admission::Lands);
+        for missing in [
+            Produced {
+                held_in: Some(true),
+                ..Produced::default()
+            },
+            Produced {
+                held_out: Some(true),
+                ..Produced::default()
+            },
+            Produced::default(),
+        ] {
+            assert!(
+                matches!(admits(&policy, &missing), Admission::Refused { .. }),
+                "half of a double validation is not a double validation"
+            );
+        }
+        let regressed = Produced {
+            held_in: Some(true),
+            held_out: Some(false),
+            ..Produced::default()
+        };
+        let Admission::Refused { because, .. } = admits(&policy, &regressed) else {
+            panic!("a change that only holds where it was built does not land");
+        };
+        assert!(because.contains("held-out"));
+    }
+
+    /// An experiment lands nothing, whatever it proved and whatever it
+    /// was allowed to write.
+    #[test]
+    fn an_experiment_lands_nothing_however_well_it_went() {
+        let excellent = Produced {
+            tests_passed: Some(true),
+            contract_moved: false,
+            held_in: Some(true),
+            held_out: Some(true),
+        };
+        for admit in AdmissionRequirement::ALL {
+            let policy = RunPolicy {
+                landing: LandingPolicy::Experiment,
+                write: kernel::WriteLimit::Create,
+                ..work(admit)
+            };
+            assert!(matches!(
+                admits(&policy, &excellent),
+                Admission::Refused { .. }
+            ));
+        }
     }
 }

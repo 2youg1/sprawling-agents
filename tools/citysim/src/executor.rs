@@ -214,6 +214,7 @@ pub fn run_scenario_on(
         parent: None,
         predecessor: None,
         dispatched_by: kernel::event::Who::Person,
+        run_policy: kernel::RunPolicy::of(kernel::Mode::Work),
         // A simulated run is nobody's branch: it is a scenario's own
         // first run.
         inherited: Vec::new(),

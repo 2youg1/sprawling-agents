@@ -57,14 +57,16 @@ pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome {
                     GateRefusal::new(
                         "this run creates files and changes none",
                         format!(
-                            "{} would change what is already there, and this run was                              dispatched under the create write limit",
+                            "{} would change what is already there, and this run was \
+                             dispatched under the create write limit",
                             target.as_str()
                         ),
                         "write what you have to the path of a file that does not exist yet",
                     ),
                 )
                 .with_recovery(
-                    "the write limit is chosen when the work is dispatched; ask the person to                      dispatch it again with the full write limit to change existing files",
+                    "the write limit is chosen when the work is dispatched; ask the person to \
+                     dispatch it again with the full write limit to change existing files",
                 ),
             ),
         },

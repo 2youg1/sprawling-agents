@@ -186,6 +186,7 @@ fn plan() -> RunPlan {
         parent: None,
         predecessor: None,
         dispatched_by: kernel::event::Who::Person,
+        run_policy: kernel::RunPolicy::of(kernel::Mode::Work),
         inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),

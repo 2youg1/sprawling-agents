@@ -39,6 +39,8 @@ pub struct Charter<'a> {
     pub predecessor: Option<RunId>,
     pub dispatched_by: &'a Who,
     pub skills: &'a [SkillPin],
+    /// The run policy `run_started` records (kernel-SPEC 8-77).
+    pub policy: kernel::RunPolicy,
 }
 
 impl RunPlan {
@@ -56,6 +58,7 @@ impl RunPlan {
             predecessor: self.predecessor,
             dispatched_by: &self.dispatched_by,
             skills: &self.skills,
+            policy: self.run_policy,
         }
     }
 }
@@ -92,7 +95,7 @@ impl Charter<'_> {
             predecessor: self.predecessor,
             skills: self.skills.to_vec(),
             dispatched_by: Some(self.dispatched_by.clone()),
-            policy: None,
+            policy: Some(self.policy),
         };
         ledger.append(EventDraft {
             run: self.run,

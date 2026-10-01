@@ -72,7 +72,7 @@ pub struct RunStarted {
     /// Absent in a record written before the policy was recorded; the
     /// six mode words before it never reached a typed payload, so
     /// there is no older shape to read.
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub policy: Option<RunPolicy>,
 }
 

@@ -63,6 +63,12 @@ pub struct RunPlan {
     /// author is always the city's desk, so only the dispatch site
     /// knows whether the person, the city or a resident sent it.
     pub dispatched_by: kernel::event::Who,
+    /// The run policy this run was dispatched under, written into
+    /// `run_started` as it was chosen (kernel-SPEC 8-77). Named apart
+    /// from `policy`, which is the building's, because the two answer
+    /// different questions: what the building allows, and what this
+    /// dispatch asked for inside that.
+    pub run_policy: kernel::RunPolicy,
     /// The conversation this run starts from, when it is the first run of
     /// a session that branched off another. Empty for every other run.
     ///
