@@ -105,7 +105,7 @@ fn a_lane_that_finds_the_turn_taken_skips_and_leaves_it_standing() {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .contains(&probe);
-        drop(told.send((second, standing)));
+        told.send((second, standing)).unwrap();
     });
     let answered = heard.recv_timeout(std::time::Duration::from_secs(10));
     let again = if answered.is_ok() {

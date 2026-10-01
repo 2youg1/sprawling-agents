@@ -194,7 +194,7 @@ impl<'a> StockingTurn<'a> {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(city_root.to_path_buf())
-            .then_some(StockingTurn { city_root })
+            .then(|| StockingTurn { city_root })
     }
 }
 
