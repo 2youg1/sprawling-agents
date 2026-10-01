@@ -1,6 +1,6 @@
-⚠️ **Pre-alpha.** sprawling 0.0.7 runs a city end to end, but data formats, the wire and the screens still change between versions, and nothing here is promised to keep working. Try it on a throwaway directory.
+⚠️ **<!-- xtask:begin maturity:titled -->Pre-alpha<!-- xtask:end -->.** sprawling <!-- xtask:begin workspace_version -->0.0.8<!-- xtask:end --> something runs a city end to end, but data formats, the wire and the screens still change between versions, and nothing here is promised to keep working. Try it on a throwaway directory.
 
-⚠️ **Pre-alpha。** 0.0.7 已经能从头到尾跑起一座城，但数据格式、协议和界面在版本之间仍会变，这里的一切都不保证继续可用。请在一个可以丢掉的目录里试。
+⚠️ **<!-- xtask:begin maturity:titled -->Pre-alpha<!-- xtask:end -->。** <!-- xtask:begin workspace_version -->0.0.8<!-- xtask:end --> something 已经能从头到尾跑起一座城，但数据格式、协议和界面在版本之间仍会变，这里的一切都不保证继续可用。请在一个可以丢掉的目录里试。
 
 **What this version is for / 这一版做什么** — in the author's words, below in Chinese: this release optimises as much as possible for experiments at scale, and adds the tools common work needs, such as survey and screenshot. The author's note on why, and where the project is going, follows.
 

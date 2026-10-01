@@ -91,10 +91,6 @@ jobs:
       # v0.0.6 on gates that had never judged it.
       - name: just check
         run: just check
-        # One tag only, by the person's ruling: 0.0.7 ships while the CI
-        # reds its first push exposed are fixed after it. Remove this line
-        # in the next change to this file.
-        continue-on-error: ${{ github.ref_name == 'v0.0.7-Pre-alpha-260927' }}
       # The one read `just check` leaves to the nightly: an advisory is
       # news about a dependency, and a release is where it must be read.
       - name: advisories
