@@ -230,8 +230,6 @@ impl Tool for PlaybackTool {
     }
 
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
-        return Err(AxError::failure(AxCode::ToolUnavailable, ACTION, "not built yet")
-            .with_recovery("wait for the tool to be built"));
         if call.name != self.meta.name {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
