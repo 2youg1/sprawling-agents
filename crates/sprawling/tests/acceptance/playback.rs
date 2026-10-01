@@ -127,7 +127,7 @@ fn dispatch(worker: &mut accounting::worker::RunWorker, room: &str) -> Result<()
         addr: Address::parse(room).unwrap(),
         task: "Look back at the newsroom's day with the playback tool.".to_owned(),
         goal: "the playback tool has answered".to_owned(),
-        mode: kernel::Mode::Chat,
+        policy: kernel::RunPolicy::of(kernel::Mode::Chat),
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, room.as_bytes()),
         session: None,
         effort: None,
