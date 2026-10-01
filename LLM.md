@@ -68,10 +68,10 @@ sending the same key twice does the thing once and answers twice. An ask
 changes nothing.
 
 Commands, every one the city accepts, generated from the wire schema by
-`cargo xtask docnum` (<!-- xtask:begin command_frames -->34<!-- xtask:end --> in all):
+`cargo xtask docnum` (<!-- xtask:begin command_frames -->36<!-- xtask:end --> in all):
 
 <!-- xtask:begin command_names -->
-`dispatch`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `open_session`, `create_building`, `remove_building`, `put_secret`, `steer`, `cancel`, `halt`, `reveal`, `restore_discard`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `hand_off`, `set_autonomy`, `pursue`, `wake`, `put_document`, `put_identity`, `put_rules`, `restore_file`, `put_guide`, `configure_city`, `put_spine`, `connect_toolkit`, `put_preferences`, `put_shelved`, `auth`
+`dispatch`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `open_session`, `create_building`, `remove_building`, `put_secret`, `steer`, `cancel`, `halt`, `reveal`, `restore_discard`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `hand_off`, `set_autonomy`, `pursue`, `wake`, `put_document`, `put_identity`, `put_rules`, `restore_file`, `put_guide`, `configure_city`, `put_spine`, `put_range`, `decide_proposals`, `connect_toolkit`, `put_preferences`, `put_shelved`, `auth`
 <!-- xtask:end -->
 
 `put_secret` is listed because the schema names it, and no socket can send
@@ -110,10 +110,10 @@ under it:
 {"ask":{"ask_id":2,"query":{"run_view":{"run":"<run id>"}}}}
 ```
 
-Queries, every one the city answers (<!-- xtask:begin query_frames -->44<!-- xtask:end --> in all):
+Queries, every one the city answers (<!-- xtask:begin query_frames -->46<!-- xtask:end --> in all):
 
 <!-- xtask:begin query_names -->
-`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `history_range`, `sessions`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `known_hosts`, `harnesses`, `building_view`, `identity`, `automation`, `github_login`, `guide`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `document`, `range`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `newest_release`, `preferences`, `config`, `run_costs`, `upstream_version`
+`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `history_range`, `sessions`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `known_hosts`, `harnesses`, `building_view`, `identity`, `automation`, `github_login`, `guide`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `document`, `proposals`, `range`, `preview`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `newest_release`, `preferences`, `config`, `run_costs`, `upstream_version`
 <!-- xtask:end -->
 
 A bounded answer says how many rows it left out. `city_view` and `cost_view`

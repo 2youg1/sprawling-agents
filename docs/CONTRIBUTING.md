@@ -54,7 +54,7 @@ A green result belongs to the tree it ran on: record it with `git rev-parse HEAD
 
 ## 4 The rules, and what holds each one
 
-A gate's violation turns the check red with a message naming the rule, the violation, and an alternative. The roster is the array in `tools/xtask/src/gates.rs`, and `cargo xtask gates --list` prints its <!-- xtask:begin gate_count -->22<!-- xtask:end --> names.
+A gate's violation turns the check red with a message naming the rule, the violation, and an alternative. The roster is the array in `tools/xtask/src/gates.rs`, and `cargo xtask gates --list` prints its <!-- xtask:begin gate_count -->23<!-- xtask:end --> names.
 
 | Write it this way | Held by |
 |---|---|

@@ -37,7 +37,7 @@ def RunOutcome.code : RunOutcome → Nat
 
 /-
 D2 **一门判不动，不得连累其余各门的结论。**`gates` 的那张数组是急切求值的，
-<!-- xtask:begin gate_count -->22<!-- xtask:end --> 道门在第一行输出之前就已全部跑完；聚合运行遍历到底，
+<!-- xtask:begin gate_count -->23<!-- xtask:end --> 道门在第一行输出之前就已全部跑完；聚合运行遍历到底，
 逐门打印 `gate <name>: ok`、违规数或 `gate <name>: could not judge`，再统一渲染全部违规
 （`report.rs`）。**退出码取最重的一态**：任一门判不动为 2，否则有违规为 1，否则 0——判不动压过
 判有罪，因为「没判」与「判过且干净」同形正是本条要拆开的东西。理由：缺 `cargo-public-api` 这类
