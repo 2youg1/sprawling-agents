@@ -173,6 +173,9 @@ jobs:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
+      # The Zig the desktop's leaf is built with; every Windows build of
+      # `sprawling` compiles it (desktop-SPEC.md section 8-12).
+      - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@v2
       - uses: oven-sh/setup-bun@v2
       - uses: taiki-e/install-action@v2

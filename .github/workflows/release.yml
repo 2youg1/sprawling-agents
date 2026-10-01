@@ -52,6 +52,9 @@ jobs:
           fetch-depth: 0
       - name: install pinned toolchain
         run: rustup show
+      # The Zig the desktop's leaf is built with; every Windows build of
+      # `sprawling` compiles it (desktop-SPEC.md section 8-12).
+      - uses: ./.github/actions/zig
       # `test` rather than a key of its own, and that is the whole of the
       # change: this job used to have a key no other run could fill, so
       # every tag compiled 494 packages from zero. The `test` entry holds
@@ -166,6 +169,9 @@ jobs:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
+      # The Zig the desktop's leaf is built with, on the Windows row; the
+      # action installs nothing on the other two (desktop-SPEC.md 8-12).
+      - uses: ./.github/actions/zig
       # The pinned toolchain installs the host target only, and adding
       # `targets` to `rust-toolchain.toml` would make every job on every
       # platform download a musl std nothing else compiles against.

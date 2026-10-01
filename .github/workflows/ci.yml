@@ -109,6 +109,9 @@ jobs:
           fetch-depth: 0
       - name: install pinned toolchain
         run: rustup show
+      # The Zig the desktop's leaf is built with; every Windows build of
+      # `sprawling` compiles it (desktop-SPEC.md section 8-12).
+      - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: fast
@@ -175,6 +178,9 @@ jobs:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
+      # The Zig the desktop's leaf is built with; every Windows build of
+      # `sprawling` compiles it (desktop-SPEC.md section 8-12).
+      - uses: ./.github/actions/zig
       # Without this every run compiles the whole graph from zero, including
       # aws-lc-sys and libgit2, which are C. A key per job, because
       # check-mode metadata and real rlibs are different artifacts and one
@@ -201,6 +207,9 @@ jobs:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
+      # The Zig the desktop's leaf is built with; every Windows build of
+      # `sprawling` compiles it (desktop-SPEC.md section 8-12).
+      - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: test
@@ -307,6 +316,9 @@ jobs:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
         run: rustup show
+      # The Zig the desktop's leaf is built with; every Windows build of
+      # `sprawling` compiles it (desktop-SPEC.md section 8-12).
+      - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: desktop -> target
