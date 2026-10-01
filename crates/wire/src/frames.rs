@@ -18,9 +18,9 @@
 //!   constructor that omits it, so "double-clicking twice opens two Runs" is
 //!   not reachable from this type.
 //!
-//! Names of things this crate does not own - modes, providers, templates -
+//! Names of things this crate does not own - providers, templates, toolkits -
 //! travel as validated newtypes with no closed value list. The authority for
-//! which values are legal stays upstream (`runtime::Mode`, gateway, city);
+//! which values are legal stays upstream (gateway, city, the broker);
 //! the mapping point is the assembly layer, and an unknown value is an error
 //! there, never a guess.
 

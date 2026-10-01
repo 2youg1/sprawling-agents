@@ -104,7 +104,8 @@ pub use server::{DROP_BYTES_MAX, DropSink};
 #[cfg(feature = "server")]
 pub use server::{bind, router, serve};
 
-pub use kernel::model::{Mode, Window};
+pub use kernel::WriteLimit;
+pub use kernel::model::{AdmissionRequirement, LandingPolicy, Mode, RunPolicy, Window};
 pub use kernel::{Address, ApprovalId, Autonomy, AxCode, AxError, B3Hash};
 pub use kernel::{ApprovalClass, ApprovalItem, ClusterKey, Restoration};
 pub use kernel::{BudgetUse, Locator, PlannedProgress, Progress, UnplannedProgress};

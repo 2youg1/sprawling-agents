@@ -5,7 +5,7 @@
 
 //! Command kinds: names, steps, the wire enum.
 
-use kernel::model::{Mode, Window};
+use kernel::model::{RunPolicy, Window};
 use kernel::{
     Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, IdemKey, McpServer, ModelTag,
     Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed, SessionName,
@@ -36,7 +36,11 @@ pub enum Command<Secret = Sealed<String>> {
         addr: Address,
         task: String,
         goal: String,
-        mode: Mode,
+        /// The four values the run works under: mode, write limit,
+        /// admission requirement and landing policy, all four stated
+        /// (wire-SPEC.md section 8-57). Written as sent into the run's
+        /// `run_started` line.
+        policy: RunPolicy,
         idem: IdemKey,
         /// What this session is called, when it is a new one.
         ///
