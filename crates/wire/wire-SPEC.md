@@ -48,6 +48,7 @@
 - **`control` 自持鉴权与幂等，独立成模块**。ARCHITECTURE §6 预留了「做不到则并入 server」的退路，这里不需要它：`control` 持有一条 `server` 不知道也不该知道的策略——**哪些 Command 是干预，以及一次干预必须留下什么**（「任何中断都以 Handoff 收尾，下一位拿得到完整现场」）。那是判定，不是转调。
 - **令牌的整个生命周期住 `auth`**（铸造、展示形、摘要、常数时间比对），`server::decide_handshake` 调用它：握手是令牌的一个读者，不是它的第二个家。
 - **Signal 不在 Command 面**：Signal 的投递与消费住 `collab::inbox`。
+- **未定：`Command::PutRange { doc, baseline, idem, edits }`。** 页面对任意一份文档的保存（refrain 路线图 §4-8）要在账本上如实记下一次写：哪份文档、从哪一版到哪一版、多少字节。现有的三种写文档的事件各只说一类文件（`spine_document_written` 四份 spine 文档、`governed_document_written` 三份治理文档、`rules_changed` 两份规矩文件），用它们记一份任意文档的写就是凑，所以 `PutRange` 与它的回执（新版本）等下一次加事件种类的那一轮一起落，§19-2 那时多一行。规则已经在 `crates/documents/Spec.lean`（D8、D9）：基线是 §8-69 答出的 `version`，编辑是那一版的 `Span`，后到者得 `E_VERSION_CONFLICT`。在那之前文档答复里没有写的操作。
 - **`Welcome.resume_from` 读自 `LedgerHead`，`Welcome.epoch` 是创世记录的链哈希**：`decide_frame` 的第四个参数是 `WelcomeFacts { city, head, epoch }`——城名、账本头与 epoch 合成一个值，因为 `decide_frame` 已占满 4 个参数。`LedgerHead` 是 `ServeConfig.head` 递进来的一个 `AtomicU64`：装配层以重建视图时读到的最后一条记录的 `seq` 起头，折叠线程在每条记录**广播之前**把头推到它的 `seq`，socket 在 hello 时读一次。头放在原子量里而不放在视图锁里，因为读者可能长时间持有视图，而 hello 跑在 tokio 任务上，读头只是一次 Acquire load。先推头、后广播，加上会话在 hello 之前已订阅事件流，保证 `resume_from` 之后的记录必在流上：头之前而在订阅之后广播的记录会同时出现在流上与补拉里，所以边界上只可能重复、不可能缺失。`epoch` 是 `kernel::ledger::chain_hash(创世行)`，装配层在重建视图时读一次，由 `ServeConfig.epoch` 递进来：同一份账本的 epoch 永不改变，换了账本（重新 init、换了城目录）epoch 必变，所以客户端见到与上次不同的 epoch 就丢弃 belief、按快照重建，而不是拿旧水位去新账本里补拉。
 
 ## 4 现状分析
@@ -504,6 +505,16 @@ WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionN
 
 **重开参数**：(a) 页面要列出 gh 已登录的全部主机供人选时，加一条读 `gh auth status` 的查询；(b) 同一座城常有几个人各开一个浏览器、各走各的指南时，进度改为按人存。
 
+### 12.8 文档答复带版本，三种「没有文本」各是一种答复，范围按版本读
+
+**决定**：`Query::Document` 答 `DocumentAnswer { at, state }`：缺失、读不了、空、有内容四种状态；有内容时带版本、格式、大小与第一个窗口，文本之外的是 `Opaque`（§8-69）。其余的经 `Query::Range { version, range }` 从内容库里那一版读（§8-70）。
+
+**理由**：文档工作区要编辑、要保存、要知道自己改的是哪一版（refrain 路线图 §4-8），旧答复只有一个被截断、被有损解码的头，没有版本。把版本做成内容库的地址，「这一版的第三屏」就有一个不随文件变动的读法，而下一次保存的基线是 32 字节的摘要而不是整份正文。
+
+**被否**：①仍用 `Unavailable` 答缺失：页面分不出「可以新建」与「读不了」，`Unavailable` 的 `query` 串也不是给人读的理由；②范围读文件此刻的字节、版本不对就拒：文件每动一次，读到一半的页面就要从头重读，而一个居民在写的文件每几秒动一次；③每一版都存进内容库：一份整份已经在答复里的小文件，页面不会再按版本要它，存下它只是让内容库替每一次打开付一份拷贝。
+
+**重开参数**：页面要读一份整份放得下的文件的旧版本时（例如对比保存前后），小文件也存版本；内容库长出回收时，按版本读的窗口要说「这一版已经回收」，与 `Unavailable` 分开。
+
 ## 13 依赖选型
 
 | 依赖 | 用途 | 依据与替代 |
@@ -776,8 +787,7 @@ Document { at: Address },           // → Answer::Document(Box<DocumentAnswer>)
 pub struct ListingAnswer { pub at: Option<Address>, pub entries: Vec<Entry> }
 pub struct Entry { pub name: String, pub kind: EntryKind }
 pub enum EntryKind { Directory, File { bytes: u64 } }          // 目录在前、文件在后，各按名字序
-pub struct DocumentAnswer { pub at: Address, pub text: String, pub bytes: u64,
-                            pub truncated: bool, pub binary: bool }
+// DocumentAnswer 的形状见 §8-69
 ```
 
 **这四件事都是同一个发现**：ARCHITECTURE §8 说「线就是全部 API」，而旧客户端从没把这句话当真——它在浏览器里折叠 `history` 的原始记录，所以从来没问过线「这次跑在哪个房间」。新客户端只问线不折历史，四处空白一次全露出来。
@@ -785,9 +795,50 @@ pub struct DocumentAnswer { pub at: Address, pub text: String, pub bytes: u64,
 - **`RunSummary.addr`／`started`**：`who` 是这次跑第一条记录的作者，恒为 `city`，不是房间。房间是 `run_started` 记录自己的 `addr`，热视图在那一条上记下它（storage-SPEC §8-5）。没有它，页面无法把 `city_view` 列出的 run 归到 `hall/mayor`，「与 Mayor 的对话」拼不出来。`Option`：热视图可能只看到没有开场的一段尾巴，看不到的事不猜。
 - **`CityAnswer.halted`**：`city_halted` 是记录，`halted_by` 是 `bin::assembly` 工作线程的判定，而页面刷新后两者都够不到——它只收此后的事件。答里带上被 halt 的 scope 名，一个刚打开的页面才知道城是不是停着的，而不是等下一次 dispatch 被拒才发现。名字与 `HaltScope` 的 `scope_name` 同拼法，页面按名字画。
 - **`RoundsAnswer.opening`／`closing`**：回合的折叠从第一条 `model_called` 开始，所以人说的第一句（`run_started.task`）与这次跑怎么结束的（`run_frozen.completion`）都不在答里；一段对话缺开头与结尾就不是对话。两个都是 `Option`，理由同 `addr`：`HISTORY_MAX` 那段窗口可能不含开场。
-- **`Listing`／`Document`**：这座城是一棵目录树，而目录树本身就是产品（glossary：「那个层级就是目录树——不是它的模型，是树本身」）；`building_view` 只回楼根的 `.md` 与房间名，房间里的 `URBANITE.md`／`JOB.md`／`Handoff.md`／`<run>.jsonl` 页面看不到，于是这个设计在界面上是不可见的。两条查询让页面能走完整棵树。**路径经 `Address` 文法把关**（非绝对、无 `..`、无 `\`、无 `:`），所以走不出城根；`.sprawling/` **允许读**——它正是要展示的那部分，且这条线只答回环（或持配对 token 的）人，与工具层对居民的拒绝不是一个门。`Document` 上限 64 KiB 与 `BuildingDoc` 同（`DOC_BYTES_MAX`），截断必说；头 8 KiB 里出现 NUL 字节判 `binary`，`text` 留空——把 redb 或 CAS 的字节当文本喷到页面上是撒谎。文件不存在答 `Unavailable { query: "Document(<at>)" }`，与 `BuildingView`（没人立过的楼）、`Changes`（本城没写过的 oid）同口径：「我读不了」是一个真答案，与空文件不同。
+- **`Listing`／`Document`**：这座城是一棵目录树，而目录树本身就是产品（glossary：「那个层级就是目录树——不是它的模型，是树本身」）；`building_view` 只回楼根的 `.md` 与房间名，房间里的 `URBANITE.md`／`JOB.md`／`Handoff.md`／`<run>.jsonl` 页面看不到，于是这个设计在界面上是不可见的。两条查询让页面能走完整棵树。**路径经 `Address` 文法把关**（非绝对、无 `..`、无 `\`、无 `:`），所以走不出城根；`.sprawling/` **允许读**——它正是要展示的那部分，且这条线只答回环（或持配对 token 的）人，与工具层对居民的拒绝不是一个门。`Document` 答什么、在哪里切、怎样判文本，见 §8-69：答复带版本，缺失、读不了、空各是一种答复。
 - **`WIRE_V` 16→17，一次进位管四件事**：四件事同一提交同一哈希。
 - **被否**：（a）让客户端自己折 `history` 找 `run_started`——那是旧客户端的做法，也是这四处空白存在的原因；（b）`Document` 直接回任意大小——同 §8-20／§8-21 拒绝整批的理由；（c）`Listing` 排除 `.sprawling/`——排除了要展示的东西。
+
+### 8-69 文档读取契约：`Query::Document` 答一个版本
+
+```rust
+// Query（形状不变）
+Document { at: Address },                    // → Answer::Document(Box<DocumentAnswer>)
+pub struct DocumentAnswer { pub at: Address, pub state: DocumentState }
+pub enum DocumentState {                     // 线上 "missing" | { unreadable } | { empty } | { held }
+    Missing,                                 // 这个地址上没有文件
+    Unreadable { reason: String },           // 有东西而读不出：目录、无权限、读到一半出错；reason 是系统的原话
+    Empty { version: B3Hash, format: documents::Format },
+    Held(Box<HeldDocument>),
+}
+pub struct HeldDocument { pub version: B3Hash, pub format: documents::Format, pub bytes: u64, pub body: DocumentBody }
+pub enum DocumentBody {
+    Text { encoding: documents::Encoding, head: documents::Window, coverage: Coverage },
+    Opaque,                                  // 不是任何一种本城读的编码的文本：只有版本与大小
+}
+pub enum Coverage { Whole, Head }            // Head：其余的经 Query::Range 按 version 读
+// documents::{Span, Format, Encoding, Window} 由 documents crate 定义，线上直接携带（documents D1）
+```
+
+- **版本身份是整份字节的 `B3Hash`**，与内容库给同一份字节的地址相同（documents D3）。下一次保存拿它作基线（§3 的 `PutRange`），页面拿它判断两次读到的是不是同一版。
+- **缺失、读不了、空是三种答复**，不再借 `Unavailable`：「这里没有文件」页面画成可以新建，「读不了」页面说出系统的原话，「空」是一份可以写的文件，三者页面采取的动作不同。空文件也有版本（空字节的摘要），因为它同样可以是一次保存的基线。`Unavailable { query: "Document(<at>)" }` 只剩视图本身答不了的情形。
+- **文本的判定**（documents D4）：字节顺序标记先判，所以带标记的 UTF-16 是文本；没有标记时，不含 NUL 的合法 UTF-8 是文本；其余是 `Opaque`。不再有损解码，不再凭头 8 KiB 的 NUL 判二进制。
+- **第一个窗口** `head`（documents D7）：整份放得下 `WINDOW_BYTES_MAX`（64 KiB）就是整份（`Coverage::Whole`）；放不下时止于放得下的最后一个块的末尾，一块都放不下时止于界内最后一个字符边界（`Coverage::Head`）。窗口从第 0 个字节数起，标记是文本的第一个字符（documents D5），所以页面把各窗口的文本接起来就是整份文本。
+- **`Coverage::Head` 的版本在内容库里**：答复发出之前，读面把这一版的字节放进城的内容库（storage-SPEC §8-36），所以之后按版本取范围读的是这一版，而不是文件此刻的样子。整份已经在答复里的版本不存：页面没有理由再要它。
+- 验收：accounting 的 `views::document::tests`——缺失、目录、空文件各得各的答复；带标记的 UTF-16 文件判成文本并解出原文；没有标记而含 NUL 的判成 `Opaque`；超过一个窗口的文件答 `Coverage::Head`，它的版本在内容库里。
+
+### 8-70 按版本取范围：`Query::Range`
+
+```rust
+// Query
+Range { version: B3Hash, range: documents::Span },   // → Answer::Range(Box<RangeAnswer>)
+pub struct RangeAnswer { pub version: B3Hash, pub window: documents::Window }
+```
+
+- **读的是内容库里的那一版**，不是文件此刻：一个页面滚到第三屏时，文件可能已经被居民改过，而它要的是它开始读的那一版的第三屏。内容库里没有这一版答 `Unavailable { query: "Range(<version>)" }`。
+- **请求的是半开字节区间，答的是切好的窗口**（documents D2、D7）：起点在字符中间时退到那个字符的第一个字节，终点往回退到字符边界，长度不过 `WINDOW_BYTES_MAX`，起点在版本末尾之后时答末尾处的空窗口。编码由这一版前三个字节里的标记定，切出的字节在这种编码下拼不出文本（`Opaque` 的版本）时答 `Unavailable`。答复里的 `window.span` 是实际切出的区间，页面从它的 `end` 接着要下一段。
+- **只读内容库里要答的那几个字节**（`storage::Cas::size` 与 `Cas::get_range`），所以第三屏的代价是第三屏，与文件多大无关。
+- 验收：accounting 的 `views::answering::range::tests`——从 `Document` 的 `head` 末尾起逐段读到末尾，窗口首尾相接就是整份字节；文件在第一次读之后被改写，按旧版本读出的仍是旧字节；内容库里没有的版本答 `Unavailable`。
 
 ### 8-24 `Query::Commits`：一座楼做过的提交，倒序分页
 

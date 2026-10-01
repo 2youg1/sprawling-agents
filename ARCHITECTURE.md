@@ -48,6 +48,7 @@ shipped one happens to be written in is a replaceable fact.
 │        ├── collab                                            │
 │        ├── city                                              │
 │        ├── browser                                           │
+│        ├── documents                                         │
 │        ├── agent_protocols                                   │
 │        ├── remote_access                                     │
 │        ├── storage                                           │
@@ -166,10 +167,11 @@ runtime: kernel, storage, gateway
 collab: kernel, storage
 city: kernel
 browser: kernel
+documents: kernel
 agent_protocols: kernel, gateway
-wire: kernel
+wire: kernel, documents
 remote_access: kernel
-accounting: kernel, storage, gateway, runtime, collab, city, agent_protocols, wire
+accounting: kernel, storage, gateway, runtime, collab, city, agent_protocols, wire, documents
 sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop, remote_access
 desktop: kernel, agent_protocols, desktop_ffi
 desktop_ffi:
@@ -882,6 +884,7 @@ flowchart TD
     accounting --> agent_protocols
     accounting --> city
     accounting --> collab
+    accounting --> documents
     accounting --> gateway
     accounting --> kernel
     accounting --> runtime
@@ -897,6 +900,7 @@ flowchart TD
     desktop --> desktop_ffi
     desktop --> kernel
     desktop_ffi
+    documents --> kernel
     gateway --> kernel
     kernel
     remote_access --> kernel
@@ -916,6 +920,7 @@ flowchart TD
     sprawling --> storage
     sprawling --> wire
     storage --> kernel
+    wire --> documents
     wire --> kernel
 ```
 <!-- xtask:end -->

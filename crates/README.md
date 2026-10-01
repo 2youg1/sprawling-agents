@@ -9,20 +9,21 @@ Every Rust package of the product lives in this directory. The packages are sepa
 <!-- xtask:begin crate_table -->
 | Directory | Package | Lib | Owns | May depend on | SPEC |
 |---|---|---|---|---|---|
-| `crates/accounting` | `sprawling-accounting` | `accounting` | the city's one writer, the views every page is answered from, and the ports the writer reaches outside itself through | `agent_protocols`, `city`, `collab`, `gateway`, `kernel`, `runtime`, `storage`, `wire` | `crates/accounting/accounting-SPEC.md` |
+| `crates/accounting` | `sprawling-accounting` | `accounting` | the city's one writer, the views every page is answered from, and the ports the writer reaches outside itself through | `agent_protocols`, `city`, `collab`, `documents`, `gateway`, `kernel`, `runtime`, `storage`, `wire` | `crates/accounting/accounting-SPEC.md` |
 | `crates/agent_protocols` | `sprawling-agent-protocols` | `agent_protocols` | MCP out to a server, ACP in from an editor, and ACP out to a harness | `gateway`, `kernel` | `crates/agent_protocols/Spec.lean` |
 | `crates/browser` | `sprawling-browser` | `browser` | a browser driven over WebDriver BiDi, and what a model may see of a page and do to it | `kernel` | `crates/browser/Spec.lean` |
 | `crates/city` | `sprawling-city` | `city` | space, identity, and the documents a building keeps | `kernel` | `crates/city/city-SPEC.md` |
 | `crates/collab` | `sprawling-collab` | `collab` | several residents in one building, without stepping on each other | `kernel`, `storage` | `crates/collab/Spec.lean` |
 | `crates/desktop` | `sprawling-desktop` | `desktop` | this Windows desktop, offered as an MCP server, and the one FFI seam beneath it | `agent_protocols`, `desktop_ffi`, `kernel` | `crates/desktop/Spec.lean` |
 | `crates/desktop/ffi` | `sprawling-desktop-ffi` | `desktop_ffi` | this Windows desktop, offered as an MCP server, and the one FFI seam beneath it | nothing | `crates/desktop/ffi/Spec.lean` |
+| `crates/documents` | `sprawling-documents` | `documents` | the rules of a document a person reads and edits through a page: its version, its characters, its windows, and what one save changes | `kernel` | `crates/documents/Spec.lean` |
 | `crates/gateway` | `sprawling-gateway` | `gateway` | everything between a decision to call a model and the bytes on the wire | `kernel` | `crates/gateway/gateway-SPEC.md` |
 | `crates/kernel` | `sprawling-kernel` | `kernel` | every decision in the city, and nothing that touches a disk | nothing | `crates/kernel/kernel-SPEC.md` |
 | `crates/remote_access` | `sprawling-remote-access` | `remote_access` | the remote door, and the routes that carry its bytes and decide nothing | `kernel` | `crates/remote_access/Spec.lean` |
 | `crates/runtime` | `sprawling-runtime` | `runtime` | one run, from dispatch to freeze | `gateway`, `kernel`, `storage` | `crates/runtime/runtime-SPEC.md` |
 | `crates/sprawling` | `sprawling` | `sprawling` | the assembly root: every concrete type, the one clock, the one spawn point, and the command line | `accounting`, `agent_protocols`, `browser`, `city`, `collab`, `desktop`, `gateway`, `kernel`, `runtime`, `storage`, `wire` | `crates/sprawling/sprawling-SPEC.md` |
 | `crates/storage` | `sprawling-storage` | `storage` | persistence, and every view derived from it | `kernel` | `crates/storage/storage-SPEC.md` |
-| `crates/wire` | `sprawling-wire` | `wire` | the process boundary | `kernel` | `crates/wire/wire-SPEC.md` |
+| `crates/wire` | `sprawling-wire` | `wire` | the process boundary | `documents`, `kernel` | `crates/wire/wire-SPEC.md` |
 <!-- xtask:end -->
 
 `crates/desktop` and its FFI seam `crates/desktop/ffi` get their rows from the next `cargo xtask docnum --write`. The seam is the one crate with a lint table of its own, the workspace's with `unsafe_code` at `deny`, because each call into its Zig leaf relaxes the lint at that one statement.

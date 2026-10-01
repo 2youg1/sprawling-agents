@@ -286,6 +286,8 @@ impl Cas {
     /// Range read per Locator semantics (L: 1-based closed; B: 0-based closed).
     /// Reads only the named bytes; trusts the object as verified at put.
     pub fn get_range(&self, hash: &B3Hash, range: &Range) -> Result<Vec<u8>, StorageError>;
+    /// 对象的字节数，不读内容；没有这个对象即 CasMissing（§8-36）。
+    pub fn size(&self, hash: &B3Hash) -> Result<u64, StorageError>;
 }
 ```
 
@@ -301,6 +303,19 @@ pub struct BlockOrigin { pub run: RunId, pub building: Address }
 
 布局：`<dir>/b3/<hex 前 2>/<hex64>`；临时件 `<dir>/tmp/<hex64>.<pid>.<本进程第几次 put>.part`（每次 put 一个自己的名字：同内容并发写者各自写满、各自 rename 到同一目标，无随机源；开句柄只清 pid 不是本进程的 tmp，理由见 §12；同名残留先 truncate 再写）。put 四步：hash→已存在即去重返回→写 tmp＋`sync_data`→`rename`＋`sync_dir`（分片目录）。范围取回越界＝`RangeOutOfBounds`（fail-closed，不静默夹取）；`L` 式行切分按 `\n`，末行无终止符同计一行；返回字节含行间 `\n`、不含末行终止符；`B` 式按 0 起闭区间直切。
 rename 入 Vfs；FaultFs 模型：rename 原子；新目标目录项在 `sync_dir` 前不存活，断电即整体消失（源已移除）——看似比真实更损，但 put 尚未返回 Ok，无可观察效果被丢失，A3 点 2 的断言面（已命名对象恒不腐蚀）不受影响。
+
+### 8-36 文档的一版是内容库里的一个对象（`storage::cas`）
+
+```rust
+impl Cas {
+    pub fn size(&self, hash: &B3Hash) -> Result<u64, StorageError>;   // Vfs::size；不存在即 CasMissing
+}
+```
+
+- **版本身份就是地址。** 页面读的一份文档的一版，身份是整份字节的 BLAKE3（`crates/documents/Spec.lean` D3），正是 `put` 给同一份字节的地址；读面把一版放进来走的就是 `put`，不另开目录、不另记索引（accounting-SPEC §8-21）。
+- **按版本取一段，先问长度。** 一个窗口要知道这一版多长才能把请求夹在末尾之内（`documents::lift`），然后用 `get_range` 的 `B` 式读那一段；`get_range` 越界即拒的规则不变，夹取是 `documents` 的判定，不是本模块的。`size` 走 `Vfs::size`，不读内容，所以问一个两百兆对象的长度不付两百兆。
+- **不校验。** 与范围读同一条理由（§8-3）：长度来自文件系统，地址覆盖的是整份内容。
+- 验收：`cas::tests::a_stored_object_states_its_size_and_a_missing_one_is_named`。
 
 ### 8-4 storage::index（形状 7）
 
@@ -916,6 +931,7 @@ impl Vfs for RealFs { … }
 ## 12 Decisions
 
 - **临时件按「内容哈希＋写者进程＋本进程的 put 序号」命名，开句柄只清别的进程写的临时件。** 一个进程同时开着多个 `Cas` 句柄（驱动 run 的各条 lane、读图、浏览器工具、前缀视图各开各的），若临时件只以内容哈希命名、且每次开句柄都清空 `tmp/`，则后开的句柄会删掉另一个句柄写好尚未 rename 的临时件（rename 报 `NotFound`，run 以 `E_STORAGE_FATAL` 停下），两个句柄同写一份字节时一方的 `truncate` 还会截掉另一方正要 rename 的文件、给对象留下错误内容。按写者分名后两种撞车都不存在；残留只可能来自已经退出的进程，而同一座城同时只有一个进程（`LedgerHeld`），所以 pid 不同即残留。代价：本进程里 put 失败留下的临时件要到下次启动才清。被否：全进程只开一个句柄（每个开句柄的调用方都得改，且下一个新调用方仍会踩中）；在 put 里遇 `NotFound` 重写一次（仍不防 `truncate` 截断别人的文件）。**重开参数**：若允许两个进程同时写同一座城的 CAS，改为按锁或租约判定残留。
+- **文档的版本不另设存放处，进的就是内容库。** 一份文档的版本身份是它整份字节的 BLAKE3，与内容库的地址同一个算法、同一个值，所以「把这一版留下来以便按版本读」就是 `put`，「按版本读一段」就是 `size` 加 `get_range`（§8-36）。被否：在城的保留子树里另开一个版本目录——同一份字节两个地址，两处各自要原子写、要清残留、要校验；只记文件路径与修改时间，按版本读时回去读文件——文件动过之后那一版就没了。代价：内容库替页面读过的每一个大文件的每一版留一份，直到内容库长出回收。**重开参数**：内容库有了回收，被回收的版本要一个与「从没有过」分开的答复。
 - `VersionAhead`→`E_LOG_VERSION_UNSUPPORTED`：不可定义掉——二进制升级与数据寿命天然错位；方向感知拒绝即其最小语义。
 - `CasCorrupt`→`E_CAS_CORRUPT`：不可定义掉——位腐烂与外部改动在本设计边界外；能定义掉的部分（写路径半成品）已由 tmp+rename 定义掉。
 - `CasMissing`→`E_PATH_NOT_FOUND`：不可定义掉——Locator 是跨会话引用，对象可被更早的介质事故清除；nearby 给同前缀既存对象。

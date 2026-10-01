@@ -739,6 +739,22 @@ pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError>;
 - **代价。** `ask` 之后再建一次 `LedgerIndex`，再按索引读两段：本 run 的行（倒着读到下界前最近的 `model_called`）与区间里的每一行（判同楼的别人）。读的行数与区间长度成正比；建索引与 `ask` 的审计各与账本字节数成正比，与一次性的 `whose` 同阶。
 - **失败。** `ask` 的失败原样上抛；建索引与读行的 `StorageError` 经 `into_ax`；一行解析不了按 `EventRecord::parse_line` 的错误上抛，审过的链上出现它，说明账本在 `ask` 之后被改了；actor 落在保留子树里时 `Building::of` 的拒绝上抛（城写的提交不会落在那里）。
 
+### 8-21 accounting::views::document 与 views::answering::range：文档的一版与它的窗口（形状 7 投影）
+
+```rust
+// accounting::views::document（锁外，sprawling-SPEC.md 8-100）
+pub(super) fn document_answer(city_root: &Path, at: Address) -> wire::DocumentAnswer;
+pub(super) fn read_bytes(bytes: &[u8]) -> Reading;      // Content 与 Prefix 的文本判定，经 documents::Reading::of
+// accounting::views::answering::range（锁外）
+pub(in crate::views) fn range_answer(city_root: &Path, version: B3Hash, range: documents::Span) -> wire::Answer;
+```
+
+- **读盘只读一次，判定全在 `documents`。** `document_answer` 读文件的全部字节：读不到且是 `NotFound` 答 `Missing`，别的读错（目录、无权限）答 `Unreadable`，带系统的原话；零字节答 `Empty`；否则 `B3Hash::digest` 得版本，`Format::of_name` 读文件名，`Reading::of` 判文本，是文本就 `documents::head` 取第一个窗口（wire-SPEC §8-69）。本模块不写任何一条判定，所以页面、`Content` 与 `Prefix` 对「这是不是文本」只有一个答案。
+- **第一个窗口盖不住整份时，这一版进内容库**（`storage::Cas::put`，storage-SPEC §8-36），然后才答 `Coverage::Head`：之后的 `Query::Range` 读的是这一版。放不进去（盘满、目录不可写）答 `Unreadable`，原话是内容库的拒因：答一个之后读不到的 `Head` 等于许诺一件做不到的事。整份放得下的版本不存（wire-SPEC §12.8）。
+- **`range_answer` 只读内容库里要答的那几个字节。** `Cas::size` 得这一版的长度，前三个字节经 `Encoding::of_mark` 得编码，`documents::lift` 说要抬起哪一段，`Cas::get_range` 读它，`documents::cut` 切出窗口。内容库没有这一版、或切出的字节不是文本，答 `Unavailable { query: "Range(<version>)" }`。
+- **`read_bytes` 留给 `Content` 与 `Prefix`。** 两者的答复形状不变（头 `DOC_BYTES_MAX` 字节、`truncated`、`binary`），判定换成 `Reading::of`，切法换成 `documents::cut`：一个块在内容库里、又是城里的一份文件时，两处给同一个判断。
+- 验收：`views::document::tests` 与 `views::answering::range::tests`，名字见 wire-SPEC §8-69、§8-70。
+
 ## 12 决策
 
 1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只用 `gateway` 的接口类型，不构造适配器。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。`GatewayModels` 在 worker 搬进来时一同搬进本 crate，理由见 §12-18；本条对 `SystemClock`、`ThisMachine` 这样直接碰主机的生产适配器仍然成立。
@@ -785,3 +801,5 @@ pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError>;
 27. **一个 session 的身份冻在房间那一层，读回失败就拒，不换成此刻的名字。** 理由：session 的形状（模型、强度）已经记在房间那一层，`/new` 清的也是它，身份跟着同一个边界就不需要另一条「何时重读身份」的规则（city-SPEC §12.11）；读不回冻下的那一版时换成此刻的名字，等于在 session 中途悄悄改名，而这正是冻结要防的。被否决的做法：每次 run 现读身份——改名立刻改掉正在进行的 session 的前缀，provider 的前缀缓存从 city 段起失效，页面上的旧 session 与请求里的名字也对不上。
 28. **`whose --trace` 的逻辑是读面上的一个模块 `accounting::trace`，从 `Query::Commit` 的答出发再读账本，不加线上查询；同楼的别人只计数。** 理由：区间的两端已经在 `CommitAnswer` 的 `seq` 与 `previous` 里，调用的读法已经在 `views::turns` 里；今天的读者是读盘的 CLI，下一轮的 playback 与验收工具都在本 crate 里或经本 crate 读。同楼别的 run 的写也可能落进这个提交，但把它们的调用与本 run 的并列，会把「候选」读成「原因」，所以只给条数与地址，要细看的人拿 `view --run` 去读。被否决的做法：①加 `Query::Trace`：线上多一个形状、`WIRE_V` 进一位、`wire.ts` 与 adversary 的门面都要跟着改，换来的只是把这几步搬到服务端，而 CLI 本来就读盘；②按 `Call.effect` 只留写调用：读调用决定了写什么，去掉它们就去掉了归因的一半证据，`effect` 留在每条调用上由读者判断；③区间以 git 的父提交或全城紧邻的上一个提交为界：两者都可能属于别的 run，会把别人的调用算成这个 run 的。重开参数：页面要显示一个提交的调用时（那时要一个线上查询，本模块搬到 `views` 后面作答）；或同一栋楼里几个 run 同写一棵树成为常态、条数不够区分时。
 30. **死掉的 run 由启动扫描冻结，冻结行写成它的居民，结局读 `RunFrozen::lost`。** (a) 理由：只有拿到写者锁的那一刻才知道没有别的进程在驱动它，而 `startup_scan` 正是那一刻的那一遍验链；视图与 worker 的折叠都从账本来，账上一行冻结让服务中的城与重开的城对同一次 run 说同一个结局。写成居民而不是城，与补写结果未知的调用同一条理由，按居民计数的读者不必为死亡另写一条规则。被否决的做法：在服务时由视图把「没有冻结行、进程已重开过」的 run 读作死掉——那是视图的第二条冻结规则，而且一次性的 `views::ask` 与服务中的视图会各算一次；由 `RunWorker::new` 冻结——`new` 也在 `serve` 里跑，那时冻结要跟账本证明的次序对齐，而 `resume` 本来就是收拾死亡的那一步（sprawling-SPEC 8-109）。重开参数：`serve` 也要在起步时收拾死亡（不经 `resume`）时，把这一遍挪进它的起步路径，次序仍是先补调用、后冻 run。 (b) **指南进度住 `accounting::guide`，一个与 `person` 平行的模块，读写各一扇门。** 理由：页面读与命令写读的是同一份文件，文件的文法只能有一处；它不属于视图的折叠，也不属于 worker 的状态，`person` 已经是「一份人改的文件，读整份、写整份」的样子。被否决的做法：读放在 `views::answering`、写放在 `worker::commanding`——两处各知道一遍文件的形状。(c) **跑 gh 的函数经 `Views::ask_github_through` 交进来，主机名的判定与缺省主机留在视图。** 理由：起子进程碰主机，按第 9、10 条住 `sprawling`、经 `fn` 指针交进来；而「问哪台主机、这个串能不能交给 gh」是城对输入的判定，测试不必起 gh 就能判它。被否决的做法：经 `Hands` 交给 worker——这是一条查询，worker 不答查询；在二进制里判主机名——测试就要经过子进程才看得到拒绝。
+
+33. **文档的版本只在第一个窗口盖不住整份时进内容库，由答 `Document` 的读面放进去。** 理由：之后的 `Range` 要读的是这一版，而版本的身份本来就是内容库的地址（documents D3），放进去之后按版本读就是按地址读对象，不需要第二个存放处；整份已经在答复里的版本页面不会再按版本要，存它只是让每一次打开多付一份拷贝。放进去的是读面而不是写者：这是一次查询的副作用，但它只添一个按内容寻址、重复放入即去重的对象，不改任何一条历史，写者也不知道哪个页面在读哪一版。被否决的做法：①`Range` 读文件此刻、版本不符就拒——居民在写的文件每几秒动一次，读到一半的页面要从头重读；②每次打开都存——小文件的每一次打开都多一份拷贝；③由写者在每次保存时存——城之外的写者（人的编辑器、居民的 `edit`）不经过写者。重开参数：内容库长出回收时，被回收的版本要有自己的答复；页面要对比一份小文件的两个版本时，小文件也存。
