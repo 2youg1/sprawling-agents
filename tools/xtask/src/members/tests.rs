@@ -6,11 +6,11 @@
 use super::*;
 
 /// The roster this tree gives: the kernel where its directory is, the
-/// package outside the lint wall reached through its dependent, the
-/// gates' own package declared a tool, and no package at the root, which
-/// holds the workspace table rather than a package.
+/// desktop server and the seam nested in its directory each as a package
+/// of its own, the gates' own package declared a tool, and no package at
+/// the root, which holds the workspace table rather than a package.
 #[test]
-fn this_checkout_lists_its_members_and_the_package_outside_the_wall() {
+fn this_checkout_lists_its_members_and_the_package_nested_in_one() {
     let found = members(crate::root::this_checkout()).unwrap();
     let kernel = found.iter().find(|m| m.dir == "crates/kernel").unwrap();
     assert_eq!(kernel.lib.as_deref(), Some("kernel"));
@@ -18,12 +18,18 @@ fn this_checkout_lists_its_members_and_the_package_outside_the_wall() {
         (kernel.role, kernel.reach),
         (Role::Product, Reach::Workspace)
     );
-    let outside: Vec<&str> = found
+    let desktop: Vec<(&str, Option<&str>)> = found
         .iter()
-        .filter(|m| m.reach == Reach::PathDependency)
-        .map(|m| m.dir.as_str())
+        .filter(|m| m.dir.starts_with("crates/desktop"))
+        .map(|m| (m.dir.as_str(), m.lib.as_deref()))
         .collect();
-    assert_eq!(outside, ["desktop"]);
+    assert_eq!(
+        desktop,
+        [
+            ("crates/desktop", Some("desktop")),
+            ("crates/desktop/ffi", Some("desktop_ffi"))
+        ]
+    );
     let gates = found.iter().find(|m| m.package == "xtask").unwrap();
     assert_eq!((gates.role, gates.lib.as_deref()), (Role::Tool, None));
     assert!(found.iter().all(|m| !m.dir.is_empty()), "{found:?}");
@@ -50,23 +56,26 @@ fn a_package_outside_the_checkout_is_refused() {
     );
 }
 
-/// What `check-branch` selects tests by: the workspace packages holding a
-/// changed path, each once. Documents, Lean models, deleted paths and the
-/// package outside the workspace select nothing.
-#[test]
-fn owning_names_each_workspace_package_once_and_skips_the_rest() {
-    let member = |package: &str, dir: &str, reach| Member {
+/// One package, as a fixture names it.
+fn member(package: &str, dir: &str) -> Member {
+    Member {
         package: package.to_owned(),
         lib: None,
         dir: dir.to_owned(),
         role: Role::Product,
-        reach,
+        reach: Reach::Workspace,
         depends_on: BTreeSet::new(),
-    };
+    }
+}
+
+/// What `check-branch` selects tests by: the workspace packages holding a
+/// changed path, each once. Documents, Lean models and deleted paths
+/// select nothing.
+#[test]
+fn owning_names_each_workspace_package_once_and_skips_the_rest() {
     let found = [
-        member("sprawling-j", "crates/j", Reach::Workspace),
-        member("sprawling-k", "tools/k", Reach::Workspace),
-        member("sprawling-desktop", "desktop", Reach::PathDependency),
+        member("sprawling-j", "crates/j"),
+        member("sprawling-k", "tools/k"),
     ];
     let paths = [
         "crates/j/src/lib.rs",
@@ -75,11 +84,32 @@ fn owning_names_each_workspace_package_once_and_skips_the_rest() {
         "tools/k/Spec.lean",
         "crates/jx/src/lib.rs",
         "gone/src/lib.rs",
-        "desktop/src/lib.rs",
     ]
     .map(str::to_owned);
     assert_eq!(
         owning(&found, &paths).into_iter().collect::<Vec<_>>(),
         ["sprawling-j"]
+    );
+}
+
+/// A path inside a package nested in another belongs to the nested one:
+/// `crates/desktop/ffi` is a package of its own, though the directory of
+/// `crates/desktop` holds it too, so a change to the seam selects the
+/// seam's tests and a change beside it selects the server's.
+#[test]
+fn a_path_in_a_nested_package_belongs_to_the_nested_package() {
+    let found = [
+        member("sprawling-desktop", "crates/desktop"),
+        member("sprawling-desktop-ffi", "crates/desktop/ffi"),
+    ];
+    let seam = ["crates/desktop/ffi/src/leaf.rs".to_owned()];
+    assert_eq!(
+        owning(&found, &seam).into_iter().collect::<Vec<_>>(),
+        ["sprawling-desktop-ffi"]
+    );
+    let server = ["crates/desktop/src/lib.rs".to_owned()];
+    assert_eq!(
+        owning(&found, &server).into_iter().collect::<Vec<_>>(),
+        ["sprawling-desktop"]
     );
 }

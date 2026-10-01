@@ -3,10 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the wall comparison is held to: a copied lint table that has
-//! been edited on one side, a version line that has moved, a recorded
-//! difference that is no longer a difference, and this repository's own
-//! two manifests.
+//! What the one lint table of its own is held to: a lint dropped,
+//! relaxed or added on the leaf's side, a recorded difference that is no
+//! longer a difference, another member writing a table of its own, and a
+//! leaf that is no longer a member at all.
 
 #![allow(
     clippy::unwrap_used,
@@ -22,17 +22,6 @@ fn read(text: &str) -> toml::Value {
 }
 
 const WORKSPACE: &str = r#"
-[workspace.package]
-version = "0.0.5"
-edition = "2024"
-license = "MPL-2.0"
-rust-version = "1.97"
-publish = false
-
-[workspace.dependencies]
-serde_json = "1"
-toml = "1.1"
-
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
@@ -41,110 +30,77 @@ unwrap_used = "deny"
 as_conversions = "deny"
 "#;
 
-/// The wall as `desktop/Cargo.toml` writes it: the root of a workspace
-/// of its own, stating the copy once, and a package that inherits it.
-const DESKTOP: &str = r#"
-[workspace]
-members = ["ffi"]
-
-[workspace.package]
-version = "0.0.5"
-edition = "2024"
-license = "MPL-2.0"
-rust-version = "1.97"
-publish = false
-
-[workspace.lints.rust]
-unsafe_code = "deny"
-
-[workspace.lints.clippy]
-unwrap_used = "deny"
-as_conversions = "deny"
-
-[package]
-name = "sprawling-desktop"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
-publish.workspace = true
-
-[dependencies]
-serde_json = "1"
-toml = "1.1"
-image = { version = "0.25", default-features = false }
-
-[lints]
-workspace = true
-"#;
-
-/// A member of the wall, inheriting all of it.
-const MEMBER: &str = r#"
+/// The leaf as `crates/desktop/ffi/Cargo.toml` writes it: the
+/// workspace's table, with the one recorded line changed.
+const LEAF_MANIFEST: &str = r#"
 [package]
 name = "sprawling-desktop-ffi"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
-publish.workspace = true
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"
+as_conversions = "deny"
+"#;
+
+/// Any other member, inheriting the workspace's table.
+const MEMBER: &str = r#"
+[package]
+name = "sprawling-k"
 
 [lints]
 workspace = true
 "#;
 
-fn compared(workspace: &str, desktop: &str) -> Vec<Violation> {
-    let (workspace, desktop) = (read(workspace), read(desktop));
-    let mut out = Vec::new();
-    metadata(&workspace, &desktop, &mut out);
-    lints(&workspace, &desktop, &mut out);
-    dependencies(&workspace, &desktop, &mut out);
-    inherited(&[(DESKTOP_MANIFEST.to_owned(), desktop)], &mut out);
-    out
-}
-
-fn inherited_by(member: &str) -> Vec<Violation> {
-    let mut out = Vec::new();
-    inherited(
-        &[("desktop/ffi/Cargo.toml".to_owned(), read(member))],
-        &mut out,
-    );
-    out
+fn judged(leaf: &str, member: &str) -> Vec<Violation> {
+    tables(
+        &read(WORKSPACE),
+        &[
+            ("crates/k".to_owned(), read(member)),
+            (LEAF.to_owned(), read(leaf)),
+        ],
+    )
 }
 
 /// The pair as it stands: one recorded difference, and nothing else.
 #[test]
-fn two_walls_that_differ_only_where_somebody_decided_are_quiet() {
-    assert!(compared(WORKSPACE, DESKTOP).is_empty());
+fn a_leaf_that_differs_only_where_somebody_decided_is_quiet() {
+    let found = judged(LEAF_MANIFEST, MEMBER);
+    assert!(found.is_empty(), "{found:#?}");
 }
 
 /// The defect this gate exists for. A clippy lint dropped from the
-/// out-of-tree copy silently un-enforces it for 5,800 lines that no
-/// workspace command compiles.
+/// leaf's table silently un-enforces it in the one crate that may write
+/// `unsafe`.
 #[test]
-fn a_lint_the_copy_no_longer_carries_is_refused_and_named() {
-    let weakened = DESKTOP.replace("as_conversions = \"deny\"", "");
-    let found = compared(WORKSPACE, &weakened);
+fn a_lint_the_leaf_no_longer_carries_is_refused_and_named() {
+    let weakened = LEAF_MANIFEST.replace("as_conversions = \"deny\"", "");
+    let found = judged(&weakened, MEMBER);
     assert_eq!(found.len(), 1, "{found:#?}");
-    assert!(found[0].location.contains("as_conversions"), "{found:#?}");
+    assert_eq!(
+        found[0].location,
+        "crates/desktop/ffi/Cargo.toml [lints.clippy] as_conversions"
+    );
     assert!(found[0].violation.contains("absent"), "{found:#?}");
     assert!(found[0].alternative.contains("RECORDED"), "{found:#?}");
 }
 
 /// A lint relaxed rather than removed is the same finding, and a lint
-/// the copy adds alone is one too: a wall nobody else stands behind is
-/// a rule with one home too many.
+/// the leaf adds alone is one too: a rule only one crate stands behind
+/// is a rule with one home too many.
 #[test]
 fn a_lint_relaxed_on_one_side_and_a_lint_added_on_one_side_are_both_refused() {
-    let relaxed = DESKTOP.replace("unwrap_used = \"deny\"", "unwrap_used = \"warn\"");
-    let found = compared(WORKSPACE, &relaxed);
+    let relaxed = LEAF_MANIFEST.replace("unwrap_used = \"deny\"", "unwrap_used = \"warn\"");
+    let found = judged(&relaxed, MEMBER);
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(found[0].violation.contains("warn"), "{found:#?}");
 
-    let added = DESKTOP.replace(
+    let added = LEAF_MANIFEST.replace(
         "as_conversions = \"deny\"",
         "as_conversions = \"deny\"\nstring_slice = \"deny\"",
     );
-    let found = compared(WORKSPACE, &added);
+    let found = judged(&added, MEMBER);
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(found[0].location.contains("string_slice"), "{found:#?}");
 }
@@ -154,76 +110,39 @@ fn a_lint_relaxed_on_one_side_and_a_lint_added_on_one_side_are_both_refused() {
 /// budget. The refusal repeats the reason the row was granted for.
 #[test]
 fn a_recorded_difference_the_two_sides_now_agree_on_is_struck() {
-    let matched = DESKTOP.replace("unsafe_code = \"deny\"", "unsafe_code = \"forbid\"");
-    let found = compared(WORKSPACE, &matched);
+    let matched = LEAF_MANIFEST.replace("unsafe_code = \"deny\"", "unsafe_code = \"forbid\"");
+    let found = judged(&matched, MEMBER);
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(found[0].location.contains("RECORDED"), "{found:#?}");
-    assert!(found[0].alternative.contains("Win32"), "{found:#?}");
+    assert!(found[0].alternative.contains("Zig leaf"), "{found:#?}");
 }
 
-/// Metadata is inherited inside the workspace and typed out here, so a
-/// version bump that reaches the workspace alone is caught.
+/// Any other member that writes a table of its own stands outside the
+/// comparison, so it is named at its own manifest.
 #[test]
-fn metadata_that_stayed_behind_a_version_bump_is_caught() {
-    let bumped = WORKSPACE.replace("version = \"0.0.5\"", "version = \"0.0.6\"");
-    let found = compared(&bumped, DESKTOP);
-    assert_eq!(found.len(), 1, "{found:#?}");
-    assert!(
-        found[0].location.contains("[workspace.package] version"),
-        "{found:#?}"
-    );
-}
-
-/// A dependency both manifests name is one version line. A dependency
-/// only this package names is its own business, and the comparison says
-/// nothing about it.
-#[test]
-fn a_shared_dependency_is_held_to_one_version_and_a_private_one_is_not() {
-    let drifted = DESKTOP.replace("toml = \"1.1\"", "toml = \"0.8\"");
-    let found = compared(WORKSPACE, &drifted);
-    assert_eq!(found.len(), 1, "{found:#?}");
-    assert!(found[0].violation.contains("`0.8`"), "{found:#?}");
-    assert!(found[0].alternative.contains("1.1"), "{found:#?}");
-    // `image` is named by one manifest only, and stays unjudged.
-    assert!(
-        compared(WORKSPACE, &DESKTOP.replace("\"0.25\"", "\"0.24\"")).is_empty(),
-        "a dependency the workspace does not name is this package's own"
-    );
-}
-
-/// A package inside the wall that writes a lint table or a version of
-/// its own stands outside the comparison above, so it is named: the
-/// copy is stated once and every package of the wall inherits it.
-#[test]
-fn a_package_inside_the_wall_that_does_not_inherit_it_is_named() {
-    assert!(
-        inherited_by(MEMBER).is_empty(),
-        "{:#?}",
-        inherited_by(MEMBER)
-    );
-
-    let own_lints = MEMBER.replace(
+fn another_member_with_a_table_of_its_own_is_named() {
+    let own = MEMBER.replace(
         "[lints]\nworkspace = true",
-        "[lints.clippy]\nunwrap_used = \"allow\"",
+        "[lints.rust]\nunsafe_code = \"deny\"",
     );
-    let found = inherited_by(&own_lints);
+    let found = judged(LEAF_MANIFEST, &own);
     assert_eq!(found.len(), 1, "{found:#?}");
-    assert!(
-        found[0].location.contains("desktop/ffi/Cargo.toml [lints]"),
-        "{found:#?}"
-    );
+    assert_eq!(found[0].location, "crates/k/Cargo.toml [lints]");
     assert!(
         found[0].alternative.contains("workspace = true"),
         "{found:#?}"
     );
+}
 
-    let own_version = MEMBER.replace("\nversion.workspace = true", "\nversion = \"0.0.4\"");
-    let found = inherited_by(&own_version);
-    assert_eq!(found.len(), 1, "{found:#?}");
-    assert!(
-        found[0]
-            .location
-            .contains("desktop/ffi/Cargo.toml [package] version"),
-        "{found:#?}"
+/// A leaf that is no longer a member leaves its exception granted to
+/// nothing; the exception is struck with it.
+#[test]
+fn a_leaf_that_is_no_longer_a_member_strikes_its_exception() {
+    let found = tables(
+        &read(WORKSPACE),
+        &[("crates/k".to_owned(), read(MEMBER))],
     );
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(found[0].location.contains("LEAF"), "{found:#?}");
+    assert!(found[0].alternative.contains("RECORDED"), "{found:#?}");
 }

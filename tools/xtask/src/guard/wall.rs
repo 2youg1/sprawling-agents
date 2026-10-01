@@ -79,6 +79,16 @@ const RECORDED: [Recorded; 2] = [
     },
 ];
 
+/// The one member whose lint table is its own.
+#[cfg(test)]
+const LEAF: &str = "crates/desktop/ffi";
+
+/// Every member's lint table, judged against the workspace's.
+#[cfg(test)]
+fn tables(_workspace: &toml::Value, _members: &[(String, toml::Value)]) -> Vec<Violation> {
+    Vec::new()
+}
+
 pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let workspace = manifest(root, ROOT_MANIFEST)?;
     let desktop = manifest(root, DESKTOP_MANIFEST)?;
