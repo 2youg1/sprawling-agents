@@ -82,6 +82,37 @@ pub struct RunStarted {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub naming: Option<B3Hash>,
+    /// How the run's first user message was written (kernel-SPEC 8-82-1):
+    /// what a fork reads to rebuild that message the way the mother sent
+    /// it. Absent in a record written before the key existed, and on a
+    /// harness run, whose first words are the harness's own prompt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening: Option<Opening>,
+}
+
+/// How a run's first user message opens.
+///
+/// Exhaustive, and the choice is made once by the city that wrote (or
+/// did not write) the job file. It is not a formatting preference: a
+/// session working from an assignment and a session talking with the
+/// person want different first words, and inferring which from an empty
+/// string would make the emptiness of a goal mean two things.
+///
+/// It lives here rather than beside the conversation that writes it
+/// because `run_started` records it, and the ledger's payloads are this
+/// crate's; `runtime::conversation` re-exports it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Opening {
+    /// Somebody wrote the task down; the job file's text is in the prefix.
+    FromJob,
+    /// Somebody wrote the task down for a mother, and a branch is
+    /// rebuilding her conversation: her job file lives in her room, not
+    /// in the branch's prefix, so the task travels in the message.
+    Inherited,
+    /// Nobody did; the person is on the other side of this message.
+    WithPerson,
 }
 
 /// `run_frozen`: how a run ended, and what it cites for having ended

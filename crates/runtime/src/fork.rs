@@ -92,15 +92,7 @@ fn fold_run<'a>(
         match record.kind() {
             EventKind::RunStarted => {
                 let started = record.data().read::<RunStarted>()?;
-                conversation.push_task_lines(
-                    &started.task,
-                    &started.goal,
-                    if started.job.is_some() {
-                        Opening::Inherited
-                    } else {
-                        Opening::WithPerson
-                    },
-                );
+                conversation.push_task_lines(&started.task, &started.goal, rebuilt(&started));
                 at = record.seq();
             }
             EventKind::ModelReturned => {
@@ -241,6 +233,29 @@ fn fold_run<'a>(
         messages: conversation.messages().to_vec(),
         at,
     })
+}
+
+/// How a branch writes the first message of a run it rebuilds: the way
+/// the mother wrote it, so a provider's cached prefix holds from the
+/// first message on (runtime-SPEC.md 8-58).
+///
+/// **`FromJob` is the one opening rewritten.** Its line says the task is
+/// in the JOB.md above, and the JOB.md it means is the mother's, in the
+/// run segment of her prefix; the branch's prefix carries its own brief,
+/// so the line copied would point the branch at a file it was never
+/// given. The rewrite costs the cache from the first message, and copying
+/// her job file into the branch's run segment instead would cost it from
+/// the system prompt (runtime-SPEC.md 12.14).
+///
+/// A record from before `opening` was written is read the way it was
+/// read before.
+fn rebuilt(started: &RunStarted) -> Opening {
+    match started.opening {
+        Some(Opening::FromJob) => Opening::Inherited,
+        Some(spoken @ (Opening::Inherited | Opening::WithPerson)) => spoken,
+        None if started.job.is_some() => Opening::Inherited,
+        None => Opening::WithPerson,
+    }
 }
 
 /// One turn being folded: the assistant message and the results it is

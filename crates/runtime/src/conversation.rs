@@ -25,24 +25,9 @@
 
 use kernel::{ChatMessage, ContentBlock, Role};
 
-/// How the first user message opens.
-///
-/// Exhaustive, and the choice is made once by the city that wrote (or
-/// did not write) the job file. It is not a formatting preference: a
-/// session working from an assignment and a session talking with the
-/// person want different first words, and inferring which from an empty
-/// string would make the emptiness of a goal mean two things.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Opening {
-    /// Somebody wrote the task down; the job file's text is in the prefix.
-    FromJob,
-    /// Somebody wrote the task down for a mother, and a branch is
-    /// rebuilding her conversation: her job file lives in her room, not
-    /// in the branch's prefix, so the task travels in the message.
-    Inherited,
-    /// Nobody did; the person is on the other side of this message.
-    WithPerson,
-}
+/// How the first user message opens: kernel's, because `run_started`
+/// records it (kernel-SPEC.md 8-82-1).
+pub use kernel::event::record::Opening;
 
 /// The run's conversation history, owned by the executor and folded
 /// forward turn by turn. Frozen-prefix bytes never live here — the

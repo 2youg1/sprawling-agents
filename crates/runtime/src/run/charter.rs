@@ -13,7 +13,7 @@
 //! of run can lend.
 
 use kernel::event::Who;
-use kernel::event::record::{CheckpointCommitted, RunFrozen, RunStarted};
+use kernel::event::record::{CheckpointCommitted, Opening, RunFrozen, RunStarted};
 use kernel::{
     Address, AxCode, AxError, Completion, EventDraft, EventKind, Ledger, Locator, Payload, RunId,
     TimeMs,
@@ -43,6 +43,10 @@ pub struct Charter<'a> {
     pub policy: kernel::RunPolicy,
     /// The identity version `run_started` records (kernel-SPEC 8-79).
     pub naming: Option<kernel::B3Hash>,
+    /// How the run's first user message was written, which a fork reads
+    /// back (kernel-SPEC 8-82-1); `None` for a run the city writes no
+    /// first message for.
+    pub opening: Option<Opening>,
 }
 
 impl RunPlan {
@@ -62,6 +66,7 @@ impl RunPlan {
             skills: &self.skills,
             policy: self.run_policy,
             naming: self.naming,
+            opening: Some(self.opening),
         }
     }
 }
@@ -100,6 +105,7 @@ impl Charter<'_> {
             dispatched_by: Some(self.dispatched_by.clone()),
             policy: Some(self.policy),
             naming: self.naming,
+            opening: self.opening,
         };
         ledger.append(EventDraft {
             run: self.run,

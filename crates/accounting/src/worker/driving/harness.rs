@@ -103,6 +103,10 @@ impl Chartered {
             // A harness run is handed no prefix of this city's, so it
             // froze no names (runtime-SPEC.md 8-56).
             naming: None,
+            // Its first words are the prompt handed to the harness's own
+            // session; the city writes it no first message to record
+            // (kernel-SPEC.md 8-82-1).
+            opening: None,
         }
     }
 }
