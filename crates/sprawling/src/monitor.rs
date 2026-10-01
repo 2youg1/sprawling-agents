@@ -11,7 +11,7 @@
 //! reading function; this module touches no platform interface.
 
 pub(crate) mod counters;
-pub(crate) mod memory;
+pub mod memory;
 pub(crate) mod sampler;
 pub mod spread;
 pub mod top;

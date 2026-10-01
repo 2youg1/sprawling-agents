@@ -27,13 +27,13 @@ mod ending;
 /// Enrolment is a credential handed to an HTTP route rather than a
 /// frame spoken on the socket, so it has its own file.
 mod enrolment;
-/// `sprawling top` holds its socket open until the city stops.
+/// `sprawling gauge --at` holds its socket open until the city stops.
 mod watching;
 
 use ending::{Awaited, Echo, Ending, Heard, Reply};
 pub(crate) use ending::{Milestone, Spoken, Until};
 pub(crate) use enrolment::{enrol, split_reference};
-pub(crate) use watching::{Output, top};
+pub(crate) use watching::top;
 
 /// How long a call listens: the silence that ends it, and what it waits
 /// for before then. They are read together at every frame, so they

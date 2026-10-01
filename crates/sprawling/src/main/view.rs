@@ -17,7 +17,7 @@ use super::city::report;
 use super::grammar::{Arguments, nearest};
 use kernel::{AxError, EventKind, EventRecord, RunId, Seq};
 use runtime::clock::{UtcSpan, parse_iso};
-use std::io::{BufWriter, ErrorKind, IsTerminal, Write};
+use std::io::{BufWriter, ErrorKind, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -45,10 +45,9 @@ pub(super) enum Audience {
 
 impl Audience {
     fn of_stdout() -> Audience {
-        if std::io::stdout().is_terminal() {
-            Audience::Person
-        } else {
-            Audience::Agent
+        match sprawling::audience::Audience::of_stdout() {
+            sprawling::audience::Audience::Person => Audience::Person,
+            sprawling::audience::Audience::Agent => Audience::Agent,
         }
     }
 

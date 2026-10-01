@@ -20,7 +20,7 @@ pub(super) enum Verb {
     Resume,
     Call,
     Dispatch,
-    Top,
+    Gauge,
     Enrol,
     Whose,
     Check,
@@ -64,6 +64,15 @@ pub(super) struct Flag {
     pub(super) says: &'static str,
 }
 
+/// Whether a verb takes the words after the first `--` as a command of
+/// its own, handed over without reading any of them as a flag
+/// (sprawling-SPEC.md 8-129-4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum AfterDashes {
+    Refused,
+    Command,
+}
+
 /// Whether a positional argument may be left out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Need {
@@ -81,6 +90,7 @@ pub(super) struct Row {
     pub(super) flags: &'static [Flag],
     pub(super) says: &'static str,
     pub(super) effect: Effect,
+    pub(super) after_dashes: AfterDashes,
 }
 
 const fn flag(name: &'static str, takes: Takes, says: &'static str) -> Flag {
@@ -172,6 +182,7 @@ pub(super) const VERBS: &[Row] = &[
         flags: SERVED,
         says: "raise a city here if needed, serve it, open the WebUI",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Init,
@@ -185,6 +196,7 @@ pub(super) const VERBS: &[Row] = &[
         )],
         says: "raise a city: writes the genesis record",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Serve,
@@ -194,6 +206,7 @@ pub(super) const VERBS: &[Row] = &[
         flags: SERVED,
         says: "serve a city that already exists",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Resume,
@@ -203,6 +216,7 @@ pub(super) const VERBS: &[Row] = &[
         flags: &[],
         says: "after a restart: verify, close what was lost, report",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Call,
@@ -226,6 +240,7 @@ pub(super) const VERBS: &[Row] = &[
         ],
         says: "send one wire frame, print every frame back",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Dispatch,
@@ -252,15 +267,35 @@ pub(super) const VERBS: &[Row] = &[
         ],
         says: "send one task, print its events until the run freezes",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
-        verb: Verb::Top,
-        name: "top",
-        aliases: &[],
+        verb: Verb::Gauge,
+        name: "gauge",
+        aliases: &["top"],
         positionals: &[],
-        flags: &[AT, flag("--token", Value("token"), "the pairing token")],
-        says: "watch a city's monitor: a screen on a terminal, a JSON line a second otherwise",
-        effect: Effect::ReadsOnly,
+        flags: &[
+            AT,
+            flag("--token", Value("token"), "the pairing token"),
+            flag(
+                "--pid",
+                Value("pid"),
+                "a running process and its descendants",
+            ),
+            flag(
+                "--every",
+                Value("ms"),
+                "the beat, 250 to 60000 ms; 1000 when not given",
+            ),
+            flag(
+                "--samples",
+                Value("n"),
+                "runs of the command, or beats of the process",
+            ),
+        ],
+        says: "measure a served city, a process tree, or a command run n times: lines a person reads on a terminal, JSON lines otherwise",
+        effect: Effect::Changes,
+        after_dashes: AfterDashes::Command,
     },
     Row {
         verb: Verb::Enrol,
@@ -270,6 +305,7 @@ pub(super) const VERBS: &[Row] = &[
         flags: &[AT],
         says: "read a credential from stdin, hand it to a city",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Whose,
@@ -283,6 +319,7 @@ pub(super) const VERBS: &[Row] = &[
         )],
         says: "which run wrote a commit this city made",
         effect: Effect::ReadsOnly,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Check,
@@ -292,6 +329,7 @@ pub(super) const VERBS: &[Row] = &[
         flags: &[],
         says: "read every TOML file a city holds; print each error as path:line:column",
         effect: Effect::ReadsOnly,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::View,
@@ -315,6 +353,7 @@ pub(super) const VERBS: &[Row] = &[
         ],
         says: "read a city's ledger lines or its run tree, read-only",
         effect: Effect::ReadsOnly,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::PlaybackExport,
@@ -343,6 +382,7 @@ pub(super) const VERBS: &[Row] = &[
         ],
         says: "export a stretch of a city's history as a playback bundle",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::PlaybackCheck,
@@ -364,6 +404,7 @@ pub(super) const VERBS: &[Row] = &[
         ],
         says: "check a playback bundle on its own, against another, or against its city",
         effect: Effect::ReadsOnly,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Fork,
@@ -378,6 +419,7 @@ pub(super) const VERBS: &[Row] = &[
         flags: &[],
         says: "branch a lineage from one step of a run",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Adopt,
@@ -387,6 +429,7 @@ pub(super) const VERBS: &[Row] = &[
         flags: &[],
         says: "take an existing directory in as a building",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Replay,
@@ -396,6 +439,7 @@ pub(super) const VERBS: &[Row] = &[
         flags: &[],
         says: "verify a chain offline, read-only",
         effect: Effect::ReadsOnly,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Export,
@@ -405,6 +449,7 @@ pub(super) const VERBS: &[Row] = &[
         flags: &[],
         says: "pack a whole city",
         effect: Effect::ReadsOnly,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Restore,
@@ -414,6 +459,7 @@ pub(super) const VERBS: &[Row] = &[
         flags: &[],
         says: "unpack a bundle on another machine",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Doctor,
@@ -435,6 +481,7 @@ pub(super) const VERBS: &[Row] = &[
         ],
         says: "what this machine has against what a city needs",
         effect: Effect::ReadsOnly,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Desktop,
@@ -444,6 +491,7 @@ pub(super) const VERBS: &[Row] = &[
         flags: &[],
         says: "serve this machine's desktop as an MCP server on stdin and stdout, within the windows <scope> allows",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Install,
@@ -457,6 +505,7 @@ pub(super) const VERBS: &[Row] = &[
         )],
         says: "put this binary on your PATH",
         effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
     },
     Row {
         verb: Verb::Status,
@@ -474,6 +523,7 @@ pub(super) const VERBS: &[Row] = &[
         ],
         says: "this binary: version, client, what it is built from",
         effect: Effect::ReadsOnly,
+        after_dashes: AfterDashes::Refused,
     },
 ];
 
@@ -493,9 +543,13 @@ pub(super) fn usage(row: &Row) -> String {
         Nothing => format!(" [{}]", spelled(flag)),
         Value(what) => format!(" [{} <{what}>]", spelled(flag)),
     });
+    let command = match row.after_dashes {
+        AfterDashes::Refused => "",
+        AfterDashes::Command => " [-- <program> [arg...]]",
+    };
     let name = row.name;
     format!(
-        "sprawling {name}{}",
+        "sprawling {name}{}{command}",
         positionals.chain(flags).collect::<String>()
     )
 }

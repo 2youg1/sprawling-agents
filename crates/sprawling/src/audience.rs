@@ -29,8 +29,11 @@ impl Audience {
 
     /// A terminal is read by a person; anything else by an agent.
     fn of(stream: &impl IsTerminal) -> Audience {
-        let _terminal = stream.is_terminal();
-        Audience::Person
+        if stream.is_terminal() {
+            Audience::Person
+        } else {
+            Audience::Agent
+        }
     }
 }
 

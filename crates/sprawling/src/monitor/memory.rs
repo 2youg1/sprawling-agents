@@ -17,7 +17,8 @@ thread_local! {
 }
 
 /// Reads this machine's memory now, through this thread's kept handle.
-pub(crate) fn read() -> Memory {
+#[must_use]
+pub fn read() -> Memory {
     SYSTEM.with(|kept| {
         let mut system = kept.take().unwrap_or_else(System::new);
         let memory = refreshed(&mut system);

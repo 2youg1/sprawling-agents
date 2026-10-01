@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `sprawling top`: watch a served city's monitor over the wire and
-//! write each reading to stdout (sprawling-SPEC.md 8-97).
+//! `sprawling gauge --at`: watch a served city's monitor over the wire
+//! and write each reading to stdout (sprawling-SPEC.md 8-97).
 
 use std::collections::VecDeque;
 use std::io::Write;
@@ -12,11 +12,13 @@ use std::time::Duration;
 
 use futures_util::SinkExt;
 use kernel::{AxCode, AxError};
-use sprawling::monitor::top::{json_line, screen};
+use sprawling::audience::Audience;
+use sprawling::monitor::top::screen;
 use sprawling::monitor::{CAPACITY, Sample};
 use tokio_tungstenite::tungstenite::Message;
 
-use super::{hello, malformed, next_frame, unreachable_city};
+use super::{Unheard, hello, malformed, next_frame, unreachable_city};
+use crate::gauge::lines::city_line;
 
 /// Five empty beats: the city has stopped, or stopped sending.
 const SILENCE: Duration = Duration::from_secs(5);
@@ -30,47 +32,48 @@ const COLUMNS: usize = 80;
 /// Clears the terminal and puts the cursor top left.
 const REDRAW: &str = "\u{1b}[H\u{1b}[2J";
 
-/// How a reading is written: redrawn on a terminal, one JSON line a
-/// second for anything else, an agent included.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Output {
-    Screen,
-    Lines,
-}
-
-/// Watches the city at `at` until it closes the socket or falls silent.
+/// Watches the city at `at` until it closes the socket or falls silent,
+/// writing each reading in the form `audience` reads.
 ///
 /// # Errors
-/// The city cannot be reached, refuses the greeting, or a frame breaks
-/// mid-read; writing to stdout fails.
-pub(crate) fn top(at: &str, token: Option<&str>, output: Output) -> Result<(), AxError> {
+/// `Unheard::NoCity` when nothing at `at` takes the connection or the
+/// opening frames; `Unheard::Broken` when a frame breaks mid-read,
+/// writing to stdout fails, or this process cannot start the runtime.
+pub(crate) fn top(at: &str, token: Option<&str>, audience: Audience) -> Result<(), Unheard> {
     let greeting = serde_json::to_string(&hello(token))
-        .map_err(|err| malformed("encode the greeting", &err.to_string()))?;
+        .map_err(|err| Unheard::Broken(malformed("encode the greeting", &err.to_string())))?;
     let watch = serde_json::to_string(&wire::ClientFrame::Monitor(wire::Monitoring::Watch))
-        .map_err(|err| malformed("encode the watch frame", &err.to_string()))?;
+        .map_err(|err| Unheard::Broken(malformed("encode the watch frame", &err.to_string())))?;
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|err| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "start the async runtime",
-                err.to_string(),
+            Unheard::Broken(
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "start the async runtime",
+                    err.to_string(),
+                )
+                .with_recovery("close some programs and try again"),
             )
-            .with_recovery("close some programs and try again")
         })?
-        .block_on(watch_until_silent(at, [greeting, watch], output))
+        .block_on(watch_until_silent(at, [greeting, watch], audience))
 }
 
-async fn watch_until_silent(at: &str, opening: [String; 2], output: Output) -> Result<(), AxError> {
+async fn watch_until_silent(
+    at: &str,
+    opening: [String; 2],
+    audience: Audience,
+) -> Result<(), Unheard> {
+    let no_city = |why: String| Unheard::NoCity(unreachable_city(at, &why));
     let (mut socket, _) = tokio_tungstenite::connect_async(format!("ws://{at}/ws"))
         .await
-        .map_err(|err| unreachable_city(at, &err.to_string()))?;
+        .map_err(|err| no_city(err.to_string()))?;
     for frame in opening {
         socket
             .send(Message::Text(frame.into()))
             .await
-            .map_err(|err| unreachable_city(at, &err.to_string()))?;
+            .map_err(|err| no_city(err.to_string()))?;
     }
     let curve_width = std::env::var("COLUMNS")
         .ok()
@@ -79,18 +82,23 @@ async fn watch_until_silent(at: &str, opening: [String; 2], output: Output) -> R
         .saturating_sub(BEFORE_CURVE);
     let mut history = VecDeque::new();
     let mut stdout = std::io::stdout().lock();
-    while let Some(text) = next_frame(&mut socket, SILENCE).await? {
-        if let Some(shown) = shown(&text, &mut history, output, curve_width) {
+    while let Some(text) = next_frame(&mut socket, SILENCE)
+        .await
+        .map_err(Unheard::Broken)?
+    {
+        if let Some(shown) = shown(&text, &mut history, audience, curve_width) {
             stdout
                 .write_all(shown.as_bytes())
                 .and_then(|()| stdout.flush())
                 .map_err(|err| {
-                    AxError::failure(
-                        AxCode::StorageFatal,
-                        "write a reading to stdout",
-                        err.to_string(),
+                    Unheard::Broken(
+                        AxError::failure(
+                            AxCode::StorageFatal,
+                            "write a reading to stdout",
+                            err.to_string(),
+                        )
+                        .with_recovery("stdout was closed; run `sprawling gauge` again"),
                     )
-                    .with_recovery("stdout was closed; run `sprawling top` again")
                 })?;
         }
     }
@@ -102,7 +110,7 @@ async fn watch_until_silent(at: &str, opening: [String; 2], output: Output) -> R
 pub(crate) fn shown(
     text: &str,
     history: &mut VecDeque<Sample>,
-    output: Output,
+    audience: Audience,
     curve_width: usize,
 ) -> Option<String> {
     let Ok(wire::ServerFrame::Monitor(sample)) = serde_json::from_str(text) else {
@@ -112,9 +120,9 @@ pub(crate) fn shown(
         history.pop_front();
     }
     history.push_back(sample);
-    match output {
-        Output::Lines => json_line(&sample).ok().map(|line| format!("{line}\n")),
-        Output::Screen => Some(format!(
+    match audience {
+        Audience::Agent => city_line(&sample).ok().map(|line| format!("{line}\n")),
+        Audience::Person => Some(format!(
             "{REDRAW}{}\n",
             screen(history.make_contiguous(), curve_width)
         )),

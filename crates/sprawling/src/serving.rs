@@ -25,7 +25,7 @@ pub(crate) mod folding;
 pub(crate) mod journal;
 pub(crate) mod output_ring;
 pub(super) mod serve;
-pub(crate) mod standing;
+pub mod standing;
 #[cfg(test)]
 mod tests;
 

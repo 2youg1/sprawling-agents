@@ -74,7 +74,10 @@ struct Row {
 }
 
 /// What a counter's integer counts, which decides how it is written.
-enum Unit {
+/// The one table of units: `gauge`'s lines for a person are written
+/// through it too (sprawling-SPEC.md 8-129-4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Unit {
     Permille,
     Bytes,
     Nanos,
@@ -163,7 +166,8 @@ const ROWS: [Row; 15] = [
 impl Unit {
     /// `value` in this unit, one decimal truncated where a larger unit
     /// applies.
-    fn reading(&self, value: u64) -> String {
+    #[must_use]
+    pub fn reading(&self, value: u64) -> String {
         match self {
             Self::Permille => format!("{}%", tenths(u128::from(value))),
             Self::Bytes => scaled(value, 1024, &["B", "KiB", "MiB", "GiB", "TiB"]),

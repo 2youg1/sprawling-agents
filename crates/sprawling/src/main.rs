@@ -41,6 +41,8 @@ mod desktop;
 mod dispatch;
 #[path = "main/exit.rs"]
 mod exit;
+#[path = "main/gauge.rs"]
+mod gauge;
 #[path = "main/grammar.rs"]
 mod grammar;
 #[path = "main/playback.rs"]

@@ -166,6 +166,13 @@ fn a_verb_of_two_words_is_read_from_two_words() {
 fn the_words_after_two_dashes_are_not_read_as_sprawlings_own() {
     let parsed = parse(&words(&["top", "--", "cargo", "--version", "--help"]));
     assert!(matches!(parsed, Ok(Invocation::Run(_, _))), "{parsed:?}");
+    let Ok(Invocation::Run(_, read)) = parsed else {
+        return;
+    };
+    assert_eq!(
+        read.after_dashes(),
+        Some(&words(&["cargo", "--version", "--help"])[..])
+    );
 }
 
 /// `top` is the alias of `gauge`, so both words reach one verb.

@@ -23,7 +23,8 @@ use accounting::person::CorePriority;
     clippy::disallowed_methods,
     reason = "the one monotonic sampling point: a core thread's valve measures spans"
 )]
-pub(crate) fn monotonic_now() -> Instant {
+#[must_use]
+pub fn monotonic_now() -> Instant {
     Instant::now()
 }
 

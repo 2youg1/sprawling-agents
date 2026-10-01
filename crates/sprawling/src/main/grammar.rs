@@ -7,10 +7,12 @@
 //! word that could not be read (sprawling-SPEC.md 8-89). Pure: it reads
 //! the command table and the words, and touches nothing else.
 //!
-//! `--help`/`-h` and `--version`/`-V` win wherever they stand, so no
-//! verb can act on a request for its help.
+//! `--help`/`-h` and `--version`/`-V` win wherever they stand among
+//! sprawling's own words, so no verb can act on a request for its help.
+//! Those words end at the first `--`: what follows belongs to the
+//! command a verb such as `gauge` runs (sprawling-SPEC.md 8-129-4).
 
-use super::verbs::{Need, Row, Takes, VERBS, Verb};
+use super::verbs::{AfterDashes, Need, Row, Takes, VERBS, Verb};
 
 /// What a command line asks for.
 #[derive(Debug, PartialEq, Eq)]
@@ -31,6 +33,7 @@ pub(super) enum Invocation {
 pub(super) struct Arguments {
     positionals: Vec<String>,
     flags: Vec<(&'static str, Option<String>)>,
+    after_dashes: Option<Vec<String>>,
 }
 
 impl Arguments {
@@ -51,6 +54,12 @@ impl Arguments {
             .rev()
             .find(|(name, _)| *name == flag)
             .and_then(|(_, value)| value.as_deref())
+    }
+
+    /// The words after the first `--`, exactly as given: `None` when the
+    /// line has no `--`, empty when nothing follows it.
+    pub(super) fn after_dashes(&self) -> Option<&[String]> {
+        self.after_dashes.as_deref()
     }
 }
 
@@ -112,10 +121,11 @@ fn guess(nearest: &[&str]) -> String {
 /// # Errors
 /// `LineError` names the word that could not be read and what was near it.
 pub(super) fn parse(words: &[String]) -> Result<Invocation, LineError> {
-    if words.iter().any(|word| word == "--version" || word == "-V") {
+    let own = words.split(|word| word == "--").next().unwrap_or(&[]);
+    if own.iter().any(|word| word == "--version" || word == "-V") {
         return Ok(Invocation::Version);
     }
-    let asks_help = words.iter().any(|word| word == "--help" || word == "-h");
+    let asks_help = own.iter().any(|word| word == "--help" || word == "-h");
     let Some((first, rest)) = words.split_first() else {
         return Ok(Invocation::FirstScreen);
     };
@@ -186,6 +196,10 @@ fn arguments(row: &Row, words: &[String]) -> Result<Arguments, LineError> {
     let mut read = Arguments::default();
     let mut words = words.iter();
     while let Some(word) = words.next() {
+        if word == "--" && row.after_dashes == AfterDashes::Command {
+            read.after_dashes = Some(words.cloned().collect());
+            break;
+        }
         let named = row
             .flags
             .iter()
