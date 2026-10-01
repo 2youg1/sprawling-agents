@@ -147,8 +147,11 @@ fn large_ledger_fold(
     )?])
 }
 
-/// Large-worktree placement: one claim places the whole tree. The seam
-/// does not split weighing from copying, so the reading is priced whole.
+/// Large-worktree placement: one claim places a new node's tree by
+/// taking over the stock, which is checked out at the trunk before the
+/// clock starts, where the city checks it out while nobody waits
+/// (citysim-SPEC.md section 3-13). The seam does not split the rename
+/// from git's bookkeeping, so the reading is priced whole.
 fn large_worktree_placement(
     scratch: &Path,
     fixture: &Fixture,
@@ -158,6 +161,7 @@ fn large_worktree_placement(
     let mut times = Vec::new();
     for i in 0..fixture.placements {
         let name = node(i)?;
+        trees.stock().map_err(|why| format!("{}", why.into_ax()))?;
         let t0 = super::stamp();
         let lease = trees
             .claim(&name, &[])
