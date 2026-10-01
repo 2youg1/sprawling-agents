@@ -142,11 +142,19 @@ impl Browser {
 }
 
 /// What a step acted on, as the ledger names it: the reference the
-/// snapshot minted, or the viewport when a pointer action named none.
+/// snapshot minted, the viewport when a pointer action named none, and
+/// the focus for a key, which lands wherever the page has put it.
 fn acted_on(action: &browser::Action) -> String {
-    action
-        .reference()
-        .map_or_else(|| "viewport".to_owned(), str::to_owned)
+    match action {
+        browser::Action::Press { .. } => "focus".to_owned(),
+        browser::Action::Click { .. }
+        | browser::Action::Type { .. }
+        | browser::Action::Read { .. }
+        | browser::Action::Drag { .. }
+        | browser::Action::Scroll { .. } => action
+            .reference()
+            .map_or_else(|| "viewport".to_owned(), str::to_owned),
+    }
 }
 
 /// What a step of the development loop is called on the wire. Written

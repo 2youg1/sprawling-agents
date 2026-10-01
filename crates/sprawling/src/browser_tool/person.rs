@@ -107,21 +107,21 @@ pub(super) fn user_browser_params() -> Result<Payload, AxError> {
         "url": text("for open: the page to open; for fetch: the absolute http(s) address the open page fetches with its own cookies, answered as readable text"),
         "kind": {
             "type": "string",
-            "enum": ["click", "type", "read", "drag", "scroll"],
-            "description": "for act: the action to perform",
+            "enum": ["click", "type", "read", "drag", "scroll", "press"],
+            "description": "for act: the action to perform; `press` presses one key on whatever the page has focused, so click the element first",
         },
-        "ref": text("for act, measure: a reference from the snapshot, such as `e12`"),
+        "ref": text("a reference from the snapshot, such as `e12`: for act, the element acted on; for measure, the element measured; for screenshot, the region to cover, whose box the page reports so nothing is guessed"),
         "refs": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "for measure: the references to measure",
+            "description": "references from the snapshot: for measure, the elements to measure; for screenshot, the elements to cover together as one region, boxed by the same measurement `measure` reads",
         },
         "text": text("for type: what to type"),
-        "ref": text("for screenshot: the region to cover, as a reference from the snapshot; the page reports that element's box, so nothing is guessed"),
-        "refs": {
+        "key": text("for press: the key, as a DOM `KeyboardEvent.key` name such as `Enter`, `Tab` or `ArrowDown`, or one character; a name this tool cannot press is refused with the names it can"),
+        "modifiers": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "for screenshot: the references to cover together as one region; the boxes come from the same measurement `measure` reads",
+            "description": "for press: the keys held around it, by their DOM `KeyboardEvent.key` names such as `Control` or `Shift`",
         },
         "generation": {
             "type": "integer",
