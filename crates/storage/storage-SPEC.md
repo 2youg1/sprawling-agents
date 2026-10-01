@@ -1213,3 +1213,16 @@ pub fn blob_at(city_root: &Path, oid: GitOid, addr: &Address) -> Result<Option<V
 
 - 读城仓库里 `oid` 那次提交的树上 `addr` 处的 blob；那里不是文件（目录、子模块、不存在）＝`Ok(None)`，由调用方说出拒因——它知道是谁问的。仓库打不开、提交找不到＝`StorageError::Checkpoint`。
 - 不碰工作区与索引：`file:<addr>@<oid>` 指的是提交里的字节，工作区此刻的文件可能已经改过。
+
+### 8-33 从检查点取回一个文件进城自己的工作树（`storage::checkpoint::commit`，形状 4 适配器）
+
+```rust
+impl Checkpoint {
+    pub fn take_back(&self, address: &Address, point: &GitOid) -> Result<FileRestored, StorageError>;
+}
+```
+
+- **换回，或删去。** `point` 在 `address` 有一个文件：经 `bundle::landing::land`（暂存再 `rename`，取被替换文件的权限）把工作树里这一处换成那一份；没有：删去工作树里这一处（本来就没有也算成功）。目录或别的东西在那里拒。与回收站那一扇门（`restore`）不同：那一扇只放回一个不在的文件，见到已有的就拒；这一扇的意思就是「不要现在这一份」。
+- **门与 `restore` 相同。** 保留子树里的地址拒；`WriteTarget::within` 字面拒路径上的链接与 junction；不动索引与 HEAD——取回一个文件不是一次提交。
+- **回的那一行。** 返回 `FileRestored { name: "", path, point }`，由调用方写进账本；空的 `name` 指城自己的工作树，与 `Worktrees::restore_file` 写的 run 树的名字区分。
+- 验收：`checkpoint::commit::restore_tests` 的 `taking_a_file_back_replaces_what_the_tree_holds_and_removes_what_the_point_did_not_hold`。

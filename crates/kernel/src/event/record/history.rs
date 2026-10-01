@@ -26,7 +26,9 @@ pub struct WentBack {
 }
 
 /// `file_restored`: `path` in the tree `name` now holds what `point`
-/// holds there, or nothing when `point` holds no such file.
+/// holds there, or nothing when `point` holds no such file. An empty
+/// `name` is the city's own working tree, which a person takes a file
+/// back into from a page (wire-SPEC.md 8-62).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FileRestored {
