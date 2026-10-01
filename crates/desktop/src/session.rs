@@ -44,6 +44,22 @@ pub(crate) enum Phase {
     Ready,
 }
 
+impl Phase {
+    /// The phase `notifications/initialized` leaves a connection in:
+    /// only one that has answered `initialize` opens
+    /// (`crates/desktop/Spec.lean` D15).
+    ///
+    /// # Errors
+    /// Refuses the notification on a fresh connection, which stays fresh:
+    /// a client that never sent `initialize` negotiated no revision.
+    fn opened(self) -> Result<Phase, Refusal> {
+        match self {
+            Phase::Fresh => Err(unfinished("finish the handshake")),
+            Phase::Initializing | Phase::Ready => Ok(Phase::Ready),
+        }
+    }
+}
+
 /// One connection: the scope it is bounded by, and the desk it works
 /// at.
 ///
@@ -137,7 +153,7 @@ impl Server {
                 }))
             }
             "notifications/initialized" => {
-                self.phase = Phase::Ready;
+                self.phase = self.phase.opened()?;
                 Ok(json!({}))
             }
             "ping" => Ok(json!({})),
@@ -164,13 +180,7 @@ impl Server {
     fn handshaken(&self, action: &str) -> Result<(), Refusal> {
         match self.phase {
             Phase::Ready => Ok(()),
-            Phase::Fresh | Phase::Initializing => Err(Refusal::new(
-                RefusalCode::GateDenied,
-                action,
-                "this connection has not finished its handshake",
-                "send `initialize`, then the `notifications/initialized` notification, \
-                 before anything else",
-            )),
+            Phase::Fresh | Phase::Initializing => Err(unfinished(action)),
         }
     }
 
@@ -223,6 +233,18 @@ impl Server {
         // reports only the windows this allowlist could name.
         self.desk.perform(tool, arguments, &admitted)
     }
+}
+
+/// The refusal for `action` asked of a connection whose handshake has not
+/// finished.
+fn unfinished(action: &str) -> Refusal {
+    Refusal::new(
+        RefusalCode::GateDenied,
+        action,
+        "this connection has not finished its handshake",
+        "send `initialize`, then the `notifications/initialized` notification, \
+         before anything else",
+    )
 }
 
 /// The tool table as `tools/list` publishes it.
