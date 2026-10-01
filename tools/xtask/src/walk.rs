@@ -23,12 +23,22 @@ use crate::report::XtaskError;
 /// no reader will ever receive. A gate that reports generated files
 /// reports nothing, because nobody reads past the first screen of them.
 ///
+/// `web-dist` is the client bundle `just build-web` writes into the
+/// `sprawling` package, where its build script and its crates.io archive
+/// find it (xtask-SPEC.md section 8-18): Vite's output, minified.
+///
 /// This list is a second authority for "what is in the tree", and git is
 /// the first. It stays a list rather than a `.gitignore` reader because
-/// four names cost four tokens and a parser costs a parser - but that is
-/// the parameter: **the day this list needs a fifth entry that is not a
-/// build directory, read the ignore file instead of adding a row.**
-const SKIP_DIRS: [&str; 4] = ["target", "node_modules", ".lake", ".svelte-check"];
+/// five names cost five tokens and a parser costs a parser - but that is
+/// the parameter: **the day this list needs an entry that is not a build
+/// directory, read the ignore file instead of adding a row.**
+const SKIP_DIRS: [&str; 5] = [
+    "target",
+    "node_modules",
+    ".lake",
+    ".svelte-check",
+    "web-dist",
+];
 
 /// Version control's own entry. It is never walked, whether a directory or
 /// the pointer file a worktree or submodule carries (which names an

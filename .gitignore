@@ -1,5 +1,9 @@
 /target
 /local
+# The client bundle `just build-web` writes into the package whose build
+# script embeds it; `crates/sprawling/Cargo.toml` lists it for the
+# crates.io archive by name, since cargo leaves ignored files out.
+/crates/sprawling/web-dist/
 /.lake
 # `just mutants` writes its report and the previous run's beside the
 # workspace root.
@@ -17,8 +21,8 @@
 # document that sends a reader there.
 #
 # The three city names are root-anchored: a city writes its own Roadmap,
-# Memo and Handoff, and `docs/templates/` ships the empty shells it writes
-# them from. Only a copy left at the root of this repository is a mistake.
+# Memo and Handoff, and `crates/city/templates/` ships the empty shells it
+# writes them from. Only a copy left at the root of this repository is a mistake.
 /Roadmap.md
 /Memo.md
 /Handoff.md

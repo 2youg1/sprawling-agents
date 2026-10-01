@@ -5,9 +5,12 @@
 
 //! Where the built client lands, read from the file that embeds it.
 //!
-//! The location is a path relative to the workspace root, stated whole:
-//! a name with one home and a parent directory spelled once per reader
-//! still let the bundler write where the build script did not look.
+//! The build script states the location relative to its own package,
+//! because a package archived for crates.io carries its own directory
+//! and nothing else (xtask-SPEC.md section 8-18); this joins it onto that
+//! package's directory and hands every reader the whole repo-relative
+//! path: a name with one home and a parent directory spelled once per
+//! reader still let the bundler write where the build script did not look.
 //!
 //! The directory name had four homes: the build script that embeds the
 //! bundle, the bundler that writes it, the gate that opens it, and the
@@ -18,8 +21,9 @@
 //!
 //! **The path lives in `crates/sprawling/build.rs`, and this reads it
 //! from there.** That file is the only reader that must work in the
-//! published tree, which carries no `tools/xtask/`, and it is the first reader
-//! in any build; a copy kept here would be the second home again. The
+//! published tree and in the crates.io archive, neither of which carries
+//! `tools/xtask/`, and it is the first reader in any build; a copy kept
+//! here would be the second home again. The
 //! two files that restate the path in another language are held to it by
 //! `restated`, which reports rather than rewrites — a gate does not edit
 //! a bundler's configuration.
@@ -29,8 +33,11 @@ use std::path::{Path, PathBuf};
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The file that owns the bundle's path.
-const EMBEDDER: &str = "crates/sprawling/build.rs";
+/// The package whose build script embeds the bundle, repo-relative.
+const PACKAGE: &str = "crates/sprawling";
+
+/// The file in it that owns the bundle's path.
+const EMBEDDER: &str = "build.rs";
 
 /// The constant in it that states the path.
 const DECLARATION: &str = "BUNDLE_DIR";
@@ -40,23 +47,25 @@ const DECLARATION: &str = "BUNDLE_DIR";
 /// contributor's build goes.
 const RESTATEMENTS: [&str; 2] = ["client/vite.config.ts", "justfile"];
 
-/// The workspace-relative path the product embeds, `/`-separated, as
-/// its build script states it.
+/// The workspace-relative path the product embeds, `/`-separated: the
+/// package's directory, then the path its build script states.
 ///
 /// # Errors
 /// When the build script cannot be read or parsed, or when it no longer
 /// declares the constant: a gate that guessed a path here would weigh an
 /// empty directory and report a bundle of zero bytes.
 pub(crate) fn stated_path(root: &Path) -> Result<String, XtaskError> {
-    let text = walk::read_text(&root.join(EMBEDDER))?;
+    let embedder = format!("{PACKAGE}/{EMBEDDER}");
+    let text = walk::read_text(&root.join(&embedder))?;
     let parsed = syn::parse_file(&text).map_err(|err| XtaskError::Doc {
-        file: EMBEDDER.to_owned(),
+        file: embedder.clone(),
         msg: format!("this file does not parse as Rust: {err}"),
     })?;
-    declared(&parsed.items).ok_or_else(|| XtaskError::Doc {
-        file: EMBEDDER.to_owned(),
+    let declared = declared(&parsed.items).ok_or_else(|| XtaskError::Doc {
+        file: embedder,
         msg: format!("no `const {DECLARATION}: &str` states where the client bundle lands"),
-    })
+    })?;
+    Ok(format!("{PACKAGE}/{declared}"))
 }
 
 /// Where the built client lands in this checkout.
@@ -106,7 +115,8 @@ pub(crate) fn restated(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             gate: "artifact",
             location: rel.to_owned(),
             rule: format!(
-                "the client bundle lands at one path, stated by `{DECLARATION}` in {EMBEDDER}"
+                "the client bundle lands at one path, stated by `{DECLARATION}` in \
+                 {PACKAGE}/{EMBEDDER}"
             ),
             violation: format!(
                 "this file spells no `{stated}`, so it writes or documents \

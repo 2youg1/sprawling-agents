@@ -8,7 +8,7 @@ default: check
 # `main` (AGENTS.md, Verification tier 3).
 #
 # `build-web` sits before `gates` because two of the gates - render and
-# npm - judge artifacts rather than sources: they need `target/web-dist`
+# npm - judge artifacts rather than sources: they need `crates/sprawling/web-dist`
 # and `client/node_modules` to exist, and they refuse rather than skip
 # when those are absent, so a check that never built them would be red,
 # not silently green. CI says the same thing through
@@ -266,7 +266,7 @@ test-std:
     cargo test --workspace --locked
 
 # The three gates that judge a built artifact rather than a source:
-# `render` opens `target/web-dist`, `npm` reads `client/node_modules`,
+# `render` opens `crates/sprawling/web-dist`, `npm` reads `client/node_modules`,
 # `budget` weighs both. The one list of them; `gates-sources` runs every
 # other gate on the roster.
 artifact_gates := "render npm budget"
@@ -359,8 +359,8 @@ fuzz-desktop rounds="1000000" seed="5eedf022":
     DESKTOP_FFI_FUZZ_ROUNDS={{rounds}} DESKTOP_FFI_FUZZ_SEED={{seed}} cargo nextest run -p sprawling-desktop-ffi --locked --run-ignored only -E 'test(/for_as_long_as_asked/)'
 
 # The browser client (client/client-SPEC.md): Svelte + Effect, built by
-# Vite under bun, bundled into target/web-dist where crates/sprawling/build.rs reads
-# it. `just prereqs` names bun. `--frozen-lockfile` makes bun.lock
+# Vite under bun, bundled into crates/sprawling/web-dist where
+# crates/sprawling/build.rs reads it and where `cargo package` archives it. `just prereqs` names bun. `--frozen-lockfile` makes bun.lock
 # the authority, so a build cannot resolve a version nobody committed.
 build-web:
     cd client && bun install --frozen-lockfile && bun run build

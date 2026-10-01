@@ -2,7 +2,7 @@
 # repository states it.
 #
 # `npm` reads `client/node_modules` to judge every licence and `render`
-# opens `target/web-dist/index.html` to measure the page. Neither skips
+# opens `crates/sprawling/web-dist/index.html` to measure the page. Neither skips
 # when what it judges is absent: a gate that silently judged nothing let
 # one run report green on twelve gates while claiming fourteen, so both
 # refuse instead. A job that runs them therefore has to supply the tree
