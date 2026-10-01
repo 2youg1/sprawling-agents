@@ -210,7 +210,7 @@ impl WriterLock {
 - **被否：把 PID 写进锁文件。** Windows 上别的进程读不了被锁住的文件，拒词因此报不出 PID；recovery 改为说明怎样停下持锁的那个进程。
 - **重开参数**：出现不经 `JsonlLedger::open` 写账本的生产路径；或者 `std` 的 `try_lock` 改为按进程而不是按句柄判定。
 
-**open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`（只读这一行：`jsonl::first_line` 用 `Vfs::read_at` 从 4 KiB 的窗口读起、每次加倍，见到第一个 `\n` 或文件尽头即停；不见 `\n` 的首行是撕裂行，答「无行」，交给尾部恢复。整段读进来再切第一行，会让单段账本在 open 时被读两遍）——判定一律经 `kernel::consts_external::readable_log_v`：`Ahead` 即 `VersionAhead`（先于一切链检，恒不部分解读），`NotAVersion`（低于任何构建写过的首版本，含 v0）即 `Envelope` 且拒词说版本，`Current` 与 `Older` 放行；④校验最后一段：逐行 parse＋段内链续，本段任一可解析行的 `v` 同样经 `readable_log_v` 判定——`Ahead` 与 `NotAVersion` 在此**拒**而不作尾损截断（截掉它等于删掉更新构建的历史），首个非法字节起截断（`truncate`＋`sync_data`）；末段的入口取自前段末行（`jsonl::boundary`）：从前段末尾按 `BOUNDARY_WINDOW`（16 KiB）一块向前读，见到这一行之前的换行（或段首）即停，所以读量与这一行同阶，不与段长同阶；这一行过 `LineCheck::judge`，与正向检查同一条规则——已知 kind 类型解析并比对规范回显，`ig:true` 的未知 kind 只读信封——入口的 `prev` 是它的 `chain_hash`，下一个 seq 是它的 seq 加一；判不过即拒，`VersionAhead` 按版本拒，其余为 `Envelope`，行号是它在前段里的行号；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
+**open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`（只读这一行：`jsonl::first_line` 用 `Vfs::read_at` 从 4 KiB 的窗口读起、每次加倍，见到第一个 `\n` 或文件尽头即停；不见 `\n` 的首行是撕裂行，答「无行」，交给尾部恢复。整段读进来再切第一行，会让单段账本在 open 时被读两遍）——判定一律经 `kernel::consts_external::readable_log_v`：`Ahead` 即 `VersionAhead`（先于一切链检，恒不部分解读），`NotAVersion`（低于任何构建写过的首版本，含 v0）即 `Envelope` 且拒词说版本，`Current` 与 `Older` 放行；④校验最后一段：逐行 parse＋段内链续（服务中的城经 `open_reusing` 开账本，末段的已验证前缀按摘要证明、只逐行核对记录之后的行，8-34），本段任一可解析行的 `v` 同样经 `readable_log_v` 判定——`Ahead` 与 `NotAVersion` 在此**拒**而不作尾损截断（截掉它等于删掉更新构建的历史），首个非法字节起截断（`truncate`＋`sync_data`）；末段的入口取自前段末行（`jsonl::boundary`）：从前段末尾按 `BOUNDARY_WINDOW`（16 KiB）一块向前读，见到这一行之前的换行（或段首）即停，所以读量与这一行同阶，不与段长同阶；这一行过 `LineCheck::judge`，与正向检查同一条规则——已知 kind 类型解析并比对规范回显，`ig:true` 的未知 kind 只读信封——入口的 `prev` 是它的 `chain_hash`，下一个 seq 是它的 seq 加一；判不过即拒，`VersionAhead` 按版本拒，其余为 `Envelope`，行号是它在前段里的行号；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
 **append_all 五步**：逐 draft：seq=next、`EventRecord::from_draft`、`canonical_line`、必要时滚段；写段；单次 `sync_data`（跨段波对每个触及段各一次）；更新 prev/next_seq；铸 refs。任何 Io 错误⇒整波失败，内存态不前进，盘上的段也退回本波之前（`jsonl::unwind`，形状：adapter）：当前段截回 `seg_len`，本波新建的段删去。退回本身失败时留作待办，下一波写之前先完成它；完成不了，那一波以退回的 Io 错误失败而不写一个字节。于是写失败留下的半行永远不会成为下一波的前缀，进程活着也好、重启也好，账本都是一条不断的链；open 的断尾只剩掉电一种来源。
 - 被否：写失败后把账本置为只读、直到重启。它同样不写坏账本，但盘满时腾出空间以后城仍要重启才能继续记账；退回只多一次 `truncate`，而且只发生在失败的那一波。重新考虑的条件：出现一个 `truncate` 不可靠、而 open 的断尾可靠的平台。
 
@@ -950,6 +950,7 @@ impl Vfs for RealFs { … }
   锁路径的权威是 jsonl：`WriterLock::take` 从账本目录自己推出同级的 `<目录名>.lock`，不问 `CityLayout`。原因：会话切片路径只有 `storage::sessions` 一个权威，而从账本目录反推城根是 `of_ledger` 的活；另一种做法——由调用方传入锁路径——要改 `open` 的签名和它的每个调用方，却只换来同一个文件名。代价是夹具、bench、fuzz 的账本目录也各多一个锁文件，而「一个目录一个写者」对它们同样成立。
 - `Unproven`→`E_HISTORY_UNPROVEN`（装载期）：服务中的城从快照起步，快照之前的历史由后台的证明走一遍（8-30），这之前写者不往一段没证明过的历史后面写任何一行。不可定义掉：证明要读完整条链，而开城不等它（sprawling-SPEC 8-122）。它住装载期白名单，因为它恰好只在本进程此刻写不了账本时出现。recovery 让人等证明那一行出现后再发一次；证明本身失败时停机值跳闸，之后答的是断链的原因，不再是这个码。**被否：命令先扣住、证明完成再执行。** 扣住的命令要一个新的唤醒理由才能不忙等（`crates/accounting/spec/Worker/Attend.lean`），而人以为已发出的命令可能在几秒之后才执行；拒绝让这件事当场可见。**重开参数**：F1 在 40 万行城上量出的证明墙钟（M3）到了毫秒级以外、人一再撞上这个码时，改成扣住，证明到达作为一次唤醒。
 - **已验证前缀的记录不带密钥。** 记录挡的是意外：段在两次开城之间被截短、被换成另一份、某一行被外部改写，摘要都不再相符，这一段退回逐行核对。能同时改段与记录的人绕得过它，与今天没有密钥的链本身一样：能改段的人也能重算整条链。**被否：用城密钥派生的 MAC 签记录。** 开城就得先打开 vault，密钥轮换让全部记录失效，而它挡住的那个人今天就能绕过链。**被否：不要记录，每次开城逐行核对全量一遍。** 保证相同，而 40 万行城每次开城都要付秒级的解析；记录让这笔钱只在升级之后第一次开城时付一次。**重开参数**：远程访问的城要对外证明自己的历史时（remote_access 的城密钥设计），给记录加 MAC。
+- **开账本借用证明写下的记录，不另起一种记录。** 尾部恢复要的事实——末段某个前缀已逐行核对、走完它的链状态是什么——正是证明为每一段写下的那一条（8-30），所以开账本读同一条记录、用同一个判定（8-34）。**被否：开账本时为末段另写一条「已恢复到此」的记录。** 那是第二个回答「这段字节核对过没有」的地方，两处的版本与失效规则要各自维护；而且开账本的进程在证明之前写它，会让一条没有被证明线程看过的前缀被当成证明过的。**重开参数**：服务之外的打开者（`resume`、`fork`、`adopt`）也要毫秒级开账本时，它们同样经 `open_reusing`，记录照旧只读。
 
 ## 13 依赖选型
 
@@ -1242,3 +1243,23 @@ impl Checkpoint {
 - **门与 `restore` 相同。** 保留子树里的地址拒；`WriteTarget::within` 字面拒路径上的链接与 junction；不动索引与 HEAD——取回一个文件不是一次提交。
 - **回的那一行。** 返回 `FileRestored { name: "", path, point }`，由调用方写进账本；空的 `name` 指城自己的工作树，与 `Worktrees::restore_file` 写的 run 树的名字区分。
 - 验收：`checkpoint::commit::restore_tests` 的 `taking_a_file_back_replaces_what_the_tree_holds_and_removes_what_the_point_did_not_hold`。
+
+### 8-34 开账本时，末段的已验证前缀按摘要证明（`storage::jsonl::open`、`storage::verified_prefix`，形状 7 投影）
+
+```rust
+impl JsonlLedger {
+    /// `open` 的尾部恢复，末段的前缀由 `records` 里那一段的记录按摘要证明，只逐行核对记录之后的完整行。
+    pub fn open_reusing(dir: &Path, now: TimeMs, records: &ProofRecords) -> Result<(Self, OpenReport), StorageError>;
+}
+pub struct OpenReport {
+    pub recovered: Option<TailTruncation>,
+    pub counted: ProofCount,   // 尾部恢复读了什么、算了什么（8-30 的同一个计数）
+}
+```
+
+- **为什么。** 尾部恢复（8-1 第 ④ 步）逐行核对整个末段，末段至多 64 MiB。40 万行夹具城的末段 40,843,081 B，逐行核对它是开城的 `open the ledger` 那一段的几乎全部（sprawling-SPEC 8-144 的读数）；同一段读一遍、BLAKE3 一遍加起来不到它的十分之一。末段的前缀已经被后台的证明逐行核对过，并写下了记录（8-30）。
+- **四个条件，与证明相同。** `open_reusing` 照 `open` 取锁、探版本、从前一段的末行取入口状态，再把末段读进内存一次。`records` 里有末段的记录，且版本等于 `line_check_version()`、段长不短于记录的 `L`、记录的入口等于前一段末行给出的链状态、前 `L` 字节的 BLAKE3 等于记录的摘要时，链状态取记录的出口，从第 `L` 字节起逐行核对；四个条件有一个不成立，整段逐行核对，与 `open` 相同。被哈希的字节与之后被核对的字节出自同一次读（8-30 第一条）。判定 `chain_audit` 的 `Walked::reuse` 已经写过一次，`open_reusing` 调同一个判定，不写第二份。
+- **截断与拒开的判定不变。** 记录只覆盖证明时逐行核对过的完整行，所以前 `L` 字节里没有撕裂与断链，截断只可能落在 `L` 之后；`crates/storage/spec/Jsonl/Barrier.lean` 的 `reopenFromVerifiedPrefix` 陈述从这样一个前缀起重开与从头重开相同，`crates/storage/spec/Snapshot.lean` 的 `cachedVerifyIsStrict` 陈述出口状态与逐行核对相同（末段看作「记录覆盖的前缀」与「之后的字节」两段）。截断之后段比 `L` 短，记录就不再适用。
+- **开账本只读记录。** `open_reusing` 不写记录、不删记录；记录只由持锁的证明写（8-30）。`records` 由调用方给出：记录目录的唯一拼法是 `accounting::views::snapshot::start::proof_dir`（sprawling-SPEC 8-122），本 crate 不从城布局再推一次。服务中的城经 `open_reusing` 开账本（sprawling-SPEC 8-144）；其余打开者照旧走 `open`。
+- **读数是计数。** `OpenReport.counted` 与证明的 `ProofCount` 同形：逐行核对的行数、按摘要复用的段数（0 或 1）、尾部恢复读过的字节（末段的长度）、哈希过的字节。记录命中时逐行核对的行数等于证明之后写下的行数，与历史长度无关；`jsonl::open::tests` 在两种规模上断言它。
+- **被否：命中记录时不哈希，只比段长。** 段在两次开城之间被截短再接着写、或被外部改写同样长度时，段长照样相符；不哈希就接受了 8-30 要挡的那种意外。

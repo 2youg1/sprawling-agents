@@ -424,6 +424,29 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 - **`lineage` 与 `views` 同住本 crate，因为读者跨两处。** `sprawling view` 的 run 列表在二进制里，playback 的共享投影在本 crate 的读面里；二进制够得到本 crate，本 crate 够不到二进制。
 - **依赖**：`views` 折叠 `storage::HotView`、`storage::Attribution` 与 `storage::LedgerIndex`，快照起步经 `runtime::replay::fold_ledger_dir`，所以本 crate 依赖 `storage` 与 `runtime`（ARCHITECTURE.md §3 的 `depmap`，§12-14）。
 
+### 8-19 视图的第二份是克隆；一次性重建每行只核对一遍（`accounting::views::snapshot`、`accounting::views::snapshot::start`，形状 7 投影；sprawling-SPEC.md 8-144）
+
+```rust
+// accounting::views
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct Views { /* 折叠状态，私有 */ }
+impl Views {
+    pub fn twin(&self) -> Result<Views, AxError>;   // Ok(self.clone())
+}
+// accounting::views::snapshot::start
+/// 一次从已证明的历史起步，和这一路逐行核对过的行数（证明的与折叠的合计）。
+pub struct Audited<F> { pub started: Started<F>, pub lines_checked: u64 }
+pub fn start_audited<F: SnapshotFold>(ledger_dir: &Path) -> Result<Audited<F>, AxError>;
+```
+
+(a) **第二份视图是克隆。** 折叠线程轮换两份视图（sprawling-SPEC.md 8-99），第二份原先经快照编码复制：编码再解码，再把共享的句柄接回去。`Views` 的每个字段都能 `Clone`：折出来的字段深拷贝；账本索引、计划缓存、金库与停机值都在 `Arc` 里，克隆之后仍与原份共享；`machine`、`registry`、`upstream`、`programs` 照值带过去。所以 `#[derive(Clone)]` 给出的正是 `twin` 原先的结果，字段清单仍只写在 `Views` 的定义里。40 万行夹具城上，编码再解码 350 ms，克隆 22 ms（sprawling-SPEC.md 8-144）。为此 `storage::HotView`、`storage::Attribution`、`Governance` 与 `CommitFacts` 派生 `Clone`。
+
+(b) **一次性重建每行只核对一遍。** `start_audited` 先判起点，再决定要不要先证明：
+- 快照合身（`SnapshotStart::Resume`）：先 `storage::prove_chain`（只读记录），`Whole` 才解码快照、折尾部；快照之前的行起步时不看，只有这次证明看。
+- 不能用快照（`SnapshotStart::Whole`）：直接从创世全量折叠。全量折叠经 `runtime::replay::fold_ledger_dir` 让每一行过同一个 `LineCheck`，它的判定就是不带记录的证明的判定，先证明一遍只是同一批行多核对一次。
+
+`Audited.lines_checked` 是证明逐行核对的行数加上折叠核对的行数（尾部行数，或从创世折到的最后一行的 `seq + 1`）。没有快照、没有记录时它等于账本行数，不是两倍；快照合身、记录写满时它等于记录之后长出的行数加尾部行数，与历史长度无关。两条都在 `worker::folds::views_start::tests` 以两种规模断言，这是整城重建的回退门；墙钟只进 `budgets.toml`。
+
 ### 8-11 accounting::worker：城的唯一写者，和它从外面收下的手（形状 1 数据 + 形状 4 适配器）
 
 ```rust
@@ -801,5 +824,5 @@ pub(in crate::views) fn range_answer(city_root: &Path, version: B3Hash, range: d
 27. **一个 session 的身份冻在房间那一层，读回失败就拒，不换成此刻的名字。** 理由：session 的形状（模型、强度）已经记在房间那一层，`/new` 清的也是它，身份跟着同一个边界就不需要另一条「何时重读身份」的规则（city-SPEC §12.11）；读不回冻下的那一版时换成此刻的名字，等于在 session 中途悄悄改名，而这正是冻结要防的。被否决的做法：每次 run 现读身份——改名立刻改掉正在进行的 session 的前缀，provider 的前缀缓存从 city 段起失效，页面上的旧 session 与请求里的名字也对不上。
 28. **`whose --trace` 的逻辑是读面上的一个模块 `accounting::trace`，从 `Query::Commit` 的答出发再读账本，不加线上查询；同楼的别人只计数。** 理由：区间的两端已经在 `CommitAnswer` 的 `seq` 与 `previous` 里，调用的读法已经在 `views::turns` 里；今天的读者是读盘的 CLI，下一轮的 playback 与验收工具都在本 crate 里或经本 crate 读。同楼别的 run 的写也可能落进这个提交，但把它们的调用与本 run 的并列，会把「候选」读成「原因」，所以只给条数与地址，要细看的人拿 `view --run` 去读。被否决的做法：①加 `Query::Trace`：线上多一个形状、`WIRE_V` 进一位、`wire.ts` 与 adversary 的门面都要跟着改，换来的只是把这几步搬到服务端，而 CLI 本来就读盘；②按 `Call.effect` 只留写调用：读调用决定了写什么，去掉它们就去掉了归因的一半证据，`effect` 留在每条调用上由读者判断；③区间以 git 的父提交或全城紧邻的上一个提交为界：两者都可能属于别的 run，会把别人的调用算成这个 run 的。重开参数：页面要显示一个提交的调用时（那时要一个线上查询，本模块搬到 `views` 后面作答）；或同一栋楼里几个 run 同写一棵树成为常态、条数不够区分时。
 30. **死掉的 run 由启动扫描冻结，冻结行写成它的居民，结局读 `RunFrozen::lost`。** (a) 理由：只有拿到写者锁的那一刻才知道没有别的进程在驱动它，而 `startup_scan` 正是那一刻的那一遍验链；视图与 worker 的折叠都从账本来，账上一行冻结让服务中的城与重开的城对同一次 run 说同一个结局。写成居民而不是城，与补写结果未知的调用同一条理由，按居民计数的读者不必为死亡另写一条规则。被否决的做法：在服务时由视图把「没有冻结行、进程已重开过」的 run 读作死掉——那是视图的第二条冻结规则，而且一次性的 `views::ask` 与服务中的视图会各算一次；由 `RunWorker::new` 冻结——`new` 也在 `serve` 里跑，那时冻结要跟账本证明的次序对齐，而 `resume` 本来就是收拾死亡的那一步（sprawling-SPEC 8-109）。重开参数：`serve` 也要在起步时收拾死亡（不经 `resume`）时，把这一遍挪进它的起步路径，次序仍是先补调用、后冻 run。 (b) **指南进度住 `accounting::guide`，一个与 `person` 平行的模块，读写各一扇门。** 理由：页面读与命令写读的是同一份文件，文件的文法只能有一处；它不属于视图的折叠，也不属于 worker 的状态，`person` 已经是「一份人改的文件，读整份、写整份」的样子。被否决的做法：读放在 `views::answering`、写放在 `worker::commanding`——两处各知道一遍文件的形状。(c) **跑 gh 的函数经 `Views::ask_github_through` 交进来，主机名的判定与缺省主机留在视图。** 理由：起子进程碰主机，按第 9、10 条住 `sprawling`、经 `fn` 指针交进来；而「问哪台主机、这个串能不能交给 gh」是城对输入的判定，测试不必起 gh 就能判它。被否决的做法：经 `Hands` 交给 worker——这是一条查询，worker 不答查询；在二进制里判主机名——测试就要经过子进程才看得到拒绝。
-
+31. **(a) 视图的第二份按值克隆，不经快照编码。** 理由：两份视图要的是同一个折叠状态加上同一组共享句柄，派生的 `Clone` 正好如此，而编码再解码在 40 万行城上要 350 ms，是开城最长的一段之一（§8-19）。被否决的做法：①留在编码路径上，把复制挪到视图线程——首字节不再等它，但视图线程开头的每一批照样等 350 ms，而且要改装配根起线程的次序；②手写逐字段复制——字段清单的第二份拼写，加一个字段就要改两处。**(b) 重建从创世时不先证明。** 理由：全量折叠逐行核对每一行，判定与不带记录的证明相同；先证明再全量折叠是同一批行核对两遍（§8-19）。被否决的做法：照旧先证明，把证明的结果交给全量折叠跳过核对——折叠要的是每一行解析出的记录，跳过核对仍要解析，省下的只是规范回显的比较，却让「这一行核对过」有了两处来源。
 33. **文档的版本只在第一个窗口盖不住整份时进内容库，由答 `Document` 的读面放进去。** 理由：之后的 `Range` 要读的是这一版，而版本的身份本来就是内容库的地址（documents D3），放进去之后按版本读就是按地址读对象，不需要第二个存放处；整份已经在答复里的版本页面不会再按版本要，存它只是让每一次打开多付一份拷贝。放进去的是读面而不是写者：这是一次查询的副作用，但它只添一个按内容寻址、重复放入即去重的对象，不改任何一条历史，写者也不知道哪个页面在读哪一版。被否决的做法：①`Range` 读文件此刻、版本不符就拒——居民在写的文件每几秒动一次，读到一半的页面要从头重读；②每次打开都存——小文件的每一次打开都多一份拷贝；③由写者在每次保存时存——城之外的写者（人的编辑器、居民的 `edit`）不经过写者。重开参数：内容库长出回收时，被回收的版本要有自己的答复；页面要对比一份小文件的两个版本时，小文件也存。

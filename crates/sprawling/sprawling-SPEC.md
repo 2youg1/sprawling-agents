@@ -1117,6 +1117,7 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 **`replay <ledger-dir>`：「这里没有账本」不得与「验过且为空」同形**。本子命令的路径是人敲的，故它先问 `storage::ledger_segments_at`，一段都没有即报 `E_PATH_NOT_FOUND` 并给 recovery，不进验链。有段时经 `storage::audit_chain` 一段一段地验，每行过同一个 `LineCheck`，常驻一段；它答的只是行数与 tail seq（`chain verified: <n> line(s), tail seq <n-1 或 none>`，`main::tests` 的 `replay_names_the_lines_it_verified_and_the_tail_seq` 钉住这个形状），用不着 `VerifiedLedger` 那份整本的原始行与记录；断链照旧是那一行的三段式拒绝。**依据为什么在这一层而不在 `runtime::replay` 或 `storage::audit_chain`**：它们的生产调用方都自持城根算出路径，而已开未写的城就是一个无段目录（`JsonlLedger::open` 只建目录），在那一层报错会把合法启动打红，并迫使每个调用方各写一份相同的守卫。空账本仍然合法，故问的是「有没有段」而不是「有没有行」。参见 runtime-SPEC §8-1、storage-SPEC §8。
 
 **开城不等整条链的证明，接受命令等**（8-122）。首字节之前只读尾部与两份快照，整条链在写者起好之后由后台证明，证明完成之前写者拒绝每一次追加（`E_HISTORY_UNPROVEN`），查询按从快照起步的视图作答。**被否：轻量审计，封好的段只取 `prev`、`seq` 并哈希整行。** 它不再证明每一行都能被这个构建逐字节规范地写出来，与 `LineCheck` 不等价，而开城之后读这些行的正是按 `LineCheck` 解析它们的视图与索引；已验证前缀记录让「只哈希」只用在已经逐行核对过、字节没有变的段上（storage-SPEC 8-30）。**被否：证明完成之前接受命令、断链再停写。** 那是 8-101 已被否的做法：写下的行接在一条可能断了的链后面，收不回来。
+**开城变快靠少做重复的事，不靠放松保证**（8-144）。末段照样逐字节哈希、与记录比对，记录之后的行照样逐行核对；第二份视图是同一个状态的克隆；重建从创世时由全量折叠逐行核对，不再先证明一遍。**被否：开账本信任末段，只核对记录之后的字节、不哈希前缀。** 省下 23 ms，却接受了段被截短再接写、或被同长改写的那种意外，而 8-30 的记录正是为挡它才带摘要。**被否：把复制第二份视图挪到视图线程上，首字节不等它。** 首字节确实不等了，但视图线程的第一批等它，装配根起线程的次序也要改；克隆把这一段从 350 ms 降到 22 ms，不需要挪。
 
 **doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id**（wire-SPEC §8-25）。`Requirement::enables` 是 `sprawling doctor` 那份终端报告的措辞，终端只说英文，这句话与它描述的那一行同住 `bin::doctor::table`，改一行的人在同一处看见它；页面按 `DoctorItem::name` 从 `client/src/lang.json` 的 `machine_enables_<name>`（name 里的连字符写成 `_`，因为词表的键一律 snake_case）取 en 与 zh，与 doctor 其余每一种状态同口径——终端的 `absent` 由 `paint` 拼，页面的 `machine_absent` 由 `lang.json` 给，两面各说各的，线上只携枚举与 id。两面的集合由 `bin::doctor::tests` 的 `every_item_has_the_page_clause_in_both_languages` 钉在一起：需求表多一行而 `lang.json` 没给它词，测试红。**被否掉的**：终端也从 `lang.json` 取英文（二进制在编译期读 `client/` 的一份源文件，每次 doctor 都要解析整张词表，而终端从不说第二种语言）；线上继续携英文句子（页面的词成了服务端的选择，中文读者看到的是英文）。条件变了就重议：终端要说第二种语言时，两面合用一张词表。
 
@@ -3746,12 +3747,12 @@ impl Published {
     pub(crate) fn replace(&self, latest: Arc<Views>) -> Arc<Views>; // 发布新的一份，交回被换下的那份
 }
 // accounting::worker::folds
-impl Views { pub(crate) fn twin(&self) -> Result<Views, AxError>; } // 经快照编码复制出第二份，共用账本索引与计划缓存
+impl Views { pub(crate) fn twin(&self) -> Result<Views, AxError>; } // 克隆出第二份，共用账本索引与计划缓存（8-144）
 ```
 
 **写线程只做一次 `send`。** 观察者（`observer`）、机器体检的落点（`machine`）与借出金库的 `lend` 都只把一份 `Fold`（一条已提交的记录、一份 `DoctorAnswer`，或工作线程打开的金库）放进无界 `mpsc` 通道，然后返回。名为 `sprawling-views` 的线程每次把通道里已到的全部取出为一批，按到达顺序折叠。被拒：观察者在写线程上直接锁视图——读者持锁多久，写线程的下一次落盘就晚多久。
 
-**两份视图轮换，读者拿快照。** 折叠线程持有备用的一份 `Views`，`Published` 持有发布出去的那份 `Arc<Views>`。每一批：折进备用份，用 `replace` 把它发布，广播这批记录，再收回换下来的那份（`Arc::try_unwrap`；读者还拿着就让出时间片再试），把同一批折进去，它成为下一批的备用份。读者用 `snapshot` 拷一只 `Arc`，锁只罩住这一次指针拷贝；`answer_outside_the_lock` 在快照上 `prepare`，放下快照再 `finish`。于是读者之间不互等，读者不等折叠，折叠在广播之前不等任何读者，收回时只等在换下之前拿到快照、还在做纯内存 `prepare` 的读者。`prepare` 因此只做纯内存的事：连时间也要花在读盘、git 或网络上的查询在快照里只拷走它要的小数据，`finish` 在快照放下后才去读；`McpHealth` 的握手（每台服务器最多等 `HANDSHAKE_PATIENCE`）与 `Toolkits` 的中介书架都是这样，拷走的是 `LiveAsk`（城根、城地址、保管人的 `Arc`）。在快照里握手会让收回一直自旋到握手超时，其间没有一批能折叠或广播。第二份由 `Views::twin` 在 `start_served_views` 折完之后经快照编码（8-91）复制出来，不再读一遍历史；两份共用同一只账本索引与计划缓存的 `Arc`，所以多出的内存只是折叠本身的一份。计划缓存在快照里按它自己编码，锁不进快照。被拒：每批克隆一份整的视图发布——每条记录一次整份拷贝，而且 `storage::HotView` 与 `storage::Attribution` 不是 `Clone`；`RwLock<Views>`——折叠的写锁要等每个在读的读者，新读者又排在写锁后面。代价是折叠常驻两份，每条记录折两次。
+**两份视图轮换，读者拿快照。** 折叠线程持有备用的一份 `Views`，`Published` 持有发布出去的那份 `Arc<Views>`。每一批：折进备用份，用 `replace` 把它发布，广播这批记录，再收回换下来的那份（`Arc::try_unwrap`；读者还拿着就让出时间片再试），把同一批折进去，它成为下一批的备用份。读者用 `snapshot` 拷一只 `Arc`，锁只罩住这一次指针拷贝；`answer_outside_the_lock` 在快照上 `prepare`，放下快照再 `finish`。于是读者之间不互等，读者不等折叠，折叠在广播之前不等任何读者，收回时只等在换下之前拿到快照、还在做纯内存 `prepare` 的读者。`prepare` 因此只做纯内存的事：连时间也要花在读盘、git 或网络上的查询在快照里只拷走它要的小数据，`finish` 在快照放下后才去读；`McpHealth` 的握手（每台服务器最多等 `HANDSHAKE_PATIENCE`）与 `Toolkits` 的中介书架都是这样，拷走的是 `LiveAsk`（城根、城地址、保管人的 `Arc`）。在快照里握手会让收回一直自旋到握手超时，其间没有一批能折叠或广播。第二份由 `Views::twin` 在 `start_served_views` 折完之后克隆出来（8-144），不再读一遍历史；两份共用同一只账本索引与计划缓存的 `Arc`，所以多出的内存只是折叠本身的一份。计划缓存在快照里按它自己编码，锁不进快照。被拒：每批克隆一份整的视图发布——每条记录一次整份拷贝，40 万行城上一份 22 ms；`RwLock<Views>`——折叠的写锁要等每个在读的读者，新读者又排在写锁后面。代价是折叠常驻两份，每条记录折两次。
 
 **积压的读数是一件仪表。** `serving::folding::tests::instruments` 的 `instrument_view_backlog`（`#[ignore]`，`just bench` 按名字跑它，与 8-84 的两件同一个过滤器）起一个真实的 `spawn_folding`：一条线程经 `observer` 连续送入 2,000 条记录，一条读者线程在其间反复拿快照做一次 `answer_outside_the_lock`，测试线程从 `to_clients` 收广播。读数一行：每条记录从 `send` 到广播收到的时延（`samples`、`floor_us`、`p50_us`、`p99_us`、`max_us`），突发中已送出未广播的最大条数（`max_backlog`），整次突发用时（`burst_ms`），行尾带 `machine=<os>-<arch>, <n> core(s)`，与 8-84 的仪表同一形。它量的是视图线程在突发下落后多少，不加断言：墙钟因机器而异。**被否：在视图线程里写诊断或加原子计数。** 前者在服务中的城上每批一行、淹没别的日志；后者要一个线上字段才有读者，而线格式归一批一进的纪元。
 
@@ -3958,7 +3959,7 @@ pub(crate) enum Phase {
     FoldTail { lines: u64, from: TailFrom }, // 从较早的快照切点（或创世）一遍核对并折两份（8-122）
     CutStanding,                    // 切 Standing 快照
     CutViews,                       // 切视图快照
-    Twin,                           // 经快照编码复制第二份视图（8-99）
+    Twin,                           // 克隆第二份视图（8-99、8-144）
     StartWorker,                    // 起写者线程
 }
 pub(crate) struct OpeningCost { /* 私有：钟、起点、上一记、各段 (Phase, Duration)、折叠累计 */ }
@@ -4034,7 +4035,29 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 
 **计时。** `OpeningCost`（8-121）的阶段改为 `fold <n> lines from the snapshots` 或 `from genesis`，读的人从同一行看出这次开城有没有从快照起步；`OpeningCost::began` 把开城起点交给证明线程，M3 从同一个起点量起。
 
-**本节接口的当前状态。** M1 与 M2 是同一刻：`wire::serve` 在 `listen` 返回之后才开始应答，把静态页面的应答提前到折叠之前要改 `wire` 的服务入口，归 W 车道。尾部恢复（8-1 第 ④ 步）仍逐行核对整个末段，至多 64 MiB：从末段的已验证前缀起只核对之后的字节（`Barrier.lean` 的 `reopenFromVerifiedPrefix`）是下一步，判定它的证据是 40 万行城正常关闭后 `open the ledger` 那一段的读数。`SnapshotStart::Resume.tail` 仍把尾部整段读进内存；正常关闭的城尾部为空，崩溃后的尾部是上次切视图快照之后写下的记录。Standing 的快照只在开城时切（8-101），所以 Standing 的切点落后于视图，这一遍从 Standing 的切点读起：按与视图相同的节奏在服务中切 Standing，要先核对写者对 Standing 的增量更新与 `StandingFolds::absorb` 是同一条规则。页面从 `CityAnswer.proved` 读到历史已证明到哪一条（8-134）。
+**本节接口的当前状态。** M1 与 M2 是同一刻：`wire::serve` 在 `listen` 返回之后才开始应答，把静态页面的应答提前到折叠之前要改 `wire` 的服务入口，归 W 车道。尾部恢复从末段的已验证前缀起只逐行核对之后的字节（8-144，storage-SPEC 8-34）。`SnapshotStart::Resume.tail` 仍把尾部整段读进内存；正常关闭的城尾部为空，崩溃后的尾部是上次切视图快照之后写下的记录。Standing 的快照只在开城时切（8-101），所以 Standing 的切点落后于视图，这一遍从 Standing 的切点读起：按与视图相同的节奏在服务中切 Standing，要先核对写者对 Standing 的增量更新与 `StandingFolds::absorb` 是同一条规则。页面从 `CityAnswer.proved` 读到历史已证明到哪一条（8-134）。
+
+### 8-144 开城的两段与一次性重建：末段按记录证明、第二份视图按值克隆、重建每行只核对一遍（`accounting::worker::folds`、`accounting::views::snapshot`、`accounting::views::snapshot::start`，形状 7 投影；storage-SPEC 8-34，accounting-SPEC.md 8-19）
+
+**原因是一组拆开的读数。** 40 万行夹具城（`bench_startup first-byte` 的 `l400k`，8-122 之后，windows-x86_64、16 核、NVMe、release）开城 1220 ms，其中 `open the ledger` 576 ms、`fold 0 lines from the snapshots` 279 ms、`copy the views` 357 ms。逐段拆开量：
+- `open the ledger` 几乎全是尾部恢复逐行核对末段（40,843,081 B）；同一段读一遍 15 ms、BLAKE3 一遍 23 ms。
+- `copy the views` 是经快照编码复制第二份视图：编码 214 ms、解码 139 ms（15,858,109 B）；按值克隆同一份 22 ms。
+- `fold … from the snapshots` 里，视图快照解码 139 ms（其中提交折叠 105 ms：64,000 个提交，oid 每个按 40 位十六进制读三次）、`storage::tail_after` 读末段并逐字节分行 50 ms、读两份快照 20 ms。
+
+整城重建（`just bench` 的 `large_ledger_fold`，5 万行、没有快照也没有记录）p50 1286 ms：`Views::rebuild` 先经 `prove_chain` 逐行核对整条链，从创世全量折叠时又逐行核对一遍。
+
+**三处改动，保证不变。**
+1. `fold_city` 经 `JsonlLedger::open_reusing` 开账本，记录取自 `proof_dir` 的只读一份（storage-SPEC 8-34）：末段的前缀按摘要证明，逐行核对的只有上一次后台证明（8-90）之后写下的行。正常关闭的城，那几行就是关城时写的交接。
+2. `Views::twin` 是派生的 `Clone`（accounting-SPEC.md 8-19(a)）：共享的句柄在 `Arc` 里，克隆后仍共享，结果与编码再解码相同。
+3. `start_audited` 从创世折叠时不先证明，从快照起步时才先证明（accounting-SPEC.md 8-19(b)）。
+
+**回退门是计数，墙钟只登记。** storage 的 `jsonl::open::tests` 在 N 与 2N 行上断言：记录覆盖末段之后再写 2 行，开账本逐行核对 2 行、按摘要复用 1 段。accounting 的 `worker::folds::views_start::tests` 在两种规模上断言：没有快照与记录时重建逐行核对的行数等于账本行数；快照与记录都在时等于之后长出的行数的两倍（证明一遍、折尾部一遍），与历史长度无关。开城各段与首字节的毫秒数由 `bench_startup first-byte` 与 `opened the city in` 那一行（8-121）读出，进 `tools/xtask/budgets.toml` 的 `[first_byte]` 与 `[views_rebuild_per_mb]`。
+
+**本节接口的当前状态。**
+- `copy the views` 仍在开城那一行里（8-121 的 `Phase::Twin`），`twin` 仍答 `Result`：它不再会失败，去掉 `Result` 与这一段要同时改 `bin::assembly::listening` 的调用点。
+- 视图快照解码约 135 ms，其中 105 ms 是提交折叠里的十六进制 oid。`kernel::GitOid` 的 serde 按 `is_human_readable` 在 postcard 里写 20 个字节、在 JSON 里照旧写十六进制，能去掉这一大半；那是 `kernel::locator` 的改动，本节没有做。同理，`B3Hash` 在快照里也按十六进制写。
+- `storage::tail_after` 为了找到快照那一行把末段从头逐字节分行（50 ms）；从段尾往回找要先读出末行的 seq，判定它值不值得的读数是做完上一条之后的 `fold … from the snapshots`。
+- 后台证明仍在一条线程上逐段哈希（storage-SPEC 8-30「单线程哈希」）；开城变短之后，M3 约等于开城加上证明（40 万行城上证明 380 ms）。并行哈希要在 ARCHITECTURE §10 第 3 条的线程清单里加一处。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 
