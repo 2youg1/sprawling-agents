@@ -19,7 +19,8 @@ debug.skipKernelTC = false
 # Every crate's specification: `crates/<dir>/Spec.lean` and its parts under
 # `crates/<dir>/spec/` (ARCHITECTURE.md section 11, "Specifications in Lean"),
 # the checker's own, `tools/adversary/Spec.lean` and `tools/adversary/spec/`,
-# and the simulator's, `tools/citysim/Spec.lean` and `tools/citysim/spec/`.
+# the simulator's, `tools/citysim/Spec.lean` and `tools/citysim/spec/`, and the
+# gates', `tools/xtask/Spec.lean` and `tools/xtask/spec/`.
 # `just models` builds this library inside `just check`; it builds none of the
 # checker, which no specification imports. When the specification of
 # something outside `crates/` moves to Lean, the same change adds its two
@@ -27,7 +28,7 @@ debug.skipKernelTC = false
 # or `desktop.+`: those trees hold build output a recursive glob would walk.
 [[lean_lib]]
 name = "Spec"
-globs = ["crates.+", "tools.adversary.Spec", "tools.adversary.spec.+", "tools.citysim.Spec", "tools.citysim.spec.+"]
+globs = ["crates.+", "tools.adversary.Spec", "tools.adversary.spec.+", "tools.citysim.Spec", "tools.citysim.spec.+", "tools.xtask.Spec", "tools.xtask.spec.+"]
 
 # The adversarial checker (tools/adversary/Spec.lean). It imports no
 # specification: it judges the binary from outside and must not import a
