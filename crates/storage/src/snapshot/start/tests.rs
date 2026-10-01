@@ -52,6 +52,34 @@ fn a_fitting_snapshot_resumes_at_its_tail_without_reading_earlier_segments() {
     );
 }
 
+/// The cut is found from its segment's end, so a line damaged before it
+/// in the same segment changes where a start begins no more than one in
+/// an earlier segment does; the proof checks both (storage-SPEC 8-28).
+#[test]
+fn damage_before_the_cut_in_its_own_segment_does_not_move_the_start() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (ledger, snapshots) = (tmp.path().join("ledger"), tmp.path().join("snapshot"));
+    let lines = chain(8, 0);
+    lay_out(&ledger, &lines, &[0]);
+    let snapshot = ChainSnapshot::cut(3, Seq::new(5), &lines[5], b"views".to_vec());
+    write_snapshot(&snapshots, &snapshot).unwrap();
+    let segment = ledger.join(segment_file_name(Seq::new(0)));
+    let damaged = std::fs::read_to_string(&segment)
+        .unwrap()
+        .replacen('\n', "\nnot a line\n", 1);
+    std::fs::write(&segment, damaged).unwrap();
+
+    let start = start_from_snapshot(&ledger, &snapshots, 3).unwrap();
+
+    assert_eq!(
+        start,
+        SnapshotStart::Resume {
+            snapshot,
+            tail: lines[6..].to_vec(),
+        }
+    );
+}
+
 #[test]
 fn a_snapshot_that_cannot_resume_folds_the_whole_ledger_and_says_why() {
     let tmp = tempfile::tempdir().unwrap();
