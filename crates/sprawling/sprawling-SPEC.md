@@ -1151,6 +1151,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **居民的 `playback` 是一件工具、两个动作，按写登记，读者由上下文定**（8-132、accounting-SPEC.md 8-13）。导出要写文件，复核只读；工具的效应按登记而不是按调用，一件工具只能登记一种，所以取两者中较强的写：代价是复核也走写门、不被推测执行提前跑，而一次复核本来要重算整段历史，提前跑它省不下什么。导出件落在城根保留子树下的 `playback/<楼>/`，而不是居民的房间或 worktree：保留子树没有写域够得到，居民改不了一份已经写下的报告，只能另导出一份；它被城根的 `.gitignore` 挡在历史之外；它不随 worktree 清扫消失，没有 worktree 的 run 也有同一个去处。按楼分目录，是因为复核要用同一个读者重算，一栋楼的导出只有同一栋楼的居民复核得了，机密楼的导出也就不会被别的楼读到。**被否掉的**：`playback_export` 与 `playback_check` 两件工具（复核可以按 `Read` 登记，但一个动作拆成两件工具，模型要多认一个名字，而两者的参数一半相同）；写进房间并靠 `.gitignore` 挡住（worktree 会被清扫，居民能用 `edit` 改报告）；让居民在参数里选读者（读者是读界的输入，交给被读界约束的一方去选，读界就没有意义）。条件变了就重议：工具的效应可以按调用声明时，`check` 改回 `Read`。
 
+**playback 的时间条件是两扇门各读三个原文、交给同一个函数**（8-143；accounting-SPEC.md 8-17 与 §12 第 29 条）。`--since`、`--until`、`--day` 与城工具的 `since`、`until`、`day` 都只是原文，`accounting::playback::Window::span` 一处把它们读成一个 `UtcSpan`；这样人与居民导出同一天时，`source.selection` 记下同样的两端，复核也按同一个区间重算。`--day` 不进 `view`：`view` 是看行的透镜，`--since/--until` 已经够它用，多一个旗标就多一种写法要维护。**被否掉的**：CLI 复用 `view` 的 `--since/--until` 读法而城工具另写一份（两扇门读同一个条件就会有两处）；`--day` 与 `--since/--until` 互斥（「这一天九点以后」是一个合法的问题，交集就是它）。条件变了就重议：人要按本地日期回看时，那时要一个时区，而城今天只认 UTC（runtime-SPEC 8-10）。
+
 
 ## 13 依赖选型
 
@@ -4221,12 +4223,30 @@ pub(super) fn check(read: &Arguments) -> ExitCode;
 
 **本节测试**：`accounting::playback::tests::landing`：`--out` 的目标整份落下、不留暂存文件；已存在的目标被拒且原文件不变；指进 `.sprawling` 或 `.GIT` 被拒且没有留下文件；被 git 跟踪而已从盘上删掉的文件名被拒。`main::playback::tests`：矛盾的区间与读不了的楼、读不了的 seq 分成两种拒绝。`grammar::tests::a_verb_of_two_words_is_read_from_two_words`：`playback export` 从两个词读成一行，`help playback check` 是那一行的帮助，`playback` 单独与 `playback <错词>` 是 `UnknownVerb`、近似名恰是那两行。导出的字节、读界与复核由 `accounting::playback::tests` 判定（accounting-SPEC.md 8-12）。
 
+## 8-143 playback 的时间选择：`--since`、`--until`、`--day` 与城工具的同名参数（`bin::main::playback`、`accounting::worker::workbench::tools::playback`；accounting-SPEC.md 8-17）
+
+**形状。** 两扇门各读三个原文，交给 `accounting::playback::Window::span`，把得到的 `UtcSpan` 经 `Selection::during` 加进选择。解析、交集与拒绝都在 accounting-SPEC.md 8-17；本节只定两扇门的拼法。
+
+```text
+sprawling playback export <city> [--from <seq>] [--through <seq>] [--run <run>] [--building <addr>] [--since <utc>] [--until <utc>] [--day <yyyy-mm-dd>] [--include-confidential] [--page <template>] [--out <file>]
+```
+
+```json
+{"action": "export", "name": "day-1", "day": "2026-05-14", "since": "2026-05-14T09:00:00Z"}
+```
+
+- **人的门。** `--since <utc>` 与 `--until <utc>` 的写法与 `view --since/--until`（8-137）相同：UTC、到秒、以 `Z` 结尾；`--day <yyyy-mm-dd>` 是那一个 UTC 日。区间是 `[since, until)`，三者同给时取交集。读不了的值、交出空区间的组合，stderr 写那条 `AxError` 的人读形式，退出 2，什么也不导出；合法而什么都没选中的区间照常退出 0，写出带范围信息的空 bundle。
+- **居民的门。** `export` 多三个可缺的字符串参数 `since`、`until`、`day`，同一种写法、同一个函数读；读不了或交集为空时工具以 `E_INVALID_ARGS` 拒绝，不写文件。
+- **不改 `view`。** `view` 的时间过滤照 8-137；两处共用 `runtime::clock::{parse_iso, UtcSpan}`，所以是同一个时间语义。`view` 没有 `--day`：它是看账本行的透镜，按天的回看是 playback 的事。
+
+**本节测试**：`main::playback::tests`：`--day` 读不了与 `--day` 和 `--since` 交出空区间，各以退出 2 拒绝。`accounting::worker::workbench::tools::playback::tests`：居民的 `day` 进到导出的 `source.selection`，写成那一天的两端。区间本身的选择由 `accounting::playback::tests::span` 判定（accounting-SPEC.md 8-17）。
+
 ## 8-132 `playback check` 的五项、`export --page`，与居民的城工具 `playback`（`bin::main::playback`、`accounting::worker::workbench::tools::playback`；accounting-SPEC.md 8-13）
 
 **形状。** 两个适配器。`main/playback.rs` 给人用，城工具 `playback` 给居民用；页面嵌入、五项检查、落盘都是 `accounting::playback` 的（accounting-SPEC.md 8-13），这里只定两扇门各自读什么、写到哪、怎样报。
 
 ```text
-sprawling playback export <city> [--from <seq>] [--through <seq>] [--run <run>] [--building <addr>] [--include-confidential] [--page <template>] [--out <file>]
+sprawling playback export <city> [--from <seq>] [--through <seq>] [--run <run>] [--building <addr>] [--since <utc>] [--until <utc>] [--day <yyyy-mm-dd>] [--include-confidential] [--page <template>] [--out <file>]
 sprawling playback check <file> [--bundle <file>] [--city <city>] [--include-confidential] [--observed <file>]
 ```
 
@@ -4244,7 +4264,7 @@ sprawling playback check <file> [--bundle <file>] [--city <city>] [--include-con
 ```
 
 - **读者由上下文绑定。** 工具在铺工作台时拿到这个 run 所在的楼，导出与复核都用 `Reader::Resident(这栋楼)`。参数里没有读者：`reader`、`include_confidential` 之类不认识的字段以 `E_INVALID_ARGS` 拒绝，所以居民扩大不了读者，人的 `--include-confidential` 也不会下放给居民。按现行读界，居民可以回看别的非机密楼。
-- **`export`**：`name` 是 1 到 64 个 ASCII 字母、数字、`-`、`_`，首字符是字母或数字；`from`、`through` 是 seq，`run` 是 run id，`building` 是楼的地址，与人的门的选择同义（8-126）。给 `page` 时经 `embed` 写 `<name>.html`，否则写 `<name>.json`。落点是 `CityLayout::playback_exports()` 下以本楼地址命名的目录，经 `accounting::playback::land(Place::Exports)` 写：不覆盖、不跟随链接、在 git 仓库里时必须被忽略、失败不留半成品。结果是 `{"file", "digest", "events"}`，页面另带 `structure`、`offline` 两项；bundle 与页面的字节不进结果，因为工具结果会写进账本。
+- **`export`**：`name` 是 1 到 64 个 ASCII 字母、数字、`-`、`_`，首字符是字母或数字；`from`、`through` 是 seq，`run` 是 run id，`building` 是楼的地址，与人的门的选择同义（8-126）；`since`、`until`、`day` 是时间条件（8-143）。给 `page` 时经 `embed` 写 `<name>.html`，否则写 `<name>.json`。落点是 `CityLayout::playback_exports()` 下以本楼地址命名的目录，经 `accounting::playback::land(Place::Exports)` 写：不覆盖、不跟随链接、在 git 仓库里时必须被忽略、失败不留半成品。结果是 `{"file", "digest", "events"}`，页面另带 `structure`、`offline` 两项；bundle 与页面的字节不进结果，因为工具结果会写进账本。
 - **`check`**：`file` 是本楼导出目录里的一个 `<name>.json` 或 `<name>.html`，别的名字与别处的文件都拒绝。它用同一个读者对城复核，结果是 `Report::line`：五项，`bundle` 与 `browser` 为 `unchecked`（居民的门不收另一份 bundle 与观察记录）。
 - **效应与写门。** 登记 `Effect::Write { domain: 房间 }`，与 `signal`、`pr` 等写桌子的工具同样走写门；`writes` 回答 `Writes::Nothing`，因为导出件落在工作树之外，checkpoint 没有东西可收。工具的效应按登记而不是按调用，所以 `check` 也不会被推测执行提前跑（只有 `Effect::Read` 会，runtime-SPEC 的 speculation）。
 - **寿命。** 导出件跟着城：它在城根的保留子树下，不在任何 worktree 里，清扫 worktree、run 冻结或重开都不碰它；没有独立 worktree 的 run 也写在同一处。两次导出用了同一个名字，后一次被拒绝。崩溃留下的暂存文件见 accounting-SPEC.md §3。
