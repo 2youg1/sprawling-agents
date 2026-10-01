@@ -46,7 +46,7 @@ default-members = [
 # published unless its own manifest says `publish = false`, which the
 # two tools of this repository do (sprawling-SPEC.md 8-157).
 [workspace.package]
-version = "0.0.7"
+version = "0.0.8"
 edition = "2024"
 license = "MPL-2.0"
 rust-version = "1.97"
@@ -242,24 +242,24 @@ comrak = { version = "0.50", default-features = false }
 # names are written. Each version pins `[workspace.package] version`
 # exactly, because a path dependency without one cannot be published;
 # Cargo refuses to resolve a pin that disagrees with it.
-kernel = { package = "sprawling-kernel", path = "crates/kernel", version = "=0.0.7" }
-storage = { package = "sprawling-storage", path = "crates/storage", version = "=0.0.7" }
-gateway = { package = "sprawling-gateway", path = "crates/gateway", version = "=0.0.7" }
-runtime = { package = "sprawling-runtime", path = "crates/runtime", version = "=0.0.7" }
-collab = { package = "sprawling-collab", path = "crates/collab", version = "=0.0.7" }
-city = { package = "sprawling-city", path = "crates/city", version = "=0.0.7" }
-documents = { package = "sprawling-documents", path = "crates/documents", version = "=0.0.7" }
+kernel = { package = "sprawling-kernel", path = "crates/kernel", version = "=0.0.8" }
+storage = { package = "sprawling-storage", path = "crates/storage", version = "=0.0.8" }
+gateway = { package = "sprawling-gateway", path = "crates/gateway", version = "=0.0.8" }
+runtime = { package = "sprawling-runtime", path = "crates/runtime", version = "=0.0.8" }
+collab = { package = "sprawling-collab", path = "crates/collab", version = "=0.0.8" }
+city = { package = "sprawling-city", path = "crates/city", version = "=0.0.8" }
+documents = { package = "sprawling-documents", path = "crates/documents", version = "=0.0.8" }
 # `wire` turns its default features off here because accounting and
 # xtask take it without its listener; sprawling and citysim name `server`
 # themselves, so a feature later added to its default reaches neither.
-wire = { package = "sprawling-wire", path = "crates/wire", version = "=0.0.7", default-features = false }
-browser = { package = "sprawling-browser", path = "crates/browser", version = "=0.0.7" }
-agent_protocols = { package = "sprawling-agent-protocols", path = "crates/agent_protocols", version = "=0.0.7" }
-remote_access = { package = "sprawling-remote-access", path = "crates/remote_access", version = "=0.0.7" }
-accounting = { package = "sprawling-accounting", path = "crates/accounting", version = "=0.0.7" }
-sprawling = { path = "crates/sprawling", version = "=0.0.7" }
-desktop = { package = "sprawling-desktop", path = "crates/desktop", version = "=0.0.7" }
-desktop_ffi = { package = "sprawling-desktop-ffi", path = "crates/desktop/ffi", version = "=0.0.7" }
+wire = { package = "sprawling-wire", path = "crates/wire", version = "=0.0.8", default-features = false }
+browser = { package = "sprawling-browser", path = "crates/browser", version = "=0.0.8" }
+agent_protocols = { package = "sprawling-agent-protocols", path = "crates/agent_protocols", version = "=0.0.8" }
+remote_access = { package = "sprawling-remote-access", path = "crates/remote_access", version = "=0.0.8" }
+accounting = { package = "sprawling-accounting", path = "crates/accounting", version = "=0.0.8" }
+sprawling = { path = "crates/sprawling", version = "=0.0.8" }
+desktop = { package = "sprawling-desktop", path = "crates/desktop", version = "=0.0.8" }
+desktop_ffi = { package = "sprawling-desktop-ffi", path = "crates/desktop/ffi", version = "=0.0.8" }
 
 # C3 hardening: panicking constructs and silent numeric
 # corruption are compile-time errors everywhere; tests relax locally.
