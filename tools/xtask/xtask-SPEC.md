@@ -181,6 +181,8 @@ pub(crate) struct Violation {
 
 **12-11 动词类由表与中继的匹配各写一次，门对照两者。** `wiring` 读 §19-2 的 `class` 列，也读 `sprawling` 包里 `command_class` 的每一臂，逐个动词比（§8-45）。理由：表是人读到并决定的地方，匹配是设备真正碰到的地方，两者都要；只有一处时，要么决定藏在代码里没人读，要么二进制要在启动时解析一份 Markdown 来授权。按文本读匹配而不是用 `syn` 解析：门要的只是「哪个动词归哪个值」，臂的形状由穷尽匹配自己守着，`syn` 的模式树在大版本之间换形，门不该为一张两列的对照表跟着它走。被击败的备选：①只判表里每行都有 class，不读代码——表与中继各自漂开时没有红；②在 wire 里给 `Command` 加 `class()` 再让门读它——wire 要么依赖 `remote_access`，要么另立一个同值的枚举（wire-SPEC §12.6）。重开参数：`command_class` 的臂长出守卫条件（同一个动词按参数分两类）时，文本读法不够，改用 `syn`。
 
+**12-13 检验器的规格由位置认出，不由 cargo 认出。** `spec` 门按路径把 `tools/adversary/Spec.lean` 与 `tools/adversary/spec/` 认作检验器的规格（§8-47），常量 `CHECKER` 是检验器目录的唯一拼写。理由：检验器是一个 Lean 程序，不进 workspace 也不进发布物（`tools/adversary/Spec.lean`），cargo 没有一个包能代表它；而它的规格与 crate 的规格守同一组规则——一份生效规格、不 import 检验器、引用的路径在盘上——所以门要认得它，否则它整份落在「检验器」那一侧，入口 import 自己的分部会被报成违规，分部 import 检验器反而放行。被击败的备选：①给检验器造一个只为门存在的 `Cargo.toml`——一个包从此出现在 `members`、depmap、modmap、`unused` 的每一次遍历里，为了一个不编译 Rust 的目录；②在 `architecture.toml` 里登记它——那张表登记 Rust 模块，检验器的规格不是任何 Rust 模块的锚点。**重开参数**：第二个不是 cargo 包的目录也有了 Lean 规格（例如 `client` 的 §7），那时位置表从一个常量变成一张表。
+
 **12-14 guard 只判一张自己的 lint 表；`members` 只列工作区成员。** desktop 并回工作区之后（`crates/desktop/Spec.lean` D14），本仓没有一个在工作区之外构建的包，唯一的抄件是 FFI 叶子 `crates/desktop/ffi` 那张 `[lints]`，它与根表只差 `unsafe_code` 一行。guard 因此判这一张表，再判其余每个成员都写 `lints.workspace = true`；墙的元数据、依赖版本与四处抄过去的常量（协议修订、`_meta` 键、错误码、质量域）不再有第二份，比对随之删去。成员名单取自 `members`（`cargo metadata`），不从根清单的 `members` 数组读，因为 cargo 会把工作区目录里的 path 依赖自动收为成员，数组里没写的成员照样存在。`members` 的 `Reach` 与「经 path 依赖进来的墙外包」那一支一起删去：没有那样的包，一个永远不出现的变体只会让每个读者多判一臂。嵌套的包（`crates/desktop/ffi` 在 `crates/desktop` 之下）由 `members::owner` 判归属：持有一个路径的包里目录最长的那一个。被击败的备选：①叶子也抄包元数据与依赖版本、guard 照旧比对一整堵墙——这些在工作区里都能继承，抄了就是第二个家；②guard 从根清单的 `members` 数组读成员——漏掉 cargo 自动收进来的成员；③留着 `Reach::PathDependency` 等下一个墙外包——没有读者的变体是死代码。重开参数：cargo 允许一个成员继承工作区 lint 表而只改一行，那时叶子写 `workspace = true` 加一行覆盖，本门的比对删去。
 
 ## 13 依赖选型
@@ -926,11 +928,11 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError>;   // 下
 
 **五条断言**：
 
-1. **一个包恰有一份生效规格。** `members` 列出的每个包（工具在内），目录里直接放着的 `*-SPEC.md` 与 `Spec.lean` 合起来恰好一份。两份都在，是一次迁移没有在一个变更集里完成（`skills/sdd` 迁移第 5 步）；一份都没有，是一个包没有规格。分部（`spec/` 下的 `.lean`）可以先于 `Spec.lean` 存在（ARCHITECTURE.md §11），不算一份规格。
+1. **一个包恰有一份生效规格。** `members` 列出的每个包（工具在内），以及不是包的检验器 `tools/adversary`（§8-47），目录里直接放着的 `*-SPEC.md` 与 `Spec.lean` 合起来恰好一份。两份都在，是一次迁移没有在一个变更集里完成（`skills/sdd` 迁移第 5 步）；一份都没有，是一个包没有规格。分部（`spec/` 下的 `.lean`）可以先于 `Spec.lean` 存在（ARCHITECTURE.md §11），不算一份规格。
 2. **散文不点名树上没有的 SPEC。** 散文取 `release::is_prose` 的定义（Markdown 与 HTML 的每一行、Rust 的 `//` 行、Lean 的整份）；其中每个 `<名>-SPEC`（带不带 `.md` 都算）都要有一个叫 `<名>-SPEC.md` 的文件在树上。拒词：若有一个包的目录名是 `<名>` 且它已有 `Spec.lean`，指向那份 Lean 规格（`<lib> D<n>` 或分部的路径）；否则让作者改正名字或删掉这句。`CHANGELOG.md` 豁免：它的每一节说的是那一版的树。代码里的字符串不算——测试夹具为它造的包造出 SPEC 文件，那些名字不是给读者的引用。
-3. **import 纪律。** `tools/adversary/` 下的 `.lean` 只 import `Sprawling` 或 `Sprawling.*`，以及工具链自带的 `Init`、`Std`、`Lean`；一个包目录下的 `.lean` 只 import 工具链自带的库、本包的规格、以及 ARCHITECTURE.md §3 的 `depmap` 块允许本包依赖的包的规格。模块名到包的对应按目录：`crates.agent_protocols.spec.Harness.Session` 属于目录是 `crates/agent_protocols` 的那个包。规格 import 检验器、检验器 import 规格、一个包的规格 import 它不许依赖的包，各是一条违规。
+3. **import 纪律。** `tools/adversary/` 下的 `.lean`，除了检验器自己的规格（§8-47），只 import `Sprawling` 或 `Sprawling.*`，以及工具链自带的 `Init`、`Std`、`Lean`；检验器的规格只 import 工具链自带的库与它自己的分部；一个包目录下的 `.lean` 只 import 工具链自带的库、本包的规格、以及 ARCHITECTURE.md §3 的 `depmap` 块允许本包依赖的包的规格。模块名到包的对应按目录：`crates.agent_protocols.spec.Harness.Session` 属于目录是 `crates/agent_protocols` 的那个包。规格 import 检验器、检验器 import 规格、一个包的规格 import 它不许依赖的包，各是一条违规。
 4. **没有 `sorry`、`admit`、`axiom`。** 每个 `.lean` 去掉注释与字符串之后，不出现 `sorry` 与 `admit` 这两个词，也没有以 `axiom`（前面可以带 `private`）开头的声明。这一条原在 `just models` 的一行 grep 里，只看 `crates/`、只在有 Lean 的机器上跑；门不要 Lean，也看得到检验器。`lakefile.toml` 的 `warningAsError` 仍让 `sorry` 在构建时失败，两者判的是同一件事的两端：门在编译之前、构建在 elaborate 之后。
-5. **规格引用的仓内路径在盘上。** 包目录下每个 `.lean` 里，首段是仓库根下一个目录、扩展名在 `release` 的 `CITED_EXTENSIONS` 里的路径，都指向一个存在的文件。`release` 判「首段不是这棵树的目录」，这里判「首段是，文件却不在」——规格点名它规定的 Rust 模块（ARCHITECTURE.md §11），模块搬走而规格没跟上，就是这一条。
+5. **规格引用的仓内路径在盘上。** 包目录下每个 `.lean` 里，以及检验器的规格里，首段是仓库根下一个目录、扩展名在 `release` 的 `CITED_EXTENSIONS` 里的路径，都指向一个存在的文件。`release` 判「首段不是这棵树的目录」，这里判「首段是，文件却不在」——规格点名它规定的 Rust 模块（ARCHITECTURE.md §11），模块搬走而规格没跟上，就是这一条。
 
 **读法**：Lean 以源文本读（§12-8）。注释是 `--` 到行尾与 `/-` 到配对的 `-/`（可以嵌套），字符串是 `"…"`（认 `\"`）；这三样在判第三、四条之前抹成空格，行号不变。
 
@@ -1010,6 +1012,26 @@ fn judged(all: &[String], stated: &…, coded: &…) -> Vec<Violation>;
 - wire 的规格迁成 Lean 后，`class` 写成 `def Command.verbClass` 的一臂一行，右侧是 `.read`／`.act`／`.localOnly`；读法与 reach 的 `def Command.reach` 相同（§8-43）。
 
 **测试**：`wiring::class::tests::a_row_with_no_class_cell_is_named_by_its_verb`：夹具表里一行缺 class、一行与夹具匹配说法不一，两条违规按动词点名。
+
+### 8-47 `spec` 门认得检验器自己的规格（形状 1 判定）
+
+检验器 `tools/adversary` 不是 cargo 的包，`members` 列不出它，而它的规格从 Markdown 迁到 Lean 时落在 `tools/adversary/Spec.lean` 与 `tools/adversary/spec/`（ARCHITECTURE.md §11，`lakefile.toml` 为它加 `tools.adversary.Spec` 与 `tools.adversary.spec.+` 两个 glob）。门因此按位置分出第三种文件主人：
+
+```rust
+// xtask::spec
+const CHECKER: &str = "tools/adversary";        // 检验器的目录，两个子模块共读这一处
+// xtask::spec::source
+enum Owner<'a> { Checker, CheckerSpecification, Package(&'a Member) }
+// xtask::spec::effective
+pub(super) fn one_per_package(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskError>;  // 包，再加检验器
+```
+
+- **检验器的规格**是 `tools/adversary/Spec.lean` 与 `tools/adversary/spec/` 下的 `.lean`。它只 import 工具链自带的库与 `tools.adversary.Spec`、`tools.adversary.spec.*`；import `Sprawling`（检验器）或任何一个 crate 的规格都是一条违规，拒词点名那个模块，替代是「import 工具链的库或本规格的分部」。理由是 ARCHITECTURE.md §11 那一句「no part imports the checker」：规格陈述检验器要守的性质，检验器实现它们，一份 import 了实现的规格就成了实现的第二份读法。
+- **检验器**是 `tools/adversary/` 下其余的 `.lean`，规则不变：只 import `Sprawling` 与工具链的库，所以它也 import 不到自己的规格。
+- **一份生效规格**：第一条断言在包之外再判 `tools/adversary` 一次，`adversary-SPEC.md` 与 `Spec.lean` 合起来恰好一份。
+- **引用的路径在盘上**：第五条也读检验器的规格。
+
+**测试**：`spec::tests` 在夹具上判：检验器的入口 import 自己的分部不报；分部 import `Sprawling.Door` 报；检验器的源文件 import 规格报；规格引用一个不在盘上的路径报；Markdown 与 Lean 两份规格并存报。
 
 **本节属门禁机具，与产品代码分开提交。**
 
