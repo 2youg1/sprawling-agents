@@ -104,16 +104,50 @@ pub enum FoldStart {
 /// A tail or a whole history that does not verify, a record the fold
 /// cannot read, and an I/O failure reading the ledger or the snapshot.
 pub fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> {
+    begin(ledger_dir, Resuming::AsItStands).map(|audited| audited.started)
+}
+
+/// What a start does before it resumes from a snapshot.
+#[derive(Clone, Copy)]
+enum Resuming {
+    /// Nothing: a proof runs behind the start, or none is wanted.
+    AsItStands,
+    /// Prove the whole chain first, because the lines before the snapshot
+    /// are not read by the start and nothing else will prove them.
+    AfterProof,
+}
+
+/// The one start behind [`start`] and [`start_audited`]: from the
+/// snapshot when one fits, proving the chain first when `resuming` says
+/// so; from genesis otherwise, where the whole fold checks every line and
+/// a proof would check each a second time (accounting-SPEC.md 8-19).
+fn begin<F: SnapshotFold>(ledger_dir: &Path, resuming: Resuming) -> Result<Audited<F>, AxError> {
     let city_root = city_root_of(ledger_dir);
-    match storage::start_from_snapshot(ledger_dir, &snapshot_dir::<F>(city_root), F::fold_version())
-        .map_err(StorageError::into_ax)?
+    let (started, proved) = match storage::start_from_snapshot(
+        ledger_dir,
+        &snapshot_dir::<F>(city_root),
+        F::fold_version(),
+    )
+    .map_err(StorageError::into_ax)?
     {
-        SnapshotStart::Resume { snapshot, tail } => match F::decode(city_root, snapshot.views()) {
-            Ok(folded) => resume(folded, &snapshot, tail, ledger_dir),
-            Err(undecodable) => whole(ledger_dir, WholeFold::Damaged(undecodable.to_string())),
-        },
-        SnapshotStart::Whole(because) => whole(ledger_dir, because),
-    }
+        SnapshotStart::Resume { snapshot, tail } => {
+            let proved = match resuming {
+                Resuming::AsItStands => 0,
+                Resuming::AfterProof => prove(ledger_dir)?,
+            };
+            let started = match F::decode(city_root, snapshot.views()) {
+                Ok(folded) => resume(folded, &snapshot, tail, ledger_dir)?,
+                Err(undecodable) => whole(ledger_dir, WholeFold::Damaged(undecodable.to_string()))?,
+            };
+            (started, proved)
+        }
+        SnapshotStart::Whole(because) => (whole(ledger_dir, because)?, 0),
+    };
+    let folded = folded_lines(&started);
+    Ok(Audited {
+        started,
+        lines_checked: proved.saturating_add(folded),
+    })
 }
 
 /// A start from a proved history, and how many lines were checked one by
@@ -124,24 +158,21 @@ pub struct Audited<F> {
     pub lines_checked: u64,
 }
 
-/// [`start`] once a proof of the whole chain returns `Whole`, so a start
-/// from the snapshot never accepts a chain a whole fold would refuse: the
-/// snapshot's fit checks only the line at its seq, and the ledger open
-/// scans only the last segment (sprawling-SPEC 8-101). The proof reads
-/// the city's verified prefix records and never writes one: a one-shot
-/// read does not write to the disk.
+/// [`start`] from a proved history, so a start from the snapshot never
+/// accepts a chain a whole fold would refuse: the snapshot's fit checks
+/// only the line at its seq, and the ledger open scans only the last
+/// segment (sprawling-SPEC 8-101). Before resuming, the whole chain is
+/// proved with the city's verified prefix records, read and never
+/// written: a one-shot read does not write to the disk. From genesis the
+/// whole fold checks every line through the same `LineCheck`, which is
+/// the proof's verdict, so no separate proof runs (accounting-SPEC.md
+/// 8-19).
 ///
 /// # Errors
 /// The proof's reason when the chain is broken or cannot be read, and
 /// those of [`start`].
 pub fn start_audited<F: SnapshotFold>(ledger_dir: &Path) -> Result<Audited<F>, AxError> {
-    let proved = prove(ledger_dir)?;
-    let started = start(ledger_dir)?;
-    let folded = folded_lines(&started);
-    Ok(Audited {
-        started,
-        lines_checked: proved.saturating_add(folded),
-    })
+    begin(ledger_dir, Resuming::AfterProof)
 }
 
 /// Proves the chain in `ledger_dir` with the city's records read-only,
