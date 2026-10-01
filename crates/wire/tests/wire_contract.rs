@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "046ff264f692eb93d76f15267f31b986a139f9b6829b877e27211e863e76ebc8";
+const WIRE_SCHEMA_GOLDEN: &str = "85ca5ecc871408f3ced9c72cfe37bc1deec31fcbfceade25e314a0b8662c0004";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "a309e857a4f4a163ce27e7dd89edbaf1ce5a555c3413fadfa2558768dbdd3de9";
+const WIRE_SHAPE_GOLDEN: &str = "9bd62ba4e8efcfdfd7a69fd22dac0eee0215c614e5ebfe7755c5712fd274deef";
 
 // -------------------------------------------------------------- binding face
 
