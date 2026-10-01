@@ -41,8 +41,8 @@ use std::time::Duration;
 use kernel::{AxCode, AxError, TimeoutMs};
 
 use super::http::{WholeRequest, client_for};
+use super::reading::answer_unread;
 use super::redeeming::{Redeemed, redeem};
-use super::stdio::answer_unread;
 use super::{Received, read_one_message};
 
 /// How long the stream is given to announce where messages go. Shorter

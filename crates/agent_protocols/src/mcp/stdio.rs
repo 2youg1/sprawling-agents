@@ -43,6 +43,7 @@ use std::time::Duration;
 
 use kernel::{AxCode, AxError, TimeoutMs};
 
+use super::reading::answer_unread;
 use super::redeeming::Redeemed;
 use super::{Heard, Lines};
 
@@ -266,16 +267,6 @@ impl Drop for Connection {
     fn drop(&mut self) {
         self.reclaim();
     }
-}
-
-/// The refusal a reader gave an answer, as the call that was waiting
-/// reads it: the server took the call and answered, so what it did is
-/// unknown (agent_protocols-SPEC.md 8-15). Both line-framed transports
-/// hand their callers this one.
-pub(super) fn answer_unread(refused: &AxError) -> AxError {
-    AxError::failure(*refused.code(), refused.action(), refused.subject())
-        .effect_unknown()
-        .with_recovery(refused.recovery())
 }
 
 fn pipes_missing(command: &str) -> AxError {

@@ -37,7 +37,7 @@
 //! peer closes its output, which killing a child does, after a refusal,
 //! or when the caller drops the [`Lines`].
 
-use std::io::BufRead;
+use std::io::{BufRead, ErrorKind, Read};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 
@@ -161,6 +161,52 @@ pub fn read_one_message(source: &mut dyn BufRead, server: &str) -> Result<Receiv
             Framing::More => {}
         }
     }
+}
+
+/// Reads the whole of `source` as one message, refusing anything above
+/// [`MESSAGE_CEILING`]: the body of an HTTP answer, which carries one
+/// message and ends where the response ends.
+///
+/// The refusal comes as soon as the bytes held pass the ceiling, so a
+/// body with no end is refused while it is still arriving, and this
+/// side never holds more than the ceiling and one chunk.
+///
+/// # Errors
+/// Refuses a body above the ceiling and bytes that are not UTF-8, as
+/// `E_WIRE_MISMATCH`, and a body the reader cannot finish, as
+/// `E_TOOL_UNAVAILABLE`.
+pub(crate) fn read_whole_message(source: &mut dyn Read, server: &str) -> Result<String, AxError> {
+    let mut held: Vec<u8> = Vec::new();
+    let mut chunk = [0_u8; WHOLE_CHUNK_BYTES];
+    loop {
+        let read = match source.read(&mut chunk) {
+            Ok(read) => read,
+            Err(err) if err.kind() == ErrorKind::Interrupted => continue,
+            Err(err) => return Err(unreadable(server, &err)),
+        };
+        if read == 0 {
+            return decode(held, server);
+        }
+        held.extend_from_slice(chunk.get(..read).ok_or_else(|| unframed(server))?);
+        if held.len() > MESSAGE_CEILING {
+            return Err(over_ceiling(server, held.len()));
+        }
+    }
+}
+
+/// How much of a whole body one read asks for: the size a buffered
+/// reader of a pipe fills at a time, so both readers overrun the ceiling
+/// by at most the same amount before they refuse.
+const WHOLE_CHUNK_BYTES: usize = 8_192;
+
+/// The refusal a reader gave an answer, as the call that was waiting
+/// reads it: the server took the call and answered, so what it did is
+/// unknown (agent_protocols-SPEC.md 8-15). Every transport hands its
+/// callers this one.
+pub(super) fn answer_unread(refused: &AxError) -> AxError {
+    AxError::failure(*refused.code(), refused.action(), refused.subject())
+        .effect_unknown()
+        .with_recovery(refused.recovery())
 }
 
 /// Where the current chunk left the message.

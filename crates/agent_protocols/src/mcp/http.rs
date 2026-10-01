@@ -29,6 +29,7 @@ use std::time::Duration;
 
 use kernel::{AxCode, AxError, TimeoutMs};
 
+use super::reading::{answer_unread, read_whole_message};
 use super::redeeming::{Redeemed, redeem};
 
 /// What the far end told us about itself, and what has to travel back.
@@ -117,14 +118,25 @@ impl HttpServer {
                 request = request.header("mcp-protocol-version", version);
             }
         }
-        let response = request.send().map_err(|err| self.unreachable(&err))?;
+        let mut response = request.send().map_err(|err| self.unreachable(&err))?;
         let status = response.status().as_u16();
         let handed = response
             .headers()
             .get("mcp-session-id")
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned);
-        let body = response.text().map_err(|err| self.unreachable(&err))?;
+        // A refusal states its status and never its page, so its body is
+        // not read: a long error page is not worth the memory, and must
+        // not turn a 401 into a refusal of the answer's size. An answer's
+        // body is read under the ceiling every transport keeps; the
+        // server took the request, so a refused body leaves the effect
+        // unknown.
+        let body = if (200..300).contains(&status) {
+            read_whole_message(&mut response, &self.url)
+                .map_err(|refused| answer_unread(&refused))?
+        } else {
+            String::new()
+        };
         Ok(Exchange {
             status,
             carried,
@@ -226,6 +238,8 @@ struct Exchange {
     carried: Option<String>,
     /// The `Mcp-Session-Id` the server handed out, if it opened one.
     handed: Option<String>,
+    /// The answer's body; empty on a status outside 2xx, which is
+    /// refused without reading it.
     body: String,
 }
 
