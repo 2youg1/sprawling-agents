@@ -548,6 +548,7 @@ impl Watchdog {
 // 关切时区的权威住 kernel::config::ClockZone（[clock] zones 属三层配置，city 仍拒写它，city-SPEC §8-31）：
 // FrozenConfig 携 clock_zones: Vec<ClockZone>；本模块只消费不定义（一个权威）。
 pub fn iso(at: TimeMs) -> String;   // ISO 8601，UTC，到秒："2026-05-14T09:31:07Z"；一刻给人或模型读时的唯一拼法
+pub fn parse_iso(raw: &str) -> Result<TimeMs, AxError>;   // iso 的逆：只收 iso 写出的那一种形状；其余 → E_INVALID_ARGS
 pub struct ZoneEntry { pub id: String, pub offset_min: i32, pub local: String }   // local＝同一刻带偏移："2026-05-14T18:31:07+09:00"
 pub struct ClockStamp { pub utc_ms: TimeMs, pub zones: Vec<ZoneEntry> }           // utc_ms＝读数本身，不按桶截；zones 只含配置的时区
 impl ClockStamp { pub fn render(&self) -> String }   // 信封的时钟行："clock: 2026-05-14T09:31:07Z;"，其后每个时区 " <id> <local>;"
@@ -564,7 +565,7 @@ impl StampGate {
 ```
 
 - 历法纯整数（civil-from-days，无 chrono 依赖）：全程在 `i128` 上算，`u64` 毫秒加 `i32` 分钟偏移落不出它的界，所以格式化不会失败，`iso` 与 `render` 不带 `Result`；界证明携 `#[expect]`。**精度与频率分开**：戳一律到秒，粒度只决定 `Timeless` 工具多久带一次戳——同桶里第二条 `Timeless` 结果不带戳，`Timestamped` 每条都带。A18 零字节：Off 时 observe 恒 None。
-- `iso` 是本 crate 里一刻的唯一文字形：时钟行、`status` 的 `now:` 行都经它；按 ISO 读回一刻（`view --since/--until`）的解析放在它旁边，同一模块、同一精度。
+- `iso` 是本 crate 里一刻的唯一文字形：时钟行、`status` 的 `now:` 行都经它；`parse_iso` 把同一种文字读回一刻（`view --since/--until`，sprawling-SPEC 8-137），同一模块、同一精度。两者互逆：`parse_iso(&iso(t))` 是 `t` 去掉毫秒，`iso(parse_iso(s)?)` 是 `s`。`parse_iso` 只收 `YYYY-MM-DDTHH:MM:SSZ` 这 20 个字节：时区偏移、秒的小数、只有日期、小写的 `t`/`z`、历法里没有的那一天（2 月 30 日、非闰年的 2 月 29 日）、`24:00:00` 与闰秒 `:60`、1970 年之前，一律 `E_INVALID_ARGS`（action `read a UTC moment`，subject 是原文，recovery 给出正确写法）。日子在不在历法里，由把算出的日数经 `civil_from_days` 再算回来、比对年月日判定，历法只有那一份算法。
 - 时区行仍在：`FrozenConfig.clock_zones` 在真城里恒空（城配置拒 `[clock] zones`），剧本仍可冻结出非空表，所以格式化保留，偏移写成 `+HH:MM`／`-HH:MM`。
 
 ### 8-53 runtime::clock::ClockReading：一跑的驱动最近读到的那一刻（形状 2 值类型）
@@ -584,6 +585,25 @@ impl StatusTool { pub fn clocked(self, clock: ClockReading) -> StatusTool; }   /
 - **读到的是哪一刻**：工具起跑之前驱动最后一次读钟是这条调用的开始时刻（§8-15），所以串行的一条调用读到自己的开始；开头只读段里读到的是这一段最后一条的开始。答复时刻不在其中，见 §3 第 5 条。
 - **`status` 的 `now:` 行**：`now: 2026-05-14T09:31:07Z`，没有读数时是 `now: not stamped`。它不看粒度：`now` 是 `status` 自己报的一栏，不是信封附件，关掉戳不该让模型问不出时间。`StatusSnapshot` 不再有 `now` 字段——快照在派发时冻结，冻结下来的时刻整跑都不动，而这一栏要的正是调用那一刻。
 - 与 `ContextReading` 同形同理：一跑一个、克隆共享、写者一个。用 `Mutex<Option<TimeMs>>` 而不是原子整数：「还没读过」是一个状态，不该拿某个整数冒充；锁里只放一个 `Copy` 值、整值替换，所以中毒不留半写的值，读写都取锁里的值照常走。
+
+### 8-57 runtime::clock::UtcSpan：按 UTC 选一段时间（形状 2 值类型）
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct UtcSpan { /* since: Option<TimeMs>, until: Option<TimeMs> —— 私有 */ }
+impl UtcSpan {
+    /// until 不晚于 since → E_INVALID_ARGS（action `select a span of time`）；缺一端即那一端不设界。
+    pub fn new(since: Option<TimeMs>, until: Option<TimeMs>) -> Result<UtcSpan, AxError>;
+    pub fn since(&self) -> Option<TimeMs>;
+    pub fn until(&self) -> Option<TimeMs>;
+    /// 半开区间 [since, until)：since 那一刻在内，until 那一刻不在。
+    pub fn contains(&self, at: TimeMs) -> bool;
+}
+```
+
+- **读者**：`sprawling view --since/--until`（sprawling-SPEC 8-137）；playback 的时间筛选接进来时读同一个值，不另写一份区间规则。`Default` 是两端都不设界，`contains` 恒真。
+- **逐个时刻判断，不假定有序**：`contains` 只看给它的那一刻。账本的 `t` 不随 `seq` 单调（§12.5：并行只读段的开始时刻可以早于前一条的答复；墙钟也会回拨），所以按时间选行的读者每一行都问一次，不在第一条越过 `until` 的行处停下，也不二分。
+- **矛盾的区间在构造时拒绝**：`until <= since` 的区间里没有任何一刻，按它选行只会安静地答出一段空历史；拒绝时 subject 写出两端的 `iso`。合法而恰好什么都没选中的区间照常答空。
 
 ### 8-11 runtime::catalog（形状 6＋渲染）
 
@@ -1179,6 +1199,16 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 **被否**：①在 host 上跑完再比对、改了就回滚：回滚发生在改动之后，期间读到这个文件的人与进程看到的是改过的字节，而且一个被删掉又建回来的文件已经不是原来那个目录项；②把命令新建的文件从副本搬回树上：要给副本里每个新文件再判一遍写域与「只新建」，这是第二条写路径，今天没有读者要它。
 
 **重开参数**：出现一个能让已有文件只读的放置（例如 `LinuxNamespaces` 臂把工作目录只读挂进去）时，那个臂在 `Create` 下可以开放；出现要在 `Create` 下由命令产出新文件的场景时，重议第②条。
+
+### 12.13 时刻只有 `iso` 写出的那一种拼法可以读回，时间段是半开的、两端在构造时核对
+
+**决定**：`parse_iso` 只收 `iso` 写出的形状（§8-10），`UtcSpan` 是 `[since, until)`，`until <= since` 在 `UtcSpan::new` 里拒绝（§8-57）。
+
+**理由**：人从时钟行、`status` 的 `now:` 行或 `view` 的输出里抄下一刻，抄来的就是这一种形状；读回只收它，`iso` 与 `parse_iso` 互逆是一条可以逐值检验的性质，而不是两份各自宽容的规则。半开区间让相邻的两段（今天、明天）不重不漏，一行恰好落在交界那一毫秒时只属于后一段。矛盾的区间在值里拒绝，而不是让每个读者各自判一次：一个打错顺序的命令行得到一句错误，而不是一段看起来正常的空历史。
+
+**被否**：①也收时区偏移并换算成 UTC——城的配置拒绝时区（city-SPEC 12.7），收偏移就有了第二条关于时区的规则；②也收只有日期、或带小数秒的写法——每多一种写法就多一条「它等于哪一刻」的规定（一天的开始还是整天、截断还是舍入），而它们都不再与 `iso` 互逆；③闭区间 `[since, until]`——相邻两段在交界那一毫秒重叠；④`until <= since` 时答空——与「这段时间里什么都没发生」分不开。
+
+**重开参数**：页面或居民工具要按本地日期选一天时，「一天」由读者的时区展开成一个 `UtcSpan`，那时再定展开规则住哪里；本模块仍只读 UTC。
 
 ## 13 依赖选型
 

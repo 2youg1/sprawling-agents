@@ -1116,6 +1116,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **`view` 在终端前给每一行标上它的链哈希，不加字段，也不给 agent 看**（8-105、8-117）。人要一个能记下来、以后拿来对照某一行的值，账本每一行已经有一个：`kernel::ledger::chain_hash` 对这一行规范字节算出的 BLAKE3，下一行的 `prev` 存的就是它，它覆盖整行，`t` 与载荷都在内。在载荷里或旁边再存一份同源的哈希，就是同一件事有两个权威。哈希从盘上的字节现算：一行一次 BLAKE3，比解析这一行便宜，交互界面又只给屏上的行算，四十万行的账本也不多付。谁要哈希仍按 8-105 决定 1 的 TTY 规则分：管道与文件里仍是账本原行，agent 解析的字节不变。哈希放在行前而不是行后，因为定宽的一列在终端折行后仍然对齐，而交互界面按栏宽截行，行后的哈希根本画不出来；列表只放前 12 位，因为 64 位会在半屏宽的列表里挤掉整行，完整的值在详情栏第一行。12 位是 48 bit，四十万行里出现一对同前缀的行的机会约为万分之三，所以前缀只用来凭眼睛找行，要记下来就用完整的值。**被否掉的**：每行后面接哈希，理由见上；`Row` 在折叠时就带上哈希，整遍折叠要给每一行多算一次、多存 32 字节，而人一次只看一屏；加一个 `--hash` 参数，人坐在终端前就要哈希，参数只是让人多敲一次。条件变了就重议：常见的 agent 宿主改在伪终端里跑命令、并解析 `view` 的输出时，TTY 就分不开两个主人，那时改为显式参数。
 
+**`view --since/--until` 按每一行信封的 `t` 流式过滤，不建时间索引**（8-137）。时间窗读的是信封 `t`，因为它就是这一行记下的那一刻，任何种类都有它；按种类去载荷里挑时间字段，就是同一件事有两个家。不二分也不提前停：`t` 不随 `seq` 单调，在第一条越过 `until` 的行处停下会漏掉后面回退的行。**被否掉的**：在 `LedgerIndex` 里给每行多存一个 8 字节的时间列再二分——它要 `t` 有序，而 `t` 无序；也让索引多一份要维护的事实。条件变了就重议：四十万行的账本上 `view --since` 超过一秒，或页面需要按时间跳转。
+
 **`playback` 是一个两个词的动词，导出写 stdout 或一个新文件，只在 bundle 完整之后写**（8-126、accounting-SPEC.md 8-12）。回看一段工作流有两个动作：导出与复核，它们的标志不同（导出读选择与 `--out`，复核读 `--bundle`/`--city`），所以是两行；放在一个词 `playback` 之下，是因为总览里两者挨着，人找到一个就找到另一个。命令表的一行可以带两个词，解析先试两个词，其余不变，8-89 决定 1「动词需要子动词」的重议条件因此被这一个最小的扩展满足，没有换参数库。输出不沿用 `view` 的做法：`view | head` 截断仍算成功，是因为账本原行本来就一行一行有意义；一份截断的 bundle 读不回来，却可能被当成一份完整的东西留下，所以 bundle 先整份算好、量过尺寸再写，管道中途关闭是失败，`--out` 经暂存文件与硬链接落位、已有目标不覆盖。**被否掉的**：`export --playback` 之类挂在现有动词上的标志（`export` 打包整座城，两件事的输入与输出都不同）；`--out` 默认写进城里（导出件不进 git，城里的保留导出位置由布局 owner 在居民入口落地时定）；`rename` 落位（在 Unix 上会覆盖已有目标）。条件变了就重议：城里的保留导出位置定下之后，`--out` 缺省时可以写到那里，而不是 stdout。
 
 
@@ -4082,7 +4084,7 @@ pub(super) fn written(err: &AxError, form: Form) -> String;
 ```rust
 // bin::main::view
 pub(super) fn verb(read: &Arguments) -> ExitCode;
-pub(super) struct Selection { tail: Option<usize>, from: Option<Seq>, run: Option<RunId>, kind: Option<EventKind>, who: Option<String>, grep: Option<String> }
+pub(super) struct Selection { tail: Option<usize>, from: Option<Seq>, run: Option<RunId>, kind: Option<EventKind>, who: Option<String>, grep: Option<String>, span: UtcSpan }  // span 见 8-137
 pub(super) enum Audience { Agent, Person }  // 谁读 stdout：管道或文件后面的 agent，终端前的人
 pub(super) fn write_records(dir: &Path, chosen: &Selection, audience: Audience, out: &mut impl Write) -> Result<(), ViewError>;
 enum HashWidth { Whole, Glance }             // 64 位，或前 GLANCE_DIGITS 位
@@ -4095,7 +4097,7 @@ impl Lineage { pub fn lines(&self) -> impl Iterator<Item = RunLine>; }
 pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 ```
 
-**`records` 透镜（非终端时的输出）。** 输出账本原行，逐字节相同，每行一个 `\n`，按 seq 升序。条件同时成立才选中：`--from <seq>`（含）、`--run <id>`（走 `LedgerIndex::run_seqs_before`，不读别的 run 的行）、`--kind <k>`（信封的 `kind`）、`--who <addr前缀>`（信封 `addr` 以它开头；没有 `addr` 的行不中）、`--grep <子串>`（原行按字节含这个子串，不是正则，glossary 的搜索规则）。`--tail N` 最后作用：只留选中的最后 N 行，从尾部倒着找，找够就停。信封只借用解析 `run`、`kind`、`addr` 三个字段。
+**`records` 透镜（非终端时的输出）。** 输出账本原行，逐字节相同，每行一个 `\n`，按 seq 升序。条件同时成立才选中：`--from <seq>`（含）、`--run <id>`（走 `LedgerIndex::run_seqs_before`，不读别的 run 的行）、`--kind <k>`（信封的 `kind`）、`--who <addr前缀>`（信封 `addr` 以它开头；没有 `addr` 的行不中）、`--grep <子串>`（原行按字节含这个子串，不是正则，glossary 的搜索规则）。`--tail N` 最后作用：只留选中的最后 N 行，从尾部倒着找，找够就停。`--since <utc>`/`--until <utc>` 按信封的 `t` 选（8-137）。信封只借用解析 `run`、`kind`、`addr`、`t` 四个字段。
 
 **终端前的 `records` 透镜。** 谁读 stdout 只在 `verb` 里判一次（`Audience::of_stdout`）：stdout 是终端就是 `Person`，否则是 `Agent`。`Person` 而命令行一个过滤参数都没带时进 8-117 的交互界面；带了过滤参数，`write_records` 按上一段的规则选行，每个选中的行写成：这一行的链哈希、两个空格、原行、一个 `\n`。链哈希是 `kernel::ledger::chain_hash` 对这一行在盘上的字节（不含行尾 `\n`）算出的 BLAKE3，64 位小写十六进制；链完好时它就是下一行的 `prev`。`view` 不核对链，打出来的只是这行字节的哈希，链断没断由 `sprawling replay` 核对。哈希前缀与两个空格只由 `chain_label` 写出，交互界面的列表调同一个函数，只取前 `GLANCE_DIGITS` 位（8-117）。`Agent` 时的输出与上一段逐字节相同。测试不经过终端，直接把 `Audience` 交给 `write_records`。
 
@@ -4858,6 +4860,25 @@ pub(super) fn show(dir: &Path) -> Result<(), ViewError>;
 5. 跟随靠轮询 `LedgerIndex::refresh`，不开文件系统通知，也不连服务中的城的 socket：没变时一次 refresh 只是一次目录列表加每段一次 `stat`，100 ms 一次对任何盘都是噪声；而通知在 Windows、inotify 与网络盘上是三套行为，socket 又要求查看器先知道城在不在服务。城不在服务时轮询什么都读不到，所以跟随不区分两种情况。条件变了就重议：`refresh` 在没变时也要读字节时。被否掉的：只在打开时读一次（人得退出重开才看得见新 run）。
 6. 回合在展开时才折，从已在内存里的 `records` 行折，不回盘：打开时就给每个 run 折回合，会让 40 万行的账本在首屏前多解析一遍，而人一次只看几个 run；回盘按 `run_seqs_before` 读会让纯的 `Face` 碰盘。代价是展开一个 run 要扫一遍 `records` 挑它的行、再解析这些行。条件变了就重议：`records` 不再整本常驻内存时（从尾部倒读首屏之后），改由 `follow` 按 `LedgerIndex::run_seqs_before` 读这个 run 的行。被否掉的：在 `view` 里另写一份回合折叠（与 Views 的回合页是同一个规则的两份）。
 7. 首屏的窗口按行数定（`FIRST_WINDOW_LINES` = 1000），不按终端行数，也不按字节：树要的是足够多的 run，一屏的行数给不出几个 run；一千行是几百 KB 的读与解析，在任何盘上都是首屏里的小头，而整遍折叠在后台，不挡第一帧。后台用一条 `std::thread`，因为查看器是同步的终端循环，没有运行时可以借；它只活到整遍折完，结果经一条 channel 交回，查看器退出时它随进程结束。条件变了就重议：run 索引快照（S5.22）落地后，首屏直接读快照，窗口与后台折叠一起删掉。被否掉的：打开时同步读完整本（40 万行的账本首屏要等整遍折叠）。
+
+## 8-137 `sprawling view --since/--until`：按 UTC 选行（`bin::main::view`；runtime-SPEC 8-10、8-57）
+
+**形状。** 不变：`main/view.rs` 仍是 adapter。`Selection` 多一个条件 `span: runtime::clock::UtcSpan`，由 `--since <utc>` 与 `--until <utc>` 给出，两者都经 `runtime::clock::parse_iso` 读，再由 `UtcSpan::new` 组成一个值。
+
+```rust
+// bin::main::view
+pub(super) struct Selection { tail, from, run, kind, who, grep, span: UtcSpan }
+```
+
+**选中。** 一行选中当且仅当它信封的 `t` 在 `[since, until)` 里（`UtcSpan::contains`），其余条件照 8-105 同时成立。`t` 是这一行自己记下的那一刻（kernel-SPEC 8-4；回合里等来的四种行各记各的，runtime-SPEC 12.5），所以时间窗精确到单次调用；版本早于逐行时刻的账本里，同一回合的行共用回合的 `t`，时间窗就只精确到回合。
+
+**逐行判断，不靠 `t` 有序。** `t` 不随 `seq` 单调：并行只读段的开始时刻可以早于前一条的答复，墙钟也会回拨。所以 `--since/--until` 与 `--grep` 一样是流式过滤：走完 `--from`/`--run` 给出的整段，每一行解析一次信封再判，不在第一条越过 `until` 的行处停，也不二分。`--tail N` 仍最后作用。代价与读到的行数成正比，与 `--kind`/`--who` 相同。
+
+**失败。** `--since` 或 `--until` 不是 `iso` 写出的形状：stderr 一行 `sprawling: view: --since '<原文>': <parse_iso 的 recovery>`，recovery 给出正确写法（`2026-05-14T09:31:07Z`，UTC，到秒，以 `Z` 结尾），退出 2。`--until` 不晚于 `--since`：`sprawling: view: --since and --until: <UtcSpan::new 的 recovery>`，退出 2。合法而什么都没选中的区间照常退出 0、写零行。
+
+**人的那一面。** 带了 `--since` 或 `--until` 就是带了过滤参数：终端前不进 8-117 的交互界面，按 8-105 写选中的行、行前带链哈希。
+
+**测试。** `the_records_lens_keeps_the_lines_inside_a_time_window`、`a_line_whose_time_steps_back_is_judged_on_its_own`、`a_moment_view_cannot_read_names_the_shape_it_wants`（`bin::main::view::tests`）。
 
 ## 8-118 发布前在回环地址上跑一遍 `install.sh`（`install.sh`、`.github/install-loopback.sh`、`release.yml` 的 `archive`）
 
