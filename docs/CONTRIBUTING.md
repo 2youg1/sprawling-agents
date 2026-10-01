@@ -158,7 +158,7 @@ Let a Rust command finish, and never kill it by PID; waiting on the build lock i
 | `cargo xtask gates <name>...` | the named gates only; `--list` prints the roster |
 | `just features` | the workspace on its default features, and `wire` without `server` |
 | `just check-client` | the client's lint, typecheck and tests, after `build-web` |
-| `just build-web` | build the client bundle into `target/web-dist` |
+| `just build-web` | build the client bundle into `crates/sprawling/web-dist` |
 | `just dist` | the whole deliverable: client, binary, and bill of materials |
 | `just budget` / `just bench` | every budget with what it costs today; the wall-clock readings, never gated |
 | `just sim` | citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |

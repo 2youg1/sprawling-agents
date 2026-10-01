@@ -45,7 +45,7 @@ just check                    # the whole check: fmt, source gates, Lean specifi
 | `just models` | every Lean specification under `crates/`, built with no `sorry`, `admit` or `axiom`; fails where Lean is absent |
 | `just features` | the two feature combinations nothing else compiles: the workspace on its default features, and `wire` without `server` |
 | `just check-client` | the client's lint, typecheck and tests |
-| `just build-web` | the client bundle, built into `target/web-dist` |
+| `just build-web` | the client bundle, built into `crates/sprawling/web-dist` |
 | `just dist` | the whole deliverable: client, binary, bill of materials |
 | `just sim` | the citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |
 | `just provider <script> <record>` | the stand-in provider: a wire script played on a loopback port, every exchange recorded, `SPRAWLING_PROVIDER=<url>` printed first |

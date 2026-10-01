@@ -27,7 +27,7 @@
 ## 1 What runs
 
 One process serves one page, and the page is inside the binary rather than
-beside it: `crates/sprawling/build.rs` compresses `target/web-dist` and emits
+beside it: `crates/sprawling/build.rs` compresses `crates/sprawling/web-dist` and emits
 an `include_bytes!` entry per file, so a server that started has no asset
 directory left to lose. The page is `client/`: Svelte and Effect, bundled by
 Vite and driven by bun (§2).

@@ -16,7 +16,7 @@ The view layer is exempt from the two rituals the Rust crates follow, writing th
 
 ```bash
 cd client && bun run dev     # the page, reloading as you edit
-just build-web               # the bundle the binary embeds, in target/web-dist
+just build-web               # the bundle the binary embeds, in crates/sprawling/web-dist
 cargo xtask render           # where the boxes of #/gallery landed in a real engine
 just check-client            # lint, typecheck, the client's own tests
 ```
