@@ -149,3 +149,69 @@ pub(super) fn user_browser_params() -> Result<Payload, AxError> {
     );
     Payload::new(schema)
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+
+    fn disclosed() -> Map<String, Value> {
+        user_browser_params().unwrap().as_map().clone()
+    }
+
+    /// Every argument the parser reads for a key press is one the model
+    /// was told about, and `press` is among the kinds it may name: a
+    /// model that never sees an argument does not send it.
+    #[test]
+    fn every_argument_a_key_press_is_read_with_is_disclosed() {
+        let press = serde_json::json!({
+            "action": "act", "generation": 1, "kind": "press",
+            "key": "Enter", "modifiers": ["Control"],
+        });
+        let Value::Object(fields) = press else {
+            panic!("the press is an object");
+        };
+        let args = Payload::new(fields.clone()).unwrap();
+        assert!(
+            browser::Verb::read(&args).is_ok(),
+            "the parser reads the press"
+        );
+        let schema = disclosed();
+        let properties = schema["properties"].as_object().unwrap();
+        let undisclosed: Vec<&String> = fields
+            .keys()
+            .filter(|name| !properties.contains_key(name.as_str()))
+            .collect();
+        let kinds = properties["kind"]["enum"].as_array().unwrap();
+        assert_eq!(
+            (undisclosed, kinds.contains(&Value::from("press"))),
+            (Vec::<&String>::new(), true),
+            "{properties:?}"
+        );
+    }
+
+    /// One name, one entry: an object written with the same key twice
+    /// keeps the later one, so the act and measure reading of `ref` was
+    /// silently lost to the screenshot one.
+    #[test]
+    fn a_reference_is_described_for_every_action_that_takes_one() {
+        let schema = disclosed();
+        let properties = schema["properties"].as_object().unwrap();
+        let describes = |name: &str| properties[name]["description"].as_str().unwrap().to_owned();
+        let (one, many) = (describes("ref"), describes("refs"));
+        assert_eq!(
+            (
+                ["act", "measure", "screenshot"].map(|verb| one.contains(verb)),
+                ["measure", "screenshot"].map(|verb| many.contains(verb)),
+            ),
+            ([true; 3], [true; 2]),
+            "ref: {one}; refs: {many}"
+        );
+    }
+}

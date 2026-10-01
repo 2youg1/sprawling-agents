@@ -168,3 +168,38 @@ pub(super) fn payload(fields: Vec<(&str, Value)>) -> Result<Payload, AxError> {
     }
     Payload::new(map)
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use super::*;
+
+    /// A key lands on whatever has the focus. Naming the viewport made the
+    /// ledger record a pointer action that never happened.
+    #[test]
+    fn a_key_press_is_recorded_as_acting_on_the_focus() {
+        let press = browser::Action::Press {
+            key: browser::Key::parse("Enter").unwrap(),
+            modifiers: BTreeSet::new(),
+        };
+        let scroll = browser::Action::Scroll {
+            at: None,
+            by: browser::Point { x: 0, y: 40 },
+        };
+        let click = browser::Action::Click {
+            reference: "e3".to_owned(),
+        };
+        assert_eq!(
+            [&press, &scroll, &click].map(acted_on),
+            ["focus", "viewport", "e3"].map(str::to_owned)
+        );
+    }
+}
