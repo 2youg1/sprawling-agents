@@ -34,9 +34,11 @@ toml.workspace = true
 flate2.workspace = true
 # Measuring where a function begins and ends is a parsing problem: a
 # brace counter gets `'{'`, a line-continued string and `#[cfg(test)]`
-# wrong, and each mistake produces a wrong list of offenders. Workspace
-# tooling only, never the product binary (xtask-SPEC.md section 13).
-syn = { version = "3", features = ["full", "parsing", "printing"] }
+# wrong, and each mistake produces a wrong list of offenders. `visit`
+# reaches every macro call inside a function body, where `packaged` finds
+# the include calls a published package compiles. Workspace tooling only,
+# never the product binary (xtask-SPEC.md section 13).
+syn = { version = "3", features = ["full", "parsing", "printing", "visit"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 zip.workspace = true
 

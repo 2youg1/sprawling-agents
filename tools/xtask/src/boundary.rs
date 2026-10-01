@@ -344,6 +344,8 @@ mod tests {
             dir: rel.split('/').take(2).collect::<Vec<_>>().join("/"),
             role: Role::Product,
             depends_on: std::collections::BTreeSet::new(),
+            publish: crate::members::Publish::Registry,
+            roots: Vec::new(),
         }
     }
 

@@ -197,6 +197,7 @@ fn main() -> ExitCode {
         Some("length") => report::finish("length", length::check(&root)),
         Some("boundary") => report::finish("boundary", boundary::check(&root)),
         Some("artifact") => report::finish("artifact", artifact::check(&root)),
+        Some("packaged") => report::finish("packaged", packaged::check(&root)),
         Some("modmap") => report::finish("modmap", modmap::check(&root)),
         Some("npm") => report::finish("npm", npm::check(&root)),
         Some("depmap") => report::finish("depmap", depmap::check(&root)),

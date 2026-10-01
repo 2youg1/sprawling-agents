@@ -232,16 +232,21 @@ pub(crate) fn workspace_version(root: &Path) -> Result<String, XtaskError> {
         file: path.display().to_string(),
         msg: err.to_string(),
     })?;
-    parsed
-        .get("workspace")
-        .and_then(|w| w.get("package"))
-        .and_then(|p| p.get("version"))
-        .and_then(toml::Value::as_str)
+    package_field(&parsed, "version")
         .map(str::to_owned)
         .ok_or_else(|| XtaskError::Doc {
             file: path.display().to_string(),
             msg: "workspace.package.version is missing".to_owned(),
         })
+}
+
+/// One string of a parsed root manifest's `[workspace.package]` table.
+pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<&'a str> {
+    manifest
+        .get("workspace")
+        .and_then(|it| it.get("package"))
+        .and_then(|it| it.get(key))
+        .and_then(toml::Value::as_str)
 }
 
 #[cfg(test)]

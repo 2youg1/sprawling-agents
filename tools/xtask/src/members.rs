@@ -48,6 +48,24 @@ pub(crate) struct Member {
     /// Every package its normal and build dependencies name; dev
     /// dependencies are left out, since tests may reach anything.
     pub(crate) depends_on: BTreeSet<String>,
+    /// Whether `cargo publish` may send this package to a registry.
+    pub(crate) publish: Publish,
+    /// The source file of every target a published copy of this package
+    /// compiles - its lib, binaries, build script and proc macro -
+    /// repo-relative and `/`-separated. Tests, benches and examples are
+    /// left out: `cargo install` and the packaging check build none of
+    /// them.
+    pub(crate) roots: Vec<String>,
+}
+
+/// Whether a package can be published, as its manifest's `publish`
+/// field says (xtask-SPEC.md section 8-49).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Publish {
+    /// No `publish` field, `publish = true`, or a list of registries.
+    Registry,
+    /// `publish = false`, which cargo's metadata reports as an empty list.
+    Never,
 }
 
 impl Member {
@@ -71,6 +89,19 @@ impl Member {
         self.role == Role::Product
     }
 }
+
+/// The target kinds a published package compiles. Every other kind -
+/// `test`, `bench`, `example` - is built only from a checkout.
+const COMPILED: [&str; 8] = [
+    "lib",
+    "rlib",
+    "dylib",
+    "cdylib",
+    "staticlib",
+    "proc-macro",
+    "bin",
+    "custom-build",
+];
 
 /// The arguments one `cargo metadata` run takes. `--no-deps` resolves
 /// nothing, so `--offline` costs nothing and keeps a gate off the network.
@@ -245,7 +276,47 @@ fn workspace_member(root: &Path, package: &Value) -> Result<Member, XtaskError> 
             .filter_map(|dependency| dependency.get("name").and_then(Value::as_str))
             .map(str::to_owned)
             .collect(),
+        publish: publish_of(package),
+        roots: roots_of(root, package, name)?,
     })
+}
+
+fn publish_of(package: &Value) -> Publish {
+    let refused = package
+        .get("publish")
+        .and_then(Value::as_array)
+        .is_some_and(Vec::is_empty);
+    if refused {
+        Publish::Never
+    } else {
+        Publish::Registry
+    }
+}
+
+/// The source files of the targets a published copy compiles.
+fn roots_of(root: &Path, package: &Value, name: &str) -> Result<Vec<String>, XtaskError> {
+    targets(package)?
+        .iter()
+        .filter(|target| {
+            target
+                .get("kind")
+                .and_then(Value::as_array)
+                .is_some_and(|kinds| {
+                    kinds
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .any(|kind| COMPILED.contains(&kind))
+                })
+        })
+        .map(|target| relative(root, Path::new(text(target, "src_path")?), name))
+        .collect()
+}
+
+fn targets(package: &Value) -> Result<&Vec<Value>, XtaskError> {
+    package
+        .get("targets")
+        .and_then(Value::as_array)
+        .ok_or_else(|| missing("a `targets` array for every package"))
 }
 
 /// `dir` below `root`, `/`-separated. A package outside the checkout is
@@ -267,11 +338,7 @@ fn relative(root: &Path, dir: &Path, package: &str) -> Result<String, XtaskError
 }
 
 fn lib_of(package: &Value) -> Result<Option<String>, XtaskError> {
-    let targets = package
-        .get("targets")
-        .and_then(Value::as_array)
-        .ok_or_else(|| missing("a `targets` array for every package"))?;
-    Ok(targets
+    Ok(targets(package)?
         .iter()
         .find(|target| {
             target

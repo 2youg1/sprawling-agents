@@ -45,6 +45,8 @@ fn product() -> [Member; 1] {
         dir: "crates/kernel".to_owned(),
         role: members::Role::Product,
         depends_on: BTreeSet::new(),
+        publish: members::Publish::Registry,
+        roots: Vec::new(),
     }]
 }
 

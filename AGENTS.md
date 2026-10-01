@@ -133,6 +133,7 @@ A violation turns the check red with a message that names the rule, the violatio
 | Module map registered; functions within 200 lines and 4 parameters, files within 400 production lines. | `xtask modmap`, `xtask length` |
 | A white-box check written in Rust beside the code it judges; a check that enters the way a stranger does written in Lean under `tools/adversary/`. | `xtask boundary` |
 | Nothing written for a test compiled into the binary a person downloads. | `xtask artifact` |
+| Every file a publishable package compiles in production, through `include!`, `include_str!` or `include_bytes!`, inside that package's own directory or its build script's `OUT_DIR`, because crates.io carries the package directory and nothing else. | `xtask packaged` |
 | `pub(crate)` by default; `pub` traits only on the seam list. | `xtask depmap` |
 | Every dependency a manifest declares named by the code of its package, and every workspace dependency inherited by some package. | `xtask unused` |
 | The client's lockfile in step with its manifest, its runtime dependencies exactly the list `RUNTIME` in `tools/xtask/src/npm.rs` names (`svelte`, `effect`, and the `@lezer` highlighter), every licence on the list `deny.toml` permits. | `xtask npm` |
@@ -148,7 +149,7 @@ A violation turns the check red with a message that names the rule, the violatio
 | Kernel enums and the kernel-SPEC tables agree variant by variant, and every module's SPEC anchor resolves. | `xtask specalign` |
 | One effective specification per crate, no prose naming a SPEC the tree lacks, the checker and the specifications importing along the crate graph and never each other, no `sorry`, `admit` or `axiom` in any `.lean`, and every path a specification cites on disk. `cargo xtask spec <lib>` is the command that writes a skeleton; the gate of the same name only judges. | `xtask spec` |
 | Nothing published that names one machine's home directory, its working notes, or a document this tree does not contain. | `xtask release` |
-| The one lint table of its own, `crates/desktop/ffi`'s, equal to the workspace's except `unsafe_code`, and every other crate inheriting the workspace's. | `xtask guard` |
+| The one lint table of its own, `crates/desktop/ffi`'s, equal to the workspace's except `unsafe_code`, and every other crate inheriting the workspace's; every workspace package pinned in `[workspace.dependencies]` to `=` the `[workspace.package] version`, and named by no member through a path of its own. | `xtask guard` |
 
 - Fix the cause when a gate goes red. Loosening a gate in the change the gate is failing requires an explicit ruling from the person, recorded as the commit's `Verdict: user-approved` trailer; the wording of the ruling stays with the person, and the trailer records that there was one. Review holds this rule rather than a gate, because a gate that read commit history made every run depend on the range its caller passed.
 - Put a change to gate machinery — `tools/xtask/`, `justfile`, `.github/`, `flake.nix`, the root `Cargo.toml`, `deny.toml`, `clippy.toml`, `rust-toolchain.toml`, `lakefile.toml`, `lean-toolchain`, `tools/xtask/budgets.toml`, `architecture.toml` — in a commit apart from the source it judges, so review sees whether the gate moved to admit it. Re-pricing a rule in a commit of its own is ordinary work and needs no ruling.

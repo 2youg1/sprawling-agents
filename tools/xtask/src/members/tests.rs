@@ -61,6 +61,8 @@ fn member(package: &str, dir: &str) -> Member {
         dir: dir.to_owned(),
         role: Role::Product,
         depends_on: BTreeSet::new(),
+        publish: Publish::Registry,
+        roots: Vec::new(),
     }
 }
 
