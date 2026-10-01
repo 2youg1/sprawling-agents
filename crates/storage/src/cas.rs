@@ -165,8 +165,15 @@ impl Cas {
     /// (storage-SPEC 8-36). Like a range read, it trusts what `put`
     /// verified.
     pub fn size(&self, hash: &B3Hash) -> Result<u64, StorageError> {
-        let _ = hash;
-        Ok(0)
+        let (_, path) = self.object_path(hash);
+        if !self.vfs.exists(&path) {
+            return Err(StorageError::CasMissing {
+                hash: hash.to_string(),
+            });
+        }
+        self.vfs
+            .size(&path)
+            .map_err(io_err("measure cas object", &path))
     }
 }
 
