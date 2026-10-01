@@ -18,6 +18,7 @@ use super::weight::{Weight, measure, written};
 use kept::Standing;
 
 mod kept;
+mod stock;
 
 /// Where the trees live: inside the reserved subtree, because they are
 /// the city's own machinery rather than anybody's writable space. What a
@@ -391,6 +392,7 @@ impl Worktrees {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
     reason = "test code"
 )]
 pub(crate) mod tests;

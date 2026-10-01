@@ -256,34 +256,13 @@ fn index_writes_tree(index: &mut git2::Index, tree: git2::Oid) -> Result<bool, g
 mod tests {
     use super::super::super::lease::FileWork;
     use super::super::Landing;
-    use super::super::Worktrees;
-    use super::super::tests::{city, name, owner};
+    use super::super::tests::{bulk_city, city, entries, name, owner};
     use crate::checkpoint::Checkpoint;
     use kernel::TimeMs;
     use std::path::Path;
 
     fn read(path: &Path) -> String {
         std::fs::read_to_string(path).unwrap()
-    }
-
-    /// A city of `files` small files under `bulk/`, committed.
-    fn bulk_city(dir: &Path, files: u64) -> Worktrees {
-        let bulk = dir.join("bulk");
-        std::fs::create_dir_all(&bulk).unwrap();
-        for i in 0..files {
-            std::fs::write(bulk.join(format!("file-{i:04}.txt")), b"sixteen bytes ..").unwrap();
-        }
-        Checkpoint::open(dir)
-            .unwrap()
-            .ensure_base(&["bulk".to_owned()], TimeMs::new(1_000), &owner())
-            .unwrap();
-        Worktrees::open(dir).unwrap()
-    }
-
-    /// How many entries a directory and its `bulk/` hold between them.
-    fn entries(root: &Path) -> u64 {
-        let count = |dir: &Path| u64::try_from(std::fs::read_dir(dir).unwrap().count()).unwrap();
-        count(root) + count(&root.join("bulk"))
     }
 
     /// storage-SPEC 8-31: a placement writes the tree's files once and walks

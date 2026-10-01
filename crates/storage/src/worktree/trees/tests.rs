@@ -42,6 +42,26 @@ pub(super) fn name(raw: &str) -> WorktreeName {
     WorktreeName::parse(raw).unwrap()
 }
 
+/// A city of `files` small files under `bulk/`, committed.
+pub(crate) fn bulk_city(dir: &Path, files: u64) -> Worktrees {
+    let bulk = dir.join("bulk");
+    std::fs::create_dir_all(&bulk).unwrap();
+    for i in 0..files {
+        std::fs::write(bulk.join(format!("file-{i:04}.txt")), b"sixteen bytes ..").unwrap();
+    }
+    Checkpoint::open(dir)
+        .unwrap()
+        .ensure_base(&["bulk".to_owned()], TimeMs::new(1_000), &owner())
+        .unwrap();
+    Worktrees::open(dir).unwrap()
+}
+
+/// How many entries a directory and its `bulk/` hold between them.
+pub(crate) fn entries(root: &Path) -> u64 {
+    let count = |dir: &Path| u64::try_from(std::fs::read_dir(dir).unwrap().count()).unwrap();
+    count(root) + count(&root.join("bulk"))
+}
+
 #[test]
 fn two_nodes_get_two_trees_and_neither_sees_the_others_work() {
     let dir = tempfile::tempdir().unwrap();
