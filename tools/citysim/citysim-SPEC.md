@@ -1,7 +1,7 @@
 # citysim-SPEC.md
 
 > 工作区成员：`citysim`（dev-only，第二个 Main，不占产品拓扑）。本 SPEC 先于代码存在。
-> 内容：内存 Ledger 与链检查器（§8）、剧本设施与薄执行器（§8-2）、真适配器换入（§8-3）、两个测量二进制（§8-5、§8-6）、评估仪器（§8-7、§8-8）与替身 provider（§8-10）。
+> 内容：内存 Ledger 与链检查器（§8）、剧本设施与薄执行器（§8-2）、真适配器换入（§8-3）、两个测量二进制（§8-5、§8-6）、评估仪器（§8-7、§8-8）与替身 provider（§8-10、§8-13）。
 
 ## 1 需求分解
 
@@ -82,19 +82,28 @@ fx 的一次修复之前，一个长回合每一步都留着整份恢复重建�
 
 被否：计数型全局分配器（要 `unsafe impl GlobalAlloc`，workspace 的 `unsafe_code` 是 forbid）；`long_turn` 自己读自己的计数器（Windows 上要么写 FFI，要么像 xtask 那样起一个 PowerShell，于是计数器有了第二个读者）。**重开参数**：出现安全的分配计数接口时，把每步分配的字节也做成门；runtime 给回合窗口一个默认的上界（压缩）时，断言从「增量处处相同」改成「窗口不超过上界」。
 
-### 3-11 决定：进程外的替身 provider 是 citysim 的一个二进制，脚本就是 `ScriptModel` 的那种线上 JSON
+### 3-11 决定：进程外的替身 provider 是 citysim 的一个二进制，脚本就是 `ScriptModel` 的那种线上 JSON，按 run 分开作答
 
 黑盒验收要让发行件去调一个会应答的 provider，而三条已有的规则各挡住一个位置：黑盒检查写在 Lean 里（`xtask boundary`），`tools/adversary/` 不自带 HTTP 服务端（`tools/adversary/Spec.lean` §13：一个假 provider 会让那个目录变成第二个 gateway 实现），为测试写的东西不进人下载的二进制（`xtask artifact`）。剩下的位置是这里：`bin/provider` 是测试工具，由 justfile 拉起，URL 经环境变量 `SPRAWLING_PROVIDER` 交给调用它的检查，与对抗器经 `SPRAWLING_BIN` 接收二进制是同一个形状。
 
-脚本的格式只有一种：一份 JSON 写明兼容格式（`face`，拼法取 `kernel::DialectKind` 的 serde 形）、`/models` 列出的模型 id，以及按到达顺序回放的回复，每条回复就是那个兼容格式的 provider 会发的线上 JSON。`WireScript::parse` 把每条回复经 `ScriptModel::from_wire` 读一遍，那里走的是 `gateway::response_from_wire`，与城读真 provider 的回复是同一个函数，所以一份替身能回放的脚本也是 `ScriptModel` 能回放的脚本，写错一个键在解析时就被拒，而不是在城里变成一条 `E_WIRE_MISMATCH`。
+脚本的格式只有一种：一份 JSON 写明兼容格式（`face`，拼法取 `kernel::DialectKind` 的 serde 形）、`/models` 列出的模型 id，以及一串 run，每个 run 是它按序拿到的回复，每条回复就是那个兼容格式的 provider 会发的线上 JSON。`WireScript::parse` 把每条回复经 `gateway::response_from_wire` 与 `ModelReturn::from_response` 读一遍，与城读真 provider 的回复是同一个函数，也是 `ScriptModel::from_wire` 走的那一条，所以一份替身能回放的脚本也是 `ScriptModel` 能回放的脚本，写错一个键在解析时就被拒，而不是在城里变成一条 `E_WIRE_MISMATCH`。
 
-**替身不生成任何文字**（产品里不内置模型）：它只回放脚本，脚本用尽就拒绝。
+**一个请求属于哪个 run，由它带回来的调用 id 认。** 城每一轮都把这个 run 至今的对话整段送回去：模型要过的每一次工具调用，连同它的 id，都在请求里（OpenAI 的 `tool_calls[].id` 与 `tool_call_id`、Anthropic 的 `tool_use.id` 与 `tool_use_id`）。脚本里每个调用 id 只出现一次，所以请求正文里任何一个与脚本调用 id 相等的字符串值就指出了这个 run，以及它最近拿到的是第几条回复；替身答它下一条。正文里一个脚本 id 都没有的请求是一个 run 的第一轮，它开启脚本里下一个还没开启的 run。于是一个 run 拿到什么只取决于它自己走到哪一步：两个 run 怎么交错、一个请求被重发几次、城被杀之后接着送同一段对话，答的都是同一条。替身认的只有城本来就送的字节，产品的请求里不为它加任何字段。
 
-被否：①把 `bin::assembly::fixture::FakeProvider` 提出来复用——它挂在 `#[cfg(test)]` 下，是 crate 内部回答 HTTP 细节的替身，脚本是散落在测试里的字符串，而且用尽后重复最后一条，黑盒检查因此看不出城多调了一次；②第三种脚本格式——替身与 `ScriptModel` 各读一种，同一段对话就要写两遍。**重开参数**：一份脚本要同时驱动两个并发的 run 时（多日小镇的确定性版本），到达顺序由机器决定，脚本加上按请求内容选路的一支，形状照 `FakeProvider` 的 `Routed`；一条检查要让城收到一条读不懂的回复时，脚本加上一种不经 `parse` 验证的条目。
+**替身不生成任何文字**（产品里不内置模型）：它只回放脚本，一个 run 的回复用尽就拒绝。
+
+被否：①把 `bin::assembly::fixture::FakeProvider` 提出来复用——它挂在 `#[cfg(test)]` 下，是 crate 内部回答 HTTP 细节的替身，脚本是散落在测试里的字符串，而且用尽后重复最后一条，黑盒检查因此看不出城多调了一次；②第三种脚本格式——替身与 `ScriptModel` 各读一种，同一段对话就要写两遍；③按请求里的一句话选路（`FakeProvider` 的 `Routed`）——黑盒那扇门派活时任务的字样是固定的，每个 run 的第一轮送的文字除了房间几乎一样，而一句也出现在共享前缀里（如邻居表）的话会同时指向两条路；④按请求里 assistant 消息的条数定位——城可能折叠或卸下旧的几轮，条数会动，最近那个 id 不会；⑤重算 gateway 的 `conversation_id`——那是城的一条规则在替身里的第二份，而且它只在预设要求的主机上随请求送出。**重开参数**：两个同时开启、要拿不同回复的 run（多日小镇的确定性版本），第一轮里没有脚本 id 可认，开启的次序由机器决定——那时脚本里的 run 要带上一句它第一轮必然送出的话，形状照 `FakeProvider` 的 `Routed`；一个分叉出来的 run 继承了母 run 的调用 id，替身今天把它读成母 run 的续轮或两个 run 交叉（§8-13）——分叉进验收时，脚本要能写明一个 run 从谁分出来；一条检查要让城收到一条读不懂的回复时，脚本加上一种不经 `parse` 验证的条目。
 
 ### 3-13 决定：`large_worktree_placement` 量的是领树，备树在计时之外
 
 放置分成两段（storage-SPEC 8-35）：`Worktrees::stock` 在没人等的时候检出一棵备树，`claim` 在 run 等着的时候接管它。场景在每次计时的 `claim` 之前调一次 `stock`，计时只包住 `claim`，因为人等的是这一段；`stock` 的代价就是改动之前的那个读数（一次全量检出），它不随这次改动变，由 storage 的计数断言守着它新建多少文件，而不是由墙钟。被否：①把 `stock` 也算进同一个样本——读数就成了两段之和，看不出领树这一段降没降；②给备树另开一行读数——要在 `bench::reading` 加一个 `Load`，那一份是读数文法的唯一权威，本决定不为一行读数改它；需要那一行时在那里加。**重开参数**：产品里有了 `stock` 的调用者之后（sprawling-SPEC 8-145），如果它的位置仍让某个人等它，把它的读数加进来。
+
+
+### 3-15 决定：脚本的 run 用完时，替身先把脚本文件再读一遍，再拒一个新开的 run
+
+有的回复要写进城才知道的东西：一个要评审的房间的分支名由城按地址的摘要取（`room-<摘要前 16 位>`），而黑盒检查不预测任何摘要（`tools/adversary/Spec.lean` §2 第 3 条）。所以检查先从历史里读出它，再把要用它的那个 run 追加进脚本文件；替身在一个新开的 run 找不到还没开启的 run 时把文件再读一遍，读到的脚本若以它已经握着的那些 run 开头（`face`、`models` 与这些 run 逐值相等），多出来的 run 接在后面；否则这次重读被拒（`E_CONFIG_INVALID`，写到标准错误），这个新开的 run 照样得到 `no_run_left`。已经开启的 run 永远按它开启时的回复作答，追加改不动它们。
+
+被否：①按请求里的内容拼回复（把分支名从上一次工具结果里抄过来）——替身就在写自己的文字了，§3-11 的那条线就没了；②走到半路再起第二个替身——城要改挂第二个 URL，而起进程的是配方，不是检查；③每个请求都重读文件——每次交换都多付一次读盘，而且一个已经开启的 run 会在它脚下被换掉。**重开参数**：要在一个已经开启的 run 里插进城才知道的东西时，这条不够用，要重新判断替身能不能答一个它看不见的值。
 
 ## 4 现状分析
 
@@ -479,16 +488,16 @@ pub fn long_turn(steps: u32, pauses: Pauses) -> Result<TurnReading, AxError>;
 
 ```rust
 // citysim::wire_script
-pub struct WireScript { /* face: DialectKind, models: Vec<String>, replies: Vec<Value> */ }
+pub struct WireScript { /* face: DialectKind, models: Vec<String>, runs: Vec<Run> */ }
 impl WireScript {
-    /// `{"face": "open_ai", "models": ["…"], "replies": [<线上 JSON>, …]}`；每条回复经
-    /// `ScriptModel::from_wire` 读一遍。
+    /// `{"face": "open_ai", "models": ["…"], "runs": [[<线上 JSON>, …], …]}`；每条回复经
+    /// 城读回复的那个函数读一遍（§8-13）。
     pub fn parse(text: &str) -> Result<WireScript, AxError>;   // E_CONFIG_INVALID，subject 写键路径
 }
-pub struct ScriptedProvider { /* listener, replay, record */ }
+pub struct ScriptedProvider { /* listener, script 的路径, replay, record */ }
 impl ScriptedProvider {
-    /// 记录文件在这里被清空：一次回放一份记录。
-    pub fn open(listener: TcpListener, script: WireScript, record: &Path) -> Result<ScriptedProvider, AxError>;
+    /// 读入并解析 `script`；记录文件在这里被清空：一次回放一份记录。
+    pub fn open(listener: TcpListener, script: &Path, record: &Path) -> Result<ScriptedProvider, AxError>;
     pub fn url(&self) -> Result<String, AxError>;               // http://127.0.0.1:<port>/v1
     /// 接一条连接，读完一个请求，答它，把这次交换追加进记录。
     pub fn answer_one(&mut self) -> Result<(), AxError>;
@@ -501,27 +510,61 @@ impl ScriptedProvider {
 |---|---|
 | `GET` 任意路径，脚本列了模型 | 200，`{"data":[{"id":…},…]}` |
 | `GET`，脚本没列模型 | 404，码 `no_model_list`：一个不提供列表的网关，城要按人写下的 id 挂它 |
-| `POST`，脚本还有回复 | 200，下一条回复，`content-type: application/json`——城要的是流时也照读（gateway 按媒体类型认出整段回复） |
-| `POST`，脚本已用尽 | 410，码 `script_exhausted` |
+| `POST` | 按 run 作答，见 §8-13；回复以 200 送出，`content-type: application/json`——城要的是流时也照读（gateway 按媒体类型认出整段回复） |
 | 其他方法 | 405，码 `method_unanswered` |
 
 拒绝的正文是 `{"error":{"type":"<码>","message":"<一句话>"}}`，OpenAI 与 Anthropic 两种兼容格式的错误都是这个形状。410 与 405 都不在 gateway 的「可重试」之列（408、429、5xx），所以城把用尽读成一次不会自己好的拒绝，而不是一直重发。**用尽要拒，不重复最后一条**：黑盒检查要看得见城比脚本多调了一次。
 
 **什么算一个请求，只在读的那一处定**：头读到空行，再按 `content-length`（缺省为 0）读完正文，才是一个请求；连接在那之前断了，不回答、不记录、不花掉脚本里的一条，否则之后的每一轮都在答前一轮的问题。一条连接一个请求，回答带 `connection: close`；连接一条接一条地答，顺序就是到达顺序。
 
-**记录**：每次交换一行 JSON，追加进 `record`：`seq`（从 1 起）、`method`、`target`、`headers`（到达顺序，名字小写，值原样）、`body`（请求正文的文字）、`status`、`answer`（回答的正文）。同一份脚本收到同样的请求字节，记录逐字节相同。**凭据头的值不落盘**：名字是 `authorization`、`proxy-authorization` 或以 `api-key` 结尾的头，值写成 `redacted`。检查要的是「带了凭据」，不是凭据本身，而人在测试时填的 key 不能出现在任何文件里。
+**记录**：每次交换一行 JSON，追加进 `record`：`seq`（从 1 起）、`run` 与 `reply`（这次回答出自第几个 run 的第几条，都从 0 起；没有放进任何 run 的请求两者都是 `null`，§8-13）、`method`、`target`、`headers`（到达顺序，名字小写，值原样）、`body`（请求正文的文字）、`status`、`answer`（回答的正文）。所以一份记录按 `run` 筛出来，就是那个 run 自己的对话。同一份脚本收到同样的请求字节，记录逐字节相同。**凭据头的值不落盘**：名字是 `authorization`、`proxy-authorization` 或以 `api-key` 结尾的头，值写成 `redacted`。检查要的是「带了凭据」，不是凭据本身，而人在测试时填的 key 不能出现在任何文件里。
 
 **`bin/provider`**：`provider <script.json> <record.jsonl> [<listen>]`，`listen` 缺省 `127.0.0.1:0`，不是回环地址就拒（`E_INVALID_ARGS`）。绑定之后先在标准输出印一行 `SPRAWLING_PROVIDER=<url>` 再开始回放，调用它的配方读这一行拿到 URL。一次交换失败（连接断了、答不出去）写到标准错误，替身接着答下一条；记录写不进去（`E_STORAGE_FATAL`）时退出非零，因为之后的检查读的正是那份记录。
 
-**失败**：`parse` 以 `E_CONFIG_INVALID` 拒一份读不懂的脚本（subject 是键路径，如 `replies[2]`，recovery 指回那一条）；套接字的失败是 `E_TOOL_UNAVAILABLE`；记录文件写不进去是 `E_STORAGE_FATAL`。
+**失败**：`parse` 以 `E_CONFIG_INVALID` 拒一份读不懂的脚本（subject 是键路径，如 `runs[1][2]`，recovery 指回那一条）；套接字的失败是 `E_TOOL_UNAVAILABLE`；记录文件写不进去是 `E_STORAGE_FATAL`。
 
-**红**：`wire_script::tests::the_same_request_twice_is_recorded_byte_for_byte_alike`——两个替身各回放同一份脚本，各收一次同样的模型列表请求与对话请求，两份记录逐字节相同且各有两行；`wire_script::tests::an_exhausted_script_is_refused_with_its_code`——一条回复的脚本收到第二次对话请求，回答是 410 与码 `script_exhausted`。
+**红**：`wire_script::tests::the_same_request_twice_is_recorded_byte_for_byte_alike`——两个替身各回放同一份脚本，各收一次同样的模型列表请求与对话请求，两份记录逐字节相同且各有两行；`wire_script::tests::an_exhausted_script_is_refused_with_its_code`——一条回复的脚本，同一个 run 再来一轮，回答是 410 与码 `script_exhausted`。
 
 ### 8-12 `large_worktree_placement`：领树接管一棵备树（`bench::scenarios`）
 
 每轮：`Worktrees::stock`（把备树检出或带到干线，不计时）→ `bench::stamp` → `Worktrees::claim(node-<i>, &[])` → 读时钟 → `release`。四个节点名各不相同，所以每一轮都是一次放置而不是再领；每一轮的备树都是上一轮被接管之后新检出的，干线不动，所以 `claim` 接管时不写文件（storage-SPEC 8-35 的计数）。夹具不变：512 个 16 KB 文件、4 轮，`REGISTERED.pinned` 不动。读数是 `sub=whole`，因为接管仍是盘上的改名与 git 的元数据写入，缝口不拆。
 
 前后的读数（同一台机器、debug 构建、同一夹具的放置一段，四轮）：改动之前 `claim` 一次 1.18–1.30 s；改动之后 `claim` 接管备树一次 30–37 ms，`stock` 一次 1.19–1.35 s（那次全量检出，不计时）。`budgets.toml` 的 `[large_worktree_placement]` 行由 `just bench` 的发行构建读数登记。
+
+
+### 8-13 替身按 run 作答：一个请求放进哪个 run 的哪一条（`citysim::wire_script` 的 `Replay`）
+
+形状：`Replay` 是 decision——请求正文进来，答出放在哪里与回答什么，不碰套接字也不碰文件；把脚本文件再读一遍是 `wire_script::exchange` 的事（§3-15）。决定见 §3-11。
+
+```rust
+// citysim::wire_script（crate 内）
+pub(crate) struct Replay { /* script, ids: BTreeMap<String, Turn>, opened: usize */ }
+pub(crate) struct Turn { pub(crate) run: usize, pub(crate) reply: usize }
+impl Replay {
+    pub(crate) fn new(script: WireScript) -> Replay;
+    /// 这个请求放在哪一条，以及它的回答；GET 与其他方法放不进任何 run。
+    pub(crate) fn answer(&mut self, asked: Asked, body: &str) -> (Option<Turn>, Answer);
+    /// 接上一份以已握着的 run 开头的脚本（§3-15）。
+    pub(crate) fn grow(&mut self, script: WireScript) -> Result<(), AxError>;   // E_CONFIG_INVALID
+}
+```
+
+**一个 `POST` 得到什么**（请求正文按 JSON 读；正文里与脚本调用 id 相等的字符串值，叫它带回来的 id）：
+
+| 请求 | 回答 |
+|---|---|
+| 正文不是 JSON | 400，码 `body_unreadable` |
+| 带回来的 id 分属两个 run | 409，码 `runs_crossed`：替身说不出该答哪一个 |
+| 带回来的 id 都属于第 r 个 run，其中最靠后的是第 k 条回复的，r 还有第 k+1 条 | 200，第 r 个 run 的第 k+1 条 |
+| 同上，第 k 条已是 r 的最后一条 | 410，码 `script_exhausted` |
+| 一个 id 都没带，还有没开启的 run | 200，下一个没开启的 run 的第一条；那个 run 就此开启 |
+| 一个 id 都没带，每个 run 都开启过 | 先把脚本文件再读一遍（§3-15）；仍没有就 410，码 `no_run_left` |
+
+410、409 与 400 都不在 gateway 的「可重试」之列，所以城把它们读成一次不会自己好的拒绝。**用尽要拒，不重复最后一条**：黑盒检查要看得见城比脚本多调了一次。
+
+**`parse` 另外拒的三种脚本**，都在城开口之前、以 `E_CONFIG_INVALID` 拒，subject 是键路径：一个空的 run（`runs[r]`：它开启之后什么都答不出）；一个调用 id 在脚本里出现第二次（`runs[r][k]`，说出它第一次出现在哪里：两个 run 共用一个 id，替身就分不清是谁的续轮）；一个 run 里不是最后一条、却一个工具都不调的回复（`runs[r][k]`：一句话就让 run 结束，它后面的回复永远答不到，而且之后的请求认不出它）。
+
+**红**：`wire_script::tests::two_interleaved_runs_are_each_answered_from_their_own_replies`——两个 run 各两条回复，第一轮按 run 0、run 1 的次序到，续轮按 run 1、run 0 的次序到，每个 run 拿到的是它自己的第二条，记录里四行的 `run` 依次是 0、1、1、0；`wire_script::tests::a_run_written_after_the_script_ran_out_is_opened`——一个 run 的脚本答完之后，把第二个 run 追加进脚本文件，下一个新开的 run 拿到它的第一条。
 
 ## 9–16 工作流程／实现／边界／错误／依赖／硬编码／影响面／测试
 

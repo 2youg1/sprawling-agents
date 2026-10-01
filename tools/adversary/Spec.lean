@@ -14,7 +14,7 @@ import tools.adversary.spec.Model
 
 权威顺序：人的决定 → `ARCHITECTURE.md` §8「the wire is the whole API; a second client writes against it」→ 本规格 → 检验器的代码与它的运行。本规格先于代码改动。
 
-本文件是规格的入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定，决定写作 `D<n>`，别处引作 `adversary D<n>`。这份规格在 Markdown 时 §12 没有编号的条目，D1 到 D5 从这一版起编。
+本文件是规格的入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定，决定写作 `D<n>`，别处引作 `adversary D<n>`。这份规格在 Markdown 时 §12 没有编号的条目，D1 从迁到 Lean 的那一版起编；号不复用，一条被取代的决定留着它的号，指向取代它的那一条。
 -/
 
 /-! ## 1 需求分解
@@ -31,7 +31,7 @@ import tools.adversary.spec.Model
 | U6 历史 | 任意轨迹之后，账本离线自证；改一个字节则不能自证 | `replay` 在干净轨迹上恒绿、在翻过一位的轨迹上恒红 |
 | U7 供应世界 | `Provider`：挂过 endpoint 的第二种世界——一个 URL 的全部拼法、一个注册模型的上限、两条同时跑的车道 | 等价类的每种拼法经探测与经挂载各落到同一个 `base_url`；注册过的模型带得出上限；messages 派活拿不到「没有输出上限」；不等第一条做完就派出去的活是两个 run |
 | U8 配置世界 | `Layer`：写过配置的第三种世界——`configure_building` 任意序列之后，磁盘上的 `CONFIG.toml` 与 `Query::BuildingView` 折出的答案一致 | 任意非空写序列之后：答案等于最后一次写入的值；楼自己那层的文件陈述该值且不再陈述更早的值；上一层一个都不陈述 |
-| U9 验收世界 | `Acceptance`：一个陌生人拿发行归档里的二进制，在一个新目录里起城，经门走完第一天、一次进程被杀、第二天早上；provider 是 `just acceptance` 在本目录之外起的替身（§13） | `just acceptance <archive>` 的每一步按序通过，第一处失败报出步名；人的清单写到 `target/acceptance/` 下的 `checklist.md` |
+| U9 验收世界 | `Acceptance`：一个陌生人拿发行归档里的二进制，在一个新目录里起城，经门走完第一天、一次进程被杀、第二天早上，以及协作那一串——一栋要评审的楼里，计划的一行被分成两片叶子，两个同时派出的活认同一片叶子而只有一个拿到，活被重派、认下还空着的那一片并提出请求，另一个居民查它而判不通过；provider 是 `just acceptance` 在本目录之外起的替身（§13） | `just acceptance <archive>` 的每一步按序通过，第一处失败报出步名；人的清单写到 `target/acceptance/` 下的 `checklist.md` |
 
 **不负责**：任何规则的再实现（链哈希、`IdemKey` 派生、写域判定、份额守恒）；任何 Rust 侧的构建闸门；任何随产品交付的东西。三者中任何一条被违反，本目录应当被删除而不是被修补。
 
@@ -66,13 +66,15 @@ import tools.adversary.spec.Model
 | 城是什么 | 一个本地目录，`init` 造它，`serve` 端起来，账本在 `.sprawling/ledger/` 下按段分文件 | 布局改变时 `Ground.lean` 的敌意动作报错，属预期 |
 | 静默 | 门的第三种回答。**不是接受**——见 §10「静默不是接受」 | 若将来 `call` 改为「命令被受理才返回」，`quiet` 这一支变成异常而不是取值 |
 | provider | `Model` 的世界一个都不挂，于是每一次派活在配置这道门上被拒，而模型知道这一点；`Provider` 的世界挂一个**这台电脑上没人听的地址**，于是每一次调用停在 socket 上；U9 挂 `just acceptance` 起的替身，调用成功，替身不在本目录里（§13） | 检查树里的世界要一个会应答的 endpoint 时，它们照 U9 的样子从 justfile 接收一个 URL，而不是在本目录里起一个 |
-| 替身按什么次序答 | 替身按请求到达的次序花掉脚本里的回复（`citysim-SPEC.md` §8-10），所以 U9 每派一次活都等那个 run 冻结再派下一次；唯一不等的是它要杀掉的那个 run，那个 run 的回复全是同一个只读调用，接着花剩下回复的 run 因此以同一句话结束 | 替身能按 run 分开作答之前（`citysim-SPEC.md` §3-11 的重开参数），U9 不并发派活 |
+| 替身怎样分 run | 替身按请求带回来的调用 id 认出 run 与它走到哪一条，一个 id 都没带的第一轮按到达次序开启脚本里下一个 run（`citysim-SPEC.md` §3-11、§8-13；`spec/Acceptance.lean`）。所以 U9 只在第一轮可能同时到达的地方——两个同时派出的认领——把那几个 run 写成一样，其余的活都等前一个 run 冻结再派，第一轮的次序就是脚本的次序（D6） | 两个同时开启、要拿不同回复的 run 进 U9 时，替身要能认第一轮（`citysim-SPEC.md` §3-11 的重开参数） |
 | 杀进程 | `Serving.hangUp` 结束被服务的进程（Windows 上是 `TerminateProcess`，Unix 上是 `SIGKILL`），等被杀的 run 写下 `inFlight` 条 `tool_result` 之后才杀，所以刀落在两次写之间，而不是在最后一次写之后；被杀的 run 若已冻结，那一步报红并说明替身给的调用太少 | 城回来之后怎么处理那个死掉的 run，不是 U9 断言的事：它断言的是历史自证、城再服务、新的活跑到它自己的结尾 |
 | 配置写回 | 「写了什么就读得回什么」这条不变量的对象是 **TOML 文件**，不是哪一条帧。人层偏好的那一条（`PutPreferences` / `Query::Preferences`）今天并不存在，而 `configure_building` 写楼自己那层、`Query::BuildingView` 把它折回来，是同一条不变量今天已经承载的地方，所以性质写在那里 | 那一对帧落地后，`Layer` 换成它们驱动，断言一字不改：变的是谁写进文件，不是文件欠谁什么 |
 | 时钟 | 只用于超时，从不被预测 | —— |
 | 端口 | 从 47100 起向上探，第一个能答 `city_view` 的即用 | 机器上有别的东西占着整段时报错并说明 |
 | `just check` 读不读本目录 | `AGENTS.md` 写着 `just check` 不读 `tools/adversary/` 下的任何文件。本规格迁到 Lean 之后，`just models` 构建本文件与 `spec/`（ARCHITECTURE.md §11 为 `tools/` 下的规格定的位置），仍不构建检验器 | 那一句要改成「不构建检验器」；它在 `AGENTS.md`，本次迁移没有改它，这一格等它改了就删 |
-| 一次可用性验收还该走什么 | U9 走的是一个人第一天能做的事：城答话、挂上 provider、立楼、准入 skill、派活到结尾、历史自证，以及进程被杀之后城回来接着干。**协作那一串还没走**：市长做计划、两次派活认领同一个节点、重派、`pr check` 判不通过 | 那一串要几个 run 交错调用替身，替身按 run 分开作答之后它进 U9；在那之前它由 `crates/sprawling/tests/acceptance/` 的白盒部分承担 |
+| 协作那一串在哪栋楼里走 | 在一栋要评审的楼（`beta`）自己的计划上走：`plan` 只读写派活那栋楼自己的 `Roadmap.md`，市长在 City Hall 分的是 hall 的计划，没有一栋 builder 楼从那里认领，而 City Hall 没有自己的树，提不出请求。所以分计划的是这栋楼里的一个居民（`beta/planner`），市长那一半——City Hall 把一件事分给几栋楼——U9 不走 | 一栋楼的 `plan` 能认领另一栋楼计划里的叶子时，分计划的那一步改由 `hall/mayor` 来做 |
+| 计划的第一行谁写 | 人用编辑器写：新立的楼的 `Roadmap.md` 一行都没有，`plan` 的 `split` 只分已有的行，而门（`Door.lean`）不拼写 `put_spine`。人照模板的六列写下一行，与 U9 改阅览室、改 `review` 那两处是同一种手动作 | 门拼写了 `put_spine` 之后，这一步经它写，断言一字不改 |
+| 一次可用性验收还该走什么 | U9 走的是一个人第一天能做的事：城答话、挂上 provider、立楼、准入 skill、派活到结尾、历史自证；进程被杀之后城回来接着干；以及一栋楼里的协作：分计划、认领冲突、重派、评审不通过 | 市长跨楼分活、红队消融与多日小镇属 V0.1.0（G4、G8），各自照 U9 的样子从 justfile 接收替身 |
 -/
 
 /-! ## 4 现状分析
@@ -202,7 +204,9 @@ src/Sprawling/Person.lean    人自己那一层的第四种世界：住在城外
 src/Sprawling/Regression.lean 两个世界的反例 → 一个 Rust 测试文件
 src/Sprawling/Acceptance/Script.lean 替身要回放的脚本：从归档的 skills 写出
 src/Sprawling/Acceptance/Stage.lean  陌生人的目录，以及他用编辑器改的两份文件
-src/Sprawling/Acceptance/Walk.lean   第一天、进程被杀、第二天早上
+src/Sprawling/Acceptance/Walk.lean   第一天、进程被杀、第二天早上，以及各段共用的步与读法
+src/Sprawling/Acceptance/Collaboration.lean 协作那一串：分计划、两次认领、重派、查而不过
+src/Sprawling/Acceptance/Servings.lean 一个目录的三次服务，按序：走哪几段、步名的次序
 src/Sprawling/Acceptance/Checklist.lean 人手测的清单：每一节从决定它的那一处读出
 test/Main.lean               入口与检查树
 test/Acceptance.lean         `acceptance` 可执行文件的两个命令：写脚本、走一遍
@@ -210,7 +214,7 @@ Spec.lean                    本规格的入口：十七节与决定
 spec/Answer.lean             门说了什么：接受、拒绝、静默
 spec/Model.lean              欠哪一种拒绝：守序，以及被拒的命令也花掉它的键
 spec/Check.lean              收缩的候选更短；一个端口一次只借给一个场地
-spec/Acceptance.lean         替身的回复怎样被几个 run 分着花；按序走、停在第一处失败
+spec/Acceptance.lean         替身把一个请求放进哪个 run 的哪一条；按序走、停在第一处失败
 ```
 
 依赖单向：`Model` → `Door` → `Frame`，`Model` → `Ground` → `Door`，`Model` → `Check`，`Provider` → `Ground`，`Layer` → `Ground` 与 `Check`，`Person` → `Layer`，`Regression` → `Model` 与 `Provider`。**`Person` 读 `Layer` 而不自立一套**：两个世界问的是同一件事（一份人也手改的文件与一个折出来的答案会不会分岔），差在那份文件在不在城里；序列生成器、收缩器、“这份读数陈述了某个值吗”那一个子串探针、以及七个互不为子串的四位数，全部只有 `Layer` 一个家。`Layer` 不被 `Regression` 读：它至今没有找到反例，而一条没有反例的性质不向 Rust 侧交付任何东西。**`Regression` 依赖两个世界，因为交付物是一个文件**：轨迹那条测试的每一步与极性从 `Model` 读，供应世界那两条测试的拼法、中转站名字与模型 id 从 `Provider` 读，于是演员表在本目录里仍然只有一个家。`Provider` 不 import `Model`：那是另一种世界，两边共用的只有门与场地。`Frame` 不 import 任何本工程模块；`Check` 也不，且它**不 import `Door`**——抽样与收缩不允许知道有一座城存在。
@@ -224,7 +228,7 @@ spec/Acceptance.lean         替身的回复怎样被几个 run 分着花；按�
 
 /-! ## 8 接口先行
 
-检验器的接口如下；它们必须守的性质，凡能写成定理的，在 `spec/` 的分部里以参照定义与定理陈述：`Adversary.Answer`（`classify` 与「静默不满足任何期待」）、`Adversary.Model`（`owedOnRaise`、`owedOnWork` 与三条守序、`spent` 与「被拒的命令也花掉它的键」）、`Adversary.Check`（`removeAt` 与「候选更短」、端口池 `claim`／`release`）、`Adversary.Acceptance`（`runOn` 与「被杀之后的活以自己的最后一句结束」、`firstBroken` 与「报出的那一步失败而之前的都通过」）。
+检验器的接口如下；它们必须守的性质，凡能写成定理的，在 `spec/` 的分部里以参照定义与定理陈述：`Adversary.Answer`（`classify` 与「静默不满足任何期待」）、`Adversary.Model`（`owedOnRaise`、`owedOnWork` 与三条守序、`spent` 与「被拒的命令也花掉它的键」）、`Adversary.Check`（`removeAt` 与「候选更短」、端口池 `claim`／`release`）、`Adversary.Acceptance`（`place` 与「每个 run 答它自己的下一条」「第一轮按次序开启 run」「追加 run 不改已有的回答」、`firstBroken` 与「报出的那一步失败而之前的都通过」）。
 
 ```lean
 -- Frame.lean —— 线上说了什么
@@ -291,8 +295,15 @@ def building : String                              -- U9 立的那栋楼
 def notesPath : String                             -- 第一个 run 写的文件
 def notesText : String
 def statusCalls : Nat                              -- 被杀的 run 拿到的只读调用数
-def closingLines : Nat                             -- 收尾的那句话写几遍
+def callId  : Nat → Nat → String                   -- 第 run 个 run 第 turn 条回复的调用 id，全脚本唯一
+def reviewed : String                              -- 协作那一串的楼
+def planner left right : String                    -- 它的三个房间
+def planItem : String                              -- 人写下的那一行
+def leaves  : List String                          -- 分出来的两片叶子
+def offeredPath offeredText refusedWhy : String    -- 提出评审的文件，与查它的人说的理由
+def runsFor : List String → List (Nat → List Json) -- 按 run 开启的次序；每个 run 拿到自己的序号
 def script : List String → Json                    -- 由归档的 skill 名写出整份脚本
+def scriptWithChecker : List String → String → Json -- 同一份脚本，后面接上查那条分支的 run（D7）
 
 -- Acceptance/Stage.lean —— 陌生人的目录
 structure Stage where root city home : System.FilePath
@@ -301,15 +312,22 @@ def Stage.serving : Stage → Door → (Ground → IO α) → IO α
 def shipped    : System.FilePath → IO (List String) -- 书架上带 SKILL.md 的目录名，排序
 def mountShelf : System.FilePath → System.FilePath → IO Unit  -- 把书架写进城那一层
 def admit      : System.FilePath → String → List String → IO Unit  -- 改阅览室那一行
+def askForReview : System.FilePath → String → IO Unit              -- 把 `review = false` 改成 true
+def layPlan    : System.FilePath → String → String → IO Unit       -- 在楼的计划表里写下第一行
 
 -- Acceptance/Walk.lean —— 走什么
 structure Setting where door : Door; url : String; shelf : System.FilePath
-                        skills : List String; record : System.FilePath
+                        skills : List String; script record : System.FilePath
 structure Step where name : String; walk : Ground → IO Unit
 def firstDay     : Setting → List Step
 def interrupted  : Setting → Stage → IO Unit
 def morningAfter : Setting → List Step
-def walkedSteps  : Setting → List String           -- 三段的步名，按走的次序
+
+-- Acceptance/Collaboration.lean —— 协作那一串，在第三次服务里、第二天早上之后走
+def collaboration : Setting → List Step
+
+-- Acceptance/Servings.lean —— 整个一遍
+def walkedSteps  : Setting → List String           -- 四段的步名，按走的次序
 def walk         : Setting → (Ground → IO α) → IO α  -- 全部通过后在第三次服务里问一次
 
 -- Acceptance/Checklist.lean —— 人手测什么
@@ -381,10 +399,11 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 3. 反例出现时，报文给出种子、收缩次数、最小化后的轨迹与破掉的那条承诺。把种子经 `SPRAWLING_SEED` 传回去可以原样复现。
 4. 人把最小反例经 `SPRAWLING_ACCEPT=1` 渲染成 Rust 源码，提交到 `crates/sprawling/tests/`。**知识就此迁移到 Rust，本目录不保留它。**
 5. `just adversary --select <文字>` 与 `--reject <文字>` 按检查的完整路径筛选。它们为红之后的那几分钟而存：单条检查几秒就重跑完，而整棵树要几分钟。定时任务不用它们——它把整棵树一次跑完，因为树里每一条都是**必须通过**的。
-6. `just acceptance <archive>`：把归档解进 `target/acceptance/`，构建替身与 `acceptance`；`lake exe acceptance script <书架> <脚本>` 按归档的 `skills/` 写出脚本；配方起替身，从它印出的第一行读 `SPRAWLING_PROVIDER`；`lake exe acceptance walk <书架> <记录>` 在 `SPRAWLING_BIN` 指着归档里的二进制时走完三段：
+6. `just acceptance <archive>`：把归档解进 `target/acceptance/`，构建替身与 `acceptance`；`lake exe acceptance script <书架> <脚本>` 按归档的 `skills/` 写出脚本；配方起替身，从它印出的第一行读 `SPRAWLING_PROVIDER`；`lake exe acceptance walk <书架> <脚本> <记录> <清单>` 在 `SPRAWLING_BIN` 指着归档里的二进制时走完四段：
    - **第一天**（一次服务）：城答出它起城时的那栋 hall；替身被挂上、它的模型被选中；立一栋楼并被列出；人在楼的阅览室里准入每一件 skill；派活跑到脚本给的结尾并在盘上留下文件；run 钉住的 skill 恰是书架上的那些，按名读到的每一件以它自己的正文到达模型；模型拿到的目录里有脚本调用的每件工具；城列出的楼恰是历史创建过的楼；历史自证。
    - **进程被杀**（第二次服务）：派活，等那个 run 写下几条工具结果，然后结束进程。
-   - **第二天早上**（第三次服务）：被杀的城留下的历史自证；城再服务，新派的活跑到它自己的结尾；历史再自证；最后问城 `known_hosts`。
+   - **第二天早上**（第三次服务）：被杀的城留下的历史自证；城再服务，新派的活跑到它自己的结尾；历史再自证。
+   - **协作**（仍是第三次服务）：立第二栋楼 `beta`，人把它的 `review` 改成 true、在它的计划表里写下一行；`beta/planner` 把那一行分成两片叶子；`beta/left` 与 `beta/right` 同时派活、都去认第一片叶子，历史里只有一条认领；活重派到 `beta/left`，它认下第二片叶子、写一个文件、提出评审，文件不在城里；检查从历史读出那条请求的分支，把查它的 run 接到脚本后面（D7），派给 `beta/right`，它判不通过，历史里有一条以同一个分支、同一句理由被拒的记录，文件仍不在城里；历史再自证；最后问城 `known_hosts`。
 
    全部通过后，`walk` 把清单写到 `target/acceptance/` 下的 `checklist.md`（§8 `Acceptance/Checklist.lean`）。
 
@@ -435,7 +454,11 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 
 **「拒绝」不是「期望输出」**。模型断言的是**哪一种失败**，从不断言任何被计算出来的值：错误码由 `AGENTS.md` 定为门的契约的一部分，钉住它钉的是产品对调用方的承诺，不是对某条规则的重算。
 
-D5 **验收世界一次只派一个 run，走到第一处失败就停。** 替身按请求到达的次序花掉回复，并发的两个 run 会互相花掉对方的回复，脚本就失去确定的意义；每一步又站在前面几步留下的城上，一处失败之后接着走，只会把一个原因报成许多个。唯一不等的 run 是要杀掉的那个，它的回复全是同一个只读调用，接着花剩下回复的 run 因此以同一句话结束（`spec/Acceptance.lean` 的 `the_work_after_the_crash_ends_on_its_own_line`）。被否：让替身按 run 分开作答再并发派活——那是 `citysim-SPEC.md` §3-11 记下的重开参数，等它落地，协作那一串（§3）随之进来。
+D5 由 D6 取代。
+
+D6 **验收世界在协作那一串里并发派活，仍走到第一处失败就停；它取代 D5。** 替身按 run 分开作答（`citysim-SPEC.md` §3-11）：一个续轮由它带回的调用 id 放进它自己的 run，与别的 run 怎么交错无关（`spec/Acceptance.lean` 的 `every_run_is_answered_from_its_own_replies`）；第一轮按到达次序开启脚本里的下一个 run（`openings_take_the_runs_in_order`）。所以只有第一轮可能同时到达的 run 要写成一样（`alike_runs_answer_alike`）——两个同时派出的认领正是这样：两个 run 都去认同一片叶子，谁先到替身都答同一条，谁拿到叶子由城的认领决定，而那正是这一步要看的。其余的活仍等前一个 run 冻结再派，第一轮的次序就是脚本的次序。被杀的 run 不再与之后的活分一段回复：城回来之后若接着送它的对话，它续自己的那一段，新派的活开启自己的那一段。每一步站在前面几步留下的城上，一处失败之后接着走只会把一个原因报成许多个，所以仍停在第一处失败（`the_reported_step_broke_and_every_earlier_one_held`）。被否：D5 的做法——一次只派一个 run，并发认领就走不了，认领冲突只有白盒的 `crates/accounting/src/worker/plans/tests/rows.rs` 守着；给两个认领的 run 写不同的回复——它们第一轮同时到达，替身分不出谁是谁。
+
+D7 **城才知道的东西，检查从历史里读出来，再把要用它的 run 接到脚本后面。** 查一条请求要说出它的分支，分支名由城按房间地址的摘要取，而本目录不预测任何摘要（§2 第 3 条）。所以 `beta/left` 提出评审之后，检查从 `pr_opened` 读出分支，把整份脚本连同查它的那个 run 写回脚本文件，再派活给 `beta/right`；替身在新开的 run 找不到还没开启的 run 时重读这个文件（`citysim-SPEC.md` §3-15），接上的 run 不改动已经在答的那些（`a_grown_script_answers_the_runs_it_held_alike`）。写回时没有别的 run 在开启：前一个 run 已经冻结，下一个活还没派。被否：把分支名写死在脚本里——那是在预测一个摘要；让替身从上一次工具结果里抄出分支——替身就在写自己的文字（`citysim-SPEC.md` §3-11）；用 `pr list` 让模型自己看——脚本写好的回复不会读它拿到的结果。
 -/
 
 /-! ## 11 边界枚举
@@ -451,6 +474,7 @@ D5 **验收世界一次只派一个 run，走到第一处失败就停。** 替�
 | 进程没被杀干净 | `withGround` 用 `try … finally`，异常路径也走 `hangUp` 并等它被回收 |
 | 检查自身抛出 | 原样传上去。只有端口在出口处被收回——一个把每种失败都改名的检验器，会在产品欠着答案时报出自己的脚手架 |
 | 同一 `IdemKey` 用两次 | 模型每个动作各铸一个新的；重放同一个由 `keyUsedTwice` 单独断言，见 §4 第三个发现 |
+| 替身答一个 run 时拒了（`no_run_left`、`script_exhausted`、`runs_crossed`） | 城把这次模型调用读成一次失败，那个 run 不以自己的最后一句结束，等它的那一步报红并说出它怎样结束；替身的记录里那一行的 `run` 是 `null`，读记录的人从那里看出是哪一种 |
 | U9 没有 `SPRAWLING_BIN` 或 `SPRAWLING_PROVIDER` | 抛出并说明该经 `just acceptance <archive>` 运行。与检查树不同，U9 不跳过：人点名了一个归档，一跑什么都没走的绿就是在报一次没发生的验收 |
 | 归档的书架上一件 skill 都没有 | `acceptance script` 拒绝写脚本：一次什么都不钉、什么都不读的验收会让 skill 那一步平凡成立 |
 | 人要改的那一行不在模板里 | `admit` 拒绝而不追加：第二个 `reading_room` 键会让城以本目录造成的原因拒这份文件；`mountShelf` 对已经有 `[skills]` 的配置同理 |
@@ -507,8 +531,11 @@ D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。*
 | 渲染出的一行 `attach(...)` 不折行 | 最长的那种拼法仍在 rustfmt 的宽度以内，于是渲染器写一行、rustfmt 不动它 | 换一个更长的地址会让 rustfmt 折行，逐字节对拍当场报红——这正是它该报的 |
 | 记录预算 240 × 250 ms | 一条命令等自己那条记录的上限。只在城真的还在干活时花掉；一次探测在 debug 二进制上的主要开销是构造 HTTP 客户端，不是那次被拒的连接 | 探测变快后可以调小；调小前要先量 |
 | 替身的模型 `stand-in-1` 与 U9 的楼 `acme` | 一个替身列出的 id，一栋演员表里的楼，让一次红读起来与本目录别处的报告一样 | —— |
-| `statusCalls` 120、`inFlight` 3、`closingLines` 3 | 被杀的 run 要在被杀时仍在调用：一次调用在 debug 二进制上约十毫秒，120 次是一秒多的在途，等到 3 条工具结果再杀；收尾那句写三遍，城回来时若也捡起那个死掉的 run，两个 run 都能以自己的最后一句结束 | 发布二进制更快；被杀的 run 若在被杀前就冻结，那一步报红并点名这个数 |
-| 幂等键 400–405 | U9 每条命令一把，与检查树的 0–323 不相交，一份报告里不会有两条命令共用一个数 | —— |
+| `statusCalls` 120、`inFlight` 3 | 被杀的 run 要在被杀时仍在调用：一次调用在 debug 二进制上约十毫秒，120 次是一秒多的在途，等到 3 条工具结果再杀；它的最后一条是一句收尾的话，城回来时若接着送它的对话，它以自己的那一句结束 | 发布二进制更快；被杀的 run 若在被杀前就冻结，那一步报红并点名这个数 |
+| 幂等键 400–411 | U9 每条命令一把，与检查树的 0–323 不相交，一份报告里不会有两条命令共用一个数 | —— |
+| 调用 id `call-<run>-<turn>` | 替身靠它认 run（`citysim-SPEC.md` §3-11），所以全脚本唯一；带上 run 的序号，一份记录里的 id 读得出是哪个 run 的 | 替身认 id 的办法变了时，这里跟着变 |
+| 楼 `beta`，房间 `beta/planner`、`beta/left`、`beta/right`，计划的一行 `glaze the kiln` 与两片叶子 `1.1`、`1.2` | 演员表里的第二栋楼；叶子的编号是计划表的文法（`docs/templates/Roadmap.md`：分出来的子行从父行往下编号），一个人读计划时看到的就是它 | 计划表的编号规则变了时，认领那两步报红 |
+| 计划文件 `Roadmap.md`、表头下的分隔行以 `|---` 开头、`review = false` 那一行 | 人用编辑器改的两处，照模板的字样找；找不到恰好一处就拒，不追加 | 模板变了时这两步报红，并说出找的是哪一行 |
 | 目录 `target/acceptance/` | 解开的归档、脚本、替身的记录、清单都在这里，配方每次先清空它 | 由 justfile 提供 |
 | 客户端的两张表 `client/src/core/route.ts`、`client/src/core/slash.ts`，以及它们的开头行 `const BARE`、`export const SLASH` | 清单的页面与命令两节从这里读；`just acceptance` 在仓库根运行，路径相对于根 | 表搬家或改了开头行时，那一节读成空，清单把空节写成一行要人先查原因的条目，而不是一个空标题 |
 -/
@@ -526,7 +553,7 @@ D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。*
 
 **U8 同样被演示过咬得动**（§2 第 5 条）：把“答案等于最后一次写入”改成“等于第一次写入”后，该条报错，收缩 1 次得到两步反例 `[6556, 9223]`；恢复后转绿。**磁盘那一条同样被演示过**（§4 第七个发现）：把被改的那一格从「除最后一条之外」改成「包括最后一条」，该条报错并指名 `a change inside record 4 of 4 was believed: the chain still verified, with tail seq 3`；改回来转绿。它咬得住的是产品欠的那件事——被覆盖的改动必被读出——而不仅仅是「改一位就会红」。U7 那七条各自实测为 7–37 s（debug 二进制，四核 Windows），其中的时间几乎全在城构造 HTTP 客户端上；其余十三条一整套 2 min 35 s（实测，四核 Windows，热缓存）；同一棵树在两核 Linux 上 51 s，差别在起进程的价钱而不在核数。**新增的那一条**（`a change to any record but the last is refused`）单独实测 18.2 s 首跑、2.5 s 暖盘（同机）：它贵在每问一次都起一个 `replay` 子进程，而不在计算。约束是 §2 第 5 条——**咬得动**必须被演示过，而不是被相信。
 
-U9 不在这棵树里，它由 `just acceptance` 单独跑：第一天约 1.8 s，被杀那一步约 0.75 s，第二天早上约 2 s（debug 二进制，同一台四核 Windows）。
+U9 不在这棵树里，它由 `just acceptance` 单独跑：第一天约 1.8 s，被杀那一步约 0.75 s，第二天早上约 2 s（debug 二进制，同一台四核 Windows）。协作那一串的读数见 §2 第 6 条。
 
 **树里没有一条是被期待失败的。** 一条因为预期会红而被留下的检查，教会每一个看到它的人把红当成常态，于是下一个真的发现落进一次没人读的运行里。
 
@@ -549,5 +576,5 @@ D4 **整棵树串行跑。** 一座被端起来的城占着一个端口、一个
 6. `.github/workflows/adversary.yml`——定时任务，永远不进 `check`。
 7. 仓库根的 `lakefile.toml`：检验器的三个目标在那里定义（`Sprawling` 库、`adversary` 与 `acceptance` 两个可执行文件），本规格经 `Spec` 库的两个 glob 进 `just models`。
 9. `tools/xtask/xtask-SPEC.md` §8-47：`spec` 门怎样认出本规格。
-8. `justfile` 的 `acceptance` 配方，以及 `tools/citysim/citysim-SPEC.md` §8-10：替身的脚本格式与它印出的那一行。
+8. `justfile` 的 `acceptance` 配方，以及 `tools/citysim/citysim-SPEC.md` §8-10、§8-13、§3-11、§3-15：替身的脚本格式、它印出的那一行、它怎样按 run 作答与怎样接上后写的 run。
 -/

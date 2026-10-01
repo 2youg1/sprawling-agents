@@ -4,17 +4,19 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# 验收世界：替身的回复怎样被几个 run 分着花，与按序走、停在第一处失败
+# 验收世界：替身把一个请求放进哪个 run，与按序走、停在第一处失败
 
 规定验收世界 `Sprawling.Acceptance`（`tools/adversary/src/Sprawling/Acceptance/Script.lean`、
-`tools/adversary/src/Sprawling/Acceptance/Walk.lean`）必须守的性质。
+`tools/adversary/src/Sprawling/Acceptance/Walk.lean`）依赖的性质。
 
-**替身按请求到达的次序花掉回复**（`tools/citysim/citysim-SPEC.md` §8-10），所以一份脚本只有在
-它的读者一次只派一个 run 时才有确定的意义。唯一不等的是被杀的那个 run：它在被杀之前花掉了
-多少条回复，取决于刀落在哪里。脚本给它的是一串同样的只读调用，接着是几句收尾的话；于是不论
-它花掉了多少条只读调用，接下来花剩下回复的那个 run 都以一句收尾的话结束，而收尾的话写两遍
-以上时，城回来之后即便也捡起那个死掉的 run，两个 run 各自都以收尾的话结束，谁都不会碰上
-「脚本已用尽」的拒绝。
+**替身按 run 分开作答**（`tools/citysim/citysim-SPEC.md` §3-11、§8-13）。一个请求带回它这个
+run 至今拿到过的调用 id；替身由其中最靠后的那一个认出它是哪个 run 的第几条之后，答那个 run 的
+下一条。一个 id 都没带的请求开启下一个还没开启的 run。下面的参照定义只陈述这条放置规则，不陈述
+id 怎样从正文里读出来——那一半在 citysim 的 Rust 里，由它自己的测试守着。
+
+由放置规则推出验收世界要用的三件事：一个续轮的位置与它之前到过什么无关，所以两个 run 怎么交错、
+一个请求被重发几次、城被杀之后接着送同一段对话，答的都是同一条；第一轮按到达的次序依次开启
+脚本里的 run，夹在中间的续轮不占位置；往脚本后面追加 run 不改动任何已有 run 的回答。
 
 **按序走、停在第一处失败。** 每一步站在前面几步留下的城上，接着走只会把一个原因报成许多个；
 报出来的是第一步失败的那一步，它之前的每一步都通过了。
@@ -22,65 +24,84 @@
 
 namespace Adversary.Acceptance
 
-/-- 被杀的 run 与它之后的 run 分着花的那一段脚本里的一条回复。 -/
-inductive Reply where
-  /-- 一次只读的工具调用。 -/
-  | status
-  /-- 一句话、不调工具：一个 run 以它结束。 -/
-  | closing
+/-- 一个请求带回来的东西：一个脚本 id 都没带，或它最近拿到的是第 `run` 个 run 的第 `reply` 条。 -/
+inductive Ask where
+  | opening
+  | after (run reply : Nat)
 deriving DecidableEq, Repr
 
-/-- 一个 run 怎样结束：以自己的最后一句话，或碰上替身用尽脚本的拒绝。 -/
-inductive Ending where
-  | ownLine
-  | exhausted
-deriving DecidableEq, Repr
+/-- 一个请求开启几个 run：第一轮开启一个，续轮一个都不开启。 -/
+def opens : Ask → Nat
+  | .opening => 1
+  | .after _ _ => 0
 
-/-- 一个 run 从剩下的回复里一直花，直到花掉一句收尾的话，或脚本用尽；答它怎样结束，以及
-留给下一个 run 的回复。 -/
-def runOn : List Reply → Ending × List Reply
-  | [] => (.exhausted, [])
-  | .closing :: rest => (.ownLine, rest)
-  | .status :: rest => runOn rest
+/-- 已经开启了 `opened` 个 run 时，一个请求放在哪一条：(run, 第几条)。 -/
+def place (opened : Nat) : Ask → Nat × Nat
+  | .opening => (opened, 0)
+  | .after run reply => (run, reply + 1)
 
-/-- 那一段脚本：`calls` 次只读调用，再 `closings` 句收尾的话。 -/
-def interrupted (calls closings : Nat) : List Reply :=
-  List.replicate calls .status ++ List.replicate closings .closing
+/-- 一串请求按到达的次序进来，每一个放在哪一条。 -/
+def placeAll : Nat → List Ask → List (Nat × Nat)
+  | _, [] => []
+  | opened, ask :: rest => place opened ask :: placeAll (opened + opens ask) rest
 
-/-- 只读调用一条一条被花掉，不改变接下来那句收尾的话落在谁身上。 -/
-theorem calls_pass_through (calls : Nat) (rest : List Reply) :
-    runOn (List.replicate calls .status ++ rest) = runOn rest := by
-  induction calls with
-  | zero => rfl
-  | succ calls ih => simp [List.replicate_succ, runOn, ih]
+/-- 脚本在某个位置上的那条回复；位置不在脚本里时没有回复（替身以拒绝作答）。 -/
+def replyAt (runs : List (List α)) (at_ : Nat × Nat) : Option α :=
+  runs[at_.1]?.bind (·[at_.2]?)
 
-/-- 被杀的 run 花掉了任意多条只读调用之后，剩下的是同样形状的一段：少了几条只读调用。 -/
-theorem what_the_killed_run_leaves (calls closings spent : Nat) (within : spent ≤ calls) :
-    (interrupted calls closings).drop spent = interrupted (calls - spent) closings := by
-  simp [interrupted, List.drop_append_of_le_length, List.length_replicate, within,
-    List.drop_replicate]
+/-- 一个续轮的位置不取决于此前开启过多少个 run：重发的请求、城回来之后接着送的同一段对话，
+都放在同一条上。 -/
+theorem a_continuing_request_is_placed_whatever_was_opened (one other run reply : Nat) :
+    place one (.after run reply) = place other (.after run reply) := rfl
 
-/-- 不论被杀的 run 花掉了多少条只读调用，城回来之后派的活都以自己的最后一句话结束。 -/
-theorem the_work_after_the_crash_ends_on_its_own_line (calls closings spent : Nat)
-    (within : spent ≤ calls) :
-    (runOn ((interrupted calls (closings + 1)).drop spent)).1 = .ownLine := by
-  rw [what_the_killed_run_leaves calls (closings + 1) spent within]
-  simp [interrupted, calls_pass_through, List.replicate_succ, runOn]
+/-- 不论前面交错着什么，一个带回第 `run` 个 run 第 `reply` 条的请求放在那个 run 的下一条。 -/
+theorem every_run_is_answered_from_its_own_replies (opened : Nat) (asks : List Ask) (index run reply : Nat)
+    (arrived : asks[index]? = some (.after run reply)) :
+    (placeAll opened asks)[index]? = some (run, reply + 1) := by
+  induction asks generalizing opened index with
+  | nil => simp at arrived
+  | cons ask rest ih =>
+    cases index with
+    | zero =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq] at arrived
+      subst arrived
+      rfl
+    | succ index =>
+      simp only [List.getElem?_cons_succ] at arrived
+      simp only [placeAll, List.getElem?_cons_succ]
+      exact ih (opened + opens ask) index arrived
 
-/-- 收尾的话写两遍以上时，城回来之后若有两个 run 先后花这一段，两个都以自己的最后一句话结束。 -/
-theorem two_runs_after_the_crash_both_end_on_their_own_lines (calls closings spent : Nat)
-    (within : spent ≤ calls) :
-    let first := runOn ((interrupted calls (closings + 2)).drop spent)
-    first.1 = .ownLine ∧ (runOn first.2).1 = .ownLine := by
-  rw [what_the_killed_run_leaves calls (closings + 2) spent within]
-  simp [interrupted, calls_pass_through, List.replicate_succ, runOn]
+/-- 第一轮按到达的次序开启 run：一个第一轮开启的是第「它之前到过几个第一轮」个 run，夹在中间的
+续轮不占位置。 -/
+theorem openings_take_the_runs_in_order (opened : Nat) (asks : List Ask) (index : Nat)
+    (arrived : asks[index]? = some .opening) :
+    (placeAll opened asks)[index]? = some (opened + ((asks.take index).map opens).sum, 0) := by
+  induction asks generalizing opened index with
+  | nil => simp at arrived
+  | cons ask rest ih =>
+    cases index with
+    | zero =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq] at arrived
+      subst arrived
+      simp [placeAll, place]
+    | succ index =>
+      simp only [List.getElem?_cons_succ] at arrived
+      simp only [placeAll, List.getElem?_cons_succ, ih (opened + opens ask) index arrived,
+        List.take_succ_cons, List.map_cons, List.sum_cons, Nat.add_assoc]
 
-/-- 一句收尾的话都没有时，接着花的 run 碰上的是用尽：所以收尾的话至少一句，这条不是多余的。 -/
-theorem without_a_closing_line_the_script_runs_out (calls : Nat) :
-    (runOn (interrupted calls 0)).1 = .exhausted := by
-  show (runOn (List.replicate calls .status ++ [])).1 = .exhausted
-  rw [calls_pass_through]
-  rfl
+/-- 往脚本后面追加 run，已有的每个 run 答的仍是原来那一条：检查走到半路才写下的 run 改不动
+已经在答的那些（`tools/citysim/citysim-SPEC.md` §3-15）。 -/
+theorem a_grown_script_answers_the_runs_it_held_alike (runs more : List (List α)) (run reply : Nat)
+    (held : run < runs.length) :
+    replyAt (runs ++ more) (run, reply) = replyAt runs (run, reply) := by
+  simp [replyAt, List.getElem?_append_left held]
+
+/-- 两个逐条相同的 run，第几条答的都一样：两个同时开启的 run 谁先到替身无从分辨，脚本把它们写成
+一样，到达的次序就不改变任何一个拿到什么。 -/
+theorem alike_runs_answer_alike (runs : List (List α)) (one other reply : Nat)
+    (alike : runs[one]? = runs[other]?) :
+    replyAt runs (one, reply) = replyAt runs (other, reply) := by
+  simp [replyAt, alike]
 
 /-- 按序走：每一步答通过或失败；走到第一处失败就停，报出它的位置。 -/
 def firstBroken : List Bool → Option Nat
