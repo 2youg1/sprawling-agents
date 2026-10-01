@@ -1223,6 +1223,16 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 **重开参数**：页面或居民工具要按本地日期选一天时，「一天」由读者的时区展开成一个 `UtcSpan`，那时再定展开规则住哪里；本模块仍只读 UTC。
 
+### 12.15 连接器把声音块存进 CAS，交出的是 locator 而不是附件
+
+**决定**：MCP 答复里的 `audio` 块与图片块走同一步：容器认得、base64 解得开、不为空时存进 CAS，块换成一行带 locator 的字（§8-27-10）。它不进 `ToolOutcome.attachments`。
+
+**理由**：桌面 server 录下的声音落在它自己机器的临时目录里，城里没有工具读得到；答复是它交回城里的唯一一条路（desktop-SPEC §12.13）。base64 留在窗口里会把一段两分钟的录音变成五百万个字符，账本也跟着记下它们，所以它与图片一样在这一步离开答复。附件是模型要看的东西，`ImageRef` 带宽高，provider 的线把它画成图片；声音没有一个模型能读的形状，要读它的是一件工具，工具要的是 locator。容器的认法只有一处，`gateway::AudioType::of_media_type`，与 composer 的麦克风、城的 `transcribe` 读同一张表。
+
+**被否**：①给 `ToolOutcome` 加一个声音附件的槽（kernel 的类型多一臂，provider 的两条线都要为一种它们画不出的东西写一条拒绝）；②原样留在窗口里（见上）；③存进 CAS 并照着落盘一个 rest 文件给 `read`（`read` 读的是文本，一段 wav 的字节对模型没有用）。
+
+**重开参数**：provider 的线有了声音输入的形状，模型自己能听；那时声音进附件，与图片同形。
+
 ## 13 依赖选型
 
 kernel、storage（读面与 cas）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（prefix golden）。
@@ -1557,8 +1567,9 @@ pub const CONNECTOR_CAP_BYTES: u64 = 16_384;
 pub fn package_connector(outcome: ToolOutcome, offload: OffloadSite<'_>) -> Result<ToolOutcome, AxError>;
 ```
 
-- **图片块进 CAS，窗口里只留引用**：`type: "image"` 的块在文本那一步之后、在它原来的位置上处理，所以替它的那行字不并入被存下分窗的文本，模型不用翻页就读得到。`mimeType` 是 `image/png`、`data` 解得开 base64、字节不超过 `IMAGE_MAX_BYTES`、PNG 头读得出宽高，四条都成立时，字节以 `put_for` 存进 CAS，`ToolOutcome.attachments` 多一张 `ImageRef`（与浏览器截图同一种形状），块换成一个文本块 `[picture attached: image/png <宽>x<高>, <locator>]`。任一条不成立，块换成一个说明为什么没带图的文本块（`[picture left out: <原因>]`）。base64 恒不进窗口，也恒不进账本。其余非文本块（音频、资源）照旧按原顺序留在其后。
-- 回答没有 `content` 数组，或没有图片块且文本合计不超过 `CONNECTOR_CAP_BYTES`：原样返回，一个字节不动。
+- **声音块进 CAS，窗口里只留引用**：`type: "audio"` 的块与图片块在同一步、同一种位置上处理。`mimeType` 是 `gateway::AudioType::of_media_type` 认得的容器、`data` 解得开 base64、字节不为空，三条都成立时，字节以 `put_for` 存进 CAS，块换成一个文本块 `[recording attached: <mimeType>, <字节数> bytes, <locator>]`；任一条不成立，换成 `[recording left out: <原因>]`。它不进 `ToolOutcome.attachments`：那里是模型看得见的图片，而模型听不见声音；要用这段录音的是一件工具（例如 `transcribe`），它要的是 locator（§12.15）。
+- **图片块进 CAS，窗口里只留引用**：`type: "image"` 的块在文本那一步之后、在它原来的位置上处理，所以替它的那行字不并入被存下分窗的文本，模型不用翻页就读得到。`mimeType` 是 `image/png`、`data` 解得开 base64、字节不超过 `IMAGE_MAX_BYTES`、PNG 头读得出宽高，四条都成立时，字节以 `put_for` 存进 CAS，`ToolOutcome.attachments` 多一张 `ImageRef`（与浏览器截图同一种形状），块换成一个文本块 `[picture attached: image/png <宽>x<高>, <locator>]`。任一条不成立，块换成一个说明为什么没带图的文本块（`[picture left out: <原因>]`）。base64 恒不进窗口，也恒不进账本。其余非文本块（资源）照旧按原顺序留在其后。
+- 回答没有 `content` 数组，或既没有图片块也没有声音块且文本合计不超过 `CONNECTOR_CAP_BYTES`：原样返回，一个字节不动。
 - 超过：全部文本块按原顺序以换行连成一份，交 `package`（`sieve: None`，带落盘处）；`content` 换成**一个**文本块，装 `package` 给出的替身（开头一段加 `read` 可分窗读的路径），非文本块（图片等）按原顺序留在其后；`package` 记下的 `ResultOffloaded` 放进结果的 `offload` 字段，与 `exec` 的 `sieve` 字段同一种账。
 - 替身是什么由 `package` 一处决定，本模块不另判：`Markup`（Markdown 一类）按 8-7 走节标题骨架而不入 store，故一份转换出来的长 Markdown 进窗口的是骨架，没有可翻的路径，`offload` 为空表；其余文本按 `OFFLOAD_MIN_BYTES` 入 store。
 - 失败只有 `package` 自己的失败（`E_INVALID_ARGS`，原样上抛）。

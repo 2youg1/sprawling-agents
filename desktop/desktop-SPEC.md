@@ -25,7 +25,7 @@
 | session | 未握手完成前 `tools/list`／`tools/call` 恒被拒；`notifications/initialized` 恒无答案；`ping` 恒答空对象；未知方法回 `-32601`；`tools/call` 在工具名认出之后的拒绝恒以 `isError` 结果回答，恒不以 JSON-RPC error 回答 |
 | tools | 六个名字恒在 `tools/list` 里；每条 description 恒含一句「不做什么」；每张 `inputSchema` 恒是 `type: object` |
 | outline | 同一串行恒折成同样的字节；每行恒是 `e<n> <role> "<name>"`，深度每深一层多缩进两格，没有名字的行恒不带引号；名字里的控制字符恒换成空格、空白恒压成一个、超过 80 个字符恒截断并以 `…` 收尾；role 恒是封闭词表里的一个词；遍历提前停下时，最后一行恒说出停在哪里、为什么 |
-| scope | 缺文件与坏文件恒全拒；空 allowlist 恒不容许任何窗口；`record`／`clipboard` 未开则该工具恒被拒；不指名窗口的整屏截取恒被拒；allowlist 没列的窗口恒不出现在 `desktop.windows` 的答复里 |
+| scope | 缺文件与坏文件恒全拒；空 allowlist 恒不容许任何窗口；`record`／`clipboard` 未开则该工具恒被拒；没写 `sound` 则要声音的录制恒以 `E_GATE_DENIED` 被拒；不指名窗口的整屏截取恒被拒；allowlist 没列的窗口恒不出现在 `desktop.windows` 的答复里 |
 | platform | 非 Windows 上恒回 `E_TOOL_UNAVAILABLE` 并报出平台名；Windows 上六件工具皆真的落到这台桌面上 |
 | windows::target | 名字命中零个窗口恒被拒并指向 `desktop.windows`；命中两个以上恒被拒并列出各自的 title，**恒不**在其中挑一个 |
 | windows::tree | 兄弟元素恒按窗口列出它们的次序铸 ref（文档序：先父后子，子按次序）；role 恒取自 control type 的编号，恒不取本地化的字符串；walker 的故障恒让遍历停下并被说出，恒不被读成「到头了」；ref 恒不超过 500 个 |
@@ -36,13 +36,13 @@
 | windows::strokes | 一批事件只被收下前 k 个（0 < k < n）时恒报出 k／n 并标效果未知；恒只补发前缀里按下而未抬起的键与鼠标键的抬起，恒不补发按下，恒不重发整批；一个都没收下时恒说「什么都没发出去」 |
 | windows::dpi | 连接器答第一次调用之前，本进程恒已按显示器感知 DPI；做不到时每一次调用恒被拒，恒不在两种坐标之间混算 |
 | windows::clipboard | 读恒以 `GlobalSize` 为上界；锁不住恒是拒绝而不是「没有文本」；写恒先备好整块内存再清空剪贴板，交不出时恒释放那块内存，拒词恒说明剪贴板已被清空 |
-| windows::record | 同一窗口重复 start 恒被拒；未 start 就 stop 恒被拒；每一帧恒取自 `capture::window`；抓帧失败恒让录制停下，`stop` 恒交出落盘路径并说出写了多少帧、为什么提前停 |
+| windows::record | 同一窗口重复 start 恒被拒；未 start 就 stop 恒被拒；每一帧恒取自 `capture::window`；抓帧失败恒让录制停下，`stop` 恒交出落盘路径并说出写了多少帧、为什么提前停；`audio: true` 恒只录 scope 文件点名的那一个设备；`stop` 恒把不超过 `SOUND_CARRIED_MOST` 的声音作为一块 audio content 放在文字之前交回，更长的只交路径并说出为什么 |
 | unsafe | 生产代码的 `unsafe` 恒只在 `desktop/ffi/src/` 之下，恒是一次对 Zig 叶子的调用或那一处声明（§8-12 的表）；每一个 `unsafe` 块恒带一行 `SAFETY:`，写的是**使它成立、并且可能为假的前提**，而不是把这次调用换句话再说一遍 |
 
 ## 3 假设与歧义
 
 - **假设**：运行中的机器上的桌面是操作者自己的桌面。本 package 不做远程桌面、不做跨机器、不做无人值守的持续录制。
-- **歧义已定**：scope 文件只能表达 allowlist（window title patterns ＋ process names）与 `record`／`clipboard` 两位开关，**没有**「允许整屏」这一项。故**整屏截取在本版恒被拒**（见 §8.5 第三对），而不是被默许——一张全屏图会显示 allowlist 没有列出的一切。
+- **歧义已定**：scope 文件只能表达 allowlist（window title patterns ＋ process names）、`record`／`clipboard` 两位开关与 `sound` 一个设备名，**没有**「允许整屏」这一项。故**整屏截取在本版恒被拒**（见 §8.5 第三对），而不是被默许——一张全屏图会显示 allowlist 没有列出的一切。
 
 ## 4 现状分析
 
@@ -115,10 +115,11 @@ pub(crate) fn error_line(id: Option<&Value>, refusal: &Refusal) -> String;
 
 // 8-2b answer（形状 2 值类型）：一次做成了的 tools/call 怎么答
 pub(crate) struct Answer { /* 私有：Vec<Block> */ }
-enum Block { Text(String), Image { bytes: Vec<u8>, mime: &'static str } } // 私有
+enum Block { Text(String), Image { bytes: Vec<u8>, mime: &'static str }, Sound { bytes: Vec<u8>, mime: &'static str } } // 私有
 impl Answer {
     pub(crate) fn facts(facts: Value) -> Answer;                                        // 一块文字：facts 的单行 JSON
     pub(crate) fn picture(bytes: Vec<u8>, mime: &'static str, facts: Value) -> Answer;  // 一块图片在前，一块文字在后
+    pub(crate) fn sound(bytes: Vec<u8>, mime: &'static str, facts: Value) -> Answer;    // 一块 audio 在前，一块文字在后（§12.13）
     pub(crate) fn as_result(&self) -> Value;      // { content: [...] }；图片的 base64 只在这里编
 }
 
@@ -139,13 +140,15 @@ pub(crate) struct Reach<'a> { pub(crate) tool: ToolName, pub(crate) title: Optio
 // Closed 携码：没人写过的文件是没人给过的许可（E_GATE_DENIED），
 // 读不出来的文件是这份文件本身有缺陷（E_CONFIG_INVALID）。两件事，两个码。
 pub(crate) enum Scope { Closed { code: RefusalCode, because: String }, Open(Allowance) }
-pub(crate) struct Allowance { /* 私有：windows／processes／record／clipboard */ }
+pub(crate) struct Allowance { /* 私有：windows／processes／record／clipboard／sound */ }
 // 准入是一个值：它带着准入了这次调用的那份 allowlist，
 // 于是「答复本身受 scope 约束」的那一件工具读的是同两张 Pattern 表。
 pub(crate) struct Admitted<'a> { /* 私有：&Allowance；非 Windows 的非测试构建里没有读者，字段带 expect(dead_code)（§12.1） */ }
 impl Admitted<'_> {
     #[cfg(any(windows, test))]   // 只有 Windows 臂报窗口；测试在每个平台上都判它（§16.2）
     pub(crate) fn visible(&self, title: &str, process: &str) -> bool;
+    #[cfg(any(windows, test))]   // 只有 Windows 臂录声音
+    pub(crate) fn sound(&self) -> Result<&str, Refusal>;   // scope 文件点名的那一个设备；没写 `sound` 即 E_GATE_DENIED（§12.11）
 }
 impl Scope {
     pub(crate) fn read(path: Option<&Path>) -> Scope;       // 恒不失败：缺文件与坏文件都关成 Closed
@@ -199,7 +202,7 @@ pub(crate) fn perform(tool: ToolName, arguments: &Value, admitted: &Admitted<'_>
 | `desktop.snapshot` | 一个窗口的 accessibility tree，折成一段文字（`outline`）：每个元素一行，写它的 ref、role 与 name，按深度缩进；另一块文字写 title、process 与 generation；bounds 只留在 `Views` 里，由 `desktop.act` 按 ref 取 | 不给像素、不给控件的内部句柄、不读被遮挡的内容 |
 | `desktop.act` | ref 或 point ＋ 动作（click／double／right／drag／scroll／type／key，带 modifiers），携 snapshot 的 generation；**发事件前先核对前台窗口**；桌面只收下一部分时如实报数，并补发它留下按住的键与鼠标键的抬起 | 不合成整段脚本、不重试、不在 generation 过期或窗口挪动后改打别处、不在别的窗口拿着键盘时把按键发出去 |
 | `desktop.screenshot` | window／region，format png\|jpeg\|webp，quality、scale；答一块 image content（`data` 是 base64，`mimeType`）和一块写着 title／width／height／lossless 的文字 | 不做 OCR、不做比对、不落盘 |
-| `desktop.record` | start／stop：本 package 唯一那条线程经 `capture::window` 抓帧，PATH 上有 ffmpeg 就经它的 stdin 编成 mp4，否则写成一个 PNG 序列目录；`audio: true` 被拒（声音将怎样录，见 §12.11） | 不做剪辑、不做转码、不在没说 stop 时自己停（十分钟上限除外） |
+| `desktop.record` | start／stop：本 package 唯一那条线程经 `capture::window` 抓帧，PATH 上有 ffmpeg 就经它的 stdin 编成 mp4，否则写成一个 PNG 序列目录；`audio: true` 另起一个 ffmpeg 录 scope 文件点名的那一个声音设备（§12.11），`stop` 把录下的声音作为一块 audio content 交回（§12.13） | 不做剪辑、不做转码、不替人选声音设备、不在没说 stop 时自己停（十分钟上限除外） |
 | `desktop.clipboard` | get／set 文本 | 不碰图片与文件列表、不保留历史 |
 
 `desktop.act` 携 generation 是照抄 `browser::act` 的那一条：**对着一份快照做的决定，恒不落到另一份快照上**——过期就拒，而不是打到那时挪过去的东西上。
@@ -243,6 +246,7 @@ impl Desk {
 | `windows::dpi` | 本进程按哪种 DPI 感知读桌面：连接器开张时声明按显示器感知，失败时读回判定 | 4 适配器 | 经 `desktop_ffi` |
 | `windows::record` | 这条连接正在录哪些窗口、每一份由谁在写 | 4 适配器 | 否 |
 | `windows::record::sink` | 一份录制的字节由谁写、落到哪里：本 package 唯一那条线程抓帧，交给 ffmpeg 的 stdin 或写成 PNG 序列 | 4 适配器 | 间接 |
+| `windows::record::hearing` | 一份录制的声音：第二个 ffmpeg 读 scope 文件点名的 DirectShow 设备，写成录制目录里的一个 wav | 4 适配器 | 否（ffmpeg 读设备）|
 | `windows::clipboard` | 运行中的机器的剪贴板，作为文本（经 `desktop_ffi::clipboard`），以及每个失败的那一步怎么说 | 4 适配器 | 经 `desktop_ffi` |
 
 **这张表的分法就是 Humble Object**（ARCHITECTURE §9）：难测的那一端（`enumerate`／`tree`／`act`／`capture`／`clipboard`／`dpi`／`focus` 的三次平台调用）薄到几乎没有判断，判断都搬进了 `target`／`views`／`strokes`／`encode`／`keys`／`geometry`／`focus::settled` 七处纯代码——它们一行 Win32 都不跑，因而可以被逐条证明。一台没有桌面的机器上，本 package 仍然能证明「哪个窗口被选中」「过期的动作被拒」「一张图缩成什么尺寸」「键盘不在这个窗口手里时什么都不发」「一批输入被截断时还按着哪些键」这几件最容易错的事。
@@ -354,7 +358,7 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 ## 11 边界枚举
 
-非 JSON 行／非对象／无 `method`／`params` 非对象／未知方法／握手未完成就调用／`tools/call` 无 `name`／`name` 不在表里／scope 文件缺失／scope 文件语法坏／scope 文件有拼错的键／allowlist 两张表皆空／title 不匹配／process 不匹配／同时给 title 与 process 而只中一个／既不给 title 也不给 process／`record` 未开／`clipboard` 未开／整屏截取／非 Windows 平台／Windows 但本 build 未实现／键盘在别的窗口手里且置前请求没有生效／指针动作的落点被别的窗口盖住。一批输入只被收下一部分／补发的抬起也被挡／窗口快照后挪动或改了尺寸／两扇同名窗口／进程已被设成别的 DPI 感知／剪贴板块没有终止符／剪贴板块锁不住／剪贴板清空之后交不出新文本／ffmpeg 起不来或中途退出／录制中窗口不再能抓帧。
+非 JSON 行／非对象／无 `method`／`params` 非对象／未知方法／握手未完成就调用／`tools/call` 无 `name`／`name` 不在表里／scope 文件缺失／scope 文件语法坏／scope 文件有拼错的键／allowlist 两张表皆空／title 不匹配／process 不匹配／同时给 title 与 process 而只中一个／既不给 title 也不给 process／`record` 未开／`clipboard` 未开／整屏截取／非 Windows 平台／Windows 但本 build 未实现／键盘在别的窗口手里且置前请求没有生效／指针动作的落点被别的窗口盖住。一批输入只被收下一部分／补发的抬起也被挡／窗口快照后挪动或改了尺寸／两扇同名窗口／进程已被设成别的 DPI 感知／剪贴板块没有终止符／剪贴板块锁不住／剪贴板清空之后交不出新文本／ffmpeg 起不来或中途退出／录制中窗口不再能抓帧／要声音而 scope 文件没写 `sound`／要声音而运行中的机器上没有 ffmpeg／声音设备打不开或录到一半退出／录下的声音比一次答复带得下的长。
 
 **同时给两个标识则两个都要中**：任何一个给出的标识都要落在它自己那张表里，这是 fail closed 的一致读法。
 
@@ -464,6 +468,13 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 - **击败的备选**：①留在 `windows` 绑定上继续手写 `unsafe`（33 个块，与口径 ① 相反）；②一个独立的 Zig 可执行程序、经进程边界说话（多一个交付物与它的监管，而本 server 本来就是一个子进程，多一层隔离买不到新东西）；③每个 Win32 调用一个 export（见上）；④`desktop/ffi` 自己抄一份 lint 表（墙里就有了两份抄件，`guard` 要比对三份）。
 - **重开的参数**：一个安全 crate 修好了其中一组（例如 `winsafe` 修好 `EnumWindows`），那一行先写契约测试、再离开叶子；Zig 的 `--fuzz` 或 cargo-fuzz 在 Windows 上落地，`just fuzz-desktop` 换成覆盖引导的那一种；X4 把两个包搬进 `crates/desktop` 时，墙随根工作区合并而删去，lint 表改为继承根工作区，`unsafe_code` 的那一行例外只留给 `desktop/ffi`。
 
+### 12.13 录下的声音作为一块 audio content 交回城里
+
+- **决定**：`desktop.record` 的 `stop` 在这份录制录了声音时，答复的第一块是 MCP 的 audio content（`type: "audio"`、`data` 是 base64、`mimeType: "audio/wav"`），第二块是照旧的那段文字，多写 `sound`（wav 的路径）。wav 超过 `SOUND_CARRIED_MOST` 时不带 audio 块，文字里写 `sound_left_out` 说明多长、在哪里；声音那个 ffmpeg 提前退出时写 `sound_ended_early`，有多少交多少。
+- **理由**：wav 落在临时目录（§14），城里没有一件工具读得到那里；交回城里的唯一一条不新增依赖、不新增写权限的路，是 MCP 答复本身。连接器已经把答复里的图片存进 CAS（runtime-SPEC §8-27-10），声音走同一条路，模型读到的是一行带 locator 的字，base64 恒不进窗口也恒不进账本。截图恒是一块 image 在前（§8-2b），声音照同一个形状，模型读这两种答复用的是同一种读法。
+- **击败的备选**：①把录音写进这座楼（scope 文件说的是能碰哪些窗口，没说能往城里哪里写，§14；而且本 server 不知道城根在哪）；②只交路径（城里没有工具读得到临时目录）；③把整段声音不论多长都塞进答复（十分钟的 wav 是 19 MB，base64 之后超过城的 MCP 单行上限，整个答复会被拒，连画面的路径都到不了）。
+- **重开的参数**：城的 MCP 客户端改了单行上限；或者 `transcribe` 能直接读运行中的机器上的一个文件。
+
 ## 13 依赖选型
 
 八个依赖，加同一工作区里的 `desktop_ffi`。`serde`、`serde_json`、`toml` 三个与 workspace 同版本线，只做协议与 scope 文件的读写；另外五个各自买到什么，写在下表，后三个与 `desktop_ffi` 只在 Windows 上链接。**恒不引入**：workspace 内任何 crate（理由见 §8.5 第一对）、async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
@@ -496,6 +507,9 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 | `scale` 与城里那个同名量的区别 | 本包的 `scale` 是窗口自身像素的百分数 | 城里 `browser` 的 `scale` 是设备像素比（devicePixelRatio）的百分数——同一个词、两个量，**不是同一个事实**，所以两边的域也不必相同 |
 | `webp` 忽略 `quality` | —— | 外面的事实：`image` 的 WebP 编码器是**无损**的，故 `quality` 对它无意义。schema 允许同时给出，本 server 恒不因此报错，而在答复里写明这一次的编码是无损的 |
 | 帧序列的抓帧间隔 | 100 ms（10 fps） | 我们的选择：`PrintWindow` 一帧的代价决定了上限，而 10 fps 足够看清一次交互 |
+| 声音的格式 | 16 kHz、单声道、16 位 PCM 的 wav，一分钟约 1.9 MB | 外面的事实与我们的选择：wav 是 `gateway::AudioType` 认得的容器；转写端点要的是语音，16 kHz 单声道足够，再高只多字节（§12.11） |
+| 一次答复里最多带多少声音（`SOUND_CARRIED_MOST`） | 4 MiB，约两分钟 | 我们的选择：base64 让它长三分之一，整行仍在城的 MCP 客户端那 8 MiB 的单行上限之内；更长的录音只交路径（§12.13） |
+| 声音的收尾 | 往第二个 ffmpeg 的 stdin 写 `q`，再等它自己退出 | 外面的事实：ffmpeg 读到 `q` 才写完 wav 的头；直接杀掉会留下一个长度字段为零的文件 |
 | 录制落盘的去处 | `std::env::temp_dir()/sprawling-desktop/<窗口名安全化>-<序号>` | 我们的选择：scope 文件说的是「可以碰哪些窗口」，没说「可以往哪写文件」，故恒不写进城里，也恒不写进操作者的家目录 |
 | ffmpeg 的收尾 | 关掉它的 stdin，再等它自己退出 | 外面的事实：帧从 stdin 进，读到结尾时 ffmpeg 写完 mp4 的尾部索引；直接杀掉会留下一个播放不了的文件 |
 | 全黑像素判为失败 | —— | 外面的事实：`PrintWindow` 对某些独立合成的窗口回全黑。依据是「每一个像素的 RGB 三通道皆为 0」 |
@@ -526,8 +540,8 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 
 **还欠的**，都是这条接口的当前状态：
 
-1. **OCR**：一张截图经人接入的 OCR 端点变成文字，给 accessibility tree 读不到字的窗口（画在画布上的界面、远程桌面）。端点的形状与 `gateway` 里的哪一面还没有定。
-2. **ASR**：城给 run 的 `transcribe` 工具已经在（sprawling-SPEC 8-131），它经人为 `ModelTag::Transcribe` 选的端点，把 run 自己这座楼里的一个录音文件变成字。桌面这一侧，§12.11 定下的形状还没有落，`desktop.record` 的 `audio: true` 仍被拒：scope 文件还没有 `sound` 这一键（`scope.rs`）；`platform::windows` 还没有把 scope 放行的设备交给 `record::Recordings::start`；`record::sink` 还没有 dshow 那一支。录下的 wav 也还到不了 `transcribe`：它落在临时目录（§14），而工具只读本楼的文件；交回城里要一条路，或者连接器把 MCP 的 audio 块存进城里（`runtime::pipeline::connector` 今天只存 png），或者录音落进这座楼。
+1. **OCR**：一张截图变成文字由城工具 `ocr` 承担（sprawling-SPEC 8-142），它读连接器存进 CAS 的截图，经人为 `ModelTag::Ocr` 选的端点；本 package 不做 OCR。
+2. **录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（§12.13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（runtime-SPEC §8-27-10）。`transcribe` 今天只读本楼的文件（sprawling-SPEC 8-131），读一个 `cas:` 块是那里的未决；在它落地之前，录音的路径与 locator 都写在答复里，但工具还收不下它们。
 3. **macOS 这条胳膊**：`platform/elsewhere.rs` 对 macOS 答 `E_TOOL_UNAVAILABLE`。它要在一台 Mac 或夜间的 `platforms.yml` 上验，Windows 上验不了。
 
 
