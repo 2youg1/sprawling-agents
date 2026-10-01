@@ -94,6 +94,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [cap-fs-ext](https://crates.io/crates/cap-fs-ext) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [cap-std](https://crates.io/crates/cap-std) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [chacha20poly1305](https://crates.io/crates/chacha20poly1305) | Apache-2.0 OR MIT |
+| [comrak](https://crates.io/crates/comrak) | BSD-2-Clause |
 | [cpu-time](https://crates.io/crates/cpu-time) | MIT OR Apache-2.0 |
 | [crossterm](https://crates.io/crates/crossterm) | MIT |
 | [flate2](https://crates.io/crates/flate2) | MIT OR Apache-2.0 |

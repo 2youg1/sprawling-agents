@@ -20,6 +20,9 @@ kernel = { workspace = true }
 # and one spelling of each needs one derive (crates/documents/Spec.lean D1).
 serde = { workspace = true }
 schemars = { workspace = true, optional = true }
+# The one Markdown grammar a preview, and later an export, is read by
+# (crates/documents/Spec.lean D20, D22).
+comrak = { workspace = true }
 
 [lints]
 workspace = true
