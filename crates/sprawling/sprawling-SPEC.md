@@ -4650,6 +4650,8 @@ pub(super) struct Run { index: u32, exit: Option<i32>, wall: Duration, watched: 
 pub(super) struct Watched { beats: u64, seen: Option<Seen>, read_cost: Duration } // 拍线程交回的东西
 pub(super) struct ChildPeaks { private_bytes: Option<u64>, working_set_bytes: Option<u64> }
 pub(super) struct Host { cores: NonZeroUsize, physical_bytes: u64 } // available_parallelism 与 monitor::memory::read
+// bin::main::gauge::running —— shape: adapter；一条命令跑 n 次：spawn 到 wait 的单调钟用时、拍线程 sprawling-gauge、子进程峰值
+pub(super) fn run(running: &Running, audience: Audience, out: &mut impl Write) -> Result<(), AxError>;
 // bin::main::gauge::lines —— shape: projection；每种行只在这里变成文字
 pub(crate) fn city_line(sample: &Sample) -> serde_json::Result<String>; // {"line":"city", 其后是 Sample 的字段}；watching 调它
 pub(super) fn tree_line(at: Duration, reading: &TreeReading, audience: Audience) -> String;
