@@ -58,6 +58,20 @@
         # not a second place the version is decided.
         declaredChannel = (builtins.fromTOML (builtins.readFile toolchainFile)).toolchain.channel;
 
+        # Zig's version lives in `crates/desktop/ffi/zig-version` and
+        # nowhere else, as Rust's lives in `rust-toolchain.toml`. nixpkgs
+        # carries one attribute per Zig series (`zig_0_16` for 0.16.x), so
+        # the attribute is derived from that file rather than named here.
+        # The doctor's `zig` row probes for the exact pin, and
+        # `checks.devshell-covers-just-check` below runs that probe, so a
+        # nixpkgs whose series has moved to another patch release turns the
+        # check red rather than handing the shell a Zig the build refuses.
+        zigPin = pkgs.lib.strings.trim (builtins.readFile ./crates/desktop/ffi/zig-version);
+        zigAttribute = "zig_" + builtins.replaceStrings [ "." ] [ "_" ] (pkgs.lib.versions.majorMinor zigPin);
+        zig =
+          pkgs.${zigAttribute}
+            or (throw "nixpkgs has no ${zigAttribute}, the series crates/desktop/ffi/zig-version pins (${zigPin})");
+
         # `just check` needs these on PATH; a devshell that stops short of
         # the repository's own closing condition is not a devshell. Which
         # tools those are is decided by the `prereqs` recipe in the
@@ -73,6 +87,7 @@
           pkgs.git
           pkgs.elan
           pkgs.uv
+          zig
         ];
 
         # The required rows this shell cannot answer, named here so that
