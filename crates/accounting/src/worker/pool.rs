@@ -11,11 +11,13 @@
 //! writer" is held by the types rather than by discipline: a lane
 //! cannot reach the segments at all (sprawling-SPEC.md 8-46-3).
 //!
-//! **A lane is a thread that lives exactly as long as the run it
-//! drives.** A resident pool of threads would need an entrance channel
-//! and a closing protocol to hold nothing between runs; here the
-//! `JoinHandle` *is* the evidence that a run is still going, and its
-//! end is the run's end.
+//! **A lane is a thread that lives as long as the run it drives and
+//! the stock it puts back once that run is home.** A resident pool of
+//! threads would need an entrance channel and a closing protocol to hold
+//! nothing between runs; here a `JoinHandle` in `running` *is* the
+//! evidence that a run is still going, and one in `trailing` that its
+//! lane is still finishing after the run came home (sprawling-SPEC.md
+//! 8-161).
 
 use std::collections::VecDeque;
 use std::sync::mpsc;
@@ -71,10 +73,16 @@ pub(crate) struct DrivingPool {
     /// Handed to each lane: a run comes home on the accounting
     /// thread's one queue, beside the relay requests it wrote.
     home: mpsc::Sender<Wake>,
-    /// One entry per run still driving. The handle is joined where the
-    /// run comes home, so a pool that reports nothing in flight has no
-    /// thread left behind it.
+    /// One entry per run still driving. Its handle moves to `trailing`
+    /// where the run comes home, so the run is landed without waiting
+    /// for what its lane does after.
     running: std::collections::BTreeMap<RunId, std::thread::JoinHandle<()>>,
+    /// The lanes whose run came home and that are still putting the
+    /// city's stock back. Joined once they have finished, and all of
+    /// them when the pool is dropped. Not counted against `lanes`: one
+    /// lane per city stocks at a time, and counting it would make a new
+    /// run wait on a checkout (sprawling-SPEC.md 8-161).
+    trailing: Vec<(RunId, std::thread::JoinHandle<()>)>,
     /// Drives prepared while every lane was taken, oldest first. A
     /// waiting drive holds no thread: the queue is here, where it can be
     /// counted, rather than in threads parked on the provider's
@@ -100,6 +108,7 @@ impl DrivingPool {
             lanes: lanes.max(1),
             home,
             running: std::collections::BTreeMap::new(),
+            trailing: Vec::new(),
             waiting: VecDeque::new(),
             read_memory,
         }
@@ -209,11 +218,13 @@ impl DrivingPool {
         let lane = std::thread::Builder::new()
             .name(format!("sprawling-drive-{run}"))
             .spawn(move || {
-                let flown = staged.fly(&mut ledger, context);
-                // Nobody listening means the city stopped pursuing while
-                // this run was going: the history already has whatever
-                // this drive wrote, and there is nothing left to tell.
-                drop(home.send(Wake::Home(Box::new(Arrival { run, flown }))));
+                staged.fly(&mut ledger, context, |flown| {
+                    // Nobody listening means the city stopped pursuing
+                    // while this run was going: the history already has
+                    // whatever this drive wrote, and there is nothing
+                    // left to tell.
+                    drop(home.send(Wake::Home(Box::new(Arrival { run, flown }))));
+                });
             })
             .map_err(|source| {
                 AxError::failure(
@@ -227,25 +238,48 @@ impl DrivingPool {
         Ok(())
     }
 
-    /// Closes the lane `arrival` came home from.
+    /// Takes the run `arrival` carries off the driving table without
+    /// waiting for its lane, which may still be putting the stock back,
+    /// and closes every lane that has finished since.
     ///
     /// # Errors
-    /// Refuses when a lane ended without saying so, which under
+    /// Refuses when a finished lane ended without saying so, which under
     /// `panic = "abort"` cannot happen in a shipped binary and can in a
     /// test build that unwinds.
     pub fn landed(&mut self, arrival: Arrival) -> Result<Arrival, AxError> {
-        let Some(lane) = self.running.remove(&arrival.run) else {
-            return Ok(arrival);
-        };
-        if lane.join().is_err() {
-            return Err(AxError::failure(
-                AxCode::StorageFatal,
-                "close a driving lane",
-                format!("the lane driving {} ended abnormally", arrival.run),
-            )
-            .with_recovery("restart this city; its history is verified on the way back up"));
+        if let Some(lane) = self.running.remove(&arrival.run) {
+            self.trailing.push((arrival.run, lane));
         }
+        let (finished, going) = std::mem::take(&mut self.trailing)
+            .into_iter()
+            .partition::<Vec<_>, _>(|(_, lane)| lane.is_finished());
+        self.trailing = going;
+        finished.into_iter().try_for_each(|(run, lane)| {
+            lane.join().map_err(|_| {
+                AxError::failure(
+                    AxCode::StorageFatal,
+                    "close a driving lane",
+                    format!("the lane that drove {run} ended abnormally"),
+                )
+                .with_recovery("restart this city; its history is verified on the way back up")
+            })
+        })?;
         Ok(arrival)
+    }
+}
+
+impl Drop for DrivingPool {
+    /// Waits for every lane still putting the stock back. A city opened
+    /// again in this process lifts every tree's lock first, and a stock
+    /// half checked out would then read as ready for the next placement
+    /// (sprawling-SPEC.md 8-155, 8-161).
+    fn drop(&mut self) {
+        for (_, lane) in self.trailing.drain(..) {
+            // A lane that ended abnormally has nobody left to tell: the
+            // city is closing, and the next open takes back a stock left
+            // half made (sprawling-SPEC.md 8-155).
+            drop(lane.join());
+        }
     }
 }
 

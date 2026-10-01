@@ -7,9 +7,10 @@
 //! another process: the review tree, the bench with its MCP servers,
 //! and the frozen plan. It runs in the lane that drives the run, so the
 //! accounting thread never waits on a handshake or a checkout
-//! (sprawling-SPEC.md 8-113). Once the run is driven, the same lane puts
-//! the city's stock back, so the next placement is a rename rather than
-//! a checkout (sprawling-SPEC.md 8-145, 8-155).
+//! (sprawling-SPEC.md 8-113). Once the run is driven and handed home,
+//! the same lane puts the city's stock back, so the next placement is a
+//! rename rather than a checkout and the run's landing does not wait on
+//! the checkout (sprawling-SPEC.md 8-145, 8-155, 8-161).
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -85,16 +86,23 @@ impl Staged {
         }
     }
 
-    /// Prepares the run in this lane, drives it, and puts the city's
-    /// stock back when the run borrowed a tree. The pool's lane is the
-    /// one caller, so the stock's checkout is never the accounting
-    /// thread's (sprawling-SPEC.md 8-145).
+    /// Prepares the run in this lane, drives it, hands what it flew to
+    /// `home`, and only then puts the city's stock back when the run
+    /// borrowed a tree. The run's landing therefore never waits on the
+    /// stock's checkout, and the pool's lane, the one caller outside
+    /// tests, makes that checkout off the accounting thread
+    /// (sprawling-SPEC.md 8-145, 8-161).
     ///
     /// Generic in the ledger for the reason [`drive_run`] is: a lane
     /// writes through its relay, and a test on the accounting thread
     /// writes through the city's own ledger.
-    pub(crate) fn fly<L: Ledger>(self, ledger: &mut L, context: DriveContext) -> Flown {
-        match self {
+    pub(crate) fn fly<L: Ledger>(
+        self,
+        ledger: &mut L,
+        context: DriveContext,
+        home: impl FnOnce(Flown),
+    ) {
+        let (flown, restock) = match self {
             Staged::Model { at, mut site, lane } => {
                 let restock = Restock {
                     city_root: lane.laying.city_root.clone(),
@@ -104,8 +112,8 @@ impl Staged {
                 let driven = lane
                     .prepare(&at, &mut site, ledger, &context)
                     .and_then(|driving| drive_run(driving, ledger, context));
-                restock.after_run(site.lease.as_ref());
-                Flown::Model { at, site, driven }
+                let restock = restock.owed_by(site.lease.as_ref());
+                (Flown::Model { at, site, driven }, restock)
             }
             Staged::Harness { at, half } => {
                 let restock = Restock {
@@ -114,9 +122,13 @@ impl Staged {
                     staged_at: half.staged_at,
                 };
                 let driven = drive_harness(half, ledger, context);
-                restock.after_run(driven.lease.as_ref());
-                Flown::Harness { at, driven }
+                let restock = restock.owed_by(driven.lease.as_ref());
+                (Flown::Harness { at, driven }, restock)
             }
+        };
+        home(flown);
+        if let Some(restock) = restock {
+            restock.put_back();
         }
     }
 }
@@ -132,17 +144,18 @@ struct Restock {
 }
 
 impl Restock {
-    /// Puts the stock back when the run borrowed a tree, unless another
-    /// lane of this process is stocking the same city, and writes one
-    /// diagnostic line saying what that cost or why it failed.
-    ///
-    /// A run that borrowed no tree took no stock, and a stock it made
-    /// would only hold a tree's worth of disk. A failure leaves the run
-    /// as it ended: the next placement checks its tree out whole.
-    fn after_run(self, borrowed: Option<&storage::WorktreeLease>) {
-        if borrowed.is_none() {
-            return;
-        }
+    /// The restock a run owes, or `None` for a run that borrowed no
+    /// tree: it took no stock, and a stock it made would only hold a
+    /// tree's worth of disk.
+    fn owed_by(self, borrowed: Option<&storage::WorktreeLease>) -> Option<Restock> {
+        borrowed.map(|_| self)
+    }
+
+    /// Puts the stock back, unless another lane of this process is
+    /// stocking the same city, and writes one diagnostic line saying
+    /// what that cost or why it failed. A failure leaves the run as it
+    /// ended: the next placement checks its tree out whole.
+    fn put_back(self) {
         let Some(_turn) = StockingTurn::take(&self.city_root) else {
             return;
         };
@@ -188,7 +201,8 @@ struct StockingTurn<'a> {
 impl<'a> StockingTurn<'a> {
     /// Takes the city's turn, or answers `None` while another lane holds
     /// it: that lane's stock is the one the next placement takes, and
-    /// waiting for its checkout would only make this run land later.
+    /// waiting for its checkout would only keep this lane alive one
+    /// checkout longer.
     fn take(city_root: &'a Path) -> Option<StockingTurn<'a>> {
         STOCKING
             .lock()

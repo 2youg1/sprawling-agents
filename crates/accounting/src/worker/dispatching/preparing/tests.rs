@@ -19,19 +19,21 @@ use super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// sprawling-SPEC.md 8-145: the lane that drove a run in a room under
-/// review puts the stock back before the run comes home. `fly` is the
-/// whole of what a lane runs and `land` is what the accounting thread
-/// runs once the run is home, so a stock that stands ready when `fly`
-/// returns, with nothing landed, is a stock no accounting thread made.
+/// sprawling-SPEC.md 8-145, 8-161: the lane that drove a run in a room
+/// under review hands the run home first and puts the stock back after.
+/// `fly` is the whole of what a lane runs and `land` is what the
+/// accounting thread runs once the run is home, so a stock that is
+/// absent when the run is handed home and stands ready when `fly`
+/// returns, with nothing landed, is a stock no accounting thread made
+/// and no landing waited for.
 #[test]
-fn a_lane_puts_the_stock_back_before_its_run_comes_home() {
+fn a_lane_puts_the_stock_back_after_its_run_comes_home() {
     let dir = tempfile::tempdir().unwrap();
     lay_review_city(dir.path(), &["room1"]);
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
 
-    let flown = fly_here(&mut worker, "lab/room1");
+    let (flown, stocked_at_home) = fly_here(&mut worker, "lab/room1");
     let Flown::Model { site, driven, .. } = &flown else {
         panic!("a model dispatch flies a model run");
     };
@@ -39,10 +41,11 @@ fn a_lane_puts_the_stock_back_before_its_run_comes_home() {
         (
             driven.is_ok(),
             site.lease.is_some(),
+            stocked_at_home,
             stock_is_ready(dir.path())
         ),
-        (true, true, true),
-        "the run drove in a tree it borrowed, and its lane put the stock back"
+        (true, true, false, true),
+        "the run drove in a tree it borrowed, came home, and then its lane put the stock back"
     );
 }
 
@@ -69,8 +72,15 @@ fn the_next_room_takes_the_stock_and_creates_no_file() {
         )
         .unwrap();
     worker.land_the_rest().unwrap();
+    // The first room's lane puts the stock back after its run has
+    // landed (8-161), so the second room waits for the stock to stand.
+    let stocked = (0..2_000).any(|_| {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        stock_is_ready(dir.path())
+    });
+    assert!(stocked, "the first room's lane put the stock back");
 
-    let flown = fly_here(&mut worker, "lab/room2");
+    let (flown, _) = fly_here(&mut worker, "lab/room2");
     let Flown::Model { site, driven, .. } = &flown else {
         panic!("a model dispatch flies a model run");
     };
@@ -166,8 +176,10 @@ fn a_lane_that_finds_the_turn_taken_skips_and_leaves_it_standing() {
 /// milliseconds, over a building whose trunk carries 512 files of 16 KB
 /// (sprawling-SPEC.md 8-155). The first room's placement makes the
 /// city's first commit and checks the trunk out whole; the second room's
-/// takes the stock over. Each lane then puts a stock back, and that is
-/// what lies between the run's last line and `fly` returning.
+/// takes the stock over. Each lane then hands its run home, which is
+/// all the landing waits for after the run's last line, and puts a stock
+/// back, which lies between that hand-over and `fly` returning
+/// (sprawling-SPEC.md 8-161).
 #[test]
 #[ignore = "a wall-clock instrument; prints one reading line per room"]
 #[allow(
@@ -201,8 +213,12 @@ fn instrument_production_placement() {
             last: None,
         };
         let began = Instant::now();
-        let flown = staged.fly(&mut timed, context);
+        let mut homed = None;
+        staged.fly(&mut timed, context, |flown| {
+            homed = Some((Instant::now(), flown));
+        });
         let ended = Instant::now();
+        let (home, flown) = homed.unwrap();
         let Flown::Model { site, driven, .. } = &flown else {
             panic!("a model dispatch flies a model run");
         };
@@ -214,9 +230,10 @@ fn instrument_production_placement() {
         let created = site.lease.as_ref().unwrap().work().created;
         let ms = |from: Instant, to: Instant| to.saturating_duration_since(from).as_millis();
         println!(
-            "instrument_production_placement room={room} created={created} placement_ms={} restock_ms={} fly_ms={} machine={}-{}, {cores} core(s)",
+            "instrument_production_placement room={room} created={created} placement_ms={} landing_wait_ms={} restock_ms={} fly_ms={} machine={}-{}, {cores} core(s)",
             ms(began, timed.opened.unwrap()),
-            ms(timed.last.unwrap(), ended),
+            ms(timed.last.unwrap(), home),
+            ms(home, ended),
             ms(began, ended),
             std::env::consts::OS,
             std::env::consts::ARCH,
@@ -280,13 +297,19 @@ fn asked(room: &str) -> Assignment {
 
 /// Stages a dispatch to `room` and flies it on this thread, through the
 /// city's own ledger: everything a lane does for the run, and nothing
-/// the accounting thread does once it is home.
-fn fly_here(worker: &mut RunWorker, room: &str) -> Flown {
+/// the accounting thread does once it is home. Answers what the lane
+/// handed home, and whether the city held a ready stock at that moment.
+fn fly_here(worker: &mut RunWorker, room: &str) -> (Flown, bool) {
     let (staged, _continuation) = worker
         .stage_dispatch(asked(room), "work".to_owned(), "work".to_owned())
         .unwrap();
     let context = worker.drive_context();
-    staged.fly(&mut worker.ledger, context)
+    let city_root = worker.city_root.clone();
+    let mut homed = None;
+    staged.fly(&mut worker.ledger, context, |flown| {
+        homed = Some((flown, stock_is_ready(&city_root)));
+    });
+    homed.unwrap()
 }
 
 /// Whether the city holds a stock the next placement can take over:
