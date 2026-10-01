@@ -14,7 +14,12 @@
 //!
 //! Definitions come out in dependency order with names as the tie-break:
 //! an Effect `Schema` is a runtime value, so what a struct refers to must
-//! already be defined when the struct is.
+//! already be defined when the struct is. A definition that reaches
+//! itself through its references is the exception: its references into
+//! the cycle are `Schema.suspend`, read when a value is decoded rather
+//! than when the file loads, and its two types are written out, because
+//! TypeScript cannot infer a type from an initialiser that refers to
+//! itself.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -22,8 +27,10 @@ use std::fmt::Write as _;
 use serde_json::Value;
 
 use super::Constants;
-use values::expression;
+use types::{Side, Types, object_body};
+use values::Values;
 
+mod types;
 mod values;
 
 /// Where the emitter stopped, and on what.
@@ -59,11 +66,13 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<String, Re
         constants.body_px.min,
         constants.body_px.max
     );
-    for name in ordered(&defs)? {
+    let edges = edges(&defs);
+    let recursive = recursive(&edges);
+    for name in ordered(&edges)? {
         let schema = defs
             .get(name.as_str())
             .ok_or_else(|| refuse(&name, "named by a `$ref` and absent from `$defs`"))?;
-        out.push_str(&definition(&name, schema)?);
+        out.push_str(&definition(&name, schema, &recursive)?);
     }
     Ok(out)
 }
@@ -88,48 +97,73 @@ fn refuse(at: &str, why: impl Into<String>) -> Refused {
     }
 }
 
-/// Every definition, each after the ones it refers to. Depth-first from
-/// the names in order, so ties fall alphabetically and the output is the
-/// same on every machine.
-fn ordered(defs: &BTreeMap<&str, &Value>) -> Result<Vec<String>, Refused> {
+/// Every definition, each after the ones it refers to outside a cycle.
+/// Depth-first from the names in order, so ties fall alphabetically and
+/// the output is the same on every machine.
+fn ordered(edges: &BTreeMap<String, BTreeSet<String>>) -> Result<Vec<String>, Refused> {
     let mut done = Vec::new();
     let mut trail = Vec::new();
-    for name in defs.keys() {
-        visit(name, defs, &mut trail, &mut done)?;
+    for name in edges.keys() {
+        visit(name, edges, &mut trail, &mut done)?;
     }
     Ok(done)
 }
 
+/// A name already on the trail closes a cycle. The definitions on a
+/// cycle reach each other through `Schema.suspend`, so no order is owed
+/// among them.
 fn visit(
     name: &str,
-    defs: &BTreeMap<&str, &Value>,
+    edges: &BTreeMap<String, BTreeSet<String>>,
     trail: &mut Vec<String>,
     done: &mut Vec<String>,
 ) -> Result<(), Refused> {
-    if done.iter().any(|d| d == name) {
+    if done.iter().any(|d| d == name) || trail.iter().any(|t| t == name) {
         return Ok(());
     }
-    if trail.iter().any(|t| t == name) {
-        let cycle = trail.join(" -> ");
-        return Err(refuse(
-            name,
-            format!(
-                "`{name}` refers to itself through {cycle}; a recursive type is outside the subset"
-            ),
-        ));
-    }
-    let schema = defs
+    let refs = edges
         .get(name)
         .ok_or_else(|| refuse(name, "named by a `$ref` and absent from `$defs`"))?;
     trail.push(name.to_owned());
-    let mut refs = BTreeSet::new();
-    refs_within(schema, &mut refs);
     for target in refs {
-        visit(&target, defs, trail, done)?;
+        visit(target, edges, trail, done)?;
     }
     trail.pop();
     done.push(name.to_owned());
     Ok(())
+}
+
+/// Every definition and the definitions it refers to.
+fn edges(defs: &BTreeMap<&str, &Value>) -> BTreeMap<String, BTreeSet<String>> {
+    defs.iter()
+        .map(|(name, schema)| {
+            let mut refs = BTreeSet::new();
+            refs_within(schema, &mut refs);
+            ((*name).to_owned(), refs)
+        })
+        .collect()
+}
+
+/// The definitions that reach themselves through their references:
+/// every member of a cycle, and nothing that only refers into one.
+fn recursive(edges: &BTreeMap<String, BTreeSet<String>>) -> BTreeSet<String> {
+    edges
+        .keys()
+        .filter(|name| {
+            let mut seen = BTreeSet::new();
+            let mut next: Vec<&String> = edges.get(*name).into_iter().flatten().collect();
+            while let Some(at) = next.pop() {
+                if at == *name {
+                    return true;
+                }
+                if seen.insert(at) {
+                    next.extend(edges.get(at).into_iter().flatten());
+                }
+            }
+            false
+        })
+        .cloned()
+        .collect()
 }
 
 fn refs_within(schema: &Value, out: &mut BTreeSet<String>) {
@@ -152,8 +186,9 @@ fn refs_within(schema: &Value, out: &mut BTreeSet<String>) {
 /// One `export const` and its `export type`, with the description as a
 /// doc comment. A named bare primitive is a newtype and gets its brand;
 /// every other definition carries its name as the identifier a decode
-/// error prints.
-fn definition(name: &str, schema: &Value) -> Result<String, Refused> {
+/// error prints. A recursive definition states its two types first and
+/// annotates its value with them.
+fn definition(name: &str, schema: &Value, recursive: &BTreeSet<String>) -> Result<String, Refused> {
     if !is_identifier(name) {
         return Err(refuse(name, "not a TypeScript identifier"));
     }
@@ -165,7 +200,10 @@ fn definition(name: &str, schema: &Value) -> Result<String, Refused> {
         }
         out.push_str(" */\n");
     }
-    let body = expression(schema, name, 0)?;
+    let none = BTreeSet::new();
+    let is_recursive = recursive.contains(name);
+    let suspended = if is_recursive { recursive } else { &none };
+    let body = Values { suspended }.expression(schema, name, 0)?;
     // A brand already prints as `string & Brand<"Name">` in a decode
     // error; everything else is named so the error says `Command`
     // rather than spelling the whole union out.
@@ -174,9 +212,37 @@ fn definition(name: &str, schema: &Value) -> Result<String, Refused> {
     } else {
         format!("{body}.annotations({{ identifier: \"{name}\" }})")
     };
-    let _ = writeln!(out, "export const {name} = {body};");
-    let _ = writeln!(out, "export type {name} = typeof {name}.Type;\n");
+    if is_recursive {
+        out.push_str(&declared(name, Side::Type, schema, recursive)?);
+        out.push_str(&declared(name, Side::Encoded, schema, recursive)?);
+        let _ = writeln!(
+            out,
+            "export const {name}: Schema.Schema<{name}, {name}Encoded> = {body};\n"
+        );
+    } else {
+        let _ = writeln!(out, "export const {name} = {body};");
+        let _ = writeln!(out, "export type {name} = typeof {name}.Type;\n");
+    }
     Ok(out)
+}
+
+/// One side of a recursive definition's type, as the client's lint
+/// spells it: an object type is an `interface`, anything else a `type`.
+fn declared(
+    name: &str,
+    side: Side,
+    schema: &Value,
+    recursive: &BTreeSet<String>,
+) -> Result<String, Refused> {
+    let spelled = match side {
+        Side::Type => name.to_owned(),
+        Side::Encoded => format!("{name}Encoded"),
+    };
+    let denoted = Types { recursive, side }.denoted(schema, name)?;
+    Ok(match object_body(&denoted) {
+        Some(fields) => format!("export interface {spelled} {{ {fields} }}\n"),
+        None => format!("export type {spelled} = {denoted}\n"),
+    })
 }
 
 fn is_identifier(name: &str) -> bool {
