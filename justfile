@@ -227,9 +227,12 @@ fmt-check:
     cargo fmt --all --check
 
 # `desktop/` is outside the workspace, so `cargo fmt --all` at the root
-# does not reach it.
+# does not reach it. Its Zig leaf is formatted by `zig fmt`, on Windows,
+# the one platform the leaf is built on and the one where the doctor
+# makes Zig required (desktop-SPEC.md section 8-12).
 fmt-check-desktop:
     cd desktop && cargo fmt --all --check
+    {{ if os() == "windows" { "zig fmt --check desktop/ffi/zig" } else { "echo 'zig fmt: the Zig leaf is built on Windows only'" } }}
 
 # --all-features is load-bearing: code behind a feature (runtime/wasm, */conformance)
 # escapes the zero-warning gate without it.
@@ -348,19 +351,32 @@ deny dir=".":
     cargo deny check bans licenses sources
 
 # `desktop/` is not compiled by any workspace command - the root
-# Cargo.toml excludes it so the Win32 boundary can relax `unsafe_code`
-# in one place (desktop-SPEC.md section 8.5). Without this recipe its
-# source never meets a compiler, a test runner or a licence check that
-# this repository runs.
+# Cargo.toml excludes it so its FFI seam can relax `unsafe_code` at each
+# call into the Zig leaf (desktop-SPEC.md sections 8.5 and 8-12). It is a
+# workspace of two packages, the server and `desktop/ffi`, so every
+# command takes `--workspace`. Without this recipe its source never meets
+# a compiler, a test runner or a licence check that this repository runs.
+# On Windows the Zig leaf's own tests run too: its unit tests, its seeded
+# property tests and one input of its fuzz test.
 #
 # Two things this recipe does not judge are judged by `gates`: the lint
 # table and the package metadata are compared back to the root manifest
 # by `cargo xtask guard`, because a drifted copy is not something a
 # compiler can see.
 check-desktop: fmt-check-desktop
-    cd desktop && cargo clippy --all-targets --locked -- -D warnings
-    cd desktop && cargo nextest run --locked
+    cd desktop && cargo clippy --workspace --all-targets --locked -- -D warnings
+    cd desktop && cargo nextest run --workspace --locked
+    {{ if os() == "windows" { "zig test desktop/ffi/zig/leaf.zig --cache-dir desktop/target/zig-test" } else { "echo 'zig test: the Zig leaf is built on Windows only'" } }}
     just deny desktop
+
+# The Rust side's fuzz of desktop/ffi's Zig leaf: its four buffer rules
+# against their Rust reference, for `rounds` drawn inputs from `seed`
+# (hexadecimal), on Windows, the one platform the leaf is built on. A
+# disagreement prints the seed and the round it replays from. Drawn
+# rather than coverage-guided: libFuzzer has no platform for this leaf
+# today (desktop-SPEC.md section 12.12).
+fuzz-desktop rounds="1000000" seed="5eedf022":
+    cd desktop && DESKTOP_FFI_FUZZ_ROUNDS={{rounds}} DESKTOP_FFI_FUZZ_SEED={{seed}} cargo nextest run -p sprawling-desktop-ffi --locked --run-ignored only -E 'test(/for_as_long_as_asked/)'
 
 # The browser client (client/client-SPEC.md): Svelte + Effect, built by
 # Vite under bun, bundled into target/web-dist where crates/sprawling/build.rs reads
