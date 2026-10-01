@@ -251,7 +251,7 @@ impl Tool for CityTool {
 )]
 mod tests {
     use super::*;
-    use kernel::{AxCode, Payload, Tool, ToolCall, ToolName};
+    use kernel::{AxCode, GateSubject, Payload, Tool, ToolCall, ToolName};
     use serde_json::{Map, Value};
 
     fn call(fields: &[(&str, &str)]) -> ToolCall {
@@ -301,6 +301,39 @@ mod tests {
             .invoke(&call(&[("action", "raise"), ("name", "imported")]))
             .unwrap_err();
         assert_eq!(again.code(), &AxCode::InvalidArgs);
+    }
+
+    /// Every action changes or reads the shape of the city, so every
+    /// call names the city; a call the grammar cannot read is refused
+    /// here exactly as `invoke` would refuse it.
+    #[test]
+    fn every_call_names_the_city_as_the_scope_it_would_rewrite() {
+        let dir = tempfile::tempdir().unwrap();
+        let tool = CityTool::new(dir.path()).unwrap();
+        let city = GateSubject::Scope("city".to_owned());
+        for fields in [
+            &[("action", "list")][..],
+            &[("action", "raise"), ("name", "kiln")],
+            &[("action", "adopt"), ("name", "kiln")],
+        ] {
+            assert_eq!(tool.subject(&call(fields)).unwrap(), city, "{fields:?}");
+        }
+        for unread in [
+            &[("action", "demolish")][..],
+            &[("action", "raise")],
+            &[
+                ("action", "raise"),
+                ("name", "kiln"),
+                ("template", "palace"),
+            ],
+        ] {
+            assert_eq!(
+                tool.subject(&call(unread)).unwrap_err(),
+                tool.invoke(&call(unread)).unwrap_err(),
+                "{unread:?}"
+            );
+        }
+        assert!(!dir.path().join("kiln").exists());
     }
 
     #[test]

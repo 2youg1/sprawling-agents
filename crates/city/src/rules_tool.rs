@@ -184,6 +184,7 @@ impl Tool for RulesTool {
 )]
 mod tests {
     use super::*;
+    use kernel::GateSubject;
 
     fn call(op: &str, text: Option<&str>) -> ToolCall {
         let mut args = Map::new();
@@ -270,6 +271,26 @@ mod tests {
             .unwrap_err();
         assert_eq!(err.code(), &AxCode::ConfigInvalid);
         assert!(!rules_path(dir.path(), &Address::parse("lab").unwrap()).exists());
+    }
+
+    /// The effect layer refuses a Govern call by the scope it names; a
+    /// tool that named none was refused as a wiring defect instead, with
+    /// a recovery that sent the model to report the tool.
+    #[test]
+    fn every_call_names_this_buildings_rules_as_the_scope_it_would_rewrite() {
+        let dir = tempfile::tempdir().unwrap();
+        let tool = tool(dir.path());
+        let lab = GateSubject::Scope("building:lab".to_owned());
+        assert_eq!(tool.subject(&call("read", None)).unwrap(), lab);
+        assert_eq!(
+            tool.subject(&call("propose", Some("confidential = false\n")))
+                .unwrap(),
+            lab
+        );
+        assert_eq!(
+            tool.subject(&call("delete", None)).unwrap_err(),
+            tool.invoke(&call("delete", None)).unwrap_err()
+        );
     }
 
     #[test]
