@@ -18,6 +18,7 @@ use super::engine::machine_half;
 use super::{BenchDesks, Laying, Reach, Site, Situation, Workbench, held, status_snapshot};
 
 mod kept;
+mod ocr;
 mod playback;
 mod reading_room;
 mod transcribe;
@@ -225,8 +226,13 @@ impl Laying {
         }
         // Present only where the book names an endpoint this building
         // may send a recording to (sprawling-SPEC.md 8-131).
-        if let Some(transcribe) = self.transcription_tool(site, reader)? {
+        if let Some(transcribe) = self.transcription_tool(site, reader.clone())? {
             admitted.push(Box::new(transcribe));
+        }
+        // Present only where the book names a model this building may
+        // send a picture to (sprawling-SPEC.md 8-142).
+        if let Some(ocr) = self.ocr_tool(site, reader)? {
+            admitted.push(Box::new(ocr));
         }
         // The last built-in: a look back at the history this building
         // may read, written into the city's playback exports

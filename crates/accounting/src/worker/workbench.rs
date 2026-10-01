@@ -67,8 +67,8 @@ pub(in crate::worker) struct Laying {
     /// answers from the list the conflict check reads.
     locks: Vec<String>,
     /// The endpoints and the choices made from them, which the
-    /// transcription tool asks under this building's rules
-    /// (sprawling-SPEC.md 8-131).
+    /// transcription and OCR tools ask under this building's rules
+    /// (sprawling-SPEC.md 8-131, 8-142).
     book: gateway::EndpointBook,
 }
 
