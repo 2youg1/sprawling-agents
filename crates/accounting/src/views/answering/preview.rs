@@ -14,8 +14,9 @@
 
 use std::path::Path;
 
-use documents::Span;
-use kernel::B3Hash;
+use documents::{Encoding, Lifted, Preview, Span};
+use kernel::{AxError, B3Hash};
+use storage::{Cas, StorageError};
 
 use super::super::holding::Views;
 use super::super::prepared::{Prepared, unavailable};
@@ -39,8 +40,43 @@ pub(in crate::views) fn preview_answer(
     version: B3Hash,
     viewport: Span,
 ) -> wire::Answer {
-    let _unread = (city_root, viewport);
-    unavailable(format!("Preview({version})"))
+    match preview_of(city_root, &version, viewport) {
+        Ok(preview) => wire::Answer::Preview(Box::new(wire::PreviewAnswer { version, preview })),
+        // "I could not look" is the answer for every way this fails, as it
+        // is for a range: a version the store never kept, a store that
+        // will not open, bytes that are not text. The query handed back
+        // names which version.
+        Err(_) => unavailable(format!("Preview({version})")),
+    }
+}
+
+fn preview_of(city_root: &Path, version: &B3Hash, viewport: Span) -> Result<Preview, AxError> {
+    let store = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
+        .map_err(StorageError::into_ax)?;
+    let size = store.size(version).map_err(StorageError::into_ax)?;
+    let mark = read(&store, version, Span::new(0, size.min(3))?)?;
+    let lift = documents::lift(viewport, size);
+    let bytes = read(&store, version, lift)?;
+    documents::preview(
+        Encoding::of_mark(&mark),
+        Lifted {
+            at: lift.start(),
+            bytes: &bytes,
+            size,
+        },
+        viewport,
+    )
+}
+
+/// The bytes of one half-open span of a stored object.
+fn read(store: &Cas, version: &B3Hash, span: Span) -> Result<Vec<u8>, AxError> {
+    if span.is_empty() {
+        return Ok(Vec::new());
+    }
+    let closed = kernel::Range::bytes(span.start(), span.end().saturating_sub(1))?;
+    store
+        .get_range(version, &closed)
+        .map_err(StorageError::into_ax)
 }
 
 #[cfg(test)]
