@@ -26,6 +26,7 @@ use reader::Readership;
 
 mod check;
 mod consistency;
+mod diff;
 mod document;
 mod encode;
 mod landing;
@@ -36,6 +37,7 @@ mod page;
 mod project;
 mod reader;
 mod select;
+mod traced;
 mod walk;
 
 pub use check::{Asked, City, Report, Verdict, check};
@@ -57,6 +59,10 @@ pub const PROJECTION_RULES: u32 = 3;
 /// peak on a multi-day fixture is measured; it bounds the bundle, not
 /// the memory an export uses.
 pub const BUNDLE_MAX_BYTES: usize = 32 * 1024 * 1024;
+
+/// The most bytes of patch text one committed checkpoint shows across
+/// its files. An initial value, like the bundle's.
+pub const DIFF_MAX_BYTES: usize = 64 * 1024;
 
 /// The most bytes a checked file may have: a bundle's ceiling and 16 MiB
 /// for the page around it and the fonts and pictures it carries. An
@@ -113,7 +119,7 @@ fn project(city_root: &Path, request: &Request) -> Result<Projected, AxError> {
     let ledger = CityLayout::new(city_root).ledger();
     let city = storage::Provenance::city_of(&ledger).map_err(storage::StorageError::into_ax)?;
     let readership = Readership::new(city_root, request.reader.clone());
-    let mut projection = Projection::new(&request.selection, readership);
+    let mut projection = Projection::new(&request.selection, readership, city_root);
     let tip = walk::walk(&ledger, request.cutoff, |raw, walked| {
         projection.apply(raw, walked)
     })?;

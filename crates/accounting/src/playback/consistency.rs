@@ -14,7 +14,7 @@ use kernel::{AxCode, AxError, RunId};
 use storage::CheckedLine;
 
 use super::SCHEMA;
-use super::document::{Decimal, Document, End, Event};
+use super::document::{CallTrace, Cited, Decimal, Document, End, Event, Holds};
 
 /// Every reference inside a document resolves, and every line is the
 /// ledger line its entry says it is.
@@ -50,6 +50,12 @@ pub(super) fn consistent(document: &Document) -> Result<(), AxError> {
                 .messages
                 .iter()
                 .flat_map(|message| [message.sent, message.consumed]),
+        )
+        .chain(
+            document
+                .calls
+                .iter()
+                .flat_map(|call| [call.called, call.answered]),
         );
     for end in ends {
         match end {
@@ -67,6 +73,12 @@ pub(super) fn consistent(document: &Document) -> Result<(), AxError> {
             }
             End::At(_) | End::Outside(_) | End::Withheld | End::Pending | End::Missing => {}
         }
+    }
+    if let Some(cited) = traced_calls(document).find(|seq| !events.contains(seq)) {
+        return Err(inconsistent(format!(
+            "a commit's trace names seq {} as in the bundle, which is no event",
+            cited.0
+        )));
     }
     if let Some(member) = document
         .moments
@@ -86,6 +98,25 @@ pub(super) fn consistent(document: &Document) -> Result<(), AxError> {
         ))),
         None => Ok(()),
     }
+}
+
+/// The seqs every committed checkpoint's trace says are in `events`.
+fn traced_calls(document: &Document) -> impl Iterator<Item = Decimal> + '_ {
+    document
+        .checkpoints
+        .iter()
+        .filter_map(|checkpoint| match &checkpoint.holds {
+            Holds::Committed {
+                trace: CallTrace::Traced { calls, .. },
+                ..
+            } => Some(calls),
+            Holds::Committed { .. } | Holds::Pinned { .. } | Holds::Merged { .. } => None,
+        })
+        .flatten()
+        .filter_map(|cited| match cited {
+            Cited::At(seq) => Some(*seq),
+            Cited::Elsewhere(_) | Cited::Withheld => None,
+        })
 }
 
 /// The seqs of `entries`, refusing a list that is not strictly ascending.

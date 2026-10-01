@@ -45,16 +45,21 @@ The bundle is `sprawling.playback/2`, one JSON object with these sections in thi
 | `events` | the selected lines the reader may see, ascending, once each: `seq`, `moment`, `line` (the ledger line, byte for byte) |
 | `context` | lines outside the selection that explain it - a run's first line, the far end of a moment or message - same shape |
 | `unknown` | seqs of lines a newer writer wrote that this build cannot read; their content is not in the bundle |
-| `runs` | `run`, `addr`, `session`, `parent`, `forked_at`, `predecessor`, `first_seq`, `last_seq`, `state`, `unanswered`, as of the cutoff |
+| `runs` | `run`, `addr`, `session`, `parent`, `forked_at`, `predecessor`, `first_seq`, `last_seq`, `state`, `unanswered`, as of the cutoff, and `policy` (`mode`, `write`, `admit`, `landing`; `null` before runs recorded one) |
 | `moments` | key moments: `family` (`run`, `approval`, `pr`), `key`, `opened`, `closed`, `seqs` |
 | `messages` | `id`, `from`, `room`, `sent`, `consumed` |
-| `checkpoints` | `seq`, `run`, `holds`: `pinned` (a job), `committed` (`oid`, `scope`, `files`), or `merged` (`oid`, the commit a pull request landed) |
+| `calls` | each tool call: `run`, `id`, `tool`, `called`, `answered`, `took` |
+| `checkpoints` | `seq`, `run`, `holds`: `pinned` (a job), `committed` (`oid`, `scope`, `files`, `base`, `diff`, `trace`), or `merged` (`oid`, the commit a pull request landed) |
 | `costs` | `billed_usd_micros`, `by_run`, `unpriced_calls`, `unpriced_tokens`, over the visible selection only |
 | `withheld` | `events`, `kinds`, `buildings` (each with its `reason`), `credential`: counts of what the reader may not see |
 
 - Every seq, moment, amount and count is a decimal string. Display it as text, or convert with `BigInt`; `Number` loses digits past 2^53.
 - An end of a moment or message is `{"at": seq}` (in `events`), `{"outside": seq}` (in `context`), `"withheld"`, `"pending"` (not closed by the cutoff) or `"missing"`. These are five different facts; draw them differently.
 - `moment: null` means the time was not recorded, not zero. A window's right edge is not a closing event.
+- A call's `took` is `{"measured": ms}` only when both of its moments were measured; `"unknown"` otherwise - an older ledger, an answer the city wrote after a restart, a call not answered yet, a withheld end. Draw no duration for `"unknown"`, never a zero. In a stretch that mixes older and newer lines, keep each call's and each line's own precision.
+- A run's `policy.admit` is the evidence its work had to carry; the outcome is how its pull request closed (`pr_merged` with `reviewed_commit` and `verified_by`, or `pr_rejected` with `by` and `why`). Report both as recorded; never infer that tests ran from a merge.
+- A committed checkpoint's `base` is `{"previous": oid}` (the same run's last commit), `{"parent": oid}` or `"none"`. Each `diff` entry's `change` is one of `patch` (`lines`, and `credential` lines held back by number and reason), `truncated` (the head of the patch, and how many lines were `cut`), `"empty"`, `"binary"`, `"missing"` (the repository lacks an object) or `"withheld"` (a building the reader may not see). Six different facts; draw them differently.
+- A committed checkpoint's `trace` is `{"traced": {"calls", "nearby"}}`, `"untraced"` or `{"unread": code}`. Each traced call is `{"at": seq}` (in `events`), `{"elsewhere": seq}` (outside the selection; widen it to read the line) or `"withheld"`. `nearby` counts other runs' calls in the same building: candidates, not causes.
 - Unpriced calls are not free; a cost total covers only what this reader sees.
 - `withheld` names buildings and counts; it does not hide that something happened there. Freeform text can still paraphrase a secret: report what the bundle holds, and add nothing a line does not say.
 

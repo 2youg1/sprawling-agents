@@ -11,23 +11,26 @@
 //! facts as of the cutoff, not as of the window. Every table the bundle
 //! carries is then built from the lines the reader may see alone: a
 //! withheld line adds to a count and to nothing else
-//! (`crates/accounting/spec/Playback/Project.lean`).
+//! (`crates/accounting/spec/Playback/Project.lean`). A committed
+//! checkpoint's diff and trace are read last, from outside the ledger
+//! (accounting-SPEC.md 8-17).
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 
-use kernel::event::record::{BuildingCreated, CheckpointCommitted};
-use kernel::{Address, AxCode, AxError, EventKind, EventRecord, RunId, Seq};
+use kernel::event::record::{BuildingCreated, RunStarted};
+use kernel::{Address, AxCode, AxError, EventKind, EventRecord, RunId, RunPolicy, Seq};
 
 use super::document::{
-    Billed, Checkpoint, Closed, Costs, Decimal, Document, Event, Holds, KindCount, Phase, Reason,
-    Run, Source, Withheld,
+    Billed, Checkpoint, Closed, Costs, Decimal, Document, Event, KindCount, Phase, Reason, Run,
+    Source, Withheld,
 };
-use super::links::{Links, Role, Seen};
+use super::links::{Key, Links, Role, Seen};
 use super::reader::{Readership, Sight};
 use super::select::Selection;
+use super::traced::{Known, attach, checkpoint_of};
 use super::walk::Walked;
 use crate::lineage::{Lineage, RunLine};
-use crate::views::commits::commit_facts;
 
 pub(super) struct Projection<'selection> {
     selection: &'selection Selection,
@@ -46,6 +49,13 @@ pub(super) struct Projection<'selection> {
     withheld: Tally,
     checkpoints: Vec<Checkpoint>,
     attribution: storage::Attribution,
+    /// The city whose repository and history a commit's evidence is read from.
+    city_root: PathBuf,
+    /// The policy each run's visible `run_started` recorded.
+    policies: BTreeMap<RunId, RunPolicy>,
+    /// The `tool_called` lines the reader may not see, which a commit's
+    /// trace may name.
+    hidden_calls: BTreeSet<Seq>,
 }
 
 /// What becomes of one line: shown, closed by a building, or withheld
@@ -66,7 +76,11 @@ struct Tally {
 }
 
 impl<'selection> Projection<'selection> {
-    pub(super) fn new(selection: &'selection Selection, readership: Readership) -> Self {
+    pub(super) fn new(
+        selection: &'selection Selection,
+        readership: Readership,
+        city_root: &Path,
+    ) -> Self {
         Projection {
             selection,
             readership,
@@ -80,6 +94,9 @@ impl<'selection> Projection<'selection> {
             withheld: Tally::default(),
             checkpoints: Vec::new(),
             attribution: storage::Attribution::new(),
+            city_root: city_root.to_path_buf(),
+            policies: BTreeMap::new(),
+            hidden_calls: BTreeSet::new(),
         }
     }
 
@@ -114,9 +131,18 @@ impl<'selection> Projection<'selection> {
             visible: fate == Fate::Shown,
             in_range: self.selection.admits(&record),
         };
+        self.remember(&record, seen.visible)?;
         let pairs_something = touches.iter().any(|touch| touch.role != Role::Member);
+        let closes_a_call = touches
+            .iter()
+            .find(|touch| touch.role == Role::Closes && matches!(touch.key, Key::Call(..)))
+            .map(|touch| touch.key.clone());
         self.links
             .note(&record, touches, (&touched, room.as_ref()), seen)?;
+        let settled = closes_a_call.and_then(|key| self.links.settled_unselected(&key));
+        if let Some(Some(opened)) = settled {
+            self.candidates.remove(&opened);
+        }
         match (seen.in_range, fate) {
             (true, Fate::Shown) => self.take(&record, raw)?,
             (true, Fate::Closed(building, reason)) => {
@@ -127,7 +153,7 @@ impl<'selection> Projection<'selection> {
                 self.withheld.hide(record.kind());
                 self.withheld.credential = self.withheld.credential.saturating_add(1);
             }
-            (false, Fate::Shown) if pairs_something => {
+            (false, Fate::Shown) if pairs_something && settled.is_none() => {
                 self.candidates.insert(record.seq(), event(&record, raw)?);
             }
             (false, Fate::Shown | Fate::Closed(..) | Fate::Credential) => {}
@@ -139,10 +165,12 @@ impl<'selection> Projection<'selection> {
     ///
     /// # Errors
     /// A run's count of unanswered questions past what the bundle writes.
-    pub(super) fn finish(self, source: Source) -> Result<Document, AxError> {
+    pub(super) fn finish(mut self, source: Source) -> Result<Document, AxError> {
+        self.attach_evidence();
         let mut outside = BTreeSet::new();
         let moments = self.links.moments(&mut outside);
         let messages = self.links.messages(&mut outside);
+        let calls = self.links.calls(&mut outside);
         let context = self
             .candidates
             .into_iter()
@@ -153,7 +181,7 @@ impl<'selection> Projection<'selection> {
             .lineage
             .lines()
             .filter(|line| self.runs.contains(&line.run))
-            .map(|line| run_row(&line, &self.links))
+            .map(|line| run_row(&line, &self.links, self.policies.get(&line.run).copied()))
             .collect::<Result<Vec<_>, _>>()?;
         let report = self.attribution.report();
         Ok(Document {
@@ -165,6 +193,7 @@ impl<'selection> Projection<'selection> {
             runs,
             moments,
             messages,
+            calls,
             checkpoints: self.checkpoints,
             costs: Costs {
                 billed_usd_micros: Decimal(report.total.get()),
@@ -221,6 +250,44 @@ impl<'selection> Projection<'selection> {
         Ok(())
     }
 
+    /// What a later table needs of one line beyond its own fate: the
+    /// policy a visible `run_started` records, and a call the reader may
+    /// not see, which a commit's trace may still name.
+    fn remember(&mut self, record: &EventRecord, visible: bool) -> Result<(), AxError> {
+        if visible
+            && record.kind() == EventKind::RunStarted
+            && let Some(policy) = record.data().read::<RunStarted>()?.policy
+        {
+            self.policies.insert(record.run(), policy);
+        }
+        if !visible && record.kind() == EventKind::ToolCalled {
+            self.hidden_calls.insert(record.seq());
+        }
+        Ok(())
+    }
+
+    /// Reads each committed checkpoint's base, diff and trace, which live
+    /// outside the ledger: in the city's repository and in what
+    /// `accounting::trace` folds of its history.
+    fn attach_evidence(&mut self) {
+        let shown: BTreeSet<Seq> = self
+            .events
+            .iter()
+            .map(|event| Seq::new(event.seq.0))
+            .collect();
+        let known = Known {
+            shown: &shown,
+            hidden: &self.hidden_calls,
+            links: &self.links,
+        };
+        attach(
+            &mut self.checkpoints,
+            &self.city_root,
+            &known,
+            &mut self.readership,
+        );
+    }
+
     /// Adds the building a line is addressed in, and the one a
     /// `building_created` raises, to the buildings this history has named.
     fn learn_buildings(
@@ -271,7 +338,7 @@ impl Tally {
 /// The building an address lies in. An address in the reserved subtree
 /// belongs to no building and stands for itself, so the reader's rules
 /// cannot read for it and it closes.
-fn building_of(addr: &Address) -> Address {
+pub(super) fn building_of(addr: &Address) -> Address {
     city::Building::of(addr).map_or_else(|_| addr.clone(), |building| building.addr().clone())
 }
 
@@ -293,7 +360,7 @@ fn event(record: &EventRecord, raw: &[u8]) -> Result<Event, AxError> {
     })
 }
 
-fn run_row(line: &RunLine, links: &Links) -> Result<Run, AxError> {
+fn run_row(line: &RunLine, links: &Links, policy: Option<RunPolicy>) -> Result<Run, AxError> {
     let unanswered = u64::try_from(line.unanswered).map_err(|_| {
         AxError::failure(
             AxCode::InvalidArgs,
@@ -316,29 +383,6 @@ fn run_row(line: &RunLine, links: &Links) -> Result<Run, AxError> {
             storage::RunPhase::Frozen => Phase::Frozen,
         }),
         unanswered: Decimal(unanswered),
+        policy,
     })
-}
-
-/// What a line says about a commit or a job pin: the pin read by its own
-/// type, and every commit as `commit_facts`, the one place that tells
-/// which lines name a commit and which oid, identifies it
-/// (accounting-SPEC.md 8-12, decision 24(f)).
-fn checkpoint_of(record: &EventRecord) -> Result<Option<Holds>, AxError> {
-    let named = commit_facts(record).map(|(oid, _)| oid);
-    if record.kind() == EventKind::CheckpointCommitted {
-        return Ok(
-            match (record.data().read::<CheckpointCommitted>()?, named) {
-                (CheckpointCommitted::JobPinned { job }, _) => Some(Holds::Pinned { job }),
-                (CheckpointCommitted::Committed(commit), Some(oid)) => Some(Holds::Committed {
-                    oid,
-                    scope: commit.scope,
-                    files: commit.files,
-                }),
-                (CheckpointCommitted::Committed(_), None) => None,
-            },
-        );
-    }
-    Ok(named
-        .filter(|_| record.kind() == EventKind::PrMerged)
-        .map(|oid| Holds::Merged { oid }))
 }

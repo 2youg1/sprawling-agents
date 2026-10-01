@@ -320,7 +320,7 @@ fn recomputed(document: &Document, root: &Path, reader: Reader) -> Result<Recomp
 
 /// The first section in which two documents differ, if any.
 fn first_difference(ours: &Document, theirs: &Document) -> Option<&'static str> {
-    let sections: [(&'static str, bool); 11] = [
+    let sections: [(&'static str, bool); 12] = [
         ("schema", ours.schema == theirs.schema),
         ("source", ours.source == theirs.source),
         ("events", ours.events == theirs.events),
@@ -329,6 +329,7 @@ fn first_difference(ours: &Document, theirs: &Document) -> Option<&'static str> 
         ("runs", ours.runs == theirs.runs),
         ("moments", ours.moments == theirs.moments),
         ("messages", ours.messages == theirs.messages),
+        ("calls", ours.calls == theirs.calls),
         ("checkpoints", ours.checkpoints == theirs.checkpoints),
         ("costs", ours.costs == theirs.costs),
         ("withheld", ours.withheld == theirs.withheld),

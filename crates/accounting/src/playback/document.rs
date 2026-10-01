@@ -10,7 +10,7 @@
 //! Every u64 travels as a [`Decimal`] string, so no reader parses a seq,
 //! a moment or an amount through a floating-point number.
 
-use kernel::{Address, B3Hash, EventKind, GitOid, Locator, RunId};
+use kernel::{Address, B3Hash, EventKind, GitOid, Locator, RunId, RunPolicy};
 use serde::{Deserialize, Serialize};
 
 /// A u64 written as its decimal digits, with no sign and no leading zero.
@@ -48,6 +48,7 @@ pub(super) struct Document {
     pub(super) runs: Vec<Run>,
     pub(super) moments: Vec<Moment>,
     pub(super) messages: Vec<Message>,
+    pub(super) calls: Vec<Call>,
     pub(super) checkpoints: Vec<Checkpoint>,
     pub(super) costs: Costs,
     pub(super) withheld: Withheld,
@@ -121,6 +122,9 @@ pub(super) struct Run {
     pub(super) last_seq: Decimal,
     pub(super) state: Option<Phase>,
     pub(super) unanswered: Decimal,
+    /// The policy its `run_started` recorded; `None` for a line written
+    /// before policies were, or one the reader may not see.
+    pub(super) policy: Option<RunPolicy>,
 }
 
 /// Another run one run points at.
@@ -178,6 +182,27 @@ pub(super) struct Message {
     pub(super) consumed: End,
 }
 
+/// One tool call: the run and the id its two lines are paired by.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Call {
+    pub(super) run: RunId,
+    pub(super) id: String,
+    pub(super) tool: Option<String>,
+    pub(super) called: End,
+    pub(super) answered: End,
+    pub(super) took: Took,
+}
+
+/// How long a call took: measured milliseconds, or not known. Never a
+/// zero standing in for a moment nobody measured.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub(super) enum Took {
+    Measured(Decimal),
+    Unknown,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Checkpoint {
@@ -198,10 +223,106 @@ pub(super) enum Holds {
         oid: GitOid,
         scope: Vec<String>,
         files: Vec<String>,
+        base: Base,
+        diff: Vec<FileDiff>,
+        trace: CallTrace,
     },
     Merged {
         oid: GitOid,
     },
+}
+
+/// What a commit is compared with: the same run's previous commit, its
+/// one parent, or nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub(super) enum Base {
+    Previous(GitOid),
+    Parent(GitOid),
+    #[serde(rename = "none")]
+    Absent,
+}
+
+/// One path a commit names, and what became of it between the base and
+/// the commit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct FileDiff {
+    pub(super) path: String,
+    pub(super) change: Change,
+}
+
+/// The six things a file's diff can be, kept apart.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub(super) enum Change {
+    Patch {
+        lines: Vec<DiffLine>,
+        credential: Vec<HiddenLine>,
+    },
+    /// The head of the patch that fit in what was left of the budget, and
+    /// how many lines did not.
+    Truncated {
+        lines: Vec<DiffLine>,
+        credential: Vec<HiddenLine>,
+        cut: Decimal,
+    },
+    Empty,
+    Binary,
+    Missing,
+    Withheld,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct DiffLine {
+    pub(super) number: Decimal,
+    pub(super) text: String,
+}
+
+/// A patch line the credential scan matched: where it was and why, never
+/// its bytes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct HiddenLine {
+    pub(super) number: Decimal,
+    pub(super) reason: String,
+}
+
+/// The calls a commit is the result of, as `accounting::trace` answers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub(super) enum CallTrace {
+    Traced {
+        calls: Vec<Cited>,
+        nearby: Vec<Near>,
+    },
+    /// The trace knows no such commit, or answers another announcement of
+    /// the same oid.
+    Untraced,
+    /// The trace failed, with this code.
+    Unread(String),
+}
+
+/// One call a trace names, as the reader may see it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub(super) enum Cited {
+    /// In `events`.
+    At(Decimal),
+    /// Visible, outside the selection; its line is not carried.
+    Elsewhere(Decimal),
+    Withheld,
+}
+
+/// Another run that called tools in the commit's building in the span.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Near {
+    pub(super) run: Related,
+    /// Where it called from, when the reader may see the run.
+    pub(super) actor: Option<Address>,
+    pub(super) calls: Decimal,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -349,7 +349,9 @@ fn a_merge_names_its_landed_commit_beside_the_checkpoints() {
         bundle["checkpoints"],
         json!([
             {"seq": "2", "run": run, "holds": {"committed": {
-                "oid": checkpoint, "scope": ["lab"], "files": ["lab/a/notes.md"]}}},
+                "oid": checkpoint, "scope": ["lab"], "files": ["lab/a/notes.md"],
+                "base": "none", "diff": [],
+                "trace": {"traced": {"calls": [], "nearby": []}}}}},
             {"seq": "4", "run": run, "holds": {"merged": {"oid": landed}}},
         ])
     );

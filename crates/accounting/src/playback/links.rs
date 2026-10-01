@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two ends of every key moment and every message
-//! (accounting-SPEC.md 8-12).
+//! The two ends of every key moment, every message and every tool call
+//! (accounting-SPEC.md 8-12 and 8-17).
 //!
 //! A key moment is a set of lines grouped under a stable key: a run, an
 //! approval, a pull request. It closes only on its real closing line,
@@ -13,20 +13,24 @@
 //! (`crates/accounting/spec/Playback/Project.lean`). A closing line also
 //! inherits the buildings its opening line touched, which is how an
 //! answer written on the city run stays behind the confidential
-//! building that asked the question.
+//! building that asked the question, and a call's answer behind the
+//! building its call named.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::event::record::{ApprovalResolved, SignalConsumed, SignalEnqueued};
-use kernel::{Address, ApprovalItem, AxError, EventKind, EventRecord, RunId, Seq};
+use kernel::{Address, ApprovalItem, AxError, EventKind, EventRecord, RunId, Seq, TimeMs};
 
-use super::document::{Decimal, End, Family, Message, Moment, Related};
+use super::document::{Call, Decimal, End, Family, Message, Moment, Related, Took};
+use crate::views::rounds::{answered_timing, timing_of};
 
 /// What one line is keyed to.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Key {
     Moment(Family, String),
     Message(String),
+    /// A tool call: its run, and the id its call and its answer share.
+    Call(RunId, String),
 }
 
 /// Which part of a keyed pair one line is.
@@ -66,6 +70,12 @@ struct Link {
     members: Vec<Seq>,
     /// `from` and `room` of a message, when its sending line was visible.
     sent_by: Option<(String, Address)>,
+    /// A call's tool and the moment its call line recorded, and whether
+    /// that moment was measured, when the call line was visible.
+    asked: Option<(Option<String>, TimeMs, wire::Timing)>,
+    /// A call's measured milliseconds, when both lines were visible and
+    /// the rounds' rule says the span was measured.
+    took: Option<u64>,
 }
 
 #[derive(Debug, Default)]
@@ -128,6 +138,10 @@ impl Links {
                 Key::Message(data.read::<SignalConsumed>()?.id.as_str().to_owned()),
                 Role::Closes,
             )),
+            EventKind::ToolCalled => wire::text(data.as_map().get("id"))
+                .map(|id| (Key::Call(record.run(), id), Role::Opens)),
+            EventKind::ToolResult => wire::text(data.as_map().get("tool_use_id"))
+                .map(|id| (Key::Call(record.run(), id), Role::Closes)),
             _ => None,
         };
         let run_role = match record.kind() {
@@ -183,6 +197,7 @@ impl Links {
             }
             let family_is_run = matches!(touch.key, Key::Moment(Family::Run, _));
             let is_message = matches!(touch.key, Key::Message(_));
+            let is_call = matches!(touch.key, Key::Call(..));
             let link = self.links.entry(touch.key).or_default();
             match touch.role {
                 Role::Opens if link.opened.is_none() => {
@@ -196,8 +211,20 @@ impl Links {
                         let sent = record.data().read::<SignalEnqueued>()?;
                         link.sent_by = Some((sent.from, sent.room));
                     }
+                    if is_call && seen.visible {
+                        let tool = wire::text(record.data().as_map().get("name"));
+                        link.asked = Some((tool, record.t(), timing_of(record)));
+                    }
                 }
-                Role::Closes if link.closed.is_none() => link.closed = Some(seat),
+                Role::Closes if link.closed.is_none() => {
+                    link.closed = Some(seat);
+                    if let (true, Some((_, at, asked))) = (is_call && seen.visible, &link.asked) {
+                        link.took = match answered_timing(*asked, record) {
+                            wire::Timing::Measured => record.t().value().checked_sub(at.value()),
+                            wire::Timing::Unmeasured => None,
+                        };
+                    }
+                }
                 Role::Opens | Role::Closes | Role::Member => {}
             }
             if seen.visible && seen.in_range {
@@ -225,7 +252,7 @@ impl Links {
                         .map(|seq| Decimal(seq.value()))
                         .collect(),
                 }),
-                Key::Message(_) => None,
+                Key::Message(_) | Key::Call(..) => None,
             })
             .collect()
     }
@@ -243,9 +270,46 @@ impl Links {
                     sent: end(link.opened, End::Missing, outside),
                     consumed: end(link.closed, End::Pending, outside),
                 }),
-                Key::Moment(..) => None,
+                Key::Moment(..) | Key::Call(..) => None,
             })
             .collect()
+    }
+
+    /// Every call with a line the reader sees in range, in the order of
+    /// its first such line.
+    pub(super) fn calls(&self, outside: &mut BTreeSet<Seq>) -> Vec<Call> {
+        let mut calls: Vec<(Seq, Call)> = self
+            .links
+            .iter()
+            .filter_map(|(key, link)| match key {
+                Key::Call(run, id) => Some((
+                    *link.members.first()?,
+                    Call {
+                        run: *run,
+                        id: id.clone(),
+                        tool: link.asked.as_ref().and_then(|(tool, _, _)| tool.clone()),
+                        called: end(link.opened, End::Missing, outside),
+                        answered: end(link.closed, End::Pending, outside),
+                        took: link
+                            .took
+                            .map_or(Took::Unknown, |took| Took::Measured(Decimal(took))),
+                    },
+                )),
+                Key::Moment(..) | Key::Message(_) => None,
+            })
+            .collect();
+        calls.sort_by_key(|(first, _)| *first);
+        calls.into_iter().map(|(_, call)| call).collect()
+    }
+
+    /// When the call `key` has closed with no line the reader sees in
+    /// range, where it opened, if it did: neither of its lines can become
+    /// context any more, so the fold keeps neither.
+    pub(super) fn settled_unselected(&self, key: &Key) -> Option<Option<Seq>> {
+        self.links
+            .get(key)
+            .filter(|link| link.closed.is_some() && link.members.is_empty())
+            .map(|link| link.opened.map(|seat| seat.seq))
     }
 
     /// What the bundle may say about another run one run points at.

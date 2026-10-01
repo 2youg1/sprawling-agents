@@ -281,11 +281,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                         ..shown
                     });
                     call.answered = Some(record.t());
-                    if supplied_by_the_city(map.get("error")) {
-                        call.timing = wire::Timing::Unmeasured;
-                    } else if let wire::Timing::Measured = call.timing {
-                        call.timing = timing_of(record);
-                    }
+                    call.timing = answered_timing(call.timing, record);
                 }
             }
             kind => {
@@ -305,10 +301,25 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
 
 /// Whether this line's `t` is the moment its own event happened
 /// (kernel-SPEC 8-4, "what the envelope `t` records").
-fn timing_of(record: &EventRecord) -> wire::Timing {
+pub(crate) fn timing_of(record: &EventRecord) -> wire::Timing {
     match record.moment() {
         Some(_) => wire::Timing::Measured,
         None => wire::Timing::Unmeasured,
+    }
+}
+
+/// Whether a call's two times are measured once `answer` is paired with
+/// it, given how the call's own line read (`asked`): the one rule a page's
+/// rounds and a playback bundle's calls both time a call by
+/// (accounting-SPEC.md 8-17). An answer the city wrote itself after a
+/// restart makes the span unmeasured either way.
+pub(crate) fn answered_timing(asked: wire::Timing, answer: &EventRecord) -> wire::Timing {
+    if supplied_by_the_city(answer.data().as_map().get("error")) {
+        return wire::Timing::Unmeasured;
+    }
+    match asked {
+        wire::Timing::Measured => timing_of(answer),
+        wire::Timing::Unmeasured => wire::Timing::Unmeasured,
     }
 }
 
