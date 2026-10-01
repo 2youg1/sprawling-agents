@@ -38,7 +38,7 @@
 
 <Case label="mailbox key · nothing to do">
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]}>
-    <Presence asked={0} hint={(words) => words} />
+    <Presence asked={0} hint={(words: string) => words} />
   </Stand>
 </Case>
 
@@ -48,7 +48,7 @@
     unread={[UNREAD]}
     waiting={[ONE_QUESTION]}
   >
-    <Presence asked={0} hint={(words) => words} />
+    <Presence asked={0} hint={(words: string) => words} />
   </Stand>
 </Case>
 
@@ -56,6 +56,6 @@
 the dot pulses rather than asking for anything. -->
 <Case label="mailbox key · the link is still connecting">
   <Stand link={{ kind: "handshaking" }} unread={[]} waiting={[]}>
-    <Presence asked={0} hint={(words) => words} />
+    <Presence asked={0} hint={(words: string) => words} />
   </Stand>
 </Case>

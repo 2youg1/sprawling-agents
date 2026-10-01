@@ -100,6 +100,7 @@
   <Tip text={reading}>
     {#snippet children(hint)}
       <span class="relative grid size-key shrink-0 place-items-center">
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex (the meter takes focus so a keyboard reaches the reading its tip spells out, as a pointer does by hovering) -->
         <span
           class="absolute inset-0 rounded-pill"
           role="meter"

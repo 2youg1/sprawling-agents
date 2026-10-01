@@ -194,10 +194,10 @@
     exposing = null;
     if (on) {
       exposing = setTimeout(() => {
-        document.documentElement.dataset["expose"] = "";
+        document.documentElement.dataset.expose = "";
       }, HOLD_MS);
     } else {
-      delete document.documentElement.dataset["expose"];
+      delete document.documentElement.dataset.expose;
     }
   }
 
@@ -383,7 +383,7 @@
     <Pages {view} />
   {/if}
   {#if view.kind !== "welcome"}
-    <Edge {tier} onTier={cycleTier} onPeek={(on) => (peeking = on)} {mailboxAsked} />
+    <Edge {tier} onTier={cycleTier} onPeek={(on: boolean) => (peeking = on)} {mailboxAsked} />
   {/if}
   <Refusal {stopsWithoutRun} />
   {#if paletteOpen}

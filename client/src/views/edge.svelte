@@ -119,7 +119,7 @@
       </button>
     {/snippet}
   </Tip>
-  <Notices asked={mailboxAsked} hint={(words) => named(words, "mailbox")} />
+  <Notices asked={mailboxAsked} hint={(words: string) => named(words, "mailbox")} />
   <Tip text={named(say($lang, "nav_settings"), "go.setup")} side="right" exposable>
     {#snippet children(hint)}
       <a

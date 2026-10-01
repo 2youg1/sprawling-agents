@@ -102,6 +102,7 @@
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- typescript-eslint resolves no named export of a `.svelte` module; `svelte-check` resolves it and is the type gate
   const records = recordsAt(ui().now());
 
   interface Shown {

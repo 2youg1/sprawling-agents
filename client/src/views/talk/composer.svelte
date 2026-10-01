@@ -25,7 +25,6 @@
 
   import { QUERIES } from "../../core/asking";
   import type { Snippet } from "svelte";
-
   import { heldIn } from "../../core/belief/rooms";
   import type { Sending } from "../../core/doing";
   import { runInFront } from "../../core/in_front";
@@ -38,7 +37,8 @@
   import { canRecord } from "../../core/speaking";
   import { ui } from "../../ui";
   import SettingsRow from "./settings_row.svelte";
-  import Coin, { faceOf } from "./coin.svelte";
+  import Coin from "./coin.svelte";
+  import { faceOf } from "./coin_face";
   import Gauge from "./gauge.svelte";
   import Record from "./record.svelte";
   import TypedLine from "./typed_line.svelte";
@@ -372,7 +372,7 @@ strength, and a drag over the box by the wash it takes. -->
       ></textarea>
       {#if hearing === true && canRecord()}
         <!-- What the microphone heard joins the words; it is never sent by itself (4-16). -->
-        <Record onWords={(words) => write(text === "" ? words : `${text} ${words}`)} />
+        <Record onWords={(words: string) => { write(text === "" ? words : `${text} ${words}`); }} />
       {/if}
       <Gauge room={here}>
         <Coin

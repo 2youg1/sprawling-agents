@@ -67,18 +67,15 @@
   // One row per room, the room's newest run speaking for it, grouped by
   // building in the order buildings first ran something.
   const groups = $derived.by(() => {
-    const byBuilding = new Map<string, { room: Address; run: RunBelief }[]>();
-    for (const room of $belief.rooms.keys()) {
+    const rows = [...$belief.rooms.keys()].flatMap((room): { building: string; room: Address; run: RunBelief }[] => {
       const run = heldIn($belief, room).at(-1);
-      if (run === undefined || run.addr === null) continue;
-      const building = buildingOf(run.addr);
-      const rows = byBuilding.get(building) ?? [];
-      rows.push({ room: run.addr, run });
-      byBuilding.set(building, rows);
-    }
-    return [...byBuilding.entries()].map(([building, rows]) => ({
+      const addr = run?.addr ?? null;
+      return run === undefined || addr === null ? [] : [{ building: buildingOf(addr), room: addr, run }];
+    });
+    const buildings = rows.map((row) => row.building).filter((building, at, all) => all.indexOf(building) === at);
+    return buildings.map((building) => ({
       building,
-      rows: rows.sort((a, b) => (b.run.started ?? 0) - (a.run.started ?? 0)),
+      rows: rows.filter((row) => row.building === building).sort((a, b) => (b.run.started ?? 0) - (a.run.started ?? 0)),
     }));
   });
 
