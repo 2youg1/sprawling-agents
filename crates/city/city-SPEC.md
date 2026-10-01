@@ -22,10 +22,10 @@
 | `room` | 一个地址是不是房间，会话没指名时开哪一间 | 8-13 |
 | `session` | 一段会话开始时清掉什么 | 8-14b |
 | `neighbourhood`、`neighbours_tool` | 这座城有哪些地方，我身边站着谁，我该跟谁说话 | 8-15 |
-| `rules_tool` | 居民怎么读写自己楼的规则 | 8-2b |
+| `rules_tool` | 居民怎么读写自己楼的规则 | 8-2b、8-36 |
 | `gitignore` | 一栋楼的哪些字节进历史 | 8-21 |
 | `vocation` | 一个地址上的居民是来建造的还是来规划的 | 8-22 |
-| `city_tool` | 市政厅对城市本身的那一扇门 | 8-23 |
+| `city_tool` | 市政厅对城市本身的那一扇门 | 8-23、8-36 |
 | `governed` | 治理这座城的三份文件 | 8-24b |
 | `document` | 一份文档整个换上去，或者旧的留着 | 8-27 |
 | `handoff_form` | 交接表单的四节怎么读 | 8-5 |
@@ -145,9 +145,27 @@ impl RulesTool { pub fn new(city_root: &Path, building: Address) -> Result<Rules
 ```
 
 - **每一次经工具台的调用都在效果层被拒，这是定规而不是漏接**：一个 run 不改写审判它自己的规则（§12.1 定规；kernel-SPEC §8-27 的 `Governance` 行）。`Effect::Govern` 无门、无审批、无 `ApprovalItem`：`runtime::bench::admit` 在 `invoke` 之前就把调用拒掉，拒绝以 tool result 回到模型而回合不终止（`runtime::turn::wave`「A tool Err is not a turn Err」那条）。规则要变只有人改文件这一条路——`RULES.toml` 的唯一写者是人，下一个 run 按改后的字节受审。
-- **两种拒词，一条定规**：本工具的 `subject` 取 trait 默认（`GateSubject::None`），调用因此落进「答出的主体与声明的效果不一致」那条拒；每个工具补上自己的 `subject` 解析之后，拒词换成 `E_GATE_DENIED` 的「一个 run 不得改写审判它自己的规则」，恢复语指向人改的 `CONFIG.toml` 与 `RULES.toml`。两种拒都出自效果层，run 都到不了 `invoke`。
+- **拒词说出被治理的 scope**：本工具的 `subject` 答 `GateSubject::Scope`（§8-36），效果层因此给出 `E_GATE_DENIED` 的「一个 run 不得改写审判它自己的规则」，恢复语指向人改的 `CONFIG.toml` 与 `RULES.toml`。参数读不懂的调用在同一处被拒，拒词与 `invoke` 读到同样参数时给出的相同；两种拒都出自效果层，run 都到不了 `invoke`。
 - **为什么不是 `edit`**：`RULES.toml` 住在楼的保留子树，没有任何写域到得了那里——这不是一个要绕过的障碍，它就是规则本身。写面（`policy::write_rules`）因此只有本工具的 `invoke` 一个调用方，形状是整份提案、先求值后落盘（§8-2 末条）；run 到不了它，人改文件也不经它。
 - **楼是携入的而不是参数**：工具持调用方自己那栋楼的地址，于是一个 Run 无法靠填另一个名字去改别人的规则。
+
+### 8-36 两件治理工具说出自己治理的 scope（`rules_tool`、`city_tool` 的 `Tool::subject`，形状 4 适配器）
+
+```rust
+impl Tool for RulesTool {
+    fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError>;
+    // Ok(GateSubject::Scope("building:<本楼地址>"))，op 读不懂即 Err
+}
+impl Tool for CityTool {
+    fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError>;
+    // Ok(GateSubject::Scope("city"))，action、name、template 读不懂即 Err
+}
+```
+
+- **scope 的拼法取 `kernel::event::Scope` 的 `Display`**：`rules` 答本楼的 `Scope::Building`，`city` 答 `Scope::City`，`GateSubject::Scope` 里的字符串就是账本上 `rules_changed` 写 scope 的那一种文字（§12.13）。
+- **`city` 三个动作答同一个 scope**：`list` 读、`raise` 与 `adopt` 改的都是城的形状，被点名的那栋楼在 `raise` 时还不存在，治理它的不是它自己的规则。
+- **参数只有一处文法**：`subject` 与 `invoke` 经同一个读参函数（`rules` 的 `Op::read`、`city` 的 `Request::read`），所以 `subject` 的拒词就是 `invoke` 读同样参数时的拒词（kernel-SPEC 讲 `Tool::subject` 的那一段：文法读不出的调用返回 `Err`，bench 原样拒收）。
+- **验收**：两件工具对一条合法调用答出上述 `Scope`，对一条读不懂的调用答出与 `invoke` 相同的码（`city` crate 内两件工具旁的测试）；经工具台的拒词由 `runtime::bench::admit` 的 Govern 臂给出，它的测试已钉住恢复语。
 
 ### 8-3 city::building（形状 2 值类型＋一个实例化动作）
 
@@ -740,6 +758,16 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 **被否**：①另起一份 `IDENTITY.toml`：同一个人写的同一件事分在两个文件里，原文编辑器里看到的正文与卡片上的名字各说各的；②身份区用 YAML（`---`）：本 crate 只依赖 TOML 的解析器，而 YAML 的隐式类型会把 `no`、`on` 这样的名字读成布尔值；③session 开始时把身份写进 `session_opened`：经 `Dispatch` 打开的房间没有那一行，而第一次 run 是每个 session 都有的那一刻。
 
 **重开参数**：身份要跨城复用（人明确导入另一座城的身份）时，重议身份是否搬到人自己那一层（`~/.sprawling/config.toml`）。
+
+### 12.13 治理工具的 scope 用账本上的 scope 文字
+
+**决定**：`rules` 与 `city` 的 `subject` 答 `GateSubject::Scope`，字符串是 `kernel::event::Scope` 的 `Display`：`building:<地址>` 或 `city`（§8-36）。
+
+**理由**：scope 在这座城里已经有一种文字，`rules_changed` 与 `city_halted` 都按它写进账本，`Scope::parse` 读回它。拒词里的 scope 用同一种文字，模型与人读到的是账本上会出现的那个词；`city` 与一栋叫 `city` 的楼在这种写法里也分得开。补上 `subject` 之前，两件工具答 trait 默认的 `GateSubject::None`，效果层按「主体与效果不一致」拒，恢复语让模型去报告工具缺陷，而工具并没有缺陷。
+
+**被否**：①只写楼的地址（`lab`）：`city` 要另造一个词，而这个词可能就是某栋楼的名字；②`city` 的 `raise`／`adopt` 答被点名的楼：那栋楼还不存在，改的是城的形状，治理它的不是它自己的规则；③`subject` 不读参数、只答 scope：一条读不懂的调用得到的是「不得改写规则」而不是「这个动作不存在」，模型下一步改不对。
+
+**重开参数**：`GateSubject::Scope` 改成携带类型化的 `kernel::event::Scope`（kernel 一侧的改形），这时两件工具交值而不交文字。
 
 ## 13 依赖选型
 
