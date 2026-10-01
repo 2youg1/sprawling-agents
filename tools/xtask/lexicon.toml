@@ -238,11 +238,11 @@ replacement = "兼容格式 (glossary: dialect)"
 
 [[entry]]
 banned = "Note::Fenced"
-replacement = "Note::Checkpointed（wire-SPEC §8-53）"
+replacement = "Note::Checkpointed（crates/wire/Spec.lean §8-53）"
 
 [[entry]]
 banned = "\"fenced\""
-replacement = "\"checkpointed\"（wire-SPEC §8-53）"
+replacement = "\"checkpointed\"（crates/wire/Spec.lean §8-53）"
 
 [[entry]]
 banned = "栅栏"
