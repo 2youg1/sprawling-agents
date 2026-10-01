@@ -15,7 +15,7 @@
 
 use kernel::{
     Address, ApprovalItem, Autonomy, ClusterKey, EventKind, FileChange, GitOid, Restoration,
-    Ruling, RunId, Seq, TimeMs, UsdMicros,
+    Ruling, RunId, Seq, TimeMs,
 };
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +27,7 @@ mod automation;
 mod building;
 mod commits;
 mod config;
+mod cost;
 mod cost_of;
 mod doctor;
 mod document;
@@ -57,6 +58,7 @@ pub use commits::{CommitAnswer, CommitAt, CommitsAnswer};
 pub use config::{
     ConfigAnswer, ConfigLayer, SecondDomain, SettledEffort, SettledSecond, TuningDefaults,
 };
+pub use cost::{CostAnswer, UnpricedCalls};
 pub use cost_of::{CostOfAnswer, RUN_COSTS_MAX, RunCostsAnswer};
 pub use doctor::DoctorSandboxMissing;
 pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
@@ -178,33 +180,6 @@ pub struct CityAnswer {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ApprovalsAnswer {
     pub items: Vec<ApprovalItem>,
-}
-
-/// The five cuts of one authoritative total. Four cuts sum to `total`;
-/// `by_run` names the active runs and the few billed most, so it may sum
-/// to less. Shares render against `total`, so a remainder stays visible.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct CostAnswer {
-    pub total: UsdMicros,
-    pub by_run: Vec<(String, UsdMicros)>,
-    pub by_actor: Vec<(String, UsdMicros)>,
-    pub by_segment: Vec<(String, UsdMicros)>,
-    pub by_tool: Vec<(String, UsdMicros)>,
-    pub by_skill: Vec<(String, UsdMicros)>,
-    /// The calls no provider priced, which `total` cannot show.
-    pub unpriced: UnpricedCalls,
-}
-
-/// The model calls that came back with no authoritative amount, and the
-/// tokens they used. A city whose provider never prices a call has a
-/// zero `total` after any number of runs; this is what tells that city
-/// apart from one where nothing ran.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct UnpricedCalls {
-    pub calls: u64,
-    pub tokens: u64,
 }
 
 /// What a query returns. `Unavailable` is a real answer: a view this
