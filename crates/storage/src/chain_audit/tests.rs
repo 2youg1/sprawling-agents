@@ -124,6 +124,7 @@ fn a_second_proof_checks_only_the_lines_written_since_the_first() {
             segments_by_digest: history,
             bytes_read: total,
             bytes_hashed: total,
+            waves: 1,
         },
         unkept: None,
     };
@@ -142,22 +143,15 @@ fn a_second_proof_checks_only_the_lines_written_since_the_first() {
 /// exactly as a walk with no records refuses it.
 #[test]
 fn a_record_is_reused_only_where_the_chain_still_links_to_it() {
-    let reproved = |damage: &dyn Fn(&Path)| {
-        let tmp = tempfile::tempdir().unwrap();
-        let (_ledger, records) = ledger_of(tmp.path(), 4);
-        let ledger_dir = tmp.path().join("ledger");
-        prove_chain(&ledger_dir, &records).unwrap();
-        damage(&ledger_dir);
-        prove_chain(&ledger_dir, &records).unwrap().audit
-    };
-    let rewritten = reproved(&|ledger_dir| {
+    let reproved = |damage: &dyn Fn(&Path, &Path)| reproved_with(4, damage).0.audit;
+    let rewritten = reproved(&|ledger_dir, _| {
         let first = ledger_segments_at(ledger_dir).unwrap().remove(0);
         let tampered = fs::read_to_string(&first)
             .unwrap()
             .replace("\"who\":\"city\"", "\"who\":\"town\"");
         fs::write(&first, tampered).unwrap();
     });
-    let spliced = reproved(&|ledger_dir| {
+    let spliced = reproved(&|ledger_dir, _| {
         let third = ledger_segments_at(ledger_dir).unwrap().remove(2);
         fs::remove_file(third).unwrap();
     });
@@ -338,6 +332,7 @@ fn a_reopened_ledger_checks_only_what_its_last_record_has_not_proved() {
             segments_by_digest: 1,
             bytes_read: fs::metadata(&last).unwrap().len(),
             bytes_hashed: proved,
+            waves: 0,
         };
         (report.counted, expected)
     };
@@ -345,4 +340,59 @@ fn a_reopened_ledger_checks_only_what_its_last_record_has_not_proved() {
         let (counted, expected) = reopened(history);
         assert_eq!(counted, expected, "a history of {history} lines");
     }
+}
+
+/// A second proof of `segments` one-line segments, after `damage`
+/// touched the ledger and the records the first proof wrote, with the
+/// bytes the segments hold.
+fn reproved_with(segments: u64, damage: &dyn Fn(&Path, &Path)) -> (Proven, u64) {
+    let tmp = tempfile::tempdir().unwrap();
+    let (_ledger, records) = ledger_of(tmp.path(), segments);
+    let ledger_dir = tmp.path().join("ledger");
+    prove_chain(&ledger_dir, &records).unwrap();
+    damage(&ledger_dir, &tmp.path().join("records"));
+    (
+        prove_chain(&ledger_dir, &records).unwrap(),
+        bytes_on_disk(&ledger_dir),
+    )
+}
+
+/// The segments are read in waves of `PROOF_WAVE`, so the number of
+/// waves follows the number of segments and nothing else: not the cores
+/// of the machine, and not which thread of a wave finished first. A
+/// segment whose record is gone is checked line by line while the rest of
+/// its wave stands by their records.
+#[test]
+fn a_proof_reads_in_waves_and_checks_alone_a_segment_without_its_record() {
+    let expected = |segments: u64, checked: u64, total: u64| Proven {
+        audit: ChainAudit::Whole { lines: segments },
+        counted: ProofCount {
+            lines_checked: checked,
+            segments_by_digest: segments - checked,
+            bytes_read: total,
+            bytes_hashed: total,
+            waves: segments.div_ceil(8),
+        },
+        unkept: None,
+    };
+    let unrecorded = |ledger_dir: &Path, records_dir: &Path| {
+        let fifth = ledger_segments_at(ledger_dir).unwrap().remove(4);
+        let name = fifth.file_name().unwrap().to_str().unwrap().to_owned();
+        fs::remove_file(records_dir.join(format!("{name}.proof"))).unwrap();
+    };
+
+    let ((short, short_total), (long, long_total), (gap, gap_total)) = (
+        reproved_with(9, &|_, _| {}),
+        reproved_with(18, &|_, _| {}),
+        reproved_with(9, &unrecorded),
+    );
+
+    assert_eq!(
+        (short, long, gap),
+        (
+            expected(9, 0, short_total),
+            expected(18, 0, long_total),
+            expected(9, 1, gap_total)
+        )
+    );
 }
