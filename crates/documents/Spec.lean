@@ -156,7 +156,7 @@ D10 选区跨过一次保存：编辑之前的位置不动（恰在插入点上�
 
 /-! ## 16 测试与约束
 
-证明：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`。咬得动的演示：`Documents.Edit.withoutBaseline_overwrites`、`Documents.Window.withoutStepBack_splits`、`Documents.Encoding.nulJudgement_calls_utf16_opaque`。
+证明：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`。咬得动的演示：`Documents.Edit.withoutBaseline_overwrites`、`Documents.Window.withoutStepBack_splits`、`Documents.Encoding.nulJudgement_calls_wide_text_opaque`。
 
 实现一致性：逐模块 `#[cfg(test)]`（`cargo nextest run -p sprawling-documents`）；§2 的表是它们与验收的对应。选区跨过一次保存的规则（D10）由 `selection::tests` 断言，没有写成定理。模型的证明不是 Rust 实现的证明。
 -/

@@ -16,7 +16,7 @@
 2. **没有标记而含 NUL 的不是文本**（`nul_without_mark_is_opaque`）：文本文件不含 NUL，城自己存的东西（redb、CAS 里的块）含。
 3. **判成文本的，在它的编码下拼得出**（`text_is_spelled`）：判定与解码读同一条规则，所以一个判成文本的版本，它的每个窗口都解得出（窗口切在字符边界上，`spec/Window.lean`）。
 
-**照旧的 NUL 判法，带标记的 UTF-16 文件就成了不透明的**（`nulJudgement_calls_utf16_opaque`）：本模型咬得动的演示。
+**照旧的 NUL 判法，带标记的 UTF-16 文件就成了不透明的**（`nulJudgement_calls_wide_text_opaque`）：本模型咬得动的演示。
 -/
 
 namespace Documents.Encoding
@@ -84,7 +84,7 @@ theorem text_is_spelled (v : Validity) (s : List Nat) (e : Encoding)
 def nulJudgement (s : List Nat) : Reading :=
   if s.contains 0 then .opaque else .text .utf8
 
-theorem nulJudgement_calls_utf16_opaque :
+theorem nulJudgement_calls_wide_text_opaque :
     nulJudgement [0xFF, 0xFE, 0x61, 0x00] = .opaque := by
   decide
 
