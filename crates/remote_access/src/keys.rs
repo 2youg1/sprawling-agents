@@ -50,9 +50,10 @@ impl SigningKey {
     /// # Errors
     /// Fails only when the cryptographic library refuses a derived seed.
     pub fn from_seed(seed: &[u8; SEED_BYTES]) -> Result<Self, AxError> {
-        let ed25519 = Ed25519KeyPair::from_seed_unchecked(&derive(seed, b"ed25519")?)
+        let (ed_seed, ml_seed) = halves(seed)?;
+        let ed25519 = Ed25519KeyPair::from_seed_unchecked(&ed_seed)
             .map_err(|_| crypto_failure("derive the Ed25519 half of a key"))?;
-        let ml_dsa = PqdsaKeyPair::from_seed(&ML_DSA_44_SIGNING, &derive(seed, b"ml-dsa-44")?)
+        let ml_dsa = PqdsaKeyPair::from_seed(&ML_DSA_44_SIGNING, &ml_seed)
             .map_err(|_| crypto_failure("derive the ML-DSA-44 half of a key"))?;
         Ok(Self { ed25519, ml_dsa })
     }
@@ -162,6 +163,16 @@ impl Signature {
     pub fn as_bytes(&self) -> &[u8; SIGNATURE_BYTES] {
         &self.0
     }
+}
+
+/// The two sub-seeds a seed derives, Ed25519's first and ML-DSA-44's
+/// second. A browser derives the same two from the seed in
+/// `tools/fixtures/remote-handshake/keys.txt` (remote_access-SPEC.md
+/// §8-12), which is why the pair is readable inside the crate.
+pub(crate) fn halves(
+    seed: &[u8; SEED_BYTES],
+) -> Result<([u8; SEED_BYTES], [u8; SEED_BYTES]), AxError> {
+    Ok((derive(seed, b"ed25519")?, derive(seed, b"ml-dsa-44")?))
 }
 
 /// One 32-byte sub-seed per half, by HKDF-SHA256 under its own label.

@@ -21,6 +21,9 @@ use super::Session;
 use crate::keys::{Length, crypto_failure};
 use crate::seal::{Direction, Opener, Sealer};
 
+#[cfg(test)]
+mod interop;
+
 /// The two session keys, one for each direction.
 pub(super) struct Keys {
     device_to_city: [u8; 32],
