@@ -22,12 +22,34 @@ use crate::span::Span;
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Preview {
-    /// The stretch of the version that was read, and its blocks. An
-    /// empty stretch has none.
-    Laid { span: Span, blocks: Vec<Block> },
+    Laid(Laid),
     /// The version is text in an encoding whose bytes do not line up with
     /// the text read from them, so no block could name its bytes (D25).
-    Unsupported { encoding: Encoding },
+    Unsupported {
+        encoding: Encoding,
+    },
+}
+
+/// A stretch of Markdown that was read, and its blocks: what a preview
+/// and a reply both answer (D32). An empty stretch has none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Laid {
+    pub span: Span,
+    pub blocks: Vec<Block>,
+}
+
+/// Whether a model's reply is still arriving (D30).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum ReplyState {
+    /// More text may follow, so only the blocks before the closure point
+    /// are read.
+    Streaming,
+    /// The call settled, so the whole text is read, as a version holding
+    /// it would be previewed.
+    Settled,
 }
 
 /// One block of a window, with the bytes of the version it was read from

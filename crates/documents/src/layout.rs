@@ -30,6 +30,12 @@ pub(crate) fn blocks(format: Format, source: &[u8]) -> Vec<Span> {
     }
 }
 
+/// Where the blocks that can no longer change end, in Markdown still
+/// being written (`crates/documents/Spec.lean` D31).
+pub(crate) fn closed(_source: &[u8]) -> u64 {
+    0
+}
+
 /// One line of the source: where it starts, and its content up to but
 /// not including its `\r\n` or `\n`.
 struct Line<'a> {

@@ -148,3 +148,71 @@ fn an_empty_plain_document_is_one_empty_line() {
     assert_eq!(blocks(Format::Plain, b""), vec![Span::at(0)]);
     assert_eq!(blocks(Format::Markdown, b""), Vec::<Span>::new());
 }
+
+/// D31: a closure point falls just past the last complete line that is
+/// blank outside a code block, a heading at the margin, or the line that
+/// closes a code block opened at the margin. Each row is a text and the
+/// prefix of it that can no longer change.
+#[test]
+fn closed_ends_after_the_last_line_that_closes_a_block() {
+    let rows: &[(&str, &str)] = &[
+        ("", ""),
+        ("still saying", ""),
+        ("a line break joins\n", ""),
+        ("a paragraph\n\n", "a paragraph\n\n"),
+        ("one\n\ntwo, still", "one\n\n"),
+        ("crlf\r\n\r\nnext", "crlf\r\n\r\n"),
+        ("# Title\n", "# Title\n"),
+        ("# Title", ""),
+        ("#\n", "#\n"),
+        ("#hashtag\n", ""),
+        ("####### seven\n", ""),
+        ("  # indented\n", ""),
+        ("text\n# Heading\nmore", "text\n# Heading\n"),
+        ("```\ncode\n\nmore\n", ""),
+        ("```\ncode\n```", ""),
+        (
+            "```rust\nlet a = 1;\n```\nafter",
+            "```rust\nlet a = 1;\n```\n",
+        ),
+        ("~~~\ncode\n~~~\n", "~~~\ncode\n~~~\n"),
+        ("````\n```\n\n", ""),
+        ("- item\n  ```\n  code\n  ```\n", ""),
+        (
+            "- item\n  ```\n  code\n  ```\n\nafter",
+            "- item\n  ```\n  code\n  ```\n\n",
+        ),
+        ("```\n# not a heading\n", ""),
+    ];
+    let found: Vec<(&str, u64)> = rows
+        .iter()
+        .map(|(text, _)| (*text, closed(text.as_bytes())))
+        .collect();
+    let wanted: Vec<(&str, u64)> = rows
+        .iter()
+        .map(|(text, prefix)| {
+            assert!(text.starts_with(prefix), "{text:?}");
+            (*text, u64::try_from(prefix.len()).unwrap())
+        })
+        .collect();
+    assert_eq!(found, wanted);
+}
+
+/// The Rust half of `closed_stays` and `closed_le_length`: written out one
+/// byte at a time, a text's closure point never moves back and never
+/// passes what was written.
+#[test]
+fn closed_never_moves_back_as_a_text_grows() {
+    let (_, text, _) = CORPUS
+        .iter()
+        .find(|(name, _, _)| *name == "everything-at-once")
+        .unwrap();
+    let bytes = text.as_bytes();
+    let mut last = 0;
+    for end in 0..=bytes.len() {
+        let at = closed(&bytes[..end]);
+        assert!(at >= last && at <= u64::try_from(end).unwrap(), "{end}");
+        last = at;
+    }
+    assert!(last > 0, "the corpus closes blocks");
+}

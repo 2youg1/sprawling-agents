@@ -226,6 +226,9 @@ pub enum Answer {
     Proposals(Box<ProposalsAnswer>),
     Range(Box<RangeAnswer>),
     Preview(Box<PreviewAnswer>),
+    /// A reply's text laid out (wire-SPEC 8-75): its closed blocks, and
+    /// the bytes they cover.
+    Reply(Box<documents::Laid>),
     Commits(CommitsAnswer),
     Doctor(Box<DoctorAnswer>),
     Upstream(Box<DoctorUpstream>),
@@ -242,7 +245,9 @@ pub enum Answer {
     Automation(Box<AutomationAnswer>),
     GithubLogin(GithubLoginAnswer),
     Guide(GuideProgress),
-    Unavailable { query: String },
+    Unavailable {
+        query: String,
+    },
 }
 
 /// Who answers for this city, and what was answered on the person's

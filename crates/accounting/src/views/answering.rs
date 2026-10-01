@@ -36,6 +36,7 @@ mod history;
 pub(crate) mod identity;
 pub(super) mod preview;
 pub(super) mod range;
+pub(super) mod reply;
 use super::lines::{endpoints_answer, known_hosts_answer, summarize};
 
 /// How many runs a cost view names besides every active one: a bound
@@ -226,6 +227,12 @@ impl Views {
             wire::Query::Range { version, range } => return self.range_ask(*version, *range),
             wire::Query::Preview { version, viewport } => {
                 return self.preview_ask(*version, *viewport);
+            }
+            wire::Query::Reply { text, state } => {
+                return Prepared::Reply {
+                    text: text.clone(),
+                    state: *state,
+                };
             }
             // What an agent was told, and the store read that recovers
             // it. A run with no prompt yet and an object this city no

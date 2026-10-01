@@ -224,6 +224,11 @@ pub enum Query {
         version: B3Hash,
         viewport: documents::Span,
     },
+    /// A reply's text, laid out by the preview's grammar (wire-SPEC 8-75).
+    Reply {
+        text: String,
+        state: documents::ReplyState,
+    },
     /// The commits this city made, newest first, a page at a time.
     ///
     /// `building` keeps the commits whose actor worked at that address
@@ -313,42 +318,34 @@ pub enum Query {
     McpHealth {
         addr: Address,
     },
-    /// Which outside applications the broker offers, and where each one
-    /// stands for this city.
+    /// Which outside applications the broker offers, and where each one stands for this city.
     ///
-    /// **The second query that costs a round trip to somebody else**,
-    /// and it is asked on the same terms as [`Query::McpHealth`]: when
-    /// a person opens the page, and when they come back to it from the
-    /// consent page they were sent to. Never on a timer - a city that
-    /// asked the broker "anything new?" on a schedule would be
-    /// generating traffic nobody reads, which `docs/third-party.md`
-    /// rules out.
+    /// **The second query that costs a round trip to somebody else**, and it is asked on the same
+    /// terms as [`Query::McpHealth`]: when a person opens the page, and when they come back to it
+    /// from the consent page they were sent to. Never on a timer - a city that asked the broker
+    /// "anything new?" on a schedule would be generating traffic nobody reads, which
+    /// `docs/third-party.md` rules out.
     ///
-    /// Carries no key: the project key is enrolled in the vault and
-    /// redeemed on the host machine, so a frame from a socket names
-    /// nothing secret and an unenrolled city answers
+    /// Carries no key: the project key is enrolled in the vault and redeemed on the host machine,
+    /// so a frame from a socket names nothing secret and an unenrolled city answers
     /// `ToolkitsAnswer::Unenrolled` rather than failing.
     Toolkits,
     /// Which release this city is running, and which one npm offers.
     ///
-    /// **Asked when a person presses the button, and at no other time.**
-    /// Not on connect, not on a timer, and not folded into another
-    /// query: `QUICKSTART.md` opens by promising that nothing was
-    /// installed and nothing outside the folder was written, and a city
-    /// that reached a registry on its own schedule would be spending
-    /// that sentence on a question nobody asked. `docs/third-party.md`
-    /// rules out the same traffic for the broker.
+    /// **Asked when a person presses the button, and at no other time.** Not on connect, not on a
+    /// timer, and not folded into another query: `QUICKSTART.md` opens by promising that nothing
+    /// was installed and nothing outside the folder was written, and a city that reached a registry
+    /// on its own schedule would be spending that sentence on a question nobody asked.
+    /// `docs/third-party.md` rules out the same traffic for the broker.
     ///
-    /// Answering it costs one request to `registry.npmjs.org`, so it is
-    /// the slowest query here and the only one whose cost a person
-    /// chose. A registry that cannot be reached is
-    /// [`ReleaseAnswer::Refused`](crate::ReleaseAnswer::Refused) rather
-    /// than [`Answer::Unavailable`](crate::Answer::Unavailable): the
-    /// city is available, the registry is not, and the page has to be
-    /// able to say which.
+    /// Answering it costs one request to `registry.npmjs.org`, so it is the slowest query here and
+    /// the only one whose cost a person chose. A registry that cannot be reached is
+    /// [`ReleaseAnswer::Refused`](crate::ReleaseAnswer::Refused) rather than
+    /// [`Answer::Unavailable`](crate::Answer::Unavailable): the city is available, the registry is
+    /// not, and the page has to be able to say which.
     ///
-    /// Nothing it answers updates anything. Where a binary lives belongs
-    /// to whoever installed it, so this reports and stops.
+    /// Nothing it answers updates anything. Where a binary lives belongs to whoever installed it,
+    /// so this reports and stops.
     NewestRelease,
     /// Everything this person settled about their own reading of the
     /// city: the language, the appearance, the chords they rebound.

@@ -150,6 +150,11 @@ pub enum Prepared {
         version: B3Hash,
         viewport: documents::Span,
     },
+    /// A reply's text the page sent, still to be laid out.
+    Reply {
+        text: String,
+        state: documents::ReplyState,
+    },
     /// Every building's progress and every pursuit's verdict, with the
     /// buildings still to list and their plans still to read.
     City(CityAsk),
@@ -318,6 +323,7 @@ impl Prepared {
                 version,
                 viewport,
             } => super::answering::preview::preview_answer(&city_root, version, viewport),
+            Self::Reply { text, state } => super::answering::reply::reply_answer(&text, state),
             Self::Building {
                 city_root,
                 addr,

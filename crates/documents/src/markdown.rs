@@ -18,7 +18,8 @@ mod position;
 mod target;
 mod tree;
 
-pub use tree::{Align, Block, Check, Construct, Inline, ListItem, Order, Preview, Row, Spacing};
+pub use tree::{Align, Block, Check, Construct, Inline, Laid, ListItem, Order, Preview};
+pub use tree::{ReplyState, Row, Spacing};
 
 use kernel::AxError;
 
@@ -37,15 +38,34 @@ use crate::window::{Lifted, Window, cut};
 pub fn preview(encoding: Encoding, lifted: Lifted<'_>, viewport: Span) -> Result<Preview, AxError> {
     match encoding {
         Encoding::Utf16Le | Encoding::Utf16Be => Ok(Preview::Unsupported { encoding }),
-        Encoding::Utf8 | Encoding::Utf8Bom => {
-            let window = settled(cut(encoding, lifted, viewport)?, lifted.size);
-            let blocks = lowering::blocks(&window.text, window.span.start());
-            Ok(Preview::Laid {
-                span: window.span,
-                blocks,
-            })
-        }
+        Encoding::Utf8 | Encoding::Utf8Bom => laid(encoding, lifted, viewport).map(Preview::Laid),
     }
+}
+
+/// The blocks of a model's reply that can no longer change, read by the
+/// grammar a preview is (D30): a settled reply is read as a version
+/// holding exactly its text, one still streaming only up to its closure
+/// point (D31). At most one window, as a preview; `span.end` is where
+/// the rest of the text is sent from.
+///
+/// # Errors
+/// The [`cut`] refusals: a text holding a NUL is not unmarked UTF-8
+/// text (D4).
+pub fn reply(_text: &str, _state: ReplyState) -> Result<Laid, AxError> {
+    Ok(Laid {
+        span: Span::at(0),
+        blocks: Vec::new(),
+    })
+}
+
+/// One window of UTF-8 text, cut, ended on a block, and laid out.
+fn laid(encoding: Encoding, lifted: Lifted<'_>, viewport: Span) -> Result<Laid, AxError> {
+    let window = settled(cut(encoding, lifted, viewport)?, lifted.size);
+    let blocks = lowering::blocks(&window.text, window.span.start());
+    Ok(Laid {
+        span: window.span,
+        blocks,
+    })
 }
 
 /// The window, ended at its second-to-last block when the version runs

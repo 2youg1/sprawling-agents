@@ -88,7 +88,7 @@ fn read(store: &Cas, version: &B3Hash, span: Span) -> Result<Vec<u8>, AxError> {
     reason = "test code"
 )]
 mod tests {
-    use documents::{Block, Encoding, Inline, Preview};
+    use documents::{Block, Encoding, Inline, Laid, Preview};
     use kernel::Address;
     use storage::Cas;
     use wire::{Coverage, DocumentBody, DocumentState};
@@ -160,7 +160,7 @@ mod tests {
                 panic!("the version was kept");
             };
             assert_eq!(answer.version, held.version);
-            let Preview::Laid { span, blocks } = answer.preview else {
+            let Preview::Laid(Laid { span, blocks }) = answer.preview else {
                 panic!("UTF-8 is laid out");
             };
             assert_eq!(span.start(), from);
@@ -189,6 +189,48 @@ mod tests {
             from = span.end();
         }
         assert_eq!(read, paragraphs);
+    }
+
+    /// A Markdown file one window holds whole, opened through `Document`,
+    /// previews by the version that answer named (accounting-SPEC 33).
+    #[test]
+    fn a_short_document_previews_by_its_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = "# Title\n\nbody\n";
+        std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+        std::fs::write(dir.path().join("lab/short.md"), source).unwrap();
+        let mut views = Views::new(dir.path());
+        let at = Address::parse("lab/short.md").unwrap();
+        let wire::Answer::Document(answer) = views.answer(&wire::Query::Document { at }) else {
+            panic!("Document answers with a document");
+        };
+        let DocumentState::Held(held) = answer.state else {
+            panic!("{answer:?}");
+        };
+        let DocumentBody::Text { coverage, .. } = held.body else {
+            panic!("the fixture is text");
+        };
+        assert_eq!(coverage, Coverage::Whole, "one window holds it");
+        assert_eq!(
+            preview(&mut views, held.version, 0, 14),
+            wire::Answer::Preview(Box::new(wire::PreviewAnswer {
+                version: held.version,
+                preview: Preview::Laid(Laid {
+                    span: Span::new(0, 14).unwrap(),
+                    blocks: vec![
+                        Block::Heading {
+                            span: Span::new(0, 7).unwrap(),
+                            level: 1,
+                            inline: vec![Inline::Text("Title".to_owned())],
+                        },
+                        Block::Paragraph {
+                            span: Span::new(9, 13).unwrap(),
+                            inline: vec![Inline::Text("body".to_owned())],
+                        },
+                    ],
+                }),
+            }))
+        );
     }
 
     #[test]
