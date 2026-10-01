@@ -326,6 +326,49 @@ pub(super) const LEAN: Requirement = row(
 .from(Upstream::GitHub("leanprover/lean4"))
 .pinned(Pin::LeanToolchain);
 
+/// The Zig version `desktop/ffi/zig-version` pins, the one file the
+/// leaf's build script and CI's install step read too (sprawling-SPEC.md
+/// 8-146).
+const ZIG_PIN: &str = include_str!("../../../../../desktop/ffi/zig-version").trim_ascii_end();
+
+/// The compiler of the desktop server's Zig leaf. Required because a
+/// Windows build of this binary compiles the leaf, and `Need` does not
+/// vary by platform; elsewhere the leaf is not compiled and the tool is
+/// simply unused (sprawling-SPEC.md 8-146).
+pub(super) const ZIG: Requirement = row(
+    "zig",
+    Need::Required,
+    "the Zig leaf desktop/ffi builds on Windows, at the version desktop/ffi/zig-version pins",
+    Detection::Listed {
+        program: "zig",
+        args: &["version"],
+        line: ZIG_PIN,
+    },
+    "https://ziglang.org/",
+    PerPlatform {
+        windows: Recipe::Command {
+            program: "winget",
+            args: &[
+                "install",
+                "--id",
+                "zig.zig",
+                "-e",
+                "--version",
+                ZIG_PIN,
+                "--scope",
+                "user",
+            ],
+        },
+        macos: Recipe::Command {
+            program: "brew",
+            args: &["install", "zig"],
+        },
+        linux: Recipe::Manual(
+            "install the Zig desktop/ffi/zig-version names from https://ziglang.org/download/",
+        ),
+    },
+);
+
 pub(super) const UV: Requirement = row(
     "uv",
     Need::Optional,

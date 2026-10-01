@@ -304,6 +304,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
     toolchain::CARGO_DENY,
     toolchain::ELAN,
     toolchain::LEAN,
+    toolchain::ZIG,
     toolchain::UV,
     toolchain::PYTHON,
     toolchain::CARGO_MUTANTS,
