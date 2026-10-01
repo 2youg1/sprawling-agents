@@ -212,7 +212,6 @@ names = [
   "crates/runtime/src/handoff.rs::new",            # 5
   "crates/runtime/src/run.rs::drive",              # 5
   "crates/runtime/src/turn.rs::call",              # 5
-  "crates/sprawling/src/console/terminal.rs::drive",  # 5
 ]
 
 # **Re-priced from 1000 to 400 on the person's ruling, 2026-09-05.** The
