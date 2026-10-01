@@ -7,6 +7,7 @@ import crates.collab.spec.Inbox
 import crates.collab.spec.Fanin
 import crates.collab.spec.Workshop
 import crates.collab.spec.Triage
+import crates.collab.spec.Claim
 
 /-! # collab 的规格
 
@@ -25,14 +26,14 @@ import crates.collab.spec.Triage
 | `signal_tool`、`goal_tool`、`workshop_tool` | 上面的机制怎么变成居民手里真能调的工具（§8） |
 | `pr_tool` | 开 PR 与 worktree 为根的 run（§8） |
 | `triage` | 一条外来信号该送到哪个 Address（`spec/Triage.lean`） |
-| `claim_tool`、`claim_effect` | 认领、结项、拆分 `Roadmap.md` 上的一个节点（§8） |
+| `claim_tool`、`claim_effect` | 认领、结项、拆分 `Roadmap.md` 上的一个节点，以及落地时哪一条效应要核盘上那份（`spec/Claim.lean`；§8、D6） |
 | `archive_tool` | 把一条偏好、决定、更正或事实记上书架（§8、§14） |
 | `citation` | 一条引文是否仍然指着被钉住的那份原文（§8） |
 -/
 
 /-! ## 2 验收标准
 
-分部里的定理是模型对性质的证明：重复投递不产生第二件、急件 lane 只装 Steer、pull 不超 bandwidth；验证者不是生产者、验不过没有 Artifact、PR 的验证者不是实现者；只派就绪节点、一个节点不派两次；污染件不自己开工、判不出就交给人。每个分部各有一条「拿掉守卫即反例」的定理（咬得动的演示）。
+分部里的定理是模型对性质的证明：重复投递不产生第二件、急件 lane 只装 Steer、pull 不超 bandwidth；验证者不是生产者、验不过没有 Artifact、PR 的验证者不是实现者；只派就绪节点、一个节点不派两次；污染件不自己开工、判不出就交给人；分一行要先握着它、桌子答应的效应落在派活那份计划上全部落下、一行被别人动过则本 run 对它的拆分落不下。每个分部各有一条「拿掉守卫即反例」的定理（咬得动的演示）。
 
 Rust 实现对模型的一致性由测试检查，不由证明：每个模块旁的 `tests.rs` 经生产入口断言它在本文件 §8 或分部里的规则；两条判负线（`Artifact` 无公开构造子、未验证的 PR 合不进来）由 `tests/ui/` 的编译失败反例钉住；`tests/pr_flow.rs` 从外面走一遍开 PR、被拒、合并。
 -/
@@ -151,17 +152,17 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 
 **`collab::triage`**（形状 1 判定；性质见 `spec/Triage.lean`）。`Reflex::{Discard, Notify, Light, Full}`、`Arrival`、`Rule`、`Landing { addr, reflex, because }`；`Triage::new(rules, fallback)` 在构造点拒空匹配串。
 
-**`collab::claim_tool`、`collab::claim_effect`**（形状 4 适配器、形状 2 值类型）。`ClaimEffect::{Claimed, PutDown { exit: PlanExit }, Split { children }}` 与它的 `id`、`expected_before`、`kind`、`payload`（形状是 `kernel::event::record::RoadmapMoved`）、`apply`；`ClaimDesk::new(who, room, roadmap, booking)`、`take_effects`、`roadmap`（仅当本次 drive 改过）、`holding`、`abandon`；`Booking` 是调用时判定认领的权威（城里是记账线程）；`still_true(text, effect)`。六个动作：`list`、`claim`、`finish`、`block`、`release`、`split`。
+**`collab::claim_tool`、`collab::claim_effect`**（形状 4 适配器、形状 2 值类型）。`ClaimEffect::{Claimed, PutDown { exit: PlanExit }, Split { children }}` 与它的 `id`、`kind`、`payload`（形状是 `kernel::event::record::RoadmapMoved`）、`apply`；`ClaimDesk::new(who, room, roadmap, booking)`、`take_effects`、`roadmap`（仅当本次 drive 改过）、`holding`、`abandon`；`Booking` 是调用时判定认领的权威（城里是记账线程）；`still_true(text, effect)`。六个动作：`list`、`claim`、`finish`、`block`、`release`、`split`。
 
 - `Roadmap.md` 是唯一权威，不另立认领登记表：文件被人读、被 `PlanTree::progress` 数、被这个工具改，一处事实，三个读者。
 - 六个动作长在同一条 catalog 行上：模型每一轮读的行数是成本，一行背后的动词数不是（§14 的字节上限）。
-- 状态迁移由 `kernel::PlanTree` 从计划自身判：`claim` 只从就绪集里取（叶子、无人认领、依赖全绿），`finish`、`block`、`release` 只作用于本次 drive 认领的那个节点；拒词报出此刻的状态并指向一个真能拿的节点。
+- 状态迁移由 `kernel::PlanTree` 从计划自身判：`claim` 只从就绪集里取（叶子、无人认领、依赖全绿），`finish`、`block`、`release`、`split` 只作用于本次 drive 认领的那个节点（D6）；拒词报出此刻的状态并指向一个真能拿的节点。
 - 认领在调用时由 `Booking` 判定，桌子的副本先答：先让 `PlanTree::claim` 在副本上判，再问 `Booking`；`Booking` 拒绝时桌子不持有节点、不排效应、不改文本。`Booking` 记的是哪轮在飞的活持有哪个节点，只活到那轮活落地为止，所以它不是第二份登记表；它拿到整条 `ClaimEffect::Claimed`，因为那一行的种类与载荷只由 `ClaimEffect::kind` 与 `payload` 定义。
 - 一次 drive 只持有一个节点。计划门禁就是那个 `Held` 值：它由 `PlanTree::claim` 铸出，只能花在 `finish` 或 `stop` 上，没有第三个出口；一个只是结束了的 run 由 `abandon` 把它花在 `FrozeWithoutEvidence` 上，「认领了却没交代」在冻结之后不可达。
-- `split` 之后不再持有那根枝；写盘前把新文本重新解析并 `PlanTree::build` 一次，拆不出合法树就一个字节都不写。拆分结果带 `unfinished`：该节点下尚未 Done 的子节点数，由拆完的树数出。
+- `split` 只分本次 drive 握着的那一行，没握着就拒绝，拒词说这个 run 握着什么、恢复语叫它先认领那一行，桌子不排效应、不改副本（D6；`spec/Claim.lean` 的 `split_needs_hold`）。分完之后不再持有那根枝；写盘前把新文本重新解析并 `PlanTree::build` 一次，拆不出合法树就一个字节都不写。拆分结果带 `unfinished`：该节点下尚未 Done 的子节点数，由拆完的树数出。
 - `block` 与 `release` 必须带一句原因，原因随记录走（`roadmap_blocked` 的载荷），不随表格走。哪一种记录由出口决定（`ClaimEffect::kind`）：绿是 `roadmap_finished`，红是 `roadmap_blocked`，交回是 `roadmap_released`，拆是 `roadmap_split`。效应穷尽，新增一个变体应当是写入处的编译错误。
-- 效应怎么改文本只有 `ClaimEffect::apply` 一个定义：桌子在调用时用它改副本，工人落地时用它把同一组效应重放到盘上；`Split` 因此带着子节点的 weight。`PutDown` 携 `PlanExit` 而不是一个动词，把出口的两条臂抄进第二个枚举，就是对「一个节点可以怎么离开」的第二份意见。`still_true` 问的是记录答不了的那个问题：盘上的文档现在是否仍然说着这条效应声称它让它说的话。
-- 并发口径：工人写盘前重读文件，每个节点只核第一条效应（第二条是这轮自己按派活时的文件产出的）；行若已不是预期状态则整组丢弃并留一条诊断，而不是覆盖；都对得上时只有本轮碰过的行改变。
+- 效应怎么改文本只有 `ClaimEffect::apply` 一个定义：桌子在调用时用它改副本，工人落地时用它把同一组效应重放到盘上；`Split` 因此带着子节点的 weight。`PutDown` 携 `PlanExit` 而不是一个动词，把出口的两条臂抄进第二个枚举，就是对「一个节点可以怎么离开」的第二份意见。`still_true` 问的是记录答不了的那个问题：盘上的文档现在是否仍然容得下这条效应。只有认领会答「不」——它要那一行仍是 `Not started`；放下与拆分只作用于本 run 握着的那一行，它们的新鲜由握持之前的那条认领担保（D6），`still_true` 不为它们另判一个期待状态。
+- 并发口径：工人写盘前重读文件，把效应按次序重放上去，每条在前面几条留下的文本上问 `still_true`（`spec/Claim.lean` 的 `land`；accounting-SPEC §8-27）：本 run 拆出又认领的子行因此在那里；一条认领的行若已不是 `Not started` 则整组丢弃并留一条诊断，而不是覆盖；都对得上时只有本轮碰过的行改变。桌子答应的效应落在派活那份计划上全部落下（`admitted_lands`），工具答成功而落地一字不写只在别的写者动过那一行时发生，并且有那条诊断。
 
 **`collab::archive_tool`**（形状 4 适配器）。`ARCHIVE_KINDS` 是封闭的四类（§14）。回忆是读，不是记：索引由 worker 从书架算出后交给桌子，桌子不留副本，盘上的文件才是真的。`ArchiveEffect::Recorded` 是桌子交回的值，落盘与记账归装配层。
 
@@ -180,13 +181,15 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 
 /-! ## 10 实现逻辑
 
-每个模块的实现规则写在 §8 与分部里。三个设计选择各有被否决的备选：
+每个模块的实现规则写在 §8 与分部里。四个设计选择各有被否决的备选：
 
 D3 工具怎么拿到活的跨 run 状态：把 Inbox 本体借给工具。被否决的是开一个 `peek` 让工具拿快照：它要在 `storage::EventQueue` 与 `collab::Inbox` 两处各长一个读面，还造出两份同时存在的队列，「谁才是顺序的权威」多了一个答案。借出方案零新接口，与装配层已有的 `interrupts` 借还同形；代价是借出期间工人手上没有该房间的队列，所以归还必须在成败两条路上都发生，一条断言盯着这件事。
 
 D4 谁来定一个 run 写在哪：楼的规则说了算（`RULES.toml` 的 `review`）。被否决的是每个 dispatch 都领一棵树：它让每一次普通派活都付一次全量检出，并把「派一个居民改一行字」变成「还得再派一个来看一眼」。楼级开关把选择交回给人，并与 `confidential` 同形同位：一个已有的权威多一行。
 
 D5 三件工具还是一件多臂工具：每个机制一件。被否决的是一件 `collab` 工具带 action 枚举：它省两份 schema 的常驻字节（工具表在缓存前缀里，这是真成本），但把三件变更理由不同的东西绑成一个接口，disclosure 只能写成一句拉长的话；模型按名字选工具，一个叫 `collab` 的工具不告诉它任何事。多出的常驻字节是两份空 schema 的量级。
+
+D6 分一行计划要不要握着它：要，由桌子在调用时判，落地不再判。`ClaimDesk::split` 只分本次 drive 握着的那一行，没握着就以 `E_INVALID_ARGS` 拒绝，三段式的主体说这个 run 握着什么，恢复语叫它先认领那一行（`spec/Claim.lean` 的 `split_needs_hold`）；`still_true` 只问认领，不为拆分另判一个期待状态。理由有三条。其一，拆分于是走过认领，而认领在调用时由 `Booking` 对全城判、落地时对盘上那份判，所以从同一份计划派出的两个 run 不会把同一行各分一次（`split_of_moved_row_is_stale`）；不经认领的两次拆分都会落下，`kernel::spine::insert_children` 在已有子行之后接着编号，第二组子行不报错地长出来（`withoutHold_splits_twice`）。其二，拒绝在模型调用的那一刻到达，模型当场拿到下一步，而不是被告知分好了、落地时才被丢掉（`tools/adversary/Spec.lean` §4 第八个发现）。其三，`split` 本来就是一个干着活的 run 发现活更多时说的话（`collab::claim_tool` 的模块注释），握着那一行是它的前提。被否决的是让落地按桌子看到的状态判、允许分一行没人认领的计划：那样的拆分绕过 `Booking`，并发的两次拆分都按 `Not started` 落下；要挡住它就得给拆分另立一种预订，那是「谁在动这一行」的第二个权威。代价是一个只想分计划的 run 多付一次 `claim` 调用。重开参数：出现只分计划、不干那一行活的角色（例如市长把一件事分给几栋楼，G4），而 `Booking` 能为一次拆分预订那一行时，改由预订判，桌子不再要求握着。
 
 成本：每件工具在 catalog 里占一行，坐在缓存前缀里，一行背后的动词数不增加常驻成本，行数与字节数才增加（§14）。Signal 在 prefix 里占零字节，常驻的只有 `status` 的 `signals_pending`；pull 的 bandwidth 在接收方。拒词报出此刻的状态与一条可执行的下一步，因为只说「不行」的拒绝会让模型换个说法再试。
 -/
@@ -219,12 +222,12 @@ D2 没有草稿退回机制。房间没有版本，发言不带「作者所见�
 
 /-! ## 15 影响面
 
-改一张桌子或一件工具的构造签名，波及 `crates/sprawling` 装配层造这张桌子的地方；改记录的形状（`Signal`、`OpenRequest` 一族、`ClaimEffect::payload`）波及读 Ledger 的折叠与视图。改分部里的模型，先改本文件对应的要求，再改 Rust 与它的测试。
+改一张桌子或一件工具的构造签名，波及 `crates/sprawling` 装配层造这张桌子的地方；改记录的形状（`Signal`、`OpenRequest` 一族、`ClaimEffect::payload`）波及读 Ledger 的折叠与视图。改 `still_true` 或桌子对哪些动作要求握持（D6），波及落地的那一处 `accounting::effect::Claims::of`（accounting-SPEC §8-27），两边与 `spec/Claim.lean` 一起改。改分部里的模型，先改本文件对应的要求，再改 Rust 与它的测试。
 -/
 
 /-! ## 16 测试与约束
 
-证明：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`，`spec` 门判后两条的文本形状。咬得动的演示：`Collab.Inbox.withoutSeen_duplicates`、`Collab.Fanin.withoutGuard_self_verifies`、`Collab.Workshop.withoutHanded_hands_twice`、`Collab.Triage.withoutCap_starts_work`，各自说明拿掉哪条守卫后对应的性质不再成立。
+证明：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`，`spec` 门判后两条的文本形状。咬得动的演示：`Collab.Inbox.withoutSeen_duplicates`、`Collab.Fanin.withoutGuard_self_verifies`、`Collab.Workshop.withoutHanded_hands_twice`、`Collab.Triage.withoutCap_starts_work`、`Collab.Claim.withoutHold_splits_twice`，各自说明拿掉哪条守卫后对应的性质不再成立。
 
 实现一致性：逐模块 `tests.rs`；`tests/ui/` 钉住两条判负线；`tests/pr_flow.rs` 走一遍 PR；`cargo nextest run -p sprawling-collab`。模型的证明不是 Rust 实现的证明：两者之间由这些测试连着。
 -/

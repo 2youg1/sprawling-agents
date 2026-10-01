@@ -271,10 +271,10 @@ impl Landing {
     pub fn shelf(Vec<ArchiveEffect>, write_root: &Path, building: &Address, at: TimeMs, room: &Address, who: &str) -> Result<Landing, AxError>;
 }
 
-/// 一跑对共享计划做的事。两种而无第三种：每条效应都还对得上盘上那份、全部重放上去，或有一条对不上、一个字也不写。
+/// 一跑对共享计划做的事。两种而无第三种：效应按次序重放到盘上那份、每条都还对得上，或有一条认领对不上、一个字也不写（§8-27）。
 pub enum Claims {
     Landed(Box<Landing<Closing>>),
-    Stale { nodes: Vec<String>, released: Box<Landing<Closing>> },   // 动过的节点报给人；released 关掉本跑已落账的认领
+    Stale { node: NodeId, released: Box<Landing<Closing>> },   // 第一条对不上的认领报给人；released 关掉本跑已落账的认领
 }
 impl Claims { pub fn of(effects: &[ClaimEffect], on_disk: &str, path: PathBuf, room: &Address, who: &str) -> Result<Claims, AxError>; }
 
@@ -287,7 +287,7 @@ impl RunWorker { fn settle(&mut self, at: &Assignment, run: RunId, landing: effe
 **形状**：先后是类型的性质，而不是写桌子的人的纪律。`Then` 只能从 `Landing::record` 里拿到，而 `record` 先把所有行送进去才返回它；要把顺序写反，得先拿到一个拿不到的值。
 
 - **批而不是逐条**：一张桌子的行全部落完，才轮到它的变化。signal 一支因此先落完所有 `signal_enqueued` 再投递；`deliver` 与 `knock` 都不写账，所以账本字节与逐条交错时相同。
-- **计划那一支是全有全无的**，所以它自己一个穷尽枚举 `Claims`：任一条效应对不上盘上的那份，就一字不写，把动过的节点报给人，并用 `released` 里的 `roadmap_released` 行关掉本跑已经落账的认领（sprawling-SPEC.md §8-16 的形制）。效应重放到 `on_disk` 上，而不是写回派活时的副本，所以别的 run 在此期间落下的行保留。记账线程在模型认领时已经拒绝了另一个在飞 run 持有的节点（`accounting::worker::booking`，sprawling-SPEC.md 8-42-8）；`Claims::of` 是后盾，接住从旧副本认领了已被别人落地的节点的 run。
+- **计划那一支是全有全无的**，所以它自己一个穷尽枚举 `Claims`：效应按次序重放、只有认领核盘上的状态（§8-27），任一条认领对不上，就一字不写，把那个节点报给人，并用 `released` 里的 `roadmap_released` 行关掉本跑已经落账的认领（sprawling-SPEC.md §8-16 的形制）。效应重放到 `on_disk` 上，而不是写回派活时的副本，所以别的 run 在此期间落下的行保留。记账线程在模型认领时已经拒绝了另一个在飞 run 持有的节点（`accounting::worker::booking`，sprawling-SPEC.md 8-42-8）；`Claims::of` 是后盾，接住从旧副本认领了已被别人落地的节点的 run。
 - **归档行不需要先写盘**：账本行要的 `kind`／`day`／`subject` 由 `city::archive_entry` 从入参算出（city-SPEC §8-9）。不在装配层另算 `day_of`，因为那会是「一条归档记录长什么样」的第二个权威。
 - **`raised`（待批项）不进本模块**：它不是桌子交出来的效应，而是驱动期间暂存的项，本身就先落账后改状态。
 
@@ -299,6 +299,24 @@ impl RunWorker { fn settle(&mut self, at: &Assignment, run: RunId, landing: effe
 **测试**：`what_a_run_changes_is_changed_after_the_line_that_announces_it`（`accounting::worker::driving::tests::ledger`）。一跑归档一条决定、又从共享计划里拿一行；`RunWorker::observe` 的 sink 在一行耐久之后才跑，所以它正是看得见「先」的位置。断言：`asset_archived` 落时书架上还没有它，`roadmap_claimed` 落时盘上那一行还没被拿走；跑完两者都在位。
 
 **影响面**：`accounting` 公开面有 `effect` 模块，因为写它的桌子在 `bin::assembly`；`city` 的 `archive_entry` 与 `collab` 的效应类型是它的入参，所以本 crate 依赖 `city` 与 `collab`（ARCHITECTURE.md §3 的 `depmap`）。
+
+### 8-27 accounting::effect：计划的效应按次序重放，只有认领核盘上的状态（形状 2 值类型；collab D6）
+
+```rust
+// crates/accounting/src/effect.rs
+pub enum Claims {
+    Landed(Box<Landing<Closing>>),
+    Stale { node: NodeId, released: Box<Landing<Closing>> },
+}
+impl Claims { pub fn of(effects: &[ClaimEffect], on_disk: &str, path: PathBuf, room: &Address, who: &str) -> Result<Claims, AxError>; }
+```
+
+- **按次序重放，每条在前面几条留下的文本上核。** `Claims::of` 从盘上此刻的那份出发，对每条效应先问 `collab::still_true`，再用 `ClaimEffect::apply` 改文本；本 run 自己的前几条效应因此是后几条的前提，不需要「每个节点只核第一条」的例外。本 run 分了自己握着的一行、再认领其中一片叶子，那条认领核的是拆完的文本，两条都落下。
+- **只有认领会对不上。** 认领要那一行仍是 `Not started`；放下与拆分只作用于本 run 握着的那一行（collab D6），握持之前的那条认领已经在重放里核过，落地不为它们另判一个期待状态。「分一行要不要握着它」于是只有桌子那一处判定（`crates/collab/spec/Claim.lean` 的 `land` 与 `admitted_lands`）。
+- **过时报第一条对不上的认领，重放就停在那里。** `Stale.node` 是那一行；`released` 照旧关掉本跑每一条已落账的认领。停下而不是接着核：被丢下的那条认领之后可能跟着它拆出的子行，接着核会把还不存在的子行报成「被动过」，而接着重放就得吞掉 `apply` 对一行已被别人改掉的拒绝。
+- **装配层**：`accounting::worker::settling::desks` 的 `Stale` 一臂为那一行留一条诊断（`collab::claim_tool`，Refuse 级），其余不变。
+
+**测试**：`a_run_that_splits_its_row_and_claims_a_leaf_lands_both`（`accounting::effect::tests`）；`a_split_of_a_row_this_run_does_not_hold_is_refused_at_the_call`（`collab::claim_tool::tests`）。
 
 ### 8-6 accounting::plan_view：计划从每问一次重解析，变成一次投影（形状 7 投影）
 
@@ -1084,6 +1102,7 @@ pub(super) fn offered(reader: &runtime::BoundReader, asked: &Offering) -> Result
     (a) 模型调用作 links 里调用的第二种对，答复由 `views::rounds::Attempts` 配到它的 run 最近一条 `model_called`，`turns` 也经它配；`calls` 的行换成 `callee` 两种之一，`SCHEMA` 进到 `sprawling.playback/3`，`PROJECTION_RULES` 进到 4。理由：「一条答复答哪次尝试」原来只写在 `turns` 的 `folded.last_mut()` 里，playback 再写一份就是第二个家；做成两处共用的一个小值，rounds 改这条规则时 bundle 跟着改。模型调用没有 id，键用 `model_called` 的 seq：它在一本账里唯一，复核时也不变。用 `callee` 而不是在原来的行上加一个可空的 `model` 字段，因为工具调用的 `id` 对模型调用没有意义，可空字段会让读者分不清「没有」与「读不到」。被否决的做法：①让 `wire::Turn` 交出答复行的 seq（线上形状变，`WIRE_V` 进位，换来的只是 playback 少写几行）；②页面拿 `events` 里两条 `moment` 自己相减（看不出哪条答复配哪次尝试，一次重发会被读成一次很长的调用）；③把 `first_at` 当耗时（那是首字延迟，另一个问题）。
     (b) 提交的证据从 walk 里逐行折的 `trace::History` 读：范围内第一次宣告的 `Committed` 行，在折完它的那一刻问 `Query::Commit`；调用与同楼的别人经 walk 建的索引读。理由：cutoff 的唯一定义是 walk 停下的那一行；视图折的是 walk 核对过的同一批记录，问的是折到宣告行时的视图，所以答只取决于那一行之前的历史，cutoff 之后的行写了什么、审不审得过都碰不到它。一遍折叠代替了每个提交一次 `views::ask`（每次审一遍整条链、折一遍视图）与一次 `LedgerIndex::rebuild`，一份 bundle 的代价不再是提交数乘账本字节数。被否决的做法：①给 `trace` 一个停在某个 seq 上的 `views::ask`（要 storage 的整链审计与快照起点都能停在一个 seq 上，那是 storage 的公开契约；而且每个提交仍各折一遍）；②walk 之后从创世再折一遍到 cutoff（多读一遍账本，读到的字节不是这一遍核对过的）；③在 playback 里只折提交，按「同一 run 上一个提交」自己求 `previous`（那是 `views::commits` 那条规则的第二个家，第 29(d) 条已否决）。代价：没有提交的窄选择也要折一遍视图（§3）。重开参数：多日夹具上视图折叠在导出里占大头时，按 §3 改成遇到第一个范围内的提交才开始折。
     (c) 「一次导出开始了几次视图折叠」由一个只在测试里编译的计数读出：`trace` 里开始一次折叠的两处（`trace` 的 `views::ask` 与 `History::new`）各数一次，`playback::tests::tracing` 在 N 与 2N 个提交上比较。理由：要挡住的回退是「每个提交又把整本账折一遍」，墙钟读数在小夹具上看不出它，计数与机器快慢无关。被否决的做法：只记墙钟读数（看不出按 N 增长的代价）；经 storage 的 `Vfs` 缝数读了几遍段（那是 storage 的接口，这里不改它）。
+39. **计划的效应按次序重放、每条在前面几条留下的文本上核，只有认领核盘上的状态；过时报第一条对不上的认领（§8-27）。** 理由：「分一行要不要握着它」只由桌子判（collab D6），落地若再为拆分、放下各判一个期待状态，就是同一条规则的第二份拼写，`tools/adversary/Spec.lean` §4 的第八个发现正是两份拼写不一致的样子。按次序重放让本 run 的前几条效应成为后几条的前提，「每个节点只核第一条效应」那条例外随之没有了，本 run 拆出又认领的子行也不再被判过时。被否决的做法：①照旧只核每个节点的第一条效应、对盘上原文判——拆出的子行在盘上还不存在，认领它的那条被判过时，工具答了成功、落地一字不写，与第八个发现同一类；②过时之后接着重放，把每一条对不上的认领都报出来——被丢下的拆分之后的子行认领会被误报，而接着重放就得吞掉 `apply` 的拒绝。重开参数：一个 run 能同时握多行时，一行过时不该挡住别的行，那时按行分组判。
 41. **(a) 回复在视图锁外读，读出的块不缓存。** `prepare` 只把文字拷进 `Prepared::Reply`，`documents::reply` 在锁放开之后读（§8-29）。理由：读一窗是一次 comrak，与预览同阶，锁里多一次它，等着折叠的每一行都多等一次；同一段文字恒读出同一棵树，页面自己留着答复就够了。被否决的做法：①在 `prepare` 里当场作答——它不读盘，看上去是「视图里就答得了」的一类，但它的代价随文字长短走，不随视图走；②按文字的摘要缓存读出的块——一份要随快照编码的拷贝，换来的只是页面重问同一段文字时省一次 comrak，而页面不重问。**(b) 读内容库只有 `range::stored` 一处**，`Range` 与 `Preview` 都经它拿到编码与抬起的字节（§8-21、§8-23）。理由：打开、长度、标记、抬起这四步是「按版本读一个窗口」的前一半，两条查询的差别只在后一半（切还是读成块）；四步写两遍，改其中一处（例如内容库换了读法）时另一处不会跟着改。放在 `range` 而不另开模块，是因为 `range` 本来就拥有「按版本读一个窗口」，`preview` 是它的第二个读者。被否决的做法：①`preview` 先答一个 `Range` 再拿窗口的文字读——读法相同，却要把 `Window` 的文本再交回 `documents`，而 `documents::preview` 要的是抬起的字节，好在窗口之外判块末；②新开一个只有这一个函数的模块——两个读者都在 `answering` 里，一个函数不值得一个模块名。
 42. **提案的原文由 run 引出，不给字节区间；工具经 lane 的 relay 写行；收回由工具自己那本小账判（§8-30）。**
     (a) 引文：模型读文件经 `read`，看到的是文字，不是字节偏移；它给出原话，区间由工具在那一版里找出，找不到或不止一处就拒，与 `edit` 的 `old` 同一种约定。被否决的做法：①收 `start`、`end` 字节偏移——模型要自己按编码数字节，数错一个就切进字符中间或切错句子；②收行号——要第二套「行怎样数」的规则，而 `documents` 的区间都按字节。
