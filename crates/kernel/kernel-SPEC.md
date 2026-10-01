@@ -2417,3 +2417,13 @@ pub struct RunStarted {
 - **一次 run 用的是哪一版。** `run_started.naming` 由 `runtime::run::Charter::open` 从 `RunPlan.naming` 照录（runtime-SPEC §8-56）。旧行没有这个键，读作「这一行早于身份入账」，页面回退到地址或角色名，不用今天的名字。
 - 两个键都按 `default` 加、缺席不写，所以旧账本照读，旧构建读新行时把它们当未知键拒（§8-40 的方向门照旧）。
 - 验收：`record::run` 的 `a_run_started_line_records_the_naming_it_froze`（写出、读回、缺席不写）。
+
+### 8-80 `ModelTag::Ocr`：一个能读图的模型的登记位（`kernel::model::wire`，形状 2 值类型）
+
+```rust
+pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest" | "transcribe" | "ocr"
+```
+
+- **一个标签，不是一个模型。** 二进制里不带任何模型（D18）：人接一个端点、为 `Ocr` 选一个能读图的模型，城的 OCR 工具（X6）按这一次选择调用它，与转写读 `Transcribe` 是同一个机制（wire-SPEC §8-27）。没有选时，用到它的工具答它不可用，不回落到 `Main`——一个只会读字的模型被递上一张图，答的是它猜的东西。
+- **先有登记位，调用方随 X6 来。** 这条与本枚举「有人问才长」的规矩相违，理由是线上形状：`ModelTag` 在线上，加一个值要进位，本批（`WIRE_V` 45）一次带上，X6 落地时不再为它另进一位（wire-SPEC §12.1）。在 X6 落地之前，页面不画这一行（client-SPEC 的模型表照旧三行）。
+- `ALL` 的顺序就是设置页给出它们的顺序，`Ocr` 在最后。

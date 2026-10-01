@@ -1398,12 +1398,9 @@ pub enum Query { /* … */ NewestRelease }   // 线上拼作 "newest_release"
 监视页和 `sprawling top` 读同一份历史（sprawling-SPEC.md 8-94），它们从线上拿到它。线协议为此加一种帧，两个方向各一个变体：
 
 - `ClientFrame::Monitor(Monitoring)`：`Monitoring` 是 `Watch`、`WatchSummary` 或 `Release`。`Watch` 让这个会话算作一个看整页的人，`WatchSummary` 让它算作一个只看事实条摘要的人，`Release` 让它不再算；会话结束等于 `Release`。
-- `ServerFrame::Monitor(Sample)`：一次读数，只发给正在看的会话。`Sample` 的字段即 sprawling-SPEC.md 8-94 列出的 13 个 `u64`；它定义在 `wire::frames::monitor`，`bin::monitor` 用的就是这一个类型，不再另写一份。
+- `ServerFrame::Monitor(Sample)`：一次读数，只发给正在看的会话。`Sample` 的字段即 sprawling-SPEC.md 8-94 列出的 13 个 `u64`，加上 §8-64 的 `view_backlog` 与 `read_nanos`；它定义在 `wire::frames::monitor`，`bin::monitor` 用的就是这一个类型，不再另写一份。
 - `Watched`：看的人看什么，`Everything`（整页）或 `Summary`（事实条上的摘要）。它不上线，是 `MonitorFeed::watch` 的参数，`bin::monitor::Monitor` 按它分两类计数。
 - `decide_frame` 把一个已打开会话的 `Monitor(Watch)` 答成 `SessionStep::Watch(Watched::Everything)`，`Monitor(WatchSummary)` 答成 `SessionStep::Watch(Watched::Summary)`，`Monitor(Release)` 答成 `SessionStep::Release`；未打开的会话照旧拒绝并关闭。外壳收到 `Watch(watched)` 时调用 `ServeConfig::monitor` 的 `watch(watched)` 拿一个看的凭据，已有凭据时换掉它、保留已有的 `samples` 订阅，没有时订阅 `samples`；收到 `Release` 时把两者都丢掉。重复的 `Watch` 不叠加计数：一个会话至多持有一个凭据。
-- `ClientFrame::Monitor(Monitoring)`：`Monitoring` 是 `Watch` 或 `Release`。`Watch` 让这个会话算作一个在看的人，`Release` 让它不再算；会话结束等于 `Release`。
-- `ServerFrame::Monitor(Sample)`：一次读数，只发给正在看的会话。`Sample` 的字段即 sprawling-SPEC.md 8-94 列出的 13 个 `u64`；它定义在 `wire::frames::monitor`，`bin::monitor` 用的就是这一个类型，不再另写一份。
-- `decide_frame` 把一个已打开会话的 `Monitor(Watch)` 答成 `SessionStep::Watch`，`Monitor(Release)` 答成 `SessionStep::Release`；未打开的会话照旧拒绝并关闭。外壳收到 `Watch` 时调用 `ServeConfig::monitor` 的 `watch` 拿一个看的凭据并订阅 `samples`，收到 `Release` 时把两者都丢掉；重复的 `Watch` 不叠加计数。
 
 **决定。**
 
@@ -1689,6 +1686,48 @@ pub enum CorePriority { Raised, Normal }   // 值集与拼法住这里，account
 - **账上一行。** 写成之后城记一行 `rules_changed { scope: city, which: "CONFIG.toml", … }`，与派活前核对城配置的那一行同形。
 - **核心优先级是这个人自己那一层。** `CorePriority` 进 `PreferencePatch`，所以经已有的 `PutPreferences` 写，落在 `~/.sprawling/config.toml` 的 `[core] priority`——那是它一直住的地方（sprawling-SPEC 8-93），不在 `[ui]` 里，所以 `PreferencesAnswer` 不带它；页面从 `Query::Doctor` 的核心一项读到它此刻的效果。写下之后，下一次 `serve` 起线程时读它。
 - 验收：city 的 `a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it`（城层写 `keep_warm` 之后，一间没有说话的房间读到 `FiveMinute`；写 `effort` 之后梯子答它来自城那一层）；accounting 的 `the_core_priority_lands_in_its_own_section_and_reads_back`。
+
+### 8-62 自动化只读组：`Query::Automation`
+
+```rust
+// Query
+Automation,                                  // → Answer::Automation(Box<AutomationAnswer>)
+pub struct AutomationAnswer {
+    pub jobs: Vec<ScheduledJob>,             // SCHEDULE.toml，文件里的顺序
+    pub sources: Vec<WatchedSource>,         // WATCH.toml，文件里的顺序
+    pub unreadable: Vec<String>,             // 读不出的那份文件：文件名与拒因；它的行不列
+}
+pub struct ScheduledJob { pub name: String, pub addr: Address, pub task: String, pub goal: String, pub cadence: Cadence }
+pub enum Cadence { EveryMinutes { minutes: u64 }, DailyAt { minute: u64 }, WeeklyAt { minute: u64 } }   // minute：UTC 的一天／一周里的第几分钟
+pub struct WatchedSource { pub name: String, pub matches: String, pub addr: Address, pub starts_work: bool }
+```
+
+- **只读，读的是文件此刻。** 两份文件由人在城根上写，城每一拍读一次 `SCHEDULE.toml`，起服务时读一次 `WATCH.toml`；本查询在问的那一刻经 `city::Schedule::load` 与 `city::Watch::load` 各读一次，答的正是下一拍会读到的东西。页面上不写这两份文件（S06 Q4 (b)）：写它们要一套 cron 与路由的编辑器，而 CLI 与编辑器已经够得到。
+- **一份读不出不挡另一份。** 读不出的文件进 `unreadable`，拒因就是派活那一拍会给的那一句；另一份照常列出。没有文件即空列表，那是没设自动化的城的常态。
+- **`Cadence` 是线上自己的拼法。** `city::Cadence` 不派生 serde（它是城判定的值），本 crate 定一份线上形状，装配处一一映射，三个值一一对应、穷尽匹配，不另存规则。
+- 验收：accounting 的 `the_automation_query_lists_both_tables_and_names_the_one_that_does_not_read`。
+
+### 8-63 页面上「历史已证明到哪一条」：`CityAnswer.proved`
+
+```rust
+pub struct CityAnswer { /* …既有字段… */ pub proved: Option<Seq> }
+```
+
+- **意思。** `Some(n)`：账本到 `n` 为止整条链已经证明完好，写者在接受命令（sprawling-SPEC 8-122 的 M3）；证明之后写下的每一行都由这个已证明的写者接在链上，所以 `n` 就是视图此刻折到的最后一条。`None`：服务中的城还在后台证明（命令此时答 `E_HISTORY_UNPROVEN`），或者证明发现链断了；视图照常答查询（S10 Q2 (a)），页面据此标明「历史还在核对」。
+- **读法。** 视图持有写者挂上的那个 `storage::ChainHalt` 的一份句柄（sprawling-SPEC 8-134）；`proved()` 为真时答视图的头。一次性查询（`views::ask`）与测试里的视图起步前已经同步证明过整条链，答它们的头。
+- 名字不变而形状变，与本批共用 `WIRE_V` 45。
+
+### 8-64 `Sample` 多两项，`ModelTag` 多一值
+
+```rust
+pub struct Sample { /* …既有 13 项… */ pub view_backlog: u64, pub read_nanos: u64 }
+pub enum ModelTag { /* …既有… */ Ocr }      // 线上 "ocr"
+```
+
+- `view_backlog`：写者已经交给视图线程、还没折完广播的已提交记录条数，读 `bin::serving::folding::Backlog::records`（sprawling-SPEC 8-123）；采样线程每一拍读一次。
+- `read_nanos`：上一拍读计数器花了多少纳秒，由采样线程用单调钟在读取前后各量一次；第一拍为 0（sprawling-SPEC 8-129-6）。
+- `ModelTag::Ocr`：人登记的一个能读图的模型，城的 OCR 工具读这一次选择（gateway-SPEC §8-34）。二进制里不带任何模型（D18），这个值只是一个登记位。
+- 三项都是名字不变的改形，共用 45。
 
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 

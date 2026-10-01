@@ -2969,6 +2969,15 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。
 - **验收**：`doctor::report::tests`——没有任何浏览器引擎的假机器答出 `Absent { NotOnSearchPath }`、`use` 档 `missing == ["a browser engine"]` 而 `develop` 档为空；平台不明时每一项的 `install` 都是 `UnknownPlatform`。
 
+## 8-134 页面读到历史证明到哪里（`accounting::views::city`、`bin::assembly::attending`；wire-SPEC §8-63）
+
+服务中的城在后台证明整条链（8-90、8-122），证明完成之前写者拒绝每一次追加。页面需要在同一刻知道这件事，否则一次被拒的命令看起来是坏了。`CityAnswer.proved` 回答它。
+
+- **一个句柄，两个读者。** 写者线程挂上的 `storage::ChainHalt` 是判定的唯一一处：写者用它决定接不接一行，视图用它决定答不答「已证明」。`bin::assembly::attending` 在起写者之前造这只 halt，经 `RunWorker::chain_under_audit(halt)` 挂给写者，同一只的克隆经 `Views::watch_proof` 交给发布与备用两份视图。
+- **答什么。** `halt.proved()` 为真时答视图此刻的头（`Some(head)`）：证明完成时写者还没写过一行，之后的每一行都由这个已证明的写者接上；为假（还在证明，或证明发现链断了）答 `None`。不经 halt 起步的视图（一次性查询、测试）起步前已同步证明过整条链，答它们的头。
+- **不进账本。** 证明是这台主机对这份账本的一次核对，不是城的历史；它记在 `the history is proved` 那一行诊断里（8-121），页面读的是此刻的判定。
+- 验收：`accounting::views::city` 的 `a_city_answer_says_the_history_is_proved_only_once_the_halt_says_so`。
+
 ## 8-55 一栋楼的桌面白名单，走配置那条帧（`accounting::worker::commanding::configure`；wire-SPEC §8-26、§8-45、city-SPEC §8-26）
 
 城这一侧的两件事（楼级 `desktop:` 与 `kernel::gate::undoable`）早已落地，缺的是**把那份 allowlist 从人手里送到盘上的那一段**。
@@ -3963,7 +3972,7 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 
 **计时。** `OpeningCost`（8-121）的阶段改为 `fold <n> lines from the snapshots` 或 `from genesis`，读的人从同一行看出这次开城有没有从快照起步；`OpeningCost::began` 把开城起点交给证明线程，M3 从同一个起点量起。
 
-**本节接口的当前状态。** M1 与 M2 是同一刻：`wire::serve` 在 `listen` 返回之后才开始应答，把静态页面的应答提前到折叠之前要改 `wire` 的服务入口，归 W 车道。尾部恢复（8-1 第 ④ 步）仍逐行核对整个末段，至多 64 MiB：从末段的已验证前缀起只核对之后的字节（`Barrier.lean` 的 `reopenFromVerifiedPrefix`）是下一步，判定它的证据是 40 万行城正常关闭后 `open the ledger` 那一段的读数。`SnapshotStart::Resume.tail` 仍把尾部整段读进内存；正常关闭的城尾部为空，崩溃后的尾部是上次切视图快照之后写下的记录。Standing 的快照只在开城时切（8-101），所以 Standing 的切点落后于视图，这一遍从 Standing 的切点读起：按与视图相同的节奏在服务中切 Standing，要先核对写者对 Standing 的增量更新与 `StandingFolds::absorb` 是同一条规则。页面上「历史已证明到 seq N」要一个线上字段，随波次 4 的 W6 批进 `CityAnswer`；在那之前人从日志里的 `the history is proved` 一行读到它。
+**本节接口的当前状态。** M1 与 M2 是同一刻：`wire::serve` 在 `listen` 返回之后才开始应答，把静态页面的应答提前到折叠之前要改 `wire` 的服务入口，归 W 车道。尾部恢复（8-1 第 ④ 步）仍逐行核对整个末段，至多 64 MiB：从末段的已验证前缀起只核对之后的字节（`Barrier.lean` 的 `reopenFromVerifiedPrefix`）是下一步，判定它的证据是 40 万行城正常关闭后 `open the ledger` 那一段的读数。`SnapshotStart::Resume.tail` 仍把尾部整段读进内存；正常关闭的城尾部为空，崩溃后的尾部是上次切视图快照之后写下的记录。Standing 的快照只在开城时切（8-101），所以 Standing 的切点落后于视图，这一遍从 Standing 的切点读起：按与视图相同的节奏在服务中切 Standing，要先核对写者对 Standing 的增量更新与 `StandingFolds::absorb` 是同一条规则。页面从 `CityAnswer.proved` 读到历史已证明到哪一条（8-134）。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 
@@ -4673,10 +4682,10 @@ impl Audience { pub fn of_stdout() -> Audience; } // stdout 是终端即 Person
 
 ### 8-129-6 对 wire 的需求（wire-SPEC 8-47）
 
-- `Sample.view_backlog: u64`：视图积压的条数，读 8-123 给出的读法。
-- `Sample.read_nanos: u64`：上一拍的读取用时，由采样线程用单调钟量出；第一拍为 0。
+- `Sample.view_backlog: u64`：视图积压的条数，读 8-123 给出的读法：`spawn_sampler` 收下 `bin::serving::folding::Folding` 交出的 `Backlog` 句柄，每一拍读一次 `records()`。
+- `Sample.read_nanos: u64`：上一拍的读取用时，由采样线程用单调钟量出：`spawn_sampler` 收下一只 `fn() -> Instant`（生产交 `serving::standing::monotonic_now`），在读计数器前后各取一次，差值填进下一拍；第一拍为 0。
 - 加上这两项，`Sample` 是 15 个 `u64`，历史 300 × 15 × 8 = 36 000 字节，仍在 `HISTORY_BUDGET`（64 KiB）之内，编译期断言不必改。
-- `monitor::top::screen` 随之多两行；WebUI 监视页的两行随页面的改动做。
+- `monitor::top::screen` 随之多两行（`view backlog` 记录条数、`read` 微秒）；WebUI 监视页的两行随页面的改动做。
 - 不要求：`relay_p50_nanos`、`event_to_screen_p50_nanos`、`queued_runs` 的来源（8-98 的当前状态）。
 
 **决定。**
