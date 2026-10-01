@@ -179,6 +179,8 @@ pub(crate) struct Violation {
 
 **12-10 截图矩阵是给人看的产物，不是门。** `cargo xtask shots`（§8-44）不进 `gates::GATES`，不断言任何性质，也不比较两张图：它产出每一页在两个宽度、两种光照下的 PNG 与一份索引，给改画面的人与验收的人逐张看。理由与 `render` 断性质、不断图片（本 SPEC 的「`render`」一节）是同一条：截图对比会被字体 hinting 弄红，也放过没人拍过的错版面，所以机器判性质，人判图片，两件事各有一个工具。页面清单不另写一份：路由取 `client/src/core/route.ts` 里 `BARE` 那张表的键，一个页面里的状态取画出来的页面上每个带 `aria-label` 的顶层 `section`（`#/gallery` 的每个夹具就是这样画的），所以前端改了外壳或加了夹具，这个工具不用跟着改。浏览器只经 `render::engine::browser` 找，与 `render` 门在同样的地方找同样的牌子。被击败的备选：①把截图当 `render` 的第六次开页——门就要为一件不判的事多开一次引擎，门名册上也多一个不会变红的步骤；②在 xtask 里写一张页面清单——前端加一条路由而这里没加，那一页就悄悄没有图。
 
+**12-11 动词类由表与中继的匹配各写一次，门对照两者。** `wiring` 读 §19-2 的 `class` 列，也读 `sprawling` 包里 `command_class` 的每一臂，逐个动词比（§8-45）。理由：表是人读到并决定的地方，匹配是设备真正碰到的地方，两者都要；只有一处时，要么决定藏在代码里没人读，要么二进制要在启动时解析一份 Markdown 来授权。按文本读匹配而不是用 `syn` 解析：门要的只是「哪个动词归哪个值」，臂的形状由穷尽匹配自己守着，`syn` 的模式树在大版本之间换形，门不该为一张两列的对照表跟着它走。被击败的备选：①只判表里每行都有 class，不读代码——表与中继各自漂开时没有红；②在 wire 里给 `Command` 加 `class()` 再让门读它——wire 要么依赖 `remote_access`，要么另立一个同值的枚举（wire-SPEC §12.6）。重开参数：`command_class` 的臂长出守卫条件（同一个动词按参数分两类）时，文本读法不够，改用 `syn`。
+
 **12-14 guard 只判一张自己的 lint 表；`members` 只列工作区成员。** desktop 并回工作区之后（`crates/desktop/Spec.lean` D14），本仓没有一个在工作区之外构建的包，唯一的抄件是 FFI 叶子 `crates/desktop/ffi` 那张 `[lints]`，它与根表只差 `unsafe_code` 一行。guard 因此判这一张表，再判其余每个成员都写 `lints.workspace = true`；墙的元数据、依赖版本与四处抄过去的常量（协议修订、`_meta` 键、错误码、质量域）不再有第二份，比对随之删去。成员名单取自 `members`（`cargo metadata`），不从根清单的 `members` 数组读，因为 cargo 会把工作区目录里的 path 依赖自动收为成员，数组里没写的成员照样存在。`members` 的 `Reach` 与「经 path 依赖进来的墙外包」那一支一起删去：没有那样的包，一个永远不出现的变体只会让每个读者多判一臂。嵌套的包（`crates/desktop/ffi` 在 `crates/desktop` 之下）由 `members::owner` 判归属：持有一个路径的包里目录最长的那一个。被击败的备选：①叶子也抄包元数据与依赖版本、guard 照旧比对一整堵墙——这些在工作区里都能继承，抄了就是第二个家；②guard 从根清单的 `members` 数组读成员——漏掉 cargo 自动收进来的成员；③留着 `Reach::PathDependency` 等下一个墙外包——没有读者的变体是死代码。重开参数：cargo 允许一个成员继承工作区 lint 表而只改一行，那时叶子写 `workspace = true` 加一行覆盖，本门的比对删去。
 
 ## 13 依赖选型
@@ -989,6 +991,25 @@ pub(super) fn index(shots: &[Shot]) -> String;
 - **失败**：没有包时 `XtaskError::Doc`，recovery 是 `just build-web`；没有引擎时 `XtaskError::Doc`，recovery 是装一个 Chromium 一族的浏览器或设 `SPRAWLING_BROWSER`；读不出 `BARE` 时 `XtaskError::Doc` 点名 `route.ts`；引擎失败沿用 `render::engine::dump` 的 `XtaskError::Cmd`。
 
 **测试**：`shots::pages::tests::every_route_gets_four_pictures`：一份夹具 `route.ts` 读出的每条路由，在两个宽度、两种光照下各有一张图，夹具目录里缺一张时 `missing` 恰好点名那一张。真跑要先 `just build-web`，归整合者或前端会话。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-45 `wiring::class`：§19-2 的 `class` 列与中继的匹配是一个决定（形状 1 判定）
+
+```rust
+enum Class { Read, Act, LocalOnly }                                         // 拼法同 remote_access::door::VerbClass
+fn stated(root: &Path) -> Result<BTreeMap<String, Option<Class>>, XtaskError>;   // 表的第三格；Lean 时读 def Command.verbClass
+fn coded(root: &Path) -> Result<BTreeMap<String, Class>, XtaskError>;            // sprawling 包里 fn command_class 的每一臂
+fn judged(all: &[String], stated: &…, coded: &…) -> Vec<Violation>;
+```
+
+- **表说给读者，匹配说给设备**：wire-SPEC §19-2 的 `class` 列是远程设备的一帧属于哪一类的陈述，`bin::outside::verbs::command_class` 是中继据以放行的穷尽匹配（wire-SPEC §8-65）。两者谁也推不出谁，门把两者逐个动词对照，`wiring` 的同一次运行里报出。
+- **缺格点名那一行**：表里的一行只写了 reach、没写 class（第三格读不成 `Read`／`Act`／`LocalOnly` 之一），违规写「the row for `<动词>` … has no class」，替代办法是写 `LocalOnly`，除非人决定了城外的设备可以做它。新加 Command 的车道照旧格式加行而不写这一格时，就是这一条红。
+- **两边说法不一点名动词与两个值**：「`<动词>` is <表的值> in the table and <匹配的值> in `command_class`」。
+- **匹配按文本读**：从 `fn command_class` 读到函数结束，每个 `Command::<动词>` 归到它后面第一个 `=> VerbClass::<值>`。函数按包找（`members` 的 `sprawling`），与 `performed` 按包找 `run_command` 同一个理由：拆文件不让门读空。找不到这个函数以 `Doc` 拒判。
+- wire 的规格迁成 Lean 后，`class` 写成 `def Command.verbClass` 的一臂一行，右侧是 `.read`／`.act`／`.localOnly`；读法与 reach 的 `def Command.reach` 相同（§8-43）。
+
+**测试**：`wiring::class::tests::a_row_with_no_class_cell_is_named_by_its_verb`：夹具表里一行缺 class、一行与夹具匹配说法不一，两条违规按动词点名。
 
 **本节属门禁机具，与产品代码分开提交。**
 

@@ -32,6 +32,10 @@
 //! contributes the one fact none of the three can state - which side is
 //! *supposed* to reach it - and the gate reads it as data, so "the table
 //! drifted" and "the enum grew silently" are the same red.
+//!
+//! The same table carries a second fact, the class of verb a frame is
+//! when a remote device sends it; `class` reads it beside the relay's
+//! own match (wire-SPEC.md section 19-2).
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -87,6 +91,7 @@ impl Reach {
     }
 }
 
+mod class;
 mod reading;
 
 use reading::{declared, variants};
@@ -215,7 +220,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let table = declared(root)?;
     let performed = performed(root, &all)?;
     let emitted = emitted(root, &all)?;
-    let mut violations = Vec::new();
+    let mut violations = class::judged(&all, &class::stated(root)?, &class::coded(root)?);
 
     for name in &all {
         let Some(reach) = table.get(name) else {

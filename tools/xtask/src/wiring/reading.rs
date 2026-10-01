@@ -146,7 +146,7 @@ fn markdown_reach(root: &Path) -> Result<BTreeMap<String, Reach>, XtaskError> {
     Ok(out)
 }
 
-fn cells(line: &str) -> Option<Vec<String>> {
+pub(super) fn cells(line: &str) -> Option<Vec<String>> {
     let trimmed = line.trim();
     let inner = trimmed.strip_prefix('|')?.strip_suffix('|')?;
     Some(
