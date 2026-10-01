@@ -65,7 +65,7 @@ fn says(text: &str, calls: Vec<ToolCall>) -> ModelReturn {
 }
 
 #[test]
-#[ignore = "red until run_started records how the run opened: runtime-SPEC.md section 3, item 6"]
+#[ignore = "red until run_started records how the run opened: runtime-SPEC.md section 3, item 8"]
 fn a_branch_first_request_opens_with_the_bytes_of_the_mothers_last() {
     let dir = tempfile::tempdir().unwrap();
     let (mut ledger, _) = storage::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
