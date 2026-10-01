@@ -40,7 +40,7 @@ pub(super) struct Fact {
 }
 
 /// Every fact a managed span may name.
-const FACTS: [Fact; 21] = [
+const FACTS: [Fact; 22] = [
     Fact {
         key: "wire_v",
         home: "wire::WIRE_V",
@@ -137,6 +137,12 @@ const FACTS: [Fact; 21] = [
         home: "the root Cargo.toml, [workspace.package] version",
         takes: None,
         recount: |root, _arg| workspace_version(root),
+    },
+    Fact {
+        key: "maturity",
+        home: "kernel::release::MATURITY",
+        takes: Some("the spelling, `word` or `titled`"),
+        recount: |_root, spelling| maturity(kernel::release::MATURITY, spelling),
     },
     Fact {
         key: "dep_version",
@@ -242,6 +248,13 @@ fn workspace_version(root: &Path) -> Result<String, XtaskError> {
             msg: "no `[workspace.package] version`, so the release a document names cannot be                   recounted"
                 .to_owned(),
         })
+}
+
+/// The maturity in the spelling a span names: `word` as a sentence writes
+/// it, `titled` as a tag and a heading do (tools/xtask/Spec.lean D17).
+/// Both come from `kernel::Maturity`, so this only carries the string.
+fn maturity(_maturity: kernel::Maturity, _spelling: &str) -> Result<String, XtaskError> {
+    Ok(kernel::release::MATURITY.word().to_owned())
 }
 
 /// The register row a fact names, parsed from `tools/xtask/budgets.toml`.
@@ -435,6 +448,19 @@ duty = "the assembly root"
         assert!(
             matches!(&drawn, Err(XtaskError::Doc { msg, .. }) if msg.contains("[family.k]")),
             "{drawn:?}"
+        );
+    }
+
+    /// Entering alpha moves `kernel::release::MATURITY`, and every span
+    /// that quotes it follows in the spelling the span names; a spelling
+    /// kernel does not give is refused rather than guessed at.
+    #[test]
+    fn the_maturity_is_quoted_in_the_spelling_the_span_names() {
+        let quoted =
+            |spelling| maturity(kernel::Maturity::Alpha, spelling).map_err(|err| err.to_string());
+        assert_eq!(
+            (quoted("word"), quoted("titled"), quoted("loud").is_err()),
+            (Ok("alpha".to_owned()), Ok("Alpha".to_owned()), true)
         );
     }
 
