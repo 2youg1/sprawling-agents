@@ -27,6 +27,7 @@ use super::reader::{Readership, Sight};
 use super::select::Selection;
 use super::walk::Walked;
 use crate::lineage::{Lineage, RunLine};
+use crate::views::commits::commit_facts;
 
 pub(super) struct Projection<'selection> {
     selection: &'selection Selection,
@@ -210,15 +211,7 @@ impl<'selection> Projection<'selection> {
         self.attribution
             .apply(record)
             .map_err(storage::StorageError::into_ax)?;
-        if record.kind() == EventKind::CheckpointCommitted {
-            let holds = match record.data().read::<CheckpointCommitted>()? {
-                CheckpointCommitted::JobPinned { job } => Holds::Pinned { job },
-                CheckpointCommitted::Committed(commit) => Holds::Committed {
-                    oid: commit.oid,
-                    scope: commit.scope,
-                    files: commit.files,
-                },
-            };
+        if let Some(holds) = checkpoint_of(record)? {
             self.checkpoints.push(Checkpoint {
                 seq: Decimal(record.seq().value()),
                 run: record.run(),
@@ -324,4 +317,28 @@ fn run_row(line: &RunLine, links: &Links) -> Result<Run, AxError> {
         }),
         unanswered: Decimal(unanswered),
     })
+}
+
+/// What a line says about a commit or a job pin: the pin read by its own
+/// type, and every commit as `commit_facts`, the one place that tells
+/// which lines name a commit and which oid, identifies it
+/// (accounting-SPEC.md 8-12, decision 24(f)).
+fn checkpoint_of(record: &EventRecord) -> Result<Option<Holds>, AxError> {
+    let named = commit_facts(record).map(|(oid, _)| oid);
+    if record.kind() == EventKind::CheckpointCommitted {
+        return Ok(
+            match (record.data().read::<CheckpointCommitted>()?, named) {
+                (CheckpointCommitted::JobPinned { job }, _) => Some(Holds::Pinned { job }),
+                (CheckpointCommitted::Committed(commit), Some(oid)) => Some(Holds::Committed {
+                    oid,
+                    scope: commit.scope,
+                    files: commit.files,
+                }),
+                (CheckpointCommitted::Committed(_), None) => None,
+            },
+        );
+    }
+    Ok(named
+        .filter(|_| record.kind() == EventKind::PrMerged)
+        .map(|oid| Holds::Merged { oid }))
 }

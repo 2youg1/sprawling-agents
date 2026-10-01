@@ -182,7 +182,8 @@ pub(super) struct Checkpoint {
     pub(super) holds: Holds,
 }
 
-/// The two facts `checkpoint_committed` carries, kept apart.
+/// The two facts `checkpoint_committed` carries, and the commit a
+/// `pr_merged` landed, kept apart.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum Holds {
@@ -193,6 +194,9 @@ pub(super) enum Holds {
         oid: GitOid,
         scope: Vec<String>,
         files: Vec<String>,
+    },
+    Merged {
+        oid: GitOid,
     },
 }
 

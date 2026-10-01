@@ -51,7 +51,7 @@ pub const SCHEMA: &str = "sprawling.playback/1";
 /// The version of the rules a bundle is projected under. It moves with
 /// every change to what a bundle holds or how a table is derived, so a
 /// bundle this build cannot recompute says so instead of differing.
-pub const PROJECTION_RULES: u32 = 1;
+pub const PROJECTION_RULES: u32 = 2;
 
 /// The most bytes a bundle may have. An initial value until the export
 /// peak on a multi-day fixture is measured; it bounds the bundle, not

@@ -33,7 +33,7 @@ use super::prepared::{Prepared, unavailable};
 /// record, so a set of facts about a commit nobody made cannot be
 /// assembled here a field at a time.
 #[derive(serde::Serialize, serde::Deserialize)]
-pub(super) struct CommitFacts {
+pub(crate) struct CommitFacts {
     run: RunId,
     seq: Seq,
     at: kernel::TimeMs,
@@ -225,7 +225,7 @@ impl super::holding::Views {
     clippy::wildcard_enum_match_arm,
     reason = "a few kinds name a commit; the rest of the event vocabulary does not"
 )]
-pub(super) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)> {
+pub(crate) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)> {
     let data = record.data();
     let (oid, by) = match record.kind() {
         EventKind::CheckpointCommitted => match data.read::<CheckpointCommitted>().ok()? {
