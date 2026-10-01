@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // What a running command has written so far, as this page holds it
-// (runtime-SPEC 8-28-3). A preview: the call's result in the Ledger is
+// (`crates/runtime/Spec.lean` §8-28-3). A preview: the call's result in the Ledger is
 // the authority on that output, so a run's tail is dropped the moment
 // its `tool_result` arrives. Bounded by lines, because the page draws
 // lines, and the oldest are dropped first and counted, so the terminal

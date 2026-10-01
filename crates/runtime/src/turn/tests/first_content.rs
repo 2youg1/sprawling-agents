@@ -5,7 +5,7 @@
 
 //! When a reply's first content arrived: read from the turn's clock on
 //! every streaming door, whether or not a page is watching, and on no
-//! other door (runtime-SPEC 8-50).
+//! other door (`crates/runtime/spec/Turn/Recovery.lean` §8-50).
 
 #![allow(
     clippy::unwrap_used,

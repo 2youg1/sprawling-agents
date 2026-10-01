@@ -66,7 +66,7 @@ pub struct ToolBench {
     /// What each key already answered, success or failure. A key alone
     /// would stop the second call's side effect and still owe the model
     /// an answer; the answer is the first call's own, whichever way it
-    /// went (runtime-SPEC.md 8-35).
+    /// went (`crates/runtime/spec/Bench.lean` §8-35).
     seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>,
     prior_public_egress: bool,
     /// The checkpoint net. A command the forecast suspects of deleting
@@ -94,7 +94,7 @@ pub enum BenchOutcome {
     /// the wave was checkpointed against when the forecast suspected a
     /// discard, so the post-wave sweep knows what to restore from.
     /// `wrote` is the tool's own account of what the call may have
-    /// written, which the next checkpoint stages (runtime-SPEC 8-45).
+    /// written, which the next checkpoint stages (`crates/runtime/spec/Run/Checkpoint.lean` §8-45).
     Ran {
         outcome: ToolOutcome,
         checkpointed: Option<String>,
@@ -183,7 +183,7 @@ impl ToolBench {
 
     /// What each registered tool may write, read off its declared
     /// effect alone, taken out before the bench is lent to the run so the
-    /// checkpoint policy can ask it while a wave waits (runtime-SPEC 8-45).
+    /// checkpoint policy can ask it while a wave waits (`crates/runtime/spec/Run/Checkpoint.lean` §8-45).
     pub fn declared_writes(&self) -> DeclaredWrites {
         DeclaredWrites(
             self.tools
@@ -330,7 +330,7 @@ impl ToolBench {
 
     /// The tool registered under `name`, lent out before any call to it
     /// is cleared, so a read the model hands over can start while it is
-    /// still generating (runtime-SPEC §8-3). A name this bench does not
+    /// still generating (`crates/runtime/spec/Turn.lean` §8-3). A name this bench does not
     /// hold starts nothing early; admitting the call reports it.
     pub fn tool_named(&self, name: &ToolName) -> Option<&dyn Tool> {
         self.tools.get(name).map(AsRef::as_ref)

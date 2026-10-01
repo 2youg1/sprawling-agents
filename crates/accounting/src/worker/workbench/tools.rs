@@ -328,7 +328,7 @@ impl Laying {
                 domain: addr.clone(),
                 run: site.run_id,
                 // The dispatch's write limit: under `Create` a command
-                // runs only in the copy (runtime-SPEC 8-55).
+                // runs only in the copy (`crates/runtime/Spec.lean` §8-55).
                 limit: at.policy.write,
             },
             machine.engine,

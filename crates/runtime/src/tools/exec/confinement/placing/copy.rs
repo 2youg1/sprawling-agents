@@ -8,7 +8,7 @@
 //!
 //! A copy is synced rather than made again, because creating files is
 //! what a real-time scanner waits on, and a fresh copy per command would
-//! create every file of the tree per command (runtime-SPEC 12.10). The
+//! create every file of the tree per command (runtime D10). The
 //! sync leaves the copy file for file equal to the working directory, so
 //! nothing an earlier command wrote reaches a later one.
 //!

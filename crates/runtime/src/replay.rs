@@ -29,7 +29,7 @@ pub enum VerifiedLine {
 
 /// A verified sequence: raw bytes plus their verified reading. Forking
 /// consumes this type, never raw lines — a fork of an unverified
-/// sequence is unrepresentable (runtime-SPEC 8.5).
+/// sequence is unrepresentable (`crates/runtime/Spec.lean` §10).
 #[derive(Debug)]
 pub struct VerifiedLedger {
     raw: Vec<Vec<u8>>,

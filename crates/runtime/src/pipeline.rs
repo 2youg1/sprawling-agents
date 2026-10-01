@@ -40,7 +40,7 @@ pub(crate) const EXEC_ACCOUNTS: &str = "sieve";
 pub(crate) const CONNECTOR_ACCOUNTS: &str = "offload";
 
 /// Where the whole of one tool result was stored, read from the first
-/// account it carries (runtime-SPEC 8-51(b)). The first, because the
+/// account it carries (`crates/runtime/spec/Turn.lean` §8-51(b)). The first, because the
 /// pipeline writes the sieve's account before a later store's, and the
 /// sieve's original is what the command wrote; `None` when the result
 /// carries no account this build can read.

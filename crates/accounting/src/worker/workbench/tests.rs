@@ -284,7 +284,7 @@ fn a_checkpoint_carries_what_the_run_may_write_and_not_only_its_room() {
 /// The checkpoint after a wave stages the paths that wave's calls said they
 /// wrote, not the whole write domain: `edit` knows its one file, so the
 /// closing checkpoint has no reason to walk the building for it
-/// (runtime-SPEC section 8-45). The first checkpoint of the run still takes
+/// (`crates/runtime/Spec.lean` §8-45). The first checkpoint of the run still takes
 /// the whole domain, because no commit of this run vouches for the tree
 /// before it.
 #[test]

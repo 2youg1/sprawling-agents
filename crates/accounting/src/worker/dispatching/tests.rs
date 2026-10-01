@@ -180,7 +180,7 @@ fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
 /// first call the provider sees is the run itself and a model's reply
 /// never becomes a room (sprawling-SPEC.md 8-86). The run is known by
 /// its assigned opening, which points at the task in JOB.md rather than
-/// repeating it (runtime-SPEC.md 8-6).
+/// repeating it (`crates/runtime/Spec.lean` §8-6).
 #[test]
 fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
     let dir = tempfile::tempdir().unwrap();

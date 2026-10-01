@@ -8,7 +8,7 @@
 //!
 //! Four value types and no behaviour. They sit apart from the table
 //! because they are what everything outside this module reads, while
-//! the table is how it is kept (runtime-SPEC 8-28-1).
+//! the table is how it is kept (`crates/runtime/spec/Backlog.lean` §8-28-1).
 
 use kernel::Address;
 

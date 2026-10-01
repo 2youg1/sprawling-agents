@@ -551,7 +551,7 @@ impl OpenRuns {
 pub struct ScanReport { /* …既有字段… */ pub frozen_runs: usize }
 ```
 
-- **哪些 run 死了。** `startup_scan` 只在 `RunWorker::new` 拿到写者锁之后跑（`sprawling resume`），这时这座城没有一次 run 在驱动：账上有 `run_started`、没有 `run_frozen` 的每一次 run，都是上一个进程死时正在跑的。harness run 与模型 run 一样开、一样冻（runtime-SPEC §8-52），一并计入。
+- **哪些 run 死了。** `startup_scan` 只在 `RunWorker::new` 拿到写者锁之后跑（`sprawling resume`），这时这座城没有一次 run 在驱动：账上有 `run_started`、没有 `run_frozen` 的每一次 run，都是上一个进程死时正在跑的。harness run 与模型 run 一样开、一样冻（`crates/runtime/Spec.lean` §8-52），一并计入。
 - **次序。** 先补写悬空调用的 `E_TOOL_OUTCOME_UNKNOWN`（它们属于那次 run，要落在它的冻结之前），再为每次死掉的 run 写一行 `RunFrozen::lost()`（kernel-SPEC §8-82-2），按 `run_started` 的 seq 升序。
 - **作者。** 冻结行写成那次 run 最近一行的作者（它的居民），与补写的 `tool_result` 写成那次调用的作者同一条理由：按居民计数冻结的读者（`city::resident` 的档案）不因进程死过而少计一次。只写过 `run_started`、没写别的就死了的 run，用 `run_started` 的作者。`addr` 缺席，与 `Charter::close` 写的冻结行同形。
 - **幂等。** 第二次扫描看到的每次 run 都已冻结，什么都不写；`ScanReport.frozen_runs` 是这一次写了几行，`summary` 把它与关掉的调用数并列告诉人。
@@ -787,7 +787,7 @@ impl Window<'_> {
 - `took` 是 `{"measured":"<毫秒>"}`，当且仅当两端都可见、`views::rounds::answered_timing` 判这一对的时刻是量出来的（两行都有 `EventRecord::moment`，答复不是城在重启后补写的 `E_TOOL_OUTCOME_UNKNOWN`），并且答复的 `t` 不早于调用的 `t`；其余一律是 `"unknown"`。所以版本早于逐行时刻的账本、混合区间里旧版本的那几次调用、补写的答复、还没答、有一端被隐去，都不给耗时，页面也就不会画出零耗时。判定量没量的规则只在 `views::rounds` 一处；逐行的精度仍是每条 `events` 的 `moment`，混合的区间逐行、逐调用各自保留。
 - 一条两端都落在范围外、范围内又没有成员的调用，在它关闭时就从「可能成为上下文的范围外行」里删掉：调用占账本行数的大头，留着它们会让一次窄选择的常驻量与整本账同阶；删掉以后常驻的只有还没关闭的调用。
 
-**运行策略（`runs[].policy`）。** 每个 run 行带这个 run 的 `run_started.policy`（kernel-SPEC §8-77：`mode`、`write`、`admit`、`landing`），早于策略入账的行写 `null`。`admit` 是这次派活要求的准入证据；它的结果是这个 run 打开的 PR 怎样关闭：合并时准入不过写成 `pr_rejected`，`by` 与 `why` 是拒绝它的一方与理由（runtime-SPEC §8-54），合并写成 `pr_merged`，带 `reviewed_commit` 与 `verified_by`。这些行在 `events` 里，关键时刻 `pr` 一项指向它们。要求与结局各是记下的事实，playback 不从一次合并推断测试跑过没有。
+**运行策略（`runs[].policy`）。** 每个 run 行带这个 run 的 `run_started.policy`（kernel-SPEC §8-77：`mode`、`write`、`admit`、`landing`），早于策略入账的行写 `null`。`admit` 是这次派活要求的准入证据；它的结果是这个 run 打开的 PR 怎样关闭：合并时准入不过写成 `pr_rejected`，`by` 与 `why` 是拒绝它的一方与理由（`crates/runtime/Spec.lean` §8-54），合并写成 `pr_merged`，带 `reviewed_commit` 与 `verified_by`。这些行在 `events` 里，关键时刻 `pr` 一项指向它们。要求与结局各是记下的事实，playback 不从一次合并推断测试跑过没有。
 
 **提交的证据。** 范围内可见的每个 `Committed` checkpoint 多三项；读这三项要读账本之外的输入（git 对象与 `accounting::trace` 对整本账的折叠），确定性的条件是这些输入相同，而 git 对象按 oid 不可变：
 
@@ -839,7 +839,7 @@ pub(super) struct OcrTool { /* reader、policy、recogniser: Mutex<Recogniser>�
 // 两件都是 kernel::Tool；参数 `{ path }`；答 `{ path, text }`
 ```
 
-- **两件工具读字节只经 `runtime::BoundReader`**（runtime-SPEC §8-59）。`endpoint_tools` 用交给 `read` 与 `search` 的同一个 `ReadBound`、同一个 run 的树根与城的块仓造一个 `BoundReader`，克隆给两件工具；它是工作台登记里自成一段的一步，因为这两件工具共用这一扇门，而 `lay_out_workbench` 已在函数与文件的长度上限边上。本 crate 不判路径：`Address::is_within`、`Address::is_reserved` 与 `storage::WriteTarget::within` 曾在 `transcribe` 里替这扇门判，门落地后删去。
+- **两件工具读字节只经 `runtime::BoundReader`**（`crates/runtime/Spec.lean` §8-59）。`endpoint_tools` 用交给 `read` 与 `search` 的同一个 `ReadBound`、同一个 run 的树根与城的块仓造一个 `BoundReader`，克隆给两件工具；它是工作台登记里自成一段的一步，因为这两件工具共用这一扇门，而 `lay_out_workbench` 已在函数与文件的长度上限边上。本 crate 不判路径：`Address::is_within`、`Address::is_reserved` 与 `storage::WriteTarget::within` 曾在 `transcribe` 里替这扇门判，门落地后删去。
 - **有没有这件工具，是一次 `select`。** `transcribe` 读 `ModelTag::Transcribe`，`ocr` 读 `ModelTag::Ocr`，都按 run 所在那座楼的楼规（`site.rules.policy()`）问端点账本；拒了，工具不上表。设施由 gateway 造：`gateway::transcriber_for` 与 `gateway::recogniser_for`，后者带上 `credentials::dialect_headers` 给这个 face 的头，与主模型的适配器同一张。
 - **容器的认法：** 图按 `runtime::pipeline::connector::png_picture` 认（读界判过的字节整份读进来，再交它），录音按 `Named` 分：文件看扩展名（`gateway::AudioType::of_file_name`，`file:` Locator 也是文件），块看开头的字节（`gateway::Recording::read_unlabelled`）。
 - **`ocr` 的设施在一把锁后面**，理由同 `transcribe`：凭据解析器是 `Send` 而不是 `Sync`，`recognise` 又要 `&mut`；同一个 run 的两次 OCR 轮流进行。
@@ -915,7 +915,7 @@ pub(in crate::views) fn range_answer(city_root: &Path, version: B3Hash, range: d
 20. **宿主的手是一个值 `Hands`，由构造器收下。** 理由：搬过来以后 `new` 叫不出 `sprawling` 里的适配器，生产的那一份只能从外面来；九样东西总是一起到、一起用，是一个值（AGENTS.md）；参数上限是四个。换一只手有两种写法：结构体更新语法，或者构造之后的 `with_*` 门。被否决的做法：`Host` trait——§12-10 已否决，理由不变（脚本为换一只手要实现全部）；`fn` 指针组成的结构体没有这个代价。九个参数——超出 4 的上限，而且每个调用点都要把九样东西排一遍。
 21. **vault 也放进 `Hands`。** 理由：生产的 vault 打开的是这台电脑的凭据服务（`Custodian::probe`），脚本给的是内存里的一份，它与其余几只手一样是构造时从外面交进来的；放进去以后三个构造器都不超过四个参数。被否决的做法：把 `vault` 与 `log` 捆成一个值——两者没有共同的意思，捆起来只是为了凑参数个数。
 22. **驾驶 lane 的线程从 `accounting::worker::pool` 起。** 理由：`pool` 与 `relay`、`drive_run`、`RunWorker` 成环，必须一起搬（§12-11）；lane 的寿命仍然恰好是它驾驶的那个 run。ARCHITECTURE.md 的确定性规则 3 因此把它列为库 crate 起线程的第六处。被否决的做法：经 `Hands` 交一个起线程的 `fn`——它只有一个实现，而且只是把 `std::thread::Builder` 换个名字。
-23. **验收覆盖从模型收到的工具表算出应当调用的集合；城外工具不进这张表；效果层拒绝的工具按「没有东西变」判定；技能经城库装入。** 理由：哪些工具存在，唯一的权威是工作台的那一次登记（sprawling-SPEC.md §8-27），模型第一次请求里的工具表就是它的输出。测试若照抄一份名单，下一次加工具时名单会悄悄漏掉那一件；从工具表算，漏掉的那件会被点名。城外工具的集合随楼的配置与主机而变，放进来就要在测试里配一台浏览器或一台 MCP server，而它们的路由已经各有一条端口测试。`rules` 与 `city` 声明 `Effect::Govern`，拒绝码取决于工具是否给出自己的 `subject`（city-SPEC §8-2b 写了两种拒词）；钉住拒绝码，补上 `subject` 的那次改动就会打红验收，而验收要守的规矩——run 不改写审判它的规则、不立楼——在那次改动前后都成立。技能经 `city::install_skill` 装进城库：那条路把一个包的每个文件落在城内，所以验收连包里附属文件的按名读取一起判；城外书架上的一件由 catalog 携着正文交给 run（runtime-SPEC §8-29-6），它的验收是另一条测试，判的是同一条阅览室、catalog、`read` 与 `SkillPin` 的链。被否决的做法：手写工具名单再逐件断言（第二个权威）；把城外工具一并覆盖（重复端口测试，并让验收依赖主机）；按拒绝码断言效果层的拒绝（钉死一个 SPEC 已说明会变的细节）。
+23. **验收覆盖从模型收到的工具表算出应当调用的集合；城外工具不进这张表；效果层拒绝的工具按「没有东西变」判定；技能经城库装入。** 理由：哪些工具存在，唯一的权威是工作台的那一次登记（sprawling-SPEC.md §8-27），模型第一次请求里的工具表就是它的输出。测试若照抄一份名单，下一次加工具时名单会悄悄漏掉那一件；从工具表算，漏掉的那件会被点名。城外工具的集合随楼的配置与主机而变，放进来就要在测试里配一台浏览器或一台 MCP server，而它们的路由已经各有一条端口测试。`rules` 与 `city` 声明 `Effect::Govern`，拒绝码取决于工具是否给出自己的 `subject`（city-SPEC §8-2b 写了两种拒词）；钉住拒绝码，补上 `subject` 的那次改动就会打红验收，而验收要守的规矩——run 不改写审判它的规则、不立楼——在那次改动前后都成立。技能经 `city::install_skill` 装进城库：那条路把一个包的每个文件落在城内，所以验收连包里附属文件的按名读取一起判；城外书架上的一件由 catalog 携着正文交给 run（`crates/runtime/Spec.lean` §8-29-6），它的验收是另一条测试，判的是同一条阅览室、catalog、`read` 与 `SkillPin` 的链。被否决的做法：手写工具名单再逐件断言（第二个权威）；把城外工具一并覆盖（重复端口测试，并让验收依赖主机）；按拒绝码断言效果层的拒绝（钉死一个 SPEC 已说明会变的细节）。
 24. **playback 是账务读面上的一个投影，按整行判定可见，逐字节携带账本行，只读一遍严格校验过的字节，复核靠重算。**
     (a) 一行可见，当且仅当它碰到的每一栋楼对读者都是 `Open`；碰到的楼由信封地址、run 的房间、关闭的那一对的打开行与载荷里以已知楼开头的地址求出，一条规则管所有事件种类。理由：读界要对未来新加的种类也关着，一张按种类列可公开字段的表，每加一个种类就要加一行，漏一行就漏字段；整行判定漏不了。代价是一行只要碰到一栋关闭的楼就整行隐去，连同它本可公开的字段。被否决的做法：按种类逐字段投影（维护面随种类增长，缺行时无声地开或关）；只按信封 `addr` 删行（`approval_resolved` 记在 city run 上、`addr` 为空，handback 的内容来自子 run）。
     (b) `events` 里每条是账本原行的字符串，外加十进制字符串的 `seq` 与 `moment`。理由：原行就是账本的权威字节，读者可以对它重算 `chain_hash`；把记录展开成 JSON 对象会让 seq、`t` 与金额在 JS 的 `Number` 里丢精度，也等于第二种写法。被否决的做法：展开成对象、u64 写成数字。

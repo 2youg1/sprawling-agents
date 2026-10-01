@@ -33,14 +33,14 @@ toml.workspace = true
 # already carries the path_open TRUNCATE bypass fix (GHSA-2r75-cxrj-cmph)
 # and the hard-link/rename FilePerms bypass fix (CVE-2026-58494). The
 # floor is stated here rather than left to the lockfile, so no update can
-# step back below it (runtime-SPEC 8-13). wasip1 only - there is no
+# step back below it (`crates/runtime/Spec.lean` §8-13). wasip1 only - there is no
 # socket host implementation, which is the Python arm's mechanical proof
 # that it cannot reach the network.
 wasmtime = { version = "48.0.3", optional = true, default-features = false, features = ["cranelift", "runtime", "std"] }
 wasmtime-wasi = { version = "48.0.3", optional = true }
 
 # One Job Object per run, so a run's whole process tree can be read
-# (runtime-SPEC 8-13-3); the crate's public surface is safe.
+# (`crates/runtime/Spec.lean` §8-13-3); the crate's public surface is safe.
 [target.'cfg(windows)'.dependencies]
 win32job = { workspace = true }
 

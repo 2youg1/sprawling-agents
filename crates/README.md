@@ -20,7 +20,7 @@ Every Rust package of the product lives in this directory. The packages are sepa
 | `crates/gateway` | `sprawling-gateway` | `gateway` | everything between a decision to call a model and the bytes on the wire | `kernel` | `crates/gateway/gateway-SPEC.md` |
 | `crates/kernel` | `sprawling-kernel` | `kernel` | every decision in the city, and nothing that touches a disk | nothing | `crates/kernel/kernel-SPEC.md` |
 | `crates/remote_access` | `sprawling-remote-access` | `remote_access` | the remote door, and the routes that carry its bytes and decide nothing | `kernel` | `crates/remote_access/Spec.lean` |
-| `crates/runtime` | `sprawling-runtime` | `runtime` | one run, from dispatch to freeze | `gateway`, `kernel`, `storage` | `crates/runtime/runtime-SPEC.md` |
+| `crates/runtime` | `sprawling-runtime` | `runtime` | one run, from dispatch to freeze | `gateway`, `kernel`, `storage` | `crates/runtime/Spec.lean` |
 | `crates/sprawling` | `sprawling` | `sprawling` | the assembly root: every concrete type, the one clock, the one spawn point, and the command line | `accounting`, `agent_protocols`, `browser`, `city`, `collab`, `desktop`, `gateway`, `kernel`, `remote_access`, `runtime`, `storage`, `wire` | `crates/sprawling/sprawling-SPEC.md` |
 | `crates/storage` | `sprawling-storage` | `storage` | persistence, and every view derived from it | `kernel` | `crates/storage/storage-SPEC.md` |
 | `crates/wire` | `sprawling-wire` | `wire` | the process boundary | `documents`, `kernel` | `crates/wire/wire-SPEC.md` |

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A run's opening pair and its closing pair, written once for every
-//! kind of run (runtime-SPEC.md 8-52, 12.7).
+//! kind of run (`crates/runtime/spec/Run.lean` §8-52, runtime D7).
 //!
 //! A model run and a harness run open and close alike: the job pin, then
 //! `run_started`; `handoff_written`, then `run_frozen` a millisecond

@@ -4,9 +4,52 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# runtime::mode 的模型
+# runtime::mode
 
-证明 `mode`（`crates/runtime/src/` 下同名的文件）必须守住的性质。每个 mode 在目录里怎么介绍，以及一次 run 的产出准不准合并。runtime 的规格仍是 `crates/runtime/runtime-SPEC.md`，它的 §16 引本分部作为这些性质的权威。
+规定 `mode`（`crates/runtime/src/` 下同名的文件）。每个 mode 在目录里怎么介绍，以及一次 run 的产出准不准合并。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+-/
+
+/-!
+### 8-12 runtime::mode（形状 6；dev 入口）
+
+
+```rust
+pub const DEV_ENTRY: &str = "dev";
+pub fn dev_entry() -> CatalogEntry;   // 一行披露，全部细则归 expansion
+```
+
+- **一个 Run 只被告知它所在的那个 mode**，于是没有任何 Agent 知道这座城自己的代码与 SPEC 是可改的。`dev` 行补上这一句，**而且只补一句**：三种准入证据要求与两种落地策略的意思、阅读次序（SPEC → 代码 → 旁边的测试）与「下一步去跟人要它们」全在 expansion 里，由 `read` 按需取。**大多数会话不改这座城，就只付一行的价。**
+-/
+
+/-!
+### 8-12b runtime::mode 原有面
+
+
+```rust
+pub fn catalog_entry(mode: kernel::Mode) -> CatalogEntry;     // chat 与 work 两行
+```
+
+`Chat` 的目录行只有一句：专心同人交谈，就对方说的话作答。除这一行提示之外它什么也不做，它存在的理由是让一句闲话不被当成一件要做的活。`Work` 的目录行说：朝人给的目标干活，任务要一份计划时先用 `plan` 工具写进 `Roadmap.md`，目标达成时报告。
+
+哪些 mode 存在、各自拼成什么词，只由 `kernel::Mode` 回答（线、账本都读它）；本模块只持每个 mode 在目录里怎么介绍、以及一次 run 的产出准不准合并（§8-54）。runtime 不再有自己的 `Mode`：两份同成员的枚举要靠装配层一个恒等的 `match` 维系，新增一个 mode 时那是第二处必须同步改的地方。
+-/
+
+/-!
+### 8-54 合并时的准入，按运行策略判（`runtime::mode::admits`，形状 1 判定）
+
+
+```rust
+pub struct Produced { pub tests_passed: Option<bool>, pub contract_moved: bool,
+                      pub held_in: Option<bool>, pub held_out: Option<bool> }
+pub enum Admission { Lands, Refused { because: &'static str, alternative: &'static str } }
+pub fn admits(policy: &kernel::RunPolicy, produced: &Produced) -> Admission;
+```
+
+- **判定序**：先看落地策略——`Experiment` 恒 `Refused`（试验的产出不合并，学到的写进 `Memo.md`，换一次常规落地的派活再做）；`Ordinary` 再看准入证据要求：`Standing` 恒 `Lands`（楼自己的规矩已经在别处判过，本函数不加检查）；`Tested` 要 `tests_passed == Some(true)`，`Some(false)` 与 `None` 各有自己的拒词；`ContractKept` 在 `contract_moved` 时拒；`DoubleValidated` 要 held-in 与 held-out 两半都是 `Some(true)`，缺一半与任一半为 `Some(false)` 各有拒词。
+- **mode 不参与准入**：交谈与干活产出的东西走同一道合并，要不要证据由证据要求一个值回答（kernel-SPEC §12.12）。
+- **唯一的调用方是合并那一刻**：`accounting::worker::reviewing` 在 `PrEffect::Merged` 写 `pr_merged` 之前问它，`Refused` 写 `pr_rejected`，理由是 `because; alternative` 两句（sprawling-SPEC 8-133）。评审说「另一位居民看过」，准入说「这次派活要的证据在」，两个问题两道门。
+- **`ContractKept` 今天以城看不见的方式成立**：城读不出一个契约动没动，`Produced.contract_moved` 由装配层恒填 `false`，所以这一要求只在 run 自己报出契约动了的那一天才会拒。这一点照旧写在 §3 而不是假装已经量过。
+- 验收：`mode` 测试 `a_work_run_without_the_evidence_it_chose_does_not_land`（`work`＋`tested`、没跑测试 → `Refused`），以及每种要求、每种落地各自的拒与放。
 -/
 
 namespace Runtime.Mode

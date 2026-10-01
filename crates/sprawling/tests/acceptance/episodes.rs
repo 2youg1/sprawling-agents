@@ -360,7 +360,7 @@ fn rules() -> Episode {
 }
 
 /// A shell is off unless a building turns it on, so the shell arm has
-/// nothing to run (runtime-SPEC.md, `exec`).
+/// nothing to run (`crates/runtime/Spec.lean`, `exec`).
 fn exec() -> Episode {
     Episode {
         step: Step {

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whether a wave needs a checkpoint before it runs — the one
-//! authority on that question (runtime-SPEC §8-45).
+//! authority on that question (`crates/runtime/spec/Run/Checkpoint.lean` §8-45).
 
 use kernel::ToolCall;
 

@@ -22,7 +22,7 @@ impl RunWorker {
     ///
     /// It still does not end a run: stopping a run in flight is
     /// `Cancel`, and one verb that did both would leave a person unable
-    /// to ask for either alone. What changed (runtime-SPEC 8-28) is that
+    /// to ask for either alone. What changed (`crates/runtime/Spec.lean` §8-28) is that
     /// a background command is not a run. It is a child process nobody
     /// could reach, because a run waiting on one is inside a system call
     /// rather than at a phase boundary; leaving it going would make

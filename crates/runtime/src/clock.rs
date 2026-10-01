@@ -16,7 +16,7 @@
 //! carries the reading it was given.
 //!
 //! [`ClockReading`] is how a tool face learns what time it is without a
-//! clock of its own (runtime-SPEC 8-53).
+//! clock of its own (`crates/runtime/spec/Clock.lean` §8-53).
 
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -39,7 +39,7 @@ pub fn iso(at: TimeMs) -> String {
 /// `E_INVALID_ARGS` for every other spelling - a zone offset, a fraction
 /// of a second, a date alone, a lowercase `t` or `z`, a day the calendar
 /// does not have, `24:00:00`, a leap second, a moment before 1970 - with
-/// a recovery that shows the shape (runtime-SPEC 8-10).
+/// a recovery that shows the shape (`crates/runtime/spec/Clock.lean` §8-10).
 pub fn parse_iso(raw: &str) -> Result<TimeMs, AxError> {
     let refused = || {
         AxError::failure(AxCode::InvalidArgs, "read a UTC moment", raw).with_recovery(
@@ -109,7 +109,7 @@ fn millis_of([year, month, day, hour, minute, second]: [i128; 6]) -> Option<i128
 }
 
 /// The moments a selection by time keeps: `[since, until)` in UTC, an
-/// absent end left open (runtime-SPEC 8-57).
+/// absent end left open (`crates/runtime/spec/Clock.lean` §8-57).
 ///
 /// It judges one moment at a time and assumes no order: a ledger's `t`
 /// does not rise with `seq`, so a reader asks about every line and never
@@ -326,7 +326,7 @@ impl StampGate {
 }
 
 /// The moment a run's driver read its clock last, shared with the tool
-/// faces that report the time (runtime-SPEC 8-53).
+/// faces that report the time (`crates/runtime/spec/Clock.lean` §8-53).
 ///
 /// The driver's clock hook is the one sampling point of a run, and a
 /// tool face receives readings rather than sampling: the hook `keep`s

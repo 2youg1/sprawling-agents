@@ -11,7 +11,7 @@
 //! sits in a temp directory every backlog on the machine shares. Naming
 //! it `sprawling-<pid>-<id>` assumed the id was unique per process, and
 //! two backlogs of one process then collided on their first command each
-//! (runtime-SPEC.md 8-40).
+//! (`crates/runtime/spec/Backlog.lean` §8-40).
 
 use std::sync::atomic::{AtomicU64, Ordering};
 

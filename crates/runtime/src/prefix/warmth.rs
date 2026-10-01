@@ -5,7 +5,7 @@
 
 //! One session's keep-warm account: the last real request each prefix
 //! carried, and the renewal sent for it when `kernel::keep_warm` says it
-//! is due (runtime-SPEC 8-4-2).
+//! is due (`crates/runtime/spec/Prefix.lean` §8-4-2).
 //!
 //! **Off keeps nothing.** Under [`KeepWarm::Off`] a request is not even
 //! cloned, so the default setting costs no memory per session and has no

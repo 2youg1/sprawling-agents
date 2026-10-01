@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The bytes a model named, read after the one judgement `read` gives a
-//! path (runtime-SPEC.md section 8-59).
+//! path (`crates/runtime/spec/Tools/BoundReader.lean` §8-59).
 //!
 //! `read` hands back text. A tool that sends a picture or a recording to
 //! an endpoint needs the bytes, and they may sit in another building the

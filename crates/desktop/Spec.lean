@@ -370,7 +370,7 @@ D12 没有准入安全接口的四组调用经一片 Zig 叶子，Rust 面零业
 D13 录下的声音作为一块 audio content 交回城里。
 
 - **决定**：`desktop.record` 的 `stop` 在这份录制录了声音时，答复的第一块是 MCP 的 audio content（`type: "audio"`、`data` 是 base64、`mimeType: "audio/wav"`），第二块是照旧的那段文字，多写 `sound`（wav 的路径）。wav 超过 `SOUND_CARRIED_MOST` 时不带 audio 块，文字里写 `sound_left_out` 说明多长、在哪里；声音那个 ffmpeg 提前退出时写 `sound_ended_early`，有多少交多少。
-- **理由**：wav 落在临时目录（§14），城里没有一件工具读得到那里；交回城里的唯一一条不新增依赖、不新增写权限的路，是 MCP 答复本身。连接器已经把答复里的图片存进 CAS（runtime-SPEC §8-27-10），声音走同一条路，模型读到的是一行带 locator 的字，base64 恒不进窗口也恒不进账本。截图恒是一块 image 在前（§8-2b），声音照同一个形状，模型读这两种答复用的是同一种读法。
+- **理由**：wav 落在临时目录（§14），城里没有一件工具读得到那里；交回城里的唯一一条不新增依赖、不新增写权限的路，是 MCP 答复本身。连接器已经把答复里的图片存进 CAS（`crates/runtime/Spec.lean` §8-27-10），声音走同一条路，模型读到的是一行带 locator 的字，base64 恒不进窗口也恒不进账本。截图恒是一块 image 在前（§8-2b），声音照同一个形状，模型读这两种答复用的是同一种读法。
 - **击败的备选**：①把录音写进这座楼（scope 文件说的是能碰哪些窗口，没说能往城里哪里写，§14；而且本 server 不知道城根在哪）；②只交路径（城里没有工具读得到临时目录）；③把整段声音不论多长都塞进答复（十分钟的 wav 是 19 MB，base64 之后超过城的 MCP 单行上限，整个答复会被拒，连画面的路径都到不了）。
 - **重开的参数**：城的 MCP 客户端改了单行上限；或者 `transcribe` 能直接读运行中的机器上的一个文件。
 -/
@@ -602,7 +602,7 @@ D16 截图 schema 的 `quality` 上限经 `IMAGE_QUALITY.admit` 读出。
 **还欠的**，都是这条接口的当前状态：
 
 1. **OCR**：一张截图变成文字由城工具 `ocr` 承担（sprawling-SPEC 8-142），它读连接器存进 CAS 的截图，经人为 `ModelTag::Ocr` 选的端点；本 package 不做 OCR。
-2. **录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（D13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（runtime-SPEC §8-27-10、runtime-SPEC §12.15）。`transcribe` 今天只读本楼的文件（sprawling-SPEC 8-131），读一个 `cas:` 块是那里的未决；在它落地之前，录音的路径与 locator 都写在答复里，但工具还收不下它们。
+2. **录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（D13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（`crates/runtime/Spec.lean` §8-27-10、runtime D15）。`transcribe` 今天只读本楼的文件（sprawling-SPEC 8-131），读一个 `cas:` 块是那里的未决；在它落地之前，录音的路径与 locator 都写在答复里，但工具还收不下它们。
 3. **macOS 这条胳膊**：`platform/elsewhere.rs` 对 macOS 答 `E_TOOL_UNAVAILABLE`。它要在一台 Mac 或夜间的 `platforms.yml` 上验，Windows 上验不了。
 -/
 

@@ -24,7 +24,7 @@
 //! The tee comes first and is not optional. The original is pinned in
 //! the CAS and materialized as a rest file before anything is cut,
 //! which is why this may cut harder than a compactor that cannot
-//! promise the way back. Parameters are runtime-SPEC §8-27-5, and are
+//! promise the way back. Parameters are `crates/runtime/spec/Sieve.lean` §8-27-5, and are
 //! not choices to revisit here.
 
 use kernel::{AxError, Locator};

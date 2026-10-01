@@ -11,6 +11,9 @@
 //! Time arrives through the `now` hook and is never sampled here. The
 //! caller decides what a clock is: a counter in the simulator, the one
 //! sanctioned wall-clock sample in `bin::assembly`.
+//!
+//! `crates/runtime/spec/Run.lean` proves what the event sequence must
+//! hold (§8-15): `handoff_written` and `run_frozen` close every run, once.
 
 use kernel::{
     Address, AxError, BuildingPolicy, Carrier, Completion, EventDraft, Ledger, Locator, Model,
@@ -104,7 +107,7 @@ pub struct RunPlan {
     /// when somebody looked at a form.
     pub retries: kernel::Retries,
     /// The identity version this run's session froze, which
-    /// `run_started` records as it is (runtime-SPEC.md 8-56).
+    /// `run_started` records as it is (`crates/runtime/spec/Run.lean` §8-56).
     pub naming: Option<kernel::B3Hash>,
 }
 
@@ -204,7 +207,7 @@ pub struct Active {
     /// request, and that absence is the `FirstRequest` a record states.
     prior_shape: Option<crate::prefix::shape::PromptShape>,
     /// The `prompt_assembled` payload this run wrote last, which a turn
-    /// does not write again (runtime-SPEC.md section 8-39, item 5).
+    /// does not write again (`crates/runtime/spec/Prefix.lean` §8-39, item 5).
     prompt: crate::turn::PromptRecord,
     /// Whether the next wave needs a checkpoint (§8-45).
     checkpoint: checkpoint::CheckpointPolicy,

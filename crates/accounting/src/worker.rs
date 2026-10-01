@@ -326,7 +326,7 @@ impl RunWorker {
     /// cannot interrupt it.
     ///
     /// The backlog takes the output sink here, so a worker nobody serves
-    /// reads no command's output at all (runtime-SPEC 8-28-3).
+    /// reads no command's output at all (`crates/runtime/Spec.lean` §8-28-3).
     pub fn serve(&mut self, serving: Serving) {
         let outputs = Arc::clone(&serving.outputs);
         self.flight.backlog = self.flight.backlog.clone().with_sink(runtime::Sink::new(

@@ -18,6 +18,10 @@
 //! `model_returned`, `tool_called`, `tool_result` - carry that moment,
 //! read from the clock the driver handed to [`Turn::begin`]; every other
 //! line of the turn carries the turn's stamp. Order is `seq`'s business.
+//!
+//! `crates/runtime/spec/Turn.lean` proves what the boundaries must hold
+//! (§8-3): a cancel before call k leaves exactly the first k calls
+//! accounted, and a steer never ends a turn.
 
 use std::borrow::Cow;
 
@@ -186,7 +190,7 @@ impl<'h> Turn<'h, Calling<'_>> {
         // `ModelReturn`, and the record below is written from that return
         // in each case - so what a page sees arriving and what the ledger
         // keeps cannot come from two different readings of one reply. A failure goes to the
-        // recovery pipeline before it leaves this phase (runtime-SPEC
+        // recovery pipeline before it leaves this phase (`crates/runtime/spec/Turn/Recovery.lean`
         // §8-49), and every attempt - first or repaired - is recorded
         // before it is made.
         let mut call = recovery::ModelCall::open(&mut self.journal, ledger, model, &request);

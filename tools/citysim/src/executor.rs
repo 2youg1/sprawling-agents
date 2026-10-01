@@ -10,7 +10,7 @@
 //!
 //! Event order (no cancel, natural conclusion):
 //! checkpoint_committed, run_started, prompt_assembled once per run
-//! (runtime-SPEC §8-39 item 5), then per turn prompt_shape_compared,
+//! (`crates/runtime/Spec.lean` §8-39 item 5), then per turn prompt_shape_compared,
 //! model_called, model_returned, (tool_called, tool_result)*, and finally
 //! handoff_written, run_frozen.
 
@@ -251,7 +251,7 @@ pub fn run_scenario_on(
             .map_or(Temporal::Timeless, |meta| meta.temporal);
         match bench.invoke(call, &key, t)? {
             // A replay carries the first call's own result, and is
-            // packaged exactly as that result was (runtime-SPEC.md 8-35).
+            // packaged exactly as that result was (`crates/runtime/Spec.lean` §8-35).
             BenchOutcome::Ran { outcome, .. } | BenchOutcome::Duplicate { outcome } => {
                 // The envelope is the caller's to hang: a clock line when
                 // one is due, inside this result's byte budget.

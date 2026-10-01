@@ -295,7 +295,7 @@ enum Path {
 
 /// A face that reads the driver's latest clock reading while it packages
 /// each answer, the way the lane's exec face renders a result's clock
-/// line (runtime-SPEC 8-53).
+/// line (`crates/runtime/spec/Clock.lean` §8-53).
 struct Stamping {
     placed: Placed,
     reading: crate::clock::ClockReading,

@@ -43,7 +43,7 @@ impl Breakpoint {
 /// provider refuses (`CACHE_BREAKPOINTS_MAX`). The tail is the last
 /// message rather than the last assistant message: trailing tool results
 /// ride in the last message, and anchoring before them pays for them
-/// again on every request (runtime-SPEC.md section 12).
+/// again on every request (`crates/runtime/spec/Turn.lean` §8-6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BreakpointPlan {
     tail: Option<usize>,

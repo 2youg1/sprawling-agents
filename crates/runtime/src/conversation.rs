@@ -21,7 +21,7 @@
 //! and lands after the next tool results, so the next request extends the
 //! last one instead of editing it. The one exception is tool results after
 //! an empty reply, which extend the sent message rather than open a second
-//! adjacent user message, and leave it open again (runtime-SPEC §8-47).
+//! adjacent user message, and leave it open again (`crates/runtime/spec/Conversation.lean` §8-47).
 
 use kernel::{ChatMessage, ContentBlock, Role};
 

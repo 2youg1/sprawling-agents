@@ -177,7 +177,7 @@ fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
 fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
     // Named on the host: a sandboxed command copies the room and its
     // deletion dies with the copy, so only a host command can leave the
-    // sweep something to report (runtime-SPEC 8-13-2).
+    // sweep something to report (`crates/runtime/Spec.lean` §8-13-2).
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = dir.path().join("lab").join("room1");

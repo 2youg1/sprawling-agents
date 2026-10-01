@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The first request a branch sends opens with the bytes of the last
-//! request its mother sent (runtime-SPEC.md 8-2): a provider reuses a
+//! request its mother sent (`crates/runtime/spec/Fork.lean` §8-2): a provider reuses a
 //! cached prompt only for a prefix that matches byte for byte, so a
 //! branch that re-worded any message its mother sent pays for the whole
 //! conversation again.

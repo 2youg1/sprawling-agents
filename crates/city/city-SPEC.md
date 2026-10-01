@@ -125,7 +125,7 @@ impl RulesCache {
 - **规则是一份 TOML，散文没有另起一份文件**：若是 Markdown，读者就得在**任意一行**上匹配 `confidential:`／`write:`／`review:`／`browser:`／`usersbrowser:`／`desktop:`，于是「How work is done here」里一句以 `desktop = true` 开头的话就授予了宿主机的桌面，而一栋没写 `write:` 的楼落到 `Everything`。两处都朝宽松的一侧失败，那是权限读者唯一不许失败的方向。改成 TOML 之后键只在文法给出键的位置成立，`deny_unknown_fields` 让拼错成为一条消息而不是一次静默缺席，`confidential` 与 `write` 都不再有缺省。**散文留在同一份文件里**，作 `does` 与 `conventions` 两个键：拆成两份文档同样能关掉撞键，代价是一栋楼有两种说法且可以互相矛盾。居民拿到的就是这份文件本身的字节，所以城判定的与 agent 读到的是同一串。
 
 - **confidential 四条各有其守处**：模型池锁本地由 `gateway::endpoint` **在会泄漏的那一端**拒（`req.policy.confidential` 即拒，携三段式）；写域止于本楼子树由 `write_domain()` 在构造点拒；数据可入不可出归出网门；**楼里的字节楼外读不到**，归读界（下一条）。**把兜底放在会出事的那一层**，路由错了仍然拦得住。
-- **读界：本楼全开，他楼非机密可读，机密楼对楼外全关**。判定只有一处：`kernel::address::may_read(reader_building, target, rules) -> ReadVerdict`（kernel-SPEC §8-2），三臂 `Open`／`Confidential`／`RulesUnreadable(AxError)`。问它的是模型选路的唯一判定处 `runtime::tools::chosen_path`（runtime-SPEC §8-30-1）：`read` 的路径、`search` 的起点、`search` 不带路径时在城根下走进的每一栋楼，以及经这两件工具读到的 transcript（runtime-SPEC §8-32），都先过它。`rules` 是目标所在楼此刻的规则：装配层把 `city::Building::of(target)` 与 `policy::load` 接成一个闭包交给 `may_read`，**只在目标出了本楼时才调用**——本楼的读不读盘，他楼的读每次现读规则。规则读不出＝`RulesUnreadable`，一样关：读不出的那份规则可能写着 `confidential = true`，而隐私设置不得朝宽松的一侧失败（本节「没有 RULES.toml」那条同理）。**读界只管模型选的路径**：catalog 名是人在阅览室里准入的（runtime-SPEC §8-29 起首），不经它；`exec` 在宿主机上跑的命令读得到盘上任何文件，那道墙要 OS sandbox，与「出网」那条的缺口是同一个缺口。
+- **读界：本楼全开，他楼非机密可读，机密楼对楼外全关**。判定只有一处：`kernel::address::may_read(reader_building, target, rules) -> ReadVerdict`（kernel-SPEC §8-2），三臂 `Open`／`Confidential`／`RulesUnreadable(AxError)`。问它的是模型选路的唯一判定处 `runtime::tools::chosen_path`（`crates/runtime/Spec.lean` §8-30-1）：`read` 的路径、`search` 的起点、`search` 不带路径时在城根下走进的每一栋楼，以及经这两件工具读到的 transcript（`crates/runtime/Spec.lean` §8-32），都先过它。`rules` 是目标所在楼此刻的规则：装配层把 `city::Building::of(target)` 与 `policy::load` 接成一个闭包交给 `may_read`，**只在目标出了本楼时才调用**——本楼的读不读盘，他楼的读每次现读规则。规则读不出＝`RulesUnreadable`，一样关：读不出的那份规则可能写着 `confidential = true`，而隐私设置不得朝宽松的一侧失败（本节「没有 RULES.toml」那条同理）。**读界只管模型选的路径**：catalog 名是人在阅览室里准入的（`crates/runtime/Spec.lean` §8-29 起首），不经它；`exec` 在宿主机上跑的命令读得到盘上任何文件，那道墙要 OS sandbox，与「出网」那条的缺口是同一个缺口。
 - **没有 RULES.toml 是普通楼；有而不声明是错误**：把隐私设置的默认值悄悄取成宽松的那一边，正是这整个面存在的理由。拼写不是 `true`／`false` 同样拒——读起来像笔误的隐私设置不得解析成许可。
 - **confidential 楼声明越界前缀＝拒而不裁剪**：静默裁剪会让文件说一套、城做另一套；拒绝会指出该改哪一行。
 - **无声明写域时默认只写本楼**：一栋楼至少能写自己，且不多。`prefixes` 里一条读不出的地址**传播而不跳过**——在读它的地方丢掉，一栋楼就写得比人授予的少，而这件事没有任何一处说出来。
@@ -409,13 +409,13 @@ pub fn city_shelves(city_root: &Path, home: &Path) -> Result<Vec<PathBuf>, AxErr
 - **读架上的失败逐条上报**：目录项读不动、目录名或文件名不是 Unicode，都带路径报 `E_STORAGE_FATAL`。一件静默缺席于每一间阅览室的 skill，是人从 catalog 上看不出来的那一种故障。
 - **一格书架加一个落点是一个值，不是两个字段**（`Holding::shelf`）：一个持有只在一格书架上、只在一个落点上，两个字段允许「说 library、指向城外的文件」这个任何书架都进不了的状态。三条臂正好是 skill 能在的三个地方，没有第四条；哪一条由**扫盘时读的那个根**给出，不从地址反推——反推只对「两格书架碰巧落在不同地方」成立，而那是个巧合而不是规则。
 - **`Shelf::address()` 答的是 catalog 承诺一件 skill 之前要问的那个问题**：城内书架上的一件靠地址打开，城外书架上的文件没有地址。所以**不发明一个假地址**：拼一个看起来像 `Address` 的字符串，会让读者去开一个并不在那儿的文件，且失败发生在第一次 `read` 而不在写下列表的那个时候。
-- **城外书架上的一件带着它的正文**（`Holding::carried`）：扫描为了取一行披露与哈希本来就读了每个字节，留下这份正文，阅览室就能把它整份交给 catalog（runtime-SPEC §8-29-6），run 按名读到的字节与 `hash` 出自同一次读入。只在 `Holding::of` 一处派生：`shelf.address()` 为 `None` 时为 `Some(正文)`，否则为 `None`——有地址的一件由 `read` 到地址去开，再带一份正文就是同一份文档的第二个家（§12.9）。
+- **城外书架上的一件带着它的正文**（`Holding::carried`）：扫描为了取一行披露与哈希本来就读了每个字节，留下这份正文，阅览室就能把它整份交给 catalog（`crates/runtime/Spec.lean` §8-29-6），run 按名读到的字节与 `hash` 出自同一次读入。只在 `Holding::of` 一处派生：`shelf.address()` 为 `None` 时为 `Some(正文)`，否则为 `None`——有地址的一件由 `read` 到地址去开，再带一份正文就是同一份文档的第二个家（§12.9）。
 - **外部书架只读挂载，路径由城自己的配置给出**（`[skills] shelves`，城层一份）：`city_shelves` 在城的那一级上读它，而不是走三层梯子——书架是这座城所在的文件系统上的一个目录，它对每一栋楼同时挂上，让楼或房间能自己挂一本就是让一个作用域准入一份没人选过的文件。楼或房间写下它即在读文件处拒（`E_CONFIG_INVALID`，恢复语说把它移进城自己的 `CONFIG.toml`），而不是解析后丢掉——一份被接受却什么都不发生的配置，写它的人无从诊断。
 - **外部书架的布局属于写它的那个 harness**：一层目录一件 skill、目录里放 `SKILL.md`（`SKILL_FILE` 是本城写下这条布局的**唯一一处**）；目录名就是 skill 名。**section 为空**：那棵树没有 section 这一级，替它编一个就是本城对一份它不拥有的东西的猜测。不在那里、不是目录的外部路径直接跳过（空架就是空架）；是文件而不是目录则以 `E_CONFIG_INVALID` 拒并报出是哪一条——一句「配置写了却什么都没发生」是没人能诊断的状态。
 - **外部路径里的 `~` 指这个人自己的 home，home 以参数传入**：读环境不是本 crate 的活（`bin::assembly` 给出 `Home`），因此测试扫的是测试自己造的目录。committed 的城配置里不放一台机器的绝对路径，这正是 `~` 存在的理由。不是 `~` 开头也不是绝对路径的条目在解释处即拒，恢复语说出这条规则。
 - **同一名的优先级是 building > library > external（外部按数组序）**：按最远的架先上、近的盖上去，于是城自己的存货盖过别的程序的目录——城留下一个名字时，那个名字指城的 skill；楼的自己一份又盖过城的。外部条目排到最后，因为它是别人写的：一份目录不是一个权威。
 - **目录的架次由 `Shelf` 的臂序给出**：`Library::all` 先按 `Shelf::catalog_position`——城库、楼架、外部架按 `[skills] shelves` 的数组序——再按 `(section, name)`。位置是对三条臂的穷尽 match，不另立一张次序表；加一条臂而不在这里安置它，本 crate 编译不过。外部持有者没有 section，若把全部持有者按 `(section, name)` 排，别人的目录会排到城自己的存货之前，那正是上一条优先级的反面。
-- **一件藏品可以是一个目录**：section 书架上的一项是 `<name>.md` 一份文档，或 `<name>/` 一个包——包里的 `SKILL.md`（`SKILL_FILE`，与外部书架同一布局）就是这件持有：catalog 只列它的第一行，`Holding::shelf` 指向它，`hash` 是它的字节，`Holding::package` 是包目录的地址——一件藏品是不是包由扫描在这里说出，读包的一方不从地址的写法去猜：一份恰好叫 `SKILL.md` 的单文档会让整个 section 被当成包，把阅览室没准入的藏品一并交出去。单文档与城外书架上的持有 `package` 为 `None`（后者没有地址）。包里其余文件不是持有，留在架上由 `read` 按 `<名>/<相对路径>` 打开（runtime-SPEC §8-29-3）；只列一行是常驻上下文不随包膨胀的原因。没有 `SKILL.md` 的目录不是藏品，跳过而不报——与外部书架同形。
+- **一件藏品可以是一个目录**：section 书架上的一项是 `<name>.md` 一份文档，或 `<name>/` 一个包——包里的 `SKILL.md`（`SKILL_FILE`，与外部书架同一布局）就是这件持有：catalog 只列它的第一行，`Holding::shelf` 指向它，`hash` 是它的字节，`Holding::package` 是包目录的地址——一件藏品是不是包由扫描在这里说出，读包的一方不从地址的写法去猜：一份恰好叫 `SKILL.md` 的单文档会让整个 section 被当成包，把阅览室没准入的藏品一并交出去。单文档与城外书架上的持有 `package` 为 `None`（后者没有地址）。包里其余文件不是持有，留在架上由 `read` 按 `<名>/<相对路径>` 打开（`crates/runtime/Spec.lean` §8-29-3）；只列一行是常驻上下文不随包膨胀的原因。没有 `SKILL.md` 的目录不是藏品，跳过而不报——与外部书架同形。
 - **`Holding` 不再携 `path`**：落点由 `Shelf` 说出（城内的两个臂就是地址），而多一个 `PathBuf` 就是同一件事的第二个家，且两层书架下必有一个是错的（§8-12 对 `holding_address` 的同一条理由）。
 ### 8-10 city::wizard（形状 1 判定＋形状 2 值类型；含 survey）
 
@@ -595,7 +595,7 @@ pub struct Holding { …, pub hash: B3Hash }   // 整份文档的 BLAKE3，扫�
 ```
 
 - **它是白得的**：`shelve` 为了取 disclosure 那一行，本来就把整份文档读进了内存；哈希只多走一遍已在手里的字节。
-- **为什么存在 `Holding` 而不是让读者自己算**：读者要的答案是「它变了没有」，而那需要**两个时刻各一次读取**；一张只能报当下内容的书架永远答不了这个问题。早一次的那一读由 `run_started` 携走存进账本（runtime-SPEC §8-11），于是比对对的是**这座城自己的历史**，不是一份签名：它只能说「这变了」，永远不说「这安全」。
+- **为什么存在 `Holding` 而不是让读者自己算**：读者要的答案是「它变了没有」，而那需要**两个时刻各一次读取**；一张只能报当下内容的书架永远答不了这个问题。早一次的那一读由 `run_started` 携走存进账本（`crates/runtime/Spec.lean` §8-11），于是比对对的是**这座城自己的历史**，不是一份签名：它只能说「这变了」，永远不说「这安全」。
 - **名字不变而字节变了，正是注入的样子**，而只按名字核对的读者发现不了它。
 
 ### 8-11 楼的治理字节搬进它自己的保留子树（沉淀一处路径权威）
@@ -733,11 +733,11 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 
 **决定**：`Holding` 多一个字段 `carried: Option<String>`，城外书架上的一件是 `Some(SKILL.md 正文)`，城内书架上的是 `None`；只由 `Holding::of` 按 `Shelf::address()` 派生。
 
-**理由**：阅览室要把城外的一件交给 run，而 run 打不开城外的路径；正文是唯一能交的东西（runtime-SPEC §12.9）。扫描已经读了这些字节去取披露行与哈希，留下它们就保证交出去的字节与 `hash` 是同一次读入——在阅览室再读一次文件，两次读之间文件可能被它的主人改掉，pin 说的就不再是 run 读到的那份。
+**理由**：阅览室要把城外的一件交给 run，而 run 打不开城外的路径；正文是唯一能交的东西（runtime D9）。扫描已经读了这些字节去取披露行与哈希，留下它们就保证交出去的字节与 `hash` 是同一次读入——在阅览室再读一次文件，两次读之间文件可能被它的主人改掉，pin 说的就不再是 run 读到的那份。
 
 **被否**：①把正文放进 `Shelf::External` 臂——`Shelf` 答的是「在哪里」，而且 `accounting::views::skills` 按字段解构这一臂、把它映射到线上，正文会跟着进页面的那一侧；②阅览室准入时再读一次并比哈希——多一次读盘，比不上时还要另造一个拒词；③每件持有都带正文——城内的一件由 `read` 到地址去开，正文是第二个家，也让一千件的城库多占一千份内存。
 
-**重开参数**：城外书架上的包里附属文件也要可读（runtime-SPEC §12.9 的重开参数）时，`carried` 换成整包的字节或一份城内镜像的地址。
+**重开参数**：城外书架上的包里附属文件也要可读（runtime D9 的重开参数）时，`carried` 换成整包的字节或一份城内镜像的地址。
 
 ### 12.10 写入限制随派活走，不进 `RULES.toml`
 
@@ -919,7 +919,7 @@ impl CityTool { pub fn new(city_root: &Path) -> Result<CityTool, AxError>; }
 
 ### 8-24 Handoff 从楼搬到房间
 
-> 权威在 runtime-SPEC §8-33；本节只记 city 这一侧怎么变。
+> 权威在 `crates/runtime/Spec.lean` §8-33；本节只记 city 这一侧怎么变。
 
 `handoff_path(city_root, room)` 与 `handoff(city_root, room)` 的第二个参数从楼地址改为**房间地址**：`<city>/<room>/Handoff.md`。签名一字不变，变的是调用方递什么——装配层的 `run_segment` 递本跑的地址。模板由 `room::open` 在打开房间时经 `spine_files::lay_out_handoff` 铺下；楼级 `lay_out` 不再铺 `Handoff.md`。理由是同楼并发：两个房间同时冻结，一份楼级文件就是两份内容抢一个名字。没有房间的地址（直接派到楼根的跑）读到 `None`，与从前空表单的读法一致。
 
@@ -1086,7 +1086,7 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 
 **拒什么**：`[clock]` 表 `deny_unknown_fields`。`zones` 与任何别的键、拼不出的值（`"minutes"`）都在解析时拒，走本模块既有的那一种拒法（`refuse::unreadable`）：主体是 serde 点名的键或值与它接受的集合，恢复语是「under `[clock]`, change the value the message names, or take that key out」。
 
-**读者**：粒度只在 `runtime::clock::StampGate` 里起作用（runtime-SPEC §8-10）；生产的每一跑由装配层按冻结下来的值造一个 `StampGate`（sprawling-SPEC 8-125）。
+**读者**：粒度只在 `runtime::clock::StampGate` 里起作用（`crates/runtime/Spec.lean` §8-10）；生产的每一跑由装配层按冻结下来的值造一个 `StampGate`（sprawling-SPEC 8-125）。
 
 ### 8-32 楼的写域是上限，一次派活的写入限制只收窄它（`city::policy`，形状 1 判定）
 

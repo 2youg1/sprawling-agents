@@ -6,7 +6,7 @@
 //! Every skill this repository ships, on a shelf the city mounts from
 //! outside itself and admitted by a building's reading room, is pinned
 //! when a run starts and read by name as the bytes the pin names
-//! (runtime-SPEC.md 8-29-6; `docs/getting-started.md`, "Tools, skills
+//! (`crates/runtime/Spec.lean` §8-29-6; `docs/getting-started.md`, "Tools, skills
 //! and MCP").
 //!
 //! The shelf is the `skills/` directory itself, named in the city's own

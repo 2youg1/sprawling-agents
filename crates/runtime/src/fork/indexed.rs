@@ -5,7 +5,7 @@
 
 //! Rebuilding a branch's conversation through the ledger's resident
 //! index: the named line for its run, then that run's own lines, and no
-//! other line read (runtime-SPEC.md 8-2).
+//! other line read (`crates/runtime/spec/Fork.lean` §8-2).
 //!
 //! The ledger's only writer asks this, and it verified the ledger when
 //! it opened it; verifying the whole chain again to read one run's lines

@@ -10,7 +10,7 @@
 //! harness has to win that contest, so every host command the exec tool
 //! dispatches starts one level down instead of inheriting the core's
 //! level. Both platforms are reached through a safe interface, so this
-//! file needs no foreign call (runtime-SPEC §8-13-3).
+//! file needs no foreign call (`crates/runtime/spec/Tools/Exec.lean` §8-13-3).
 
 use std::process::Command;
 

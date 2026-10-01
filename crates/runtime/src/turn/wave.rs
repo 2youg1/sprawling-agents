@@ -14,7 +14,7 @@
 //! Each call's two lines carry their own moments: the start is read once
 //! the call is admitted and before its tool runs, the answer before the
 //! tool face packages it, so a stamp the face renders is the answer's
-//! moment (runtime-SPEC 12.8). The turn reads both; the face holds none.
+//! moment (runtime D8). The turn reads both; the face holds none.
 
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{
@@ -62,7 +62,7 @@ fn printed(payload: &Payload, action: &'static str) -> Result<String, AxError> {
 pub trait ConcurrentInvoke {
     /// The registration of the call's tool: its effect decides whether
     /// the call is read-only, and `tool_called` copies its effect and
-    /// render (runtime-SPEC 8-51). `None` is a tool the bench does not
+    /// render (`crates/runtime/spec/Turn.lean` §8-51). `None` is a tool the bench does not
     /// know, which is not read-only.
     fn meta_of(&self, call: &ToolCall) -> Option<&ToolMeta>;
     /// The tool a read-only call would run on, lent out before the call

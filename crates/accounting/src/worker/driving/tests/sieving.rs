@@ -124,7 +124,7 @@ fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() 
 /// result reaches the ledger ending with the clock line, and the second
 /// it names is the one its `tool_result` line records: the turn reads
 /// the answer moment before the face accounts the result (sprawling-SPEC
-/// 8-125, runtime-SPEC 8-15).
+/// 8-125, `crates/runtime/Spec.lean` §8-15).
 ///
 /// Before this, the product handed the pipeline no stamp at all, so a
 /// model in a real city never learned when a command ran.

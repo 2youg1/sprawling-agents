@@ -79,7 +79,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
             probed(),
             probed(),
             // A call that may write, because only such a wave is checkpointed
-            // (runtime-SPEC 8-45): a read-only one changes no file.
+            // (`crates/runtime/Spec.lean` §8-45): a read-only one changes no file.
             tool_completion(
                 "noting",
                 "tu_4",

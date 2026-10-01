@@ -12,7 +12,7 @@
 //! later line was a copy of the first; what does move between turns is
 //! recorded by `prompt_shape_compared`. The comparison is on the payload
 //! rather than on the turn index, so a turn whose request really differs
-//! still gets its own line (runtime-SPEC.md section 8-39, item 5).
+//! still gets its own line (`crates/runtime/spec/Prefix.lean` §8-39, item 5).
 
 use kernel::Payload;
 

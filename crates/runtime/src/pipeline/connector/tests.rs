@@ -214,7 +214,7 @@ fn sounded(block: Value) -> (ToolOutcome, Cas, tempfile::TempDir) {
 /// named in the window by its locator, where a tool that reads a
 /// recording can be pointed at it. Its base64 reaches neither the window
 /// nor the ledger, and it is not a picture attachment: the model cannot
-/// hear it (runtime-SPEC.md section 12.15).
+/// hear it (runtime D15).
 #[test]
 fn a_sound_block_is_stored_and_named_by_its_locator() {
     use base64::Engine as _;
@@ -243,7 +243,7 @@ fn a_sound_block_is_stored_and_named_by_its_locator() {
 /// A sound block whose bytes do not decode, or whose media type is not
 /// audio, is left out with the reason, as words the model reads. Which
 /// containers a transcription endpoint takes is the reader's to judge,
-/// not the connector's (runtime-SPEC.md section 12.15).
+/// not the connector's (runtime D15).
 #[test]
 fn a_sound_this_city_cannot_carry_is_left_out_in_words() {
     for block in [

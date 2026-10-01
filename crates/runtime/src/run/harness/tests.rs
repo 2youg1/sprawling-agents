@@ -128,7 +128,7 @@ fn answered(stop: HarnessStop, text: &str, cut: Option<Cut>) -> (Completion, Eve
     (completion, cited.unwrap())
 }
 
-/// The ending table of runtime-SPEC 8-52, row by row: done needs an end
+/// The ending table of `crates/runtime/spec/Run.lean` §8-52, row by row: done needs an end
 /// of turn that said something, the ceiling reads as limit, and only a
 /// halt reads as cancelled.
 #[test]

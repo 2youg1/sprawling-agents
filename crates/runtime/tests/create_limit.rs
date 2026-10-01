@@ -6,7 +6,7 @@
 //! What this asserts: under the create write limit a file that already
 //! exists keeps its bytes on every write path a run has - edit's two
 //! arms, a second name that links to it, and a command on the host
-//! (runtime-SPEC 8-55).
+//! (`crates/runtime/spec/Tools.lean` §8-55).
 
 #![allow(
     clippy::unwrap_used,
@@ -40,7 +40,7 @@ fn call(path: &str, base: &str, old: &str, new: &str) -> ToolCall {
 /// that already exists keeps its bytes whether a run reaches for it
 /// through edit's replacing arm, through edit's creating arm, through a
 /// second name that links to it, or through a command on the host
-/// (runtime-SPEC 8-55).
+/// (`crates/runtime/spec/Tools.lean` §8-55).
 #[test]
 fn an_existing_file_is_unchanged_under_create_by_edit_exec_and_link() {
     let tmp = tempfile::tempdir().unwrap();

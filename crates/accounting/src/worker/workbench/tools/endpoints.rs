@@ -9,7 +9,7 @@
 //! They are one phase of laying out the bench because they share one
 //! door: a `runtime::BoundReader` over the read bound `read` and
 //! `search` ask, the tree the run reads in and the city's block store,
-//! so what one tool may open the others may send (runtime-SPEC 8-59).
+//! so what one tool may open the others may send (`crates/runtime/Spec.lean` §8-59).
 
 use std::sync::Arc;
 

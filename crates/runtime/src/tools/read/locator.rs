@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Opening a Locator: `cas:` bytes and `file:` bytes at a commit
-//! (runtime-SPEC section 8-29-5).
+//! (`crates/runtime/spec/Tools/Read.lean` §8-29-5).
 //!
 //! **A content block is judged at the building it was put for.** The
 //! same bytes may sit in the store because a confidential building put

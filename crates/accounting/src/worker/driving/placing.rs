@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A run's bench as the tool face a wave drives in three stages
-//! (runtime-SPEC.md 8-3): each call's key is placed by its position when
+//! (`crates/runtime/Spec.lean` §8-3): each call's key is placed by its position when
 //! it is admitted, and the commits it was checkpointed against, what it says
 //! it wrote and the commands that ran are counted when it is accounted.
 //! Both happen in call order, so a wave whose reads ran at once leaves
@@ -30,7 +30,7 @@ pub(super) struct Checkpointing {
     /// from.
     pub(super) checkpointed: RefCell<Vec<String>>,
     /// What the calls since the last checkpoint said they wrote, which is
-    /// what the next checkpoint stages (runtime-SPEC 8-45).
+    /// what the next checkpoint stages (`crates/runtime/Spec.lean` §8-45).
     wrote: RefCell<Writes>,
 }
 
@@ -65,7 +65,7 @@ impl Checkpointing {
 
     /// A call that failed may have failed partway through its writes, and
     /// its own account of them no longer holds, so the next checkpoint walks
-    /// the whole domain (runtime-SPEC 8-45).
+    /// the whole domain (`crates/runtime/Spec.lean` §8-45).
     fn widen(&self) {
         self.add(Writes::Domain);
     }
@@ -114,7 +114,7 @@ impl<'f> Placing<'f> {
 
     /// What the model reads of a result no command produced: a
     /// connector's answer is packaged for the window
-    /// (runtime-SPEC.md 8-27-10); every other tool shapes its own.
+    /// (`crates/runtime/Spec.lean` §8-27-10); every other tool shapes its own.
     fn unsieved(&mut self, call: &ToolCall, outcome: ToolOutcome) -> Result<ToolOutcome, AxError> {
         match self.bench.meta_of(&call.name).map(|meta| &meta.effect) {
             Some(Effect::Connector { .. }) => self.sieving.package_connector(outcome),
@@ -177,7 +177,7 @@ impl<'f> Placing<'f> {
             BenchOutcome::Refused { refusal } => Err(*refusal),
             // A replay is answered with what the first call answered,
             // sieved the same way. An error here would tell the model its
-            // call failed when it succeeded (runtime-SPEC.md 8-35). The
+            // call failed when it succeeded (`crates/runtime/Spec.lean` §8-35). The
             // command counters are not touched: nothing ran this time.
             BenchOutcome::Duplicate { outcome } => {
                 if call.name.as_str() == kernel::ToolName::EXEC {

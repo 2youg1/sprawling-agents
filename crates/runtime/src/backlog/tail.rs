@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a running command has written since the last poll, handed to a
-//! sink while the command still runs (runtime-SPEC 8-28-3).
+//! sink while the command still runs (`crates/runtime/spec/Backlog.lean` §8-28-3).
 //!
 //! A child writes to two files, never to pipes, so reading its output
 //! live needs nobody to change how it writes: the window's poll loop

@@ -313,7 +313,7 @@ pub enum GateSubject {
 /// holds something a thread cannot give up has no place on a bench.
 ///
 /// `Sync`, and `invoke` takes `&self`, because the read-only calls at
-/// the head of a wave run at the same time (runtime-SPEC 8-3), so one
+/// the head of a wave run at the same time (`crates/runtime/Spec.lean` §8-3), so one
 /// tool can be inside `invoke` on several threads at once. A tool with
 /// state of its own keeps that state behind its own lock.
 pub trait Tool: Send + Sync {

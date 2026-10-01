@@ -16,7 +16,7 @@
 //!
 //! The half that decides is [`admits`]: it says whether what a run
 //! produced may land, given the run policy it was dispatched under
-//! (runtime-SPEC 8-54). The evidence arrives as plain answers rather
+//! (`crates/runtime/spec/Mode.lean` §8-54). The evidence arrives as plain answers rather
 //! than as an instrument's type, because the instruments live in
 //! citysim, outside this crate, and the question here is not how
 //! evidence was gathered but whether enough of it exists.
@@ -118,7 +118,7 @@ pub enum Admission {
 }
 
 /// Whether what a run produced may be merged, under the policy it was
-/// dispatched with (runtime-SPEC 8-54).
+/// dispatched with (`crates/runtime/spec/Mode.lean` §8-54).
 ///
 /// The landing policy is asked first: an experiment lands nothing
 /// however well it went. Then the evidence requirement, exhaustively,

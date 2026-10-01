@@ -6,7 +6,7 @@
 /-!
 # 模型还在生成时起跑只读工具
 
-规定 `crates/gateway/src/anthropic/stream.rs` 里的提前交出（`completed_call`），以及运行时回合循环据一条提前交出的调用行事时守的规则：`crates/runtime/src/turn/speculation.rs` 起跑读调用并按位置缓存结果，`crates/runtime/src/turn/wave.rs` 把它们记进账本（gateway-SPEC.md 第 8 节，runtime-SPEC.md 8-3）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `crates/gateway/src/anthropic/stream.rs` 里的提前交出（`completed_call`），以及运行时回合循环据一条提前交出的调用行事时守的规则：`crates/runtime/src/turn/speculation.rs` 起跑读调用并按位置缓存结果，`crates/runtime/src/turn/wave.rs` 把它们记进账本（gateway-SPEC.md 第 8 节，`crates/runtime/Spec.lean` §8-3）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 每条工具调用的 `content_block_stop` 一到，解码器就交出这条调用。运行时可以在回答结算之前起跑它，并把它的返回值存进一个按调用在回答中的位置做键的缓存。回答结算之前 Ledger 不追加任何记录；结算之后，调用按模型发出的次序入账，有缓存结果的取缓存，没有的照常执行。
 

@@ -297,7 +297,7 @@ pub fn may_read(
 
 - 规则一句话：`target.is_within(reader_building)` 即 `Open`，且**不调用 `rules`**；否则问 `rules`——`Ok(false)`＝`Open`，`Ok(true)`＝`Confidential`，`Err(e)`＝`RulesUnreadable(e)`。后两臂都是「关」，分成两臂是因为恢复语不同：前者请去问那栋楼里的人，后者要一个人去修那份规则。
 - `rules` 是闭包而不是值：本楼的读是绝大多数，它们不该为一次读盘付账；「哪栋楼持有 target」与「读它的规则」是 city 的权威（`city::Building::of`、`city::policy::load`），由装配层接成这个闭包，kernel 不复述「楼是地址的首段」。它交出的是 `BuildingPolicy::confidential` 那一个事实，形状因此是 `bool`：本模块不引 `model`，`address` 保持叶子模块。
-- 拒绝的措辞不在这里：`ReadVerdict` 是判定，拒词由问它的人写（runtime-SPEC §8-30-1 `chosen_path::admit`，那是模型选路唯一的拒绝处）。
+- 拒绝的措辞不在这里：`ReadVerdict` 是判定，拒词由问它的人写（`crates/runtime/Spec.lean` §8-30-1 `chosen_path::admit`，那是模型选路唯一的拒绝处）。
 
 ### 8-3 kernel::locator
 
@@ -422,7 +422,7 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
 pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64 }
-    // prompt_assembled 的一行来源；不带摘要生产者指纹：没有路径产出摘要（runtime-SPEC §12.1）。旧行里多出的 producer 键读时忽略；本结构没有方法，读者直接读字段
+    // prompt_assembled 的一行来源；不带摘要生产者指纹：没有路径产出摘要（runtime D1）。旧行里多出的 producer 键读时忽略；本结构没有方法，读者直接读字段
 pub struct EvalRun { pub probe: String, pub version: u32, pub predecessor: RunId,  // eval_run：交接探针的一次读数
                     pub kept: u32, pub lost: Vec<u32>,       // lost 是答案不同的题号
                     pub before: Vec<String>, pub after: Vec<String> }   // 全部必填，空亦写出
@@ -654,7 +654,7 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
 - `t` 是写方经注入的时钟采到的 UTC 整数毫秒，kernel 从不采样。
 - `v` 为 2 起，`model_called`、`model_returned`、`tool_called`、`tool_result` 四种行记这一行自己那件事的时刻：一次模型尝试发出、一次回复到齐、一次工具调用开始（放行之后、工具起跑之前）、一次调用答复。`EventKind::records_a_moment` 是这四种的名册，`moment` 对这样的行答 `Some(t)`。
 - `v` 为 1 的行里，这四种带的是它所在回合的时间戳，同一回合的行同值。`moment` 答 `None`，意思是「这一刻没有量过」，不是零耗时。
-- 其余种类的 `t` 是写方为这一行采的一次读数；一个回合里的其余行沿用回合时间戳（runtime-SPEC §8-15）。
+- 其余种类的 `t` 是写方为这一行采的一次读数；一个回合里的其余行沿用回合时间戳（`crates/runtime/Spec.lean` §8-15）。
 - `t` 不随 `seq` 单调：并行只读调用的开始可以早于前一条调用的答复，壁钟也会回拨。次序以 `seq` 为准。
 - 重启之后由 `runtime::replay::outcome_unknown_draft` 补上的 `tool_result`（错误码 `E_TOOL_OUTCOME_UNKNOWN`）记的是城补上它的时刻，不是工具答复的时刻；量工具用时的读者跳过这样的行。
 
@@ -833,7 +833,7 @@ pub const CTX_REMINDER_SECOND_MAX: u64 = 90;                         // 第二�
 pub const LOOP_REPEAT_THRESHOLD: u32 = 3;
 pub const OFFLOAD_MIN_BYTES: u64 = 16_384;
 pub const INTERVAL_CAP_BYTES: usize = 65_536;                        // 一次区间读／检索的窗口预算
-pub const EXCHANGE_BUDGET_BYTES: u64 = OUTPUT_CEILING_DEFAULT * BYTES_PER_TOKEN;  // 一回合 exchange 的窗口预算（runtime-SPEC.md 8-44）
+pub const EXCHANGE_BUDGET_BYTES: u64 = OUTPUT_CEILING_DEFAULT * BYTES_PER_TOKEN;  // 一回合 exchange 的窗口预算（`crates/runtime/Spec.lean` §8-44）
 pub const DRAFT_HELD_ESCALATE: u32 = 3;
 pub const EDIT_WAR_FREEZE: u32 = 2;
 pub const SECRET_ENTROPY_MIN: Ratio = Ratio { num: 7, den: 2 };      // 3.5 bits/char
@@ -851,7 +851,7 @@ pub const PREFIX_SLOTS: NonZeroU64 = 4;                              // 整份 p
 pub const SANDBOX_FUEL_DEFAULT: u64 = 200_000_000;                   // §8-22 沙箱限额的缺省燃料
 pub const CREDENTIAL_NAME_MARKERS: [&str; 11];                       // §8-22 凭据形状名字的标记词
 pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;                       // messages 面输出上限梯的最后一档（token；gateway-SPEC §8-17）
-pub const CLOCK_STAMP_DEFAULT: ClockStampGranularity = ClockStampGranularity::Minute;   // runtime-SPEC §12.8
+pub const CLOCK_STAMP_DEFAULT: ClockStampGranularity = ClockStampGranularity::Minute;   // runtime D8
 pub const AUTONOMY_DEFAULT: Autonomy = Autonomy::Owner;
 pub const DEFAULT_AT: &str = "127.0.0.1:8787";                       // 服务缺省监听地址
 ```
@@ -1345,7 +1345,7 @@ pub fn freeze(clock_stamp: &LayeredValue<ClockStampGranularity>, clock_zones: &L
 ```
 
 - **无字段交集可机械判**：单测将两型缺省值 serde 成 JSON，断言键集交集为空；新增字段自动入判。
-- `CLOCK_STAMP_DEFAULT: ClockStampGranularity = Minute` 落 consts_policy：没有一级写 `[clock] stamp` 的城，`Timestamped` 结果每条带戳，`Timeless` 结果每分钟至多一条（runtime-SPEC §12.8）。
+- `CLOCK_STAMP_DEFAULT: ClockStampGranularity = Minute` 落 consts_policy：没有一级写 `[clock] stamp` 的城，`Timestamped` 结果每条带戳，`Timeless` 结果每分钟至多一条（runtime D8）。
 
 **时钟分区（config）**：`ClockZone { id, offset_min }`（已解析偏移，恒不记时区名——重解会随时区库版本分叉重放历史）；`FrozenConfig.clock_zones` 由 `freeze` 的同名梯解析；zones 梯整表覆盖（下层写即替换上层全表）。本段属 kernel::config（§8-22），就近登记于此避免拆章。
 
@@ -1437,7 +1437,7 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
                                     // 三臂恒三（L0 冻结面），故穷尽不标 non_exhaustive；discard::forecast 的入参
 ```
 
-- **`invoke` 取 `&self`，trait 要求 `Send + Sync`。** 一波里开头连续的只读调用由 `Turn::execute_concurrent` 同时起跑（runtime-SPEC §8-3），同一张工作台上的工具因此会被几个线程同时借用；`&self` 加 `Sync` 让「这件工具能被并行调用」由类型回答，而不是由调用方记住。有内部状态的工具把状态放在自己的锁后面（`Mutex`），锁只罩住那份状态，不罩整次调用。**被否**：①保留 `&mut self`，由工作台给每件工具套一把锁——同名的两条只读调用（两次 `read`）会在这把锁上排队，并行只剩不同名的调用；②每次调用克隆一件工具——持有子进程、连接或目录的工具克隆不出同一件东西。
+- **`invoke` 取 `&self`，trait 要求 `Send + Sync`。** 一波里开头连续的只读调用由 `Turn::execute_concurrent` 同时起跑（`crates/runtime/Spec.lean` §8-3），同一张工作台上的工具因此会被几个线程同时借用；`&self` 加 `Sync` 让「这件工具能被并行调用」由类型回答，而不是由调用方记住。有内部状态的工具把状态放在自己的锁后面（`Mutex`），锁只罩住那份状态，不罩整次调用。**被否**：①保留 `&mut self`，由工作台给每件工具套一把锁——同名的两条只读调用（两次 `read`）会在这把锁上排队，并行只剩不同名的调用；②每次调用克隆一件工具——持有子进程、连接或目录的工具克隆不出同一件东西。
 - **`params` 复用 `Payload`**：键序 BTreeMap＋拒浮点白拿；schema 约定属各工具的实现。
 - **`ToolName::EXEC`**：`exec` 的唯一拼写；discard 预报、命令计数与 sieve、citysim 的执行器都读这个常量。`BROWSER` 同理。
 - **conformance 三断言**：①meta 八字段形状合法（name 文法、disclosure 非空）；②错名调用拒收（E_INVALID_ARGS）；③拒收后工具仍可用（再次正确调用不受污染）。
@@ -1878,7 +1878,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 ### 12.10 信封 `t` 记这一行等来的时刻，`EVENT_LOG_V` 因此为 2
 
-**决定**：四种等来的行的 `t` 记各自那一刻（runtime-SPEC §12.5），账本版本随之从 1 进到 2；`EventRecord::moment` 读 `v` 与种类，答这一行的 `t` 是不是量出来的时刻。
+**决定**：四种等来的行的 `t` 记各自那一刻（runtime D5），账本版本随之从 1 进到 2；`EventRecord::moment` 读 `v` 与种类，答这一行的 `t` 是不是量出来的时刻。
 
 **理由**：`v` 是每一行自带的版本，读者据它区分两种含义，不用猜。一个 `t` 同时服务结果上的戳、时间窗与调用用时，不在载荷里另加时刻字段。
 
@@ -2088,7 +2088,7 @@ pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutc
 ```
 
 - `gate::reach` 判声明的区域：`reaches` 为假出与 `domain` 同一段 `Outside` 三段式（同一处产出，`outside` 提为二者共用），为真 `Allow`；它永不问文件名，因为区域没有文件名。
-- `gate::domain` 判文件，一字不改；它的调用方从 bench 挪到 **`runtime::tools::edit`** 拿到路径的那一刻（runtime-SPEC §8-36）——门口只判区域，所以工具这一层必须判全（`Outside` 与 `NotWritable` 都拒），它判全的方式是调同一个门。
+- `gate::domain` 判文件，一字不改；它的调用方从 bench 挪到 **`runtime::tools::edit`** 拿到路径的那一刻（`crates/runtime/Spec.lean` §8-36）——门口只判区域，所以工具这一层必须判全（`Outside` 与 `NotWritable` 都拒），它判全的方式是调同一个门。
 - 被否：让 bench 读 `call.args["path"]`——那把 bench 和一个工具的参数名绑在一起，而 `exec` 同样声明 `Write` 却没有路径。
 
 ### 8-47 kernel::approval：City Hall 的两个常量与 clerk 的默认代答
@@ -2356,7 +2356,7 @@ pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u
 - `lead_ms` 由调用方对所连 provider 实测给出，不在这里写死一个网络余量：慢链路与快链路要的提前量不同。
 - 花费只观察、不设门限：续期请求照常记 usage，本模块不读余额也不拦。
 - 设置按城→楼→居民三层梯解析，下层覆盖上层，一层也没说＝`Off`（city-SPEC §8-4 `[cache]` 一节）。它不进 `FrozenConfig`：续期发生在两次 run 之间，不属于任何一次 run 的冻结面。
-- 现状：设置与判定已落地；按它记账并经 `kernel::Model` 发出续期的是 `runtime::prefix::warmth`（runtime-SPEC §8-4-2）。续期由 `accounting::worker::keeping_warm` 在房间落地后按 `renewal_due` 发出，每次续期写一行 `cache_renewed`（sprawling-SPEC 8-93）。
+- 现状：设置与判定已落地；按它记账并经 `kernel::Model` 发出续期的是 `runtime::prefix::warmth`（`crates/runtime/Spec.lean` §8-4-2）。续期由 `accounting::worker::keeping_warm` 在房间落地后按 `renewal_due` 发出，每次续期写一行 `cache_renewed`（sprawling-SPEC 8-93）。
 
 ### 8-75 回合记录多记的事：回复的首个内容几时到（形状 2 值类型）
 
@@ -2371,8 +2371,8 @@ pub struct ModelReturned {
 ```
 
 - **它是一个时刻，不是一个时长。** 首字耗时（TTFT）由读者拿它减去开这个回合的 `model_called` 的 `t`；账本不记派生值，记下的两个时刻已经够算。
-- **读数来自回合的钟**：`runtime::turn` 在它包住的增量汇点里读第一段非空内容到达的那一刻（runtime-SPEC §8-50）。kernel 不采样，gateway 也不采样：`kernel::Model` 的实现从不读钟。
-- **缺席有三种情形，都不是零**：回复从一扇到齐之前什么也不报的门回来（阻塞门、没有流的适配器、流式解析失败之后换阻塞门重发修好的那一次）；回复在流上只带工具调用，没有一段文字或推理（首个内容的定义与理由见 runtime-SPEC §12.6）；这把键出现之前写下的每一行。三种都读作「没有量到」，页面不画首字耗时，不猜。
+- **读数来自回合的钟**：`runtime::turn` 在它包住的增量汇点里读第一段非空内容到达的那一刻（`crates/runtime/Spec.lean` §8-50）。kernel 不采样，gateway 也不采样：`kernel::Model` 的实现从不读钟。
+- **缺席有三种情形，都不是零**：回复从一扇到齐之前什么也不报的门回来（阻塞门、没有流的适配器、流式解析失败之后换阻塞门重发修好的那一次）；回复在流上只带工具调用，没有一段文字或推理（首个内容的定义与理由见 runtime D6）；这把键出现之前写下的每一行。三种都读作「没有量到」，页面不画首字耗时，不猜。
 - **字节不动**：缺席即省略（`skip_serializing_if`），旧行与今天没量到的行字节相同；读宽（`default`）。账本版本不为此进位：`v` 为 2 的行里这一格可以缺席，读者不从版本推断它在不在。
 
 **(b) `tool_called` 记下这件工具的登记：`effect` 与 `render`**
@@ -2388,7 +2388,7 @@ pub struct ToolCalled {
 // Effect 与 RenderIntent 在 feature `schema` 下派生 JsonSchema：线上 Call 直接携它们（wire-SPEC §8-55）
 ```
 
-- **写方只有回合的工具波**：`runtime::turn::wave` 写 `tool_called` 时，从工具面的 `ConcurrentInvoke::meta_of` 取这件工具的 `ToolMeta`，照录其中两项（runtime-SPEC §8-51）。工具面不认识这个名字时两者缺席——一次调用了没登记的工具，是一个真实状态。
+- **写方只有回合的工具波**：`runtime::turn::wave` 写 `tool_called` 时，从工具面的 `ConcurrentInvoke::meta_of` 取这件工具的 `ToolMeta`，照录其中两项（`crates/runtime/Spec.lean` §8-51）。工具面不认识这个名字时两者缺席——一次调用了没登记的工具，是一个真实状态。
 - **记的是调用那一刻的登记**：一件工具以后换了效果或呈现，旧行仍说它当时是什么；折叠不去问今天的登记。新加一件内置工具不需要改任何读者：它的登记随它第一次被调用写进账本。
 - **`Diff.locations` 照录登记**：登记层面的声明是空表（§8-23），每次调用的位置是工具一侧由参数算出的纯函数，今天还没有这个函数，所以账上的 `locations` 恒为空；一次编辑调用改的是哪个文件，读者读 `subject`。
 - **不进模型的字节**：`tool_called` 是入窗种类，但窗口从 `model_returned` 的消息重建工具调用，从不读 `tool_called` 的载荷（`runtime::fork` 的逐种类表把它列在「不是对话」一侧），所以这两个键不改变任何请求。
@@ -2433,7 +2433,7 @@ impl LandingPolicy { pub const ALL: [LandingPolicy; 2]; pub const fn as_str(self
 
 - **四件事，四个值。** `Mode` 回答这次 run 是在交谈还是在干活；`WriteLimit` 回答它能改什么；`AdmissionRequirement` 回答它的产出要带什么证据才准合并；`LandingPolicy` 回答产出走常规的路，还是留在一棵试验的树里不落地。四者独立取值、可以任意组合：只读可新建的试验、要测试的交谈都拼得出来，而且都有确定的意思。它们总是一起走（线上的 `Dispatch`、账本的 `run_started`、装配层的派活），所以是一个值 `RunPolicy`。
 - **`Standing` 是一个有名字的值，不是「没有要求」。** 它说的是「楼自己的规矩已经要的检查，不多加一项」：楼要评审，评审照旧；楼不要，就只有这次 run 自己的检查点。它不取消任何既有的强制校验。把它写成 `Option<AdmissionRequirement>` 的 `None`，读者会把缺席读成免检。
-- **选了要求不等于拿到了证据。** `RunPolicy` 只记要求；证据由 `runtime::mode::admits` 在合并那一刻对照（runtime-SPEC §8-54）。
+- **选了要求不等于拿到了证据。** `RunPolicy` 只记要求；证据由 `runtime::mode::admits` 在合并那一刻对照（`crates/runtime/Spec.lean` §8-54）。
 - **`RunPolicy::of(mode)` 是「只选了 mode」的策略**：写入不额外收窄、准入按楼的规矩、常规落地。派活的入口里只有人能选另外三项；城自己派的活（计划、排程、来信、编辑器经 ACP 派来的活）都走 `of(Mode::Work)`，一次委派或敲门继承说话那一方的整份策略。
 - **拼法只有一处**：每个枚举的 `as_str` 写出的词就是 serde 读的词，各有一条遍历式断言钉住往返同词；未知词在反序列化处即拒（§8-40）。
 - **入账**：`RunStarted.policy: Option<RunPolicy>`（§8-4 记录围栏），由 `runtime::run::Charter::open` 写，`#[serde(default, skip_serializing_if = "Option::is_none")]`。旧账本里没有这个键，读作「这一行早于策略入账」；旧的六个 mode 词从未以类型化载荷进过账本，所以没有要映射的历史读法（§12.12）。
@@ -2449,8 +2449,8 @@ pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome;   // kerne
 
 - **限制叠在写域上，不并进写域。** 写域（§8-11、§8-46）回答一个地址能不能写、写哪种文件，它来自楼的 `RULES.toml`；写入限制回答一次 run 能不能改动已经存在的文件，它来自这次派活。`Full` 表示不额外收窄；`Create` 表示只准原子地新建一个不存在的普通文件，已经存在的文件——包括这次 run 刚建成的——不能覆盖、删除或改名。两道判定都要通过，所以 `Full` 永远放不宽楼的写域，`Documents` 楼里的 `Create` 仍只能新建 Markdown 文档、仍够不到计划文件。
 - **`gate::replacing` 是「这次写会动到已有文件」时的唯一判定**：`Full` 答 `Allow`；`Create` 答 `Deny`，`E_OUTSIDE_WRITE_DOMAIN` 三段式，规则「this run creates files and changes none」，违规点出目标，替代给出「写到一个新路径」，恢复语说限制由派活时选定、换一次派活才能改。复用既有的码而不新开一个：对调用者而言这与写域外的拒绝是同一类事——这次 run 不准写那里——恢复的路也同类。
-- **「目标是否已经存在」不由本模块判。** 那是文件系统在写那一刻的事实；只有在写的那一刻原子地判，竞争的两次新建才只成一次（runtime-SPEC §8-55，storage-SPEC §8-32）。kernel 只持规则与拒词，判定点在每一条写路径上调它。
-- 验收：`gate::domain` 测试里 `Create` 拒、`Full` 放各一条；真实写路径上的验收在 runtime-SPEC §8-55。
+- **「目标是否已经存在」不由本模块判。** 那是文件系统在写那一刻的事实；只有在写的那一刻原子地判，竞争的两次新建才只成一次（`crates/runtime/Spec.lean` §8-55，storage-SPEC §8-32）。kernel 只持规则与拒词，判定点在每一条写路径上调它。
+- 验收：`gate::domain` 测试里 `Create` 拒、`Full` 放各一条；真实写路径上的验收在 `crates/runtime/Spec.lean` §8-55。
 
 ### 8-82 一次 run 怎样开篇，进程死后谁冻结它（`kernel::event::record::run`，形状 2 值类型）
 
@@ -2466,10 +2466,10 @@ pub struct RunStarted {
 ```
 
 - **它说什么。** 一次 run 的第一条 user 消息有三种写法：`FromJob` 是一句指向前缀 run 段里 JOB.md 的话加目标，`Inherited` 是 `Task: …\nGoal: …`，`WithPerson` 是人的原话。写法在派活时由城定一次（`accounting::worker::freezing` 按 `city::RunBrief` 选），`runtime::conversation::Conversation::push_task_lines` 按它写出字节。
-- **为什么记进账本。** 分叉从账本重建母 run 的对话（`runtime::fork::fold_run`），第一条消息要照母 run 发出的写法重建，provider 的前缀缓存才从第一条消息起命中（runtime-SPEC §8-58）。不记，重建只能猜；而按 `goal` 是否为空去猜，等于在分叉里再写一遍 `city::write_brief` 的「有目标才是一份 job」那条规则。
-- **一个枚举，一个家。** 这个值以前只住在 `runtime::conversation`；现在账本载荷要带它，而 runtime 依赖 kernel、kernel 不依赖 runtime，所以枚举住在本模块，`runtime::Opening` 与 `runtime::conversation::Opening` 是它的再导出，调用方的路径不变（runtime-SPEC §12.14）。
+- **为什么记进账本。** 分叉从账本重建母 run 的对话（`runtime::fork::fold_run`），第一条消息要照母 run 发出的写法重建，provider 的前缀缓存才从第一条消息起命中（`crates/runtime/Spec.lean` §8-58）。不记，重建只能猜；而按 `goal` 是否为空去猜，等于在分叉里再写一遍 `city::write_brief` 的「有目标才是一份 job」那条规则。
+- **一个枚举，一个家。** 这个值以前只住在 `runtime::conversation`；现在账本载荷要带它，而 runtime 依赖 kernel、kernel 不依赖 runtime，所以枚举住在本模块，`runtime::Opening` 与 `runtime::conversation::Opening` 是它的再导出，调用方的路径不变（runtime D14）。
 - **写者**：`runtime::run::Charter::open` 从 `Charter.opening` 照录。模型 run 的 charter 填 `Some(RunPlan.opening)`；harness run 的第一句话是交给 harness 自己会话的 prompt，城不为它写 user 消息，填 `None`。
-- **缺席读作「不知道」。** 加这个键之前写下的行没有它，`fold_run` 对它沿用加键之前的读法（runtime-SPEC §8-58 的表）。按 `default` 加、缺席不写，所以旧账本照读，`golden-s1` 里载荷为 `{}` 的那行 `run_started` 照旧读成 `RunStarted::default()`。
+- **缺席读作「不知道」。** 加这个键之前写下的行没有它，`fold_run` 对它沿用加键之前的读法（`crates/runtime/Spec.lean` §8-58 的表）。按 `default` 加、缺席不写，所以旧账本照读，`golden-s1` 里载荷为 `{}` 的那行 `run_started` 照旧读成 `RunStarted::default()`。
 - 验收：`runtime::fork::request_tests` 的 `a_branch_first_request_opens_with_the_bytes_of_the_mothers_last`，与 `accounting::worker::freezing::tests::lineage` 的 `a_branch_first_request_carries_the_bytes_of_the_mothers_last`（sprawling-SPEC 8-141）：写出的键经真实的派活与分叉读回。
 
 #### 8-82-2 进程死后冻结的那一行：`run_frozen.cause`
@@ -2512,7 +2512,7 @@ pub struct RunStarted {
 
 - **两个键都只是摘要。** 身份本身——名字与「关于你」——在两份治理文档里，冻下的那一版在内容库里，摘要是读回它的钥匙（`cas:<naming>`）。账本不抄名字：名字是人改的字，抄进不可删的历史就有了第二个家，而人删掉的一段「关于你」会永远留在那里。
 - **回执。** 写 `MAYOR.md` 或 `PREFERENCES.md`（`PutDocument`、`PutIdentity`）之后的那一行带上新的身份版本，页面见到它才把卡片标为已保存（wire-SPEC §8-59）。写 `CLERK.md` 不动身份，键缺席。
-- **一次 run 用的是哪一版。** `run_started.naming` 由 `runtime::run::Charter::open` 从 `RunPlan.naming` 照录（runtime-SPEC §8-56）。旧行没有这个键，读作「这一行早于身份入账」，页面回退到地址或角色名，不用今天的名字。
+- **一次 run 用的是哪一版。** `run_started.naming` 由 `runtime::run::Charter::open` 从 `RunPlan.naming` 照录（`crates/runtime/Spec.lean` §8-56）。旧行没有这个键，读作「这一行早于身份入账」，页面回退到地址或角色名，不用今天的名字。
 - 两个键都按 `default` 加、缺席不写，所以旧账本照读，旧构建读新行时把它们当未知键拒（§8-40 的方向门照旧）。
 - 验收：`record::run` 的 `a_run_started_line_records_the_naming_it_froze`（写出、读回、缺席不写）。
 

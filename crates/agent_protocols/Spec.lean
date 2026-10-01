@@ -156,7 +156,7 @@ impl Lines {
 
 MCP 2025-06-18 把工具的答复定为 `CallToolResult`：`content` 是内容块数组；`isError` 为真时，这是工具自己报的错。规格要求工具的错误放进结果、置 `isError`，不回协议层的 JSON-RPC error。`McpTool::invoke` 按这条读，判决在 `spec/Mcp/Tools.lean` 的 `read`（D1）：
 
-- `isError` 不为真：`result` 经 `digits_for_floats` 成为 `ToolOutcome.result`。窗口怎么装它，归 `runtime::pipeline::connector`（runtime-SPEC 8-27-10）。
+- `isError` 不为真：`result` 经 `digits_for_floats` 成为 `ToolOutcome.result`。窗口怎么装它，归 `runtime::pipeline::connector`（`crates/runtime/Spec.lean` §8-27-10）。
 - `isError` 为真：这是一次失败，`invoke` 回 `Err`。subject 是 `<remote> reported a failure: <文字>`，文字是全部 `type: "text"` 块按原顺序以换行连起；超过 `ERROR_TEXT_CAP_BYTES` 时在字符边界截断，并写明截掉了多少字节；非文字块不进 subject，只报个数。码是 `E_TOOL_UNAVAILABLE`，`Retry::No`。
 - `isError` 为真且 `_meta` 里有 `sprawling/effect-unknown`、值不是 `false`：码是 `E_TOOL_OUTCOME_UNKNOWN`，标 `effect_unknown`（`Retry::Unknown`）。这个键说的是「这次调用交出去了一部分，桌面或别处是否已经生效不知道」。值写错也按「不知道」读。
 - 协议层的 JSON-RPC error 照旧由 `Rpc::read` 读成 `E_TOOL_UNAVAILABLE`，只取 `code` 与 `message`，不读 `data`：`data` 的形状各家自定，城只认规格定过的东西。
@@ -417,7 +417,7 @@ D15 请求行与 id 是本 crate 的契约，不是序列化器的：行由 `for
 
 - `ARCHITECTURE.md` §4 缝清单（`Outbound` 一行）、§10 规则 3（库 crate 起线程的地方：`mcp::reading` 与 `mcp::sse` 的读端）与模块表的 agent_protocols 各行（`architecture.toml`，锚点指向本文件与分部）。这些改了，重读本文件 §7、§8-15 与 §8-19。
 - `docs/third-party.md` §1（ACP schema 与 registry 被看的路径）与服务外挂的边界：上游改了线或包名，重读 §5 与 §8-19。
-- kernel-SPEC §8-23（`ServerLabel`、`TimeoutMs`）、gateway-SPEC §8-5（订阅额度经 harness 进城）、runtime-SPEC 8-27-10（窗口怎么装工具答复）与 §8-52（harness run 写的行）、sprawling-SPEC §8-4d（桌面经 stdio 接进来）、§8-4e 与 §8-124（harness run 与它的派活路径）、wire-SPEC 的配对中间件。这些节改了，重读本文件对应的条目。
+- kernel-SPEC §8-23（`ServerLabel`、`TimeoutMs`）、gateway-SPEC §8-5（订阅额度经 harness 进城）、`crates/runtime/Spec.lean` §8-27-10（窗口怎么装工具答复）与 §8-52（harness run 写的行）、sprawling-SPEC §8-4d（桌面经 stdio 接进来）、§8-4e 与 §8-124（harness run 与它的派活路径）、wire-SPEC 的配对中间件。这些节改了，重读本文件对应的条目。
 - `crates/desktop/Spec.lean` §4 与 `crates/desktop/src/refusal.rs`：`isError` 与 `_meta` 的读法（§8-1c），以及本 crate 对外给出的 `EFFECT_META_KEY` 与 `PROTOCOL_VERSION`。
 - `tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]` 与 `[prepare_dispatch_ms]`：上限的推导与常驻连接省下的时间。
 -/

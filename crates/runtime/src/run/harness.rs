@@ -5,7 +5,7 @@
 
 //! A run whose turn an official harness takes: every line the city
 //! writes for it, and the completion its answer freezes as
-//! (runtime-SPEC.md 8-52).
+//! (`crates/runtime/spec/Run.lean` §8-52).
 //!
 //! The harness runs its own tools, so the city writes what it decided -
 //! the opening, the cancel, the tree it committed, the answer to its own

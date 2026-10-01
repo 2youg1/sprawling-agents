@@ -13,7 +13,7 @@ use kernel::{Address, AxError, EventKind, ModelReturn, TimeMs};
 use std::collections::BTreeMap;
 
 /// The chosen adapter, wrapped so every request a run sends enters the
-/// keep-warm account (runtime-SPEC 8-4-2), timed on the worker's own
+/// keep-warm account (`crates/runtime/Spec.lean` §8-4-2), timed on the worker's own
 /// clock (accounting-SPEC.md 8-3).
 pub(crate) type Door = runtime::prefix::warmth::Warmed<DoorClock>;
 

@@ -63,7 +63,7 @@ impl Placement {
     /// reaches, and nothing on this machine makes the existing ones
     /// read-only to it without administrator rights, so under `Create`
     /// only the copy is open; what a command writes there stays there
-    /// (runtime-SPEC 8-55, 12.11).
+    /// (`crates/runtime/spec/Tools.lean` §8-55, runtime D11).
     ///
     /// # Errors
     /// The refusal of `kernel::gate::replacing`, naming the run's
@@ -97,7 +97,7 @@ impl Placement {
 /// commands still hold.
 ///
 /// The copy of a command that settled is kept for the next command,
-/// which syncs it rather than making another (runtime-SPEC 12.10). A
+/// which syncs it rather than making another (runtime D10). A
 /// command handed to the backlog keeps its copy until the member reports
 /// its ending, because the process is still in it.
 pub struct Confined {

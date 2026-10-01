@@ -67,7 +67,7 @@ impl RunWorker {
                         // than the author looked; admission says the
                         // evidence this dispatch asked for is present,
                         // and that it was not an experiment. They are
-                        // different questions (runtime-SPEC 8-54).
+                        // different questions (`crates/runtime/Spec.lean` §8-54).
                         if let runtime::Admission::Refused {
                             because,
                             alternative,

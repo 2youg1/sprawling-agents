@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One MCP server's answer as the model reads it (runtime-SPEC.md
-//! 8-27-10): text that fits passes untouched, text that does not is
+//! One MCP server's answer as the model reads it (`crates/runtime/spec/Pipeline.lean`
+//! §8-27-10): text that fits passes untouched, text that does not is
 //! stored whole and replaced by a window the model pages with `read`,
 //! a PNG picture is stored in the content store and travels as an
 //! attachment, with a line of text where it stood, and a sound is stored
@@ -203,7 +203,7 @@ fn measured(block: &Value) -> Result<(Vec<u8>, ImageRef), String> {
 
 /// The picture `bytes` are, as this city carries one: a PNG inside
 /// [`IMAGE_MAX_BYTES`] whose header gives its two sides, referred to by
-/// the `cas:` locator its bytes hash to (runtime-SPEC.md section 8-59).
+/// the `cas:` locator its bytes hash to (`crates/runtime/spec/Tools/BoundReader.lean` §8-59).
 ///
 /// The one recognition a picture gets, whether it arrived in a
 /// connector's answer or was named to a tool. Only PNG is measured, for
@@ -260,7 +260,7 @@ fn heard(block: &Value, offload: &mut OffloadSite<'_>) -> Result<Value, AxError>
 
 /// The bytes of a sound block and the media type it names, or the
 /// reason they cannot be carried. The container is not judged here: the
-/// tool that reads a recording judges it (runtime-SPEC.md section 12.15).
+/// tool that reads a recording judges it (runtime D15).
 fn sound_of(block: &Value) -> Result<(Vec<u8>, &str), String> {
     let media = block
         .get("mimeType")

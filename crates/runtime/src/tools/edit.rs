@@ -31,7 +31,7 @@ pub struct EditTool {
     /// The run's write domain. Every model-chosen path is judged against
     /// it before the filesystem is touched.
     writable: kernel::WriteDomain,
-    /// What the run may do to a file that already exists (runtime-SPEC 8-55).
+    /// What the run may do to a file that already exists (`crates/runtime/spec/Tools.lean` §8-55).
     limit: kernel::WriteLimit,
     meta: ToolMeta,
 }

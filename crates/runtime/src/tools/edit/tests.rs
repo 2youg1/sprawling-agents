@@ -148,7 +148,7 @@ fn a_path_outside_the_write_domain_is_refused_before_the_disk_is_touched() {
         assert_eq!(*err.code(), AxCode::InvalidArgs, "{illegal}");
     }
     // A path this platform calls absolute is an address only inside the
-    // city (runtime-SPEC 12.4): outside it the refusal points at `exec`,
+    // city (runtime D4): outside it the refusal points at `exec`,
     // and the create form leaves nothing behind there.
     let err = match tool.invoke(&call(beyond.to_str().unwrap(), "new", "", "y")) {
         Err(err) => err,

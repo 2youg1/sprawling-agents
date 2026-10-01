@@ -28,7 +28,7 @@
 //! The table has two kinds of member: a background command, which a
 //! halt kills, and a run a resident handed down, which a halt marks and
 //! which stops itself at its next safe point by asking [`Backlog::stopping`]
-//! (runtime-SPEC 8-28-2). One table, one `halt`, so a stopped scope has
+//! (`crates/runtime/spec/Backlog.lean` §8-28-2). One table, one `halt`, so a stopped scope has
 //! nothing left going in it under either name.
 
 use std::collections::BTreeMap;
@@ -90,7 +90,7 @@ impl Backlog {
     }
 
     /// The same table, handing what a command writes to `sink` while
-    /// the command is still inside its window (runtime-SPEC 8-28-3).
+    /// the command is still inside its window (`crates/runtime/spec/Backlog.lean` §8-28-3).
     #[must_use]
     pub fn with_sink(self, sink: Sink) -> Backlog {
         Backlog {

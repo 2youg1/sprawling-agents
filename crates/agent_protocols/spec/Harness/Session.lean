@@ -17,7 +17,7 @@ properties must hold:
   (`crates/agent_protocols/Spec.lean` section 8-19);
 * `crates/runtime/src/run/harness.rs` - the lines the run writes: its opening,
   each report, the cancel, the checkpoint, the answer and the freeze, and which
-  `kernel::Completion` the answer freezes as (runtime-SPEC.md section 8-52);
+  `kernel::Completion` the answer freezes as (`crates/runtime/Spec.lean` §8-52);
 * `crates/accounting/src/worker/driving/harness.rs` - the drive that joins the
   two in a lane: what counts as a cut, and the tree the checkpoint commits.
 

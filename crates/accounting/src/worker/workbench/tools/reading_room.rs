@@ -57,7 +57,7 @@ impl Laying {
 ///
 /// A holding inside the city is opened at its address. One on a shelf
 /// outside the city has none, and the catalog carries the text the scan
-/// read instead (runtime-SPEC.md 8-29-6). In both the hash is what the
+/// read instead (`crates/runtime/Spec.lean` §8-29-6). In both the hash is what the
 /// shelf held at this scan, and the run records it, so a document that
 /// changes behind the same name is a difference somebody can see later.
 ///

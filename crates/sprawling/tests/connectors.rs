@@ -294,7 +294,7 @@ impl accounting::ModelFactory for Callers {
 }
 
 /// A converted document longer than the window reaches the model as
-/// the pipeline's window over it, not whole (runtime-SPEC.md 8-27-10).
+/// the pipeline's window over it, not whole (`crates/runtime/Spec.lean` §8-27-10).
 #[test]
 fn a_long_connector_answer_reaches_the_model_packaged() {
     let document = "The quarter closed with every account reconciled. ".repeat(1_000);

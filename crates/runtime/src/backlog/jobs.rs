@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which processes belong to which run (runtime-SPEC 8-13-3).
+//! Which processes belong to which run (`crates/runtime/spec/Tools/Exec.lean` §8-13-3).
 //!
 //! A dispatched `cargo test` spends its memory in the `rustc` and test
 //! processes it starts, not in `cargo`. On Windows every run therefore

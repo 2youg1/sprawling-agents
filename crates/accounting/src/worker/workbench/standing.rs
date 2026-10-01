@@ -30,7 +30,7 @@ pub(in crate::worker) fn provenance(
 }
 
 /// The filter table that governs this run: the building's file over
-/// the city's over the built-in three, whole-value (runtime-SPEC 8-27-6).
+/// the city's over the built-in three, whole-value (`crates/runtime/Spec.lean` §8-27-6).
 ///
 /// A file that is not there is no layer; a file that cannot be read is
 /// reported, because a run sieving under the built-in table while the

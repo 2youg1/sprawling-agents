@@ -4,9 +4,38 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# runtime::run::checkpoint 的模型
+# runtime::run::checkpoint
 
-证明 `run::checkpoint`（`crates/runtime/src/` 下同名的文件）必须守住的性质。一波之前立不立 checkpoint 的唯一权威。runtime 的规格仍是 `crates/runtime/runtime-SPEC.md`，它的 §16 引本分部作为这些性质的权威。
+规定 `run::checkpoint`（`crates/runtime/src/` 下同名的文件）。一波之前立不立 checkpoint 的唯一权威。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+-/
+
+/-!
+### 8-45 runtime::run::checkpoint（形状 1 判定；**一波前立不立 checkpoint 的唯一权威**）
+
+
+```rust
+pub(crate) enum WaveCheckpoint { Skip, Stage }
+pub(crate) enum Wave { Empty, ReadOnly, MayWrite }  // 由 RunHooks::writes 逐个调用读出
+enum SinceCheckpoint { NotYet, Checkpointed, Changed }   // 相对本 run 上一次 checkpoint 的树
+pub(crate) struct CheckpointPolicy { since: SinceCheckpoint }
+impl CheckpointPolicy {
+    pub(crate) fn opening() -> Self;                                   // NotYet
+    pub(crate) fn for_wave(&self, wave: Wave) -> WaveCheckpoint;                // 只读
+    pub(crate) fn record_wave(&mut self, checkpoint: WaveCheckpoint, wave: Wave);    // 只改状态
+}
+// RunHooks 上：
+pub writes: &'a dyn Fn(&ToolCall) -> kernel::Writes;   // 按声明的 Effect 答（Writes::of），未注册的名字答 Domain
+```
+
+- **checkpoint 做两件事**：一是给这一波可能删改的东西留一个能回退的提交；二是把上一波写下的文件带进一个提交——否则那些写既进不了 diff，也还原不回来。所以判定看两样：这一波要调用什么，以及上一次 checkpoint 之后有没有调用跑过。
+- **波的分类**：没有调用 → `Empty`；每个调用的 `RunHooks::writes` 都答 `Nothing` → `ReadOnly`；否则 `MayWrite`。
+- **判定表**：`Changed`（上次 checkpoint 后跑过可能写的调用）→ `Stage`，空波与只读波也一样；`NotYet` 且 `MayWrite` → `Stage`；`NotYet` 且 `Empty`／`ReadOnly` → `Skip`（树就是 run 开张时那棵）；`Checkpointed`（checkpoint 之后没有可能写的调用跑过）→ `Skip`，上一个提交已经是这棵树。
+- **状态转移**：`MayWrite` → `Changed`（被取消打断的波也算，它的部分调用可能已经跑了）；`Empty`／`ReadOnly` 且立了 checkpoint → `Checkpointed`；`Empty`／`ReadOnly` 且跳过 → 不变。只读波不改树，所以它既不需要自己的 checkpoint，也不让下一波的 checkpoint 多出一次提交。`Run<Active>` 持一个 `CheckpointPolicy`，`advance` 只在 `Stage` 时调用 `RunHooks::checkpoint` 并写 `checkpoint_committed`。
+- **为什么是一个模块**：「这一波要不要 checkpoint」是一个判定，后面两条规则（只读波、按写过的路径 stage）都只改这一处。
+- **`Stage` 带什么由调用方定**：`RunHooks::checkpoint` 仍只收时刻；stage 哪些路径，由持有 `ToolBench` 的一侧决定，因为只有 bench 知道每个调用的工具。`ToolBench::invoke` 在 `BenchOutcome::Ran.wrote` 里交回工具的 `Tool::writes`（kernel-SPEC `Writes`）；sprawling 的 lane 把上次 checkpoint 以来各调用的 `wrote` 用 `Writes::and` 并起来，下一次 checkpoint 只 stage 这些路径，并在 checkpoint 后清零。run 的第一次 checkpoint、以及并出来是 `Domain` 或 `Nothing` 的那次，stage 整个写域：第一次之前的树没有任何本 run 的提交担保；`Nothing` 出现在 run 的第一道 checkpoint：那时还没有调用跑过。**失败的调用并入 `Domain`**：`ToolBench::invoke` 答 `Err` 时没有 `wrote`，而工具可能写到一半才失败，它自己对写了什么的说法不再可信；lane 于是把 `Domain` 并进去，下一次 checkpoint stage 整个写域。只丢掉它、留下同波其他调用的 `Paths`，会让那半截写不进任何提交。**被否**：`RunHooks::checkpoint` 收一个范围参数——run 驱动拿不到工具的 `Effect`，这个参数只能由 lane 填，等于把同一个并集在两层各拼一次。
+- **调用可能不可能写，由 `RunHooks::writes` 答**：`ToolDef` 只有名字、描述与 schema，`Effect` 住 `ToolBench` 的注册表里，所以 lane 在把 bench 借给 `invoke` 之前取出 `ToolBench::declared_writes`（名字到 `Writes::of(effect)` 的表），`writes` 查这张表。它按声明答，不按参数答：判定发生在波跑之前，而 `Tool::writes` 读的是一条跑完的调用。**被否**：`RunPlan` 带名字到 `Effect` 的表——`RunPlan` 是冻结的 run 描述，进账本的重放读它，而工具的 `Effect` 是 bench 注册时的事实，不该在两处各记一份。
+- **否决「空波一律跳过」**：结束回合的空波前那次 checkpoint，是把上一波的写带进提交的唯一时机；跳过它，run 写下的文件就没有任何提交持有。
+- **否决「每波都 checkpoint」**：一个没跑过任何调用的 run，提交的是一棵没变的树，却多付一次 stage 与 commit。
 -/
 
 namespace Runtime.Run.Checkpoint

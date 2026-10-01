@@ -79,8 +79,8 @@ enum Kept {
     /// On a shelf inside the city, at the address `expansion` spells.
     Shelved,
     /// In the catalog itself: `expansion` is the text the scan read off a
-    /// shelf outside the city, which has no address (runtime-SPEC.md
-    /// 8-29-6).
+    /// shelf outside the city, which has no address (`crates/runtime/spec/Tools/Read.lean`
+    /// §8-29-6).
     Carried,
 }
 
@@ -140,7 +140,7 @@ impl Catalog {
 
     /// Registers one reading-room-admitted SKILL entry from a shelf
     /// outside the city: `expansion` is the document's text, which a
-    /// read by name hands back as it stands (runtime-SPEC.md 8-29-6).
+    /// read by name hands back as it stands (`crates/runtime/spec/Tools/Read.lean` §8-29-6).
     ///
     /// # Errors
     /// The same refusals as [`Catalog::admit_skill`].

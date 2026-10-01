@@ -27,8 +27,8 @@ impl RunWorker {
     /// so the locator the parent is handed names bytes rather than a
     /// sentence this process happened to build. The account's one origin
     /// is the child's run and room, so the parent reads it only through
-    /// a read bound that covers the child's room (runtime-SPEC.md
-    /// 8-29-5), and is refused it otherwise. The city verifies:
+    /// a read bound that covers the child's room (`crates/runtime/Spec.lean`
+    /// §8-29-5), and is refused it otherwise. The city verifies:
     /// `Completion::Done` is something the city observed, and a producer
     /// verifying itself is what `Claim::verified` refuses.
     ///

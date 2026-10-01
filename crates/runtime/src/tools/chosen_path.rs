@@ -23,6 +23,10 @@
 //! happened when a person wrote the building's reading room, which is
 //! why a skill inside reserved space is still handed over: `read`
 //! resolves the catalog first and only unresolved names reach this.
+//!
+//! `crates/runtime/spec/Tools/ChosenPath.lean` proves what the judgement
+//! must hold: an admitted path is open and outside every reserved
+//! subtree, and `land` judges where the disk really lands (§8-30-1).
 
 use std::borrow::Cow;
 use std::io::ErrorKind;

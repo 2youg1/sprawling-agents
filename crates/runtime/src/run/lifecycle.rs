@@ -57,8 +57,8 @@ impl Run<Active> {
     /// The dispatch pair: the job pin lands first, then the run exists.
     /// Two ledger lines, two clock samples — the pin is a fact about the
     /// city and the start is a fact about the run. Written by the plan's
-    /// charter, the one author of every run's opening (runtime-SPEC.md
-    /// 8-52).
+    /// charter, the one author of every run's opening (`crates/runtime/spec/Run.lean`
+    /// §8-52).
     ///
     /// # Errors
     /// Propagates whatever the ledger says; nothing else here can fail.

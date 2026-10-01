@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which directory entries a search walk descends into (runtime-SPEC,
-//! the `search` section).
+//! Which directory entries a search walk descends into (`crates/runtime/spec/Tools/Search.lean`
+//! §8-30).
 
 use std::path::PathBuf;
 

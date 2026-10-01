@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The model-call recovery pipeline: the call chain's middle error layer
-//! (runtime-SPEC.md §8-49). `gateway` decides whether the same request
+//! (`crates/runtime/spec/Turn/Recovery.lean` §8-49). `gateway` decides whether the same request
 //! may go out again; a segment repairs the failures an identical second
 //! request would fail on again; `crate::Watchdog` disposes of the rest.
 //! The segment contract is three exhaustive answers, and a skip hands
@@ -43,7 +43,7 @@ pub(super) trait Segment {
 
 /// What one model call settled into: the return the turn records, the
 /// reads started early, and when the attempt that returned it first
-/// reported content (runtime-SPEC 8-50).
+/// reported content (`crates/runtime/spec/Turn/Recovery.lean` §8-50).
 #[derive(Debug)]
 pub(super) struct Settled {
     pub(super) returned: ModelReturn,
@@ -184,7 +184,7 @@ impl<'a, 'h> ModelCall<'a, 'h> {
             }),
             // The failed attempt's first content, and any failure to read
             // the clock for it, belong to no record: the repair's return
-            // came through a door with no stream (runtime-SPEC 8-50).
+            // came through a door with no stream (`crates/runtime/spec/Turn/Recovery.lean` §8-50).
             Err(failure) => match recover(segments, self, failure) {
                 SegmentOutcome::Recovered(returned) => Ok(Settled {
                     returned,

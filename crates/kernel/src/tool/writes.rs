@@ -11,7 +11,7 @@ use crate::Address;
 
 /// What one call, or every call since the last checkpoint, may have written.
 ///
-/// A checkpoint stages what this names (runtime-SPEC section 8-45), so an
+/// A checkpoint stages what this names (`crates/runtime/Spec.lean` §8-45), so an
 /// answer narrower than the truth leaves a write no commit carries. Only
 /// a tool that knows every file it wrote answers `Paths`.
 #[derive(Debug, Clone, PartialEq, Eq)]

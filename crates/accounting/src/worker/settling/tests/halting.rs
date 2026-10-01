@@ -15,7 +15,7 @@ use crate::worker::fixture::*;
 use crate::worker::*;
 
 /// A run a resident handed down is a member of the backlog, so a halt
-/// on its scope reaches it (runtime-SPEC 8-28-2).
+/// on its scope reaches it (`crates/runtime/Spec.lean` §8-28-2).
 ///
 /// Before this, the table held background commands only: a halted
 /// building's delegated run went on to its freeze as if nobody had
@@ -128,7 +128,7 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
 }
 
 /// A served city hands what a running command writes to the page while
-/// it still writes it (runtime-SPEC 8-28-3), through the same backlog a
+/// it still writes it (`crates/runtime/Spec.lean` §8-28-3), through the same backlog a
 /// halt reaches.
 #[test]
 fn a_served_city_hands_a_running_commands_output_to_the_page() {

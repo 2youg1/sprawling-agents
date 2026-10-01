@@ -7,6 +7,8 @@
 //! the mother sequence. Forking is not
 //! resurrection: the mother's frozen state never changes, and the new
 //! RunId arrives from the caller — this module is pure.
+//! `crates/runtime/spec/Fork.lean` proves what a fork must hold (§8-2):
+//! the prefix is the mother's first lines, and the cut never splits a wave.
 //!
 //! [`prefix`] consumes [`VerifiedLedger`], so replay and fork share one
 //! rebuilder; a branch's conversation is rebuilt through the ledger
@@ -237,7 +239,7 @@ fn fold_run<'a>(
 
 /// How a branch writes the first message of a run it rebuilds: the way
 /// the mother wrote it, so a provider's cached prefix holds from the
-/// first message on (runtime-SPEC.md 8-58).
+/// first message on (`crates/runtime/spec/Fork.lean` §8-58).
 ///
 /// **`FromJob` is the one opening rewritten.** Its line says the task is
 /// in the JOB.md above, and the JOB.md it means is the mother's, in the
@@ -245,7 +247,7 @@ fn fold_run<'a>(
 /// so the line copied would point the branch at a file it was never
 /// given. The rewrite costs the cache from the first message, and copying
 /// her job file into the branch's run segment instead would cost it from
-/// the system prompt (runtime-SPEC.md 12.14).
+/// the system prompt (runtime D14).
 ///
 /// A record from before `opening` was written is read the way it was
 /// read before.

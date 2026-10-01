@@ -61,7 +61,7 @@ pub(crate) struct Driving {
     /// decides the cut (sprawling-SPEC 8-43).
     pub sieving: Sieving,
     /// This run's place in the backlog, when it is a run somebody handed
-    /// down: the member a halt on its scope marks (runtime-SPEC 8-28-2).
+    /// down: the member a halt on its scope marks (`crates/runtime/Spec.lean` §8-28-2).
     pub member: Option<runtime::BacklogId>,
     /// What is to be run, and what says how to pick it up again. Fields
     /// rather than parameters beside this value: a lane is entered with

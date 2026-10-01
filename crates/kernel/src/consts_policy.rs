@@ -199,7 +199,7 @@ pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;
 /// Every `Timestamped` result carries the clock line, and a `Timeless`
 /// one at most once a minute, until a layer writes `[clock] stamp`: a
 /// model that cannot tell when a command ran cannot tell a stale answer
-/// from a fresh one (runtime-SPEC 12.8).
+/// from a fresh one (runtime D8).
 pub const CLOCK_STAMP_DEFAULT: crate::config::ClockStampGranularity =
     crate::config::ClockStampGranularity::Minute;
 
