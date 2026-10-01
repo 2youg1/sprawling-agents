@@ -878,7 +878,7 @@ pub struct TextEdit { pub span: documents::Span, pub text: String }   // documen
 - **没有文件读作空字节。** 基线是空字节的摘要时（§8-69 的 `Empty`，或页面要新建一份文件），一次保存把文件建起来；上面的目录随之建起。
 - **回执是账本行，不是命令的答复。** 命令的答复只送拒绝（§8-2）；成功时城写一行 `document_written`，带这条命令的 `idem`。页面见到带着自己那个 `idem` 的一行才显示「已保存」，并从 `version` 读到下一次保存的基线；在那之前只显示「保存中」。丢了答复的页面用同一个 `idem` 再发，城答它第一次的结果，不再写第二次（accounting 的 `commanding::entrance`）。
 - **`WIRE_V` 不另进位**：`PutRange` 是新名字，哈希自己会变（§12.1）。
-- 验收：accounting 的 `a_second_save_from_the_same_version_is_refused_and_the_first_stands`——两个从同一版出发的 `PutRange`，先到的落下并写一行带新版本的 `document_written`，后到的得 `E_VERSION_CONFLICT`，文件是先到者的字节；`a_save_inside_the_reserved_subtree_is_refused`。
+- 验收：accounting 的 `worker::commanding::tests::saving`：`a_second_save_from_the_same_version_is_refused_and_the_first_stands`——两个从同一版出发的 `PutRange`，先到的落下并写一行带新版本的 `document_written`，后到的得 `E_VERSION_CONFLICT`，文件是先到者的字节；`a_save_inside_the_reserved_subtree_is_refused`。
 
 ### 8-73 修改提案：`Query::Proposals` 与 `Command::DecideProposals`
 
@@ -912,7 +912,7 @@ pub struct ProposalDecision { pub proposal: B3Hash, pub verdicts: Vec<kernel::ev
 - **提出与收回不在线上。** 提案是 run 提出的，收回也是它；人对一张卡只有决定。`proposal_offered` 与 `proposal_withdrawn` 由提出它的 run 的工具写下，那件工具还没有落地（city-SPEC §8-40 的当前状态）。
 - **`version` 只答一次，卡上只带各自的基线。** 页面比较两者就知道哪张卡已经过期；卡本身不带「过期」这一格，因为过期是此刻的事实，一张卡在账上是什么不随文件而变。
 - **`WIRE_V` 不另进位**：`Proposals`、`DecideProposals` 是新名字（§12.1）。
-- 验收：accounting 的 `views::proposals::tests` 与 `commanding::saving::tests`——整张接受、改后接受、拒绝各落下它该落的字节与行；收回的卡不能再决定；同一个 `idem` 的重发不再写；一张卡被决定之后再决定被拒；重开的城从账本折回同样的卡；基线已动的卡被拒、拒绝它却可以。
+- 验收：accounting 的 `worker::commanding::tests::saving`——整张接受、改后接受、拒绝各落下它该落的字节与行；收回的卡不能再决定；同一个 `idem` 的重发不再写；一张卡被决定之后再决定被拒；重开的城从账本折回同样的卡；基线已动的卡被拒、拒绝它却可以。
 
 ### 8-24 `Query::Commits`：一座楼做过的提交，倒序分页
 

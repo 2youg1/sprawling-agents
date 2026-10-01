@@ -40,7 +40,7 @@ refrain 路线图 §4-8、§4-10 的验收在 Rust 测试里成立，测试走�
 | A1 字节不变 | `edit::tests::every_byte_outside_the_edits_is_copied_through`：带 BOM、混合换行、尾随空格、非 UTF-8 的四份样本，编辑之外的每个字节原样留下；`window::tests::windows_read_end_to_end_give_back_every_byte`：逐窗读完一个版本，窗口首尾相接就是这个版本，逐字节；`layout::tests` 的 RefRain 回归语料：块与空隙首尾相接就是源文 |
 | A3 后到者被拒 | `edit::tests::a_second_save_from_the_same_version_is_refused`：两个写者从同一版本出发，先到的落下，后到的得到 `E_VERSION_CONFLICT`，先到者的字节不动；线上那一半是 accounting 的 `a_second_save_from_the_same_version_is_refused_and_the_first_stands`（wire-SPEC §8-72） |
 | 文本编辑写回字节 | `edit::tests::a_text_save_writes_the_version_s_own_encoding`：UTF-16 与带标记的 UTF-8 文档上的文本编辑按那一版的编码写回；`edit::tests::a_save_that_splits_a_character_is_refused` |
-| A10 修改提案 | `proposal::tests`：整张接受得到提议、改后接受得到人改过的句子、整张拒绝不写；过期的提案被拒、拒绝它却可以；两张重叠的卡不能一起接受；切出的句子接起来是两边的原文；accounting 的 `commanding::saving::tests` 走线上那一半（收回、重复请求、重开之后从账本折回） |
+| A10 修改提案 | `proposal::tests`：整张接受得到提议、改后接受得到人改过的句子、整张拒绝不写；过期的提案被拒、拒绝它却可以；两张重叠的卡不能一起接受；切出的句子接起来是两边的原文；accounting 的 `worker::commanding::tests::saving` 走线上那一半（收回、重复请求、重开之后从账本折回） |
 -/
 
 /-! ## 3 假设与歧义
@@ -97,7 +97,7 @@ refrain 路线图 §4-8、§4-10 的验收在 Rust 测试里成立，测试走�
 - **`layout`**（形状 1 判定，crate 内）：`blocks(Format, &[u8]) -> Vec<Span>`。
 - **`window`**（形状 1 判定）：`WINDOW_BYTES_MAX`、`Window { span, text }`、`Lifted { at, bytes, size }`、`head(Format, Encoding, &[u8])`、`lift(Span, size) -> Span`、`cut(Encoding, Lifted, Span) -> Result<Window, AxError>`（`spec/Window.lean`）。
 - **`edit`**（形状 2 值类型 ＋ 形状 1 判定）：`Edit { span, bytes }`、`Transaction::new(baseline, edits)`、`Transaction::apply(&[u8]) -> Result<Applied, AxError>`、`Applied::{bytes, version, undo}`（`spec/Edit.lean`）；`TextEdit { span, text }`（线上携带）与 `save(source, baseline, &[TextEdit]) -> Result<Applied, AxError>`（D11、D12）。
-- **`proposal`**（形状 2 值类型 ＋ 形状 1 判定）：`Offer::of(RunId, &ProposalOffered) -> Result<Offer, AxError>`、`Offer::{id, run, doc, baseline, span, before, review}`；`Review::of(before, after)`、`Review::{slices, merged(&[SliceVerdict]) -> Result<String, AxError>}`；`Slice { kind, text, lead, trail }`、`SliceKind::{Same, Delete, Insert}`（线上携带）；`decide(source, &[(&Offer, &[SliceVerdict])]) -> Result<Option<Applied>, AxError>`（`spec/Proposal.lean`）。判词的类型 `SliceVerdict`、`Verdict` 住 kernel（kernel-SPEC §8-83），因为账本记的就是它。
+- **`proposal`**（形状 2 值类型 ＋ 形状 1 判定）：`Offer::of(RunId, &ProposalOffered) -> Result<Offer, AxError>`、`Offer::{id, run, doc, baseline, span, before, after, review}`；`Review::of(before, after)`、`Review::{slices, into_slices, merged(&[SliceVerdict]) -> Result<String, AxError>}`；`Slice { kind, text, lead, trail }`、`SliceKind::{Same, Delete, Insert}`（线上携带）；`decide(source, &[(&Offer, &[SliceVerdict])]) -> Result<Option<Applied>, AxError>`（`spec/Proposal.lean`）。判词的类型 `SliceVerdict`、`Verdict` 住 kernel（kernel-SPEC §8-83），因为账本记的就是它。
 - **`selection`**（形状 2 值类型）：`Selection { anchor, focus }`、`collapsed`、`span`、`mapped(&Transaction)`。
 -/
 

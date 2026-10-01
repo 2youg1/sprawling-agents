@@ -902,9 +902,11 @@ impl RunWorker {
 // accounting::views::proposals（视图与 worker 共用的折叠，住 Governance 里）
 pub struct Proposals { /* 开着的卡：身份 ↦ documents::Offer；处理过的卡：身份 ↦ 怎样处理的 */ }
 impl Proposals {
-    pub(crate) fn absorb(&mut self, kind: EventKind, run: RunId, payload: &Payload) -> Result<(), AxError>;
-    pub(crate) fn open_on(&self, doc: &Address) -> impl Iterator<Item = &documents::Offer>;
-    pub(crate) fn find(&self, id: &B3Hash) -> Result<&documents::Offer, AxError>;   // 处理过的、没有的 → E_INVALID_ARGS
+    pub(crate) fn offered(&mut self, run: RunId, payload: &Payload) -> Result<(), AxError>;   // proposal_offered
+    pub(crate) fn decided(&mut self, payload: &Payload) -> Result<(), AxError>;               // proposal_decided
+    pub(crate) fn withdrawn(&mut self, payload: &Payload) -> Result<(), AxError>;             // proposal_withdrawn
+    pub(crate) fn open_on(&self, doc: &Address, id: &B3Hash) -> Result<&documents::Offer, AxError>;   // 不开着、不在这份文档上 → E_INVALID_ARGS
+    pub(crate) fn all_open_on(&self, doc: &Address) -> Vec<documents::Offer>;                // 按提出的先后
 }
 pub(super) fn proposals_answer(city_root: &Path, doc: Address, open: Vec<documents::Offer>) -> wire::Answer;   // 锁外
 // accounting::views::commits（锁外，与 parents 同一刻）
@@ -916,7 +918,7 @@ fn give_messages(city_root: &Path, commits: &mut [wire::CommitAnswer]);
 - **提案的折叠住 `Governance`，视图与 worker 各持一份、折法一处**（第 34 条）。`proposal_offered` 经 `documents::Offer::of` 读成一张卡，身份由它算出；读不出的一行（区间颠倒、超长）与别的读不出的治理行一样拒绝，让这座城停在打开那一步，而不是少一张人等着决定的卡（sprawling-SPEC 8-74 的同一条理由）。`proposal_decided` 与 `proposal_withdrawn` 把卡从开着挪到处理过；处理过的卡只记身份与怎样处理的，不留原文与提议。
 - **`Query::Proposals` 在锁内拷出这份文档上开着的卡，锁外读盘。** 文件此刻的版本要读一次全部字节（`B3Hash::digest`），所以与 `Document` 一样在快照放开之后做；卡的句子由 `Offer::review` 在那时切。文件缺失或读不了时 `version` 为 `None`，卡照答。
 - **提交说明读自 git，与父提交同一刻。** `CommitsAsk::read` 在快照放开之后先经 `storage::parents_of` 读父提交，再经 `give_messages` 读说明：一次打开仓库（`git2::Repository::open`），每个 oid 一次 `find_commit`，`Commit::message` 不是 UTF-8 或对象不在时为 `None`（wire-SPEC §8-54）。
-- 验收：`commanding::saving::tests`（wire-SPEC §8-72、§8-73 列的那几条）；`views::proposals::tests::an_open_card_answers_with_its_slices_and_the_version_on_disk`；`views::commits::tests::a_page_of_commits_carries_each_ones_message_from_git`。
+- 验收：`worker::commanding::tests::saving`（wire-SPEC §8-72、§8-73 列的那几条；`Query::Proposals` 的答复——开着的卡按提出的先后、文件此刻的版本——在其中经 `views::ask` 读）；`views::commits::tests::a_page_of_commits_carries_each_ones_message_from_git`。
 
 ## 12 决策
 
