@@ -15,22 +15,22 @@
 //! shown it the way it is shown every other line a lane writes.
 
 use std::collections::BTreeMap;
-use std::io::Read as _;
 use std::sync::{Arc, Mutex};
 
-use documents::{Encoding, Offer, Reading};
-use kernel::event::record::{ProposalOffered, ProposalWithdrawn};
+use documents::Offer;
+use kernel::event::record::ProposalWithdrawn;
 use kernel::layout::CityLayout;
 use kernel::{
     Address, AxCode, AxError, B3Hash, CostTier, Effect, EventDraft, EventKind, Ledger, Payload,
     RenderIntent, RunId, Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome, Writes,
 };
-use runtime::tools::Named;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
 use crate::worker::Relay;
 use crate::worker::workbench::{Laying, Site, held};
+
+mod quoting;
 
 /// What every refusal of this tool names as the action that failed.
 const ACTION: &str = "proposal";
@@ -207,74 +207,69 @@ impl<L: Ledger> ProposalTool<L> {
     /// Writes the `proposal_offered` line for the change `asked` quotes,
     /// unless this run already offered the same card.
     fn offer(&self, asked: &Offering) -> Result<Map<String, Value>, AxError> {
-        Err(refused(
-            format!("offering {} is not built", asked.path),
-            ACTIONS,
-        ))
-    }
-
-    /// The `proposal_offered` line `asked` makes of the document as the
-    /// city holds it now (documents D35).
-    fn quoted(&self, asked: &Offering) -> Result<ProposalOffered, AxError> {
-        if asked.old.is_empty() {
-            return Err(refused(
-                "`old` is empty".to_owned(),
-                "quote the text the change replaces; to add text, quote the sentence it goes \
-                 beside and repeat that sentence in `new`",
-            ));
+        let offered = quoting::offered(&self.reader, asked)?;
+        let id = Offer::of(self.filing.run, &offered)?.id();
+        let mut desk = held(&self.desk, "take the proposal desk")?;
+        match desk.cards.get(&id).copied() {
+            // The same card offered again is the same card (documents
+            // D13): the history already holds it.
+            Some(Held::Open) => {}
+            Some(Held::Withdrawn) => {
+                return Err(refused(
+                    format!("proposal {id} was withdrawn, and a card is handled once"),
+                    "offer a different change, or leave this one withdrawn",
+                ));
+            }
+            None => {
+                desk.file(
+                    &self.filing,
+                    EventKind::ProposalOffered,
+                    Payload::of(&offered)?,
+                )?;
+                desk.cards.insert(id, Held::Open);
+            }
         }
-        if asked.old == asked.new {
-            return Err(refused(
-                "`new` is the same as `old`".to_owned(),
-                "suggest text that differs from what the document says",
-            ));
-        }
-        if kernel::Locator::parse(&asked.path).is_ok() {
-            return Err(refused(
-                format!("`{}` is a locator", asked.path),
-                "name the document by its path: a proposal is about the city's copy as it stands",
-            ));
-        }
-        let mut opened = self.reader.open(&asked.path, ACTION)?;
-        let Named::File(doc) = opened.named().clone() else {
-            return Err(refused(
-                format!("`{}` is a stored block, not a document", asked.path),
-                "name the document by its path",
-            ));
-        };
-        let mut bytes = Vec::new();
-        opened.read_to_end(&mut bytes).map_err(|err| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                ACTION,
-                format!("{}: {err}", asked.path),
-            )
-            .with_recovery("a person has to make the file readable")
-        })?;
-        let Reading::Text(encoding) = Reading::of(&bytes) else {
-            return Err(refused(
-                format!("`{}` does not read as text", asked.path),
-                "propose changes only to a text document",
-            ));
-        };
-        let (start, end) = stretch(&encoding.decode(&bytes)?, &asked.old, encoding)?;
-        Ok(ProposalOffered {
-            doc,
-            baseline: B3Hash::digest(&bytes),
-            start,
-            end,
-            before: asked.old.clone(),
-            after: asked.new.clone(),
-        })
+        let mut out = Map::new();
+        out.insert("proposal".to_owned(), id.to_string().into());
+        out.insert("doc".to_owned(), offered.doc.as_str().into());
+        out.insert("baseline".to_owned(), offered.baseline.to_string().into());
+        out.insert("start".to_owned(), offered.start.into());
+        out.insert("end".to_owned(), offered.end.into());
+        Ok(out)
     }
 
     /// Writes the `proposal_withdrawn` line for a card this run offered
     /// and has not withdrawn.
     fn withdraw(&self, asked: &Withdrawing) -> Result<Map<String, Value>, AxError> {
-        Err(refused(
-            format!("withdrawing {} is not built", asked.proposal),
-            ACTIONS,
-        ))
+        let id = asked.proposal;
+        let mut desk = held(&self.desk, "take the proposal desk")?;
+        match desk.cards.get(&id).copied() {
+            Some(Held::Open) => {
+                desk.file(
+                    &self.filing,
+                    EventKind::ProposalWithdrawn,
+                    Payload::of(&ProposalWithdrawn { proposal: id })?,
+                )?;
+                desk.cards.insert(id, Held::Withdrawn);
+            }
+            Some(Held::Withdrawn) => {
+                return Err(refused(
+                    format!("proposal {id} was withdrawn already"),
+                    "nothing to do: the card is closed",
+                ));
+            }
+            None => {
+                return Err(refused(
+                    format!("proposal {id} is not a card this run offered"),
+                    "withdraw only a card your own offer answered with; the person decides \
+                     every other card",
+                ));
+            }
+        }
+        let mut out = Map::new();
+        out.insert("proposal".to_owned(), id.to_string().into());
+        out.insert("withdrawn".to_owned(), true.into());
+        Ok(out)
     }
 }
 
@@ -336,55 +331,6 @@ impl<L: Ledger + Send> Tool for ProposalTool<L> {
     fn writes(&self, _call: &ToolCall) -> Writes {
         Writes::Nothing
     }
-}
-
-/// Where `old` lies in `text`, the whole of a version read in
-/// `encoding`, as a byte interval of that version: in either UTF-8 the
-/// text's bytes are the version's (documents D5), in UTF-16 each code
-/// unit is two bytes.
-fn stretch(text: &str, old: &str, encoding: Encoding) -> Result<(u64, u64), AxError> {
-    let mut places = text.match_indices(old).map(|(at, _)| at);
-    let (Some(at), None) = (places.next(), places.next()) else {
-        return Err(match text.matches(old).count() {
-            0 => refused(
-                "`old` is not in the document as the city holds it".to_owned(),
-                "read the document and quote it exactly; a run under review quotes the city's \
-                 copy, not its own tree's",
-            ),
-            times => refused(
-                format!("`old` appears {times} times in the document"),
-                "quote more of the text around the change, so that it appears once",
-            ),
-        });
-    };
-    let width = |piece: &str| match encoding {
-        Encoding::Utf8 | Encoding::Utf8Bom => piece.len(),
-        Encoding::Utf16Le | Encoding::Utf16Be => piece.encode_utf16().count().saturating_mul(2),
-    };
-    let before = text.get(..at).ok_or_else(|| {
-        refused(
-            "`old` does not begin at a character".to_owned(),
-            "quote whole characters",
-        )
-    })?;
-    let start = width(before);
-    let end = start.checked_add(width(old)).ok_or_else(|| {
-        refused(
-            "the stretch ends past what a document can hold".to_owned(),
-            "quote a shorter stretch",
-        )
-    })?;
-    Ok((offset(start)?, offset(end)?))
-}
-
-/// A byte count as the offset a line carries.
-fn offset(count: usize) -> Result<u64, AxError> {
-    u64::try_from(count).map_err(|_| {
-        refused(
-            format!("offset {count} does not fit a line"),
-            "quote a shorter stretch",
-        )
-    })
 }
 
 /// One action's arguments, every field known.
