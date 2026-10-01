@@ -27,6 +27,7 @@ use serde_json::{Map, Value, json};
 use crate::playback::{
     Asked, BUNDLE_BLOCK, City, Cutoff, PAGE_MAX_BYTES, Place, Reader, Request, Selection,
 };
+use crate::worker::workbench::{Laying, Site};
 
 /// What every refusal of this tool names as the action that failed.
 const ACTION: &str = "playback";
@@ -76,17 +77,28 @@ impl Kind {
     }
 }
 
+impl Laying {
+    /// The playback tool for a run in `room`, answering as the building
+    /// of `site` and writing into this city's playback exports.
+    ///
+    /// # Errors
+    /// Propagates [`PlaybackTool::new`]'s refusal.
+    pub(super) fn playback_tool(
+        &self,
+        site: &Site,
+        room: &Address,
+    ) -> Result<PlaybackTool, AxError> {
+        PlaybackTool::new(&self.city_root, site.building.addr().clone(), room.clone())
+    }
+}
+
 impl PlaybackTool {
     /// The tool for a run in `room`, whose building is `building`.
     ///
     /// # Errors
     /// Refuses a name or a parameter schema that does not build, which
     /// the literals below cannot produce.
-    pub(super) fn new(
-        city_root: &Path,
-        building: Address,
-        room: Address,
-    ) -> Result<PlaybackTool, AxError> {
+    fn new(city_root: &Path, building: Address, room: Address) -> Result<PlaybackTool, AxError> {
         let params = json!({
             "type": "object",
             "properties": {

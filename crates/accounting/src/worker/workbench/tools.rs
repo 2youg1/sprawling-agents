@@ -225,11 +225,7 @@ impl Laying {
         // The last built-in: a look back at the history this building
         // may read, written into the city's playback exports
         // (sprawling-SPEC.md 8-132).
-        admitted.push(Box::new(playback::PlaybackTool::new(
-            &self.city_root,
-            site.building.addr().clone(),
-            addr.clone(),
-        )?));
+        admitted.push(Box::new(self.playback_tool(site, addr)?));
         admitted.extend(self.outside_tools(site)?);
         for tool in admitted {
             held(&catalog, "lay out the catalog")?.admit_tool(tool.meta())?;
