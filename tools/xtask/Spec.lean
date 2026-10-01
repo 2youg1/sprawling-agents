@@ -206,12 +206,15 @@ pub(crate) struct Violation {
 |---|---|
 | `tools/xtask/src/wire_ts.rs` | 命令本身：文本从哪来（`render`：`wire::wire_schema()`＋`WIRE_V`＋`schema_hash()`）、写到哪（`TARGET`）、怎么比（`check`、`first_difference`）、怎么写（`write`） |
 | `tools/xtask/src/wire_ts/emit.rs` | 一份 JSON Schema 文档怎么变成一份 `wire.ts`（`emit`）：文件抬头与三个常量、`$defs` 按名排序后按依赖拓扑输出（`ordered`、`refs_within`）、一条定义怎么命名与打 brand（`definition`）、以及拒绝长什么样（`Refused`、`refuse`） |
+| `tools/xtask/src/wire_ts/emit/types.rs` | 一个 schema 在 TypeScript 里是什么类型（`denoted`），解码后与编码前两侧（`Side`）：只给递归定义写显式注解用，非递归定义的类型仍由 `typeof X.Type` 推出 |
 | `tools/xtask/src/wire_ts/emit/values.rs` | 一个 schema 怎么变成一个 Effect `Schema` 表达式（`expression`、`typed`、`fields`、`union`、`literals`）与它认得的关键字子集（`KNOWN`）：读 schema 的那一半，与读文档的那一半在 `expression` 处相接 |
-| `tools/xtask/src/wire_ts/tests.rs` | 具名裸 `string` 打上 brand；带 `pattern` 的 `string` 收成 `Schema.pattern`；外标签枚举成 `Union`；依赖先于引用；子集外关键字被点名拒绝；环被拒绝；真实文档能发出；第一处不同的行被点名 |
+| `tools/xtask/src/wire_ts/tests.rs` | 具名裸 `string` 打上 brand；带 `pattern` 的 `string` 收成 `Schema.pattern`；外标签枚举成 `Union`；依赖先于引用；子集外关键字被点名拒绝；递归类型经 `Schema.suspend` 接上并带两侧的显式类型；真实文档能发出；第一处不同的行被点名 |
 
 **只认 serde 会产出的那个子集，其余点名拒绝。** 对象（`properties`／`required`／`additionalProperties`）、`string`／`integer`／`number`／`boolean`／`null`、`array`（`items`）与元组（`prefixItems`）、`enum` 字符串表、`const`、`oneOf`／`anyOf`（外标签、内标签、邻标签三种 serde 变体形状都落在这一条上，无需分别特判）、`$ref` 指向 `#/$defs/<名>`、`type: [T, "null"]`、`true`／`false`。`pattern` 译出：`string` 上带 `pattern` 时发 `Schema.String.pipe(Schema.pattern(new RegExp(<模式>, "u")))`，`u` 不是可选的——模式里写着 Unicode 属性（`\p{Cc}`、`\p{White_Space}`），不开 `u` 的引擎把 `\p` 读成字母 `p`。**一条语法由 Rust 那一侧的类型拥有，只有生成器把它带过来，客户端才不必自备第二份**：`client/src/core/address.ts` 曾手抄 `kernel::Address::parse` 的语法，那就是这一条存在的理由。`pattern` 不是字符串则点名拒绝，不静默丢弃。`description`／`format`／`minimum`／`minItems`／`maxItems`／`default` 读而不译（`description` 只在顶层定义处作为 JSDoc 发出）。`default` 是 `#[serde(default)]` 字段的注解：字段可缺省这件事由 `required` 一处表达，`Schema.optional` 已据它发出，所以再读 `default` 会造出第二个权威。其它任何关键字（`allOf`、`not`、`patternProperties`……）一律 `Refused`，报出所在类型的路径与关键字——**一个会猜的生成器就是一个会静默产出错类型的生成器**。具名的裸 `string`／`integer`／`number`／`boolean` 即 newtype，打上 `Schema.brand("<名>")`。
 
-**为什么依赖拓扑而不是字母序**：Effect 的 `Schema` 是运行期值，`const B = Schema.Struct({ a: A })` 要求 `A` 已定义；字母序会撞 TDZ。拓扑序内按名字母序断平，故输出确定；环（自引用类型）以 `Refused` 拒绝——线上今天没有一个，出现那天再上 `Schema.suspend`，不预留。
+**为什么依赖拓扑而不是字母序**：Effect 的 `Schema` 是运行期值，`const B = Schema.Struct({ a: A })` 要求 `A` 已定义；字母序会撞 TDZ。拓扑序内按名字母序断平，故输出确定。
+
+**环（递归类型）由 `Schema.suspend` 接上，两侧的 TS 类型由生成器写出。** 预览的块树（`documents::Block` 里列表项与引用各带自己的块，行内标记套行内标记）是线上第一批递归类型。一个定义能沿 `$ref` 走回自己，它就是递归的（`emit::ordered` 判，环上每一个都算）；拓扑序走到环上已在路上的名字时不再下行，环由运行期的惰性引用闭合。递归定义的值写成 `export const X: Schema.Schema<X, XEncoded> = …`，它引用的递归定义一律写成 `Schema.suspend((): Schema.Schema<T, TEncoded> => T)`；`X` 与 `XEncoded` 两个类型由 `emit::types` 按同一份 schema 逐关键字写出（解码后与编码前两侧，newtype 的 brand 只在解码后一侧），因为 TypeScript 不能从一个引用自己的初值推出类型，Effect 要的正是这条显式注解。拼法照客户端的 lint：对象类型写 `interface`，数组写 `readonly T[]`，键值表写 `Readonly<Record<string, T>>`。非递归定义的输出一字不变。被否决的：①把块树在 Rust 侧摊平成带下标的数组——线上的形状为生成器让路，页面拿到的是一张要自己重建的表；②给递归处写 `Schema.Unknown`——页面读到的是没有类型的值，正是这个生成器要关掉的门。
 
 **依赖**：`wire = { workspace = true, features = ["schema"] }`，工作区那一行关掉缺省 feature——不开 `server`，xtask 不为此拖进 tokio 与 axum；`schemars` 经 wire 的 `schema` feature 到达。xtask 是工作区成员而不占产品拓扑（§7 对 kernel 已用过同一条理由）。
 -/
