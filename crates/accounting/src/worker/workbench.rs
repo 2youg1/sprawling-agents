@@ -4,7 +4,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What one run works at: where it stands, and the bench it is given.
-
 //!
 //! The values are declared here and the methods that build them live
 //! below: `standing` settles the site, `desks` opens what the run
@@ -70,6 +69,7 @@ pub(in crate::worker) struct Laying {
     /// transcription and OCR tools ask under this building's rules
     /// (sprawling-SPEC.md 8-131, 8-142).
     book: gateway::EndpointBook,
+    proposing: tools::proposal::Proposing,
 }
 
 impl Laying {
@@ -126,6 +126,7 @@ impl super::RunWorker {
                 .map(|entry| entry.statement.clone())
                 .collect(),
             book: self.credentials.book.clone(),
+            proposing: self.proposing(),
         })
     }
 }

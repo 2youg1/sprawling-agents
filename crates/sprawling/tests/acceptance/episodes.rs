@@ -105,6 +105,7 @@ fn shared(setup: &Setup) -> Vec<Episode> {
         plan(),
         signal(setup),
         crate::playback::episode(),
+        proposal(setup),
     ]
 }
 
@@ -334,6 +335,65 @@ fn pr_list() -> Episode {
             ensure(
                 result.get("requests").is_some_and(Value::is_array),
                 format!("the list answered {result:?}"),
+            )
+        },
+    }
+}
+
+/// The document the lead offers a change to, laid in the city before the
+/// dispatch: a proposal is about the city's copy (documents D35).
+fn draft(setup: &Setup) -> String {
+    format!("{}/draft.md", setup.room)
+}
+
+const DRAFT: &str = "# Draft\n\nThe kiln is fired at noon. It cools overnight.\n";
+
+/// Where the draft lies in the city.
+fn draft_path(city: &Path, setup: &Setup) -> std::path::PathBuf {
+    draft(setup)
+        .split('/')
+        .fold(city.to_path_buf(), |at, part| at.join(part))
+}
+
+/// Lays the draft the `proposal` episode offers a change to.
+pub(crate) fn lay_draft(city: &Path, setup: &Setup) {
+    let path = draft_path(city, setup);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, DRAFT).unwrap();
+}
+
+/// An offer is a card the person is shown and nothing more: the
+/// document keeps its bytes (accounting-SPEC.md 8-30).
+fn proposal(setup: &Setup) -> Episode {
+    Episode {
+        step: Step {
+            tool: "proposal",
+            args: json!({
+                "action": "offer",
+                "path": draft(setup),
+                "old": "It cools overnight.",
+                "new": "It cools by dawn.",
+            }),
+        },
+        holds: |seen| {
+            let result = answered(seen.answer)?;
+            let doc = address(&draft(seen.setup));
+            let open = match accounting::views::ask(seen.city, &wire::Query::Proposals(doc)) {
+                Ok(wire::Answer::Proposals(cards)) => cards.open,
+                other => return Err(format!("the cards answered {other:?}")),
+            };
+            ensure(
+                open.iter().any(|card| {
+                    result.get("proposal") == Some(&json!(card.id.to_string()))
+                        && card.run == seen.lead
+                }),
+                format!("the offer answered {result:?} and the open cards are {open:?}"),
+            )?;
+            let now =
+                std::fs::read_to_string(draft_path(seen.city, seen.setup)).unwrap_or_default();
+            ensure(
+                now == DRAFT,
+                format!("the draft changed under an offer: {now:?}"),
             )
         },
     }

@@ -21,6 +21,7 @@ mod endpoints;
 mod kept;
 mod ocr;
 mod playback;
+pub(super) mod proposal;
 mod reading_room;
 mod transcribe;
 
@@ -223,10 +224,10 @@ impl Laying {
         // may send a recording or a picture to (sprawling-SPEC.md 8-131,
         // 8-142).
         admitted.extend(self.endpoint_tools(site, &bound)?);
-        // The last built-in: a look back at the history this building
-        // may read, written into the city's playback exports
-        // (sprawling-SPEC.md 8-132).
+        // A look back at the history this building may read, written
+        // into the city's playback exports (sprawling-SPEC.md 8-132).
         admitted.push(Box::new(self.playback_tool(site, addr)?));
+        admitted.push(Box::new(self.proposal_tool(site, addr, &bound)?));
         admitted.extend(self.outside_tools(site)?);
         for tool in admitted {
             held(&catalog, "lay out the catalog")?.admit_tool(tool.meta())?;
