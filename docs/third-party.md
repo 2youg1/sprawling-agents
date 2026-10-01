@@ -165,7 +165,7 @@ The font is not fetched from a font host at run time. The reason is in `client/s
 
 ## 5 The skills this repository ships
 
-Eight skills under `skills/` travel with this tree. The directory is a skill shelf in the layout harnesses file a skill in — one directory per skill, holding `SKILL.md`, which `crates/city/src/library/reading.rs` spells in the one place this city states it — so a city mounts it read-only through `[skills] shelves`, and a person copies it anywhere a skill is read. **The release archive carries the directory as itself**, `skills/LICENSES.md` beside it: `cargo xtask package` walks the tree in, so the person who unpacks a release finds the skills where the harnesses look.
+Nine skills under `skills/` travel with this tree. The directory is a skill shelf in the layout harnesses file a skill in — one directory per skill, holding `SKILL.md`, which `crates/city/src/library/reading.rs` spells in the one place this city states it — so a city mounts it read-only through `[skills] shelves`, and a person copies it anywhere a skill is read. **The release archive carries the directory as itself**, `skills/LICENSES.md` beside it: `cargo xtask package` walks the tree in, so the person who unpacks a release finds the skills where the harnesses look.
 
 | Skill | What it is for | Licence | Origin |
 |---|---|---|---|
@@ -173,6 +173,7 @@ Eight skills under `skills/` travel with this tree. The directory is a skill she
 | `skills/tutor/SKILL.md` | discovery teaching: one person, dialogue and verifiable outcomes, no courseware | MPL-2.0 | the same |
 | `skills/translation/SKILL.md` | low-variance translation of form-as-content text into Chinese | MPL-2.0 | the same |
 | `skills/gauge/SKILL.md` | measuring a performance change with `sprawling gauge`, in this repository or another | MPL-2.0 | the owner's own, written for this tree |
+| `skills/playback/SKILL.md` | turning a playback bundle into a self-contained page and checking it with `sprawling playback check` | MPL-2.0 | written for this tree; it states the contract this build writes, so it changes with that code |
 | `skills/why/SKILL.md` | design rationale read off evidence, with citations | MIT | modified adaptation of pstack's `why` |
 | `skills/how/SKILL.md` | how a subsystem works, and how to critique it | MIT | modified adaptation of pstack's `how` |
 | `skills/blast-radius/SKILL.md` | what a change breaks somewhere else | MIT | modified adaptation of pstack's `blast-radius` |
