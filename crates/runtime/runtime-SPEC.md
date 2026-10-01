@@ -1297,6 +1297,8 @@ citysim 是 `run::drive` 的调用方（§8-15），assemble 的签名变动波�
 A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）；A7 往返四断言；A18 零字节；watchdog 分级序；A10 三断言（feature `wasm` 下真 wasmtime＋WAT）；L0×失败注入矩阵（三臂×（正常／工具错／拒收））；ToolBench 门路由（Deny 回流／门的提问回流／dedup 先于副作用）。
 回合边界的压缩（§8-44）：`compaction::exchange::tests` 三例（预算内全保留；超预算回复按 `plan` 裁、结构化结果整块保留；份额随 exchange 大小走）；`turn/tests/compaction` 两例（收尾边界才换快照、波中达阈值按全波分组一次压）；`fork/tests` 一例（分支继承的是压缩后的 exchange）；citysim `compaction` 两例（波中达阈值账本全字节保留、同剧本逐字节重放）。
 
+下列性质的权威是 `crates/runtime/spec/` 下的 Lean 分部，由 `lake build crates.runtime.spec.<分部>` 证明，本文相应各节只陈述接口：一波之前立不立 checkpoint（`crates/runtime/spec/Run/Checkpoint.lean`，§8-45）；run 的唯一出口与结局判定（`crates/runtime/spec/Run.lean`，§8-15、§8-37）；回合的边界（`crates/runtime/spec/Turn.lean`，§8-3）；分叉的前缀、切点与开篇写法（`crates/runtime/spec/Fork.lean`，§8-2、§8-58）；打戳与按 UTC 选一段时间（`crates/runtime/spec/Clock.lean`，§8-10、§8-57）；合并时的准入（`crates/runtime/spec/Mode.lean`，§8-54）；模型选路的判定与按字节读的门（`crates/runtime/spec/Tools/ChosenPath.lean`、`crates/runtime/spec/Tools/BoundReader.lean`，§8-30-1、§8-59）。
+
 ## 17 模型体验
 
 入窗字节大半由本 crate 决定：prefix 四段与断点（§8-4、§8-6）、catalog 的 Resident 行与二级披露（§8-11）、工具结果的信封与压缩（§8-7、§8-27）、上下文提醒（§8-34）与回合边界的压缩（§8-44）。replay/fork 是离线设施，其产物（分叉 Run 的入窗历史）经 prefix 组装间接入窗，自身不产生 prefix 字节。
