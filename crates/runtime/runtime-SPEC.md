@@ -616,7 +616,8 @@ pub struct Catalog { /* tools: BTreeMap<ToolName,…>、skills: BTreeMap、mode:
 impl Catalog {
     pub fn new() -> Catalog;
     pub fn admit_tool(&mut self, meta: &ToolMeta) -> Result<(), AxError>;      // disclosure 非空；重名＝E_INVALID_ARGS
-    pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 只收阅览室准入者（装配层按楼的 city::policy 规则求值后直供）
+    pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 只收阅览室准入者（装配层按楼的 city::policy 规则求值后直供）；expansion 是城内地址
+    pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 城外书架上的一件：expansion 是扫描读到的那份文档正文（§8-29-6）
     pub fn set_mode(&mut self, mode: Mode);                                    // 只列本 Run 所处者
     pub fn render(&self) -> String;              // Resident 段的 catalog 部分：段头一行自述＋一行一件；BTreeMap 序恒定
     pub fn tool_defs(&self) -> Vec<ToolDef>;     // ChatRequest.tools 的唯一来源
@@ -627,6 +628,7 @@ impl Catalog {
 
 - **`hash` 是 `Option`，而那个 `None` 不是「没算」**：目录里另有两类条目的正文由本构建自己握着（mode 的纪律、dev 那一条），它们背后没有一份能在无人看着时改掉的文档。
 - **pin 从 catalog 取，不重扫一遍书架**：catalog 已经是「本 Run 能够到什么」的权威，再扫一次就是在另一个时刻对同一个问题给第二个答案。
+- **一件 skill 怎么交给 run，由它进 catalog 的那扇门定**：`admit_skill` 收城内书架上的一件，`expand` 答 `Expansion::Skill`，`read` 到那个地址去开；`admit_carried_skill` 收城外书架上的一件，`expand` 答 `Expansion::Said`，正文就是 catalog 手里那份。两扇门而不是一个布尔参数：`expansion` 这一格在两扇门后是两种东西（地址与正文），门名把这件事说在调用处。两扇门共用同一套卫生检查（名字与一行披露非空、不重名），重名跨两扇门同样拒。
 
 **`render()` 与 `set_mode()` 的生产调用者是装配层的 prefix 组装**。工具走 `ChatRequest.tools` 到达模型；没有 `render()`，**阅览室准入的 SKILL 与本 Run 所处的 mode 就到不了任何模型**，`city::library` 的准入判定就是一道没有下游的门。
 
@@ -1179,6 +1181,16 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 **被否**：①工具面自己读一次钟打戳——那是一跑里的第二个采样点，戳上的秒数可以与它 `tool_result` 的 `t` 差一秒，计数时钟下的剧本也会多出采样而改变字节；②用 `admit` 收到的回合时间戳——一条命令的戳会早于模型给出这条调用的那一刻；③在回合的 `account` 里打戳——要 `turn::wave` 把打包移出工具面，而把答复读数挪到 `tools.account` 之前已经给出同一个秒数，工具面一行不改；④答复读数留在写 `tool_called`/`tool_result` 两行之前、工具面的 `account` 之后——戳就是开始时刻，一条长命令的戳早出它跑的那么久。读数挪动不改变采样的次数与次序，计数时钟下的剧本与并行对拍测试的字节不变。
 
 **重开参数**：出现要本地时间的读者、且城配置开始受理 `[clock] zones` 时，时区行与偏移格式重议；工具面开始在 `account` 里做耗时可观的事（例如同步写盘）时，重议答复读数是否仍在它之前。
+
+### 12.9 城外书架上的 skill 由 catalog 携着正文交给 run
+
+**决定**：阅览室准入的一件城外书架上的 skill 经 `Catalog::admit_carried_skill` 进 catalog，条目的 `expansion` 是扫描读到的 `SKILL.md` 正文，`read <名>` 交回这份正文（§8-29-6）。包里其余文件对它不可读。
+
+**理由**：`docs/getting-started.md` 告诉人，挂上 `[skills] shelves` 再在 `reading_room` 里写下名字，居民就用得上那件 skill；而城外的文件没有城内地址，`read` 只开城根下的路径。携正文让这句话成真，又不给 `read` 开一条去城外读文件的路：模型能选的仍只有城内路径，城外的字节只以「人准入过的那一份」的身份进来。正文与哈希出自同一次读入，所以 pin 说的字节就是 run 读到的字节。
+
+**被否**：①给城外持有编一个城内地址或把城外目录映射进城根——那是一个指向并不在那儿的文件的地址，失败落在第一次 `read` 而不在写清单的时候（city-SPEC §8-8）；②让 `read` 在调用时去城外路径读——读到的可能不是钉住的那份字节，且 `read` 多出一条不经读界判定的打开路径；③改文档，告诉人城外书架只能浏览不能用——书架挂了却用不上，人从 catalog 上看不出为什么。
+
+**重开参数**：城外 skill 的包里附属文件也要按名读到（例如一件 skill 的 `SKILL.md` 指名它目录里的脚本）时，`Holding` 要带整包的字节或一份只读的城内镜像，本条与 city-SPEC §12.9 一起重议。
 
 ### 12.10 沙箱副本按工具一份、每条命令前同步，而不是每条命令新建一份
 
@@ -1757,6 +1769,18 @@ fn judged_at(hash: &B3Hash, origins: &[storage::BlockOrigin],
 - **`file:` 在该 oid 上做 git 读**（`storage::blob_at`，storage-SPEC §8-29），读的是那一次提交里的字节而不是工作区此刻的文件；地址在该提交里不是一个文件（目录、不存在）＝`E_INVALID_ARGS`。
 - **范围**：`cas:` 带的范围照 Locator 本身只交回那一段（`Cas::get_range`）；`file:` 带范围＝`E_INVALID_ARGS`，恢复语让它去掉范围改用 `offset`／`limit`——提交里的文件没有一份按范围读的实现，而 `offset`／`limit` 已答同一个问题。之后都按 `offset`／`limit` 切（§8-29-1）。字节不是 UTF-8＝`E_INVALID_ARGS`，read 只交文本。
 - **为 run 存块的调用方都走 `put_for`**：转录（`Transcript::materialise`，记房间）、卸载的原件（`offload::tee`，记命令所在的房间，来源随 `OffloadSite` 传入）、截图（`bin::browser_tool`，记这栋楼）、交接单 must-read 里的规范文档（`accounting::worker::freezing`，记 run 所在的房间）、run 的任务书（`accounting::worker::dispatching::running`，记房间；run id 由任务书的定位符派生，所以先 `put` 取得哈希，run 立起后再 `put_for` 补记来源）、子 run 的交回说明（`accounting::worker::dispatching::handback`，记子 run 与它的房间）。仍走 `put` 的有两类：上架的技能包不是为某个 run 存的，读不到它的 `cas:`，它按 catalog 名读；冻结前缀的各段（`intern_prefix`）只为让账本里的前缀可审计，一个段为同一栋楼的所有 run 共用，不作为定位符交给任何 run。
+
+#### 8-29-6 城外书架上的 skill：catalog 携着它的字节
+
+```rust
+// runtime::catalog
+pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>;
+// entry.expansion＝扫描读到的 SKILL.md 正文；entry.hash＝同一份字节的哈希；entry.package＝None
+```
+
+- **按名读到的是钉住的那份字节**：城外书架是别的程序的目录，城给不出地址（city-SPEC §8-8），所以 catalog 不交地址而交正文。正文由 city 的扫描读一次、哈希一次（`Holding::carried` 与 `Holding::hash` 出自同一次读入），`read <名>` 经 `Expansion::Said` 交回它，走 §8-29-1 同一条切行路。于是这个 run 读到的字节恒等于 `run_started` 里那条 `SkillPin` 说的字节，哪怕那份文件在 run 进行中被它的主人改了。
+- **包里的其余文件读不到**：`package` 为 `None`，`<名>/<相对路径>` 不进 §8-29-3 那条路，落回普通路径并按城内路径判（多半是 `E_INVALID_ARGS` 的没命中）。城外的文件不在城根之下，`read` 不打开城外的路径；要整包可读，人把它装进城库（city-SPEC §8-28），那条路把包里每个文件落在城内。
+- **一件 skill 在 catalog 里只有一个名字**：城外的与城内的同名时，书架扫描已经按「近架盖远架」留下城内那一件（city-SPEC §8-8），catalog 收到的是一件；`admit_skill` 与 `admit_carried_skill` 之间的重名仍拒，与同一扇门里的重名同一个拒词。
 
 ### 8-30 runtime::tools::search（形状 1 判定＋形状 4 适配器）
 

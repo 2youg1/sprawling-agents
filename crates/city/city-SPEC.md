@@ -368,7 +368,8 @@ pub enum Shelf {
     External { index: u32, path: String },
 }
 impl Shelf { pub fn address(&self) -> Option<&Address>; }
-pub struct Holding { pub name, pub section, pub disclosure, pub hash, pub shelf: Shelf, pub package: Option<Address> }
+pub struct Holding { pub name, pub section, pub disclosure, pub hash, pub shelf: Shelf, pub package: Option<Address>,
+                     pub carried: Option<String> }   // 城外书架上的一件：扫描读到的正文；城内书架为 None
 pub struct Library { /* BTreeMap<ShelfKey, Holding> —— 私有，ShelfKey 由 name 造 */ }
 impl Library {
     pub fn scan(city_root: &Path, building: Option<&Address>, home: &Path) -> Result<Library, AxError>;
@@ -389,7 +390,8 @@ pub fn city_shelves(city_root: &Path, home: &Path) -> Result<Vec<PathBuf>, AxErr
 - **身份是名字，hash 不是身份**：`Library` 按名建键、`reading_room` 按名准入，于是每一件都由名字唯一说出；hash 答的是另一个问题——这份文档变了没有、哪一次 run 读的是哪份字节（§8-13）。把两问混为一问，会把「同名改了内容」读成换了一件，把「同一份挂在两处」报成两件。要按 hash 标「亦见于」，先得让 `Holding` 留下被近架盖住的那一份（hash 本身已在 `Holding` 上，缺的是被盖住者的落点与身份），再给答案加一列读它；今天没有这一列，所以「按 hash 判定身份」只是一个没有读者的说法。
 - **读架上的失败逐条上报**：目录项读不动、目录名或文件名不是 Unicode，都带路径报 `E_STORAGE_FATAL`。一件静默缺席于每一间阅览室的 skill，是人从 catalog 上看不出来的那一种故障。
 - **一格书架加一个落点是一个值，不是两个字段**（`Holding::shelf`）：一个持有只在一格书架上、只在一个落点上，两个字段允许「说 library、指向城外的文件」这个任何书架都进不了的状态。三条臂正好是 skill 能在的三个地方，没有第四条；哪一条由**扫盘时读的那个根**给出，不从地址反推——反推只对「两格书架碰巧落在不同地方」成立，而那是个巧合而不是规则。
-- **`Shelf::address()` 答的是 catalog 承诺一件 skill 之前要问的那个问题**：一个条目靠地址打开，城外书架上的文件没有地址。所以**不发明一个假地址**：拼一个看起来像 `Address` 的字符串，会让读者去开一个并不在那儿的文件，且失败发生在第一次 `read` 而不在写下列表的那个时候。
+- **`Shelf::address()` 答的是 catalog 承诺一件 skill 之前要问的那个问题**：城内书架上的一件靠地址打开，城外书架上的文件没有地址。所以**不发明一个假地址**：拼一个看起来像 `Address` 的字符串，会让读者去开一个并不在那儿的文件，且失败发生在第一次 `read` 而不在写下列表的那个时候。
+- **城外书架上的一件带着它的正文**（`Holding::carried`）：扫描为了取一行披露与哈希本来就读了每个字节，留下这份正文，阅览室就能把它整份交给 catalog（runtime-SPEC §8-29-6），run 按名读到的字节与 `hash` 出自同一次读入。只在 `Holding::of` 一处派生：`shelf.address()` 为 `None` 时为 `Some(正文)`，否则为 `None`——有地址的一件由 `read` 到地址去开，再带一份正文就是同一份文档的第二个家（§12.9）。
 - **外部书架只读挂载，路径由城自己的配置给出**（`[skills] shelves`，城层一份）：`city_shelves` 在城的那一级上读它，而不是走三层梯子——书架是这座城所在的文件系统上的一个目录，它对每一栋楼同时挂上，让楼或房间能自己挂一本就是让一个作用域准入一份没人选过的文件。楼或房间写下它即在读文件处拒（`E_CONFIG_INVALID`，恢复语说把它移进城自己的 `CONFIG.toml`），而不是解析后丢掉——一份被接受却什么都不发生的配置，写它的人无从诊断。
 - **外部书架的布局属于写它的那个 harness**：一层目录一件 skill、目录里放 `SKILL.md`（`SKILL_FILE` 是本城写下这条布局的**唯一一处**）；目录名就是 skill 名。**section 为空**：那棵树没有 section 这一级，替它编一个就是本城对一份它不拥有的东西的猜测。不在那里、不是目录的外部路径直接跳过（空架就是空架）；是文件而不是目录则以 `E_CONFIG_INVALID` 拒并报出是哪一条——一句「配置写了却什么都没发生」是没人能诊断的状态。
 - **外部路径里的 `~` 指这个人自己的 home，home 以参数传入**：读环境不是本 crate 的活（`bin::assembly` 给出 `Home`），因此测试扫的是测试自己造的目录。committed 的城配置里不放一台机器的绝对路径，这正是 `~` 存在的理由。不是 `~` 开头也不是绝对路径的条目在解释处即拒，恢复语说出这条规则。
@@ -708,6 +710,16 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 **被否**：①`[resident] minutes` 与 `harness` 并列：见上，房间一层能改楼的上限；②缺省不限、只靠停摆：卡住的 harness 要人来发现。
 
 **重开参数**：车道数（sprawling-SPEC §8-46-3）变得不再稀缺，或 harness 能在回合中间报告进度、城能分辨「在做事」与「卡住了」时。
+
+### 12.9 城外书架上的持有带着扫描读到的正文
+
+**决定**：`Holding` 多一个字段 `carried: Option<String>`，城外书架上的一件是 `Some(SKILL.md 正文)`，城内书架上的是 `None`；只由 `Holding::of` 按 `Shelf::address()` 派生。
+
+**理由**：阅览室要把城外的一件交给 run，而 run 打不开城外的路径；正文是唯一能交的东西（runtime-SPEC §12.9）。扫描已经读了这些字节去取披露行与哈希，留下它们就保证交出去的字节与 `hash` 是同一次读入——在阅览室再读一次文件，两次读之间文件可能被它的主人改掉，pin 说的就不再是 run 读到的那份。
+
+**被否**：①把正文放进 `Shelf::External` 臂——`Shelf` 答的是「在哪里」，而且 `accounting::views::skills` 按字段解构这一臂、把它映射到线上，正文会跟着进页面的那一侧；②阅览室准入时再读一次并比哈希——多一次读盘，比不上时还要另造一个拒词；③每件持有都带正文——城内的一件由 `read` 到地址去开，正文是第二个家，也让一千件的城库多占一千份内存。
+
+**重开参数**：城外书架上的包里附属文件也要可读（runtime-SPEC §12.9 的重开参数）时，`carried` 换成整包的字节或一份城内镜像的地址。
 
 ### 12.10 写入限制随派活走，不进 `RULES.toml`
 
