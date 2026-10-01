@@ -290,7 +290,7 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 - **位置**：`desktop/ffi/`，包名 `sprawling-desktop-ffi`，库名 `desktop_ffi`，规格是 `desktop/ffi/Spec.lean`（边界规则与资源配对的定理在那里）。Zig 源码在 `desktop/ffi/zig/`：`leaf.zig`（四组操作与 export）、`boundary.zig`（叶子往借来的缓冲里写什么）、`step.zig`（step 的 Zig 拼写）。
 - **一堵墙，两个包**：`desktop/Cargo.toml` 同时是一个工作区的根，`members = ["ffi"]`。lint 表（`[workspace.lints]`）、五项包元数据（`[workspace.package]`）与 `winsafe` 的版本行（`[workspace.dependencies]`）只写在那里，两个包都以 `workspace = true` 继承；`xtask guard` 把这堵墙与根工作区逐键比对，并要求墙里的每个包都继承它（xtask-SPEC §8-46）。X4 把 `desktop/` 与 `desktop/ffi/` 搬进 `crates/desktop` 时，照这一段搬：两个包的相对位置不变，墙随根工作区合并后删去。
 - **构建**：`desktop/ffi/build.rs` 只用标准库起 `zig build-lib`（`ReleaseSafe`，目标取自 cargo 的目标），只在 Windows 目标上；别的目标上本包只剩 `step`，本 package 也只在 Windows 上依赖它。Zig 的版本只写在 `desktop/ffi/zig-version`：构建脚本、doctor 的 `zig` 一行（sprawling-SPEC 8-146）与 CI 的安装步骤都读它。
-- **对拍与 fuzz 的配方**：`desktop_ffi::boundary` 的测试以种子化输入比对叶子与 Rust 参考（`desktop/ffi/src/reference.rs`）；`just fuzz-desktop` 以 libFuzzer 选输入比对同两者（nightly，`desktop/ffi/fuzz/`）；`just check-desktop` 里的 `zig test desktop/ffi/zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试的单次输入。
+- **对拍与 fuzz 的配方**：`desktop_ffi::boundary` 的测试以种子化输入比对叶子与 Rust 参考（`desktop/ffi/src/reference.rs`），每条规则两万个；`just fuzz-desktop <rounds> <seed>` 把同一比对按给定的轮数与种子跑下去（Rust 一侧的 fuzz）；`just check-desktop` 里的 `zig test desktop/ffi/zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz）。
 
 生产代码的每一个 `unsafe` 都在这张表里，各是一次叶子调用，`SAFETY:` 写在调用旁：
 
@@ -460,9 +460,9 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 - **决定**：枚举、捕获、剪贴板、DPI 四组调用由 `desktop/ffi` 的 Zig 叶子整段做完（§8-12）：一个 export 一个完整操作，Rust 借出缓冲、读回 step 与错误码，句柄、DC 与全局块恒不跨边界。Rust 面每次调用一个 `unsafe` 块，加那一处 `unsafe extern` 声明，全部在 §8-12 的表里；本 package 的 `src/` 生产代码不写 `unsafe`。两个包同在 `desktop/Cargo.toml` 这一个工作区里，共享一张 lint 表、一份包元数据与 `winsafe` 的一条版本行。叶子往缓冲里写什么、资源怎么配对，由 `desktop/ffi/Spec.lean` 证明模型性质，由对拍、fuzz 与真窗口上的契约测试检查实现。
 - **理由**：AGENTS.md「Rust」一节给平台调用定了次序：先找安全接口，没有合格的就用 Zig 叶子，`unsafe` Rust 只在测量表明它整体最好时才准入。这四组在 X2 的审查里没有合格的安全接口（§12.9），口径 ① 要的正是业务代码零 `unsafe`、只留一个经审的 FFI 缝。整段操作放进叶子，是因为这四组的风险不在某一次调用，而在调用之间：位图选进之后要选回、DC 要随取得它的窗口还回去、全局块要么交出要么释放。这些次序在叶子里写成取得旁边的 `defer`，在 Lean 里写成可穷举的模型；若每个 Win32 调用各包一个 export，次序就又回到 Rust 的 `Drop` 与 `unsafe` 里（`desktop_ffi` D1）。
-- **剩余限制**（写明，不当作已解决）：Zig 的覆盖引导 fuzz（`zig test --fuzz`）今天不在 Windows 上实现，叶子在本机上只受种子化性质测试与 libFuzzer 对拍；对拍时 libFuzzer 只给 Rust 一侧插桩，Zig 一侧是以 `ReleaseSafe` 编的黑盒，越界即 trap。Lean 证明的是叶子对操作系统回答的处理，操作系统本身是假设。`header`、`length`、`modmap` 三道门今天只读 `.rs`，`.zig` 文件的 MPL 注记与长度由评审守（ARCHITECTURE §2 条件 5 的这一半未落地）。
+- **剩余限制**（写明，不当作已解决）：两侧的 fuzz 都是抽样而不是覆盖引导。Zig 的覆盖引导 fuzz（`--fuzz`）今天不在 Windows 上实现；cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时，而叶子只在 Windows 上编，所以 libFuzzer 没有一个能跑它的平台。叶子以 `ReleaseSafe` 编，抽样到的越界即 trap。Lean 证明的是叶子对操作系统回答的处理，操作系统本身是假设。`header`、`length`、`modmap` 三道门今天只读 `.rs`，`.zig` 文件的 MPL 注记与长度由评审守（ARCHITECTURE §2 条件 5 的这一半未落地）。
 - **击败的备选**：①留在 `windows` 绑定上继续手写 `unsafe`（33 个块，与口径 ① 相反）；②一个独立的 Zig 可执行程序、经进程边界说话（多一个交付物与它的监管，而本 server 本来就是一个子进程，多一层隔离买不到新东西）；③每个 Win32 调用一个 export（见上）；④`desktop/ffi` 自己抄一份 lint 表（墙里就有了两份抄件，`guard` 要比对三份）。
-- **重开的参数**：一个安全 crate 修好了其中一组（例如 `winsafe` 修好 `EnumWindows`），那一行先写契约测试、再离开叶子；Zig 的 fuzz 在 Windows 上落地，`just fuzz-desktop` 加上它；X4 把两个包搬进 `crates/desktop` 时，墙随根工作区合并而删去，lint 表改为继承根工作区，`unsafe_code` 的那一行例外只留给 `desktop/ffi`。
+- **重开的参数**：一个安全 crate 修好了其中一组（例如 `winsafe` 修好 `EnumWindows`），那一行先写契约测试、再离开叶子；Zig 的 `--fuzz` 或 cargo-fuzz 在 Windows 上落地，`just fuzz-desktop` 换成覆盖引导的那一种；X4 把两个包搬进 `crates/desktop` 时，墙随根工作区合并而删去，lint 表改为继承根工作区，`unsafe_code` 的那一行例外只留给 `desktop/ffi`。
 
 ## 13 依赖选型
 
