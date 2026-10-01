@@ -1101,6 +1101,18 @@ impl ConfigLayer { pub fn naming(&self) -> Option<B3Hash>; }          // 房间�
 
 **验收**：`identity` 的测试：没有身份区的旧文件照读；`a_stale_identity_save_is_refused_and_the_draft_survives`（`base` 过期被拒，文件仍是后写的那一份）；改一次再改回逐字节不变；重复的键与没有闭合的 `+++` 各拒一次并给出行号；未知键在改写后仍在。
 
+### 8-34 页面写的两处：楼规带基线、城一层的两个键（`city::policy`、`city::config_layers::city_layer`，形状 4 adapter）
+
+```rust
+pub fn write_rules_against(city_root: &Path, addr: &Address, base: &str, text: &str) -> Result<BuildingRules, AxError>;
+pub enum CitySetting { KeepWarm(KeepWarm), Effort(Effort) }
+pub fn write_city_setting(city_root: &Path, setting: CitySetting) -> Result<(), AxError>;
+```
+
+- **楼规：先求值，再守基线。** `write_rules_against` 先 `evaluate(addr, text)`，拒了就什么都不写；通过之后经 `document::edit_against` 落盘，文件已经不是 `base` 就拒 `E_VERSION_CONFLICT`。`write_rules` 照旧是 `rules` 工具的门：市长在一次 run 里提案，它读到的那一份就是它要换掉的那一份，没有页面上那种「打开之后别人改过」的窗口。两扇门共用同一个求值器与同一个落盘函数，所以「盘上的楼规永远读得懂」只有一条规则。
+- **城一层：两个键各一臂。** `write_city_setting` 经 `config_layers::write` 那一个读改写入口改城自己的 `CONFIG.toml`：`KeepWarm` 写 `[cache] keep_warm`，`Effort` 写 `[model] effort`；同一文件里别的键原样留着，写出的字节先过 `ConfigLayer::parse` 才落盘。城一层不是 session 的记录处，所以这里写 `[model] effort` 不碰 `[model] name`。
+- 验收：`config_layers::city_layer` 的 `a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it`；楼规两道判定的组合在 accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing` 里经真实命令观察。
+
 ## 模板的写法：格式标注的是「该多小心」（`docs/templates/`）
 
 **格式不是允许与否的门禁，是谨慎程度的标记**，而且不设门禁把它变红：想清楚了照样改。据此三类：

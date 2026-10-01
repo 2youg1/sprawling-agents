@@ -580,6 +580,8 @@ pub enum Reader { Person(Confidential), Resident(Address) }
 
 - 验收：`worker::freezing::tests::naming` 的 `a_new_session_freezes_the_name_the_page_shows`。
 
+**楼规与城一层。** `PutRules` 由 `commanding::configure` 执行：`city::write_rules_against` 落盘之后，读回文件的摘要，与折叠里这份文件上一次的摘要比，记一行 `rules_changed`。`ConfigureCity` 同样落盘之后记 `rules_changed { scope: city, which: Config }`。两条都只在有一项写了时记行；什么都没写的 `ConfigureCity` 什么都不记。`PreferencePatch::CorePriority` 由 `person::put` 落在 `[core]`，其余臂照旧落在 `[ui]`；`CorePriority` 的值集是 `wire::CorePriority`，`person` 再导出它，`bin` 的调用方不必改路径。
+
 ## 12 决策
 
 1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只用 `gateway` 的接口类型，不构造适配器。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。`GatewayModels` 在 worker 搬进来时一同搬进本 crate，理由见 §12-18；本条对 `SystemClock`、`ThisMachine` 这样直接碰主机的生产适配器仍然成立。

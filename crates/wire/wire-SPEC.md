@@ -1662,6 +1662,34 @@ pub struct StatedIdentity {
 - **`WIRE_V` 不另进位**：`PutDocument` 加 `base` 是名字不变的改形，与本批其余改形共用 45（§12.1）；`PutIdentity`、`Identity` 是新名字，哈希自己会变。
 - 验收：city 的 `a_stale_identity_save_is_refused_and_the_draft_survives`（基线过期被拒、文件不变）；accounting 的 `a_new_session_freezes_the_name_the_page_shows`（实际发出的请求上下文与 `Query::Identity` 的答面同名同版本，旧 session 不改名，`/new` 之后两边一起换）。
 
+### 8-60 `PutRules`：页面写一栋楼的 `RULES.toml`，整份、带基线、先求值后落盘
+
+```rust
+// Command
+PutRules { building: Address, base: String, body: String, idem: IdemKey }
+```
+
+- **整份文本，一道基线。** `body` 是新的整份 `RULES.toml`，`base` 是页面起手时读到的那份（文件还不存在时为空串）。楼规有两个写者——人在页面上，以及住在楼里的市长经 `rules` 工具提案——所以与 `PutSpine` 同一条守卫：文件已经不是 `base` 就拒 `E_VERSION_CONFLICT`，什么都不写。
+- **先求值，后落盘。** 城先用读楼规的同一个求值器（`city::evaluate`）读 `body`，读不出——不合 TOML、缺 `confidential`、机密楼列了出网域名——就拒，盘上不动；求值通过才经基线守卫整份换上去（city-SPEC §8-34）。所以盘上的楼规永远是这个构建读得懂的那一份，下一次派活不会因为一次保存而打不开这栋楼。
+- **账上一行 `rules_changed`。** 写成之后城记一行 `rules_changed { scope: building, which: "RULES.toml", before, after, bytes }`，与派活前核对楼规的那一行同形（kernel-SPEC §8-4）；所以下一次派活看到的摘要与账上一致，不会把这次保存读成「有人绕过了门改了文件」。
+- **只经页面，不经远程设备之前先分类。** 楼规决定一栋楼能出网、能开浏览器与桌面，远程门打开之后这条帧走哪一类由 R2 定（§19-2 的 `class` 列落地时）。
+- 验收：accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing`（过期的 `base` 被拒、求值失败被拒，两次之后文件不变、账上没有 `rules_changed`；对的 `base` 与能求值的正文落盘并记一行）。
+
+### 8-61 城一级的配置与核心优先级可写：`ConfigureCity`、`PreferencePatch::CorePriority`
+
+```rust
+// Command
+ConfigureCity { keep_warm: Option<KeepWarm>, effort: Option<Effort>, idem: IdemKey }
+// PreferencePatch 多一臂
+CorePriority(CorePriority)                 // {"core_priority":"raised"} | {"core_priority":"normal"}
+pub enum CorePriority { Raised, Normal }   // 值集与拼法住这里，accounting::person 读写 `[core] priority` 用的就是它
+```
+
+- **城那一层，两个键。** `ConfigureCity` 写城自己那份 `CONFIG.toml`（`<city>/.sprawling/CONFIG.toml`）：`keep_warm` 写 `[cache] keep_warm`，`effort` 写 `[model] effort`；`None` 不动那一项。城那一层从梯子的最远一端说话，楼与房间各自的一层照旧压过它（city-SPEC §8-4）。`ConfigureBuilding` 不改：它的地址就是它写的楼，城那一层没有地址可写，所以是另一条帧，而不是 `ConfigureBuilding` 收一个特殊地址。
+- **账上一行。** 写成之后城记一行 `rules_changed { scope: city, which: "CONFIG.toml", … }`，与派活前核对城配置的那一行同形。
+- **核心优先级是这个人自己那一层。** `CorePriority` 进 `PreferencePatch`，所以经已有的 `PutPreferences` 写，落在 `~/.sprawling/config.toml` 的 `[core] priority`——那是它一直住的地方（sprawling-SPEC 8-93），不在 `[ui]` 里，所以 `PreferencesAnswer` 不带它；页面从 `Query::Doctor` 的核心一项读到它此刻的效果。写下之后，下一次 `serve` 起线程时读它。
+- 验收：city 的 `a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it`（城层写 `keep_warm` 之后，一间没有说话的房间读到 `FiveMinute`；写 `effort` 之后梯子答它来自城那一层）；accounting 的 `the_core_priority_lands_in_its_own_section_and_reads_back`。
+
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 
 **这张表存在的理由，是一次已经发生过的失效。** v0.0.3 的审计发现 `accounting::worker::run_command` 只匹配 22 个 Command 里的 14 个，
@@ -1712,6 +1740,8 @@ pub struct StatedIdentity {
 | `Pursue` | client | 设一个持续追的目标，以及暂停／恢复／清除 |
 | `PutDocument` | client | 写治理这座城的三份文件之一，携 `base`（§8-59） |
 | `PutIdentity` | client | 写身份卡：城在 `base` 上改写 `PREFERENCES.md` 或 `MAYOR.md` 的身份区（§8-59） |
+| `PutRules` | client | 写一栋楼的 `RULES.toml`：整份、带 `base`，先求值后落盘（§8-60） |
+| `ConfigureCity` | client | 写城自己那一层 `CONFIG.toml` 的 `keep_warm` 与 `effort`（§8-61） |
 | `BatchByBuilding` | client | 按楼成批派活 |
 | `Wake` | push | 外面发生了一件事；地址由 watch 表与 triage 决定，调用方说不出房间 |
 | `Auth` | handshake | 出示配对令牌，`server::decide_handshake` 吃掉它 |
