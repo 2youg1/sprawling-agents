@@ -54,6 +54,14 @@ export function count(n: number): string {
   return n.toLocaleString("en-US");
 }
 
+// A count of tokens as a reader compares two of them at a glance:
+// thousands as `k`, millions as `M`, three significant figures, and no
+// trailing zero, so `82.4k / 200k` reads as a fraction rather than as
+// two long numbers. Under a thousand the count is exact.
+export function kilo(n: number): string {
+  return count(n);
+}
+
 export function usd(micros: number): string {
   return `$${(micros / 1_000_000).toFixed(micros >= 1_000_000 ? 2 : 3)}`;
 }
