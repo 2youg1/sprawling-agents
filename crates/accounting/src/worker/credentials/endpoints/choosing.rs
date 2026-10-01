@@ -108,6 +108,14 @@ impl RunWorker {
             },
         );
         let max_output_tokens = resolved.and_then(gateway::OutputCeiling::tokens);
+        // What a model accepts is the vendor's fact, read off the
+        // catalogue or the preset table; a form cannot make a text-only
+        // model see (gateway-SPEC.md 8-37).
+        let input = gateway::accepted_input(
+            priced.as_ref().map(|row| row.input),
+            &known.base_url,
+            &model,
+        );
         let entry = gateway::ModelEntry {
             id: model,
             // The catalogue row carries a plain figure; a window nobody
@@ -115,9 +123,7 @@ impl RunWorker {
             // the one place the two spellings meet.
             context_tokens: context_tokens.map_or(0, kernel::Window::get),
             max_output_tokens,
-            // What a model accepts is the catalogue's fact, not a
-            // person's: a form cannot make a text-only model see.
-            input: priced.as_ref().map(|row| row.input).unwrap_or_default(),
+            input,
             // Prices come from the pinned catalog when it knows the
             // model and are zero when it does not: an unpriced call is
             // reported as unpriced rather than as free-looking guesswork.

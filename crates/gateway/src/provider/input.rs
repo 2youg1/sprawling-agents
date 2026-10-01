@@ -31,8 +31,9 @@ use crate::market::InputKinds;
 /// yet; when it gains one it becomes the first rung here.
 #[must_use]
 pub fn accepted_input(pinned: Option<InputKinds>, base_url: &str, id: &str) -> InputKinds {
-    let _ = (base_url, id);
-    pinned.unwrap_or_default()
+    pinned
+        .or_else(|| super::preset::input_for(base_url, id))
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

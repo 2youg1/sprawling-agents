@@ -200,7 +200,8 @@ pub enum ReasoningReturn {
 /// documented figure is three chances to update two of them.
 ///
 /// The window and modality columns reach a registration through the
-/// same caller as the host columns above.
+/// same caller as the host columns above: the window through
+/// [`window_for`], the modality through the ladder in [`super::input`].
 pub struct ModelPreset {
     pub id_prefix: &'static str,
     pub context_tokens: u64,
@@ -277,6 +278,13 @@ pub fn ceiling_for(base_url: &str, id: &str) -> Option<Ceiling> {
 #[must_use]
 pub fn window_for(base_url: &str, id: &str) -> Option<kernel::Window> {
     kernel::Window::new(model_for(base_url, id)?.context_tokens)
+}
+
+/// What this table states one model accepts. Read only by the ladder
+/// in [`super::input`], which decides whether this rung answers.
+#[must_use]
+pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds> {
+    model_for(base_url, id).map(|row| row.input)
 }
 
 /// The preset table as the host authority the normaliser reads.
