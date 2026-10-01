@@ -12,9 +12,9 @@
 //! payloads, that serial execution writes.
 //!
 //! Each call's two lines carry their own moments: the start is read once
-//! the call is admitted and before its tool runs, the answer just before
-//! the two lines are written. The turn reads both from its clock; the
-//! tool face holds none.
+//! the call is admitted and before its tool runs, the answer before the
+//! tool face packages it, so a stamp the face renders is the answer's
+//! moment (runtime-SPEC 12.8). The turn reads both; the face holds none.
 
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{
@@ -142,21 +142,29 @@ fn unheld_ticket() -> AxError {
     .with_recovery("report this against runtime::turn::wave: only a bench issues tickets")
 }
 
-/// A call, the moment it started (after admission, before its tool ran),
-/// and its tool's registration, which `tool_called` copies.
-struct Begun<'c> {
+/// A call, the moments it started (after admission, before its tool
+/// ran) and answered (before the tool face packaged the answer), and its
+/// tool's registration, which `tool_called` copies.
+struct Timed<'c> {
     call: &'c ToolCall,
-    at: TimeMs,
+    started: TimeMs,
+    answered: TimeMs,
     effect: Option<Effect>,
     render: Option<RenderIntent>,
 }
 
-impl<'c> Begun<'c> {
-    fn of(call: &'c ToolCall, at: TimeMs, tools: &dyn ConcurrentInvoke) -> Begun<'c> {
+impl<'c> Timed<'c> {
+    fn of(
+        call: &'c ToolCall,
+        started: TimeMs,
+        answered: TimeMs,
+        tools: &dyn ConcurrentInvoke,
+    ) -> Timed<'c> {
         let meta = tools.meta_of(call);
-        Begun {
+        Timed {
             call,
-            at,
+            started,
+            answered,
             effect: meta.map(|registered| registered.effect.clone()),
             render: meta.map(|registered| registered.render.clone()),
         }
@@ -242,6 +250,7 @@ impl<'h> Turn<'h, ToolWave> {
             if let Some(cancelled) = self.consume_boundary(standing, ledger)? {
                 return Ok(PhaseOutcome::Cancelled(cancelled));
             }
+            let answered_at = self.journal.read_clock()?;
             let answered = match admission {
                 Admitted::Answered(answered) => answered,
                 Admitted::Cleared(ticket) => {
@@ -250,12 +259,8 @@ impl<'h> Turn<'h, ToolWave> {
                     tools.account(call, ticket, ran)
                 }
             };
-            self.account(
-                ledger,
-                &mut exchange,
-                Begun::of(call, at, &*tools),
-                answered,
-            )?;
+            let timed = Timed::of(call, at, answered_at, &*tools);
+            self.account(ledger, &mut exchange, timed, answered)?;
         }
         if let Some(cancelled) = self.consume_boundary(halt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
@@ -264,13 +269,8 @@ impl<'h> Turn<'h, ToolWave> {
             if let Some(cancelled) = self.consume_boundary(still_going(index), ledger)? {
                 return Ok(PhaseOutcome::Cancelled(cancelled));
             }
-            let (at, answered) = self.alone(tools, call)?;
-            self.account(
-                ledger,
-                &mut exchange,
-                Begun::of(call, at, &*tools),
-                answered,
-            )?;
+            let (timed, answered) = self.alone(tools, call)?;
+            self.account(ledger, &mut exchange, timed, answered)?;
         }
         Ok(self.recorded(calls, exchange))
     }
@@ -283,42 +283,42 @@ impl<'h> Turn<'h, ToolWave> {
 
     /// One call through all three stages on this thread: how every call
     /// after the leading reads runs. The start is read once the call is
-    /// admitted, before its tool runs.
-    fn alone(
+    /// admitted; the answer before the face's `account` packages it.
+    fn alone<'c>(
         &mut self,
         tools: &mut dyn ConcurrentInvoke,
-        call: &ToolCall,
-    ) -> Result<(TimeMs, Result<ToolOutcome, AxError>), AxError> {
+        call: &'c ToolCall,
+    ) -> Result<(Timed<'c>, Result<ToolOutcome, AxError>), AxError> {
         let admission = tools.admit(call, self.journal.stamp());
-        let at = self.journal.read_clock()?;
-        let answered = match admission {
-            Admitted::Answered(answered) => answered,
+        let started = self.journal.read_clock()?;
+        let (answered_at, answered) = match admission {
+            Admitted::Answered(answered) => (self.journal.read_clock()?, answered),
             Admitted::Cleared(ticket) => {
                 let ran = tools.tool(&ticket).and_then(|tool| tool.invoke(call));
-                tools.account(call, ticket, ran)
+                let answered_at = self.journal.read_clock()?;
+                (answered_at, tools.account(call, ticket, ran))
             }
         };
-        Ok((at, answered))
+        Ok((Timed::of(call, started, answered_at, &*tools), answered))
     }
 
     /// Writes one call's `tool_called` and `tool_result` lines and its
     /// result block: the one place a wave's accounting happens, whichever
-    /// way the call was run. The answer's moment is read here, just before
-    /// the two lines are written.
+    /// way the call was run.
     fn account(
         &mut self,
         ledger: &mut dyn Ledger,
         exchange: &mut Exchange,
-        begun: Begun<'_>,
+        timed: Timed<'_>,
         answered: Result<ToolOutcome, AxError>,
     ) -> Result<(), AxError> {
-        let Begun {
+        let Timed {
             call,
-            at: started,
+            started,
+            answered: answered_at,
             effect,
             render,
-        } = begun;
-        let answered_at = self.journal.read_clock()?;
+        } = timed;
         let called = ToolCalled {
             id: call.id.clone(),
             name: call.name.clone(),

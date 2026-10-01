@@ -102,7 +102,7 @@ pub fn package_exec(
                      names and counts, and JSON refuses neither",
                 )
         })?;
-    result.insert("sieve".to_owned(), Value::Array(accounts));
+    result.insert(super::EXEC_ACCOUNTS.to_owned(), Value::Array(accounts));
     Ok(ToolOutcome {
         result: kernel::Payload::new(result)?,
         attachments: Vec::new(),
