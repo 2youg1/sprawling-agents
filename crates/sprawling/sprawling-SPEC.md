@@ -1108,6 +1108,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **Lean 是开发这份代码必需的工具**（§8-58）。各 crate 的规格正从 `<crate>-SPEC.md` 迁成 `Spec.lean`（ARCHITECTURE.md §11「Specifications in Lean」），`just check` 里的 `models` 一步是这些规格在本地被证明过的唯一证据。Lean 列为可选时，没装 Lean 的机器上 `models` 静默通过，本地的绿就不再说明规格被证明过，只有 CI 知道。所以 `elan` 与 `lean` 两行是 `required`：缺了它们，`just prereqs` 在编译之前报出来并给出装法，`just models` 自己也报错而不是跳过。被否决的备选：保持可选、只靠 CI 的 `models` job 证明——那样每次本地验证都得另外说明「规格没有证过」，而这句话没有哪道门会替人说。
 
+**崩溃验收在盘上造死亡，不在进程里杀**（8-127）。一次 run 真跑完，丢掉 worker 释放写者锁，再把账截在一行的半途、删去其后的行；重开走 `RunWorker::new` 与 `startup_scan`，与 `sprawling resume` 同一条路。理由：被杀的进程留在盘上的就是这样一份账——锁已释放，最后一行写了一半——而盘上的截法可以精确指定死在哪一行的哪一个字节，每次重跑都是同一次死亡。被否：①起真二进制再杀掉它——那是从外面进城的检查，按边界规则归 `tools/adversary/` 的 Lean 黑盒（G1e），而且杀在哪一刻取决于调度，失败不能逐字节重演；②把账本放在 `storage` 的故障文件系统上断电——它只承载账本，`Standing::fold` 与视图读真目录，重开的不是一座完整的城，断电的耐久契约已由 storage 自己的测试证过。重开参数：账本之外的文件（检查点、快照、CAS）也要在一次死亡里与账本错开时，验收要能在同一刻截断它们，那时改为在 `Vfs` 缝之上承载整座城。
+
 **不从别的工具的配置里读 provider 表（人的决定）**。`bin::import` 的五个文件读 Codex 的 `~/.codex/config.toml` 与 pi 的 `models.json`，把其中的 provider 折成本城的词汇；但没有任何 `mod` 声明过它们，所以它们从没被编译，clippy 与测试也从没看过它们，模块图却把它们记为 built。本城删去这五个文件，首次上手的第 1 步由人手填端点，或选一个已知主机。理由：没有调用点的代码是一份没人维护的第二文法，它记下的 Codex 与 pi 键名会随上游改版静默过时。**被否**：接上它，作为首次上手第 1 步「从别的工具已写好的配置读入」的候选来源——那要在 wire 上加一条 Query、在设置页加一行，属于线协议与页面的改动，本版不做。**重开参数**：首次上手要给出「别的工具已配置的 provider」这一步时，从 git 历史取回这两种文法，先在 `lib.rs` 声明模块，让测试与 clippy 看见它们，再接 Query。
 
 **居民判一次，harness 走第二个驱动函数**。`agree_to_work` 得出 `Seat` 枚举，模型一臂带着原来的 `Agreed`，harness 一臂带着楼、规则与那一家；`Staged::fly` 按它分到 `drive_run` 或 `drive_harness`，`land` 按它分到原来的落地或 harness 的落地。理由：`Driving` 的十二个字段里，适配器、工作台、sieve、计划与 bench 只有模型用得到，`Driven` 带回的适配器、工作台与冻结的 `Run<Frozen>` 也是；把居民枚举放进 `Driving`，`drive_run` 开头就要 match 一次，结果还是两条路，而每个只有模型才有的字段都要变成 `Option`。**被否**：`Driving` 里的居民枚举（同一个判断在 `Driving`、`Driven`、`Site`、`land` 四处各 match 一次）；在 bench 上立一件「harness」工具（§8-4e 第 8 条已否）。**重开参数**：harness 的 run 开始有第二个回合、或开始用城的工具（MCP 转交）时，两条路共享的部分会变大，那时重议。
@@ -4228,6 +4230,26 @@ impl RunWorker {
 - **不碰的东西**：人加的 worktree、人的分支、带着未进 HEAD 的提交的租约分支、`refs/sprawling/runs/` 下的检查点引用（storage-SPEC §8-9）。
 
 **本节测试**：`storage::worktree::sweep::tests` 的四条——崩溃留下的租约被收走（`a_crash_left_lease_is_swept_when_the_city_opens`）；检查点引用留下；另一座城的家目录下的树留下；活着的 run 的树与人自己的树留下——以及 `accounting::worker::lifetime` 的 `a_crash_left_worktree_is_gone_once_the_city_opens`，它从开城这一侧看同一件事。
+
+## 8-127 进程死在写账的半途之后，城照规则重开（验收：`crates/sprawling/tests/acceptance/crash.rs`）
+
+**要什么。** 服务进程在写一行账的半途被杀，或机器断了电，人再打开这座城时，城说出它截掉了什么，链照样验得过，丢了答复的调用关成「结果未知」而不是「失败」，视图从幸存的历史与补写的行折出，那间房照样派得出活。这一条把这几件事放在同一座真城上一次验收，作为 V0.1.0 崩溃验收（G5）的白盒证据。
+
+**怎么造一次死亡。** 一座真城，脚本化的模型（`ModelFactory` 缝）让一次 run 调一次 `status`；run 写完后丢掉 worker——这释放写者锁，与被杀的进程释放它一样——然后在盘上把账截在回答那次调用的 `tool_result` 那一行的一半处，那一行之后的行与之后的段都不存在：它们正是一个死在那一刻的进程来不及写的东西。之后经 `RunWorker::new` 重开，跑 `startup_scan`（`sprawling resume` 的那一遍），再经一次性查询 `accounting::views::ask` 问城景，最后向同一间房再派一次活。
+
+**验收的五件事，一个值比较**（`Reopened`）：
+
+1. `startup_scan` 报 `TailDropped { bytes }`，字节数就是被截的那半行的长度（8-102）；
+2. 账里多一行 `log_truncated`，整条链经 `verify_ledger_dir` 验过；
+3. 那次调用恰有一个答复，码是 `E_TOOL_OUTCOME_UNKNOWN`，`startup_scan` 报关了一个（ARCHITECTURE §5 末）；
+4. 城景列出的那次 run，`last_kind` 是补写的那行 `tool_result`、`last_seq` 是它的序号——视图从截过、补过的历史折出，没有拿一份比账长的快照作答（8-91、8-101）；
+5. 同一间房的下一个任务立起一次新 run 并冻结它：死掉的 run 没有把房间占住。
+
+**能咬住，量过。** 把 `startup_scan` 里补写结果未知的那一步拿掉再跑，测试红在第 3、4 两项上（答复为空，城景的 `last_kind` 停在 `tool_called`）。
+
+**断电那一半归 storage。** 断电比被杀多丢的，是平台还没落盘的字节；那是账本自己的耐久契约，由 `storage` 在它的故障文件系统上证（`power_cut_matrix_over_every_op_keeps_acknowledged_waves`，storage-SPEC §8-2）。这里不重证它：故障文件系统只承载账本，城的其余文件与 `Standing::fold`、视图的折叠读的是真目录，在它上面重开的不是一座完整的城（§12「崩溃验收在盘上造死亡」）。
+
+**本节接口的当前状态。** `startup_scan` 关掉悬空的调用，却不冻结死掉的那次 run：城景仍把它列为未冻结，而 ARCHITECTURE §13.7 画的是 `Lost --> Frozen: resume closes lost tool calls as unknown`。补上它，要由启动扫描为每一次有 `run_started`、没有 `run_frozen` 的 run 写一行冻结，并定下它用哪一种 `Completion`（今天的 `Done`、`Limit`、`Cancelled` 都不说「进程死了」）；那一行的形状属于 kernel 的事件表。验收第 4 项因此只比 `last_kind` 与 `last_seq`，不比 `frozen`，免得把今天的读法钉成规则。
 
 ## 8-109 `sprawling up --supervise`：崩溃 → `resume` → `serve`（`bin::supervising`、`bin::supervising::children`）
 
