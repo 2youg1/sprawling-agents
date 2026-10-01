@@ -37,34 +37,7 @@ impl Laying {
         let home = crate::home::Home::detect()?;
         let shelves = city::Library::scan(&self.city_root, Some(building.addr()), home.path())?;
         for holding in shelves.reading_room(rules.reading_room()) {
-            // A catalog entry is opened by an address, and a shelf
-            // outside the city holds files that have none. The holding
-            // is passed over rather than promised, and noted, so the
-            // person who admitted the name can see the run will not
-            // read it.
-            let Some(at) = holding.shelf.address() else {
-                self.note(
-                    runtime::diagnostics::Level::Effect,
-                    "city::library",
-                    &format!(
-                        "{} admits `{}`, which is on a shelf outside this city and has no \
-                         address a run can open",
-                        addr.as_str(),
-                        holding.name
-                    ),
-                );
-                continue;
-            };
-            held(catalog, "admit the reading room")?.admit_skill(runtime::CatalogEntry {
-                name: holding.name.clone(),
-                disclosure: holding.disclosure.clone(),
-                expansion: at.as_str().to_owned(),
-                // What the shelf held at this scan. The run records it,
-                // so a document that changes content behind the same
-                // name is a difference somebody can see later.
-                hash: Some(holding.hash),
-                package: holding.package.as_ref().map(|dir| dir.as_str().to_owned()),
-            })?;
+            admit_holding(&mut *held(catalog, "admit the reading room")?, holding)?;
         }
         for absent in shelves.missing(rules.reading_room()) {
             self.note(
@@ -77,5 +50,41 @@ impl Laying {
             );
         }
         Ok(())
+    }
+}
+
+/// One admitted holding into the catalog, by the door its shelf takes.
+///
+/// A holding inside the city is opened at its address. One on a shelf
+/// outside the city has none, and the catalog carries the text the scan
+/// read instead (runtime-SPEC.md 8-29-6). In both the hash is what the
+/// shelf held at this scan, and the run records it, so a document that
+/// changes behind the same name is a difference somebody can see later.
+///
+/// # Errors
+/// Propagates an entry the catalog refuses, and refuses a holding that
+/// has neither an address nor its text, which no scan produces.
+fn admit_holding(catalog: &mut runtime::Catalog, holding: &city::Holding) -> Result<(), AxError> {
+    let entry = |expansion: String| runtime::CatalogEntry {
+        name: holding.name.clone(),
+        disclosure: holding.disclosure.clone(),
+        expansion,
+        hash: Some(holding.hash),
+        package: holding.package.as_ref().map(|dir| dir.as_str().to_owned()),
+    };
+    match (holding.shelf.address(), &holding.carried) {
+        (Some(at), _) => catalog.admit_skill(entry(at.as_str().to_owned())),
+        (None, Some(text)) => catalog.admit_carried_skill(entry(text.clone())),
+        (None, None) => Err(AxError::failure(
+            kernel::AxCode::InvalidArgs,
+            "admit the reading room",
+            format!(
+                "`{}` has neither an address nor the text it was read with",
+                holding.name
+            ),
+        )
+        .with_recovery(
+            "report this against city::library: a holding with no address carries its text",
+        )),
     }
 }

@@ -180,19 +180,28 @@ pub struct Holding {
     /// that happens to be called `SKILL.md`. `None` for a single
     /// document, and for a shelf outside the city, which has no address.
     pub package: Option<Address>,
+    /// The document's text, for a holding no run can open by an address:
+    /// one on a shelf outside the city. The scan read these bytes to take
+    /// the disclosure line and the hash, so the text a reading room hands
+    /// a run is the text `hash` names (city-SPEC.md section 12.9). `None`
+    /// for a holding on the city's own shelves, which a run opens where
+    /// it sits.
+    pub carried: Option<String>,
 }
 
 impl Holding {
     /// One holding, derived from the document's bytes in exactly one
-    /// place. The disclosure line and the content hash are what every
-    /// scan and every install reports, and two derivations of them would
-    /// be two answers to what this document said.
+    /// place. The disclosure line, the content hash and the text carried
+    /// for a shelf with no address are what every scan and every install
+    /// reports, and two derivations of them would be two answers to what
+    /// this document said.
     pub(super) fn of(name: String, section: String, text: &str, shelf: Shelf) -> Holding {
         Holding {
             name,
             section,
             disclosure: first_line(text),
             hash: B3Hash::digest(text.as_bytes()),
+            carried: shelf.address().is_none().then(|| text.to_owned()),
             shelf,
             package: None,
         }

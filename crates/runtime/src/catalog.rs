@@ -53,16 +53,35 @@ pub enum Expansion {
         addr: String,
         package: Option<String>,
     },
-    /// Text the catalog holds: the mode's own discipline, or the
-    /// developer entry's.
+    /// Text the catalog holds: the mode's own discipline, the developer
+    /// entry's, or a skill carried in from a shelf outside the city.
     Said { text: String },
 }
 
 #[derive(Debug, Default)]
 pub struct Catalog {
     tools: BTreeMap<String, ToolDef>,
-    skills: BTreeMap<String, CatalogEntry>,
+    skills: BTreeMap<String, Admitted>,
     mode: Option<Mode>,
+}
+
+/// One admitted skill, and which door it came in by: the door decides
+/// whether its `expansion` is an address or the document's text.
+#[derive(Debug)]
+struct Admitted {
+    entry: CatalogEntry,
+    kept: Kept,
+}
+
+/// Where a run finds the text of an admitted skill.
+#[derive(Debug, Clone, Copy)]
+enum Kept {
+    /// On a shelf inside the city, at the address `expansion` spells.
+    Shelved,
+    /// In the catalog itself: `expansion` is the text the scan read off a
+    /// shelf outside the city, which has no address (runtime-SPEC.md
+    /// 8-29-6).
+    Carried,
 }
 
 impl Catalog {
@@ -109,8 +128,28 @@ impl Catalog {
         Ok(())
     }
 
-    /// Registers one reading-room-admitted SKILL entry.
+    /// Registers one reading-room-admitted SKILL entry kept inside the
+    /// city: `expansion` is the address a run opens it at.
+    ///
+    /// # Errors
+    /// An empty name or disclosure, and a name already admitted by
+    /// either door, are `E_INVALID_ARGS`.
     pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError> {
+        self.admit(entry, Kept::Shelved)
+    }
+
+    /// Registers one reading-room-admitted SKILL entry from a shelf
+    /// outside the city: `expansion` is the document's text, which a
+    /// read by name hands back as it stands (runtime-SPEC.md 8-29-6).
+    ///
+    /// # Errors
+    /// The same refusals as [`Catalog::admit_skill`].
+    pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError> {
+        self.admit(entry, Kept::Carried)
+    }
+
+    /// The one hygiene check both doors share.
+    fn admit(&mut self, entry: CatalogEntry, kept: Kept) -> Result<(), AxError> {
         if entry.name.trim().is_empty() || entry.disclosure.trim().is_empty() {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -134,7 +173,8 @@ impl Catalog {
                 entry.name
             )));
         }
-        self.skills.insert(entry.name.clone(), entry);
+        self.skills
+            .insert(entry.name.clone(), Admitted { entry, kept });
         Ok(())
     }
 
@@ -159,11 +199,11 @@ impl Catalog {
             "Catalog: what you can reach beyond the tools listed with this request. \
              Open an entry by name with `read` before first use.\n",
         );
-        for (name, entry) in &self.skills {
+        for (name, admitted) in &self.skills {
             out.push_str("- skill ");
             out.push_str(name);
             out.push_str(": ");
-            out.push_str(&entry.disclosure);
+            out.push_str(&admitted.entry.disclosure);
             out.push('\n');
         }
         if let Some(mode) = self.mode {
@@ -199,8 +239,8 @@ impl Catalog {
     pub fn skill_pins(&self) -> Vec<SkillPin> {
         self.skills
             .iter()
-            .filter_map(|(name, entry)| {
-                entry.hash.map(|hash| SkillPin {
+            .filter_map(|(name, admitted)| {
+                admitted.entry.hash.map(|hash| SkillPin {
                     name: name.clone(),
                     hash,
                 })
@@ -218,10 +258,15 @@ impl Catalog {
     /// which it had by trying to parse it as an address, and a mode
     /// whose text happened to parse would have been opened as a file.
     pub fn expand(&self, name: &str) -> Option<Expansion> {
-        if let Some(entry) = self.skills.get(name) {
-            return Some(Expansion::Skill {
-                addr: entry.expansion.clone(),
-                package: entry.package.clone(),
+        if let Some(Admitted { entry, kept }) = self.skills.get(name) {
+            return Some(match kept {
+                Kept::Shelved => Expansion::Skill {
+                    addr: entry.expansion.clone(),
+                    package: entry.package.clone(),
+                },
+                Kept::Carried => Expansion::Said {
+                    text: entry.expansion.clone(),
+                },
             });
         }
         if let Some(mode) = self.mode {
