@@ -220,7 +220,7 @@ fmt:
 
 # The desktop server's Zig leaf is formatted by `zig fmt`, on Windows,
 # the one platform the leaf is built on and the one where the doctor
-# makes Zig required (desktop-SPEC.md section 8-12).
+# makes Zig required (`crates/desktop/Spec.lean` section 8-12).
 fmt-check:
     cargo fmt --all --check
     {{ if os() == "windows" { "zig fmt --check crates/desktop/ffi/zig" } else { "echo 'zig fmt: the Zig leaf is built on Windows only'" } }}
@@ -339,7 +339,7 @@ deny:
 # What no cargo command runs for `crates/desktop`: the Zig leaf's own
 # tests - its unit tests, its seeded property tests and one input of its
 # fuzz test - on Windows, the one platform the leaf is built on
-# (desktop-SPEC.md section 8-12). The server and its seam are workspace
+# (`crates/desktop/Spec.lean` section 8-12). The server and its seam are workspace
 # members, so clippy, the suite and the licence read judge them with
 # everything else.
 check-desktop:
@@ -350,7 +350,7 @@ check-desktop:
 # (hexadecimal), on Windows, the one platform the leaf is built on. A
 # disagreement prints the seed and the round it replays from. Drawn
 # rather than coverage-guided: libFuzzer has no platform for this leaf
-# today (desktop-SPEC.md section 12.12).
+# today (`crates/desktop/Spec.lean` D12).
 fuzz-desktop rounds="1000000" seed="5eedf022":
     DESKTOP_FFI_FUZZ_ROUNDS={{rounds}} DESKTOP_FFI_FUZZ_SEED={{seed}} cargo nextest run -p sprawling-desktop-ffi --locked --run-ignored only -E 'test(/for_as_long_as_asked/)'
 

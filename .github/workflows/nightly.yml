@@ -271,7 +271,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup show
       # The Zig the desktop's leaf is built with; every Windows build of
-      # `sprawling` compiles it (desktop-SPEC.md section 8-12).
+      # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@v2
         with:

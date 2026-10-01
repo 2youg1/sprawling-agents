@@ -1,5 +1,5 @@
 # The Zig `crates/desktop/ffi/zig-version` pins, which builds the desktop
-# server's Zig leaf (desktop-SPEC.md section 8-12). The leaf is compiled
+# server's Zig leaf (`crates/desktop/Spec.lean` section 8-12). The leaf is compiled
 # on Windows targets only, so on any other runner this action installs
 # nothing: a Linux or macOS build of the workspace never starts `zig`.
 #

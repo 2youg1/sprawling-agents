@@ -110,7 +110,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup show
       # The Zig the desktop's leaf is built with; every Windows build of
-      # `sprawling` compiles it (desktop-SPEC.md section 8-12).
+      # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@v2
         with:
@@ -179,7 +179,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup show
       # The Zig the desktop's leaf is built with; every Windows build of
-      # `sprawling` compiles it (desktop-SPEC.md section 8-12).
+      # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
       # Without this every run compiles the whole graph from zero, including
       # aws-lc-sys and libgit2, which are C. A key per job, because
@@ -208,7 +208,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup show
       # The Zig the desktop's leaf is built with; every Windows build of
-      # `sprawling` compiles it (desktop-SPEC.md section 8-12).
+      # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@v2
         with:
@@ -305,14 +305,14 @@ jobs:
 
   # The desktop server and its FFI seam are workspace members, so the jobs
   # above lint and test them; what is left is the Zig leaf's own tests,
-  # which no cargo command runs (desktop-SPEC.md section 8-12). It compiles
+  # which no cargo command runs (`crates/desktop/Spec.lean` section 8-12). It compiles
   # no Rust, so it needs no toolchain and no cache.
   desktop:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      # The Zig the desktop's leaf is built with (desktop-SPEC.md section
+      # The Zig the desktop's leaf is built with (`crates/desktop/Spec.lean` section
       # 8-12).
       - uses: ./.github/actions/zig
       - uses: taiki-e/install-action@v2

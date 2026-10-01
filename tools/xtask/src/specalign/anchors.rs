@@ -89,7 +89,7 @@ pub(super) fn check(root: &Path, violations: &mut Vec<Violation>) -> Result<(), 
     let mut loaded: BTreeMap<String, Spec> = BTreeMap::new();
     for anchor in modmap::anchors(root)? {
         let at = format!("{MAP}: {}", anchor.module);
-        let owner = found.iter().find(|member| member.holds(&anchor.file));
+        let owner = members::owner(&found, &anchor.file);
         let migrated = owner.is_some_and(|member| lean::migrated(root, &member.dir));
         let markdown = anchor.spec.contains('#') || anchor.spec.ends_with(".md");
         let problem = match (migrated, markdown, owner) {

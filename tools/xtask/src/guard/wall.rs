@@ -10,7 +10,7 @@
 //! `crates/desktop/ffi`. Each call into its Zig leaf relaxes
 //! `unsafe_code` at that one statement, which `forbid` makes impossible,
 //! so it writes a table of its own: the workspace's, with `unsafe_code`
-//! at `deny` (desktop-SPEC.md section 12.14, xtask-SPEC.md section 8-46).
+//! at `deny` (`crates/desktop/Spec.lean` D14, xtask-SPEC.md section 8-46).
 //! Every other line of that table is a **copy**, and a copy is a second
 //! home for a fact.
 //!
@@ -57,7 +57,7 @@ const RECORDED: [Recorded; 1] = [Recorded {
     table: "rust",
     key: "unsafe_code",
     because: "each call into the Zig leaf that carries the Win32 calls relaxes it at that one \
-              statement with a written reason, which `forbid` makes impossible (desktop-SPEC.md \
+              statement with a written reason, which `forbid` makes impossible (`crates/desktop/Spec.lean` \
               section 12.14)",
 }];
 

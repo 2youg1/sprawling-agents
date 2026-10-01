@@ -86,7 +86,7 @@ winapi-util = "0.1.11"
 # (sprawling-SPEC 8-129-4); the crate's public surface is safe.
 win32job = "2.0.3"
 # The desktop server's safe Win32 calls, and the handle and error types its
-# FFI seam hands back (desktop-SPEC.md sections 12.9 and 8-12): the server
+# FFI seam hands back (`crates/desktop/Spec.lean` D9 and section 8-12): the server
 # and the seam both name it, so its version and features are written once.
 winsafe = { version = "0.0.29", features = ["user", "ole"] }
 # The Win32 binding the desktop server reads constants from, and the one
