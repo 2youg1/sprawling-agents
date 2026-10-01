@@ -28,6 +28,17 @@ pub(crate) struct Counters {
     volume: PathBuf,
 }
 
+/// How many platform readings were taken, by kind: this process through
+/// its own handle, the machine through `sysinfo`, and the whole process
+/// table (sprawling-SPEC.md 8-129-3). A count rather than a time, so a
+/// test can hold the sampling cost exactly on any machine.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Reads {
+    pub(crate) own: u64,
+    pub(crate) machine: u64,
+    pub(crate) table: u64,
+}
+
 /// The `sysinfo` handles, which cost milliseconds a reading; only a
 /// watcher of the whole page pays for them.
 struct Machine {
@@ -72,6 +83,11 @@ impl Counters {
                 .get_or_insert_with(Machine::open)
                 .read(&self.volume, own),
         }
+    }
+
+    /// The platform readings taken since this was opened.
+    pub(crate) fn reads(&self) -> Reads {
+        Reads::default()
     }
 }
 
