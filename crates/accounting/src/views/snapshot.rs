@@ -140,24 +140,17 @@ impl Views {
     }
 
     /// A second copy of these views, folded to the same record and sharing
-    /// their ledger index and plan cache, for the fold thread to alternate
-    /// with (sprawling-SPEC.md 8-99). Made through the encoding a snapshot
-    /// holds, which carries every folded field, so the copy starts where
-    /// this one stands without the history being read again.
+    /// their ledger index, plan cache, vault and halt, for the fold thread
+    /// to alternate with (sprawling-SPEC.md 8-99): a clone, which copies
+    /// every folded field and shares what sits behind an `Arc`, so the
+    /// copy starts where this one stands without the history being read
+    /// again (accounting-SPEC.md 8-19).
     ///
     /// # Errors
-    /// Those of [`Views::encode`] and [`Views::decode`].
+    /// None today; the `Result` stays until its caller in
+    /// `bin::assembly::listening` drops the `?` (sprawling-SPEC.md 8-144).
     pub fn twin(&self) -> Result<Views, AxError> {
-        let copy = Views::decode(&self.city_root, &self.encode()?)?;
-        Ok(Views {
-            index: Arc::clone(&self.index),
-            plans: Arc::clone(&self.plans),
-            machine: self.machine.clone(),
-            vault: self.vault.clone(),
-            reach: self.reach,
-            proof: self.proof.clone(),
-            ..copy
-        })
+        Ok(self.clone())
     }
 
     /// Cuts a snapshot of these views at `record`, the last record they

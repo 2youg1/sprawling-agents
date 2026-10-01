@@ -32,7 +32,7 @@ use super::prepared::{Prepared, unavailable};
 /// Private fields with one production point: every field is read off a
 /// record, so a set of facts about a commit nobody made cannot be
 /// assembled here a field at a time.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct CommitFacts {
     run: RunId,
     seq: Seq,

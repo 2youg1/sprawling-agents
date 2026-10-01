@@ -117,7 +117,7 @@ impl RunHot {
 /// (storage-SPEC section 8-5).
 pub const RECENT_FROZEN: usize = 32;
 
-#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct HotView {
     runs: BTreeMap<RunId, RunHot>,
     /// Frozen runs pushed out of `runs`, by id alone. Freezing is

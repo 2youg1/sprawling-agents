@@ -37,7 +37,7 @@ use super::snapshot::start::city_root_of;
 /// The encoding a snapshot holds (sprawling-SPEC 8-91) leaves out the
 /// four fields that are not folded from the ledger; `Views::decode`
 /// takes them from `Views::new`.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Views {
     #[serde(skip)]
     pub(super) city_root: PathBuf,

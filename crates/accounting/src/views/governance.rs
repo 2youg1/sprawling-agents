@@ -42,7 +42,7 @@ pub(crate) struct Sent {
 /// running city writes. These were once two implementations that
 /// happened to agree, and `set_admission` and `answer_approval` each
 /// held a third by writing a field directly.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Governance {
     pub pending: std::collections::BTreeMap<String, kernel::ApprovalItem>,
     pub autonomy: kernel::Autonomy,
