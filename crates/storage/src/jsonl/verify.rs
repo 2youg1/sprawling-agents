@@ -144,6 +144,13 @@ pub fn read_line(raw: &[u8]) -> Result<CheckedLine, LineFault> {
     readable_envelope(raw).and_then(|envelope| classify(envelope, raw))
 }
 
+/// The seq a line claims in its envelope, read without judging the rest:
+/// where a reader looks for a line, never whether the line is good, which
+/// the chain check that follows decides.
+pub(crate) fn claimed_seq(raw: &[u8]) -> Option<Seq> {
+    readable_envelope(raw).ok().map(|envelope| envelope.seq)
+}
+
 fn readable_envelope(raw: &[u8]) -> Result<Envelope<'_>, LineFault> {
     let envelope: Envelope = serde_json::from_slice(raw)
         .map_err(|e| LineFault::NotALine(format!("not a ledger line: {e}")))?;

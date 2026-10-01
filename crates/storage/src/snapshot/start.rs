@@ -13,7 +13,7 @@ use kernel::Seq;
 
 use super::{ChainSnapshot, SnapshotFit, StoredSnapshot, read_snapshot};
 use crate::error::{StorageError, io_err};
-use crate::jsonl::{complete_lines, ledger_segments_at, segment_first_seq};
+use crate::jsonl::{claimed_seq, complete_lines, ledger_segments_at, segment_first_seq};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
@@ -120,7 +120,8 @@ struct Cut {
 
 /// The line at `seq` and every complete line after it, read from the
 /// segment whose name claims `seq` onward; `None` when no line sits at
-/// `seq`.
+/// `seq`. Within that segment the line is found from the end, and by
+/// counting from the start when the end cannot say (storage-SPEC 8-28).
 fn lines_from_cut(vfs: &dyn Vfs, dir: &Path, seq: Seq) -> Result<Option<Cut>, StorageError> {
     let segments = ledger_segments_at(dir)?;
     let Some((at, first)) = segments.iter().enumerate().rev().find_map(|(at, segment)| {
@@ -130,24 +131,65 @@ fn lines_from_cut(vfs: &dyn Vfs, dir: &Path, seq: Seq) -> Result<Option<Cut>, St
     }) else {
         return Ok(None);
     };
-    // Past the address space the line cannot be in memory either: skip all.
-    let mut skip = usize::try_from(seq.value().saturating_sub(first.value())).unwrap_or(usize::MAX);
-    let (mut line_at_seq, mut tail) = (None, Vec::new());
-    for segment in segments.iter().skip(at) {
+    let mut onward = segments.iter().skip(at);
+    let Some(holding) = onward.next() else {
+        return Ok(None);
+    };
+    let bytes = vfs.read(holding).map_err(io_err("read segment", holding))?;
+    let Some(mut cut) = from_the_end(&bytes, seq).or_else(|| from_the_start(&bytes, first, seq))
+    else {
+        return Ok(None);
+    };
+    for segment in onward {
         let bytes = vfs.read(segment).map_err(io_err("read segment", segment))?;
-        for line in complete_lines(&bytes)
-            .0
-            .into_iter()
-            .filter(|line| !line.is_empty())
-        {
-            match (skip.checked_sub(1), &line_at_seq) {
-                (Some(left), _) => skip = left,
-                (None, None) => line_at_seq = Some(line.to_vec()),
-                (None, Some(_)) => tail.push(line.to_vec()),
-            }
-        }
+        cut.tail.extend(
+            complete_lines(&bytes)
+                .0
+                .into_iter()
+                .filter(|line| !line.is_empty())
+                .map(<[u8]>::to_vec),
+        );
     }
-    Ok(line_at_seq.map(|line_at_seq| Cut { line_at_seq, tail }))
+    Ok(Some(cut))
+}
+
+/// The line at `seq` in one segment's `bytes`, and its complete lines
+/// after it, found from the end: the last complete line names its own
+/// seq, so the line at `seq` is that many lines back, and only the bytes
+/// after it are scanned. `None` when the last line names no seq, names
+/// one before `seq`, or the segment holds fewer lines than that.
+fn from_the_end(bytes: &[u8], seq: Seq) -> Option<Cut> {
+    let end = bytes.iter().rposition(|byte| *byte == b'\n')?;
+    let mut lines = bytes
+        .get(..end)?
+        .rsplit(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty());
+    let newest = lines.clone().next()?;
+    let back = claimed_seq(newest)?.value().checked_sub(seq.value())?;
+    let back = usize::try_from(back).ok()?;
+    let mut tail: Vec<Vec<u8>> = lines.by_ref().take(back).map(<[u8]>::to_vec).collect();
+    if tail.len() != back {
+        return None;
+    }
+    let line_at_seq = lines.next()?.to_vec();
+    tail.reverse();
+    Some(Cut { line_at_seq, tail })
+}
+
+/// The line at `seq` in one segment's `bytes`, whose first line is
+/// `first`, and its complete lines after it, found by counting from the
+/// segment's start; `None` when no line sits at `seq`.
+fn from_the_start(bytes: &[u8], first: Seq, seq: Seq) -> Option<Cut> {
+    // Past the address space the line cannot be in memory either.
+    let skip = usize::try_from(seq.value().checked_sub(first.value())?).ok()?;
+    let mut lines = complete_lines(bytes)
+        .0
+        .into_iter()
+        .filter(|line| !line.is_empty())
+        .skip(skip);
+    let line_at_seq = lines.next()?.to_vec();
+    let tail = lines.map(<[u8]>::to_vec).collect();
+    Some(Cut { line_at_seq, tail })
 }
 
 fn first_seq_of(segment: &Path) -> Option<Seq> {

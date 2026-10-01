@@ -43,4 +43,5 @@ pub use ledger::{JsonlLedger, OpenReport, TailTruncation, WriteObserver};
 pub(crate) use ledger::{complete_lines, segment_first_seq, segment_names};
 pub use reading::{ledger_segments_at, read_raw_lines_at};
 pub use tail::{TailLine, TailLines};
+pub(crate) use verify::claimed_seq;
 pub use verify::{CheckedLine, LineCheck, LineFault, read_line};
