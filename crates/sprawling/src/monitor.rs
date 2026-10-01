@@ -13,6 +13,7 @@
 pub(crate) mod counters;
 pub(crate) mod memory;
 pub(crate) mod sampler;
+pub mod spread;
 pub mod top;
 pub(crate) mod volume;
 

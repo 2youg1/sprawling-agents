@@ -17,6 +17,7 @@
 use std::time::Duration;
 
 use kernel::{AxCode, AxError, B3Hash};
+use sprawling::monitor::spread::{Share, Spread};
 
 /// The class of machine a reading was taken on.
 ///
@@ -109,15 +110,13 @@ pub(crate) struct Reading {
     load: Load,
     sub: SubMetric,
     taken: Taken,
-    samples: u64,
-    floor: Duration,
-    p50: Duration,
-    p95: Duration,
-    p99: Duration,
+    spread: Spread,
 }
 
 impl Reading {
-    /// The one construction point: percentiles off the sample vector.
+    /// The one construction point: the shares are read by the product's
+    /// one percentile reading, `Spread`, nearest rank
+    /// (sprawling-SPEC.md 8-129-2).
     ///
     /// # Errors
     /// Refuses a scenario that sampled nothing, because a reading with no
@@ -126,29 +125,15 @@ impl Reading {
         load: Load,
         sub: SubMetric,
         taken: Taken,
-        mut samples: Vec<Duration>,
+        samples: Vec<Duration>,
     ) -> Result<Reading, String> {
-        samples.sort();
-        let count = samples.len();
-        if count == 0 {
-            return Err(sampled_nothing());
-        }
-        let at = |percent: usize| -> Result<Duration, String> {
-            let index = count
-                .saturating_mul(percent)
-                .saturating_div(100)
-                .min(count.saturating_sub(1));
-            samples.get(index).copied().ok_or_else(sampled_nothing)
-        };
+        let mut samples = samples.into_iter();
+        let head = samples.next().ok_or_else(sampled_nothing)?;
         Ok(Reading {
             load,
             sub,
             taken,
-            samples: u64::try_from(count).map_err(|why| format!("count the samples: {why}"))?,
-            floor: samples.first().copied().ok_or_else(sampled_nothing)?,
-            p50: at(50)?,
-            p95: at(95)?,
-            p99: at(99)?,
+            spread: Spread::of(head, samples),
         })
     }
 
@@ -160,11 +145,11 @@ impl Reading {
             self.sub.as_str(),
             self.taken.machine.as_str(),
             citysim::fixture_label(&self.taken.fixture),
-            self.samples,
-            self.floor.as_micros(),
-            self.p50.as_micros(),
-            self.p95.as_micros(),
-            self.p99.as_micros()
+            self.spread.samples(),
+            self.spread.floor().as_micros(),
+            self.spread.p(Share::P50).as_micros(),
+            self.spread.p(Share::P95).as_micros(),
+            self.spread.p(Share::P99).as_micros()
         )
     }
 }

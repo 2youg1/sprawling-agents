@@ -16,17 +16,10 @@
 
 use std::time::Duration;
 
-/// Which order statistic is asked for.
-///
-/// Three named shares rather than a percent parameter: the report asks
-/// these three and no other, and a parameter would accept a question
-/// nobody answers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Share {
-    P50,
-    P95,
-    P99,
-}
+/// Which order statistic is asked for: the product's own, so a share
+/// here and in a `bench` or `gauge` reading names the same sample.
+pub use sprawling::monitor::spread::Share;
+use sprawling::monitor::spread::{SUSPICIOUS_TIMES, Spread};
 
 /// Whether one sample looks like the action or like interference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,25 +40,16 @@ pub enum Tier {
 /// section 8-5).
 const SECOND_TIER: Duration = Duration::from_millis(1);
 
-/// How far above the middle a sample is flagged suspicious, in halves
-/// kept whole: three times p50 (citysim-SPEC.md section 8-5).
-const SUSPICIOUS_TIMES: u32 = 3;
-
 /// One action's sample set: at least one duration, in the order it was
 /// recorded.
 ///
-/// Everything a report reads is derived at the one construction point,
-/// so a query is a field read and no reader can disagree with another
-/// about what the middle was. The order is arrival order on purpose: a
-/// suspicious stretch is a question about *when* in the run something
-/// happened, so the set keeps the timeline and sorts only for an order
-/// statistic.
+/// The shares, floor and peak are the product's one reading of a set,
+/// `Spread` (sprawling-SPEC.md 8-129-2); what this set adds is the
+/// arrival order. A suspicious stretch is a question about *when* in the
+/// run something happened, so each sample keeps its mark in the order it
+/// arrived.
 pub struct Samples {
-    p50: Duration,
-    p95: Duration,
-    p99: Duration,
-    floor: Duration,
-    peak: Duration,
+    spread: Spread,
     marks: Vec<SampleKind>,
 }
 
@@ -76,61 +60,43 @@ impl Samples {
     /// sample cannot be spelled.
     #[must_use]
     pub fn of(head: Duration, tail: Vec<Duration>) -> Samples {
-        let mut arrival = Vec::with_capacity(tail.len().saturating_add(1));
-        arrival.push(head);
-        arrival.extend(tail);
-        let mut sorted = arrival.clone();
-        sorted.sort();
-        let middle = at(&sorted, index_of(sorted.len(), Share::P50));
-        let cut = middle.saturating_mul(SUSPICIOUS_TIMES);
-        let marks = arrival
-            .iter()
+        let spread = Spread::of(head, tail.iter().copied());
+        let cut = spread.p(Share::P50).saturating_mul(SUSPICIOUS_TIMES);
+        let marks = std::iter::once(head)
+            .chain(tail)
             .map(|time| {
-                if *time > cut {
+                if time > cut {
                     SampleKind::Suspicious
                 } else {
                     SampleKind::Plain
                 }
             })
             .collect();
-        let floor = arrival.iter().copied().fold(head, Duration::min);
-        let peak = arrival.iter().copied().fold(head, Duration::max);
-        Samples {
-            p50: middle,
-            p95: at(&sorted, index_of(sorted.len(), Share::P95)),
-            p99: at(&sorted, index_of(sorted.len(), Share::P99)),
-            floor,
-            peak,
-            marks,
-        }
+        Samples { spread, marks }
     }
 
     /// The nearest-rank order statistic: rank `ceil(share * n)`, one-based.
     #[must_use]
     pub fn p(&self, share: Share) -> Duration {
-        match share {
-            Share::P50 => self.p50,
-            Share::P95 => self.p95,
-            Share::P99 => self.p99,
-        }
+        self.spread.p(share)
     }
 
     /// The smallest sample: the limit reading the report records.
     #[must_use]
     pub fn floor(&self) -> Duration {
-        self.floor
+        self.spread.floor()
     }
 
     /// The largest sample.
     #[must_use]
     pub fn peak(&self) -> Duration {
-        self.peak
+        self.spread.peak()
     }
 
     /// What one sample looks like, by its place in the run.
     ///
     /// A place the run never recorded reads `Plain`: nothing was measured
-    /// there, which is the same convention `at` names for a pick.
+    /// there.
     #[must_use]
     pub fn kind_at(&self, index: usize) -> SampleKind {
         self.marks.get(index).copied().unwrap_or(SampleKind::Plain)
@@ -148,47 +114,12 @@ impl Samples {
     /// Whether the tail fits the second tier.
     #[must_use]
     pub fn tier(&self) -> Tier {
-        if self.p99 <= SECOND_TIER {
+        if self.spread.p(Share::P99) <= SECOND_TIER {
             Tier::Within
         } else {
             Tier::Outside
         }
     }
-}
-
-/// Where the order statistic for `share` sits in an `n`-sample set,
-/// zero-based: rank `ceil(share * n)` minus one, which over whole
-/// numbers is `(n * numerator - 1) / 100`.
-///
-/// Every step saturates: the arithmetic is on a sample count, not on a
-/// value anything depends on wrapping.
-fn index_of(n: usize, share: Share) -> usize {
-    let numerator = match share {
-        Share::P50 => 50,
-        Share::P95 => 95,
-        Share::P99 => 99,
-    };
-    n.saturating_mul(numerator).saturating_sub(1) / 100
-}
-
-/// The value at `index` of an ascending set.
-///
-/// The pick always lands: `index_of` returns `ceil(n * q / 100) - 1`,
-/// which is below `n` for every share here and `n` is at least one by
-/// construction. A fold rather than `Vec::get`, because the fallback an
-/// index needs would be a reading nobody measured.
-fn at(sorted: &[Duration], index: usize) -> Duration {
-    debug_assert!(
-        index < sorted.len(),
-        "rank arithmetic kept outside the set: index {index} of {}",
-        sorted.len()
-    );
-    sorted.iter().enumerate().fold(
-        Duration::ZERO,
-        |picked, (i, time)| {
-            if i == index { *time } else { picked }
-        },
-    )
 }
 
 #[cfg(test)]
