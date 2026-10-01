@@ -10,7 +10,7 @@
 //! model. The second adapter is what makes this a seam rather than a
 //! layer of indirection — a power cut is a property of filesystem
 //! semantics, so it is injected here and every module above stays free
-//! of test hooks (storage-SPEC 8.5, design A).
+//! of test hooks (`crates/storage/Spec.lean` §10, design A).
 //!
 //! **The seam stays inner.** `Vfs` is `pub(crate)`: `JsonlLedger` holds
 //! a `Box<dyn Vfs>` and never names it in a public signature, because a
@@ -49,7 +49,7 @@ pub(crate) trait Vfs: Send {
     /// asking past the end learns it did: this seam reports the file as
     /// it is and refuses nothing, so the meaning of an out-of-range
     /// request stays with the module that owns the request's grammar
-    /// (storage-SPEC 8-3).
+    /// (`crates/storage/spec/Cas.lean` §8-3).
     fn read_at(&self, path: &Path, offset: u64, len: u64) -> io::Result<Vec<u8>>;
     /// Creates the file when absent.
     fn append(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()>;
@@ -58,7 +58,7 @@ pub(crate) trait Vfs: Send {
     /// Atomic replace; durability of the new entry still needs sync_dir.
     fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()>;
     /// Durability of directory entries; explicit no-op on Windows (no
-    /// directory-handle sync primitive there — storage-SPEC 3-3).
+    /// directory-handle sync primitive there — `crates/storage/Spec.lean` §3, item 3).
     fn sync_dir(&mut self, dir: &Path) -> io::Result<()>;
     fn remove_file(&mut self, path: &Path) -> io::Result<()>;
     /// Gives `to` the permissions `from` carries, so a file written

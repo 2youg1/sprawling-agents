@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A wave that failed to reach the disk leaves nothing the next wave
-//! builds on (storage-SPEC 8-1).
+//! builds on (`crates/storage/spec/Jsonl.lean` §8-1).
 
 use std::path::PathBuf;
 

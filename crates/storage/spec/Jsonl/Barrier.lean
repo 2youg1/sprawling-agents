@@ -6,13 +6,33 @@
 /-!
 # 账本的回答与重开后磁盘上的内容
 
-规定 `crates/storage/src/jsonl/barrier.rs`：`append_all` 在一波之前查询、在该波最后一次 sync 之后修补的状态 `Barrier`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪条性质」的权威（storage-SPEC.md 8-1）。
+规定 `crates/storage/src/jsonl/barrier.rs`：`append_all` 在一波之前查询、在该波最后一次 sync 之后修补的状态 `Barrier`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪条性质」的权威（§8-1）。
 
 磁盘是一列格子：一格要么是一条带 seq 的完整记录，要么是一波写到一半中断时留下的字节。开账本时保留到第一个不是完整记录的格子为止，这就是尾部恢复。一个 handle 记着一个位置，以及它答过 `Ok` 的那些 seq。
 
 一条性质：**handle 答过 `Ok` 的每个 seq，重开后的账本里都有**。它成立，是因为一个有一波失败过的 handle 拒绝此后的每一波；`withoutBarrier` 给出 handle 继续写时打破这条性质的轨迹。
 
 这里一波就是一条记录。一波带几条记录，不改变撕裂相对于此前已答记录能落在哪里。
+-/
+
+/-!
+### 8-1 storage::jsonl：屏障状态
+
+**屏障状态 `jsonl::barrier`（形状 2 值）**：内存里的位置（`seg_len`、`next_seq`、`prev`）必须就是段的末尾，账本答出的 `Ok` 才能都在重开后的账本里找到。
+
+```rust
+pub(crate) enum Barrier { Whole, Broken }
+impl Barrier {
+    /// Whole ⇒ Ok；Broken ⇒ StorageError::LedgerBroken { dir, at: next_seq }。
+    pub(crate) fn admit(&self, dir: &Path, at: Seq) -> Result<(), StorageError>;
+}
+```
+
+- 一波在写出第一个字节之前把屏障置为 `Broken`，在它触及的每一段都 sync 完（以及新段的 `sync_dir`）之后才置回 `Whole`；`append_all` 进门先 `admit`，空波也一样。
+- 原因：写到一半死掉的波会在段尾留下位置不认识的字节——撕裂的半行，或 sync 失败的整行。在它后面再写的一波，会接在下次 open 要截掉的那段字节之后，它的 `Ok` 就说了一条盘上没有的记录（`barrier.rs` 的 `no_append_after_a_failed_barrier_claims_a_record_the_disk_loses`）。能判断段尾有什么的只有 open，所以坏了的句柄拒绝之后的每一波。
+- 性质「句柄答过 `Ok` 的每个 seq 重开后都在」由 `crates/storage/spec/Jsonl/Barrier.lean` 对任意一串波证明（`answered_survives_reopen`），并给出不守屏障时的反例（`withoutBarrier`）；`just models` 证明它。
+- 被否：失败后把位置退回或前推到盘上真实的末尾。写失败时句柄不知道落下了多少字节，sync 失败后页缓存里的字节是否还会落盘也不知道；猜一个位置，就是用猜测替 open 的断尾恢复作答。
+- 重开参数：出现后台组提交（记账线程发布「已持久到 seq N」的水位线）之后，sync 失败不再发生在 `append_all` 里，屏障状态随水位线一起搬到记账线程。
 -/
 
 namespace Storage.Jsonl.Barrier
@@ -155,7 +175,7 @@ theorem withoutBarrier :
 
 /-! ## 从已验证前缀起重开
 
-一段的前 `L` 个格子已由记录证明是完整记录（storage-SPEC.md 8-30）时，尾部恢复不必从第 0 格看起：前缀原样保留，只看 `L` 之后。记录只写在完整记录组成的前缀上，这是 `verified` 这个前提；Rust 一侧由 `storage::verified_prefix` 只为核对过的完整行写记录守住它。 -/
+一段的前 `L` 个格子已由记录证明是完整记录（§8-30）时，尾部恢复不必从第 0 格看起：前缀原样保留，只看 `L` 之后。记录只写在完整记录组成的前缀上，这是 `verified` 这个前提；Rust 一侧由 `storage::verified_prefix` 只为核对过的完整行写记录守住它。 -/
 
 /-- 前 `L` 格都是记录时，重开等于前缀加上从 `L` 起的重开。 -/
 theorem reopenFromVerifiedPrefix (disk : List Cell) (L : Nat)
@@ -186,3 +206,8 @@ theorem answered_survives_reopen_from_a_verified_prefix (waves : List Outcome) (
   exact (answered_survives_reopen waves).2 s hs
 
 end Storage.Jsonl.Barrier
+
+/-! D16 `LedgerBroken`→`E_STORAGE_FATAL`
+
+`LedgerBroken`→`E_STORAGE_FATAL`：不可定义掉——写与 sync 的失败来自介质；能定义掉的那部分（失败之后再写的一波被下次 open 截掉，却已答了 `Ok`）已由 `Barrier` 定义掉。recovery 是修好盘之后重启，由 open 修段尾。
+-/

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Aliases, and the write target that refuses them (storage-SPEC 8-25).
+//! Aliases, and the write target that refuses them (`crates/storage/spec/Alias.lean` §8-25).
 //!
 //! A name in a working tree can point at a file other than itself: a
 //! symlink or a junction makes the path lead somewhere else, and a hard
@@ -28,7 +28,7 @@ use crate::error::StorageError;
 /// true for either, which is why they share a variant: refusing the
 /// family is one rule, not one rule per reparse tag. The third member
 /// of the family - the hard link - is a regular file whose link count is
-/// above one (storage-SPEC 8-25 and §3).
+/// above one (`crates/storage/spec/Alias.lean` §8-25, `crates/storage/Spec.lean` §3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AliasKind {
     /// A symbolic link or a directory junction: the name leads
@@ -172,7 +172,7 @@ impl WriteTarget {
     /// chose: `path` and every directory between it and `root` are
     /// examined, and `root` and everything above it are not, because
     /// where a person keeps a city is their placement rather than a
-    /// write a run could redirect (storage-SPEC 8-12). A `path` outside
+    /// write a run could redirect (`crates/storage/spec/Bundle.lean` §8-12). A `path` outside
     /// `root` is examined up to the filesystem root, as [`WriteTarget::at`]
     /// does.
     ///
@@ -200,7 +200,7 @@ impl WriteTarget {
 
     /// Replaces the file at this name with `bytes`: a staging file
     /// beside it, flushed, given the replaced file's permissions and
-    /// renamed over the name (storage-SPEC 8-12, 8-32). A reader finds
+    /// renamed over the name (`crates/storage/Spec.lean` §8-12, §8-32). A reader finds
     /// the old file or the whole new one.
     ///
     /// # Errors
@@ -217,7 +217,7 @@ impl WriteTarget {
 
     /// Creates the file at this name only when nothing stands there:
     /// the name is claimed by the filesystem at the moment of the write,
-    /// so of two racing creates one succeeds (storage-SPEC 8-32).
+    /// so of two racing creates one succeeds (`crates/storage/spec/Alias.lean` §8-32).
     ///
     /// # Errors
     /// `StorageError::NameTaken` when anything stands at the name, with

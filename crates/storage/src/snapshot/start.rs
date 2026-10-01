@@ -5,7 +5,7 @@
 
 //! Where a start begins folding: after a snapshot whose line still sits
 //! at its seq, or from genesis with the reason it could not resume
-//! (storage-SPEC 8-28).
+//! (`crates/storage/spec/Snapshot/Start.lean` §8-28).
 
 use std::path::Path;
 
@@ -121,7 +121,7 @@ struct Cut {
 /// The line at `seq` and every complete line after it, read from the
 /// segment whose name claims `seq` onward; `None` when no line sits at
 /// `seq`. Within that segment the line is found from the end, and by
-/// counting from the start when the end cannot say (storage-SPEC 8-28).
+/// counting from the start when the end cannot say (`crates/storage/spec/Snapshot/Start.lean` §8-28).
 fn lines_from_cut(vfs: &dyn Vfs, dir: &Path, seq: Seq) -> Result<Option<Cut>, StorageError> {
     let segments = ledger_segments_at(dir)?;
     let Some((at, first)) = segments.iter().enumerate().rev().find_map(|(at, segment)| {

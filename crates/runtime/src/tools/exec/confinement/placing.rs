@@ -121,8 +121,8 @@ pub struct Placed {
 }
 
 impl Placed {
-    /// What putting the copy in place cost the filesystem (storage-SPEC
-    /// 8-31).
+    /// What putting the copy in place cost the filesystem (`crates/storage/Spec.lean`
+    /// §8-31).
     pub fn work(&self) -> storage::FileWork {
         self.work
     }

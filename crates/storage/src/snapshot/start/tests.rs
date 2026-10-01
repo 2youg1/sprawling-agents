@@ -54,7 +54,7 @@ fn a_fitting_snapshot_resumes_at_its_tail_without_reading_earlier_segments() {
 
 /// The cut is found from its segment's end, so a line damaged before it
 /// in the same segment changes where a start begins no more than one in
-/// an earlier segment does; the proof checks both (storage-SPEC 8-28).
+/// an earlier segment does; the proof checks both (`crates/storage/spec/Snapshot/Start.lean` §8-28).
 #[test]
 fn damage_before_the_cut_in_its_own_segment_does_not_move_the_start() {
     let tmp = tempfile::tempdir().unwrap();

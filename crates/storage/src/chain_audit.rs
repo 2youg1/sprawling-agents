@@ -6,7 +6,7 @@
 //! The whole chain proved from genesis, one segment after another,
 //! reusing what an earlier strict walk proved, the segments read and
 //! their recorded prefixes hashed in waves side by side; and the verdict
-//! the writer waits for or halts on (storage-SPEC 8-30, 8-37). The proof
+//! the writer waits for or halts on (`crates/storage/spec/ChainAudit.lean` §8-30, §8-37). The proof
 //! is a query; setting the verdict is the caller's command.
 
 use std::path::Path;
@@ -42,7 +42,7 @@ pub struct ProofCount {
     pub bytes_read: u64,
     pub bytes_hashed: u64,
     /// Waves the segments were read in, each wave read side by side
-    /// before the chain is walked through it (storage-SPEC 8-37).
+    /// before the chain is walked through it (`crates/storage/spec/ChainAudit.lean` §8-37).
     pub waves: u64,
 }
 
@@ -253,7 +253,7 @@ struct Walked {
 impl Walked {
     /// Prove one segment's complete lines and answer the record of what
     /// was proved. The bytes checked and the bytes hashed are the same
-    /// read (storage-SPEC 8-30).
+    /// read (`crates/storage/spec/ChainAudit.lean` §8-30).
     fn segment(&mut self, read: Read, version: u32) -> Result<SegmentRecord, AxError> {
         let Read { bytes, hashed } = read;
         self.counted.bytes_read = self.counted.bytes_read.saturating_add(len_of(&bytes));

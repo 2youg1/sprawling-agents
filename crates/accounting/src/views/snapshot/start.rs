@@ -62,7 +62,7 @@ pub fn snapshot_dir<F: SnapshotFold>(city_root: &Path) -> PathBuf {
 }
 
 /// Where the city at `city_root` keeps its verified prefix records
-/// (storage-SPEC 8-30): the one spelling of that path.
+/// (`crates/storage/Spec.lean` §8-30): the one spelling of that path.
 pub fn proof_dir(city_root: &Path) -> PathBuf {
     CityLayout::new(city_root).snapshot().join("verified")
 }

@@ -247,10 +247,10 @@ impl Tool for EditTool {
         let updated = text.replacen(old, new, 1);
         // A name that is a link lands this write somewhere the gate
         // never judged - `.git/hooks` through a junction is privilege
-        // escalation (storage-SPEC 8-25). The replacement lands the way
+        // escalation (`crates/storage/Spec.lean` §8-25). The replacement lands the way
         // every city write does: a staging file renamed over the name,
         // so a failed write leaves the old file and a hard link's other
-        // names keep their bytes (storage-SPEC 8-32).
+        // names keep their bytes (`crates/storage/Spec.lean` §8-32).
         storage::WriteTarget::within("edit file", &self.city_root, &path)
             .and_then(|cleared| cleared.replace(updated.as_bytes()))
             .map_err(storage::StorageError::into_ax)?;
@@ -290,7 +290,7 @@ impl EditTool {
         // The alias check runs before any directory is made: making a
         // parent through a link would land a directory inside the
         // protected metadata the link reaches, before the write itself
-        // is refused (storage-SPEC 8-25).
+        // is refused (`crates/storage/Spec.lean` §8-25).
         storage::WriteTarget::within("edit file", &self.city_root, path)
             .map_err(|err| err.into_ax())?;
         if let Some(parent) = path.parent() {
@@ -303,7 +303,7 @@ impl EditTool {
             })?;
         }
         // The filesystem claims the name at the write, so of two racing
-        // creates one lands, under either limit (storage-SPEC 8-32).
+        // creates one lands, under either limit (`crates/storage/Spec.lean` §8-32).
         storage::WriteTarget::within("edit file", &self.city_root, path)
             .and_then(|cleared| cleared.create(new.as_bytes()))
             .map_err(|err| refused_create(err, rel, path))?;

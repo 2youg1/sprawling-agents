@@ -200,8 +200,7 @@ fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {
     );
 }
 
-/// The hot view keeps only the recent frozen few (storage-SPEC section
-/// 8-5); a run pushed out of it is still a run the city holds, so its
+/// The hot view keeps only the recent frozen few (`crates/storage/Spec.lean` §8-5); a run pushed out of it is still a run the city holds, so its
 /// run view is answered from the Ledger instead of reading as unknown.
 #[test]
 fn an_evicted_run_still_answers_its_run_view() {

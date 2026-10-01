@@ -322,7 +322,7 @@ fn walk<E>(
 
 /// Only the folded maps are written: the seam is this process's own, and
 /// an index read back reaches disk through a new one. A views snapshot
-/// carries the index this way (storage-SPEC 8-4).
+/// carries the index this way (`crates/storage/spec/Index.lean` §8-4).
 impl serde::Serialize for LedgerIndex {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.folded.serialize(serializer)

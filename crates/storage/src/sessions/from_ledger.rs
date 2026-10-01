@@ -5,7 +5,7 @@
 
 //! What the projection reads from the Ledger's segments: the lines of
 //! one address, and the first sequence of every address. Both are the
-//! slow path a missing or doubtful slice takes (storage-SPEC 8-24); a
+//! slow path a missing or doubtful slice takes (`crates/storage/spec/Sessions.lean` §8-24); a
 //! room the Ledger never carried before reaches neither.
 
 use std::collections::BTreeMap;

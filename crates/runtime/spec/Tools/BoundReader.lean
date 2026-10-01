@@ -59,7 +59,7 @@ inductive Named (Address : Type) where
   | File (addr : Address)
   | Block (hash : Nat)
 
-/-- 块仓记下的来源：一个块为哪几栋楼存过（`Cas::origins`，storage-SPEC §8-3）。 -/
+/-- 块仓记下的来源：一个块为哪几栋楼存过（`Cas::origins`，`crates/storage/Spec.lean` §8-3）。 -/
 structure Store (Address : Type) where
   origins : Nat → List Address
 

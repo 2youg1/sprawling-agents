@@ -28,7 +28,7 @@ use crate::error::{StorageError, io_err};
 /// walking forward and 5.82 µs walking backward now.
 ///
 /// This held handle is why line reading is the index's one step
-/// outside `Vfs` (storage-SPEC 8-15): the seam's `read_at` opens the
+/// outside `Vfs` (`crates/storage/spec/Vfs.lean` §8-15): the seam's `read_at` opens the
 /// segment per call, which is the 734 µs this type exists to avoid.
 /// Nothing here writes, so the crash semantics the seam is there to
 /// model have nothing to say about it.

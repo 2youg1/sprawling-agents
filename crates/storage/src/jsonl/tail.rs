@@ -7,7 +7,7 @@
 //! segment backwards, each segment read from its end through a window
 //! that starts at one page and doubles (the rule `first_line` uses), so
 //! a reader that wants the last N records pays for their bytes and not
-//! for the whole ledger (storage-SPEC 8-1). Each line passes the same
+//! for the whole ledger (`crates/storage/spec/Jsonl.lean` §8-1). Each line passes the same
 //! judgement a forward reader applies (`LineCheck::judge`); the chain is
 //! linked from the newer end instead.
 

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whose a block is: the run and the building it was put for, recorded
-//! when it is put (storage-SPEC section 8-3).
+//! when it is put (`crates/storage/spec/Cas.lean` §8-3).
 //!
 //! The same bytes may be put for two buildings, so a block keeps every
 //! origin it was put for, one line each, in `<dir>/from/<shard>/<hex>`.

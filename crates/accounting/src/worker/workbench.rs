@@ -261,7 +261,7 @@ impl Site {
     ///
     /// Without a lease the checkpoint is **the run's write domain**, which is
     /// the building's own subtree plus whatever else its `RULES.toml`
-    /// declares, as storage-SPEC section 8-18 states. The room would be
+    /// declares, as `crates/storage/Spec.lean` §8-18 states. The room would be
     /// narrower than the gate: `city::policy::write_domain` defaults to
     /// the whole building, and City Hall's residents reach every document
     /// under theirs. Anything a run wrote outside a room-sized checkpoint would

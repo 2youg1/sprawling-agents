@@ -35,7 +35,7 @@
 
 **`earlier` 的含义**：「从这条之前接着问」，`None` 即「到头了」；「答是空的而 `earlier` 是 `Some`」这一态**不存在**——服务端不需要把「我这一段没扫到」告诉客户端。
 
-**建 run→seq 的索引**：不建索引，一次 `RunHistory` 要扫整本账，扫描量与账本长度同阶，而这是「打开一个较早的会话」这个动作的全部延迟。那份要随账本同步的派生状态已经存在：`storage::LedgerIndex` 常驻于 `Views` 并每次查询 `refresh`，run 表只是它多一个字段，搭同一趟刷新、同一份 cache、同一条「存疑即重建」的反射，不新增同步义务。至于「第二个权威」：索引回答的是「在哪」，从不回答「是什么」，它可弃且存疑即重建；账本仍是唯一权威。接面与内存代价见 storage-SPEC §8-4。
+**建 run→seq 的索引**：不建索引，一次 `RunHistory` 要扫整本账，扫描量与账本长度同阶，而这是「打开一个较早的会话」这个动作的全部延迟。那份要随账本同步的派生状态已经存在：`storage::LedgerIndex` 常驻于 `Views` 并每次查询 `refresh`，run 表只是它多一个字段，搭同一趟刷新、同一份 cache、同一条「存疑即重建」的反射，不新增同步义务。至于「第二个权威」：索引回答的是「在哪」，从不回答「是什么」，它可弃且存疑即重建；账本仍是唯一权威。接面与内存代价见 `crates/storage/Spec.lean` §8-4。
 - **server**：默认绑定回环；绑非回环且 `auth` 未配置令牌时**拒绝启动**并回 `E_CONFIG_INVALID`（不是启动后再拒连——这是绑定面判定，不是请求面判定）。**暴露面必须有凭证是一条不变量，不是一句注释**：绑定判定把凭证本身装进 `BindFace::Exposed`，壳只持有这个面，于是「暴露着却不要求任何东西」是一个类型上不存在的状态（§8-41）。
 - **auth**：令牌比较恒为常数时间（不早退）；比较函数以「逐字节差异位置不影响耗时」的性质测试看守。地基是 `server::constant_time_eq` 与 `decide_handshake`；`auth` 模块接令牌的生成、展示与持久化。
 - **aggregate**：**类型化保证**——聚合上游连接的发送面在类型上只接受 `Query`，没有一个能塞进 `Command` 的方法（不是运行时 `if`，是类型上不存在该入口）；以 trybuild 反例钉死。
@@ -658,7 +658,7 @@ pub struct CommitAnswer {
   有房间时它就是 `city::open_room` 当初拿这个名字开的那一段（重名时带 `-2` 后缀）。
 - **一条这座城没写过的 oid 答 `Unavailable`**，与 `Changes` 同口径：「没有变化」与
   「我看不了」是两个答案，而读的人对它们的下一步不同。
-- **答案从账本来，不从 git 来**（storage-SPEC §8-18）。一座导出后在别处恢复、
+- **答案从账本来，不从 git 来**（`crates/storage/Spec.lean` §8-18）。一座导出后在别处恢复、
   `.git` 不在身边的城，照样答得出自己的历史。
 - **客户端欠的（前端冻结，此处不画界面）**：`client/src/wire.ts` 需重新生成
   （`cargo xtask wire-ts --write`）；只把新变体接进
@@ -792,7 +792,7 @@ pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
 ### 8-23 新客户端第一次真正用这条线，线上缺的四件事
 
 ```rust
-// RunSummary 多两个字段（storage::RunHot 从 run_started 记下，storage-SPEC §8-5）
+// RunSummary 多两个字段（storage::RunHot 从 run_started 记下，`crates/storage/Spec.lean` §8-5）
 pub struct RunSummary { pub run: RunId, pub who: String, pub frozen: bool,
                         pub last_seq: Seq, pub last_kind: EventKind,
                         pub addr: Option<Address>, pub started: Option<TimeMs> }
@@ -819,7 +819,7 @@ pub enum EntryKind { Directory, File { bytes: u64 } }          // 目录在前�
 
 **这四件事都是同一个发现**：ARCHITECTURE §8 说「线就是全部 API」，而旧客户端从没把这句话当真——它在浏览器里折叠 `history` 的原始记录，所以从来没问过线「这次跑在哪个房间」。新客户端只问线不折历史，四处空白一次全露出来。
 
-- **`RunSummary.addr`／`started`**：`who` 是这次跑第一条记录的作者，恒为 `city`，不是房间。房间是 `run_started` 记录自己的 `addr`，热视图在那一条上记下它（storage-SPEC §8-5）。没有它，页面无法把 `city_view` 列出的 run 归到 `hall/mayor`，「与 Mayor 的对话」拼不出来。`Option`：热视图可能只看到没有开场的一段尾巴，看不到的事不猜。
+- **`RunSummary.addr`／`started`**：`who` 是这次跑第一条记录的作者，恒为 `city`，不是房间。房间是 `run_started` 记录自己的 `addr`，热视图在那一条上记下它（`crates/storage/Spec.lean` §8-5）。没有它，页面无法把 `city_view` 列出的 run 归到 `hall/mayor`，「与 Mayor 的对话」拼不出来。`Option`：热视图可能只看到没有开场的一段尾巴，看不到的事不猜。
 - **`CityAnswer.halted`**：`city_halted` 是记录，`halted_by` 是 `bin::assembly` 工作线程的判定，而页面刷新后两者都够不到——它只收此后的事件。答里带上被 halt 的 scope 名，一个刚打开的页面才知道城是不是停着的，而不是等下一次 dispatch 被拒才发现。名字与 `HaltScope` 的 `scope_name` 同拼法，页面按名字画。
 - **`RoundsAnswer.opening`／`closing`**：回合的折叠从第一条 `model_called` 开始，所以人说的第一句（`run_started.task`）与这次跑怎么结束的（`run_frozen.completion`）都不在答里；一段对话缺开头与结尾就不是对话。两个都是 `Option`，理由同 `addr`：`HISTORY_MAX` 那段窗口可能不含开场。
 - **`Listing`／`Document`**：这座城是一棵目录树，而目录树本身就是产品（glossary：「那个层级就是目录树——不是它的模型，是树本身」）；`building_view` 只回楼根的 `.md` 与房间名，房间里的 `URBANITE.md`／`JOB.md`／`Handoff.md`／`<run>.jsonl` 页面看不到，于是这个设计在界面上是不可见的。两条查询让页面能走完整棵树。**路径经 `Address` 文法把关**（非绝对、无 `..`、无 `\`、无 `:`），所以走不出城根；`.sprawling/` **允许读**——它正是要展示的那部分，且这条线只答回环（或持配对 token 的）人，与工具层对居民的拒绝不是一个门。`Document` 答什么、在哪里切、怎样判文本，见 §8-69：答复带版本，缺失、读不了、空各是一种答复。
@@ -869,7 +869,7 @@ pub enum Coverage { Whole, Head }            // Head：其余的经 Query::Range
 - **缺失、读不了、空是三种答复**，不再借 `Unavailable`：「这里没有文件」页面画成可以新建，「读不了」页面说出系统的原话，「空」是一份可以写的文件，三者页面采取的动作不同。空文件也有版本（空字节的摘要），因为它同样可以是一次保存的基线。`Unavailable { query: "Document(<at>)" }` 只剩视图本身答不了的情形。
 - **文本的判定**（documents D4）：字节顺序标记先判，所以带标记的 UTF-16 是文本；没有标记时，不含 NUL 的合法 UTF-8 是文本；其余是 `Opaque`。不再有损解码，不再凭头 8 KiB 的 NUL 判二进制。
 - **第一个窗口** `head`（documents D7）：整份放得下 `WINDOW_BYTES_MAX`（64 KiB）就是整份（`Coverage::Whole`）；放不下时止于放得下的最后一个块的末尾，一块都放不下时止于界内最后一个字符边界（`Coverage::Head`）。窗口从第 0 个字节数起，标记是文本的第一个字符（documents D5），所以页面把各窗口的文本接起来就是整份文本。
-- **`Coverage::Head` 的版本在内容库里**：答复发出之前，读面把这一版的字节放进城的内容库（storage-SPEC §8-36），所以之后按版本取范围读的是这一版，而不是文件此刻的样子。整份已经在答复里的版本不存：页面没有理由再要它。
+- **`Coverage::Head` 的版本在内容库里**：答复发出之前，读面把这一版的字节放进城的内容库（`crates/storage/Spec.lean` §8-36），所以之后按版本取范围读的是这一版，而不是文件此刻的样子。整份已经在答复里的版本不存：页面没有理由再要它。
 - 验收：accounting 的 `views::document::tests`——缺失、目录、空文件各得各的答复；带标记的 UTF-16 文件判成文本并解出原文；没有标记而含 NUL 的判成 `Opaque`；超过一个窗口的文件答 `Coverage::Head`，它的版本在内容库里。
 
 ### 8-70 按版本取范围：`Query::Range`
@@ -1427,7 +1427,7 @@ pub enum SessionStart {
 ```
 
 - **为什么。** 页面对一个房间的历史只知道热视图里的 run（最近冻结的 32 个加上在跑的）和本次打开以后收到的记录，所以重载之后看不到更早一段的边界，房间信箱的「最近」段（refrain 路线图 S7.5）没有东西可列。session 是房间的一段（`docs/glossary.md` 的 Session），它的边界与起法都在账本里：`session_opened` 带着 `carried` 与 `from`，房间第一次被派活打开时没有这一行，第一行是那个 `run_started`。
-- **字段读自账本的哪一行。** `began` 是那一段的第一行；`start` 是 `Opened` 时，`carry` 由 `session_opened.carried` 读出（`true` 即 `Carry::Handoff`：上一段的交接真的带过去了），`from` 原样是它的 `from`；`runs` 数这一段里地址是这个房间的 `run_started`；`last` 与 `at` 是这一段里地址是这个房间的最后一行与它的 `t`，与 `storage::sessions` 为这个房间切的那份切片是同一组行（storage-SPEC 8-24）。地址不是房间的记录（模型调用、工具调用）不挪 `last`：它们属于 run，run 的进度由 `Query::RunView` 回答。
+- **字段读自账本的哪一行。** `began` 是那一段的第一行；`start` 是 `Opened` 时，`carry` 由 `session_opened.carried` 读出（`true` 即 `Carry::Handoff`：上一段的交接真的带过去了），`from` 原样是它的 `from`；`runs` 数这一段里地址是这个房间的 `run_started`；`last` 与 `at` 是这一段里地址是这个房间的最后一行与它的 `t`，与 `storage::sessions` 为这个房间切的那份切片是同一组行（`crates/storage/Spec.lean` §8-24）。地址不是房间的记录（模型调用、工具调用）不挪 `last`：它们属于 run，run 的进度由 `Query::RunView` 回答。
 - **作答在锁内，不读盘。** 视图折叠一张按地址的表（accounting-SPEC.md 8-19(c)），`Query::Sessions` 只从这张表里拷出这个房间最新的至多 `SESSIONS_MAX` 段，没有一行账本被读；一个房间从没有过 session 时答空表、`earlier` 为 0，与「这个地址不存在」不作区分，因为房间是目录，答它在不在是 `Query::Listing` 的事。
 - **新的在前，一次至多 64 段，没有翻页。** 读它的是「最近」段，要的是最近几段；`earlier` 说出更早的还有多少，页面据此说「更早的 n 段不在此处」而不是假装没有。
 - **只动名字表，不进 `WIRE_V`。** 新加一个查询与一个答复，旧帧一个也没改形；名字表多一项，schema 哈希随之变（§12.1、§4）。
@@ -1638,7 +1638,7 @@ pub struct RunSummary {
 ```
 
 - **为什么要上线**：只看结果的城把冻结的 run 分成做完、失败与已结束，并在一行末尾写出 PR 或等你做的事。页面重载后它只有 `city_view` 的答，没有这三件，每个冻结 run 都落进「已结束」，等你的 run 只知道在等、不知道等什么。
-- **三件都由 `storage::RunHot` 折出**（storage-SPEC §8-5），`summarize` 照抄，不读账本。
+- **三件都由 `storage::RunHot` 折出**（`crates/storage/Spec.lean` §8-5），`summarize` 照抄，不读账本。
 - **`ask` 只在 `last_kind` 为 `approval_requested` 时有值**：页面判断等待用的是 `last_kind`，`ask` 跟着同一条记录走，二者不会一个说在等、一个说不等。
 - **`pr` 是分支名而不是数字**：城里的 PR 是 `collab::OpenRequest`，它的身份是分支（`node` 由分支解析而来），账本里没有别的编号；编一个序号就是给人一个线外查不到的名字。
 - **被否：把 `Rounds.closing` 让城逐行去问**。那是每行一次查询，一座两百个 run 的城首屏要问两百次，而这三件热视图本来就在折。
@@ -1679,7 +1679,7 @@ pub struct RunSummary {
 ```
 
 - **为什么要上线**：run 板以人说的第一句话给一行 run 起名，没有这句话就以目标起名。页面只从事件流里听到 `run_started` 时才知道这两句；重载之后它只有 `city_view` 的答，每一行都只能叫「某房间里的一次 run」，同一个房间里的几次 run 在板上没法分开。
-- **两件都由 `storage::RunHot` 从 `run_started` 折出**（storage-SPEC §8-5），`summarize` 照抄，不读账本。空串记作 `None`：一句空的任务不是一个名字，页面对 `None` 与空串本来就得同样处理，线上只留一种拼法。
+- **两件都由 `storage::RunHot` 从 `run_started` 折出**（`crates/storage/Spec.lean` §8-5），`summarize` 照抄，不读账本。空串记作 `None`：一句空的任务不是一个名字，页面对 `None` 与空串本来就得同样处理，线上只留一种拼法。
 - **被否：让页面逐行问 `Rounds` 拿 `opening`**。与 §8-48b 否掉逐行问 `closing` 同一个理由：一座两百个 run 的城首屏要问两百次，而热视图本来就在折 `run_started`。
 - **`WIRE_V` 42→43**：给既有答面类型加字段是「语法换形而名字没换」那一类，golden 随之变；`client/src/wire.ts` 由 `cargo xtask wire-ts --write` 同集重生成。
 
@@ -1978,7 +1978,7 @@ RestoreFile { at: Address, point: GitOid, idem: IdemKey }
 
 - **把城自己工作树里的一个文件换回检查点里的那一份。** `at` 是文件在城里的地址（`Address` 爬不出城、点不到保留子树），`point` 是一个检查点的 oid（页面从 `checkpoint_committed` 或 `Query::Commits` 读到）。检查点里有这个文件：工作树里这一处的字节换成检查点里的那一份（原子替换，取被替换文件的权限）；检查点里没有：工作树里这一处的文件删去。不回到过去开一棵树（S07 Q2 (c) 只做取回单个文件）。
 - **有 run 在这栋楼里干活就拒。** 拒 `E_BUSY`，点名房间与 run：取回会改掉 run 正在写的那棵树，与 `RemoveBuilding` 同一条理由。
-- **一步一行。** 写成之后记一行 `file_restored { name: "", path, point }`；`name` 为空串指城自己的工作树，非空时仍是一棵 run 的工作树的名字（kernel-SPEC §8-4，storage-SPEC §8-33）。
+- **一步一行。** 写成之后记一行 `file_restored { name: "", path, point }`；`name` 为空串指城自己的工作树，非空时仍是一棵 run 的工作树的名字（kernel-SPEC §8-4，`crates/storage/Spec.lean` §8-33）。
 - 验收：storage 的 `taking_a_file_back_replaces_what_the_tree_holds_and_removes_what_the_point_did_not_hold`。
 
 ### 8-63 页面上「历史已证明到哪一条」：`CityAnswer.proved`

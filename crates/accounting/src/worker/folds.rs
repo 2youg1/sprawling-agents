@@ -132,7 +132,7 @@ pub(crate) fn fold_city(
     log: &mut Diagnostics,
 ) -> Result<(Started<Views>, Held), AxError> {
     // The last proof's records are read, never written, here: the proof
-    // that holds the lock writes them (storage-SPEC 8-34).
+    // that holds the lock writes them (`crates/storage/Spec.lean` §8-34).
     let records = storage::ProofRecords::read_only(&proof_dir(city_root_of(ledger_dir)));
     let (ledger, report) = JsonlLedger::open_reusing(ledger_dir, now, &records)
         .map_err(storage::StorageError::into_ax)?;

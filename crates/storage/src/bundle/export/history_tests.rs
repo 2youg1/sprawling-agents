@@ -5,7 +5,7 @@
 
 //! Refusals of a bundle whose history is short or borrowed: a pack
 //! gone missing, and a v0.0.6 repository at `city/.git` that reads
-//! objects from elsewhere (storage-SPEC 8-12).
+//! objects from elsewhere (`crates/storage/spec/Bundle.lean` §8-12).
 
 use super::super::fixture::city_with;
 use super::tests::{committed_twice, copy_dir, log_of};

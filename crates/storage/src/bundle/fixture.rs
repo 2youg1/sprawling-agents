@@ -6,7 +6,7 @@
 //! The one city the bundle tests export, restore and weigh.
 //!
 //! One fixture for the three bundle test modules, so they assert
-//! against one shape of a city (storage-SPEC.md 8-21).
+//! against one shape of a city (`crates/storage/spec/Bundle.lean` §8-21).
 
 #![allow(
     clippy::unwrap_used,

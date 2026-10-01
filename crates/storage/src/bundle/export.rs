@@ -145,7 +145,7 @@ impl Bundle {
         };
         // A bundle carries city files and nothing else: git metadata in
         // one is forged, and restoring it would plant hooks. Refused
-        // before anything is copied, all or nothing (storage-SPEC 8-12),
+        // before anything is copied, all or nothing (`crates/storage/spec/Bundle.lean` §8-12),
         // except the repository a v0.0.6 export carried whole, whose
         // files that manifest counted and which lands as history.
         let repository = only_city_files(vfs.as_ref(), &bundle.join(CITY))?;

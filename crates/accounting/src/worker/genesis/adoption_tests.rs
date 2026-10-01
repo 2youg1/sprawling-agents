@@ -8,7 +8,7 @@ use crate::worker::*;
 /// Adopting a folder checkpoints it at once, as one pack: the first dispatch
 /// into a building of thousands of files would otherwise hash every one
 /// of them and write each as a loose object before its first tool call
-/// (storage-SPEC 8-8, the base checkpoint).
+/// (`crates/storage/Spec.lean` §8-8, the base checkpoint).
 #[test]
 fn adopting_a_folder_checkpoints_it_as_one_pack_before_any_dispatch() {
     let dir = tempfile::tempdir().unwrap();

@@ -23,7 +23,7 @@ git2.workspace = true
 
 # The link count of a file on Windows: std reads it only on the unstable
 # `windows_by_handle` feature, and this crate writes no unsafe
-# (storage-SPEC 8-25).
+# (`crates/storage/spec/Alias.lean` §8-25).
 [target.'cfg(windows)'.dependencies]
 winapi-util.workspace = true
 

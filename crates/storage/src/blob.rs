@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The bytes of one file as one commit holds them (storage-SPEC section
-//! 8-29). The working tree and the index are not consulted: a
+//! The bytes of one file as one commit holds them (`crates/storage/spec/Blob.lean` §8-29). The working tree and the index are not consulted: a
 //! `file:<addr>@<oid>` Locator names a commit's bytes, and the file on
 //! disk may have moved on since.
 

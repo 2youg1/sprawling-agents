@@ -13,11 +13,11 @@ use crate::error::{StorageError, io_err};
 use crate::vfs::Vfs;
 
 /// Segment rolling threshold. Internal affair: changing it changes how
-/// files are cut, never any observable semantics (storage-SPEC 14).
+/// files are cut, never any observable semantics (`crates/storage/Spec.lean` §14).
 pub(crate) const SEGMENT_ROLL_BYTES: u64 = 64 * 1024 * 1024;
 
 /// What open found and repaired, and what its tail recovery read and
-/// checked (storage-SPEC 8-34).
+/// checked (`crates/storage/spec/Jsonl.lean` §8-34).
 pub struct OpenReport {
     pub recovered: Option<TailTruncation>,
     pub counted: crate::ProofCount,
@@ -50,7 +50,7 @@ pub struct JsonlLedger {
     /// directory that is not a city's ledger, and on the fault model,
     /// whose disk no other process can reach.
     pub(crate) lock: Option<WriterLock>,
-    /// The stop a failed whole-chain audit trips (storage-SPEC 8-27).
+    /// The stop a failed whole-chain audit trips (`crates/storage/spec/Worktree/Back.lean` §8-27).
     pub(crate) halt: crate::chain_audit::ChainHalt,
     /// The segments a failed wave created, while restoring the disk to
     /// its length before that wave is still owed (`jsonl::unwind`).
@@ -58,7 +58,7 @@ pub struct JsonlLedger {
 }
 
 /// This process's exclusive hold on a city's Ledger, released when the
-/// ledger that took it is dropped (storage-SPEC 8-1).
+/// ledger that took it is dropped (`crates/storage/spec/Jsonl.lean` §8-1).
 ///
 /// The operating system keeps the lock on an open handle and refuses it
 /// to every other handle on the same file, in this process or in
@@ -75,7 +75,7 @@ impl WriterLock {
     /// Takes the writer lock of the ledger directory `dir`: the file
     /// `<name>.lock` beside it, named from `dir` alone so that this
     /// module, not the city layout, owns where the lock lies
-    /// (storage-SPEC 12).
+    /// (storage D18).
     ///
     /// # Errors
     /// `LedgerHeld` when another handle holds the lock; `Io` when `dir`

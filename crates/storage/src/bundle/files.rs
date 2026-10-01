@@ -80,7 +80,7 @@ pub(crate) fn read_lines(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<Vec<Vec<u8>
 /// bundle comes out short and agrees with itself about it. So does an
 /// alias: walking one would read through it, and a copy that followed a
 /// link would carry bytes no name in the bundle accounts for
-/// (storage-SPEC 8-25).
+/// (`crates/storage/spec/Alias.lean` §8-25).
 ///
 /// An explicit worklist rather than recursion: a city's depth is not
 /// this module's to assume, and a stack overflow is not catchable.
@@ -212,7 +212,7 @@ pub(crate) fn copy_tree(
         let target = to.join(relative);
         // Cleared before any directory is made: making a parent through
         // a link would land a directory inside what the link reaches,
-        // before the file write is refused (storage-SPEC 8-25).
+        // before the file write is refused (`crates/storage/spec/Alias.lean` §8-25).
         let cleared = WriteTarget::within("copy a bundle file", root, &target)?;
         if let Some(parent) = target.parent() {
             vfs.create_dir_all(parent)

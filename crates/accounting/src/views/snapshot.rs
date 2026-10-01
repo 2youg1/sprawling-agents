@@ -43,7 +43,7 @@ pub(super) fn fresh_index() -> std::sync::Arc<std::sync::Mutex<storage::LedgerIn
 /// The ledger index as a snapshot holds it: the index itself, not the
 /// lock the two copies of the views share it through. A lock a panic
 /// poisoned is taken as it stands: the index is a projection that
-/// `refresh` rebuilds on any doubt (storage-SPEC 8-4).
+/// `refresh` rebuilds on any doubt (`crates/storage/Spec.lean` §8-4).
 pub(super) fn encode_index<S: serde::Serializer>(
     index: &Arc<Mutex<LedgerIndex>>,
     serializer: S,
@@ -112,7 +112,7 @@ impl SnapshotFold for Views {
 
     /// The index the snapshot carried is brought up to the ledger: only
     /// the bytes appended since the cut are read, and a segment that
-    /// shrank or vanished rebuilds it (storage-SPEC 8-4).
+    /// shrank or vanished rebuilds it (`crates/storage/Spec.lean` §8-4).
     fn resumed(&mut self, ledger_dir: &Path) -> Result<(), AxError> {
         let mut index = self
             .index

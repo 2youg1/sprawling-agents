@@ -121,7 +121,7 @@ impl Checkpoint {
     /// Only an unborn branch and a missing reference mean "none yet";
     /// anything else that stops HEAD being read is an error, because
     /// reading it as "none" would turn the next checkpoint into a parentless
-    /// root commit cut off from the history before it (storage-SPEC 8-17).
+    /// root commit cut off from the history before it (`crates/storage/spec/Checkpoint/Provenance.lean` §8-17).
     fn head_commit(repo: &git2::Repository) -> Result<Option<git2::Commit<'_>>, StorageError> {
         match repo.head() {
             Ok(head) => head
@@ -153,7 +153,7 @@ impl Checkpoint {
     /// wave runs, and a checkpoint that staged it would ask git to read a
     /// workdir file it believes it already knows; a file still growing
     /// under an open handle makes that read refuse the whole wave
-    /// (storage-SPEC 8-8, 8-24). Nor does one ever stage protected
+    /// (`crates/storage/Spec.lean` §8-8, §8-24). Nor does one ever stage protected
     /// metadata or an alias - [`StageFilter`] owns that rule.
     ///
     /// Returns the paths whose staged blob this call added, changed or
@@ -303,7 +303,7 @@ impl Checkpoint {
     /// Only `scopes` is staged, as a checkpoint stages it: a kept tree is
     /// checked out again over its scope alone, so its files outside the
     /// scope may trail the branch, and staging them would take back
-    /// what the trunk changed there (storage-SPEC 8-9). Entries outside
+    /// what the trunk changed there (`crates/storage/spec/Worktree.lean` §8-9). Entries outside
     /// the scope go into the commit as the index holds them. No scope
     /// stages the whole tree except the reserved subtree, whose rule
     /// [`StageFilter`] owns.

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One node, one working tree.
+//! One node, one working tree (`crates/storage/spec/Worktree.lean` §8-9).
 //!
 //! Concurrency inside a building is not held apart by discipline but by
 //! the filesystem: each node works in its own checkout, so two agents
@@ -21,7 +21,7 @@
 //! interface without unsafe FFI or a new dependency, so every tree is a
 //! full checkout under the ceiling. What moves the checkout off the path
 //! a run waits on is the stock: one tree checked out ahead of time and
-//! taken over by the next placement with a rename (storage-SPEC 8-35).
+//! taken over by the next placement with a rename (`crates/storage/spec/Worktree/Trees/Stock.lean` §8-35).
 
 mod back;
 mod landing;

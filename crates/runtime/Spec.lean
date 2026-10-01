@@ -119,7 +119,7 @@ verify 为 O(n) 全量；消费面（测试/夹具/citysim）规模千行级，�
 
 /-! ## 5 权威信源
 
-Fork 三规则；重放/分叉/幂等；at_seq 越界、未知 kind、崩溃恢复行；kernel-SPEC §8-4/§8-9；storage-SPEC §8-1。
+Fork 三规则；重放/分叉/幂等；at_seq 越界、未知 kind、崩溃恢复行；kernel-SPEC §8-4/§8-9；`crates/storage/Spec.lean` §8-1。
 -/
 
 /-! ## 6 命名统一
@@ -276,7 +276,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 - `E_INVALID_ARGS`（at_seq 越界）：不可定义掉——「从已冻结 Run 最后事件之后分叉」是用户可达输入；静默夹取是被明拒的替代。
 - `E_LOG_VERSION_UNSUPPORTED`（v 判向＋未知 kind 无 ig）：不可定义掉——数据比二进制长寿。
-- 链断/seq 洞/非规范字节：以 `E_CAS_CORRUPT` 报（存储完整性族；subject=行号与路径）——能否定义掉＝「介质位腐烂在设计边界外」，同 storage-SPEC §12。
+- 链断/seq 洞/非规范字节：以 `E_CAS_CORRUPT` 报（存储完整性族；subject=行号与路径）——能否定义掉＝「介质位腐烂在设计边界外」，同 storage D4。
 
 决定的条目与它们住的地方：
 
@@ -347,7 +347,7 @@ A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）�
 - `architecture.toml` 的模块图：runtime 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
 - kernel 的规格（`crates/kernel/kernel-SPEC.md`）：事件表、`Effect`、`Opening`、`RunPolicy` 与 `ReadVerdict` 的权威；它们改了，这里的模型与 §8 相应各节一起重看。
-- storage 的规格（`crates/storage/storage-SPEC.md`）：逐行检查 `LineCheck`、块的来源 `Cas::origins` 与写目标；gateway 的规格（`crates/gateway/Spec.lean`）：模型口、`AudioType` 与 `Recording`。
+- storage 的规格（`crates/storage/Spec.lean`）：逐行检查 `LineCheck`、块的来源 `Cas::origins` 与写目标；gateway 的规格（`crates/gateway/Spec.lean`）：模型口、`AudioType` 与 `Recording`。
 - `crates/agent_protocols/spec/Harness/Session.lean`：harness run 的次序与结局表（§8-52 引它），runtime 不 import 它，因为 `depmap` 不让 runtime 依赖 agent_protocols。
 - 引本规格的其他规格与 rustdoc 写 `crates/runtime/Spec.lean §8-n` 或 `runtime D<n>`；一节换了分部，它的标签不变，引用不必改。
 -/

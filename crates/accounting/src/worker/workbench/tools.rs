@@ -156,7 +156,7 @@ impl Laying {
         // when the building asks for review.
         // One reading of the write domain feeds both: what the bench
         // admits and what its checkpoint stages are the same set by
-        // definition (storage-SPEC section 8-18), and taking them from
+        // definition (`crates/storage/Spec.lean` §8-18), and taking them from
         // one call is what keeps them that way.
         let domain = site.rules.write_domain()?;
         let scope: Vec<String> = domain.prefixes().map(|p| p.as_str().to_owned()).collect();

@@ -8,7 +8,7 @@
 //! `fault` feature; never in a production build.
 //!
 //! The model is stricter than any real platform so the write discipline
-//! it enforces holds on every platform (storage-SPEC 8-2):
+//! it enforces holds on every platform (`crates/storage/spec/FaultFs.lean` §8-2):
 //! - every file has two planes: `durable` (survives power loss) and
 //!   `live` (what the running process observes). `sync_data` promotes
 //!   live to durable; a power cut drops the unsynced delta, except a

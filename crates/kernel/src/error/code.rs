@@ -79,7 +79,7 @@ pub enum AxCode {
     /// A served city is still proving the history it opened from, and
     /// its writer takes no line until the proof is whole. Loadtime for
     /// the same reason as `LedgerHeld`: the refused process may not write
-    /// yet (storage-SPEC 8-30).
+    /// yet (`crates/storage/Spec.lean` §8-30).
     HistoryUnproven,
     // Privacy and Discard (2).
     SecretEgress,

@@ -245,7 +245,7 @@ fn verdict(checked: Result<CheckedLine, LineFault>) -> String {
 /// The rule version moves with the rule: a change to what the per-line
 /// check accepts - the event table, the canonical echo, the envelope -
 /// changes a line or a verdict here, and this test names the value
-/// `LINE_CHECK_RULES` must take (storage-SPEC 8-30).
+/// `LINE_CHECK_RULES` must take (`crates/storage/spec/ChainAudit.lean` §8-30).
 #[test]
 fn line_check_rules_pin_the_verdicts_of_a_fixed_fixture() {
     let mut prev = kernel::GENESIS_PREV;
@@ -306,7 +306,7 @@ fn line_check_rules_pin_the_verdicts_of_a_fixed_fixture() {
 /// A ledger reopened after its history was proved checks only the lines
 /// written since the proof, however long its last segment has grown: the
 /// opening takes the last segment's record through the judgement the
-/// proof uses, and reads and hashes the prefix once (storage-SPEC 8-34).
+/// proof uses, and reads and hashes the prefix once (`crates/storage/spec/Jsonl.lean` §8-34).
 #[test]
 fn a_reopened_ledger_checks_only_what_its_last_record_has_not_proved() {
     let reopened = |history: u64| {

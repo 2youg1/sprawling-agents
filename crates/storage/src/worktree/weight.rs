@@ -35,7 +35,7 @@ const GITLINK: u32 = 0o160_000;
 /// wrote: libgit2 lstats every file it writes and records the size in
 /// that file's entry, so the sum is a measure of the disk rather than
 /// an estimate, and no walk of the tree is needed to find it
-/// (storage-SPEC 8-31). A submodule's entry is a commit, not a file.
+/// (`crates/storage/spec/Worktree.lean` §8-31). A submodule's entry is a commit, not a file.
 ///
 /// # Errors
 /// Propagates a tree whose repository or index cannot be opened.

@@ -172,7 +172,7 @@ impl RunWorker {
     ///
     /// Landed rather than checkpointed: what a verifier judges has to be
     /// on the run's own branch, and a wave checkpoint is a dangling
-    /// commit nobody can merge (storage-SPEC 8-8). The one place a
+    /// commit nobody can merge (`crates/storage/Spec.lean` §8-8). The one place a
     /// request is opened, whether a resident asked with `pr open` or the
     /// city offers a harness run's work (sprawling-SPEC.md 8-124).
     ///

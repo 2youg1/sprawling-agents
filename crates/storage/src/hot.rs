@@ -114,7 +114,7 @@ impl RunHot {
 /// How many frozen runs the hot view holds besides every active one,
 /// and so how many a city view carries. A bound on the size of an
 /// answer on the wire, not a machine reading, so it is a constant
-/// (storage-SPEC section 8-5).
+/// (`crates/storage/spec/Hot.lean` §8-5).
 pub const RECENT_FROZEN: usize = 32;
 
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]

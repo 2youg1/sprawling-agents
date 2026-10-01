@@ -22,7 +22,7 @@ Every Rust package of the product lives in this directory. The packages are sepa
 | `crates/remote_access` | `sprawling-remote-access` | `remote_access` | the remote door, and the routes that carry its bytes and decide nothing | `kernel` | `crates/remote_access/Spec.lean` |
 | `crates/runtime` | `sprawling-runtime` | `runtime` | one run, from dispatch to freeze | `gateway`, `kernel`, `storage` | `crates/runtime/Spec.lean` |
 | `crates/sprawling` | `sprawling` | `sprawling` | the assembly root: every concrete type, the one clock, the one spawn point, and the command line | `accounting`, `agent_protocols`, `browser`, `city`, `collab`, `desktop`, `gateway`, `kernel`, `remote_access`, `runtime`, `storage`, `wire` | `crates/sprawling/sprawling-SPEC.md` |
-| `crates/storage` | `sprawling-storage` | `storage` | persistence, and every view derived from it | `kernel` | `crates/storage/storage-SPEC.md` |
+| `crates/storage` | `sprawling-storage` | `storage` | persistence, and every view derived from it | `kernel` | `crates/storage/Spec.lean` |
 | `crates/wire` | `sprawling-wire` | `wire` | the process boundary | `documents`, `kernel` | `crates/wire/wire-SPEC.md` |
 <!-- xtask:end -->
 

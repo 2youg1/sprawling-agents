@@ -159,7 +159,7 @@ impl RunWorker {
         } = hands;
         let now = crate::Clock::now(&*clock)?;
         // Holding the one writer is what makes every worktree lock a
-        // lock nobody alive holds (storage-SPEC 8-9).
+        // lock nobody alive holds (`crates/storage/Spec.lean` §8-9).
         storage::Worktrees::lift_abandoned_leases(city_root, &ledger)
             .map_err(storage::StorageError::into_ax)?;
         // A rule the ignore table gained since a building was raised

@@ -209,7 +209,7 @@ fn a_file_without_a_synced_dir_entry_vanishes_entirely() {
     v.create_dir_all(&dir).unwrap();
     v.append(&file, b"synced but entry is not").unwrap();
     v.sync_data(&file).unwrap();
-    // no sync_dir: stricter than POSIX on purpose (storage-SPEC 8-2).
+    // no sync_dir: stricter than POSIX on purpose (`crates/storage/spec/FaultFs.lean` §8-2).
     fs.power_cut();
     assert!(!v.exists(&file));
     assert!(v.read(&file).is_err());

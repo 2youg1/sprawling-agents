@@ -16,7 +16,7 @@
 ```rust
 pub const REST_DIR: &str = ".rest";
 pub struct OffloadSite<'a> { pub cas: &'a mut storage::Cas, pub city_root: &'a std::path::Path,
-                             pub room: &'a kernel::Address, pub origin: storage::BlockOrigin }   // origin：这块字节替哪个 run、哪栋楼写下（storage-SPEC）
+                             pub room: &'a kernel::Address, pub origin: storage::BlockOrigin }   // origin：这块字节替哪个 run、哪栋楼写下（`crates/storage/Spec.lean` §8-3）
 pub struct OffloadRecord { pub substitute: Vec<u8>, pub original: Locator, pub rest_path: String,
                            pub original_len: u64 }
 pub fn offload(bytes: &[u8], cap_bytes: u64, site: &mut OffloadSite<'_>) -> Result<OffloadRecord, AxError>;

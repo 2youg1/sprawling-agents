@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The checkpoint admission rule for one staged path: what enters, what is
-//! skipped, and what refuses the wave (storage-SPEC 8-8 and 8-25).
+//! skipped, and what refuses the wave (`crates/storage/Spec.lean` §8-8 and §8-25).
 
 use crate::error::StorageError;
 
@@ -17,7 +17,7 @@ pub(super) fn workdir(repo: &git2::Repository) -> Result<&std::path::Path, Stora
 }
 
 /// The checkpoint's admission rule for one staged path: what enters a
-/// checkpoint, what is skipped, and what refuses the wave (storage-SPEC 8-8).
+/// checkpoint, what is skipped, and what refuses the wave (`crates/storage/spec/Checkpoint.lean` §8-8).
 ///
 /// git asks with 1 for skip and 0 for stage, and hands over paths
 /// relative to the repository's working tree - so the alias question is
@@ -28,7 +28,7 @@ pub(super) fn workdir(repo: &git2::Repository) -> Result<&std::path::Path, Stora
 /// scope refuses the whole wave, because a name that leads into a
 /// reserved file would capture reserved bytes under a lying name, and
 /// the `file_discarded` restoration would write back through it
-/// (storage-SPEC 8-25).
+/// (`crates/storage/spec/Alias.lean` §8-25).
 pub(super) struct StageFilter {
     root: std::path::PathBuf,
     aliases: Vec<(String, crate::alias::AliasKind)>,

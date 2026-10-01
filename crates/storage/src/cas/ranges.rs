@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The Locator range grammar, read off a stored object without lifting
-//! the object.
+//! the object (`crates/storage/spec/Cas/Ranges.lean` §8-23).
 //!
 //! One authority for what `L` and `B` mean: `B` is a 0-based closed byte
 //! range, `L` a 1-based closed line range whose answer keeps the
@@ -16,7 +16,7 @@
 //! read the whole object and hash it, which is the cost this module
 //! exists to remove. Integrity is bought at `put` and re-checked by
 //! [`crate::Cas::get`]; a caller that needs the address proved takes the
-//! full read (storage-SPEC 8-3).
+//! full read (`crates/storage/spec/Cas.lean` §8-3).
 
 use std::path::Path;
 

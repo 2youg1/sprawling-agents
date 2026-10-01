@@ -7,7 +7,7 @@
 //! (version direction, chain, seq), the kind split (typed or ignorable),
 //! and the writer-canonical echo. `JsonlLedger::open`'s tail scan and
 //! `runtime::replay` both walk a ledger through a `LineCheck`, so a line
-//! one of them accepts the other cannot refuse (storage-SPEC 8-1).
+//! one of them accepts the other cannot refuse (`crates/storage/spec/Jsonl/Verify.lean` §8-1).
 //!
 //! The check holds the chain state only - the previous line's hash and
 //! the seq expected next - never a line, so a reader that feeds it one

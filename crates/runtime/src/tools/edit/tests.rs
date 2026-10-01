@@ -311,7 +311,7 @@ fn an_edit_through_a_link_to_a_reserved_path_is_refused() {
 /// Creating below a name that is a link must not make a single
 /// directory at the link's target. The alias check has to run before
 /// `create_dir_all`, or a protected subtree gains a directory through a
-/// name the write-domain gate already allowed (storage-SPEC 8-25).
+/// name the write-domain gate already allowed (`crates/storage/Spec.lean` §8-25).
 #[test]
 fn creating_below_a_link_leaves_the_link_target_untouched() {
     let tmp = tempfile::tempdir().unwrap();
@@ -366,7 +366,7 @@ fn an_edit_through_a_hard_link_leaves_the_reserved_file_whole() {
 /// Where a person keeps a city is their placement, not a write a run
 /// could redirect: a city reached through a link above its root - macOS
 /// puts every temporary directory under `/var`, which is a link to
-/// `/private/var` - is edited like any other (storage-SPEC 8-12).
+/// `/private/var` - is edited like any other (`crates/storage/Spec.lean` §8-12).
 #[test]
 fn a_city_placed_below_a_link_is_edited_like_any_other() {
     let tmp = tempfile::tempdir().unwrap();

@@ -39,7 +39,7 @@ pub struct SessionLine {
     /// The runs started in this stretch.
     pub runs: u64,
     /// The last line of this stretch filed under the room's address, and
-    /// its time: the room's slice ends there (storage-SPEC 8-24).
+    /// its time: the room's slice ends there (`crates/storage/Spec.lean` §8-24).
     pub last: Seq,
     pub at: TimeMs,
 }

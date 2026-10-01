@@ -6,7 +6,7 @@
 //! Going back to a point, and taking one file back from a point.
 //!
 //! `crates/storage/spec/Worktree/Back.lean` holds which properties these two
-//! must keep (storage-SPEC.md 8-27): a tree opened at a point holds that
+//! must keep (`crates/storage/spec/Worktree/Back.lean` §8-27): a tree opened at a point holds that
 //! point's files, a live name or an existing line of work is refused
 //! rather than replaced, and neither step touches the trunk or another
 //! run's tree.

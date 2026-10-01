@@ -28,7 +28,7 @@ impl VerifiedLedger {
 /// `subject`. Refuses: v > EVENT_LOG_V (direction-aware), broken prev chain,
 /// seq gaps, non-canonical bytes, unknown kind without `ig:true`.
 /// 逐行判定不住在这里：每一行经 `storage::LineCheck::advance`，拒词经 `LineFault::into_ax`
-/// ——与 `JsonlLedger::open` 的尾段扫描同一份检查（storage-SPEC §8-1）。
+/// ——与 `JsonlLedger::open` 的尾段扫描同一份检查（`crates/storage/Spec.lean` §8-1）。
 pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError>;
 /// Convenience over a jsonl directory: storage::jsonl::read_raw_lines + verify.
 /// 给要原始行的读者：分叉（`fork::prefix` 吃 `VerifiedLedger`）、citysim 检查器与测试。只要结论的 `sprawling replay`

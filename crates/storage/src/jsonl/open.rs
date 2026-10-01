@@ -38,7 +38,7 @@ impl JsonlLedger {
 
     /// [`JsonlLedger::open`], with the last segment's verified-prefix
     /// record in `records` standing in for checking its prefix line by
-    /// line when the record holds (storage-SPEC 8-34). Records are read,
+    /// line when the record holds (`crates/storage/spec/Jsonl.lean` §8-34). Records are read,
     /// never written: the proof that holds the writer lock writes them.
     ///
     /// # Errors
@@ -67,7 +67,7 @@ impl JsonlLedger {
     /// power-loss model, for a caller that needs one named write to fail.
     ///
     /// Takes the concrete adapter rather than the trait, so the `Vfs`
-    /// seam stays inner (storage-SPEC 8-1) and no `pub trait` leaves this
+    /// seam stays inner (`crates/storage/spec/Jsonl.lean` §8-1) and no `pub trait` leaves this
     /// crate. What comes back is the same `JsonlLedger` production uses -
     /// a caller above this crate exercises its real code and loses only
     /// the write it named.
@@ -171,7 +171,7 @@ impl JsonlLedger {
         // A mangled first line in a single-segment ledger is tail damage:
         // it carries no version information, and tail recovery owns it.
         // With more segments behind it the same damage is non-tail and
-        // must refuse instead (storage-SPEC 8-1).
+        // must refuse instead (`crates/storage/spec/Jsonl.lean` §8-1).
         let probed = serde_json::from_slice::<serde_json::Value>(&first_line)
             .ok()
             .and_then(|value| value.get("v").and_then(serde_json::Value::as_u64));
@@ -211,8 +211,8 @@ impl JsonlLedger {
     }
 
     /// Tail-truncation recovery over the last segment, taking its
-    /// verified prefix from `proof` when the record holds (storage-SPEC
-    /// 8-34). Returns dropped bytes and what was read and checked; on
+    /// verified prefix from `proof` when the record holds (`crates/storage/spec/Jsonl.lean`
+    /// §8-34). Returns dropped bytes and what was read and checked; on
     /// return the ledger state points at the surviving tail.
     fn recover_tail(
         &mut self,
@@ -248,7 +248,7 @@ impl JsonlLedger {
             };
             // What a version refuses, it refuses by name: a line this
             // build cannot read is not tail damage, and truncating it
-            // would delete a newer build's history (storage-SPEC 8-1).
+            // would delete a newer build's history (`crates/storage/spec/Jsonl.lean` §8-1).
             // A tear only ever damages the tail and never leaves a record
             // behind, so a break is refused - not truncated - when the
             // breaking line carries an envelope (a fork: a second writer
@@ -351,7 +351,7 @@ impl JsonlLedger {
 enum TailProof<'a> {
     /// Every line of the last segment is checked.
     Strict,
-    /// The last segment's record in these, when it holds (storage-SPEC 8-34).
+    /// The last segment's record in these, when it holds (`crates/storage/spec/Jsonl.lean` §8-34).
     Records(&'a ProofRecords),
 }
 

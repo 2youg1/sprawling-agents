@@ -29,7 +29,7 @@ pub use jsonl::{JsonlLedger, OpenReport, TailTruncation, ledger_segments_at, rea
 pub use jsonl::{TailLine, TailLines};
 
 // The projection the Ledger lays down beside each building: one file per
-// room, disposable, read by nobody in the product (storage-SPEC 8-24).
+// room, disposable, read by nobody in the product (`crates/storage/spec/Sessions.lean` §8-24).
 mod sessions;
 
 pub use sessions::Sessions;

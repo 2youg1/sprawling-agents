@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The city's git history in a bundle: one pack of every object the refs
-//! reach, and the refs themselves (storage-SPEC.md 8-12).
+//! reach, and the refs themselves (`crates/storage/spec/Bundle.lean` §8-12).
 //!
 //! Two files and nothing else travel. A repository's `hooks/` and
 //! `config` are what a forged bundle would plant, so the restoring side

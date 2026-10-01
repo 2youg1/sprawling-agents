@@ -12,7 +12,7 @@
 //! persisted only inside the views snapshot, as a projection: `scanned`
 //! says how far each segment was folded, so a segment that shrank or
 //! vanished since rebuilds them rather than being trusted
-//! (storage-SPEC 8-4).
+//! (`crates/storage/spec/Index.lean` §8-4).
 //!
 //! The storage is one implicit-seq column over lines and a span table
 //! over runs ([`Entries`], [`RunTable`]). The public queries are the

@@ -19,8 +19,8 @@
 //! **Whether an entry is there has one spelling: [`Vfs::exists`].**
 //! Asking by reading the whole file would answer "not cached" for an
 //! entry this process may not open and pay a full read to learn a
-//! yes/no. Reading is for `get`, which wants the bytes (storage-SPEC.md
-//! 8-11).
+//! yes/no. Reading is for `get`, which wants the bytes (`crates/storage/spec/DigestCache.lean`
+//! §8-11).
 
 use std::path::{Path, PathBuf};
 

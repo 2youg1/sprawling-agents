@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The session slice: a disposable projection of the Ledger, one file per
-//! room, laid down beside the building that ran it (storage-SPEC 8-24).
+//! room, laid down beside the building that ran it (`crates/storage/spec/Sessions.lean` §8-24).
 //!
 //! **The Ledger is not split.** It stays one chain with one writer, and a
 //! slice is derived from it: one file per room address, holding the
@@ -16,7 +16,7 @@
 //! **One writer, after durability.** [`Sessions::absorb`] is called by
 //! [`crate::JsonlLedger`] on the accounting thread once a wave is synced,
 //! or, once the ledger has handed the slices off, by the thread that
-//! took them - a served city's view thread (storage-SPEC 8-24).
+//! took them - a served city's view thread (`crates/storage/spec/Sessions.lean` §8-24).
 //! A refusal is reported and skipped: the history already has the record,
 //! and a disposable artifact must never fail history's caller.
 //!

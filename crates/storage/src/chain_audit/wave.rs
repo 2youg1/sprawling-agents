@@ -5,7 +5,7 @@
 
 //! One wave of a proof: up to `PROOF_WAVE` segments read whole and their
 //! recorded prefixes hashed side by side, before the walk checks the
-//! chain through them in order (storage-SPEC 8-37). What a segment's own
+//! chain through them in order (`crates/storage/spec/ChainAudit.lean` §8-37). What a segment's own
 //! bytes decide is all a wave computes; the chain state entering each
 //! segment is the walk's.
 
@@ -17,7 +17,7 @@ use crate::verified_prefix::{ProofRecords, SegmentRecord};
 use crate::vfs::Vfs;
 
 /// Segments one wave reads side by side, and so the threads it reads them
-/// on, the calling thread being the first (storage-SPEC 8-37). With
+/// on, the calling thread being the first (`crates/storage/spec/ChainAudit.lean` §8-37). With
 /// `SEGMENT_ROLL_BYTES` it bounds the bytes a proof holds at once.
 pub(super) const PROOF_WAVE: usize = 8;
 

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Every bundle write and every edit a run makes, and the two ways a
-//! file reaches disk (storage-SPEC 8-12, 8-32): replacing a name, and
+//! file reaches disk (`crates/storage/Spec.lean` §8-12, §8-32): replacing a name, and
 //! creating one that nothing holds.
 //!
 //! A replacement's bytes go to a staging file beside the target, are flushed, take
@@ -79,7 +79,7 @@ pub(crate) fn land(
 }
 
 /// Creates the file at `target` with `bytes` only when nothing stands at
-/// its name (storage-SPEC 8-32).
+/// its name (`crates/storage/spec/Alias.lean` §8-32).
 ///
 /// # Errors
 /// As [`WriteTarget::create`](crate::WriteTarget::create).

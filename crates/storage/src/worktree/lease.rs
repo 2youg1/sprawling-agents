@@ -24,7 +24,7 @@ pub struct WorktreeLease {
 }
 
 /// What putting a tree in place cost the filesystem, counted by the code
-/// that did the work (storage-SPEC 8-31).
+/// that did the work (`crates/storage/spec/Worktree.lean` §8-31).
 ///
 /// A wall-clock reading of the same work moves with the machine and its
 /// real-time scanner, which waits on every file created; these four

@@ -948,7 +948,7 @@ pub(in crate::views) fn range_answer(city_root: &Path, version: B3Hash, range: d
 ```
 
 - **读盘只读一次，判定全在 `documents`。** `document_answer` 读文件的全部字节：读不到且是 `NotFound` 答 `Missing`，别的读错（目录、无权限）答 `Unreadable`，带系统的原话；零字节答 `Empty`；否则 `B3Hash::digest` 得版本，`Format::of_name` 读文件名，`Reading::of` 判文本，是文本就 `documents::head` 取第一个窗口（wire-SPEC §8-69）。本模块不写任何一条判定，所以页面、`Content` 与 `Prefix` 对「这是不是文本」只有一个答案。
-- **第一个窗口盖不住整份时，这一版进内容库**（`storage::Cas::put`，storage-SPEC §8-36），然后才答 `Coverage::Head`：之后的 `Query::Range` 读的是这一版。放不进去（盘满、目录不可写）答 `Unreadable`，原话是内容库的拒因：答一个之后读不到的 `Head` 等于许诺一件做不到的事。整份放得下的版本不存（wire-SPEC §12.8）。
+- **第一个窗口盖不住整份时，这一版进内容库**（`storage::Cas::put`，`crates/storage/Spec.lean` §8-36），然后才答 `Coverage::Head`：之后的 `Query::Range` 读的是这一版。放不进去（盘满、目录不可写）答 `Unreadable`，原话是内容库的拒因：答一个之后读不到的 `Head` 等于许诺一件做不到的事。整份放得下的版本不存（wire-SPEC §12.8）。
 - **`range_answer` 只读内容库里要答的那几个字节。** `Cas::size` 得这一版的长度，前三个字节经 `Encoding::of_mark` 得编码，`documents::lift` 说要抬起哪一段，`Cas::get_range` 读它，`documents::cut` 切出窗口。内容库没有这一版、或切出的字节不是文本，答 `Unavailable { query: "Range(<version>)" }`。
 - **`read_bytes` 留给 `Content` 与 `Prefix`。** 两者的答复形状不变（头 `DOC_BYTES_MAX` 字节、`truncated`、`binary`），判定换成 `Reading::of`，切法换成 `documents::cut`：一个块在内容库里、又是城里的一份文件时，两处给同一个判断。
 - 验收：`views::document::tests` 与 `views::answering::range::tests`，名字见 wire-SPEC §8-69、§8-70。

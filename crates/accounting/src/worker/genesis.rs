@@ -267,7 +267,7 @@ impl RunWorker {
         );
         // The base checkpoint is paid here rather than by the first dispatch,
         // which would otherwise hash every file of the folder before its
-        // first tool call (storage-SPEC 8-8). No run and no model exist
+        // first tool call (`crates/storage/Spec.lean` §8-8). No run and no model exist
         // yet, and an invented model id would be worse than none.
         let of = storage::Provenance::new(
             RunId::CITY,

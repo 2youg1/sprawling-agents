@@ -82,7 +82,7 @@ impl JsonlLedger {
 /// How far back from a segment's end the first read reaches for its last
 /// line; the window doubles until the line's start is in it, so a line of
 /// any length costs at most twice its own bytes and a segment's length
-/// costs nothing (storage-SPEC 8-1).
+/// costs nothing (`crates/storage/spec/Jsonl.lean` §8-1).
 const BOUNDARY_WINDOW: u64 = 16 * 1024;
 
 /// The last complete line of the segment at `path`, `len` bytes long,

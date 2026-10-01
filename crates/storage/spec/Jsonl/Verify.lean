@@ -8,7 +8,34 @@ import crates.kernel.spec.Ledger
 /-!
 # storage::jsonl::verify
 
-规定 `jsonl::verify`（`crates/storage/src/` 下同名的文件）。账本的每个读者走一行的同一份检查 `LineCheck`，以及 `open` 对一行故障的处置。Markdown 规格 `crates/storage/storage-SPEC.md` 仍是 storage 唯一生效的规格；本分部陈述并证明它相应各节写下的性质，切换到 `crates/storage/Spec.lean` 时收下那些节。
+规定 `jsonl::verify`（`crates/storage/src/` 下同名的文件）。账本的每个读者走一行的同一份检查 `LineCheck`，以及 `open` 对一行故障的处置。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
+-/
+
+/-!
+### 8-1 storage::jsonl：逐行检查
+
+**逐行检查 `jsonl::verify`（形状 2 值）**：账本的每个读者都经同一个 `LineCheck` 走一行——`open` 的尾段扫描与前段末行、`audit_chain`、`runtime::replay` 同一份，故一方收下的行另一方拒不了。
+
+```rust
+pub struct LineCheck { /* prev 与下一个期望 seq——只有链状态，不持行 */ }
+pub enum CheckedLine { Known(EventRecord), IgnoredUnknown(Seq) }
+pub enum LineFault { NotALine(String), VersionAhead(u64), NotAVersion(u64), ChainBreak,
+                     SeqGap { found: Seq, expected: Seq }, UnknownKind(String),
+                     NotCanonical(String), SeqExhausted(AxError) }
+impl LineCheck {
+    pub fn at_genesis() -> Self;
+    pub fn expected(&self) -> Seq;
+    /// 判一行（不带 `
+`）；过则链前进，错则状态不动。
+    pub fn advance(&mut self, raw: &[u8]) -> Result<CheckedLine, LineFault>;
+}
+impl LineFault { pub fn into_ax(self, line_no: u64) -> AxError; }  // 整本读者的拒词：更新的写者＝E_LOG_VERSION_UNSUPPORTED，其余＝E_CAS_CORRUPT
+```
+
+- 判定顺序：信封（`v` 经 `readable_log_v`）→ `prev` → `seq` → kind 二分（借用判定，不 clone）→ 已知 kind 的类型解析与规范回写比对；`ig:true` 的未知 kind 不解析但照样入链。
+- `open` 对故障的处置：`VersionAhead`／`NotAVersion` 按版本拒；`NotALine` 且其后无带信封的行＝撕裂，截断；其余一律拒而不截——撕裂不会留下带信封的行，截掉它等于删掉合法历史。
+- 被否：两个读者各持一份检查。只做类型解析的 `open` 会把一条链续正确的 `ig:true` 行在尾段当撕裂截掉，而 `replay` 收下同一行。
+- 被否：前段末行只做类型解析。`EventRecord` 的 kind 没有「未知」这一臂，一条 `ig:true` 的新 kind 行若恰是前段的最后一行，类型解析拒它，城就打不开，而尾段扫描与 `replay` 都收下同一行（`jsonl/boundary/tests.rs` 的 `a_prior_segment_ending_in_an_ignorable_line_opens`）。代价：前段末行若不是写者规范的字节，`open` 现在也拒；那样的行 `replay` 本来就拒。
 -/
 
 /-!
@@ -24,7 +51,6 @@ import crates.kernel.spec.Ledger
 
 Rust 的 `Seq` 是 `u64`，`next` 到顶时答 `SeqExhausted`；模型的 seq 是自然数，不建这一臂。
 -/
-
 
 namespace Storage.Jsonl.Verify
 

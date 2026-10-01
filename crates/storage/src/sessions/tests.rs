@@ -363,7 +363,7 @@ fn a_new_room_is_filed_without_reading_the_ledger() {
 
 /// A served city hands its slices to the thread that files them, so the
 /// writer that appends a record files nothing, and the slices it handed
-/// off file that record once they are shown it (storage-SPEC 8-24).
+/// off file that record once they are shown it (`crates/storage/spec/Sessions.lean` §8-24).
 #[test]
 fn a_ledger_that_handed_off_its_slices_files_nothing_itself() {
     let tmp = tempfile::tempdir().unwrap();

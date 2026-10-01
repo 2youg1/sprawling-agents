@@ -11,7 +11,7 @@
 //! earlier serving, a crashed one included. What each leaves is three
 //! things: git's registration, the directory under the reserved subtree,
 //! and the branch git made for it. This module takes back each of them,
-//! and only what the city made (storage-SPEC 8-9).
+//! and only what the city made (`crates/storage/spec/Worktree.lean` §8-9).
 
 use std::path::{Path, PathBuf};
 
@@ -157,7 +157,7 @@ impl Worktrees {
     /// machinery, so nothing in it is the person's.
     ///
     /// A name that is a link is refused rather than removed, because the
-    /// placement it precedes would refuse it too (storage-SPEC 8-25).
+    /// placement it precedes would refuse it too (`crates/storage/spec/Alias.lean` §8-25).
     ///
     /// # Errors
     /// Refuses a name that is a link, and propagates a directory that

@@ -8,7 +8,7 @@
 //! The version probe and the city's identity both need line 1 alone,
 //! and a segment grows to tens of megabytes: lifting it whole to split
 //! off one line made a single-segment ledger cost two full reads on
-//! every open (storage-SPEC 8-1). The window starts at one page and
+//! every open (`crates/storage/spec/Jsonl.lean` §8-1). The window starts at one page and
 //! doubles, so a line of any length costs at most twice its own bytes.
 
 use std::io;

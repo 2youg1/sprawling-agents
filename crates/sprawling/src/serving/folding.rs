@@ -313,7 +313,7 @@ fn last_committed(batch: &[Fold]) -> Option<&EventRecord> {
 /// Files each committed record of `batch` into the session slices once
 /// they have been handed over, in arrival order, and answers how many
 /// committed records the batch carried. A refused slice is reported and
-/// skipped, as the writer did when it filed them (storage-SPEC 8-24).
+/// skipped, as the writer did when it filed them (`crates/storage/Spec.lean` §8-24).
 fn file_slices(slices: &mut Option<storage::Sessions>, batch: Vec<Fold>) -> u64 {
     let mut committed: u64 = 0;
     for fold in batch {

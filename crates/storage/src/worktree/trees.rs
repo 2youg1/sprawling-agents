@@ -95,7 +95,7 @@ impl Worktrees {
 
     /// Places a new tree for `name`, locked from the moment it exists:
     /// the stock taken over when there is one to take, and a checkout of
-    /// the whole tree otherwise (storage-SPEC 8-35).
+    /// the whole tree otherwise (`crates/storage/spec/Worktree/Trees/Stock.lean` §8-35).
     fn place(&self, name: &WorktreeName) -> Result<WorktreeLease, StorageError> {
         let city = self.refuse_oversized(name.as_str())?;
         if self.repo.head().is_err() {
@@ -189,7 +189,7 @@ impl Worktrees {
         })?;
         let path = self.home.join(id);
         // The checkout lands at this name, and a name that is an alias
-        // would write the whole tree through it (storage-SPEC 8-25).
+        // would write the whole tree through it (`crates/storage/spec/Alias.lean` §8-25).
         crate::alias::WriteTarget::within("place a worktree", &self.city_root, &path)?;
         let mut opts = git2::WorktreeAddOptions::new();
         opts.lock(true);
@@ -202,7 +202,7 @@ impl Worktrees {
                     detail: format!("{id}: {err}"),
                 })?;
         // The size is read from the index the checkout just wrote rather
-        // than by walking the tree it wrote (storage-SPEC 8-31).
+        // than by walking the tree it wrote (`crates/storage/spec/Worktree.lean` §8-31).
         Ok((path, written(&tree)?))
     }
 

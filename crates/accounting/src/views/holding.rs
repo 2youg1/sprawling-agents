@@ -108,7 +108,7 @@ pub struct Views {
     )]
     /// seq to byte offset, held rather than rebuilt, and carried by the
     /// views snapshot so a start from it does not rebuild it either
-    /// (storage-SPEC 8-4): rebuilt, it cost every history question 14.4
+    /// (`crates/storage/Spec.lean` §8-4): rebuilt, it cost every history question 14.4
     /// ms on a fifty thousand record ledger.
     ///
     /// Behind a lock of its own because the fold never touches it: a

@@ -1043,7 +1043,7 @@ pub fn free_space_floor(volume_bytes: u64) -> u64;
 - 内存紧：`queued_runs > 0`。排队由装配层按可用内存决定（运行因一个也装不下而等待），这里只把它说出来。
 - CPU 被占满：`schedule_delay > CPU_SATURATED_DELAY`，即一帧（60 Hz）——人开始看得见的延迟；它是感知常数，不随机器类别调。
 - 只有盘快满停止接新活：盘慢与 CPU 满时接活只会变慢，不会丢；内存紧已由排队处理。`admit_work` 只读卷的两个数，因为受理新活的入口只该为它付一次读卷，而不是整份读数；拒绝带着 `Degradation::DiskLow`，入口据它的 `recovery()` 告诉人至少腾出多少。
-- 写盘失败时账本不坏、重启可恢复，由 storage 承担（storage-SPEC 8-1）：失败的一波由 `jsonl::unwind` 把段退回波前长度，进程接着写也不会写在半行之后；掉电留下的撕裂尾由 open 截到最长有效前缀。本模块不复述。
+- 写盘失败时账本不坏、重启可恢复，由 storage 承担（`crates/storage/Spec.lean` §8-1）：失败的一波由 `jsonl::unwind` 把段退回波前长度，进程接着写也不会写在半行之后；掉电留下的撕裂尾由 open 截到最长有效前缀。本模块不复述。
 - 生产的调用方：人发来的 `Dispatch` 在写下任何东西之前经 `admit_work` 读一次城所在卷（sprawling-SPEC 8-94）。未落地：事实条与 doctor 的显示；`Wake` 等不经人的入口；`ResourceReadings` 其余四项的生产填写者——`bin::monitor::Sample` 没有 fsync 中位数与调度延迟，它的 `durable_lag` 是条数而本模块要的是等待时长，且监视器只在有人看时采样，不能作为判定的唯一来源（sprawling-SPEC 8-90 决定 1）。
 
 ### 8-14 kernel::stall
@@ -1764,9 +1764,9 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 - `E_LOCATOR_INVALID`：同上；且与宽松接受严格互斥（fail-closed 是策略）。
 - `E_VERSION_CONFLICT`（verdict 映射在 `runtime::tools::edit`）：不可定义掉——乐观并发的存在理由就是冲突可发生。
 - `E_LOG_VERSION_UNSUPPORTED`／`E_CAS_CORRUPT`：住装载期白名单，产生地在 memory/runtime（见各自 SPEC）。
-- `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；storage 的 Io 映射已改正（storage-SPEC §12）。
-- `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 storage 的写者锁先于一切读写定义掉（storage-SPEC §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
-- `E_HISTORY_UNPROVEN`（服务中的城还在证明它开城时的历史，装载期）：不可定义掉——城从快照起步，快照之前的历史由后台证明走一遍（storage-SPEC §8-30、sprawling-SPEC 8-122），而开城不等它。它只能住装载期白名单：证明完成之前，写者拒绝每一次追加，被拒的一方此刻恰恰写不了账本。它不能借 `E_LEDGER_HELD`：那一码的 recovery 是停下另一个进程，这一码的 recovery 是等几秒再发一次（「the city is still proving the history it opened from; send it again once the log says the history is proved」）。它也不能借 `E_BUSY`：那一码点名一条正在工作的 run，这里没有 run。
+- `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；storage 的 Io 映射已改正（storage D7）。
+- `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 storage 的写者锁先于一切读写定义掉（`crates/storage/Spec.lean` §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
+- `E_HISTORY_UNPROVEN`（服务中的城还在证明它开城时的历史，装载期）：不可定义掉——城从快照起步，快照之前的历史由后台证明走一遍（`crates/storage/Spec.lean` §8-30、sprawling-SPEC 8-122），而开城不等它。它只能住装载期白名单：证明完成之前，写者拒绝每一次追加，被拒的一方此刻恰恰写不了账本。它不能借 `E_LEDGER_HELD`：那一码的 recovery 是停下另一个进程，这一码的 recovery 是等几秒再发一次（「the city is still proving the history it opened from; send it again once the log says the history is proved」）。它也不能借 `E_BUSY`：那一码点名一条正在工作的 run，这里没有 run。
 
 其余的码（逐码答「能否定义掉」）：
 
@@ -1870,7 +1870,7 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 ### 12.8 定规：受保护元数据名单只有 kernel::address 一个家
 
-`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`storage::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是storage 侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 storage 的别名族规则承担（storage-SPEC 8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
+`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`storage::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是storage 侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 storage 的别名族规则承担（`crates/storage/Spec.lean` §8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
 
 ### 12.9 harness 的汇报与回答按本城的词入账
 
@@ -2293,7 +2293,7 @@ impl CityLayout {
 3. **`RESERVED_PREFIX` 仍住在 `kernel::address`，本模块引用它。** 它是地址文法的一部分——`is_reserved` 是写域与读路径共用的谓词（8-2、8-55）——而不是一条布局规定。布局这一侧只决定「什么落在保留子树里」：治理一个 scope 的文件（`CONFIG.toml`、`FILTERS.toml`、`skills`）落在该 scope 的 `.sprawling/` 下，于是没有任何写域够得到它们；居民自己写的文件（`JOB.md`、`Handoff.md`、`URBANITE.md`、`Archive/`）落在明处。这条摆放规则由单元测试逐个方法核对，而不是靠注释重申。
 4. **逐段 push 而不是整串 join。** 一个地址在 Windows 与在 Linux 必须落成同一个目录树；整串 join 把 `/` 交给平台去解释，逐段 push 不给它这个机会。
 5. **一个落点一个方法，不是便利方法。** 少一个落点，就有一处调用点继续自己拼，于是本模块不再是唯一权威。后续新增一类文件时，先在此加方法与常量，再写调用点。
-6. **session 切片的路径不在此处。** 切片是账本的可弃投影，只有 `storage::sessions` 一个写者、没有读者；它的目录名与路径推导是该模块的私有项（storage-SPEC 8-24），于是「别处点名这条路」在编译期就写不出来，不必再靠文本扫描去拦。
+6. **session 切片的路径不在此处。** 切片是账本的可弃投影，只有 `storage::sessions` 一个写者、没有读者；它的目录名与路径推导是该模块的私有项（`crates/storage/Spec.lean` §8-24），于是「别处点名这条路」在编译期就写不出来，不必再靠文本扫描去拦。
 7. **`of_ledger` 是 `ledger` 的逆，为「只拿到账本目录」的写者而存在。** 账本的写者手里只有它打开的那一个目录，而切片落在城根之下，故城根必须能从这一个输入反推回来；逆运算住在具名常量所在的同一模块里，任何调用点都不许用 `parent().parent()` 重新拼一遍。不是 `ledger()` 形状的目录不是城（夹具、bundle 的校验台、直接打开的存储），回答 `None`。
 
 ### 8-72 `kernel::retries`：失败的调用再试几次（形状 2 值类型）
@@ -2463,7 +2463,7 @@ pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome;   // kerne
 
 - **限制叠在写域上，不并进写域。** 写域（§8-11、§8-46）回答一个地址能不能写、写哪种文件，它来自楼的 `RULES.toml`；写入限制回答一次 run 能不能改动已经存在的文件，它来自这次派活。`Full` 表示不额外收窄；`Create` 表示只准原子地新建一个不存在的普通文件，已经存在的文件——包括这次 run 刚建成的——不能覆盖、删除或改名。两道判定都要通过，所以 `Full` 永远放不宽楼的写域，`Documents` 楼里的 `Create` 仍只能新建 Markdown 文档、仍够不到计划文件。
 - **`gate::replacing` 是「这次写会动到已有文件」时的唯一判定**：`Full` 答 `Allow`；`Create` 答 `Deny`，`E_OUTSIDE_WRITE_DOMAIN` 三段式，规则「this run creates files and changes none」，违规点出目标，替代给出「写到一个新路径」，恢复语说限制由派活时选定、换一次派活才能改。复用既有的码而不新开一个：对调用者而言这与写域外的拒绝是同一类事——这次 run 不准写那里——恢复的路也同类。
-- **「目标是否已经存在」不由本模块判。** 那是文件系统在写那一刻的事实；只有在写的那一刻原子地判，竞争的两次新建才只成一次（`crates/runtime/Spec.lean` §8-55，storage-SPEC §8-32）。kernel 只持规则与拒词，判定点在每一条写路径上调它。
+- **「目标是否已经存在」不由本模块判。** 那是文件系统在写那一刻的事实；只有在写的那一刻原子地判，竞争的两次新建才只成一次（`crates/runtime/Spec.lean` §8-55，`crates/storage/Spec.lean` §8-32）。kernel 只持规则与拒词，判定点在每一条写路径上调它。
 - 验收：`gate::domain` 测试里 `Create` 拒、`Full` 放各一条；真实写路径上的验收在 `crates/runtime/Spec.lean` §8-55。
 
 ### 8-82 一次 run 怎样开篇，进程死后谁冻结它（`kernel::event::record::run`，形状 2 值类型）

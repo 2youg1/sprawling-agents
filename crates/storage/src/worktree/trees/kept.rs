@@ -181,13 +181,13 @@ impl Worktrees {
 
 /// Puts `tree` on `branch` and forces every tracked file under `scopes`
 /// to its head, removing what is untracked there, and counts what that
-/// wrote (storage-SPEC 8-31). The index is read back from the head first
+/// wrote (`crates/storage/spec/Worktree.lean` §8-31). The index is read back from the head first
 /// when it does not already write the head's tree, for the reason
 /// [`Worktrees::reattach`] gives.
 ///
 /// The worktree's HEAD is pointed at `branch` when it names anything
 /// else: a stock taken over by a node still names the stock's branch
-/// (storage-SPEC 8-35), and a checkout of the wrong head would hand the
+/// (`crates/storage/spec/Worktree/Trees/Stock.lean` §8-35), and a checkout of the wrong head would hand the
 /// node another line of work.
 ///
 /// # Errors
@@ -249,7 +249,7 @@ pub(super) fn restore(
 }
 
 /// Counts one change a reattaching checkout announced before making it
-/// (storage-SPEC 8-31). `present` says whether the branch head holds the
+/// (`crates/storage/spec/Worktree.lean` §8-31). `present` says whether the branch head holds the
 /// path and whether the disk does: a tracked file the head lacks is
 /// removed, one the disk lacks is created, and any other is rewritten;
 /// an untracked entry is removed.
@@ -299,7 +299,7 @@ mod tests {
         std::fs::read_to_string(path).unwrap()
     }
 
-    /// storage-SPEC 8-31: a placement writes the tree's files once and walks
+    /// `crates/storage/spec/Worktree.lean` §8-31: a placement writes the tree's files once and walks
     /// the city once; a reclaim writes what the last run changed in its
     /// scope and nothing else. Judged at two sizes, so a cost that grows
     /// with the tree where it should not is a failure here rather than a

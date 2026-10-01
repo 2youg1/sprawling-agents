@@ -5,7 +5,7 @@
 
 //! The stock: one tree checked out at the trunk before any node asks for
 //! it, so that placing a node's tree is a rename rather than a checkout
-//! (storage-SPEC 8-35).
+//! (`crates/storage/spec/Worktree/Trees/Stock.lean` §8-35).
 //!
 //! A checkout waits on the real-time scanner once for every file it
 //! creates, so any placement that creates the tree's files while a run
@@ -96,7 +96,7 @@ impl Worktrees {
     ///
     /// The directory is renamed first, because that rename is the one
     /// step two placements cannot both make; every later step leaves a
-    /// state the next claim of `name` takes back (storage-SPEC 8-35).
+    /// state the next claim of `name` takes back (`crates/storage/spec/Worktree/Trees/Stock.lean` §8-35).
     pub(super) fn adopt(
         &self,
         name: &WorktreeName,
@@ -331,7 +331,7 @@ mod tests {
         u64::try_from(std::fs::read_dir(dir).unwrap().count()).unwrap()
     }
 
-    /// storage-SPEC 8-35: a placement from the stock creates no file,
+    /// `crates/storage/spec/Worktree/Trees/Stock.lean` §8-35: a placement from the stock creates no file,
     /// whatever the tree holds - the files were written when the stock
     /// was, where nobody waited. Judged at two sizes, so a placement
     /// whose file count grows with the tree is a failure here.

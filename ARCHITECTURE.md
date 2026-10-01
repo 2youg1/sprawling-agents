@@ -1065,9 +1065,9 @@ definition of this order, sprawling-SPEC.md 8-88),
 `crates/storage/src/verified_prefix.rs` (sprawling-SPEC.md 8-122, 8-144).
 The last segment's prefix the previous proof recorded is proved by its
 digest, so tail recovery checks line by line only what was written after
-that proof (storage-SPEC.md 8-34). The proof reads and hashes up to
+that proof (`crates/storage/Spec.lean` §8-34). The proof reads and hashes up to
 eight segments side by side and walks the chain through them in order
-(storage-SPEC.md 8-37).
+(`crates/storage/Spec.lean` §8-37).
 Until the proof is whole the writer refuses every append with
 `E_HISTORY_UNPROVEN`, so the page answers queries from the snapshots
 while commands wait for a history that has been walked.
