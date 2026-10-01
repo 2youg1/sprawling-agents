@@ -6,14 +6,19 @@
 //! The wall around `desktop/`, which is a copy of the workspace's own
 //! and must stay one.
 //!
-//! `desktop` is the one package this repository builds from outside the
-//! workspace (root `Cargo.toml`, `exclude`), and it sits there for one
-//! recorded reason: the Win32 boundary relaxes `unsafe_code` at a few
-//! call sites, which `forbid` makes impossible and `deny` makes visible
-//! (desktop-SPEC.md section 8.5, second pair). Everything else about
-//! that package's manifest is a **copy** of the workspace's — the lint
-//! tables, the package metadata, the version of every dependency both
-//! sides name — and a copy is a second home for a fact.
+//! `desktop` and its FFI seam `desktop/ffi` are the packages this
+//! repository builds from outside the workspace (root `Cargo.toml`,
+//! `exclude`), and they sit there for one recorded reason: each call
+//! into the Zig leaf relaxes `unsafe_code`, which `forbid` makes
+//! impossible and `deny` makes visible (desktop-SPEC.md section 8.5,
+//! second pair). `desktop/Cargo.toml` is the root of a workspace of
+//! their own, and everything else about it is a **copy** of the root
+//! workspace's — the lint tables and the package metadata, stated once
+//! in `[workspace.lints]` and `[workspace.package]`, and the version of
+//! every dependency both sides name — and a copy is a second home for a
+//! fact. Every package inside the wall inherits that copy, which is
+//! checked too: a package that wrote a table of its own would stand
+//! outside the comparison (xtask-SPEC.md section 8-46).
 //!
 //! **This is the shape `guard`'s own rule cannot see.** The trailer
 //! rule catches a gate loosened in the same commit as the work it would
@@ -61,8 +66,9 @@ const RECORDED: [Recorded; 2] = [
     Recorded {
         table: "rust",
         key: "unsafe_code",
-        because: "the Win32 boundary relaxes it at one call site with a written reason, which \
-                  `forbid` makes impossible (desktop-SPEC.md section 8.5, second pair)",
+        because: "each call into the Zig leaf that carries the Win32 calls relaxes it at that one \
+                  statement with a written reason, which `forbid` makes impossible (desktop-SPEC.md \
+                  section 8.5, second pair, and section 8-12)",
     },
     Recorded {
         table: "rust",
@@ -80,15 +86,40 @@ pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     metadata(&workspace, &desktop, &mut violations);
     lints(&workspace, &desktop, &mut violations);
     dependencies(&workspace, &desktop, &mut violations);
+    inherited(&packages(root, &desktop)?, &mut violations);
     quoted::check(root, &mut violations)?;
     Ok(violations)
 }
 
-/// The package metadata, which every member inherits and this package
-/// restates.
+/// Every package inside the wall: the root package of
+/// `desktop/Cargo.toml`, then each of its `[workspace] members`, each
+/// with the manifest path a refusal names.
+fn packages(root: &Path, desktop: &toml::Value) -> Result<Vec<(String, toml::Value)>, XtaskError> {
+    let members = desktop
+        .get("workspace")
+        .and_then(|it| it.get("members"))
+        .and_then(toml::Value::as_array)
+        .map(|listed| {
+            listed
+                .iter()
+                .filter_map(toml::Value::as_str)
+                .map(|member| format!("desktop/{member}/Cargo.toml"))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let mut found = vec![(DESKTOP_MANIFEST.to_owned(), desktop.clone())];
+    for rel in members {
+        let read = manifest(root, &rel)?;
+        found.push((rel, read));
+    }
+    Ok(found)
+}
+
+/// The package metadata, which every member inherits and the wall
+/// restates once.
 fn metadata(workspace: &toml::Value, desktop: &toml::Value, out: &mut Vec<Violation>) {
     let inherited = workspace.get("workspace").and_then(|it| it.get("package"));
-    let restated = desktop.get("package");
+    let restated = desktop.get("workspace").and_then(|it| it.get("package"));
     for key in SHARED_METADATA {
         let expected = inherited.and_then(|table| table.get(key));
         let found = restated.and_then(|table| table.get(key));
@@ -96,8 +127,8 @@ fn metadata(workspace: &toml::Value, desktop: &toml::Value, out: &mut Vec<Violat
             continue;
         }
         out.push(diverged(
-            format!("{DESKTOP_MANIFEST} [package] {key}"),
-            "the out-of-tree package states the metadata every member inherits from \
+            format!("{DESKTOP_MANIFEST} [workspace.package] {key}"),
+            "the out-of-tree workspace states the metadata every member inherits from \
              `[workspace.package]`, and states the same value",
             format!(
                 "{} against the workspace's {}",
@@ -116,7 +147,10 @@ fn lints(workspace: &toml::Value, desktop: &toml::Value, out: &mut Vec<Violation
             .get("workspace")
             .and_then(|it| it.get("lints"))
             .and_then(|it| it.get(table));
-        let copy = desktop.get("lints").and_then(|it| it.get(table));
+        let copy = desktop
+            .get("workspace")
+            .and_then(|it| it.get("lints"))
+            .and_then(|it| it.get(table));
         let mut named = keys(wall);
         named.extend(keys(copy));
         for key in named {
@@ -152,7 +186,7 @@ fn judge(compared: Compared<'_>, out: &mut Vec<Violation>) {
     let recorded = RECORDED
         .iter()
         .find(|row| row.table == table && row.key == key);
-    let location = format!("{DESKTOP_MANIFEST} [lints.{table}] {key}");
+    let location = format!("{DESKTOP_MANIFEST} [workspace.lints.{table}] {key}");
     match (recorded, wall == copy) {
         // A decided difference that has become no difference is struck,
         // the way a register entry is struck when its file comes back
@@ -180,8 +214,42 @@ fn judge(compared: Compared<'_>, out: &mut Vec<Violation>) {
     }
 }
 
-/// Every package inside the wall inherits it.
-fn inherited(_packages: &[(String, toml::Value)], _out: &mut Vec<Violation>) {}
+/// Every package inside the wall inherits it: `[lints]` is exactly
+/// `workspace = true`, and each shared metadata key is
+/// `{ workspace = true }`. A package that states either itself is a
+/// copy the comparison above does not read.
+fn inherited(packages: &[(String, toml::Value)], out: &mut Vec<Violation>) {
+    for (rel, package) in packages {
+        if !inheriting(package.get("lints")) {
+            out.push(diverged(
+                format!("{rel} [lints]"),
+                "every package inside the wall inherits its lint table",
+                format!("{} against `workspace = true`", shown(package.get("lints"))),
+                format!("write `[lints]` in {rel} as `workspace = true` and nothing else"),
+            ));
+        }
+        for key in SHARED_METADATA {
+            let found = package.get("package").and_then(|it| it.get(key));
+            if inheriting(found) {
+                continue;
+            }
+            out.push(diverged(
+                format!("{rel} [package] {key}"),
+                "every package inside the wall inherits its package metadata",
+                format!("{} against `{{ workspace = true }}`", shown(found)),
+                format!("write `{key}.workspace = true` in {rel}"),
+            ));
+        }
+    }
+}
+
+/// Whether a value is a table holding `workspace = true` and nothing
+/// else.
+fn inheriting(value: Option<&toml::Value>) -> bool {
+    value.and_then(toml::Value::as_table).is_some_and(|table| {
+        table.len() == 1 && table.get("workspace") == Some(&toml::Value::Boolean(true))
+    })
+}
 
 /// The version of every dependency both manifests name.
 ///

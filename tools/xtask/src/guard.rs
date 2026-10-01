@@ -6,10 +6,12 @@
 //! Guard gate: whether a rule this repository states is still the rule
 //! it enforces, judged on the tree and never on history.
 //!
-//! `desktop/` is built outside the workspace and carries a copy of the
-//! workspace's lint table, package metadata and dependency versions. A
-//! copy drifts without any commit touching both sides, so no rule about
-//! commits can see it; `wall` compares the two, key by key, on every run.
+//! `desktop/` is a workspace of its own, built outside the root one, and
+//! carries a copy of the root workspace's lint table, package metadata
+//! and dependency versions. A copy drifts without any commit touching
+//! both sides, so no rule about commits can see it; `wall` compares the
+//! two, key by key, and holds every package inside the wall to
+//! inheriting the copy, on every run.
 //!
 //! A `Verdict:` trailer on a commit that loosens a gate beside the work it
 //! judges stays a rule of AGENTS.md, held by review rather than by this
