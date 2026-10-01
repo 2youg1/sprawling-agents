@@ -9,7 +9,7 @@ use super::{Ablation, Capability, Cost};
 /// The document every resident reads first, ablated by the run below.
 /// Read here rather than in the decision so the decision stays a
 /// function of the text it is given.
-const CITY_MD: &str = include_str!("../../../../docs/City.md");
+const CITY_MD: &str = include_str!("../../../../crates/city/templates/City.md");
 
 const TWO: [Capability; 2] = [
     Capability {
@@ -96,7 +96,7 @@ fn the_costliest_passage_is_first_and_a_tie_goes_to_the_shorter_one() {
 }
 
 /// The run this card exists for. Ignored on purpose: it is evidence for
-/// the next edit of `docs/City.md`, not a wall in front of it.
+/// the next edit of `crates/city/templates/City.md`, not a wall in front of it.
 ///
 /// ```text
 /// cargo nextest run -p citysim --run-ignored all -E 'test(city_md)' --no-capture

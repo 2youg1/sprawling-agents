@@ -17,10 +17,10 @@ use kernel::{Address, AxCode, AxError};
 /// the city and by every resident of the building. Instantiated at
 /// compile time so that a moved or renamed template breaks the build
 /// rather than a city.
-const TEMPLATE_RULES: &str = include_str!("../../../../docs/templates/RULES.toml");
+const TEMPLATE_RULES: &str = include_str!("../../templates/RULES.toml");
 /// City Hall's rules, fixed rather than derived: what its two residents
 /// may do serves every other building, so it is a property of the city.
-const HALL_RULES: &str = include_str!("../../../../docs/templates/RULES-hall.toml");
+const HALL_RULES: &str = include_str!("../../templates/RULES-hall.toml");
 /// The word every document template carries where a building's own
 /// name goes. One spelling for the rules laid out here and for the
 /// plan, memo and handoff `crate::spine_files` lays out beside them: a
@@ -117,7 +117,7 @@ impl BuildingTemplate {
                         format!("the template no longer carries `{ORDINARY_LINE}`"),
                     )
                     .with_recovery(
-                        "restore that line in docs/templates/RULES.toml; the confidential \
+                        "restore that line in crates/city/templates/RULES.toml; the confidential \
                          template is the ordinary one with that value flipped",
                     ));
                 }

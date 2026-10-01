@@ -13,7 +13,7 @@ Templates land in the building root with `CreateBuilding`; the two hall files la
 | `Roadmap.md` | building root | agent, through `plan` | no | The single denominator for plan and progress. A city has no second roadmap and no todo tool. |
 | `Memo.md` | building root | agent | no | The notepad for what needs recording and has no other home. Its form is the writer's to choose. |
 | `Handoff.md` | building root | agent | no | The recovery package, five sections. **Not a new authority.** |
-| `JOB.md` | room | person or dispatcher | no | The task for this session. The agent **reads it and leaves it unchanged**. `write_job` fills `docs/templates/JOB.md`, which is the only copy of the form. |
+| `JOB.md` | room | person or dispatcher | no | The task for this session. The agent **reads it and leaves it unchanged**. `write_job` fills `crates/city/templates/JOB.md`, which is the only copy of the form. |
 | `URBANITE.md` | with the resident | person | no | Who this resident is and how they work. |
 | `MAYOR.md` | `<city>/.sprawling/` | person | — | Who the Mayor is and how it speaks. The tool list and the prohibitions are compiled into the city and appended after this file, so a persona cannot remove them. |
 | `CLERK.md` | `<city>/.sprawling/` | person | — | Who the clerk is and how it sounds. What it allows, refuses, and leaves to the person is compiled into the city beside it. |

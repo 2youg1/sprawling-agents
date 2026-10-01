@@ -184,7 +184,7 @@ Agent 越强，人的注意力就越贵，sprawling 不打算成为又一个抢�
 | 改它 | [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`AGENTS.md`](AGENTS.md)、[`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) |
 | 改一个屏 | [`docs/frontend-method.md`](docs/frontend-method.md) |
 
-另有：[`CHANGELOG.md`](CHANGELOG.md)（每一版改了什么）、[`SECURITY.md`](SECURITY.md)（怎样报告漏洞）、[`docs/logging.md`](docs/logging.md)（为什么日志不是历史）、[`docs/third-party.md`](docs/third-party.md)（站在谁的肩膀上，以及许可义务）。[`docs/City.md`](docs/City.md) 与 [`docs/templates/`](docs/templates/) 是城写进各栋楼的文档：agent 读它们，你也可以读。
+另有：[`CHANGELOG.md`](CHANGELOG.md)（每一版改了什么）、[`SECURITY.md`](SECURITY.md)（怎样报告漏洞）、[`docs/logging.md`](docs/logging.md)（为什么日志不是历史）、[`docs/third-party.md`](docs/third-party.md)（站在谁的肩膀上，以及许可义务）。[`City.md`](crates/city/templates/City.md) 与 [`crates/city/templates/`](crates/city/templates/) 里的其余文件是城写进各栋楼的文档：agent 读它们，你也可以读。
 
 ## 参与开发
 

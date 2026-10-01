@@ -807,11 +807,11 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 
 ### 12.18 模板与 `City.md` 住进 city 的包目录，不留在 `docs/`
 
-**决定**：`docs/templates/` 与 `docs/City.md` 整个搬进 `crates/city/templates/`（§8-41），git 记着改名；`City.md` 由 `city::CITY_TEMPLATE` 交给 accounting。
+**决定**：城写下的模板与 `City.md` 住在 `crates/city/templates/`（§8-41）；`City.md` 由 `city::CITY_TEMPLATE` 交给 accounting。
 
-**理由**：模板的字节是 city 的产品：`building::create`、`spine_files::lay_out`、`write_job` 与创世都按它们写盘，编译期 `include_str!` 它们。一个包要发布，它编译时读的每个文件都得在它自己的目录里（sprawling-SPEC 8-157），而 `docs/` 不属于任何包。放进 city 而不是 accounting，因为这些文件的名字、读法与「谁写哪一份」本来就在本模块。
+**理由**：模板的字节是 city 的产品：`building::create`、`spine_files::lay_out`、`write_job` 与创世都按它们写盘，编译期 `include_str!` 它们。一个包要发布，它编译时读的每个文件都得在它自己的目录里（sprawling-SPEC 8-157），而 `docs/` 这样的仓库目录不属于任何包。放进 city 而不是 accounting，因为这些文件的名字、读法与「谁写哪一份」本来就在本模块。
 
-**被否**：①模板留在 `docs/templates/`，发布前由脚本复制进包——仓库里的包与发布出去的包不再是同一组文件，复制那一步要自己的检查；②在 city 里放一个指向 `docs/templates/` 的符号链接——Windows 上建符号链接要开发者模式或管理员权限，git 在那里默认把链接检出成一个写着路径的普通文件；③`City.md` 搬进 accounting——它的文件名与同族模板都在 city，搬过去就把一族文件拆进两个包。
+**被否**：①模板放在 `docs/` 下给人读，发布前由脚本复制进包——仓库里的包与发布出去的包不再是同一组文件，复制那一步要自己的检查；②模板放在 `docs/` 下，city 里放一个指向它的符号链接——Windows 上建符号链接要开发者模式或管理员权限，git 在那里默认把链接检出成一个写着路径的普通文件；③`City.md` 搬进 accounting——它的文件名与同族模板都在 city，搬过去就把一族文件拆进两个包。
 
 **重开参数**：模板要给 city 之外的读者在运行期按文件读（而不只是编译进二进制），那时它们的位置成为一个运行期的事实，要另议。
 

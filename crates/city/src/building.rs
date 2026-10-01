@@ -12,7 +12,7 @@
 //! questions a second answer.
 //!
 //! The bytes a new building starts with are the template a person reads
-//! in `docs/templates/RULES.toml`, not a copy of it kept here. One
+//! in `crates/city/templates/RULES.toml`, not a copy of it kept here. One
 //! string, one authority; the confidential template differs from the
 //! ordinary one by the single line whose value the city refuses to
 //! assume.

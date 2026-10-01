@@ -441,7 +441,7 @@ pub fn sweep<T: Clone>(assets: &[(T, AssetUse, Score, bool)]) -> Vec<(T, Disposa
 
 #### 8-8-4 ablation（`ablation.rs` 形状 1 判定，`ablation/capabilities.rs` 形状 6 数据；仅测试构型）
 
-`docs/City.md` 是每个居民读到的第一份文本，它每多一段就向每一次 prefix 收一次租。这把尺把文档按段切开，逐段拿掉，量一个居民因此做不了什么。入口是一条 `#[ignore]` 测试，只在有人点名时跑：
+`crates/city/templates/City.md` 是每个居民读到的第一份文本，它每多一段就向每一次 prefix 收一次租。这把尺把文档按段切开，逐段拿掉，量一个居民因此做不了什么。入口是一条 `#[ignore]` 测试，只在有人点名时跑：
 
 ```
 cargo nextest run -p citysim --run-ignored all -E 'test(city_md)' --no-capture

@@ -84,7 +84,7 @@ def right : String := s!"{reviewed}/right"
 def planItem : String := "glaze the kiln"
 
 /-- What the planner divides that row into. The plan numbers the children of
-row `1` as `1.1` and `1.2` (`docs/templates/Roadmap.md`), which is what a person
+row `1` as `1.1` and `1.2` (`crates/city/templates/Roadmap.md`), which is what a person
 reading the plan sees and what the claims below name. -/
 def leaves : List String := ["wire the kiln", "glaze tests"]
 

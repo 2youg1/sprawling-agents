@@ -545,7 +545,7 @@ D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。*
 | `statusCalls` 120、`inFlight` 3 | 被杀的 run 要在被杀时仍在调用：一次调用在 debug 二进制上约十毫秒，120 次是一秒多的在途，等到 3 条工具结果再杀；它的最后一条是一句收尾的话，城回来时若接着送它的对话，它以自己的那一句结束 | 发布二进制更快；被杀的 run 若在被杀前就冻结，那一步报红并点名这个数 |
 | 幂等键 400–411 | U9 每条命令一把，与检查树的 0–323 不相交，一份报告里不会有两条命令共用一个数 | —— |
 | 调用 id `call-<run>-<turn>` | 替身靠它认 run（`citysim-SPEC.md` §3-11），所以全脚本唯一；带上 run 的序号，一份记录里的 id 读得出是哪个 run 的 | 替身认 id 的办法变了时，这里跟着变 |
-| 楼 `beta`，房间 `beta/planner`、`beta/left`、`beta/right`，计划的一行 `glaze the kiln` 与两片叶子 `1.1`、`1.2` | 演员表里的第二栋楼；叶子的编号是计划表的文法（`docs/templates/Roadmap.md`：分出来的子行从父行往下编号），一个人读计划时看到的就是它 | 计划表的编号规则变了时，认领那两步报红 |
+| 楼 `beta`，房间 `beta/planner`、`beta/left`、`beta/right`，计划的一行 `glaze the kiln` 与两片叶子 `1.1`、`1.2` | 演员表里的第二栋楼；叶子的编号是计划表的文法（`crates/city/templates/Roadmap.md`：分出来的子行从父行往下编号），一个人读计划时看到的就是它 | 计划表的编号规则变了时，认领那两步报红 |
 | 计划文件 `Roadmap.md`、表头下的分隔行以 `|---` 开头、`review = false` 那一行 | 人用编辑器改的两处，照模板的字样找；找不到恰好一处就拒，不追加 | 模板变了时这两步报红，并说出找的是哪一行 |
 | 目录 `target/acceptance/` | 解开的归档、脚本、替身的记录、清单都在这里，配方每次先清空它 | 由 justfile 提供 |
 | 客户端的两张表 `client/src/core/route.ts`、`client/src/core/slash.ts`，以及它们的开头行 `const BARE`、`export const SLASH` | 清单的页面与命令两节从这里读；`just acceptance` 在仓库根运行，路径相对于根 | 表搬家或改了开头行时，那一节读成空，清单把空节写成一行要人先查原因的条目，而不是一个空标题 |

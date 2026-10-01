@@ -184,7 +184,7 @@ Apart from this page and the getting-started guide, the docs are in English.
 | change it | [`ARCHITECTURE.md`](ARCHITECTURE.md), [`AGENTS.md`](AGENTS.md), [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) |
 | change a screen | [`docs/frontend-method.md`](docs/frontend-method.md) |
 
-Also: [`CHANGELOG.md`](CHANGELOG.md) (what each release changed), [`SECURITY.md`](SECURITY.md) (how to report a vulnerability), [`docs/logging.md`](docs/logging.md) (why logs are not history), [`docs/third-party.md`](docs/third-party.md) (whose shoulders this stands on, and the licence obligations). [`docs/City.md`](docs/City.md) and [`docs/templates/`](docs/templates/) are the documents the city writes into buildings: agents read them, and so can you.
+Also: [`CHANGELOG.md`](CHANGELOG.md) (what each release changed), [`SECURITY.md`](SECURITY.md) (how to report a vulnerability), [`docs/logging.md`](docs/logging.md) (why logs are not history), [`docs/third-party.md`](docs/third-party.md) (whose shoulders this stands on, and the licence obligations). [`City.md`](crates/city/templates/City.md) and the rest of [`crates/city/templates/`](crates/city/templates/) are the documents the city writes into buildings: agents read them, and so can you.
 
 ## Contributing
 

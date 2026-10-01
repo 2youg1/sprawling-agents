@@ -25,7 +25,7 @@ use kernel::{Address, AxError};
 
 use crate::resident::Identity;
 
-/// The heading `docs/templates/URBANITE.md` asks a resident to write the
+/// The heading `crates/city/templates/URBANITE.md` asks a resident to write the
 /// kind of work that belongs with them under. A roster's one line is
 /// taken from there when it exists, because "why would I go to them" is
 /// exactly what that section answers.
@@ -368,10 +368,10 @@ mod tests {
     /// falls back to the first line of prose.
     #[test]
     fn the_shipped_template_still_carries_the_section_this_reads() {
-        let template = include_str!("../../../docs/templates/URBANITE.md");
+        let template = include_str!("../templates/URBANITE.md");
         assert!(
             template.contains(BRING_HEADING),
-            "docs/templates/URBANITE.md no longer has {BRING_HEADING}"
+            "crates/city/templates/URBANITE.md no longer has {BRING_HEADING}"
         );
     }
 }

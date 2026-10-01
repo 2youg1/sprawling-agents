@@ -55,22 +55,27 @@ pub const HANDOFF_FILE: &str = kernel::layout::HANDOFF_FILE;
 pub const SPEC_FILE: &str = "SPEC.md";
 /// The city's own instructions, read into every prefix.
 pub const CITY_FILE: &str = "City.md";
+/// The bytes a new city's [`CITY_FILE`] starts as. Exported because the
+/// city is formed by `accounting`, which may not reach into this
+/// package's directory for them: a published copy of either package
+/// carries its own directory only (city-SPEC.md section 8-41).
+pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");
 /// The conventions a project brings with it. **The city neither writes
 /// this file nor owns it**; it is listed here because a resident is
 /// given it rather than sent to fetch it. How it is matched and where
 /// it lands in the prompt is `accounting::worker::freezing::building_segment`.
 pub const AGENTS_FILE: &str = "AGENTS.md";
 
-const ROADMAP_TEMPLATE: &str = include_str!("../../../docs/templates/Roadmap.md");
-const MEMO_TEMPLATE: &str = include_str!("../../../docs/templates/Memo.md");
-const HANDOFF_TEMPLATE: &str = include_str!("../../../docs/templates/Handoff.md");
+const ROADMAP_TEMPLATE: &str = include_str!("../templates/Roadmap.md");
+const MEMO_TEMPLATE: &str = include_str!("../templates/Memo.md");
+const HANDOFF_TEMPLATE: &str = include_str!("../templates/Handoff.md");
 /// The condensed form of the seventeen-section crate SPEC: the same
 /// section order, with the sections that only a crate in this workspace
 /// owes left out. One template, so a building's SPEC and a crate's SPEC
 /// stay one shape rather than two competing ones.
-const SPEC_TEMPLATE: &str = include_str!("../../../docs/templates/SPEC.md");
+const SPEC_TEMPLATE: &str = include_str!("../templates/SPEC.md");
 /// The job file and the two markers `write_job` fills: one form, one home.
-const JOB_TEMPLATE: &str = include_str!("../../../docs/templates/JOB.md");
+const JOB_TEMPLATE: &str = include_str!("../templates/JOB.md");
 const TASK_PLACEHOLDER: &str = "<fill-task>";
 const GOAL_PLACEHOLDER: &str = "<fill-goal>";
 use crate::building::template::NAME_PLACEHOLDER;

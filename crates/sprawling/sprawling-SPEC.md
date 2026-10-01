@@ -3612,7 +3612,7 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 
 ### 8-157 从 crates.io 构建的二进制与发行归档是同一个东西（`build.rs`、`bin::doctor::pin`、各包清单）
 
-**原因**：发行渠道有三条：GitHub 的归档、npm 包、crates.io。前两条装的是 `release.yml` 编出的同一份二进制；第三条在装的人自己的机器上从 `.crate` 编译。这棵树原先打不出能用的包：`build.rs` 从包目录往上数两级去找 `Cargo.lock` 与包体，在验证目录与 registry 里都落空，一个让构建失败、一个只嵌入占位页；city、accounting 与本包的 `include_str!` 指向包目录之外的 `docs/` 与工具链文件，编译失败；`sandbox` 不是默认 feature，装出来的二进制拒绝每一次 exec。
+**原因**：发行渠道有三条：GitHub 的归档、npm 包、crates.io。前两条装的是 `release.yml` 编出的同一份二进制；第三条在装的人自己的机器上从 `.crate` 编译，而 `.crate` 里只有一个包目录。凡按层数往上数到包目录之外去找的东西——锁、包体、模板、工具链文件——在 `cargo package` 的验证目录与 registry 解开的目录里都不存在：找锁落空让构建失败，找包体落空只嵌入占位页，`include_str!` 落空则编译失败；而不是默认 feature 的执行引擎，`cargo install` 不会带上，装出来的二进制拒绝每一次 exec。
 
 ```rust
 // build.rs
@@ -3637,7 +3637,7 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 
 - **锁按 cargo 的规则找。** cargo 把 `Cargo.lock` 写在工作区根，`cargo package` 把它放进包的根（cargo-package 文档：「Cargo.lock is always included」）。所以「往上第一个含 `Cargo.lock` 的目录」在检出里是工作区根，在 `target/package/sprawling-<版本>/` 与 registry 解开的目录里是包自己，用不着按层数往上数。整条链上都没有锁时 `build.rs` 以 `cargo::error` 失败，与此前读不到锁时一样：没有锁的构建说不出自己由哪些包组成。
 - **包体进包**：见 8-83。`.crate` 的上限是 10 MB（cargo 的 publishing 文档），包体压缩前约 1.5 MB。
-- **城写下的文档模板归 city。** `docs/templates/` 与 `docs/City.md` 搬进 `crates/city/templates/`：它们是城立城、建楼、开会话时写下的第一批字节，`city::spine_files` 与 `city::building` 按包内路径 `include_str!` 它们；accounting 立城时写的 `City.md` 读 `city::CITY_TEMPLATE`，不再自己伸手到 `docs/`（city-SPEC §8-41）。
+- **城写下的文档模板归 city。** 模板与 `City.md` 住在 `crates/city/templates/`：它们是城立城、建楼、开会话时写下的第一批字节，`city::spine_files` 与 `city::building` 按包内路径 `include_str!` 它们；accounting 立城时写的 `City.md` 读 `city::CITY_TEMPLATE`，不伸手到别的包目录里（city-SPEC §8-41）。
 - **工具链钉子由构建脚本找，找不到就不钉。** `doctor` 的 develop 层报「钉住的版本」，读的是检出根上的 `rust-toolchain.toml`、`lean-toolchain` 与 `crates/desktop/ffi/zig-version`。这三份文件不在本包里，从包里构建时它们不存在，所以 `build.rs` 在 `checkout_root` 下找它们，把全文写进 `OUT_DIR/pins.rs`；只有「不存在」读成空串，别的读失败仍是 `cargo::error`。空串即不钉：`pinned` 答 `None`，页面不画钉住的版本，探测按空前缀接受任何一版。
 - **`packaged` 门守这条线**（xtask-SPEC §8-49）：可发布的包的生产代码里，`include!`、`include_str!`、`include_bytes!` 只指向包目录之内或 `OUT_DIR`。
 - **清单**：`[workspace.package]` 写 `repository`、`homepage`，`publish = true`；每个包写自己的 `description`，本包另写 `readme`、`keywords`、`categories` 与 `include`；`xtask` 与 `citysim` 写 `publish = false`。工作区自己的包在 `[workspace.dependencies]` 里各钉 `version = "=<工作区版本>"`，`guard` 判它们等于 `[workspace.package] version`（xtask-SPEC §8-49）。`sprawling-remote-access` 被二进制链接，随之可发布。`sprawling-desktop-ffi` 也可发布：`sprawling-desktop` 在 Windows 上依赖它，而 crates.io 要求依赖的每个包都在 registry 上；它的包里带着 Zig 叶子的源码与 `zig-version`，构建脚本只读包内的文件，所以从 crates.io 在 Windows 上装这个二进制要先装钉住的那一版 Zig（8-146），别的平台不编叶子。
@@ -3758,7 +3758,7 @@ impl kernel::Tool for Kept {
 
 **本章测试**：`accounting::worker::dispatching::custody::tests::a_pasted_key_reaches_the_vault_and_nothing_else`——任务文字里夹一把 `sk-ant-` 形状的 key 派活，断言：模型收到的每个请求、城目录下的每个文件（账本和 `JOB.md` 都在其中）都不含原文；请求里带着 `secret:pasted/anthropic-…` 引用；vault 按这个引用解出的正是原文。`accounting::worker::workbench::tools::kept::tests::a_written_key_reaches_the_vault_and_not_the_file`——模型用 `edit` 新建一个含 key 的文件，断言：文件里没有原文，只有 `secret:written/anthropic-…` 引用，vault 按这个引用解出原文。`accounting::worker::workbench::tools::kept::tests::a_key_a_tool_reads_reaches_the_vault_and_not_the_model`——城里的文件里有一把 key，模型用 `read` 读它，断言：之后发给模型的请求里没有原文，只有 `secret:output/anthropic-…` 引用，vault 按这个引用解出原文。`accounting::worker::workbench::tools::kept::tests::one_key_seen_twice_is_kept_under_one_reference`——同一把 key 两次交给工具、再交另一把，断言：前两次工具收到同一个引用，第三次收到下一个编号。
 
-## 8-60 提示词语料的分层：哪类事实住哪一层（`docs/City.md`＋`ToolMeta`＋`Catalog`）
+## 8-60 提示词语料的分层：哪类事实住哪一层（`crates/city/templates/City.md`＋`ToolMeta`＋`Catalog`）
 
 **依据是成本的形状，不是篇幅的偏好。** 四段前缀与工具 schema 在 `runtime::turn` 的**每一趟请求**里全文重发（`turn.rs:108-117`），于是同一批字节有两种代价：**窗口**是进上下文的一次性入场费（请求累积，前缀不随 turn 增长），**钱**是每 turn 重付（`prompt_cache_breakpoint` 命中后按 `cache_read_price` 折价）。两种读法下窗口占用完全相同，所以「多写一句」永远是全城每次请求少一份工作空间。
 
@@ -3772,7 +3772,7 @@ impl kernel::Tool for Kept {
 
 `plan` 的六个动作就住在说明书里（`action` 那句），目录行只剩 84 B 余量而原文已占 83 B——**把动作抄进目录行既付两遍钱也放不下**，那条预算就是这个决定的执法者。`signal` 的四类 kind 同理。
 
-**搬走的**：市长与书记的角色描述（`docs/templates/MAYOR.md`、`CLERK.md` 已逐条写着）、`signal`／`goal`／`pr` 的动词解释（各自 disclosure）、委托的一层上限（`delegate` 的 disclosure）、模式语义（`Mode::catalog_entry()`）、六份文档清单（各模板开头的自述已逐条重复）、浏览器语义（`BUILDING_DISCLOSURE`）、Python 子集（`exec` 的 `arm` 描述）。
+**搬走的**：市长与书记的角色描述（`crates/city/templates/MAYOR.md`、`CLERK.md` 已逐条写着）、`signal`／`goal`／`pr` 的动词解释（各自 disclosure）、委托的一层上限（`delegate` 的 disclosure）、模式语义（`Mode::catalog_entry()`）、六份文档清单（各模板开头的自述已逐条重复）、浏览器语义（`BUILDING_DISCLOSURE`）、Python 子集（`exec` 的 `arm` 描述）。
 
 **补进 City.md 的**：读全再动手、外置记忆（照模板写、按需读）、通信（先读别人留下的、加入前先问、方式由现场定）、隐私（**上下文本身是泄露面**，不问不找不需要的隐私与密钥值，拿到就叫人换）、环境探测、licence 与 copyright、引用保留完整上下文与出处、重要事实对第二来源交叉验证。这些都是四类身份都成立的话，才留在这个每跑都要付的段落里。
 

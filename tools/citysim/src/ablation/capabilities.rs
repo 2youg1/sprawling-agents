@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The corpus: each thing a resident of this city must be able to do,
-//! and the phrase in `docs/City.md` that grants it.
+//! and the phrase in `crates/city/templates/City.md` that grants it.
 //!
 //! **Data, not behaviour.** Editing this list is editing what the
 //! ablation measures, and the run refuses outright when a `cue` here is

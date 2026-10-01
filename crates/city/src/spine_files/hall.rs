@@ -65,8 +65,8 @@ const CLERK_DISCIPLINE: &str = "What the clerk holds: `read`, `neighbours`, `rul
      by name and the fact in the item that met it. A reason that only restates the verdict is not a \
      reason.\n";
 
-const MAYOR_TEMPLATE: &str = include_str!("../../../../docs/templates/MAYOR.md");
-const CLERK_TEMPLATE: &str = include_str!("../../../../docs/templates/CLERK.md");
+const MAYOR_TEMPLATE: &str = include_str!("../../templates/MAYOR.md");
+const CLERK_TEMPLATE: &str = include_str!("../../templates/CLERK.md");
 
 /// Where the identity file of a City Hall resident lives, and `None`
 /// for every other address.

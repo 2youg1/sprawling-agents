@@ -6,7 +6,7 @@
 //! What a resident stops being able to do when one passage of the city
 //! document is taken away.
 //!
-//! **`docs/City.md` is compiled into the binary and read by every
+//! **`crates/city/templates/City.md` is compiled into the binary and read by every
 //! resident before anything else, so each passage of it charges rent on
 //! every prefix the city assembles.** This module is the instrument that
 //! prices that rent: it cuts the document into passages, removes one at

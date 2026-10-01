@@ -19,8 +19,8 @@ use super::{Hands, RunWorker, ScanReport};
 /// The city segment of every prefix, and a file the person is meant to
 /// edit: `init` writes it into the city, and every later run reads that
 /// copy. The binary carries the default so a fresh city is complete
-/// without a checkout.
-pub(super) const CITY_MD: &str = include_str!("../../../../docs/City.md");
+/// without a checkout; its bytes are the city's template.
+pub(super) const CITY_MD: &str = city::CITY_TEMPLATE;
 
 #[derive(Debug)]
 pub struct InitReport {
