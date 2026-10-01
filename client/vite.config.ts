@@ -13,12 +13,11 @@ import type { Plugin } from "vite";
 
 import { thirdPartyNotices } from "./scripts/notices";
 
-// The three files a shipped face is made of: one variable woff2 per
-// family, and the licence they are given under. `theme.css` names the
-// two woff2 files, so the asset pipeline emits those by itself; the
-// licence is named by nothing, and OFL-1.1 requires it to travel with
-// the font, so this plugin puts it in the bundle beside them.
-const SANS = "Geist-Variable.woff2";
+// The two files the shipped face is made of: one variable woff2, and
+// the licence it is given under. `theme.css` names the woff2 file, so
+// the asset pipeline emits it by itself; the licence is named by
+// nothing, and OFL-1.1 requires it to travel with the font, so this
+// plugin puts it in the bundle beside it.
 const MONO = "GeistMono-Variable.woff2";
 const LICENCE = "OFL.txt";
 
@@ -33,7 +32,7 @@ function shippedFace(): Plugin {
     name: "sprawling:shipped-face",
     apply: "build",
     generateBundle() {
-      for (const name of [SANS, MONO, LICENCE]) {
+      for (const name of [MONO, LICENCE]) {
         const path = at(name);
         if (!existsSync(path)) {
           this.warn(

@@ -182,9 +182,9 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **control surface** | The verbs that intervene in work already running: `Steer`, `Cancel`, `Halt`, and `Release`, the way back out of a halt (`wire::control::Intervention`). |
 | **Approval Inbox** | The queue of pending answers, grouped by cluster key. |
 | **progress bar** | The part that shows how far along something is, as a bar and the two numbers it was drawn from; when the end is not known it says it is busy instead of claiming a fraction (`client/src/views/parts/progress.svelte`). |
-| **ACCENT** | Jing blue, `H=264`, meaning "something is happening here". |
-| **ALERT** | Champagne gold, `H=84`, meaning "a person is needed here". |
-| **single-hue language** | Every colour on one hue axis, ACCENT's, with ALERT as the one derived exception and the greys taken on the same axis; `client/src/theme.css` holds the values. |
+| **ACCENT** | Acid blue, `H=250`, meaning "something is moving here, or this is the one chosen". |
+| **ALERT** | Warm amber, `H=70`, ACCENT's complement, meaning "a person is needed here, or something is missing". |
+| **single-hue language** | Every colour on one hue axis, ACCENT's, with ALERT as the one derived exception and the greys taken on the same axis; the two checkpoints of the **context ring**, green and red, are the only other hues, each named; `client/src/theme.css` holds the values. |
 
 ## 7 Construction vocabulary (not product concepts)
 

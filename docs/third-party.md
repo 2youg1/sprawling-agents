@@ -146,17 +146,16 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 ## 4 What the client ships that others wrote
 
-The client draws itself in **Geist Sans** and **Geist Mono** ([vercel/geist-font](https://github.com/vercel/geist-font)), one variable-weight `woff2` each, under **SIL Open Font License 1.1**. They are the only binary assets in this repository that are somebody else's work.
+The client draws itself in **Geist Mono** ([vercel/geist-font](https://github.com/vercel/geist-font)), one variable-weight `woff2`, under **SIL Open Font License 1.1**. It is the only binary asset in this repository that is somebody else's work.
 
 | File | Family | Licence |
 |---|---|---|
-| `client/src/fonts/Geist-Variable.woff2` | Geist | OFL-1.1 |
 | `client/src/fonts/GeistMono-Variable.woff2` | Geist Mono | OFL-1.1 |
 | `client/src/fonts/OFL.txt` | the licence text, copied verbatim from upstream `LICENSE.TXT` | OFL-1.1 |
 
-**The licence travels with the font, not with this document.** OFL-1.1 §2 requires the copyright notice and the licence text to accompany every copy of the font, including one embedded in a program, so `OFL.txt` sits in the same directory as the two `woff2` files and `client/vite.config.ts` emits it into the bundle as `fonts/OFL.txt`. The binary embeds the bundle, so the obligation is discharged wherever the binary goes. A build whose `client/src/fonts/` is missing any of the three names says so once per file and produces a bundle that draws in the fallback stack.
+**The licence travels with the font, not with this document.** OFL-1.1 §2 requires the copyright notice and the licence text to accompany every copy of the font, including one embedded in a program, so `OFL.txt` sits in the same directory as the `woff2` file and `client/vite.config.ts` emits it into the bundle as `fonts/OFL.txt`. The binary embeds the bundle, so the obligation is discharged wherever the binary goes. A build whose `client/src/fonts/` is missing either name says so once per file and produces a bundle that draws in the fallback stack.
 
-**Three things OFL-1.1 asks that this repository keeps honouring**: the font files are not sold on their own, they are not renamed while still carrying a reserved name, and a modified copy would have to drop the name *Geist*. This code does none of the three; the files travel unmodified, under their own names.
+**Three things OFL-1.1 asks that this repository keeps honouring**: the font file is not sold on its own, it is not renamed while still carrying a reserved name, and a modified copy would have to drop the name *Geist*. This code does none of the three; the file travels unmodified, under its own name.
 
 **The JavaScript inside the bundle carries its notices the same way.** When Vite writes the bundle, `client/scripts/notices.ts` reads which npm packages the emitted chunks were built from, and writes `THIRD-PARTY-NOTICES.txt` at the bundle's root with each package's name, version, declared licence and its licence file verbatim. The binary embeds the bundle, so the notices go wherever the binary goes, and a running city serves them at `/THIRD-PARTY-NOTICES.txt`. A package that reaches the bundle without a licence file stops the build and is named, because a notice file that silently lacks one package is the gap it exists to close.
 
