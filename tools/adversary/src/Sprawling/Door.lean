@@ -245,7 +245,11 @@ def Verb.frame : Verb → String
       [ ("addr", .str addr)
       , ("task", .str "say something")
       , ("goal", .str "an answer")
-      , ("mode", .str "up")
+      , ("policy", Json.mkObj
+          [ ("mode", .str "work")
+          , ("write", .str "full")
+          , ("admit", .str "standing")
+          , ("landing", .str "ordinary") ])
       , ("idem", .str idem.value)
       , ("session", .str session)
       , ("effort", .null) ]
@@ -538,9 +542,34 @@ door refuses to carry it. -/
 def Door.askRaw (door : Door) (port : Port) (frame : String) : IO Answer :=
   door.say port frame .byHand
 
-/-- Asks one question of one city. -/
+/-- How many times a command is sent again while the city is still proving the
+history it opened from, and how long it waits between two sends.
+
+A served city answers queries at once and refuses commands with
+`E_HISTORY_UNPROVEN` until its proof of the Ledger is done; its recovery says to
+send the same frame again. The refusal comes before the idempotency key is
+judged, so the frame that is finally taken is taken once. Forty sends fifty
+milliseconds apart cover two seconds, which is three orders above the proof of
+the few lines a ground's city holds. -/
+def unprovenRetries : Nat := 40
+def unprovenPauseMillis : UInt32 := 50
+
+/-- Asks one question of one city, and sends a command again while the city is
+still proving its history, because that refusal asks for exactly this. -/
 def Door.ask (door : Door) (port : Port) (verb : Verb) : IO Answer :=
-  door.say port verb.frame .encoded
+  untilProved unprovenRetries
+where
+  untilProved : Nat → IO Answer
+    | 0 => door.say port verb.frame .encoded
+    | left + 1 => do
+      match ← door.say port verb.frame .encoded with
+      | .denied complaint =>
+        if complaint.code.value == "E_HISTORY_UNPROVEN" then
+          IO.sleep unprovenPauseMillis
+          untilProved left
+        else
+          return .denied complaint
+      | answer => return answer
 
 /-- Verifies a chain offline, the way `just replay` does.
 

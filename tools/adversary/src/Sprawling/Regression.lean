@@ -83,7 +83,7 @@ private def fieldsOf (index : Nat) : Action y → List String
     [ s!"addr: Address::parse({quoted addr}).unwrap(),"
     , "task: \"say something\".to_owned(),"
     , "goal: \"an answer\".to_owned(),"
-    , "mode: kernel::Mode::Up,"
+    , "policy: kernel::RunPolicy::of(kernel::Mode::Work),"
     , idemField index
     , s!"session: Some(kernel::SessionName::parse({quoted session}).unwrap()),"
     , "effort: None,"

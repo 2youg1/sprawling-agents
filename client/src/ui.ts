@@ -100,7 +100,7 @@ export interface Opening {
 // statement of what a page reads.
 function readied(value: Opening): Ui {
   const effort = writable<Effort | null>(null);
-  const mode = writable<Mode>(MODES[0] ?? "plan_goal");
+  const mode = writable<Mode>(MODES[0] ?? "chat");
   const hearing = value.conn.asking.ask(QUERIES.endpoints);
   return {
     ...value,

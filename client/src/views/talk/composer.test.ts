@@ -23,7 +23,7 @@ const around: Around = {
   rooms: [],
   here: null,
   effort: null,
-  mode: "plan_goal",
+  mode: "work",
 };
 
 describe("the `/` menu", () => {

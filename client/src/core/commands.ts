@@ -51,7 +51,7 @@ import {
 // is what `Dispatch.effort === null` spells below.
 export const EFFORTS: readonly Effort[] = EffortSchema.literals;
 
-// The disciplines a run may work under, in the order a control offers
+// The modes a run may work in, in the order a control offers
 // them (kernel `Mode::ALL`); the first is the one a page starts with.
 export const MODES: readonly Mode[] = ModeSchema.members.flatMap((member) => member.literals);
 
@@ -83,11 +83,7 @@ export function statedGoal(mode: Mode, goal: string): string {
   switch (mode) {
     case "chat":
       return "";
-    case "plan_goal":
-    case "up":
-    case "sc":
-    case "ud":
-    case "experiment":
+    case "work":
       return goal;
   }
 }
@@ -98,7 +94,10 @@ export function dispatch(d: Dispatch): Command {
       addr: d.addr,
       task: d.task,
       goal: statedGoal(d.mode, d.goal),
-      mode: d.mode,
+      // The page offers the mode alone today; the other three values
+      // are the ones that add nothing (wire-SPEC 8-57): the full write
+      // limit, the building's own checks, the ordinary landing.
+      policy: { mode: d.mode, write: "full", admit: "standing", landing: "ordinary" },
       session: null,
       effort: d.effort,
       idem: mintIdem(),

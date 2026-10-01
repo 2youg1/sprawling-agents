@@ -4335,25 +4335,9 @@
     "en": "missing",
     "zh": "不存在"
   },
-  "mode_experiment": {
-    "en": "experiment",
-    "zh": "试验"
-  },
-  "mode_plan_goal": {
-    "en": "plan",
-    "zh": "计划"
-  },
-  "mode_sc": {
-    "en": "renovate",
-    "zh": "翻新"
-  },
-  "mode_ud": {
-    "en": "change",
-    "zh": "改变"
-  },
-  "mode_up": {
-    "en": "build",
-    "zh": "建造"
+  "mode_work": {
+    "en": "work",
+    "zh": "工作"
   },
   "mode_chat": {
     "en": "chat",
@@ -4363,25 +4347,9 @@
     "en": "talk with the resident; it answers what you say",
     "zh": "和居民说话；它就你说的话作答"
   },
-  "mode_note_plan_goal": {
-    "en": "plan first, then work toward the goal; writes the plan down",
-    "zh": "先计划，再朝目标做；计划写成文件"
-  },
-  "mode_note_up": {
-    "en": "build one new piece together with its own tests",
-    "zh": "造一件新东西，连同它自己的测试"
-  },
-  "mode_note_sc": {
-    "en": "renovate existing work without changing what it does",
-    "zh": "翻新已有的东西，外部行为不变"
-  },
-  "mode_note_ud": {
-    "en": "change behaviour, with evidence on known and new cases",
-    "zh": "改变行为，要在已知与新的情形上都有证据"
-  },
-  "mode_note_experiment": {
-    "en": "try something out; nothing lands, what it learns goes to Memo.md",
-    "zh": "试一试；什么都不落地，学到的写进 Memo.md"
+  "mode_note_work": {
+    "en": "carry out the task towards the goal you state",
+    "zh": "朝你说的目标把这件事做完"
   },
   "monitor_title": {
     "en": "performance",

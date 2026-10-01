@@ -134,7 +134,7 @@ describe("new and fork", () => {
         models: [],
         effort: null,
         setEffort: () => undefined,
-        mode: "plan_goal",
+        mode: "work",
         goal: "a goal",
         write: (line) => written.push(line),
       },
@@ -160,21 +160,21 @@ describe("new and fork", () => {
 
   test("/dispatch runs in the mode the person chose, not a fixed one", () => {
     const held = hands(Address.make("lab/room1"), () => null);
-    verb("/dispatch").run({ ...held.filled, mode: "up" }, called("/dispatch add the parser"));
+    verb("/dispatch").run({ ...held.filled, mode: "chat" }, called("/dispatch add the parser"));
     const frame = held.sent[0];
-    expect(frame !== undefined && "dispatch" in frame ? frame.dispatch.mode : null).toBe("up");
+    expect(frame !== undefined && "dispatch" in frame ? frame.dispatch.policy.mode : null).toBe("chat");
   });
 
   // A plain "hello" sent with the page's goal became a job whose goal
   // the model answered by planning; a chat carries the words alone.
   test("a chat states no goal, and every job mode states the one it was given", () => {
-    const sentGoal = (mode: "chat" | "plan_goal"): string | null => {
+    const sentGoal = (mode: "chat" | "work"): string | null => {
       const held = hands(Address.make("hall/mayor"), () => null);
       verb("/dispatch").run({ ...held.filled, mode }, called("/dispatch hello"));
       const frame = held.sent[0];
       return frame !== undefined && "dispatch" in frame ? frame.dispatch.goal : null;
     };
-    expect([sentGoal("chat"), sentGoal("plan_goal")]).toEqual(["", "a goal"]);
+    expect([sentGoal("chat"), sentGoal("work")]).toEqual(["", "a goal"]);
   });
 
   test("/new opens a session here and carries nothing by default", () => {
