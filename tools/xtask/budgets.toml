@@ -361,7 +361,7 @@ what = "append plus fsync, p50 and p99"
 budget_p50_ms = 5
 budget_p99_ms = 20
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 0.568 ms / p99 1.600 ms (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30); batched append_all moves 116,003 records/s. The two readings the register used to carry (about 335k records/s batched, run_history 3.3 ms) were re-read on the two trees either side of 2ff1859b: its parent gives 206,501 records/s and 4.177 ms, 2ff1859b itself 135,831 records/s and 6.429 ms, so most of the later drop is the bench load changing shape in 2ff1859b, not the product; the parent itself sits below the old figures, a gap that is either in 2feeb2d6..2ff1859b^ or the machine and has not been bisected. A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: p50 0.555 ms / p99 0.688 ms, nearest rank (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01); batched append_all moves 140,934 records/s. The two readings the register used to carry (about 335k records/s batched, run_history 3.3 ms) were re-read on the two trees either side of 2ff1859b: its parent gives 206,501 records/s and 4.177 ms, 2ff1859b itself 135,831 records/s and 6.429 ms, so most of the later drop is the bench load changing shape in 2ff1859b, not the product; the parent itself sits below the old figures, a gap that is either in 2feeb2d6..2ff1859b^ or the machine and has not been bisected. A wall-clock figure is the machine's, so it is recorded, never gated"
 
 # What one durability barrier costs per record as the batch under
 # it grows. The absolute figures belong to the disk class they were
@@ -378,7 +378,7 @@ status = "measured, not gated: p50 0.568 ms / p99 1.600 ms (fixture 1dc560ad5766
 [durability_barrier]
 what = "one fsync barrier, amortised over the records under it"
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: 582.9 us/record at one record per barrier, 57.9 at ten, 15.9 at fifty (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: 562.3 us/record at one record per barrier, 55.2 at ten, 14.8 at fifty (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01). A wall-clock figure is the machine's, so it is recorded, never gated"
 
 # Opening yesterday's session: the whole of what `bin::assembly`'s
 # `run_history` does, over the same public faces it calls - refresh the
@@ -397,13 +397,13 @@ status = "measured, not gated: 582.9 us/record at one record per barrier, 57.9 a
 [run_history]
 what = "one session's newest 500 records, out of a ledger holding eight sessions"
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 4.172 ms (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30), against 6.009 ms on the same fixture before the run's sequences were taken lazily, and 27.6 ms before the index. The registered 3.3 ms is explained under ledger_append. A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: p50 4.232 ms (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01), against 6.009 ms on the same fixture before the run's sequences were taken lazily, and 27.6 ms before the index. The registered 3.3 ms is explained under ledger_append. A wall-clock figure is the machine's, so it is recorded, never gated"
 
 [prefix_assembly]
 what = "assembling one frozen prefix"
 budget_ms = 1
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 0.022 ms for 16.5 KB over four slots on windows-x86_64 (2026-08-22)"
+status = "measured, not gated: p50 0.009 ms for 16.5 KB over four slots, 1000 rounds (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01)"
 
 # What one query pays for the appends that arrived since the last one.
 # `Views` refreshes the resident index before every history query, so a
@@ -514,7 +514,7 @@ fold_records = 50000
 best_p50_ms = 1222
 best_p95_ms = 1225
 best_p99_ms = 1225
-status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`), p50 1221.938 ms, p95 and p99 1224.078 ms, the best_* fields rounded up to whole milliseconds (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30); 1265.980 ms on the same fixture before the whole fold streamed the ledger. The per-megabyte figure is best_p50_ms over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
+status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`), p50 1221.938 ms, p95 and p99 1224.078 ms, the best_* fields rounded up to whole milliseconds (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30); re-read under the nearest-rank rule (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01) at p50 1277.206 ms, p95 and p99 1285.196 ms, so the best_* fields keep the earlier reading; 1265.980 ms on the same fixture before the whole fold streamed the ledger. The per-megabyte figure is best_p50_ms over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
 
 # What a dispatch spends before the model is called: opening the room,
 # writing the brief, standing the run up, and assembling the tools -
@@ -530,7 +530,7 @@ status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::sce
 # person will find it.
 [prepare_dispatch_ms]
 what = "one dispatch, from the command arriving to the lane taking the drive, on the accounting thread"
-measured_by = "the instrument is two clock reads around `stage_dispatch` (crates/accounting/src/worker/dispatching/running.rs) and two more around `Laying::mcp_tools` (crates/accounting/src/worker/workbench/servers.rs), which runs in the lane that drives the run (sprawling-SPEC.md 8-93), written out at `Level::Trace` through the city's own clock - the same shape `worker/credentials/probing.rs` uses to report `elapsed_ms`, which is why no new sampling point was sanctioned for it. Read it off `a_dispatch_says_what_it_spent_before_the_drive` (cargo nextest run -p sprawling-accounting --release -E 'test(a_dispatch_says_what_it_spent_before_the_drive)' --no-capture), or off any served city running at that floor"
+measured_by = "the instrument is two reads of the monotonic clock `Hands.monotonic` around `stage_dispatch` (crates/accounting/src/worker/dispatching/running.rs) and two more around `Laying::mcp_tools` (crates/accounting/src/worker/workbench/servers.rs), which runs in the lane that drives the run (sprawling-SPEC.md 8-93), written out at `Level::Trace`; the assembly hands the worker that clock beside the city's own (accounting-SPEC.md 8-11), so a span never reads a city clock that a test or a correction can move. Read it off `a_dispatch_says_what_it_spent_before_the_drive` (cargo nextest run -p sprawling-accounting --release -E 'test(a_dispatch_says_what_it_spent_before_the_drive)' --no-capture), or off any served city running at that floor"
 status = "measured, not gated: 58 ms median on windows-x86_64, 16 cores, NVMe (2026-09-21, release, four runs: 50, 50, 51, 66; ~70 ms unoptimized when idle), for a dispatch into a fresh city with **no MCP server declared** - so this figure is the floor, and the `mcp_tools` line beside it read 0 ms over 0 servers in every run. The two lines are reported apart because a resident connection table (K-05) removes only the second, and the reading is K-05's own verdict: at 0 ms the table saves nothing, so it stays unbuilt until a served building declares servers and the second line shows them dominating. Not gated - a wall-clock reading is the machine's, and this one also depends on how many MCP servers a building declares"
 
 # T14's four-action pressure reading (deepening plan section 3 T14): the
@@ -646,7 +646,17 @@ status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized b
 [view_backlog]
 what = "how far the view fold falls behind a burst of 2,000 records while readers keep asking"
 measured_by = "just bench (instrument_view_backlog, crates/sprawling/src/serving/folding/tests/instruments.rs)"
-status = "measured, not gated: 2,003 records in a 14.949 ms burst, 73 reader questions; a record waits floor 193 us, p50 5547 us, p99 10659 us, max 10717 us for its broadcast, and at most 1,888 records wait at once (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30)"
+status = "measured, not gated: 2,003 records in an 18.618 ms burst, 90 reader questions; a record waits floor 300 us, p50 9297 us, p99 14425 us, max 14527 us for its broadcast, and at most 1,600 records wait at once (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01)"
+
+# What one beat of the monitor costs the process it watches, per kind of
+# platform reading: the summary counters, the whole page, and one
+# process tree. The count gate in `monitor::counters` holds how many
+# readings a beat takes; how long each takes is the machine's, so it is
+# recorded here and never gated, for the reason `[local_latency]` gives.
+[monitor_beat]
+what = "one platform reading of the monitor's beat: the summary counters, the whole page, or one process tree"
+measured_by = "just bench (instrument_monitor_beat, crates/sprawling/src/monitor/counters/tests.rs), 200 samples per reading, nearest rank through `bin::monitor::spread::Spread`"
+status = "measured, not gated: summary floor 2 us, p50 2 us, p99 3 us; page floor 95 us, p50 121 us, p99 440 us; tree floor 5019 us, p50 5738 us, p99 9441 us (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01)"
 
 # The wall time of a tool wave whose leading calls only read. The
 # concurrent-wave test judges the behaviour (every read of the wave in
