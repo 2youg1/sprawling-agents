@@ -3,17 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `specalign` once the kernel's specification is Lean (tools/xtask/Spec.lean
-//! §8-43): the carrier of every `AxCode`, the window class of
-//! every `EventKind`, and every `inductive` that shares a name with a
-//! kernel enum, each against what the kernel compiles.
+//! `specalign`'s reading of the kernel's Lean specification
+//! (tools/xtask/Spec.lean §8-43): the carrier of every `AxCode`, the
+//! window class of every `EventKind`, and every `inductive` that shares a
+//! name with a kernel enum, each against what the kernel compiles.
 //!
-//! The Markdown SPEC wrote the first two as tables and the rosters as
-//! Rust fences; the Lean specification writes them as a `def` with one
-//! arm per line and as an `inductive` with one constructor per line. The
-//! names are the Rust names, spelled the same, so the comparison is one
-//! of equal strings. An `inductive` is never abbreviated, so no roster
-//! is skipped as a pointer elsewhere.
+//! The specification writes the two tables as a `def` with one arm per
+//! line and the rosters as an `inductive` with one constructor per line.
+//! The names are the Rust names, spelled the same, so the comparison is
+//! one of equal strings. An `inductive` is never abbreviated, so no
+//! roster is skipped as a pointer elsewhere.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;

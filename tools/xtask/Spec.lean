@@ -38,7 +38,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 | render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17 与 §8-38 |
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | secret | 全仓加夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
-| specalign | kernel 枚举 ↔ kernel 的规格逐 variant（kernel 迁到 Lean 之后读 Lean 的受限形状，§8-43）：§8-1／§8-4 两表消费真 enum（`AxCode::ALL`／`EventKind::ALL`）作证，计数、归属、carrier／窗类逐项同；SPEC 围栏里其余每一处 `pub enum` 体与 syn 解出的同名枚举双向对账（§8-10）；模块图每一行的 `spec` 锚点落在盘上，已迁移的包写 Lean 模块名（§8-43） |
+| specalign | kernel 枚举 ↔ kernel 的规格逐 variant（读 `crates/kernel/Spec.lean` 与分部里的受限形状，§8-43）：§8-1／§8-4 两张表消费真 enum（`AxCode::ALL`／`EventKind::ALL`）作证，归属、carrier／窗类逐臂同；规格里每一个与 kernel 枚举同名的 `inductive` 与 syn 解出的枚举双向对账（§8-10、§8-43）；模块图每一行的 `spec` 锚点落在盘上，已迁移的包写 Lean 模块名（§8-43） |
 | spec | 一个包恰有一份生效规格；散文里点名的 `<名>-SPEC` 在树上；Lean 的 import 纪律；`.lean` 里没有 `sorry`、`admit`、`axiom`；规格引用的仓内路径在盘上（§8-42） |
 | budget | `tools/xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；没有构建产物可称时沉默（`just check` 不构建 release 二进制），壁钟读数只入册不入门 |
 | color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免 |
@@ -278,9 +278,7 @@ pub(crate) struct Violation {
 
 **已知的限，写在明处**：节号在同一份 SPEC 里并不唯一（`sprawling` 的 `8-40`／`8-41`／`8-42` 各出现过三次，`web` 的 `8-12`～`8-16` 各两次），因为各节各自续号而无人对账。故本条只判存在，不判唯一：加一条唯一性断言会对七份未经重编号的 SPEC 一次报错，而重编号是另一件工作。**翻案条件**：任一 SPEC 的 §8 完成一次重编号后，唯一性断言随即上线。
 
-**specalign 的第四条断言：kernel-SPEC 的每一个 `pub enum` 体，就是 kernel 编译出来的那份 variant 名单。** 判据分两侧取数：SPEC 侧只读 ```rust 围栏（围栏外的散文提到一个枚举不算声明它），注释字符先抹成空格再按深度零的 `,` 与 `|` 切分，首字母大写的标识符才算一个 variant；代码侧用 `syn` 解析 `crates/kernel/src/**`，`#[cfg(test)]` 模块里的夹具枚举不算。同名两侧都在，才逐 variant **双向**报——SPEC 有代码无、代码有 SPEC 无各是一条，因为照着 SPEC 抄 match 臂的人会写出编译不过的代码，而只报一侧的门会让另一侧长期失真。**一名多卡按并集合并**：SPEC 用后一张卡修订前一张（`DomainVerdict` 在 kernel-SPEC §8-46 加了 `NotWritable`），并集才是这份文档说的那份名单。**SPEC 有而代码没有的枚举不报**：SPEC 同时规定尚未开工的阶段，「这个模块在不在」由 modmap 答，本条只答「两份名单同不同」，需要两份都在场。
-
-**带省略号的体是指路牌，不是名单，整名跳过。** `AxCode` 与 `EventKind` 写作 `{ PathNotFound, /* …36 variant */ }`，说的是名单在别处，而那个别处正是 §8-1 与 §8-4 两张表——本门的前两条断言已经逐 variant 对过它们。体内出现 `…` 即跳过该名，于是没有人被教着去替 SPEC 补全一处它故意写短的缩写；`ContentBlock` 的增补卡同理。
+**specalign 的第四条断言：kernel 规格里与 kernel 枚举同名的每一个 `inductive`，就是 kernel 编译出来的那份 variant 名单。** 判据分两侧取数：规格侧读 `crates/kernel/Spec.lean` 与它的分部里一行一个构造子的 `inductive`（§8-43）；代码侧用 `syn` 解析 `crates/kernel/src/**`，`#[cfg(test)]` 模块里的夹具枚举不算。同名两侧都在，才逐 variant **双向**报——规格有代码无、代码有规格无各是一条，因为照着规格抄 match 臂的人会写出编译不过的代码，而只报一侧的门会让另一侧长期失真。**规格有而代码没有的名字不报**：模型里另起的类型（例如 `Draft`、`Names`）不是 kernel 的枚举，本条只答「两份名单同不同」，需要两份都在场。Lean 的 `inductive` 没有省略的写法，所以没有「指路牌」这一类跳过。
 
 **模块图不带手写的小节计数。** `architecture.toml` 是结构化文件，没有小节也没有位置，数目由条目本身给出，于是「能被机器数出来的数不由文档手写」（§10 第 5 条）在这里以更彻底的方式成立：那个数不被写出来。
 -/
@@ -355,7 +353,7 @@ pub(crate) struct Violation {
 **引擎按三级取，每一级都是一条已有的权威，不新立第二份名单**：
 
 1. `SPRAWLING_BROWSER` 点名的那一个；
-2. **doctor 装到 `~/.sprawling/components/firefox/` 的那一个**——读的是 `components_dir()` 这条**文件系统约定**（kernel-SPEC.md §8-22 已记），与 `xtask budget` 读 `target/` 同性质，不是对「运行中的机器上 Firefox 在哪」再写一份探测；
+2. **doctor 装到 `~/.sprawling/components/firefox/` 的那一个**——读的是 `components_dir()` 这条**文件系统约定**（`crates/kernel/Spec.lean` §8-22 已记），与 `xtask budget` 读 `target/` 同性质，不是对「运行中的机器上 Firefox 在哪」再写一份探测；
 3. **doctor 的 Chromium 一族**：`crates/sprawling/src/doctor/family/chromium.tsv` 每行一个牌子——程序名与三平台的安装位置——由 doctor 自己的测试 `the_chromium_file_is_the_family_rendered` 从 `family::chromium` 渲染，本门 `include_str!` 它，按表序逐个牌子先看安装位置、再看 `PATH`。门与 doctor 因此在同样的地方找同样的牌子；本门不留自己的路径表，新加一个牌子只改 doctor 的那张表。
 
 **为什么可及面不单独成一道门。** 比两侧**写下的**角色与可及名，是没有浏览器时的替代品；门能进浏览器之后，角色、可及名与地标从画出来的 DOM 上读更准，也少一份要维护的读法。
