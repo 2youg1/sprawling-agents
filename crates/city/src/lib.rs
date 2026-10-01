@@ -52,6 +52,7 @@ pub use config_layers::path as config_path;
 pub use config_layers::write_second_threshold;
 pub use config_layers::{CitySetting, write_city_setting};
 pub use config_layers::{ConfigLayer, Layer, load as load_config};
+pub use config_layers::{HostPermanence, RemoteRoute, remote_route};
 pub use config_layers::{freeze_naming, keep_warm, own_layer, settled_harness, write_session};
 pub use config_layers::{settled_effort, settled_second, write_mcp, write_sandbox};
 pub use document::{Held, edit as edit_document, edit_against, revise as revise_document};

@@ -36,6 +36,7 @@ mod context;
 mod ladder;
 mod mcp;
 mod refuse;
+mod remote;
 mod resident;
 mod session;
 mod settled;
@@ -45,6 +46,7 @@ mod write;
 pub use cache::keep_warm;
 pub use city_layer::{CitySetting, write_city_setting};
 pub use ladder::Layer;
+pub use remote::{HostPermanence, RemoteRoute, remote_route};
 pub use resident::settled_harness;
 pub(crate) use session::forget as forget_session;
 pub use session::{freeze_naming, own_layer, write_session};
@@ -87,6 +89,9 @@ pub struct ConfigLayer {
     /// The identity version a session froze at this address
     /// (city-SPEC.md 8-33): read at the room's own layer only.
     naming: Option<B3Hash>,
+    /// The route the city's own layer chooses for the remote door
+    /// (city-SPEC.md 8-39); refused on every other rung.
+    remote: Option<RemoteRoute>,
 }
 
 impl ConfigLayer {
@@ -165,6 +170,7 @@ impl ConfigLayer {
             // be a second spelling of the same shelf.
             shelves: file.skills.map(|section| section.shelves),
             naming: file.identity.map(|section| section.version),
+            remote: None,
         })
     }
 
@@ -220,6 +226,12 @@ impl ConfigLayer {
     #[must_use]
     pub fn shelves(&self) -> Option<&[String]> {
         self.shelves.as_deref()
+    }
+
+    /// The route this layer chooses for the remote door, as written.
+    #[must_use]
+    pub fn remote(&self) -> Option<&RemoteRoute> {
+        self.remote.as_ref()
     }
 }
 
