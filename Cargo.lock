@@ -2761,6 +2761,7 @@ dependencies = [
  "thread-priority",
  "tokio",
  "tokio-tungstenite",
+ "win32job",
 ]
 
 [[package]]
