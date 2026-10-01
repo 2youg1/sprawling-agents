@@ -3,9 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The socket and the record: reading one request off a connection,
-//! writing its answer back, and appending the exchange to a file
-//! (citysim-SPEC.md 8-10).
+//! The socket and the files: reading one request off a connection,
+//! writing its answer back, appending the exchange to the record, and
+//! reading the script again when a first turn finds no run left
+//! (citysim-SPEC.md 8-10, 3-15).
 //!
 //! **What counts as a request is settled in one place, `read_request`.**
 //! A head up to its blank line and a body of `content-length` bytes is a
@@ -23,7 +24,7 @@ use std::time::Duration;
 use kernel::{AxCode, AxError};
 use serde_json::{Value, json};
 
-use super::{Asked, Replay, WireScript};
+use super::{Answer, Asked, Replay, Turn, WireScript};
 
 /// How long a connection may stay silent before it is given up on as
 /// carrying no request. The city writes a whole request at once; a
@@ -41,6 +42,8 @@ const REDACTED: &str = "redacted";
 /// recording every exchange.
 pub struct ScriptedProvider {
     listener: TcpListener,
+    /// Where the script was read from, and is read again (§3-15).
+    script: PathBuf,
     replay: Replay,
     record: Record,
     seq: u64,
@@ -91,6 +94,7 @@ impl ScriptedProvider {
     ) -> Result<ScriptedProvider, AxError> {
         Ok(ScriptedProvider {
             listener,
+            script: script.to_path_buf(),
             replay: Replay::new(read_script(script)?),
             record: Record::create(record)?,
             seq: 0,
@@ -114,7 +118,9 @@ impl ScriptedProvider {
     /// # Errors
     /// `E_STORAGE_FATAL` when the record cannot be appended to, and
     /// `E_TOOL_UNAVAILABLE` when the connection fails; the first ends a
-    /// playing, the second ends only that connection.
+    /// playing, the second ends only that connection. `E_CONFIG_INVALID`
+    /// when the script read again for a first turn could not be taken,
+    /// returned after that turn was answered `no_run_left`.
     pub fn answer_one(&mut self) -> Result<(), AxError> {
         let (mut stream, _peer) = self
             .listener
@@ -126,12 +132,14 @@ impl ScriptedProvider {
         let Some(request) = read_request(&mut stream) else {
             return Ok(());
         };
-        let answer = self.replay.answer(Asked::of(&request.method));
+        let (turn, answer, unread) = self.answered(&request);
         let (status, reason) = answer.status();
         let body = answer.body();
         self.seq = self.seq.saturating_add(1);
         self.record.append(&json!({
             "seq": self.seq,
+            "run": turn.map(|turn| turn.run),
+            "reply": turn.map(|turn| turn.reply),
             "method": request.method,
             "target": request.target,
             "headers": request.headers,
@@ -147,7 +155,26 @@ impl ScriptedProvider {
         stream
             .write_all(response.as_bytes())
             .and_then(|()| stream.flush())
-            .map_err(|err| socket("write an answer", &err))
+            .map_err(|err| socket("write an answer", &err))?;
+        unread.map_or(Ok(()), Err)
+    }
+
+    /// The answer to one request, after reading the script again when a
+    /// first turn found no run left; the failure to take the script read
+    /// again travels beside the refusal it leaves standing.
+    fn answered(&mut self, request: &Request) -> (Option<Turn>, Answer, Option<AxError>) {
+        let asked = Asked::of(&request.method);
+        let (turn, answer) = self.replay.answer(asked, &request.body);
+        if !answer.wants_more_runs() {
+            return (turn, answer, None);
+        }
+        match read_script(&self.script).and_then(|script| self.replay.grow(script)) {
+            Ok(()) => {
+                let (turn, answer) = self.replay.answer(asked, &request.body);
+                (turn, answer, None)
+            }
+            Err(err) => (turn, answer, Some(err)),
+        }
     }
 }
 
