@@ -3,52 +3,43 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The wall around `desktop/`, which is a copy of the workspace's own
-//! and must stay one.
+//! The workspace's lint wall, and the one table that stands beside it.
 //!
-//! `desktop` and its FFI seam `desktop/ffi` are the packages this
-//! repository builds from outside the workspace (root `Cargo.toml`,
-//! `exclude`), and they sit there for one recorded reason: each call
-//! into the Zig leaf relaxes `unsafe_code`, which `forbid` makes
-//! impossible and `deny` makes visible (desktop-SPEC.md section 8.5,
-//! second pair). `desktop/Cargo.toml` is the root of a workspace of
-//! their own, and everything else about it is a **copy** of the root
-//! workspace's — the lint tables and the package metadata, stated once
-//! in `[workspace.lints]` and `[workspace.package]`, and the version of
-//! every dependency both sides name — and a copy is a second home for a
-//! fact. Every package inside the wall inherits that copy, which is
-//! checked too: a package that wrote a table of its own would stand
-//! outside the comparison (xtask-SPEC.md section 8-46).
+//! Every member inherits `[workspace.lints]` by writing `[lints]
+//! workspace = true`, except the desktop server's FFI seam,
+//! `crates/desktop/ffi`. Each call into its Zig leaf relaxes
+//! `unsafe_code` at that one statement, which `forbid` makes impossible,
+//! so it writes a table of its own: the workspace's, with `unsafe_code`
+//! at `deny` (desktop-SPEC.md section 12.14, xtask-SPEC.md section 8-46).
+//! Every other line of that table is a **copy**, and a copy is a second
+//! home for a fact.
 //!
-//! **This is the shape `guard`'s own rule cannot see.** The trailer
-//! rule catches a gate loosened in the same commit as the work it would
-//! have refused. A copied lint table needs no such commit: one side is
+//! **This is the shape no rule about commits can see.** One side is
 //! edited, the other is not, and nothing red follows. So the copy is
-//! compared here, key by key, and a difference is a refusal unless it
-//! is one of the differences this module records with its reason.
+//! compared here, key by key, and a difference is a refusal unless it is
+//! one this module records with its reason. A member that writes a table
+//! of its own stands outside the comparison, so every other member is
+//! held to inheriting.
 //!
 //! **A recorded difference cleans itself.** A row whose two sides have
 //! become equal is struck, exactly as `length` strikes a register entry
-//! for a file that came back under budget: an exception nobody needs is
-//! an exception nobody decided to keep granting.
-//!
-//! The facts the package quotes from source files inside the wall — the
-//! protocol revision, the effect-unknown key, the error codes and the
-//! quality domain — are compared for the same reason, in `quoted`.
+//! for a file that came back under budget, and a leaf that is no longer
+//! a member strikes its row too: an exception nobody needs is an
+//! exception nobody decided to keep granting.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 
+use crate::members;
 use crate::report::{Violation, XtaskError};
 
-mod quoted;
-
 const ROOT_MANIFEST: &str = "Cargo.toml";
-const DESKTOP_MANIFEST: &str = "desktop/Cargo.toml";
-/// The package metadata every workspace member inherits from
-/// `[workspace.package]` and this package restates by hand.
-const SHARED_METADATA: [&str; 5] = ["version", "edition", "license", "rust-version", "publish"];
 
-/// One key the two walls are allowed to disagree about, and why.
+/// The one member whose lint table is its own.
+const LEAF: &str = "crates/desktop/ffi";
+
+/// One key the leaf's table is allowed to disagree with the workspace
+/// about, and why.
 ///
 /// The reason is printed when the disagreement disappears, so whoever
 /// strikes the row reads what it was for.
@@ -58,109 +49,65 @@ struct Recorded {
     because: &'static str,
 }
 
-/// Every difference between the two walls that somebody decided.
+/// Every difference between the two tables that somebody decided.
 ///
 /// Nothing else may differ. Adding a row here is a re-pricing of the
-/// rule and lands in `tools/xtask/`, which `guard`'s trailer rule watches.
-const RECORDED: [Recorded; 2] = [
-    Recorded {
-        table: "rust",
-        key: "unsafe_code",
-        because: "each call into the Zig leaf that carries the Win32 calls relaxes it at that one \
-                  statement with a written reason, which `forbid` makes impossible (desktop-SPEC.md \
-                  section 8.5, second pair, and section 8-12)",
-    },
-    Recorded {
-        table: "rust",
-        key: "unexpected_cfgs",
-        because: "the workspace declares `cfg(kani)` because kani runs against its crates; this \
-                  package has no harness, so declaring that name here would be a second home \
-                  for a fact that is not true of it",
-    },
-];
-
-/// The one member whose lint table is its own.
-#[cfg(test)]
-const LEAF: &str = "crates/desktop/ffi";
-
-/// Every member's lint table, judged against the workspace's.
-#[cfg(test)]
-fn tables(_workspace: &toml::Value, _members: &[(String, toml::Value)]) -> Vec<Violation> {
-    Vec::new()
-}
+/// rule and lands in `tools/xtask/`, in a commit of its own.
+const RECORDED: [Recorded; 1] = [Recorded {
+    table: "rust",
+    key: "unsafe_code",
+    because: "each call into the Zig leaf that carries the Win32 calls relaxes it at that one \
+              statement with a written reason, which `forbid` makes impossible (desktop-SPEC.md \
+              section 12.14)",
+}];
 
 pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let workspace = manifest(root, ROOT_MANIFEST)?;
-    let desktop = manifest(root, DESKTOP_MANIFEST)?;
-    let mut violations = Vec::new();
-    metadata(&workspace, &desktop, &mut violations);
-    lints(&workspace, &desktop, &mut violations);
-    dependencies(&workspace, &desktop, &mut violations);
-    inherited(&packages(root, &desktop)?, &mut violations);
-    quoted::check(root, &mut violations)?;
-    Ok(violations)
-}
-
-/// Every package inside the wall: the root package of
-/// `desktop/Cargo.toml`, then each of its `[workspace] members`, each
-/// with the manifest path a refusal names.
-fn packages(root: &Path, desktop: &toml::Value) -> Result<Vec<(String, toml::Value)>, XtaskError> {
-    let members = desktop
-        .get("workspace")
-        .and_then(|it| it.get("members"))
-        .and_then(toml::Value::as_array)
-        .map(|listed| {
-            listed
-                .iter()
-                .filter_map(toml::Value::as_str)
-                .map(|member| format!("desktop/{member}/Cargo.toml"))
-                .collect::<Vec<_>>()
+    let manifests = members::members(root)?
+        .into_iter()
+        .map(|member| {
+            manifest(root, &format!("{}/Cargo.toml", member.dir)).map(|read| (member.dir, read))
         })
-        .unwrap_or_default();
-    let mut found = vec![(DESKTOP_MANIFEST.to_owned(), desktop.clone())];
-    for rel in members {
-        let read = manifest(root, &rel)?;
-        found.push((rel, read));
-    }
-    Ok(found)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(tables(&workspace, &manifests))
 }
 
-/// The package metadata, which every member inherits and the wall
-/// restates once.
-fn metadata(workspace: &toml::Value, desktop: &toml::Value, out: &mut Vec<Violation>) {
-    let inherited = workspace.get("workspace").and_then(|it| it.get("package"));
-    let restated = desktop.get("workspace").and_then(|it| it.get("package"));
-    for key in SHARED_METADATA {
-        let expected = inherited.and_then(|table| table.get(key));
-        let found = restated.and_then(|table| table.get(key));
-        if expected == found {
-            continue;
+/// Every member's lint table, judged against the workspace's: the leaf
+/// key by key, every other member for inheriting it.
+fn tables(workspace: &toml::Value, members: &[(String, toml::Value)]) -> Vec<Violation> {
+    let mut out = Vec::new();
+    let wall = workspace.get("workspace").and_then(|it| it.get("lints"));
+    match members.iter().find(|(dir, _)| dir == LEAF) {
+        Some((_, leaf)) => compared(wall, leaf.get("lints"), &mut out),
+        None => out.push(diverged(
+            format!("tools/xtask/src/guard/wall.rs LEAF {LEAF}"),
+            "the one lint table of its own belongs to a workspace member",
+            format!("no workspace member lives at {LEAF}"),
+            "strike `LEAF` and its rows in `RECORDED`: the exception they grant has nothing left \
+             to be granted to"
+                .to_owned(),
+        )),
+    }
+    for (dir, member) in members.iter().filter(|(dir, _)| dir != LEAF) {
+        if !inheriting(member.get("lints")) {
+            out.push(diverged(
+                format!("{dir}/Cargo.toml [lints]"),
+                "every member but the leaf inherits the workspace's lint table",
+                format!("{} against `workspace = true`", shown(member.get("lints"))),
+                format!(
+                    "write `[lints]` in {dir}/Cargo.toml as `workspace = true` and nothing else"
+                ),
+            ));
         }
-        out.push(diverged(
-            format!("{DESKTOP_MANIFEST} [workspace.package] {key}"),
-            "the out-of-tree workspace states the metadata every member inherits from \
-             `[workspace.package]`, and states the same value",
-            format!(
-                "{} against the workspace's {}",
-                shown(found),
-                shown(expected)
-            ),
-            format!("set `{key}` in {DESKTOP_MANIFEST} to what `[workspace.package]` says"),
-        ));
     }
+    out
 }
 
-/// The two lint tables, key by key, in both directions.
-fn lints(workspace: &toml::Value, desktop: &toml::Value, out: &mut Vec<Violation>) {
+/// The two tables, key by key, in both directions.
+fn compared(wall: Option<&toml::Value>, copy: Option<&toml::Value>, out: &mut Vec<Violation>) {
     for table in ["rust", "clippy"] {
-        let wall = workspace
-            .get("workspace")
-            .and_then(|it| it.get("lints"))
-            .and_then(|it| it.get(table));
-        let copy = desktop
-            .get("workspace")
-            .and_then(|it| it.get("lints"))
-            .and_then(|it| it.get(table));
+        let wall = wall.and_then(|it| it.get(table));
+        let copy = copy.and_then(|it| it.get(table));
         let mut named = keys(wall);
         named.extend(keys(copy));
         for key in named {
@@ -177,7 +124,7 @@ fn lints(workspace: &toml::Value, desktop: &toml::Value, out: &mut Vec<Violation
     }
 }
 
-/// One lint key as the two walls spell it.
+/// One lint key as the two tables spell it.
 struct Compared<'a> {
     table: &'a str,
     key: &'a str,
@@ -196,14 +143,13 @@ fn judge(compared: Compared<'_>, out: &mut Vec<Violation>) {
     let recorded = RECORDED
         .iter()
         .find(|row| row.table == table && row.key == key);
-    let location = format!("{DESKTOP_MANIFEST} [workspace.lints.{table}] {key}");
     match (recorded, wall == copy) {
         // A decided difference that has become no difference is struck,
         // the way a register entry is struck when its file comes back
         // under budget.
         (Some(row), true) => out.push(diverged(
             format!("tools/xtask/src/guard/wall.rs RECORDED {table}.{key}"),
-            "a recorded difference between the two walls is struck once the two sides agree",
+            "a recorded difference between the two tables is struck once the two sides agree",
             format!("`{key}` now reads the same on both sides"),
             format!(
                 "delete its row: it was granted because {}, and that reason no longer shows",
@@ -211,45 +157,16 @@ fn judge(compared: Compared<'_>, out: &mut Vec<Violation>) {
             ),
         )),
         (None, false) => out.push(diverged(
-            location,
-            "the lint wall of the out-of-tree package is the workspace's own, key for key",
+            format!("{LEAF}/Cargo.toml [lints.{table}] {key}"),
+            "the leaf's lint table is the workspace's own, key for key",
             format!("{} against the workspace's {}", shown(copy), shown(wall)),
             format!(
-                "copy the workspace's line into {DESKTOP_MANIFEST}, or record the difference \
-                 and its reason in `RECORDED` (tools/xtask/src/guard/wall.rs) — a difference nobody \
-                 wrote down is a wall that fell over quietly"
+                "copy the workspace's line into {LEAF}/Cargo.toml, or record the difference \
+                 and its reason in `RECORDED` (tools/xtask/src/guard/wall.rs) — a difference \
+                 nobody wrote down is a wall that fell over quietly"
             ),
         )),
         (Some(_), false) | (None, true) => {}
-    }
-}
-
-/// Every package inside the wall inherits it: `[lints]` is exactly
-/// `workspace = true`, and each shared metadata key is
-/// `{ workspace = true }`. A package that states either itself is a
-/// copy the comparison above does not read.
-fn inherited(packages: &[(String, toml::Value)], out: &mut Vec<Violation>) {
-    for (rel, package) in packages {
-        if !inheriting(package.get("lints")) {
-            out.push(diverged(
-                format!("{rel} [lints]"),
-                "every package inside the wall inherits its lint table",
-                format!("{} against `workspace = true`", shown(package.get("lints"))),
-                format!("write `[lints]` in {rel} as `workspace = true` and nothing else"),
-            ));
-        }
-        for key in SHARED_METADATA {
-            let found = package.get("package").and_then(|it| it.get(key));
-            if inheriting(found) {
-                continue;
-            }
-            out.push(diverged(
-                format!("{rel} [package] {key}"),
-                "every package inside the wall inherits its package metadata",
-                format!("{} against `{{ workspace = true }}`", shown(found)),
-                format!("write `{key}.workspace = true` in {rel}"),
-            ));
-        }
     }
 }
 
@@ -259,50 +176,6 @@ fn inheriting(value: Option<&toml::Value>) -> bool {
     value.and_then(toml::Value::as_table).is_some_and(|table| {
         table.len() == 1 && table.get("workspace") == Some(&toml::Value::Boolean(true))
     })
-}
-
-/// The version of every dependency both manifests name.
-///
-/// Features are left alone: this package switches on what its six tools
-/// reach and nothing else, which is a statement about it rather than a
-/// copy of anything. A version line is the copy.
-fn dependencies(workspace: &toml::Value, desktop: &toml::Value, out: &mut Vec<Violation>) {
-    let shared = workspace
-        .get("workspace")
-        .and_then(|it| it.get("dependencies"));
-    for section in ["dependencies", "dev-dependencies"] {
-        let Some(named) = desktop.get(section).and_then(toml::Value::as_table) else {
-            continue;
-        };
-        for (name, held) in named {
-            let Some(theirs) = shared.and_then(|it| it.get(name)).and_then(required) else {
-                continue;
-            };
-            let ours = required(held);
-            if ours == Some(theirs) {
-                continue;
-            }
-            out.push(diverged(
-                format!("{DESKTOP_MANIFEST} [{section}] {name}"),
-                "a dependency both manifests name is held to one version line",
-                format!(
-                    "`{name}` at {} against the workspace's `{theirs}`",
-                    ours.map_or_else(|| "no version".to_owned(), |it| format!("`{it}`")),
-                ),
-                format!(
-                    "set `{name}` to `{theirs}`, the version `[workspace.dependencies]` states"
-                ),
-            ));
-        }
-    }
-}
-
-/// The version requirement of one dependency, however it is written.
-fn required(held: &toml::Value) -> Option<&str> {
-    match held {
-        toml::Value::String(line) => Some(line),
-        other => other.get("version").and_then(toml::Value::as_str),
-    }
 }
 
 /// One manifest, read as a value.
@@ -317,10 +190,10 @@ fn manifest(root: &Path, rel: &str) -> Result<toml::Value, XtaskError> {
 /// The keys of one table. A table that is absent has no keys, which is
 /// the reading that lets a key present on one side only be compared
 /// against nothing on the other.
-fn keys(table: Option<&toml::Value>) -> std::collections::BTreeSet<String> {
+fn keys(table: Option<&toml::Value>) -> BTreeSet<String> {
     match table.and_then(toml::Value::as_table) {
         Some(found) => found.keys().cloned().collect(),
-        None => std::collections::BTreeSet::new(),
+        None => BTreeSet::new(),
     }
 }
 

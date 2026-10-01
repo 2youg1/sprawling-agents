@@ -58,10 +58,7 @@ pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskEr
         let owner = if rel.starts_with(CHECKER) {
             Some(Owner::Checker)
         } else {
-            found
-                .iter()
-                .find(|member| member.holds(&rel))
-                .map(Owner::Package)
+            members::owner(&found, &rel).map(Owner::Package)
         };
         let Some(owner) = owner else {
             continue;

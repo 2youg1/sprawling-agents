@@ -44,7 +44,6 @@ fn product() -> [Member; 1] {
         lib: Some("kernel".to_owned()),
         dir: "crates/kernel".to_owned(),
         role: members::Role::Product,
-        reach: members::Reach::Workspace,
         depends_on: BTreeSet::new(),
     }]
 }

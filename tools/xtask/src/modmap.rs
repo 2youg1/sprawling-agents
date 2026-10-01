@@ -287,7 +287,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 const GATES: &str = env!("CARGO_PKG_NAME");
 
 /// The packages whose files the map registers: every package the
-/// members reader lists, tools and the path-dependent desktop included,
+/// members reader lists, tools included,
 /// except the gates' own. A new tool is covered from its first file, so
 /// forgetting to register one is a red rather than a package quietly
 /// left unjudged.

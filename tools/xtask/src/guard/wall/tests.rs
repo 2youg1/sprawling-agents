@@ -138,10 +138,7 @@ fn another_member_with_a_table_of_its_own_is_named() {
 /// nothing; the exception is struck with it.
 #[test]
 fn a_leaf_that_is_no_longer_a_member_strikes_its_exception() {
-    let found = tables(
-        &read(WORKSPACE),
-        &[("crates/k".to_owned(), read(MEMBER))],
-    );
+    let found = tables(&read(WORKSPACE), &[("crates/k".to_owned(), read(MEMBER))]);
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(found[0].location.contains("LEAF"), "{found:#?}");
     assert!(found[0].alternative.contains("RECORDED"), "{found:#?}");

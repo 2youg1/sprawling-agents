@@ -120,7 +120,7 @@ fn reading(rel: &str, found: &[Member]) -> Reading {
     if rel.starts_with(FUZZ) {
         return Reading::Whole;
     }
-    let Some(owner) = found.iter().find(|member| member.holds(rel)) else {
+    let Some(owner) = members::owner(found, rel) else {
         return Reading::Skipped;
     };
     match owner.role {
@@ -343,7 +343,6 @@ mod tests {
             lib: None,
             dir: rel.split('/').take(2).collect::<Vec<_>>().join("/"),
             role: Role::Product,
-            reach: members::Reach::Workspace,
             depends_on: std::collections::BTreeSet::new(),
         }
     }

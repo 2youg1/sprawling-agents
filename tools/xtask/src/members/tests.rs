@@ -14,10 +14,7 @@ fn this_checkout_lists_its_members_and_the_package_nested_in_one() {
     let found = members(crate::root::this_checkout()).unwrap();
     let kernel = found.iter().find(|m| m.dir == "crates/kernel").unwrap();
     assert_eq!(kernel.lib.as_deref(), Some("kernel"));
-    assert_eq!(
-        (kernel.role, kernel.reach),
-        (Role::Product, Reach::Workspace)
-    );
+    assert_eq!(kernel.role, Role::Product);
     let desktop: Vec<(&str, Option<&str>)> = found
         .iter()
         .filter(|m| m.dir.starts_with("crates/desktop"))
@@ -63,7 +60,6 @@ fn member(package: &str, dir: &str) -> Member {
         lib: None,
         dir: dir.to_owned(),
         role: Role::Product,
-        reach: Reach::Workspace,
         depends_on: BTreeSet::new(),
     }
 }

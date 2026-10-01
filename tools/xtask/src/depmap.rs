@@ -22,7 +22,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::architecture;
-use crate::members::{self, Member, Reach, Role};
+use crate::members::{self, Member, Role};
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
@@ -162,7 +162,6 @@ fn check_edges(
 ) {
     let names: BTreeMap<&str, &str> = found
         .iter()
-        .filter(|member| member.reach == Reach::Workspace)
         .map(|member| (member.package.as_str(), member.name()))
         .collect();
     for member in found.iter().filter(|member| member.in_product_graph()) {

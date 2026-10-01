@@ -13,7 +13,7 @@
 //! saying so. Every gate that needs a package's directory asks here, so
 //! a package is found by all of them or by none.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::Path;
 use std::process::Command;
@@ -35,18 +35,7 @@ pub(crate) enum Role {
     Tool,
 }
 
-/// How cargo reaches a package.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Reach {
-    /// A workspace member: `cargo -p` names it from the checkout root.
-    Workspace,
-    /// Excluded from the workspace and reached as a member's path
-    /// dependency. `--no-deps` does not read its manifest, so its lib
-    /// name and its dependencies are unknown here.
-    PathDependency,
-}
-
-/// One package, as cargo places it.
+/// One workspace member, as cargo places it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Member {
     /// The name `cargo -p` takes.
@@ -56,7 +45,6 @@ pub(crate) struct Member {
     /// Repo-relative, `/`-separated.
     pub(crate) dir: String,
     pub(crate) role: Role,
-    pub(crate) reach: Reach,
     /// Every package its normal and build dependencies name; dev
     /// dependencies are left out, since tests may reach anything.
     pub(crate) depends_on: BTreeSet<String>,
@@ -78,10 +66,9 @@ impl Member {
     }
 
     /// Whether this package is a node of the product's crate graph: it
-    /// ships, and the workspace builds it. The depmap block and the
-    /// proof roster name exactly these.
+    /// ships. The depmap block and the proof roster name exactly these.
     pub(crate) fn in_product_graph(&self) -> bool {
-        self.role == Role::Product && self.reach == Reach::Workspace
+        self.role == Role::Product
     }
 }
 
@@ -130,8 +117,7 @@ pub(crate) fn members(root: &Path) -> Result<Vec<Member>, XtaskError> {
     read(&metadata)
 }
 
-/// The packages that ship: every [`Role::Product`] package, the one
-/// outside the workspace included.
+/// The packages that ship: every [`Role::Product`] package.
 pub(crate) fn product(root: &Path) -> Result<Vec<Member>, XtaskError> {
     Ok(members(root)?
         .into_iter()
@@ -156,6 +142,17 @@ pub(crate) fn find<'a>(found: &'a [Member], name: &str) -> Result<&'a Member, Xt
                 .collect::<Vec<_>>()
                 .join(" "),
         })
+}
+
+/// The package that owns `rel`, a repo-relative `/`-separated path: of
+/// the packages whose directory holds it, the one whose directory is
+/// longest. A package nested in another's directory (`crates/desktop/ffi`
+/// in `crates/desktop`) owns its own paths.
+pub(crate) fn owner<'a>(found: &'a [Member], rel: &str) -> Option<&'a Member> {
+    found
+        .iter()
+        .filter(|member| member.holds(rel))
+        .max_by_key(|member| member.dir.len())
 }
 
 /// `cargo xtask members`: `--owning [<path>...]` prints the workspace
@@ -191,17 +188,13 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError> {
 /// A Markdown or Lean path selects nothing, because a document or a
 /// model changes no Rust test's outcome. A path no workspace package
 /// holds is skipped rather than refused: a branch's own diff names the
-/// paths it deleted, and `desktop/` has a check of its own.
+/// paths it deleted.
 fn owning<'a>(found: &'a [Member], paths: &[String]) -> BTreeSet<&'a str> {
     paths
         .iter()
         .map(|path| path.trim().replace('\\', "/"))
         .filter(|path| !path.ends_with(".md") && !path.ends_with(".lean"))
-        .filter_map(|path| {
-            found
-                .iter()
-                .find(|member| member.reach == Reach::Workspace && member.holds(&path))
-        })
+        .filter_map(|path| owner(found, &path))
         .map(|member| member.package.as_str())
         .collect()
 }
@@ -220,8 +213,7 @@ fn standard_input() -> Result<Vec<String>, XtaskError> {
         .collect()
 }
 
-/// The packages `metadata` describes: the workspace members, then the
-/// path dependencies the workspace excludes, sorted by directory.
+/// The workspace members `metadata` describes, sorted by directory.
 fn read(metadata: &Value) -> Result<Vec<Member>, XtaskError> {
     let root = Path::new(text(metadata, "workspace_root")?);
     let packages = metadata
@@ -232,8 +224,6 @@ fn read(metadata: &Value) -> Result<Vec<Member>, XtaskError> {
         .iter()
         .map(|package| workspace_member(root, package))
         .collect::<Result<Vec<_>, _>>()?;
-    let outside = path_dependencies(root, packages, &found)?;
-    found.extend(outside);
     found.sort_by_key(|member| member.dir.clone());
     Ok(found)
 }
@@ -249,7 +239,6 @@ fn workspace_member(root: &Path, package: &Value) -> Result<Member, XtaskError> 
         lib: lib_of(package)?,
         dir: relative(root, dir, name)?,
         role: role_of(package, name)?,
-        reach: Reach::Workspace,
         depends_on: dependencies(package)?
             .iter()
             .filter(|dependency| dependency.get("kind").and_then(Value::as_str) != Some("dev"))
@@ -257,36 +246,6 @@ fn workspace_member(root: &Path, package: &Value) -> Result<Member, XtaskError> 
             .map(str::to_owned)
             .collect(),
     })
-}
-
-/// Every package a member reaches by `path` that is not itself a member.
-fn path_dependencies(
-    root: &Path,
-    packages: &[Value],
-    members: &[Member],
-) -> Result<Vec<Member>, XtaskError> {
-    let mut outside: BTreeMap<String, Member> = BTreeMap::new();
-    for package in packages {
-        for dependency in dependencies(package)? {
-            let Some(path) = dependency.get("path").and_then(Value::as_str) else {
-                continue;
-            };
-            let name = text(dependency, "name")?;
-            let dir = relative(root, Path::new(path), name)?;
-            if members.iter().any(|member| member.dir == dir) {
-                continue;
-            }
-            outside.entry(dir.clone()).or_insert_with(|| Member {
-                package: name.to_owned(),
-                lib: None,
-                dir,
-                role: Role::Product,
-                reach: Reach::PathDependency,
-                depends_on: BTreeSet::new(),
-            });
-        }
-    }
-    Ok(outside.into_values().collect())
 }
 
 /// `dir` below `root`, `/`-separated. A package outside the checkout is
