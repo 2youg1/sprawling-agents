@@ -36,7 +36,7 @@ use std::net::{Ipv4Addr, TcpListener};
 use std::path::Path;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use kernel::{Address, AxCode, EventKind, EventRecord, IdemKey, RunId, Seq};
@@ -354,16 +354,13 @@ impl Served {
     }
 
     /// Types `line` at the console and answers what it printed up to the
-    /// first line holding `answer`.
+    /// first line holding `answer`, waiting up to [`PATIENCE`] for each
+    /// line it prints.
     fn type_line(&mut self, line: &str, answer: &str) -> String {
         writeln!(self.console, "{line}").unwrap();
         self.console.flush().unwrap();
-        let deadline = Instant::now().checked_add(PATIENCE).unwrap();
         let mut printed = String::new();
-        while let Some(left) = deadline.checked_duration_since(Instant::now()) {
-            let Ok(next) = self.printed.recv_timeout(left) else {
-                break;
-            };
+        while let Ok(next) = self.printed.recv_timeout(PATIENCE) {
             printed.push_str(&next);
             printed.push('\n');
             if next.contains(answer) {
