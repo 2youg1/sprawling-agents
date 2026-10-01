@@ -312,6 +312,70 @@ fn splitting_grows_the_plan_and_the_run_stops_holding_the_branch() {
     assert_eq!(effects[1].kind(), kernel::EventKind::RoadmapSplit);
 }
 
+/// The eighth finding of `tools/adversary/Spec.lean`: a split of a row
+/// nobody held was answered as done and then dropped at landing. The
+/// desk now refuses it at the call (collab D6), queues nothing and leaves
+/// the plan as the claim left it, and the refusal names what the run
+/// holds and the claim that would make the split possible.
+#[test]
+fn a_split_of_a_row_this_run_does_not_hold_is_refused_at_the_call() {
+    let split = |id: &str| {
+        call(serde_json::json!({
+            "action": "split", "node": id, "parts": ["run the cable", "test the element"]
+        }))
+    };
+    // What a desk queued and wrote, and what it still holds.
+    let left = |shared: &Arc<Mutex<ClaimDesk>>| {
+        let mut desk = shared.lock().unwrap();
+        let kinds: Vec<_> = desk.take_effects().iter().map(ClaimEffect::kind).collect();
+        (
+            kinds,
+            desk.roadmap().map(str::to_owned),
+            desk.holding().cloned(),
+        )
+    };
+    let idle = desk();
+    let unheld = ClaimTool::new(Arc::clone(&idle))
+        .unwrap()
+        .invoke(&split("1"))
+        .err();
+    let busy = desk();
+    let tool = ClaimTool::new(Arc::clone(&busy)).unwrap();
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    let elsewhere = tool.invoke(&split("3")).err();
+    let claimed = set_roadmap_status(PLAN, &node("1"), RoadmapStatus::InProgress, None).unwrap();
+
+    assert_eq!(
+        (unheld, left(&idle), elsewhere, left(&busy)),
+        (
+            Some(
+                AxError::failure(
+                    AxCode::InvalidArgs,
+                    "split a plan node",
+                    "this run holds nothing, so it cannot split 1",
+                )
+                .with_recovery("claim 1 first; a row is divided by the run that holds it")
+            ),
+            (Vec::new(), None, None),
+            Some(
+                AxError::failure(
+                    AxCode::InvalidArgs,
+                    "split a plan node",
+                    "this run holds 1, not 3",
+                )
+                .with_recovery("split 1, or put it down and claim 3 first")
+            ),
+            (
+                vec![kernel::EventKind::RoadmapClaimed],
+                Some(claimed),
+                Some(node("1"))
+            )
+        ),
+        "a split the desk cannot land is refused before anything is queued"
+    );
+}
+
 /// A run that ends holding a node leaves red behind, and the reason
 /// says what happened rather than inventing one.
 #[test]
