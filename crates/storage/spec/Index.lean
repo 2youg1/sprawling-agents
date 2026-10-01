@@ -73,3 +73,159 @@ impl LineReader<'_> {
   - **答的顺序**：`run_seqs_before` 由新到旧，因为调用方要的是会话的**末尾**；调用方取够条数后翻转成由旧到新再取行，于是 `LineReader` 全程向前走，不付逆序读每行一次的 seek。
 - `locate` 只探 `seq` 与 `run` 两个字段——索引不要求整条记录可解析，破损日志上的索引正是修复路径所需；`run` 缺失或解析不出的行**照样入 seq 表，只是不属于任何 run**，残尾（无换行结尾）跳过不入索引，其修复归 jsonl。段名排序由本模块自持（不信文件系统枚举序）。新增 `StorageError::SeqMissing{seq}`（→ `E_INVALID_ARGS`）：问一条从未写过的 seq 是调用者错，不是损坏。
 -/
+
+/-!
+### 8-38 storage::index 按 seq 往后读（`LedgerIndex::seqs_from`）
+
+```rust
+impl LedgerIndex {
+    /// 索引里 seq 不小于 `from` 的每一条，升序；两端都可取。`seqs()` 就是 `seqs_from(Seq::FIRST)`。
+    pub fn seqs_from(&self, from: Seq) -> impl DoubleEndedIterator<Item = Seq> + '_;
+}
+```
+
+- **答什么**：`seqs()` 里不小于 `from` 的那一段，次序不变（`seqs_from_answers_the_held_seqs_at_or_after`）；也就是调用方原来写的 `seqs().skip_while(|seq| *seq < from)` 交出的那一串（`seqs_from_is_the_walk_past_the_smaller`）。`from` 之后没有行时答空，`from` 不必是写过的 seq。
+- **不看 `from` 之前的格**：seq 是隐式的（8-4），`from` 所在那一格就是 `from - base`，读者从那一格起走；列外行是有序表，从 `BTreeMap::range(from..)` 起走。起步的代价是一次减法与一次 O(log 列外行数) 的查找，之后每交出一个值走一格（空洞不交出，但要走过）。答案不取决于 `from` 之前的任何一格（`seqs_from_reads_no_slot_before_its_start`），所以从某个 seq 往后读一段的代价只与那一段同阶，而与它前面的账本长度无关。
+- **消费者**：`accounting::trace` 判同楼的别人时，从区间的下界读到上界（accounting-SPEC.md 8-25）；每个提交一次，有了这个读者，一次导出在这一项上的代价是各区间长度之和，而不是提交数乘行数。
+- **列外行与归并**：与 `seqs()` 同一个归并，列与列外行各从 `from` 起；`index/fold/tests.rs` 的 map 形 oracle 对每个探测的 `from` 判等（正反两向）。本模型只写列，列外行是有序表的区间查询，没有自己的算术。
+
+D23 从某个 seq 往后读由索引给，而不由调用方跳过前面的。理由：列里一行的位置就是它的 seq 减 `base`，索引知道 `from` 在哪一格，调用方只能从第一格数过去；`skip_while` 在每个提交上都把区间之前的全部 seq 走一遍，一次导出就是提交数乘行数。被否决的做法：①给一个闭开区间的读者 `seqs_in(Range<Seq>)`——上界是调用方的条件（`take_while` 在第一个越界的值上停），放进索引不省一格，只多一个参数；②在 playback 里留一份 walk 走过的 seq 表，按下界二分——那是同一批行的第二份索引，要与 `LedgerIndex` 各自维护；③按 run 读（`run_seqs_before`）再合并——同楼的别人是全部 run，按 run 读要先知道有哪些 run。重开参数：有调用方要从某个 seq 往前读（例如 `view --follow` 从尾部倒着取新长出来的行）时，再看要不要一个从上界往前的读者；今天的 `seqs().rev().take_while(..)` 只走新长出来的那几行，不随账本长度增长。
+-/
+
+namespace Storage.Index
+
+/-- seq 列：从 `base` 起每格一个槽，`true` 是有行，`false` 是空洞（Rust 的 `HOLE`）。第 `i` 格的 seq 是 `base + i`，seq 本身不存。 -/
+structure Column where
+  base : Nat
+  slots : List Bool
+
+/-- 从 seq `low` 那一格起逐格读，有行的格交出它的 seq。 -/
+def heldFrom : Nat → List Bool → List Nat
+  | _, [] => []
+  | low, true :: rest => low :: heldFrom (low + 1) rest
+  | low, false :: rest => heldFrom (low + 1) rest
+
+/-- `seqs()`：列里的每一条，升序。 -/
+def Column.seqs (c : Column) : List Nat := heldFrom c.base c.slots
+
+/-- `seqs_from(start)`：直接到 `start` 所在那一格（`start` 在 `base` 之前时就是第一格），它之前的格一格也不读。 -/
+def Column.seqsFrom (c : Column) (start : Nat) : List Nat :=
+  heldFrom (c.base + (start - c.base)) (c.slots.drop (start - c.base))
+
+theorem held_from_starts_at {low x : Nat} {slots : List Bool} (h : x ∈ heldFrom low slots) :
+    low ≤ x := by
+  induction slots generalizing low with
+  | nil => simp [heldFrom] at h
+  | cons s rest ih =>
+    cases s with
+    | true =>
+      simp only [heldFrom, List.mem_cons] at h
+      cases h with
+      | inl here => omega
+      | inr later => have := ih later; omega
+    | false =>
+      simp only [heldFrom] at h
+      have := ih h
+      omega
+
+/-- 一串从 `low` 起的值，丢掉小于 `m` 的，`m ≤ low` 时什么也不丢。 -/
+theorem held_from_drops_nothing_below_its_start (slots : List Bool) :
+    ∀ (low m : Nat), m ≤ low →
+      (heldFrom low slots).dropWhile (fun x => decide (x < m)) = heldFrom low slots := by
+  induction slots with
+  | nil => intro low m _; simp [heldFrom]
+  | cons s rest ih =>
+    intro low m below
+    cases s with
+    | true =>
+      simp only [heldFrom]
+      rw [List.dropWhile_cons_of_neg (by simp only [decide_eq_true_eq]; omega)]
+    | false =>
+      simp only [heldFrom]
+      exact ih (low + 1) m (by omega)
+
+/-- 跳过前 `k` 格再读，与读完再丢掉小于 `low + k` 的值相同。 -/
+theorem held_from_after_dropping (slots : List Bool) :
+    ∀ (low k : Nat), heldFrom (low + k) (slots.drop k)
+      = (heldFrom low slots).dropWhile (fun x => decide (x < low + k)) := by
+  induction slots with
+  | nil => intro low k; simp [heldFrom]
+  | cons s rest ih =>
+    intro low k
+    cases k with
+    | zero =>
+      simp only [Nat.add_zero, List.drop_zero]
+      exact (held_from_drops_nothing_below_its_start (s :: rest) low low (Nat.le_refl low)).symm
+    | succ k =>
+      have shifted : low + (k + 1) = (low + 1) + k := by omega
+      cases s with
+      | true =>
+        simp only [List.drop_succ_cons, heldFrom]
+        rw [List.dropWhile_cons_of_pos (by simp only [decide_eq_true_eq]; omega), shifted]
+        exact ih (low + 1) k
+      | false =>
+        simp only [List.drop_succ_cons, heldFrom]
+        rw [shifted]
+        exact ih (low + 1) k
+
+/-- `seqs_from(start)` 交出的，就是 `seqs()` 跳过小于 `start` 的那些之后剩下的：调用方原来的 `skip_while` 一字不差。 -/
+theorem seqs_from_is_the_walk_past_the_smaller (c : Column) (start : Nat) :
+    c.seqsFrom start = c.seqs.dropWhile (fun x => decide (x < start)) := by
+  unfold Column.seqsFrom Column.seqs
+  rw [held_from_after_dropping c.slots c.base (start - c.base)]
+  by_cases before : start ≤ c.base
+  · have none_skipped : start - c.base = 0 := by omega
+    rw [none_skipped, Nat.add_zero,
+      held_from_drops_nothing_below_its_start c.slots c.base c.base (Nat.le_refl _),
+      held_from_drops_nothing_below_its_start c.slots c.base start before]
+  · have reaches : c.base + (start - c.base) = start := by omega
+    rw [reaches]
+
+/-- 答的是索引里不小于 `start` 的每一条，升序。 -/
+theorem seqs_from_answers_the_held_seqs_at_or_after (c : Column) (start : Nat) :
+    c.seqsFrom start = c.seqs.filter (fun x => decide (start ≤ x)) := by
+  unfold Column.seqsFrom Column.seqs
+  have answer : ∀ (slots : List Bool) (low k : Nat),
+      heldFrom (low + k) (slots.drop k) = (heldFrom low slots).filter (fun x => decide (low + k ≤ x)) := by
+    intro slots
+    induction slots with
+    | nil => intro low k; simp [heldFrom]
+    | cons s rest ih =>
+      intro low k
+      cases k with
+      | zero =>
+        simp only [Nat.add_zero, List.drop_zero]
+        refine (List.filter_eq_self.mpr ?_).symm
+        intro x held
+        simpa using held_from_starts_at held
+      | succ k =>
+        have shifted : low + (k + 1) = (low + 1) + k := by omega
+        cases s with
+        | true =>
+          simp only [List.drop_succ_cons, heldFrom]
+          rw [List.filter_cons_of_neg (by simp only [decide_eq_true_eq]; omega), shifted]
+          exact ih (low + 1) k
+        | false =>
+          simp only [List.drop_succ_cons, heldFrom]
+          rw [shifted]
+          exact ih (low + 1) k
+  rw [answer c.slots c.base (start - c.base)]
+  apply List.filter_congr
+  intro x held
+  have := held_from_starts_at held
+  simp only [decide_eq_decide]
+  constructor <;> intro <;> omega
+
+/-- 改动 `start` 之前的任何一格都不改变答案：读者从 `start` 那一格起走，前面的格它不读。 -/
+theorem seqs_from_reads_no_slot_before_its_start (c c' : Column) (start : Nat)
+    (sameBase : c.base = c'.base)
+    (sameFromStart : c.slots.drop (start - c.base) = c'.slots.drop (start - c'.base)) :
+    c.seqsFrom start = c'.seqsFrom start := by
+  unfold Column.seqsFrom
+  rw [sameFromStart, sameBase]
+
+/-- 一列：seq 3 有行，4 是空洞，5、6 有行。从 5 起读得 5、6；从 1 起读得全部。 -/
+example : (Column.mk 3 [true, false, true, true]).seqsFrom 5 = [5, 6] := by decide
+example : (Column.mk 3 [true, false, true, true]).seqsFrom 1 = [3, 5, 6] := by decide
+
+end Storage.Index

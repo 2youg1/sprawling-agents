@@ -868,11 +868,11 @@ pub(crate) fn trace_through(index: &LedgerIndex, ledger_dir: &Path, commit: wire
 - `History::absorb` 遇到视图拒绝折的第一行时停下，记住那条拒绝；之后每次 `commit` 都答它，这些提交写 `{"unread":"<错误码>"}`，导出不因此失败（8-17）。视图折的是 walk 已核对过的同一批记录，被拒绝的行在 cutoff 以内，所以一份 bundle 里的 `unread` 只取决于 cutoff 以内的历史，复核时照样重现。
 - `whose --trace`（sprawling-SPEC.md 8-136）不变：`trace(city_root, oid)` 照旧经 `views::ask` 求这个 oid 最近一次的宣告、重建一次索引，再经 `trace_through` 按同一条区间规则读。
 
-**代价。** 一份 bundle 只折一遍视图，与 walk 同一遍、同一批记录；它从不调用 `views::ask`，也不重建索引。每个范围内第一次宣告的提交另有一次视图查询（在内存里）、一次打开仓库读父提交（`storage::parents_of`），再按索引读它的 run 的行（倒着读到下界前最近的 `model_called`）与区间里的行。判同楼的别人时 `LedgerIndex::seqs` 从头数到区间的下界：那是内存里的一遍 seq，不读盘，但每个提交数一遍，所以这一项仍与提交数乘行数同阶；storage 的索引给出从某个 seq 起的迭代时，它就只与区间长度成正比。确定性计数：`accounting::playback::tests::tracing` 在 N 与 2N 个提交的历史上各导出一次，数这次导出开始了几次视图折叠，两种规模下都是 1。毫秒读数由同一文件的仪表 `instrument_evidence_cost` 给出（`cargo nextest run -p sprawling-accounting --run-ignored only -E 'test(instrument_evidence_cost)' --no-capture`）。walk 里多出的视图折叠是每行的固定代价（§3）。
+**代价。** 一份 bundle 只折一遍视图，与 walk 同一遍、同一批记录；它从不调用 `views::ask`，也不重建索引。每个范围内第一次宣告的提交另有一次视图查询（在内存里）、一次打开仓库读父提交（`storage::parents_of`），再按索引读它的 run 的行（倒着读到下界前最近的 `model_called`）与区间里的行。判同楼的别人时从区间的下界起读索引（`LedgerIndex::seqs_from`，`crates/storage/Spec.lean` §8-38），读到区间之后的第一行为止：一个提交读过的索引项是它的区间长度加一，与它之前的账本有多长无关，一次导出在这一项上的代价是各区间长度之和，不是提交数乘行数。确定性计数：`accounting::playback::tests::tracing` 在 N 与 2N 个提交的历史上各导出一次，数这次导出开始了几次视图折叠，两种规模下都是 1；再数一个提交判同楼的别人时最多读过几条索引项，两种规模下都是 6（第一个提交的区间从它的 run 的第一行起，五行，加上区间之后那一行）。两个数都只在测试里编译（`trace::counted`），理由与第 37(c) 条相同：要挡住的是按 N 增长的代价，墙钟在小夹具上看不出它。毫秒读数由同一文件的仪表 `instrument_evidence_cost` 给出（`cargo nextest run -p sprawling-accounting --run-ignored only -E 'test(instrument_evidence_cost)' --no-capture`）。walk 里多出的视图折叠是每行的固定代价（§3）。
 
 **失败。** `History::commit` 的失败是视图拒绝折某一行的那条 `AxError`；`trace_through` 的失败是读行的 `StorageError`（经 `into_ax`）、一行解析不了、actor 落在保留子树里（同 8-16）。两者在 playback 里都写成 `unread`。
 
-**本节测试**：`accounting::playback::tests::tracing`：旧版本的一次模型调用、被重发替下的一次尝试、量过的一次与没有答复的一次在同一区间里，`took` 依次是 `"unknown"`、`"unknown"`（答复端 `"pending"`）、量出来的毫秒、`"unknown"`；导出之后在 cutoff 之后追加两行、改坏其中第一行，`check --city` 的来源一项仍通过；N 与 2N 个提交时一次导出都只开始一次视图折叠。`accounting::playback::tests::evidence` 的调用表照 `callee` 的形状写。
+**本节测试**：`accounting::playback::tests::tracing`：旧版本的一次模型调用、被重发替下的一次尝试、量过的一次与没有答复的一次在同一区间里，`took` 依次是 `"unknown"`、`"unknown"`（答复端 `"pending"`）、量出来的毫秒、`"unknown"`；导出之后在 cutoff 之后追加两行、改坏其中第一行，`check --city` 的来源一项仍通过；N 与 2N 个提交时一次导出都只开始一次视图折叠，一个提交判同楼的别人时读过的索引项也不随 N 变。`accounting::playback::tests::evidence` 的调用表照 `callee` 的形状写。
 
 ### 8-15 页面要的几样新东西，从哪一处答（`accounting::views::answering`、`accounting::worker::commanding`、`accounting::worker::freezing`）
 

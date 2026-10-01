@@ -39,7 +39,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被 `architecture.toml` 模块图的旧锚点与别的规格里的引用锚住，所以不重排：8-6 是空号。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部的末尾，别处引作 `storage D<n>`；§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：逐行检查与链（`spec/Jsonl/Verify.lean`）、屏障与重开（`spec/Jsonl/Barrier.lean`）、已命名对象恒不腐蚀（`spec/Cas.lean`）与范围读（`spec/Cas/Ranges.lean`）、快照与已验证前缀（`spec/Snapshot.lean`）、停机值与证明的波（`spec/ChainAudit.lean`）、工作树的租约（`spec/Worktree.lean`）、接管备树的断点（`spec/Worktree/Trees/Stock.lean`）、回到过去（`spec/Worktree/Back.lean`）、每个错误答哪个码（`spec/Error.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：逐行检查与链（`spec/Jsonl/Verify.lean`）、屏障与重开（`spec/Jsonl/Barrier.lean`）、已命名对象恒不腐蚀（`spec/Cas.lean`）与范围读（`spec/Cas/Ranges.lean`）、快照与已验证前缀（`spec/Snapshot.lean`）、停机值与证明的波（`spec/ChainAudit.lean`）、工作树的租约（`spec/Worktree.lean`）、接管备树的断点（`spec/Worktree/Trees/Stock.lean`）、回到过去（`spec/Worktree/Back.lean`）、每个错误答哪个码（`spec/Error.lean`）、按 seq 往后读索引（`spec/Index.lean` §8-38）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -95,6 +95,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 - `spec/Worktree.lean`：锁着的树拒第二次领（`a_held_tree_refuses_a_second_claim`）；还了的树再领不重新放置（`a_released_tree_is_claimed_again_without_a_placement`）；开城之后只剩备树（`opening_a_city_leaves_only_the_stock`）。
 - `spec/Worktree/Trees/Stock.lean`：接管在任何一步之后断掉都收得回来（`every_cut_is_recovered`）；备树被拿走只成一次（`the_stock_is_taken_once`）。
 - `spec/Worktree/Back.lean`：回到过去的树恰在那一点、拒绝活树、只动自己的树、账本只增不减（§8-27）。
+- `spec/Index.lean`：从某个 seq 往后读，答的是索引里不小于它的每一条（`seqs_from_answers_the_held_seqs_at_or_after`），与从头读再跳过前面的相同（`seqs_from_is_the_walk_past_the_smaller`），答案不取决于它之前的任何一格（`seqs_from_reads_no_slot_before_its_start`）。
 - `spec/Error.lean`：账本介质的失败答 `E_STORAGE_FATAL`（`ledger_failures_stop_the_writer`），只有两个变体原样交出它们带着的错误（`only_two_variants_carry`）。
 
 每个模型都带一个可实现的正常路径（走得通的两行账本、一次没有打扰的 `put`、恰触界的范围、没有断掉的接管、Lean 里的 `example`），所以这些保证不是从一个无法满足的前提推出来的。生产实现与模型的对应由 §16 列出的 Rust 测试检查；一条 Lean 定理证明的是模型，不是 Rust。
@@ -214,6 +215,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | 8-33 | `crates/storage/spec/Checkpoint.lean` |
 | 8-34 | `crates/storage/spec/Jsonl.lean` |
 | 8-37 | `crates/storage/spec/ChainAudit.lean` |
+| 8-38 | `crates/storage/spec/Index.lean` |
 -/
 
 /-! ## 9 工作流程
@@ -275,6 +277,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | D20 | 已验证前缀的记录不带密钥 | `crates/storage/spec/ChainAudit.lean` |
 | D21 | 证明并行的只是各段前缀的摘要，链仍按段序判 | `crates/storage/spec/ChainAudit.lean` |
 | D22 | 开账本借用证明写下的记录，不另起一种记录 | `crates/storage/spec/Jsonl.lean` |
+| D23 | 从某个 seq 往后读由索引给，而不由调用方跳过前面的（8-38） | `crates/storage/spec/Index.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -309,7 +312,7 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 - 工作树与备树：`worktree::trees::tests`（`one_node_holds_one_tree_and_the_second_claim_is_refused_by_name` 等）、`trees::kept::tests`、`trees::stock::tests`（`a_placement_from_the_stock_creates_no_file_at_either_size`、`the_stock_is_no_nodes_tree_and_outlives_the_sweep`）、`worktree::back::tests`。
 - 错误码：没有逐臂比对整张表的测试；`jsonl/open/tests.rs`（`E_LEDGER_HELD`、`E_LOG_VERSION_UNSUPPORTED`）、`chain_audit::tests`（`E_HISTORY_UNPROVEN`）、`snapshot::tests` 与 `worktree::trees::tests`（`E_STORAGE_FATAL`）各比对它们走到的那一臂，其余各臂由 `into_ax` 的穷尽 `match` 与 `spec/Error.lean` 的 `code` 对照着读。
 
-没有 Lean 模型的分部，其要求由类型与 `cargo nextest run -p sprawling-storage` 的各模块测试守住：索引的列与列外行（`index/fold/tests.rs` 的 map 形 oracle）、热视图与归因（`tests/derived_views.rs` 与各自的测试）、检查点与它的凭证扫描、`changes`、`hunks`、`status`、`blob`、`bundle`、`sessions`、`alias`、`queue`、`digest_cache`、`real_fs`、`fault_fs`。`TailLines` 倒着接链与正着接是同一条链，由 `jsonl/tail/tests.rs` 比对，没有在 Lean 里证明。
+没有 Lean 模型的分部，其要求由类型与 `cargo nextest run -p sprawling-storage` 的各模块测试守住：索引的列与列外行，以及 `seqs_from` 的列外行与归并（`index/fold/tests.rs` 的 map 形 oracle）、热视图与归因（`tests/derived_views.rs` 与各自的测试）、检查点与它的凭证扫描、`changes`、`hunks`、`status`、`blob`、`bundle`、`sessions`、`alias`、`queue`、`digest_cache`、`real_fs`、`fault_fs`。`TailLines` 倒着接链与正着接是同一条链，由 `jsonl/tail/tests.rs` 比对，没有在 Lean 里证明。
 -/
 
 /-! ## 17 文档关系
