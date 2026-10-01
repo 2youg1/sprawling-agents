@@ -1043,6 +1043,10 @@
     "en": "the Python this repository's probes and maintenance scripts run on",
     "zh": "本仓库探针与维护脚本所用的 Python"
   },
+  "machine_enables_zig": {
+    "en": "the Zig leaf crates/desktop/ffi builds on Windows, at the version crates/desktop/ffi/zig-version pins",
+    "zh": "Windows 上编译 crates/desktop/ffi 的 Zig 叶子，版本是 crates/desktop/ffi/zig-version 钉住的那个"
+  },
   "machine_install": {
     "en": "install",
     "zh": "安装"
