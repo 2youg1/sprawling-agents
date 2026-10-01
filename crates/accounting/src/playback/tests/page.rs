@@ -309,3 +309,53 @@ fn a_template_without_exactly_one_empty_block_or_with_a_way_out_is_not_embedded(
         ]
     );
 }
+
+/// `skills/playback/SKILL.md`, which ships beside the binary.
+const SKILL: &str = include_str!("../../../../../skills/playback/SKILL.md");
+
+#[test]
+fn the_skill_states_the_contract_this_build_writes() {
+    let (dir, _) = city();
+    let bundle = export(dir.path(), &person()).unwrap();
+    let raw = String::from_utf8(bundle.bytes().to_vec()).unwrap();
+    let parsed: serde_json::Value = serde_json::from_slice(bundle.bytes()).unwrap();
+    let mut sections: Vec<&String> = parsed.as_object().unwrap().keys().collect();
+    sections.sort_by_key(|key| raw.find(&format!("\"{key}\":")).unwrap());
+    let rows: Vec<Option<usize>> = sections
+        .iter()
+        .map(|key| SKILL.find(&format!("| `{key}` |")))
+        .collect();
+    let mut items: Vec<String> = Vec::new();
+    let mut words: Vec<String> = Vec::new();
+    for found in [
+        check(bundle.bytes(), &Asked::default()),
+        check(b"<p>no page</p>", &Asked::default()),
+    ] {
+        for (name, item) in found.line().as_object().unwrap() {
+            if let Some(status) = item.get("status").and_then(serde_json::Value::as_str) {
+                items.push(format!("| `{name}` |"));
+                words.push(format!("`{status}`"));
+            }
+        }
+    }
+    let example = SKILL
+        .split("```json\n")
+        .nth(1)
+        .and_then(|block| block.split("```").next())
+        .unwrap();
+    let (read, _) = super::super::observed::judge(example.as_bytes(), B3Hash::digest(b"x"));
+    assert_eq!(
+        (
+            SKILL.contains(super::super::SCHEMA),
+            SKILL.contains(BUNDLE_BLOCK),
+            rows.iter().all(Option::is_some) && rows.is_sorted(),
+            items
+                .iter()
+                .chain(&words)
+                .all(|said| SKILL.contains(said.as_str())),
+            matches!(&read, Verdict::Unable { why } if why.starts_with("the observation speaks of the page")),
+        ),
+        (true, true, true, true, true),
+        "sections {sections:?} at {rows:?}; items {items:?}; statuses {words:?}; the example reads as {read:?}"
+    );
+}

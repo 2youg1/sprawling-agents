@@ -57,6 +57,13 @@ skill keeps the byline its original wore — KL9 ＆ Claude Fable 5.
 The repository owner's own skill, written for this tree under MPL-2.0, the
 license in `LICENSE` at the root of this tree.
 
+## `playback` — MPL-2.0
+
+Written for this repository by 2youg1 and the sprawling contributors, 2026,
+under MPL-2.0, the license in `LICENSE` at the root of this tree. It states
+the playback bundle's data contract and the checks `sprawling playback check`
+runs, so it changes with the code that writes them.
+
 ## `authority-review` — MIT
 
 Modified adaptation of the Thermos plugin (`cursor/plugins`, MIT), the same upstream as
