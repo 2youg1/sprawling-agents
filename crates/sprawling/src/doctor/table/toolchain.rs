@@ -312,9 +312,10 @@ pub(super) const ELAN: Requirement = row(
 .from(Upstream::GitHub("leanprover/elan"));
 
 /// What `elan toolchain install` is handed for one pin: the toolchain
-/// `lean-toolchain` names (sprawling-SPEC.md 8-162).
+/// `lean-toolchain` names, or `stable` when the build found no pin file,
+/// because elan refuses an empty toolchain name (sprawling-SPEC.md 8-162).
 const fn lean_install(pin: &'static str) -> &'static str {
-    pin
+    if pin.is_empty() { "stable" } else { pin }
 }
 
 /// The toolchain this build installs for the `lean` row.
@@ -340,22 +341,28 @@ pub(super) const LEAN: Requirement = row(
 /// 8-146).
 const ZIG_PIN: &str = crate::doctor::pin::ZIG_VERSION;
 
-/// winget's arguments for Zig at one pin (sprawling-SPEC.md 8-162). A
-/// macro rather than a `const fn`: a recipe's arguments are a `'static`
-/// slice, which a `const fn` cannot build out of its parameter, while a
-/// macro expands into a `const` item where the pin is a constant.
+/// winget's arguments for Zig at one pin, without `--version` when the
+/// build found no pin file, because winget refuses an empty version
+/// (sprawling-SPEC.md 8-162). A macro rather than a `const fn`: a recipe's
+/// arguments are a `'static` slice, which a `const fn` cannot build out of
+/// its parameter, while a macro expands into a `const` item where the pin
+/// is a constant.
 macro_rules! winget_zig {
     ($pin:expr) => {
-        &[
-            "install",
-            "--id",
-            "zig.zig",
-            "-e",
-            "--version",
-            $pin,
-            "--scope",
-            "user",
-        ]
+        if $pin.is_empty() {
+            &["install", "--id", "zig.zig", "-e", "--scope", "user"]
+        } else {
+            &[
+                "install",
+                "--id",
+                "zig.zig",
+                "-e",
+                "--version",
+                $pin,
+                "--scope",
+                "user",
+            ]
+        }
     };
 }
 
