@@ -58,6 +58,17 @@ def recordsWhere (ground : Ground) (kind key value : String) : IO (List Record) 
   return (← ground.records).filter fun record =>
     record.kind == kind && field record key == some value
 
+/-- Waits for a record of `kind` whose payload says `value` under `key`, and
+then hands back every such record.
+
+A run's landing writes what its plan and its requests came to after the run
+has frozen, so a step that read the history once at the freeze could read it
+before the landing; waiting for the first such record and then reading them all
+is what lets a step say "exactly once". -/
+def landedWhere (ground : Ground) (kind key value what : String) : IO (List Record) := do
+  let _ ← awaitingOne ground kind (fun record => field record key == some value) what recordTries
+  recordsWhere ground kind key value
+
 /-- The person raises the second building, asks it to review its work, and
 writes the first row of its plan. -/
 def reviewRaised (setting : Setting) : Step :=
@@ -72,7 +83,7 @@ def divided (setting : Setting) : Step :=
   { name := "a resident divides the plan's row into two leaves"
   , walk := fun ground => do
       let _ ← sentAndEnded setting ground planner "plan" 407
-      let splits ← recordsWhere ground "roadmap_split" "node" "1"
+      let splits ← landedWhere ground "roadmap_split" "node" "1" "for the planner's division"
       let children := splits.map fun record =>
         match (record.data.getObjVal? "children").toOption.bind (·.getArr?.toOption) with
         | some named => named.toList.filterMap (·.getStr?.toOption)
@@ -115,6 +126,7 @@ def offeredForReview (setting : Setting) : Step :=
       let _ ← sentAndEnded setting ground left "again" 410
       ensureEq 1 (← recordsWhere ground "roadmap_claimed" "node" secondLeaf).length
         s!"the leaf {secondLeaf} was not claimed once"
+      let _ ← awaitingOne ground "pr_opened" (fun _ => true) "for the offer" recordTries
       ensureEq 1 ((← ground.records).filter (·.kind == "pr_opened")).length
         "the work was not offered for review once"
       ensure (!(← (ground.city / offeredPath).pathExists))
@@ -130,7 +142,7 @@ def refused (setting : Setting) : Step :=
         | ensure false "the history holds no offer with a branch to check"
       IO.FS.writeFile setting.script (scriptWithChecker setting.skills branch).compress
       let _ ← sentAndEnded setting ground right "check" 411
-      let rejected ← recordsWhere ground "pr_rejected" "branch" branch
+      let rejected ← landedWhere ground "pr_rejected" "branch" branch "for the refused check"
       ensureEq [some refusedWhy] (rejected.map (field · "why"))
         s!"the offer on {branch} was not refused once with the checker's reason"
       ensureEq 0 ((← ground.records).filter (·.kind == "pr_merged")).length

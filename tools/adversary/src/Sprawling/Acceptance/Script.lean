@@ -61,12 +61,14 @@ def statusCalls : Nat := 120
 
 /-- How many `status` calls each claimant makes after it asks for the leaf.
 
-The two claimants are sent at once, but each first waits for a tree of its own,
-and the city places one tree after the other; the one that asks first has to be
-still in flight when the other asks, or the second claim would be judged
-against a run that already came home. Three hundred calls are a few seconds of
-a debug build, more than one placement. -/
-def holdCalls : Nat := 300
+The two claimants are sent at once, but each first waits for the city to place
+a tree of its own; the one that asks first has to be still in flight when the
+other asks, or the second claim would be judged against a run that already came
+home. Measured on a debug build, the two first turns reached the stand-in one
+after the other and the claims followed at once; sixty calls keep the first
+claimant working for about two seconds after that, which is room for a
+placement that runs late. -/
+def holdCalls : Nat := 60
 
 /-- The building the collaboration happens in: the second of `Sprawling.cast`,
 raised by the walk and asked by the person to review its work. -/
@@ -160,9 +162,15 @@ def interruptedRun : Run := fun run =>
 /-- The work sent the morning after the crash. -/
 def morningRun : Run := fun _ => [saying "the city came back"]
 
-/-- Divides the person's row into the two leaves. -/
+/-- Takes the person's row and divides it into the two leaves.
+
+The row is claimed first because a landing replays a split only onto a row that
+is still in progress (`collab::ClaimEffect::expected_before`); a split of a row
+nobody holds is answered by the tool and then dropped when the run lands
+(`tools/adversary/Spec.lean` section 4, the eighth finding). -/
 def plannerRun : Run := fun run =>
-  [ calling run 0 "plan"
+  [ calling run 0 "plan" (Json.mkObj [("action", .str "claim"), ("node", .str "1")])
+  , calling run 1 "plan"
       (Json.mkObj
         [ ("action", .str "split"), ("node", .str "1")
         , ("parts", Json.arr (leaves.map Json.str).toArray) ])
@@ -198,7 +206,8 @@ def checkerRun (branch : String) : Run := fun run =>
 
 /-- The runs the walk opens, in the order it opens them. -/
 def runsFor (skills : List String) : List Run :=
-  [ firstRun skills, interruptedRun, morningRun ]
+  [ firstRun skills, interruptedRun, morningRun
+  , plannerRun, claimantRun, claimantRun, offeringRun ]
 
 /-- A script of the runs given, each handed its place. -/
 private def written (runs : List Run) : Json :=
