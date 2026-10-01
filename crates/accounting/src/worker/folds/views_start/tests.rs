@@ -12,7 +12,9 @@ use kernel::{Address, RunId, Seq};
 use storage::{StoredSnapshot, WholeFold};
 
 use super::*;
-use crate::views::snapshot::start::{FoldStart, cut, snapshot_dir, start};
+use crate::views::snapshot::start::{
+    FoldStart, cut, proof_dir, snapshot_dir, start, start_audited,
+};
 use crate::worker::RunWorker;
 
 fn raise(worker: &mut RunWorker, names: std::ops::Range<u8>) {
@@ -231,4 +233,44 @@ fn a_served_city_reopens_from_its_snapshots_and_folds_only_what_grew() {
         Some(format!("fold {grown} lines from the snapshots")),
         "{line}"
     );
+}
+
+/// A one-shot rebuild checks each line once: from genesis the fold's own
+/// check is the proof, and from a snapshot with the proof records full it
+/// checks only what was written since - twice, once proving and once
+/// folding - at any length of history (accounting-SPEC.md 8-19).
+#[test]
+fn a_rebuild_checks_each_line_once_whatever_the_length_of_history() {
+    let hands = crate::worker::fixture::hands;
+    let checked = |buildings: u8| {
+        let dir = tempfile::tempdir().unwrap();
+        let city = dir.path();
+        let ledger = crate::worker::fixture::init_city(city).unwrap().ledger_dir;
+        let mut worker = RunWorker::new(city, Diagnostics::off(), hands()).unwrap();
+        raise(&mut worker, 0..buildings);
+        drop(worker);
+        let count = |ledger: &Path| {
+            u64::try_from(storage::read_raw_lines_at(ledger).unwrap().len()).unwrap()
+        };
+        let lines = count(&ledger);
+        let whole = start_audited::<Views>(&ledger).unwrap();
+        cut(&ledger, &whole.started).unwrap();
+        let (held, _) = storage::JsonlLedger::open(&ledger, kernel::TimeMs::new(0)).unwrap();
+        storage::prove_chain(&ledger, &held.proof_records(&proof_dir(city))).unwrap();
+        drop(held);
+        let mut worker = RunWorker::new(city, Diagnostics::off(), hands()).unwrap();
+        raise(&mut worker, 100..102);
+        drop(worker);
+        let since = count(&ledger) - lines;
+        let resumed = start_audited::<Views>(&ledger).unwrap();
+        assert!(matches!(resumed.started.from, FoldStart::Resumed { .. }));
+        (
+            (whole.lines_checked, resumed.lines_checked),
+            (lines, 2 * since),
+        )
+    };
+    for buildings in [3, 6] {
+        let (counted, expected) = checked(buildings);
+        assert_eq!(counted, expected, "{buildings} buildings");
+    }
 }

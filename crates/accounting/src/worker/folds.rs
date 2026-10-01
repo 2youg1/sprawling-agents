@@ -80,7 +80,7 @@ impl Standing {
         if !ledger_dir.exists() {
             return StandingFolds::empty(ledger_dir).settle(Ok(()));
         }
-        let started = start_audited::<StandingFolds>(ledger_dir)?;
+        let started = start_audited::<StandingFolds>(ledger_dir)?.started;
         let cut = cut(ledger_dir, &started);
         started.folded.settle(cut)
     }

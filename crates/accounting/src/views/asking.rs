@@ -53,6 +53,6 @@ impl Views {
     /// the verification failures of the lines it folds; a city whose
     /// history does not verify is not one whose views should be served.
     pub fn rebuild(ledger_dir: &Path) -> Result<Views, AxError> {
-        start_audited::<Views>(ledger_dir).map(|started| started.folded)
+        start_audited::<Views>(ledger_dir).map(|audited| audited.started.folded)
     }
 }

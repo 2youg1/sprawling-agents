@@ -116,6 +116,14 @@ pub fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> 
     }
 }
 
+/// A start from a proved history, and how many lines were checked one by
+/// one on the way there: the proof's and the fold's together
+/// (accounting-SPEC.md 8-19).
+pub struct Audited<F> {
+    pub started: Started<F>,
+    pub lines_checked: u64,
+}
+
 /// [`start`] once a proof of the whole chain returns `Whole`, so a start
 /// from the snapshot never accepts a chain a whole fold would refuse: the
 /// snapshot's fit checks only the line at its seq, and the ledger open
@@ -126,14 +134,39 @@ pub fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> 
 /// # Errors
 /// The proof's reason when the chain is broken or cannot be read, and
 /// those of [`start`].
-pub fn start_audited<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> {
+pub fn start_audited<F: SnapshotFold>(ledger_dir: &Path) -> Result<Audited<F>, AxError> {
+    let proved = prove(ledger_dir)?;
+    let started = start(ledger_dir)?;
+    let folded = folded_lines(&started);
+    Ok(Audited {
+        started,
+        lines_checked: proved.saturating_add(folded),
+    })
+}
+
+/// Proves the chain in `ledger_dir` with the city's records read-only,
+/// answering how many lines the proof checked one by one.
+///
+/// # Errors
+/// The proof's reason when the chain is broken, and an I/O failure
+/// reading it.
+fn prove(ledger_dir: &Path) -> Result<u64, AxError> {
     let records = storage::ProofRecords::read_only(&proof_dir(city_root_of(ledger_dir)));
-    match storage::prove_chain(ledger_dir, &records)
-        .map_err(StorageError::into_ax)?
-        .audit
-    {
-        storage::ChainAudit::Whole { .. } => start(ledger_dir),
+    let proven = storage::prove_chain(ledger_dir, &records).map_err(StorageError::into_ax)?;
+    match proven.audit {
+        storage::ChainAudit::Whole { .. } => Ok(proven.counted.lines_checked),
         storage::ChainAudit::Broken(reason) => Err(reason),
+    }
+}
+
+/// The lines a start checked one by one while folding: the tail after its
+/// snapshot, or every line from genesis to the last one it folded.
+fn folded_lines<F>(started: &Started<F>) -> u64 {
+    match started.from {
+        FoldStart::Resumed { tail } => u64::try_from(tail).unwrap_or(u64::MAX),
+        FoldStart::Whole(_) | FoldStart::Alongside => started
+            .last_seq()
+            .map_or(0, |seq| seq.value().saturating_add(1)),
     }
 }
 
