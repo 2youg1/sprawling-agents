@@ -105,7 +105,7 @@ const FUZZ: &str = "tools/fuzz/";
 const GATES: &str = env!("CARGO_PKG_NAME");
 
 /// How much of one file is test code, decided by where it lives
-/// (xtask-SPEC.md section 8-39).
+/// (tools/xtask/Spec.lean §8-39).
 #[derive(Debug, PartialEq, Eq)]
 enum Reading {
     /// The whole file is test code by its address.

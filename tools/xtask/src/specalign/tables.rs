@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `specalign` once the kernel's specification is Lean (xtask-SPEC.md
-//! section 8-43): the carrier of every `AxCode`, the window class of
+//! `specalign` once the kernel's specification is Lean (tools/xtask/Spec.lean
+//! §8-43): the carrier of every `AxCode`, the window class of
 //! every `EventKind`, and every `inductive` that shares a name with a
 //! kernel enum, each against what the kernel compiles.
 //!
@@ -85,7 +85,7 @@ fn located(sources: &[Source], def: &str) -> Result<Located, XtaskError> {
         .ok_or_else(|| XtaskError::Doc {
             file: "the kernel's Lean specification".to_owned(),
             msg: format!(
-                "no `def {def}` written one arm per line (xtask-SPEC.md section 8-43); write it \
+                "no `def {def}` written one arm per line (tools/xtask/Spec.lean §8-43); write it \
                  there, so the gate has a table to hold the enum to"
             ),
         })
@@ -158,7 +158,7 @@ fn finding(location: String, violation: String, alternative: &str) -> Violation 
         gate: "specalign",
         location,
         rule: "the kernel's Lean specification names exactly the variants the kernel compiles, \
-               with the carrier and window class each one has (xtask-SPEC.md section 8-43)"
+               with the carrier and window class each one has (tools/xtask/Spec.lean §8-43)"
             .to_owned(),
         violation,
         alternative: alternative.to_owned(),

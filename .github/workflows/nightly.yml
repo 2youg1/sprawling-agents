@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   # The public surface of the two seam crates, kernel and wire, against
-  # its committed baseline (xtask-SPEC.md section 8-32). It is not a gate:
+  # its committed baseline (tools/xtask/Spec.lean §8-32). It is not a gate:
   # whether an interface change belongs in a SPEC is the reviewer's call,
   # and a drift here is read the next morning.
   #
@@ -34,7 +34,7 @@ jobs:
   # source printed by another nightly's rustdoc can differ line by line.
   # So the job installs exactly the pair `tools/xtask/public-api.txt`
   # names - a dated nightly and a cargo-public-api release - and
-  # `cargo xtask apisync` refuses any other (xtask-SPEC.md section 12-6).
+  # `cargo xtask apisync` refuses any other (xtask D6).
   # cargo-public-api is built from that version rather than taken from an
   # install action, whose `tool:` line would carry a second copy of it.
   apisync:

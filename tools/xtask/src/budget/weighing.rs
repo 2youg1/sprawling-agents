@@ -30,7 +30,7 @@ use crate::report::XtaskError;
 /// `[dependency_count]` row, so the number a reader meets in
 /// `ARCHITECTURE.md`, the number `docs/third-party.md` states and the
 /// number the report prints are one reading taken once. No count is
-/// refused (xtask-SPEC.md section 8-25).
+/// refused (tools/xtask/Spec.lean §8-25).
 ///
 /// # Errors
 /// Refuses a lockfile it cannot read, and one that resolves no package

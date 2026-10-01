@@ -128,7 +128,7 @@ fn an_spdx_expression_is_read_the_way_cargo_deny_reads_it() {
 
 /// Parentheses group before an `OR` splits them, `WITH` binds its
 /// exception to one licence, and an expression that does not parse is a
-/// licence nobody stated (xtask-SPEC.md section 8-12).
+/// licence nobody stated (tools/xtask/Spec.lean §8-12).
 #[test]
 fn parentheses_group_before_an_or_splits_them() {
     let permitted: BTreeSet<String> = [

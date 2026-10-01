@@ -5,13 +5,13 @@
 
 //! `cargo xtask spec <lib>`: create a crate's `Spec.lean` with the MPL
 //! notice and the seventeen numbered section comments `skills/sdd` lists
-//! (xtask-SPEC.md section 8-41), in the directory of the package whose lib
+//! (tools/xtask/Spec.lean §8-41), in the directory of the package whose lib
 //! (or, for a tool without one, whose package) goes by that name.
 //! Creation only: an existing `Spec.lean` is never overwritten, because
 //! everything past the skeleton is a specification somebody wrote.
 //!
 //! The gate of the same name judges what the tree holds and never
-//! writes (xtask-SPEC.md section 8-42): the command makes a
+//! writes (tools/xtask/Spec.lean §8-42): the command makes a
 //! specification, the gate holds every specification to its rules, and
 //! neither does the other's job.
 
@@ -25,8 +25,8 @@ mod effective;
 mod source;
 
 /// The checker's directory. Its own specification sits in it, beside the
-/// checker, and is held to the rules a crate's is (xtask-SPEC.md section
-/// 8-47): the checker is a Lean program, so no cargo package stands for it.
+/// checker, and is held to the rules a crate's is (tools/xtask/Spec.lean
+/// §8-47): the checker is a Lean program, so no cargo package stands for it.
 const CHECKER: &str = "tools/adversary";
 
 /// The seventeen responsibilities of `skills/sdd`, in its order. What each

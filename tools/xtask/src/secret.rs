@@ -22,7 +22,7 @@
 //! produced 268 findings and zero credentials. The
 //! alternative was a table of 268 byte offsets, which the next
 //! `bun install` invalidates in full - a category question written down as
-//! coordinates. The known limit is recorded in xtask-SPEC.md section 8-9:
+//! coordinates. The known limit is recorded in tools/xtask/Spec.lean §8-9:
 //! a test that read a live credential from the environment and recorded it
 //! into a snapshot would pass here, and the defect in that case is the
 //! test.

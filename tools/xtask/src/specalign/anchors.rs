@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The fifth assertion of `specalign`: every module row's `spec` anchor
-//! resolves to where that module is specified (xtask-SPEC.md sections
-//! 8-10 and 8-43).
+//! resolves to where that module is specified (tools/xtask/Spec.lean
+//! §8-10 and §8-43).
 //!
 //! A package that has not migrated names a section of its Markdown SPEC,
 //! `<crate>-SPEC.md#8-N`. A package that has migrated names the Lean
@@ -25,7 +25,7 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 /// What a `<crate>-SPEC.md` cell finds on disk, looked for in every
-/// package directory (xtask-SPEC.md section 8-10). The file name is the
+/// package directory (tools/xtask/Spec.lean §8-10). The file name is the
 /// whole address: which directory holds it is cargo's answer, never a
 /// path spelled here.
 enum Spec {
@@ -81,8 +81,8 @@ pub(super) fn section_present(spec: &str, section: &str) -> bool {
 ///
 /// Existence is asserted, uniqueness is not: section numbers repeat
 /// inside several Markdown SPECs because successive cards numbered
-/// independently, and renumbering them is its own work (xtask-SPEC.md
-/// section 8-10 records the condition for tightening this).
+/// independently, and renumbering them is its own work (tools/xtask/Spec.lean
+/// §8-10 records the condition for tightening this).
 pub(super) fn check(root: &Path, violations: &mut Vec<Violation>) -> Result<(), XtaskError> {
     let found = members::members(root)?;
     let dirs: Vec<String> = found.iter().map(|member| member.dir.clone()).collect();
@@ -96,7 +96,7 @@ pub(super) fn check(root: &Path, violations: &mut Vec<Violation>) -> Result<(), 
             (true, false, Some(member)) => lean_part(root, &anchor, member),
             (true, true, _) => Some((
                 "a migrated crate's rows name the Lean part that specifies them \
-                 (xtask-SPEC.md section 8-43)",
+                 (tools/xtask/Spec.lean §8-43)",
                 format!(
                     "{}: {:?} names a Markdown SPEC, and this crate's specification is {}",
                     anchor.module,
@@ -107,7 +107,7 @@ pub(super) fn check(root: &Path, violations: &mut Vec<Violation>) -> Result<(), 
                  `crates.browser.Spec` where the entry specifies the module",
             )),
             (false, false, _) | (true, false, None) => Some((
-                "a crate names its Lean parts once it has a Spec.lean (xtask-SPEC.md section 8-43)",
+                "a crate names its Lean parts once it has a Spec.lean (tools/xtask/Spec.lean §8-43)",
                 format!(
                     "{}: {:?} is a Lean module name, and this crate has no {}",
                     anchor.module,
@@ -136,7 +136,7 @@ fn lean_part(
     let file = lean::module_file(&anchor.spec);
     if !owner.holds(&file) {
         return Some((
-            "a row cites its own crate's specification (xtask-SPEC.md section 8-43)",
+            "a row cites its own crate's specification (tools/xtask/Spec.lean §8-43)",
             format!(
                 "{}: {:?} is not under {}, the directory of the crate this row belongs to",
                 anchor.module, anchor.spec, owner.dir
@@ -148,7 +148,7 @@ fn lean_part(
         return None;
     }
     Some((
-        "the Spec column points at a part that exists (xtask-SPEC.md section 8-43)",
+        "the Spec column points at a part that exists (tools/xtask/Spec.lean §8-43)",
         format!("{}: {file} is not on disk", anchor.module),
         "correct the module name, or write that part",
     ))
@@ -164,14 +164,14 @@ fn markdown_section(
 ) -> Option<(&'static str, String, &'static str)> {
     let Some((file, section)) = anchor.spec.split_once('#') else {
         return Some((
-            "the Spec column is `<crate>-SPEC.md#8-N` (xtask-SPEC.md section 8-10)",
+            "the Spec column is `<crate>-SPEC.md#8-N` (tools/xtask/Spec.lean §8-10)",
             format!("{}: {:?} has no section", anchor.module, anchor.spec),
             "write the SPEC file and the section it is specified in",
         ));
     };
     if !file.ends_with("-SPEC.md") {
         return Some((
-            "the Spec column names a crate SPEC (xtask-SPEC.md section 8-10)",
+            "the Spec column names a crate SPEC (tools/xtask/Spec.lean §8-10)",
             format!("{}: {file:?} is not a `<crate>-SPEC.md`", anchor.module),
             "name the SPEC of the crate the module lives in",
         ));
@@ -179,11 +179,11 @@ fn markdown_section(
     let spec = &*loaded
         .entry(file.to_owned())
         .or_insert_with(|| Spec::find(root, dirs, file));
-    let exists = "the Spec column points at a SPEC that exists (xtask-SPEC.md section 8-10)";
+    let exists = "the Spec column points at a SPEC that exists (tools/xtask/Spec.lean §8-10)";
     match spec {
         Spec::Text(text) if section_present(text, section) => None,
         Spec::Text(_) => Some((
-            "the Spec anchor names a section that exists (xtask-SPEC.md section 8-10)",
+            "the Spec anchor names a section that exists (tools/xtask/Spec.lean §8-10)",
             format!("{}: {file} has no section {section}", anchor.module),
             "write that section, or point the row at the section that does specify this module",
         )),
@@ -198,7 +198,7 @@ fn markdown_section(
             "correct the crate name, or write that SPEC",
         )),
         Spec::Ambiguous(paths) => Some((
-            "a SPEC file name belongs to one package (xtask-SPEC.md section 8-10)",
+            "a SPEC file name belongs to one package (tools/xtask/Spec.lean §8-10)",
             format!("{}: {file} is at {}", anchor.module, paths.join(" and ")),
             "keep one of the files, so the anchor names one SPEC",
         )),

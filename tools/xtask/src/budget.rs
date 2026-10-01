@@ -16,7 +16,7 @@
 //! built artifact. Wall-clock figures are not gated, because gating them
 //! would turn a busy runner into a defect report, and the register says
 //! so per row. The lockfile's package count is read and printed and
-//! refused by nothing (xtask-SPEC.md section 8-25).
+//! refused by nothing (tools/xtask/Spec.lean §8-25).
 
 use std::path::Path;
 
@@ -296,8 +296,8 @@ mod tests {
     }
 
     /// The package count is printed beside its row with its reading,
-    /// and no count, however large, is a finding (xtask-SPEC.md section
-    /// 8-25).
+    /// and no count, however large, is a finding (tools/xtask/Spec.lean
+    /// §8-25).
     #[test]
     fn a_package_count_is_reported_beside_its_row_and_refused_by_nothing() {
         let root = std::env::temp_dir().join(format!("xtask-budget-count-{}", std::process::id()));

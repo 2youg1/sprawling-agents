@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Packaged gate: a package that can be published compiles only files it
-//! carries (xtask-SPEC.md section 8-49).
+//! carries (tools/xtask/Spec.lean §8-49).
 //!
 //! **A `.crate` is one package directory.** `cargo package` archives what
 //! a package's directory holds, and the packaging check and every
@@ -103,7 +103,7 @@ fn packaged(location: String, violation: String) -> Violation {
     Violation {
         gate: "packaged",
         location,
-        rule: "a published package compiles only files it carries (xtask-SPEC.md section 8-49)"
+        rule: "a published package compiles only files it carries (tools/xtask/Spec.lean §8-49)"
             .to_owned(),
         violation,
         alternative: "move the file into the package that owns it; or let the build script \

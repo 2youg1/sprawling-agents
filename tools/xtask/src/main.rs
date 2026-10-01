@@ -13,7 +13,7 @@
 //! Gate runner. One gate per module; `gates` runs them all in order.
 //! Exit codes: 0 clean, 1 violations found, 2 usage or gate-internal failure.
 //! A broken gate must fail loudly (code 2): silent passes are the worst
-//! failure mode a gate can have (xtask-SPEC.md section 12).
+//! failure mode a gate can have (xtask D1).
 
 mod apisync;
 mod architecture;

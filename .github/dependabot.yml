@@ -29,7 +29,7 @@
 # Every block's commit prefix is `card-S0.DEPS`, a card reserved for
 # dependency bumps: Dependabot adds `: ` after a prefix that ends in a
 # letter, so its subjects pass the commit-message check in ci.yml
-# (xtask-SPEC.md section 8-35) under the same rule as any other commit.
+# (tools/xtask/Spec.lean §8-35) under the same rule as any other commit.
 #
 # Crates that must move together are one group, and each group is listed
 # before the catch-all `patch-and-minor`, because an update joins the

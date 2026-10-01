@@ -93,7 +93,7 @@ fn mismatch(at: &str, violation: String, alternative: &str) -> Violation {
         gate: "specalign",
         location: at.to_owned(),
         rule: "a SPEC enum body lists exactly the variants the kernel compiles \
-               (xtask-SPEC.md section 8-10)"
+               (tools/xtask/Spec.lean §8-10)"
             .to_owned(),
         violation,
         alternative: alternative.to_owned(),

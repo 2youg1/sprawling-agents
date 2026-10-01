@@ -5,7 +5,7 @@
 
 //! Deterministic file walker: sorted output, fixed skip set, forward-slash
 //! relative paths. Determinism makes gate reports diffable across runs and
-//! platforms (xtask-SPEC.md section 10-1).
+//! platforms (tools/xtask/Spec.lean §10-1).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -25,7 +25,7 @@ use crate::report::XtaskError;
 ///
 /// `web-dist` is the client bundle `just build-web` writes into the
 /// `sprawling` package, where its build script and its crates.io archive
-/// find it (xtask-SPEC.md section 8-18): Vite's output, minified.
+/// find it (tools/xtask/Spec.lean §8-18): Vite's output, minified.
 ///
 /// This list is a second authority for "what is in the tree", and git is
 /// the first. It stays a list rather than a `.gitignore` reader because
@@ -46,7 +46,7 @@ const SKIP_DIRS: [&str; 5] = [
 /// holds one is another checkout - `git worktree add` into `.pi/worktrees/`
 /// for example - so none of it is this tree's committed objects. The rule
 /// is structural rather than a row in [`SKIP_DIRS`], so it holds wherever a
-/// tool puts its checkouts (xtask-SPEC.md, "the scan surface").
+/// tool puts its checkouts (tools/xtask/Spec.lean §8, "the scan surface").
 const GIT: &str = ".git";
 
 /// All regular files under `root`, sorted by their relative forward-slash path.
@@ -101,7 +101,7 @@ pub(crate) fn rel(root: &Path, path: &Path) -> String {
 
 /// The isolation zone: root-level `local/` holds handoffs and machine-local
 /// notes, is gitignored, and never enters the tree. Gates testify about
-/// committed objects only, so repo-root scans exclude it (xtask-SPEC 10-1).
+/// committed objects only, so repo-root scans exclude it (tools/xtask/Spec.lean §10-1).
 pub(crate) fn in_isolation_zone(rel: &str) -> bool {
     rel == "local" || rel.starts_with("local/")
 }

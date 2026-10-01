@@ -46,7 +46,7 @@ use crate::walk;
 const SPEC: &str = "crates/wire/wire-SPEC.md";
 /// The wire crate's directory, where `Spec.lean` decides whether the
 /// reach table is read from `SPEC` or from the Lean specification
-/// (xtask-SPEC.md section 8-43).
+/// (tools/xtask/Spec.lean §8-43).
 const WIRE_CRATE: &str = "crates/wire";
 const WIRE_DIR: &str = "crates/wire/src";
 /// The package the city's one writer lives in, whose `src` is searched.
@@ -329,7 +329,7 @@ mod tests {
     }
 
     /// Once the wire crate has a `Spec.lean`, the reach of each verb is an
-    /// arm of its `def Command.reach` (xtask-SPEC.md section 8-43).
+    /// arm of its `def Command.reach` (tools/xtask/Spec.lean §8-43).
     #[test]
     fn a_migrated_wire_specification_answers_the_reach_of_each_verb() {
         let root = crate::root::fixture::relocated("wiring-lean");

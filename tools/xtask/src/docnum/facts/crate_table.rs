@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The crate table a document quotes (xtask-SPEC.md section 8-40): one
+//! The crate table a document quotes (tools/xtask/Spec.lean §8-40): one
 //! row per package of the product graph, each cell taken from the place
 //! that already holds it. Where a package lives and what it is called
 //! come from `members`, what it may depend on from the depmap block, and

@@ -7,7 +7,7 @@
 //!
 //! The build script states the location relative to its own package,
 //! because a package archived for crates.io carries its own directory
-//! and nothing else (xtask-SPEC.md section 8-18); this joins it onto that
+//! and nothing else (tools/xtask/Spec.lean §8-18); this joins it onto that
 //! package's directory and hands every reader the whole repo-relative
 //! path: a name with one home and a parent directory spelled once per
 //! reader still let the bundler write where the build script did not look.

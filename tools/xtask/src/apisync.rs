@@ -6,9 +6,9 @@
 //! `cargo xtask apisync`: the committed public-surface baselines of the
 //! two crates whose surface is read outside this repository equal the
 //! live surface, rendered by the one nightly rustdoc and cargo-public-api
-//! release `tools/xtask/public-api.txt` pins (xtask-SPEC §12-6). Not a
+//! release `tools/xtask/public-api.txt` pins (xtask D6). Not a
 //! gate: the nightly job runs it, and whether an interface change belongs
-//! in a SPEC is a reviewer's call (xtask-SPEC §8-32).
+//! in a SPEC is a reviewer's call (tools/xtask/Spec.lean §8-32).
 
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
@@ -24,7 +24,7 @@ const BASELINE_DIR: &str = "tools/xtask/api-baselines";
 const RENDERER: &str = "tools/xtask/public-api.txt";
 
 /// How many drifted lines a violation names before it only counts them
-/// (xtask-SPEC §12-7).
+/// (xtask D7).
 const DRIFT_SHOWN: usize = 40;
 
 /// The crates whose public surface is a seam other code reads across a
@@ -34,7 +34,7 @@ const SEAM_CRATES: [&str; 2] = ["wire", "kernel"];
 
 /// What turns a crate into its baseline text: a dated nightly whose
 /// rustdoc emits the JSON, and the cargo-public-api release that prints
-/// it (xtask-SPEC §12-6). Only `pinned` builds one, so no render can
+/// it (xtask D6). Only `pinned` builds one, so no render can
 /// happen with a toolchain the file does not name.
 struct Renderer {
     /// A dated nightly such as `nightly-2026-09-29`, passed as `+<rustdoc>`.
@@ -65,7 +65,7 @@ impl Renderer {
                     msg: format!(
                         "no `{key}=` line; write the dated nightly (PUBLIC_API_RUSTDOC) and the \
                          cargo-public-api version (PUBLIC_API_VERSION) the baselines are \
-                         rendered with (xtask-SPEC §12-6)"
+                         rendered with (xtask D6)"
                     ),
                 })
         };
@@ -163,7 +163,7 @@ fn normalize(raw: &str) -> String {
 /// The lines only one side holds, each on a line of its own after a
 /// leading newline: `- ` for a line only the baseline has, `+ ` for a
 /// line only the live surface has. Past `DRIFT_SHOWN` lines the rest is
-/// only counted (xtask-SPEC §12-7).
+/// only counted (xtask D7).
 fn drift(committed: &str, live: &str) -> String {
     let (committed, live) = (normalize(committed), normalize(live));
     let mut gone = committed.lines().filter(|l| !l.is_empty()).peekable();

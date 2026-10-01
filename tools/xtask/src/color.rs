@@ -26,7 +26,7 @@
 //! the share of the gamut a token takes, the APCA tier it claims, the
 //! brightest surface text may sit on - and none of the three is a colour
 //! component. They are declared beside the values they govern, as
-//! properties the cascade ignores (xtask-SPEC.md section 8-8).
+//! properties the cascade ignores (tools/xtask/Spec.lean §8-8).
 
 use std::path::Path;
 
@@ -378,7 +378,7 @@ fn token_violation(rule: &str, violation: String) -> Violation {
         rule: rule.to_owned(),
         violation,
         alternative: "adjust the client's theme file, and record the reason in \
-                      xtask-SPEC.md section 8-8; colour rules are mechanical by design"
+                      tools/xtask/Spec.lean §8-8; colour rules are mechanical by design"
             .to_owned(),
     }
 }

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The disabled ink is written only behind a variant that names a
-//! disabled state (xtask-SPEC.md section 8-8a).
+//! disabled state (tools/xtask/Spec.lean §8-8a).
 //!
 //! `--color-text-disabled` aims at APCA Lc 30, about 2:1 on the light
 //! page: enough to tell a hand that a control will not answer, not enough

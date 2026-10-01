@@ -8,7 +8,7 @@ publish = false
 
 # The gates are a tool of this repository, not part of the product: the
 # members reader keeps a tool out of the crate graph, the module map and
-# the proof roster (xtask-SPEC.md sections 8-39 and 12-4).
+# the proof roster (tools/xtask/Spec.lean §8-39 and xtask D4).
 [package.metadata.sprawling]
 role = "tool"
 
@@ -38,7 +38,7 @@ flate2.workspace = true
 # wrong, and each mistake produces a wrong list of offenders. `visit`
 # reaches every macro call inside a function body, where `packaged` finds
 # the include calls a published package compiles. Workspace tooling only,
-# never the product binary (xtask-SPEC.md section 13).
+# never the product binary (tools/xtask/Spec.lean §13).
 syn = { version = "3", features = ["full", "parsing", "printing", "visit"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 zip.workspace = true

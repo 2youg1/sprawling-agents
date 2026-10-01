@@ -5,7 +5,7 @@
 
 //! `cargo xtask shots`: every page of the client, each fold of it, in
 //! two windows and two lightings, as PNG files and one index a person
-//! reads them through (xtask-SPEC.md sections 8-44 and 12-10).
+//! reads them through (tools/xtask/Spec.lean §8-44 and xtask D10).
 //!
 //! **This is not a gate.** It asserts nothing and compares no two
 //! pictures; the render gate judges properties, and a person judges

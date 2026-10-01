@@ -5,7 +5,7 @@
 
 //! Dead dependencies: a key a manifest declares that no source file of
 //! its package names, and a workspace dependency no package inherits
-//! (xtask-SPEC.md section 8-37). rustc's `dead_code` already refuses a
+//! (tools/xtask/Spec.lean §8-37). rustc's `dead_code` already refuses a
 //! dead private item under `-D warnings`; a dead manifest entry is the
 //! kind of dead code no compiler pass reports.
 
@@ -20,7 +20,7 @@ use crate::walk;
 /// each `[target.*]` table alike.
 const TABLES: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
-const RULE: &str = "every dependency a manifest declares is named by the code that compiles against it (xtask-SPEC.md section 8-37)";
+const RULE: &str = "every dependency a manifest declares is named by the code that compiles against it (tools/xtask/Spec.lean §8-37)";
 
 /// Where a manifest lists the dependencies it declares only to constrain
 /// resolution, which no source is expected to name.
@@ -252,7 +252,7 @@ mod tests {
     /// A dependency declared only to constrain resolution is exempt from
     /// naming when its manifest lists it under `pins`, and a pin that
     /// points at nothing or is no longer needed is itself a finding
-    /// (xtask-SPEC.md section 8-37).
+    /// (tools/xtask/Spec.lean §8-37).
     #[test]
     fn a_dependency_declared_to_pin_a_resolution_is_listed_in_its_manifest() {
         let root = std::env::temp_dir().join(format!("xtask-unused-pins-{}", std::process::id()));

@@ -35,7 +35,7 @@ mod index;
 use index::{check_index_content, is_index_name};
 
 /// The module map. This gate is its only reader, so a field change breaks
-/// one place (xtask-SPEC.md section 8-10); `specalign` names the file when
+/// one place (tools/xtask/Spec.lean §8-10); `specalign` names the file when
 /// reporting an anchor it could not resolve.
 pub(crate) const MAP: &str = "architecture.toml";
 /// The status column, in the language the table is written in. It moved
@@ -91,8 +91,8 @@ struct Row {
 /// One module's claim about where its interface is specified.
 ///
 /// Handed to `specalign`, which is the gate that owns "a SPEC says what
-/// the code says". This gate stays the map's only reader (xtask-SPEC.md
-/// section 8-10), so a field change breaks one place. The module names
+/// the code says". This gate stays the map's only reader (tools/xtask/Spec.lean
+/// §8-10), so a field change breaks one place. The module names
 /// itself rather than carrying a line number: an entry is found by name in
 /// a structured file, and a name does not move when the file is reordered.
 pub(crate) struct Anchor {
@@ -144,7 +144,7 @@ pub(crate) fn shapes(root: &Path) -> Result<BTreeMap<String, String>, XtaskError
 }
 
 /// What each of `packages` owns, in their order: the `duty` of the family
-/// its registered modules are named for (xtask-SPEC.md section 12-5).
+/// its registered modules are named for (xtask D5).
 ///
 /// # Errors
 /// When the map does not parse, and when a package has no registered
@@ -280,7 +280,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 }
 
 /// The package these gates are compiled into. Its modules are described
-/// by xtask-SPEC.md section 7 rather than by the map, and it is the one
+/// by tools/xtask/Spec.lean §7 rather than by the map, and it is the one
 /// package the map does not cover (section 12-9).
 const GATES: &str = env!("CARGO_PKG_NAME");
 

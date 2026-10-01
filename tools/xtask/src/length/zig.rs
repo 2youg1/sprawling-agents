@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How long a Zig function is, and how many of a Zig file's lines are
-//! production, read from Zig's tokens (xtask-SPEC.md sections 8-48 and
-//! 12-15).
+//! production, read from Zig's tokens (tools/xtask/Spec.lean §8-48 and
+//! xtask D15).
 //!
 //! **Counting braces is exact in Zig once four kinds of token are
 //! skipped**, which is the reason it is wrong for Rust and right here.

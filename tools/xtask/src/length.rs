@@ -73,7 +73,7 @@
 //! skipped, which is what the client's TypeScript does not allow. The
 //! parameter rule stays Rust's, because a Zig file here is a C ABI leaf
 //! whose parameters are `(ptr, len)` pairs and Win32's own signatures
-//! (xtask-SPEC.md section 12-15).
+//! (xtask D15).
 //!
 //! A generated file is not measured on either side. `client/src/wire.ts`
 //! is 2,445 lines that `cargo xtask wire-ts` writes from the Rust wire;

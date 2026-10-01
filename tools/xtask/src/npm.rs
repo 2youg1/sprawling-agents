@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The npm gate: the dependency face of `client/` (xtask-SPEC.md
-//! section 8-12).
+//! The npm gate: the dependency face of `client/` (tools/xtask/Spec.lean
+//! §8-12).
 //!
 //! The workspace side of the tree has `cargo-deny` and `depmap` watching
 //! what it may depend on; the JavaScript side had nothing, so one

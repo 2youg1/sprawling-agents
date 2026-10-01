@@ -5,7 +5,7 @@
 
 //! The script that measures the page, the three elements it writes its
 //! readings into, and the reader of every sentence it writes
-//! (xtask-SPEC.md section 8-17).
+//! (tools/xtask/Spec.lean §8-17).
 //!
 //! **The writer and the reader of one sentence live in one file.** The
 //! probe's record is a line of positional fields with no schema behind

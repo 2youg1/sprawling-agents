@@ -202,7 +202,7 @@ pub(crate) fn outside_the_tree(line: &str, dirs: &BTreeSet<String>) -> Option<St
 /// looking.
 pub(crate) fn is_prose(rel: &str, line: &str) -> bool {
     // A Lean specification's code is a model, not a city: a path in it is
-    // a citation (xtask-SPEC.md section 8-43).
+    // a citation (tools/xtask/Spec.lean §8-43).
     if rel.ends_with(".md") || rel.ends_with(".html") || rel.ends_with(".lean") {
         return true;
     }

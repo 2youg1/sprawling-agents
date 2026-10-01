@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which pictures one run takes, what each is called, and which of them
-//! the run failed to write (xtask-SPEC.md section 8-44).
+//! the run failed to write (tools/xtask/Spec.lean §8-44).
 //!
 //! **The pages are the client's, read rather than listed.** A route is
 //! a key of the `BARE` table in `client/src/core/route.ts`, the table
@@ -136,7 +136,7 @@ pub(super) fn index(shots: &[Shot]) -> String {
     shots.iter().fold(
         String::from(
             "# Screenshots\n\nEvery page `cargo xtask shots` drew, at each width and lighting \
-             (xtask-SPEC.md section 8-44).\n\n\
+             (tools/xtask/Spec.lean §8-44).\n\n\
              | page | fold | width | lighting | picture | states in this fold |\n\
              |---|---|---|---|---|---|\n",
         ),

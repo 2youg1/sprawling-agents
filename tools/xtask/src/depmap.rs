@@ -75,7 +75,7 @@ pub(crate) fn graph(text: &str) -> Result<String, XtaskError> {
 /// Parse the ```depmap fenced block: `name:` or `name: dep, dep`.
 ///
 /// The one reader of the block: this gate, [`graph`] and the crate
-/// table docnum draws (xtask-SPEC.md section 8-40) all read it here, so
+/// table docnum draws (tools/xtask/Spec.lean §8-40) all read it here, so
 /// no two of them can read a different topology.
 ///
 /// # Errors

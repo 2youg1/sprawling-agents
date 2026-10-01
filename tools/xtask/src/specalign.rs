@@ -17,7 +17,7 @@
 //! Until the kernel migrates, the tables are the 8-1 and 8-4 tables of
 //! `kernel-SPEC.md` and the rosters its Rust fences (`enums`); once
 //! `crates/kernel/Spec.lean` exists, they are the Lean shapes `tables`
-//! reads (xtask-SPEC.md section 8-43). Which one is read is decided by
+//! reads (tools/xtask/Spec.lean §8-43). Which one is read is decided by
 //! that one file, so the kernel never answers from both.
 
 use std::collections::BTreeMap;

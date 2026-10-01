@@ -5,7 +5,7 @@
 
 //! Violation shape and rendering. Mirrors the product's three-part refusal:
 //! the builder who trips a gate gets rule | violation | alternative,
-//! never a bare "failed" (xtask-SPEC.md section 10-5).
+//! never a bare "failed" (tools/xtask/Spec.lean §10-8).
 
 use std::process::ExitCode;
 
@@ -97,7 +97,7 @@ pub(crate) fn finish(gate: &'static str, result: Result<Vec<Violation>, XtaskErr
 /// all evaluated before the first line is printed, so the ones after the
 /// failure are already holding their findings, and returning early threw
 /// those away — which made "not judged" and "clean" the same output on
-/// any machine without `cargo-public-api` (xtask-SPEC.md section 12).
+/// any machine without `cargo-public-api` (xtask D2).
 pub(crate) fn finish_all(
     results: impl IntoIterator<Item = (&'static str, Result<Vec<Violation>, XtaskError>)>,
 ) -> ExitCode {

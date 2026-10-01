@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A Lean file read as text, in the few restricted shapes a gate reads
-//! (xtask-SPEC.md sections 8-42 and 8-43).
+//! (tools/xtask/Spec.lean §8-42 and §8-43).
 //!
 //! **No gate runs Lean** (section 12-8). A gate judges in milliseconds
 //! beside twenty others, and proving belongs to `just models`; what a

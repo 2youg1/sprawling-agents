@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Where each package lives, what it is called, and whether it ships
-//! (xtask-SPEC.md section 8-39).
+//! (tools/xtask/Spec.lean §8-39).
 //!
 //! The one reader of `cargo metadata`. A gate that derives a directory
 //! for itself assumes that the directory, the package name and the lib
@@ -23,7 +23,7 @@ use serde_json::Value;
 use crate::report::XtaskError;
 
 /// Whether a package ships, declared by the package itself
-/// (xtask-SPEC.md section 12-4).
+/// (xtask D4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Role {
     /// Part of what a person downloads; every product gate judges it.
@@ -59,7 +59,7 @@ pub(crate) struct Member {
 }
 
 /// Whether a package can be published, as its manifest's `publish`
-/// field says (xtask-SPEC.md section 8-49).
+/// field says (tools/xtask/Spec.lean §8-49).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Publish {
     /// No `publish` field, `publish = true`, or a list of registries.

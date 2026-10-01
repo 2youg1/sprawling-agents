@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Render gate: the client's own gallery is opened in a real engine, and
-//! what it drew is measured (xtask-SPEC.md sections 8-13 and 8-14).
+//! what it drew is measured (tools/xtask/Spec.lean §8-13 and §8-14).
 //!
 //! **This is the step the method never had.** A stylesheet's rules do not
 //! collide in either source file — they collide in the cascade. Two rules
@@ -104,7 +104,7 @@ enum Errand {
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     // Where the bundle lands is the build script's statement, read
     // rather than repeated: this gate and the binary must open one
-    // directory (xtask-SPEC.md section 8-18).
+    // directory (tools/xtask/Spec.lean §8-18).
     let bundle = crate::bundle::dist(root)?;
     if !bundle.join("index.html").is_file() {
         return Ok(vec![violation(

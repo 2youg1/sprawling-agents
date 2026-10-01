@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which tree this run judges (xtask-SPEC.md section 12, "判的是哪棵树").
+//! Which tree this run judges (xtask D3).
 
 use std::path::{Path, PathBuf};
 
@@ -44,7 +44,7 @@ pub(crate) fn judged(built: &Path, cwd: &Path) -> Result<PathBuf, XtaskError> {
 /// The checkout `dir` lies in: the first directory from `dir` upward that
 /// holds `Cargo.lock`, which is where cargo puts the workspace root. How
 /// many levels below it xtask sits is a fact about the layout, so nothing
-/// counts parent directories to find the root (xtask-SPEC.md section 12-3).
+/// counts parent directories to find the root (xtask D3).
 ///
 /// # Errors
 /// `no-checkout` when no directory from `dir` upward holds the lockfile.

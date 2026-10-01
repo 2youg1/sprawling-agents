@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The role layer: what a surface is *for*, judged against a closed
-//! vocabulary (xtask-SPEC.md section 8-8).
+//! vocabulary (tools/xtask/Spec.lean §8-8).
 //!
 //! The rungs are the authority on values and the six assertions beside
 //! this file judge them. They do not answer the question a view asks -

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Every archive the release attaches to a tag carries a build-provenance
-//! attestation before it is attached (xtask-SPEC §8-34).
+//! attestation before it is attached (tools/xtask/Spec.lean §8-34).
 
 use std::path::Path;
 
@@ -42,7 +42,7 @@ const ATTACH: &str = "gh release create";
 const PERMISSIONS: [&str; 2] = ["id-token: write", "attestations: write"];
 
 /// What the job that attaches archives leaves unattested, one sentence
-/// per fact of xtask-SPEC §8-34.
+/// per fact of tools/xtask/Spec.lean §8-34.
 ///
 /// Read by shape: a job opens with a two-space-indented `name:` line and
 /// runs to the next one, and only the lines of the attaching job count,

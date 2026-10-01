@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The class column: which class of verb each Command is when a remote
-//! device sends it (wire-SPEC.md section 19-2, xtask-SPEC.md section
-//! 8-45).
+//! device sends it (wire-SPEC.md section 19-2, tools/xtask/Spec.lean
+//! §8-45).
 //!
 //! **Two sources, one decision.** The SPEC's table states each verb's
 //! class, and the relay decides it with an exhaustive match,

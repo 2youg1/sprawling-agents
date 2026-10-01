@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The first two assertions of the `spec` gate (xtask-SPEC.md section
-//! 8-42): a package holds exactly one effective specification, and prose
+//! The first two assertions of the `spec` gate (tools/xtask/Spec.lean
+//! §8-42): a package holds exactly one effective specification, and prose
 //! names no SPEC the tree does not have.
 //!
 //! A migration that stops halfway leaves two specifications a builder
@@ -41,7 +41,7 @@ pub(super) fn one_per_package(root: &Path, out: &mut Vec<Violation>) -> Result<(
             [_] => {}
             [] => out.push(finding(
                 member.dir.clone(),
-                "every package has a specification (xtask-SPEC.md section 8-42)",
+                "every package has a specification (tools/xtask/Spec.lean §8-42)",
                 format!(
                     "{} holds neither a `*{MARKDOWN}` nor a {}",
                     member.dir,
@@ -78,7 +78,7 @@ fn held_in(root: &Path, dir: &str) -> Result<Vec<String>, XtaskError> {
 fn two_held(dir: &str, held: &[String]) -> Violation {
     finding(
         dir.to_owned(),
-        "a package has one effective specification (xtask-SPEC.md section 8-42)",
+        "a package has one effective specification (tools/xtask/Spec.lean §8-42)",
         format!("{dir} holds {}", held.join(" and ")),
         "finish the migration in one change-set: carry every requirement into Spec.lean, \
          then delete the Markdown SPEC"
@@ -133,7 +133,7 @@ pub(super) fn no_dangling_names(root: &Path, out: &mut Vec<Violation>) -> Result
                 }
                 out.push(finding(
                     format!("{rel}:{}", index.saturating_add(1)),
-                    "prose names only a SPEC this tree has (xtask-SPEC.md section 8-42)",
+                    "prose names only a SPEC this tree has (tools/xtask/Spec.lean §8-42)",
                     format!("names `{stem}{CITED}`, and no `{stem}{MARKDOWN}` is in the tree"),
                     successor(root, &found, stem),
                 ));

@@ -5,7 +5,7 @@
 
 //! The three properties a screen reader meets: every control says what
 //! it is, every landmark says which region it is, and the page has one
-//! first heading (xtask-SPEC.md section 8-13).
+//! first heading (tools/xtask/Spec.lean §8-13).
 //!
 //! They were the gate called `ax` until a browser could be opened, and
 //! they are the three that read the page's names rather than its

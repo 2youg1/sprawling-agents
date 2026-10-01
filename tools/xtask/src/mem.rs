@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How heavy a served city is, in this platform's own counters
-//! (xtask-SPEC.md section 8-30).
+//! (tools/xtask/Spec.lean §8-30).
 //!
 //! **Three counters, because they answer three questions.** Private is
 //! what the process holds that nobody shares, which is what one more

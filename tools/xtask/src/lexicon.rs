@@ -51,7 +51,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 
 /// The files whose words a reader meets: documents, Rust and the Lean
 /// specifications, whose comments are Chinese prose that names concepts
-/// by their English names (xtask-SPEC.md section 8-43). The isolation
+/// by their English names (tools/xtask/Spec.lean §8-43). The isolation
 /// zone is never published, so it is left out.
 fn sources(root: &Path) -> Result<Vec<String>, XtaskError> {
     Ok(walk::files_with_ext(root, &["md", "rs", "lean"])?

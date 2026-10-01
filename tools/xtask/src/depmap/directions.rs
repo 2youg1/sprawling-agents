@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Module directions inside one crate (xtask-SPEC.md section 8-33).
+//! Module directions inside one crate (tools/xtask/Spec.lean §8-33).
 //!
 //! The crate edges in the `depmap` block cannot see a cycle between two
 //! modules of the same crate: `sprawling` compiles as one unit whichever

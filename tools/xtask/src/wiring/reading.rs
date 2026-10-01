@@ -82,7 +82,7 @@ pub(super) fn declared(root: &Path) -> Result<BTreeMap<String, Reach>, XtaskErro
 }
 
 /// The arms of `def Command.reach`, each right-hand side one of the four
-/// reaches with a leading dot (xtask-SPEC.md section 8-43).
+/// reaches with a leading dot (tools/xtask/Spec.lean §8-43).
 ///
 /// # Errors
 /// When no file holds the `def`, or an arm answers something that is not

@@ -10,7 +10,7 @@
 //! `crates/desktop/ffi`. Each call into its Zig leaf relaxes
 //! `unsafe_code` at that one statement, which `forbid` makes impossible,
 //! so it writes a table of its own: the workspace's, with `unsafe_code`
-//! at `deny` (`crates/desktop/Spec.lean` D14, xtask-SPEC.md section 8-46).
+//! at `deny` (`crates/desktop/Spec.lean` D14, tools/xtask/Spec.lean §8-46).
 //! Every other line of that table is a **copy**, and a copy is a second
 //! home for a fact.
 //!

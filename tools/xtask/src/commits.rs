@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The subject line and the ruling trailer of every commit in a range
-//! (xtask-SPEC §8-35). Not a gate: gates judge the tree, and this judges
+//! (tools/xtask/Spec.lean §8-35). Not a gate: gates judge the tree, and this judges
 //! history, so it runs only where a caller names the range.
 
 use std::path::Path;

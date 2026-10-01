@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One opening of the gallery: how wide the window is, how the page is
-//! lit, and whether the engine is in a forced-colour mode (xtask-SPEC.md
-//! section 8-16).
+//! lit, and whether the engine is in a forced-colour mode (tools/xtask/Spec.lean
+//! §8-17).
 //!
 //! **A property that holds at one width is not a property.** The three
 //! columns are drawn by container queries, so what a rule collapses at

@@ -82,8 +82,8 @@ check-branch base="main":
     if [ -n "$clean" ] && [ -f "$mark" ]; then echo "check-branch: tree $tree is already green"; exit 0; fi
     changed=$(git diff --name-only "$mb" HEAD)
     touched() { printf '%s\n' "$changed" | grep -q "^$1/"; }
-    # Which package holds a path is cargo metadata's answer (xtask-SPEC.md
-    # section 8-39); the paths go through stdin, since a rename branch
+    # Which package holds a path is cargo metadata's answer (tools/xtask/Spec.lean
+    # §8-39); the paths go through stdin, since a rename branch
     # lists more of them than one command line holds.
     packages=$(printf '%s\n' "$changed" | cargo xtask members --owning | tr -d '\r') || exit 2
     rc=0
@@ -103,7 +103,7 @@ check-branch base="main":
     touched crates/desktop/ffi && step desktop just check-desktop
     # A Lean specification is proved by `models`, which no other step runs;
     # the Lean package's own three files change what it proves
-    # (tools/xtask/xtask-SPEC.md section 8-43).
+    # (tools/xtask/Spec.lean §8-43).
     printf '%s\n' "$changed" | grep -qE '\.lean$|^(lakefile\.toml|lean-toolchain|lake-manifest\.json)$' \
         && step models just models
     [ "$rc" = 0 ] && [ -n "$clean" ] && mkdir -p "$(dirname "$mark")" && touch "$mark"
@@ -293,7 +293,7 @@ gates-artifacts: build-web
 # Lean"). `lakefile.toml` sets `warningAsError`, so a `sorry` or an `admit`,
 # which Lean reports as a warning, fails the build; an `axiom` raises no
 # warning at all, so the `spec` gate refuses it by its shape, where Lean is
-# not needed to see it (tools/xtask/xtask-SPEC.md section 8-42). The checker under
+# not needed to see it (tools/xtask/Spec.lean §8-42). The checker under
 # `tools/adversary/` is not built here: it attacks the binary and stays out
 # of every required check.
 #
@@ -310,7 +310,7 @@ models:
     lake build Spec
 
 # Every commit subject and ruling trailer in a range of history
-# (xtask-SPEC.md section 8-35). Not in `check`, because a tree has no
+# (tools/xtask/Spec.lean §8-35). Not in `check`, because a tree has no
 # range: CI names it, and at a desk it is `just commits main..HEAD`.
 commits range:
     cargo xtask commits --range '{{range}}'
@@ -409,13 +409,13 @@ provider script record *listen:
     cargo run --package citysim --bin provider --locked -- {{script}} {{record}} {{listen}}
 
 # Every page of the client at 1440 and 1920, dark and light, as PNG files
-# and an index under target/shots (tools/xtask/xtask-SPEC.md section
-# 8-44). Not a gate: a person reads the pictures. `--origin <url>`
+# and an index under target/shots (tools/xtask/Spec.lean
+# §8-44). Not a gate: a person reads the pictures. `--origin <url>`
 # photographs a served city instead of the bundle.
 shots *args: build-web
     cargo xtask shots {{args}}
 
-# Create a crate's Spec.lean skeleton (tools/xtask/xtask-SPEC.md section 8-41).
+# Create a crate's Spec.lean skeleton (tools/xtask/Spec.lean §8-41).
 spec crate:
     cargo xtask spec {{crate}}
 
@@ -504,7 +504,7 @@ replay log:
     cargo run -p sprawling --locked -- replay {{log}}
 
 # Private, peak private and working set, in this platform's own counters
-# (xtask-SPEC.md section 8-30). A pid reads that process. `long-turn
+# (tools/xtask/Spec.lean §8-30). A pid reads that process. `long-turn
 # [steps] [every]` reads the long-turn instrument at each of its pauses
 # (citysim-SPEC.md section 3-10). Anything else serves a city - a fresh
 # empty one, or `--city <dir>` - so the release binary is built first: a
