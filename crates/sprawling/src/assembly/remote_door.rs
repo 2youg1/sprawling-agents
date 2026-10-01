@@ -5,24 +5,41 @@
 
 //! What the remote door of a served city is made of (sprawling-SPEC.md
 //! 8-139): the device table's path, the writer's relay for its five
-//! lines, this machine's clock and random source, and where the city's
-//! own listener answers on this machine.
+//! lines, this machine's clock and random source, where the city's own
+//! listener answers on this machine, and the route the city's `[remote]`
+//! table names (sprawling-SPEC.md 8-151).
 //!
 //! Assembled here because the clock is sampled in `bin::assembly` only,
-//! and because the relay exists only once the writer thread runs. No
-//! route is chosen yet: nothing reads a `[remote]` table, so `/remote
-//! open` refuses and says so (sprawling-SPEC.md 8-139).
+//! and because the relay exists only once the writer thread runs.
+//!
+//! [`chosen`] is the one place a route is built: the door asks it at
+//! each `/remote open`, so a person who edits the table opens the door
+//! on the new route without restarting the city, which would change the
+//! city's key and make every device pair again.
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use kernel::{AxCode, AxError};
-use remote_access::route::Route;
+use city::{HostPermanence, RemoteRoute};
+use kernel::{AxCode, AxError, TimeoutMs};
+use remote_access::route::cloudflare::{NamedTunnel, Tunnel, TunnelName};
+use remote_access::route::command::{CommandRoute, RouteCommand};
+use remote_access::route::{Permanence, PublicUrl, Route};
 
 use crate::outside::console::Remote;
 use crate::outside::keeper::{Doorway, Keeping, Senses};
 use crate::outside::listener::Reaching;
+
+/// The program a Cloudflare route runs when the table names none: the
+/// one on `PATH`.
+const CLOUDFLARED: &str = "cloudflared";
+
+/// The longest one `/remote open` waits for its route to be reachable.
+/// The console's thread waits, and the door's lock is held, for as long
+/// as this; `cloudflared` reaches its edge in one to a few seconds
+/// (sprawling-SPEC.md 8-151).
+const ROUTE_PATIENCE: TimeoutMs = TimeoutMs(30_000);
 
 /// The parts a remote door is kept with, gathered while the city opens.
 pub(super) struct Outdoors {
@@ -63,7 +80,7 @@ impl Outdoors {
         let doorway = Doorway::keep(Keeping {
             devices: kernel::layout::CityLayout::new(&city_root).devices(),
             ledger: Box::new(relay),
-            route: None,
+            choose: Box::new(move || chosen(&city_root)),
             senses: Senses {
                 clock: Arc::new(|| accounting::Clock::now(&super::SystemClock)),
                 entropy: Arc::new(|bytes: &mut [u8]| {
@@ -107,14 +124,38 @@ impl Outdoors {
 /// The route the city's `[remote]` table names, built and closed.
 ///
 /// # Errors
-/// Not chosen yet.
+/// The city's own layer names no route or cannot be read; a tunnel name
+/// or an address `remote_access` refuses.
 fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError> {
-    Err(AxError::failure(
-        AxCode::ConfigInvalid,
-        "open the remote door",
-        format!("{}: no route is chosen", city_root.display()),
-    )
-    .with_recovery("this build reads no `[remote]` table yet"))
+    Ok(match city::remote_route(city_root)? {
+        RemoteRoute::Cloudflare {
+            tunnel,
+            url,
+            command,
+        } => Box::new(NamedTunnel::new(
+            Tunnel {
+                program: PathBuf::from(command.as_deref().unwrap_or(CLOUDFLARED)),
+                name: TunnelName::parse(&tunnel)?,
+                url: PublicUrl::parse(&url)?,
+            },
+            ROUTE_PATIENCE,
+        )),
+        RemoteRoute::Command {
+            command,
+            args,
+            permanence,
+        } => Box::new(CommandRoute::new(
+            RouteCommand {
+                program: PathBuf::from(command),
+                args,
+            },
+            match permanence {
+                HostPermanence::Fixed => Permanence::Fixed,
+                HostPermanence::PerStart => Permanence::PerStart,
+            },
+            ROUTE_PATIENCE,
+        )),
+    })
 }
 
 #[cfg(test)]

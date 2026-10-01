@@ -79,7 +79,7 @@ fn kept(devices: &std::path::Path, written: &Written) -> Doorway {
     Doorway::keep(Keeping {
         devices: devices.join("remote").join("devices.toml"),
         ledger: Box::new(written.clone()),
-        route: Some(Box::new(ScriptedRoute::new(opened()))),
+        choose: Box::new(|| Ok(Box::new(ScriptedRoute::new(opened())))),
         senses: senses(),
     })
     .unwrap()

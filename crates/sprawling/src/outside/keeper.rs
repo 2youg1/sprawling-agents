@@ -46,6 +46,10 @@ pub(crate) use pairing::Inviting;
 pub(crate) type Clock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
 /// This machine's random source, filling the slice it is given.
 pub(crate) type Entropy = Arc<dyn Fn(&mut [u8]) -> Result<(), AxError> + Send + Sync>;
+/// Builds the route one opening of the door goes out through, closed
+/// (sprawling-SPEC.md 8-151): asked once per `open`, so the route is the
+/// one the city's configuration names at that moment.
+pub(crate) type Choosing = Box<dyn FnMut() -> Result<Box<dyn Route + Send>, AxError> + Send>;
 
 /// What the door reads this machine through.
 #[derive(Clone)]
@@ -60,8 +64,8 @@ pub(crate) struct Keeping {
     pub(crate) devices: PathBuf,
     /// Where the five lines go: the worker's relay in a served city.
     pub(crate) ledger: Box<dyn Ledger + Send>,
-    /// The route the person chose, or `None` while nothing chooses one.
-    pub(crate) route: Option<Box<dyn Route + Send>>,
+    /// How each opening of the door builds its route.
+    pub(crate) choose: Choosing,
     pub(crate) senses: Senses,
 }
 
@@ -92,13 +96,15 @@ struct Kept {
     city: SigningKey,
     devices: PathBuf,
     ledger: Box<dyn Ledger + Send>,
-    route: Option<Box<dyn Route + Send>>,
+    choose: Choosing,
     standing: Option<Standing>,
 }
 
-/// What an open door stands on: the route's answer, and the listener
-/// answering on its loopback port, which ends when this is dropped.
+/// What an open door stands on: the open route and its answer, and the
+/// listener answering on its loopback port, which ends when this is
+/// dropped.
 struct Standing {
+    route: Box<dyn Route + Send>,
     opened: Opened,
     listening: Option<Box<dyn Send>>,
 }
@@ -113,7 +119,7 @@ impl Doorway {
         let Keeping {
             devices,
             ledger,
-            route,
+            choose,
             senses,
         } = keeping;
         let known = super::devices::read(&devices)?;
@@ -127,7 +133,7 @@ impl Doorway {
                 city,
                 devices,
                 ledger,
-                route,
+                choose,
                 standing: None,
             })),
             senses,
@@ -138,9 +144,9 @@ impl Doorway {
     /// `remote_opened`.
     ///
     /// # Errors
-    /// The door is open already; no route is chosen; the route does not
-    /// open; the ledger refuses the line, in which case the route is
-    /// closed again.
+    /// The door is open already; no route can be built from what the
+    /// city chose; the route does not open; the ledger refuses the line,
+    /// in which case the route is closed again.
     pub(crate) fn open(&self, local: SocketAddr, lasting: Lasting) -> Result<Opened, AxError> {
         let now = (self.senses.clock)()?;
         let epoch = Epoch::from_entropy(drawn(&self.senses)?);
@@ -153,7 +159,7 @@ impl Doorway {
             )
             .with_recovery("close it first with `/remote close`, or leave it open"));
         }
-        let route = kept.route.as_mut().ok_or_else(no_route)?;
+        let mut route = (kept.choose)()?;
         let opened = route.open(local)?;
         let closes_at = TimeMs::new(now.value().saturating_add(lasting.ms()));
         let line = RemoteOpened {
@@ -161,13 +167,12 @@ impl Doorway {
             url: opened.url.as_str().to_owned(),
         };
         if let Err(refused) = kept.record(now, Who::Person, EventKind::RemoteOpened, &line) {
-            if let Some(route) = kept.route.as_mut() {
-                route.close()?;
-            }
+            route.close()?;
             return Err(refused);
         }
         kept.door.open(epoch, closes_at)?;
         kept.standing = Some(Standing {
+            route,
             opened: opened.clone(),
             listening: None,
         });
@@ -283,14 +288,19 @@ impl Doorway {
 
 impl Kept {
     fn close(&mut self, now: TimeMs, why: RemoteClosing) -> Result<(), AxError> {
-        if self.standing.is_none() {
+        let Some(Standing {
+            mut route,
+            listening,
+            ..
+        }) = self.standing.take()
+        else {
             return Ok(());
-        }
+        };
         self.door.close();
-        // Dropping the standing ends the listener before the route goes,
-        // so no connection is answered on a door already shut.
-        self.standing = None;
-        let closed_route = self.route.as_mut().map_or(Ok(()), |route| route.close());
+        // The listener ends before the route goes, so no connection is
+        // answered on a door already shut.
+        drop(listening);
+        let closed_route = route.close();
         let who = match why {
             RemoteClosing::Expired => Who::City,
             RemoteClosing::Console | RemoteClosing::Locked => Who::Person,
@@ -333,18 +343,6 @@ fn nonce(senses: &Senses) -> Result<[u8; NONCE_BYTES], AxError> {
     let mut bytes = [0u8; NONCE_BYTES];
     (senses.entropy)(&mut bytes)?;
     Ok(bytes)
-}
-
-fn no_route() -> AxError {
-    AxError::failure(
-        AxCode::ConfigInvalid,
-        "open the remote door",
-        "no route is chosen",
-    )
-    .with_recovery(
-        "this build reads no `[remote]` table yet, so nothing can make the door reachable from \
-         outside this machine; reach the city from this machine's WebUI",
-    )
 }
 
 fn closed(action: &str) -> AxError {
