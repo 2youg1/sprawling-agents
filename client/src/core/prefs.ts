@@ -59,11 +59,11 @@ const ROWS = {
   welcomed: "sprawling.welcomed",
   // Whether the artefact panel beside a conversation is open.
   panel: "sprawling.talk.panel",
-  // How much of the rail is drawn. Kept rather than held in memory
-  // because it is a decision about the shape of the window, and a
-  // decision a reload undoes is a decision the person has to take
-  // again every morning.
-  rail: "sprawling.rail",
+  // How much of the world layer the page draws (client-SPEC 7H). Kept
+  // rather than held in memory because it is a decision about the shape
+  // of the window, and a decision a reload undoes is a decision the
+  // person has to take again every morning.
+  tier: "sprawling.tier",
   lighting: "sprawling.appearance.lighting",
   sans: "sprawling.appearance.sans",
   mono: "sprawling.appearance.mono",
@@ -97,19 +97,22 @@ const ROWS = {
 
 // ------------------------------------------------------------ the shell
 
-// How much of the rail is drawn.
-//
-// Three postures rather than a boolean, and the third is the reason
-// this type exists: `glyphs` is the column of icons, `named` pins it
-// open with every name and chord beside its glyph, and `away` takes
-// the column off the page for somebody reading a long document or
-// watching a wide table. A boolean could carry two of the three and
-// the third was the one people asked for.
-export type Rail = "glyphs" | "named" | "away";
+// How much of the world layer the page draws: none of it (`zen`), whole
+// panels beside the conversation (`blend`), or all of it as the
+// workspace with the conversation as a band along the bottom
+// (`panorama`). Named for what is drawn rather than for a share of
+// opacity, because the three are three layouts and not three points on
+// one slider (client-SPEC 7H, 12-17).
+export type Tier = "zen" | "blend" | "panorama";
 
-// In the order the accelerator cycles them: out from the resting
-// posture, then away, then back.
-export const RAILS: readonly Rail[] = ["glyphs", "named", "away"];
+// In the order the layers key cycles them: out from the conversation
+// alone to the world as the workspace, then back.
+export const TIERS: readonly Tier[] = ["zen", "blend", "panorama"];
+
+// The tier a first visit opens in, and the one an unreadable row reads
+// as: the world layer is visible as being there, and the words are not
+// covered by it.
+const FIRST_TIER: Tier = "blend";
 
 // Read out of the wire's own union rather than spelled again, so a rule
 // the city adds is offered here without a second list to forget.
@@ -130,7 +133,7 @@ export interface Preferences {
   // person who skipped it is nagged again.
   readonly welcomed: boolean;
   readonly panel: boolean;
-  readonly rail: Rail;
+  readonly tier: Tier;
   readonly appearance: Appearance;
   readonly proxying: Proxying;
   readonly notifying: Notifying;
@@ -160,9 +163,9 @@ export type Keeper =
 // Named changes rather than one `write`, because each of them is its
 // own `PutPreferences` patch: a caller that handed over a whole record
 // would send the city every field to change one, and a caller that says
-// which fact it is changing sends that fact. The layout of the rail, the
-// bell and how a conversation is shown stay in this browser, since the
-// city's record has no field for them. `adopt` is the other
+// which fact it is changing sends that fact. The tier, the bell and how
+// a conversation is shown stay in this browser, since the city's record
+// has no field for them yet. `adopt` is the other
 // direction and is therefore whole - an answer states every value at
 // once, and a record applied field by field could be half of one
 // answer and half of the last.
@@ -182,7 +185,7 @@ export interface PreferenceDoor {
   readonly setLang: (lang: Lang) => void;
   readonly setWelcomed: (done: boolean) => void;
   readonly setPanel: (open: boolean) => void;
-  readonly setRail: (rail: Rail) => void;
+  readonly setTier: (tier: Tier) => void;
   readonly setAppearance: (next: Appearance) => void;
   readonly setProxying: (rule: Proxying) => void;
   readonly setNotifying: (switched: Notifying) => void;
@@ -267,7 +270,7 @@ function readPreferences(rows: Rows, browserLang: string): Preferences {
     lang: readLang(rows.getItem(ROWS.lang), browserLang),
     welcomed: rows.getItem(ROWS.welcomed) === YES,
     panel: rows.getItem(ROWS.panel) !== NO,
-    rail: readOne(RAILS, rows.getItem(ROWS.rail), "glyphs"),
+    tier: readOne(TIERS, rows.getItem(ROWS.tier), FIRST_TIER),
     appearance: readAppearance(rows),
     proxying: readOne(PROXYING_RULES, rows.getItem(ROWS.proxying), "except_local"),
     notifying: readOne(NOTIFYINGS, rows.getItem(ROWS.notifying), "off"),
@@ -282,7 +285,7 @@ function writePreferences(rows: Rows, next: Preferences): void {
   rows.setItem(ROWS.lang, next.lang);
   rows.setItem(ROWS.welcomed, next.welcomed ? YES : NO);
   rows.setItem(ROWS.panel, next.panel ? YES : NO);
-  rows.setItem(ROWS.rail, next.rail);
+  rows.setItem(ROWS.tier, next.tier);
   writeAppearance(rows, next.appearance);
   rows.setItem(ROWS.proxying, next.proxying);
   rows.setItem(ROWS.notifying, next.notifying);
@@ -332,8 +335,8 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
       settle({ ...get(held), panel });
       told({ panel });
     },
-    setRail(rail) {
-      settle({ ...get(held), rail });
+    setTier(tier) {
+      settle({ ...get(held), tier });
     },
     setAppearance(appearance) {
       settle({ ...get(held), appearance });

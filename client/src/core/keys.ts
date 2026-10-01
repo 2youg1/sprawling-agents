@@ -9,8 +9,8 @@
 // letter, the rail drew a string, and nothing could change either. Here
 // an action names what a key does, a chord says which keys reach it,
 // the person's own chord replaces the default, and one function answers
-// "which action was that". The rail, the shell and the settings section
-// read this table; none of them spells a key itself.
+// "which action was that". The edge keys, the shell and the settings
+// section read this table; none of them spells a key itself.
 //
 // **A chord is what every other application on the machine means by
 // one**: the accelerator (Cmd on a Mac, Ctrl everywhere else), Shift,
@@ -54,7 +54,9 @@ export const ACTIONS = [
   "go.setup",
   "go.waiting",
   "palette",
-  "rail.toggle",
+  "tier.cycle",
+  "mailbox",
+  "inspect",
   "help",
   "composer.focus",
   "run.stop",
@@ -100,15 +102,19 @@ function accelShift(key: string): Chord {
 
 // The chords this client ships with.
 //
-// **Six pages sit on the six digits, in the order the rail draws
-// them**, with settings taken out: settings is on the comma that every
-// browser and every editor puts it on, which leaves the sixth digit
-// for the registry - the one screen that reached this build with no
-// way in at all.
+// **Six pages sit on the six digits**, with settings taken out:
+// settings is on the comma that every browser and every editor puts it
+// on, which leaves the sixth digit for the registry. The settings tree
+// reaches the same pages (client-SPEC 7L); the digits are the fast way.
 //
-// `?` and `/` hold no modifier because they are read only outside a
-// text box; that rule is `matches`'s below, and it is the reason those
-// two can stay single keys.
+// The three edge keys borrow their chords from the habits a person
+// already has: the mailbox is the side panel on B, the right pane is
+// the panel on J, as in the editors that taught both, and the tier is
+// the backslash, the one key here with no borrowed meaning.
+//
+// `?`, `/` and the backslash hold no modifier because they are read
+// only outside a text box; that rule is `matches`'s below, and it is
+// the reason those three can stay single keys.
 export const DEFAULTS: Readonly<Record<Action, Chord>> = {
   "go.talk": accel("1"),
   "go.city": accel("2"),
@@ -119,7 +125,9 @@ export const DEFAULTS: Readonly<Record<Action, Chord>> = {
   "go.setup": accel(","),
   "go.waiting": accelShift("a"),
   palette: accel("k"),
-  "rail.toggle": accel("b"),
+  "tier.cycle": plain("\\"),
+  mailbox: accel("b"),
+  inspect: accel("j"),
   help: plain("?"),
   "composer.focus": plain("/"),
   "run.stop": accel("."),
@@ -141,7 +149,9 @@ export const LABELS: Readonly<Record<Action, Key>> = {
   "go.setup": "nav_settings",
   "go.waiting": "wait_title",
   palette: "nav_palette",
-  "rail.toggle": "keys_rail",
+  "tier.cycle": "edge_layers",
+  mailbox: "edge_mailbox",
+  inspect: "keys_inspect",
   help: "keys_help",
   "composer.focus": "keys_composer",
   "run.stop": "run_cancel",
@@ -256,8 +266,8 @@ export function matches(held: Chord, pressed: Pressed): boolean {
   }
   // Inside a text field a single key is what the person is typing, so
   // only a chord holding the accelerator is the shell's. Without this
-  // rule a `/` in a sentence moved the focus to the composer and a `[`
-  // took the rail away mid-word.
+  // rule a `/` in a sentence moved the focus to the composer and a
+  // backslash changed the tier mid-word.
   if (pressed.target === "field" && !held.accel) {
     return false;
   }

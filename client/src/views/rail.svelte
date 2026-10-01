@@ -32,7 +32,7 @@
   // own control opens the drawer that says which. The city's name
   // beside it pins the rail, so neither control answers for the other.
 
-  import type { Rail } from "../core/prefs";
+  type Rail = "glyphs" | "named" | "away";
   import { LABELS } from "../core/keys";
   import type { Action } from "../core/keys";
   import { MAYOR, toFragment } from "../core/route";
@@ -143,8 +143,6 @@
       >
         <span class="flex items-center gap-base">
           <span class="truncate">{$belief.city ?? say($lang, "nav_city")}</span>
-          <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; svelte-check types this imported snippet fine, and typescript-eslint does not resolve exports of another .svelte module) -->
-          {@render Kbd({ action: "rail.toggle", class: "ml-auto" })}
         </span>
       </button>
     </div>

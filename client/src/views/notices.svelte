@@ -31,7 +31,7 @@
   import type { Notice as NoticeRecord } from "../core/belief";
   import type { Lang } from "../core/lang";
   import { fill, say } from "../core/lang";
-  import type { Rail } from "../core/prefs";
+  type Rail = "glyphs" | "named" | "away";
   import { linkRecovery, recoveryFor } from "../core/recovering";
   import { ago, clock } from "../core/time";
   import { ui } from "../ui";

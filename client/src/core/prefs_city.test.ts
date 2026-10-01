@@ -61,7 +61,7 @@ describe("the preferences the city keeps", () => {
     door.setAppearance(appearance);
     door.setProxying("never");
     door.setChord("go.city", "accel+2");
-    door.setRail("away");
+    door.setTier("zen");
 
     expect(told).toEqual([
       { lang: "zh" },

@@ -26,7 +26,7 @@
   import type { Action } from "./core/keys";
   import { fill, say } from "./core/lang";
   import { markOf, paintMark } from "./core/mark";
-  import { RAILS } from "./core/prefs";
+  import { TIERS } from "./core/prefs";
   import { cityIsShut, CITY } from "./core/scope";
   import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
   import type { View } from "./core/route";
@@ -189,13 +189,18 @@
     opener = null;
   }
 
-  // The rail's posture is the person's, kept where their other
-  // postures are kept (`core/prefs.ts`): a reload must not put the
-  // column back on somebody who works with it away. Three postures,
-  // cycled by one chord in the order `RAILS` states.
+  // The rail's posture, held here until the edge keys replace the rail.
+  const RAILS = ["glyphs", "named", "away"] as const;
+  let rail = $state<(typeof RAILS)[number]>("glyphs");
   function cycleRail(): void {
-    const at = RAILS.indexOf($held.rail);
-    u.prefs.setRail(RAILS[(at + 1) % RAILS.length] ?? "glyphs");
+    rail = RAILS[(RAILS.indexOf(rail) + 1) % RAILS.length] ?? "glyphs";
+  }
+
+  // The tier is the person's, kept where their other postures are kept
+  // (`core/prefs.ts`), and cycled in the order `TIERS` states.
+  function cycleTier(): void {
+    const at = TIERS.indexOf($held.tier);
+    u.prefs.setTier(TIERS[(at + 1) % TIERS.length] ?? "blend");
   }
 
   function typing(target: EventTarget | null): boolean {
@@ -224,8 +229,14 @@
       case "palette":
         paletteOpen = !paletteOpen;
         return;
-      case "rail.toggle":
+      case "tier.cycle":
+        cycleTier();
+        return;
+      case "mailbox":
         cycleRail();
+        return;
+      case "inspect":
+        u.prefs.setPanel(!$held.panel);
         return;
       case "help":
         opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -254,7 +265,7 @@
     if (event.key === "Escape") {
       if (paletteOpen) paletteOpen = false;
       else if (sheetOpen) closeSheet();
-      else if ($held.rail === "named") u.prefs.setRail("glyphs");
+      else if (rail === "named") rail = "glyphs";
       return;
     }
     // With the palette open, only a chord that holds the accelerator is
@@ -319,7 +330,7 @@
     {say($lang, "skip_main")}
   </a>
   {#if view.kind !== "welcome"}
-    <Rail {view} posture={$held.rail} onToggle={cycleRail} onPalette={() => (paletteOpen = true)} />
+    <Rail {view} posture={rail} onToggle={cycleRail} onPalette={() => (paletteOpen = true)} />
   {/if}
   <div class="flex min-h-0 min-w-0 flex-1 flex-col">
     {#if lostAttempt !== null}

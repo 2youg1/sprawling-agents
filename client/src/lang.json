@@ -707,9 +707,17 @@
     "en": "press keys",
     "zh": "按下组合键"
   },
-  "keys_rail": {
-    "en": "the rail",
-    "zh": "左栏"
+  "keys_inspect": {
+    "en": "the right pane",
+    "zh": "右侧"
+  },
+  "edge_layers": {
+    "en": "layers",
+    "zh": "图层"
+  },
+  "edge_mailbox": {
+    "en": "mailbox",
+    "zh": "信箱"
   },
   "keys_reserved": {
     "en": "the browser takes this key before the page sees it",
