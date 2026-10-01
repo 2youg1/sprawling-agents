@@ -126,7 +126,7 @@ tower = { version = "0.5", features = ["util"] }
 # the certificate. What the city
 # owes that deployment is the other half, and it is enforced rather than
 # configured: a face reachable beyond this machine refuses to serve
-# without a credential (wire-SPEC section 8-41). Loading a
+# without a credential (`crates/wire/Spec.lean` §8-41). Loading a
 # certificate, renewing it, and choosing cipher suites here would put
 # "how the control surface is protected" in two homes at once - the
 # proxy's configuration and the city's.
