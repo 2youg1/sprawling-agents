@@ -6,7 +6,7 @@
 
 ## 1 需求分解
 
-`ARCHITECTURE.md` §8 把线格式定为整个 API，并明说「用任何语言写第二个客户端都是支持的」。本目录行使这一条：它是**第三个**客户端，写在仓外，用来攻击而不是使用。拆成六个可独立验收的最小单元：
+`ARCHITECTURE.md` §8 把线格式定为整个 API，并明说「用任何语言写第二个客户端都是支持的」。本目录行使这一条：它是**第三个**客户端，写在仓外，用来攻击而不是使用。拆成以下可独立验收的最小单元：
 
 | 单元 | 交付物 | 独立验收 |
 |---|---|---|
@@ -18,10 +18,13 @@
 | U6 历史 | 任意轨迹之后，账本离线自证；改一个字节则不能自证 | `replay` 在干净轨迹上恒绿、在翻过一位的轨迹上恒红 |
 | U7 供应世界 | `Provider`：挂过 endpoint 的第二种世界——一个 URL 的全部拼法、一个注册模型的上限、两条同时跑的车道 | 等价类的每种拼法经探测与经挂载各落到同一个 `base_url`；注册过的模型带得出上限；messages 派活拿不到「没有输出上限」；不等第一条做完就派出去的活是两个 run |
 | U8 配置世界 | `Layer`：写过配置的第三种世界——`configure_building` 任意序列之后，磁盘上的 `CONFIG.toml` 与 `Query::BuildingView` 折出的答案一致 | 任意非空写序列之后：答案等于最后一次写入的值；楼自己那层的文件陈述该值且不再陈述更早的值；上一层一个都不陈述 |
+| U9 验收世界 | `Acceptance`：一个陌生人拿发行归档里的二进制，在一个新目录里起城，经门走完第一天、一次进程被杀、第二天早上；provider 是 `just acceptance` 在本目录之外起的替身（§13） | `just acceptance <archive>` 的每一步按序通过，第一处失败报出步名；人的清单写到 `target/acceptance/checklist.md` |
 
 **不负责**：任何规则的再实现（链哈希、`IdemKey` 派生、写域判定、份额守恒）；任何 Rust 侧的构建闸门；任何随产品交付的东西。三者中任何一条被违反，本目录应当被删除而不是被修补。
 
-**本目录只有检验器。** 规定某个 Rust 模块必须守住哪些性质的 Lean 模型住在该 crate 的 `spec/` 下（ARCHITECTURE.md §11「Specifications in Lean」），由 `just models` 证明。Lean 包的三个文件（`lakefile.toml`、`lean-toolchain`、`lake-manifest.json`）在仓库根，本目录是其中两个目标：`Sprawling` 库（`src/`）与 `adversary` 可执行文件（`test/`）。它们只 import `Sprawling.*` 与 Lean 工具链自带的库，不 import 任何规格，所以检验器里没有任何规则的再实现；`just adversary` 与夜间任务构建它们，`just models` 不碰它们。
+**本目录只有检验器。** 规定某个 Rust 模块必须守住哪些性质的 Lean 模型住在该 crate 的 `spec/` 下（ARCHITECTURE.md §11「Specifications in Lean」），由 `just models` 证明。Lean 包的三个文件（`lakefile.toml`、`lean-toolchain`、`lake-manifest.json`）在仓库根，本目录是其中三个目标：`Sprawling` 库（`src/`）与 `adversary`、`acceptance` 两个可执行文件（`test/`）。它们只 import `Sprawling.*` 与 Lean 工具链自带的库，不 import 任何规格，所以检验器里没有任何规则的再实现；`just adversary` 与夜间任务构建它们，`just models` 不碰它们。
+
+**U9 不在 `just adversary` 的检查树里**：它要一个发行归档和一个会应答的 provider，那一跑两样都没有。它是另一个可执行文件 `acceptance`，只由 `just acceptance <archive>` 调用；树里的世界不挂会应答的 endpoint，U9 挂，这是两者唯一的分界。
 
 **U6 是本目录相对一次性 CLI 检验器的增量**，理由在产品而不在方法：一座城把**一条全序的历史**写在磁盘上，于是「任意轨迹之后历史仍然自洽」是一条可以对着随机轨迹反复问的性质，而不只是一次定点检查。
 
@@ -36,6 +39,7 @@
 5. **咬得动的证据**：把 `Model.lean` 的 `refusal` 里 `work` 那条停摆守卫摘掉后，`a halted city takes no work until it is released` 必须失败。一个永远为真的性质与没有性质等价。
 
    **已演示。** 摘掉该守卫后该性质报错，收缩 3 次得到两步反例 `Stop City ; Work acme one`，并指出 `refused with Code "E_GATE_DENIED" where Code "E_MODEL_UNCHOSEN" was owed`；恢复后转绿。它咬得动的是**守序**，而不只是「停摆时派活会失败」。这一条同时是对 §13 那套自备机器的验收：生成器、收缩器、极性推导与后置条件四件必须同时工作，才会得到这个最小反例。
+6. `just acceptance <archive>` 把归档解进 `target/acceptance/`，按归档的 `skills/` 写出替身的脚本，起替身，然后用归档里的二进制走完 U9 的每一步（§9），每一步打印 `ok` 与耗时，第一处失败以步名开头报出并以退码 1 结束；全部通过才写清单。它不是门，也不进 `just check`：归档要先由 `just package` 造出来，而那是一次发布构建。
 
 ## 3 假设与歧义
 
@@ -44,10 +48,13 @@
 | 门的形状 | `sprawling call <frame> --at <addr> --quiet-ms <n>`：stdout 每行一枚 JSON 帧，stderr 一行计数，退出码 0／1／2／3 | 线格式换传输时门变成它的 schema，改 `Door.lean` 一处 |
 | 城是什么 | 一个本地目录，`init` 造它，`serve` 端起来，账本在 `.sprawling/ledger/` 下按段分文件 | 布局改变时 `Ground.lean` 的敌意动作报错，属预期 |
 | 静默 | 门的第三种回答。**不是接受**——见 §10「静默不是接受」 | 若将来 `call` 改为「命令被受理才返回」，`quiet` 这一支变成异常而不是取值 |
-| provider | `Model` 的世界一个都不挂，于是每一次派活在配置这道门上被拒，而模型知道这一点；`Provider` 的世界挂一个**这台电脑上没人听的地址**，于是每一次调用停在 socket 上 | 挂上一个真会应答的 endpoint 后，两种世界都要学第三种：调用会成功，而本目录不许自带一个假 provider（§13） |
+| provider | `Model` 的世界一个都不挂，于是每一次派活在配置这道门上被拒，而模型知道这一点；`Provider` 的世界挂一个**这台电脑上没人听的地址**，于是每一次调用停在 socket 上；U9 挂 `just acceptance` 起的替身，调用成功，替身不在本目录里（§13） | 检查树里的世界要一个会应答的 endpoint 时，它们照 U9 的样子从 justfile 接收一个 URL，而不是在本目录里起一个 |
+| 替身按什么次序答 | 替身按请求到达的次序花掉脚本里的回复（`citysim-SPEC.md` §8-10），所以 U9 每派一次活都等那个 run 冻结再派下一次；唯一不等的是它要杀掉的那个 run，那个 run 的回复全是同一个只读调用，接着花剩下回复的 run 因此以同一句话结束 | 替身能按 run 分开作答之前（`citysim-SPEC.md` §3-11 的重开参数），U9 不并发派活 |
+| 杀进程 | `Serving.hangUp` 结束被服务的进程（Windows 上是 `TerminateProcess`，Unix 上是 `SIGKILL`），等被杀的 run 写下 `inFlight` 条 `tool_result` 之后才杀，所以刀落在两次写之间，而不是在最后一次写之后；被杀的 run 若已冻结，那一步报红并说明替身给的调用太少 | 城回来之后怎么处理那个死掉的 run，不是 U9 断言的事：它断言的是历史自证、城再服务、新的活跑到它自己的结尾 |
 | 配置写回 | 「写了什么就读得回什么」这条不变量的对象是 **TOML 文件**，不是哪一条帧。人层偏好的那一条（`PutPreferences` / `Query::Preferences`）今天并不存在，而 `configure_building` 写楼自己那层、`Query::BuildingView` 把它折回来，是同一条不变量今天已经承载的地方，所以性质写在那里 | 那一对帧落地后，`Layer` 换成它们驱动，断言一字不改：变的是谁写进文件，不是文件欠谁什么 |
 | 时钟 | 只用于超时，从不被预测 | —— |
 | 端口 | 从 47100 起向上探，第一个能答 `city_view` 的即用 | 机器上有别的东西占着整段时报错并说明 |
+| 一次可用性验收还该走什么 | U9 走的是一个人第一天能做的事：城答话、挂上 provider、立楼、准入 skill、派活到结尾、历史自证，以及进程被杀之后城回来接着干。**协作那一串还没走**：市长做计划、两次派活认领同一个节点、重派、`pr check` 判不通过 | 那一串要几个 run 交错调用替身，替身按 run 分开作答之后它进 U9；在那之前它由 `crates/sprawling/tests/acceptance/` 的白盒部分承担 |
 
 ## 4 现状分析
 
@@ -171,12 +178,18 @@ src/Sprawling/Provider.lean  挂过 endpoint 的第二种世界：URL 等价类�
 src/Sprawling/Layer.lean     写过配置的第三种世界：磁盘上的那份与答案里的那份
 src/Sprawling/Person.lean    人自己那一层的第四种世界：住在城外的那份与答案里的那份
 src/Sprawling/Regression.lean 两个世界的反例 → 一个 Rust 测试文件
+src/Sprawling/Acceptance/Script.lean 替身要回放的脚本：从归档的 skills 写出
+src/Sprawling/Acceptance/Stage.lean  陌生人的目录，以及他用编辑器改的两份文件
+src/Sprawling/Acceptance/Walk.lean   第一天、进程被杀、第二天早上
 test/Main.lean               入口与检查树
+test/Acceptance.lean         `acceptance` 可执行文件的两个命令：写脚本、走一遍
 ```
 
 依赖单向：`Model` → `Door` → `Frame`，`Model` → `Ground` → `Door`，`Model` → `Check`，`Provider` → `Ground`，`Layer` → `Ground` 与 `Check`，`Person` → `Layer`，`Regression` → `Model` 与 `Provider`。**`Person` 读 `Layer` 而不自立一套**：两个世界问的是同一件事（一份人也手改的文件与一个折出来的答案会不会分岔），差在那份文件在不在城里；序列生成器、收缩器、“这份读数陈述了某个值吗”那一个子串探针、以及七个互不为子串的四位数，全部只有 `Layer` 一个家。`Layer` 不被 `Regression` 读：它至今没有找到反例，而一条没有反例的性质不向 Rust 侧交付任何东西。**`Regression` 依赖两个世界，因为交付物是一个文件**：轨迹那条测试的每一步与极性从 `Model` 读，供应世界那两条测试的拼法、中转站名字与模型 id 从 `Provider` 读，于是演员表在本目录里仍然只有一个家。`Provider` 不 import `Model`：那是另一种世界，两边共用的只有门与场地。`Frame` 不 import 任何本工程模块；`Check` 也不，且它**不 import `Door`**——抽样与收缩不允许知道有一座城存在。
 
 `Ground` 依赖 `Door` 而不是自己起进程：**「二进制在哪」只允许有一个答案**，而场地要用它做三件事（`init`、`serve`、探活）。
+
+**U9 读 `Provider` 与 `Layer` 而不自立一套**：等一条记录、读整段历史、发一条不许被拒的命令在 `Provider`，城自己那一层配置的路径在 `Layer`，服务一个已经起好的目录在 `Ground.servingAt`（`withGround` 就是它加一个一次性目录）。`Script` 不 import 任何本工程模块：脚本是数据，它只知道替身读的那种线上 JSON。
 
 **检验器不 import 规格。** `src/` 与 `test/` 下每一条 `import` 只指向 `Sprawling.*` 或 Lean 工具链自带的库。链与快照的定理在 kernel 与 storage 的规格里（`crates/kernel/spec/Ledger.lean`、`crates/storage/spec/Snapshot.lean`），检验器只在注释里引用它们。一条规则因此只有一处权威：规格陈述它，产品实现它，检验器从门外问产品守没守住。
 
@@ -238,6 +251,39 @@ def render : String → Trace → String
 ```
 
 ```lean
+-- Ground.lean —— 服务一个已经起好的目录；withGround 是它加一个一次性目录
+def servingAt : Door → System.FilePath → System.FilePath → (Ground → IO α) → IO α
+
+-- Acceptance/Script.lean —— 替身回放什么
+def standInModel : String                          -- 替身列出的唯一模型
+def building : String                              -- U9 立的那栋楼
+def notesPath : String                             -- 第一个 run 写的文件
+def notesText : String
+def statusCalls : Nat                              -- 被杀的 run 拿到的只读调用数
+def closingLines : Nat                             -- 收尾的那句话写几遍
+def script : List String → Json                    -- 由归档的 skill 名写出整份脚本
+
+-- Acceptance/Stage.lean —— 陌生人的目录
+structure Stage where root city home : System.FilePath
+def Stage.raise   : Door → IO Stage
+def Stage.serving : Stage → Door → (Ground → IO α) → IO α
+def shipped    : System.FilePath → IO (List String) -- 书架上带 SKILL.md 的目录名，排序
+def mountShelf : System.FilePath → System.FilePath → IO Unit  -- 把书架写进城那一层
+def admit      : System.FilePath → String → List String → IO Unit  -- 改阅览室那一行
+
+-- Acceptance/Walk.lean —— 走什么
+structure Setting where door : Door; url : String; shelf : System.FilePath
+                        skills : List String; record : System.FilePath
+structure Step where name : String; walk : Ground → IO Unit
+def firstDay     : Setting → List Step
+def interrupted  : Setting → Stage → IO Unit
+def morningAfter : Setting → List Step
+def walk         : Setting → IO Unit
+```
+
+`walk` 按序走、停在第一处失败：每一步站在前面几步留下的城上，一栋没立起来的楼没法派活，接着走只会把一个原因报成许多个。每一处断言都从城写下它的地方读回——盘上的文件、历史里的记录、查询的答案、替身记下的请求——不重算任何东西。
+
+```lean
 -- Provider.lean —— 挂过 endpoint 的第二种世界
 def deadAuthority : String                       -- 这台电脑上没人听的那个地址
 def spellings : String → List String             -- 一个 endpoint 的等价类，穷举而非抽样
@@ -288,6 +334,12 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 3. 反例出现时，报文给出种子、收缩次数、最小化后的轨迹与破掉的那条承诺。把种子经 `SPRAWLING_SEED` 传回去可以原样复现。
 4. 人把最小反例经 `SPRAWLING_ACCEPT=1` 渲染成 Rust 源码，提交到 `crates/sprawling/tests/`。**知识就此迁移到 Rust，本目录不保留它。**
 5. `just adversary --select <文字>` 与 `--reject <文字>` 按检查的完整路径筛选。它们为红之后的那几分钟而存：单条检查几秒就重跑完，而整棵树要几分钟。定时任务不用它们——它把整棵树一次跑完，因为树里每一条都是**必须通过**的。
+6. `just acceptance <archive>`：把归档解进 `target/acceptance/`，构建替身与 `acceptance`；`lake exe acceptance script <书架> <脚本>` 按归档的 `skills/` 写出脚本；配方起替身，从它印出的第一行读 `SPRAWLING_PROVIDER`；`lake exe acceptance walk <书架> <记录>` 在 `SPRAWLING_BIN` 指着归档里的二进制时走完三段：
+   - **第一天**（一次服务）：城答出它起城时的那栋 hall；替身被挂上、它的模型被选中；立一栋楼并被列出；人在楼的阅览室里准入每一件 skill；派活跑到脚本给的结尾并在盘上留下文件；run 钉住的 skill 恰是书架上的那些，按名读到的每一件以它自己的正文到达模型；模型拿到的目录里有脚本调用的每件工具；城列出的楼恰是历史创建过的楼；历史自证。
+   - **进程被杀**（第二次服务）：派活，等那个 run 写下几条工具结果，然后结束进程。
+   - **第二天早上**（第三次服务）：被杀的城留下的历史自证；城再服务，新派的活跑到它自己的结尾；历史再自证。
+
+   配方在结束时停掉替身，无论走没走完。
 
 ## 10 实现逻辑
 
@@ -346,6 +398,9 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 | 进程没被杀干净 | `withGround` 用 `try … finally`，异常路径也走 `hangUp` 并等它被回收 |
 | 检查自身抛出 | 原样传上去。只有端口在出口处被收回——一个把每种失败都改名的检验器，会在产品欠着答案时报出自己的脚手架 |
 | 同一 `IdemKey` 用两次 | 模型每个动作各铸一个新的；重放同一个由 `keyUsedTwice` 单独断言，见 §4 第三个发现 |
+| U9 没有 `SPRAWLING_BIN` 或 `SPRAWLING_PROVIDER` | 抛出并说明该经 `just acceptance <archive>` 运行。与检查树不同，U9 不跳过：人点名了一个归档，一跑什么都没走的绿就是在报一次没发生的验收 |
+| 归档的书架上一件 skill 都没有 | `acceptance script` 拒绝写脚本：一次什么都不钉、什么都不读的验收会让 skill 那一步平凡成立 |
+| 人要改的那一行不在模板里 | `admit` 拒绝而不追加：第二个 `reading_room` 键会让城以本目录造成的原因拒这份文件；`mountShelf` 对已经有 `[skills]` 的配置同理 |
 
 ## 12 Decisions
 
@@ -370,6 +425,8 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 
 **不引入**：任何 FFI、任何绑定 Rust 类型的东西、任何需要改 Rust 代码才能工作的东西、任何 HTTP 服务端（假 provider 会让本目录变成第二个 gateway 实现）。
 
+**一个会应答的 provider 从 justfile 接收，不在本目录里起。** U9 要一座调用成功的城，替身是 `tools/citysim` 的 `provider` 二进制（`citysim-SPEC.md` §8-10），由 `just acceptance` 起在本目录之外，URL 经 `SPRAWLING_PROVIDER` 交进来——与二进制的路径经 `SPRAWLING_BIN` 交进来是同一个形状。一个接收来的 URL 不让本目录变成第二个 gateway 实现：替身用城自己的翻译读脚本里的每一条回复，HTTP 那一面是 citysim 的，本目录只写脚本，而脚本是 U9 把期待写成数据。**被否**：在 Lean 里起一个 HTTP 服务端——本目录会多出一个 provider 的实现，并为一个注册表之外的协议栈负责；用 Rust 写一个起子进程的测试去驱动发行件——从门外进城的检查是 Lean 的（边界那条裁定，`xtask boundary` 守着），换成 Rust 就是把黑盒写回白盒的那一侧。
+
 ## 14 硬编码声明
 
 | 硬编码 | 意图 | 后续影响 |
@@ -389,6 +446,10 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 | 演员表 `relay` / `opus-nine` | 一个中转站，一个内置目录与预设表都不认得的模型 id——事实梯最后一级正是为这一格而存在 | 预设表有了这个 id 的行时，换一个它不认得的 |
 | 渲染出的一行 `attach(...)` 不折行 | 最长的那种拼法仍在 rustfmt 的宽度以内，于是渲染器写一行、rustfmt 不动它 | 换一个更长的地址会让 rustfmt 折行，逐字节对拍当场报红——这正是它该报的 |
 | 记录预算 240 × 250 ms | 一条命令等自己那条记录的上限。只在城真的还在干活时花掉；一次探测在 debug 二进制上的主要开销是构造 HTTP 客户端，不是那次被拒的连接 | 探测变快后可以调小；调小前要先量 |
+| 替身的模型 `stand-in-1` 与 U9 的楼 `acme` | 一个替身列出的 id，一栋演员表里的楼，让一次红读起来与本目录别处的报告一样 | —— |
+| `statusCalls` 120、`inFlight` 3、`closingLines` 3 | 被杀的 run 要在被杀时仍在调用：一次调用在 debug 二进制上约十毫秒，120 次是一秒多的在途，等到 3 条工具结果再杀；收尾那句写三遍，城回来时若也捡起那个死掉的 run，两个 run 都能以自己的最后一句结束 | 发布二进制更快；被杀的 run 若在被杀前就冻结，那一步报红并点名这个数 |
+| 幂等键 400–405 | U9 每条命令一把，与检查树的 0–323 不相交，一份报告里不会有两条命令共用一个数 | —— |
+| 目录 `target/acceptance/` | 解开的归档、脚本、替身的记录、清单都在这里，配方每次先清空它 | 由 justfile 提供 |
 
 ## 15 影响面
 
@@ -401,6 +462,8 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 按「坏得越早越省时间」排序，共 23 条：渲染对拍（U5，毫秒级）、门的契约三条（U1，含 §4 那条退出码性质）、人填进去的四条（U7：探测的等价类、挂载的等价类、幂等、读不懂的帧）、挂过 provider 的三条（U7：注册带上限、派活不为上限被拒、两条车道是两个 run）、配置写回（U8，实测 26 s）、随机轨迹（U3）、定向停摆（U4）、账本自洽（U6）、磁盘的四句（U2，含 §4 第七个发现之后补上的那一条：改动落在被覆盖的每一格上）、最后是按缺陷命名的那一组与那一条。
 
 **U8 同样被演示过咬得动**（§2 第 5 条）：把“答案等于最后一次写入”改成“等于第一次写入”后，该条报错，收缩 1 次得到两步反例 `[6556, 9223]`；恢复后转绿。**磁盘那一条同样被演示过**（§4 第七个发现）：把被改的那一格从「除最后一条之外」改成「包括最后一条」，该条报错并指名 `a change inside record 4 of 4 was believed: the chain still verified, with tail seq 3`；改回来转绿。它咬得住的是产品欠的那件事——被覆盖的改动必被读出——而不仅仅是「改一位就会红」。U7 那七条各自实测为 7–37 s（debug 二进制，四核 Windows），其中的时间几乎全在城构造 HTTP 客户端上；其余十三条一整套 2 min 35 s（实测，四核 Windows，热缓存）；同一棵树在两核 Linux 上 51 s，差别在起进程的价钱而不在核数。**新增的那一条**（`a change to any record but the last is refused`）单独实测 18.2 s 首跑、2.5 s 暖盘（同机）：它贵在每问一次都起一个 `replay` 子进程，而不在计算。约束是 §2 第 5 条——**咬得动**必须被演示过，而不是被相信。
+
+U9 不在这 23 条里，它由 `just acceptance` 单独跑：第一天约 1.8 s，被杀那一步约 0.75 s，第二天早上约 2 s（debug 二进制，同一台四核 Windows）。
 
 **树里没有一条是被期待失败的。** 一条因为预期会红而被留下的检查，教会每一个看到它的人把红当成常态，于是下一个真的发现落进一次没人读的运行里。
 
@@ -418,7 +481,8 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 4. `justfile` 的 `adversary` 配方。
 5. `.gitignore` 的 `/.lake`（Lean 包在仓库根），以及 `tools/xtask/src/walk.rs` 的 `SKIP_DIRS`。
 6. `.github/workflows/adversary.yml`——定时任务，永远不进 `check`。
-7. 仓库根的 `lakefile.toml`：本目录的两个目标在那里定义。
+7. 仓库根的 `lakefile.toml`：本目录的三个目标在那里定义（`Sprawling` 库、`adversary` 与 `acceptance` 两个可执行文件）。
+8. `justfile` 的 `acceptance` 配方，以及 `tools/citysim/citysim-SPEC.md` §8-10：替身的脚本格式与它印出的那一行。
 
 ---
 
