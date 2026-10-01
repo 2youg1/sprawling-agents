@@ -1,10 +1,61 @@
-[package]
-name = "sprawling-desktop"
+# The desktop server and its one FFI seam, `ffi`, built outside the root
+# workspace (root `Cargo.toml`, `exclude`). The two packages share the one
+# wall below: the package metadata, the lint table and the version of
+# `winsafe` are stated here once and inherited by both, and `xtask guard`
+# compares this wall with the root workspace's key by key
+# (desktop-SPEC.md section 8-12).
+[workspace]
+members = ["ffi"]
+# The fuzz target is a cargo-fuzz project of its own, built on nightly
+# with sanitizer flags, and never part of this build.
+exclude = ["ffi/fuzz"]
+
+[workspace.package]
 version = "0.0.7"
 edition = "2024"
 license = "MPL-2.0"
 rust-version = "1.97"
 publish = false
+
+[workspace.dependencies]
+# Safe Rust over the Win32 calls admitted operation by operation
+# (desktop-SPEC.md sections 8-11 and 12.9): input, the facts of a window,
+# and the handle and error types the seam hands back. `user` is those
+# calls and nothing of the GUI layer above them; `ole` is the guard that
+# enters and leaves the tree's COM apartment, and the HRESULT type.
+winsafe = { version = "0.0.29", features = ["user", "ole"] }
+
+# The workspace lint table, copied rather than inherited: these packages
+# are not members of the root workspace. One line differs: `unsafe_code`
+# is `deny` rather than `forbid`, so each call into the Zig leaf can
+# relax it at that one statement, with a written reason.
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+indexing_slicing = "deny"
+string_slice = "deny"
+arithmetic_side_effects = "deny"
+as_conversions = "deny"
+dbg_macro = "deny"
+wildcard_enum_match_arm = "deny"
+let_underscore_must_use = "deny"
+let_underscore_untyped = "deny"
+fn_params_excessive_bools = "deny"
+
+[package]
+name = "sprawling-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 description = "An MCP server that gives an agent eyes and hands on this Windows desktop."
 
 [lib]
@@ -25,11 +76,13 @@ base64 = "0.23"
 # encoder, which is why `quality` does not reach it (desktop-SPEC.md §14).
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 
-# The Win32 binding, for the call groups that have no admitted safe
-# interface yet (desktop-SPEC.md section 8-11) and for the constants
-# the others read. Only the namespaces those groups reach are switched
-# on, so a call this package never makes is not even nameable here.
 [target.'cfg(windows)'.dependencies]
+# The seam: enumeration, capture, the clipboard and DPI awareness, the
+# four call groups with no admitted safe interface (desktop-SPEC.md
+# sections 8-11 and 8-12).
+desktop_ffi = { package = "sprawling-desktop-ffi", path = "ffi" }
+# The Win32 binding, for the call groups that still reach it directly
+# and for the constants the others read.
 windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
@@ -40,11 +93,7 @@ windows = { version = "0.62", features = [
     "Win32_UI_HiDpi",
     "Win32_UI_WindowsAndMessaging",
 ] }
-# Safe Rust over the Win32 calls admitted operation by operation
-# (desktop-SPEC.md sections 8-11 and 12.9): input and the facts of a
-# window. `user` is those calls and nothing of the GUI layer above them;
-# `ole` is the guard that enters and leaves the tree's COM apartment.
-winsafe = { version = "0.0.29", features = ["user", "ole"] }
+winsafe = { workspace = true }
 # The UI Automation tree, read through safe calls (desktop-SPEC.md
 # section 12.10). Its `control` default adds control matching, and its
 # other features add screenshots and the clipboard, which this package
@@ -55,30 +104,13 @@ uiautomation = { version = "0.25.1", default-features = false, features = ["inpu
 [dev-dependencies]
 tempfile = "3"
 
-# The workspace lint table, copied rather than inherited: this package is not a
-# workspace member (root `Cargo.toml`, `exclude`). One line differs:
-# `unsafe_code` is `deny` rather than `forbid`, so the Win32 calls under
-# `src/platform/windows/` can relax it one function at a time, each with a
-# written reason.
-[lints.rust]
-unsafe_code = "deny"
+# What the tests call to build windows of their own and to count the GDI
+# objects this process holds; nothing here reaches the server.
+[target.'cfg(windows)'.dev-dependencies]
+windows = { version = "0.62", features = ["Win32_Graphics_Gdi", "Win32_System_Threading"] }
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
-panic = "deny"
-todo = "deny"
-unimplemented = "deny"
-unreachable = "deny"
-indexing_slicing = "deny"
-string_slice = "deny"
-arithmetic_side_effects = "deny"
-as_conversions = "deny"
-dbg_macro = "deny"
-wildcard_enum_match_arm = "deny"
-let_underscore_must_use = "deny"
-let_underscore_untyped = "deny"
-fn_params_excessive_bools = "deny"
+[lints]
+workspace = true
 
 # The same release profile as the workspace's own, for the same reason:
 # a size is a fact about the linker that produced it, and this connector
