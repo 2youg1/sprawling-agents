@@ -266,7 +266,7 @@ fn a_dropped_call_is_asked_again_and_both_handdowns_still_come_back() {
             addr: room.clone(),
             task: "get it measured and written up".to_owned(),
             goal: "a page with a number in it, then stop".to_owned(),
-            mode: kernel::Mode::PlanGoal,
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,

@@ -32,7 +32,7 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
                 addr: Address::parse(room).unwrap(),
                 task: "claim the notes".to_owned(),
                 goal: "register a goal, then stop".to_owned(),
-                mode: kernel::Mode::PlanGoal,
+                policy: kernel::RunPolicy::of(kernel::Mode::Work),
                 idem: kernel::IdemKey::derive(
                     &RunId::CITY,
                     kernel::Seq::new(u64::try_from(n).unwrap()),

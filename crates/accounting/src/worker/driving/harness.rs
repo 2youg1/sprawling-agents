@@ -83,6 +83,7 @@ pub(in crate::worker) struct Chartered {
     pub(in crate::worker) parent: Option<RunId>,
     pub(in crate::worker) predecessor: Option<RunId>,
     pub(in crate::worker) dispatched_by: Who,
+    pub(in crate::worker) policy: kernel::RunPolicy,
 }
 
 impl Chartered {
@@ -98,6 +99,7 @@ impl Chartered {
             predecessor: self.predecessor,
             dispatched_by: &self.dispatched_by,
             skills: &[],
+            policy: self.policy,
         }
     }
 }

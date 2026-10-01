@@ -72,7 +72,7 @@ fn the_same_dispatch_twice_under_one_key_opens_one_room_and_starts_one_run() {
         addr: Address::parse("lab").unwrap(),
         task: "read the plan".to_owned(),
         goal: "one answer".to_owned(),
-        mode: kernel::Mode::PlanGoal,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lab|read the plan"),
         session: Some(kernel::SessionName::parse("one").unwrap()),
         effort: None,

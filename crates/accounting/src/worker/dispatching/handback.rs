@@ -108,7 +108,7 @@ impl RunWorker {
 
     /// Hands down the nodes of the parent room's graph that its join has
     /// just made ready, the way the node that handed back was handed
-    /// down: under the same parent run, in the same mode, owing the same
+    /// down: under the same parent run, under the same run policy, owing the same
     /// room. The graph is dropped once every node has joined.
     ///
     /// # Errors
@@ -148,7 +148,7 @@ impl RunWorker {
                     session: None,
                     effort: None,
                     model: None,
-                    mode: sibling.mode,
+                    policy: sibling.policy,
                     origin: None,
                     parent: sibling.parent,
                     succession: None,

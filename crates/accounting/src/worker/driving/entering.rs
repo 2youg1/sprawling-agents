@@ -67,7 +67,7 @@ impl RunWorker {
             session: None,
             effort: None,
             model: None,
-            mode: kernel::Mode::PlanGoal,
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
             parent: None,
             succession: None,
             taint: because.taint(),

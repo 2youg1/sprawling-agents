@@ -49,7 +49,7 @@ impl Laying {
         at: &Assignment,
         job_locator: &Locator,
     ) -> Result<Workbench, AxError> {
-        let (addr, mode) = (&at.addr, at.mode);
+        let addr = &at.addr;
         // The catalog is the single source of `ChatRequest.tools`: the
         // bench routes a call, the catalog is what the model was told
         // exists, and one registration feeds both.
@@ -60,10 +60,9 @@ impl Laying {
         // conversation's cache. Progressive disclosure is about what a
         // line says, not about when a tool appears.
         let catalog = Arc::new(Mutex::new(runtime::Catalog::new()));
-        // The mode a run sits in is a capability like any other: it says
-        // what this run admits, and until it was set here the mode's own
-        // catalog entry reached no model.
-        held(&catalog, "lay out the catalog")?.set_mode(mode);
+        // The mode a run sits in is a capability like any other: until
+        // it was set here the mode's own catalog entry reached no model.
+        held(&catalog, "lay out the catalog")?.set_mode(at.policy.mode);
         let edit = EditTool::new(&site.write_root, addr.clone(), site.rules.write_domain()?)?;
         // Every tool shares one keeper, so no two of them keep two keys
         // under one name (sprawling-SPEC.md 8-87).
@@ -345,7 +344,7 @@ impl Laying {
                 addr: &at.addr,
                 who: &site.who,
                 signals_pending: desks.waiting,
-                mode: at.mode,
+                policy: at.policy,
                 write_domain: &site.rules.write_domain()?,
                 worktree: &site.write_root,
                 trust: &self.trust,

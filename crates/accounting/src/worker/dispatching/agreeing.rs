@@ -79,7 +79,7 @@ pub fn acp_dispatch(
             addr,
             task,
             goal,
-            mode: wire::Mode::PlanGoal,
+            policy: wire::RunPolicy::of(wire::Mode::Work),
             idem,
             // An editor drives an address it already chose.
             session: None,

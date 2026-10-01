@@ -179,7 +179,7 @@ fn dispatch(worker: &mut RunWorker) -> Result<(), AxError> {
         addr: Address::parse(BUILDING)?,
         task: "Reply with one word: ready.".to_owned(),
         goal: "one answer from the endpoint this city was pointed at".to_owned(),
-        mode: kernel::Mode::PlanGoal,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"e2e-dispatch"),
         session: Some(kernel::SessionName::parse(SESSION)?),
         effort: None,

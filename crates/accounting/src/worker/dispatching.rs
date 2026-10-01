@@ -20,7 +20,7 @@ use kernel::{Address, AxError, Locator, RunId};
 /// Four of these reach every phase below together and are never chosen
 /// independently: standing the run up, laying out its bench, freezing
 /// its plan, settling its desks and concluding it all name the same
-/// address, mode and ceiling. Passed side by side they were four
+/// address, run policy and ceiling. Passed side by side they were four
 /// parameters on six signatures, and the depth had to be derived twice.
 ///
 /// The other two are spent in `stage_dispatch`'s prologue and never seen
@@ -46,7 +46,10 @@ pub(super) struct Assignment {
     /// one; `None` runs on the `main` tag's model. Spent by agreeing,
     /// which finds the tag that registered it (sprawling-SPEC.md 8-10).
     pub(super) model: Option<String>,
-    pub(super) mode: kernel::Mode,
+    /// The run policy the dispatch chose (kernel-SPEC 8-77): written
+    /// into `run_started`, asked by the merge, and inherited whole by
+    /// every run this one hands work to or knocks for.
+    pub(super) policy: kernel::RunPolicy,
     /// The run that handed this work down, when somebody did.
     pub(super) parent: Option<RunId>,
     /// The run this one replaces, when it is a successor, and what that
@@ -213,9 +216,11 @@ pub(super) struct Knock {
     pub(super) addr: Address,
     /// Who spoke, as they will be named in the woken run's own brief.
     pub(super) from: String,
-    /// The mode of the run that spoke. Carried rather than defaulted: an
-    /// answer belongs to the same piece of work as the question.
-    pub(super) mode: kernel::Mode,
+    /// The run policy of the run that spoke. Carried rather than
+    /// defaulted: an answer belongs to the same piece of work as the
+    /// question, and a knock must not widen what the speaker could
+    /// write or lift what it had to prove.
+    pub(super) policy: kernel::RunPolicy,
     /// Where the run that spoke stood in its conversation. The woken run
     /// is one hop further on, and both ceilings are read there
     /// (sprawling-SPEC.md 8-46-12).

@@ -351,7 +351,7 @@ impl Desks {
 
 /// What a run can be told about itself at the moment it starts.
 ///
-/// Every field here is read from something, never a constant: the mode,
+/// Every field here is read from something, never a constant: the run policy,
 /// the write domain the building granted, the budget, the context limit
 /// and the locks. City.md tells a model to call `status` for exactly
 /// those, and a row of constants would teach a model that obeyed not to
@@ -365,7 +365,7 @@ pub(super) struct Situation<'a> {
     pub(super) addr: &'a Address,
     pub(super) who: &'a str,
     signals_pending: u32,
-    mode: kernel::Mode,
+    policy: kernel::RunPolicy,
     write_domain: &'a kernel::WriteDomain,
     worktree: &'a Path,
     trust: &'a kernel::Autonomy,
@@ -378,7 +378,7 @@ pub(super) fn status_snapshot(situation: Situation<'_>) -> runtime::StatusSnapsh
     runtime::StatusSnapshot {
         who: situation.who.to_owned(),
         addr: situation.addr.clone(),
-        mode: situation.mode,
+        policy: situation.policy,
         ctx_limit: kernel::Tokens::new(situation.context_tokens),
         trust: autonomy_word::spell(situation.trust),
         write_domain: situation

@@ -95,7 +95,7 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
         addr: Address::parse(LAB).unwrap(),
         task: "Answer.".to_owned(),
         goal: "one turn with this machine's desktop".to_owned(),
-        mode: kernel::Mode::PlanGoal,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: idem(b"dispatch"),
         session: Some(kernel::SessionName::parse("s1").unwrap()),
         effort: None,

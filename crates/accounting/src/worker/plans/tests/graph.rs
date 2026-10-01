@@ -67,7 +67,7 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             addr: room.clone(),
             task: "get it measured and written up".to_owned(),
             goal: "a page with a number in it, then stop".to_owned(),
-            mode: kernel::Mode::PlanGoal,
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,

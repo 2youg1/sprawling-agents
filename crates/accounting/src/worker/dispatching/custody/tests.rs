@@ -56,7 +56,7 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
             addr: Address::parse("lab/room1").unwrap(),
             task: format!("call the messages API with {key} and report the model list"),
             goal: "the list is written down".to_owned(),
-            mode: kernel::Mode::PlanGoal,
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"paste"),
             session: None,
             effort: None,

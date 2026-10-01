@@ -32,7 +32,7 @@ fn the_effort_a_config_layer_states_is_what_goes_out_on_the_wire() {
             addr: room,
             task: "think about it".to_owned(),
             goal: "answer".to_owned(),
-            mode: kernel::Mode::PlanGoal,
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,

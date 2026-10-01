@@ -159,7 +159,7 @@ fn dispatch(
         addr: Address::parse(LAB).unwrap(),
         task: "Answer.".to_owned(),
         goal: "one answer from the model this worker was handed".to_owned(),
-        mode: kernel::Mode::PlanGoal,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: idem(b"dispatch"),
         session,
         effort: None,

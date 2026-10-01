@@ -324,6 +324,7 @@ impl Freezing<'_> {
             parent: at.parent,
             predecessor: at.predecessor(),
             dispatched_by: at.dispatched_by.clone(),
+            run_policy: at.policy,
             inherited: std::mem::take(&mut self.inherited),
             shape: runtime::turn::CallShape {
                 model: site.model.id.clone(),

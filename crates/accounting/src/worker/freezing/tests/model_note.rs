@@ -39,7 +39,7 @@ fn system_prompt_with_a_note_for(noted: &str) -> String {
             addr: Address::parse("lab/room1").unwrap(),
             task: "measure the thing".to_owned(),
             goal: "a number, then stop".to_owned(),
-            mode: kernel::Mode::PlanGoal,
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,

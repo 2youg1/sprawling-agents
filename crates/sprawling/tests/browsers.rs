@@ -168,7 +168,7 @@ fn a_run_is_offered_the_browser_the_worker_was_handed() {
         addr: Address::parse(LAB).unwrap(),
         task: "Answer.".to_owned(),
         goal: "one turn with the browser this worker was handed".to_owned(),
-        mode: kernel::Mode::PlanGoal,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: idem(b"dispatch"),
         session: Some(kernel::SessionName::parse("s1").unwrap()),
         effort: None,

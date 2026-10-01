@@ -24,7 +24,7 @@ fn a_mother_ran(city_root: &std::path::Path) -> (RunWorker, kernel::Origin, impl
             task: "measure the meter".to_owned(),
             goal: "a number is written down".to_owned(),
             model: None,
-            mode: kernel::Mode::PlanGoal,
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"mother"),
             session: None,
             effort: None,

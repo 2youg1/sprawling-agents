@@ -167,7 +167,7 @@ impl RunWorker {
         &mut self,
         signal: &collab::Signal,
         speaker: &Address,
-        mode: kernel::Mode,
+        policy: kernel::RunPolicy,
         chain: &super::KnockChain,
     ) -> Result<(), AxError> {
         let room = signal.room();
@@ -183,7 +183,7 @@ impl RunWorker {
         self.doorstep.queue(Knock {
             addr: room.clone(),
             from: signal.from().to_owned(),
-            mode,
+            policy,
             chain: chain.clone(),
         });
         Ok(())
@@ -268,7 +268,7 @@ impl RunWorker {
                         session: None,
                         effort: None,
                         model: None,
-                        mode: knock.mode,
+                        policy: knock.policy,
                         parent: None,
                         succession: None,
                         taint: kernel::TaintSet::empty(),

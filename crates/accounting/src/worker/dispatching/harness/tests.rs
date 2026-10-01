@@ -177,7 +177,7 @@ fn dispatch(addr: &str, model: Option<&str>) -> wire::Command {
         addr: Address::parse(addr).unwrap(),
         task: "fix the notes".to_owned(),
         goal: "the notes read well".to_owned(),
-        mode: kernel::Mode::PlanGoal,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
         session: None,
         effort: None,

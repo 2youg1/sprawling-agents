@@ -92,6 +92,7 @@ impl RunWorker {
                 parent: at.parent,
                 predecessor: at.predecessor(),
                 dispatched_by: at.dispatched_by.clone(),
+                policy: at.policy,
             },
             building,
             prompt,

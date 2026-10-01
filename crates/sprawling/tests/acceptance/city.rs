@@ -111,7 +111,7 @@ pub(crate) fn dispatch(
         addr: Address::parse(addr).unwrap(),
         task: "Use every tool you were given once.".to_owned(),
         goal: "each tool has answered".to_owned(),
-        mode: kernel::Mode::PlanGoal,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: idem(b"dispatch"),
         session: None,
         effort: None,

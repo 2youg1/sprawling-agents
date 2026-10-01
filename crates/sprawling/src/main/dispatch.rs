@@ -65,7 +65,7 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
         addr: addr.clone(),
         task: task.clone(),
         goal: String::new(),
-        mode: wire::Mode::PlanGoal,
+        policy: wire::RunPolicy::of(wire::Mode::Work),
         idem,
         session: None,
         effort: None,

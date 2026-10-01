@@ -78,7 +78,7 @@ fn ask(addr: &Address, effort: Option<kernel::Effort>, key: &[u8]) -> wire::Comm
         addr: addr.clone(),
         task: "write one line".to_owned(),
         goal: "the line is written".to_owned(),
-        mode: kernel::Mode::PlanGoal,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         session: None,
         effort,

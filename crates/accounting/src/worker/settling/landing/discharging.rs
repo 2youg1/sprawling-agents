@@ -52,7 +52,7 @@ impl RunWorker {
                 // still out comes back on its own (sprawling-SPEC.md
                 // 8-46-12).
                 if !self.collaborating.workshops.contains_key(&parent) {
-                    self.knock(&handback, &done.addr, at.mode, owing.knock_chain())?;
+                    self.knock(&handback, &done.addr, at.policy, owing.knock_chain())?;
                 }
                 Ok(Landed::Elsewhere)
             }

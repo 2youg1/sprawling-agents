@@ -339,7 +339,7 @@ fn dispatch(addr: &Address, task: &str, idem: kernel::IdemKey) -> wire::ClientFr
         addr: addr.clone(),
         task: task.to_owned(),
         goal: String::new(),
-        mode: wire::Mode::PlanGoal,
+        policy: wire::RunPolicy::of(wire::Mode::Work),
         idem,
         // `/at` already chose the room; a line typed after it
         // continues what is working there.

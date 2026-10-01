@@ -68,7 +68,7 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
             addr: Address::parse("market/ito").unwrap(),
             task: "ask hana what she charges".to_owned(),
             goal: "a price".to_owned(),
-            mode: kernel::Mode::PlanGoal,
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,
@@ -116,7 +116,7 @@ fn a_knock_past_the_conversation_ceiling_starts_no_run() {
     worker.doorstep.knocks.push(Knock {
         addr: Address::parse("market/hana").unwrap(),
         from: "market/ito".to_owned(),
-        mode: kernel::Mode::PlanGoal,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         chain: KnockChain::deep(u32::MAX),
     });
     worker.answer_knocks();
@@ -312,7 +312,7 @@ fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
     worker.doorstep.knocks.push(Knock {
         addr: hana.clone(),
         from: "market/ito".to_owned(),
-        mode: kernel::Mode::PlanGoal,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         chain: KnockChain::default(),
     });
     worker.answer_knocks();
@@ -373,7 +373,7 @@ fn what_comes_back_wakes_the_resident_who_asked_for_it() {
             addr: Address::parse("lab/lead").unwrap(),
             task: "get it measured".to_owned(),
             goal: "the number is written down, then stop".to_owned(),
-            mode: kernel::Mode::PlanGoal,
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,

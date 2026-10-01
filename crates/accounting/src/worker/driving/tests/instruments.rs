@@ -288,7 +288,7 @@ fn dispatch(addr: &str, task: &str, key: &[u8]) -> wire::Command {
         addr: Address::parse(addr).unwrap(),
         task: task.to_owned(),
         goal: format!("{task}, done"),
-        mode: kernel::Mode::PlanGoal,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         session: None,
         effort: None,

@@ -32,7 +32,7 @@ impl RunWorker {
         pr: &std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
         produced: &runtime::Produced,
     ) -> Result<(), AxError> {
-        let (addr, who, run_id, mode) = (&at.addr, site.who.as_str(), site.run_id, at.mode);
+        let (addr, who, run_id) = (&at.addr, site.who.as_str(), site.run_id);
         let write_root = site.write_root.as_path();
         let scopes = site.checkpoint_scope()?;
         // What the run asked of the request register. Opening commits
@@ -65,13 +65,13 @@ impl RunWorker {
                         // The last gate before work becomes the
                         // building's. Verification says a person other
                         // than the author looked; admission says the
-                        // evidence this mode demands is present. They
-                        // are different questions, and the second one is
-                        // the only place a mode means anything.
+                        // evidence this dispatch asked for is present,
+                        // and that it was not an experiment. They are
+                        // different questions (runtime-SPEC 8-54).
                         if let runtime::Admission::Refused {
                             because,
                             alternative,
-                        } = runtime::admits(mode, produced)
+                        } = runtime::admits(&at.policy, produced)
                         {
                             self.record_for(
                                 run_id,

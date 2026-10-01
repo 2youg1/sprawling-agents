@@ -46,7 +46,7 @@ fn a_volume_below_its_floor_refuses_a_dispatch_before_anything_is_written() {
             addr: Address::parse("lab/east").unwrap(),
             task: "fire the east kiln".to_owned(),
             goal: String::new(),
-            mode: kernel::Mode::PlanGoal,
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
             effort: None,

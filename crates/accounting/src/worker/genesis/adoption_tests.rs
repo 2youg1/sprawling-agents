@@ -109,7 +109,7 @@ fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
                 addr: kernel::Address::parse(room).unwrap(),
                 task: "measure the thing".to_owned(),
                 goal: "a number, then stop".to_owned(),
-                mode: kernel::Mode::PlanGoal,
+                policy: kernel::RunPolicy::of(kernel::Mode::Work),
                 idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, idem),
                 session: None,
                 effort: None,

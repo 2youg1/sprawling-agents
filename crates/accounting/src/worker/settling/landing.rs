@@ -72,7 +72,7 @@ impl RunWorker {
                         // reaching a resident stay one decision. The
                         // speaking run's place in the conversation rides on,
                         // so the knock this queues is one hop further in.
-                        self.knock(signal, &at.addr, at.mode, chain)?;
+                        self.knock(signal, &at.addr, at.policy, chain)?;
                     }
                     Ok(())
                 })();
@@ -224,7 +224,7 @@ impl RunWorker {
                     session: None,
                     effort: None,
                     model: None,
-                    mode: at.mode,
+                    policy: at.policy,
                     origin: None,
                     parent: Some(run_id),
                     succession: None,
@@ -296,7 +296,7 @@ impl RunWorker {
                     session: None,
                     effort: None,
                     model: None,
-                    mode: at.mode,
+                    policy: at.policy,
                     origin: None,
                     parent: at.parent,
                     succession: Some(Handover {
