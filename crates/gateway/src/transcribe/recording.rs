@@ -103,6 +103,22 @@ impl AudioType {
             })
     }
 
+    /// The container a recording's leading bytes show (gateway-SPEC.md
+    /// section 8-34): a recording with no name, such as a block a
+    /// connector stored, says what it is only by how it starts.
+    ///
+    /// # Errors
+    /// `E_INVALID_ARGS` for bytes that start like none of the containers
+    /// this city can send; the refusal lists them.
+    pub fn of_signature(head: &[u8]) -> Result<AudioType, AxError> {
+        Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "read a recording's container",
+            format!("{} leading bytes", head.len()),
+        )
+        .with_recovery("not built yet"))
+    }
+
     /// The extension [`AudioType::file_name`] ends in, so the name a
     /// request body sends and the name a file is read by are one fact.
     fn extension(self) -> &'static str {
@@ -205,6 +221,18 @@ impl Recording {
             .read_to_end(&mut bytes)
             .map_err(|err| unreadable(err.to_string()))?;
         Recording::new(bytes, kind)
+    }
+
+    /// A recording with no name to read its container from, read from
+    /// `reader` as [`Recording::read_from`] reads one, its container
+    /// taken from the bytes it starts with (gateway-SPEC.md section
+    /// 8-34).
+    ///
+    /// # Errors
+    /// Whatever [`Recording::read_from`] refuses, and what
+    /// [`AudioType::of_signature`] refuses.
+    pub fn read_unlabelled(reader: impl std::io::Read) -> Result<Recording, AxError> {
+        Recording::read_from(reader, AudioType::Wav)
     }
 
     #[must_use]
@@ -339,6 +367,40 @@ mod tests {
                 "{unknown} is refused with the extensions this city can send: {refused:?}"
             );
         }
+    }
+
+    /// A recording with no name is read as the container its first bytes
+    /// show, and bytes that start like none of them are refused with the
+    /// list of the ones this city can send.
+    #[test]
+    fn a_recording_with_no_name_is_read_as_the_container_it_starts_with() {
+        let starts: [(&[u8], AudioType); 6] = [
+            (b"RIFF\x24\x00\x00\x00WAVEfmt ", AudioType::Wav),
+            (b"OggS\x00\x02", AudioType::Ogg),
+            (&[0x1A, 0x45, 0xDF, 0xA3, 0x9F], AudioType::Webm),
+            (b"\x00\x00\x00\x20ftypM4A ", AudioType::Mp4),
+            (b"ID3\x04\x00", AudioType::Mpeg),
+            (&[0xFF, 0xFB, 0x90, 0x00], AudioType::Mpeg),
+        ];
+        let read: Vec<Option<AudioType>> = starts
+            .iter()
+            .map(|(head, _)| {
+                Recording::read_unlabelled(*head)
+                    .ok()
+                    .map(|taken| taken.kind())
+            })
+            .collect();
+        let owed: Vec<Option<AudioType>> = starts.iter().map(|(_, kind)| Some(*kind)).collect();
+        assert_eq!(read, owed);
+        let refused = AudioType::of_signature(b"fLaC\x00").err();
+        assert!(
+            refused
+                .as_ref()
+                .is_some_and(|err| *err.code() == AxCode::InvalidArgs
+                    && err.recovery().contains("audio/webm")
+                    && err.recovery().contains("audio/wav")),
+            "{refused:?}"
+        );
     }
 
     /// Zeros for as long as anyone reads, counting how many were given.
