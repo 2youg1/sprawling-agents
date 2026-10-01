@@ -140,10 +140,18 @@ fn call(id: &str, tool: &str) -> ToolCall {
 }
 
 fn wave_of(ledger: &mut TestLedger, calls: Vec<ToolCall>) -> Turn<'static, ToolWave> {
+    waved(opened::<1>(), ledger, calls)
+}
+
+/// `turn`, assembled and called until it holds a wave of `calls`.
+fn waved<'h>(
+    turn: Turn<'h, Assembling>,
+    ledger: &mut TestLedger,
+    calls: Vec<ToolCall>,
+) -> Turn<'h, ToolWave> {
     let mut model = OneShotModel { calls };
     let mut conversation = Conversation::new();
     conversation.push_task_lines("read three files", "three reads", Opening::FromJob);
-    let turn = opened::<1>();
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -275,4 +283,99 @@ fn a_call_line_carries_its_tools_registration() {
         ],
         "a registered tool's line says what it was registered as; an unknown one says nothing"
     );
+}
+
+/// Which way a wave reaches its calls: each through all three stages in
+/// turn, or the leading reads run at once.
+#[derive(Debug, Clone, Copy)]
+enum Path {
+    OneAtATime,
+    ReadsAtOnce,
+}
+
+/// A face that reads the driver's latest clock reading while it packages
+/// each answer, the way the lane's exec face renders a result's clock
+/// line (runtime-SPEC 8-53).
+struct Stamping {
+    placed: Placed,
+    reading: crate::clock::ClockReading,
+    path: Path,
+    seen: Vec<TimeMs>,
+}
+
+impl ConcurrentInvoke for Stamping {
+    fn meta_of(&self, call: &ToolCall) -> Option<&kernel::ToolMeta> {
+        match self.path {
+            // A face that names no registration makes no call read-only.
+            Path::OneAtATime => None,
+            Path::ReadsAtOnce => self.placed.meta_of(call),
+        }
+    }
+
+    fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted {
+        self.placed.admit(call, t)
+    }
+
+    fn tool(&self, ticket: &Ticket) -> Result<&dyn Tool, AxError> {
+        self.placed.tool(ticket)
+    }
+
+    fn account(
+        &mut self,
+        call: &ToolCall,
+        ticket: Ticket,
+        answered: Result<ToolOutcome, AxError>,
+    ) -> Result<ToolOutcome, AxError> {
+        self.seen.extend(self.reading.latest());
+        self.placed.account(call, ticket, answered)
+    }
+}
+
+/// The reading a face stamps a result with is the moment that call's
+/// `tool_result` records, on both ways through a wave: the turn reads
+/// the answer's moment before the face packages the answer.
+#[test]
+fn a_stamp_the_face_reads_is_the_moment_its_answer_records() {
+    for path in [Path::OneAtATime, Path::ReadsAtOnce] {
+        let reading = crate::clock::ClockReading::default();
+        let kept = reading.clone();
+        let mut next = 100u64;
+        let mut now = move || -> Result<TimeMs, AxError> {
+            next = next.checked_add(1).unwrap();
+            kept.keep(TimeMs::new(next));
+            Ok(TimeMs::new(next))
+        };
+        let mut ledger = TestLedger::new();
+        let begun = Turn::begin(
+            run_id(),
+            "resident@sim.1".into(),
+            TimeMs::new(100),
+            &mut now,
+        );
+        let turn = waved(
+            begun,
+            &mut ledger,
+            vec![call("c1", "read"), call("c2", "read")],
+        );
+        let mut face = Stamping {
+            placed: Placed::new(),
+            reading,
+            path,
+            seen: Vec::new(),
+        };
+        advance(
+            turn.execute_concurrent(Interrupt::None, &mut ledger, &mut face, &mut |_| {
+                Interrupt::None
+            })
+            .unwrap(),
+        );
+        let answered: Vec<TimeMs> = ledger
+            .lines
+            .iter()
+            .map(|line| serde_json::from_slice::<serde_json::Value>(line).unwrap())
+            .filter(|line| line["kind"] == "tool_result")
+            .map(|line| TimeMs::new(line["t"].as_u64().unwrap()))
+            .collect();
+        assert_eq!(face.seen, answered, "{path:?}");
+    }
 }
