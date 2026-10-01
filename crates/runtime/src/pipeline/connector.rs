@@ -165,34 +165,27 @@ fn pictured(
     block: &Value,
     offload: &mut OffloadSite<'_>,
 ) -> Result<(Value, Option<ImageRef>), AxError> {
-    let (bytes, width, height) = match measured(block) {
+    let (bytes, picture) = match measured(block) {
         Ok(measured) => measured,
         Err(why) => return Ok((text_block(format!("[picture left out: {why}]")), None)),
     };
-    let hash = offload
+    // The store hashes what it takes the way `png_picture` named it, so
+    // the locator the picture already carries is the one it is kept under.
+    offload
         .cas
         .put_for(&bytes, &offload.origin)
         .map_err(storage::StorageError::into_ax)?;
-    let picture = ImageRef {
-        locator: Locator::cas(hash),
-        media_type: ImageType::Png,
-        width,
-        height,
-    };
     let words = format!(
-        "[picture attached: image/png {width}x{height}, {}]",
-        picture.locator
+        "[picture attached: image/png {}x{}, {}]",
+        picture.width, picture.height, picture.locator
     );
     Ok((text_block(words), Some(picture)))
 }
 
-/// The bytes and the two sides of a picture this city can carry, or the
-/// reason it cannot, as the words the model reads in its place.
-///
-/// Only PNG is measured, for the reason the browser's screenshots give:
-/// another format needs a second decoder to read its sides, and a side
-/// read wrong is worse than none.
-fn measured(block: &Value) -> Result<(Vec<u8>, u32, u32), String> {
+/// The bytes of a picture this city can carry and the picture they are,
+/// or the reason they cannot be carried, as the words the model reads in
+/// its place.
+fn measured(block: &Value) -> Result<(Vec<u8>, ImageRef), String> {
     if block.get("mimeType").and_then(Value::as_str) != Some(ImageType::Png.mime()) {
         return Err("only png is measured here; ask the tool for png".to_owned());
     }
@@ -203,15 +196,45 @@ fn measured(block: &Value) -> Result<(Vec<u8>, u32, u32), String> {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(data)
         .map_err(|err| format!("its bytes are not base64: {err}"))?;
-    IMAGE_MAX_BYTES
-        .admit(&Locator::cas(B3Hash::digest(&bytes)), bytes.len())
+    let picture = png_picture(&bytes)
         .map_err(|refused| format!("{}; {}", refused.subject(), refused.recovery()))?;
-    let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes.as_slice()));
+    Ok((bytes, picture))
+}
+
+/// The picture `bytes` are, as this city carries one: a PNG inside
+/// [`IMAGE_MAX_BYTES`] whose header gives its two sides, referred to by
+/// the `cas:` locator its bytes hash to (runtime-SPEC.md section 8-59).
+///
+/// The one recognition a picture gets, whether it arrived in a
+/// connector's answer or was named to a tool. Only PNG is measured, for
+/// the reason the browser's screenshots give: another format needs a
+/// second decoder to read its sides, and a side read wrong is worse than
+/// none.
+///
+/// # Errors
+/// The refusal [`IMAGE_MAX_BYTES`] gives bytes past it, and
+/// `E_INVALID_ARGS` when the bytes are not a PNG whose header reads.
+pub fn png_picture(bytes: &[u8]) -> Result<ImageRef, AxError> {
+    let locator = Locator::cas(B3Hash::digest(bytes));
+    IMAGE_MAX_BYTES.admit(&locator, bytes.len())?;
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
     let (width, height) = decoder
         .read_header_info()
         .map(|info| (info.width, info.height))
-        .map_err(|err| format!("its png header does not read: {err}"))?;
-    Ok((bytes, width, height))
+        .map_err(|err| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "read a picture",
+                format!("its png header does not read: {err}"),
+            )
+            .with_recovery("only png is read here; ask for the picture as png")
+        })?;
+    Ok(ImageRef {
+        locator,
+        media_type: ImageType::Png,
+        width,
+        height,
+    })
 }
 
 /// One `audio` block as the line that names where it was stored, or the

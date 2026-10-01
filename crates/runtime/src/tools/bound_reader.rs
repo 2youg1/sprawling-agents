@@ -20,10 +20,10 @@
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxCode, AxError, B3Hash};
+use kernel::{Address, AxCode, AxError, B3Hash, Locator};
 use same_file::Handle;
 
-use super::chosen_path::ReadBound;
+use super::chosen_path::{self, Located, ReadBound};
 
 /// What one run may read by a name its model wrote: the city it reads
 /// in, the read bound, and the store blocks are kept in. Cloned to every
@@ -49,16 +49,70 @@ impl BoundReader {
     }
 
     /// The bytes `asked` names, once the judgement `read` gives it has
-    /// let them through. `action` names the tool in every refusal.
+    /// let them through: a `cas:` or `file:` Locator is opened where its
+    /// bytes belong, and anything else is a path, judged as written,
+    /// judged again where its links lead, and checked once more after it
+    /// is opened. `action` names the tool in every refusal.
     ///
     /// # Errors
-    /// The codes `read` answers the same argument with.
+    /// The codes `read` answers the same argument with: `E_INVALID_ARGS`
+    /// for a name that does not parse, a file that is not there and a
+    /// directory; `E_GATE_DENIED` for a reserved subtree, a building the
+    /// read bound closes, a place outside the city, a block stored for
+    /// no building, and a file that changed after it was judged;
+    /// `E_STORAGE_FATAL` for a file that is there and will not open.
     pub fn open(&self, asked: &str, action: &'static str) -> Result<Opened, AxError> {
-        Err(
-            AxError::failure(AxCode::StorageFatal, action, asked.to_owned())
-                .with_recovery("the byte reader is not built yet"),
-        )
+        if let Some(found) = super::read::locator::open_locator(asked, self, action) {
+            let (locator, bytes) = found?;
+            let named = match locator {
+                Locator::Cas { hash, .. } => Named::Block(hash),
+                Locator::File { address, .. } => Named::File(address),
+            };
+            return Ok(Opened {
+                named,
+                source: Source::Held(Cursor::new(bytes)),
+            });
+        }
+        let spelled = chosen_path::within_city(&self.city_root, asked, action)?;
+        let addr = chosen_path::admit(&spelled, action, &*self.bound)?;
+        let real = match chosen_path::land(&self.city_root, &addr, action, &*self.bound)? {
+            Located::Present(real) if real.is_file() => real,
+            Located::Present(_) => {
+                return Err(AxError::failure(
+                    AxCode::InvalidArgs,
+                    action,
+                    format!("{asked} is not a file"),
+                )
+                .with_recovery("name one file; `search` finds files by name"));
+            }
+            Located::Absent(_) => return Err(not_there(asked, action)),
+        };
+        let opened = std::fs::File::open(&real)
+            .and_then(Handle::from_file)
+            .map_err(|err| unopened(asked, action, &err))?;
+        chosen_path::still_judged(asked, &real, &opened, action)?;
+        Ok(Opened {
+            named: Named::File(addr),
+            source: Source::Disk(opened),
+        })
     }
+}
+
+/// The refusal for a file that was not there when it was judged.
+fn not_there(asked: &str, action: &'static str) -> AxError {
+    AxError::failure(AxCode::InvalidArgs, action, format!("{asked} is not there"))
+        .with_recovery("name a file that exists; `search` finds files by name")
+}
+
+/// The refusal for a judged file that did not open: gone since it was
+/// judged is the caller's mistake, as a miss is; anything else is
+/// storage, and a person has to make the file readable.
+fn unopened(asked: &str, action: &'static str, err: &std::io::Error) -> AxError {
+    if err.kind() == std::io::ErrorKind::NotFound {
+        return not_there(asked, action);
+    }
+    AxError::failure(AxCode::StorageFatal, action, format!("{asked}: {err}"))
+        .with_recovery("a person has to make the file readable")
 }
 
 /// The bytes one name led to, and where they came from.

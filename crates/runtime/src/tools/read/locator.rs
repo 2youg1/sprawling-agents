@@ -14,46 +14,48 @@
 //! address a Locator is judged at; the judgement itself stays
 //! `chosen_path::admit`.
 
-use std::path::Path;
-
 use kernel::{Address, AxCode, AxError, B3Hash, Locator, ReadVerdict};
 use storage::StorageError;
 
-/// The text a `cas:` or `file:` argument names, or `None` when the
-/// argument is not a Locator and belongs to the catalog or a path.
-pub(super) fn open_locator(
+use crate::tools::BoundReader;
+use crate::tools::chosen_path::admit;
+
+/// The Locator a `cas:` or `file:` argument names and the bytes behind
+/// it, or `None` when the argument is not a Locator and belongs to the
+/// catalog or a path. `read` and [`BoundReader`] both open Locators
+/// here; `action` names the tool in every refusal.
+pub(in crate::tools) fn open_locator(
     asked: &str,
-    city_root: &Path,
-    store: &Path,
-    bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Option<Result<String, AxError>> {
+    reader: &BoundReader,
+    action: &'static str,
+) -> Option<Result<(Locator, Vec<u8>), AxError>> {
     if !(asked.starts_with("cas:") || asked.starts_with("file:")) {
         return None;
     }
-    Some(read_admitted(asked, city_root, store, bound))
+    Some(read_admitted(asked, reader, action))
 }
 
 fn read_admitted(
     asked: &str,
-    city_root: &Path,
-    store: &Path,
-    bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<String, AxError> {
+    reader: &BoundReader,
+    action: &'static str,
+) -> Result<(Locator, Vec<u8>), AxError> {
     let locator = Locator::parse(asked).map_err(|err| {
-        AxError::failure(AxCode::InvalidArgs, "read", err.subject().to_owned()).with_recovery(
-            "write a Locator as `cas:b3-<hash>` or `file:<address>@<commit>`, as the ledger \
-             spells it",
+        AxError::failure(AxCode::InvalidArgs, action, err.subject().to_owned()).with_recovery(
+            "write a Locator as `cas:b3-<hash>` or `file:<address>@<commit>`, as the ledger              spells it",
         )
     })?;
+    let bound = &*reader.bound;
     let bytes = match &locator {
         Locator::Cas { hash, range } => {
-            let cas = storage::Cas::open(store).map_err(StorageError::into_ax)?;
+            let cas = storage::Cas::open(&reader.block_store).map_err(StorageError::into_ax)?;
             let building = judged_at(
                 hash,
                 &cas.origins(hash).map_err(StorageError::into_ax)?,
                 bound,
+                action,
             )?;
-            super::super::chosen_path::admit(building.as_str(), "read", bound)?;
+            admit(building.as_str(), action, bound)?;
             match range {
                 Some(range) => cas.get_range(hash, range),
                 None => cas.get(hash),
@@ -65,13 +67,13 @@ fn read_admitted(
             oid,
             range: None,
         } => {
-            super::super::chosen_path::admit(address.as_str(), "read", bound)?;
-            storage::blob_at(city_root, *oid, address)
+            admit(address.as_str(), action, bound)?;
+            storage::blob_at(&reader.city_root, *oid, address)
                 .map_err(StorageError::into_ax)?
                 .ok_or_else(|| {
                     AxError::failure(
                         AxCode::InvalidArgs,
-                        "read",
+                        action,
                         format!("{asked} is not a file in that commit"),
                     )
                     .with_recovery("name a file the commit holds, not a directory or a later file")
@@ -80,16 +82,13 @@ fn read_admitted(
         Locator::File { range: Some(_), .. } => {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
-                "read",
+                action,
                 format!("{asked} carries a range, which a commit's file is not cut by"),
             )
             .with_recovery("drop the range and pass `offset` and `limit` instead"));
         }
     };
-    String::from_utf8(bytes).map_err(|_| {
-        AxError::failure(AxCode::InvalidArgs, "read", format!("{asked} is not text"))
-            .with_recovery("read hands back text; these bytes are not UTF-8")
-    })
+    Ok((locator, bytes))
 }
 
 /// The building whose read bound decides a `cas:` block: the first
@@ -104,6 +103,7 @@ fn judged_at(
     hash: &B3Hash,
     origins: &[storage::BlockOrigin],
     bound: &dyn Fn(&Address) -> ReadVerdict,
+    action: &'static str,
 ) -> Result<Address, AxError> {
     origins
         .iter()
@@ -114,7 +114,7 @@ fn judged_at(
         .ok_or_else(|| {
             AxError::failure(
                 AxCode::GateDenied,
-                "read",
+                action,
                 format!("cas:b3-{hash} was put for no building"),
             )
             .with_recovery(

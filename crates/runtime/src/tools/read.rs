@@ -30,7 +30,7 @@
 //! and the offset to continue from, which is the number `search`
 //! reports for a hit.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use kernel::{
@@ -39,10 +39,11 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-mod locator;
+pub(super) mod locator;
 mod miss;
 mod package;
 
+use super::BoundReader;
 use super::chosen_path::{Located, ReadBound};
 use crate::catalog::{Catalog, Expansion};
 use miss::Floor;
@@ -187,16 +188,14 @@ impl Interval {
 
 /// What a read answers with, and what it refuses.
 pub struct ReadTool {
-    city_root: PathBuf,
     /// The same catalog the model was shown, shared: a copy would be a
     /// second authority on what this run may open, and copies drift.
     catalog: Arc<Mutex<Catalog>>,
-    /// What this run's building may read, asked of every path the model
-    /// chooses and of the building a Locator's bytes belong to.
-    bound: ReadBound,
-    /// Where this city keeps content blocks: a run may write in a
-    /// worktree that holds no store of its own.
-    block_store: PathBuf,
+    /// The tree this run reads in, what its building may read - asked
+    /// of every path the model chooses and of the building a Locator's
+    /// bytes belong to - and where this city keeps content blocks, which
+    /// a worktree does not hold. A Locator's bytes are read through it.
+    reader: BoundReader,
     meta: ToolMeta,
 }
 
@@ -246,10 +245,8 @@ impl ReadTool {
             Value::Array(vec![Value::String("path".to_owned())]),
         );
         Ok(ReadTool {
-            city_root: city_root.to_path_buf(),
             catalog,
-            bound,
-            block_store: block_store.to_path_buf(),
+            reader: BoundReader::new(city_root, bound, block_store),
             meta: ToolMeta {
                 name: ToolName::parse("read")?,
                 disclosure: "Read a file by its path, or a skill by the name the catalog lists \
@@ -272,10 +269,12 @@ impl ReadTool {
     /// called `review` has said what that word means here, and a file
     /// that happens to share the name must not be able to shadow it.
     fn resolve(&self, asked: &str) -> Result<Found, AxError> {
-        if let Some(read) =
-            locator::open_locator(asked, &self.city_root, &self.block_store, &*self.bound)
-        {
-            return read.map(Found::Text);
+        if let Some(read) = locator::open_locator(asked, &self.reader, "read") {
+            let (_, bytes) = read?;
+            return String::from_utf8(bytes).map(Found::Text).map_err(|_| {
+                AxError::failure(AxCode::InvalidArgs, "read", format!("{asked} is not text"))
+                    .with_recovery("read hands back text; these bytes are not UTF-8")
+            });
         }
         let catalog = self.catalog.lock().map_err(|_| {
             AxError::failure(
@@ -302,7 +301,7 @@ impl ReadTool {
                              a person has to fix the shelf",
                         )
                     })?;
-                    package::open_document(&self.city_root, &addr, asked)
+                    package::open_document(&self.reader.city_root, &addr, asked)
                 }
                 // The catalog's own second level. The prompt carries one
                 // line per entry, and this is what that line stood for,
@@ -310,7 +309,7 @@ impl ReadTool {
                 Expansion::Said { text } => Ok(Found::Text(text)),
             };
         }
-        if let Some(inside) = package::open_in_package(&catalog, &self.city_root, asked) {
+        if let Some(inside) = package::open_in_package(&catalog, &self.reader.city_root, asked) {
             return inside;
         }
         drop(catalog);
@@ -318,11 +317,12 @@ impl ReadTool {
         // it is written. `search` asks the same function the same
         // question, so what is reserved and what is closed have one
         // answer each.
-        let spelled = super::chosen_path::within_city(&self.city_root, asked, "read")?;
-        let addr = super::chosen_path::admit(&spelled, "read", &*self.bound)?;
+        let city_root = &self.reader.city_root;
+        let spelled = super::chosen_path::within_city(city_root, asked, "read")?;
+        let addr = super::chosen_path::admit(&spelled, "read", &*self.reader.bound)?;
         Ok(Found::File {
-            at: super::chosen_path::land(&self.city_root, &addr, "read", &*self.bound)?,
-            floor: Floor::of_address(&self.city_root, &addr),
+            at: super::chosen_path::land(city_root, &addr, "read", &*self.reader.bound)?,
+            floor: Floor::of_address(city_root, &addr),
         })
     }
 }

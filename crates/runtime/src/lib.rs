@@ -74,7 +74,7 @@ pub use digest::{digest_once, structure_of};
 pub use handoff::{Handoff, ResumeSeed, resume};
 pub use mode::{Admission, Produced, admits};
 pub use offload::{OffloadRecord, OffloadSite, offload, rematerialize};
-pub use pipeline::connector::{CONNECTOR_CAP_BYTES, package_connector};
+pub use pipeline::connector::{CONNECTOR_CAP_BYTES, package_connector, png_picture};
 pub use pipeline::exec::{EXEC_CAP_BYTES, SieveSite, package_exec};
 pub use pipeline::{PackContext, Packaged, SieveRequest, package, pinned_original};
 pub use prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};

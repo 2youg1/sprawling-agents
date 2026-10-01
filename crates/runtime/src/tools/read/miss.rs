@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 use kernel::{Address, AxCode, AxError};
 use same_file::Handle;
 
-use crate::tools::chosen_path::{Located, real_location};
+use crate::tools::chosen_path::{Located, real_location, still_judged};
 
 /// The highest directory a miss may list.
 pub(super) enum Floor {
@@ -75,7 +75,7 @@ pub(super) fn text_at(asked: &str, at: Located, floor: &Floor) -> Result<String,
             let mut opened = std::fs::File::open(&path)
                 .and_then(Handle::from_file)
                 .map_err(|err| unread(asked, &path, floor, &err))?;
-            still_judged(asked, &path, &opened)?;
+            still_judged(asked, &path, &opened, "read")?;
             let mut text = String::new();
             opened
                 .as_file_mut()
@@ -89,33 +89,6 @@ pub(super) fn text_at(asked: &str, at: Located, floor: &Floor) -> Result<String,
             floor,
             &std::io::ErrorKind::NotFound.into(),
         )),
-    }
-}
-
-/// Whether the file `opened` at the judged real location `judged` is
-/// still the file judged there: the location must still resolve to
-/// itself, so no link was swapped onto it after the judgement, and the
-/// file at it now must be the one opened, so no link was there during
-/// the open and gone again before the resolution. The refusal does not
-/// say where a swapped link leads.
-fn still_judged(asked: &str, judged: &Path, opened: &Handle) -> Result<(), AxError> {
-    let changed = |why: &str| {
-        AxError::failure(
-            AxCode::GateDenied,
-            "read",
-            format!("{asked} changed after it was judged: {why}"),
-        )
-        .with_recovery("read it again once nothing is moving the directories on its path")
-    };
-    match std::fs::canonicalize(judged) {
-        Ok(real) if real == judged => {}
-        Ok(_) => return Err(changed("a link now stands on its path")),
-        Err(err) => return Err(changed(&err.to_string())),
-    }
-    match Handle::from_path(judged) {
-        Ok(now) if now == *opened => Ok(()),
-        Ok(_) => Err(changed("another file stands there now")),
-        Err(err) => Err(changed(&err.to_string())),
     }
 }
 

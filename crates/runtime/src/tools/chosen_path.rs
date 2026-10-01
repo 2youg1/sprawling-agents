@@ -30,6 +30,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 use kernel::{Address, AxCode, AxError, ReadVerdict};
+use same_file::Handle;
 
 /// What one run may read: the read bound closed over the reader's
 /// building and the city's rules. The assembly builds it once per run
@@ -193,6 +194,42 @@ pub(crate) fn land(
         admit(&inside, action, bound)?;
     }
     Ok(located)
+}
+
+/// Whether the file `opened` at the judged real location `judged` is
+/// still the file judged there: the location must still resolve to
+/// itself, so no link was swapped onto it after the judgement, and the
+/// file at it now must be the one opened, so no link was there during
+/// the open and gone again before the resolution. The refusal does not
+/// say where a swapped link leads. Every caller that opens what [`land`]
+/// answered asks this before reading a byte.
+///
+/// # Errors
+/// `E_GATE_DENIED`, naming `action`, when either no longer holds.
+pub(crate) fn still_judged(
+    asked: &str,
+    judged: &Path,
+    opened: &Handle,
+    action: &'static str,
+) -> Result<(), AxError> {
+    let changed = |why: &str| {
+        AxError::failure(
+            AxCode::GateDenied,
+            action,
+            format!("{asked} changed after it was judged: {why}"),
+        )
+        .with_recovery("ask again once nothing is moving the directories on its path")
+    };
+    match std::fs::canonicalize(judged) {
+        Ok(real) if real == judged => {}
+        Ok(_) => return Err(changed("a link now stands on its path")),
+        Err(err) => return Err(changed(&err.to_string())),
+    }
+    match Handle::from_path(judged) {
+        Ok(now) if now == *opened => Ok(()),
+        Ok(_) => Err(changed("another file stands there now")),
+        Err(err) => Err(changed(&err.to_string())),
+    }
 }
 
 /// Where a path really lands, and whether the disk had anything there
