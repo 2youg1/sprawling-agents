@@ -8,13 +8,23 @@ hears it, how hard the model thinks, which mode the run works in.
 `composer.ts` owns what a pill offers and what a pick means; this is the
 shape all four are drawn in.
 
-The trigger says the pill's name faintly and its value plainly, so four
-pills of one shape still tell a reader which is which. The menu opens
+The trigger shows the value alone, the way the settings row shows every
+fact under the composer's line; its name is the first half of the
+accessible name, so a screen reader still hears which pill is which. The menu opens
 above the box, because the box sits at the foot of the window, and it is
 as wide as its longest row rather than as wide as the trigger: every row
 is a short name over one line saying what it changes, and a row cut off
 at the trigger's width is a row nobody can choose by reading it. A list
 long enough to scroll gets a filter; a list of six does not. -->
+<script lang="ts" module>
+  // A fact on the composer's settings row, and the shape a pill's trigger
+  // takes there: no frame and no fill at rest, a wash under the pointer,
+  // so the row reads as words under a line rather than as a toolbar
+  // (client-SPEC 7I). `bounds.svelte` draws its read-only facts in it too.
+  export const FACT =
+    "inline-flex h-control-sm max-w-[16rem] min-w-0 items-center gap-tight rounded-control px-snug text-note text-text-quiet";
+</script>
+
 <script lang="ts">
   import { untrack } from "svelte";
 
@@ -124,7 +134,7 @@ long enough to scroll gets a filter; a list of six does not. -->
   <button
     type="button"
     bind:this={trigger}
-    class="inline-flex h-control-sm max-w-[16rem] min-w-0 items-center gap-tight rounded-pill px-snug text-note text-text-quiet hover:bg-raised-hover hover:text-text aria-expanded:bg-raised-hover aria-expanded:text-text"
+    class="{FACT} hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text"
     aria-label={`${spec.label}: ${chosen?.label ?? spec.placeholder}`}
     aria-haspopup="listbox"
     aria-expanded={open}
@@ -134,9 +144,7 @@ long enough to scroll gets a filter; a list of six does not. -->
       else open = true;
     }}
   >
-    <span class="shrink-0 text-text-faint">{spec.label}</span>
     <span class="truncate">{chosen?.label ?? spec.placeholder}</span>
-    <Glyph name="chevron" size="sm" class="shrink-0 rotate-90 text-text-faint" />
   </button>
   {#if open}
     <div

@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // The one thing that may float over a page uninvited: a refusal, in
-  // the three parts the city wrote it in, seated at the bottom right
+  // the three parts the city wrote it in, standing over the composer
   // (client-SPEC 4-35). Three may stand at once; a fourth pushes the
   // oldest away, and every refusal that reached a corner is in the
   // drawer afterwards whatever happens here.
@@ -25,9 +25,9 @@
   // how it looks going. A departure is cut when the next arrival
   // prunes it, which `cut needs no class` covers.
   //
-  // **The corner is bottom right because bottom left is the rail's
-  // hover zone.** A toast over the rail's open edge would be dismissed
-  // by every hand reaching for a navigation row.
+  // **Over the composer, because that is where the eye is** when a send
+  // or a stop is refused: the right pane holds the editor, and the foot
+  // of the first column holds the edge keys.
   //
   // **What a recovery's control says and does is
   // `notice_recovery.ts`'s**, shared with the drawer (client-SPEC
@@ -155,10 +155,11 @@
   });
 </script>
 
-<!-- Top right, where no page keeps a control a person needs at the
-moment a refusal arrives: in the bottom corner the stack sat over the
-composer's send button, which is the retry. -->
-<ul class="fixed top-wide right-pane flex flex-col items-end gap-snug">
+<!-- Centred over the composer and clear of it, so the stack never covers
+the coin key, which is the retry. -->
+<ul
+  class="fixed bottom-[calc(var(--spacing-margin)+8*var(--spacing-baseline)+var(--spacing-section)*2)] left-1/2 flex w-[min(480px,calc(100vw-2*var(--spacing-margin)))] -translate-x-1/2 flex-col items-stretch gap-snug"
+>
   {#each toasts as toast (toast.id)}
     <li
       class={[

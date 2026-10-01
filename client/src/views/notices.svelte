@@ -6,13 +6,15 @@
 -->
 
 <script lang="ts">
-  // The notice drawer: one dot at the top of the rail opens a
+  // The notice drawer and the edge key that opens it: the mailbox key
+  // at the foot of the first column (client-SPEC 7E) opens a
   // full-height drawer that keeps everything the city has to tell this
   // person - the link, the questions waiting on them, and every refusal
   // of the session, newest first and grouped by day (client-SPEC
   // 4-35). Opening it is what marks the refusals read, so the count on
-  // the dot is a number a person clears by doing the thing the count
-  // asks for.
+  // the key is a number a person clears by doing the thing the count
+  // asks for. The three-part mailbox replaces this drawer behind the
+  // same key when it is built.
   //
   // **The drawer is a `popover`, which is why it is the one seat that
   // may anchor to the viewport.** `popover="auto"` gives the top layer,
@@ -31,23 +33,29 @@
   import type { Notice as NoticeRecord } from "../core/belief";
   import type { Lang } from "../core/lang";
   import { fill, say } from "../core/lang";
-  type Rail = "glyphs" | "named" | "away";
   import { linkRecovery, recoveryFor } from "../core/recovering";
   import { ago, clock } from "../core/time";
   import { ui } from "../ui";
   import { recover, recoveryLabel, recoveryWhy } from "./notice_recovery";
+  import { EDGE_KEY } from "./edge.svelte";
   import Button from "./parts/button.svelte";
   import Empty from "./parts/empty.svelte";
+  import Glyph from "./parts/glyph.svelte";
   import Notice from "./parts/notice.svelte";
+  import Tip from "./parts/tip.svelte";
   import { WaitingCards } from "./talk/waiting.svelte";
 
   interface Props {
-    // Which edge the drawer hangs off: the rail's right edge moves with
-    // the rail's posture, and this is the drawer's whole anchor.
-    readonly posture: Rail;
+    // How many times the mailbox chord asked for the drawer: a count
+    // rather than a flag, so a second press while it is open is heard
+    // and closes it.
+    readonly asked: number;
+    // The key's hint, given its name: the edge writes the chord beside
+    // it, from the one key table.
+    readonly hint: (words: string) => string;
   }
 
-  const { posture }: Props = $props();
+  const { asked, hint }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -63,15 +71,18 @@
   // belief for a person who scrolls back.
   let swept = $state.raw<Readonly<Record<string, number>>>({});
 
-  const EDGE: Readonly<Record<Rail, string>> = {
-    named: "left-[var(--spacing-rail-open)]",
-    glyphs: "left-[var(--spacing-rail)]",
-    away: "left-0",
-  };
-
-  // The dot, in the same square a glyph is drawn in, so the first mark
-  // of every rail row starts at the same x.
+  // The link's own mark at the head of the drawer, in the same square
+  // a glyph is drawn in.
   const DOT = "flex size-glyph shrink-0 items-center justify-center";
+
+  // The chord answers here, where the drawer is: each new ask toggles it.
+  let heard = 0;
+  $effect(() => {
+    const now = asked;
+    if (now === heard) return;
+    heard = now;
+    toggle();
+  });
 
   function toggle(): void {
     const node = drawer;
@@ -95,13 +106,14 @@
     swept = next;
   }
 
-  // What the dot says when it is all the rail has room for: what it is,
-  // then each reason it is not grey. `aria-label` is the collapsed
-  // control's whole name, so it carries the state as well.
+  // How many things wait for the person: the count on the key.
+  const waiting = $derived($approvals?.length ?? 0);
+  const unread = $derived($belief.notices.filter((notice) => !notice.seen).length);
+
+  // What the key says, which is its whole name: what it is, then each
+  // reason it carries a count.
   const name = $derived.by(() => {
-    const parts = [say($lang, "presence_title")];
-    const waiting = $approvals?.length ?? 0;
-    const unread = $belief.notices.filter((notice) => !notice.seen).length;
+    const parts = [say($lang, "edge_mailbox")];
     if (waiting > 0) parts.push(fill(say($lang, "nav_waiting"), { n: String(waiting) }));
     if (unread > 0) parts.push(fill(say($lang, "notices_unread"), { n: String(unread) }));
     return parts.join(" · ");
@@ -165,9 +177,7 @@
   }
 </script>
 
-<!-- One dot and nothing beside it: the rail is 44 px wide when it is
-collapsed, and what the dot means is in the drawer rather than in a
-second mark next to it. -->
+<!-- The link's state as one mark at the head of the drawer. -->
 {#snippet dot()}
   <span class={DOT}>
     <span
@@ -180,22 +190,37 @@ second mark next to it. -->
   </span>
 {/snippet}
 
-<button
-  type="button"
-  class="flex h-rail w-full items-center px-base text-label text-text-quiet hover:text-text"
-  aria-expanded={open}
-  aria-label={name}
-  onclick={toggle}
->
-  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-  {@render dot()}
-</button>
+<Tip text={hint(name)} side="right" exposable>
+  {#snippet children(id)}
+    <button
+      type="button"
+      class={EDGE_KEY}
+      aria-expanded={open}
+      aria-label={name}
+      aria-describedby={id}
+      onclick={toggle}
+    >
+      <Glyph name="inbox" size="key" />
+      {#if waiting + unread > 0}
+        <span
+          class="absolute -top-tight -right-[6px] min-w-[18px] rounded-pill bg-alert px-[5px] text-center text-tally leading-[18px] font-label text-on-accent"
+          aria-hidden="true"
+        >
+          {waiting + unread}
+        </span>
+      {/if}
+      {#if connecting}
+        <span class="absolute right-[5px] bottom-[5px] size-[5px] animate-pulse rounded-pill bg-mark" aria-hidden="true"></span>
+      {/if}
+    </button>
+  {/snippet}
+</Tip>
 
 <aside
   bind:this={drawer}
   popover="auto"
   aria-label={say($lang, "presence_title")}
-  class="slide fixed inset-y-0 right-auto m-0 h-full w-[440px] max-w-[100vw] overflow-y-auto bg-raised shadow-sheet {EDGE[posture]}"
+  class="slide fixed inset-y-0 right-auto left-[calc(var(--spacing-margin)+var(--spacing-key)+var(--spacing-pane))] m-0 h-full w-[440px] max-w-[100vw] overflow-y-auto bg-raised shadow-sheet"
   ontoggle={(event) => {
     open = event.currentTarget.matches(":popover-open");
   }}

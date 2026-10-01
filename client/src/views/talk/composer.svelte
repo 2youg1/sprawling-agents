@@ -5,12 +5,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The box a person writes in: one textarea where Enter sends, the
-  // four pills that say which model answers, which room hears it, how
-  // hard the model thinks and which mode the run works in, and the way
-  // to stop a run while it is going. Nothing here decides where a
-  // message goes; the page does. `composer.ts` owns what the pills offer
-  // and what a pick means, `dropping.ts` what a dropped file becomes.
+  // The box a person writes in, written as a page (client-SPEC 7I): the
+  // words, a line under them, the settings row under the line, and the
+  // coin key in its context ring beside the words. Nothing here decides
+  // where a message goes; the page does. `composer.ts` owns what the
+  // pills offer and what a pick means, `dropping.ts` a dropped file.
   //
   // A line that begins with `/` is a command rather than a message, and
   // the menu over the box is the same list the Ctrl-K palette reads.
@@ -25,6 +24,8 @@
   import { get } from "svelte/store";
 
   import { QUERIES } from "../../core/asking";
+  import type { Snippet } from "svelte";
+
   import { heldIn } from "../../core/belief/rooms";
   import type { Sending } from "../../core/doing";
   import { runInFront } from "../../core/in_front";
@@ -33,10 +34,14 @@
   import { completed } from "../../core/completion";
   import { find, parse } from "../../core/slash";
   import type { Slash } from "../../core/slash_hands";
+  import type { Address } from "../../wire";
   import { canRecord } from "../../core/speaking";
   import { ui } from "../../ui";
-  import PillView from "./pill.svelte";
-  import Actions from "./actions.svelte";
+  import SettingsRow from "./settings_row.svelte";
+  import Coin, { faceOf } from "./coin.svelte";
+  import Gauge from "./gauge.svelte";
+  import Record from "./record.svelte";
+  import TypedLine from "./typed_line.svelte";
   import Popover from "../parts/popover.svelte";
   import {
     draftAt,
@@ -66,9 +71,15 @@
     // Whether this city has an endpoint that transcribes. A microphone
     // on a city with none is a button whose only answer is a refusal.
     readonly hearing?: boolean | undefined;
+    // What stands above the words: in the panorama tier, the last thing
+    // said, set the way the thread sets a message (client-SPEC 7I).
+    readonly above?: Snippet | undefined;
+    // The room this box speaks to, when the page holding it says so; the
+    // address bar answers otherwise.
+    readonly room?: Address | undefined;
   }
 
-  const { placeholder, sending, draft, onSend, onStop, hearing }: ComposerProps = $props();
+  const { placeholder, sending, draft, onSend, onStop, hearing, above, room }: ComposerProps = $props();
 
   const u = ui();
   const { lang } = u;
@@ -86,6 +97,8 @@
   // A message the connection would not take: the words stay in the box.
   let kept = $state(false);
   let handed = $state(false);
+  // Whether the box has the focus, which draws its line at full strength.
+  let focused = $state(false);
   // Which list is over the box: the `/` menu is the only one left here.
   let open = $state(false);
   // The row the menu's cursor is on, as `aria-activedescendant` on the box.
@@ -96,11 +109,8 @@
   let menuKeys: ((event: KeyboardEvent) => boolean) | null = null;
   let receipt: ReturnType<typeof setTimeout> | undefined = undefined;
 
-  // Whether this engine grows a textarea to fit what is typed in it.
-  // `field-sizing: content` does in one declaration what this script
-  // does in three, and before the frame is painted; Safari and Firefox
-  // have not shipped it (client-SPEC 9.0), so both paths stay and this
-  // check decides which runs. Both cap at `max-h-output`.
+  // `field-sizing: content` grows the box before the frame is painted
+  // where the engine has it; this is the path for the engines without it.
   function grow(): void {
     if (CSS.supports("field-sizing", "content")) return;
     if (box === undefined) return;
@@ -149,9 +159,8 @@
     if (next.box !== null) write(next.box);
   });
 
-  // The receipt: the pill reads where the words went, with a check, for
-  // a moment, so a press is seen to land (ux A3). A box that speaks to
-  // no room shows no receipt: there is nowhere to name.
+  // The receipt: for a moment a screen reader is told where the words
+  // went, so a press is heard to land; nowhere to name, no receipt.
   function landed(): void {
     const room = here;
     if (room === null) return;
@@ -177,8 +186,8 @@
   );
   const main = $derived(answer?.chosen.find((each) => each.tag === "main"));
 
-  // The room this box speaks to, read off the address bar.
-  const shown = $derived(Option.getOrNull(current(u.bar)));
+  // The room this box speaks to: the page's word for it, or the address bar's.
+  const shown = $derived(room === undefined ? Option.getOrNull(current(u.bar)) : { kind: "talk" as const, address: room });
   const here = $derived(shown !== null && shown.kind === "talk" ? shown.address : null);
   // Every room a person could move this conversation to.
   const cityAnswer = u.conn.asking.ask(QUERIES.city);
@@ -292,13 +301,6 @@
     });
   }
 
-  // ---------------------------------------------------------- speaking
-
-  function heardWords(words: string): void {
-    const before = text;
-    write(before === "" ? words : `${before} ${words}`);
-  }
-
   onMount(() => {
     // A draft restored on mount is taller than one row.
     requestAnimationFrame(grow);
@@ -309,17 +311,10 @@
   });
 </script>
 
-<!-- Focus is said by the edge going from quiet to firm, and by nothing
-     else: a full-strength accent here made this box the brightest
-     rectangle on any page - brighter than the stop button. The accent
-     is a budget with two lines in it (client-SPEC 7B). A drag over the
-     box is said the same way, with the raised fill, so a person sees
-     where to let go. -->
+<!-- A page, not a card: focus is said by the line coming to full
+strength, and a drag over the box by the wash it takes. -->
 <form
-  class={[
-    "relative rounded-panel border bg-raised px-base pt-base pb-snug shadow-float focus-within:border-edge-input",
-    over ? "border-edge-input bg-raised-hover" : "border-edge-panel",
-  ]}
+  class={["relative rounded-control transition-colors duration-200 ease-standard", over ? "wash" : ""]}
   aria-label={say($lang, "region_composer")}
   onsubmit={(event) => {
     event.preventDefault();
@@ -353,44 +348,53 @@
       }}
     />
   {/if}
-  <!-- svelte-ignore a11y_autofocus (the box is what the page exists for, and the shell's own focus chord reaches it the same way) -->
-  <textarea
-    bind:this={box}
-    bind:value={text}
-    class="block max-h-output min-h-control w-full resize-none overflow-y-auto bg-transparent px-tight text-body leading-relaxed text-text outline-none field-sizing-content placeholder:text-text-faint focus-visible:outline-none"
-    rows={1}
-    {placeholder}
-    aria-label={placeholder}
-    aria-activedescendant={activeId}
-    autofocus
-    onkeydown={onKeydown}
-    oninput={onInput}
-  ></textarea>
+  {#if above !== undefined}{@render above()}{/if}
+  <div class="relative pb-snug">
+    <div class="flex min-h-key items-end gap-base">
+      <!-- svelte-ignore a11y_autofocus (the box is what the page exists for, and the shell's own focus chord reaches it the same way) -->
+      <textarea
+        bind:this={box}
+        bind:value={text}
+        class="block max-h-output min-h-key min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-snug text-body leading-relaxed text-text caret-accent outline-hidden field-sizing-content placeholder:text-text-faint"
+        rows={1}
+        {placeholder}
+        aria-label={placeholder}
+        aria-activedescendant={activeId}
+        autofocus
+        onkeydown={onKeydown}
+        oninput={onInput}
+        onfocus={() => {
+          focused = true;
+        }}
+        onblur={() => {
+          focused = false;
+        }}
+      ></textarea>
+      {#if hearing === true && canRecord()}
+        <!-- What the microphone heard joins the words; it is never sent by itself (4-16). -->
+        <Record onWords={(words) => write(text === "" ? words : `${text} ${words}`)} />
+      {/if}
+      <Gauge room={here}>
+        <Coin
+          face={faceOf(text, live !== undefined)}
+          {sending}
+          onStop={() => {
+            onStop();
+          }}
+        />
+      </Gauge>
+    </div>
+    <TypedLine {text} {box} lit={focused || text !== ""} />
+  </div>
+  <span role="status" class="sr-only">
+    {#if handed && here !== null}{fill(say($lang, "talk_handed"), { room: here })}{/if}
+  </span>
   {#each unkept as each (each.kind === "refused" ? each.name : "")}
     {#if each.kind === "refused"}
-      <p class="px-tight text-note text-alert" role="alert">
+      <p class="text-note text-alert" role="alert">
         {fill(say($lang, "talk_drop_refused"), { name: each.name, why: each.said === "" ? say($lang, "talk_not_live") : each.said })}
       </p>
     {/if}
   {/each}
-  <div class="mt-snug flex items-center gap-tight text-note text-text-faint">
-    <div class="flex min-w-0 grow flex-wrap items-center gap-tight">
-      <PillView spec={specs[0]} />
-      <PillView spec={specs[1]} />
-      <PillView spec={specs[2]} />
-      <PillView spec={specs[3]} />
-      {#if kept}
-        <span class="text-alert">{say($lang, "talk_not_live")}</span>
-      {/if}
-    </div>
-    <Actions
-      {sending}
-      {handed}
-      {here}
-      empty={text.trim() === ""}
-      hearing={hearing === true && canRecord()}
-      onWords={heardWords}
-      {onStop}
-    />
-  </div>
+  <SettingsRow {specs} room={here} begun={session !== null} {kept} />
 </form>

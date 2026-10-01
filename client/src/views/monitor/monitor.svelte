@@ -121,7 +121,7 @@
   </header>
   <div class="flex min-h-0 flex-1">
     {#if terminal === "folded"}
-      <nav class="w-rail-open shrink-0 overflow-y-auto border-e border-edge py-tight" aria-label={say($lang, "mon_files")}>
+      <nav class="w-index shrink-0 overflow-y-auto border-e border-edge py-tight" aria-label={say($lang, "mon_files")}>
         {#each trace.files as file (file.path)}
           <button
             type="button"

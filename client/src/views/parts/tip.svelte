@@ -6,8 +6,16 @@
 -->
 
 <script lang="ts" module>
+  // Which side of its control a hint stands on. Above, unless the
+  // control stands at the window's foot with room only beside it - the
+  // edge keys - where it stands to the right.
+  export type TipSide = "above" | "right";
+
   // Against the wrapper, for an engine without anchor positioning.
-  const AGAINST_WRAPPER = "absolute bottom-full left-1/2 -translate-x-1/2";
+  const AGAINST_WRAPPER: Record<TipSide, string> = {
+    above: "absolute bottom-full left-1/2 -translate-x-1/2 mb-tight",
+    right: "absolute left-full top-1/2 -translate-y-1/2 ml-base",
+  };
 
   // Against the anchor, for an engine with it. `flip-block` drops the
   // hint below the control when there is no room above.
@@ -15,12 +23,20 @@
   // `--tip-anchor` is spelled out rather than built from a constant
   // because Tailwind reads class names out of this file as text: a name
   // assembled at run time produces no CSS at all.
-  const AGAINST_ANCHOR =
-    "supports-[anchor-name:--a]:fixed supports-[anchor-name:--a]:bottom-auto " +
-    "supports-[anchor-name:--a]:left-auto supports-[anchor-name:--a]:translate-x-0 " +
-    "supports-[anchor-name:--a]:[position-anchor:var(--tip-anchor)] " +
-    "supports-[anchor-name:--a]:[position-area:block-start] " +
-    "supports-[anchor-name:--a]:[position-try-fallbacks:flip-block]";
+  const AGAINST_ANCHOR: Record<TipSide, string> = {
+    above:
+      "supports-[anchor-name:--a]:fixed supports-[anchor-name:--a]:bottom-auto " +
+      "supports-[anchor-name:--a]:left-auto supports-[anchor-name:--a]:translate-x-0 " +
+      "supports-[anchor-name:--a]:[position-anchor:var(--tip-anchor)] " +
+      "supports-[anchor-name:--a]:[position-area:block-start] " +
+      "supports-[anchor-name:--a]:[position-try-fallbacks:flip-block]",
+    right:
+      "supports-[anchor-name:--a]:fixed supports-[anchor-name:--a]:top-auto " +
+      "supports-[anchor-name:--a]:left-auto supports-[anchor-name:--a]:translate-y-0 " +
+      "supports-[anchor-name:--a]:[position-anchor:var(--tip-anchor)] " +
+      "supports-[anchor-name:--a]:[position-area:inline-end] " +
+      "supports-[anchor-name:--a]:[position-try-fallbacks:flip-inline]",
+  };
 
   // No stacking number: the hint is positioned and whatever it is drawn
   // over is not, which is already the order the two are painted in.
@@ -30,7 +46,7 @@
   // and client-SPEC 4-18 pins it. Only opacity moves, so the reveal
   // costs no layout, and `motion-reduce` cuts it to nothing.
   const PAINT =
-    "pointer-events-none mb-tight w-max max-w-measure rounded-card border border-edge-panel bg-raised " +
+    "pointer-events-none w-max max-w-measure rounded-card border border-edge-panel bg-raised " +
     "px-snug py-tight text-note text-text shadow-float " +
     "transition-[opacity,display] transition-discrete delay-300 duration-200 ease-standard " +
     "motion-reduce:transition-none";
@@ -88,9 +104,14 @@
     // `aria-describedby` when the control is named by its own text, as
     // `aria-labelledby` when these words are that name.
     readonly children: Snippet<[string]>;
+    readonly side?: TipSide;
+    // Whether holding the accelerator alone draws this hint with the
+    // others (client-SPEC 7E): the names of the edge keys are, a hint
+    // inside a form is not.
+    readonly exposable?: boolean;
   }
 
-  const { text, children }: Props = $props();
+  const { text, children, side = "above", exposable = false }: Props = $props();
 
   const hint = $props.id();
 
@@ -130,7 +151,8 @@
   <span
     id={hint}
     role="tooltip"
-    class={[PAINT, AGAINST_WRAPPER, AGAINST_ANCHOR, dismissed ? WHEN_DISMISSED : WHEN_WANTED]}
+    class={[PAINT, AGAINST_WRAPPER[side], AGAINST_ANCHOR[side], dismissed ? WHEN_DISMISSED : WHEN_WANTED]}
+    data-exposable={exposable && !dismissed ? "" : undefined}
   >
     {text}
   </span>

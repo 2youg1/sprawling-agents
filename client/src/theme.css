@@ -343,13 +343,9 @@
   /* The few fixed sizes a shell needs: the bar, a status dot, the
    * building glyphs, and the pane a tree takes beside a file. */
   --spacing-bar: 44px;
-  /* The strip along the bottom of the window that states what is
-   * running on this person's behalf. Shorter than a bar because it is
-   * read and never pressed: it holds one line of the note step and the
-   * air around it, and nothing in it is a target for a pointer. */
-  --spacing-facts: 28px;
-  --spacing-rail: 44px;
-  --spacing-rail-open: 232px;
+  /* The column a list of files or groups takes beside what it opens:
+   * the monitor's file list, wide enough for a path's last two parts. */
+  --spacing-index: 232px;
   /* The icon grids. An icon is drawn on one of two squares - sixteen
    * for a mark that sits inside a line of text, twenty for the ones a
    * column of navigation is built from - and the box it is drawn in is
@@ -374,6 +370,27 @@
   --spacing-caret: 18px;
   --spacing-hair: 2px;
 
+  /* The shell's grid (client-SPEC 4-33): twelve columns, a margin round
+   * the window, a gutter between columns, and an eight-pixel baseline
+   * the rows are counted in. Outside the density coefficient on
+   * purpose: the grid is what makes two edges one line, and a tighter
+   * page is tighter inside its columns, not a different set of them. */
+  --spacing-margin: 32px;
+  --spacing-gutter: 24px;
+  --spacing-baseline: 8px;
+  /* The edge keys and the context ring are drawn in one square, so the
+   * ring round the coin key and the three keys share a size; the coin
+   * sits inside the ring with four pixels of air. The glyph a key is
+   * drawn with sits between the two icon squares, because a key is
+   * read from further away than a line of text and nearer than a
+   * column of navigation. */
+  --spacing-key: 40px;
+  --spacing-coin: 32px;
+  --spacing-glyph-key: 18px;
+  /* The conversation as a band along the bottom of the panorama tier:
+   * the last thing said, the field, and its line. */
+  --spacing-band: 112px;
+
   /* Three heights a box may sit at above the page, and they are one ink
    * at three strengths rather than three colours: a row or a control
    * that has lifted slightly, a panel floating over the page, and the
@@ -390,6 +407,9 @@
   --radius-card: 8px;
   --radius-control: 6px;
   --radius-pill: 999px;
+  /* The edge keys: rounder than a control, because a key that floats
+   * over the page reads as an object rather than as part of a form. */
+  --radius-key: 14px;
 
   /* The one duration: the acknowledgement a control owes a hand. A
    * popover and a banner take 200ms and a page-level move 400ms, both
@@ -399,6 +419,11 @@
   /* The one easing: everything that moves leaves fast and arrives
    * slow, so a thing entering the page is read before it stops. */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  /* Arriving at a place the eye should rest on - the composer sinking
+   * to its seat, the world layer coming in, the coin key turning over -
+   * decelerates hard and settles late, so the thing is read before it
+   * stops. */
+  --ease-arrive: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* A count pinned to a glyph's corner. It has to be smaller than the
    * 16px glyph it marks, or it covers the glyph instead of marking it;
@@ -685,6 +710,53 @@
   font-variant-numeric: var(--figures);
 }
 
+/* The shell's one grid (client-SPEC 4-33). Every region of the page is
+ * placed on its column lines, so two edges that should line up are one
+ * line rather than two measurements. The first row is the banners a
+ * page may carry; the second is the page. */
+@utility frame {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: var(--spacing-gutter);
+  padding: var(--spacing-margin);
+
+  /* Narrower than twelve readable columns: one column, the conversation
+   * in it, and the edge keys in a row of their own at its foot. */
+  @media (width < 768px) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding: var(--spacing-pane);
+  }
+}
+
+/* The same width, for a region that changes where it stands below it. */
+@custom-variant narrow (@media (width < 768px));
+
+/* Glass, for the edge keys and nothing larger (client-SPEC 4-34): a
+ * blurred, saturated view of what is behind, a fill that keeps the key
+ * legible over any of it, one edge that separates it from the words it
+ * floats over, and one level of shadow that says it floats. */
+@utility glass {
+  background-color: color-mix(in oklch, var(--color-raised) 68%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-text) 10%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, var(--color-text) 5%, transparent),
+    var(--shadow-float);
+  backdrop-filter: blur(24px) saturate(170%);
+}
+
+/* The two washes a row takes over the page: under the pointer, and
+ * chosen. A wash of the ink rather than a rung of the ramp, because the
+ * shell's rows sit on the page itself and a lifted surface would draw a
+ * card where there is only a row. */
+@utility wash {
+  background-color: color-mix(in oklch, var(--color-text) 5%, transparent);
+}
+@utility wash-strong {
+  background-color: color-mix(in oklch, var(--color-text) 8%, transparent);
+}
+
 /* As many columns of prose as the room holds, and no breakpoint.
  *
  * A settings page and a dependency page are lists of cards that read
@@ -798,6 +870,134 @@
 .fade {
   animation: fade 150ms var(--ease-standard) both;
 }
+/* The line under the composer's words (client-SPEC 7I). It runs as far
+ * as the words do and fades out after them, so an empty field shows only
+ * a short lead from the left edge, the way a terminal shows its prompt,
+ * and the first words draw it out like a progress bar. `--typed` is set
+ * on the element by the composer; registering it as a length is what
+ * lets the gradient move rather than jump. */
+@property --typed {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+.typed-line {
+  --typed: 0px;
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    var(--color-text-faint) 0,
+    var(--color-text-faint) var(--typed),
+    transparent calc(var(--typed) + 160px)
+  );
+  opacity: 0.55;
+  pointer-events: none;
+  transition:
+    --typed 320ms var(--ease-arrive),
+    opacity 200ms var(--ease-standard);
+}
+.typed-line[data-lit] {
+  opacity: 1;
+}
+
+/* The coin key: send on one face, stop on the other (client-SPEC 7I).
+ * The faces turn about the vertical axis; with motion reduced they cross
+ * fade in place instead, so the answer to "what does this key do now"
+ * still changes and nothing travels. */
+.coin {
+  perspective: 240px;
+}
+.coin-faces {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 420ms var(--ease-arrive);
+}
+.coin-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  backface-visibility: hidden;
+  transition:
+    background-color 200ms var(--ease-standard),
+    color 200ms var(--ease-standard),
+    opacity 200ms var(--ease-standard);
+}
+.coin-face[data-face="stop"] {
+  transform: rotateY(180deg);
+}
+.coin[data-up="stop"] .coin-faces {
+  transform: rotateY(180deg);
+}
+.coin:active .coin-faces {
+  scale: 0.94;
+}
+:root[data-motion="off"] .coin-faces {
+  transform: none;
+}
+:root[data-motion="off"] .coin-face[data-face="stop"] {
+  transform: none;
+  opacity: 0;
+}
+:root[data-motion="off"] .coin[data-up="stop"] .coin-face[data-face="stop"] {
+  opacity: 1;
+}
+:root[data-motion="off"] .coin[data-up="stop"] .coin-face[data-face="send"] {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) .coin-faces {
+    transform: none;
+  }
+  :root:not([data-motion="on"]) .coin-face[data-face="stop"] {
+    transform: none;
+    opacity: 0;
+  }
+  :root:not([data-motion="on"]) .coin[data-up="stop"] .coin-face[data-face="stop"] {
+    opacity: 1;
+  }
+  :root:not([data-motion="on"]) .coin[data-up="stop"] .coin-face[data-face="send"] {
+    opacity: 0;
+  }
+}
+
+/* The context ring's two checkpoints (client-SPEC 7J): a dot at its
+ * percent of the window, ringed in the page colour so it reads over the
+ * line it sits on. The remaining arc moves rather than jumps. */
+.ring-left {
+  transition:
+    stroke-dasharray 600ms var(--ease-arrive),
+    stroke-dashoffset 600ms var(--ease-arrive);
+}
+.rung {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 1.5px var(--color-page);
+  transform: rotate(calc(var(--at) * 3.6deg)) translateY(-18px);
+}
+
+/* Hold to reveal (client-SPEC 7E): while the accelerator is held alone,
+ * the shell sets `data-expose` on the root and every hint that may be
+ * revealed this way is drawn at once. Unlayered, so it outranks the
+ * utilities that hide a hint at rest. */
+:root[data-expose] [data-exposable] {
+  display: block;
+  opacity: 1;
+  transition-delay: 0ms;
+}
+
 /* The shape of what is coming, while it is coming: a light band travels
  * across the bar once per pass. A block that fades in and out reads as
  * something broken, and a band travelling one way reads as something on
@@ -883,32 +1083,16 @@
 
 /* One route replacing another, as one page becoming the next.
  *
- * Two things survive a route change and say so: the rail entry the
- * person is on, and the page's own title. Naming them hands the browser
- * two pairs of boxes to carry from the old page to the new one, and the
- * rest of the page cross-fades. The rail entry is named by the attribute
- * that already says which entry is current, so nothing in the view has
- * to be marked for this.
- *
- * A name has to be unique at the moment the browser captures the page,
- * or the whole transition is skipped: one rail entry carries
- * `aria-current="page"` at a time, and the router draws one view inside
- * `<main>` at a time, so both names are held by one box each.
+ * The page's own title survives a route change and says so: naming it
+ * hands the browser one pair of boxes to carry from the old page to the
+ * new one, and the rest of the page cross-fades. The router draws one
+ * page inside `<main>` at a time, so the name is held by one box.
  *
  * The JS side wraps the route change in `document.startViewTransition`
  * where the engine has it; Firefox does not yet, and there the route
- * changes the way it does today. Nothing here needs `@supports`, because
- * an engine that does not know `view-transition-name` drops the
- * declaration and keeps the rest of the rule.
- *
- * Motion off stops the animation rather than the transition, so the two
- * pages still swap in one frame. The switch is bound to the element
- * carrying the attribute rather than to its descendants, because the
- * boxes a transition animates hang off the root element and no
- * descendant selector can reach them. */
-nav[data-rail] [aria-current="page"] {
-  view-transition-name: rail-current;
-}
+ * changes in one frame. Motion off stops the animation rather than the
+ * transition, bound to the root element because the boxes a transition
+ * animates hang off it and no descendant selector can reach them. */
 main h1 {
   view-transition-name: title;
 }
@@ -916,56 +1100,6 @@ main h1 {
 [data-motion="off"]::view-transition-old(*),
 [data-motion="off"]::view-transition-new(*) {
   animation: none;
-}
-
-/* The rail opens because a pointer stayed on it, and that is a fact
- * about the pointer rather than about any state the client holds.
- *
- * A threshold on the way in and a delay on the way out are one property
- * each: the delay is 200ms while the pointer is away, so leaving the
- * column for a moment does not close it, and 120ms while the pointer is
- * on it, so crossing the 44px edge by accident does not open it. The
- * transition itself is what keeps the edge from chasing the pointer -
- * the width moves over 200ms rather than jumping out from under it.
- *
- * `data-rail` and `rail-label` are the two hooks `views/rail.tsx` names
- * for this rule; every other nav in this client - the file tree, the
- * lens tabs, the settings groups - is content, and none of them opens.
- *
- * Only hover is stated here. Pinning the rail with `[` is a decision
- * rather than a gesture, so the view keeps it and writes the open width
- * and the open labels as classes; saying the resting width here as well
- * would overrule those classes from outside every layer and the pin
- * would stop working. Hover is the one state the view no longer tracks,
- * so hover is the one state this rule owns. */
-nav[data-rail] {
-  transition-property: width, box-shadow;
-  transition-duration: 200ms;
-  transition-timing-function: var(--ease-standard);
-  transition-delay: 200ms;
-}
-/* **Only the glyph column opens on hover, and that is the answer to
- * what a pointer crossing a rail of zero width does.** A person who
- * put the rail away asked for the whole window; a column that sprang
- * back out of the left edge whenever the pointer passed it would take
- * the decision back from them every time they reached for a word at
- * the start of a line. Away is left by the accelerator that put it
- * there, and by nothing a hand does in passing.
- *
- * The pinned posture is not named here either, for the reason it never
- * was: the view writes the open width as a class, and a rule outside
- * every layer would overrule it. */
-/* A page picked from the opened column closes it at once: the pointer
- * is still over the rail, and a column left open would cover the page
- * the person just asked for. `data-tucked` holds from that click until
- * the pointer leaves, and the view owns it. */
-nav[data-rail="glyphs"]:not([data-tucked]):hover {
-  width: var(--spacing-rail-open);
-  box-shadow: var(--shadow-float);
-  transition-delay: 120ms;
-}
-nav[data-rail="glyphs"]:not([data-tucked]):hover .rail-label {
-  display: block;
 }
 
 /* Base: a page is dark, text never pure white, links carry no

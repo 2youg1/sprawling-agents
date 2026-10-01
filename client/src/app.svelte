@@ -4,10 +4,13 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The shell: one rail on the left, one content region, and the three
-  // things that may float over them - a refusal, the palette, and the
-  // sheet of keys. Which page shows is the address bar's decision, read
-  // on every `hashchange`.
+  // The shell: one twelve-column grid (client-SPEC 4-33), the page on its
+  // columns, the three edge keys at the foot of the first column, and the
+  // three things that may float over them - a refusal, the palette, and
+  // the sheet of keys. Which page shows is the address bar's decision,
+  // read on every `hashchange`; the conversation page lays itself out by
+  // the tier (`views/workspace.svelte`), every other page takes the
+  // columns right of the edge keys.
   //
   // The keys are not spelled here. `core/keys` holds the action, the
   // chord that reaches it and the person's own chord if they set one;
@@ -32,26 +35,16 @@
   import type { View } from "./core/route";
   import { setUi, ui } from "./ui";
   import type { Opening } from "./ui";
-  import Building from "./views/building.svelte";
   import Banner from "./views/parts/banner.svelte";
   import Button from "./views/parts/button.svelte";
   import Cheatsheet from "./views/parts/kbd.svelte";
-  import City from "./views/city.svelte";
-  import Cost from "./views/cost.svelte";
-  import Facts from "./views/facts.svelte";
+  import Edge from "./views/edge.svelte";
   import LinkBanner from "./views/link_banner.svelte";
-  import Mcp from "./views/mcp.svelte";
   import Notifier from "./views/notifier.svelte";
-  import Monitor from "./views/monitor.svelte";
+  import Pages from "./views/pages.svelte";
   import Palette from "./views/palette.svelte";
-  import Rail from "./views/rail.svelte";
-  import RecordView from "./views/record.svelte";
   import Refusal from "./views/refusal.svelte";
-  import Registry from "./views/registry.svelte";
-  import Run from "./views/run.svelte";
-  import Setup from "./views/setup.svelte";
-  import Talk from "./views/talk.svelte";
-  import Welcome from "./views/welcome.svelte";
+  import Workspace from "./views/workspace.svelte";
   import { motionOff } from "./views/shared/motion";
 
   // The Opening `main.ts` read off the page once. Taken as one prop
@@ -66,7 +59,6 @@
   const approvals = u.approvals;
   const belief = u.conn.belief;
   const linkState = u.conn.state;
-  const samples = u.conn.monitor.samples;
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const bindings = keymap();
 
@@ -75,14 +67,9 @@
   // land somewhere here before this file compiles.
   type GoAction = Extract<Action, `go.${string}`>;
 
-  // Where each of them lands. Every other action moves the shell rather
-  // than the address bar, and is answered by `act` below.
-  //
-  // **Keyed by `GoAction`, which is what makes this table checked**: a
-  // key spelled wrong is not an action, and an action left out is a
-  // missing property. A table keyed by `string` left the name of a
-  // destination with two homes - this table and `ACTIONS` - and neither
-  // could tell the other was wrong (roadmap B-77).
+  // Where each of them lands; every other action moves the shell and is
+  // answered by `act` below. Keyed by `GoAction`, so a key spelled wrong
+  // is not an action and an action left out is a missing property.
   const GOES: Readonly<Record<GoAction, View>> = {
     "go.talk": { kind: "talk", address: MAYOR },
     "go.waiting": { kind: "talk", address: MAYOR },
@@ -159,19 +146,11 @@
     arrived = true;
   }
 
-  // One page replaces another. A swap is a cut; a view transition
-  // carries the rail's current item and the page's title across, so
-  // the eye keeps the thing it was already looking at.
-  //
-  // It wraps the read of the address bar rather than the write of it,
-  // because `hashchange` arrives in a later task: a transition around
-  // `go()` would finish before the page had changed. Doing it here
-  // also covers the back button and every `<a href="#/…">` on the
-  // page, which `go()` never sees.
-  //
-  // Firefox has not shipped the API, and a person who turned movement
-  // off asked for no travel; both take the plain swap (client-SPEC
-  // 9.0, rows 4 and 8).
+  // One page replaces another through a view transition that carries the
+  // page's title across. It wraps the read of the address bar, not the
+  // write, because `hashchange` arrives in a later task - which also
+  // covers the back button and every `<a href="#/…">`. Firefox lacks the
+  // API, and motion turned off asks for no travel: both take a plain swap.
   function follow(): void {
     if (!("startViewTransition" in document) || motionOff(document.documentElement)) {
       settle();
@@ -189,18 +168,66 @@
     opener = null;
   }
 
-  // The rail's posture, held here until the edge keys replace the rail.
-  const RAILS = ["glyphs", "named", "away"] as const;
-  let rail = $state<(typeof RAILS)[number]>("glyphs");
-  function cycleRail(): void {
-    rail = RAILS[(RAILS.indexOf(rail) + 1) % RAILS.length] ?? "glyphs";
-  }
-
   // The tier is the person's, kept where their other postures are kept
-  // (`core/prefs.ts`), and cycled in the order `TIERS` states.
+  // (`core/prefs.ts`), and cycled in the order `TIERS` states. Holding the
+  // layers key - the edge key or its chord - shows the blend tier for as
+  // long as it is held and changes nothing (client-SPEC 7E).
   function cycleTier(): void {
     const at = TIERS.indexOf($held.tier);
     u.prefs.setTier(TIERS[(at + 1) % TIERS.length] ?? "blend");
+  }
+  let peeking = $state(false);
+  const tier = $derived(peeking ? "blend" : $held.tier);
+
+  // How many times the mailbox chord asked for the drawer; the drawer
+  // answers each one where it stands.
+  let mailboxAsked = $state(0);
+
+  // A press is held when its key stays down this long: the layers chord
+  // becomes a look, and the accelerator alone draws every key's name.
+  const HOLD_MS = 300;
+  let tierHeld: ReturnType<typeof setTimeout> | null = null;
+  let exposing: ReturnType<typeof setTimeout> | null = null;
+
+  function expose(on: boolean): void {
+    if (exposing !== null) clearTimeout(exposing);
+    exposing = null;
+    if (on) {
+      exposing = setTimeout(() => {
+        document.documentElement.dataset["expose"] = "";
+      }, HOLD_MS);
+    } else {
+      delete document.documentElement.dataset["expose"];
+    }
+  }
+
+  function holdTier(): void {
+    if (tierHeld !== null) return;
+    tierHeld = setTimeout(() => {
+      peeking = true;
+    }, HOLD_MS);
+  }
+
+  // The layers chord acts when it is let go: a tap changes the tier, and
+  // a hold that already showed the blend tier only ends the look.
+  function releaseTier(): void {
+    if (tierHeld === null) return;
+    clearTimeout(tierHeld);
+    tierHeld = null;
+    if (peeking) peeking = false;
+    else cycleTier();
+  }
+
+  function letGo(event: KeyboardEvent): void {
+    if (event.key === "Control" || event.key === "Meta") expose(false);
+    if (tierHeld !== null && !(event.ctrlKey || event.metaKey)) releaseTier();
+  }
+
+  function forget(): void {
+    expose(false);
+    if (tierHeld !== null) clearTimeout(tierHeld);
+    tierHeld = null;
+    peeking = false;
   }
 
   function typing(target: EventTarget | null): boolean {
@@ -230,10 +257,10 @@
         paletteOpen = !paletteOpen;
         return;
       case "tier.cycle":
-        cycleTier();
+        holdTier();
         return;
       case "mailbox":
-        cycleRail();
+        mailboxAsked += 1;
         return;
       case "inspect":
         u.prefs.setPanel(!$held.panel);
@@ -262,12 +289,15 @@
 
   function keys(event: KeyboardEvent): void {
     const accel = event.ctrlKey || event.metaKey;
+    // The accelerator alone, held, draws every key's name; any other key
+    // with it, or an input method's composition, is a chord and not a look.
+    expose((event.key === "Control" || event.key === "Meta") && !event.isComposing && !event.repeat);
     if (event.key === "Escape") {
       if (paletteOpen) paletteOpen = false;
       else if (sheetOpen) closeSheet();
-      else if (rail === "named") rail = "glyphs";
       return;
     }
+    if (event.repeat && tierHeld !== null) return;
     // With the palette open, only a chord that holds the accelerator is
     // the shell's; everything else is being typed into its filter. The
     // text-field half of this rule lives in `core/keys`' `matches`.
@@ -319,85 +349,42 @@
   onMount(follow);
 </script>
 
-<svelte:window onhashchange={follow} onkeydown={keys} />
+<svelte:window onhashchange={follow} onkeydown={keys} onkeyup={letGo} onblur={forget} />
 
 <Notifier {view} />
-<div class="relative flex h-screen bg-page font-sans text-body text-text">
+<div class="frame relative h-screen overflow-hidden bg-page font-sans text-body text-text">
   <a
     href="#main"
     class="sr-only focus:not-sr-only focus:absolute focus:top-snug focus:left-snug focus:z-30 focus:rounded-control focus:bg-raised focus:px-base focus:py-snug focus:text-label focus:text-text"
   >
     {say($lang, "skip_main")}
   </a>
-  {#if view.kind !== "welcome"}
-    <Rail {view} posture={rail} onToggle={cycleRail} onPalette={() => (paletteOpen = true)} />
-  {/if}
-  <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-    {#if lostAttempt !== null}
-      <LinkBanner attempt={lostAttempt} unsent={$unsent} onRetry={u.conn.retry} />
-    {/if}
-    {#if halted}
-      <Banner
-        text={say($lang, "halt_title")}
-        {...frozen > 0 ? { detail: fill(say($lang, "halt_frozen"), { n: String(frozen) }) } : {}}
-        weight="alert"
-      >
-        {#snippet action()}
-          <Button label={say($lang, "city_release")} tone="secondary" onPress={() => u.send(release(CITY))} />
-        {/snippet}
-      </Banner>
-    {/if}
-    <main
-      id="main"
-      class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
-      aria-label={say($lang, "region_main")}
-    >
-      {#if view.kind === "talk"}
-        <Talk address={view.address} />
-      {:else if view.kind === "city"}
-        <City />
-      {:else if view.kind === "building"}
-        <Building address={view.address} />
-      {:else if view.kind === "run"}
-        <Run run={view.run} />
-      {:else if view.kind === "setup"}
-        <Setup />
-      {:else if view.kind === "mcp"}
-        <Mcp />
-      {:else if view.kind === "record"}
-        <RecordView lens={view.lens} />
-      {:else if view.kind === "cost"}
-        <Cost />
-      {:else if view.kind === "registry"}
-        <Registry />
-      {:else if view.kind === "welcome"}
-        <Welcome />
-      {:else if view.kind === "monitor"}
-        <Monitor samples={$samples} watch={u.conn.monitor.watch} />
-      {:else if view.kind === "gallery"}
-        <!-- The storybook and its fixture tables are a chunk of their
-             own, fetched only when a person opens `#/gallery`, so the
-             page every other route loads does not carry them. -->
-        {#await import("./views/gallery.svelte")}
-          <!-- Pending until the chunk lands; the render gate waits for
-               this mark to go before it measures the page. -->
-          <div data-pending></div>
-        {:then gallery}
-          <gallery.default />
-        {/await}
+  {#if lostAttempt !== null || halted}
+    <div class="col-[2/-1] row-start-1 flex flex-col gap-snug pb-base narrow:col-span-full">
+      {#if lostAttempt !== null}
+        <LinkBanner attempt={lostAttempt} unsent={$unsent} onRetry={u.conn.retry} />
       {/if}
-    </main>
-    <!-- Under every page, and outside `<main>` on purpose: it is a
-         control surface rather than content, so it does not print,
-         and a person tabbing through the page does not walk into
-         seven unlabelled readings. The welcome walk is the one
-         screen without it - nothing is running yet, and a strip of
-         dashes would teach a first-time reader that this product
-         shows them nothing. -->
-    {#if view.kind !== "welcome"}
-      <Facts />
-    {/if}
-  </div>
+      {#if halted}
+        <Banner
+          text={say($lang, "halt_title")}
+          {...frozen > 0 ? { detail: fill(say($lang, "halt_frozen"), { n: String(frozen) }) } : {}}
+          weight="alert"
+        >
+          {#snippet action()}
+            <Button label={say($lang, "city_release")} tone="secondary" onPress={() => u.send(release(CITY))} />
+          {/snippet}
+        </Banner>
+      {/if}
+    </div>
+  {/if}
+  {#if view.kind === "talk"}
+    <Workspace address={view.address} {tier} />
+  {:else}
+    <Pages {view} />
+  {/if}
+  {#if view.kind !== "welcome"}
+    <Edge {tier} onTier={cycleTier} onPeek={(on) => (peeking = on)} {mailboxAsked} />
+  {/if}
   <Refusal {stopsWithoutRun} />
   {#if paletteOpen}
     <Palette onClose={() => (paletteOpen = false)} />

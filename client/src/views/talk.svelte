@@ -5,23 +5,23 @@
 -->
 
 <script lang="ts">
-  // The first page: one conversation with one room, the Mayor's unless
-  // the address says otherwise, laid out as a chat page is - one centred
-  // column the height of the window, words flowing down it, the box
-  // pinned at the foot. Every run in the room is a stretch of the same
-  // thread; what waits for the person is a card in it; and the box
-  // either steers the run that is going or opens the next one.
+  // The conversation: one room, the Mayor's unless the address says
+  // otherwise, as the column the shell's grid gives it (client-SPEC 4-33)
+  // - words flowing down it, the box at its foot. Every run in the room
+  // is a stretch of the same thread; what waits for the person is a card
+  // in it; and the box either steers the run that is going or opens the
+  // next one. In the panorama tier the column is a band along the bottom:
+  // the last thing said, and the same box (client-SPEC 7I).
   //
   // A session is a stretch of the room, not the room (roadmap S1): runs
   // before it fold behind one line, and how it began is drawn where the
-  // two meet. Beside the conversation, once the main region is wide
-  // enough (a container query, because an open rail takes 232px of the
-  // window), stands what the run produced.
+  // two meet.
   import { cancel, dispatch, openSession, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
   import { newestWorking } from "../core/belief/live";
   import { heldIn } from "../core/belief/rooms";
   import { fill, say } from "../core/lang";
+  import { hhmmss } from "../core/time";
   import { landingOf, sentFrom } from "../core/landing";
   import type { Landing, Sent } from "../core/landing";
   import { MAYOR, roomOf } from "../core/route";
@@ -29,7 +29,6 @@
   import type { Snippet } from "svelte";
   import type { Address, RoundsAnswer, Seq } from "../wire";
   import { ui } from "../ui";
-  import Artifact, { PANEL_ID } from "./talk/artifact.svelte";
   import Composer from "./talk/composer.svelte";
   import Divider from "./talk/divider.svelte";
   import Forking from "./talk/forking.svelte";
@@ -41,10 +40,8 @@
   import { drawsCalls } from "../core/results";
   import { anchorAt, footOf } from "./talk/anchoring";
   import type { Anchoring } from "./talk/anchoring";
-  import { NOTHING, artifactsIn } from "./talk/trace";
   import Inbox from "./talk/inbox.svelte";
   import Waiting from "./talk/waiting.svelte";
-  import ContextStrip from "./talk/context_strip.svelte";
   import Failed from "./talk/failed.svelte";
   import { IDLE, NOT_CONVERSING, hand, settle } from "./talk/handing";
   import type { Handing } from "./talk/handing";
@@ -52,9 +49,12 @@
 
   interface Props {
     readonly address: Address;
+    // The panorama tier's band: the thread steps aside and the last thing
+    // said stands above the box.
+    readonly band: boolean;
   }
 
-  const { address }: Props = $props();
+  const { address, band }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -78,12 +78,12 @@
   const earlier = $derived(began === null ? [] : runs.filter((run) => run.lastSeq <= began));
   const shown = $derived(began === null ? runs : runs.filter((run) => run.lastSeq > began));
 
-  // The run the panel speaks for: the one still going, or the last one
-  // this room finished. The same question `Thread` asks, merged with it
+  // The run the band and the fork picker speak for: the one still going,
+  // or the last one this room finished. The same question `Thread` asks, merged with it
   // by `asking` because the two ask it in the same words.
   const current = $derived(live ?? runs.at(-1));
 
-  // The rounds of that run, asked here for the artifact panel and the
+  // The rounds of that run, asked here for the band's last line and the
   // fork picker. Subscribed by hand because the run it follows changes:
   // `$store` binds one store at initialisation, and this question moves
   // to a new run the moment one starts.
@@ -96,17 +96,9 @@
     });
   });
 
-  const artifacts = $derived(answer === undefined ? NOTHING : artifactsIn(answer.turns));
-  // Whether there is a card to draw at all. Any one of the three panes
-  // is enough; a run that read nothing, changed nothing and ran nothing
-  // gets no card and no control to open one.
-  const produced = $derived(
-    artifacts.read !== null || artifacts.wrote !== null || artifacts.terminal !== null,
-  );
-  // Open until the person closes it, and forgotten on reload: this
-  // belongs in the person's own `[ui]` section and there is no door to
-  // it yet (client-SPEC 4-27).
-  const panel = $derived($held.panel);
+  // The last thing said in this room, which the panorama band shows above
+  // the box: the newest run's reply as the rounds have it.
+  const said = $derived(answer?.turns.filter((turn) => typeof turn.said === "string").at(-1));
 
   // How this stretch began, in the words the divider draws. A branch
   // that went out from this screen knows its turn and its mother the
@@ -257,6 +249,18 @@
   const composer: Snippet = drawComposer;
 </script>
 
+{#snippet lastSaid()}
+  {#if said !== undefined}
+    <div class="mb-snug flex flex-col gap-tight">
+      <div class="flex items-baseline gap-base text-note text-text-faint">
+        <span class="font-label text-text">{isMayor ? say($lang, "talk_empty_mayor") : who}</span>
+        <span class="figure">{hhmmss(said.t)}</span>
+      </div>
+      <p class="truncate text-body text-text">{said.said}</p>
+    </div>
+  {/if}
+{/snippet}
+
 {#snippet drawComposer()}
   <Landed {landing} />
   {#if refused !== null}
@@ -275,89 +279,35 @@
     sending={sendingInto(live?.doing)}
     draft={address}
     hearing={u.hearing()}
+    room={address}
+    above={band ? lastSaid : undefined}
     onSend={send}
     onStop={() => {
       const going = live;
       return going === undefined ? false : u.send(cancel(going.run));
     }}
   />
-  <ContextStrip {address} run={current?.run} />
 {/snippet}
 
-<div class="flex min-h-0 flex-1 flex-col @lg/page:flex-row">
-  <div class="flex min-h-0 flex-1 flex-col">
-    <!-- The one control the panel has. It is here rather than on the
-         panel because the panel is what it opens: a second control
-         inside would be a second place to look for the same state. -->
-    {#if produced}
-      <div class="flex justify-end px-pane pt-snug">
-        <button
-          type="button"
-          class="rounded-control px-snug py-tight text-note text-text-faint hover:bg-chrome hover:text-text-quiet"
-          aria-expanded={panel}
-          aria-controls={PANEL_ID}
-          onclick={() => {
-            u.prefs.setPanel(!panel);
-          }}
-        >
-          {panel ? say($lang, "talk_panel_hide") : say($lang, "talk_panel_show")}
-        </button>
-      </div>
-    {/if}
+<!-- One column, one box. The box is the same element in an empty room and
+in a full one: in an empty room it is lifted to the middle of the column
+with the room's name above it, and the first send lets it sink to its seat
+(client-SPEC 7I), so neither the words being typed nor an input method's
+composition is rebuilt on the way. -->
+<div class={["flex min-h-0 flex-col", band ? "" : "h-full"]} style:container-type={band ? undefined : "size"}>
+  {#if !band}
     <div
       bind:this={scroller}
-      class="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]"
+      class={[
+        "-mx-wide min-h-0 flex-1 overflow-y-auto px-wide [scrollbar-gutter:stable] [mask-image:linear-gradient(to_bottom,transparent_0,black_160px)] transition-opacity duration-300 ease-arrive",
+        runs.length === 0 ? "opacity-0" : "",
+      ]}
       onscroll={(event) => {
         anchoring = anchorAt({ kind: "scrolled", foot: footOf(event.currentTarget) });
       }}
     >
-      <!-- An empty room holds the greeting and the box in the middle of
-           the window, the way a chat page opens, because the first thing
-           asked of a person here is to say something and a composer
-           pinned to the foot of two thousand pixels of nothing reads as
-           broken (ux A4). It rides down to the bar on the first send. -->
-      <div
-        bind:this={column}
-        class={[
-          "mx-auto flex min-h-full w-full max-w-talk flex-col px-pane",
-          runs.length === 0 ? "justify-center pb-section" : "justify-end pt-wide pb-wide",
-        ]}
-      >
-        <!-- The page's own name, and it is always here: a reader
-             arriving by keyboard or by screen reader has something to
-             land on, and `theme.css` hangs the view transition off
-             `main h1`. Drawn as the heading of an empty room and read
-             out but not drawn once the thread is what the page is
-             about. -->
-        <h1
-          tabindex="-1"
-          class={runs.length === 0 ? "sr-only" : "mb-wide text-note text-text-faint"}
-        >
-          {isMayor ? say($lang, "talk_empty_mayor") : who}
-        </h1>
-        {#if !isMayor && runs.length === 0}
-          <p class="mb-wide text-center text-note text-text-faint">{address}</p>
-        {/if}
-        {#if runs.length === 0}
-          <div class="flex flex-col items-center gap-base text-center">
-            <p class="text-heading font-heading text-text">
-              {isMayor
-                ? say($lang, "talk_empty_mayor")
-                : fill(say($lang, "talk_empty_room"), { room: who })}
-            </p>
-            <p class="mb-base text-note text-text-quiet">
-              {isMayor
-                ? say($lang, "talk_opening_mayor")
-                : fill(say($lang, "talk_opening_room"), { room: who })}
-            </p>
-            <div class="w-full text-left">{@render composer()}</div>
-          </div>
-          <!-- The queue is drawn in an empty room too: "N waiting" links
-              to the mayor's room, which a person who only worked in a
-              building has never spoken in. -->
-          <Waiting />
-          <Inbox addr={address} />
-        {:else}
+      <div bind:this={column} class="flex min-h-full w-full flex-col justify-end pt-section pb-section">
+        {#if runs.length > 0}
           <div class="mb-base flex justify-end"><Showing /></div>
           {#if drawsCalls($held.showing)}
             <Divider {earlier} {who} boundary={story} onFork={doFork} onRetry={send} />
@@ -367,34 +317,41 @@
           {:else}
             <Stream {shown} {earlier} boundary={story} />
           {/if}
-          <Waiting />
-          <Inbox addr={address} />
         {/if}
+        <!-- The queue is drawn in an empty room too: "N waiting" links to
+        the mayor's room, which a person who only worked in a building has
+        never spoken in. -->
+        <Waiting />
+        <Inbox addr={address} />
       </div>
     </div>
-    {#if runs.length > 0}
-      <div class="relative mx-auto w-full max-w-talk px-pane pb-pane">
-        {#if story?.kind === "forked" && shown.length === 0}
-          <p class="mb-tight text-note text-text-faint" role="status">
-            {fill(say($lang, "fork_pending"), { turn: String(story.turn) })}
-          </p>
-        {/if}
-        {#key story}
-          {@render composer()}
-        {/key}
-        {#if picking && answer !== undefined}
-          <Forking
-            rounds={answer}
-            onFork={doFork}
-            onClose={() => {
-              picking = false;
-            }}
-          />
-        {/if}
+  {/if}
+  <div
+    class="relative shrink-0 transition-transform duration-500 ease-arrive"
+    style:transform={!band && runs.length === 0 ? "translateY(calc(-50cqh + 50% + var(--spacing-margin)))" : undefined}
+  >
+    {#if !band && runs.length === 0}
+      <div class="absolute inset-x-0 bottom-full mb-wide text-center">
+        <p class="text-title font-title text-text">{isMayor ? say($lang, "talk_empty_mayor") : who}</p>
+        <p class="text-note text-text-faint">{address}</p>
       </div>
     {/if}
+    {#if story?.kind === "forked" && shown.length === 0}
+      <p class="mb-tight text-note text-text-faint" role="status">
+        {fill(say($lang, "fork_pending"), { turn: String(story.turn) })}
+      </p>
+    {/if}
+    {#key story}
+      {@render composer()}
+    {/key}
+    {#if picking && answer !== undefined}
+      <Forking
+        rounds={answer}
+        onFork={doFork}
+        onClose={() => {
+          picking = false;
+        }}
+      />
+    {/if}
   </div>
-  {#if produced}
-    <Artifact artifacts={artifacts} open={panel} />
-  {/if}
 </div>

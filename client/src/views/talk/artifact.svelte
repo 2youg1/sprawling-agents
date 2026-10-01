@@ -209,12 +209,7 @@
 <aside
   id={PANEL_ID}
   aria-label={say($lang, "talk_panel")}
-  class={[
-    "group flex max-h-output min-h-0 w-full flex-col overflow-hidden border-t border-edge bg-chrome",
-    "@lg/page:max-h-none @lg/page:w-tree @lg/page:shrink-0 @lg/page:border-t-0 @lg/page:border-l",
-    "@wide/page:max-w-measure @wide/page:flex-1",
-    !open && "hidden",
-  ]}
+  class={["group flex h-full min-h-0 w-full flex-col overflow-hidden bg-chrome", !open && "hidden"]}
 >
   <!-- The head names the subject of the body, and takes the shell's one
        bar height rather than a second nearly-equal number of its own. -->

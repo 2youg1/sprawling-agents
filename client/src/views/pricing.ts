@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // What one `CostAnswer` lets a page say. `cost.svelte` draws the whole
-// answer and `facts.svelte` draws two figures out of it, and both have
-// to tell the same three situations apart: nothing has run, a provider
+// answer and the panorama sheet draws two figures out of it, and both
+// have to tell the same three situations apart: nothing has run, a provider
 // priced what ran, and calls ran that no provider priced. The fold
 // lives here so the two pages cannot answer that question differently.
 

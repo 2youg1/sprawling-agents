@@ -4674,5 +4674,77 @@
   "recover_e_plan_missing": {
     "en": "Ask the Mayor to write a plan for this goal in the building's Roadmap.md.",
     "zh": "请市长在这栋楼的 Roadmap.md 里为这个目标写一份计划。"
+  },
+  "tier_zen": {
+    "en": "zen",
+    "zh": "专注"
+  },
+  "tier_blend": {
+    "en": "blend",
+    "zh": "混合"
+  },
+  "tier_panorama": {
+    "en": "panorama",
+    "zh": "检阅"
+  },
+  "region_edge": {
+    "en": "edge keys",
+    "zh": "边缘键"
+  },
+  "region_conversation": {
+    "en": "the conversation",
+    "zh": "对话"
+  },
+  "world_sessions": {
+    "en": "sessions",
+    "zh": "会话"
+  },
+  "world_commits": {
+    "en": "commits",
+    "zh": "提交"
+  },
+  "world_session": {
+    "en": "the chosen session",
+    "zh": "所选会话"
+  },
+  "world_waiting": {
+    "en": "waiting for you",
+    "zh": "等你"
+  },
+  "world_frozen": {
+    "en": "frozen",
+    "zh": "已冻结"
+  },
+  "world_running": {
+    "en": "running",
+    "zh": "运行中"
+  },
+  "world_session_pending": {
+    "en": "This session's instruments and timeline appear once the wire carries their figures.",
+    "zh": "这个会话的仪表与时间轴，等线协议带上它们的数字后出现。"
+  },
+  "world_open_run": {
+    "en": "open the run",
+    "zh": "打开 run 页"
+  },
+  "ring_used": {
+    "en": "{used} / {window}",
+    "zh": "{used} / {window}"
+  },
+  "ring_share": {
+    "en": "{n}% used",
+    "zh": "已用 {n}%"
+  },
+  "ring_first": {
+    "en": "reminder at {n}%",
+    "zh": "提醒 {n}%"
+  },
+  "ring_second": {
+    "en": "handoff at {n}%",
+    "zh": "交接 {n}%"
+  },
+  "ring_name": {
+    "en": "context",
+    "zh": "上下文"
   }
 }

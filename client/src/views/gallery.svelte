@@ -50,6 +50,7 @@
   import Streamed from "./gallery/streamed.svelte";
   import Screens from "./gallery/screens.svelte";
   import Settings from "./gallery/settings.svelte";
+  import Shell from "./gallery/shell.svelte";
   import Shelved from "./gallery/shelved.svelte";
   import Switches from "./gallery/switches.svelte";
   import Talking from "./gallery/talking.svelte";
@@ -82,6 +83,7 @@
   <h1 class="mb-wide text-heading text-text">{say($lang, "gallery_title")}</h1>
   <Hints />
   <FirstRun />
+  <Shell />
   <Presences />
   <Conversation />
   <RefusedLine />
