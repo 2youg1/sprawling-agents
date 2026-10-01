@@ -489,7 +489,7 @@ fn failed(answer: &ToolAnswer) -> Result<&Map<String, Value>, String> {
 }
 
 /// The `text` field of a call that answered.
-fn answered_text(answer: &ToolAnswer) -> Result<&str, String> {
+pub(crate) fn answered_text(answer: &ToolAnswer) -> Result<&str, String> {
     answered(answer)?
         .get("text")
         .and_then(Value::as_str)
@@ -507,7 +507,7 @@ const HEARD: &str = "fire the kiln at dawn";
 const EARS: &str = "whisper-1";
 
 /// Rules for the lab that leave it open and writing where it works.
-const OPEN_LAB: &str = "confidential = false\nwrite = \"everything\"\n";
+pub(crate) const OPEN_LAB: &str = "confidential = false\nwrite = \"everything\"\n";
 
 #[test]
 fn a_run_hears_a_recording_through_the_endpoint_chosen_to_transcribe() {
@@ -518,7 +518,7 @@ fn a_run_hears_a_recording_through_the_endpoint_chosen_to_transcribe() {
         args: json!({ "path": format!("{}/voice.wav", LAB.room) }),
     }]);
     let (mut worker, ledger) = crate::city::city_with_a_model(dir.path(), factory);
-    choose_to_transcribe(&mut worker, &url);
+    choose(&mut worker, &url, kernel::ModelTag::Transcribe, EARS);
     crate::city::raise(&mut worker, LAB.building, "minimal");
     crate::city::rules(dir.path(), LAB.building, OPEN_LAB);
     crate::city::move_in(dir.path(), LAB.room);
@@ -565,7 +565,12 @@ fn a_confidential_building_is_not_offered_a_transcription_endpoint_off_this_mach
     let (mut worker, _) = crate::city::city_with_a_model(dir.path(), factory);
     // A name that never resolves (RFC 2606): not this machine, and the
     // model list attaching it asks for fails at once.
-    choose_to_transcribe(&mut worker, "http://transcribe.invalid/v1");
+    choose(
+        &mut worker,
+        "http://transcribe.invalid/v1",
+        kernel::ModelTag::Transcribe,
+        EARS,
+    );
     crate::city::raise(&mut worker, LAB.building, "minimal");
     crate::city::rules(
         dir.path(),
@@ -587,10 +592,77 @@ fn a_confidential_building_is_not_offered_a_transcription_endpoint_off_this_mach
     );
 }
 
-/// Attaches an endpoint at `base_url` and chooses its one model to
-/// transcribe, as a person does on the settings page.
-fn choose_to_transcribe(worker: &mut accounting::worker::RunWorker, base_url: &str) {
-    let endpoint = wire::ProviderName::parse("ears").unwrap();
+/// A recording a connector stored: a wav block put into the city's
+/// content store for the lab, the way `runtime::pipeline::connector`
+/// stores one, named by its locator.
+const STORED: &[u8] = b"RIFF\x24\x00\x00\x00WAVEfmt a stored recording";
+
+/// The transcription tool reads a block a connector stored, by the
+/// locator the window showed for it (sprawling-SPEC.md 8-131): no name,
+/// so the container is read from its leading bytes.
+#[test]
+fn a_run_hears_a_recording_a_connector_stored_by_its_locator() {
+    let dir = tempfile::tempdir().unwrap();
+    let (url, served) = transcription_endpoint();
+    let locator = format!("cas:b3-{}", kernel::B3Hash::digest(STORED));
+    let (factory, _, _) = crate::script::scripted(vec![Step {
+        tool: "transcribe",
+        args: json!({ "path": locator }),
+    }]);
+    let (mut worker, ledger) = crate::city::city_with_a_model(dir.path(), factory);
+    choose(&mut worker, &url, kernel::ModelTag::Transcribe, EARS);
+    crate::city::raise(&mut worker, LAB.building, "minimal");
+    crate::city::rules(dir.path(), LAB.building, OPEN_LAB);
+    crate::city::move_in(dir.path(), LAB.room);
+    stored_for(dir.path(), LAB.building, STORED);
+
+    let dispatched = crate::city::dispatch(&mut worker, LAB.room);
+
+    let history = History::read(&ledger);
+    let lead = history.started().first().map(|started| started.run);
+    let calls = lead.map(|run| history.calls_of(run)).unwrap_or_default();
+    let heard = calls
+        .iter()
+        .find(|call| call.called.name.as_str() == "transcribe")
+        .and_then(|call| call.results.first())
+        .map(|result| answered_text(&result.answer));
+    assert_eq!(
+        heard,
+        Some(Ok(HEARD)),
+        "the dispatch answered {dispatched:?}"
+    );
+    let request = served.join().unwrap();
+    assert!(
+        request.contains("filename=\"recording.wav\"") && request.contains("a stored recording"),
+        "{request}"
+    );
+}
+
+/// Puts `bytes` into the city's content store for `building`, as a
+/// connector stores what a run's tool answered with, and names the run
+/// the city's own: who stored a block does not decide who may read it.
+pub(crate) fn stored_for(city: &Path, building: &str, bytes: &[u8]) -> kernel::B3Hash {
+    storage::Cas::open(&kernel::layout::CityLayout::new(city).cas())
+        .unwrap()
+        .put_for(
+            bytes,
+            &storage::BlockOrigin {
+                run: RunId::CITY,
+                building: address(building),
+            },
+        )
+        .unwrap()
+}
+
+/// Attaches an endpoint at `base_url` and chooses its one model, `model`,
+/// for `tag`, as a person does on the settings page.
+pub(crate) fn choose(
+    worker: &mut accounting::worker::RunWorker,
+    base_url: &str,
+    tag: kernel::ModelTag,
+    model: &str,
+) {
+    let endpoint = wire::ProviderName::parse(tag.as_str()).unwrap();
     let idem = |what: &[u8]| kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, what);
     worker
         .handle(wire::Command::AttachEndpoint {
@@ -599,7 +671,7 @@ fn choose_to_transcribe(worker: &mut accounting::worker::RunWorker, base_url: &s
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
             auth_header: None,
-            admit: vec![EARS.to_owned()],
+            admit: vec![model.to_owned()],
             // One brief try, so an endpoint that is not there fails the
             // model list at once rather than retrying into it.
             tuning: wire::EndpointTuning {
@@ -607,17 +679,17 @@ fn choose_to_transcribe(worker: &mut accounting::worker::RunWorker, base_url: &s
                 request_max_retries: Some(0),
                 ..wire::EndpointTuning::default()
             },
-            idem: idem(b"attach ears"),
+            idem: idem(format!("attach {tag}").as_bytes()),
         })
         .unwrap();
     worker
         .handle(wire::Command::SelectModel {
             endpoint,
-            model: EARS.to_owned(),
-            tag: kernel::ModelTag::Transcribe,
+            model: model.to_owned(),
+            tag,
             context_tokens: kernel::Window::new(131_072),
             max_output_tokens: kernel::Ceiling::new(4_096),
-            idem: idem(b"select ears"),
+            idem: idem(format!("select {tag}").as_bytes()),
         })
         .unwrap();
 }
@@ -656,7 +728,7 @@ fn transcription_endpoint() -> (String, std::thread::JoinHandle<String>) {
 }
 
 /// One HTTP request: its head, then as many body bytes as it declared.
-fn read_request(stream: &mut std::net::TcpStream) -> String {
+pub(crate) fn read_request(stream: &mut std::net::TcpStream) -> String {
     use std::io::Read as _;
     let mut seen = Vec::new();
     let mut chunk = [0u8; 4096];

@@ -26,6 +26,7 @@ mod catalogue;
 mod city;
 mod crash;
 mod episodes;
+mod ocr;
 mod playback;
 mod script;
 mod shelf_outside;
