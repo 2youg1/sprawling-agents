@@ -4,7 +4,7 @@
 
 [![npm](https://img.shields.io/npm/v/sprawling?logo=npm&labelColor=171717&color=CB3837)](https://www.npmjs.com/package/sprawling)[![License](https://img.shields.io/github/license/2youg1/sprawling-agents?labelColor=171717&color=4C8BF5)](LICENSE)[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/2youg1/sprawling-agents)[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat-square&color=00b0aa&labelColor=000000)](https://zread.ai/2youg1/sprawling-agents)
 
-> **状态：pre-alpha，研究与开发中。** 主回路是通的：在浏览器里注册一个 provider、盖一栋楼、派一件活，模型会调用工具并把文件写进那栋楼。多个 Agent 各在各的房间里开工；同一栋楼的几轮活可以同时跑，而写进 Ledger 的只有一条记账线程。还没做到的写在[现在能做什么、还不能做什么](#现在能做什么还不能做什么)那一节，把真活交给它之前请先读。
+> **状态：<!-- xtask:begin maturity:word -->pre-alpha<!-- xtask:end -->，研究与开发中。** 主回路是通的：在浏览器里注册一个 provider、盖一栋楼、派一件活，模型会调用工具并把文件写进那栋楼。多个 Agent 各在各的房间里开工；同一栋楼的几轮活可以同时跑，而写进 Ledger 的只有一条记账线程。还没做到的写在[现在能做什么、还不能做什么](#现在能做什么还不能做什么)那一节，把真活交给它之前请先读。
 >
 > English: [README.md](README.md) · 给从外面驱动一座城的 Agent 看的：[LLM.md](LLM.md) · 想改代码：[AGENTS.md](AGENTS.md)
 

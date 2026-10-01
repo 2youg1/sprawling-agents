@@ -1,31 +1,33 @@
 # Changelog
 
-Every release is a tag of the form `v<version>-Pre-alpha-<YYMMDD>`. The date is
-part of the name because a pre-alpha version number says almost nothing about
-how old the tree is, and how old the tree is, is what a reader of a pre-alpha
-release most needs to know. A section written before its release is cut is
-headed by the version the workspace manifest carries and the release's name,
-and takes its tag when the release is cut.
+Every release is a tag of the form `v<version>-<maturity>-<YYMMDD>`, and the
+releases this tree cuts are <!-- xtask:begin maturity:word -->pre-alpha<!-- xtask:end -->; `kernel::release::MATURITY`
+is the one place that is decided. The date is part of the name because an
+early version number says almost nothing about how old the tree is, and how
+old the tree is, is what a reader of an early release most needs to know. A
+section written before its release is cut is headed by the version the
+workspace manifest carries and the release's name, and takes its tag when the
+release is cut.
 
 Each entry records what changed. A wall-clock figure names the class of
 machine that produced it, because the same figure from a busier or slower
-machine is a different reading, not a regression; wall-clock figures are
-readings and never gates. Byte counts are gated, because a byte count does not
-depend on how busy the machine was.
+machine is a different reading, not a regression. Wall-clock figures and byte
+counts are both readings and never gates, because a faster binary that is
+larger is the better binary.
 
 The three releases before this file existed are reconstructed here from their
 release notes and their commits.
 
 ---
 
-## v0.0.8-Pre-alpha (not yet cut)
+## v<!-- xtask:begin workspace_version -->0.0.8<!-- xtask:end -->-<!-- xtask:begin maturity:titled -->Pre-alpha<!-- xtask:end --> (not yet cut)
 
-**sprawling 0.0.8 something (pre-alpha)**
+**sprawling <!-- xtask:begin workspace_version -->0.0.8<!-- xtask:end --> something (<!-- xtask:begin maturity:word -->pre-alpha<!-- xtask:end -->)**
 
-Pre-alpha. It records what has landed after `v0.0.7-Pre-alpha-260927` so
-far. Every wire change below shares one `WIRE_V`: the version moved once, at
-the first change of shape after the last push, and moves again only after the
-next push (wire-SPEC 12.1).
+<!-- xtask:begin maturity:titled -->Pre-alpha<!-- xtask:end -->. It records what has landed after `v0.0.7-Pre-alpha-260927` so
+far. WIRE_V <!-- xtask:begin wire_v -->45<!-- xtask:end -->. Every wire change below shares that one `WIRE_V`: the
+version moved once, at the first change of shape after the last push, and
+moves again only after the next push (wire-SPEC 12.1).
 
 ### What the city calls the person and the Mayor
 
@@ -97,12 +99,12 @@ them.
 
 ---
 
-## v<!-- xtask:begin workspace_version -->0.0.7<!-- xtask:end -->-Pre-alpha-260927
+## v0.0.7-Pre-alpha-260927
 
 **sprawling 0.0.7 citior (pre-alpha)**
 
 Pre-alpha. It records what landed in the repository after
-`v0.0.6-Pre-alpha-260922`. WIRE_V <!-- xtask:begin wire_v -->45<!-- xtask:end -->.
+`v0.0.6-Pre-alpha-260922`. WIRE_V 45.
 
 This section quotes no wall-clock figure. The measurements that would price
 this release's changes are taken after it, so the entries below say what the
