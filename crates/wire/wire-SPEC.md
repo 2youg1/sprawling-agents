@@ -474,6 +474,16 @@ WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionN
 
 **重开参数**：运行策略多出一个只有部分派活才需要的值时，重议那个值要不要缺省。
 
+### 12.5 身份卡片的改写在城里做，页面只交值
+
+**决定**：身份卡片发 `PutIdentity { card, base }`，由 `city::Naming` 在 `base` 上改写身份区并整份落盘；原文编辑器发 `PutDocument { which, base, body }`，城在落盘之前用同一个解析器读一遍身份区（§8-59）。
+
+**理由**：身份区是 TOML，`PREFERENCES.md` 与 `MAYOR.md` 里还有人写的未知键与正文。页面若自己拼整份文件，「身份区怎么写、保留什么、名字合法与否」在 TypeScript 与 Rust 各有一份，两份迟早不一致，而写坏的一份会让下一次开城读不出名字。卡片只交值，拼法就只有城一处；两条命令携同一种 `base`，所以并发保存只有一条规则：后到的那一个被拒。
+
+**被否**：①页面拼出整份文本，只用 `PutDocument`：拼法有第二个家；②卡片带一个版本号而不是全文作 `base`：城要另存版本到全文的对应，而 `PutSpine` 已经用全文作基线，两种基线会让同一个页面写两种守卫。
+
+**重开参数**：身份区长出页面要分块编辑的结构（例如多个账号各一张卡）时，重议卡片是否改为按键寻址。
+
 ## 13 依赖选型
 
 | 依赖 | 用途 | 依据与替代 |
@@ -616,7 +626,7 @@ Dispatch { addr, task, goal, policy, idem, session, effort }   // 删去 budget:
 
 ```rust
 // Command（第 24 条）
-PutDocument { which: GovernedDocument, body: String, idem: IdemKey }
+PutDocument { which: GovernedDocument, base: String, body: String, idem: IdemKey }
 pub enum GovernedDocument { Mayor, Clerk, Preferences }
 
 // Query（第 16 条）
@@ -637,7 +647,7 @@ pub struct Decision {
 - **三份文件一条命令，不是三条**：`MAYOR.md`／`CLERK.md`／`PREFERENCES.md` 都住 `<city>/.sprawling/`（没有任何写域够得到的地方），三者的写法逐字节相同，差别只在文件名。用穷尽枚举而不是路径串：**路径由城决定，不由发帧的人决定**，否则这条命令就成了往保留子树里写任意文件的入口。
 - **`Preferences` 是第三份**：市长与文书各有身份文件，而「这个人怎么喜欢这座城办事」不属于其中任何一个居民，它属于城。它与前两者同住一处、同一条命令写，因为它们被同一条规则治理：住在保留子树里，居民读得到、改不了。
 - **`decided` 回答的是「你不在的时候，有谁替你答了什么」**：`approval_resolved` 折出来的流，旧在前——与 `HistoryAnswer` 同口径，因为折叠期待这个顺序。它**不筛掉人自己答的那些**：一份只列代答的清单，会让「我答过」与「从没人答」在界面上长得一样。谁答的写在 `autonomy` 里，那是同一次读的另一半。
-- **`PutDocument` 不携版本**：这三份文件没有并发写入者——只有人写，而人一次只按一次保存。`edit` 工具的乐观并发管的是居民之间抢同一个文件，这里没有那回事。
+- **`PutDocument` 携 `base`**：三份文件有两个写者——原文编辑器与身份卡片，或者开在两处的两个页面——所以一次保存说明它起手时的全文，文件已经变了就拒，什么都不写（§8-59）。`edit` 工具碰不到这三份文件，居民不是它们的写者。
 - **被否**：（a）三条命令 `PutMayor`／`PutClerk`／`PutPreferences`——同一条规则三个入口，加第四份文件要改三处；（b）复用 `edit` 工具——`edit` 走写域，而写域恒不含保留子树，让它开一个例外就是把「居民改不了治自己的东西」这条最老的规矩打穿。
 
 ### 8-20 一段补丁是它自己的一次请求
@@ -1616,6 +1626,42 @@ Dispatch { addr, task, goal, policy: kernel::RunPolicy, idem, session, effort, m
 - **账上读得到**：装配层把收到的策略原样写进这次 run 的 `run_started.policy`，所以一次派活选了什么，回放与 playback 从账本读，不从线上猜。
 - **`WIRE_V` 不另进位**：`Dispatch` 的名字没变而形状变了，这正是 §12.1 说的改形，与本批其余改形共用 45。
 
+### 8-59 身份的线面：读名字，带基线写，读回当时冻下的那一版
+
+```rust
+// Command
+PutDocument { which: GovernedDocument, base: String, body: String, idem: IdemKey }
+PutIdentity { card: IdentityCard, base: String, idem: IdemKey }
+pub enum IdentityCard {
+    Person { user_id: Option<String>, imported_from: Option<String>, about: Option<String> }, // 写 PREFERENCES.md
+    Mayor { name: Option<String> },                                                         // 写 MAYOR.md
+}
+// Query
+Identity,                                  // → Answer::Identity(Box<IdentityAnswer>)
+pub enum IdentityAnswer {
+    Stated(StatedIdentity),
+    Unreadable { document: GovernedDocument, line: u32, why: String },
+}
+pub struct StatedIdentity {
+    pub user_id: Option<String>,           // 城怎么称呼这个人；缺席时页面用语言表里的「你」
+    pub imported_from: Option<String>,     // user_id 是从哪台主机的 gh 导入的；手填为 None
+    pub about: String,                     // PREFERENCES.md 身份区之后的正文
+    pub mayor: Option<String>,             // 主 Agent 的显示名；缺席时页面用语言表里的默认名
+    pub version: B3Hash,                   // 新 session 会冻下的那一版（city-SPEC §8-33）
+    pub preferences_text: String,          // 两份文件此刻的全文：保存时的 base
+    pub mayor_text: String,
+}
+```
+
+- **两份文件，一个身份区。** 用户 ID、导入来源与「关于你」住 `PREFERENCES.md`，主 Agent 的名字住 `MAYOR.md`；身份区的语法、名字的合法域与「一个 session 冻下哪一版」都由 `city::Naming` 一处回答（city-SPEC §8-33），本 crate 只携字符串，不判它们合法与否（§8-0 同一条理由）。
+- **卡片只写自己那几个键，其余原样。** `PutIdentity` 把卡上的值交给城，由城在 `base` 上改写身份区：卡上的键写入或删去（`None` 即删去，回到默认称呼），身份区里别的键、`about` 为 `None` 时的正文，都按 `base` 里的字节留着。页面不拼 TOML：拼身份区的只有城一处，表单与原文编辑器读到的是同一份解析结果（§12.5）。
+- **两个写者，一道守卫。** 原文编辑器发 `PutDocument`，卡片发 `PutIdentity`，两者都携 `base`——发信方起手时那份全文——文件已经变了就拒 `E_VERSION_CONFLICT`，什么都不写；人的草稿留在页面上，页面重读之后再发。`MAYOR.md` 与 `PREFERENCES.md` 的身份区读不出时（重复的键、没有闭合的 `+++`、名字为空或带控制字符），`PutDocument` 在落盘之前拒 `E_CONFIG_INVALID`，拒因里有行号；`CLERK.md` 没有身份区，只经基线守卫。
+- **回执是账本行。** 两条命令都写一行 `governed_document_written`，`naming` 键是写完之后城的身份版本（kernel-SPEC §8-79）；页面发出之后只显示「保存中」，见到这一行才显示「已保存」，并以它判断自己读到的 `version` 是否已经过时。
+- **读的是此刻，跑的是冻下的那一版。** `Query::Identity` 每次从盘上读，所以页面显示的总是新 session 将要冻下的名字。已经开始的 session 用它第一次 run 冻下的版本（accounting-SPEC §8-15）；那一版记在每次 run 的 `run_started.naming` 上，页面拿它经 `Query::Content { locator: cas:<naming> }` 读回当时的名字。旧账本没有这个键，页面就显示地址或语言表里的角色名，不拿今天的名字冒充当时的。
+- **读不出就说在哪一行。** 身份区读不出时答 `Unreadable`：哪一份文件、第几行（从文件第一行数起）、为什么。页面据此打开原文编辑器，而不是画一个默认名字再让下一次保存把人的正文盖掉。
+- **`WIRE_V` 不另进位**：`PutDocument` 加 `base` 是名字不变的改形，与本批其余改形共用 45（§12.1）；`PutIdentity`、`Identity` 是新名字，哈希自己会变。
+- 验收：city 的 `a_stale_identity_save_is_refused_and_the_draft_survives`（基线过期被拒、文件不变）；accounting 的 `a_new_session_freezes_the_name_the_page_shows`（实际发出的请求上下文与 `Query::Identity` 的答面同名同版本，旧 session 不改名，`/new` 之后两边一起换）。
+
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 
 **这张表存在的理由，是一次已经发生过的失效。** v0.0.3 的审计发现 `accounting::worker::run_command` 只匹配 22 个 Command 里的 14 个，
@@ -1664,7 +1710,8 @@ Dispatch { addr, task, goal, policy: kernel::RunPolicy, idem, session, effort, m
 | `PutPreferences` | client | 写这个人自己的 `~/.sprawling/config.toml` 的 `[ui]` |
 | `PutShelved` | client | 写一份上架的文档（技能或说明） |
 | `Pursue` | client | 设一个持续追的目标，以及暂停／恢复／清除 |
-| `PutDocument` | client | 写治理这座城的三份文件之一 |
+| `PutDocument` | client | 写治理这座城的三份文件之一，携 `base`（§8-59） |
+| `PutIdentity` | client | 写身份卡：城在 `base` 上改写 `PREFERENCES.md` 或 `MAYOR.md` 的身份区（§8-59） |
 | `BatchByBuilding` | client | 按楼成批派活 |
 | `Wake` | push | 外面发生了一件事；地址由 watch 表与 triage 决定，调用方说不出房间 |
 | `Auth` | handshake | 出示配对令牌，`server::decide_handshake` 吃掉它 |

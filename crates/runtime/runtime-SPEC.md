@@ -664,6 +664,15 @@ pub struct ExecSetup { /* …既有字段… */ pub limit: kernel::WriteLimit }
 - **链接**：写目标与它到城根之间的每一级若是链接（符号链接、junction、硬链接），`WriteTarget::within` 字面拒（storage-SPEC 8-25），两种限制下一样，所以经链接改旧文件这条路在 `Create` 下同样不通。
 - 验收：集成测试 `crates/runtime/tests/create_limit.rs` 的 `an_existing_file_is_unchanged_under_create_by_edit_exec_and_link`：`Create` 下对一个已有文件的 edit 改写、host 上一条改它的 shell 命令、在指向它的链接名上新建，三者都拒，文件字节不变；storage 的 `two_racing_creates_admit_one`。
 
+### 8-56 一次 run 记下它冻下的身份版本（`runtime::run`、`runtime::run::charter`，形状 2 值类型）
+
+```rust
+pub struct RunPlan { /* …既有字段… */ pub naming: Option<B3Hash> }
+```
+
+- **照录，不读。** 身份由 accounting 在冻结前缀时按 session 取定（accounting-SPEC §8-15、city-SPEC §8-33），名字已经在 city 段与 resident 段的字节里；本 crate 只把那一版的摘要从 `RunPlan.naming` 抄进 `run_started.naming`（kernel-SPEC §8-79），由 `Charter::open` 与运行策略同一处写。`None` 是这座城的这次 run 没有冻任何身份（测试替身、早于身份入账的构造方）。
+- 被否：让 runtime 读两份治理文档自己算摘要——run 开始的那一刻读到的未必是前缀冻下的那一版，账上的摘要会与请求里的名字不符。
+
 ### 8-13 runtime::sandbox（缝清单文件，形状 3＋4）
 
 ```rust
@@ -964,6 +973,7 @@ pub struct RunPlan {                 // 一个 Run 的全部常量，调用方�
     pub prefix: FrozenPrefix, pub policy: BuildingPolicy, pub tools: Vec<ToolDef>,
     pub skills: Vec<SkillPin>,                            // 阅览室准进了什么，当时各是什么字节
     pub retries: Retries,                                 // 人在端点上设的重试上限（§8-9）
+    pub naming: Option<B3Hash>,                           // 这次 run 的 session 冻下的身份版本（§8-56）
 }
 ```
 

@@ -433,7 +433,8 @@ pub mod autonomy_word {                          // owner | delegate:<resident>
     pub fn spell(autonomy: &Autonomy) -> String;
     pub fn read(word: &str) -> Result<Autonomy, AxError>;
 }
-pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize }
+pub struct GovernedDocumentWritten { pub which: String, pub bytes: usize,
+                                     pub naming: Option<B3Hash> }        // §8-79
 pub struct RulesChanged { pub scope: Scope, pub which: GoverningDocument,
                           pub before: Option<B3Hash>, pub after: B3Hash, pub bytes: usize }
 pub enum GoverningDocument { Rules, Config }     // serde: "RULES.toml" | "CONFIG.toml"
@@ -2394,3 +2395,25 @@ pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome;   // kerne
 - **`gate::replacing` 是「这次写会动到已有文件」时的唯一判定**：`Full` 答 `Allow`；`Create` 答 `Deny`，`E_OUTSIDE_WRITE_DOMAIN` 三段式，规则「this run creates files and changes none」，违规点出目标，替代给出「写到一个新路径」，恢复语说限制由派活时选定、换一次派活才能改。复用既有的码而不新开一个：对调用者而言这与写域外的拒绝是同一类事——这次 run 不准写那里——恢复的路也同类。
 - **「目标是否已经存在」不由本模块判。** 那是文件系统在写那一刻的事实；只有在写的那一刻原子地判，竞争的两次新建才只成一次（runtime-SPEC §8-55，storage-SPEC §8-32）。kernel 只持规则与拒词，判定点在每一条写路径上调它。
 - 验收：`gate::domain` 测试里 `Create` 拒、`Full` 放各一条；真实写路径上的验收在 runtime-SPEC §8-55。
+
+### 8-79 身份的两处入账：保存的回执与一次 run 冻下的那一版（`kernel::event::record`，形状 2 值类型）
+
+```rust
+pub struct GovernedDocumentWritten {
+    pub which: String,
+    pub bytes: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub naming: Option<B3Hash>,     // 写完之后城的身份版本；写 CLERK.md 与旧行为 None
+}
+pub struct RunStarted {
+    // …既有字段…
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub naming: Option<B3Hash>,     // 这次 run 的 session 冻下的身份版本（city-SPEC §8-33）
+}
+```
+
+- **两个键都只是摘要。** 身份本身——名字与「关于你」——在两份治理文档里，冻下的那一版在内容库里，摘要是读回它的钥匙（`cas:<naming>`）。账本不抄名字：名字是人改的字，抄进不可删的历史就有了第二个家，而人删掉的一段「关于你」会永远留在那里。
+- **回执。** 写 `MAYOR.md` 或 `PREFERENCES.md`（`PutDocument`、`PutIdentity`）之后的那一行带上新的身份版本，页面见到它才把卡片标为已保存（wire-SPEC §8-59）。写 `CLERK.md` 不动身份，键缺席。
+- **一次 run 用的是哪一版。** `run_started.naming` 由 `runtime::run::Charter::open` 从 `RunPlan.naming` 照录（runtime-SPEC §8-56）。旧行没有这个键，读作「这一行早于身份入账」，页面回退到地址或角色名，不用今天的名字。
+- 两个键都按 `default` 加、缺席不写，所以旧账本照读，旧构建读新行时把它们当未知键拒（§8-40 的方向门照旧）。
+- 验收：`record::run` 的 `a_run_started_line_records_the_naming_it_froze`（写出、读回、缺席不写）。

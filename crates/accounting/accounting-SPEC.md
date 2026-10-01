@@ -572,6 +572,14 @@ pub enum Reader { Person(Confidential), Resident(Address) }
 
 **给后续阶段的接口。** HTML 的分项 check（结构、静态离线、浏览器观察）读同一份 `Bundle::bytes` 与 `check`，不另写 schema；skill 的 schema 说明由 `playback::document` 生成或核对。居民入口传 `Reader::Resident(楼)`，它的写门与文件寿命在布局 owner 的规格里定。时间筛选与 `Selection` 同处；checkpoint 之间的 diff 与调用归属在 `CommitAnswer.previous`/`parents` 与调用归属进入 kernel 之后加段，加段时 `PROJECTION_RULES` 进一位。
 
+### 8-15 页面要的几样新东西，从哪一处答（`accounting::views::answering`、`accounting::worker::commanding`、`accounting::worker::freezing`）
+
+**身份。** `Query::Identity` 在锁外读两份治理文档（`city::read_naming`），答 `StatedIdentity` 或带行号的 `Unreadable`（wire-SPEC §8-59）。`PutDocument` 与 `PutIdentity` 由 `commanding::governing` 执行：先经 `city` 带基线落盘，再写一行 `governed_document_written`，写 `MAYOR.md`／`PREFERENCES.md` 时 `naming` 是落盘之后此刻的身份版本。
+
+**一个 session 冻一版身份**（`worker::freezing::naming`）。冻前缀时先看房间这一层有没有 `[identity] version`：有，就从内容库读回那一版（读不回即拒 `E_STORAGE_FATAL`，不悄悄换成此刻的名字）；没有，就读此刻的身份，放进内容库，写进房间这一层。city 段是 `City.md` 之后接 `Naming::context()`，resident 段对 `hall/mayor` 以冻下的名字开头，`RunPlan.naming` 是那一版的摘要。所以同一个 session 的每次 run 请求里的名字一样，`/new` 之后的第一次 run 换成此刻的名字，页面经 `run_started.naming` 读回的是请求里真正用的那一版。
+
+- 验收：`worker::freezing::tests::naming` 的 `a_new_session_freezes_the_name_the_page_shows`。
+
 ## 12 决策
 
 1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只用 `gateway` 的接口类型，不构造适配器。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。`GatewayModels` 在 worker 搬进来时一同搬进本 crate，理由见 §12-18；本条对 `SystemClock`、`ThisMachine` 这样直接碰主机的生产适配器仍然成立。
@@ -605,3 +613,4 @@ pub enum Reader { Person(Confidential), Resident(Address) }
     (e) PR 的关键时刻键是 `<branch>@<pr_opened 的 seq>`，关闭行关掉同一分支最近打开的那一个。理由：请求在账本上的身份就是分支（`collab::OpenRequest`），同一分支会重开；只用分支作键会把两次请求并成一个。被否决的做法：只用分支。
     (f) `checkpoints` 只列 `checkpoint_committed`，经 kernel 的 `CheckpointCommitted` 类型读，分开 `JobPinned` 与 `Committed`。理由：识别「哪些行点名一个提交」的权威是 `accounting::views::commits::commit_facts`，它在 `views` 里是 `pub(super)`，而 `views` 另有改动正在进行；在这里再写一遍会成为第二个权威。`pr_merged` 的提交由 §3 记下的那一步补上。被否决的做法：抄一份 `commit_facts`。
     (g) 人的入口在 `Confidential::Withheld` 时按楼的规则取三臂，而不调 `may_read`。理由：`may_read` 要一个读者所在的楼，人不住在任何一栋楼里；为了调它而编一栋楼，会让「人的楼」成为一个不存在的地址。三臂的类型仍是 `kernel::ReadVerdict`，居民入口仍调 `may_read`。被否决的做法：给人编一个地址。
+27. **一个 session 的身份冻在房间那一层，读回失败就拒，不换成此刻的名字。** 理由：session 的形状（模型、强度）已经记在房间那一层，`/new` 清的也是它，身份跟着同一个边界就不需要另一条「何时重读身份」的规则（city-SPEC §12.11）；读不回冻下的那一版时换成此刻的名字，等于在 session 中途悄悄改名，而这正是冻结要防的。被否决的做法：每次 run 现读身份——改名立刻改掉正在进行的 session 的前缀，provider 的前缀缓存从 city 段起失效，页面上的旧 session 与请求里的名字也对不上。
