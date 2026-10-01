@@ -144,34 +144,35 @@ impl TailStart {
 impl ProofRecords {
     /// Where checking `bytes`, the last segment `segment` entered at
     /// `entry`, begins: after the prefix its record proves when the record
-    /// stands for it (`SegmentRecord::reused`), and at the first byte
-    /// otherwise. The bytes hashed are the bytes then checked: one read.
+    /// stands for it (`SegmentRecord::prefix`, `SegmentRecord::stands`),
+    /// and at the first byte otherwise. The bytes hashed are the bytes
+    /// then checked: one read.
     pub(crate) fn tail_start(&self, segment: &str, bytes: &[u8], entry: LineCheck) -> TailStart {
         let strict = TailStart::strict(bytes, entry);
         let Some(record) = self.read(segment) else {
             return strict;
         };
-        match record.reused(
-            bytes,
-            entry,
-            line_check_version(),
-            &mut blake3::Hasher::new(),
-        ) {
-            Reused::No => strict,
-            Reused::Differs { hashed } => TailStart {
+        let Some(prefix) = record.prefix(bytes, line_check_version()) else {
+            return strict;
+        };
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(prefix);
+        let hashed = u64::try_from(prefix.len()).unwrap_or(u64::MAX);
+        match record.stands(entry, &hasher) {
+            None => TailStart {
                 counted: ProofCount {
                     bytes_hashed: hashed,
                     ..strict.counted
                 },
                 ..strict
             },
-            Reused::Stands { len, lines, exit } => TailStart {
-                from: len,
+            Some((lines, exit)) => TailStart {
+                from: prefix.len(),
                 lines,
                 check: exit,
                 counted: ProofCount {
                     segments_by_digest: 1,
-                    bytes_hashed: u64::try_from(len).unwrap_or(u64::MAX),
+                    bytes_hashed: hashed,
                     ..strict.counted
                 },
             },
@@ -253,58 +254,35 @@ impl SegmentRecord {
     }
 }
 
-/// What one record says about the bytes of the segment it names, judged
-/// once for the proof and for the opening of a ledger (storage-SPEC 8-30,
-/// 8-34).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Reused {
-    /// Another rule version, another entry state, or a segment shorter
-    /// than the prefix the record names: nothing was hashed.
-    No,
-    /// The prefix was hashed, `hashed` bytes of it, and its digest is not
-    /// the record's.
-    Differs { hashed: u64 },
-    /// The record stands in for the first `len` bytes: `lines` lines, and
-    /// the chain state `exit` after them.
-    Stands {
-        len: usize,
-        lines: u64,
-        exit: LineCheck,
-    },
-}
-
+/// The judgement of one record, in two halves a proof can take apart:
+/// what the segment's own bytes decide, which a wave hashes before the
+/// walk reaches the segment, and what the chain entering it decides
+/// (storage-SPEC 8-30, 8-34, 8-37). Together they are `reuses` in
+/// `crates/storage/spec/Snapshot.lean`, whose `cachedVerifyIsStrict`
+/// says a record that stands gives the strict verdict.
 impl SegmentRecord {
-    /// Whether this record stands in for checking the prefix of `bytes`
-    /// it names, entered at `entry` under rule version `version`: all of
-    /// the version, the entry state and the digest of that prefix must
-    /// match (`cachedVerifyIsStrict` in `crates/storage/spec/Snapshot.lean`).
-    /// `hasher` has hashed the prefix whenever the answer says so, so a
-    /// caller that goes on hashing the rest digests the whole segment.
-    pub(crate) fn reused(
-        &self,
-        bytes: &[u8],
-        entry: LineCheck,
-        version: u32,
-        hasher: &mut blake3::Hasher,
-    ) -> Reused {
-        if self.version != version || self.entry != entry {
-            return Reused::No;
+    /// The first `len` bytes of `bytes` this record names, when it was
+    /// written under rule version `version` and the segment still holds
+    /// that much; `None` otherwise, and nothing is to be hashed.
+    pub(crate) fn prefix<'a>(&self, bytes: &'a [u8], version: u32) -> Option<&'a [u8]> {
+        if self.version != version {
+            return None;
         }
-        let Some(prefix) = usize::try_from(self.len)
+        usize::try_from(self.len)
             .ok()
             .and_then(|len| bytes.get(..len))
-        else {
-            return Reused::No;
-        };
-        hasher.update(prefix);
-        if B3Hash::from_bytes(*hasher.finalize().as_bytes()) != self.digest {
-            return Reused::Differs { hashed: self.len };
-        }
-        Reused::Stands {
-            len: prefix.len(),
-            lines: self.lines,
-            exit: self.exit,
-        }
+    }
+
+    /// Whether this record stands in for the prefix `hashed` has hashed,
+    /// entered at `entry`: its entry and its digest must both match. The
+    /// answer is the lines the prefix held and the chain state after them.
+    pub(crate) fn stands(
+        &self,
+        entry: LineCheck,
+        hashed: &blake3::Hasher,
+    ) -> Option<(u64, LineCheck)> {
+        (self.entry == entry && B3Hash::from_bytes(*hashed.finalize().as_bytes()) == self.digest)
+            .then_some((self.lines, self.exit))
     }
 }
 

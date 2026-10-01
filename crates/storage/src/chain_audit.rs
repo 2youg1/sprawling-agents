@@ -3,21 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The whole chain proved from genesis, one segment at a time, reusing
-//! what an earlier strict walk proved; and the verdict the writer waits
-//! for or halts on (storage-SPEC 8-30). The proof is a query; setting the
-//! verdict is the caller's command.
+//! The whole chain proved from genesis, one segment after another,
+//! reusing what an earlier strict walk proved, the segments read and
+//! their recorded prefixes hashed in waves side by side; and the verdict
+//! the writer waits for or halts on (storage-SPEC 8-30, 8-37). The proof
+//! is a query; setting the verdict is the caller's command.
 
 use std::path::Path;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 
 use kernel::{AxError, B3Hash};
 
-use crate::error::{StorageError, io_err};
+use crate::error::StorageError;
 use crate::jsonl::{JsonlLedger, LineCheck, segment_names};
 use crate::real_fs::RealFs;
-use crate::verified_prefix::{ProofRecords, Reused, SegmentRecord, line_check_version};
-use crate::vfs::Vfs;
+use crate::verified_prefix::{ProofRecords, SegmentRecord, line_check_version};
+use wave::{Hashed, PROOF_WAVE, Read, read_wave};
+
+mod wave;
 
 /// What walking the whole chain found.
 #[derive(Debug, Clone, PartialEq)]
@@ -201,9 +204,9 @@ pub fn prove_chain(dir: &Path, records: &ProofRecords) -> Result<Proven, Storage
     walk(dir, Some(records))
 }
 
-/// The one walk behind both faces.
+/// The one walk behind both faces: each wave is read whole before the
+/// chain is walked through its segments in order.
 fn walk(dir: &Path, records: Option<&ProofRecords>) -> Result<Proven, StorageError> {
-    let vfs = RealFs::new();
     let version = line_check_version();
     let mut walked = Walked {
         check: LineCheck::at_genesis(),
@@ -211,26 +214,23 @@ fn walk(dir: &Path, records: Option<&ProofRecords>) -> Result<Proven, StorageErr
         counted: ProofCount::default(),
         unkept: None,
     };
-    for name in segment_names(&vfs, dir)? {
+    for wave in segment_names(&RealFs::new(), dir)?.chunks(PROOF_WAVE) {
         walked.counted.waves = walked.counted.waves.saturating_add(1);
-        let path = dir.join(&name);
-        let bytes = vfs
-            .read(&path)
-            .map_err(io_err("read a segment to prove", &path))?;
-        let known = records.and_then(|records| records.read(&name));
-        let proved = match walked.segment(&bytes, known, version) {
-            Ok(proved) => proved,
-            Err(broken) => {
-                return Ok(Proven {
-                    audit: ChainAudit::Broken(broken),
-                    counted: walked.counted,
-                    unkept: walked.unkept,
-                });
+        for (name, read) in wave.iter().zip(read_wave(dir, wave, records, version)?) {
+            let proved = match walked.segment(read, version) {
+                Ok(proved) => proved,
+                Err(broken) => {
+                    return Ok(Proven {
+                        audit: ChainAudit::Broken(broken),
+                        counted: walked.counted,
+                        unkept: walked.unkept,
+                    });
+                }
+            };
+            if let Some(records) = records {
+                let kept = records.keep(name, &proved).map_err(StorageError::into_ax);
+                walked.unkept = walked.unkept.take().or(kept.err());
             }
-        };
-        if let Some(records) = records {
-            let kept = records.keep(&name, &proved).map_err(StorageError::into_ax);
-            walked.unkept = walked.unkept.take().or(kept.err());
         }
     }
     Ok(Proven {
@@ -254,30 +254,17 @@ impl Walked {
     /// Prove one segment's complete lines and answer the record of what
     /// was proved. The bytes checked and the bytes hashed are the same
     /// read (storage-SPEC 8-30).
-    fn segment(
-        &mut self,
-        bytes: &[u8],
-        known: Option<SegmentRecord>,
-        version: u32,
-    ) -> Result<SegmentRecord, AxError> {
-        self.counted.bytes_read = self.counted.bytes_read.saturating_add(len_of(bytes));
+    fn segment(&mut self, read: Read, version: u32) -> Result<SegmentRecord, AxError> {
+        let Read { bytes, hashed } = read;
+        self.counted.bytes_read = self.counted.bytes_read.saturating_add(len_of(&bytes));
         let entry = self.check;
         let complete = bytes
             .iter()
             .rposition(|byte| *byte == b'\n')
             .map_or(0, |at| at.saturating_add(1));
-        let mut hasher = blake3::Hasher::new();
-        let mut in_segment: u64 = 0;
-        let from = match known.and_then(|record| self.reuse(bytes, &record, version, &mut hasher)) {
-            Some((from, lines)) => {
-                in_segment = lines;
-                from
-            }
-            None => {
-                hasher.reset();
-                0
-            }
-        };
+        let (from, mut in_segment, mut hasher) = hashed
+            .and_then(|hashed| self.reuse(hashed))
+            .unwrap_or_else(|| (0, 0, blake3::Hasher::new()));
         let rest = bytes.get(from..complete).unwrap_or_default();
         hasher.update(rest);
         self.counted.bytes_hashed = self.counted.bytes_hashed.saturating_add(len_of(rest));
@@ -302,34 +289,26 @@ impl Walked {
         })
     }
 
-    /// Takes `record` in place of checking the prefix it names when it
-    /// stands for it (`SegmentRecord::reused`), answering where checking
-    /// goes on and how many lines the prefix held; `hasher` has then
-    /// hashed the prefix. `None` leaves the chain state where it was.
-    fn reuse(
-        &mut self,
-        bytes: &[u8],
-        record: &SegmentRecord,
-        version: u32,
-        hasher: &mut blake3::Hasher,
-    ) -> Option<(usize, u64)> {
-        match record.reused(bytes, self.check, version, hasher) {
-            Reused::No => None,
-            Reused::Differs { hashed } => {
-                self.counted.bytes_hashed = self.counted.bytes_hashed.saturating_add(hashed);
-                None
-            }
-            Reused::Stands { len, lines, exit } => {
-                self.counted.bytes_hashed = self
-                    .counted
-                    .bytes_hashed
-                    .saturating_add(u64::try_from(len).unwrap_or(u64::MAX));
-                self.lines = self.lines.saturating_add(lines);
-                self.check = exit;
-                self.counted.segments_by_digest = self.counted.segments_by_digest.saturating_add(1);
-                Some((len, lines))
-            }
-        }
+    /// Takes the record in place of checking the prefix it names when it
+    /// stands for it (`SegmentRecord::stands`), answering where checking
+    /// goes on, how many lines the prefix held, and the hasher that has
+    /// hashed it. `None` leaves the chain state where it was; the prefix
+    /// was hashed either way, and is counted.
+    fn reuse(&mut self, hashed: Hashed) -> Option<(usize, u64, blake3::Hasher)> {
+        let Hashed {
+            record,
+            len,
+            hasher,
+        } = hashed;
+        self.counted.bytes_hashed = self
+            .counted
+            .bytes_hashed
+            .saturating_add(u64::try_from(len).unwrap_or(u64::MAX));
+        let (lines, exit) = record.stands(self.check, &hasher)?;
+        self.lines = self.lines.saturating_add(lines);
+        self.check = exit;
+        self.counted.segments_by_digest = self.counted.segments_by_digest.saturating_add(1);
+        Some((len, lines, hasher))
     }
 }
 
