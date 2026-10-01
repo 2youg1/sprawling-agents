@@ -76,10 +76,19 @@ fn the_tree_a_page_reads_is_read_after_the_views_are_released() {
         (
             wire::Answer::Document(Box::new(wire::DocumentAnswer {
                 at,
-                text: "written after the lock".to_owned(),
-                bytes: 22,
-                truncated: false,
-                binary: false,
+                state: wire::DocumentState::Held(Box::new(wire::HeldDocument {
+                    version: kernel::B3Hash::digest(b"written after the lock"),
+                    format: documents::Format::Plain,
+                    bytes: 22,
+                    body: wire::DocumentBody::Text {
+                        encoding: documents::Encoding::Utf8,
+                        head: documents::Window {
+                            span: documents::Span::new(0, 22).unwrap(),
+                            text: "written after the lock".to_owned(),
+                        },
+                        coverage: wire::Coverage::Whole,
+                    },
+                })),
             })),
             wire::Answer::Listing(wire::ListingAnswer {
                 at: None,

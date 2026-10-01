@@ -43,6 +43,7 @@ mod listing;
 mod mcp_health;
 mod model_facts;
 mod prefix;
+mod range;
 mod release;
 mod rounds;
 mod skills;
@@ -62,7 +63,7 @@ pub use doctor::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCus
 pub use doctor::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use doctor::{DoctorNewest, DoctorPack, DoctorUnread, DoctorUpstream};
-pub use document::DocumentAnswer;
+pub use document::{Coverage, DocumentAnswer, DocumentBody, DocumentState, HeldDocument};
 pub use endpoints::{ChosenSummary, EndpointSummary, EndpointsAnswer};
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use git_status::{Drift, GitStatusAnswer};
@@ -76,6 +77,7 @@ pub use listing::{Entry, EntryKind, ListingAnswer};
 pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use model_facts::ModelFactsSummary;
 pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
+pub use range::RangeAnswer;
 pub use release::{ReleaseAnswer, ReleaseLine};
 pub use rounds::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn, Used};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
@@ -239,6 +241,7 @@ pub enum Answer {
     RunCosts(RunCostsAnswer),
     Listing(ListingAnswer),
     Document(Box<DocumentAnswer>),
+    Range(Box<RangeAnswer>),
     Commits(CommitsAnswer),
     Doctor(Box<DoctorAnswer>),
     Upstream(Box<DoctorUpstream>),

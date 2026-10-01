@@ -13,7 +13,7 @@
 //! a table that could drift from the enum would let two builds agree on
 //! a hash while disagreeing on what a frame means.
 
-use kernel::{Address, GitOid, Locator, NodeId, RunId, Seq};
+use kernel::{Address, B3Hash, GitOid, Locator, NodeId, RunId, Seq};
 use serde::{Deserialize, Serialize};
 
 use crate::named_frames::named_frames;
@@ -214,14 +214,17 @@ pub enum Query {
     Listing {
         at: Option<Address>,
     },
-    /// One file of the city, bounded, with the cut stated.
-    ///
-    /// The path is an `Address`, so it cannot leave the city root; the
-    /// reserved subtree is readable here on purpose, because what
-    /// governs a building is part of what this view exists to show, and
+    /// One file of the city as a version, with its first window
+    /// (wire-SPEC 8-69). The path is an `Address`, so it cannot leave the
+    /// city root; the reserved subtree is readable on purpose, because
     /// this door answers the person and not a resident.
     Document {
         at: Address,
+    },
+    /// One window of a stored version, by its version (wire-SPEC 8-70).
+    Range {
+        version: B3Hash,
+        range: documents::Span,
     },
     /// The commits this city made, newest first, a page at a time.
     ///

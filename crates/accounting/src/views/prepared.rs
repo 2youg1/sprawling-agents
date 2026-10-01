@@ -15,7 +15,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use kernel::{Address, GitOid, Locator, RunId, Seq};
+use kernel::{Address, B3Hash, GitOid, Locator, RunId, Seq};
 
 use super::archives::search_archives;
 use super::building_page::read_building;
@@ -129,8 +129,14 @@ pub enum Prepared {
         city_root: PathBuf,
         at: Option<Address>,
     },
-    /// The head of one file.
+    /// One file of the tree, as a version.
     Document { city_root: PathBuf, at: Address },
+    /// One window of a stored document version.
+    Range {
+        city_root: PathBuf,
+        version: B3Hash,
+        range: documents::Span,
+    },
     /// Every building's progress and every pursuit's verdict, with the
     /// buildings still to list and their plans still to read.
     City(CityAsk),
@@ -279,15 +285,16 @@ impl Prepared {
             Self::Listing { city_root, at } => {
                 wire::Answer::Listing(listing_answer(&city_root, at))
             }
-            // A file this city does not hold, for the reason a building
-            // nobody raised is: "I could not look" is its own answer.
+            // Missing, unreadable and empty are answers of their own
+            // (wire-SPEC 8-69), so this read always answers a document.
             Self::Document { city_root, at } => {
-                let query = format!("Document({})", at.as_str());
-                match document_answer(&city_root, at) {
-                    Some(answer) => wire::Answer::Document(Box::new(answer)),
-                    None => unavailable(query),
-                }
+                wire::Answer::Document(Box::new(document_answer(&city_root, at)))
             }
+            Self::Range {
+                city_root,
+                version,
+                range,
+            } => super::answering::range::range_answer(&city_root, version, range),
             Self::Building {
                 city_root,
                 addr,

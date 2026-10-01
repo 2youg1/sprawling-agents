@@ -34,6 +34,7 @@ pub(crate) mod automation;
 pub(crate) mod github;
 mod history;
 pub(crate) mod identity;
+pub(super) mod range;
 use super::lines::{endpoints_answer, known_hosts_answer, summarize};
 
 /// How many runs a cost view names besides every active one: a bound
@@ -231,6 +232,13 @@ impl Views {
                 return Prepared::Document {
                     city_root: self.city_root.clone(),
                     at: at.clone(),
+                };
+            }
+            wire::Query::Range { version, range } => {
+                return Prepared::Range {
+                    city_root: self.city_root.clone(),
+                    version: *version,
+                    range: *range,
                 };
             }
             // What an agent was told, and the store read that recovers

@@ -17,10 +17,13 @@ server = ["dep:tokio", "dep:axum"]
 # into the TypeScript client's types (wire-SPEC.md section 8-16). Off
 # for the product binary: it does not ask what its frames look like, and
 # the answer must not travel to a browser.
-schema = ["dep:schemars", "kernel/schema"]
+schema = ["dep:schemars", "kernel/schema", "documents/schema"]
 
 [dependencies]
 kernel = { workspace = true }
+# The document answers carry its spans, formats, encodings and windows
+# (crates/documents/Spec.lean D1).
+documents = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, optional = true }
