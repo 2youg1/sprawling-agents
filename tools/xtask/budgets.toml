@@ -66,8 +66,12 @@ budget_bytes = 2097152
 # number may improve freely and drift only within slack_bytes. The
 # reading rose by 30 KB when the talk thread, the setup screens, the
 # building and monitor views and their gallery fixtures grew by about
-# nine thousand lines of view code, none of it dead.
-best_bytes = 578422
+# nine thousand lines of view code, none of it dead. It rose by 20 KB
+# more when the wire schema the client decodes grew by four queries,
+# the guide command, the versioned document and range shapes and the
+# remote door's five event kinds, and the client gained the document
+# reader and the guide command that use them.
+best_bytes = 599102
 slack_bytes = 20480
 measured_by = "just build-web, then just gates (the whole dist directory, recursive)"
 status = "gated"
