@@ -23,6 +23,7 @@
 | `lineage` | 每个 run 怎样折成一行，带上它的父指针 | 8-10 |
 | `worker` | 城的唯一写者 `RunWorker`：它持有的状态、它执行的命令、它驱动的 run | 8-11 |
 | `playback` | 一段历史怎样成为一份可以重算、可以复核的 playback bundle | 8-12 |
+| `trace` | 一个提交是这个 run 哪几次调用的结果，同一栋楼里还有谁在那一段里调用过工具 | 8-16 |
 
 表里的模块全部在本 crate。`RunWorker` 与它的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例住 `worker`；它经构造时收下的一个 `Hands` 碰这台电脑，生产的那一份由二进制的装配根 `bin::assembly::production::hands` 造出（8-11）。
 
@@ -582,6 +583,31 @@ pub enum Reader { Person(Confidential), Resident(Address) }
 
 **楼规与城一层。** `PutRules` 由 `commanding::configure` 执行：`city::write_rules_against` 落盘之后，读回文件的摘要，与折叠里这份文件上一次的摘要比，记一行 `rules_changed`。`ConfigureCity` 同样落盘之后记 `rules_changed { scope: city, which: Config }`。两条都只在有一项写了时记行；什么都没写的 `ConfigureCity` 什么都不记。`PreferencePatch::CorePriority` 由 `person::put` 落在 `[core]`，其余臂照旧落在 `[ui]`；`CorePriority` 的值集是 `wire::CorePriority`，`person` 再导出它，`bin` 的调用方不必改路径。
 
+### 8-16 accounting::trace：一个提交倒推到它之前的那些调用（形状 7 投影）
+
+`trace` 回答拿着一个提交 oid 的人在 `whose` 之后问的下一句：这个提交是哪几次调用的结果。CLI（`sprawling whose --trace`，sprawling-SPEC.md 8-136）是它的薄适配器；下一轮 playback 的调用归属与验收工具从坏提交归因到写它的居民，都读同一个值。
+
+```rust
+// accounting::trace
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Trace {
+    pub commit: wire::CommitAnswer,   // 与 `Query::Commit` 的答是同一个值：run、actor、previous、parents
+    pub calls: Vec<wire::Call>,       // 这个 run 在区间里的调用，按 seq 升序
+    pub nearby: Vec<Nearby>,          // 同一栋楼里别的 run 在区间里的调用，每个 run 一项，按 run id 升序
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Nearby { pub run: RunId, pub actor: Address, pub calls: u64 }
+/// 只读。这座城没写过这个提交时 `Ok(None)`。
+pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError>;
+```
+
+- **提交的事实从 `views::ask` 来。** `trace` 先问 `Query::Commit`，这一步审计整条链、折叠视图（sprawling-SPEC.md 8-41），所以「这座城写没写过它」与 `whose` 同一个答案；答不是 `Answer::Commit` 时就是 `Ok(None)`。
+- **区间。** 上界是宣告这个提交的那一行（不含）；下界是 `commit.previous` 那一行（不含），没有 `previous`（这是这个 run 的第一个提交）时是这个 run 的第一行（含）。`previous` 是同一个 run 上一个宣告的提交（`views::commits` 的折叠）：别的 run 在中间的提交不是界，git 的父提交也不是，因为父提交可能出自别的 run 或人自己。
+- **调用。** 这个 run 在区间里的 `tool_called`，经 `views::turns` 与各自的 `tool_result` 配对成 `wire::Call`：工具、subject、参数、结局、输出、`effect`、两个时刻与 `timing` 的读法只有 rounds 那一份。`turns` 只把一条 `model_called` 之后的调用归进回合，而区间的下界可以落在一个回合中间，所以往回读过下界之后，继续读到下界之前最近的一条 `model_called` 为止（含），折完再按 `Call.at` 只留区间里的调用。读的是本 run 的行（`LedgerIndex::run_seqs_before`），不读别的 run。
+- **同楼的别人。** 区间里信封 `run` 不是这个 run、信封地址在 `city::Building::of(commit.actor)` 那栋楼里（`Address::is_within`）的 `tool_called`，按 run 计数；`actor` 是这个 run 在区间里第一条这样的行的地址。同一栋楼共用一棵工作树，这些 run 的写也可能落进这个提交，所以它们是本 run 之外的候选。只计数，不列调用。
+- **代价。** `ask` 之后再建一次 `LedgerIndex`，再按索引读两段：本 run 的行（倒着读到下界前最近的 `model_called`）与区间里的每一行（判同楼的别人）。读的行数与区间长度成正比；建索引与 `ask` 的审计各与账本字节数成正比，与一次性的 `whose` 同阶。
+- **失败。** `ask` 的失败原样上抛；建索引与读行的 `StorageError` 经 `into_ax`；一行解析不了按 `EventRecord::parse_line` 的错误上抛，审过的链上出现它，说明账本在 `ask` 之后被改了；actor 落在保留子树里时 `Building::of` 的拒绝上抛（城写的提交不会落在那里）。
+
 ## 12 决策
 
 1. **生产适配器住装配根，不住本 crate。** 理由：它把 `gateway` 的具体构造接到端口上，这正是 ARCHITECTURE.md §3 说的装配边；本 crate 只用 `gateway` 的接口类型，不构造适配器。被否决的做法：在 `gateway` 里实现本 trait——那要让 `gateway` 依赖 `accounting`，依赖就朝外指了。`GatewayModels` 在 worker 搬进来时一同搬进本 crate，理由见 §12-18；本条对 `SystemClock`、`ThisMachine` 这样直接碰主机的生产适配器仍然成立。
@@ -616,3 +642,4 @@ pub enum Reader { Person(Confidential), Resident(Address) }
     (f) `checkpoints` 只列 `checkpoint_committed`，经 kernel 的 `CheckpointCommitted` 类型读，分开 `JobPinned` 与 `Committed`。理由：识别「哪些行点名一个提交」的权威是 `accounting::views::commits::commit_facts`，它在 `views` 里是 `pub(super)`，而 `views` 另有改动正在进行；在这里再写一遍会成为第二个权威。`pr_merged` 的提交由 §3 记下的那一步补上。被否决的做法：抄一份 `commit_facts`。
     (g) 人的入口在 `Confidential::Withheld` 时按楼的规则取三臂，而不调 `may_read`。理由：`may_read` 要一个读者所在的楼，人不住在任何一栋楼里；为了调它而编一栋楼，会让「人的楼」成为一个不存在的地址。三臂的类型仍是 `kernel::ReadVerdict`，居民入口仍调 `may_read`。被否决的做法：给人编一个地址。
 27. **一个 session 的身份冻在房间那一层，读回失败就拒，不换成此刻的名字。** 理由：session 的形状（模型、强度）已经记在房间那一层，`/new` 清的也是它，身份跟着同一个边界就不需要另一条「何时重读身份」的规则（city-SPEC §12.11）；读不回冻下的那一版时换成此刻的名字，等于在 session 中途悄悄改名，而这正是冻结要防的。被否决的做法：每次 run 现读身份——改名立刻改掉正在进行的 session 的前缀，provider 的前缀缓存从 city 段起失效，页面上的旧 session 与请求里的名字也对不上。
+28. **`whose --trace` 的逻辑是读面上的一个模块 `accounting::trace`，从 `Query::Commit` 的答出发再读账本，不加线上查询；同楼的别人只计数。** 理由：区间的两端已经在 `CommitAnswer` 的 `seq` 与 `previous` 里，调用的读法已经在 `views::turns` 里；今天的读者是读盘的 CLI，下一轮的 playback 与验收工具都在本 crate 里或经本 crate 读。同楼别的 run 的写也可能落进这个提交，但把它们的调用与本 run 的并列，会把「候选」读成「原因」，所以只给条数与地址，要细看的人拿 `view --run` 去读。被否决的做法：①加 `Query::Trace`：线上多一个形状、`WIRE_V` 进一位、`wire.ts` 与 adversary 的门面都要跟着改，换来的只是把这几步搬到服务端，而 CLI 本来就读盘；②按 `Call.effect` 只留写调用：读调用决定了写什么，去掉它们就去掉了归因的一半证据，`effect` 留在每条调用上由读者判断；③区间以 git 的父提交或全城紧邻的上一个提交为界：两者都可能属于别的 run，会把别人的调用算成这个 run 的。重开参数：页面要显示一个提交的调用时（那时要一个线上查询，本模块搬到 `views` 后面作答）；或同一栋楼里几个 run 同写一棵树成为常态、条数不够区分时。

@@ -1118,6 +1118,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **`view --since/--until` 按每一行信封的 `t` 流式过滤，不建时间索引**（8-137）。时间窗读的是信封 `t`，因为它就是这一行记下的那一刻，任何种类都有它；按种类去载荷里挑时间字段，就是同一件事有两个家。不二分也不提前停：`t` 不随 `seq` 单调，在第一条越过 `until` 的行处停下会漏掉后面回退的行。**被否掉的**：在 `LedgerIndex` 里给每行多存一个 8 字节的时间列再二分——它要 `t` 有序，而 `t` 无序；也让索引多一份要维护的事实。条件变了就重议：四十万行的账本上 `view --since` 超过一秒，或页面需要按时间跳转。
 
+**`whose --trace` 读盘作答，候选就说是候选**（8-136，accounting-SPEC.md §12-28）。区间以同一个 run 的上一个提交为界，调用经 rounds 的那一份配对规则读出，同楼别的 run 只给条数。CLI 读盘而不走线上查询，城不在服务也答得出，与 `whose` 本身同一条理由。**被否掉的**：只列写调用——读调用决定了写什么；把同楼别人的调用并列出来——读者会把候选读成原因。条件变了就重议：页面要显示一个提交的调用时。
+
 **`playback` 是一个两个词的动词，导出写 stdout 或一个新文件，只在 bundle 完整之后写**（8-126、accounting-SPEC.md 8-12）。回看一段工作流有两个动作：导出与复核，它们的标志不同（导出读选择与 `--out`，复核读 `--bundle`/`--city`），所以是两行；放在一个词 `playback` 之下，是因为总览里两者挨着，人找到一个就找到另一个。命令表的一行可以带两个词，解析先试两个词，其余不变，8-89 决定 1「动词需要子动词」的重议条件因此被这一个最小的扩展满足，没有换参数库。输出不沿用 `view` 的做法：`view | head` 截断仍算成功，是因为账本原行本来就一行一行有意义；一份截断的 bundle 读不回来，却可能被当成一份完整的东西留下，所以 bundle 先整份算好、量过尺寸再写，管道中途关闭是失败，`--out` 经暂存文件与硬链接落位、已有目标不覆盖。**被否掉的**：`export --playback` 之类挂在现有动词上的标志（`export` 打包整座城，两件事的输入与输出都不同）；`--out` 默认写进城里（导出件不进 git，城里的保留导出位置由布局 owner 在居民入口落地时定）；`rename` 落位（在 Unix 上会覆盖已有目标）。条件变了就重议：城里的保留导出位置定下之后，`--out` 缺省时可以写到那里，而不是 stdout。
 
 
@@ -2130,7 +2132,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 
 ### `sprawling whose <city> <oid>`（`bin::main::whose`）
 
-四行输出：run、actor（带 session）、model 与 effort、以及账本位置 seq。
+四行输出：run、actor（带 session）、model 与 effort、以及账本位置 seq；之后是 8-136 的 `previous` 行，带 `--trace` 时再列区间里的调用。
 **自己一个文件而不是 `main::data` 多一个臂**：`data` 里每一个动词不是搬字节就是验链，
 而这一个是从城的历史里读出一个答案并把它渲染给人看；且 `data` 已到 360 行，
 把四十行放进去得拿别处的行数去换。
@@ -2174,6 +2176,20 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 **影响面（一处真实回归，已改）**：从此每座城市至少有两栋楼。`views::tests` 里两处按 `buildings[0]` 取楼的断言改成按地址找 `lab`——它们原本靠「城里只有一栋楼」这个此后不再成立的前提。改的是测试对现实的假设，不是把依据放宽。
 
 **留给后续卡**：`hall` 的居民目前拿到的仍是 `workbench::tools` 给所有人的同一套工具表，`exec`／`delegate`／`workshop` 都在里面；这张表按地址裁，而不是只由写域挡住（`Documents` 拒非 `.md`），不由工具表挡住。
+
+## 8-136 `sprawling whose --trace`：一个提交倒推到产生它的调用与居民（`bin::main::whose`；accounting-SPEC.md 8-16）
+
+**形状。** `main/whose.rs` 仍是 adapter：读命令行，不带 `--trace` 时问 `accounting::views::ask`，带 `--trace` 时问 `accounting::trace::trace`，把答写成几行给人读。写 stdout 失败时与 `view` 一样：读者提前停下（`| head`）退出 0，别的写失败退出 1。
+
+**输出。** 8-41 的四行（`run`、`actor`、`model`、`ledger`）与各 `replaced` 行之后，总有一行 `previous`：`previous <oid> at seq <n>`，这个 run 的第一个提交写 `previous none, the run's first commit`。带 `--trace` 再写：
+
+- `span    after seq <n>, before seq <m>`；没有 `previous` 时是 `span    from the run's first line, before seq <m>`。
+- 每条调用一行 `call    seq <n>  <called 的 iso>  <工具>  <effect>  <结局>  <subject>`，结果有输出时下一行是 `        > <输出的第一行>`。`effect` 与结局按它们的 serde 拼法写（`read`、`{"write":{"domain":"lab"}}`；`answered`、`failed`、`waiting`），没有登记的工具写 `unregistered`；没有 subject 时取参数的第一行，两者都没有写 `-`。区间里一条调用都没有时写 `call    none`。版本早于逐行时刻的账本里，`called` 是回合的时刻。
+- 同楼的每个别的 run 一行：`nearby  <run> at <actor>: <k> call(s)`。最后一行 `note    the calls are candidates; a nearby run may have written in the same span`，只在有 `nearby` 行时写。
+
+**退出码。** 同 8-41：0 答上了；1 这座城没写过这个提交；2 命令行读不了。
+
+**测试。** `whose_trace_names_the_run_its_calls_and_who_else_called_in_the_building`（`bin::main::tests`）在一座城的账本上逐字节比输出；区间与配对的规则由 `accounting::trace::tests` 钉住。
 
 ## 8-43 筛子接进产品：`driving` 把 `exec` 结果经 `pipeline::package` 交给模型（`accounting::worker::driving`、`runtime::pipeline::exec`）
 
