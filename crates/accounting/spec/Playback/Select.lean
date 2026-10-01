@@ -17,7 +17,7 @@
 * **截止线不读未来**：cutoff 之后追加的行改变不了这次选择（`cutoff_ignores_future`）；
 * **矛盾的范围与合法的空选择是两件事**：`first > last` 由 Rust 拒绝（`Contradictory`），合法而为空的选择输出带范围信息的空 bundle（`empty_selection_is_legal`）。
 
-模型边界：楼的判定在 Rust 里是 `Address::is_within`（按段边界的前缀），这里抽象成楼的编号相等，`lab` 与 `laboratory` 的区别由 `is_within` 自己的测试守住（kernel-SPEC 8-2）。本模型不是 Rust 实现的证明；两者的一致由 `accounting::playback::tests` 在同一组场景上的比较守住。
+模型边界：楼的判定在 Rust 里是 `Address::is_within`（按段边界的前缀），这里抽象成楼的编号相等，`lab` 与 `laboratory` 的区别由 `is_within` 自己的测试守住（kernel-SPEC 8-2）。本模型不是 Rust 实现的证明。两者的一致靠一张场景表：`history` 与 `scenes` 只写在本文件里，`scenes_agree` 证明模型对每一项给出表里的 seq；`crates/accounting/src/playback/tests/model.rs` 从本文件逐行读出 `line …` 与 `scene …` 两种行，按同一张表写账本、跑生产的 `export`，比较选中的 seq（accounting-SPEC.md 8-12、§12-25(i)）。所以这两种行的写法是那个测试读的格式：一行一项，`line seq run building`，`scene first last run building cutoff [seq, …]`，`some n` 或 `none`。
 -/
 
 namespace Accounting.Playback.Select
@@ -101,6 +101,64 @@ theorem a_selection_reaches_lines :
     selected ⟨some 1, none, none, some 0⟩ 3
       [⟨0, 0, none⟩, ⟨1, 1, some 0⟩, ⟨2, 2, some 1⟩, ⟨3, 1, some 0⟩, ⟨4, 1, some 0⟩] =
       [⟨1, 1, some 0⟩, ⟨3, 1, some 0⟩] := by
+  decide
+
+/-! ## 与 Rust 比较的场景表 -/
+
+/-- 一行账本的写法，供场景表逐行书写。 -/
+def line (seq run : Nat) (building : Option Nat) : Line := ⟨seq, run, building⟩
+
+/-- 一项场景：一个选择、一个 cutoff、模型应选中的 seq。 -/
+structure Scene where
+  selection : Selection
+  cutoff : Nat
+  seqs : List Nat
+  deriving Repr, DecidableEq
+
+/-- 一项场景的写法，供场景表逐行书写。 -/
+def scene (first last run building : Option Nat) (cutoff : Nat) (seqs : List Nat) : Scene :=
+  ⟨⟨first, last, run, building⟩, cutoff, seqs⟩
+
+/-- 场景表的账本：seq 0 是创世行；run 1 在楼 0，run 2 在楼 1 且有一行没有地址，run 3 在楼 1。 -/
+def history : List Line := [
+  line 0 0 none,
+  line 1 1 (some 0),
+  line 2 2 (some 1),
+  line 3 1 (some 0),
+  line 4 1 (some 0),
+  line 5 2 none,
+  line 6 3 (some 1),
+  line 7 2 (some 1)
+]
+
+/-- 场景表：每一项单独改一个条件，或在端点、cutoff 与空选择上取边界。 -/
+def scenes : List Scene := [
+  scene none none none none 7 [0, 1, 2, 3, 4, 5, 6, 7],
+  scene none none none none 3 [0, 1, 2, 3],
+  scene (some 1) (some 3) none none 7 [1, 2, 3],
+  scene (some 3) (some 3) none none 7 [3],
+  scene (some 5) none none none 4 [],
+  scene none (some 9) none none 7 [0, 1, 2, 3, 4, 5, 6, 7],
+  scene none none (some 1) none 7 [1, 3, 4],
+  scene none none (some 2) none 6 [2, 5],
+  scene none none none (some 0) 7 [1, 3, 4],
+  scene none none none (some 1) 7 [2, 6, 7],
+  scene (some 2) none (some 2) (some 1) 7 [2, 7],
+  scene none none (some 0) none 7 [0],
+  scene none none (some 9) none 7 [],
+  scene (some 4) (some 6) none (some 1) 7 [6],
+  scene none none (some 1) (some 1) 7 [],
+  scene (some 0) (some 0) none none 0 [0]
+]
+
+/-- 模型对表里每一项给出那一项写下的 seq。 -/
+theorem scenes_agree :
+    scenes.all (fun c => (selected c.selection c.cutoff history).map (·.seq) == c.seqs) = true := by
+  decide
+
+/-- 表里没有矛盾的区间：Rust 对每一项都输出 bundle，而不是拒绝。 -/
+theorem scenes_are_not_contradictory :
+    scenes.all (fun c => c.selection.first.all (fun a => c.selection.last.all (a ≤ ·))) = true := by
   decide
 
 end Accounting.Playback.Select
