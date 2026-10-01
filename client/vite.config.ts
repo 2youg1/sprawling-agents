@@ -52,8 +52,9 @@ function shippedFace(): Plugin {
 }
 
 // The bundle lands where `crates/sprawling/build.rs` reads it: the path
-// its `BUNDLE_DIR` states, `target/web-dist` under the workspace root,
-// whatever `CARGO_TARGET_DIR` says, with `index.html` at its root.
+// its `BUNDLE_DIR` states inside its own package, crates/sprawling/web-dist,
+// whatever `CARGO_TARGET_DIR` says, with `index.html` at its root; inside
+// the package because the crates.io archive carries nothing else.
 // `base: './'` keeps every asset reference relative, so the same bundle
 // serves from inside the binary.
 //
@@ -70,7 +71,7 @@ export default defineConfig({
     thirdPartyNotices(),
   ],
   build: {
-    outDir: "../../target/web-dist",
+    outDir: "../../crates/sprawling/web-dist",
     emptyOutDir: true,
     // No sourcemap ships: the map of this bundle is 4 MB against a
     // 644 KB bundle, `xtask budget` weighs everything the directory

@@ -4,11 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The versions this repository pins, read from the files that pin
-//! them (sprawling-SPEC.md section 8-120).
+//! them (sprawling-SPEC.md sections 8-120 and 8-157).
 //!
-//! Both files are compiled in, so changing a pinned version is an edit
-//! to that one file and this binary reports the new pin on its next
-//! build rather than a copy somebody forgot to update.
+//! The build script reads the files from the checkout this binary is
+//! built in, so changing a pinned version is an edit to that one file
+//! and this binary reports the new pin on its next build rather than a
+//! copy somebody forgot to update. None of the files is inside this
+//! package, so a build from its crates.io archive finds none of them:
+//! each then reads as empty, and an empty file pins nothing.
 
 /// The file in this repository that pins an item's version.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -21,18 +24,26 @@ pub(crate) enum Pin {
     LeanToolchain,
 }
 
-const RUST_TOOLCHAIN: &str = include_str!("../../../../rust-toolchain.toml");
+// RUST_TOOLCHAIN_FILE, LEAN_TOOLCHAIN_FILE and ZIG_VERSION_FILE: each
+// pin file's whole text as the build script found it, or empty.
+include!(concat!(env!("OUT_DIR"), "/pins.rs"));
 
 /// The whole line elan reads, `leanprover/lean4:v<version>`; the table
-/// installs and detects by it.
-pub(crate) const LEAN_TOOLCHAIN: &str = include_str!("../../../../lean-toolchain").trim_ascii_end();
+/// installs and detects by it. Empty in a build that found no pin.
+pub(crate) const LEAN_TOOLCHAIN: &str = LEAN_TOOLCHAIN_FILE.trim_ascii_end();
+
+/// The Zig version `crates/desktop/ffi/zig-version` pins, the one file
+/// the leaf's build script and CI's install step read too
+/// (sprawling-SPEC.md 8-146). Empty in a build that found no pin.
+pub(crate) const ZIG_VERSION: &str = ZIG_VERSION_FILE.trim_ascii_end();
 
 /// The version `pin` names, as a dotted number; `None` for an unpinned
-/// item, or for a file whose shape no longer carries one.
+/// item, for a file this build did not find, or for a file whose shape
+/// no longer carries one.
 pub(crate) fn pinned(pin: Pin) -> Option<String> {
     match pin {
         Pin::Unpinned => None,
-        Pin::RustToolchain => rust_channel(RUST_TOOLCHAIN),
+        Pin::RustToolchain => rust_channel(RUST_TOOLCHAIN_FILE),
         Pin::LeanToolchain => lean_version(LEAN_TOOLCHAIN),
     }
 }
@@ -58,8 +69,9 @@ fn lean_version(line: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    /// The pins are read out of the two files as they stand, whatever
-    /// version those files name next.
+    /// The pins are read out of the files as they stand, whatever
+    /// version those files name next; a file this build did not find is
+    /// empty, and an empty file pins nothing.
     #[test]
     fn each_pin_is_the_version_its_file_names() {
         assert_eq!(
@@ -67,10 +79,17 @@ mod tests {
                 rust_channel("[toolchain]\nchannel = \"1.97.1\"\nprofile = \"minimal\"\n"),
                 lean_version("leanprover/lean4:v4.33.1"),
                 pinned(Pin::Unpinned),
+                (rust_channel(""), lean_version("")),
             ),
-            (Some("1.97.1".to_owned()), Some("4.33.1".to_owned()), None)
+            (
+                Some("1.97.1".to_owned()),
+                Some("4.33.1".to_owned()),
+                None,
+                (None, None)
+            )
         );
         assert!(pinned(Pin::RustToolchain).is_some());
         assert!(LEAN_TOOLCHAIN.ends_with(&pinned(Pin::LeanToolchain).unwrap()));
+        assert!(!ZIG_VERSION.is_empty() && !ZIG_VERSION.ends_with('\n'));
     }
 }

@@ -103,8 +103,8 @@ fn embedded_client_table_is_present_and_marked() {
     }
 }
 
-/// The binary embeds the bundle `just build-web` wrote into the
-/// workspace, wherever cargo puts its own output.
+/// The binary embeds the bundle `just build-web` wrote into this
+/// package, wherever cargo puts its own output.
 ///
 /// With `CARGO_TARGET_DIR` pointing outside the workspace, a build
 /// script that looked for the bundle there would find nothing and ship
@@ -113,9 +113,7 @@ fn embedded_client_table_is_present_and_marked() {
 /// tell the two readings apart where the variable is set.
 #[test]
 fn the_embedded_client_is_the_bundle_the_workspace_built() {
-    let dist = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .join(CLIENT_BUNDLE_DIR);
+    let dist = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(CLIENT_BUNDLE_DIR);
     let mut on_disk = Vec::new();
     files_under(&dist, &dist, &mut on_disk);
     on_disk.sort();

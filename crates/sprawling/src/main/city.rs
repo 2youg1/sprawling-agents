@@ -242,7 +242,7 @@ pub(super) fn serve_city(
     {
         eprintln!(
             "warning: this binary carries the page shell only; the browser will get an empty \
-             page. Run `just build-web`, rebuild, or pass --web-dir {CLIENT_BUNDLE_DIR}"
+             page. Run `just build-web`, rebuild, or pass --web-dir with the sprawling              package's {CLIENT_BUNDLE_DIR} directory"
         );
     }
     // The key is settled before anything binds. A configured token is

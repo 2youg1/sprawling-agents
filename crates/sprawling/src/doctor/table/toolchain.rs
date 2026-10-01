@@ -329,7 +329,7 @@ pub(super) const LEAN: Requirement = row(
 /// The Zig version `crates/desktop/ffi/zig-version` pins, the one file the
 /// leaf's build script and CI's install step read too (sprawling-SPEC.md
 /// 8-146).
-const ZIG_PIN: &str = include_str!("../../../../desktop/ffi/zig-version").trim_ascii_end();
+const ZIG_PIN: &str = crate::doctor::pin::ZIG_VERSION;
 
 /// The compiler of the desktop server's Zig leaf. Required because a
 /// Windows build of this binary compiles the leaf, and `Need` does not
