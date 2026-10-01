@@ -53,7 +53,41 @@ impl RunWorker {
         &mut self,
         decisions: &wire::ProposalDecisions,
     ) -> Result<(), AxError> {
-        self.document_path(&decisions.doc).map(drop)
+        let path = self.document_path(&decisions.doc)?;
+        let cards = decisions
+            .decisions
+            .iter()
+            .map(|decision| {
+                self.governance
+                    .proposals
+                    .open_on(&decisions.doc, &decision.proposal)
+                    .map(|offer| (offer.clone(), decision.verdicts.as_slice()))
+            })
+            .collect::<Result<Vec<(Offer, &[SliceVerdict])>, AxError>>()?;
+        let named: Vec<(&Offer, &[SliceVerdict])> = cards
+            .iter()
+            .map(|(offer, verdicts)| (offer, *verdicts))
+            .collect();
+        let landed = city::revise_document(&path, |held, source| {
+            let decided = documents::decide(source, &named)?;
+            if let Some(applied) = &decided {
+                held.replace(applied.bytes())?;
+            }
+            Ok(decided)
+        })?;
+        if let Some(applied) = landed {
+            self.document_written(&decisions.doc, &applied)?;
+        }
+        for decision in &decisions.decisions {
+            self.record(
+                EventKind::ProposalDecided,
+                Payload::of(&ProposalDecided {
+                    proposal: decision.proposal,
+                    verdicts: decision.verdicts.clone(),
+                })?,
+            )?;
+        }
+        Ok(())
     }
 
     /// Where a document a page names lives, refused inside the reserved

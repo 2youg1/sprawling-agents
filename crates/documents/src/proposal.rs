@@ -75,7 +75,9 @@ pub struct Review {
 impl Review {
     /// Cuts both texts into sentences and aligns them (D14, D15).
     pub fn of(before: &str, after: &str) -> Review {
-        Review { slices: Vec::new() }
+        Review {
+            slices: slices::align(slices::pieces(before), slices::pieces(after)),
+        }
     }
 
     pub fn slices(&self) -> &[Slice] {
@@ -94,8 +96,38 @@ impl Review {
     /// a sentence that did not change, one named twice, and an amended
     /// deletion.
     pub fn merged(&self, verdicts: &[SliceVerdict]) -> Result<String, AxError> {
-        drop(verdicts);
-        Ok(String::new())
+        let mut named: BTreeMap<u32, &Verdict> = BTreeMap::new();
+        for verdict in verdicts {
+            if named.insert(verdict.slice, &verdict.verdict).is_some() {
+                return Err(refused(verdict.slice, "is named twice"));
+            }
+        }
+        let mut out = String::new();
+        for (place, slice) in (0_u32..).zip(&self.slices) {
+            match (slice.kind, named.remove(&place)) {
+                (SliceKind::Same, Some(Verdict::Accept | Verdict::Amend { .. })) => {
+                    return Err(refused(place, "did not change"));
+                }
+                (SliceKind::Delete, Some(Verdict::Amend { .. })) => {
+                    return Err(refused(
+                        place,
+                        "is a deletion, and only an insertion is amended",
+                    ));
+                }
+                (SliceKind::Same | SliceKind::Delete, None)
+                | (SliceKind::Insert, Some(Verdict::Accept)) => {
+                    slice.bytes_onto(&slice.text, &mut out)
+                }
+                (SliceKind::Insert, Some(Verdict::Amend { text })) => {
+                    slice.bytes_onto(text, &mut out)
+                }
+                (SliceKind::Delete, Some(Verdict::Accept)) | (SliceKind::Insert, None) => {}
+            }
+        }
+        match named.into_keys().next() {
+            Some(place) => Err(refused(place, "is not on this card")),
+            None => Ok(out),
+        }
     }
 }
 
@@ -212,8 +244,62 @@ pub fn decide(
     source: &[u8],
     cards: &[(&Offer, &[SliceVerdict])],
 ) -> Result<Option<Applied>, AxError> {
-    drop((source, cards));
-    Ok(None)
+    let mut seen = BTreeSet::new();
+    let mut edits = Vec::new();
+    for (offer, verdicts) in cards {
+        if !seen.insert(offer.id()) {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "decide proposals",
+                format!("proposal {} is named twice", offer.id()),
+            )
+            .with_recovery("name each card once, with all its verdicts"));
+        }
+        let text = offer.review().merged(verdicts)?;
+        if text != offer.before {
+            edits.push((*offer, text));
+        }
+    }
+    let Some((first, _)) = edits.first() else {
+        return Ok(None);
+    };
+    let version = B3Hash::digest(source);
+    if let Some((stale, _)) = edits.iter().find(|(offer, _)| offer.baseline != version) {
+        return Err(AxError::failure(
+            AxCode::VersionConflict,
+            "decide proposals",
+            format!(
+                "proposal {} was made on version {}, and the document is now {version}",
+                stale.id(),
+                stale.baseline
+            ),
+        )
+        .with_recovery(
+            "reject the card, or ask the run to offer it again on what the document says now",
+        ));
+    }
+    let Reading::Text(encoding) = Reading::of(source) else {
+        return Err(unmatched(first));
+    };
+    for (offer, _) in &edits {
+        let stated = offer
+            .span
+            .within(source.len())
+            .and_then(|(start, end)| source.get(start..end))
+            .map(|bytes| encoding.decode(bytes));
+        if !matches!(stated, Some(Ok(ref text)) if *text == offer.before) {
+            return Err(unmatched(offer));
+        }
+    }
+    let mut edits: Vec<TextEdit> = edits
+        .into_iter()
+        .map(|(offer, text)| TextEdit {
+            span: offer.span,
+            text,
+        })
+        .collect();
+    edits.sort_by_key(|edit| edit.span);
+    saved_on(source, version, &edits).map(Some)
 }
 
 fn unmatched(offer: &Offer) -> AxError {
