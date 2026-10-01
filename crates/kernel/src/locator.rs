@@ -46,10 +46,6 @@ impl B3Hash {
     pub fn digest(bytes: &[u8]) -> Self {
         B3Hash(*blake3::hash(bytes).as_bytes())
     }
-
-    fn parse_hex(raw: &str) -> Option<Self> {
-        decode_hex_fixed::<32>(raw).map(B3Hash)
-    }
 }
 
 impl std::fmt::Display for B3Hash {
@@ -60,15 +56,13 @@ impl std::fmt::Display for B3Hash {
 
 impl Serialize for B3Hash {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.collect_str(self)
+        write_digest(self, &self.0, serializer)
     }
 }
 
 impl<'de> Deserialize<'de> for B3Hash {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let raw = String::deserialize(deserializer)?;
-        B3Hash::parse_hex(&raw)
-            .ok_or_else(|| serde::de::Error::custom("expected exactly 64 lowercase hex digits"))
+        read_digest(deserializer).map(B3Hash)
     }
 }
 
@@ -95,10 +89,6 @@ impl GitOid {
     /// a wrong length is a refusal, never a padded guess.
     #[must_use]
     pub fn parse(raw: &str) -> Option<Self> {
-        Self::parse_hex(raw)
-    }
-
-    fn parse_hex(raw: &str) -> Option<Self> {
         decode_hex_fixed::<20>(raw).map(GitOid)
     }
 }
@@ -111,21 +101,55 @@ impl std::fmt::Display for GitOid {
 
 impl Serialize for GitOid {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.collect_str(self)
+        write_digest(self, &self.0, serializer)
     }
 }
 
 impl<'de> Deserialize<'de> for GitOid {
-    /// Same shape discipline as `B3Hash` above: the hex spelling is the only
-    /// accepted form, and a wrong length is a refusal rather than a padded
-    /// guess. Needed once a checkpoint identity has to cross the process
-    /// boundary (`wire::frames`); the shape authority stays here so
-    /// the wire does not grow a second definition of what an oid looks like.
+    /// The shape authority stays here, so the wire (`wire::frames`) has no
+    /// second definition of what an oid looks like.
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let raw = String::deserialize(deserializer)?;
-        GitOid::parse_hex(&raw)
-            .ok_or_else(|| serde::de::Error::custom("expected exactly 40 lowercase hex digits"))
+        read_digest(deserializer).map(GitOid)
     }
+}
+
+/// A digest as its format wants it (kernel-SPEC 8-84): the hex spelling
+/// wherever a person or a frame reads it, the bytes themselves in a
+/// binary format, which only this binary reads back (a snapshot).
+fn write_digest<const N: usize, S: serde::Serializer>(
+    spelled: &impl std::fmt::Display,
+    bytes: &[u8; N],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    [u8; N]: Serialize,
+{
+    if serializer.is_human_readable() {
+        serializer.collect_str(spelled)
+    } else {
+        bytes.serialize(serializer)
+    }
+}
+
+/// What [`write_digest`] wrote. A human-readable format is read through
+/// the one hex spelling, and a wrong length is a refusal rather than a
+/// padded guess.
+fn read_digest<'de, const N: usize, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<[u8; N], D::Error>
+where
+    [u8; N]: Deserialize<'de>,
+{
+    if !deserializer.is_human_readable() {
+        return <[u8; N]>::deserialize(deserializer);
+    }
+    let raw = String::deserialize(deserializer)?;
+    decode_hex_fixed::<N>(&raw).ok_or_else(|| {
+        serde::de::Error::custom(format_args!(
+            "expected exactly {} lowercase hex digits",
+            N.saturating_mul(2)
+        ))
+    })
 }
 
 /// Sub-content range. `Lines` is 1-based closed; `Bytes` is 0-based closed.
@@ -217,7 +241,8 @@ impl Locator {
                     "unknown or missing algorithm tag; the only tag is `b3-`",
                 )
             })?;
-            let hash = B3Hash::parse_hex(hex)
+            let hash = decode_hex_fixed::<32>(hex)
+                .map(B3Hash)
                 .ok_or_else(|| invalid(raw, "hash must be exactly 64 lowercase hex digits"))?;
             return Ok(Locator::Cas { hash, range });
         }
@@ -228,7 +253,7 @@ impl Locator {
                 .ok_or_else(|| invalid(raw, "file locator needs `<address>@<git-oid>`"))?;
             let address = Address::parse(addr_raw)
                 .map_err(|_| invalid(raw, "address part violates the address grammar"))?;
-            let oid = GitOid::parse_hex(oid_raw)
+            let oid = GitOid::parse(oid_raw)
                 .ok_or_else(|| invalid(raw, "git oid must be exactly 40 lowercase hex digits"))?;
             return Ok(Locator::File {
                 address,
