@@ -301,6 +301,12 @@ pub(super) const VERBS: &[Row] = &[
             flag("--kind", Value("kind"), "only lines of this event kind"),
             flag("--who", Value("addr"), "only lines whose address starts so"),
             flag("--grep", Value("text"), "only lines holding this text"),
+            flag(
+                "--since",
+                Value("utc"),
+                "only lines at or after this moment, as 2026-05-14T09:31:07Z",
+            ),
+            flag("--until", Value("utc"), "only lines before this moment"),
             flag("--runs", Nothing, "one JSON line per run, with its parents"),
         ],
         says: "read a city's ledger lines or its run tree, read-only",

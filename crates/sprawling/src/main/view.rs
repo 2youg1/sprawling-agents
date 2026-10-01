@@ -16,6 +16,7 @@
 use super::city::report;
 use super::grammar::{Arguments, nearest};
 use kernel::{AxError, EventKind, EventRecord, RunId, Seq};
+use runtime::clock::{UtcSpan, parse_iso};
 use std::io::{BufWriter, ErrorKind, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
@@ -30,6 +31,8 @@ pub(super) struct Selection {
     pub(super) kind: Option<EventKind>,
     pub(super) who: Option<String>,
     pub(super) grep: Option<String>,
+    /// The moments a line's own `t` must fall in (sprawling-SPEC.md 8-137).
+    pub(super) span: UtcSpan,
 }
 
 /// Who reads stdout, decided once per command: an agent reading a pipe
@@ -162,9 +165,10 @@ impl Selection {
                 run: None,
                 kind: None,
                 who: None,
-                grep: None
+                grep: None,
+                span: _
             }
-        )
+        ) && self.span == UtcSpan::default()
     }
 
     fn read(read: &Arguments) -> Result<Selection, String> {
@@ -177,6 +181,7 @@ impl Selection {
             kind: read.value("--kind").map(kind_named).transpose()?,
             who: read.value("--who").map(str::to_owned),
             grep: read.value("--grep").map(str::to_owned),
+            span: utc_span(read)?,
         })
     }
 
@@ -213,6 +218,19 @@ fn whole_number(read: &Arguments, flag: &str) -> Result<Option<u64>, String> {
                 .map_err(|_| format!("{flag} wants a whole number, not '{raw}'"))
         })
         .transpose()
+}
+
+/// The span `--since` and `--until` give, each end read by
+/// `runtime::clock::parse_iso`, or the line that says which end could
+/// not be read and what shape it wants.
+fn utc_span(read: &Arguments) -> Result<UtcSpan, String> {
+    let moment = |flag: &str| {
+        read.value(flag)
+            .map(|raw| parse_iso(raw).map_err(|err| format!("{flag} '{raw}': {}", err.recovery())))
+            .transpose()
+    };
+    UtcSpan::new(moment("--since")?, moment("--until")?)
+        .map_err(|err| format!("--since and --until: {}", err.recovery()))
 }
 
 /// The seq `flag` names. `view --from` and the playback range read a seq

@@ -30,6 +30,44 @@ pub fn iso(at: TimeMs) -> String {
     format_at(at, 0)
 }
 
+/// The moment `raw` spells in the one shape [`iso`] writes.
+///
+/// # Errors
+/// `E_INVALID_ARGS` for every other spelling (runtime-SPEC 8-10).
+pub fn parse_iso(raw: &str) -> Result<TimeMs, AxError> {
+    Err(AxError::failure(AxCode::InvalidArgs, "read a UTC moment", raw).with_recovery("red"))
+}
+
+/// The moments a selection by time keeps (runtime-SPEC 8-57).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct UtcSpan {
+    since: Option<TimeMs>,
+    until: Option<TimeMs>,
+}
+
+impl UtcSpan {
+    /// # Errors
+    /// `E_INVALID_ARGS` when `until` is not after `since`.
+    pub fn new(since: Option<TimeMs>, until: Option<TimeMs>) -> Result<UtcSpan, AxError> {
+        Ok(UtcSpan { since, until })
+    }
+
+    #[must_use]
+    pub fn since(&self) -> Option<TimeMs> {
+        self.since
+    }
+
+    #[must_use]
+    pub fn until(&self) -> Option<TimeMs> {
+        self.until
+    }
+
+    #[must_use]
+    pub fn contains(&self, _at: TimeMs) -> bool {
+        true
+    }
+}
+
 /// One configured zone's row: the offset it was computed from and the
 /// same second in that zone, `2026-05-14T18:31:07+09:00`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -326,6 +364,105 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(s.utc_ms, TimeMs::new(61_000));
+    }
+
+    /// Every second from 1970 to 9999 is written by `iso` and read back
+    /// by `parse_iso` to the same second; the milliseconds `iso` drops are
+    /// the only difference.
+    #[test]
+    fn an_iso_moment_reads_back_to_the_second_it_was_written() {
+        let last = 253_402_300_799_999u64; // 9999-12-31T23:59:59.999Z
+        let step = 7_919_999_999u64; // not a whole day, so the sweep walks every hour
+        let moments = (0..=last / step).map(|k| k * step).chain([
+            0,
+            999,
+            951_782_400_000,   // 2000-02-29T00:00:00Z
+            1_709_251_199_999, // 2024-02-29T23:59:59.999Z
+            4_107_542_400_000, // 2100-03-01T00:00:00Z
+            last,
+        ]);
+        for at in moments {
+            let written = iso(TimeMs::new(at));
+            assert_eq!(
+                parse_iso(&written),
+                Ok(TimeMs::new(at - at % 1_000)),
+                "{written}"
+            );
+        }
+        assert_eq!(
+            parse_iso("2024-02-29T23:59:59Z"),
+            Ok(TimeMs::new(1_709_251_199_000))
+        );
+    }
+
+    /// Every spelling but the one `iso` writes is refused, and the refusal
+    /// shows the shape it wanted.
+    #[test]
+    fn parse_iso_refuses_every_spelling_iso_does_not_write() {
+        for raw in [
+            "2026-05-14T18:31:07+09:00",
+            "2026-05-14T09:31:07.000Z",
+            "2026-05-14",
+            "2026-05-14 09:31:07Z",
+            "2026-05-14t09:31:07z",
+            "2026-02-30T00:00:00Z",
+            "2025-02-29T00:00:00Z",
+            "2100-02-29T00:00:00Z",
+            "2026-13-01T00:00:00Z",
+            "2026-00-10T00:00:00Z",
+            "2026-05-00T00:00:00Z",
+            "2026-05-14T24:00:00Z",
+            "2026-05-14T09:60:00Z",
+            "2026-12-31T23:59:60Z",
+            "1969-12-31T23:59:59Z",
+            "+026-05-14T09:31:07Z",
+            " 2026-05-14T09:31:07Z",
+            "",
+        ] {
+            let refused = parse_iso(raw);
+            assert!(
+                matches!(&refused, Err(err) if *err.code() == AxCode::InvalidArgs
+                    && err.subject() == raw
+                    && err.recovery().contains("2026-05-14T09:31:07Z")),
+                "{raw:?}: {refused:?}"
+            );
+        }
+    }
+
+    /// `[since, until)`: the start is kept, the end is not, and an absent
+    /// end bounds nothing.
+    #[test]
+    fn a_span_keeps_its_start_and_leaves_out_its_end() {
+        let at = TimeMs::new;
+        let both = UtcSpan::new(Some(at(1_000)), Some(at(2_000))).unwrap();
+        assert_eq!(
+            [999, 1_000, 1_999, 2_000].map(|t| both.contains(at(t))),
+            [false, true, true, false]
+        );
+        let until = UtcSpan::new(None, Some(at(2_000))).unwrap();
+        assert_eq!([0, 2_000].map(|t| until.contains(at(t))), [true, false]);
+        let since = UtcSpan::new(Some(at(1_000)), None).unwrap();
+        assert_eq!(
+            [999, u64::MAX].map(|t| since.contains(at(t))),
+            [false, true]
+        );
+        assert!(UtcSpan::default().contains(at(0)));
+    }
+
+    /// A span that holds no moment is refused when it is built, naming
+    /// both ends.
+    #[test]
+    fn a_span_with_no_moment_in_it_is_refused() {
+        let at = TimeMs::new;
+        for (since, until) in [(2_000, 2_000), (2_001, 2_000)] {
+            let refused = UtcSpan::new(Some(at(since)), Some(at(until)));
+            assert!(
+                matches!(&refused, Err(err) if *err.code() == AxCode::InvalidArgs
+                    && err.subject().contains(&iso(at(since)))
+                    && err.subject().contains(&iso(at(until)))),
+                "{since}..{until}: {refused:?}"
+            );
+        }
     }
 
     #[test]
