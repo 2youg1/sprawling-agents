@@ -439,18 +439,13 @@ mutants:
 budget:
     cargo xtask budget
 
-# The features of the binary a person downloads, spelled once: every
-# recipe that builds or measures the product reads it, so a reading is
-# never taken on a binary nobody installs (citysim D9).
-product_features := "sprawling/sandbox"
-
 # The wall-clock readings, never gated: citysim's load scenarios, then
 # the two instruments that drive the city's own accounting loop - a relay
 # round trip and the gap a second dispatch leaves in a running one
 # (sprawling-SPEC.md 8-84).
 bench:
-    cargo run --release -p citysim --features {{product_features}} --bin bench
-    cargo nextest run -p sprawling -p sprawling-accounting --release --features {{product_features}} --run-ignored only -E 'test(/::instrument_/)' --no-capture
+    cargo run --release -p citysim --bin bench
+    cargo nextest run -p sprawling -p sprawling-accounting --release --run-ignored only -E 'test(/::instrument_/)' --no-capture
 
 # The four-action pressure reading (tools/citysim/Spec.lean 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.
@@ -464,8 +459,8 @@ bench:
 # lands beside its own executable, so no run can be driven by a stale
 # artifact. This recipe is where that ordering lives.
 bench-startup: build-web
-    cargo build --release -p sprawling --features {{product_features}} --locked
-    cargo run --release -p citysim --features {{product_features}} --bin bench_startup --locked
+    cargo build --release -p sprawling --locked
+    cargo run --release -p citysim --bin bench_startup --locked
 
 # CycloneDX bill of materials for the release archive. Where it lands is
 # written once, in `cargo xtask sbom`, and the archive's contents table
@@ -481,14 +476,15 @@ repro:
 # it, then its bill of materials.
 # An optional target triple builds for a platform other than this
 # machine's default.
-# **The engine is part of what ships.** `runtime/wasm` is off by default,
-# so a plain release build carries no execution engine and every `python`
-# call an archive's city makes would be refused; `cargo xtask package`
-# refuses exactly that binary, which is how a release built without
-# `product_features` fails at the last step instead of publishing a
-# crippled one. The size this produces is the size a person downloads.
+# **The engine is part of what ships.** `sandbox`, which carries
+# `runtime/wasm`, is a default feature of the sprawling package, so every
+# recipe that builds or measures the product builds it without
+# `--features` (citysim D9); `cargo xtask package` refuses a binary
+# without the engine, so a build that lost it fails at the last step
+# instead of publishing a crippled one. The size this produces is the size
+# a person downloads.
 dist target="": build-web
-    cargo build --release -p sprawling --features {{product_features}} --locked {{ if target == "" { "" } else { "--target " + target } }}
+    cargo build --release -p sprawling --locked {{ if target == "" { "" } else { "--target " + target } }}
     cargo xtask sbom
 
 # The release archive: the one file a person downloads, unpacks and runs.
@@ -510,7 +506,7 @@ replay log:
 # empty one, or `--city <dir>` - so the release binary is built first: a
 # reading of a stale binary describes a tree nobody has.
 mem *args:
-    {{ if args =~ '^[0-9]+$' { "true" } else if args =~ '^long-turn' { "cargo build --release -p citysim --bin long_turn --locked" } else { "cargo build --release -p sprawling --features " + product_features + " --locked" } }}
+    {{ if args =~ '^[0-9]+$' { "true" } else if args =~ '^long-turn' { "cargo build --release -p citysim --bin long_turn --locked" } else { "cargo build --release -p sprawling --locked" } }}
     {{ if args =~ '^long-turn' { "just mem-long-turn " + trim_start_match(args, "long-turn") } else { "cargo xtask mem " + args } }}
 
 # The long turn's counters, read through `cargo xtask mem` each time the
