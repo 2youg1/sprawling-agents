@@ -107,7 +107,7 @@ To stop work, you have three verbs. **`/steer <text>`** adds an instruction to a
 | `/clear`, `/compact` | `/clear` and `/new` start a fresh session; `/new --carry` carries the room's `Handoff.md` across |
 | `/model` | `/model <id>`, the **model** pill under the box, or the model table in settings |
 | thinking budget | the **effort** pill, from `none` to `max` |
-| plan mode | the **plan** mode on the **mode** pill, or asking the Mayor, whose job is planning |
+| plan mode | asking the Mayor, whose job is planning |
 | subagents | other residents: a run can `delegate`, speak to a neighbour, or wake one, and every one of them is a run you can open |
 | permission prompts | `RULES.toml` decides; only design questions reach you, on **waiting on you** |
 | skills in `~/.claude/skills` | the same folders, mounted as a shelf and admitted per building |
@@ -198,7 +198,7 @@ Under the box, four pills say how the message runs, and a click changes each:
 | **model** | the model that answers; a session keeps the model it started on, so choosing another opens a new session |
 | **workspace** | the room that hears the message |
 | **effort** | how long the model reasons first |
-| **mode** | the discipline of the run: **chat** answers what you say; **plan** writes a plan down and works towards it; **build** makes one new piece with its own tests; **renovate** reworks something without changing what it does; **change** changes behaviour with evidence on known and new cases; **experiment** tries something whose results go to `Memo.md` and land nowhere else |
+| **mode** | what the run does with your message: **chat** answers what you say and changes nothing else; **work** carries out the task towards the goal you state |
 
 Write the idea in one sentence — *rewrite the ledger reader so a cold read of a million events stays under a second, and write down the numbers you measured* — leave the workspace at `hall/mayor`, and press Enter.
 
