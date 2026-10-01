@@ -46,6 +46,7 @@
 4. **前缀续期未接线**：`prefix::warmth` 的 `Warmed` 与记账已在（§8-4-2），而 run 结束后按 `next_due` 醒来发续期的那条循环还没有；接上它要先定续期的 usage 记成哪一种事件。
 6. **`contract_kept` 的证据今天没人量。** 城读不出一次翻新有没有动到可观察的契约，装配层把 `Produced.contract_moved` 恒填 `false`，所以选了 `contract_kept` 的 run 在合并时恒放行（§8-54）。要让这一要求真的拒，得有一个读得出契约的量具（例如 run 前后同一组对外测试的结果对照）把它填进 `Produced`；判定它的证据是一次动了对外行为、测试仍绿的翻新在 citysim 里被放行。
 7. **`Create` 管不到楼的 MCP 工具。** 一个 MCP server 是楼自己声明的外部进程，它写不写文件、写在哪里，城看不见（§8-55 只覆盖城自己的写路径：edit、exec 与链接）。候选是 `Create` 下不挂载声明了写效果的连接器，或只挂载声明只读的；判定它的证据是一个会写文件的连接器在 `Create` 的 run 里改动了已有文件。
+8. **分叉的第一个请求改写了母 run 的第一条消息**：`fork::request_tests` 把母 run 与分叉都经 `drive` 真跑一遍，分叉从账本经 `inherited_indexed` 重建，比较模型缝收到的每一条消息的序列化字节。母 run 最后一个请求里的消息，除第一条外在分叉的第一个请求开头逐字节相同；第一条，母 run 发的是它开篇那一种写法（`Opening::WithPerson` 是人的原话，`Opening::FromJob` 是一句指向前缀里 JOB.md 的话），重建按 `run_started.job` 在场一律写成 `Opening::Inherited` 的 `Task: …\nGoal: …`。provider 的提示缓存只认逐字节相同的前缀，所以每一次分叉都从第一条消息起把整段对话重付一遍（fx 研究 R6 要守的正是这一点）。`run_started` 不记 run 是怎么开篇的，`fork::fold_run` 因此无从照抄；补上它要 `RunStarted` 多一个记开篇的字段（kernel 的事件载荷，由 `run::charter` 写），`fold_run` 读它：`WithPerson` 照原话重建；`FromJob` 那一句指向的是母 run 前缀里的 JOB.md，分叉的前缀里没有它，所以那一种仍须改写，改写的理由写在 `fold_run` 旁边。测试以 `#[ignore]` 停着，指向本条；修好时去掉 `ignore`。另一半不在本 crate：分叉的冻结前缀由 `accounting::worker::freezing` 为分叉组装，它的 run 段若与母 run 的不同，provider 在 system 那一段就已不命中，消息再一致也无用；那一半要在 accounting 里对真组装出来的前缀比字节。
 
 ## 4 现状分析
 
