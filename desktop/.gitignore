@@ -3,8 +3,3 @@
 # without a cache directory of their own.
 /ffi/.zig-cache
 /ffi/zig-out
-# The fuzz target's build, corpus and findings.
-/ffi/fuzz/target
-/ffi/fuzz/corpus
-/ffi/fuzz/artifacts
-/ffi/fuzz/coverage

@@ -6,13 +6,13 @@
 //! The leaf's buffer rules, called on their own: the very functions of
 //! `zig/boundary.zig` the operations write Rust's memory with.
 //!
-//! They are public so the two judges outside this file reach them
-//! through the door production uses: the equivalence check below, which
-//! compares each with a Rust reference on seeded inputs, and the fuzz
-//! target under `desktop/ffi/fuzz/`, which compares the same pairs on
-//! inputs a fuzzer chooses. [`bitmap_bytes`] is also the size the
-//! capture lends its buffer at. Every buffer here starts zeroed, so what
-//! a rule left untouched is part of what the two sides are compared on.
+//! They are public so the judge below reaches them through the door
+//! production uses: the equivalence check compares each with the Rust
+//! reference on seeded inputs, twenty thousand per rule on every test
+//! run, and as many as `just fuzz-desktop` asks for from a seed it
+//! names. [`bitmap_bytes`] is also the size the capture lends its buffer
+//! at. Every buffer here starts zeroed, so what a rule left untouched is
+//! part of what the two sides are compared on.
 
 use crate::ended;
 use crate::leaf;
@@ -172,30 +172,29 @@ mod tests {
         }
     }
 
-    /// The leaf and the Rust reference give the same answer, buffers
-    /// included, on every drawn input, for each of the four rules.
-    #[test]
-    fn the_leaf_and_the_rust_reference_agree_on_every_drawn_input() {
-        let mut draws = Draws(0x5eed_de5c_70b0_0001);
-        for round in 0..20_000 {
+    /// `rounds` drawn inputs from `seed`, each through the leaf and the
+    /// reference, for each of the four rules.
+    fn agree(seed: u64, rounds: u64) {
+        let mut draws = Draws(seed);
+        for round in 0..rounds {
             let units = draws.units();
             let capacity = draws.below(52);
             assert_eq!(
                 text_copy(&units, capacity),
                 reference::text_copy(&units, capacity),
-                "round {round}: copy {units:?} into {capacity}"
+                "seed {seed:#x} round {round}: copy {units:?} into {capacity}"
             );
             let block_len = units.len() + draws.below(3);
             assert_eq!(
                 text_fill(&units, block_len),
                 reference::text_fill(&units, block_len),
-                "round {round}: fill {units:?} into {block_len}"
+                "seed {seed:#x} round {round}: fill {units:?} into {block_len}"
             );
             let stream: Vec<usize> = units.iter().map(|unit| usize::from(*unit)).collect();
             assert_eq!(
                 keep(&stream, capacity),
                 reference::keep(&stream, capacity),
-                "round {round}: keep {stream:?} in {capacity}"
+                "seed {seed:#x} round {round}: keep {stream:?} in {capacity}"
             );
             let (width, height) = (
                 draws.next() as i32 >> draws.below(31),
@@ -204,9 +203,39 @@ mod tests {
             assert_eq!(
                 bitmap_bytes(width, height),
                 reference::bitmap_bytes(width, height),
-                "round {round}: bitmap {width}x{height}"
+                "seed {seed:#x} round {round}: bitmap {width}x{height}"
             );
         }
+    }
+
+    /// The leaf and the Rust reference give the same answer, buffers
+    /// included, on every drawn input, for each of the four rules.
+    #[test]
+    fn the_leaf_and_the_rust_reference_agree_on_every_drawn_input() {
+        agree(0x5eed_de5c_70b0_0001, 20_000);
+    }
+
+    /// The same comparison for as long as a person asks: the rounds and
+    /// the seed come from `DESKTOP_FFI_FUZZ_ROUNDS` and
+    /// `DESKTOP_FFI_FUZZ_SEED`, and a disagreement prints the seed and
+    /// the round it replays from. libFuzzer has no platform for this
+    /// leaf today (desktop-SPEC.md section 12.12), so the Rust side is
+    /// fuzzed by drawing rather than by coverage.
+    #[test]
+    #[ignore = "runs for as long as DESKTOP_FFI_FUZZ_ROUNDS asks; `just fuzz-desktop` runs it"]
+    fn the_leaf_and_the_rust_reference_agree_for_as_long_as_asked() {
+        let asked = |name: &str| {
+            std::env::var(name)
+                .ok()
+                .and_then(|value| u64::from_str_radix(value.trim_start_matches("0x"), 16).ok())
+        };
+        let rounds = std::env::var("DESKTOP_FFI_FUZZ_ROUNDS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(1_000_000);
+        // Xorshift never leaves zero, so a zero seed is taken as one.
+        let seed = asked("DESKTOP_FFI_FUZZ_SEED").unwrap_or(0x5eed_f022).max(1);
+        agree(seed, rounds);
     }
 
     /// The edges a drawn input reaches rarely, written down.

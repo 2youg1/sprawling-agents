@@ -6,9 +6,6 @@
 # (desktop-SPEC.md section 8-12).
 [workspace]
 members = ["ffi"]
-# The fuzz target is a cargo-fuzz project of its own, built on nightly
-# with sanitizer flags, and never part of this build.
-exclude = ["ffi/fuzz"]
 
 [workspace.package]
 version = "0.0.7"
