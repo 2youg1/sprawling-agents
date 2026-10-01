@@ -5,6 +5,7 @@
 
 //! The plan as a tree: what the nodes are, what each one is worth, what
 //! may be started now, and the two ways a held node is put down.
+//! The part `crates/kernel/spec/Plan.lean` specifies this module.
 //!
 //! `crate::spine` owns the document — how a row is written and read.
 //! This module owns the structure that document describes, and the two

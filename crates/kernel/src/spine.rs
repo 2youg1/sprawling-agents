@@ -5,6 +5,7 @@
 
 //! The spine documents' grammar: how a row of `Roadmap.md` is written
 //! and read, and the six fields a Memo outline carries.
+//! The part `crates/kernel/spec/Spine.lean` specifies this module.
 //!
 //! Shape and truth are two doors. `check_*` answers "is this written
 //! like a roadmap"; what the rows then *mean* — how they hang together,

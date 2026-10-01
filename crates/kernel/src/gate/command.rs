@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The command door: whether a run may execute a command at all.
+//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! rest of `kernel::gate`.
 //!
 //! A command's effect is whatever its text says, and no door can list
 //! that in advance, so the only input this door reads is where the run's

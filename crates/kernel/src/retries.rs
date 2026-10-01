@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How many times a failed call is made again.
+//! The part `crates/kernel/spec/Retries.lean` specifies this module.
 //!
 //! **One value, one absence.** The figure is a value here and its
 //! absence is [`Retries::UntilHalted`] by construction, so a dispatch,

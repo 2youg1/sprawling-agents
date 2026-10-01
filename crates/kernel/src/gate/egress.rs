@@ -3,6 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+//! The egress doors: whether bytes may leave and whether a host may be
+//! reached.
+//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! rest of `kernel::gate`.
+
 use crate::error::{AxCode, AxError, GateRefusal};
 use crate::secret::SecretSpan;
 

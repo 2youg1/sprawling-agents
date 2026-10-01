@@ -5,6 +5,7 @@
 
 //! A pursuit: a goal the city keeps working towards, and the one
 //! condition under which a city that holds one stops.
+//! The part `crates/kernel/spec/Pursuit.lean` specifies this module.
 //!
 //! The construction plan called this Endless. It is named for what it
 //! is rather than for how long it lasts, because three other things in

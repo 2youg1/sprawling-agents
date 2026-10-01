@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Sealed values: plaintext that cannot reach any sink.
+//! The part `crates/kernel/spec/Secret.lean` specifies this module with the
+//! rest of `kernel::secret`.
 
 use secrecy::{ExposeSecret, SecretBox};
 use zeroize::{Zeroize, Zeroizing};

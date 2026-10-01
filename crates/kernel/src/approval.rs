@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The Approval Inbox holds design questions and nothing else (9.2).
+//! The part `crates/kernel/spec/Approval.lean` specifies this module.
 //!
 //! An action is either allowed by a rule or refused by one, and both
 //! answers are the gates' (§8-27); what is left for a person is the

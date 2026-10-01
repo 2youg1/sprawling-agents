@@ -6,6 +6,7 @@
 //! The Ledger port: the only write entrance to history (seam list,
 //! ARCHITECTURE section 3), plus the chain rule both adapters and replay
 //! share.
+//! The part `crates/kernel/spec/Ledger.lean` specifies this module.
 //!
 //! Contract owned here:
 //! - implementations own seq/prev assignment and byte production; callers

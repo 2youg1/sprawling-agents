@@ -9,6 +9,7 @@
 //! state that stops the city taking on new work is a disk close to full,
 //! and the refusal carries that [`Degradation::DiskLow`] so the door can
 //! say how much to free.
+//! The part `crates/kernel/spec/Degradation.lean` specifies this module.
 
 use std::time::Duration;
 

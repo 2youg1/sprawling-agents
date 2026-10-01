@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one door that asks a person.
+//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! rest of `kernel::gate`.
 //!
 //! Every other door answers from the rules it was handed. This one
 //! cannot: what it would grant is not an action but the whole of the

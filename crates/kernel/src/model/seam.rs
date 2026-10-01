@@ -5,6 +5,8 @@
 
 //! What one call across the seam carries in each direction, and the two
 //! conversions between assistant content and a ledger payload.
+//! The part `crates/kernel/spec/Model.lean` specifies this module with the
+//! rest of `kernel::model`.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Map;

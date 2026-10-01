@@ -5,6 +5,7 @@
 
 //! Address: canonical relative path inside a city, and
 //! the WriteDomain primitive `is_within`.
+//! The part `crates/kernel/spec/Address.lean` specifies this module.
 //!
 //! Invariants owned here:
 //! - one constructor: [`Address::parse`]; whatever it accepts is already

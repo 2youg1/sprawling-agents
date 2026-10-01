@@ -6,6 +6,7 @@
 //! WriteDomain prefix checking and edit-war detection. C17 is enforced twice on purpose: a reserved prefix cannot be
 //! *constructed into* a domain, and a reserved target is refused at
 //! judgment even so — fail-closed has no single point of failure.
+//! The part `crates/kernel/spec/WriteDomain.lean` specifies this module.
 
 use std::collections::BTreeMap;
 

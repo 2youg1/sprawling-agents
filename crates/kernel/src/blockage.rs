@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Red, and how far it reaches.
+//! The part `crates/kernel/spec/Blockage.lean` specifies this module.
 //!
 //! **Red is not a new mechanism.** Every source of it is a fact the city
 //! already records — a run that froze without citing anything, a door

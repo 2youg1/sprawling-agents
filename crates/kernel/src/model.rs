@@ -7,6 +7,7 @@
 //! Every provider call carries a `BuildingPolicy` value; the policy is
 //! *defined* here (kernel cannot name outer crates) and *evaluated* by
 //! `city::policy` — dependency inversion, same as the ledger seam.
+//! The part `crates/kernel/spec/Model.lean` specifies this module.
 
 mod image;
 mod mode;

@@ -9,6 +9,7 @@
 //! entropy runs in fixed point so the judgment is deterministic and
 //! kani-provable. False positives are the accepted normal: the entrance
 //! replaces losslessly, only the exits refuse.
+//! The part `crates/kernel/spec/Secret.lean` specifies this module.
 
 mod hex_run;
 mod scan;

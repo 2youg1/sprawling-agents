@@ -6,6 +6,7 @@
 //! Same-resource mutual exclusion. Detection is
 //! kernel's; arbitration is not — reading statements and judging intent
 //! belongs to models (collab::arbiter) and humans.
+//! The part `crates/kernel/spec/Goal.lean` specifies this module.
 
 use serde::{Deserialize, Serialize};
 

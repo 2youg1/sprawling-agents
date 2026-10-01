@@ -6,6 +6,7 @@
 //! The sole stall criterion. Watchdog consumes the
 //! verdict and decides disposal; it never re-derives the criterion —
 //! "what counts as stalled" lives here and nowhere else.
+//! The part `crates/kernel/spec/Stall.lean` specifies this module.
 
 use crate::consts_policy::LOOP_REPEAT_THRESHOLD;
 use crate::locator::B3Hash;

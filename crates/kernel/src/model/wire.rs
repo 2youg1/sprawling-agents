@@ -5,6 +5,8 @@
 
 //! The canonical conversation vocabulary: what a request and a response
 //! are made of, in the city dialect every adapter translates from.
+//! The part `crates/kernel/spec/Model.lean` specifies this module with the
+//! rest of `kernel::model`.
 
 use std::borrow::Cow;
 use std::num::NonZeroU64;

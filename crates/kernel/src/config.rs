@@ -5,6 +5,7 @@
 
 //! Three-layer config resolution and the frozen/live split. `FrozenConfig` and `LiveConfig` share no field: the freeze
 //! line is a machine-checkable property, not a review note.
+//! The part `crates/kernel/spec/Config.lean` specifies this module.
 
 use serde::{Deserialize, Serialize};
 

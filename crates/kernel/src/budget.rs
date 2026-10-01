@@ -5,6 +5,7 @@
 
 //! Money and quantities as integers (15.3-6), and what a piece of work
 //! turned out to cost.
+//! The part `crates/kernel/spec/Budget.lean` specifies this module.
 //!
 //! There is no ceiling here and no decision that reads one. Nobody can
 //! price a piece of work before it runs, so the only brake this city has

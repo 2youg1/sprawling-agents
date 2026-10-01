@@ -5,6 +5,8 @@
 
 //! Pure decision functions: values in, verdicts out. Zero internal deps.
 //! Holds no I/O handles, no clock, no global state (ARCHITECTURE.md paragraph 1).
+//! The entry `crates/kernel/Spec.lean` specifies this crate, and each module
+//! names the part under `crates/kernel/spec/` that specifies it.
 //!
 //! **This file is an index, and the modules are the library.** Every
 //! module is public and a caller reaches a decision through the module

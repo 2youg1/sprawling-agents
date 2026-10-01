@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What moved between two checkpoints, as a fact rather than as a patch.
+//! The part `crates/kernel/spec/Change.lean` specifies this module.
 //!
 //! Here rather than beside the git call that produces it, for the reason
 //! `Restoration` is here: three places need this shape — `storage` reads

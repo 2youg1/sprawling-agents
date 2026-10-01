@@ -9,6 +9,7 @@
 //! door between the two (player–referee in the type). The registry is a
 //! value, not a store: state lives with the caller and is rebuilt from
 //! the Ledger.
+//! The part `crates/kernel/spec/Registry.lean` specifies this module.
 
 use std::collections::{BTreeMap, BTreeSet};
 

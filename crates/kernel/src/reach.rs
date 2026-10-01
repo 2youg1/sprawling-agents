@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Where a call to a provider stops, stage by stage.
+//! The part `crates/kernel/spec/Reach.lean` specifies this module.
 //!
 //! **A refusal reading `error sending request for url (...): operation
 //! timed out` tells a person nothing they can act on.** Four things go

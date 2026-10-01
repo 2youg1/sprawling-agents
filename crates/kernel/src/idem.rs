@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! IdemKey: the dedup key for outward actions.
+//! The part `crates/kernel/spec/Idem.lean` specifies this module.
 //!
 //! Derivation is the whole point: `BLAKE3-XOF(run(16B) || seq(8B LE) ||
 //! action_canonical)` taken as a direct 16-byte output (not a truncation),

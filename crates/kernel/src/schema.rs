@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The JSON Schema of the values a derive cannot state.
+//! The part `crates/kernel/spec/Schema.lean` specifies this module.
 //!
 //! Every other value on the wire derives its schema from the declaration
 //! serde reads, so the two cannot drift. These are the strings a grammar

@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Discard verdicts: the decision table.
+//! The part `crates/kernel/spec/Discard.lean` specifies this module with the
+//! rest of `kernel::discard`.
 
 use super::request::{DenyReason, DiscardRequest};
 

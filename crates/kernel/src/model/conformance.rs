@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One assertion suite for every model implementation (V3).
+//! The part `crates/kernel/spec/Model.lean` specifies this module with the
+//! rest of `kernel::model`.
 
 use super::image::{ImageRef, ImageType};
 use super::wire::{ChatMessage, ContentBlock, Role};

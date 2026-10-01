@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A plan node's address: the dotted path that says where it hangs.
+//! The part `crates/kernel/spec/NodeId.lean` specifies this module.
 //!
 //! **A value, and that is why it is not in `kernel::plan`.** The tree
 //! decides — what may be started, what a branch is worth, which of the

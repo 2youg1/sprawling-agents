@@ -4,7 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Locator: the one grammar for referring to content across events and
-//! sessions. Two schemes only:
+//! sessions. The part `crates/kernel/spec/Locator.lean` specifies this
+//! module. Two schemes only:
 //!
 //! `cas:b3-<hex64>[#(L|B)<a>-<b>]` | `file:<address>@<hex40>[#(L|B)<a>-<b>]`
 //!

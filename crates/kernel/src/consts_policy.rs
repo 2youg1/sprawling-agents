@@ -6,6 +6,7 @@
 //! Policy constants: our choices. Changing one
 //! changes behavior and therefore requires EVAL evidence or an
 //! explicit ruling. Data only — zero branches by charter.
+//! The part `crates/kernel/spec/ConstsPolicy.lean` specifies this module.
 //!
 //! Five entries carry a type rather than a plain number (`crates/kernel/spec/ConstsPolicy.lean`
 //! §8-8): AUTONOMY_DEFAULT, CLOCK_STAMP_DEFAULT, and the three limits

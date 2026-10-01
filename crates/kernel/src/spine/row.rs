@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Roadmap rows: the types a table is read into.
+//! The part `crates/kernel/spec/Spine.lean` specifies this module with the
+//! rest of `kernel::spine`.
 
 use serde::{Deserialize, Serialize};
 

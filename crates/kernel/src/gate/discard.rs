@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The discard door: whether these files may go.
+//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! rest of `kernel::gate`.
 //!
 //! The decision is `crate::discard`'s; this file shapes the refusal the
 //! model reads, which is the only thing a door adds to a verdict.

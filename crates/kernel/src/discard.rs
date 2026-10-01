@@ -9,6 +9,7 @@
 //! as a request shape for exec forecasts — and the door denies it.
 //! This module is the discard door's sole authority; `gate::discard`
 //! delegates wholly and only shapes the refusal.
+//! The part `crates/kernel/spec/Discard.lean` specifies this module.
 
 mod forecast;
 mod request;

@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Table rewrites: status changes and child insertions.
+//! The part `crates/kernel/spec/Spine.lean` specifies this module with the
+//! rest of `kernel::spine`.
 
 use crate::error::{AxCode, AxError};
 use crate::locator::Locator;

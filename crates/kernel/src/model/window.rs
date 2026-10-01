@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How much of a conversation one model can be given at once.
+//! The part `crates/kernel/spec/Model.lean` specifies this module with the
+//! rest of `kernel::model`.
 
 use std::num::NonZeroU64;
 

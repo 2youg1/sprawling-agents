@@ -6,6 +6,7 @@
 //! External-fact constants: values that follow the
 //! outside world. Changing one requires evidence that the world changed,
 //! never our own preference.
+//! The part `crates/kernel/spec/ConstsExternal.lean` specifies this module.
 //!
 //! Data, plus the classifications that read that data and nothing else:
 //! [`readable_log_v`] answers a question only [`EVENT_LOG_V`] can answer

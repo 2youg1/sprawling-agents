@@ -7,6 +7,7 @@
 //! One function serves every queue-shaped resource — signal queues and fd
 //! headroom alike; capacity semantics belong to the caller. Queues and
 //! counters live in storage::queue, never here.
+//! The part `crates/kernel/spec/Backpressure.lean` specifies this module.
 
 /// A queue's occupancy snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

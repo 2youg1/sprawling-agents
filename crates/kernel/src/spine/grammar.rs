@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Table grammar: locating the table and reading its rows.
+//! The part `crates/kernel/spec/Spine.lean` specifies this module with the
+//! rest of `kernel::spine`.
 
 use crate::locator::Locator;
 use crate::node_id::NodeId;

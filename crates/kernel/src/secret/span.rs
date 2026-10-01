@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Secret references and spans: the shapes that name secrets.
+//! The part `crates/kernel/spec/Secret.lean` specifies this module with the
+//! rest of `kernel::secret`.
 
 use crate::error::{AxCode, AxError};
 

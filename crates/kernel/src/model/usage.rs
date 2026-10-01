@@ -5,6 +5,8 @@
 
 //! What a provider reports a call cost in tokens, and how a stored row
 //! of it reads under each meaning `input_tokens` has had.
+//! The part `crates/kernel/spec/Model.lean` specifies this module with the
+//! rest of `kernel::model`.
 
 use serde::{Deserialize, Serialize};
 

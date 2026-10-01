@@ -8,6 +8,7 @@
 //! city recorded itself (the runtime checks depth). Progress
 //! is honest in the type: only a planned run owns a ratio method —
 //! an unplanned run has nothing to ask a percentage from.
+//! The part `crates/kernel/spec/Completion.lean` specifies this module.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};

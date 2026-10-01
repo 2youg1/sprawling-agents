@@ -9,6 +9,7 @@
 //! dynamically, `admit` re-checks depth at every spawn so a hand-rolled
 //! path cannot sneak past the type. One level is an invariant, not a
 //! constant — a constant would imply it is tunable.
+//! The part `crates/kernel/spec/Delegation.lean` specifies this module.
 
 use serde::{Deserialize, Serialize};
 

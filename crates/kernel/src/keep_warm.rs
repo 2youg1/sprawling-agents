@@ -5,6 +5,7 @@
 
 //! Keep-warm: whether, and when, a prompt cache still in use is renewed
 //! before the provider lets it expire.
+//! The part `crates/kernel/spec/KeepWarm.lean` specifies this module.
 //!
 //! **Off unless the city enables it.** A renewal is a request the person
 //! pays for, so [`KeepWarm::Off`] is the default and plans nothing. Spend

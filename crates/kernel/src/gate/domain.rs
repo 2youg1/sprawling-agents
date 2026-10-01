@@ -3,6 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+//! The domain doors: whether a run may write one file, reach a declared
+//! area, or change a file already there, each read from its WriteDomain.
+//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! rest of `kernel::gate`.
+
 use crate::address::Address;
 use crate::error::{AxCode, AxError, GateRefusal};
 use crate::taint::TaintSet;

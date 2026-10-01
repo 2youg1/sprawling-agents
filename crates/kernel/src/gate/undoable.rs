@@ -5,6 +5,8 @@
 
 //! Which connector tools reach effects nothing here can take back, and
 //! the rule that answers for them.
+//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! rest of `kernel::gate`.
 //!
 //! Every consequential path in this city ships with a way back. A
 //! `Discard` cannot be constructed without a `Restoration`; a tool wave

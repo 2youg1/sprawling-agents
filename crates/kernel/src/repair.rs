@@ -7,6 +7,7 @@
 //! broken, repair is serialized — one live lease per scope subtree, so
 //! two runs can never "fix" the same breakage into a bigger one. The
 //! active table is the caller's state; kernel only judges.
+//! The part `crates/kernel/spec/Repair.lean` specifies this module.
 
 use std::collections::BTreeMap;
 

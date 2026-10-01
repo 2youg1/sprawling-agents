@@ -7,6 +7,7 @@
 //! `ToolMeta` is the eight-field registration: a tool without a complete
 //! meta is invisible to the model. `effect` decides which gate a call
 //! passes; `temporal` decides whether its envelope carries a clock stamp.
+//! The part `crates/kernel/spec/Tool.lean` specifies this module.
 
 use serde::{Deserialize, Serialize};
 

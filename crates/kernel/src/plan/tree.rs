@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The plan as a tree: placement, division, queries, claims, and progress.
+//! The part `crates/kernel/spec/Plan.lean` specifies this module with the
+//! rest of `kernel::plan`.
 
 use std::collections::{BTreeMap, BTreeSet};
 

@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Error codes: the closed AxCode set and its carrier events.
+//! The part `crates/kernel/spec/Error.lean` specifies this module with the
+//! rest of `kernel::error`.
 
 use serde::{Deserialize, Serialize};
 

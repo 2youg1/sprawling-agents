@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Secret scanning: shape-table-first, entropy-second, float-free.
+//! The part `crates/kernel/spec/Secret.lean` specifies this module with the
+//! rest of `kernel::secret`.
 
 use crate::consts_external::{SECRET_SHAPES, SecretCharset};
 use crate::consts_policy::SECRET_ENTROPY_MIN;

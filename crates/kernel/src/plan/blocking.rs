@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Blocking queries: what a node waits for and the circles it waits in.
+//! The part `crates/kernel/spec/Plan.lean` specifies this module with the
+//! rest of `kernel::plan`.
 
 use std::collections::{BTreeMap, BTreeSet};
 

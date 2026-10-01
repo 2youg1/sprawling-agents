@@ -5,6 +5,7 @@
 
 //! AxError, the one error shape of the whole city, and
 //! AxCode, the closed set of 35 error codes.
+//! The part `crates/kernel/spec/Error.lean` specifies this module.
 //!
 //! Invariants owned here:
 //! - every wire spelling (`E_…`) has exactly one authority: [`AxCode::as_str`];

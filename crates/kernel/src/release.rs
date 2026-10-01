@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which release a binary is, and how two releases order.
+//! The part `crates/kernel/spec/Release.lean` specifies this module.
 //!
 //! **One release is spelled two ways, and this is the only place that
 //! knows both.** A git tag reads `v0.0.5-Pre-alpha-260912`; npm accepts

@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Share division: weight is conserved because [`crate::share`] is the only way to hold any.
+//! The part `crates/kernel/spec/Plan.lean` specifies this module with the
+//! rest of `kernel::plan`.
 
 use crate::error::AxError;
 use crate::node_id::NodeId;

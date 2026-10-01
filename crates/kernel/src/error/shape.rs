@@ -5,6 +5,8 @@
 
 //! AxError: the one error shape of the whole city, and ErrorDraft, the
 //! only way to reach it.
+//! The part `crates/kernel/spec/Error.lean` specifies this module with the
+//! rest of `kernel::error`.
 
 use serde::{Deserialize, Serialize};
 

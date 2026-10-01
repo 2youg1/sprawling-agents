@@ -5,6 +5,7 @@
 
 //! Optimistic concurrency: writes carry a
 //! `base_version`; a stale base yields a verdict, never a silent merge.
+//! The part `crates/kernel/spec/Version.lean` specifies this module.
 //!
 //! The mapping from [`VersionVerdict::Stale`] to `E_VERSION_CONFLICT`
 //! plus a fresh diff lives with the edit tool; kernel only judges

@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One refusal per door, produced by the door itself.
+//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! rest of `kernel::gate`.
 //!
 //! The samples call the real functions with inputs that deny, so
 //! what the matrix judges is the refusal a run would receive rather

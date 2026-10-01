@@ -7,6 +7,7 @@
 //! refusal codes: every Deny goes through `AxError::refusal` with the
 //! three mandatory parts. Boundary feedback beats opening sermons — the
 //! refusal is the teaching.
+//! The part `crates/kernel/spec/Gate.lean` specifies this module.
 //!
 //! **A door answers Allow or Deny, and never asks a person** — with one
 //! named exception. An action a person would have to approve is either

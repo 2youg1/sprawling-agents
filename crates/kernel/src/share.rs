@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How much of the whole plan one node is, and why nobody can mint more.
+//! The part `crates/kernel/spec/Share.lean` specifies this module.
 //!
 //! A share exists in exactly two ways: it is the whole plan, or it is
 //! one part of a share that was divided. [`Share::split`] takes its

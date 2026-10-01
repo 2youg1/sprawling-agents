@@ -8,6 +8,7 @@
 //! bytes; reads hand out borrows, derivation unions provenance, and no
 //! method ever returns the bare value — "washing it clean" is a compile
 //! error, not a review finding.
+//! The part `crates/kernel/spec/Taint.lean` specifies this module.
 //!
 //! Deliberately absent: serde on `Tainted` (deserialization would be a
 //! second entrance and a forged-empty-taint hole) and any `into_inner`.
