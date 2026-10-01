@@ -9,9 +9,10 @@
 //! assertion).
 //!
 //! The set of skills is the `skills/` directory itself. They go in
-//! through the city library rather than an outside shelf, because a
-//! holding on an outside shelf has no address a run can open
-//! (accounting-SPEC.md section 12, decision 23).
+//! through the city library, the path that lands every file of a
+//! package inside the city, so a file a package carries is read here
+//! too (accounting-SPEC.md section 12, decision 23); `shelf_outside.rs`
+//! mounts the same directory as a shelf outside the city.
 
 use std::path::{Path, PathBuf};
 
@@ -91,20 +92,20 @@ fn every_shipped_skill_a_building_admits_is_read_by_name_and_pinned() {
 }
 
 /// One package under `skills/`.
-struct Shipped {
-    name: String,
-    dir: PathBuf,
+pub(crate) struct Shipped {
+    pub(crate) name: String,
+    pub(crate) dir: PathBuf,
     /// The `name:` line of its `SKILL.md`, which a read by name hands
     /// back whatever else the result is wrapped in.
-    name_line: String,
+    pub(crate) name_line: String,
 }
 
-fn skills_dir() -> PathBuf {
+pub(crate) fn skills_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills")
 }
 
 /// Every directory under `skills/` that holds a `SKILL.md`, by name.
-fn shipped() -> Vec<Shipped> {
+pub(crate) fn shipped() -> Vec<Shipped> {
     let mut shipped: Vec<Shipped> = std::fs::read_dir(skills_dir())
         .unwrap()
         .map(|entry| entry.unwrap().path())
