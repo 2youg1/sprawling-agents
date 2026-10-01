@@ -40,7 +40,7 @@ mod undoable;
 pub use attach::attach;
 pub use command::command;
 pub use discard::discard;
-pub use domain::{domain, reach};
+pub use domain::{domain, reach, replacing};
 pub use egress::{
     EgressAllowlist, EgressOutcome, EgressTarget, egress, egress_target, host_of, target_of,
 };
@@ -95,10 +95,13 @@ pub enum DoorId {
     Attach,
     /// [`command`] — may this run start a process.
     Command,
+    /// [`replacing`] — may this write change a file that is already
+    /// there.
+    Replacing,
 }
 
 /// Every door, in the order this module declares them.
-pub const DOORS: [DoorId; 9] = [
+pub const DOORS: [DoorId; 10] = [
     DoorId::Domain,
     DoorId::Reach,
     DoorId::Egress,
@@ -108,6 +111,7 @@ pub const DOORS: [DoorId; 9] = [
     DoorId::Undoable,
     DoorId::Attach,
     DoorId::Command,
+    DoorId::Replacing,
 ];
 
 impl DoorId {
@@ -125,6 +129,7 @@ impl DoorId {
             DoorId::Undoable => "undoable",
             DoorId::Attach => "attach",
             DoorId::Command => "command",
+            DoorId::Replacing => "replacing",
         }
     }
 }

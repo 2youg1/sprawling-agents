@@ -33,7 +33,7 @@ use serde_json::{Map, Value};
 use crate::backlog::{Backlog, Standing};
 use crate::clock::{ClockReading, iso};
 use crate::reminder::ContextReading;
-use kernel::Mode;
+use kernel::RunPolicy;
 
 /// How the gateway is currently able to serve. Degraded and LocalOnly
 /// are situations the model should plan around, so they are reported
@@ -76,7 +76,9 @@ pub struct ChildStatus {
 pub struct StatusSnapshot {
     pub who: String,
     pub addr: Address,
-    pub mode: Mode,
+    /// The run policy this run was dispatched under; its mode heads
+    /// the line and the other three values follow it.
+    pub policy: RunPolicy,
     pub ctx_limit: Tokens,
     pub trust: String,
     pub write_domain: String,
@@ -149,7 +151,7 @@ impl StatusTool {
                 name: ToolName::parse("status")?,
                 disclosure:
                     "Report your current situation in thirteen lines: who you are, where you \
-                     are, your mode, context used against the window, your trust, your write \
+                     are, your mode and run policy, context used against the window, your trust, your write \
                      domain and its locks, the worktree and its size, the signals waiting, your \
                      children, the clock, whether the provider is serving, your neighbours, and \
                      your backlog. None of it is stated anywhere else."
@@ -229,7 +231,13 @@ impl StatusSnapshot {
         [
             format!("who: {}", self.who),
             format!("addr: {}", self.addr),
-            format!("mode: {}", self.mode.as_str()),
+            format!(
+                "mode: {} (write {}, admit {}, landing {})",
+                self.policy.mode.as_str(),
+                self.policy.write.as_str(),
+                self.policy.admit.as_str(),
+                self.policy.landing.as_str()
+            ),
             format!("ctx: {}/{}", used.get(), self.ctx_limit.get()),
             format!("trust: {}", self.trust),
             format!("write_domain: {} (locks: {locks})", self.write_domain),

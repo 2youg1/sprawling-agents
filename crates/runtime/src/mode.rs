@@ -3,25 +3,26 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Run modes. A run sits in exactly one mode; the
-//! catalog lists only that one (progressive disclosure — the other modes'
-//! semantics stay out of the window).
+//! Run modes and admission. A run sits in exactly one mode; the
+//! catalog lists only that one (progressive disclosure — the other
+//! mode's text stays out of the window).
 //!
 //! One exception, and it is one line long: [`dev_entry`] tells a run
-//! that this city's own code is changeable, and names its modes. Without it an agent working
-//! in this city never learns that the city's own code and SPECs are
-//! changeable at all, or under what discipline — and a capability nobody
-//! is told about is one nobody uses.
+//! that this city's own code is changeable, and names the evidence a
+//! change can be asked to carry. Without it an agent working in this
+//! city never learns that the city's own code and SPECs are changeable
+//! at all, or under what discipline — and a capability nobody is told
+//! about is one nobody uses.
 //!
 //! The half that decides is [`admits`]: it says whether what a run
-//! produced may land, given the mode it was in. The evidence arrives as
-//! plain answers rather than as an instrument's type, because the
-//! instruments live in citysim, outside this crate, and the question
-//! here is not how evidence was gathered but whether enough of it
-//! exists.
+//! produced may land, given the run policy it was dispatched under
+//! (runtime-SPEC 8-54). The evidence arrives as plain answers rather
+//! than as an instrument's type, because the instruments live in
+//! citysim, outside this crate, and the question here is not how
+//! evidence was gathered but whether enough of it exists.
 
 use crate::catalog::CatalogEntry;
-use kernel::Mode;
+use kernel::{AdmissionRequirement, LandingPolicy, Mode, RunPolicy};
 
 /// The name of the catalog row that opens the developer discipline.
 pub const DEV_ENTRY: &str = "dev";
@@ -31,9 +32,10 @@ pub const DEV_ENTRY: &str = "dev";
 /// One line in the resident segment, and the whole discipline behind an
 /// expansion. That split is the point: most sessions never change this
 /// city, so they pay a line; a session that is about to change it asks
-/// once and gets the modes, the reading order and what to do next. The
-/// same progressive disclosure the tool rows use, applied to the one
-/// capability an agent would otherwise never learn it has.
+/// once and gets the evidence a change can be asked for, the reading
+/// order and what to do next. The same progressive disclosure the tool
+/// rows use, applied to the one capability an agent would otherwise
+/// never learn it has.
 #[must_use]
 pub fn dev_entry() -> CatalogEntry {
     CatalogEntry {
@@ -45,12 +47,14 @@ pub fn dev_entry() -> CatalogEntry {
                     `crates/<crate>/<crate>-SPEC.md`. Read that SPEC, then the code, then the \
                     tests next to the code - in that order, and before you change any of them. \
                     Where the implementation would differ from the SPEC, the SPEC changes first \
-                    and says why.\n\nChanging anything here happens under one of three modes, and \
-                    the person grants the mode:\n- up: build one asset that has its own tests.\n\
-                    - sc: renovate an existing asset without moving its observable contract.\n\
-                    - ud: change behaviour, carrying held-in and held-out evidence.\n\nYour next \
-                    step: say which of the three this work needs and why, and wait for the \
-                    person to grant it. Do not start the change in the mode you are in now."
+                    and says why.\n\nThe person chooses what a change must prove before it is \
+                    merged:\n- tested: the asset's own tests ran and passed.\n- contract_kept: \
+                    the asset's observable contract did not move.\n- double_validated: the change \
+                    holds on held-in and on held-out evidence.\nAnd where it lands: \
+                    ordinary work takes the building's own road, while an experiment works in a \
+                    tree of its own and nothing in it is merged.\n\nYour next step: say which \
+                    evidence this work needs and why, and wait for the person to dispatch it \
+                    with that requirement. Choosing a requirement does not provide the evidence."
             .to_owned(),
         // Text this build holds, not a document on a shelf: there is
         // nothing behind it that could change while nobody is looking.
@@ -60,9 +64,8 @@ pub fn dev_entry() -> CatalogEntry {
 }
 
 /// The catalog row for this mode: disclosure one-liner plus the
-/// expansion text (plan_goal carries its four exit conditions). The
-/// chat row is the whole of what chat mode does: one line telling the
-/// resident that the person is talking with it.
+/// expansion text. The chat row is the whole of what chat mode does:
+/// one line telling the resident that the person is talking with it.
 #[must_use]
 pub fn catalog_entry(mode: Mode) -> CatalogEntry {
     let (disclosure, expansion) = match mode {
@@ -70,27 +73,11 @@ pub fn catalog_entry(mode: Mode) -> CatalogEntry {
             "chat mode: focus on conversing with the person; answer what they said, in their language",
             "Reply in the conversation. Start work, plans or dispatches only when the person asks for them.",
         ),
-        Mode::PlanGoal => (
-            "plan first, then execute toward the stated goal; report when the goal is met",
-            "Write the plan into Roadmap.md before edits. Exit plan_goal and work \
-                 directly when any holds: the task is lightweight; no file changes; no \
-                 mechanically verifiable goal; pure conversation. Record the exit reason.",
-        ),
-        Mode::Up => (
-            "utility-production mode: build one reusable asset with tests",
-            "Produce one asset, register it, and prove it with its own tests before reporting.",
-        ),
-        Mode::Sc => (
-            "self-check mode: renovate an existing asset without changing its contract",
-            "Refresh the asset; its observable contract must not move. Diff and tests are the evidence.",
-        ),
-        Mode::Ud => (
-            "upgrade-with-double-validation mode: change behavior behind held-out evidence",
-            "A behavior change needs held-in and held-out evidence before adoption.",
-        ),
-        Mode::Experiment => (
-            "experiment mode: explore without landing anything",
-            "Nothing produced here merges; findings go to Memo.md.",
+        Mode::Work => (
+            "work mode: carry out the task towards the stated goal; report when the goal is met",
+            "When the task asks for a plan first, write it into Roadmap.md with the `plan` tool \
+             before you change anything, then work through it. Report what you did and the \
+             evidence that the goal is met.",
         ),
     };
     CatalogEntry {
@@ -105,8 +92,9 @@ pub fn catalog_entry(mode: Mode) -> CatalogEntry {
 /// What a run has to show for itself.
 ///
 /// `None` is not `Some(false)`: a suite that was never run and a suite
-/// that failed are different facts, and a mode that treated them alike
-/// would let "we did not check" pass as "we checked and it was fine".
+/// that failed are different facts, and a requirement that treated them
+/// alike would let "we did not check" pass as "we checked and it was
+/// fine".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Produced {
     /// The asset's own tests ran and passed.
@@ -129,21 +117,38 @@ pub enum Admission {
     },
 }
 
-/// The admission each mode asks for. Exhaustive on both the mode and
-/// the evidence, so a new mode has to say what it demands.
+/// Whether what a run produced may be merged, under the policy it was
+/// dispatched with (runtime-SPEC 8-54).
 ///
-/// The three that matter are the three the design names. UP wants the
-/// asset proven by its own tests. SC wants the contract to have stayed
-/// where it was, because a renovation that moves it is not a renovation.
-/// UD wants both halves of the double validation, and it is the only one
-/// that does: it changes how the city behaves, so confidence is not the
-/// currency — evidence is.
+/// The landing policy is asked first: an experiment lands nothing
+/// however well it went. Then the evidence requirement, exhaustively,
+/// so a new requirement has to say what it demands. The mode takes no
+/// part: talk and work produce things that meet the same merge.
 #[must_use]
-pub fn admits(mode: Mode, produced: &Produced) -> Admission {
-    match mode {
-        Mode::Chat => Admission::Lands,
-        Mode::PlanGoal => Admission::Lands,
-        Mode::Up => match produced.tests_passed {
+pub fn admits(policy: &RunPolicy, produced: &Produced) -> Admission {
+    match policy.landing {
+        LandingPolicy::Experiment => Admission::Refused {
+            because: "nothing produced in an experiment lands",
+            alternative: "write what you learned into Memo.md, then ask for the work again \
+                          with the ordinary landing",
+        },
+        LandingPolicy::Ordinary => admits_evidence(AdmissionRequirement::Standing, produced),
+    }
+}
+
+/// The evidence half of [`admits`].
+///
+/// `Standing` adds nothing: the building's own checks were made where
+/// they are made. `Tested` wants the asset proven by its own tests.
+/// `ContractKept` wants the contract to have stayed where it was,
+/// because a renovation that moves it is not a renovation.
+/// `DoubleValidated` wants both halves of the double validation: it is
+/// asked for a change to how the city behaves, so confidence is not the
+/// currency — evidence is.
+fn admits_evidence(required: AdmissionRequirement, produced: &Produced) -> Admission {
+    match required {
+        AdmissionRequirement::Standing => Admission::Lands,
+        AdmissionRequirement::Tested => match produced.tests_passed {
             Some(true) => Admission::Lands,
             Some(false) => Admission::Refused {
                 because: "the asset's own tests did not pass",
@@ -154,18 +159,18 @@ pub fn admits(mode: Mode, produced: &Produced) -> Admission {
                 alternative: "write the test that would fail if this asset broke",
             },
         },
-        Mode::Sc => {
+        AdmissionRequirement::ContractKept => {
             if produced.contract_moved {
                 Admission::Refused {
                     because: "the asset's observable contract moved",
-                    alternative: "keep the contract and renovate behind it, or do this in ud mode \
-                                 with held-out evidence",
+                    alternative: "keep the contract and renovate behind it, or ask for the work \
+                                  again under double_validated with held-out evidence",
                 }
             } else {
                 Admission::Lands
             }
         }
-        Mode::Ud => match (produced.held_in, produced.held_out) {
+        AdmissionRequirement::DoubleValidated => match (produced.held_in, produced.held_out) {
             (Some(true), Some(true)) => Admission::Lands,
             (Some(false), _) => Admission::Refused {
                 because: "it got worse on the held-in set",
@@ -182,10 +187,6 @@ pub fn admits(mode: Mode, produced: &Produced) -> Admission {
                               confidence",
             },
         },
-        Mode::Experiment => Admission::Refused {
-            because: "nothing produced in experiment mode lands",
-            alternative: "write what you learned into Memo.md, then do it again in up or ud mode",
-        },
     }
 }
 
@@ -199,122 +200,22 @@ pub fn admits(mode: Mode, produced: &Produced) -> Admission {
 mod tests {
     use super::*;
 
-    /// A chat run is told one thing, to talk with the person, and is
-    /// held to nothing else: whatever it produced lands.
-    #[test]
-    fn chat_is_one_line_about_the_conversation_and_holds_nothing_back() {
-        let entry = catalog_entry(Mode::Chat);
-        assert_eq!(entry.name, "mode:chat");
-        assert!(entry.disclosure.contains("convers"), "{}", entry.disclosure);
-        assert!(!entry.disclosure.contains('\n'), "one line");
-        assert!(
-            !entry.expansion.is_empty(),
-            "a read of the entry says something"
-        );
-        assert_eq!(admits(Mode::Chat, &Produced::default()), Admission::Lands);
-    }
-
-    #[test]
-    fn up_wants_the_asset_proven_and_says_which_way_it_failed() {
-        let untested = Produced::default();
-        let Admission::Refused { because, .. } = admits(Mode::Up, &untested) else {
-            panic!("an asset with no tests does not land");
-        };
-        assert!(because.contains("no tests"));
-        let failed = Produced {
-            tests_passed: Some(false),
-            ..Produced::default()
-        };
-        let Admission::Refused { because, .. } = admits(Mode::Up, &failed) else {
-            panic!("a failing asset does not land");
-        };
-        assert!(
-            because.contains("did not pass"),
-            "not the same sentence as untested"
-        );
-        assert_eq!(
-            admits(
-                Mode::Up,
-                &Produced {
-                    tests_passed: Some(true),
-                    ..Produced::default()
-                }
-            ),
-            Admission::Lands
-        );
-    }
-
-    #[test]
-    fn sc_refuses_a_renovation_that_moved_the_contract() {
-        assert_eq!(admits(Mode::Sc, &Produced::default()), Admission::Lands);
-        let moved = Produced {
-            contract_moved: true,
-            ..Produced::default()
-        };
-        let Admission::Refused { alternative, .. } = admits(Mode::Sc, &moved) else {
-            panic!("a moved contract is not a renovation");
-        };
-        assert!(
-            alternative.contains("ud mode"),
-            "the refusal names the mode that would take it"
-        );
-    }
-
-    #[test]
-    fn ud_takes_nothing_on_confidence() {
-        let both = Produced {
-            held_in: Some(true),
-            held_out: Some(true),
-            ..Produced::default()
-        };
-        assert_eq!(admits(Mode::Ud, &both), Admission::Lands);
-        for missing in [
-            Produced {
-                held_in: Some(true),
-                ..Produced::default()
-            },
-            Produced {
-                held_out: Some(true),
-                ..Produced::default()
-            },
-            Produced::default(),
-        ] {
-            assert!(
-                matches!(admits(Mode::Ud, &missing), Admission::Refused { .. }),
-                "half of a double validation is not a double validation"
-            );
+    fn work(admit: AdmissionRequirement) -> RunPolicy {
+        RunPolicy {
+            admit,
+            ..RunPolicy::of(Mode::Work)
         }
-        let regressed = Produced {
-            held_in: Some(true),
-            held_out: Some(false),
-            ..Produced::default()
-        };
-        let Admission::Refused { because, .. } = admits(Mode::Ud, &regressed) else {
-            panic!("a change that only holds where it was built does not land");
-        };
-        assert!(because.contains("held-out"));
     }
 
+    /// A requirement chosen is not evidence held: work that asked for
+    /// its own tests and ran none does not land.
     #[test]
-    fn experiment_lands_nothing_however_well_it_went() {
-        let excellent = Produced {
-            tests_passed: Some(true),
-            contract_moved: false,
-            held_in: Some(true),
-            held_out: Some(true),
+    fn a_work_run_without_the_evidence_it_chose_does_not_land() {
+        let Admission::Refused { because, .. } =
+            admits(&work(AdmissionRequirement::Tested), &Produced::default())
+        else {
+            panic!("work that chose `tested` and ran no test landed");
         };
-        assert!(matches!(
-            admits(Mode::Experiment, &excellent),
-            Admission::Refused { .. }
-        ));
-    }
-
-    #[test]
-    fn names_are_stable_and_entries_carry_both_levels() {
-        assert_eq!(Mode::PlanGoal.as_str(), "plan_goal");
-        let entry = catalog_entry(Mode::PlanGoal);
-        assert_eq!(entry.name, "mode:plan_goal");
-        assert!(entry.expansion.contains("Exit plan_goal"));
-        assert!(!catalog_entry(Mode::Experiment).disclosure.is_empty());
+        assert!(because.contains("no tests"), "{because}");
     }
 }

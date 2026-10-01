@@ -116,16 +116,16 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
 fn an_entry_the_catalog_holds_is_handed_over_not_refused() {
     let dir = tempfile::tempdir().unwrap();
     let (tool, catalog) = tool(dir.path());
-    catalog.lock().unwrap().set_mode(kernel::Mode::Experiment);
+    catalog.lock().unwrap().set_mode(kernel::Mode::Work);
 
-    let mode = tool.invoke(&call("mode:experiment")).unwrap();
+    let mode = tool.invoke(&call("mode:work")).unwrap();
     let said = mode.result.as_map()["text"].as_str().unwrap_or_default();
-    assert!(said.contains("Memo.md"), "the mode's discipline: {said}");
+    assert!(said.contains("Roadmap.md"), "the mode's discipline: {said}");
 
     let dev = tool.invoke(&call("dev")).unwrap();
     let said = dev.result.as_map()["text"].as_str().unwrap_or_default();
     assert!(said.contains("-SPEC.md"), "the developer entry: {said}");
-    assert!(said.contains("wait for the person to grant it"));
+    assert!(said.contains("wait for the person to dispatch it"));
 }
 
 #[test]

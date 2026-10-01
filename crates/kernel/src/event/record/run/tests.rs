@@ -71,6 +71,7 @@ fn typed_started(parent: Option<RunId>, predecessor: Option<RunId>) -> RunStarte
         parent,
         predecessor,
         dispatched_by: None,
+        policy: None,
         skills: vec![
             SkillPin {
                 name: "read".to_owned(),
@@ -127,6 +128,33 @@ fn the_golden_fixture_line_reads_back_and_writes_itself_again() {
     assert_eq!(read.job, Some(job()));
     assert!(read.skills.is_empty());
     assert_eq!(bytes(&Payload::of(&read).unwrap()), raw);
+}
+
+/// The policy a run was dispatched under is on its first line, in the
+/// spelling the wire uses, and reads back whole.
+#[test]
+fn a_run_started_line_records_its_policy() {
+    use crate::model::{AdmissionRequirement, LandingPolicy, Mode};
+    let started = RunStarted {
+        policy: Some(RunPolicy {
+            mode: Mode::Work,
+            write: crate::WriteLimit::Create,
+            admit: AdmissionRequirement::Tested,
+            landing: LandingPolicy::Experiment,
+        }),
+        ..typed_started(None, None)
+    };
+    let payload = Payload::of(&started).unwrap();
+    assert_eq!(
+        serde_json::to_value(&payload).unwrap()["policy"],
+        serde_json::json!({
+            "mode": "work",
+            "write": "create",
+            "admit": "tested",
+            "landing": "experiment",
+        })
+    );
+    assert_eq!(payload.read::<RunStarted>().unwrap(), started);
 }
 
 #[test]

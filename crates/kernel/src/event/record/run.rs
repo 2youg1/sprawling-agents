@@ -12,6 +12,7 @@ use crate::event::identity::{RunId, Seq};
 use crate::event::kind::EventKind;
 use crate::event::who::Who;
 use crate::locator::{B3Hash, Locator};
+use crate::model::RunPolicy;
 use crate::origin::Origin;
 
 /// One skill a run was dispatched with, pinned to the bytes it read.
@@ -67,6 +68,12 @@ pub struct RunStarted {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub dispatched_by: Option<Who>,
+    /// The run policy this run was dispatched under (kernel-SPEC 8-77).
+    /// Absent in a record written before the policy was recorded; the
+    /// six mode words before it never reached a typed payload, so
+    /// there is no older shape to read.
+    #[serde(skip)]
+    pub policy: Option<RunPolicy>,
 }
 
 /// `run_frozen`: how a run ended, and what it cites for having ended

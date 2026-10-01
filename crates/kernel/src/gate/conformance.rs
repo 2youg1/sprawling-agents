@@ -21,7 +21,7 @@ use crate::locator::Locator;
 use crate::secret::SecretSpan;
 use crate::taint::{TaintSet, TaintSource};
 use crate::tool::{ServerLabel, ToolName};
-use crate::write_domain::WriteDomain;
+use crate::write_domain::{WriteDomain, WriteLimit};
 
 /// Whatever this door answers when its sample calls it.
 ///
@@ -45,6 +45,7 @@ pub fn sample(door: DoorId) -> Result<GateOutcome, DoorId> {
         DoorId::Undoable => undoable_sample(),
         DoorId::Attach => attach_sample(),
         DoorId::Command => command_sample(),
+        DoorId::Replacing => replacing_sample(),
     };
     answered.ok_or(door)
 }
@@ -70,6 +71,11 @@ fn one_room() -> Option<WriteDomain> {
 fn domain_sample() -> Option<GateOutcome> {
     let elsewhere = Address::parse("b2/other.md").ok()?;
     outcome_of(super::domain(&one_room()?, &elsewhere, &TaintSet::empty()))
+}
+
+fn replacing_sample() -> Option<GateOutcome> {
+    let existing = Address::parse("b1/room/notes.md").ok()?;
+    outcome_of(super::replacing(WriteLimit::Create, &existing))
 }
 
 fn reach_sample() -> Option<GateOutcome> {

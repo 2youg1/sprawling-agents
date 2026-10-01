@@ -6,7 +6,7 @@
 use crate::address::Address;
 use crate::error::{AxCode, AxError, GateRefusal};
 use crate::taint::TaintSet;
-use crate::write_domain::{DocumentReason, DomainVerdict, WriteDomain};
+use crate::write_domain::{DocumentReason, DomainVerdict, WriteDomain, WriteLimit};
 
 use super::GateOutcome;
 
@@ -33,6 +33,41 @@ pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutc
             domain.prefixes().map(|p| p.as_str().to_owned()).collect(),
             taint,
         )
+    }
+}
+
+/// Whether a write that may change a file already there is open under
+/// this run's write limit (kernel-SPEC 8-78).
+///
+/// Asked by every write path before it touches a file that exists, or
+/// before it starts anything that could: the edit tool's replacing arm,
+/// and a command placed on the host. Whether the target exists is not
+/// asked here; a create that finds its name taken is refused by the
+/// filesystem at the moment of the write, under either limit.
+#[must_use]
+pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome {
+    match limit {
+        WriteLimit::Full => GateOutcome::Allow,
+        WriteLimit::Create => GateOutcome::Deny {
+            refusal: Box::new(
+                AxError::refusal(
+                    AxCode::OutsideWriteDomain,
+                    "write file",
+                    target.as_str(),
+                    GateRefusal::new(
+                        "this run creates files and changes none",
+                        format!(
+                            "{} would change what is already there, and this run was                              dispatched under the create write limit",
+                            target.as_str()
+                        ),
+                        "write what you have to the path of a file that does not exist yet",
+                    ),
+                )
+                .with_recovery(
+                    "the write limit is chosen when the work is dispatched; ask the person to                      dispatch it again with the full write limit to change existing files",
+                ),
+            ),
+        },
     }
 }
 
@@ -162,6 +197,32 @@ mod tests {
             panic!("refusal shape asserted above")
         };
         assert!(refusal.gate().unwrap().violation().contains("web:evil"));
+    }
+
+    /// The full limit adds nothing to the domain; the create limit
+    /// refuses every write that would change a file already there, with
+    /// the target as the subject and the way to a new file as the
+    /// alternative.
+    #[test]
+    fn the_create_limit_refuses_a_replacing_write_and_the_full_one_does_not() {
+        let existing = Address::parse("b1/room/notes.md").unwrap();
+        assert!(matches!(
+            replacing(WriteLimit::Full, &existing),
+            GateOutcome::Allow
+        ));
+        let outcome = replacing(WriteLimit::Create, &existing);
+        assert_three_parts(&outcome, AxCode::OutsideWriteDomain);
+        let GateOutcome::Deny { refusal } = outcome else {
+            panic!("refusal shape asserted above")
+        };
+        assert_eq!(refusal.subject(), "b1/room/notes.md");
+        assert!(
+            refusal
+                .gate()
+                .unwrap()
+                .alternative()
+                .contains("does not exist")
+        );
     }
 
     /// City Hall's residents write Markdown and nothing else, and the

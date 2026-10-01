@@ -241,7 +241,7 @@ fn status_reports_the_count_of_the_call_that_asked() {
     let status = runtime::StatusTool::new(runtime::StatusSnapshot {
         who: "resident".to_owned(),
         addr: Address::parse("lab/room1").unwrap(),
-        mode: kernel::Mode::Up,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         ctx_limit: Tokens::new(1_000),
         trust: "trusted".to_owned(),
         write_domain: "lab/room1".to_owned(),

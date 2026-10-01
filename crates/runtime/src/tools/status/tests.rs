@@ -17,7 +17,7 @@ fn snapshot() -> StatusSnapshot {
     StatusSnapshot {
         who: "alice".to_owned(),
         addr: Address::parse("work").unwrap(),
-        mode: Mode::Up,
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
         ctx_limit: Tokens::new(8000),
         trust: "trusted".to_owned(),
         write_domain: "work".to_owned(),

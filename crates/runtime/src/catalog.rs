@@ -280,7 +280,7 @@ mod tests {
                 package: None,
             })
             .unwrap();
-        catalog.set_mode(Mode::PlanGoal);
+        catalog.set_mode(Mode::Work);
         let text = catalog.render();
         let defs = catalog.tool_defs();
         let alpha = defs
@@ -297,10 +297,10 @@ mod tests {
             !text.contains("does one thing"),
             "the tools array carries it"
         );
-        assert!(text.contains("- mode:plan_goal:"));
+        assert!(text.contains("- mode:work:"));
         assert_eq!(text, catalog.render(), "same content, same bytes");
-        // One line says the city itself can be changed; the three modes
-        // and the reading order sit behind an expansion nobody pays for
+        // One line says the city itself can be changed; the evidence a
+        // change can be asked for and the reading order sit behind an expansion nobody pays for
         // until they ask.
         assert!(text.contains("- dev: when the work is to change"));
         assert!(!text.contains("held-out evidence"), "the detail is fetched");
@@ -325,12 +325,12 @@ mod tests {
     fn tool_defs_carry_schema_and_expand_serves_skills_and_mode() {
         let mut catalog = Catalog::new();
         catalog.admit_tool(&meta("probe")).unwrap();
-        catalog.set_mode(Mode::Experiment);
+        catalog.set_mode(Mode::Chat);
         let defs = catalog.tool_defs();
         assert_eq!(defs.len(), 1);
         assert_eq!(defs[0].name.as_str(), "probe");
         assert!(matches!(
-            catalog.expand("mode:experiment"),
+            catalog.expand("mode:chat"),
             Some(Expansion::Said { .. })
         ));
         assert!(catalog.expand("missing").is_none());

@@ -92,6 +92,7 @@ impl Charter<'_> {
             predecessor: self.predecessor,
             skills: self.skills.to_vec(),
             dispatched_by: Some(self.dispatched_by.clone()),
+            policy: None,
         };
         ledger.append(EventDraft {
             run: self.run,

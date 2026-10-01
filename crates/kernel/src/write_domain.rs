@@ -9,6 +9,8 @@
 
 use std::collections::BTreeMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::address::Address;
 use crate::consts_policy::EDIT_WAR_FREEZE;
 use crate::error::{AxCode, AxError};
@@ -117,6 +119,40 @@ impl WriteDomain {
 
     fn prefix_strings(&self) -> Vec<String> {
         self.prefixes().map(|p| p.as_str().to_owned()).collect()
+    }
+}
+
+/// What a run may do to a file that already exists inside its write
+/// domain (kernel-SPEC 8-78).
+///
+/// It narrows the domain and never widens it: the domain answers where
+/// a run may write and what kind of file, this answers whether a write
+/// may change a file that is already there. Whether the target exists
+/// is the filesystem's fact at the moment of the write, so the check
+/// that makes `Create` hold is the writer's atomic create; the rule and
+/// its refusal are [`crate::gate::replacing`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum WriteLimit {
+    /// No narrowing beyond the write domain.
+    Full,
+    /// Create files that do not exist; change, remove and rename none,
+    /// including one this run created itself.
+    Create,
+}
+
+impl WriteLimit {
+    /// Both limits, the one that narrows nothing first.
+    pub const ALL: [WriteLimit; 2] = [WriteLimit::Full, WriteLimit::Create];
+
+    /// The word this limit travels under.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            WriteLimit::Full => "full",
+            WriteLimit::Create => "create",
+        }
     }
 }
 
