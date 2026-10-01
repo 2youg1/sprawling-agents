@@ -77,7 +77,7 @@ const EXPOSE_WHITELIST: [&str; 4] = [
 ///   never itself hold a value; the target triple's digits and
 ///   underscores are what trip the mixed-alphabet rule.
 /// - The six `Win32_*` names — Cargo features of the `windows` crate,
-///   listed in `desktop/Cargo.toml` to select the API surfaces the
+///   listed in `crates/desktop/Cargo.toml` to select the API surfaces the
 ///   Windows arm calls: data exchange for the clipboard, threading and
 ///   variant for COM, accessibility for the UI Automation tree, HiDPI
 ///   for per-monitor scaling, keyboard and mouse for `SendInput`, and

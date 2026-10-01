@@ -7,6 +7,19 @@
 [profile.default]
 slow-timeout = { period = "60s", terminate-after = 3 }
 
+# Every desktop test whose name carries `clipboard` touches the machine's
+# real clipboard. `TURN` and `PAIRS` are one-per-process locks, and this
+# runner gives every test its own process, so between these tests the
+# exclusion is this group's single thread rather than any lock in the
+# code: two of them side by side swap each other's text between a write
+# and the read that follows it.
+[test-groups]
+clipboard = { max-threads = 1 }
+
+[[profile.default.overrides]]
+filter = '(package(sprawling-desktop) | package(sprawling-desktop-ffi)) & test(clipboard)'
+test-group = 'clipboard'
+
 [[profile.default.overrides]]
 filter = 'binary(trybuild)'
 slow-timeout = { period = "120s", terminate-after = 10 }

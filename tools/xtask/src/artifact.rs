@@ -60,8 +60,9 @@ const MARKERS: [&str; 6] = [
 ///
 /// `fault` is here with `conformance`: `storage::fault_fs` is the second
 /// adapter behind the `Vfs` inner seam, a deterministic power-loss model
-/// whose whole purpose is to be injected by a test.
-const TEST_FEATURES: [&str; 2] = ["conformance", "fault"];
+/// whose whole purpose is to be injected by a test. `fixture` is
+/// `desktop_ffi::fixture`, the window a desktop contract test opens.
+const TEST_FEATURES: [&str; 3] = ["conformance", "fault", "fixture"];
 
 /// The crate whose feature table becomes the shipped binary.
 const PRODUCT: &str = "crates/sprawling/Cargo.toml";

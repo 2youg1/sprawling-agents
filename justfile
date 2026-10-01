@@ -17,25 +17,21 @@ default: check
 # `crates/sprawling/build.rs` embeds the bundle: built after the compile,
 # a stale bundle is what clippy and the tests would see.
 #
-# Formatting of both trees runs right after `prereqs`, because it answers
-# in seconds and every later step compiles for minutes: without it an
-# unformatted line in `desktop/` would surface only in `check-desktop`,
-# the last step, after the whole workspace was built and tested. `just` runs
-# a dependency once per invocation, so `check-desktop` finds
-# `fmt-check-desktop` already done and does not repeat it. The source
-# gates and the Lean models follow for the same reason: each answers in
-# seconds, before clippy's minutes.
+# Formatting runs right after `prereqs`, because it answers in seconds
+# and every later step compiles for minutes. The source gates and the
+# Lean models follow for the same reason: each answers in seconds, before
+# clippy's minutes.
 #
 # `ci.yml` runs the same recipes, one job per slice of this line, so a
 # green pull request implies exactly this and no less.
-check: prereqs fmt-check fmt-check-desktop gates-sources models build-web clippy features test gates check-client check-desktop
+check: prereqs fmt-check gates-sources models build-web clippy features test gates check-client check-desktop
 
 # The merge's whole check: the phases of `check`, but every phase runs
 # even after another has failed, so one run names every red rather than
 # the first. build-web runs first and once, because the compile embeds
 # the bundle and the gates read it. The phases that share the workspace
-# target run as one chain, and the client and `desktop/` (its own
-# target) run beside it, so the run takes as long as its longest chain.
+# target run as one chain, and the client and the desktop's Zig leaf
+# run beside it, so the run takes as long as its longest chain.
 # Each phase logs to <target>/check-all/<phase>.log, and phases.tsv holds
 # one `phase<TAB>exit<TAB>seconds` row per phase. Naming phases runs
 # those alone, which is how a red phase is rerun after its fix.
@@ -55,13 +51,12 @@ check-all *phases:
     }
     just prereqs || exit 2
     phase fmt just fmt-check
-    phase fmt-desktop just fmt-check-desktop
     phase build-web just build-web
     { phase clippy just clippy; phase features just features
       phase test just test --no-fail-fast; phase gates just gates; } &
     { phase models just models; } &
     { phase client just client-checks; } &
-    { phase desktop just --no-deps check-desktop; } &
+    { phase desktop just check-desktop; } &
     wait
     touch "$out/phases.tsv"
     column -t -s $'\t' "$out/phases.tsv"
@@ -72,7 +67,7 @@ check-all *phases:
 # workspace when a package changed, every test of a changed package and
 # the tests of its dependents that name an item or module the diff
 # touched, every gate that reads sources, and the client, its artifact
-# gates and `desktop/` when the branch touched them. Every step runs even
+# gates and the desktop's Zig leaf when the branch touched them. Every step runs even
 # after another failed. Clippy lints the whole workspace on all features,
 # the set `check` compiles, because a `-p` selection unifies features
 # differently and recompiles shared dependencies for every selection.
@@ -105,7 +100,7 @@ check-branch base="main":
     step gates cargo xtask gates $gates --range "$mb..HEAD"
     step deny just deny
     touched client && step client just client-checks && step artifacts cargo xtask gates render budget npm
-    touched desktop && step desktop just check-desktop
+    touched crates/desktop/ffi && step desktop just check-desktop
     # A Lean specification is proved by `models`, which no other step runs;
     # the Lean package's own three files change what it proves
     # (tools/xtask/xtask-SPEC.md section 8-43).
@@ -223,16 +218,12 @@ prereqs mode="check":
 fmt:
     cargo fmt --all
 
-fmt-check:
-    cargo fmt --all --check
-
-# `desktop/` is outside the workspace, so `cargo fmt --all` at the root
-# does not reach it. Its Zig leaf is formatted by `zig fmt`, on Windows,
+# The desktop server's Zig leaf is formatted by `zig fmt`, on Windows,
 # the one platform the leaf is built on and the one where the doctor
 # makes Zig required (desktop-SPEC.md section 8-12).
-fmt-check-desktop:
-    cd desktop && cargo fmt --all --check
-    {{ if os() == "windows" { "zig fmt --check desktop/ffi/zig" } else { "echo 'zig fmt: the Zig leaf is built on Windows only'" } }}
+fmt-check:
+    cargo fmt --all --check
+    {{ if os() == "windows" { "zig fmt --check crates/desktop/ffi/zig" } else { "echo 'zig fmt: the Zig leaf is built on Windows only'" } }}
 
 # --all-features is load-bearing: code behind a feature (runtime/wasm, */conformance)
 # escapes the zero-warning gate without it.
@@ -336,47 +327,32 @@ commits range:
 # fails this recipe**: the recipe tells a missing tool from a refusal by
 # asking `command -v` first, because a single `&& … || echo` would report
 # "not installed" for a real violation too.
-#
-# The optional directory is for a tree outside the workspace: `desktop/`
-# carries its own manifest and its own deny.toml, and it is read with the
-# same list of checks rather than with a second spelling of it.
-deny dir=".":
+deny:
     #!/usr/bin/env bash
     set -euo pipefail
     if ! command -v cargo-deny >/dev/null 2>&1; then
         echo "cargo-deny not installed locally; CI runs it on every push"
         exit 0
     fi
-    cd '{{dir}}'
     cargo deny check bans licenses sources
 
-# `desktop/` is not compiled by any workspace command - the root
-# Cargo.toml excludes it so its FFI seam can relax `unsafe_code` at each
-# call into the Zig leaf (desktop-SPEC.md sections 8.5 and 8-12). It is a
-# workspace of two packages, the server and `desktop/ffi`, so every
-# command takes `--workspace`. Without this recipe its source never meets
-# a compiler, a test runner or a licence check that this repository runs.
-# On Windows the Zig leaf's own tests run too: its unit tests, its seeded
-# property tests and one input of its fuzz test.
-#
-# Two things this recipe does not judge are judged by `gates`: the lint
-# table and the package metadata are compared back to the root manifest
-# by `cargo xtask guard`, because a drifted copy is not something a
-# compiler can see.
-check-desktop: fmt-check-desktop
-    cd desktop && cargo clippy --workspace --all-targets --locked -- -D warnings
-    cd desktop && cargo nextest run --workspace --locked
-    {{ if os() == "windows" { "zig test desktop/ffi/zig/leaf.zig --cache-dir desktop/target/zig-test" } else { "echo 'zig test: the Zig leaf is built on Windows only'" } }}
-    just deny desktop
+# What no cargo command runs for `crates/desktop`: the Zig leaf's own
+# tests - its unit tests, its seeded property tests and one input of its
+# fuzz test - on Windows, the one platform the leaf is built on
+# (desktop-SPEC.md section 8-12). The server and its seam are workspace
+# members, so clippy, the suite and the licence read judge them with
+# everything else.
+check-desktop:
+    {{ if os() == "windows" { "zig test crates/desktop/ffi/zig/leaf.zig --cache-dir target/zig-test" } else { "echo 'zig test: the Zig leaf is built on Windows only'" } }}
 
-# The Rust side's fuzz of desktop/ffi's Zig leaf: its four buffer rules
+# The Rust side's fuzz of crates/desktop/ffi's Zig leaf: its four buffer rules
 # against their Rust reference, for `rounds` drawn inputs from `seed`
 # (hexadecimal), on Windows, the one platform the leaf is built on. A
 # disagreement prints the seed and the round it replays from. Drawn
 # rather than coverage-guided: libFuzzer has no platform for this leaf
 # today (desktop-SPEC.md section 12.12).
 fuzz-desktop rounds="1000000" seed="5eedf022":
-    cd desktop && DESKTOP_FFI_FUZZ_ROUNDS={{rounds}} DESKTOP_FFI_FUZZ_SEED={{seed}} cargo nextest run -p sprawling-desktop-ffi --locked --run-ignored only -E 'test(/for_as_long_as_asked/)'
+    DESKTOP_FFI_FUZZ_ROUNDS={{rounds}} DESKTOP_FFI_FUZZ_SEED={{seed}} cargo nextest run -p sprawling-desktop-ffi --locked --run-ignored only -E 'test(/for_as_long_as_asked/)'
 
 # The browser client (client/client-SPEC.md): Svelte + Effect, built by
 # Vite under bun, bundled into target/web-dist where crates/sprawling/build.rs reads

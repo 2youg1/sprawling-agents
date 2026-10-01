@@ -7,7 +7,7 @@
 # alone cannot hold: the commit messages of the range under review, and the
 # kani proofs, which need a Linux host.
 #
-#   fast      fmt of both trees, the gates that read sources, the commit
+#   fast      fmt, the gates that read sources, the commit
 #             messages; compiles only xtask, so it answers first
 #   models    the Lean specifications under `crates/`
 #   clippy    the zero-warning build of every target and feature, and the
@@ -16,7 +16,7 @@
 #   gates     the gates that judge the built client bundle
 #   supply    licences, bans and sources; compiles nothing
 #   client    the client's own linter, typecheck and tests
-#   desktop   `desktop/`, which no workspace command compiles
+#   desktop   the desktop server's Zig leaf, whose tests no cargo command runs
 #   proof     the kernel propositions kani can hold; `changes` decides
 #             whether a change touched anything a proof is about
 #
@@ -121,7 +121,7 @@ jobs:
         with:
           tool: just
       - name: fmt
-        run: just fmt-check fmt-check-desktop
+        run: just fmt-check
       - name: the gates that read sources
         run: just gates-sources
       # base..head for a pull request, before..after for a push. A push
@@ -303,32 +303,22 @@ jobs:
       - name: lint, typecheck and test the client
         run: just check-client
 
-  # `desktop/` sits outside the workspace (desktop-SPEC.md section 8.5).
-  # The jobs above compile it only as a dependency of `sprawling`, where
-  # its warnings print but fail nothing and clippy's own lints never run,
-  # so its clippy and tests run here; `just check` ends with it, and so
-  # does this. Its fmt runs again here, seconds, because the recipe
-  # depends on it.
+  # The desktop server and its FFI seam are workspace members, so the jobs
+  # above lint and test them; what is left is the Zig leaf's own tests,
+  # which no cargo command runs (desktop-SPEC.md section 8-12). It compiles
+  # no Rust, so it needs no toolchain and no cache.
   desktop:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - name: install pinned toolchain
-        run: rustup show
-      # The Zig the desktop's leaf is built with; every Windows build of
-      # `sprawling` compiles it (desktop-SPEC.md section 8-12).
+      # The Zig the desktop's leaf is built with (desktop-SPEC.md section
+      # 8-12).
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: desktop -> target
-          shared-key: desktop
-          key: ${{ hashFiles('desktop/Cargo.lock', 'rust-toolchain.toml') }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-deny,just
-      - name: clippy, tests and licences of desktop
+          tool: just
+      - name: the Zig leaf's own tests
         run: just check-desktop
 
   # The propositions only a proof can hold, against real MIR.

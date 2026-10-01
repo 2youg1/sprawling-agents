@@ -87,9 +87,7 @@ jobs:
         run: rustup show
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            . -> target
-            desktop -> target
+          workspaces: . -> target
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest,just
@@ -133,15 +131,6 @@ jobs:
       - name: tests
         if: ${{ !cancelled() }}
         run: cargo nextest run --workspace --locked --all-features --no-fail-fast
-      # desktop/ sits outside the workspace, so the steps above compile it
-      # only as a dependency of `sprawling` and lint none of it: its
-      # non-Windows arm and the tests that compile only off Windows meet
-      # clippy and nextest nowhere but here (desktop-SPEC.md section 16).
-      # cargo-deny is not installed, so the recipe's licence read skips
-      # itself; ci.yml's desktop job holds that one.
-      - name: desktop
-        if: ${{ !cancelled() }}
-        run: just check-desktop
       # See ci.yml: the cache's save step cannot walk trybuild's scratch.
       - name: clear the trybuild scratch before the cache is saved
         if: always()

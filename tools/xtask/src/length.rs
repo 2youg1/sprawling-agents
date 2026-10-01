@@ -53,10 +53,6 @@
 //! why `web::lang`, 3,217 lines of every word the client says in two
 //! languages, is not in the register below.
 //!
-//! **The file rule reaches the client and the out-of-tree desktop
-//! package.** Neither is compiled by a workspace command, and a rule
-//! whose only executor is a compiler is a rule that stops at the wall.
-//!
 //! **The file rule reaches the client, and only the file rule.** The
 //! client is 19,000 lines of TypeScript read by the same two readers,
 //! and until this gate reached it the 400-line line had no executor
@@ -328,12 +324,6 @@ fn over(rel: &str, found: &Found, limit: usize) -> Violation {
 /// places. `tests/` and `benches/` are absent on purpose: test code may
 /// relax what production code carries (AGENTS.md), and a long test is a
 /// different question from a long function.
-///
-/// **The package outside the workspace is here as well.** No workspace
-/// command compiles `desktop`, and the rule it states for itself is this
-/// one (desktop-SPEC.md section 16). The members reader lists it, so the
-/// same 400 lines reach it, because the reader who has to find one thing
-/// in a long file is the same reader on both sides of that wall.
 fn sources(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
     let mut out = Vec::new();
     for member in crate::members::members(root)? {

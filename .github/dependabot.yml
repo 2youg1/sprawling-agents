@@ -110,19 +110,6 @@ updates:
       patch-and-minor:
         update-types: ["patch", "minor"]
 
-  # desktop/ builds outside the workspace with a lockfile of its own, and
-  # it is also a path dependency of the binary: the root lockfile carries
-  # its dependencies too, and `xtask guard` holds the versions it shares
-  # with the workspace equal. A manifest change made from here alone would
-  # be red by construction, so this block updates desktop/Cargo.lock only;
-  # a version requirement moves at the root, with both manifests in one
-  # change. The block goes when desktop joins the workspace.
-  - package-ecosystem: cargo
-    directory: /desktop
-    schedule:
-      interval: daily
-    versioning-strategy: lockfile-only
-    open-pull-requests-limit: 5
     commit-message:
       prefix: "card-S0.DEPS"
     groups:

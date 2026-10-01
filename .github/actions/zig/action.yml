@@ -1,4 +1,4 @@
-# The Zig `desktop/ffi/zig-version` pins, which builds the desktop
+# The Zig `crates/desktop/ffi/zig-version` pins, which builds the desktop
 # server's Zig leaf (desktop-SPEC.md section 8-12). The leaf is compiled
 # on Windows targets only, so on any other runner this action installs
 # nothing: a Linux or macOS build of the workspace never starts `zig`.
@@ -9,7 +9,7 @@
 # here rather than as a build-script error later.
 name: zig
 description: >-
-  Install the Zig desktop/ffi/zig-version pins on a Windows runner, and
+  Install the Zig crates/desktop/ffi/zig-version pins on a Windows runner, and
   prove zig answers with that version.
 runs:
   using: composite
@@ -18,7 +18,7 @@ runs:
       id: pin
       if: runner.os == 'Windows'
       shell: bash
-      run: echo "version=$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/desktop/ffi/zig-version")" >> "$GITHUB_OUTPUT"
+      run: echo "version=$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/crates/desktop/ffi/zig-version")" >> "$GITHUB_OUTPUT"
     - uses: mlugg/setup-zig@v2
       if: runner.os == 'Windows'
       with:
