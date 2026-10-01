@@ -165,6 +165,7 @@ fn a_run_is_offered_the_tools_the_worker_was_handed() {
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(1_024),
+            input: None,
             idem: idem(b"select"),
         })
         .unwrap();
@@ -329,6 +330,7 @@ fn a_long_connector_answer_reaches_the_model_packaged() {
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(1_024),
+            input: None,
             idem: idem(b"select"),
         })
         .unwrap();

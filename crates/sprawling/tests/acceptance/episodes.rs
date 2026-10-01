@@ -689,6 +689,7 @@ pub(crate) fn choose(
             tag,
             context_tokens: kernel::Window::new(131_072),
             max_output_tokens: kernel::Ceiling::new(4_096),
+            input: None,
             idem: idem(format!("select {tag}").as_bytes()),
         })
         .unwrap();

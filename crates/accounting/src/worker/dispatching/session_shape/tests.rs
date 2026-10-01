@@ -103,6 +103,7 @@ fn choose(worker: &mut RunWorker, model: &str, key: &[u8]) {
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(4_096),
+            input: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         })
         .unwrap();
@@ -329,6 +330,7 @@ fn a_dispatch_that_names_a_registered_model_runs_on_it() {
             tag: kernel::ModelTag::Digest,
             context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(4_096),
+            input: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select-digest"),
         })
         .unwrap();
@@ -369,6 +371,7 @@ fn a_run_naming_no_model_runs_on_the_room_frozen_one() {
             tag: kernel::ModelTag::Digest,
             context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(4_096),
+            input: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select-digest"),
         })
         .unwrap();

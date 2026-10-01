@@ -75,6 +75,7 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(1_024),
+            input: None,
             idem: idem(b"select"),
         })
         .unwrap();

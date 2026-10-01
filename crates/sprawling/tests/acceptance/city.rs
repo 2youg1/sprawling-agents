@@ -67,6 +67,7 @@ pub(crate) fn city_with_a_model(
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(131_072),
             max_output_tokens: kernel::Ceiling::new(4_096),
+            input: None,
             idem: idem(b"select"),
         })
         .unwrap();

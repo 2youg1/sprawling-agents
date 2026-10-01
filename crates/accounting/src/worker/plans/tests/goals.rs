@@ -242,6 +242,7 @@ fn a_pursuit_gives_the_desk_back_while_its_rows_drive() {
             tag: kernel::ModelTag::Digest,
             context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(4_096),
+            input: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"digest"),
         })
         .unwrap();

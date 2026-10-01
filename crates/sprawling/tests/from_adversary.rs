@@ -150,6 +150,7 @@ fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {
             tag: kernel::ModelTag::Main,
             context_tokens: None,
             max_output_tokens: None,
+            input: None,
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"select"),
         })
         .unwrap();

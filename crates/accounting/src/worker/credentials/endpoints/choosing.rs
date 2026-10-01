@@ -16,7 +16,7 @@ use kernel::event::EventKind;
 use kernel::{AxCode, AxError};
 
 use crate::worker::RunWorker;
-use crate::worker::credentials::{Ceilings, Chosen, registered_as};
+use crate::worker::credentials::{Chosen, Stated, registered_as};
 
 impl RunWorker {
     /// Points one tag at one model.
@@ -31,17 +31,18 @@ impl RunWorker {
     pub(in crate::worker) fn select_model(
         &mut self,
         chosen: Chosen,
-        ceilings: Ceilings,
+        stated: Stated,
     ) -> Result<(), AxError> {
         let Chosen {
             endpoint,
             model,
             tag,
         } = chosen;
-        let Ceilings {
+        let Stated {
             context_tokens,
             max_output_tokens,
-        } = ceilings;
+            input: stated_input,
+        } = stated;
         let known = self
             .credentials
             .book
@@ -108,10 +109,11 @@ impl RunWorker {
             },
         );
         let max_output_tokens = resolved.and_then(gateway::OutputCeiling::tokens);
-        // What a model accepts is the vendor's fact, read off the
-        // catalogue or the preset table; a form cannot make a text-only
-        // model see (`crates/gateway/Spec.lean` §8-37).
+        // What a model accepts is what the person said, else the
+        // vendor's fact read off the catalogue or the preset table
+        // (`crates/gateway/Spec.lean` §8-37, gateway D16).
         let input = gateway::accepted_input(
+            stated_input,
             priced.as_ref().map(|row| row.input),
             &known.base_url,
             &model,
@@ -189,7 +191,67 @@ mod tests {
                 tag: kernel::ModelTag::Ocr,
                 context_tokens: None,
                 max_output_tokens: None,
+                input: None,
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
+            })
+            .unwrap();
+        let registered: Vec<(kernel::ModelTag, gateway::InputKinds)> = worker
+            .credentials
+            .book
+            .choices()
+            .map(|(tag, _, entry)| (tag, entry.input))
+            .collect();
+        assert_eq!(
+            registered,
+            vec![(kernel::ModelTag::Ocr, gateway::InputKinds::TextImage)]
+        );
+    }
+
+    /// The person's statement is the first rung: a model the pinned
+    /// catalogue lists as reading text, on a server no preset row speaks
+    /// for, is registered as reading pictures when the person says so
+    /// (`crates/gateway/Spec.lean` §8-37, gateway D16).
+    #[test]
+    fn a_model_the_person_says_reads_pictures_is_registered_as_reading_them() {
+        let dir = tempfile::tempdir().unwrap();
+        crate::worker::fixture::init_city(dir.path()).unwrap();
+        let mut worker = RunWorker::new(
+            dir.path(),
+            runtime::diagnostics::Diagnostics::off(),
+            crate::worker::fixture::hands(),
+        )
+        .unwrap();
+        let attached = kernel::event::record::EndpointAttached {
+            name: "here".to_owned(),
+            base_url: "http://127.0.0.1:8000/v1".to_owned(),
+            dialect: kernel::DialectKind::OpenAi,
+            auth: None,
+            auth_header: None,
+            models: vec!["local".to_owned()],
+            connection_kind: None,
+            probed: false,
+            tuning: None,
+        };
+        worker
+            .record(EventKind::EndpointAttached, Payload::of(&attached).unwrap())
+            .unwrap();
+        assert_eq!(
+            gateway::MarketSnapshot::builtin()
+                .unwrap()
+                .lookup("local")
+                .map(|row| row.input),
+            Some(gateway::InputKinds::Text),
+            "the catalogue says text"
+        );
+        worker
+            .handle(wire::Command::SelectModel {
+                endpoint: wire::ProviderName::parse("here").unwrap(),
+                model: "local".to_owned(),
+                tag: kernel::ModelTag::Ocr,
+                context_tokens: None,
+                max_output_tokens: None,
+                input: Some(kernel::InputKinds::TextImage),
+                idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"stated"),
             })
             .unwrap();
         let registered: Vec<(kernel::ModelTag, gateway::InputKinds)> = worker

@@ -7,8 +7,9 @@
 
 use kernel::model::{RunPolicy, Window};
 use kernel::{
-    Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, GitOid, IdemKey, McpServer,
-    ModelTag, Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed, SessionName,
+    Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, GitOid, IdemKey, InputKinds,
+    McpServer, ModelTag, Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed,
+    SessionName,
 };
 use serde::{Deserialize, Serialize};
 
@@ -151,13 +152,15 @@ pub enum Command<Secret = Sealed<String>> {
         /// where the catalogue has no row the model is registered
         /// without a ceiling rather than with a zero one.
         max_output_tokens: Option<Ceiling>,
+        /// What the person says the model accepts. Absent, the catalogue and
+        /// the preset table answer (`crates/gateway/Spec.lean` §8-37, D16).
+        input: Option<InputKinds>,
         idem: IdemKey,
     },
-    /// Starts a new session at an address: same room, a fresh stretch of
-    /// conversation in it, so a person who changed the model starts it on
-    /// purpose rather than having the room's frozen shape move behind
-    /// their back (sprawling-SPEC.md 8-82). [`Carry`] names what crosses;
-    /// the default keeps nothing. Writes `session_opened`.
+    /// Starts a new session at an address: same room, a fresh stretch of conversation in it, so a
+    /// person who changed the model starts it on purpose rather than having the room's frozen shape
+    /// move behind their back (sprawling-SPEC.md 8-82). [`Carry`] names what crosses; the default
+    /// keeps nothing. Writes `session_opened`.
     OpenSession {
         addr: Address,
         carry: Carry,
@@ -274,9 +277,8 @@ pub enum Command<Secret = Sealed<String>> {
     },
     /// A goal the city keeps working towards until the work runs out.
     ///
-    /// One frame with four steps rather than four frames: a person who
-    /// can set a goal can pause it, and splitting that into separate
-    /// commands would let a client offer one without the other.
+    /// One frame with four steps rather than four frames: a person who can set a goal can pause it,
+    /// and splitting that into separate commands would let a client offer one without the other.
     Pursue {
         addr: Address,
         step: PursuitStep,
@@ -348,46 +350,43 @@ pub enum Command<Secret = Sealed<String>> {
     PutRange(RangeWrite),
     /// Decides proposal cards on one document (wire-SPEC.md 8-73).
     DecideProposals(ProposalDecisions),
-    /// Connects one outside application through the broker that holds
-    /// its OAuth, answered with the whole shelf: the broker was asked, so
-    /// every row is fresh, and the pressed one carries its consent page.
+    /// Connects one outside application through the broker that holds its OAuth, answered with the
+    /// whole shelf: the broker was asked, so every row is fresh, and the pressed one carries its
+    /// consent page.
     ///
-    /// **The client opens the consent page, never the city**, which may
-    /// run on a machine nobody is looking at. The `IdemKey` stops a
-    /// second press from opening a second account on one application.
+    /// **The client opens the consent page, never the city**, which may run on a machine nobody is
+    /// looking at. The `IdemKey` stops a second press from opening a second account on one
+    /// application.
     ConnectToolkit {
         toolkit: ToolkitSlug,
         idem: IdemKey,
     },
     /// Change one fact about how this person reads their own city.
     ///
-    /// One named fact per frame rather than a whole record: two
-    /// screens settling different things must not be able to overwrite
-    /// each other's field on the way past.
+    /// One named fact per frame rather than a whole record: two screens settling different things
+    /// must not be able to overwrite each other's field on the way past.
     PutPreferences {
         patch: PreferencePatch,
         idem: IdemKey,
     },
     /// Write one skill or script onto a shelf.
     ///
-    /// The shelf and the name are separate because the city owns where
-    /// a shelf lives: the two shelves sit inside the reserved subtree,
-    /// which no write domain reaches, so this is the door a person
-    /// writes there through and there is no path to spell. `name` may
-    /// carry sub-directories, which is how a script keeps its folder.
+    /// The shelf and the name are separate because the city owns where a shelf lives: the two
+    /// shelves sit inside the reserved subtree, which no write domain reaches, so this is the door
+    /// a person writes there through and there is no path to spell. `name` may carry
+    /// sub-directories, which is how a script keeps its folder.
     ///
-    /// The body replaces the file whole, for the reason
-    /// [`Command::PutDocument`] gives. Writes `shelved_document_written`.
+    /// The body replaces the file whole, for the reason [`Command::PutDocument`] gives. Writes
+    /// `shelved_document_written`.
     PutShelved {
         shelf: Shelf,
         name: String,
         text: String,
         idem: IdemKey,
     },
-    /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token
-    /// is plain here because a token that must cross a wire has, by
-    /// definition, no secrecy left to protect in transit - it is sealed the
-    /// moment it lands (see `server::decide_handshake`).
+    /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token is plain here because a
+    /// token that must cross a wire has, by definition, no secrecy left to protect in transit - it
+    /// is sealed the moment it lands (see `server::decide_handshake`).
     Auth {
         token: String,
     },

@@ -306,6 +306,7 @@ private def ceilingRegistered : List String :=
      , "            tag: kernel::ModelTag::Main,"
      , "            context_tokens: None,"
      , "            max_output_tokens: None,"
+     , "            input: None,"
      , "            idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b\"select\"),"
      , "        })"
      , "        .unwrap();"

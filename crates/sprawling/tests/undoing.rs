@@ -101,6 +101,7 @@ fn choosing_a_model_needs_the_endpoint_the_earlier_choice_named() {
             tag: kernel::ModelTag::Main,
             context_tokens: None,
             max_output_tokens: None,
+            input: None,
             idem: key(b"choose"),
         })
         .unwrap_err();

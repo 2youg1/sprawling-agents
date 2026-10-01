@@ -12,7 +12,7 @@ use kernel::{AxCode, AxError};
 use crate::guide;
 
 use super::super::{
-    Assignment, Ceilings, Chosen, Credential, Entered, Owing, RunWorker, Unasked, not_built,
+    Assignment, Chosen, Credential, Entered, Owing, RunWorker, Stated, Unasked, not_built,
     tuning_of,
 };
 
@@ -164,6 +164,7 @@ impl RunWorker {
                 tag,
                 context_tokens,
                 max_output_tokens,
+                input,
                 ..
             } => self.select_model(
                 Chosen {
@@ -171,10 +172,7 @@ impl RunWorker {
                     model,
                     tag,
                 },
-                Ceilings {
-                    context_tokens,
-                    max_output_tokens,
-                },
+                Stated::new(context_tokens, max_output_tokens, input),
             ),
             wire::Command::PutSecret { realm, name, value } => self.put_secret(
                 &kernel::SecretRef::new(&realm, &name)?,

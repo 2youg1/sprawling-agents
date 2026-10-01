@@ -154,18 +154,38 @@ pub(super) struct Chosen {
     pub(super) tag: kernel::ModelTag,
 }
 
-/// The two ceilings a model row states.
+/// The three facts about a model that no model list returns, as a
+/// person stated them.
 ///
-/// The pair travels together because a context window without an output
-/// ceiling describes no model that can be called. A zero window and an
-/// absent ceiling each mean "nobody stated this", and the catalogue's
-/// figure is taken where the catalogue has a row for the model.
-pub(super) struct Ceilings {
+/// They travel together because a model row states all three: a context
+/// window without an output ceiling describes no model that can be
+/// called, and what it accepts decides whether a picture may be sent at
+/// all. Each absent means "nobody stated this", and the ladder that
+/// fact climbs answers instead.
+pub(super) struct Stated {
     /// `None` when nobody stated one. Zero is unrepresentable here:
     /// a window of zero and a window nobody registered would be the same
     /// byte, and the reminder would read every session as full.
     pub(super) context_tokens: Option<kernel::Window>,
     pub(super) max_output_tokens: Option<kernel::Ceiling>,
+    /// The first rung of `gateway::accepted_input` (gateway D16).
+    pub(super) input: Option<kernel::InputKinds>,
+}
+
+impl Stated {
+    /// The three facts in the order `SelectModel` carries them; each
+    /// has its own type, so two of them cannot trade places.
+    pub(super) const fn new(
+        context_tokens: Option<kernel::Window>,
+        max_output_tokens: Option<kernel::Ceiling>,
+        input: Option<kernel::InputKinds>,
+    ) -> Self {
+        Self {
+            context_tokens,
+            max_output_tokens,
+            input,
+        }
+    }
 }
 
 /// How long a probe may take. Short: a person is watching the settings

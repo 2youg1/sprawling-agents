@@ -505,6 +505,7 @@ title = \"a window\"
             tag: kernel::ModelTag::Main,
             context_tokens: wire::Window::new(128_000),
             max_output_tokens: kernel::Ceiling::new(8_192),
+            input: None,
             idem,
         },
         Command::OpenSession {

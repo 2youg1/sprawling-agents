@@ -170,6 +170,7 @@ impl From<WireCommand> for Command {
                 tag,
                 context_tokens,
                 max_output_tokens,
+                input,
                 idem,
             } => Self::SelectModel {
                 endpoint,
@@ -177,6 +178,7 @@ impl From<WireCommand> for Command {
                 tag,
                 context_tokens,
                 max_output_tokens,
+                input,
                 idem,
             },
             Command::OpenSession {

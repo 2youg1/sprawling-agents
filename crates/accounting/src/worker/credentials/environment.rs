@@ -15,7 +15,7 @@
 use kernel::{AxError, EventKind, Payload};
 
 use super::super::RunWorker;
-use super::{Ceilings, Chosen, Credential, ENVIRONMENT_ENDPOINT, Entered, local_model_facts};
+use super::{Chosen, Credential, ENVIRONMENT_ENDPOINT, Entered, Stated, local_model_facts};
 
 impl RunWorker {
     fn seed_from_environment(&mut self, base_url: &str, model: &str) -> Result<(), AxError> {
@@ -36,9 +36,10 @@ impl RunWorker {
                 model: model.to_owned(),
                 tag: kernel::ModelTag::Main,
             },
-            Ceilings {
+            Stated {
                 context_tokens: kernel::Window::new(facts.context_tokens),
                 max_output_tokens: facts.max_output_tokens,
+                input: None,
             },
         )
     }

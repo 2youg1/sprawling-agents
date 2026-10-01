@@ -95,6 +95,7 @@ fn a_refused_command_reaches_the_peer_that_sent_it() {
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(200_000),
             max_output_tokens: kernel::Ceiling::new(8_192),
+            input: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
         },
         reply,

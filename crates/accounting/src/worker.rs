@@ -66,7 +66,7 @@ mod workbench;
 use collaborating::Collaborating;
 use commanding::entrance::Entrance;
 use credentials::held::Credentials;
-use credentials::{Ceilings, Chosen, Credential, Entered, tuning_of};
+use credentials::{Chosen, Credential, Entered, Stated, tuning_of};
 use desk::Posted;
 pub use desk::{CommandDesk, DeskWait};
 use dispatching::Dispatched;

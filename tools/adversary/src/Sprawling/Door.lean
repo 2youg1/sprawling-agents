@@ -274,6 +274,9 @@ def Verb.frame : Verb → String
       -- window is a nonzero count whenever it is stated at all.
       , ("context_tokens", Json.null)
       , ("max_output_tokens", tokensOrNull ceiling)
+      -- Null is "the person said nothing about what the model accepts": the
+      -- catalogue and the preset table answer, as the settings page leaves it.
+      , ("input", Json.null)
       , ("idem", .str idem.value) ]
 where
   /-- Every question goes out under id 1: this adversary reads an answer by the

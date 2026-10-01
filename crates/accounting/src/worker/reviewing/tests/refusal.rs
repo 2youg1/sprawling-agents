@@ -128,6 +128,7 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
             tag: kernel::ModelTag::Main,
             context_tokens: kernel::Window::new(32_768),
             max_output_tokens: kernel::Ceiling::new(4_096),
+            input: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
         })
         .unwrap();

@@ -78,6 +78,7 @@ pub use discard::{DenyReason, Discard, DiscardForecast, DiscardRequest, DiscardV
 pub use error::{AxCode, AxError, Carrier, ErrorDraft, GateRefusal, ProviderFailureKind, Retry};
 pub use event::{EventDraft, EventKind, EventRecord, EventRef, Payload};
 pub use event::{RunId, Seq, TimeMs, WindowClass};
+pub use event::record::InputKinds;
 pub use gate::GateOutcome;
 pub use gate::{ConnectorCall, DOORS, DoorId, EgressAllowlist, EgressOutcome, EgressTarget};
 pub use goal::{GoalEntry, GoalId, GoalResource, GoalVerdict};

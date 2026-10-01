@@ -239,6 +239,7 @@ fn settled(round: &Round, key: &str, city_root: &Path) -> Result<RunWorker, AxEr
         tag: kernel::ModelTag::Main,
         context_tokens: kernel::Window::new(32_768),
         max_output_tokens: kernel::Ceiling::new(1_024),
+        input: None,
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"e2e-select"),
     })?;
     worker.handle(wire::Command::CreateBuilding {

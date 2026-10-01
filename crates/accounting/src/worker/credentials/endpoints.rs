@@ -337,6 +337,7 @@ mod tests {
                 tag: kernel::ModelTag::Main,
                 context_tokens: None,
                 max_output_tokens: None,
+                input: None,
                 idem: kernel::IdemKey::derive(
                     &kernel::RunId::CITY,
                     kernel::Seq::FIRST,
@@ -369,6 +370,7 @@ mod tests {
                 tag: kernel::ModelTag::Main,
                 context_tokens: None,
                 max_output_tokens: None,
+                input: None,
                 idem: kernel::IdemKey::derive(
                     &kernel::RunId::CITY,
                     kernel::Seq::FIRST,
