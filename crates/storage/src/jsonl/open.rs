@@ -10,8 +10,10 @@ use std::path::{Path, PathBuf};
 use kernel::consts_external::{LogVersion, readable_log_v};
 use kernel::{AxCode, AxError, GENESIS_PREV, Seq, TimeMs};
 
+use crate::chain_audit::ProofCount;
 use crate::error::{StorageError, io_err};
 use crate::real_fs::RealFs;
+use crate::verified_prefix::{ProofRecords, TailStart};
 use crate::vfs::Vfs;
 
 use super::first_line::first_line;
@@ -31,8 +33,32 @@ impl JsonlLedger {
     /// process or another; otherwise whatever reading and repairing the
     /// segments reports.
     pub fn open(dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), StorageError> {
+        JsonlLedger::open_locked(dir, now, TailProof::Strict)
+    }
+
+    /// [`JsonlLedger::open`], with the last segment's verified-prefix
+    /// record in `records` standing in for checking its prefix line by
+    /// line when the record holds (storage-SPEC 8-34). Records are read,
+    /// never written: the proof that holds the writer lock writes them.
+    ///
+    /// # Errors
+    /// Those of [`JsonlLedger::open`].
+    pub fn open_reusing(
+        dir: &Path,
+        now: TimeMs,
+        records: &ProofRecords,
+    ) -> Result<(Self, OpenReport), StorageError> {
+        JsonlLedger::open_locked(dir, now, TailProof::Records(records))
+    }
+
+    fn open_locked(
+        dir: &Path,
+        now: TimeMs,
+        proof: TailProof<'_>,
+    ) -> Result<(Self, OpenReport), StorageError> {
         let lock = WriterLock::take(dir)?;
-        let (mut ledger, report) = JsonlLedger::open_with(Box::new(RealFs::new()), dir, now)?;
+        let (mut ledger, report) =
+            JsonlLedger::open_through(Box::new(RealFs::new()), dir, now, proof)?;
         ledger.lock = Some(lock);
         Ok((ledger, report))
     }
@@ -58,12 +84,22 @@ impl JsonlLedger {
         JsonlLedger::open_with(Box::new(fs), dir, now)
     }
 
-    /// Injection point for the second Vfs adapter; [`JsonlLedger::open`]
-    /// and `open_faulty` are its two entrances.
+    /// Injection point for the second Vfs adapter, checking the last
+    /// segment line by line; `open_faulty` is its entrance.
+    #[cfg(any(test, feature = "fault"))]
     pub(crate) fn open_with(
+        vfs: Box<dyn Vfs>,
+        dir: &Path,
+        now: TimeMs,
+    ) -> Result<(Self, OpenReport), StorageError> {
+        JsonlLedger::open_through(vfs, dir, now, TailProof::Strict)
+    }
+
+    fn open_through(
         mut vfs: Box<dyn Vfs>,
         dir: &Path,
         now: TimeMs,
+        proof: TailProof<'_>,
     ) -> Result<(Self, OpenReport), StorageError> {
         vfs.create_dir_all(dir)
             .map_err(io_err("create ledger dir", dir))?;
@@ -95,24 +131,28 @@ impl JsonlLedger {
         };
 
         let Some(last) = segments.last().cloned() else {
-            return Ok((ledger, OpenReport { recovered: None }));
+            return Ok((
+                ledger,
+                OpenReport {
+                    recovered: None,
+                    counted: ProofCount::default(),
+                },
+            ));
         };
 
         ledger.probe_version(&segments)?;
-        let dropped = ledger.recover_tail(&segments, &last)?;
-        let report = if dropped > 0 {
+        let (dropped, counted) = ledger.recover_tail(&segments, &last, proof)?;
+        let recovered = if dropped > 0 {
             if ledger.next_seq != Seq::FIRST {
                 ledger.append_log_truncated(now, dropped)?;
             }
-            OpenReport {
-                recovered: Some(TailTruncation {
-                    dropped_bytes: dropped,
-                }),
-            }
+            Some(TailTruncation {
+                dropped_bytes: dropped,
+            })
         } else {
-            OpenReport { recovered: None }
+            None
         };
-        Ok((ledger, report))
+        Ok((ledger, OpenReport { recovered, counted }))
     }
 
     /// Direction-aware version refusal, before any repair or parse
@@ -170,18 +210,35 @@ impl JsonlLedger {
         }
     }
 
-    /// Tail-truncation recovery over the last segment. Returns dropped
-    /// bytes; on return the ledger state points at the surviving tail.
-    fn recover_tail(&mut self, segments: &[PathBuf], last: &Path) -> Result<u64, StorageError> {
+    /// Tail-truncation recovery over the last segment, taking its
+    /// verified prefix from `proof` when the record holds (storage-SPEC
+    /// 8-34). Returns dropped bytes and what was read and checked; on
+    /// return the ledger state points at the surviving tail.
+    fn recover_tail(
+        &mut self,
+        segments: &[PathBuf],
+        last: &Path,
+        proof: TailProof<'_>,
+    ) -> Result<(u64, ProofCount), StorageError> {
         let boundary = self.boundary(segments, last)?;
-        let mut check = LineCheck::after(boundary.prev, boundary.next_seq);
         let prior = boundary.prior;
         let bytes = self.vfs.read(last).map_err(io_err("read segment", last))?;
-        let (lines, _terminated_len) = complete_lines(&bytes);
+        let start = proof.start(
+            last,
+            &bytes,
+            LineCheck::after(boundary.prev, boundary.next_seq),
+        );
+        let mut check = start.check;
+        let mut counted = start.counted;
+        let (lines, _terminated_len) = complete_lines(bytes.get(start.from..).unwrap_or_default());
 
-        let mut valid_len = 0usize;
+        let mut valid_len = start.from;
         for (index, line) in lines.iter().enumerate() {
-            let at = u64::try_from(index).unwrap_or(u64::MAX).saturating_add(1);
+            let at = u64::try_from(index)
+                .unwrap_or(u64::MAX)
+                .saturating_add(1)
+                .saturating_add(start.lines);
+            counted.lines_checked = counted.lines_checked.saturating_add(1);
             let fault = match check.advance(line) {
                 Ok(_) => {
                     valid_len = valid_len.saturating_add(line.len()).saturating_add(1);
@@ -284,7 +341,30 @@ impl JsonlLedger {
         }
         self.prev = run_prev;
         self.next_seq = run_seq;
-        Ok(dropped)
+        Ok((dropped, counted))
+    }
+}
+
+/// What tail recovery may take in place of checking the last segment's
+/// prefix line by line.
+#[derive(Clone, Copy)]
+enum TailProof<'a> {
+    /// Every line of the last segment is checked.
+    Strict,
+    /// The last segment's record in these, when it holds (storage-SPEC 8-34).
+    Records(&'a ProofRecords),
+}
+
+impl TailProof<'_> {
+    /// Where checking `bytes`, the last segment at `last`, begins when
+    /// the chain state entering it is `entry`.
+    fn start(self, last: &Path, bytes: &[u8], entry: LineCheck) -> TailStart {
+        match (self, last.file_name().and_then(|name| name.to_str())) {
+            (TailProof::Records(_records), Some(_name)) => TailStart::strict(bytes, entry),
+            (TailProof::Records(_), None) | (TailProof::Strict, _) => {
+                TailStart::strict(bytes, entry)
+            }
+        }
     }
 }
 

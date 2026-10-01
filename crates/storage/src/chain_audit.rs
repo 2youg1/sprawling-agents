@@ -16,7 +16,7 @@ use kernel::{AxError, B3Hash};
 use crate::error::{StorageError, io_err};
 use crate::jsonl::{JsonlLedger, LineCheck, segment_names};
 use crate::real_fs::RealFs;
-use crate::verified_prefix::{ProofRecords, SegmentRecord, line_check_version};
+use crate::verified_prefix::{ProofRecords, Reused, SegmentRecord, line_check_version};
 use crate::vfs::Vfs;
 
 /// What walking the whole chain found.
@@ -298,11 +298,10 @@ impl Walked {
         })
     }
 
-    /// Takes `record` in place of checking the prefix it names when its
-    /// rule version, its entry state and the digest of that prefix all
-    /// match, answering where checking goes on and how many lines the
-    /// prefix held; `hasher` has then hashed the prefix. `None` leaves
-    /// the chain state where it was.
+    /// Takes `record` in place of checking the prefix it names when it
+    /// stands for it (`SegmentRecord::reused`), answering where checking
+    /// goes on and how many lines the prefix held; `hasher` has then
+    /// hashed the prefix. `None` leaves the chain state where it was.
     fn reuse(
         &mut self,
         bytes: &[u8],
@@ -310,21 +309,23 @@ impl Walked {
         version: u32,
         hasher: &mut blake3::Hasher,
     ) -> Option<(usize, u64)> {
-        if record.version != version || record.entry != self.check {
-            return None;
+        match record.reused(bytes, self.check, version, hasher) {
+            Reused::No => None,
+            Reused::Differs { hashed } => {
+                self.counted.bytes_hashed = self.counted.bytes_hashed.saturating_add(hashed);
+                None
+            }
+            Reused::Stands { len, lines, exit } => {
+                self.counted.bytes_hashed = self
+                    .counted
+                    .bytes_hashed
+                    .saturating_add(u64::try_from(len).unwrap_or(u64::MAX));
+                self.lines = self.lines.saturating_add(lines);
+                self.check = exit;
+                self.counted.segments_by_digest = self.counted.segments_by_digest.saturating_add(1);
+                Some((len, lines))
+            }
         }
-        let prefix = usize::try_from(record.len)
-            .ok()
-            .and_then(|len| bytes.get(..len))?;
-        hasher.update(prefix);
-        self.counted.bytes_hashed = self.counted.bytes_hashed.saturating_add(len_of(prefix));
-        if B3Hash::from_bytes(*hasher.finalize().as_bytes()) != record.digest {
-            return None;
-        }
-        self.lines = self.lines.saturating_add(record.lines);
-        self.check = record.exit;
-        self.counted.segments_by_digest = self.counted.segments_by_digest.saturating_add(1);
-        Some((prefix.len(), record.lines))
     }
 }
 

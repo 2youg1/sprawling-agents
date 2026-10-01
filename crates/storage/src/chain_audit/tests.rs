@@ -308,3 +308,41 @@ fn line_check_rules_pin_the_verdicts_of_a_fixed_fixture() {
         "the per-line check changed what it accepts: set LINE_CHECK_RULES to this value"
     );
 }
+
+/// A ledger reopened after its history was proved checks only the lines
+/// written since the proof, however long its last segment has grown: the
+/// opening takes the last segment's record through the judgement the
+/// proof uses, and reads and hashes the prefix once (storage-SPEC 8-34).
+#[test]
+fn a_reopened_ledger_checks_only_what_its_last_record_has_not_proved() {
+    let reopened = |history: u64| {
+        let tmp = tempfile::tempdir().unwrap();
+        let (dir, kept) = (tmp.path().join("ledger"), tmp.path().join("records"));
+        let (mut ledger, _) = JsonlLedger::open(&dir, TimeMs::new(0)).unwrap();
+        ledger
+            .append_all((0..history).map(draft).collect())
+            .unwrap();
+        prove_chain(&dir, &ledger.proof_records(&kept)).unwrap();
+        let last = ledger_segments_at(&dir).unwrap().pop().unwrap();
+        let proved = fs::metadata(&last).unwrap().len();
+        ledger.append_all(vec![draft(90), draft(91)]).unwrap();
+        drop(ledger);
+        let records = ProofRecords::read_only(&kept);
+        let (ledger, report) = JsonlLedger::open_reusing(&dir, TimeMs::new(99), &records).unwrap();
+        assert_eq!(
+            u64::try_from(ledger.read_raw_lines().unwrap().len()).unwrap(),
+            history + 2
+        );
+        let expected = ProofCount {
+            lines_checked: 2,
+            segments_by_digest: 1,
+            bytes_read: fs::metadata(&last).unwrap().len(),
+            bytes_hashed: proved,
+        };
+        (report.counted, expected)
+    };
+    for history in [40, 80] {
+        let (counted, expected) = reopened(history);
+        assert_eq!(counted, expected, "a history of {history} lines");
+    }
+}

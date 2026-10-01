@@ -16,9 +16,11 @@ use crate::vfs::Vfs;
 /// files are cut, never any observable semantics (storage-SPEC 14).
 pub(crate) const SEGMENT_ROLL_BYTES: u64 = 64 * 1024 * 1024;
 
-/// What open found and repaired.
+/// What open found and repaired, and what its tail recovery read and
+/// checked (storage-SPEC 8-34).
 pub struct OpenReport {
     pub recovered: Option<TailTruncation>,
+    pub counted: crate::ProofCount,
 }
 
 pub struct TailTruncation {
