@@ -4646,6 +4646,8 @@ static STOCKING: Mutex<BTreeSet<PathBuf>>;
 
 读数（debug 构建，windows-x86_64、16 核，同一仪表三轮）：第二个房间接管备树的放置 39–42 ms，`created` 为 0；它的 lane 之后补回一棵全量检出的备树 1.44–1.46 s。第一个房间的放置 5.6–6.2 s，`created` 513：这一段里有城的第一次提交（`ensure_base` 把 512 个文件 stage 并扫描一遍）和一次全量检出；它之后补备树 1.26–1.33 s。
 
+读数（发行构建，windows-x86_64、16 核，同一仪表两轮）：第二个房间接管备树的放置 47–48 ms，`created` 为 0；它的 lane 补回备树 1.35–1.54 s。第一个房间的放置 4.29–4.72 s，`created` 513；它之后补备树 1.24–1.42 s。发行构建省下的是计算，省不下实时扫描对每个新建文件的放行，所以补树与城的第一次放置在发行构建里仍以秒计。`just bench` 的 `large_worktree_placement`（bench 自己备树）p50 36.0 ms。
+
 当前状态：上面各条都已落地。还以秒计的有两段：一是补备树本身，落在接管了备树的 run 的落地之前（本节「剩下的秒级读数在落地这一段」）；二是一座城的第一次放置，它先提交一次城（`crates/storage/Spec.lean` §8-8 的 `ensure_base`），每座城只有一次，那次之前没有干线可备，所以备树帮不上它，这一段仍在那座城第一个 run 的第一次模型调用之前。发行构建的读数由同一个仪表测试给出：`cargo nextest run --release -p sprawling-accounting --run-ignored only --no-capture -E 'test(instrument_production_placement)'`。
 
 ### 8-113 派活的准备进 lane：记账线程只做决定，树、MCP 连接与冻结在 lane 里（`accounting::worker::dispatching::running`、`accounting::worker::dispatching::preparing`、`accounting::worker::driving::flight`）
