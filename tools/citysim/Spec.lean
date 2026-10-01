@@ -215,6 +215,7 @@ MemLedger 的 append 是 from_draft→canonical_line→chain_hash 推进；无�
 | D19 | 红队两臂共用剧本与判定，只差判定是否被调用 | `tools/citysim/spec/RedTeam.lean` |
 | D20 | 一次工具调用的键：每跑一个的位次，加上整个动作的字节 | `tools/citysim/spec/Executor.lean` |
 | D21 | 仪器只在测试构型里编译 | `tools/citysim/spec/Suite.lean` §8-8 |
+| D22 | 过期基线的场景驱动一座真的城，而不是 `run::drive` 加剧本工具台 | 本文件 §16 |
 -/
 
 /-! ## 13 依赖选型
@@ -242,12 +243,15 @@ kernel（features=["conformance"]）、storage（对拍与夹具）、runtime（
 
 - 内存 Ledger 与检查器：`tests/ledger_conformance.rs`（`mem_ledger_passes_the_same_conformance_suite_as_jsonl`、`mem_and_jsonl_produce_identical_bytes`、`the_chain_checker_passes_truth_and_bites_tampering`、`golden_fixture_pins_cross_os_bytes`）。
 - 确定性与取消：`tests/scenario.rs`（`the_loop_is_byte_deterministic`、三条 `a9_cancel_…`、`s3_14_the_run_is_byte_identical_when_replayed`、`two_runs_interleaved_on_one_ledger_replay_byte_identically`、`two_reads_in_one_wave_are_two_calls`）与 `tests/interventions.rs`（`a_cancel_at_the_same_boundary_beats_a_steer`、`a_steer_advances_the_run_instead_of_stopping_it`）；`script_model` 的 `pops_in_script_order_then_concludes`。
+- 驱动一座真城的场景：`tests/proposal_baseline.rs`（`a_proposal_made_on_a_version_the_document_left_is_refused_when_decided`，D22）。
 - 替身：`wire_script::tests` 的七条（同一请求逐字节同录、用尽、两个 run 交错、追加的 run 被开启、改写了已在答的 run 的脚本被拒、读不懂的回复与分不清或到不了的 run 在解析时拒）。
 - 长回合：`long_turn::tests` 的 `a_long_turn_grows_its_window_by_one_step_at_a_time`。
 - 仪器：`red_team::tests`、`suite` 与 `tests/evaluation.rs`、`metabolism`、`score`、`nesting::tests`、`ablation::tests`。
 - bench：`bench::reading::tests`、`bench::scenarios::tests`（含 `the_registered_fixture_writes_the_bytes_its_digest_pins`）、`bench_startup::samples` 与 `footprint`、`actions` 的测试。
 
 只有节注释的分部（`spec/Nesting.lean`、`spec/Ablation.lean`）由穷尽枚举与各自的测试守住。挂钟读数不是任何断言的对象：它们入册不入门（D17）。
+
+D22 **过期基线的场景驱动一座真的城，而不是 `run::drive` 加剧本工具台。** 场景经 `accounting::worker::genesis::form` 造城、经 `accounting::worker::RunWorker` 派一次活：`Hands` 换上计数时钟与内存里的 vault，模型是剧本的 `ScriptModel`，工具台、`proposal` 工具、relay、治理折叠与人的决定都是生产件（accounting-SPEC §8-30）。理由：要判的事跨三个写者——run 的工具写下卡，城外的写者（人的编辑器）挪动文档，人的决定判基线（documents D17、D35）——三者只在 worker 里会合；在剧本工具台上用 `ScriptTool` 写一行 `proposal_offered`，判的是剧本自己，生产的工具与 relay 都不在路上。它判结局：拒绝码是 `E_VERSION_CONFLICT`，文档留着挪动之后的字节，卡仍开着；不判同一场景跑两遍账本逐字节相同，那是 accounting-SPEC §3 第一条还差的一步。代价：场景经 git 与文件系统，比只经 `run::drive` 的场景慢。被否决的做法：写进 `crates/sprawling/tests/acceptance/`——那里判每件工具答得对，过期是一个跨写者的场景，refrain 路线图 §4-10 的验收要的正是一个 citysim 场景。重开参数：场景库要逐字节重放一次 dispatch 时，本场景是它的起点。
 -/
 
 /-! ## 17 文档关系

@@ -55,7 +55,7 @@
 
 ## 3 假设与歧义
 
-- citysim 的场景库还驱动不了一次 dispatch：场景库只经 `runtime::run::drive` 驱动一次 run，从不造 worker；citysim 的 bench 二进制依赖 `sprawling`，只为计时产品自己的启动与查询。worker 已经只经 `Hands` 与四个端口碰外面（8-11），所以剩下的一步是一个场景造一份脚本的 `Hands`、经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活。能定下它的证据是那个场景在 citysim 里逐字节重放。
+- citysim 有一个场景经脚本的 `Hands`（计数时钟、内存里的 vault）与 `ModelFactory` 驱动一次 dispatch：`tests/proposal_baseline.rs`（citysim D22）。它判的是结局，不判同一场景跑两遍账本逐字节相同，所以 ARCHITECTURE.md §11 的 V6 缺口还差这一步；能定下它的证据是那个场景在 citysim 里逐字节重放。
 - 模块从 `sprawling` 搬过来时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）；8-7、8-8、8-9 是早先整节搬进来的，保持原样。未定的只有 S4 的切分：哪几节归 `views`、哪几节归 `worker`，按 `architecture.toml` 里各行的 `spec` 锚点定。
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
 - `playback` 的导出在 walk 里把每一行折进视图（8-25），不论范围里有没有提交：省掉的是每个提交一次的整账重建，多出的是没有提交的窄选择也要付的一遍视图折叠。要不要改成遇到第一个范围内的提交才开始折（那时要从创世再读一遍到那一行，读到的字节不是这一遍核对过的），由多日夹具上 release 的导出读数定：视图折叠在 walk 里占的比例小，就照现在这样。
@@ -990,10 +990,34 @@ fn give_messages(city_root: &Path, commits: &mut [wire::CommitAnswer]);
 
 - **一次保存是三步，都在 worker 线程上。** `put_range` 先拒保留子树（`Address::is_reserved`，`E_OUTSIDE_WRITE_DOMAIN`），再经 `city::revise_document`（city-SPEC §8-40）在这份文档的锁里读出此刻的字节、交给 `documents::save` 判定并换上，最后写一行 `document_written`（`crates/kernel/Spec.lean` §8-83），它带着这条命令的 `idem`（`commanding::entrance::stamped`）。被拒的保存什么也不写，账上没有它。
 - **决定修改提案也是一次保存。** `decide_proposals` 从 worker 的 `Governance.proposals` 找出点名的每一张卡（不在这份文档上、已经处理过、没有的都拒 `E_INVALID_ARGS`），经同一扇 `revise` 在锁里交给 `documents::decide`；有改动时写一行 `document_written`，然后每张卡一行 `proposal_decided`。卡的状态不在这里改：worker 写下的每一行都经 `RunWorker::absorb` 交给同一个折叠，重开的城读账本得到同一个答案。
-- **提案的折叠住 `Governance`，视图与 worker 各持一份、折法一处**（第 34 条）。`proposal_offered` 经 `documents::Offer::of` 读成一张卡，身份由它算出；读不出的一行（区间颠倒、超长）与别的读不出的治理行一样拒绝，让这座城停在打开那一步，而不是少一张人等着决定的卡（sprawling-SPEC 8-74 的同一条理由）。`proposal_decided` 与 `proposal_withdrawn` 把卡从开着挪到处理过；处理过的卡只记身份与怎样处理的，不留原文与提议。
+- **提案的折叠住 `Governance`，视图与 worker 各持一份、折法一处**（第 34 条）。`proposal_offered` 与 `proposal_withdrawn` 由 run 经工作台的 `proposal` 工具写下（§8-30）。`proposal_offered` 经 `documents::Offer::of` 读成一张卡，身份由它算出；读不出的一行（区间颠倒、超长）与别的读不出的治理行一样拒绝，让这座城停在打开那一步，而不是少一张人等着决定的卡（sprawling-SPEC 8-74 的同一条理由）。`proposal_decided` 与 `proposal_withdrawn` 把卡从开着挪到处理过；处理过的卡只记身份与怎样处理的，不留原文与提议。
 - **`Query::Proposals` 在锁内拷出这份文档上开着的卡，锁外读盘。** 文件此刻的版本要读一次全部字节（`B3Hash::digest`），所以与 `Document` 一样在快照放开之后做；卡的句子由 `Offer::review` 在那时切。文件缺失或读不了时 `version` 为 `None`，卡照答。
 - **提交说明读自 git，与父提交同一刻。** `CommitsAsk::read` 在快照放开之后先经 `storage::parents_of` 读父提交，再经 `give_messages` 读说明：一次打开仓库（`git2::Repository::open`），每个 oid 一次 `find_commit`，`Commit::message` 不是 UTF-8 或对象不在时为 `None`（`crates/wire/Spec.lean` §8-54）。
 - 验收：`worker::commanding::tests::saving`（`crates/wire/Spec.lean` §8-72、§8-73 列的那几条；`Query::Proposals` 的答复——开着的卡按提出的先后、文件此刻的版本——在其中经 `views::ask` 读）；`views::commits::tests::a_page_of_commits_carries_each_ones_message_from_git`。
+
+### 8-30 工作台的 `proposal`：run 提出与收回修改提案（`accounting::worker::workbench::tools::proposal`，形状 4 适配器；documents D35、D36）
+
+```rust
+// accounting::worker::workbench::tools::proposal
+pub(in crate::worker) struct Proposing { /* relay: worker::Relay、clock —— 私有 */ }
+impl Proposing {
+    pub(in crate::worker) fn new(relay: Relay, clock: Arc<dyn Clock + Send + Sync>) -> Proposing;
+}
+impl Laying {
+    pub(super) fn proposal_tool(&self, site: &Site, room: &Address, bound: &runtime::ReadBound)
+        -> Result<ProposalTool<Relay>, AxError>;
+}
+pub(super) struct ProposalTool<L: kernel::Ledger> { /* reader、filing、desk: Mutex<Desk<L>>、meta —— 私有 */ }
+// kernel::Tool。参数 { action: "offer", path, old, new } 或 { action: "withdraw", proposal }；
+// offer 答 { proposal, doc, baseline, start, end }，withdraw 答 { proposal, withdrawn: true }
+```
+
+- **一件工具两个动作，按写登记。** `Effect::Write { domain: 房间 }`，与 `goal`、`signal` 同形：它写的是账本行，所以同一波里的 `offer` 与 `withdraw` 按序执行，不被当作读提前跑；`writes` 答 `Nothing`，因为树里没有文件动。它在表上排在 `playback` 之后、城外工具之前，所以每栋楼的 run 都有它。
+- **`offer`：读城里那一版，找出原文，判长度，写一行。** `path` 经一个建在城根上的 `runtime::BoundReader` 打开（交给 `read` 的同一个读界，第 32 条）：保留子树、读界关着的楼由那扇门拒；Locator 与块被拒，因为提案是关于城里那份文件此刻的字节（documents D35）。读出的字节不是文本（`Reading::Opaque`）时拒；是文本就整份解码，`old` 必须恰好出现一次，零次与多次各一句拒词，带次数；区间按那一版的编码换成字节：UTF-8 的两种，解码出的文字就是版本的字节（documents D5），UTF-16 的两种，每个码元两个字节。`old` 为空或与 `new` 相同时拒。然后 `documents::Offer::of` 判长度（documents D18），工具写一行 `proposal_offered`，记在这次 run、这个居民、这个房间名下，回答卡的身份（documents D13）。同一张卡再 `offer` 一次不再写行，答同一个身份；收回过的卡再 `offer` 被拒（documents D19）。
+- **行经 lane 的 relay 写下。** relay 是 lane 唯一能写账本的门（第 11 条）；记账线程写下这一行之后把它交给 `Governance` 的折叠（§8-22），`Query::Proposals` 从此答出这张卡，人的决定也从同一个折叠找它。
+- **`withdraw` 只收这次 run 自己提出、还开着的卡。** 判它的是工具自己的一本小账（身份 ↦ 开着／收回过）：run 的身份每次派活新铸（`run_id_for` 读时刻），所以这次 run 提出的卡只出自这件工具的这一个实例。别的 run 的卡、没提出过的身份、收回过的卡都拒 `E_INVALID_ARGS`，不写行。
+- **当前状态：人在 run 还在跑时决定了它的一张卡，run 随后收回同一张卡，会多写一行 `proposal_withdrawn`。** 工具看不见那次决定；`views::proposals::Proposals::close` 照最后写下的一行把卡记成收回过。卡上的字节已经由人的决定落下，`open_on` 对两种处理都拒，所以没有字节写错，错的是折叠记下的「怎样处理的」，与 documents D19「处理过的卡不再动」不合。补法是折叠对已经处理过的卡不再改（`close` 保留第一次处理，`views/proposals.rs` 里一行），它也让任何一条迟到的收回成为被拒的一步；另一条路是收回改走记账线程的问询，像 `goal` 的登记那样由 `Governance` 当场判（sprawling-SPEC.md 8-42-8），那要在 `relay::Wake` 加一臂。
+- 验收：`worker::workbench::tools::proposal::tests`（一次 `offer` 恰写一行、文档字节不动；收回别人的卡、收回两次、重提收回过的卡都被拒；UTF-16 文档上引出的原文经 `documents::decide` 落得下）；`crates/sprawling/tests/acceptance/` 的 catalogue 里 `proposal` 一段（`views::ask` 的 `Query::Proposals` 答出这张卡，属于这次 run，文档字节不动）；citysim 的 `tests/proposal_baseline.rs`（citysim D22：文档被城外的写者挪动之后，人接受这张卡以 `E_VERSION_CONFLICT` 被拒，文档留着挪动之后的字节，卡仍开着）。
 
 ## 12 决策
 
@@ -1059,3 +1083,7 @@ fn give_messages(city_root: &Path, commits: &mut [wire::CommitAnswer]);
     (b) 提交的证据从 walk 里逐行折的 `trace::History` 读：范围内第一次宣告的 `Committed` 行，在折完它的那一刻问 `Query::Commit`；调用与同楼的别人经 walk 建的索引读。理由：cutoff 的唯一定义是 walk 停下的那一行；视图折的是 walk 核对过的同一批记录，问的是折到宣告行时的视图，所以答只取决于那一行之前的历史，cutoff 之后的行写了什么、审不审得过都碰不到它。一遍折叠代替了每个提交一次 `views::ask`（每次审一遍整条链、折一遍视图）与一次 `LedgerIndex::rebuild`，一份 bundle 的代价不再是提交数乘账本字节数。被否决的做法：①给 `trace` 一个停在某个 seq 上的 `views::ask`（要 storage 的整链审计与快照起点都能停在一个 seq 上，那是 storage 的公开契约；而且每个提交仍各折一遍）；②walk 之后从创世再折一遍到 cutoff（多读一遍账本，读到的字节不是这一遍核对过的）；③在 playback 里只折提交，按「同一 run 上一个提交」自己求 `previous`（那是 `views::commits` 那条规则的第二个家，第 29(d) 条已否决）。代价：没有提交的窄选择也要折一遍视图（§3）。重开参数：多日夹具上视图折叠在导出里占大头时，按 §3 改成遇到第一个范围内的提交才开始折。
     (c) 「一次导出开始了几次视图折叠」由一个只在测试里编译的计数读出：`trace` 里开始一次折叠的两处（`trace` 的 `views::ask` 与 `History::new`）各数一次，`playback::tests::tracing` 在 N 与 2N 个提交上比较。理由：要挡住的回退是「每个提交又把整本账折一遍」，墙钟读数在小夹具上看不出它，计数与机器快慢无关。被否决的做法：只记墙钟读数（看不出按 N 增长的代价）；经 storage 的 `Vfs` 缝数读了几遍段（那是 storage 的接口，这里不改它）。
 41. **(a) 回复在视图锁外读，读出的块不缓存。** `prepare` 只把文字拷进 `Prepared::Reply`，`documents::reply` 在锁放开之后读（§8-29）。理由：读一窗是一次 comrak，与预览同阶，锁里多一次它，等着折叠的每一行都多等一次；同一段文字恒读出同一棵树，页面自己留着答复就够了。被否决的做法：①在 `prepare` 里当场作答——它不读盘，看上去是「视图里就答得了」的一类，但它的代价随文字长短走，不随视图走；②按文字的摘要缓存读出的块——一份要随快照编码的拷贝，换来的只是页面重问同一段文字时省一次 comrak，而页面不重问。**(b) 读内容库只有 `range::stored` 一处**，`Range` 与 `Preview` 都经它拿到编码与抬起的字节（§8-21、§8-23）。理由：打开、长度、标记、抬起这四步是「按版本读一个窗口」的前一半，两条查询的差别只在后一半（切还是读成块）；四步写两遍，改其中一处（例如内容库换了读法）时另一处不会跟着改。放在 `range` 而不另开模块，是因为 `range` 本来就拥有「按版本读一个窗口」，`preview` 是它的第二个读者。被否决的做法：①`preview` 先答一个 `Range` 再拿窗口的文字读——读法相同，却要把 `Window` 的文本再交回 `documents`，而 `documents::preview` 要的是抬起的字节，好在窗口之外判块末；②新开一个只有这一个函数的模块——两个读者都在 `answering` 里，一个函数不值得一个模块名。
+42. **提案的原文由 run 引出，不给字节区间；工具经 lane 的 relay 写行；收回由工具自己那本小账判（§8-30）。**
+    (a) 引文：模型读文件经 `read`，看到的是文字，不是字节偏移；它给出原话，区间由工具在那一版里找出，找不到或不止一处就拒，与 `edit` 的 `old` 同一种约定。被否决的做法：①收 `start`、`end` 字节偏移——模型要自己按编码数字节，数错一个就切进字符中间或切错句子；②收行号——要第二套「行怎样数」的规则，而 `documents` 的区间都按字节。
+    (b) 写行经 relay：relay 是 lane 唯一能写账本的门（第 11 条），记账线程写下之后把这一行交给每个折叠，与 lane 写的 `tool_called` 同一条路。被否决的做法：把卡放进一张桌子、落地时由结算写——卡要等 run 结束才出现在人面前，而 `offer` 在行写下之前就把身份答给了模型。
+    (c) 收回的判定在工具里，开着与否的权威仍是 `Governance`：工具只判「这是不是我提出的、我收回过没有」，这两件只有它知道。被否决的做法：派活时把 `Governance.proposals` 拷进工具——这次 run 在那一刻还没有任何一张卡，拷来的只会是别人的，而且拷贝是折叠的第二份。重开参数：§8-30 当前状态那一条在真实的城里出现。
