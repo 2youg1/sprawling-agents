@@ -44,6 +44,7 @@ mod listing;
 mod mcp_health;
 mod model_facts;
 mod prefix;
+mod preview;
 mod proposals;
 mod range;
 mod release;
@@ -81,6 +82,7 @@ pub use listing::{Entry, EntryKind, ListingAnswer};
 pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use model_facts::ModelFactsSummary;
 pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
+pub use preview::PreviewAnswer;
 pub use proposals::{ProposalCard, ProposalsAnswer};
 pub use range::RangeAnswer;
 pub use release::{ReleaseAnswer, ReleaseLine};
@@ -223,6 +225,7 @@ pub enum Answer {
     Document(Box<DocumentAnswer>),
     Proposals(Box<ProposalsAnswer>),
     Range(Box<RangeAnswer>),
+    Preview(Box<PreviewAnswer>),
     Commits(CommitsAnswer),
     Doctor(Box<DoctorAnswer>),
     Upstream(Box<DoctorUpstream>),

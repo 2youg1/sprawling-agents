@@ -144,6 +144,12 @@ pub enum Prepared {
         version: B3Hash,
         range: documents::Span,
     },
+    /// One window of a stored Markdown version, laid out.
+    Preview {
+        city_root: PathBuf,
+        version: B3Hash,
+        viewport: documents::Span,
+    },
     /// Every building's progress and every pursuit's verdict, with the
     /// buildings still to list and their plans still to read.
     City(CityAsk),
@@ -307,6 +313,11 @@ impl Prepared {
                 version,
                 range,
             } => super::answering::range::range_answer(&city_root, version, range),
+            Self::Preview {
+                city_root,
+                version,
+                viewport,
+            } => super::answering::preview::preview_answer(&city_root, version, viewport),
             Self::Building {
                 city_root,
                 addr,

@@ -34,6 +34,7 @@ pub(crate) mod automation;
 pub(crate) mod github;
 mod history;
 pub(crate) mod identity;
+pub(super) mod preview;
 pub(super) mod range;
 use super::lines::{endpoints_answer, known_hosts_answer, summarize};
 
@@ -223,6 +224,9 @@ impl Views {
             }
             wire::Query::Proposals(doc) => return self.proposals_ask(doc),
             wire::Query::Range { version, range } => return self.range_ask(*version, *range),
+            wire::Query::Preview { version, viewport } => {
+                return self.preview_ask(*version, *viewport);
+            }
             // What an agent was told, and the store read that recovers
             // it. A run with no prompt yet and an object this city no
             // longer holds are both "I could not look".

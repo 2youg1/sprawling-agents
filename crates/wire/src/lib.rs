@@ -57,7 +57,7 @@ pub use answer::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSand
 pub use answer::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use answer::{DoctorNewest, DoctorPack, DoctorUnread, DoctorUpstream};
 pub use answer::{EndpointSummary, EndpointsAnswer, UnpricedCalls};
-pub use answer::{Entry, EntryKind, ListingAnswer, RangeAnswer};
+pub use answer::{Entry, EntryKind, ListingAnswer, PreviewAnswer, RangeAnswer};
 pub use answer::{EvidenceItem, EvidenceKind, Picture};
 pub use answer::{GithubLoginAnswer, GithubReading};
 pub use answer::{HarnessLine, HarnessesAnswer, KnownFace, KnownHost, KnownHostsAnswer};
