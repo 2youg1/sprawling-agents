@@ -89,7 +89,7 @@ base64 = "0.23"
 # work would have needed this crate anyway.
 png = "0.18"
 # How many names a file has, read on Windows through a handle, for the
-# hard-link arm of the alias family (storage-SPEC 8-25). Already in the
+# hard-link arm of the alias family (`crates/storage/Spec.lean` §8-25). Already in the
 # lock beneath same-file; the unsafe call is inside the crate.
 winapi-util = "0.1.11"
 # One Job Object per run in runtime (`crates/runtime/Spec.lean` §8-13-3), and the peak

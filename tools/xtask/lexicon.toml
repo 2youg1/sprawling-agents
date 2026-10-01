@@ -292,4 +292,4 @@ replacement = "checkpoint（glossary）"
 
 [[entry]]
 banned = "MemoryError"
-replacement = "StorageError（storage-SPEC.md）"
+replacement = "StorageError（storage 的 SPEC：crates/storage/Spec.lean §8-14）"
