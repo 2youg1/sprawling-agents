@@ -81,6 +81,10 @@ png = "0.18"
 # hard-link arm of the alias family (storage-SPEC 8-25). Already in the
 # lock beneath same-file; the unsafe call is inside the crate.
 winapi-util = "0.1.11"
+# One Job Object per run in runtime (runtime-SPEC 8-13-3), and the peak
+# memory a measured command's process reached in `sprawling gauge`
+# (sprawling-SPEC 8-129-4); the crate's public surface is safe.
+win32job = "2.0.3"
 # S2 pins: Sealed<T> zeroization.
 secrecy = "0.10"
 zeroize = "1.9"

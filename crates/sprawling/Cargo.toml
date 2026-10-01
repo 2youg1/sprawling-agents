@@ -41,6 +41,11 @@ thread-priority = "3.1"
 # workspace, which keeps its own lint table for the Win32 boundary.
 sprawling-desktop = { workspace = true }
 
+# The peak memory a command `sprawling gauge` measured reached, read
+# after it exits and before its handle closes (sprawling-SPEC.md 8-129-4).
+[target.'cfg(windows)'.dependencies]
+win32job = { workspace = true }
+
 [features]
 # The execution engine, off by default. `AbsentSandbox` refuses tool
 # execution in three parts and its recovery says "install a build with
