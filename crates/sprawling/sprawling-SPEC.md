@@ -4086,7 +4086,6 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 
 **本节接口的当前状态。**
 - `copy the views` 仍在开城那一行里（8-121 的 `Phase::Twin`），`twin` 仍答 `Result`：它不再会失败，去掉 `Result` 与这一段要同时改 `bin::assembly::listening` 的调用点。
-- 快照里的十六进制摘要与单线程的证明由 8-154 接手。
 
 ### 8-154 开城与证明再降一档：快照里的摘要是字节，证明按波读段（`accounting::views::snapshot`、`accounting::worker::folds::standing_start`，形状 7 投影；`bin::assembly::chain_watch`，形状：状态机；kernel-SPEC §8-84，storage-SPEC 8-37，accounting-SPEC.md 8-24）
 
@@ -4097,6 +4096,14 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 2. 后台证明按波读段：一波至多 8 段，各段的读与记录前缀的哈希同时做，链仍按段序判（storage-SPEC 8-37）。`chain_watch` 的那一行不变。
 
 **保证不变。** 账本行、线上帧、`golden-p0`／`golden-s1`、wire 的两份 golden 都不变；证明的判定与逐行核对相同（`crates/storage/spec/Snapshot.lean` 的 `wavesAreStrict`）。回退门仍是计数：storage 的 `chain_audit::tests` 在 N 与 2N 段上断言五个计数（逐行核对的行数、按摘要的段数、读与哈希的字节、波数），accounting 的两个 fold-rules 测试钉住快照格式。
+
+**改后的读数**（同一台机器、同一组夹具、同样三轮）。`l400k`：首字节 p50 249–259 ms；`opened the city in` 216–222 ms，其中 `fold 0 lines from the snapshots` 145–149 ms；证明 119–121 ms，开城起点之后 335–343 ms 接受命令。`l100k`：首字节 p50 116–119 ms，折叠 42 ms，证明 77–78 ms，M3 159–161 ms。一波 4 段（两波读完 6 段）时 `l400k` 的证明是 200 ms、M3 420 ms，所以一波取 8 段（storage-SPEC 8-37）。
+
+**本节接口的当前状态。**
+- 视图快照解码去掉十六进制只省下约 44 ms，不是 8-144 估的 105 ms；`fold … from the snapshots` 余下的 145 ms 还没有拆开量过。下一步是在这一段里分开读快照、postcard 解码各字段与尾部，按读数找下一处。
+- 证明的墙钟由最长的一段定：`l100k` 只有两段，一段 64 MiB 读与哈希约 60 ms，所以证明 77 ms；在一段之内并行哈希（storage-SPEC 8-37 的第二条被否）是段少的城的下一处余量。M3 在 40 万行城上仍是开城加证明，两者都在毫秒级。
+- `copy the views`（22 ms）与 `open the ledger`（41 ms，读末段并按记录证明它）没有动。
+- 升级之后第一次开城从创世折一次（`l400k` 约 7 s），因为两份快照的 `fold_version` 都进了位；之后的开城照上面的读数。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 

@@ -1314,6 +1314,7 @@ impl SegmentRecord {
 - **判定不变。** 第一步算的只是前缀的摘要，它是段字节的纯函数；版本、段长、入口、摘要四个条件仍由 `prefix` 与 `stands` 两个方法定，开账本（8-34）也经这两个方法判末段，判定只写一次。`crates/storage/spec/Snapshot.lean` 的 `wavesAreCached` 陈述：先把每段的摘要判定算好、再按段序走，与边走边算的 `cachedRun` 是同一个判定，所以经 `cachedVerifyIsStrict` 等于逐行核对。
 - **核对与哈希仍是同一次读。** 每段只读一次，第二步核对的字节就是第一步哈希的那一份。
 - **计数是确定的。** `waves` 只取决于段数，不取决于核数或线程完成的次序；`bytes_read` 等于各段长度之和；`bytes_hashed` 在 `prefix` 给出前缀时总含这段前缀，入口接不上时也含，因为第一步已经哈希过它。`chain_audit::tests` 在 N 与 2N 段上断言全部五个计数。
-- **常驻内存。** 一波的段字节同时在内存里，至多 `PROOF_WAVE × SEGMENT_ROLL_BYTES`（8 × 64 MiB）；历史短于一波时就是整条账本。原先常驻的是一段。
+- **常驻内存。** 一波的段字节同时在内存里，至多 `PROOF_WAVE × SEGMENT_ROLL_BYTES`（8 × 64 MiB）；历史短于一波时就是整条账本。
+- **读数。** 40 万行夹具城（6 段，windows-x86_64、16 核、NVMe、release）上证明从 390–395 ms 落到 119–121 ms；一波 4 段（两波）时是 200 ms（sprawling-SPEC 8-154）。一波 8 段因此胜过 4 段：多出的常驻内存只在段数超过 4 的城上付，换来的是这些城的证明少一波。
 - **线程。** 这是库 crate 起线程的又一处（ARCHITECTURE.md §10 第 3 条）：作用域线程，一波 join 完才往下走，寿命不超过一次 `prove_chain`。起不了线程是 `StorageError::Io`（op `start a thread to read a segment`）；线程没有交回结果也是 `StorageError::Io`（op `read a segment on its own thread`）。两者都让证明没有走完，调用方照 8-30 跳闸。
 - **被否：按块流式读前缀，每条线程只持一个小缓冲。** 常驻内存会小得多，但 `Vfs` 没有读进调用方缓冲的门：`read_at` 每块开一次文件、新分配一次；加一个 `Vfs` 方法要四个适配器各写一份。**被否：在一段之内并行哈希（blake3 的 `rayon` 特性，或 `hazmat` 的子树拼接）。** `rayon` 带一个线程池，是第二个起线程的地方，还要改锁文件；子树拼接要本 crate 自己维护 BLAKE3 的树形偏移。段间并行已经让 6 段的城一波读完。**重开参数**：一波的常驻内存成为问题（机器内存小于一波的字节），或一座城的段数常常少于核数、证明仍是 M3 的大头时。
