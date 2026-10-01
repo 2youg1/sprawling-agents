@@ -1043,7 +1043,7 @@ sequenceDiagram
     participant R as Ledger
     participant C as bin::assembly::chain_watch
     M->>S: bind, and a port another process holds is refused before any write
-    M->>R: open: take the writer lock, then recover a torn tail
+    M->>R: open: take the writer lock, then recover a torn tail past the last proof's record
     M->>P: both snapshots, one pass from the earlier cut over the tail
     M->>A: start the writer thread
     A->>C: prove the history in the background, verified prefixes by digest
@@ -1059,7 +1059,10 @@ definition of this order, sprawling-SPEC.md 8-88),
 `crates/storage/src/jsonl.rs` (`open`),
 `crates/sprawling/src/assembly/chain_watch.rs`,
 `crates/storage/src/chain_audit.rs` (`prove_chain`, `ChainHalt`),
-`crates/storage/src/verified_prefix.rs` (sprawling-SPEC.md 8-122).
+`crates/storage/src/verified_prefix.rs` (sprawling-SPEC.md 8-122, 8-144).
+The last segment's prefix the previous proof recorded is proved by its
+digest, so tail recovery checks line by line only what was written after
+that proof (storage-SPEC.md 8-34).
 Until the proof is whole the writer refuses every append with
 `E_HISTORY_UNPROVEN`, so the page answers queries from the snapshots
 while commands wait for a history that has been walked.
