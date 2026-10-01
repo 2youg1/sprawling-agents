@@ -160,6 +160,22 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 
 **验收**：`crates/sprawling/tests/desktop.rs` 的 `a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary`。一栋楼的 `RULES.toml` 写 `desktop = true`，没有任何 `[[mcp]]`，城起真的 `sprawling desktop` 子进程，模型收到的工具表里有 `desktop_desktop_windows` 等六件。
 
+## 8-146 Windows 上构建这个二进制要有 Zig（`bin::doctor::table::toolchain` 的 `zig` 一行）
+
+`sprawling` 按路径链接 `desktop/`，`desktop/` 在 Windows 上链接它的 FFI 缝 `desktop/ffi`，而那个包的构建脚本用 `zig build-lib` 编一片 Zig 叶子（desktop-SPEC §8-12）。所以 Windows 上编这个二进制、跑 `just check` 都要一个 Zig，且是 `desktop/ffi/zig-version` 钉住的那一版。
+
+```rust
+// bin::doctor::table::toolchain（形状 6 数据）
+pub(super) const ZIG: Requirement;   // develop 层，Required；探测 `zig version` 以钉子开头的一行
+const ZIG_PIN: &str = include_str!("../../../../../desktop/ffi/zig-version").trim_ascii_end();
+```
+
+- **钉子只在一处**：`ZIG_PIN` 是 `desktop/ffi/zig-version` 的 `include_str!`，与 `LEAN_PIN` 读 `lean-toolchain` 同一种写法（8-58）；探测是 `zig version` 的输出以钉子开头，Windows 的装法是 `winget install --id zig.zig -e --version <钉子> --scope user`，macOS 是 `brew install zig`，Linux 印出官方下载页。构建脚本与 CI 的安装步骤读同一个文件。
+- **`Required` 而不是 `Optional`**：Windows 上没有它，`just check` 编不出这个二进制；在别的平台上 Zig 叶子不编，有它也不多花什么，而 `Need` 不按平台分（8-58），两害取其轻是把它列为必需。
+- **位置**：表里 `lean` 之后、`uv` 之前：它与 Rust、Lean 同属编译这份代码要的工具，装法不依赖表里更早的任何一行。
+
+**验收**：`prereqs.tsv` 与表渲染出的文本逐字相等（8-58 的现有测试）；`zig` 一行的探测与装法读的是钉子文件里的那一版。
+
 ## 8-4e harness 居民的一次 run（性质已证明）
 
 一个房间的居民可以是五家官方 harness 之一（`crates/agent_protocols/Spec.lean` §8-19）。派活到这样的房间时，城起那一家的进程，在房间自己的 worktree 里开一场 ACP 会话，把它汇报的东西记进账本，在它答出停止原因时结束这次 run。
@@ -1107,6 +1123,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 **一条命令的戳从驱动最近的读数渲染，不给工具面一个钟**（8-125，runtime-SPEC §12.8）。`drive_run` 把它交给驱动的 `now` 包一层，每个读数先记进这一跑的 `ClockReading`；`Sieving` 打包时读最新的那个。回合在调用工具面的 `account` 之前读答复时刻，所以最新的那个就是这条命令的答复时刻，戳上的秒数等于它 `tool_result` 的 `t`；一跑仍只有一个采样点，计数时钟下的剧本字节不变。**被否掉的**：`Sieving` 打包时自己读 `hands.clock`——一跑多了一个采样点，戳与它 `tool_result` 的 `t` 可以差一秒；把戳挪进回合的 `account`——那是 runtime 的 `turn` 的事，不是装配层的，而读数的位置已经给出同一个秒数。
 
 **Lean 是开发这份代码必需的工具**（§8-58）。各 crate 的规格正从 `<crate>-SPEC.md` 迁成 `Spec.lean`（ARCHITECTURE.md §11「Specifications in Lean」），`just check` 里的 `models` 一步是这些规格在本地被证明过的唯一证据。Lean 列为可选时，没装 Lean 的机器上 `models` 静默通过，本地的绿就不再说明规格被证明过，只有 CI 知道。所以 `elan` 与 `lean` 两行是 `required`：缺了它们，`just prereqs` 在编译之前报出来并给出装法，`just models` 自己也报错而不是跳过。被否决的备选：保持可选、只靠 CI 的 `models` job 证明——那样每次本地验证都得另外说明「规格没有证过」，而这句话没有哪道门会替人说。
+
+**Zig 是在 Windows 上开发这份代码必需的工具**（8-146）。桌面 server 没有准入安全接口的四组 Win32 调用经一片 Zig 叶子（desktop-SPEC §12.12），叶子在构建时编译，所以 Windows 上没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
 
 **崩溃验收在盘上造死亡，不在进程里杀**（8-127）。一次 run 真跑完，丢掉 worker 释放写者锁，再把账截在一行的半途、删去其后的行；重开走 `RunWorker::new` 与 `startup_scan`，与 `sprawling resume` 同一条路。理由：被杀的进程留在盘上的就是这样一份账——锁已释放，最后一行写了一半——而盘上的截法可以精确指定死在哪一行的哪一个字节，每次重跑都是同一次死亡。被否：①起真二进制再杀掉它——那是从外面进城的检查，按边界规则归 `tools/adversary/` 的 Lean 黑盒（G1e），而且杀在哪一刻取决于调度，失败不能逐字节重演；②把账本放在 `storage` 的故障文件系统上断电——它只承载账本，`Standing::fold` 与视图读真目录，重开的不是一座完整的城，断电的耐久契约已由 storage 自己的测试证过。重开参数：账本之外的文件（检查点、快照、CAS）也要在一次死亡里与账本错开时，验收要能在同一刻截断它们，那时改为在 `Vfs` 缝之上承载整座城。
 
@@ -3102,7 +3120,7 @@ pub(crate) fn prereqs() -> String;            // Develop 档渲染成 prereqs.ts
 ```
 
 - **表是权威，`just prereqs` 读它的渲染**：`crates/sprawling/src/doctor/table/prereqs.tsv` 每行 `class<TAB>name<TAB>program<TAB>windows<TAB>macos<TAB>linux<TAB>purpose`，由 `table::prereqs()` 从 Develop 档渲染；测试 `the_prereqs_file_is_the_develop_tier_rendered` 要求文件逐字等于渲染结果，不等时把应有的全文印出来。`just prereqs` 在编译之前跑，只能读文件而不能问二进制，所以读的是这份渲染而不是另一张清单；`command -v <program>` 是它的探测，`program` 为 `-` 的行（浏览器家族）归 doctor 与 render 门自己去找。被否决的备选：justfile 当权威、doctor 在编译期读它——justfile 不写三平台的装法，doctor 就得再拼一遍。
-- **`class` 就是 `Need`**：`required` 是 `just check` 离了它跑不起来的（git、bash、rustup、rust、rustfmt、clippy、just、cargo-nextest、bun、render 用的浏览器、elan、lean），`optional` 是 `just check` 缺了会跳过、或只由人主动跑的 recipe 调用的（cargo-deny、uv、python，以及 cargo-mutants、cargo-fuzz、cargo-public-api、kani）。elan 与 lean 为什么必需，见 §12「Lean 是开发这份代码必需的工具」。
+- **`class` 就是 `Need`**：`required` 是 `just check` 离了它跑不起来的（git、bash、rustup、rust、rustfmt、clippy、just、cargo-nextest、bun、render 用的浏览器、elan、lean、zig），`optional` 是 `just check` 缺了会跳过、或只由人主动跑的 recipe 调用的（cargo-deny、uv、python，以及 cargo-mutants、cargo-fuzz、cargo-public-api、kani）。elan 与 lean 为什么必需，见 §12「Lean 是开发这份代码必需的工具」。
 - **行序就是安装顺序**：后一行的装法用到前一行装出的程序——rustup 之后才有 `rustup component add` 与 `cargo install`，elan 之后才有 `elan toolchain install`，uv 之后才有 `uv python install`。页面的「全部安装」按表序逐项跑，所以顺序写在表里而不是写在页面上。
 - **Lean 的版本只写在 `lean-toolchain`**：`LEAN_PIN` 是那个文件的 `include_str!`（`str::trim_ascii_end` 在 const 里去掉换行），装法是 `elan toolchain install <pin>`，探测是 `elan toolchain list` 里有以 pin 开头的一行。换 Lean 版本只改那一个文件。
 - **Windows 上能用 winget 的都用 winget，且按用户装**：Git、just、bun、uv、ffmpeg 的 winget 清单都有用户级安装程序，配方带 `--scope user`，于是装的时候不弹 UAC——§8-40「恒不提权」在 winget 上就是这个参数。rustup 的清单没有 scope 字段，而 rustup-init 本来就只写这个人的 profile，所以不带（带了 winget 答「找不到适用的安装程序」）；Chrome 的清单只有机器级安装程序，而每台 Windows 都有 Edge，Chromium 一族在 Windows 上由 Edge 答上，Chrome 那条配方很少被走到。

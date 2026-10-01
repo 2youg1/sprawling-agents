@@ -13,7 +13,7 @@
 | lexicon | Markdown、Rust 源码、Lean 与 `client/src/lang.json` 里的退役词命中即红；退役词表是 `tools/xtask/lexicon.toml` |
 | modmap | 每个包（§8-39，工作区外的 desktop 与工具包 citysim 在内）目录下的 `src/**/*.rs` ↔ `architecture.toml` 里文件落在这些目录下的条目一一对应；状态一致；`owns` 非空；索引文件零逻辑。本门所在的包 xtask 除外，它的模块由本 SPEC §7 描述（§12-9） |
 | depmap | crate 依赖边 ⊆ ARCHITECTURE §3 的 `depmap` 围栏块；一个 crate 之内的模块方向服从 `directions` 块（§8-33）；`pub trait` 只现于缝那一节（ARCHITECTURE §4）列出的文件 |
-| guard | 墙外那份 `desktop/` 的 lint 表、包元数据与共享依赖版本与工作区逐键相等 |
+| guard | 墙外那份 `desktop/` 工作区的 lint 表、包元数据与共享依赖版本与根工作区逐键相等，墙里每个包都继承它（§8-46） |
 | wording | 读者拿到的词出自短语表 `client/src/lang.json`：`.svelte` 标记里文本节点与朗读型属性的字面量（`wording::markup`），`.ts` 里拒绝各段的实参（`wording::refusal`，§8-24），去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名；生成的文件由它的生成器作证 |
 | render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17 与 §8-38 |
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire-SPEC §19-2 只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
@@ -45,7 +45,7 @@
 | 逻辑漏进 lib.rs／索引文件 | modmap | 纯索引文件只许注释、属性、mod、use |
 | 偷加依赖边、绕过分层 | depmap | 实际边 ⊆ 文档边；kernel 恒零内部依赖 |
 | 娱乐性抽象（无第二实现的 trait） | depmap | `pub trait` 只许出现在缝清单文件 |
-| 悄悄放宽墙外那份 lint 表 | guard | `desktop/Cargo.toml` 与根 `[workspace.lints]` 逐键相等，例外只在 `RECORDED` 里且各带理由 |
+| 悄悄放宽墙外那份 lint 表 | guard | `desktop/Cargo.toml` 的 `[workspace.lints]` 与根 `[workspace.lints]` 逐键相等，例外只在 `RECORDED` 里且各带理由；墙里每个包以 `workspace = true` 继承它 |
 | 词汇漂移、自造同义词 | lexicon | `tools/xtask/lexicon.toml` 里的退役词，命中即红 |
 | 忘记许可头或版权行 | header | 四行逐字节比对 |
 | 定稿屏上有的 `role`／可及名，客户端里丢了 | render | 在真引擎里画出来，从 DOM 上读可及名与地标（§8-13） |
@@ -63,7 +63,7 @@
 ## 3 假设与歧义
 
 - 「注释与标识符扫描」简化为整行子串扫描：中文退役词只会出现在注释与文档，英文退役词不构成合法标识符片段。误伤由 `lexicon-ok:` 行内豁免兜住。
-- **guard 判一堵抄过去的墙**（`guard::wall`）。`desktop/` 是本仓唯一一个在工作区之外构建的 package，它坐在墙外的理由只有一条：Win32 边界要把 `unsafe_code` 从 `forbid` 放宽到 `deny`（`desktop/desktop-SPEC.md` §8.5 第二对）。除此之外它的 manifest 是一份**抄件**——lint 两张表、`[workspace.package]` 的五项元数据、两份 manifest 都点名的每一个依赖的版本行——而抄件是一个事实的第二个家。**任何判提交的规则都看不见这种漂移**：改一侧不改另一侧不需要任何一枚提交同时碰两边，也不会有任何东西变红。故本门每次运行都逐键比对，不相等即红，除非它在 `RECORDED` 那张表里带着理由。**记下的例外会自清理**：两侧重新相等时，那一行必须划掉，与 `length` 划掉回到预算之内的钉子是同一条纪律。另比两件抄过去的常量：`PROTOCOL_VERSION`（两端谈不拢就握不上手）与 `refusal.rs` 里每个 `E_` 码必须是 `kernel::error::code` 已定义的拼写——墙外那份**只许引用、恒不铸新码**（desktop-SPEC §8.5 第一对划的边界）。**本门只判工作树、不读提交历史**：「门变更与被判源码同处一枚提交须携 `Verdict:` 尾注」是 AGENTS.md 的规则，由评审执行，因为读历史会让每次运行都取决于调用方传来的区间。
+- **guard 判一堵抄过去的墙**（`guard::wall`）。`desktop/` 是本仓唯一一个在工作区之外构建的 package，它坐在墙外的理由只有一条：Win32 边界要把 `unsafe_code` 从 `forbid` 放宽到 `deny`（`desktop/desktop-SPEC.md` §8.5 第二对）。除此之外它的 manifest 是一份**抄件**——lint 两张表、`[workspace.package]` 的五项元数据、两份 manifest 都点名的每一个依赖的版本行——而抄件是一个事实的第二个家。墙外是一个工作区（`desktop` 与它的 FFI 缝 `desktop/ffi`），抄件只写在它的根 `desktop/Cargo.toml` 一处，两个包都继承（§8-46）。**任何判提交的规则都看不见这种漂移**：改一侧不改另一侧不需要任何一枚提交同时碰两边，也不会有任何东西变红。故本门每次运行都逐键比对，不相等即红，除非它在 `RECORDED` 那张表里带着理由。**记下的例外会自清理**：两侧重新相等时，那一行必须划掉，与 `length` 划掉回到预算之内的钉子是同一条纪律。另比两件抄过去的常量：`PROTOCOL_VERSION`（两端谈不拢就握不上手）与 `refusal.rs` 里每个 `E_` 码必须是 `kernel::error::code` 已定义的拼写——墙外那份**只许引用、恒不铸新码**（desktop-SPEC §8.5 第一对划的边界）。**本门只判工作树、不读提交历史**：「门变更与被判源码同处一枚提交须携 `Verdict:` 尾注」是 AGENTS.md 的规则，由评审执行，因为读历史会让每次运行都取决于调用方传来的区间。
 - 语境依赖的退役词（如 session 指本城运行时、建筑指项目时）不入 `lexicon.toml`，由评审执行；`lexicon.toml` 内以注释记录此边界。
 - **发行件的签名动作未接**（§8-29）：私钥由谁托管、谁签、泄露时怎么处置三项未定；验签侧已落地，无签名件恒拒收。定下托管方式，`just dist` 才能签。
 
@@ -179,6 +179,8 @@ pub(crate) struct Violation {
 
 **12-10 截图矩阵是给人看的产物，不是门。** `cargo xtask shots`（§8-44）不进 `gates::GATES`，不断言任何性质，也不比较两张图：它产出每一页在两个宽度、两种光照下的 PNG 与一份索引，给改画面的人与验收的人逐张看。理由与 `render` 断性质、不断图片（本 SPEC 的「`render`」一节）是同一条：截图对比会被字体 hinting 弄红，也放过没人拍过的错版面，所以机器判性质，人判图片，两件事各有一个工具。页面清单不另写一份：路由取 `client/src/core/route.ts` 里 `BARE` 那张表的键，一个页面里的状态取画出来的页面上每个带 `aria-label` 的顶层 `section`（`#/gallery` 的每个夹具就是这样画的），所以前端改了外壳或加了夹具，这个工具不用跟着改。浏览器只经 `render::engine::browser` 找，与 `render` 门在同样的地方找同样的牌子。被击败的备选：①把截图当 `render` 的第六次开页——门就要为一件不判的事多开一次引擎，门名册上也多一个不会变红的步骤；②在 xtask 里写一张页面清单——前端加一条路由而这里没加，那一页就悄悄没有图。
 
+**12-12 guard 判墙外工作区的根，再判墙里每个包都继承它。** 墙外有两个包（`desktop` 与 `desktop/ffi`），lint 表与元数据只写在 `desktop/Cargo.toml` 的 `[workspace.lints]`、`[workspace.package]` 一处（desktop-SPEC §8-12）。门因此比的是那一处与根工作区，而不是每个包各比一次；再要求 `[workspace] members` 里的每个包与根包本身都写 `lints.workspace = true`、五项元数据都写 `workspace = true`，因为一个不继承的包就站在墙外的墙外，前一项比对看不见它。被击败的备选：每个包抄一份 lint 表、门逐份比对——墙里就有了两份抄件，比对的次数随包数涨，而一个新包忘了抄时门看不见它。重开参数：X4 把墙外工作区并回根工作区，墙删去，本门的 `wall` 随之删去。
+
 ## 13 依赖选型
 
 serde 与 serde_json（cargo metadata 解析；工作区已钉）；toml（`lexicon.toml`、`architecture.toml`、`budgets.toml`；xtask 独用，不入产品面）；thiserror（工作区已钉）；kernel（secret 门复用 `kernel::secret::scan`，一个判定一个家）。不引 walkdir/regex/clap：手写遍历十几行；判定用子串与前缀即可；子命令分发一个 match 足矣。
@@ -201,7 +203,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 ## 16 测试与约束
 
-单测：`members` 读本仓（kernel 在 `crates/kernel`，desktop 以 path 依赖列入，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；lexicon 命中与 `lexicon-ok:` 豁免；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 五例（抄件少一条 lint、抄件放宽一条 lint、抄件多一条 lint、元数据落在版本号后面、共享依赖版本漂移）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）；`crate_table` 在 relocated 夹具上画出整张表（`sprawling-j` 的模块名写 `bin::`，于是读 `[family.bin]`；duty 里的竖线被转义；没有边的写 `nothing`），夹具缺 `[family.k]` 时以点名它的 `Doc` 拒读（§8-40）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
+单测：`members` 读本仓（kernel 在 `crates/kernel`，desktop 以 path 依赖列入，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；lexicon 命中与 `lexicon-ok:` 豁免；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 六例（抄件少一条 lint、抄件放宽一条 lint、抄件多一条 lint、元数据落在版本号后面、共享依赖版本漂移、墙里一个包不继承墙）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）；`crate_table` 在 relocated 夹具上画出整张表（`sprawling-j` 的模块名写 `bin::`，于是读 `[family.bin]`；duty 里的竖线被转义；没有边的写 `nothing`），夹具缺 `[family.k]` 时以点名它的 `Doc` 拒读（§8-40）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
 
 ## 17 模型体验
 
@@ -988,5 +990,18 @@ pub(super) fn index(shots: &[Shot]) -> String;
 - **失败**：没有包时 `XtaskError::Doc`，recovery 是 `just build-web`；没有引擎时 `XtaskError::Doc`，recovery 是装一个 Chromium 一族的浏览器或设 `SPRAWLING_BROWSER`；读不出 `BARE` 时 `XtaskError::Doc` 点名 `route.ts`；引擎失败沿用 `render::engine::dump` 的 `XtaskError::Cmd`。
 
 **测试**：`shots::pages::tests::every_route_gets_four_pictures`：一份夹具 `route.ts` 读出的每条路由，在两个宽度、两种光照下各有一张图，夹具目录里缺一张时 `missing` 恰好点名那一张。真跑要先 `just build-web`，归整合者或前端会话。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-46 `guard::wall` 读墙外工作区的根（形状 1 判定）
+
+`desktop/Cargo.toml` 是墙外工作区的根（`[workspace] members = ["ffi"]`）。`wall::check` 读它与根 `Cargo.toml`：
+
+- **元数据**：根 `[workspace.package]` 的五项（`SHARED_METADATA`）与墙的 `[workspace.package]` 逐项相等。
+- **lint 表**：根 `[workspace.lints.rust]`／`[workspace.lints.clippy]` 与墙的同名两张表逐键比对，例外只在 `RECORDED`。
+- **继承**：墙的根包与 `[workspace] members` 里的每个包，`[lints]` 恰是 `workspace = true`，五项元数据各是 `{ workspace = true }`；不是即红，位置写那个包的 manifest，替代写「改成 `workspace = true`」。一个读不出的成员 manifest 是 `XtaskError::Doc`。
+- **依赖**：墙的根包 `[dependencies]`／`[dev-dependencies]` 里与根 `[workspace.dependencies]` 同名的依赖，版本行相等（不变）。
+
+**测试**：`guard::wall::tests` 的夹具改成墙外工作区的形状；新加一条：墙里一个成员的 `[lints]` 不是 `workspace = true` 时，门点名那个成员的 manifest。
 
 **本节属门禁机具，与产品代码分开提交。**

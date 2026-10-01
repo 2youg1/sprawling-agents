@@ -113,8 +113,14 @@ a ruling of the person. Safe Rust comes first; Zig comes next, and only for
 a hot leaf where a benchmark shows it clearly faster than the safe Rust
 version, or where the alternative would be `unsafe` Rust (FFI, SIMD, raw
 memory); `unsafe` Rust comes last. Domain rules stay in Rust whichever
-language computes a leaf. A Zig leaf enters the tree only when all six
-hold at once:
+language computes a leaf. A Zig leaf enters the tree for one of two
+reasons. A **hot leaf** enters only when all six conditions below hold at
+once. A **platform leaf** — Win32 calls with no admitted safe interface,
+where the alternative is `unsafe` Rust — enters without conditions 1 to
+3, which measure speed it does not claim, and holds 4 to 6, with its
+boundary properties proved in Lean and each `extern` call named in its
+SPEC (AGENTS.md, Rust; the desktop's leaf is desktop-SPEC.md section
+8-12):
 
 1. the hot spot has a production caller, and `just bench` or citysim
    measures it as a real share of a latency a person or an agent sees;
@@ -616,7 +622,11 @@ model call — a changed world would diverge through no defect of the record.
 production except where a test module relaxes it locally: no `unwrap`,
 `expect`, `panic!`, `todo!`, `unreachable!`, bare indexing or slicing;
 arithmetic is checked; narrowing goes through `TryFrom`; `as` casts are
-denied; `unsafe_code` is forbidden outright. Money and quantities are
+denied; `unsafe_code` is forbidden outright in the workspace. Outside it,
+the desktop server's production code holds no `unsafe` at all, and its
+FFI seam (`desktop/ffi`) holds one `unsafe` block per call into the Zig
+leaf, each with the precondition that makes it sound (desktop-SPEC.md
+section 8-12). Money and quantities are
 integer newtypes (`UsdMicros`, `Tokens`, `ByteLen`, `Seq`), and floats stay
 out of every decision path.
 
