@@ -54,6 +54,42 @@ pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError> {
     else {
         return Ok(None);
     };
+    traced(city_root, *commit).map(Some)
+}
+
+/// The trace of `oid` as the line that first announced it, `line`, sees
+/// it: the views' `previous` and `parents`, with the run, the actor, the
+/// seq and the moment taken from `line` rather than from the commit's
+/// latest announcement, so no later line changes the answer
+/// (accounting-SPEC.md 8-16). `None` when this city never wrote that
+/// commit, or `line` has no address.
+///
+/// # Errors
+/// What [`trace`] refuses.
+pub fn trace_first(
+    city_root: &Path,
+    oid: GitOid,
+    line: &EventRecord,
+) -> Result<Option<Trace>, AxError> {
+    let (wire::Answer::Commit(commit), Some(actor)) = (
+        crate::views::ask(city_root, &wire::Query::Commit { oid })?,
+        line.addr(),
+    ) else {
+        return Ok(None);
+    };
+    let first = wire::CommitAnswer {
+        run: line.run(),
+        actor: actor.clone(),
+        seq: line.seq(),
+        at: line.t(),
+        ..*commit
+    };
+    traced(city_root, first).map(Some)
+}
+
+/// The calls `commit`'s run made in its span, and who else called tools
+/// in its building meanwhile.
+fn traced(city_root: &Path, commit: wire::CommitAnswer) -> Result<Trace, AxError> {
     let ledger_dir = kernel::layout::CityLayout::new(city_root).ledger();
     let index = LedgerIndex::rebuild(&ledger_dir).map_err(StorageError::into_ax)?;
     let mut reader = index.reader(&ledger_dir);
@@ -72,11 +108,11 @@ pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError> {
         .filter(|call| span.contains(&call.at))
         .collect();
     let nearby = nearby(&index, &mut reader, &commit, &span)?;
-    Ok(Some(Trace {
-        commit: *commit,
+    Ok(Trace {
+        commit,
         calls,
         nearby,
-    }))
+    })
 }
 
 /// The commit's run's lines before the commit, oldest first: back past

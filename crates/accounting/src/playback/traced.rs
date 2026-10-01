@@ -20,17 +20,19 @@ use std::path::Path;
 use kernel::event::record::CheckpointCommitted;
 use kernel::{AxError, EventKind, EventRecord, GitOid, Seq};
 
-use super::document::{Base, CallTrace, Checkpoint, Cited, Decimal, Holds, Near, Related};
+use super::document::{Base, CallTrace, Checkpoint, Cited, Decimal, Event, Holds, Near, Related};
 use super::links::Links;
 use super::reader::Readership;
 use crate::views::commits::commit_facts;
 
 /// What the bundle already knows about the lines a trace may name.
 pub(super) struct Known<'a> {
-    /// The seqs in `events`.
-    pub(super) shown: &'a BTreeSet<Seq>,
+    /// The bundle's `events`, in ascending seq.
+    pub(super) events: &'a [Event],
     /// The `tool_called` lines the reader may not see.
     pub(super) hidden: &'a BTreeSet<Seq>,
+    /// The lines that announce a commit an earlier line announced.
+    pub(super) repeated: &'a BTreeSet<Seq>,
     pub(super) links: &'a Links,
 }
 
@@ -53,7 +55,12 @@ pub(super) fn attach(
             ..
         } = &mut checkpoint.holds
         {
-            let (found, attributed) = traced(city_root, *oid, Seq::new(checkpoint.seq.0), known);
+            let announced = Seq::new(checkpoint.seq.0);
+            let (found, attributed) = if known.repeated.contains(&announced) {
+                (Base::Absent, CallTrace::Untraced)
+            } else {
+                traced(city_root, *oid, announced, known)
+            };
             *diff = super::diff::changes(city_root, found, *oid, files, readership);
             *base = found;
             *trace = attributed;
@@ -61,13 +68,21 @@ pub(super) fn attach(
     }
 }
 
-/// The base the commit `oid`, announced at `announced`, is compared with,
-/// and the calls it is the result of. A trace that fails is written down
-/// as unread, so a history the trace cannot read past the cutoff still
-/// exports.
+/// The base the commit `oid`, first announced at `announced`, is compared
+/// with, and the calls it is the result of. A trace that fails is written
+/// down as unread, so a history the trace cannot read past the cutoff
+/// still exports.
 fn traced(city_root: &Path, oid: GitOid, announced: Seq, known: &Known<'_>) -> (Base, CallTrace) {
-    match crate::trace::trace(city_root, oid) {
-        Ok(Some(found)) if found.commit.seq == announced => (
+    let first = known
+        .line_at(announced)
+        .map(|event| EventRecord::parse_line(event.line.as_bytes()))
+        .transpose()
+        .and_then(|line| match line {
+            Some(line) => crate::trace::trace_first(city_root, oid, &line),
+            None => Ok(None),
+        });
+    match first {
+        Ok(Some(found)) => (
             base_of(&found.commit),
             CallTrace::Traced {
                 calls: found
@@ -89,7 +104,7 @@ fn traced(city_root: &Path, oid: GitOid, announced: Seq, known: &Known<'_>) -> (
                     .collect(),
             },
         ),
-        Ok(Some(_) | None) => (Base::Absent, CallTrace::Untraced),
+        Ok(None) => (Base::Absent, CallTrace::Untraced),
         Err(err) => (
             Base::Absent,
             CallTrace::Unread(err.code().as_str().to_owned()),
@@ -107,9 +122,19 @@ fn base_of(commit: &wire::CommitAnswer) -> Base {
     }
 }
 
+impl Known<'_> {
+    /// The entry of `events` at `seq`.
+    fn line_at(&self, seq: Seq) -> Option<&Event> {
+        self.events
+            .binary_search_by_key(&Decimal(seq.value()), |event| event.seq)
+            .ok()
+            .and_then(|at| self.events.get(at))
+    }
+}
+
 /// One call by what the reader may see of its line.
 fn cited(at: Seq, known: &Known<'_>) -> Cited {
-    if known.shown.contains(&at) {
+    if known.line_at(at).is_some() {
         Cited::At(Decimal(at.value()))
     } else if known.hidden.contains(&at) {
         Cited::Withheld

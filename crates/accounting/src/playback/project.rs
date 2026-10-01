@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use kernel::event::record::{BuildingCreated, RunStarted};
-use kernel::{Address, AxCode, AxError, EventKind, EventRecord, RunId, RunPolicy, Seq};
+use kernel::{Address, AxCode, AxError, EventKind, EventRecord, GitOid, RunId, RunPolicy, Seq};
 
 use super::document::{
     Billed, Checkpoint, Closed, Costs, Decimal, Document, Event, KindCount, Phase, Reason, Run,
@@ -31,6 +31,7 @@ use super::select::Selection;
 use super::traced::{Known, attach, checkpoint_of};
 use super::walk::Walked;
 use crate::lineage::{Lineage, RunLine};
+use crate::views::commits::commit_facts;
 
 pub(super) struct Projection<'selection> {
     selection: &'selection Selection,
@@ -56,6 +57,10 @@ pub(super) struct Projection<'selection> {
     /// The `tool_called` lines the reader may not see, which a commit's
     /// trace may name.
     hidden_calls: BTreeSet<Seq>,
+    /// Every commit a line up to here announced, and the lines that
+    /// announced one again.
+    announced: BTreeSet<GitOid>,
+    repeated: BTreeSet<Seq>,
 }
 
 /// What becomes of one line: shown, closed by a building, or withheld
@@ -97,6 +102,8 @@ impl<'selection> Projection<'selection> {
             city_root: city_root.to_path_buf(),
             policies: BTreeMap::new(),
             hidden_calls: BTreeSet::new(),
+            announced: BTreeSet::new(),
+            repeated: BTreeSet::new(),
         }
     }
 
@@ -251,8 +258,9 @@ impl<'selection> Projection<'selection> {
     }
 
     /// What a later table needs of one line beyond its own fate: the
-    /// policy a visible `run_started` records, and a call the reader may
-    /// not see, which a commit's trace may still name.
+    /// policy a visible `run_started` records, a call the reader may not
+    /// see, which a commit's trace may still name, and whether the commit
+    /// a line names was announced before.
     fn remember(&mut self, record: &EventRecord, visible: bool) -> Result<(), AxError> {
         if visible
             && record.kind() == EventKind::RunStarted
@@ -263,6 +271,11 @@ impl<'selection> Projection<'selection> {
         if !visible && record.kind() == EventKind::ToolCalled {
             self.hidden_calls.insert(record.seq());
         }
+        if let Some((oid, _)) = commit_facts(record)
+            && !self.announced.insert(oid)
+        {
+            self.repeated.insert(record.seq());
+        }
         Ok(())
     }
 
@@ -270,14 +283,10 @@ impl<'selection> Projection<'selection> {
     /// outside the ledger: in the city's repository and in what
     /// `accounting::trace` folds of its history.
     fn attach_evidence(&mut self) {
-        let shown: BTreeSet<Seq> = self
-            .events
-            .iter()
-            .map(|event| Seq::new(event.seq.0))
-            .collect();
         let known = Known {
-            shown: &shown,
+            events: &self.events,
             hidden: &self.hidden_calls,
+            repeated: &self.repeated,
             links: &self.links,
         };
         attach(
