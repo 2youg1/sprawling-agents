@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 45 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "1216d480a3798add868fcd19fff5f32563214a31115aeac109ef1f93b8a60bb8" as const;
+export const WIRE_HASH = "d9d1464930557780d1972fb674f46c2e34f89e6d805270cb98e92beb730cb08c" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -622,6 +622,10 @@ export const EventKind = Schema.Union(
   Schema.Literal("device_paired"),
   Schema.Literal("device_revoked"),
   Schema.Literal("remote_session_started"),
+  Schema.Literal("document_written"),
+  Schema.Literal("proposal_offered"),
+  Schema.Literal("proposal_decided"),
+  Schema.Literal("proposal_withdrawn"),
 ).annotations({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 
@@ -715,6 +719,7 @@ export const CommitAnswer = Schema.Struct({
   at: TimeMs,
   effort: Schema.optional(Schema.NullOr(Effort)),
   lineage: Schema.Array(RunId),
+  message: Schema.optional(Schema.NullOr(Schema.String)),
   model: Schema.String,
   oid: GitOid,
   parents: Schema.optional(Schema.NullOr(Schema.Array(GitOid))),
@@ -2294,6 +2299,48 @@ export const PrefixAnswer = Schema.Struct({
 }).annotations({ identifier: "PrefixAnswer" });
 export type PrefixAnswer = typeof PrefixAnswer.Type;
 
+/**
+ * The role one sentence plays on a card.
+ */
+export const SliceKind = Schema.Union(
+  Schema.Literal("same"),
+  Schema.Literal("delete"),
+  Schema.Literal("insert"),
+).annotations({ identifier: "SliceKind" });
+export type SliceKind = typeof SliceKind.Type;
+
+/**
+ * One sentence of a card with the whitespace around it; `lead`,
+ * `text` and `trail` read in order are the sentence's bytes (D14).
+ */
+export const Slice = Schema.Struct({
+  kind: SliceKind,
+  lead: Schema.String,
+  text: Schema.String,
+  trail: Schema.String,
+}).annotations({ identifier: "Slice" });
+export type Slice = typeof Slice.Type;
+
+/**
+ * One open card: who offered it, on which stretch of which version,
+ * and its sentences.
+ */
+export const ProposalCard = Schema.Struct({
+  baseline: B3Hash,
+  id: B3Hash,
+  run: RunId,
+  slices: Schema.Array(Slice),
+  span: Span,
+}).annotations({ identifier: "ProposalCard" });
+export type ProposalCard = typeof ProposalCard.Type;
+
+export const ProposalsAnswer = Schema.Struct({
+  doc: Address,
+  open: Schema.Array(ProposalCard),
+  version: Schema.optional(Schema.NullOr(B3Hash)),
+}).annotations({ identifier: "ProposalsAnswer" });
+export type ProposalsAnswer = typeof ProposalsAnswer.Type;
+
 export const RangeAnswer = Schema.Struct({
   version: B3Hash,
   window: Window2,
@@ -2899,6 +2946,9 @@ export const Answer = Schema.Union(
     document: DocumentAnswer,
   }),
   Schema.Struct({
+    proposals: ProposalsAnswer,
+  }),
+  Schema.Struct({
     range: RangeAnswer,
   }),
   Schema.Struct({
@@ -3096,6 +3146,9 @@ export const Query = Schema.Union(
     document: Schema.Struct({
       at: Address,
     }),
+  }),
+  Schema.Struct({
+    proposals: Address,
   }),
   Schema.Struct({
     range: Schema.Struct({
@@ -3307,6 +3360,51 @@ export const PreferencePatch = Schema.Union(
 export type PreferencePatch = typeof PreferencePatch.Type;
 
 /**
+ * Take the sentence's change, or take an inserted sentence after
+ * rewriting it.
+ */
+export const Verdict = Schema.Union(
+  Schema.Literal("accept"),
+  Schema.Struct({
+    amend: Schema.Struct({
+      text: Schema.String,
+    }),
+  }),
+).annotations({ identifier: "Verdict" });
+export type Verdict = typeof Verdict.Type;
+
+/**
+ * A person's verdict on one sentence of a card, by its place on the
+ * card counted from zero.
+ */
+export const SliceVerdict = Schema.Struct({
+  slice: Schema.Int,
+  verdict: Verdict,
+}).annotations({ identifier: "SliceVerdict" });
+export type SliceVerdict = typeof SliceVerdict.Type;
+
+/**
+ * One card and the verdicts on its changed sentences; a sentence left
+ * unnamed is rejected.
+ */
+export const ProposalDecision = Schema.Struct({
+  proposal: B3Hash,
+  verdicts: Schema.Array(SliceVerdict),
+}).annotations({ identifier: "ProposalDecision" });
+export type ProposalDecision = typeof ProposalDecision.Type;
+
+/**
+ * A person's decision on proposal cards of one document, landed as one
+ * save (wire-SPEC.md 8-73).
+ */
+export const ProposalDecisions = Schema.Struct({
+  decisions: Schema.Array(ProposalDecision),
+  doc: Address,
+  idem: IdemKey,
+}).annotations({ identifier: "ProposalDecisions" });
+export type ProposalDecisions = typeof ProposalDecisions.Type;
+
+/**
  * A provider name in transit. Authority for the provider set is `gateway`.
  */
 export const ProviderName = Schema.String.pipe(Schema.brand("ProviderName"));
@@ -3329,6 +3427,28 @@ export const PursuitStep = Schema.Union(
   }),
 ).annotations({ identifier: "PursuitStep" });
 export type PursuitStep = typeof PursuitStep.Type;
+
+/**
+ * One edit as a page sends it: a stretch of the baseline's bytes, and
+ * the text that takes its place (D11).
+ */
+export const TextEdit = Schema.Struct({
+  span: Span,
+  text: Schema.String,
+}).annotations({ identifier: "TextEdit" });
+export type TextEdit = typeof TextEdit.Type;
+
+/**
+ * A page's save of one document: edits made on the version `baseline`,
+ * refused once that version has moved (wire-SPEC.md 8-72).
+ */
+export const RangeWrite = Schema.Struct({
+  baseline: B3Hash,
+  doc: Address,
+  edits: Schema.Array(TextEdit),
+  idem: IdemKey,
+}).annotations({ identifier: "RangeWrite" });
+export type RangeWrite = typeof RangeWrite.Type;
 
 /**
  * A building's whole `RULES.toml` from a page, and the text the page
@@ -3667,6 +3787,12 @@ export const Command = Schema.Union(
       idem: IdemKey,
       which: SpineDocument,
     }),
+  }),
+  Schema.Struct({
+    put_range: RangeWrite,
+  }),
+  Schema.Struct({
+    decide_proposals: ProposalDecisions,
   }),
   Schema.Struct({
     connect_toolkit: Schema.Struct({
