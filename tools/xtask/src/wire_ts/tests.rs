@@ -179,15 +179,68 @@ fn a_defaulted_field_is_optional_and_its_default_is_not_translated() {
 }
 
 #[test]
-fn a_type_that_refers_to_itself_is_refused() {
-    let refused = emit(
-        &document(json!({
-            "Node": { "type": "object", "properties": { "next": { "$ref": "#/$defs/Node" } } },
-        })),
-        &constants(),
-    )
-    .expect_err("a cycle has no definition order");
-    assert!(refused.why.contains("Node"), "{}", refused.why);
+fn a_type_that_refers_to_itself_is_suspended_and_typed_on_both_sides() {
+    let text = emitted(json!({
+        "Node": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": { "$ref": "#/$defs/Id" },
+                "next": { "$ref": "#/$defs/Node" },
+            },
+        },
+        "Id": { "type": "string" },
+    }));
+    let expected = "export interface Node { readonly id: typeof Id.Type; readonly next?: Node | undefined }
+export interface NodeEncoded { readonly id: typeof Id.Encoded; readonly next?: NodeEncoded | undefined }
+export const Node: Schema.Schema<Node, NodeEncoded> = Schema.Struct({
+  id: Id,
+  next: Schema.optional(Schema.suspend((): Schema.Schema<Node, NodeEncoded> => Node)),
+}).annotations({ identifier: \"Node\" });
+";
+    assert!(text.contains(expected), "{text}");
+    assert!(!text.contains("typeof Node.Type"), "{text}");
+}
+
+#[test]
+fn a_cycle_of_two_suspends_inside_itself_and_its_readers_refer_directly() {
+    let text = emitted(json!({
+        "Answer": {
+            "type": "object",
+            "required": ["blocks"],
+            "properties": { "blocks": { "type": "array", "items": { "$ref": "#/$defs/Block" } } },
+        },
+        "Block": {
+            "oneOf": [
+                { "type": "string", "enum": ["rule"] },
+                {
+                    "type": "object",
+                    "required": ["list"],
+                    "properties": { "list": { "type": "array", "items": { "$ref": "#/$defs/Item" } } },
+                },
+            ],
+        },
+        "Item": {
+            "type": "object",
+            "required": ["blocks"],
+            "properties": { "blocks": { "type": "array", "items": { "$ref": "#/$defs/Block" } } },
+        },
+    }));
+    for expected in [
+        "export type Block = \"rule\" | { readonly list: readonly Item[] }\n",
+        "export type BlockEncoded = \"rule\" | { readonly list: readonly ItemEncoded[] }\n",
+        "export interface Item { readonly blocks: readonly Block[] }\n",
+        "list: Schema.Array(Schema.suspend((): Schema.Schema<Item, ItemEncoded> => Item)),",
+        "blocks: Schema.Array(Block),\n}).annotations({ identifier: \"Answer\" });",
+        "export type Answer = typeof Answer.Type;",
+    ] {
+        assert!(text.contains(expected), "{expected}\n---\n{text}");
+    }
+    let at = |name: &str| text.find(&format!("export const {name}")).unwrap();
+    assert!(
+        at("Block") < at("Answer") && at("Item") < at("Answer"),
+        "{text}"
+    );
 }
 
 #[test]
