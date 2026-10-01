@@ -47,7 +47,7 @@
 
 - **字节怎么走**归本 crate 的三种传输（`mcp::stdio`、`mcp::http`、`mcp::sse`，见 §8-17）：子进程的拉起、期限与回收，HTTP 会话与事件流都住这里。装配层只决定一栋楼按配置连哪几台 server。
 - **哪家 broker 替人持外部应用的 OAuth**也归本 crate（`mcp::broker`，见 §8-18）：出网政策仍只在 `gateway::client_for`。
-- **一条消息能有多大**归本 crate（`mcp::reading`）：上限是 MCP 这个协议的事实，不是某一种传输的事实；两个传输各写一个数字就是两条会漂的上限。每种传输拥有自己 reader 的形式（线程、管道、`sync_channel`），它把字节交给 `read_one_message` 并接受它的拒绝。
+- **一条消息能有多大**归本 crate（`mcp::reading`）：上限是 MCP 这个协议的事实，不是某一种传输的事实；两个传输各写一个数字就是两条会漂的上限。按行读一条连接的线程与无队列的交接也住那里（`Lines`）：stdio 与 harness 两条连接读法相同，用同一个 `Lines`。SSE 在同一条线程上先开流、只留 `data:` 行，所以自留循环，每一行仍交给 `read_one_message` 并接受它的拒绝；HTTP 一次请求一条消息，整段 body 经 `read_whole_message` 受同一个上限。
 - **准不准出网**归 `kernel::gate` 的 egress 门：外部工具声明 `Effect::Egress`，路由到那道门；本 crate 只在 confidential 一位上做构造点拒（更早、更硬）。
 - **回来的东西算什么**归 `kernel::taint`：与 L0 工具同落 `kernel::tool` 缝，故自动进污染环，本 crate 无解包面。
 
@@ -100,6 +100,13 @@ pub struct ScriptedOutbound { /* 私有 */ }                                    
 pub const MESSAGE_CEILING: usize = 8_388_608;
 pub enum Received { Message(String), EndOfInput }
 pub fn read_one_message(source: &mut dyn BufRead, server: &str) -> Result<Received, AxError>;
+pub(crate) fn read_whole_message(source: &mut dyn Read, server: &str) -> Result<String, AxError>; // HTTP 的一整段 body
+// 一条线程读一条按行分帧的连接，交接无队列（§8-15 决定 4）；stdio 与 harness 共用
+pub struct Lines { /* 私有：Receiver<Result<Received, AxError>> */ }
+impl Lines {
+    pub fn over<R: BufRead + Send + 'static>(reader: R, name: &str) -> Result<Lines, AxError>;
+    pub(crate) fn next(&self, wait: Duration) -> Result<Heard, AxError>; // Heard::{Message, Ended, Silent}
+}
 
 // 8-2 acp（形状 1 判定＋形状 2 值类型）
 pub struct Incoming { /* 私有：addr／task／goal；唯一构造者是 parse */ }
@@ -168,7 +175,7 @@ MCP 2025-06-18 把工具的答复定为 `CallToolResult`：`content` 是内容�
 | 码 | 何时 | 能否让它不可能发生 |
 |---|---|---|
 | `E_INVALID_ARGS` | 浮点入参、入站字段缺失、路由错工具 | 部分能：浮点由模型给出，故在出口拒并指位置 |
-| `E_WIRE_MISMATCH` | 答案或列表形状读不出；一条消息超过 `MESSAGE_CEILING`；流在消息中途断掉；消息不是 UTF-8（后三者发生在一次调用的答案上时带 `Retry::Unknown`，§8-15） | 不能：对侧写多少字节不由本库决定，fail closed；超限恒是整条拒，恒不截断后解析 |
+| `E_WIRE_MISMATCH` | 答案或列表形状读不出；一条消息或一段 HTTP 答复的 body 超过 `MESSAGE_CEILING`；流在消息中途断掉；消息不是 UTF-8（后三者发生在一次调用的答案上时带 `Retry::Unknown`，§8-15） | 不能：对侧写多少字节不由本库决定，fail closed；超限恒是整条拒，恒不截断后解析 |
 | `E_TOOL_UNAVAILABLE` | server 返回 JSON-RPC error；`tools/call` 答 `isError: true`；stdio 对侧在作答前关了输出、SSE 流在作答前断了（后两者带 `Retry::Unknown`）；重放缺答案 | 不能：外部世界的事实 |
 | `E_TIMEOUT` | 期限内未答；请求已交出，带 `Retry::Unknown` | 不能：对侧多久回答不由本库决定；拒词同时是子进程被回收的那一刻 |
 | `E_TOOL_OUTCOME_UNKNOWN` | `tools/call` 答 `isError: true`，且 `_meta` 带 `sprawling/effect-unknown` | 不能：server 自己说不知道 |
@@ -197,7 +204,7 @@ MCP 2025-06-18 把工具的答复定为 `CallToolResult`：`content` 是内容�
 
 ## 16 测试与约束
 
-逐模块 `#[cfg(test)]`；「单行无换行」「同名不合并」「浮点按位置拒」「confidential 构造即拒」「未配对只泄一位」「重放同答案」六条各有一条断言，再加「恰在上限内的消息照常解析」「超限的消息被整条拒且拒词报出上限与是哪台 server」「stdio 与 SSE 的 server 答出超限的一条时，那次调用被拒且标效果未知」三条（§8-15），以及「`isError` 读成失败」「`_meta` 效果未知」「stdio 超时与断流、SSE 断流标效果未知」三条。**约束**：本 crate 恒不出现 `async`、恒不持文件句柄、恒不内置任何服务商名字。
+逐模块 `#[cfg(test)]`；「单行无换行」「同名不合并」「浮点按位置拒」「confidential 构造即拒」「未配对只泄一位」「重放同答案」六条各有一条断言，再加「恰在上限内的消息照常解析」「超限的消息被整条拒且拒词报出上限与是哪台 server」「stdio 与 SSE 的 server 答出超限的一条时，那次调用被拒且标效果未知」「HTTP 答复的 body 恰在上限内照常读，超过即拒且标效果未知」四条（§8-15），以及「`isError` 读成失败」「`_meta` 效果未知」「stdio 超时与断流、SSE 断流标效果未知」三条。**约束**：本 crate 恒不出现 `async`、恒不持文件句柄、恒不内置任何服务商名字。
 
 ## 17 模型体验
 
@@ -218,11 +225,13 @@ MCP 2025-06-18 把工具的答复定为 `CallToolResult`：`content` 是内容�
 2. **数值是推导来的，不是拍的。** `IMAGE_MAX_BYTES` 是 2 MiB，base64 后 2,796,203 B；8 MiB 让一次工具答案装得下这样一张图、它的文字与 JSON-RPC 信封，对本城已接受的最大载荷留 3 倍余量。读数与推导记在 `tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]`，值本身只有 `MESSAGE_CEILING` 一个家。
 3. **拒绝是终止性的，不是跳过一条。** 超限消息未读完的尾巴与下一条消息在字节上无从分辨，所以拒绝之后调用方**恒不**再从同一个 source 读；传输回收子进程。`Received` 是穷尽枚举而非 `Option<String>`：「对侧关了输出」是调用方要据以停读的状态，用缺席表示它就等于让每个调用点各自重推一遍。
 
-4. **读端不排队。** `mcp::stdio` 与 `mcp::sse` 的 reader 线程每读一条都调 `read_one_message`，读到的交给 `sync_channel(0)`：reader 等调用方取走这一条才读下一条，于是一条连接在内存里至多握着一条读完待取的消息与一条正在读的，上界是两倍 `MESSAGE_CEILING`；再往后的字节留在子进程的管道或 TCP 的接收窗口里，那是对侧的缓冲，不是本城的。被否：`sync_channel(N)`（N > 0）多买到的只是 reader 能先读 N 条，而一次调用只取一条答案，多读的那几条只会多占 N 倍上限的内存；无界的 `channel()` 在读端慢时把内存吃光，而「慢」正是一个被工具卡住的 Run 的常态。`harness::reading`（§8-19）的 reader 是同一种读法。
+4. **读端不排队。** `mcp::stdio` 与 `mcp::sse` 的 reader 线程每读一条都调 `read_one_message`，读到的交给 `sync_channel(0)`：reader 等调用方取走这一条才读下一条，于是一条连接在内存里至多握着一条读完待取的消息与一条正在读的，上界是两倍 `MESSAGE_CEILING`；再往后的字节留在子进程的管道或 TCP 的接收窗口里，那是对侧的缓冲，不是本城的。被否：`sync_channel(N)`（N > 0）多买到的只是 reader 能先读 N 条，而一次调用只取一条答案，多读的那几条只会多占 N 倍上限的内存；无界的 `channel()` 在读端慢时把内存吃光，而「慢」正是一个被工具卡住的 Run 的常态。harness 的会话（§8-19）读的是同一个 `Lines`。
 
 **两条传输怎么用它**：reader 读到 `Received::EndOfInput` 就停，调用方看见的是连接断开；读到拒词（超限、不是 UTF-8、流在消息中途断掉、读不出）就把它交给正在等的那次调用，然后停读（决定 3）。这次调用拿到的拒词带 `Retry::Unknown`：请求已经交出，server 也答了，只是这份答案本城不读，它做没做事与 §8-17 丢了答的情形一样不可知。stdio 随即回收子进程，`has_ended` 为真，持有者下一次派活重开；SSE 的 reader 停读即放下这条流，之后的调用读到流已断。SSE 的一行是一个 `data:` 帧、一个事件名或一行注释，`read_one_message` 按换行分帧，所以每一行受同一个上限。
 
-**HTTP 这条还欠**：`mcp::http` 今天以 `response.text()` 读整个响应体，没有上限；按上限读它（`take(MESSAGE_CEILING)` 或同等的读法）是这一节在 `mcp::http` 那一侧的现状。
+**一个读端，两条连接**：stdio 与 harness 的读端是同一个 `mcp::reading::Lines`：一条线程循环调 `read_one_message`，经 `sync_channel(0)` 交出，读到 `EndOfInput` 或拒词即停；调用方用 `Lines::next(wait)` 带期限地等，得到 `Heard::{Message, Ended, Silent}` 或那条拒词。期限各归调用方：stdio 等一次调用的 patience，harness 每 `HALT_TICK_MS` 回头问一次停摆。两份循环逐字相同时，改其中一份（比如决定 3 的停读）另一份不会跟上。SSE 不用它：它的线程先开流、把打不开的拒词当作第一条也是唯一一条交出，读到的行只留 `data:` 那些，每一行照样经 `read_one_message`。
+
+**HTTP 这条**：一次 POST 的答复 body 就是一条消息（或一段只带一条消息的事件流），`mcp::http` 经 `read_whole_message` 读它：持有的字节一过上限即整条拒，所以一段没有尽头的 body 在还在到达时就被拒，本城至多多握一块（与按行读同样的 8 KiB）（`E_WIRE_MISMATCH`，`Retry::Unknown`：server 收下了请求），不是 UTF-8 同样拒。上限量的是整段 body，事件流的 `event:` 行也算在内：本城在内存里握的是整段 body，上限约束的正是它。非 2xx 的答复不读 body：拒词只报状态码（§8-17），一页报错文字不值得读进内存，也不该因为它太长而把 401 报成形状错误。
 
 ### 8-16 常驻连接
 
@@ -299,9 +308,7 @@ pub struct Launch { pub program: Program, pub args: &'static [&'static str] }
 pub enum Program { Npx, Kimi }
 impl Program { pub const fn name(self) -> &'static str; }   // Windows 上 npx 是 npx.cmd，kimi 是 kimi.exe 由搜索路径补
 
-// harness::reading —— 读端：一条线程把对侧的行交进通道，会话带期限地等
-pub struct Lines { /* 私有：Receiver<Result<Received, AxError>> */ }
-impl Lines { pub fn over<R: BufRead + Send + 'static>(reader: R, name: &str) -> Result<Lines, AxError>; }
+// 读端是 mcp::reading::Lines（§8-1b），与 mcp::stdio 同一个；会话带期限地等它
 
 // harness::process —— 把一家 harness 起成子进程（形状 4 适配器）；落地即杀
 pub struct HarnessProcess { /* 私有：Child */ }
