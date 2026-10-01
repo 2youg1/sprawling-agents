@@ -12,7 +12,9 @@ use kernel::{Address, GitOid, Payload, TimeMs};
 use serde_json::{Map, Value};
 
 use crate::alias::WriteTarget;
+use crate::bundle::landing::{Bits, land};
 use crate::error::StorageError;
+use crate::real_fs::RealFs;
 
 use super::provenance::Provenance;
 use super::scan::CommitPlan;
@@ -340,12 +342,56 @@ impl Checkpoint {
         address: &Address,
         point: &GitOid,
     ) -> Result<FileRestored, StorageError> {
-        self.restore(address, point)?;
-        Ok(FileRestored {
+        let refused = |detail: String| StorageError::Checkpoint {
+            op: "take a file back from a checkpoint",
+            detail,
+        };
+        if address.is_reserved() {
+            return Err(refused(format!(
+                "{address} is protected metadata; the city writes it through its own gates"
+            )));
+        }
+        let tree = git2::Oid::from_str(&point.to_string())
+            .and_then(|oid| self.repo.find_commit(oid))
+            .and_then(|commit| commit.tree())
+            .map_err(git_err("find the checkpoint to take a file back from"))?;
+        let workdir = self
+            .repo
+            .workdir()
+            .ok_or_else(|| refused("the city repository is bare".to_owned()))?;
+        let target = WriteTarget::within(
+            "take a file back from a checkpoint",
+            workdir,
+            &workdir.join(address.as_str()),
+        )?;
+        let restored = FileRestored {
             name: String::new(),
             path: address.as_str().to_owned(),
             point: *point,
-        })
+        };
+        let entry = match tree.get_path(Path::new(address.as_str())) {
+            Ok(entry) => entry,
+            // The point never held it: taking it back is taking it away.
+            Err(err) if err.code() == git2::ErrorCode::NotFound => {
+                return match std::fs::remove_file(target.as_path()) {
+                    Ok(()) => Ok(restored),
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(restored),
+                    Err(err) => Err(refused(format!("{address}: {err}"))),
+                };
+            }
+            Err(err) => return Err(git_err("find the file in the checkpoint")(err)),
+        };
+        let blob = entry
+            .to_object(&self.repo)
+            .map_err(git_err("read the file in the checkpoint"))?
+            .into_blob()
+            .map_err(|_| refused(format!("{address}@{point} is not a file")))?;
+        if let Some(parent) = target.as_path().parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|err| refused(format!("{}: {err}", parent.display())))?;
+        }
+        land(&mut RealFs::new(), target, blob.content(), Bits::OfReplaced)?;
+        Ok(restored)
     }
 }
 
