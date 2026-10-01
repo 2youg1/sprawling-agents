@@ -269,7 +269,7 @@ A line that begins with `/` is a command, and the menu above the box lists them:
 | `/model <id>`, `/effort <level>` | point `main` at another model; set the effort |
 | `/diff`, `/go <page>`, `/mcp`, `/doctor`, `/help` | open changes, a page, the MCP page, the machine check, the list |
 
-**everything** in the rail, or Ctrl+K (⌘K on a Mac), offers every command with every page and session beside it. The keys that ship: Ctrl+1 to Ctrl+6 for the Mayor, city, MCP, the record, cost and the registry; Ctrl+, for settings; Ctrl+Shift+A for **waiting on you**; Ctrl+B to fold the rail; Ctrl+. to stop the run; `/` to focus the box and `?` for the key list, outside a text box; `f` to fork from the entry under the pointer. **settings** → **keybindings** changes any of them.
+**everything** in the rail, or Ctrl+K (⌘K on a Mac), offers every command with every page, building and room beside it. The keys that ship: Ctrl+1 to Ctrl+6 for the Mayor, city, MCP, the record, cost and the registry; Ctrl+, for settings; Ctrl+Shift+A for **waiting on you**; Ctrl+B to fold the rail; Ctrl+. to stop the run in front of you, which on a page with no run going stops nothing and names `/halt --all`, the verb that stops the whole city; `/` to focus the box and `?` for the key list, outside a text box; `f` to fork from the entry under the pointer. **settings** → **keybindings** changes any of them.
 
 ## Sessions
 
