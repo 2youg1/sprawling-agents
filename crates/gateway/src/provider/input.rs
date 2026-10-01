@@ -30,12 +30,13 @@ use crate::market::InputKinds;
 /// costs the provider's 400.
 #[must_use]
 pub fn accepted_input(
-    _stated: Option<InputKinds>,
+    stated: Option<InputKinds>,
     pinned: Option<InputKinds>,
     base_url: &str,
     id: &str,
 ) -> InputKinds {
-    pinned
+    stated
+        .or(pinned)
         .or_else(|| super::preset::input_for(base_url, id))
         .unwrap_or_default()
 }
