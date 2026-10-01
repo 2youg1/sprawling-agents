@@ -4632,23 +4632,26 @@ sprawling gauge [--every <ms>] [--samples <n>] -- <program> [<arg>...]     一�
 pub(super) fn verb(read: &Arguments) -> ExitCode;
 pub(super) enum Subject {
     City { at: String, token: Option<String> },
-    Process { pid: u32, every: Every, beats: Option<NonZeroU32> },     // 缺省：直到根进程退出
-    Command { argv: Vec<OsString>, every: Every, samples: NonZeroU32 }, // samples 缺省 1；argv 至少一个词
+    Process(Watching),
+    Command(Running),
 }
+pub(super) struct Watching { pid: u32, every: Every, beats: Option<NonZeroU32> }  // beats 缺省：直到根进程退出
+pub(super) struct Running { program: OsString, args: Vec<OsString>, every: Every, samples: NonZeroU32 } // samples 缺省 1；程序名单独一个字段，空命令写不出来
 pub(super) fn subject(read: &Arguments) -> Result<Subject, Misread>;
 pub(super) enum Misread {                   // 每一臂退 2，Display 写出最近的合法写法
     TwoSubjects,                            // --pid 与 -- 同时出现
-    NotForThisSubject { flag: &'static str, subject: &'static str },
+    NotForThisSubject { flag: &'static str, subject: Measured },
     OutOfRange { flag: &'static str, given: String, range: &'static str },
     NothingAfterDashes,
 }
+pub(super) enum Measured { City, Process, Command } // Misread 说出是哪个对象，并写出它的合法写法
 pub(super) struct Every(Duration);          // 250 ms ..= 60 s，缺省 1 s
 pub(super) struct Run { index: u32, exit: Option<i32>, wall: Duration, watched: Watched, child: ChildPeaks }
 pub(super) struct Watched { beats: u64, seen: Option<Seen>, read_cost: Duration } // 拍线程交回的东西
 pub(super) struct ChildPeaks { private_bytes: Option<u64>, working_set_bytes: Option<u64> }
 pub(super) struct Host { cores: NonZeroUsize, physical_bytes: u64 } // available_parallelism 与 monitor::memory::read
 // bin::main::gauge::lines —— shape: projection；每种行只在这里变成文字
-pub(super) fn city_line(sample: &Sample) -> serde_json::Result<String>; // {"line":"city", 其后是 Sample 的字段}
+pub(crate) fn city_line(sample: &Sample) -> serde_json::Result<String>; // {"line":"city", 其后是 Sample 的字段}；watching 调它
 pub(super) fn tree_line(at: Duration, reading: &TreeReading, audience: Audience) -> String;
 pub(super) fn run_line(run: &Run, audience: Audience) -> String;
 pub(super) fn spread_line(spread: &Spread, failed: u32, host: Host, audience: Audience) -> String;
