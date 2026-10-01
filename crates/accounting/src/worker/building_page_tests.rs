@@ -163,7 +163,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
 
 /// The desktop allowlist travels on the same frame as the rest of
 /// what a building's runs may reach, and lands where no write domain
-/// goes (city-SPEC.md 8-26).
+/// goes (`crates/city/Spec.lean` §8-26).
 ///
 /// The bytes a person wrote are the bytes on disk: this side never
 /// parses the file, because the connector that reads it at start-up

@@ -18,7 +18,7 @@
 //! written in that run's room, and who may read it is the read bound's
 //! answer for that room: `read` and `search` ask it of a transcript's
 //! path as of any other, so a confidential building's transcripts stay
-//! inside it (city-SPEC 8-2).
+//! inside it (`crates/city/Spec.lean` §8-2).
 //!
 //! Three steps in a fixed order: scanned for credentials, pinned into
 //! the CAS, then materialised. Scanned before pinned, because a key that

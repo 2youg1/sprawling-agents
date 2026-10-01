@@ -59,7 +59,7 @@ pub(super) fn open_in_package(catalog: &Catalog, city_root: &Path, asked: &str) 
 pub(super) fn open_document(city_root: &Path, shelved: &Address, asked: &str) -> Result<Found, AxError>;  // 单文档 skill
 ```
 
-- **阅览室准入的是整个包**：catalog 条目带着包目录（`CatalogEntry::package`，由 city 的扫描给出，city-SPEC §8-8）时它是一个包，不从落点的写法去猜——一份恰好叫 `SKILL.md` 的单文档会让整个 section 被当成包；`<名>/<相对路径>` 打开包目录下的那个文件。准入是人写阅览室时做的，所以包内文件与 `SKILL.md` 一样不经读界与保留区判定——它们住在同一个被准入的目录里。
+- **阅览室准入的是整个包**：catalog 条目带着包目录（`CatalogEntry::package`，由 city 的扫描给出，`crates/city/Spec.lean` §8-8）时它是一个包，不从落点的写法去猜——一份恰好叫 `SKILL.md` 的单文档会让整个 section 被当成包；`<名>/<相对路径>` 打开包目录下的那个文件。准入是人写阅览室时做的，所以包内文件与 `SKILL.md` 一样不经读界与保留区判定——它们住在同一个被准入的目录里。
 - **名字在前、路径在后，名字先查 catalog**：与整名命中同一条理由（§8-29 起首），一个恰好同名的城内目录遮不住它。首段不是 catalog 里的包（没有这个名字，或它是单份文档）即返回 `None`，交回普通路径那条路。
 - **相对路径逐段判形，不做规范化**：空段、`.`、`..`、带反斜杠或冒号的段一律 `E_INVALID_ARGS`，恢复语说出「包内相对路径，只用普通段」。规范化会把一条爬出包的路径「修」成另一条，而拒绝让写错的那一方看见自己写了什么。
 - **链接按落点判，不出包目录**：拼出的路径解开链接后的真实位置，必须落在「规范化的城根 + 书架上写的包路径」之下，否则 `E_GATE_DENIED`，恢复语说出「指包里的文件本身，而不是包里链接背后的东西」。以书架上的写法而非包目录的真实位置为准，所以包目录本身是链接时同样拒绝。免于读界的理由只覆盖被准入的那个目录；链接背后的文件没有被准入，而书架上的文件可以由人手或 `exec` 写进来，安装时的预检挡不住它们。文件不存在时同样按落点判：真实位置由 `chosen_path::real_location`（§8-30-1）求出，不存在的尾段不可能是链接，所以包里一条链接背后的缺失文件落在链接目标之下，出包即 `E_GATE_DENIED`，不交给读取去列链接背后的目录。
@@ -82,7 +82,7 @@ const NEARBY_CAP: usize = 16;
 - **文件在而打不开＝`E_STORAGE_FATAL`，不给 `nearby`**：名字是对的，候选只会误导。
 - **打开之后再核一次，不符＝`E_GATE_DENIED`**：`text_at` 打开判过的真实路径，然后核两件事：这条路径此刻的真实位置仍是它自己（路上没有换进来的链接），此刻这条路径上的文件与打开的句柄是同一个文件（`same-file` 的 `Handle`，比的是卷与文件号）；任一不符即拒，拒因不说出链接指向哪里。之后只从已打开的句柄读。两道核验各挡一种换法：判定之后换进来并一直留着的链接，打开与再开都穿过它而相等，只有重求真实位置看得见；打开时是链接、重求前又换回的，只有句柄比对看得见。剩下的窗口要在打开、重求、再开之间来回换三次。打开放在判定之后而不是之前，因为先打开就会在判定前打开链接背后未经判定的东西，Unix 上一个 FIFO 会让这次打开一直阻塞。catalog 里的单份文档也先经 `real_location`（§8-30-1）求真实位置，所以 `text_at` 的每个调用方交来的都是真实路径，核验对它们一视同仁。
 - **列目录是尽力而为**：目录列不出或名字不是 Unicode 时 `nearby` 为空，调用方要的拒因是「没命中」本身。
-- **恢复语指向 `search`，不指向 `exec`**：每栋楼的工具集都有 `search`，而 City Hall 的工具集里没有 `exec`（city-SPEC §8-22）；一句指向一件不存在的工具的恢复语会让规划者空转一个回合。
+- **恢复语指向 `search`，不指向 `exec`**：每栋楼的工具集都有 `search`，而 City Hall 的工具集里没有 `exec`（`crates/city/Spec.lean` §8-22）；一句指向一件不存在的工具的恢复语会让规划者空转一个回合。
 
 #### 8-29-5 打开一个 Locator：`cas:` 与 `file:`（`runtime::tools::read::locator`）
 
@@ -111,9 +111,9 @@ pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError
 // entry.expansion＝扫描读到的 SKILL.md 正文；entry.hash＝同一份字节的哈希；entry.package＝None
 ```
 
-- **按名读到的是钉住的那份字节**：城外书架是别的程序的目录，城给不出地址（city-SPEC §8-8），所以 catalog 不交地址而交正文。正文由 city 的扫描读一次、哈希一次（`Holding::carried` 与 `Holding::hash` 出自同一次读入），`read <名>` 经 `Expansion::Said` 交回它，走 §8-29-1 同一条切行路。于是这个 run 读到的字节恒等于 `run_started` 里那条 `SkillPin` 说的字节，哪怕那份文件在 run 进行中被它的主人改了。
-- **包里的其余文件读不到**：`package` 为 `None`，`<名>/<相对路径>` 不进 §8-29-3 那条路，落回普通路径并按城内路径判（多半是 `E_INVALID_ARGS` 的没命中）。城外的文件不在城根之下，`read` 不打开城外的路径；要整包可读，人把它装进城库（city-SPEC §8-28），那条路把包里每个文件落在城内。
-- **一件 skill 在 catalog 里只有一个名字**：城外的与城内的同名时，书架扫描已经按「近架盖远架」留下城内那一件（city-SPEC §8-8），catalog 收到的是一件；`admit_skill` 与 `admit_carried_skill` 之间的重名仍拒，与同一扇门里的重名同一个拒词。
+- **按名读到的是钉住的那份字节**：城外书架是别的程序的目录，城给不出地址（`crates/city/Spec.lean` §8-8），所以 catalog 不交地址而交正文。正文由 city 的扫描读一次、哈希一次（`Holding::carried` 与 `Holding::hash` 出自同一次读入），`read <名>` 经 `Expansion::Said` 交回它，走 §8-29-1 同一条切行路。于是这个 run 读到的字节恒等于 `run_started` 里那条 `SkillPin` 说的字节，哪怕那份文件在 run 进行中被它的主人改了。
+- **包里的其余文件读不到**：`package` 为 `None`，`<名>/<相对路径>` 不进 §8-29-3 那条路，落回普通路径并按城内路径判（多半是 `E_INVALID_ARGS` 的没命中）。城外的文件不在城根之下，`read` 不打开城外的路径；要整包可读，人把它装进城库（`crates/city/Spec.lean` §8-28），那条路把包里每个文件落在城内。
+- **一件 skill 在 catalog 里只有一个名字**：城外的与城内的同名时，书架扫描已经按「近架盖远架」留下城内那一件（`crates/city/Spec.lean` §8-8），catalog 收到的是一件；`admit_skill` 与 `admit_carried_skill` 之间的重名仍拒，与同一扇门里的重名同一个拒词。
 -/
 
 /-! D9 城外书架上的 skill 由 catalog 携着正文交给 run
@@ -122,7 +122,7 @@ pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError
 
 **理由**：`docs/getting-started.md` 告诉人，挂上 `[skills] shelves` 再在 `reading_room` 里写下名字，居民就用得上那件 skill；而城外的文件没有城内地址，`read` 只开城根下的路径。携正文让这句话成真，又不给 `read` 开一条去城外读文件的路：模型能选的仍只有城内路径，城外的字节只以「人准入过的那一份」的身份进来。正文与哈希出自同一次读入，所以 pin 说的字节就是 run 读到的字节。
 
-**被否**：①给城外持有编一个城内地址或把城外目录映射进城根——那是一个指向并不在那儿的文件的地址，失败落在第一次 `read` 而不在写清单的时候（city-SPEC §8-8）；②让 `read` 在调用时去城外路径读——读到的可能不是钉住的那份字节，且 `read` 多出一条不经读界判定的打开路径；③改文档，告诉人城外书架只能浏览不能用——书架挂了却用不上，人从 catalog 上看不出为什么。
+**被否**：①给城外持有编一个城内地址或把城外目录映射进城根——那是一个指向并不在那儿的文件的地址，失败落在第一次 `read` 而不在写清单的时候（`crates/city/Spec.lean` §8-8）；②让 `read` 在调用时去城外路径读——读到的可能不是钉住的那份字节，且 `read` 多出一条不经读界判定的打开路径；③改文档，告诉人城外书架只能浏览不能用——书架挂了却用不上，人从 catalog 上看不出为什么。
 
-**重开参数**：城外 skill 的包里附属文件也要按名读到（例如一件 skill 的 `SKILL.md` 指名它目录里的脚本）时，`Holding` 要带整包的字节或一份只读的城内镜像，本条与 city-SPEC §12.9 一起重议。
+**重开参数**：城外 skill 的包里附属文件也要按名读到（例如一件 skill 的 `SKILL.md` 指名它目录里的脚本）时，`Holding` 要带整包的字节或一份只读的城内镜像，本条与 city D9 一起重议。
 -/

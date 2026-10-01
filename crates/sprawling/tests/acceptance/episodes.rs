@@ -39,7 +39,7 @@ pub(crate) const LAB: Setup = Setup {
     neighbour: "lab/other",
 };
 
-/// City Hall, which plans (city-SPEC.md 8-22).
+/// City Hall, which plans (`crates/city/Spec.lean` §8-22).
 pub(crate) const HALL: Setup = Setup {
     building: "hall",
     room: "hall/mayor",
@@ -400,7 +400,7 @@ fn proposal(setup: &Setup) -> Episode {
 }
 
 /// Refused at the effect layer: a run does not change what governs it
-/// (city-SPEC.md 8-2b). Judged by the file staying as it was.
+/// (`crates/city/Spec.lean` §8-2b). Judged by the file staying as it was.
 fn rules() -> Episode {
     Episode {
         step: Step {
@@ -496,7 +496,7 @@ fn succeed() -> Episode {
 }
 
 /// Refused at the effect layer: a run does not raise a building
-/// (city-SPEC.md 8-23). Judged by the building not existing.
+/// (`crates/city/Spec.lean` §8-23). Judged by the building not existing.
 fn city() -> Episode {
     Episode {
         step: Step {

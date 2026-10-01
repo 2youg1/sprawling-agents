@@ -11,7 +11,7 @@
 //! module cannot know: whether a run is working in one of the building's
 //! rooms, and what the Ledger records. Everything the building wrote
 //! before stays in that history; `building_removed` is appended after it
-//! and deletes nothing (`city-SPEC.md` 8-3).
+//! and deletes nothing (`crates/city/Spec.lean` §8-3).
 
 use kernel::{Address, AxCode, AxError, EventKind};
 

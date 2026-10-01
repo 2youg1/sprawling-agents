@@ -19,7 +19,7 @@
 //!   ([`PROTECTED_METADATA`]) can never enter a WriteDomain, at whatever
 //!   depth it sits, and every WriteDomain constructor must ask first.
 //! - [`may_read`] answers the read bound: what a resident of one
-//!   building may read by a path it chose (city-SPEC 8-2).
+//!   building may read by a path it chose (`crates/city/Spec.lean` §8-2).
 
 use serde::{Deserialize, Serialize};
 

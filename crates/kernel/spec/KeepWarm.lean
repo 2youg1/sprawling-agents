@@ -32,6 +32,6 @@ pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u
 - 判定：`FiveMinute` 时，续期时刻＝`refreshed_ms + PROMPT_CACHE_TTL_SECS·1000 − lead_ms`（饱和减）；该时刻距 `used_ms` 超过一个 TTL 即不续期。所以「最近 5 分钟内用过」与缓存寿命是同一个常数 `consts_external::PROMPT_CACHE_TTL_SECS`，不另立第二个 300。一次真实使用最多换来一次续期：续期不改 `used_ms`，第二次续期的时刻必然离真实使用超过一个 TTL。
 - `lead_ms` 由调用方对所连 provider 实测给出，不在这里写死一个网络余量：慢链路与快链路要的提前量不同。
 - 花费只观察、不设门限：续期请求照常记 usage，本模块不读余额也不拦。
-- 设置按城→楼→居民三层梯解析，下层覆盖上层，一层也没说＝`Off`（city-SPEC §8-4 `[cache]` 一节）。它不进 `FrozenConfig`：续期发生在两次 run 之间，不属于任何一次 run 的冻结面。
+- 设置按城→楼→居民三层梯解析，下层覆盖上层，一层也没说＝`Off`（`crates/city/Spec.lean` §8-4 `[cache]` 一节）。它不进 `FrozenConfig`：续期发生在两次 run 之间，不属于任何一次 run 的冻结面。
 - 现状：设置与判定已落地；按它记账并经 `kernel::Model` 发出续期的是 `runtime::prefix::warmth`（`crates/runtime/Spec.lean` §8-4-2）。续期由 `accounting::worker::keeping_warm` 在房间落地后按 `renewal_due` 发出，每次续期写一行 `cache_renewed`（sprawling-SPEC 8-93）。
 -/

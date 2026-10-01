@@ -195,6 +195,6 @@ D12 一个 run 能按键：`Action::Press { key, modifiers }`，一帧 `input.pe
 
 - `architecture.toml` 里 browser 各行（锚点指向本文件与分部）与 ARCHITECTURE.md §4 缝清单（`BrowserPort`）；ARCHITECTURE.md §11 的 V3 一行引 D1。
 - `docs/glossary.md` 的 **browser** 行（D4）与新增词汇。
-- `crates/desktop/Spec.lean` §8-7（拖拽与滚动的同一份词汇，D9）；client-SPEC §7（键表，D12）；city-SPEC 的 policy（confidential 与 `usersbrowser`，D10）；`tools/xtask/Spec.lean` 的 `render` 一节与 §8-26 `survey`（D11）；sprawling-SPEC 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
+- `crates/desktop/Spec.lean` §8-7（拖拽与滚动的同一份词汇，D9）；client-SPEC §7（键表，D12）；`crates/city/Spec.lean` §8-2 的 policy（confidential 与 `usersbrowser`，D10）；`tools/xtask/Spec.lean` 的 `render` 一节与 §8-26 `survey`（D11）；sprawling-SPEC 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
 - 本 crate 没有 `conformance` feature（D1）。
 -/

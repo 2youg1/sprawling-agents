@@ -164,7 +164,7 @@ impl RunWorker {
             .map_err(storage::StorageError::into_ax)?;
         // A rule the ignore table gained since a building was raised
         // reaches it now: no working record of this city enters git,
-        // however old the building (city-SPEC.md 12.5).
+        // however old the building (city D5).
         city::keep_records_out_of_git(city_root)?;
         let Standing {
             book,

@@ -95,7 +95,7 @@ impl RunWorker {
         // Written whole and never parsed here: the connector that reads
         // it at start-up is the authority on its syntax and fails closed,
         // so a second reading on this side would be a second authority
-        // (city-SPEC.md 8-26).
+        // (`crates/city/Spec.lean` §8-26).
         if let Some(allowlist) = desktop {
             city::write_desktop_scope(&self.city_root, building.addr(), allowlist)?;
         }

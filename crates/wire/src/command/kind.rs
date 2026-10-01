@@ -62,7 +62,7 @@ pub enum Command<Secret = Sealed<String>> {
         /// own configuration and, failing that, the provider's default.
         /// A value is written into the session's own configuration when
         /// its room is opened, so it is chosen once and holds for every
-        /// run in that room (city-SPEC.md section 8-14).
+        /// run in that room (`crates/city/Spec.lean` §8-14).
         effort: Option<Effort>,
         /// Which registered model this one dispatch calls, by its id.
         ///
@@ -102,7 +102,7 @@ pub enum Command<Secret = Sealed<String>> {
     /// `desktop` is the allowlist's text and not a parsed value: the
     /// connector that reads that file at start-up is the authority on
     /// its syntax and fails closed, and a second parser here would be a
-    /// second authority (city-SPEC.md 8-26).
+    /// second authority (`crates/city/Spec.lean` §8-26).
     ConfigureBuilding {
         addr: Address,
         sandbox: Option<SandboxLimits>,

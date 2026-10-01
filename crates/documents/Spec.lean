@@ -102,7 +102,7 @@ refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「�
 
 - **字节从哪里来**归调用方：`accounting::views` 读盘与内容库，把切片交进来；本 crate 恒不持文件句柄。
 - **一版字节存到哪**归 `storage::cas`：版本身份就是内容库的地址（D3），所以按版本取范围就是按地址读对象（`crates/storage/Spec.lean` §8-36）。
-- **一次保存怎样落盘、怎样记账**归 `city::document`（锁、读当前字节、整份换上，city-SPEC §8-40）与写者 `accounting::worker::commanding::saving`（`crates/wire/Spec.lean` §8-72、§8-73）。
+- **一次保存怎样落盘、怎样记账**归 `city::document`（锁、读当前字节、整份换上，`crates/city/Spec.lean` §8-40）与写者 `accounting::worker::commanding::saving`（`crates/wire/Spec.lean` §8-72、§8-73）。
 - **一张卡开着、决定过还是收回过**归读账本的折叠（accounting-SPEC §8-22）：本 crate 给出每一步的判定，不持有任何一张卡。
 - **线上的拼写**归 `wire`：它直接携带本 crate 的 `Span`、`Format`、`Encoding`、`Window`，以及预览的 `Preview` 与它的块（D1、D21）。
 - **把块画成元素**归页面（client-SPEC 4-26）：本 crate 给出数据，不给 HTML，也不决定一个 `Unsupported` 怎样显示原文。
@@ -260,6 +260,6 @@ comrak（BSD-2-Clause）关掉默认 feature 取用：默认的是它的命令�
 - `crates/wire/Spec.lean` §8-74、§12.11（`Query::Preview`）；accounting-SPEC §8-23、§12 第 35 条（谁从内容库读、谁作答）；client-SPEC 4-26、12-14（页面怎样画这棵树，为什么在城里读）。
 - accounting-SPEC §8-30、§12 第 42 条（`proposal` 工具：在哪一版上提、怎样找出原文、怎样写行，D35、D36）。
 - `crates/wire/Spec.lean` §8-75、§12.12（`Query::Reply`）；accounting-SPEC §8-29、§12 第 41 条（回复在视图锁外读）；client-SPEC 4-26、12-15（页面什么时候问、删 `prose.ts`）；`crates/wire/Spec.lean` §8-8（增量为什么不带块）。
-- `crates/wire/Spec.lean` §8-69、§8-70（文档读取契约）、§8-72、§8-73（保存与提案）、§12.8、§12.10；`crates/kernel/Spec.lean` §8-83（`document_written` 与提案的三种事件，`SliceVerdict`）；accounting-SPEC §8-21（谁读盘、谁存版本、谁作答）、§12 第 33 条；`crates/storage/Spec.lean` §8-36（版本进内容库）；city-SPEC §8-27、§8-40（`city::document`：锁、读当前字节、整份换上）；accounting-SPEC §8-22（保存与提案的写者、提案的折叠）。这些节改了，重读本文件对应的决定。
+- `crates/wire/Spec.lean` §8-69、§8-70（文档读取契约）、§8-72、§8-73（保存与提案）、§12.8、§12.10；`crates/kernel/Spec.lean` §8-83（`document_written` 与提案的三种事件，`SliceVerdict`）；accounting-SPEC §8-21（谁读盘、谁存版本、谁作答）、§12 第 33 条；`crates/storage/Spec.lean` §8-36（版本进内容库）；`crates/city/Spec.lean` §8-27、§8-40（`city::document`：锁、读当前字节、整份换上）；accounting-SPEC §8-22（保存与提案的写者、提案的折叠）。这些节改了，重读本文件对应的决定。
 - refrain 路线图 §4-8、§4-9、§4-10、附录 B–G 是本 crate 的需求来源；RefRain 的 `source_layout`、`native_document`、`manuscript::review` 与 `manuscript::decision` 四个模块是迁入的出处（§4）。
 -/

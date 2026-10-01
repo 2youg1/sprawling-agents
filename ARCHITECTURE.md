@@ -531,7 +531,7 @@ the part worth knowing before starting, not after.
 | how a provider is spoken to | `gateway::dialect` + `crates/gateway/Spec.lean` | a pure two-way translation with the canonical shape in the middle |
 | how a key is kept and redeemed | `gateway::credential` | plaintext may reach only the platform vault; `secret` gate reads every boundary |
 | where a city keeps a file | `kernel::layout` | the reserved subtree is out of every write domain, by one predicate in `kernel::address` |
-| what a building may do | `city::policy` (`RULES.toml`) + city-SPEC | a run's write domain is what its building declares |
+| what a building may do | `city::policy` (`RULES.toml`) + `crates/city/Spec.lean` | a run's write domain is what its building declares |
 | a crate depending on another | the `depmap` block in §3 | actual edges must be a subset; a hidden edge is a red build |
 | a new seam | §4, and the trait's file | `depmap` refuses a `pub trait` outside the files §4 names |
 | a new module, or a deleted one | `architecture.toml` | `modmap` refuses a file with no entry, and an entry whose file is gone |

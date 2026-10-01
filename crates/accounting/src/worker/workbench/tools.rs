@@ -68,7 +68,7 @@ impl Laying {
         // it was set here the mode's own catalog entry reached no model.
         held(&catalog, "lay out the catalog")?.set_mode(at.policy.mode);
         // The building's domain is the ceiling and the dispatch's write
-        // limit narrows it; both are asked at every write (city-SPEC 8-32).
+        // limit narrows it; both are asked at every write (`crates/city/Spec.lean` §8-32).
         let edit = EditTool::new(
             &site.write_root,
             addr.clone(),
@@ -114,7 +114,7 @@ impl Laying {
         // The refusal face of the building's own governance. It reaches
         // for the reserved subtree, which no write domain does, and
         // `Effect::Govern` is refused at the effect layer: a run does
-        // not change what governs it (city-SPEC section 8-2b).
+        // not change what governs it (`crates/city/Spec.lean` §8-2b).
         let rules_tool = city::RulesTool::new(&self.city_root, site.building.addr().clone())?;
         // The one door onto the rest of the city. It is registered
         // beside `signal` rather than behind it because the two answer
@@ -200,7 +200,7 @@ impl Laying {
         // door onto the shape of the city instead. Holding that in the
         // tool table rather than in the wording of `MAYOR.md` is the
         // whole point - an invariant a prompt is asked to keep is not
-        // an invariant (city-SPEC.md section 8-22).
+        // an invariant (`crates/city/Spec.lean` §8-22).
         //
         // These join at the end of the table for the same reason a new
         // tool does: the order above is hashed with the resident
@@ -285,12 +285,12 @@ impl Laying {
     }
 
     /// What this run's building may read by a path its model chose: the read bound, closed over
-    /// the building and this city's rules (city-SPEC 8-2).
+    /// the building and this city's rules (`crates/city/Spec.lean` §8-2).
     ///
     /// Another building's rules are read each time a path lands in it, not here, so a run that
     /// stays in its own building never pays for them, and a building made confidential after this
-    /// dispatch is closed from that moment (city-SPEC 12.2). What was read stays for this run
-    /// while the file's stamp holds (city-SPEC 12.3).
+    /// dispatch is closed from that moment (city D2). What was read stays for this run
+    /// while the file's stamp holds (city D3).
     fn read_bound(&self, site: &Site) -> runtime::ReadBound {
         let rules = city::RulesCache::new(&self.city_root);
         let home = site.building.addr().clone();

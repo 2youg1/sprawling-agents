@@ -143,7 +143,7 @@ fn steps(shipped: &[Shipped]) -> Vec<Step> {
 /// Installs every package into the city library, and answers the
 /// `SKILL.md` hash each install reported for what the scan reads back.
 /// The whole package's hash is the store's key and answers another
-/// question (city-SPEC.md 8-28).
+/// question (`crates/city/Spec.lean` §8-28).
 fn install(city_root: &Path, shipped: &[Shipped]) -> Vec<(String, B3Hash)> {
     let mut cas = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).unwrap();
     let mut register = |bytes: &[u8]| cas.put(bytes).map_err(storage::StorageError::into_ax);

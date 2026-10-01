@@ -52,7 +52,7 @@ fn adopting_a_folder_checkpoints_it_as_one_pack_before_any_dispatch() {
 /// the project's files, and the project's git would list the ledger and
 /// the object store as untracked work. Genesis adds one anchored line
 /// for the city's reserved subtree to the root's `.gitignore`, keeping
-/// every line the project already had (city-SPEC.md 8-21).
+/// every line the project already had (`crates/city/Spec.lean` §8-21).
 #[test]
 fn forming_a_city_keeps_its_own_subtree_out_of_the_workspaces_git() {
     let dir = tempfile::tempdir().unwrap();
@@ -79,7 +79,7 @@ fn forming_a_city_keeps_its_own_subtree_out_of_the_workspaces_git() {
 }
 
 /// No working document and no conversation record the city writes in a
-/// project folder is visible to that project's git (city-SPEC.md 12.5).
+/// project folder is visible to that project's git (city D5).
 /// A dispatch sent straight to a room address nobody opened writes its
 /// task and its transcript in a room the city made; one sent to a
 /// directory the project already had writes them among the project's

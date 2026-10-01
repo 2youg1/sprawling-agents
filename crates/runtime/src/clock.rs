@@ -170,7 +170,7 @@ pub struct ZoneEntry {
 
 /// The stamp a result envelope carries: the reading itself, and the
 /// rows of the zones the run was frozen with (none, in a real city:
-/// the city refuses `[clock] zones`, city-SPEC 12.7).
+/// the city refuses `[clock] zones`, `crates/city/Spec.lean` §8-31).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClockStamp {
     pub utc_ms: TimeMs,

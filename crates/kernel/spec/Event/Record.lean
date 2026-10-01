@@ -346,7 +346,7 @@ pub struct GovernedDocumentWritten {
 pub struct RunStarted {
     // …既有字段…
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub naming: Option<B3Hash>,     // 这次 run 的 session 冻下的身份版本（city-SPEC §8-33）
+    pub naming: Option<B3Hash>,     // 这次 run 的 session 冻下的身份版本（`crates/city/Spec.lean` §8-33）
 }
 ```
 

@@ -39,7 +39,7 @@ impl Address {
 - 解析拒绝的 AxError：`action="parse address"`、`subject=原串`、recovery 指出违规成分与合法形态。
 - 判例表只有一份：`tools/fixtures/address.jsonl`，每行一个拼写与它的判决（`accepted`／`refused`，拒绝行附所违规则）。`Address::parse` 的测试、`schema` 给客户端的 `ADDRESS_PATTERN`、客户端 `address.test.ts` 对生成出的 schema，三个读者读同一个文件；表放在两种语言之外，是因为放在任何一边都会让另一边抄一份，而抄本的条数会各自漂移。
 
-**读界**（city-SPEC §8-2 confidential 的第四条；形状 1 判定）：
+**读界**（`crates/city/Spec.lean` §8-2 confidential 的第四条；形状 1 判定）：
 
 ```rust
 pub enum ReadVerdict { Open, Confidential, RulesUnreadable(AxError) }   // 穷尽；不是 bool

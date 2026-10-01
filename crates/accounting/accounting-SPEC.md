@@ -48,8 +48,8 @@
 | 测试 | 它钉住的事 |
 |---|---|
 | `every_tool_a_builder_is_offered_is_called_and_answered` | 一栋 `Builds` 楼里的 run，第一次请求收到的每一件工具都被脚本调用一次；每条 `tool_called` 恰有一条同 id 的 `tool_result`；每件工具的回答与它自己的 SPEC 一致，逐件的判定在 `episodes.rs`。该调用哪些工具不写名单，取模型收到的工具表：工作台多登记一件工具而脚本里没有它的一段，这条测试点名那件工具变红。 |
-| `every_tool_city_hall_is_offered_is_called_and_answered` | 同一条验收标准，对 `Plans` 楼（市政厅）。多出的 `city` 和 `rules` 一样在效果层被拒（city-SPEC §8-2b、§8-23）；判定看的是调用之后城根下的目录与楼的 `RULES.toml` 一字未变，不钉拒绝码。 |
-| `every_shipped_skill_a_building_admits_is_read_by_name_and_pinned` | 仓库 `skills/` 下每个技能包经 `city::install_skill` 装进城库、由楼的阅览室按名准入之后：`run_started.skills` 按目录顺序列出每一件，哈希等于装入时 `Installed::holding` 报告的 `SKILL.md` 哈希（整包哈希是 CAS 的键，答的是另一个问题，city-SPEC §8-28）；`read <名>` 交给模型的就是那份 `SKILL.md`；包内附属文件按 `<名>/<相对路径>` 读得到。技能集合取 `skills/` 目录本身，不另写名单。 |
+| `every_tool_city_hall_is_offered_is_called_and_answered` | 同一条验收标准，对 `Plans` 楼（市政厅）。多出的 `city` 和 `rules` 一样在效果层被拒（`crates/city/Spec.lean` §8-2b、§8-23）；判定看的是调用之后城根下的目录与楼的 `RULES.toml` 一字未变，不钉拒绝码。 |
+| `every_shipped_skill_a_building_admits_is_read_by_name_and_pinned` | 仓库 `skills/` 下每个技能包经 `city::install_skill` 装进城库、由楼的阅览室按名准入之后：`run_started.skills` 按目录顺序列出每一件，哈希等于装入时 `Installed::holding` 报告的 `SKILL.md` 哈希（整包哈希是 CAS 的键，答的是另一个问题，`crates/city/Spec.lean` §8-28）；`read <名>` 交给模型的就是那份 `SKILL.md`；包内附属文件按 `<名>/<相对路径>` 读得到。技能集合取 `skills/` 目录本身，不另写名单。 |
 
 城外工具（浏览器、MCP、桌面）不在这张覆盖表里：它们经端口交进来的路由各有一条测试（`browsers.rs`、`connectors.rs`、`desktop.rs`），在真实浏览器与真实 MCP server 上的行为不由白盒判定。
 
@@ -288,7 +288,7 @@ impl RunWorker { fn settle(&mut self, at: &Assignment, run: RunId, landing: effe
 
 - **批而不是逐条**：一张桌子的行全部落完，才轮到它的变化。signal 一支因此先落完所有 `signal_enqueued` 再投递；`deliver` 与 `knock` 都不写账，所以账本字节与逐条交错时相同。
 - **计划那一支是全有全无的**，所以它自己一个穷尽枚举 `Claims`：效应按次序重放、只有认领核盘上的状态（§8-27），任一条认领对不上，就一字不写，把那个节点报给人，并用 `released` 里的 `roadmap_released` 行关掉本跑已经落账的认领（sprawling-SPEC.md §8-16 的形制）。效应重放到 `on_disk` 上，而不是写回派活时的副本，所以别的 run 在此期间落下的行保留。记账线程在模型认领时已经拒绝了另一个在飞 run 持有的节点（`accounting::worker::booking`，sprawling-SPEC.md 8-42-8）；`Claims::of` 是后盾，接住从旧副本认领了已被别人落地的节点的 run。
-- **归档行不需要先写盘**：账本行要的 `kind`／`day`／`subject` 由 `city::archive_entry` 从入参算出（city-SPEC §8-9）。不在装配层另算 `day_of`，因为那会是「一条归档记录长什么样」的第二个权威。
+- **归档行不需要先写盘**：账本行要的 `kind`／`day`／`subject` 由 `city::archive_entry` 从入参算出（`crates/city/Spec.lean` §8-9）。不在装配层另算 `day_of`，因为那会是「一条归档记录长什么样」的第二个权威。
 - **`raised`（待批项）不进本模块**：它不是桌子交出来的效应，而是驱动期间暂存的项，本身就先落账后改状态。
 
 **pr 那两支不走 `Landing`，理由记在这里**：
@@ -378,7 +378,7 @@ pub fn core_priority() -> Result<CorePriority, AxError>;   // ConfigInvalid：pr
 
 - **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `accounting::home`（8-7）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。
 - **`[ui]` 一节就是 `PreferencesAnswer` 的序列化**（`crates/wire/Spec.lean` §8-39 第七条）：文件能写的键与答案能说的字段是**同一份声明**，因此本模块只做读与写，不陈述「一项偏好是什么」。一条补丁落在记录上的效果同理，归 `PreferencesAnswer::apply` —— `Chord("")` 是解绑还是绑一个空串，只有一个地方回答。
-- **别的节原样留下**：写是一次读-改-写，经 `city::edit_document`（city-SPEC §8-27）持锁并整份替换。「要么整份要么不动」只有一份实现，人层与城层共用它；再写一份就是给 B-49 立第二个权威。
+- **别的节原样留下**：写是一次读-改-写，经 `city::edit_document`（`crates/city/Spec.lean` §8-27）持锁并整份替换。「要么整份要么不动」只有一份实现，人层与城层共用它；再写一份就是给 B-49 立第二个权威。
 - **读不动的文件不覆写**：解析失败报 `E_CONFIG_INVALID`，主题带上文件与是哪一节，恢复语请人手工修或删掉那一节重选。能读回来的才配被改写——写它的人是唯一能修它的人。
 - **不入账**：偏好不属于城的历史，任何 run 都观测不到它。因此这条命令被接受时城无话可播，`adversary` 第四世界据此把「静默」读作接受，而它真正的关门条件是读回来那一组断言（`tools/adversary/src/Sprawling/Person.lean`，叶子 5.6）。
 - **文件缺席不是失败**：那是一个什么都还没定的人，答案是本 build 画的那几档（`PreferencesAnswer::default`）。`lang` 缺席就是缺席，不填 `en`——没人选过之前，只有浏览器自己的语言标签是证据。
@@ -764,7 +764,7 @@ pub fn land(place: Place<'_>, bytes: &[u8]) -> Result<(), AxError>;
 **落盘**（`playback::landing`）。两种落点，一个做法：同一目录写 `<文件名>.partial-<pid>`，`sync_all`，以硬链接落到目标名，删掉暂存文件；任何一步失败都删暂存文件，目标要么整份出现，要么不出现。
 
 - `Place::Chosen(path)` 是人的 `--out`：父目录经 `std::fs::canonicalize` 解开链接之后，路径里任一段是受保护的元数据（`kernel::PROTECTED_METADATA`）则以 `E_OUTSIDE_WRITE_DOMAIN` 拒绝；目标已存在、或目标在某个 git 仓库里且被索引跟踪，以 `E_INVALID_ARGS` 拒绝。被删掉而仍被跟踪的文件名不存在于盘上，落下去却等于改了历史里的那个文件，所以存在与跟踪分开查。
-- `Place::Exports { city_root, file }` 是城里的保留导出位置，`file` 在 `CityLayout::playback_exports()` 之下：从城根到 `file` 的每一段经 `storage::WriteTarget::within` 查，链接与 junction 一律拒绝；缺的目录建出来；目标已存在、被跟踪以 `E_INVALID_ARGS` 拒绝；目标在 git 仓库里而没有被忽略，以 `E_OUTSIDE_WRITE_DOMAIN` 拒绝，因为它会进历史。`/.sprawling/` 在城根的 `.gitignore` 里（city-SPEC.md 8-21），所以正常的城里这一条成立。
+- `Place::Exports { city_root, file }` 是城里的保留导出位置，`file` 在 `CityLayout::playback_exports()` 之下：从城根到 `file` 的每一段经 `storage::WriteTarget::within` 查，链接与 junction 一律拒绝；缺的目录建出来；目标已存在、被跟踪以 `E_INVALID_ARGS` 拒绝；目标在 git 仓库里而没有被忽略，以 `E_OUTSIDE_WRITE_DOMAIN` 拒绝，因为它会进历史。`/.sprawling/` 在城根的 `.gitignore` 里（`crates/city/Spec.lean` §8-21），所以正常的城里这一条成立。
 - git 的两问经 `git2` 读：从目标的父目录向上找仓库，找不到就两问都不适用；工作区与目标都先 canonicalize 再求相对路径。
 
 **失败与资源。** `check` 不返回错误；`embed` 与 `land` 的失败是 `AxError`，subject 是第一条发现或目标路径，不交回部分的页面或文件。被查文件的上限是 `PAGE_MAX_BYTES`：bundle 的上限加 16 MiB 留给页面自身与内嵌的字体、图，与 `BUNDLE_MAX_BYTES` 一样是待测初值（§3）。解析一遍建一张平面元素表，常驻量与页面字节同阶；CSS 的嵌套深度由 `cssparser` 的上限截住。
@@ -1008,7 +1008,7 @@ pub(super) fn proposals_answer(city_root: &Path, doc: Address, open: Vec<documen
 fn give_messages(city_root: &Path, commits: &mut [wire::CommitAnswer]);
 ```
 
-- **一次保存是三步，都在 worker 线程上。** `put_range` 先拒保留子树（`Address::is_reserved`，`E_OUTSIDE_WRITE_DOMAIN`），再经 `city::revise_document`（city-SPEC §8-40）在这份文档的锁里读出此刻的字节、交给 `documents::save` 判定并换上，最后写一行 `document_written`（`crates/kernel/Spec.lean` §8-83），它带着这条命令的 `idem`（`commanding::entrance::stamped`）。被拒的保存什么也不写，账上没有它。
+- **一次保存是三步，都在 worker 线程上。** `put_range` 先拒保留子树（`Address::is_reserved`，`E_OUTSIDE_WRITE_DOMAIN`），再经 `city::revise_document`（`crates/city/Spec.lean` §8-40）在这份文档的锁里读出此刻的字节、交给 `documents::save` 判定并换上，最后写一行 `document_written`（`crates/kernel/Spec.lean` §8-83），它带着这条命令的 `idem`（`commanding::entrance::stamped`）。被拒的保存什么也不写，账上没有它。
 - **决定修改提案也是一次保存。** `decide_proposals` 从 worker 的 `Governance.proposals` 找出点名的每一张卡（不在这份文档上、已经处理过、没有的都拒 `E_INVALID_ARGS`），经同一扇 `revise` 在锁里交给 `documents::decide`；有改动时写一行 `document_written`，然后每张卡一行 `proposal_decided`。卡的状态不在这里改：worker 写下的每一行都经 `RunWorker::absorb` 交给同一个折叠，重开的城读账本得到同一个答案。
 - **提案的折叠住 `Governance`，视图与 worker 各持一份、折法一处**（第 34 条）。`proposal_offered` 与 `proposal_withdrawn` 由 run 经工作台的 `proposal` 工具写下（§8-30）。`proposal_offered` 经 `documents::Offer::of` 读成一张卡，身份由它算出；读不出的一行（区间颠倒、超长）与别的读不出的治理行一样拒绝，让这座城停在打开那一步，而不是少一张人等着决定的卡（sprawling-SPEC 8-74 的同一条理由）。`proposal_decided` 与 `proposal_withdrawn` 把卡从开着挪到处理过；处理过的卡只记身份与怎样处理的，不留原文与提议。
 - **`Query::Proposals` 在锁内拷出这份文档上开着的卡，锁外读盘。** 文件此刻的版本要读一次全部字节（`B3Hash::digest`），所以与 `Document` 一样在快照放开之后做；卡的句子由 `Offer::review` 在那时切。文件缺失或读不了时 `version` 为 `None`，卡照答。
@@ -1065,7 +1065,7 @@ pub(super) fn offered(reader: &runtime::BoundReader, asked: &Offering) -> Result
 20. **宿主的手是一个值 `Hands`，由构造器收下。** 理由：搬过来以后 `new` 叫不出 `sprawling` 里的适配器，生产的那一份只能从外面来；九样东西总是一起到、一起用，是一个值（AGENTS.md）；参数上限是四个。换一只手有两种写法：结构体更新语法，或者构造之后的 `with_*` 门。被否决的做法：`Host` trait——§12-10 已否决，理由不变（脚本为换一只手要实现全部）；`fn` 指针组成的结构体没有这个代价。九个参数——超出 4 的上限，而且每个调用点都要把九样东西排一遍。
 21. **vault 也放进 `Hands`。** 理由：生产的 vault 打开的是这台电脑的凭据服务（`Custodian::probe`），脚本给的是内存里的一份，它与其余几只手一样是构造时从外面交进来的；放进去以后三个构造器都不超过四个参数。被否决的做法：把 `vault` 与 `log` 捆成一个值——两者没有共同的意思，捆起来只是为了凑参数个数。
 22. **驾驶 lane 的线程从 `accounting::worker::pool` 起。** 理由：`pool` 与 `relay`、`drive_run`、`RunWorker` 成环，必须一起搬（§12-11）；lane 的寿命仍然恰好是它驾驶的那个 run。ARCHITECTURE.md 的确定性规则 3 因此把它列为库 crate 起线程的第六处。被否决的做法：经 `Hands` 交一个起线程的 `fn`——它只有一个实现，而且只是把 `std::thread::Builder` 换个名字。
-23. **验收覆盖从模型收到的工具表算出应当调用的集合；城外工具不进这张表；效果层拒绝的工具按「没有东西变」判定；技能经城库装入。** 理由：哪些工具存在，唯一的权威是工作台的那一次登记（sprawling-SPEC.md §8-27），模型第一次请求里的工具表就是它的输出。测试若照抄一份名单，下一次加工具时名单会悄悄漏掉那一件；从工具表算，漏掉的那件会被点名。城外工具的集合随楼的配置与主机而变，放进来就要在测试里配一台浏览器或一台 MCP server，而它们的路由已经各有一条端口测试。`rules` 与 `city` 声明 `Effect::Govern`，拒绝码取决于工具是否给出自己的 `subject`（city-SPEC §8-2b 写了两种拒词）；钉住拒绝码，补上 `subject` 的那次改动就会打红验收，而验收要守的规矩——run 不改写审判它的规则、不立楼——在那次改动前后都成立。技能经 `city::install_skill` 装进城库：那条路把一个包的每个文件落在城内，所以验收连包里附属文件的按名读取一起判；城外书架上的一件由 catalog 携着正文交给 run（`crates/runtime/Spec.lean` §8-29-6），它的验收是另一条测试，判的是同一条阅览室、catalog、`read` 与 `SkillPin` 的链。被否决的做法：手写工具名单再逐件断言（第二个权威）；把城外工具一并覆盖（重复端口测试，并让验收依赖主机）；按拒绝码断言效果层的拒绝（钉死一个 SPEC 已说明会变的细节）。
+23. **验收覆盖从模型收到的工具表算出应当调用的集合；城外工具不进这张表；效果层拒绝的工具按「没有东西变」判定；技能经城库装入。** 理由：哪些工具存在，唯一的权威是工作台的那一次登记（sprawling-SPEC.md §8-27），模型第一次请求里的工具表就是它的输出。测试若照抄一份名单，下一次加工具时名单会悄悄漏掉那一件；从工具表算，漏掉的那件会被点名。城外工具的集合随楼的配置与主机而变，放进来就要在测试里配一台浏览器或一台 MCP server，而它们的路由已经各有一条端口测试。`rules` 与 `city` 声明 `Effect::Govern`，拒绝码取决于工具是否给出自己的 `subject`（`crates/city/Spec.lean` §8-2b 写了两种拒词）；钉住拒绝码，补上 `subject` 的那次改动就会打红验收，而验收要守的规矩——run 不改写审判它的规则、不立楼——在那次改动前后都成立。技能经 `city::install_skill` 装进城库：那条路把一个包的每个文件落在城内，所以验收连包里附属文件的按名读取一起判；城外书架上的一件由 catalog 携着正文交给 run（`crates/runtime/Spec.lean` §8-29-6），它的验收是另一条测试，判的是同一条阅览室、catalog、`read` 与 `SkillPin` 的链。被否决的做法：手写工具名单再逐件断言（第二个权威）；把城外工具一并覆盖（重复端口测试，并让验收依赖主机）；按拒绝码断言效果层的拒绝（钉死一个 SPEC 已说明会变的细节）。
 24. **playback 是账务读面上的一个投影，按整行判定可见，逐字节携带账本行，只读一遍严格校验过的字节，复核靠重算。**
     (a) 一行可见，当且仅当它碰到的每一栋楼对读者都是 `Open`；碰到的楼由信封地址、run 的房间、关闭的那一对的打开行与载荷里以已知楼开头的地址求出，一条规则管所有事件种类。理由：读界要对未来新加的种类也关着，一张按种类列可公开字段的表，每加一个种类就要加一行，漏一行就漏字段；整行判定漏不了。代价是一行只要碰到一栋关闭的楼就整行隐去，连同它本可公开的字段。被否决的做法：按种类逐字段投影（维护面随种类增长，缺行时无声地开或关）；只按信封 `addr` 删行（`approval_resolved` 记在 city run 上、`addr` 为空，handback 的内容来自子 run）。
     (b) `events` 里每条是账本原行的字符串，外加十进制字符串的 `seq` 与 `moment`。理由：原行就是账本的权威字节，读者可以对它重算 `chain_hash`；把记录展开成 JSON 对象会让 seq、`t` 与金额在 JS 的 `Number` 里丢精度，也等于第二种写法。被否决的做法：展开成对象、u64 写成数字。
@@ -1084,7 +1084,7 @@ pub(super) fn offered(reader: &runtime::BoundReader, asked: &Offering) -> Result
     (g) `check` 交回五项而不返回错误，`Unasked` 与 `Unable` 在 Rust 里分开、对外同写 `unchecked`。理由：一项读不下去（城的账坏了、观察记录读不懂）不该挡住另外几项的结论；而「没人要」与「要了做不了」对退出码的意思不同，前者不算失败，后者算。被否决的做法：一个总结论（把「内容正确」「不联网」混成一个标识）；用错误终止整个检查。
     (h) 写新文件的做法从 `bin::main::playback` 搬到 `playback::landing`，人的 `--out` 与居民的导出位置共用；本 crate 因此直接依赖 `git2`，只读索引与忽略规则。理由：两扇门要的是同一个保证（整份落下、不覆盖、失败不留半成品、不进历史），写两份就会在某一份加了检查而另一份没加时分开。`git2` 已是 `storage` 的依赖、同一份 libgit2，按 ARCHITECTURE.md §4 直接用，不为两问开一个端口。被否决的做法：CLI 与工具各写一份；在 `storage` 加一个只为这两问的函数（这两问不属于 checkpoint，也不属于 worktree）。
     (i) `Select.lean` 的场景表只写在 Lean 里，`scenes_agree` 证明模型给出表里的结果，Rust 测试从同一个 `.lean` 文件读表、跑生产的 `export`。理由：表只有一份，模型与实现分别对它负责；Lean 输出一份 JSON 再由 Rust 读，要多一个必须与 `.lean` 保持同步的生成物，测试还要先跑一次 Lean。被否决的做法：Lean 生成 JSON 夹具；Rust 里另写一份场景表。
-27. **一个 session 的身份冻在房间那一层，读回失败就拒，不换成此刻的名字。** 理由：session 的形状（模型、强度）已经记在房间那一层，`/new` 清的也是它，身份跟着同一个边界就不需要另一条「何时重读身份」的规则（city-SPEC §12.11）；读不回冻下的那一版时换成此刻的名字，等于在 session 中途悄悄改名，而这正是冻结要防的。被否决的做法：每次 run 现读身份——改名立刻改掉正在进行的 session 的前缀，provider 的前缀缓存从 city 段起失效，页面上的旧 session 与请求里的名字也对不上。
+27. **一个 session 的身份冻在房间那一层，读回失败就拒，不换成此刻的名字。** 理由：session 的形状（模型、强度）已经记在房间那一层，`/new` 清的也是它，身份跟着同一个边界就不需要另一条「何时重读身份」的规则（city D11）；读不回冻下的那一版时换成此刻的名字，等于在 session 中途悄悄改名，而这正是冻结要防的。被否决的做法：每次 run 现读身份——改名立刻改掉正在进行的 session 的前缀，provider 的前缀缓存从 city 段起失效，页面上的旧 session 与请求里的名字也对不上。
 28. **`whose --trace` 的逻辑是读面上的一个模块 `accounting::trace`，从 `Query::Commit` 的答出发再读账本，不加线上查询；同楼的别人只计数。** 理由：区间的两端已经在 `CommitAnswer` 的 `seq` 与 `previous` 里，调用的读法已经在 `views::turns` 里；今天的读者是读盘的 CLI，下一轮的 playback 与验收工具都在本 crate 里或经本 crate 读。同楼别的 run 的写也可能落进这个提交，但把它们的调用与本 run 的并列，会把「候选」读成「原因」，所以只给条数与地址，要细看的人拿 `view --run` 去读。被否决的做法：①加 `Query::Trace`：线上多一个形状、`WIRE_V` 进一位、`wire.ts` 与 adversary 的门面都要跟着改，换来的只是把这几步搬到服务端，而 CLI 本来就读盘；②按 `Call.effect` 只留写调用：读调用决定了写什么，去掉它们就去掉了归因的一半证据，`effect` 留在每条调用上由读者判断；③区间以 git 的父提交或全城紧邻的上一个提交为界：两者都可能属于别的 run，会把别人的调用算成这个 run 的。重开参数：页面要显示一个提交的调用时（那时要一个线上查询，本模块搬到 `views` 后面作答）；或同一栋楼里几个 run 同写一棵树成为常态、条数不够区分时。
 29. **playback 的时间条件比信封 `t`、逐行判断，`--day` 展开成同一个区间；调用的耗时只在 rounds 判为量出来时给出；提交的证据经 `trace` 与 `storage::hunks` 读，读不到就写明读不到。**
     (a) 时间条件读每一行信封的 `t`，与 `view --since/--until`（sprawling-SPEC.md 8-137）同一个 `UtcSpan`，不按种类去载荷里挑时间字段，也不靠 `t` 有序提前停或二分。理由：`t` 就是这一行记下的那一刻，任何种类都有；它不随 seq 单调，在第一条越过 `until` 的行处停下会漏掉回退的行。被否决的做法：只对四种记时刻的行判时间、其余行跟着它所在的回合走（同一件事两个家，且旧账本里根本分不出回合的边界）；在索引里存时间列再二分（要 `t` 有序）。

@@ -102,7 +102,7 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
 }
 
 /// The fourth thing a confidential building means: what is in it is read
-/// by nobody outside it (city-SPEC 8-2). A run in an ordinary building
+/// by nobody outside it (`crates/city/Spec.lean` §8-2). A run in an ordinary building
 /// asks for a confidential building's file twice - once by path, once by
 /// a search with no path - and the provider it talks to must never see
 /// the file's bytes, because that provider is exactly where they would

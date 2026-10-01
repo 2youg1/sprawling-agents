@@ -39,7 +39,7 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 | 跳过 | 理由 | 权威 |
 |---|---|---|
 | 保留区子树 | 一跑不读治理自己的东西 | `Address::is_reserved`（kernel） |
-| 读界关上的楼 | 机密楼对楼外全关；规则读不出的楼同样关 | `kernel::address::may_read`（city-SPEC §8-2） |
+| 读界关上的楼 | 机密楼对楼外全关；规则读不出的楼同样关 | `kernel::address::may_read`（`crates/city/Spec.lean` §8-2） |
 | `.git` 目录 | 它是对象库不是文本，扫它只产出乱码命中 | 本节 |
 | 非 UTF-8 文件 | 二进制里没有可读的行 | 本节 |
 | `land` 以 `E_GATE_DENIED` 拒绝的链接 | 链接的目标落在城外、保留区或关上的楼 | `chosen_path::land` |

@@ -148,7 +148,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - 验证与 merge 是一次调用的两个结果：一个 `Verified` 而无人 merge 的请求是第三种要人去追的状态，而 merge 就是「验证通过」的含义；拒绝是同一次调用的另一个结果（`passed: false` 携 `why`）。
 - typestate 是走过的：`check` 内部真的造 `Claim`、`verified(true, self.who)`、`Pr::open(..).verified(&artifact)`，实现者不自测被检查两次：工具先拒（`E_GATE_DENIED`），类型再拒。
 - 被判的是一个 commit 而不是一条分支：`OpenRequest.commit` 记下开请求那一刻分支站在哪里，Artifact 的 digest 由它派生，看过一个 commit 的人没有为后一个背书。`pr_merged` 同时携被审的与落地的两个 commit，一个键装两个事实，Ledger 的链就断在 merge 这一步；`merged_payload` 是这一行唯一的成形处。
-- 三条记录的形状留在 collab，因为它们的键里有 `NodeId`。没有树的 run 说得出自己没有：`open` 报 `E_TOOL_UNAVAILABLE` 并指向要审查的楼。谁得到树由楼说了算（`RULES.toml` 的 `review = true`，见 city-SPEC；D4）。
+- 三条记录的形状留在 collab，因为它们的键里有 `NodeId`。没有树的 run 说得出自己没有：`open` 报 `E_TOOL_UNAVAILABLE` 并指向要审查的楼。谁得到树由楼说了算（`RULES.toml` 的 `review = true`，见 `crates/city/Spec.lean` §8-2；D4）。
 
 **`collab::triage`**（形状 1 判定；性质见 `spec/Triage.lean`）。`Reflex::{Discard, Notify, Light, Full}`、`Arrival`、`Rule`、`Landing { addr, reflex, because }`；`Triage::new(rules, fallback)` 在构造点拒空匹配串。
 
@@ -236,5 +236,5 @@ D2 没有草稿退回机制。房间没有版本，发言不带「作者所见�
 
 - ARCHITECTURE.md 的模块表（`architecture.toml` 里 collab 各行，锚点指向本文件与分部）与 §4 缝清单。
 - `docs/glossary.md` 的 Signal、Inbox、Workshop 等词条：词条改名时本文件与分部一起改。
-- `crates/kernel/Spec.lean` 的 goal、repair、delegation 各节（§8-15、§8-16、§8-17）与 §8-4（Signal 的线上形状）；city-SPEC 的 `review` 规则（D4）；sprawling-SPEC §8-42-8（记账线程是 `Booking` 与 `GoalBooking` 的权威）与 §8-73（安全点怎么处理 `take_steer` 的拒绝）。这些节改了，重读本文件 §8 的对应条目。
+- `crates/kernel/Spec.lean` 的 goal、repair、delegation 各节（§8-15、§8-16、§8-17）与 §8-4（Signal 的线上形状）；`crates/city/Spec.lean` §8-2 的 `review` 规则（D4）；sprawling-SPEC §8-42-8（记账线程是 `Booking` 与 `GoalBooking` 的权威）与 §8-73（安全点怎么处理 `take_steer` 的拒绝）。这些节改了，重读本文件 §8 的对应条目。
 -/

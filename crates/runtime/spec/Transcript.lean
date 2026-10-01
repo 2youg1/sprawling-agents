@@ -17,7 +17,7 @@
 
 **它是什么**：一跑冻结时，把**模型实际看到的消息**——工具调用与其结果、sieve 产出的压缩形、指回被搁置部分的 rest 指针——写成 `<room>/<run-id>.jsonl`，一行一条 `ChatMessage`（`kernel::model::wire` 的 serde 形，原样，所以 `search` 找到的行号就是消息序号）。frozen prefix 不在其中：它是每次请求都相同的那一半，账本的 `prompt_assembled` 已经持有它的哈希。
 
-**它不是账本**：账本住 `.sprawling/`，`read` 对那里的每一条路径都拒绝；而且账本是**全城一条链**——把它交给一个 resident 就是把一栋 confidential 楼的事件也交出去。transcript 不加密，谁读得到它由读界答：它住在 run 的房间里，`read` 与 `search` 对它的路径和对房间里任何文件一样先过 `chosen_path::admit`，所以本楼的 resident 读得到，非机密楼的 transcript 他楼也读得到，而机密楼的 transcript 楼外读不到（city-SPEC §8-2）。
+**它不是账本**：账本住 `.sprawling/`，`read` 对那里的每一条路径都拒绝；而且账本是**全城一条链**——把它交给一个 resident 就是把一栋 confidential 楼的事件也交出去。transcript 不加密，谁读得到它由读界答：它住在 run 的房间里，`read` 与 `search` 对它的路径和对房间里任何文件一样先过 `chosen_path::admit`，所以本楼的 resident 读得到，非机密楼的 transcript 他楼也读得到，而机密楼的 transcript 楼外读不到（`crates/city/Spec.lean` §8-2）。
 
 **三步定序，不可颠倒**：①凭据扫描（`redact::redact` 逐消息走一遍，与 `model_returned` 入账本同一把扫描器）；②钉入 CAS（`storage::Cas::put`，内容寻址，同一份 transcript 写两次是一次）；③实体化（写到房间，只读位）。先扫后钉：一个钉进 CAS 的密钥永远删不掉。
 
