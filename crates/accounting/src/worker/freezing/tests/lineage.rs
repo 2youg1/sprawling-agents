@@ -195,3 +195,89 @@ fn inheriting_a_branch_does_not_verify_the_history() {
         "a branch rebuild verified the history, or inherited nothing: {inherited:?}"
     );
 }
+
+/// A provider reuses a cached prompt only for a prefix that matches byte
+/// for byte, so a branch in the same room opens with the bytes its
+/// mother last sent: the four frozen segments, every other key of the
+/// rendered request, and each message the mother exchanged
+/// (sprawling-SPEC.md 8-141).
+#[test]
+fn a_branch_first_request_carries_the_bytes_of_the_mothers_last() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            completion("the meter reads 42", None),
+            completion("in feet it is 138", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let room = Address::parse("lab/room1").unwrap();
+    let talk = |task: &str, idem: &[u8]| wire::Command::Dispatch {
+        addr: room.clone(),
+        task: task.to_owned(),
+        goal: String::new(),
+        policy: kernel::RunPolicy::of(kernel::Mode::Work),
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
+        session: None,
+        effort: None,
+        model: None,
+    };
+    worker.handle(talk("measure the meter", b"mother")).unwrap();
+    let verified =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
+            .unwrap();
+    let mother = verified
+        .lines()
+        .iter()
+        .filter_map(|line| match line {
+            runtime::replay::VerifiedLine::Known { record, .. }
+                if record.kind() == EventKind::RunStarted =>
+            {
+                Some(record.run())
+            }
+            runtime::replay::VerifiedLine::Known { .. }
+            | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
+        })
+        .next()
+        .expect("the mother ran");
+    let last = verified
+        .lines()
+        .iter()
+        .filter_map(|line| match line {
+            runtime::replay::VerifiedLine::Known { record, .. } if record.run() == mother => {
+                Some(record.seq())
+            }
+            runtime::replay::VerifiedLine::Known { .. }
+            | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
+        })
+        .next_back()
+        .expect("the mother wrote lines");
+    worker
+        .handle(wire::Command::OpenSession {
+            addr: room.clone(),
+            carry: wire::Carry::Nothing,
+            from: Some(kernel::Origin {
+                run: mother,
+                at_seq: last,
+            }),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"branch"),
+        })
+        .unwrap();
+    worker.handle(talk("and in feet?", b"daughter")).unwrap();
+
+    let chats: Vec<serde_json::Value> = provider
+        .bodies()
+        .iter()
+        .filter_map(|body| serde_json::from_str::<serde_json::Value>(body).ok())
+        .filter(|body| body.get("messages").is_some())
+        .collect();
+    let [mothers_last, daughters_first] = chats.as_slice() else {
+        panic!("one request each, not {}: {chats:?}", chats.len());
+    };
+    let sent = mothers_last["messages"].as_array().unwrap().len();
+    let mut opening = daughters_first.clone();
+    opening["messages"].as_array_mut().unwrap().truncate(sent);
+    assert_eq!(&opening, mothers_last);
+}
