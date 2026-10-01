@@ -17,6 +17,7 @@ mod edit;
 mod encoding;
 mod format;
 mod layout;
+mod markdown;
 mod proposal;
 mod selection;
 mod span;
@@ -25,6 +26,9 @@ mod window;
 pub use edit::{Applied, Edit, TextEdit, Transaction, save};
 pub use encoding::{Encoding, Reading};
 pub use format::Format;
+pub use markdown::{
+    Align, Block, Check, Construct, Inline, ListItem, Order, Preview, Row, Spacing, preview,
+};
 pub use proposal::{ALIGN_CELLS_MAX, Offer, PROPOSAL_ID_TAG, Review, Slice, SliceKind, decide};
 pub use selection::Selection;
 pub use span::Span;
