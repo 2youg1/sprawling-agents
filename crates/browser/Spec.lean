@@ -49,7 +49,7 @@ usersbrowser 披露给模型的参数表（`crates/sprawling/src/browser_tool/pe
 - **假设**：起进程归 `bin::browser_bidi`；本库恒不拉起浏览器进程、恒不持套接字、恒不下载驱动（D2、D4）。
 - **假设（附着）**：连一个已经开着的浏览器也归装配层，本库只把帧交给缝。装配层的 `AttachedBrowser` 与 `LazyEngine` 是同一缝上的两个实现：前者只连、不启动、不结束进程；后者的 `running` 与 `Drop` 假定进程归自己，两者因此不能合成一个类型。
 - **协议形状**：`input.performActions` 的 `pointer`、`wheel`、`key` 源动作字段与元素 origin 的 `SharedReference` 据 W3C 草案写成；`script.evaluate` 回复里 `sharedId` 的位置、空能力集、`image/png` 拼写已对 Gecko 真会话核过（§4）。`input::shared_id_of` 在回复里按有界深度找 `sharedId`，找不到即 `E_WIRE_MISMATCH`。
-- **未定**：`-headless` 这一位由哪一面提供（楼的 `CONFIG.toml` 还是派活帧的一个字段）；某个具体 Firefox fork 是否接受本 crate 的启动参数与会话形态；行容器的交叉轴怎么扫（D11）；`fetch` 的脚本在 Gecko 上是否读出与 Chromium 相同的文字；画出来的一对颜色是否可读，接进 `xtask::color` 的对比度模型要把它开放给本 crate，另写一条对比度公式就是第二个权威（`survey::legibility`）；usersbrowser 披露的参数表还没有 `press`、`key`、`modifiers`，模型照样调得通，这一处归装配层的 `browser_tool`。
+- **未定**：`-headless` 这一位由哪一面提供（楼的 `CONFIG.toml` 还是派活帧的一个字段）；某个具体 Firefox fork 是否接受本 crate 的启动参数与会话形态；行容器的交叉轴怎么扫（D11）；`fetch` 的脚本在 Gecko 上是否读出与 Chromium 相同的文字；画出来的一对颜色是否可读，接进 `xtask::color` 的对比度模型要把它开放给本 crate，另写一条对比度公式就是第二个权威（`survey::legibility`）。
 - **已定**：BiDi 的 `session.new` 本版本只请求空能力加按需 `network` 事件；更多能力等到有消费者再加，每一项能力都是远端因此获得的一项许可。
 -/
 

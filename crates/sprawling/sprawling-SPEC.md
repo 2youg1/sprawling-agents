@@ -2315,6 +2315,10 @@ impl Engine {
 
 `effect` 是 `Effect::Egress`：浏览器打开的每个 URL 都离开运行中的机器，所以它过出网门，confidential 楼因此天然拿不到它。
 
+**`act` 的结果说出它落在哪里**（`browser_tool::answering`）：`acted` 一格是快照给的 ref；指针动作没有 ref 时是 `viewport`；按键（`Action::Press`）是 `focus`，因为一次按键落在页面此刻的焦点上，不带 ref，也不碰视口（`crates/browser/Spec.lean` 的 D12）。三个词按 `Action` 的臂穷尽给出，不从「有没有 ref」反推——那样按键会被记成 `viewport`，读账本的人看到的是一次没发生过的指针动作。
+
+**`usersbrowser` 披露的参数表与 `Verb::read` 读的参数一一对应**（`browser_tool::person`）：`kind` 的枚举含 `press`，`key` 与 `modifiers` 各有一格；键名与修饰键名的清单不抄进描述，描述只说它们取 DOM `KeyboardEvent.key` 的名字，未知的名字由 `Key::parse`、`Modifier::parse` 拒，拒词列出能用的名字——清单的家仍是 `browser::keyboard` 一处。同一个参数名只写一格：`ref` 与 `refs` 的说明把 `act`、`measure` 与 `screenshot` 写在同一句里，因为 JSON 对象里后写的同名键会静默盖掉先写的，模型只会读到后一种用法。
+
 **worker 经它被交到的 `fn` 指针拿这些工具**：
 
 ```rust
