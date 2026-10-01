@@ -64,6 +64,17 @@
 //! three times, so the client's function lengths stay unmeasured and
 //! said so, rather than measured wrongly.
 //!
+//! **Zig is measured on both sides, and only on those two.** The Zig
+//! leaf's files are held to the same function and file budgets as
+//! Rust, which is the fifth condition ARCHITECTURE.md section 2 sets
+//! for admitting a leaf. Zig needs no parser for that: its lexical
+//! grammar has no block comment and no string that crosses a line, so
+//! `zig` reads the brace structure exactly once four kinds of token are
+//! skipped, which is what the client's TypeScript does not allow. The
+//! parameter rule stays Rust's, because a Zig file here is a C ABI leaf
+//! whose parameters are `(ptr, len)` pairs and Win32's own signatures
+//! (xtask-SPEC.md section 12-15).
+//!
 //! A generated file is not measured on either side. `client/src/wire.ts`
 //! is 2,445 lines that `cargo xtask wire-ts` writes from the Rust wire;
 //! splitting it would be splitting the generator's output, and the
@@ -80,8 +91,9 @@ use crate::walk;
 
 mod measurement;
 mod register;
+mod zig;
 
-use measurement::{Found, measure, production_lines};
+use measurement::{Body, Found, measure, production_lines};
 use register::{ARG_ROW, FILE_ROW, PREDATING, ROW, excused, key, limit, predating};
 
 /// Where the client's own sources live. Only the file rule reaches
@@ -140,10 +152,10 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         let lines = production_lines(&text, &parsed.items);
         judge_file(&files, &rel, lines, &mut violations);
         for found in measure(&parsed.items) {
-            if found.lines > body_limit {
-                violations.push(over(&rel, &found, body_limit));
+            if found.body.lines > body_limit {
+                violations.push(over(&rel, &found.body, body_limit));
             }
-            let named = key(&rel, &found.name);
+            let named = key(&rel, &found.body.name);
             if excused.contains(&named) {
                 let widest = still_here.entry(named).or_insert(found.args);
                 *widest = (*widest).max(found.args);
@@ -151,6 +163,21 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                 violations.push(too_many_arguments(&rel, &found, arg_limit));
             }
         }
+    }
+    for file in zig_sources(root)? {
+        let rel = walk::rel(root, &file);
+        if shapes.get(&rel).is_some_and(|shape| shape == "data") {
+            continue;
+        }
+        let text = walk::read_text(&file)?;
+        seen.insert(rel.clone());
+        judge_file(&files, &rel, zig::production_lines(&text), &mut violations);
+        violations.extend(
+            zig::measure(&text)
+                .iter()
+                .filter(|body| body.lines > body_limit)
+                .map(|body| over(&rel, body, body_limit)),
+        );
     }
     for file in client_sources(root)? {
         let rel = walk::rel(root, &file);
@@ -292,12 +319,12 @@ fn no_longer_an_exception(rel: &str, lines: usize, limit: usize) -> Violation {
 fn too_many_arguments(rel: &str, found: &Found, limit: usize) -> Violation {
     Violation {
         gate: "length",
-        location: format!("{rel}:{}", found.line),
+        location: format!("{rel}:{}", found.body.line),
         rule: format!(
             "a function takes at most {limit} parameters \
              ({REGISTER}, {ARG_ROW})"
         ),
-        violation: format!("{} takes {}", found.name, found.args),
+        violation: format!("{} takes {}", found.body.name, found.args),
         alternative: "the ones that always travel together are one value: give them a struct \
                       with a name, as `Reporter` did for the four that describe who is \
                       reporting a change to a plan"
@@ -305,15 +332,15 @@ fn too_many_arguments(rel: &str, found: &Found, limit: usize) -> Violation {
     }
 }
 
-fn over(rel: &str, found: &Found, limit: usize) -> Violation {
+fn over(rel: &str, body: &Body, limit: usize) -> Violation {
     Violation {
         gate: "length",
-        location: format!("{rel}:{}", found.line),
+        location: format!("{rel}:{}", body.line),
         rule: format!(
             "a production function stays inside {limit} lines \
              ({REGISTER}, function_length)"
         ),
-        violation: format!("{} is {} lines", found.name, found.lines),
+        violation: format!("{} is {} lines", body.name, body.lines),
         alternative: "give a phase of it its own name, and hand the values it produces back \
                       as one value"
             .to_owned(),
@@ -333,6 +360,19 @@ fn sources(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
         }
     }
     Ok(out)
+}
+
+/// Where first-party Zig lives: anywhere in a package's directory, since
+/// a Zig leaf keeps its sources beside its manifest rather than under
+/// `src/`. A package nested in another's directory is walked twice, and
+/// its files are measured once.
+fn zig_sources(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
+    let members = crate::members::members(root)?;
+    walk::files_under(
+        root,
+        members.iter().map(|member| member.dir.as_str()),
+        &["zig"],
+    )
 }
 
 #[cfg(test)]

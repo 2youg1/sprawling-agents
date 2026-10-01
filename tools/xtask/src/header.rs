@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! MPL-2.0 header gate: every `.rs` in the repo opens with the exact
-//! Exhibit A notice, then the copyright line.
+//! MPL-2.0 header gate: every `.rs` and every `.zig` in the repo opens
+//! with the exact Exhibit A notice, then the copyright line, behind the
+//! `//` both languages comment a line with.
 //!
 //! Markdown is out of this gate's scope by ruling: a skill document
 //! carries its own licence in its frontmatter and in `skills/LICENSES.md`,
@@ -67,26 +68,35 @@ pub(crate) const NOTICE: [&str; 4] = [
 #[derive(Clone, Copy)]
 pub(crate) enum Leader {
     Rust,
+    Zig,
     Lean,
 }
+
+/// The languages this gate judges, each known by its file extension.
+/// A Zig leaf is admitted only when this gate reads its files
+/// (ARCHITECTURE.md section 2, condition 5).
+const JUDGED: [(Leader, &str); 2] = [(Leader::Rust, "rs"), (Leader::Zig, "zig")];
 
 /// The four rows as a file in that language spells them.
 pub(crate) fn notice(leader: Leader) -> [String; 4] {
     let mark = match leader {
-        Leader::Rust => "//",
+        Leader::Rust | Leader::Zig => "//",
         Leader::Lean => "--",
     };
     NOTICE.map(|row| format!("{mark} {row}"))
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let expected = notice(Leader::Rust);
     let mut violations = Vec::new();
-    for file in walk::files_with_ext(root, &["rs"])? {
+    for file in walk::files_with_ext(root, &JUDGED.map(|(_, extension)| extension))? {
         let rel = walk::rel(root, &file);
+        let Some(leader) = leader_of(&file) else {
+            continue;
+        };
         if walk::in_isolation_zone(&rel) {
             continue;
         }
+        let expected = notice(leader);
         let text = walk::read_text(&file)?;
         let rows: Vec<&str> = text.lines().map(|l| l.trim_end_matches('\r')).collect();
         let opens = expected
@@ -97,7 +107,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             violations.push(Violation {
                 gate: "header",
                 location: rel.clone(),
-                rule: "every .rs file carries the MPL-2.0 notice and the copyright line".to_owned(),
+                rule: "every .rs and .zig file carries the MPL-2.0 notice and the copyright line"
+                    .to_owned(),
                 violation: "the first four lines differ from the header".to_owned(),
                 alternative: "prepend the exact 4-line header; see any existing module".to_owned(),
             });
@@ -119,6 +130,15 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
+/// The language a judged file is written in, by its extension.
+fn leader_of(file: &Path) -> Option<Leader> {
+    let extension = file.extension()?.to_str()?;
+    JUDGED
+        .iter()
+        .find(|(_, judged)| *judged == extension)
+        .map(|(leader, _)| *leader)
+}
+
 /// The one-based line where the notice begins a second time, if it
 /// does. The first row is enough to find it: the opening comparison has
 /// already established that this file starts with the whole notice.
@@ -134,7 +154,7 @@ fn repeated(rows: &[&str], expected: &[String; 4]) -> Option<usize> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 mod tests {
-    use super::{Leader, NOTICE, check, notice, repeated};
+    use super::{Leader, check, notice, repeated};
 
     #[test]
     fn this_file_carries_the_header() {
@@ -168,7 +188,10 @@ mod tests {
     #[test]
     fn a_zig_file_without_the_header_is_named() {
         let root = std::env::temp_dir().join(format!("xtask-header-zig-{}", std::process::id()));
-        let head: String = NOTICE.iter().map(|row| format!("// {row}\n")).collect();
+        let head: String = notice(Leader::Zig)
+            .iter()
+            .map(|row| format!("{row}\n"))
+            .collect();
         crate::root::fixture::write(&root, "kept.rs", &format!("{head}\nfn kept() {{}}\n"));
         crate::root::fixture::write(&root, "leaf/headed.zig", &format!("{head}\nconst a = 0;\n"));
         crate::root::fixture::write(&root, "leaf/bare.zig", "const std = @import(\"std\");\n");

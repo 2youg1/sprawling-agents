@@ -7,6 +7,7 @@
 //! relative paths. Determinism makes gate reports diffable across runs and
 //! platforms (xtask-SPEC.md section 10-1).
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
@@ -57,6 +58,24 @@ pub(crate) fn files_with_ext(root: &Path, keep: &[&str]) -> Result<Vec<PathBuf>,
                 .is_some_and(|e| keep.contains(&e))
         })
         .collect())
+}
+
+/// Like [`files_with_ext`], over several directories of `root` at once:
+/// each file once however many of the directories hold it, which they
+/// do when one package sits inside another's directory, sorted by its
+/// relative path as [`files`] sorts.
+pub(crate) fn files_under<'d>(
+    root: &Path,
+    dirs: impl IntoIterator<Item = &'d str>,
+    keep: &[&str],
+) -> Result<Vec<PathBuf>, XtaskError> {
+    let mut found = BTreeMap::new();
+    for dir in dirs {
+        for file in files_with_ext(&root.join(dir), keep)? {
+            found.entry(rel(root, &file)).or_insert(file);
+        }
+    }
+    Ok(found.into_values().collect())
 }
 
 /// Repo-relative path with forward slashes; used for all matching and reports

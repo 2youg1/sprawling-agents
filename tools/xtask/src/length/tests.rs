@@ -20,7 +20,7 @@ fn a_receiver_is_not_an_argument_and_everything_else_is() {
     let parsed = syn::parse_file(source).unwrap();
     let counted: Vec<(String, usize)> = measure(&parsed.items)
         .into_iter()
-        .map(|found| (found.name, found.args))
+        .map(|found| (found.body.name, found.args))
         .collect();
     assert_eq!(
         counted,
@@ -54,7 +54,7 @@ fn every_excused_signature_is_a_real_one_that_is_still_over() {
         let parsed = syn::parse_file(&text).unwrap();
         for item in measure(&parsed.items) {
             if item.args > budget {
-                still_over.insert(key(&rel, &item.name));
+                still_over.insert(key(&rel, &item.body.name));
             }
         }
     }
@@ -105,7 +105,9 @@ fn an_address_holding_two_functions_is_judged_by_the_wider_one() {
     let parsed = syn::parse_file(source).unwrap();
     let mut widest: BTreeMap<String, usize> = BTreeMap::new();
     for found in measure(&parsed.items) {
-        let held = widest.entry(key("x.rs", &found.name)).or_insert(found.args);
+        let held = widest
+            .entry(key("x.rs", &found.body.name))
+            .or_insert(found.args);
         *held = (*held).max(found.args);
     }
     assert_eq!(widest.get("x.rs::new"), Some(&5));
@@ -168,7 +170,7 @@ fn lengths(source: &str) -> Vec<(String, usize)> {
     let parsed = syn::parse_file(source).unwrap();
     measure(&parsed.items)
         .into_iter()
-        .map(|found| (found.name, found.lines))
+        .map(|found| (found.body.name, found.body.lines))
         .collect()
 }
 

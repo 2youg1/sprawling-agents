@@ -5,7 +5,8 @@
 
 //! Module-map gate (redline C4). `architecture.toml` is a closed list:
 //! every `.rs` under the `src/` of every package but the gates' own is
-//! either a registered module, a `lib.rs`, or a pure index file. Status coherence
+//! either a registered module, a `lib.rs`, or a pure index file, and
+//! every `.zig` anywhere in such a package is a registered module. Status coherence
 //! is checked both ways — a file that exists while its entry still says
 //! planned means the builder skipped the "flip the status" leg of the
 //! completion evidence.
@@ -29,6 +30,10 @@ use crate::members::{self, Member};
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
+mod index;
+
+use index::{check_index_content, is_index_name};
+
 /// The module map. This gate is its only reader, so a field change breaks
 /// one place (xtask-SPEC.md section 8-10); `specalign` names the file when
 /// reporting an anchor it could not resolve.
@@ -40,18 +45,10 @@ pub(crate) const MAP: &str = "architecture.toml";
 const STATUS_PLANNED: &str = "planned";
 const STATUSES: [&str; 4] = [STATUS_PLANNED, "building", "built", "frozen"];
 
-/// Line prefixes allowed in `lib.rs` and pure index files: single-line
-/// declarations only, which is what makes exempting them free.
-const INDEX_PREFIXES: [&str; 8] = [
-    "//",
-    "#![",
-    "#[",
-    "pub mod ",
-    "mod ",
-    "pub use ",
-    "pub(crate) use ",
-    "use ",
-];
+/// The languages whose files are modules, by extension. A Zig leaf is
+/// admitted only when this gate reads its files (ARCHITECTURE.md
+/// section 2, condition 5).
+const SOURCES: [&str; 2] = ["rs", "zig"];
 
 /// One module's entry, exactly as the map spells it.
 ///
@@ -222,14 +219,15 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         .collect();
 
     let mut on_disk: BTreeSet<String> = BTreeSet::new();
-    let files = scope
-        .iter()
-        .map(|member| walk::files_with_ext(&root.join(&member.dir), &["rs"]))
-        .collect::<Result<Vec<_>, _>>()?;
-    for file in files.into_iter().flatten() {
+    let files = walk::files_under(
+        root,
+        scope.iter().map(|member| member.dir.as_str()),
+        &SOURCES,
+    )?;
+    for file in files {
         let rel = walk::rel(root, &file);
-        if !rel.contains("/src/") {
-            continue; // build.rs and friends are not modules
+        if !is_module(&rel) {
+            continue;
         }
         on_disk.insert(rel.clone());
         if let Some(row) = table.get(rel.as_str()) {
@@ -310,7 +308,7 @@ fn rows(map: &Map, scope: &[Member], violations: &mut Vec<Violation>) -> Vec<Row
     for entry in &map.module {
         let (name, file) = (entry.name.as_str(), entry.file.as_str());
         let judged = scope.iter().any(|member| member.holds(file));
-        if !name.contains("::") || !judged || !file.ends_with(".rs") {
+        if !name.contains("::") || !judged || !is_source(file) {
             continue;
         }
         if !STATUSES.contains(&entry.status.as_str()) {
@@ -355,38 +353,20 @@ fn rows(map: &Map, scope: &[Member], violations: &mut Vec<Violation>) -> Vec<Row
     rows
 }
 
-fn is_index_name(rel: &str, index_dirs: &BTreeSet<String>) -> bool {
-    if rel.ends_with("/lib.rs") {
-        return true;
-    }
-    rel.strip_suffix(".rs")
-        .is_some_and(|stem| index_dirs.contains(stem))
+/// Whether a file is written in one of the languages this map registers.
+fn is_source(file: &str) -> bool {
+    Path::new(file)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| SOURCES.contains(&extension))
 }
 
-fn check_index_content(
-    root: &Path,
-    rel: &str,
-    violations: &mut Vec<Violation>,
-) -> Result<(), XtaskError> {
-    let text = walk::read_text(&root.join(rel))?;
-    for (index, raw) in text.lines().enumerate() {
-        let line = raw.trim();
-        let allowed =
-            line.is_empty() || INDEX_PREFIXES.iter().any(|prefix| line.starts_with(prefix));
-        if !allowed {
-            violations.push(Violation {
-                gate: "modmap",
-                location: format!("{rel}:{}", index.saturating_add(1)),
-                rule: "index files hold declarations only — comments, attributes, \
-                       mod, use"
-                    .to_owned(),
-                violation: format!("logic line in an index file: {line:?}"),
-                alternative: "move the logic into a registered module".to_owned(),
-            });
-            return Ok(());
-        }
-    }
-    Ok(())
+/// Whether a source file found in a package is a module. A Zig file is,
+/// wherever it sits, because a Zig leaf keeps its sources beside its
+/// manifest; a Rust file is when it is under `src/`, because `build.rs`
+/// and its friends are not modules.
+fn is_module(rel: &str) -> bool {
+    rel.ends_with(".zig") || rel.contains("/src/")
 }
 
 #[cfg(test)]

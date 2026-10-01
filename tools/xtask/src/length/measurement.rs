@@ -8,11 +8,17 @@
 
 use syn::spanned::Spanned;
 
-/// One function, as the gate sees it.
-pub(crate) struct Found {
+/// One function body, as the gate sees it in any language it measures:
+/// its name, the line of its `fn`, and how many lines it spans.
+pub(crate) struct Body {
     pub(crate) name: String,
     pub(crate) line: usize,
     pub(crate) lines: usize,
+}
+
+/// One Rust function: its body, and the parameters its signature takes.
+pub(crate) struct Found {
+    pub(crate) body: Body,
     /// Parameters, not counting a receiver. `self` is what the method is
     /// for, never an argument somebody had to decide to pass.
     pub(crate) args: usize,
@@ -82,9 +88,11 @@ fn found(signature: &syn::Signature, body: proc_macro2::Span) -> Found {
     let start = signature.fn_token.span().start().line;
     let end = body.end().line;
     Found {
-        name: signature.ident.to_string(),
-        line: start,
-        lines: end.saturating_sub(start).saturating_add(1),
+        body: Body {
+            name: signature.ident.to_string(),
+            line: start,
+            lines: end.saturating_sub(start).saturating_add(1),
+        },
         // A receiver is not a parameter. `&self` is what makes the
         // function a method, not a value somebody chose to thread
         // through it, and counting it would charge every method one
