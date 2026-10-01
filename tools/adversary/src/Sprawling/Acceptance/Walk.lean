@@ -215,7 +215,7 @@ def verified (setting : Setting) (when : String) : Step :=
       | .error why => ensure false s!"the history did not verify: {why}" }
 
 def firstDay (setting : Setting) : List Step :=
-  [ answers setting, attached setting, raised setting, worked setting
+  [ answers setting, attached setting, raised setting, admitted setting, worked setting
   , pinned setting, catalogued setting, agreed setting, verified setting "after the first day" ]
 
 /-! ## The crash -/

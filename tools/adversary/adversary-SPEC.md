@@ -41,6 +41,8 @@
    **已演示。** 摘掉该守卫后该性质报错，收缩 3 次得到两步反例 `Stop City ; Work acme one`，并指出 `refused with Code "E_GATE_DENIED" where Code "E_MODEL_UNCHOSEN" was owed`；恢复后转绿。它咬得动的是**守序**，而不只是「停摆时派活会失败」。这一条同时是对 §13 那套自备机器的验收：生成器、收缩器、极性推导与后置条件四件必须同时工作，才会得到这个最小反例。
 6. `just acceptance <archive>` 把归档解进 `target/acceptance/`，按归档的 `skills/` 写出替身的脚本，起替身，然后用归档里的二进制走完 U9 的每一步（§9），每一步打印 `ok` 与耗时，第一处失败以步名开头报出并以退码 1 结束；全部通过才写清单。它不是门，也不进 `just check`：归档要先由 `just package` 造出来，而那是一次发布构建。
 
+   **咬得动，已演示。** 去掉第一天里人准入 skill 的那一步，前四步照常通过，走到 `every shipped skill is pinned, and read by name it reaches the model` 停下，报出 run 钉住的 skill 是空表而书架上有九件；补回那一步转绿。
+
 ## 3 假设与歧义
 
 | 歧义 | 假设 | 何时失效 |
