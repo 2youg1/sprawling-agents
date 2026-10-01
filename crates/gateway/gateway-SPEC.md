@@ -13,7 +13,7 @@
 | `credential` | Custody 效果半（scan 命中→入 Vault→原位替换 SecretRef）；兑付（组请求末格 expose，credential_lent）；describe；持久性探测。凭证只有人交出的 API key，订阅额度不经本 crate（§8-5） |
 | `market`＋`cost` | 模型目录快照＋钉版回滚；per-call 入账（权威计费额优先）。本 crate 不设 provider 侧准入与备用端点（§8-6、§8-11） |
 | `router` | Endpoint 簿：从 Ledger 重建的已登记端点与每个标签的选择；一次取模型只答一问（§8-9） |
-| `provider` | 厂商文档写下来一次：host 预设、输出上限的事实梯、一个端点怎么连（§8-17、§8-18） |
+| `provider` | 厂商文档写下来一次：host 预设、输出上限的事实梯、一个模型收得下什么的梯子、一个端点怎么连（§8-17、§8-37、§8-18） |
 | `reach` | 哪些调用走这台电脑的代理，与一次分段读数（§8-15） |
 | `transcribe` | 把一段录音变成一行字的可选设施（§8-12） |
 | `adviser` | 一次顾问咨询，走既有登记面（§8-23） |
@@ -33,6 +33,7 @@
 - 线格式 JSON 允许浮点（temperature 等 provider 字段）：dialect 是翻译面不是判定路径；判定路径（cost／market 价目）恒整数。
 - **只有 Anthropic 兼容格式在结算前交出调用。** `Endpoint` 经 `Model::call_speculating`（kernel SPEC「模型端口第三扇门」）在 `content_block_stop` 到达时交出完整调用，消费方是 `runtime::turn::speculation`（`crates/runtime/Spec.lean` §8-3），它守的性质由 `crates/runtime/spec/Turn/Speculation.lean` 证明。OpenAI 两种兼容格式在结算前不交出调用：它们的调用在哪一帧完整，线上没有一帧明说。
 - **加密金库文件还没有探针选它**：`Custodian::probe` 只试平台服务，何时向人要口令、口令从哪里来未定（§8-21）。
+- **上游 `/models` 说了 `image` 算不算「收得下什么」的一档，未定。** 探测把每一行的 `input_modalities` 原样记进 `ModelFacts`（§8-16），`AttachedEndpoint.models` 带着它，而 `accepted_input`（§8-37）不读它：那是供应方自己的词（`image`、`audio`），一个中转站可能为一个厂商自己拒图的 id 写上 `image`。若定为一档，它排在人之后、目录之前，与上限梯的 `Upstream` 同位；要定下它，需要一份真实中转站的 `/models` 记录，其中写着 `image` 的模型在那条线上确实收图。
 - **responses 面答 `usage: null` 时算不算「供应方没报用量」，未定。** `openai-openapi` 把 `Response.usage` 写作 `ResponseUsage` 或 `null`。`dialect::responses::reply` 在 `usage` 缺席时报 `E_WIRE_MISMATCH`，为 `null` 时经 `mismatch::tokens_or_zero` 把输入与输出都读成 0 token：两种缺法得到相反的结论，后一种让这次调用的用量从账上静默消失。规格没有说 `status` 为 `completed` 的 response 会不会带 `null`，所以读法暂不改；要定下它，需要一个真实供应方在已完成的 response 里答出 `usage: null` 的记录。
 
 ## 4 现状分析
@@ -275,7 +276,7 @@ impl MarketSnapshot {
 }
 ```
 
-- **`input` 默认 `Text`，宽容读。** `selected_payload` 经 `Payload::of(&ModelSelected)` 写 `input` 键，`read_choice` 经 `Payload::read::<ModelSelected>` 读，读不到就当 `Text`——旧 Ledger 里的 `model_selected` 没有这个键，而重放一份旧历史不应该报错；默认取「只收文字」而非「收图」，因为猜错方向的代价不同：猜小了是一句拒绝，猜大了是 provider 的 400。内置目录里收图的行（现为 `claude-sonnet`）标 `TextImage`，`local` 保持 `Text`。
+- **`input` 默认 `Text`，宽容读。** `selected_payload` 经 `Payload::of(&ModelSelected)` 写 `input` 键，`read_choice` 经 `Payload::read::<ModelSelected>` 读，读不到就当 `Text`——旧 Ledger 里的 `model_selected` 没有这个键，而重放一份旧历史不应该报错；默认取「只收文字」而非「收图」，因为猜错方向的代价不同：猜小了是一句拒绝，猜大了是 provider 的 400。内置目录里收图的行（现为 `claude-sonnet`）标 `TextImage`，`local` 保持 `Text`。目录只是「收得下什么」那架梯子的一档，登记时谁答由 §8-37 判。
 - 钉版回滚＝持前一快照即回滚（值语义，无 I/O）；快照落盘属 projection／config 面，本模块只管形与查询。价目恒整数微美元（判定路径禁浮点）。
 - **`builtin()` 上抛 `from_entries` 的拒绝，不顶一份空目录。** 两行同 id 是编程错误，而把它顶成空目录的后果是：城里每一个模型都查不到价目行，拒词一个也不点名那张表。`Result` 让这件事在第一个调用点就说出来（`E_INVALID_ARGS`，主题为撞车的 id）。落选的是「rows 改 const 数组加一条去重测试」：那把不变量交给一条可以被删掉的测试，而类型能一直拿着它。
 
@@ -458,11 +459,29 @@ impl Recogniser {
 
 - **发给模型的是所选 face 的图片内容，不另造 OCR 协议。** `recogniser_for` 经 `adapter_for` 造出与 run 同一种适配器：chat 面写 `image_url`，Responses 面写 `input_image`，Messages 面写 `image` 块，各由 dialect 一处写（§8.5 A）。请求是一条 system（读出图里的全部文字，只交文字）加一条 user 消息（这张图与一句要求），没有工具；上限是这个选择登记时的 `max_output_tokens`，即 `select_model` 那条事实梯的答案（§8-17），不另定一个数。专用 OCR 服务（一条不是对话的线）不在这一版：要接它时，它是 `Recogniser` 的第二种 attached，重议参数是人要接一个不说三种 face 之一的 OCR 端点。
 - **图的字节经兑付那一格进请求，不进账本，也不进 CAS。** 适配器的 `ImageResolver` 读的是 `Recogniser` 自己的一格：`recognise` 把这张 `Picture` 放进去，调用返回后取走；兑付只认 locator 与格里那张图相同的请求。`Picture::new` 守住 locator 就是字节的哈希，所以兑付交出的字节与 locator 说的是同一份。不经 CAS：楼里的一个 PNG 文件读进来就够发，为发一次再存一份，读就成了写。`recognise` 取 `&mut self`，一次只有一张图在格里。
-- **能不能把图交给这个模型，由端点判。** 选中的模型登记为只读字（`InputKinds::Text`）时，适配器在发出前拒绝（`E_INVALID_ARGS`，恢复语让人把这个标签指向一个 `text_image` 的模型；`endpoint::model` 发出前的那道检查）；本模块不再判一遍。`policy` 照 run 的调用交给适配器，机密楼的那道兜底拒绝因此与主模型同一处。
+- **能不能把图交给这个模型，由端点判。** 登记的 `input` 是 §8-37 那架梯子的答案。选中的模型登记为只读字（`InputKinds::Text`）时，适配器在发出前拒绝（`E_INVALID_ARGS`，恢复语让人把这个标签指向一个 `text_image` 的模型；`endpoint::model` 发出前的那道检查）；本模块不再判一遍。`policy` 照 run 的调用交给适配器，机密楼的那道兜底拒绝因此与主模型同一处。
 - **答复只读文字。** 答复里的文字块按序以换行连起来，推理块与别的块不读；一个文字块都没有就是空串。一张没有字的图答空串是合法的：那是模型读到的东西，而一个说不清的答复在 dialect 解读时已经是 `E_WIRE_MISMATCH`。
 - **没配就是一句具名的拒绝。** `Recogniser::absent()` 上的 `recognise` 恒返回 `E_TOOL_UNAVAILABLE`：action ＝ `read the text in a picture`，subject ＝ `this city has no OCR model chosen`，恢复语让人为 `ocr` 选一个能读图的模型，或改用窗口的 accessibility tree。码的理由同 §8-12：这次部署里没有这项设施。
 - **没有名字的录音，容器从开头的字节认。** 连接器把声音块存进 CAS 时不记它的 media type（runtime D15），块只有字节。`AudioType::of_signature` 看开头：`RIFF`…`WAVE` 是 `Wav`，`OggS` 是 `Ogg`，EBML 头 `1A 45 DF A3` 是 `Webm`，第 4 到 8 字节是 `ftyp` 的是 `Mp4`，`ID3` 或 MPEG 帧同步（`FF`，次字节高三位全 1）是 `Mpeg`。每一种的认法写在 `AudioType` 的一个穷尽 `match` 里，第六种容器进来时编译器要它的认法；认不出＝`E_INVALID_ARGS`，拒词由 `ALL` 列出五种。`Recording::read_unlabelled` 读到同一个上限多一字节为止，再从读到的字节认容器。被否：让模型在参数里写 media type（模型抄错一个字，provider 就以 400 拒一段好录音）；连接器把 media type 存在块旁边（CAS 只存字节，来源记录只记楼与 run，storage-SPEC §8-3，多一个字段是 storage 的接口变化，而字节本身已经说出了容器）。文件仍按扩展名读（§8-33）：扩展名是写下它的人对容器的声明，两条路各认各的输入，表仍是 `AudioType` 一张。
 - **验收**：`ocr::recogniser` 的测试经回环替身（`endpoint::fakes::fake_provider`）对三种 face 各发一次，比请求的路径、请求里的模型名与这张图的 base64，以及读回的字；没有设施时按名拒绝；`Picture::new` 拒 locator 与字节不符的一对。`transcribe::recording` 的测试：五种容器各从自己的开头认出，认不出的列出五种。
+
+### 8-37 一个模型收得下什么：`gateway::provider::input`（形状 1 判定）
+
+`ocr` 能不能用在一个模型上，取决于这个模型登记时的 `InputKinds`（§8-34「能不能把图交给这个模型，由端点判」）。这个值原先只从钉版目录读，目录里收图的只有一行，而预置表的每个模型行都已写着 `input`；于是一个厂商文档写明能读图的模型选为 `Ocr` 之后仍按 `Text` 登记，端点拒绝每一张图。上下文窗口与输出上限早已是一架从目录到预置表再到缺省的梯子（`window_for`、`OutputCeiling::resolve`，§8-17）；「收得下什么」走同一种梯子，判定只写在这里。
+
+```rust
+// provider::input —— 判定，先命中者胜
+pub fn accepted_input(pinned: Option<InputKinds>, base_url: &str, id: &str) -> InputKinds;
+// provider::preset —— 与 ceiling_for、window_for 读 model_for 的同一行
+pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds>;
+```
+
+- **梯子从高到低：人登记的事实 → 钉版目录 → 预置表 → `Text`。** `pinned` 是钉版目录按精确 id 的那一行的 `input`；预置表按 base URL 的 host 与 id 前缀查（`model_for`，中转站借厂商的行、本机的服务不借，规则同 §8-17）；两者都不说时答 `Text`，理由同 §8-7：猜小了是一句拒绝，猜大了是 provider 的 400。目录与预置表是同一档的两个索引（§8-17 的测试钉住两者不为同一个 id 作答），这里仍让目录在前，与 `OutputCeiling::resolve` 的 `pinned` 先于预置表同序。
+- **人那一档今天没有线上入口。** `SelectModel` 不带「这个模型读图」这一格，设置页也没有这个控件，所以梯子从目录开始；那一格上线时它排在最前，成为本函数的一个参数，与 `Stated.person` 同理：人说的是一个决定，不是推断。
+- **不读这个模型以前登记的 `input`。** 以前登记的值是当时梯子的答案，不是谁说过的话；读回它，一个在预置表学会它之前按 `Text` 登记的模型就永远按 `Text` 登记。重选同一个模型因此总按今天的表重新作答。
+- **不记是哪一档答的。** `model_selected` 记 `input`，不记它的来处：读它的只有端点发图前的那道检查，那道检查不因来处而异；上限要记来处（`ceiling_from`），是因为一次被截断的跑要读得出原因。
+- **唯一的生产调用者是选型点**（`accounting::worker::credentials::endpoints::choosing` 的 `select_model`）：登记行的 `input` 就是本函数的答案。
+- **验收**：`provider::input` 的测试比一张表——目录说 `Text` 而预置表说 `TextImage` 时答 `Text`、目录沉默而预置表说 `TextImage` 时答 `TextImage`（厂商主机上与中转站上各一次）、本机服务与两表都不认识的 id 答 `Text`；`accounting` 的 `a_preset_model_that_reads_pictures_is_registered_as_reading_them`：一个目录没有、预置表写着 `text_image` 的模型选为 `Ocr` 之后，端点账本里那一次选择的 `input` 是 `TextImage`。
 
 ## 8.5 两个设计（crate 级）
 
@@ -497,6 +516,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 - **一个端点的连接不在派活时预热（§8-35）。** 决定：派活路径上不加预热；同一端点的调用照旧共用一个客户端的连接池，空闲上限取 reqwest 的默认值。理由：派活时开始的预热最多藏住派活到第一次调用之间那一段（lane 的准备，下限 58 ms，放置接管备树之后以毫秒计），而要藏的连接是 0.35–0.67 s（§8-35 的读数）；而且预热要发一次真实请求才能让连接进池，每次派活多一次不带凭据、发给 provider 的请求。被否：①在派活时于记账线程上发一个轻请求——记账线程等一次往返（sprawling-SPEC 8-113）；②在 lane 的准备开头发——与准备串行，藏不住任何东西；③另起一条线程在准备期间发——为最多 58 ms 加一条每次派活的线程；④把空闲上限拉长并开 HTTP/2 保活 ping，让连接跨过人读答案、打下一句的那段时间——它藏得住整段连接，但一条被中间设备静默丢掉的 HTTP/1.1 连接会让下一次流式调用一直等到静默上限，这一臂没有故障注入测试之前不做。**重开参数**：①城收到「人要开始说话了」这样比派活更早的信号（例如输入框获得焦点经线协议到达），那时在它到达时预热，能藏的是人打字的时间；②有了覆盖静默断连的故障注入测试（发送失败的连接不回池、静默的连接在上限内被认出），那时考虑④；③准备的那一段长到与连接同一个量级。
 - **转写是一项设施，两条路用它。** 决定：`transcribe` 既是 composer 麦克风背后的设施，也是城给 run 的一件工具（sprawling-SPEC 8-131）；两条路读端点账本里 `ModelTag::Transcribe` 的同一个选择，经同一个 `transcriber_for` 造设施；工具只在那个选择成立时上 run 的工具表。理由：computer use 要能把声音变成字，而二进制里不内置任何模型（定规），于是模型要转写只能经人接入的这个端点；`Transcriber::absent()` 的码仍是 `E_TOOL_UNAVAILABLE`，语义不变，仍是「这次部署里没有这项设施」。被否的备选：给工具另立一个专码（同一个事实两个名字）；让转写只做界面设施（模型拿不到任何转写能力）。
 - **OCR 是一项设施，形状照转写。** 决定：`gateway::ocr` 与 `gateway::transcribe` 同形：端点账本里 `ModelTag::Ocr` 的那一次 `select` 给出 `Chosen`，`recogniser_for` 把它变成设施，`absent()` 答 `E_TOOL_UNAVAILABLE`；城的工具 `ocr` 只在那个选择成立时上 run 的工具表（sprawling-SPEC 8-142）。适配器就是 `adapter_for` 造的那一个，图片内容由所选 face 的 dialect 写（§8-34）。理由：「哪个端点答这一类活」已有账本这一个机制，「一张图在三种 face 上怎么写」已有 dialect 这一处；OCR 再写一套请求，就是这两件事的第二个权威。被否的备选：①专为 OCR 写一条请求（三种 face 各要一份图片拼法）；②让主模型自己看截图（主模型可能只读字，而 run 要的是一行可以读、可以搜的字，不是窗口里的一张图）；③把图先存进 CAS 再经城的 `ImageResolver` 兑付（读一个文件就成了一次写）。
+- **一个模型收得下什么只在 `provider::input` 判一次（§8-37）。** 决定：`accepted_input` 按目录、预置表、`Text` 的序作答，选型点只调用它。理由：预置表已逐行写着 `input` 并注出处，目录与预置表本是同一档的两个索引，窗口与上限都已按这个序读；判定放在 gateway，前端将来为人那一档加的控件与选型点读同一个函数。被否的备选：①在选型点接一个 `.or_else(preset::input_for)`，窗口梯在 `accounting` 里就是这么写的——那是第二处判定，人那一档上线时要在两处各加一次；②给钉版目录为每个读图的模型加一行——目录是价目的家，一行没有复核日期的价目就是一个会漂的权威（§8-17 不把价目放进预置表的同一理由），而预置表已经说了这件事。重开参数：人那一档上线（`SelectModel` 带上「这个模型读图」），或上游 `/models` 的 `input_modalities` 被定为一档（§3）。
 - **凭证库经 `keyring-core` 与各平台 store 接入，不经 `keyring`。** 决定见 §8-4。理由：`keyring` 第 4 代的默认 feature 在 Linux 上选 secret service，与静态 musl 发行件矛盾；关掉默认 feature 的 `keyring` 只剩一层转发，上游 README 建议应用直接依赖 `keyring-core` 与所需的 store。被否的备选：停在 `keyring` 3——它是锁里 `security-framework` 2 与 `windows-sys` 0.60 两族的来源之一，也不再是上游维护的那条线。
 
 ## 13 依赖选型
@@ -696,6 +716,7 @@ pub fn for_host(host: &str) -> Option<&'static HostPreset>;
 pub fn model_for(base_url: &str, id: &str) -> Option<&'static ModelPreset>;   // 这个 host 自己的行；没有自己模型行、`reach::is_local` 答否的 host 再查发布这个 id 的厂商的行
 pub fn ceiling_for(base_url: &str, id: &str) -> Option<Ceiling>;
 pub fn window_for(base_url: &str, id: &str) -> Option<Window>;               // 同一行的上下文窗口
+pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds>;     // 同一行的 input，只由 §8-37 的梯子读
 
 // provider::ceiling —— 判定，先命中者胜；哪几档作答取决于这一面要不要这个字段
 pub enum CeilingSource { Person, Upstream, Preset, Policy }   // as_str(): person|upstream|preset|policy

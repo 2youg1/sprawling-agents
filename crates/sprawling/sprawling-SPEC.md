@@ -3122,7 +3122,7 @@ impl kernel::Tool for OcrTool { … }   // 名 `ocr`；参数 `{ path }`：PNG �
 - **效果照 8-131**：`Effect::Read`（读一个文件，城里什么都不写；图出门去的是按本楼 policy 选出的端点）、`CostTier::Heavy`（一次 provider 往返，可能计费）、`timeout: None`（端点自己的调用期限是上限）、`render: Generic`（产出的是文字）。
 - **在工具表上的位置**：紧接 `transcribe` 之后、`playback` 之前。provider 按位置缓存工具数组，所以内置工具的新成员接在内置那一段的末尾；以后的提案工具排在 `ocr` 之后。
 - **验收**：`crates/sprawling/tests/acceptance/ocr.rs`。选了 OCR 模型的城（回环端点、chat 面），run 以楼里的一个 PNG 与一个为这座楼存进 CAS 的截图各调一次 `ocr`，拿回端点读出的字；端点收到的两次请求走 `chat/completions`、带人选的模型名与那张图的 base64。没选 OCR 的城不上这件工具，由 catalogue 的两条覆盖测试守着。工具自己的拒绝（不是 PNG、机密楼的路径、没有设施）由 `ocr` 模块的测试守着。
-- **本节接口的当前状态**：线上已有的 `SelectModel` 能为 `Ocr` 选模型，但一个模型能不能读图（`InputKinds`）只从内置目录（`gateway::MarketSnapshot::builtin`）读，那里今天只有一行 `text_image`；其余模型按 `Text` 登记，`ocr` 在它们上面由端点拒绝。人登记一个模型时能说「它读图」，或选型点也读预置表（`provider::preset` 里各行已写着 `input`），二者之一落地，`ocr` 才能用在内置目录之外的模型上；判定它的证据是一个 `text_image` 的预置模型被选为 `Ocr` 之后仍被拒。人登记 OCR 模型的设置页控件归前端（client-SPEC 的模型表仍是三行，kernel-SPEC §8-80）。
+- **本节接口的当前状态**：线上已有的 `SelectModel` 能为 `Ocr` 选模型，登记的 `input` 是 `gateway::accepted_input` 那架梯子的答案（gateway-SPEC §8-37）：钉版目录、预置表、`Text`，先说者胜。所以预置表写着 `text_image` 的模型（例如 `api.anthropic.com` 上的 `claude-sonnet-4-5`，或中转站转发的同一个 id）选为 `Ocr` 之后，`ocr` 在它上面读得出字；两张表都不认识的模型仍按 `Text` 登记，`ocr` 在它上面由端点拒绝。梯子最高的一档——人自己说「这个模型读图」——还没有线上入口：`SelectModel` 不带这一格，设置页也没有这个控件（client-SPEC 的模型表仍是三行，kernel-SPEC §8-80）；它上线时排在目录之前，线上字段与控件归 wire 与前端。
 
 ## 8-57 浏览器是一族引擎，不是一个牌子（`bin::doctor::family`、`family::gecko`／`chromium`／`webkit`、`bin::doctor::registry`）
 
