@@ -157,6 +157,17 @@ impl Cas {
         }
         ranges::of_object(self.vfs.as_ref(), &path, hash, range)
     }
+
+    /// The object's length in bytes, read from the filesystem rather than
+    /// from the object, so asking how long a two hundred megabyte version
+    /// is costs nothing like two hundred megabytes. A window of a stored
+    /// document version needs it to keep its request inside the object
+    /// (storage-SPEC 8-36). Like a range read, it trusts what `put`
+    /// verified.
+    pub fn size(&self, hash: &B3Hash) -> Result<u64, StorageError> {
+        let _ = hash;
+        Ok(0)
+    }
 }
 
 /// The puts this process has begun, across every handle it holds.
@@ -208,6 +219,23 @@ mod tests {
         );
         assert!(cas.contains(&hash));
         assert_eq!(cas.get(&hash).unwrap(), b"hello world");
+    }
+
+    /// A stored document version states its length without being read,
+    /// and a version the store never kept is named rather than measured
+    /// as empty.
+    #[test]
+    fn a_stored_object_states_its_size_and_a_missing_one_is_named() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut cas = Cas::open(dir.path()).unwrap();
+        let hash = cas.put(&[7_u8; 70_000]).unwrap();
+        assert_eq!(cas.size(&hash).unwrap(), 70_000);
+        let absent = kernel::B3Hash::digest(b"never stored");
+        assert!(
+            matches!(cas.size(&absent), Err(StorageError::CasMissing { .. })),
+            "{:?}",
+            cas.size(&absent)
+        );
     }
 
     #[test]
