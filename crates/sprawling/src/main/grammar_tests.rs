@@ -158,3 +158,25 @@ fn a_verb_of_two_words_is_read_from_two_words() {
         )
     );
 }
+
+/// The first `--` ends sprawling's own words: what follows is the
+/// measured command's, `--version` and `--help` included, so
+/// `gauge -- cargo --version` measures cargo (sprawling-SPEC.md 8-129-4).
+#[test]
+fn the_words_after_two_dashes_are_not_read_as_sprawlings_own() {
+    let parsed = parse(&words(&["top", "--", "cargo", "--version", "--help"]));
+    assert!(matches!(parsed, Ok(Invocation::Run(_, _))), "{parsed:?}");
+}
+
+/// `top` is the alias of `gauge`, so both words reach one verb.
+#[test]
+fn gauge_and_top_name_one_verb() {
+    let verb = |line: &[&str]| match parse(&words(line)) {
+        Ok(Invocation::Run(verb, _)) => Some(verb),
+        Ok(_) | Err(_) => None,
+    };
+    assert_eq!(
+        (verb(&["gauge"]).is_some(), verb(&["gauge"])),
+        (true, verb(&["top"]))
+    );
+}

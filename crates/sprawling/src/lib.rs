@@ -18,6 +18,7 @@
 //! an integration test enters through them.
 
 pub mod assembly;
+pub mod audience;
 pub mod console;
 pub mod doctor;
 pub mod firstrun;
