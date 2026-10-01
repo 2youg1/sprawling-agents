@@ -28,12 +28,9 @@
 //! exception nobody decided to keep granting.
 
 use std::collections::BTreeSet;
-use std::path::Path;
 
-use crate::members;
-use crate::report::{Violation, XtaskError};
-
-const ROOT_MANIFEST: &str = "Cargo.toml";
+use super::{diverged, shown};
+use crate::report::Violation;
 
 /// The one member whose lint table is its own.
 const LEAF: &str = "crates/desktop/ffi";
@@ -61,20 +58,9 @@ const RECORDED: [Recorded; 1] = [Recorded {
               section 12.14)",
 }];
 
-pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let workspace = manifest(root, ROOT_MANIFEST)?;
-    let manifests = members::members(root)?
-        .into_iter()
-        .map(|member| {
-            manifest(root, &format!("{}/Cargo.toml", member.dir)).map(|read| (member.dir, read))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(tables(&workspace, &manifests))
-}
-
 /// Every member's lint table, judged against the workspace's: the leaf
 /// key by key, every other member for inheriting it.
-fn tables(workspace: &toml::Value, members: &[(String, toml::Value)]) -> Vec<Violation> {
+pub(super) fn tables(workspace: &toml::Value, members: &[(String, toml::Value)]) -> Vec<Violation> {
     let mut out = Vec::new();
     let wall = workspace.get("workspace").and_then(|it| it.get("lints"));
     match members.iter().find(|(dir, _)| dir == LEAF) {
@@ -178,15 +164,6 @@ fn inheriting(value: Option<&toml::Value>) -> bool {
     })
 }
 
-/// One manifest, read as a value.
-fn manifest(root: &Path, rel: &str) -> Result<toml::Value, XtaskError> {
-    let text = crate::walk::read_text(&root.join(rel))?;
-    toml::from_str(&text).map_err(|err| XtaskError::Doc {
-        file: rel.to_owned(),
-        msg: format!("this manifest does not parse as TOML: {err}"),
-    })
-}
-
 /// The keys of one table. A table that is absent has no keys, which is
 /// the reading that lets a key present on one side only be compared
 /// against nothing on the other.
@@ -194,34 +171,6 @@ fn keys(table: Option<&toml::Value>) -> BTreeSet<String> {
     match table.and_then(toml::Value::as_table) {
         Some(found) => found.keys().cloned().collect(),
         None => BTreeSet::new(),
-    }
-}
-
-/// One value as a refusal prints it, including its absence.
-///
-/// A lint is as often a table (`{ level = "deny", … }`) as a bare
-/// string, and the table is shown as Debug rather than re-serialised:
-/// what a reader needs is the difference, not valid TOML.
-fn shown(value: Option<&toml::Value>) -> String {
-    match value {
-        None => "absent".to_owned(),
-        Some(toml::Value::String(line)) => format!("`{line}`"),
-        Some(table) => format!("`{table:?}`"),
-    }
-}
-
-fn diverged(
-    location: String,
-    rule: &'static str,
-    violation: String,
-    alternative: String,
-) -> Violation {
-    Violation {
-        gate: "guard",
-        location,
-        rule: rule.to_owned(),
-        violation,
-        alternative,
     }
 }
 
