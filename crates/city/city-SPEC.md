@@ -709,6 +709,16 @@ pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 
 **重开参数**：车道数（sprawling-SPEC §8-46-3）变得不再稀缺，或 harness 能在回合中间报告进度、城能分辨「在做事」与「卡住了」时。
 
+### 12.10 写入限制随派活走，不进 `RULES.toml`
+
+**决定**：「只读可新建」是一次派活的选择（`RunPolicy.write`），楼的 `RULES.toml` 不加对应的键；楼的写域是一次 run 的上限，派活只能收窄它（§8-32）。
+
+**理由**：今天要「只新建」的是人对某一次活的谨慎——让一个 agent 起草新文件而不碰已有的——不是一栋楼的性质。若楼与派活各有一个限制，就要再定一条「两者取更严」的规则，并让页面、状态工具与回放都说清楚一次 run 的限制来自哪一处；只有一个来源时，账上的 `run_started.policy` 就是全部答案。
+
+**被否**：`RULES.toml` 加 `limit = "full" | "create"`，与派活取更严的一个：一个事实有两个来源，而今天没有一栋楼需要它。
+
+**重开参数**：出现一栋每次 run 都必须只新建的楼（例如只收稿件的投稿楼），且人要求不依赖每次派活都选对时。
+
 ## 13 依赖选型
 
 workspace 内只依赖 `kernel`（拓扑硬约束）。dev 依赖 `tempfile`。外部依赖如下，均在 workspace 钉版（不新增版本权威）。
@@ -1027,6 +1037,14 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 **拒什么**：`[clock]` 表 `deny_unknown_fields`。`zones` 与任何别的键、拼不出的值（`"minutes"`）都在解析时拒，走本模块既有的那一种拒法（`refuse::unreadable`）：主体是 serde 点名的键或值与它接受的集合，恢复语是「under `[clock]`, change the value the message names, or take that key out」。
 
 **读者**：粒度只在 `runtime::clock::StampGate` 里起作用（runtime-SPEC §8-10）；生产的每一跑由装配层按冻结下来的值造一个 `StampGate`（sprawling-SPEC 8-125）。
+
+### 8-32 楼的写域是上限，一次派活的写入限制只收窄它（`city::policy`，形状 1 判定）
+
+**接口**：不新增。`BuildingRules::write_domain()` 照旧从 `RULES.toml` 的 `prefixes` 与 `write` 两键给出 `kernel::WriteDomain`；一次 run 的写入限制 `kernel::WriteLimit` 由派活给出（kernel-SPEC §8-78），在写门上与写域各判一次。
+
+- **两道判定都要过**：写域回答能不能写这个地址、写哪种文件；写入限制回答能不能改动已经存在的文件。`full` 不额外收窄，所以普通档永远放不宽楼的 `RULES.toml`；`create` 在 `write = "documents"` 的楼里仍只能新建 Markdown 文档、仍够不到计划文件；保留子树对两者都在写域之外。
+- **`RULES.toml` 没有写入限制的键。** 一栋楼的规则说它允许什么，一次派活的限制说这一次要多小心；两者分在两处，「哪一处说了算」就不用规则来回答（§12.10）。
+- 验收：写域一侧的判定由 kernel 的 `gate::domain` 测试与本 crate 的 `policy` 测试持有；两道判定的组合在 runtime 的 `an_existing_file_is_unchanged_under_create_by_edit_exec_and_link` 里由真实写路径观察。
 
 ## 模板的写法：格式标注的是「该多小心」（`docs/templates/`）
 

@@ -54,7 +54,6 @@
 7. **合并的检出先于干线的比较并交换。** `worktree::trees` 的 `apply` 先把节点的树写进城的工作目录，再用 `reference_matching` 移动干线；两步之间干线若被别处移动，比较并交换失败，工作目录却已是节点的树，下一次 checkpoint 会把这份差读成人的编辑。开城时账本的独占锁（8-1）使同一座城只有一个写者，所以窗口只在一个进程内的两次合并之间打开。候选是先做比较并交换、再以旧干线为显式基线检出（`CheckoutBuilder` 的 baseline），或比较并交换失败时撤回检出；判定它的证据是一个在两次合并之间移动干线的 citysim 场景。
 8. **取回一个文件抄的是被替换文件的权限，不是 point 上那一项的 `filemode`。** `worktree::back` 的 `restore_file` 经 `bundle::landing::land`（`Bits::OfReplaced`）落盘，所以在 Unix 上，point 上可执行、树里此刻不可执行的文件取回后仍不可执行；被删后再取回的文件取新建默认值。Windows 没有可执行位，不受影响。改法是由 `entry.filemode()` 推出权限，需要给 `landing::Bits` 添一臂；判定它的证据是一个 Unix 上取回脚本的场景。
 9. **`checkpoint::commit` 的 family 1 只做了一部分。** `file_discarded` 的载荷仍由 checkpoint 手工拼成 `Map`，`taint_promoted`、`cross_building_transfer`、`secret_egress_blocked` 三种还没有各自的结构体。未定的是这些结构体住在 kernel 的事件表旁边还是 storage 里；判定它的证据是它们的第二个写者出现在哪个 crate。
-10. **`runtime::tools::edit` 仍是写前移除该名再建，这是 8-12 否决的做法。** 8-12 否决它的两条理由对 edit 同样成立：移除之后写入失败，文件就没了；新建取默认权限，可执行位随之丢失。edit 这样写的理由是 Windows 上硬链接曾经不报拒、要靠换目录项兜住；§3.5 之后硬链接在两个平台都在 `WriteTarget` 被拒，换目录项只剩罩住判定与落盘之间那个窗口的用处，而 `bundle::landing::land` 的暂存文件再 `rename` 同样换目录项、没有丢文件的窗口。改法是 edit 经同一个落盘函数写（storage 要把它开放给 runtime）；edit 住在 `crates/runtime/src/tools/edit.rs`，不在本 crate。判定它的证据是一次移除之后写入失败的 edit（例如磁盘写满）留下的盘面。
 
 ## 4 现状分析
 
@@ -814,7 +813,7 @@ pub fn open_restored(city_root: &Path, now: TimeMs) -> Result<PathBuf, StorageEr
 - **什么算城里的文件：`travels` 一个家（形状 1 判定）。** 导出端与恢复端问同一个谓词：根层 `.sprawling`（其内容经 ledger／cas 两张门各走各的）与任何深度的 `.git`（受保护元数据，写下即提权）不算城文件；楼自己的 `.sprawling`（`RULES.toml` 等治理字节）**随行**，它是城的一部分。名字引自 kernel 的名单（12.3 定规），不重拼字符串。两侧的策略不同且必须不同：导出端**跳过**（选择带走什么，源城里的簿记本来就不走），恢复端**拒绝**（全成或全拒——一份夹带 `.git` 的 bundle 是伪造品，恢复它就是在落 hooks）。
 - **git 历史随行（`bundle::history`，形状 4 适配器；git2）。** 城根若是 git 仓库，`export` 用 `git2::PackBuilder` 把每条引用所达的全部对象（沿 revwalk 的提交与树，外加每个引用目标的递归闭包，覆盖附注标签）打成 `history/history.pack`，把引用写成 `history/refs`（每行 `<oid> <name>` 或 `ref:<target> <name>`，`HEAD` 在内）；城根不是仓库时 bundle 没有 `history/`，恢复端也不建仓库。`restore` 在复制任何东西之前拒绝已有 `.git` 的城根（`StorageError::Bundle { op: "restore" }`），复制后 `git2::Repository::init` 一个新仓库，经 `Odb::packwriter` 写入包（libgit2 边写边建索引并校验每个对象），再逐条立引用、按 `HEAD` 读出树写入索引，使 `git status` 只报导出时未提交的改动。**`hooks/` 与 `config` 永不复制**：bundle 里只有包与引用两样，仓库的配置与钩子来自新 init，于是一份伪造的 bundle 没有落钩子的路。引用名只收 `HEAD` 与 `refs/` 之下、且过 `git2::Reference::is_valid_name` 的名字，其余整次拒绝。被否：直接复制 `.git` 目录（会带上 hooks 与 config，正是 8-12 要拒的东西）；`git bundle` 子进程（引外部二进制，且 bundle 格式的解析不在本进程的校验之内）。
 - **v0.0.6 的 bundle 导入其仓库而不是整体拒绝。** v0.0.6 的导出把城根的 `.git` 整个复制进 `city/.git`，清单的 `files` 也数了它的文件。恢复端见到 `city/.git` 是目录、而 bundle 没有 `history/` 时，把它当作一份旧式历史：以 `git2::Repository::open_bare` 只读打开，按导出端同一段打包逻辑（同一个引用名准入）得到包与引用，再走同一个 `History::land`；`city/.git` 下的文件既不拒也不复制，清单的 `files` 减去它们的个数再比。`hooks/` 与 `config` 依旧只来自新 init。仍整次拒绝：`history/` 与 `city/.git` 同在（v0.0.7 的导出从不写后者，二者同在即伪造）、`city/.git` 不是能打开的仓库、`city/.git/objects/info/alternates` 或 `city/.git/commondir` 存在（`open_bare` 会顺着前者把 bundle 之外任一仓库的对象读进包，顺着后者把 `objects`、`refs` 与 `packed-refs` 整个换成它所写路径下的那一份，伪造的 bundle 借此把 bundle 之外的对象与引用带进新城；v0.0.6 的导出从不写二者，因为城根的仓库既不借用别处的对象库，也不是别处仓库的 worktree），以及任何更深处的 `.git`（那是别的仓库，导入它不在本契约内）。被否：继续整体拒绝（v0.0.6 用户的备份因此恢复不了，而其中的对象与引用正是本节已有的导入路径能安全接住的）。
-- **别名永不落盘（8-25）。** `walk` 见到任一链接拒绝整次操作；bundle 的每一次落盘只走 `bundle::landing::land`（形状 4 适配器）：它按值收下 `alias::WriteTarget`，让清过的目标被消费而不是查完即丢。bundle 的目标由 `WriteTarget::within(op, root, path)` 清出：`root` 是人给的根（导出时是 bundle 目录，恢复时是城根），只查 `path` 与它和 `root` 之间的每一级目录，不查 `root` 本身及其上——城根放在哪里是人选的，`/home` 指向 `var/home`、macOS 的 `$TMPDIR` 经 `/var` 这样的链接不是 run 能造出来的写路径。不在 `root` 之下的路径退回到查到文件系统根，所以界只会放宽人选的那一段。被否：沿用 `WriteTarget::at` 查到文件系统根（城只要放在链接下面，导出与恢复就整次失败）。runtime 的 edit 工具同一条理由：它以城根为界调 `within`，因为 macOS 的临时目录都在 `/var` 这个链接之下，查到文件系统根的写门在那里拒绝每一次编辑（`crates/runtime/src/tools/edit/tests.rs` 里放在链接下面的城那一条）。字节先写同目录的暂存文件 `.<name>.part`（这个拼写只在 `landing` 定义一处；导出不把合这个拼写的名字当城文件带走，因为恢复中途崩溃会把暂存文件留在城根下）、`sync_data`，再把原权限抄到暂存文件上，最后 `rename` 覆盖并 `sync_dir`。原权限按 `landing::Bits` 取：复制城文件时取源文件的（可执行位、只读位随文件走，导出再恢复后不丢），写清单与历史时取被覆盖文件的（没有就用新建默认值）。`rename` 换的是目录项，所以判定之后才出现的硬链接也写不穿（硬链接本身在 `WriteTarget` 被拒，8-25），且不存在「名已删、字节未落」的丢文件窗口。权限在 `sync_data` 之后才抄：只读位一旦落上，Windows 不再允许以写句柄打开该文件。被否：写前移除该名再建（失败即丢文件，且按 umask 新建，丢可执行位；`runtime::tools::edit` 仍这样写，§3.10）；就地截断重写（写穿硬链接，崩溃留半个文件）。链接臂是拒绝不是跳过——对照组的 “skipped N files” 就是宽容部分还原。悬空链接在列举中不可见（`is_file`／`is_dir` 走不到它），但落盘必须先过 `WriteTarget`，故恒拒仍然成立。
+- **别名永不落盘（8-25）。** `walk` 见到任一链接拒绝整次操作；bundle 的每一次落盘只走 `bundle::landing::land`（形状 4 适配器）：它按值收下 `alias::WriteTarget`，让清过的目标被消费而不是查完即丢。bundle 的目标由 `WriteTarget::within(op, root, path)` 清出：`root` 是人给的根（导出时是 bundle 目录，恢复时是城根），只查 `path` 与它和 `root` 之间的每一级目录，不查 `root` 本身及其上——城根放在哪里是人选的，`/home` 指向 `var/home`、macOS 的 `$TMPDIR` 经 `/var` 这样的链接不是 run 能造出来的写路径。不在 `root` 之下的路径退回到查到文件系统根，所以界只会放宽人选的那一段。被否：沿用 `WriteTarget::at` 查到文件系统根（城只要放在链接下面，导出与恢复就整次失败）。runtime 的 edit 工具同一条理由：它以城根为界调 `within`，因为 macOS 的临时目录都在 `/var` 这个链接之下，查到文件系统根的写门在那里拒绝每一次编辑（`crates/runtime/src/tools/edit/tests.rs` 里放在链接下面的城那一条）。字节先写同目录的暂存文件 `.<name>.part`（这个拼写只在 `landing` 定义一处；导出不把合这个拼写的名字当城文件带走，因为恢复中途崩溃会把暂存文件留在城根下）、`sync_data`，再把原权限抄到暂存文件上，最后 `rename` 覆盖并 `sync_dir`。原权限按 `landing::Bits` 取：复制城文件时取源文件的（可执行位、只读位随文件走，导出再恢复后不丢），写清单与历史时取被覆盖文件的（没有就用新建默认值）。`rename` 换的是目录项，所以判定之后才出现的硬链接也写不穿（硬链接本身在 `WriteTarget` 被拒，8-25），且不存在「名已删、字节未落」的丢文件窗口。权限在 `sync_data` 之后才抄：只读位一旦落上，Windows 不再允许以写句柄打开该文件。被否：写前移除该名再建（失败即丢文件，且按 umask 新建，丢可执行位）；就地截断重写（写穿硬链接，崩溃留半个文件）。链接臂是拒绝不是跳过——对照组的 “skipped N files” 就是宽容部分还原。悬空链接在列举中不可见（`is_file`／`is_dir` 走不到它），但落盘必须先过 `WriteTarget`，故恒拒仍然成立。
 
 ### 8-14 storage::error（形状 2 值）
 
@@ -927,7 +926,8 @@ impl Vfs for RealFs { … }
 - `MergeWouldDiscard`→`E_VERSION_CONFLICT`：不可定义掉——人的未提交改动在城市目录里，机器无权决定它与节点的活谁留下；能定义掉的「静默覆盖」已由 SAFE 检出定义掉。
 - `Worktree`→`E_STORAGE_FATAL`：不可定义掉——仓库与文件系统是外部世界；能定义掉的那部分（名字走出目录）已由 `WorktreeName` 在构造点定义掉。
 - `Alias`→`E_OUTSIDE_WRITE_DOMAIN`：不可定义掉——名字与它指向的文件之间隔着一个链接是外部文件系统的事实；能定义掉的那部分（一次写入经链接穿透）已由 `WriteTarget` 在构造点定义掉，recovery 恒为「换成普通文件后重试」，故被拒的 run 不会卡死。硬链接臂在两个平台上都在这个码下（链接计数大于 1 即拒，§3.5）。
-- **Windows 上硬链接按链接计数字面拒绝，计数经 `winapi-util` 的句柄读取。** 同一个硬链接在两个平台上得到同一个答案：`E_OUTSIDE_WRITE_DOMAIN`，恢复是换成普通文件后重试。被否：Windows 上维持不报拒、只靠写入落新 entry——同一条规则在 Unix 拒、在 Windows 静默拆开，拆开的那一臂还要靠每一扇写门都记得换目录项，edit 的「写前移除该名再建」正是这样来的（§3.10）。代价是每个被判定的普通文件多开一次句柄，读数在 8-25。**重开参数**：Windows `std` 出现稳定的 `number_of_links`。
+- **Windows 上硬链接按链接计数字面拒绝，计数经 `winapi-util` 的句柄读取。** 同一个硬链接在两个平台上得到同一个答案：`E_OUTSIDE_WRITE_DOMAIN`，恢复是换成普通文件后重试。被否：Windows 上维持不报拒、只靠写入落新 entry——同一条规则在 Unix 拒、在 Windows 静默拆开，拆开的那一臂还要靠每一扇写门都记得换目录项，edit 曾经的「写前移除该名再建」正是这样来的，今天它经 `WriteTarget::replace` 落盘（8-32）。代价是每个被判定的普通文件多开一次句柄，读数在 8-25。**重开参数**：Windows `std` 出现稳定的 `number_of_links`。
+- **runtime 的 edit 经本 crate 落盘，新建由文件系统原子地占名（8-32）。** 落盘纪律只有一处：替换就是 `bundle::landing::land`，新建是 `create_new` 加同样的刷盘。理由：edit 自己的「写前移除该名再建」有丢文件与丢权限两个窗口（8-12 已否），而「仅新建」要的「竞争创建只成一次」只有在写的那一刻由文件系统判才成立；先查 `exists` 再写，两次调用都会查到「不存在」。被否：①edit 留在 runtime 里自己写，只把移除换成暂存再 `rename`——同一条纪律的第二份抄本；②新建也走暂存再 `rename`——`rename` 会覆盖竞争者刚建成的文件，占名就不再是原子的。**重开参数**：出现要在新建时保留别处权限位的调用方（今天新建取新建默认值）。
 - `LedgerBroken`→`E_STORAGE_FATAL`：不可定义掉——写与 sync 的失败来自介质；能定义掉的那部分（失败之后再写的一波被下次 open 截掉，却已答了 `Ok`）已由 `Barrier` 定义掉。recovery 是修好盘之后重启，由 open 修段尾。
 - `Envelope`→`E_LOG_VERSION_UNSUPPORTED` 同族拒读（段中损坏非尾部＝不可自动修复，指出路径交人决定）。
 - `LedgerHeld`→`E_LEDGER_HELD`（装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各跑一次 `up`／`serve`／`resume`）。能定义掉的那部分已经定义掉：锁先于一切读写，被拒的一方不会先写下任何东西。recovery 说明持锁的是另一个 sprawling 进程，以及怎样停下它。
@@ -1060,7 +1060,7 @@ impl WriteTarget {
 pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, StorageError>;   // 叶级分类，walk 用
 ```
 
-- **别名族全不穿透（junction／symlink／硬链接）。** junction 与 symlink 都是重解析点、`file_type().is_symlink()` 对两者同真，故合为 `Link`；硬链接是链接计数大于 1 的普通文件（Unix 读 `nlink`，Windows 经句柄读 `number_of_links`，§3.5）。三者在每一扇门**字面拒绝**。判定与落盘之间的替换窗口由落盘纪律罩住：`bundle::landing::land` 把同目录的暂存文件 `rename` 覆盖该名，换的是目录项，其它名字保有旧字节。「写前移除该名再建」同样换目录项，但移除之后写入失败即丢文件、新建即丢权限位，8-12 否决它；`runtime::tools::edit` 仍这样写，那是 §3.10 记下的未决分歧，不是本节认可的第二种纪律。**被否：跳过并报数**（对照组 “skipped N files”）——部分落盘破坏全成/全拒，且一行计数无法让重放方复现跳过了哪几个。
+- **别名族全不穿透（junction／symlink／硬链接）。** junction 与 symlink 都是重解析点、`file_type().is_symlink()` 对两者同真，故合为 `Link`；硬链接是链接计数大于 1 的普通文件（Unix 读 `nlink`，Windows 经句柄读 `number_of_links`，§3.5）。三者在每一扇门**字面拒绝**。判定与落盘之间的替换窗口由落盘纪律罩住：`bundle::landing::land` 把同目录的暂存文件 `rename` 覆盖该名，换的是目录项，其它名字保有旧字节。「写前移除该名再建」同样换目录项，但移除之后写入失败即丢文件、新建即丢权限位，8-12 否决它，runtime 的 edit 也已改走同一个落盘函数（8-32）。**被否：跳过并报数**（对照组 “skipped N files”）——部分落盘破坏全成/全拒，且一行计数无法让重放方复现跳过了哪几个。
 - **`WriteTarget` 是形状 2 值：不变量在唯一构造点，字段私有。** 「未经检查的写目标拼不出来」由 trybuild 编译失败反例钉住（`tests/ui/`）。它的证明范围是「检查那一刻这个名与它的父级都不是链接」；检查与落盘之间的替换窗口属效果面，故两个采样点（walk 与写入）都过同一判定。硬链接在两个平台上都在判定内被拒。
 - **消费面是三个写域加一个工具写面**：checkpoint 暂存回调（8-8）、bundle 的 `landing::land`（8-12；`worktree::back::restore_file` 也经它落盘，8-27）、worktree 放置，加上 `runtime::tools::edit` 的物理写入（运行的写域）——经链接写保留路径在每一扇门恒拒。
 - **proptest 族「别名永不落盘」**：对别名种类 × 目标（受保护／普通）× 落点（名上／父目录）的组合，凡该平台造得出的别名（junction 无需特权即可创建；symlink 需特权；硬链接随处可造）：链接臂与硬链接臂写入都被拒；各臂同一断言——目标字节不变、别名带不出新字节；该平台造不出的退化为断言「放置失败时盘上无任何变化」，各臂同性质。
@@ -1188,6 +1188,22 @@ impl WorktreeLease { pub fn work(&self) -> FileWork; }   // 领这棵树花了�
 - **放置（新建一棵）。** 称城的工作树一遍（`walked` 是城的目录项数，`.git` 与 reserved 两个不下探的目录各算一项），全量检出（`created` 是树里的文件数，子模块不算），`rewritten` 与 `removed` 为 0。树的 `disk` 取检出刚写下的索引：libgit2 每写一个文件就 lstat 它，把大小记进索引项，所以各项大小之和就是量出来的字节，不必再走一遍新树。被否：检出后再 `measure` 新树——多读一遍 N 个目录项，而新树里只有检出写下的文件。索引项的大小是 32 位（git 索引格式），4 GiB 及以上的单个文件记成取模后的值，`disk` 随之偏小；`disk` 只进 `worktree_opened` 的读数，不参与任何判定。
 - **再领（留着的树）。** `created`、`rewritten`、`removed` 取 scope 内检出的通知（`CheckoutNotificationType::UPDATED` 与 `UNTRACKED`，libgit2 在改盘之前逐项告知）：目标没有的已跟踪文件算 `removed`，盘上没有的算 `created`，其余算 `rewritten`，被删的未跟踪项算 `removed`。所以一次什么都没变的再领这三个数都是 0，一个 run 在 scope 里改了一个文件、多留了一个文件，下一次再领就是 1、0、1。`walked` 是 `disk` 那一遍全树称重，随树的大小长：树里可能有 scope 之外、上一次 run 留下的未跟踪文件（构建产物），只有走一遍才量得到。取消这一遍要么让 `disk` 只报已跟踪的字节，要么把它改成估计值，两者都改了 `worktree_opened` 的含义。**重开参数**：`disk` 不再需要是量出来的值时。
 - **首次放置仍检出整棵树。** git2 不把 `checkout_options` 暴露成安全接口（8-9）；而且 run 会读 scope 之外的文件，`exec` 里的编译器经真实文件系统读依赖，按需放置必须覆盖这些读取，缩到 scope 会让它们读不到。所以新建文件数的缩减落在 run 的沙箱副本上：每条沙箱命令不再复制整棵树（runtime-SPEC §8-13-2、§12.10）。不用硬链接把树「放」成共享文件：共享可写文件的两棵树不是彼此隔离的两棵树，一边的写入会出现在另一边。
+
+### 8-32 `alias::WriteTarget` 的两种落盘：替换与新建（形状 4 适配器）
+
+```rust
+impl WriteTarget {
+    pub fn replace(self, bytes: &[u8]) -> Result<(), StorageError>;   // 暂存文件再 rename，取被替换文件的权限
+    pub fn create(self, bytes: &[u8]) -> Result<(), StorageError>;    // 名字不存在才建；已有即 NameTaken
+}
+pub enum StorageError { /* …既有臂… */ NameTaken { path: PathBuf } }   // → E_VERSION_CONFLICT
+```
+
+- **落盘纪律只有一处，runtime 借用它。** `replace` 就是 `bundle::landing::land`（`Bits::OfReplaced`）：字节先写同目录的暂存文件、`sync_data`、抄被替换文件的权限、`rename` 覆盖、`sync_dir`（8-12）。runtime 的 edit 改写一个已有文件时经它落盘，写前移除该名再建的做法随之删去：移除之后写入失败不再丢文件，可执行位也不再丢。
+- **`create` 由文件系统原子地占名。** 以「仅当不存在才建」（`create_new`）打开目标：名字上已有任何东西——普通文件、悬空链接、别的调用刚建成的文件——都答 `NameTaken`，什么都不写；占到之后写入字节、`sync_data`，再 `sync_dir` 父目录。两次竞争的新建只有一次占得到名字，这是 `WriteLimit::Create` 的「竞争创建只成一次」在盘上的依据（kernel-SPEC §8-78）。占到名字之后写入失败，删掉自己刚建的文件再报原来的失败；删也失败时报删的失败，因为那时盘上留着半个文件，这才是调用方要处理的状态。
+- **两者都消费清过的目标**：只有经 `WriteTarget::at`／`within` 清过别名的名字才落得了盘（8-25），所以经链接新建或改写一个旧文件在两条路上都不通。
+- `NameTaken`→`E_VERSION_CONFLICT`：不可定义掉——名字有没有被占是落盘那一刻文件系统的事实。恢复：读那个文件、对着它的版本改，或换一个名字。
+- 验收：`alias` 测试 `two_racing_creates_admit_one`（八个线程同时新建同一个名字，恰一个 `Ok`，其余 `NameTaken`，盘上是那一个的字节）；runtime 的 `an_existing_file_is_unchanged_under_create_by_edit_exec_and_link`。
 
 ### 8-29 `storage::blob`：一次提交里一个文件的字节（形状 4 adapter）
 
