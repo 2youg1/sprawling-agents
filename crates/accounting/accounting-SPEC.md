@@ -488,7 +488,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
 - **失败**：构造器与 `form` 原样传账本、CAS、`city` 与 `Standing::fold` 的 `AxError`，本节不另造错误码。
 - **测试的手**：`accounting::worker::fixture::hands()` 交一份不碰主机的 `Hands`——内存里的 vault、读墙钟的测试钟、一台什么都没有的机器、宽裕的内存与卷、拒绝的文件管理器、空的浏览器表、拒绝的桌面程序、拒绝的需求表、没有解释器与 shell、`runtime::AbsentSandbox`。要真的某一只手的测试，自己换上那一只。
 
-### 8-18 重开时冻结死掉的 run（`accounting::worker::genesis::lost`、`RunWorker::startup_scan`，形状 1 判定）
+### 8-18 重开时冻结死掉的 run；上手指南的进度与 `gh` 的候选 ID 从哪一处答（`accounting::worker::genesis::lost`、`accounting::guide`、`accounting::views::answering::github`）
 
 #### 8-18-1 启动扫描为死掉的 run 写冻结
 
@@ -509,6 +509,35 @@ pub struct ScanReport { /* …既有字段… */ pub frozen_runs: usize }
 - **幂等。** 第二次扫描看到的每次 run 都已冻结，什么都不写；`ScanReport.frozen_runs` 是这一次写了几行，`summary` 把它与关掉的调用数并列告诉人。
 - **不做的事。** 不写 `handoff_written`：死掉的 run 没留下交接，替它编一份是假话；不起后继：冻结的 run 是历史，接手由人或计划另派（ARCHITECTURE §13.7）。
 - 验收：`genesis::tests` 的 `a_run_the_process_died_in_is_frozen_once`（冻结行的载荷、作者与次数，第二次扫描不再写）；崩溃验收（sprawling-SPEC 8-127）钉住城景里那次 run 的最后一行是冻结、结局是 `cancelled`。
+
+#### 8-18-2 上手指南的进度（`accounting::guide`，形状 4 适配器）
+
+```rust
+// accounting::guide
+pub fn read(city_root: &Path) -> Result<wire::GuideProgress, AxError>;
+pub fn put(city_root: &Path, progress: &wire::GuideProgress) -> Result<(), AxError>;
+```
+
+- **一份记录，一种文法。** 文件 `CityLayout::guide`（`<城>/.sprawling/GUIDE.toml`）就是 `wire::GuideProgress` 的 TOML 序列化，与 `person` 的 `[ui]` 是 `PreferencesAnswer` 的序列化同一条理（§8-8）：本模块只读与写，什么是一步、什么是标记由线上的类型说。
+- **读。** 文件不在即 `GuideProgress::default()`；读不出或解析不了答 `E_CONFIG_INVALID`（文件与原因）或 `E_STORAGE_FATAL`（读不了），视图把两者答成 `Unavailable`，不拿缺省值冒充。
+- **写。** 经 `city::edit_document` 整份替换，读者在写的途中只会读到写之前或写之后的那一份；保留子树不存在时先建它。`Command::PutGuide` 由 `worker::commanding::routing` 直接交给 `put`，不写账本行（wire-SPEC §8-68）。
+- 验收：`worker::commanding::tests::guide` 的 `the_guide_keeps_its_progress_across_a_reopen`。
+
+#### 8-18-3 `gh` 的候选 ID 从哪一处答（`accounting::views::answering::github`，形状 1 判定）
+
+```rust
+// accounting::views::answering::github
+pub(crate) const DEFAULT_HOST: &str = "github.com";
+pub(crate) fn github_answer(ask: Option<fn(&str) -> wire::GithubReading>, host: Option<&str>) -> wire::Answer;
+// accounting::views::served
+impl Views { pub fn ask_github_through(&mut self, login: fn(&str) -> wire::GithubReading); }
+// bin::doctor::github（sprawling）
+pub(crate) fn login(host: &str) -> wire::GithubReading;
+```
+
+- **视图只判两件事。** 问哪台主机（`host` 缺席即 `DEFAULT_HOST`），以及它是不是一个主机名（字母、数字、`.`、`-`、`:`，不以 `-` 开头、不为空）；不是就答 `NotAHost`，不调用交进来的函数。其余交给交进来的那一个，在 `Prepared::finish` 里、快照放开之后调用（§12 第 13 条同形）。没有交的视图答 `Unavailable`。
+- **二进制跑 gh。** `bin::doctor::github::login` 经 `doctor::host::find_program("gh")` 找程序，找不到答 `NoCli`；找到就起 `gh api --hostname <host> user --jq .login`，stdin 为空、stdout 接管道、stderr 丢弃、`GH_PROMPT_DISABLED=1`，以固定间隔数次数等它结束（与 `doctor::running` 同一种有界的等），数完仍未结束就经 `running::stop` 停下它。退出码 0 且 stdout 第一行是一个 login 答 `Found`；4 答 `NotLoggedIn`；其余答 `Failed { exit }`；起不来、被停下或 0 却读不出 login 答 `Failed`（起不来与被停下时 `exit` 为 `None`）；超时之后 `running::stop` 也停不下它时答 `Stuck`，带 `stop` 说的原因。退出码到答复的映射是一个纯函数，三种答复各有一条测试。
+- 验收：`views::answering::github` 的 `a_github_login_is_asked_of_the_reader_the_views_were_handed`；`bin::doctor::github` 的 `no_gh_on_the_search_path_is_no_cli`、`exit_four_is_not_logged_in`、`a_login_on_the_first_line_is_found`。
 
 ### 8-12 accounting::playback：一段历史成为一份可以重算的 playback bundle（形状 7 投影）
 
@@ -755,4 +784,4 @@ pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError>;
     (i) `Select.lean` 的场景表只写在 Lean 里，`scenes_agree` 证明模型给出表里的结果，Rust 测试从同一个 `.lean` 文件读表、跑生产的 `export`。理由：表只有一份，模型与实现分别对它负责；Lean 输出一份 JSON 再由 Rust 读，要多一个必须与 `.lean` 保持同步的生成物，测试还要先跑一次 Lean。被否决的做法：Lean 生成 JSON 夹具；Rust 里另写一份场景表。
 27. **一个 session 的身份冻在房间那一层，读回失败就拒，不换成此刻的名字。** 理由：session 的形状（模型、强度）已经记在房间那一层，`/new` 清的也是它，身份跟着同一个边界就不需要另一条「何时重读身份」的规则（city-SPEC §12.11）；读不回冻下的那一版时换成此刻的名字，等于在 session 中途悄悄改名，而这正是冻结要防的。被否决的做法：每次 run 现读身份——改名立刻改掉正在进行的 session 的前缀，provider 的前缀缓存从 city 段起失效，页面上的旧 session 与请求里的名字也对不上。
 28. **`whose --trace` 的逻辑是读面上的一个模块 `accounting::trace`，从 `Query::Commit` 的答出发再读账本，不加线上查询；同楼的别人只计数。** 理由：区间的两端已经在 `CommitAnswer` 的 `seq` 与 `previous` 里，调用的读法已经在 `views::turns` 里；今天的读者是读盘的 CLI，下一轮的 playback 与验收工具都在本 crate 里或经本 crate 读。同楼别的 run 的写也可能落进这个提交，但把它们的调用与本 run 的并列，会把「候选」读成「原因」，所以只给条数与地址，要细看的人拿 `view --run` 去读。被否决的做法：①加 `Query::Trace`：线上多一个形状、`WIRE_V` 进一位、`wire.ts` 与 adversary 的门面都要跟着改，换来的只是把这几步搬到服务端，而 CLI 本来就读盘；②按 `Call.effect` 只留写调用：读调用决定了写什么，去掉它们就去掉了归因的一半证据，`effect` 留在每条调用上由读者判断；③区间以 git 的父提交或全城紧邻的上一个提交为界：两者都可能属于别的 run，会把别人的调用算成这个 run 的。重开参数：页面要显示一个提交的调用时（那时要一个线上查询，本模块搬到 `views` 后面作答）；或同一栋楼里几个 run 同写一棵树成为常态、条数不够区分时。
-30. **死掉的 run 由启动扫描冻结，冻结行写成它的居民，结局读 `RunFrozen::lost`。** (a) 理由：只有拿到写者锁的那一刻才知道没有别的进程在驱动它，而 `startup_scan` 正是那一刻的那一遍验链；视图与 worker 的折叠都从账本来，账上一行冻结让服务中的城与重开的城对同一次 run 说同一个结局。写成居民而不是城，与补写结果未知的调用同一条理由，按居民计数的读者不必为死亡另写一条规则。被否决的做法：在服务时由视图把「没有冻结行、进程已重开过」的 run 读作死掉——那是视图的第二条冻结规则，而且一次性的 `views::ask` 与服务中的视图会各算一次；由 `RunWorker::new` 冻结——`new` 也在 `serve` 里跑，那时冻结要跟账本证明的次序对齐，而 `resume` 本来就是收拾死亡的那一步（sprawling-SPEC 8-109）。重开参数：`serve` 也要在起步时收拾死亡（不经 `resume`）时，把这一遍挪进它的起步路径，次序仍是先补调用、后冻 run。
+30. **死掉的 run 由启动扫描冻结，冻结行写成它的居民，结局读 `RunFrozen::lost`。** (a) 理由：只有拿到写者锁的那一刻才知道没有别的进程在驱动它，而 `startup_scan` 正是那一刻的那一遍验链；视图与 worker 的折叠都从账本来，账上一行冻结让服务中的城与重开的城对同一次 run 说同一个结局。写成居民而不是城，与补写结果未知的调用同一条理由，按居民计数的读者不必为死亡另写一条规则。被否决的做法：在服务时由视图把「没有冻结行、进程已重开过」的 run 读作死掉——那是视图的第二条冻结规则，而且一次性的 `views::ask` 与服务中的视图会各算一次；由 `RunWorker::new` 冻结——`new` 也在 `serve` 里跑，那时冻结要跟账本证明的次序对齐，而 `resume` 本来就是收拾死亡的那一步（sprawling-SPEC 8-109）。重开参数：`serve` 也要在起步时收拾死亡（不经 `resume`）时，把这一遍挪进它的起步路径，次序仍是先补调用、后冻 run。 (b) **指南进度住 `accounting::guide`，一个与 `person` 平行的模块，读写各一扇门。** 理由：页面读与命令写读的是同一份文件，文件的文法只能有一处；它不属于视图的折叠，也不属于 worker 的状态，`person` 已经是「一份人改的文件，读整份、写整份」的样子。被否决的做法：读放在 `views::answering`、写放在 `worker::commanding`——两处各知道一遍文件的形状。(c) **跑 gh 的函数经 `Views::ask_github_through` 交进来，主机名的判定与缺省主机留在视图。** 理由：起子进程碰主机，按第 9、10 条住 `sprawling`、经 `fn` 指针交进来；而「问哪台主机、这个串能不能交给 gh」是城对输入的判定，测试不必起 gh 就能判它。被否决的做法：经 `Hands` 交给 worker——这是一条查询，worker 不答查询；在二进制里判主机名——测试就要经过子进程才看得到拒绝。

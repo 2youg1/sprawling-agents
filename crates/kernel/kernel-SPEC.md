@@ -2214,6 +2214,7 @@ pub const ARCHIVE_DIR: &str = "Archive";
 pub const JOB_FILE: &str = "JOB.md";
 pub const HANDOFF_FILE: &str = "Handoff.md";
 pub const URBANITE_FILE: &str = "URBANITE.md";
+pub const GUIDE_FILE: &str = "GUIDE.toml";                          // 上手指南的进度，城的保留子树下（wire-SPEC §8-68）
 pub const TRANSCRIPT_EXT: &str = "jsonl";                            // 一次 run 的对话记录：房间里的 `<run>.jsonl`
 pub const RUN_ID_PATTERN: &str = "????????-????-????-????-????????????";   // `RunId` 显示形的 git 忽略模式，一个字符一个 `?`
 pub const REMOTE_DIR: &str = "remote";                               // 远程门的状态，城的保留子树下（§8-76）
@@ -2238,6 +2239,7 @@ impl CityLayout {
     pub fn job(&self, addr: &Address) -> PathBuf;               // <scope>/JOB.md
     pub fn handoff(&self, room: &Address) -> PathBuf;           // <scope>/Handoff.md
     pub fn urbanite(&self, addr: &Address) -> PathBuf;          // <scope>/URBANITE.md
+    pub fn guide(&self) -> PathBuf;                             // root/.sprawling/GUIDE.toml
     pub fn devices(&self) -> PathBuf;                           // root/.sprawling/remote/devices.toml（§8-76）
     pub fn playback_exports(&self) -> PathBuf;                  // root/.sprawling/playback
     pub fn city_address(&self) -> Option<Address>;             // 城自己的名字：根目录名，能拼成地址时

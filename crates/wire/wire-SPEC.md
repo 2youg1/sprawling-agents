@@ -54,7 +54,7 @@
 
 公开面见 `tools/xtask/api-baselines/wire.txt`。装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
 
-**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`CommitAnswer` 带出提交说明；身份的另外两件——在主机上经 `gh` 导入用户 ID 的读（一条 `Query`，在锁外跑 `gh api --hostname <host> user --jq .login`，只取 login，不读不记令牌，失败答拒因）与上手指南按城保存的进度（存放位置在 `kernel::layout` 的 `urbanite` 一组之后，待定）。下列新名字只动名字表，哈希随之变，不另进位：按房间分页列出 session 的查询（UC7b：起点 seq、起点方式——新开、`--carry`、分叉及其 `Origin`——、run 数、最近一次活动）。后者未落的原因是读法：今天视图只持热视图里最近冻结的 32 个 run，账本索引只按 run 建表，所以要么视图多折一张按房间的 session 表（视图快照的 `fold_version` 随之进一位），要么 `storage::index` 多建一张按地址的表；判定它的证据是两种做法在 40 万行城上开一次「最近」段的读数。每落一项删一项。
+**已定而未落的改形。** 下列改形与 §8-53 起各节共用 `WIRE_V` 45（§12.1）：`CommitAnswer` 带出提交说明。下列新名字只动名字表，哈希随之变，不另进位：按房间分页列出 session 的查询（UC7b：起点 seq、起点方式——新开、`--carry`、分叉及其 `Origin`——、run 数、最近一次活动）。后者未落的原因是读法：今天视图只持热视图里最近冻结的 32 个 run，账本索引只按 run 建表，所以要么视图多折一张按房间的 session 表（视图快照的 `fold_version` 随之进一位），要么 `storage::index` 多建一张按地址的表；判定它的证据是两种做法在 40 万行城上开一次「最近」段的读数。每落一项删一项。
 
 ## 5 权威信源
 
@@ -493,6 +493,16 @@ WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionN
 **被否**：①给 `wire::Command` 加一个 `class()` 方法：要么本 crate 依赖 `remote_access`，要么另立一个同值的枚举，两处定义同一组值；②在表里写类、中继在启动时解析 SPEC：二进制读一份 Markdown 做授权，文档的排版错误就成了门的漏洞；③不写表、只留匹配：一个动词能不能从城外做，是人要读到、要决定的事，藏在代码里没人看。
 
 **重开参数**：wire 的规格迁成 `Spec.lean` 时，`class` 改写成 `def Command.verbClass` 的一臂一行，`xtask wiring` 按 xtask-SPEC §8-45 读它。
+
+### 12.7 GitHub 导入是一条只读查询，由二进制跑 gh；指南进度是一个按城的文件，整份写
+
+**决定**：(a) 从 gh 读用户 ID 是 `Query::GithubLogin`，答一个候选与它来自的主机，不写任何东西；跑 gh 的函数住二进制（`bin::doctor::github`），由服务中的城交给视图（§8-67）。(b) 上手指南的进度是 `Query::Guide` 与 `Command::PutGuide`，存进城保留子树里的 `GUIDE.toml`，整份写、后到者为准、不写账本行（§8-68）。
+
+**理由**：(a) 导入只给出一个候选，保存仍经 `PutIdentity` 与它的基线守卫，所以「谁改了称呼」只有一条路；gh 的当前身份会随多账号、环境令牌而变，一条把它直接写进文件的命令会让一次按键悄悄改掉已保存的名字。起子进程是碰主机的事，按 accounting-SPEC §12 第 9、10 条它住 `sprawling`，经一个 `fn` 指针交进来；视图在放开快照之后才调用它，所以一次慢的网络请求不挡折叠。(b) 进度要跨浏览器、跨重开，所以在城里；它治理的是这座城给人看什么，所以在保留子树里、没有写域够得到；文件就是线上值的序列化，键名只有一处。它是光标而不是正文，基线守卫只会把一次普通的翻页变成冲突。
+
+**被否**：(a) ①一条命令读 gh 并直接写进 `PREFERENCES.md`：跳过了人对候选的确认与基线守卫；②在开城时读一次 gh：违背「只在人要求时跑」，并让每次开城都碰一次网络；③在 accounting 里直接起 gh：本 crate 的端口规矩（accounting-SPEC §12 第 9 条）就是为了让 citysim 与测试换得掉碰主机的那一步。(b) ①存进浏览器：换一个浏览器就从头再来；②存进人的 `~/.sprawling/config.toml`：一个人有几座城，每座城的配置不同，进度也不同；③每一步一条命令：进度的形状一变就多几条帧，而整份写的唯一代价是两个浏览器同时翻页时少一个「看过」；④写一行账本：要一个新的事件种类，而界面的位置不是这座城做过的事。
+
+**重开参数**：(a) 页面要列出 gh 已登录的全部主机供人选时，加一条读 `gh auth status` 的查询；(b) 同一座城常有几个人各开一个浏览器、各走各的指南时，进度改为按人存。
 
 ## 13 依赖选型
 
@@ -1669,6 +1679,62 @@ pub struct StatedIdentity {
 - **`WIRE_V` 不另进位**：`PutDocument` 加 `base` 是名字不变的改形，与本批其余改形共用 45（§12.1）；`PutIdentity`、`Identity` 是新名字，哈希自己会变。
 - 验收：city 的 `a_stale_identity_save_is_refused_and_the_draft_survives`（基线过期被拒、文件不变）；accounting 的 `a_new_session_freezes_the_name_the_page_shows`（实际发出的请求上下文与 `Query::Identity` 的答面同名同版本，旧 session 不改名，`/new` 之后两边一起换）。
 
+### 8-67 从 GitHub CLI 读一个候选用户 ID：`Query::GithubLogin`
+
+```rust
+// Query
+GithubLogin(Option<String>),                 // 问哪台主机 → Answer::GithubLogin(GithubLoginAnswer)；None 即 github.com
+pub struct GithubLoginAnswer {
+    pub host: String,                        // 问的是哪台主机：页面显示它，保存时写进 imported_from
+    pub reading: GithubReading,
+}
+pub enum GithubReading {
+    Found { login: String },                 // 这台主机当前认证身份的 login：一个候选，不是已保存的名字
+    NoCli,                                   // 服务这座城的机器的搜索路径上没有 gh
+    NotLoggedIn,                             // gh 在，这台主机没有登录（gh 的退出码 4）
+    Failed { exit: Option<i32> },            // 别的失败：网络、gh 自己的错误；None 是没有退出码（没起来，或超时被停下）
+    Stuck { why: String },                   // gh 超时，城停不下它：那个进程还在城的机器上跑，why 是停的时候出了什么错
+    NotAHost,                                // host 不是一个主机名，gh 没有被启动
+}
+```
+
+- **只在人按下时跑。** 这是一条查询，页面在人按「从 GitHub CLI 导入」时问一次；开城、刷新、换页都不问，城也不周期地问。读到的 login 只是候选：页面把它填进「你的 ID」卡，人保存时经 `PutIdentity` 写下（`imported_from` 记 `host`）。答复不改任何文件，所以多账号或环境令牌换了 gh 的当前身份，也不会悄悄改掉已保存的名字。
+- **跑在服务这座城的那台机器上。** 城执行 `gh api --hostname <host> user --jq .login`，stdin 为空、`GH_PROMPT_DISABLED=1`，所以 gh 不会停下来等人登录；有上限地等它结束，超时就停下它，答 `Failed { exit: None }`；停不下时答 `Stuck`，因为一个城起了却收不回的进程是人要处理的事实，与「没读到」不同。不需要管理员权限，不读、不记令牌：stdout 只取 login 那一行，stderr 不读。远程设备上的页面问到的是城那台机器的 gh，页面在导入之前说明这一点。
+- **主机由人选，默认 `github.com`。** 查询带的主机缺席即 `github.com`，这个默认只写在城一处（`accounting::views::answering::github`）。不是主机名的串（空、以 `-` 开头、带空白或 `/`）答 `NotAHost`，gh 不被启动，所以一个以 `-` 开头的串不会被 gh 读成一个选项。
+- **每种失败各有一个名字，页面按它给出路。** `NoCli`：说明装 gh 或手填；`NotLoggedIn`：说明在那台机器上运行 `gh auth login --hostname <host>`，城不替人启动登录；`Failed`：照样留着手填的草稿；`Stuck`：说明那台机器上还有一个 gh 进程；`NotAHost`：说明主机名的写法。没有一种失败清掉卡上已有的值。
+- **读的人是视图，跑的人是二进制。** 视图经 `Views::ask_github_through` 收下一个 `fn(&str) -> GithubReading`（与 `ask_upstream_through` 同形），在放开快照之后调用它；生产的那一个是 `bin::doctor::github::login`，找 gh 走 `doctor::host::find_program` 那一条搜索路径，起子进程、停子进程走 doctor 起程序的同一套规矩。没有交这个函数的视图（一次性的 `views::ask`）答 `Unavailable`。
+- **`WIRE_V` 不另进位**：`GithubLogin` 是新名字，哈希自己会变（§12.1）。
+- 验收：`bin::doctor::github` 的三条——搜索路径上没有 gh 答 `NoCli`、退出码 4 答 `NotLoggedIn`、退出码 0 加一行 login 答 `Found`；accounting 的 `a_github_login_is_asked_of_the_reader_the_views_were_handed`（缺席的 host 问的是 `github.com`，不是主机名的串不去问）。
+
+### 8-68 上手指南的进度按城保存：`Query::Guide`、`Command::PutGuide`
+
+```rust
+// Query
+Guide,                                       // → Answer::Guide(GuideProgress)
+// Command
+PutGuide { progress: GuideProgress, idem: IdemKey },
+pub struct GuideProgress {
+    pub at: Option<GuideStep>,               // 指南下次从哪一步打开；没走过时缺席
+    pub state: GuideState,                   // Open：开城时仍给出指南；Left：人离开过，开城直接进对话
+    pub dependencies: Option<GuideMark>,     // 第 2 步：依赖项
+    pub texts: Option<GuideMark>,            // 第 3 步：文本与称呼
+    pub skills: Option<GuideMark>,           // 第 4 步：导入 skill
+    pub mcp: Option<GuideMark>,              // 第 5 步：连接 MCP
+}
+pub enum GuideStep { Provider, Dependencies, Texts, Skills, Mcp }   // "provider" | "dependencies" | "texts" | "skills" | "mcp"
+pub enum GuideState { Open, Left }                                   // "open" | "left"；缺省 Open
+pub enum GuideMark { Seen, Skipped }                                 // "seen" | "skipped"；缺席即还没看过
+```
+
+- **存的是「走到哪、看过什么、跳过什么」，不存「做完了没有」。** 每一步做完没有，由已保存的配置与检测结果推出：第 1 步看服务端已确认的端点与 `main` 的选择，第 2 步看 doctor，其余各看各自的文件与连接。这里存的是另一种进度：人看过哪一步、选了跳过哪一步、下次从哪一步继续、是否已经离开指南。点开一步不算完成，跳过不画成已配置。
+- **第 1 步没有标记。** 它是唯一必做的一步，完成与否只由服务端的配置答，没有「跳过」可选；类型里于是没有它的标记格，`at` 仍可以停在它上面。
+- **按城保存，换浏览器也在。** 进度写在城的保留子树里（`kernel::layout::CityLayout::guide`，`<城>/.sprawling/GUIDE.toml`），文件就是 `GuideProgress` 的 TOML 序列化，没有第二份键表；写经 `city::edit_document` 整份替换（与 `accounting::person` 写人的配置同一条路）。浏览器的副本只是缓存。没有文件即 `GuideProgress::default()`：从头开始、仍给出指南。读不出的文件答 `Unavailable`，`PutGuide` 拒 `E_CONFIG_INVALID` 并说出文件与原因，不拿缺省值盖掉它。
+- **整份写，后到者为准。** `PutGuide` 带整份进度；两个浏览器同时移动指南时，后写的那一份留下。它是一个光标，不是人写的正文，不设基线守卫：被盖掉的最多是一个「看过」的标记，而守卫会让一次普通的翻页被拒。
+- **不写账本行。** 进度是界面的位置，不是这座城做过的事；与 `PutPreferences` 一样只落盘。回执是命令的答复本身，页面再问一次 `Guide` 即得此刻的值。
+- **`GuideProgress` 住 `wire::guide`，与 `wire::preference` 并列**：它与人的设置一样，是一份页面读、也整份写回的记录，不只是一种答复。
+- **`WIRE_V` 不另进位**：三个都是新名字（§12.1）。
+- 验收：accounting 的 `the_guide_keeps_its_progress_across_a_reopen`（`PutGuide` 写下的进度，在 worker 丢掉、城经 `views::ask` 重开读之后原样答回；没写过的城答缺省）。
+
 ### 8-60 `PutRules`：页面写一栋楼的 `RULES.toml`，整份、带基线、先求值后落盘
 
 ```rust
@@ -1826,6 +1892,7 @@ pub(super) fn command_class(command: &wire::WireCommand) -> remote_access::door:
 | `PutRules` | client | LocalOnly | 写一栋楼的 `RULES.toml`：整份、带 `base`，先求值后落盘（§8-60） |
 | `ConfigureCity` | client | LocalOnly | 写城自己那一层 `CONFIG.toml` 的 `keep_warm` 与 `effort`（§8-61） |
 | `RestoreFile` | client | LocalOnly | 把城工作树里的一个文件换回一个检查点里的那一份，检查点里没有就删去（§8-62(b)） |
+| `PutGuide` | client | LocalOnly | 写这座城的上手指南进度：走到哪一步、看过与跳过了哪几步、是否已离开指南（§8-68） |
 | `BatchByBuilding` | client | Act | 按楼成批派活 |
 | `Wake` | push | LocalOnly | 外面发生了一件事；地址由 watch 表与 triage 决定，调用方说不出房间 |
 | `Auth` | handshake | LocalOnly | 出示配对令牌，`server::decide_handshake` 吃掉它 |
