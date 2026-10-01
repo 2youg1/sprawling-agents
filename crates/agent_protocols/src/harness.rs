@@ -8,12 +8,10 @@
 //! (agent_protocols-SPEC.md 8-19).
 
 mod process;
-mod reading;
 mod roster;
 mod session;
 
 pub use process::HarnessProcess;
-pub use reading::Lines;
 pub use roster::{Harness, Launch, Program};
 pub use session::{
     AcpSession, Answer, Listener, PermissionAsk, Permit, PermitKind, PermitOption, StopReason,

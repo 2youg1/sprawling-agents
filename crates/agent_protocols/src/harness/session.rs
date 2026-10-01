@@ -30,8 +30,7 @@ use std::time::Duration;
 use kernel::{AxCode, AxError};
 use serde_json::{Value, json};
 
-use super::Lines;
-use super::reading::Heard;
+use crate::mcp::{Heard, Lines};
 
 mod report;
 

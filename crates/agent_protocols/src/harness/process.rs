@@ -17,7 +17,8 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 
 use kernel::{AxCode, AxError};
 
-use super::{AcpSession, Harness, Lines};
+use super::{AcpSession, Harness};
+use crate::mcp::Lines;
 
 /// A running harness. Dropping it kills the child and waits for it.
 pub struct HarnessProcess {

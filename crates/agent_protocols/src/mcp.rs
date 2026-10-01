@@ -41,7 +41,8 @@ pub use handshake::PROTOCOL_VERSION;
 pub use handshake::{Handshake, Rpc, handshake};
 pub use link::McpLink;
 pub use outbound::{EXTERNAL_CALL_PATIENCE, Outbound, ScriptedOutbound, digits_for_floats};
-pub use reading::{MESSAGE_CEILING, Received, read_one_message};
+pub(crate) use reading::Heard;
+pub use reading::{Lines, MESSAGE_CEILING, Received, read_one_message};
 #[cfg(feature = "conformance")]
 pub use stdio::{counting_starts, echoing, gated};
 pub use tools::{Listed, McpTool, tools_from};

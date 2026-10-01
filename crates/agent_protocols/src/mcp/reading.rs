@@ -25,8 +25,21 @@
 //! next message, so a caller that read again would take the tail of a
 //! refused message for a fresh one; the transport reclaims the
 //! child instead.
+//!
+//! [`Lines`] is the one reader of a line-framed connection, the stdio
+//! transport's and a harness session's alike: a read on a pipe has no
+//! deadline of its own, so one thread per connection reads through
+//! [`read_one_message`] and hands each message over a channel the caller
+//! waits on for a bounded time. The channel holds no queue: the reader
+//! waits until the caller takes a message before it reads the next, so a
+//! connection holds at most one message read and one being read, and the
+//! peer's own pipe is the only other buffer. The thread ends when the
+//! peer closes its output, which killing a child does, after a refusal,
+//! or when the caller drops the [`Lines`].
 
 use std::io::BufRead;
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::time::Duration;
 
 use kernel::{AxCode, AxError};
 
@@ -53,6 +66,73 @@ pub enum Received {
     /// The server closed its output between messages, which is how a
     /// child process that has finished looks from this side.
     EndOfInput,
+}
+
+/// What one peer says, as the caller waits for it.
+pub struct Lines {
+    heard: Receiver<Result<Received, AxError>>,
+}
+
+/// What one bounded wait found.
+pub(crate) enum Heard {
+    Message(String),
+    /// The peer closed its output, or its reader is gone.
+    Ended,
+    /// Nothing within the wait.
+    Silent,
+}
+
+impl Lines {
+    /// Starts the reader over `reader`, which a peer named `name` writes
+    /// into; `name` is what every refusal of this connection reports.
+    ///
+    /// # Errors
+    /// `E_TOOL_UNAVAILABLE` when the machine refuses the thread.
+    pub fn over<R: BufRead + Send + 'static>(mut reader: R, name: &str) -> Result<Lines, AxError> {
+        let (sender, heard) = std::sync::mpsc::sync_channel(0);
+        let named = name.to_owned();
+        std::thread::Builder::new()
+            .name(format!("read-{name}"))
+            .spawn(move || {
+                loop {
+                    let read = read_one_message(&mut reader, &named);
+                    // The end of input or a refusal is the last thing this
+                    // reader has to say: the bytes after an oversized
+                    // message cannot be told apart from the next one. A
+                    // closed channel means the caller stopped listening.
+                    let last = !matches!(read, Ok(Received::Message(_)));
+                    if sender.send(read).is_err() || last {
+                        break;
+                    }
+                }
+            })
+            .map_err(|err| {
+                AxError::failure(
+                    AxCode::ToolUnavailable,
+                    "start a reader",
+                    format!("{name}: {err}"),
+                )
+                .with_recovery(format!(
+                    "the machine refused a thread to read {name}; close some programs and \
+                     dispatch again"
+                ))
+            })?;
+        Ok(Lines { heard })
+    }
+
+    /// Waits at most `wait` for the next message.
+    ///
+    /// # Errors
+    /// Hands on the reader's refusal of an oversized or unreadable
+    /// message, after which this connection has nothing more to say.
+    pub(crate) fn next(&self, wait: Duration) -> Result<Heard, AxError> {
+        match self.heard.recv_timeout(wait) {
+            Ok(Ok(Received::Message(line))) => Ok(Heard::Message(line)),
+            Ok(Ok(Received::EndOfInput)) | Err(RecvTimeoutError::Disconnected) => Ok(Heard::Ended),
+            Ok(Err(refused)) => Err(refused),
+            Err(RecvTimeoutError::Timeout) => Ok(Heard::Silent),
+        }
+    }
 }
 
 /// Reads one newline-framed message from `source`, refusing anything
