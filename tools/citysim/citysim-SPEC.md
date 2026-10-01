@@ -92,6 +92,10 @@ fx 的一次修复之前，一个长回合每一步都留着整份恢复重建�
 
 被否：①把 `bin::assembly::fixture::FakeProvider` 提出来复用——它挂在 `#[cfg(test)]` 下，是 crate 内部回答 HTTP 细节的替身，脚本是散落在测试里的字符串，而且用尽后重复最后一条，黑盒检查因此看不出城多调了一次；②第三种脚本格式——替身与 `ScriptModel` 各读一种，同一段对话就要写两遍。**重开参数**：一份脚本要同时驱动两个并发的 run 时（多日小镇的确定性版本），到达顺序由机器决定，脚本加上按请求内容选路的一支，形状照 `FakeProvider` 的 `Routed`；一条检查要让城收到一条读不懂的回复时，脚本加上一种不经 `parse` 验证的条目。
 
+### 3-13 决定：`large_worktree_placement` 量的是领树，备树在计时之外
+
+放置分成两段（storage-SPEC 8-35）：`Worktrees::stock` 在没人等的时候检出一棵备树，`claim` 在 run 等着的时候接管它。场景在每次计时的 `claim` 之前调一次 `stock`，计时只包住 `claim`，因为人等的是这一段；`stock` 的代价就是改动之前的那个读数（一次全量检出），它不随这次改动变，由 storage 的计数断言守着它新建多少文件，而不是由墙钟。被否：①把 `stock` 也算进同一个样本——读数就成了两段之和，看不出领树这一段降没降；②给备树另开一行读数——要在 `bench::reading` 加一个 `Load`，那一份是读数文法的唯一权威，本决定不为一行读数改它；需要那一行时在那里加。**重开参数**：产品里有了 `stock` 的调用者之后（sprawling-SPEC 8-145），如果它的位置仍让某个人等它，把它的读数加进来。
+
 ## 4 现状分析
 
 `just sim` 跑全部场景测试，单线程、无 I/O 等待，耗时由编译主导。测量二进制（§8-5、§8-6）的读数写在 `tools/xtask/budgets.toml` 各自的行里，只入册不入门。
@@ -326,7 +330,7 @@ bench Main 在第一项读数之前算 `REGISTERED.digest`：与 `pinned` 不等
 | 场景 | 驱动的公共面 | 子指标 |
 |---|---|---|
 | `large_ledger_fold` | `accounting::views::ask`，重建每个视图的生产全路径 | `harness` |
-| `large_worktree_placement` | `storage::Checkpoint::ensure_base` 之后 `Worktrees::claim`／`release` | `whole` |
+| `large_worktree_placement` | `storage::Checkpoint::ensure_base` 之后，每轮先 `Worktrees::stock`（不计时，§3-13），再计时 `Worktrees::claim`，然后 `release`（§8-12） | `whole` |
 | `kept_worktree_reclaim` | 同一座城里同一个节点的第二次及以后的 `Worktrees::claim`，其间干线不动（storage-SPEC 8-9 的再领） | `whole` |
 | `long_session_forwarding` | `wire::ServerFrame::Event` 装帧＋序列化，即 socket 之前的本地半段 | `harness` |
 
@@ -512,6 +516,12 @@ impl ScriptedProvider {
 **失败**：`parse` 以 `E_CONFIG_INVALID` 拒一份读不懂的脚本（subject 是键路径，如 `replies[2]`，recovery 指回那一条）；套接字的失败是 `E_TOOL_UNAVAILABLE`；记录文件写不进去是 `E_STORAGE_FATAL`。
 
 **红**：`wire_script::tests::the_same_request_twice_is_recorded_byte_for_byte_alike`——两个替身各回放同一份脚本，各收一次同样的模型列表请求与对话请求，两份记录逐字节相同且各有两行；`wire_script::tests::an_exhausted_script_is_refused_with_its_code`——一条回复的脚本收到第二次对话请求，回答是 410 与码 `script_exhausted`。
+
+### 8-12 `large_worktree_placement`：领树接管一棵备树（`bench::scenarios`）
+
+每轮：`Worktrees::stock`（把备树检出或带到干线，不计时）→ `bench::stamp` → `Worktrees::claim(node-<i>, &[])` → 读时钟 → `release`。四个节点名各不相同，所以每一轮都是一次放置而不是再领；每一轮的备树都是上一轮被接管之后新检出的，干线不动，所以 `claim` 接管时不写文件（storage-SPEC 8-35 的计数）。夹具不变：512 个 16 KB 文件、4 轮，`REGISTERED.pinned` 不动。读数是 `sub=whole`，因为接管仍是盘上的改名与 git 的元数据写入，缝口不拆。
+
+前后的读数（同一台机器、debug 构建、同一夹具的放置一段，四轮）：改动之前 `claim` 一次 1.18–1.30 s；改动之后 `claim` 接管备树一次 30–37 ms，`stock` 一次 1.19–1.35 s（那次全量检出，不计时）。`budgets.toml` 的 `[large_worktree_placement]` 行由 `just bench` 的发行构建读数登记。
 
 ## 9–16 工作流程／实现／边界／错误／依赖／硬编码／影响面／测试
 

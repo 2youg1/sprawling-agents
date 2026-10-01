@@ -658,6 +658,8 @@ impl Worktrees {
     pub fn open(city_root: &Path) -> Result<Worktrees, StorageError>;
     /// `scopes` 是这棵树的写域（与检查点同一组 pathspec，空即整棵）：再领时只检出它。
     pub fn claim(&self, name: &WorktreeName, scopes: &[String]) -> Result<WorktreeLease, StorageError>;
+    /// 备一棵树给下一次放置接管（8-35）：没有就全量检出一棵，有就带到干线。返回这次备树花了文件系统什么。
+    pub fn stock(&self) -> Result<FileWork, StorageError>;
     pub fn release(&self, lease: WorktreeLease) -> Result<(), StorageError>;   // 解锁，不删树
     /// 城的唯一写者（借出的 `JsonlLedger` 即凭证）打开时调用：之前的写者没还的锁全部解开。无仓库即无事可做。
     pub fn lift_abandoned_leases(city_root: &Path, writer: &JsonlLedger) -> Result<(), StorageError>;
@@ -693,7 +695,7 @@ impl WorktreeLease {
 - **上限只称人的字节**：`measure` 跳 `.git` 与 `RESERVED_PREFIX` 子树（谓词住 `storage::reserved`，与 checkpoint 的 `stage_tree` 同一个）。
   账本、CAS、投影与别人的工作树都住 reserved 之下；把它们算进来，跑了一个月的城会因为自己的簿记长大而拒绝派活，
   并用一句「城的工作树有 N 字节」说这件事。断言：账本 4 KB、产品文件不到 1 KB 的城仍可领树。
-- **上限称一次检出，不称留着的树之和**：`WORKTREE_MAX_BYTES` 只在 `place`（新建一棵、全量检出）之前量城的工作树；再领一棵留着的树不量，留着的各棵也不相加。
+- **上限称一次检出，不称留着的树之和**：`WORKTREE_MAX_BYTES` 只在 `place`（新建一棵：接管备树或全量检出，8-35）与 `stock` 之前量城的工作树；再领一棵留着的树不量，留着的各棵也不相加。
   上限挡的是「一次检出要复制多少字节」，只有量在复制之前才挡得住；再领只把树重置到分支头，写的是差量。
   否决「领树时把留着的树加起来比上限」：那要在每次领树时走遍每一棵留着的树，正是保留树省下的那次全量遍历；而且它量的其实是磁盘占用，该比的是磁盘余量，std 读不到。
   盘上的总量因此大致是评审房间数乘以单棵上限（再领不量，所以干线长过上限之后，留着的树也跟着长过去）；留着的树在下一次开城时由 `sweep_abandoned` 收走（见下）。重开的条件：能廉价读到磁盘余量时，改为按余量拒；评审房间数不再有界时，先做回收。
@@ -707,7 +709,7 @@ impl WorktreeLease {
   它们不进提交，因为 `land` 与检查点只按 `scopes` 暂存，scope 之外的索引项就是分支头，提交的树在 scope 之外与分支头逐项相同。
   索引与分支头一致是这条的关键：路径收窄的检出只改 scope 内的索引项，scope 外的索引项若留在上一次 run 的提交上（分支刚随干线快进），下一次按 scope 暂存的提交会把干线在别处的改动悄悄退回去；若是某次 run 在 scope 外暂存过、却没有献出的路径，它会搭下一次献出进提交。所以重读的条件是「索引写成的树不是分支头的树」，而不是「分支动过」：后者漏掉第二种。先比后读，因为整份重读要走整棵树，而分支与索引都停在上一次 run 留下之处的再领最常见；比较用 `Index::write_tree`，索引的树缓存完整时它不必哈希就给出根。
   否决 skip-worktree 位：所用 git2 版本所带的 libgit2 在 `Index::update_all` 里不认这一位，置了位、盘上又没有的文件会被记成删除。
-  否决首次放置也只检出 scope：`Worktree::add` 总做一次全量检出，所用 git2 版本没有把 `checkout_options` 暴露成安全接口，而本 crate 禁 `unsafe`；重开的条件是 git2 暴露它。
+  否决首次放置也只检出 scope：`Worktree::add` 总做一次全量检出，所用 git2 版本没有把 `checkout_options` 暴露成安全接口，而本 crate 禁 `unsafe`；重开的条件是 git2 暴露它。首次放置不在人等的时候检出，靠的是备树（8-35），不是缩小检出。
   进程在 run 中途死掉会留下锁：一个城只有一个写者，所以新写者一拿到 `JsonlLedger` 就由 `lift_abandoned_leases` 解开全部锁——此时任何锁都不可能属于活着的 run。
   `E_WORKTREE_BUSY` 因此恒表示「锁着」，也就是有人正在用；登记在册但目录不存在即 prune 后重建，与 index 的「存疑即重建」同一反射。
   否决「释放即 prune 并删目录」：它让同一节点的下一次 run 重新量整个城并全量检出，代价随城的大小涨，而节点的分支本来就留着。
@@ -718,6 +720,7 @@ impl WorktreeLease {
   `.sprawling/worktrees/` 下没有登记的目录（整个子树是城的机器）；与被收登记同名、且尖端已被 HEAD 包含的分支——尖端带着 HEAD 没有的提交时，
   那是一轮已经 land 的活（PR 的 commit 就在它上面），分支留下；人把它检出成当前分支时，它已是人的，也留下。`held` 里的名字一概不动，那是活着的 run 手里的树。
   `refs/sprawling/runs/` 下的检查点引用不在清扫范围里：回收站靠它们让被删文件的提交躲过 `git gc`（§8-8）。
+  备树（`+spare`，8-35）也不在清扫范围里：它不是任何节点的树，`live` 不列它，没有登记的 `+spare` 目录也不是 `WorktreeName`；它是给下一次放置的库存，留到下一次服务照样接管。
   清扫在开城时做，因为账本的独占锁（§8-1）保证那一刻没有别的进程在用这座城——这把锁只罩本城，所以别城的树靠上面的精确路径比较排除，不靠锁；被否：在 `claim` 里顺手清——`claim` 只遇得到它要领的那个名字，别的节点留下的树它碰不到。
 - **同名再领即 `E_WORKTREE_BUSY`**；能否定义掉：能，但尚未做——当「领节点」本身变成取租约（`storage::queue` 已有队列），busy 就从错误变成排队。在那之前它是一条拒，不是一个静默的第二棵树。
 - **路径不入历史**：`worktree_opened` 载荷只携 name 与字节数。绝对路径是一台机器自己的事实，写进账本会使一本能搬到另一台机器的历史带上搬不走的东西。
@@ -943,6 +946,7 @@ impl Vfs for RealFs { … }
 - `Worktree`→`E_STORAGE_FATAL`：不可定义掉——仓库与文件系统是外部世界；能定义掉的那部分（名字走出目录）已由 `WorktreeName` 在构造点定义掉。
 - `Alias`→`E_OUTSIDE_WRITE_DOMAIN`：不可定义掉——名字与它指向的文件之间隔着一个链接是外部文件系统的事实；能定义掉的那部分（一次写入经链接穿透）已由 `WriteTarget` 在构造点定义掉，recovery 恒为「换成普通文件后重试」，故被拒的 run 不会卡死。硬链接臂在两个平台上都在这个码下（链接计数大于 1 即拒，§3.5）。
 - **Windows 上硬链接按链接计数字面拒绝，计数经 `winapi-util` 的句柄读取。** 同一个硬链接在两个平台上得到同一个答案：`E_OUTSIDE_WRITE_DOMAIN`，恢复是换成普通文件后重试。被否：Windows 上维持不报拒、只靠写入落新 entry——同一条规则在 Unix 拒、在 Windows 静默拆开，拆开的那一臂还要靠每一扇写门都记得换目录项，edit 曾经的「写前移除该名再建」正是这样来的，今天它经 `WriteTarget::replace` 落盘（8-32）。代价是每个被判定的普通文件多开一次句柄，读数在 8-25。**重开参数**：Windows `std` 出现稳定的 `number_of_links`。
+- **放置接管一棵事先检出好的备树，备树在没人等的时候检出（8-35）。** 决定：`Worktrees::stock` 在城仓库里留一棵检出在干线上的 worktree；`place` 先把它改名成节点的树、改写 git 的两份链接文件、再按再领那一段补写干线自备树以来的改动，接管不成才全量检出。理由：放置的时间花在实时扫描对每个新建文件的放行上（8-31、8-35 的读数），按新建文件计价；不在领树时新建文件，是让放置随文件数不变的唯一办法，而一次目录改名是毫秒级。被否：①只检出 scope——run 会读 scope 之外的文件，而且 git2 不给安全的检出选项（8-9）；②硬链接——两棵树共享可写字节，`alias` 对链接计数大于 1 的文件一律拒写（8-25），run 在自己的树里就写不了任何文件；③CoW 克隆——NTFS 没有，ReFS／Dev Drive 的块克隆要 `unsafe` 的 FSCTL 调用或一个 Zig 叶子，而且 Dev Drive 要管理员权限建；④压低 libgit2 的检出开销——最好也只到直接写文件的 0.5 s，仍以秒计；⑤在 `release` 里补备树——`release` 在记账线程上（sprawling-SPEC 8-113），补备树要等一次全量检出。代价：盘上多一棵树（不超过 `WORKTREE_MAX_BYTES`）；两份链接文件按 git 文档里的布局由本模块改写，换的只是末尾的 id。**重开参数**：git2 提供移动或改名 worktree 的接口（届时改用它）；城所在的卷支持块克隆而进程不需要额外权限（届时克隆比备树便宜，也不占一棵树的盘）。
 - **runtime 的 edit 经本 crate 落盘，新建由文件系统原子地占名（8-32）。** 落盘纪律只有一处：替换就是 `bundle::landing::land`，新建是 `create_new` 加同样的刷盘。理由：edit 自己的「写前移除该名再建」有丢文件与丢权限两个窗口（8-12 已否），而「仅新建」要的「竞争创建只成一次」只有在写的那一刻由文件系统判才成立；先查 `exists` 再写，两次调用都会查到「不存在」。被否：①edit 留在 runtime 里自己写，只把移除换成暂存再 `rename`——同一条纪律的第二份抄本；②新建也走暂存再 `rename`——`rename` 会覆盖竞争者刚建成的文件，占名就不再是原子的。**重开参数**：出现要在新建时保留别处权限位的调用方（今天新建取新建默认值）。
 - `LedgerBroken`→`E_STORAGE_FATAL`：不可定义掉——写与 sync 的失败来自介质；能定义掉的那部分（失败之后再写的一波被下次 open 截掉，却已答了 `Ok`）已由 `Barrier` 定义掉。recovery 是修好盘之后重启，由 open 修段尾。
 - `Envelope`→`E_LOG_VERSION_UNSUPPORTED` 同族拒读（段中损坏非尾部＝不可自动修复，指出路径交人决定）。
@@ -960,7 +964,7 @@ kernel（workspace 内层）；`thiserror`；`blake3`（经 kernel 的 chain_has
 
 ## 14 硬编码声明
 
-`SEGMENT_ROLL_BYTES = 64 MiB`（内部事务，非 consts_policy——对上层不可见，改它不改任何行为语义，只改文件切法）；段名前缀 `ledger-`＋20 位零填；CAS 分片取 hex 前 2；tmp 后缀 `.part`。均为 pub(crate) 常量，改动随本 SPEC。
+备树的 id `+spare`（8-35；`storage::worktree::trees::stock::STOCK`，私有常量：登记名、目录名、分支名都是它，选 `+` 是因为它不在 `WorktreeName` 的字符集里而 git 容许它；改它只需同时改本 SPEC）；`SEGMENT_ROLL_BYTES = 64 MiB`（内部事务，非 consts_policy——对上层不可见，改它不改任何行为语义，只改文件切法）；段名前缀 `ledger-`＋20 位零填；CAS 分片取 hex 前 2；tmp 后缀 `.part`。均为 pub(crate) 常量，改动随本 SPEC。
 
 ## 15 影响面
 
@@ -1204,7 +1208,29 @@ impl WorktreeLease { pub fn work(&self) -> FileWork; }   // 领这棵树花了�
 - **门是计数，墙钟只是读数。** 放置一棵 512 个 16 KB 文件的树 p50 约 0.9 s，等的是实时扫描对新建文件的放行，不是磁盘，也不是本 crate 的计算；墙钟随扫描器与机器变，计数不变。`trees::kept::tests` 的 `claiming_a_tree_costs_what_it_places_and_restores` 在 N 与 2N 个文件的城上各领一次、再领一次，断言四个数；墙钟与 RSS 以毫秒、MiB 记进 `budgets.toml`，不设门。
 - **放置（新建一棵）。** 称城的工作树一遍（`walked` 是城的目录项数，`.git` 与 reserved 两个不下探的目录各算一项），全量检出（`created` 是树里的文件数，子模块不算），`rewritten` 与 `removed` 为 0。树的 `disk` 取检出刚写下的索引：libgit2 每写一个文件就 lstat 它，把大小记进索引项，所以各项大小之和就是量出来的字节，不必再走一遍新树。被否：检出后再 `measure` 新树——多读一遍 N 个目录项，而新树里只有检出写下的文件。索引项的大小是 32 位（git 索引格式），4 GiB 及以上的单个文件记成取模后的值，`disk` 随之偏小；`disk` 只进 `worktree_opened` 的读数，不参与任何判定。
 - **再领（留着的树）。** `created`、`rewritten`、`removed` 取 scope 内检出的通知（`CheckoutNotificationType::UPDATED` 与 `UNTRACKED`，libgit2 在改盘之前逐项告知）：目标没有的已跟踪文件算 `removed`，盘上没有的算 `created`，其余算 `rewritten`，被删的未跟踪项算 `removed`。所以一次什么都没变的再领这三个数都是 0，一个 run 在 scope 里改了一个文件、多留了一个文件，下一次再领就是 1、0、1。`walked` 是 `disk` 那一遍全树称重，随树的大小长：树里可能有 scope 之外、上一次 run 留下的未跟踪文件（构建产物），只有走一遍才量得到。取消这一遍要么让 `disk` 只报已跟踪的字节，要么把它改成估计值，两者都改了 `worktree_opened` 的含义。**重开参数**：`disk` 不再需要是量出来的值时。
-- **首次放置仍检出整棵树。** git2 不把 `checkout_options` 暴露成安全接口（8-9）；而且 run 会读 scope 之外的文件，`exec` 里的编译器经真实文件系统读依赖，按需放置必须覆盖这些读取，缩到 scope 会让它们读不到。所以新建文件数的缩减落在 run 的沙箱副本上：每条沙箱命令不再复制整棵树（runtime-SPEC §8-13-2、§12.10）。不用硬链接把树「放」成共享文件：共享可写文件的两棵树不是彼此隔离的两棵树，一边的写入会出现在另一边。
+- **首次放置的树是整棵的。** git2 不把 `checkout_options` 暴露成安全接口（8-9）；而且 run 会读 scope 之外的文件，`exec` 里的编译器经真实文件系统读依赖，按需放置必须覆盖这些读取，缩到 scope 会让它们读不到。整棵树的文件在备树时写下（8-35），放置接管备树时只写干线自备树以来改过的文件；没有备树可接管时放置全量检出，`created` 是树里的文件数。沙箱副本的缩减另见 runtime-SPEC §8-13-2、§12.10。不用硬链接把树「放」成共享文件：共享可写文件的两棵树不是彼此隔离的两棵树，一边的写入会出现在另一边，而且链接计数大于 1 的文件在 `alias` 那里一律拒写（8-25）。
+
+### 8-35 `storage::worktree::trees::stock`：备树——检出在人等之前做完，放置只改名（形状 4 适配器）
+
+```rust
+impl Worktrees {
+    pub fn stock(&self) -> Result<FileWork, StorageError>;
+}
+// 私有：`place` 在上限预检之后先试接管
+fn adopt(&self, name: &WorktreeName, city: &Weight) -> Result<Option<WorktreeLease>, StorageError>;
+```
+
+- **为什么不能在领树时做完。** 放置一棵 512 个 16 KB 文件的树，等的是实时扫描对每个新建文件的放行（8-31）。在开着 Defender 的 NTFS 上（Windows x86_64，16 核，debug 构建）：直接写 512 个 16 KB 文件 0.47–0.53 s，512 个空文件 0.14 s，`CopyFile` 0.36–0.39 s，libgit2 全量检出 1.2 s（512 个相同的文件）到 2.2 s（512 个各不相同的文件）；把装着 512 个文件的目录改名 2.4–4.0 ms。扫描按新建的文件计价，所以任何在领树那一刻新建 N 个文件的做法都随 N 计价，缩小 libgit2 自己的开销也只能把 1.2 s 压向 0.5 s。降到毫秒只有一条路：检出挪到没人等的时候，领树时只改名。
+- **备树是什么。** 一棵登记在城仓库里、id 为 `+spare` 的 git worktree：目录 `<city>/.sprawling/worktrees/+spare`，分支 `+spare`，检出在干线上。`+` 不在 `WorktreeName` 的字符集里（8-9），所以没有节点能叫这个名字，`claim`、`release`、`plan_merge`、`claim_at` 都够不到它；`live` 不列它，所以开城的清扫（8-9）留着它——它是库存，不是崩溃留下的树，下一次服务的第一次放置照样接管它。git 的 refname 规则容许 `+`。
+- **`stock` 做什么。** 没有备树：按上限预检（与放置同一个 `refuse_oversized`），清掉一个没有登记的 `+spare` 目录（上一次备树中途失败留下的），分支 `+spare` 强制指向干线，加锁全量检出（与放置同一个 `check_out_tree`），把索引从分支头整份重读一遍再写下，然后解锁；检出失败时把登记收回，失败照原样交出。锁着的备树就是「还没检出完」，接管只接没锁的。已有、没锁：加锁，分支移到干线，整棵强制检出到分支头（与再领同一段 `restore`），同样重读、写下索引，解锁——只写干线自上次备树以来改过的文件。重读索引是为了让它带上树缓存：重读保留 blob 与模式没变的每一项的 stat，而检出之后才写下的索引让每一项都不再「racily clean」，于是接管时「索引写成的是不是分支头的树」不必哈希一棵树就答得出（debug 下这一问从 50 ms 降到 4 µs）。这一段失败也先解锁，因为一棵检出到一半的备树会在接管时被那一次 `restore` 补全，而留下的锁会让本次服务里再也没有备树可接管。已有而锁着：别的调用正在备，答零。登记在而目录或链接文件不是本模块写下的样子：收回登记再新备一棵。返回 `FileWork`（8-31）：新备时 `created` 是树的文件数、`walked` 是城的目录项；带到干线时三个数是干线改过的文件。
+- **放置先接管。** `place` 在上限预检之后先清掉同名的、没有登记的目录（`standing` 已答 `Absent`，那个目录只能是一次中途失败的放置留下的），再试 `adopt`；备树不在、锁着、已被别的放置拿走、或链接文件认不出时答 `None`，放置照旧全量检出。接管的步骤，次序是有意的：①节点没有分支就在干线上建一条（有就用它，那是节点的工作线）；②把目录 `<home>/+spare` 改名为 `<home>/<name>`——这是「拿走」，两条 lane 同时放置时只有一条改得成，另一条见 `NotFound` 便全量检出；③把目录里的 `.git` 文件改指 `.git/worktrees/<name>`；④把登记目录 `.git/worktrees/+spare` 改名为 `.git/worktrees/<name>`；⑤把登记里的 `gitdir` 改指 `<home>/<name>/.git`；⑥走再领那一段（`reattach`，scope 取整棵）：HEAD 指到节点分支、跟上干线、索引不是分支头的树就整份重读、整棵强制检出、加锁、称重。所以备树之后干线动过的文件在⑥里补写，节点已有分支时写的是分支与备树之差。分支 `+spare` 留着，下一次 `stock` 强制把它指到干线：删它要 libgit2 逐棵打开城里的每一棵树查它有没有被检出，代价随树的数目长（debug 下九棵树 33–48 ms）。HEAD 用写一个符号引用改指（`reference_symbolic`），不用 `set_head`，理由相同：`set_head` 也逐棵查分支有没有被检出（debug 下 34 ms）。
+- **两份链接文件是 git 写下的布局，本模块只换末尾那一段 id。** git-worktree(1) 的 DETAILS 一节记着这两份：工作树里的 `.git` 文件（`gitdir: <公共 git 目录>/worktrees/<id>/`）与登记目录里的 `gitdir`（`<工作树>/.git`）；`git worktree move` 改的也是它们。接管读出 libgit2 写下的原文，认得出末尾的 `worktrees/+spare/` 与 `/+spare/.git` 才接管，只把这一段换成节点的名字，其余字样（盘符、斜杠方向）原样保留；认不出就不接管，备树留给 `stock` 收回重备。
+- **每一步之后断掉都收得回来。** ②之后：`<home>/<name>` 没有登记，下一次放置先清掉它再放；备树的登记指向一个不存在的目录，下一次 `stock` 收回它重备。④之后：登记 `<name>` 指向不存在的 `<home>/+spare`，`standing` 收回登记（8-9 的「登记在册但目录不存在」），放置清掉目录再放。⑤之后、⑥之前：树与登记已一致，HEAD 仍指 `+spare`；`standing` 答「留着」，再领的 `restore` 先把 HEAD 指到节点分支，所以节点不会在别的分支上工作。
+- **读数。** 同一台机器、debug 构建、512 个 16 KB 文件的城：放置一次全量检出 1.18–1.30 s；`stock` 新备一棵 1.19–1.35 s（就是那次全量检出，挪到了没人等的地方）；放置接管备树 30–37 ms，其中拿走（读备树、建节点分支、两次改名、两份链接文件）约 15 ms，`restore`（打开、改指 HEAD、读索引、整棵检出时对 512 个文件各一次 stat）约 19 ms，称重约 1.5 ms。发行构建的读数由 `just bench` 的 `large_worktree_placement` 给出（citysim-SPEC §8-12）。
+- **计数（8-31）。** 接管的 `created`、`rewritten`、`removed` 是⑥写下的：干线自备树以来改过的文件，与树里有多少文件无关；`walked` 是城的目录项（上限预检）加新树的目录项（称重）。断言：`a_placement_from_the_stock_creates_no_file_at_either_size` 在 32 与 64 个文件的城上各备一棵、放置一次，整值比较两份 `FileWork`：备树的 `created` 是 N，放置的三个数都是 0；`a_stock_behind_the_trunk_is_placed_at_the_trunk_and_merges` 备树之后干线改一个文件，放置 `rewritten` 为 1、HEAD 在节点分支上、节点献出的改动照常合进干线；`the_stock_is_no_nodes_tree_and_outlives_the_sweep` 开城清扫之后备树还在，下一次放置不新建文件。
+- **谁来调 `stock`。** 它的代价就是一次全量检出，所以它只能放在没人等的地方：一条 lane 在它的 run 落地之后（sprawling-SPEC 8-145）。本 crate 只提供这扇门，不自己起线程（ARCHITECTURE §10 第 3 条：库 crate 起线程的地方是点名的）。没有调用者时每一次放置都全量检出，与没有这一节时相同。
+- **两个并发的窗口，结局都正确。** 两次放置争一棵备树：改名只成一次（见②）。`stock` 刷新备树与一次放置接管它：接管先看锁再改名，二者之间刷新可能刚加锁；那时刷新的检出写进一个已经改了名的路径而失败，接管的⑥把树补全，下一次 `stock` 清掉刷新留下的残目录重备。
+
 
 ### 8-32 `alias::WriteTarget` 的两种落盘：替换与新建（形状 4 适配器）
 
