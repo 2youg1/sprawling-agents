@@ -124,7 +124,7 @@ impl RunWorker {
             .map_err(storage::StorageError::into_ax)?;
         // The branch is the tree's name, so the desks opened here know it
         // while the lane still places the tree.
-        site.name_tree(&at.addr)?;
+        site.name_tree(&at)?;
         let desks = self.open_desks(&site, &at.addr)?;
         // The conversation this run opens with is rebuilt here, where
         // the ledger's index is held and its lineage line is written.

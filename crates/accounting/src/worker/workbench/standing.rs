@@ -107,10 +107,24 @@ pub(in crate::worker) struct Placing<'a> {
 }
 
 impl Site {
-    /// Lends a room under review its tree, kept between the room's runs,
-    /// and points this run's writes there instead of at the city: nothing
-    /// it writes is visible until somebody else checks it. A building
-    /// that asks for no review is left writing in the city.
+    /// Whether this run writes in the room's own tree rather than in the
+    /// city: always for an experiment, which lands nothing whatever the
+    /// building says, and otherwise when the building asks for review
+    /// (sprawling-SPEC.md 8-133). The one answer both `name_tree` and
+    /// `place_tree` read, so the branch the desks are told and the tree
+    /// the run writes in cannot disagree.
+    fn works_apart(&self, at: &super::super::Assignment) -> bool {
+        match at.policy.landing {
+            kernel::LandingPolicy::Experiment => true,
+            kernel::LandingPolicy::Ordinary => self.rules.review(),
+        }
+    }
+
+    /// Lends a room that works apart its tree, kept between the room's
+    /// runs, and points this run's writes there instead of at the city:
+    /// nothing it writes is visible until somebody else checks it, and
+    /// an experiment's never is. A run that does not work apart is left
+    /// writing in the city.
     ///
     /// The checkpoint goes up first: a worktree branches from a commit, so
     /// the city needs one before it can lend anything out.
@@ -125,13 +139,14 @@ impl Site {
     /// records it.
     pub(in crate::worker) fn place_tree<L: kernel::Ledger>(
         &mut self,
-        addr: &Address,
+        at: &super::super::Assignment,
         placing: &Placing<'_>,
         lines: &mut Stamping<'_, L>,
     ) -> Result<(), AxError> {
-        if !self.rules.review() {
+        if !self.works_apart(at) {
             return Ok(());
         }
+        let addr = &at.addr;
         // The base commit carries the same trailers every other commit
         // the city makes carries, so the first line of an adopted
         // repository's history already says which session put it there.
@@ -218,16 +233,19 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
 }
 
 impl Site {
-    /// Names the branch a room under review works on before its tree is
+    /// Names the branch a room that works apart writes on before its tree is
     /// placed. The branch is the tree's name, a function of the room
     /// alone, so the desks opened on the accounting thread know it while
     /// the lane still places the tree (sprawling-SPEC.md 8-113).
     ///
     /// # Errors
     /// Propagates a room whose tree name will not parse.
-    pub(in crate::worker) fn name_tree(&mut self, addr: &Address) -> Result<(), AxError> {
-        if self.rules.review() {
-            self.branch = Some(tree_of(addr)?.as_str().to_owned());
+    pub(in crate::worker) fn name_tree(
+        &mut self,
+        at: &super::super::Assignment,
+    ) -> Result<(), AxError> {
+        if self.works_apart(at) {
+            self.branch = Some(tree_of(&at.addr)?.as_str().to_owned());
         }
         Ok(())
     }

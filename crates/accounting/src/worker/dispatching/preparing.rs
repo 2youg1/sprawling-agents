@@ -126,7 +126,7 @@ impl LaneHalf {
         } = self;
         let clock = &*context.clock;
         site.place_tree(
-            &at.addr,
+            at,
             &Placing {
                 city_root: &laying.city_root,
                 city: laying.city,
