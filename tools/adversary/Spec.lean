@@ -164,7 +164,7 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 
 **诊断**：一件事两处判。`collab::ClaimDesk::split` 不要求 run 握着那一行，照分不误，并把这次分记成要落地的效果；落地时 `accounting::effect::Claims::of` 用 `collab::still_true` 问盘上的那一行是否仍是效果期待的状态，而 `ClaimEffect::expected_before` 对 `Split` 答的是 `In progress`——一行没人认领的计划是 `Not started`，于是整次落地被判为过时（`Claims::Stale`），不写一行、不改文件，而模型已被告知计划分好了。
 
-**已修。** 「分一行要不要先握着它」现在只由书桌判（collab D6）：`plan` 的 `split` 只分本 run 握着的那一行，没握着就当场以 `E_INVALID_ARGS` 拒绝，恢复语叫它先认领那一行，书桌不排效应；落地不再为拆分另判状态，只核认领，效应按次序重放（accounting-SPEC §8-27）。被否的另一条路——落地按书桌看到的状态判、让没人认领的一行也能分——会让两个 run 把同一行各分一次，第二组子行在第一组之后不报错地长出来（`crates/collab/spec/Claim.lean` 的 `withoutHold_splits_twice`）。反例在仓内钉住：`a_split_of_a_row_this_run_does_not_hold_is_refused_at_the_call`（`crates/collab/src/claim_tool/tests.rs`）。修的时候还找到同一类的第二条路：一个 run 分了自己握着的一行、再认领其中一片叶子，旧的落地拿盘上原文核那片叶子，叶子还不存在，整次落地被判过时；钉在 `a_run_that_splits_its_row_and_claims_a_leaf_lands_both`（`crates/accounting/src/effect.rs`）。
+**已修。** 「分一行要不要先握着它」现在只由书桌判（collab D6）：`plan` 的 `split` 只分本 run 握着的那一行，没握着就当场以 `E_INVALID_ARGS` 拒绝，恢复语叫它先认领那一行，书桌不排效应；落地不再为拆分另判状态，只核认领，效应按次序重放（accounting-SPEC §8-27）。被否的另一条路——落地按书桌看到的状态判、让没人认领的一行也能分——会让两个 run 把同一行各分一次，第二组子行在第一组之后不报错地长出来（`crates/collab/spec/Claim.lean` 的 `withoutHold_splits_twice`）。反例在仓内钉住：`a_split_of_a_row_this_run_does_not_hold_is_refused_at_the_call`（`crates/collab/src/claim_tool/split_tests.rs`）。修的时候还找到同一类的第二条路：一个 run 分了自己握着的一行、再认领其中一片叶子，旧的落地拿盘上原文核那片叶子，叶子还不存在，整次落地被判过时；钉在 `a_run_that_splits_its_row_and_claims_a_leaf_lands_both`（`crates/accounting/src/effect.rs`）。
 
 U9 的分计划的 run 照旧先认领再分（`Acceptance/Script.lean` 的 `plannerRun`）：那已经不是绕路，而是产品唯一接受的走法。走法里不加一步去看拒绝：拒词与「书桌不排效应」由上面那条仓内测试经生产入口钉住，U9 要看的是一个人第一天能走通的那一串（§3「一次可用性验收还该走什么」）。
 -/

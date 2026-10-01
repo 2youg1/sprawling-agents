@@ -405,3 +405,7 @@ mod booking_tests;
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 mod catalog_tests;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
+mod split_tests;

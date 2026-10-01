@@ -316,7 +316,7 @@ impl Claims { pub fn of(effects: &[ClaimEffect], on_disk: &str, path: PathBuf, r
 - **过时报第一条对不上的认领，重放就停在那里。** `Stale.node` 是那一行；`released` 照旧关掉本跑每一条已落账的认领。停下而不是接着核：被丢下的那条认领之后可能跟着它拆出的子行，接着核会把还不存在的子行报成「被动过」，而接着重放就得吞掉 `apply` 对一行已被别人改掉的拒绝。
 - **装配层**：`accounting::worker::settling::desks` 的 `Stale` 一臂为那一行留一条诊断（`collab::claim_tool`，Refuse 级），其余不变。
 
-**测试**：`a_run_that_splits_its_row_and_claims_a_leaf_lands_both`（`accounting::effect::tests`）；`a_split_of_a_row_this_run_does_not_hold_is_refused_at_the_call`（`collab::claim_tool::tests`）。
+**测试**：`a_run_that_splits_its_row_and_claims_a_leaf_lands_both`（`accounting::effect::tests`）；`a_split_of_a_row_this_run_does_not_hold_is_refused_at_the_call`（`collab::claim_tool::split_tests`）。
 
 ### 8-6 accounting::plan_view：计划从每问一次重解析，变成一次投影（形状 7 投影）
 
