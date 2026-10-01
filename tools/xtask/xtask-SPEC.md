@@ -1015,6 +1015,21 @@ fn judged(all: &[String], stated: &…, coded: &…) -> Vec<Violation>;
 
 **测试**：`wiring::class::tests::a_row_with_no_class_cell_is_named_by_its_verb`：夹具表里一行缺 class、一行与夹具匹配说法不一，两条违规按动词点名。
 
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-46 `guard::wall` 判唯一一张自己的 lint 表（形状 1 判定）
+
+`wall::check` 读根 `Cargo.toml` 的 `[workspace.lints]`，再经 `members`（§8-39）读每个成员的清单：
+
+- **叶子**（目录是 `LEAF`，`crates/desktop/ffi`）：它的 `[lints.rust]`／`[lints.clippy]` 与根 `[workspace.lints.rust]`／`[workspace.lints.clippy]` 逐键比对，两个方向都比，例外只在 `RECORDED`（今天一行：`rust.unsafe_code`，理由见 `crates/desktop/Spec.lean` D14）。不相等且不在 `RECORDED` 即红，位置写 `crates/desktop/ffi/Cargo.toml [lints.<表>] <键>`；在 `RECORDED` 而两侧已相等，红在那一行上，替代写「删去这一行」。
+- **其余成员**：`[lints]` 恰是 `workspace = true`；不是即红，位置写那个成员的 `Cargo.toml [lints]`，替代写「改成 `workspace = true`」。
+- **叶子不在成员里**：红在 `LEAF` 上，替代写「划掉 `LEAF` 与它在 `RECORDED` 里的行」，因为一条没有对象的例外是谁都没有再决定过要给的许可。
+- 读不出的清单是 `XtaskError::Doc`。
+
+**测试**：`guard::wall::tests` 在 `judge` 上判夹具清单：叶子的表与根表只差 `unsafe_code` 时无违规；少一条、放宽一条、多一条各一例；一个别的成员写了自己的表；叶子不在成员里；`unsafe_code` 两侧相等时那一行须划掉。
+
+**本节属门禁机具，与产品代码分开提交。**
+
 ### 8-47 `spec` 门认得检验器自己的规格（形状 1 判定）
 
 检验器 `tools/adversary` 不是 cargo 的包，`members` 列不出它，而它的规格从 Markdown 迁到 Lean 时落在 `tools/adversary/Spec.lean` 与 `tools/adversary/spec/`（ARCHITECTURE.md §11，`lakefile.toml` 为它加 `tools.adversary.Spec` 与 `tools.adversary.spec.+` 两个 glob）。门因此按位置分出第三种文件主人：
@@ -1034,19 +1049,6 @@ pub(super) fn one_per_package(root: &Path, out: &mut Vec<Violation>) -> Result<(
 - **引用的路径在盘上**：第五条也读检验器的规格。
 
 **测试**：`spec::tests` 在夹具上判：检验器的入口 import 自己的分部不报；分部 import `Sprawling.Door` 报；检验器的源文件 import 规格报；规格引用一个不在盘上的路径报；Markdown 与 Lean 两份规格并存报。
-
-**本节属门禁机具，与产品代码分开提交。**
-
-### 8-46 `guard::wall` 判唯一一张自己的 lint 表（形状 1 判定）
-
-`wall::check` 读根 `Cargo.toml` 的 `[workspace.lints]`，再经 `members`（§8-39）读每个成员的清单：
-
-- **叶子**（目录是 `LEAF`，`crates/desktop/ffi`）：它的 `[lints.rust]`／`[lints.clippy]` 与根 `[workspace.lints.rust]`／`[workspace.lints.clippy]` 逐键比对，两个方向都比，例外只在 `RECORDED`（今天一行：`rust.unsafe_code`，理由见 `crates/desktop/Spec.lean` D14）。不相等且不在 `RECORDED` 即红，位置写 `crates/desktop/ffi/Cargo.toml [lints.<表>] <键>`；在 `RECORDED` 而两侧已相等，红在那一行上，替代写「删去这一行」。
-- **其余成员**：`[lints]` 恰是 `workspace = true`；不是即红，位置写那个成员的 `Cargo.toml [lints]`，替代写「改成 `workspace = true`」。
-- **叶子不在成员里**：红在 `LEAF` 上，替代写「划掉 `LEAF` 与它在 `RECORDED` 里的行」，因为一条没有对象的例外是谁都没有再决定过要给的许可。
-- 读不出的清单是 `XtaskError::Doc`。
-
-**测试**：`guard::wall::tests` 在 `judge` 上判夹具清单：叶子的表与根表只差 `unsafe_code` 时无违规；少一条、放宽一条、多一条各一例；一个别的成员写了自己的表；叶子不在成员里；`unsafe_code` 两侧相等时那一行须划掉。
 
 **本节属门禁机具，与产品代码分开提交。**
 
