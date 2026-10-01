@@ -8,7 +8,7 @@ import { newestWorking } from "./belief/live";
 import type { View } from "./route";
 
 // The run in front of the person: the one a stop, a steer and `/diff`
-// reach from wherever they are pressed (client-SPEC 4-41, 12-15). A
+// reach from wherever they are pressed (client-SPEC 4-41, 12-16). A
 // talk page answers with its room's newest working run, a run page
 // with its own run while that run still works, and every other page
 // with none: a city, a building or the monitor shows many runs, and a

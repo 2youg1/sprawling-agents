@@ -13,7 +13,7 @@
   // drawer afterwards whatever happens here.
   //
   // **The page's answer to a stop key with no run in front of it stands
-  // in the same stack and nowhere else** (client-SPEC 12-15): it says
+  // in the same stack and nowhere else** (client-SPEC 12-16): it says
   // what the person just did, and the drawer keeps what the city said.
   //
   // **A toast leaves by itself.** Eight seconds, paused while the
