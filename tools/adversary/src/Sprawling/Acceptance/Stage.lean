@@ -10,10 +10,11 @@ import Sprawling.Layer
 
 The acceptance world is a person with a fresh folder, the binary out of a
 release archive, and a text editor. Everything that person does through the city
-goes through `Sprawling.Door`; the two things they do with the editor — naming
-the archive's `skills/` as a shelf, and admitting those skills in a building's
-reading room — are written here, as the files say a person writes them
-(`docs/getting-started.md`, "Tools, skills and MCP").
+goes through `Sprawling.Door`; what they do with the editor is written here, as
+the files say a person writes it: naming the archive's `skills/` as a shelf and
+admitting those skills in a building's reading room (`docs/getting-started.md`,
+"Tools, skills and MCP"), asking a building to review its work, and writing the
+first row of its plan (`docs/templates/RULES.toml`, `docs/templates/Roadmap.md`).
 
 Unlike `withGround`, the directory outlives one served process: the walk serves
 it, kills it in the middle of a run, and serves it again.
@@ -93,5 +94,43 @@ def admit (city : System.FilePath) (addr : String) (skills : List String) : IO U
     throw <| IO.userError s!"{rules} does not hold the line `{emptyRoom}` once"
   let named := ", ".intercalate (skills.map fun skill => s!"\"{skill}\"")
   IO.FS.writeFile rules (written.replace emptyRoom s!"reading_room = [{named}]")
+
+/-- The line a building is raised with that says its work lands unreviewed. -/
+private def unreviewed : String := "review = false"
+
+/-- Asks a building to review its work before it lands.
+
+Replaces the one line the template writes, as a person editing the file would,
+and refuses a file that does not hold it exactly once, for the reason `admit`
+gives. -/
+def askForReview (city : System.FilePath) (addr : String) : IO Unit := do
+  let rules := city / rulesLayer addr
+  let written ← IO.FS.readFile rules
+  if (written.splitOn unreviewed).length != 2 then
+    throw <| IO.userError s!"{rules} does not hold the line `{unreviewed}` once"
+  IO.FS.writeFile rules (written.replace unreviewed "review = true")
+
+/-- Where a building's plan lives, relative to the city. -/
+def roadmapOf (addr : String) : String := s!"{addr}/Roadmap.md"
+
+/-- Writes the first row of a building's plan, `1`, under the table's header.
+
+A building is raised with a plan that has no rows, and the `plan` tool divides
+rows that exist, so the first row is the person's to write. The row goes right
+under the line of dashes that ends the table's header, in the six columns the
+template names; a plan without exactly one such line is refused rather than
+guessed at. -/
+def layPlan (city : System.FilePath) (addr item : String) : IO Unit := do
+  let plan := city / roadmapOf addr
+  let lines := (← IO.FS.readFile plan).splitOn "
+"
+  match lines.filter (·.startsWith "|---") with
+  | [rule] =>
+    let row := s!"| 1 | {item} | 1 |  | Not started |  |"
+    let laid := lines.flatMap fun line => if line == rule then [line, row] else [line]
+    IO.FS.writeFile plan ("
+".intercalate laid)
+  | found =>
+    throw <| IO.userError s!"{plan} has {found.length} header rules where the template has one"
 
 end Sprawling.Acceptance

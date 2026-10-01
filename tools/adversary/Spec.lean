@@ -300,6 +300,8 @@ def reviewed : String                              -- 协作那一串的楼
 def planner left right : String                    -- 它的三个房间
 def planItem : String                              -- 人写下的那一行
 def leaves  : List String                          -- 分出来的两片叶子
+def firstLeaf secondLeaf : String                 -- 它们的编号 `1.1`、`1.2`
+def holdCalls : Nat                               -- 每个认领的 run 认领之后再调几次只读工具
 def offeredPath offeredText refusedWhy : String    -- 提出评审的文件，与查它的人说的理由
 def runsFor : List String → List (Nat → List Json) -- 按 run 开启的次序；每个 run 拿到自己的序号
 def script : List String → Json                    -- 由归档的 skill 名写出整份脚本
@@ -531,6 +533,7 @@ D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。*
 | 渲染出的一行 `attach(...)` 不折行 | 最长的那种拼法仍在 rustfmt 的宽度以内，于是渲染器写一行、rustfmt 不动它 | 换一个更长的地址会让 rustfmt 折行，逐字节对拍当场报红——这正是它该报的 |
 | 记录预算 240 × 250 ms | 一条命令等自己那条记录的上限。只在城真的还在干活时花掉；一次探测在 debug 二进制上的主要开销是构造 HTTP 客户端，不是那次被拒的连接 | 探测变快后可以调小；调小前要先量 |
 | 替身的模型 `stand-in-1` 与 U9 的楼 `acme` | 一个替身列出的 id，一栋演员表里的楼，让一次红读起来与本目录别处的报告一样 | —— |
+| `holdCalls` 300 | 两个认领的 run 同时派出，但各自先等城给它放一棵树，城一棵接一棵地放；先认领的那个要在另一个认领时仍在跑，第二次认领才由在途的 run 拒，而不是由一个已经回家的 run 放过去（`crates/accounting/src/worker/booking.rs`：预订只持续到 run 回家）。三百次是 debug 二进制上几秒，比一次放树长 | 放树变快或变慢时跟着量；第二次认领若落在第一个 run 回家之后，那一步报红并点名这个数 |
 | `statusCalls` 120、`inFlight` 3 | 被杀的 run 要在被杀时仍在调用：一次调用在 debug 二进制上约十毫秒，120 次是一秒多的在途，等到 3 条工具结果再杀；它的最后一条是一句收尾的话，城回来时若接着送它的对话，它以自己的那一句结束 | 发布二进制更快；被杀的 run 若在被杀前就冻结，那一步报红并点名这个数 |
 | 幂等键 400–411 | U9 每条命令一把，与检查树的 0–323 不相交，一份报告里不会有两条命令共用一个数 | —— |
 | 调用 id `call-<run>-<turn>` | 替身靠它认 run（`citysim-SPEC.md` §3-11），所以全脚本唯一；带上 run 的序号，一份记录里的 id 读得出是哪个 run 的 | 替身认 id 的办法变了时，这里跟着变 |

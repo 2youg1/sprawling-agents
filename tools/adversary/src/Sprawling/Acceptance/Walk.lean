@@ -20,7 +20,7 @@ The steps run in order and stop at the first that breaks, because each one
 stands on the city the steps before it left: a building that was never raised
 cannot be worked in, and a walk that went on would report one cause many times.
 
-Three servings of one folder:
+The steps of three parts live here, with what every part reads the same way:
 
 * **the first day** — the city answers, the stand-in is attached and its model
   chosen, a building is raised, its reading room admits the shipped skills, and
@@ -29,6 +29,9 @@ Three servings of one folder:
   still calling tools;
 * **the morning after** — what the killed city left verifies, the city serves
   again, and new work runs to its end.
+
+The fourth part, the collaboration, is `Sprawling.Acceptance.Collaboration`, and
+the order the parts are served in is `Sprawling.Acceptance.Servings`.
 -/
 
 namespace Sprawling.Acceptance
@@ -37,12 +40,15 @@ open Sprawling
 open Lean (Json)
 
 /-- What the walk was handed: the binary, the stand-in's URL, the archive's
-shelf with the skills on it, and the file the stand-in records into. -/
+shelf with the skills on it, the script the stand-in plays, which the walk
+appends a run to once the city has named what that run needs
+(`tools/adversary/Spec.lean` D7), and the file the stand-in records into. -/
 structure Setting where
   door : Door
   url : String
   shelf : System.FilePath
   skills : List String
+  script : System.FilePath
   record : System.FilePath
 
 /-- One step: what a person would say they did, and the check that it worked. -/
@@ -284,25 +290,5 @@ def resumed (setting : Setting) : Step :=
 def morningAfter (setting : Setting) : List Step :=
   [ verified setting "that a killed city left behind", resumed setting
   , verified setting "after the morning's work" ]
-
-/-! ## The whole walk -/
-
-/-- The name of every step the walk takes, in its order. -/
-def walkedSteps (setting : Setting) : List String :=
-  (firstDay setting).map (·.name) ++ [interruptedStep] ++ (morningAfter setting).map (·.name)
-
-/-- Walks one fresh folder through all three servings, asks the city that came
-back `atLast` once every step has held, and throws the folder away. -/
-def walk (setting : Setting) (atLast : Ground → IO α) : IO α := do
-  let stage ← Stage.raise setting.door
-  try
-    mountShelf stage.city setting.shelf
-    stage.serving setting.door fun ground => Step.runAll ground (firstDay setting)
-    interrupted setting stage
-    stage.serving setting.door fun ground => do
-      Step.runAll ground (morningAfter setting)
-      atLast ground
-  finally
-    stage.discard
 
 end Sprawling.Acceptance

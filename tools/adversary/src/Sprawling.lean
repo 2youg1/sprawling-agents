@@ -15,6 +15,8 @@ import Sprawling.Regression
 import Sprawling.Acceptance.Script
 import Sprawling.Acceptance.Stage
 import Sprawling.Acceptance.Walk
+import Sprawling.Acceptance.Collaboration
+import Sprawling.Acceptance.Servings
 import Sprawling.Acceptance.Checklist
 
 /-! The library index. It holds no logic; every rule lives in the module that
