@@ -348,12 +348,12 @@ fn a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing() 
     std::fs::write(&path, &moved).unwrap();
     let mut put = |base: &str, body: &str, tag: &[u8]| {
         worker
-            .handle(wire::Command::PutRules {
+            .handle(wire::Command::PutRules(wire::RulesWrite {
                 building: lab.clone(),
                 base: base.to_owned(),
                 body: body.to_owned(),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, tag),
-            })
+            }))
             .map_err(|err| *err.code())
     };
     let booked = |dir: &std::path::Path| {

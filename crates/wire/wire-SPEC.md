@@ -474,9 +474,9 @@ WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionN
 
 **重开参数**：运行策略多出一个只有部分派活才需要的值时，重议那个值要不要缺省。
 
-### 12.5 身份卡片的改写在城里做，页面只交值
+### 12.5 设置页上的卡片的改写在城里做，页面只交值
 
-**决定**：身份卡片发 `PutIdentity { card, base }`，由 `city::Naming` 在 `base` 上改写身份区并整份落盘；原文编辑器发 `PutDocument { which, base, body }`，城在落盘之前用同一个解析器读一遍身份区（§8-59）。
+**决定**：设置页上的卡片发 `PutIdentity { card, base }`，由 `city::Naming` 在 `base` 上改写身份区并整份落盘；原文编辑器发 `PutDocument { which, base, body }`，城在落盘之前用同一个解析器读一遍身份区（§8-59）。
 
 **理由**：身份区是 TOML，`PREFERENCES.md` 与 `MAYOR.md` 里还有人写的未知键与正文。页面若自己拼整份文件，「身份区怎么写、保留什么、名字合法与否」在 TypeScript 与 Rust 各有一份，两份迟早不一致，而写坏的一份会让下一次开城读不出名字。卡片只交值，拼法就只有城一处；两条命令携同一种 `base`，所以并发保存只有一条规则：后到的那一个被拒。
 
@@ -647,7 +647,7 @@ pub struct Decision {
 - **三份文件一条命令，不是三条**：`MAYOR.md`／`CLERK.md`／`PREFERENCES.md` 都住 `<city>/.sprawling/`（没有任何写域够得到的地方），三者的写法逐字节相同，差别只在文件名。用穷尽枚举而不是路径串：**路径由城决定，不由发帧的人决定**，否则这条命令就成了往保留子树里写任意文件的入口。
 - **`Preferences` 是第三份**：市长与文书各有身份文件，而「这个人怎么喜欢这座城办事」不属于其中任何一个居民，它属于城。它与前两者同住一处、同一条命令写，因为它们被同一条规则治理：住在保留子树里，居民读得到、改不了。
 - **`decided` 回答的是「你不在的时候，有谁替你答了什么」**：`approval_resolved` 折出来的流，旧在前——与 `HistoryAnswer` 同口径，因为折叠期待这个顺序。它**不筛掉人自己答的那些**：一份只列代答的清单，会让「我答过」与「从没人答」在界面上长得一样。谁答的写在 `autonomy` 里，那是同一次读的另一半。
-- **`PutDocument` 携 `base`**：三份文件有两个写者——原文编辑器与身份卡片，或者开在两处的两个页面——所以一次保存说明它起手时的全文，文件已经变了就拒，什么都不写（§8-59）。`edit` 工具碰不到这三份文件，居民不是它们的写者。
+- **`PutDocument` 携 `base`**：三份文件有两个写者——原文编辑器与设置页上的卡片，或者开在两处的两个页面——所以一次保存说明它起手时的全文，文件已经变了就拒，什么都不写（§8-59）。`edit` 工具碰不到这三份文件，居民不是它们的写者。
 - **被否**：（a）三条命令 `PutMayor`／`PutClerk`／`PutPreferences`——同一条规则三个入口，加第四份文件要改三处；（b）复用 `edit` 工具——`edit` 走写域，而写域恒不含保留子树，让它开一个例外就是把「居民改不了治自己的东西」这条最老的规矩打穿。
 
 ### 8-20 一段补丁是它自己的一次请求
@@ -1663,12 +1663,14 @@ pub struct StatedIdentity {
 
 ```rust
 // Command
-PutRules { building: Address, base: String, body: String, idem: IdemKey }
+PutRules(RulesWrite)
+pub struct RulesWrite { pub building: Address, pub base: String, pub body: String, pub idem: IdemKey }
 ```
 
 - **整份文本，一道基线。** `body` 是新的整份 `RULES.toml`，`base` 是页面起手时读到的那份（文件还不存在时为空串）。楼规有两个写者——人在页面上，以及住在楼里的市长经 `rules` 工具提案——所以与 `PutSpine` 同一条守卫：文件已经不是 `base` 就拒 `E_VERSION_CONFLICT`，什么都不写。
 - **先求值，后落盘。** 城先用读楼规的同一个求值器（`city::evaluate`）读 `body`，读不出——不合 TOML、缺 `confidential`、机密楼列了出网域名——就拒，盘上不动；求值通过才经基线守卫整份换上去（city-SPEC §8-34）。所以盘上的楼规永远是这个构建读得懂的那一份，下一次派活不会因为一次保存而打不开这栋楼。
 - **账上一行 `rules_changed`。** 写成之后城记一行 `rules_changed { scope: building, which: "RULES.toml", before, after, bytes }`，与派活前核对楼规的那一行同形（kernel-SPEC §8-4）；所以下一次派活看到的摘要与账上一致，不会把这次保存读成「有人绕过了门改了文件」。
+- **载荷是一个值。** `PutRules` 与 `ConfigureCity` 各带一个结构体而不是平铺的字段，线上形状与平铺时相同（`{"put_rules":{…}}`）；理由是 `Command` 住的文件与 `From<WireCommand>` 那个函数都已经贴着长度上限，一个值占一行。
 - **只经页面，不经远程设备之前先分类。** 楼规决定一栋楼能出网、能开浏览器与桌面，远程门打开之后这条帧走哪一类由 R2 定（§19-2 的 `class` 列落地时）。
 - 验收：accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing`（过期的 `base` 被拒、求值失败被拒，两次之后文件不变、账上没有 `rules_changed`；对的 `base` 与能求值的正文落盘并记一行）。
 
@@ -1676,7 +1678,8 @@ PutRules { building: Address, base: String, body: String, idem: IdemKey }
 
 ```rust
 // Command
-ConfigureCity { keep_warm: Option<KeepWarm>, effort: Option<Effort>, idem: IdemKey }
+ConfigureCity(CitySettings)
+pub struct CitySettings { pub keep_warm: Option<KeepWarm>, pub effort: Option<Effort>, pub idem: IdemKey }
 // PreferencePatch 多一臂
 CorePriority(CorePriority)                 // {"core_priority":"raised"} | {"core_priority":"normal"}
 pub enum CorePriority { Raised, Normal }   // 值集与拼法住这里，accounting::person 读写 `[core] priority` 用的就是它
@@ -1789,7 +1792,7 @@ pub enum ModelTag { /* …既有… */ Ocr }      // 线上 "ocr"
 | `PutShelved` | client | 写一份上架的文档（技能或说明） |
 | `Pursue` | client | 设一个持续追的目标，以及暂停／恢复／清除 |
 | `PutDocument` | client | 写治理这座城的三份文件之一，携 `base`（§8-59） |
-| `PutIdentity` | client | 写身份卡：城在 `base` 上改写 `PREFERENCES.md` 或 `MAYOR.md` 的身份区（§8-59） |
+| `PutIdentity` | client | 写设置页上的卡片：城在 `base` 上改写 `PREFERENCES.md` 或 `MAYOR.md` 的身份区（§8-59） |
 | `PutRules` | client | 写一栋楼的 `RULES.toml`：整份、带 `base`，先求值后落盘（§8-60） |
 | `ConfigureCity` | client | 写城自己那一层 `CONFIG.toml` 的 `keep_warm` 与 `effort`（§8-61） |
 | `RestoreFile` | client | 把城工作树里的一个文件换回一个检查点里的那一份，检查点里没有就删去（§8-62(b)） |

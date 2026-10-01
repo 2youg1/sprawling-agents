@@ -73,7 +73,7 @@ pub use carried_name::{ProviderName, TemplateName, ToolkitSlug};
 pub use command::COMMAND_NAMES;
 pub use command::{BodyOverride, EndpointTuning, HeaderPair};
 pub use command::{Carry, Command, WireCommand};
-pub use command::{GovernedDocument, HaltScope, IdentityCard, NoSecret};
+pub use command::{CitySettings, GovernedDocument, HaltScope, IdentityCard, NoSecret, RulesWrite};
 pub use command::{PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};
 #[cfg(feature = "schema")]

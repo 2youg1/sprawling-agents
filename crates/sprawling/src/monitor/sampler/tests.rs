@@ -45,8 +45,9 @@ fn ticking() -> std::time::Instant {
     static BASE: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
     static READS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let reads = READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    *BASE.get_or_init(std::time::Instant::now)
-        + std::time::Duration::from_nanos(reads.saturating_mul(1_500))
+    BASE.get_or_init(crate::serving::standing::monotonic_now)
+        .checked_add(std::time::Duration::from_nanos(reads.saturating_mul(1_500)))
+        .unwrap()
 }
 
 /// Each beat carries the views' backlog as it stands, and the time the

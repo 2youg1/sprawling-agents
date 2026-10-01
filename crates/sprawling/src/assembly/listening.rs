@@ -165,9 +165,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     rebuilt.ask_the_registry_through(crate::release::answer);
     rebuilt.ask_upstream_through(crate::doctor::newest);
     rebuilt.find_programs_through(crate::doctor::host::find_program);
-    // One verdict, made here so the views and the writer read the same
-    // one: the writer refuses lines by it, the city page says whether the
-    // history is proved by it (sprawling-SPEC.md 8-134).
+    // One verdict for the writer and the views (sprawling-SPEC.md 8-134).
     let halt = storage::ChainHalt::awaiting_proof();
     rebuilt.watch_proof(halt.clone());
     let spare = rebuilt.twin()?;

@@ -183,21 +183,17 @@ impl RunWorker {
                 self.create_building(addr, template.as_str())
             }
             wire::Command::RemoveBuilding { addr, .. } => self.remove_building(&addr),
+            // The person's entrance, so the answerer is a human by
+            // construction; a delegate arrives through its own tool.
             wire::Command::Approve { item, verdict, .. } => {
-                // The control surface is the person's entrance, so the
-                // answerer is a human here by construction. A resident
-                // answering as a delegate arrives with the tool that
-                // lets it, and takes the same door.
                 self.answer_approval(&item, verdict, &kernel::Answerer::Human)
             }
             wire::Command::SetAutonomy {
                 scope, autonomy, ..
             } => self.set_autonomy(&scope, autonomy),
             wire::Command::HandOff { item, .. } => Err(Unbuilt::HandOff(&item).not_built()),
-            // Nothing is written into the ledger: this is the person's
-            // own layer and no run can observe it, so a record of it
-            // in the city's one history would travel to every machine
-            // that city is copied to.
+            // Not recorded: the person's own layer, which no run observes
+            // and a copied city must not carry to another machine.
             wire::Command::PutPreferences { patch, .. } => crate::person::put(patch),
             wire::Command::PutShelved { name, .. } => Err(Unbuilt::PutShelved(name).not_built()),
             wire::Command::Pursue { addr, step, .. } => self.set_pursuit(&addr, step),
@@ -213,16 +209,13 @@ impl RunWorker {
             wire::Command::PutIdentity {
                 ref card, ref base, ..
             } => self.put_identity(card, base),
-            wire::Command::PutRules {
-                ref building,
-                ref base,
-                ref body,
-                ..
-            } => self.put_rules(building, base, body),
+            wire::Command::PutRules(write) => {
+                self.put_rules(&write.building, &write.base, &write.body)
+            }
             wire::Command::RestoreFile { ref at, point, .. } => self.take_back(at, point),
-            wire::Command::ConfigureCity {
-                keep_warm, effort, ..
-            } => self.configure_city(keep_warm, effort),
+            wire::Command::ConfigureCity(settings) => {
+                self.configure_city(settings.keep_warm, settings.effort)
+            }
             wire::Command::PutSpine {
                 building: ref at,
                 which,
@@ -257,11 +250,9 @@ impl RunWorker {
                 run,
                 "no run in flight answers to that id: steer one while it runs, or dispatch a new one",
             )),
-            // Four verbs the wire spells and this city cannot perform.
-            // Answered one at a time rather than by a catch-all, so that
-            // a Command added without an executor stops the build here:
-            // `wire::Command` is deliberately not `non_exhaustive`,
-            // and this match is what that decision buys.
+            // Verbs the wire spells and this city cannot perform, one arm
+            // each rather than a catch-all, so a Command added without an
+            // executor stops the build here.
             wire::Command::BatchByBuilding { addr, .. } => {
                 Err(Unbuilt::BatchByBuilding(&addr).not_built())
             }

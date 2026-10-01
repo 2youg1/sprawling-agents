@@ -7,16 +7,16 @@
 
 use kernel::model::{RunPolicy, Window};
 use kernel::{
-    Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, GitOid, IdemKey, KeepWarm,
-    McpServer, ModelTag, Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed,
-    SessionName,
+    Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, GitOid, IdemKey, McpServer,
+    ModelTag, Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed, SessionName,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
 use crate::command::step::{
-    Carry, GovernedDocument, HaltScope, IdentityCard, PursuitStep, SpineDocument,
+    Carry, CitySettings, GovernedDocument, HaltScope, IdentityCard, PursuitStep, RulesWrite,
+    SpineDocument,
 };
 use crate::command::tuning::EndpointTuning;
 use crate::named_frames::named_frames;
@@ -311,14 +311,8 @@ pub enum Command<Secret = Sealed<String>> {
         base: String,
         idem: IdemKey,
     },
-    /// Writes a building's `RULES.toml` whole, evaluated before it lands
-    /// and only over `base` (wire-SPEC.md 8-60).
-    PutRules {
-        building: Address,
-        base: String,
-        body: String,
-        idem: IdemKey,
-    },
+    /// Writes a building's `RULES.toml` whole (wire-SPEC.md 8-60).
+    PutRules(RulesWrite),
     /// Takes one file of the city's own tree back to what a checkpoint
     /// holds, or away when it holds none (wire-SPEC.md 8-62).
     RestoreFile {
@@ -326,13 +320,8 @@ pub enum Command<Secret = Sealed<String>> {
         point: GitOid,
         idem: IdemKey,
     },
-    /// Writes the city's own layer: `None` leaves a key as it is
-    /// (wire-SPEC.md 8-61).
-    ConfigureCity {
-        keep_warm: Option<KeepWarm>,
-        effort: Option<Effort>,
-        idem: IdemKey,
-    },
+    /// Writes the city's own layer (wire-SPEC.md 8-61).
+    ConfigureCity(CitySettings),
     /// Writes one of a building's own spine documents.
     ///
     /// The body replaces the file whole. Unlike [`Command::PutDocument`]

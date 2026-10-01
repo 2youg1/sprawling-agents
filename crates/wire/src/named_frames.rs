@@ -27,14 +27,15 @@
 /// Declares a frame enum together with its name table.
 ///
 /// The optional `<Carrier = Default>` clause carries `Command`'s secret
-/// parameter; `Query` has none and omits it.
+/// parameter; `Query` has none and omits it. A variant is a unit, a set of
+/// named fields, or one carried value.
 macro_rules! named_frames {
     (
         $(#[$enum_attr:meta])*
         pub enum $frame:ident $(<$carrier:ident = $carried:ty>)? {
             $(
                 $(#[$variant_attr:meta])*
-                $variant:ident $({ $($field:tt)* })?
+                $variant:ident $({ $($field:tt)* })? $(( $($carried_value:tt)* ))?
             ),* $(,)?
         }
 
@@ -45,7 +46,7 @@ macro_rules! named_frames {
         pub enum $frame $(<$carrier = $carried>)? {
             $(
                 $(#[$variant_attr])*
-                $variant $({ $($field)* })?,
+                $variant $({ $($field)* })? $(( $($carried_value)* ))?,
             )*
         }
 

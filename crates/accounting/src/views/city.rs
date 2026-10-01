@@ -136,7 +136,12 @@ fn named(scope: &kernel::event::Scope) -> wire::HaltScope {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::wildcard_enum_match_arm,
+    reason = "test code"
+)]
 mod tests {
     use super::*;
 

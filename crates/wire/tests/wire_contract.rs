@@ -392,25 +392,22 @@ fn sample_of_every_command() -> Vec<Command> {
             base: String::new(),
             idem,
         },
-        Command::PutRules {
+        Command::PutRules(wire::RulesWrite {
             building: Address::parse("lab").unwrap(),
             base: String::new(),
-            body: "confidential = false
-write = \"everything\"
-"
-            .to_owned(),
+            body: "confidential = false".to_owned(),
             idem,
-        },
+        }),
         Command::RestoreFile {
             at: Address::parse("lab/notes.md").unwrap(),
             point: kernel::GitOid::parse("8ea61adc1c8339d02a5c665ba8280a85151ee549").unwrap(),
             idem,
         },
-        Command::ConfigureCity {
+        Command::ConfigureCity(wire::CitySettings {
             keep_warm: Some(kernel::KeepWarm::FiveMinute),
             effort: None,
             idem,
-        },
+        }),
         Command::PutDocument {
             which: wire::GovernedDocument::Mayor,
             base: String::new(),

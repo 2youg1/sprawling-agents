@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The closed sets a Command carries: which scope a halt applies to, which governed document is being written,
+//! The values a Command carries beside its scalars, and the closed sets: which scope a halt applies to, which governed document is being written,
 //! what is being done to a pursuit, and what a new session keeps from
 //! the one before it.
 //!
@@ -12,8 +12,30 @@
 //! `wire::carried_name`: those defer to whoever owns the value set,
 //! and these have no one to defer to.
 
-use kernel::Address;
+use kernel::{Address, Effort, IdemKey, KeepWarm};
 use serde::{Deserialize, Serialize};
+
+/// A building's whole `RULES.toml` from a page, and the text the page
+/// read: the city evaluates `body` before it lands, and only over `base`
+/// (wire-SPEC.md 8-60).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct RulesWrite {
+    pub building: Address,
+    pub base: String,
+    pub body: String,
+    pub idem: IdemKey,
+}
+
+/// The city's own layer from the settings page: `None` leaves a key as
+/// it is (wire-SPEC.md 8-61).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct CitySettings {
+    pub keep_warm: Option<KeepWarm>,
+    pub effort: Option<Effort>,
+    pub idem: IdemKey,
+}
 
 /// What a new session at an address keeps from the previous one.
 ///
