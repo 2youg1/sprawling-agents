@@ -4046,17 +4046,17 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 
 整城重建（`just bench` 的 `large_ledger_fold`，5 万行、没有快照也没有记录）p50 1286 ms：`Views::rebuild` 先经 `prove_chain` 逐行核对整条链，从创世全量折叠时又逐行核对一遍。
 
-**三处改动，保证不变。**
+**四处改动，保证不变。**
 1. `fold_city` 经 `JsonlLedger::open_reusing` 开账本，记录取自 `proof_dir` 的只读一份（storage-SPEC 8-34）：末段的前缀按摘要证明，逐行核对的只有上一次后台证明（8-90）之后写下的行。正常关闭的城，那几行就是关城时写的交接。
 2. `Views::twin` 是派生的 `Clone`（accounting-SPEC.md 8-19(a)）：共享的句柄在 `Arc` 里，克隆后仍共享，结果与编码再解码相同。
 3. `start_audited` 从创世折叠时不先证明，从快照起步时才先证明（accounting-SPEC.md 8-19(b)）。
+4. `storage::tail_after` 从含快照那一行的段尾往回找它，不再从段首把整段切成行（storage-SPEC 8-28）。
 
 **回退门是计数，墙钟只登记。** storage 的 `jsonl::open::tests` 在 N 与 2N 行上断言：记录覆盖末段之后再写 2 行，开账本逐行核对 2 行、按摘要复用 1 段。accounting 的 `worker::folds::views_start::tests` 在两种规模上断言：没有快照与记录时重建逐行核对的行数等于账本行数；快照与记录都在时等于之后长出的行数的两倍（证明一遍、折尾部一遍），与历史长度无关。开城各段与首字节的毫秒数由 `bench_startup first-byte` 与 `opened the city in` 那一行（8-121）读出，进 `tools/xtask/budgets.toml` 的 `[first_byte]` 与 `[views_rebuild_per_mb]`。
 
 **本节接口的当前状态。**
 - `copy the views` 仍在开城那一行里（8-121 的 `Phase::Twin`），`twin` 仍答 `Result`：它不再会失败，去掉 `Result` 与这一段要同时改 `bin::assembly::listening` 的调用点。
 - 视图快照解码约 135 ms，其中 105 ms 是提交折叠里的十六进制 oid。`kernel::GitOid` 的 serde 按 `is_human_readable` 在 postcard 里写 20 个字节、在 JSON 里照旧写十六进制，能去掉这一大半；那是 `kernel::locator` 的改动，本节没有做。同理，`B3Hash` 在快照里也按十六进制写。
-- `storage::tail_after` 为了找到快照那一行把末段从头逐字节分行（50 ms）；从段尾往回找要先读出末行的 seq，判定它值不值得的读数是做完上一条之后的 `fold … from the snapshots`。
 - 后台证明仍在一条线程上逐段哈希（storage-SPEC 8-30「单线程哈希」）；开城变短之后，M3 约等于开城加上证明（40 万行城上证明 380 ms）。并行哈希要在 ARCHITECTURE §10 第 3 条的线程清单里加一处。
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
