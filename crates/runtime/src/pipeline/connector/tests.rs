@@ -187,3 +187,78 @@ fn a_picture_this_city_cannot_measure_is_left_out_in_words() {
         "the base64 stays out of the window"
     );
 }
+
+/// The opening bytes of a wav, which is what a recording's sound block
+/// carries; the connector judges the container by the block's media type
+/// and never decodes the sound.
+const WAVE_HEAD: &[u8] = b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00";
+
+fn sounded(block: Value) -> (ToolOutcome, Cas, tempfile::TempDir) {
+    let dir = tempfile::tempdir().unwrap();
+    let mut cas = Cas::open(&dir.path().join("cas")).unwrap();
+    let room = kernel::Address::parse("room").unwrap();
+    let out = package_connector(
+        answer(json!([block, { "type": "text", "text": "{\"state\":\"stopped\"}" }])),
+        OffloadSite {
+            cas: &mut cas,
+            city_root: dir.path(),
+            room: &room,
+            origin: crate::offload::tests::origin(),
+        },
+    )
+    .unwrap();
+    (out, cas, dir)
+}
+
+/// A recording a tool answers with is stored in the content store and
+/// named in the window by its locator, where a tool that reads a
+/// recording can be pointed at it. Its base64 reaches neither the window
+/// nor the ledger, and it is not a picture attachment: the model cannot
+/// hear it (runtime-SPEC.md section 12.15).
+#[test]
+fn a_sound_block_is_stored_and_named_by_its_locator() {
+    use base64::Engine as _;
+
+    let data = base64::engine::general_purpose::STANDARD.encode(WAVE_HEAD);
+    let (out, cas, _dir) =
+        sounded(json!({ "type": "audio", "data": data, "mimeType": "audio/wav" }));
+    let hash = B3Hash::digest(WAVE_HEAD);
+    let content = out.result.as_map()["content"].as_array().unwrap().clone();
+    assert_eq!(
+        content[0],
+        json!({
+            "type": "text",
+            "text": format!(
+                "[recording attached: audio/wav, {} bytes, {}]",
+                WAVE_HEAD.len(),
+                Locator::cas(hash)
+            ),
+        })
+    );
+    assert_eq!(cas.get(&hash).unwrap(), WAVE_HEAD.to_vec());
+    assert!(out.attachments.is_empty());
+    assert!(!Value::Array(content).to_string().contains(&data));
+}
+
+/// A sound block whose bytes do not decode, or whose media type is not
+/// audio, is left out with the reason, as words the model reads. Which
+/// containers a transcription endpoint takes is the reader's to judge,
+/// not the connector's (runtime-SPEC.md section 12.15).
+#[test]
+fn a_sound_this_city_cannot_carry_is_left_out_in_words() {
+    for block in [
+        json!({ "type": "audio", "data": "not base64!", "mimeType": "audio/wav" }),
+        json!({ "type": "audio", "data": "UklGRg==", "mimeType": "text/plain" }),
+    ] {
+        let (out, _cas, _dir) = sounded(block);
+        let content = out.result.as_map()["content"].as_array().unwrap().clone();
+        assert!(
+            content[0]["text"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("[recording left out:"),
+            "{content:?}"
+        );
+        assert!(!Value::Array(content).to_string().contains("UklGRg=="));
+    }
+}
