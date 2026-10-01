@@ -19,25 +19,23 @@
 //! machine's, and telling a model to fix its arguments would send it
 //! rewriting a call that was correct.
 
+use desktop_ffi::ended::Failure;
+use desktop_ffi::step::Step;
+
 use crate::refusal::{Refusal, RefusalCode};
 
-/// What the operating system said, as a refusal.
+/// What the operating system said through `winsafe` or through the Zig
+/// leaf, as a refusal.
 ///
 /// `doing` names the operation in a caller's vocabulary rather than the
-/// API's — "read the window's title", not "GetWindowTextW".
-pub(crate) fn win32(doing: &str, recovery: &str, err: &windows::core::Error) -> Refusal {
-    refused(doing, recovery, &err.message())
-}
-
-/// What the operating system said through `winsafe`, as a refusal.
-///
-/// The same sentence as [`win32`]: which binding carried the call is
-/// this server's business, and the caller reads the machine's words.
+/// API's — "read the window's title", not "GetWindowTextW". Which
+/// binding carried the call is this server's business, and the caller
+/// reads the machine's words.
 pub(crate) fn system(doing: &str, recovery: &str, err: winsafe::co::ERROR) -> Refusal {
     refused(doing, recovery, &err.to_string())
 }
 
-/// What COM said when this thread asked to join an apartment.
+/// What COM, or shcore, said in an HRESULT.
 pub(crate) fn com(doing: &str, recovery: &str, err: winsafe::co::HRESULT) -> Refusal {
     refused(doing, recovery, &err.to_string())
 }
@@ -45,6 +43,45 @@ pub(crate) fn com(doing: &str, recovery: &str, err: winsafe::co::HRESULT) -> Ref
 /// What UI Automation said, as a refusal.
 pub(crate) fn automation(doing: &str, recovery: &str, err: &uiautomation::Error) -> Refusal {
     refused(doing, recovery, err.message())
+}
+
+/// A failure of the leaf whose step this operation has but whose
+/// meaning is the step's alone: the machine's reason, in the machine's
+/// words, for the one thing `doing` names.
+pub(crate) fn leaf(doing: &str, recovery: &str, failure: Failure) -> Refusal {
+    match failure {
+        Failure::At { code, .. } => system(doing, recovery, code),
+        Failure::Unspelled(raw) => unspelled(doing, raw),
+    }
+}
+
+/// The leaf answered a step the operation `doing` does not have. The
+/// leaf and this server are built together, so this is a defect in this
+/// server, and it is reported as one rather than dressed as the
+/// machine's refusal.
+pub(crate) fn stray(doing: &str, step: Step) -> Refusal {
+    defect(
+        doing,
+        &format!("its leaf stopped at {step:?}, a step this operation does not have"),
+    )
+}
+
+/// The leaf answered a number no step has: a leaf and a server from two
+/// builds.
+pub(crate) fn unspelled(doing: &str, raw: u32) -> Refusal {
+    defect(
+        doing,
+        &format!("its leaf answered step {raw}, which this build does not spell"),
+    )
+}
+
+fn defect(doing: &str, said: &str) -> Refusal {
+    Refusal::new(
+        RefusalCode::ToolUnavailable,
+        "use the desktop",
+        format!("this server could not {doing}: {said}"),
+        "this is a defect in this server rather than in the call; report it",
+    )
 }
 
 /// The one sentence every machine failure is told in.
@@ -55,16 +92,6 @@ fn refused(doing: &str, recovery: &str, said: &str) -> Refusal {
         format!("this machine refused to {doing}: {said}"),
         recovery,
     )
-}
-
-/// A Win32 call that reports failure without an error code of its own.
-///
-/// Several of the GDI entry points answer with a null handle or a zero
-/// and leave the reason on the calling thread; `Error::from_thread` is
-/// what reads it, so those sites still arrive here with a message rather
-/// than with silence.
-pub(crate) fn last(doing: &str, recovery: &str) -> Refusal {
-    win32(doing, recovery, &windows::core::Error::from_thread())
 }
 
 #[cfg(test)]
@@ -82,10 +109,10 @@ mod tests {
     /// rather than telling a model its correct call was wrong.
     #[test]
     fn a_machine_failure_is_unavailable_rather_than_bad_arguments() {
-        let refusal = win32(
+        let refusal = system(
             "read the window's title",
             "call `desktop.windows` again",
-            &windows::core::Error::from_hresult(windows::core::HRESULT(-2147024891)),
+            winsafe::co::ERROR::ACCESS_DENIED,
         );
         let error = refusal.as_error();
         assert_eq!(error["data"]["code"], "E_TOOL_UNAVAILABLE");
@@ -99,17 +126,28 @@ mod tests {
         assert_eq!(error["data"]["recovery"], "call `desktop.windows` again");
     }
 
-    /// The three parts survive the path that has no error code of its
-    /// own, which is the one a GDI failure takes.
+    /// A step the leaf should not have answered, and a number that is no
+    /// step, still arrive with three parts, and say they are this
+    /// server's defect.
     #[test]
-    fn a_failure_with_no_code_of_its_own_still_carries_three_parts() {
-        let refusal = last("make a bitmap for the capture", "ask for a smaller region");
-        let error = refusal.as_error();
-        assert_eq!(error["data"]["code"], "E_TOOL_UNAVAILABLE");
-        for part in ["action", "subject", "recovery"] {
+    fn a_step_this_operation_does_not_have_still_carries_three_parts() {
+        for refusal in [
+            stray("capture a window", Step::Handing),
+            leaf("capture a window", "try again", Failure::Unspelled(77)),
+        ] {
+            let error = refusal.as_error();
+            assert_eq!(error["data"]["code"], "E_TOOL_UNAVAILABLE");
+            for part in ["action", "subject", "recovery"] {
+                assert!(
+                    !error["data"][part].as_str().unwrap_or_default().is_empty(),
+                    "{part} is empty"
+                );
+            }
             assert!(
-                !error["data"][part].as_str().unwrap_or_default().is_empty(),
-                "{part} is empty"
+                error["data"]["recovery"]
+                    .as_str()
+                    .unwrap()
+                    .contains("defect")
             );
         }
     }

@@ -12,9 +12,7 @@
 //! desk declares per-monitor awareness when it opens, before it reads
 //! any coordinate, and holds the proof that it did.
 
-use windows::Win32::UI::HiDpi::{
-    GetProcessDpiAwareness, PROCESS_PER_MONITOR_DPI_AWARE, SetProcessDpiAwareness,
-};
+use windows::Win32::UI::HiDpi::PROCESS_PER_MONITOR_DPI_AWARE;
 
 use super::fault;
 use crate::refusal::{Refusal, RefusalCode};
@@ -24,6 +22,19 @@ use crate::refusal::{Refusal, RefusalCode};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct PhysicalPixels(());
 
+/// The awareness this server asks for, as the binding defines it and as
+/// the leaf passes it to shcore.
+fn per_monitor() -> Result<u32, Refusal> {
+    u32::try_from(PROCESS_PER_MONITOR_DPI_AWARE.0).map_err(|_negative| {
+        Refusal::new(
+            RefusalCode::ToolUnavailable,
+            "use the desktop",
+            "the binding defines per-monitor awareness as a negative number".to_owned(),
+            "this is a defect in this server rather than in the call; report it",
+        )
+    })
+}
+
 /// Makes this process read every monitor in physical pixels.
 ///
 /// A process whose awareness was already set elsewhere cannot change
@@ -31,16 +42,8 @@ pub(super) struct PhysicalPixels(());
 ///
 /// # Errors
 /// Refuses when this process is left reading scaled coordinates.
-#[expect(
-    unsafe_code,
-    reason = "a process declares its DPI awareness only through the FFI entry point"
-)]
 pub(super) fn declare() -> Result<PhysicalPixels, Refusal> {
-    // SAFETY: the call takes one enum value by value and lends it no
-    // memory of ours; what it changes is this process's awareness, and
-    // the desk calls it before this process has read any coordinate.
-    let declared = unsafe { SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE) };
-    let Err(refused) = declared else {
+    let Err(refused) = desktop_ffi::dpi::declare(per_monitor()?) else {
         return Ok(PhysicalPixels(()));
     };
     match current()? {
@@ -50,8 +53,7 @@ pub(super) fn declare() -> Result<PhysicalPixels, Refusal> {
             "use the desktop",
             format!(
                 "this process reads the desktop in scaled coordinates and could not switch to \
-                 per-monitor physical pixels: {}",
-                refused.message()
+                 per-monitor physical pixels: {refused}"
             ),
             "start the connector as its own process, `sprawling desktop`, which declares this \
              before anything else runs",
@@ -73,22 +75,15 @@ pub(super) enum Awareness {
 ///
 /// # Errors
 /// Refuses when the operating system will not say.
-#[expect(
-    unsafe_code,
-    reason = "a process's DPI awareness is readable only through the FFI entry point"
-)]
 pub(super) fn current() -> Result<Awareness, Refusal> {
-    // SAFETY: `None` asks about this process, and the call only writes
-    // one enum value back through the binding's own out-parameter; no
-    // memory of ours is lent to it.
-    let awareness = unsafe { GetProcessDpiAwareness(None) }.map_err(|err| {
-        fault::win32(
+    let awareness = desktop_ffi::dpi::awareness().map_err(|err| {
+        fault::com(
             "say which DPI awareness this process has",
             "start the connector as its own process, `sprawling desktop`",
-            &err,
+            err,
         )
     })?;
-    Ok(if awareness == PROCESS_PER_MONITOR_DPI_AWARE {
+    Ok(if awareness == per_monitor()? {
         Awareness::PerMonitor
     } else {
         Awareness::Other

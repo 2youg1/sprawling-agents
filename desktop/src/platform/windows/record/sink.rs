@@ -35,8 +35,6 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use windows::Win32::Foundation::HWND;
-
 use super::super::capture;
 use super::super::geometry::Bounds;
 use crate::refusal::{Refusal, RefusalCode};
@@ -122,7 +120,11 @@ impl Sink {
     /// # Errors
     /// Refuses when ffmpeg is on this machine and will not start. A
     /// machine without ffmpeg gets the frame sequence instead.
-    pub(super) fn open(handle: HWND, bounds: Bounds, into: &Path) -> Result<Sink, Refusal> {
+    pub(super) fn open(
+        handle: winsafe::HWND,
+        bounds: Bounds,
+        into: &Path,
+    ) -> Result<Sink, Refusal> {
         let writer = match Command::new("ffmpeg")
             .args(command_line(bounds, into))
             .stdin(Stdio::piped())
@@ -149,15 +151,10 @@ impl Sink {
         };
         let stopping = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&stopping);
-        // An `HWND` is a token rather than a pointer into this process's
-        // memory, so it travels as its address and is rebuilt on the
-        // other side. Win32 documents the drawing calls this thread makes
-        // as usable from any thread with the window's handle.
-        let carried = handle.0.expose_provenance();
-        let thread = std::thread::spawn(move || {
-            let handle = HWND(std::ptr::with_exposed_provenance_mut(carried));
-            recorded(handle, bounds, writer, &flag)
-        });
+        // The handle moves to the thread: a `winsafe::HWND` is `Send`,
+        // and Win32 documents the drawing calls this thread makes as
+        // usable from any thread with the window's handle.
+        let thread = std::thread::spawn(move || recorded(&handle, bounds, writer, &flag));
         Ok(Sink {
             stopping,
             thread,
@@ -198,7 +195,12 @@ fn unstartable(why: &str) -> Refusal {
 
 /// The writing thread: one frame every `FRAME_EVERY` until it is told to
 /// stop, reaches `MOST_FRAMES`, or cannot take or write a frame.
-fn recorded(handle: HWND, bounds: Bounds, mut writer: Writer, stopping: &AtomicBool) -> Ended {
+fn recorded(
+    handle: &winsafe::HWND,
+    bounds: Bounds,
+    mut writer: Writer,
+    stopping: &AtomicBool,
+) -> Ended {
     let mut frames: u64 = 0;
     let mut cut_short = None;
     while !stopping.load(Ordering::Acquire) && frames < MOST_FRAMES {

@@ -18,17 +18,15 @@
 //! window it has no title for, and a row of empty strings would only
 //! look like something it could name.
 //!
-//! **This is where a window handle is minted, and the only place.** The
-//! enumeration itself goes through the `windows` binding, because
-//! `winsafe`'s `EnumWindows` is not admitted (desktop-SPEC.md section
-//! 12.9); each handle it hands the callback becomes a `winsafe::HWND`
-//! there, and everything after that — visibility, title, process,
-//! rectangle, and every other module's use of the window — goes through
-//! `winsafe`'s safe calls (section 8-11).
+//! **No window handle is minted here.** The enumeration goes through
+//! the Zig leaf, because `winsafe`'s `EnumWindows` is not admitted
+//! (desktop-SPEC.md section 12.9); the leaf writes each handle the
+//! system reports into a `winsafe::HWND` slot this server lent it, so
+//! the handles arrive already typed and nothing on this side builds one
+//! from a raw pointer (section 8-11). Everything after that —
+//! visibility, title, process, rectangle, and every other module's use
+//! of the window — goes through `winsafe`'s safe calls.
 
-use windows::Win32::Foundation::{HWND, LPARAM};
-use windows::Win32::UI::WindowsAndMessaging::EnumWindows;
-use windows::core::BOOL;
 use winsafe::co;
 
 use super::fault;
@@ -44,91 +42,22 @@ pub(crate) struct Window {
     pub(crate) handle: winsafe::HWND,
 }
 
-impl Window {
-    /// The handle as the `windows` binding spells it, for the calls that
-    /// still go through that binding (desktop-SPEC.md section 8-11).
-    /// Taking the address out of a `winsafe::HWND` needs no `unsafe`;
-    /// only putting one in does, and that happens in `collect` alone.
-    pub(crate) fn raw(&self) -> HWND {
-        HWND(self.handle.ptr())
-    }
-}
-
 /// Every visible, titled top-level window on this desktop.
 ///
 /// # Errors
 /// Refuses when the enumeration itself will not run. A window that
 /// individually will not answer is dropped from the list instead, since
 /// one unreadable window is not a reason to report none.
-#[expect(
-    unsafe_code,
-    reason = "EnumWindows is a callback API, so the list it fills has to travel to the callback as an address"
-)]
 pub(crate) fn desktop() -> Result<Vec<Window>, Refusal> {
-    let mut handles: Vec<winsafe::HWND> = Vec::new();
-    // The address travels as a number because that is the only thing an
-    // `LPARAM` is. `expose_provenance` is the spelling that says so, and
-    // it pairs with the `with_exposed_provenance_mut` in the callback:
-    // going through `as` would say the same thing while hiding that a
-    // pointer's provenance is what is being carried.
-    let address = std::ptr::from_mut(&mut handles).expose_provenance();
-    let Ok(carried) = isize::try_from(address) else {
-        return Err(fault::last(
-            "list the windows on this desktop",
-            "this is a defect in this server rather than in the call; report it",
-        ));
-    };
-    let collecting = LPARAM(carried);
-    // SAFETY: `collect` is the `extern "system"` function immediately
-    // below, so `EnumWindows` calls back into this module and nothing
-    // else. The pointer inside `collecting` is derived from `handles`,
-    // which is a live local for the whole of this call and has no second
-    // alias while the call runs — `handles` is not touched again until
-    // `EnumWindows` has returned, and `EnumWindows` is documented as
-    // synchronous, so the callback cannot outlive the borrow.
-    let walked = unsafe { EnumWindows(Some(collect), collecting) };
-    walked.map_err(|err| {
-        fault::win32(
+    let handles = desktop_ffi::top_level::windows().map_err(|failure| {
+        fault::leaf(
             "list the windows on this desktop",
             "this is the operating system refusing, not the scope file; try again, and if it \
              persists this desktop session may be one no program can enumerate",
-            &err,
+            failure,
         )
     })?;
     Ok(handles.into_iter().filter_map(described).collect())
-}
-
-/// The callback `EnumWindows` drives. It does the least a callback can:
-/// puts one handle in a list, and decides nothing.
-///
-/// Returning `TRUE` means "keep going"; there is no early stop, because
-/// stopping early would make the listing depend on enumeration order.
-#[expect(
-    unsafe_code,
-    reason = "this is the callback EnumWindows drives; recovering the list it was given, and minting the handle it was handed, are the two things it does"
-)]
-extern "system" fn collect(handle: HWND, into: LPARAM) -> BOOL {
-    let Ok(address) = usize::try_from(into.0) else {
-        return BOOL(1);
-    };
-    let into = std::ptr::with_exposed_provenance_mut::<Vec<winsafe::HWND>>(address);
-    // SAFETY: `into` is the address `desktop` passed to `EnumWindows` in
-    // this same call, and `EnumWindows` passes it through unchanged, so
-    // it addresses that function's live `Vec` with that vector's own
-    // provenance. Nothing else in this package registers this callback,
-    // so there is no other provenance it could arrive with, and
-    // `EnumWindows` drives the callback on the calling thread before it
-    // returns, so this is the only reference to that vector alive.
-    let handles = unsafe { into.as_mut() };
-    if let Some(handles) = handles {
-        // SAFETY: `handle` is a top-level window handle `EnumWindows`
-        // handed this callback, so the pointer has the type a
-        // `winsafe::HWND` wraps. `winsafe::HWND` neither owns nor closes
-        // what it wraps, so a window that closes later leaves a stale
-        // value that every later call answers with a failure.
-        handles.push(unsafe { winsafe::HWND::from_ptr(handle.0) });
-    }
-    BOOL(1)
 }
 
 /// One handle, answered for — or dropped, when it will not answer.

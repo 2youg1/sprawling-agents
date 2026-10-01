@@ -260,7 +260,7 @@ impl Desk {
     /// has since retitled itself out of every list this server reads.
     fn record(&mut self, arguments: &Value) -> Result<Value, Refusal> {
         match record::asked(arguments)? {
-            record::Wanted::Start => self.recordings.start(&resolved(arguments)?),
+            record::Wanted::Start => self.recordings.start(resolved(arguments)?),
             record::Wanted::Stop(id) => self.recordings.stop(id),
         }
     }
@@ -305,7 +305,7 @@ fn listing(arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal>
 /// `desktop.screenshot`: one window, or a region of it.
 fn screenshot(arguments: &Value) -> Result<Answer, Refusal> {
     let window = resolved(arguments)?;
-    let whole = capture::window(window.raw(), window.bounds)?;
+    let whole = capture::window(&window.handle, window.bounds)?;
     let pixels = match region(arguments)? {
         Some((left, top, width, height)) => {
             if left.saturating_add(width) > whole.width()

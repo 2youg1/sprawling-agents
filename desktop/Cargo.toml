@@ -81,15 +81,12 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # four call groups with no admitted safe interface (desktop-SPEC.md
 # sections 8-11 and 8-12).
 desktop_ffi = { package = "sprawling-desktop-ffi", path = "ffi" }
-# The Win32 binding, for the call groups that still reach it directly
-# and for the constants the others read.
+# The constants the safe calls read, the `HWND` UI Automation is handed,
+# and the error type a Win32 failure is told in. No function of this
+# binding is called outside tests, so no namespace that exists only to
+# call one is switched on.
 windows = { version = "0.62", features = [
     "Win32_Foundation",
-    "Win32_Graphics_Gdi",
-    "Win32_Storage_Xps",
-    "Win32_System_DataExchange",
-    "Win32_System_Memory",
-    "Win32_System_Threading",
     "Win32_UI_HiDpi",
     "Win32_UI_WindowsAndMessaging",
 ] }

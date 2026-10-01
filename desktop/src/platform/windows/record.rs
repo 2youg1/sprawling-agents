@@ -143,7 +143,7 @@ impl Recordings {
     /// # Errors
     /// Refuses a second recording of the same window and a place on
     /// this machine that cannot be written to.
-    pub(crate) fn start(&mut self, window: &Window) -> Result<Value, Refusal> {
+    pub(crate) fn start(&mut self, window: Window) -> Result<Value, Refusal> {
         let of = window.handle.ptr().addr();
         if let Some(already) = self.running.values().find(|running| running.of == of) {
             return Err(Refusal::new(
@@ -157,18 +157,19 @@ impl Recordings {
         self.begun = self.begun.saturating_add(1);
         let id = RecordingId(self.begun);
         let into = somewhere(&window.named.title, self.begun)?;
-        let written_by = Sink::open(window.raw(), window.bounds, &into)?;
+        let title = window.named.title;
+        let written_by = Sink::open(window.handle, window.bounds, &into)?;
         let answer = json!({
             "state": "started",
             "recording": id.0,
-            "title": window.named.title,
+            "title": title,
             "into": into.display().to_string(),
         });
         self.running.insert(
             id,
             Running {
                 of,
-                title: window.named.title.clone(),
+                title,
                 into,
                 written_by,
             },
@@ -278,13 +279,13 @@ mod tests {
         assert_eq!(unstarted.as_error()["data"]["code"], "E_INVALID_ARGS");
 
         let started = recordings
-            .start(&window("Calculator", 0x10))
+            .start(window("Calculator", 0x10))
             .expect("a recording starts even of a window that draws nothing");
         let into = landed(&started);
         assert!(into.is_dir(), "{} was not laid out", into.display());
 
         let twice = recordings
-            .start(&window("Calculator", 0x10))
+            .start(window("Calculator", 0x10))
             .expect_err("two recordings of one window is not a thing `stop` can answer");
         assert_eq!(twice.as_error()["data"]["code"], "E_GATE_DENIED");
 
@@ -304,7 +305,7 @@ mod tests {
     #[test]
     fn a_window_that_renames_itself_mid_recording_can_still_be_stopped() {
         let mut recordings = Recordings::new();
-        let started = recordings.start(&window("a.txt — Notepad", 0x20)).unwrap();
+        let started = recordings.start(window("a.txt — Notepad", 0x20)).unwrap();
         let ended = recordings
             .stop(id_of(&started))
             .expect("the id outlives the title");
@@ -352,8 +353,8 @@ mod tests {
     #[test]
     fn two_windows_record_and_stop_independently() {
         let mut recordings = Recordings::new();
-        let one = recordings.start(&window("Calculator", 0x30)).unwrap();
-        let two = recordings.start(&window("a.txt — Notepad", 0x31)).unwrap();
+        let one = recordings.start(window("Calculator", 0x30)).unwrap();
+        let two = recordings.start(window("a.txt — Notepad", 0x31)).unwrap();
         assert_ne!(landed(&one), landed(&two));
         assert!(recordings.stop(id_of(&one)).is_ok());
         assert!(recordings.stop(id_of(&one)).is_err());
@@ -372,7 +373,7 @@ mod tests {
         let landing = {
             let mut recordings = Recordings::new();
             let started = recordings
-                .start(&window("a window only this test names", 0x40))
+                .start(window("a window only this test names", 0x40))
                 .unwrap();
             assert_eq!(recordings.running.len(), 1);
             landed(&started)
