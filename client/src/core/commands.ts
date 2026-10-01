@@ -25,6 +25,7 @@ import type {
   Window,
   DialectKind,
   Effort,
+  GitOid,
   GovernedDocument,
   HaltScope,
   IdentityCard,
@@ -360,6 +361,12 @@ export function putIdentity(card: IdentityCard, base: string): Command {
 // since `base` was read is refused rather than written over.
 export function putRules(building: Address, base: string, body: string): Command {
   return { put_rules: { building, base, body, idem: mintIdem() } };
+}
+
+// One file of the city's own tree, taken back to what a checkpoint holds,
+// or away when it holds none. The city refuses while a run works there.
+export function restoreFile(at: Address, point: GitOid): Command {
+  return { restore_file: { at, point, idem: mintIdem() } };
 }
 
 // The city's own layer: `null` leaves a key as it is.

@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use kernel::event::record::{CheckpointCommitted, Commit};
+use kernel::event::record::{CheckpointCommitted, Commit, FileRestored};
 use kernel::{Address, GitOid, Payload, TimeMs};
 use serde_json::{Map, Value};
 
@@ -324,6 +324,28 @@ impl Checkpoint {
             .open(target)
             .and_then(|mut file| std::io::Write::write_all(&mut file, blob.content()))
             .map_err(|err| refused(format!("{address}: {err}")))
+    }
+
+    /// Takes `address` back from `point` into the city's own working
+    /// tree: the point's bytes in place of what is there, or no file when
+    /// the point holds none (storage-SPEC 8-33). Returns the
+    /// `file_restored` record of this step, `name` empty for this tree.
+    ///
+    /// # Errors
+    /// What [`Checkpoint::restore`] refuses for the path and the commit,
+    /// something other than a file at `address` in `point`, and a write
+    /// or a removal the file system refuses.
+    pub fn take_back(
+        &self,
+        address: &Address,
+        point: &GitOid,
+    ) -> Result<FileRestored, StorageError> {
+        self.restore(address, point)?;
+        Ok(FileRestored {
+            name: String::new(),
+            path: address.as_str().to_owned(),
+            point: *point,
+        })
     }
 }
 

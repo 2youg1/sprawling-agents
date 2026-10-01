@@ -129,6 +129,9 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // A building's rules and the city's own layer are read by the
         // next dispatch; a live run holds the policy it was frozen with.
         | Command::PutRules { .. }
+        // Taking a file back is refused while a run works in that
+        // building, so it reaches no run that is going.
+        | Command::RestoreFile { .. }
         | Command::ConfigureCity { .. }
         // A building's own spine documents take the same reading, and
         // one more: they have a second writer, so the frame carries the

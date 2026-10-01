@@ -219,6 +219,7 @@ impl RunWorker {
                 ref body,
                 ..
             } => self.put_rules(building, base, body),
+            wire::Command::RestoreFile { ref at, point, .. } => self.take_back(at, point),
             wire::Command::ConfigureCity {
                 keep_warm, effort, ..
             } => self.configure_city(keep_warm, effort),

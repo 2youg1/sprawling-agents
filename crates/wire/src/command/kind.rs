@@ -7,8 +7,9 @@
 
 use kernel::model::{RunPolicy, Window};
 use kernel::{
-    Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, IdemKey, KeepWarm, McpServer,
-    ModelTag, Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed, SessionName,
+    Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, GitOid, IdemKey, KeepWarm,
+    McpServer, ModelTag, Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed,
+    SessionName,
 };
 use serde::{Deserialize, Serialize};
 
@@ -316,6 +317,13 @@ pub enum Command<Secret = Sealed<String>> {
         building: Address,
         base: String,
         body: String,
+        idem: IdemKey,
+    },
+    /// Takes one file of the city's own tree back to what a checkpoint
+    /// holds, or away when it holds none (wire-SPEC.md 8-62).
+    RestoreFile {
+        at: Address,
+        point: GitOid,
         idem: IdemKey,
     },
     /// Writes the city's own layer: `None` leaves a key as it is

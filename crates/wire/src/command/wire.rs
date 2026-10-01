@@ -57,6 +57,7 @@ impl<Secret> Command<Secret> {
             | Self::PutDocument { ref idem, .. }
             | Self::PutIdentity { ref idem, .. }
             | Self::PutRules { ref idem, .. }
+            | Self::RestoreFile { ref idem, .. }
             | Self::ConfigureCity { ref idem, .. }
             | Self::PutSpine { ref idem, .. }
             | Self::PutPreferences { ref idem, .. }
@@ -251,6 +252,7 @@ impl From<WireCommand> for Command {
                 body,
                 idem,
             },
+            Command::RestoreFile { at, point, idem } => Self::RestoreFile { at, point, idem },
             Command::ConfigureCity {
                 keep_warm,
                 effort,

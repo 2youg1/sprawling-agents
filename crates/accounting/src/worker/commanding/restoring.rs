@@ -75,6 +75,39 @@ impl RunWorker {
     }
 }
 
+impl RunWorker {
+    /// Takes one file of the city's own tree back to what a checkpoint
+    /// holds, then records the step (wire-SPEC.md 8-62).
+    ///
+    /// # Errors
+    /// Refuses `E_BUSY` while a run works in that building, naming the
+    /// room and the run; propagates what the checkpoint refuses and a
+    /// ledger that refuses the record.
+    pub(in crate::worker) fn take_back(
+        &mut self,
+        at: &kernel::Address,
+        point: kernel::GitOid,
+    ) -> Result<(), AxError> {
+        let building = city::Building::of(at)?;
+        if let Some((room, working)) = self.collaborating.rooms.worked_within(building.addr()) {
+            return Err(AxError::failure(
+                AxCode::Busy,
+                "take a file back from a checkpoint",
+                format!("{}: {working} is running in {}", at.as_str(), room.as_str()),
+            )
+            .with_recovery(
+                "stop that run first, then take the file back; a file cannot change under \
+                 the run writing beside it",
+            ));
+        }
+        // Disk first, ledger second, as every other restore here.
+        let restored = storage::Checkpoint::open(&self.city_root)
+            .and_then(|checkpoint| checkpoint.take_back(at, &point))
+            .map_err(storage::StorageError::into_ax)?;
+        self.record(EventKind::FileRestored, Payload::of(&restored)?)
+    }
+}
+
 fn refused(subject: String, recovery: impl Into<String>) -> AxError {
     AxError::failure(AxCode::InvalidArgs, "restore a discarded file", subject)
         .with_recovery(recovery)

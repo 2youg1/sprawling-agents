@@ -97,3 +97,40 @@ fn restore_refuses_a_reserved_address_and_writes_nothing() {
         (true, false)
     );
 }
+
+/// Taking a file back replaces the bytes the tree holds with the ones the
+/// checkpoint holds, and a file the checkpoint never held is taken away.
+#[test]
+fn taking_a_file_back_replaces_what_the_tree_holds_and_removes_what_the_point_did_not_hold() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/kept.txt", "as it was");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+    let pre = checkpoint
+        .wave_pre(
+            &["work".to_owned()],
+            TimeMs::new(1_700_000_000_000),
+            &resident(),
+        )
+        .unwrap();
+    let point = GitOid::parse(&oid_of(&pre)).unwrap();
+    write(tmp.path(), "work/kept.txt", "changed since");
+    write(tmp.path(), "work/new.txt", "made since");
+
+    let kept = checkpoint.take_back(&Address::parse("work/kept.txt").unwrap(), &point);
+    let new = checkpoint.take_back(&Address::parse("work/new.txt").unwrap(), &point);
+
+    assert_eq!(
+        (
+            kept.map(|restored| restored.path).ok(),
+            new.is_ok(),
+            std::fs::read_to_string(tmp.path().join("work/kept.txt")).unwrap(),
+            tmp.path().join("work/new.txt").exists(),
+        ),
+        (
+            Some("work/kept.txt".to_owned()),
+            true,
+            "as it was".to_owned(),
+            false
+        )
+    );
+}
