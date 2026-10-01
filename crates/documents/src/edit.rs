@@ -53,6 +53,24 @@ impl Transaction {
     /// `E_INVALID_ARGS` naming the first edit that starts before the one
     /// ahead of it ends.
     pub fn new(baseline: B3Hash, edits: Vec<Edit>) -> Result<Transaction, AxError> {
+        let tangled = edits
+            .iter()
+            .zip(edits.iter().skip(1))
+            .find_map(|(earlier, later)| {
+                (later.span.start() < earlier.span.end()).then_some(later.span)
+            });
+        if let Some(span) = tangled {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "save a document",
+                format!(
+                    "the edit at {}..{} starts before the edit ahead of it ends",
+                    span.start(),
+                    span.end()
+                ),
+            )
+            .with_recovery("send the edits in document order, each apart from the next"));
+        }
         Ok(Transaction { baseline, edits })
     }
 
@@ -73,10 +91,43 @@ impl Transaction {
     /// `E_INVALID_ARGS` when an edit reaches past the end of `source`.
     /// Either way nothing was applied.
     pub fn apply(&self, source: &[u8]) -> Result<Applied, AxError> {
+        if B3Hash::digest(source) != self.baseline {
+            return Err(AxError::failure(
+                AxCode::VersionConflict,
+                "save a document",
+                format!("the document is no longer version {}", self.baseline),
+            )
+            .with_recovery("read the document again and make the change on what it says now"));
+        }
+        let mut bytes = Vec::with_capacity(source.len());
+        let mut undo = Vec::with_capacity(self.edits.len());
+        let mut cursor = 0_usize;
+        for edit in &self.edits {
+            let outside = || past_the_end(edit.span, source.len());
+            let (start, end) = edit.span.within(source.len()).ok_or_else(outside)?;
+            bytes.extend_from_slice(source.get(cursor..start).ok_or_else(outside)?);
+            let replaced = source.get(start..end).ok_or_else(outside)?;
+            let from = offset(bytes.len());
+            bytes.extend_from_slice(&edit.bytes);
+            undo.push(Edit {
+                span: Span::ordered(from, offset(bytes.len())),
+                bytes: replaced.to_vec(),
+            });
+            cursor = end;
+        }
+        bytes.extend_from_slice(
+            source
+                .get(cursor..)
+                .ok_or_else(|| past_the_end(Span::at(offset(cursor)), source.len()))?,
+        );
+        let version = B3Hash::digest(&bytes);
         Ok(Applied {
-            bytes: source.to_vec(),
-            version: self.baseline,
-            undo: self.clone(),
+            bytes,
+            version,
+            undo: Transaction {
+                baseline: version,
+                edits: undo,
+            },
         })
     }
 }

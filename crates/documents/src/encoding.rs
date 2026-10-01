@@ -48,8 +48,12 @@ pub enum Reading {
 impl Reading {
     /// Judges one whole version.
     pub fn of(bytes: &[u8]) -> Reading {
-        let _ = bytes;
-        Reading::Opaque
+        let encoding = Encoding::of_mark(bytes);
+        if encoding.spells(bytes) {
+            Reading::Text(encoding)
+        } else {
+            Reading::Opaque
+        }
     }
 }
 
@@ -58,8 +62,15 @@ impl Encoding {
     /// and UTF-8 when there is none. Reads at most the first three bytes,
     /// so a window of a stored version learns its encoding from them.
     pub fn of_mark(front: &[u8]) -> Encoding {
-        let _ = front;
-        Encoding::Utf8
+        if front.starts_with(&UTF8_MARK) {
+            Encoding::Utf8Bom
+        } else if front.starts_with(&UTF16_LE_MARK) {
+            Encoding::Utf16Le
+        } else if front.starts_with(&UTF16_BE_MARK) {
+            Encoding::Utf16Be
+        } else {
+            Encoding::Utf8
+        }
     }
 
     /// Whether `bytes` - a whole version, or a stretch of one cut at
@@ -84,8 +95,26 @@ impl Encoding {
     /// `E_INVALID_ARGS` naming the encoding when the bytes do not spell
     /// text in it.
     pub fn decode(self, bytes: &[u8]) -> Result<String, AxError> {
-        let _ = (self, bytes);
-        Ok(String::new())
+        let text = match self {
+            Encoding::Utf8 | Encoding::Utf8Bom => std::str::from_utf8(bytes)
+                .ok()
+                .filter(|text| matches!(self, Encoding::Utf8Bom) || !text.contains('\0'))
+                .map(str::to_owned),
+            Encoding::Utf16Le | Encoding::Utf16Be => {
+                let (units, rest) = bytes.as_chunks::<2>();
+                rest.is_empty()
+                    .then(|| char::decode_utf16(self.units(units)).collect::<Result<String, _>>())
+                    .and_then(Result::ok)
+            }
+        };
+        text.ok_or_else(|| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "read a document window",
+                format!("{} bytes that are not {self:?} text", bytes.len()),
+            )
+            .with_recovery("open the document again: its answer says whether it reads as text")
+        })
     }
 
     /// Whether a character begins at byte `index` of `bytes`, where
@@ -93,8 +122,19 @@ impl Encoding {
     /// is a beginning only when the caller has said the version ends
     /// there, which is [`crate::window`]'s business, not this one's.
     pub(crate) fn begins_at(self, bytes: &[u8], index: usize, origin: u64) -> bool {
-        let _ = (self, bytes, index, origin);
-        true
+        match self {
+            Encoding::Utf8 | Encoding::Utf8Bom => {
+                bytes.get(index).is_some_and(|byte| byte & 0xC0 != 0x80)
+            }
+            Encoding::Utf16Le | Encoding::Utf16Be => {
+                let at = origin.saturating_add(crate::span::offset(index));
+                let unit = bytes
+                    .get(index..)
+                    .and_then(<[u8]>::first_chunk::<2>)
+                    .map(|pair| self.unit(*pair));
+                at.is_multiple_of(2) && unit.is_some_and(|unit| !(0xDC00..=0xDFFF).contains(&unit))
+            }
+        }
     }
 
     fn units(self, pairs: &[[u8; 2]]) -> impl Iterator<Item = u16> {

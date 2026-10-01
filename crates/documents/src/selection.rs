@@ -38,8 +38,10 @@ impl Selection {
     /// removed; one inside a replaced span moves to the end of what
     /// replaced it, because the bytes it pointed into are gone.
     pub fn mapped(self, transaction: &Transaction) -> Selection {
-        let _ = transaction;
-        self
+        Selection {
+            anchor: position_after(self.anchor, transaction),
+            focus: position_after(self.focus, transaction),
+        }
     }
 }
 

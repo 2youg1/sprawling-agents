@@ -24,8 +24,10 @@ use crate::span::{Span, offset};
 /// every encoding that keeps ASCII as itself, and the caller reads a
 /// layout only for such an encoding.
 pub(crate) fn blocks(format: Format, source: &[u8]) -> Vec<Span> {
-    let _ = (format, source);
-    Vec::new()
+    match format {
+        Format::Markdown => markdown_blocks(source),
+        Format::Plain => plain_blocks(source),
+    }
 }
 
 /// One line of the source: where it starts, and its content up to but

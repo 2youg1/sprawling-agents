@@ -11,7 +11,10 @@ use super::*;
 /// spans RefRain froze for it. The texts are the ones its manifest pins
 /// by SHA-256, carried here as literals because RefRain generates the
 /// files rather than keeping them.
-const CORPUS: &[(&str, &str, &[(u64, u64)])] = &[
+/// A corpus entry: its RefRain name, its text, and its frozen block spans.
+type Frozen = (&'static str, &'static str, &'static [(u64, u64)]);
+
+const CORPUS: &[Frozen] = &[
     (
         "ideographic-indent",
         "\u{3000}\u{3000}全角空格缩进的段落，中文写作常用。\n\n第二段也缩进。\n",

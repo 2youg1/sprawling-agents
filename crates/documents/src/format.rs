@@ -30,8 +30,18 @@ const MARKDOWN_EXTENSIONS: [&str; 2] = ["md", "markdown"];
 impl Format {
     /// The format of a file called `name`; a path's last segment decides.
     pub fn of_name(name: &str) -> Format {
-        let _ = name;
-        Format::Plain
+        let last = name.rsplit(['/', '\\']).next().unwrap_or(name);
+        let markdown = last.rsplit_once('.').is_some_and(|(stem, extension)| {
+            !stem.is_empty()
+                && MARKDOWN_EXTENSIONS
+                    .iter()
+                    .any(|known| known.eq_ignore_ascii_case(extension))
+        });
+        if markdown {
+            Format::Markdown
+        } else {
+            Format::Plain
+        }
     }
 }
 

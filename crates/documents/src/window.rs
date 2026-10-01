@@ -65,11 +65,28 @@ pub struct Lifted<'a> {
 /// The [`Encoding::decode`] refusal, for bytes that are not text in
 /// `encoding`.
 pub fn head(format: Format, encoding: Encoding, source: &[u8]) -> Result<Window, AxError> {
-    let _ = (format, encoding, source);
-    Ok(Window {
-        span: Span::at(0),
-        text: String::new(),
-    })
+    let size = offset(source.len());
+    let fits = match encoding {
+        Encoding::Utf8 | Encoding::Utf8Bom if size > WINDOW_BYTES_MAX => {
+            layout::blocks(format, source)
+                .iter()
+                .map(|block| block.end())
+                .take_while(|end| *end <= WINDOW_BYTES_MAX)
+                .last()
+                .filter(|end| *end > 0)
+        }
+        Encoding::Utf8 | Encoding::Utf8Bom | Encoding::Utf16Le | Encoding::Utf16Be => None,
+    };
+    let wanted = Span::ordered(0, fits.unwrap_or(size));
+    cut(
+        encoding,
+        Lifted {
+            at: 0,
+            bytes: source,
+            size,
+        },
+        wanted,
+    )
 }
 
 /// The bytes to lift out of a version of `size` bytes to cut the window
@@ -78,8 +95,11 @@ pub fn head(format: Format, encoding: Encoding, source: &[u8]) -> Result<Window,
 /// after its bounded end, so the end can tell whether a character runs
 /// on past it.
 pub fn lift(wanted: Span, size: u64) -> Span {
-    let _ = size;
-    wanted
+    let start = wanted.start().min(size);
+    Span::ordered(
+        start.saturating_sub(REACH),
+        bounded_end(wanted, size).saturating_add(REACH).min(size),
+    )
 }
 
 /// The window `wanted` asks for, cut from bytes [`lift`] named.
@@ -90,11 +110,26 @@ pub fn lift(wanted: Span, size: u64) -> Span {
 /// the lifted bytes decodes to - and `E_INVALID_ARGS` when `lifted`
 /// does not hold the bytes the window needs.
 pub fn cut(encoding: Encoding, lifted: Lifted<'_>, wanted: Span) -> Result<Window, AxError> {
-    let _ = (encoding, lifted);
-    Ok(Window {
-        span: wanted,
-        text: String::new(),
-    })
+    let start = lifted.boundary_at_or_before(encoding, wanted.start().min(lifted.size));
+    let end = lifted
+        .boundary_at_or_before(encoding, bounded_end(wanted, lifted.size))
+        .max(start);
+    let span = Span::ordered(start, end);
+    let bytes = lifted.slice(span).ok_or_else(|| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "read a document window",
+            format!(
+                "{}..{} lies outside the bytes lifted from {}",
+                span.start(),
+                span.end(),
+                lifted.at
+            ),
+        )
+        .with_recovery("lift the bytes `lift` names for this window, then cut again")
+    })?;
+    let text = encoding.decode(bytes)?;
+    Ok(Window { span, text })
 }
 
 /// Where a window asked for as `wanted` may end at most: inside the
