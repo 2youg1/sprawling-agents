@@ -45,19 +45,22 @@ pub(super) fn check(
     rosters(root, sources, out)
 }
 
-/// The right-hand side the carrier table owes `code`.
+/// The right-hand side the carrier table owes `code`, spelled as the
+/// kernel spells `Carrier`, because the specification declares that
+/// enum too and its roster is held to the same names.
 fn carrier_of(code: AxCode) -> String {
     match code.carrier() {
-        Carrier::Loadtime => ".loadtime".to_owned(),
-        Carrier::Event(kind) => format!(".event .{kind:?}"),
+        Carrier::Loadtime => ".Loadtime".to_owned(),
+        Carrier::Event(kind) => format!(".Event .{kind:?}"),
     }
 }
 
-/// The right-hand side the window table owes `kind`.
+/// The right-hand side the window table owes `kind`, spelled as the
+/// kernel spells `WindowClass`, for the reason `carrier_of` gives.
 fn window_of(kind: EventKind) -> String {
     match kind.window_class() {
-        WindowClass::InWindow => ".inWindow".to_owned(),
-        WindowClass::RecordOnly => ".recordOnly".to_owned(),
+        WindowClass::InWindow => ".InWindow".to_owned(),
+        WindowClass::RecordOnly => ".RecordOnly".to_owned(),
     }
 }
 
@@ -188,7 +191,7 @@ mod tests {
         let windows: Vec<String> = kernel::EventKind::ALL
             .iter()
             .map(|kind| match kind {
-                kernel::EventKind::ToolResult => "  | .ToolResult => .recordOnly".to_owned(),
+                kernel::EventKind::ToolResult => "  | .ToolResult => .RecordOnly".to_owned(),
                 other => format!("  | .{other:?} => {}", super::window_of(*other)),
             })
             .collect();
@@ -219,8 +222,8 @@ mod tests {
             texts,
             Ok(vec![
                 "`InvalidArgs` is in the kernel and has no arm in `AxCode.carrier`".to_owned(),
-                "`ToolResult`: `EventKind.windowClass` says `.recordOnly`, the kernel says \
-                 `.inWindow`"
+                "`ToolResult`: `EventKind.windowClass` says `.RecordOnly`, the kernel says \
+                 `.InWindow`"
                     .to_owned(),
                 "`Colour::Blue` is in the kernel and not in the specification".to_owned(),
             ])
