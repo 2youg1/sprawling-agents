@@ -226,4 +226,60 @@ mod tests {
             ])
         );
     }
+
+    /// A specification that declares `Carrier` and `WindowClass` as the
+    /// kernel spells them, and writes its two tables in that spelling,
+    /// with one carrier arm left out: the one absent arm is the only
+    /// finding, so the two tables and the two rosters agree on one
+    /// spelling.
+    #[test]
+    fn the_tables_are_spelled_as_the_rosters_they_point_into() {
+        let root = fixture::relocated("specalign-spelled");
+        let carriers: Vec<String> = kernel::AxCode::ALL
+            .iter()
+            .filter(|code| **code != kernel::AxCode::InvalidArgs)
+            .map(|code| match code.carrier() {
+                kernel::Carrier::Loadtime => format!("  | .{code:?} => .Loadtime"),
+                kernel::Carrier::Event(kind) => format!("  | .{code:?} => .Event .{kind:?}"),
+            })
+            .collect();
+        let windows: Vec<String> = kernel::EventKind::ALL
+            .iter()
+            .map(|kind| match kind.window_class() {
+                kernel::WindowClass::InWindow => format!("  | .{kind:?} => .InWindow"),
+                kernel::WindowClass::RecordOnly => format!("  | .{kind:?} => .RecordOnly"),
+            })
+            .collect();
+        let spec = format!(
+            "inductive Carrier where\n  | Event (kind : EventKind)\n  | Loadtime\n\n\
+             inductive WindowClass where\n  | InWindow\n  | RecordOnly\n\n\
+             def AxCode.carrier : AxCode \u{2192} Carrier\n{}\n\n\
+             def EventKind.windowClass : EventKind \u{2192} WindowClass\n{}\n",
+            carriers.join("\n"),
+            windows.join("\n")
+        );
+        fixture::write(&root, "crates/kernel/Spec.lean", &spec);
+        fixture::write(
+            &root,
+            "crates/kernel/src/lib.rs",
+            "pub enum Carrier { Event(EventKind), Loadtime }\n\
+             pub enum WindowClass { InWindow, RecordOnly }\n",
+        );
+        let found = super::super::check(&root);
+        std::fs::remove_dir_all(&root).unwrap();
+        let texts = found
+            .map(|all| {
+                all.into_iter()
+                    .filter(|v| v.location.starts_with("crates/kernel"))
+                    .map(|v| v.violation)
+                    .collect::<Vec<_>>()
+            })
+            .map_err(|err| err.to_string());
+        assert_eq!(
+            texts,
+            Ok(vec![
+                "`InvalidArgs` is in the kernel and has no arm in `AxCode.carrier`".to_owned(),
+            ])
+        );
+    }
 }
