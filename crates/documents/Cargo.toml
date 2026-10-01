@@ -1,0 +1,25 @@
+[package]
+name = "sprawling-documents"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "documents"
+
+[features]
+# The JSON Schema of the values the wire carries out of this crate, read by
+# `wire`'s own `schema` feature (wire-SPEC.md section 8-16). Off for the
+# product binary, which never asks what its frames look like.
+schema = ["dep:schemars", "kernel/schema"]
+
+[dependencies]
+kernel = { workspace = true }
+# The wire answers with this crate's spans, formats, encodings and windows,
+# and one spelling of each needs one derive (crates/documents/Spec.lean D1).
+serde = { workspace = true }
+schemars = { workspace = true, optional = true }
+
+[lints]
+workspace = true
