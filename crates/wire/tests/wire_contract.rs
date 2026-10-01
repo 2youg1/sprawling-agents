@@ -45,18 +45,18 @@ fn exposed() -> SocketAddr {
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
-    assert_eq!(COMMAND_NAMES.len(), 34, "command table");
-    assert_eq!(QUERY_NAMES.len(), 44, "query table");
+    assert_eq!(COMMAND_NAMES.len(), 36, "command table");
+    assert_eq!(QUERY_NAMES.len(), 45, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 34, "command names are distinct");
+    assert_eq!(sorted.len(), 36, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 44, "query names are distinct");
+    assert_eq!(sorted.len(), 45, "query names are distinct");
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "1216d480a3798add868fcd19fff5f32563214a31115aeac109ef1f93b8a60bb8";
+const WIRE_SCHEMA_GOLDEN: &str = "d9d1464930557780d1972fb674f46c2e34f89e6d805270cb98e92beb730cb08c";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "a09e9322b7deff9a6a2a6011ab25783533fc4d1fd6a6e77a9a662038c6bc3381";
+const WIRE_SHAPE_GOLDEN: &str = "3c9767165c94559874d58c757bb40b787e2744fe4672e17783f4fef7f9d3f3cf";
 
 // -------------------------------------------------------------- binding face
 
@@ -414,6 +414,26 @@ fn sample_of_every_command() -> Vec<Command> {
         Command::ConfigureCity(wire::CitySettings {
             keep_warm: Some(kernel::KeepWarm::FiveMinute),
             effort: None,
+            idem,
+        }),
+        Command::PutRange(wire::RangeWrite {
+            doc: Address::parse("lab/notes.md").unwrap(),
+            baseline: kernel::B3Hash::digest(b""),
+            edits: vec![documents::TextEdit {
+                span: documents::Span::new(0, 0).unwrap(),
+                text: "first".to_owned(),
+            }],
+            idem,
+        }),
+        Command::DecideProposals(wire::ProposalDecisions {
+            doc: Address::parse("lab/notes.md").unwrap(),
+            decisions: vec![wire::ProposalDecision {
+                proposal: kernel::B3Hash::digest(b"card"),
+                verdicts: vec![kernel::event::record::SliceVerdict {
+                    slice: 1,
+                    verdict: kernel::event::record::Verdict::Accept,
+                }],
+            }],
             idem,
         }),
         Command::PutDocument {

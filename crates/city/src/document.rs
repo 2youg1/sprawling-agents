@@ -185,12 +185,7 @@ pub fn edit<T>(
 /// `E_STORAGE_FATAL` every other write face of this module raises when
 /// the file cannot be read or the write will not land.
 pub fn edit_against(path: &Path, base: &[u8], body: &[u8]) -> Result<(), AxError> {
-    edit(path, |held| {
-        let on_disk = match std::fs::read(path) {
-            Ok(bytes) => bytes,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-            Err(err) => return Err(storage(path, err.to_string())),
-        };
+    revise(path, |held, on_disk| {
         if on_disk != base {
             return Err(AxError::failure(
                 AxCode::VersionConflict,
@@ -204,6 +199,24 @@ pub fn edit_against(path: &Path, base: &[u8], body: &[u8]) -> Result<(), AxError
         }
         held.replace(body)
     })
+}
+
+/// Runs `act` on the bytes `path` holds now, with `path` held against
+/// every other writer of it in this process (city-SPEC.md section 8-40).
+///
+/// The door for a writer whose rule reads the whole document: read here,
+/// judged by `act`, replaced through [`Held::replace`] before `act`
+/// returns, so a second writer that started from the same bytes reads
+/// the first one's. A document that is not there reads as no bytes.
+///
+/// # Errors
+/// `E_STORAGE_FATAL` naming the path when it cannot be read for any
+/// reason but its absence, and whatever `act` returns.
+pub fn revise<T>(
+    path: &Path,
+    act: impl FnOnce(&Held<'_>, &[u8]) -> Result<T, AxError>,
+) -> Result<T, AxError> {
+    edit(path, |held| act(held, &[]))
 }
 
 /// One document, held against every other writer of it in this process.

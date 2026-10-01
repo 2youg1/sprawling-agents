@@ -140,6 +140,11 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // one more: they have a second writer, so the frame carries the
         // text it started from and a file that moved is refused.
         | Command::PutSpine { .. }
+        // Saving any document, and landing what a person accepted of a
+        // proposal, takes the same reading: a file changes on disk under
+        // a baseline, and no run that is going is reached by it.
+        | Command::PutRange(_)
+        | Command::DecideProposals(_)
         // What a person settled about their own reading of the city
         // reaches no run at all, and a skill written onto a shelf is
         // admitted by the run after this one.

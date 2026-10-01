@@ -52,7 +52,13 @@ const BUILDING_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
   "building_created", "building_configured", "building_removed", "roadmap_claimed", "roadmap_finished",
   "roadmap_released", "roadmap_split", "roadmap_blocked", "pursuit_changed",
   "checkpoint_committed", "handoff_written", "run_started", "run_frozen",
-  "pr_merged", "asset_archived", "governed_document_written",
+  "pr_merged", "asset_archived", "governed_document_written", "document_written",
+]);
+
+// What moves the proposal cards open on a document: a card offered,
+// decided or taken back, and a save that makes a card stale.
+const PROPOSALS_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
+  "proposal_offered", "proposal_decided", "proposal_withdrawn", "document_written",
 ]);
 
 // How far one record of this kind reaches into the answers held under
@@ -94,6 +100,8 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return kind === "checkpoint_committed" || kind === "pr_merged" ? "newest_page" : "none";
     case "building_view": case "listing": case "document": case "archive_search":
       return reached(BUILDING_MOVED.has(kind));
+    case "proposals":
+      return reached(PROPOSALS_MOVED.has(kind));
     default:
       return "none";
   }

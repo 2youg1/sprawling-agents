@@ -370,6 +370,7 @@ export function restoreFile(at: Address, point: GitOid): Command {
 }
 
 export { putGuide } from "./commands/guide";
+export { decideProposals, putRange } from "./commands/document";
 
 // The city's own layer: `null` leaves a key as it is.
 export function configureCity(keepWarm: KeepWarm | null, effort: Effort | null): Command {

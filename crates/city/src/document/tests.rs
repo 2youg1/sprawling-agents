@@ -160,3 +160,33 @@ fn a_tree_refused_for_a_target_already_there_stages_nothing() {
     );
     assert_eq!(std::fs::read_dir(&target).unwrap().count(), 0);
 }
+
+/// The bytes a revision is handed are the ones on disk at the moment it
+/// holds the lock, so two writers deciding from them take turns and
+/// neither change is lost; a document that is not there is no bytes.
+#[test]
+fn a_revision_reads_the_bytes_on_disk_and_holds_the_lock_while_it_decides() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("notes.md");
+    let first = revise(&path, |held, on_disk| {
+        held.replace(b"0")?;
+        Ok(on_disk.to_vec())
+    })
+    .unwrap();
+    assert_eq!(first, b"");
+
+    let raise = || {
+        for _ in 0..200 {
+            revise(&path, |held, on_disk| {
+                let count: u32 = std::str::from_utf8(on_disk).unwrap().parse().unwrap();
+                held.replace(format!("{}", count + 1).as_bytes())
+            })
+            .unwrap();
+        }
+    };
+    std::thread::scope(|scope| {
+        scope.spawn(raise);
+        scope.spawn(raise);
+    });
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "400");
+}

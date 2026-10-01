@@ -66,6 +66,10 @@ pub struct CommitAnswer {
     /// it, the repository does not hold this object, or it could not be
     /// read - the other facts still stand without it.
     pub parents: Option<Vec<GitOid>>,
+    /// The commit object's own message, trailers included, read when
+    /// the parents are and absent for the same reasons, or when it is
+    /// not UTF-8 (wire-SPEC.md 8-54).
+    pub message: Option<String>,
 }
 
 /// A commit, and where in the one history the line announcing it sits.

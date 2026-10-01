@@ -226,6 +226,8 @@ impl RunWorker {
                 ref body,
                 ..
             } => self.put_spine(at, which, base, body),
+            wire::Command::PutRange(ref write) => self.put_range(write),
+            wire::Command::DecideProposals(ref decisions) => self.decide_proposals(decisions),
             wire::Command::Halt { scope, .. } => self.set_admission(&scope, Admittance::Halted),
             wire::Command::Reveal { at, .. } => (self.reveal)(&self.city_root, &at),
             wire::Command::RestoreDiscard {

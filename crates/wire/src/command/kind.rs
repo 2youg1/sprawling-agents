@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
 use crate::command::step::{
-    Carry, CitySettings, GovernedDocument, HaltScope, IdentityCard, PursuitStep, RulesWrite,
-    SpineDocument,
+    Carry, CitySettings, GovernedDocument, HaltScope, IdentityCard, ProposalDecisions, PursuitStep,
+    RangeWrite, RulesWrite, SpineDocument,
 };
 use crate::command::tuning::EndpointTuning;
 use crate::guide::GuideProgress;
@@ -344,6 +344,10 @@ pub enum Command<Secret = Sealed<String>> {
         body: String,
         idem: IdemKey,
     },
+    /// Saves edits on one document version (wire-SPEC.md 8-72).
+    PutRange(RangeWrite),
+    /// Decides proposal cards on one document (wire-SPEC.md 8-73).
+    DecideProposals(ProposalDecisions),
     /// Connects one outside application through the broker that holds
     /// its OAuth, answered with the whole shelf: the broker was asked, so
     /// every row is fresh, and the pressed one carries its consent page.

@@ -27,7 +27,7 @@ use kernel::IdemKey;
 
 use super::kind::Command;
 use super::no_secret::NoSecret;
-use super::step::{CitySettings, RulesWrite};
+use super::step::{CitySettings, ProposalDecisions, RangeWrite, RulesWrite};
 
 /// The Command set a socket can carry. `PutSecret` is unreachable because
 /// `NoSecret` has no values.
@@ -62,6 +62,8 @@ impl<Secret> Command<Secret> {
             | Self::RestoreFile { ref idem, .. }
             | Self::PutGuide { ref idem, .. }
             | Self::PutSpine { ref idem, .. }
+            | Self::PutRange(RangeWrite { ref idem, .. })
+            | Self::DecideProposals(ProposalDecisions { ref idem, .. })
             | Self::PutPreferences { ref idem, .. }
             | Self::PutShelved { ref idem, .. }
             | Self::AttachEndpoint { ref idem, .. }
@@ -247,6 +249,8 @@ impl From<WireCommand> for Command {
             Command::RestoreFile { at, point, idem } => Self::RestoreFile { at, point, idem },
             Command::PutGuide { progress, idem } => Self::PutGuide { progress, idem },
             Command::ConfigureCity(settings) => Self::ConfigureCity(settings),
+            Command::PutRange(write) => Self::PutRange(write),
+            Command::DecideProposals(decisions) => Self::DecideProposals(decisions),
             Command::PutSpine {
                 building,
                 which,

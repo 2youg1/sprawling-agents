@@ -2063,6 +2063,22 @@
     "en": "a device started a remote session",
     "zh": "一台设备开始了远程会话"
   },
+  "event_document_written": {
+    "en": "a document was saved",
+    "zh": "一份文档已保存"
+  },
+  "event_proposal_offered": {
+    "en": "a run proposed a change to a document",
+    "zh": "一次运行对一份文档提出了修改"
+  },
+  "event_proposal_decided": {
+    "en": "a proposed change was decided",
+    "zh": "一处修改提案已有决定"
+  },
+  "event_proposal_withdrawn": {
+    "en": "a run withdrew its proposed change",
+    "zh": "一次运行收回了它的修改提案"
+  },
   "rec_raw": {
     "en": "the record as written",
     "zh": "原始记录"

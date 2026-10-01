@@ -54,7 +54,7 @@ pub use config_layers::{CitySetting, write_city_setting};
 pub use config_layers::{ConfigLayer, Layer, load as load_config};
 pub use config_layers::{freeze_naming, keep_warm, own_layer, settled_harness, write_session};
 pub use config_layers::{settled_effort, settled_second, write_mcp, write_sandbox};
-pub use document::{Held, edit as edit_document, edit_against};
+pub use document::{Held, edit as edit_document, edit_against, revise as revise_document};
 pub use governed::{Governed, PREFERENCES_FILE, write_governed};
 pub use history::{History, has_history};
 pub use identity::{DisplayName, NAME_MAX_CHARS, Naming, NamingEdit, NamingWritten};

@@ -5,8 +5,9 @@
 
 //! The rules of a document a person reads and edits through a page:
 //! which version it is, which characters its bytes spell, where its
-//! blocks lie, how much of it one answer carries, and what one save
-//! changes (`crates/documents/Spec.lean`).
+//! blocks lie, how much of it one answer carries, what one save
+//! changes, and how a suggestion about it is read and decided
+//! (`crates/documents/Spec.lean`).
 //!
 //! No I/O: the bytes arrive as slices and leave as values. Reading the
 //! disk and the content store, and recording a save, belong to the
@@ -16,13 +17,15 @@ mod edit;
 mod encoding;
 mod format;
 mod layout;
+mod proposal;
 mod selection;
 mod span;
 mod window;
 
-pub use edit::{Applied, Edit, Transaction};
+pub use edit::{Applied, Edit, TextEdit, Transaction, save};
 pub use encoding::{Encoding, Reading};
 pub use format::Format;
+pub use proposal::{ALIGN_CELLS_MAX, Offer, PROPOSAL_ID_TAG, Review, Slice, SliceKind, decide};
 pub use selection::Selection;
 pub use span::Span;
 pub use window::{Lifted, WINDOW_BYTES_MAX, Window, cut, head, lift};

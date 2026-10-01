@@ -75,6 +75,7 @@ impl CommitFacts {
             lineage,
             previous: self.previous,
             parents: None,
+            message: None,
         }
     }
 }
@@ -273,19 +274,49 @@ enum Settled {
 }
 
 impl CommitsAsk {
-    /// The answer, each commit with the parents git states for it.
+    /// The answer, each commit with the parents and the message git
+    /// states for it.
     pub(super) fn read(self) -> wire::Answer {
         let CommitsAsk { city_root, settled } = self;
         match settled {
             Settled::One(mut commit) => {
-                give_parents(&city_root, std::slice::from_mut(&mut commit));
+                give_git_facts(&city_root, std::slice::from_mut(&mut commit));
                 wire::Answer::Commit(Box::new(commit))
             }
             Settled::Page(mut page) => {
-                give_parents(&city_root, &mut page.commits);
+                give_git_facts(&city_root, &mut page.commits);
                 wire::Answer::Commits(page)
             }
         }
+    }
+}
+
+/// The two facts of a commit only its object holds, read once the
+/// snapshot is let go (sprawling-SPEC 8-128, wire-SPEC 8-54).
+fn give_git_facts(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
+    give_parents(city_root, commits);
+}
+
+/// Gives each commit the message its object holds, from one opening of
+/// the repository: in this crate rather than in `storage` until storage's
+/// contract can take a reader of both facts (accounting-SPEC.md decision
+/// 34(b)). A repository that cannot be opened, an object it does not hold
+/// and a message that is not UTF-8 each leave `message` at `None`, as
+/// `parents` is left.
+fn give_messages(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
+    let Ok(repository) = git2::Repository::open(city_root) else {
+        return;
+    };
+    for commit in commits {
+        commit.message = match git2::Oid::from_str(&commit.oid.to_string())
+            .and_then(|oid| repository.find_commit(oid))
+        {
+            Ok(found) => match found.message() {
+                Ok(said) => Some(said.to_owned()),
+                Err(_not_utf8) => None,
+            },
+            Err(_not_read) => None,
+        };
     }
 }
 
@@ -474,6 +505,42 @@ mod tests {
             ],
             "a commit the repository does not hold has no parents to read; a root has none"
         );
+    }
+
+    /// wire-SPEC 8-54: a commit's message is read from its object, as its
+    /// parents are; one the repository does not hold has none to read.
+    #[test]
+    fn a_page_of_commits_carries_each_ones_message_from_git() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = git2::Repository::init(dir.path()).unwrap();
+        let signature = git2::Signature::now("city", "city@example.invalid").unwrap();
+        let tree = repo
+            .find_tree(repo.index().unwrap().write_tree().unwrap())
+            .unwrap();
+        let said = "checkpoint: wave 2
+
+Sprawling-Actor: lab/room1
+";
+        let made = repo
+            .commit(Some("HEAD"), &signature, &signature, said, &tree, &[])
+            .unwrap();
+        let mut views = super::super::holding::Views::new(dir.path());
+        views.fold_commit(&checkpoint_by(3, &made.to_string(), 1));
+        views.fold_commit(&checkpoint_by(5, &oid_at(5), 1));
+        let asked = wire::Query::Commits {
+            building: None,
+            before: None,
+            limit: 20,
+        };
+        let wire::Answer::Commits(page) = views.prepare(&asked).finish() else {
+            panic!("a page of commits");
+        };
+        let messages: Vec<(u64, Option<String>)> = page
+            .commits
+            .into_iter()
+            .map(|commit| (commit.seq.value(), commit.message))
+            .collect();
+        assert_eq!(messages, vec![(5, None), (3, Some(said.to_owned()))]);
     }
 
     fn addr(text: &str) -> Address {

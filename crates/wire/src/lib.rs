@@ -66,6 +66,7 @@ pub use answer::{IdentityAnswer, StatedIdentity};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
 pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
+pub use answer::{ProposalCard, ProposalsAnswer};
 pub use answer::{ReleaseAnswer, ReleaseLine};
 pub use answer::{SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use answer::{SecondDomain, SettledEffort, SettledSecond, TuningDefaults};
@@ -78,6 +79,7 @@ pub use command::COMMAND_NAMES;
 pub use command::{BodyOverride, EndpointTuning, HeaderPair};
 pub use command::{Carry, Command, WireCommand};
 pub use command::{CitySettings, GovernedDocument, HaltScope, IdentityCard, NoSecret, RulesWrite};
+pub use command::{ProposalDecision, ProposalDecisions, RangeWrite};
 pub use command::{PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};
 #[cfg(feature = "schema")]

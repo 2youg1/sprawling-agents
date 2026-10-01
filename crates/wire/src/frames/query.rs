@@ -4,14 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Everything a page may ask, and the name table the schema hash is
-//! built from.
-//!
-//! Queries read state. They are cacheable and free of side effects, so
-//! none carries an `IdemKey` — a Query that needed one would have
-//! stopped being a Query. The name table is generated from the variant
-//! list by `named_frames!`, because the schema hash is built from it and
-//! a table that could drift from the enum would let two builds agree on
-//! a hash while disagreeing on what a frame means.
+//! built from; `frames` says what every Query shares.
 
 use kernel::{Address, B3Hash, GitOid, Locator, NodeId, RunId, Seq};
 use serde::{Deserialize, Serialize};
@@ -219,6 +212,8 @@ pub enum Query {
     Document {
         at: Address,
     },
+    /// The proposal cards still open on one document (wire-SPEC 8-73).
+    Proposals(Address),
     /// One window of a stored version, by its version (wire-SPEC 8-70).
     Range {
         version: B3Hash,

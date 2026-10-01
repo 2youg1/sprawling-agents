@@ -189,7 +189,11 @@ impl SessionOrigins {
             | EventKind::RemoteClosed
             | EventKind::DevicePaired
             | EventKind::DeviceRevoked
-            | EventKind::RemoteSessionStarted => Ok(()),
+            | EventKind::RemoteSessionStarted
+            | EventKind::DocumentWritten
+            | EventKind::ProposalOffered
+            | EventKind::ProposalDecided
+            | EventKind::ProposalWithdrawn => Ok(()),
         }
     }
 

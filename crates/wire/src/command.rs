@@ -33,6 +33,9 @@ pub use no_secret::NoSecret;
 pub use shelf::Shelf;
 pub use step::PursuitStep;
 pub use step::SpineDocument;
-pub use step::{Carry, CitySettings, GovernedDocument, HaltScope, IdentityCard, RulesWrite};
+pub use step::{
+    Carry, CitySettings, GovernedDocument, HaltScope, IdentityCard, ProposalDecision,
+    ProposalDecisions, RangeWrite, RulesWrite,
+};
 pub use tuning::{BodyOverride, EndpointTuning, HeaderPair};
 pub use wire::WireCommand;

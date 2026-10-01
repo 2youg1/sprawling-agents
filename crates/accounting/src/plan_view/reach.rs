@@ -121,7 +121,12 @@ pub(super) fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::RemoteClosed
         | EventKind::DevicePaired
         | EventKind::DeviceRevoked
-        | EventKind::RemoteSessionStarted => PlanReach::Untouched,
+        | EventKind::RemoteSessionStarted
+        // A saved document and a proposal about one move no plan row.
+        | EventKind::DocumentWritten
+        | EventKind::ProposalOffered
+        | EventKind::ProposalDecided
+        | EventKind::ProposalWithdrawn => PlanReach::Untouched,
     }
 }
 

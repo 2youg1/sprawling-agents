@@ -126,7 +126,13 @@ impl EventKind {
             | EventKind::RemoteClosed
             | EventKind::DevicePaired
             | EventKind::DeviceRevoked
-            | EventKind::RemoteSessionStarted => WindowClass::RecordOnly,
+            | EventKind::RemoteSessionStarted
+            // A save, and a person's verdicts on a suggestion, change a
+            // file on disk; a later run reads that file, never this line.
+            | EventKind::DocumentWritten
+            | EventKind::ProposalOffered
+            | EventKind::ProposalDecided
+            | EventKind::ProposalWithdrawn => WindowClass::RecordOnly,
         }
     }
 }

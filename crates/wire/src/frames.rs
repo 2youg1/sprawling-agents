@@ -33,6 +33,12 @@ use serde::{Deserialize, Serialize};
 pub const WIRE_V: u32 = 45;
 mod ask;
 mod monitor;
+/// Queries read state. They are cacheable and free of side effects, so
+/// none carries an `IdemKey`: a Query that needed one would have stopped
+/// being a Query. The name table is generated from the variant list by
+/// `named_frames!`, because the schema hash is built from it and a table
+/// that could drift from the enum would let two builds agree on a hash
+/// while disagreeing on what a frame means.
 mod query;
 
 pub use ask::{Answered, Ask, AskId, AskOutcome};

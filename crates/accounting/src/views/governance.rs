@@ -67,6 +67,9 @@ pub struct Governance {
     /// What each waiting item is holding up, by approval id. Pruned when
     /// the item is answered, because an answered item holds nothing up.
     pub origins: std::collections::BTreeMap<String, BlockedJob>,
+    /// The proposal cards waiting on a person, and the ones handled
+    /// (accounting-SPEC.md 8-22, decision 34).
+    pub proposals: super::proposals::Proposals,
 }
 
 impl Governance {
@@ -80,6 +83,7 @@ impl Governance {
             rules: std::collections::BTreeMap::new(),
             sent: std::collections::BTreeMap::new(),
             origins: std::collections::BTreeMap::new(),
+            proposals: super::proposals::Proposals::default(),
         }
     }
 
@@ -178,6 +182,9 @@ impl Governance {
                     }
                 }
             }
+            EventKind::ProposalOffered => self.proposals.offered(run, payload)?,
+            EventKind::ProposalDecided => self.proposals.decided(payload)?,
+            EventKind::ProposalWithdrawn => self.proposals.withdrawn(payload)?,
             EventKind::RulesChanged => {
                 let changed = payload.read::<RulesChanged>()?;
                 self.rules

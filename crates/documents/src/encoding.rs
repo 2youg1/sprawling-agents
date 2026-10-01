@@ -137,6 +137,17 @@ impl Encoding {
         }
     }
 
+    /// The bytes `text` is spelled in this encoding. Every encoding here
+    /// spells every character, so this cannot fail; a U+FEFF in `text`
+    /// becomes this encoding's mark (D5, D11).
+    pub(crate) fn encode(self, text: &str) -> Vec<u8> {
+        match self {
+            Encoding::Utf8 | Encoding::Utf8Bom => text.as_bytes().to_vec(),
+            Encoding::Utf16Le => text.encode_utf16().flat_map(u16::to_le_bytes).collect(),
+            Encoding::Utf16Be => text.encode_utf16().flat_map(u16::to_be_bytes).collect(),
+        }
+    }
+
     fn units(self, pairs: &[[u8; 2]]) -> impl Iterator<Item = u16> {
         pairs.iter().map(move |pair| self.unit(*pair))
     }

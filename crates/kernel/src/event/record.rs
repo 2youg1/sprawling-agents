@@ -44,6 +44,7 @@ mod collaboration;
 mod control;
 mod credential;
 mod discard;
+mod document;
 mod endpoint;
 mod governance;
 mod harness;
@@ -73,6 +74,9 @@ pub use control::{
 };
 pub use credential::{SecretCaptured, ToolkitLinkOpened};
 pub use discard::{AssetArchived, DiscardRestored, FileDiscarded};
+pub use document::{
+    DocumentWritten, ProposalDecided, ProposalOffered, ProposalWithdrawn, SliceVerdict, Verdict,
+};
 pub use endpoint::{AttachedTuning, EndpointAttached, EndpointLost, InputKinds, ModelSelected};
 pub use governance::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,

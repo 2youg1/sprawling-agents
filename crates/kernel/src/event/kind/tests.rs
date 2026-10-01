@@ -45,15 +45,16 @@ fn every_kind_spells_itself_once_and_exactly_nine_reach_the_window() {
     );
 }
 
-/// The remote door's five kinds close the table, in the order a door's
-/// life writes them (kernel-SPEC.md section 8-81), so the SPEC table and
-/// `ALL` keep one order.
+/// The remote door's five kinds, in the order a door's life writes them
+/// (kernel-SPEC.md section 8-81), and then the four document kinds
+/// (section 8-83) close the table, so the SPEC table and `ALL` keep one
+/// order.
 #[test]
-fn the_remote_door_kinds_close_the_table() {
+fn the_remote_door_and_the_document_kinds_close_the_table() {
     let tail: Vec<String> = EventKind::ALL
         .iter()
         .rev()
-        .take(5)
+        .take(9)
         .rev()
         .map(|kind| serde_json::to_string(kind).unwrap())
         .collect();
@@ -65,6 +66,10 @@ fn the_remote_door_kinds_close_the_table() {
             "\"device_paired\"",
             "\"device_revoked\"",
             "\"remote_session_started\"",
+            "\"document_written\"",
+            "\"proposal_offered\"",
+            "\"proposal_decided\"",
+            "\"proposal_withdrawn\"",
         ]
     );
 }

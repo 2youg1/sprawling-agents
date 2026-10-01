@@ -224,7 +224,13 @@ fn fold_run<'a>(
             | EventKind::RemoteClosed
             | EventKind::DevicePaired
             | EventKind::DeviceRevoked
-            | EventKind::RemoteSessionStarted => {}
+            | EventKind::RemoteSessionStarted
+            // A save and a proposal are the person's page and a file on
+            // disk, never a turn of the conversation.
+            | EventKind::DocumentWritten
+            | EventKind::ProposalOffered
+            | EventKind::ProposalDecided
+            | EventKind::ProposalWithdrawn => {}
         }
     }
     // A wave the cut landed inside is dropped whole: the assistant

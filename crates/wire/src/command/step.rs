@@ -12,8 +12,39 @@
 //! `wire::carried_name`: those defer to whoever owns the value set,
 //! and these have no one to defer to.
 
-use kernel::{Address, Effort, IdemKey, KeepWarm};
+use kernel::event::record::SliceVerdict;
+use kernel::{Address, B3Hash, Effort, IdemKey, KeepWarm};
 use serde::{Deserialize, Serialize};
+
+/// A page's save of one document: edits made on the version `baseline`,
+/// refused once that version has moved (wire-SPEC.md 8-72).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct RangeWrite {
+    pub doc: Address,
+    pub baseline: B3Hash,
+    pub edits: Vec<documents::TextEdit>,
+    pub idem: IdemKey,
+}
+
+/// A person's decision on proposal cards of one document, landed as one
+/// save (wire-SPEC.md 8-73).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ProposalDecisions {
+    pub doc: Address,
+    pub decisions: Vec<ProposalDecision>,
+    pub idem: IdemKey,
+}
+
+/// One card and the verdicts on its changed sentences; a sentence left
+/// unnamed is rejected.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ProposalDecision {
+    pub proposal: B3Hash,
+    pub verdicts: Vec<SliceVerdict>,
+}
 
 /// A building's whole `RULES.toml` from a page, and the text the page
 /// read: the city evaluates `body` before it lands, and only over `base`

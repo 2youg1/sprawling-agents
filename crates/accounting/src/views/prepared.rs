@@ -131,6 +131,13 @@ pub enum Prepared {
     },
     /// One file of the tree, as a version.
     Document { city_root: PathBuf, at: Address },
+    /// One document's open proposal cards, with its version still to
+    /// read.
+    Proposals {
+        city_root: PathBuf,
+        doc: Address,
+        open: Vec<documents::Offer>,
+    },
     /// One window of a stored document version.
     Range {
         city_root: PathBuf,
@@ -290,6 +297,11 @@ impl Prepared {
             Self::Document { city_root, at } => {
                 wire::Answer::Document(Box::new(document_answer(&city_root, at)))
             }
+            Self::Proposals {
+                city_root,
+                doc,
+                open,
+            } => super::proposals::proposals_answer(&city_root, doc, open),
             Self::Range {
                 city_root,
                 version,

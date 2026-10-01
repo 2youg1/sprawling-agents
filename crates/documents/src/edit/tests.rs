@@ -103,3 +103,74 @@ fn an_edit_past_the_end_is_refused_and_nothing_lands() {
         .unwrap_err();
     assert_eq!(refused.code(), &AxCode::InvalidArgs);
 }
+
+fn text_edit(start: u64, end: u64, text: &str) -> TextEdit {
+    TextEdit {
+        span: Span::new(start, end).unwrap(),
+        text: text.to_owned(),
+    }
+}
+
+/// D11: a page's text lands in the encoding the version is in, the
+/// mark and every byte outside the edit kept.
+#[test]
+fn a_text_save_writes_the_version_s_own_encoding() {
+    let cases: [(&[u8], TextEdit, &[u8]); 4] = [
+        (b"ab", text_edit(1, 2, "\u{4e2d}"), "a\u{4e2d}".as_bytes()),
+        (b"\xef\xbb\xbfx", text_edit(3, 4, "y"), b"\xef\xbb\xbfy"),
+        (
+            b"\xff\xfea\x00b\x00",
+            text_edit(4, 6, "\u{4e2d}"),
+            b"\xff\xfea\x00\x2d\x4e",
+        ),
+        (
+            b"\xfe\xff\x00a\x00b",
+            text_edit(2, 4, "\u{4e2d}"),
+            b"\xfe\xff\x4e\x2d\x00b",
+        ),
+    ];
+    for (source, edit, expected) in cases {
+        let saved = save(source, B3Hash::digest(source), &[edit]).unwrap();
+        assert_eq!(saved.bytes(), expected);
+        assert_eq!(saved.version(), B3Hash::digest(expected));
+        assert_eq!(saved.baseline(), B3Hash::digest(source));
+    }
+}
+
+/// D12: an empty version, or a file that is not there yet, is the
+/// baseline its first version is saved on.
+#[test]
+fn a_save_on_an_empty_version_writes_its_first_bytes() {
+    let saved = save(b"", B3Hash::digest(b""), &[text_edit(0, 0, "hello\n")]).unwrap();
+    assert_eq!(saved.bytes(), b"hello\n");
+}
+
+/// D11, D12: a save that would leave bytes another reading, or that
+/// starts inside a character, is refused before anything lands, and a
+/// version that moved is told so first.
+#[test]
+fn a_save_that_splits_a_character_or_leaves_no_text_is_refused() {
+    let accented = "caf\u{e9}".as_bytes();
+    let refusals: [(&[u8], TextEdit, &str); 5] = [
+        (accented, text_edit(4, 5, "e"), "E_INVALID_ARGS"),
+        (b"plain", text_edit(1, 1, "\0"), "E_INVALID_ARGS"),
+        (b"\xef\xbb\xbfx", text_edit(0, 3, ""), "E_INVALID_ARGS"),
+        (
+            b"\xff\xfea\x00b\x00",
+            text_edit(3, 5, "c"),
+            "E_INVALID_ARGS",
+        ),
+        (b"\x00raw", text_edit(0, 1, "x"), "E_INVALID_ARGS"),
+    ];
+    for (source, edit, code) in refusals {
+        let refused = save(source, B3Hash::digest(source), &[edit]).unwrap_err();
+        assert_eq!(refused.code().as_str(), code, "{source:?}");
+    }
+    let moved = save(
+        b"\x00raw",
+        B3Hash::digest(b"other"),
+        &[text_edit(0, 1, "x")],
+    )
+    .unwrap_err();
+    assert_eq!(moved.code().as_str(), "E_VERSION_CONFLICT");
+}

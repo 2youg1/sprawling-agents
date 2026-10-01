@@ -216,6 +216,17 @@ pub enum EventKind {
     DeviceRevoked,
     /// A paired device proved its key and holds a remote session.
     RemoteSessionStarted,
+
+    // Documents (4).
+    /// A save through the page landed: which document, from which
+    /// version to which, and how long it now is; never the text.
+    DocumentWritten,
+    /// A run suggested replacing one stretch of one document version.
+    ProposalOffered,
+    /// A person decided a proposal card, sentence by sentence.
+    ProposalDecided,
+    /// The run that offered a card took it back while it was open.
+    ProposalWithdrawn,
 }
 
 impl EventKind {

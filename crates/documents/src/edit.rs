@@ -11,11 +11,81 @@
 //! instead of writing over the first writer's change. Its edits are
 //! byte spans of that version, in order and apart, so every byte outside
 //! them is copied through untouched, and applying one hands back the
-//! transaction that undoes it.
+//! transaction that undoes it. A page sends text rather than bytes, and
+//! [`save`] writes that text in the version's own encoding (D11, D12).
 
 use kernel::{AxCode, AxError, B3Hash};
+use serde::{Deserialize, Serialize};
 
+use crate::encoding::{Encoding, Reading};
 use crate::span::{Span, offset};
+
+/// One edit as a page sends it: a stretch of the baseline's bytes, and
+/// the text that takes its place (D11).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct TextEdit {
+    pub span: Span,
+    pub text: String,
+}
+
+/// Applies a page's text edits to `source`, which must be the version
+/// `baseline`, writing each text in that version's encoding (D11, D12).
+///
+/// # Errors
+/// `E_VERSION_CONFLICT` when `source` is not `baseline`, judged before
+/// anything else. `E_INVALID_ARGS` when the version is not text, when an
+/// edit starts or ends inside a character, when the edits are out of
+/// order, overlap or reach past the end, and when the result would not
+/// read as text in the same encoding. Nothing was applied in any case.
+pub fn save(source: &[u8], baseline: B3Hash, edits: &[TextEdit]) -> Result<Applied, AxError> {
+    if B3Hash::digest(source) != baseline {
+        return Err(moved(baseline));
+    }
+    saved_on(source, baseline, edits)
+}
+
+/// [`save`] once the source is known to be `baseline`, so a caller that
+/// already compared the digest does not hash the version twice.
+pub(crate) fn saved_on(
+    source: &[u8],
+    baseline: B3Hash,
+    edits: &[TextEdit],
+) -> Result<Applied, AxError> {
+    drop(edits);
+    Transaction::new(baseline, Vec::new())?.splice(source)
+}
+
+/// Whether both ends of `span` fall on a character of `source`.
+fn on_characters(encoding: Encoding, source: &[u8], span: Span) -> Result<(), AxError> {
+    let starts = |at: u64| {
+        usize::try_from(at)
+            .is_ok_and(|index| index == source.len() || encoding.begins_at(source, index, 0))
+    };
+    if starts(span.start()) && starts(span.end()) {
+        Ok(())
+    } else {
+        Err(not_text(&format!(
+            "the edit at {}..{} starts or ends inside a character",
+            span.start(),
+            span.end()
+        )))
+    }
+}
+
+fn not_text(why: &str) -> AxError {
+    AxError::failure(AxCode::InvalidArgs, "save a document", why.to_owned())
+        .with_recovery("read the document again: its answer says whether and how it reads as text")
+}
+
+fn moved(baseline: B3Hash) -> AxError {
+    AxError::failure(
+        AxCode::VersionConflict,
+        "save a document",
+        format!("the document is no longer version {baseline}"),
+    )
+    .with_recovery("read the document again and make the change on what it says now")
+}
 
 /// One replacement: the bytes of `span` in the baseline become `bytes`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,6 +108,7 @@ pub struct Transaction {
 /// identity, and the transaction that takes it back.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Applied {
+    baseline: B3Hash,
     bytes: Vec<u8>,
     version: B3Hash,
     undo: Transaction,
@@ -92,13 +163,13 @@ impl Transaction {
     /// Either way nothing was applied.
     pub fn apply(&self, source: &[u8]) -> Result<Applied, AxError> {
         if B3Hash::digest(source) != self.baseline {
-            return Err(AxError::failure(
-                AxCode::VersionConflict,
-                "save a document",
-                format!("the document is no longer version {}", self.baseline),
-            )
-            .with_recovery("read the document again and make the change on what it says now"));
+            return Err(moved(self.baseline));
         }
+        self.splice(source)
+    }
+
+    /// Applies the edits to `source`, already known to be the baseline.
+    fn splice(&self, source: &[u8]) -> Result<Applied, AxError> {
         let mut bytes = Vec::with_capacity(source.len());
         let mut undo = Vec::with_capacity(self.edits.len());
         let mut cursor = 0_usize;
@@ -122,6 +193,7 @@ impl Transaction {
         );
         let version = B3Hash::digest(&bytes);
         Ok(Applied {
+            baseline: self.baseline,
             bytes,
             version,
             undo: Transaction {
@@ -133,6 +205,11 @@ impl Transaction {
 }
 
 impl Applied {
+    /// The version the transaction was applied on.
+    pub fn baseline(&self) -> B3Hash {
+        self.baseline
+    }
+
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }

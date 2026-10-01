@@ -221,6 +221,7 @@ impl Views {
                     at: at.clone(),
                 };
             }
+            wire::Query::Proposals(doc) => return self.proposals_ask(doc),
             wire::Query::Range { version, range } => return self.range_ask(*version, *range),
             // What an agent was told, and the store read that recovers
             // it. A run with no prompt yet and an object this city no
