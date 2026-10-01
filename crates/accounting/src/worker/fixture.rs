@@ -11,7 +11,7 @@ pub(super) use rules::{lay_rules, ordinary_rules, shut_rules};
 
 mod hands;
 
-pub(super) use hands::{WallClock, monotonic, roomy_volume};
+pub(super) use hands::{LeapingClock, WallClock, monotonic, roomy_volume};
 pub(crate) use hands::{hands, init_city};
 
 #[cfg(test)]

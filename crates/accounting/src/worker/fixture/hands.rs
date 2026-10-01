@@ -59,6 +59,31 @@ impl crate::Clock for WallClock {
     }
 }
 
+/// A city clock that leaps a minute forward at every read, from the
+/// wall's present: what a person setting the wall clock, or a laptop
+/// waking, does to a span read off the city's clock.
+pub(crate) struct LeapingClock(std::sync::atomic::AtomicU64);
+
+impl LeapingClock {
+    /// How far one read moves the clock: a span read off it as two
+    /// reads apart is at least this long.
+    pub(crate) const LEAP_MS: u64 = 60_000;
+
+    pub(crate) fn from_now() -> LeapingClock {
+        let now = crate::Clock::now(&WallClock).unwrap();
+        LeapingClock(std::sync::atomic::AtomicU64::new(now.value()))
+    }
+}
+
+impl crate::Clock for LeapingClock {
+    fn now(&self) -> Result<TimeMs, AxError> {
+        Ok(TimeMs::new(self.0.fetch_add(
+            Self::LEAP_MS,
+            std::sync::atomic::Ordering::Relaxed,
+        )))
+    }
+}
+
 /// The monotonic clock, read the way the served city's one monotonic
 /// sampling point reads it, for the tests that lap an opening.
 #[allow(

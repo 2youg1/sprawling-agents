@@ -271,7 +271,13 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
                     .push(runtime::diagnostics::render(entry));
             }),
         ),
-        crate::worker::fixture::hands(),
+        // The city's clock leaps a minute at every read, so a span
+        // read off it would be a minute or more (sprawling-SPEC.md
+        // 8-129-2).
+        Hands {
+            clock: std::sync::Arc::new(LeapingClock::from_now()),
+            ..crate::worker::fixture::hands()
+        },
     )
     .unwrap();
     worker
@@ -333,6 +339,19 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
         servers.len(),
         1,
         "the servers phase reports separately, because a resident connection table would remove only that part: {lines:#?}"
+    );
+    let took = |line: &&String| {
+        line.split("took ")
+            .nth(1)
+            .and_then(|rest| rest.split(' ').next())
+            .and_then(|spent| spent.parse::<u64>().ok())
+    };
+    assert!(
+        prepared
+            .iter()
+            .chain(servers.iter())
+            .all(|line| took(line).is_some_and(|spent| spent < LeapingClock::LEAP_MS)),
+        "each span is read off the monotonic clock, not the city's: {prepared:#?} {servers:#?}"
     );
 }
 
