@@ -17,7 +17,7 @@ const STATED: Preferences = {
   lang: "zh",
   welcomed: true,
   panel: false,
-  rail: "away",
+  tier: "panorama",
   appearance: {
     lighting: "light",
     sans: "system",
@@ -56,6 +56,12 @@ describe("the cache in front of the city", () => {
     loadPreferences(rows, "en").adopt(STATED, []);
     rows.setItem("sprawling.appearance.lighting", "sepia");
     expect(get(loadPreferences(rows, "en").held).appearance.lighting).toBe("system");
+  });
+
+  test("a tier this build does not draw reads as blend, the tier a first visit opens in", () => {
+    const rows = memory();
+    rows.setItem("sprawling.tier", "survey");
+    expect(get(loadPreferences(rows, "en").held).tier).toBe("blend");
   });
 
   test("a browser asking in Chinese is answered in Chinese before anything is stored", () => {
