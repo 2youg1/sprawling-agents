@@ -7,6 +7,7 @@ members = [
     "crates/runtime",
     "crates/collab",
     "crates/city",
+    "crates/documents",
     "crates/wire",
     "crates/remote_access",
     "crates/browser",
@@ -25,6 +26,7 @@ default-members = [
     "crates/runtime",
     "crates/collab",
     "crates/city",
+    "crates/documents",
     "crates/wire",
     "crates/remote_access",
     "crates/browser",
@@ -228,6 +230,7 @@ gateway = { package = "sprawling-gateway", path = "crates/gateway", version = "=
 runtime = { package = "sprawling-runtime", path = "crates/runtime", version = "=0.0.7" }
 collab = { package = "sprawling-collab", path = "crates/collab", version = "=0.0.7" }
 city = { package = "sprawling-city", path = "crates/city", version = "=0.0.7" }
+documents = { package = "sprawling-documents", path = "crates/documents", version = "=0.0.7" }
 # `wire` turns its default features off here because accounting and
 # xtask take it without its listener; sprawling and citysim name `server`
 # themselves, so a feature later added to its default reaches neither.
