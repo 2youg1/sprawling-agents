@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 45 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "85ca5ecc871408f3ced9c72cfe37bc1deec31fcbfceade25e314a0b8662c0004" as const;
+export const WIRE_HASH = "1216d480a3798add868fcd19fff5f32563214a31115aeac109ef1f93b8a60bb8" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -617,6 +617,11 @@ export const EventKind = Schema.Union(
   Schema.Literal("cache_renewed"),
   Schema.Literal("harness_reported"),
   Schema.Literal("harness_answered"),
+  Schema.Literal("remote_opened"),
+  Schema.Literal("remote_closed"),
+  Schema.Literal("device_paired"),
+  Schema.Literal("device_revoked"),
+  Schema.Literal("remote_session_started"),
 ).annotations({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 
@@ -1256,14 +1261,123 @@ export const DoctorUpstream = Schema.Struct({
 export type DoctorUpstream = typeof DoctorUpstream.Type;
 
 /**
- * One file's head, and what was left out.
+ * A BLAKE3 digest: exactly 64 lowercase hex digits.
+ */
+export const B3Hash = Schema.String.pipe(Schema.pattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
+export type B3Hash = typeof B3Hash.Type;
+
+/**
+ * The grammar a document's blocks are read by.
+ * 
+ * Decided by the file name, never by the bytes: a window into a
+ * Markdown file looks exactly like a plain file, and a Markdown file
+ * with no heading is still Markdown.
+ */
+export const Format = Schema.Union(
+  Schema.Literal("markdown"),
+  Schema.Literal("plain"),
+).annotations({ identifier: "Format" });
+export type Format = typeof Format.Type;
+
+/**
+ * How much of the version the first window holds.
+ */
+export const Coverage = Schema.Union(
+  Schema.Literal("whole"),
+  Schema.Literal("head"),
+).annotations({ identifier: "Coverage" });
+export type Coverage = typeof Coverage.Type;
+
+/**
+ * The character encoding one document version is read in.
+ */
+export const Encoding = Schema.Union(
+  Schema.Literal("utf8"),
+  Schema.Literal("utf8_bom"),
+  Schema.Literal("utf16_le"),
+  Schema.Literal("utf16_be"),
+).annotations({ identifier: "Encoding" });
+export type Encoding = typeof Encoding.Type;
+
+/**
+ * A half-open byte interval `[start, end)` of one document version.
+ * 
+ * Half-open, so an empty span - an insertion point, the whole of an
+ * empty document - can be spelled, which the closed byte range of a
+ * `Locator` cannot do. [`Span::new`] is the one construction point and
+ * the wire reads through it, so a span whose start lies past its end
+ * is never held.
+ */
+export const Span = Schema.Struct({
+  end: Schema.Int,
+  start: Schema.Int,
+}).annotations({ identifier: "Span" });
+export type Span = typeof Span.Type;
+
+/**
+ * One stretch of a version, and the characters it spells.
+ */
+export const Window2 = Schema.Struct({
+  span: Span,
+  text: Schema.String,
+}).annotations({ identifier: "Window2" });
+export type Window2 = typeof Window2.Type;
+
+/**
+ * What the bytes of one version are to a reader.
+ */
+export const DocumentBody = Schema.Union(
+  Schema.Struct({
+    text: Schema.Struct({
+      coverage: Coverage,
+      encoding: Encoding,
+      head: Window2,
+    }),
+  }),
+  Schema.Literal("opaque"),
+).annotations({ identifier: "DocumentBody" });
+export type DocumentBody = typeof DocumentBody.Type;
+
+/**
+ * A file with bytes: which version, how long, and what of it a reader
+ * is given now.
+ */
+export const HeldDocument = Schema.Struct({
+  body: DocumentBody,
+  bytes: Schema.Int,
+  format: Format,
+  version: B3Hash,
+}).annotations({ identifier: "HeldDocument" });
+export type HeldDocument = typeof HeldDocument.Type;
+
+/**
+ * What stands at an address in the tree.
+ */
+export const DocumentState = Schema.Union(
+  Schema.Literal("missing"),
+  Schema.Struct({
+    unreadable: Schema.Struct({
+      reason: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    empty: Schema.Struct({
+      format: Format,
+      version: B3Hash,
+    }),
+  }),
+  Schema.Struct({
+    held: HeldDocument,
+  }),
+).annotations({ identifier: "DocumentState" });
+export type DocumentState = typeof DocumentState.Type;
+
+/**
+ * One file, and what state it is in.
  */
 export const DocumentAnswer = Schema.Struct({
   at: Address,
-  binary: Schema.Boolean,
-  bytes: Schema.Int,
-  text: Schema.String,
-  truncated: Schema.Boolean,
+  state: DocumentState,
 }).annotations({ identifier: "DocumentAnswer" });
 export type DocumentAnswer = typeof DocumentAnswer.Type;
 
@@ -1464,6 +1578,44 @@ export const GitStatusAnswer = Schema.Struct({
 export type GitStatusAnswer = typeof GitStatusAnswer.Type;
 
 /**
+ * What the GitHub CLI said about one host, or the named reason it said
+ * nothing. Every reading but `Found` leaves the card as the person left
+ * it, and each names the way on that the page offers.
+ */
+export const GithubReading = Schema.Union(
+  Schema.Struct({
+    found: Schema.Struct({
+      login: Schema.String,
+    }),
+  }),
+  Schema.Literal("no_cli"),
+  Schema.Literal("not_logged_in"),
+  Schema.Struct({
+    failed: Schema.Struct({
+      exit: Schema.optional(Schema.NullOr(Schema.Int)),
+    }),
+  }),
+  Schema.Struct({
+    stuck: Schema.Struct({
+      why: Schema.String,
+    }),
+  }),
+  Schema.Literal("not_a_host"),
+).annotations({ identifier: "GithubReading" });
+export type GithubReading = typeof GithubReading.Type;
+
+/**
+ * What one import asked and what came back. Nothing was saved: the
+ * login is a candidate the identity card writes only when the person
+ * saves it, through `PutIdentity`.
+ */
+export const GithubLoginAnswer = Schema.Struct({
+  host: Schema.String,
+  reading: GithubReading,
+}).annotations({ identifier: "GithubLoginAnswer" });
+export type GithubLoginAnswer = typeof GithubLoginAnswer.Type;
+
+/**
  * Non-empty resident identity; the `role@building.n` grammar tightens
  * with city::resident.
  */
@@ -1520,6 +1672,47 @@ export const GovernanceAnswer = Schema.Struct({
 export type GovernanceAnswer = typeof GovernanceAnswer.Type;
 
 /**
+ * What the person did with one optional step. A step with no mark has
+ * not been looked at.
+ */
+export const GuideMark = Schema.Literal("seen", "skipped").annotations({ identifier: "GuideMark" });
+export type GuideMark = typeof GuideMark.Type;
+
+/**
+ * Whether opening the city still offers the guide.
+ */
+export const GuideState = Schema.Union(
+  Schema.Literal("open"),
+  Schema.Literal("left"),
+).annotations({ identifier: "GuideState" });
+export type GuideState = typeof GuideState.Type;
+
+/**
+ * The five steps, in the order the guide gives them.
+ */
+export const GuideStep = Schema.Literal("provider", "dependencies", "texts", "skills", "mcp").annotations({ identifier: "GuideStep" });
+export type GuideStep = typeof GuideStep.Type;
+
+/**
+ * The guide's progress in one city: where it reopens, whether the
+ * person has left it, and each optional step seen or put off.
+ * 
+ * The provider step has no mark: it is the one step that must be done,
+ * and only the city's saved endpoint and `main` model say whether it is.
+ * Every field defaults, so a city nobody has guided reads as a guide at
+ * its start.
+ */
+export const GuideProgress = Schema.Struct({
+  at: Schema.optional(Schema.NullOr(GuideStep)),
+  dependencies: Schema.optional(Schema.NullOr(GuideMark)),
+  mcp: Schema.optional(Schema.NullOr(GuideMark)),
+  skills: Schema.optional(Schema.NullOr(GuideMark)),
+  state: Schema.optional(GuideState),
+  texts: Schema.optional(Schema.NullOr(GuideMark)),
+}).annotations({ identifier: "GuideProgress" });
+export type GuideProgress = typeof GuideProgress.Type;
+
+/**
  * One harness as the page draws it.
  */
 export const HarnessLine = Schema.Struct({
@@ -1537,12 +1730,6 @@ export const HarnessesAnswer = Schema.Struct({
   harnesses: Schema.Array(HarnessLine),
 }).annotations({ identifier: "HarnessesAnswer" });
 export type HarnessesAnswer = typeof HarnessesAnswer.Type;
-
-/**
- * A BLAKE3 digest: exactly 64 lowercase hex digits.
- */
-export const B3Hash = Schema.String.pipe(Schema.pattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
-export type B3Hash = typeof B3Hash.Type;
 
 /**
  * Ledger payload: a JSON object with every float refused, at construction
@@ -2107,6 +2294,12 @@ export const PrefixAnswer = Schema.Struct({
 }).annotations({ identifier: "PrefixAnswer" });
 export type PrefixAnswer = typeof PrefixAnswer.Type;
 
+export const RangeAnswer = Schema.Struct({
+  version: B3Hash,
+  window: Window2,
+}).annotations({ identifier: "RangeAnswer" });
+export type RangeAnswer = typeof RangeAnswer.Type;
+
 export const RegistryLine = Schema.Struct({
   addr: Address,
   at: TimeMs,
@@ -2416,6 +2609,81 @@ export const RunCostsAnswer = Schema.Struct({
 export type RunCostsAnswer = typeof RunCostsAnswer.Type;
 
 /**
+ * What a new session at an address keeps from the previous one.
+ * 
+ * An enum rather than a flag: the two states are named actions with
+ * different results on disk, and `carry: true` at a call site says
+ * neither of them. `Nothing` is the first variant and the default,
+ * because that is what a person means by starting a new session — a
+ * new one, here, not a continuation (`sprawling-SPEC.md` 8-82). The
+ * handoff is the exception a person states.
+ */
+export const Carry = Schema.Union(
+  Schema.Literal("nothing"),
+  Schema.Literal("handoff"),
+).annotations({ identifier: "Carry" });
+export type Carry = typeof Carry.Type;
+
+/**
+ * Where a session branched off: one run of this city, and the line in
+ * it that the branch starts after.
+ * 
+ * **The pair has one home, and its older spelling stays where it is.**
+ * A `run_forked` record spells this same pair as `{from, at_seq}`,
+ * because a ledger already written cannot be re-spelled; a value this
+ * build passes around is the type below. A reader holding a `RunForked`
+ * builds an `Origin` from it rather than keeping both.
+ * 
+ * `at_seq` is the line itself and not the line after it: a branch
+ * inherits through that line, and the safe point the rebuild settles on
+ * is that value or an earlier one (`runtime::fork::inherited_indexed`).
+ */
+export const Origin = Schema.Struct({
+  at_seq: Seq,
+  run: RunId,
+}).annotations({ identifier: "Origin" });
+export type Origin = typeof Origin.Type;
+
+/**
+ * How a stretch began.
+ */
+export const SessionStart = Schema.Union(
+  Schema.Literal("dispatched"),
+  Schema.Struct({
+    opened: Schema.Struct({
+      carry: Carry,
+      from: Schema.optional(Schema.NullOr(Origin)),
+    }),
+  }),
+).annotations({ identifier: "SessionStart" });
+export type SessionStart = typeof SessionStart.Type;
+
+/**
+ * One stretch of a room, each field read off a line the Ledger files
+ * under the room's address.
+ */
+export const SessionLine = Schema.Struct({
+  at: TimeMs,
+  began: Seq,
+  last: Seq,
+  runs: Schema.Int,
+  start: SessionStart,
+}).annotations({ identifier: "SessionLine" });
+export type SessionLine = typeof SessionLine.Type;
+
+/**
+ * One room's stretches, newest first, and how many older ones the answer
+ * leaves out. `room` echoes the question, which the wire carries no id
+ * for.
+ */
+export const SessionsAnswer = Schema.Struct({
+  earlier: Schema.Int,
+  room: Address,
+  sessions: Schema.Array(SessionLine),
+}).annotations({ identifier: "SessionsAnswer" });
+export type SessionsAnswer = typeof SessionsAnswer.Type;
+
+/**
  * Which shelf a holding sits on, and where its document is.
  * 
  * One value rather than a shelf name beside a path, because a holding
@@ -2559,6 +2827,9 @@ export const Answer = Schema.Union(
     history_range: HistoryRangeAnswer,
   }),
   Schema.Struct({
+    sessions: SessionsAnswer,
+  }),
+  Schema.Struct({
     changes: ChangesAnswer,
   }),
   Schema.Struct({
@@ -2628,6 +2899,9 @@ export const Answer = Schema.Union(
     document: DocumentAnswer,
   }),
   Schema.Struct({
+    range: RangeAnswer,
+  }),
+  Schema.Struct({
     commits: CommitsAnswer,
   }),
   Schema.Struct({
@@ -2668,6 +2942,12 @@ export const Answer = Schema.Union(
   }),
   Schema.Struct({
     automation: AutomationAnswer,
+  }),
+  Schema.Struct({
+    github_login: GithubLoginAnswer,
+  }),
+  Schema.Struct({
+    guide: GuideProgress,
   }),
   Schema.Struct({
     unavailable: Schema.Struct({
@@ -2740,6 +3020,11 @@ export const Query = Schema.Union(
     }),
   }),
   Schema.Struct({
+    sessions: Schema.Struct({
+      room: Address,
+    }),
+  }),
+  Schema.Struct({
     changes: Schema.Struct({
       base: GitOid,
       head: Schema.optional(Schema.NullOr(GitOid)),
@@ -2782,6 +3067,10 @@ export const Query = Schema.Union(
   }),
   Schema.Literal("identity"),
   Schema.Literal("automation"),
+  Schema.Struct({
+    github_login: Schema.NullOr(Schema.String),
+  }),
+  Schema.Literal("guide"),
   Schema.Literal("governance"),
   Schema.Struct({
     rounds: Schema.Struct({
@@ -2806,6 +3095,12 @@ export const Query = Schema.Union(
   Schema.Struct({
     document: Schema.Struct({
       at: Address,
+    }),
+  }),
+  Schema.Struct({
+    range: Schema.Struct({
+      range: Span,
+      version: B3Hash,
     }),
   }),
   Schema.Struct({
@@ -2885,22 +3180,6 @@ export const BodyOverride = Schema.Struct({
   value: Schema.String,
 }).annotations({ identifier: "BodyOverride" });
 export type BodyOverride = typeof BodyOverride.Type;
-
-/**
- * What a new session at an address keeps from the previous one.
- * 
- * An enum rather than a flag: the two states are named actions with
- * different results on disk, and `carry: true` at a call site says
- * neither of them. `Nothing` is the first variant and the default,
- * because that is what a person means by starting a new session — a
- * new one, here, not a continuation (`sprawling-SPEC.md` 8-82). The
- * handoff is the exception a person states.
- */
-export const Carry = Schema.Union(
-  Schema.Literal("nothing"),
-  Schema.Literal("handoff"),
-).annotations({ identifier: "Carry" });
-export type Carry = typeof Carry.Type;
 
 /**
  * The deduplication key of one outward action: `idem1-` then 32 lowercase hex digits.
@@ -2985,26 +3264,6 @@ export type IdentityCard = typeof IdentityCard.Type;
 
 export const NoSecret = Schema.Never.annotations({ identifier: "NoSecret" });
 export type NoSecret = typeof NoSecret.Type;
-
-/**
- * Where a session branched off: one run of this city, and the line in
- * it that the branch starts after.
- * 
- * **The pair has one home, and its older spelling stays where it is.**
- * A `run_forked` record spells this same pair as `{from, at_seq}`,
- * because a ledger already written cannot be re-spelled; a value this
- * build passes around is the type below. A reader holding a `RunForked`
- * builds an `Origin` from it rather than keeping both.
- * 
- * `at_seq` is the line itself and not the line after it: a branch
- * inherits through that line, and the safe point the rebuild settles on
- * is that value or an earlier one (`runtime::fork::inherited_indexed`).
- */
-export const Origin = Schema.Struct({
-  at_seq: Seq,
-  run: RunId,
-}).annotations({ identifier: "Origin" });
-export type Origin = typeof Origin.Type;
 
 /**
  * Whether the core's threads stand above normal (sprawling-SPEC.md
@@ -3389,6 +3648,12 @@ export const Command = Schema.Union(
       at: Address,
       idem: IdemKey,
       point: GitOid,
+    }),
+  }),
+  Schema.Struct({
+    put_guide: Schema.Struct({
+      idem: IdemKey,
+      progress: GuideProgress,
     }),
   }),
   Schema.Struct({
