@@ -22,8 +22,8 @@
 | `views` | 页面问的每个问题，怎样从折叠的记录里答 | 8-10 |
 | `lineage` | 每个 run 怎样折成一行，带上它的父指针 | 8-10 |
 | `worker` | 城的唯一写者 `RunWorker`：它持有的状态、它执行的命令、它驱动的 run | 8-11 |
-| `playback` | 一段历史怎样成为一份可以重算、可以复核的 playback bundle；一个 playback page 怎样分五项查过，导出件怎样整份落下；按 UTC 时间选一段，调用的耗时何时是量出来的，一个提交改了什么、出自哪几次调用 | 8-12、8-13、8-17 |
-| `trace` | 一个提交是这个 run 哪几次调用的结果，同一栋楼里还有谁在那一段里调用过工具 | 8-16 |
+| `playback` | 一段历史怎样成为一份可以重算、可以复核的 playback bundle；一个 playback page 怎样分五项查过，导出件怎样整份落下；按 UTC 时间选一段，调用的耗时何时是量出来的，一个提交改了什么、出自哪几次调用；模型调用的耗时，证据怎样只读到 cutoff | 8-12、8-13、8-17、8-25 |
+| `trace` | 一个提交是这个 run 哪几次调用的结果，同一栋楼里还有谁在那一段里调用过工具；一份历史逐行折到宣告行时怎样答一个提交 | 8-16、8-25 |
 
 表里的模块全部在本 crate。`RunWorker` 与它的六个对象（凭据、协作、计划、治理、入口、飞行中的 run）、全部用例住 `worker`；它经构造时收下的一个 `Hands` 碰这台电脑，生产的那一份由二进制的装配根 `bin::assembly::production::hands` 造出（8-11）。
 
@@ -58,8 +58,7 @@
 - citysim 的场景库还驱动不了一次 dispatch：场景库只经 `runtime::run::drive` 驱动一次 run，从不造 worker；citysim 的 bench 二进制依赖 `sprawling`，只为计时产品自己的启动与查询。worker 已经只经 `Hands` 与四个端口碰外面（8-11），所以剩下的一步是一个场景造一份脚本的 `Hands`、经本 crate 的端口驱动一次 dispatch，ARCHITECTURE.md §11 的 V6 缺口随之关闭。写这个场景是 citysim 的活。能定下它的证据是那个场景在 citysim 里逐字节重放。
 - 模块从 `sprawling` 搬过来时，它在 sprawling-SPEC.md 里的那一节留在原处，只把模块路径改成新的拼写：`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`。这些节在 S4 迁 `Spec.lean` 时一次进入本 crate 的规格（§12-15）；8-7、8-8、8-9 是早先整节搬进来的，保持原样。未定的只有 S4 的切分：哪几节归 `views`、哪几节归 `worker`，按 `architecture.toml` 里各行的 `spec` 锚点定。
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
-- `playback` 的提交证据（8-17）对每个范围内、第一次宣告的提交问一次 `accounting::trace::trace_first`，它每次重建一遍视图、审一遍整条链，所以一份 bundle 的代价与范围内的提交数乘账本字节数同阶，多日夹具上可能到秒级。它还读到 cutoff 之后：bundle 取用的只是第一次宣告时就定下的事实（`previous`、git 的父提交、这一行之前的调用），cutoff 之后的行改变不了它们；但 cutoff 之后的历史审不过时，`trace` 失败，复核就把这个提交写成 `unread` 而与原 bundle 不同。两者都要 `trace` 能在一个 seq 上停下（或收一份折到 cutoff 的视图），那是 `accounting::trace` 的接口；能定下要不要做的是多日夹具上的导出读数。
-- `calls`（8-17）只配工具调用。模型调用（`model_called` 到 `model_returned`）按回合配对，没有 id，逐行精度仍由 `events` 的 `moment` 给出；页面要画模型调用的耗时时，回合配对的那一份规则（`views::rounds`）要交出它的两端 seq。
+- `playback` 的导出在 walk 里把每一行折进视图（8-25），不论范围里有没有提交：省掉的是每个提交一次的整账重建，多出的是没有提交的窄选择也要付的一遍视图折叠。要不要改成遇到第一个范围内的提交才开始折（那时要从创世再读一遍到那一行，读到的字节不是这一遍核对过的），由多日夹具上 release 的导出读数定：视图折叠在 walk 里占的比例小，就照现在这样。
 - `playback`（8-12、8-13）的两个上限是待测初值：`BUNDLE_MAX_BYTES` 与 `PAGE_MAX_BYTES` 要在多日夹具上量过导出峰值、页面解析与首屏成本才定值，定值的证据是 citysim 的多日场景读数。居民导出位置（8-13）里崩溃留下的暂存文件 `<名>.partial-<pid>` 没有人收走：它不会被当成导出件读（`check` 只认 `.json`/`.html` 的名字），能定下要不要收的是这类文件在真实城里出现的频率。
 
 ## 4 现状分析
@@ -593,8 +592,8 @@ pub(crate) fn login(host: &str) -> wire::GithubReading;
 
 ```rust
 // accounting::playback
-pub const SCHEMA: &str = "sprawling.playback/2";
-pub const PROJECTION_RULES: u32 = 3;
+pub const SCHEMA: &str = "sprawling.playback/3";
+pub const PROJECTION_RULES: u32 = 4;
 pub const BUNDLE_MAX_BYTES: usize = 32 * 1024 * 1024;
 pub enum Cutoff { Latest, At(Seq) }
 pub struct Request { pub selection: Selection, pub reader: Reader, pub cutoff: Cutoff }
@@ -648,7 +647,7 @@ pub enum Reader { Person(Confidential), Resident(Address) }
 | `runs` | 有范围内事件的 run，取 `accounting::lineage::Lineage` 折到 cutoff 的那一行：`run`、`addr`、`session`、`parent`、`forked_at`、`predecessor`、`first_seq`、`last_seq`、`state`、`unanswered`、`policy`（8-17）；`parent`/`predecessor` 是 `{"run":id}`、`"withheld"`（那个 run 的房间读者读不到）或 `"missing"`（本账到 cutoff 没有它） |
 | `moments` | 关键时刻：`family`（`run`、`approval`、`pr`）、稳定键（run id、approval id、`<branch>@<pr_opened 的 seq>`）、`opened`、`closed`、`seqs`（范围内可见的成员） |
 | `messages` | 每封信（`signal_enqueued` 的 id）：`from`、`room`、`sent`、`consumed` |
-| `calls` | 每次工具调用（run 与调用 id）：`run`、`id`、`tool`、`called`、`answered`、`took`（8-17） |
+| `calls` | 每次工具调用（run 与调用 id）与每次模型调用（run 与它的 `model_called` 的 seq）：`run`、`callee`、`called`、`answered`、`took`（8-17、8-25） |
 | `checkpoints` | 范围内可见、点名一个提交或钉住一份 job 的行，按 seq 升序：`checkpoint_committed` 的 `JobPinned` 写 `{"pinned":{"job":…}}`，`Committed` 写 `{"committed":{"oid","scope","files","base","diff","trace"}}`（后三项见 8-17）；`pr_merged` 写 `{"merged":{"oid"}}`，`oid` 是落地的提交。哪些行点名提交、点名的是哪个 oid，由 `accounting::views::commits::commit_facts` 一处回答 |
 | `costs` | 范围内可见行上折的 `storage::Attribution`：`billed_usd_micros`、`by_run`、`unpriced_calls`、`unpriced_tokens`；只涵盖所选可见范围 |
 | `withheld` | 见上 |
@@ -667,7 +666,7 @@ pub enum Reader { Person(Confidential), Resident(Address) }
 
 **失败。** 全部是 `AxError`：`Selection::new` 的矛盾区间、bundle 读不懂或不规范是 `E_INVALID_ARGS`（action `select a playback range` / `read a playback bundle`）；链上的行按 `LineFault::into_ax` 报（`E_CAS_CORRUPT`、`E_LOG_VERSION_UNSUPPORTED`），recovery 指向 `sprawling replay`；序列化后超过 `BUNDLE_MAX_BYTES` 是 `E_INVALID_ARGS`，recovery 是用 `--from`/`--through`、`--run` 或 `--building` 收窄；规则、payload 读不了按各自的 `AxError` 原样上抛。任何失败都不交回部分的 bundle。错误文字不回显被隐去的内容。
 
-**资源。** 一遍读，一个段的字节常驻；另外常驻的是 `Lineage`（每个 run 一行）、关键时刻与消息的两端（每个键一项）、可能成为上下文的范围外可见行（run 的首行与各对的两端），以及范围内的投影。`BUNDLE_MAX_BYTES` 只限最终字节，不限这些常驻量。32 MiB 是待测的初值：多日夹具上的导出峰值与读取成本量出来之前，不把它当作内存上界。
+**资源。** 一遍读，一个段的字节常驻；另外常驻的是 `Lineage`（每个 run 一行）、关键时刻与消息的两端（每个键一项）、可能成为上下文的范围外可见行（run 的首行与各对的两端），范围内的投影，以及折到当前行的视图（8-25）。`BUNDLE_MAX_BYTES` 只限最终字节，不限这些常驻量。32 MiB 是待测的初值：多日夹具上的导出峰值与读取成本量出来之前，不把它当作内存上界。
 
 **版本。** bundle 的内容或某张表的求法每变一次，`PROJECTION_RULES` 进一位，于是旧构建导出、本构建读得开的 bundle 复核时报「复核不了」，而不是报「不同」。字段增减是形状的变化，`SCHEMA` 随之进一位：读回时先只读 `schema` 一个键，不是本构建的 `SCHEMA` 就在结构一项报出两个版本、要求用写它的那个版本复核，而不报一条字段缺失。
 
@@ -782,8 +781,8 @@ impl Window<'_> {
 
 **调用与耗时（`calls`）。**
 
-- 一次工具调用是 links 里的一对：`tool_called` 的 `id` 打开、同一 run 里 `tool_result` 的 `tool_use_id` 关闭，与 `views::rounds` 配对用的是同一对键。两端的状态与关键时刻、消息一样是五种之一（8-12）。关闭行继承打开行碰到的楼，所以一条调用碰到机密楼时，它的答复同样隐去。至少一端在范围内可见的调用才出现，按它在范围内的第一行的 seq 升序。
-- 行：`run`、`id`、`tool`（打开行可见时取它载荷的 `name`，否则 `null`）、`called`、`answered`、`took`。
+- 一次工具调用是 links 里的一对（模型调用是另一种对，见 8-25）：`tool_called` 的 `id` 打开、同一 run 里 `tool_result` 的 `tool_use_id` 关闭，与 `views::rounds` 配对用的是同一对键。两端的状态与关键时刻、消息一样是五种之一（8-12）。关闭行继承打开行碰到的楼，所以一条调用碰到机密楼时，它的答复同样隐去。至少一端在范围内可见的调用才出现，按它在范围内的第一行的 seq 升序。
+- 行：`run`、`callee`（工具调用写 `{"tool":{"id","name"}}`，`name` 在打开行可见时取它载荷的 `name`，否则 `null`；模型调用见 8-25）、`called`、`answered`、`took`。
 - `took` 是 `{"measured":"<毫秒>"}`，当且仅当两端都可见、`views::rounds::answered_timing` 判这一对的时刻是量出来的（两行都有 `EventRecord::moment`，答复不是城在重启后补写的 `E_TOOL_OUTCOME_UNKNOWN`），并且答复的 `t` 不早于调用的 `t`；其余一律是 `"unknown"`。所以版本早于逐行时刻的账本、混合区间里旧版本的那几次调用、补写的答复、还没答、有一端被隐去，都不给耗时，页面也就不会画出零耗时。判定量没量的规则只在 `views::rounds` 一处；逐行的精度仍是每条 `events` 的 `moment`，混合的区间逐行、逐调用各自保留。
 - 一条两端都落在范围外、范围内又没有成员的调用，在它关闭时就从「可能成为上下文的范围外行」里删掉：调用占账本行数的大头，留着它们会让一次窄选择的常驻量与整本账同阶；删掉以后常驻的只有还没关闭的调用。
 
@@ -791,7 +790,7 @@ impl Window<'_> {
 
 **提交的证据。** 范围内可见的每个 `Committed` checkpoint 多三项；读这三项要读账本之外的输入（git 对象与 `accounting::trace` 对整本账的折叠），确定性的条件是这些输入相同，而 git 对象按 oid 不可变：
 
-- **`trace`**（`playback::traced`）：这一行是 cutoff 以内第一次宣告这个 oid 的行时，是 `accounting::trace::trace_first(city_root, oid, 这一行)` 的答，写 `{"traced":{"calls","nearby"}}`：`calls` 是这个 run 在区间里的每次调用，各是 `{"at":seq}`（在 `events` 里）、`{"elsewhere":seq}`（读者看得到，在选择之外，行不随 bundle 携带，要看它就把选择放宽到它）或 `"withheld"`（读者看不到那条 `tool_called`）；`nearby` 是同一栋楼里别的 run 的调用数，各是 `{"run","actor","calls"}`，`run` 照 `runs` 的写法是 `{"run":id}`、`"withheld"` 或 `"missing"`，`actor` 只在 `run` 读得到时写出。这一行之前已经宣告过同一个 oid（同一棵树再次宣告，它的调用归在第一次宣告上），或 `trace_first` 答「没有这个提交」时，写 `"untraced"`；`trace` 失败（例如 cutoff 之后的历史不通过审计）写 `{"unread":"<错误码>"}`，导出不因此失败。这两种情形下没有 `trace` 的答，`base` 是 `"none"`，`diff` 为空表。
+- **`trace`**（`playback::traced`）：这一行是 cutoff 以内第一次宣告这个 oid 的行时，是 `accounting::trace` 按这一行求出的答（8-25：视图折到这一行时的 `Query::Commit`，调用与同楼的别人经 walk 的索引读），写 `{"traced":{"calls","nearby"}}`：`calls` 是这个 run 在区间里的每次调用，各是 `{"at":seq}`（在 `events` 里）、`{"elsewhere":seq}`（读者看得到，在选择之外，行不随 bundle 携带，要看它就把选择放宽到它）或 `"withheld"`（读者看不到那条 `tool_called`）；`nearby` 是同一栋楼里别的 run 的调用数，各是 `{"run","actor","calls"}`，`run` 照 `runs` 的写法是 `{"run":id}`、`"withheld"` 或 `"missing"`，`actor` 只在 `run` 读得到时写出。这一行之前已经宣告过同一个 oid（同一棵树再次宣告，它的调用归在第一次宣告上），或视图答「没有这个提交」时，写 `"untraced"`；`trace` 失败（视图拒绝折 cutoff 以内的某一行，或这一段的行读不了）写 `{"unread":"<错误码>"}`，导出不因此失败。这两种情形下没有 `trace` 的答，`base` 是 `"none"`，`diff` 为空表。
 - **`base`**：`trace` 答的 `commit.previous`（同一 run 的上一个提交），写 `{"previous":oid}`；没有时，`commit.parents` 恰好一个，写 `{"parent":oid}`；否则 `"none"`。全城紧邻的上一个提交不是基准：它可能属于别的 run。
 - **`diff`**（`playback::diff`）：`base` 是 `"none"` 时为空表；否则按 `files` 的次序，每个路径一项 `{"path","change"}`。`change` 是六种之一，互不混同：
   - `{"patch":{"lines","credential"}}`：经 `storage::hunks::of_file(city_root, base, Head::Commit(oid), path)` 读出的整段 patch。它只比较两个不可变的 oid，从不读工作区；`lines` 是 `{"number","text"}`，`credential` 是被凭据扫描隐去的行的 `{"number","reason"}`，与 `storage::hunks` 同一个扫描，不回显字节。
@@ -804,9 +803,60 @@ impl Window<'_> {
 
 **失败。** `Window::span` 的失败是 `E_INVALID_ARGS`：`since`/`until` 是 `parse_iso` 的拒绝；`day` 读不了时 action 是 `select a playback day`，subject 是原文，recovery 给出 `2026-05-14` 的写法；交集为空时是 `UtcSpan::new` 的拒绝。`diff` 与 `trace` 从不让导出失败：账本之外的输入缺了、读不了，各有一个写明的状态。
 
-**资源。** 时间条件只多读每行信封的 `t`，walk 已经解析了它。调用表常驻每个有成员的调用一项，加上还没关闭的范围外调用。每个范围内的 `Committed` 提交问一次 `trace`（代价见 §3），再对 `files` 里每个路径读一次 git：一份 patch 一次物化，显示的部分不超过 `DIFF_MAX_BYTES`。
+**资源。** 时间条件只多读每行信封的 `t`，walk 已经解析了它。调用表常驻每个有成员的调用一项，加上还没关闭的范围外调用。每个范围内、第一次宣告的 `Committed` 提交问一次折到它的视图、按 walk 的索引读一段（代价见 8-25），再对 `files` 里每个路径读一次 git：一份 patch 一次物化，显示的部分不超过 `DIFF_MAX_BYTES`。
 
 **本节测试**：`accounting::playback::tests::span`：`t` 回退的行按它自己的时刻取舍；`day` 与 `since` 取交集，交出空区间时拒绝，`day` 读不了时拒绝；不重叠的合法区间给出空 bundle 且 `source.selection` 记着两端。`accounting::playback::tests::model`：`Select.lean` 场景表里带时间的几项在生产的 `export` 上给出同样的 seq。`accounting::playback::tests::evidence`：旧版本的调用与新版本的调用在同一区间里，前者 `took` 为 `"unknown"`、后者是量出来的毫秒，补写的答复为 `"unknown"`；run 行带它的策略，PR 的拒绝行在 `events` 里；一个提交的 `diff` 把文字、凭据行、空、二进制、缺失、隐去分开，基准是同一 run 的上一个提交；它的 `trace` 把区间里的调用按读者能看到的写出；导出之后别的 run 再宣告同一个提交，复核仍逐字节相同。
+
+### 8-25 accounting::playback 的模型调用耗时，与只读到 cutoff 的提交证据（形状 7 投影；`views::rounds::Attempts` 为形状 1 决策）
+
+8-17 给工具调用配了耗时，给提交配了调用归属。这一节补两样：模型调用（一条 `model_called` 到答它的 `model_returned`）的耗时；提交的证据只读到 cutoff——cutoff 之后的行写了什么、审不审得过，都改变不了 bundle，所以 `check --city` 在一段 cutoff 之后才坏掉的历史上照样逐字节重现。必须守住的性质在 `crates/accounting/spec/Playback/Project.lean`：`took_is_measured`、`an_unmeasured_end_is_unknown`、`evidence_ignores_lines_after_the_cutoff`。
+
+```rust
+// accounting::views::rounds（形状 1 决策）
+/// 每条 `model_returned` 答的是它的 run 在它之前最近的一条 `model_called`。
+#[derive(Debug, Default)]
+pub(crate) struct Attempts { /* 私有：每个 run 最近一次尝试的 seq */ }
+impl Attempts {
+    pub(crate) fn note(&mut self, record: &EventRecord);
+    pub(crate) fn answered_by(&self, reply: &EventRecord) -> Option<Seq>;
+}
+
+// accounting::trace
+/// 一座城的历史，按严格校验走过的次序一行一行折进视图。
+pub(crate) struct History { /* 私有：折到当前行的视图，或第一次拒绝 */ }
+impl History {
+    pub(crate) fn new(city_root: &Path) -> History;
+    pub(crate) fn absorb(&mut self, record: &EventRecord);
+    /// 折到当前行为止的视图答 `Query::Commit` 的那个值；没有一行宣告过它时 `Ok(None)`。
+    pub(crate) fn commit(&self, oid: GitOid) -> Result<Option<wire::CommitAnswer>, AxError>;
+}
+pub(crate) fn trace_through(index: &LedgerIndex, ledger_dir: &Path, commit: wire::CommitAnswer) -> Result<Trace, AxError>;
+```
+
+模块：`views::rounds`（`Attempts`）、`playback::links`（调用的第二种对）、`playback::document`（`Callee`）、`trace`（`History`、`trace_through`）、`playback::walk`（交回它建的索引）、`playback::traced`（`Evidence`：在 walk 里折历史，记下每个第一次宣告的答）。
+
+**模型调用（`calls`）。**
+
+- 一次模型调用是 links 里调用的第二种对：键是 run 与那条 `model_called` 的 seq；关闭它的是同一 run 的 `model_returned`，它答哪一条由 `views::rounds::Attempts` 判：这个 run 在它之前最近的那条 `model_called`。rounds 的 `turns` 把答复放进回合时也经 `Attempts`，所以页面的回合与 bundle 的调用用同一条配对规则。每次尝试都入账，修复后的重发是第二条 `model_called`（`crates/runtime/spec/Turn/Recovery.lean` §8-50），被它替下的那次尝试不会有答复，写 `"pending"`，`took` 为 `"unknown"`。
+- 行：`run`、`callee`、`called`、`answered`、`took`。`callee` 是两种之一：`{"tool":{"id","name"}}`（工具调用，8-17）或 `{"model":{"name"}}`（模型调用：打开行可见时是 `ModelCalled.model`，请求里写的端点自己的模型 id，否则 `null`）。
+- `took` 与工具调用同一条规则（8-17）：两端都可见，`views::rounds::answered_timing` 判两端量过（两行都有 `EventRecord::moment`），答复的 `t` 不早于调用的 `t`，才写 `{"measured":"<毫秒>"}`，其余一律 `"unknown"`。模型的答复不带 `error`，所以「城在重启后补写的答复」这一条对它不成立；规则仍只在 rounds 一处。`ModelReturned.first_at` 是首个内容到达的时刻，不进 `took`：它答的是另一个问题（首字延迟），那一行在 `events` 里，页面要时自己读。
+- 两端都在范围外、范围内没有成员的模型调用，与工具调用一样在关闭时从候选里删掉（8-17）。
+
+**只读到 cutoff 的提交证据。**
+
+- `playback::walk` 交回它经 `storage::LedgerIndex::folding` 建出的索引，`project` 把它交给证据那一步。cutoff 只有一处定义，是 walk 停下的那一行（8-12）；证据那一步不另读一遍账本，也不另建索引。
+- `playback::traced::Evidence` 在 walk 里收下每一条核对过的行（`Walked::Known`）：先折进 `trace::History`，再记下这一行是不是第一次宣告它点名的提交（`views::commits::commit_facts`）。范围内可见的 `Committed` checkpoint 是第一次宣告时，在折完这一行的那一刻问 `History::commit(oid)`：此刻的视图恰好折到这一行，`previous` 是这个 run 在它之前宣告的最近一个提交，run、`actor`、`seq` 就是这一行自己的，`parents` 由 git 按 oid 给出。答只取决于这一行与它之前的历史，以后的宣告与 cutoff 之后的行都改变不了它（`evidence_ignores_lines_after_the_cutoff`）。
+- walk 结束后，每个这样的答交给 `trace::trace_through`，经 walk 的索引读这个 run 在这一行之前的行与区间里的行，区间规则是 8-16 那一条；读到的 seq 全都小于这一行，所以不越过 cutoff。
+- `History::absorb` 遇到视图拒绝折的第一行时停下，记住那条拒绝；之后每次 `commit` 都答它，这些提交写 `{"unread":"<错误码>"}`，导出不因此失败（8-17）。视图折的是 walk 已核对过的同一批记录，被拒绝的行在 cutoff 以内，所以一份 bundle 里的 `unread` 只取决于 cutoff 以内的历史，复核时照样重现。
+- `whose --trace`（sprawling-SPEC.md 8-136）不变：`trace(city_root, oid)` 照旧经 `views::ask` 求这个 oid 最近一次的宣告、重建一次索引，再经 `trace_through` 按同一条区间规则读。
+
+**代价。** 一份 bundle 只折一遍视图，与 walk 同一遍、同一批记录；它从不调用 `views::ask`，也不重建索引。每个范围内第一次宣告的提交另有一次视图查询（在内存里）、一次打开仓库读父提交（`storage::parents_of`），再按索引读它的 run 的行（倒着读到下界前最近的 `model_called`）与区间里的行。判同楼的别人时 `LedgerIndex::seqs` 从头数到区间的下界，那是内存里的一遍 seq，不读盘。确定性计数：`accounting::playback::tests::tracing` 在 N 与 2N 个提交的历史上各导出一次，数这次导出开始了几次视图折叠，两种规模下都是 1。毫秒读数由同一文件的仪表 `instrument_evidence_cost` 给出（`cargo nextest run -p sprawling-accounting --run-ignored only -E 'test(instrument_evidence_cost)' --no-capture`）。walk 里多出的视图折叠是每行的固定代价（§3）。
+
+**失败。** `History::commit` 的失败是视图拒绝折某一行的那条 `AxError`；`trace_through` 的失败是读行的 `StorageError`（经 `into_ax`）、一行解析不了、actor 落在保留子树里（同 8-16）。两者在 playback 里都写成 `unread`。
+
+**本节测试**：`accounting::playback::tests::tracing`：旧版本的一次模型调用、被重发替下的一次尝试、量过的一次与没有答复的一次在同一区间里，`took` 依次是 `"unknown"`、`"unknown"`（答复端 `"pending"`）、量出来的毫秒、`"unknown"`；导出之后在 cutoff 之后追加两行、改坏其中第一行，`check --city` 的来源一项仍通过；N 与 2N 个提交时一次导出都只开始一次视图折叠。`accounting::playback::tests::evidence` 的调用表照 `callee` 的形状写。
+
+**尚未跟上的读者。** `skills/playback/SKILL.md` 的数据契约表与 `took` 一条仍写着 `calls` 只有工具调用、行是 `run`、`id`、`tool`；它要改成上面 `callee` 的形状，并说明模型调用的 `"pending"` 可能是一次被重发替下的尝试。
 
 ### 8-15 页面要的几样新东西，从哪一处答（`accounting::views::answering`、`accounting::worker::commanding`、`accounting::worker::freezing`）
 
@@ -862,17 +912,17 @@ pub struct Trace {
 pub struct Nearby { pub run: RunId, pub actor: Address, pub calls: u64 }
 /// 只读。这座城没写过这个提交时 `Ok(None)`。
 pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError>;
-/// 只读。`line` 是第一次宣告 `oid` 的那一行：区间与调用按这一行的 run、地址与 seq 求，
-/// 而不是按视图里这个 oid 最近一次的宣告。这座城没写过这个提交、或这一行没有地址时 `Ok(None)`。
-pub fn trace_first(city_root: &Path, oid: GitOid, line: &EventRecord) -> Result<Option<Trace>, AxError>;
+/// 经 `index` 读 `commit` 的 run 的行与区间里的行；只读 seq 小于 `commit.seq` 的行。
+pub(crate) fn trace_through(index: &LedgerIndex, ledger_dir: &Path, commit: wire::CommitAnswer) -> Result<Trace, AxError>;
+// 逐行折到宣告行时答 `Query::Commit` 的 `History` 见 8-25。
 ```
 
 - **提交的事实从 `views::ask` 来。** `trace` 先问 `Query::Commit`，这一步审计整条链、折叠视图（sprawling-SPEC.md 8-41），所以「这座城写没写过它」与 `whose` 同一个答案；答不是 `Answer::Commit` 时就是 `Ok(None)`。
 - **区间。** 上界是宣告这个提交的那一行（不含）；下界是 `commit.previous` 那一行（不含），没有 `previous`（这是这个 run 的第一个提交）时是这个 run 的第一行（含）。`previous` 是同一个 run 上一个宣告的提交（`views::commits` 的折叠）：别的 run 在中间的提交不是界，git 的父提交也不是，因为父提交可能出自别的 run 或人自己。
 - **调用。** 这个 run 在区间里的 `tool_called`，经 `views::turns` 与各自的 `tool_result` 配对成 `wire::Call`：工具、subject、参数、结局、输出、`effect`、两个时刻与 `timing` 的读法只有 rounds 那一份。`turns` 只把一条 `model_called` 之后的调用归进回合，而区间的下界可以落在一个回合中间，所以往回读过下界之后，继续读到下界之前最近的一条 `model_called` 为止（含），折完再按 `Call.at` 只留区间里的调用。读的是本 run 的行（`LedgerIndex::run_seqs_before`），不读别的 run。
 - **同楼的别人。** 区间里信封 `run` 不是这个 run、信封地址在 `city::Building::of(commit.actor)` 那栋楼里（`Address::is_within`）的 `tool_called`，按 run 计数；`actor` 是这个 run 在区间里第一条这样的行的地址。同一栋楼共用一棵工作树，这些 run 的写也可能落进这个提交，所以它们是本 run 之外的候选。只计数，不列调用。
-- **第一次宣告。** 同一个 oid 可以被再次宣告（一次没有改动的检查点交回同一棵树），别的 run 也可以宣告它；视图为这个 oid 记的 run、地址与 seq 是最近那一次，`previous` 是第一次时的那个。`trace` 回答的是最近那一次。`trace_first` 用视图给的 `previous`、`parents`，而 run、`actor`、`seq` 换成 `line` 自己的，再按同一条区间规则求：所以它的答只取决于 `line` 及其之前的历史，以后的宣告改变不了它，playback 的复核才能逐字节重现（8-17）。
-- **代价。** `ask` 之后再建一次 `LedgerIndex`，再按索引读两段：本 run 的行（倒着读到下界前最近的 `model_called`）与区间里的每一行（判同楼的别人）。读的行数与区间长度成正比；建索引与 `ask` 的审计各与账本字节数成正比，与一次性的 `whose` 同阶。
+- **第一次宣告。** 同一个 oid 可以被再次宣告（一次没有改动的检查点交回同一棵树），别的 run 也可以宣告它；视图为这个 oid 记的 run、地址与 seq 是最近那一次，`previous` 是第一次时的那个。`trace` 回答的是最近那一次。playback 要的是第一次宣告的那一行：它在视图折到那一行时问 `History::commit`，此刻视图里这个 oid 的 run、`actor`、`seq` 就是那一行的，再经 `trace_through` 按同一条区间规则求；所以它的答只取决于那一行及其之前的历史，以后的宣告与 cutoff 之后的行都改变不了它，playback 的复核才能逐字节重现（8-17、8-25）。
+- **代价。** `ask` 之后再建一次 `LedgerIndex`，再按索引读两段：本 run 的行（倒着读到下界前最近的 `model_called`）与区间里的每一行（判同楼的别人）。读的行数与区间长度成正比；建索引与 `ask` 的审计各与账本字节数成正比，与一次性的 `whose` 同阶。playback 不走这条路：它不调用 `ask`、不重建索引，只按 walk 建的索引读这两段（8-25）。
 - **失败。** `ask` 的失败原样上抛；建索引与读行的 `StorageError` 经 `into_ax`；一行解析不了按 `EventRecord::parse_line` 的错误上抛，审过的链上出现它，说明账本在 `ask` 之后被改了；actor 落在保留子树里时 `Building::of` 的拒绝上抛（城写的提交不会落在那里）。
 
 ### 8-23 accounting::views::answering::preview：一个 Markdown 版本的一个窗口读成块（形状 7 投影）
@@ -983,9 +1033,9 @@ fn give_messages(city_root: &Path, commits: &mut [wire::CommitAnswer]);
     (a) 时间条件读每一行信封的 `t`，与 `view --since/--until`（sprawling-SPEC.md 8-137）同一个 `UtcSpan`，不按种类去载荷里挑时间字段，也不靠 `t` 有序提前停或二分。理由：`t` 就是这一行记下的那一刻，任何种类都有；它不随 seq 单调，在第一条越过 `until` 的行处停下会漏掉回退的行。被否决的做法：只对四种记时刻的行判时间、其余行跟着它所在的回合走（同一件事两个家，且旧账本里根本分不出回合的边界）；在索引里存时间列再二分（要 `t` 有序）。
     (b) `day` 拼成 `<day>T00:00:00Z` 交给 `parse_iso`，加一个 UTC 日的毫秒数作上界；与 `since`/`until` 同给时取交集。理由：历法与校验只有 `runtime::clock` 那一份，日期另写一个解析器就是第二份；一天在 UTC 里总是 86 400 秒（Unix 时间不计闰秒）。交集而不拒绝同给，是因为「这一天里九点以后」本来就是一个合法的问题。被否决的做法：`day` 与 `since`/`until` 互斥（把一个合法的问题拒掉）；在本模块写一个 `YYYY-MM-DD` 解析器。
     (c) 工具调用作为 links 的第四种对，键是 run 与调用 id；耗时由 `views::rounds::answered_timing` 判量没量，playback 只做减法。理由：配对的两端状态（在范围内、范围外、隐去、未答、缺）与关键时刻、消息是同一套，放进 links 就不必为调用另写一份；「补写的答复不算量过」这条规则在 rounds 里，把它搬成一个函数让两处共用，就不会在 rounds 改它时分开。代价：关闭行继承打开行碰到的楼，一条碰过机密楼的调用，它的答复也隐去，比以前多隐去一些行。被否决的做法：把 `views::turns` 用在选中的行上（回合的开头可能在范围外，turns 会丢掉没有回合的调用，也不交出答复那一行的 seq）；让页面拿两条 `moment` 自己相减（读者看不出补写的答复，旧行与真的零毫秒也分不开）。
-    (d) 提交的调用归属只经 `accounting::trace`，问的是 `trace_first`：区间按第一次宣告的那一行求；再次宣告的行写 `untraced`；范围外的调用只给 seq（`elsewhere`），行不进 `context`。理由：归因的权威是 `accounting::trace`，playback 再写一份区间规则就是两个家；`trace` 按视图里最近一次宣告求区间，而没有改动的检查点会把同一棵树再宣告一次，别的 run 也会，所以导出之后的一次宣告就能让复核与原 bundle 不同——两名居民的验收先撞上了这一点。按第一次宣告那一行求，答只取决于那一行之前的历史。范围外的调用要进 `context`，就得在整遍读里把所有调用行留着，常驻量与整本账同阶。被否决的做法：直接用 `trace`（导出之后的宣告改变复核）；在 playback 的折叠里按「同一 run 上一个提交」自己求区间（第二个家）；把归属里的调用行都放进 `context`。重开参数：`trace` 能在一个 seq 上停下时（§3），`unread` 这一种不同也随之消失。
+    (d) 提交的调用归属只经 `accounting::trace`，问的是第一次宣告的那一行：区间按这一行求；再次宣告的行写 `untraced`；范围外的调用只给 seq（`elsewhere`），行不进 `context`。理由：归因的权威是 `accounting::trace`，playback 再写一份区间规则就是两个家；`trace` 按视图里最近一次宣告求区间，而没有改动的检查点会把同一棵树再宣告一次，别的 run 也会，所以导出之后的一次宣告就能让复核与原 bundle 不同——两名居民的验收先撞上了这一点。按第一次宣告那一行求，答只取决于那一行之前的历史。范围外的调用要进 `context`，就得在整遍读里把所有调用行留着，常驻量与整本账同阶。被否决的做法：直接用 `trace`（导出之后的宣告改变复核）；在 playback 的折叠里按「同一 run 上一个提交」自己求区间（第二个家）；把归属里的调用行都放进 `context`。这一行的答怎样只读到它自己、不越过 cutoff，见第 37 条。
     (e) diff 的基准是同一 run 的上一个提交，没有时才用唯一的父提交；文件的六种状态分开写，凭据扫描是 `storage::hunks` 那一个；读不到 git 不让导出失败。理由：全城紧邻的提交可能属于别的 run，git 的父提交也可能出自别人或人自己（与 §12-28 同一条理由）；缺失、二进制、空、截断、隐去对读者是不同的事，混成一个「没有 diff」就让读者把「没动」读成「读不到」。账本是 bundle 的核心，git 是附件：附件缺了，核心那一段照样能回看。被否决的做法：对比工作区（不是历史）；用全城紧邻的 checkpoint 作基准；git 读不到就整个导出失败。
-    (f) `SCHEMA` 进到 `sprawling.playback/2`，`PROJECTION_RULES` 进到 3；读回时先只读 `schema`。理由：多了字段是形状变了，旧构建读不懂新 bundle，新构建也读不懂旧的；先看 `schema`，结构一项报的是「这是第几版、用哪一版复核」，而不是一条字段缺失。被否决的做法：只进 `PROJECTION_RULES`（旧 bundle 在解析时就失败，到不了「复核不了」那一步，报出来的是一条难懂的字段错误）。
+    (f) 字段一变，`SCHEMA` 与 `PROJECTION_RULES` 一起进位；读回时先只读 `schema`。理由：多了字段是形状变了，旧构建读不懂新 bundle，新构建也读不懂旧的；先看 `schema`，结构一项报的是「这是第几版、用哪一版复核」，而不是一条字段缺失。被否决的做法：只进 `PROJECTION_RULES`（旧 bundle 在解析时就失败，到不了「复核不了」那一步，报出来的是一条难懂的字段错误）。
 30. **死掉的 run 由启动扫描冻结，冻结行写成它的居民，结局读 `RunFrozen::lost`。** (a) 理由：只有拿到写者锁的那一刻才知道没有别的进程在驱动它，而 `startup_scan` 正是那一刻的那一遍验链；视图与 worker 的折叠都从账本来，账上一行冻结让服务中的城与重开的城对同一次 run 说同一个结局。写成居民而不是城，与补写结果未知的调用同一条理由，按居民计数的读者不必为死亡另写一条规则。被否决的做法：在服务时由视图把「没有冻结行、进程已重开过」的 run 读作死掉——那是视图的第二条冻结规则，而且一次性的 `views::ask` 与服务中的视图会各算一次；由 `RunWorker::new` 冻结——`new` 也在 `serve` 里跑，那时冻结要跟账本证明的次序对齐，而 `resume` 本来就是收拾死亡的那一步（sprawling-SPEC 8-109）。重开参数：`serve` 也要在起步时收拾死亡（不经 `resume`）时，把这一遍挪进它的起步路径，次序仍是先补调用、后冻 run。 (b) **指南进度住 `accounting::guide`，一个与 `person` 平行的模块，读写各一扇门。** 理由：页面读与命令写读的是同一份文件，文件的文法只能有一处；它不属于视图的折叠，也不属于 worker 的状态，`person` 已经是「一份人改的文件，读整份、写整份」的样子。被否决的做法：读放在 `views::answering`、写放在 `worker::commanding`——两处各知道一遍文件的形状。(c) **跑 gh 的函数经 `Views::ask_github_through` 交进来，主机名的判定与缺省主机留在视图。** 理由：起子进程碰主机，按第 9、10 条住 `sprawling`、经 `fn` 指针交进来；而「问哪台主机、这个串能不能交给 gh」是城对输入的判定，测试不必起 gh 就能判它。被否决的做法：经 `Hands` 交给 worker——这是一条查询，worker 不答查询；在二进制里判主机名——测试就要经过子进程才看得到拒绝。
 31. **(a) 视图的第二份按值克隆，不经快照编码。** 理由：两份视图要的是同一个折叠状态加上同一组共享句柄，派生的 `Clone` 正好如此，而编码再解码在 40 万行城上要 350 ms，是开城最长的一段之一（§8-19）。被否决的做法：①留在编码路径上，把复制挪到视图线程——首字节不再等它，但视图线程开头的每一批照样等 350 ms，而且要改装配根起线程的次序；②手写逐字段复制——字段清单的第二份拼写，加一个字段就要改两处。**(b) 重建从创世时不先证明。** 理由：全量折叠逐行核对每一行，判定与不带记录的证明相同；先证明再全量折叠是同一批行核对两遍（§8-19）。被否决的做法：照旧先证明，把证明的结果交给全量折叠跳过核对——折叠要的是每一行解析出的记录，跳过核对仍要解析，省下的只是规范回显的比较，却让「这一行核对过」有了两处来源。 **(c) 房间的各段 session 由视图折叠，表按地址存在 `views::sessions`。** 理由：作答不读盘，表的大小与 session 数同阶（wire-SPEC §12.9）。被否决的做法：把这张表并进 `worker::folds::SessionOrigins`——那张表回答的是派活要问的「这一段还欠不欠一段对话」，只留当前一段，worker 的 `Standing` 也不由页面读；把各段 session 并进 `lineage`——`lineage` 由读盘的 CLI 每次重建，服务中的城不持有它。
 32. **城的工具读别楼的文件与 `cas:` 块，只经 runtime 的 `BoundReader`。** 理由：读界与 reserved subtree 的判定住 `runtime::tools::chosen_path`，`read` 与 `search` 用它；一件读字节的工具若在本 crate 自己判，就是那份判定的第二个权威，而且只判得了本楼（`is_within`），连接器存进 CAS 的录音与截图都读不到（§8-20）。被否决的做法：①保留「只收本楼」并为 `cas:` 另写一段（两套判定，一套跟着 `read` 变，一套不跟）；②在本 crate 复制 `admit` 与 `land`（同上，且链接的判定要拷两遍）。重开参数：要读的字节不在读界之内（例如人拖进来、只给这一次 run 的文件），那时它是一个新的入口，而不是放宽这扇门。
@@ -993,3 +1043,7 @@ fn give_messages(city_root: &Path, commits: &mut [wire::CommitAnswer]);
 34. **(a) 修改提案的折叠住 `views::Governance`，与待答的审批同一个值。** 理由：一张提案卡与一条审批同是「等人决定的事」，worker 判一次决定要的状态与页面画卡要的状态是同一个，`Governance` 正是「一份定义、两处持有、`what_a_worker_holds_is_what_a_restart_rebuilds` 判它们相等」的那个值；放进去之后，快照、重开、worker 写下一行就折一行，都不需要新的接线。被否决的做法：①worker 另折一份 `Standing` 字段、视图另折一份——两份折法；②决定时按身份回账本找那一行——要一个按内容找行的索引，而且「已经处理过」还要再扫一遍。**(b) 提交说明在本 crate 用 `git2` 直接读，与 `storage::parents_of` 各开一次仓库。** 理由：本轮 storage 的公开契约不改（它的规格在迁移），而本 crate 已经为 playback 链接 `git2`；读说明只是 `find_commit` 之后的一个字段，一页至多 `HISTORY_MAX` 个提交多开一次仓库。被否决的做法：①在本 crate 里连父提交一起读、不再调 `parents_of`——两处各有一份「父提交怎样读」，`parents_of` 留下来没有调用方；②把说明写进账本——提交对象就是它的权威，账本记的是 oid。重开参数：storage 的契约下一次能动时，`parents_of` 换成一次读出父提交与说明的读者，本 crate 的 `give_messages` 删去。
 35. **预览由读面按版本从内容库读，判定全在 `documents`，读出的块不缓存。** 理由：版本就是内容库的地址（documents D3），按版本读与 `Range` 同一条路，读面在视图锁外读，worker 不答查询；一个版本的字节不变，预览也就不会过时，页面不因任何事件重问。读出的块不进视图：它与一个窗口的大小同阶，而视图里的每一样东西都要随快照编码、随每一次重建折叠。被否决的做法：①按地址读文件此刻——与第 33 条的①同一个缺陷；②把读出的块按版本存在视图里——第二份拷贝要随快照走，而一次读出只是一窗的 comrak；③由页面先 `Range` 再把文字送回城里读——文字在线上走两趟。重开参数：在固定语料上量出一窗的读出超过毫秒级（D41），或同一版本被许多页面同时预览成为常态时，按版本缓存。
 36. **快照的格式门用夹具摘要，夹具里放进每一种出现在快照里的 kernel 摘要类型（§8-24）。** 理由：`fold_version` 只在夹具的编码变了时才动，夹具缺哪一种类型，哪一种类型的编码就能悄悄改变，而旧快照照样被当成新格式读。被否决的做法：①为每个出现在快照里的类型各写一条字节数断言——那是编码的第二份拼写，加一个类型就要多写一条；②把快照格式的版本号写成手改的常量——改 kernel 的人看不见它。重开参数：快照换掉 postcard、或快照的编码有了自己的模式描述（schema）可以直接取摘要时，改由模式描述钉住版本。
+37. **模型调用的耗时按 rounds 的那一条配对规则求；提交的证据在 walk 里折到宣告行时问视图，再经 walk 的索引读行，所以只读到 cutoff（§8-25）。**
+    (a) 模型调用作 links 里调用的第二种对，答复由 `views::rounds::Attempts` 配到它的 run 最近一条 `model_called`，`turns` 也经它配；`calls` 的行换成 `callee` 两种之一，`SCHEMA` 进到 `sprawling.playback/3`，`PROJECTION_RULES` 进到 4。理由：「一条答复答哪次尝试」原来只写在 `turns` 的 `folded.last_mut()` 里，playback 再写一份就是第二个家；做成两处共用的一个小值，rounds 改这条规则时 bundle 跟着改。模型调用没有 id，键用 `model_called` 的 seq：它在一本账里唯一，复核时也不变。用 `callee` 而不是在原来的行上加一个可空的 `model` 字段，因为工具调用的 `id` 对模型调用没有意义，可空字段会让读者分不清「没有」与「读不到」。被否决的做法：①让 `wire::Turn` 交出答复行的 seq（线上形状变，`WIRE_V` 进位，换来的只是 playback 少写几行）；②页面拿 `events` 里两条 `moment` 自己相减（看不出哪条答复配哪次尝试，一次重发会被读成一次很长的调用）；③把 `first_at` 当耗时（那是首字延迟，另一个问题）。
+    (b) 提交的证据从 walk 里逐行折的 `trace::History` 读：范围内第一次宣告的 `Committed` 行，在折完它的那一刻问 `Query::Commit`；调用与同楼的别人经 walk 建的索引读。理由：cutoff 的唯一定义是 walk 停下的那一行；视图折的是 walk 核对过的同一批记录，问的是折到宣告行时的视图，所以答只取决于那一行之前的历史，cutoff 之后的行写了什么、审不审得过都碰不到它。一遍折叠代替了每个提交一次 `views::ask`（每次审一遍整条链、折一遍视图）与一次 `LedgerIndex::rebuild`，一份 bundle 的代价不再是提交数乘账本字节数。被否决的做法：①给 `trace` 一个停在某个 seq 上的 `views::ask`（要 storage 的整链审计与快照起点都能停在一个 seq 上，那是 storage 的公开契约；而且每个提交仍各折一遍）；②walk 之后从创世再折一遍到 cutoff（多读一遍账本，读到的字节不是这一遍核对过的）；③在 playback 里只折提交，按「同一 run 上一个提交」自己求 `previous`（那是 `views::commits` 那条规则的第二个家，第 29(d) 条已否决）。代价：没有提交的窄选择也要折一遍视图（§3）。重开参数：多日夹具上视图折叠在导出里占大头时，按 §3 改成遇到第一个范围内的提交才开始折。
+    (c) 「一次导出开始了几次视图折叠」由一个只在测试里编译的计数读出：`trace` 里开始一次折叠的两处（`trace` 的 `views::ask` 与 `History::new`）各数一次，`playback::tests::tracing` 在 N 与 2N 个提交上比较。理由：要挡住的回退是「每个提交又把整本账折一遍」，墙钟读数在小夹具上看不出它，计数与机器快慢无关。被否决的做法：只记墙钟读数（看不出按 N 增长的代价）；经 storage 的 `Vfs` 缝数读了几遍段（那是 storage 的接口，这里不改它）。
