@@ -180,6 +180,9 @@ fn judge(compared: Compared<'_>, out: &mut Vec<Violation>) {
     }
 }
 
+/// Every package inside the wall inherits it.
+fn inherited(_packages: &[(String, toml::Value)], _out: &mut Vec<Violation>) {}
+
 /// The version of every dependency both manifests name.
 ///
 /// Features are left alone: this package switches on what its six tools

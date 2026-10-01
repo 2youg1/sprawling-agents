@@ -41,25 +41,55 @@ unwrap_used = "deny"
 as_conversions = "deny"
 "#;
 
+/// The wall as `desktop/Cargo.toml` writes it: the root of a workspace
+/// of its own, stating the copy once, and a package that inherits it.
 const DESKTOP: &str = r#"
-[package]
+[workspace]
+members = ["ffi"]
+
+[workspace.package]
 version = "0.0.5"
 edition = "2024"
 license = "MPL-2.0"
 rust-version = "1.97"
 publish = false
 
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+as_conversions = "deny"
+
+[package]
+name = "sprawling-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
 [dependencies]
 serde_json = "1"
 toml = "1.1"
 image = { version = "0.25", default-features = false }
 
-[lints.rust]
-unsafe_code = "deny"
+[lints]
+workspace = true
+"#;
 
-[lints.clippy]
-unwrap_used = "deny"
-as_conversions = "deny"
+/// A member of the wall, inheriting all of it.
+const MEMBER: &str = r#"
+[package]
+name = "sprawling-desktop-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
 "#;
 
 fn compared(workspace: &str, desktop: &str) -> Vec<Violation> {
@@ -68,6 +98,16 @@ fn compared(workspace: &str, desktop: &str) -> Vec<Violation> {
     metadata(&workspace, &desktop, &mut out);
     lints(&workspace, &desktop, &mut out);
     dependencies(&workspace, &desktop, &mut out);
+    inherited(&[(DESKTOP_MANIFEST.to_owned(), desktop)], &mut out);
+    out
+}
+
+fn inherited_by(member: &str) -> Vec<Violation> {
+    let mut out = Vec::new();
+    inherited(
+        &[("desktop/ffi/Cargo.toml".to_owned(), read(member))],
+        &mut out,
+    );
     out
 }
 
@@ -100,7 +140,10 @@ fn a_lint_relaxed_on_one_side_and_a_lint_added_on_one_side_are_both_refused() {
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(found[0].violation.contains("warn"), "{found:#?}");
 
-    let added = format!("{DESKTOP}\nstring_slice = \"deny\"\n");
+    let added = DESKTOP.replace(
+        "as_conversions = \"deny\"",
+        "as_conversions = \"deny\"\nstring_slice = \"deny\"",
+    );
     let found = compared(WORKSPACE, &added);
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(found[0].location.contains("string_slice"), "{found:#?}");
@@ -126,7 +169,7 @@ fn metadata_that_stayed_behind_a_version_bump_is_caught() {
     let found = compared(&bumped, DESKTOP);
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(
-        found[0].location.contains("[package] version"),
+        found[0].location.contains("[workspace.package] version"),
         "{found:#?}"
     );
 }
@@ -145,5 +188,42 @@ fn a_shared_dependency_is_held_to_one_version_and_a_private_one_is_not() {
     assert!(
         compared(WORKSPACE, &DESKTOP.replace("\"0.25\"", "\"0.24\"")).is_empty(),
         "a dependency the workspace does not name is this package's own"
+    );
+}
+
+/// A package inside the wall that writes a lint table or a version of
+/// its own stands outside the comparison above, so it is named: the
+/// copy is stated once and every package of the wall inherits it.
+#[test]
+fn a_package_inside_the_wall_that_does_not_inherit_it_is_named() {
+    assert!(
+        inherited_by(MEMBER).is_empty(),
+        "{:#?}",
+        inherited_by(MEMBER)
+    );
+
+    let own_lints = MEMBER.replace(
+        "[lints]\nworkspace = true",
+        "[lints.clippy]\nunwrap_used = \"allow\"",
+    );
+    let found = inherited_by(&own_lints);
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(
+        found[0].location.contains("desktop/ffi/Cargo.toml [lints]"),
+        "{found:#?}"
+    );
+    assert!(
+        found[0].alternative.contains("workspace = true"),
+        "{found:#?}"
+    );
+
+    let own_version = MEMBER.replace("\nversion.workspace = true", "\nversion = \"0.0.4\"");
+    let found = inherited_by(&own_version);
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(
+        found[0]
+            .location
+            .contains("desktop/ffi/Cargo.toml [package] version"),
+        "{found:#?}"
     );
 }
