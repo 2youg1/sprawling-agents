@@ -588,6 +588,7 @@ pub struct City<'a> { pub root: &'a Path, pub reader: Reader }
 pub struct Asked<'a> { pub bundle: Option<&'a [u8]>, pub city: Option<City<'a>>, pub observed: Option<&'a [u8]> }
 pub enum Verdict { Passed, Failed { found: String }, Unasked { why: &'static str }, Unable { why: String } }
 pub struct Report {
+    pub file: B3Hash,
     pub digest: Option<B3Hash>,
     pub events: Option<usize>,
     pub structure: Verdict,
@@ -600,7 +601,7 @@ pub struct Report {
 impl Report {
     /// 没有 Failed，也没有 Unable。
     pub fn holds(&self) -> bool;
-    /// 一行 JSON：digest、events 与五项。
+    /// 一行 JSON：file、digest、events 与五项。
     pub fn line(&self) -> serde_json::Value;
 }
 /// 不返回错误：每一项读不下去的原因写在它自己的结论里。
@@ -642,7 +643,7 @@ pub fn land(place: Place<'_>, bytes: &[u8]) -> Result<(), AxError>;
 {"page":"<页面字节的 BLAKE3，十六进制>","paths":["…"],"requests":["…"],"navigations":["…"],"popups":["…"],"unresolved":["…"]}
 ```
 
-`requests` 是页面自身之外发出的请求（`data:`、`blob:` 不算），`navigations` 是离开页面的导航，`popups` 是打开的新窗口，`unresolved` 是点了之后什么也没指到的证据链接。`page` 与被查文件的摘要不同、`paths` 为空，是 `Unable`；四张表都空是 `Passed`，`Report.covered` 是 `paths`；否则 `Failed`，给出第一项。记录是跑浏览器的 agent 自报的：产品核对的是它说的是这一份字节，不核对浏览器真的跑过；它也只说在这些路径下没看到，不说别的路径。
+`requests` 是页面自身之外发出的请求（`data:`、`blob:` 不算），`navigations` 是离开页面的导航，`popups` 是打开的新窗口，`unresolved` 是点了之后什么也没指到的证据链接。`page` 与被查文件的摘要（`Report.file`，复核那一行的 `file`）不同、`paths` 为空，是 `Unable`；四张表都空是 `Passed`，`Report.covered` 是 `paths`；否则 `Failed`，给出第一项。记录是跑浏览器的 agent 自报的：产品核对的是它说的是这一份字节，不核对浏览器真的跑过；它也只说在这些路径下没看到，不说别的路径。
 
 **落盘**（`playback::landing`）。两种落点，一个做法：同一目录写 `<文件名>.partial-<pid>`，`sync_all`，以硬链接落到目标名，删掉暂存文件；任何一步失败都删暂存文件，目标要么整份出现，要么不出现。
 

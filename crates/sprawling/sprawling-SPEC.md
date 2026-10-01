@@ -4166,7 +4166,7 @@ sprawling playback check <file> [--bundle <file>] [--city <city>] [--include-con
 **人的门。**
 
 - **`export --page <template>`**：读模板（超过 `PAGE_MAX_BYTES` 先拒绝），经 `accounting::playback::embed` 把这次导出的 bundle 放进去，写出的是页面而不是 bundle；去处照 8-126，stdout 或 `--out`。页面过不了结构或静态离线一项时退出 1，什么也不写。
-- **`check <file>`**：文件可以是 bundle，也可以是页面（accounting-SPEC.md 8-13 按首字节分）。`--bundle` 与 `--city` 可以一起给，各自成一项；`--observed <file>` 是 skill 写下的浏览器观察记录。stdout 写一行 JSON：`digest`（十六进制）与 `events`（十进制字符串）在读出了 bundle 时出现；`structure`、`bundle`、`source`、`offline`、`browser` 五项各是 `{"status": "passed" | "failed" | "unchecked"}`，`failed` 带 `found`，`unchecked` 带 `why`，`browser` 通过时带 `covered`（观察走过的路径）。
+- **`check <file>`**：文件可以是 bundle，也可以是页面（accounting-SPEC.md 8-13 按首字节分）。`--bundle` 与 `--city` 可以一起给，各自成一项；`--observed <file>` 是 skill 写下的浏览器观察记录。stdout 写一行 JSON：`file` 是被查文件的 BLAKE3（十六进制，观察记录的 `page` 要写它）；`digest`（bundle 的 BLAKE3）与 `events`（十进制字符串）在读出了 bundle 时出现；`structure`、`bundle`、`source`、`offline`、`browser` 五项各是 `{"status": "passed" | "failed" | "unchecked"}`，`failed` 带 `found`，`unchecked` 带 `why`，`browser` 通过时带 `covered`（观察走过的路径）。
 - **退出码**（8-103 的表）：0 是 `Report::holds`——没有一项失败，也没有一项要了而做不了；1 是其余，包括 `--city` 复核不了、观察记录说的是另一份字节；2 是命令行读不懂。没要的项写 `unchecked` 但不影响退出码。
 
 **居民的门：城工具 `playback`。**

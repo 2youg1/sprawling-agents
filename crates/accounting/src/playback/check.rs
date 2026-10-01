@@ -67,6 +67,8 @@ pub enum Verdict {
 /// The five items, and the bundle they are about when one was read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Report {
+    /// BLAKE3 over the checked file's bytes, which an observation names.
+    pub file: B3Hash,
     pub digest: Option<B3Hash>,
     pub events: Option<usize>,
     pub structure: Verdict,
@@ -87,8 +89,8 @@ impl Report {
             .all(|(_, verdict)| matches!(verdict, Verdict::Passed | Verdict::Unasked { .. }))
     }
 
-    /// The report as one JSON object: the digest and event count when a
-    /// bundle was read, then each item as `passed`, `failed` with what
+    /// The report as one JSON object: the file's digest, the bundle's
+    /// digest and event count when a bundle was read, then each item as `passed`, `failed` with what
     /// was found, or `unchecked` with why.
     #[must_use]
     pub fn line(&self) -> Value {
@@ -158,8 +160,9 @@ pub fn check(file: &[u8], asked: &Asked<'_>) -> Report {
             ),
         },
     };
+    let checked = B3Hash::digest(file);
     let (browser, covered) = match asked.observed {
-        Some(record) => observed::judge(record, B3Hash::digest(file)),
+        Some(record) => observed::judge(record, checked),
         None => (
             Verdict::Unasked {
                 why: "no browser observation was given; the product does not run the page",
@@ -169,6 +172,7 @@ pub fn check(file: &[u8], asked: &Asked<'_>) -> Report {
     };
     let held = opened.as_ref().ok();
     Report {
+        file: checked,
         digest: held.map(|(_, bundle)| bundle.digest()),
         events: held.map(|(_, bundle)| bundle.events()),
         structure: opened.as_ref().map_or_else(

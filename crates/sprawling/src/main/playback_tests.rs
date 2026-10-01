@@ -51,6 +51,7 @@ fn a_range_or_a_building_that_does_not_read_is_a_command_line_refusal() {
 /// A report whose items are as given, about a three-event bundle.
 fn report(source: Verdict, browser: Verdict) -> Report {
     Report {
+        file: B3Hash::digest(b"page"),
         digest: Some(B3Hash::digest(b"bundle")),
         events: Some(3),
         structure: Verdict::Passed,
@@ -66,7 +67,10 @@ fn report(source: Verdict, browser: Verdict) -> Report {
 
 #[test]
 fn a_check_exits_refused_on_a_failed_item_or_one_asked_for_and_not_done() {
-    let digest = B3Hash::digest(b"bundle").to_string();
+    let (file, digest) = (
+        B3Hash::digest(b"page").to_string(),
+        B3Hash::digest(b"bundle").to_string(),
+    );
     let unasked = || Verdict::Unasked {
         why: "no browser observation was given; the product does not run the page",
     };
@@ -89,6 +93,7 @@ fn a_check_exits_refused_on_a_failed_item_or_one_asked_for_and_not_done() {
         [
             (
                 json!({
+                    "file": file,
                     "digest": digest,
                     "events": "3",
                     "structure": {"status": "passed"},
@@ -101,6 +106,7 @@ fn a_check_exits_refused_on_a_failed_item_or_one_asked_for_and_not_done() {
             ),
             (
                 json!({
+                    "file": file,
                     "digest": digest,
                     "events": "3",
                     "structure": {"status": "passed"},
@@ -113,6 +119,7 @@ fn a_check_exits_refused_on_a_failed_item_or_one_asked_for_and_not_done() {
             ),
             (
                 json!({
+                    "file": file,
                     "digest": digest,
                     "events": "3",
                     "structure": {"status": "passed"},
