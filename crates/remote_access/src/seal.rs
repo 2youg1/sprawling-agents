@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every frame of a remote session, sealed end to end (remote_access-SPEC.md §8-5).
+//! Every frame of a remote session, sealed end to end (crates/remote_access/Spec.lean §8-5).
 //!
 //! AES-256-GCM under the session key of one direction. The nonce is the
 //! direction and a counter, and the counter is not sent: the socket
@@ -34,7 +34,7 @@ impl Direction {
 }
 
 /// What one sealed frame of a session carries, told apart by its first
-/// byte (remote_access-SPEC.md §8-5, §12-13): the door's own verb, the
+/// byte (crates/remote_access/Spec.lean §8-5, remote_access D13): the door's own verb, the
 /// lock, never travels on the wire protocol, so it is spoken here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Payload {

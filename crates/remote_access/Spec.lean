@@ -1,11 +1,19 @@
-# remote_access-SPEC.md
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-> crate：`remote_access`（lib，依赖 kernel）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
-> 骨架：apostle-sdd 十七节；按模块分章、每章自足（ARCHITECTURE.md §5）。
-> 模块：door（门的状态）／pairing（一次性配对码）／keys（混合签名密钥）／handshake（每次连接的握手，以及设备第一次连接时的配对握手）／seal（帧封装）／route（通路缝与它的三个实现）；尚未落地的部分写在 §3。
-> 本 crate 覆盖的语义：一个人离开这台电脑时，从外面够到自己这座城——谁能进、进来能做什么、何时失效、如何一键关上。
+import crates.remote_access.spec.Door
+import crates.remote_access.spec.Handshake
 
-## 1 需求分解
+/-! # remote_access 的规格
+
+`sprawling-remote-access`（库名 `remote_access`，目录 `crates/remote_access`）是远程接入：一个人离开这台电脑时，从外面够到自己这座城——谁能进、进来能做什么、何时失效、如何一键关上。模块：door（门的状态）／pairing（一次性配对码）／keys（混合签名密钥）／handshake（每次连接的握手，以及设备第一次连接时的配对握手）／seal（帧封装）／route（通路缝与它的三个实现）；尚未落地的部分写在 §3。
+
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」：`spec/Door.lean` 证明远程门的六条性质，`spec/Handshake.lean` 证明配对握手的三条性质。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定。决定写作 `D<n>`，别处引作 `remote_access D<n>`；D1 到 D21 沿用这份规格在 Markdown 时 §12 的条目号，所以旧的引用改写之后号不变。§8 的各条保留 `8-1` 到 `8-12` 的编号，别处引作 `crates/remote_access/Spec.lean` §8-n。
+-/
+
+/-! ## 1 需求分解
 
 一个人把城留在家里的电脑上出门，要能用平板或手机继续看城、回答提问、叫停。今天城只听回环地址，或者在局域网上凭一把配对令牌（wire-SPEC §8-41）；出了局域网就够不到。本 crate 是 remote access（远程接入），其中的安全内核是远程门（`door::Door`，它的性质由 Lean 模型 `RemoteDoor` 规定）：
 
@@ -19,9 +27,12 @@
 | `seal` | 会话内每一帧的 AES-256-GCM 封装，计数器防重放；负载的首字节分开线协议帧与锁门 | 1b、2（已落） |
 | `route`（缝） | 让外面够得到这台电脑回环上的远程监听：开、关；开的时候答出外面用的地址，以及这个地址跨重启是否不变。三个实现：Cloudflare 命名隧道、人写的一条命令、测试用的脚本化通路 | 2（已落） |
 
-**安全与通路分成两层，只有通路可换。** 门、配对、密钥、握手、封装、权限是安全内核，不可换、不可关；通路只负责可达性，默认是 Cloudflare 命名隧道（§12-3、§8-8），人可以换成一条自己的命令（§8-9）。握手认证的是配对时钉住的密钥而不是地址，配对本身也走一次只由城认证的握手（§8-6），帧又是端到端加密的，所以只搬运字节的通路看到的只有握手消息与密文，冒充不了任何一方，通路选错的最坏结果是连不上。页面本身也经通路送到设备，改写页面的通路能读到页面读到的一切；这一件由选择通路的人承担，密码学替不了（§12-10）。
+**安全与通路分成两层，只有通路可换。** 门、配对、密钥、握手、封装、权限是安全内核，不可换、不可关；通路只负责可达性，默认是 Cloudflare 命名隧道（D3、§8-8），人可以换成一条自己的命令（§8-9）。握手认证的是配对时钉住的密钥而不是地址，配对本身也走一次只由城认证的握手（§8-6），帧又是端到端加密的，所以只搬运字节的通路看到的只有握手消息与密文，冒充不了任何一方，通路选错的最坏结果是连不上。页面本身也经通路送到设备，改写页面的通路能读到页面读到的一切；这一件由选择通路的人承担，密码学替不了（D10）。
 
-## 2 验收标准
+D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层机密性，但 Cloudflare 隧道总在边缘解开 TLS；帧封装让边缘只看到密文，配对码也只在封装里走（§8-6），所以「现在截获、以后解密」对这一层也不成立。
+-/
+
+/-! ## 2 验收标准
 
 - **door**：`crates/remote_access/spec/Door.lean` 证明的六条性质在 Rust 门上各有一个场景测试：关着的门什么都不放；关门结束每一个会话，再开也带不回来；配对码只用一次、只在自己的纪元、只在过期之前；撤销的设备不持有会话也开不了新的；会话不比门活得久；远程会话永远够不到只限本地的动词。另加一条：门拒绝在它所在的纪元里重开。`cargo nextest run -p sprawling-remote-access` 全绿，且每条性质的测试在对应实现被故意改坏时转红。
 - **pairing**：铸出的码按人重新抄写（大小写、空格、连字符）读回同一个码；码的正文是 16 字节熵的 RFC 4648 base32（26 个符号）；两份熵给出两个码。
@@ -29,28 +40,35 @@
 - **handshake**：两端握手后，一端封的帧另一端打得开，两个方向都是；设备拒绝一个它没有钉住的城；城拒绝一台持有别的密钥的设备；途中被改过的回复被拒；一次握手的 Finish 完不成另一次握手。
 - **handshake（配对）**：诚实的一次配对两侧对上：设备拿到城的公钥与会话，城拿到配对码、设备公钥与会话。回答里出示的公钥与邀请里的指纹不符，或回答的签名不是那把公钥签的，设备在发出认领之前停下。被改过的认领、另一次配对的认领、在回答之前到达的字节，城都打不开；设备签名不对的认领，城不交给门。`crates/remote_access/spec/Handshake.lean` 证明三条性质：配对码只封给邀请钉住的城；城只从封好的认领里兑码；诚实的一次配对走得通。无 `sorry`、`admit`、`axiom`。
 - **route**：`PublicUrl` 收 `https://` 的地址，拒 `http://`、其他 scheme、没有主机、带用户信息或片段的写法。`command` 通路对一个脚本化子进程答出的 `Opened` 与脚本化通路答出的相同，子进程从环境变量读到回环地址，前面的噪声行被跳过；在印出地址之前就结束的命令、印错地址那一行的命令各得一句带恢复语的拒绝；三个实现关一个没开的通路都答成功。`cloudflare` 通路不进自动测试，它要一个 Cloudflare 账号、一个域名与能连上边缘的网络，由操作者按 §8-8 的检查跑一次。
-- **与浏览器互通**：按 §12-11，组件级已知答案向量在 Rust 与 TS 两侧都过；一条由 Rust 城生成的单向夹具，TS 设备解出约定的明文。文件与写法见 §8-12：Rust 一侧的测试读回每一份，确定的三份逐字节等于重算的结果，签名在 Rust 里验过，夹具的第一帧在 Rust 设备一侧用同样固定的临时私钥打开、得出约定的明文；文件不在时测试在断言上失败。
+- **与浏览器互通**：按 D11，组件级已知答案向量在 Rust 与 TS 两侧都过；一条由 Rust 城生成的单向夹具，TS 设备解出约定的明文。文件与写法见 §8-12：Rust 一侧的测试读回每一份，确定的三份逐字节等于重算的结果，签名在 Rust 里验过，夹具的第一帧在 Rust 设备一侧用同样固定的临时私钥打开、得出约定的明文；文件不在时测试在断言上失败。
 - **正文写法**：设备 id、公钥与权限各自的正文读回原值；短了的 id 与不认识的权限字被拒（§8-11）。
 - **seal**：帧按封的次序打开；被重放、被丢掉前一帧、被改过、方向不对的帧都打不开。负载按首字节读回原样；未知的首字节、锁门后面多出的字节、不是 UTF-8 的帧、空负载都以 `E_WIRE_MISMATCH` 拒。
-- **Lean**：`just models` 构建 `Spec`，`crates/remote_access/spec/Door.lean` 无 `sorry`、无 `admit`、无 `axiom`。
+- **Lean**：`just models` 构建 `Spec`；本文件、`crates/remote_access/spec/Door.lean` 与 `crates/remote_access/spec/Handshake.lean` 无 `sorry`、无 `admit`、无 `axiom`。
+-/
 
-## 3 假设与歧义
+/-! ## 3 假设与歧义
 
 以下是这个接口今天尚未落地的部分，按阶段写成当前状态；每一段落地时，从这里删掉，写进它所属的 §8 章节。
 
-- **浏览器一侧的互通只证了 Rust 那一半。** §8-12 的向量与单向夹具由 Rust 生成、提交入库，Rust 一侧读回它们。缺的证据有两件：浏览器侧的实现（ML-KEM、ML-DSA 见 §12-21）对上这些文件；浏览器签的 `signature-browser.txt` 提交入库，由 Rust 一侧的同一个测试验过（§8-12）。它们随客户端阶段落地。
+- **浏览器一侧的互通只证了 Rust 那一半。** §8-12 的向量与单向夹具由 Rust 生成、提交入库，Rust 一侧读回它们。缺的证据有两件：浏览器侧的实现（ML-KEM、ML-DSA 见 D21）对上这些文件；浏览器签的 `signature-browser.txt` 提交入库，由 Rust 一侧的同一个测试验过（§8-12）。它们随客户端阶段落地。
 - **`cloudflare` 通路没有在真的隧道上开过。** 自动测试不跑它（§2）。缺的证据有两件：在一台装了 `cloudflared`、能连上 Cloudflare 边缘的电脑上，按 §8-8 的操作者检查开、关一次；在一台出网受限（经代理、7844 端口被拦）的电脑上，`cloudflared` 在就绪之前退出时，能否给出比「它在就绪之前退出」更具体的一句拒绝。今天的拒绝给出手动跑的那一行命令，人从 `cloudflared` 自己的输出里读原因。
-- **3 客户端未落。** 页面的配对页、握手、PWA 与窄屏布局属于 `client/`，不在本 crate；它们的交互契约写进 `client/client-SPEC.md` §7。远程监听今天只答 §8-10 的两条 WebSocket 路径，不送页面：页面经通路送达设备，与配对页同批落地。
+- **客户端（阶段 3）未落。** 页面的配对页、握手、PWA 与窄屏布局属于 `client/`，不在本 crate；它们的交互契约写进 `client/client-SPEC.md` §7。远程监听今天只答 §8-10 的两条 WebSocket 路径，不送页面：页面经通路送达设备，与配对页同批落地。
 - **城密钥只活在一个进程里。** 装配层在城启动时取 32 字节熵派生城的签名密钥（§8-3），不存下来；设备钉住的是配对时那把城公钥，所以城一重启，每台设备都要重新配对，`/remote open` 照实说出这一句。要跨重启保存，种子得进 vault（`secret:remote/city-key`），而从 vault 取回它要在本 crate（`keys`）或装配层多一个 `Sealed::expose` 的兑现点，那是 `xtask secret` 名单上的新一项，即放宽一道门，要人的决定。未决的是这一个兑现点放在哪里、名单收不收它；收下之后，`keys::SigningKey` 多一个从 `Sealed<String>` 派生的构造。
 - **没有一条通路被选中。** 选哪条通路、隧道名、主机名或人写的命令，属于 `[remote]` 配置表（city 的配置层），本批没有读者读它；`/remote open` 因此以 `E_CONFIG_INVALID` 拒，恢复语说明这一点。`[remote]` 落地时，装配层把它读成 §8-8、§8-9 的类型化参数交给 `Doorway`，这一段删去。
+-/
 
-## 4 现状分析
+/-! ## 4 现状分析
 
-- `wire::auth::PairingToken` 与 `wire::server::decide_bind` 已经守住局域网这一面：非回环绑定必须带令牌，令牌只存摘要、常数时间比较。远程门不改它，也不把它当作通路（§12-8）：局域网地址是 `http://`，浏览器不把它当安全上下文，页面在那里做不了握手，也装不成 PWA。
+- `wire::auth::PairingToken` 与 `wire::server::decide_bind` 已经守住局域网这一面：非回环绑定必须带令牌，令牌只存摘要、常数时间比较。远程门不改它，也不把它当作通路（D8）：局域网地址是 `http://`，浏览器不把它当安全上下文，页面在那里做不了握手，也装不成 PWA。
 - 城的线协议帧由 `wire::frames` 定义，远程门不改帧，只在帧外加一层封装，所以本 crate 不让 `WIRE_V` 进位。远程门的 Ledger 事件随装配落地时，事件种类名进 schema 哈希，哈希随之变（wire-SPEC §12.1）。
-- 门、配对码、密钥、握手与封装零 I/O：时间与熵都是参数，与 `wire::auth` 的做法相同。通路是例外，两个生产实现起子进程、在回环上问就绪（§7、§12-14）。
+- 门、配对码、密钥、握手与封装零 I/O：时间与熵都是参数，与 `wire::auth` 的做法相同。通路是例外，两个生产实现起子进程、在回环上问就绪（§7、D14）。
 
-## 5 权威信源
+各单元的落地情形：门、配对码、密钥、两种握手、封装与三个通路实现都已落地，装配层 `bin::outside`（sprawling-SPEC 8-139、8-140）是唯一调用方；§3 列出的是还没有落地的部分。
+
+已知的出入：`spec/Handshake.lean` 规定的是 `handshake::pairing`，按 ARCHITECTURE.md §11 的路径规则它的名字应是 `spec/Handshake/Pairing.lean`。它沿用迁移之前的名字，因为两个分部的名字已被 Rust 的模块文档与 `architecture.toml` 的锚点引用；它的内容下一次改动时一并改名，改名不改任何性质。
+-/
+
+/-! ## 5 权威信源
 
 - 门的性质：`crates/remote_access/spec/Door.lean`（本 crate 是它的实现，它是性质的权威）。
 - base32：RFC 4648 §6，测试向量取自 §10（`"foobar"` → `MZXW6YTBOI======`）。
@@ -60,28 +78,39 @@
 - 配对握手的性质：`crates/remote_access/spec/Handshake.lean`（本 crate 的配对握手是它的实现，它是性质的权威）。
 - `cloudflared`：`tunnel run` 收 `--url`（隧道的源）、`--metrics`（指标服务的地址）与 `--no-autoupdate`；指标服务的 `/ready` 在至少有一条到边缘的连接时答 200，否则答 503（cloudflare/cloudflared 仓库 `metrics/readiness.go`）。
 - 安全上下文：WebCrypto 的 `SubtleCrypto`、service worker 与 `StorageManager.persist()` 只在安全上下文里可用，`http://localhost` 之外的 `http://` 地址不算（MDN 的 SubtleCrypto 与 Service Worker API 页）。URL 片段在请求发出之前就被分离出去，不送给服务器（RFC 3986 §3.5）。
+-/
 
-## 6 命名统一
+/-! ## 6 命名统一
 
 门（remote door）、纪元（epoch）、配对码（pairing code）、邀请（invitation：二维码里城的指纹与配对码那一对）、城的指纹（city fingerprint）、配对握手（pairing handshake）、认领（claim）、设备（device）、远程会话（remote session）、权限（authority：`Watch`／`Act`）、动词类（verb class：`Read`／`Act`／`LocalOnly`）、通路（route）、主机名的持久性（permanence：`Fixed`／`PerStart`）。五个词与城里别处的词同名或相近而不同义，本 crate 的文档这样区分：
 
 - 「门」写全为「远程门」。glossary 的 door 是 Gate 的判定点，列在 `kernel::gate::DOORS`，判的是城里的一个动作；远程门判的是谁能从外面进城。
 - 「会话」在本 crate 指远程会话：一台设备一次握手之后持有的那一段，`SessionId` 与 `handshake::Session` 都指它。glossary 的 Session 是房间的一段，与它无关。
 - 「纪元」指远程门的纪元。wire 的 `Welcome.epoch` 是 Ledger 首行的链哈希，是另一件事。
-- 通路打开的答案叫 `Opened`，不叫 reach：`kernel::Reach` 是一次到 provider 的分段可达性读数，wire-SPEC §19 的 reach 说一个动词从哪里够得到（§12-12）。
+- 通路打开的答案叫 `Opened`，不叫 reach：`kernel::Reach` 是一次到 provider 的分段可达性读数，wire-SPEC §19 的 reach 说一个动词从哪里够得到（D12）。
 - 「配对令牌」（pairing token）是 wire 局域网那一面的词，与本 crate 的「配对码」不是一物：令牌在一次服务期间反复出示，配对码只兑一次。
+-/
 
-## 7 模块边界
+/-! ## 7 模块边界
 
 **三件邻居的活，及它们各自的主人**：
 
 - 帧的类型、编码与握手版本归 `wire::frames`；本 crate 只在帧外封一层，不认识任何一个帧。
 - 一帧属于哪个动词类（`Read`／`Act`／`LocalOnly`）的对照表住在 wire-SPEC §19-2，是 reach 旁边的 `class` 一列，`xtask wiring` 读那一张表并对照代码；逐帧查表、再问 `door::permits` 的中继在装配层，因为只有 `sprawling` 同时依赖 wire 与本 crate。本 crate 只给出 `door::permits(Authority, VerbClass)` 这条判定。
-- 随机字节、时钟、远程监听与它的路径、设备表的落盘与城密钥的保管归装配层 `bin::assembly`；本 crate 只收参数、只给判定。通路是唯一的例外：通路缝（§8-7）与它的三个实现都在本 crate，两个生产实现在这里起子进程（`cloudflared`、人写的命令）、读它们的输出、在回环上问就绪（§12-14）。它们只用标准库的 `std::process` 与 `std::net`，本 crate 仍只依赖 kernel 与 aws-lc-rs。装配层选哪一条通路、把配置读成类型化的参数交给它。
+- 随机字节、时钟、远程监听与它的路径、设备表的落盘与城密钥的保管归装配层（`bin::assembly` 取时钟与熵，`bin::outside` 持有门、远程监听与设备表，sprawling-SPEC 8-139）；本 crate 只收参数、只给判定。通路是唯一的例外：通路缝（§8-7）与它的三个实现都在本 crate，两个生产实现在这里起子进程（`cloudflared`、人写的命令）、读它们的输出、在回环上问就绪（D14）。它们只用标准库的 `std::process` 与 `std::net`，本 crate 仍只依赖 kernel 与 aws-lc-rs。装配层选哪一条通路、把配置读成类型化的参数交给它。
 
-依赖：`remote: kernel`（ARCHITECTURE §3 的 depmap）。`sprawling` 是唯一消费者。
+依赖：`remote_access: kernel`（ARCHITECTURE §3 的 depmap）。`sprawling` 是唯一消费者。
 
-## 8 接口先行
+D8 局域网那一面不是通路。wire 的局域网面（绑定非回环地址，凭配对令牌）照旧，远程门不经过它。局域网地址是 `http://`，浏览器不把它当安全上下文，WebCrypto、service worker 与 `storage.persist()` 在那里都不可用，页面做不了握手，也装不成 PWA；那一面又是 `serve` 启动时一次定下的绑定，不能随门开关。落选的两种：给局域网配自签名的 HTTPS，浏览器会警告，iOS 上 service worker 装不上，还要多一份生成证书的依赖；把它照旧放进缝里，它既不经过门也不经过封装，名字却让人以为它受门保护。在局域网里要用远程门，跑一条带有效证书的 `command` 通路。
+
+D10 页面由通路送达，这是通路上剩下的一件信任。页面脚本经通路到达设备，改写页面的通路能读到页面读到的一切：片段里的配对码、设备的种子、解开的帧。浏览器目前没有办法让一个页面钉住自己下一次加载的字节：service worker 的脚本变了，浏览器就装上新版本，旧版本拦不住。落选的做法：只在这台电脑旁边配对（手机要先到电脑边上，而局域网不是安全上下文，D8）；另做一个原生外壳（多一种发行件和一条签名链）。浏览器提供钉住顶层页面字节的办法时，重新考虑这一条。
+
+D14 通路缝的三个实现与缝同在本 crate。一条缝要带着它的第二个实现落地才是真的（ARCHITECTURE §4），而装配层要到接上中继时才链接本 crate；通路的策略——哪种地址算安全上下文、通路何时算就绪、人写的命令要印什么——又都属于声明它的接口。两个生产实现只用标准库起子进程、读一个管道、在回环上问一次 HTTP，所以本 crate 的依赖仍是 kernel 与 aws-lc-rs，装配层只选一条通路、把配置读成类型化的参数交给它。落选的做法是把 `cloudflare` 与 `command` 放进装配层、脚本化通路放进 `crates/sprawling/tests/`：缝在链接之前就无从证明，装配层还要多管两个与组装无关的子进程。
+-/
+
+/-! ## 8 接口先行
+
+签名的权威是 Rust 源码；这里记每个模块的接口、它为什么是这个形状，以及分部没有表示的要求。
 
 ### 8-1 remote_access::door（形状 1 判定＋形状 5 状态）
 
@@ -118,6 +147,12 @@ impl Door {
 - **会话的寿命取 `min(请求的到期, 门的关闭时刻)`**：会话永远不比门活得久。`authority` 在门关着、纪元不符、会话过期或设备已撤销时答 `None`。
 - 失败码：门关着、码不对、设备未配对 → `E_GATE_DENIED`；重用纪元、撤销未知设备、设备名不合 → `E_INVALID_ARGS`。每一条都带一句可执行的恢复语，指向控制台上的哪条命令。
 
+D4 开门、配对、撤销只在控制台，不上线协议。agent 拿到的任何工具（包括驱动本地页面的浏览器工具）都够不到它们。限制：Windows 与 macOS 上 `exec` 尚无操作系统级沙箱，agent 跑的命令拥有这个用户的权限；那个缺口由 exec 沙箱补，不由这扇门补。
+
+D5 关门可以由任何人做，开门只能由人做。关门只会减少访问，所以远程设备自己也可以「锁门离开」。
+
+D19 会话的寿命就是门的寿命。`Door::admit` 取门关上的时刻作会话的到期，会话不另设时长；设备锁门、人关门、门到时，会话都随之结束。落选的是给会话一个比门短的时长：设备每过一段就要重新握手，而握手证明的事——它持有配对时的密钥——在门开着的这段时间里不会变。
+
 ### 8-2 remote_access::pairing（形状 2 值类型）
 
 ```rust
@@ -151,6 +186,8 @@ pub struct Signature(Box<[u8; SIGNATURE_BYTES]>);   // from_bytes／as_bytes
 
 - **一个种子派生两半**：HKDF-SHA256，盐 `sprawling remote key v1`，两半各用自己的标签（`ed25519`、`ml-dsa-44`），所以两半不共享任何密钥材料；盐里的版本号保证以后的派生不会产出以前的密钥。人要保存的只是这 32 字节。
 - **验证两半都要成立，并且只给一个答案**：调用方从拒绝里得不出是哪一半没过。
+
+D6 设备密钥在设备上生成。城只存公钥，城的存储泄露不让任何人登录；人要保存的恢复种子是设备自己的，城从未见过它。
 
 ### 8-4 remote_access::handshake（形状 1 判定＋形状 5 状态）
 
@@ -188,13 +225,15 @@ impl Opener { pub fn open(&mut self, sealed: &[u8]) -> Result<Vec<u8>, AxError>;
 
 - AES-256-GCM；随机数是 4 字节方向标签加 8 字节大端计数器；计数器不上线，因为套接字按序送达，双方各自知道下一个编号。被重放、被丢掉前一帧、被改过、方向不对的帧都打不开，打不开就结束会话：没有哪一帧值得跳过。
 - 计数器用尽（2^64 帧）以 `E_BUDGET_EXHAUSTED` 拒，恢复语是重连：新会话换新密钥、从零计数。
-- **会话里封装的负载，第一个字节说它是什么**（§12-13）：
+- **会话里封装的负载，第一个字节说它是什么**（D13）：
 
   ```rust
   pub enum Payload { Frame(String), Lock }   // to_bytes／from_bytes：0 后接一帧线协议文本（UTF-8）；1 是锁门，其后没有字节
   ```
 
-  `Frame` 两个方向都用；中继把设备发来的 `Frame` 原样转给回环上的 `/ws`，不解析后再序列化。`Lock` 只由设备发，装配层收到后调用 `Door::close`，任何权限的设备都可以发（§12-5）。未知的首字节、`Lock` 后面多出的字节、不是 UTF-8 的帧，`from_bytes` 以 `E_WIRE_MISMATCH` 拒，连接结束。配对连接里的负载不带这个字节，它们是 §8-6 的定长消息。
+  `Frame` 两个方向都用；中继把设备发来的 `Frame` 原样转给回环上的 `/ws`，不解析后再序列化。`Lock` 只由设备发，装配层收到后调用 `Door::close`，任何权限的设备都可以发（D5）。未知的首字节、`Lock` 后面多出的字节、不是 UTF-8 的帧，`from_bytes` 以 `E_WIRE_MISMATCH` 拒，连接结束。配对连接里的负载不带这个字节，它们是 §8-6 的定长消息。
+
+D13 会话里封装的负载用第一个字节说它是线协议文本帧还是锁门。D5 许诺远程设备可以「锁门离开」，而门的动词不上线协议（D4），所以锁门只能在封装这一层说。落选的做法是给 wire 加一个锁门命令：它要动线协议的 schema 哈希，而且让城的线协议认识一扇它本不认识的门（§7）。
 
 ### 8-6 remote_access::handshake 的配对一半（形状 1 判定＋形状 5 状态）
 
@@ -225,7 +264,7 @@ impl CityPairing {
 }
 ```
 
-- **为什么要这一半**：设备第一次连上城时，城还没有它的公钥，§8-4 的握手无从认证设备。如果这时把配对码与设备公钥明文发出，解开 TLS 的边缘在码的十分钟里就能抢先配上自己的密钥（§12-9）。所以配对先走一次只由城认证的握手，认领在它派生的会话密钥下封好再发。
+- **为什么要这一半**：设备第一次连上城时，城还没有它的公钥，§8-4 的握手无从认证设备。如果这时把配对码与设备公钥明文发出，解开 TLS 的边缘在码的十分钟里就能抢先配上自己的密钥（D9）。所以配对先走一次只由城认证的握手，认领在它派生的会话密钥下封好再发。
 - **邀请不经通路**：`/remote pair` 在控制台印出二维码，内容是 `https://<主机名>/#pair=<配对码正文>&city=<指纹正文>`。配对码与指纹放在 URL 片段里，浏览器不把片段随请求发出（RFC 3986 §3.5），所以只转发请求的通路见不到它们；页面脚本从 `location.hash` 读出它们。二维码里放指纹而不放整把公钥：公钥 1344 字节，编进 URL 后二维码密得难扫；指纹 32 字节，城在回答里出示整把公钥，设备核对它的 SHA-256。
 - **三条消息，一条回执**：设备发 `PairHello`。城回 `PairReply`，出示自己的公钥，并用城的密钥签「配对标签‖`city`‖握手记录」。设备先核对 `CityFingerprint::of(出示的公钥)` 等于邀请里的指纹，再验签名，两样都过才派生会话密钥，把「配对码正文‖设备公钥‖设备对『配对标签‖`device`‖握手记录』的签名」封成第一帧发出。城用 `open_claim` 解开它、验设备的签名，交回 `Claim`；装配层随后 `PairingCode::read`、`Door::pair`，门给出的 `DeviceId`（16 字节）由城封成第一帧回给设备，连接随即结束。设备留下城的公钥、自己的种子与 `DeviceId`，此后每次连接走 §8-4。
 - **握手记录与会话密钥**：配对标签是 `sprawling remote pairing v1`，与 §8-4 的协议标签不同，所以一次配对的签名不能冒充一次会话握手的签名，反过来也一样。记录是 SHA-256（配对标签‖`PairHello`‖不含签名的 `PairReply`）；会话密钥的派生与 §8-4 相同，盐换成这份记录。
@@ -234,6 +273,8 @@ impl CityPairing {
 - **指纹的读法**：`CityFingerprint::read` 去掉首尾空白、不论大小写；正文须是 52 个 base32 符号，并且是某 32 字节的规范写法（最后一个符号的低 4 位为 0），否则 `E_INVALID_ARGS`，恢复语是重新扫码。一个指纹只有一种写法，所以两个指纹相等当且仅当它们的正文相等。
 - **一条配对连接只做配对**：它不调 `Door::admit`，不转发任何帧，回执之后就结束。`DevicePairing` 与 `CityPairing` 各只能用一次（`claim`、`open_claim` 取走 `self`）。
 - **临时密钥的随机性**：与 §8-4 相同，由 aws-lc-rs 在内部抽取；nonce 由调用方给。
+
+D9 配对走一次只由城认证的握手，配对码只在封装里走。边缘解开 TLS，明文的配对消息会把配对码交给边缘，边缘在码的十分钟有效期里可以抢先配上自己的密钥。落选的做法是在这十分钟里信任边缘并把这一点写明：它省下 §8-6 的一组消息，代价是 §1「通路冒充不了任何一方」在配对这一步不成立。指纹与配对码经二维码从控制台屏幕直接到设备，放在 URL 片段里，只转发请求的通路见不到它们。
 
 ### 8-7 remote_access::route（缝：通路）
 
@@ -249,12 +290,16 @@ pub enum Permanence { Fixed, PerStart }
 
 - **开**：`local` 是装配层的远程监听在回环上的地址。`open` 在外面够得到它之后才返回，答出外面用的地址，以及这个地址的主机名在通路重启之后是否不变。一条已开的通路再 `open`，先关掉原来那一条，再开新的。
 - **关**：之后外面再够不到 `local`。`close` 可以重复调用，关一个没开的通路答成功，所以门到时与人输入 `/remote close` 同时发生也无妨。
-- **两个方法是同步的**（§12-15）：`open` 阻塞到通路就绪，最长到实现构造时收下的耐心（`kernel::TimeoutMs`）用完；装配层在自己起的阻塞线程上调用它们。
-- **`PublicUrl` 只收 `https://`**：页面要做握手、要装成 PWA，都需要浏览器的安全上下文，`http://` 的地址上两样都做不成（§12-8）。类型挡住它，调用方就不必再问一个通路「能不能用」。`parse` 不论 scheme 的大小写，存成小写；拒 `http://` 与其他 scheme、没有主机的地址、主机前带用户信息（`user@`）的地址、带片段（`#`）的地址、含空白或控制字符的地址，报 `E_CONFIG_INVALID`，恢复语指向产生这个地址的通路配置。片段被拒，是因为邀请要在这个地址后面接上 `#pair=…&city=…`（§8-6）；用户信息被拒，是因为这个地址要印进二维码。
+- **两个方法是同步的**（D15）：`open` 阻塞到通路就绪，最长到实现构造时收下的耐心（`kernel::TimeoutMs`）用完；装配层在自己起的阻塞线程上调用它们。
+- **`PublicUrl` 只收 `https://`**：页面要做握手、要装成 PWA，都需要浏览器的安全上下文，`http://` 的地址上两样都做不成（D8）。类型挡住它，调用方就不必再问一个通路「能不能用」。`parse` 不论 scheme 的大小写，存成小写；拒 `http://` 与其他 scheme、没有主机的地址、主机前带用户信息（`user@`）的地址、带片段（`#`）的地址、含空白或控制字符的地址，报 `E_CONFIG_INVALID`，恢复语指向产生这个地址的通路配置。片段被拒，是因为邀请要在这个地址后面接上 `#pair=…&city=…`（§8-6）；用户信息被拒，是因为这个地址要印进二维码。
 - **`Permanence`**：设备上的密钥与 PWA 按域名隔离，主机名一换，已配对的设备就读不到自己的密钥。在 `PerStart` 的通路上，装配层在配对之前向人说明这一点。Cloudflare 命名隧道答 `Fixed`；`command` 通路由人在配置里写明。
-- **实现**（§12-14）：`route::cloudflare::NamedTunnel`（默认，§12-3、§8-8）、`route::command::CommandRoute`（§8-9）与 `route::scripted::ScriptedRoute`。脚本化通路答出构造时给它的 `Opened`，并按次序记下每一次 `open(local)` 与 `close()`（`ScriptedRoute::new(Opened)`、`calls() -> &[RouteCall]`、`enum RouteCall { Open(SocketAddr), Close }`），装配层的测试从中看出自己按什么次序开关通路。缝登记在 ARCHITECTURE §4。局域网那一面不是通路（§12-8）。
+- **实现**（D14）：`route::cloudflare::NamedTunnel`（默认，D3、§8-8）、`route::command::CommandRoute`（§8-9）与 `route::scripted::ScriptedRoute`。脚本化通路答出构造时给它的 `Opened`，并按次序记下每一次 `open(local)` 与 `close()`（`ScriptedRoute::new(Opened)`、`calls() -> &[RouteCall]`、`enum RouteCall { Open(SocketAddr), Close }`），装配层的测试从中看出自己按什么次序开关通路。缝登记在 ARCHITECTURE §4。局域网那一面不是通路（D8）。
 - **子进程的寿命跟着通路**：两个生产实现各起一个子进程，`close` 结束它并等它退出；一条通路没有关就被丢弃时，`Drop` 同样结束它，所以城退出时不留下一条还开着的隧道。
-- **没有能力查询**：一个通路要让调用方知道的两件事，一件由 `PublicUrl` 的类型挡住，一件放在 `Opened.permanence` 里（§12-12）。
+- **没有能力查询**：一个通路要让调用方知道的两件事，一件由 `PublicUrl` 的类型挡住，一件放在 `Opened.permanence` 里（D12）。
+
+D12 通路的接口只有开与关；早先设想的 `Reach` 与 `Capabilities` 两个类型不存在。开通路答 `Opened`：外面用的地址，以及这个地址的主机名是否跨重启不变。`Reach` 已是 kernel 公开的分段可达性读数（`kernel::Reach`），reach 又是 wire-SPEC §19 的一列，第三个同名物会让读者把打开通路读成一次探测；`Capabilities` 在 ACP 里是握手字段名，glossary 里的 capability bits 是楼的能力位。能力查询整个消失，还因为调用方据以行动的事实只有两件：地址是否是安全上下文，由 `PublicUrl` 的类型挡住；主机名会不会变，通路打开之后才可靠地知道，于是放进 `open` 的答案。落选的做法是保留一个改了名的 `capabilities()`：它多一个查询面，还允许通路自报的能力与它打开之后的实际不一致。
+
+D15 `Route` 的两个方法是同步的。三个实现里，两个要等一个子进程（印出地址，或者连上边缘），一个什么也不等；等子进程要么阻塞一个线程，要么要 tokio 的 `process` 特性，而本 crate 不依赖任何执行器。同步的签名把「这一步会阻塞，最长到耐心用完」写在类型上，调用方在装配层自己的阻塞线程上调用它（装配层是起线程的地方，ARCHITECTURE §10 第 3 条）。落选的做法是保留 `async` 签名：实现要么在 future 里阻塞执行器的一个工作线程，要么让本 crate 带上 tokio 与它的 `process` 特性。一个通路能不占线程地等待（例如只和本地守护进程说 HTTP）、并且装配层同时持有很多条通路时，重新考虑这一条。
 
 ### 8-8 remote_access::route::cloudflare（适配器：Cloudflare 命名隧道）
 
@@ -264,12 +309,14 @@ pub struct TunnelName(String);         // parse(&str) -> Result<TunnelName, AxEr
 pub struct NamedTunnel { /* 私有 */ }  // new(tunnel: Tunnel, patience: TimeoutMs)；impl Route
 ```
 
-- **跑的是本地管理的命名隧道**（§12-16）。人事先建好它一次：`cloudflared tunnel login`、`cloudflared tunnel create <名字>`、`cloudflared tunnel route dns <名字> <主机名>`。隧道的凭据留在 `cloudflared` 自己的目录里，从不进城；`url` 是 `https://<主机名>`，由人写在配置里。
+- **跑的是本地管理的命名隧道**（D16）。人事先建好它一次：`cloudflared tunnel login`、`cloudflared tunnel create <名字>`、`cloudflared tunnel route dns <名字> <主机名>`。隧道的凭据留在 `cloudflared` 自己的目录里，从不进城；`url` 是 `https://<主机名>`，由人写在配置里。
 - **开**：跑 `<program> tunnel --no-autoupdate --metrics 127.0.0.1:<空闲端口> --url http://<local> run <名字>`。`--url` 把隧道的源指到这一次的远程监听，所以监听的端口不必写进配置；`--no-autoupdate` 让 `cloudflared` 不在通路开着的时候替换自己再重启。空闲端口的取法：在回环上绑一个 0 端口，读出系统给的端口，再放开。子进程的 stdin、stdout、stderr 都接空：它的日志只写给它自己，读它就要一个线程替它排空管道。
 - **就绪**：每 200 ms 问一次 `http://127.0.0.1:<端口>/ready`，答 200 表示 `cloudflared` 至少有一条到边缘的连接；这时答 `Opened { url, permanence: Fixed }`。问的次数是耐心除以 200 ms，所以等待按次数计，不读时钟。
 - **`TunnelName`**：1 到 64 个字符，只含 ASCII 字母、数字、`.`、`_`、`-`，不以 `-` 开头。名字作为一个参数交给 `cloudflared`，以 `-` 开头就会被读成一个选项。
 - **失败**：程序起不来 → `E_TOOL_UNAVAILABLE`，恢复语是装上 `cloudflared` 或给出它的完整路径；在就绪之前退出 → `E_TOOL_UNAVAILABLE`，主题带退出状态，恢复语给出手动跑的那一行命令与建隧道的三条命令；到时仍未就绪 → 结束子进程，`E_TIMEOUT`；回环上拿不到空闲端口 → `E_TOOL_UNAVAILABLE`；名字不合 → `E_CONFIG_INVALID`。
 - **操作者检查**（不作门）：在装了 `cloudflared`、建好隧道、能连上边缘的电脑上，经 `NamedTunnel::open` 开一次（装配层接上之后就是 `/remote open`），在另一台设备上打开答出的地址，看到远程监听的回答；再 `close`，确认 `cloudflared` 进程已经退出，地址不再有回答。
+
+D16 `cloudflare` 通路跑本地管理的命名隧道，凭据留在 `cloudflared` 自己手里。隧道由人用 `cloudflared` 的三条命令建好一次，`cloudflared` 凭它自己目录里的凭据连上边缘，城只把 `--url http://<local>` 交给它。好处有两件：隧道的源随每次打开给出，远程监听的端口不必固定，也不必与 Cloudflare 面板上的配置保持一致；城里从不出现隧道凭据的明文。落选的做法是面板管理的隧道：令牌存进 vault、经 `TUNNEL_TOKEN` 交给子进程。它的源写在面板上，监听端口要写死在配置里并手工与面板对齐；令牌的明文要在本 crate 里从 `Sealed` 取出，那是 `xtask secret` 名单之外的又一个兑现点，加进名单是放宽一道门。人要用面板管理的隧道时，重新考虑这一条，那时它是 `cloudflare` 里一个带兑现点与固定端口的变体。
 
 ### 8-9 remote_access::route::command（适配器：人写的一条命令）
 
@@ -306,6 +353,8 @@ pub struct CommandRoute { /* 私有 */ }  // new(command: RouteCommand, permanen
 - **会话里每一帧都逐帧授权**：中继打开封装，按首字节分开线协议帧与锁门；线协议帧先按 wire-SPEC §19-2 的 `class` 列判类，再问 `Door::authority(会话, 此刻)` 与 `permits`。放行的帧原样发给城的 `/ws`；拒绝的帧不到城，设备收到一帧封好的 `Refusal`；会话已不被门持有（门关了、设备被撤销、到时）时连接结束，而不是一帧一帧地拒（wire-SPEC §8-66）。
 - **门的一次判定、它写的那一行与设备表的落盘在同一把锁下**，所以账本上的次序就是门里发生的次序（sprawling-SPEC 8-139）。
 
+D17 远程监听是自己的一个回环端口，不是城的端口上的一条路由。通路把这个端口引到外面，城自己的端口留在 `serve` 绑定它的地方、由它自己的令牌守着；两件事一个开一个不开，所以是两个端口。中继在这里以一个线协议客户端的身份连城的 `/ws`，与浏览器同一扇门进城。落选的做法是在城的端口上加 `/remote` 路由：那要让通路指向城的端口，局域网那一面的配对令牌与远程门的设备密钥守同一个端口，门关着时外面仍够得到城的端口。
+
 ### 8-11 remote_access::door 的正文写法（形状 2 值类型）
 
 ```rust
@@ -316,6 +365,8 @@ impl Authority { pub fn word(self) -> &'static str; pub fn from_word(word: &str)
 
 - **设备表与账本读同一种写法**：设备 id 与公钥用配对码与城的指纹已经用的那一种 base32（§8-2），一个人可能看到的每一串字节都是同一个字母表。`DeviceId::read` 只收 16 字节的规范写法。
 - **失败**：读不成 → `E_INVALID_ARGS`，主题截到 64 个字符，恢复语是撤销那台设备再重新配对（表被人手改过）。
+
+D18 设备 id 与公钥写成配对码那一种 base32 （§8-11）。一个字母表，人无论在设备表里、在账本里、还是在二维码的片段里看到的字节串都长一个样；落选的十六进制让同一个 id 有两种外形。
 
 ### 8-12 与浏览器互通的向量与单向夹具（`tools/fixtures/remote-handshake/`；形状 6 数据面）
 
@@ -332,31 +383,40 @@ fixture.txt           city_public, hello, x25519_private, ml_kem_private, reply,
 - **`session-keys.txt`**：§8-4 的会话密钥派生。`transcript` 是盐，`x25519_secret` 接 `ml_kem_secret` 是输入，`info` 为 `device to city`、`city to device` 的两次 HKDF-SHA256 展开各 32 字节。三个输入是固定的字节，不来自一次握手，所以这份文件只测 HKDF。
 - **`seal.txt`**：§8-5 的封装。同一把城到设备的密钥 `key` 依次封两个负载：`frame` 是 `Payload::Frame` 的字节（首字节 `00`，后接 UTF-8 文字），计数 0；`lock` 是 `Payload::Lock`（一个字节 `01`），计数 1。nonce 是方向标签 `c->d` 的四个 ASCII 字节接 8 字节大端计数，计数不上线；AAD 为空；`*_sealed` 是密文接 16 字节的 GCM 标签。
 - **`signature-*.txt`**：一把混合公钥、一条消息与它的混合签名（§8-3）。`signature-rust.txt` 由 Rust 用 `keys.txt` 的那把密钥签；aws-lc-rs 的 ML-DSA-44 签名带随机（hedged），所以只有 Ed25519 一半能逐字节复现，浏览器验整份。浏览器一侧签的那一份由客户端提交为 `signature-browser.txt`，字段相同；Rust 的测试验目录里每一个 `signature-*.txt`，所以它落地时 Rust 一侧不改代码。
-- **`fixture.txt`**：单向夹具（§12-11）。`hello` 是设备的 `Hello`（设备 id、X25519 公钥、ML-KEM-768 封装密钥、nonce），`x25519_private` 与 `ml_kem_private`（FIPS 203 的 2400 字节解封装密钥）是它的两把临时私钥；`reply` 是 Rust 城对它的回答，`city_public` 是签回答的城公钥；`first_frame` 是握手之后城封给设备的第一帧（城到设备，计数 0），`plaintext` 是它打开后的负载字节（`Payload::Frame`，约定的文字）。设备走 §8-4 的设备一半：从 `hello` 与不含签名的 `reply` 算握手记录，用 `city_public` 验回答的签名，派生会话密钥，打开 `first_frame`，得出 `plaintext`。
+- **`fixture.txt`**：单向夹具（D11）。`hello` 是设备的 `Hello`（设备 id、X25519 公钥、ML-KEM-768 封装密钥、nonce），`x25519_private` 与 `ml_kem_private`（FIPS 203 的 2400 字节解封装密钥）是它的两把临时私钥；`reply` 是 Rust 城对它的回答，`city_public` 是签回答的城公钥；`first_frame` 是握手之后城封给设备的第一帧（城到设备，计数 0），`plaintext` 是它打开后的负载字节（`Payload::Frame`，约定的文字）。设备走 §8-4 的设备一半：从 `hello` 与不含签名的 `reply` 算握手记录，用 `city_public` 验回答的签名，派生会话密钥，打开 `first_frame`，得出 `plaintext`。
 - **重生成**：`GOLDEN_WRITE=1 cargo nextest run -p sprawling-remote-access -E 'test(/vector|fixture/)'`。确定的三份（`keys.txt`、`session-keys.txt`、`seal.txt`）每次重写，字节不变；`signature-rust.txt` 与 `fixture.txt` 带着随机（ML-DSA 的签名、城的临时密钥、新抽的 ML-KEM 密钥），只在提交入库的那一份在 Rust 一侧验不过或打不开时重写，所以协议没变时重跑一次不改一个字节，而标签、握手记录、派生或封装的任何改动都让它们打不开、随之重写。不带这个变量时，测试只读、只比，不写。
-- **固定的临时密钥只经测试的缝进来**：读写这些文件的是 `#[cfg(test)]` 的 `remote_access::handshake::agreement::interop`，它从两把私钥造出设备的临时密钥；发行二进制里设备的临时密钥只有 `generate` 一个来处，`handshake` 没有可注入随机源的接口（§12-20）。
+- **固定的临时密钥只经测试的缝进来**：读写这些文件的是 `#[cfg(test)]` 的 `remote_access::handshake::agreement::interop`，它从两把私钥造出设备的临时密钥；发行二进制里设备的临时密钥只有 `generate` 一个来处，`handshake` 没有可注入随机源的接口（D20）。
 
-## 8.5 两个设计
+D20 互通的证据是 §8-12 的五份文本文件，由 Rust 的测试写、两侧的测试读。写法是一行一个字段的十六进制，而不是 JSON：本 crate 不依赖 JSON 解析器，为测试加一条 `serde_json` 的开发依赖会让锁文件多一条边，手写一个 JSON 读写器又是为测试多一份文法；TS 一侧两种写法都只要一行代码。固定的设备临时密钥经 `#[cfg(test)]` 的缝进来，生产的 `handshake` 不加可注入随机源的接口：§8-4 的城一侧随机性在 aws-lc-rs 内部，加一个注入点也做不出双向固定的整次握手，只会让发行二进制多一条测试才用的路。带随机的两份只在验不过时重写：每次重写都改字节的夹具，会让与协议无关的重跑在评审里看起来像协议改了。落选的做法是跑测试时起 bun 现场比对（D11 已排除）。
+-/
 
-**签名算法：FN-DSA 还是 ML-DSA-44。** 选 ML-DSA-44 与 Ed25519 的混合（§12-1）。落选的 FN-DSA 小在公钥与签名，而一次会话只做一次握手，这点大小不影响任何体验；人需要抄写或保存的是私钥种子，两种算法都能从 32 字节种子确定地派生整对密钥，写成 base32 都是 52 个字符。FN-DSA（FIPS 206）仍是草案，签名依赖浮点高斯采样，NIST 自己说难以做成常数时间，而手机浏览器里的 JS 只有双精度浮点、没有审计过的实现。FIPS 206 定稿且有审计过的实现时，换进来是 `keys` 里多一个枚举分支。
-
-**默认通路：Quick Tunnel 还是命名隧道。** 选命名隧道（§12-3）。Quick Tunnel 不要账号，但每次启动换一个子域：人在外面无从得知新地址，而手机上的密钥与 PWA 按域名隔离，地址一换就全读不到，只能再加一个静态站与一个签名会合点去补。命名隧道要一个 Cloudflare 账号与一个域名，换来固定主机名，还能在边缘开 Access、WAF 与 Bot 规则，在机器流量到达这台电脑之前挡掉它们，页面里不加一行第三方脚本。
-
-## 9 工作流程
+/-! ## 9 工作流程
 
 1. 人在城的控制台输入 `/remote open --for 12h`：装配层取一个新纪元，`Door::open`，并启动所选通路。
 2. `/remote pair phone`：装配层取 16 字节熵，`PairingCode::mint`，`Door::expect_pairing`（10 分钟到期），把地址、配对码正文与 `CityFingerprint::of(城公钥)` 按 §8-6 的片段写法印成二维码。
 3. 手机扫码打开页面，页面在设备上生成设备密钥，走配对握手（§8-6）：`device_pair_hello` → `city_pair_reply` → `DevicePairing::claim` → `CityPairing::open_claim` → `PairingCode::read`、`Door::pair` → 城把 `DeviceId` 封好回给设备，连接结束。
 4. 此后每次连接：握手（§8-4）证明设备持有已配对的私钥，`Door::admit` 开会话；每一帧进来先 `Opener::open`，再按首字节分开线协议帧与锁门（§8-5）；线协议帧先问 `Door::authority`，再按 `permits` 判它所属的动词类。
 5. `/remote close`、设备发来的锁门或门到时：`Door::close` 或 `Door::tick`，装配层同时 `Route::close`；`/remote revoke phone`：`Door::revoke`。
+-/
 
-## 10 实现逻辑
+/-! ## 10 实现逻辑
 
 - 门是一个值加 `&mut self` 方法，而不是 Lean 模型里的纯函数：装配层持有唯一一扇门，就地改比每步重建一次整张表便宜，性质不变。
 - 三张表都是 `Vec`：一座城配对的设备与同时持有的会话以个位数计，线性查找比哈希表更短也更快；按设备数上界（§14）封顶之后复杂度无关紧要。
 - `pair` 用 `swap_remove` 取走码：表内次序无意义，O(1)。
 
-## 11 边界枚举
+**签名算法：FN-DSA 还是 ML-DSA-44。** 选 ML-DSA-44 与 Ed25519 的混合（D1）。落选的 FN-DSA 小在公钥与签名，而一次会话只做一次握手，这点大小不影响任何体验；人需要抄写或保存的是私钥种子，两种算法都能从 32 字节种子确定地派生整对密钥，写成 base32 都是 52 个字符。FN-DSA（FIPS 206）仍是草案，签名依赖浮点高斯采样，NIST 自己说难以做成常数时间，而手机浏览器里的 JS 只有双精度浮点、没有审计过的实现。FIPS 206 定稿且有审计过的实现时，换进来是 `keys` 里多一个枚举分支。
+
+D1 签名用 ML-DSA-44＋Ed25519 的混合，不用 FN-DSA。理由见上一段。混合而非单用 ML-DSA：攻击者必须同时攻破两者；Ed25519 那一半在浏览器里可用 WebCrypto 的不可导出密钥，页面脚本能用它签名却导不出它。
+
+**默认通路：Quick Tunnel 还是命名隧道。** 选命名隧道（D3）。Quick Tunnel 不要账号，但每次启动换一个子域：人在外面无从得知新地址，而手机上的密钥与 PWA 按域名隔离，地址一换就全读不到，只能再加一个静态站与一个签名会合点去补。命名隧道要一个 Cloudflare 账号与一个域名，换来固定主机名，还能在边缘开 Access、WAF 与 Bot 规则，在机器流量到达这台电脑之前挡掉它们，页面里不加一行第三方脚本。
+
+D3 默认通路是 Cloudflare 命名隧道；通路是一条缝，人可以换。理由见上一段。README 原有的决定是「本仓库不附带隧道，替你选一种就是替你做安全决定」。端到端的配对密钥把这件决定缩成一件事：通路是否原样送达页面（D10）。只看、只转发、甚至改动帧的通路什么也得不到，能读到内容的只有改写页面的通路，那是运营方的主动攻击。所以附带一个默认通路仍是替人做一件信任决定，只是范围小了，文档照这个范围写。
+
+**成本与模型体验**：零字节。本 crate 不进任何 run 的上下文，城的居民不知道这扇门存在；远程门的五个 Ledger 事件由装配层写（kernel-SPEC §8-81），它们怎样进窗口归 kernel。
+-/
+
+/-! ## 11 边界枚举
 
 - 同一个码被两个连接同时出示：门在装配层只有一个持有者，两次 `pair` 串行，第二次找不到码。
 - 时钟回拨：`tick` 与判定都只比较 `now` 与到期时刻；回拨只会让会话多活一会儿，不会让门在关着时打开，也不会让旧纪元的东西回来。
@@ -368,39 +428,37 @@ fixture.txt           city_public, hello, x25519_private, ml_kem_private, reply,
 - 同一个名字配对两次：门里是两台设备。名字是否唯一由装配层在 `expect_pairing` 之前判定，门不看名字。
 - `command` 通路的命令在通路开着时自己结束了：外面再够不到 `local`，本 crate 不察觉；之后的 `close` 仍答成功，下一次 `open` 起一条新命令。
 - 通路重启后主机名变了（`PerStart`）：已配对设备的页面读不到自己的密钥，只能重新配对；这正是 `Permanence` 要说出的事。
+-/
 
-## 12 Decisions
+/-! ## 12 错误处理
 
-1. **签名用 ML-DSA-44＋Ed25519 的混合，不用 FN-DSA。** 理由见 §8.5。混合而非单用 ML-DSA：攻击者必须同时攻破两者；Ed25519 那一半在浏览器里可用 WebCrypto 的不可导出密钥，页面脚本能用它签名却导不出它。
-2. **后量子放在三处：TLS、设备认证、帧封装。** TLS 负责传输层机密性，但 Cloudflare 隧道总在边缘解开 TLS；帧封装让边缘只看到密文，配对码也只在封装里走（§8-6），所以「现在截获、以后解密」对这一层也不成立。
-3. **默认通路是 Cloudflare 命名隧道；通路是一条缝，人可以换。** 理由见 §8.5。README 原有的决定是「本仓库不附带隧道，替你选一种就是替你做安全决定」。端到端的配对密钥把这件决定缩成一件事：通路是否原样送达页面（§12-10）。只看、只转发、甚至改动帧的通路什么也得不到，能读到内容的只有改写页面的通路，那是运营方的主动攻击。所以附带一个默认通路仍是替人做一件信任决定，只是范围小了，文档照这个范围写。
-4. **开门、配对、撤销只在控制台，不上线协议。** agent 拿到的任何工具（包括驱动本地页面的浏览器工具）都够不到它们。限制：Windows 与 macOS 上 `exec` 尚无操作系统级沙箱，agent 跑的命令拥有这个用户的权限；那个缺口由 exec 沙箱补，不由这扇门补。
-5. **关门可以由任何人做，开门只能由人做。** 关门只会减少访问，所以远程设备自己也可以「锁门离开」。
-6. **设备密钥在设备上生成。** 城只存公钥，城的存储泄露不让任何人登录；人要保存的恢复种子是设备自己的，城从未见过它。
-7. 每个错误码能否不可能发生：`E_GATE_DENIED` 不能——它报的是外面来的东西不合格，这是门存在的理由；`E_INVALID_ARGS` 的重用纪元一条，由装配层每次开门都取新熵而在实践中不会发生，保留检查是因为它是旧纪元回来的唯一一条路。
-8. **局域网那一面不是通路。** wire 的局域网面（绑定非回环地址，凭配对令牌）照旧，远程门不经过它。局域网地址是 `http://`，浏览器不把它当安全上下文，WebCrypto、service worker 与 `storage.persist()` 在那里都不可用，页面做不了握手，也装不成 PWA；那一面又是 `serve` 启动时一次定下的绑定，不能随门开关。落选的两种：给局域网配自签名的 HTTPS，浏览器会警告，iOS 上 service worker 装不上，还要多一份生成证书的依赖；把它照旧放进缝里，它既不经过门也不经过封装，名字却让人以为它受门保护。在局域网里要用远程门，跑一条带有效证书的 `command` 通路。
-9. **配对走一次只由城认证的握手，配对码只在封装里走。** 边缘解开 TLS，明文的配对消息会把配对码交给边缘，边缘在码的十分钟有效期里可以抢先配上自己的密钥。落选的做法是在这十分钟里信任边缘并把这一点写明：它省下 §8-6 的一组消息，代价是 §1「通路冒充不了任何一方」在配对这一步不成立。指纹与配对码经二维码从控制台屏幕直接到设备，放在 URL 片段里，只转发请求的通路见不到它们。
-10. **页面由通路送达，这是通路上剩下的一件信任。** 页面脚本经通路到达设备，改写页面的通路能读到页面读到的一切：片段里的配对码、设备的种子、解开的帧。浏览器目前没有办法让一个页面钉住自己下一次加载的字节：service worker 的脚本变了，浏览器就装上新版本，旧版本拦不住。落选的做法：只在这台电脑旁边配对（手机要先到电脑边上，而局域网不是安全上下文，§12-8）；另做一个原生外壳（多一种发行件和一条签名链）。浏览器提供钉住顶层页面字节的办法时，重新考虑这一条。
-11. **与浏览器的互通只做组件级已知答案向量，加一条从 Rust 城到 JS 设备的单向夹具。** 城一侧的临时 X25519 与 ML-KEM 随机性在 aws-lc-rs 内部（§8-4），每次的回答都不同，两端都固定的整次握手向量做不出来。组件向量覆盖：同一个种子在两侧得到同样的两半公钥；两个方向的签名互验；HKDF 展开；给定密钥下的 AES-GCM 封装与 §8-5 的负载首字节。单向夹具：Rust 城对一个固定的设备 `Hello` 生成一次回答与第一帧密文，提交入库，JS 设备用同样固定的临时密钥解出约定的明文；协议改动时重新生成。落选的是两个运行时同时在线的跨进程测试：它让 `just check` 依赖 bun，还要先按 `xtask boundary` 判定它放在哪里。JS 设备发往 Rust 城的那一半，由组件向量与 Rust 设备端的测试间接覆盖。
-12. **通路的接口只有开与关；早先设想的 `Reach` 与 `Capabilities` 两个类型不存在。** 开通路答 `Opened`：外面用的地址，以及这个地址的主机名是否跨重启不变。`Reach` 已是 kernel 公开的分段可达性读数（`kernel::Reach`），reach 又是 wire-SPEC §19 的一列，第三个同名物会让读者把打开通路读成一次探测；`Capabilities` 在 ACP 里是握手字段名，glossary 里的 capability bits 是楼的能力位。能力查询整个消失，还因为调用方据以行动的事实只有两件：地址是否是安全上下文，由 `PublicUrl` 的类型挡住；主机名会不会变，通路打开之后才可靠地知道，于是放进 `open` 的答案。落选的做法是保留一个改了名的 `capabilities()`：它多一个查询面，还允许通路自报的能力与它打开之后的实际不一致。
-13. **会话里封装的负载用第一个字节说它是线协议文本帧还是锁门。** §12-5 许诺远程设备可以「锁门离开」，而门的动词不上线协议（§12-4），所以锁门只能在封装这一层说。落选的做法是给 wire 加一个锁门命令：它要动线协议的 schema 哈希，而且让城的线协议认识一扇它本不认识的门（§7）。
-14. **通路缝的三个实现与缝同在本 crate。** 一条缝要带着它的第二个实现落地才是真的（ARCHITECTURE §4），而装配层要到接上中继时才链接本 crate；通路的策略——哪种地址算安全上下文、通路何时算就绪、人写的命令要印什么——又都属于声明它的接口。两个生产实现只用标准库起子进程、读一个管道、在回环上问一次 HTTP，所以本 crate 的依赖仍是 kernel 与 aws-lc-rs，装配层只选一条通路、把配置读成类型化的参数交给它。落选的做法是把 `cloudflare` 与 `command` 放进装配层、脚本化通路放进 `crates/sprawling/tests/`：缝在链接之前就无从证明，装配层还要多管两个与组装无关的子进程。
-15. **`Route` 的两个方法是同步的。** 三个实现里，两个要等一个子进程（印出地址，或者连上边缘），一个什么也不等；等子进程要么阻塞一个线程，要么要 tokio 的 `process` 特性，而本 crate 不依赖任何执行器。同步的签名把「这一步会阻塞，最长到耐心用完」写在类型上，调用方在装配层自己的阻塞线程上调用它（装配层是起线程的地方，ARCHITECTURE §10 第 3 条）。落选的做法是保留 `async` 签名：实现要么在 future 里阻塞执行器的一个工作线程，要么让本 crate 带上 tokio 与它的 `process` 特性。一个通路能不占线程地等待（例如只和本地守护进程说 HTTP）、并且装配层同时持有很多条通路时，重新考虑这一条。
-16. **`cloudflare` 通路跑本地管理的命名隧道，凭据留在 `cloudflared` 自己手里。** 隧道由人用 `cloudflared` 的三条命令建好一次，`cloudflared` 凭它自己目录里的凭据连上边缘，城只把 `--url http://<local>` 交给它。好处有两件：隧道的源随每次打开给出，远程监听的端口不必固定，也不必与 Cloudflare 面板上的配置保持一致；城里从不出现隧道凭据的明文。落选的做法是面板管理的隧道：令牌存进 vault、经 `TUNNEL_TOKEN` 交给子进程。它的源写在面板上，监听端口要写死在配置里并手工与面板对齐；令牌的明文要在本 crate 里从 `Sealed` 取出，那是 `xtask secret` 名单之外的又一个兑现点，加进名单是放宽一道门。人要用面板管理的隧道时，重新考虑这一条，那时它是 `cloudflare` 里一个带兑现点与固定端口的变体。
-17. **远程监听是自己的一个回环端口，不是城的端口上的一条路由。** 通路把这个端口引到外面，城自己的端口留在 `serve` 绑定它的地方、由它自己的令牌守着；两件事一个开一个不开，所以是两个端口。中继在这里以一个线协议客户端的身份连城的 `/ws`，与浏览器同一扇门进城。落选的做法是在城的端口上加 `/remote` 路由：那要让通路指向城的端口，局域网那一面的配对令牌与远程门的设备密钥守同一个端口，门关着时外面仍够得到城的端口。
-18. **设备 id 与公钥写成配对码那一种 base32**（§8-11）。一个字母表，人无论在设备表里、在账本里、还是在二维码的片段里看到的字节串都长一个样；落选的十六进制让同一个 id 有两种外形。
-19. **会话的寿命就是门的寿命。** `Door::admit` 取门关上的时刻作会话的到期，会话不另设时长；设备锁门、人关门、门到时，会话都随之结束。落选的是给会话一个比门短的时长：设备每过一段就要重新握手，而握手证明的事——它持有配对时的密钥——在门开着的这段时间里不会变。
-20. **互通的证据是 §8-12 的五份文本文件，由 Rust 的测试写、两侧的测试读。** 写法是一行一个字段的十六进制，而不是 JSON：本 crate 不依赖 JSON 解析器，为测试加一条 `serde_json` 的开发依赖会让锁文件多一条边，手写一个 JSON 读写器又是为测试多一份文法；TS 一侧两种写法都只要一行代码。固定的设备临时密钥经 `#[cfg(test)]` 的缝进来，生产的 `handshake` 不加可注入随机源的接口：§8-4 的城一侧随机性在 aws-lc-rs 内部，加一个注入点也做不出双向固定的整次握手，只会让发行二进制多一条测试才用的路。带随机的两份只在验不过时重写：每次重写都改字节的夹具，会让与协议无关的重跑在评审里看起来像协议改了。落选的做法是跑测试时起 bun 现场比对（§12-11 已排除）。
-21. **浏览器一侧的 ML-KEM 与 ML-DSA 用 `@noble/post-quantum`，精确钉版本，只由远程页面懒加载；种子只在配对时显示一次（定规）。** 它是一个自审、未经独立审计的 0.x 库，而 Rust 一侧选 aws-lc-rs 的理由之一是它的 FIPS 验证历史，两侧的信任口径因此不同；接受它的条件是它的 ML-KEM-768 与 ML-DSA-44 过 §8-12 的向量与夹具。版本号只写在 `client/package.json`，`tools/xtask/src/npm.rs` 的 `RUNTIME` 表收它一项，两处都归客户端的那次改动。懒加载让没有打开远程页面的人不为它付字节。种子：页面在配对时把 52 个字符的种子给人看一次，不保存；两半密钥分开保存，Ed25519 那一半是 WebCrypto 的不可导出密钥（§12-1）。代价是重装 PWA 就要重新配对。落选的三种：把 aws-lc 或 RustCrypto 编成 wasm（两端同源，体积推断大一个数量级，aws-lc 编 wasm 未验证）；等浏览器原生支持 ML-KEM 与 ML-DSA（远程门推迟到不定的时候）；种子加密后存进 IndexedDB（页面持有种子，§12-1 的不可导出就不成立）。出现独立审计，或主流引擎的 WebCrypto 原生提供这两种算法时，重新考虑这一条。
+一个拒绝是三段式的 `AxError`：动作、主体、恢复。下表按码列出本 crate 何时答出它；每一条的恢复语写在 §8 对应的一节。
 
-## 13 依赖选型
+| 码 | 何时 | 之后的状态 |
+|---|---|---|
+| `E_GATE_DENIED` | 门关着、码不对、设备未配对（§8-1）；混合签名有一半验不过（§8-3）；对方的密钥材料被库拒（§8-4）；回答的指纹不符、城的签名不对、认领打不开或设备签名不对（§8-6）；一帧打不开（§8-5） | 门不变；码已从等待表取走的仍算用掉（§8-1）；握手的等待状态已被取走，连接结束；会话里一帧打不开即结束会话 |
+| `E_INVALID_ARGS` | 重用纪元、撤销未知设备、设备名不合（§8-1）；公钥或签名的线形式长度不对（§8-3）；邀请里的配对码或指纹读不成（§8-6）；设备 id、公钥或权限的正文读不成（§8-11） | 门不变；读不成的设备表行由装配层拒整张表 |
+| `E_WIRE_MISMATCH` | 握手消息长度不对（§8-4、§8-6）；负载的首字节未知、锁门后面多出字节、帧不是 UTF-8、负载为空（§8-5） | 连接结束 |
+| `E_BUDGET_EXHAUSTED` | 一个方向的帧计数用尽（§8-5） | 会话结束，重连得到新密钥与从零开始的计数 |
+| `E_CONFIG_INVALID` | `PublicUrl` 不合、隧道名不合、命令印错地址那一行（§8-7 到 §8-9） | 命令已被结束，通路没有开 |
+| `E_TOOL_UNAVAILABLE` | 程序起不来、在就绪或印出地址之前退出、回环上拿不到空闲端口（§8-8、§8-9） | 通路没有开 |
+| `E_TIMEOUT` | 耐心用完仍未就绪或仍未印出地址（§8-8、§8-9） | 子进程已被结束，通路没有开 |
+| `E_STORAGE_FATAL` | 密码库拒绝一次本该成功的派生、签名或封装（`keys::crypto_failure`） | 这一步没有产出；恢复语是重启城并报告平台与版本 |
+
+D7 每个错误码能否不可能发生：`E_GATE_DENIED` 不能——它报的是外面来的东西不合格，这是门存在的理由；`E_INVALID_ARGS` 的重用纪元一条，由装配层每次开门都取新熵而在实践中不会发生，保留检查是因为它是旧纪元回来的唯一一条路。
+-/
+
+/-! ## 13 依赖选型
 
 - 1a 只依赖 kernel（`B3Hash`、`TimeMs`、`AxError`）。
-- 通路（2）不加依赖：子进程用 `std::process`，就绪用 `std::net::TcpStream` 上的一次 HTTP/1.0 请求，命令的那一行按 §8-9 的子集读，不引入 JSON 解析器与执行器（§12-15）。
-- 1b 选 **aws-lc-rs**（已在依赖图里，经 rustls 引入）：它在稳定接口上提供 ML-KEM-768、ML-DSA-44、X25519、Ed25519、HKDF 与 AES-GCM，是一个带 FIPS 验证历史的库，比拼接几个各自维护的 RustCrypto crate 少一个信任面。浏览器侧：X25519、Ed25519、HKDF、AES-GCM 用 WebCrypto；ML-KEM 与 ML-DSA 需要一个纯 JS 实现，用 `@noble/post-quantum`（MIT），信任口径见 §12-21；加入它要改 `tools/xtask/src/npm.rs` 的 `RUNTIME` 表，是一次门的改动，按 AGENTS.md 单独提交。
-- 互通向量（§8-12）不加依赖：十六进制的读写在测试里，不引入 JSON 解析器（§12-20）。
+- 通路（2）不加依赖：子进程用 `std::process`，就绪用 `std::net::TcpStream` 上的一次 HTTP/1.0 请求，命令的那一行按 §8-9 的子集读，不引入 JSON 解析器与执行器（D15）。
+- 1b 选 **aws-lc-rs**（已在依赖图里，经 rustls 引入）：它在稳定接口上提供 ML-KEM-768、ML-DSA-44、X25519、Ed25519、HKDF 与 AES-GCM，是一个带 FIPS 验证历史的库，比拼接几个各自维护的 RustCrypto crate 少一个信任面。浏览器侧：X25519、Ed25519、HKDF、AES-GCM 用 WebCrypto；ML-KEM 与 ML-DSA 需要一个纯 JS 实现，用 `@noble/post-quantum`（MIT），信任口径见 D21；加入它要改 `tools/xtask/src/npm.rs` 的 `RUNTIME` 表，是一次门的改动，按 AGENTS.md 单独提交。
+- 互通向量（§8-12）不加依赖：十六进制的读写在测试里，不引入 JSON 解析器（D20）。
 
-## 14 硬编码声明
+D21 浏览器一侧的 ML-KEM 与 ML-DSA 用 `@noble/post-quantum`，精确钉版本，只由远程页面懒加载；种子只在配对时显示一次（定规）。它是一个自审、未经独立审计的 0.x 库，而 Rust 一侧选 aws-lc-rs 的理由之一是它的 FIPS 验证历史，两侧的信任口径因此不同；接受它的条件是它的 ML-KEM-768 与 ML-DSA-44 过 §8-12 的向量与夹具。版本号只写在 `client/package.json`，`tools/xtask/src/npm.rs` 的 `RUNTIME` 表收它一项，两处都归客户端的那次改动。懒加载让没有打开远程页面的人不为它付字节。种子：页面在配对时把 52 个字符的种子给人看一次，不保存；两半密钥分开保存，Ed25519 那一半是 WebCrypto 的不可导出密钥（D1）。代价是重装 PWA 就要重新配对。落选的三种：把 aws-lc 或 RustCrypto 编成 wasm（两端同源，体积推断大一个数量级，aws-lc 编 wasm 未验证）；等浏览器原生支持 ML-KEM 与 ML-DSA（远程门推迟到不定的时候）；种子加密后存进 IndexedDB（页面持有种子，D1 的不可导出就不成立）。出现独立审计，或主流引擎的 WebCrypto 原生提供这两种算法时，重新考虑这一条。
+-/
+
+/-! ## 14 硬编码声明
 
 - 配对码 16 字节熵（128 位）、10 分钟到期：到期由装配层给出，本 crate 不写死它。
 - 设备名最长 64 个字符（`DeviceName::MAX_CHARS`）：够写「客厅的 iPad」，又不让一个名字撑坏设备列表。
@@ -411,17 +469,18 @@ fixture.txt           city_public, hello, x25519_private, ml_kem_private, reply,
 - `command` 通路交给命令的环境变量名是 `SPRAWLING_REMOTE_LOCAL`（`route::command::LOCAL_ENV`），与城给子进程的其他变量同一个前缀。
 - 互通向量里的种子、nonce、固定的 X25519 临时私钥与约定的明文是 `handshake::agreement::interop` 里的测试常量，只有这一处；它们改了，§8-12 的文件随之重生成。
 - 隧道名最长 64 个字符：`cloudflared` 的名字写进命令行，这个长度足够任何人起的名字。
+-/
 
-## 15 影响面
+/-! ## 15 影响面
 
 - 新增 crate `remote_access`：根 `Cargo.toml` 的 members、`ARCHITECTURE.md` §3 的 depmap、`architecture.toml` 的模块图与 family 表。
-- `crates/remote_access/spec/Door.lean` 由根 `lakefile.toml` 的 `Spec` 库按 glob 收进构建，不必登记。
-- 1a 没有调用方，产品二进制行为不变。
+- 本文件与 `spec/` 下的两个分部由根 `lakefile.toml` 的 `Spec` 库按 glob 收进构建，不必登记。
 - 通路缝登记在 ARCHITECTURE §4 的缝表，`architecture.toml` 的 family 表说本 crate 也持有通路。
 - 装配层（`bin::outside`，sprawling-SPEC 8-139、8-140）是唯一调用方，depmap 的 `sprawling` 一行带着本 crate。二维码的片段写法由装配层印、由客户端读，两边以 §8-6 为准；两条监听路径与上面的消息以 §8-10 为准。
 - `tools/fixtures/remote-handshake/`（§8-12）由本 crate 的测试写、由客户端的 TS 测试读：改 §8-3 的派生、§8-4 的标签与握手记录、§8-5 的 nonce 布局与负载首字节，这些文件随之重生成，客户端的测试须仍过。
+-/
 
-## 16 测试与约束
+/-! ## 16 测试与约束
 
 - `crates/remote_access/src/door/tests.rs`：§2 的七个场景，每个对应 Lean 模型的一组定理。
 - `crates/remote_access/src/pairing.rs` 内的测试：读回、RFC 4648 向量、两份熵两个码。
@@ -429,15 +488,19 @@ fixture.txt           city_public, hello, x25519_private, ml_kem_private, reply,
 - `crates/remote_access/src/keys.rs`、`crates/remote_access/src/seal.rs` 内的测试与 `crates/remote_access/src/handshake/tests.rs`：§2 对 keys、handshake、seal 的各条；每条验证步骤被故意拿掉时，对应测试转红。
 - `crates/remote_access/src/handshake/pairing/tests.rs`：§2 对配对握手的各条，每条对应 `Handshake.lean` 的一组定理；`crates/remote_access/src/route/tests.rs`：§2 对通路的各条，`command` 通路对一个脚本化子进程（Windows 上是 `cmd`，其余平台是 `sh`）答出的 `Opened` 与脚本化通路答出的相同。
 - `crates/remote_access/src/handshake/agreement/interop.rs`：§8-12 的五份文件各有一条读回测试，名字里带 `vector` 或 `fixture`；带 `GOLDEN_WRITE=1` 时按 §8-12 重写。
-- 约束：零 `unsafe`；门、配对码、密钥、握手与封装零 I/O，时间与熵从参数来，唯一例外是两种握手的临时密钥（§8-4、§8-6）；通路的 I/O 只经标准库（§12-14）。
+- 约束：零 `unsafe`；门、配对码、密钥、握手与封装零 I/O，时间与熵从参数来，唯一例外是两种握手的临时密钥（§8-4、§8-6）；通路的 I/O 只经标准库（D14）。
 - `crates/remote_access/spec/Handshake.lean`：配对握手的三条性质，由 `just models` 证明。它不驱动 Rust 代码；Rust 一侧与它对应的是 §2 里配对的各条。
 
-## 17 模型体验
+D11 与浏览器的互通只做组件级已知答案向量，加一条从 Rust 城到 JS 设备的单向夹具。城一侧的临时 X25519 与 ML-KEM 随机性在 aws-lc-rs 内部（§8-4），每次的回答都不同，两端都固定的整次握手向量做不出来。组件向量覆盖：同一个种子在两侧得到同样的两半公钥；两个方向的签名互验；HKDF 展开；给定密钥下的 AES-GCM 封装与 §8-5 的负载首字节。单向夹具：Rust 城对一个固定的设备 `Hello` 生成一次回答与第一帧密文，提交入库，JS 设备用同样固定的临时密钥解出约定的明文；协议改动时重新生成。落选的是两个运行时同时在线的跨进程测试：它让 `just check` 依赖 bun，还要先按 `xtask boundary` 判定它放在哪里。JS 设备发往 Rust 城的那一半，由组件向量与 Rust 设备端的测试间接覆盖。
+-/
 
-零字节：本 crate 不进任何 run 的上下文，城的居民不知道这扇门存在。
+/-! ## 17 文档关系
 
-## 18 文档同步
-
-- 1a：`ARCHITECTURE.md` §3 depmap、`architecture.toml`。
-- 互通向量：`tools/README.md` 的 fixtures 一行写明 `remote-handshake` 是什么、怎样重生成（§8-12）。
-- 装配落地时：`README.md` 与 `README.zh-CN.md` 的「它在哪里监听」一节（改写 §12-3 取代的那句话，照 §12-10 写明通路上剩下的那一件信任）、`docs/getting-started.md` 与中文版的「另一台机器」一节、`docs/operating.md`（`command` 通路包一层 `tailscale serve` 的示例照 §8-9）、`docs/glossary.md`（远程门、纪元、配对码、邀请、设备、通路、远程会话，并写明远程门与 Gate 的 door、远程会话与房间的 Session 不是一物）、kernel-SPEC §8-4 的事件表。
+- `ARCHITECTURE.md`：§3 的 `depmap` 块（`remote_access: kernel`，`sprawling` 一行带着本 crate）、§4 的缝表（`remote_access::route` 一行）、§10 规则 3（`route::command` 的读线程与 `bin::outside::listener` 的任务）。这些改了，重读本文件 §7 与 §8-7。
+- `architecture.toml`：本 crate 各行与 `[family.remote_access]`，锚点指向本文件或两个分部。新模块先在那里登记。
+- `docs/glossary.md`：远程门、纪元、配对码、邀请、设备、通路、远程会话，并写明远程门与 Gate 的 door、远程会话与房间的 Session 不是一物（§6）。§6 的词改了，两处一起改。
+- kernel-SPEC §8-76（设备表的路径）与 §8-81（远程门的五个事件）、wire-SPEC §19-2 的 `class` 列与 §8-66（中继与 `Refusal`）、sprawling-SPEC 8-139 与 8-140（门的看守、远程监听、控制台的 `/remote`）、`client/client-SPEC.md` §7（配对页的交互契约落地时写在那里，§3）。§8-1 的动词类、§8-5 的负载、§8-6 的邀请写法或 §8-10 的两条路径改了，重读这几节。
+- `tools/fixtures/remote-handshake/` 与 `tools/README.md` 的 fixtures 一行（§8-12）：客户端的互通测试读这些文件；§8-3 到 §8-5 的任何字节改了，文件重生成，客户端的测试须仍过。
+- `docs/operating.md` 里控制台 `/remote` 的那一段：控制台的动词以 sprawling-SPEC 8-140 为准。
+- 尚未写到的文档：`README.md` 与 `README.zh-CN.md` 的「它在哪里监听」一节仍是 D3 取代的那句「本仓库不附带隧道」，要照 D3 与 D10 写明通路上剩下的那一件信任；`docs/getting-started.md` 与中文版的「另一台机器」一节、`docs/operating.md` 里 `command` 通路包一层 `tailscale serve` 的示例（§8-9）都还没有写。中英两份在同一个提交里改。
+-/

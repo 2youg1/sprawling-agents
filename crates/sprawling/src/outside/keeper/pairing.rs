@@ -5,7 +5,7 @@
 
 //! A device's first connection, as the door keeper carries it out: the
 //! code the console mints, the city's half of the pairing handshake,
-//! and the claim that makes a device paired (remote_access-SPEC.md
+//! and the claim that makes a device paired (crates/remote_access/Spec.lean
 //! §8-6; sprawling-SPEC.md 8-139).
 
 use kernel::event::Who;
@@ -20,7 +20,7 @@ use remote_access::route::Opened;
 
 use super::{Doorway, closed, drawn, nonce};
 
-/// How long a pairing code waits for its device (remote_access-SPEC.md
+/// How long a pairing code waits for its device (crates/remote_access/Spec.lean
 /// §14): long enough to find the phone, short enough that a code
 /// photographed off a screen is stale by the time it is tried.
 const PAIRING_MS: u64 = 10 * 60 * 1000;
@@ -29,7 +29,7 @@ const PAIRING_MS: u64 = 10 * 60 * 1000;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Inviting {
     /// The address with the invitation in its fragment, which the QR
-    /// code carries (remote_access-SPEC.md §8-6).
+    /// code carries (crates/remote_access/Spec.lean §8-6).
     pub(crate) link: String,
     /// The code as a person reads it aloud: groups of five.
     pub(crate) shown: String,

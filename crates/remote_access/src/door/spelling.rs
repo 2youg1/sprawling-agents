@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How a device is written down: the text of its id and key, and the
-//! word for its authority (remote_access-SPEC.md §8-11).
+//! word for its authority (crates/remote_access/Spec.lean §8-11).
 //!
 //! The device table and the ledger lines both read these spellings, so
 //! they live beside the types they spell rather than in either reader.

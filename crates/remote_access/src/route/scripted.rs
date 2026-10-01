@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A route that answers a fixed address and starts nothing
-//! (remote_access-SPEC.md §8-7): the second implementation of the seam,
+//! (crates/remote_access/Spec.lean §8-7): the second implementation of the seam,
 //! for tests of whatever opens and closes routes. It records every call
 //! in the order it was made, so such a test can see that it opened the
 //! route before pairing and closed it when the door closed.

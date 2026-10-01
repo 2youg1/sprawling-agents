@@ -5,7 +5,7 @@
 
 //! The route seam: what makes the remote listener on this computer's
 //! loopback reachable from outside, and nothing more
-//! (remote_access-SPEC.md §8-7).
+//! (crates/remote_access/Spec.lean §8-7).
 //!
 //! A route carries bytes. The handshake authenticates keys pinned at
 //! pairing rather than an address, and every frame is sealed end to end,
@@ -33,7 +33,7 @@ mod tests;
 ///
 /// Both methods block: `open` until the route is ready or the patience
 /// its implementation was built with runs out. The caller runs them on a
-/// thread of its own (remote_access-SPEC.md §12-15).
+/// thread of its own (remote_access D15).
 pub trait Route {
     /// Opens the route to `local` and answers the address outside uses.
     /// A route that is already open is closed first.

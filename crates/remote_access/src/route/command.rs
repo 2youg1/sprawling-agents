@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A route that is a command the person wrote, run for as long as the
-//! route is open (remote_access-SPEC.md §8-9).
+//! route is open (crates/remote_access/Spec.lean §8-9).
 //!
 //! The command learns the loopback address from `SPRAWLING_REMOTE_LOCAL`
 //! and, once outside can reach it, prints one line

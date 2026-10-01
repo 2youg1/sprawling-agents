@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The vectors and the one-way fixture a browser must reproduce
-//! (remote_access-SPEC.md §8-12, §12-11), written into
+//! (crates/remote_access/Spec.lean §8-12, remote_access D11), written into
 //! `tools/fixtures/remote-handshake/` by this module and read back by it.
 //!
 //! Without `GOLDEN_WRITE=1` every test only reads and compares. With it,

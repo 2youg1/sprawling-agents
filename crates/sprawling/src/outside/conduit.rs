@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One remote session's frames, judged one at a time
-//! (sprawling-SPEC.md 8-139; remote_access-SPEC.md §8-5, §8-10).
+//! (sprawling-SPEC.md 8-139; crates/remote_access/Spec.lean §8-5, §8-10).
 //!
 //! A sealed payload from the device is opened, read by its first byte,
 //! and, when it is a wire frame, classed (`outside::verbs`) and judged by

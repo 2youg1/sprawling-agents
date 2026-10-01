@@ -5,7 +5,7 @@
 
 //! A paired device's every later connection, as the door keeper carries
 //! it out: the city's reply, the session it admits, and the authority
-//! each frame is judged against (remote_access-SPEC.md §8-4;
+//! each frame is judged against (crates/remote_access/Spec.lean §8-4;
 //! sprawling-SPEC.md 8-139).
 
 use kernel::event::Who;

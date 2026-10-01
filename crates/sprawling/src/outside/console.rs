@@ -8,7 +8,7 @@
 //!
 //! These verbs are not on the wire, so no frame - from a browser, a
 //! remote device or a tool a resident holds - can open the door or pair
-//! a device (remote_access-SPEC.md §12-4). The console reads the line
+//! a device (remote_access D4). The console reads the line
 //! here ([`parse`], pure) and carries it out here ([`carry`]), and what
 //! it prints is the whole answer: a refusal prints its three parts.
 //!

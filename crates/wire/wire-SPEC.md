@@ -1760,13 +1760,13 @@ pub enum ModelTag { /* …既有… */ Ocr }      // 线上 "ocr"
 pub(super) fn command_class(command: &wire::WireCommand) -> remote_access::door::VerbClass;   // 穷尽匹配，无通配臂
 ```
 
-- **`class` 是 §19-2 的一列，不是 wire 的一个方法。** 它说的是远程门放不放一帧进来，而远程门的权限与 `VerbClass` 归 `remote_access`（remote_access-SPEC §8-1）；本 crate 不依赖它，也不为它另立一个同值的枚举。中继在 `sprawling`，那里同时看得见两者（remote_access-SPEC §7）。
+- **`class` 是 §19-2 的一列，不是 wire 的一个方法。** 它说的是远程门放不放一帧进来，而远程门的权限与 `VerbClass` 归 `remote_access`（crates/remote_access/Spec.lean §8-1）；本 crate 不依赖它，也不为它另立一个同值的枚举。中继在 `sprawling`，那里同时看得见两者（crates/remote_access/Spec.lean §7）。
 - **表与匹配由门机器对照**：`xtask wiring` 读表的第三格与 `command_class` 的每一臂，表里缺格、读不成三个取值之一、或与匹配说法不一，都点名那一个动词（xtask-SPEC §8-45）。匹配是穷尽的，所以一个新 Command 在有人定下它的类之前编译不过。
 - 不改任何帧，不动 `WIRE_V`。
 
 ### 8-66 远程中继怎样用这条线
 
-- **设备说的是同一条线。** 远程会话里封装的每一帧文本（remote_access-SPEC §8-5 的 `Payload::Frame`）就是一帧 `ClientFrame` 或 `ServerFrame`；中继打开封装、按 §19-2 判类，放行的帧**原样**发给城自己在回环上的 `/ws`，不解析后再序列化。
+- **设备说的是同一条线。** 远程会话里封装的每一帧文本（crates/remote_access/Spec.lean §8-5 的 `Payload::Frame`）就是一帧 `ClientFrame` 或 `ServerFrame`；中继打开封装、按 §19-2 判类，放行的帧**原样**发给城自己在回环上的 `/ws`，不解析后再序列化。
 - **`Hello` 换成城自己的**：设备不知道、也不该知道城的配对令牌（§8-41）。中继把设备的 `Hello` 里的 `token` 换成城的令牌（没有就是空），`wire_v` 与 `schema` 照设备说的发，所以设备上的页面与城说不说同一版线，仍由 `server::decide_handshake` 判。
 - **拒绝是一帧 `Refusal`**：被门拒的帧不到城，中继封一帧 `ServerFrame::Refusal` 回给设备，码是 `E_GATE_DENIED`，恢复语说该在城自己的机器上做，或该重新配对为 `act`。读不成 `ClientFrame` 的文本同样封一帧 `E_WIRE_MISMATCH` 回去。
 - 城发来的每一帧都封好送回设备，事件、答复、增量一视同仁：一台 `Watch` 设备能读的就是这座城的整条线，这正是「看」的意思。
@@ -1840,7 +1840,7 @@ pub(super) fn command_class(command: &wire::WireCommand) -> remote_access::door:
 | `LocalOnly` | 放宽访问、够到凭证或城所在的宿主机、改变治理这座城的东西：接端点、选模型、建楼拆楼、写规则与配置、装东西、开文件管理器 | 恒不带进来，不论权限 |
 
 - **新加的 Command 一律 `LocalOnly`**，除非人决定一台不在电脑旁的设备可以做它。`Act` 与 `Read` 是一次决定，不是默认值；表里一行缺 `class` 格，`xtask wiring` 点名那一行。
-- `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门自己的动词（开门、配对、撤销）不在线上，表里没有它们（remote_access-SPEC §12-4）。
+- `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门自己的动词（开门、配对、撤销）不在线上，表里没有它们（remote_access D4）。
 - 这一列是权威，中继按它判，`xtask wiring` 把表与中继的穷尽匹配（`bin::outside::verbs::command_class`）逐行对照（§8-65）。
 
 **`client` 而尚未落地的三个**（`HandOff`／`PutShelved`／`BatchByBuilding`）今天由 `not_built` 作答，

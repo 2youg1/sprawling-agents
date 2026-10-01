@@ -10,7 +10,7 @@ Specifies `crates/remote_access/src/door.rs`, the state a city keeps about its r
 door: whether it is open and in which epoch, the pairing codes that are still
 live, the devices that were paired, and the sessions those devices hold. The
 Rust code is the authority on how these properties hold; this model is the
-authority on which properties must hold (remote_access-SPEC.md §8-1).
+authority on which properties must hold (crates/remote_access/Spec.lean §8-1).
 
 The door is independent of the route that makes it reachable (a Cloudflare
 named tunnel, or a command the person wrote). A route carries bytes and

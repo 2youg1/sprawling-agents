@@ -5,7 +5,7 @@
 
 //! The door's state: open or closed and in which epoch, the pairings
 //! still pending, the devices paired, and the sessions they hold
-//! (remote_access-SPEC.md §8-1).
+//! (crates/remote_access/Spec.lean §8-1).
 //!
 //! Specified by `crates/remote_access/spec/Door.lean`, which proves the six
 //! properties this module keeps: a closed door admits nothing, closing

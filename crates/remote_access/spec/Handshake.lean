@@ -6,7 +6,7 @@
 /-!
 # 配对握手：配对码只封给二维码钉住的那座城
 
-规定 `crates/remote_access/src/handshake/pairing.rs`，握手里配对的那一半（remote_access-SPEC.md §8-6）：
+规定 `crates/remote_access/src/handshake/pairing.rs`，握手里配对的那一半（crates/remote_access/Spec.lean §8-6）：
 一台还没配对的设备第一次连上城时，线上走哪几条消息，城在什么时候把一个配对码交给门去兑。
 Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。门自己的性质（码只兑
 一次、只在本纪元、只在到期之前，等等）在 `crates/remote_access/spec/Door.lean`，这里不重述：
@@ -26,7 +26,7 @@ Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性
   不是公理。
 * **A4 邀请不经通路**：城的指纹与配对码从控制台屏幕经二维码直接到设备，放在 URL 片段里，
   片段不随请求发出。模型里它们是设备状态的参数，从不来自 `Wire`。改写页面的通路能读到页面
-  读到的一切，那是 remote_access-SPEC.md §12-10 写下的边界，本模型不覆盖。
+  读到的一切，那是 remote_access D10 写下的边界，本模型不覆盖。
 
 三条性质，各一组定理：
 

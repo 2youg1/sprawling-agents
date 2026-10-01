@@ -8,7 +8,7 @@
 //! (sprawling-SPEC.md 8-139).
 //!
 //! It answers two WebSocket paths. [`PAIR_PATH`] carries one pairing
-//! handshake and ends (remote_access-SPEC.md §8-6). [`SESSION_PATH`]
+//! handshake and ends (crates/remote_access/Spec.lean §8-6). [`SESSION_PATH`]
 //! carries a session handshake, then relays: each sealed frame from the
 //! device is judged by the conduit and, when the door permits it, sent
 //! to the city's own `/ws` on this machine as a client would send it;
