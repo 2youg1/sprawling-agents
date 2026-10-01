@@ -807,7 +807,13 @@ impl Window<'_> {
 ### 8-20 工作台的两件读外来字节的工具：`ocr` 与 `transcribe`（`accounting::worker::workbench::tools::ocr`、`…::tools::transcribe`，形状 4 适配器；sprawling-SPEC 8-131、8-142）
 
 ```rust
-// accounting::worker::workbench::tools（登记）
+// accounting::worker::workbench::tools::endpoints（登记里的一段）
+impl Laying {
+    // 造一个 BoundReader，按序交回这座楼可用的 `transcribe` 与 `ocr`；lay_out_workbench 把它们接在按用途加的工具之后。
+    pub(super) fn endpoint_tools(&self, site: &Site, bound: &runtime::ReadBound)
+        -> Result<Vec<Box<dyn kernel::Tool>>, AxError>;
+}
+// accounting::worker::workbench::tools::{transcribe, ocr}
 impl Laying {
     pub(super) fn transcription_tool(&self, site: &Site, reader: runtime::BoundReader)
         -> Result<Option<TranscribeTool>, AxError>;
@@ -819,7 +825,7 @@ pub(super) struct OcrTool { /* reader、policy、recogniser: Mutex<Recogniser>�
 // 两件都是 kernel::Tool；参数 `{ path }`；答 `{ path, text }`
 ```
 
-- **两件工具读字节只经 `runtime::BoundReader`**（runtime-SPEC §8-59）。`lay_out_workbench` 用交给 `read` 与 `search` 的同一个 `ReadBound`、同一个 run 的树根与城的块仓造一个 `BoundReader`，克隆给两件工具。本 crate 不判路径：`Address::is_within`、`Address::is_reserved` 与 `storage::WriteTarget::within` 曾在 `transcribe` 里替这扇门判，门落地后删去。
+- **两件工具读字节只经 `runtime::BoundReader`**（runtime-SPEC §8-59）。`endpoint_tools` 用交给 `read` 与 `search` 的同一个 `ReadBound`、同一个 run 的树根与城的块仓造一个 `BoundReader`，克隆给两件工具；它是工作台登记里自成一段的一步，因为这两件工具共用这一扇门，而 `lay_out_workbench` 已在函数与文件的长度上限边上。本 crate 不判路径：`Address::is_within`、`Address::is_reserved` 与 `storage::WriteTarget::within` 曾在 `transcribe` 里替这扇门判，门落地后删去。
 - **有没有这件工具，是一次 `select`。** `transcribe` 读 `ModelTag::Transcribe`，`ocr` 读 `ModelTag::Ocr`，都按 run 所在那座楼的楼规（`site.rules.policy()`）问端点账本；拒了，工具不上表。设施由 gateway 造：`gateway::transcriber_for` 与 `gateway::recogniser_for`，后者带上 `credentials::dialect_headers` 给这个 face 的头，与主模型的适配器同一张。
 - **容器的认法：** 图按 `runtime::pipeline::connector::png_picture` 认（读界判过的字节整份读进来，再交它），录音按 `Named` 分：文件看扩展名（`gateway::AudioType::of_file_name`，`file:` Locator 也是文件），块看开头的字节（`gateway::Recording::read_unlabelled`）。
 - **`ocr` 的设施在一把锁后面**，理由同 `transcribe`：凭据解析器是 `Send` 而不是 `Sync`，`recognise` 又要 `&mut`；同一个 run 的两次 OCR 轮流进行。
