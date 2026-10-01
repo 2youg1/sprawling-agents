@@ -204,7 +204,7 @@ MemLedger 的 append 是 from_draft→canonical_line→chain_hash 推进；无�
 | D6 | 评估仪器住在 citysim，不另立 crate | 本文件 §7 |
 | D7 | 场景只在回合边界取消 | `tools/citysim/spec/Executor.lean`，`answer_at` 之上 |
 | D8 | 读数带着它所量字节的摘要，登记的夹具钉住这个摘要 | `tools/citysim/spec/Bench.lean`，`bench` 之上 |
-| D9 | 被量的产品 feature 集只写在 justfile 一处 | `tools/citysim/spec/Bench.lean` §8-6 |
+| D9 | 被量的产品 feature 集就是 `sprawling` 包的默认 feature | `tools/citysim/spec/Bench.lean` §8-6 |
 | D10 | 长回合的门是请求窗口的逐步增量，RSS 只作读数 | `tools/citysim/spec/LongTurn.lean` |
 | D11 | 进程外的替身 provider 是 citysim 的一个二进制，脚本就是 `ScriptModel` 的那种线上 JSON，按 run 分开作答 | `tools/citysim/spec/WireScript.lean`，`Replay` 之上 |
 | D13 | `large_worktree_placement` 量的是领树，备树在计时之外 | `tools/citysim/spec/Bench.lean` §8-12 |
@@ -256,7 +256,7 @@ kernel（features=["conformance"]）、storage（对拍与夹具）、runtime（
 - `architecture.toml` 的模块图：citysim 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - ARCHITECTURE.md §3（citysim 在产品图之外、驱动回合循环的第二个 Main）、§10（确定性七条）、§11 的 V6 一行（citysim 的场景数由 `cargo xtask docnum` 管）。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
-- `justfile` 的 `sim`、`bench`、`bench-startup`、`mem`、`provider`、`acceptance` 配方与变量 `product_features`（D9）。
+- `justfile` 的 `sim`、`bench`、`bench-startup`、`mem`、`provider`、`acceptance` 配方，与 `crates/sprawling/Cargo.toml` 的默认 feature（D9）。
 - adversary 的规格：`tools/adversary/Spec.lean` D3、D6、D7 与 `tools/adversary/spec/Acceptance.lean` 依靠替身的脚本格式与放置规则（§3 未决的第一条）。
 - runtime 的规格（`crates/runtime/Spec.lean`）：驱动器、回合、`SafePoint` 与 `verify_lines`；它们改了，`spec/Executor.lean` 与 `spec/MemLedger.lean` 一起重看。
 - 增一个场景、测量或仪器时，本规格同一变更集增一节（在规定它的模块的分部里）；夹具更新须与 storage、kernel 的字节规范同一变更集。
