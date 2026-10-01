@@ -170,7 +170,7 @@ A command you write. The city starts it with the loopback address in `SPRAWLING_
 [remote]
 route = "command"
 command = "sh"
-args = ["/home/me/tailscale-route.sh"]
+args = ["/path/to/tailscale-route.sh"]
 permanence = "fixed"
 ```
 

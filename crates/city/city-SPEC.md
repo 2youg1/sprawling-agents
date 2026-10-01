@@ -1148,7 +1148,7 @@ url = "https://city.example.org"    # 隧道的 DNS 路由指向的主机
 [remote]
 route = "command"
 command = "sh"
-args = ["/home/me/tailscale-route.sh"]
+args = ["/path/to/tailscale-route.sh"]
 permanence = "fixed"                # "fixed" | "per_start"
 ```
 
