@@ -1,4 +1,3 @@
-/target
 # What `zig test` and `zig build-lib` leave beside the sources when run
 # without a cache directory of their own.
 /ffi/.zig-cache

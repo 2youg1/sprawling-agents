@@ -16,7 +16,7 @@ use std::process::ExitCode;
 
 /// Serves until the caller closes this process's input.
 pub(super) fn verb(scope: Option<&str>) -> ExitCode {
-    match sprawling_desktop::serve_stdio(scope.map(Path::new)) {
+    match ::desktop::serve_stdio(scope.map(Path::new)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
             // stdout belongs to the protocol, so the one line a caller's

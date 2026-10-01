@@ -1,0 +1,58 @@
+[package]
+name = "sprawling-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "An MCP server that gives an agent eyes and hands on this Windows desktop."
+
+[lib]
+name = "desktop"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+# An image crosses this wire base64-encoded, as it does on both
+# provider wires in the workspace.
+base64 = { workspace = true }
+# The three encoders `desktop.screenshot` names, and nothing
+# else — no decoders, no other formats. `webp` here is the lossless
+# encoder, which is why `quality` does not reach it (desktop-SPEC.md §14).
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+
+[target.'cfg(windows)'.dependencies]
+# The seam: enumeration, capture, the clipboard and DPI awareness, the
+# four call groups with no admitted safe interface (desktop-SPEC.md
+# sections 8-11 and 8-12).
+desktop_ffi = { workspace = true }
+# The constants the safe calls read, the `HWND` UI Automation is handed,
+# and the error type a Win32 failure is told in. No function of this
+# binding is called, so no namespace that exists only to call one is
+# switched on.
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_UI_HiDpi",
+    "Win32_UI_WindowsAndMessaging",
+] }
+winsafe = { workspace = true }
+# The UI Automation tree, read through safe calls (desktop-SPEC.md
+# section 12.10). Its `control` default adds control matching, and its
+# other features add screenshots and the clipboard, which this package
+# does elsewhere or not at all, so they stay off. `input` stays on only
+# because the crate's core module does not compile without it.
+uiautomation = { version = "0.25.1", default-features = false, features = ["input"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+# The window a contract test opens and reads back: the seam's fixture,
+# which holds the `unsafe` that opening a window costs, so this package
+# holds none even in its tests (desktop-SPEC.md section 12.14).
+[target.'cfg(windows)'.dev-dependencies]
+desktop_ffi = { workspace = true, features = ["fixture"] }
+
+[lints]
+workspace = true

@@ -7,7 +7,7 @@
 //! admitted safe interface, carried out by a Zig leaf behind a
 //! `(ptr, len)` boundary and offered to the server as safe functions
 //! (desktop-SPEC.md sections 8-12 and 12.12; the boundary's properties
-//! are proved in `desktop/ffi/Spec.lean`).
+//! are proved in `crates/desktop/ffi/Spec.lean`).
 //!
 //! Every `unsafe` in the desktop server's production code is one call
 //! into the leaf, here, with the precondition that makes it sound
@@ -27,6 +27,8 @@ pub mod clipboard;
 pub mod dpi;
 #[cfg(windows)]
 pub mod ended;
+#[cfg(all(windows, feature = "fixture"))]
+pub mod fixture;
 #[cfg(windows)]
 mod leaf;
 #[cfg(all(windows, test))]

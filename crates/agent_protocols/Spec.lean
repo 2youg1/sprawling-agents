@@ -399,7 +399,7 @@ D15 请求行与 id 是本 crate 的契约，不是序列化器的：行由 `for
 
 /-! ## 15 影响面
 
-改 `Outbound`、`McpLink` 或 `tools_from` 的签名，波及 `crates/accounting` 的 `accounting::worker::mcp`、`accounting::worker::workbench::servers` 与 `views::mcp_health`；改 `Incoming`／`admit` 波及入站路由与 `wire::auth` 的配对比对；改 `Harness`、`HarnessProcess`、`AcpSession`、`Listener` 或 `Lines` 波及 `accounting::worker::driving::harness` 与它的测试（`agent_protocols::Lines` 是它们扮演 agent 时读内存管道的门）；改 `PROTOCOL_VERSION` 或 `EFFECT_META_KEY` 波及 `desktop/` 的抄本。改分部里的模型，先改本文件对应的要求，再改 Rust 与它的测试。
+改 `Outbound`、`McpLink` 或 `tools_from` 的签名，波及 `crates/accounting` 的 `accounting::worker::mcp`、`accounting::worker::workbench::servers` 与 `views::mcp_health`；改 `Incoming`／`admit` 波及入站路由与 `wire::auth` 的配对比对；改 `Harness`、`HarnessProcess`、`AcpSession`、`Listener` 或 `Lines` 波及 `accounting::worker::driving::harness` 与它的测试（`agent_protocols::Lines` 是它们扮演 agent 时读内存管道的门）；改 `PROTOCOL_VERSION` 或 `EFFECT_META_KEY` 波及 `crates/desktop/` 的抄本。改分部里的模型，先改本文件对应的要求，再改 Rust 与它的测试。
 -/
 
 /-! ## 16 测试与约束
@@ -418,6 +418,6 @@ D15 请求行与 id 是本 crate 的契约，不是序列化器的：行由 `for
 - `ARCHITECTURE.md` §4 缝清单（`Outbound` 一行）、§10 规则 3（库 crate 起线程的地方：`mcp::reading` 与 `mcp::sse` 的读端）与模块表的 agent_protocols 各行（`architecture.toml`，锚点指向本文件与分部）。这些改了，重读本文件 §7、§8-15 与 §8-19。
 - `docs/third-party.md` §1（ACP schema 与 registry 被看的路径）与服务外挂的边界：上游改了线或包名，重读 §5 与 §8-19。
 - kernel-SPEC §8-23（`ServerLabel`、`TimeoutMs`）、gateway-SPEC §8-5（订阅额度经 harness 进城）、runtime-SPEC 8-27-10（窗口怎么装工具答复）与 §8-52（harness run 写的行）、sprawling-SPEC §8-4d（桌面经 stdio 接进来）、§8-4e 与 §8-124（harness run 与它的派活路径）、wire-SPEC 的配对中间件。这些节改了，重读本文件对应的条目。
-- `desktop/desktop-SPEC.md` §4 与 `desktop/src/refusal.rs`：`isError` 与 `_meta` 的读法（§8-1c），以及本 crate 对外给出的 `EFFECT_META_KEY` 与 `PROTOCOL_VERSION`。
+- `crates/desktop/desktop-SPEC.md` §4 与 `crates/desktop/src/refusal.rs`：`isError` 与 `_meta` 的读法（§8-1c），以及本 crate 对外给出的 `EFFECT_META_KEY` 与 `PROTOCOL_VERSION`。
 - `tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]` 与 `[prepare_dispatch_ms]`：上限的推导与常驻连接省下的时间。
 -/

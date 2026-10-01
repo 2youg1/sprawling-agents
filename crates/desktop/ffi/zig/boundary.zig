@@ -12,7 +12,7 @@
 // written with exactly one terminator into a block of exactly that size,
 // and a bitmap measured in bytes without overflow. They touch no Win32
 // call, so they are judged three ways without a desktop: the theorems of
-// `desktop/ffi/Spec.lean`, the tests below, and the Rust reference the
+// `crates/desktop/ffi/Spec.lean`, the tests below, and the Rust reference the
 // equivalence check and the fuzz target compare them with.
 
 const std = @import("std");
@@ -134,7 +134,7 @@ test "a bitmap's bytes are refused for a side that is not positive or a product 
     try testing.expectEqual(@as(?usize, null), blockBytes(std.math.maxInt(usize)));
 }
 
-/// The properties `desktop/ffi/Spec.lean` proves of the copy, asked of
+/// The properties `crates/desktop/ffi/Spec.lean` proves of the copy, asked of
 /// one input: what is written is the block's text and fits the room,
 /// and a room as long as the answer always suffices.
 fn copyHolds(block: []const u16, capacity: usize) !void {

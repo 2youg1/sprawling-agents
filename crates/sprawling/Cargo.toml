@@ -37,9 +37,8 @@ tokio-tungstenite = { workspace = true }
 thread-priority = "3.1"
 # The desktop server this binary runs as `sprawling desktop`, a child
 # the city starts for a building whose rules ask for the desktop
-# (sprawling-SPEC.md 8-4d). A path to the package outside the
-# workspace, which keeps its own lint table for the Win32 boundary.
-sprawling-desktop = { workspace = true }
+# (sprawling-SPEC.md 8-4d).
+desktop = { workspace = true }
 
 # The peak memory a command `sprawling gauge` measured reached, read
 # after it exits and before its handle closes (sprawling-SPEC.md 8-129-4).

@@ -204,56 +204,23 @@ mod tests {
     /// the GDI objects it held before: every context and bitmap a capture
     /// takes goes back the way it came. A leak here would show as a later
     /// capture failing on a machine where nothing changed.
-    #[expect(unsafe_code, reason = "test code creates the window it captures")]
     #[test]
     fn capturing_a_window_gives_back_every_gdi_object_it_took() {
-        use windows::Win32::System::Threading::{
-            GR_GDIOBJECTS, GetCurrentProcess, GetGuiResources,
+        let title = format!("sprawling contract gdi {}", std::process::id());
+        let opened = super::super::fixture::Opened::at(&title, -20_000, -20_000, None);
+        let captured = opened.handle();
+        let held = || {
+            winsafe::HPROCESS::GetCurrentProcess()
+                .GetGuiResources(winsafe::co::GR::GDIOBJECTS)
+                .unwrap()
         };
-        use windows::Win32::UI::WindowsAndMessaging::{
-            CreateWindowExW, DestroyWindow, WINDOW_EX_STYLE, WS_POPUP,
-        };
-        use windows::core::{PCWSTR, w};
-
-        // SAFETY: `STATIC` is a class every process has registered, the
-        // name is a null pointer the call accepts for "no title", and no
-        // parent, menu, instance or creation data is lent to it.
-        let handle = unsafe {
-            CreateWindowExW(
-                WINDOW_EX_STYLE(0),
-                w!("STATIC"),
-                PCWSTR::null(),
-                WS_POPUP,
-                0,
-                0,
-                64,
-                64,
-                None,
-                None,
-                None,
-                None,
-            )
-        }
-        .unwrap();
-        let bounds = Bounds::from_corners(0, 0, 64, 64).unwrap();
-        // SAFETY: `handle` is the window created above on this thread,
-        // and `winsafe::HWND` neither dereferences nor closes what it
-        // wraps; the window is destroyed below, after the last capture.
-        let captured = unsafe { winsafe::HWND::from_ptr(handle.0) };
-        // SAFETY: the pseudo-handle of this process is always valid for
-        // the process that asks, and the call only reads a counter.
-        let held = || unsafe { GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS) };
         // One capture first, so what GDI allocates once per process is
         // not counted as a leak.
-        let _first = window(&captured, bounds);
+        let _first = window(&captured, opened.bounds());
         let before = held();
         for _attempt in 0..200 {
-            let _captured = window(&captured, bounds);
+            let _captured = window(&captured, opened.bounds());
         }
-        let after = held();
-        // SAFETY: `handle` is the window this test created above on this
-        // thread and has not destroyed.
-        unsafe { DestroyWindow(handle) }.unwrap();
-        assert_eq!(after, before);
+        assert_eq!(held(), before);
     }
 }

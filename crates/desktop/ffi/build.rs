@@ -83,7 +83,7 @@ fn rendered() -> String {
 fn pinned_zig(pinned: &str) -> Result<(), String> {
     let install = format!(
         "install Zig {pinned} (`winget install --id zig.zig -e --version {pinned}`), which \
-         builds desktop/ffi's leaf; `sprawling doctor` lists it with the other tools"
+         builds crates/desktop/ffi's leaf; `sprawling doctor` lists it with the other tools"
     );
     let asked = Command::new("zig")
         .arg("version")

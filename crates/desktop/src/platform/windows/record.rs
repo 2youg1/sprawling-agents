@@ -280,10 +280,6 @@ mod tests {
 
     /// A window with a handle no recording thread can draw from, which
     /// is what makes these tests about the bookkeeping alone.
-    #[expect(
-        unsafe_code,
-        reason = "test code names windows that do not exist by made-up handles"
-    )]
     fn window(title: &str, handle: usize) -> Window {
         Window {
             named: Named {
@@ -291,11 +287,10 @@ mod tests {
                 process: "test.exe".to_owned(),
             },
             bounds: super::super::geometry::Bounds::from_corners(0, 0, 32, 32).unwrap(),
-            // SAFETY: `winsafe::HWND` neither dereferences nor closes what
-            // it wraps, and the one call that hands this made-up handle to
-            // Win32, the recording thread's capture, refuses it as a
-            // window that does not exist.
-            handle: unsafe { winsafe::HWND::from_ptr(std::ptr::without_provenance_mut(handle)) },
+            // The one call that hands this made-up handle to Win32, the
+            // recording thread's capture, refuses it as a window that does
+            // not exist.
+            handle: desktop_ffi::fixture::made_up(handle),
         }
     }
 

@@ -151,7 +151,7 @@ impl Missing {
 /// `WindowsJobObject` is the arm a Windows machine with a job-object
 /// enforcer compiled in would report. No build of this crate constructs
 /// one, because `CreateJobObject` is a foreign call the workspace
-/// forbids outside `desktop/`; a Windows machine therefore reports
+/// forbids outside `crates/desktop/`; a Windows machine therefore reports
 /// [`Confinement::CopiedTree`], whose [`Assurances`] say what it does
 /// not hold (the network, above all) rather than implying it holds
 /// everything a job object would.

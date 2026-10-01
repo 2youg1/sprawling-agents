@@ -149,28 +149,28 @@ impl Laying {
 pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 ```
 
-- **同一个二进制，另一个进程**：规则要桌面时，`servers` 给这栋楼添一条 stdio 声明：`command` 是正在运行的这个可执行文件，`args` 是 `["desktop", <这栋楼的 DESKTOP.toml>]`（`city::desktop_scope_path`，住城根下这栋楼的保留子树，评审楼的 worktree 里没有它）。之后它与任何一条 `[[mcp]]` 走同一条路：经 `accounting::Connectors` 连上、握手、list，常驻连接表管它的寿命（§8-4）。子进程这条边界是故意留的：UI Automation 的 COM 状态、`SendInput` 与 `desktop/` 里那些带 `SAFETY:` 的 `unsafe` 都跑在子进程里，城那个唯一写者的进程里一行也不跑；COM 出错或子进程 abort，结束的是子进程，城只在那一次调用上拿到 `E_TIMEOUT` 或 `E_TOOL_UNAVAILABLE`；两者都发生在请求交出之后，所以都带 `Retry::Unknown`（`crates/agent_protocols/Spec.lean` §8-17）。桌面自己的拒绝以 `isError` 结果到达，城把它读成一次失败，拒词全文进 subject（`crates/agent_protocols/Spec.lean` §8-1c）。MCP 这条路上已有的规矩一条不改：工具表随 run 冻结，`kernel::gate::undoable` 按远端名前缀 `desktop.` 升给人，期限到即杀子进程。
+- **同一个二进制，另一个进程**：规则要桌面时，`servers` 给这栋楼添一条 stdio 声明：`command` 是正在运行的这个可执行文件，`args` 是 `["desktop", <这栋楼的 DESKTOP.toml>]`（`city::desktop_scope_path`，住城根下这栋楼的保留子树，评审楼的 worktree 里没有它）。之后它与任何一条 `[[mcp]]` 走同一条路：经 `accounting::Connectors` 连上、握手、list，常驻连接表管它的寿命（§8-4）。子进程这条边界是故意留的：UI Automation 的 COM 状态、`SendInput` 与 `crates/desktop/` 里那些带 `SAFETY:` 的 `unsafe` 都跑在子进程里，城那个唯一写者的进程里一行也不跑；COM 出错或子进程 abort，结束的是子进程，城只在那一次调用上拿到 `E_TIMEOUT` 或 `E_TOOL_UNAVAILABLE`；两者都发生在请求交出之后，所以都带 `Retry::Unknown`（`crates/agent_protocols/Spec.lean` §8-17）。桌面自己的拒绝以 `isError` 结果到达，城把它读成一次失败，拒词全文进 subject（`crates/agent_protocols/Spec.lean` §8-1c）。MCP 这条路上已有的规矩一条不改：工具表随 run 冻结，`kernel::gate::undoable` 按远端名前缀 `desktop.` 升给人，期限到即杀子进程。
 - **程序路径是收下的，不是问出来的**：`RunWorker` 持一个 `DesktopProgram`，生产交 `std::env::current_exe`，测试交 `CARGO_BIN_EXE_sprawling`。理由与 `Browsers`（§8-45-2）相同：它在主机上起一个程序。问不出路径或路径不是 UTF-8 时，这栋楼这一次没有桌面工具，诊断里留一条 `Refuse`，派活照常。这与起不来的 `[[mcp]]` server 是同一个答法。
 - **楼自己写了 `label = "desktop"` 的 `[[mcp]]`，就用它那一条**：两台 server 用一个标签，同一个工具名就指向两个进程（city 对同层重名的拒绝是同一个理由）。人明写的那一条优先，自带的这台不起，诊断里留一条 `Decide`（诊断的级别里没有「提醒」一级，`Decide` 说的正是一个判定为什么取了这个值）：要用自带的，删掉那一行。
 - **装配层不按平台分支**：非 Windows 的机器上这台 server 照样起，每次调用答 `E_TOOL_UNAVAILABLE` 并报出平台名（desktop-SPEC §8.5 第四对）。在这里再判一次平台，这条规则就有了第二个家。
 - **confidential 楼够不着它**：`city::policy` 解析时就拒绝 `confidential` 与 `desktop` 同真，`mcp_tools` 对 confidential 楼也不起任何进程。这里不判第三次。
-- **体积**：把 `desktop/` 链进来使 release 二进制变大多少，读数只记在 `tools/xtask/budgets.toml` 的 `[release_binary]`。增量来自 `desktop/` 自己的代码、`image` 的编码器与 `windows` 绑定；std、serde_json、toml、png 两边共用，只算一份。
+- **体积**：把 `crates/desktop/` 链进来使 release 二进制变大多少，读数只记在 `tools/xtask/budgets.toml` 的 `[release_binary]`。增量来自 `crates/desktop/` 自己的代码、`image` 的编码器与 `windows` 绑定；std、serde_json、toml、png 两边共用，只算一份。
 - **不内置任何模型（定规）**：桌面给模型的文字反馈先取 accessibility tree；OCR 与 ASR 都经人接入的端点，二进制里不带任何模型的权重。desktop-SPEC §15.2 记着这条线后面还欠的东西。
-- **被否的两条路**：①照旧另发一个 `sprawling-desktop` 可执行文件，由人放上搜索路径再手写 `[[mcp]]`：一件功能成了两个制品，版本要对齐，人还得知道那一行怎么写；②把单独编出的桌面可执行文件的字节嵌进本二进制，运行时写到盘上再起：运行时往盘上写可执行文件，std 也多带一份。**重开参数**：`desktop/` 使 release 二进制增大超过 1 MiB（`[release_binary]` 的 slack），就回到第一条路重新比较。
+- **被否的两条路**：①照旧另发一个 `sprawling-desktop` 可执行文件，由人放上搜索路径再手写 `[[mcp]]`：一件功能成了两个制品，版本要对齐，人还得知道那一行怎么写；②把单独编出的桌面可执行文件的字节嵌进本二进制，运行时写到盘上再起：运行时往盘上写可执行文件，std 也多带一份。**重开参数**：`crates/desktop/` 使 release 二进制增大超过 1 MiB（`[release_binary]` 的 slack），就回到第一条路重新比较。
 
 **验收**：`crates/sprawling/tests/desktop.rs` 的 `a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary`。一栋楼的 `RULES.toml` 写 `desktop = true`，没有任何 `[[mcp]]`，城起真的 `sprawling desktop` 子进程，模型收到的工具表里有 `desktop_desktop_windows` 等六件。
 
 ## 8-146 Windows 上构建这个二进制要有 Zig（`bin::doctor::table::toolchain` 的 `zig` 一行）
 
-`sprawling` 按路径链接 `desktop/`，`desktop/` 在 Windows 上链接它的 FFI 缝 `desktop/ffi`，而那个包的构建脚本用 `zig build-lib` 编一片 Zig 叶子（desktop-SPEC §8-12）。所以 Windows 上编这个二进制、跑 `just check` 都要一个 Zig，且是 `desktop/ffi/zig-version` 钉住的那一版。
+`sprawling` 按路径链接 `crates/desktop/`，`crates/desktop/` 在 Windows 上链接它的 FFI 缝 `crates/desktop/ffi`，而那个包的构建脚本用 `zig build-lib` 编一片 Zig 叶子（desktop-SPEC §8-12）。所以 Windows 上编这个二进制、跑 `just check` 都要一个 Zig，且是 `crates/desktop/ffi/zig-version` 钉住的那一版。
 
 ```rust
 // bin::doctor::table::toolchain（形状 6 数据）
 pub(super) const ZIG: Requirement;   // develop 层，Required；探测 `zig version` 以钉子开头的一行
-const ZIG_PIN: &str = include_str!("../../../../../desktop/ffi/zig-version").trim_ascii_end();
+const ZIG_PIN: &str = include_str!("../../../../desktop/ffi/zig-version").trim_ascii_end();
 ```
 
-- **钉子只在一处**：`ZIG_PIN` 是 `desktop/ffi/zig-version` 的 `include_str!`，与 `LEAN_PIN` 读 `lean-toolchain` 同一种写法（8-58）；探测是 `zig version` 的输出以钉子开头，Windows 的装法是 `winget install --id zig.zig -e --version <钉子> --scope user`，macOS 是 `brew install zig`，Linux 印出官方下载页。构建脚本与 CI 的安装步骤读同一个文件。
+- **钉子只在一处**：`ZIG_PIN` 是 `crates/desktop/ffi/zig-version` 的 `include_str!`，与 `LEAN_PIN` 读 `lean-toolchain` 同一种写法（8-58）；探测是 `zig version` 的输出以钉子开头，Windows 的装法是 `winget install --id zig.zig -e --version <钉子> --scope user`，macOS 是 `brew install zig`，Linux 印出官方下载页。构建脚本与 CI 的安装步骤读同一个文件。
 - **`Required` 而不是 `Optional`**：Windows 上没有它，`just check` 编不出这个二进制；在别的平台上 Zig 叶子不编，有它也不多花什么，而 `Need` 不按平台分（8-58），两害取其轻是把它列为必需。
 - **位置**：表里 `lean` 之后、`uv` 之前：它与 Rust、Lean 同属编译这份代码要的工具，装法不依赖表里更早的任何一行。
 
@@ -1124,7 +1124,7 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **Lean 是开发这份代码必需的工具**（§8-58）。各 crate 的规格正从 `<crate>-SPEC.md` 迁成 `Spec.lean`（ARCHITECTURE.md §11「Specifications in Lean」），`just check` 里的 `models` 一步是这些规格在本地被证明过的唯一证据。Lean 列为可选时，没装 Lean 的机器上 `models` 静默通过，本地的绿就不再说明规格被证明过，只有 CI 知道。所以 `elan` 与 `lean` 两行是 `required`：缺了它们，`just prereqs` 在编译之前报出来并给出装法，`just models` 自己也报错而不是跳过。被否决的备选：保持可选、只靠 CI 的 `models` job 证明——那样每次本地验证都得另外说明「规格没有证过」，而这句话没有哪道门会替人说。
 
-**Zig 是在 Windows 上开发这份代码必需的工具**（8-146）。桌面 server 没有准入安全接口的四组 Win32 调用经一片 Zig 叶子（desktop-SPEC §12.12），叶子在构建时编译，所以 Windows 上没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
+**Zig 是在 Windows 上开发这份代码必需的工具**（8-146）。桌面 server 没有准入安全接口的四组 Win32 调用经一片 Zig 叶子（desktop-SPEC §12.12），叶子在构建时编译，所以 Windows 上没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `crates/desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
 
 **崩溃验收在盘上造死亡，不在进程里杀**（8-127）。一次 run 真跑完，丢掉 worker 释放写者锁，再把账截在一行的半途、删去其后的行；重开走 `RunWorker::new` 与 `startup_scan`，与 `sprawling resume` 同一条路。理由：被杀的进程留在盘上的就是这样一份账——锁已释放，最后一行写了一半——而盘上的截法可以精确指定死在哪一行的哪一个字节，每次重跑都是同一次死亡。被否：①起真二进制再杀掉它——那是从外面进城的检查，按边界规则归 `tools/adversary/` 的 Lean 黑盒（G1e），而且杀在哪一刻取决于调度，失败不能逐字节重演；②把账本放在 `storage` 的故障文件系统上断电——它只承载账本，`Standing::fold` 与视图读真目录，重开的不是一座完整的城，断电的耐久契约已由 storage 自己的测试证过。重开参数：账本之外的文件（检查点、快照、CAS）也要在一次死亡里与账本错开时，验收要能在同一刻截断它们，那时改为在 `Vfs` 缝之上承载整座城。
 
@@ -2844,7 +2844,7 @@ fn knock(&mut self, signal: &Signal, speaker: &Address, mode, chain: &KnockChain
 
 ## 8-47 六处探测收成一处：doctor 是「运行中的机器有什么」的唯一权威（`bin::doctor::host`、`bin::doctor::presence`）
 
-**原因**：运行中的机器被问了六次，每次一套读法——`SPRAWLING_PYTHON_WASM` 在 `accounting::worker::mcp` 与 `doctor::table` 各拼一次（§8-40 记下的债）；`host_shell()` 与 `execution_engine()` 住 `accounting::worker::workbench::engine`；Firefox 与 `chromedriver` 由 `bin::browser_bidi::lazy` 按名字盲起（Windows 上 Firefox 不在 PATH，于是 doctor 说「有」而浏览器工具说「没有」）；`ffmpeg` 在 `desktop/` 里按名字起。六个答案各自漂，一个人看到的「缺什么」与 run 撞上的「缺什么」不是同一份。
+**原因**：运行中的机器被问了六次，每次一套读法——`SPRAWLING_PYTHON_WASM` 在 `accounting::worker::mcp` 与 `doctor::table` 各拼一次（§8-40 记下的债）；`host_shell()` 与 `execution_engine()` 住 `accounting::worker::workbench::engine`；Firefox 与 `chromedriver` 由 `bin::browser_bidi::lazy` 按名字盲起（Windows 上 Firefox 不在 PATH，于是 doctor 说「有」而浏览器工具说「没有」）；`ffmpeg` 在 `crates/desktop/` 里按名字起。六个答案各自漂，一个人看到的「缺什么」与 run 撞上的「缺什么」不是同一份。
 
 **主机事实住机器层**（沿 kernel-SPEC §8-22「主机事实不入城」）。doctor 装的东西落 `~/.sprawling/components/<item>/`，**恒不落进任何一座城**——一座城搬到另一台机器时不该带着运行中的机器的组件。城里 `CONFIG.toml` 仍只说能力位（`sandbox.shell`）与限额，不说路径。
 
@@ -2894,7 +2894,7 @@ pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Res
 - **`Broken` 是第三态，不是 `Absent` 的别名**：一个在 PATH 上却起不来的二进制（权限、坏文件、架构不符）、一个存在却没有那份文件的组件目录（下载中断）、一个读不了的目录（权限），三者对 verdict 都算缺，但每一个都带着自己的原因进报告行——**绝不以「absent」一词吞掉一个可以说清的故障**。`Version` 的四态同理：说了、没说、说的不是文本、超时没说；后三者仍算 Present（§8-40 已定：不说话的工具仍是装了的工具）。
 - **本二进制起的每个子进程都由 `doctor::running::stop` 结束**：`ask_version` 读到第一行后杀掉子进程，用的是安装程序超时后走的同一段——杀不掉或收不了尸都不是可以丢掉的 `Result`，而是一句带进 `Fault::Unreadable` 的话，于是「本城起了一个它停不掉的进程」这件事排在它印出的版本号之前给人看。`Fault::Unreadable` 因此是「这台电脑不让本城把这一项做完」的那一态，它携带的那句话就是全部解释，`describe` 原样印出。
 - **`Detection::Built` 的探测是真起一次引擎**，而不是读一个 cfg：一份声称带引擎却起不来的构建，doctor 必须报 `Broken { WillNotStart }`；`ENGINE_CARRIED` 是那个 cfg 的唯一拼写，表引用它。
-- **`ffmpeg` 进表但 doctor 管不到 `desktop/`**：`desktop/` 跑在 `sprawling desktop` 这个子进程里，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`desktop/` 不改——这是这里的边界，如实记。桌面 server 本身不进表：它是本二进制的一个动词（§8-4d），没有要装的东西。
+- **`ffmpeg` 进表但 doctor 管不到 `crates/desktop/`**：`crates/desktop/` 跑在 `sprawling desktop` 这个子进程里，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`crates/desktop/` 不改——这是这里的边界，如实记。桌面 server 本身不进表：它是本二进制的一个动词（§8-4d），没有要装的东西。
 - **`browser::profile` 没有探测可搬**：读 `crates/browser/Spec.lean` 的 D4 确认 profile 是「楼的登录态住城的保留区」这条纯判定，浏览器探测住 `bin::browser_bidi::lazy`，故不改 `crates/browser`。
 - **doctor 进 lib 的公开面只多一行**：`pub use screen::verb`，二进制半边 `main/router.rs` 改调 `sprawling::doctor::verb`；`Machine` 仍是 `pub(crate) trait`，不上缝清单。`tools/xtask/api-baselines/sprawling.txt` 随之重算。
 

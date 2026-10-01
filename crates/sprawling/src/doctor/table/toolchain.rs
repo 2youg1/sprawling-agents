@@ -326,10 +326,10 @@ pub(super) const LEAN: Requirement = row(
 .from(Upstream::GitHub("leanprover/lean4"))
 .pinned(Pin::LeanToolchain);
 
-/// The Zig version `desktop/ffi/zig-version` pins, the one file the
+/// The Zig version `crates/desktop/ffi/zig-version` pins, the one file the
 /// leaf's build script and CI's install step read too (sprawling-SPEC.md
 /// 8-146).
-const ZIG_PIN: &str = include_str!("../../../../../desktop/ffi/zig-version").trim_ascii_end();
+const ZIG_PIN: &str = include_str!("../../../../desktop/ffi/zig-version").trim_ascii_end();
 
 /// The compiler of the desktop server's Zig leaf. Required because a
 /// Windows build of this binary compiles the leaf, and `Need` does not
@@ -338,7 +338,7 @@ const ZIG_PIN: &str = include_str!("../../../../../desktop/ffi/zig-version").tri
 pub(super) const ZIG: Requirement = row(
     "zig",
     Need::Required,
-    "the Zig leaf desktop/ffi builds on Windows, at the version desktop/ffi/zig-version pins",
+    "the Zig leaf crates/desktop/ffi builds on Windows, at the version crates/desktop/ffi/zig-version pins",
     Detection::Listed {
         program: "zig",
         args: &["version"],
@@ -364,7 +364,7 @@ pub(super) const ZIG: Requirement = row(
             args: &["install", "zig"],
         },
         linux: Recipe::Manual(
-            "install the Zig desktop/ffi/zig-version names from https://ziglang.org/download/",
+            "install the Zig crates/desktop/ffi/zig-version names from https://ziglang.org/download/",
         ),
     },
 );

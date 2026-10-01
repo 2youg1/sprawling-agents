@@ -6,7 +6,7 @@
 //! An MCP server that gives an agent eyes and hands on this Windows
 //! desktop.
 //!
-//! Read `desktop/README.md` for what it is and `desktop/desktop-SPEC.md`
+//! Read `crates/desktop/README.md` for what it is and `crates/desktop/desktop-SPEC.md`
 //! for why it has this shape. The whole public surface is one function,
 //! because everything else about a server is reached through its
 //! protocol.

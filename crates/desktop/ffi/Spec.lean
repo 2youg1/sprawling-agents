@@ -5,9 +5,9 @@
 
 /-! # desktop_ffi 的规格
 
-`sprawling-desktop-ffi`（库名 `desktop_ffi`，目录 `desktop/ffi`）是桌面 server 唯一的 FFI 缝：没有准入安全接口的四组 Win32 调用——枚举顶层窗口、按窗口捕获、剪贴板文本、DPI 感知——由一片 Zig 叶子（`desktop/ffi/zig/leaf.zig`）整段做完，Rust 一侧只借出缓冲、读回一个 step 与一个错误码。本文件是这个包的规格入口；能写成定理的性质在下面证明，其余要求、理由与决定写在十七节的注释里，决定写作 `D<n>`，别处引作 `desktop_ffi D<n>`。
+`sprawling-desktop-ffi`（库名 `desktop_ffi`，目录 `crates/desktop/ffi`）是桌面 server 唯一的 FFI 缝：没有准入安全接口的四组 Win32 调用——枚举顶层窗口、按窗口捕获、剪贴板文本、DPI 感知——由一片 Zig 叶子（`crates/desktop/ffi/zig/leaf.zig`）整段做完，Rust 一侧只借出缓冲、读回一个 step 与一个错误码。本文件是这个包的规格入口；能写成定理的性质在下面证明，其余要求、理由与决定写在十七节的注释里，决定写作 `D<n>`，别处引作 `desktop_ffi D<n>`。
 
-桌面 server 那一侧怎么用这条缝（哪些调用经过它、`unsafe` 恒只在哪里）写在 `desktop/desktop-SPEC.md` §8-12 与 §12.12；那里是 server 的规格，这里是缝本身的规格。
+桌面 server 那一侧怎么用这条缝（哪些调用经过它、`unsafe` 恒只在哪里）写在 `crates/desktop/desktop-SPEC.md` §8-12 与 §12.12；那里是 server 的规格，这里是缝本身的规格。
 -/
 
 namespace DesktopFfi
@@ -37,13 +37,13 @@ namespace DesktopFfi
 
 /-! ## 4 现状分析
 
-四组调用此前在 `platform::windows` 的 `enumerate`、`capture`、`clipboard`、`dpi` 四个模块里经 `windows` 绑定手写 `unsafe`（desktop-SPEC §8-11 的表）；本包落地后，那四个模块只调这里的安全函数。叶子从 `desktop/ffi/build.rs` 以 `zig build-lib` 编译成静态库，只在 Windows 目标上编；别的目标上本包只剩 `step`。
+四组调用此前在 `platform::windows` 的 `enumerate`、`capture`、`clipboard`、`dpi` 四个模块里经 `windows` 绑定手写 `unsafe`（desktop-SPEC §8-11 的表）；本包落地后，那四个模块只调这里的安全函数。叶子从 `crates/desktop/ffi/build.rs` 以 `zig build-lib` 编译成静态库，只在 Windows 目标上编；别的目标上本包只剩 `step`。
 -/
 
 /-! ## 5 权威信源
 
-- Step 的名字与编号：`desktop/ffi/src/step.rs`；`zig/step.zig` 是它的 Zig 拼写，`build.rs` 每次构建比对两者（D2）。
-- Zig 的版本：`desktop/ffi/zig-version`（D3）。
+- Step 的名字与编号：`crates/desktop/ffi/src/step.rs`；`zig/step.zig` 是它的 Zig 拼写，`build.rs` 每次构建比对两者（D2）。
+- Zig 的版本：`crates/desktop/ffi/zig-version`（D3）。
 - 各 Win32 调用的前提：learn.microsoft.com 上 `EnumWindows`、`GetDC`、`ReleaseDC`、`PrintWindow`、`GetDIBits`、`OpenClipboard`、`GetClipboardData`、`GlobalSize`、`SetClipboardData`、`SetProcessDpiAwareness` 各自的函数页。
 - 常量（`PW_RENDERFULLCONTENT`、`CF_UNICODETEXT`、`GMEM_MOVEABLE`、`HWND_MESSAGE`）只写在 `leaf.zig` 一处；DPI 感知值由 Rust 从 `windows` 绑定的定义传入。
 -/
@@ -55,7 +55,7 @@ namespace DesktopFfi
 
 /-! ## 7 模块边界
 
-叶子不拥有任何措辞、scope、generation 或工具名；它只做调用、只写借来的缓冲、只答 step 与码。把 step 与码变成三段式拒词归桌面 server 的 `platform::windows::fault`。Rust 面每个调用组一个文件，`leaf.rs` 是 export 的唯一声明处，`ended.rs` 是把跨边界的数读成 `Step` 的唯一处。
+叶子不拥有任何措辞、scope、generation 或工具名；它只做调用、只写借来的缓冲、只答 step 与码。把 step 与码变成三段式拒词归桌面 server 的 `platform::windows::fault`。Rust 面每个调用组一个文件，`leaf.rs` 是 export 的唯一声明处，`ended.rs` 是把跨边界的数读成 `Step` 的唯一处。`fixture`（只在 `fixture` feature 下编译）是测试自己开一扇窗口、建一个编出来的句柄的那几处 `unsafe`：桌面 server 继承工作区的 `forbid`，连测试也写不出 `unsafe`，本包是唯一能放开它的一层，所以 server 的契约测试经这里开窗口（desktop-SPEC §12.14）。
 -/
 
 /-! ## 8 接口先行
@@ -478,14 +478,14 @@ theorem reading_inside_the_selection_breaks_it :
 
 /-! ## 13 依赖选型
 
-`winsafe`（版本在 `desktop/Cargo.toml` 的 `[workspace.dependencies]`）：边界上的 `HWND`、`co::ERROR`、`co::HRESULT` 都是它的 `#[repr(transparent)]` 类型，叶子直接写进这些类型的槽里，所以 Rust 面不需要 `from_ptr` 或 `from_raw` 就得到它们。Zig：只用标准库与自己声明的 `extern`；构建脚本只用 Rust 标准库起 `zig`，不加 crates.io 依赖。被否：`cc` 或 `zig` 的构建 crate（为一条命令多一个黑箱）；`build.zig`（`zig build` 先编译构建脚本本身，每次冷构建多几秒，而这里只有一条 `build-lib`）。
+`winsafe`（版本在根 `Cargo.toml` 的 `[workspace.dependencies]`）：边界上的 `HWND`、`co::ERROR`、`co::HRESULT` 都是它的 `#[repr(transparent)]` 类型，叶子直接写进这些类型的槽里，所以 Rust 面不需要 `from_ptr` 或 `from_raw` 就得到它们。Zig：只用标准库与自己声明的 `extern`；构建脚本只用 Rust 标准库起 `zig`，不加 crates.io 依赖。被否：`cc` 或 `zig` 的构建 crate（为一条命令多一个黑箱）；`build.zig`（`zig build` 先编译构建脚本本身，每次冷构建多几秒，而这里只有一条 `build-lib`）。
 -/
 
 /-! ## 14 硬编码声明
 
 **D2 step 的定义在 Rust，Zig 是检查过的拼写。** `src/step.rs` 是名字与编号的唯一定义，`build.rs` 以 `include!` 读它，要求 `zig/step.zig` 含有逐字的渲染结果，不同即拒绝构建并印出应有的文本。被否：构建时把 `step.zig` 生成进 `OUT_DIR`——那样 `zig test zig/leaf.zig` 不经 cargo 就跑不起来。
 
-**D3 Zig 的版本只写在 `desktop/ffi/zig-version`。** `build.rs` 要求 `zig version` 与它相等；doctor 的 `zig` 一行以 `include_str!` 读它；CI 的安装步骤读它。被否：`build.zig.zon` 的 `minimum_zig_version`（这里没有 `build.zig`，而且它说的是下限不是钉子）。
+**D3 Zig 的版本只写在 `crates/desktop/ffi/zig-version`。** `build.rs` 要求 `zig version` 与它相等；doctor 的 `zig` 一行以 `include_str!` 读它；CI 的安装步骤读它。被否：`build.zig.zon` 的 `minimum_zig_version`（这里没有 `build.zig`，而且它说的是下限不是钉子）。
 
 缓冲的起始大小与重试次数（`top_level` 1024 个句柄、加 64、四次；`clipboard` 4096 个单元、四次）是我们的选择：一台桌面的顶层窗口数是几百，绝大多数剪贴板文本在四千单元以内；改它们只改一次调用的往返次数，不改结果。
 -/
@@ -497,12 +497,12 @@ theorem reading_inside_the_selection_breaks_it :
 
 /-! ## 16 测试与约束
 
-已证：§10 的定理。测试：`desktop_ffi` 的 `ended` 与 `boundary` 单测（对拍）；`zig test desktop/ffi/zig/leaf.zig`（Zig 侧单测、种子化性质、fuzz 测试的单次输入）；`just fuzz-desktop`（按给定轮数与种子的长时对拍）。libFuzzer 在这里没有平台：叶子只在 Windows 上编，而 cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时；所以 Rust 一侧以抽样而不是以覆盖来 fuzz。重开参数：cargo-fuzz 在 windows-msvc 上链接得出。环境假设：§3。约束：`unsafe` 恒只在本包、恒是一次 export 调用、恒带一行 `SAFETY:`；lint 表是 `desktop/Cargo.toml` 的 `[workspace.lints]`，与根工作区逐键比对（`xtask guard`）。
+已证：§10 的定理。测试：`desktop_ffi` 的 `ended` 与 `boundary` 单测（对拍）；`zig test crates/desktop/ffi/zig/leaf.zig`（Zig 侧单测、种子化性质、fuzz 测试的单次输入）；`just fuzz-desktop`（按给定轮数与种子的长时对拍）。libFuzzer 在这里没有平台：叶子只在 Windows 上编，而 cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时；所以 Rust 一侧以抽样而不是以覆盖来 fuzz。重开参数：cargo-fuzz 在 windows-msvc 上链接得出。环境假设：§3。约束：`unsafe` 恒只在本包、恒是一次 export 调用、恒带一行 `SAFETY:`；lint 表是 `crates/desktop/Cargo.toml` 的 `[workspace.lints]`，与根工作区逐键比对（`xtask guard`）。
 -/
 
 /-! ## 17 文档关系
 
-- `desktop/desktop-SPEC.md` §8-11、§8-12、§12.12：server 一侧的调用组表、缝的位置与 lint 墙；那里的表变了，§1 的四组随之变。
+- `crates/desktop/desktop-SPEC.md` §8-11、§8-12、§12.12、§12.14：server 一侧的调用组表、缝的位置，以及本包那一张只差 `unsafe_code` 一行的 lint 表；那里的表变了，§1 的四组随之变。
 - `tools/xtask/xtask-SPEC.md` §8-46：guard 怎么读这堵墙。
 - `crates/sprawling/sprawling-SPEC.md` 8-146：doctor 的 `zig` 一行。
 - `AGENTS.md`「Rust」一节：平台调用的次序与 `SAFETY:` 行的写法；那里的规则变了，D1 重议。

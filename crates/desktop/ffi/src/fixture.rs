@@ -3,7 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A window a contract test opens in its own process, and closes again.
+//! A window a contract test opens in its own process, and closes again;
+//! compiled only with the `fixture` feature, which only the desktop
+//! server's Windows dev-dependencies switch on.
 //!
 //! The contracts of desktop-SPEC.md section 8-11 are read back from a
 //! real window, and the only window a test may read is one it made: a
@@ -11,10 +13,21 @@
 //! depend on what happens to be open, and could change it. This window
 //! takes no focus and shows no taskbar button.
 //!
+//! It lives here rather than beside the tests that use it because opening
+//! a window and answering its messages are calls with no safe interface,
+//! and the desktop server inherits the workspace's `forbid` even in its
+//! tests (desktop-SPEC.md section 12.14); this crate is the one that may
+//! relax `unsafe_code`.
+//!
 //! It lives on a thread of its own that answers its messages. UI
 //! Automation reads a control by sending messages to the thread that
 //! owns it, and a test thread that owned the window would be waiting on
 //! itself.
+
+#![expect(
+    clippy::unwrap_used,
+    reason = "test scaffolding: a window that cannot be opened or closed fails the test that asked for it"
+)]
 
 use std::sync::mpsc;
 use std::thread::JoinHandle;
@@ -28,13 +41,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{HSTRING, w};
 
-use super::geometry::Bounds;
-
 /// How wide the window is, in pixels.
-const WIDTH: i32 = 160;
+pub const WIDTH: i32 = 160;
 
 /// How tall the window is, in pixels.
-const HEIGHT: i32 = 90;
+pub const HEIGHT: i32 = 90;
 
 /// `SS_NOTIFY`, which the binding does not name: a static window with
 /// it answers a hit test as its own client area rather than as
@@ -42,25 +53,17 @@ const HEIGHT: i32 = 90;
 const ANSWERS_HIT_TESTS: WINDOW_STYLE = WINDOW_STYLE(0x0100);
 
 /// One open window, closed when this is dropped.
-pub(crate) struct Opened {
+pub struct Opened {
     address: usize,
-    bounds: Bounds,
     thread: u32,
     pumping: Option<JoinHandle<()>>,
 }
 
 impl Opened {
-    /// Opens a window titled `title` whose top-left corner is at
-    /// `(left, top)` on the screen, holding one button captioned
-    /// `button` when one is given.
-    pub(crate) fn at(title: &str, left: i32, top: i32, button: Option<&str>) -> Opened {
-        let bounds = Bounds::from_corners(
-            left,
-            top,
-            left.checked_add(WIDTH).unwrap(),
-            top.checked_add(HEIGHT).unwrap(),
-        )
-        .unwrap();
+    /// Opens a window titled `title`, [`WIDTH`] by [`HEIGHT`], whose
+    /// top-left corner is at `(left, top)` on the screen, holding one
+    /// button captioned `button` when one is given.
+    pub fn at(title: &str, left: i32, top: i32, button: Option<&str>) -> Opened {
         let (sent, opened) = mpsc::channel();
         let title = title.to_owned();
         let button = button.map(str::to_owned);
@@ -74,20 +77,19 @@ impl Opened {
         let (address, thread) = opened.recv().unwrap();
         Opened {
             address,
-            bounds,
             thread,
             pumping: Some(pumping),
         }
     }
 
     /// The window's handle, as the address it is.
-    pub(crate) fn address(&self) -> usize {
+    pub fn address(&self) -> usize {
         self.address
     }
 
-    /// Where the window is on the screen.
-    pub(crate) fn bounds(&self) -> Bounds {
-        self.bounds
+    /// The window's handle, as the server's calls take it.
+    pub fn handle(&self) -> winsafe::HWND {
+        made_up(self.address)
     }
 }
 
@@ -98,6 +100,20 @@ impl Drop for Opened {
             pumping.join().unwrap();
         }
     }
+}
+
+/// A handle with the given address, which a bookkeeping test names a
+/// window by whether or not one exists there.
+#[expect(
+    unsafe_code,
+    reason = "a handle is minted from an address only through the binding's unsafe constructor"
+)]
+pub fn made_up(address: usize) -> winsafe::HWND {
+    // SAFETY: `winsafe::HWND` neither dereferences nor closes what it
+    // wraps, and every call that hands a handle to Win32 refuses one
+    // that names no window, so an address that is no window's is a
+    // refusal there rather than a fault.
+    unsafe { winsafe::HWND::from_ptr(std::ptr::without_provenance_mut(address)) }
 }
 
 /// The window, and the button inside it.

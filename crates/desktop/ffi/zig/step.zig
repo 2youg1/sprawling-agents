@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The Zig spelling of `desktop/ffi/src/step.rs`, which is the definition.
+// The Zig spelling of `crates/desktop/ffi/src/step.rs`, which is the definition.
 // `build.rs` compares this file with that one on every build and refuses
 // when they differ, printing the text this file must hold.
 

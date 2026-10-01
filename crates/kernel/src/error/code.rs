@@ -285,7 +285,7 @@ mod tests {
     /// It has to: it sits outside the workspace so that its Win32
     /// boundary may relax `unsafe_code`, and a `use kernel::…` for six
     /// string constants would give that reason away
-    /// (`desktop/desktop-SPEC.md` §8.5, first pair). **The duplication
+    /// (`crates/desktop/desktop-SPEC.md` §8.5, first pair). **The duplication
     /// cannot be removed by a shared dependency, so what is removed
     /// instead is its ability to drift unnoticed**: this table is the
     /// authority, and the test below reads the other spelling off disk
@@ -295,7 +295,7 @@ mod tests {
     /// code this set already has, and may not mint a new one. A new code
     /// is minted here first.
     const DESKTOP_REFUSAL_FILE: &str =
-        concat!(env!("CARGO_MANIFEST_DIR"), "/../../desktop/src/refusal.rs");
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../desktop/src/refusal.rs");
 
     /// Every `E_…` spelling the out-of-tree desktop connector writes is
     /// one this table already produces.

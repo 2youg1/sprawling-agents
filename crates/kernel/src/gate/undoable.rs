@@ -29,7 +29,7 @@ use crate::tool::{ServerLabel, ToolName};
 use super::GateOutcome;
 
 /// The remote-name prefix this server's tools carry. It is the desktop
-/// connector's own vocabulary (`desktop/desktop-SPEC.md` §8-7), quoted
+/// connector's own vocabulary (`crates/desktop/desktop-SPEC.md` §8-7), quoted
 /// here because this is the side that has to recognise it.
 const REACHES_THIS_MACHINE: &str = "desktop.";
 
