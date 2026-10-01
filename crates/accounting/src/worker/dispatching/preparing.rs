@@ -7,12 +7,19 @@
 //! another process: the review tree, the bench with its MCP servers,
 //! and the frozen plan. It runs in the lane that drives the run, so the
 //! accounting thread never waits on a handshake or a checkout
-//! (sprawling-SPEC.md 8-113).
+//! (sprawling-SPEC.md 8-113). Once the run is driven, the same lane puts
+//! the city's stock back, so the next placement is a rename rather than
+//! a checkout (sprawling-SPEC.md 8-145, 8-155).
+
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, PoisonError};
 
 use kernel::{AxCode, AxError, Ledger, Locator, RunId};
 
 use super::super::driving::Sieving;
 use super::super::driving::harness::{HarnessDriven, HarnessHalf, drive_harness};
+use super::super::recording::Notes;
 use super::super::workbench::{BenchDesks, Laying, Placing, held};
 use super::super::{Assignment, DriveContext, Driven, Driving, Given, Site, Stamping, drive_run};
 
@@ -78,7 +85,10 @@ impl Staged {
         }
     }
 
-    /// Prepares the run in this lane and drives it.
+    /// Prepares the run in this lane, drives it, and puts the city's
+    /// stock back when the run borrowed a tree. The pool's lane is the
+    /// one caller, so the stock's checkout is never the accounting
+    /// thread's (sprawling-SPEC.md 8-145).
     ///
     /// Generic in the ledger for the reason [`drive_run`] is: a lane
     /// writes through its relay, and a test on the accounting thread
@@ -86,16 +96,117 @@ impl Staged {
     pub(crate) fn fly<L: Ledger>(self, ledger: &mut L, context: DriveContext) -> Flown {
         match self {
             Staged::Model { at, mut site, lane } => {
+                let restock = Restock {
+                    city_root: lane.laying.city_root.clone(),
+                    notes: lane.laying.notes.clone(),
+                    staged_at: lane.laying.staged_at,
+                };
                 let driven = lane
                     .prepare(&at, &mut site, ledger, &context)
                     .and_then(|driving| drive_run(driving, ledger, context));
+                restock.after_run(site.lease.as_ref());
                 Flown::Model { at, site, driven }
             }
-            Staged::Harness { at, half } => Flown::Harness {
-                at,
-                driven: drive_harness(half, ledger, context),
-            },
+            Staged::Harness { at, half } => {
+                let restock = Restock {
+                    city_root: half.city_root.clone(),
+                    notes: half.notes.clone(),
+                    staged_at: half.staged_at,
+                };
+                let driven = drive_harness(half, ledger, context);
+                restock.after_run(driven.lease.as_ref());
+                Flown::Harness { at, driven }
+            }
         }
+    }
+}
+
+/// What a lane needs once its run is driven to put the city's stock
+/// back, and to say so when it cannot (sprawling-SPEC.md 8-155).
+struct Restock {
+    city_root: PathBuf,
+    notes: Notes,
+    /// Where the ledger stood when the dispatch was staged, which the
+    /// lane's diagnostic lines are anchored at (sprawling-SPEC.md 8-113).
+    staged_at: kernel::Seq,
+}
+
+impl Restock {
+    /// Puts the stock back when the run borrowed a tree, unless another
+    /// lane of this process is stocking the same city, and writes one
+    /// diagnostic line saying what that cost or why it failed.
+    ///
+    /// A run that borrowed no tree took no stock, and a stock it made
+    /// would only hold a tree's worth of disk. A failure leaves the run
+    /// as it ended: the next placement checks its tree out whole.
+    fn after_run(self, borrowed: Option<&storage::WorktreeLease>) {
+        if borrowed.is_none() {
+            return;
+        }
+        let Some(_turn) = StockingTurn::take(&self.city_root) else {
+            return;
+        };
+        let stocked = storage::Worktrees::open(&self.city_root).and_then(|trees| trees.stock());
+        let (level, message) = match stocked {
+            Ok(work) => (
+                runtime::diagnostics::Level::Trace,
+                format!(
+                    "put the stock back: {} files created, {} rewritten, {} removed",
+                    work.created, work.rewritten, work.removed
+                ),
+            ),
+            Err(refused) => (
+                runtime::diagnostics::Level::Refuse,
+                format!(
+                    "could not put the stock back, so the next placement checks its tree out \
+                     whole: {refused}"
+                ),
+            ),
+        };
+        self.notes.write(
+            level,
+            self.staged_at,
+            "accounting::worker::dispatching::preparing",
+            &message,
+        );
+    }
+}
+
+/// The cities whose stock a lane of this process is putting back now.
+///
+/// One writer process per city, so this is who is stocking each city.
+/// Two stockings that both found no stock would race, and the loser
+/// would take back the winner's registration under a placement that is
+/// taking it over (sprawling-SPEC.md 8-155).
+static STOCKING: Mutex<BTreeSet<PathBuf>> = Mutex::new(BTreeSet::new());
+
+/// One lane's turn at stocking one city, given up when it is dropped.
+struct StockingTurn<'a> {
+    city_root: &'a Path,
+}
+
+impl<'a> StockingTurn<'a> {
+    /// Takes the city's turn, or answers `None` while another lane holds
+    /// it: that lane's stock is the one the next placement takes, and
+    /// waiting for its checkout would only make this run land later.
+    fn take(city_root: &'a Path) -> Option<StockingTurn<'a>> {
+        STOCKING
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(city_root.to_path_buf())
+            .then_some(StockingTurn { city_root })
+    }
+}
+
+impl Drop for StockingTurn<'_> {
+    /// A lock a dead lane left behind is taken all the same: every step
+    /// under it is whole, and a turn never given back would stop this
+    /// city's stock for the rest of the serving.
+    fn drop(&mut self) {
+        STOCKING
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(self.city_root);
     }
 }
 

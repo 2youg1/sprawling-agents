@@ -54,12 +54,12 @@ pub(in crate::worker) struct Laying {
     pub(in crate::worker) checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// The store the lanes share (`RunWorker::lane_store`).
     pub(in crate::worker) store: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
-    notes: super::recording::Notes,
+    pub(in crate::worker) notes: super::recording::Notes,
     /// How long starting the building's servers took (`Hands.monotonic`).
     monotonic: fn() -> std::time::Instant,
     /// Where the ledger stood when the dispatch was staged: what the
     /// keeper counts from, and where each line written here is anchored.
-    staged_at: kernel::Seq,
+    pub(in crate::worker) staged_at: kernel::Seq,
     trust: kernel::Autonomy,
     /// How many signals each room with any waiting was holding.
     waiting: std::collections::BTreeMap<Address, u32>,
