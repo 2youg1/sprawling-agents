@@ -20,6 +20,9 @@
 //! line it cannot read — is a JSON-RPC error. Everything a named tool
 //! says, a refusal included, is a `CallToolResult`, and a refusal sets
 //! its `isError`.
+//!
+//! The properties this module must hold are proved in `crates/desktop/spec/Session.lean`;
+//! this code is the authority on how it holds them.
 
 use crate::answer::Answer;
 use crate::platform;
@@ -177,7 +180,7 @@ impl Server {
     /// a protocol fault and answers with a JSON-RPC error. Once the tool
     /// is named, every refusal is the tool's own and answers as a result
     /// with `isError` set, so the model reads all three parts
-    /// (desktop-SPEC.md section 12.2).
+    /// (`crates/desktop/Spec.lean` D2).
     fn call(&mut self, params: &Value) -> Result<Value, Refusal> {
         let name = params.get("name").and_then(Value::as_str).ok_or_else(|| {
             Refusal::new(

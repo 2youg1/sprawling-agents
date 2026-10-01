@@ -6,7 +6,7 @@
 //! Where one recording's bytes go, and what writes them: this package's
 //! one thread captures every frame through `capture::window`, and hands
 //! it to ffmpeg's stdin when this machine has ffmpeg, or writes it as a
-//! PNG when it does not (desktop-SPEC.md section 12.7).
+//! PNG when it does not (`crates/desktop/Spec.lean` D7).
 //!
 //! **This file holds the only `std::thread::spawn` in the package.** It
 //! is stopped by one flag and joined by [`Sink::close`], so a recording
@@ -40,7 +40,7 @@ use crate::refusal::{Refusal, RefusalCode};
 
 /// How many frames a second both writers aim for. `PrintWindow` costs
 /// what it costs, and ten frames a second is enough to see one
-/// interaction happen (desktop-SPEC.md §14).
+/// interaction happen (`crates/desktop/Spec.lean` §14).
 const FRAMES_A_SECOND: u64 = 10;
 
 /// The shortest gap between two frames of the frame-sequence path,
@@ -277,7 +277,7 @@ impl Writer {
 /// Not into the city and not into the person's own folders: the scope
 /// file says which windows this server may touch and says nothing about
 /// where it may write, so the answer is the place the operating system
-/// keeps things nobody promised to keep (desktop-SPEC.md §14).
+/// keeps things nobody promised to keep (`crates/desktop/Spec.lean` §14).
 ///
 /// **The directory is created only if it did not exist**, and the name
 /// is bumped until one is free. A second connection recording the same

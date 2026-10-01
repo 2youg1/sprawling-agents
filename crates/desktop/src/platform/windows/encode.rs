@@ -12,7 +12,7 @@
 //!
 //! Two facts about the encoders are the outside world's rather than
 //! ours, and a caller is told about them rather than left to discover
-//! them (desktop-SPEC.md §14). This build's webp encoder is **lossless**,
+//! them (`crates/desktop/Spec.lean` §14). This build's webp encoder is **lossless**,
 //! so `quality` does not reach it; and jpeg has no alpha channel, so the
 //! window is composited onto white before it is encoded — which is a
 //! visible choice, not a silent one.

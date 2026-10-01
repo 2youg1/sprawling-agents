@@ -119,7 +119,7 @@ once. A **platform leaf** — Win32 calls with no admitted safe interface,
 where the alternative is `unsafe` Rust — enters without conditions 1 to
 3, which measure speed it does not claim, and holds 4 to 6, with its
 boundary properties proved in Lean and each `extern` call named in its
-SPEC (AGENTS.md, Rust; the desktop's leaf is desktop-SPEC.md section
+SPEC (AGENTS.md, Rust; the desktop's leaf is `crates/desktop/Spec.lean` section
 8-12):
 
 1. the hot spot has a production caller, and `just bench` or citysim
@@ -177,7 +177,7 @@ desktop_ffi:
 The `desktop_ffi` row is the desktop server's FFI seam (`crates/desktop/ffi`),
 the one member whose lint table is its own: it is the workspace's table with
 `unsafe_code` at `deny`, so each call into its Zig leaf can relax the lint at
-that one statement (desktop-SPEC.md section 12.14). `desktop` reads `kernel`
+that one statement (`crates/desktop/Spec.lean` D14). `desktop` reads `kernel`
 and `agent_protocols` for four facts the city defines, the error codes, the
 image quality domain, the MCP revision and the effect-unknown key, and for
 nothing else.
@@ -631,7 +631,7 @@ denied; `unsafe_code` is forbidden in every workspace crate but one. The
 desktop server's FFI seam (`crates/desktop/ffi`) carries the workspace's
 table with `unsafe_code` at `deny`, and holds one `unsafe` block per call
 into the Zig leaf, each with the precondition that makes it sound
-(desktop-SPEC.md sections 8-12 and 12.14); `xtask guard` holds that table
+(`crates/desktop/Spec.lean` sections 8-12 and D14); `xtask guard` holds that table
 to the workspace's, key by key. Money and quantities are
 integer newtypes (`UsdMicros`, `Tokens`, `ByteLen`, `Seq`), and floats stay
 out of every decision path.

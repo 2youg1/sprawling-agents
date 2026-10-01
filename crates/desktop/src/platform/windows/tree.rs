@@ -4,12 +4,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The UI Automation tree of one window: role, name, ref and bounds,
-//! read through `uiautomation`'s safe calls (desktop-SPEC.md section
-//! 12.10).
+//! read through `uiautomation`'s safe calls (`crates/desktop/Spec.lean`
+//! D10).
 //!
 //! **Every element this module reads dies inside the call that read
 //! it.** A `ref` handed back to a caller is a rectangle and a
-//! generation, never a live element (desktop-SPEC.md §8.6, second pair),
+//! generation, never a live element (`crates/desktop/Spec.lean` section 10, design six),
 //! so a connection that snapshots a thousand windows holds a thousand
 //! rectangles rather than a thousand cross-process interface pointers.
 //! What does outlive a call is the [`Reader`]: the COM apartment, the
@@ -63,7 +63,7 @@ impl Reader {
     ///
     /// The multithreaded apartment, because this thread opens no window
     /// that COM would have to pump messages for, which is the case
-    /// Microsoft recommends it for (desktop-SPEC.md section 12.10).
+    /// Microsoft recommends it for (`crates/desktop/Spec.lean` D10).
     ///
     /// # Errors
     /// Refuses when this thread cannot enter an apartment, and when UI
@@ -187,8 +187,8 @@ impl Branches for Reader {
 /// is zero, which is how the binding spells a call that succeeded with
 /// nothing to hand back; that is the end of a list. Any other code is
 /// the element's provider failing, and reading it as the end would hand
-/// a model a tree that looks whole and is not (desktop-SPEC.md section
-/// 12.10).
+/// a model a tree that looks whole and is not (`crates/desktop/Spec.lean`
+/// D10).
 fn listed(step: uiautomation::Result<UIElement>) -> Result<Option<UIElement>, String> {
     match step {
         Ok(element) => Ok(Some(element)),
@@ -458,7 +458,7 @@ mod tests {
         );
     }
 
-    /// The contract desktop-SPEC.md section 8-11 holds the tree to,
+    /// The contract `crates/desktop/Spec.lean` section 8-11 holds the tree to,
     /// whichever interface reads it: a window's tree starts at the window,
     /// named by its title, and names the control inside it one level
     /// down. Roles are not compared, because they are a word this server
@@ -484,7 +484,7 @@ mod tests {
     /// A window that is not there has no tree, and that is a refusal
     /// naming a next step rather than a crash. This is the one thing
     /// about this module that holds on a machine with no desktop
-    /// (desktop-SPEC.md §16.2).
+    /// (`crates/desktop/Spec.lean` §16.2).
     #[test]
     fn a_handle_that_names_no_window_is_refused_with_a_next_step() {
         let refusal = Reader::start()

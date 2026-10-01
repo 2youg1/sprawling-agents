@@ -7,7 +7,7 @@
 
 `sprawling-desktop-ffi`（库名 `desktop_ffi`，目录 `crates/desktop/ffi`）是桌面 server 唯一的 FFI 缝：没有准入安全接口的四组 Win32 调用——枚举顶层窗口、按窗口捕获、剪贴板文本、DPI 感知——由一片 Zig 叶子（`crates/desktop/ffi/zig/leaf.zig`）整段做完，Rust 一侧只借出缓冲、读回一个 step 与一个错误码。本文件是这个包的规格入口；能写成定理的性质在下面证明，其余要求、理由与决定写在十七节的注释里，决定写作 `D<n>`，别处引作 `desktop_ffi D<n>`。
 
-桌面 server 那一侧怎么用这条缝（哪些调用经过它、`unsafe` 恒只在哪里）写在 `crates/desktop/desktop-SPEC.md` §8-12 与 §12.12；那里是 server 的规格，这里是缝本身的规格。
+桌面 server 那一侧怎么用这条缝（哪些调用经过它、`unsafe` 恒只在哪里）写在 `crates/desktop/Spec.lean` §8-12 与 D12；那里是 server 的规格，这里是缝本身的规格。
 -/
 
 namespace DesktopFfi
@@ -25,7 +25,7 @@ namespace DesktopFfi
 
 下面的定理是模型对性质的证明：保留的恰是前缀、计数是全长；复制恒不越过块、写下的恒放得进缓冲、恒不含零、缓冲够长时恒成功；填写恰好一个终止符且与复制互逆；块恒不留在进程手里；GDI 对象恒成对释放。每一组各有一条「拿掉守卫即反例」的定理。
 
-生产实现与模型的一致性由三处检查，均不需要桌面：`desktop_ffi::boundary` 的测试 `the_leaf_and_the_rust_reference_agree_on_every_drawn_input` 用种子化的输入比对 Zig 叶子与 Rust 参考（`src/reference.rs`），每条规则两万个；同一比对的 `the_leaf_and_the_rust_reference_agree_for_as_long_as_asked` 按 `just fuzz-desktop` 给的轮数与种子跑（Rust 一侧的 fuzz）；`zig test zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz；覆盖引导的 `--fuzz` 今天不在 Windows 上实现，这里跑的是种子化那一半与 fuzz 测试的单次输入）。资源配对在真窗口上由桌面 server 的契约测试判（desktop-SPEC §8-11）。
+生产实现与模型的一致性由三处检查，均不需要桌面：`desktop_ffi::boundary` 的测试 `the_leaf_and_the_rust_reference_agree_on_every_drawn_input` 用种子化的输入比对 Zig 叶子与 Rust 参考（`src/reference.rs`），每条规则两万个；同一比对的 `the_leaf_and_the_rust_reference_agree_for_as_long_as_asked` 按 `just fuzz-desktop` 给的轮数与种子跑（Rust 一侧的 fuzz）；`zig test zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz；覆盖引导的 `--fuzz` 今天不在 Windows 上实现，这里跑的是种子化那一半与 fuzz 测试的单次输入）。资源配对在真窗口上由桌面 server 的契约测试判（`crates/desktop/Spec.lean` §8-11）。
 -/
 
 /-! ## 3 假设与歧义
@@ -37,7 +37,7 @@ namespace DesktopFfi
 
 /-! ## 4 现状分析
 
-四组调用此前在 `platform::windows` 的 `enumerate`、`capture`、`clipboard`、`dpi` 四个模块里经 `windows` 绑定手写 `unsafe`（desktop-SPEC §8-11 的表）；本包落地后，那四个模块只调这里的安全函数。叶子从 `crates/desktop/ffi/build.rs` 以 `zig build-lib` 编译成静态库，只在 Windows 目标上编；别的目标上本包只剩 `step`。
+四组调用此前在 `platform::windows` 的 `enumerate`、`capture`、`clipboard`、`dpi` 四个模块里经 `windows` 绑定手写 `unsafe`（`crates/desktop/Spec.lean` §8-11 的表）；本包落地后，那四个模块只调这里的安全函数。叶子从 `crates/desktop/ffi/build.rs` 以 `zig build-lib` 编译成静态库，只在 Windows 目标上编；别的目标上本包只剩 `step`。
 -/
 
 /-! ## 5 权威信源
@@ -50,12 +50,12 @@ namespace DesktopFfi
 
 /-! ## 6 命名统一
 
-沿用 desktop-SPEC 的词：three-part refusal、scope、generation。**step**：叶子的一次调用停在哪里（`Finished` 或停下的那一步）；**leaf**：Zig 的那一片；**boundary rule**：叶子往借来的缓冲里写什么的规则。Lean 里的名字与 Zig／Rust 的对应：`kept` ↔ `Kept.keep`／`boundary::keep`，`textEnd` ↔ `textEnd`，`textCopy` ↔ `textCopy`／`boundary::text_copy`，`textFill` ↔ `textFill`／`boundary::text_fill`，`bitmapBytes` ↔ `bitmapBytes`／`boundary::bitmap_bytes`。
+沿用 `crates/desktop/Spec.lean` 的词：three-part refusal、scope、generation。**step**：叶子的一次调用停在哪里（`Finished` 或停下的那一步）；**leaf**：Zig 的那一片；**boundary rule**：叶子往借来的缓冲里写什么的规则。Lean 里的名字与 Zig／Rust 的对应：`kept` ↔ `Kept.keep`／`boundary::keep`，`textEnd` ↔ `textEnd`，`textCopy` ↔ `textCopy`／`boundary::text_copy`，`textFill` ↔ `textFill`／`boundary::text_fill`，`bitmapBytes` ↔ `bitmapBytes`／`boundary::bitmap_bytes`。
 -/
 
 /-! ## 7 模块边界
 
-叶子不拥有任何措辞、scope、generation 或工具名；它只做调用、只写借来的缓冲、只答 step 与码。把 step 与码变成三段式拒词归桌面 server 的 `platform::windows::fault`。Rust 面每个调用组一个文件，`leaf.rs` 是 export 的唯一声明处，`ended.rs` 是把跨边界的数读成 `Step` 的唯一处。`fixture`（只在 `fixture` feature 下编译）是测试自己开一扇窗口、建一个编出来的句柄的那几处 `unsafe`：桌面 server 继承工作区的 `forbid`，连测试也写不出 `unsafe`，本包是唯一能放开它的一层，所以 server 的契约测试经这里开窗口（desktop-SPEC §12.14）。
+叶子不拥有任何措辞、scope、generation 或工具名；它只做调用、只写借来的缓冲、只答 step 与码。把 step 与码变成三段式拒词归桌面 server 的 `platform::windows::fault`。Rust 面每个调用组一个文件，`leaf.rs` 是 export 的唯一声明处，`ended.rs` 是把跨边界的数读成 `Step` 的唯一处。`fixture`（只在 `fixture` feature 下编译）是测试自己开一扇窗口、建一个编出来的句柄的那几处 `unsafe`：桌面 server 继承工作区的 `forbid`，连测试也写不出 `unsafe`，本包是唯一能放开它的一层，所以 server 的契约测试经这里开窗口（`crates/desktop/Spec.lean` D14）。
 -/
 
 /-! ## 8 接口先行
@@ -419,7 +419,7 @@ theorem cleared_and_unwritten_is_handing (a : Answers)
   cases a.allocated <;> cases a.filled <;> cases a.owned <;> cases a.opened <;>
     cases a.emptied <;> cases a.handed <;> simp
 
-/-- 先备好再清空：剪贴板只在块已分配并填好之后才被清空（desktop-SPEC §12.8）。 -/
+/-- 先备好再清空：剪贴板只在块已分配并填好之后才被清空（`crates/desktop/Spec.lean` D8）。 -/
 theorem cleared_only_after_the_block_is_ready (a : Answers) (h : (write a).cleared = true) :
     a.allocated = true ∧ a.filled = true := by
   revert h
@@ -502,7 +502,7 @@ theorem reading_inside_the_selection_breaks_it :
 
 /-! ## 17 文档关系
 
-- `crates/desktop/desktop-SPEC.md` §8-11、§8-12、§12.12、§12.14：server 一侧的调用组表、缝的位置，以及本包那一张只差 `unsafe_code` 一行的 lint 表；那里的表变了，§1 的四组随之变。
+- `crates/desktop/Spec.lean` §8-11、§8-12、D12、D14：server 一侧的调用组表、缝的位置，以及本包那一张只差 `unsafe_code` 一行的 lint 表；那里的表变了，§1 的四组随之变。
 - `tools/xtask/xtask-SPEC.md` §8-46：guard 怎么读这堵墙。
 - `crates/sprawling/sprawling-SPEC.md` 8-146：doctor 的 `zig` 一行。
 - `AGENTS.md`「Rust」一节：平台调用的次序与 `SAFETY:` 行的写法；那里的规则变了，D1 重议。

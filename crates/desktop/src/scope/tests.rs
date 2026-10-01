@@ -247,7 +247,7 @@ fn a_closed_scope_yields_no_admission_to_list_windows_with() {
 
 /// The device a recording hears is the one the scope file names, and
 /// only that one: the operator's naming it is the permission
-/// (desktop-SPEC.md section 12.11).
+/// (`crates/desktop/Spec.lean` D11).
 #[test]
 fn a_recording_hears_the_one_device_the_scope_file_names() {
     let scope = Scope::parse(

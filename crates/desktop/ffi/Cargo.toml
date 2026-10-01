@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 description = "The Zig leaf behind the desktop server's one FFI seam, offered as safe functions."
 # The leaf is built by `build.rs` with the standard library alone, and
-# linked under this one name (desktop-SPEC.md section 12.12).
+# linked under this one name (`crates/desktop/Spec.lean` D12).
 links = "sprawling_desktop_leaf"
 
 [lib]
@@ -33,7 +33,7 @@ windows = { workspace = true, optional = true, features = [
 # `unsafe_code` is `deny` rather than `forbid`, so each call into the Zig
 # leaf can relax it at that one statement, with a written reason. Every
 # other key is the workspace's own, and `xtask guard` holds this table to
-# `[workspace.lints]` key by key (desktop-SPEC.md section 12.14).
+# `[workspace.lints]` key by key (`crates/desktop/Spec.lean` D14).
 [lints.rust]
 unsafe_code = "deny"
 unexpected_cfgs = { level = "deny", check-cfg = ["cfg(kani)"] }

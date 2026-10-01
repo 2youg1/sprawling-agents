@@ -5,7 +5,7 @@
 
 //! The sound of one recording: a second ffmpeg reading the one
 //! DirectShow device the scope file names, writing a 16 kHz mono wav
-//! into the recording's own directory (desktop-SPEC.md section 12.11).
+//! into the recording's own directory (`crates/desktop/Spec.lean` D11).
 //!
 //! **This server never chooses the device.** The name arrives from
 //! `scope::Admitted::sound`, which is the operator's word for which
@@ -31,13 +31,13 @@ use crate::refusal::{Refusal, RefusalCode};
 const SOUND_FILE: &str = "sound.wav";
 
 /// What the city's `transcribe` needs of speech: 16 kHz, one channel.
-/// More is only more bytes (desktop-SPEC.md section 14).
+/// More is only more bytes (`crates/desktop/Spec.lean` section 14).
 const SAMPLE_RATE: &str = "16000";
 const CHANNELS: &str = "1";
 
 /// The most sound one `stop` answer carries: base64 makes it a third
 /// longer, and the whole line stays inside the city's MCP line ceiling
-/// of 8 MiB (desktop-SPEC.md sections 12.13 and 14).
+/// of 8 MiB (`crates/desktop/Spec.lean` D13 and section 14).
 const SOUND_CARRIED_MOST: u64 = 4 * 1024 * 1024;
 
 /// The sound's ffmpeg, while it records.

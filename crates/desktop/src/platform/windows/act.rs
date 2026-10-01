@@ -11,7 +11,7 @@
 //! where that promise is kept: `super::strokes` decides which events the
 //! action is, and this module turns each into the event Win32 reads and
 //! sends them in one batch, through `winsafe`'s safe `SendInput`
-//! (desktop-SPEC.md section 12.9).
+//! (`crates/desktop/Spec.lean` D9).
 //!
 //! Mouse coordinates go out as absolute positions on the **virtual**
 //! desktop, normalised to the range Win32 wants. Relative movement would
@@ -26,7 +26,7 @@
 //! desktop — a UAC prompt, a screen lock. When only part went in, this
 //! module says so, with the counts, and sends one more batch: the
 //! releases of whatever that part left held down, and nothing else
-//! (desktop-SPEC.md section 12.4).
+//! (`crates/desktop/Spec.lean` D4).
 
 use winsafe::co;
 
@@ -206,7 +206,7 @@ fn send(events: &[winsafe::HwKbMouse]) -> Result<usize, Refusal> {
 mod tests {
     use super::*;
 
-    /// The contract desktop-SPEC.md section 8-11 holds input to: each
+    /// The contract `crates/desktop/Spec.lean` section 8-11 holds input to: each
     /// stroke becomes the one event it names, keys by their code,
     /// typed units as units whatever the layout, and pointer events at
     /// an absolute place on the whole virtual desktop, so the corners of

@@ -86,7 +86,7 @@ pub(super) fn hold(window: &winsafe::HWND, at: Option<Point>) -> Result<(), Refu
 /// lies under the point, against the window this call named.
 ///
 /// Pure over three values, which is what makes the rule this module
-/// exists for provable without a desktop (desktop-SPEC.md section 16.2).
+/// exists for provable without a desktop (`crates/desktop/Spec.lean` section 16.2).
 fn settled(intended: Aim, holder: Aim, under_pointer: Option<Aim>) -> Result<(), Refusal> {
     if holder != intended {
         return Err(Refusal::new(
@@ -160,7 +160,7 @@ fn wait_for(intended: Aim) {
 mod tests {
     use super::*;
 
-    /// The contract desktop-SPEC.md section 8-11 holds the hit test to,
+    /// The contract `crates/desktop/Spec.lean` section 8-11 holds the hit test to,
     /// whichever interface answers it: the window under a point is the
     /// top-level window drawn there. The window is this test's own, kept
     /// on top of every other and never given the keyboard.

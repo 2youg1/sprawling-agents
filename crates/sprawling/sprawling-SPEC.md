@@ -130,7 +130,7 @@ impl Residents {
 
 ## 8-4d 桌面是这个二进制自带的工具（`accounting::worker::workbench::desktop`、`bin::main::desktop`）
 
-一栋楼的 `RULES.toml` 写 `desktop = true`，它的 run 就拿到这台电脑的桌面那六件工具（desktop-SPEC §8-7）。人不在 `CONFIG.toml` 里手写 `[[mcp]]`，也不另装程序。
+一栋楼的 `RULES.toml` 写 `desktop = true`，它的 run 就拿到这台电脑的桌面那六件工具（`crates/desktop/Spec.lean` §8-7）。人不在 `CONFIG.toml` 里手写 `[[mcp]]`，也不另装程序。
 
 ```rust
 // bin::assembly —— 起桌面 server 的那个程序；装配点收下它，而不是自己去问
@@ -152,17 +152,17 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 - **同一个二进制，另一个进程**：规则要桌面时，`servers` 给这栋楼添一条 stdio 声明：`command` 是正在运行的这个可执行文件，`args` 是 `["desktop", <这栋楼的 DESKTOP.toml>]`（`city::desktop_scope_path`，住城根下这栋楼的保留子树，评审楼的 worktree 里没有它）。之后它与任何一条 `[[mcp]]` 走同一条路：经 `accounting::Connectors` 连上、握手、list，常驻连接表管它的寿命（§8-4）。子进程这条边界是故意留的：UI Automation 的 COM 状态、`SendInput` 与 `crates/desktop/` 里那些带 `SAFETY:` 的 `unsafe` 都跑在子进程里，城那个唯一写者的进程里一行也不跑；COM 出错或子进程 abort，结束的是子进程，城只在那一次调用上拿到 `E_TIMEOUT` 或 `E_TOOL_UNAVAILABLE`；两者都发生在请求交出之后，所以都带 `Retry::Unknown`（`crates/agent_protocols/Spec.lean` §8-17）。桌面自己的拒绝以 `isError` 结果到达，城把它读成一次失败，拒词全文进 subject（`crates/agent_protocols/Spec.lean` §8-1c）。MCP 这条路上已有的规矩一条不改：工具表随 run 冻结，`kernel::gate::undoable` 按远端名前缀 `desktop.` 升给人，期限到即杀子进程。
 - **程序路径是收下的，不是问出来的**：`RunWorker` 持一个 `DesktopProgram`，生产交 `std::env::current_exe`，测试交 `CARGO_BIN_EXE_sprawling`。理由与 `Browsers`（§8-45-2）相同：它在主机上起一个程序。问不出路径或路径不是 UTF-8 时，这栋楼这一次没有桌面工具，诊断里留一条 `Refuse`，派活照常。这与起不来的 `[[mcp]]` server 是同一个答法。
 - **楼自己写了 `label = "desktop"` 的 `[[mcp]]`，就用它那一条**：两台 server 用一个标签，同一个工具名就指向两个进程（city 对同层重名的拒绝是同一个理由）。人明写的那一条优先，自带的这台不起，诊断里留一条 `Decide`（诊断的级别里没有「提醒」一级，`Decide` 说的正是一个判定为什么取了这个值）：要用自带的，删掉那一行。
-- **装配层不按平台分支**：非 Windows 的机器上这台 server 照样起，每次调用答 `E_TOOL_UNAVAILABLE` 并报出平台名（desktop-SPEC §8.5 第四对）。在这里再判一次平台，这条规则就有了第二个家。
+- **装配层不按平台分支**：非 Windows 的机器上这台 server 照样起，每次调用答 `E_TOOL_UNAVAILABLE` 并报出平台名（`crates/desktop/Spec.lean` §10 设计四）。在这里再判一次平台，这条规则就有了第二个家。
 - **confidential 楼够不着它**：`city::policy` 解析时就拒绝 `confidential` 与 `desktop` 同真，`mcp_tools` 对 confidential 楼也不起任何进程。这里不判第三次。
 - **体积**：把 `crates/desktop/` 链进来使 release 二进制变大多少，读数只记在 `tools/xtask/budgets.toml` 的 `[release_binary]`。增量来自 `crates/desktop/` 自己的代码、`image` 的编码器与 `windows` 绑定；std、serde_json、toml、png 两边共用，只算一份。
-- **不内置任何模型（定规）**：桌面给模型的文字反馈先取 accessibility tree；OCR 与 ASR 都经人接入的端点，二进制里不带任何模型的权重。desktop-SPEC §15.2 记着这条线后面还欠的东西。
+- **不内置任何模型（定规）**：桌面给模型的文字反馈先取 accessibility tree；OCR 与 ASR 都经人接入的端点，二进制里不带任何模型的权重。`crates/desktop/Spec.lean` §15.2 记着这条线后面还欠的东西。
 - **被否的两条路**：①照旧另发一个 `sprawling-desktop` 可执行文件，由人放上搜索路径再手写 `[[mcp]]`：一件功能成了两个制品，版本要对齐，人还得知道那一行怎么写；②把单独编出的桌面可执行文件的字节嵌进本二进制，运行时写到盘上再起：运行时往盘上写可执行文件，std 也多带一份。**重开参数**：`crates/desktop/` 使 release 二进制增大超过 1 MiB（`[release_binary]` 的 slack），就回到第一条路重新比较。
 
 **验收**：`crates/sprawling/tests/desktop.rs` 的 `a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary`。一栋楼的 `RULES.toml` 写 `desktop = true`，没有任何 `[[mcp]]`，城起真的 `sprawling desktop` 子进程，模型收到的工具表里有 `desktop_desktop_windows` 等六件。
 
 ## 8-146 Windows 上构建这个二进制要有 Zig（`bin::doctor::table::toolchain` 的 `zig` 一行）
 
-`sprawling` 按路径链接 `crates/desktop/`，`crates/desktop/` 在 Windows 上链接它的 FFI 缝 `crates/desktop/ffi`，而那个包的构建脚本用 `zig build-lib` 编一片 Zig 叶子（desktop-SPEC §8-12）。所以 Windows 上编这个二进制、跑 `just check` 都要一个 Zig，且是 `crates/desktop/ffi/zig-version` 钉住的那一版。
+`sprawling` 按路径链接 `crates/desktop/`，`crates/desktop/` 在 Windows 上链接它的 FFI 缝 `crates/desktop/ffi`，而那个包的构建脚本用 `zig build-lib` 编一片 Zig 叶子（`crates/desktop/Spec.lean` §8-12）。所以 Windows 上编这个二进制、跑 `just check` 都要一个 Zig，且是 `crates/desktop/ffi/zig-version` 钉住的那一版。
 
 ```rust
 // bin::doctor::table::toolchain（形状 6 数据）
@@ -1124,7 +1124,7 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **Lean 是开发这份代码必需的工具**（§8-58）。各 crate 的规格正从 `<crate>-SPEC.md` 迁成 `Spec.lean`（ARCHITECTURE.md §11「Specifications in Lean」），`just check` 里的 `models` 一步是这些规格在本地被证明过的唯一证据。Lean 列为可选时，没装 Lean 的机器上 `models` 静默通过，本地的绿就不再说明规格被证明过，只有 CI 知道。所以 `elan` 与 `lean` 两行是 `required`：缺了它们，`just prereqs` 在编译之前报出来并给出装法，`just models` 自己也报错而不是跳过。被否决的备选：保持可选、只靠 CI 的 `models` job 证明——那样每次本地验证都得另外说明「规格没有证过」，而这句话没有哪道门会替人说。
 
-**Zig 是在 Windows 上开发这份代码必需的工具**（8-146）。桌面 server 没有准入安全接口的四组 Win32 调用经一片 Zig 叶子（desktop-SPEC §12.12），叶子在构建时编译，所以 Windows 上没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `crates/desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
+**Zig 是在 Windows 上开发这份代码必需的工具**（8-146）。桌面 server 没有准入安全接口的四组 Win32 调用经一片 Zig 叶子（`crates/desktop/Spec.lean` D12），叶子在构建时编译，所以 Windows 上没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `crates/desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
 
 **崩溃验收在盘上造死亡，不在进程里杀**（8-127）。一次 run 真跑完，丢掉 worker 释放写者锁，再把账截在一行的半途、删去其后的行；重开走 `RunWorker::new` 与 `startup_scan`，与 `sprawling resume` 同一条路。理由：被杀的进程留在盘上的就是这样一份账——锁已释放，最后一行写了一半——而盘上的截法可以精确指定死在哪一行的哪一个字节，每次重跑都是同一次死亡。被否：①起真二进制再杀掉它——那是从外面进城的检查，按边界规则归 `tools/adversary/` 的 Lean 黑盒（G1e），而且杀在哪一刻取决于调度，失败不能逐字节重演；②把账本放在 `storage` 的故障文件系统上断电——它只承载账本，`Standing::fold` 与视图读真目录，重开的不是一座完整的城，断电的耐久契约已由 storage 自己的测试证过。重开参数：账本之外的文件（检查点、快照、CAS）也要在一次死亡里与账本错开时，验收要能在同一刻截断它们，那时改为在 `Vfs` 缝之上承载整座城。
 
@@ -3062,11 +3062,11 @@ book: gateway::EndpointBook,   // 派活立起那一刻的端点账本
 
 - **有没有这件工具，与 composer 的麦克风读同一个选择。** `EndpointBook::select(ModelTag::Transcribe, 楼的 policy)` 成了，`gateway::transcriber_for` 把它变成设施，工具上表；拒了，工具不上表。没有第二个「这座城能不能转写」的开关。与 `views::hearing` 只差 policy：run 有楼，读楼规，于是机密楼只拿得到回环地址上的转写端点；口述没有楼，按普通楼。`select` 的三种拒绝——没选、端点已撤、机密楼而端点离机——对模型是同一件事：这座楼没有转写，一件叫了必败的工具不放上表。`transcriber_for` 的失败（HTTP 客户端造不起来）照常上抛，因为它对主模型的调用同样成立。设施放在一把锁后面：它里面的凭据解析器是 `Send` 而不是 `Sync`，而一件工具要在一波调用之间共享，于是同一个 run 的两次转写轮流进行。
 - **账本在 `RunWorker::laying` 里复制一份进 `Laying`。** 工作台在驾驶这个 run 的 lane 里摆（8-113），账本属于 accounting 线程；`Laying` 本来就带着「派活立起那一刻」的值（`waiting`、`locks`、`trust`），账本是同一种值，几个端点的复制是微秒量级。被否：在 `agree_to_work` 里造好设施随 `Agreed` 带过去——那样工具在一处造、在另一处登记，「这件工具有没有」就有两处答案；只把 `Transcriber` 放进 `Laying`——`laying()` 手里没有楼规，造不出对的 policy。
-- **录音从 run 自己这座楼里的一个文件进来。** 参数是相对城根的路径（审查楼里是这个 run 的树），与 `read` 同一种写法。不经 CAS：今天没有一条路把音频放进 CAS（desktop 的录音落在临时目录，desktop-SPEC §14；连接器只把 png 存进 CAS）。只收本楼，理由有二：发出这段录音的端点是按本楼的 policy 选的，录音也出自本楼，于是判这次上传的只有一份楼规；读别楼要问读界（read bound），而把一条模型选的路径判成「可读」的那一处是 `runtime::tools::chosen_path`，crate 私有，在这里再写一份就是第二个权威。判定只用已有的权威：`Address::parse`（语法）、`Address::is_within`（本楼）、`Address::is_reserved`（reserved subtree）、`storage::WriteTarget::within`（路上不许有 link）。最后一项对读比 `chosen_path::land` 更严：它拒 link 而不去解析 link，所以放不进 `land` 会拒的东西。容器从文件名读（`AudioType::of_file_name`），字节经 `Recording::read_from` 读到上限为止（gateway-SPEC §8-33）。
+- **录音从 run 自己这座楼里的一个文件进来。** 参数是相对城根的路径（审查楼里是这个 run 的树），与 `read` 同一种写法。不经 CAS：今天没有一条路把音频放进 CAS（desktop 的录音落在临时目录，`crates/desktop/Spec.lean` §14；连接器只把 png 存进 CAS）。只收本楼，理由有二：发出这段录音的端点是按本楼的 policy 选的，录音也出自本楼，于是判这次上传的只有一份楼规；读别楼要问读界（read bound），而把一条模型选的路径判成「可读」的那一处是 `runtime::tools::chosen_path`，crate 私有，在这里再写一份就是第二个权威。判定只用已有的权威：`Address::parse`（语法）、`Address::is_within`（本楼）、`Address::is_reserved`（reserved subtree）、`storage::WriteTarget::within`（路上不许有 link）。最后一项对读比 `chosen_path::land` 更严：它拒 link 而不去解析 link，所以放不进 `land` 会拒的东西。容器从文件名读（`AudioType::of_file_name`），字节经 `Recording::read_from` 读到上限为止（gateway-SPEC §8-33）。
 - **效果是 `Effect::Read`。** 它读一个文件，城里什么都不写；录音出门去的是人为这类活选定、已按本楼 policy 判过的端点，与 run 的对话去主模型端点是同一种出门，而模型调用不是工具效果。被否：`Effect::Egress`——那一类的定义是「目的地由这次调用指名」，出网门扫的是参数里的字节，而这里参数只有一条路径，出去的是录音，判它的是已经判过的 `select`。`CostTier::Heavy`：一次 provider 往返，数秒，可能计费。`timeout: None`：设施自己的 `TRANSCRIBE_TIMEOUT_MS` 已是上限，第二个期限会是第二个权威。`render: Generic`：它产出的是文字。
 - **在工具表上的位置**：内置工具与按用途加的那几件之后、城外工具（浏览器、MCP）之前。provider 按位置缓存工具数组，所以新的内置工具接在内置那一段的末尾。
 - **验收**：`crates/sprawling/tests/acceptance/episodes.rs` 末尾一段。选了转写端点的城，run 调 `transcribe` 拿回脚本端点转出的字，端点收到的模型名是人选的那一个；机密楼配离机转写端点时，工具不在表上。没选转写的城不上这件工具，由 catalogue 的两条覆盖测试守着：上了表而没被调用，会被点名。工具自己的拒绝（别楼的路径、认不得的容器、不存在的文件）由 `transcribe` 模块的测试守着。
-- **未决**：读别楼的录音（读界之内的任意路径，或一个 `cas:` 块）要等 runtime 把 `chosen_path` 的判定公开成一扇按字节读的门。促成它的证据是出现一条把音频放进 CAS 或放进别楼的生产路径，例如 desktop 的录音交回城里（desktop-SPEC §15.2）。
+- **未决**：读别楼的录音（读界之内的任意路径，或一个 `cas:` 块）要等 runtime 把 `chosen_path` 的判定公开成一扇按字节读的门。促成它的证据是出现一条把音频放进 CAS 或放进别楼的生产路径，例如 desktop 的录音交回城里（`crates/desktop/Spec.lean` §15.2）。
 
 ## 8-57 浏览器是一族引擎，不是一个牌子（`bin::doctor::family`、`family::gecko`／`chromium`／`webkit`、`bin::doctor::registry`）
 

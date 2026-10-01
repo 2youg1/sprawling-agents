@@ -20,7 +20,7 @@
 //!
 //! **No window handle is minted here.** The enumeration goes through
 //! the Zig leaf, because `winsafe`'s `EnumWindows` is not admitted
-//! (desktop-SPEC.md section 12.9); the leaf writes each handle the
+//! (`crates/desktop/Spec.lean` D9); the leaf writes each handle the
 //! system reports into a `winsafe::HWND` slot this server lent it, so
 //! the handles arrive already typed and nothing on this side builds one
 //! from a raw pointer (section 8-11). Everything after that —
@@ -129,7 +129,7 @@ mod tests {
     use super::super::fixture::Opened;
     use super::*;
 
-    /// The contract desktop-SPEC.md section 8-11 holds this row to,
+    /// The contract `crates/desktop/Spec.lean` section 8-11 holds this row to,
     /// whichever interface answers it: a window this process opens is
     /// listed once, by the title it was given, the file name of this
     /// process, and the rectangle it occupies. The window sits off every
@@ -166,7 +166,7 @@ mod tests {
     /// a build server, say — is that enumerating answers rather than
     /// crashing, and that everything it answers with is nameable. What
     /// *is* open is this machine's business and is not asserted
-    /// (desktop-SPEC.md §16.2).
+    /// (`crates/desktop/Spec.lean` §16.2).
     #[test]
     fn every_window_this_lists_can_be_named_by_a_caller() {
         let listed = desktop().expect("enumerating this desktop answers");

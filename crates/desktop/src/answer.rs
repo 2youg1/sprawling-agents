@@ -9,8 +9,8 @@
 //! content blocks. The facts of an answer travel as one text block
 //! holding their JSON on one line, a picture travels as an image block,
 //! so a model that reads images sees the picture rather than a page of
-//! base64 (desktop-SPEC.md section 12.2), and a recording's sound
-//! travels as an audio block the city stores (section 12.13). The
+//! base64 (`crates/desktop/Spec.lean` D2), and a recording's sound
+//! travels as an audio block the city stores (`crates/desktop/Spec.lean` D13). The
 //! base64 is written here and nowhere else.
 
 use base64::Engine as _;
@@ -86,7 +86,7 @@ impl Answer {
 
     /// A recording's sound, then the facts about the recording: the
     /// same order a picture takes, so the city reads both answers one
-    /// way (desktop-SPEC.md section 12.13).
+    /// way (`crates/desktop/Spec.lean` D13).
     #[cfg_attr(
         not(any(windows, test)),
         expect(
@@ -152,7 +152,7 @@ mod tests {
 
     /// A recording's sound reaches the city as MCP audio content, in
     /// front of the facts, the same shape a screenshot has
-    /// (desktop-SPEC.md section 12.13).
+    /// (`crates/desktop/Spec.lean` D13).
     #[test]
     fn a_recordings_sound_travels_as_audio_content_before_its_facts() {
         let answer = Answer::sound(

@@ -8,7 +8,7 @@
 //! A process that declares nothing is given scaled coordinates on a
 //! scaled monitor by `GetWindowRect` and `GetSystemMetrics`, while UI
 //! Automation reports physical ones, and a click placed from one lands
-//! somewhere else in the other (desktop-SPEC.md section 12.6). So the
+//! somewhere else in the other (`crates/desktop/Spec.lean` D6). So the
 //! desk declares per-monitor awareness when it opens, before it reads
 //! any coordinate, and holds the proof that it did.
 

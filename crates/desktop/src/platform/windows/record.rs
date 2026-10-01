@@ -28,7 +28,7 @@
 //! and stopping would be ambiguous in a way no answer resolves.
 //!
 //! Sound is heard only from the one device the scope file names
-//! (desktop-SPEC.md section 12.11): `hearing` runs it, and `stop` hands
+//! (`crates/desktop/Spec.lean` D11): `hearing` runs it, and `stop` hands
 //! the sound back as an audio block when it is short enough to carry
 //! (section 12.13).
 

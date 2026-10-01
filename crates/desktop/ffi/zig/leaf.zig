@@ -5,7 +5,7 @@
 
 // The Win32 call groups that have no admitted safe Rust interface,
 // each as one whole operation behind a `(ptr, len)` boundary
-// (desktop-SPEC.md sections 8-12 and 12.12).
+// (`crates/desktop/Spec.lean` sections 8-12 and D12).
 //
 // What crosses the boundary is Rust's memory, lent for one call: a
 // buffer and its length, an out-parameter for a count, an out-parameter
@@ -161,7 +161,7 @@ export fn sprawling_desktop_windows(into: [*]?HWND, capacity: usize, found: *usi
 /// One window's pixels as top-down 32-bit BGRA, written into exactly
 /// `len` bytes. The bitmap is unselected before it is read back, the
 /// window's context goes back with the window it came from, and every
-/// object is released on every path (desktop-SPEC.md section 10, item 8).
+/// object is released on every path (`crates/desktop/Spec.lean` section 10, item 8).
 export fn sprawling_desktop_capture(window: ?HWND, width: i32, height: i32, into: [*]u8, len: usize, code: *u32) u32 {
     return capture(window, width, height, into[0..len]).answer(code);
 }
@@ -214,7 +214,7 @@ fn readBack(memory: HDC, bitmap: HGDIOBJ, width: i32, height: i32, into: []u8) E
 // -------------------------------------------------------------- clipboard
 
 /// The clipboard, open under a message-only window of this process's
-/// own for as long as `open` holds it (desktop-SPEC.md section 12.8).
+/// own for as long as `open` holds it (`crates/desktop/Spec.lean` D8).
 const Held = struct {
     owner: HWND,
 

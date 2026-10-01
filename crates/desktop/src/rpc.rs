@@ -20,7 +20,7 @@ use crate::refusal::{Refusal, RefusalCode};
 use serde_json::{Value, json};
 
 /// The revision this server speaks: the city's client's own, because the
-/// two ends have to agree (desktop-SPEC.md section 14).
+/// two ends have to agree (`crates/desktop/Spec.lean` section 14).
 pub(crate) use agent_protocols::PROTOCOL_VERSION;
 
 /// One request line, read.

@@ -219,7 +219,7 @@ mod tests {
     /// the seed come from `DESKTOP_FFI_FUZZ_ROUNDS` and
     /// `DESKTOP_FFI_FUZZ_SEED`, and a disagreement prints the seed and
     /// the round it replays from. libFuzzer has no platform for this
-    /// leaf today (desktop-SPEC.md section 12.12), so the Rust side is
+    /// leaf today (`crates/desktop/Spec.lean` D12), so the Rust side is
     /// fuzzed by drawing rather than by coverage.
     #[test]
     #[ignore = "runs for as long as DESKTOP_FFI_FUZZ_ROUNDS asks; `just fuzz-desktop` runs it"]

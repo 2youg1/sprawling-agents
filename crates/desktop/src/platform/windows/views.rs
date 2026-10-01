@@ -9,7 +9,7 @@
 //! A `ref` here means one thing and it is worth stating exactly: **the
 //! place an element occupied on the screen at the moment the snapshot
 //! was taken**. Nothing is held open across the call — the tree walk
-//! keeps its COM objects to itself (desktop-SPEC.md §8.6, second pair) —
+//! keeps its COM objects to itself (`crates/desktop/Spec.lean` section 10, design six) —
 //! so a ref is a rectangle and a generation, and that is the whole of
 //! it.
 //!
@@ -25,14 +25,17 @@
 //! holds only while that window's rectangle is the one the snapshot saw:
 //! a window that moved or changed size refuses its old generation, since
 //! every ref of it now points at where the window used to be. What this
-//! does not catch is written down rather than hidden (desktop-SPEC.md
-//! section 12.5): a window that rearranges its inside while its outline
+//! does not catch is written down rather than hidden (`crates/desktop/Spec.lean`
+//! D5; the model is `crates.desktop.spec.Platform.Windows.Views`): a window that rearranges its inside while its outline
 //! stays put, and a handle reused by a new window that happens to take
 //! the same rectangle.
 //!
 //! A `point` carries no generation check, because a point did not come
 //! from a snapshot: the caller measured it against the window's own
 //! edges, and `geometry::Bounds::at` is what judges it.
+//!
+//! The properties this module must hold are proved in `crates/desktop/spec/Platform/Windows/Views.lean`;
+//! this code is the authority on how it holds them.
 
 use crate::outline::Role;
 use crate::refusal::{Refusal, RefusalCode};

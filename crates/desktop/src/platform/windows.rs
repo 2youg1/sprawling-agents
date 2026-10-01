@@ -69,11 +69,11 @@ pub(crate) struct Desk {
     recordings: record::Recordings,
     /// Whether this process reads the desktop in physical pixels. A desk
     /// that could not make it so refuses every call rather than mix two
-    /// kinds of coordinate (desktop-SPEC.md section 12.6).
+    /// kinds of coordinate (`crates/desktop/Spec.lean` D6).
     pixels: Result<dpi::PhysicalPixels, Refusal>,
     /// What this desk reads trees with, started by the first snapshot:
     /// a connection that never asks for a tree never enters COM
-    /// (desktop-SPEC.md section 12.10).
+    /// (`crates/desktop/Spec.lean` D10).
     reader: Option<tree::Reader>,
 }
 
@@ -133,7 +133,7 @@ impl Desk {
             &walked.ending,
         );
         // The rectangles stay here, where `desktop.act` looks a ref up;
-        // a model has no use for them (desktop-SPEC.md section 12.10 (b)).
+        // a model has no use for them (`crates/desktop/Spec.lean` D10 (b)).
         let generation = self.views.mint(sight(&window), walked.nodes);
         Ok(Answer::outline(
             text,
@@ -163,7 +163,7 @@ impl Desk {
         // desktop may have handed the keyboard to another window, and
         // `SendInput` follows the keyboard rather than the decision.
         // The window named here is the window the events reach, or
-        // nothing is sent (desktop-SPEC.md section 8.6, sixth pair).
+        // nothing is sent (`crates/desktop/Spec.lean` section 10, design ten).
         focus::hold(&window.handle, action.lands_at())?;
         act::perform(&action, &modifiers)?;
         Ok(json!({
@@ -302,7 +302,7 @@ fn listing(arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal>
                 // It is deliberately not accepted back by the other
                 // tools: the scope file judges a title and a process, so
                 // a second way to name a window would be a second door
-                // onto the same permission (desktop-SPEC.md §8.6, third
+                // onto the same permission (`crates/desktop/Spec.lean` section 10, design seven
                 // pair). It carries no native handle for the same reason.
                 "ref": format!("w{}", at.saturating_add(1)),
                 "title": window.named.title,

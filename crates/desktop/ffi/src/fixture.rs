@@ -7,7 +7,7 @@
 //! compiled only with the `fixture` feature, which only the desktop
 //! server's Windows dev-dependencies switch on.
 //!
-//! The contracts of desktop-SPEC.md section 8-11 are read back from a
+//! The contracts of `crates/desktop/Spec.lean` section 8-11 are read back from a
 //! real window, and the only window a test may read is one it made: a
 //! test that listed, hit-tested or walked the person's own windows would
 //! depend on what happens to be open, and could change it. This window
@@ -16,7 +16,7 @@
 //! It lives here rather than beside the tests that use it because opening
 //! a window and answering its messages are calls with no safe interface,
 //! and the desktop server inherits the workspace's `forbid` even in its
-//! tests (desktop-SPEC.md section 12.14); this crate is the one that may
+//! tests (`crates/desktop/Spec.lean` D14); this crate is the one that may
 //! relax `unsafe_code`.
 //!
 //! It lives on a thread of its own that answers its messages. UI

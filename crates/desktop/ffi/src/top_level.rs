@@ -9,7 +9,7 @@
 //! The leaf writes each handle into a slot of a `winsafe::HWND` buffer,
 //! so the only place a window handle comes into being is the one
 //! `extern` call below: no `HWND::from_ptr` is written anywhere in the
-//! server (desktop-SPEC.md section 8-11).
+//! server (`crates/desktop/Spec.lean` section 8-11).
 
 use winsafe::co;
 use winsafe::prelude::Handle;

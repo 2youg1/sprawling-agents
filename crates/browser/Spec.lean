@@ -141,7 +141,7 @@ D7 截图的区域三臂互斥，框只有一个来源，上界由两端说住�
 
 D8 `diff` 的百分比是万分比整数（`changed_ppm`、`ratio_q4`），框是像素坐标的整数矩形，因为两者会进账本载荷。尺寸不同的两张图不比较，回 `E_INVALID_ARGS`：缩放后再比，比出来的是缩放算法的差异。解码后的字节短于头部声明的尺寸时回 `E_WIRE_MISMATCH` 并说出是哪一张短了（先拍的、后拍的、两张都短），因为三种情况的下一步不同；判定对前后两个像素取值穷尽匹配。全 crate 只有一个矩形类型 `shot::Rect`（`covers` 与 `covering` 是它的方法），`diff` 从 `shot` 读它。`png` 依赖：产品路径只解码，测试用它的编码器造夹具，断言比的是真 PNG 字节。
 
-D9 拖拽与滚动与 `desktop.act` 同一份词汇：`drag` 从 ref 或 point 到 point，`scroll` 用 `to` 表示滚多远，`steps` 为中间移动次数，两侧字段名与含义逐字相同（desktop-SPEC §8-4 指向这里）。BiDi 的元素 origin 用页面自己的 shared id 而不是选择器，所以元素起点的拖拽在线上是两帧：`act::resolve_frame` 让页面报出元素，`input::shared_id_of` 读出 id，`input::pointer_frame` 发 `input.performActions`；`Verb::frames` 只发第一帧，工具在 `invoke` 里补第二帧，判定仍在纯代码里，`Recording` 能逐帧重放。`Scroll` 与 point 起点的 `Drag` 没有元素，所以 `Action::reference()` 是 `Option`。
+D9 拖拽与滚动与 `desktop.act` 同一份词汇：`drag` 从 ref 或 point 到 point，`scroll` 用 `to` 表示滚多远，`steps` 为中间移动次数，两侧字段名与含义逐字相同（`crates/desktop/Spec.lean` §8-7 指向这里）。BiDi 的元素 origin 用页面自己的 shared id 而不是选择器，所以元素起点的拖拽在线上是两帧：`act::resolve_frame` 让页面报出元素，`input::shared_id_of` 读出 id，`input::pointer_frame` 发 `input.performActions`；`Verb::frames` 只发第一帧，工具在 `invoke` 里补第二帧，判定仍在纯代码里，`Recording` 能逐帧重放。`Scroll` 与 point 起点的 `Drag` 没有元素，所以 `Action::reference()` 是 `Option`。
 
 D10 `usersbrowser` 驱动人已经开着的那个浏览器，用的是那个人的真 profile；与 `browser` 的差别是安全模型而不是动作集合。地址是人的声明：`RULES.toml` 的 `usersbrowser` 一键，值为 `ws://127.0.0.1:<port>/session` 时启用该工具并把地址交给 attach 门；值为 `true` 时启用而地址未定，每次调用都得到门的问题（`E_APPROVAL_PENDING`）；absent 或 `false` 即无此工具；confidential 楼写这一键即在规则读取处被拒。恒不关人的浏览器：`AttachedBrowser` 只连、不启动、不结束进程，`Verb::Close` 结束的是一次会话；附着是会话级、绑一个 run。入账：附着是工具的第一次调用，与之后每个动作一样写 `tool_called` 与 `tool_result`；`disclosure` 写明它需要人先批准并引导先用 `browser`。平台的门就是授权：Firefox 走 `--remote-debugging-port`、Chromium 走驱动，两者都要求人的动作；地址是否 loopback 由 `gate::attach` 判，非 loopback 的声明被拒，因为那会把登录态读过一个网络。
 
@@ -195,6 +195,6 @@ D12 一个 run 能按键：`Action::Press { key, modifiers }`，一帧 `input.pe
 
 - `architecture.toml` 里 browser 各行（锚点指向本文件与分部）与 ARCHITECTURE.md §4 缝清单（`BrowserPort`）；ARCHITECTURE.md §11 的 V3 一行引 D1。
 - `docs/glossary.md` 的 **browser** 行（D4）与新增词汇。
-- desktop-SPEC §8-4（拖拽与滚动的同一份词汇，D9）；client-SPEC §7（键表，D12）；city-SPEC 的 policy（confidential 与 `usersbrowser`，D10）；xtask-SPEC 的 `render` 与 `survey` 各节（D11）；sprawling-SPEC 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
+- `crates/desktop/Spec.lean` §8-7（拖拽与滚动的同一份词汇，D9）；client-SPEC §7（键表，D12）；city-SPEC 的 policy（confidential 与 `usersbrowser`，D10）；xtask-SPEC 的 `render` 与 `survey` 各节（D11）；sprawling-SPEC 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
 - 本 crate 没有 `conformance` feature（D1）。
 -/

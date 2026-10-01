@@ -9,7 +9,7 @@
 //! done instead — and all three travel to the caller. The stable code is
 //! one of the city's own, `kernel::AxCode`, and its spelling is read from
 //! there; this server answers with a closed six of them, and a new one is
-//! minted in `kernel` first (desktop-SPEC.md section 8.5, first pair).
+//! minted in `kernel` first (`crates/desktop/Spec.lean` section 10, design one).
 
 use agent_protocols::EFFECT_META_KEY;
 use kernel::AxCode;
@@ -151,8 +151,8 @@ impl Refusal {
     ///
     /// A tool's own refusal is a result with `isError` set, as MCP asks,
     /// so its whole text reaches the model; a client reads only `code`
-    /// and `message` from a JSON-RPC error (desktop-SPEC.md section
-    /// 12.2). The text is the summary, then the recovery on a line of its
+    /// and `message` from a JSON-RPC error (`crates/desktop/Spec.lean`
+    /// D2). The text is the summary, then the recovery on a line of its
     /// own.
     pub(crate) fn as_tool_result(&self) -> Value {
         let text = format!("{}\ninstead: {}", self.summary(), self.recovery);

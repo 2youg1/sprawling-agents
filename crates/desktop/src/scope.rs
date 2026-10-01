@@ -13,8 +13,8 @@
 //!
 //! A whole-screen capture is refused because the file has no way to
 //! permit it: the allowlist speaks of windows, and a full-screen image
-//! shows everything the allowlist left out (desktop-SPEC.md section 8.5,
-//! third pair).
+//! shows everything the allowlist left out (`crates/desktop/Spec.lean` section
+//! 10, design three; the model is `crates.desktop.spec.Scope`).
 //!
 //! **Admission is a value, and it is the only way to reach the desk.**
 //! [`Scope::admits`] hands back an [`Admitted`] carrying the allowlist
@@ -23,6 +23,9 @@
 //! disclosing as a snapshot — a title carries a document name, a URL
 //! and often a person's name — so the tool that reports titles is held
 //! to the same allowlist as the tools that act on them.
+//!
+//! The properties this module must hold are proved in `crates/desktop/spec/Scope.lean`;
+//! this code is the authority on how it holds them.
 
 mod pattern;
 
@@ -120,7 +123,7 @@ pub(crate) struct Admitted<'a> {
         not(any(windows, test)),
         expect(
             dead_code,
-            reason = "only the Windows arm reports windows, so only it reads the allowlist back (desktop-SPEC.md section 12.1)"
+            reason = "only the Windows arm reports windows, so only it reads the allowlist back (`crates/desktop/Spec.lean` D1)"
         )
     )]
     allowance: &'a Allowance,
@@ -141,7 +144,7 @@ impl Admitted<'_> {
     }
 
     /// The one sound device this scope's operator named, which is the
-    /// only device a recording may hear (desktop-SPEC.md section 12.11).
+    /// only device a recording may hear (`crates/desktop/Spec.lean` D11).
     ///
     /// # Errors
     /// `E_GATE_DENIED` when the file names none: a device nobody named is

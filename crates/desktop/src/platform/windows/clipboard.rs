@@ -8,7 +8,7 @@
 //! The clipboard is one shared object for the whole desktop, and the
 //! operating system lends it to one program at a time. The Zig leaf
 //! opens it under a message-only window of its own, closes it on every
-//! path, and takes one turn per process (desktop-SPEC.md sections 12.8
+//! path, and takes one turn per process (`crates/desktop/Spec.lean` D8
 //! and 8-12); this module decides what each of its answers means to a
 //! caller.
 //!

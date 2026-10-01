@@ -1,9 +1,24 @@
-# desktop-SPEC.md
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-> package：`sprawling-desktop`（库名 `desktop`，根工作区的成员，继承工作区的 lint 表；作为库链进 `sprawling`，由 `sprawling desktop` 这个动词起成子进程），与它唯一的 FFI 缝 `sprawling-desktop-ffi`（`crates/desktop/ffi`，规格是 `crates/desktop/ffi/Spec.lean`）同为根工作区的成员（§8-12、§12.14）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
-> 骨架：apostle-sdd 十七节；按模块分章、每章自足（ARCHITECTURE.md §5）。
+import crates.desktop.spec.Outline
+import crates.desktop.spec.Platform.Windows.Strokes
+import crates.desktop.spec.Platform.Windows.Target
+import crates.desktop.spec.Platform.Windows.Views
+import crates.desktop.spec.Scope
+import crates.desktop.spec.Scope.Pattern
+import crates.desktop.spec.Session
 
-## 1 需求分解
+/-! # desktop 的规格
+
+`sprawling-desktop`（库名 `desktop`，目录 `crates/desktop`）是一台按行说话的 MCP server：它给 agent 一双眼睛和一双手，落在这台 Windows 桌面上，并且这双手从第一天起就受一份 allowlist 约束。它是根工作区的成员，继承工作区的 lint 表，作为库链进 `sprawling`，由 `sprawling desktop` 这个动词起成子进程；它唯一的 FFI 缝 `sprawling-desktop-ffi`（`crates/desktop/ffi`）是另一个成员，规格是 `crates/desktop/ffi/Spec.lean`。
+
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定，决定写作 `D<n>`，别处引作 `desktop D<n>`。D1 到 D14 沿用这份规格在 Markdown 时 §12 的条目号，§10 的设计一到设计十是它原来 §8.5 的四对与 §8.6 的六对。
+-/
+
+/-! ## 1 需求分解
 
 一件事：**给 agent 一双眼睛和一双手，落在这台 Windows 桌面上**，并且这双手从第一天起就受一份 allowlist 约束。
 
@@ -15,7 +30,10 @@
 
 第三件事的后半句是**真的实现**，且它换掉的只有 `platform` 一个模块：协议壳与工具表一行不改，这正是把形状定死所买到的东西。
 
-## 2 验收标准
+分部与单元的对应：`scope`（`spec/Scope.lean`）与 `scope::pattern`（`spec/Scope/Pattern.lean`）、`session`（`spec/Session.lean`）、`outline`（`spec/Outline.lean`），以及 Windows 臂里不碰 Win32 的三处判定：`strokes`（`spec/Platform/Windows/Strokes.lean`）、`views`（`spec/Platform/Windows/Views.lean`）、`target`（`spec/Platform/Windows/Target.lean`）。
+-/
+
+/-! ## 2 验收标准
 
 | 单元 | 完成的定义 |
 |---|---|
@@ -39,18 +57,25 @@
 | windows::record | 同一窗口重复 start 恒被拒；未 start 就 stop 恒被拒；每一帧恒取自 `capture::window`；抓帧失败恒让录制停下，`stop` 恒交出落盘路径并说出写了多少帧、为什么提前停；`audio: true` 恒只录 scope 文件点名的那一个设备；`stop` 恒把不超过 `SOUND_CARRIED_MOST` 的声音作为一块 audio content 放在文字之前交回，更长的只交路径并说出为什么 |
 | unsafe | 生产代码的 `unsafe` 恒只在 `crates/desktop/ffi/src/` 之下，恒是一次对 Zig 叶子的调用或那一处声明（§8-12 的表）；每一个 `unsafe` 块恒带一行 `SAFETY:`，写的是**使它成立、并且可能为假的前提**，而不是把这次调用换句话再说一遍 |
 
-## 3 假设与歧义
+分部里的定理是模型对性质的证明：scope 缺与坏都关成全拒、两个标识都要中、空 allowlist 不准任何窗口、没写 `sound` 不录声音；`*` 匹配任何名字、不带 `*` 的 pattern 只匹配等长的名字；握手完成之前不出工具；名字无控制字符且有上界；部分输入只补发前缀里按下过的东西的抬起；旧的一代与挪动过的窗口都被拒；两扇以上中了恒不挑。每个分部各有一条「拿掉守卫即反例」的定理。表里其余的行由各模块旁的测试经生产入口断言（§16）。
+-/
+
+/-! ## 3 假设与歧义
 
 - **假设**：运行中的机器上的桌面是操作者自己的桌面。本 package 不做远程桌面、不做跨机器、不做无人值守的持续录制。
-- **歧义已定**：scope 文件只能表达 allowlist（window title patterns ＋ process names）、`record`／`clipboard` 两位开关与 `sound` 一个设备名，**没有**「允许整屏」这一项。故**整屏截取在本版恒被拒**（见 §8.5 第三对），而不是被默许——一张全屏图会显示 allowlist 没有列出的一切。
+- **歧义已定**：scope 文件只能表达 allowlist（window title patterns ＋ process names）、`record`／`clipboard` 两位开关与 `sound` 一个设备名，**没有**「允许整屏」这一项。故**整屏截取在本版恒被拒**（见 §10 设计三），而不是被默许——一张全屏图会显示 allowlist 没有列出的一切。
+-/
 
-## 4 现状分析
+/-! ## 4 现状分析
 
 `crates/agent_protocols` 已经是这套协议的**客户端**权威：`Rpc::initialize`／`initialized`／`list_tools`／`call_tool`／`read` 定死了城里说出去的每一行，`agent_protocols::mcp::stdio` 定死了字节怎么走（子进程、按行、消息内无换行、超时即回收子进程）。本 package 是那一端的**对侧**，因此它的形状不是设计出来的，是**读出来的**。
 
 城这一侧读 `tools/call` 答复的是 `agent_protocols::McpTool`：`isError: true` 的结果是一次失败，拒词全文进它的 subject；`_meta` 带 `sprawling/effect-unknown` 时它标 `Retry::Unknown`（`crates/agent_protocols/Spec.lean` §8-1c）。
 
-## 5 权威信源
+**已知出入**：§10 第 2 条写「`Fresh` 只答 `initialize` 与 `ping`，`Initializing` 收到通知才进 `Ready`」；代码里 `notifications/initialized` 在任何阶段都让连接进 `Ready`，包括没有先收到 `initialize` 的 `Fresh`。`spec/Session.lean` 照代码今天的转移建模，它证明的「没收到这条通知就不出工具」两边都成立；要不要在 `Fresh` 拒这条通知是 §3 之外一处未决的收紧，改它先改 `spec/Session.lean` 的 `next`。
+-/
+
+/-! ## 5 权威信源
 
 | 事实 | 出处 |
 |---|---|
@@ -65,17 +90,21 @@
 | `_meta` 键名的格式与保留前缀 | <https://modelcontextprotocol.io/specification/2025-06-18/basic> 的 `_meta` 一节 |
 | `GetDIBits`、`ReleaseDC`、`OpenClipboard`、`GetClipboardData`、`SendInput` 的调用前提 | learn.microsoft.com 上各自的函数页（`wingdi/nf-wingdi-getdibits`、`winuser/nf-winuser-releasedc`、`winuser/nf-winuser-openclipboard`、`winuser/nf-winuser-getclipboarddata`、`winuser/nf-winuser-sendinput`） |
 | 按显示器感知 DPI 时各 API 给的是物理像素 | <https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-screenscaling> |
+-/
 
-## 6 命名统一
+/-! ## 6 命名统一
 
 沿用词汇表（`docs/glossary.md`）：**three-part refusal**（拒了什么／为什么／还能做什么）、**reference**（快照铸的句柄，形如 `e1`）、**generation**（快照的世代号，随动作一起走）。
 
 - **scope** 在本 package 里专指 `DESKTOP.toml` 里那份 allowlist，与 `kernel` 的 halted scope 不同层，故恒不缩写成裸词 `policy`。
 - **恒不**把窗口叫作 page，**恒不**把桌面叫作 browser：`browser::act` 是被借鉴的形状，不是被复用的名字。
-- 错误码是 `kernel::AxCode` 的六个变体（`E_TOOL_UNAVAILABLE`／`E_GATE_DENIED`／`E_INVALID_ARGS`／`E_TOOL_UNKNOWN`／`E_CONFIG_INVALID`／`E_WIRE_MISMATCH`），拼写只取 `AxCode::as_str`，本 package 不写第二份（§8.5 第一对）。
-- **效果未知（effect unknown）**：请求已经交出一部分，桌面上是否生效不知道。城里对应 kernel 的 `Retry::Unknown`；本 package 用 `_meta` 的 `sprawling/effect-unknown` 说出它（§12.3）。
+- 错误码是 `kernel::AxCode` 的六个变体（`E_TOOL_UNAVAILABLE`／`E_GATE_DENIED`／`E_INVALID_ARGS`／`E_TOOL_UNKNOWN`／`E_CONFIG_INVALID`／`E_WIRE_MISMATCH`），拼写只取 `AxCode::as_str`，本 package 不写第二份（§10 设计一）。
+- **效果未知（effect unknown）**：请求已经交出一部分，桌面上是否生效不知道。城里对应 kernel 的 `Retry::Unknown`；本 package 用 `_meta` 的 `sprawling/effect-unknown` 说出它（D3）。
 
-## 7 模块边界
+Lean 里的名字与 Rust 的对应：`Desktop.Scope.Tool` ↔ `tools::ToolName`，`namesAWindow` ↔ `names_a_window`，`Allowance.admits` ↔ `Allowance::admits`，`Desktop.Scope.Pattern.fits` ↔ `Pattern::matches`（`matches` 在 Lean 里是关键字），`Desktop.Session.Phase` ↔ `session::Phase`，`Method.opening`／`Method.opened` ↔ `initialize`／`notifications/initialized`（`initialize` 在 Lean 里是关键字），`Desktop.Outline.LABEL_MOST` ↔ `outline::LABEL_MOST`，`Strokes.lifts` ↔ `strokes::left_held`，`Views.mint`／`Views.resolve` ↔ `Views::mint`／`Views::resolve`，`Target.choose` ↔ `target::choose`。
+-/
+
+/-! ## 7 模块边界
 
 - **字节从哪里来**归 `serve_stdio` 的调用方，城里的 `bin::main::desktop`：一个位置参数（`DESKTOP.toml` 的路径）与一对管道。stdin／stdout 的锁与刷新住 `serve_stdio`；`session` 只收一行、出一行。
 - **准不准做**归 `scope`：一次 `tools/call` 在碰到平台之前先过它，于是「越界」这件事在任何 Win32 调用之前就已判完。
@@ -84,9 +113,17 @@
 - **说什么**归 `tools`：六张卡片是数据，改它就是改行为（形状 6）。
 - **一扇窗口读起来是什么样**归 `outline`：role 的封闭词表、名字的清洗与截断、一串节点折成的文字。它平台无关，因为 macOS 臂以后把 AX 的 role 映到同一张词表；control type 编号到词表的映射是 Windows 的事实，住 `windows::tree`。
 
-**恒不**引入：async runtime、HTTP 客户端、任何 GUI 框架。workspace crate 只依赖三个：`kernel`（错误码与质量的域）、`agent_protocols`（协议修订与效果未知的键）、`desktop_ffi`（只为本 package 存在的 FFI 缝），每一条边都是为了读一个事实的唯一定义，而不是为了它的行为（§12.14）。
+**恒不**引入：async runtime、HTTP 客户端、任何 GUI 框架。workspace crate 只依赖三个：`kernel`（错误码与质量的域）、`agent_protocols`（协议修订与效果未知的键）、`desktop_ffi`（只为本 package 存在的 FFI 缝），每一条边都是为了读一个事实的唯一定义，而不是为了它的行为（D14）。
 
-## 8 接口先行
+D14 并回 workspace：本 package 继承 `forbid`，FFI 叶子自带一张只差一行的 lint 表。
+
+- **决定**：server 与它的 FFI 缝住在 `crates/desktop` 与 `crates/desktop/ffi`，两个都是根工作区的成员；它们不再自成一个工作区，没有第二份锁，根 `Cargo.toml` 不 exclude 任何包。本 package 以 `[lints] workspace = true` 继承工作区的 lint 表（`unsafe_code = "forbid"`），包元数据与共享依赖都经 `workspace = true` 继承；lib 名改为 `desktop`，与 depmap 的行名、与其余 crate 的「lib 名即目录名」一致。`desktop_ffi` 写一张自己的 `[lints]`：与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`。`xtask guard` 判这一张表（逐键等于根表，例外只有记下理由的 `unsafe_code`），并判其余每个成员的 `[lints]` 恰是 `workspace = true`。本 package 依赖 `kernel` 与 `agent_protocols`：错误码的拼写取 `kernel::AxCode::as_str`，质量的域取 `kernel::consts_policy::IMAGE_QUALITY`，协议修订取 `agent_protocols::PROTOCOL_VERSION`，效果未知的键取 `agent_protocols::EFFECT_META_KEY`；`refusal.rs`、`rpc.rs`、`encode.rs` 里的抄件、`xtask guard` 的 `quoted` 比对与 `kernel::error::code` 里读 `refusal.rs` 的那条测试一起删去。测试自己建窗口要写的 `unsafe` 搬进 `desktop_ffi::fixture`，只在 `fixture` feature 下编译；本 package 只在 Windows 的 dev 依赖里打开它，`xtask artifact` 把 `fixture` 列为测试 feature。
+- **理由**：本 package 坐在墙外的理由只有一条（Win32 边界要放开 `unsafe_code`，§10 设计二）。X3 把那些调用收进 Zig 叶子之后（D12），本 package 的生产代码已不写 `unsafe`，这条理由只剩叶子那一层。墙外的代价却都还在：一份抄来的 lint 表、包元数据与依赖版本，第二份锁，六个错误码、质量域、协议修订与 `_meta` 键各一份第二拼写，`depmap` 只能陈述那一行而守不住，`cargo clippy --workspace` 判不到它。并回之后这些抄件都换成引用，剩下的唯一一处差异是叶子那张表的 `unsafe_code` 一行，guard 判的正是它。叶子留在工作区里，而不是另起一个工作区：放在外面它就要自己的锁与 `[workspace.package]`，guard 又要比对一整堵墙；在里面，它与别的成员共享锁、元数据与依赖版本，只有一张表是自己的。依赖 `agent_protocols` 只为两个常量，代价是本 package 单独编译时要先编 `agent_protocols` 与 `gateway`；二进制不变，因为 `sprawling` 本来就链接它们，而这是两个常量各只剩一个定义的唯一做法。
+- **击败的备选**：①叶子也继承 `forbid`，把 `extern` 声明交给一个生成的或第三方的安全绑定——今天没有合格的绑定（D9），而 Rust 2024 的 `unsafe extern` 块在 `forbid` 下编不过；②叶子留在一个墙外工作区，只把本 package 并回——墙还在，只是变小，第二份锁与抄写核对都留着；③测试建窗口的 `unsafe` 留在本 package，给它另开一张 lint 表——cargo 的 lint 表不分 profile，给测试开就是给生产代码开；④不依赖 `agent_protocols`，两个常量留着由 guard 比对——一个事实两个定义，再加一道只为它们存在的门；⑤lib 名保持 `sprawling_desktop`——`depmap` 按 lib 名判边，那一行就要改名，而其余每个 crate 的 lib 名都是它的目录名。
+- **重开的参数**：一个合格的安全绑定覆盖了叶子的四组调用，叶子离开，那张自己的表与 guard 一起删去；或 cargo 允许一个成员继承工作区 lint 表而只改一行，那时叶子写 `workspace = true` 加一行覆盖，guard 的比对随之删去。
+-/
+
+/-! ## 8 接口先行
 
 ```rust
 // 8-1 refusal（形状 2 值类型）
@@ -119,7 +156,7 @@ enum Block { Text(String), Image { bytes: Vec<u8>, mime: &'static str }, Sound {
 impl Answer {
     pub(crate) fn facts(facts: Value) -> Answer;                                        // 一块文字：facts 的单行 JSON
     pub(crate) fn picture(bytes: Vec<u8>, mime: &'static str, facts: Value) -> Answer;  // 一块图片在前，一块文字在后
-    pub(crate) fn sound(bytes: Vec<u8>, mime: &'static str, facts: Value) -> Answer;    // 一块 audio 在前，一块文字在后（§12.13）
+    pub(crate) fn sound(bytes: Vec<u8>, mime: &'static str, facts: Value) -> Answer;    // 一块 audio 在前，一块文字在后（D13）
     pub(crate) fn as_result(&self) -> Value;      // { content: [...] }；图片的 base64 只在这里编
 }
 
@@ -143,12 +180,12 @@ pub(crate) enum Scope { Closed { code: RefusalCode, because: String }, Open(Allo
 pub(crate) struct Allowance { /* 私有：windows／processes／record／clipboard／sound */ }
 // 准入是一个值：它带着准入了这次调用的那份 allowlist，
 // 于是「答复本身受 scope 约束」的那一件工具读的是同两张 Pattern 表。
-pub(crate) struct Admitted<'a> { /* 私有：&Allowance；非 Windows 的非测试构建里没有读者，字段带 expect(dead_code)（§12.1） */ }
+pub(crate) struct Admitted<'a> { /* 私有：&Allowance；非 Windows 的非测试构建里没有读者，字段带 expect(dead_code)（D1） */ }
 impl Admitted<'_> {
     #[cfg(any(windows, test))]   // 只有 Windows 臂报窗口；测试在每个平台上都判它（§16.2）
     pub(crate) fn visible(&self, title: &str, process: &str) -> bool;
     #[cfg(any(windows, test))]   // 只有 Windows 臂录声音
-    pub(crate) fn sound(&self) -> Result<&str, Refusal>;   // scope 文件点名的那一个设备；没写 `sound` 即 E_GATE_DENIED（§12.11）
+    pub(crate) fn sound(&self) -> Result<&str, Refusal>;   // scope 文件点名的那一个设备；没写 `sound` 即 E_GATE_DENIED（D11）
 }
 impl Scope {
     pub(crate) fn read(path: Option<&Path>) -> Scope;       // 恒不失败：缺文件与坏文件都关成 Closed
@@ -202,7 +239,7 @@ pub(crate) fn perform(tool: ToolName, arguments: &Value, admitted: &Admitted<'_>
 | `desktop.snapshot` | 一个窗口的 accessibility tree，折成一段文字（`outline`）：每个元素一行，写它的 ref、role 与 name，按深度缩进；另一块文字写 title、process 与 generation；bounds 只留在 `Views` 里，由 `desktop.act` 按 ref 取 | 不给像素、不给控件的内部句柄、不读被遮挡的内容 |
 | `desktop.act` | ref 或 point ＋ 动作（click／double／right／drag／scroll／type／key，带 modifiers），携 snapshot 的 generation；**发事件前先核对前台窗口**；桌面只收下一部分时如实报数，并补发它留下按住的键与鼠标键的抬起 | 不合成整段脚本、不重试、不在 generation 过期或窗口挪动后改打别处、不在别的窗口拿着键盘时把按键发出去 |
 | `desktop.screenshot` | window／region，format png\|jpeg\|webp，quality、scale；答一块 image content（`data` 是 base64，`mimeType`）和一块写着 title／width／height／lossless 的文字 | 不做 OCR、不做比对、不落盘 |
-| `desktop.record` | start／stop：本 package 唯一那条线程经 `capture::window` 抓帧，PATH 上有 ffmpeg 就经它的 stdin 编成 mp4，否则写成一个 PNG 序列目录；`audio: true` 另起一个 ffmpeg 录 scope 文件点名的那一个声音设备（§12.11），`stop` 把录下的声音作为一块 audio content 交回（§12.13） | 不做剪辑、不做转码、不替人选声音设备、不在没说 stop 时自己停（十分钟上限除外） |
+| `desktop.record` | start／stop：本 package 唯一那条线程经 `capture::window` 抓帧，PATH 上有 ffmpeg 就经它的 stdin 编成 mp4，否则写成一个 PNG 序列目录；`audio: true` 另起一个 ffmpeg 录 scope 文件点名的那一个声音设备（D11），`stop` 把录下的声音作为一块 audio content 交回（D13） | 不做剪辑、不做转码、不替人选声音设备、不在没说 stop 时自己停（十分钟上限除外） |
 | `desktop.clipboard` | get／set 文本 | 不碰图片与文件列表、不保留历史 |
 
 `desktop.act` 携 generation 是照抄 `browser::act` 的那一条：**对着一份快照做的决定，恒不落到另一份快照上**——过期就拒，而不是打到那时挪过去的东西上。
@@ -253,7 +290,7 @@ impl Desk {
 
 ### 8-9 `unsafe` 的那一条规矩
 
-本 package 继承工作区的 `unsafe_code = "forbid"`，生产与测试代码都写不出 `unsafe`。唯一放开它的一层是 `desktop_ffi`：它的 lint 表与工作区逐键相同，只有 `unsafe_code` 是 `deny`（§8.5 第二对、§12.14）。既然是花了代价换来的，代价就要花在明处：
+本 package 继承工作区的 `unsafe_code = "forbid"`，生产与测试代码都写不出 `unsafe`。唯一放开它的一层是 `desktop_ffi`：它的 lint 表与工作区逐键相同，只有 `unsafe_code` 是 `deny`（§10 设计二、D14）。既然是花了代价换来的，代价就要花在明处：
 
 **每一个 `unsafe` 块恒带一行 `SAFETY:`，写的是使这次调用成立的前提。**「我们调用 `EnumWindows`」不是前提，那只是把调用换句话再说一遍；「`into` 有 `into.len()` 个已初始化的槽、只借给这一次调用，叶子按同一个长度写」才是前提。审这一条的办法是逐个 `SAFETY:` 问一句：它说的东西**能不能是假的**？不能为假的句子不是前提，是复述。
 
@@ -270,7 +307,7 @@ impl Desk {
 
 ### 8-11 按操作准入的安全接口
 
-Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏是它今天经过的接口；写 `desktop_ffi` 的行由 Zig 叶子整段做完（§8-12），本 package 只调它的安全函数。「准入」一栏是审过、可以换上的安全接口，写「无」的行理由在 §12.9、§12.10。换一行的次序是固定的：先写它的契约测试，在旧实现上跑绿，证明契约不依赖实现；再换实现，并在同一提交里把这一行的「实现」改成新的接口。
+Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏是它今天经过的接口；写 `desktop_ffi` 的行由 Zig 叶子整段做完（§8-12），本 package 只调它的安全函数。「准入」一栏是审过、可以换上的安全接口，写「无」的行理由在 D9、D10。换一行的次序是固定的：先写它的契约测试，在旧实现上跑绿，证明契约不依赖实现；再换实现，并在同一提交里把这一行的「实现」改成新的接口。
 
 | 操作 | 模块 | 调用 | 实现 | 准入 | 契约测试 |
 |---|---|---|---|---|---|
@@ -292,7 +329,7 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 没有准入安全接口的四组调用（§8-11 里「实现」写 `desktop_ffi` 的四行）由一个包做完：
 
 - **位置**：`crates/desktop/ffi/`，包名 `sprawling-desktop-ffi`，库名 `desktop_ffi`，规格是 `crates/desktop/ffi/Spec.lean`（边界规则与资源配对的定理在那里）。Zig 源码在 `crates/desktop/ffi/zig/`：`leaf.zig`（四组操作与 export）、`boundary.zig`（叶子往借来的缓冲里写什么）、`step.zig`（step 的 Zig 拼写）。
-- **一张自己的表**：两个包都是根工作区的成员，包元数据与 `winsafe` 的版本行都以 `workspace = true` 继承。本 package 的 `[lints]` 是 `workspace = true`；`desktop_ffi` 的 `[lints]` 是它自己的一张，与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`，`xtask guard` 判这一张表，例外只有那一行（xtask-SPEC §8-46、§12.14）。
+- **一张自己的表**：两个包都是根工作区的成员，包元数据与 `winsafe` 的版本行都以 `workspace = true` 继承。本 package 的 `[lints]` 是 `workspace = true`；`desktop_ffi` 的 `[lints]` 是它自己的一张，与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`，`xtask guard` 判这一张表，例外只有那一行（xtask-SPEC §8-46、D14）。
 - **构建**：`crates/desktop/ffi/build.rs` 只用标准库起 `zig build-lib`（`ReleaseSafe`，目标取自 cargo 的目标），只在 Windows 目标上；别的目标上本包只剩 `step`，本 package 也只在 Windows 上依赖它。Zig 的版本只写在 `crates/desktop/ffi/zig-version`：构建脚本、doctor 的 `zig` 一行（sprawling-SPEC 8-146）与 CI 的安装步骤都读它。
 - **对拍与 fuzz 的配方**：`desktop_ffi::boundary` 的测试以种子化输入比对叶子与 Rust 参考（`crates/desktop/ffi/src/reference.rs`），每条规则两万个；`just fuzz-desktop <rounds> <seed>` 把同一比对按给定的轮数与种子跑下去（Rust 一侧的 fuzz）；`just check-desktop` 里的 `zig test crates/desktop/ffi/zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz）。
 
@@ -314,37 +351,37 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 叶子答 step（`desktop_ffi::step::Step`）与调用线程当时的 Win32 错误码；本 package 的 `platform::windows::fault` 是把它们写成三段式拒词的唯一一处，每个 step 对应一句「拒了什么」，码只在停在 Win32 调用上的 step 里读出。
 
-## 8.5 四个设计
+D1 定规：`visible` 只在 Windows 与测试里编译。
 
-**第一对（错误码住哪）**：在本 package 重新定义同拼写的一小组（落选）vs `RefusalCode` 映到 `kernel::AxCode`、拼写只取 `AxCode::as_str`（选中）。`RefusalCode` 留着，因为它是本 server 能答的那六个码的封闭子集，并且带着 JSON-RPC 的数；它不再带字符串。落选方案是一个事实的两处定义，靠一道门盯着才不漂；本 package 在工作区里，锁只有一份，依赖 `kernel` 不再多解一遍任何东西（§12.14）。新码仍要先进 `kernel::error::code`，因为那是唯一能写下它的地方。
+- **决定**：`Admitted::visible` 与它所读的 `Allowance::visible` 带 `#[cfg(any(windows, test))]`；`Admitted` 的 `allowance` 字段带 `#[cfg_attr(not(any(windows, test)), expect(dead_code, reason = "…"))]`。类型与唯一的构造点 `Admitted { allowance: self }` 在每个平台上相同。
+- **理由**：非 Windows 臂（`platform/elsewhere.rs`）拒绝一切调用，不报任何窗口，所以那里的非测试构建里这两个方法与这个字段没有读者，编译器报三条 `dead_code`。`visible` 是纯判定、不碰 Win32，§16.2 要它在任何机器上受测，所以条件里带 `test`。字段上用 `expect` 而不是 `allow`：哪天非 Windows 臂开始报窗口，字段有了读者，这条 `expect` 落空，构建变红，它就跟着被删掉。
+- **击败的备选**：①按平台把字段拼成 `&'a Allowance` 与 `PhantomData<&'a Allowance>`——不需要任何 lint 抑制，但同一个值有两种拼写，构造点也要跟着分叉，而「是不是 Windows」按 `platform.rs` 的约定只写在一处；②等本 package 并入 workspace 时再处理——并入之后，workspace 的 `-D warnings` 会在 macOS 上把这三条警告变成错误。
+- **重开的参数**：非 Windows 臂开始报告窗口。那时 `visible` 在每个平台上都有读者，本条与那条 `expect` 一起删除。
 
-**第二对（unsafe 怎么关）**：叶子也继承 `unsafe_code = "forbid"`（落选）vs 本 package 继承 `forbid`、只有 `desktop_ffi` 用 `deny`（选中）。`forbid` 在文件内无法就地放开，而叶子的每次调用要就地放开、并在那一处写明理由；`deny` 让放开成为**一个带理由的、看得见的、最窄作用域的例外**，而且只在叶子那一层。clippy 那张表逐行相同，一条不减。协议壳与平台臂**一行 unsafe 也不写**。
+D12 没有准入安全接口的四组调用经一片 Zig 叶子，Rust 面零业务 `unsafe`。
 
-**第三对（整屏怎么办）**：默许整屏截取（落选）vs 无表达即拒（选中）。scope 文件能表达的只有「哪些窗口」，一张全屏图会显示 allowlist 没有列出的一切；把没写下来的东西当成允许，正是 fail closed 要防的那件事。拒词里给的替代是「指名一个窗口」，可执行。等 scope 文件长出一位 `screen` 开关，这条再改，改时先改本节。
+- **决定**：枚举、捕获、剪贴板、DPI 四组调用由 `crates/desktop/ffi` 的 Zig 叶子整段做完（§8-12）：一个 export 一个完整操作，Rust 借出缓冲、读回 step 与错误码，句柄、DC 与全局块恒不跨边界。Rust 面每次调用一个 `unsafe` 块，加那一处 `unsafe extern` 声明，全部在 §8-12 的表里；本 package 的 `src/` 生产代码不写 `unsafe`。两个包都是根工作区的成员，共享锁、包元数据与 `winsafe` 的一条版本行；lint 表只有 `desktop_ffi` 那一张与工作区差一行（D14）。叶子往缓冲里写什么、资源怎么配对，由 `crates/desktop/ffi/Spec.lean` 证明模型性质，由对拍、fuzz 与真窗口上的契约测试检查实现。
+- **理由**：AGENTS.md「Rust」一节给平台调用定了次序：先找安全接口，没有合格的就用 Zig 叶子，`unsafe` Rust 只在测量表明它整体最好时才准入。这四组在 X2 的审查里没有合格的安全接口（D9），口径 ① 要的正是业务代码零 `unsafe`、只留一个经审的 FFI 缝。整段操作放进叶子，是因为这四组的风险不在某一次调用，而在调用之间：位图选进之后要选回、DC 要随取得它的窗口还回去、全局块要么交出要么释放。这些次序在叶子里写成取得旁边的 `defer`，在 Lean 里写成可穷举的模型；若每个 Win32 调用各包一个 export，次序就又回到 Rust 的 `Drop` 与 `unsafe` 里（`desktop_ffi` D1）。
+- **剩余限制**（写明，不当作已解决）：两侧的 fuzz 都是抽样而不是覆盖引导。Zig 的覆盖引导 fuzz（`--fuzz`）今天不在 Windows 上实现；cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时，而叶子只在 Windows 上编，所以 libFuzzer 没有一个能跑它的平台。叶子以 `ReleaseSafe` 编，抽样到的越界即 trap。Lean 证明的是叶子对操作系统回答的处理，操作系统本身是假设。`header`、`length`、`modmap` 三道门今天只读 `.rs`，`.zig` 文件的 MPL 注记与长度由评审守（ARCHITECTURE §2 条件 5 的这一半未落地）。
+- **击败的备选**：①留在 `windows` 绑定上继续手写 `unsafe`（33 个块，与口径 ① 相反）；②一个独立的 Zig 可执行程序、经进程边界说话（多一个交付物与它的监管，而本 server 本来就是一个子进程，多一层隔离买不到新东西）；③每个 Win32 调用一个 export（见上）；④把叶子的调用留在本 package 里、本 package 整个用 `deny`（`unsafe` 的许可就落到了协议壳与平台臂上，那里一行也不需要它）。
+- **重开的参数**：一个安全 crate 修好了其中一组（例如 `winsafe` 修好 `EnumWindows`），那一行先写契约测试、再离开叶子；Zig 的 `--fuzz` 或 cargo-fuzz 在 Windows 上落地，`just fuzz-desktop` 换成覆盖引导的那一种。
 
-**第四对（未实现怎么回答）**：先回一个假的成功形状让上游先接线（落选）vs 回 `E_TOOL_UNAVAILABLE` 并说明这个 build 里没有它（选中）。一个假的成功会让模型据此往下推理，而错误的答案比没有答案贵得多；全部价值就是**形状已经定死、拒绝是诚实的**。
+D13 录下的声音作为一块 audio content 交回城里。
 
-## 8.6 六个设计
+- **决定**：`desktop.record` 的 `stop` 在这份录制录了声音时，答复的第一块是 MCP 的 audio content（`type: "audio"`、`data` 是 base64、`mimeType: "audio/wav"`），第二块是照旧的那段文字，多写 `sound`（wav 的路径）。wav 超过 `SOUND_CARRIED_MOST` 时不带 audio 块，文字里写 `sound_left_out` 说明多长、在哪里；声音那个 ffmpeg 提前退出时写 `sound_ended_early`，有多少交多少。
+- **理由**：wav 落在临时目录（§14），城里没有一件工具读得到那里；交回城里的唯一一条不新增依赖、不新增写权限的路，是 MCP 答复本身。连接器已经把答复里的图片存进 CAS（runtime-SPEC §8-27-10），声音走同一条路，模型读到的是一行带 locator 的字，base64 恒不进窗口也恒不进账本。截图恒是一块 image 在前（§8-2b），声音照同一个形状，模型读这两种答复用的是同一种读法。
+- **击败的备选**：①把录音写进这座楼（scope 文件说的是能碰哪些窗口，没说能往城里哪里写，§14；而且本 server 不知道城根在哪）；②只交路径（城里没有工具读得到临时目录）；③把整段声音不论多长都塞进答复（十分钟的 wav 是 19 MB，base64 之后超过城的 MCP 单行上限，整个答复会被拒，连画面的路径都到不了）。
+- **重开的参数**：城的 MCP 客户端改了单行上限；或者 `transcribe` 能直接读运行中的机器上的一个文件。
+-/
 
-**第一对（截图怎么取）**：DXGI Desktop Duplication（落选）vs `PrintWindow`（选中）。DXGI 复制的是**整个输出**，而这台 server 的 scope 文件说的是「哪些窗口」；用一个整屏机制去实现一件按窗口授权的事，等于把 §8.5 第三对刚关上的门从背面打开。`PrintWindow` 带 `PW_RENDERFULLCONTENT` 直接向一个 `HWND` 要它自己的像素，授权单位与机制单位因此是同一个。代价写在明处：某些用 DirectComposition 独立合成的窗口会回一片黑，那时的答案是**拒绝并说出来**（`E_TOOL_UNAVAILABLE`，全黑像素是可判的），恒不把一片黑当成截图交出去。录制走同一个入口（§12.7）：每一帧都取自 `capture::window`，再经管道交给 ffmpeg，所以「授权单位与机制单位是同一个」这句话对录制也成立。全黑判为失败是一条产品策略，不是对捕获失败的完美识别：一扇真的全黑的窗口也会被拒，拒词给出不经像素的 `desktop.snapshot`。
-
-**第二对（快照的 ref 拿什么撑住）**：跨调用持有 `IUIAutomationElement` 这个 COM 指针（落选）vs 只留下快照当时的**屏幕矩形**（选中）。前者让 COM 对象的生存期缠上连接的生存期，而一次 `desktop.act` 需要的其实只有「点哪里」。选中方案让 COM 完整地关在 `tree` 一次调用之内，`act` 只面对整数坐标；generation 这一条的确切含义见 §12.5：一代 ref 属于一扇窗口（按句柄，不按标题），并且只在这扇窗口的矩形与快照时相同的前提下有效；窗口挪动或改了尺寸，旧的一代被拒。窗口内部重排而外框不动时，这一代仍被接受——这是剩余限制，不是已经解决的事。
-
-**第三对（`desktop.windows` 报的 ref 是什么）**：让它成为 `snapshot`／`act` 也接受的第二种指名方式（落选）vs 只作为这条连接内一个窗口的**稳定叫法**（选中）。scope 判定读的是 `title` 与 `process`（`Reach`），一个绕过它们的 ref 就是同一份许可的第二道门——而两道门里一定有一道最后没人看。工具表是定死的，`snapshot`／`act` 的 schema 里本来也没有窗口 ref 这一项；本节记下的是**为什么不去加它**。ref 里恒不含 `HWND` 的数值：句柄是运行中的机器的内部事实，模型没有一处用得上它。
-
-**第四对（没有 ffmpeg 时录什么）**：宣告录制不可用（落选）vs 自己抓一列 PNG 帧（选中）。工具卡片明写了「有 ffmpeg 出 mp4，没有则出帧序列」，而帧序列要一个**在读循环之外**跑的东西——本 package 因此有且只有一个 `std::thread::spawn`，在 `record::sink`：这条线程抓帧，交给 ffmpeg 的 stdin，或写成 PNG，由一个 `AtomicBool` 停下，`stop` 恒 join 它。这是本 package 唯一一处并发，写在这里是为了下一个读者不必去找第二处。声音（`audio: true`）恒被拒：选一个录音设备要知道运行中的机器上它叫什么，而这台 server 没有任何一处知道；假装录了而没录，比拒绝贵。能知道它的只有人，所以设备名只从 scope 文件来（§12.11）。
-
-**第五对（城里的事实怎么读）**：抄一份、由 `xtask guard` 比对（落选）vs 直接引用唯一定义（选中）。错误码、质量的域、协议修订与 `_meta` 的键 `sprawling/effect-unknown` 都是城里定下的事实，本 package 读 `kernel::AxCode`、`kernel::consts_policy::IMAGE_QUALITY`、`agent_protocols::PROTOCOL_VERSION` 与 `agent_protocols::EFFECT_META_KEY`。抄件加比对只能让漂移**可见**；引用让它**不可能**，而且 `RefusalCode::code` 是一个对两侧穷尽的 match，每个变体映到哪个 kernel 码由编译器读出，不再只是拼写存在（§12.14）。
-
-**第六对（一次 `act` 落在哪个窗口上）**：信任 `scope` 已经判过的那个窗口（落选）vs 发事件之前核对前台窗口，不是它就拒（选中）。`SendInput` 不带窗口：一次按键落在**那一刻**持有键盘的窗口上，而 scope、allowlist 与拒词判的是 title 与 process，这些没有一样跟着事件走。决定动作与发出动作之间隔着一段时间，操作者按一次 Alt+Tab、一个提权对话框弹出来，键盘就在别人手里了——`type` 会把整段文字打进那个窗口，密码框也包括在内；今天全仓 grep `SetForegroundWindow`／`GetForegroundWindow`／`WindowFromPoint` 零命中，故 scope 实际约束住的只有坐标的算法。选中方案是：`windows::focus` 读一次前台窗口，不是它就请求置前并在 200 ms 内有界地重读，仍不是就以 `E_TOOL_UNAVAILABLE` 拒，拒词写明**什么都没有发出去**；指针动作另问第二句——落点下面的顶层窗口也得是它，因为一个窗口可以持有键盘而另一个盖在点击处。比较的是句柄地址这一个纯值，于是这条规则在一台没有桌面的机器上也能逐条证明（§16.2）。付的代价写在明处：置前是一次**副作用**，而它是这台 server 唯一一处主动改变桌面的排布；把它藏起来的做法是不置前直接拒，那会让每一次正常的连续操作都要操作者手动切窗口。
-
-## 9 工作流程
+/-! ## 9 工作流程
 
 进程起来 → `sprawling desktop` 取 scope 路径（第一个位置参数，否则无）→ `serve_stdio` → `Scope::read`（缺文件即 `Closed`）→ `Server::serve` 阻塞读 stdin。
 
 每收到一行：`rpc::read` → 按 method 分派 → `initialize` 答能力与自我介绍并进 `Initializing` → `notifications/initialized` 无答案并进 `Ready` → `ping` 答 `{}` → `tools/list` 答六张卡片 → `tools/call` 先 `Scope::admits`（过了交出一个 `Admitted`），再把它随参数一起交给 `platform::perform` → 出一行 → flush。
+-/
 
-## 10 实现逻辑
+/-! ## 10 实现逻辑
 
 1. **一条消息一行**：`serde_json::to_string` 不产生换行，且写出前不做美化；这与 `agent_protocols::mcp::stdio::Connection::framed` 的检查是同一条契约的两端。
 2. **握手顺序被强制**：`Fresh` 只答 `initialize` 与 `ping`，`Initializing` 收到通知才进 `Ready`。规范就是这么写的，而一个不强制它的 server 会让客户端的顺序错误在别处以别的形状爆出来。
@@ -356,13 +393,82 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 8. **GDI 的三条前提写在取得旁边**：叶子的 `draw` 把位图选进 memory DC，`defer` 在它返回之前选回旧对象，`readBack` 在 `draw` 返回之后才调 `GetDIBits`；`ReleaseDC` 的 `defer` 传的是 `GetDC` 时的那扇窗口；`GetDIBits` 读回的行数不等于高就答 `ShortRows`，不交出半张图。空句柄在 `GetDC` 之前就答 `NoWindow`，因为 `GetDC(NULL)` 取的是整屏。三条的模型性质在 `crates/desktop/ffi/Spec.lean`（`every_gdi_object_is_given_back_once`、`read_back_follows_unselect`）。
 9. **每个常量只写一处**：滚轮一格的 `WHEEL_DELTA` 用 `windows` 绑定里的定义；`PW_RENDERFULLCONTENT`、`CF_UNICODETEXT`、`GMEM_MOVEABLE`、`HWND_MESSAGE` 只写在 `leaf.zig`，Rust 一侧不再拼写它们；DPI 感知值由本 package 从 `windows` 绑定的 `PROCESS_PER_MONITOR_DPI_AWARE` 读出、传给叶子。
 
-## 11 边界枚举
+下面十个设计各记一个被选中的做法与它击败的备选。
+
+**设计一（错误码住哪）**：在本 package 重新定义同拼写的一小组（落选）vs `RefusalCode` 映到 `kernel::AxCode`、拼写只取 `AxCode::as_str`（选中）。`RefusalCode` 留着，因为它是本 server 能答的那六个码的封闭子集，并且带着 JSON-RPC 的数；它不再带字符串。落选方案是一个事实的两处定义，靠一道门盯着才不漂；本 package 在工作区里，锁只有一份，依赖 `kernel` 不再多解一遍任何东西（D14）。新码仍要先进 `kernel::error::code`，因为那是唯一能写下它的地方。
+
+**设计二（unsafe 怎么关）**：叶子也继承 `unsafe_code = "forbid"`（落选）vs 本 package 继承 `forbid`、只有 `desktop_ffi` 用 `deny`（选中）。`forbid` 在文件内无法就地放开，而叶子的每次调用要就地放开、并在那一处写明理由；`deny` 让放开成为**一个带理由的、看得见的、最窄作用域的例外**，而且只在叶子那一层。clippy 那张表逐行相同，一条不减。协议壳与平台臂**一行 unsafe 也不写**。
+
+**设计三（整屏怎么办）**：默许整屏截取（落选）vs 无表达即拒（选中）。scope 文件能表达的只有「哪些窗口」，一张全屏图会显示 allowlist 没有列出的一切；把没写下来的东西当成允许，正是 fail closed 要防的那件事。拒词里给的替代是「指名一个窗口」，可执行。等 scope 文件长出一位 `screen` 开关，这条再改，改时先改本节。
+
+**设计四（未实现怎么回答）**：先回一个假的成功形状让上游先接线（落选）vs 回 `E_TOOL_UNAVAILABLE` 并说明这个 build 里没有它（选中）。一个假的成功会让模型据此往下推理，而错误的答案比没有答案贵得多；全部价值就是**形状已经定死、拒绝是诚实的**。
+
+**设计五（截图怎么取）**：DXGI Desktop Duplication（落选）vs `PrintWindow`（选中）。DXGI 复制的是**整个输出**，而这台 server 的 scope 文件说的是「哪些窗口」；用一个整屏机制去实现一件按窗口授权的事，等于把 §10 设计三刚关上的门从背面打开。`PrintWindow` 带 `PW_RENDERFULLCONTENT` 直接向一个 `HWND` 要它自己的像素，授权单位与机制单位因此是同一个。代价写在明处：某些用 DirectComposition 独立合成的窗口会回一片黑，那时的答案是**拒绝并说出来**（`E_TOOL_UNAVAILABLE`，全黑像素是可判的），恒不把一片黑当成截图交出去。录制走同一个入口（D7）：每一帧都取自 `capture::window`，再经管道交给 ffmpeg，所以「授权单位与机制单位是同一个」这句话对录制也成立。全黑判为失败是一条产品策略，不是对捕获失败的完美识别：一扇真的全黑的窗口也会被拒，拒词给出不经像素的 `desktop.snapshot`。
+
+**设计六（快照的 ref 拿什么撑住）**：跨调用持有 `IUIAutomationElement` 这个 COM 指针（落选）vs 只留下快照当时的**屏幕矩形**（选中）。前者让 COM 对象的生存期缠上连接的生存期，而一次 `desktop.act` 需要的其实只有「点哪里」。选中方案让 COM 完整地关在 `tree` 一次调用之内，`act` 只面对整数坐标；generation 这一条的确切含义见 D5：一代 ref 属于一扇窗口（按句柄，不按标题），并且只在这扇窗口的矩形与快照时相同的前提下有效；窗口挪动或改了尺寸，旧的一代被拒。窗口内部重排而外框不动时，这一代仍被接受——这是剩余限制，不是已经解决的事。
+
+**设计七（`desktop.windows` 报的 ref 是什么）**：让它成为 `snapshot`／`act` 也接受的第二种指名方式（落选）vs 只作为这条连接内一个窗口的**稳定叫法**（选中）。scope 判定读的是 `title` 与 `process`（`Reach`），一个绕过它们的 ref 就是同一份许可的第二道门——而两道门里一定有一道最后没人看。工具表是定死的，`snapshot`／`act` 的 schema 里本来也没有窗口 ref 这一项；本节记下的是**为什么不去加它**。ref 里恒不含 `HWND` 的数值：句柄是运行中的机器的内部事实，模型没有一处用得上它。
+
+**设计八（没有 ffmpeg 时录什么）**：宣告录制不可用（落选）vs 自己抓一列 PNG 帧（选中）。工具卡片明写了「有 ffmpeg 出 mp4，没有则出帧序列」，而帧序列要一个**在读循环之外**跑的东西——本 package 因此有且只有一个 `std::thread::spawn`，在 `record::sink`：这条线程抓帧，交给 ffmpeg 的 stdin，或写成 PNG，由一个 `AtomicBool` 停下，`stop` 恒 join 它。这是本 package 唯一一处并发，写在这里是为了下一个读者不必去找第二处。声音（`audio: true`）恒被拒：选一个录音设备要知道运行中的机器上它叫什么，而这台 server 没有任何一处知道；假装录了而没录，比拒绝贵。能知道它的只有人，所以设备名只从 scope 文件来（D11）。
+
+**设计九（城里的事实怎么读）**：抄一份、由 `xtask guard` 比对（落选）vs 直接引用唯一定义（选中）。错误码、质量的域、协议修订与 `_meta` 的键 `sprawling/effect-unknown` 都是城里定下的事实，本 package 读 `kernel::AxCode`、`kernel::consts_policy::IMAGE_QUALITY`、`agent_protocols::PROTOCOL_VERSION` 与 `agent_protocols::EFFECT_META_KEY`。抄件加比对只能让漂移**可见**；引用让它**不可能**，而且 `RefusalCode::code` 是一个对两侧穷尽的 match，每个变体映到哪个 kernel 码由编译器读出，不再只是拼写存在（D14）。
+
+**设计十（一次 `act` 落在哪个窗口上）**：信任 `scope` 已经判过的那个窗口（落选）vs 发事件之前核对前台窗口，不是它就拒（选中）。`SendInput` 不带窗口：一次按键落在**那一刻**持有键盘的窗口上，而 scope、allowlist 与拒词判的是 title 与 process，这些没有一样跟着事件走。决定动作与发出动作之间隔着一段时间，操作者按一次 Alt+Tab、一个提权对话框弹出来，键盘就在别人手里了——`type` 会把整段文字打进那个窗口，密码框也包括在内；今天全仓 grep `SetForegroundWindow`／`GetForegroundWindow`／`WindowFromPoint` 零命中，故 scope 实际约束住的只有坐标的算法。选中方案是：`windows::focus` 读一次前台窗口，不是它就请求置前并在 200 ms 内有界地重读，仍不是就以 `E_TOOL_UNAVAILABLE` 拒，拒词写明**什么都没有发出去**；指针动作另问第二句——落点下面的顶层窗口也得是它，因为一个窗口可以持有键盘而另一个盖在点击处。比较的是句柄地址这一个纯值，于是这条规则在一台没有桌面的机器上也能逐条证明（§16.2）。付的代价写在明处：置前是一次**副作用**，而它是这台 server 唯一一处主动改变桌面的排布；把它藏起来的做法是不置前直接拒，那会让每一次正常的连续操作都要操作者手动切窗口。
+
+D4 部分输入：如实报数，只补抬起。
+
+- **决定**：`SendInput` 只收下前 k 个事件（0 < k < n）时，按已收下的前缀算出仍按住的键、Unicode 单元与鼠标键，按按下的相反次序补发一次它们的抬起；从不补发按下，从不重发整批。答复是 `E_TOOL_UNAVAILABLE` 的拒绝，标效果未知，写出 k／n 以及补发的抬起是否全部被收下。k = 0 时什么都没发出去，拒词照实说，不标效果未知。
+- **理由**：微软只承诺按序插入、返回插入的个数，不承诺回滚；前缀可能已经落在窗口上，修饰键可能停在按下状态，人的桌面随后每一次按键都会带着 Ctrl。补发抬起只会松开本次按下的东西，不会让动作多做一步；重发整批会把已经落地的点击或文字再做一遍。
+- **击败的备选**：只报告、不补发（桌面可能停在 Ctrl 按下，人要自己找原因）；重发整批（重复点击、重复输入）。
+- **重开的参数**：换成能按元素投递的接口（UIA patterns）之后，部分投递不再是这个形状。
+
+D5 generation 按窗口身份与快照时的矩形失效。
+
+- **决定**：`Views` 以窗口句柄（`focus::Aim`）为键，不以标题为键；一份快照记下这扇窗口当时的外框矩形。`resolve` 同时比对句柄、generation 与当前外框，外框不同即按过期拒绝。
+- **理由**：按标题记，两个进程的同名窗口共用一份记录，对 A 做的快照会让对 B 的动作取 A 的坐标；窗口挪动而不重新快照时，ref 的屏幕坐标指向挪动前的位置。外框是本 package 每次调用本来就读的值，比对它不多一次 Win32 调用。
+- **剩余限制**（写明，不当作已解决）：窗口内部重排而外框不动时，旧的一代仍被接受；句柄在窗口关闭后可能被新窗口复用，新窗口恰好外框相同时同样检测不到。
+- **击败的备选**：持有 UIA 元素跨调用（§10 设计六）；每次动作前重读整棵树比对（一次动作的代价变成一次快照）。
+- **重开的参数**：换成按元素投递（UIA patterns），ref 改指元素而不是矩形。
+
+D6 坐标约定：虚拟桌面上的物理像素。
+
+- **决定**：连接器建 `Desk` 时以 `SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE)` 声明按显示器感知；声明失败时读回 `GetProcessDpiAwareness`，已是按显示器感知就接受，不是就让每一次调用以 `E_TOOL_UNAVAILABLE` 被拒。此后枚举的外框、UIA 的矩形、落点检查、截图尺寸与输入的归一化都是虚拟桌面上的物理像素。
+- **理由**：不声明时，缩放显示器上 `GetWindowRect` 与 `GetSystemMetrics` 给的是虚拟化后的坐标，UIA 给的是物理坐标，一次按 ref 的点击会落在别处。声明只作用于 `sprawling desktop` 这个子进程，城的进程不受影响。用 Windows 8.1 起就有的 shcore 接口而不是 1703 起的 per-monitor v2 context 接口：本 package 链在 `sprawling` 里，一个缺失的 user32 导出会让整个二进制在更老的 Windows 上起不来；本 server 不画窗口，v2 多出的子窗口与非客户区缩放用不上。
+- **击败的备选**：在 `sprawling.exe` 的 manifest 里声明（城的进程也被改，本 package 自己的测试进程享受不到）；不声明（两种坐标混算）。
+- **重开的参数**：本 package 开始画自己的窗口，或最低支持的 Windows 版本升到 1703 以上。
+
+D7 录制经同一个捕获入口。
+
+- **决定**：录制的唯一那条线程按 `FRAME_EVERY` 调 `capture::window` 抓帧。PATH 上有 ffmpeg 时，帧以 `-f rawvideo -pixel_format rgba -video_size <宽>x<高> -framerate 10 -i -` 从 stdin 交给它；`spawn` 报「找不到程序」时写 PNG 序列；`spawn` 报别的错时 `start` 被拒。抓帧失败、写帧失败或 ffmpeg 提前退出，录制停下，`stop` 照常交出路径并说出写了多少帧、为什么停。结束 ffmpeg 靠关掉它的 stdin，它读到结尾自己写完索引退出。
+- **理由**：按标题交给 gdigrab 时，ffmpeg 以 `FindWindowW(NULL, title)` 重新找窗口，不看进程，像素来自 `BitBlt` 而不是 `PrintWindow`，也不过全黑判定；一个按 title 加 process 选中的窗口可能在这里换成另一扇同名窗口。
+- **击败的备选**：gdigrab 的 `hwnd=`（要 FFmpeg 7.0 以上，像素仍来自 `BitBlt`，版本过老时本 package 还探测不出来）；保持按标题（与 §10 设计五矛盾）。
+- **重开的参数**：`PrintWindow` 每帧的代价让 10 fps 做不到，届时再比较按句柄的 gdigrab。
+
+D8 剪贴板：自己的 owner，有界的读，先备好再清空。
+
+- **决定**：每次打开剪贴板时建一扇仅消息窗口（预定义类 `STATIC`，父窗口 `HWND_MESSAGE`）作为 owner，交给 `OpenClipboard`；`Held` 结束时先关剪贴板，再销毁这扇窗口，最后放掉进程内的轮次锁。读：以 `GlobalSize` 求出块的上界，在界内找终止符，找不到就取整块；`GlobalLock` 失败是拒绝。写：先分配并填好整块，再打开、清空、交出；交出失败时本进程释放这块内存，拒词说明剪贴板已被清空。
+- **理由**：微软写明以空窗口打开时 `EmptyClipboard` 把 owner 置空，随后的 `SetClipboardData` 会失败；块是别的程序写的，「它会以 0 结尾」可能为假；把锁失败当成「没有文本」，调用方会去试别的而不是重试；先清空再分配，分配失败时剪贴板已空，拒词却只说内存不够。这扇窗口只活一个剪贴板轮次、在同一线程建和毁，本 package 不依赖它收到任何消息，所以不需要消息泵。
+- **击败的备选**：`OpenClipboard(None)`（与文档冲突）；遇到无终止符的块就拒（对一个格式不规范的程序，整块文字仍然可读，界已经由 `GlobalSize` 守住）；WinRT Clipboard（要求前台与 UI 线程，后台子进程是否适用未证）。
+- **重开的参数**：出现一个能证明 owner、界与所有权移交的安全封装。X2 审过的 `winsafe` 0.0.29 还不是，理由见 D9。
+
+D11 声音：ffmpeg 的 `dshow` 录 scope 文件点名的那一个设备。
+
+- **决定**：`desktop.record` 的 `audio: true` 录的是人写在 scope 文件里的那一个 DirectShow 音频设备，键为 `sound = "<设备名>"`，与 `record`、`clipboard` 同样缺省不写。设备名只从 scope 文件来：调用方的参数里没有它，本 server 也不枚举设备。scope 文件写了 `record = true` 而没写 `sound` 时，`audio: true` 以 `E_GATE_DENIED` 拒，恢复语说出去哪里查设备名（`ffmpeg -hide_banner -list_devices true -f dshow -i dummy`）与写进哪一键。声音由第二个 ffmpeg 进程录，`-f dshow -i audio=<设备名>`，写成录制目录里的一个 16 kHz 单声道 wav，与画面各成一个文件；没有 ffmpeg 时，有声音的录制以 `E_TOOL_UNAVAILABLE` 拒，因为帧序列那一支录不了声音。
+- **理由**：主线 ffmpeg 在 Windows 上的音频输入是 `dshow`（`ffmpeg -devices` 列得出），不加依赖、不加 `unsafe`。dshow 设备的名字是驱动起的，随机器而变，城里没有一处知道；替人挑一个，就是替人授权录下一个他没点名的声音源，而麦克风是比一扇窗口更重的授权。人写下名字，就是人授权了这一个设备，与 `windows` 列表授权窗口是同一种读法。画面与声音分成两个进程、两个文件：画面从 stdin 进（D7），声音是 ffmpeg 自己的输入，放进一个进程就要对齐两条时钟；wav 是 `gateway::AudioType` 认得、城的 `transcribe` 工具直接收得下的容器（sprawling-SPEC 8-131），16 kHz 单声道一分钟约 1.9 MB。
+- **击败的备选**：WASAPI 回环（能录机器正在放的任何声音，但要新依赖或新 `unsafe`）；枚举设备取第一个（替人选了授权对象）；由调用方在参数里给设备名（模型给出授权对象，scope 文件就不再是授权的唯一处）；把声音混进 mp4（两条时钟，而没有 ffmpeg 的那一支本来就没有声音可混）。
+- **重开的参数**：主线 ffmpeg 在 Windows 上有了 WASAPI 输入；或者 scope 文件要按窗口给不同的设备。
+
+**成本：模型读到的是什么。** 工具名恒是 `desktop.<动词>`，模型一眼看得出这一件事发生在桌面上而不是页面里。一扇窗口读起来是一段缩进的大纲，每行一个元素和它的 ref，模型读完就能指名要点的那一个。每条说明的后半句写的是**不做什么**，因为模型下一步最贵的错误是把一件工具当成它旁边那件。拒词恒给一个可执行的下一步：越界给「把这个窗口写进 `DESKTOP.toml`」，未实现给「这个 build 里没有它」。拒词全文作为文字到达模型：城这一侧把 `isError` 结果读成一次失败，文字原样进它的 subject；部分输入另带效果未知，模型读到的是「先看一眼再动」，不是「可以重试」。
+-/
+
+/-! ## 11 边界枚举
 
 非 JSON 行／非对象／无 `method`／`params` 非对象／未知方法／握手未完成就调用／`tools/call` 无 `name`／`name` 不在表里／scope 文件缺失／scope 文件语法坏／scope 文件有拼错的键／allowlist 两张表皆空／title 不匹配／process 不匹配／同时给 title 与 process 而只中一个／既不给 title 也不给 process／`record` 未开／`clipboard` 未开／整屏截取／非 Windows 平台／Windows 但本 build 未实现／键盘在别的窗口手里且置前请求没有生效／指针动作的落点被别的窗口盖住。一批输入只被收下一部分／补发的抬起也被挡／窗口快照后挪动或改了尺寸／两扇同名窗口／进程已被设成别的 DPI 感知／剪贴板块没有终止符／剪贴板块锁不住／剪贴板清空之后交不出新文本／ffmpeg 起不来或中途退出／录制中窗口不再能抓帧／要声音而 scope 文件没写 `sound`／要声音而运行中的机器上没有 ffmpeg／声音设备打不开或录到一半退出／录下的声音比一次答复带得下的长。
 
 **同时给两个标识则两个都要中**：任何一个给出的标识都要落在它自己那张表里，这是 fail closed 的一致读法。
+-/
 
-## 12 Decisions
+/-! ## 12 错误处理
 
 | 码 | 何时 | 能否让它不可能发生 |
 |---|---|---|
@@ -375,75 +481,48 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 拒词恒是三段（three-part refusal）：拒了什么（action）、为什么（subject）、还能做什么（recovery）。工具名认出之后的拒绝写进 `isError` 结果的文字：第一行 `E_…: cannot <action> — <subject>`，第二行 `instead: <recovery>`；协议层的拒绝装进 JSON-RPC error 的 `data`，`message` 是第一行那句摘要。
 
-### 12.1 定规：`visible` 只在 Windows 与测试里编译
-
-- **决定**：`Admitted::visible` 与它所读的 `Allowance::visible` 带 `#[cfg(any(windows, test))]`；`Admitted` 的 `allowance` 字段带 `#[cfg_attr(not(any(windows, test)), expect(dead_code, reason = "…"))]`。类型与唯一的构造点 `Admitted { allowance: self }` 在每个平台上相同。
-- **理由**：非 Windows 臂（`platform/elsewhere.rs`）拒绝一切调用，不报任何窗口，所以那里的非测试构建里这两个方法与这个字段没有读者，编译器报三条 `dead_code`。`visible` 是纯判定、不碰 Win32，§16.2 要它在任何机器上受测，所以条件里带 `test`。字段上用 `expect` 而不是 `allow`：哪天非 Windows 臂开始报窗口，字段有了读者，这条 `expect` 落空，构建变红，它就跟着被删掉。
-- **击败的备选**：①按平台把字段拼成 `&'a Allowance` 与 `PhantomData<&'a Allowance>`——不需要任何 lint 抑制，但同一个值有两种拼写，构造点也要跟着分叉，而「是不是 Windows」按 `platform.rs` 的约定只写在一处；②等本 package 并入 workspace 时再处理——并入之后，workspace 的 `-D warnings` 会在 macOS 上把这三条警告变成错误。
-- **重开的参数**：非 Windows 臂开始报告窗口。那时 `visible` 在每个平台上都有读者，本条与那条 `expect` 一起删除。
-
-### 12.2 工具自己的拒绝以 `isError` 结果回答
+D2 工具自己的拒绝以 `isError` 结果回答。
 
 - **决定**：`tools/call` 在工具名认出之后的一切拒绝——scope 不准、参数读不了、平台做不到——都答 `CallToolResult`，`isError: true`，`content` 是一块文字，写三段拒词。握手未完、方法或工具名不认识、行读不出、`params` 不是对象，这几类才回 JSON-RPC error。
 - **理由**：MCP 2025-06-18 规定工具自己的错误放进结果、置 `isError`，协议层错误留给协议本身。城的客户端只读 JSON-RPC error 的 `code` 与 `message`，拒词里的恢复句到不了模型；放进结果，全文作为文字到达。
 - **击败的备选**：继续回 JSON-RPC error，让城读 `data.code`、`data.recovery`：那是规格外的约定，城要为每一家 server 猜一次 `data` 的形状。
 - **重开的参数**：MCP 的新修订改了工具错误的答法。
 
-### 12.3 效果未知写在 `_meta` 的一个命名空间键里
+D3 效果未知写在 `_meta` 的一个命名空间键里。
 
-- **决定**：一次拒绝若发生在请求已交出一部分之后（今天只有部分输入，§12.4），`isError` 结果带 `_meta: { "sprawling/effect-unknown": true }`。键的唯一定义在 `agent_protocols::mcp::tools::EFFECT_META_KEY`，本 package 引用它（§12.14）。
+- **决定**：一次拒绝若发生在请求已交出一部分之后（今天只有部分输入，D4），`isError` 结果带 `_meta: { "sprawling/effect-unknown": true }`。键的唯一定义在 `agent_protocols::mcp::tools::EFFECT_META_KEY`，本 package 引用它（D14）。
 - **理由**：「效果未知」要落成城里的 `Retry::Unknown`，它决定模型与人会不会把一次可能已经点下去的动作再做一遍；写进文字，城只能把它当一句话，读不出这个三态。`_meta` 是规格留给实现附加元数据的位置，键名按规格带自己的前缀，不占 `mcp` 的保留前缀。
-- **击败的备选**：放进 JSON-RPC error 的 `data.retry`（与 §12.2 冲突，也是规格外）；只写进拒词文字（城标不出 `Retry::Unknown`）。
+- **击败的备选**：放进 JSON-RPC error 的 `data.retry`（与 D2 冲突，也是规格外）；只写进拒词文字（城标不出 `Retry::Unknown`）。
 - **重开的参数**：MCP 规格为「副作用未知」定了自己的字段。
+-/
 
-### 12.4 部分输入：如实报数，只补抬起
+/-! ## 13 依赖选型
 
-- **决定**：`SendInput` 只收下前 k 个事件（0 < k < n）时，按已收下的前缀算出仍按住的键、Unicode 单元与鼠标键，按按下的相反次序补发一次它们的抬起；从不补发按下，从不重发整批。答复是 `E_TOOL_UNAVAILABLE` 的拒绝，标效果未知，写出 k／n 以及补发的抬起是否全部被收下。k = 0 时什么都没发出去，拒词照实说，不标效果未知。
-- **理由**：微软只承诺按序插入、返回插入的个数，不承诺回滚；前缀可能已经落在窗口上，修饰键可能停在按下状态，人的桌面随后每一次按键都会带着 Ctrl。补发抬起只会松开本次按下的东西，不会让动作多做一步；重发整批会把已经落地的点击或文字再做一遍。
-- **击败的备选**：只报告、不补发（桌面可能停在 Ctrl 按下，人要自己找原因）；重发整批（重复点击、重复输入）。
-- **重开的参数**：换成能按元素投递的接口（UIA patterns）之后，部分投递不再是这个形状。
+三个 workspace crate（`kernel`、`agent_protocols`、`desktop_ffi`，§7、D14），加八个外部依赖。`serde`、`serde_json`、`toml`、`base64` 经 `workspace = true` 取工作区的版本行，只做协议、scope 文件与 image content 的读写；另外四个各自买到什么，写在下表，后三个与 `desktop_ffi` 只在 Windows 上链接。**恒不引入**：async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
 
-### 12.5 generation 按窗口身份与快照时的矩形失效
+| crate | 买到什么 | 为什么不是别的 |
+|---|---|---|
+| `desktop_ffi`（同一工作区，§8-12） | 枚举、捕获、剪贴板、DPI 四组调用的安全函数，由 Zig 叶子做完 | 手写 `windows` 绑定的 `unsafe`（口径 ① 要的正是业务代码零 `unsafe`，D12） |
+| `windows` 0.62 | 绑定里的常量（`WHEEL_DELTA`、DPI 感知值）、交给 `uiautomation` 的 `HWND`、Win32 错误的文字；生产代码不调它的任何函数，测试用它建自己的窗口 | `windows-sys` 只有裸函数；`uiautomation` 本身也链接同一版 `windows`，锁里不多一个包 |
+| `winsafe` 0.0.29（只开 `user`、`ole`） | 输入与窗口事实的安全接口、COM 公寓的守卫（D9、D10），以及缝上的 `HWND`、`co::ERROR`、`co::HRESULT` | 没有 Cargo 依赖；它的 `EnumWindows` 与剪贴板写法不准入，理由在 D9 |
+| `uiautomation` 0.25.1（`default-features = false`，只开 `input`） | UIA 树的安全封装：automation 对象、walker、元素属性（D10） | 关掉默认特性，于是它的截图、剪贴板与控件匹配都不进来；`input` 只因它的 core 模块不开就编不过而开着，本 package 不调它；手写 COM 调用是被它换掉的那九个 `unsafe` 块 |
+| `image` 0.25（`default-features = false`，只开 `png`／`jpeg`／`webp`） | `desktop.screenshot` 点名的三种编码，以及缩放 | 关掉默认特性是因为本 package 只编码、从不解码，也不碰另外十种格式 |
+| `base64` 0.23 | image content 的 `data` 那一层编码，只在 `answer` 里编 | 与 workspace 的 `gateway::dialect::images` 同一条版本行（`workspace = true`） |
 
-- **决定**：`Views` 以窗口句柄（`focus::Aim`）为键，不以标题为键；一份快照记下这扇窗口当时的外框矩形。`resolve` 同时比对句柄、generation 与当前外框，外框不同即按过期拒绝。
-- **理由**：按标题记，两个进程的同名窗口共用一份记录，对 A 做的快照会让对 B 的动作取 A 的坐标；窗口挪动而不重新快照时，ref 的屏幕坐标指向挪动前的位置。外框是本 package 每次调用本来就读的值，比对它不多一次 Win32 调用。
-- **剩余限制**（写明，不当作已解决）：窗口内部重排而外框不动时，旧的一代仍被接受；句柄在窗口关闭后可能被新窗口复用，新窗口恰好外框相同时同样检测不到。
-- **击败的备选**：持有 UIA 元素跨调用（§8.6 第二对）；每次动作前重读整棵树比对（一次动作的代价变成一次快照）。
-- **重开的参数**：换成按元素投递（UIA patterns），ref 改指元素而不是矩形。
+`windows` 与 `winsafe` 的 feature 列表本身就是一份**够得着范围的声明**：一个本 package 从不调用的 API，在这里连名字都拼不出来。
 
-### 12.6 坐标约定：虚拟桌面上的物理像素
+D9 输入与窗口事实经 `winsafe`；枚举、捕获、剪贴板、DPI 仍走 FFI。
 
-- **决定**：连接器建 `Desk` 时以 `SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE)` 声明按显示器感知；声明失败时读回 `GetProcessDpiAwareness`，已是按显示器感知就接受，不是就让每一次调用以 `E_TOOL_UNAVAILABLE` 被拒。此后枚举的外框、UIA 的矩形、落点检查、截图尺寸与输入的归一化都是虚拟桌面上的物理像素。
-- **理由**：不声明时，缩放显示器上 `GetWindowRect` 与 `GetSystemMetrics` 给的是虚拟化后的坐标，UIA 给的是物理坐标，一次按 ref 的点击会落在别处。声明只作用于 `sprawling desktop` 这个子进程，城的进程不受影响。用 Windows 8.1 起就有的 shcore 接口而不是 1703 起的 per-monitor v2 context 接口：本 package 链在 `sprawling` 里，一个缺失的 user32 导出会让整个二进制在更老的 Windows 上起不来；本 server 不画窗口，v2 多出的子窗口与非客户区缩放用不上。
-- **击败的备选**：在 `sprawling.exe` 的 manifest 里声明（城的进程也被改，本 package 自己的测试进程享受不到）；不声明（两种坐标混算）。
-- **重开的参数**：本 package 开始画自己的窗口，或最低支持的 Windows 版本升到 1703 以上。
-
-### 12.7 录制经同一个捕获入口
-
-- **决定**：录制的唯一那条线程按 `FRAME_EVERY` 调 `capture::window` 抓帧。PATH 上有 ffmpeg 时，帧以 `-f rawvideo -pixel_format rgba -video_size <宽>x<高> -framerate 10 -i -` 从 stdin 交给它；`spawn` 报「找不到程序」时写 PNG 序列；`spawn` 报别的错时 `start` 被拒。抓帧失败、写帧失败或 ffmpeg 提前退出，录制停下，`stop` 照常交出路径并说出写了多少帧、为什么停。结束 ffmpeg 靠关掉它的 stdin，它读到结尾自己写完索引退出。
-- **理由**：按标题交给 gdigrab 时，ffmpeg 以 `FindWindowW(NULL, title)` 重新找窗口，不看进程，像素来自 `BitBlt` 而不是 `PrintWindow`，也不过全黑判定；一个按 title 加 process 选中的窗口可能在这里换成另一扇同名窗口。
-- **击败的备选**：gdigrab 的 `hwnd=`（要 FFmpeg 7.0 以上，像素仍来自 `BitBlt`，版本过老时本 package 还探测不出来）；保持按标题（与 §8.6 第一对矛盾）。
-- **重开的参数**：`PrintWindow` 每帧的代价让 10 fps 做不到，届时再比较按句柄的 gdigrab。
-
-### 12.8 剪贴板：自己的 owner，有界的读，先备好再清空
-
-- **决定**：每次打开剪贴板时建一扇仅消息窗口（预定义类 `STATIC`，父窗口 `HWND_MESSAGE`）作为 owner，交给 `OpenClipboard`；`Held` 结束时先关剪贴板，再销毁这扇窗口，最后放掉进程内的轮次锁。读：以 `GlobalSize` 求出块的上界，在界内找终止符，找不到就取整块；`GlobalLock` 失败是拒绝。写：先分配并填好整块，再打开、清空、交出；交出失败时本进程释放这块内存，拒词说明剪贴板已被清空。
-- **理由**：微软写明以空窗口打开时 `EmptyClipboard` 把 owner 置空，随后的 `SetClipboardData` 会失败；块是别的程序写的，「它会以 0 结尾」可能为假；把锁失败当成「没有文本」，调用方会去试别的而不是重试；先清空再分配，分配失败时剪贴板已空，拒词却只说内存不够。这扇窗口只活一个剪贴板轮次、在同一线程建和毁，本 package 不依赖它收到任何消息，所以不需要消息泵。
-- **击败的备选**：`OpenClipboard(None)`（与文档冲突）；遇到无终止符的块就拒（对一个格式不规范的程序，整块文字仍然可读，界已经由 `GlobalSize` 守住）；WinRT Clipboard（要求前台与 UI 线程，后台子进程是否适用未证）。
-- **重开的参数**：出现一个能证明 owner、界与所有权移交的安全封装。X2 审过的 `winsafe` 0.0.29 还不是，理由见 §12.9。
-
-### 12.9 输入与窗口事实经 `winsafe`；枚举、捕获、剪贴板、DPI 仍走 FFI
-
-- **决定**：输入（`SendInput`、`GetSystemMetrics`）与窗口事实（可见、标题、进程映像名、外框、前台、落点、置前）改经 `winsafe` 0.0.29 的安全接口，只开 `user` 与 `ole` 两个 feature。键码以 `co::VK` 常量写在 `keys` 表里，一个动作的事件在 Rust 里构造成 `HwKbMouse` 值，整批一次交给 `winsafe::SendInput`，它回的收下个数照 §12.4 读。窗口句柄只在 `enumerate` 的 `EnumWindows` 回调里铸成 `winsafe::HWND`（§8-11），那是这一组唯一新写的 `unsafe`。
+- **决定**：输入（`SendInput`、`GetSystemMetrics`）与窗口事实（可见、标题、进程映像名、外框、前台、落点、置前）改经 `winsafe` 0.0.29 的安全接口，只开 `user` 与 `ole` 两个 feature。键码以 `co::VK` 常量写在 `keys` 表里，一个动作的事件在 Rust 里构造成 `HwKbMouse` 值，整批一次交给 `winsafe::SendInput`，它回的收下个数照 D4 读。窗口句柄只在 `enumerate` 的 `EnumWindows` 回调里铸成 `winsafe::HWND`（§8-11），那是这一组唯一新写的 `unsafe`。
 - **理由**：这几个调用的前提（出参缓冲的长度、句柄的借用、`INPUT` 数组的元素大小）由 `winsafe` 的签名承担，本 package 只剩值；`winsafe` 没有 Cargo 依赖，`user` 不拉 GUI 那一层。
-- **不准入的四组与各自的理由**（它们今天经 §8-12 的 Zig 缝）：`winsafe::EnumWindows` 把 `&func` 当作地址交出去，回调里再从它造出 `&mut F`（`src/user/funcs.rs` 与 `src/user/callbacks.rs`），这是从共享引用造可变引用，属未定义行为，所以枚举留在 `windows` 绑定上；以 `FindWindowEx` 或 `GetWindow` 逐个取顶层窗口可以不写 `unsafe`，但 z 序在两次调用之间变化时会漏掉窗口或兜圈，而 `EnumWindows` 先取快照再回调，故落选。剪贴板：`HCLIPBOARD::SetClipboardData` 在调用方已经清空剪贴板之后才分配内存，交出失败时那块内存被 `leak` 而不释放，与 §12.8「先备好再清空、交不出就释放」相反；建 owner 窗口的 `CreateWindowEx` 在 `winsafe` 里本身是 `unsafe`。捕获：`winsafe` 没有 `PrintWindow`，`GetDIBits` 是 `unsafe`。DPI：`SetProcessDpiAwareness` 在 shcore 里，`winsafe` 没有它。这四组由 §8-12 的 Zig 缝做完（§12.12）。
-- **剩余限制**（写明，不当作已解决）：`SendInput` 仍只报收下几个；换接口不改变 §8.6 第六对的前台检查只是一次采样这件事。
+- **不准入的四组与各自的理由**（它们今天经 §8-12 的 Zig 缝）：`winsafe::EnumWindows` 把 `&func` 当作地址交出去，回调里再从它造出 `&mut F`（`src/user/funcs.rs` 与 `src/user/callbacks.rs`），这是从共享引用造可变引用，属未定义行为，所以枚举留在 `windows` 绑定上；以 `FindWindowEx` 或 `GetWindow` 逐个取顶层窗口可以不写 `unsafe`，但 z 序在两次调用之间变化时会漏掉窗口或兜圈，而 `EnumWindows` 先取快照再回调，故落选。剪贴板：`HCLIPBOARD::SetClipboardData` 在调用方已经清空剪贴板之后才分配内存，交出失败时那块内存被 `leak` 而不释放，与 D8「先备好再清空、交不出就释放」相反；建 owner 窗口的 `CreateWindowEx` 在 `winsafe` 里本身是 `unsafe`。捕获：`winsafe` 没有 `PrintWindow`，`GetDIBits` 是 `unsafe`。DPI：`SetProcessDpiAwareness` 在 shcore 里，`winsafe` 没有它。这四组由 §8-12 的 Zig 缝做完（D12）。
+- **剩余限制**（写明，不当作已解决）：`SendInput` 仍只报收下几个；换接口不改变 §10 设计十的前台检查只是一次采样这件事。
 - **击败的备选**：把这几组一起搬进 Zig 缝（有合格安全接口的调用不需要一道新的 FFI 缝）；留在 `windows` 绑定上继续手写 `unsafe`（口径 ①要的正是业务代码零 `unsafe`）。
 - **重开的参数**：`winsafe` 修好 `EnumWindows`，枚举这一行随之换过去；或者新版本改了这里准入的签名，那一行的契约测试先红。
 
-### 12.10 树经 `uiautomation` 读、按文档序铸 ref、折成文字；COM 公寓每张桌子进一次
+D10 树经 `uiautomation` 读、按文档序铸 ref、折成文字；COM 公寓每张桌子进一次。
 
-- **决定**：`tree` 经 `uiautomation` 0.25.1 读树，默认 feature 关掉，只开 `input`（它的 core 模块不开 `input` 编不过），只用 `UIAutomation::new_direct`、`element_from_handle`、control view walker 与元素的三项属性（role、name、外框）。COM 公寓由 `Desk` 在第一次 snapshot 时进入一次，用多线程公寓（MTA），经 `winsafe::CoInitializeEx` 的守卫；automation 对象与 walker 同这个守卫一起住在桌子里，字段的析构次序保证先放 COM 对象、后退出公寓。元素仍只活在一次 snapshot 之内（§8.6 第二对）。walker 答「没有这个元素」（错误码 0）是这一层到头；答别的错误是 provider 出了故障，遍历在那里停下，而不是当作到头。
+- **决定**：`tree` 经 `uiautomation` 0.25.1 读树，默认 feature 关掉，只开 `input`（它的 core 模块不开 `input` 编不过），只用 `UIAutomation::new_direct`、`element_from_handle`、control view walker 与元素的三项属性（role、name、外框）。COM 公寓由 `Desk` 在第一次 snapshot 时进入一次，用多线程公寓（MTA），经 `winsafe::CoInitializeEx` 的守卫；automation 对象与 walker 同这个守卫一起住在桌子里，字段的析构次序保证先放 COM 对象、后退出公寓。元素仍只活在一次 snapshot 之内（§10 设计六）。walker 答「没有这个元素」（错误码 0）是这一层到头；答别的错误是 provider 出了故障，遍历在那里停下，而不是当作到头。
 - **理由**：微软对不开窗口的 UIA 工作线程推荐 MTA；进一次、配对退出，公寓的生存期就是连接的生存期。旧写法每次 snapshot 都以 STA 进入而从不退出，并且每次新建 automation 对象；`uiautomation::UIAutomation::new()` 同样每次进入而不退出，故不用它。把 provider 的故障读成「到头了」，模型拿到的是一棵看起来完整、其实缺了一块的树。
 - **剩余限制**（写明，不当作已解决）：`winsafe` 的 `CoUninitializeGuard` 在进入公寓答 `RPC_E_CHANGED_MODE` 时也会调 `CoUninitialize`；本 package 的读循环线程不进入任何别的公寓，这条路走不到。剪贴板走的是 Win32 剪贴板而不是 OLE 剪贴板，同一线程上的 MTA 与它无关。
 - **击败的备选**：保留经 `windows` 绑定手写的 COM 调用（九个 `unsafe` 块）；让 UIA 也回答窗口事实（UIA 根的子元素、`IsOffscreen` 与 `EnumWindows`、`WS_VISIBLE` 不是同一个定义，安全判断会跟着 provider 的实现走）。
@@ -452,52 +531,9 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 - **(b) 理由**：模型读一行一个元素的文字比读嵌套 JSON 快，bounds 对模型没有用处，`desktop.act` 按 ref 从 `Views` 取；一个可读的词表比一串编号或一个随语言变的字符串更好对照。
 - **(b) 击败的备选**：继续回每个节点的 JSON（答复是现在的四五倍长，bounds 占去一半）；另造一套平台无关的 role 词（在只有一个平台的今天，它只是一层没有第二个读者的翻译）。
 - **(b) 重开的参数**：macOS 臂落地时 AX 的 role 映不进这张词表。
+-/
 
-### 12.11 声音：ffmpeg 的 `dshow` 录 scope 文件点名的那一个设备
-
-- **决定**：`desktop.record` 的 `audio: true` 录的是人写在 scope 文件里的那一个 DirectShow 音频设备，键为 `sound = "<设备名>"`，与 `record`、`clipboard` 同样缺省不写。设备名只从 scope 文件来：调用方的参数里没有它，本 server 也不枚举设备。scope 文件写了 `record = true` 而没写 `sound` 时，`audio: true` 以 `E_GATE_DENIED` 拒，恢复语说出去哪里查设备名（`ffmpeg -hide_banner -list_devices true -f dshow -i dummy`）与写进哪一键。声音由第二个 ffmpeg 进程录，`-f dshow -i audio=<设备名>`，写成录制目录里的一个 16 kHz 单声道 wav，与画面各成一个文件；没有 ffmpeg 时，有声音的录制以 `E_TOOL_UNAVAILABLE` 拒，因为帧序列那一支录不了声音。
-- **理由**：主线 ffmpeg 在 Windows 上的音频输入是 `dshow`（`ffmpeg -devices` 列得出），不加依赖、不加 `unsafe`。dshow 设备的名字是驱动起的，随机器而变，城里没有一处知道；替人挑一个，就是替人授权录下一个他没点名的声音源，而麦克风是比一扇窗口更重的授权。人写下名字，就是人授权了这一个设备，与 `windows` 列表授权窗口是同一种读法。画面与声音分成两个进程、两个文件：画面从 stdin 进（§12.7），声音是 ffmpeg 自己的输入，放进一个进程就要对齐两条时钟；wav 是 `gateway::AudioType` 认得、城的 `transcribe` 工具直接收得下的容器（sprawling-SPEC 8-131），16 kHz 单声道一分钟约 1.9 MB。
-- **击败的备选**：WASAPI 回环（能录机器正在放的任何声音，但要新依赖或新 `unsafe`）；枚举设备取第一个（替人选了授权对象）；由调用方在参数里给设备名（模型给出授权对象，scope 文件就不再是授权的唯一处）；把声音混进 mp4（两条时钟，而没有 ffmpeg 的那一支本来就没有声音可混）。
-- **重开的参数**：主线 ffmpeg 在 Windows 上有了 WASAPI 输入；或者 scope 文件要按窗口给不同的设备。
-
-### 12.12 没有准入安全接口的四组调用经一片 Zig 叶子，Rust 面零业务 `unsafe`
-
-- **决定**：枚举、捕获、剪贴板、DPI 四组调用由 `crates/desktop/ffi` 的 Zig 叶子整段做完（§8-12）：一个 export 一个完整操作，Rust 借出缓冲、读回 step 与错误码，句柄、DC 与全局块恒不跨边界。Rust 面每次调用一个 `unsafe` 块，加那一处 `unsafe extern` 声明，全部在 §8-12 的表里；本 package 的 `src/` 生产代码不写 `unsafe`。两个包都是根工作区的成员，共享锁、包元数据与 `winsafe` 的一条版本行；lint 表只有 `desktop_ffi` 那一张与工作区差一行（§12.14）。叶子往缓冲里写什么、资源怎么配对，由 `crates/desktop/ffi/Spec.lean` 证明模型性质，由对拍、fuzz 与真窗口上的契约测试检查实现。
-- **理由**：AGENTS.md「Rust」一节给平台调用定了次序：先找安全接口，没有合格的就用 Zig 叶子，`unsafe` Rust 只在测量表明它整体最好时才准入。这四组在 X2 的审查里没有合格的安全接口（§12.9），口径 ① 要的正是业务代码零 `unsafe`、只留一个经审的 FFI 缝。整段操作放进叶子，是因为这四组的风险不在某一次调用，而在调用之间：位图选进之后要选回、DC 要随取得它的窗口还回去、全局块要么交出要么释放。这些次序在叶子里写成取得旁边的 `defer`，在 Lean 里写成可穷举的模型；若每个 Win32 调用各包一个 export，次序就又回到 Rust 的 `Drop` 与 `unsafe` 里（`desktop_ffi` D1）。
-- **剩余限制**（写明，不当作已解决）：两侧的 fuzz 都是抽样而不是覆盖引导。Zig 的覆盖引导 fuzz（`--fuzz`）今天不在 Windows 上实现；cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时，而叶子只在 Windows 上编，所以 libFuzzer 没有一个能跑它的平台。叶子以 `ReleaseSafe` 编，抽样到的越界即 trap。Lean 证明的是叶子对操作系统回答的处理，操作系统本身是假设。`header`、`length`、`modmap` 三道门今天只读 `.rs`，`.zig` 文件的 MPL 注记与长度由评审守（ARCHITECTURE §2 条件 5 的这一半未落地）。
-- **击败的备选**：①留在 `windows` 绑定上继续手写 `unsafe`（33 个块，与口径 ① 相反）；②一个独立的 Zig 可执行程序、经进程边界说话（多一个交付物与它的监管，而本 server 本来就是一个子进程，多一层隔离买不到新东西）；③每个 Win32 调用一个 export（见上）；④把叶子的调用留在本 package 里、本 package 整个用 `deny`（`unsafe` 的许可就落到了协议壳与平台臂上，那里一行也不需要它）。
-- **重开的参数**：一个安全 crate 修好了其中一组（例如 `winsafe` 修好 `EnumWindows`），那一行先写契约测试、再离开叶子；Zig 的 `--fuzz` 或 cargo-fuzz 在 Windows 上落地，`just fuzz-desktop` 换成覆盖引导的那一种。
-
-### 12.13 录下的声音作为一块 audio content 交回城里
-
-- **决定**：`desktop.record` 的 `stop` 在这份录制录了声音时，答复的第一块是 MCP 的 audio content（`type: "audio"`、`data` 是 base64、`mimeType: "audio/wav"`），第二块是照旧的那段文字，多写 `sound`（wav 的路径）。wav 超过 `SOUND_CARRIED_MOST` 时不带 audio 块，文字里写 `sound_left_out` 说明多长、在哪里；声音那个 ffmpeg 提前退出时写 `sound_ended_early`，有多少交多少。
-- **理由**：wav 落在临时目录（§14），城里没有一件工具读得到那里；交回城里的唯一一条不新增依赖、不新增写权限的路，是 MCP 答复本身。连接器已经把答复里的图片存进 CAS（runtime-SPEC §8-27-10），声音走同一条路，模型读到的是一行带 locator 的字，base64 恒不进窗口也恒不进账本。截图恒是一块 image 在前（§8-2b），声音照同一个形状，模型读这两种答复用的是同一种读法。
-- **击败的备选**：①把录音写进这座楼（scope 文件说的是能碰哪些窗口，没说能往城里哪里写，§14；而且本 server 不知道城根在哪）；②只交路径（城里没有工具读得到临时目录）；③把整段声音不论多长都塞进答复（十分钟的 wav 是 19 MB，base64 之后超过城的 MCP 单行上限，整个答复会被拒，连画面的路径都到不了）。
-- **重开的参数**：城的 MCP 客户端改了单行上限；或者 `transcribe` 能直接读运行中的机器上的一个文件。
-
-### 12.14 并回 workspace：本 package 继承 `forbid`，FFI 叶子自带一张只差一行的 lint 表
-
-- **决定**：server 与它的 FFI 缝住在 `crates/desktop` 与 `crates/desktop/ffi`，两个都是根工作区的成员；它们不再自成一个工作区，没有第二份锁，根 `Cargo.toml` 不 exclude 任何包。本 package 以 `[lints] workspace = true` 继承工作区的 lint 表（`unsafe_code = "forbid"`），包元数据与共享依赖都经 `workspace = true` 继承；lib 名改为 `desktop`，与 depmap 的行名、与其余 crate 的「lib 名即目录名」一致。`desktop_ffi` 写一张自己的 `[lints]`：与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`。`xtask guard` 判这一张表（逐键等于根表，例外只有记下理由的 `unsafe_code`），并判其余每个成员的 `[lints]` 恰是 `workspace = true`。本 package 依赖 `kernel` 与 `agent_protocols`：错误码的拼写取 `kernel::AxCode::as_str`，质量的域取 `kernel::consts_policy::IMAGE_QUALITY`，协议修订取 `agent_protocols::PROTOCOL_VERSION`，效果未知的键取 `agent_protocols::EFFECT_META_KEY`；`refusal.rs`、`rpc.rs`、`encode.rs` 里的抄件、`xtask guard` 的 `quoted` 比对与 `kernel::error::code` 里读 `refusal.rs` 的那条测试一起删去。测试自己建窗口要写的 `unsafe` 搬进 `desktop_ffi::fixture`，只在 `fixture` feature 下编译；本 package 只在 Windows 的 dev 依赖里打开它，`xtask artifact` 把 `fixture` 列为测试 feature。
-- **理由**：本 package 坐在墙外的理由只有一条（Win32 边界要放开 `unsafe_code`，§8.5 第二对）。X3 把那些调用收进 Zig 叶子之后（§12.12），本 package 的生产代码已不写 `unsafe`，这条理由只剩叶子那一层。墙外的代价却都还在：一份抄来的 lint 表、包元数据与依赖版本，第二份锁，六个错误码、质量域、协议修订与 `_meta` 键各一份第二拼写，`depmap` 只能陈述那一行而守不住，`cargo clippy --workspace` 判不到它。并回之后这些抄件都换成引用，剩下的唯一一处差异是叶子那张表的 `unsafe_code` 一行，guard 判的正是它。叶子留在工作区里，而不是另起一个工作区：放在外面它就要自己的锁与 `[workspace.package]`，guard 又要比对一整堵墙；在里面，它与别的成员共享锁、元数据与依赖版本，只有一张表是自己的。依赖 `agent_protocols` 只为两个常量，代价是本 package 单独编译时要先编 `agent_protocols` 与 `gateway`；二进制不变，因为 `sprawling` 本来就链接它们，而这是两个常量各只剩一个定义的唯一做法。
-- **击败的备选**：①叶子也继承 `forbid`，把 `extern` 声明交给一个生成的或第三方的安全绑定——今天没有合格的绑定（§12.9），而 Rust 2024 的 `unsafe extern` 块在 `forbid` 下编不过；②叶子留在一个墙外工作区，只把本 package 并回——墙还在，只是变小，第二份锁与抄写核对都留着；③测试建窗口的 `unsafe` 留在本 package，给它另开一张 lint 表——cargo 的 lint 表不分 profile，给测试开就是给生产代码开；④不依赖 `agent_protocols`，两个常量留着由 guard 比对——一个事实两个定义，再加一道只为它们存在的门；⑤lib 名保持 `sprawling_desktop`——`depmap` 按 lib 名判边，那一行就要改名，而其余每个 crate 的 lib 名都是它的目录名。
-- **重开的参数**：一个合格的安全绑定覆盖了叶子的四组调用，叶子离开，那张自己的表与 guard 一起删去；或 cargo 允许一个成员继承工作区 lint 表而只改一行，那时叶子写 `workspace = true` 加一行覆盖，guard 的比对随之删去。
-
-## 13 依赖选型
-
-三个 workspace crate（`kernel`、`agent_protocols`、`desktop_ffi`，§7、§12.14），加八个外部依赖。`serde`、`serde_json`、`toml`、`base64` 经 `workspace = true` 取工作区的版本行，只做协议、scope 文件与 image content 的读写；另外四个各自买到什么，写在下表，后三个与 `desktop_ffi` 只在 Windows 上链接。**恒不引入**：async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
-
-| crate | 买到什么 | 为什么不是别的 |
-|---|---|---|
-| `desktop_ffi`（同一工作区，§8-12） | 枚举、捕获、剪贴板、DPI 四组调用的安全函数，由 Zig 叶子做完 | 手写 `windows` 绑定的 `unsafe`（口径 ① 要的正是业务代码零 `unsafe`，§12.12） |
-| `windows` 0.62 | 绑定里的常量（`WHEEL_DELTA`、DPI 感知值）、交给 `uiautomation` 的 `HWND`、Win32 错误的文字；生产代码不调它的任何函数，测试用它建自己的窗口 | `windows-sys` 只有裸函数；`uiautomation` 本身也链接同一版 `windows`，锁里不多一个包 |
-| `winsafe` 0.0.29（只开 `user`、`ole`） | 输入与窗口事实的安全接口、COM 公寓的守卫（§12.9、§12.10），以及缝上的 `HWND`、`co::ERROR`、`co::HRESULT` | 没有 Cargo 依赖；它的 `EnumWindows` 与剪贴板写法不准入，理由在 §12.9 |
-| `uiautomation` 0.25.1（`default-features = false`，只开 `input`） | UIA 树的安全封装：automation 对象、walker、元素属性（§12.10） | 关掉默认特性，于是它的截图、剪贴板与控件匹配都不进来；`input` 只因它的 core 模块不开就编不过而开着，本 package 不调它；手写 COM 调用是被它换掉的那九个 `unsafe` 块 |
-| `image` 0.25（`default-features = false`，只开 `png`／`jpeg`／`webp`） | `desktop.screenshot` 点名的三种编码，以及缩放 | 关掉默认特性是因为本 package 只编码、从不解码，也不碰另外十种格式 |
-| `base64` 0.23 | image content 的 `data` 那一层编码，只在 `answer` 里编 | 与 workspace 的 `gateway::dialect::images` 同一条版本行（`workspace = true`） |
-
-`windows` 与 `winsafe` 的 feature 列表本身就是一份**够得着范围的声明**：一个本 package 从不调用的 API，在这里连名字都拼不出来。
-
-## 14 硬编码声明
+/-! ## 14 硬编码声明
 
 协议修订是 `agent_protocols::PROTOCOL_VERSION`，本 package 引用它而不写第二份，因为两端要谈得拢。服务器自称 `sprawling-desktop`，版本取 `CARGO_PKG_VERSION`。
 
@@ -514,22 +550,25 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 | `scale` 与城里那个同名量的区别 | 本包的 `scale` 是窗口自身像素的百分数 | 城里 `browser` 的 `scale` 是设备像素比（devicePixelRatio）的百分数——同一个词、两个量，**不是同一个事实**，所以两边的域也不必相同 |
 | `webp` 忽略 `quality` | —— | 外面的事实：`image` 的 WebP 编码器是**无损**的，故 `quality` 对它无意义。schema 允许同时给出，本 server 恒不因此报错，而在答复里写明这一次的编码是无损的 |
 | 帧序列的抓帧间隔 | 100 ms（10 fps） | 我们的选择：`PrintWindow` 一帧的代价决定了上限，而 10 fps 足够看清一次交互 |
-| 声音的格式 | 16 kHz、单声道、16 位 PCM 的 wav，一分钟约 1.9 MB | 外面的事实与我们的选择：wav 是 `gateway::AudioType` 认得的容器；转写端点要的是语音，16 kHz 单声道足够，再高只多字节（§12.11） |
-| 一次答复里最多带多少声音（`SOUND_CARRIED_MOST`） | 4 MiB，约两分钟 | 我们的选择：base64 让它长三分之一，整行仍在城的 MCP 客户端那 8 MiB 的单行上限之内；更长的录音只交路径（§12.13） |
+| 声音的格式 | 16 kHz、单声道、16 位 PCM 的 wav，一分钟约 1.9 MB | 外面的事实与我们的选择：wav 是 `gateway::AudioType` 认得的容器；转写端点要的是语音，16 kHz 单声道足够，再高只多字节（D11） |
+| 一次答复里最多带多少声音（`SOUND_CARRIED_MOST`） | 4 MiB，约两分钟 | 我们的选择：base64 让它长三分之一，整行仍在城的 MCP 客户端那 8 MiB 的单行上限之内；更长的录音只交路径（D13） |
 | 声音的收尾 | 往第二个 ffmpeg 的 stdin 写 `q`，再等它自己退出 | 外面的事实：ffmpeg 读到 `q` 才写完 wav 的头；直接杀掉会留下一个长度字段为零的文件 |
 | 录制落盘的去处 | `std::env::temp_dir()/sprawling-desktop/<窗口名安全化>-<序号>` | 我们的选择：scope 文件说的是「可以碰哪些窗口」，没说「可以往哪写文件」，故恒不写进城里，也恒不写进操作者的家目录 |
 | ffmpeg 的收尾 | 关掉它的 stdin，再等它自己退出 | 外面的事实：帧从 stdin 进，读到结尾时 ffmpeg 写完 mp4 的尾部索引；直接杀掉会留下一个播放不了的文件 |
 | 全黑像素判为失败 | —— | 外面的事实：`PrintWindow` 对某些独立合成的窗口回全黑。依据是「每一个像素的 RGB 三通道皆为 0」 |
 | 效果未知的 `_meta` 键 | `sprawling/effect-unknown`，值 `true` | 我们的约定；唯一定义在 `agent_protocols::mcp::tools::EFFECT_META_KEY`，本 package 引用它 |
 | 工具层拒词的文字 | 第一行 `E_…: cannot <action> — <subject>`，第二行 `instead: <recovery>` | 我们的选择：第一行与 JSON-RPC error 的 `message` 同一句，第二行让恢复句在模型读到的文字里有自己的位置 |
-| DPI 感知 | 按显示器感知（`PROCESS_PER_MONITOR_DPI_AWARE`，取自 `windows` 绑定，交给叶子） | 外面的事实：Windows 8.1 起的 shcore 接口；理由见 §12.6 |
+| DPI 感知 | 按显示器感知（`PROCESS_PER_MONITOR_DPI_AWARE`，取自 `windows` 绑定，交给叶子） | 外面的事实：Windows 8.1 起的 shcore 接口；理由见 D6 |
 | Zig 的版本 | `crates/desktop/ffi/zig-version` 里的那一行 | 我们的选择：叶子只对一个 Zig 版本编过、测过；换版本只改那一个文件（`crates/desktop/ffi/Spec.lean` D3） |
 
-## 15 影响面
+模型里的 `LABEL_MOST` 与 Rust 的 `outline::LABEL_MOST` 取同一个值，由 `outline` 模块旁的测试守着。
+-/
+
+/-! ## 15 影响面
 
 工作区成员，唯一的调用方是 `sprawling`：`crates/sprawling/Cargo.toml` 以 `desktop = { workspace = true }` 依赖它，`ARCHITECTURE.md` §3 的 depmap 块有它与 `desktop_ffi` 各一行。改 `kernel::AxCode` 那六个变体、`IMAGE_QUALITY`、`agent_protocols::PROTOCOL_VERSION` 或 `EFFECT_META_KEY` 波及本 package。它在 Windows 上按路径依赖 `desktop_ffi`，所以 Windows 上构建 `sprawling` 要有 `zig-version` 钉住的 Zig。改 `serve_stdio` 的签名波及 `bin::main::desktop`；改工具名或 `tools/list` 的形状波及 `kernel::gate::undoable`（按远端名前缀 `desktop.` 判）与 `crates/sprawling/tests/desktop.rs`。
 
-## 15.2 城里那一侧
+### 15.2 城里那一侧
 
 城里认这台 server 的四件事与各自的落点：
 
@@ -548,17 +587,17 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 **还欠的**，都是这条接口的当前状态：
 
 1. **OCR**：一张截图变成文字由城工具 `ocr` 承担（sprawling-SPEC 8-142），它读连接器存进 CAS 的截图，经人为 `ModelTag::Ocr` 选的端点；本 package 不做 OCR。
-2. **录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（§12.13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（runtime-SPEC §8-27-10、§12.15）。`transcribe` 今天只读本楼的文件（sprawling-SPEC 8-131），读一个 `cas:` 块是那里的未决；在它落地之前，录音的路径与 locator 都写在答复里，但工具还收不下它们。
+2. **录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（D13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（runtime-SPEC §8-27-10、runtime-SPEC §12.15）。`transcribe` 今天只读本楼的文件（sprawling-SPEC 8-131），读一个 `cas:` 块是那里的未决；在它落地之前，录音的路径与 locator 都写在答复里，但工具还收不下它们。
 3. **macOS 这条胳膊**：`platform/elsewhere.rs` 对 macOS 答 `E_TOOL_UNAVAILABLE`。它要在一台 Mac 或夜间的 `platforms.yml` 上验，Windows 上验不了。
+-/
 
-
-## 16 测试与约束
+/-! ## 16 测试与约束
 
 逐模块 `#[cfg(test)]`。真的把进程拉起来的那一条住城里（`crates/sprawling/tests/desktop.rs`，§8-10）：它是唯一一处证明「城起的 `sprawling desktop` 真的接得上」的测试，其余测试都只证明库里的判断。
 
 **约束**：`unsafe` 只在 `platform/windows/` 之下且每块携一行 `SAFETY:`（§8-9）；其余处恒不出现 `unsafe`、`unwrap`、`expect`、`panic!`、`todo!`、裸下标、`as`；算术走 `checked_*`／`saturating_*`；每个文件 ≤400 行、每个函数 ≤200 行且 ≤4 参数。`scope.rs` 因这条尺子而在 446 行处切出 `scope/pattern.rs`——切口落在「一行 allowlist 匹配什么」与「这份文件许可什么」之间，是语义的，不是为了凑行数；`Admitted` 落地时它再次抵线，这一次切出的是 `scope/tests.rs`（形状同 `session/tests.rs`），判定与对判定的断言各占一个文件。
 
-验收命令：本 package 与 `desktop_ffi` 是工作区成员，`just clippy`、`just test` 与 `just fmt-check` 判它们，与判其余 crate 是同一条命令；Windows 上 `just check-desktop` 另跑 `zig test` 判叶子自己的测试（`zig fmt --check` 在 `just fmt-check` 里）。`xtask guard` 判 `desktop_ffi` 那一张自己的 lint 表，例外只有记下理由的 `unsafe_code` 一行（§12.14）。`record.rs` 因 `xtask length` 的 400 行文件尺子在 443 行处切出 `record/sink.rs`——切口落在「可不可以开始录」与「由谁写、写到哪」之间。
+验收命令：本 package 与 `desktop_ffi` 是工作区成员，`just clippy`、`just test` 与 `just fmt-check` 判它们，与判其余 crate 是同一条命令；Windows 上 `just check-desktop` 另跑 `zig test` 判叶子自己的测试（`zig fmt --check` 在 `just fmt-check` 里）。`xtask guard` 判 `desktop_ffi` 那一张自己的 lint 表，例外只有记下理由的 `unsafe_code` 一行（D14）。`record.rs` 因 `xtask length` 的 400 行文件尺子在 443 行处切出 `record/sink.rs`——切口落在「可不可以开始录」与「由谁写、写到哪」之间。
 
 `platforms.yml` 的 macOS job 跑工作区的 clippy 与 nextest，所以非 Windows 臂与只在非 Windows 上编译的测试（`session/tests.rs` 里 `#[cfg(not(windows))]` 的那一条）每晚在 macOS 上过一次。
 
@@ -575,11 +614,12 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 **操作者检查**（真机上由人做，不是门）：一台按 150% 缩放的显示器上，`desktop.snapshot` 之后按 ref 点击落在控件中心；对记事本 `type` 一段文字，文字进了指名的那扇窗口，动作之后 Ctrl、Shift 没有停在按下；两扇同名窗口按 `process` 指名录制，录到的是那一扇；写剪贴板期间 `GetClipboardOwner` 不为空；一张截图经 MCP 到模型，模型能说出图里的内容。
 
-## 17 模型体验
+**证明**：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`。咬得动的演示：`Desktop.Scope.withoutBoth_admits_an_unlisted_process`、`Desktop.Scope.Pattern.withoutTheEnd_matches_a_longer_name`、`Desktop.Session.withoutTheGate_lists_tools_on_a_fresh_connection`、`Desktop.Outline.withoutCleaning_keeps_a_newline`、`Desktop.Platform.Windows.Strokes.withoutUp_lifts_a_finished_click`、`Desktop.Platform.Windows.Views.withoutBounds_acts_on_a_moved_window`、`Desktop.Platform.Windows.Target.withoutUniqueness_picks_the_first_of_two`。模型的证明不是 Rust 实现的证明：实现与模型的一致由各模块旁的测试判（`cargo nextest run -p sprawling-desktop`），与上面的操作者检查分开记。
+-/
 
-工具名恒是 `desktop.<动词>`，模型一眼看得出这一件事发生在桌面上而不是页面里。一扇窗口读起来是一段缩进的大纲，每行一个元素和它的 ref，模型读完就能指名要点的那一个。每条说明的后半句写的是**不做什么**，因为模型下一步最贵的错误是把一件工具当成它旁边那件。拒词恒给一个可执行的下一步：越界给「把这个窗口写进 `DESKTOP.toml`」，未实现给「这个 build 里没有它」。拒词全文作为文字到达模型：城这一侧把 `isError` 结果读成一次失败，文字原样进它的 subject；部分输入另带效果未知，模型读到的是「先看一眼再动」，不是「可以重试」。
-
-## 18 文档同步
+/-! ## 17 文档关系
 
 `ARCHITECTURE.md` §3 depmap 块的 `desktop` 与 `desktop_ffi` 两行｜`crates/desktop/README.md`（英文，讲清城怎么起它、叶子为什么有自己的一张 lint 表）｜xtask-SPEC §8-46（guard 判叶子那张表）｜sprawling-SPEC §8-4d｜同步本 SPEC §13 与 §8-7 的实现状态｜`crates/desktop/README.md` 的 The honest-refusal rule 一节｜`crates/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`）。
 
+`docs/glossary.md` 的 **desktop connector** 一行；`crates/browser/Spec.lean` D9（拖拽与滚动的同一份词汇，§8-7）；`crates/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`，`EFFECT_META_KEY` 与 `PROTOCOL_VERSION` 的唯一定义）；`crates/desktop/ffi/Spec.lean`（缝本身的规格）；sprawling-SPEC §8-4d 与 8-146；`architecture.toml` 里 desktop 各行的锚点指向本文件与分部。这些改了，重读本文件对应的节与决定。
+-/

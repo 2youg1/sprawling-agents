@@ -5,7 +5,7 @@
 
 //! Builds the Zig leaf with the standard library alone: `zig build-lib`
 //! into this package's `OUT_DIR`, linked as a static library, on a
-//! Windows target and nowhere else (desktop-SPEC.md section 12.12).
+//! Windows target and nowhere else (`crates/desktop/Spec.lean` D12).
 //!
 //! Two checks run before anything is compiled, because both are cheaper
 //! to read here than as a link error: the leaf's step vocabulary in

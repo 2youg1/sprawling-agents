@@ -8,7 +8,7 @@
 //!
 //! Opening the window is `desktop_ffi::fixture`'s, because it costs
 //! `unsafe` and this package holds none, its tests included
-//! (desktop-SPEC.md section 12.14). What is left here is the rectangle
+//! (`crates/desktop/Spec.lean` D14). What is left here is the rectangle
 //! the window occupies, as the `Bounds` the contracts compare with.
 
 use super::geometry::Bounds;
