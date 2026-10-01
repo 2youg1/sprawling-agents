@@ -145,3 +145,62 @@ impl RunWorker {
         self.record(EventKind::ModelSelected, payload)
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use kernel::event::EventKind;
+    use kernel::{Payload, RunId};
+
+    use crate::worker::RunWorker;
+
+    /// A model the pinned catalogue does not know, whose vendor's page says
+    /// it reads pictures, is registered as reading them, so the endpoint
+    /// shows it the picture ocr hands it instead of refusing
+    /// (`crates/gateway/Spec.lean` §8-37).
+    #[test]
+    fn a_preset_model_that_reads_pictures_is_registered_as_reading_them() {
+        let dir = tempfile::tempdir().unwrap();
+        crate::worker::fixture::init_city(dir.path()).unwrap();
+        let mut worker = RunWorker::new(
+            dir.path(),
+            runtime::diagnostics::Diagnostics::off(),
+            crate::worker::fixture::hands(),
+        )
+        .unwrap();
+        let attached = kernel::event::record::EndpointAttached {
+            name: "vendor".to_owned(),
+            base_url: "https://api.anthropic.com/v1".to_owned(),
+            dialect: kernel::DialectKind::Anthropic,
+            auth: None,
+            auth_header: None,
+            models: vec!["claude-sonnet-4-5".to_owned()],
+            connection_kind: None,
+            probed: false,
+            tuning: None,
+        };
+        worker
+            .record(EventKind::EndpointAttached, Payload::of(&attached).unwrap())
+            .unwrap();
+        worker
+            .handle(wire::Command::SelectModel {
+                endpoint: wire::ProviderName::parse("vendor").unwrap(),
+                model: "claude-sonnet-4-5".to_owned(),
+                tag: kernel::ModelTag::Ocr,
+                context_tokens: None,
+                max_output_tokens: None,
+                idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
+            })
+            .unwrap();
+        let registered: Vec<(kernel::ModelTag, gateway::InputKinds)> = worker
+            .credentials
+            .book
+            .choices()
+            .map(|(tag, _, entry)| (tag, entry.input))
+            .collect();
+        assert_eq!(
+            registered,
+            vec![(kernel::ModelTag::Ocr, gateway::InputKinds::TextImage)]
+        );
+    }
+}
