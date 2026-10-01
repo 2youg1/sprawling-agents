@@ -83,12 +83,9 @@ fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
     })
 }
 
-/// Whether the core's threads are raised: the setting a person turns off.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CorePriority {
-    Raised,
-    Normal,
-}
+/// Whether the core's threads are raised: the setting a person turns
+/// off. Its words are the wire's, which is what a page writes it with.
+pub use wire::CorePriority;
 
 /// Whether the core's threads stand above normal: `priority` in the
 /// `[core]` section, `"raised"` when absent (sprawling-SPEC.md 8-93).
@@ -263,6 +260,23 @@ priority = \"fast\"
                 CorePriority::Normal,
                 Err(AxCode::ConfigInvalid)
             )
+        );
+    }
+
+    /// The core priority lands in `[core]`, where the serving core reads
+    /// it, and leaves the `[ui]` record as it was.
+    #[test]
+    fn the_core_priority_lands_in_its_own_section_and_reads_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        land(&file, PreferencePatch::Lang(Lang::Zh)).unwrap();
+        land(&file, PreferencePatch::CorePriority(CorePriority::Normal)).unwrap();
+        assert_eq!(
+            (
+                stated_core_priority(&file).unwrap(),
+                stated(&file).unwrap().lang
+            ),
+            (CorePriority::Normal, Some(Lang::Zh))
         );
     }
 

@@ -216,25 +216,45 @@ impl RunWorker {
             ));
         }
         for (scope, which, path) in documents {
-            let bytes = match std::fs::read(&path) {
-                Ok(bytes) => bytes,
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-                Err(err) => return Err(unreadable(&path, &err)),
-            };
-            let after = kernel::B3Hash::digest(&bytes);
-            let before = self.governance.rules.get(&(scope.clone(), which)).copied();
-            if before != Some(after) {
-                let changed = RulesChanged {
-                    scope,
-                    which,
-                    before,
-                    after,
-                    bytes: bytes.len(),
-                };
-                self.record(EventKind::RulesChanged, Payload::of(&changed)?)?;
-            }
+            self.book_document(scope, which, &path)?;
         }
         Ok(())
+    }
+
+    /// Books one governing document: compared with what the governance
+    /// fold last booked for it, and a `rules_changed` line when it moved.
+    ///
+    /// The one place such a line is written, so a dispatch that finds a
+    /// document moved and a page that has just written it book the change
+    /// in one shape, and the chain of `before` and `after` stays unbroken.
+    ///
+    /// # Errors
+    /// `E_STORAGE_FATAL` for a document that cannot be read; propagates a
+    /// history that will not take the line.
+    pub(in crate::worker) fn book_document(
+        &mut self,
+        scope: Scope,
+        which: GoverningDocument,
+        path: &std::path::Path,
+    ) -> Result<(), AxError> {
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(err) => return Err(unreadable(path, &err)),
+        };
+        let after = kernel::B3Hash::digest(&bytes);
+        let before = self.governance.rules.get(&(scope.clone(), which)).copied();
+        if before == Some(after) {
+            return Ok(());
+        }
+        let changed = RulesChanged {
+            scope,
+            which,
+            before,
+            after,
+            bytes: bytes.len(),
+        };
+        self.record(EventKind::RulesChanged, Payload::of(&changed)?)
     }
 
     /// The tag whose registration a dispatch runs on, so the endpoint,

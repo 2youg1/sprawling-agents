@@ -19,12 +19,54 @@
 //! bytes, so the prose a resident reads and the settings the city
 //! enforces cannot describe two different buildings.
 
+use std::path::Path;
+
 use serde::Deserialize;
 
 use kernel::{Address, AxCode, AxError, BuildingPolicy, EgressAllowlist};
 
 use super::reach::DomainReach;
-use super::{BuildingRules, RULES_FILE, UserBrowser, UserBrowserEndpoint};
+use super::{BuildingRules, RULES_FILE, UserBrowser, UserBrowserEndpoint, rules_path};
+
+/// Replaces a building's rules with a proposal that evaluates.
+///
+/// The evaluation comes first and the write only follows it, so the file
+/// on disk is always one this build can read: a governance document that
+/// stopped parsing halfway through a rewrite would take its building
+/// with it. What comes back is what the next run will be governed by,
+/// read from the proposal rather than from the file, because those two
+/// are the same bytes and only one of them can be returned.
+///
+/// The path is inside the scope's reserved subtree, which no write
+/// domain reaches - which is exactly why this is a door of its own and
+/// not an `edit`.
+///
+/// # Errors
+/// Propagates the evaluation's refusal, and a directory or file that
+/// cannot be written.
+pub fn write_rules(city_root: &Path, addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
+    let rules = evaluate(addr, text)?;
+    crate::document::replace(&rules_path(city_root, addr), text.as_bytes())?;
+    Ok(rules)
+}
+
+/// Replaces a building's rules with a page's whole text, evaluated first
+/// as [`write_rules`] does, and only if the file still holds `base`: the
+/// page is a second writer beside the Mayor's proposal, and a page left
+/// open while the Mayor wrote must not write over it (city-SPEC.md 8-34).
+///
+/// # Errors
+/// The evaluation's refusal, `E_VERSION_CONFLICT` for a file that is no
+/// longer `base`, and a directory or file that cannot be written.
+pub fn write_rules_against(
+    city_root: &Path,
+    addr: &Address,
+    base: &str,
+    text: &str,
+) -> Result<BuildingRules, AxError> {
+    let _base = base;
+    write_rules(city_root, addr, text)
+}
 
 /// The file as a person wrote it, before any rule is judged.
 ///

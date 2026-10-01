@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 /// Whether this city renews a warm prompt cache before it expires.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum KeepWarm {
     /// No renewal is ever planned: the city sends no request of its own.
     #[default]

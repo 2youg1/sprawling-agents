@@ -30,6 +30,7 @@ use cache::CacheSection;
 use clock::ClockSection;
 use context::ContextSection;
 mod cache;
+mod city_layer;
 mod clock;
 mod context;
 mod ladder;
@@ -42,6 +43,7 @@ mod shelves;
 mod write;
 
 pub use cache::keep_warm;
+pub use city_layer::{CitySetting, write_city_setting};
 pub use ladder::Layer;
 pub use resident::settled_harness;
 pub(crate) use session::forget as forget_session;

@@ -10,6 +10,8 @@
 //! which. They arrive as one value and are recorded as one event.
 
 use kernel::event::EventKind;
+use kernel::event::Scope;
+use kernel::event::record::GoverningDocument;
 use kernel::{Address, AxError};
 
 use super::super::RunWorker;
@@ -112,5 +114,61 @@ impl RunWorker {
             },
         )?;
         self.record(EventKind::BuildingConfigured, payload)
+    }
+}
+
+impl RunWorker {
+    /// Writes a building's `RULES.toml` whole from a page, evaluated
+    /// first and only over the text the page started from, and books the
+    /// change (wire-SPEC.md 8-60).
+    ///
+    /// # Errors
+    /// Propagates the evaluation's refusal, a file that is no longer
+    /// `base`, a file that cannot be written or read back, and a history
+    /// that will not take the line.
+    pub(in crate::worker) fn put_rules(
+        &mut self,
+        building: &Address,
+        base: &str,
+        body: &str,
+    ) -> Result<(), AxError> {
+        let building = city::Building::of(building)?;
+        city::write_rules_against(&self.city_root, building.addr(), base, body)?;
+        self.book_document(
+            Scope::Building(building.addr().clone()),
+            GoverningDocument::Rules,
+            &city::rules_path(&self.city_root, building.addr()),
+        )
+    }
+
+    /// Writes the city's own layer from the settings page, one fact at a
+    /// time, and books the change once (wire-SPEC.md 8-61). A frame that
+    /// states nothing writes nothing and books nothing.
+    ///
+    /// # Errors
+    /// Propagates a city layer this build cannot read or write, and a
+    /// history that will not take the line.
+    pub(in crate::worker) fn configure_city(
+        &mut self,
+        keep_warm: Option<kernel::KeepWarm>,
+        effort: Option<kernel::Effort>,
+    ) -> Result<(), AxError> {
+        let settings = keep_warm
+            .map(city::CitySetting::KeepWarm)
+            .into_iter()
+            .chain(effort.map(city::CitySetting::Effort));
+        let mut written = false;
+        for setting in settings {
+            city::write_city_setting(&self.city_root, setting)?;
+            written = true;
+        }
+        if !written {
+            return Ok(());
+        }
+        self.book_document(
+            Scope::City,
+            GoverningDocument::Config,
+            &kernel::layout::CityLayout::new(&self.city_root).city_config(),
+        )
     }
 }

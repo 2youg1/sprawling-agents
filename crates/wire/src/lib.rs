@@ -84,7 +84,7 @@ pub use frames::{Lagged, LogLevel, LogLine, Monitoring, Sample, Watched};
 pub use frames::{QUERY_NAMES, WIRE_V, schema_hash};
 pub use kernel::{FileChange, How, Lines};
 pub use preference::{Appearance, Chord, Chroma, Density, Face, Lang, Lighting, Motion};
-pub use preference::{BODY_PX_MAX, BODY_PX_MIN, PreferencePatch, PreferencesAnswer};
+pub use preference::{BODY_PX_MAX, BODY_PX_MIN, CorePriority, PreferencePatch, PreferencesAnswer};
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in};
 pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
@@ -110,7 +110,7 @@ pub use kernel::model::{AdmissionRequirement, LandingPolicy, Mode, RunPolicy, Wi
 pub use kernel::{Address, ApprovalId, Autonomy, AxCode, AxError, B3Hash};
 pub use kernel::{ApprovalClass, ApprovalItem, ClusterKey, Restoration};
 pub use kernel::{BudgetUse, Locator, PlannedProgress, Progress, UnplannedProgress};
-pub use kernel::{DialectKind, Effort, ModelTag};
+pub use kernel::{DialectKind, Effort, KeepWarm, ModelTag};
 pub use kernel::{EventDraft, EventKind, EventRecord, GitOid, IdemKey, RunId};
 pub use kernel::{McpServer, McpTransport, SandboxLimits, ServerLabel};
 pub use kernel::{NodeId, PursuitState, RoadmapStatus, WHOLE_PPB};

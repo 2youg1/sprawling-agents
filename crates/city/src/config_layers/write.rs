@@ -19,8 +19,8 @@ use std::path::Path;
 
 use kernel::config::SecondThreshold;
 use kernel::{
-    Address, AxCode, AxError, B3Hash, Effort, McpServer, McpTransport, SandboxLimits, SecretRef,
-    ServerLabel,
+    Address, AxCode, AxError, B3Hash, Effort, KeepWarm, McpServer, McpTransport, SandboxLimits,
+    SecretRef, ServerLabel,
 };
 
 use super::{ConfigLayer, Layer, path};
@@ -178,6 +178,12 @@ pub(super) enum Change<'a> {
     SecondThreshold(SecondThreshold),
     /// The identity version a session froze (city-SPEC.md 8-33).
     Naming(B3Hash),
+    /// Whether this layer keeps a warm cache (city-SPEC.md 8-34).
+    KeepWarm(KeepWarm),
+    /// How hard the runs under this layer think, stated for every
+    /// session that does not choose. Only the city's own layer is written
+    /// this way: a room's `[model]` is a session's record (8-14).
+    Effort(Effort),
 }
 
 impl Change<'_> {
@@ -231,6 +237,15 @@ impl Change<'_> {
                 table(document, "context", file)?
                     .insert("second_threshold".to_owned(), toml::Value::Integer(percent));
             }
+            Change::KeepWarm(setting) => {
+                let spelled = toml::Value::try_from(*setting)
+                    .map_err(|err| refuse_file(file, &err.to_string()))?;
+                table(document, "cache", file)?.insert("keep_warm".to_owned(), spelled);
+            }
+            Change::Effort(effort) => {
+                table(document, "model", file)?
+                    .insert("effort".to_owned(), spelled(*effort, file)?);
+            }
             Change::Naming(version) => {
                 table(document, "identity", file)?.insert(
                     "version".to_owned(),
@@ -278,15 +293,20 @@ pub(super) fn change(
     layer: Layer,
     change: Change<'_>,
 ) -> Result<(), AxError> {
-    let file = path(city_root, addr, layer)?;
-    document::edit(&file, |held| {
-        let mut document = read_document(&file)?;
-        change.state(&mut document, &file)?;
-        let rendered = toml::to_string_pretty(&document)
-            .map_err(|err| refuse_file(&file, &err.to_string()))?;
+    change_at(&path(city_root, addr, layer)?, change)
+}
+
+/// [`change`], for a layer named by its file: the city's own layer has
+/// no address to name it by.
+pub(super) fn change_at(file: &Path, change: Change<'_>) -> Result<(), AxError> {
+    document::edit(file, |held| {
+        let mut document = read_document(file)?;
+        change.state(&mut document, file)?;
+        let rendered =
+            toml::to_string_pretty(&document).map_err(|err| refuse_file(file, &err.to_string()))?;
         // The reader is the file's grammar: bytes it would refuse are not
         // written, so no write leaves a layer every run then refuses.
-        ConfigLayer::parse(&rendered).map_err(|err| refuse_file(&file, err.subject()))?;
+        ConfigLayer::parse(&rendered).map_err(|err| refuse_file(file, err.subject()))?;
         held.replace(rendered.as_bytes())
     })
 }

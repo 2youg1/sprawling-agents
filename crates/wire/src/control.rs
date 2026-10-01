@@ -126,6 +126,10 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // this frame arrived.
         | Command::PutDocument { .. }
         | Command::PutIdentity { .. }
+        // A building's rules and the city's own layer are read by the
+        // next dispatch; a live run holds the policy it was frozen with.
+        | Command::PutRules { .. }
+        | Command::ConfigureCity { .. }
         // A building's own spine documents take the same reading, and
         // one more: they have a second writer, so the frame carries the
         // text it started from and a file that moved is refused.

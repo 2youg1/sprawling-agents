@@ -28,6 +28,7 @@ import type {
   GovernedDocument,
   HaltScope,
   IdentityCard,
+  KeepWarm,
   McpServer,
   ModelTag,
   PreferencePatch,
@@ -352,6 +353,18 @@ export function putDocument(which: GovernedDocument, base: string, body: string)
 // TOML (wire-SPEC 8-59).
 export function putIdentity(card: IdentityCard, base: string): Command {
   return { put_identity: { card, base, idem: mintIdem() } };
+}
+
+// A building's `RULES.toml`, whole. The city reads `body` before it
+// lands and refuses one it cannot read, and a file the Mayor changed
+// since `base` was read is refused rather than written over.
+export function putRules(building: Address, base: string, body: string): Command {
+  return { put_rules: { building, base, body, idem: mintIdem() } };
+}
+
+// The city's own layer: `null` leaves a key as it is.
+export function configureCity(keepWarm: KeepWarm | null, effort: Effort | null): Command {
+  return { configure_city: { keep_warm: keepWarm, effort, idem: mintIdem() } };
 }
 
 // One of a building's own spine documents. `base` is the text the

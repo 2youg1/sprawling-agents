@@ -7,8 +7,8 @@
 
 use kernel::model::{RunPolicy, Window};
 use kernel::{
-    Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, IdemKey, McpServer, ModelTag,
-    Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed, SessionName,
+    Address, ApprovalId, Autonomy, Ceiling, DialectKind, Effort, IdemKey, KeepWarm, McpServer,
+    ModelTag, Origin, ResidentId, Restoration, Ruling, RunId, SandboxLimits, Sealed, SessionName,
 };
 use serde::{Deserialize, Serialize};
 
@@ -151,23 +151,11 @@ pub enum Command<Secret = Sealed<String>> {
         max_output_tokens: Option<Ceiling>,
         idem: IdemKey,
     },
-    /// Starts a new session at an address: same room, same person, a
-    /// fresh conversation in it.
-    ///
-    /// **A session is a stretch of a room, not the room.** A room's
-    /// first run writes down the model it calls and how hard it thinks,
-    /// and every later run there refuses to move either, because a
-    /// provider caches a conversation's prefix only while the shape of
-    /// the calls behind it holds still. This frame lets a person who
-    /// changed the model start a new stretch of the room on purpose,
-    /// rather than have it changed behind their back (sprawling-SPEC.md
-    /// 8-82).
-    ///
-    /// It carries [`Carry`] rather than a flag: what a new session
-    /// keeps from the one before it has two named answers, and the
-    /// default is the one that keeps nothing.
-    ///
-    /// Writes `session_opened`.
+    /// Starts a new session at an address: same room, a fresh stretch of
+    /// conversation in it, so a person who changed the model starts it on
+    /// purpose rather than having the room's frozen shape move behind
+    /// their back (sprawling-SPEC.md 8-82). [`Carry`] names what crosses;
+    /// the default keeps nothing. Writes `session_opened`.
     OpenSession {
         addr: Address,
         carry: Carry,
@@ -320,6 +308,21 @@ pub enum Command<Secret = Sealed<String>> {
     PutIdentity {
         card: IdentityCard,
         base: String,
+        idem: IdemKey,
+    },
+    /// Writes a building's `RULES.toml` whole, evaluated before it lands
+    /// and only over `base` (wire-SPEC.md 8-60).
+    PutRules {
+        building: Address,
+        base: String,
+        body: String,
+        idem: IdemKey,
+    },
+    /// Writes the city's own layer: `None` leaves a key as it is
+    /// (wire-SPEC.md 8-61).
+    ConfigureCity {
+        keep_warm: Option<KeepWarm>,
+        effort: Option<Effort>,
         idem: IdemKey,
     },
     /// Writes one of a building's own spine documents.

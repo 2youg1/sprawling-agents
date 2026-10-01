@@ -56,6 +56,8 @@ impl<Secret> Command<Secret> {
             | Self::Pursue { ref idem, .. }
             | Self::PutDocument { ref idem, .. }
             | Self::PutIdentity { ref idem, .. }
+            | Self::PutRules { ref idem, .. }
+            | Self::ConfigureCity { ref idem, .. }
             | Self::PutSpine { ref idem, .. }
             | Self::PutPreferences { ref idem, .. }
             | Self::PutShelved { ref idem, .. }
@@ -238,6 +240,26 @@ impl From<WireCommand> for Command {
                 idem,
             },
             Command::PutIdentity { card, base, idem } => Self::PutIdentity { card, base, idem },
+            Command::PutRules {
+                building,
+                base,
+                body,
+                idem,
+            } => Self::PutRules {
+                building,
+                base,
+                body,
+                idem,
+            },
+            Command::ConfigureCity {
+                keep_warm,
+                effort,
+                idem,
+            } => Self::ConfigureCity {
+                keep_warm,
+                effort,
+                idem,
+            },
             Command::PutSpine {
                 building,
                 which,

@@ -318,3 +318,76 @@ fn a_new_building_is_visible_in_the_city_view_with_a_denominator_of_zero() {
         "a new building owes nothing yet, and owes it out of nothing"
     );
 }
+
+/// The page's write of a building's rules lands only over the text the
+/// page read, and only once the city can read what it says: a stale base
+/// and a body that does not evaluate both leave the file as it was and
+/// book nothing, and the write that holds both books one line.
+#[test]
+fn a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    let lab = Address::parse("lab").unwrap();
+    worker
+        .handle(wire::Command::CreateBuilding {
+            addr: lab.clone(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
+        })
+        .unwrap();
+    let path = city::rules_path(dir.path(), &lab);
+    let read = || std::fs::read_to_string(&path).unwrap();
+    let opened = read();
+    let moved = format!("{opened}# a note the Mayor added\n");
+    std::fs::write(&path, &moved).unwrap();
+    let mut put = |base: &str, body: &str, tag: &[u8]| {
+        worker
+            .handle(wire::Command::PutRules {
+                building: lab.clone(),
+                base: base.to_owned(),
+                body: body.to_owned(),
+                idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, tag),
+            })
+            .map_err(|err| *err.code())
+    };
+    let booked = |dir: &std::path::Path| {
+        let ledger = kernel::layout::CityLayout::new(dir).ledger();
+        runtime::replay::verify_ledger_dir(&ledger)
+            .unwrap()
+            .raw_lines()
+            .iter()
+            .map(|line| kernel::EventRecord::parse_line(line).unwrap())
+            .filter(|record| record.kind() == kernel::EventKind::RulesChanged)
+            .count()
+    };
+    let before = booked(dir.path());
+
+    let stale = put(
+        &opened,
+        &format!("{opened}# from a page left open\n"),
+        b"stale",
+    );
+    let unread = put(&moved, "confidential = \"perhaps\"\n", b"unread");
+    assert_eq!(
+        (stale, unread, read(), booked(dir.path())),
+        (
+            Err(AxCode::VersionConflict),
+            Err(AxCode::ConfigInvalid),
+            moved.clone(),
+            before
+        )
+    );
+
+    let kept = format!("{moved}# and one from the page\n");
+    put(&moved, &kept, b"kept").unwrap();
+    assert_eq!(
+        (read(), booked(dir.path())),
+        (kept, before.saturating_add(1))
+    );
+}

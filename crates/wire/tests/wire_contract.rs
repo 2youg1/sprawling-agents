@@ -45,13 +45,13 @@ fn exposed() -> SocketAddr {
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
-    assert_eq!(COMMAND_NAMES.len(), 30, "command table");
+    assert_eq!(COMMAND_NAMES.len(), 32, "command table");
     assert_eq!(QUERY_NAMES.len(), 39, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 30, "command names are distinct");
+    assert_eq!(sorted.len(), 32, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
@@ -390,6 +390,20 @@ fn sample_of_every_command() -> Vec<Command> {
                 name: Some("Cat".to_owned()),
             },
             base: String::new(),
+            idem,
+        },
+        Command::PutRules {
+            building: Address::parse("lab").unwrap(),
+            base: String::new(),
+            body: "confidential = false
+write = \"everything\"
+"
+            .to_owned(),
+            idem,
+        },
+        Command::ConfigureCity {
+            keep_warm: Some(kernel::KeepWarm::FiveMinute),
+            effort: None,
             idem,
         },
         Command::PutDocument {

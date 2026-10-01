@@ -230,6 +230,9 @@ impl PreferencesAnswer {
             PreferencePatch::Panel(panel) => self.panel = panel,
             PreferencePatch::Appearance(appearance) => self.appearance = appearance,
             PreferencePatch::Proxying(proxying) => self.proxying = proxying,
+            // Not a fact of this record: it lives in the file's `[core]`
+            // section, which `accounting::person` writes beside `[ui]`.
+            PreferencePatch::CorePriority(_) => {}
             PreferencePatch::Chord(chord) => {
                 self.chords.retain(|held| held.action != chord.action);
                 // An action returned to the chord this build ships has
@@ -265,6 +268,20 @@ pub enum PreferencePatch {
     /// Rebind one action, or return it to the chord this build ships by
     /// sending an empty `spelled`.
     Chord(Chord),
+    /// Whether the core's threads stand above normal. Lands in the
+    /// file's `[core]` section, not in `[ui]` (wire-SPEC.md 8-61).
+    CorePriority(CorePriority),
+}
+
+/// Whether the core's threads stand above normal (sprawling-SPEC.md
+/// 8-93): the setting a person turns off. Spelled here once, for the
+/// frame and for the `[core] priority` key the person's file holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum CorePriority {
+    Raised,
+    Normal,
 }
 
 #[cfg(test)]

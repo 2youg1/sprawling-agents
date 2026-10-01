@@ -213,6 +213,15 @@ impl RunWorker {
             wire::Command::PutIdentity {
                 ref card, ref base, ..
             } => self.put_identity(card, base),
+            wire::Command::PutRules {
+                ref building,
+                ref base,
+                ref body,
+                ..
+            } => self.put_rules(building, base, body),
+            wire::Command::ConfigureCity {
+                keep_warm, effort, ..
+            } => self.configure_city(keep_warm, effort),
             wire::Command::PutSpine {
                 building: ref at,
                 which,
