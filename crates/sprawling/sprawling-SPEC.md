@@ -3619,13 +3619,13 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 const BUNDLE_DIR: &str = "web-dist";                           // 8-83
 /// 从本包目录起往上，第一个含 `Cargo.lock` 的目录：检出里是工作区根，打出来的包里是包自己。
 fn checkout_root(manifest: &Path) -> Result<PathBuf, String>;
-/// 开发这份代码所钉的三份文件，相对检出的根；常量名是 OUT_DIR/pins.rs 里的名字。
+/// 开发这份代码所钉的三份文件，相对检出的根；常量名是 OUT_DIR 下 pins.rs 里的名字。
 const PINS: [(&str, &str); 3] = [
     ("RUST_TOOLCHAIN_FILE", "rust-toolchain.toml"),
     ("LEAN_TOOLCHAIN_FILE", "lean-toolchain"),
     ("ZIG_VERSION_FILE", "crates/desktop/ffi/zig-version"),
 ];
-// OUT_DIR/pins.rs（build.rs 写，bin::doctor::pin 用 include! 读）
+// OUT_DIR 下的 pins.rs（build.rs 写，bin::doctor::pin 用 include! 读）
 pub(crate) const RUST_TOOLCHAIN_FILE: &str;   // 那份文件的全文；构建没找到它时为空串
 pub(crate) const LEAN_TOOLCHAIN_FILE: &str;
 pub(crate) const ZIG_VERSION_FILE: &str;
@@ -3638,7 +3638,7 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 - **锁按 cargo 的规则找。** cargo 把 `Cargo.lock` 写在工作区根，`cargo package` 把它放进包的根（cargo-package 文档：「Cargo.lock is always included」）。所以「往上第一个含 `Cargo.lock` 的目录」在检出里是工作区根，在 `target/package/sprawling-<版本>/` 与 registry 解开的目录里是包自己，用不着按层数往上数。整条链上都没有锁时 `build.rs` 以 `cargo::error` 失败，与此前读不到锁时一样：没有锁的构建说不出自己由哪些包组成。
 - **包体进包**：见 8-83。`.crate` 的上限是 10 MB（cargo 的 publishing 文档），包体压缩前约 1.5 MB。
 - **城写下的文档模板归 city。** 模板与 `City.md` 住在 `crates/city/templates/`：它们是城立城、建楼、开会话时写下的第一批字节，`city::spine_files` 与 `city::building` 按包内路径 `include_str!` 它们；accounting 立城时写的 `City.md` 读 `city::CITY_TEMPLATE`，不伸手到别的包目录里（city-SPEC §8-41）。
-- **工具链钉子由构建脚本找，找不到就不钉。** `doctor` 的 develop 层报「钉住的版本」，读的是检出根上的 `rust-toolchain.toml`、`lean-toolchain` 与 `crates/desktop/ffi/zig-version`。这三份文件不在本包里，从包里构建时它们不存在，所以 `build.rs` 在 `checkout_root` 下找它们，把全文写进 `OUT_DIR/pins.rs`；只有「不存在」读成空串，别的读失败仍是 `cargo::error`。空串即不钉：`pinned` 答 `None`，页面不画钉住的版本，探测按空前缀接受任何一版。
+- **工具链钉子由构建脚本找，找不到就不钉。** `doctor` 的 develop 层报「钉住的版本」，读的是检出根上的 `rust-toolchain.toml`、`lean-toolchain` 与 `crates/desktop/ffi/zig-version`。这三份文件不在本包里，从包里构建时它们不存在，所以 `build.rs` 在 `checkout_root` 下找它们，把全文写进 `OUT_DIR` 下的 `pins.rs`；只有「不存在」读成空串，别的读失败仍是 `cargo::error`。空串即不钉：`pinned` 答 `None`，页面不画钉住的版本，探测按空前缀接受任何一版。
 - **`packaged` 门守这条线**（xtask-SPEC §8-49）：可发布的包的生产代码里，`include!`、`include_str!`、`include_bytes!` 只指向包目录之内或 `OUT_DIR`。
 - **清单**：`[workspace.package]` 写 `repository`、`homepage`，`publish = true`；每个包写自己的 `description`，本包另写 `readme`、`keywords`、`categories` 与 `include`；`xtask` 与 `citysim` 写 `publish = false`。工作区自己的包在 `[workspace.dependencies]` 里各钉 `version = "=<工作区版本>"`，`guard` 判它们等于 `[workspace.package] version`（xtask-SPEC §8-49）。`sprawling-remote-access` 被二进制链接，随之可发布。`sprawling-desktop-ffi` 也可发布：`sprawling-desktop` 在 Windows 上依赖它，而 crates.io 要求依赖的每个包都在 registry 上；它的包里带着 Zig 叶子的源码与 `zig-version`，构建脚本只读包内的文件，所以从 crates.io 在 Windows 上装这个二进制要先装钉住的那一版 Zig（8-146），别的平台不编叶子。
 - **`sandbox` 是默认 feature。** `cargo install sprawling` 不写 `--features` 时也带执行引擎，与归档一致；不要引擎的构建写 `--no-default-features`，`just features` 编译这一份，因为别的命令都不再编它。
@@ -3646,7 +3646,7 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 
 **本节接口的当前状态**：从 crates.io 构建的二进制仍有三处与归档不同。`[profile.release]` 写在工作区清单里，`cargo package` 不把它带进包，`cargo install` 按 cargo 的默认 release profile 编（`opt-level = 3`，不做 fat LTO，不剥符号）；`SPRAWLING_RELEASE_TAG` 只有 `release.yml` 设，`status` 如实自称 built from source（`main::version`）；工具链钉子不在包里时，develop 层的 `lean` 与 `zig` 两行的装法仍拼着空钉子（`elan toolchain install` 后面是空参数，Windows 的 `winget … --version` 后面是空参数），改法是钉子为空时 `lean` 装 `stable`、`zig` 去掉 `--version` 那两个参数，落在 `bin::doctor::table::toolchain` 的两行上（§3）。
 
-**本章测试**：`doctor::pin::tests` 读出的钉子与检出里的文件相等，空文件读成不钉；`cargo package -p sprawling --list --allow-dirty` 的列表里有 `web-dist/index.html` 与 `Cargo.lock`；`cargo xtask gates packaged guard` 为绿；`cargo publish --workspace --dry-run --locked` 走完打包与验证构建。
+**本章测试**：`doctor::pin::tests` 读出的钉子与检出里的文件相等，空文件读成不钉；`cargo package -p sprawling --list --allow-dirty` 的列表里有包体的 `index.html`（在 `web-dist` 下）与 `Cargo.lock`；`cargo xtask gates packaged guard` 为绿；`cargo publish --workspace --dry-run --locked` 走完打包与验证构建。
 
 ### 8-84 记账线程的循环是一个有名字的函数，两件仪表直接驱动它（`accounting::worker::attend::attend`、`accounting::worker::driving::tests::instruments`）
 
