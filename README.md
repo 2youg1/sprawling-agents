@@ -102,14 +102,14 @@ sprawling serve <city-dir> [addr]     # serve a city that already exists; loopba
 sprawling dispatch <addr> <task>      # send one task to a served city and print its events until the run ends; -m <id> picks the model
 sprawling call '<frame>'              # send one wire frame, print every frame back; the exit code is the answer
 sprawling gauge -- <program> [arg...] # time a command over --samples runs; --pid watches a process, --at a served city (alias: top)
-sprawling view <city>                 # read a city's Ledger lines or its run tree, read-only
+sprawling view <city>                 # read a city's Ledger lines or its run tree, read-only; --since/--until keep a UTC span
 sprawling check <city>                # read every TOML file a city holds; print each error as path:line:column
 sprawling doctor [<city>] [--install] # what this machine has against what a city needs
 sprawling enrol <realm>/<name>        # read a credential from stdin and hand it to a city
 sprawling resume <city-dir>           # after a crash: verify the chain, close lost tool calls, report who waits for you
 sprawling fork <city> <run> <seq> <addr>  # branch a lineage from one step of a run
 sprawling adopt <city> <addr>         # take a directory already inside the city in as a building
-sprawling whose <city> <commit>       # which run wrote a commit this city made, answered from the Ledger
+sprawling whose <city> <commit>       # which run wrote a commit this city made, answered from the Ledger; --trace adds its calls
 sprawling replay <ledger-dir>         # offline chain verification, read-only
 sprawling export <city> <bundle-dir>  # pack a whole city; `restore` unpacks it on another machine
 sprawling install [--uninstall]       # put `sprawling` on your PATH, or take it back off
@@ -133,7 +133,7 @@ Sprawling-Effort: high
 Sprawling-City: <city hash>
 ```
 
-The trailers are a projection for readers outside the city; where a trailer and the Ledger disagree, the trailer is wrong. The question also reads backwards: `sprawling whose <city> <commit>` answers which run wrote a commit, out of the Ledger, so a city restored somewhere with no `.git` beside it still answers.
+The trailers are a projection for readers outside the city; where a trailer and the Ledger disagree, the trailer is wrong. The question also reads backwards: `sprawling whose <city> <commit>` answers which run wrote a commit, out of the Ledger, so a city restored somewhere with no `.git` beside it still answers. With `--trace` it also lists the calls that run made since its previous commit, and counts the calls other runs made in the same building in that span: their writes share the building's tree, so they are candidates too, and the output says so.
 
 ## Where it listens, where credentials live
 

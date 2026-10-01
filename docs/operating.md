@@ -67,7 +67,7 @@ The cost page shows shares against the billed total rather than normalising its 
 
 **A setting does not take effect.** `sprawling check <city>` reads every TOML file the city holds and prints each error as `path:line:column`.
 
-**The whole city is behaving oddly.** `/halt --all`. The halt is recorded, runs freeze, and nothing new starts until `/release --all`. Then read **the ledger** from before the trouble, or `sprawling view <city>` in a terminal, which filters the Ledger by run, kind, address, text or position and prints the run tree with `--runs`.
+**The whole city is behaving oddly.** `/halt --all`. The halt is recorded, runs freeze, and nothing new starts until `/release --all`. Then read **the ledger** from before the trouble, or `sprawling view <city>` in a terminal, which filters the Ledger by run, kind, address, text, position or UTC time (`--since`, `--until`) and prints the run tree with `--runs`. When the trouble is a commit, `sprawling whose <city> <commit> --trace` names the run that wrote it and the calls that run made since its previous commit.
 
 **The process died mid-call.** `sprawling resume <city>` verifies the chain, closes tool calls whose outcome was lost as unknown rather than as failed, and reports what waits for a person. Serving with `--supervise` does this after every crash and serves the city again, until crashes come too close together; then the supervisor stops and waits for Enter.
 

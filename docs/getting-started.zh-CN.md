@@ -229,7 +229,7 @@ Mayor 先读每一栋楼的 `Roadmap.md`、`Memo.md`、`Handoff.md`。它用 `pl
 1. run 的 **改动** 视图：动过的文件一行一个，点开一行给出那个文件的补丁。被凭证扫描命中的行只报行号与理由，不回显原文。
 2. 那栋楼里的 `git log`。城在每一波工具调用前写的检查点，是没有任何 `HEAD` 指向的提交，挂在 `refs/sprawling/runs/` 下，所以你的历史仍是你离开时的形状。
 3. 合并提交的 trailer——`Sprawling-Run`、`Sprawling-Actor`、`Sprawling-Model`、`Sprawling-Effort`、`Sprawling-City`，接替另一次 run 的还多一条 `Sprawling-Predecessor`。你复核过的合并另带 `Reviewed-by`，前提是这个仓库的 git config 里有 `user.name` 与 `user.email`。
-4. `sprawling whose ~/cities/first <commit>` 从账本反过来回答同一个问题，要给完整的四十位提交 id。退出码 1 表示这座城没有写过那个提交的记录。
+4. `sprawling whose ~/cities/first <commit>` 从账本反过来回答同一个问题，要给完整的四十位提交 id。退出码 1 表示这座城没有写过那个提交的记录。加上 `--trace`，会列出那次 run 从上一个提交以来做过的调用，每条带时间、工具与结局；同一栋楼里在这一段调用过工具的别的 run 作为候选，只给出调用次数。
 
 没有页面替你合并，也没有页面推翻已经合并的活。你的退路是 git 和 **回收站**，那里每个被丢弃的文件都写着怎么取回；你的刹车是 `/halt --all`。
 
@@ -237,7 +237,7 @@ Mayor 先读每一栋楼的 `Roadmap.md`、`Memo.md`、`Handoff.md`。它用 `pl
 
 **成本** 是钱与 token，按 run、按居民、按 prefix 段、按 skill、按工具各切一刀，每一刀加起来都等于同一个总数。provider 没报价格的（比如本地模型），页面数出调用次数和 token，而不是打印 `$0.00`。
 
-**记录** 是同一段历史的四个视图：**账本**（每一条事件，筛选时会说藏了几行）、**归档**（在你问的那一刻，搜遍每一栋楼保存的东西）、**回收站**，以及 **日志**（这个进程的诊断日志）。在终端里，`sprawling view ~/cities/first` 不需要城在服务就能读同一本账，`--runs` 打印 run 树。
+**记录** 是同一段历史的四个视图：**账本**（每一条事件，筛选时会说藏了几行）、**归档**（在你问的那一刻，搜遍每一栋楼保存的东西）、**回收站**，以及 **日志**（这个进程的诊断日志）。在终端里，`sprawling view ~/cities/first` 不需要城在服务就能读同一本账，`--runs` 打印 run 树。`--since 2026-05-14T09:00:00Z --until 2026-05-14T10:00:00Z` 只留自身时间落在那一小时里的行：UTC，到秒，以 `Z` 结尾，不含终点。
 
 ## 9 停下，再开始
 

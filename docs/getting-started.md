@@ -229,7 +229,7 @@ Work that is meant to land goes through a pull request inside the city, and the 
 1. The run's **changes** lens: one row per file that moved, and the patch of a file when you open its row. A line the credential scan matched is reported by its line number and reason, never echoed.
 2. `git log` in the building. The checkpoints the city writes before each wave of tool calls are commits no `HEAD` points at, kept under `refs/sprawling/runs/`, so your history keeps the shape you left it.
 3. The merge commit's trailers — `Sprawling-Run`, `Sprawling-Actor`, `Sprawling-Model`, `Sprawling-Effort`, `Sprawling-City`, and `Sprawling-Predecessor` for a run that replaced another. A merge you reviewed also carries `Reviewed-by`, when this repository's git config holds `user.name` and `user.email`.
-4. `sprawling whose ~/cities/first <commit>` answers the same question backwards from the Ledger, given the full forty-digit commit id. Exit code 1 means this city has no record of writing that commit.
+4. `sprawling whose ~/cities/first <commit>` answers the same question backwards from the Ledger, given the full forty-digit commit id. Exit code 1 means this city has no record of writing that commit. Add `--trace` to list the calls the run made since its previous commit, each with its time, tool and outcome; other runs that called tools in the same building in that span are counted beside them as candidates.
 
 No page merges for you, and none rejects work already merged. Your recourse is git and **the recycle bin**, where every discarded file states the way back; your brake is `/halt --all`.
 
@@ -237,7 +237,7 @@ No page merges for you, and none rejects work already merged. Your recourse is g
 
 **cost** is money and tokens cut by run, by resident, by prefix segment, by skill and by tool, each cut summing to the same total. Where a provider reported no price, as with a local model, the page counts the calls and tokens instead of printing `$0.00`.
 
-**the record** is the one history read through four lenses: **the ledger** (every event, with filters that say how many rows they hid), **the archive** (a search across what every building keeps, at the moment you ask), **the recycle bin** and **the log** (this process's diagnostic log). From a terminal, `sprawling view ~/cities/first` reads the same Ledger without a served city, and `--runs` prints the run tree.
+**the record** is the one history read through four lenses: **the ledger** (every event, with filters that say how many rows they hid), **the archive** (a search across what every building keeps, at the moment you ask), **the recycle bin** and **the log** (this process's diagnostic log). From a terminal, `sprawling view ~/cities/first` reads the same Ledger without a served city, and `--runs` prints the run tree. `--since 2026-05-14T09:00:00Z --until 2026-05-14T10:00:00Z` keeps the lines whose own time falls in that hour: UTC, to the second, ending in `Z`, the end left out.
 
 ## 9 Stop, and start again
 

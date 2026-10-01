@@ -102,14 +102,14 @@ sprawling serve <city-dir> [addr]     # 服务一座已经存在的城；默认�
 sprawling dispatch <addr> <task>      # 给一座正在服务的城派一件活，打印它的事件直到 run 结束；-m <id> 指定模型
 sprawling call '<frame>'              # 发一帧线协议，把回来的每一帧打印出来；退出码就是答案
 sprawling gauge -- <program> [arg...] # 把一条命令跑 --samples 次并计时；--pid 看一个进程，--at 看一座正在服务的城（别名 top）
-sprawling view <city>                 # 只读地读一座城的 Ledger 行或它的 run 树
+sprawling view <city>                 # 只读地读一座城的 Ledger 行或它的 run 树；--since/--until 只留一段 UTC 时间
 sprawling check <city>                # 读城里的每个 TOML 文件，把每个错误打印成 path:line:column
 sprawling doctor [<city>] [--install] # 这台电脑有的，对照一座城需要的
 sprawling enrol <realm>/<name>        # 从 stdin 读一个凭据，交给一座城
 sprawling resume <city-dir>           # 崩溃之后：验链、关掉丢了结果的工具调用、报告谁在等你
 sprawling fork <city> <run> <seq> <addr>  # 从一次 run 的某一步分出一条支线
 sprawling adopt <city> <addr>         # 把城里已有的一个目录收为一栋楼
-sprawling whose <city> <commit>       # 这座城做的某个提交是哪一次 run 写的，从 Ledger 回答
+sprawling whose <city> <commit>       # 这座城做的某个提交是哪一次 run 写的，从 Ledger 回答；--trace 再列出它的调用
 sprawling replay <ledger-dir>         # 离线验链，只读
 sprawling export <city> <bundle-dir>  # 打包整座城；`restore` 在另一台机器上解开
 sprawling install [--uninstall]       # 把 `sprawling` 放上 PATH，或撤下来
@@ -133,7 +133,7 @@ Sprawling-Effort: high
 Sprawling-City: <city hash>
 ```
 
-trailer 是给城外读者的 projection；trailer 与 Ledger 不一致时，错的是 trailer。这个问题也能反着问：`sprawling whose <city> <commit>` 从 Ledger 回答某个提交是哪次 run 写的，所以一座被还原到别处、旁边没有 `.git` 的城照样答得出。
+trailer 是给城外读者的 projection；trailer 与 Ledger 不一致时，错的是 trailer。这个问题也能反着问：`sprawling whose <city> <commit>` 从 Ledger 回答某个提交是哪次 run 写的，所以一座被还原到别处、旁边没有 `.git` 的城照样答得出。加上 `--trace`，它还列出那次 run 从它上一个提交以来做过的调用，并给出同一栋楼里别的 run 在这一段里调用了几次：它们的写落在同一棵树里，所以也是候选，输出里会这样标明。
 
 ## 它在哪里监听，凭据放在哪里
 
