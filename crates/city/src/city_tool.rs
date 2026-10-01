@@ -26,9 +26,10 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::event::Scope;
 use kernel::{
-    Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall,
-    ToolMeta, ToolName, ToolOutcome,
+    Address, AxCode, AxError, CostTier, Effect, GateSubject, Payload, RenderIntent, Temporal, Tool,
+    ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -126,21 +127,49 @@ impl CityTool {
     }
 }
 
-/// The three things this tool does. Exhaustive: reading `adopt` as
-/// `raise` would lay a template down beside somebody's year of work,
-/// and reading `raise` as `adopt` would refuse a building nobody has.
-enum Action {
+/// The three things this tool does, each with what it was told.
+/// Exhaustive: reading `adopt` as `raise` would lay a template down
+/// beside somebody's year of work, and reading `raise` as `adopt` would
+/// refuse a building nobody has.
+enum Request {
     List,
-    Raise,
-    Adopt,
+    Raise {
+        addr: Address,
+        template: BuildingTemplate,
+    },
+    Adopt {
+        addr: Address,
+    },
 }
 
-impl Action {
-    fn parse(raw: &str) -> Result<Action, AxError> {
-        match raw {
-            "list" => Ok(Action::List),
-            "raise" => Ok(Action::Raise),
-            "adopt" => Ok(Action::Adopt),
+impl Request {
+    /// The one reading of a call's arguments, shared by `subject` and
+    /// `invoke` so both refuse an unreadable call in the same words.
+    fn read(args: &Map<String, Value>) -> Result<Request, AxError> {
+        let action = args.get("action").and_then(Value::as_str).ok_or_else(|| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "read a city action",
+                "missing string argument `action`",
+            )
+            .with_recovery(ACTIONS)
+        })?;
+        match action {
+            "list" => Ok(Request::List),
+            "raise" => {
+                let addr = named(args, "raise a building")?;
+                let template = match args.get("template").and_then(Value::as_str) {
+                    // The ordinary building is what a caller that said
+                    // nothing meant; the confidential one is never a
+                    // default, because it is a promise about data.
+                    None => BuildingTemplate::Minimal,
+                    Some(raw) => BuildingTemplate::parse(raw)?,
+                };
+                Ok(Request::Raise { addr, template })
+            }
+            "adopt" => Ok(Request::Adopt {
+                addr: named(args, "adopt a building")?,
+            }),
             other => {
                 Err(
                     AxError::failure(AxCode::InvalidArgs, "read a city action", other.to_owned())
@@ -173,6 +202,14 @@ impl Tool for CityTool {
         &self.meta
     }
 
+    /// Every action reads or changes the shape of the city, so every
+    /// call is about the city; a building being raised does not exist
+    /// yet to be the scope (city-SPEC.md section 8-36).
+    fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
+        Request::read(call.args.as_map())?;
+        Ok(GateSubject::Scope(Scope::City.to_string()))
+    }
+
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
@@ -185,26 +222,9 @@ impl Tool for CityTool {
                 self.meta.name.as_str()
             )));
         }
-        let args = call.args.as_map();
-        let action = args.get("action").and_then(Value::as_str).ok_or_else(|| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "read a city action",
-                "missing string argument `action`",
-            )
-            .with_recovery(ACTIONS)
-        })?;
-        let result = match Action::parse(action)? {
-            Action::List => self.list()?,
-            Action::Raise => {
-                let addr = named(args, "raise a building")?;
-                let template = match args.get("template").and_then(Value::as_str) {
-                    // The ordinary building is what a caller that said
-                    // nothing meant; the confidential one is never a
-                    // default, because it is a promise about data.
-                    None => BuildingTemplate::Minimal,
-                    Some(raw) => BuildingTemplate::parse(raw)?,
-                };
+        let result = match Request::read(call.args.as_map())? {
+            Request::List => self.list()?,
+            Request::Raise { addr, template } => {
                 let building = create(&self.city_root, &addr, template)?;
                 let mut out = Map::new();
                 out.insert(
@@ -218,8 +238,7 @@ impl Tool for CityTool {
                 out.insert("adopted".to_owned(), Value::Bool(false));
                 Payload::new(out)?
             }
-            Action::Adopt => {
-                let addr = named(args, "adopt a building")?;
+            Request::Adopt { addr } => {
                 let building = adopt(&self.city_root, &addr)?;
                 let mut out = Map::new();
                 out.insert(

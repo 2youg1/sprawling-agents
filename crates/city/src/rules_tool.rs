@@ -22,9 +22,10 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::event::Scope;
 use kernel::{
-    Address, AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall,
-    ToolMeta, ToolName, ToolOutcome,
+    Address, AxCode, AxError, CostTier, Effect, GateSubject, Payload, RenderIntent, Temporal, Tool,
+    ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -89,21 +90,52 @@ impl RulesTool {
             },
         })
     }
+
+    /// The rules as they stand. A building nobody has written rules for
+    /// has none to show, which is an answer rather than a failure.
+    fn standing(&self) -> Result<String, AxError> {
+        let path = rules_path(&self.city_root, &self.building);
+        match std::fs::read_to_string(&path) {
+            Ok(text) => Ok(text),
+            // Linux says `NotADirectory` where Windows says `NotFound`
+            // for a path through a file, as `policy::load` reads it.
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+                ) =>
+            {
+                Ok(String::new())
+            }
+            Err(err) => Err(AxError::failure(
+                AxCode::StorageFatal,
+                "read a building's rules",
+                format!("{}: {err}", path.display()),
+            )
+            .with_recovery(format!(
+                "make {} readable by the city, or remove it so the building has no rules",
+                path.display()
+            ))),
+        }
+    }
 }
 
 /// The two things this tool does. Exhaustive: an unknown verb is refused
 /// rather than read as the harmless one, because guessing wrong here
 /// means either a silent read where a rewrite was meant or the reverse.
-enum Op {
+enum Op<'a> {
     Read,
-    Propose,
+    /// The whole new document.
+    Propose(&'a str),
 }
 
-impl Op {
-    fn parse(raw: &str) -> Result<Op, AxError> {
-        match raw {
+impl Op<'_> {
+    /// The one reading of a call's arguments, shared by `subject` and
+    /// `invoke` so both refuse an unreadable call in the same words.
+    fn read(args: &Map<String, Value>) -> Result<Op<'_>, AxError> {
+        match arg(args, "op")? {
             "read" => Ok(Op::Read),
-            "propose" => Ok(Op::Propose),
+            "propose" => Ok(Op::Propose(arg(args, "text")?)),
             other => Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "read or change a building's rules",
@@ -130,6 +162,15 @@ impl Tool for RulesTool {
         &self.meta
     }
 
+    /// This building's rules, read or rewritten, are what every call is
+    /// about (city-SPEC.md section 8-36).
+    fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
+        Op::read(call.args.as_map())?;
+        Ok(GateSubject::Scope(
+            Scope::Building(self.building.clone()).to_string(),
+        ))
+    }
+
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         if call.name != self.meta.name {
             return Err(AxError::failure(
@@ -148,14 +189,12 @@ impl Tool for RulesTool {
             "scope".to_owned(),
             Value::String(self.building.as_str().to_owned()),
         );
-        match Op::parse(arg(args, "op")?)? {
+        match Op::read(args)? {
             Op::Read => {
-                let path = rules_path(&self.city_root, &self.building);
-                let text = std::fs::read_to_string(&path).unwrap_or_default();
-                out.insert("text".to_owned(), Value::String(text));
+                out.insert("text".to_owned(), Value::String(self.standing()?));
             }
-            Op::Propose => {
-                let rules = write_rules(&self.city_root, &self.building, arg(args, "text")?)?;
+            Op::Propose(text) => {
+                let rules = write_rules(&self.city_root, &self.building, text)?;
                 out.insert(
                     "confidential".to_owned(),
                     Value::Bool(rules.policy().confidential),
