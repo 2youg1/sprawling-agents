@@ -14,7 +14,7 @@ properties must hold:
 
 * `crates/agent_protocols/src/harness/session.rs` - the ACP session: a halt
   becomes `session/cancel`, a report is handed on, a stop reason ends the turn
-  (agent_protocols-SPEC.md section 8-19);
+  (`crates/agent_protocols/Spec.lean` section 8-19);
 * `crates/runtime/src/run/harness.rs` - the lines the run writes: its opening,
   each report, the cancel, the checkpoint, the answer and the freeze, and which
   `kernel::Completion` the answer freezes as (runtime-SPEC.md section 8-52);

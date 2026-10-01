@@ -4,6 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! MCP tools: listing, naming, calling.
+//!
+//! Two servers offering one verb stay two tools, a constructed tool is
+//! outside a confidential building and has a deadline, and a reply's
+//! `isError` and `_meta` decide how it is read: the properties are proved
+//! in `crates/agent_protocols/spec/Mcp/Tools.lean`.
 
 use std::sync::Mutex;
 
@@ -16,13 +21,13 @@ use kernel::{
 use serde_json::{Map, Value};
 
 /// The `_meta` key a server sets on an `isError` result when part of the
-/// call may already have taken effect (agent_protocols-SPEC section 8-1c).
+/// call may already have taken effect (`crates/agent_protocols/Spec.lean` §8-1c).
 /// `desktop/src/refusal.rs` quotes it, and `xtask guard` compares the two.
 pub(crate) const EFFECT_META_KEY: &str = "sprawling/effect-unknown";
 
 /// How much of a server's own failure text reaches the subject: a refusal
 /// and its recovery fit, a stack trace or a whole page does not
-/// (agent_protocols-SPEC section 8-1c).
+/// (`crates/agent_protocols/Spec.lean` §8-1c).
 pub(crate) const ERROR_TEXT_CAP_BYTES: usize = 4_096;
 
 /// What a caller does after a tool reported its own failure.

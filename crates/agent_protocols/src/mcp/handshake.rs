@@ -319,7 +319,7 @@ mod tests {
     }
 
     /// What opening one connection costs, which is what a standing
-    /// connection table would save per dispatch (agent_protocols-SPEC 8-16).
+    /// connection table would save per dispatch (`crates/agent_protocols/Spec.lean` §8-16).
     ///
     /// Two answered requests and one notification, per server, every
     /// time: `initialize`, `notifications/initialized`, `tools/list`.

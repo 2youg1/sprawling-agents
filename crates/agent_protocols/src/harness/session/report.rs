@@ -5,7 +5,7 @@
 
 //! What an agent reports and asks during a turn, read off its
 //! `session/update` and `session/request_permission` messages
-//! (agent_protocols-SPEC.md 8-19).
+//! (`crates/agent_protocols/Spec.lean` §8-19).
 //!
 //! These readings follow ACP's version 1 schema and nothing else: the
 //! session decides when a message is read and where it goes, and this

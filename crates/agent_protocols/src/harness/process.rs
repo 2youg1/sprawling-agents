@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One official harness started as a child that speaks ACP on its pipes
-//! (agent_protocols-SPEC.md 8-19).
+//! (`crates/agent_protocols/Spec.lean` §8-19).
 //!
 //! The process is reclaimed when its handle is dropped, so whoever holds
 //! the handle is the one list of what to kill. Its stderr is discarded

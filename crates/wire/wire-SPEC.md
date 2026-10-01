@@ -1148,7 +1148,7 @@ decide_admission(Door::Acp,        offered, face)  // 未配对仍进，携 Pair
 三条口径：
 
 - **`Door` 是枚举而不是路径字符串**。门烧进 `route_layer` 的状态里，路由表因此仍是全仓唯一拼出 `/transcribe`、`/enroll` 的地方；middleware 不回头读 `uri().path()`，否则路径就有了第二个家。
-- **两扇会动作的门当场拒，`/acp` 不拒**。花钱与收凭证是动作，未配对者不该触发；而外来编辑器「只学到一位」是 `agent_protocols::admit` 的措辞权（agent_protocols-SPEC §9），所以那扇门把 `Pairing` 传进去而不是自己写拒词。`/acp` 的令牌仍写在 body 的 `token` 键里（编辑器没有别的地方写），但**判定调的是同一个函数**——一个规则一个家，与令牌写在哪无关。
+- **两扇会动作的门当场拒，`/acp` 不拒**。花钱与收凭证是动作，未配对者不该触发；而外来编辑器「只学到一位」是 `agent_protocols::admit` 的措辞权（`crates/agent_protocols/Spec.lean` §9），所以那扇门把 `Pairing` 传进去而不是自己写拒词。`/acp` 的令牌仍写在 body 的 `token` 键里（编辑器没有别的地方写），但**判定调的是同一个函数**——一个规则一个家，与令牌写在哪无关。
 - **`/` 与 `/{*asset}` 保持开放**：人要先拿到页面，才有地方输入配对码。
 - **令牌怎么递**：socket 写在 hello 帧里（帧类型给了它字段名），POST 没有帧，于是走标准的 `Authorization: Bearer`，`offered_pairing` 是这条拼写在服务端的唯一读者，`client/src/core/socket.ts` 的 `bearing()` 是浏览器侧唯一的写者。
 
@@ -1537,7 +1537,7 @@ pub struct HarnessesAnswer { pub harnesses: Vec<HarnessLine> }
 pub struct HarnessLine { pub name: String, pub launch: Vec<String>, pub found: bool, pub docs: String }
 ```
 
-- **provider 页与 harness 页分开**（定规）：provider 页收 API key，harness 页说明五家官方 harness（agent_protocols-SPEC §8-19）。
+- **provider 页与 harness 页分开**（定规）：provider 页收 API key，harness 页说明五家官方 harness（`crates/agent_protocols/Spec.lean` §8-19）。
 - `name` 是 `agent_protocols::Harness::as_str` 的词；`launch` 是起它说 ACP 的那条命令，逐词；`found` 是那条命令的程序在这台电脑的搜索路径上找不找得到；`docs` 是这家自己写的登录说明。**登录是人在 harness 里做的**，这一问不答任何凭据的事。
 - 名字表多一项，schema 哈希因此而变，`WIRE_V` 不为此进位。
 

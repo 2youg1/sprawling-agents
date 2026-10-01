@@ -27,7 +27,7 @@
 //! the reader. As on the child's pipe, it reads one line at a time
 //! through `read_one_message` and hands it over a channel with no
 //! queue, so the stream holds at most one line this city has read and
-//! nobody has taken (agent_protocols-SPEC.md 8-15).
+//! nobody has taken (`crates/agent_protocols/Spec.lean` §8-15).
 //!
 //! **A post is not an answer.** The far end acknowledges a post with
 //! 202 and says nothing; the answer arrives as a later event. So a call

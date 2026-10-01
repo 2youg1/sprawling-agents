@@ -50,7 +50,7 @@ pub fn acp_dispatch(
     if matches!(pairing, wire::Pairing::Absent) {
         // The refusal says nothing about whether the address exists, the
         // building is real, or the token was close: an unpaired caller
-        // learns one bit. agent_protocols-SPEC.md section 9 gives this
+        // learns one bit. `crates/agent_protocols/Spec.lean` section 9 gives this
         // judgement to the inbound middleware in `wire`; until that
         // middleware refuses on the route, the door the request already
         // reached is the one place that can.

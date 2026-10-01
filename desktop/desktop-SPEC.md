@@ -48,7 +48,7 @@
 
 `crates/agent_protocols` 已经是这套协议的**客户端**权威：`Rpc::initialize`／`initialized`／`list_tools`／`call_tool`／`read` 定死了城里说出去的每一行，`agent_protocols::mcp::stdio` 定死了字节怎么走（子进程、按行、消息内无换行、超时即回收子进程）。本 package 是那一端的**对侧**，因此它的形状不是设计出来的，是**读出来的**。
 
-城这一侧读 `tools/call` 答复的是 `agent_protocols::McpTool`：`isError: true` 的结果是一次失败，拒词全文进它的 subject；`_meta` 带 `sprawling/effect-unknown` 时它标 `Retry::Unknown`（agent_protocols-SPEC §8-1c）。
+城这一侧读 `tools/call` 答复的是 `agent_protocols::McpTool`：`isError: true` 的结果是一次失败，拒词全文进它的 subject；`_meta` 带 `sprawling/effect-unknown` 时它标 `Retry::Unknown`（`crates/agent_protocols/Spec.lean` §8-1c）。
 
 ## 5 权威信源
 
@@ -523,5 +523,5 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 
 ## 18 文档同步
 
-`ARCHITECTURE.md` §3 depmap 块的 `desktop` 一行｜`desktop/README.md`（英文，讲清它为什么住在 workspace 外、城怎么起它）｜sprawling-SPEC §8-4d｜同步本 SPEC §13 与 §8-7 的实现状态｜`desktop/README.md` 的 The honest-refusal rule 一节｜agent_protocols-SPEC §8-1c（城怎么读 `isError` 与 `_meta`）。
+`ARCHITECTURE.md` §3 depmap 块的 `desktop` 一行｜`desktop/README.md`（英文，讲清它为什么住在 workspace 外、城怎么起它）｜sprawling-SPEC §8-4d｜同步本 SPEC §13 与 §8-7 的实现状态｜`desktop/README.md` 的 The honest-refusal rule 一节｜`crates/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`）。
 

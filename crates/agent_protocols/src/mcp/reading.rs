@@ -36,6 +36,10 @@
 //! peer's own pipe is the only other buffer. The thread ends when the
 //! peer closes its output, which killing a child does, after a refusal,
 //! or when the caller drops the [`Lines`].
+//!
+//! What the readers must hold - a message within the ceiling is read, one
+//! past it is refused, and a refusal is the reader's last word - is proved
+//! in `crates/agent_protocols/spec/Mcp/Reading.lean`.
 
 use std::io::{BufRead, ErrorKind, Read};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
@@ -201,7 +205,7 @@ const WHOLE_CHUNK_BYTES: usize = 8_192;
 
 /// The refusal a reader gave an answer, as the call that was waiting
 /// reads it: the server took the call and answered, so what it did is
-/// unknown (agent_protocols-SPEC.md 8-15). Every transport hands its
+/// unknown (`crates/agent_protocols/Spec.lean` §8-15). Every transport hands its
 /// callers this one.
 pub(super) fn answer_unread(refused: &AxError) -> AxError {
     AxError::failure(*refused.code(), refused.action(), refused.subject())

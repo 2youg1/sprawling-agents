@@ -24,6 +24,9 @@
 //! What comes back is progress, not a conversation. An editor watching a
 //! run wants to know where it got to; giving it a channel into the run
 //! would be a second control surface, and the city already has one.
+//!
+//! That a parsed request has every field and an admitted one never names
+//! the city's own subtree is proved in `crates/agent_protocols/spec/Acp.lean`.
 
 use kernel::{Address, AxCode, AxError};
 use serde_json::Value;

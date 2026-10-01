@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The official harnesses this city drives, and how each is started as
-//! an ACP agent (agent_protocols-SPEC.md 8-19).
+//! an ACP agent (`crates/agent_protocols/Spec.lean` §8-19).
 //!
 //! **The roster is the person's ruling.** Five harnesses and no more: a
 //! sixth is added by a ruling, not because the ACP registry grew a row.
