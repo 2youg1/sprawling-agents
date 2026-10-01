@@ -758,7 +758,7 @@ impl Window<'_> {
 }
 ```
 
-模块：`playback::select`（时间条件与 `Window`）、`playback::links`（调用这一对）、`playback::project`（运行策略、提交证据的接入）、`playback::traced`（一个提交的调用归属，按读者能看到的写）、`playback::diff`（一个提交的基准与逐文件的 diff）。
+模块：`playback::select`（时间条件与 `Window`）、`playback::links`（调用这一对）、`playback::project`（运行策略、提交证据的接入）、`playback::traced`（一行 checkpoint 持有什么；`Committed` 那一行的调用归属与基准，按读者能看到的写）、`playback::diff`（一个提交从基准到它、逐文件的 diff）。
 
 **时间选择。**
 
@@ -777,8 +777,8 @@ impl Window<'_> {
 
 **提交的证据。** 范围内可见的每个 `Committed` checkpoint 多三项；读这三项要读账本之外的输入（git 对象与 `accounting::trace` 对整本账的折叠），确定性的条件是这些输入相同，而 git 对象按 oid 不可变：
 
-- **`trace`**（`playback::traced`）：`accounting::trace::trace(city_root, oid)` 的答。答里提交的 seq 就是这一行时，写 `{"traced":{"calls","nearby"}}`：`calls` 是这个 run 在区间里的每次调用，各是 `{"at":seq}`（在 `events` 里）、`{"elsewhere":seq}`（读者看得到，在选择之外，行不随 bundle 携带，要看它就把选择放宽到它）或 `"withheld"`（读者看不到那条 `tool_called`）；`nearby` 是同一栋楼里别的 run 的调用数，各是 `{"run","actor","calls"}`，`run` 照 `runs` 的写法是 `{"run":id}`、`"withheld"` 或 `"missing"`，`actor` 只在 `run` 读得到时写出。`trace` 答「没有这个提交」，或答的是同一个 oid 的另一次宣告时，写 `"untraced"`；`trace` 失败（例如 cutoff 之后的历史不通过审计）写 `{"unread":"<错误码>"}`，导出不因此失败。
-- **`base`**：同一 run 的上一个提交 `trace` 的 `commit.previous`，写 `{"previous":oid}`；没有时，提交对象恰好有一个父提交，写 `{"parent":oid}`；否则 `"none"`。全城紧邻的上一个提交不是基准：它可能属于别的 run。
+- **`trace`**（`playback::traced`）：`accounting::trace::trace(city_root, oid)` 的答。答里提交的 seq 就是这一行时，写 `{"traced":{"calls","nearby"}}`：`calls` 是这个 run 在区间里的每次调用，各是 `{"at":seq}`（在 `events` 里）、`{"elsewhere":seq}`（读者看得到，在选择之外，行不随 bundle 携带，要看它就把选择放宽到它）或 `"withheld"`（读者看不到那条 `tool_called`）；`nearby` 是同一栋楼里别的 run 的调用数，各是 `{"run","actor","calls"}`，`run` 照 `runs` 的写法是 `{"run":id}`、`"withheld"` 或 `"missing"`，`actor` 只在 `run` 读得到时写出。`trace` 答「没有这个提交」，或答的是同一个 oid 的另一次宣告时，写 `"untraced"`；`trace` 失败（例如 cutoff 之后的历史不通过审计）写 `{"unread":"<错误码>"}`，导出不因此失败。这两种情形下没有 `trace` 的答，`base` 是 `"none"`，`diff` 为空表。
+- **`base`**：`trace` 答的 `commit.previous`（同一 run 的上一个提交），写 `{"previous":oid}`；没有时，`commit.parents` 恰好一个，写 `{"parent":oid}`；否则 `"none"`。全城紧邻的上一个提交不是基准：它可能属于别的 run。
 - **`diff`**（`playback::diff`）：`base` 是 `"none"` 时为空表；否则按 `files` 的次序，每个路径一项 `{"path","change"}`。`change` 是六种之一，互不混同：
   - `{"patch":{"lines","credential"}}`：经 `storage::hunks::of_file(city_root, base, Head::Commit(oid), path)` 读出的整段 patch。它只比较两个不可变的 oid，从不读工作区；`lines` 是 `{"number","text"}`，`credential` 是被凭据扫描隐去的行的 `{"number","reason"}`，与 `storage::hunks` 同一个扫描，不回显字节。
   - `{"truncated":{"lines","credential","cut"}}`：这一个提交显示的 patch 文字超过 `DIFF_MAX_BYTES`，这个文件只给出预算之内的头几行，`cut` 是没给出的行数。之后的文件照样读、照样分类，只是它们的行都在预算之外。
