@@ -144,21 +144,7 @@ impl Views {
                 autonomy: self.governance.autonomy.clone(),
                 decided: self.decided.clone(),
             }),
-            wire::Query::CostView => {
-                let report = self.attribution.report();
-                wire::Answer::Cost(Box::new(wire::CostAnswer {
-                    total: report.total,
-                    by_run: top_billed(report.by_run, &self.active_names()),
-                    by_actor: report.by_actor,
-                    by_segment: report.by_segment,
-                    by_tool: report.by_tool,
-                    by_skill: report.by_skill,
-                    unpriced: wire::UnpricedCalls {
-                        calls: report.unpriced.calls,
-                        tokens: report.unpriced.tokens,
-                    },
-                }))
-            }
+            wire::Query::CostView => wire::Answer::Cost(Box::new(self.cost_answer())),
             wire::Query::History { before, limit } => {
                 return Prepared::History {
                     ledger: self.ledger_ask(),
@@ -322,6 +308,24 @@ impl Views {
                 };
             }
         })
+    }
+
+    /// The city's cost view: the attribution report, with `by_run`
+    /// narrowed to the active runs and the most billed others.
+    fn cost_answer(&self) -> wire::CostAnswer {
+        let report = self.attribution.report();
+        wire::CostAnswer {
+            total: report.total,
+            by_run: top_billed(report.by_run, &self.active_names()),
+            by_actor: report.by_actor,
+            by_segment: report.by_segment,
+            by_tool: report.by_tool,
+            by_skill: report.by_skill,
+            unpriced: wire::UnpricedCalls {
+                calls: report.unpriced.calls,
+                tokens: report.unpriced.tokens,
+            },
+        }
     }
 }
 
