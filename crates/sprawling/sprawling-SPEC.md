@@ -1121,6 +1121,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id**（wire-SPEC §8-25）。`Requirement::enables` 是 `sprawling doctor` 那份终端报告的措辞，终端只说英文，这句话与它描述的那一行同住 `bin::doctor::table`，改一行的人在同一处看见它；页面按 `DoctorItem::name` 从 `client/src/lang.json` 的 `machine_enables_<name>`（name 里的连字符写成 `_`，因为词表的键一律 snake_case）取 en 与 zh，与 doctor 其余每一种状态同口径——终端的 `absent` 由 `paint` 拼，页面的 `machine_absent` 由 `lang.json` 给，两面各说各的，线上只携枚举与 id。两面的集合由 `bin::doctor::tests` 的 `every_item_has_the_page_clause_in_both_languages` 钉在一起：需求表多一行而 `lang.json` 没给它词，测试红。**被否掉的**：终端也从 `lang.json` 取英文（二进制在编译期读 `client/` 的一份源文件，每次 doctor 都要解析整张词表，而终端从不说第二种语言）；线上继续携英文句子（页面的词成了服务端的选择，中文读者看到的是英文）。条件变了就重议：终端要说第二种语言时，两面合用一张词表。
 
+**城的工具读别楼的文件与 `cas:` 块，只经 runtime 的一扇门**（8-131、8-142，runtime-SPEC §8-59、§12.16）。`ocr` 与 `transcribe` 的字节都由 `runtime::BoundReader` 读：它把 `read` 的那一份判定（换成城里的拼写、文法、reserved subtree、读界、解开链接再判、打开后核对）公开成一个调用，交回一个 `Read` 与字节的来处。`transcribe` 原先只收本楼的文件，用 `Address::is_within`、`is_reserved` 与 `WriteTarget::within` 自己判，那是这份判定在 accounting 里的替身，门落地后删去。**被否掉的**：两件工具各自在 accounting 里判（两份判定，一份跟着 `read` 变，一份不跟）；只为 `cas:` 另开一条路、文件仍只收本楼（连接器存下的截图与录音能读，读界之内别楼的文件却不能，同一个读界有两个答案）。
+
 **一条命令的戳从驱动最近的读数渲染，不给工具面一个钟**（8-125，runtime-SPEC §12.8）。`drive_run` 把它交给驱动的 `now` 包一层，每个读数先记进这一跑的 `ClockReading`；`Sieving` 打包时读最新的那个。回合在调用工具面的 `account` 之前读答复时刻，所以最新的那个就是这条命令的答复时刻，戳上的秒数等于它 `tool_result` 的 `t`；一跑仍只有一个采样点，计数时钟下的剧本字节不变。**被否掉的**：`Sieving` 打包时自己读 `hands.clock`——一跑多了一个采样点，戳与它 `tool_result` 的 `t` 可以差一秒；把戳挪进回合的 `account`——那是 runtime 的 `turn` 的事，不是装配层的，而读数的位置已经给出同一个秒数。
 
 **Lean 是开发这份代码必需的工具**（§8-58）。各 crate 的规格正从 `<crate>-SPEC.md` 迁成 `Spec.lean`（ARCHITECTURE.md §11「Specifications in Lean」），`just check` 里的 `models` 一步是这些规格在本地被证明过的唯一证据。Lean 列为可选时，没装 Lean 的机器上 `models` 静默通过，本地的绿就不再说明规格被证明过，只有 CI 知道。所以 `elan` 与 `lean` 两行是 `required`：缺了它们，`just prereqs` 在编译之前报出来并给出装法，`just models` 自己也报错而不是跳过。被否决的备选：保持可选、只靠 CI 的 `models` job 证明——那样每次本地验证都得另外说明「规格没有证过」，而这句话没有哪道门会替人说。
@@ -3053,17 +3055,18 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **同一个选择也给 run 一件工具**：`transcribe`，有没有它读的是同一次 `select`，只是按 run 所在那座楼的楼规读（8-131）。
 - **验收**：`wire` 的 `/transcribe` 路由在没有 content-type 时按名拒绝；`gateway::transcribe::recording` 的 `of_media_type` 认得五种容器、拒第六种并列出前五种。
 
-## 8-131 城给 run 的转写工具 `transcribe`（`accounting::worker::workbench::tools::transcribe`；gateway-SPEC §8-12、§8-33）
+## 8-131 城给 run 的转写工具 `transcribe`（`accounting::worker::workbench::tools::transcribe`；gateway-SPEC §8-12、§8-33、§8-34，runtime-SPEC §8-59）
 
 **原因**：computer use 要能把声音变成字，而二进制里不内置任何模型（定规），所以模型只能经人接入的转写端点转写。composer 的麦克风已经经这个端点把录音变成字（8-56），run 却没有任何一条路用它。
 
 ```rust
 // accounting::worker::workbench::tools::transcribe（形状 4 适配器）
 impl Laying {
-    pub(super) fn transcription_tool(&self, site: &Site) -> Result<Option<TranscribeTool>, AxError>;
+    pub(super) fn transcription_tool(&self, site: &Site, reader: runtime::BoundReader)
+        -> Result<Option<TranscribeTool>, AxError>;
 }
-pub(super) struct TranscribeTool { /* root、building、transcriber: Mutex<Transcriber>、meta —— 私有 */ }
-impl kernel::Tool for TranscribeTool { … }   // 名 `transcribe`；参数 `{ path }`；答 `{ path, text }`
+pub(super) struct TranscribeTool { /* reader: runtime::BoundReader、transcriber: Mutex<Transcriber>、meta —— 私有 */ }
+impl kernel::Tool for TranscribeTool { … }   // 名 `transcribe`；参数 `{ path }`：路径或 `cas:`／`file:` Locator；答 `{ path, text }`
 
 // accounting::worker::workbench::Laying 多一格
 book: gateway::EndpointBook,   // 派活立起那一刻的端点账本
@@ -3071,11 +3074,32 @@ book: gateway::EndpointBook,   // 派活立起那一刻的端点账本
 
 - **有没有这件工具，与 composer 的麦克风读同一个选择。** `EndpointBook::select(ModelTag::Transcribe, 楼的 policy)` 成了，`gateway::transcriber_for` 把它变成设施，工具上表；拒了，工具不上表。没有第二个「这座城能不能转写」的开关。与 `views::hearing` 只差 policy：run 有楼，读楼规，于是机密楼只拿得到回环地址上的转写端点；口述没有楼，按普通楼。`select` 的三种拒绝——没选、端点已撤、机密楼而端点离机——对模型是同一件事：这座楼没有转写，一件叫了必败的工具不放上表。`transcriber_for` 的失败（HTTP 客户端造不起来）照常上抛，因为它对主模型的调用同样成立。设施放在一把锁后面：它里面的凭据解析器是 `Send` 而不是 `Sync`，而一件工具要在一波调用之间共享，于是同一个 run 的两次转写轮流进行。
 - **账本在 `RunWorker::laying` 里复制一份进 `Laying`。** 工作台在驾驶这个 run 的 lane 里摆（8-113），账本属于 accounting 线程；`Laying` 本来就带着「派活立起那一刻」的值（`waiting`、`locks`、`trust`），账本是同一种值，几个端点的复制是微秒量级。被否：在 `agree_to_work` 里造好设施随 `Agreed` 带过去——那样工具在一处造、在另一处登记，「这件工具有没有」就有两处答案；只把 `Transcriber` 放进 `Laying`——`laying()` 手里没有楼规，造不出对的 policy。
-- **录音从 run 自己这座楼里的一个文件进来。** 参数是相对城根的路径（审查楼里是这个 run 的树），与 `read` 同一种写法。不经 CAS：今天没有一条路把音频放进 CAS（desktop 的录音落在临时目录，`crates/desktop/Spec.lean` §14；连接器只把 png 存进 CAS）。只收本楼，理由有二：发出这段录音的端点是按本楼的 policy 选的，录音也出自本楼，于是判这次上传的只有一份楼规；读别楼要问读界（read bound），而把一条模型选的路径判成「可读」的那一处是 `runtime::tools::chosen_path`，crate 私有，在这里再写一份就是第二个权威。判定只用已有的权威：`Address::parse`（语法）、`Address::is_within`（本楼）、`Address::is_reserved`（reserved subtree）、`storage::WriteTarget::within`（路上不许有 link）。最后一项对读比 `chosen_path::land` 更严：它拒 link 而不去解析 link，所以放不进 `land` 会拒的东西。容器从文件名读（`AudioType::of_file_name`），字节经 `Recording::read_from` 读到上限为止（gateway-SPEC §8-33）。
+- **录音从读界之内的一个文件或一个 `cas:` 块进来，只经 `runtime::BoundReader`**（runtime-SPEC §8-59）。参数与 `read` 同一种写法：相对城根的路径（审查楼里是这个 run 的树）、城内的绝对路径，或 Locator。连接器把 desktop 的录音存进 CAS，窗口里那一行 `[recording attached: …, cas:…]` 的 locator 原样交给它（runtime-SPEC §12.15）。判定是 `read` 的那一份：文法、reserved subtree、读界，链接解开后再判一次，打开后核对没换过；拒绝与 `read` 同码。读界之内的别楼也收：模型能 `read` 的东西本来就进了它对主模型的对话，录音出门去的是按本楼的 policy 选出的端点，与那段对话同一种出门；机密楼的文件楼外读不到，机密楼里的 run 只拿得到回环上的转写端点。**容器**：文件（`file:` 在内）看扩展名（`AudioType::of_file_name`），字节经 `Recording::read_from` 读到上限为止（gateway-SPEC §8-33）；块没有名字，看开头的字节，经 `Recording::read_unlabelled`（gateway-SPEC §8-34）。
 - **效果是 `Effect::Read`。** 它读一个文件，城里什么都不写；录音出门去的是人为这类活选定、已按本楼 policy 判过的端点，与 run 的对话去主模型端点是同一种出门，而模型调用不是工具效果。被否：`Effect::Egress`——那一类的定义是「目的地由这次调用指名」，出网门扫的是参数里的字节，而这里参数只有一条路径，出去的是录音，判它的是已经判过的 `select`。`CostTier::Heavy`：一次 provider 往返，数秒，可能计费。`timeout: None`：设施自己的 `TRANSCRIBE_TIMEOUT_MS` 已是上限，第二个期限会是第二个权威。`render: Generic`：它产出的是文字。
 - **在工具表上的位置**：内置工具与按用途加的那几件之后、城外工具（浏览器、MCP）之前。provider 按位置缓存工具数组，所以新的内置工具接在内置那一段的末尾。
-- **验收**：`crates/sprawling/tests/acceptance/episodes.rs` 末尾一段。选了转写端点的城，run 调 `transcribe` 拿回脚本端点转出的字，端点收到的模型名是人选的那一个；机密楼配离机转写端点时，工具不在表上。没选转写的城不上这件工具，由 catalogue 的两条覆盖测试守着：上了表而没被调用，会被点名。工具自己的拒绝（别楼的路径、认不得的容器、不存在的文件）由 `transcribe` 模块的测试守着。
-- **未决**：读别楼的录音（读界之内的任意路径，或一个 `cas:` 块）要等 runtime 把 `chosen_path` 的判定公开成一扇按字节读的门。促成它的证据是出现一条把音频放进 CAS 或放进别楼的生产路径，例如 desktop 的录音交回城里（`crates/desktop/Spec.lean` §15.2）。
+- **验收**：`crates/sprawling/tests/acceptance/episodes.rs` 末尾一段。选了转写端点的城，run 调 `transcribe` 拿回脚本端点转出的字，端点收到的模型名是人选的那一个；机密楼配离机转写端点时，工具不在表上。没选转写的城不上这件工具，由 catalogue 的两条覆盖测试守着：上了表而没被调用，会被点名。连接器存下的录音：一个为这座楼存进 CAS 的 wav 块，run 以它的 `cas:` 调 `transcribe`，拿回脚本端点转出的字。工具自己的拒绝（机密楼的路径、reserved subtree、认不得的容器、不存在的文件与块）由 `transcribe` 模块的测试守着。
+
+## 8-142 城给 run 的 OCR 工具 `ocr`（`accounting::worker::workbench::tools::ocr`；gateway-SPEC §8-34，runtime-SPEC §8-59）
+
+**原因**：computer use 读不到字的窗口（画在画布上的界面、远程桌面）只剩截图，模型要文字反馈得有 OCR；二进制里不内置任何模型（定规），所以 OCR 与转写一样经人接入的端点。人在端点账本里为 `ModelTag::Ocr` 选一个能读图的模型，城给 run 一件 `ocr`，把 run 有权读的一张图交给那个模型，取回文字。desktop 那一侧不做 OCR，截图经连接器进 CAS（`crates/desktop/Spec.lean` §15.2「还欠的」第 1 条）。
+
+```rust
+// accounting::worker::workbench::tools::ocr（形状 4 适配器）
+impl Laying {
+    pub(super) fn ocr_tool(&self, site: &Site, reader: runtime::BoundReader)
+        -> Result<Option<OcrTool>, AxError>;
+}
+pub(super) struct OcrTool { /* reader、policy、recogniser: Mutex<gateway::Recogniser>、meta —— 私有 */ }
+impl kernel::Tool for OcrTool { … }   // 名 `ocr`；参数 `{ path }`：PNG 的路径或 `cas:`／`file:` Locator；答 `{ path, text }`
+```
+
+- **有没有这件工具，读的是 `select(ModelTag::Ocr, 楼的 policy)`。** 成了，`gateway::recogniser_for` 把它变成设施（带上这个 face 的头，与主模型的适配器同一张），工具上表；拒了（没选、端点已撤、机密楼而端点离机），工具不上表，理由同 8-131：一件叫了必败的工具不放上表。
+- **图只经 `runtime::BoundReader` 读进来**，与 `transcribe` 同一扇门、同一份判定（8-131）：楼里的一个 PNG、读界之内别楼的一个 PNG、连接器存进 CAS 的截图（窗口里那一行 `[picture attached: image/png WxH, cas:…]` 的 locator）都收。读进来的字节交 `runtime::pipeline::connector::png_picture`，与连接器存图同一种认法：只认 PNG，超过 `IMAGE_MAX_BYTES` 或头读不出，`E_INVALID_ARGS`。
+- **发出去的是所选 face 的图片内容**（gateway-SPEC §8-34）：一条 system、一条带图的 user 消息，没有工具；`policy` 是这座楼的。选中的模型登记为只读字时，端点在发出前拒绝，拒词让人把 `ocr` 指向一个 `text_image` 的模型。
+- **效果照 8-131**：`Effect::Read`（读一个文件，城里什么都不写；图出门去的是按本楼 policy 选出的端点）、`CostTier::Heavy`（一次 provider 往返，可能计费）、`timeout: None`（端点自己的调用期限是上限）、`render: Generic`（产出的是文字）。
+- **在工具表上的位置**：紧接 `transcribe` 之后、`playback` 之前。provider 按位置缓存工具数组，所以内置工具的新成员接在内置那一段的末尾；以后的提案工具排在 `ocr` 之后。
+- **验收**：`crates/sprawling/tests/acceptance/ocr.rs`。选了 OCR 模型的城（回环端点、chat 面），run 以楼里的一个 PNG 与一个为这座楼存进 CAS 的截图各调一次 `ocr`，拿回端点读出的字；端点收到的两次请求走 `chat/completions`、带人选的模型名与那张图的 base64。没选 OCR 的城不上这件工具，由 catalogue 的两条覆盖测试守着。工具自己的拒绝（不是 PNG、机密楼的路径、没有设施）由 `ocr` 模块的测试守着。
+- **本节接口的当前状态**：线上已有的 `SelectModel` 能为 `Ocr` 选模型，但一个模型能不能读图（`InputKinds`）只从内置目录（`gateway::MarketSnapshot::builtin`）读，那里今天只有一行 `text_image`；其余模型按 `Text` 登记，`ocr` 在它们上面由端点拒绝。人登记一个模型时能说「它读图」，或选型点也读预置表（`provider::preset` 里各行已写着 `input`），二者之一落地，`ocr` 才能用在内置目录之外的模型上；判定它的证据是一个 `text_image` 的预置模型被选为 `Ocr` 之后仍被拒。人登记 OCR 模型的设置页控件归前端（client-SPEC 的模型表仍是三行，kernel-SPEC §8-80）。
 
 ## 8-57 浏览器是一族引擎，不是一个牌子（`bin::doctor::family`、`family::gecko`／`chromium`／`webkit`、`bin::doctor::registry`）
 

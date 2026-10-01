@@ -804,6 +804,28 @@ impl Window<'_> {
 
 **楼规与城一层。** `PutRules` 由 `commanding::configure` 执行：`city::write_rules_against` 落盘之后，读回文件的摘要，与折叠里这份文件上一次的摘要比，记一行 `rules_changed`。`ConfigureCity` 同样落盘之后记 `rules_changed { scope: city, which: Config }`。两条都只在有一项写了时记行；什么都没写的 `ConfigureCity` 什么都不记。`PreferencePatch::CorePriority` 由 `person::put` 落在 `[core]`，其余臂照旧落在 `[ui]`；`CorePriority` 的值集是 `wire::CorePriority`，`person` 再导出它，`bin` 的调用方不必改路径。
 
+### 8-20 工作台的两件读外来字节的工具：`ocr` 与 `transcribe`（`accounting::worker::workbench::tools::ocr`、`…::tools::transcribe`，形状 4 适配器；sprawling-SPEC 8-131、8-142）
+
+```rust
+// accounting::worker::workbench::tools（登记）
+impl Laying {
+    pub(super) fn transcription_tool(&self, site: &Site, reader: runtime::BoundReader)
+        -> Result<Option<TranscribeTool>, AxError>;
+    pub(super) fn ocr_tool(&self, site: &Site, reader: runtime::BoundReader)
+        -> Result<Option<OcrTool>, AxError>;
+}
+pub(super) struct TranscribeTool { /* reader、transcriber: Mutex<Transcriber>、meta —— 私有 */ }
+pub(super) struct OcrTool { /* reader、policy、recogniser: Mutex<Recogniser>、meta —— 私有 */ }
+// 两件都是 kernel::Tool；参数 `{ path }`；答 `{ path, text }`
+```
+
+- **两件工具读字节只经 `runtime::BoundReader`**（runtime-SPEC §8-59）。`lay_out_workbench` 用交给 `read` 与 `search` 的同一个 `ReadBound`、同一个 run 的树根与城的块仓造一个 `BoundReader`，克隆给两件工具。本 crate 不判路径：`Address::is_within`、`Address::is_reserved` 与 `storage::WriteTarget::within` 曾在 `transcribe` 里替这扇门判，门落地后删去。
+- **有没有这件工具，是一次 `select`。** `transcribe` 读 `ModelTag::Transcribe`，`ocr` 读 `ModelTag::Ocr`，都按 run 所在那座楼的楼规（`site.rules.policy()`）问端点账本；拒了，工具不上表。设施由 gateway 造：`gateway::transcriber_for` 与 `gateway::recogniser_for`，后者带上 `credentials::dialect_headers` 给这个 face 的头，与主模型的适配器同一张。
+- **容器的认法：** 图按 `runtime::pipeline::connector::png_picture` 认（读界判过的字节整份读进来，再交它），录音按 `Named` 分：文件看扩展名（`gateway::AudioType::of_file_name`，`file:` Locator 也是文件），块看开头的字节（`gateway::Recording::read_unlabelled`）。
+- **`ocr` 的设施在一把锁后面**，理由同 `transcribe`：凭据解析器是 `Send` 而不是 `Sync`，`recognise` 又要 `&mut`；同一个 run 的两次 OCR 轮流进行。
+- **在表上的位置**：`transcribe` 之后、`playback` 之前，两件都在内置那一段（sprawling-SPEC 8-142）。
+- 验收：两件工具各自模块的测试经一个没有设施的工具判拒绝（别楼的机密路径、reserved subtree、认不得的容器、不在的文件、没有任何楼的 `cas:`），设施的拒绝原样交回；接上设施的那一半由 `crates/sprawling/tests/acceptance/` 的 `ocr` 与 `transcribe` 测试经回环端点证明。
+
 ### 8-16 accounting::trace：一个提交倒推到它之前的那些调用（形状 7 投影）
 
 `trace` 回答拿着一个提交 oid 的人在 `whose` 之后问的下一句：这个提交是哪几次调用的结果。CLI（`sprawling whose --trace`，sprawling-SPEC.md 8-136）是它的薄适配器；下一轮 playback 的调用归属与验收工具从坏提交归因到写它的居民，都读同一个值。
@@ -903,4 +925,5 @@ pub(in crate::views) fn range_answer(city_root: &Path, version: B3Hash, range: d
     (f) `SCHEMA` 进到 `sprawling.playback/2`，`PROJECTION_RULES` 进到 3；读回时先只读 `schema`。理由：多了字段是形状变了，旧构建读不懂新 bundle，新构建也读不懂旧的；先看 `schema`，结构一项报的是「这是第几版、用哪一版复核」，而不是一条字段缺失。被否决的做法：只进 `PROJECTION_RULES`（旧 bundle 在解析时就失败，到不了「复核不了」那一步，报出来的是一条难懂的字段错误）。
 30. **死掉的 run 由启动扫描冻结，冻结行写成它的居民，结局读 `RunFrozen::lost`。** (a) 理由：只有拿到写者锁的那一刻才知道没有别的进程在驱动它，而 `startup_scan` 正是那一刻的那一遍验链；视图与 worker 的折叠都从账本来，账上一行冻结让服务中的城与重开的城对同一次 run 说同一个结局。写成居民而不是城，与补写结果未知的调用同一条理由，按居民计数的读者不必为死亡另写一条规则。被否决的做法：在服务时由视图把「没有冻结行、进程已重开过」的 run 读作死掉——那是视图的第二条冻结规则，而且一次性的 `views::ask` 与服务中的视图会各算一次；由 `RunWorker::new` 冻结——`new` 也在 `serve` 里跑，那时冻结要跟账本证明的次序对齐，而 `resume` 本来就是收拾死亡的那一步（sprawling-SPEC 8-109）。重开参数：`serve` 也要在起步时收拾死亡（不经 `resume`）时，把这一遍挪进它的起步路径，次序仍是先补调用、后冻 run。 (b) **指南进度住 `accounting::guide`，一个与 `person` 平行的模块，读写各一扇门。** 理由：页面读与命令写读的是同一份文件，文件的文法只能有一处；它不属于视图的折叠，也不属于 worker 的状态，`person` 已经是「一份人改的文件，读整份、写整份」的样子。被否决的做法：读放在 `views::answering`、写放在 `worker::commanding`——两处各知道一遍文件的形状。(c) **跑 gh 的函数经 `Views::ask_github_through` 交进来，主机名的判定与缺省主机留在视图。** 理由：起子进程碰主机，按第 9、10 条住 `sprawling`、经 `fn` 指针交进来；而「问哪台主机、这个串能不能交给 gh」是城对输入的判定，测试不必起 gh 就能判它。被否决的做法：经 `Hands` 交给 worker——这是一条查询，worker 不答查询；在二进制里判主机名——测试就要经过子进程才看得到拒绝。
 31. **(a) 视图的第二份按值克隆，不经快照编码。** 理由：两份视图要的是同一个折叠状态加上同一组共享句柄，派生的 `Clone` 正好如此，而编码再解码在 40 万行城上要 350 ms，是开城最长的一段之一（§8-19）。被否决的做法：①留在编码路径上，把复制挪到视图线程——首字节不再等它，但视图线程开头的每一批照样等 350 ms，而且要改装配根起线程的次序；②手写逐字段复制——字段清单的第二份拼写，加一个字段就要改两处。**(b) 重建从创世时不先证明。** 理由：全量折叠逐行核对每一行，判定与不带记录的证明相同；先证明再全量折叠是同一批行核对两遍（§8-19）。被否决的做法：照旧先证明，把证明的结果交给全量折叠跳过核对——折叠要的是每一行解析出的记录，跳过核对仍要解析，省下的只是规范回显的比较，却让「这一行核对过」有了两处来源。 **(c) 房间的各段 session 由视图折叠，表按地址存在 `views::sessions`。** 理由：作答不读盘，表的大小与 session 数同阶（wire-SPEC §12.9）。被否决的做法：把这张表并进 `worker::folds::SessionOrigins`——那张表回答的是派活要问的「这一段还欠不欠一段对话」，只留当前一段，worker 的 `Standing` 也不由页面读；把各段 session 并进 `lineage`——`lineage` 由读盘的 CLI 每次重建，服务中的城不持有它。
+32. **城的工具读别楼的文件与 `cas:` 块，只经 runtime 的 `BoundReader`。** 理由：读界与 reserved subtree 的判定住 `runtime::tools::chosen_path`，`read` 与 `search` 用它；一件读字节的工具若在本 crate 自己判，就是那份判定的第二个权威，而且只判得了本楼（`is_within`），连接器存进 CAS 的录音与截图都读不到（§8-20）。被否决的做法：①保留「只收本楼」并为 `cas:` 另写一段（两套判定，一套跟着 `read` 变，一套不跟）；②在本 crate 复制 `admit` 与 `land`（同上，且链接的判定要拷两遍）。重开参数：要读的字节不在读界之内（例如人拖进来、只给这一次 run 的文件），那时它是一个新的入口，而不是放宽这扇门。
 33. **文档的版本只在第一个窗口盖不住整份时进内容库，由答 `Document` 的读面放进去。** 理由：之后的 `Range` 要读的是这一版，而版本的身份本来就是内容库的地址（documents D3），放进去之后按版本读就是按地址读对象，不需要第二个存放处；整份已经在答复里的版本页面不会再按版本要，存它只是让每一次打开多付一份拷贝。放进去的是读面而不是写者：这是一次查询的副作用，但它只添一个按内容寻址、重复放入即去重的对象，不改任何一条历史，写者也不知道哪个页面在读哪一版。被否决的做法：①`Range` 读文件此刻、版本不符就拒——居民在写的文件每几秒动一次，读到一半的页面要从头重读；②每次打开都存——小文件的每一次打开都多一份拷贝；③由写者在每次保存时存——城之外的写者（人的编辑器、居民的 `edit`）不经过写者。重开参数：内容库长出回收时，被回收的版本要有自己的答复；页面要对比一份小文件的两个版本时，小文件也存。

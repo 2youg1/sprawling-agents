@@ -16,7 +16,7 @@
 | `clock`＋`catalog`＋`mode` | ISO UTC 的唯一拼法＋ClockStamp 与它的发放规则＋ClockReading（§8-10、§8-53）＋渐进披露三类条目＋两个 mode 的目录行与合并时的准入（§8-54） |
 | `watchdog` | 处置面分级（纠正 Steer→停滞→冻结）；依据只从 kernel::stall 来 |
 | `sandbox` | 缝（trait）＋wasmtime fuel 生产适配器＋直通/故障两替身；A10 三断言 |
-| `tools/` | exec 三臂／edit 乐观并发／read 区间读／search／status／succeed，与模型选路的唯一判定 `chosen_path`（§8-14、§8-29–§8-33） |
+| `tools/` | exec 三臂／edit 乐观并发／read 区间读／search／status／succeed，与模型选路的唯一判定 `chosen_path`，以及经它按字节读的 `bound_reader`（§8-14、§8-29–§8-33、§8-59） |
 | `bench`＋`conversation` | ToolBench 按 Effect 过门（§8-14、§8-46）；会话历史的唯一持有者（§8-3、§8-47） |
 | `run` | Dispatch → N 回合 → 冻结的事件序唯一权威（§8-15、§8-45） |
 | `digest`＋`diagnostics` | 冻结时的结构化摘要（§8-16）；给人读的诊断行（§8-17、§8-38） |
@@ -1264,6 +1264,16 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 **重开参数**：provider 的线有了声音输入的形状，模型自己能听；那时声音进附件，与图片同形。
 
+### 12.16 按字节读的门在 runtime，交出一个 `Read` 与字节的来处
+
+**决定**：`chosen_path` 的判定经 `BoundReader` 公开（§8-59）；它收模型写下的参数，判过之后交回一个 `Opened`：一个 `Read`，加上 `Named` 说它是一个文件还是一个块。`read` 读 Locator 也经它。
+
+**理由**：判一条模型选的路径要依次做四件事（换成城里的拼写、文法与保留区与读界、解开链接再判、打开后核对没换过），漏掉任何一件就是从侧门把 `admit` 拒掉的东西交出去；把这四步交给每个调用方去拼，等于每个调用方都要记得它们。交一个 `Read` 而不是一份字节，是因为上限属于收字节的那个值：录音的上限在 `gateway::Recording`，图的上限在 `IMAGE_MAX_BYTES`，门若收一个上限参数，这两个数就要被抄到调用点。`Named` 是因为录音的容器在文件上与在块上认法不同，调用方要知道它拿到的是哪一种。
+
+**被否**：①把 `chosen_path` 的几个函数直接公开，让 accounting 自己拼——四步的次序与 `still_judged` 都会在 crate 外再写一遍；②门收一个上限、交回 `Vec<u8>`——上限的数离开它的值，而 `ImageMaxBytes` 本来就不交出它的数；③门放在 accounting——它照样要 `chosen_path` 公开，判定仍会分在两个 crate。
+
+**重开参数**：一个要列目录或要 `nearby` 的按字节读取者出现时，把 `read` 的没命中答复挪进这扇门。
+
 ## 13 依赖选型
 
 kernel、storage（读面与 cas）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（prefix golden）。
@@ -1798,13 +1808,14 @@ const NEARBY_CAP: usize = 16;
 #### 8-29-5 打开一个 Locator：`cas:` 与 `file:`（`runtime::tools::read::locator`）
 
 ```rust
-// read::locator
-pub(super) fn open_locator(asked: &str, city_root: &Path, store: &Path,
-                           bound: &dyn Fn(&Address) -> ReadVerdict) -> Option<Result<String, AxError>>;
+// read::locator —— `read` 与 `BoundReader`（§8-59）共用；交回 Locator 本身与它的字节，action 是拒词里点名的工具
+pub(in crate::tools) fn open_locator(asked: &str, reader: &BoundReader, action: &'static str)
+    -> Option<Result<(Locator, Vec<u8>), AxError>>;
 /// cas: 块按哪栋楼判读取界的唯一判定处。
 fn judged_at(hash: &B3Hash, origins: &[storage::BlockOrigin],
-             bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Address, AxError>;
+             bound: &dyn Fn(&Address) -> ReadVerdict, action: &'static str) -> Result<Address, AxError>;
 // ReadTool::new(city_root, catalog, bound, block_store: &Path)：块仓是城的，run 可能写在没有自己块仓的 worktree 里。
+// ReadTool 把 city_root、bound、block_store 收成一个 BoundReader；Locator 的字节由它读出，再按 UTF-8 交文本。
 ```
 
 - **以 `cas:` 或 `file:` 开头的参数是 Locator**，按 `Locator::parse` 判形，判不过即 `E_INVALID_ARGS`；其余参数走 catalog 与普通路径，不受影响（一个城内地址不含冒号，两者不相交）。
@@ -1849,6 +1860,10 @@ pub(crate) enum Located { Present(PathBuf), Absent(PathBuf) }
 // 其下不存在的段原样接上——不存在的段不可能是链接。接上的段不是普通名字（`..` 在内）＝E_GATE_DENIED；
 // 路上某个存在的条目解析不了（目标已不在的链接在内）＝E_STORAGE_FATAL。
 pub(crate) fn real_location(written: &Path, action: &'static str, subject: &str) -> Result<Located, AxError>;
+// 打开之后再核一次：判过的真实位置仍解析到它自己（其上没有新放的链接），且此刻在那里的文件就是打开的那一个；
+// 否则＝E_GATE_DENIED。read 与 BoundReader（§8-59）打开文件后都调它。
+pub(crate) fn still_judged(asked: &str, judged: &Path, opened: &same_file::Handle, action: &'static str)
+    -> Result<(), AxError>;
 // 模型写下的路径在城里的拼写。本平台不算绝对路径的（`Path::is_absolute`，§12.4）原样交回；绝对路径解开真实位置（real_location）后落在
 // 城根的真实位置之下，交回它相对城根的拼写（段以 `/` 相连，城根本身交回空串）；落在城外＝E_GATE_DENIED，
 // 恢复语说出 `read`／`search`／`edit` 只到城内、城外的文件经 `exec` 读。它不判保留区与读界：交回的拼写
@@ -1901,6 +1916,36 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 #### 8-30-4 红测试
 
 超过 512 行的文件返回恰 512 行、并给出真实 `total_lines` 与可续的 `next_offset`；`search` 找到子串并带上下文；`search` 对保留区前缀以 `E_GATE_DENIED` 拒绝；两者共用的 `chosen_path::admit` 有且只有一组测试，读界的两种关各一条拒绝。`search` 不带路径时不走关上的楼；大于 1 MiB 的文件计入 `unreadable` 并在 `unread` 里带原因；一条超过字节上限的首个命中被切进上限并带标记。开放楼里一条指向机密楼的链接：`read` 穿过它以 `E_GATE_DENIED` 拒绝，`search` 从开放楼走下去不交出机密楼里的命中。
+
+### 8-59 runtime::tools::bound_reader：模型点名的字节，经读界判过后按字节读（形状 4 适配器；sprawling-SPEC 8-131、8-142）
+
+**问题**：`read` 只交文本。城的工具 `ocr` 与 `transcribe` 要的是一张图、一段录音的字节，它们在读界之内的任意一栋楼里，或在连接器存进 CAS 的块里（§8-27-10、§12.15）。判「这条模型选的路径能不能读」的是 `chosen_path`（§8-30-1），在 accounting 里再写一份判定就是第二个权威。本节把那份判定公开成一扇按字节读的门，城里读别楼文件与 `cas:` 块的工具都只经它。
+
+```rust
+// runtime::tools::bound_reader（形状 4 适配器）
+#[derive(Clone)]
+pub struct BoundReader { /* city_root、bound、block_store —— runtime::tools 内可见 */ }
+impl BoundReader {
+    pub fn new(city_root: &Path, bound: ReadBound, block_store: &Path) -> BoundReader;
+    // asked：城相对路径、城内的绝对路径、`cas:` 或 `file:` Locator。action 是拒词里点名的那件工具。
+    pub fn open(&self, asked: &str, action: &'static str) -> Result<Opened, AxError>;
+}
+pub struct Opened { /* named、字节的来源 —— 私有 */ }
+impl Opened { pub fn named(&self) -> &Named; }
+impl std::io::Read for Opened { … }
+pub enum Named { File(Address), Block(B3Hash) }   // 路径与 `file:` 是 File，`cas:` 是 Block
+
+// runtime::pipeline::connector（形状 1 判定）：一张图的唯一认法
+pub fn png_picture(bytes: &[u8]) -> Result<ImageRef, AxError>;
+```
+
+- **判定是 `read` 的那一套，次序也一样。** 以 `cas:`／`file:` 开头的走 `read::locator`（§8-29-5）：`cas:` 块按 `judged_at` 选出的楼过 `admit`，`file:` 按自己的地址过 `admit`。其余走 `within_city`、`admit`、`land`（§8-30-1），打开之后经 `still_judged` 核对打开的就是判过的那个文件。拒绝与 `read` 同码：文法不对＝`E_INVALID_ARGS`；reserved subtree、读界关上的楼、城外的绝对路径、经链接出城＝`E_GATE_DENIED`；不存在的 `cas:` 块（存块时没有记下任何楼）＝`E_GATE_DENIED`；判定时不在的文件与目录＝`E_INVALID_ARGS`；在而打不开＝`E_STORAGE_FATAL`。拒词的 action 是调用它的那件工具，所以模型读到的是自己哪一次调用被拒。
+- **catalog 名不经这扇门。** 一件 skill 由人放进楼的阅览室，读它是 `read` 的事；一张图或一段录音不在 catalog 里，`ocr` 与 `transcribe` 收到一个 catalog 名，按路径判，多半是 `E_INVALID_ARGS`。
+- **`read` 的 Locator 也经它。** `ReadTool` 持一个 `BoundReader`，`cas:`／`file:` 读出字节再按 UTF-8 交文本。路径仍走 `read` 自己那条路：没命中时它要列 `nearby`（§8-29-4），那是读文本的答复；按字节读的只说「不在」，恢复语指向 `search`。
+- **门不设上限，上限归收字节的那个值。** `Opened` 是一个 `Read`：文件按需读，读多少由收它的值定，`gateway::Recording::read_from` 读到它的上限多一字节为止（gateway-SPEC §8-33）。`cas:` 块与 `file:` 的字节在打开时已整份在内存里，因为 `Cas::get` 与 `storage::blob_at` 只交整份；它们是这座城自己存下的，大小受存它的那条路约束。`ocr` 把一个文件整份读进来再判 `IMAGE_MAX_BYTES`，与 `read` 整份读一个文件相同：`ImageMaxBytes` 不交出它的数，按上限读要 kernel 给它一个读法。
+- **`Named` 说字节从哪里来，容器怎么认归调用方。** 文件有名字，块没有。录音的容器在文件上看扩展名、在块上看开头的字节（gateway-SPEC §8-34），那是 gateway 那张表的事，本模块不认容器。
+- **一张图只有一种认法：`png_picture`。** 连接器存图（§8-27-10）与城工具 `ocr` 读图都调它：字节在 `IMAGE_MAX_BYTES` 之内、PNG 头读得出宽高时，答一个指向这些字节的 `cas:` 哈希的 `ImageRef`；超限是 `IMAGE_MAX_BYTES` 自己的拒绝，头读不出是 `E_INVALID_ARGS`，主题说出为什么。连接器把拒绝写成那一行 `[picture left out: <主题>; <恢复语>]`。
+- **验收**：`runtime::tools::bound_reader` 的测试。门对读界外的路径、reserved subtree、不存在的 `cas:` 定位符各拒一次，码与 `read` 对同一个参数的拒绝相同；楼里的文件与为本楼存下的块按字节读回，`named` 分别是 `File` 与 `Block`。
 
 ### 8-31 runtime::tools::exec 的环境声明
 

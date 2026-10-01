@@ -369,12 +369,15 @@ impl AudioType {
     pub fn media_type(self) -> &'static str;   pub fn file_name(self) -> &'static str;
     pub fn of_media_type(raw: &str) -> Result<AudioType, AxError>;  // 认不得的容器＝E_INVALID_ARGS
     pub fn of_file_name(name: &str) -> Result<AudioType, AxError>;  // §8-33；认不得的扩展名＝E_INVALID_ARGS
+    pub fn of_signature(head: &[u8]) -> Result<AudioType, AxError>; // §8-34；开头的字节认不出容器＝E_INVALID_ARGS
 }
 pub struct Recording { /* bytes、kind —— 私有 */ }
 impl Recording {
     pub fn new(bytes: Vec<u8>, kind: AudioType) -> Result<Recording, AxError>;  // 空／越顶＝E_INVALID_ARGS
     pub fn read_from(reader: impl std::io::Read, kind: AudioType)
         -> Result<Recording, AxError>;   // §8-33；读到上限多一字节为止，读失败＝E_STORAGE_FATAL
+    pub fn read_unlabelled(reader: impl std::io::Read)
+        -> Result<Recording, AxError>;   // §8-34；同一个上限，容器由 of_signature 从读到的字节认
     pub fn kind(&self) -> AudioType;   pub fn len(&self) -> usize;
 }
 
@@ -418,10 +421,48 @@ pub(crate) fn transcription_of(wire: &serde_json::Value) -> Result<String, AxErr
 
 ### 8-33 放在文件里的一段录音（`transcribe::recording` 的 `of_file_name` 与 `read_from`）
 
-城的工具 `transcribe`（sprawling-SPEC 8-131）读的是 run 这座楼里的一个文件，而文件带着的只有名字和字节。本节是它进这个模块的那扇门；判「这条路径能不能读」是调用方的事，gateway 不认识城的地址。
+城的工具 `transcribe`（sprawling-SPEC 8-131）读的是读界之内的一个文件，或连接器存进 CAS 的一个块（§8-34）；文件带着的只有名字和字节。本节是它进这个模块的那扇门；判「这条路径能不能读」是调用方的事，gateway 不认识城的地址。
 
 - **容器从文件名的扩展名读，扩展名表不另写。** 磁盘上的文件没有 content-type，扩展名是写下它的人或程序对容器的唯一声明。`of_file_name` 拿扩展名（不分大小写）去比 `ALL` 里每一种的 `file_name()` 的扩展名，所以 `.mp3` 对 `Mpeg`，与请求体里写的 `filename` 是同一个事实。认不得就是 `E_INVALID_ARGS`，拒词列出五个扩展名；`of_media_type` 的拒词同样由 `ALL` 列出，于是「这座城发得出去哪几种」只在枚举里写一次。被否：再写一张扩展名到 `AudioType` 的表——第二张表会在第六种容器进来时少一行。
 - **`read_from` 收一个 `Read`，读到 `RECORDING_MAX_BYTES` 多一字节就停。** 多出的那一字节由 `new` 拒，拒词照旧说出上限；一个几个 GB 的文件因此不会先整个进内存。上限只在本模块：调用方若自己先读全再交 `new`，它要么不设界，要么得知道上限，那就是上限的第二个权威。读失败＝`E_STORAGE_FATAL`，subject 是读者给的错误，恢复语让人换一个可读的文件。被否：`Recording::from_file(path)`——gateway 会开始自己打开路径，而一条路径是否可读（读界、reserved subtree、link）是城的判定，放进 gateway 就多出一处看路径的地方。
+
+### 8-34 一张图变成一行字：`gateway::ocr`（`recogniser` 形状 4 适配器，`picture` 形状 2 值，`chosen` 形状 1 装配）；没有名字的录音（`transcribe::recording` 的 `of_signature` 与 `read_unlabelled`）
+
+computer use 读不到字的窗口（画在画布上的界面、远程桌面）只剩截图，模型要文字只能经人接入的一个能读图的模型（二进制里不内置任何模型，定规）。人为 `ModelTag::Ocr` 选的那个模型就是它；本节把那一次选择变成一项设施，与 §8-12 的转写同形。
+
+```rust
+// gateway::ocr（索引，无逻辑）
+pub use chosen::recogniser_for;
+pub use picture::Picture;
+pub use recogniser::Recogniser;
+
+// ocr/chosen.rs（形状 1 装配，`adapter_for` 与 `transcriber_for` 的孪生）
+pub fn recogniser_for(chosen: &Chosen<'_>, secrets: SecretResolver,
+                      dialect_headers: Vec<(String, String)>) -> Result<Recogniser, AxError>;
+
+// ocr/picture.rs（形状 2 值）
+pub struct Picture { /* seen: ImageRef、bytes —— 私有 */ }
+impl Picture {
+    // seen.locator 必须是 bytes 的 `cas:` 哈希（不带范围），否则 E_INVALID_ARGS。
+    pub fn new(seen: ImageRef, bytes: Vec<u8>) -> Result<Picture, AxError>;
+}
+
+// ocr/recogniser.rs（形状 4 适配器）
+pub struct Recogniser { /* attached: Option<…> —— 私有 */ }
+impl Recogniser {
+    pub fn absent() -> Recogniser;                        // 这座城没有这项设施
+    pub fn is_attached(&self) -> bool;
+    pub fn recognise(&mut self, picture: Picture, policy: &BuildingPolicy) -> Result<String, AxError>;
+}
+```
+
+- **发给模型的是所选 face 的图片内容，不另造 OCR 协议。** `recogniser_for` 经 `adapter_for` 造出与 run 同一种适配器：chat 面写 `image_url`，Responses 面写 `input_image`，Messages 面写 `image` 块，各由 dialect 一处写（§8.5 A）。请求是一条 system（读出图里的全部文字，只交文字）加一条 user 消息（这张图与一句要求），没有工具；上限是这个选择登记时的 `max_output_tokens`，即 `select_model` 那条事实梯的答案（§8-17），不另定一个数。专用 OCR 服务（一条不是对话的线）不在这一版：要接它时，它是 `Recogniser` 的第二种 attached，重议参数是人要接一个不说三种 face 之一的 OCR 端点。
+- **图的字节经兑付那一格进请求，不进账本，也不进 CAS。** 适配器的 `ImageResolver` 读的是 `Recogniser` 自己的一格：`recognise` 把这张 `Picture` 放进去，调用返回后取走；兑付只认 locator 与格里那张图相同的请求。`Picture::new` 守住 locator 就是字节的哈希，所以兑付交出的字节与 locator 说的是同一份。不经 CAS：楼里的一个 PNG 文件读进来就够发，为发一次再存一份，读就成了写。`recognise` 取 `&mut self`，一次只有一张图在格里。
+- **能不能把图交给这个模型，由端点判。** 选中的模型登记为只读字（`InputKinds::Text`）时，适配器在发出前拒绝（`E_INVALID_ARGS`，恢复语让人把这个标签指向一个 `text_image` 的模型；`endpoint::model` 发出前的那道检查）；本模块不再判一遍。`policy` 照 run 的调用交给适配器，机密楼的那道兜底拒绝因此与主模型同一处。
+- **答复只读文字。** 答复里的文字块按序以换行连起来，推理块与别的块不读；一个文字块都没有就是空串。一张没有字的图答空串是合法的：那是模型读到的东西，而一个说不清的答复在 dialect 解读时已经是 `E_WIRE_MISMATCH`。
+- **没配就是一句具名的拒绝。** `Recogniser::absent()` 上的 `recognise` 恒返回 `E_TOOL_UNAVAILABLE`：action ＝ `read the text in a picture`，subject ＝ `this city has no OCR model chosen`，恢复语让人为 `ocr` 选一个能读图的模型，或改用窗口的 accessibility tree。码的理由同 §8-12：这次部署里没有这项设施。
+- **没有名字的录音，容器从开头的字节认。** 连接器把声音块存进 CAS 时不记它的 media type（runtime-SPEC §12.15），块只有字节。`AudioType::of_signature` 看开头：`RIFF`…`WAVE` 是 `Wav`，`OggS` 是 `Ogg`，EBML 头 `1A 45 DF A3` 是 `Webm`，第 4 到 8 字节是 `ftyp` 的是 `Mp4`，`ID3` 或 MPEG 帧同步（`FF`，次字节高三位全 1）是 `Mpeg`。每一种的认法写在 `AudioType` 的一个穷尽 `match` 里，第六种容器进来时编译器要它的认法；认不出＝`E_INVALID_ARGS`，拒词由 `ALL` 列出五种。`Recording::read_unlabelled` 读到同一个上限多一字节为止，再从读到的字节认容器。被否：让模型在参数里写 media type（模型抄错一个字，provider 就以 400 拒一段好录音）；连接器把 media type 存在块旁边（CAS 只存字节，来源记录只记楼与 run，storage-SPEC §8-3，多一个字段是 storage 的接口变化，而字节本身已经说出了容器）。文件仍按扩展名读（§8-33）：扩展名是写下它的人对容器的声明，两条路各认各的输入，表仍是 `AudioType` 一张。
+- **验收**：`ocr::recogniser` 的测试经回环替身（`endpoint::fakes::fake_provider`）对三种 face 各发一次，比请求的路径、请求里的模型名与这张图的 base64，以及读回的字；没有设施时按名拒绝；`Picture::new` 拒 locator 与字节不符的一对。`transcribe::recording` 的测试：五种容器各从自己的开头认出，认不出的列出五种。
 
 ## 8.5 两个设计（crate 级）
 
@@ -455,6 +496,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 - **TLS 后端的权威是一次调用，不是一个 feature。** 决定：reqwest 取 `rustls-no-provider`，由 `reach::tls::install_provider` 显式安装 aws-lc-rs（§8-15）。理由：reqwest 的 `rustls` feature 顺带打开 `quinn?/rustls-aws-lc-rs`，锁里多出一族从不编译的 quinn；更要紧的是后端藏在一个 feature 名里，远程门与 HTTP 用的是不是同一个 aws-lc-rs，要去读 reqwest 的清单才知道。被否的备选：自建一份 `rustls::ClientConfig`，经 `tls_backend_preconfigured` 交给 reqwest——那要在本 crate 重写 reqwest 已有的平台证书校验与 ALPN 选择，且 reqwest 自己的文档说这条路要求两边 rustls 版本逐一同步，版本一错就是运行期的 unknown TLS backend。
 - **一个端点的连接不在派活时预热（§8-35）。** 决定：派活路径上不加预热；同一端点的调用照旧共用一个客户端的连接池，空闲上限取 reqwest 的默认值。理由：派活时开始的预热最多藏住派活到第一次调用之间那一段（lane 的准备，下限 58 ms，放置接管备树之后以毫秒计），而要藏的连接是 0.35–0.67 s（§8-35 的读数）；而且预热要发一次真实请求才能让连接进池，每次派活多一次不带凭据、发给 provider 的请求。被否：①在派活时于记账线程上发一个轻请求——记账线程等一次往返（sprawling-SPEC 8-113）；②在 lane 的准备开头发——与准备串行，藏不住任何东西；③另起一条线程在准备期间发——为最多 58 ms 加一条每次派活的线程；④把空闲上限拉长并开 HTTP/2 保活 ping，让连接跨过人读答案、打下一句的那段时间——它藏得住整段连接，但一条被中间设备静默丢掉的 HTTP/1.1 连接会让下一次流式调用一直等到静默上限，这一臂没有故障注入测试之前不做。**重开参数**：①城收到「人要开始说话了」这样比派活更早的信号（例如输入框获得焦点经线协议到达），那时在它到达时预热，能藏的是人打字的时间；②有了覆盖静默断连的故障注入测试（发送失败的连接不回池、静默的连接在上限内被认出），那时考虑④；③准备的那一段长到与连接同一个量级。
 - **转写是一项设施，两条路用它。** 决定：`transcribe` 既是 composer 麦克风背后的设施，也是城给 run 的一件工具（sprawling-SPEC 8-131）；两条路读端点账本里 `ModelTag::Transcribe` 的同一个选择，经同一个 `transcriber_for` 造设施；工具只在那个选择成立时上 run 的工具表。理由：computer use 要能把声音变成字，而二进制里不内置任何模型（定规），于是模型要转写只能经人接入的这个端点；`Transcriber::absent()` 的码仍是 `E_TOOL_UNAVAILABLE`，语义不变，仍是「这次部署里没有这项设施」。被否的备选：给工具另立一个专码（同一个事实两个名字）；让转写只做界面设施（模型拿不到任何转写能力）。
+- **OCR 是一项设施，形状照转写。** 决定：`gateway::ocr` 与 `gateway::transcribe` 同形：端点账本里 `ModelTag::Ocr` 的那一次 `select` 给出 `Chosen`，`recogniser_for` 把它变成设施，`absent()` 答 `E_TOOL_UNAVAILABLE`；城的工具 `ocr` 只在那个选择成立时上 run 的工具表（sprawling-SPEC 8-142）。适配器就是 `adapter_for` 造的那一个，图片内容由所选 face 的 dialect 写（§8-34）。理由：「哪个端点答这一类活」已有账本这一个机制，「一张图在三种 face 上怎么写」已有 dialect 这一处；OCR 再写一套请求，就是这两件事的第二个权威。被否的备选：①专为 OCR 写一条请求（三种 face 各要一份图片拼法）；②让主模型自己看截图（主模型可能只读字，而 run 要的是一行可以读、可以搜的字，不是窗口里的一张图）；③把图先存进 CAS 再经城的 `ImageResolver` 兑付（读一个文件就成了一次写）。
 - **凭证库经 `keyring-core` 与各平台 store 接入，不经 `keyring`。** 决定见 §8-4。理由：`keyring` 第 4 代的默认 feature 在 Linux 上选 secret service，与静态 musl 发行件矛盾；关掉默认 feature 的 `keyring` 只剩一层转发，上游 README 建议应用直接依赖 `keyring-core` 与所需的 store。被否的备选：停在 `keyring` 3——它是锁里 `security-framework` 2 与 `windows-sys` 0.60 两族的来源之一，也不再是上游维护的那条线。
 
 ## 13 依赖选型
