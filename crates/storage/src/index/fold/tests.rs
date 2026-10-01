@@ -155,6 +155,15 @@ proptest! {
         }
         from_both.sort();
         prop_assert_eq!(from_both, ascending);
+        for probe in &probes {
+            let from = Seq::new(*probe);
+            let at_or_after: Vec<Seq> = oracle.entries.range(from..).map(|(seq, _)| *seq).collect();
+            prop_assert_eq!(folded.seqs_from(from).collect::<Vec<_>>(), at_or_after.clone());
+            prop_assert_eq!(
+                folded.seqs_from(from).rev().collect::<Vec<_>>(),
+                at_or_after.into_iter().rev().collect::<Vec<_>>()
+            );
+        }
         prop_assert_eq!(folded.tail_seq(), oracle.entries.keys().next_back().copied());
         prop_assert_eq!(folded.len(), oracle.entries.len());
         prop_assert_eq!(folded.is_empty(), oracle.entries.is_empty());

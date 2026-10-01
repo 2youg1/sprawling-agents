@@ -140,12 +140,28 @@ impl Entries {
 
     /// Every seq held, ascending, from both stores.
     pub(super) fn seqs(&self) -> Seqs<'_> {
+        self.seqs_from(Seq::FIRST)
+    }
+
+    /// Every seq held at or after `from`, ascending, from both stores.
+    /// The column is entered at the slot `from` sits in and the outliers
+    /// at the key it sits at, so no seq before `from` is walked.
+    pub(super) fn seqs_from(&self, from: Seq) -> Seqs<'_> {
+        let column_len = u64::try_from(self.column.len()).unwrap_or(u64::MAX);
+        let skipped = from
+            .value()
+            .saturating_sub(self.base.value())
+            .min(column_len);
+        let words = usize::try_from(skipped)
+            .ok()
+            .and_then(|at| self.column.get(at..))
+            .unwrap_or(&[]);
         Seqs {
             column: Ends::new(ColumnSeqs {
-                base: self.base.value(),
-                words: self.column.iter().enumerate(),
+                base: self.base.value().saturating_add(skipped),
+                words: words.iter().enumerate(),
             }),
-            outliers: Ends::new(self.outliers.keys().copied()),
+            outliers: Ends::new(OutlierSeqs(self.outliers.range(from..))),
         }
     }
 
@@ -222,6 +238,22 @@ impl DoubleEndedIterator for ColumnSeqs<'_> {
     }
 }
 
+/// The seqs the outliers hold from some seq on, ascending.
+struct OutlierSeqs<'a>(std::collections::btree_map::Range<'a, Seq, (usize, u64)>);
+
+impl Iterator for OutlierSeqs<'_> {
+    type Item = Seq;
+    fn next(&mut self) -> Option<Seq> {
+        self.0.next().map(|(seq, _)| *seq)
+    }
+}
+
+impl DoubleEndedIterator for OutlierSeqs<'_> {
+    fn next_back(&mut self) -> Option<Seq> {
+        self.0.next_back().map(|(seq, _)| *seq)
+    }
+}
+
 /// One ascending source with its next value from each end looked at
 /// but not yet taken. When the inner iterator runs dry, the value held
 /// at the other end is the last one left.
@@ -259,7 +291,7 @@ impl<I: DoubleEndedIterator<Item = Seq>> Ends<I> {
 /// merged, which is sound because the two hold disjoint seqs.
 pub(crate) struct Seqs<'a> {
     column: Ends<ColumnSeqs<'a>>,
-    outliers: Ends<std::iter::Copied<std::collections::btree_map::Keys<'a, Seq, (usize, u64)>>>,
+    outliers: Ends<OutlierSeqs<'a>>,
 }
 
 impl Iterator for Seqs<'_> {

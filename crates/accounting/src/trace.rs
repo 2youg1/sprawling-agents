@@ -187,12 +187,10 @@ fn nearby(
 ) -> Result<Vec<Nearby>, AxError> {
     let building = city::Building::of(&commit.actor)?;
     let mut found: BTreeMap<RunId, Nearby> = BTreeMap::new();
-    let entries = index.seqs();
+    let entries = index.seqs_from(span.start);
     #[cfg(test)]
     let entries = counted::Walked::new(entries);
-    let walk = entries
-        .skip_while(|seq| *seq < span.start)
-        .take_while(|seq| *seq < span.end);
+    let walk = entries.take_while(|seq| *seq < span.end);
     for seq in walk {
         let record = EventRecord::parse_line(&reader.line_at(seq).map_err(StorageError::into_ax)?)?;
         let Some(at) = record.addr() else {

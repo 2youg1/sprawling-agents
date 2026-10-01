@@ -109,6 +109,10 @@ impl Folded {
         self.entries.seqs()
     }
 
+    pub(crate) fn seqs_from(&self, from: Seq) -> Seqs<'_> {
+        self.entries.seqs_from(from)
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.entries.len()
     }

@@ -249,6 +249,17 @@ impl LedgerIndex {
         self.folded.seqs()
     }
 
+    /// Every seq the index holds at or after `from`, ascending: the walk
+    /// a reader takes to read a stretch forwards from where it starts.
+    ///
+    /// The walk starts at `from` rather than skipping the seqs before it,
+    /// so reading a stretch costs the stretch, however long the ledger
+    /// before it is (`crates/storage/Spec.lean` §8-38). `from` need not be
+    /// a seq anybody wrote; nothing at or after it yields nothing.
+    pub fn seqs_from(&self, from: Seq) -> impl DoubleEndedIterator<Item = Seq> + '_ {
+        self.folded.seqs_from(from)
+    }
+
     pub fn tail_seq(&self) -> Option<Seq> {
         self.folded.tail_seq()
     }
