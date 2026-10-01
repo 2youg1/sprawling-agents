@@ -24,7 +24,7 @@ open Sprawling Sprawling.Acceptance
 
 private def usage : String :=
   "usage: acceptance script <shelf> <script.json>\n" ++
-  "       acceptance walk <shelf> <record.jsonl>\n" ++
+  "       acceptance walk <shelf> <record.jsonl> <checklist.md>\n" ++
   "SPRAWLING_BIN names the binary to walk, SPRAWLING_PROVIDER the stand-in's URL."
 
 /-- Writes the stand-in's script for the skills the archive's shelf holds. -/
@@ -43,8 +43,9 @@ private def required (name : String) : IO String := do
 where
   absent := throw <| IO.userError s!"{name} is not set; run this through `just acceptance <archive>`"
 
-/-- Walks the archive's binary and says where the walk stopped, if it did. -/
-private def walkWith (shelf record : System.FilePath) : IO UInt32 := do
+/-- Walks the archive's binary, says where the walk stopped if it did, and
+writes the person's checklist once it held. -/
+private def walkWith (shelf record checklist : System.FilePath) : IO UInt32 := do
   let binary : System.FilePath := ← required "SPRAWLING_BIN"
   if !(← binary.pathExists) then
     throw <| IO.userError s!"SPRAWLING_BIN names no file: {binary}"
@@ -52,8 +53,10 @@ private def walkWith (shelf record : System.FilePath) : IO UInt32 := do
     { door := ⟨binary⟩, url := ← required "SPRAWLING_PROVIDER", shelf
     , skills := ← shipped shelf, record }
   try
-    walk setting
+    let hosts ← walk setting (knownHosts setting.door)
     IO.println "the walk held"
+    writeChecklist setting hosts checklist
+    IO.println s!"the checklist is in {checklist}"
     return 0
   catch error =>
     IO.println s!"  FAIL  {error}"
@@ -61,7 +64,7 @@ private def walkWith (shelf record : System.FilePath) : IO UInt32 := do
 
 def main : List String → IO UInt32
   | ["script", shelf, out] => writeScript shelf out
-  | ["walk", shelf, record] => walkWith shelf record
+  | ["walk", shelf, record, checklist] => walkWith shelf record checklist
   | _ => do
     IO.eprintln usage
     return 2

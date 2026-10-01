@@ -225,6 +225,9 @@ the plug: enough that the run is plainly in flight, few enough that the
 `status` calls are far from spent (`statusCalls`). -/
 def inFlight : Nat := 3
 
+/-- What the kill is called in a report. -/
+def interruptedStep : String := "a city is killed while a run is calling tools"
+
 /-- Sends work, waits until its run is calling tools, and kills the city.
 
 The work is sent on a task of its own, because the door returns only once the
@@ -247,7 +250,7 @@ def interrupted (setting : Setting) (stage : Stage) : IO Unit := do
   ensure (frozen.length == 1)
     s!"the interrupted run finished before the city was killed; give it more than \
       {statusCalls} calls"
-  IO.println s!"  ok    a city is killed while a run is calling tools ({(← IO.monoMsNow) - started} ms)"
+  IO.println s!"  ok    {interruptedStep} ({(← IO.monoMsNow) - started} ms)"
 where
   waitInFlight (ground : Ground) (run : String) : Nat → IO Unit
     | 0 => throw <| IO.userError "the interrupted run never called a tool"
@@ -284,14 +287,21 @@ def morningAfter (setting : Setting) : List Step :=
 
 /-! ## The whole walk -/
 
-/-- Walks one fresh folder through all three servings, and throws it away. -/
-def walk (setting : Setting) : IO Unit := do
+/-- The name of every step the walk takes, in its order. -/
+def walkedSteps (setting : Setting) : List String :=
+  (firstDay setting).map (·.name) ++ [interruptedStep] ++ (morningAfter setting).map (·.name)
+
+/-- Walks one fresh folder through all three servings, asks the city that came
+back `atLast` once every step has held, and throws the folder away. -/
+def walk (setting : Setting) (atLast : Ground → IO α) : IO α := do
   let stage ← Stage.raise setting.door
   try
     mountShelf stage.city setting.shelf
     stage.serving setting.door fun ground => Step.runAll ground (firstDay setting)
     interrupted setting stage
-    stage.serving setting.door fun ground => Step.runAll ground (morningAfter setting)
+    stage.serving setting.door fun ground => do
+      Step.runAll ground (morningAfter setting)
+      atLast ground
   finally
     stage.discard
 
