@@ -15,6 +15,7 @@ pub(crate) mod memory;
 pub(crate) mod sampler;
 pub mod spread;
 pub mod top;
+pub mod tree;
 pub(crate) mod volume;
 
 use std::collections::VecDeque;

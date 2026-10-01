@@ -66,3 +66,60 @@ fn a_beat_reads_the_platform_exactly_as_often_as_its_watchers_ask() {
         [reads(0, 0), reads(BEATS, 0), reads(BEATS, BEATS)]
     );
 }
+
+/// The instrument the register's `[monitor_beat]` row is read from
+/// (sprawling-SPEC.md 8-129-3): each kind of platform reading taken 200
+/// times, printed as floor, p50 and p99 in microseconds. A wall-clock
+/// reading belongs to the machine that took it, so it records and does
+/// not gate; the count gate above is what holds the cost.
+#[test]
+#[ignore = "a wall-clock instrument; just bench runs it"]
+fn instrument_monitor_beat() {
+    use crate::monitor::spread::{Share, Spread};
+    use crate::monitor::tree::Tree;
+    use crate::serving::standing::monotonic_now;
+
+    const SAMPLES: usize = 200;
+    let timed = |read: &mut dyn FnMut()| {
+        let mut taken = (0..SAMPLES).map(|_| {
+            let began = monotonic_now();
+            read();
+            monotonic_now().saturating_duration_since(began)
+        });
+        let head = taken.next().unwrap_or_default();
+        Spread::of(head, taken)
+    };
+    let beat = std::time::Duration::from_secs(1);
+    let mut summary = Counters::open(std::env::temp_dir());
+    let mut page = Counters::open(std::env::temp_dir());
+    let mut tree = Tree::open(std::process::id());
+    let readings = [
+        (
+            "summary",
+            timed(&mut || {
+                std::hint::black_box(summary.read(Watched::Summary, beat));
+            }),
+        ),
+        (
+            "page",
+            timed(&mut || {
+                std::hint::black_box(page.read(Watched::Everything, beat));
+            }),
+        ),
+        (
+            "tree",
+            timed(&mut || {
+                std::hint::black_box(tree.read(beat));
+            }),
+        ),
+    ];
+    for (read, spread) in readings {
+        println!(
+            "monitor_beat read={read} samples={} floor_us={} p50_us={} p99_us={}",
+            spread.samples(),
+            spread.floor().as_micros(),
+            spread.p(Share::P50).as_micros(),
+            spread.p(Share::P99).as_micros()
+        );
+    }
+}

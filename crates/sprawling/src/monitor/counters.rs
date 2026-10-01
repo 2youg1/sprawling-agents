@@ -26,6 +26,7 @@ pub(crate) struct Counters {
     own: OwnProcess,
     machine: Option<Machine>,
     volume: PathBuf,
+    reads: Reads,
 }
 
 /// How many platform readings were taken, by kind: this process through
@@ -56,6 +57,7 @@ impl Counters {
             own: OwnProcess::new(),
             machine: None,
             volume: super::volume::resolved(&volume).unwrap_or(volume),
+            reads: Reads::default(),
         }
     }
 
@@ -65,6 +67,7 @@ impl Counters {
     /// and stay 0 (8-96, current state).
     pub(crate) fn read(&mut self, watched: Watched, elapsed: Duration) -> Sample {
         let core = self.own.read(elapsed);
+        self.reads.own = self.reads.own.saturating_add(1);
         let own = Sample {
             core_cpu_permille: core.cpu_permille,
             core_private_bytes: core.private_bytes,
@@ -78,16 +81,27 @@ impl Counters {
                 self.machine = None;
                 own
             }
-            Watched::Everything => self
-                .machine
-                .get_or_insert_with(Machine::open)
-                .read(&self.volume, own),
+            Watched::Everything => {
+                self.reads.machine = self.reads.machine.saturating_add(1);
+                self.machine
+                    .get_or_insert_with(Machine::open)
+                    .read(&self.volume, own)
+            }
         }
     }
 
-    /// The platform readings taken since this was opened.
+    /// The platform readings taken since this was opened. The table
+    /// count stays 0: the city's sampler has no path to the process
+    /// table, which only `monitor::tree` reads.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the count gate's tests read it (sprawling-SPEC.md 8-129-3); a production reading only counts"
+        )
+    )]
     pub(crate) fn reads(&self) -> Reads {
-        Reads::default()
+        self.reads
     }
 }
 
