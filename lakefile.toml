@@ -41,3 +41,16 @@ srcDir = "tools/adversary/test"
 # behind them: a reader blocked on a pipe would otherwise hold the whole
 # runtime, and the city it was draining fills its buffer and stops answering.
 supportInterpreter = true
+
+# The acceptance world (tools/adversary/adversary-SPEC.md section 9): the walk
+# a stranger takes with a release archive's binary, against the stand-in
+# provider `just acceptance` starts beside it. An executable of its own because
+# it is never part of `just adversary`: it needs an archive and a provider
+# that run does not have.
+[[lean_exe]]
+name = "acceptance"
+root = "Acceptance"
+srcDir = "tools/adversary/test"
+# The same reason as `adversary`: the walk waits on a dispatch in a task of
+# its own while it watches the history, and that task needs a real thread.
+supportInterpreter = true
