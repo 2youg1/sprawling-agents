@@ -276,19 +276,16 @@ impl ClaimDesk {
         Payload::new(result)
     }
 
-    /// Divides a node into children and leaves the run holding nothing:
-    /// the work it took has become several pieces, and one of them is
-    /// what it should take next.
+    /// Divides the node this run holds into children and leaves the run
+    /// holding nothing: the work it took has become several pieces, and
+    /// one of them is what it should take next.
+    ///
+    /// Only the held node, and this is the one place that decides it
+    /// (collab D6): the split then rides on a claim the booking granted,
+    /// so two runs cannot each divide one row, and the landing checks
+    /// that claim instead of judging the split a second time.
     fn split(&mut self, id: &NodeId, children: &[NewChild]) -> Result<Payload, AxError> {
-        let tree = self.tree()?;
-        if tree.get(id).is_none() {
-            return Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "split a plan node",
-                format!("no node numbered {id}"),
-            )
-            .with_recovery("list the plan first and use an index it carries"));
-        }
+        self.refuse_unless_holding(id)?;
         let effect = ClaimEffect::Split {
             parent: id.clone(),
             children: children
@@ -327,9 +324,7 @@ impl ClaimDesk {
         self.text = grown;
         self.changed = true;
         self.effects.push(effect);
-        if self.holding() == Some(id) {
-            self.held = None;
-        }
+        self.held = None;
         let mut result = Map::new();
         result.insert("node".to_owned(), Value::String(id.to_string()));
         result.insert(
@@ -338,6 +333,26 @@ impl ClaimDesk {
         );
         result.insert("unfinished".to_owned(), Value::from(unfinished));
         Payload::new(result)
+    }
+
+    /// Refuses a split of anything but the node this run holds, naming
+    /// what it holds and the claim that would make the split possible.
+    fn refuse_unless_holding(&self, id: &NodeId) -> Result<(), AxError> {
+        let refuse = |subject: String, recovery: String| {
+            AxError::failure(AxCode::InvalidArgs, "split a plan node", subject)
+                .with_recovery(recovery)
+        };
+        match self.holding() {
+            Some(held) if held == id => Ok(()),
+            Some(held) => Err(refuse(
+                format!("this run holds {held}, not {id}"),
+                format!("split {held}, or put it down and claim {id} first"),
+            )),
+            None => Err(refuse(
+                format!("this run holds nothing, so it cannot split {id}"),
+                format!("claim {id} first; a row is divided by the run that holds it"),
+            )),
+        }
     }
 
     /// Takes the held node, refusing when it is not the one named.
