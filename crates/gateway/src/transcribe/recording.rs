@@ -111,12 +111,40 @@ impl AudioType {
     /// `E_INVALID_ARGS` for bytes that start like none of the containers
     /// this city can send; the refusal lists them.
     pub fn of_signature(head: &[u8]) -> Result<AudioType, AxError> {
-        Err(AxError::failure(
-            AxCode::InvalidArgs,
-            "read a recording's container",
-            format!("{} leading bytes", head.len()),
-        )
-        .with_recovery("not built yet"))
+        AudioType::ALL
+            .into_iter()
+            .find(|kind| kind.leads(head))
+            .ok_or_else(|| {
+                AxError::failure(
+                    AxCode::InvalidArgs,
+                    "read a recording's container",
+                    "its leading bytes name none of the containers this city can send".to_owned(),
+                )
+                .with_recovery(format!(
+                    "pass a recording in one of {}",
+                    listed(|kind| kind.media_type().to_owned())
+                ))
+            })
+    }
+
+    /// Whether `head` starts the way this container's files start. Each
+    /// container's signature is written in this one exhaustive match, so
+    /// a sixth container cannot be added without one.
+    fn leads(self, head: &[u8]) -> bool {
+        match self {
+            AudioType::Wav => {
+                head.starts_with(b"RIFF") && head.get(8..12) == Some(b"WAVE".as_slice())
+            }
+            AudioType::Ogg => head.starts_with(b"OggS"),
+            // The EBML header a browser's WebM recording opens with.
+            AudioType::Webm => head.starts_with(&[0x1A, 0x45, 0xDF, 0xA3]),
+            AudioType::Mp4 => head.get(4..8) == Some(b"ftyp".as_slice()),
+            // An ID3 tag, or an MPEG audio frame's sync: eleven set bits.
+            AudioType::Mpeg => {
+                head.starts_with(b"ID3")
+                    || matches!(head, [0xFF, second, ..] if second & 0xE0 == 0xE0)
+            }
+        }
     }
 
     /// The extension [`AudioType::file_name`] ends in, so the name a
@@ -208,19 +236,7 @@ impl Recording {
     /// refused without being held in memory, and the ceiling keeps one
     /// owner rather than a copy in every caller.
     pub fn read_from(reader: impl std::io::Read, kind: AudioType) -> Result<Recording, AxError> {
-        let unreadable = |why: String| {
-            AxError::failure(AxCode::StorageFatal, "take a recording", why)
-                .with_recovery("name a recording this machine can read, or record it again")
-        };
-        let past_the_ceiling = u64::try_from(RECORDING_MAX_BYTES)
-            .map_err(|err| unreadable(err.to_string()))?
-            .saturating_add(1);
-        let mut bytes = Vec::new();
-        reader
-            .take(past_the_ceiling)
-            .read_to_end(&mut bytes)
-            .map_err(|err| unreadable(err.to_string()))?;
-        Recording::new(bytes, kind)
+        Recording::new(read_to_the_ceiling(reader)?, kind)
     }
 
     /// A recording with no name to read its container from, read from
@@ -229,10 +245,13 @@ impl Recording {
     /// 8-34).
     ///
     /// # Errors
-    /// Whatever [`Recording::read_from`] refuses, and what
-    /// [`AudioType::of_signature`] refuses.
+    /// `E_STORAGE_FATAL` when the reader fails, what
+    /// [`AudioType::of_signature`] refuses, and whatever
+    /// [`Recording::new`] refuses.
     pub fn read_unlabelled(reader: impl std::io::Read) -> Result<Recording, AxError> {
-        Recording::read_from(reader, AudioType::Wav)
+        let bytes = read_to_the_ceiling(reader)?;
+        let kind = AudioType::of_signature(&bytes)?;
+        Recording::new(bytes, kind)
     }
 
     #[must_use]
@@ -255,6 +274,28 @@ impl Recording {
     pub(crate) fn bytes(&self) -> &[u8] {
         &self.bytes
     }
+}
+
+/// What `reader` holds, read no further than one byte past
+/// `RECORDING_MAX_BYTES`: enough for [`Recording::new`] to refuse a
+/// recording over the ceiling without holding all of it.
+///
+/// # Errors
+/// `E_STORAGE_FATAL` when the reader fails.
+fn read_to_the_ceiling(reader: impl std::io::Read) -> Result<Vec<u8>, AxError> {
+    let unreadable = |why: String| {
+        AxError::failure(AxCode::StorageFatal, "take a recording", why)
+            .with_recovery("name a recording this machine can read, or record it again")
+    };
+    let past_the_ceiling = u64::try_from(RECORDING_MAX_BYTES)
+        .map_err(|err| unreadable(err.to_string()))?
+        .saturating_add(1);
+    let mut bytes = Vec::new();
+    reader
+        .take(past_the_ceiling)
+        .read_to_end(&mut bytes)
+        .map_err(|err| unreadable(err.to_string()))?;
+    Ok(bytes)
 }
 
 #[cfg(test)]
