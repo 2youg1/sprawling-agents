@@ -16,7 +16,9 @@ use storage::{JsonlLedger, OpenReport};
 // the same name a page is answered under.
 pub(super) use crate::views::Governance;
 use crate::views::Views;
-use crate::views::snapshot::start::{SnapshotFold, Started, cut, start_audited, start_both};
+use crate::views::snapshot::start::{
+    SnapshotFold, Started, city_root_of, cut, proof_dir, start_audited, start_both,
+};
 
 use super::Entrance;
 use super::opening_cost::{OpeningCost, Phase};
@@ -113,6 +115,10 @@ pub(crate) type Held = (JsonlLedger, OpenReport, Standing);
 /// The ledger is opened at `now`, which the caller sampled: this module
 /// reads no clock of its own (determinism rule 2).
 ///
+/// The ledger's last segment is proved by the record the last proof of
+/// this history wrote, when it holds, rather than line by line
+/// (sprawling-SPEC 8-144).
+///
 /// Opening the ledger, the pass, and the standing cut are each lapped on
 /// `cost` (sprawling-SPEC 8-121).
 ///
@@ -125,8 +131,11 @@ pub(crate) fn fold_city(
     cost: &mut OpeningCost,
     log: &mut Diagnostics,
 ) -> Result<(Started<Views>, Held), AxError> {
-    let (ledger, report) =
-        JsonlLedger::open(ledger_dir, now).map_err(storage::StorageError::into_ax)?;
+    // The last proof's records are read, never written, here: the proof
+    // that holds the lock writes them (storage-SPEC 8-34).
+    let records = storage::ProofRecords::read_only(&proof_dir(city_root_of(ledger_dir)));
+    let (ledger, report) = JsonlLedger::open_reusing(ledger_dir, now, &records)
+        .map_err(storage::StorageError::into_ax)?;
     cost.lap(Phase::OpenLedger);
     let both = start_both::<Views, StandingFolds>(ledger_dir)?;
     cost.lap(Phase::FoldTail {

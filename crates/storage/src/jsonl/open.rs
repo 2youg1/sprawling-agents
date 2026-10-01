@@ -360,7 +360,7 @@ impl TailProof<'_> {
     /// the chain state entering it is `entry`.
     fn start(self, last: &Path, bytes: &[u8], entry: LineCheck) -> TailStart {
         match (self, last.file_name().and_then(|name| name.to_str())) {
-            (TailProof::Records(_records), Some(_name)) => TailStart::strict(bytes, entry),
+            (TailProof::Records(records), Some(name)) => records.tail_start(name, bytes, entry),
             (TailProof::Records(_), None) | (TailProof::Strict, _) => {
                 TailStart::strict(bytes, entry)
             }
