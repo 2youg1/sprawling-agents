@@ -94,6 +94,11 @@ pub enum StorageError {
         path: PathBuf,
         kind: crate::alias::AliasKind,
     },
+    /// Something already stands at the name a create asked for: the
+    /// file system answered at the moment of the write, so a second of
+    /// two racing creates meets this (storage-SPEC 8-32).
+    #[error("{} already exists", path.display())]
+    NameTaken { path: PathBuf },
     /// Another handle holds this city's writer lock: a second process,
     /// or a second ledger in this one (storage-SPEC 8-1).
     #[error("the ledger at {dir} is held by another writer")]
@@ -255,6 +260,15 @@ impl StorageError {
                          replace it with a plain file, then retry"
                     ))
             }
+            StorageError::NameTaken { path } => AxError::failure(
+                AxCode::VersionConflict,
+                "create a file",
+                path.display().to_string(),
+            )
+            .with_recovery(
+                "something already stands at this name; read it and change it against its \
+                 version, or create the file under another name",
+            ),
         }
     }
 }

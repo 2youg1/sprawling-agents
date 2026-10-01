@@ -74,6 +74,16 @@ pub(crate) fn land(
     }
 }
 
+/// Creates the file at `target` with `bytes` only when nothing stands at
+/// its name (storage-SPEC 8-32).
+///
+/// # Errors
+/// As [`WriteTarget::create`](crate::WriteTarget::create).
+pub(crate) fn create(target: WriteTarget, bytes: &[u8]) -> Result<(), StorageError> {
+    let path = target.as_path();
+    std::fs::write(path, bytes).map_err(io_err("create a file", path))
+}
+
 /// `.<name>.part` beside `path`, built from the name as the operating
 /// system spells it so a name that is not valid Unicode still stages.
 fn staging_path(path: &Path) -> Result<PathBuf, StorageError> {

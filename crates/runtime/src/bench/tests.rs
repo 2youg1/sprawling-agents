@@ -22,7 +22,13 @@ fn bench(root: &std::path::Path) -> ToolBench {
     let mut bench = ToolBench::new(domain.clone());
     bench
         .register(Box::new(
-            EditTool::new(root, Address::parse("work").unwrap(), domain).unwrap(),
+            EditTool::new(
+                root,
+                Address::parse("work").unwrap(),
+                domain,
+                kernel::WriteLimit::Full,
+            )
+            .unwrap(),
         ))
         .unwrap();
     bench
@@ -88,7 +94,13 @@ fn a_write_outside_the_domain_flows_back_as_a_refusal_not_a_dead_turn() {
     // A tool whose declared domain sits outside the run's domain.
     bench
         .register(Box::new(
-            EditTool::new(tmp.path(), Address::parse("elsewhere").unwrap(), elsewhere).unwrap(),
+            EditTool::new(
+                tmp.path(),
+                Address::parse("elsewhere").unwrap(),
+                elsewhere,
+                kernel::WriteLimit::Full,
+            )
+            .unwrap(),
         ))
         .unwrap();
     let outcome = bench
@@ -133,6 +145,7 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_checkpointed() {
                     env_passthrough: Vec::new(),
                     domain: Address::parse("work").unwrap(),
                     run: RunId::from_bytes([1u8; 16]),
+                    limit: kernel::WriteLimit::Full,
                 },
                 Box::new(EchoSandbox::new()),
                 crate::Backlog::new(),
@@ -210,6 +223,7 @@ fn a_second_tool_claiming_a_taken_name_is_refused() {
             tmp.path(),
             Address::parse("work").unwrap(),
             WriteDomain::new(vec![Address::parse("work").unwrap()]).unwrap(),
+            kernel::WriteLimit::Full,
         )
         .unwrap(),
     )) {
@@ -244,7 +258,13 @@ fn a_documents_bench_lets_its_own_room_through_the_door() {
     let mut bench = ToolBench::new(domain.clone());
     bench
         .register(Box::new(
-            EditTool::new(tmp.path(), Address::parse("hall/mayor").unwrap(), domain).unwrap(),
+            EditTool::new(
+                tmp.path(),
+                Address::parse("hall/mayor").unwrap(),
+                domain,
+                kernel::WriteLimit::Full,
+            )
+            .unwrap(),
         ))
         .unwrap();
     let outcome = bench
@@ -284,6 +304,7 @@ fn exec_bench(root: &std::path::Path) -> ToolBench {
                     env_passthrough: Vec::new(),
                     domain: Address::parse("work").unwrap(),
                     run: RunId::from_bytes([1u8; 16]),
+                    limit: kernel::WriteLimit::Full,
                 },
                 Box::new(EchoSandbox::new()),
                 crate::Backlog::new(),

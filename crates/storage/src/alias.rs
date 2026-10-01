@@ -197,6 +197,35 @@ impl WriteTarget {
     pub fn as_path(&self) -> &Path {
         &self.0
     }
+
+    /// Replaces the file at this name with `bytes`: a staging file
+    /// beside it, flushed, given the replaced file's permissions and
+    /// renamed over the name (storage-SPEC 8-12, 8-32). A reader finds
+    /// the old file or the whole new one.
+    ///
+    /// # Errors
+    /// `StorageError::Io` for a write, flush, permission copy or rename
+    /// the filesystem refuses; the name keeps its previous content.
+    pub fn replace(self, bytes: &[u8]) -> Result<(), StorageError> {
+        crate::bundle::landing::land(
+            &mut crate::real_fs::RealFs::new(),
+            self,
+            bytes,
+            crate::bundle::landing::Bits::OfReplaced,
+        )
+    }
+
+    /// Creates the file at this name only when nothing stands there:
+    /// the name is claimed by the filesystem at the moment of the write,
+    /// so of two racing creates one succeeds (storage-SPEC 8-32).
+    ///
+    /// # Errors
+    /// `StorageError::NameTaken` when anything stands at the name, with
+    /// nothing written; `StorageError::Io` for a create, write or flush
+    /// the filesystem refuses.
+    pub fn create(self, bytes: &[u8]) -> Result<(), StorageError> {
+        crate::bundle::landing::create(self, bytes)
+    }
 }
 
 #[cfg(test)]
@@ -402,5 +431,47 @@ pub(crate) mod tests {
             }
             proptest::prop_assert_eq!(std::fs::read(&kept).unwrap(), b"kept".to_vec());
         }
+    }
+
+    /// Eight creates of one name, released together: the filesystem
+    /// claims the name for one of them, every other meets the name
+    /// taken, and the bytes on the disk are the winner's.
+    #[test]
+    fn two_racing_creates_admit_one() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().to_path_buf();
+        let name = root.join("draft.md");
+        let start = std::sync::Arc::new(std::sync::Barrier::new(8));
+        let racers: Vec<_> = (0u8..8)
+            .map(|racer| {
+                let (root, name, start) = (root.clone(), name.clone(), start.clone());
+                std::thread::spawn(move || {
+                    let target = WriteTarget::within("create a file", &root, &name).unwrap();
+                    start.wait();
+                    target.create(&[b'0' + racer]).map(|()| racer)
+                })
+            })
+            .collect();
+        let answers: Vec<Result<u8, StorageError>> = racers
+            .into_iter()
+            .map(|racer| racer.join().unwrap())
+            .collect();
+        let won: Vec<u8> = answers
+            .iter()
+            .filter_map(|answer| answer.as_ref().ok().copied())
+            .collect();
+        assert_eq!(
+            won.len(),
+            1,
+            "exactly one create claims the name: {answers:?}"
+        );
+        assert!(
+            answers
+                .iter()
+                .filter(|answer| answer.is_err())
+                .all(|answer| matches!(answer, Err(StorageError::NameTaken { .. }))),
+            "every other create meets the name taken: {answers:?}"
+        );
+        assert_eq!(std::fs::read(&name).unwrap(), vec![b'0' + won[0]]);
     }
 }

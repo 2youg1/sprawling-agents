@@ -63,7 +63,14 @@ impl Laying {
         // The mode a run sits in is a capability like any other: until
         // it was set here the mode's own catalog entry reached no model.
         held(&catalog, "lay out the catalog")?.set_mode(at.policy.mode);
-        let edit = EditTool::new(&site.write_root, addr.clone(), site.rules.write_domain()?)?;
+        // The building's domain is the ceiling and the dispatch's write
+        // limit narrows it; both are asked at every write (city-SPEC 8-32).
+        let edit = EditTool::new(
+            &site.write_root,
+            addr.clone(),
+            site.rules.write_domain()?,
+            at.policy.write,
+        )?;
         // Every tool shares one keeper, so no two of them keep two keys
         // under one name (sprawling-SPEC.md 8-87).
         let keeper = std::sync::Arc::new(kept::Keeper::new(
@@ -198,7 +205,7 @@ impl Laying {
         // anyway, because every address in it starts with the building.
         match city::vocation_of(site.building.addr()) {
             city::Vocation::Builds => {
-                admitted.push(Box::new(self.exec_tool(site, addr)?));
+                admitted.push(Box::new(self.exec_tool(site, at)?));
                 admitted.push(Box::new(collab::DelegateTool::new(Arc::clone(&delegates))?));
                 admitted.push(Box::new(collab::WorkshopTool::new(
                     Arc::clone(&desks.workshop),
@@ -299,8 +306,9 @@ impl Laying {
     /// # Errors
     /// Propagates a build with no execution engine and whatever the
     /// tool says about its own construction.
-    fn exec_tool(&self, site: &Site, addr: &Address) -> Result<ExecTool, AxError> {
+    fn exec_tool(&self, site: &Site, at: &Assignment) -> Result<ExecTool, AxError> {
         let machine = machine_half(&site.config.sandbox, &self.exec_host)?;
+        let addr = &at.addr;
         ExecTool::new(
             runtime::ExecSetup {
                 workdir: site.write_root.join(addr.as_str()),
@@ -314,6 +322,9 @@ impl Laying {
                 env_passthrough: site.config.sandbox.env_passthrough.clone(),
                 domain: addr.clone(),
                 run: site.run_id,
+                // The dispatch's write limit: under `Create` a command
+                // runs only in the copy (runtime-SPEC 8-55).
+                limit: at.policy.write,
             },
             machine.engine,
             self.backlog.clone(),

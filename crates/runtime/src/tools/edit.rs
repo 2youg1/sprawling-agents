@@ -31,6 +31,10 @@ pub struct EditTool {
     /// The run's write domain. Every model-chosen path is judged against
     /// it before the filesystem is touched.
     writable: kernel::WriteDomain,
+    /// What the run may do to a file that already exists: under
+    /// `Create` the replacing arm is refused before the file is read
+    /// (runtime-SPEC 8-55).
+    limit: kernel::WriteLimit,
     meta: ToolMeta,
 }
 
@@ -52,6 +56,7 @@ impl EditTool {
         city_root: &Path,
         domain: kernel::Address,
         writable: kernel::WriteDomain,
+        limit: kernel::WriteLimit,
     ) -> Result<EditTool, AxError> {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
@@ -89,6 +94,7 @@ impl EditTool {
         Ok(EditTool {
             city_root: city_root.to_path_buf(),
             writable,
+            limit,
             meta: ToolMeta {
                 name: ToolName::parse("edit")?,
                 disclosure:

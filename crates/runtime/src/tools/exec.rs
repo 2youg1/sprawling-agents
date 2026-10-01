@@ -67,6 +67,10 @@ pub struct ExecSetup {
     /// The run this tool serves: a command it hands to the background
     /// is owed to this run, and its output reaches no other.
     pub run: RunId,
+    /// What the run may do to files that already exist. Under
+    /// `Create` a command runs only in the copy; the host placement
+    /// could change any file and does not start (runtime-SPEC 8-55).
+    pub limit: kernel::WriteLimit,
 }
 
 pub struct ExecTool {
