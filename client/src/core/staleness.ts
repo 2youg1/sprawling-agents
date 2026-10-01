@@ -86,8 +86,8 @@ export function reachOf(name: string, kind: EventKind): Reach {
     // A prompt is frozen once for the life of a run and the object
     // behind a hash never changes, so none of these answers can go
     // stale: a range and a preview are read from one stored document
-    // version.
-    case "prefix": case "content": case "range": case "preview":
+    // version, and a reply's blocks from the text the question carries.
+    case "prefix": case "content": case "range": case "preview": case "reply":
       return "none";
     // A shelf moves when somebody edits the building's rules, and a
     // pin appears when a run starts under them.
