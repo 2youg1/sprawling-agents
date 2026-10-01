@@ -183,6 +183,7 @@ src/Sprawling/Regression.lean 两个世界的反例 → 一个 Rust 测试文件
 src/Sprawling/Acceptance/Script.lean 替身要回放的脚本：从归档的 skills 写出
 src/Sprawling/Acceptance/Stage.lean  陌生人的目录，以及他用编辑器改的两份文件
 src/Sprawling/Acceptance/Walk.lean   第一天、进程被杀、第二天早上
+src/Sprawling/Acceptance/Checklist.lean 人手测的清单：每一节从决定它的那一处读出
 test/Main.lean               入口与检查树
 test/Acceptance.lean         `acceptance` 可执行文件的两个命令：写脚本、走一遍
 ```
@@ -280,8 +281,22 @@ structure Step where name : String; walk : Ground → IO Unit
 def firstDay     : Setting → List Step
 def interrupted  : Setting → Stage → IO Unit
 def morningAfter : Setting → List Step
-def walk         : Setting → IO Unit
+def walkedSteps  : Setting → List String           -- 三段的步名，按走的次序
+def walk         : Setting → (Ground → IO α) → IO α  -- 全部通过后在第三次服务里问一次
+
+-- Acceptance/Checklist.lean —— 人手测什么
+def routeTable : String                            -- client/src/core/route.ts
+def slashTable : String                            -- client/src/core/slash.ts
+inductive Takes | written (grammar : String) | computed
+def pagesIn    : String → List String              -- `BARE` 的键，去掉空键
+def commandsIn : String → List (String × Takes)    -- `SLASH` 每条的拼法与它后面跟什么
+def facesIn    : Json → List (String × String × String)  -- known_hosts 的主机、方言、地址
+def knownHosts : Door → Ground → IO Json
+def render     : Gathered → String
+def writeChecklist : Setting → Json → System.FilePath → IO Unit
 ```
+
+**清单的每一节从决定它的那一处读出，本目录不列任何一项**：页面是客户端 `BARE` 表的键（与 `cargo xtask shots` 读的是同一张表、同一种读法），命令是 `SLASH` 表的拼法，工具是模型第一次请求里拿到的目录（替身的记录），skill 是归档的书架，provider 是城自己对 `known_hosts` 的回答。一份写在这里的名单会是每一项的第二个家，而它会在有人加一页的那天成为错的那一份。`SLASH` 里由别的表算出来的语法（强度的词、页面的名字）记作 `computed`，不在这里求值：求值就是那张表的第二份读法。清单只在走完之后写，第一节把走过的每一步列成已勾选。
 
 `walk` 按序走、停在第一处失败：每一步站在前面几步留下的城上，一栋没立起来的楼没法派活，接着走只会把一个原因报成许多个。每一处断言都从城写下它的地方读回——盘上的文件、历史里的记录、查询的答案、替身记下的请求——不重算任何东西。
 
@@ -339,7 +354,9 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 6. `just acceptance <archive>`：把归档解进 `target/acceptance/`，构建替身与 `acceptance`；`lake exe acceptance script <书架> <脚本>` 按归档的 `skills/` 写出脚本；配方起替身，从它印出的第一行读 `SPRAWLING_PROVIDER`；`lake exe acceptance walk <书架> <记录>` 在 `SPRAWLING_BIN` 指着归档里的二进制时走完三段：
    - **第一天**（一次服务）：城答出它起城时的那栋 hall；替身被挂上、它的模型被选中；立一栋楼并被列出；人在楼的阅览室里准入每一件 skill；派活跑到脚本给的结尾并在盘上留下文件；run 钉住的 skill 恰是书架上的那些，按名读到的每一件以它自己的正文到达模型；模型拿到的目录里有脚本调用的每件工具；城列出的楼恰是历史创建过的楼；历史自证。
    - **进程被杀**（第二次服务）：派活，等那个 run 写下几条工具结果，然后结束进程。
-   - **第二天早上**（第三次服务）：被杀的城留下的历史自证；城再服务，新派的活跑到它自己的结尾；历史再自证。
+   - **第二天早上**（第三次服务）：被杀的城留下的历史自证；城再服务，新派的活跑到它自己的结尾；历史再自证；最后问城 `known_hosts`。
+
+   全部通过后，`walk` 把清单写到 `target/acceptance/checklist.md`（§8 `Acceptance/Checklist.lean`）。
 
    配方在结束时停掉替身，无论走没走完。
 
@@ -452,6 +469,7 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 | `statusCalls` 120、`inFlight` 3、`closingLines` 3 | 被杀的 run 要在被杀时仍在调用：一次调用在 debug 二进制上约十毫秒，120 次是一秒多的在途，等到 3 条工具结果再杀；收尾那句写三遍，城回来时若也捡起那个死掉的 run，两个 run 都能以自己的最后一句结束 | 发布二进制更快；被杀的 run 若在被杀前就冻结，那一步报红并点名这个数 |
 | 幂等键 400–405 | U9 每条命令一把，与检查树的 0–323 不相交，一份报告里不会有两条命令共用一个数 | —— |
 | 目录 `target/acceptance/` | 解开的归档、脚本、替身的记录、清单都在这里，配方每次先清空它 | 由 justfile 提供 |
+| 客户端的两张表 `client/src/core/route.ts`、`client/src/core/slash.ts`，以及它们的开头行 `const BARE`、`export const SLASH` | 清单的页面与命令两节从这里读；`just acceptance` 在仓库根运行，路径相对于根 | 表搬家或改了开头行时，那一节读成空，清单把空节写成一行要人先查原因的条目，而不是一个空标题 |
 
 ## 15 影响面
 
