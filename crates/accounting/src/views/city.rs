@@ -35,6 +35,15 @@ pub struct CityAsk {
 }
 
 impl Views {
+    /// What this city is called: what its first record says, and for a
+    /// city made before that record carried a name, the directory it
+    /// lives in. One place decides, so two readers cannot disagree.
+    pub fn city(&self) -> Option<Address> {
+        self.city
+            .clone()
+            .or_else(|| kernel::layout::CityLayout::new(&self.city_root).city_address())
+    }
+
     /// Copies out what the city page needs from the fold: pure memory,
     /// so the fold waits only for the copy.
     pub(super) fn city_ask(&self) -> CityAsk {

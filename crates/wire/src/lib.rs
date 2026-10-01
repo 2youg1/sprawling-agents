@@ -67,6 +67,7 @@ pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, Signa
 pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
 pub use answer::{ReleaseAnswer, ReleaseLine};
+pub use answer::{SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use answer::{SecondDomain, SettledEffort, SettledSecond, TuningDefaults};
 pub use answer::{Standing, ToolkitLine, ToolkitsAnswer};
 #[cfg(feature = "server")]

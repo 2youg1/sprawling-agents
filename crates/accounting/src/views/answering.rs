@@ -174,6 +174,7 @@ impl Views {
                     limit: *limit,
                 };
             }
+            wire::Query::Sessions { room } => wire::Answer::Sessions(self.sessions.answer(room)),
             wire::Query::RunHistory { run, before, limit } => {
                 return Prepared::RunHistory {
                     ledger: self.ledger_ask(),

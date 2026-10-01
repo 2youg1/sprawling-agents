@@ -46,6 +46,7 @@ mod prefix;
 mod range;
 mod release;
 mod rounds;
+mod sessions;
 mod skills;
 mod toolkits;
 
@@ -80,6 +81,7 @@ pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixS
 pub use range::RangeAnswer;
 pub use release::{ReleaseAnswer, ReleaseLine};
 pub use rounds::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn, Used};
+pub use sessions::{SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
 
@@ -218,6 +220,7 @@ pub struct UnpricedCalls {
 pub enum Answer {
     History(Box<HistoryAnswer>),
     HistoryRange(Box<HistoryRangeAnswer>),
+    Sessions(SessionsAnswer),
     Changes(ChangesAnswer),
     Commit(Box<CommitAnswer>),
     City(CityAnswer),

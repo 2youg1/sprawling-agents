@@ -76,6 +76,11 @@ pub enum Query {
         to: Seq,
         limit: u32,
     },
+    /// The stretches of one room, newest first, which a page loses on a
+    /// reload: [`SessionsAnswer`](crate::SessionsAnswer) (wire-SPEC §8-71).
+    Sessions {
+        room: Address,
+    },
     /// What moved between two checkpoints: paths and counts, never patch
     /// text.
     ///

@@ -20,6 +20,7 @@ mod folding;
 mod released;
 mod released_ledger;
 mod roadmaps;
+mod sessions;
 
 /// Where a test line sits in the ledger and which run wrote it.
 pub(super) struct Place {

@@ -119,6 +119,9 @@ pub struct Views {
     /// prompt a page asks for is one ledger line rather than a walk
     /// back through the whole run.
     pub(super) first_prompts: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
+    /// Each address's stretches, so a room's sessions are answered without
+    /// reading the ledger back (wire-SPEC §8-71).
+    pub(super) sessions: super::sessions::RoomSessions,
     /// Every building's plan, parsed once and re-parsed only when a
     /// record says it may have moved.
     ///
@@ -217,6 +220,7 @@ impl Views {
             next_unfolded: kernel::Seq::FIRST,
             index,
             first_prompts: std::collections::BTreeMap::new(),
+            sessions: super::sessions::RoomSessions::default(),
             plans,
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
@@ -293,6 +297,7 @@ impl Views {
         // worker's own copy is shown it.
         self.governance
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
+        self.sessions.absorb(record)?;
         crate::plan_view::PlanView::take_back(&self.plans).apply(record);
         self.events = self.events.saturating_add(1);
         self.next_unfolded = next_unfolded;
@@ -373,14 +378,5 @@ impl Views {
 
     pub fn head(&self) -> Option<kernel::Seq> {
         self.head
-    }
-
-    /// What this city is called: what its first record says, and for a
-    /// city made before that record carried a name, the directory it
-    /// lives in. One place decides, so two readers cannot disagree.
-    pub fn city(&self) -> Option<Address> {
-        self.city
-            .clone()
-            .or_else(|| kernel::layout::CityLayout::new(&self.city_root).city_address())
     }
 }
