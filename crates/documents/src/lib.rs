@@ -11,3 +11,18 @@
 //! No I/O: the bytes arrive as slices and leave as values. Reading the
 //! disk and the content store, and recording a save, belong to the
 //! crates that own those (D1).
+
+mod edit;
+mod encoding;
+mod format;
+mod layout;
+mod selection;
+mod span;
+mod window;
+
+pub use edit::{Applied, Edit, Transaction};
+pub use encoding::{Encoding, Reading};
+pub use format::Format;
+pub use selection::Selection;
+pub use span::Span;
+pub use window::{Lifted, WINDOW_BYTES_MAX, Window, cut, head, lift};
