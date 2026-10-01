@@ -982,7 +982,7 @@ pub fn write_governed(city_root: &Path, which: Governed, base: &str, body: &str)
 
 - **`Preferences` 是第三份而不是第三个居民**：市长与文书各有身份文件，而「这个人怎么喜欢这座城办事」不属于任何一个居民，它属于城；它与前两者被同一条规矩治理，所以住同一处、走同一扇门。
 - **整份覆写，带基线**：这是人在一个框里编辑、按一次保存的文件，写一半会让这座城被半句话治理。写者有两个——原文编辑器与设置页上的卡片（§8-33），或两个开着的页面——所以一次保存携它起手时的全文，文件已经变了就拒。旧内容不留在这里——账本上那行 `governed_document_written` 才是回头看的地方。
-- **枚举而不是文件名字符串**：文件名是城的答案，不是发帧的人的答案（wire-SPEC §8-19 同一条理由，两侧各说一次）。
+- **枚举而不是文件名字符串**：文件名是城的答案，不是发帧的人的答案（`crates/wire/Spec.lean` §8-19 同一条理由，两侧各说一次）。
 
 ### 8-25 `desktop`：这栋楼把桌面交出去了吗（`policy` 内，形状 1 判定）
 
@@ -1016,7 +1016,7 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 
 **恒不复用 `Governed`**：那三份是**城**的文件（`<city>/.sprawling/`），这一份是**楼**的。把楼级路径塞进一个按 city_root 取路径的枚举里，会让那个枚举需要一个只有部分变体用得上的参数。
 
-**线上它走 `ConfigureBuilding` 的第四个可选字段**（wire-SPEC §8-40）：那条帧问的就是「这栋楼的 runs 按什么规矩来」，沙箱、外部服务器、运行中的机器上的窗口与第二级提醒落哪一层是同一个问题的四面。`configured_payload` 因此收一个 `Written { sandbox, mcp, desktop, context }` 而不是四个裸布尔——一个调用点写 `(true, false, true, false)` 说不出哪一位是哪一面。
+**线上它走 `ConfigureBuilding` 的第四个可选字段**（`crates/wire/Spec.lean` §8-40）：那条帧问的就是「这栋楼的 runs 按什么规矩来」，沙箱、外部服务器、运行中的机器上的窗口与第二级提醒落哪一层是同一个问题的四面。`configured_payload` 因此收一个 `Written { sandbox, mcp, desktop, context }` 而不是四个裸布尔——一个调用点写 `(true, false, true, false)` 说不出哪一位是哪一面。
 
 ### 8-27 city::document：一份文档整个换上去，或者旧的留着（形状 4 adapter）
 
@@ -1060,7 +1060,7 @@ pub fn revise<T>(path: &Path, act: impl FnOnce(&Held<'_>, &[u8]) -> Result<T, Ax
     -> Result<T, AxError>;                        // 门面上是 city::revise_document
 ```
 
-- **一次保存要的是「此刻的字节」，不是「我起手时的正文」。** `edit_against` 拿调用方给的整份正文与盘上的比较；页面对任意一份文档的保存（wire-SPEC §8-72）带的是 32 字节的版本摘要与几段编辑，判它的是 `documents::save`，它要读的是盘上此刻的全部字节。`revise` 在 `edit` 的锁里把这份文件读出来交给 `act`，`act` 判定、经 `Held::replace` 整份换上，锁在 `act` 返回之前一直持有，所以两个从同一版出发的保存只有先到的那个落下，第二个读到的已经是第一个的字节。
+- **一次保存要的是「此刻的字节」，不是「我起手时的正文」。** `edit_against` 拿调用方给的整份正文与盘上的比较；页面对任意一份文档的保存（`crates/wire/Spec.lean` §8-72）带的是 32 字节的版本摘要与几段编辑，判它的是 `documents::save`，它要读的是盘上此刻的全部字节。`revise` 在 `edit` 的锁里把这份文件读出来交给 `act`，`act` 判定、经 `Held::replace` 整份换上，锁在 `act` 返回之前一直持有，所以两个从同一版出发的保存只有先到的那个落下，第二个读到的已经是第一个的字节。
 - **没有文件读作空字节**，与 `edit_against` 同一条规则；`edit_against` 就是 `revise` 加一次逐字节比较，「读不到就是空」这条读法只写在 `revise` 一处。别的读错（目录、无权限）是 `E_STORAGE_FATAL`，与本模块其余的写面同一句恢复语。
 - **本 crate 不依赖 `documents`。** 判定由调用方交进来：`accounting::worker::commanding::saving` 交的是 `documents::save` 与 `documents::decide`（accounting-SPEC §8-22）。这扇门只拥有锁、读与整份换上——就是 §8-27 的两条性质。
 - **当前状态：修改提案的提出与收回还没有写者。** 提案由 run 提出（`crates/kernel/Spec.lean` §8-83 的 `proposal_offered`），这需要一件工作台工具：它读那一版、切出原文、经 `documents::Offer::of` 判长度，把一行 `proposal_offered` 记在这次 run 名下，收回时记 `proposal_withdrawn`。这件工具还没有落地，所以今天账本上的提案只来自测试。refrain 路线图 §4-10 说「文稿审阅期间 `edit`、`exec` 对该文稿的写入受同一边界约束，否则只在候选工作树里操作」：本轮按后一条走——提案只是账本上的一行，run 不改那份文档，接受时由人的决定经 `revise` 落下。前一条若要成立，要由 runtime 的写门判「这份文档有开着的提案」，那是 runtime 规格的事，决定它的证据是那件工具落地时一次 run 同时提案又直接改同一份文档的情形。

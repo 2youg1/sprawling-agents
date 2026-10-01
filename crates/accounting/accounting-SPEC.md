@@ -359,7 +359,7 @@ pub fn core_priority() -> Result<CorePriority, AxError>;   // ConfigInvalid：pr
 ```
 
 - **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `accounting::home`（8-7）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。
-- **`[ui]` 一节就是 `PreferencesAnswer` 的序列化**（wire-SPEC §8-39 第七条）：文件能写的键与答案能说的字段是**同一份声明**，因此本模块只做读与写，不陈述「一项偏好是什么」。一条补丁落在记录上的效果同理，归 `PreferencesAnswer::apply` —— `Chord("")` 是解绑还是绑一个空串，只有一个地方回答。
+- **`[ui]` 一节就是 `PreferencesAnswer` 的序列化**（`crates/wire/Spec.lean` §8-39 第七条）：文件能写的键与答案能说的字段是**同一份声明**，因此本模块只做读与写，不陈述「一项偏好是什么」。一条补丁落在记录上的效果同理，归 `PreferencesAnswer::apply` —— `Chord("")` 是解绑还是绑一个空串，只有一个地方回答。
 - **别的节原样留下**：写是一次读-改-写，经 `city::edit_document`（city-SPEC §8-27）持锁并整份替换。「要么整份要么不动」只有一份实现，人层与城层共用它；再写一份就是给 B-49 立第二个权威。
 - **读不动的文件不覆写**：解析失败报 `E_CONFIG_INVALID`，主题带上文件与是哪一节，恢复语请人手工修或删掉那一节重选。能读回来的才配被改写——写它的人是唯一能修它的人。
 - **不入账**：偏好不属于城的历史，任何 run 都观测不到它。因此这条命令被接受时城无话可播，`adversary` 第四世界据此把「静默」读作接受，而它真正的关门条件是读回来那一组断言（`tools/adversary/src/Sprawling/Person.lean`，叶子 5.6）。
@@ -425,7 +425,7 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 - **`lineage` 与 `views` 同住本 crate，因为读者跨两处。** `sprawling view` 的 run 列表在二进制里，playback 的共享投影在本 crate 的读面里；二进制够得到本 crate，本 crate 够不到二进制。
 - **依赖**：`views` 折叠 `storage::HotView`、`storage::Attribution` 与 `storage::LedgerIndex`，快照起步经 `runtime::replay::fold_ledger_dir`，所以本 crate 依赖 `storage` 与 `runtime`（ARCHITECTURE.md §3 的 `depmap`，§12-14）。
 
-### 8-19 视图的第二份是克隆；一次性重建每行只核对一遍；房间的各段 session（`accounting::views::snapshot`、`accounting::views::snapshot::start`、`accounting::views::sessions`，形状 7 投影；sprawling-SPEC.md 8-144，wire-SPEC §8-71）
+### 8-19 视图的第二份是克隆；一次性重建每行只核对一遍；房间的各段 session（`accounting::views::snapshot`、`accounting::views::snapshot::start`、`accounting::views::sessions`，形状 7 投影；sprawling-SPEC.md 8-144，`crates/wire/Spec.lean` §8-71）
 
 ```rust
 // accounting::views
@@ -455,7 +455,7 @@ impl RoomSessions {
 
 `Audited.lines_checked` 是证明逐行核对的行数加上折叠核对的行数（尾部行数，或从创世折到的最后一行的 `seq + 1`）。没有快照、没有记录时它等于账本行数，不是两倍；快照合身、记录写满时它等于记录之后长出的行数加尾部行数，与历史长度无关。两条都在 `worker::folds::views_start::tests` 以两种规模断言，这是整城重建的回退门；墙钟只进 `budgets.toml`。
 
-(c) **每个地址的各段 session 是视图里的一张表。** `accounting::views::sessions::RoomSessions` 为每个地址存一列 `wire::SessionLine`，`Views::apply` 每行调一次 `RoomSessions::absorb`：`session_opened` 在它的地址下开新的一段；`run_started` 在一个还没有任何一段的地址下开一段 `Dispatched`，否则给当前这一段的 `runs` 加一；任何带地址的记录都把这个地址当前这一段的 `last`、`at` 挪到自己。没有地址的记录不碰这张表。`Query::Sessions { room }` 由 `RoomSessions::answer` 在锁内作答（wire-SPEC §8-71）。表随视图快照存取，所以视图快照的编码变了，`VIEWS_FOLD_RULES` 随之重取（sprawling-SPEC.md 8-91）；旧快照解不开就按 `WholeFold::Damaged` 从创世折一次，不报错。
+(c) **每个地址的各段 session 是视图里的一张表。** `accounting::views::sessions::RoomSessions` 为每个地址存一列 `wire::SessionLine`，`Views::apply` 每行调一次 `RoomSessions::absorb`：`session_opened` 在它的地址下开新的一段；`run_started` 在一个还没有任何一段的地址下开一段 `Dispatched`，否则给当前这一段的 `runs` 加一；任何带地址的记录都把这个地址当前这一段的 `last`、`at` 挪到自己。没有地址的记录不碰这张表。`Query::Sessions { room }` 由 `RoomSessions::answer` 在锁内作答（`crates/wire/Spec.lean` §8-71）。表随视图快照存取，所以视图快照的编码变了，`VIEWS_FOLD_RULES` 随之重取（sprawling-SPEC.md 8-91）；旧快照解不开就按 `WholeFold::Damaged` 从创世折一次，不报错。
 
 ### 8-24 快照格式的进位由夹具摘要钉住，夹具里有每一种出现在快照里的摘要（`accounting::views::snapshot`、`accounting::worker::folds::standing_start`，形状 7 投影；`crates/kernel/Spec.lean` §8-84）
 
@@ -567,7 +567,7 @@ pub fn put(city_root: &Path, progress: &wire::GuideProgress) -> Result<(), AxErr
 
 - **一份记录，一种文法。** 文件 `CityLayout::guide`（`<城>/.sprawling/GUIDE.toml`）就是 `wire::GuideProgress` 的 TOML 序列化，与 `person` 的 `[ui]` 是 `PreferencesAnswer` 的序列化同一条理（§8-8）：本模块只读与写，什么是一步、什么是标记由线上的类型说。
 - **读。** 文件不在即 `GuideProgress::default()`；读不出或解析不了答 `E_CONFIG_INVALID`（文件与原因）或 `E_STORAGE_FATAL`（读不了），视图把两者答成 `Unavailable`，不拿缺省值冒充。
-- **写。** 经 `city::edit_document` 整份替换，读者在写的途中只会读到写之前或写之后的那一份；保留子树不存在时先建它。`Command::PutGuide` 由 `worker::commanding::routing` 直接交给 `put`，不写账本行（wire-SPEC §8-68）。
+- **写。** 经 `city::edit_document` 整份替换，读者在写的途中只会读到写之前或写之后的那一份；保留子树不存在时先建它。`Command::PutGuide` 由 `worker::commanding::routing` 直接交给 `put`，不写账本行（`crates/wire/Spec.lean` §8-68）。
 - 验收：`worker::commanding::tests::guide` 的 `the_guide_keeps_its_progress_across_a_reopen`。
 
 #### 8-18-3 `gh` 的候选 ID 从哪一处答（`accounting::views::answering::github`，形状 1 判定）
@@ -858,7 +858,7 @@ pub(crate) fn trace_through(index: &LedgerIndex, ledger_dir: &Path, commit: wire
 
 ### 8-15 页面要的几样新东西，从哪一处答（`accounting::views::answering`、`accounting::worker::commanding`、`accounting::worker::freezing`）
 
-**身份。** `Query::Identity` 在锁外读两份治理文档（`city::read_naming`），答 `StatedIdentity` 或带行号的 `Unreadable`（wire-SPEC §8-59）。`PutDocument` 与 `PutIdentity` 由 `commanding::governing` 执行：先经 `city` 带基线落盘，再写一行 `governed_document_written`，写 `MAYOR.md`／`PREFERENCES.md` 时 `naming` 是落盘之后此刻的身份版本。
+**身份。** `Query::Identity` 在锁外读两份治理文档（`city::read_naming`），答 `StatedIdentity` 或带行号的 `Unreadable`（`crates/wire/Spec.lean` §8-59）。`PutDocument` 与 `PutIdentity` 由 `commanding::governing` 执行：先经 `city` 带基线落盘，再写一行 `governed_document_written`，写 `MAYOR.md`／`PREFERENCES.md` 时 `naming` 是落盘之后此刻的身份版本。
 
 **一个 session 冻一版身份**（`worker::freezing::naming`）。冻前缀时先看房间这一层有没有 `[identity] version`：有，就从内容库读回那一版（读不回即拒 `E_STORAGE_FATAL`，不悄悄换成此刻的名字）；没有，就读此刻的身份，放进内容库，写进房间这一层。city 段是 `City.md` 之后接 `Naming::context()`，resident 段对 `hall/mayor` 以冻下的名字开头，`RunPlan.naming` 是那一版的摘要。所以同一个 session 的每次 run 请求里的名字一样，`/new` 之后的第一次 run 换成此刻的名字，页面经 `run_started.naming` 读回的是请求里真正用的那一版。
 
@@ -932,7 +932,7 @@ pub(in crate::views) fn preview_answer(city_root: &Path, version: B3Hash, viewpo
 ```
 
 - **读内容库，判定全在 `documents`。** 读内容库的那一步与 `Range` 是同一个函数（`range::stored`，§8-21）；然后 `documents::preview` 判编码、切窗口、止于块末、读出块（`crates/documents/Spec.lean` D20–D26）。本模块不写一条判定，所以预览、`Range` 与 `Document` 对「这一版是什么编码、窗口在哪里切」只有一个答案。
-- **答复。** 读出来就是 `Answer::Preview`：`Laid` 带实际读的区间与块，UTF-16 的版本是 `Unsupported`（wire-SPEC §8-74）。内容库没有这一版、打不开、或抬起的字节在这种编码下拼不出文本，答 `Unavailable { query: "Preview(<version>)" }`，与 `Range` 同一个口径：「我没能看」。
+- **答复。** 读出来就是 `Answer::Preview`：`Laid` 带实际读的区间与块，UTF-16 的版本是 `Unsupported`（`crates/wire/Spec.lean` §8-74）。内容库没有这一版、打不开、或抬起的字节在这种编码下拼不出文本，答 `Unavailable { query: "Preview(<version>)" }`，与 `Range` 同一个口径：「我没能看」。
 - **代价。** 只读内容库里这一窗要的那几个字节，加一次 comrak 读一个至多 64 KiB 的窗口；读数还没有，属 refrain 路线图 A11 的那一组。
 - **Markdown 的版本都在内容库里。** 答 `Document` 的读面把每一个 Markdown 版本放进内容库，不论它的第一个窗口盖不盖得住整份（§12 第 33 条），所以从 `Document` 打开的任何一份 Markdown 文件都能按版本预览。
 - 验收：`views::answering::preview::tests`——内容库里没有的版本答 `Unavailable`；超过一个窗口的 Markdown 文件经 `Document` 打开后，从 0 起按答复的 `span.end` 逐窗预览，每一窗止于块末，读到末尾时每一段恰好出现一次；整份放得下一个窗口的 Markdown 文件经 `Document` 打开后预览出它的块（`a_short_document_previews_by_its_version`）；字节不是文本的版本答 `Unavailable`；UTF-16 的版本答 `Preview::Unsupported`。
@@ -945,7 +945,7 @@ pub(in crate::views) fn reply_answer(text: &str, state: documents::ReplyState) -
 // Views::prepare 的一臂：Query::Reply { text, state } → Prepared::Reply { text, state }
 ```
 
-- **判定全在 `documents::reply`**（`crates/documents/Spec.lean` D30、D31）：结算的回复照预览读，还在说的读到收束点。本模块不读盘、不读内容库、不读视图，只把答复拼成 `Answer::Reply`；读不出（文字里有 NUL）答 `Unavailable { query: "Reply" }`（wire-SPEC §8-75）。
+- **判定全在 `documents::reply`**（`crates/documents/Spec.lean` D30、D31）：结算的回复照预览读，还在说的读到收束点。本模块不读盘、不读内容库、不读视图，只把答复拼成 `Answer::Reply`；读不出（文字里有 NUL）答 `Unavailable { query: "Reply" }`（`crates/wire/Spec.lean` §8-75）。
 - **在视图锁外读**：`prepare` 只把文字拷进 `Prepared::Reply`，comrak 读一窗在锁放开之后做，理由同预览（§12 第 41 条）。
 - **代价。** 一次收束点的扫描（与送来的文字同长，逐字节），加一次 comrak 读至多一个窗口；读数还没有，属 refrain 路线图 A11 的那一组。
 - 验收：`views::answering::reply::tests`——一段带标题、列表、表、代码块与脚注的回复存成一个版本，经 `Query::Preview` 读出的 `Laid` 与经 `Query::Reply { state: Settled }` 读出的相等；同一段文字截在一个开着的段落里、以 `Streaming` 问，只答闭合的块，`span.end` 停在那一段之前；含 NUL 的文字答 `Unavailable`。
@@ -960,11 +960,11 @@ pub(super) fn read_bytes(bytes: &[u8]) -> Reading;      // Content 与 Prefix �
 pub(in crate::views) fn range_answer(city_root: &Path, version: B3Hash, range: documents::Span) -> wire::Answer;
 ```
 
-- **读盘只读一次，判定全在 `documents`。** `document_answer` 读文件的全部字节：读不到且是 `NotFound` 答 `Missing`，别的读错（目录、无权限）答 `Unreadable`，带系统的原话；零字节答 `Empty`；否则 `B3Hash::digest` 得版本，`Format::of_name` 读文件名，`Reading::of` 判文本，是文本就 `documents::head` 取第一个窗口（wire-SPEC §8-69）。本模块不写任何一条判定，所以页面、`Content` 与 `Prefix` 对「这是不是文本」只有一个答案。
-- **第一个窗口盖不住整份时，或格式是 Markdown 时，这一版进内容库**（`storage::Cas::put`，`crates/storage/Spec.lean` §8-36），然后才作答：之后的 `Query::Range` 与 `Query::Preview` 读的是这一版。放不进去（盘满、目录不可写）答 `Unreadable`，原话是内容库的拒因：答一个之后读不到的版本等于许诺一件做不到的事。整份放得下的纯文本版本不存（wire-SPEC §12.8，§12 第 33 条）。
+- **读盘只读一次，判定全在 `documents`。** `document_answer` 读文件的全部字节：读不到且是 `NotFound` 答 `Missing`，别的读错（目录、无权限）答 `Unreadable`，带系统的原话；零字节答 `Empty`；否则 `B3Hash::digest` 得版本，`Format::of_name` 读文件名，`Reading::of` 判文本，是文本就 `documents::head` 取第一个窗口（`crates/wire/Spec.lean` §8-69）。本模块不写任何一条判定，所以页面、`Content` 与 `Prefix` 对「这是不是文本」只有一个答案。
+- **第一个窗口盖不住整份时，或格式是 Markdown 时，这一版进内容库**（`storage::Cas::put`，`crates/storage/Spec.lean` §8-36），然后才作答：之后的 `Query::Range` 与 `Query::Preview` 读的是这一版。放不进去（盘满、目录不可写）答 `Unreadable`，原话是内容库的拒因：答一个之后读不到的版本等于许诺一件做不到的事。整份放得下的纯文本版本不存（wire D8，§12 第 33 条）。
 - **读内容库只有一处：`range::stored`。** `Cas::size` 得这一版的长度，前三个字节经 `Encoding::of_mark` 得编码，`documents::lift` 说要抬起哪一段，`Cas::get_range` 读它；交回编码与抬起的字节。`range_answer` 拿它经 `documents::cut` 切出窗口，`preview_answer` 拿它经 `documents::preview` 读出块（§8-23）。内容库没有这一版、或切出的字节不是文本，答 `Unavailable { query: "Range(<version>)" }`。
 - **`read_bytes` 留给 `Content` 与 `Prefix`。** 两者的答复形状不变（头 `DOC_BYTES_MAX` 字节、`truncated`、`binary`），判定换成 `Reading::of`，切法换成 `documents::cut`：一个块在内容库里、又是城里的一份文件时，两处给同一个判断。
-- 验收：`views::document::tests` 与 `views::answering::range::tests`，名字见 wire-SPEC §8-69、§8-70。
+- 验收：`views::document::tests` 与 `views::answering::range::tests`，名字见 `crates/wire/Spec.lean` §8-69、§8-70。
 
 ### 8-22 保存、修改提案与提交说明（`accounting::worker::commanding::saving`，形状 4 adapter；`accounting::views::proposals`，形状 7 投影）
 
@@ -992,8 +992,8 @@ fn give_messages(city_root: &Path, commits: &mut [wire::CommitAnswer]);
 - **决定修改提案也是一次保存。** `decide_proposals` 从 worker 的 `Governance.proposals` 找出点名的每一张卡（不在这份文档上、已经处理过、没有的都拒 `E_INVALID_ARGS`），经同一扇 `revise` 在锁里交给 `documents::decide`；有改动时写一行 `document_written`，然后每张卡一行 `proposal_decided`。卡的状态不在这里改：worker 写下的每一行都经 `RunWorker::absorb` 交给同一个折叠，重开的城读账本得到同一个答案。
 - **提案的折叠住 `Governance`，视图与 worker 各持一份、折法一处**（第 34 条）。`proposal_offered` 经 `documents::Offer::of` 读成一张卡，身份由它算出；读不出的一行（区间颠倒、超长）与别的读不出的治理行一样拒绝，让这座城停在打开那一步，而不是少一张人等着决定的卡（sprawling-SPEC 8-74 的同一条理由）。`proposal_decided` 与 `proposal_withdrawn` 把卡从开着挪到处理过；处理过的卡只记身份与怎样处理的，不留原文与提议。
 - **`Query::Proposals` 在锁内拷出这份文档上开着的卡，锁外读盘。** 文件此刻的版本要读一次全部字节（`B3Hash::digest`），所以与 `Document` 一样在快照放开之后做；卡的句子由 `Offer::review` 在那时切。文件缺失或读不了时 `version` 为 `None`，卡照答。
-- **提交说明读自 git，与父提交同一刻。** `CommitsAsk::read` 在快照放开之后先经 `storage::parents_of` 读父提交，再经 `give_messages` 读说明：一次打开仓库（`git2::Repository::open`），每个 oid 一次 `find_commit`，`Commit::message` 不是 UTF-8 或对象不在时为 `None`（wire-SPEC §8-54）。
-- 验收：`worker::commanding::tests::saving`（wire-SPEC §8-72、§8-73 列的那几条；`Query::Proposals` 的答复——开着的卡按提出的先后、文件此刻的版本——在其中经 `views::ask` 读）；`views::commits::tests::a_page_of_commits_carries_each_ones_message_from_git`。
+- **提交说明读自 git，与父提交同一刻。** `CommitsAsk::read` 在快照放开之后先经 `storage::parents_of` 读父提交，再经 `give_messages` 读说明：一次打开仓库（`git2::Repository::open`），每个 oid 一次 `find_commit`，`Commit::message` 不是 UTF-8 或对象不在时为 `None`（`crates/wire/Spec.lean` §8-54）。
+- 验收：`worker::commanding::tests::saving`（`crates/wire/Spec.lean` §8-72、§8-73 列的那几条；`Query::Proposals` 的答复——开着的卡按提出的先后、文件此刻的版本——在其中经 `views::ask` 读）；`views::commits::tests::a_page_of_commits_carries_each_ones_message_from_git`。
 
 ## 12 决策
 
@@ -1048,7 +1048,7 @@ fn give_messages(city_root: &Path, commits: &mut [wire::CommitAnswer]);
     (e) diff 的基准是同一 run 的上一个提交，没有时才用唯一的父提交；文件的六种状态分开写，凭据扫描是 `storage::hunks` 那一个；读不到 git 不让导出失败。理由：全城紧邻的提交可能属于别的 run，git 的父提交也可能出自别人或人自己（与 §12-28 同一条理由）；缺失、二进制、空、截断、隐去对读者是不同的事，混成一个「没有 diff」就让读者把「没动」读成「读不到」。账本是 bundle 的核心，git 是附件：附件缺了，核心那一段照样能回看。被否决的做法：对比工作区（不是历史）；用全城紧邻的 checkpoint 作基准；git 读不到就整个导出失败。
     (f) 字段一变，`SCHEMA` 与 `PROJECTION_RULES` 一起进位；读回时先只读 `schema`。理由：多了字段是形状变了，旧构建读不懂新 bundle，新构建也读不懂旧的；先看 `schema`，结构一项报的是「这是第几版、用哪一版复核」，而不是一条字段缺失。被否决的做法：只进 `PROJECTION_RULES`（旧 bundle 在解析时就失败，到不了「复核不了」那一步，报出来的是一条难懂的字段错误）。
 30. **死掉的 run 由启动扫描冻结，冻结行写成它的居民，结局读 `RunFrozen::lost`。** (a) 理由：只有拿到写者锁的那一刻才知道没有别的进程在驱动它，而 `startup_scan` 正是那一刻的那一遍验链；视图与 worker 的折叠都从账本来，账上一行冻结让服务中的城与重开的城对同一次 run 说同一个结局。写成居民而不是城，与补写结果未知的调用同一条理由，按居民计数的读者不必为死亡另写一条规则。被否决的做法：在服务时由视图把「没有冻结行、进程已重开过」的 run 读作死掉——那是视图的第二条冻结规则，而且一次性的 `views::ask` 与服务中的视图会各算一次；由 `RunWorker::new` 冻结——`new` 也在 `serve` 里跑，那时冻结要跟账本证明的次序对齐，而 `resume` 本来就是收拾死亡的那一步（sprawling-SPEC 8-109）。重开参数：`serve` 也要在起步时收拾死亡（不经 `resume`）时，把这一遍挪进它的起步路径，次序仍是先补调用、后冻 run。 (b) **指南进度住 `accounting::guide`，一个与 `person` 平行的模块，读写各一扇门。** 理由：页面读与命令写读的是同一份文件，文件的文法只能有一处；它不属于视图的折叠，也不属于 worker 的状态，`person` 已经是「一份人改的文件，读整份、写整份」的样子。被否决的做法：读放在 `views::answering`、写放在 `worker::commanding`——两处各知道一遍文件的形状。(c) **跑 gh 的函数经 `Views::ask_github_through` 交进来，主机名的判定与缺省主机留在视图。** 理由：起子进程碰主机，按第 9、10 条住 `sprawling`、经 `fn` 指针交进来；而「问哪台主机、这个串能不能交给 gh」是城对输入的判定，测试不必起 gh 就能判它。被否决的做法：经 `Hands` 交给 worker——这是一条查询，worker 不答查询；在二进制里判主机名——测试就要经过子进程才看得到拒绝。
-31. **(a) 视图的第二份按值克隆，不经快照编码。** 理由：两份视图要的是同一个折叠状态加上同一组共享句柄，派生的 `Clone` 正好如此，而编码再解码在 40 万行城上要 350 ms，是开城最长的一段之一（§8-19）。被否决的做法：①留在编码路径上，把复制挪到视图线程——首字节不再等它，但视图线程开头的每一批照样等 350 ms，而且要改装配根起线程的次序；②手写逐字段复制——字段清单的第二份拼写，加一个字段就要改两处。**(b) 重建从创世时不先证明。** 理由：全量折叠逐行核对每一行，判定与不带记录的证明相同；先证明再全量折叠是同一批行核对两遍（§8-19）。被否决的做法：照旧先证明，把证明的结果交给全量折叠跳过核对——折叠要的是每一行解析出的记录，跳过核对仍要解析，省下的只是规范回显的比较，却让「这一行核对过」有了两处来源。 **(c) 房间的各段 session 由视图折叠，表按地址存在 `views::sessions`。** 理由：作答不读盘，表的大小与 session 数同阶（wire-SPEC §12.9）。被否决的做法：把这张表并进 `worker::folds::SessionOrigins`——那张表回答的是派活要问的「这一段还欠不欠一段对话」，只留当前一段，worker 的 `Standing` 也不由页面读；把各段 session 并进 `lineage`——`lineage` 由读盘的 CLI 每次重建，服务中的城不持有它。
+31. **(a) 视图的第二份按值克隆，不经快照编码。** 理由：两份视图要的是同一个折叠状态加上同一组共享句柄，派生的 `Clone` 正好如此，而编码再解码在 40 万行城上要 350 ms，是开城最长的一段之一（§8-19）。被否决的做法：①留在编码路径上，把复制挪到视图线程——首字节不再等它，但视图线程开头的每一批照样等 350 ms，而且要改装配根起线程的次序；②手写逐字段复制——字段清单的第二份拼写，加一个字段就要改两处。**(b) 重建从创世时不先证明。** 理由：全量折叠逐行核对每一行，判定与不带记录的证明相同；先证明再全量折叠是同一批行核对两遍（§8-19）。被否决的做法：照旧先证明，把证明的结果交给全量折叠跳过核对——折叠要的是每一行解析出的记录，跳过核对仍要解析，省下的只是规范回显的比较，却让「这一行核对过」有了两处来源。 **(c) 房间的各段 session 由视图折叠，表按地址存在 `views::sessions`。** 理由：作答不读盘，表的大小与 session 数同阶（wire D9）。被否决的做法：把这张表并进 `worker::folds::SessionOrigins`——那张表回答的是派活要问的「这一段还欠不欠一段对话」，只留当前一段，worker 的 `Standing` 也不由页面读；把各段 session 并进 `lineage`——`lineage` 由读盘的 CLI 每次重建，服务中的城不持有它。
 32. **城的工具读别楼的文件与 `cas:` 块，只经 runtime 的 `BoundReader`。** 理由：读界与 reserved subtree 的判定住 `runtime::tools::chosen_path`，`read` 与 `search` 用它；一件读字节的工具若在本 crate 自己判，就是那份判定的第二个权威，而且只判得了本楼（`is_within`），连接器存进 CAS 的录音与截图都读不到（§8-20）。被否决的做法：①保留「只收本楼」并为 `cas:` 另写一段（两套判定，一套跟着 `read` 变，一套不跟）；②在本 crate 复制 `admit` 与 `land`（同上，且链接的判定要拷两遍）。重开参数：要读的字节不在读界之内（例如人拖进来、只给这一次 run 的文件），那时它是一个新的入口，而不是放宽这扇门。
 33. **文档的版本在第一个窗口盖不住整份时、或格式是 Markdown 时进内容库，由答 `Document` 的读面放进去。** 理由：之后的 `Range` 与 `Preview` 要读的是这一版，而版本的身份本来就是内容库的地址（documents D3），放进去之后按版本读就是按地址读对象，不需要第二个存放处；整份已经在答复里的纯文本版本页面不会再按版本要，存它只是让每一次打开多付一份拷贝，而 Markdown 版本不论长短页面都按版本预览（§8-23）。内容库按内容去重，同一版第二次放入不多写一份。放进去的是读面而不是写者：这是一次查询的副作用，但它只添一个按内容寻址、重复放入即去重的对象，不改任何一条历史，写者也不知道哪个页面在读哪一版。被否决的做法：①`Range` 读文件此刻、版本不符就拒——居民在写的文件每几秒动一次，读到一半的页面要从头重读；②每次打开都存——小文件的每一次打开都多一份拷贝；③由写者在每次保存时存——城之外的写者（人的编辑器、居民的 `edit`）不经过写者；④小的 Markdown 版本让 `Preview` 读文件此刻、摘要相符才答——两条读法各判一次「这是不是那一版」，而文件在两次读之间可能被改。重开参数：内容库长出回收时，被回收的版本要有自己的答复；页面要对比一份小的纯文本文件的两个版本时，小文件也存。
 34. **(a) 修改提案的折叠住 `views::Governance`，与待答的审批同一个值。** 理由：一张提案卡与一条审批同是「等人决定的事」，worker 判一次决定要的状态与页面画卡要的状态是同一个，`Governance` 正是「一份定义、两处持有、`what_a_worker_holds_is_what_a_restart_rebuilds` 判它们相等」的那个值；放进去之后，快照、重开、worker 写下一行就折一行，都不需要新的接线。被否决的做法：①worker 另折一份 `Standing` 字段、视图另折一份——两份折法；②决定时按身份回账本找那一行——要一个按内容找行的索引，而且「已经处理过」还要再扫一遍。**(b) 提交说明在本 crate 用 `git2` 直接读，与 `storage::parents_of` 各开一次仓库。** 理由：本轮 storage 的公开契约不改（它的规格在迁移），而本 crate 已经为 playback 链接 `git2`；读说明只是 `find_commit` 之后的一个字段，一页至多 `HISTORY_MAX` 个提交多开一次仓库。被否决的做法：①在本 crate 里连父提交一起读、不再调 `parents_of`——两处各有一份「父提交怎样读」，`parents_of` 留下来没有调用方；②把说明写进账本——提交对象就是它的权威，账本记的是 oid。重开参数：storage 的契约下一次能动时，`parents_of` 换成一次读出父提交与说明的读者，本 crate 的 `give_messages` 删去。

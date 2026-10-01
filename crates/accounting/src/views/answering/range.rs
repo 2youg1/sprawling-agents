@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One window of a stored document version (accounting-SPEC.md 8-21,
-//! wire-SPEC.md 8-70).
+//! `crates/wire/Spec.lean` §8-70).
 //!
 //! Reads the content store and nothing else: the version is the
 //! object's address, so a page reading on through a file a resident is

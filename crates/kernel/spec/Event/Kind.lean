@@ -220,7 +220,7 @@ def EventKind.windowClass : EventKind → WindowClass
   | .SpineDocumentWritten => .RecordOnly
   /- 一次派发所站的规则文档之一换了内容（城的 `CONFIG.toml`，楼的 `CONFIG.toml` 与 `RULES.toml`）：载荷携 scope、which（`RULES.toml`／`CONFIG.toml`，枚举 `GoverningDocument`）、前后两枚摘要与字节数，恒不携正文。在准入（`agree_to_work`）之后、第一次读规则之前落账——先落账再生效；准入拒绝的派发与不存在的楼不记。`before` 缺席即开账行；本行的 `after` 等于同一文档下一行的 `before`，断链本身说明有人绕过一切门改了文件 -/
   | .RulesChanged => .RecordOnly
-  /- 人请求接入一个外部应用，载荷只携 slug。**恒不携站位**——那是关于此刻的事实（wire-SPEC §8-31）；**恒不携 consent URL**——那是一张能力凭证，记进可重放的账本等于发给每一个重放的人 -/
+  /- 人请求接入一个外部应用，载荷只携 slug。**恒不携站位**——那是关于此刻的事实（`crates/wire/Spec.lean` §8-35b）；**恒不携 consent URL**——那是一张能力凭证，记进可重放的账本等于发给每一个重放的人 -/
   | .ToolkitLinkOpened => .RecordOnly
   -- 供应商与模态
   /- 一次嵌入调用入账：模型、请求多少条、回来多少个向量、调用方要的维度与 provider 自报的 token。向量本身不在此处——与 `model_called` 不携请求体同理，它是可从记录的输入重算的派生值，存两份就是同一件事有两个家 -/

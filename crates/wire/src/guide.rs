@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How far the person has got through the first-run guide, kept per
-//! city (wire-SPEC.md 8-68): the record a page reads with `Query::Guide`
+//! city (`crates/wire/spec/Guide.lean` §8-68): the record a page reads with `Query::Guide`
 //! and writes whole with `Command::PutGuide`, beside `preference`, which
 //! is the same kind of record for the person's own settings.
 //!

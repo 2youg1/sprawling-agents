@@ -22,7 +22,7 @@ use kernel::{AxCode, AxError, B3Hash};
 ///
 /// The verdict a door hands inward, so it is vocabulary rather than
 /// listener: the city's writer reads it without the `server` feature
-/// (wire-SPEC.md 12.2).
+/// (wire D2).
 ///
 /// An enum rather than a boolean so that neither a door nor an
 /// admission can pass the verdict the wrong way round and still

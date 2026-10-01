@@ -43,7 +43,7 @@ pub enum Command<Secret = Sealed<String>> {
         goal: String,
         /// The four values the run works under: mode, write limit,
         /// admission requirement and landing policy, all four stated
-        /// (wire-SPEC.md section 8-57). Written as sent into the run's
+        /// (`crates/wire/spec/Command.lean` §8-57). Written as sent into the run's
         /// `run_started` line.
         policy: RunPolicy,
         idem: IdemKey,
@@ -70,7 +70,7 @@ pub enum Command<Secret = Sealed<String>> {
         /// model the city registered under some tag, so it arrives with
         /// the endpoint and the window it was registered with; an id the
         /// city never registered is refused before anything is written
-        /// (wire-SPEC.md section 8-48c).
+        /// (`crates/wire/spec/Command.lean` §8-48c).
         model: Option<String>,
     },
     /// Asks a base URL what it serves, and attaches nothing.
@@ -300,7 +300,7 @@ pub enum Command<Secret = Sealed<String>> {
     },
     /// Writes one of the three documents that govern this city, whole,
     /// only if it still holds `base`: the raw editor and the identity
-    /// cards are two writers of one file (wire-SPEC.md 8-59).
+    /// cards are two writers of one file (`crates/wire/spec/Answer/Identity.lean` §8-59).
     PutDocument {
         which: GovernedDocument,
         base: String,
@@ -308,28 +308,28 @@ pub enum Command<Secret = Sealed<String>> {
         idem: IdemKey,
     },
     /// One identity card: the city rewrites the card's keys in `base`'s
-    /// identity area and leaves every other byte (wire-SPEC.md 8-59).
+    /// identity area and leaves every other byte (`crates/wire/spec/Answer/Identity.lean` §8-59).
     PutIdentity {
         card: IdentityCard,
         base: String,
         idem: IdemKey,
     },
-    /// Writes a building's `RULES.toml` whole (wire-SPEC.md 8-60).
+    /// Writes a building's `RULES.toml` whole (`crates/wire/spec/Command/Step.lean` §8-60).
     PutRules(RulesWrite),
     /// Takes one file of the city's own tree back to what a checkpoint
-    /// holds, or away when it holds none (wire-SPEC.md 8-62).
+    /// holds, or away when it holds none (`crates/wire/spec/Answer/Automation.lean` §8-62).
     RestoreFile {
         at: Address,
         point: GitOid,
         idem: IdemKey,
     },
     /// Writes this city's first-run guide progress whole; the later of
-    /// two writes stays (wire-SPEC.md 8-68).
+    /// two writes stays (`crates/wire/spec/Guide.lean` §8-68).
     PutGuide {
         progress: GuideProgress,
         idem: IdemKey,
     },
-    /// Writes the city's own layer (wire-SPEC.md 8-61).
+    /// Writes the city's own layer (`crates/wire/spec/Command/Step.lean` §8-61).
     ConfigureCity(CitySettings),
     /// Writes one of a building's own spine documents.
     ///
@@ -346,9 +346,9 @@ pub enum Command<Secret = Sealed<String>> {
         body: String,
         idem: IdemKey,
     },
-    /// Saves edits on one document version (wire-SPEC.md 8-72).
+    /// Saves edits on one document version (`crates/wire/spec/Command/Step.lean` §8-72).
     PutRange(RangeWrite),
-    /// Decides proposal cards on one document (wire-SPEC.md 8-73).
+    /// Decides proposal cards on one document (`crates/wire/spec/Answer/Proposals.lean` §8-73).
     DecideProposals(ProposalDecisions),
     /// Connects one outside application through the broker that holds its OAuth, answered with the
     /// whole shelf: the broker was asked, so every row is fresh, and the pressed one carries its

@@ -144,7 +144,7 @@ The remote door lets a phone or a second computer reach a city that runs on this
 | `/remote revoke <name>` or `--all` | Forgets the device; its sessions end. |
 | `/remote close` | Closes the door. Paired devices stay paired. |
 
-Nothing that widens access, reaches a credential, or changes the machine or the city's rules can be done from a device, whatever it was paired as: attaching an endpoint, choosing a model, writing rules or configuration, installing a tool, raising or removing a building. Those stay at the machine the city runs on. The full list is the `class` column of `crates/wire/wire-SPEC.md` section 19-2.
+Nothing that widens access, reaches a credential, or changes the machine or the city's rules can be done from a device, whatever it was paired as: attaching an endpoint, choosing a model, writing rules or configuration, installing a tool, raising or removing a building. Those stay at the machine the city runs on. The full list is the `class` column of `crates/wire/Spec.lean` §19-2.
 
 The history records `remote_opened`, `device_paired`, `remote_session_started`, `device_revoked` and `remote_closed`, without keys, pairing codes or session ids.
 

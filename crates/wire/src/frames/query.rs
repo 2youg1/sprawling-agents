@@ -65,7 +65,7 @@ pub enum Query {
         limit: u32,
     },
     /// The stretches of one room, newest first, which a page loses on a
-    /// reload: [`SessionsAnswer`](crate::SessionsAnswer) (wire-SPEC §8-71).
+    /// reload: [`SessionsAnswer`](crate::SessionsAnswer) (`crates/wire/spec/Answer/Sessions.lean` §8-71).
     Sessions {
         room: Address,
     },
@@ -149,14 +149,14 @@ pub enum Query {
         addr: Address,
     },
     /// What the city calls the person and the Mayor, read from the two
-    /// identity areas at the moment of asking (wire-SPEC.md 8-59).
+    /// identity areas at the moment of asking (`crates/wire/spec/Answer/Identity.lean` §8-59).
     Identity,
     /// The schedule and the watch table, read at the moment of asking:
-    /// shown on the page, written by hand (wire-SPEC.md 8-62).
+    /// shown on the page, written by hand (`crates/wire/spec/Answer/Automation.lean` §8-62).
     Automation,
-    /// A candidate user id: gh's login for a host (wire-SPEC.md 8-67).
+    /// A candidate user id: gh's login for a host (`crates/wire/spec/Answer/Github.lean` §8-67).
     GithubLogin(Option<String>),
-    /// The first-run guide's progress (wire-SPEC.md 8-68).
+    /// The first-run guide's progress (`crates/wire/spec/Guide.lean` §8-68).
     Guide,
     /// Who answers for this city, and what has been answered on the
     /// person's behalf.
@@ -206,25 +206,25 @@ pub enum Query {
         at: Option<Address>,
     },
     /// One file of the city as a version, with its first window
-    /// (wire-SPEC 8-69). The path is an `Address`, so it cannot leave the
+    /// (`crates/wire/spec/Answer/Document.lean` §8-69). The path is an `Address`, so it cannot leave the
     /// city root; the reserved subtree is readable on purpose, because
     /// this door answers the person and not a resident.
     Document {
         at: Address,
     },
-    /// The proposal cards still open on one document (wire-SPEC 8-73).
+    /// The proposal cards still open on one document (`crates/wire/spec/Answer/Proposals.lean` §8-73).
     Proposals(Address),
-    /// One window of a stored version, by its version (wire-SPEC 8-70).
+    /// One window of a stored version, by its version (`crates/wire/spec/Answer/Range.lean` §8-70).
     Range {
         version: B3Hash,
         range: documents::Span,
     },
-    /// One window of a stored Markdown version, laid out (wire-SPEC 8-74).
+    /// One window of a stored Markdown version, laid out (`crates/wire/spec/Answer/Preview.lean` §8-74).
     Preview {
         version: B3Hash,
         viewport: documents::Span,
     },
-    /// A reply's text, laid out by the preview's grammar (wire-SPEC 8-75).
+    /// A reply's text, laid out by the preview's grammar (`crates/wire/spec/Answer/Preview.lean` §8-75).
     Reply {
         text: String,
         state: documents::ReplyState,

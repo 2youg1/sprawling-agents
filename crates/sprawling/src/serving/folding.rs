@@ -333,7 +333,7 @@ fn file_slices(slices: &mut Option<storage::Sessions>, batch: Vec<Fold>) -> u64 
 
 /// Moves the head past `record` and sends it to every client. The frame
 /// is spelled here, once, whatever the number of sockets that will write
-/// it (wire-SPEC.md 8-47).
+/// it (`crates/wire/Spec.lean` §8-47).
 fn send_committed(broadcast: &Broadcast, record: &EventRecord) {
     broadcast.head.advance(record.seq());
     match wire::Committed::new(record.clone()) {
@@ -341,7 +341,7 @@ fn send_committed(broadcast: &Broadcast, record: &EventRecord) {
         // browser open is a city doing its work.
         Ok(committed) => drop(broadcast.to_clients.send(committed)),
         // The next record's seq gap makes every live session send
-        // `Lagged` for this one (wire-SPEC.md 8-41).
+        // `Lagged` for this one (`crates/wire/Spec.lean` §8-41).
         Err(unframed) => {
             eprintln!("a committed record has no frame and reaches no client: {unframed}");
         }

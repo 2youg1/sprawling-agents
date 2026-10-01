@@ -4,9 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which class of verb a frame from a remote device carries
-//! (sprawling-SPEC.md 8-139; wire-SPEC.md section 19-2).
+//! (sprawling-SPEC.md 8-139; `crates/wire/Spec.lean` §19-2).
 //!
-//! The table in wire-SPEC.md section 19-2 states each Command's class,
+//! The table in `crates/wire/Spec.lean` §19-2 states each Command's class,
 //! and `xtask wiring` reads the arms of [`command_class`] against it, so
 //! the table and this match are one decision written twice and checked
 //! as one. The match is exhaustive: a Command added to the wire does
@@ -41,7 +41,7 @@ pub(super) fn passage(frame: wire::ClientFrame) -> Passage {
     }
 }
 
-/// The class of one Command, as wire-SPEC.md section 19-2 states it.
+/// The class of one Command, as `crates/wire/Spec.lean` §19-2 states it.
 ///
 /// `Act` is the work a person away from the machine still does: send
 /// work, change its course, stop it, answer what it asks. Everything

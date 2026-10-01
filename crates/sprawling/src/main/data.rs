@@ -65,7 +65,7 @@ pub(super) fn enrol(read: &Arguments) -> ExitCode {
         Ok(reference) => {
             println!("{reference}");
             // Accepted, not yet stored: the route answers before the
-            // worker has taken it (wire-SPEC.md section 8).
+            // worker has taken it (`crates/wire/Spec.lean` §8).
             eprintln!("accepted; the city stores it as soon as its worker is free");
             ExitCode::SUCCESS
         }

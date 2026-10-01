@@ -5,7 +5,7 @@
 
 //! Which host a GitHub import asks, whether it names a host at all, and
 //! the reader the served city handed in (accounting-SPEC.md 8-18-3,
-//! wire-SPEC.md 8-67).
+//! `crates/wire/Spec.lean` §8-67).
 //!
 //! Starting `gh` reaches this machine and the network, so the reader is
 //! the binary's (`bin::doctor::github`) and arrives as a `fn` pointer;

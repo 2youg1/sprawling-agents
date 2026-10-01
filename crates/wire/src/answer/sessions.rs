@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The stretches of one room, newest first: where each began, how, its
-//! runs and its last line (wire-SPEC §8-71).
+//! runs and its last line (`crates/wire/spec/Answer/Sessions.lean` §8-71).
 
 use kernel::{Address, Origin, Seq, TimeMs};
 use serde::{Deserialize, Serialize};

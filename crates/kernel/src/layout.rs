@@ -205,7 +205,7 @@ impl CityLayout {
     }
 
     /// How far the person has got through this city's first-run guide
-    /// (wire-SPEC 8-68).
+    /// (`crates/wire/Spec.lean` §8-68).
     ///
     /// Under the city's reserved subtree, because it decides what this
     /// city shows a person when it opens, and no write domain reaches it.

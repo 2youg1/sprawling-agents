@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What the city calls the person and the Mayor, as a page reads it
-//! (wire-SPEC.md 8-59).
+//! (`crates/wire/spec/Answer/Identity.lean` §8-59).
 
 use kernel::B3Hash;
 use serde::{Deserialize, Serialize};

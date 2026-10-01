@@ -7,7 +7,7 @@
 
 <script lang="ts" module>
   // The harness page: the official harnesses a subscription reaches
-  // the city through, one card each (wire-SPEC 8-52).
+  // the city through, one card each (`crates/wire/Spec.lean` §8-52).
   //
   // **The roster and the commands are the city's** (`Query::Harnesses`,
   // read from `agent_protocols::harness`); this page draws them and holds no

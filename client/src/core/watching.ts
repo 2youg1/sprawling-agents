@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Whether this page watches the city's performance monitor, and the
-// readings it has been sent (wire-SPEC 8-47).
+// readings it has been sent (`crates/wire/Spec.lean` §8-47).
 //
 // **The city samples only while somebody watches**, so this page says
 // the most any of its watchers wants: `watch` while a monitor panel is

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two automation files a page reads (wire-SPEC.md 8-62): read at
+//! The two automation files a page reads (`crates/wire/Spec.lean` §8-62): read at
 //! the moment of asking, through the same loaders the schedule tick and
 //! the watch listener read them through.
 

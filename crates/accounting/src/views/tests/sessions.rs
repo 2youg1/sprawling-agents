@@ -9,7 +9,7 @@ use kernel::{Address, EventKind, Payload, RunId};
 
 /// A room's stretches come from the fold: where each began, how, its runs
 /// and its last line, newest first, with nothing of another room in them,
-/// answered without leaving the lock (wire-SPEC 8-71).
+/// answered without leaving the lock (`crates/wire/Spec.lean` §8-71).
 #[test]
 fn a_room_s_sessions_are_answered_from_the_fold() {
     let dir = tempfile::tempdir().unwrap();

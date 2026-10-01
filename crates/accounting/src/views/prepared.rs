@@ -287,7 +287,7 @@ impl Prepared {
                 Ok(answer) => wire::Answer::Config(Box::new(answer)),
                 Err(_) => unavailable(format!("Config({})", addr.as_str())),
             },
-            // Leaves this machine, and only on a press (wire-SPEC 8-36),
+            // Leaves this machine, and only on a press (`crates/wire/Spec.lean` §8-36),
             // through the registry a served city handed the views.
             Self::Release(Some(newest)) => wire::Answer::Release(Box::new(newest())),
             Self::Release(None) => unavailable("NewestRelease".to_owned()),
@@ -304,7 +304,7 @@ impl Prepared {
                 wire::Answer::Listing(listing_answer(&city_root, at))
             }
             // Missing, unreadable and empty are answers of their own
-            // (wire-SPEC 8-69), so this read always answers a document.
+            // (`crates/wire/Spec.lean` §8-69), so this read always answers a document.
             Self::Document { city_root, at } => {
                 wire::Answer::Document(Box::new(document_answer(&city_root, at)))
             }

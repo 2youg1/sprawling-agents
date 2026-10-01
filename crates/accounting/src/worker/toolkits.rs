@@ -19,7 +19,7 @@ impl RunWorker {
     ///
     /// **What is recorded is the request, never the standing and never
     /// the consent url.** Where an application stands is a fact about
-    /// now and belongs to the broker (wire-SPEC.md section 8-31); a
+    /// now and belongs to the broker (`crates/wire/Spec.lean` §8-35b); a
     /// consent url is a capability, and anybody replaying this log would
     /// be holding one. The page reads both back from the broker with
     /// `Query::Toolkits` immediately afterwards.

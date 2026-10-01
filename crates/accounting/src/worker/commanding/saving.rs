@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A page's save of one document, and a person's decision on the
-//! proposal cards of one (accounting-SPEC.md 8-22, wire-SPEC.md 8-72,
+//! proposal cards of one (accounting-SPEC.md 8-22, `crates/wire/Spec.lean` §8-72,
 //! 8-73).
 //!
 //! Both read the document's bytes inside its lock, hand them to the
@@ -92,7 +92,7 @@ impl RunWorker {
 
     /// Where a document a page names lives, refused inside the reserved
     /// subtree: the files there have doors of their own that judge what
-    /// they are given before it lands (wire-SPEC.md 8-72).
+    /// they are given before it lands (`crates/wire/Spec.lean` §8-72).
     fn document_path(&self, doc: &Address) -> Result<PathBuf, AxError> {
         if doc.is_reserved() {
             return Err(AxError::failure(

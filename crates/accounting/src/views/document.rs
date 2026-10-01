@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One file of the city, read once from disk and answered as a version
-//! (accounting-SPEC.md 8-21, wire-SPEC.md 8-69).
+//! (accounting-SPEC.md 8-21, `crates/wire/Spec.lean` §8-69).
 //!
 //! Every judgement - which version, whether the bytes are text, where
 //! the first window ends - is the `documents` crate's; this module reads

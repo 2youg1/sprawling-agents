@@ -82,21 +82,21 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
     // which forces the SPEC to move in the same change set (apisync gate).
     // A changed name moves the hash the handshake compares; `WIRE_V` rises
     // only for a shape change under names that stay, once between two
-    // pushes (wire-SPEC §12.1).
+    // pushes (wire D1).
     assert_eq!(
         schema_hash().to_string(),
         WIRE_SCHEMA_GOLDEN,
-        "schema hash changed - update wire-SPEC.md section 8-1 in the same commit"
+        "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
         WIRE_V, 45,
-        "WIRE_V rises once between two pushes, for a shape change under names that stay (wire-SPEC 12.1)"
+        "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
 
 /// The event kinds reach a page inside every event frame, so a renamed,
 /// added or removed kind must move the hash a page is admitted by, as a
-/// renamed frame does. The recipe is the one wire-SPEC.md states.
+/// renamed frame does. The recipe is the one wire D1 states.
 #[test]
 fn the_schema_hash_covers_every_event_kind_name() {
     let mut material = b"sprawling/wire/".to_vec();
@@ -129,7 +129,7 @@ fn the_wire_shape_is_pinned_so_a_change_meets_the_version_rule() {
         digest.to_string(),
         WIRE_SHAPE_GOLDEN,
         "the wire changed shape. If no shape change has landed since the last push, raise \
-         WIRE_V in this commit (wire-SPEC 12.1); then set WIRE_SHAPE_GOLDEN to the digest above"
+         WIRE_V in this commit (wire D1); then set WIRE_SHAPE_GOLDEN to the digest above"
     );
 }
 
@@ -338,7 +338,7 @@ fn every_state_changing_command_carries_an_idempotency_key() {
 // ----------------------------------------------------------- retired frames
 
 /// The two frames that left the wire rather than staying on it answered
-/// with `not_built` for ever (wire-SPEC.md section 8-44,
+/// with `not_built` for ever (`crates/wire/spec/Command.lean` §8-44,
 /// kernel D2). Their bytes still spell what they
 /// spelled, and that is no longer a command: what a client gets for them
 /// is the grammar's own unknown-variant refusal, not a verb it may offer

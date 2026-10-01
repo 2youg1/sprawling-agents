@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The city's cost view: one authoritative total and the cuts of it a
-//! page draws (wire-SPEC.md 8-2).
+//! page draws (`crates/wire/spec/Server.lean` §8-2).
 
 use kernel::UsdMicros;
 use serde::{Deserialize, Serialize};

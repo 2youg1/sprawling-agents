@@ -17,7 +17,7 @@ name = "wire"
 default = ["server"]
 server = ["dep:tokio", "dep:axum"]
 # The JSON Schema of the whole envelope, which `cargo xtask wire-ts` turns
-# into the TypeScript client's types (wire-SPEC.md section 8-16). Off
+# into the TypeScript client's types (`crates/wire/spec/Frames.lean` §8-16). Off
 # for the product binary: it does not ask what its frames look like, and
 # the answer must not travel to a browser.
 schema = ["dep:schemars", "kernel/schema", "documents/schema"]

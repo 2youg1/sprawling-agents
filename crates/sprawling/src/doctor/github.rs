@@ -5,7 +5,7 @@
 
 //! The GitHub CLI on this machine asked which login one host is signed in
 //! as: the reader the served city hands its views for a `GithubLogin`
-//! query (wire-SPEC.md 8-67, accounting-SPEC.md 8-18-3).
+//! query (`crates/wire/Spec.lean` §8-67, accounting-SPEC.md 8-18-3).
 //!
 //! **It never waits on a person and never keeps a secret.** stdin is
 //! empty and `GH_PROMPT_DISABLED` is set, so `gh` fails rather than asks;

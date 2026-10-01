@@ -78,7 +78,7 @@ export function commitsQuery(building: Address | null, before: Seq | null): Quer
 // The one spelling of the GitHub import question: the login the GitHub
 // CLI on the city's machine is signed in as for `host`, the city's
 // default host when `null`. Asked only when the person presses import
-// (wire-SPEC 8-67).
+// (`crates/wire/Spec.lean` §8-67).
 export function githubLoginQuery(host: string | null): Query {
   return { github_login: host };
 }

@@ -269,7 +269,7 @@ pub enum PreferencePatch {
     /// sending an empty `spelled`.
     Chord(Chord),
     /// Whether the core's threads stand above normal. Lands in the
-    /// file's `[core]` section, not in `[ui]` (wire-SPEC.md 8-61).
+    /// file's `[core]` section, not in `[ui]` (`crates/wire/spec/Command/Step.lean` §8-61).
     CorePriority(CorePriority),
 }
 

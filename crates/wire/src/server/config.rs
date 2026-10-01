@@ -212,7 +212,7 @@ pub(crate) struct ShellState {
     pub(crate) epoch: Option<B3Hash>,
 }
 
-/// The performance monitor as a session sees it (wire-SPEC.md 8-47).
+/// The performance monitor as a session sees it (`crates/wire/spec/Frames/Monitor.lean` §8-47g).
 ///
 /// Whether anybody watches is decided where the history is kept; a
 /// session holds what `watch` returned for as long as it watches, and
@@ -244,7 +244,7 @@ pub type AcpSink =
 pub type TranscribeSink = Arc<dyn Fn(Vec<u8>, String) -> Result<String, AxError> + Send + Sync>;
 
 /// Where a file dropped onto the composer goes: its name and its bytes
-/// in, the absolute path the city kept it at out (wire-SPEC.md 8-49).
+/// in, the absolute path the city kept it at out (`crates/wire/spec/Server.lean` §8-49).
 pub type DropSink = Arc<dyn Fn(&str, &[u8]) -> Result<String, AxError> + Send + Sync>;
 
 /// The largest file `/drop` takes. axum's own default of 2 MiB refuses an

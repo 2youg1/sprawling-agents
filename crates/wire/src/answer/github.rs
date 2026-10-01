@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A candidate user id read from the GitHub CLI on the machine that
-//! serves the city, as a page reads it (wire-SPEC.md 8-67).
+//! serves the city, as a page reads it (`crates/wire/spec/Answer/Github.lean` §8-67).
 
 use serde::{Deserialize, Serialize};
 

@@ -281,7 +281,7 @@ pub struct ToolCalled {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub render: Option<RenderIntent>,    // 调用那一刻这件工具登记的呈现
 }
-// Effect 与 RenderIntent 在 feature `schema` 下派生 JsonSchema：线上 Call 直接携它们（wire-SPEC §8-55）
+// Effect 与 RenderIntent 在 feature `schema` 下派生 JsonSchema：线上 Call 直接携它们（`crates/wire/Spec.lean` §8-55）
 ```
 
 - **写方只有回合的工具波**：`runtime::turn::wave` 写 `tool_called` 时，从工具面的 `ConcurrentInvoke::meta_of` 取这件工具的 `ToolMeta`，照录其中两项（`crates/runtime/Spec.lean` §8-51）。工具面不认识这个名字时两者缺席——一次调用了没登记的工具，是一个真实状态。
@@ -351,7 +351,7 @@ pub struct RunStarted {
 ```
 
 - **两个键都只是摘要。** 身份本身——名字与「关于你」——在两份治理文档里，冻下的那一版在内容库里，摘要是读回它的钥匙（`cas:<naming>`）。账本不抄名字：名字是人改的字，抄进不可删的历史就有了第二个家，而人删掉的一段「关于你」会永远留在那里。
-- **回执。** 写 `MAYOR.md` 或 `PREFERENCES.md`（`PutDocument`、`PutIdentity`）之后的那一行带上新的身份版本，页面见到它才把卡片标为已保存（wire-SPEC §8-59）。写 `CLERK.md` 不动身份，键缺席。
+- **回执。** 写 `MAYOR.md` 或 `PREFERENCES.md`（`PutDocument`、`PutIdentity`）之后的那一行带上新的身份版本，页面见到它才把卡片标为已保存（`crates/wire/Spec.lean` §8-59）。写 `CLERK.md` 不动身份，键缺席。
 - **一次 run 用的是哪一版。** `run_started.naming` 由 `runtime::run::Charter::open` 从 `RunPlan.naming` 照录（`crates/runtime/Spec.lean` §8-56）。旧行没有这个键，读作「这一行早于身份入账」，页面回退到地址或角色名，不用今天的名字。
 - 两个键都按 `default` 加、缺席不写，所以旧账本照读，旧构建读新行时把它们当未知键拒（§8-40 的方向门照旧）。
 - 验收：`record::run` 的 `a_run_started_line_records_the_naming_it_froze`（写出、读回、缺席不写）。
@@ -393,7 +393,7 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 ```
 
 - **四种都是 record-only，追加在 `ALL` 末尾**，次序是 `document_written`、`proposal_offered`、`proposal_decided`、`proposal_withdrawn`（D15）。不写 `ig`：0.0.7 的读者不认识它们，按 D10 报 `E_LOG_VERSION_UNSUPPORTED`。
-- **`document_written` 是保存的回执**：写在城名下，载荷不携正文；同一条命令写下的每一行都带那条命令的 `idem`（accounting 的 `commanding::entrance`），页面凭它认出「这是我那一次」，并从 `version` 读到下一次保存的基线（wire-SPEC §8-72）。`bytes` 是新版本的长度，不是改了多少。
+- **`document_written` 是保存的回执**：写在城名下，载荷不携正文；同一条命令写下的每一行都带那条命令的 `idem`（accounting 的 `commanding::entrance`），页面凭它认出「这是我那一次」，并从 `version` 读到下一次保存的基线（`crates/wire/Spec.lean` §8-72）。`bytes` 是新版本的长度，不是改了多少。
 - **区间是两个整数，不是 `documents::Span`**：kernel 不依赖 `documents`，读者经 `documents::Span::new(start, end)` 把它读回来，起点在终点之后的一行在那里被拒。
 - **`before` 与 `after` 各至多 `documents::WINDOW_BYTES_MAX` 字节**：一张卡是一个窗口读得下的一段（documents D18）。判定在提出提案的那一处，kernel 只携带。
 - **提案的身份不在载荷里**：它是提出它的 run 与上面六个值的摘要，由 `documents::Offer::id` 一处算出（documents D13）；`proposal_decided` 与 `proposal_withdrawn` 的 `proposal` 就是这个摘要。同一个 run 对同一版同一段提同一句话是同一个提案。
@@ -415,7 +415,7 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 **理由**：一件工具是什么，权威是它的 `ToolMeta`；这份登记只在一次 run 的工具台上存在，折叠账本的读面够不到它，而楼的 MCP 工具与内置工具的登记每次 run 都可能不同。写在调用那一行上，读面读到的就是那一刻的事实，一件新工具进来不需要任何读者多写一臂。
 
-**被否**：①读面按工具名穷尽匹配出呈现：每加一件工具都要改这个匹配，MCP 工具的名字读面根本不知道；②读面持一份工具登记，在折叠时查：登记随楼与 run 变，旧行会被今天的登记重新解释；③线上自定一个不含地址的投影枚举：同一规则的第二个权威（wire-SPEC §8-0）。
+**被否**：①读面按工具名穷尽匹配出呈现：每加一件工具都要改这个匹配，MCP 工具的名字读面根本不知道；②读面持一份工具登记，在折叠时查：登记随楼与 run 变，旧行会被今天的登记重新解释；③线上自定一个不含地址的投影枚举：同一规则的第二个权威（`crates/wire/Spec.lean` §8-0）。
 
 **代价**：经工具台写下的每条 `tool_called` 多二三十个字节。
 

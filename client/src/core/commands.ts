@@ -98,7 +98,7 @@ export function dispatch(d: Dispatch): Command {
       task: d.task,
       goal: statedGoal(d.mode, d.goal),
       // The page offers the mode alone today; the other three values
-      // are the ones that add nothing (wire-SPEC 8-57): the full write
+      // are the ones that add nothing (`crates/wire/Spec.lean` §8-57): the full write
       // limit, the building's own checks, the ordinary landing.
       policy: { mode: d.mode, write: "full", admit: "standing", landing: "ordinary" },
       session: null,
@@ -351,7 +351,7 @@ export function putDocument(which: GovernedDocument, base: string, body: string)
 
 // One identity card. The city rewrites the card's keys in `base`'s
 // identity area and keeps every other byte, so the page never writes
-// TOML (wire-SPEC 8-59).
+// TOML (`crates/wire/Spec.lean` §8-59).
 export function putIdentity(card: IdentityCard, base: string): Command {
   return { put_identity: { card, base, idem: mintIdem() } };
 }

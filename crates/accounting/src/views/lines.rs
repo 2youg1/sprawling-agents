@@ -130,7 +130,7 @@ pub(crate) fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsA
 }
 
 /// The vendors this city knows by host, copied row for row from the
-/// preset table (wire-SPEC.md 8-51). A row the normaliser refuses
+/// preset table (`crates/wire/Spec.lean` §8-51). A row the normaliser refuses
 /// is a defect of the table, and the answer names itself unavailable
 /// with the row's refusal rather than listing the rest as if whole.
 pub(crate) fn known_hosts_answer() -> wire::Answer {
@@ -159,7 +159,7 @@ pub(crate) fn known_hosts_answer() -> wire::Answer {
 
 /// The harness page: every official harness in the roster, the command
 /// that starts it, and whether the search the served city handed in
-/// finds that command's program (wire-SPEC.md 8-52, accounting-SPEC.md
+/// finds that command's program (`crates/wire/Spec.lean` §8-52, accounting-SPEC.md
 /// 8-10).
 pub(crate) fn harnesses_answer(find: fn(&str) -> Option<PathBuf>) -> wire::Answer {
     wire::Answer::Harnesses(wire::HarnessesAnswer {

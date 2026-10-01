@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One file of the city, as a version (wire-SPEC.md 8-69).
+//! One file of the city, as a version (`crates/wire/spec/Answer/Document.lean` §8-69).
 //!
 //! A page that edits a file has to know which version it read, so the
 //! answer names it; and "nothing is here", "something is here that will

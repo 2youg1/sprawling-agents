@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 
 /// Wire format version. Rises by one between two pushes, in the first commit
 /// that changes a frame's shape while every frame and kind name stays
-/// (wire-SPEC §12.1); a changed name moves [`schema_hash`] on its own.
+/// (wire D1); a changed name moves [`schema_hash`] on its own.
 pub const WIRE_V: u32 = 45;
 mod ask;
 mod monitor;

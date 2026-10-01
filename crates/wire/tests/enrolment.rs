@@ -29,8 +29,8 @@
 // The route this file drives exists only in a build with the listener.
 // Without it there is no router, no axum and no tokio, and a test file
 // that named them anyway turned `--no-default-features` red for the one
-// build that has no business carrying them (wire-SPEC.md section
-// 8-22).
+// build that has no business carrying them (`crates/wire/spec/Server.lean`
+// §8-22).
 #![cfg(feature = "server")]
 #![allow(
     clippy::unwrap_used,

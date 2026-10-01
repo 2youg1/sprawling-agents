@@ -77,7 +77,7 @@ impl RunWorker {
 
 impl RunWorker {
     /// Takes one file of the city's own tree back to what a checkpoint
-    /// holds, then records the step (wire-SPEC.md 8-62).
+    /// holds, then records the step (`crates/wire/Spec.lean` §8-62).
     ///
     /// # Errors
     /// Refuses `E_BUSY` while a run works in that building, naming the

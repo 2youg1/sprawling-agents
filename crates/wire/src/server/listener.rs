@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The port a city takes before it opens, and serving on it
-//! (wire-SPEC.md 8-46).
+//! (`crates/wire/spec/Server/Listener.lean` §8-46).
 //!
 //! Two steps, because the assembly layer needs a gap between them: a
 //! city takes its port first, then opens its one writer, and only then

@@ -107,7 +107,7 @@ impl super::holding::Views {
     }
 
     /// The commits this city made, newest first, one page at a time
-    /// (wire-SPEC section 8-24).
+    /// (`crates/wire/Spec.lean` §8-24).
     ///
     /// `before` is exclusive; `limit` is clamped to the same ceiling as
     /// `History`. `more` says whether a further page exists, found by
@@ -292,7 +292,7 @@ impl CommitsAsk {
 }
 
 /// The two facts of a commit only its object holds, read once the
-/// snapshot is let go (sprawling-SPEC 8-128, wire-SPEC 8-54).
+/// snapshot is let go (sprawling-SPEC 8-128, `crates/wire/Spec.lean` §8-54).
 fn give_git_facts(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
     give_parents(city_root, commits);
     give_messages(city_root, commits);
@@ -508,7 +508,7 @@ mod tests {
         );
     }
 
-    /// wire-SPEC 8-54: a commit's message is read from its object, as its
+    /// `crates/wire/Spec.lean` §8-54: a commit's message is read from its object, as its
     /// parents are; one the repository does not hold has none to read.
     #[test]
     fn a_page_of_commits_carries_each_ones_message_from_git() {

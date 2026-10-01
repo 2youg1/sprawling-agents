@@ -214,8 +214,8 @@ impl RunWorker {
 
     /// Writes one identity card into its document, only if the document
     /// still holds `base`, and records that it happened with the identity
-    /// version it leaves: the receipt a page waits for (wire-SPEC.md
-    /// 8-59).
+    /// version it leaves: the receipt a page waits for (`crates/wire/Spec.lean`
+    /// §8-59).
     ///
     /// # Errors
     /// Propagates a name outside its domain, an identity area in `base`

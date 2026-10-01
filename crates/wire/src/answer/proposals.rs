@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The proposal cards still open on one document (wire-SPEC.md 8-73).
+//! The proposal cards still open on one document (`crates/wire/spec/Answer/Proposals.lean` §8-73).
 //!
 //! The document's version now is answered once, and each card carries
 //! the version it was made on: a page compares the two to say which

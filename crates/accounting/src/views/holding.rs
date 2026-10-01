@@ -61,7 +61,7 @@ pub struct Views {
     /// where the served ledger head starts before the fold moves it.
     pub(super) head: Option<kernel::Seq>,
     /// The chain hash of the ledger's first line, which names this
-    /// history for its whole life (wire-SPEC, `Welcome.epoch`).
+    /// history for its whole life (`crates/wire/Spec.lean` §3, `Welcome.epoch`).
     pub(super) epoch: Option<kernel::B3Hash>,
     /// What waits in each room, folded from the signal records. Held
     /// here rather than read off a queue: a queue answers by being
@@ -120,7 +120,7 @@ pub struct Views {
     /// back through the whole run.
     pub(super) first_prompts: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
     /// Each address's stretches, so a room's sessions are answered without
-    /// reading the ledger back (wire-SPEC §8-71).
+    /// reading the ledger back (`crates/wire/Spec.lean` §8-71).
     pub(super) sessions: super::sessions::RoomSessions,
     /// Every building's plan, parsed once and re-parsed only when a
     /// record says it may have moved.
@@ -171,7 +171,7 @@ pub struct Views {
     #[serde(skip)]
     pub(super) reach: super::served::Reach,
     /// The halt a served city's writer refuses lines by until the proof
-    /// of its history has a verdict (wire-SPEC.md 8-63); `None` for views
+    /// of its history has a verdict (`crates/wire/Spec.lean` §8-63); `None` for views
     /// that started from a history proved before they folded it.
     #[serde(skip)]
     pub(super) proof: Option<storage::ChainHalt>,

@@ -13,14 +13,14 @@ import type { Address, B3Hash, Command, ProposalDecision, TextEdit } from "../..
 // byte span of that version and the text that replaces it. The city
 // refuses it once the version has moved, and the draft stays on the
 // page; the receipt is the `document_written` line that carries this
-// command's key (wire-SPEC 8-72).
+// command's key (`crates/wire/Spec.lean` §8-72).
 export function putRange(doc: Address, baseline: B3Hash, edits: readonly TextEdit[]): Command {
   return { put_range: { doc, baseline, edits, idem: mintIdem() } };
 }
 
 // A person's decision on proposal cards of one document: a changed
 // sentence left unnamed is rejected, so a card with no verdicts is
-// rejected whole. What is accepted lands as one save (wire-SPEC 8-73).
+// rejected whole. What is accepted lands as one save (`crates/wire/Spec.lean` §8-73).
 export function decideProposals(doc: Address, decisions: readonly ProposalDecision[]): Command {
   return { decide_proposals: { doc, decisions, idem: mintIdem() } };
 }

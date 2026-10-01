@@ -5,7 +5,7 @@
 
 //! The harness page: each official harness, the command that starts it
 //! as an ACP agent, and whether this machine can run that command
-//! (wire-SPEC.md 8-52).
+//! (`crates/wire/spec/Answer/Harnesses.lean` §8-52).
 //!
 //! Nothing here is about a credential: the person signs in inside the
 //! harness, and `docs` is where its own vendor says how.

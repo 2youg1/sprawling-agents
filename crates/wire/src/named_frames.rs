@@ -18,7 +18,7 @@
 //! **The table is in declaration order**, which is the order the
 //! handshake hash mixes the names in. Moving a variant therefore
 //! changes the hash, and an older page is refused at the handshake
-//! without a `WIRE_V` bump (wire-SPEC §12.1).
+//! without a `WIRE_V` bump (wire D1).
 //!
 //! One macro rather than two, because `Query` and `Command` differ in
 //! their generic carrier and in nothing else that matters here —

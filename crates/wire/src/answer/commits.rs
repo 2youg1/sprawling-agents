@@ -68,7 +68,7 @@ pub struct CommitAnswer {
     pub parents: Option<Vec<GitOid>>,
     /// The commit object's own message, trailers included, read when
     /// the parents are and absent for the same reasons, or when it is
-    /// not UTF-8 (wire-SPEC.md 8-54).
+    /// not UTF-8 (`crates/wire/spec/Answer/Commits.lean` §8-54).
     pub message: Option<String>,
 }
 

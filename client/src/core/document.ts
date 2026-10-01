@@ -6,7 +6,7 @@
 // One file of the city as the pages that show it draw it: the text of
 // its first window, how long the file is, whether it is text at all, and
 // whether the window left some of it out. The city answers a document as
-// a version (wire-SPEC 8-69); this is the one place a page turns that
+// a version (`crates/wire/Spec.lean` §8-69); this is the one place a page turns that
 // answer into what it draws, so the three pages that read a file agree.
 
 import { readAnswer, type Answered } from "./answered";

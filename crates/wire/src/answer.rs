@@ -168,7 +168,7 @@ pub struct CityAnswer {
     pub halted: Vec<HaltScope>,
     /// The last record of a history proved whole, when the proof has
     /// found it so; absent while a served city is still proving it, or
-    /// after the proof found it broken (wire-SPEC.md 8-63).
+    /// after the proof found it broken (`crates/wire/spec/Answer.lean` §8-63).
     pub proved: Option<Seq>,
 }
 
@@ -226,7 +226,7 @@ pub enum Answer {
     Proposals(Box<ProposalsAnswer>),
     Range(Box<RangeAnswer>),
     Preview(Box<PreviewAnswer>),
-    /// A reply's text laid out (wire-SPEC 8-75): its closed blocks, and
+    /// A reply's text laid out (`crates/wire/spec/Answer/Preview.lean` §8-75): its closed blocks, and
     /// the bytes they cover.
     Reply(Box<documents::Laid>),
     Commits(CommitsAnswer),

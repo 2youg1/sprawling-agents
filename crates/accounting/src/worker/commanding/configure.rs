@@ -120,7 +120,7 @@ impl RunWorker {
 impl RunWorker {
     /// Writes a building's `RULES.toml` whole from a page, evaluated
     /// first and only over the text the page started from, and books the
-    /// change (wire-SPEC.md 8-60).
+    /// change (`crates/wire/Spec.lean` §8-60).
     ///
     /// # Errors
     /// Propagates the evaluation's refusal, a file that is no longer
@@ -142,7 +142,7 @@ impl RunWorker {
     }
 
     /// Writes the city's own layer from the settings page, one fact at a
-    /// time, and books the change once (wire-SPEC.md 8-61). A frame that
+    /// time, and books the change once (`crates/wire/Spec.lean` §8-61). A frame that
     /// states nothing writes nothing and books nothing.
     ///
     /// # Errors

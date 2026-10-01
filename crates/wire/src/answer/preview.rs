@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One window of a stored Markdown version, laid out as blocks
-//! (wire-SPEC.md 8-74).
+//! (`crates/wire/spec/Answer/Preview.lean` §8-74).
 //!
 //! Read by the version, for the reason a range is: a page previewing a
 //! file a resident is rewriting goes on reading the version it opened.

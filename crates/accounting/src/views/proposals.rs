@@ -5,7 +5,7 @@
 
 //! The proposal cards a city's history holds, open or handled, and the
 //! answer that lists one document's open cards (accounting-SPEC.md 8-22,
-//! wire-SPEC.md 8-73).
+//! `crates/wire/Spec.lean` §8-73).
 //!
 //! Held inside [`super::Governance`], so the worker that judges a
 //! decision and the page that draws a card read one fold: a card is a
@@ -141,7 +141,7 @@ impl super::Views {
 /// whole file (sprawling-SPEC.md 8-100).
 pub(super) fn proposals_answer(city_root: &Path, doc: Address, open: Vec<Offer>) -> wire::Answer {
     // Missing and unreadable are both "no version now"; the document
-    // answer is where a page learns which, and why (wire-SPEC.md 8-69).
+    // answer is where a page learns which, and why (`crates/wire/Spec.lean` §8-69).
     let version = match std::fs::read(super::listing::resolve(city_root, Some(&doc))) {
         Ok(bytes) => Some(B3Hash::digest(&bytes)),
         Err(_no_version_now) => None,

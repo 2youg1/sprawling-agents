@@ -17,7 +17,7 @@ use kernel::{Address, B3Hash, Effort, IdemKey, KeepWarm};
 use serde::{Deserialize, Serialize};
 
 /// A page's save of one document: edits made on the version `baseline`,
-/// refused once that version has moved (wire-SPEC.md 8-72).
+/// refused once that version has moved (`crates/wire/spec/Command/Step.lean` §8-72).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RangeWrite {
@@ -28,7 +28,7 @@ pub struct RangeWrite {
 }
 
 /// A person's decision on proposal cards of one document, landed as one
-/// save (wire-SPEC.md 8-73).
+/// save (`crates/wire/spec/Answer/Proposals.lean` §8-73).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ProposalDecisions {
@@ -48,7 +48,7 @@ pub struct ProposalDecision {
 
 /// A building's whole `RULES.toml` from a page, and the text the page
 /// read: the city evaluates `body` before it lands, and only over `base`
-/// (wire-SPEC.md 8-60).
+/// (`crates/wire/spec/Command/Step.lean` §8-60).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RulesWrite {
@@ -59,7 +59,7 @@ pub struct RulesWrite {
 }
 
 /// The city's own layer from the settings page: `None` leaves a key as
-/// it is (wire-SPEC.md 8-61).
+/// it is (`crates/wire/spec/Command/Step.lean` §8-61).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CitySettings {
@@ -124,7 +124,7 @@ pub enum GovernedDocument {
     Preferences,
 }
 
-/// One identity card's values (wire-SPEC.md 8-59).
+/// One identity card's values (`crates/wire/spec/Answer/Identity.lean` §8-59).
 ///
 /// Each key is the card's own: `None` removes it, which puts the default
 /// name back. What a name may be is the city's answer (`city::Naming`),

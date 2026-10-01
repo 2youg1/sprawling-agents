@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One window of a stored document version (wire-SPEC.md 8-70).
+//! One window of a stored document version (`crates/wire/spec/Answer/Range.lean` §8-70).
 //!
 //! Read by the version rather than by the path, so a page three screens
 //! into a file a resident is rewriting goes on reading the version it

@@ -9,7 +9,7 @@
 //!
 //! Vocabulary, not transport. The city's one writer names these types
 //! and never listens on a socket, so they sit outside the `server`
-//! feature, which carries only the listener (wire-SPEC.md 12.2).
+//! feature, which carries only the listener (wire D2).
 
 use std::sync::Arc;
 

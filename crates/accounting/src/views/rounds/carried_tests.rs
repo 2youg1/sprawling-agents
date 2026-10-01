@@ -12,7 +12,7 @@
 )]
 
 //! What a turn and a call carry beside their pairing, each read from
-//! the one record that states it (wire-SPEC 8-53 onward).
+//! the one record that states it (`crates/wire/Spec.lean` §8-53 onward).
 
 use super::turns;
 use wire::{AxCode, AxError, B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq};

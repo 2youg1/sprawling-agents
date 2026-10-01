@@ -96,7 +96,7 @@ pub(crate) async fn accept_recording(
 ///
 /// The name rides the query string rather than a header, because a
 /// header value carries ASCII reliably and a person's file names are
-/// often not ASCII (wire-SPEC.md 8-49).
+/// often not ASCII (`crates/wire/spec/Server.lean` §8-49).
 pub(crate) async fn accept_drop(
     State(state): State<Arc<ShellState>>,
     Query(params): Query<HashMap<String, String>>,

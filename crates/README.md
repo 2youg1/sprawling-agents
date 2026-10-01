@@ -23,7 +23,7 @@ Every Rust package of the product lives in this directory. The packages are sepa
 | `crates/runtime` | `sprawling-runtime` | `runtime` | one run, from dispatch to freeze | `gateway`, `kernel`, `storage` | `crates/runtime/Spec.lean` |
 | `crates/sprawling` | `sprawling` | `sprawling` | the assembly root: every concrete type, the one clock, the one spawn point, and the command line | `accounting`, `agent_protocols`, `browser`, `city`, `collab`, `desktop`, `gateway`, `kernel`, `remote_access`, `runtime`, `storage`, `wire` | `crates/sprawling/sprawling-SPEC.md` |
 | `crates/storage` | `sprawling-storage` | `storage` | persistence, and every view derived from it | `kernel` | `crates/storage/Spec.lean` |
-| `crates/wire` | `sprawling-wire` | `wire` | the process boundary | `documents`, `kernel` | `crates/wire/wire-SPEC.md` |
+| `crates/wire` | `sprawling-wire` | `wire` | the process boundary | `documents`, `kernel` | `crates/wire/Spec.lean` |
 <!-- xtask:end -->
 
 `crates/desktop` and its FFI seam `crates/desktop/ffi` get their rows from the next `cargo xtask docnum --write`. The seam is the one crate with a lint table of its own, the workspace's with `unsafe_code` at `deny`, because each call into its Zig leaf relaxes the lint at that one statement.

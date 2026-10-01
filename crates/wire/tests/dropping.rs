@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The drop route hands the file's name and bytes to the city and
-//! answers with the path the city kept it at (wire-SPEC.md 8-49).
+//! answers with the path the city kept it at (`crates/wire/spec/Server.lean` §8-49).
 //!
 //! Driven in process through `tower::ServiceExt::oneshot`, for the same
 //! reason the recording route is: this is a white-box check of the

@@ -11,7 +11,7 @@ import type { Command, GuideProgress } from "../../wire";
 
 // This city's first-run guide progress, whole: where it reopens, whether
 // the person left it, each optional step seen or skipped. The later of
-// two writes stays (wire-SPEC 8-68).
+// two writes stays (`crates/wire/Spec.lean` §8-68).
 export function putGuide(progress: GuideProgress): Command {
   return { put_guide: { progress, idem: mintIdem() } };
 }

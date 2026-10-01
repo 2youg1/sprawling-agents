@@ -6,8 +6,8 @@
 //! Which release this city is running, and which one npm offers.
 //!
 //! **A reading of right now, never folded from the Ledger**, on the
-//! same grounds as `McpHealth` and `Toolkits` (wire-SPEC section
-//! 8-31): which release is newest is a fact about this minute, and a
+//! same grounds as `McpHealth` and `Toolkits` (`crates/wire/spec/Answer/McpHealth.lean`
+//! §8-34): which release is newest is a fact about this minute, and a
 //! recorded copy would still name last month's release as the newest
 //! one. It is also the reason this answer is never sent unasked - the
 //! city reaches the registry when somebody presses the button and at no
