@@ -17,6 +17,7 @@ use super::super::{Assignment, mounts_under};
 use super::engine::machine_half;
 use super::{BenchDesks, Laying, Reach, Site, Situation, Workbench, held, status_snapshot};
 
+mod endpoints;
 mod kept;
 mod ocr;
 mod playback;
@@ -128,25 +129,19 @@ impl Laying {
         // `search` ask one read bound, so what one may open the other may
         // find.
         let bound = self.read_bound(site);
-        let block_store = kernel::layout::CityLayout::new(&self.city_root).cas();
         let read = runtime::ReadTool::new(
             &site.write_root,
             Arc::clone(&catalog),
             Arc::clone(&bound),
-            &block_store,
+            &kernel::layout::CityLayout::new(&self.city_root).cas(),
         )?;
-        // The one door the tools that send bytes to an endpoint read
-        // through: the same bound, the same tree, the same store as
-        // `read`, so what one may open the others may send
-        // (runtime-SPEC 8-59).
-        let reader = runtime::BoundReader::new(&site.write_root, Arc::clone(&bound), &block_store);
         // Reading needs an address, and until this line there was no way
         // to find one: a symbol had to be hunted through `exec`, which
         // means Python this machine may not have or a shell this
         // building may have switched off. It stands beside `read`
         // because it answers the other half of one question, and it is
         // last in the order for the reason the comment below gives.
-        let search = SearchTool::new(&site.write_root, bound)?;
+        let search = SearchTool::new(&site.write_root, Arc::clone(&bound))?;
         // The one door out of a filling window. It stands last because
         // it is the newest, and it takes no depth and asks no person:
         // the successor is this same resident, in this same room, with
@@ -225,15 +220,9 @@ impl Laying {
             }
         }
         // Present only where the book names an endpoint this building
-        // may send a recording to (sprawling-SPEC.md 8-131).
-        if let Some(transcribe) = self.transcription_tool(site, reader.clone())? {
-            admitted.push(Box::new(transcribe));
-        }
-        // Present only where the book names a model this building may
-        // send a picture to (sprawling-SPEC.md 8-142).
-        if let Some(ocr) = self.ocr_tool(site, reader)? {
-            admitted.push(Box::new(ocr));
-        }
+        // may send a recording or a picture to (sprawling-SPEC.md 8-131,
+        // 8-142).
+        admitted.extend(self.endpoint_tools(site, &bound)?);
         // The last built-in: a look back at the history this building
         // may read, written into the city's playback exports
         // (sprawling-SPEC.md 8-132).
