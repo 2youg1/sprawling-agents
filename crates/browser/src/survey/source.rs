@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! From a box on the screen back to the line that drew it
-//! (xtask-SPEC.md section 8-26).
+//! (tools/xtask/Spec.lean §8-26).
 //!
 //! **A finding is an edit, not a complaint** - the module heading says
 //! so, and a report that names the box only by its class attribute

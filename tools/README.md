@@ -4,7 +4,7 @@ This directory holds what checks, simulates, fuzzes and attacks the product, and
 
 | Directory | What it is |
 |---|---|
-| [`tools/xtask/`](./xtask/) | The machine gates and the build and release commands, run as `cargo xtask <command>`. `cargo xtask gates --list` prints every gate; [`xtask-SPEC.md`](./xtask/xtask-SPEC.md) says what each one judges. |
+| [`tools/xtask/`](./xtask/) | The machine gates and the build and release commands, run as `cargo xtask <command>`. `cargo xtask gates --list` prints every gate; [`Spec.lean`](./xtask/Spec.lean) says what each one judges. |
 | [`tools/citysim/`](./citysim/) | Fixed scenario scripts on a counted clock, with no random source, so a failure replays byte for byte from its scenario; and the benches that time the product. |
 | [`tools/fuzz/`](./fuzz/) | The cargo-fuzz targets for the parsers that read outside input: addresses, locators, a ledger's tail, wire frames, the configuration file and what an MCP server writes back. It is a workspace of its own and needs a nightly toolchain and cargo-fuzz. |
 | [`tools/adversary/`](./adversary/) | A black-box checker in Lean that starts the built binary and attacks it through the wire from outside; it is never a gate. What a Rust module must hold is specified under its crate's `spec/` and proved by `just models`. The checker is two targets of the Lean package at the repository root, whose `lean-toolchain` the product binary also embeds, which is why the pin does not live under `tools/`. |

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One fact, painted in two places (xtask-SPEC.md section 8-26).
+//! One fact, painted in two places (tools/xtask/Spec.lean §8-26).
 //!
 //! **This is the repository's own defect, read off the screen.**
 //! `AGENTS.md` hunts one family above all others - a fact with more

@@ -503,7 +503,7 @@ theorem reading_inside_the_selection_breaks_it :
 /-! ## 17 文档关系
 
 - `crates/desktop/Spec.lean` §8-11、§8-12、D12、D14：server 一侧的调用组表、缝的位置，以及本包那一张只差 `unsafe_code` 一行的 lint 表；那里的表变了，§1 的四组随之变。
-- `tools/xtask/xtask-SPEC.md` §8-46：guard 怎么读这堵墙。
+- `tools/xtask/Spec.lean` §8-46：guard 怎么读这堵墙。
 - `crates/sprawling/sprawling-SPEC.md` 8-146：doctor 的 `zig` 一行。
 - `AGENTS.md`「Rust」一节：平台调用的次序与 `SAFETY:` 行的写法；那里的规则变了，D1 重议。
 -/

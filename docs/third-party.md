@@ -138,7 +138,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 **Every licence above is permissive, and none of them is copyleft**, which is why an MPL-2.0 binary may be built from them. MPL-2.0 is file-level copyleft: it governs the files in this repository and asks nothing of the crates linked beside them. Where a crate offers a choice, the choice on `deny.toml`'s list is the one taken; `same-file`'s Unlicense is not on that list, and its MIT is.
 
-**Two obligations travel with a release artifact rather than with this repository**, and this table discharges neither. Apache-2.0 §4 requires the NOTICE to be kept on distribution and modified files to be marked; MIT requires the copyright and licence notice to be kept. For the JavaScript the client bundles, both travel inside the binary (section 4). For the crates, the release archive carries the bill of materials but not yet the licence texts; `tools/xtask/xtask-SPEC.md` section 8-23 records what is left.
+**Two obligations travel with a release artifact rather than with this repository**, and this table discharges neither. Apache-2.0 §4 requires the NOTICE to be kept on distribution and modified files to be marked; MIT requires the copyright and licence notice to be kept. For the JavaScript the client bundles, both travel inside the binary (section 4). For the crates, the release archive carries the bill of materials but not yet the licence texts; `tools/xtask/Spec.lean` §8-23 records what is left.
 
 **Links go to crates.io rather than to each project's repository**: the question this table answers is which licence a crate declares, and crates.io shows that field beside the version a lockfile would resolve to.
 

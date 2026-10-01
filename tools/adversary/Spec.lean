@@ -231,7 +231,7 @@ spec/Acceptance.lean         替身把一个请求放进哪个 run 的哪一条�
 
 **U9 读 `Provider` 与 `Layer` 而不自立一套**：等一条记录、读整段历史、发一条不许被拒的命令在 `Provider`，城自己那一层配置的路径在 `Layer`，服务一个已经起好的目录在 `Ground.servingAt`（`withGround` 就是它加一个一次性目录）。`Script` 不 import 任何本工程模块：脚本是数据，它只知道替身读的那种线上 JSON。
 
-**检验器不 import 规格，规格也不 import 检验器。** `src/` 与 `test/` 下每一条 `import` 只指向 `Sprawling.*` 或 Lean 工具链自带的库；本文件与 `spec/` 下的分部只 import 工具链与本规格的分部（`xtask spec` 门判两侧，xtask-SPEC.md §8-47）。链与快照的定理在 kernel 与 storage 的规格里（`crates/kernel/spec/Ledger.lean`、`crates/storage/spec/Snapshot.lean`），检验器只在注释里引用它们。一条规则因此只有一处权威：规格陈述它，产品实现它，检验器从门外问产品守没守住。
+**检验器不 import 规格，规格也不 import 检验器。** `src/` 与 `test/` 下每一条 `import` 只指向 `Sprawling.*` 或 Lean 工具链自带的库；本文件与 `spec/` 下的分部只 import 工具链与本规格的分部（`xtask spec` 门判两侧，tools/xtask/Spec.lean §8-47）。链与快照的定理在 kernel 与 storage 的规格里（`crates/kernel/spec/Ledger.lean`、`crates/storage/spec/Snapshot.lean`），检验器只在注释里引用它们。一条规则因此只有一处权威：规格陈述它，产品实现它，检验器从门外问产品守没守住。
 -/
 
 /-! ## 8 接口先行
@@ -586,6 +586,6 @@ D4 **整棵树串行跑。** 一座被端起来的城占着一个端口、一个
 5. `.gitignore` 的 `/.lake`（Lean 包在仓库根），以及 `tools/xtask/src/walk.rs` 的 `SKIP_DIRS`。
 6. `.github/workflows/adversary.yml`——定时任务，永远不进 `check`。
 7. 仓库根的 `lakefile.toml`：检验器的三个目标在那里定义（`Sprawling` 库、`adversary` 与 `acceptance` 两个可执行文件），本规格经 `Spec` 库的两个 glob 进 `just models`。
-9. `tools/xtask/xtask-SPEC.md` §8-47：`spec` 门怎样认出本规格。
+9. `tools/xtask/Spec.lean` §8-47：`spec` 门怎样认出本规格。
 8. `justfile` 的 `acceptance` 配方，以及 `tools/citysim/Spec.lean` §8-10、§8-13 与 citysim D11、D15：替身的脚本格式、它印出的那一行、它怎样按 run 作答与怎样接上后写的 run。
 -/

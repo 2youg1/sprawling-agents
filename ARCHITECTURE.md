@@ -538,7 +538,7 @@ the part worth knowing before starting, not after.
 | a platform the release ships | `xtask::platform`'s `PLATFORMS` | one row per platform; the npm scope and the bare root name are asserted there |
 | the page | `client/` + client-SPEC | its own lint, typecheck and tests; the bundle is measured against a byte budget |
 | what a module must hold on every input | the part under the crate's `spec/` that names the module (§11, *Specifications in Lean*) | `just models` proves it with no `sorry`, `admit` or `axiom`; the module's rustdoc names the part |
-| a gate itself | `tools/xtask/` + xtask-SPEC | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
+| a gate itself | `tools/xtask/` + `tools/xtask/Spec.lean` | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
 
 Two documents sit beside this one rather than inside it: operating a
 city — swapping a provider, pointing at another MCP server, running a
@@ -709,15 +709,16 @@ new crate, uses this layout.
 and `lake-manifest.json` sit at the root; they are the only Lean package
 and the only Lean version pin in the tree. The manifest lists no packages,
 so every import is this tree's or the toolchain's own. The package has
-four targets. The library `Spec` is every module under `crates/` and
-the checker's own specification, and `just models` builds it inside
+four targets. The library `Spec` is every module under `crates/`, the
+checker's own specification and the gates', and `just models` builds it inside
 `just check`. The library `Sprawling` (`tools/adversary/src`) and the
 executables `adversary` and `acceptance` (`tools/adversary/test`) are the
 checker, which only `just adversary`, `just acceptance` and the nightly
 schedule build. The library `Spec` reaches its modules by the glob
-`crates.+` and, for the checker's specification, by `tools.adversary.Spec`
-and `tools.adversary.spec.+`. When the specifications of `tools/xtask`,
-`tools/citysim` or `client` move to Lean, the change that
+`crates.+`, for the checker's specification by `tools.adversary.Spec` and
+`tools.adversary.spec.+`, and for the gates' by `tools.xtask.Spec` and
+`tools.xtask.spec.+`. When the specifications of `tools/citysim` or
+`client` move to Lean, the change that
 moves one adds the two globs `<dir>.Spec` and `<dir>.spec.+` for it, with
 `<dir>` its path in dotted form, and never a glob over a whole `tools`
 or `client` tree, because a `.+` glob walks every directory
@@ -769,7 +770,7 @@ one constructor per line in an `inductive`, one arm per line in a `def`,
 the `import` lines, and the words left once comments and strings are
 blanked. A Lean name and the Rust name it stands for are spelled the
 same, so a gate compares one spelling rather than converting between two.
-`tools/xtask/xtask-SPEC.md` sections 8-42 and 8-43 say which gate reads
+`tools/xtask/Spec.lean` §8-42 and §8-43 say which gate reads
 which shape; the `spec` gate holds a crate to one effective
 specification, the checker and the specifications to their imports, and
 every `.lean` to no `sorry`, `admit` or `axiom`.

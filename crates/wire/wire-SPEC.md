@@ -490,7 +490,7 @@ WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionN
 
 **被否**：①给 `wire::Command` 加一个 `class()` 方法：要么本 crate 依赖 `remote_access`，要么另立一个同值的枚举，两处定义同一组值；②在表里写类、中继在启动时解析 SPEC：二进制读一份 Markdown 做授权，文档的排版错误就成了门的漏洞；③不写表、只留匹配：一个动词能不能从城外做，是人要读到、要决定的事，藏在代码里没人看。
 
-**重开参数**：wire 的规格迁成 `Spec.lean` 时，`class` 改写成 `def Command.verbClass` 的一臂一行，`xtask wiring` 按 xtask-SPEC §8-45 读它。
+**重开参数**：wire 的规格迁成 `Spec.lean` 时，`class` 改写成 `def Command.verbClass` 的一臂一行，`xtask wiring` 按 tools/xtask/Spec.lean §8-45 读它。
 
 ### 12.7 GitHub 导入是一条只读查询，由二进制跑 gh；指南进度是一个按城的文件，整份写
 
@@ -2011,7 +2011,7 @@ pub(super) fn command_class(command: &wire::WireCommand) -> remote_access::door:
 ```
 
 - **`class` 是 §19-2 的一列，不是 wire 的一个方法。** 它说的是远程门放不放一帧进来，而远程门的权限与 `VerbClass` 归 `remote_access`（crates/remote_access/Spec.lean §8-1）；本 crate 不依赖它，也不为它另立一个同值的枚举。中继在 `sprawling`，那里同时看得见两者（crates/remote_access/Spec.lean §7）。
-- **表与匹配由门机器对照**：`xtask wiring` 读表的第三格与 `command_class` 的每一臂，表里缺格、读不成三个取值之一、或与匹配说法不一，都点名那一个动词（xtask-SPEC §8-45）。匹配是穷尽的，所以一个新 Command 在有人定下它的类之前编译不过。
+- **表与匹配由门机器对照**：`xtask wiring` 读表的第三格与 `command_class` 的每一臂，表里缺格、读不成三个取值之一、或与匹配说法不一，都点名那一个动词（tools/xtask/Spec.lean §8-45）。匹配是穷尽的，所以一个新 Command 在有人定下它的类之前编译不过。
 - 不改任何帧，不动 `WIRE_V`。
 
 ### 8-66 远程中继怎样用这条线

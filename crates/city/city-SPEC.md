@@ -342,7 +342,7 @@ pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   // 立�
 ```
 
 - **一个目录装城写下的全部第一批字节**：`crates/city/templates/` 下是 `RULES.toml`、`RULES-hall.toml`、`Roadmap.md`、`Memo.md`、`Handoff.md`、`SPEC.md`、`JOB.md`、`MAYOR.md`、`CLERK.md`、`URBANITE.md`、`City.md`，以及说明每份文件谁写、谁读的 `README.md`。人读的那份与城写出的那份仍是同一串字节（§8-3、§8-5），只是这串字节现在住在把它编进去的包里。
-- **为什么在包里**：crates.io 上的 `.crate` 只装包目录里的文件，验证构建与 `cargo install` 都在解开的包里编译；`include_str!` 指向包外的 `docs/` 时，那里没有这些文件，city 编不出来（sprawling-SPEC 8-157）。`packaged` 门判这一条（xtask-SPEC §8-49）。
+- **为什么在包里**：crates.io 上的 `.crate` 只装包目录里的文件，验证构建与 `cargo install` 都在解开的包里编译；`include_str!` 指向包外的 `docs/` 时，那里没有这些文件，city 编不出来（sprawling-SPEC 8-157）。`packaged` 门判这一条（tools/xtask/Spec.lean §8-49）。
 - **`City.md` 由 city 交出，accounting 来读**：立城时写下 `City.md` 的是 `accounting::worker::genesis`，但这份文件的名字（`CITY_FILE`）与它同目录的模板都归本模块。accounting 的 `CITY_MD` 是 `city::CITY_TEMPLATE`，一份字节、一个家；accounting 不能 `include_str!` 别的包目录里的文件，那在包里同样落空。
 - **失败**：没有运行期失败。模板改名或挪走，`include_str!` 在编译期就红。
 
