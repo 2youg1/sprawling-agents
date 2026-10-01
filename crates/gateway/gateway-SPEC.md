@@ -578,19 +578,20 @@ pub fn is_local(base_url: &str) -> bool;                                        
 pub(crate) struct StandIn { /* 回环监听、为一个主机名签的自签证书、记下听到的请求 */ }
 impl StandIn {
     pub(crate) fn listening(host: &str) -> StandIn;          // 为 host 签一张证书，在 127.0.0.1 上听一次 TLS 连接
-    pub(crate) fn toward(&self, builder: ClientBuilder) -> ClientBuilder;  // 构造后的一步：resolve(host, 回环地址)＋只信这张证书＋不走代理
+    pub(crate) fn toward(&self) -> impl Fn(ClientBuilder) -> ClientBuilder + Send + Sync + 'static;
+                                                             // 构造后的一步：resolve(host, 回环地址)＋只信这张证书＋不走代理
     pub(crate) fn heard(self) -> Heard;                      // 请求行的路径、每个头、正文
 }
 // endpoint::transport —— #[cfg(test)]
-impl Transport { pub(crate) fn detoured(config: &EndpointConfig, step: impl FnOnce(ClientBuilder) -> ClientBuilder) -> Result<Transport, AxError>; }
+impl Transport { pub(crate) fn detoured(step: impl Fn(ClientBuilder) -> ClientBuilder + Send + Sync + 'static) -> Transport; }
 ```
 
 - **请求形状随主机名而变，所以证明它的替身必须在主机名下被够到。** 会话头（`session_header`）与 chat 面的拼法（`chat_spelling`）按 base URL 的主机查 `PRESETS`；一个以 `127.0.0.1` 为地址的替身永远触发不了这两条，`x-opencode-session` 写到线上的那一步因此从未被任何测试看见。`StandIn::toward` 给 `client_for` 交出的 builder 加三步：reqwest 的 `resolve` 把主机名指到替身的回环地址；`tls_certs_only` 只信替身那张证书；`no_proxy`，因为这台机器的代理设置（环境变量或系统设置）会把请求连同主机名一起交给代理，`resolve` 就不再起作用。base URL 一个字节不改，于是主机、路径、TLS 的 SNI 与 `Host` 头都是真请求的。
-- **`client_for` 的签名不变，覆写是构造之后的一步。** `client_for` 是全工作区唯一放行的 reqwest 构造点（§8-15），它的调用者在别的 crate；覆写做成一个 `FnOnce(ClientBuilder) -> ClientBuilder`，由 `Transport::detoured` 接在端点自己的配置（`client_for` 加上超时）之后、`build()` 之前。端点的配置只在 `transport` 里写一次，生产路径与测试路径走同一个函数。
+- **`client_for` 的签名不变，覆写是构造之后的一步。** `client_for` 是全工作区唯一放行的 reqwest 构造点（§8-15），它的调用者在别的 crate；覆写做成一个 `Fn(ClientBuilder) -> ClientBuilder`，由 `Transport::detoured` 带着；`Transport` 第一次为某个端点建客户端时，把它接在端点自己的配置（`client_for` 加上超时）之后、`build()` 之前。这一步与带着它的字段都只编进测试。端点的配置只在 `transport` 里写一次，生产路径与测试路径走同一个函数。
 - **轮次从 `PRESETS` 算出，不另抄名单。** 测试对 `PRESETS` 的每一行、行里的每一个 face 各跑一轮：`router::normalise_entered` 按 face 规整出存下的 base URL，`provider::registry::resolve` 给出连接种类，凭据头由 `AuthSpec::for_dialect` 定，经 `adapter_for` 造出模型并 `call` 一次——与 `accounting` 的生产路径走同一串函数，只差 `Transport`。每一轮比一个整值：请求路径（face 的路径加上兼容格式自己的那一段）、`Host`、凭据头的名字与值、会话头（该主机要求的那一个在，别的主机的都不在）、正文的方言（`input` 是 Responses，顶层 `system` 是 Anthropic，其余是 chat）、chat 面的上限字段名。期望值的三段兼容格式路径与上限字段名写在测试里，它们是厂商文档的说法，是测试的判据而不是第二份实现。
 - **替身是 TLS 的，证书自签、只为那一个主机名。** 证书由测试按 DER 拼出（Ed25519，签名用 rustls 的 aws-lc-rs 后端），不引新包：锁里没有生成证书的 crate，而一张 v3、带 `subjectAltName`、不带扩展用途的叶证书只有几十个字节的结构。私钥是一个固定的 32 字节种子，因为这张证书除了这一次回环握手什么也不保护。
 - **它不跑真 provider。** 真 provider 的一轮要人在测试时填 key（D40），由 `just e2e` 按同一张表跑（sprawling-SPEC §8-69）。
-- **失败**：本模块只在测试里；替身的读写失败按测试的失败处理。`Transport::detoured` 的失败与 `Transport` 建客户端的失败同一个码（`E_CONFIG_INVALID`）。
+- **失败**：本模块只在测试里；替身的读写失败按测试的失败处理。改了道的 `Transport` 建客户端失败时，与没改道的同一个码（`E_CONFIG_INVALID`）。
 
 ### 8-17 `gateway::provider`：厂商文档写下来一次，与输出上限的事实梯（形状 6 数据面 ＋ 形状 1 判定）
 
