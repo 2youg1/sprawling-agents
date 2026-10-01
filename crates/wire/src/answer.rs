@@ -34,6 +34,7 @@ mod git_status;
 mod harnesses;
 mod history;
 mod hunks;
+mod identity;
 mod known_hosts;
 mod listing;
 mod mcp_health;
@@ -64,6 +65,7 @@ pub use git_status::{Drift, GitStatusAnswer};
 pub use harnesses::{HarnessLine, HarnessesAnswer};
 pub use history::{HistoryAnswer, HistoryRangeAnswer};
 pub use hunks::{HunksAnswer, PatchLine, Withheld};
+pub use identity::{IdentityAnswer, StatedIdentity};
 pub use known_hosts::{KnownFace, KnownHost, KnownHostsAnswer};
 pub use listing::{Entry, EntryKind, ListingAnswer};
 pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
@@ -240,6 +242,7 @@ pub enum Answer {
     Release(Box<ReleaseAnswer>),
     Preferences(Box<PreferencesAnswer>),
     Config(Box<ConfigAnswer>),
+    Identity(Box<IdentityAnswer>),
     Unavailable { query: String },
 }
 

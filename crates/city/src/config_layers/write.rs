@@ -19,7 +19,7 @@ use std::path::Path;
 
 use kernel::config::SecondThreshold;
 use kernel::{
-    Address, AxCode, AxError, Effort, McpServer, McpTransport, SandboxLimits, SecretRef,
+    Address, AxCode, AxError, B3Hash, Effort, McpServer, McpTransport, SandboxLimits, SecretRef,
     ServerLabel,
 };
 
@@ -176,6 +176,8 @@ pub(super) enum Change<'a> {
     /// `SecondThreshold`'s one construction point: a raw percent is
     /// refused where it is parsed, never where it is written.
     SecondThreshold(SecondThreshold),
+    /// The identity version a session froze (city-SPEC.md 8-33).
+    Naming(B3Hash),
 }
 
 impl Change<'_> {
@@ -211,6 +213,9 @@ impl Change<'_> {
                 if emptied {
                     document.remove("model");
                 }
+                // The names a session froze go with the shape it froze:
+                // the next session takes the names as they are then.
+                document.remove("identity");
             }
             Change::Sandbox(limits) => {
                 let spelled = toml::Value::try_from(*limits)
@@ -225,6 +230,12 @@ impl Change<'_> {
                     .map_err(|err| refuse_file(file, &err.to_string()))?;
                 table(document, "context", file)?
                     .insert("second_threshold".to_owned(), toml::Value::Integer(percent));
+            }
+            Change::Naming(version) => {
+                table(document, "identity", file)?.insert(
+                    "version".to_owned(),
+                    toml::Value::String(version.to_string()),
+                );
             }
         }
         Ok(())

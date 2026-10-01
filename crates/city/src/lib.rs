@@ -16,6 +16,7 @@ mod gitignore;
 mod governed;
 mod handoff_form;
 mod history;
+mod identity;
 mod library;
 mod neighbourhood;
 mod neighbours_tool;
@@ -50,11 +51,13 @@ pub use city_tool::CityTool;
 pub use config_layers::path as config_path;
 pub use config_layers::write_second_threshold;
 pub use config_layers::{ConfigLayer, Layer, load as load_config};
-pub use config_layers::{keep_warm, own_layer, settled_harness, write_session};
+pub use config_layers::{freeze_naming, keep_warm, own_layer, settled_harness, write_session};
 pub use config_layers::{settled_effort, settled_second, write_mcp, write_sandbox};
 pub use document::{Held, edit as edit_document, edit_against};
 pub use governed::{Governed, PREFERENCES_FILE, write_governed};
 pub use history::{History, has_history};
+pub use identity::{DisplayName, NAME_MAX_CHARS, Naming, NamingEdit, NamingWritten};
+pub use identity::{Unreadable, persona, read_naming, write_naming};
 // Where each of these files sits is `kernel::layout`'s answer, and the
 // names are re-exported rather than restated so that a caller reading
 // `city::CONFIG_TOML` and the layout that places it cannot disagree.

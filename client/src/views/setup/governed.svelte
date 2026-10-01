@@ -68,7 +68,7 @@ export function governedAt(which: GovernedDocument): Address {
   });
 
   function save(): void {
-    if (u.send(putDocument(which, draft))) {
+    if (u.send(putDocument(which, onDisk, draft))) {
       edited = false;
     }
   }

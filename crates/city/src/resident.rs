@@ -97,7 +97,10 @@ fn described(addr: &Address, written: Vec<u8>) -> Vec<u8> {
     let Some(discipline) = crate::spine_files::hall_discipline(addr) else {
         return written;
     };
-    let mut out = written;
+    // The identity area is not who the seat is: the name it holds opens
+    // the resident slot on its own line (city-SPEC.md 8-33), and one
+    // name said twice in one request is two answers to one question.
+    let mut out = crate::identity::persona(written);
     if !out.is_empty() && !out.ends_with(b"\n") {
         out.push(b'\n');
     }

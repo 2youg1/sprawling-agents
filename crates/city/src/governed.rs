@@ -54,19 +54,33 @@ impl Governed {
     }
 }
 
-/// Writes one governed document whole, creating the reserved subtree if
-/// this city has not laid it out yet.
+/// Writes one governed document whole, only if it still holds `base`,
+/// creating the reserved subtree if this city has not laid it out yet.
 ///
 /// Whole rather than patched: these are documents a person edits in one
 /// box and saves once, and a partial write would leave the city governed
-/// by half a sentence. The previous content is not kept here — the
-/// Ledger line that announces the write is what a reader goes back to.
+/// by half a sentence. Against a base, because the raw editor and the
+/// identity cards are two writers of `MAYOR.md` and `PREFERENCES.md`
+/// (city-SPEC.md 8-33), and a page left open in a second tab is a third.
+/// The identity area of those two is read before anything lands, by the
+/// same reader the cards use. The previous content is not kept here —
+/// the Ledger line that announces the write is what a reader goes back
+/// to.
 ///
 /// # Errors
-/// Propagates a reserved subtree that cannot be created or written.
-pub fn write_governed(city_root: &Path, which: Governed, body: &str) -> Result<PathBuf, AxError> {
+/// `E_CONFIG_INVALID` for an identity area that does not read,
+/// `E_VERSION_CONFLICT` when the document is no longer `base`, and
+/// `E_STORAGE_FATAL` for a reserved subtree that cannot be read or
+/// written.
+pub fn write_governed(
+    city_root: &Path,
+    which: Governed,
+    base: &str,
+    body: &str,
+) -> Result<PathBuf, AxError> {
+    crate::identity::readable(which, body)?;
     let path = which.path(city_root);
-    crate::document::replace(&path, body.as_bytes())?;
+    crate::document::edit_against(&path, base.as_bytes(), body.as_bytes())?;
     Ok(path)
 }
 
@@ -86,7 +100,7 @@ mod tests {
     fn all_three_documents_land_where_no_write_domain_reaches() {
         let dir = tempfile::tempdir().unwrap();
         for which in [Governed::Mayor, Governed::Clerk, Governed::Preferences] {
-            let path = write_governed(dir.path(), which, "# written by a person\n").unwrap();
+            let path = write_governed(dir.path(), which, "", "# written by a person\n").unwrap();
             assert_eq!(
                 std::fs::read_to_string(&path).unwrap(),
                 "# written by a person\n"
@@ -100,12 +114,32 @@ mod tests {
         }
     }
 
-    /// A second save replaces the first: one box, one document.
+    /// A second save replaces the first when it starts from what the
+    /// first one left: one box, one document.
     #[test]
     fn a_second_save_replaces_the_first() {
         let dir = tempfile::tempdir().unwrap();
-        write_governed(dir.path(), Governed::Preferences, "first\n").unwrap();
-        let path = write_governed(dir.path(), Governed::Preferences, "second\n").unwrap();
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), "second\n");
+        write_governed(
+            dir.path(),
+            Governed::Preferences,
+            "",
+            "first
+",
+        )
+        .unwrap();
+        let path = write_governed(
+            dir.path(),
+            Governed::Preferences,
+            "first
+",
+            "second
+",
+        )
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "second
+"
+        );
     }
 }

@@ -74,6 +74,14 @@ pub struct RunStarted {
     /// there is no older shape to read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub policy: Option<RunPolicy>,
+    /// The identity version this run's session froze: the key a page
+    /// reads the names the request carried back by, through the content
+    /// store (kernel-SPEC 8-79). Absent in a record written before the
+    /// key existed, which a page answers with the address rather than
+    /// with today's names.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub naming: Option<B3Hash>,
 }
 
 /// `run_frozen`: how a run ended, and what it cites for having ended

@@ -52,6 +52,7 @@ fn plan() -> RunPlan {
         predecessor: None,
         dispatched_by: kernel::event::Who::Person,
         run_policy: kernel::RunPolicy::of(kernel::Mode::Work),
+        naming: None,
         inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),

@@ -284,13 +284,8 @@ impl Freezing<'_> {
         // prefix stays cacheable across the run's life. Assembled here
         // rather than earlier because the catalog does not exist until
         // the tools, the reading room and the mode are known.
-        // The name a person typed when they started this session, which
-        // is the last segment of the address they started it at. It
-        // opens the resident slot rather than the city one: the city
-        // segment is identical for every agent in the city and is
-        // cached as such, and a name in it would make one copy per
-        // agent of the largest stable block in the prompt.
-        let mut resident = format!("Your name: {}\n\n", addr.name()).into_bytes();
+        let names = naming::session_naming(self.city_root, self.cas, addr)?;
+        let mut resident = names.called(addr);
         resident.extend_from_slice(&site.identity.segment_bytes());
         resident.push(NEWLINE);
         resident.extend_from_slice(
@@ -299,7 +294,7 @@ impl Freezing<'_> {
                 .as_bytes(),
         );
         let prefix = FrozenPrefix::assemble(
-            city_segment(self.city_root)?.freeze(SegmentSlot::City),
+            names.city_slot(self.city_root)?.freeze(SegmentSlot::City),
             building_segment(self.city_root, addr, site.building.addr())?
                 .freeze(SegmentSlot::Building),
             Assembled::of_nothing(resident).freeze(SegmentSlot::Resident),
@@ -351,6 +346,7 @@ impl Freezing<'_> {
             // question a second time at a different instant.
             skills: held(&workbench.catalog, "read the catalog")?.skill_pins(),
             retries: site.retries,
+            naming: Some(names.version),
         };
 
         // The norms are filled by the machine: their addresses are known
@@ -388,6 +384,7 @@ impl Freezing<'_> {
 /// module lives where the crate root says it does.
 mod inherited;
 mod model_note;
+mod naming;
 mod run_slot;
 
 mod frozen_handoff;

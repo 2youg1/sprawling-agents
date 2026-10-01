@@ -58,6 +58,7 @@ pub use answer::{EndpointSummary, EndpointsAnswer, UnpricedCalls};
 pub use answer::{EvidenceItem, EvidenceKind, Picture};
 pub use answer::{HarnessLine, HarnessesAnswer, KnownFace, KnownHost, KnownHostsAnswer};
 pub use answer::{HunksAnswer, PatchLine, Withheld};
+pub use answer::{IdentityAnswer, StatedIdentity};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
 pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
@@ -71,7 +72,7 @@ pub use carried_name::{ProviderName, TemplateName, ToolkitSlug};
 pub use command::COMMAND_NAMES;
 pub use command::{BodyOverride, EndpointTuning, HeaderPair};
 pub use command::{Carry, Command, WireCommand};
-pub use command::{GovernedDocument, HaltScope, NoSecret};
+pub use command::{GovernedDocument, HaltScope, IdentityCard, NoSecret};
 pub use command::{PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};
 #[cfg(feature = "schema")]

@@ -72,6 +72,7 @@ fn typed_started(parent: Option<RunId>, predecessor: Option<RunId>) -> RunStarte
         predecessor,
         dispatched_by: None,
         policy: None,
+        naming: None,
         skills: vec![
             SkillPin {
                 name: "read".to_owned(),
@@ -155,6 +156,26 @@ fn a_run_started_line_records_its_policy() {
         })
     );
     assert_eq!(payload.read::<RunStarted>().unwrap(), started);
+}
+
+/// The identity version a run's session froze is on its first line as
+/// the digest a page reads the names back by, and is absent when the run
+/// froze none.
+#[test]
+fn a_run_started_line_records_the_naming_it_froze() {
+    let naming = B3Hash::digest(b"{\"person\":\"2youg1\"}");
+    let started = RunStarted {
+        naming: Some(naming),
+        ..typed_started(None, None)
+    };
+    let payload = Payload::of(&started).unwrap();
+    assert_eq!(
+        serde_json::to_value(&payload).unwrap()["naming"],
+        serde_json::json!(naming.to_string())
+    );
+    assert_eq!(payload.read::<RunStarted>().unwrap(), started);
+    let bare = Payload::of(&typed_started(None, None)).unwrap();
+    assert!(!bytes(&bare).contains("naming"), "{}", bytes(&bare));
 }
 
 #[test]

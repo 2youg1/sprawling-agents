@@ -176,30 +176,79 @@ impl RunWorker {
         Ok(())
     }
 
-    /// Writes one of the three documents that govern this city, and
-    /// records that it happened.
+    /// Writes one of the three documents that govern this city, only if
+    /// it still holds `base`, and records that it happened.
     ///
     /// The bytes go to disk and the line goes to the Ledger. The line
-    /// carries which document and how long it is, never the text: the
-    /// document is on disk and readable, and copying it into history
-    /// would put the same words under two authorities that later
-    /// disagree.
+    /// carries which document, how long it is and the identity version
+    /// it leaves, never the text: the document is on disk and readable,
+    /// and copying it into history would put the same words under two
+    /// authorities that later disagree.
     ///
     /// # Errors
-    /// Propagates a reserved subtree that cannot be written, and a
-    /// history that will not take the line announcing it.
+    /// Propagates an identity area that does not read, a document that
+    /// is no longer `base`, a reserved subtree that cannot be written,
+    /// and a history that will not take the line announcing it.
     pub(in crate::worker) fn put_document(
         &mut self,
         which: wire::GovernedDocument,
+        base: &str,
         body: &str,
     ) -> Result<(), AxError> {
         let which = super::super::governed_of(which);
-        city::write_governed(&self.city_root, which, body)?;
+        city::write_governed(&self.city_root, which, base, body)?;
+        let naming = match which {
+            city::Governed::Clerk => None,
+            city::Governed::Mayor | city::Governed::Preferences => {
+                match city::read_naming(&self.city_root)? {
+                    Ok(naming) => Some(naming.version()?),
+                    // The other document's area does not read, so the
+                    // city has no names to give a version of; the page
+                    // learns why from `Query::Identity`.
+                    Err(city::Unreadable { .. }) => None,
+                }
+            }
+        };
+        self.governed_written(which, body.len(), naming)
+    }
+
+    /// Writes one identity card into its document, only if the document
+    /// still holds `base`, and records that it happened with the identity
+    /// version it leaves: the receipt a page waits for (wire-SPEC.md
+    /// 8-59).
+    ///
+    /// # Errors
+    /// Propagates a name outside its domain, an identity area in `base`
+    /// that does not read, a document that is no longer `base`, a
+    /// reserved subtree that cannot be written, and a history that will
+    /// not take the line announcing it.
+    pub(in crate::worker) fn put_identity(
+        &mut self,
+        card: &wire::IdentityCard,
+        base: &str,
+    ) -> Result<(), AxError> {
+        let edit = super::super::naming_edit_of(card);
+        let written = city::write_naming(&self.city_root, &edit, base)?;
+        self.governed_written(
+            edit.document(),
+            written.bytes,
+            Some(written.naming.version()?),
+        )
+    }
+
+    /// The line that announces one governed document landed.
+    fn governed_written(
+        &mut self,
+        which: city::Governed,
+        bytes: usize,
+        naming: Option<kernel::B3Hash>,
+    ) -> Result<(), AxError> {
         self.record(
             EventKind::GovernedDocumentWritten,
             Payload::of(&GovernedDocumentWritten {
                 which: which.file().to_owned(),
-                bytes: body.len(),
+                bytes,
+                naming,
             })?,
         )
     }

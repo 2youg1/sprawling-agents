@@ -159,6 +159,9 @@ pub enum Query {
     BuildingView {
         addr: Address,
     },
+    /// What the city calls the person and the Mayor, read from the two
+    /// identity areas at the moment of asking (wire-SPEC.md 8-59).
+    Identity,
     /// Who answers for this city, and what has been answered on the
     /// person's behalf.
     ///

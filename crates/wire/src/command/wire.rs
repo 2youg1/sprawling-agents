@@ -55,6 +55,7 @@ impl<Secret> Command<Secret> {
             | Self::SetAutonomy { ref idem, .. }
             | Self::Pursue { ref idem, .. }
             | Self::PutDocument { ref idem, .. }
+            | Self::PutIdentity { ref idem, .. }
             | Self::PutSpine { ref idem, .. }
             | Self::PutPreferences { ref idem, .. }
             | Self::PutShelved { ref idem, .. }
@@ -225,7 +226,18 @@ impl From<WireCommand> for Command {
                 autonomy,
                 idem,
             },
-            Command::PutDocument { which, body, idem } => Self::PutDocument { which, body, idem },
+            Command::PutDocument {
+                which,
+                base,
+                body,
+                idem,
+            } => Self::PutDocument {
+                which,
+                base,
+                body,
+                idem,
+            },
+            Command::PutIdentity { card, base, idem } => Self::PutIdentity { card, base, idem },
             Command::PutSpine {
                 building,
                 which,

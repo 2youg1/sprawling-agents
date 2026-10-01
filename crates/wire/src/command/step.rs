@@ -71,6 +71,28 @@ pub enum GovernedDocument {
     Preferences,
 }
 
+/// One identity card's values (wire-SPEC.md 8-59).
+///
+/// Each key is the card's own: `None` removes it, which puts the default
+/// name back. What a name may be is the city's answer (`city::Naming`),
+/// so a value here is the text the person typed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum IdentityCard {
+    /// `PREFERENCES.md`: what the city calls the person, the host the
+    /// name was imported from, and, when `about` is `Some`, the body
+    /// that says what every agent should know about them.
+    Person {
+        user_id: Option<String>,
+        imported_from: Option<String>,
+        about: Option<String>,
+    },
+    /// `MAYOR.md`: what the Mayor is called. The body under the area is
+    /// left as it is.
+    Mayor { name: Option<String> },
+}
+
 /// Which of a building's own spine documents a write carries.
 ///
 /// Named rather than addressed, for the reason [`GovernedDocument`]

@@ -100,6 +100,9 @@ impl Chartered {
             dispatched_by: &self.dispatched_by,
             skills: &[],
             policy: self.policy,
+            // A harness run is handed no prefix of this city's, so it
+            // froze no names (runtime-SPEC.md 8-56).
+            naming: None,
         }
     }
 }

@@ -21,7 +21,7 @@
 use std::path::{Path, PathBuf};
 
 use kernel::{
-    Address, AxError, ClockStampGranularity, Effort, FrozenConfig, KeepWarm, LayeredValue,
+    Address, AxError, B3Hash, ClockStampGranularity, Effort, FrozenConfig, KeepWarm, LayeredValue,
     McpServer, SandboxLimits, SecondThreshold, ServerLabel,
 };
 use serde::Deserialize;
@@ -45,7 +45,7 @@ pub use cache::keep_warm;
 pub use ladder::Layer;
 pub use resident::settled_harness;
 pub(crate) use session::forget as forget_session;
-pub use session::{own_layer, write_session};
+pub use session::{freeze_naming, own_layer, write_session};
 pub use settled::{settled_effort, settled_second};
 pub(crate) use shelves::SHELVES_KEY;
 pub use shelves::city_shelves;
@@ -82,6 +82,9 @@ pub struct ConfigLayer {
     clock_stamp: Option<ClockStampGranularity>,
     keep_warm: Option<KeepWarm>,
     shelves: Option<Vec<String>>,
+    /// The identity version a session froze at this address
+    /// (city-SPEC.md 8-33): read at the room's own layer only.
+    naming: Option<B3Hash>,
 }
 
 impl ConfigLayer {
@@ -159,6 +162,7 @@ impl ConfigLayer {
             // module's to read, and a value stored half-resolved would
             // be a second spelling of the same shelf.
             shelves: file.skills.map(|section| section.shelves),
+            naming: file.identity.map(|section| section.version),
         })
     }
 
@@ -200,6 +204,13 @@ impl ConfigLayer {
     #[must_use]
     pub fn mcp(&self) -> Option<&[McpServer]> {
         self.mcp.as_deref()
+    }
+
+    /// The identity version a session at this address froze, when it
+    /// froze one.
+    #[must_use]
+    pub fn naming(&self) -> Option<B3Hash> {
+        self.naming
     }
 
     /// The directories this layer mounts read-only beside the city's own
@@ -254,6 +265,16 @@ pub(crate) struct ConfigFile {
     skills: Option<SkillsSection>,
     #[serde(default)]
     resident: Option<resident::ResidentSection>,
+    #[serde(default)]
+    identity: Option<IdentitySection>,
+}
+
+/// The `[identity]` table: the version of the names a session froze,
+/// written by the session's first run and taken out by `/new`.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct IdentitySection {
+    version: B3Hash,
 }
 
 /// The `[skills]` table: the directories outside the city this city

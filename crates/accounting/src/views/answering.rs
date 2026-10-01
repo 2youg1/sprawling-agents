@@ -31,6 +31,7 @@ use super::holding::Views;
 use super::prepared::{LedgerAsk, LiveAsk, Prepared, unavailable};
 
 mod history;
+pub(crate) mod identity;
 use super::lines::{endpoints_answer, known_hosts_answer, summarize};
 
 /// How many runs a cost view names besides every active one: a bound
@@ -239,6 +240,11 @@ impl Views {
             // answer with what it said the last time somebody used a
             // page.
             wire::Query::Preferences => return Prepared::Preferences,
+            wire::Query::Identity => {
+                return Prepared::Identity {
+                    city_root: self.city_root.clone(),
+                };
+            }
             wire::Query::Config { addr } => {
                 return Prepared::Config {
                     city_root: self.city_root.clone(),

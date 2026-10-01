@@ -76,6 +76,7 @@ fn charter(owned: &Owned) -> Charter<'_> {
         dispatched_by: &owned.by,
         skills: &[],
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
+        naming: None,
     }
 }
 

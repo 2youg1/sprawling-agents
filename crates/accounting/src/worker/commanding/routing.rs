@@ -205,8 +205,14 @@ impl RunWorker {
                 addr, carry, from, ..
             } => self.open_session(&addr, carry, from),
             wire::Command::PutDocument {
-                which, ref body, ..
-            } => self.put_document(which, body),
+                which,
+                ref base,
+                ref body,
+                ..
+            } => self.put_document(which, base, body),
+            wire::Command::PutIdentity {
+                ref card, ref base, ..
+            } => self.put_identity(card, base),
             wire::Command::PutSpine {
                 building: ref at,
                 which,

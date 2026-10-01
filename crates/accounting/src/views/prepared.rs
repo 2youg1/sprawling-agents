@@ -63,6 +63,8 @@ pub enum Prepared {
     Commits(CommitsAsk),
     /// The person's own settings file.
     Preferences,
+    /// The two identity areas, read from disk.
+    Identity { city_root: PathBuf },
     /// The configuration ladder of one address.
     Config { city_root: PathBuf, addr: Address },
     /// The release page, which leaves this machine.
@@ -232,6 +234,7 @@ impl Prepared {
                 Ok(settled) => wire::Answer::Preferences(Box::new(settled)),
                 Err(_) => unavailable("Preferences".to_owned()),
             },
+            Self::Identity { city_root } => super::answering::identity::identity_answer(&city_root),
             // A ladder that cannot be read is "I could not look": the
             // files are the person's own and the page says so rather
             // than drawing figures nothing on disk states.

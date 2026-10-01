@@ -45,18 +45,18 @@ fn exposed() -> SocketAddr {
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
-    assert_eq!(COMMAND_NAMES.len(), 29, "command table");
-    assert_eq!(QUERY_NAMES.len(), 38, "query table");
+    assert_eq!(COMMAND_NAMES.len(), 30, "command table");
+    assert_eq!(QUERY_NAMES.len(), 39, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 29, "command names are distinct");
+    assert_eq!(sorted.len(), 30, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 38, "query names are distinct");
+    assert_eq!(sorted.len(), 39, "query names are distinct");
 }
 
 #[test]
@@ -385,8 +385,16 @@ fn sample_of_every_command() -> Vec<Command> {
             effort: Some(kernel::Effort::High),
             model: None,
         },
+        Command::PutIdentity {
+            card: wire::IdentityCard::Mayor {
+                name: Some("Cat".to_owned()),
+            },
+            base: String::new(),
+            idem,
+        },
         Command::PutDocument {
             which: wire::GovernedDocument::Mayor,
+            base: String::new(),
             body: "# who the Mayor is
 "
             .to_owned(),
@@ -721,6 +729,7 @@ fn the_governance_frames_are_on_the_wire() {
     );
     let frame: wire::WireCommand = Command::PutDocument {
         which: wire::GovernedDocument::Preferences,
+        base: String::new(),
         body: "# how I like this city run\n".to_owned(),
         idem: kernel::IdemKey::derive(&kernel::RunId::from_bytes([9u8; 16]), Seq::new(1), b"prefs"),
     };

@@ -103,6 +103,9 @@ pub struct RunPlan {
     /// through would make the account of what this run did depend on
     /// when somebody looked at a form.
     pub retries: kernel::Retries,
+    /// The identity version this run's session froze, which
+    /// `run_started` records as it is (runtime-SPEC.md 8-56).
+    pub naming: Option<kernel::B3Hash>,
 }
 
 /// Where the driver stops to ask whether anything arrived. The turn layer

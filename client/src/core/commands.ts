@@ -27,6 +27,7 @@ import type {
   Effort,
   GovernedDocument,
   HaltScope,
+  IdentityCard,
   McpServer,
   ModelTag,
   PreferencePatch,
@@ -338,8 +339,19 @@ export function configureContext(addr: Address, percent: number): Command {
   };
 }
 
-export function putDocument(which: GovernedDocument, body: string): Command {
-  return { put_document: { which, body, idem: mintIdem() } };
+// One of the three governed documents, whole. `base` is the text the
+// box started from: the raw editor and the identity cards both write
+// `MAYOR.md` and `PREFERENCES.md`, so a file that moved underneath is
+// refused and the draft stays in the box.
+export function putDocument(which: GovernedDocument, base: string, body: string): Command {
+  return { put_document: { which, base, body, idem: mintIdem() } };
+}
+
+// One identity card. The city rewrites the card's keys in `base`'s
+// identity area and keeps every other byte, so the page never writes
+// TOML (wire-SPEC 8-59).
+export function putIdentity(card: IdentityCard, base: string): Command {
+  return { put_identity: { card, base, idem: mintIdem() } };
 }
 
 // One of a building's own spine documents. `base` is the text the

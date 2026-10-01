@@ -14,7 +14,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
-use crate::command::step::{Carry, GovernedDocument, HaltScope, PursuitStep, SpineDocument};
+use crate::command::step::{
+    Carry, GovernedDocument, HaltScope, IdentityCard, PursuitStep, SpineDocument,
+};
 use crate::command::tuning::EndpointTuning;
 use crate::named_frames::named_frames;
 use crate::preference::PreferencePatch;
@@ -304,16 +306,20 @@ pub enum Command<Secret = Sealed<String>> {
         body: String,
         idem: IdemKey,
     },
-    /// Writes one of the three documents that govern this city.
-    ///
-    /// The body replaces the file whole rather than patching it: these
-    /// are documents a person edits in one box and saves once, and a
-    /// partial write would leave the city governed by half a sentence.
-    /// No version travels with it for the same reason — there is no
-    /// second writer to lose a race against.
+    /// Writes one of the three documents that govern this city, whole,
+    /// only if it still holds `base`: the raw editor and the identity
+    /// cards are two writers of one file (wire-SPEC.md 8-59).
     PutDocument {
         which: GovernedDocument,
+        base: String,
         body: String,
+        idem: IdemKey,
+    },
+    /// One identity card: the city rewrites the card's keys in `base`'s
+    /// identity area and leaves every other byte (wire-SPEC.md 8-59).
+    PutIdentity {
+        card: IdentityCard,
+        base: String,
         idem: IdemKey,
     },
     /// Writes one of a building's own spine documents.
@@ -332,22 +338,12 @@ pub enum Command<Secret = Sealed<String>> {
         idem: IdemKey,
     },
     /// Connects one outside application through the broker that holds
-    /// its OAuth.
+    /// its OAuth, answered with the whole shelf: the broker was asked, so
+    /// every row is fresh, and the pressed one carries its consent page.
     ///
-    /// Answers with the whole shelf rather than with a bare url. The row
-    /// the person pressed comes back as `Standing::Awaiting` carrying
-    /// its consent page, and every other row comes back with it: the
-    /// broker was asked, so the reading is fresh for all of them, and a
-    /// half-refreshed list is a list that disagrees with itself.
-    ///
-    /// **The consent page is opened by the client, never by the city**,
-    /// which may run on a machine nobody is looking at; the url keeps
-    /// travelling in the answer because a blocked popup leaves a person
-    /// who still needs the link.
-    ///
-    /// It carries an `IdemKey` like every other state change, and here
-    /// that key is what stops a second press from opening a second
-    /// account on the same application.
+    /// **The client opens the consent page, never the city**, which may
+    /// run on a machine nobody is looking at. The `IdemKey` stops a
+    /// second press from opening a second account on one application.
     ConnectToolkit {
         toolkit: ToolkitSlug,
         idem: IdemKey,

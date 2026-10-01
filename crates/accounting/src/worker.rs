@@ -88,7 +88,7 @@ pub use lifetime::Closing;
 use lifetime::LedgerOpening;
 use mcp::mounts_under;
 use models::GatewayModels;
-use naming::{building_of, governed_of, not_built, scope_of};
+use naming::{building_of, governed_of, naming_edit_of, not_built, scope_of};
 use plans::Reporter;
 use plans::held::{PlanHolders, Planning};
 pub use pool::Memory;

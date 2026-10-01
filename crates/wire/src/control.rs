@@ -125,6 +125,7 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // going: the frozen prefix of a live run was assembled before
         // this frame arrived.
         | Command::PutDocument { .. }
+        | Command::PutIdentity { .. }
         // A building's own spine documents take the same reading, and
         // one more: they have a second writer, so the frame carries the
         // text it started from and a file that moved is refused.

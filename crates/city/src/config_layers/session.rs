@@ -29,7 +29,7 @@
 
 use std::path::Path;
 
-use kernel::{Address, AxError, Effort};
+use kernel::{Address, AxError, B3Hash, Effort};
 
 use super::write::{Change, change};
 use super::{ConfigLayer, Layer, path};
@@ -72,6 +72,18 @@ pub fn write_session(
         Layer::Resident,
         Change::Session { model, effort },
     )
+}
+
+/// Records the identity version a session froze at its own address
+/// (city-SPEC.md 8-33).
+///
+/// Written by the session's first run, beside the shape it froze, and
+/// taken out with that shape by [`forget`].
+///
+/// # Errors
+/// Propagates what the write path reports, as [`write_session`] does.
+pub fn freeze_naming(city_root: &Path, addr: &Address, version: B3Hash) -> Result<(), AxError> {
+    change(city_root, addr, Layer::Resident, Change::Naming(version))
 }
 
 /// Forgets the record, so the next session at this address chooses its

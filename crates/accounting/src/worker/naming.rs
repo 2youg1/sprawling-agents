@@ -18,6 +18,22 @@ pub(super) fn governed_of(which: wire::GovernedDocument) -> city::Governed {
     }
 }
 
+/// One identity card, as the city's own edit of the identity area.
+pub(super) fn naming_edit_of(card: &wire::IdentityCard) -> city::NamingEdit {
+    match card {
+        wire::IdentityCard::Person {
+            user_id,
+            imported_from,
+            about,
+        } => city::NamingEdit::Person {
+            user_id: user_id.clone(),
+            imported_from: imported_from.clone(),
+            about: about.clone(),
+        },
+        wire::IdentityCard::Mayor { name } => city::NamingEdit::Mayor { name: name.clone() },
+    }
+}
+
 /// The answer to a verb this build spells on the wire and cannot perform.
 ///
 /// One authority for the shape, because the six of them differ only in

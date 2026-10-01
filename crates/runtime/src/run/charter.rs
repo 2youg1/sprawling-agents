@@ -41,6 +41,8 @@ pub struct Charter<'a> {
     pub skills: &'a [SkillPin],
     /// The run policy `run_started` records (kernel-SPEC 8-77).
     pub policy: kernel::RunPolicy,
+    /// The identity version `run_started` records (kernel-SPEC 8-79).
+    pub naming: Option<kernel::B3Hash>,
 }
 
 impl RunPlan {
@@ -59,6 +61,7 @@ impl RunPlan {
             dispatched_by: &self.dispatched_by,
             skills: &self.skills,
             policy: self.run_policy,
+            naming: self.naming,
         }
     }
 }
@@ -96,6 +99,7 @@ impl Charter<'_> {
             skills: self.skills.to_vec(),
             dispatched_by: Some(self.dispatched_by.clone()),
             policy: Some(self.policy),
+            naming: self.naming,
         };
         ledger.append(EventDraft {
             run: self.run,
