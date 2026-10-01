@@ -13,7 +13,10 @@
 
 use std::path::Path;
 
+use kernel::layout::CityLayout;
 use kernel::{AxError, Effort, KeepWarm};
+
+use super::write::{Change, change_at};
 
 /// One fact of the city's own layer a page may write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,8 +31,11 @@ pub enum CitySetting {
 /// Propagates a city layer that exists and cannot be read or parsed, and
 /// a directory that cannot be written.
 pub fn write_city_setting(city_root: &Path, setting: CitySetting) -> Result<(), AxError> {
-    let _ = (city_root, setting);
-    Ok(())
+    let change = match setting {
+        CitySetting::KeepWarm(setting) => Change::KeepWarm(setting),
+        CitySetting::Effort(effort) => Change::Effort(effort),
+    };
+    change_at(&CityLayout::new(city_root).city_config(), change)
 }
 
 #[cfg(test)]

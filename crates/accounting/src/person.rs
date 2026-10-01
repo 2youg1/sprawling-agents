@@ -75,9 +75,30 @@ pub fn put(patch: PreferencePatch) -> Result<(), AxError> {
 fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
     city::edit_document(file, |held| {
         let mut document = document(file)?;
-        let mut settled = section(&document, file)?;
-        settled.apply(patch);
-        document.insert(UI.to_owned(), rendered(&settled, file)?);
+        match patch {
+            // The one fact that is not the page's: the serving core reads
+            // it from `[core]`, where it has always lived.
+            PreferencePatch::CorePriority(level) => {
+                let spelled = toml::Value::try_from(level).map_err(|err| invalid(file, &err))?;
+                let core = document
+                    .entry(CORE.to_owned())
+                    .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+                let toml::Value::Table(core) = core else {
+                    return Err(invalid(file, &format!("[{CORE}] is not a section")));
+                };
+                core.insert(PRIORITY.to_owned(), spelled);
+            }
+            PreferencePatch::Lang(_)
+            | PreferencePatch::Welcomed(_)
+            | PreferencePatch::Panel(_)
+            | PreferencePatch::Appearance(_)
+            | PreferencePatch::Proxying(_)
+            | PreferencePatch::Chord(_) => {
+                let mut settled = section(&document, file)?;
+                settled.apply(patch);
+                document.insert(UI.to_owned(), rendered(&settled, file)?);
+            }
+        }
         let text = toml::to_string_pretty(&document).map_err(|err| invalid(file, &err))?;
         held.replace(text.as_bytes())
     })
@@ -105,16 +126,18 @@ fn stated_core_priority(file: &Path) -> Result<CorePriority, AxError> {
         .and_then(|core| core.get(PRIORITY))
     {
         None => Ok(CorePriority::Raised),
-        Some(toml::Value::String(level)) if level == "raised" => Ok(CorePriority::Raised),
-        Some(toml::Value::String(level)) if level == "normal" => Ok(CorePriority::Normal),
-        Some(other) => Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "read whether the core stands above normal",
-            format!("{}: [{CORE}] {PRIORITY} = {other}", file.display()),
-        )
-        .with_recovery(
-            "write priority = \"raised\" or priority = \"normal\" under [core], or delete the line",
-        )),
+        // Read in the words the wire writes it with, so the page and the
+        // file cannot spell one setting two ways.
+        Some(stated) => stated.clone().try_into().map_err(|_| {
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "read whether the core stands above normal",
+                format!("{}: [{CORE}] {PRIORITY} = {stated}", file.display()),
+            )
+            .with_recovery(
+                "write priority = \"raised\" or priority = \"normal\" under [core], or delete the line",
+            )
+        }),
     }
 }
 

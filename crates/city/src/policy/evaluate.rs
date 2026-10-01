@@ -64,8 +64,13 @@ pub fn write_rules_against(
     base: &str,
     text: &str,
 ) -> Result<BuildingRules, AxError> {
-    let _base = base;
-    write_rules(city_root, addr, text)
+    let rules = evaluate(addr, text)?;
+    crate::document::edit_against(
+        &rules_path(city_root, addr),
+        base.as_bytes(),
+        text.as_bytes(),
+    )?;
+    Ok(rules)
 }
 
 /// The file as a person wrote it, before any rule is judged.
