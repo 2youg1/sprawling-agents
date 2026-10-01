@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 45 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "046ff264f692eb93d76f15267f31b986a139f9b6829b877e27211e863e76ebc8" as const;
+export const WIRE_HASH = "85ca5ecc871408f3ced9c72cfe37bc1deec31fcbfceade25e314a0b8662c0004" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -22,6 +22,21 @@ export const BODY_PX = { min: 12, max: 20 } as const;
  */
 export const Address = Schema.String.pipe(Schema.pattern(new RegExp("^(?:[^/\\\\:\\p{Cc}]*[^/\\\\:\\p{Cc}.\\p{White_Space}])(?:/[^/\\\\:\\p{Cc}]*[^/\\\\:\\p{Cc}.\\p{White_Space}])*$", "u"))).pipe(Schema.brand("Address"));
 export type Address = typeof Address.Type;
+
+/**
+ * The evidence a run's work must carry before a merge lets it into
+ * the building.
+ * 
+ * Choosing one does not provide the evidence; `runtime::mode::admits`
+ * compares what the run produced against it at the merge.
+ */
+export const AdmissionRequirement = Schema.Union(
+  Schema.Literal("standing"),
+  Schema.Literal("tested"),
+  Schema.Literal("contract_kept"),
+  Schema.Literal("double_validated"),
+).annotations({ identifier: "AdmissionRequirement" });
+export type AdmissionRequirement = typeof AdmissionRequirement.Type;
 
 /**
  * Non-empty item identity, derived from the run that raises the item
@@ -116,6 +131,63 @@ export const ArchiveAnswer = Schema.Struct({
   needle: Schema.String,
 }).annotations({ identifier: "ArchiveAnswer" });
 export type ArchiveAnswer = typeof ArchiveAnswer.Type;
+
+/**
+ * How often a scheduled job runs, in UTC minutes.
+ */
+export const Cadence = Schema.Union(
+  Schema.Struct({
+    every_minutes: Schema.Struct({
+      minutes: Schema.Int,
+    }),
+  }),
+  Schema.Struct({
+    daily_at: Schema.Struct({
+      minute: Schema.Int,
+    }),
+  }),
+  Schema.Struct({
+    weekly_at: Schema.Struct({
+      minute: Schema.Int,
+    }),
+  }),
+).annotations({ identifier: "Cadence" });
+export type Cadence = typeof Cadence.Type;
+
+/**
+ * One row of `SCHEDULE.toml`.
+ */
+export const ScheduledJob = Schema.Struct({
+  addr: Address,
+  cadence: Cadence,
+  goal: Schema.String,
+  name: Schema.String,
+  task: Schema.String,
+}).annotations({ identifier: "ScheduledJob" });
+export type ScheduledJob = typeof ScheduledJob.Type;
+
+/**
+ * One row of `WATCH.toml`.
+ */
+export const WatchedSource = Schema.Struct({
+  addr: Address,
+  matches: Schema.String,
+  name: Schema.String,
+  starts_work: Schema.Boolean,
+}).annotations({ identifier: "WatchedSource" });
+export type WatchedSource = typeof WatchedSource.Type;
+
+/**
+ * Both automation files, each in the order it was written, and the file
+ * that did not read with its reason. A file that is not there states no
+ * rows, which is a city that automates nothing.
+ */
+export const AutomationAnswer = Schema.Struct({
+  jobs: Schema.Array(ScheduledJob),
+  sources: Schema.Array(WatchedSource),
+  unreadable: Schema.Array(Schema.String),
+}).annotations({ identifier: "AutomationAnswer" });
+export type AutomationAnswer = typeof AutomationAnswer.Type;
 
 /**
  * One line of a building's archive index.
@@ -586,6 +658,7 @@ export const CityAnswer = Schema.Struct({
   buildings: Schema.Array(BuildingProgress),
   frozen: Schema.Int,
   halted: Schema.Array(HaltScope),
+  proved: Schema.optional(Schema.NullOr(Seq)),
   pursuits: Schema.Array(PursuitLine),
   runs: Schema.Array(RunSummary),
 }).annotations({ identifier: "CityAnswer" });
@@ -1217,6 +1290,7 @@ export const ModelTag = Schema.Union(
   Schema.Literal("main"),
   Schema.Literal("digest"),
   Schema.Literal("transcribe"),
+  Schema.Literal("ocr"),
 ).annotations({ identifier: "ModelTag" });
 export type ModelTag = typeof ModelTag.Type;
 
@@ -1564,6 +1638,59 @@ export const HunksAnswer = Schema.Struct({
   withheld: Schema.Array(Withheld),
 }).annotations({ identifier: "HunksAnswer" });
 export type HunksAnswer = typeof HunksAnswer.Type;
+
+/**
+ * Which of the three documents that govern a city a `PutDocument`
+ * frame carries.
+ * 
+ * A closed set rather than a path, because where these files live is
+ * the city's answer and not the sender's: all three sit in the city's
+ * own reserved subtree, which no write domain reaches. A frame naming
+ * its own path would be a way to write anywhere inside the one place a
+ * resident may not edit.
+ */
+export const GovernedDocument = Schema.Union(
+  Schema.Literal("mayor"),
+  Schema.Literal("clerk"),
+  Schema.Literal("preferences"),
+).annotations({ identifier: "GovernedDocument" });
+export type GovernedDocument = typeof GovernedDocument.Type;
+
+/**
+ * The names a new session would freeze, and the two texts a save names
+ * as its `base`.
+ */
+export const StatedIdentity = Schema.Struct({
+  about: Schema.String,
+  imported_from: Schema.optional(Schema.NullOr(Schema.String)),
+  mayor: Schema.optional(Schema.NullOr(Schema.String)),
+  mayor_text: Schema.String,
+  preferences_text: Schema.String,
+  user_id: Schema.optional(Schema.NullOr(Schema.String)),
+  version: Schema.String,
+}).annotations({ identifier: "StatedIdentity" });
+export type StatedIdentity = typeof StatedIdentity.Type;
+
+/**
+ * The two identity areas as they stand, or where one stopped reading.
+ * 
+ * An area that does not read is its own answer rather than a default
+ * name: a page that drew the default would let its next save write over
+ * the line the person got wrong.
+ */
+export const IdentityAnswer = Schema.Union(
+  Schema.Struct({
+    stated: StatedIdentity,
+  }),
+  Schema.Struct({
+    unreadable: Schema.Struct({
+      document: GovernedDocument,
+      line: Schema.Int,
+      why: Schema.String,
+    }),
+  }),
+).annotations({ identifier: "IdentityAnswer" });
+export type IdentityAnswer = typeof IdentityAnswer.Type;
 
 export const SignalLine = Schema.Struct({
   at: TimeMs,
@@ -2537,6 +2664,12 @@ export const Answer = Schema.Union(
     config: ConfigAnswer,
   }),
   Schema.Struct({
+    identity: IdentityAnswer,
+  }),
+  Schema.Struct({
+    automation: AutomationAnswer,
+  }),
+  Schema.Struct({
     unavailable: Schema.Struct({
       query: Schema.String,
     }),
@@ -2582,9 +2715,7 @@ export const Answered = Schema.Struct({
 export type Answered = typeof Answered.Type;
 
 /**
- * Queries read state. They are cacheable and free of side effects, so none
- * carries an `IdemKey` - a Query that needed one would have stopped being a
- * Query.
+ * A read of the city; the module documentation says what all of them share.
  */
 export const Query = Schema.Union(
   Schema.Literal("city_view", "approval_queue", "metrics", "cost_view", "registry_view", "discard_view"),
@@ -2649,6 +2780,8 @@ export const Query = Schema.Union(
       addr: Address,
     }),
   }),
+  Schema.Literal("identity"),
+  Schema.Literal("automation"),
   Schema.Literal("governance"),
   Schema.Struct({
     rounds: Schema.Struct({
@@ -2770,6 +2903,32 @@ export const Carry = Schema.Union(
 export type Carry = typeof Carry.Type;
 
 /**
+ * The deduplication key of one outward action: `idem1-` then 32 lowercase hex digits.
+ */
+export const IdemKey = Schema.String.pipe(Schema.pattern(new RegExp("^idem1-[0-9a-f]{32}$", "u"))).pipe(Schema.brand("IdemKey"));
+export type IdemKey = typeof IdemKey.Type;
+
+/**
+ * Whether this city renews a warm prompt cache before it expires.
+ */
+export const KeepWarm = Schema.Union(
+  Schema.Literal("off"),
+  Schema.Literal("five_minute"),
+).annotations({ identifier: "KeepWarm" });
+export type KeepWarm = typeof KeepWarm.Type;
+
+/**
+ * The city's own layer from the settings page: `None` leaves a key as
+ * it is (wire-SPEC.md 8-61).
+ */
+export const CitySettings = Schema.Struct({
+  effort: Schema.optional(Schema.NullOr(Effort)),
+  idem: IdemKey,
+  keep_warm: Schema.optional(Schema.NullOr(KeepWarm)),
+}).annotations({ identifier: "CitySettings" });
+export type CitySettings = typeof CitySettings.Type;
+
+/**
  * One header every request to this endpoint carries.
  * 
  * The value may be a `secret:realm/name` reference, which the vault
@@ -2802,51 +2961,27 @@ export const EndpointTuning = Schema.Struct({
 export type EndpointTuning = typeof EndpointTuning.Type;
 
 /**
- * Which of the three documents that govern a city a `PutDocument`
- * frame carries.
+ * One identity card's values (wire-SPEC.md 8-59).
  * 
- * A closed set rather than a path, because where these files live is
- * the city's answer and not the sender's: all three sit in the city's
- * own reserved subtree, which no write domain reaches. A frame naming
- * its own path would be a way to write anywhere inside the one place a
- * resident may not edit.
+ * Each key is the card's own: `None` removes it, which puts the default
+ * name back. What a name may be is the city's answer (`city::Naming`),
+ * so a value here is the text the person typed.
  */
-export const GovernedDocument = Schema.Union(
-  Schema.Literal("mayor"),
-  Schema.Literal("clerk"),
-  Schema.Literal("preferences"),
-).annotations({ identifier: "GovernedDocument" });
-export type GovernedDocument = typeof GovernedDocument.Type;
-
-/**
- * The deduplication key of one outward action: `idem1-` then 32 lowercase hex digits.
- */
-export const IdemKey = Schema.String.pipe(Schema.pattern(new RegExp("^idem1-[0-9a-f]{32}$", "u"))).pipe(Schema.brand("IdemKey"));
-export type IdemKey = typeof IdemKey.Type;
-
-/**
- * Which discipline a run works under. A run sits in exactly one.
- * 
- * Closed, and carried on the wire in this spelling. A word outside this
- * set fails to deserialize at the process boundary, which is where the
- * sender can still be told; read as a default, a misspelled
- * `experiment` would become a planning run with no refusal.
- * 
- * Defined here rather than in `runtime` for the reason
- * [`DialectKind`](crate::DialectKind) is: the wire carries it and
- * `runtime` evaluates it, and neither of those crates may name the
- * other. `runtime::mode` holds what each one admits; this holds only
- * which ones exist.
- */
-export const Mode = Schema.Union(
-  Schema.Literal("chat"),
-  Schema.Literal("plan_goal"),
-  Schema.Literal("up"),
-  Schema.Literal("sc"),
-  Schema.Literal("ud"),
-  Schema.Literal("experiment"),
-).annotations({ identifier: "Mode" });
-export type Mode = typeof Mode.Type;
+export const IdentityCard = Schema.Union(
+  Schema.Struct({
+    person: Schema.Struct({
+      about: Schema.optional(Schema.NullOr(Schema.String)),
+      imported_from: Schema.optional(Schema.NullOr(Schema.String)),
+      user_id: Schema.optional(Schema.NullOr(Schema.String)),
+    }),
+  }),
+  Schema.Struct({
+    mayor: Schema.Struct({
+      name: Schema.optional(Schema.NullOr(Schema.String)),
+    }),
+  }),
+).annotations({ identifier: "IdentityCard" });
+export type IdentityCard = typeof IdentityCard.Type;
 
 export const NoSecret = Schema.Never.annotations({ identifier: "NoSecret" });
 export type NoSecret = typeof NoSecret.Type;
@@ -2870,6 +3005,14 @@ export const Origin = Schema.Struct({
   run: RunId,
 }).annotations({ identifier: "Origin" });
 export type Origin = typeof Origin.Type;
+
+/**
+ * Whether the core's threads stand above normal (sprawling-SPEC.md
+ * 8-93): the setting a person turns off. Spelled here once, for the
+ * frame and for the `[core] priority` key the person's file holds.
+ */
+export const CorePriority = Schema.Literal("raised", "normal").annotations({ identifier: "CorePriority" });
+export type CorePriority = typeof CorePriority.Type;
 
 /**
  * One named change to [`PreferencesAnswer`].
@@ -2898,6 +3041,9 @@ export const PreferencePatch = Schema.Union(
   Schema.Struct({
     chord: Chord,
   }),
+  Schema.Struct({
+    core_priority: CorePriority,
+  }),
 ).annotations({ identifier: "PreferencePatch" });
 export type PreferencePatch = typeof PreferencePatch.Type;
 
@@ -2924,6 +3070,75 @@ export const PursuitStep = Schema.Union(
   }),
 ).annotations({ identifier: "PursuitStep" });
 export type PursuitStep = typeof PursuitStep.Type;
+
+/**
+ * A building's whole `RULES.toml` from a page, and the text the page
+ * read: the city evaluates `body` before it lands, and only over `base`
+ * (wire-SPEC.md 8-60).
+ */
+export const RulesWrite = Schema.Struct({
+  base: Schema.String,
+  body: Schema.String,
+  building: Address,
+  idem: IdemKey,
+}).annotations({ identifier: "RulesWrite" });
+export type RulesWrite = typeof RulesWrite.Type;
+
+/**
+ * Whether a run's work takes the ordinary road or stays in an
+ * experiment that never lands.
+ */
+export const LandingPolicy = Schema.Union(
+  Schema.Literal("ordinary"),
+  Schema.Literal("experiment"),
+).annotations({ identifier: "LandingPolicy" });
+export type LandingPolicy = typeof LandingPolicy.Type;
+
+/**
+ * Whether a run is talking with the person or carrying out work.
+ * 
+ * It decides how the run's catalog row introduces it and nothing else:
+ * what it may write, what it must prove and whether it lands are the
+ * other three values of [`RunPolicy`].
+ */
+export const Mode = Schema.Union(
+  Schema.Literal("chat"),
+  Schema.Literal("work"),
+).annotations({ identifier: "Mode" });
+export type Mode = typeof Mode.Type;
+
+/**
+ * What a run may do to a file that already exists inside its write
+ * domain (kernel-SPEC 8-78).
+ * 
+ * It narrows the domain and never widens it: the domain answers where
+ * a run may write and what kind of file, this answers whether a write
+ * may change a file that is already there. Whether the target exists
+ * is the filesystem's fact at the moment of the write, so the check
+ * that makes `Create` hold is the writer's atomic create; the rule and
+ * its refusal are [`crate::gate::replacing`].
+ */
+export const WriteLimit = Schema.Union(
+  Schema.Literal("full"),
+  Schema.Literal("create"),
+).annotations({ identifier: "WriteLimit" });
+export type WriteLimit = typeof WriteLimit.Type;
+
+/**
+ * The four values one run works under, chosen when it is dispatched
+ * and written into its `run_started` line.
+ * 
+ * One value because the four always travel together — on the wire, in
+ * the ledger and through the dispatch — and are chosen independently,
+ * so every combination has a meaning.
+ */
+export const RunPolicy = Schema.Struct({
+  admit: AdmissionRequirement,
+  landing: LandingPolicy,
+  mode: Mode,
+  write: WriteLimit,
+}).annotations({ identifier: "RunPolicy" });
+export type RunPolicy = typeof RunPolicy.Type;
 
 /**
  * Where a [`Command::PutShelved`](crate::Command) writes.
@@ -2984,8 +3199,8 @@ export const Command = Schema.Union(
       effort: Schema.optional(Schema.NullOr(Effort)),
       goal: Schema.String,
       idem: IdemKey,
-      mode: Mode,
       model: Schema.optional(Schema.NullOr(Schema.String)),
+      policy: RunPolicy,
       session: Schema.optional(Schema.NullOr(SessionName)),
       task: Schema.String,
     }),
@@ -3153,10 +3368,31 @@ export const Command = Schema.Union(
   }),
   Schema.Struct({
     put_document: Schema.Struct({
+      base: Schema.String,
       body: Schema.String,
       idem: IdemKey,
       which: GovernedDocument,
     }),
+  }),
+  Schema.Struct({
+    put_identity: Schema.Struct({
+      base: Schema.String,
+      card: IdentityCard,
+      idem: IdemKey,
+    }),
+  }),
+  Schema.Struct({
+    put_rules: RulesWrite,
+  }),
+  Schema.Struct({
+    restore_file: Schema.Struct({
+      at: Address,
+      idem: IdemKey,
+      point: GitOid,
+    }),
+  }),
+  Schema.Struct({
+    configure_city: CitySettings,
   }),
   Schema.Struct({
     put_spine: Schema.Struct({
@@ -3330,7 +3566,7 @@ export type LogLine = typeof LogLine.Type;
 
 /**
  * One reading of every counter the monitor shows, in integers because
- * it travels on the wire (sprawling-SPEC.md 8-94).
+ * it travels on the wire (sprawling-SPEC.md 8-94, 8-129-6).
  */
 export const Sample = Schema.Struct({
   core_cpu_permille: Schema.Int,
@@ -3344,7 +3580,9 @@ export const Sample = Schema.Struct({
   machine_available_bytes: Schema.Int,
   machine_cpu_permille: Schema.Int,
   queued_runs: Schema.Int,
+  read_nanos: Schema.Int,
   relay_p50_nanos: Schema.Int,
+  view_backlog: Schema.Int,
   volume_free_bytes: Schema.Int,
 }).annotations({ identifier: "Sample" });
 export type Sample = typeof Sample.Type;
