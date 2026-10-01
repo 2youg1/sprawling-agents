@@ -95,6 +95,7 @@ impl Report {
     #[must_use]
     pub fn line(&self) -> Value {
         let mut line = Map::new();
+        line.insert("file".to_owned(), self.file.to_string().into());
         if let Some(digest) = self.digest {
             line.insert("digest".to_owned(), digest.to_string().into());
         }
