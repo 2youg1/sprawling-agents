@@ -153,7 +153,7 @@ cssparser = { version = "0.38", default-features = false }
 # The remote door's cryptography: ML-KEM-768, ML-DSA-44, X25519, Ed25519,
 # HKDF and AES-GCM from one library that is already in the graph through
 # rustls, with the features rustls turns on, so building `remote_access` alone
-# needs no assembler either (remote_access-SPEC.md section 13).
+# needs no assembler either (crates/remote_access/Spec.lean section 13).
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "prebuilt-nasm"] }
 # The TLS stack's crypto backend is aws-lc-rs, installed once by
 # `gateway::reach::tls` (gateway-SPEC section 8-15) rather than chosen by a
