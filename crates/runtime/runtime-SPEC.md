@@ -42,7 +42,7 @@
 1. **verify 的规范复验**：v1 无升级器链，故对每行断言 `canonical_line(parse_line(raw)) == raw`（写方规范性质）。未来 v>1 经升级器读入后此断言只对原版字节成立——届时随升级器一并改约（本文更新）。
 2. **fork 的 run_forked 落账**：事件写入母城 Ledger 由调用方（runtime 回合层／citysim）执行；fork 只产 EventDraft 与前缀，不持 Ledger 句柄——保持纯函数形。
 3. **同一套重建器**：A15 与 A19 共用 verify 输出；重建器＝verified 行序列本身。
-5. **命令结果的戳是它开始的时刻，不是它答复的时刻**：生产的 `exec` 在 `Placing::account` 里打包、打戳，而回合读答复时刻（`tool_result` 的 `t`）是在 `account` 返回之后（`turn::wave` 的 `account`），所以工具面在打戳那一刻读得到的最新读数是这条调用放行后的开始时刻（§8-53、§12.8）。一条跑两分钟的命令，模型读到的戳早两分钟。要戳等于答复时刻，回合须在调用工具面的 `account` 之前读答复时刻；那时 `ClockReading` 里就是它，工具面一行不改。定下这一点的证据：`turn::wave` 把答复读数挪到 `tools.account` 之前后，`driving/tests/sieving` 的戳测试改为比 `tool_result` 的 `t` 仍绿，并行对拍测试不动。
+5. **命令结果的戳是答复时刻，而产品的验收还比开始时刻**：回合在调用工具面的 `account` 之前读答复时刻（§8-15、§12.8），所以工具面打戳时 `ClockReading` 里最新的就是它，戳的秒数等于这条调用 `tool_result` 的 `t`；`turn::tests::concurrent` 的 `a_stamp_the_face_reads_is_the_moment_its_answer_records` 在串行与开头只读段两条路上钉住这一点。`accounting::worker::driving::tests::sieving` 的 `a_served_command_result_ends_with_the_second_its_call_started` 仍拿戳比 `tool_called` 的 `t`：墙钟下一条命令的开始与答复落在同一秒时它照样绿，跨过整秒时会红。那条测试要改为比 `tool_result` 的 `t` 并改名；它所在的文件本轮归别的改动，改它的那一步留在这里。
 4. **前缀续期未接线**：`prefix::warmth` 的 `Warmed` 与记账已在（§8-4-2），而 run 结束后按 `next_due` 醒来发续期的那条循环还没有；接上它要先定续期的 usage 记成哪一种事件。
 6. **`contract_kept` 的证据今天没人量。** 城读不出一次翻新有没有动到可观察的契约，装配层把 `Produced.contract_moved` 恒填 `false`，所以选了 `contract_kept` 的 run 在合并时恒放行（§8-54）。要让这一要求真的拒，得有一个读得出契约的量具（例如 run 前后同一组对外测试的结果对照）把它填进 `Produced`；判定它的证据是一次动了对外行为、测试仍绿的翻新在 citysim 里被放行。
 7. **`Create` 管不到楼的 MCP 工具。** 一个 MCP server 是楼自己声明的外部进程，它写不写文件、写在哪里，城看不见（§8-55 只覆盖城自己的写路径：edit、exec 与链接）。候选是 `Create` 下不挂载声明了写效果的连接器，或只挂载声明只读的；判定它的证据是一个会写文件的连接器在 `Create` 的 run 里改动了已有文件。
@@ -582,7 +582,7 @@ impl StatusTool { pub fn clocked(self, clock: ClockReading) -> StatusTool; }   /
 ```
 
 - **为什么要它**：`RunHooks::now` 是一跑里唯一的采样点，工具面不采样只收读数（§8-15 时间纪律），而 `ConcurrentInvoke` 与 `Tool::invoke` 的签名不带读数。装配层把 `now` 包一层，读到的每个值先 `keep` 再交给驱动；要报时的工具面（命令结果的戳、`status` 的 `now:`）读 `latest`。这样工具面报出的时刻恒是账本某一行的 `t`，不是第二个钟给出的另一个值。
-- **读到的是哪一刻**：工具起跑之前驱动最后一次读钟是这条调用的开始时刻（§8-15），所以串行的一条调用读到自己的开始；开头只读段里读到的是这一段最后一条的开始。答复时刻不在其中，见 §3 第 5 条。
+- **读到的是哪一刻**：回合在调用工具面的 `account` 之前读这条调用的答复时刻（§8-15），所以工具面打包、打戳时读到的就是它，串行的调用与开头只读段的调用都一样；戳的秒数因此恒等于这条调用 `tool_result` 的 `t`。被准入直接答复的调用不经工具面的 `account`，不打戳。
 - **`status` 的 `now:` 行**：`now: 2026-05-14T09:31:07Z`，没有读数时是 `now: not stamped`。它不看粒度：`now` 是 `status` 自己报的一栏，不是信封附件，关掉戳不该让模型问不出时间。`StatusSnapshot` 不再有 `now` 字段——快照在派发时冻结，冻结下来的时刻整跑都不动，而这一栏要的正是调用那一刻。
 - 与 `ContextReading` 同形同理：一跑一个、克隆共享、写者一个。用 `Mutex<Option<TimeMs>>` 而不是原子整数：「还没读过」是一个状态，不该拿某个整数冒充；锁里只放一个 `Copy` 值、整值替换，所以中毒不留半写的值，读写都取锁里的值照常走。
 
@@ -1026,8 +1026,8 @@ pub fn drive(plan: RunPlan, ledger: &mut dyn Ledger, model: &mut dyn Model,
 
 - **为什么要这个模块**：「Dispatch → N 回合 → 冻结」的事件序只有这一处。citysim 与真城各写一遍就是两个权威，而两者一旦漂开，**仿真继续绿而真城错**——仿真的全部价值恰好建立在它跑的是同一份代码上。故 citysim 是本模块的调用方，每个剧本直接验证生产回路。
 - **`run_started.parent`**：只在派生开的 Run 上出现。「两行相邻」不是一个可查询的事实；写进载荷之后，前端折得出树，离线重放也折得出同一棵树。
-- **时间纪律**：时钟只经 `RunHooks::now` 进来，只由驱动在自己的线程上、在串行阶段调用；工具面（`ConcurrentInvoke` 的实现、装配层的 bench、citysim 的闭包）恒不采样，只收读数，`admit` 收的仍是回合时间戳。采样点：dispatch 两次（checkpoint、run_started）；每回合开头一次，得回合时间戳；每次模型尝试发出之前一次（`model_called`），回复到齐之后一次（`model_returned`）；每条工具调用放行之后、工具起跑之前一次（`tool_called`），它的答复入账之前一次（`tool_result`）；provider 失败而冻结时一次；结束时 freeze 一次，handoff 用它、run_frozen 用它＋1；取消时 freeze 沿用被打断那个回合的时间戳，因为这次冻结属于那个回合。回合里其余的行（`prompt_assembled`、`prompt_shape_compared`、`steer_received`、`cancel_received`、波前的 `checkpoint_committed`）带回合时间戳。哪几种行记自己的时刻，只由 `turn::ledger` 的 `Authored`／`Carried` 变体定一次：那四个变体不带读数就造不出来。计数器闭包（citysim）下采样的次数与次序是剧本的函数，所以字节照样可重放。这四种行的 `t` 怎么读，以 kernel-SPEC §8-4「信封 `t` 记的是什么」为准。
-- **开头只读段的时刻**：各条在放行之后逐条采开始；全部 join 之后按调用序逐条入账，入账前采答复，所以一条的答复时刻是「这一波在调用序上轮到它入账的时刻」，不早于它真正答完，不晚于最慢那条答完。生成中提前起跑的读，开始时刻记成它被放行的那一刻：这两行量的是这一波为它花了多久。重开参数：出现声明 `Effect::Read` 而常超过 1 s 的工具时，改在工作线程上采样，那要一个 `Sync` 的时钟。
+- **时间纪律**：时钟只经 `RunHooks::now` 进来，只由驱动在自己的线程上、在串行阶段调用；工具面（`ConcurrentInvoke` 的实现、装配层的 bench、citysim 的闭包）恒不采样，只收读数，`admit` 收的仍是回合时间戳。采样点：dispatch 两次（checkpoint、run_started）；每回合开头一次，得回合时间戳；每次模型尝试发出之前一次（`model_called`），回复到齐之后一次（`model_returned`）；每条工具调用放行之后、工具起跑之前一次（`tool_called`），它的答复交给工具面的 `account` 之前一次（`tool_result`），所以工具面打戳时读到的最新读数就是答复时刻；provider 失败而冻结时一次；结束时 freeze 一次，handoff 用它、run_frozen 用它＋1；取消时 freeze 沿用被打断那个回合的时间戳，因为这次冻结属于那个回合。回合里其余的行（`prompt_assembled`、`prompt_shape_compared`、`steer_received`、`cancel_received`、波前的 `checkpoint_committed`）带回合时间戳。哪几种行记自己的时刻，只由 `turn::ledger` 的 `Authored`／`Carried` 变体定一次：那四个变体不带读数就造不出来。计数器闭包（citysim）下采样的次数与次序是剧本的函数，所以字节照样可重放。这四种行的 `t` 怎么读，以 kernel-SPEC §8-4「信封 `t` 记的是什么」为准。
+- **开头只读段的时刻**：各条在放行之后逐条采开始；全部 join 之后按调用序逐条入账，入账前、工具面的 `account` 之前采答复，所以一条的答复时刻是「这一波在调用序上轮到它入账的时刻」，不早于它真正答完，不晚于最慢那条答完。生成中提前起跑的读，开始时刻记成它被放行的那一刻：这两行量的是这一波为它花了多久。重开参数：出现声明 `Effect::Read` 而常超过 1 s 的工具时，改在工作线程上采样，那要一个 `Sync` 的时钟。
 - **结束判定**：`calls_made == 0` 且这一答**说了话**，即 `Completion::Done(Evidence[model_returned])`；`calls_made == 0` 而内容为空、或 `stop == MaxTokens`，即 `Completion::Limit`（§8-37）；任一安全点命中 Cancel 即 `Completion::Cancelled`。三条均经 `freeze` 出口，故 **handoff_written＋run_frozen 是唯一出口**，无第二条退路。第四点 `BeforeSpawn` 与前三点同权：命中即 `Cancelled`，那个回合的 assistant 与 tool results **不入窗**，因为窗口前推是「回合成立」的后果而不是它的一部分。
 - **第四种结束：回合中途的失败。** **两种 carrier 都经 `freeze` 出口，差别只在冻结之前写不写载体事件**：带 `Carrier::Event` 的码先写载体事件，`Carrier::Loadtime` 的码直接冻结。理由：「账本自身就是受害者时，没有什么真实的东西可写」对 `CasCorrupt`／`StorageFatal`／`LogVersionUnsupported` 成立，对 `WireMismatch` 不成立——供应方把兑换格式写错与账本健否无关；而对前三个码，写不进去的后果就是 `freeze` 的 append 自己失败并把那个失败向上抛，这比预先判定「写不进去」更诚实。一次没有冻结的 run 在账本上只剩 `run_started`，重启后仍报 `frozen: false`，页面就把每条消息都当 `steer` 发。冻结后**原错误仍然向上抛**：账本得到判决，调用方得到诊断，两件事不互相替代。否决「把 `WireMismatch` 重分类为 `Carrier::Event(ProviderDegraded)`」：该码在握手期也用于 wire 版本不匹配（那时连 run 都不存在），一个码两种含义去改分类表，会让 `kernel::event::kind` 那条「loadtime 白名单封死在五个」的测试变成对一件无关的事作证。
 - **Conversation 归驱动持有**：入窗内容就是回合报告的前推结果（assistant＋tool results），放在调用方手里等于把一条不变量交给每个调用方自己维护。
@@ -1170,15 +1170,15 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 **重开参数**：`RunPlan` 的开篇字段与 `Charter` 的字段不再一一对应（例如 `run_started` 多一个只有模型 run 才有的键），视图要带 `Option` 时，改为 `RunPlan` 持有一个 `Charter` 值。
 
-### 12.8 戳从驱动最近的读数渲染，到秒，默认每分钟
+### 12.8 戳从驱动最近的读数渲染，到秒，默认每分钟；回合在工具面打包之前读答复时刻
 
-**决定**：结果上的时钟行渲染成 ISO 8601 UTC、到秒（`clock: 2026-05-14T09:31:07Z;`）；读数取自 `ClockReading`，即驱动在工具面打包之前最后一次读到的那一刻（§8-53）；`CLOCK_STAMP_DEFAULT` 是 `Minute`，于是 `Timestamped` 工具每条结果都带戳，`Timeless` 工具只在分钟桶变了时带；`Off` 仍逐字节等于没有这个功能。
+**决定**：结果上的时钟行渲染成 ISO 8601 UTC、到秒（`clock: 2026-05-14T09:31:07Z;`）；读数取自 `ClockReading`，即驱动在工具面打包之前最后一次读到的那一刻（§8-53）；`turn::wave` 在调用工具面的 `account` 之前读答复时刻，所以那一刻就是答复时刻；`CLOCK_STAMP_DEFAULT` 是 `Minute`，于是 `Timestamped` 工具每条结果都带戳，`Timeless` 工具只在分钟桶变了时带；`Off` 仍逐字节等于没有这个功能。
 
-**理由**：模型要知道一条命令是什么时候跑的，靠回合的时间戳说不出来，一回合可以跨几分钟。读数经 `ClockReading` 来，一跑仍只有 `RunHooks::now` 一个采样点，戳上的秒数恒等于账本里某一行的 `t`；ISO 形状是人读、模型读与 `view` 解析共用的一种写法，到秒是因为分钟在一回合之内分不出先后。
+**理由**：模型要知道一条命令是什么时候答复的，靠回合的时间戳说不出来，一回合可以跨几分钟；一条跑两分钟的命令，戳若是开始时刻就早两分钟。读数经 `ClockReading` 来，一跑仍只有 `RunHooks::now` 一个采样点，戳上的秒数恒等于账本里某一行的 `t`；ISO 形状是人读、模型读与 `view` 解析共用的一种写法，到秒是因为分钟在一回合之内分不出先后。
 
-**被否**：①工具面自己读一次钟打戳——那是一跑里的第二个采样点，戳上的秒数可以与它 `tool_result` 的 `t` 差一秒，计数时钟下的剧本也会多出采样而改变字节；②用 `admit` 收到的回合时间戳——一条命令的戳会早于模型给出这条调用的那一刻；③在回合的 `account` 里打戳，读答复时刻——这是更准的一处，但要 `turn::wave` 把打包移出工具面，本次不动回合；§3 第 5 条写明了从这里走到那一处的那一步。
+**被否**：①工具面自己读一次钟打戳——那是一跑里的第二个采样点，戳上的秒数可以与它 `tool_result` 的 `t` 差一秒，计数时钟下的剧本也会多出采样而改变字节；②用 `admit` 收到的回合时间戳——一条命令的戳会早于模型给出这条调用的那一刻；③在回合的 `account` 里打戳——要 `turn::wave` 把打包移出工具面，而把答复读数挪到 `tools.account` 之前已经给出同一个秒数，工具面一行不改；④答复读数留在写 `tool_called`/`tool_result` 两行之前、工具面的 `account` 之后——戳就是开始时刻，一条长命令的戳早出它跑的那么久。读数挪动不改变采样的次数与次序，计数时钟下的剧本与并行对拍测试的字节不变。
 
-**重开参数**：回合在调用工具面的 `account` 之前读答复时刻时，戳自动变成答复时刻，本条改写为「答复时刻」；出现要本地时间的读者、且城配置开始受理 `[clock] zones` 时，时区行与偏移格式重议。
+**重开参数**：出现要本地时间的读者、且城配置开始受理 `[clock] zones` 时，时区行与偏移格式重议；工具面开始在 `account` 里做耗时可观的事（例如同步写盘）时，重议答复读数是否仍在它之前。
 
 ### 12.10 沙箱副本按工具一份、每条命令前同步，而不是每条命令新建一份
 
