@@ -552,6 +552,77 @@ adversary *args:
     ! command -v cygpath >/dev/null 2>&1 || binary="$(cygpath -m "$binary")"
     SPRAWLING_BIN="$binary" lake exe adversary {{args}}
 
+# The usability walk a stranger takes with a release archive
+# (tools/adversary/adversary-SPEC.md section 9, step 6). The archive is
+# unpacked into target/acceptance, the stand-in provider is started on the
+# script the acceptance world writes for the archive's skills, and the
+# archive's own binary is walked through a first day, a process killed in
+# the middle of a run, and the morning after. Once every step held, the
+# checklist a person works through by hand is written to
+# target/acceptance/checklist.md.
+#
+# Never a gate, and not part of `just adversary`: the archive comes from
+# `just package`, which is a release build. Name it from the repository
+# root, `just acceptance target/package/<archive>.zip`, or by an absolute
+# path. Lean is required here rather than skipped, because a person who
+# names an archive has asked for this walk.
+#
+# This recipe is the only place that starts the stand-in: the checker under
+# tools/adversary/ hosts no server (adversary-SPEC.md section 13) and is
+# told the stand-in's URL, as it is told the binary's path.
+acceptance archive:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for tool in lake unzip; do
+        command -v "$tool" >/dev/null 2>&1 || {
+            echo "acceptance: $tool is absent; \`just prereqs\` names the line that installs Lean, and unzip comes with Git for Windows and with every system package manager" >&2
+            exit 1
+        }
+    done
+    out="$PWD/target/acceptance"
+    rm -rf "$out"
+    mkdir -p "$out/archive"
+    unzip -q "{{archive}}" -d "$out/archive"
+    # The Windows name first: under Git Bash a glob for `sprawling` also
+    # matches `sprawling.exe`, so one binary would be counted twice.
+    shopt -s nullglob
+    binaries=("$out"/archive/*/sprawling.exe)
+    [ "${#binaries[@]}" -gt 0 ] || binaries=("$out"/archive/*/sprawling)
+    [ "${#binaries[@]}" -eq 1 ] || {
+        echo "acceptance: {{archive}} holds ${#binaries[@]} sprawling binaries where a release archive holds one" >&2
+        exit 1
+    }
+    binary="${binaries[0]}"
+    shelf="$(dirname "$binary")/skills"
+    cargo build --package citysim --bin provider --locked
+    targets="${CARGO_TARGET_DIR:-target}"
+    case "$targets" in /* | ?:*) ;; *) targets="$PWD/$targets" ;; esac
+    provider="$targets/debug/provider"
+    [ -f "$provider" ] || provider="$provider.exe"
+    # The paths are handed to programs that are not a shell; under Git Bash
+    # they are `/c/...`, which only that shell resolves (see `adversary`).
+    if command -v cygpath >/dev/null 2>&1; then
+        out="$(cygpath -m "$out")"
+        binary="$(cygpath -m "$binary")"
+        shelf="$(cygpath -m "$shelf")"
+    fi
+    lake exe acceptance script "$shelf" "$out/script.json"
+    "$provider" "$out/script.json" "$out/record.jsonl" > "$out/provider.out" 2> "$out/provider.err" &
+    stand_in=$!
+    trap 'kill "$stand_in" 2>/dev/null || true' EXIT
+    # The stand-in prints its URL before it answers anything; wait for that
+    # line, and stop at once if the stand-in exits instead.
+    url=""
+    for _ in $(seq 1 100); do
+        url="$(sed -n 's/^SPRAWLING_PROVIDER=//p' "$out/provider.out" | tr -d '\r')"
+        [ -n "$url" ] && break
+        kill -0 "$stand_in" 2>/dev/null || { cat "$out/provider.err" >&2; exit 1; }
+        sleep 0.1
+    done
+    [ -n "$url" ] || { echo "acceptance: the stand-in printed no URL within ten seconds" >&2; exit 1; }
+    SPRAWLING_BIN="$binary" SPRAWLING_PROVIDER="$url" \
+        lake exe acceptance walk "$shelf" "$out/record.jsonl" "$out/checklist.md"
+
 # The acceptance gate for a real endpoint (never a gate in `just
 # check`; without credentials it prints one line and succeeds).
 #
