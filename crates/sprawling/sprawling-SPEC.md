@@ -4643,7 +4643,7 @@ static STOCKING: Mutex<BTreeSet<PathBuf>>;
 - **成功与失败。** 成功写一条 `Trace` 诊断行，带 `stock` 答回的三个计数，人从日志读得出这次补树是全量检出还是差量。失败写一条 `Refuse` 诊断行，说下一次放置会退回全量检出；不返回错误，run 的结局不因它改变（8-145）。两行都锚在派活被决定时的账本位置（`Laying` 与 `HarnessHalf` 里的 `staged_at`），与 8-113 lane 半段的诊断行同一个写端。
 - **补到一半进程死了。** 账本里没有补树的记录，重放与恢复都不读它；备树的全部状态在盘上与城的 git 登记里，进程里的表随进程消失。下一个写者开城时 `RunWorker::over` 先拿账本写锁，再由 `Worktrees::lift_abandoned_leases` 解开每一棵树的锁，`+spare` 也在其中，否则一棵锁着的备树会被读成「正在补」，本次服务里再也没有备树可接管；`sweep_abandoned` 不清它，因为 `live` 不列它（`crates/storage/Spec.lean` §8-35）。之后按盘上的样子收回：登记与两份链接文件都认得出时，下一次放置接管它，检出到一半的文件由接管第⑥步的 `restore` 补全；登记在而链接文件认不出时，下一次 `stock` 收回登记重备；目录在而没有登记时，下一次 `stock` 先清掉目录再备。所以 G5（崩溃与恢复）不需要为补树加任何恢复步骤；它要守住的只有一条次序：开城解锁先于第一次放置。
 - **补树不在落地这一段。** 一个房间第一次放置接管了备树之后，这条 lane 补回的是一次全量检出；lane 在交回 `Flown` 之后才补，`DrivingPool::landed` 不 `join` 还在补的 lane，所以这个 run 的落地不等它（8-161）。
-- **读数。** 由 `preparing::tests::instrument_production_placement`（`#[ignore]`）给出：一座评审楼的 `lab/room1/bulk` 里 512 个 16 KB 文件，第一个房间经 `fly` 放置（全量检出）、驾驶、补备树；第二个房间经 `fly` 接管备树、驾驶、补回一棵。仪表用一个包住城账本的计时 `Ledger` 量三段：`fly` 开始到 `worktree_opened` 入账（放置），最后一行入账到 `fly` 返回（补树），以及整个 `fly`。
+- **读数。** 由 `preparing::tests::instrument_production_placement`（`#[ignore]`）给出：一座评审楼的 `lab/room1/bulk` 里 512 个 16 KB 文件，第一个房间经 `fly` 放置（全量检出）、驾驶、补备树；第二个房间经 `fly` 接管备树、驾驶、补回一棵。仪表用一个包住城账本的计时 `Ledger` 与交给 `fly` 的 `home` 量四段：`fly` 开始到 `worktree_opened` 入账（放置），最后一行入账到交回 `Flown`（落地等的，`landing_wait_ms`），交回 `Flown` 到 `fly` 返回（补树），以及整个 `fly`。下面两段读数在 lane 先补树、后交回 `Flown` 时量得，那时补树这一段整段落在落地之前（8-161 前后对照）。
 
 读数（debug 构建，windows-x86_64、16 核，同一仪表三轮）：第二个房间接管备树的放置 39–42 ms，`created` 为 0；它的 lane 之后补回一棵全量检出的备树 1.44–1.46 s。第一个房间的放置 5.6–6.2 s，`created` 513：这一段里有城的第一次提交（`ensure_base` 把 512 个文件 stage 并扫描一遍）和一次全量检出；它之后补备树 1.26–1.33 s。
 
@@ -4681,7 +4681,7 @@ impl Drop for DrivingPool { /* join 每条 trailing 里的 lane */ }
 
 当前状态：次序、池的一半与关城的 `join` 已落地。城的第一次放置没有改，仍以秒计（上一条）；降它的下一步是 `ensure_base` 写一个 pack 而不是逐个松散对象，判定它的证据是同一个仪表测试的 `placement_ms`。ARCHITECTURE.md §10 第 3 条与 8-46-3 仍写着 lane 在 run 回家时结束，现在 lane 在补完备树后结束。
 
-读数（发行构建，windows-x86_64、16 核，`instrument_production_placement`）：改之前，第二个房间接管备树的放置 41 ms，`created` 为 0，之后它的落地等补树 1222 ms；第一个房间放置 4239 ms，`created` 513，落地等补树 1219 ms。改之后：READING-PENDING。`large_worktree_placement`（bench 自己备树）改之前 p50 34.7 ms。
+读数（发行构建，windows-x86_64、16 核，`instrument_production_placement`）：改之前，第二个房间接管备树的放置 41 ms，`created` 为 0，之后它的落地等补树 1222 ms；第一个房间放置 4239 ms，`created` 513，落地等补树 1219 ms。改之后两轮：两个房间的落地都只等 0 ms（`landing_wait_ms` 不到 1 ms）；第二个房间放置 35–40 ms，`created` 为 0，之后 lane 补树 1178–1256 ms，在落地之外；第一个房间放置 4.00–4.32 s，`created` 513，之后补树 1149–1233 ms。`large_worktree_placement`（bench 自己备树，不经 lane）改之前 p50 34.7 ms，改之后 39.2 ms，这一段代码没有改，差别是两次运行之间的起伏。
 
 ### 8-113 派活的准备进 lane：记账线程只做决定，树、MCP 连接与冻结在 lane 里（`accounting::worker::dispatching::running`、`accounting::worker::dispatching::preparing`、`accounting::worker::driving::flight`）
 
