@@ -61,6 +61,7 @@ export const QUERIES = {
   preferences: "preferences",
   identity: "identity",
   automation: "automation",
+  guide: "guide",
 } as const satisfies Readonly<Record<string, Extract<Query, string>>>;
 
 // One page of a building's commits. The answer carries the building
@@ -72,6 +73,14 @@ export const COMMITS_PAGE = 40;
 // under and the key its answer is filed under cannot differ.
 export function commitsQuery(building: Address | null, before: Seq | null): Query {
   return { commits: { building, before, limit: COMMITS_PAGE } };
+}
+
+// The one spelling of the GitHub import question: the login the GitHub
+// CLI on the city's machine is signed in as for `host`, the city's
+// default host when `null`. Asked only when the person presses import
+// (wire-SPEC 8-67).
+export function githubLoginQuery(host: string | null): Query {
+  return { github_login: { host } };
 }
 
 // Everything a refusal states but the sentence a person reads.

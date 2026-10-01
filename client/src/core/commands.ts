@@ -27,6 +27,7 @@ import type {
   Effort,
   GitOid,
   GovernedDocument,
+  GuideProgress,
   HaltScope,
   IdentityCard,
   KeepWarm,
@@ -367,6 +368,13 @@ export function putRules(building: Address, base: string, body: string): Command
 // or away when it holds none. The city refuses while a run works there.
 export function restoreFile(at: Address, point: GitOid): Command {
   return { restore_file: { at, point, idem: mintIdem() } };
+}
+
+// This city's first-run guide progress, whole: where it reopens, whether
+// the person left it, each optional step seen or skipped. The later of
+// two writes stays (wire-SPEC 8-68).
+export function putGuide(progress: GuideProgress): Command {
+  return { put_guide: { progress, idem: mintIdem() } };
 }
 
 // The city's own layer: `null` leaves a key as it is.

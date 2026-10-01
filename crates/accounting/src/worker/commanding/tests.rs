@@ -6,6 +6,7 @@
 mod answering;
 mod clockwork;
 mod entrance;
+mod guide;
 mod restoring;
 mod revealing;
 mod shedding;

@@ -58,6 +58,9 @@ pub const JOB_FILE: &str = "JOB.md";
 pub const HANDOFF_FILE: &str = "Handoff.md";
 /// Who a standing resident is, in that resident's own directory.
 pub const URBANITE_FILE: &str = "URBANITE.md";
+/// How far the person has got through the first-run guide, under the
+/// city's reserved subtree.
+pub const GUIDE_FILE: &str = "GUIDE.toml";
 /// The extension of what one run saw, written in its room as
 /// `<run>.jsonl`.
 pub const TRANSCRIPT_EXT: &str = "jsonl";
@@ -199,6 +202,16 @@ impl CityLayout {
     #[must_use]
     pub fn urbanite(&self, addr: &Address) -> PathBuf {
         self.scope(addr).join(URBANITE_FILE)
+    }
+
+    /// How far the person has got through this city's first-run guide
+    /// (wire-SPEC 8-68).
+    ///
+    /// Under the city's reserved subtree, because it decides what this
+    /// city shows a person when it opens, and no write domain reaches it.
+    #[must_use]
+    pub fn guide(&self) -> PathBuf {
+        self.governed_root().join(GUIDE_FILE)
     }
 
     /// The devices paired to reach this city from outside the machine.

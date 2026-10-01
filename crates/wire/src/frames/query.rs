@@ -163,6 +163,15 @@ pub enum Query {
     /// The schedule and the watch table, read at the moment of asking:
     /// shown on the page, written by hand (wire-SPEC.md 8-62).
     Automation,
+    /// The login the GitHub CLI on the city's machine is signed in as for
+    /// `host`, `github.com` when absent: a candidate user id, asked only
+    /// when the person presses import (wire-SPEC.md 8-67).
+    GithubLogin {
+        host: Option<String>,
+    },
+    /// How far the person has got through this city's first-run guide
+    /// (wire-SPEC.md 8-68).
+    Guide,
     /// Who answers for this city, and what has been answered on the
     /// person's behalf.
     ///

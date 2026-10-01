@@ -29,6 +29,7 @@
 mod clock;
 mod connectors;
 pub mod effect;
+mod guide;
 pub mod held_vault;
 pub mod home;
 pub mod lineage;

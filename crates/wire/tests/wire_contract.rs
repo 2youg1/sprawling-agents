@@ -403,6 +403,14 @@ fn sample_of_every_command() -> Vec<Command> {
             point: kernel::GitOid::parse("8ea61adc1c8339d02a5c665ba8280a85151ee549").unwrap(),
             idem,
         },
+        Command::PutGuide {
+            progress: wire::GuideProgress {
+                at: Some(wire::GuideStep::Texts),
+                dependencies: Some(wire::GuideMark::Skipped),
+                ..wire::GuideProgress::default()
+            },
+            idem,
+        },
         Command::ConfigureCity(wire::CitySettings {
             keep_warm: Some(kernel::KeepWarm::FiveMinute),
             effort: None,

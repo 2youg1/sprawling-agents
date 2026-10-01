@@ -167,6 +167,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     rebuilt.ask_the_registry_through(crate::release::answer);
     rebuilt.ask_upstream_through(crate::doctor::newest);
     rebuilt.find_programs_through(crate::doctor::host::find_program);
+    rebuilt.ask_github_through(crate::doctor::github::login);
     // One verdict for the writer and the views (sprawling-SPEC.md 8-134).
     let halt = storage::ChainHalt::awaiting_proof();
     rebuilt.watch_proof(halt.clone());

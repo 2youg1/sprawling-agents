@@ -57,6 +57,8 @@ pub use answer::{DoctorNewest, DoctorPack, DoctorUnread, DoctorUpstream};
 pub use answer::{DocumentAnswer, Entry, EntryKind, ListingAnswer};
 pub use answer::{EndpointSummary, EndpointsAnswer, UnpricedCalls};
 pub use answer::{EvidenceItem, EvidenceKind, Picture};
+pub use answer::{GithubLoginAnswer, GithubReading};
+pub use answer::{GuideMark, GuideProgress, GuideState, GuideStep};
 pub use answer::{HarnessLine, HarnessesAnswer, KnownFace, KnownHost, KnownHostsAnswer};
 pub use answer::{HunksAnswer, PatchLine, Withheld};
 pub use answer::{IdentityAnswer, StatedIdentity};

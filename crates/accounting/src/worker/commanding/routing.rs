@@ -213,6 +213,9 @@ impl RunWorker {
                 self.put_rules(&write.building, &write.base, &write.body)
             }
             wire::Command::RestoreFile { ref at, point, .. } => self.take_back(at, point),
+            wire::Command::PutGuide { ref progress, .. } => {
+                crate::guide::put(&self.city_root, progress)
+            }
             wire::Command::ConfigureCity(settings) => {
                 self.configure_city(settings.keep_warm, settings.effort)
             }

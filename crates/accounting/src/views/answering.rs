@@ -31,6 +31,7 @@ use super::holding::Views;
 use super::prepared::{LedgerAsk, LiveAsk, Prepared, unavailable};
 
 pub(crate) mod automation;
+pub(crate) mod github;
 mod history;
 pub(crate) mod identity;
 use super::lines::{endpoints_answer, known_hosts_answer, summarize};
@@ -248,6 +249,18 @@ impl Views {
             }
             wire::Query::Automation => {
                 return Prepared::Automation {
+                    city_root: self.city_root.clone(),
+                };
+            }
+            // Starts a program, so only once the snapshot is let go.
+            wire::Query::GithubLogin { host } => {
+                return Prepared::GithubLogin {
+                    ask: self.reach.github,
+                    host: host.clone(),
+                };
+            }
+            wire::Query::Guide => {
+                return Prepared::Guide {
                     city_root: self.city_root.clone(),
                 };
             }

@@ -25,6 +25,7 @@
 
 mod explain;
 mod family;
+pub(crate) mod github;
 pub(crate) mod host;
 mod needs;
 mod pack;

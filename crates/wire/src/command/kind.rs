@@ -12,6 +12,7 @@ use kernel::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::answer::GuideProgress;
 use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
 use crate::command::step::{
@@ -318,6 +319,12 @@ pub enum Command<Secret = Sealed<String>> {
     RestoreFile {
         at: Address,
         point: GitOid,
+        idem: IdemKey,
+    },
+    /// Writes this city's first-run guide progress whole; the later of
+    /// two writes stays (wire-SPEC.md 8-68).
+    PutGuide {
+        progress: GuideProgress,
         idem: IdemKey,
     },
     /// Writes the city's own layer (wire-SPEC.md 8-61).

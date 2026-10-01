@@ -132,6 +132,9 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // Taking a file back is refused while a run works in that
         // building, so it reaches no run that is going.
         | Command::RestoreFile { .. }
+        // Where the person stands in the guide is the page's place, not
+        // anything a run reads.
+        | Command::PutGuide { .. }
         | Command::ConfigureCity(_)
         // A building's own spine documents take the same reading, and
         // one more: they have a second writer, so the frame carries the

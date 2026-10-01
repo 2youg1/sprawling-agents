@@ -67,6 +67,13 @@ pub enum Prepared {
     Identity { city_root: PathBuf },
     /// The schedule and the watch table, read from disk.
     Automation { city_root: PathBuf },
+    /// The GitHub CLI asked for one host's login.
+    GithubLogin {
+        ask: Option<fn(&str) -> wire::GithubReading>,
+        host: Option<String>,
+    },
+    /// The first-run guide's progress, read from disk.
+    Guide { city_root: PathBuf },
     /// The configuration ladder of one address.
     Config { city_root: PathBuf, addr: Address },
     /// The release page, which leaves this machine.
@@ -240,6 +247,15 @@ impl Prepared {
             Self::Automation { city_root } => {
                 super::answering::automation::automation_answer(&city_root)
             }
+            Self::GithubLogin { ask, host } => {
+                super::answering::github::github_answer(ask, host.as_deref())
+            }
+            // A file that does not read is "I could not look", not a
+            // guide at its start that the next write would put over it.
+            Self::Guide { city_root } => match crate::guide::read(&city_root) {
+                Ok(progress) => wire::Answer::Guide(progress),
+                Err(_) => unavailable("Guide".to_owned()),
+            },
             // A ladder that cannot be read is "I could not look": the
             // files are the person's own and the page says so rather
             // than drawing figures nothing on disk states.

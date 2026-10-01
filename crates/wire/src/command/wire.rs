@@ -60,6 +60,7 @@ impl<Secret> Command<Secret> {
             | Self::PutRules(RulesWrite { ref idem, .. })
             | Self::ConfigureCity(CitySettings { ref idem, .. })
             | Self::RestoreFile { ref idem, .. }
+            | Self::PutGuide { ref idem, .. }
             | Self::PutSpine { ref idem, .. }
             | Self::PutPreferences { ref idem, .. }
             | Self::PutShelved { ref idem, .. }
@@ -244,6 +245,7 @@ impl From<WireCommand> for Command {
             Command::PutIdentity { card, base, idem } => Self::PutIdentity { card, base, idem },
             Command::PutRules(write) => Self::PutRules(write),
             Command::RestoreFile { at, point, idem } => Self::RestoreFile { at, point, idem },
+            Command::PutGuide { progress, idem } => Self::PutGuide { progress, idem },
             Command::ConfigureCity(settings) => Self::ConfigureCity(settings),
             Command::PutSpine {
                 building,
