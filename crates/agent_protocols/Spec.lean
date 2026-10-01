@@ -161,7 +161,7 @@ MCP 2025-06-18 把工具的答复定为 `CallToolResult`：`content` 是内容�
 - `isError` 为真且 `_meta` 里有 `sprawling/effect-unknown`、值不是 `false`：码是 `E_TOOL_OUTCOME_UNKNOWN`，标 `effect_unknown`（`Retry::Unknown`）。这个键说的是「这次调用交出去了一部分，桌面或别处是否已经生效不知道」。值写错也按「不知道」读。
 - 协议层的 JSON-RPC error 照旧由 `Rpc::read` 读成 `E_TOOL_UNAVAILABLE`，只取 `code` 与 `message`，不读 `data`：`data` 的形状各家自定，城只认规格定过的东西。
 
-键名 `sprawling/effect-unknown` 合 `_meta` 的键名格式：前缀是一个以字母开头的标签加斜杠，不落在 `mcp`／`modelcontextprotocol` 的保留前缀里。它的唯一定义是 `mcp::tools::EFFECT_META_KEY`；墙外的 `desktop/` 抄一份，由 `xtask guard` 比对。
+键名 `sprawling/effect-unknown` 合 `_meta` 的键名格式：前缀是一个以字母开头的标签加斜杠，不落在 `mcp`／`modelcontextprotocol` 的保留前缀里。它的唯一定义是 `mcp::tools::EFFECT_META_KEY`，经 `agent_protocols::EFFECT_META_KEY` 对外给出；桌面 server 引用它，不写第二份。
 
 ### 8-2 acp（形状 1 判定＋形状 2 值类型）
 
@@ -388,11 +388,11 @@ D15 请求行与 id 是本 crate 的契约，不是序列化器的：行由 `for
 
 `MESSAGE_CEILING = 8_388_608`：推导来的，不是拍的（D6 (b)）。读数与推导记在 `tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]`，值本身只有这一个家。
 
-`PROTOCOL_VERSION = "2025-06-18"`：本客户端协商的 MCP 修订（§8-3）；墙外的 `desktop/` 抄一份，由 `xtask guard` 比对。
+`PROTOCOL_VERSION = "2025-06-18"`：本客户端协商的 MCP 修订（§8-3）；桌面 server 引用它，不写第二份。
 
 `HALT_TICK_MS = 200`（`harness::session`）：我们的选择。它是人按下停摆到 harness 收到 `session/cancel` 的上限；比一次按键的反应慢不了多少，又不至于让一条等着 harness 的车道每秒醒几十次。
 
-`EFFECT_META_KEY = "sprawling/effect-unknown"`：我们的约定，理由见 §8-1c；改它要同时改 `desktop/src/refusal.rs` 的抄本，`xtask guard` 会指出没跟上的那一边。`ERROR_TEXT_CAP_BYTES = 4_096`：我们的选择，理由见 D1。
+`EFFECT_META_KEY = "sprawling/effect-unknown"`：我们的约定，理由见 §8-1c；桌面 server 引用它，没有抄本。`ERROR_TEXT_CAP_BYTES = 4_096`：我们的选择，理由见 D1。
 
 `read_whole_message` 每次读 8 KiB：与 `BufReader` 的缺省块同大，两种读法在拒绝前多握的量相同（D8）。
 -/
@@ -418,6 +418,6 @@ D15 请求行与 id 是本 crate 的契约，不是序列化器的：行由 `for
 - `ARCHITECTURE.md` §4 缝清单（`Outbound` 一行）、§10 规则 3（库 crate 起线程的地方：`mcp::reading` 与 `mcp::sse` 的读端）与模块表的 agent_protocols 各行（`architecture.toml`，锚点指向本文件与分部）。这些改了，重读本文件 §7、§8-15 与 §8-19。
 - `docs/third-party.md` §1（ACP schema 与 registry 被看的路径）与服务外挂的边界：上游改了线或包名，重读 §5 与 §8-19。
 - kernel-SPEC §8-23（`ServerLabel`、`TimeoutMs`）、gateway-SPEC §8-5（订阅额度经 harness 进城）、runtime-SPEC 8-27-10（窗口怎么装工具答复）与 §8-52（harness run 写的行）、sprawling-SPEC §8-4d（桌面经 stdio 接进来）、§8-4e 与 §8-124（harness run 与它的派活路径）、wire-SPEC 的配对中间件。这些节改了，重读本文件对应的条目。
-- `desktop/desktop-SPEC.md` §4 与 `desktop/src/refusal.rs`：`isError` 与 `_meta` 的读法（§8-1c）与 `EFFECT_META_KEY` 的抄本。
+- `desktop/desktop-SPEC.md` §4 与 `desktop/src/refusal.rs`：`isError` 与 `_meta` 的读法（§8-1c），以及本 crate 对外给出的 `EFFECT_META_KEY` 与 `PROTOCOL_VERSION`。
 - `tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]` 与 `[prepare_dispatch_ms]`：上限的推导与常驻连接省下的时间。
 -/

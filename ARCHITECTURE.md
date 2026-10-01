@@ -170,13 +170,17 @@ wire: kernel
 remote_access: kernel
 accounting: kernel, storage, gateway, runtime, collab, city, agent_protocols, wire
 sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop
-desktop:
+desktop: kernel, agent_protocols, desktop_ffi
+desktop_ffi:
 ```
 
-The `desktop` row is the one package outside the workspace (`desktop/`, package
-`sprawling-desktop`). `cargo xtask depmap` reads workspace members only, so
-this row states the edge rather than guarding it; the package's own manifest
-names no workspace crate (desktop-SPEC.md section 7).
+The `desktop_ffi` row is the desktop server's FFI seam (`crates/desktop/ffi`),
+the one member whose lint table is its own: it is the workspace's table with
+`unsafe_code` at `deny`, so each call into its Zig leaf can relax the lint at
+that one statement (desktop-SPEC.md section 12.14). `desktop` reads `kernel`
+and `agent_protocols` for four facts the city defines, the error codes, the
+image quality domain, the MCP revision and the effect-unknown key, and for
+nothing else.
 
 Inside one crate the compiler sees no layering: `sprawling` builds as one
 unit whichever way its modules name each other. The block below is the
@@ -214,7 +218,8 @@ repository readable:
 Below the binary each crate that holds a domain uses at most two others:
 `runtime` and `collab` each use `kernel` and `storage`, and `agent_protocols` uses
 `kernel` and `gateway` (an MCP server reached over HTTP gets its client
-from `gateway::client_for`, the one place a client is built). The `depmap`
+from `gateway::client_for`, the one place a client is built), and `desktop`
+uses `kernel` and `agent_protocols` beside its own FFI seam. The `depmap`
 block also lets `runtime` use `gateway`, and the code does not take that
 edge. `accounting` uses eight, because it holds the city's one writer,
 the views every page is answered from, and the ports the writer reaches
@@ -622,11 +627,12 @@ model call — a changed world would diverge through no defect of the record.
 production except where a test module relaxes it locally: no `unwrap`,
 `expect`, `panic!`, `todo!`, `unreachable!`, bare indexing or slicing;
 arithmetic is checked; narrowing goes through `TryFrom`; `as` casts are
-denied; `unsafe_code` is forbidden outright in the workspace. Outside it,
-the desktop server's production code holds no `unsafe` at all, and its
-FFI seam (`desktop/ffi`) holds one `unsafe` block per call into the Zig
-leaf, each with the precondition that makes it sound (desktop-SPEC.md
-section 8-12). Money and quantities are
+denied; `unsafe_code` is forbidden in every workspace crate but one. The
+desktop server's FFI seam (`crates/desktop/ffi`) carries the workspace's
+table with `unsafe_code` at `deny`, and holds one `unsafe` block per call
+into the Zig leaf, each with the precondition that makes it sound
+(desktop-SPEC.md sections 8-12 and 12.14); `xtask guard` holds that table
+to the workspace's, key by key. Money and quantities are
 integer newtypes (`UsdMicros`, `Tokens`, `ByteLen`, `Seq`), and floats stay
 out of every decision path.
 
@@ -705,10 +711,10 @@ three targets. The library `Spec` is every module under `crates/`, and
 (`tools/adversary/test`) are the checker, which only `just adversary` and
 the nightly schedule build. The library `Spec` reaches its modules by the
 glob `crates.+`. When the specifications of `tools/xtask`, `tools/citysim`,
-`tools/adversary`, `client` or `desktop` move to Lean, the change that
+`tools/adversary` or `client` move to Lean, the change that
 moves one adds the two globs `<dir>.Spec` and `<dir>.spec.+` for it, with
-`<dir>` its path in dotted form, and never a glob over a whole `tools`,
-`client` or `desktop` tree, because a `.+` glob walks every directory
+`<dir>` its path in dotted form, and never a glob over a whole `tools`
+or `client` tree, because a `.+` glob walks every directory
 below it, build output and installed packages included.
 
 **Where a specification lives.** A crate's entry is `crates/<dir>/Spec.lean`:

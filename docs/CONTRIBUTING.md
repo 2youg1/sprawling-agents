@@ -16,7 +16,7 @@ just prereqs                  # every other tool the loop needs, with the instal
 just check                    # the whole check
 ```
 
-`just check` runs, in this order: `prereqs`; `cargo fmt --check` on the workspace and on `desktop/`; `build-web`, which bundles the client the binary embeds and the artifact gates judge; clippy on every target and feature with `-D warnings`; the two feature combinations nothing else compiles; the test suite under nextest; every machine gate followed by the supply-chain read; the client's lint, typecheck and tests; and `desktop/`'s own clippy, tests and supply-chain read. "I finished it" is a claim; a green run is the evidence.
+`just check` runs, in this order: `prereqs`; `cargo fmt --check` on the workspace and `zig fmt --check` on the desktop server's Zig leaf; `build-web`, which bundles the client the binary embeds and the artifact gates judge; clippy on every target and feature with `-D warnings`; the two feature combinations nothing else compiles; the test suite under nextest; every machine gate followed by the supply-chain read; the client's lint, typecheck and tests; and, on Windows, the Zig leaf's own tests. "I finished it" is a claim; a green run is the evidence.
 
 ## 1 Read before you write
 
@@ -59,7 +59,7 @@ A gate's violation turns the check red with a message naming the rule, the viola
 | Write it this way | Held by |
 |---|---|
 | Return failure through `Result`; propagate arithmetic, indexing and conversion errors instead of ending the process. Use `checked_*` arithmetic, `TryFrom` for narrowing conversions, and pattern matching with an explicit fallback for lookups. | workspace lints: `unwrap_used`, `expect_used`, `panic`, `indexing_slicing`, `arithmetic_side_effects`, `as_conversions`, all `deny` |
-| Write no `unsafe`: `unsafe_code` is `forbid` across the workspace. `desktop/` sits outside the workspace for one reason, the Win32 boundary, and relaxes the lint to `deny` there: its `unsafe` sits under `platform/windows/`, lifted at the narrowest scope with `#[expect(unsafe_code, reason = "…")]`, wraps the FFI call alone, and carries one `SAFETY:` line giving the precondition that makes the call sound. | workspace lints; `desktop/Cargo.toml` |
+| Write no `unsafe`: `unsafe_code` is `forbid` across the workspace. One crate relaxes it to `deny`, `crates/desktop/ffi`, the desktop server's FFI seam: its `unsafe` wraps one call into the Zig leaf, lifted at the narrowest scope with `#[expect(unsafe_code, reason = "…")]`, and carries one `SAFETY:` line giving the precondition that makes the call sound. | workspace lints; `crates/desktop/ffi/Cargo.toml` |
 | One module, one file, semantically named. Register the file in the module map, then create it. Keep `lib.rs` and index files free of logic. | `xtask modmap` |
 | Keep a function inside <!-- xtask:begin budget_figure:function_length.budget_lines -->200<!-- xtask:end --> lines and <!-- xtask:begin budget_figure:argument_count.budget_arguments -->4<!-- xtask:end --> parameters, and a source file inside <!-- xtask:begin budget_figure:file_length.budget_lines -->400<!-- xtask:end --> production lines; a top-level `#[cfg(test)]` item is not counted. The file rule covers the client too, while function length and parameter count are measured in Rust only, because measuring them means parsing the language. A file already over the line is pinned in `tools/xtask/budgets.toml` and may only get smaller. | `xtask length` |
 | Default to `pub(crate)`. Declare a `pub` trait only in a file on the seam list. | `xtask depmap` |
@@ -79,7 +79,7 @@ A gate's violation turns the check red with a message naming the rule, the viola
 | Let the kani harness roster come from the `#[kani::proof]` attributes: no workflow names a harness, a stated total is the total, and a harness left unproved cites where that was decided. | `xtask proof` |
 | Keep sizes inside their budget. | `xtask budget` |
 | Publish nothing that names one machine's home directory, its working notes, or a document this tree does not contain. | `xtask release` |
-| Keep `desktop/`'s copies of the workspace lint table, package metadata and dependency versions equal to the originals. | `xtask guard` |
+| Keep the one lint table of its own, `crates/desktop/ffi`'s, equal to the workspace's except `unsafe_code`, and let every other crate inherit the workspace's. | `xtask guard` |
 | Take the time as a parameter. The single sampling point is `bin::assembly`. | `clippy.toml` disallowed methods |
 | Use `BTreeMap` on kernel decision paths; keep floats out of ledger payloads; start tasks from the one spawn point. | review, and the determinism tests in citysim |
 

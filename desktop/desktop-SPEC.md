@@ -1,6 +1,6 @@
 # desktop-SPEC.md
 
-> package：`sprawling-desktop`（out-of-tree，**不是** workspace member；作为库链进 `sprawling`，由 `sprawling desktop` 这个动词起成子进程），与它唯一的 FFI 缝 `sprawling-desktop-ffi`（`desktop/ffi`，规格是 `desktop/ffi/Spec.lean`）同在 `desktop/Cargo.toml` 这一个工作区里（§8-12）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
+> package：`sprawling-desktop`（库名 `desktop`，根工作区的成员，继承工作区的 lint 表；作为库链进 `sprawling`，由 `sprawling desktop` 这个动词起成子进程），与它唯一的 FFI 缝 `sprawling-desktop-ffi`（`desktop/ffi`，规格是 `desktop/ffi/Spec.lean`）同为根工作区的成员（§8-12、§12.14）。本 SPEC 先于代码存在；实现不多不少地遵守本文。
 > 骨架：apostle-sdd 十七节；按模块分章、每章自足（ARCHITECTURE.md §5）。
 
 ## 1 需求分解
@@ -72,7 +72,7 @@
 
 - **scope** 在本 package 里专指 `DESKTOP.toml` 里那份 allowlist，与 `kernel` 的 halted scope 不同层，故恒不缩写成裸词 `policy`。
 - **恒不**把窗口叫作 page，**恒不**把桌面叫作 browser：`browser::act` 是被借鉴的形状，不是被复用的名字。
-- 错误码沿用 `kernel::AxCode` 的**拼写**（`E_TOOL_UNAVAILABLE`／`E_GATE_DENIED`／`E_INVALID_ARGS`／`E_TOOL_UNKNOWN`／`E_CONFIG_INVALID`／`E_WIRE_MISMATCH`），但**不依赖** `kernel`，理由见 §8.5 第一对。同一拼写、两处定义，是本 SPEC 明知并接受的一处重复；`xtask guard` 的 wall 检查本 package 写出的每个 `E_` 都是 kernel 定义过的。
+- 错误码是 `kernel::AxCode` 的六个变体（`E_TOOL_UNAVAILABLE`／`E_GATE_DENIED`／`E_INVALID_ARGS`／`E_TOOL_UNKNOWN`／`E_CONFIG_INVALID`／`E_WIRE_MISMATCH`），拼写只取 `AxCode::as_str`，本 package 不写第二份（§8.5 第一对）。
 - **效果未知（effect unknown）**：请求已经交出一部分，桌面上是否生效不知道。城里对应 kernel 的 `Retry::Unknown`；本 package 用 `_meta` 的 `sprawling/effect-unknown` 说出它（§12.3）。
 
 ## 7 模块边界
@@ -84,7 +84,7 @@
 - **说什么**归 `tools`：六张卡片是数据，改它就是改行为（形状 6）。
 - **一扇窗口读起来是什么样**归 `outline`：role 的封闭词表、名字的清洗与截断、一串节点折成的文字。它平台无关，因为 macOS 臂以后把 AX 的 role 映到同一张词表；control type 编号到词表的映射是 Windows 的事实，住 `windows::tree`。
 
-**恒不**引入：async runtime、HTTP 客户端、任何 GUI 框架、任何 workspace crate。同一工作区里的 `desktop_ffi` 不是 workspace crate：它与本 package 同在墙外，只为本 package 存在。
+**恒不**引入：async runtime、HTTP 客户端、任何 GUI 框架。workspace crate 只依赖三个：`kernel`（错误码与质量的域）、`agent_protocols`（协议修订与效果未知的键）、`desktop_ffi`（只为本 package 存在的 FFI 缝），每一条边都是为了读一个事实的唯一定义，而不是为了它的行为（§12.14）。
 
 ## 8 接口先行
 
@@ -92,12 +92,12 @@
 // 8-1 refusal（形状 2 值类型）
 pub(crate) enum RefusalCode { ToolUnknown, ToolUnavailable, InvalidArgs, GateDenied, ConfigInvalid, WireMismatch }
 impl RefusalCode {
-    pub(crate) fn as_str(self) -> &'static str;   // E_… 与 kernel 同拼写
+    pub(crate) fn code(self) -> kernel::AxCode;   // 拼写只在 AxCode::as_str
     pub(crate) fn json_rpc(self) -> i64;          // 保留区间或 -32000 起
 }
 pub(crate) struct Refusal { /* 私有：code／action／subject／recovery／aftermath */ }
 enum Aftermath { Known, Unknown }                 // 私有：拒词说的就是桌面上发生的，或者不知道
-const EFFECT_META_KEY: &str = "sprawling/effect-unknown"; // 抄自 agent_protocols::mcp::tools，xtask guard 比对两份
+use agent_protocols::EFFECT_META_KEY;             // 唯一定义在 agent_protocols::mcp::tools
 impl Refusal {
     pub(crate) fn new(code: RefusalCode, action: &str, subject: impl Into<String>, recovery: &str) -> Refusal; // Aftermath::Known
     pub(crate) fn effect_unknown(self) -> Refusal; // 请求已交出一部分，效果不知道
@@ -107,7 +107,7 @@ impl Refusal {
 }
 
 // 8-2 rpc（形状 4 适配器）
-pub(crate) const PROTOCOL_VERSION: &str = "2025-06-18";
+use agent_protocols::PROTOCOL_VERSION;            // 两端谈的是同一个修订，只有一个定义
 pub(crate) struct Request { pub(crate) id: Option<Value>, pub(crate) method: String, pub(crate) params: Value }
 pub(crate) fn read(line: &str) -> Result<Request, Refusal>;
 pub(crate) fn result_line(id: &Value, result: Value) -> String;
@@ -253,11 +253,11 @@ impl Desk {
 
 ### 8-9 `unsafe` 的那一条规矩
 
-本 package 坐在 workspace 之外，**理由只有一个**：Win32 边界要写 `unsafe`（§8.5 第二对）。既然是花了代价换来的，代价就要花在明处：
+本 package 继承工作区的 `unsafe_code = "forbid"`，生产与测试代码都写不出 `unsafe`。唯一放开它的一层是 `desktop_ffi`：它的 lint 表与工作区逐键相同，只有 `unsafe_code` 是 `deny`（§8.5 第二对、§12.14）。既然是花了代价换来的，代价就要花在明处：
 
 **每一个 `unsafe` 块恒带一行 `SAFETY:`，写的是使这次调用成立的前提。**「我们调用 `EnumWindows`」不是前提，那只是把调用换句话再说一遍；「`into` 有 `into.len()` 个已初始化的槽、只借给这一次调用，叶子按同一个长度写」才是前提。审这一条的办法是逐个 `SAFETY:` 问一句：它说的东西**能不能是假的**？不能为假的句子不是前提，是复述。
 
-生产代码的 `unsafe` 恒只在 `desktop/ffi/src/` 之下，且恒只包住一次对 Zig 叶子的调用——不包住随后的判断，因为把安全代码收进 `unsafe` 块只会让下一个读者多审几行。本 package 自己的 `src/` 一行生产 `unsafe` 也不写；测试为了建自己的窗口仍写 `unsafe`，各带 `SAFETY:`。哪些调用写 `unsafe`，只看 §8-12 那张表；本节不另列一份。
+生产代码的 `unsafe` 恒只在 `desktop/ffi/src/` 之下，且恒只包住一次对 Zig 叶子的调用——不包住随后的判断，因为把安全代码收进 `unsafe` 块只会让下一个读者多审几行。本 package 自己的 `src/` 一行 `unsafe` 也不写；测试为了建自己的窗口要写的 `unsafe` 在 `desktop_ffi::fixture` 里，各带 `SAFETY:`，只在 `fixture` feature 下编译（§8-11）。哪些生产调用写 `unsafe`，只看 §8-12 那张表；本节不另列一份。
 
 几条最容易写成复述的前提，在这里点名。剪贴板的两次调用要求本进程没有别的线程正处在一次打开与关闭之间：`desktop_ffi::clipboard` 的进程内轮次锁就是这条前提，所以 SAFETY 行写的是「锁在手里」这件可能为假的事。句柄写进 `winsafe::HWND` 的槽里，前提是槽数与交给叶子的容量是同一个数。叶子里那几条前提——位图解除选择之后才读回、`ReleaseDC` 传取得 DC 时的那扇窗口、剪贴板的块以 `GlobalSize` 为界——不再是 Rust 的 `SAFETY:`，而是 `desktop/ffi/Spec.lean` 证明的模型性质与 `leaf.zig` 里写在取得旁边的 `defer`。
 
@@ -285,14 +285,14 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 **句柄只在一处铸出。** `winsafe::HWND` 从裸指针构造（`from_ptr`）要写 `unsafe`，反方向（`ptr()` 交给叶子或 `uiautomation`）不要。所以窗口句柄只在边界的另一侧铸出：叶子把 `EnumWindows` 交来的值写进 Rust 借出的 `winsafe::HWND` 槽里（它是 `#[repr(transparent)]` 的指针），`desktop_ffi::top_level::windows` 答的就是这些槽，本 package 一处 `from_ptr` 也不写；其余模块只借用它，需要 `uiautomation` 的类型时就地转过去。
 
-**契约测试在真窗口上跑，只碰测试自己建的窗口。** 枚举、落点与树这三行的契约，由测试在本进程里建一扇不抢焦点的窗口（`platform/windows/fixture.rs`，只在测试里编译）再读回它来判；它们不读、不点、不改人桌面上别的窗口。输入这一行的旧实现把事件写进 `INPUT` 联合体，不写 `unsafe` 读不回来，所以它的契约测试随替换一起写，判的是每个 stroke 变成了哪个 `HwKbMouse` 值；真的把事件送到窗口上仍是 §16.2 的操作者检查。
+**契约测试在真窗口上跑，只碰测试自己建的窗口。** 枚举、落点、树与捕获这几行的契约，由测试在本进程里建一扇不抢焦点的窗口（`desktop_ffi::fixture`，只在 `fixture` feature 下编译，本 package 只在 Windows 的 dev 依赖里打开它；`platform/windows/fixture.rs` 只把它的外框换成本 package 的 `Bounds`）再读回它来判；它们不读、不点、不改人桌面上别的窗口。输入这一行的旧实现把事件写进 `INPUT` 联合体，不写 `unsafe` 读不回来，所以它的契约测试随替换一起写，判的是每个 stroke 变成了哪个 `HwKbMouse` 值；真的把事件送到窗口上仍是 §16.2 的操作者检查。
 
 ### 8-12 Zig 缝：`desktop/ffi`
 
 没有准入安全接口的四组调用（§8-11 里「实现」写 `desktop_ffi` 的四行）由一个包做完：
 
 - **位置**：`desktop/ffi/`，包名 `sprawling-desktop-ffi`，库名 `desktop_ffi`，规格是 `desktop/ffi/Spec.lean`（边界规则与资源配对的定理在那里）。Zig 源码在 `desktop/ffi/zig/`：`leaf.zig`（四组操作与 export）、`boundary.zig`（叶子往借来的缓冲里写什么）、`step.zig`（step 的 Zig 拼写）。
-- **一堵墙，两个包**：`desktop/Cargo.toml` 同时是一个工作区的根，`members = ["ffi"]`。lint 表（`[workspace.lints]`）、五项包元数据（`[workspace.package]`）与 `winsafe` 的版本行（`[workspace.dependencies]`）只写在那里，两个包都以 `workspace = true` 继承；`xtask guard` 把这堵墙与根工作区逐键比对，并要求墙里的每个包都继承它（xtask-SPEC §8-46）。X4 把 `desktop/` 与 `desktop/ffi/` 搬进 `crates/desktop` 时，照这一段搬：两个包的相对位置不变，墙随根工作区合并后删去。
+- **一张自己的表**：两个包都是根工作区的成员，包元数据与 `winsafe` 的版本行都以 `workspace = true` 继承。本 package 的 `[lints]` 是 `workspace = true`；`desktop_ffi` 的 `[lints]` 是它自己的一张，与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`，`xtask guard` 判这一张表，例外只有那一行（xtask-SPEC §8-46、§12.14）。
 - **构建**：`desktop/ffi/build.rs` 只用标准库起 `zig build-lib`（`ReleaseSafe`，目标取自 cargo 的目标），只在 Windows 目标上；别的目标上本包只剩 `step`，本 package 也只在 Windows 上依赖它。Zig 的版本只写在 `desktop/ffi/zig-version`：构建脚本、doctor 的 `zig` 一行（sprawling-SPEC 8-146）与 CI 的安装步骤都读它。
 - **对拍与 fuzz 的配方**：`desktop_ffi::boundary` 的测试以种子化输入比对叶子与 Rust 参考（`desktop/ffi/src/reference.rs`），每条规则两万个；`just fuzz-desktop <rounds> <seed>` 把同一比对按给定的轮数与种子跑下去（Rust 一侧的 fuzz）；`just check-desktop` 里的 `zig test desktop/ffi/zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz）。
 
@@ -316,9 +316,9 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 ## 8.5 四个设计
 
-**第一对（错误码住哪）**：`use kernel::AxCode`（落选）vs 在本 package 重新定义同拼写的一小组（选中）。依赖边不带来 lint：一个 crate 是否继承 workspace 的 lint 表，只看它自己的清单写没写 `[lints] workspace = true`，本 package 依赖 `kernel` 也照样用自己的 `deny`。落选的理由在锁上：本 package 有自己的 `Cargo.lock`，依赖 `kernel` 就要在这份锁里再解一遍 kernel 的依赖（`thiserror`、`uuid`、`blake3`、`secrecy`、`zeroize`），而 `xtask guard` 只比对两份清单直接声明的依赖，这几个包的版本会在两份锁里各走各的，没有人看。为六个字符串常量付这个价不值。选中方案付的代价是同一拼写两处定义，边界是：本 package 恒只**引用**已有拼写，恒不铸造新的 `E_` 码——新码要先进 `kernel::error::code`。**重开参数**：本 package 并回 workspace，锁只剩一份，这一对作废，直接 `use kernel::AxCode`。
+**第一对（错误码住哪）**：在本 package 重新定义同拼写的一小组（落选）vs `RefusalCode` 映到 `kernel::AxCode`、拼写只取 `AxCode::as_str`（选中）。`RefusalCode` 留着，因为它是本 server 能答的那六个码的封闭子集，并且带着 JSON-RPC 的数；它不再带字符串。落选方案是一个事实的两处定义，靠一道门盯着才不漂；本 package 在工作区里，锁只有一份，依赖 `kernel` 不再多解一遍任何东西（§12.14）。新码仍要先进 `kernel::error::code`，因为那是唯一能写下它的地方。
 
-**第二对（unsafe 怎么关）**：照抄 workspace 的 `unsafe_code = "forbid"`（落选）vs 本 package 用 `deny`（选中）。`forbid` 在文件内无法就地放开，而 Win32 调用点要就地放开、并在那一处写明理由；`deny` 让放开成为**一个带理由的、看得见的、最窄作用域的例外**，而不是把整堵墙推倒。clippy 那张表逐行照抄，一条不减。协议壳**一行 unsafe 也不写**。
+**第二对（unsafe 怎么关）**：叶子也继承 `unsafe_code = "forbid"`（落选）vs 本 package 继承 `forbid`、只有 `desktop_ffi` 用 `deny`（选中）。`forbid` 在文件内无法就地放开，而叶子的每次调用要就地放开、并在那一处写明理由；`deny` 让放开成为**一个带理由的、看得见的、最窄作用域的例外**，而且只在叶子那一层。clippy 那张表逐行相同，一条不减。协议壳与平台臂**一行 unsafe 也不写**。
 
 **第三对（整屏怎么办）**：默许整屏截取（落选）vs 无表达即拒（选中）。scope 文件能表达的只有「哪些窗口」，一张全屏图会显示 allowlist 没有列出的一切；把没写下来的东西当成允许，正是 fail closed 要防的那件事。拒词里给的替代是「指名一个窗口」，可执行。等 scope 文件长出一位 `screen` 开关，这条再改，改时先改本节。
 
@@ -334,7 +334,7 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 **第四对（没有 ffmpeg 时录什么）**：宣告录制不可用（落选）vs 自己抓一列 PNG 帧（选中）。工具卡片明写了「有 ffmpeg 出 mp4，没有则出帧序列」，而帧序列要一个**在读循环之外**跑的东西——本 package 因此有且只有一个 `std::thread::spawn`，在 `record::sink`：这条线程抓帧，交给 ffmpeg 的 stdin，或写成 PNG，由一个 `AtomicBool` 停下，`stop` 恒 join 它。这是本 package 唯一一处并发，写在这里是为了下一个读者不必去找第二处。声音（`audio: true`）恒被拒：选一个录音设备要知道运行中的机器上它叫什么，而这台 server 没有任何一处知道；假装录了而没录，比拒绝贵。能知道它的只有人，所以设备名只从 scope 文件来（§12.11）。
 
-**第五对（错误码的第二份拼写怎么收）**：§8.5 第一对接受了「同一拼写、两处定义」，而这里收成一处可检查的引用：`xtask guard` 的 wall 读 `refusal.rs` 里每个 `E_` 字符串，要求它是 `kernel::error::code` 定义过的拼写；`_meta` 的键 `sprawling/effect-unknown` 也由它与 `agent_protocols::mcp::tools` 的那一份比对。集合包含只证明拼写存在，不证明本 package 的每个变体映到了语义对的那个 kernel 码；后一件靠 §12 的码表与评审。结论不变：不能靠共享依赖消除这份重复（§8.5 第一对），能做到的是让漂移**可见**——两处定义，一处权威，一道门在城里那侧盯着。
+**第五对（城里的事实怎么读）**：抄一份、由 `xtask guard` 比对（落选）vs 直接引用唯一定义（选中）。错误码、质量的域、协议修订与 `_meta` 的键 `sprawling/effect-unknown` 都是城里定下的事实，本 package 读 `kernel::AxCode`、`kernel::consts_policy::IMAGE_QUALITY`、`agent_protocols::PROTOCOL_VERSION` 与 `agent_protocols::EFFECT_META_KEY`。抄件加比对只能让漂移**可见**；引用让它**不可能**，而且 `RefusalCode::code` 是一个对两侧穷尽的 match，每个变体映到哪个 kernel 码由编译器读出，不再只是拼写存在（§12.14）。
 
 **第六对（一次 `act` 落在哪个窗口上）**：信任 `scope` 已经判过的那个窗口（落选）vs 发事件之前核对前台窗口，不是它就拒（选中）。`SendInput` 不带窗口：一次按键落在**那一刻**持有键盘的窗口上，而 scope、allowlist 与拒词判的是 title 与 process，这些没有一样跟着事件走。决定动作与发出动作之间隔着一段时间，操作者按一次 Alt+Tab、一个提权对话框弹出来，键盘就在别人手里了——`type` 会把整段文字打进那个窗口，密码框也包括在内；今天全仓 grep `SetForegroundWindow`／`GetForegroundWindow`／`WindowFromPoint` 零命中，故 scope 实际约束住的只有坐标的算法。选中方案是：`windows::focus` 读一次前台窗口，不是它就请求置前并在 200 ms 内有界地重读，仍不是就以 `E_TOOL_UNAVAILABLE` 拒，拒词写明**什么都没有发出去**；指针动作另问第二句——落点下面的顶层窗口也得是它，因为一个窗口可以持有键盘而另一个盖在点击处。比较的是句柄地址这一个纯值，于是这条规则在一台没有桌面的机器上也能逐条证明（§16.2）。付的代价写在明处：置前是一次**副作用**，而它是这台 server 唯一一处主动改变桌面的排布；把它藏起来的做法是不置前直接拒，那会让每一次正常的连续操作都要操作者手动切窗口。
 
@@ -391,10 +391,10 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 ### 12.3 效果未知写在 `_meta` 的一个命名空间键里
 
-- **决定**：一次拒绝若发生在请求已交出一部分之后（今天只有部分输入，§12.4），`isError` 结果带 `_meta: { "sprawling/effect-unknown": true }`。键的唯一定义在 `agent_protocols::mcp::tools::EFFECT_META_KEY`，本 package 在 `refusal.rs` 抄一份，`xtask guard` 比对。
+- **决定**：一次拒绝若发生在请求已交出一部分之后（今天只有部分输入，§12.4），`isError` 结果带 `_meta: { "sprawling/effect-unknown": true }`。键的唯一定义在 `agent_protocols::mcp::tools::EFFECT_META_KEY`，本 package 引用它（§12.14）。
 - **理由**：「效果未知」要落成城里的 `Retry::Unknown`，它决定模型与人会不会把一次可能已经点下去的动作再做一遍；写进文字，城只能把它当一句话，读不出这个三态。`_meta` 是规格留给实现附加元数据的位置，键名按规格带自己的前缀，不占 `mcp` 的保留前缀。
 - **击败的备选**：放进 JSON-RPC error 的 `data.retry`（与 §12.2 冲突，也是规格外）；只写进拒词文字（城标不出 `Retry::Unknown`）。
-- **重开的参数**：MCP 规格为「副作用未知」定了自己的字段；或本 package 并回 workspace，键的拼写能直接引用。
+- **重开的参数**：MCP 规格为「副作用未知」定了自己的字段。
 
 ### 12.4 部分输入：如实报数，只补抬起
 
@@ -462,11 +462,11 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 ### 12.12 没有准入安全接口的四组调用经一片 Zig 叶子，Rust 面零业务 `unsafe`
 
-- **决定**：枚举、捕获、剪贴板、DPI 四组调用由 `desktop/ffi` 的 Zig 叶子整段做完（§8-12）：一个 export 一个完整操作，Rust 借出缓冲、读回 step 与错误码，句柄、DC 与全局块恒不跨边界。Rust 面每次调用一个 `unsafe` 块，加那一处 `unsafe extern` 声明，全部在 §8-12 的表里；本 package 的 `src/` 生产代码不写 `unsafe`。两个包同在 `desktop/Cargo.toml` 这一个工作区里，共享一张 lint 表、一份包元数据与 `winsafe` 的一条版本行。叶子往缓冲里写什么、资源怎么配对，由 `desktop/ffi/Spec.lean` 证明模型性质，由对拍、fuzz 与真窗口上的契约测试检查实现。
+- **决定**：枚举、捕获、剪贴板、DPI 四组调用由 `desktop/ffi` 的 Zig 叶子整段做完（§8-12）：一个 export 一个完整操作，Rust 借出缓冲、读回 step 与错误码，句柄、DC 与全局块恒不跨边界。Rust 面每次调用一个 `unsafe` 块，加那一处 `unsafe extern` 声明，全部在 §8-12 的表里；本 package 的 `src/` 生产代码不写 `unsafe`。两个包都是根工作区的成员，共享锁、包元数据与 `winsafe` 的一条版本行；lint 表只有 `desktop_ffi` 那一张与工作区差一行（§12.14）。叶子往缓冲里写什么、资源怎么配对，由 `desktop/ffi/Spec.lean` 证明模型性质，由对拍、fuzz 与真窗口上的契约测试检查实现。
 - **理由**：AGENTS.md「Rust」一节给平台调用定了次序：先找安全接口，没有合格的就用 Zig 叶子，`unsafe` Rust 只在测量表明它整体最好时才准入。这四组在 X2 的审查里没有合格的安全接口（§12.9），口径 ① 要的正是业务代码零 `unsafe`、只留一个经审的 FFI 缝。整段操作放进叶子，是因为这四组的风险不在某一次调用，而在调用之间：位图选进之后要选回、DC 要随取得它的窗口还回去、全局块要么交出要么释放。这些次序在叶子里写成取得旁边的 `defer`，在 Lean 里写成可穷举的模型；若每个 Win32 调用各包一个 export，次序就又回到 Rust 的 `Drop` 与 `unsafe` 里（`desktop_ffi` D1）。
 - **剩余限制**（写明，不当作已解决）：两侧的 fuzz 都是抽样而不是覆盖引导。Zig 的覆盖引导 fuzz（`--fuzz`）今天不在 Windows 上实现；cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时，而叶子只在 Windows 上编，所以 libFuzzer 没有一个能跑它的平台。叶子以 `ReleaseSafe` 编，抽样到的越界即 trap。Lean 证明的是叶子对操作系统回答的处理，操作系统本身是假设。`header`、`length`、`modmap` 三道门今天只读 `.rs`，`.zig` 文件的 MPL 注记与长度由评审守（ARCHITECTURE §2 条件 5 的这一半未落地）。
-- **击败的备选**：①留在 `windows` 绑定上继续手写 `unsafe`（33 个块，与口径 ① 相反）；②一个独立的 Zig 可执行程序、经进程边界说话（多一个交付物与它的监管，而本 server 本来就是一个子进程，多一层隔离买不到新东西）；③每个 Win32 调用一个 export（见上）；④`desktop/ffi` 自己抄一份 lint 表（墙里就有了两份抄件，`guard` 要比对三份）。
-- **重开的参数**：一个安全 crate 修好了其中一组（例如 `winsafe` 修好 `EnumWindows`），那一行先写契约测试、再离开叶子；Zig 的 `--fuzz` 或 cargo-fuzz 在 Windows 上落地，`just fuzz-desktop` 换成覆盖引导的那一种；X4 把两个包搬进 `crates/desktop` 时，墙随根工作区合并而删去，lint 表改为继承根工作区，`unsafe_code` 的那一行例外只留给 `desktop/ffi`。
+- **击败的备选**：①留在 `windows` 绑定上继续手写 `unsafe`（33 个块，与口径 ① 相反）；②一个独立的 Zig 可执行程序、经进程边界说话（多一个交付物与它的监管，而本 server 本来就是一个子进程，多一层隔离买不到新东西）；③每个 Win32 调用一个 export（见上）；④把叶子的调用留在本 package 里、本 package 整个用 `deny`（`unsafe` 的许可就落到了协议壳与平台臂上，那里一行也不需要它）。
+- **重开的参数**：一个安全 crate 修好了其中一组（例如 `winsafe` 修好 `EnumWindows`），那一行先写契约测试、再离开叶子；Zig 的 `--fuzz` 或 cargo-fuzz 在 Windows 上落地，`just fuzz-desktop` 换成覆盖引导的那一种。
 
 ### 12.13 录下的声音作为一块 audio content 交回城里
 
@@ -475,9 +475,16 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 - **击败的备选**：①把录音写进这座楼（scope 文件说的是能碰哪些窗口，没说能往城里哪里写，§14；而且本 server 不知道城根在哪）；②只交路径（城里没有工具读得到临时目录）；③把整段声音不论多长都塞进答复（十分钟的 wav 是 19 MB，base64 之后超过城的 MCP 单行上限，整个答复会被拒，连画面的路径都到不了）。
 - **重开的参数**：城的 MCP 客户端改了单行上限；或者 `transcribe` 能直接读运行中的机器上的一个文件。
 
+### 12.14 并回 workspace：本 package 继承 `forbid`，FFI 叶子自带一张只差一行的 lint 表
+
+- **决定**：`desktop` 与 `desktop/ffi` 搬到 `crates/desktop` 与 `crates/desktop/ffi`，两个都是根工作区的成员；`desktop/Cargo.toml` 那一个工作区与它的锁删去，根 `Cargo.toml` 的 `exclude` 删去。本 package 以 `[lints] workspace = true` 继承工作区的 lint 表（`unsafe_code = "forbid"`），包元数据与共享依赖都经 `workspace = true` 继承；lib 名改为 `desktop`，与 depmap 的行名、与其余 crate 的「lib 名即目录名」一致。`desktop_ffi` 写一张自己的 `[lints]`：与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`。`xtask guard` 判这一张表（逐键等于根表，例外只有记下理由的 `unsafe_code`），并判其余每个成员的 `[lints]` 恰是 `workspace = true`。本 package 依赖 `kernel` 与 `agent_protocols`：错误码的拼写取 `kernel::AxCode::as_str`，质量的域取 `kernel::consts_policy::IMAGE_QUALITY`，协议修订取 `agent_protocols::PROTOCOL_VERSION`，效果未知的键取 `agent_protocols::EFFECT_META_KEY`；`refusal.rs`、`rpc.rs`、`encode.rs` 里的抄件、`xtask guard` 的 `quoted` 比对与 `kernel::error::code` 里读 `refusal.rs` 的那条测试一起删去。测试自己建窗口要写的 `unsafe` 搬进 `desktop_ffi::fixture`，只在 `fixture` feature 下编译；本 package 只在 Windows 的 dev 依赖里打开它，`xtask artifact` 把 `fixture` 列为测试 feature。
+- **理由**：本 package 坐在墙外的理由只有一条（Win32 边界要放开 `unsafe_code`，§8.5 第二对）。X3 把那些调用收进 Zig 叶子之后（§12.12），本 package 的生产代码已不写 `unsafe`，这条理由只剩叶子那一层。墙外的代价却都还在：一份抄来的 lint 表、包元数据与依赖版本，第二份锁，六个错误码、质量域、协议修订与 `_meta` 键各一份第二拼写，`depmap` 只能陈述那一行而守不住，`cargo clippy --workspace` 判不到它。并回之后这些抄件都换成引用，剩下的唯一一处差异是叶子那张表的 `unsafe_code` 一行，guard 判的正是它。叶子留在工作区里，而不是另起一个工作区：放在外面它就要自己的锁与 `[workspace.package]`，guard 又要比对一整堵墙；在里面，它与别的成员共享锁、元数据与依赖版本，只有一张表是自己的。依赖 `agent_protocols` 只为两个常量，代价是本 package 单独编译时要先编 `agent_protocols` 与 `gateway`；二进制不变，因为 `sprawling` 本来就链接它们，而这是两个常量各只剩一个定义的唯一做法。
+- **击败的备选**：①叶子也继承 `forbid`，把 `extern` 声明交给一个生成的或第三方的安全绑定——今天没有合格的绑定（§12.9），而 Rust 2024 的 `unsafe extern` 块在 `forbid` 下编不过；②叶子留在一个墙外工作区，只把本 package 并回——墙还在，只是变小，第二份锁与抄写核对都留着；③测试建窗口的 `unsafe` 留在本 package，给它另开一张 lint 表——cargo 的 lint 表不分 profile，给测试开就是给生产代码开；④不依赖 `agent_protocols`，两个常量留着由 guard 比对——一个事实两个定义，再加一道只为它们存在的门；⑤lib 名保持 `sprawling_desktop`——`depmap` 按 lib 名判边，那一行就要改名，而其余每个 crate 的 lib 名都是它的目录名。
+- **重开的参数**：一个合格的安全绑定覆盖了叶子的四组调用，叶子离开，那张自己的表与 guard 一起删去；或 cargo 允许一个成员继承工作区 lint 表而只改一行，那时叶子写 `workspace = true` 加一行覆盖，guard 的比对随之删去。
+
 ## 13 依赖选型
 
-八个依赖，加同一工作区里的 `desktop_ffi`。`serde`、`serde_json`、`toml` 三个与 workspace 同版本线，只做协议与 scope 文件的读写；另外五个各自买到什么，写在下表，后三个与 `desktop_ffi` 只在 Windows 上链接。**恒不引入**：workspace 内任何 crate（理由见 §8.5 第一对）、async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
+三个 workspace crate（`kernel`、`agent_protocols`、`desktop_ffi`，§7、§12.14），加八个外部依赖。`serde`、`serde_json`、`toml`、`base64` 经 `workspace = true` 取工作区的版本行，只做协议、scope 文件与 image content 的读写；另外四个各自买到什么，写在下表，后三个与 `desktop_ffi` 只在 Windows 上链接。**恒不引入**：async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
 
 | crate | 买到什么 | 为什么不是别的 |
 |---|---|---|
@@ -486,13 +493,13 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 | `winsafe` 0.0.29（只开 `user`、`ole`） | 输入与窗口事实的安全接口、COM 公寓的守卫（§12.9、§12.10），以及缝上的 `HWND`、`co::ERROR`、`co::HRESULT` | 没有 Cargo 依赖；它的 `EnumWindows` 与剪贴板写法不准入，理由在 §12.9 |
 | `uiautomation` 0.25.1（`default-features = false`，只开 `input`） | UIA 树的安全封装：automation 对象、walker、元素属性（§12.10） | 关掉默认特性，于是它的截图、剪贴板与控件匹配都不进来；`input` 只因它的 core 模块不开就编不过而开着，本 package 不调它；手写 COM 调用是被它换掉的那九个 `unsafe` 块 |
 | `image` 0.25（`default-features = false`，只开 `png`／`jpeg`／`webp`） | `desktop.screenshot` 点名的三种编码，以及缩放 | 关掉默认特性是因为本 package 只编码、从不解码，也不碰另外十种格式 |
-| `base64` 0.23 | image content 的 `data` 那一层编码，只在 `answer` 里编 | 与 workspace 的 `gateway::dialect::images` 同一条版本线，`xtask guard` 比对版本 |
+| `base64` 0.23 | image content 的 `data` 那一层编码，只在 `answer` 里编 | 与 workspace 的 `gateway::dialect::images` 同一条版本行（`workspace = true`） |
 
 `windows` 与 `winsafe` 的 feature 列表本身就是一份**够得着范围的声明**：一个本 package 从不调用的 API，在这里连名字都拼不出来。
 
 ## 14 硬编码声明
 
-`PROTOCOL_VERSION = "2025-06-18"`：与 `agent_protocols::PROTOCOL_VERSION` 同值，理由是两端要谈得拢；它变了，本 package 要在同一次改动里跟着变，故本节是它的第二处台账。服务器自称 `sprawling-desktop`，版本取 `CARGO_PKG_VERSION`。
+协议修订是 `agent_protocols::PROTOCOL_VERSION`，本 package 引用它而不写第二份，因为两端要谈得拢。服务器自称 `sprawling-desktop`，版本取 `CARGO_PKG_VERSION`。
 
 常数，每条都写清它是谁的事实：
 
@@ -503,7 +510,7 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 | 大纲里一个名字最多的字符数（`outline::LABEL_MOST`） | 80 | 我们的选择：够分辨两个控件，一扇窗口的大纲仍是一页；再长的名字多半是一段正文，模型要读它就截图或读剪贴板 |
 | 大纲每深一层的缩进 | 两个空格 | 我们的选择：最省字符、仍一眼看得出层次的缩进 |
 | 截图默认格式／`scale` | `png`／100 | 我们的选择：默认不损、不缩，缩放是调用方明说才发生的事 |
-| `quality` 的域 | 0..=100 | 与城里同一域（`kernel::consts_policy::IMAGE_QUALITY`）；本包在 workspace 之外读不到它，所以两个数由 `xtask guard` 的墙对账（`wall::quality_domain`）。域外即拒：一个要求 120 的调用方以为自己要多好就有多好，而替它填默认值是在回答另一个问题 |
+| `quality` 的域 | 0..=100 | 城里的域（`kernel::consts_policy::IMAGE_QUALITY`），本 package 以它的 `admit` 判，不写第二个数。域外即拒：一个要求 120 的调用方以为自己要多好就有多好，而替它填默认值是在回答另一个问题 |
 | `scale` 与城里那个同名量的区别 | 本包的 `scale` 是窗口自身像素的百分数 | 城里 `browser` 的 `scale` 是设备像素比（devicePixelRatio）的百分数——同一个词、两个量，**不是同一个事实**，所以两边的域也不必相同 |
 | `webp` 忽略 `quality` | —— | 外面的事实：`image` 的 WebP 编码器是**无损**的，故 `quality` 对它无意义。schema 允许同时给出，本 server 恒不因此报错，而在答复里写明这一次的编码是无损的 |
 | 帧序列的抓帧间隔 | 100 ms（10 fps） | 我们的选择：`PrintWindow` 一帧的代价决定了上限，而 10 fps 足够看清一次交互 |
@@ -513,14 +520,14 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 | 录制落盘的去处 | `std::env::temp_dir()/sprawling-desktop/<窗口名安全化>-<序号>` | 我们的选择：scope 文件说的是「可以碰哪些窗口」，没说「可以往哪写文件」，故恒不写进城里，也恒不写进操作者的家目录 |
 | ffmpeg 的收尾 | 关掉它的 stdin，再等它自己退出 | 外面的事实：帧从 stdin 进，读到结尾时 ffmpeg 写完 mp4 的尾部索引；直接杀掉会留下一个播放不了的文件 |
 | 全黑像素判为失败 | —— | 外面的事实：`PrintWindow` 对某些独立合成的窗口回全黑。依据是「每一个像素的 RGB 三通道皆为 0」 |
-| 效果未知的 `_meta` 键 | `sprawling/effect-unknown`，值 `true` | 我们的约定；唯一定义在 `agent_protocols::mcp::tools::EFFECT_META_KEY`，本 package 的抄本由 `xtask guard` 比对 |
+| 效果未知的 `_meta` 键 | `sprawling/effect-unknown`，值 `true` | 我们的约定；唯一定义在 `agent_protocols::mcp::tools::EFFECT_META_KEY`，本 package 引用它 |
 | 工具层拒词的文字 | 第一行 `E_…: cannot <action> — <subject>`，第二行 `instead: <recovery>` | 我们的选择：第一行与 JSON-RPC error 的 `message` 同一句，第二行让恢复句在模型读到的文字里有自己的位置 |
 | DPI 感知 | 按显示器感知（`PROCESS_PER_MONITOR_DPI_AWARE`，取自 `windows` 绑定，交给叶子） | 外面的事实：Windows 8.1 起的 shcore 接口；理由见 §12.6 |
 | Zig 的版本 | `desktop/ffi/zig-version` 里的那一行 | 我们的选择：叶子只对一个 Zig 版本编过、测过；换版本只改那一个文件（`desktop/ffi/Spec.lean` D3） |
 
 ## 15 影响面
 
-out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `[workspace]` 有一行 `exclude = ["desktop"]`，`crates/sprawling/Cargo.toml` 按路径依赖它，`ARCHITECTURE.md` §3 的 depmap 块有它一行。它在 Windows 上按路径依赖 `desktop_ffi`，所以 Windows 上构建 `sprawling` 要有 `zig-version` 钉住的 Zig。改 `serve_stdio` 的签名波及 `bin::main::desktop`；改工具名或 `tools/list` 的形状波及 `kernel::gate::undoable`（按远端名前缀 `desktop.` 判）与 `crates/sprawling/tests/desktop.rs`。
+工作区成员，唯一的调用方是 `sprawling`：`crates/sprawling/Cargo.toml` 以 `desktop = { workspace = true }` 依赖它，`ARCHITECTURE.md` §3 的 depmap 块有它与 `desktop_ffi` 各一行。改 `kernel::AxCode` 那六个变体、`IMAGE_QUALITY`、`agent_protocols::PROTOCOL_VERSION` 或 `EFFECT_META_KEY` 波及本 package。它在 Windows 上按路径依赖 `desktop_ffi`，所以 Windows 上构建 `sprawling` 要有 `zig-version` 钉住的 Zig。改 `serve_stdio` 的签名波及 `bin::main::desktop`；改工具名或 `tools/list` 的形状波及 `kernel::gate::undoable`（按远端名前缀 `desktop.` 判）与 `crates/sprawling/tests/desktop.rs`。
 
 ## 15.2 城里那一侧
 
@@ -551,9 +558,9 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 
 **约束**：`unsafe` 只在 `platform/windows/` 之下且每块携一行 `SAFETY:`（§8-9）；其余处恒不出现 `unsafe`、`unwrap`、`expect`、`panic!`、`todo!`、裸下标、`as`；算术走 `checked_*`／`saturating_*`；每个文件 ≤400 行、每个函数 ≤200 行且 ≤4 参数。`scope.rs` 因这条尺子而在 446 行处切出 `scope/pattern.rs`——切口落在「一行 allowlist 匹配什么」与「这份文件许可什么」之间，是语义的，不是为了凑行数；`Admitted` 落地时它再次抵线，这一次切出的是 `scope/tests.rs`（形状同 `session/tests.rs`），判定与对判定的断言各占一个文件。
 
-验收命令（在 `desktop/` 内）：`cargo fmt --all`／`cargo clippy --workspace --all-targets -- -D warnings`／`cargo nextest run --workspace`，Windows 上再加 `zig test ffi/zig/leaf.zig`；根目录一条 `just check-desktop` 把这几条加上 `cargo deny check` 一起跑，并挂在 `just check` 的依赖链上——`cargo clippy --workspace` 够不到本 package，因为它不是 workspace member。**两道工作区的闸门从外面伸进来**：`xtask length` 把 400 行的文件尺子量到 `desktop/src`（它读文件而不是读 crate，故够得着 `cargo` 够不着的地方），`xtask guard` 的 `wall` 把本 package 的 lint 表、包元数据与共享依赖版本逐键比回根 `Cargo.toml`，例外只有记下理由的那两条（§8.5 第二对，以及本 package 没有 kani harness）。`record.rs` 因那把尺子在 443 行处切出 `record/sink.rs`——切口落在「可不可以开始录」与「由谁写、写到哪」之间。
+验收命令：本 package 与 `desktop_ffi` 是工作区成员，`just clippy`、`just test` 与 `just fmt-check` 判它们，与判其余 crate 是同一条命令；Windows 上 `just check-leaf` 另跑 `zig test` 判叶子自己的测试（`zig fmt --check` 在 `just fmt-check` 里）。`xtask guard` 判 `desktop_ffi` 那一张自己的 lint 表，例外只有记下理由的 `unsafe_code` 一行（§12.14）。`record.rs` 因那把尺子在 443 行处切出 `record/sink.rs`——切口落在「可不可以开始录」与「由谁写、写到哪」之间。
 
-`platforms.yml` 的 macOS job 在 workspace 测试之后跑同一条 `just check-desktop`，所以非 Windows 臂与只在非 Windows 上编译的测试（`session/tests.rs` 里 `#[cfg(not(windows))]` 的那一条）每晚在 macOS 上过一次 clippy 与 nextest。那台 runner 没装 `cargo-deny`，配方里的许可证检查会自行跳过；许可证只在 `ci.yml` 的 Windows desktop job 里判。
+`platforms.yml` 的 macOS job 跑工作区的 clippy 与 nextest，所以非 Windows 臂与只在非 Windows 上编译的测试（`session/tests.rs` 里 `#[cfg(not(windows))]` 的那一条）每晚在 macOS 上过一次。
 
 ### 16.2 怎么测一件需要桌面的事
 
@@ -574,5 +581,5 @@ out-of-tree package，唯一的调用方是 `sprawling`：根 `Cargo.toml` 的 `
 
 ## 18 文档同步
 
-`ARCHITECTURE.md` §3 depmap 块的 `desktop` 一行｜`desktop/README.md`（英文，讲清它为什么住在 workspace 外、城怎么起它）｜sprawling-SPEC §8-4d｜同步本 SPEC §13 与 §8-7 的实现状态｜`desktop/README.md` 的 The honest-refusal rule 一节｜`crates/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`）。
+`ARCHITECTURE.md` §3 depmap 块的 `desktop` 与 `desktop_ffi` 两行｜`desktop/README.md`（英文，讲清城怎么起它、叶子为什么有自己的一张 lint 表）｜xtask-SPEC §8-46（guard 判叶子那张表）｜sprawling-SPEC §8-4d｜同步本 SPEC §13 与 §8-7 的实现状态｜`desktop/README.md` 的 The honest-refusal rule 一节｜`crates/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`）。
 
