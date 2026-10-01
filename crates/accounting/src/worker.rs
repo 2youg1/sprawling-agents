@@ -117,6 +117,8 @@ pub struct ScanReport {
     pub opening: LedgerOpening,
     pub lines: usize,
     pub closed_calls: usize,
+    /// How many runs the death left open and this scan froze.
+    pub frozen_runs: usize,
     /// The one count a caller branches on rather than prints: `resume`
     /// adds a line telling the person where to answer. `lines` and
     /// `closed_calls` reach nobody outside `summary`, so they stay in.
@@ -130,8 +132,8 @@ impl ScanReport {
     #[must_use]
     pub fn summary(&self) -> String {
         let counts = format!(
-            "{} line(s) verified; {} unknown-outcome call(s) closed; {} approval(s) waiting",
-            self.lines, self.closed_calls, self.waiting_approvals
+            "{} line(s) verified; {} unknown-outcome call(s) closed; {} lost run(s) frozen;              {} approval(s) waiting",
+            self.lines, self.closed_calls, self.frozen_runs, self.waiting_approvals
         );
         match self.opening.notice() {
             None => counts,

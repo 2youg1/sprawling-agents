@@ -129,6 +129,20 @@ pub struct RunFrozen {
     pub completion: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence: Option<Vec<EvidenceCite>>,
+    /// Why the line was written by something other than the run's own
+    /// driver (kernel-SPEC 8-82-2). Absent on every freeze a run wrote
+    /// for itself, so those lines keep the bytes they always had.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cause: Option<FreezeCause>,
+}
+
+/// Why a run was frozen by something other than its own driver.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum FreezeCause {
+    /// The process driving it died; the next `resume` froze it.
+    ProcessDied,
 }
 
 impl RunFrozen {
@@ -154,6 +168,22 @@ impl RunFrozen {
         RunFrozen {
             completion: completion.name().to_owned(),
             evidence,
+            cause: None,
+        }
+    }
+
+    /// The freeze of a run whose process died before it froze itself:
+    /// the one place that says which ending such a run has.
+    ///
+    /// `cancelled`, because the run stopped without finishing - `done`
+    /// needs evidence the city recorded and it has none - and no ceiling
+    /// cut it, which is what `limit` says. The cause tells it apart from
+    /// a cancel somebody asked for (kernel-SPEC 12.14).
+    pub fn lost() -> RunFrozen {
+        RunFrozen {
+            completion: Completion::Cancelled.name().to_owned(),
+            evidence: None,
+            cause: Some(FreezeCause::ProcessDied),
         }
     }
 }

@@ -92,7 +92,8 @@ pub use remote::{
 pub use renewal::CacheRenewed;
 pub use roadmap::{RoadmapMoved, RoadmapStep};
 pub use run::{
-    EvalRun, EvidenceCite, Opening, RunForked, RunFrozen, RunStarted, SessionOpened, SkillPin,
+    EvalRun, EvidenceCite, FreezeCause, Opening, RunForked, RunFrozen, RunStarted, SessionOpened,
+    SkillPin,
 };
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{

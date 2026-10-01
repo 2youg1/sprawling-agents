@@ -295,10 +295,11 @@ impl RunWorker {
     }
 
     /// The startup scan: closes the account of every
-    /// tool call whose outcome the last process death left unknown, and
-    /// reports what is still waiting on a person. Read-only apart from
-    /// the closing `tool_result` drafts, which state E_TOOL_OUTCOME_UNKNOWN
-    /// rather than guessing an outcome.
+    /// tool call whose outcome the last process death left unknown,
+    /// freezes every run that death left open, and reports what is still
+    /// waiting on a person. Read-only apart from the closing `tool_result`
+    /// drafts, which state E_TOOL_OUTCOME_UNKNOWN rather than guessing an
+    /// outcome, and the freezes after them (accounting-SPEC.md 8-18-1).
     ///
     /// # Errors
     /// Propagates whatever the chain says about itself: a history that
@@ -308,10 +309,12 @@ impl RunWorker {
         // streamed pass: what stays resident is one segment's bytes and
         // the calls not yet closed, never the whole ledger.
         let mut calls = runtime::replay::DanglingCalls::default();
+        let mut runs = lost::OpenRuns::default();
         let index = runtime::replay::fold_ledger_dir(
             &kernel::layout::CityLayout::new(&self.city_root).ledger(),
             |record| {
                 calls.observe(record);
+                runs.observe(record);
                 Ok(())
             },
         )?;
@@ -321,14 +324,24 @@ impl RunWorker {
             self.ledger.append(draft)?;
             closed = closed.saturating_add(1);
         }
+        // After the calls: a dead run's unknown outcomes belong to it, so
+        // they land before the line that freezes it.
+        let freezes = runs.into_drafts(self.clock.now()?)?;
+        let frozen = freezes.len();
+        for freeze in freezes {
+            self.ledger.append(freeze)?;
+        }
         Ok(ScanReport {
             opening: self.opening,
             lines: index.len(),
             closed_calls: closed,
+            frozen_runs: frozen,
             waiting_approvals: self.governance.pending.len(),
         })
     }
 }
+
+mod lost;
 
 #[cfg(test)]
 #[allow(
