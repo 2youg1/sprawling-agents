@@ -49,6 +49,9 @@
   import { MAYOR, roomOf } from "../core/route";
   import { ui } from "../ui";
   import type { Address, RoundsAnswer } from "../wire";
+  import { closeRight, rightItem } from "./inspect/open.svelte";
+  import Button from "./parts/button.svelte";
+  import RefRain from "./refrain/refrain.svelte";
   import Talk from "./talk.svelte";
   import Artifact from "./talk/artifact.svelte";
   import { NOTHING, artifactsIn } from "./talk/trace";
@@ -96,7 +99,11 @@
   // A run that read nothing, changed nothing and ran nothing has no pane
   // to open.
   const produced = $derived(artifacts.read !== null || artifacts.wrote !== null || artifacts.terminal !== null);
-  const open = $derived((panel ?? $held.panel) && produced);
+  // An item somebody opened (`inspect/open.svelte.ts`) opens the right
+  // side whatever the preference says; without one, the run's own
+  // artefacts stand there as before.
+  const item = $derived(rightItem());
+  const open = $derived(item !== null || ((panel ?? $held.panel) && produced));
 
   const layout = $derived(layoutOf(narrow.current ? "zen" : tier, open));
   const title = $derived(address === MAYOR ? say($lang, "talk_empty_mayor") : roomOf(address));
@@ -149,15 +156,25 @@ covers the pane above it. -->
   >
     <Talk {address} band={layout.world === "workbench"} />
   </section>
-  {#if produced}
+  {#if produced || item !== null}
     <div
       class={[
         layout.right,
         "row-[1/3] -mt-margin -mr-margin -mb-margin min-h-0 border-l border-edge-panel narrow:fixed narrow:inset-0 narrow:m-0",
         open ? "flex" : "hidden",
+        item?.kind === "document" ? "flex-col bg-page" : "",
       ]}
     >
-      <Artifact {artifacts} {open} run={current?.run} />
+      {#if item?.kind === "document"}
+        <div class="flex justify-end border-b border-edge px-snug py-tight">
+          <Button label={say($lang, "panel_close")} tone="quiet" onPress={closeRight} />
+        </div>
+        <div class="min-h-0 flex-1 overflow-auto">
+          <RefRain building={item.building} path={item.path} version={item.version} />
+        </div>
+      {:else}
+        <Artifact {artifacts} {open} run={current?.run} />
+      {/if}
     </div>
   {/if}
 </svelte:element>
