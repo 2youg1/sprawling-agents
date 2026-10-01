@@ -9,8 +9,10 @@
 //! **A value, not a decision.** `ClaimEffect` records what happened so
 //! the desk that produced it does not have to be consulted again, and
 //! `still_true` asks the one question that cannot be answered from the
-//! record alone: does the document on disk still say what this effect
-//! says it made it say. `ClaimDesk` decides; this describes and checks.
+//! record alone: does the plan as it stands still leave the row a claim
+//! took free to take. `ClaimDesk` decides; this describes and checks.
+//! The properties both halves hold are proved in
+//! `crates/collab/spec/Claim.lean`.
 //! Two shapes, so two files (ARCHITECTURE.md section 9).
 
 use kernel::event::record::{RoadmapMoved, RoadmapStep};
@@ -54,19 +56,6 @@ impl ClaimEffect {
         match self {
             ClaimEffect::Claimed { id, .. } | ClaimEffect::PutDown { id, .. } => id,
             ClaimEffect::Split { parent, .. } => parent,
-        }
-    }
-
-    /// The status the node must already be in for this effect to still be
-    /// the truth when the worker applies it.
-    #[must_use]
-    pub fn expected_before(&self) -> RoadmapStatus {
-        match self {
-            ClaimEffect::Claimed { .. } => RoadmapStatus::NotStarted,
-            ClaimEffect::PutDown { .. } => RoadmapStatus::InProgress,
-            // A split does not move the parent, so what must still hold
-            // is only that the parent is where it was.
-            ClaimEffect::Split { .. } => RoadmapStatus::InProgress,
         }
     }
 
@@ -143,16 +132,27 @@ impl ClaimEffect {
     }
 }
 
-/// Whether the node on disk still holds what the effect assumed. The
-/// worker asks this before writing, so a concurrent run degrades to "the
-/// second claim did not take and said so" rather than "two runs each
-/// believe they own the node".
+/// Whether `text` still admits the effect. The worker asks this of each
+/// effect against the plan the earlier ones left, so a concurrent run
+/// degrades to "the second claim did not take and said so" rather than
+/// "two runs each believe they own the node".
+///
+/// Only a claim can be untrue: it takes a row from the shared plan, so
+/// the row must still be `Not started`. A put-down or a split acts only on
+/// the row this run holds (collab D6), and the claim that took that row
+/// was asked first; judging them again here would be a second answer to
+/// whether they needed the row held.
 #[must_use]
 pub fn still_true(text: &str, effect: &ClaimEffect) -> bool {
-    let RoadmapShape::WellFormed { rows } = check_roadmap_shape(text) else {
-        return false;
-    };
-    rows.iter()
-        .find(|row| &row.id == effect.id())
-        .is_some_and(|row| row.status == effect.expected_before())
+    match effect {
+        ClaimEffect::Claimed { id, .. } => {
+            let RoadmapShape::WellFormed { rows } = check_roadmap_shape(text) else {
+                return false;
+            };
+            rows.iter()
+                .find(|row| &row.id == id)
+                .is_some_and(|row| row.status == RoadmapStatus::NotStarted)
+        }
+        ClaimEffect::PutDown { .. } | ClaimEffect::Split { .. } => true,
+    }
 }

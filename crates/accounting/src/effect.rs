@@ -204,16 +204,15 @@ impl Landing {
 }
 
 /// What a run's claims on the shared plan came to. Two answers and no
-/// third: either every effect still matches the file as it stands and
-/// all of them are replayed onto it, or one of them does not and nothing
-/// at all is written.
+/// third: either every effect still holds as it is replayed onto the file
+/// as it stands, or one claim does not and nothing at all is written.
 pub enum Claims {
     Landed(Box<Landing<Closing>>),
-    /// The nodes that moved, so a person can be told which, and the
-    /// `roadmap_released` lines that close the claims this run already
-    /// put on the ledger when the model made them.
+    /// The first claimed node that moved, so a person can be told which,
+    /// and the `roadmap_released` lines that close the claims this run
+    /// already put on the ledger when the model made them.
     Stale {
-        nodes: Vec<String>,
+        node: NodeId,
         released: Box<Landing<Closing>>,
     },
 }
@@ -226,9 +225,14 @@ impl Claims {
     /// that claimed from its old copy a node somebody had since landed,
     /// whose claim is dropped rather than written over that row.
     ///
-    /// The effects are replayed onto `on_disk` rather than the desk's
-    /// dispatch-time copy written back, so a row another run landed
-    /// since this one was dispatched is kept.
+    /// The effects are replayed in order onto `on_disk` rather than the
+    /// desk's dispatch-time copy written back, so a row another run
+    /// landed since this one was dispatched is kept. Each is checked
+    /// against the plan the earlier ones left, so a leaf this run split
+    /// off and then claimed is there to be claimed; the replay stops at
+    /// the first claim that no longer holds, because what follows it may
+    /// stand on rows that claim's split would have made (accounting-SPEC
+    /// 8-27).
     ///
     /// # Errors
     /// Propagates a claim whose payload cannot be built, or an effect
@@ -240,32 +244,18 @@ impl Claims {
         room: &Address,
         who: &str,
     ) -> Result<Claims, AxError> {
-        // Only the *first* effect on each node is checked against the
-        // disk. A run that claims a node and then closes it produced
-        // both, in that order, from the file as it stood when the run
-        // was dispatched; asking the disk whether the second one still
-        // holds would ask whether this run's own earlier effect had
-        // already landed, and it has not — the desk writes the whole
-        // file once, at the end.
-        let mut asked = std::collections::BTreeSet::new();
-        let stale: Vec<String> = effects
-            .iter()
-            .filter(|effect| asked.insert(effect.id().to_string()))
-            .filter(|effect| !collab::still_true(on_disk, effect))
-            .map(|effect| effect.id().to_string())
-            .collect();
-        if !stale.is_empty() {
-            return Ok(Claims::Stale {
-                nodes: stale,
-                released: Box::new(Landing {
-                    lines: released(effects, room, who)?,
-                    then: Then::Nothing,
-                }),
-            });
-        }
         let mut lines = Vec::new();
         let mut text = on_disk.to_owned();
         for effect in effects {
+            if !collab::still_true(&text, effect) {
+                return Ok(Claims::Stale {
+                    node: effect.id().clone(),
+                    released: Box::new(Landing {
+                        lines: released(effects, room, who)?,
+                        then: Then::Nothing,
+                    }),
+                });
+            }
             text = effect.apply(&text)?;
             let closes = match effect {
                 // The claim's line went on the ledger when the accounting
@@ -403,7 +393,7 @@ mod tests {
                 Then::Roadmap { text, .. } => text,
                 _ => panic!("a claim lands on the plan"),
             },
-            Claims::Stale { nodes, .. } => panic!("{nodes:?} read as moved"),
+            Claims::Stale { node, .. } => panic!("{node} read as moved"),
         }
     }
 

@@ -129,19 +129,17 @@ impl RunWorker {
                         &chain,
                     )?;
                 }
-                effect::Claims::Stale { nodes, released } => {
+                effect::Claims::Stale { node, released } => {
                     let then = released.record(&mut close)?;
                     self.carry_out_landing(at, then, &chain)?;
-                    for node in nodes {
-                        self.note(
-                            runtime::diagnostics::Level::Refuse,
-                            "collab::claim_tool",
-                            &format!(
-                                "node {node} moved before this run's claim landed; nothing was \
-                                 written"
-                            ),
-                        );
-                    }
+                    self.note(
+                        runtime::diagnostics::Level::Refuse,
+                        "collab::claim_tool",
+                        &format!(
+                            "node {node} moved before this run's claim landed; nothing was \
+                             written"
+                        ),
+                    );
                 }
             }
         }
