@@ -3009,7 +3009,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **回执是事件流上的一行。** 成功的保存写 `document_written`，带这条命令的 `idem`；页面在 `core/belief` 的折叠里见到带自己 `idem` 的那一行才把「保存中」换成「已保存」，`version` 换成新的基线。`client/src/core/staleness.ts` 让这一行使 `document` 与 `proposals` 两种答复过期，页面再问一次就读到新版本与剩下的卡。
 - **`Query::Proposals` 读视图里的 `Governance.proposals`**，锁外读盘取文件此刻的版本（同 8-52 的 `document`，8-100 的锁外规矩）。
 - **提交说明随父提交一起读**：`Query::Commit` 与 `Query::Commits` 的 `CommitsAsk::read` 在锁外各补 `parents` 与 `message`（8-128）。
-- **客户端今天只有发出点，没有画面**：`client/src/core/commands/document.ts` 拼 `put_range` 与 `decide_proposals` 两种帧，编辑页与请决定卡由前端会话按 wire-SPEC §8-72、§8-73 画（refrain 路线图 §4-8、§4-10）。
+- **客户端今天只有发出点，没有画面**：`client/src/core/commands/document.ts` 拼 `put_range` 与 `decide_proposals` 两种帧；编辑页与请决定卡还没有画出来，画它们的依据是 wire-SPEC §8-72、§8-73 与 refrain 路线图 §4-8、§4-10。
 - 验收：见 accounting-SPEC §8-22 列的测试；远程门对两条命令的分类见 §12 「写文档的两条命令在远程门外」。
 
 ## 8-53 一座楼做过的提交，倒序分页（`accounting::views::commits`、`views::holding`；wire-SPEC §8-24）

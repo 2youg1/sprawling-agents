@@ -255,9 +255,8 @@ impl RunWorker {
                 run,
                 "no run in flight answers to that id: steer one while it runs, or dispatch a new one",
             )),
-            // Verbs the wire spells and this city cannot perform, one arm
-            // each rather than a catch-all, so a Command added without an
-            // executor stops the build here.
+            // Verbs the wire spells and this city cannot perform, one arm each and no
+            // catch-all, so a Command added without an executor stops the build here.
             wire::Command::BatchByBuilding { addr, .. } => {
                 Err(Unbuilt::BatchByBuilding(&addr).not_built())
             }

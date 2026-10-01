@@ -331,6 +331,7 @@ fn refused(place: u32, why: &str) -> AxError {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::string_slice,
     reason = "test code"
 )]
 mod tests;

@@ -45,8 +45,8 @@ enum Handled {
 }
 
 impl Proposals {
-    /// Folds a `proposal_offered` line `run` wrote. A card already known
-    /// - open or handled - is the same card offered again and changes
+    /// Folds a `proposal_offered` line `run` wrote. A card already known,
+    /// open or handled, is the same card offered again and changes
     /// nothing (documents D13).
     ///
     /// # Errors

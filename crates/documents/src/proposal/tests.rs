@@ -41,7 +41,9 @@ fn changed(review: &Review) -> Vec<SliceVerdict> {
         .collect()
 }
 
-fn offer(run: u8, source: &str, start: usize, end: usize, after: &str) -> Offer {
+/// The stretch and the suggestion travel together: one change.
+fn offer(run: u8, source: &str, change: (usize, usize, &str)) -> Offer {
+    let (start, end, after) = change;
     Offer::of(
         RunId::from_bytes([run; 16]),
         &ProposalOffered {
@@ -167,16 +169,16 @@ fn sides_past_the_alignment_budget_are_replaced_whole() {
 fn the_identity_is_the_offer_and_its_run() {
     let source = "One. Two.";
     assert_eq!(
-        offer(1, source, 5, 9, "Deux.").id(),
-        offer(1, source, 5, 9, "Deux.").id()
+        offer(1, source, (5, 9, "Deux.")).id(),
+        offer(1, source, (5, 9, "Deux.")).id()
     );
     assert_ne!(
-        offer(1, source, 5, 9, "Deux.").id(),
-        offer(2, source, 5, 9, "Deux.").id()
+        offer(1, source, (5, 9, "Deux.")).id(),
+        offer(2, source, (5, 9, "Deux.")).id()
     );
     assert_ne!(
-        offer(1, source, 5, 9, "Deux.").id(),
-        offer(1, source, 5, 9, "Zwei.").id()
+        offer(1, source, (5, 9, "Deux.")).id(),
+        offer(1, source, (5, 9, "Zwei.")).id()
     );
 }
 
@@ -208,8 +210,8 @@ fn an_offer_past_a_window_or_reversed_is_refused() {
 #[test]
 fn cards_on_the_current_version_land_together_and_a_stale_one_is_refused() {
     let source = "One. Two. Three.";
-    let first = offer(1, source, 5, 9, "Deux.");
-    let second = offer(1, source, 10, 16, "Trois.");
+    let first = offer(1, source, (5, 9, "Deux."));
+    let second = offer(1, source, (10, 16, "Trois."));
     let both = decide(
         source.as_bytes(),
         &[
@@ -231,8 +233,8 @@ fn cards_on_the_current_version_land_together_and_a_stale_one_is_refused() {
 #[test]
 fn overlapping_twice_named_or_unmatched_cards_are_refused() {
     let source = "One. Two. Three.";
-    let wide = offer(1, source, 5, 16, "Deux. Trois.");
-    let narrow = offer(1, source, 10, 16, "Trois.");
+    let wide = offer(1, source, (5, 16, "Deux. Trois."));
+    let narrow = offer(1, source, (10, 16, "Trois."));
     let take = [accept(0), accept(1)];
     let overlapping = decide(source.as_bytes(), &[(&narrow, &take), (&wide, &take)]).unwrap_err();
     assert_eq!(overlapping.code().as_str(), "E_INVALID_ARGS");

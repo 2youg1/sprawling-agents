@@ -11,6 +11,7 @@
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::string_slice,
     reason = "test code"
 )]
 
@@ -64,7 +65,9 @@ fn lines(root: &Path, kind: &str) -> Vec<serde_json::Value> {
         .collect()
 }
 
-fn put_range(baseline: &str, start: u64, end: u64, text: &str, idem: &[u8]) -> wire::Command {
+/// The stretch and its new text travel together: one edit.
+fn put_range(baseline: &str, edit: (u64, u64, &str), idem: &[u8]) -> wire::Command {
+    let (start, end, text) = edit;
     wire::Command::PutRange(wire::RangeWrite {
         doc: notes(),
         baseline: B3Hash::digest(baseline.as_bytes()),
@@ -149,10 +152,10 @@ fn code(refused: &AxError) -> &'static str {
 fn a_second_save_from_the_same_version_is_refused_and_the_first_stands() {
     let (dir, mut worker) = city("one two\n");
     worker
-        .handle(put_range("one two\n", 0, 3, "ONE", b"first"))
+        .handle(put_range("one two\n", (0, 3, "ONE"), b"first"))
         .unwrap();
     let late = worker
-        .handle(put_range("one two\n", 4, 7, "TWO", b"second"))
+        .handle(put_range("one two\n", (4, 7, "TWO"), b"second"))
         .unwrap_err();
     assert_eq!(
         (code(&late), on_disk(dir.path())),
@@ -177,7 +180,7 @@ fn a_save_sent_twice_under_one_key_lands_once_and_its_receipt_names_the_key() {
     let (dir, mut worker) = city("one\n");
     for _ in 0..2 {
         worker.serve_one(Posted {
-            command: put_range("one\n", 0, 3, "uno", b"once"),
+            command: put_range("one\n", (0, 3, "uno"), b"once"),
             reply: wire::Reply::nowhere(),
         });
     }
@@ -300,7 +303,7 @@ fn a_stale_card_is_refused_and_rejecting_it_is_not() {
     let (dir, mut worker) = city(source);
     let card = offer(&mut worker, 1, source, (5, 9, "Deux."));
     worker
-        .handle(put_range(source, 0, 4, "Uno.", b"moved"))
+        .handle(put_range(source, (0, 4, "Uno."), b"moved"))
         .unwrap();
     let stale = worker
         .handle(decide(&[(card, vec![accept(0), accept(1)])], b"stale"))
