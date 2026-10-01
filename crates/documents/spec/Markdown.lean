@@ -22,7 +22,7 @@ namespace Documents.Markdown
 
 /-! ## 链接的去处（D23）
 
-Rust 先按 WHATWG URL 的读法去掉制表符与换行、去掉开头的控制字符与空格，再取第一个 `:` 之前、合乎 RFC 3986 `scheme` 文法的那一段；没有这一段的是相对地址。本模型从分好的类开始：怎样从字符串分出类是 Rust 的 `scheme_of`，由 `markdown::tests` 的语料判。 -/
+Rust 先按 WHATWG URL 的读法去掉制表符与换行、去掉开头的控制字符与空格，再取第一个 `:` 之前、合乎 RFC 3986 `scheme` 文法的那一段；没有这一段的是相对地址。本模型从分好的类开始：怎样从字符串分出类是 Rust 的 `markdown::target::scheme_of`，由 `markdown::target::tests` 的表判。 -/
 
 /-- 一个链接目标按协议分成的类。 -/
 inductive Scheme where

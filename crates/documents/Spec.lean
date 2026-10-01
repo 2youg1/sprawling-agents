@@ -48,8 +48,8 @@ refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「�
 
 | 验收 | 完成的定义 |
 |---|---|
-| CommonMark 语料 | `markdown::tests` 里迁自 `client/src/core/prose.test.ts` 的三组（列表、表与代码块相继闭合；没闭合的代码块留着它的空行；段落由空行而不由换行结束），逐块比较整棵树，块的区间切回源文就是那一块 |
-| 项目扩展语料 | `markdown::tests`：删除线、任务列表、脚注、自动链接、CJK 友好的强调、公式、前置元数据、HTML 块，各读成 D22 说的那一种节点 |
+| CommonMark 语料 | `markdown::lowering::tests` 里迁自 `client/src/core/prose.test.ts` 的三组（列表、表与代码块相继闭合；没闭合的代码块留着它的空行；段落由空行而不由换行结束），逐块比较整棵树，块的区间切回源文就是那一块 |
+| 项目扩展语料 | `markdown::lowering::tests`：删除线、任务列表、脚注、自动链接、CJK 友好的强调、公式、前置元数据、HTML 块，各读成 D22 说的那一种节点 |
 | A4 的 Rust 一半 | `markdown::tests`：空窗口答零个块；UTF-16 的版本答 `Preview::Unsupported`；内容为空的代码块读成 `Code { text: "" }`，HTML 与公式读成带原文的 `Unsupported`，两者不同形 |
 | 预览逐窗读完 | `markdown::tests::reading_on_from_each_preview_lays_out_every_paragraph_once`：超过一窗的版本从 0 起按答复的 `span.end` 逐窗读，每一段恰好读出一次 |
 -/
@@ -194,7 +194,7 @@ D26 源位置：comrak 的 `sourcepos`（行与按字节数的列，都从 1 起
 
 空文档（一个空的纯文本行、零个 Markdown 块，版本是空字节的摘要）；只有标记的文档；没有结尾换行；混合 `\r\n` 与 `\n`；尾随空格与制表符；四列缩进的界定行（不是界定行）；没闭合的代码块（直到末尾都是一块）；非 UTF-8 字节；没有标记而含 NUL；落单的代理；奇数长度的 UTF-16；起点在字符中间、在标记中间、在版本之后；请求比 `WINDOW_BYTES_MAX` 长；第一块就比 `WINDOW_BYTES_MAX` 长；两个编辑重叠、乱序、越过末尾；两个插入点重合；基线已经移动；文本编辑劈开一个字符、在没有标记的 UTF-8 里写进 NUL、删掉字节顺序标记；不透明的版本上的保存；只有空白的提案两边；没有终止符的句子；只在空白上不同的两句；提议与原文完全不同（对齐表超出预算）；对一句没改动的句子下判词；对删除的句子改后接受；同一张卡点两次；两张卡的区间重叠；一张卡的基线已动而它被整张拒绝；一张卡被决定之后再决定、被收回之后再决定。
 
-Markdown（`markdown::tests` 与 `spec/Markdown.lean`）：空窗口；内容为空的代码块；没闭合的代码块；嵌套列表、引用里的块、HTML 块、前置元数据、脚注、引用式链接（refrain 路线图附录 D）；带标记的首行；只有 `\r` 的换行；`javascript:`、开头带空格或中间夹着制表符的协议、`data:` 图片、`./` 与 `#` 开头的相对地址；十七层的引用；窗口切在一段之中、一块就比窗口长、窗口恰到版本末尾；UTF-16 的版本。
+Markdown（`markdown::lowering::tests`、`markdown::target::tests`、`markdown::tests` 与 `spec/Markdown.lean`）：空窗口；内容为空的代码块；没闭合的代码块；嵌套列表、引用里的块、HTML 块、前置元数据、脚注、引用式链接（refrain 路线图附录 D）；带标记的首行；只有 `\r` 的换行；`javascript:`、开头带空格或中间夹着制表符的协议、`data:` 图片、`./` 与 `#` 开头的相对地址；十七层的引用；窗口切在一段之中、一块就比窗口长、窗口恰到版本末尾；UTF-16 的版本。
 -/
 
 /-! ## 12 错误处理
@@ -234,7 +234,7 @@ comrak（BSD-2-Clause）关掉默认 feature 取用：默认的是它的命令�
 
 证明：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`。咬得动的演示：`Documents.Edit.withoutBaseline_overwrites`、`Documents.Proposal.looseKey_loses_the_after_side`、`Documents.Window.withoutStepBack_splits`、`Documents.Encoding.nulJudgement_calls_wide_text_opaque`、`Documents.Markdown.withoutCheck_admits_other`、`Documents.Markdown.withoutCap_exceeds`、`Documents.Markdown.withoutGuard_stalls`。
 
-实现一致性：逐模块 `#[cfg(test)]`（`cargo nextest run -p sprawling-documents`）；§2 的表是它们与验收的对应。选区跨过一次保存的规则（D10）由 `selection::tests` 断言，没有写成定理。CommonMark 与 GFM 的文法由 comrak 自己的规范测试守，本 crate 的 `markdown::tests` 只判它选的扩展、它的树、源位置的换算与 D23–D25。模型的证明不是 Rust 实现的证明。
+实现一致性：逐模块 `#[cfg(test)]`（`cargo nextest run -p sprawling-documents`）；§2 的表是它们与验收的对应。选区跨过一次保存的规则（D10）由 `selection::tests` 断言，没有写成定理。CommonMark 与 GFM 的文法由 comrak 自己的规范测试守，本 crate 的 `markdown::lowering::tests`、`markdown::target::tests` 与 `markdown::tests` 只判它选的扩展、它的树、源位置的换算与 D23–D25。模型的证明不是 Rust 实现的证明。
 -/
 
 /-! ## 17 文档关系

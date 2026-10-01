@@ -219,10 +219,7 @@ pub enum Query {
         version: B3Hash,
         range: documents::Span,
     },
-    /// One window of a stored Markdown version, laid out as blocks by the
-    /// city's one Markdown grammar (wire-SPEC 8-74). The window is cut as
-    /// a range is and ends on a block when the version runs on, so a page
-    /// asks again from the answer's end.
+    /// One window of a stored Markdown version, laid out (wire-SPEC 8-74).
     Preview {
         version: B3Hash,
         viewport: documents::Span,

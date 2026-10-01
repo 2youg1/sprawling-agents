@@ -40,3 +40,48 @@ fn scheme_of(target: &str) -> Option<&str> {
         && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')))
     .then_some(scheme)
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+mod tests {
+    use super::admitted;
+
+    /// Targets are judged as a browser reads an `href`.
+    #[test]
+    fn a_target_is_judged_as_a_browser_reads_it() {
+        let targets = [
+            "https://x.org",
+            "HTTP://x.org",
+            "mailto:someone@x.org",
+            "./doc.md",
+            "#top",
+            "a/b:c",
+            "javascript:alert(1)",
+            "JaVaScRiPt:alert(1)",
+            " \u{1}javascript:alert(1)",
+            "java\tscript:alert(1)",
+            "data:image/png;base64,AA",
+            "file:///etc/hosts",
+            "C:\\Windows",
+        ];
+        let judged: Vec<(&str, bool)> = targets.iter().map(|t| (*t, admitted(t))).collect();
+        assert_eq!(
+            judged,
+            vec![
+                ("https://x.org", true),
+                ("HTTP://x.org", true),
+                ("mailto:someone@x.org", true),
+                ("./doc.md", true),
+                ("#top", true),
+                ("a/b:c", true),
+                ("javascript:alert(1)", false),
+                ("JaVaScRiPt:alert(1)", false),
+                (" \u{1}javascript:alert(1)", false),
+                ("java\tscript:alert(1)", false),
+                ("data:image/png;base64,AA", false),
+                ("file:///etc/hosts", false),
+                ("C:\\Windows", false),
+            ]
+        );
+    }
+}
