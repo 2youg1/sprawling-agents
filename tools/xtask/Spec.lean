@@ -416,7 +416,9 @@ pub(crate) struct Violation {
 
 **一张图也是一个事实。** `crate_graph` 把 `ARCHITECTURE.md` §3 的 `depmap` 块画成一段 mermaid `flowchart TD`：块里每个 crate 一行，每条允许的边一个箭头（依赖方指向被依赖方），不做传递约简，因为约简掉的边正是 `depmap` 允许、读者要查的那一条。生成函数 `depmap::graph` 与门用同一个 `parse_block` 读块，故图与门不会读出两张依赖表；手画一张依赖图，就是依赖表的第二个权威。值自带 ```` ```mermaid ```` 围栏，标记放在围栏之外，因为 mermaid 不认 HTML 注释。
 
-**带参数的四族，键写成 `<事实>:<参数>`**：`dep_version:<crate>`（读工作区与各成员清单钉的版本；同一个 crate 在两处钉成两个版本时，这个读数本身就是拒绝）、`budget_bytes:<行>` 与 `budget_reading:<行>`（`tools/xtask/budgets.toml` 那一行的预算与读数，按文档的写法分三位一组）、`budget_headroom:<行>`（两者之比，四舍五入到一位小数）、`budget_figure:<行>.<字段>`（那一行任一整数字段，分三位一组、不带单位，单位由字段名给出；缺 `.字段` 即拒绝）。同一个读数只住在 `budgets.toml` 的一行里，文档里每处引用它的地方都是这一族的标记，不是第二份手写的数。一个生成器服务一族事实，于是加一个被引用的版本号或预算行不需要加一行代码。
+**带参数的事实，键写成 `<事实>:<参数>`**：`dep_version:<crate>`（读工作区与各成员清单钉的版本；同一个 crate 在两处钉成两个版本时，这个读数本身就是拒绝）、`budget_bytes:<行>` 与 `budget_reading:<行>`（`tools/xtask/budgets.toml` 那一行的预算与读数，按文档的写法分三位一组）、`budget_headroom:<行>`（两者之比，四舍五入到一位小数）、`budget_figure:<行>.<字段>`（那一行任一整数字段，分三位一组、不带单位，单位由字段名给出；缺 `.字段` 即拒绝）。`maturity:<拼法>` 引 `kernel::release::MATURITY`：`maturity:word` 是句子里的写法（`pre-alpha`），`maturity:titled` 是 tag 与标题里的写法（`Pre-alpha`），两种都由 `kernel::Maturity` 的同名方法给出，别的参数即拒绝并列出这两个（D17）。同一个读数只住在 `budgets.toml` 的一行里，文档里每处引用它的地方都是这一族的标记，不是第二份手写的数。一个生成器服务一族事实，于是加一个被引用的版本号或预算行不需要加一行代码。
+
+D17 **成熟度以一个带参数的事实进文档，两种拼法由 kernel 给。** README 两份的状态句、CHANGELOG 的开篇与未切的那一节、`.github/release-notes.md` 的提醒，都圈在 `maturity:word` 或 `maturity:titled` 的区段里，值取自 `kernel::release::MATURITY`（kernel D18）。于是进 alpha 只改那一个常量，再跑一次 `--write`，漏掉的一处由本门判红。理由：tag 与标题写 `Pre-alpha`、句子写 `pre-alpha`，大小写由 kernel 的两个方法各给一次，本门只搬字符串。被否：①一个不带参数的 `maturity` 只出小写——CHANGELOG 未切那一节的标题就是 tag，`release.yml` 由 tag 推出的锚点要对上它，标题里只能写大写的那一种；②两个事实各占一行——同一个常量的两种写法成了两行可以分别改的生成器。重开参数：成熟度多出第三种写法（例如进了 npm 的版本串）。
 
 **称重只属 `budget`，引用属 `docnum`**：`budget` 称重并守住预算，`docnum` 把读数搬进散文与表格；二者读同一行 `budgets.toml`，故读数只有一个家。同理 `dep_version` 并不与 `depmap` 争权——`depmap` 判依赖边，版本号住清单，本门只负责把清单里的那个字符串搬进文档。
 
