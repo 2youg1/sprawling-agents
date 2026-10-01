@@ -30,15 +30,90 @@ pub fn iso(at: TimeMs) -> String {
     format_at(at, 0)
 }
 
-/// The moment `raw` spells in the one shape [`iso`] writes.
+/// The moment `raw` spells in the one shape [`iso`] writes,
+/// `2026-05-14T09:31:07Z`: UTC, to the second. The two are inverses:
+/// `parse_iso(&iso(t))` is `t` with its milliseconds dropped, and
+/// `iso(parse_iso(s)?)` is `s`.
 ///
 /// # Errors
-/// `E_INVALID_ARGS` for every other spelling (runtime-SPEC 8-10).
+/// `E_INVALID_ARGS` for every other spelling - a zone offset, a fraction
+/// of a second, a date alone, a lowercase `t` or `z`, a day the calendar
+/// does not have, `24:00:00`, a leap second, a moment before 1970 - with
+/// a recovery that shows the shape (runtime-SPEC 8-10).
 pub fn parse_iso(raw: &str) -> Result<TimeMs, AxError> {
-    Err(AxError::failure(AxCode::InvalidArgs, "read a UTC moment", raw).with_recovery("red"))
+    let refused = || {
+        AxError::failure(AxCode::InvalidArgs, "read a UTC moment", raw).with_recovery(
+            "write the moment in UTC to the second, ending in Z, the way a clock line \
+             does: 2026-05-14T09:31:07Z; turn a local time or an offset into UTC first",
+        )
+    };
+    let millis = civil_fields(raw.as_bytes())
+        .and_then(millis_of)
+        .ok_or_else(refused)?;
+    u64::try_from(millis)
+        .map(TimeMs::new)
+        .map_err(|_before_1970| refused())
 }
 
-/// The moments a selection by time keeps (runtime-SPEC 8-57).
+/// Where each separator of `YYYY-MM-DDTHH:MM:SSZ` stands, and each of
+/// its six numbers.
+const ISO_SEPARATORS: [(usize, u8); 6] = [
+    (4, b'-'),
+    (7, b'-'),
+    (10, b'T'),
+    (13, b':'),
+    (16, b':'),
+    (19, b'Z'),
+];
+const ISO_FIELDS: [(usize, usize); 6] = [(0, 4), (5, 7), (8, 10), (11, 13), (14, 16), (17, 19)];
+
+/// Year, month, day, hour, minute and second, when `bytes` is exactly
+/// `YYYY-MM-DDTHH:MM:SSZ` with ASCII digits.
+fn civil_fields(bytes: &[u8]) -> Option<[i128; 6]> {
+    let shaped = bytes.len() == 20
+        && ISO_SEPARATORS
+            .iter()
+            .all(|(at, separator)| bytes.get(*at) == Some(separator));
+    if !shaped {
+        return None;
+    }
+    let [year, month, day, hour, minute, second] = ISO_FIELDS.map(|(from, to)| {
+        bytes.get(from..to)?.iter().try_fold(0i128, |number, byte| {
+            let digit = char::from(*byte).to_digit(10)?;
+            number.checked_mul(10)?.checked_add(i128::from(digit))
+        })
+    });
+    Some([year?, month?, day?, hour?, minute?, second?])
+}
+
+/// Milliseconds since 1970 of a civil UTC moment, when the calendar has
+/// that day and the clock that second. Whether the day exists is asked
+/// of `civil_from_days`, so the calendar has one algorithm.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "every field is at most four decimal digits, so the day count and the \
+              milliseconds stay far inside i128; the divisors are positive constants"
+)]
+fn millis_of([year, month, day, hour, minute, second]: [i128; 6]) -> Option<i128> {
+    if !(1..=12).contains(&month) || hour > 23 || minute > 59 || second > 59 {
+        return None;
+    }
+    let y = if month <= 2 { year - 1 } else { year };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let mp = if month > 2 { month - 3 } else { month + 9 };
+    let doy = (153 * mp + 2) / 5 + day - 1;
+    let days = era * 146_097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719_468;
+    (civil_from_days(days) == (year, month, day))
+        .then_some((days * 86_400 + hour * 3_600 + minute * 60 + second) * 1_000)
+}
+
+/// The moments a selection by time keeps: `[since, until)` in UTC, an
+/// absent end left open (runtime-SPEC 8-57).
+///
+/// It judges one moment at a time and assumes no order: a ledger's `t`
+/// does not rise with `seq`, so a reader asks about every line and never
+/// stops at the first one past `until`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct UtcSpan {
     since: Option<TimeMs>,
@@ -47,8 +122,23 @@ pub struct UtcSpan {
 
 impl UtcSpan {
     /// # Errors
-    /// `E_INVALID_ARGS` when `until` is not after `since`.
+    /// `E_INVALID_ARGS` when `until` is not after `since`: such a span
+    /// holds no moment, and selecting by it would read as a stretch of
+    /// history in which nothing happened.
     pub fn new(since: Option<TimeMs>, until: Option<TimeMs>) -> Result<UtcSpan, AxError> {
+        if let (Some(start), Some(end)) = (since, until)
+            && end <= start
+        {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "select a span of time",
+                format!("{} to {}", iso(start), iso(end)),
+            )
+            .with_recovery(
+                "give an end after the start; the end itself is left out, so a span that \
+                 ends where it starts holds no moment",
+            ));
+        }
         Ok(UtcSpan { since, until })
     }
 
@@ -62,9 +152,10 @@ impl UtcSpan {
         self.until
     }
 
+    /// Whether `at` is at or after `since` and before `until`.
     #[must_use]
-    pub fn contains(&self, _at: TimeMs) -> bool {
-        true
+    pub fn contains(&self, at: TimeMs) -> bool {
+        self.since.is_none_or(|since| since <= at) && self.until.is_none_or(|until| at < until)
     }
 }
 

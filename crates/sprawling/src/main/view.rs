@@ -187,6 +187,8 @@ impl Selection {
 
     /// Whether one raw Ledger line passes the conditions that read its
     /// bytes; the run and the lower seq bound are settled by the walk.
+    /// The span is asked of every line, because `t` does not rise with
+    /// seq (sprawling-SPEC.md 8-137).
     fn admits(&self, line: &[u8]) -> Result<bool, AxError> {
         if let Some(text) = &self.grep
             && !text.is_empty()
@@ -196,17 +198,18 @@ impl Selection {
         {
             return Ok(false);
         }
-        if self.kind.is_none() && self.who.is_none() {
+        if self.kind.is_none() && self.who.is_none() && self.span == UtcSpan::default() {
             return Ok(true);
         }
         let record = EventRecord::parse_line(line)?;
+        let when_holds = self.span.contains(record.t());
         let kind_holds = self.kind.is_none_or(|kind| record.kind() == kind);
         let who_holds = self.who.as_deref().is_none_or(|prefix| {
             record
                 .addr()
                 .is_some_and(|addr| addr.as_str().starts_with(prefix))
         });
-        Ok(kind_holds && who_holds)
+        Ok(when_holds && kind_holds && who_holds)
     }
 }
 
