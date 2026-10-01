@@ -14,8 +14,8 @@
 
 use std::collections::BTreeMap;
 
-use kernel::{Address, AxError, EventRecord};
-use wire::{SESSIONS_MAX, SessionLine, SessionsAnswer};
+use kernel::{Address, AxError, EventKind, EventRecord};
+use wire::{Carry, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 
 /// Every address's stretches, oldest first.
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -35,7 +35,57 @@ impl RoomSessions {
     /// Refuses a `session_opened` whose payload cannot be read: a stretch
     /// that does not say what it carried or branched from would be shown
     /// as one that carried nothing, which is a different stretch.
-    pub(crate) fn absorb(&mut self, _record: &EventRecord) -> Result<(), AxError> {
+    pub(crate) fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
+        let Some(room) = record.addr() else {
+            return Ok(());
+        };
+        let (seq, at) = (record.seq(), record.t());
+        let kind = record.kind();
+        if kind == EventKind::SessionOpened {
+            let opened = record
+                .data()
+                .read::<kernel::event::record::SessionOpened>()?;
+            let carry = if opened.carried {
+                Carry::Handoff
+            } else {
+                Carry::Nothing
+            };
+            self.by_room
+                .entry(room.clone())
+                .or_default()
+                .push(SessionLine {
+                    began: seq,
+                    start: SessionStart::Opened {
+                        carry,
+                        from: opened.from,
+                    },
+                    runs: 0,
+                    last: seq,
+                    at,
+                });
+            return Ok(());
+        }
+        let runs = u64::from(kind == EventKind::RunStarted);
+        match self.by_room.get_mut(room).and_then(|held| held.last_mut()) {
+            Some(current) => {
+                current.runs = current.runs.saturating_add(runs);
+                current.last = seq;
+                current.at = at;
+            }
+            None if runs > 0 => {
+                self.by_room.insert(
+                    room.clone(),
+                    vec![SessionLine {
+                        began: seq,
+                        start: SessionStart::Dispatched,
+                        runs,
+                        last: seq,
+                        at,
+                    }],
+                );
+            }
+            None => {}
+        }
         Ok(())
     }
 
