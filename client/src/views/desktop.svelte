@@ -25,8 +25,8 @@ export function desktopScopeAt(addr: Address): Address {
 <script lang="ts">
   import { untrack } from "svelte";
 
-  import { readAnswer } from "../core/answered";
   import { configureDesktop } from "../core/commands";
+  import { readDocument } from "../core/document";
   import { fill, say } from "../core/lang";
   import { ui } from "../ui";
   import type { Query } from "../wire";
@@ -52,8 +52,8 @@ export function desktopScopeAt(addr: Address): Address {
   // rather than calling the allowlist empty or printing the question the
   // city could not answer: a save writes the file whole either way, and
   // the server reads an unreadable file as a closed door.
-  const read = $derived(readAnswer($held, (answer) => ("document" in answer ? answer.document.text : undefined)));
-  const onDisk = $derived(read.kind === "held" ? read.value : "");
+  const read = $derived(readDocument($held));
+  const onDisk = $derived(read.kind === "held" ? read.value.text : "");
 
   // The box follows the file until somebody types in it, and follows it
   // again once their text has landed. A draft that outlived its save

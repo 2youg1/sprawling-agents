@@ -19,7 +19,19 @@ use documents::{Encoding, Lifted, Span, Window};
 use kernel::{AxError, B3Hash};
 use storage::{Cas, StorageError};
 
-use super::super::prepared::unavailable;
+use super::super::holding::Views;
+use super::super::prepared::{Prepared, unavailable};
+
+impl Views {
+    /// A range is read from the store after the views are released.
+    pub(in crate::views) fn range_ask(&self, version: B3Hash, range: Span) -> Prepared {
+        Prepared::Range {
+            city_root: self.city_root.clone(),
+            version,
+            range,
+        }
+    }
+}
 
 /// The window of `version` that `range` asks for, or `Unavailable`
 /// when the store does not hold that version or its bytes are not text.
@@ -28,8 +40,13 @@ pub(in crate::views) fn range_answer(
     version: B3Hash,
     range: Span,
 ) -> wire::Answer {
-    let _ = (city_root, range);
-    unavailable(format!("Range({version})"))
+    match window_of(city_root, &version, range) {
+        Ok(window) => wire::Answer::Range(Box::new(wire::RangeAnswer { version, window })),
+        // "I could not look" is the answer for every way this fails: a
+        // version the store never kept, a store that will not open, bytes
+        // that are not text. The query handed back names which version.
+        Err(_) => unavailable(format!("Range({version})")),
+    }
 }
 
 fn window_of(city_root: &Path, version: &B3Hash, wanted: Span) -> Result<Window, AxError> {

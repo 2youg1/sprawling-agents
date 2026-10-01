@@ -234,13 +234,7 @@ impl Views {
                     at: at.clone(),
                 };
             }
-            wire::Query::Range { version, range } => {
-                return Prepared::Range {
-                    city_root: self.city_root.clone(),
-                    version: *version,
-                    range: *range,
-                };
-            }
+            wire::Query::Range { version, range } => return self.range_ask(*version, *range),
             // What an agent was told, and the store read that recovers
             // it. A run with no prompt yet and an object this city no
             // longer holds are both "I could not look".

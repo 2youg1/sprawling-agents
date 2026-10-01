@@ -78,8 +78,9 @@ export function reachOf(name: string, kind: EventKind): Reach {
     case "cost_view": case "cost_of":
       return reached(kind === "model_returned" || kind === "roadmap_claimed");
     // A prompt is frozen once for the life of a run and the object
-    // behind a hash never changes, so neither answer can go stale.
-    case "prefix": case "content":
+    // behind a hash never changes, so none of these answers can go
+    // stale: a range is read from one stored document version.
+    case "prefix": case "content": case "range":
       return "none";
     // A shelf moves when somebody edits the building's rules, and a
     // pin appears when a run starts under them.

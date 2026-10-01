@@ -16,8 +16,8 @@
   // one of the two seats `mx-auto` is allowed in (client-SPEC 4-33) -
   // while numbered lines grow to their longest line and scroll, because
   // code and tables are never capped.
-  import { readAnswer } from "../../core/answered";
   import { putSpine } from "../../core/commands";
+  import { readDocument } from "../../core/document";
   import { fill, say } from "../../core/lang";
   import { kib } from "../../core/time";
   import { ui } from "../../ui";
@@ -50,7 +50,7 @@
   const asked = $derived(u.conn.asking.ask(question));
   // Three readings, not two: still asking, the city could not look (a
   // file it does not hold answers this way too), or the head itself.
-  const read = $derived(readAnswer($asked, (answer) => ("document" in answer ? answer.document : undefined)));
+  const read = $derived(readDocument($asked));
   const doc = $derived(read.kind === "held" ? read.value : undefined);
 
   const markdown = $derived(at.endsWith(".md"));

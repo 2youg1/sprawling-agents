@@ -30,8 +30,8 @@ export function governedAt(which: GovernedDocument): Address {
 <script lang="ts">
   import { untrack } from "svelte";
 
-  import { readAnswer } from "../../core/answered";
   import { putDocument } from "../../core/commands";
+  import { readDocument } from "../../core/document";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Query } from "../../wire";
@@ -51,8 +51,8 @@ export function governedAt(which: GovernedDocument): Address {
   // A document the city has not written yet answers `unavailable`, as an
   // unreadable one does; either way the box starts empty and the page
   // says it could not read one, and a save writes the file whole.
-  const read = $derived(readAnswer($held, (answer) => ("document" in answer ? answer.document.text : undefined)));
-  const onDisk = $derived(read.kind === "held" ? read.value : "");
+  const read = $derived(readDocument($held));
+  const onDisk = $derived(read.kind === "held" ? read.value.text : "");
 
   // The box follows the file until somebody types in it, and follows it
   // again once their text has landed or another document is chosen.

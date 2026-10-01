@@ -27,11 +27,14 @@ use super::listing::resolve;
 /// Takes the city root rather than the views: it reads the disk, and
 /// runs after the view lock is released (sprawling-SPEC.md 8-100).
 pub(super) fn document_answer(city_root: &Path, at: Address) -> wire::DocumentAnswer {
-    let _ = city_root;
-    wire::DocumentAnswer {
-        at,
-        state: DocumentState::Missing,
-    }
+    let state = match std::fs::read(resolve(city_root, Some(&at))) {
+        Ok(bytes) => state_of(city_root, &at, &bytes),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => DocumentState::Missing,
+        Err(err) => DocumentState::Unreadable {
+            reason: err.to_string(),
+        },
+    };
+    wire::DocumentAnswer { at, state }
 }
 
 /// What one file's bytes are, as an answer.
