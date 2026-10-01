@@ -58,25 +58,48 @@
   // code and the subject together - one code covers several subjects,
   // and the subject is what a person acts on; this component receives
   // the strings and the count and draws them.
+  //
+  // **The page's own answer to a key the person pressed is two
+  // phrases**, a heading and the next step, both from `lang.json`: it
+  // has no code to cite and no words of the city's to fold away.
   import type { Snippet } from "svelte";
 
+  import type { Key } from "../../core/lang";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Badge from "./badge.svelte";
   import { noticeTitle, recoveryWords } from "./notice_title";
 
-  interface Props {
+  // What the notice says. A refusal arrives as the four strings its
+  // writer gave it - the city, or this page's link and asking: the
+  // action that failed, its stable code, what it was against, and what
+  // the caller can do next. Strings rather than the belief record, so
+  // this draws refusals from anywhere the wire carries one. The page's
+  // own answer to a key the person pressed is two phrases.
+  // Each shape names the other's fields as absent, so a component that
+  // reads one field can tell which shape it was given.
+  type Said =
+    | {
+        readonly action: string;
+        readonly code: string;
+        readonly subject: string;
+        readonly recovery: string;
+        readonly heading?: undefined;
+        readonly next?: undefined;
+      }
+    | {
+        readonly heading: Key;
+        readonly next: Key;
+        readonly action?: undefined;
+        readonly code?: undefined;
+        readonly subject?: undefined;
+        readonly recovery?: undefined;
+      };
+
+  interface Common {
     readonly seat: Seat;
     // Absent is `info`: `alert` is for something that was refused.
     readonly weight?: Weight | undefined;
-    // The error, as the city wrote it: the action that failed, its
-    // stable code, what it was against, and what the caller can do next.
-    // Strings rather than the belief record, so this draws refusals from
-    // anywhere the wire carries one.
-    readonly action: string;
-    readonly code: string;
-    readonly subject: string;
-    readonly recovery: string;
     // Already formatted by the caller's clock.
     readonly at?: string | undefined;
     // How many times this refusal arrived; the badge shows past one.
@@ -85,12 +108,31 @@
     readonly actions?: Snippet | undefined;
   }
 
-  const { seat, weight, action, code, subject, recovery, at, count, actions }: Props = $props();
+  type Props = Common & Said;
+
+  // Taken whole rather than destructured, and read only field by field:
+  // spreading the rest of a union loses the field that tells its two
+  // shapes apart.
+  const props: Props = $props();
+  const seat = $derived(props.seat);
+  const weight = $derived(props.weight);
+  const at = $derived(props.at);
+  const count = $derived(props.count);
+  const actions = $derived(props.actions);
 
   const { lang } = ui();
 
-  const title = $derived(noticeTitle($lang, code, subject));
-  const nextStep = $derived(recoveryWords($lang, code, recovery));
+  const refused = $derived(
+    props.code === undefined
+      ? null
+      : { action: props.action, code: props.code, subject: props.subject, recovery: props.recovery },
+  );
+  const title = $derived(
+    props.heading === undefined ? noticeTitle($lang, props.code, props.subject) : say($lang, props.heading),
+  );
+  const nextStep = $derived(
+    props.heading === undefined ? recoveryWords($lang, props.code, props.recovery) : say($lang, props.next),
+  );
 </script>
 
 <div
@@ -111,23 +153,27 @@
       {#if count !== undefined && count > 1}
         <Badge text={`×${String(count)}`} weight="quiet" />
       {/if}
-      <span class="ml-auto shrink-0 font-mono text-note text-text-faint">{code}</span>
+      {#if refused !== null}
+        <span class="ml-auto shrink-0 font-mono text-note text-text-faint">{refused.code}</span>
+      {/if}
     </div>
     {#if nextStep !== ""}
       <p class="min-w-0 wrap-anywhere text-note text-text">{nextStep}</p>
     {/if}
-    <details class="min-w-0">
-      <summary class="cursor-pointer text-note text-text-faint">{say($lang, "notices_detail")}</summary>
-      <div
-        class="mt-tight flex min-w-0 flex-col gap-tight wrap-anywhere font-mono text-note text-text-quiet"
-      >
-        <span>{action}</span>
-        <span>{subject}</span>
-        {#if recovery !== "" && recovery !== nextStep}
-          <span>{recovery}</span>
-        {/if}
-      </div>
-    </details>
+    {#if refused !== null}
+      <details class="min-w-0">
+        <summary class="cursor-pointer text-note text-text-faint">{say($lang, "notices_detail")}</summary>
+        <div
+          class="mt-tight flex min-w-0 flex-col gap-tight wrap-anywhere font-mono text-note text-text-quiet"
+        >
+          <span>{refused.action}</span>
+          <span>{refused.subject}</span>
+          {#if refused.recovery !== "" && refused.recovery !== nextStep}
+            <span>{refused.recovery}</span>
+          {/if}
+        </div>
+      </details>
+    {/if}
   </div>
   {#if actions}
     <div class="ml-auto flex shrink-0 items-center gap-tight">{@render actions()}</div>

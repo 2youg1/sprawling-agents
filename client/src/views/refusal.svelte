@@ -9,8 +9,12 @@
   // The one thing that may float over a page uninvited: a refusal, in
   // the three parts the city wrote it in, seated at the bottom right
   // (client-SPEC 4-35). Three may stand at once; a fourth pushes the
-  // oldest away, and everything that reached a corner is in the drawer
-  // afterwards whatever happens here.
+  // oldest away, and every refusal that reached a corner is in the
+  // drawer afterwards whatever happens here.
+  //
+  // **The page's answer to a stop key with no run in front of it stands
+  // in the same stack and nowhere else** (client-SPEC 12-15): it says
+  // what the person just did, and the drawer keeps what the city said.
   //
   // **A toast leaves by itself.** Eight seconds, paused while the
   // pointer or the focus is on it - a person reading one is never
@@ -34,7 +38,7 @@
   import { say } from "../core/lang";
   import { recoveryFor } from "../core/recovering";
   import { ui } from "../ui";
-  import type { About } from "./notice_recovery";
+  import type { Refused } from "./notice_recovery";
   import { recover, recoveryLabel, recoveryWhy } from "./notice_recovery";
   import type { AxError } from "../wire";
   import { claims } from "./talk/handing";
@@ -45,13 +49,14 @@
   const VISIBLE = 3;
   const LIFE = 8_000;
 
+  // A refusal carries what its subject names, folded where every
+  // notice's subject is folded (`core/belief/shape`), so the deed acts
+  // on the city's own reading rather than a second grammar of its own.
+  type Said = { readonly kind: "refused"; readonly refused: Refused } | { readonly kind: "no_run_in_front" };
+
   interface Toast {
     readonly id: number;
-    readonly error: AxError;
-    // What its subject names, folded where every notice's subject is
-    // folded (`core/belief/shape`), so the deed acts on the city's own
-    // reading rather than a second grammar of its own.
-    readonly about: About;
+    readonly said: Said;
     // Set means it is leaving: the display toggle below plays the
     // departure, and the next arrival sweeps it out of the list.
     gone: boolean;
@@ -60,6 +65,8 @@
     left: number;
     since: number;
   }
+
+  const { stopsWithoutRun }: { readonly stopsWithoutRun: number } = $props();
 
   const u = ui();
   const { lang } = u;
@@ -73,7 +80,7 @@
   // What the refusal's subject names, as the belief folded it when the
   // notice arrived. `null` is the honest answer for a subject that is a
   // sentence rather than a name.
-  function aboutOf(error: AxError): About {
+  function aboutOf(error: AxError): Refused["about"] {
     const found = $belief.notices.find(
       (notice) => notice.error.code === error.code && notice.error.subject === error.subject,
     );
@@ -105,7 +112,7 @@
     toast.gone = true;
   }
 
-  function push(error: AxError): void {
+  function push(said: Said): void {
     // A departure that finished is swept when the next one arrives -
     // by then its fade has played, so the sweep is never seen.
     const kept = toasts.filter((each) => !each.gone);
@@ -114,8 +121,7 @@
     }
     const next: Toast = {
       id: follow,
-      error,
-      about: aboutOf(error),
+      said,
       gone: false,
       left: LIFE,
       since: u.now(),
@@ -137,7 +143,15 @@
     }
     heard = refusal;
     if (claims(get(u.conversing), refusal, $belief)) return;
-    push(refusal);
+    push({ kind: "refused", refused: { error: refusal, about: aboutOf(refusal) } });
+  });
+
+  // Each press the shell counted is answered once; the count only grows.
+  let answered = 0;
+  $effect(() => {
+    if (stopsWithoutRun === answered) return;
+    answered = stopsWithoutRun;
+    push({ kind: "no_run_in_front" });
   });
 </script>
 
@@ -159,40 +173,55 @@ composer's send button, which is the retry. -->
         if (!toast.gone) arm(toast);
       }}
     >
-      <Notice
-        seat="toast"
-        weight="alert"
-        action={toast.error.action}
-        code={toast.error.code}
-        subject={toast.error.subject}
-        recovery={toast.error.recovery}
-      >
-        {#snippet actions()}
-          <div class="flex flex-col gap-tight">
+      {#if toast.said.kind === "refused"}
+        {@const refused = toast.said.refused}
+        <Notice
+          seat="toast"
+          weight="alert"
+          action={refused.error.action}
+          code={refused.error.code}
+          subject={refused.error.subject}
+          recovery={refused.error.recovery}
+        >
+          {#snippet actions()}
+            <div class="flex flex-col gap-tight">
+              <Button
+                tone="quiet"
+                label={say($lang, "dismiss")}
+                onPress={() => {
+                  // Waving one away is still the answer to what was
+                  // asked, so the corner lets go and the drawer keeps it.
+                  u.conn.dismissRefusal();
+                  leave(toast);
+                }}
+              />
+              {#each recoveryFor(refused.error) as recovery (recoveryLabel(recovery, $lang))}
+                {@const why = recoveryWhy(u, recovery, refused)}
+                <Button
+                  tone="quiet"
+                  label={recoveryLabel(recovery, $lang)}
+                  {...why === undefined ? {} : { why: say($lang, why) }}
+                  onPress={() => {
+                    recover(u, recovery, refused);
+                  }}
+                />
+              {/each}
+            </div>
+          {/snippet}
+        </Notice>
+      {:else}
+        <Notice seat="toast" weight="info" heading="no_run_in_front" next="stop_whole_city">
+          {#snippet actions()}
             <Button
               tone="quiet"
               label={say($lang, "dismiss")}
               onPress={() => {
-                // Waving one away is still the answer to what was
-                // asked, so the corner lets go and the drawer keeps it.
-                u.conn.dismissRefusal();
                 leave(toast);
               }}
             />
-            {#each recoveryFor(toast.error) as recovery (recoveryLabel(recovery, $lang))}
-              {@const why = recoveryWhy(u, recovery, toast)}
-              <Button
-                tone="quiet"
-                label={recoveryLabel(recovery, $lang)}
-                {...why === undefined ? {} : { why: say($lang, why) }}
-                onPress={() => {
-                  recover(u, recovery, toast);
-                }}
-              />
-            {/each}
-          </div>
-        {/snippet}
-      </Notice>
+          {/snippet}
+        </Notice>
+      {/if}
     </li>
   {/each}
 </ul>

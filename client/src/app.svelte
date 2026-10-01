@@ -20,7 +20,8 @@
   import { onMount, tick } from "svelte";
 
   import { QUERIES } from "./core/asking";
-  import { halt, release } from "./core/commands";
+  import { cancel, release } from "./core/commands";
+  import { runInFront } from "./core/in_front";
   import { keymap } from "./core/keys";
   import type { Action } from "./core/keys";
   import { fill, say } from "./core/lang";
@@ -96,6 +97,9 @@
   let view = $state.raw<View>(DEFAULT_VIEW);
   let paletteOpen = $state(false);
   let sheetOpen = $state(false);
+  // How many times the stop key found no run in front of the person;
+  // the corner answers each one.
+  let stopsWithoutRun = $state(0);
   // What opened the sheet, so closing it puts the focus back where the
   // person left it.
   let opener: HTMLElement | null = null;
@@ -230,9 +234,12 @@
       case "composer.focus":
         focusComposer();
         return;
-      case "run.stop":
-        u.send(halt(CITY));
+      case "run.stop": {
+        const going = runInFront($belief, view);
+        if (going === undefined) stopsWithoutRun += 1;
+        else u.send(cancel(going.run));
         return;
+      }
       case "fork.here":
         // The entry under the hand is one page's own fact, so this
         // chord is answered where the entries are: the thread's own
@@ -380,7 +387,7 @@
       <Facts />
     {/if}
   </div>
-  <Refusal />
+  <Refusal {stopsWithoutRun} />
   {#if paletteOpen}
     <Palette onClose={() => (paletteOpen = false)} />
   {/if}

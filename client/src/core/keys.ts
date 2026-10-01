@@ -144,7 +144,7 @@ export const LABELS: Readonly<Record<Action, Key>> = {
   "rail.toggle": "keys_rail",
   help: "keys_help",
   "composer.focus": "keys_composer",
-  "run.stop": "city_stop",
+  "run.stop": "run_cancel",
   "fork.here": "fork_here",
 };
 

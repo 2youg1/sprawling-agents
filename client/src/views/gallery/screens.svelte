@@ -351,6 +351,12 @@ rather than into a taller corner. -->
   </div>
 </Case>
 
+<Case label="notices · a stop key with no run in front">
+  <div class="flex min-h-output w-full items-end justify-end rounded-card border border-dashed border-edge-input p-snug">
+    <Notice seat="toast" weight="info" heading="no_run_in_front" next="stop_whole_city" />
+  </div>
+</Case>
+
 <!-- One refusal with a home: it sits under the field it was refused
 at, and the field carries no error of its own - the notice is the
 error, and both red markings at once would say it twice. -->
