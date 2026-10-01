@@ -1128,6 +1128,8 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **崩溃验收在盘上造死亡，不在进程里杀**（8-127）。一次 run 真跑完，丢掉 worker 释放写者锁，再把账截在一行的半途、删去其后的行；重开走 `RunWorker::new` 与 `startup_scan`，与 `sprawling resume` 同一条路。理由：被杀的进程留在盘上的就是这样一份账——锁已释放，最后一行写了一半——而盘上的截法可以精确指定死在哪一行的哪一个字节，每次重跑都是同一次死亡。被否：①起真二进制再杀掉它——那是从外面进城的检查，按边界规则归 `tools/adversary/` 的 Lean 黑盒（G1e），而且杀在哪一刻取决于调度，失败不能逐字节重演；②把账本放在 `storage` 的故障文件系统上断电——它只承载账本，`Standing::fold` 与视图读真目录，重开的不是一座完整的城，断电的耐久契约已由 storage 自己的测试证过。重开参数：账本之外的文件（检查点、快照、CAS）也要在一次死亡里与账本错开时，验收要能在同一刻截断它们，那时改为在 `Vfs` 缝之上承载整座城。
 
+**死掉的 run 在重开时冻结，验收比它的整行状态**（8-127）。启动扫描补完悬空调用之后为死掉的 run 写冻结，验收第 4 项比城景里那次 run 的冻结、结局、最后一行与序号，并读账上那一行的 `cause`。理由：ARCHITECTURE §13.7 画的 `Lost --> Frozen` 是账本上的一行，服务中的城与重开的城读同一份账本，必须对这次 run 说同一个结局；只比最后一行的种类，看不出视图把它当成仍在跑。被否：验收只比 `last_kind` 与 `last_seq`、冻结留给以后——那是在把「死掉的 run 永远未冻结」钉成规则；在验收里自己补写冻结——验收就成了它要判的那段代码的第二份。重开参数：`serve` 不经 `resume` 也要收拾死亡时（accounting-SPEC §12 第 30 条），验收改为经 `serve` 的起步路径重开。
+
 **不从别的工具的配置里读 provider 表（人的决定）**。`bin::import` 的五个文件读 Codex 的 `~/.codex/config.toml` 与 pi 的 `models.json`，把其中的 provider 折成本城的词汇；但没有任何 `mod` 声明过它们，所以它们从没被编译，clippy 与测试也从没看过它们，模块图却把它们记为 built。本城删去这五个文件，首次上手的第 1 步由人手填端点，或选一个已知主机。理由：没有调用点的代码是一份没人维护的第二文法，它记下的 Codex 与 pi 键名会随上游改版静默过时。**被否**：接上它，作为首次上手第 1 步「从别的工具已写好的配置读入」的候选来源——那要在 wire 上加一条 Query、在设置页加一行，属于线协议与页面的改动，本版不做。**重开参数**：首次上手要给出「别的工具已配置的 provider」这一步时，从 git 历史取回这两种文法，先在 `lib.rs` 声明模块，让测试与 clippy 看见它们，再接 Query。
 
 **远程门的五行经 worker 的 relay 写，不经命令桌**。远程门在装配层，而城的唯一写者在 `accounting::worker`；本城给 `RunWorker` 一个公开的 `relay()`，交出驾驶线程用的那一种 `kernel::Ledger`，门的看守拿它写 `remote_opened` 等五行（§8-139）。理由：relay 本就是「一个不是写者的线程把一行交给写者并等它落盘」的那扇门，答回来时这一行已经持久，门的下一步可以靠它；城仍只有一个写者。**被否**：①给 `wire::Command` 加五个没有线上形式的命令（如 `PutSecret`），由 `run_command` 落账：每一个都要进 `COMMAND_NAMES`、§19-2 的 reach 与 class、控制台的投影与客户端的生成类型，五个只为写一行而存在的动词散进六处；②让门的看守自己开一个账本写者：一座城就有了两个写者。**重开参数**：门需要等一行落盘之外的答复（例如写者先判这一步合不合规矩）时，改成一条桌上的进程内命令。
@@ -4276,14 +4278,14 @@ impl RunWorker {
 1. `startup_scan` 报 `TailDropped { bytes }`，字节数就是被截的那半行的长度（8-102）；
 2. 账里多一行 `log_truncated`，整条链经 `verify_ledger_dir` 验过；
 3. 那次调用恰有一个答复，码是 `E_TOOL_OUTCOME_UNKNOWN`，`startup_scan` 报关了一个（ARCHITECTURE §5 末）；
-4. 城景列出的那次 run，`last_kind` 是补写的那行 `tool_result`、`last_seq` 是它的序号——视图从截过、补过的历史折出，没有拿一份比账长的快照作答（8-91、8-101）；
+4. 城景列出的那次 run 已冻结，结局是 `cancelled`，`last_kind` 是启动扫描写的那行 `run_frozen`、`last_seq` 是它的序号，账上那一行带 `cause: process_died`——视图从截过、补过的历史折出，没有拿一份比账长的快照作答（8-91、8-101），死掉的 run 按 ARCHITECTURE §13.7 的 `Lost --> Frozen` 冻结（kernel-SPEC §8-82-2，accounting-SPEC §8-18-1）；
 5. 同一间房的下一个任务立起一次新 run 并冻结它：死掉的 run 没有把房间占住。
 
-**能咬住，量过。** 把 `startup_scan` 里补写结果未知的那一步拿掉再跑，测试红在第 3、4 两项上（答复为空，城景的 `last_kind` 停在 `tool_called`）。
+**能咬住，量过。** 把 `startup_scan` 里补写结果未知的那一步拿掉再跑，测试红在第 3、4 两项上（答复为空，城景的 `last_kind` 停在 `tool_called`）；不冻结死掉的 run 时，红在第 4 项上（城景把它列为未冻结，`last_kind` 停在补写的 `tool_result`）。
 
 **断电那一半归 storage。** 断电比被杀多丢的，是平台还没落盘的字节；那是账本自己的耐久契约，由 `storage` 在它的故障文件系统上证（`power_cut_matrix_over_every_op_keeps_acknowledged_waves`，storage-SPEC §8-2）。这里不重证它：故障文件系统只承载账本，城的其余文件与 `Standing::fold`、视图的折叠读的是真目录，在它上面重开的不是一座完整的城（§12「崩溃验收在盘上造死亡」）。
 
-**本节接口的当前状态。** `startup_scan` 关掉悬空的调用，却不冻结死掉的那次 run：城景仍把它列为未冻结，而 ARCHITECTURE §13.7 画的是 `Lost --> Frozen: resume closes lost tool calls as unknown`。补上它，要由启动扫描为每一次有 `run_started`、没有 `run_frozen` 的 run 写一行冻结，并定下它用哪一种 `Completion`（今天的 `Done`、`Limit`、`Cancelled` 都不说「进程死了」）；那一行的形状属于 kernel 的事件表。验收第 4 项因此只比 `last_kind` 与 `last_seq`，不比 `frozen`，免得把今天的读法钉成规则。
+**死掉的 run 由谁冻结。** `startup_scan` 补完悬空调用之后，为每一次有 `run_started`、没有 `run_frozen` 的 run 写一行 `RunFrozen::lost()`：结局 `cancelled`，载荷 `cause: process_died`，作者是那次 run 的居民（accounting-SPEC §8-18-1；为什么不是第四种结局，见 kernel-SPEC §12.14）。所以第 4 项比的是城景里那次 run 的整行状态：已冻结、结局、最后一行与它的序号。
 
 ## 8-109 `sprawling up --supervise`：崩溃 → `resume` → `serve`（`bin::supervising`、`bin::supervising::children`）
 

@@ -1905,6 +1905,16 @@ pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCI
 
 **重开参数**：账本需要证明「这一帧是哪台设备发来的」时（例如设备发出的命令要在账本上署设备的名），重议会话 id 是否入账。
 
+### 12.14 进程死后的 run 冻成 `cancelled`，载荷记下原因，不加第四种结局
+
+**决定**：重开时的启动扫描为每一次有 `run_started`、没有 `run_frozen` 的 run 写一行 `run_frozen`，结局是 `cancelled`，载荷带 `cause: process_died`（§8-82-2）。`Completion` 仍是三种。
+
+**理由**：`Completion` 的三种结局是 run 驱动自己能得出的判定，读它们的地方（视图的 `completion`、居民的冻结计数、`runtime::run` 的收尾）都按三种穷尽匹配。进程死亡不是一个 run 自己得出的判定，它是城重开时发现的事实；它在三种之中最接近 `cancelled`——停下了、没做完、不是上限截的。把「谁让它停的」放在载荷的一个可缺席的键里，读结局的地方一行不改，要区分死亡的读者读这个键。
+
+**被否**：①加第四种结局 `Lost`：每个穷尽匹配 `Completion` 的地方都要多一臂，而 `RunFrozen::of` 的「三种结局，第四种不可表示」正是要守住结局的集合由 run 的驱动定；②不写冻结、让视图把没有冻结行的 run 读作死掉的：服务中的城与重开的城读同一份账本会得出不同的答案，而 ARCHITECTURE §13.7 的 `Lost --> Frozen` 要的是账本上的一行；③冻成 `limit`：那是「被上限截断」，读者会去找一个不存在的上限。
+
+**重开参数**：出现一种由 run 自己得出、又不属于三种的结局时，重议 `Completion` 的集合，那时 `process_died` 也一并重议它属于哪一种。
+
 ## 13 依赖选型
 
 `serde`＋`serde_json`（规范字节与载荷）；`thiserror`（Display/Error derive）；`blake3`（唯一哈希）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）；`secrecy`＋`zeroize`（Sealed）。版本由根 `Cargo.toml` 与 `Cargo.lock` 给出。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
@@ -2415,7 +2425,7 @@ pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome;   // kerne
 - **「目标是否已经存在」不由本模块判。** 那是文件系统在写那一刻的事实；只有在写的那一刻原子地判，竞争的两次新建才只成一次（runtime-SPEC §8-55，storage-SPEC §8-32）。kernel 只持规则与拒词，判定点在每一条写路径上调它。
 - 验收：`gate::domain` 测试里 `Create` 拒、`Full` 放各一条；真实写路径上的验收在 runtime-SPEC §8-55。
 
-### 8-82 一次 run 怎样开篇（`kernel::event::record::run`，形状 2 值类型）
+### 8-82 一次 run 怎样开篇，进程死后谁冻结它（`kernel::event::record::run`，形状 2 值类型）
 
 #### 8-82-1 `run_started.opening`
 
@@ -2434,6 +2444,28 @@ pub struct RunStarted {
 - **写者**：`runtime::run::Charter::open` 从 `Charter.opening` 照录。模型 run 的 charter 填 `Some(RunPlan.opening)`；harness run 的第一句话是交给 harness 自己会话的 prompt，城不为它写 user 消息，填 `None`。
 - **缺席读作「不知道」。** 加这个键之前写下的行没有它，`fold_run` 对它沿用加键之前的读法（runtime-SPEC §8-58 的表）。按 `default` 加、缺席不写，所以旧账本照读，`golden-s1` 里载荷为 `{}` 的那行 `run_started` 照旧读成 `RunStarted::default()`。
 - 验收：`runtime::fork::request_tests` 的 `a_branch_first_request_opens_with_the_bytes_of_the_mothers_last`，与 `accounting::worker::freezing::tests::lineage` 的 `a_branch_first_request_carries_the_bytes_of_the_mothers_last`（sprawling-SPEC 8-141）：写出的键经真实的派活与分叉读回。
+
+#### 8-82-2 进程死后冻结的那一行：`run_frozen.cause`
+
+```rust
+pub enum FreezeCause { ProcessDied }                  // "process_died"
+pub struct RunFrozen {
+    pub completion: String,
+    pub evidence: Option<Vec<EvidenceCite>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cause: Option<FreezeCause>,  // 不是 run 自己的驱动写下这一行时，为什么写
+}
+impl RunFrozen {
+    pub fn of(completion: &Completion) -> RunFrozen;   // cause 恒 None，字节与加键之前相同
+    pub fn lost() -> RunFrozen;                        // completion "cancelled"、无 evidence、cause ProcessDied
+}
+```
+
+- **它说什么。** ARCHITECTURE §13.7 画的是 `Lost --> Frozen`：进程死在一次 run 的半途，那次 run 再也不会被驱动，重开的城要把它冻结。冻结的那一行由重开时的启动扫描写（accounting-SPEC §8-18），不由 run 自己写，所以载荷多一个键说明原因。
+- **结局仍是三种之一。** `Completion` 的三种结局不变（§8-20），死掉的 run 冻成 `cancelled`：它没做完，`Done` 需要城自己记下的证据而它没有；也没有被上限截断，`Limit` 说的是那件事。`cancelled` 说的是「停下了，不是做完」，`cause: process_died` 把「人或 halt 叫停的」与「进程死了」分开（§12.14）。
+- **一处构造。** `RunFrozen::lost` 是写这一行的唯一入口，「死掉的 run 冻成哪一种结局」只在这里回答。
+- **缺席即 run 自己的冻结。** `RunFrozen::of` 写的行没有这个键，字节与加键之前相同；旧行照读。读结局的读者（`views` 的 `completion`、`city::resident` 的计数）照旧只读 `completion`。
+- 验收：`sprawling` 的崩溃验收 `a_city_killed_while_writing_an_answer_reopens_with_the_torn_line_cut_and_the_call_unknown`（sprawling-SPEC 8-127）钉住死 run 的最后一行是这一行。
 
 ### 8-79 身份的两处入账：保存的回执与一次 run 冻下的那一版（`kernel::event::record`，形状 2 值类型）
 

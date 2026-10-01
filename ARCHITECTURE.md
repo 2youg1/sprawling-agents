@@ -1107,20 +1107,23 @@ stateDiagram-v2
     Driving --> Frozen: Cancel, Completion cancelled
     Driving --> Frozen: a harness answered, or its session ended with no answer
     Driving --> Lost: the process died
-    Lost --> Frozen: resume closes lost tool calls as unknown
+    Lost --> Frozen: resume closes lost tool calls as unknown, then freezes the run cancelled
     Frozen --> [*]
 ```
 
 A frozen run is history and is never woken: a succession or a knock
 starts a new run. A harness run freezes the way its answer and its first
 cut say: done only on an end of turn that said something, limit when the
-building's ceiling cut it, cancelled when a halt did.
+building's ceiling cut it, cancelled when a halt did. A run whose
+process died is frozen by the next `resume`: cancelled, with
+`cause: process_died` on the line, written as its resident.
 `crates/accounting/src/worker/dispatching/agreeing.rs`,
 `crates/accounting/src/worker/pool.rs`, `crates/runtime/src/run.rs`
 (`drive`), `crates/runtime/src/run/harness.rs`,
 `crates/kernel/src/completion.rs`,
 `crates/accounting/src/worker/freezing.rs`,
-`crates/accounting/src/worker/genesis.rs`.
+`crates/accounting/src/worker/genesis.rs`,
+`crates/accounting/src/worker/genesis/lost.rs`.
 
 ### 13.8 The client's fold
 

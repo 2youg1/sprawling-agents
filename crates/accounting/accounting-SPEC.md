@@ -488,6 +488,28 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
 - **失败**：构造器与 `form` 原样传账本、CAS、`city` 与 `Standing::fold` 的 `AxError`，本节不另造错误码。
 - **测试的手**：`accounting::worker::fixture::hands()` 交一份不碰主机的 `Hands`——内存里的 vault、读墙钟的测试钟、一台什么都没有的机器、宽裕的内存与卷、拒绝的文件管理器、空的浏览器表、拒绝的桌面程序、拒绝的需求表、没有解释器与 shell、`runtime::AbsentSandbox`。要真的某一只手的测试，自己换上那一只。
 
+### 8-18 重开时冻结死掉的 run（`accounting::worker::genesis::lost`、`RunWorker::startup_scan`，形状 1 判定）
+
+#### 8-18-1 启动扫描为死掉的 run 写冻结
+
+```rust
+// accounting::worker::genesis::lost
+pub(super) struct OpenRuns { /* 每个还开着的 run：它 run_started 的 seq，与它最近一行的作者 */ }
+impl OpenRuns {
+    pub(super) fn observe(&mut self, record: &EventRecord);        // 与 DanglingCalls 骑同一遍验链
+    pub(super) fn into_drafts(self, t: TimeMs) -> Result<Vec<EventDraft>, AxError>;   // 按 run_started 的 seq 升序
+}
+// accounting::worker
+pub struct ScanReport { /* …既有字段… */ pub frozen_runs: usize }
+```
+
+- **哪些 run 死了。** `startup_scan` 只在 `RunWorker::new` 拿到写者锁之后跑（`sprawling resume`），这时这座城没有一次 run 在驱动：账上有 `run_started`、没有 `run_frozen` 的每一次 run，都是上一个进程死时正在跑的。harness run 与模型 run 一样开、一样冻（runtime-SPEC §8-52），一并计入。
+- **次序。** 先补写悬空调用的 `E_TOOL_OUTCOME_UNKNOWN`（它们属于那次 run，要落在它的冻结之前），再为每次死掉的 run 写一行 `RunFrozen::lost()`（kernel-SPEC §8-82-2），按 `run_started` 的 seq 升序。
+- **作者。** 冻结行写成那次 run 最近一行的作者（它的居民），与补写的 `tool_result` 写成那次调用的作者同一条理由：按居民计数冻结的读者（`city::resident` 的档案）不因进程死过而少计一次。只写过 `run_started`、没写别的就死了的 run，用 `run_started` 的作者。`addr` 缺席，与 `Charter::close` 写的冻结行同形。
+- **幂等。** 第二次扫描看到的每次 run 都已冻结，什么都不写；`ScanReport.frozen_runs` 是这一次写了几行，`summary` 把它与关掉的调用数并列告诉人。
+- **不做的事。** 不写 `handoff_written`：死掉的 run 没留下交接，替它编一份是假话；不起后继：冻结的 run 是历史，接手由人或计划另派（ARCHITECTURE §13.7）。
+- 验收：`genesis::tests` 的 `a_run_the_process_died_in_is_frozen_once`（冻结行的载荷、作者与次数，第二次扫描不再写）；崩溃验收（sprawling-SPEC 8-127）钉住城景里那次 run 的最后一行是冻结、结局是 `cancelled`。
+
 ### 8-12 accounting::playback：一段历史成为一份可以重算的 playback bundle（形状 7 投影）
 
 `playback` 把一座城 Ledger 的一段折成一份 **playback bundle**：带来源的、字节确定的 JSON，人或 agent 拿它回看一段工作流。它是账务读面上的一个共享投影，CLI（`sprawling playback export/check`，sprawling-SPEC.md 8-126）与以后的居民工具都是它的薄适配器。必须守住的性质的权威是 `crates/accounting/spec/Playback/Select.lean`（选择、次序与去重、cutoff 不读未来）与 `crates/accounting/spec/Playback/Project.lean`（读不到的行不流进派生表、真实关闭的单调性）；本节是接口与做法。
@@ -733,3 +755,4 @@ pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError>;
     (i) `Select.lean` 的场景表只写在 Lean 里，`scenes_agree` 证明模型给出表里的结果，Rust 测试从同一个 `.lean` 文件读表、跑生产的 `export`。理由：表只有一份，模型与实现分别对它负责；Lean 输出一份 JSON 再由 Rust 读，要多一个必须与 `.lean` 保持同步的生成物，测试还要先跑一次 Lean。被否决的做法：Lean 生成 JSON 夹具；Rust 里另写一份场景表。
 27. **一个 session 的身份冻在房间那一层，读回失败就拒，不换成此刻的名字。** 理由：session 的形状（模型、强度）已经记在房间那一层，`/new` 清的也是它，身份跟着同一个边界就不需要另一条「何时重读身份」的规则（city-SPEC §12.11）；读不回冻下的那一版时换成此刻的名字，等于在 session 中途悄悄改名，而这正是冻结要防的。被否决的做法：每次 run 现读身份——改名立刻改掉正在进行的 session 的前缀，provider 的前缀缓存从 city 段起失效，页面上的旧 session 与请求里的名字也对不上。
 28. **`whose --trace` 的逻辑是读面上的一个模块 `accounting::trace`，从 `Query::Commit` 的答出发再读账本，不加线上查询；同楼的别人只计数。** 理由：区间的两端已经在 `CommitAnswer` 的 `seq` 与 `previous` 里，调用的读法已经在 `views::turns` 里；今天的读者是读盘的 CLI，下一轮的 playback 与验收工具都在本 crate 里或经本 crate 读。同楼别的 run 的写也可能落进这个提交，但把它们的调用与本 run 的并列，会把「候选」读成「原因」，所以只给条数与地址，要细看的人拿 `view --run` 去读。被否决的做法：①加 `Query::Trace`：线上多一个形状、`WIRE_V` 进一位、`wire.ts` 与 adversary 的门面都要跟着改，换来的只是把这几步搬到服务端，而 CLI 本来就读盘；②按 `Call.effect` 只留写调用：读调用决定了写什么，去掉它们就去掉了归因的一半证据，`effect` 留在每条调用上由读者判断；③区间以 git 的父提交或全城紧邻的上一个提交为界：两者都可能属于别的 run，会把别人的调用算成这个 run 的。重开参数：页面要显示一个提交的调用时（那时要一个线上查询，本模块搬到 `views` 后面作答）；或同一栋楼里几个 run 同写一棵树成为常态、条数不够区分时。
+30. **死掉的 run 由启动扫描冻结，冻结行写成它的居民，结局读 `RunFrozen::lost`。** (a) 理由：只有拿到写者锁的那一刻才知道没有别的进程在驱动它，而 `startup_scan` 正是那一刻的那一遍验链；视图与 worker 的折叠都从账本来，账上一行冻结让服务中的城与重开的城对同一次 run 说同一个结局。写成居民而不是城，与补写结果未知的调用同一条理由，按居民计数的读者不必为死亡另写一条规则。被否决的做法：在服务时由视图把「没有冻结行、进程已重开过」的 run 读作死掉——那是视图的第二条冻结规则，而且一次性的 `views::ask` 与服务中的视图会各算一次；由 `RunWorker::new` 冻结——`new` 也在 `serve` 里跑，那时冻结要跟账本证明的次序对齐，而 `resume` 本来就是收拾死亡的那一步（sprawling-SPEC 8-109）。重开参数：`serve` 也要在起步时收拾死亡（不经 `resume`）时，把这一遍挪进它的起步路径，次序仍是先补调用、后冻 run。
