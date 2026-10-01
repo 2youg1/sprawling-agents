@@ -39,7 +39,7 @@ use kernel::{Answered, Connected, Named, Proxying, Reach, Through};
 
 mod proxy;
 #[cfg(test)]
-mod resolve;
+pub(crate) mod resolve;
 mod tls;
 
 pub use proxy::{client_for, is_local, through};

@@ -35,7 +35,7 @@
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
@@ -62,26 +62,15 @@ pub(crate) struct StandIn {
 impl StandIn {
     /// Signs a certificate for `host` and listens for one request.
     pub(crate) fn listening(host: &str) -> StandIn {
-        let (certificate, key) = self_signed(host);
-        let config = rustls::ServerConfig::builder_with_provider(Arc::new(
-            rustls::crypto::aws_lc_rs::default_provider(),
-        ))
-        .with_safe_default_protocol_versions()
-        .unwrap()
-        .with_no_client_auth()
-        .with_single_cert(
-            vec![CertificateDer::from(certificate.clone())],
-            PrivateKeyDer::Pkcs8(key),
-        )
-        .unwrap();
+        let (certificate, config) = server_for(host);
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let at = listener.local_addr().unwrap();
         let served = std::thread::spawn(move || {
             let (socket, _) = listener.accept().unwrap();
-            let session = rustls::ServerConnection::new(Arc::new(config)).unwrap();
+            let session = rustls::ServerConnection::new(config).unwrap();
             let mut stream = rustls::StreamOwned::new(session, socket);
-            let heard = read_request(&mut stream);
-            refuse(&mut stream);
+            let heard = read_request(&mut stream).unwrap();
+            refuse(&mut stream, Closing::Close);
             stream.conn.send_close_notify();
             stream.flush().unwrap();
             heard
@@ -104,13 +93,7 @@ impl StandIn {
     + Send
     + Sync
     + 'static {
-        let (host, at, certificate) = (self.host.clone(), self.at, self.certificate.clone());
-        move |builder| {
-            builder
-                .resolve(&host, at)
-                .tls_certs_only([reqwest::Certificate::from_der(&certificate).unwrap()])
-                .no_proxy()
-        }
+        toward(&self.host, self.at, &self.certificate)
     }
 
     /// What the stand-in heard, once its one request has come and gone.
@@ -119,13 +102,112 @@ impl StandIn {
     }
 }
 
+/// A TLS listener on loopback that answers every request meant for one
+/// host with a refusal and keeps each connection open for the next, and
+/// notes which connection every request came on (gateway-SPEC.md
+/// section 8-35). Its threads live as long as the test process.
+pub(crate) struct KeptOpen {
+    host: String,
+    at: SocketAddr,
+    certificate: Vec<u8>,
+    /// For each request in arrival order, the index of the connection,
+    /// in accept order, that carried it.
+    served_on: Arc<Mutex<Vec<usize>>>,
+}
+
+impl KeptOpen {
+    /// Signs a certificate for `host` and serves every connection the
+    /// client opens, one thread each, until the client closes it.
+    pub(crate) fn listening(host: &str) -> KeptOpen {
+        let (certificate, config) = server_for(host);
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let at = listener.local_addr().unwrap();
+        let served_on = Arc::new(Mutex::new(Vec::new()));
+        let noted = Arc::clone(&served_on);
+        std::thread::spawn(move || {
+            for (connection, socket) in listener.incoming().enumerate() {
+                let session = rustls::ServerConnection::new(Arc::clone(&config)).unwrap();
+                let mut stream = rustls::StreamOwned::new(session, socket.unwrap());
+                let noted = Arc::clone(&noted);
+                std::thread::spawn(move || {
+                    while read_request(&mut stream).is_some() {
+                        noted.lock().unwrap().push(connection);
+                        refuse(&mut stream, Closing::KeepOpen);
+                    }
+                });
+            }
+        });
+        KeptOpen {
+            host: host.to_owned(),
+            at,
+            certificate,
+            served_on,
+        }
+    }
+
+    /// The same step after `client_for` as [`StandIn::toward`].
+    pub(crate) fn toward(
+        &self,
+    ) -> impl Fn(reqwest::blocking::ClientBuilder) -> reqwest::blocking::ClientBuilder
+    + Send
+    + Sync
+    + 'static {
+        toward(&self.host, self.at, &self.certificate)
+    }
+
+    /// Which connection carried each request so far.
+    pub(crate) fn served_on(&self) -> Vec<usize> {
+        self.served_on.lock().unwrap().clone()
+    }
+}
+
+/// A server configuration that answers for `host` alone, and the
+/// certificate it answers with.
+fn server_for(host: &str) -> (Vec<u8>, Arc<rustls::ServerConfig>) {
+    let (certificate, key) = self_signed(host);
+    let config = rustls::ServerConfig::builder_with_provider(Arc::new(
+        rustls::crypto::aws_lc_rs::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .unwrap()
+    .with_no_client_auth()
+    .with_single_cert(
+        vec![CertificateDer::from(certificate.clone())],
+        PrivateKeyDer::Pkcs8(key),
+    )
+    .unwrap();
+    (certificate, Arc::new(config))
+}
+
+/// The step after `client_for`: `host` resolves to `at`, the stand-in's
+/// certificate is the only one trusted, and no proxy takes the request -
+/// a proxy would be handed the name and do its own resolving.
+fn toward(
+    host: &str,
+    at: SocketAddr,
+    certificate: &[u8],
+) -> impl Fn(reqwest::blocking::ClientBuilder) -> reqwest::blocking::ClientBuilder + Send + Sync + 'static
+{
+    let (host, certificate) = (host.to_owned(), certificate.to_vec());
+    move |builder| {
+        builder
+            .resolve(&host, at)
+            .tls_certs_only([reqwest::Certificate::from_der(&certificate).unwrap()])
+            .no_proxy()
+    }
+}
+
 /// Reads one HTTP/1.1 request: the head, then as many body bytes as
-/// `content-length` says.
-fn read_request(stream: &mut impl Read) -> Heard {
+/// `content-length` says. `None` when the client closed the connection
+/// before sending a byte of another request.
+fn read_request(stream: &mut impl Read) -> Option<Heard> {
     let mut bytes = Vec::new();
     let mut buf = [0u8; 16_384];
     let head_end = loop {
-        let n = stream.read(&mut buf).unwrap();
+        let n = stream.read(&mut buf).unwrap_or(0);
+        if n == 0 && bytes.is_empty() {
+            return None;
+        }
         assert!(n > 0, "the client closed before its request was whole");
         bytes.extend_from_slice(&buf[..n]);
         if let Some(at) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
@@ -152,21 +234,32 @@ fn read_request(stream: &mut impl Read) -> Heard {
         assert!(n > 0, "the client closed before its body was whole");
         body.extend_from_slice(&buf[..n]);
     }
-    Heard {
+    Some(Heard {
         path,
         headers,
-        body: serde_json::from_slice(&body).unwrap(),
-    }
+        body: serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null),
+    })
+}
+
+/// Whether an answer tells the client to close the connection after it.
+#[derive(Clone, Copy)]
+enum Closing {
+    Close,
+    KeepOpen,
 }
 
 /// Answers with a refusal: what the client does with an answer is not
 /// what this stand-in is asked about.
-fn refuse(stream: &mut impl Write) {
+fn refuse(stream: &mut impl Write, closing: Closing) {
     let body = "{}";
+    let connection = match closing {
+        Closing::Close => "connection: close\r\n",
+        Closing::KeepOpen => "",
+    };
     stream
         .write_all(
             format!(
-                "HTTP/1.1 500 X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                "HTTP/1.1 500 X\r\ncontent-type: application/json\r\ncontent-length: {}\r\n{connection}\r\n{body}",
                 body.len()
             )
             .as_bytes(),

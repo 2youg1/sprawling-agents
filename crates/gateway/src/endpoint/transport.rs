@@ -113,3 +113,109 @@ impl Endpoint {
         })
     }
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    clippy::arithmetic_side_effects,
+    clippy::print_stderr,
+    reason = "test code: an instrument samples its own clock and prints its reading"
+)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use kernel::Model as _;
+
+    use super::*;
+    use crate::endpoint::fakes::{config, request};
+    use crate::endpoint::redemption::redemption;
+    use crate::reach::resolve::KeptOpen;
+
+    const HOST: &str = "api.anthropic.com";
+    const BASE: &str = "https://api.anthropic.com/v1/messages";
+
+    /// gateway-SPEC.md section 8-35: every call to one endpoint goes out
+    /// over the connection the endpoint's first call opened, so resolving,
+    /// connecting and the handshake are paid once per endpoint rather than
+    /// once per call. A call through another transport opens a connection
+    /// of its own, which is what tells the stand-in's count apart from a
+    /// count that could not see a second connection.
+    #[test]
+    fn a_second_call_to_one_endpoint_goes_out_over_the_first_calls_connection() {
+        let stand_in = KeptOpen::listening(HOST);
+        let shared = Transport::detoured(stand_in.toward());
+        let other = Transport::detoured(stand_in.toward());
+        for transport in [&shared, &shared, &other] {
+            let mut endpoint = Endpoint::over(transport, config(BASE), redemption()).unwrap();
+            let refused = endpoint.call(&request()).unwrap_err();
+            assert_eq!(*refused.code(), AxCode::Provider, "{refused}");
+        }
+        let served = stand_in.served_on();
+        assert_eq!(
+            (served.len(), served[1] == served[0], served[2] == served[0]),
+            (3, true, false),
+            "connections that carried the three calls: {served:?}"
+        );
+    }
+
+    /// The reading behind gateway-SPEC.md section 8-35: an endpoint's
+    /// first and second request through one client, timed apart, over
+    /// `ROUNDS` fresh clients. The difference is what the first request
+    /// pays to resolve, connect and shake hands. By default it reads the
+    /// loopback TLS stand-in; `SPRAWLING_CONNECT_PROBE` names base URLs
+    /// to read instead, comma-separated, each asked twice with a `GET`
+    /// that carries no credential.
+    #[test]
+    #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
+    fn instrument_first_call_connect() {
+        const ROUNDS: usize = 20;
+        let stand_in = KeptOpen::listening(HOST);
+        let named = std::env::var("SPRAWLING_CONNECT_PROBE").unwrap_or_default();
+        let urls: Vec<String> = if named.is_empty() {
+            vec![BASE.to_owned()]
+        } else {
+            named.split(',').map(str::to_owned).collect()
+        };
+        for url in urls {
+            let detoured = named.is_empty();
+            let mut first = Vec::new();
+            let mut second = Vec::new();
+            for _ in 0..ROUNDS {
+                let builder = crate::client_for(kernel::Proxying::default(), &url);
+                let builder = if detoured {
+                    stand_in.toward()(builder)
+                } else {
+                    builder
+                };
+                let client = builder.build().unwrap();
+                let asked = |client: &reqwest::blocking::Client| {
+                    let t0 = Instant::now();
+                    let answer = client.get(&url).send().unwrap();
+                    drop(answer.text().unwrap());
+                    t0.elapsed()
+                };
+                first.push(asked(&client));
+                second.push(asked(&client));
+            }
+            let gaps: Vec<Duration> = first
+                .iter()
+                .zip(&second)
+                .map(|(one, two)| one.saturating_sub(*two))
+                .collect();
+            let median = |samples: &[Duration]| {
+                let mut sorted = samples.to_vec();
+                sorted.sort();
+                sorted[sorted.len() / 2].as_micros()
+            };
+            eprintln!(
+                "connect url={url} rounds={ROUNDS} process_first_us={} first_p50_us={} second_p50_us={} gap_p50_us={}",
+                first[0].as_micros(),
+                median(&first),
+                median(&second),
+                median(&gaps)
+            );
+        }
+    }
+}
