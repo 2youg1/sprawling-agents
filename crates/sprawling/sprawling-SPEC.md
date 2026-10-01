@@ -3530,6 +3530,20 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 
 **本章验收**：`cargo nextest run -p sprawling -p sprawling-city -p sprawling-wire -p sprawling-kernel` 绿；`cargo xtask wire-ts`、`wiring`、`specalign`、`apisync` 绿。
 
+### 8-141 分支的第一个请求接着母 run 最后一个请求的字节（`accounting::worker::freezing`、`runtime::fork`；runtime-SPEC §8-58）
+
+**要什么。** provider 只为逐字节相同的前缀复用缓存：分支的第一个请求要以母 run 最后一个请求的字节开头——冻结前缀的四段，经 gateway 按兼容格式渲染之后的整份请求体，再到母 run 发过的每一条消息。消息那一半由 runtime 按 `run_started.opening` 重建（runtime-SPEC §8-58）；前缀那一半由 `accounting::worker::freezing` 为分支重新组装，本节判两半合在一起、经真实渲染之后的字节。
+
+**同一间房、`Carry::Nothing`、两次都是与人交谈的派活时，字节相同。** city 段、building 段、resident 段读的是同一组文件与同一版冻下的身份；`Carry::Nothing` 清掉了房间的 `Handoff.md`，没有 `--carry` 的前任，所以 run 段只剩 `city::RunBrief::Principal` 那一句，两次相同；模型、上限与工具表也相同。
+
+**设计上就不同的三种，不改，理由在各自的规则里。**
+
+1. 母 run 以 `FromJob` 开篇：第一条消息改写，理由在 runtime-SPEC §8-58。
+2. 分支开在另一间房：building 段以房间地址开头（`freezing::building_segment`），房间换了，从这一段起就不同；分支在哪间房是人的选择。
+3. `Carry::Handoff` 或派活带了目标：run 段带上交接或分支自己的 JOB.md，run 段不同；这一段本来就不进缓存断点（`BreakpointPlan::marks_edge`），它的字节是这一次 run 自己的任务。
+
+- 验收：`accounting::worker::freezing::tests::lineage` 的 `a_branch_first_request_carries_the_bytes_of_the_mothers_last`：一座真城、一个记下每个请求体的假 provider；母 run 在 `lab/room1` 答一句，`OpenSession { carry: Nothing, from: 母 run 的最后一行 }` 之后同一间房再派一次活；分支第一个请求体去掉 `messages` 之外的每个键与母 run 最后一个请求体相同，`messages` 以母 run 的 `messages` 开头。
+
 ### 8-83 客户端包落在工作区的 `target/web-dist`，与 cargo 的输出目录无关（`build.rs` 的 `BUNDLE_DIR`）
 
 **原因**：「客户端包在哪」有三个读者、两种答法。`client/vite.config.ts` 把包写进工作区的 `target/web-dist`；`xtask::bundle::dist` 在工作区的 `target/` 下找它；`build.rs` 却在 `CARGO_TARGET_DIR` 下找。三者只在没有设这个变量时一致。设了之后，`just build-web` 写出的真包没人嵌入，二进制带着占位页通过构建，只留一条 cargo warning。

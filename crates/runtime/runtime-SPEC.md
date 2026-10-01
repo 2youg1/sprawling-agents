@@ -46,7 +46,6 @@
 4. **前缀续期未接线**：`prefix::warmth` 的 `Warmed` 与记账已在（§8-4-2），而 run 结束后按 `next_due` 醒来发续期的那条循环还没有；接上它要先定续期的 usage 记成哪一种事件。
 6. **`contract_kept` 的证据今天没人量。** 城读不出一次翻新有没有动到可观察的契约，装配层把 `Produced.contract_moved` 恒填 `false`，所以选了 `contract_kept` 的 run 在合并时恒放行（§8-54）。要让这一要求真的拒，得有一个读得出契约的量具（例如 run 前后同一组对外测试的结果对照）把它填进 `Produced`；判定它的证据是一次动了对外行为、测试仍绿的翻新在 citysim 里被放行。
 7. **`Create` 管不到楼的 MCP 工具。** 一个 MCP server 是楼自己声明的外部进程，它写不写文件、写在哪里，城看不见（§8-55 只覆盖城自己的写路径：edit、exec 与链接）。候选是 `Create` 下不挂载声明了写效果的连接器，或只挂载声明只读的；判定它的证据是一个会写文件的连接器在 `Create` 的 run 里改动了已有文件。
-8. **分叉的第一个请求改写了母 run 的第一条消息**：`fork::request_tests` 把母 run 与分叉都经 `drive` 真跑一遍，分叉从账本经 `inherited_indexed` 重建，比较模型缝收到的每一条消息的序列化字节。母 run 最后一个请求里的消息，除第一条外在分叉的第一个请求开头逐字节相同；第一条，母 run 发的是它开篇那一种写法（`Opening::WithPerson` 是人的原话，`Opening::FromJob` 是一句指向前缀里 JOB.md 的话），重建按 `run_started.job` 在场一律写成 `Opening::Inherited` 的 `Task: …\nGoal: …`。provider 的提示缓存只认逐字节相同的前缀，所以每一次分叉都从第一条消息起把整段对话重付一遍（fx 研究 R6 要守的正是这一点）。`run_started` 不记 run 是怎么开篇的，`fork::fold_run` 因此无从照抄；补上它要 `RunStarted` 多一个记开篇的字段（kernel 的事件载荷，由 `run::charter` 写），`fold_run` 读它：`WithPerson` 照原话重建；`FromJob` 那一句指向的是母 run 前缀里的 JOB.md，分叉的前缀里没有它，所以那一种仍须改写，改写的理由写在 `fold_run` 旁边。测试以 `#[ignore]` 停着，指向本条；修好时去掉 `ignore`。另一半不在本 crate：分叉的冻结前缀由 `accounting::worker::freezing` 为分叉组装，它的 run 段若与母 run 的不同，provider 在 system 那一段就已不命中，消息再一致也无用；那一半要在 accounting 里对真组装出来的前缀比字节。
 
 ## 4 现状分析
 
@@ -168,7 +167,7 @@ pub struct Inherited { pub messages: Vec<ChatMessage>, pub at: Seq }
 
 **一个 typestate 机、一张工作台、一份会话历史，三种形状三个模块。**
 - `bench`（形状 1 判定）：`ToolBench`／`BenchOutcome` 与三条必要前提次序（去重先于副作用；exec 的 discard 预报先于 Write 门；Deny 以 `tool_result` 回去而不结束回合）。它拥有的是**次序**；工具本身以 `Box<dyn Tool>` 递入，沙盒在缝上，副作用不归它。
-- `conversation`（形状 2 值）：`Conversation`／`Opening`。它是会话，不是 transcript（冻结后写下的逐 run 文件），也不是 `kernel::Window`（上下文大小）。一条不变量在每一个入口上成立——**连续的 user 内容并进已开的那条消息，而不另开一条**；steer、工具结果与开场任务是同一条规则的三扇门。
+- `conversation`（形状 2 值）：`Conversation`，以及再导出的 `Opening`（定义住 kernel，因为 `run_started` 要带它，kernel-SPEC §8-82-1）。它是会话，不是 transcript（冻结后写下的逐 run 文件），也不是 `kernel::Window`（上下文大小）。一条不变量在每一个入口上成立——**连续的 user 内容并进已开的那条消息，而不另开一条**；steer、工具结果与开场任务是同一条规则的三扇门。
 - 根重导出：`runtime::Opening` 在根上；`ToolBench` 只经 `runtime::bench`。
 
 ```rust
@@ -605,6 +604,28 @@ impl UtcSpan {
 - **读者**：`sprawling view --since/--until`（sprawling-SPEC 8-137）；playback 的时间筛选接进来时读同一个值，不另写一份区间规则。`Default` 是两端都不设界，`contains` 恒真。
 - **逐个时刻判断，不假定有序**：`contains` 只看给它的那一刻。账本的 `t` 不随 `seq` 单调（§12.5：并行只读段的开始时刻可以早于前一条的答复；墙钟也会回拨），所以按时间选行的读者每一行都问一次，不在第一条越过 `until` 的行处停下，也不二分。
 - **矛盾的区间在构造时拒绝**：`until <= since` 的区间里没有任何一刻，按它选行只会安静地答出一段空历史；拒绝时 subject 写出两端的 `iso`。合法而恰好什么都没选中的区间照常答空。
+
+### 8-58 分叉照母 run 开篇的写法重建第一条消息（`runtime::fork`、`runtime::run::charter`，形状 1 判定）
+
+```rust
+pub use kernel::event::record::Opening;           // runtime::conversation 与根上各一处再导出（kernel-SPEC §8-82-1）
+pub struct Charter<'a> { /* …既有字段… */ pub opening: Option<Opening> }
+// RunPlan::charter 填 Some(self.opening)；harness 的 charter 填 None
+```
+
+- **开篇的写法进账本。** `Charter::open` 把 `opening` 照录进 `run_started.opening`，与 `policy`、`naming` 同一处写。
+- **`fold_run` 读它，按下表重建母 run 的第一条消息**：
+
+| `run_started.opening` | 重建成 | 与母 run 发出的字节 |
+|---|---|---|
+| `WithPerson` | `WithPerson`：人的原话 | 相同 |
+| `Inherited` | `Inherited`：`Task: …\nGoal: …` | 相同 |
+| `FromJob` | `Inherited` | 第一条起不同 |
+| 缺席（加键之前的行） | `job` 在场为 `Inherited`，否则 `WithPerson` | 加键之前的读法，不变 |
+
+- **只有 `FromJob` 改写，理由写在 `fold_run` 旁。** 那一句说「任务在上面的 JOB.md 里」，指的是母 run 前缀 run 段里的那份文本；分支的前缀带的是它自己的 brief，不是母 run 的 JOB.md，照抄那一句就是让分支去读一份它从没拿到的文件。改写的代价是 provider 的前缀缓存从第一条消息起不命中，这一种开篇的分支每次都付；换成把母 run 的 JOB.md 抄进分支的 run 段，run 段就与母 run 的不同，缓存在 system 那一段已经不命中，付的一样多，还在分支里多了一份没人派给它的任务（§12.14）。
+- **为什么不用 `goal` 是否为空来猜。** 「有目标才写 job 文件」是 `city::write_brief` 的规则；分叉里按 `goal` 猜写法，就是同一条规则的第二个权威，哪天 brief 的规则改了，分叉会悄悄猜错，而只有缓存命中率会说出来。
+- 验收：`fork::request_tests` 的 `a_branch_first_request_opens_with_the_bytes_of_the_mothers_last`（母 run 与分支都经 `drive` 真跑；分支经 `inherited_indexed` 从账本重建；分支第一个请求的消息序列以母 run 最后一个请求的消息序列开头，逐条序列化字节相同）。真实组装出来的前缀经 gateway 按兼容格式渲染后的整份请求，在 accounting 一侧比（sprawling-SPEC 8-141）。
 
 ### 8-11 runtime::catalog（形状 6＋渲染）
 
@@ -1222,6 +1243,16 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 **被否**：①也收时区偏移并换算成 UTC——城的配置拒绝时区（city-SPEC 12.7），收偏移就有了第二条关于时区的规则；②也收只有日期、或带小数秒的写法——每多一种写法就多一条「它等于哪一刻」的规定（一天的开始还是整天、截断还是舍入），而它们都不再与 `iso` 互逆；③闭区间 `[since, until]`——相邻两段在交界那一毫秒重叠；④`until <= since` 时答空——与「这段时间里什么都没发生」分不开。
 
 **重开参数**：页面或居民工具要按本地日期选一天时，「一天」由读者的时区展开成一个 `UtcSpan`，那时再定展开规则住哪里；本模块仍只读 UTC。
+
+### 12.14 开篇的写法记在 `run_started` 上，`FromJob` 的分支仍改写第一条消息
+
+**决定**：`Opening` 搬进 kernel，`run_started.opening` 记它；`fork::fold_run` 照记下的写法重建母 run 的第一条消息，只有 `FromJob` 改写成 `Inherited`（§8-58）。
+
+**理由**：provider 的前缀缓存只认逐字节相同的前缀，分叉的第一个请求要以母 run 最后一个请求的字节开头；重建者唯一的材料是账本，所以写法必须在账本上。值的定义只能有一处：runtime 依赖 kernel，载荷住 kernel，所以枚举搬过去，runtime 再导出它，调用方的路径一处不改。`FromJob` 那一句指向母 run 前缀里的 JOB.md，分支没有那份文本，照抄是一条指向空处的话；把文本抄进分支的 run 段会让 run 段与母 run 不同，缓存一样不命中。
+
+**被否**：①在 kernel 另立一个两值的记录类型、runtime 保留自己的三值枚举——同一件事两个定义，两边的词迟早不一致；②按 `goal` 是否为空推断写法——那是 `city::write_brief` 的规则在分叉里的第二份；③`FromJob` 的分支也照抄那一句——分支读到一条找不到对象的指示；④把母 run 的 JOB.md 抄进分支的 run 段——缓存在 system 段就不命中，还多一份没人派给分支的任务。
+
+**重开参数**：分支的前缀能带上母 run 的 run 段（例如分支沿用母 run 的 brief 而不另写一份）时，`FromJob` 也照抄。
 
 ### 12.15 连接器把声音块存进 CAS，交出的是 locator 而不是附件
 

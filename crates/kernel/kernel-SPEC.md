@@ -2415,6 +2415,26 @@ pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome;   // kerne
 - **「目标是否已经存在」不由本模块判。** 那是文件系统在写那一刻的事实；只有在写的那一刻原子地判，竞争的两次新建才只成一次（runtime-SPEC §8-55，storage-SPEC §8-32）。kernel 只持规则与拒词，判定点在每一条写路径上调它。
 - 验收：`gate::domain` 测试里 `Create` 拒、`Full` 放各一条；真实写路径上的验收在 runtime-SPEC §8-55。
 
+### 8-82 一次 run 怎样开篇（`kernel::event::record::run`，形状 2 值类型）
+
+#### 8-82-1 `run_started.opening`
+
+```rust
+pub enum Opening { FromJob, Inherited, WithPerson }   // "from_job" | "inherited" | "with_person"
+pub struct RunStarted {
+    // …既有字段…
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening: Option<Opening>,   // 第一条 user 消息的写法；缺席读作「不知道」
+}
+```
+
+- **它说什么。** 一次 run 的第一条 user 消息有三种写法：`FromJob` 是一句指向前缀 run 段里 JOB.md 的话加目标，`Inherited` 是 `Task: …\nGoal: …`，`WithPerson` 是人的原话。写法在派活时由城定一次（`accounting::worker::freezing` 按 `city::RunBrief` 选），`runtime::conversation::Conversation::push_task_lines` 按它写出字节。
+- **为什么记进账本。** 分叉从账本重建母 run 的对话（`runtime::fork::fold_run`），第一条消息要照母 run 发出的写法重建，provider 的前缀缓存才从第一条消息起命中（runtime-SPEC §8-58）。不记，重建只能猜；而按 `goal` 是否为空去猜，等于在分叉里再写一遍 `city::write_brief` 的「有目标才是一份 job」那条规则。
+- **一个枚举，一个家。** 这个值以前只住在 `runtime::conversation`；现在账本载荷要带它，而 runtime 依赖 kernel、kernel 不依赖 runtime，所以枚举住在本模块，`runtime::Opening` 与 `runtime::conversation::Opening` 是它的再导出，调用方的路径不变（runtime-SPEC §12.14）。
+- **写者**：`runtime::run::Charter::open` 从 `Charter.opening` 照录。模型 run 的 charter 填 `Some(RunPlan.opening)`；harness run 的第一句话是交给 harness 自己会话的 prompt，城不为它写 user 消息，填 `None`。
+- **缺席读作「不知道」。** 加这个键之前写下的行没有它，`fold_run` 对它沿用加键之前的读法（runtime-SPEC §8-58 的表）。按 `default` 加、缺席不写，所以旧账本照读，`golden-s1` 里载荷为 `{}` 的那行 `run_started` 照旧读成 `RunStarted::default()`。
+- 验收：`runtime::fork::request_tests` 的 `a_branch_first_request_opens_with_the_bytes_of_the_mothers_last`，与 `accounting::worker::freezing::tests::lineage` 的 `a_branch_first_request_carries_the_bytes_of_the_mothers_last`（sprawling-SPEC 8-141）：写出的键经真实的派活与分叉读回。
+
 ### 8-79 身份的两处入账：保存的回执与一次 run 冻下的那一版（`kernel::event::record`，形状 2 值类型）
 
 ```rust
