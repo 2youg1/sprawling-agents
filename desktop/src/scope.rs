@@ -127,6 +127,17 @@ impl Admitted<'_> {
     pub(crate) fn visible(&self, title: &str, process: &str) -> bool {
         self.allowance.visible(title, process)
     }
+
+    /// The one sound device this scope's operator named.
+    #[cfg(any(windows, test))]
+    pub(crate) fn sound(&self) -> Result<&str, Refusal> {
+        Err(Refusal::new(
+            RefusalCode::ToolUnavailable,
+            "record a window",
+            "this server does not choose a sound device",
+            "record without `audio`",
+        ))
+    }
 }
 
 impl Scope {

@@ -244,3 +244,37 @@ fn a_closed_scope_yields_no_admission_to_list_windows_with() {
             .is_err()
     );
 }
+
+/// The device a recording hears is the one the scope file names, and
+/// only that one: the operator's naming it is the permission
+/// (desktop-SPEC.md section 12.11).
+#[test]
+fn a_recording_hears_the_one_device_the_scope_file_names() {
+    let scope = Scope::parse(
+        "windows = [\"Notepad\"]\nrecord = true\nsound = \"Microphone (USB Audio)\"\n",
+    );
+    let heard = scope
+        .admits(&reach(ToolName::Record, Some("Notepad")))
+        .map(|admitted| admitted.sound().map(str::to_owned).ok());
+    assert_eq!(heard.ok(), Some(Some("Microphone (USB Audio)".to_owned())));
+}
+
+/// Recording is switched on and no device is named: a call that asks
+/// for sound is refused by the gate, and told where the device names
+/// are listed and which key takes one.
+#[test]
+fn asking_for_sound_without_a_named_device_is_refused_by_the_gate() {
+    let scope = Scope::parse("windows = [\"Notepad\"]\nrecord = true\n");
+    let admitted = scope
+        .admits(&reach(ToolName::Record, Some("Notepad")))
+        .expect("recording is switched on");
+    let refused = admitted.sound().expect_err("no device is named");
+    let error = refused.as_error();
+    assert_eq!(error["data"]["code"], "E_GATE_DENIED");
+    let recovery = error["data"]["recovery"].as_str().unwrap();
+    assert!(
+        recovery.contains("-list_devices true -f dshow"),
+        "{recovery}"
+    );
+    assert!(recovery.contains("sound = "), "{recovery}");
+}

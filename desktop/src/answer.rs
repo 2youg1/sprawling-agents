@@ -82,6 +82,18 @@ impl Answer {
         }
     }
 
+    /// A recording's sound, then the facts about the recording.
+    #[cfg_attr(
+        not(any(windows, test)),
+        expect(
+            dead_code,
+            reason = "the non-Windows arm refuses every call, so it builds no answer"
+        )
+    )]
+    pub(crate) fn sound(_bytes: Vec<u8>, _mime: &'static str, facts: &Value) -> Answer {
+        Answer::facts(facts)
+    }
+
     /// The `result` of the JSON-RPC answer.
     pub(crate) fn as_result(&self) -> Value {
         let content: Vec<Value> = self
@@ -123,6 +135,25 @@ mod tests {
             json!({ "content": [
                 { "type": "image", "data": "iVBORw==", "mimeType": "image/png" },
                 { "type": "text", "text": "{\"height\":1,\"lossless\":true,\"title\":\"a.txt\",\"width\":1}" },
+            ]})
+        );
+    }
+
+    /// A recording's sound reaches the city as MCP audio content, in
+    /// front of the facts, the same shape a screenshot has
+    /// (desktop-SPEC.md section 12.13).
+    #[test]
+    fn a_recordings_sound_travels_as_audio_content_before_its_facts() {
+        let answer = Answer::sound(
+            b"RIFF".to_vec(),
+            "audio/wav",
+            &json!({ "state": "stopped", "recording": 1 }),
+        );
+        assert_eq!(
+            answer.as_result(),
+            json!({ "content": [
+                { "type": "audio", "data": "UklGRg==", "mimeType": "audio/wav" },
+                { "type": "text", "text": "{\"recording\":1,\"state\":\"stopped\"}" },
             ]})
         );
     }

@@ -32,6 +32,7 @@
 //! recording that silently had no audio track would be discovered by
 //! whoever played it back (desktop-SPEC.md §8.6, fourth pair).
 
+mod hearing;
 mod sink;
 
 use std::collections::BTreeMap;
