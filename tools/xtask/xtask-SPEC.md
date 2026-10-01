@@ -129,10 +129,10 @@ pub(crate) struct Violation {
 
 ## 10 实现逻辑
 
-1. **walk**：手写递归（不引 walkdir），跳过 `walk::SKIP_DIRS` 的四个构建目录名（`target`、`node_modules`、`.lake`、`.svelte-check`），也不进根以下自带 `.git` 条目的目录（另一份检出）；名为 `.git` 的条目按结构跳过，不在表里。输出按路径字符串排序——报告顺序确定，diff 可比。路径统一正斜杠（Windows 反斜杠归一），因为模块表以正斜杠书写。理由见本文末「扫描面」一节。**隔离区**：仓库根 `local/`（gitignore，恒不入库）存一台机器自己的工作记录；从仓库根扫描的四门（header／lexicon／secret／color）排除它——门只对入库对象作证。modmap 扫除本门所在包之外每个包的目录，depmap 扫产品包的目录（§8-39），包目录里嵌套的 `local/` 仍被封闭清单咬住。
+1. **walk**：手写递归（不引 walkdir），跳过 `walk::SKIP_DIRS` 的五个构建目录名（`target`、`node_modules`、`.lake`、`.svelte-check`、`web-dist`），也不进根以下自带 `.git` 条目的目录（另一份检出）；名为 `.git` 的条目按结构跳过，不在表里。输出按路径字符串排序——报告顺序确定，diff 可比。路径统一正斜杠（Windows 反斜杠归一），因为模块表以正斜杠书写。理由见本文末「扫描面」一节。**隔离区**：仓库根 `local/`（gitignore，恒不入库）存一台机器自己的工作记录；从仓库根扫描的四门（header／lexicon／secret／color）排除它——门只对入库对象作证。modmap 扫除本门所在包之外每个包的目录，depmap 扫产品包的目录（§8-39），包目录里嵌套的 `local/` 仍被封闭清单咬住。
 2. **modmap**：读 `architecture.toml` 的 `module` 条目；只判 `name` 含 `::`、`file` 落在某个受判包的目录（§8-39 的全部包减去本门所在的包，§12-9）之下且以 `.rs` 或 `.zig` 结尾的条目，磁盘一侧遍历同一组目录里 `src/` 下的 `.rs` 与任何位置的 `.zig`（§8-48），嵌套包的文件只判一次，状态取 `planned`／`building`／`built`／`frozen` 之一。双向对账：表有文件无（状态不是 `planned` 才要求在盘）；盘有表无（lib.rs 与索引文件豁免）；盘有而状态仍是 `planned` →「状态未翻转」。同一文件两个条目即红。索引文件的依据：文件名去 `.rs` 后与同目录某子目录同名，且该子目录内有表内文件。
 3. **depmap**：ARCHITECTURE §3 的 `depmap` 围栏块是 crate 边的机器权威；包与它的依赖取自 `members`（§8-39），块里的键是包的 lib 名，一条依赖边以被依赖包的 lib 名比对，工具包不进产品图；只查 normal 与 build 依赖（dev 依赖留给测试自由）。断言是子集而不是相等：文档可以先写下一条尚未使用的边。`directions` 块判一个 crate 之内的模块方向（§8-33）。
-4. **guard**：`wall` 把叶子的 `[lints]` 与根 `[workspace.lints]` 逐键比对，再判其余成员都继承根表；只读工作树，不调 git。
+4. **guard**：`wall` 把叶子的 `[lints]` 与根 `[workspace.lints]` 逐键比对，再判其余成员都继承根表；`version` 判工作区自己的包在 `[workspace.dependencies]` 里各钉 `=` 加 `[workspace.package] version`，且没有成员绕过那张表按路径点名一个工作区包（§8-49）；只读工作树，不调 git。
 5. **vocabulary（挂在 lexicon 门下）**：**退役词必须指向被定义过的词**——`lexicon.toml` 说哪种说法作废，`docs/glossary.md` 说该用哪个词；二者不对账时，一条退役词可以指向一个词汇表从未定义的名字，照门的建议改词的人会落到一个没有释义的词上。依据宽一格：replacement 命中任一词汇表**粗体词**或含 `.md`（指向一份文件也是一种定义）。文档里的门数不在这里对账：`docnum` 的 `gate_count` 从 `gates::COUNT` 重算它，一个数只有一个重算者。重算只到受管标记为止：标记之外用数字或数词写出的门数，没有任何一道门读它，所以文档只在 `gate_count` 标记里写门数，别处写「全部门」，评审守这一条。
 6. **release**：公开树**由过滤生成**而不由手工挑选，分类是一条**封闭的前缀规则**（`is_scaffolding`）；未被规则点名的一律归产品面——**失败方向是故意的**：未分类的文件出现在产物里会被人看见，反过来则无声消失。其中三条的依据值得写下来：①公开树上零脚手架路径；②产品文档不得链向或在正文里点名脚手架（无链的「去看 SPEC」最好写也最难发现，故扫全文而不只扫链接）；③**任何发布文件不得携家目录路径**（`machine_path`）。第三条的口径是**隐私而非整洁**：`/tmp`、`/etc`、`C:/windows` 是关于一类机器的事实，而且「绝对路径被拒」那三条测试必须写出一个绝对路径，故规则收窄到家目录形状（`:\users\`／`:/users/`／`/home/`／`/root/` 等七种，大小写不计）。扫描面是**全部可读成文本的发布文件**，不只 `.md`：源码与清单里的硬编码家目录更坏而不是更好。报告只截二十字符，因为把整行引进 CI 日志就是把它再公开一次；文件自豁免（同 secret／color 两门：写不出不包含待检形状的检测器）。
 
@@ -187,6 +187,8 @@ pub(crate) struct Violation {
 
 **12-15 Zig 的函数按 Zig 的词法量，不引解析器；参数面不判 Zig；`test` 声明不计。** `length` 量 Rust 用 `syn`，§13 记着按行数括号会错的三处：`#[cfg(test)]` 被当成文件截断点、`'{'` 被当成开括号、跨行字符串。Zig 的词法让这三处各有一个确定的答案：语言参考的 Comments 一节写「There are no multiline comments in Zig (e.g. like /* */ comments in C). This allows Zig to have the property that each line of code can be tokenized out of context.」；文法里 `string_char` 与 `char_char` 都排除换行，只有 `\\` 开头的多行字符串跨行，而它像注释一样到行尾为止；`test` 是关键字，测试只能写成 `test` 声明。于是 `length::zig` 只认行注释、字符串、字符字面量与多行字符串四种要跳过的东西，剩下的花括号与圆括号就是结构。函数体之前唯一会出现花括号的地方是返回类型（文法 `FnProto` 的 `TypeExpr`），那里的花括号只跟在 `error`、`struct`、`enum`、`union`、`opaque`（可带一个括号里的参数）、`switch (…)` 或一个块标签之后，量法跳过这些组，第一个别的 `{` 就是函数体。**参数面不判 Zig**：本仓的 Zig 只做 C ABI 叶子，一段缓冲过边界是 `(ptr, len)` 两个参数，`extern` 原型是 Win32 自己的签名，把它们收进一个 `extern struct` 就为一条管 Rust 数据团的规则改了边界的 ABI。**`test` 声明不计入文件面**：它只在 `zig test` 下编译，`build.rs` 链进二进制的库里没有它，与 Rust 的 `#[cfg(test)]` 同理。被击败的备选：①调 `zig ast-check` 或 `zig fmt` 取结构——每台跑 `cargo xtask gates` 的机器就都得装 Zig，而 Zig 今天只是编叶子的前置，且没有一种稳定的 AST 输出；②引 tree-sitter-zig——为三份文件往工作区工具链里加一个 C 构建依赖；③像客户端一样只判文件面——客户端不量函数是因为 TypeScript 的词法数不准括号，Zig 数得准，这个理由在这里不成立。重开参数：本仓进来一份不是 C ABI 叶子的 Zig（参数面随之进来），或 Zig 的文法让返回类型里出现上面五种之外的花括号。
 
+**12-16 `packaged` 沿 cargo 的 target 走模块树，不按文件名猜哪些是测试。** 一个包被打包之后，验证构建与 `cargo install` 只编译它的 lib、bin 与构建脚本，测试、bench、example 都不编；所以「这个 `include_str!` 会不会在包外落空」只对生产编译单元里的调用成立。门从 `cargo metadata` 交出的 target 源文件起，按 Rust 参考的模块路径规则跟 `mod` 声明走，凡 cfg 谓词在 `test` 为假时不可能成立的项（`test`，或含 `test` 的 `all(…)`，或每一支都如此的 `any(…)`）连同它声明的文件一并不进（§8-49）。理由：本仓用 `#[path = "…/tests.rs"]`、`#[path = "grammar_tests.rs"]`、`#[cfg(test)] mod tests;` 几种写法放测试，文件名说不准；而模块树就是编译器自己的答案，没有第二种读法。被击败的备选：①像 `boundary`、`depmap` 那样按 `tests`、`tests.rs`、`_tests.rs` 认测试文件——一个生产文件叫 `fixture.rs`、一个测试文件叫 `grammar_tests.rs` 之外的名字时，前者放过、后者误报，且失败无声；②在门里跑 `cargo package` 加验证构建——要编译整个包，分钟级，而门在 `gates` 里毫秒级并行（§8-31），这份证据由人发布前的 `cargo publish --dry-run` 给；③判每个文件里的每个 `include_str!`，测试也算——测试读 `tools/fixtures/` 是本仓的惯例，而打包之后它们根本不编译，拒它们是错的。**重开参数**：一个可发布的包开始用宏生成 `mod` 声明，或用 `cfg_attr` 给 `mod` 换路径，那时门改为读 `cargo rustc -- -Zunpretty` 一类编译器给出的模块表。
+
 ## 13 依赖选型
 
 serde 与 serde_json（cargo metadata 解析；工作区已钉）；toml（`lexicon.toml`、`architecture.toml`、`budgets.toml`；xtask 独用，不入产品面）；thiserror（工作区已钉）；kernel（secret 门复用 `kernel::secret::scan`，一个判定一个家）。不引 walkdir/regex/clap：手写遍历十几行；判定用子串与前缀即可；子命令分发一个 match 足矣。
@@ -227,20 +229,21 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 **它断的是性质，不是图片。** 截图对比会被一次字体 hinting 弄红，却放过一个没人拍过的错版面。性质逐条写在 §8-13、§8-14、§8-17 与 §8-38。
 
-**缺客户端产物、缺浏览器、画廊什么都没画，各是一条违规，不是跳过。** `render` 读 `target/web-dist` 里的客户端（§8-18），那份产物由 `just build-web` 生成；浏览器取 Chromium 一族，`SPRAWLING_BROWSER` 可以点名一个。前两条违规各自给出补上所缺之物的办法，第三条把画廊本身点成缺陷，三者从不并成一句。理由：一道找不到对象就沉默的门，给一页没人看过的页面报绿，坏掉的仪器读起来就像通过的产品。
+**缺客户端产物、缺浏览器、画廊什么都没画，各是一条违规，不是跳过。** `render` 读 `crates/sprawling/web-dist` 里的客户端（§8-18），那份产物由 `just build-web` 生成；浏览器取 Chromium 一族，`SPRAWLING_BROWSER` 可以点名一个。前两条违规各自给出补上所缺之物的办法，第三条把画廊本身点成缺陷，三者从不并成一句。理由：一道找不到对象就沉默的门，给一页没人看过的页面报绿，坏掉的仪器读起来就像通过的产品。
 
 ### 扫描面：构建目录不在里面
 
-`walk::SKIP_DIRS` 持四个名字：`target`、`node_modules`、`.lake`、`.svelte-check`。
+`walk::SKIP_DIRS` 持五个名字：`target`、`node_modules`、`.lake`、`.svelte-check`、`web-dist`。
+`web-dist` 是 `just build-web` 写进 `crates/sprawling/` 的客户端包（§8-18），bun 的产物，同样被 `.gitignore` 点名。
 **一道门为已提交的对象作证**，而构建目录里一个都没有；`.gitignore` 逐个点过它们的名。
 对抗性检查器就地编译，一次构建就在源码旁边留下几十个生成文件；
 扫进去读出的每一条都是关于生成文件的真命题，而那些文件没有任何读者会收到。
 **一道报出满屏生成文件的门等于什么都没报**，因为没有人会读完第一屏。
 
-这张表是「树里有什么」的第二个权威，git 是第一个；它继续做一张表而不去读 `.gitignore`，是因为四个名字值四个 token 而一个解析器值一个解析器。
-**这就是它的重新定价参数：哪天这张表需要第五行而那一行不是构建目录，就去读忽略文件，不要再添一行。**
+这张表是「树里有什么」的第二个权威，git 是第一个；它继续做一张表而不去读 `.gitignore`，是因为五个名字值五个 token 而一个解析器值一个解析器。
+**这就是它的重新定价参数：哪天这张表需要一行不是构建目录的名字，就去读忽略文件，不要再添一行。**
 
-**另一份检出不是这棵树。** `git worktree add` 放在树里的检出根上有一个 `.git`，遍历器遇到根以下任何一个自带 `.git` 条目的目录就整个不进去；名为 `.git` 的条目不论是目录还是文件都不收——worktree 与子模块的 `.git` 是一个写着绝对路径的指针文件，它不是入库对象，`release` 读它就会报一台机器的路径。这条规则按结构判，不按名字判，所以它不是那张表的第五行：检出放在哪个目录下都一样被跳过，而一个非检出的隐藏目录照常被扫。被击败的替代是把某个工具的检出目录名加进表里——它只认一个工具，下一个把检出放在别处的工具又会让 `release` 把别人的检出当成仓库本体。
+**另一份检出不是这棵树。** `git worktree add` 放在树里的检出根上有一个 `.git`，遍历器遇到根以下任何一个自带 `.git` 条目的目录就整个不进去；名为 `.git` 的条目不论是目录还是文件都不收——worktree 与子模块的 `.git` 是一个写着绝对路径的指针文件，它不是入库对象，`release` 读它就会报一台机器的路径。这条规则按结构判，不按名字判，所以它不是那张表里的一行：检出放在哪个目录下都一样被跳过，而一个非检出的隐藏目录照常被扫。被击败的替代是把某个工具的检出目录名加进表里——它只认一个工具，下一个把检出放在别处的工具又会让 `release` 把别人的检出当成仓库本体。
 
 ### `wording`
 
@@ -407,7 +410,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 **为什么可及面不单独成一道门。** 比两侧**写下的**角色与可及名，是没有浏览器时的替代品；门能进浏览器之后，角色、可及名与地标从画出来的 DOM 上读更准，也少一份要维护的读法。
 
-**判不了的理由各自点名**：没有构建产物（`target/web-dist/`）、没有引擎、画廊什么都没画——三种各报一条违规，各说各的。一道找不到东西就悄悄变绿的门，是这里要避的失效。
+**判不了的理由各自点名**：没有构建产物（`crates/sprawling/web-dist/`）、没有引擎、画廊什么都没画——三种各报一条违规，各说各的。一道找不到东西就悄悄变绿的门，是这里要避的失效。
 
 **探针等懒加载的视图落地才量。** 客户端把单独成块、按需取来的视图（例如 `#/gallery`）在块落地之前标一个 `data-pending` 属性，块到了这个标记随占位一起消失。以 `file://` 取来的块不占住引擎的虚拟时间，所以只在 `SETTLE_MS` 那一刻量一次，量到的是一页没有首标题的半成品。所以门给自己那份插了探针的副本在 `<head>` 里为 bundle `assets/` 下每个页面自己没点名的脚本块加一行 `<link rel="modulepreload">`（`engine::preloads`）：预取属于文档加载，而文档加载占住虚拟时间，块于是在探针量之前就已取到，之后的 `import()` 直接拿到它；交付的页面不带这几行，仍然按需取。探针在 `SETTLE_MS` 之后每 `POLL_MS` 问一次，直到页上没有 `PENDING`；到 `BUDGET_MS` 前两次轮询还在等，就把「还在等」写进 `FAILED`，门报「页面没有在量之前稳下来」，不去判那半页。不用 ARIA 的 `aria-busy`，理由是画廊把骨架屏和加载中的按钮当夹具来画，它们在页面开着的整段时间里都读作忙碌，拿它当信号探针永远等不到。
 
@@ -504,15 +507,19 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 **本节属门禁机具，与产品代码分开提交。**
 
-### 8-18 `target/web-dist` 的一个家：产品的 build script 说它叫什么
+### 8-18 客户端包的一个家：产品的 build script 说它叫什么
 
 **一个目录，写者一个读者三个。** `client/vite.config.ts` 写出那个目录，`crates/sprawling/build.rs` 嵌入它，`xtask::render` 打开它，`xtask::budget` 称它。四处各写一份时，改 `outDir` 之后没有一处会红：build script 走 placeholder 只打一条 warning，两道门各自找不到对象，直到有人下载到一个只有空白页的二进制——这正是「找不到输入就变绿」那一类失效（§8-13）。
 
-**权威落在 `crates/sprawling/build.rs` 的 `BUNDLE_DIR`，它的值是相对工作区根、以 `/` 分段的整条路径 `target/web-dist`，判据两条。** 谁先需要它：任何一次 `cargo build` 都要先由 build script 找到那个目录，而门跑在其后。谁能被另一个引用：build script 是**唯一一个在已发布树里仍要工作的读者**——`release::is_scaffolding` 把 `tools/xtask/` 留在机器上，所以一个住在 `xtask` 的常量在那棵树上根本不存在，而反方向可行——`xtask::bundle` 用 `syn` 从 build script 里读出这个常量。故 `xtask` 侧零副本：`render` 与 `budget` 都调 `bundle::dist(root)`，它把这条路径逐段接在工作区根上。
+**权威落在 `crates/sprawling/build.rs` 的 `BUNDLE_DIR`，它的值是相对 `sprawling` 包目录、以 `/` 分段的路径 `web-dist`，判据两条。** 谁先需要它：任何一次 `cargo build` 都要先由 build script 找到那个目录，而门跑在其后。谁能被另一个引用：build script 是**唯一一个在已发布树里仍要工作的读者**——`release::is_scaffolding` 把 `tools/xtask/` 留在机器上，crates.io 上的 `.crate` 里也只有这个包自己的文件，所以一个住在 `xtask` 的常量在那两棵树上根本不存在，而反方向可行——`xtask::bundle` 用 `syn` 从 build script 里读出这个常量。故 `xtask` 侧零副本：`bundle::stated_path` 把它接在 build script 所在的目录后面，交出仓库相对的整条路径 `crates/sprawling/web-dist`；`render`、`budget` 与 `shots` 都调 `bundle::dist(root)`，它把这条路径逐段接在工作区根上。
 
-**另外两处用另一门语言写，由闸断言相等而不代写**：`client/vite.config.ts` 与 `justfile` 必须拼出权威说的那条路径，不然 `artifact` 门红。一道门不改别人的打包器配置。**判的是整条路径而不只是目录名**：父目录 `target` 若在各处各写一份，名字对得上而位置对不上，门仍是绿的。
+**包体在包里，因为 crates.io 上只有包。** `cargo package` 只把包目录里的文件打进 `.crate`，验证构建与 `cargo install` 都在那份解开的包里跑 `build.rs`；包体落在工作区的 `target/` 下时，从 crates.io 装出来的二进制只带占位页。`sprawling` 的清单用 `include` 把被 `.gitignore` 挡掉的 `web-dist/` 收进包（sprawling-SPEC 8-157）。
 
-**包的位置与 cargo 的输出目录无关。** 客户端包是 bun 的产物，`build.rs` 不读 `CARGO_TARGET_DIR`，只在工作区根下找 `BUNDLE_DIR`（sprawling-SPEC §8-83）。若让三个读者都跟随 cargo 的目标目录，每个读者都要复刻 cargo 解析它的规则（环境变量、`build.target-dir`、相对路径按当前目录解析），而这三份复刻用两门语言写，没有门能判它们相等。
+**另外两处用另一门语言写，由闸断言相等而不代写**：`client/vite.config.ts` 与 `justfile` 必须拼出 `stated_path` 交出的那条仓库相对路径，不然 `artifact` 门红。一道门不改别人的打包器配置。**判的是整条路径而不只是目录名**：父目录若在各处各写一份，名字对得上而位置对不上，门仍是绿的。
+
+**包的位置与 cargo 的输出目录无关。** 客户端包是 bun 的产物，`build.rs` 不读 `CARGO_TARGET_DIR`，只在自己的包目录下找 `BUNDLE_DIR`（sprawling-SPEC §8-83）。若让三个读者都跟随 cargo 的目标目录，每个读者都要复刻 cargo 解析它的规则（环境变量、`build.target-dir`、相对路径按当前目录解析），而这三份复刻用两门语言写，没有门能判它们相等。
+
+**扫描面不进它**：`web-dist` 是 `walk::SKIP_DIRS` 的第五个名字，与 `target` 同为构建目录（本文「扫描面」一节）；不跳过时，`release`、`secret`、`header` 会把 Vite 压过的 JavaScript 当成入库对象来判。
 
 **`render` 的 `location` 因此少了一段前缀**：一处版面违规现在报 `#/gallery <这一次开页>`，不再抄一份构建目录——那条读数对着的是画出来的页面，不是盘上的某个文件。
 
@@ -634,9 +641,9 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 **本节属门禁机具，与产品代码分开提交。**
 
-### 8-28 `features` 那两条命令写在 `justfile` 一处，CI 调它
+### 8-28 `features` 那三条命令写在 `justfile` 一处，CI 调它
 
-**决定**：这个仓库对 feature 组合的检查是 `just features` 那两条命令——工作区在默认 feature 集上（`--all-targets`，故测试目标也进编译），以及 `wire` 关掉 `server`。`ci.yml` 的 `clippy` 作业调这条 recipe，自己不拼命令。
+**决定**：这个仓库对 feature 组合的检查是 `just features` 那三条命令——工作区在默认 feature 集上（`--all-targets`，故测试目标也进编译）；`sprawling` 关掉默认 feature，也就是不带执行引擎的那一份二进制（`sandbox` 是默认 feature 之后，别的命令都不再编译它）；以及 `wire` 关掉 `server`。`ci.yml` 的 `clippy` 作业调这条 recipe，自己不拼命令。
 
 **为什么**：同一个检查写过三遍时它们真的分叉了——CI 那一遍少了 `--all-targets`，于是本地门红的那棵树在 CI 上是绿的；三处又各自声称「别的命令都不编译这一份」，而三句话合起来互相证伪。`--all-targets` 是非对称的那一半：`cargo check` 单独一条不编译测试目标，而 `refusal_matrix` 曾在未声明 gate 的情况下用 `#[cfg(feature = "conformance")]` 的项，唯一编译过它的配置是 `--all-features`。
 
@@ -813,8 +820,11 @@ pub(crate) struct Member {
     pub(crate) dir: String,                  // 仓库相对、以 `/` 分段
     pub(crate) role: Role,
     pub(crate) depends_on: BTreeSet<String>, // 正常与构建依赖点名的包名；dev 依赖不在内
+    pub(crate) publish: Publish,
+    pub(crate) roots: Vec<String>,           // lib、bin、构建脚本、过程宏这几种 target 的源文件，仓库相对；测试、bench、example 不在内
 }
 pub(crate) enum Role { Product, Tool }
+pub(crate) enum Publish { Registry, Never } // metadata 的 `publish` 是空表即 Never，其余（null 或一张 registry 名单）即 Registry
 
 impl Member {
     pub(crate) fn name(&self) -> &str;             // lib 名；没有 lib 的包用包名
@@ -847,6 +857,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>; /
 | `spec` | 参数经 `find` 找包，`Spec.lean` 骨架写进它的 `dir` |
 | `unused`、`docnum` 的逐包计数 | 全部包的目录 |
 | `justfile` 的 `check-branch` 与 `branch-tests` | `members` 子命令 |
+| `packaged` | `publish` 为 `Registry` 的包的 `dir` 与 `roots`（§8-49） |
 
 **子命令**：`cargo xtask members --owning <path>...` 逐行打印拥有这些路径的工作区包的包名，去重、排序。三种路径跳过：`.md` 与 `.lean`（文档与 Lean 模型的改动不选中 Rust 测试），以及不落在任何工作区包里的路径（一个分支自己的 diff 会列出已经不存在的旧路径）。一条路径归持有它的包里目录最长的那一个（`owner`），所以 `crates/desktop/ffi` 下的改动选中叶子而不是 desktop。不给路径时从标准输入逐行读：一次改名的 diff 有几百条路径，而 Windows 一条命令行最长 32,767 个字符。`cargo xtask members --dir <package>` 打印那个包（经 `find`，按包名或 lib 名）的目录；没有那个包时以 `unknown-package` 退出码 2 拒绝并列出全部包名，不退回一个猜出来的目录。
 
@@ -1073,5 +1084,34 @@ pub(crate) struct Found { body: Body, args: usize }                   // Rust �
 - **失败**：`.zig` 读不出是 `XtaskError::Io`；词法上不完整的文件（一个函数体没有右花括号）不是判不动，那个函数量到文件末尾，因为 `zig fmt --check` 与构建会先拒这份文件。
 
 **测试**：每道门在自建的夹具上判一份 `.zig`：`header::tests::a_zig_file_without_the_header_is_named`（一份缺头的 `.zig` 与一份带头的 `.rs`，只点名前者）；`length::tests::a_long_zig_file_and_a_long_zig_function_are_named`（`root::fixture::relocated` 上一份超过文件预算、含一个超过函数预算的函数的 `.zig`，两条都点名它；`test` 声明里同样长的函数不报）；`length::zig` 的单测：返回类型里的 `union(enum) { … }`、`error{ … }` 不是函数体，字符字面量 `'{'`、字符串与 `\\` 多行字符串里的花括号不计，`extern` 原型不量，`test` 声明的行不计入文件面；`modmap::tests::an_unregistered_zig_file_is_named`（夹具里一份未登记的 `.zig` 被点名，一份登记了的不报）。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+### 8-49 可发布的包只编译它自己带着的文件：`packaged` 门与 `guard::version`（形状 1 判定）
+
+**要挡的事**：`cargo package` 把一个包目录里的文件打进 `.crate`，crates.io 上只有这份文件；验证构建与 `cargo install` 都在解开的包里编译。一个 `include_str!("../../../docs/x.md")` 在工作区里编得过，在包里指向 `target/package/` 或 registry 目录之外不存在的文件，构建失败；而这个失败只在有人发布或安装时才看得见。依赖那一侧同理：一个 path 依赖没有 `version` 就发布不了，`version` 与被依赖包的版本不一致时 cargo 拒绝解析。
+
+```rust
+// xtask::packaged
+pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError>;
+// xtask::guard::version
+pub(super) fn pins(workspace: &toml::Value, members: &[(String, toml::Value)]) -> Vec<Violation>;
+// xtask::package
+pub(crate) fn workspace_package(root: &Path, key: &str) -> Result<String, XtaskError>; // 根清单 `[workspace.package]` 的一个字符串
+pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<&'a str>;
+```
+
+**`packaged` 判什么**：
+
+- **哪些包**：`members`（§8-39）里 `publish` 为 `Registry` 的包；`publish = false` 的工具包（xtask、citysim）不判，因为它们不会被打包。
+- **哪些文件**：从每个包的 `roots`（lib、bin、构建脚本、过程宏的源文件）出发，沿 `mod` 声明走。没有 `#[path]` 的 `mod name;` 落在「子模块目录」下的 `name.rs` 或 `name/mod.rs`：`lib.rs`、`main.rs`、`mod.rs`、构建脚本与经 `#[path]` 载入的文件，子模块目录就是文件自己的目录；其余文件是自己目录下与文件同名（去掉 `.rs`）的子目录；内联 `mod a { … }` 在其上再加一段 `a`。带 `#[path = "p"]` 的声明落在声明它的文件的目录加 `p`（内联块里再加内联模块那几段）。cfg 谓词在 `test` 为假时不能成立的项不进（§12-16）：它是 `test`；或它是 `all(…)` 且某一支如此；或它是 `any(…)` 且每一支都如此；`not(…)` 与别的谓词都算可能成立。一个声明找不到文件，门判不动，`XtaskError::Doc` 点名声明它的文件与模块名。
+- **哪些调用**：走到的每个文件里、不在上面那种测试项内的 `include!`、`include_str!`、`include_bytes!`，连同嵌在别的宏的记号里的。参数有三种读法：字符串字面量按文件所在目录解析；`concat!(env!("OUT_DIR"), …)` 是构建脚本的输出，不判；`concat!(env!("CARGO_MANIFEST_DIR"), "…", …)` 按包目录接上其余字面量。别的写法门读不出它指向哪里，一律是一条违规，替代是改成上面三种之一。
+- **判据**：解析出的路径按词法消去 `.` 与 `..` 之后，落在包目录之内，且不落在嵌套在其中的另一个成员的目录里（cargo 打包时把带 `Cargo.toml` 的子目录整个留下）。违规的位置是 `<文件>:<行>`，规则写「a published package compiles only files it carries」，替代写「把文件挪进拥有它的包；或由构建脚本找到它、写进 `OUT_DIR`；或让那个包交出一个常量给这里读」。
+
+**`guard::version` 判什么**：根清单 `[workspace.dependencies]` 里每一个带 `path` 的项，`version` 恰是 `=` 加 `[workspace.package] version`；没有、或写成别的，红在 `Cargo.toml [workspace.dependencies] <键>` 上，替代给出应写的那一行。成员清单的任何依赖表（`dependencies`、`dev-dependencies`、`build-dependencies`，以及 `target.<cfg>` 下的同名表）里带 `path` 的项都红在 `<目录>/Cargo.toml <表> <键>` 上，替代写「改成 `<键> = { workspace = true }`」：路径与版本只在根清单写一次。版本的唯一权威仍是 `[workspace.package] version`，guard 不另抄一份，只判那十几行 `=` 钉子与它相等；cargo 的依赖表不能写 `version.workspace`，所以钉子必然是抄件，这道判定就是它们的持有者。
+
+**`xtask::package` 的 `workspace_package`**：`[workspace.package]` 的字段只经它读。`package` 与 `channel` 取 `version`，`channel` 取 `repository` 写进每个 npm 包的 `repository` 与 `homepage`（原先是 `channel.rs` 里的常量 `REPOSITORY`，与根清单是同一个事实的两个家）；guard 经 `package_field` 读已解析的根清单。
+
+**测试**：`packaged::tests` 在 `root::fixture` 上建一个小工作区：一个可发布的包的 `lib.rs` 写 `include_str!("../../x.txt")` 必须报一条违规并点名那一行；包内的 `include_str!`、`concat!(env!("OUT_DIR"), …)`、`#[cfg(test)] mod tests;` 声明的文件里的包外 `include_str!`、`#[path]` 载入的文件里的包外 `include_bytes!` 各一例，只有最后一例报；`publish = false` 的包里的包外 `include_str!` 不报。`guard::version::tests` 在夹具清单上判：工作区 `0.0.8` 而某项写 `=0.0.7` 报一条；缺 `version` 报一条；一个成员按路径点名工作区包报一条；全都对时无违规。
 
 **本节属门禁机具，与产品代码分开提交。**
