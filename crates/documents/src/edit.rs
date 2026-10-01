@@ -52,8 +52,27 @@ pub(crate) fn saved_on(
     baseline: B3Hash,
     edits: &[TextEdit],
 ) -> Result<Applied, AxError> {
-    drop(edits);
-    Transaction::new(baseline, Vec::new())?.splice(source)
+    let Reading::Text(encoding) = Reading::of(source) else {
+        return Err(not_text(
+            "the version is not text in any encoding this city reads",
+        ));
+    };
+    let bytes = edits
+        .iter()
+        .map(|edit| {
+            on_characters(encoding, source, edit.span).map(|()| Edit {
+                span: edit.span,
+                bytes: encoding.encode(&edit.text),
+            })
+        })
+        .collect::<Result<Vec<Edit>, AxError>>()?;
+    let applied = Transaction::new(baseline, bytes)?.splice(source)?;
+    if Reading::of(&applied.bytes) != Reading::Text(encoding) {
+        return Err(not_text(
+            "the saved bytes would not read as text in the version's own encoding",
+        ));
+    }
+    Ok(applied)
 }
 
 /// Whether both ends of `span` fall on a character of `source`.

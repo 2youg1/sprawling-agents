@@ -232,7 +232,7 @@ pub enum EventKind {
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and `xtask specalign`.
-    pub const ALL: [EventKind; 85] = [
+    pub const ALL: [EventKind; 89] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -318,6 +318,10 @@ impl EventKind {
         EventKind::DevicePaired,
         EventKind::DeviceRevoked,
         EventKind::RemoteSessionStarted,
+        EventKind::DocumentWritten,
+        EventKind::ProposalOffered,
+        EventKind::ProposalDecided,
+        EventKind::ProposalWithdrawn,
     ];
 }
 

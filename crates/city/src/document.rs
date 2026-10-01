@@ -216,7 +216,14 @@ pub fn revise<T>(
     path: &Path,
     act: impl FnOnce(&Held<'_>, &[u8]) -> Result<T, AxError>,
 ) -> Result<T, AxError> {
-    edit(path, |held| act(held, &[]))
+    edit(path, |held| {
+        let on_disk = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(err) => return Err(storage(path, err.to_string())),
+        };
+        act(held, &on_disk)
+    })
 }
 
 /// One document, held against every other writer of it in this process.

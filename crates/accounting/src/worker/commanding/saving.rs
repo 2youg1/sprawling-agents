@@ -31,7 +31,13 @@ impl RunWorker {
     /// fit, a result that is not text); a file that cannot be read or
     /// replaced; and a history that will not take the line.
     pub(in crate::worker) fn put_range(&mut self, write: &wire::RangeWrite) -> Result<(), AxError> {
-        self.document_path(&write.doc).map(drop)
+        let path = self.document_path(&write.doc)?;
+        let applied = city::revise_document(&path, |held, source| {
+            let applied = documents::save(source, write.baseline, &write.edits)?;
+            held.replace(applied.bytes())?;
+            Ok(applied)
+        })?;
+        self.document_written(&write.doc, &applied)
     }
 
     /// Lands what a person accepted of the proposal cards they decided
