@@ -283,7 +283,7 @@ second answer would be believed about a line nothing had tested.
 
 The file names are the ones `Ground.stored` read, which is the same assumption
 `corrupt`, `tear` and `duplicate` already make about the layout:
-`adversary-SPEC.md` section 14 records it. -/
+`tools/adversary/Spec.lean` section 14 records it. -/
 def Ground.putBack (ground : Ground) (saved : List (String × ByteArray)) : IO Unit := do
   for (name, bytes) in saved do
     IO.FS.writeBinFile (ground.ledger / name) bytes

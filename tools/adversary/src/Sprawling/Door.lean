@@ -167,7 +167,7 @@ inductive Verb where
 door prints what arrives before the city has been silent for a window, so a
 command still being served looks exactly like a command that produced nothing.
 Collapsing the two is how a refused action gets read as a successful one;
-adversary-SPEC section 4 records the measurement that found this. -/
+`tools/adversary/Spec.lean` section 4 records the measurement that found this. -/
 inductive Answer where
   | accepted (frames : List Frame)
   | denied (complaint : Complaint)

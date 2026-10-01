@@ -255,7 +255,7 @@ private def attaching (spelling : String) (index : Nat) : String :=
 
 /-- Every spelling of one endpoint reaches one registration.
 
-The defect this remembers is recorded in `adversary-SPEC.md` section 4, fourth
+The defect this remembers is recorded in `tools/adversary/Spec.lean` section 4, fourth
 finding: the normalisation existed, had its own tests, and had no caller, so the
 city wrote down five different URLs for one endpoint and the first call to four
 of them answered 404. -/

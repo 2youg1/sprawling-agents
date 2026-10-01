@@ -41,7 +41,7 @@ def required (hash : String → String) (genesis : String) (lines : List String)
 
 任何一串 prev 都可以，所以下面的陈述对读者把记录解析成什么都成立；检验器的 `Record` 是这样的读者之一，本模块不 import 它。
 
-摘要函数与创世摘要是参数，因为两者都不是这里的事实：`chain_hash` 住在 `crates/kernel/src/ledger.rs`，它的值与 `GENESIS_PREV` 从产品读出。在这里抄一份，就是 `adversary-SPEC.md` 第 5 节禁止的第二个家。 -/
+摘要函数与创世摘要是参数，因为两者都不是这里的事实：`chain_hash` 住在 `crates/kernel/src/ledger.rs`，它的值与 `GENESIS_PREV` 从产品读出。在这里抄一份，就是 `tools/adversary/Spec.lean` 第 5 节禁止的第二个家。 -/
 def Chained (hash : String → String) (genesis : String) (lines : List String)
     (prevs : List String) : Prop :=
   prevs = required hash genesis lines
@@ -128,7 +128,7 @@ theorem theLastLineIsNotCertified (genesis a b c : String) (different : b ≠ c)
 
 一串 prev，两本账本，都成链，在一条有后继对它取过摘要的行上不同——摘要函数把每一行都映到同一个字符串。`theClaimsDecideTheCoveredLines` 与 `aCoveredLineCannotChangeUnnoticed` 用假设排除的就是这种情形，而它不是边角情形：「假设不成立」就长这个样子。树的校验有多强，就等于这条假设有多强，别无其他。
 
-要紧的是这条假设写在哪里。这里没有证明它，也证明不了：它是关于 blake3 的陈述。树能做的，是说清自己的哪些承诺建立在它上面，`adversary-SPEC.md` 第 5 节做的就是这件事——下一个需要更强保证的读者因此知道自己在换什么，而不是事后发现一个洞。 -/
+要紧的是这条假设写在哪里。这里没有证明它，也证明不了：它是关于 blake3 的陈述。树能做的，是说清自己的哪些承诺建立在它上面，`tools/adversary/Spec.lean` 第 5 节做的就是这件事——下一个需要更强保证的读者因此知道自己在换什么，而不是事后发现一个洞。 -/
 theorem aCoveredLineHidesWithoutInjectivity (genesis a z b : String) (different : a ≠ z) :
     ∃ lines lines' prevs,
       lines ≠ lines' ∧ Chained (fun _ => "") genesis lines prevs

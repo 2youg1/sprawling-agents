@@ -18,7 +18,7 @@ import Sprawling.Acceptance.Walk
 import Sprawling.Acceptance.Checklist
 
 /-! The library index. It holds no logic; every rule lives in the module that
-owns it, and the dependency order is the one `adversary-SPEC.md` section 7
+owns it, and the dependency order is the one `tools/adversary/Spec.lean` section 7
 draws: `Model` → `Door` → `Frame`, `Model` → `Ground` → `Door`, `Provider` →
 `Ground` for the second world, `Layer` → `Ground` with `Check` for the third,
 `Person` on `Layer` for the fourth, and the acceptance world under

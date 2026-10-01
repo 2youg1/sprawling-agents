@@ -1741,13 +1741,13 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 
 ## 8-41 门说的话与门做的事：静默有自己的退出码，重放的命令只做一次（`bin::wire_client`、`accounting::worker::commanding::entrance`）
 
-仓外的对抗性检验器（`tools/adversary/adversary-SPEC.md` §4）留了两条未修的发现。两条都只在**门外**可观测，
+仓外的对抗性检验器（`tools/adversary/Spec.lean` §4）留了两条未修的发现。两条都只在**门外**可观测，
 两条都伤同一类调用方——一个拿退出码分支、拿重试兜底的 agent。本节一次答完，因为它们是同一个承诺的两半：
 **门说出口的话必须等于门做的事**。
 
 ### 发现一：静默不是接受，故它不是 0
 
-**原因**：窗口内没收到拒绝，不等于城照办了。`AttachEndpoint` 指向一个连不上的 base URL 时，产品侧探测 15 s，客户端默认窗口 2 s（adversary-SPEC §4 第一个发现）；把没有拒绝读成 0，「拒绝没赶上静默窗口」与「城照办了」就是同一个码。
+**原因**：窗口内没收到拒绝，不等于城照办了。`AttachEndpoint` 指向一个连不上的 base URL 时，产品侧探测 15 s，客户端默认窗口 2 s（`tools/adversary/Spec.lean` §4 第一个发现）；把没有拒绝读成 0，「拒绝没赶上静默窗口」与「城照办了」就是同一个码。
 
 **依据**：`call` 与 `dispatch` 有四种结局。
 
@@ -1849,7 +1849,7 @@ socket 上的一次对话与 HTTP 上的一次托管是两件事，同处一个�
 ### 文档同步
 
 本节；`ARCHITECTURE.md` §12 增 `accounting::worker::commanding::entrance` 与两个测试文件的行；
-`kernel-SPEC.md` 的 `gate::dedup` 一节记下它的承兑人；`tools/adversary/adversary-SPEC.md` §4 两条发现标注已修。
+`kernel-SPEC.md` 的 `gate::dedup` 一节记下它的承兑人；`tools/adversary/Spec.lean` §4 两条发现标注已修。
 `docs/operating.md` 增退出码表。公开面：`bin::wire_client` 与 `bin::assembly` 都是二进制内部（`pub(crate)`
 以下），`RunWorker::handle` 的签名不变，故 `api-baselines` 不动。
 
@@ -2183,7 +2183,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 
 本节；`wire-SPEC.md` §8-17 与 §2 的 golden（WIRE_V 13→14，Query 15 个）；
 `storage-SPEC.md` §8-18；`ARCHITECTURE.md` §7 的两个数与 §12 的 `accounting::views::commits` 一行；
-`README.md` 的 History 一节；`tools/adversary/adversary-SPEC.md` §2 的线面计数。
+`README.md` 的 History 一节；`tools/adversary/Spec.lean` §2 的线面计数。
 公开面：`wire` 增 `Query::Commit`／`Answer::Commit`／`CommitAnswer`，
 `storage` 增 `Provenance::model_fields`／`model_choice_of`／`effort_word`，
 `sprawling` 增 `ask`，故 `api-baselines` 三份随之重算。

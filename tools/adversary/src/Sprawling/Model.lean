@@ -149,7 +149,7 @@ def refusal (world : World) : Action y → Option Code
     if !standing world addr then some ⟨"E_GATE_DENIED"⟩
     else if reserved addr then some ⟨"E_INVALID_ARGS"⟩
     -- Nothing has been attached, so no tag names a model, and every dispatch
-    -- stops at configuration. adversary-SPEC section 3 records that no provider
+    -- stops at configuration. `tools/adversary/Spec.lean` section 3 records that no provider
     -- is ever attached.
     --
     -- Whether the building exists is **not** asked here, and that is a measured
@@ -215,7 +215,7 @@ def World.after (world : World) : Trace → World
 
 `look` is reachable in a hand-written trace and absent from this generator,
 which is not an oversight. A refused dispatch leaves a directory behind
-(adversary-SPEC section 4), and `city_view` scans directories, so a random trace
+(`tools/adversary/Spec.lean` section 4), and `city_view` scans directories, so a random trace
 containing one would fail every later `look` for a cause that has nothing to do
 with the step it landed on. Generating it would therefore report one defect as
 many, and hide the next one behind it. The claim itself is asserted once, by
@@ -299,7 +299,7 @@ def perform (world : World) (act : Action y) : Attempt (Except Complaint y.Obser
   | .denied complaint => return .error complaint
   | .quiet =>
     throw <| IO.userError
-      s!"the city said nothing at all to {act}; see adversary-SPEC section 4"
+      s!"the city said nothing at all to {act}; see `tools/adversary/Spec.lean` section 4"
   | .accepted frames =>
     match project act frames with
     | some value => return .ok value

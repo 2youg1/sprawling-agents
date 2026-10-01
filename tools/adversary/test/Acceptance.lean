@@ -13,7 +13,7 @@ order: `script` writes what the stand-in provider will play, the recipe starts
 the stand-in on it, and `walk` drives the archive's binary through the city a
 stranger raises. The recipe holds the order because it holds the processes:
 the stand-in is started outside this directory, which hosts no server of its
-own (`adversary-SPEC.md` section 13).
+own (`tools/adversary/Spec.lean` section 13).
 
 Unlike `adversary`, nothing here is skipped. The person asked for this run by
 naming an archive, so a binary or a provider that is missing is a failure that

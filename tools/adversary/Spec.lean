@@ -1,10 +1,23 @@
-# adversary-SPEC
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-> `tools/adversary/` —— 仓外的对抗性性质检验器。它不是 crate，不进 workspace，不进发布物，不进 `just check`。
->
-> 权威顺序：人的决定 → `ARCHITECTURE.md` §8「the wire is the whole API; a second client writes against it」→ 本文 → 代码与测试。本文先于代码改动。
+import tools.adversary.spec.Acceptance
+import tools.adversary.spec.Answer
+import tools.adversary.spec.Check
+import tools.adversary.spec.Model
 
-## 1 需求分解
+/-! # adversary 的规格
+
+`tools/adversary/` —— 仓外的对抗性性质检验器与验收世界。它不是 crate，不进 workspace，不进发布物；检验器不进 `just check`，本规格进 `just models`。
+
+权威顺序：人的决定 → `ARCHITECTURE.md` §8「the wire is the whole API; a second client writes against it」→ 本规格 → 检验器的代码与它的运行。本规格先于代码改动。
+
+本文件是规格的入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定，决定写作 `D<n>`，别处引作 `adversary D<n>`。这份规格在 Markdown 时 §12 没有编号的条目，D1 到 D5 从这一版起编。
+-/
+
+/-! ## 1 需求分解
 
 `ARCHITECTURE.md` §8 把线格式定为整个 API，并明说「用任何语言写第二个客户端都是支持的」。本目录行使这一条：它是**第三个**客户端，写在仓外，用来攻击而不是使用。拆成以下可独立验收的最小单元：
 
@@ -22,15 +35,16 @@
 
 **不负责**：任何规则的再实现（链哈希、`IdemKey` 派生、写域判定、份额守恒）；任何 Rust 侧的构建闸门；任何随产品交付的东西。三者中任何一条被违反，本目录应当被删除而不是被修补。
 
-**本目录只有检验器。** 规定某个 Rust 模块必须守住哪些性质的 Lean 模型住在该 crate 的 `spec/` 下（ARCHITECTURE.md §11「Specifications in Lean」），由 `just models` 证明。Lean 包的三个文件（`lakefile.toml`、`lean-toolchain`、`lake-manifest.json`）在仓库根，本目录是其中三个目标：`Sprawling` 库（`src/`）与 `adversary`、`acceptance` 两个可执行文件（`test/`）。它们只 import `Sprawling.*` 与 Lean 工具链自带的库，不 import 任何规格，所以检验器里没有任何规则的再实现；`just adversary` 与夜间任务构建它们，`just models` 不碰它们。
+**本目录是检验器与它自己的规格。** 规定某个 Rust 模块必须守住哪些性质的 Lean 模型住在该 crate 的 `spec/` 下（ARCHITECTURE.md §11「Specifications in Lean」），由 `just models` 证明。Lean 包的三个文件（`lakefile.toml`、`lean-toolchain`、`lake-manifest.json`）在仓库根，检验器是其中三个目标：`Sprawling` 库（`src/`）与 `adversary`、`acceptance` 两个可执行文件（`test/`）。它们只 import `Sprawling.*` 与 Lean 工具链自带的库，不 import 任何规格，所以检验器里没有任何规则的再实现；`just adversary`、`just acceptance` 与夜间任务构建它们，`just models` 不碰它们。检验器自己的规格是本文件与 `spec/` 下的分部，属于 `Spec` 库（`lakefile.toml` 的 `tools.adversary.Spec` 与 `tools.adversary.spec.+` 两个 glob），由 `just models` 证明；它只 import 工具链与自己的分部，不 import 检验器（ARCHITECTURE.md §11），所以分部里写的是参照定义与定理，检验器是它们的实现。
 
 **U9 不在 `just adversary` 的检查树里**：它要一个发行归档和一个会应答的 provider，那一跑两样都没有。它是另一个可执行文件 `acceptance`，只由 `just acceptance <archive>` 调用；树里的世界不挂会应答的 endpoint，U9 挂，这是两者唯一的分界。
 
 **U6 是本目录相对一次性 CLI 检验器的增量**，理由在产品而不在方法：一座城把**一条全序的历史**写在磁盘上，于是「任意轨迹之后历史仍然自洽」是一条可以对着随机轨迹反复问的性质，而不只是一次定点检查。
+-/
 
-## 2 验收标准
+/-! ## 2 验收标准
 
-1. `just adversary` 全绿：树里每一条检查都通过，`0 failed`。**条数没有第二个家**——它是 `test/Main.lean` 的叶子数，今天 23 条。
+1. `just adversary` 全绿：树里每一条检查都通过，`0 failed`。**条数没有第二个家**——它是 `test/Main.lean` 的叶子数，本规格不抄。
 
    **曾经不是全绿**：U7 的五条里有三条红（等价类一条、上限两条），红在产品而不在检查。两处修复都落在 `crates/` 下——`Entered::resolved` 成为打字地址变成被调用地址的唯一一处，`select_model` 经 `OutputCeiling::resolve` 取上限——三条随之转绿（实测见 §4 第四、第五个发现）。反例按 §9 第 4 步渲染进 `crates/sprawling/tests/from_adversary.rs`，本目录不再留着它们。
 2. `just check` 不读本目录的任何文件：删掉 `tools/adversary/` 后 `just check` 的每一步不变。没有 Lean 的机器上 `just adversary` 打印 `skipped: Lean is not installed` 并返回 0。
@@ -42,8 +56,9 @@
 6. `just acceptance <archive>` 把归档解进 `target/acceptance/`，按归档的 `skills/` 写出替身的脚本，起替身，然后用归档里的二进制走完 U9 的每一步（§9），每一步打印 `ok` 与耗时，第一处失败以步名开头报出并以退码 1 结束；全部通过才写清单。它不是门，也不进 `just check`：归档要先由 `just package` 造出来，而那是一次发布构建。
 
    **咬得动，已演示。** 去掉第一天里人准入 skill 的那一步，前四步照常通过，走到 `every shipped skill is pinned, and read by name it reaches the model` 停下，报出 run 钉住的 skill 是空表而书架上有九件；补回那一步转绿。
+-/
 
-## 3 假设与歧义
+/-! ## 3 假设与歧义
 
 | 歧义 | 假设 | 何时失效 |
 |---|---|---|
@@ -56,9 +71,11 @@
 | 配置写回 | 「写了什么就读得回什么」这条不变量的对象是 **TOML 文件**，不是哪一条帧。人层偏好的那一条（`PutPreferences` / `Query::Preferences`）今天并不存在，而 `configure_building` 写楼自己那层、`Query::BuildingView` 把它折回来，是同一条不变量今天已经承载的地方，所以性质写在那里 | 那一对帧落地后，`Layer` 换成它们驱动，断言一字不改：变的是谁写进文件，不是文件欠谁什么 |
 | 时钟 | 只用于超时，从不被预测 | —— |
 | 端口 | 从 47100 起向上探，第一个能答 `city_view` 的即用 | 机器上有别的东西占着整段时报错并说明 |
+| `just check` 读不读本目录 | `AGENTS.md` 写着 `just check` 不读 `tools/adversary/` 下的任何文件。本规格迁到 Lean 之后，`just models` 构建本文件与 `spec/`（ARCHITECTURE.md §11 为 `tools/` 下的规格定的位置），仍不构建检验器 | 那一句要改成「不构建检验器」；它在 `AGENTS.md`，本次迁移没有改它，这一格等它改了就删 |
 | 一次可用性验收还该走什么 | U9 走的是一个人第一天能做的事：城答话、挂上 provider、立楼、准入 skill、派活到结尾、历史自证，以及进程被杀之后城回来接着干。**协作那一串还没走**：市长做计划、两次派活认领同一个节点、重派、`pr check` 判不通过 | 那一串要几个 run 交错调用替身，替身按 run 分开作答之后它进 U9；在那之前它由 `crates/sprawling/tests/acceptance/` 的白盒部分承担 |
+-/
 
-## 4 现状分析
+/-! ## 4 现状分析
 
 Rust 侧的验收测试全部是**具体轨迹**：`crates/sprawling/tests/assembly_door.rs` 证明「这一条路走得通」，不证明「任何一条路都走不出去」。本目录的全部增量在后者，以及三件 Rust 侧写不出的事：
 
@@ -138,8 +155,9 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 **它对检查的约束有两条，都是本目录自己欠的账。** 一是测**检测**的检查必须落在被覆盖的记录上：`Ground.corrupt` 今天挑最老那条是为了确定性（没有城进程在竞写它），而 `a change to any record but the last is refused` 把整段走完，因为一格通过只说明一格；二是**不许把这一格写成需要修的东西**：谁若把「改一条记录必被拒」写成对所有记录成立，他写的是一条产品不欠的断言，而修它的唯一办法是在文件里放一个自指的摘要——那是伪证，不是校验。
 
 **kernel 的规格 `crates/kernel/spec/Ledger.lean` 把这四件事写成了定理，连同它们各自的价格**：字节 ⇒ 声索是免费的（同余，不假设摘要函数）；声索 ⇒ 字节（头一格除外）要买，价钱是摘函数的单射性，而那条假设写在定理自己的语句里，并有一个反模型（常函数）证明它不省得掉；头一格落在所有这一切之外，且不需要任何假设就能证。
+-/
 
-## 5 权威信源
+/-! ## 5 权威信源
 
 **本节只指位置，不抄数值。** 一个被抄进本文的常量就是同一条规则的第二个权威，而它必然先于产品陈旧：这一点是量出来的——本文曾抄下一个 `WIRE_V`，产品早已走过它许多版，而本文读起来仍然像是对的。
 
@@ -154,8 +172,9 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 | 摘要函数的**单射性**（碰撞抵抗） | 不是本仓的事实，也不是本目录能证的事实：它是对所依赖摘要函数的假设 | `crates/kernel/spec/Ledger.lean` 把它作为定理假设写在语句里，并用一个反模型（常函数）证明去掉它结论就假；需要一个比它更强的保证的人，从这里知道自己在换什么 |
 
 **门讲六类帧**（`ServerFrame`）。`Frame.lean` 认得全部六类，并对第七类当场报错——一个未知的帧类意味着线格式变了形，而把新形状当成一次拒绝会把红的测成绿的。其中 `log` 只被解析、不被断言：它没有自己的账本序号，两行可以共用一个位置，漏掉一行什么也没丢；它被解析仅仅因为城在这条通道上**也**叙述它的拒绝，而一个读失败报告的人想看到那句话。
+-/
 
-## 6 命名统一
+/-! ## 6 命名统一
 
 `Address`、`Building`、`Run`、`Ledger`、`Seq`、`Refusal` 一律沿用 `docs/glossary.md` 与 `ARCHITECTURE.md` 的词表，本目录不得另起名字。本目录只新增四个词，各自只指一件事：
 
@@ -167,8 +186,9 @@ B-24 要钉的是「并发两 run 的审批 id 不相等」。审批项的 id �
 | **putBack** | 把一个账本目录按一份读数写回去：本目录撤掉自己造成的伤，好让同一个场地回答第二个位置的问题 |
 
 第三种世界的模块叫 `Layer`，这个词不是本目录新起的：它就是 `city::config_layers::Layer`——配置梯子上的一级。
+-/
 
-## 7 模块边界
+/-! ## 7 模块边界
 
 ```
 src/Sprawling/Frame.lean     线格式的代数镜像。只解析，不判断
@@ -186,6 +206,11 @@ src/Sprawling/Acceptance/Walk.lean   第一天、进程被杀、第二天早上
 src/Sprawling/Acceptance/Checklist.lean 人手测的清单：每一节从决定它的那一处读出
 test/Main.lean               入口与检查树
 test/Acceptance.lean         `acceptance` 可执行文件的两个命令：写脚本、走一遍
+Spec.lean                    本规格的入口：十七节与决定
+spec/Answer.lean             门说了什么：接受、拒绝、静默
+spec/Model.lean              欠哪一种拒绝：守序，以及被拒的命令也花掉它的键
+spec/Check.lean              收缩的候选更短；一个端口一次只借给一个场地
+spec/Acceptance.lean         替身的回复怎样被几个 run 分着花；按序走、停在第一处失败
 ```
 
 依赖单向：`Model` → `Door` → `Frame`，`Model` → `Ground` → `Door`，`Model` → `Check`，`Provider` → `Ground`，`Layer` → `Ground` 与 `Check`，`Person` → `Layer`，`Regression` → `Model` 与 `Provider`。**`Person` 读 `Layer` 而不自立一套**：两个世界问的是同一件事（一份人也手改的文件与一个折出来的答案会不会分岔），差在那份文件在不在城里；序列生成器、收缩器、“这份读数陈述了某个值吗”那一个子串探针、以及七个互不为子串的四位数，全部只有 `Layer` 一个家。`Layer` 不被 `Regression` 读：它至今没有找到反例，而一条没有反例的性质不向 Rust 侧交付任何东西。**`Regression` 依赖两个世界，因为交付物是一个文件**：轨迹那条测试的每一步与极性从 `Model` 读，供应世界那两条测试的拼法、中转站名字与模型 id 从 `Provider` 读，于是演员表在本目录里仍然只有一个家。`Provider` 不 import `Model`：那是另一种世界，两边共用的只有门与场地。`Frame` 不 import 任何本工程模块；`Check` 也不，且它**不 import `Door`**——抽样与收缩不允许知道有一座城存在。
@@ -194,9 +219,12 @@ test/Acceptance.lean         `acceptance` 可执行文件的两个命令：写�
 
 **U9 读 `Provider` 与 `Layer` 而不自立一套**：等一条记录、读整段历史、发一条不许被拒的命令在 `Provider`，城自己那一层配置的路径在 `Layer`，服务一个已经起好的目录在 `Ground.servingAt`（`withGround` 就是它加一个一次性目录）。`Script` 不 import 任何本工程模块：脚本是数据，它只知道替身读的那种线上 JSON。
 
-**检验器不 import 规格。** `src/` 与 `test/` 下每一条 `import` 只指向 `Sprawling.*` 或 Lean 工具链自带的库。链与快照的定理在 kernel 与 storage 的规格里（`crates/kernel/spec/Ledger.lean`、`crates/storage/spec/Snapshot.lean`），检验器只在注释里引用它们。一条规则因此只有一处权威：规格陈述它，产品实现它，检验器从门外问产品守没守住。
+**检验器不 import 规格，规格也不 import 检验器。** `src/` 与 `test/` 下每一条 `import` 只指向 `Sprawling.*` 或 Lean 工具链自带的库；本文件与 `spec/` 下的分部只 import 工具链与本规格的分部（`xtask spec` 门判两侧，xtask-SPEC.md §8-47）。链与快照的定理在 kernel 与 storage 的规格里（`crates/kernel/spec/Ledger.lean`、`crates/storage/spec/Snapshot.lean`），检验器只在注释里引用它们。一条规则因此只有一处权威：规格陈述它，产品实现它，检验器从门外问产品守没守住。
+-/
 
-## 8 接口先行
+/-! ## 8 接口先行
+
+检验器的接口如下；它们必须守的性质，凡能写成定理的，在 `spec/` 的分部里以参照定义与定理陈述：`Adversary.Answer`（`classify` 与「静默不满足任何期待」）、`Adversary.Model`（`owedOnRaise`、`owedOnWork` 与三条守序、`spent` 与「被拒的命令也花掉它的键」）、`Adversary.Check`（`removeAt` 与「候选更短」、端口池 `claim`／`release`）、`Adversary.Acceptance`（`runOn` 与「被杀之后的活以自己的最后一句结束」、`firstBroken` 与「报出的那一步失败而之前的都通过」）。
 
 ```lean
 -- Frame.lean —— 线上说了什么
@@ -290,7 +318,7 @@ def slashTable : String                            -- client/src/core/slash.ts
 inductive Takes | written (grammar : String) | computed
 def pagesIn    : String → List String              -- `BARE` 的键，去掉空键
 def commandsIn : String → List (String × Takes)    -- `SLASH` 每条的拼法与它后面跟什么
-def facesIn    : Json → List (String × String × String)  -- known_hosts 的主机、方言、地址
+def facesIn    : Json → List (String × String × String)  -- known_hosts 的主机、兼容格式、地址
 def knownHosts : Door → Ground → IO Json
 def render     : Gathered → String
 def writeChecklist : Setting → Json → System.FilePath → IO Unit
@@ -343,8 +371,9 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 **黑盒边界由类型划定。** `World` 到 `refusal` 全段没有一个签名提到 `IO`，`Gen` 是种子的纯函数；于是决定「欠哪一种失败」的那一半，和抽取轨迹的那一半，都够不到它们正在审判的那座城。一个能先看后判的模型会按构造与产品一致，那是本目录唯一可能在什么都没检查的情况下报绿的路。
 
 `Action` 以 `Yield` 这个有限标签为索引而不是以结果类型本身为索引：后者会把存在包装推到更高的宇宙，进而把宇宙多态传染给 `Gen`、`shrinkList` 与整棵检查树。以标签为索引，`look` 是唯一答地址表的动作这一点仍由类型保证，而别处一分钱不花。
+-/
 
-## 9 工作流程
+/-! ## 9 工作流程
 
 1. `just adversary` 先 `cargo build -p sprawling`，把二进制路径经 `SPRAWLING_BIN` 传给检查器。**唯一一处知道二进制在哪的地方是 justfile**。
 2. `lake exe adversary` 按树跑：先跑 U5 的渲染对拍（毫秒级，先失败先止损），再跑 U1 的门契约，再跑 U3 的随机轨迹，然后 U4 的定向场景，再是 U6 的历史自洽与磁盘敌意，最后是按缺陷命名的那一组与那一条。
@@ -359,8 +388,9 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
    全部通过后，`walk` 把清单写到 `target/acceptance/checklist.md`（§8 `Acceptance/Checklist.lean`）。
 
    配方在结束时停掉替身，无论走没走完。
+-/
 
-## 10 实现逻辑
+/-! ## 10 实现逻辑
 
 **门**：`IO.Process.output` 在等待之前把两个管道读空——这是手写版本必须记住的死锁：一个没被读的管道会让子进程活着，于是先等待就会在输出超过一个缓冲区时把两边挂住。退出码 0／1／3 都要读 stdout；退出码 2 是 `sprawling call` 的命令行被拒，而帧是命令行的一部分——客户端在开套接字之前先解析帧。所以退出码 2 按帧的作者分两种读法：从 `Verb` 编码出来的帧本该可读，被拒就是本目录自己的错，抛出；为了被拒而手写的帧（`askRaw`，如 `put_secret` 与读不懂的三种帧），stderr 上带 `E_` 码的那行拒绝就是答复。
 
@@ -404,7 +434,10 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 
 **「拒绝」不是「期望输出」**。模型断言的是**哪一种失败**，从不断言任何被计算出来的值：错误码由 `AGENTS.md` 定为门的契约的一部分，钉住它钉的是产品对调用方的承诺，不是对某条规则的重算。
 
-## 11 边界枚举
+D5 **验收世界一次只派一个 run，走到第一处失败就停。** 替身按请求到达的次序花掉回复，并发的两个 run 会互相花掉对方的回复，脚本就失去确定的意义；每一步又站在前面几步留下的城上，一处失败之后接着走，只会把一个原因报成许多个。唯一不等的 run 是要杀掉的那个，它的回复全是同一个只读调用，接着花剩下回复的 run 因此以同一句话结束（`spec/Acceptance.lean` 的 `the_work_after_the_crash_ends_on_its_own_line`）。被否：让替身按 run 分开作答再并发派活——那是 `citysim-SPEC.md` §3-11 记下的重开参数，等它落地，协作那一串（§3）随之进来。
+-/
+
+/-! ## 11 边界枚举
 
 | 边界 | 处理 |
 |---|---|
@@ -420,14 +453,20 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 | U9 没有 `SPRAWLING_BIN` 或 `SPRAWLING_PROVIDER` | 抛出并说明该经 `just acceptance <archive>` 运行。与检查树不同，U9 不跳过：人点名了一个归档，一跑什么都没走的绿就是在报一次没发生的验收 |
 | 归档的书架上一件 skill 都没有 | `acceptance script` 拒绝写脚本：一次什么都不钉、什么都不读的验收会让 skill 那一步平凡成立 |
 | 人要改的那一行不在模板里 | `admit` 拒绝而不追加：第二个 `reading_room` 键会让城以本目录造成的原因拒这份文件；`mountShelf` 对已经有 `[skills]` 的配置同理 |
+-/
 
-## 12 Decisions
+/-! ## 12 错误处理
+
+D1 断言不成立就是发现，不是一个要恢复的错误。
 
 本目录没有「恢复」这个概念：断言不成立就是发现，发现就该停下并交付一个 Rust 回归测试。三件被当作错误处理的事：**门的形状变了**（JSON 解析失败、未知帧类）、**场地起不来**（端口或进程）、**用法错**（从 `Verb` 编码的帧得到退出码 2）。它们都抛异常，因为继续跑只会把新形状当成拒绝，从而把红的测成绿的。
 
-## 13 依赖选型
+被否：遇到读不懂的形状时记一条警告接着跑——那会把一个变了形的门当成一次拒绝，把红的测成绿的。
+-/
 
-**一个外部依赖都不引入。** 仓库根 `lake-manifest.json` 的 `"packages": []` 是这条的机器形式。
+/-! ## 13 依赖选型
+
+D2 **一个外部依赖都不引入。** 仓库根 `lake-manifest.json` 的 `"packages": []` 是这条的机器形式。
 
 | 需要的东西 | 由谁提供 |
 |---|---|
@@ -444,9 +483,10 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 
 **不引入**：任何 FFI、任何绑定 Rust 类型的东西、任何需要改 Rust 代码才能工作的东西、任何 HTTP 服务端（假 provider 会让本目录变成第二个 gateway 实现）。
 
-**一个会应答的 provider 从 justfile 接收，不在本目录里起。** U9 要一座调用成功的城，替身是 `tools/citysim` 的 `provider` 二进制（`citysim-SPEC.md` §8-10），由 `just acceptance` 起在本目录之外，URL 经 `SPRAWLING_PROVIDER` 交进来——与二进制的路径经 `SPRAWLING_BIN` 交进来是同一个形状。一个接收来的 URL 不让本目录变成第二个 gateway 实现：替身用城自己的翻译读脚本里的每一条回复，HTTP 那一面是 citysim 的，本目录只写脚本，而脚本是 U9 把期待写成数据。**被否**：在 Lean 里起一个 HTTP 服务端——本目录会多出一个 provider 的实现，并为一个注册表之外的协议栈负责；用 Rust 写一个起子进程的测试去驱动发行件——从门外进城的检查是 Lean 的（边界那条裁定，`xtask boundary` 守着），换成 Rust 就是把黑盒写回白盒的那一侧。
+D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。** U9 要一座调用成功的城，替身是 `tools/citysim` 的 `provider` 二进制（`citysim-SPEC.md` §8-10），由 `just acceptance` 起在本目录之外，URL 经 `SPRAWLING_PROVIDER` 交进来——与二进制的路径经 `SPRAWLING_BIN` 交进来是同一个形状。一个接收来的 URL 不让本目录变成第二个 gateway 实现：替身用城自己的翻译读脚本里的每一条回复，HTTP 那一面是 citysim 的，本目录只写脚本，而脚本是 U9 把期待写成数据。**被否**：在 Lean 里起一个 HTTP 服务端——本目录会多出一个 provider 的实现，并为一个注册表之外的协议栈负责；用 Rust 写一个起子进程的测试去驱动发行件——从门外进城的检查是 Lean 的（`xtask boundary` 守着的那条边界），换成 Rust 就是把黑盒写回白盒的那一侧。
+-/
 
-## 14 硬编码声明
+/-! ## 14 硬编码声明
 
 | 硬编码 | 意图 | 后续影响 |
 |---|---|---|
@@ -470,40 +510,43 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 | 幂等键 400–405 | U9 每条命令一把，与检查树的 0–323 不相交，一份报告里不会有两条命令共用一个数 | —— |
 | 目录 `target/acceptance/` | 解开的归档、脚本、替身的记录、清单都在这里，配方每次先清空它 | 由 justfile 提供 |
 | 客户端的两张表 `client/src/core/route.ts`、`client/src/core/slash.ts`，以及它们的开头行 `const BARE`、`export const SLASH` | 清单的页面与命令两节从这里读；`just acceptance` 在仓库根运行，路径相对于根 | 表搬家或改了开头行时，那一节读成空，清单把空节写成一行要人先查原因的条目，而不是一个空标题 |
+-/
 
-## 15 影响面
+/-! ## 15 影响面
 
 对 Rust 侧的影响**必须**恰好为零：不改 `Cargo.toml` 的 members，不进 `cargo deny` 的依赖图，不参与 `xtask length` 的行数，不进 `xtask modmap` 的模块表。唯一的交汇点是 `crates/sprawling/tests/from_adversary.rs`——它由本目录渲染、由 `cargo test` 编译，两侧任何一方漂移都会让某一侧变红。
 
 `xtask` 的扫描不进 `.lake`（`walk::SKIP_DIRS`），因为那是构建产物，而一道门为已提交的对象作证。`xtask release` 拒绝「引用了一台机器自己的文件的文件」，`xtask header` 要求每个 `.rs` 带 MPL 抬头；本目录不含 `.rs`，且只引用仓内相对路径与环境变量名，两道门都不适用。
+-/
 
-## 16 测试与约束
+/-! ## 16 测试与约束
 
-按「坏得越早越省时间」排序，共 23 条：渲染对拍（U5，毫秒级）、门的契约三条（U1，含 §4 那条退出码性质）、人填进去的四条（U7：探测的等价类、挂载的等价类、幂等、读不懂的帧）、挂过 provider 的三条（U7：注册带上限、派活不为上限被拒、两条车道是两个 run）、配置写回（U8，实测 26 s）、随机轨迹（U3）、定向停摆（U4）、账本自洽（U6）、磁盘的四句（U2，含 §4 第七个发现之后补上的那一条：改动落在被覆盖的每一格上）、最后是按缺陷命名的那一组与那一条。
+按「坏得越早越省时间」排序：渲染对拍（U5，毫秒级）、门的契约三条（U1，含 §4 那条退出码性质）、人填进去的四条（U7：探测的等价类、挂载的等价类、幂等、读不懂的帧）、挂过 provider 的三条（U7：注册带上限、派活不为上限被拒、两条车道是两个 run）、配置写回（U8，实测 26 s）、随机轨迹（U3）、定向停摆（U4）、账本自洽（U6）、磁盘的四句（U2，含 §4 第七个发现之后补上的那一条：改动落在被覆盖的每一格上）、最后是按缺陷命名的那一组与那一条。
 
 **U8 同样被演示过咬得动**（§2 第 5 条）：把“答案等于最后一次写入”改成“等于第一次写入”后，该条报错，收缩 1 次得到两步反例 `[6556, 9223]`；恢复后转绿。**磁盘那一条同样被演示过**（§4 第七个发现）：把被改的那一格从「除最后一条之外」改成「包括最后一条」，该条报错并指名 `a change inside record 4 of 4 was believed: the chain still verified, with tail seq 3`；改回来转绿。它咬得住的是产品欠的那件事——被覆盖的改动必被读出——而不仅仅是「改一位就会红」。U7 那七条各自实测为 7–37 s（debug 二进制，四核 Windows），其中的时间几乎全在城构造 HTTP 客户端上；其余十三条一整套 2 min 35 s（实测，四核 Windows，热缓存）；同一棵树在两核 Linux 上 51 s，差别在起进程的价钱而不在核数。**新增的那一条**（`a change to any record but the last is refused`）单独实测 18.2 s 首跑、2.5 s 暖盘（同机）：它贵在每问一次都起一个 `replay` 子进程，而不在计算。约束是 §2 第 5 条——**咬得动**必须被演示过，而不是被相信。
 
-U9 不在这 23 条里，它由 `just acceptance` 单独跑：第一天约 1.8 s，被杀那一步约 0.75 s，第二天早上约 2 s（debug 二进制，同一台四核 Windows）。
+U9 不在这棵树里，它由 `just acceptance` 单独跑：第一天约 1.8 s，被杀那一步约 0.75 s，第二天早上约 2 s（debug 二进制，同一台四核 Windows）。
 
 **树里没有一条是被期待失败的。** 一条因为预期会红而被留下的检查，教会每一个看到它的人把红当成常态，于是下一个真的发现落进一次没人读的运行里。
 
 曾经红的那三条现在是绿的，两处修复都在 `crates/` 下（§4 第四、第五个发现）。当时留着它们而不是摘掉，理由在期限：被期待失败的检查，是没有修复日期的那一条；那三条点名了要改的那一处，红只活到修复落地为止。
 
-**整棵树串行跑。** 一座被端起来的城占着一个端口、一个目录与一条历史，两组同时跑就三样都争。实测过的后果不是变慢而是**换城**：输的那一边城绑不上端口退了出去，它自己的探活却在同一个口上接到了赢的那一边的城，于是一整条轨迹跑在别人的历史上。它把当时还开着的那个缺陷测成了绿的——一个答案取决于哪个线程赢了的对手，比没有对手更坏。
+D4 **整棵树串行跑。** 一座被端起来的城占着一个端口、一个目录与一条历史，两组同时跑就三样都争。实测过的后果不是变慢而是**换城**：输的那一边城绑不上端口退了出去，它自己的探活却在同一个口上接到了赢的那一边的城，于是一整条轨迹跑在别人的历史上。它把当时还开着的那个缺陷测成了绿的——一个答案取决于哪个线程赢了的对手，比没有对手更坏。
 
 **一条检查失败不中止整棵树。** 检验器存在的理由是把每一条破掉的承诺都报出来，停在第一条会把其余的藏在它后面。
 
-## 17 文档同步
+**证明的与检查的，分开说。** `spec/` 的分部由 `just models` 证明，没有 `sorry`、`admit`、`axiom`；它们证的是参照定义的性质，不是检验器那几行 Lean 的性质——检验器不 import 规格，规格也不 import 检验器（§7）。检验器与参照定义一致，由从门外跑的两件事作证：`just adversary` 的树（门契约、守序、磁盘、钥匙）与 `just acceptance <archive>` 的那一遍（被杀之后的活跑到它自己的结尾）。一处参照定义与检验器分岔，红出现在这两次运行里，而不在证明里。
+-/
 
-1. 本文。
+/-! ## 17 文档关系
+
+1. 本文件与 `spec/` 下的分部。
 2. `ARCHITECTURE.md` §11 的验证层表——本目录是 V9 之外的一层，记为 V10，并写明它不是门。
 3. `AGENTS.md` 的命令表（`just adversary` 一行）与边界那一节。
 4. `justfile` 的 `adversary` 配方。
 5. `.gitignore` 的 `/.lake`（Lean 包在仓库根），以及 `tools/xtask/src/walk.rs` 的 `SKIP_DIRS`。
 6. `.github/workflows/adversary.yml`——定时任务，永远不进 `check`。
-7. 仓库根的 `lakefile.toml`：本目录的三个目标在那里定义（`Sprawling` 库、`adversary` 与 `acceptance` 两个可执行文件）。
+7. 仓库根的 `lakefile.toml`：检验器的三个目标在那里定义（`Sprawling` 库、`adversary` 与 `acceptance` 两个可执行文件），本规格经 `Spec` 库的两个 glob 进 `just models`。
+9. `tools/xtask/xtask-SPEC.md` §8-47：`spec` 门怎样认出本规格。
 8. `justfile` 的 `acceptance` 配方，以及 `tools/citysim/citysim-SPEC.md` §8-10：替身的脚本格式与它印出的那一行。
-
----
-
-*本文档采用 MPL-2.0。*
+-/

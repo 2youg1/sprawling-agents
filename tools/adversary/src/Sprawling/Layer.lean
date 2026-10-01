@@ -25,7 +25,7 @@ visible from inside the process that wrote them.
 the city itself produced: the answer states the figure of the last write, the
 file states that figure and states no earlier one, and the layer above states
 none of them. A second TOML reader in this directory would be a second authority
-on the file's grammar, which `adversary-SPEC.md` section 1 forbids.
+on the file's grammar, which `tools/adversary/Spec.lean` section 1 forbids.
 
 ## What this stands in for
 
@@ -59,7 +59,7 @@ def cityLayer : String := ".sprawling/CONFIG.toml"
 Four digits each, all distinct, and no one of them a substring of another: the
 file is compared by asking whether it states a figure, so two budgets where one
 reads inside the other would make "the earlier write is gone" untestable.
-Fixed rather than drawn from a range for the reason `adversary-SPEC.md`
+Fixed rather than drawn from a range for the reason `tools/adversary/Spec.lean`
 section 14 gives for the cast of addresses — a counterexample is worth reading
 only when its values are ones a person recognises on sight. -/
 def budgets : List Nat := [7001, 8112, 9223, 4334, 5445, 6556, 3667]

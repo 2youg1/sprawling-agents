@@ -84,7 +84,7 @@ fx 的一次修复之前，一个长回合每一步都留着整份恢复重建�
 
 ### 3-11 决定：进程外的替身 provider 是 citysim 的一个二进制，脚本就是 `ScriptModel` 的那种线上 JSON
 
-黑盒验收要让发行件去调一个会应答的 provider，而三条已有的规则各挡住一个位置：黑盒检查写在 Lean 里（`xtask boundary`），`tools/adversary/` 不自带 HTTP 服务端（adversary-SPEC §13：一个假 provider 会让那个目录变成第二个 gateway 实现），为测试写的东西不进人下载的二进制（`xtask artifact`）。剩下的位置是这里：`bin/provider` 是测试工具，由 justfile 拉起，URL 经环境变量 `SPRAWLING_PROVIDER` 交给调用它的检查，与对抗器经 `SPRAWLING_BIN` 接收二进制是同一个形状。
+黑盒验收要让发行件去调一个会应答的 provider，而三条已有的规则各挡住一个位置：黑盒检查写在 Lean 里（`xtask boundary`），`tools/adversary/` 不自带 HTTP 服务端（`tools/adversary/Spec.lean` §13：一个假 provider 会让那个目录变成第二个 gateway 实现），为测试写的东西不进人下载的二进制（`xtask artifact`）。剩下的位置是这里：`bin/provider` 是测试工具，由 justfile 拉起，URL 经环境变量 `SPRAWLING_PROVIDER` 交给调用它的检查，与对抗器经 `SPRAWLING_BIN` 接收二进制是同一个形状。
 
 脚本的格式只有一种：一份 JSON 写明兼容格式（`face`，拼法取 `kernel::DialectKind` 的 serde 形）、`/models` 列出的模型 id，以及按到达顺序回放的回复，每条回复就是那个兼容格式的 provider 会发的线上 JSON。`WireScript::parse` 把每条回复经 `ScriptModel::from_wire` 读一遍，那里走的是 `gateway::response_from_wire`，与城读真 provider 的回复是同一个函数，所以一份替身能回放的脚本也是 `ScriptModel` 能回放的脚本，写错一个键在解析时就被拒，而不是在城里变成一条 `E_WIRE_MISMATCH`。
 

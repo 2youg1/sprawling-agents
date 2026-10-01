@@ -358,7 +358,7 @@ mod tests {
     /// promised 1 means "the city refused". An agent branching on the
     /// exit code read a refusal it never received as a success - which
     /// the out-of-tree checker measured against a real city
-    /// (`tools/adversary/adversary-SPEC.md` section 4).
+    /// (`tools/adversary/Spec.lean` section 4).
     #[test]
     fn a_city_that_says_nothing_inside_the_window_is_not_a_success() {
         let (at, scripted) = city_saying(Vec::new(), Duration::from_millis(1_500));

@@ -669,14 +669,15 @@ is the whole API and that a second client writes against it; `tools/adversary/`
 exercises that permission by writing a third one outside the workspace, in
 another language, to attack rather than to use. It is reached by
 `just adversary` and by a schedule, never by `just check`,
-which reads nothing under `tools/adversary/`: deleting the directory changes
-no step of the check, and where Lean is absent `just adversary` prints one
-line and succeeds.
+which builds none of the checker: what `just models` reads there is the
+checker's own specification, `tools/adversary/Spec.lean` and its parts,
+proved like any crate's, and where Lean is absent `just adversary` prints
+one line and succeeds.
 What it buys that V2 cannot is quantification over traces: V2 proves that
 the paths we thought of hold, and V10 asks whether the door's stable error
 codes survive any prefix, one halt, and any suffix. What it has found, and
 what each finding cost to fix, is recorded in
-`tools/adversary/adversary-SPEC.md` section 4 — beside the mechanism rather than
+`tools/adversary/Spec.lean` section 4 — beside the mechanism rather than
 here, so that retiring the mechanism retires its record.
 
 **Four gaps, named rather than hidden.** V9 needs a real city served by a
@@ -708,13 +709,15 @@ new crate, uses this layout.
 and `lake-manifest.json` sit at the root; they are the only Lean package
 and the only Lean version pin in the tree. The manifest lists no packages,
 so every import is this tree's or the toolchain's own. The package has
-three targets. The library `Spec` is every module under `crates/`, and
-`just models` builds it inside `just check`. The library `Sprawling`
-(`tools/adversary/src`) and the executable `adversary`
-(`tools/adversary/test`) are the checker, which only `just adversary` and
-the nightly schedule build. The library `Spec` reaches its modules by the
-glob `crates.+`. When the specifications of `tools/xtask`, `tools/citysim`,
-`tools/adversary` or `client` move to Lean, the change that
+four targets. The library `Spec` is every module under `crates/` and
+the checker's own specification, and `just models` builds it inside
+`just check`. The library `Sprawling` (`tools/adversary/src`) and the
+executables `adversary` and `acceptance` (`tools/adversary/test`) are the
+checker, which only `just adversary`, `just acceptance` and the nightly
+schedule build. The library `Spec` reaches its modules by the glob
+`crates.+` and, for the checker's specification, by `tools.adversary.Spec`
+and `tools.adversary.spec.+`. When the specifications of `tools/xtask`,
+`tools/citysim` or `client` move to Lean, the change that
 moves one adds the two globs `<dir>.Spec` and `<dir>.spec.+` for it, with
 `<dir>` its path in dotted form, and never a glob over a whole `tools`
 or `client` tree, because a `.+` glob walks every directory

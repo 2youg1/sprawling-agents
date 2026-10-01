@@ -10,7 +10,7 @@ Three things this directory needs and the toolchain does not offer: drawing a
 random value, making a failing one smaller, and running a named tree of checks
 one at a time. They live here, together, because they are one job — a shrinker
 that could not re-run a check would have nothing to test a candidate with.
-`adversary-SPEC.md` section 13 records what writing them costs and what it buys.
+`tools/adversary/Spec.lean` section 13 records what writing them costs and what it buys.
 
 **This module knows nothing about a city.** It draws values, shrinks them, runs
 a named tree of checks, and reports. Everything about what a trace *means* is
@@ -86,7 +86,7 @@ whole city per step. Single removals follow, so the last few steps can still be
 taken one at a time.
 
 Elements themselves are never made smaller. Every value a trace carries is
-already one word of a fixed cast, and `adversary-SPEC.md` section 14 records why
+already one word of a fixed cast, and `tools/adversary/Spec.lean` section 14 records why
 the cast is fixed: a counterexample is worth reading only if its addresses are
 names a person recognises. -/
 private def removeAt (values : List α) (index count : Nat) : List α :=
@@ -157,7 +157,7 @@ where
 /-- A named tree of checks.
 
 A group, a leaf, and one run at a time. Nothing here runs anything in parallel,
-and `adversary-SPEC.md` section 16 records why: a served city owns a port, a
+and `tools/adversary/Spec.lean` section 16 records why: a served city owns a port, a
 directory and a history, and two groups at once contend for all three. -/
 inductive Tree where
   | leaf (name : String) (check : IO Unit)
