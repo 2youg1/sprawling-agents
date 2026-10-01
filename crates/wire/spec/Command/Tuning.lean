@@ -1,0 +1,39 @@
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-- Copyright (c) 2026 2youg1 and the sprawling contributors
+
+/-!
+# wire::command::tuning
+
+规定 `command::tuning`（`crates/wire/src/` 下同名的文件）。一个人对一个端点定下的、地址之外的规矩。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+-/
+
+/-!
+### 8-29 一个端点带着人给它定的规矩上线
+
+```rust
+pub struct EndpointTuning {
+    pub label: Option<String>,               // 显示名，缺省即 id
+    pub timeout_ms: Option<u64>,             // 一次已结请求的期限
+    pub request_max_retries: Option<u32>,    // 值得再问一次的失败再问几次
+    pub stream_idle_timeout_ms: Option<u64>, // 一次流式请求的期限（命名同 Codex）
+    pub headers: Vec<HeaderPair>,            // { name, value }，value 可为 `secret:` 引用
+    pub overrides: Vec<BodyOverride>,        // { pointer, value }，JSON pointer → 值的文本
+    pub proxying: Option<Proxying>,          // 这个端点的调用走不走这台电脑的代理，缺席即城自己的规则
+}
+
+ProbeEndpoint  { name, base_url, dialect, secret, auth_header, tuning: EndpointTuning, idem }
+AttachEndpoint { name, base_url, dialect, secret, auth_header, admit, tuning: EndpointTuning, idem }
+EndpointSummary { name, label, base_url, dialect, models, local, has_credential }
+```
+
+- **一个值而不是六个字段**。它们在同一张表单上被填，被同一次调用一起读；分开传就给了 probe 与它之后的 attach 三次机会对「我们在跟什么说话」产生分歧——`Entered` 当初收成一个值正是这个理由。
+- **probe 也带 tuning**。一个需要自定义请求头的网关，在 probe 不带那个头时答 401；人于是读到「密钥无效」，而那把密钥是好的。probe 与 call 因此按同一套头、同一个期限发出。
+- **覆盖的值走文本，不走 `serde_json::Value`**。`Command` 派生 `Eq`，而 JSON 没有全序相等；更要紧的是 `/temperature` → `0.2` 一旦成为值就是一个浮点，而它随 `endpoint_attached` 进账本——这座城把浮点挡在账本之外。文本原样往返，「这段文本作为 JSON 是什么」只有一个权威：`gateway::EndpointTuning::applied_overrides`，规则是「解析得出就是那个 JSON，解析不出就是它看上去的那个字符串」，于是 `/reasoning/effort` → `high` 不必要求人自己加引号。**败给的方案**：帧上直接放 `Value`——那要求 `Command` 放弃 `Eq`，并把浮点写进账本。
+- **零即缺省**。清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成；装配层把零读成「没说」（`accounting::worker::credentials::tuning_of`），于是清空一个框等于回到城自己的值，而不是让此后每一次调用立刻失败。
+- **`stream_idle_timeout_ms` 在线上保留 Codex 的名字，在 gateway 里叫 `stream_deadline_ms`**：阻塞传输交回的是一个没有分块钩子的 body reader，城因此能限定一次应答总共多久，限定不了其中某一次沉默多久。线上用人在自己 `config.toml` 里写熟的那个词，gateway 用它真正做到的那件事命名，装配层是唯一的翻译点。**败给的方案**：在 gateway 里也叫 idle——那会让一个读代码的人以为分块之间有计时器。
+- **`Turn` 携 `thought`**。thinking 块为供应方的签名校验端到端携带，看起来属于传输；但对一个把大部分调用花在推理上的模型，挡住它就是让人先对着空线程等几分钟，再读到两句话。所以推理以自己的字段作答，页面把它折起来放在散文旁边，两者永不混进同一个缓冲区。`RedactedThinking` 仍然不出现：它的载荷是加密的，里面没有人能读的东西。
+- **`EndpointSummary` 长出 `label`**：缺省即 `name`，所以页面永远不必替一个没写显示名的端点决定显示什么。
+- **`proxying` 跟着 tuning 走，因而探测与调用恒用同一个决定**（WIRE_V 27→28）。一个只在调用时生效的代理设置，会让表单上那份分段读数描述一条真正的调用不会走的路，而那份读数存在的全部意义就是告诉人调用停在了哪一段。`Option` 而非值：线上的缺席是「没人定过」，装配层把它翻成城的默认值（`ExceptLocal`），于是 `gateway` 一侧拿到的是一个已经定下来的值，没有第三种状态要每一个调用方再答一次。
+-/
