@@ -47,6 +47,9 @@ fn a_reading_line_is_stable_and_carries_its_machine_class() {
 /// The floor is what the path costs on a quiet machine and the middle
 /// is what it cost beside everything else the machine did, so a line
 /// that drops the first cannot tell a slower design from a busier day.
+/// The shares are the nearest rank, `ceil(n * p / 100)` counted from
+/// one, the reading `bench_startup` and `sprawling gauge` print for the
+/// same samples (sprawling-SPEC.md 8-129-2).
 #[test]
 fn a_reading_line_carries_its_floor_beside_the_middle() {
     let reading = Reading::of(
@@ -60,7 +63,7 @@ fn a_reading_line_carries_its_floor_beside_the_middle() {
         reading.line(),
         format!(
             "perf load=long_session_forwarding sub=harness machine_class=general fixture={} \
-             samples=100 floor_us=1 p50_us=51 p95_us=96 p99_us=100",
+             samples=100 floor_us=1 p50_us=50 p95_us=95 p99_us=99",
             label()
         )
     );
