@@ -101,7 +101,7 @@ sprawling init <city-dir>             # found a city; the name is written into t
 sprawling serve <city-dir> [addr]     # serve a city that already exists; loopback only by default
 sprawling dispatch <addr> <task>      # send one task to a served city and print its events until the run ends; -m <id> picks the model
 sprawling call '<frame>'              # send one wire frame, print every frame back; the exit code is the answer
-sprawling top                         # watch a served city's monitor
+sprawling gauge -- <program> [arg...] # time a command over --samples runs; --pid watches a process, --at a served city (alias: top)
 sprawling view <city>                 # read a city's Ledger lines or its run tree, read-only
 sprawling check <city>                # read every TOML file a city holds; print each error as path:line:column
 sprawling doctor [<city>] [--install] # what this machine has against what a city needs

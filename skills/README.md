@@ -6,6 +6,7 @@ Agent skills that ship with sprawling. Each directory holds one skill, and its `
 |---|---|
 | [`authority-review`](authority-review/SKILL.md) | A two-pass audit of a branch before it merges: bugs and broken behaviour first, then every fact that has more than one definition |
 | [`blast-radius`](blast-radius/SKILL.md) | What a change could break outside its diff, proved by running code |
+| [`gauge`](gauge/SKILL.md) | Measuring a performance change with `sprawling gauge`: a pinned load, a baseline, alternating rounds, and a gate on a count rather than a clock |
 | [`how`](how/SKILL.md) | How a subsystem works, and where a piece of code should live |
 | [`sdd`](sdd/SKILL.md) | Specification-first development with Lean contracts |
 | [`translation`](translation/SKILL.md) | Translating texts whose form carries the thought into Chinese |

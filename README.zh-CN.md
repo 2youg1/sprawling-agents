@@ -101,7 +101,7 @@ sprawling init <city-dir>             # 建城；城名写进创世记录
 sprawling serve <city-dir> [addr]     # 服务一座已经存在的城；默认只监听回环地址
 sprawling dispatch <addr> <task>      # 给一座正在服务的城派一件活，打印它的事件直到 run 结束；-m <id> 指定模型
 sprawling call '<frame>'              # 发一帧线协议，把回来的每一帧打印出来；退出码就是答案
-sprawling top                         # 看一座正在服务的城的监视器
+sprawling gauge -- <program> [arg...] # 把一条命令跑 --samples 次并计时；--pid 看一个进程，--at 看一座正在服务的城（别名 top）
 sprawling view <city>                 # 只读地读一座城的 Ledger 行或它的 run 树
 sprawling check <city>                # 读城里的每个 TOML 文件，把每个错误打印成 path:line:column
 sprawling doctor [<city>] [--install] # 这台电脑有的，对照一座城需要的

@@ -52,6 +52,11 @@ author licenses these three files under MPL-2.0, the license in `LICENSE` at
 the root of this tree; the originals remain AGPL-3.0-or-later. The translation
 skill keeps the byline its original wore — KL9 ＆ Claude Fable 5.
 
+## `gauge` — MPL-2.0
+
+The repository owner's own skill, written for this tree under MPL-2.0, the
+license in `LICENSE` at the root of this tree.
+
 ## `authority-review` — MIT
 
 Modified adaptation of the Thermos plugin (`cursor/plugins`, MIT), the same upstream as
