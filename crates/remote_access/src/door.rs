@@ -20,6 +20,7 @@ use kernel::{AxCode, AxError, TimeMs};
 
 use crate::pairing::PairingCode;
 
+mod spelling;
 #[cfg(test)]
 mod tests;
 
