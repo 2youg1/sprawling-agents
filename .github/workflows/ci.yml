@@ -327,7 +327,7 @@ jobs:
   # prints the roster, so a harness added to the kernel cannot be proved
   # locally and forgotten in CI. A harness over one concrete value, or one
   # that builds a `Vec`, a `String` or a `BTreeSet` whose loops CBMC cannot
-  # bound, is held by a `#[test]` or a proptest instead; kernel-SPEC.md
+  # bound, is held by a `#[test]` or a proptest instead; `crates/kernel/Spec.lean`
   # section 2 records which and why.
   proof:
     needs: changes
