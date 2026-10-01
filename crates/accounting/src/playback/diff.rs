@@ -22,13 +22,20 @@ use super::document::{Base, Change, Decimal, DiffLine, FileDiff, HiddenLine};
 use super::project::building_of;
 use super::reader::Readership;
 
-/// Each of `files`, in order, as it changed from `base` to `head`; none
-/// when there is no base. The patch text shown across all of them stays
-/// within [`DIFF_MAX_BYTES`].
+/// The two commits a diff compares: what the commit is compared with,
+/// and the commit.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Between {
+    pub(super) base: Base,
+    pub(super) head: GitOid,
+}
+
+/// Each of `files`, in order, as it changed from the base to the head;
+/// none when there is no base. The patch text shown across all of them
+/// stays within [`DIFF_MAX_BYTES`].
 pub(super) fn changes(
     city_root: &Path,
-    base: Base,
-    head: GitOid,
+    Between { base, head }: Between,
     files: &[String],
     readership: &mut Readership,
 ) -> Vec<FileDiff> {

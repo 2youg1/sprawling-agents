@@ -61,7 +61,11 @@ pub(super) fn attach(
             } else {
                 traced(city_root, *oid, announced, known)
             };
-            *diff = super::diff::changes(city_root, found, *oid, files, readership);
+            let between = super::diff::Between {
+                base: found,
+                head: *oid,
+            };
+            *diff = super::diff::changes(city_root, between, files, readership);
             *base = found;
             *trace = attributed;
         }
