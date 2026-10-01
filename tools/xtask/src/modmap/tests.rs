@@ -115,3 +115,34 @@ fn a_tool_package_other_than_the_gates_is_judged() {
         ])
     );
 }
+
+/// A Zig file in a judged package is a module like any other: one the
+/// map does not register is named, wherever in the package it sits, and
+/// one it registers is not.
+#[test]
+fn an_unregistered_zig_file_is_named() {
+    let root = crate::root::fixture::relocated("modmap-zig");
+    crate::root::fixture::write(
+        &root,
+        MAP,
+        "module = [\n  { name = \"k::a\", file = \"tools/k/src/a.rs\", owns = \"a module\", \
+         shape = \"value\", since = \"T\", status = \"built\", spec = \"k-SPEC.md#8-9\" },\n  \
+         { name = \"k::zig::step\", file = \"tools/k/zig/step.zig\", owns = \"a leaf's steps\", \
+         shape = \"data\", since = \"T\", status = \"built\", spec = \"k-SPEC.md#8-9\" },\n]\n",
+    );
+    crate::root::fixture::write(&root, "tools/k/src/lib.rs", "mod a;\n");
+    crate::root::fixture::write(&root, "tools/k/zig/step.zig", "");
+    crate::root::fixture::write(&root, "tools/k/zig/leaf.zig", "");
+    let found = check(&root).map(|all| {
+        all.into_iter()
+            .map(|v| format!("{}: {}", v.location, v.violation))
+            .collect::<Vec<_>>()
+    });
+    std::fs::remove_dir_all(&root).unwrap();
+    assert_eq!(
+        found.map_err(|err| err.to_string()),
+        Ok(vec![
+            "tools/k/zig/leaf.zig: file is not registered in the module map".to_owned()
+        ])
+    );
+}

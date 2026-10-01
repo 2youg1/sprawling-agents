@@ -200,3 +200,42 @@ fn methods_inside_an_impl_are_measured_one_by_one() {
     );
     assert_eq!(found, vec![("a".to_owned(), 1)]);
 }
+
+/// The three budgets a fixture checkout states, at the numbers this
+/// repository's register states.
+const FIXTURE_REGISTER: &str = "[function_length]\nbudget_lines = 200\n\n\
+    [argument_count]\nbudget_arguments = 4\n\n[file_length]\nbudget_lines = 400\n";
+
+/// A Zig file is held to the file budget and its functions to the
+/// function budget, both named at the file; a `test` declaration is
+/// neither counted into the file nor measured, as `#[cfg(test)]` is not.
+#[test]
+fn a_long_zig_file_and_a_long_zig_function_are_named() {
+    let root = crate::root::fixture::relocated("length-zig");
+    crate::root::fixture::write(&root, REGISTER, FIXTURE_REGISTER);
+    let mut zig = String::from("const std = @import(\"std\");\npub fn long() void {\n");
+    zig.push_str(&"    _ = 0;\n".repeat(199));
+    zig.push_str("}\n");
+    for index in 0..200 {
+        zig.push_str(&format!("const filler{index}: u8 = 0;\n"));
+    }
+    zig.push_str(
+        "test \"a long test\" {\n    const helper = struct {\n        fn inner() void {\n",
+    );
+    zig.push_str(&"            _ = 0;\n".repeat(210));
+    zig.push_str("        }\n    };\n    helper.inner();\n}\n");
+    crate::root::fixture::write(&root, "tools/k/zig/long.zig", &zig);
+    let found = check(&root).map(|all| {
+        all.into_iter()
+            .map(|v| format!("{}: {}", v.location, v.violation))
+            .collect::<Vec<_>>()
+    });
+    std::fs::remove_dir_all(&root).unwrap();
+    assert_eq!(
+        found.map_err(|err| err.to_string()),
+        Ok(vec![
+            "tools/k/zig/long.zig: 402 lines".to_owned(),
+            "tools/k/zig/long.zig:2: long is 201 lines".to_owned(),
+        ])
+    );
+}

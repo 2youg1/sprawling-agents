@@ -134,7 +134,7 @@ fn repeated(rows: &[&str], expected: &[String; 4]) -> Option<usize> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 mod tests {
-    use super::{Leader, notice, repeated};
+    use super::{Leader, NOTICE, check, notice, repeated};
 
     #[test]
     fn this_file_carries_the_header() {
@@ -160,5 +160,23 @@ mod tests {
             .chain(expected.iter().map(String::as_str))
             .collect();
         assert_eq!(repeated(&twice, &expected), Some(7));
+    }
+
+    /// A Zig file is held to the same four rows as a Rust file, behind
+    /// the same `//`; the one without them is named and the others are
+    /// not.
+    #[test]
+    fn a_zig_file_without_the_header_is_named() {
+        let root = std::env::temp_dir().join(format!("xtask-header-zig-{}", std::process::id()));
+        let head: String = NOTICE.iter().map(|row| format!("// {row}\n")).collect();
+        crate::root::fixture::write(&root, "kept.rs", &format!("{head}\nfn kept() {{}}\n"));
+        crate::root::fixture::write(&root, "leaf/headed.zig", &format!("{head}\nconst a = 0;\n"));
+        crate::root::fixture::write(&root, "leaf/bare.zig", "const std = @import(\"std\");\n");
+        let found = check(&root).map(|all| all.into_iter().map(|v| v.location).collect::<Vec<_>>());
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(
+            found.map_err(|err| err.to_string()),
+            Ok(vec!["leaf/bare.zig".to_owned()])
+        );
     }
 }
