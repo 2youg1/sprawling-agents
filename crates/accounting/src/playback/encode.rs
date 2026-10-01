@@ -16,8 +16,8 @@
 
 use kernel::{AxCode, AxError, B3Hash};
 
-use super::BUNDLE_MAX_BYTES;
 use super::document::Document;
+use super::{BUNDLE_MAX_BYTES, SCHEMA};
 
 /// A playback bundle: canonical bytes, built only by [`encode`] and
 /// [`decode`], so every value of this type is a bundle this build can
@@ -81,7 +81,8 @@ pub(super) fn encode(document: &Document) -> Result<Bundle, AxError> {
 /// what [`encode`] writes for it.
 ///
 /// # Errors
-/// `E_INVALID_ARGS` for bytes over the ceiling, bytes that are not a
+/// `E_INVALID_ARGS` for bytes over the ceiling, a bundle of another
+/// schema (named, with the build to read it with), bytes that are not a
 /// bundle of this schema's shape, and bytes that are not canonical.
 pub(super) fn decode(bytes: &[u8]) -> Result<(Document, Bundle), AxError> {
     let refuse = |subject: String| {
@@ -96,6 +97,20 @@ pub(super) fn decode(bytes: &[u8]) -> Result<(Document, Bundle), AxError> {
             bytes.len()
         )));
     }
+    let named: Schema = serde_json::from_slice(bytes).map_err(|err| refuse(err.to_string()))?;
+    if named.schema != SCHEMA {
+        return Err(AxError::failure(
+            AxCode::InvalidArgs,
+            "read a playback bundle",
+            format!(
+                "schema '{}', where this build reads '{SCHEMA}'",
+                named.schema
+            ),
+        )
+        .with_recovery(
+            "check it with the build that exported it, or export it again with this one",
+        ));
+    }
     let document: Document =
         serde_json::from_slice(bytes).map_err(|err| refuse(err.to_string()))?;
     let bundle = encode(&document)?;
@@ -105,6 +120,14 @@ pub(super) fn decode(bytes: &[u8]) -> Result<(Document, Bundle), AxError> {
         ));
     }
     Ok((document, bundle))
+}
+
+/// The one key a bundle of any schema carries, read before the rest so a
+/// bundle of another schema is named as one instead of failing on a
+/// field.
+#[derive(serde::Deserialize)]
+struct Schema {
+    schema: String,
 }
 
 /// Compact JSON with the five characters that can end or break an HTML

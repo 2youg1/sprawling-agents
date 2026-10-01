@@ -18,7 +18,7 @@ use std::process::ExitCode;
 
 use accounting::playback::{
     Asked, BUNDLE_MAX_BYTES, City, Confidential, Cutoff, PAGE_MAX_BYTES, Place, Reader, Report,
-    Request, Selection,
+    Request, Selection, Window,
 };
 use kernel::{Address, AxCode, AxError};
 
@@ -111,7 +111,8 @@ pub(super) fn check(read: &Arguments) -> ExitCode {
 enum Refused {
     /// A flag value that does not read.
     Line(String),
-    /// A range that contradicts itself.
+    /// A range that contradicts itself, or a time condition that does
+    /// not read.
     Selection(AxError),
 }
 
@@ -121,13 +122,21 @@ fn request_of(read: &Arguments) -> Result<Request, Refused> {
         .map(|raw| Address::parse(raw).map_err(|_| format!("'{raw}' is not a building's address")))
         .transpose()
         .map_err(Refused::Line)?;
+    let span = Window {
+        since: read.value("--since"),
+        until: read.value("--until"),
+        day: read.value("--day"),
+    }
+    .span()
+    .map_err(Refused::Selection)?;
     let selection = Selection::new(
         seq_flag(read, "--from").map_err(Refused::Line)?,
         seq_flag(read, "--through").map_err(Refused::Line)?,
         run_flag(read).map_err(Refused::Line)?,
         building,
     )
-    .map_err(Refused::Selection)?;
+    .map_err(Refused::Selection)?
+    .during(span);
     Ok(Request {
         selection,
         reader: person(read),

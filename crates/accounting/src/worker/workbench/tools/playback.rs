@@ -25,7 +25,7 @@ use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
 use crate::playback::{
-    Asked, BUNDLE_BLOCK, City, Cutoff, PAGE_MAX_BYTES, Place, Reader, Request, Selection,
+    Asked, BUNDLE_BLOCK, City, Cutoff, PAGE_MAX_BYTES, Place, Reader, Request, Selection, Window,
 };
 use crate::worker::workbench::{Laying, Site};
 
@@ -117,6 +117,18 @@ impl PlaybackTool {
                     "type": "string",
                     "description": "export: only lines addressed within this building",
                 },
+                "since": {
+                    "type": "string",
+                    "description": "export: only lines at or after this UTC moment, as 2026-05-14T09:31:07Z",
+                },
+                "until": {
+                    "type": "string",
+                    "description": "export: only lines before this UTC moment",
+                },
+                "day": {
+                    "type": "string",
+                    "description": "export: only lines of this UTC day, as 2026-05-14; crossed with since and until",
+                },
                 "page": {
                     "type": "string",
                     "description": format!(
@@ -179,12 +191,19 @@ impl PlaybackTool {
             Kind::Bundle
         };
         let file = format!("{}.{}", named(&asked.name)?, kind.extension());
+        let span = Window {
+            since: asked.since.as_deref(),
+            until: asked.until.as_deref(),
+            day: asked.day.as_deref(),
+        }
+        .span()?;
         let selection = Selection::new(
             asked.from.map(Seq::new),
             asked.through.map(Seq::new),
             asked.run.as_deref().map(run_of).transpose()?,
             asked.building.as_deref().map(building_of).transpose()?,
-        )?;
+        )?
+        .during(span);
         let request = Request {
             selection,
             reader: Reader::Resident(self.building.clone()),

@@ -3,24 +3,30 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which lines a playback selection holds (accounting-SPEC.md 8-12).
-//! The properties are `crates/accounting/spec/Playback/Select.lean`: the
-//! selection is the intersection of every condition given, bounded by
-//! the cutoff the walk stops at.
+//! Which lines a playback selection holds (accounting-SPEC.md 8-12 and
+//! 8-17). The properties are `crates/accounting/spec/Playback/Select.lean`:
+//! the selection is the intersection of every condition given, bounded
+//! by the cutoff the walk stops at, and each line is judged on its own,
+//! because a line's `t` does not rise with its seq.
 
-use kernel::{Address, AxCode, AxError, EventRecord, RunId, Seq};
-use runtime::clock::UtcSpan;
+use kernel::{Address, AxCode, AxError, EventRecord, RunId, Seq, TimeMs};
+use runtime::clock::{UtcSpan, parse_iso};
 
 use super::document::{Chosen, Decimal};
 
-/// A closed seq range, a run and a building, each optional; a line is
-/// selected when every condition given holds.
+/// The milliseconds of one UTC day: Unix time counts no leap second, so
+/// every UTC day is 86 400 seconds long.
+const DAY_MS: u64 = 86_400_000;
+
+/// A closed seq range, a run, a building and a UTC span, each optional;
+/// a line is selected when every condition given holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Selection {
     first: Option<Seq>,
     last: Option<Seq>,
     run: Option<RunId>,
     building: Option<Address>,
+    span: UtcSpan,
 }
 
 impl Selection {
@@ -32,6 +38,7 @@ impl Selection {
             last: None,
             run: None,
             building: None,
+            span: UtcSpan::default(),
         }
     }
 
@@ -63,19 +70,22 @@ impl Selection {
             last,
             run,
             building,
+            span: UtcSpan::default(),
         })
     }
 
-    /// The selection with a time condition added.
+    /// The selection with a time condition: a line's envelope `t` must
+    /// lie in `span`, the end left out.
     #[must_use]
-    pub fn during(self, _span: UtcSpan) -> Selection {
-        self
+    pub fn during(self, span: UtcSpan) -> Selection {
+        Selection { span, ..self }
     }
 
     /// Whether `record` is in the selection. The cutoff is the walk's to
     /// enforce: no line after it is ever offered here.
     pub(super) fn admits(&self, record: &EventRecord) -> bool {
         self.holds_seq(record.seq())
+            && self.span.contains(record.t())
             && self.run.is_none_or(|run| record.run() == run)
             && self
                 .building
@@ -96,24 +106,31 @@ impl Selection {
             through: self.last.map(|seq| Decimal(seq.value())),
             run: self.run,
             building: self.building.clone(),
+            since: self.span.since().map(|at| Decimal(at.value())),
+            until: self.span.until().map(|at| Decimal(at.value())),
         }
     }
 
     /// The selection a bundle's `source` recorded, for recomputing it.
     ///
     /// # Errors
-    /// The same contradiction [`Selection::new`] refuses.
+    /// The same contradictions [`Selection::new`] and `UtcSpan::new`
+    /// refuse.
     pub(super) fn from_chosen(chosen: &Chosen) -> Result<Selection, AxError> {
-        Selection::new(
+        let moment = |end: Option<Decimal>| end.map(|at| TimeMs::new(at.0));
+        Ok(Selection::new(
             chosen.from.map(|seq| Seq::new(seq.0)),
             chosen.through.map(|seq| Seq::new(seq.0)),
             chosen.run,
             chosen.building.clone(),
-        )
+        )?
+        .during(UtcSpan::new(moment(chosen.since), moment(chosen.until))?))
     }
 }
 
-/// The time conditions of one export, as given.
+/// The time conditions of one export, as the person or the resident
+/// wrote them: `since` and `until` in the one shape `runtime::clock::iso`
+/// writes, `day` as `YYYY-MM-DD`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Window<'a> {
     pub since: Option<&'a str>,
@@ -122,11 +139,38 @@ pub struct Window<'a> {
 }
 
 impl Window<'_> {
-    /// The span the conditions make.
+    /// The span every condition given holds in: the latest start, the
+    /// earliest end. No condition is the unbounded span.
     ///
     /// # Errors
-    /// None yet.
+    /// `E_INVALID_ARGS` for a moment `parse_iso` refuses, a day that is
+    /// not a calendar day in `YYYY-MM-DD`, and conditions whose crossing
+    /// holds no moment (`UtcSpan::new`'s refusal).
     pub fn span(&self) -> Result<UtcSpan, AxError> {
-        Ok(UtcSpan::default())
+        let day = self.day.map(day_of).transpose()?;
+        let since = self.since.map(parse_iso).transpose()?;
+        let until = self.until.map(parse_iso).transpose()?;
+        UtcSpan::new(
+            since.into_iter().chain(day.map(|(start, _)| start)).max(),
+            until.into_iter().chain(day.map(|(_, end)| end)).min(),
+        )
     }
+}
+
+/// The first moment of the UTC day `raw` names and the first of the next.
+/// The day is read by `parse_iso` as that day's midnight, so the calendar
+/// that judges it is the one `runtime::clock` holds.
+fn day_of(raw: &str) -> Result<(TimeMs, TimeMs), AxError> {
+    let refused = || {
+        AxError::failure(AxCode::InvalidArgs, "select a playback day", raw).with_recovery(
+            "write the day in UTC as 2026-05-14: a year, a month and a day the calendar has",
+        )
+    };
+    let start = parse_iso(&format!("{raw}T00:00:00Z")).map_err(|_not_a_day| refused())?;
+    let end = start
+        .value()
+        .checked_add(DAY_MS)
+        .map(TimeMs::new)
+        .ok_or_else(refused)?;
+    Ok((start, end))
 }

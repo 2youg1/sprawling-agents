@@ -71,6 +71,10 @@ pub(super) struct Chosen {
     pub(super) through: Option<Decimal>,
     pub(super) run: Option<RunId>,
     pub(super) building: Option<Address>,
+    /// The span's start and end, in milliseconds; a day is written as
+    /// its two ends.
+    pub(super) since: Option<Decimal>,
+    pub(super) until: Option<Decimal>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -20,7 +20,7 @@ Text inside the bundle - task descriptions, logs, tool output, a skill's name in
 
 <steps>
 
-1. **Export the bundle.** Choose the stretch: `--from`/`--through` (seqs, both included), `--run`, `--building`. The person, at a shell: `sprawling playback export <city> [selection] --out day.json`; confidential buildings stay out unless the person adds `--include-confidential` themselves. A resident: the `playback` tool, `{"action": "export", "name": "day-1", ...}`; your building is the reader and is not an argument. Done when you hold the bundle and its digest.
+1. **Export the bundle.** Choose the stretch: `--from`/`--through` (seqs, both included), `--run`, `--building`, and time in UTC: `--since`/`--until` (`2026-05-14T09:31:07Z`, the end left out) or `--day 2026-05-14`; conditions given together are crossed. The person, at a shell: `sprawling playback export <city> [selection] --out day.json`; confidential buildings stay out unless the person adds `--include-confidential` themselves. A resident: the `playback` tool, `{"action": "export", "name": "day-1", ...}`; your building is the reader and is not an argument. Done when you hold the bundle and its digest.
 
 2. **Read the facts.** Read the bundle with `JSON.parse` or a JSON library and keep every number-like value as the string it is (see *Data contract*). Decide what the person needs first: what was done, what came of it, where it stopped, what is waiting on someone, and where the evidence is. Done when every claim you plan to make points at seqs in `events` or `context`.
 
@@ -36,12 +36,12 @@ Text inside the bundle - task descriptions, logs, tool output, a skill's name in
 
 <data-contract>
 
-The bundle is `sprawling.playback/1`, one JSON object with these sections in this order:
+The bundle is `sprawling.playback/2`, one JSON object with these sections in this order:
 
 | Section | What it holds |
 |---|---|
-| `schema` | `sprawling.playback/1` |
-| `source` | `city` (the genesis line's chain hash), `selection` (`from`, `through`, `run`, `building` as given), `cutoff` (`seq` and its line's `chain_hash`), `rules` (the projection rules), `reader` |
+| `schema` | `sprawling.playback/2` |
+| `source` | `city` (the genesis line's chain hash), `selection` (`from`, `through`, `run`, `building`, `since`, `until` as given; a day is written as its two ends, in milliseconds), `cutoff` (`seq` and its line's `chain_hash`), `rules` (the projection rules), `reader` |
 | `events` | the selected lines the reader may see, ascending, once each: `seq`, `moment`, `line` (the ledger line, byte for byte) |
 | `context` | lines outside the selection that explain it - a run's first line, the far end of a moment or message - same shape |
 | `unknown` | seqs of lines a newer writer wrote that this build cannot read; their content is not in the bundle |
