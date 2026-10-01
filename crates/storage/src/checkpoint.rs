@@ -29,6 +29,8 @@
 //! everything downstream works from the oid as it always did. Only
 //! `ensure_base` and `land` move HEAD, because a worktree branches from
 //! a commit and offered work has to be on a branch.
+//!
+//! Specified by `crates/storage/spec/Checkpoint.lean` §8-8.
 
 mod base;
 pub(crate) mod commit;

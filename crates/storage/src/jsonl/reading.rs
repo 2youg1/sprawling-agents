@@ -7,6 +7,8 @@
 //! the ledger, never repair, never write — replay must not mutate what it
 //! verifies (`crates/runtime/Spec.lean` §8-1). Complete lines only; a torn tail
 //! byte-run is not a line and is left for `open` to judge.
+//!
+//! Specified by `crates/storage/spec/Jsonl.lean` §8-1.
 
 use std::path::{Path, PathBuf};
 

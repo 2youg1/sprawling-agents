@@ -21,6 +21,8 @@
 //! never echoed: the answer carries its line number and the reason, for
 //! the reason `scan_staged` gives about its own hits — printing the bytes
 //! to prove a leak is the leak.
+//!
+//! Specified by `crates/storage/spec/Hunks.lean` §8-19.
 
 use std::path::Path;
 

@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The git pathspecs a checkpoint stages its scopes through.
+//!
+//! Specified by `crates/storage/spec/Checkpoint.lean` §8-8.
 
 /// Two git pathspecs per scope, the scope itself and everything
 /// under it, because a scope is a prefix the run may write under or,

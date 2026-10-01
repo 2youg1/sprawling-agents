@@ -10,6 +10,8 @@
 //! of the process and are rebuilt from the segments whenever they are
 //! opened; there is no persisted copy to believe and no stamp to
 //! compare, so no doubt has to be resolved in silence.
+//!
+//! Specified by `crates/storage/spec/Index.lean` §8-4.
 
 mod fold;
 mod ledger;

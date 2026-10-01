@@ -18,6 +18,8 @@
 //! to pack all go to `outliers`, an
 //! ordered map that answers the same questions. Each seq lives in at
 //! most one of the two, and a seq written twice keeps the last location.
+//!
+//! Specified by `crates/storage/spec/Index.lean` §8-4.
 
 use std::collections::BTreeMap;
 

@@ -25,6 +25,8 @@
 //! wave since as uncommitted. The caller therefore names the checkpoint it
 //! wants compared against; the head is the fallback for a city that has
 //! checkpointed nothing.
+//!
+//! Specified by `crates/storage/spec/Status.lean` §8-22.
 
 use std::path::Path;
 

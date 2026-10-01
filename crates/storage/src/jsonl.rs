@@ -24,6 +24,8 @@
 //! purpose (`crate::vfs`): std fs and FaultFs are its two adapters, and
 //! it never enters a public signature — `JsonlLedger` hides it behind
 //! `Box<dyn Vfs>`.
+//!
+//! Specified by `crates/storage/spec/Jsonl.lean` §8-1.
 
 mod append;
 mod barrier;

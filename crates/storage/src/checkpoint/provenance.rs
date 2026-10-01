@@ -17,6 +17,8 @@
 //! The block is rendered as git's own trailer syntax rather than as a
 //! prefix language of this repository's invention, so
 //! `git interpret-trailers --parse` reads it with no help from us.
+//!
+//! Specified by `crates/storage/spec/Checkpoint/Provenance.lean` §8-17.
 
 use std::path::Path;
 

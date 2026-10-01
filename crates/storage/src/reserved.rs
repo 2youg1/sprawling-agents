@@ -13,6 +13,8 @@
 //! object store, the projections, git's own metadata and the other
 //! nodes' trees all live under [`kernel::PROTECTED_METADATA`] and count
 //! as neither.
+//!
+//! Specified by `crates/storage/spec/Worktree.lean` §8-9.
 
 use std::path::Path;
 

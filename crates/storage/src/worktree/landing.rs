@@ -5,6 +5,8 @@
 
 //! A merge that has been decided, and what it writes down when it is
 //! made.
+//!
+//! Specified by `crates/storage/spec/Worktree.lean` §8-9.
 
 use kernel::TimeMs;
 

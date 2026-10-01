@@ -4,6 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Worktree names: one segment, no escape.
+//!
+//! Specified by `crates/storage/spec/Worktree.lean` §8-9.
 
 use crate::error::StorageError;
 

@@ -10,6 +10,8 @@
 //! appending to — exists because opening a file costs a syscall per
 //! call rather than per byte, and a ledger appends to one segment over
 //! and over.
+//!
+//! Specified by `crates/storage/spec/RealFs.lean` §8-16.
 
 use std::io;
 use std::io::{Read as _, Seek as _, SeekFrom};

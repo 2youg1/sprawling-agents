@@ -22,6 +22,8 @@
 //! prove a leak is the leak. Patch text is file content on a socket, and
 //! that is the same question — so a hunk has to be its own request,
 //! answered through the same scan, and it is not this module.
+//!
+//! Specified by `crates/storage/spec/Changes.lean` §8-13.
 
 use std::cell::{Cell, RefCell};
 use std::path::Path;

@@ -18,6 +18,8 @@
 //! The total comes from `model_returned.billed_usd_micros` and nowhere
 //! else. This module never prices a call — that authority is
 //! `gateway::cost`, and a second one would be a second answer.
+//!
+//! Specified by `crates/storage/spec/Attribution.lean` §8-7.
 
 mod report;
 mod split;
