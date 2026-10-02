@@ -16,9 +16,15 @@
 // a quota can fill while the tab is open. Each throw is turned into a
 // value here, so no reader above has to know that keeping a row is an
 // operation that can fail, and the first paint cannot die on one.
+//
+// **A refusal is not silent.** The row the browser would not take is
+// held by this tab instead, and `unkept` names it until it is written
+// again with success or removed, so a page that keeps a person's words
+// can say they will not outlive the tab (refrain §3-14, the second row;
+// client/Spec.lean §4-63).
 
 import { Result } from "effect";
-import { readable } from "svelte/store";
+import { readable, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 // The little of `Storage` this client needs: a test hands it a map and
@@ -30,15 +36,17 @@ export interface Store {
   readonly removeItem: (key: string) => void;
 }
 
+// The door every reader goes through: a store, and the rows of it only
+// this tab holds because the browser would not keep them.
 export interface Rows extends Store {
   readonly unkept: Readable<ReadonlySet<string>>;
 }
 
 const NONE: Readable<ReadonlySet<string>> = readable(new Set());
 
-// What a browser without storage remembers: this session, and no
-// longer. A choice still takes effect; it just does not outlive the
-// tab.
+// A plain table of rows. It stands in for the browser's store where a
+// test or the gallery needs one, and holds what the browser refused;
+// as a store it never refuses, so it names nothing unkept.
 export function memory(): Rows {
   const held = new Map<string, string>();
   return {
@@ -65,11 +73,35 @@ function attempted<T>(act: () => T): T | null {
 // another application cannot mistake it for theirs.
 const PROBE_KEY = "sprawling.probe";
 
+// The names of the rows this tab alone holds, as one store a page can
+// follow.
+interface Unkept {
+  readonly store: Readable<ReadonlySet<string>>;
+  mark(key: string, held: "tab" | "browser"): void;
+}
+
+function unkeptRows(): Unkept {
+  const store = writable<ReadonlySet<string>>(new Set());
+  return {
+    store,
+    mark(key, held) {
+      store.update((names) => {
+        if ((held === "tab") === names.has(key)) return names;
+        const next = new Set(names);
+        if (held === "tab") next.add(key);
+        else next.delete(key);
+        return next;
+      });
+    },
+  };
+}
+
 // The browser's own store with its refusals answered: a row the quota
 // will not take is kept for this session instead, so a person typing
 // into a box never loses the sentence that filled the quota and no
 // page dies on a write.
 function guarded(store: Store, spare: Rows): Rows {
+  const unkept = unkeptRows();
   return {
     getItem: (key) => attempted(() => store.getItem(key)) ?? spare.getItem(key),
     setItem: (key, value) => {
@@ -79,7 +111,10 @@ function guarded(store: Store, spare: Rows): Rows {
       });
       if (took === null) {
         spare.setItem(key, value);
+      } else {
+        spare.removeItem(key);
       }
+      unkept.mark(key, took === null ? "tab" : "browser");
     },
     removeItem: (key) => {
       // Both copies are asked to drop the row and neither answer is
@@ -90,27 +125,46 @@ function guarded(store: Store, spare: Rows): Rows {
         return true;
       });
       spare.removeItem(key);
+      unkept.mark(key, "browser");
     },
-    unkept: NONE,
+    unkept: unkept.store,
   };
 }
 
-// Whether this browser gives the client a place to keep rows, decided
-// by writing one and dropping it again. A store that answers the probe
-// is used; a store that throws on the reach, or takes nothing, is
-// stood in for by a map that lasts as long as the tab.
+// No store at all: the tab holds every row, and every row it holds is
+// one the browser did not keep.
+function tabOnly(spare: Rows): Rows {
+  const unkept = unkeptRows();
+  return {
+    getItem: spare.getItem,
+    setItem: (key, value) => {
+      spare.setItem(key, value);
+      unkept.mark(key, "tab");
+    },
+    removeItem: (key) => {
+      spare.removeItem(key);
+      unkept.mark(key, "browser");
+    },
+    unkept: unkept.store,
+  };
+}
+
+// The door over the store `reach` returns, decided by writing one row
+// and dropping it again. A store that answers the probe is used; a
+// store that throws on the reach, or takes nothing, is stood in for by
+// a table that lasts as long as the tab.
 export function keptRows(reach: () => Store): Rows {
   const spare = memory();
   const store = attempted<Store>(reach);
   if (store === null) {
-    return spare;
+    return tabOnly(spare);
   }
   const kept = attempted(() => {
     store.setItem(PROBE_KEY, PROBE_KEY);
     store.removeItem(PROBE_KEY);
     return true;
   });
-  return kept === null ? spare : guarded(store, spare);
+  return kept === null ? tabOnly(spare) : guarded(store, spare);
 }
 
 // Where this browser's rows live, and the only reach for that global

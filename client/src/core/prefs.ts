@@ -30,7 +30,7 @@
 // `[model] effort`, and a copy kept here would ride on every dispatch
 // from this browser and quietly overrule the city's own file.
 
-import { get, writable } from "svelte/store";
+import { derived, get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 import { EDITORS, type Opening } from "./editor";
@@ -200,6 +200,8 @@ export interface PreferenceDoor {
   // the box that owns it reads it once when it mounts.
   readonly draft: (at: string) => string;
   readonly setDraft: (at: string, text: string) => void;
+  // Whether that draft lives in this tab alone, the browser having refused it (4-63).
+  readonly draftUnkept: (at: string) => Readable<boolean>;
   // Facts of the machine this browser runs on, never the city's (client/Spec.lean §4-39).
   readonly editor: () => Pick<Opening, "editor" | "folder">;
   readonly setEditor: (next: Pick<Opening, "editor" | "folder">) => void;
@@ -364,12 +366,10 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
     },
     draft: (at) => rows.getItem(ROWS.draft + at) ?? "",
     setDraft(at, text) {
-      if (text === "") {
-        rows.removeItem(ROWS.draft + at);
-      } else {
-        rows.setItem(ROWS.draft + at, text);
-      }
+      if (text === "") rows.removeItem(ROWS.draft + at);
+      else rows.setItem(ROWS.draft + at, text);
     },
+    draftUnkept: (at) => derived(rows.unkept, (names) => names.has(ROWS.draft + at)),
     editor: () => ({
       editor: readOne(EDITORS, rows.getItem(ROWS.editor), "none"),
       folder: rows.getItem(ROWS.cityFolder) ?? "",

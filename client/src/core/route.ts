@@ -10,7 +10,7 @@
 
 import { Option, Schema } from "effect";
 
-import { Address, SessionName } from "../wire";
+import { Address, B3Hash, GuideStep, Seq, SessionName } from "../wire";
 import type { RunId } from "../wire";
 import { isInvitation } from "./remote/invitation";
 import { readRunId } from "./run_id";
@@ -37,15 +37,34 @@ export const SETUP_GROUPS = [
 
 export type SetupGroup = (typeof SETUP_GROUPS)[number];
 
+// The lenses of the run page, in the order its tabs offer them; a
+// `#/run/<id>/<lens>` link opens the page at one (client D28).
+export const RUN_LENSES = ["time", "turns", "monitor", "prompt", "context", "changes", "evidence"] as const;
+
+export type RunLens = (typeof RUN_LENSES)[number];
+
+// An item of the right side, as a link names it (client/Spec.lean §4-63): a
+// call, or a version of a building's document - the worktree's current
+// text when `version` is `null`. The same two shapes the inspector holds
+// (`views/inspect/open.svelte.ts`), so opening one hands it over whole.
+export type ItemLink =
+  | { readonly kind: "call"; readonly run: RunId; readonly at: Seq }
+  | { readonly kind: "document"; readonly building: Address; readonly path: string; readonly version: B3Hash | null };
+
 // The room a person talks to when they have named none: the Mayor.
 export const MAYOR: Address = Address.make("hall/mayor");
 
 // Which page the content region shows.
 export type View =
-  | { readonly kind: "talk"; readonly address: Address }
+  // A conversation, and the item a link asks the right side to open
+  // beside it on arrival; the right side's state itself is not here
+  // (client/Spec.lean §4-27).
+  | { readonly kind: "talk"; readonly address: Address; readonly item?: ItemLink }
   | { readonly kind: "city" }
   | { readonly kind: "building"; readonly address: Address }
-  | { readonly kind: "run"; readonly run: RunId }
+  // A run, and the lens a link opened it at; without one the page picks
+  // its lens from the run's state.
+  | { readonly kind: "run"; readonly run: RunId; readonly lens?: RunLens }
   // The settings panel, open over the page beneath it. Without a group
   // the panel opens at the one it drew last: the address bar names a
   // group only when somebody chose one.
@@ -54,7 +73,9 @@ export type View =
   | { readonly kind: "record"; readonly lens: Lens }
   | { readonly kind: "cost" }
   | { readonly kind: "registry" }
-  | { readonly kind: "welcome" }
+  // The guide, and the step a link opened; without one the guide opens
+  // at the step it judges current.
+  | { readonly kind: "welcome"; readonly step?: GuideStep }
   | { readonly kind: "monitor" }
   // Every screen at once, on fixtures, reachable without a city. It is
   // a route rather than a build flag so the gate that measures it opens
@@ -70,13 +91,14 @@ export const DEFAULT_VIEW: View = { kind: "talk", address: MAYOR };
 export function toFragment(view: View): string {
   switch (view.kind) {
     case "talk":
+      if (view.item !== undefined) return `#/talk/${escaped(view.address)}?${itemQuery(view.item)}`;
       return view.address === MAYOR ? "#/" : `#/talk/${escaped(view.address)}`;
     case "city":
       return "#/city";
     case "building":
       return `#/building/${escaped(view.address)}`;
     case "run":
-      return `#/run/${view.run}`;
+      return view.lens === undefined ? `#/run/${view.run}` : `#/run/${view.run}/${view.lens}`;
     case "setup":
       return view.group === undefined ? "#/setup" : `#/setup/${view.group}`;
     case "mcp":
@@ -88,13 +110,61 @@ export function toFragment(view: View): string {
     case "cost":
       return "#/cost";
     case "welcome":
-      return "#/welcome";
+      return view.step === undefined ? "#/welcome" : `#/welcome/${view.step}`;
     case "monitor":
       return "#/monitor";
     case "gallery":
       return "#/gallery";
   }
 }
+
+// An item as the query after a conversation's address: every value
+// percent-encoded by the browser's own writer, a worktree's text with no
+// `version` key at all.
+function itemQuery(item: ItemLink): string {
+  switch (item.kind) {
+    case "call":
+      return new URLSearchParams({ call: item.run, at: String(item.at) }).toString();
+    case "document":
+      return new URLSearchParams({
+        building: item.building,
+        path: item.path,
+        ...(item.version === null ? {} : { version: item.version }),
+      }).toString();
+  }
+}
+
+// The item a conversation's query names: exactly the keys one of the two
+// shapes writes, each read through the wire's own schema, or `None`.
+function readItem(query: string): Option.Option<ItemLink> {
+  const asked = new URLSearchParams(query);
+  const keys = [...asked.keys()].sort().join(" ");
+  const value = (key: string): string => asked.get(key) ?? "";
+  switch (keys) {
+    case "at call":
+      return Option.map(
+        Option.all([readRunId(value("call")), readSeq(value("at"))]),
+        ([run, at]): ItemLink => ({ kind: "call", run, at }),
+      );
+    case "building path":
+    case "building path version": {
+      const path = value("path");
+      const version: Option.Option<B3Hash | null> = keys.endsWith("version") ? readB3(value("version")) : Option.some(null);
+      if (path === "") return Option.none();
+      return Option.map(
+        Option.all([readAddress(value("building")), version]),
+        ([building, held]): ItemLink => ({ kind: "document", building, path, version: held }),
+      );
+    }
+    default:
+      return Option.none();
+  }
+}
+
+const readB3 = Schema.decodeOption(B3Hash);
+const readSeq = (raw: string): Option.Option<Seq> => (/^\d+$/.test(raw) ? Schema.decodeOption(Seq)(Number(raw)) : Option.none());
+const readLens = (raw: string): Option.Option<RunLens> => Option.fromNullishOr(RUN_LENSES.find((lens) => lens === raw));
+const readStep = (raw: string): Option.Option<GuideStep> => Option.fromNullishOr(GuideStep.literals.find((step) => step === raw));
 
 function recordFragment(lens: Lens): string {
   switch (lens) {
@@ -186,7 +256,10 @@ export function fromFragment(raw: string): Option.Option<View> {
   // The link `/remote pair` prints carries its invitation in a fragment
   // of its own shape; it opens the group that pairs (client/Spec.lean §3-2).
   if (isInvitation(raw)) return Option.some({ kind: "setup", group: "remote" });
-  const path = named(raw);
+  const whole = named(raw);
+  const mark = whole.indexOf("?");
+  if (mark >= 0) return talkWith(whole.slice(0, mark), whole.slice(mark + 1));
+  const path = whole;
   const slash = path.indexOf("/");
   const head = slash < 0 ? path : path.slice(0, slash);
   const tail = slash < 0 ? "" : path.slice(slash + 1);
@@ -216,11 +289,29 @@ export function fromFragment(raw: string): Option.Option<View> {
       return lens === undefined ? Option.none() : Option.some({ kind: "record", lens });
     }
     case "run":
-    case "live":
-      return Option.map(readRunId(tail), (run) => ({ kind: "run", run }));
+    case "live": {
+      const cut = tail.indexOf("/");
+      if (cut < 0) return Option.map(readRunId(tail), (run) => ({ kind: "run", run }));
+      return Option.map(Option.all([readRunId(tail.slice(0, cut)), readLens(tail.slice(cut + 1))]), ([run, lens]) => ({ kind: "run", run, lens }));
+    }
+    case "welcome":
+      return Option.map(readStep(tail), (step) => ({ kind: "welcome", step }));
     default:
       return Option.none();
   }
+}
+
+// A conversation with an item to open beside it: the only view a query
+// follows. The address is escaped, so its own question marks are `%3F`
+// and the first bare one starts the query.
+function talkWith(path: string, query: string): Option.Option<View> {
+  const head = ["talk/", "s/"].find((prefix) => path.startsWith(prefix));
+  if (head === undefined) return Option.none();
+  return Option.map(Option.all([readEscapedAddress(path.slice(head.length)), readItem(query)]), ([address, item]) => ({
+    kind: "talk",
+    address,
+    item,
+  }));
 }
 
 // What the address bar says, when this build cannot resolve it. `None`
