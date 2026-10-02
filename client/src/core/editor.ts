@@ -115,6 +115,14 @@ export type Shown = "current" | "past";
 // location written out for the person to copy.
 export type Reach = { readonly kind: "link"; readonly href: string } | { readonly kind: "copy"; readonly text: string };
 
-export function reachOf(_at: Opening, _shown: Shown): Reach {
-  return { kind: "copy", text: "" };
+//
+// An editor opens the worktree's file as it is now, so a line read from
+// a past version would land on whatever line stands there today and say
+// nothing about it (client-SPEC 4-39). That line, and any line no link
+// can be spelled for, is offered as `path:line` to copy, so the person
+// always has a location to carry and the page never claims an editor
+// opened something.
+export function reachOf(at: Opening, shown: Shown): Reach {
+  const href = shown === "current" ? editorLink(at) : null;
+  return href === null ? { kind: "copy", text: `${at.path}:${String(at.line)}` } : { kind: "link", href };
 }
