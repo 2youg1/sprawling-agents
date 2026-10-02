@@ -49,6 +49,18 @@ export function hhmmss(at: number): string {
   return new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
+// A moment the ledger wrote, in UTC, as two halves: the day, written
+// once at the head of a timeline, and the time of day to the
+// millisecond, written on every row (client-SPEC 7D). Joined, they are
+// the ISO 8601 instant a `<time datetime>` carries.
+export function isoDay(at: number): string {
+  return "";
+}
+
+export function isoTime(at: number): string {
+  return "";
+}
+
 // Whole numbers with a thin separator, and money from micro-dollars.
 export function count(n: number): string {
   return n.toLocaleString("en-US");
