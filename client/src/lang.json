@@ -4719,6 +4719,10 @@
     "en": "edge keys",
     "zh": "边缘键"
   },
+  "region_inspect": {
+    "en": "inspect side",
+    "zh": "检视面"
+  },
   "region_conversation": {
     "en": "the conversation",
     "zh": "对话"

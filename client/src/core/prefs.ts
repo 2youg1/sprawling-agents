@@ -241,28 +241,25 @@ function readAppearance(rows: Rows): Appearance {
   };
 }
 
-// A size or an opacity the person has not stated is absent from storage
-// too, so the stylesheet's own figure keeps its one home in `theme.css`.
 function writeAppearance(rows: Rows, next: Appearance): void {
   rows.setItem(ROWS.lighting, next.lighting);
   rows.setItem(ROWS.sans, next.sans);
   rows.setItem(ROWS.mono, next.mono);
   rows.setItem(ROWS.sansStack, next.sansStack);
   rows.setItem(ROWS.monoStack, next.monoStack);
-  if (next.body === null) {
-    rows.removeItem(ROWS.body);
-  } else {
-    rows.setItem(ROWS.body, String(next.body));
-  }
+  writeFigure(rows, ROWS.body, next.body);
   rows.setItem(ROWS.density, next.density);
   rows.setItem(ROWS.chroma, next.chroma);
   rows.setItem(ROWS.motion, next.motion);
   rows.setItem(ROWS.glass, next.glass);
-  if (next.blend === null) {
-    rows.removeItem(ROWS.blend);
-  } else {
-    rows.setItem(ROWS.blend, String(next.blend));
-  }
+  writeFigure(rows, ROWS.blend, next.blend);
+}
+
+// A size or an opacity the person has not stated is absent from storage
+// too, so the stylesheet's own figure keeps its one home in `theme.css`.
+function writeFigure(rows: Rows, row: string, figure: number | null): void {
+  if (figure === null) rows.removeItem(row);
+  else rows.setItem(row, String(figure));
 }
 
 // The two words a yes-or-no row is written with, spelled here so the
