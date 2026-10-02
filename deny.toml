@@ -14,6 +14,11 @@ allow = [
     "Zlib",
     "CC0-1.0",
     "Unicode-3.0",
+    # Unicode-DFS-2016: finl_unicode, through which comrak reads Unicode
+    # character categories. The 2016 text of the Unicode licence whose
+    # newer text, Unicode-3.0, is listed above; it is as permissive and
+    # asks only that the notice travel with the data.
+    "Unicode-DFS-2016",
     # CDLA-Permissive-2.0: webpki-root-certs, the platform root-store
     # certificate bundle rustls-platform-verifier uses (reqwest's desktop
     # trust store). A data license for a list of public certificates.
