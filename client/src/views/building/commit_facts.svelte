@@ -57,7 +57,7 @@
     <div class="flex min-w-0 flex-col">
       <dt class="text-text-faint">{say($lang, "commit_run")}</dt>
       <dd>
-        <a href={toFragment({ kind: "run", run: commit.run })} class="figure text-text hover:text-accent"
+        <a href={toFragment({ kind: "run", run: commit.run, lens: "changes" })} class="figure text-text hover:text-accent"
           >{commit.run.slice(0, RUN_SHORT)}</a
         >
       </dd>

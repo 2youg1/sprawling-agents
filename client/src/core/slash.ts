@@ -345,7 +345,7 @@ export const SLASH: readonly Slash[] = [
     run: (hands) => {
       const shown = hands.live ?? (hands.here === null ? null : hands.newest(hands.here));
       if (shown === null) return;
-      hands.go({ kind: "run", run: shown.run });
+      hands.go({ kind: "run", run: shown.run, lens: "changes" });
       hands.write("");
     },
   },
