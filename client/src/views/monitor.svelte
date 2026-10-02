@@ -53,11 +53,14 @@
   $effect(() => watch());
 
   const shown = $derived(rows(samples, glyph > 0 ? Math.floor(panel / glyph) : 0));
+
+  const CURVE =
+    "col-span-full block min-w-0 overflow-hidden whitespace-nowrap pt-tight font-mono text-note leading-none text-accent @min-[40rem]:col-span-1 @min-[40rem]:pt-0";
 </script>
 
 <Page title={say($lang, "monitor_title")} {rank}>
 <section
-  class="relative flex min-w-0 flex-col gap-snug"
+  class="@container relative flex min-w-0 flex-col"
   aria-label={say($lang, "monitor_title")}
 >
   <span aria-hidden="true" class="invisible absolute font-mono text-note" bind:clientWidth={glyph}
@@ -66,22 +69,23 @@
   {#if shown.length === 0}
     <p class="text-note text-text-faint">{say($lang, "monitor_waiting")}</p>
   {:else}
-    <ul class="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-base">
+    <!-- One counter a row, ruled like a table: its name, its latest
+         reading set right on the figure column, then its curve to the
+         end of the line. Under 40rem the curve takes a line of its own. -->
+    <ul>
       {#each shown as row, at (row.label)}
-        <li class="flex min-w-0 flex-col gap-snug rounded-card bg-raised px-pane py-base">
-          <div class="flex items-baseline justify-between gap-snug">
-            <span class="truncate text-label text-text-quiet">{say($lang, row.label)}</span>
-            <span class="shrink-0 font-mono text-note text-text tabular-nums">{row.reading}</span>
-          </div>
+        <li
+          class="grid grid-cols-[minmax(0,1fr)_14ch] items-baseline gap-x-gutter border-b border-edge py-snug @min-[40rem]:grid-cols-[minmax(0,28ch)_14ch_minmax(0,1fr)]"
+        >
+          <span class="truncate text-note text-text-quiet">{say($lang, row.label)}</span>
+          <span class="figure text-right text-text">{row.reading}</span>
+          <!-- The first curve measures the room every curve has, so the
+               panel asks for as many points as one line holds. -->
           {#if at === 0}
-            <div aria-hidden="true" class="w-full" bind:clientWidth={panel}></div>
+            <span aria-hidden="true" class={CURVE} bind:clientWidth={panel}>{row.curve}</span>
+          {:else}
+            <span aria-hidden="true" class={CURVE}>{row.curve}</span>
           {/if}
-          <div
-            aria-hidden="true"
-            class="overflow-hidden whitespace-nowrap font-mono text-note leading-none text-accent"
-          >
-            {row.curve}
-          </div>
         </li>
       {/each}
     </ul>

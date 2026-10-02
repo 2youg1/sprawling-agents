@@ -61,9 +61,12 @@ function lensOf(source: Source): Lens {
 
   interface Props {
     readonly lens: Lens;
+    // The shell draws this as a page; the gallery draws it as one region
+    // among many, where it may not carry the page's heading.
+    readonly rank?: "page" | "section" | undefined;
   }
 
-  const { lens }: Props = $props();
+  const { lens, rank = "page" }: Props = $props();
 
   const u = ui();
   const lang = u.lang;
@@ -89,7 +92,7 @@ function lensOf(source: Source): Lens {
   }
 </script>
 
-<Page title={say($lang, "nav_the_record")}>
+<Page title={say($lang, "nav_the_record")} {rank}>
   <Tabs label={say($lang, "rec_lenses")} lenses={tabs} current={readingOf(lens)} onPick={pick}>
     {#snippet panel(reading: Tab)}
       {#if reading.id === "timeline"}

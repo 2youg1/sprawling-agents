@@ -91,6 +91,14 @@
   import Servers from "./mcp/servers.svelte";
   import { BuildingColumn, HALL, useBuildings } from "./shared/buildings";
 
+  interface Props {
+    // The shell draws this as a page; the gallery draws it as one region
+    // among many, where it may not carry the page's heading.
+    readonly rank?: "page" | "section" | undefined;
+  }
+
+  const { rank = "page" }: Props = $props();
+
   const u = ui();
   const { lang } = u;
    
@@ -156,13 +164,18 @@
 
 <!-- Three columns once the page holds them: the building a server is
 added for, the servers it has and the form that adds one, and the two
-other ways in - Composio and the desktop - as a side panel. Under the
-wide container the side panel drops beneath the form. -->
-<Page title={say($lang, "mcp_title")} aside={scopeControl}>
+other ways in - Composio and the desktop - beside them. Each section is
+a rule and a small name over its body rather than a lifted card, so the
+page reads as one sheet in columns; under the wide container the side
+column drops beneath the form. -->
+<Page title={say($lang, "mcp_title")} aside={scopeControl} {rank}>
   {#if banner !== null}
     <Banner text={banner} />
   {/if}
-  <div class="flex min-h-0 flex-1 items-start gap-wide">
+  <!-- The building column stands beside the rest once the page is
+       wide enough to hold both, and above it when it is not. -->
+  <div class="@container flex min-h-0 min-w-0 flex-1">
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-wide @min-[48rem]:flex-row @min-[48rem]:items-start">
     <BuildingColumn
       label={say($lang, "mcp_building")}
       buildings={$buildings}
@@ -172,7 +185,7 @@ wide container the side panel drops beneath the form. -->
         chosen = addr;
       }}
     />
-    <div class="grid min-w-0 flex-1 items-start gap-wide @wide/page:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <div class="grid min-w-0 flex-1 items-start gap-wide @min-[64rem]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <section class="flex min-w-0 flex-col gap-wide" aria-label={say($lang, "mcp_doors")}>
         <Servers
           servers={reach.servers()}
@@ -180,7 +193,8 @@ wide container the side panel drops beneath the form. -->
           onCheck={reach.check}
           onRemove={reach.withdraw}
         />
-        <div class="flex flex-col gap-base rounded-panel bg-chrome/60 p-base">
+        <div class="flex flex-col gap-base border-t border-edge pt-base">
+          <h2 class="text-note text-text-faint">{say($lang, "mcp_doors")}</h2>
           <Tabs
             label={say($lang, "mcp_doors")}
             lenses={lenses}
@@ -205,16 +219,17 @@ wide container the side panel drops beneath the form. -->
         </div>
       </section>
       <div class="flex min-w-0 flex-col gap-wide">
-        <section class="flex flex-col gap-base rounded-card bg-raised px-pane py-base">
-          <h2 class="text-label font-label text-text-quiet">{say($lang, "mcp_composio")}</h2>
+        <section class="flex flex-col gap-base border-t border-edge pt-base">
+          <h2 class="text-note text-text-faint">{say($lang, "mcp_composio")}</h2>
           <Composio intake={reach.intake} />
         </section>
-        <section class="flex flex-col gap-base rounded-card bg-raised px-pane py-base">
-          <h2 class="text-label font-label text-text-quiet">{say($lang, "desktop_title")}</h2>
+        <section class="flex flex-col gap-base border-t border-edge pt-base">
+          <h2 class="text-note text-text-faint">{say($lang, "desktop_title")}</h2>
           <DesktopForm addr={chosen} />
           <ContextRung addr={chosen} />
         </section>
       </div>
     </div>
+  </div>
   </div>
 </Page>

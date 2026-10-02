@@ -56,6 +56,8 @@
 </script>
 
 <script lang="ts">
+  import Mcp from "../mcp.svelte";
+  import RecordView from "../record.svelte";
   import Timeline from "../record/timeline.svelte";
   import type { Source } from "../record/timeline";
   import Case from "./case.svelte";
@@ -80,6 +82,22 @@
   <Case label={`record · ${shown.name}`} width={shown.width}>
     <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={history(shown.records)} logs={LOGS}>
       <Timeline source={shown.source} onSource={() => undefined} />
+    </Stand>
+  </Case>
+{/each}
+
+{#each [1440, 390] as width (width)}
+  <Case label={`record · the page with its three readings at ${String(width)}`} {width}>
+    <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={history(RECORDS)} logs={LOGS}>
+      <RecordView lens="ledger" rank="section" />
+    </Stand>
+  </Case>
+{/each}
+
+{#each [1440, 390] as width (width)}
+  <Case label={`mcp · the page before the city answers at ${String(width)}`} {width}>
+    <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]}>
+      <Mcp rank="section" />
     </Stand>
   </Case>
 {/each}
