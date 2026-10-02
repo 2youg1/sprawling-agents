@@ -22,16 +22,18 @@ use super::health::Health;
 use super::pool::Arrival;
 use super::registering::GoalAsk;
 
-/// One append, and the address its answer goes back to.
+/// One batch of appends, and the address its answer goes back to.
 ///
 /// The two travel together because a driving thread is blocked on the
 /// second until the first has been written: an append with no way back
-/// is a thread that never wakes.
+/// is a thread that never wakes. A batch is what a turn held back until
+/// its next outside effect (runtime D24), so it crosses as one request
+/// and is answered once, with one ref per draft in draft order.
 pub(crate) struct RelayRequest {
-    draft: EventDraft,
+    drafts: Vec<EventDraft>,
     /// A rendezvous channel, so there is no third state between "the
     /// accounting thread wrote it" and "the driving thread knows".
-    back: mpsc::SyncSender<Result<EventRef, AxError>>,
+    back: mpsc::SyncSender<Result<Vec<EventRef>, AxError>>,
 }
 
 /// Everything that wakes the accounting thread, on the one queue it
@@ -106,10 +108,26 @@ impl Ledger for Relay {
     /// failure this crossing adds: a driving thread must be able to
     /// freeze its run rather than wait for a writer that ended.
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
+        self.append_all(vec![draft])?
+            .into_iter()
+            .next()
+            .ok_or_else(|| gone("the accounting thread answered one draft with no ref"))
+    }
+
+    /// Sends the whole batch as one request and **blocks** until it is
+    /// durable: one round trip, and one disk barrier shared with whatever
+    /// else is queued, however many drafts the batch holds.
+    ///
+    /// # Errors
+    /// As [`Relay::append`]; a refusal answers the whole batch.
+    fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
+        if drafts.is_empty() {
+            return Ok(Vec::new());
+        }
         let (back, answer) = mpsc::sync_channel(0);
         self.health.asked();
         self.asking
-            .send(Wake::Relay(RelayRequest { draft, back }))
+            .send(Wake::Relay(RelayRequest { drafts, back }))
             .map_err(|_| {
                 self.health.withdrawn();
                 gone("the accounting thread is no longer taking writes")
@@ -190,11 +208,16 @@ impl RelayGate {
         let mut goals = Vec::new();
         let mut drafts = Vec::new();
         let mut senders = Vec::new();
+        let mut sizes = Vec::new();
         let queued = std::iter::from_fn(|| self.wakes.try_recv().ok());
         for wake in first.into_iter().chain(queued) {
             match wake {
-                Wake::Relay(RelayRequest { draft, back }) => {
-                    drafts.push(draft);
+                Wake::Relay(RelayRequest {
+                    drafts: batch,
+                    back,
+                }) => {
+                    sizes.push(batch.len());
+                    drafts.extend(batch);
                     senders.push(back);
                 }
                 Wake::Claim(ask) => written.extend(self.booked.answer(ask, ledger)),
@@ -211,12 +234,22 @@ impl RelayGate {
         self.health.taken(batch);
         match ledger.append_all(drafts) {
             Ok(echoes) => {
-                // Positional, the port's own promise: a sender with no echo
-                // would be a caller left waiting, never one told a lie.
-                for (back, echo) in senders.into_iter().zip(echoes) {
+                // Positional, the port's own promise: each request takes the
+                // next `size` echoes, so a short answer leaves a caller told
+                // it was refused, never one told a lie.
+                let mut echoes = echoes.into_iter();
+                for (back, size) in senders.into_iter().zip(sizes) {
+                    let theirs: Vec<EventRef> = echoes.by_ref().take(size).collect();
+                    let answer = if theirs.len() == size {
+                        Ok(theirs)
+                    } else {
+                        Err(gone(
+                            "the ledger answered a batch with fewer refs than drafts",
+                        ))
+                    };
                     // A driving thread that stopped listening does not undo the line: the
                     // history is what the city believes, and it was written before this send.
-                    drop(back.send(Ok(echo)));
+                    drop(back.send(answer));
                 }
                 written.extend(kept);
             }
@@ -481,7 +514,7 @@ mod tests {
             answers.push(answer);
             gate.issuing
                 .send(Wake::Relay(RelayRequest {
-                    draft: EventDraft {
+                    drafts: vec![EventDraft {
                         run: kernel::RunId::CITY,
                         t: kernel::TimeMs::new(stamp),
                         who: "city".to_owned(),
@@ -489,7 +522,7 @@ mod tests {
                         kind: kernel::EventKind::CityInitialized,
                         data: kernel::Payload::empty(),
                         ig: false,
-                    },
+                    }],
                     back,
                 }))
                 .expect("the gate holds a sender of its own");
@@ -516,5 +549,63 @@ mod tests {
                 .expect("an answer is already there, because the write came first");
             assert!(echo.is_ok(), "every waiting draft is answered");
         }
+    }
+
+    /// **A turn's held-back records cross in one round trip** (runtime
+    /// D24). Three drafts sent through `append_all` reach the store as one
+    /// wave and come back as one answer, one ref per draft in draft order.
+    #[test]
+    fn tf1_relay_answers_a_batch_in_one_round_trip() {
+        struct Waves(Vec<usize>);
+        impl Ledger for Waves {
+            fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
+                self.append_all(vec![draft])?
+                    .into_iter()
+                    .next()
+                    .ok_or_else(|| super::gone("a wave of one answered with nothing"))
+            }
+
+            fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
+                self.0.push(drafts.len());
+                Ok((1..)
+                    .zip(drafts)
+                    .map(|(seq, draft)| {
+                        kernel::EventRecord::from_draft(
+                            draft,
+                            kernel::Seq::new(seq),
+                            kernel::GENESIS_PREV,
+                        )
+                        .to_ref()
+                    })
+                    .collect())
+            }
+        }
+
+        let mut gate = RelayGate::open();
+        let mut relay = gate.issue();
+        let draft = |stamp| EventDraft {
+            run: kernel::RunId::CITY,
+            t: kernel::TimeMs::new(stamp),
+            who: "city".to_owned(),
+            addr: None,
+            kind: kernel::EventKind::CityInitialized,
+            data: kernel::Payload::empty(),
+            ig: false,
+        };
+        let lane = std::thread::spawn(move || relay.append_all(vec![draft(1), draft(2), draft(3)]));
+        let mut store = Waves(Vec::new());
+        gate.serve(
+            Patience::Unbounded,
+            &mut store,
+            &mut std::collections::VecDeque::new(),
+        );
+        let seqs: Vec<u64> = lane
+            .join()
+            .unwrap()
+            .unwrap()
+            .iter()
+            .map(|echo| echo.seq().value())
+            .collect();
+        assert_eq!((store.0, seqs), (vec![3], vec![1, 2, 3]));
     }
 }

@@ -1079,17 +1079,19 @@ settling::tests 已有、waking::tests）；`crates/city/Spec.lean` 的 schedule
 形状：**adapter**（ARCH §9 第 4 种）。它不做任何判断，判断全在记账线程那一侧。
 
 ```rust
-/// 一次追加，以及它的回信地址。
+/// 一批追加（一个回合在下一个对外效果之前攒下的记录，runtime D24），以及它的回信地址。
 pub(crate) struct RelayRequest {
-    draft: EventDraft,
-    back: std::sync::mpsc::SyncSender<Result<EventRef, AxError>>,
+    drafts: Vec<EventDraft>,
+    back: std::sync::mpsc::SyncSender<Result<Vec<EventRef>, AxError>>,
 }
 
 /// 池那一侧的脸：唯一的 `kernel::Ledger` 实现，池线程只有它。
 pub(crate) struct Relay { /* 一个 Sender */ }
 impl kernel::Ledger for Relay {
-    /// 把 draft 发下去，然后**阻塞**等回信。
+    /// 一条 draft 是一批只有一条的 `append_all`。
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError>;
+    /// 整批作为**一个**请求发下去，然后**阻塞**等一封回信：一次往返，与同时排队的别的请求共用一道屏障。
+    fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError>;
 }
 
 /// 唤醒记账线程的一切，同在一条队列上：每张嘴一个变体，再加关门。
@@ -1120,7 +1122,7 @@ pub(crate) struct Drained { pub(crate) written: Vec<EventDraft>, pub(crate) goal
 一个不阻塞的 relay 会在记录还没落盘时就回 `Ok`，那是把契约改写成「已经排队」——
 于是 `run_started` 可能排在它自己那轮活的 `model_called` 后面。阻塞是这条契约的价钱，也是它的全部内容。
 
-**回信通道是 `sync_channel(0)`**（会合信道）：一次 `append` 一个回信地址，不留缓冲，
+**回信通道是 `sync_channel(0)`**（会合信道）：一次 `append_all` 一个回信地址，不留缓冲，
 所以「记账线程写完了」与「池线程知道写完了」之间没有第三种状态。
 
 **签名的一处出入，如实记在这里**：另一种说法是「阻塞等 `Result<EventRecord>`」，
@@ -1136,7 +1138,7 @@ pub(crate) struct Drained { pub(crate) written: Vec<EventDraft>, pub(crate) goal
 **服务顺序：relay 请求排在 desk 命令之前**。理由是一个已经在跑、已经花了钱的活，不该排在一条还没开始的命令后面；
 反过来排会让一次 `Dispatch` 命令挡住三轮正在写 `tool_result` 的活。
 
-**一道屏障带一回合攒下的记录（runtime D24）**。今天 `Relay` 用 `kernel::Ledger::append_all` 的默认实现，一条 draft 一次往返；一条车道上每次往返就是一道屏障，只有别的车道恰好同时排队时才合进同一道。runtime D24 让回合把只读调用的 `tool_called`／`tool_result` 与 `model_returned` 留在回合自己的账本门里，到下一个对外可见的效果之前用一次 `append_all` 交下来（`crates/runtime/Spec.lean` §8-3，性质在 `crates/runtime/spec/Turn/Durability.lean`）。于是 relay 的那一半是：`Relay` 覆写 `append_all`，把整批 draft 装进**一个** `RelayRequest`（`drafts: Vec<EventDraft>`，回信 `Result<Vec<EventRef>, AxError>`，按位置对应），记账线程把它与同时排队的别的请求一起写进同一道屏障。契约一字不改：回信仍在整批落盘之后才发，`Ok(refs)` 里每一条都已耐久；一批中途被拒时，拒绝之前的那些可能已经落盘，与 `append_all` 在端口上的承诺相同。落选的是「relay 收下就回信、回合另发一个只等屏障的请求」：那等于在 relay 上开一个「已排队」的回信，`EventRef` 就不再指向一段存在的历史。
+**一道屏障带一回合攒下的记录（runtime D24）**。回合把只读调用的 `tool_called`／`tool_result` 与 `model_returned` 留在回合自己的账本门里，到下一个对外可见的效果之前用一次 `append_all` 交下来（`crates/runtime/Spec.lean` §8-3，性质在 `crates/runtime/spec/Turn/Durability.lean`）。relay 的那一半是：`Relay` 覆写 `append_all`，把整批 draft 装进**一个** `RelayRequest`，记账线程把它与同时排队的别的请求摊平后一起写进同一道屏障，再按各请求的条数把 ref 按位置切回去；ref 少于 draft 时那个请求得到拒绝，不会得到一份短的答复。`Health` 的两个计数按请求计，一批是一次追加。契约一字不改：回信仍在整批落盘之后才发，`Ok(refs)` 里每一条都已耐久；一批中途被拒时整批都得到拒绝，拒绝之前的那些可能已经落盘，与 `append_all` 在端口上的承诺相同。`relay::tests::tf1_relay_answers_a_batch_in_one_round_trip` 守着「三条 draft 一次往返、一道屏障、按序三个 ref」。落选的是「relay 收下就回信、回合另发一个只等屏障的请求」：那等于在 relay 上开一个「已排队」的回信，`EventRef` 就不再指向一段存在的历史。
 
 ### 8-42-3 `accounting::worker::pool`
 
