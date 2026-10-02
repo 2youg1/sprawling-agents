@@ -231,7 +231,7 @@ Mail, GitHub, Figma, Discord: writing an integration for each is a weekly chore 
 |---|---|
 | give a building tools from a server | its `CONFIG.toml`: a `command` starts a child process, a `url` reaches a hosted server; the **MCP** page writes the same entries |
 | point at a different provider of the same tools | the same URL field. Nothing else changes |
-| add a transport | `agent_protocols::mcp::stdio` and `agent_protocols::mcp::http` are the two adapters behind `agent_protocols::mcp`'s `Outbound` seam |
+| add a transport | `agent_protocols::mcp::stdio`, `agent_protocols::mcp::http` and `agent_protocols::mcp::sse` are the three adapters behind `agent_protocols::mcp`'s `Outbound` seam |
 | drive this city from an editor | `agent_protocols::acp` accepts an outside request as an ordinary dispatch |
 
 A confidential building constructs none of them: data may enter and may not leave.

@@ -51,6 +51,7 @@ shipped one happens to be written in is a replaceable fact.
 │        ├── documents                                         │
 │        ├── agent_protocols                                   │
 │        ├── remote_access                                     │
+│        ├── desktop                                           │
 │        ├── storage                                           │
 │        ├── gateway                                           │
 │        └── wire                                              │
@@ -60,8 +61,9 @@ shipped one happens to be written in is a replaceable fact.
 └──────────────────────────────────────────────────────────────┘
         │                                    │
         ▼                                    ▼
-   the city directory                 model providers, MCP servers
-   (a tree on this disk)              (only over one gateway endpoint)
+   the city directory                 model providers and HTTP MCP servers,
+   (a tree on this disk)              through gateway; stdio MCP servers
+                                      and official harnesses, as children
 ```
 
 The figure draws the units and how they are wired, and nothing about what
@@ -72,10 +74,11 @@ from it. `kernel` is absent from the figure because everything above depends
 on it and nothing it holds is reached from outside the process.
 
 The address the server binds is `kernel::consts_policy::DEFAULT_AT` unless a
-caller overrides it. The value is not repeated here: the CLI defaults, the
-first-run screen, the installer and `README.md` all read that one constant,
-because the address a person is told and the address actually bound may not
-be two spellings (`crates/sprawling/Spec.lean` §8-2b).
+caller overrides it. The value is not repeated here: every verb's default and
+the first-run screen read that one constant, and `README.md` sends a person
+to the address the console prints rather than spelling it, because the
+address a person is told and the address actually bound may not be two
+spellings (`crates/sprawling/Spec.lean` §8-2b).
 
 ## 2 The stack, and what each choice costs
 
@@ -265,7 +268,7 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `runtime::turn::wave` | crates/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `accounting::worker::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
 | `browser::port` | crates/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
 | `remote_access::route` | crates/remote_access/src/route.rs | `route::cloudflare`: a locally managed Cloudflare named tunnel; `route::command`: a command the person wrote | `route::scripted`: a fixed address, and the order it was opened and closed in |
-| `agent_protocols::mcp` | crates/agent_protocols/src/mcp/outbound.rs | stdio child process, or HTTP | `ScriptedOutbound` for offline replay |
+| `agent_protocols::mcp` | crates/agent_protocols/src/mcp/outbound.rs | stdio child process, HTTP, or SSE | `ScriptedOutbound` for offline replay |
 | `accounting::models` | crates/accounting/src/models.rs | `accounting::worker::models`: the endpoint book's adapters | the scripted factory in `crates/sprawling/tests/model_factory.rs` |
 | `accounting::clock` | crates/accounting/src/clock.rs | `bin::assembly::production::SystemClock`: the wall clock, the one sampling point, handed in through `Hands.clock` | the stopped clock in `crates/sprawling/tests/clock.rs` |
 | `accounting::connectors` | crates/accounting/src/connectors.rs | `accounting::worker::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `crates/sprawling/tests/connectors.rs` |
@@ -520,9 +523,9 @@ answering it does not compile.
 
 ## 8 Where to change what
 
-The table this document never had. Each crate's SPEC settles the interface
-of its own modules; what belongs here is only the first hop, so that
-nobody has to read a hundred module rows to find which SPEC to open.
+Each crate's SPEC settles the interface of its own modules; this table gives
+only the first hop for each kind of change, so that nobody has to read a
+hundred module rows to find which SPEC to open.
 
 The third column names what turns red when the change is wrong — which is
 the part worth knowing before starting, not after.
@@ -533,14 +536,21 @@ the part worth knowing before starting, not after.
 | a new `Command` or `Query` frame | `wire::frames` + `crates/wire/Spec.lean` | the new name moves the schema hash, so an older page is refused at the handshake; `WIRE_V` rises only when a frame changes shape while every name stays (wire D1); every `Query` must be answered or it does not compile |
 | what a model may call | `runtime::catalog`, tools in `runtime` or `collab` | `kernel::tool` is the seam; a tool with no conformance suite is not a seam |
 | how a provider is spoken to | `gateway::dialect` + `crates/gateway/Spec.lean` | a pure two-way translation with the canonical shape in the middle |
+| a known provider host | `gateway::provider::preset` | a table with data and no branches, each row citing its source |
+| an official harness, or how one starts | `agent_protocols::harness::roster` + `crates/agent_protocols/Spec.lean` §8-19 | the roster is the person's ruling; each start command is pinned to the version the ACP registry names, which `docs/third-party.md` §1 watches |
+| what a harness run may do in a room | `accounting::worker::driving::harness` + `crates/sprawling/spec/Accounting/Worker.lean` §8-4e | `runtime::run::harness` is the one author of the order a harness run writes; `crates/agent_protocols/spec/Harness/Session.lean` proves it |
 | how a key is kept and redeemed | `gateway::credential` | plaintext may reach only the platform vault; `secret` gate reads every boundary |
 | where a city keeps a file | `kernel::layout` | the reserved subtree is out of every write domain, by one predicate in `kernel::address` |
 | what a building may do | `city::policy` (`RULES.toml`) + `crates/city/Spec.lean` | a run's write domain is what its building declares |
+| the documents a building is raised with | `crates/city/templates/` + `city::building::template` | compiled in with `include_str!`, so a moved template breaks the build; laying out a confidential building is refused when the line its template flips is gone |
+| how a host command is confined | `runtime::tools::exec::confinement` + `crates/runtime/spec/Tools/Exec.lean` | every arm states all five guarantees, so a new axis is a compile error in each arm |
+| the Windows desktop a resident may drive | `crates/desktop` + `crates/desktop/Spec.lean` | `unsafe` only in `crates/desktop/ffi`, under the Zig rule of §2; `xtask guard` holds its lint table |
 | a crate depending on another | the `depmap` block in §3 | actual edges must be a subset; a hidden edge is a red build |
 | a new seam | §4, and the trait's file | `depmap` refuses a `pub trait` outside the files §4 names |
 | a new module, or a deleted one | `architecture.toml` | `modmap` refuses a file with no entry, and an entry whose file is gone |
 | a platform the release ships | `xtask::platform`'s `PLATFORMS` | one row per platform; the npm scope and the bare root name are asserted there |
 | the page | `client/` + `client/Spec.lean` | its own lint, typecheck and tests; the bundle is measured against a byte budget |
+| the page's colours, motion or words | `client/src/theme.css`, `client/src/lang.json` + `docs/frontend-method.md` | `xtask color`, `xtask motion` and `xtask wording` refuse a colour, curve, duration or word spelled anywhere else |
 | what a module must hold on every input | the part under the crate's `spec/` that names the module (§11, *Specifications in Lean*) | `just models` proves it with no `sorry`, `admit` or `axiom`; the module's rustdoc names the part |
 | a gate itself | `tools/xtask/` + `tools/xtask/Spec.lean` | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
 

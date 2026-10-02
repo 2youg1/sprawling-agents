@@ -26,7 +26,7 @@ Every Rust package of the product lives in this directory. The packages are sepa
 | `crates/wire` | `sprawling-wire` | `wire` | the process boundary | `documents`, `kernel` | `crates/wire/Spec.lean` |
 <!-- xtask:end -->
 
-`crates/desktop` and its FFI seam `crates/desktop/ffi` get their rows from the next `cargo xtask docnum --write`. The seam is the one crate with a lint table of its own, the workspace's with `unsafe_code` at `deny`, because each call into its Zig leaf relaxes the lint at that one statement.
+The desktop's FFI seam, `crates/desktop/ffi`, is the one crate with a lint table of its own, the workspace's with `unsafe_code` at `deny`, because each call into its Zig leaf relaxes the lint at that one statement.
 
 ## Adding a crate
 

@@ -53,7 +53,7 @@ Every city is raised with one building already standing, `hall` (City Hall), whe
 
 ## Scaffolding: the forms a building is raised with
 
-A harness's *scaffolding* is the structure it puts around a model so that long work stays coherent: the files an agent reads before it starts, the files it writes before it stops, and the rules it cannot change. In sprawling that scaffolding is a set of Markdown and TOML forms that land in a building when it is raised (the templates are in [`templates/`](templates/)). A form teaches by its shape: a blank form with the right headings makes even a small local model fill it in correctly.
+A harness's *scaffolding* is the structure it puts around a model so that long work stays coherent: the files an agent reads before it starts, the files it writes before it stops, and the rules it cannot change. In sprawling that scaffolding is a set of Markdown and TOML forms that land in a building when it is raised (the templates are in [`crates/city/templates/`](../crates/city/templates/)). A form teaches by its shape: a blank form with the right headings makes even a small local model fill it in correctly.
 
 | File | Where | Written by | What it is for |
 |---|---|---|---|
