@@ -67,7 +67,7 @@
   has to come from the column the page already gives, and a `w-full`
   child inside a shrink-to-fit parent resolves to nothing at all. -->
   {#if width === undefined}
-    <div class="w-full {FRAME}" style:max-width={TALK}>{@render children()}</div>
+    <div class="w-full {FRAME}" style:max-width="{String(TALK)}px">{@render children()}</div>
   {:else}
     <div class="w-max max-w-full {FRAME}">
       <div style:width="{String(width)}px" style:max-width="100%">{@render children()}</div>
