@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { EDITORS, editorLink } from "./editor";
+import { EDITORS, editorLink, reachOf } from "./editor";
 
 describe("editorLink", () => {
   test("spells each editor's file:line:column form for a path inside the city", () => {
@@ -56,5 +56,29 @@ describe("editorLink", () => {
       { path: "shop/main.rs", folder: "/srv/city", line: 1.5 },
     ];
     expect(outside.map((each) => editorLink({ editor: "vscode", ...each }))).toEqual(outside.map(() => null));
+  });
+});
+
+describe("reachOf", () => {
+  const at = { editor: "vscode", folder: "/srv/city", path: "shop/main.rs", line: 42 } as const;
+
+  // A line read from a version the worktree no longer holds would open
+  // on whatever line now stands there, so it is offered as a location
+  // to copy and never as a link.
+  test("links a line of the worktree's own text and copies a line of a past version", () => {
+    expect([reachOf(at, "current"), reachOf(at, "past")]).toEqual([
+      { kind: "link", href: "vscode://file/srv/city/shop/main.rs:42:1" },
+      { kind: "copy", text: "shop/main.rs:42" },
+    ]);
+  });
+
+  test("offers the location to copy where no link can be spelled", () => {
+    expect([
+      reachOf({ ...at, editor: "none" }, "current"),
+      reachOf({ ...at, folder: "" }, "current"),
+    ]).toEqual([
+      { kind: "copy", text: "shop/main.rs:42" },
+      { kind: "copy", text: "shop/main.rs:42" },
+    ]);
   });
 });

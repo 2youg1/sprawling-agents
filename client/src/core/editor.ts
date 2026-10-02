@@ -106,3 +106,15 @@ function absoluteFolder(written: string): Folder | null {
     .filter((each) => each !== "");
   return segments.some((each) => each === "." || each === "..") ? null : { drive, segments };
 }
+
+// Whether a line number was read from the worktree's current text, or
+// from a version the worktree no longer holds.
+export type Shown = "current" | "past";
+
+// What the page offers for one line: a link the editor opens, or the
+// location written out for the person to copy.
+export type Reach = { readonly kind: "link"; readonly href: string } | { readonly kind: "copy"; readonly text: string };
+
+export function reachOf(_at: Opening, _shown: Shown): Reach {
+  return { kind: "copy", text: "" };
+}
