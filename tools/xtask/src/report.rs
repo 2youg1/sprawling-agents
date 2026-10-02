@@ -97,7 +97,7 @@ pub(crate) fn finish(gate: &'static str, result: Result<Vec<Violation>, XtaskErr
 /// all evaluated before the first line is printed, so the ones after the
 /// failure are already holding their findings, and returning early threw
 /// those away — which made "not judged" and "clean" the same output on
-/// any machine without `cargo-public-api` (xtask D2).
+/// any machine without a tool one gate needs (xtask D2).
 pub(crate) fn finish_all(
     results: impl IntoIterator<Item = (&'static str, Result<Vec<Violation>, XtaskError>)>,
 ) -> ExitCode {
@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn a_broken_gate_outranks_a_violation() {
-        // The regression this pins: `apisync` failing to run used to
+        // The regression this pins: a gate failing to run used to
         // discard `guard`'s findings, so a commit that had loosened a
         // gate printed the same thing as a commit that had not.
         assert_eq!(RunOutcome::of(1, 7), RunOutcome::Broken);

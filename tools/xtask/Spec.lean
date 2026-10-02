@@ -56,7 +56,6 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 | gates（命令） | 不带名字时跑全部门，带名字时只跑点名的那几道（按门表次序）；名字不在门表里即以 `unknown-gate` 退出码 2 拒绝并列出全部门名，不退回「全跑」；聚合报告，任一违规即退出码 1（D2，`spec/Report.lean`） |
 | spec（命令） | 在那个包的目录下新建 `Spec.lean` 骨架；名字是包的 lib 名，没有 lib 的包用包名（`just spec`，§8-39、§8-41）。同名的门判树、不写盘（§8-42） |
 | members（命令） | 包在哪：`--owning` 答一组路径属于哪些工作区包，`--dir` 答一个包住在哪个目录；`justfile` 用它，不再从路径里推包名（§8-39） |
-| apisync（命令） | 不在门名册里：`cargo xtask apisync` 只判两条跨 crate 的缝 kernel 与 wire 的基线是否新鲜——用 `tools/xtask/public-api.txt` 钉住的渲染器算出实时面，与已提交基线逐行比对；夜间作业跑它（§8-32、D6） |
 
 ### 门禁针对的 LLM 失效模式（本包存在的理由）
 
@@ -133,13 +132,12 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——字段一变，只有一处要改。同理，`[family.<键>]` 的 `duty` 也只由 `modmap::duties` 读，`docnum` 的 `crate_table` 经它取每个 crate 拥有什么（§8-40）。
 
-**本模块不做什么（否定式两条）**：判定路径不改任何文件；写盘只发生在带 `--write` 的命令上，且每条只重写它自己生成的那一面——`spec` 只新建不覆盖，`apisync` 只写基线文件，`wire-ts` 只写 `client/src/wire.ts`，`docnum` 只写受管区段两个标记之间的字节。不缓存扫描结果（每次全量重扫——确定性优于速度）。
+**本模块不做什么（否定式两条）**：判定路径不改任何文件；写盘只发生在带 `--write` 的命令上，且每条只重写它自己生成的那一面——`spec` 只新建不覆盖，`wire-ts` 只写 `client/src/wire.ts`，`docnum` 只写受管区段两个标记之间的字节。不缓存扫描结果（每次全量重扫——确定性优于速度）。
 
 **secret 门细则**：扫描面是仓内全部文件（含 fixtures 与语料），排除隔离区 `local/` 与 `walk` 跳过的目录（§10 第 1 条）；判定器是 `kernel::secret::scan`（xtask 依赖 kernel，工作区成员不占产品拓扑，合法）；命中只报文件、偏移与长度，恒不回显字节；无内联豁免（豁免口会被注入内容利用）。兼查：产品包（§8-39）`src/**` 内 `.expose(` 的调用点只许出现在 `EXPOSE_WHITELIST` 列出的文件里——定义处与每一个出线前的最后一格，理由逐条写在表旁；命中即红。自测纪律：扫描器自身测试的高熵样本在源码中必须拆段拼接，不留可扫描的完整字面量。
 
 **已复核字面量表**：判定器恒不改——它的活是在入口捕获一切像钥匙的东西，那里误报不要钱；**本门问的是另一个问题**「这里是不是提交了一份凭证」，那里误报要一次构建。故门内持一张 `NOT_CREDENTIALS` 精确字面量表，逐条写明它是谁、为什么不可能是凭证。三条纪律：①**整串精确匹配**——带前缀或后缀的更长 token 仍是命中，故没人能靠戴一个已复核的名字混过去（一条断言钉这件事）；②**表住门里而不是站点上**——注释式豁免是注入内容能写的洞，这张表不是；③表在门机械的路径下，增一条与被判源码分开提交。表里的条目是 Cargo 的分目标 C 编译器变量名（`release.yml` 的 musl job 设它），以及 `desktop/Cargo.toml` 用来选出 Windows 臂 API 面的 `windows` crate feature 名：feature 名由 resolver 读取、自身恒不持值，`Win32` 里的数字与下划线并置才是触发混合字母表规则的原因；只列长度 ≥20 字节的名字，更短的够不着熵侦测器。
 
-**apisync 细则**：基线集是 `SEAM_CRATES`，按 lib 名写（kernel、wire），基线住 `tools/xtask/api-baselines/<lib>.txt`，由 `cargo xtask apisync --write` 生成。实时面由 `cargo +<rustdoc> public-api -p <包名> --simplified` 算出，包名由 `members` 按 lib 名查出（§8-39），`<rustdoc>` 与 cargo-public-api 的版本都只取自 `tools/xtask/public-api.txt`（D6）。判定与重写开始前先跑一次 `cargo +<rustdoc> public-api --version`：钉住的 nightly 没装、cargo-public-api 没装、或答出的版本不是钉住的那个，都以 `XtaskError::Cmd` 拒判，消息里给出两条安装命令，退出码 2。没有 rustup 的环境（例如 Nix devshell）走同一条拒判。漂移时，违规列出只在基线里的行（前缀 `- `）和只在实时面里的行（前缀 `+ `），最多 `DRIFT_SHOWN` 行，其余只报条数（D7）。接口变动要不要进 SPEC 交给评审，机器不判（§8-32）。cargo-public-api 是环境前置，`just prereqs` 把它列为可选；钉住的 nightly 由拒判消息点名。
 
 D9 **modmap 判每一个包，门自己所在的包除外。**范围是 `members` 列出的全部包（§8-39），减去本门编进去的那个包（`CARGO_PKG_NAME`，与 `boundary` 读同一个事实）。xtask 的模块由本规格 §7 按模块描述，给它的文件另开一张表就是同一份描述的第二个家；其余工具包——今天是 citysim——与产品一样受封闭清单约束，因为它们的文件同样会被顺手新建、同样会忘记翻状态。锚点随之扩大：`specalign` 判 citysim 的 `spec` 列，与判产品的一样（§8-43）。失败的方向是故意的：一个新加的工具包默认受判，第一次提交就看得见一片红，而不是静静少判一个包。被击败的备选：在 citysim 的清单里再写一个 `mapped = true`——同一个包的一个性质分写在 `role` 与 `mapped` 两处；在 `modmap` 里写一张 `MAPPED_TOOLS` 常量表——包的一个性质住进了门里，改包名的那次提交不碰 xtask 也能过编译。
 -/
@@ -201,7 +199,7 @@ pub(crate) struct Violation {
 
 /-! ### 命令 `wire-ts`：线的 TS 面由 Rust 面生成
 
-**它关掉的门是「手写第二份线」。** `client/` 用 TypeScript 说 `crates/wire` 的语言，而一份手写的 `wire.ts` 就是同一形状的第二个权威，它漂了也要到握手之后才被发现。故 TS 面由 Rust 面生成，且生成物入库、门盯着它：`cargo xtask wire-ts --write` 写 `client/src/wire.ts`，`cargo xtask wire-ts` 只比对——盘上文件与当场生成的文本逐字节不同即红，拒词点名文件与第一处不同的行号并给出 `--write`。与 `apisync` 同一口径：生成物由门自己写、由门自己校验。
+**它关掉的门是「手写第二份线」。** `client/` 用 TypeScript 说 `crates/wire` 的语言，而一份手写的 `wire.ts` 就是同一形状的第二个权威，它漂了也要到握手之后才被发现。故 TS 面由 Rust 面生成，且生成物入库、门盯着它：`cargo xtask wire-ts --write` 写 `client/src/wire.ts`，`cargo xtask wire-ts` 只比对——盘上文件与当场生成的文本逐字节不同即红，拒词点名文件与第一处不同的行号并给出 `--write`。生成物由门自己写、由门自己校验。
 
 | 文件 | 它回答什么 |
 |---|---|
@@ -608,7 +606,7 @@ D17 **成熟度以一个带参数的事实进文档，两种拼法由 kernel 给
 
 **对比度不在这一档。** 本仓已有一份对比度模型（`xtask::color::contrast`），标定在单色轴上两个**声明的 token** 之间；把屏幕上画出来的一对颜色接进去，要动一处本次改动不拥有的可见性，而在这里另写一个公式就是这件量具自己反对的第二权威。**本档的可读性只量布局造成的那一种：一个盒子把自己的文字切掉又不画任何记号。** 缺的那一半登记为债（F 章），不以一份副本补上。
 
-**住处与称呼。** 阶段一住 `tools/xtask/src/survey/`，不进产品二进制、不动 wire、不动 `cargo public-api` 基线、不加 `Verb`、不进 `runtime::catalog` 的 `tool_defs`。**它不是一个子命令**：`gates` 那张数组与 `TOOLS` 那张数组各自是自己那件事的唯一权威，为一件还没证明自己的量具各加一行，是在有消费者之前先造 API；`cargo xtask render --survey` 是它的入口，`--route <fragment>` 换一页来量，两个开关都由 `render` 自己读，理由与 `--width` 同（§8-17）。
+**住处与称呼。** 阶段一住 `tools/xtask/src/survey/`，不进产品二进制、不动 wire、不加 `Verb`、不进 `runtime::catalog` 的 `tool_defs`。**它不是一个子命令**：`gates` 那张数组与 `TOOLS` 那张数组各自是自己那件事的唯一权威，为一件还没证明自己的量具各加一行，是在有消费者之前先造 API；`cargo xtask render --survey` 是它的入口，`--route <fragment>` 换一页来量，两个开关都由 `render` 自己读，理由与 `--width` 同（§8-17）。
 
 **探针的记录是一句话，写者与读者同住。** `probe.rs` 生成那段脚本，`probe/read.rs` 读它写下的每一个字段——记录是一行按位置排的字段、背后没有 schema，一边插一个字段而另一边不插，后面每一个字段都会静悄悄错位，而门会继续报出一批已经名不副实的数。父子同住是这里能拿到的全部防御。
 
@@ -698,19 +696,15 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 **限制**：没有门起 cargo 编译，并行的上限是最慢那道纯读门。
 -/
 
-/-! ### 8-32 `apisync` 不在门名册里，只判 kernel 与 wire（裁决）
+/-! ### 8-32 公开面没有基线命令（裁决）
 
-**决定**：`apisync` 移出 `GATES`，因而也移出 `just check` 与 CI 的门作业；`cargo xtask apisync` 只比 kernel 与 wire 两条跨 crate 缝的基线，由 `nightly.yml` 跑。「基线变了就要求同 crate SPEC 同集被碰」这条共现断言删掉，接口要不要进 SPEC 交给评审。这是人的裁决。
+**决定**：xtask 不保存也不比较任何 crate 的公开面基线；`tools/xtask/` 下没有基线目录、没有渲染器钉子文件，nightly 工具链不为它安装。这是人的裁决：编译型语言的公开面由编译器守，不为它另设 nightly。
 
-**为什么**：它在门阶段里最慢（每次 `just check` 起十一次 `cargo public-api`，量级数十秒），而它保证的只是「SPEC 文件被碰过」：碰一个字节就过，拆提交就绕开，判不出宽度也判不出内容。其余九个 crate 的公开面只被本仓自己用，缝之外的面由编译器守。
+**为什么**：比较基线要一个带日期的 nightly rustdoc 加一个钉住版本的 cargo-public-api，两者任一浮动都会让一行源码没动的基线报漂移；它守的读者（`tools/adversary/` 与客户端的 `wire.ts`）各自已有更近的守门：`wire.ts` 由 `wire-ts` 门对生成结果逐字比对，wire 的线形由 `crates/wire/tests/wire_contract.rs` 的 schema golden 判，kernel 与 wire 的公开类型一变，下游 crate 不编译。
 
-**败给的方案**：整道删掉。kernel 与 wire 的公开面有仓外读者（`tools/adversary/`、客户端生成的 `wire.ts` 所依的线），它们的漂移值得一张夜间可见的差异表。
+**败给的方案**：留着基线只给 kernel 与 wire、由夜间作业跑：每晚多装一个 nightly，换来的是一张已经由 golden 与编译器覆盖的差异表。
 
-**重议条件**：又有 crate 的公开面出现仓外读者，或夜间作业里 `apisync` 的红多次在合并后才被发现。
-
-D6 **基线是一次渲染，渲染器与基线一起钉住。** `tools/xtask/public-api.txt` 写两个值：rustdoc 取哪个带日期的 nightly（`PUBLIC_API_RUSTDOC`），cargo-public-api 取哪个版本（`PUBLIC_API_VERSION`）。`apisync` 只用这一对算实时面，`nightly.yml` 的 apisync 作业也只装这一对；挪动任一值，就在同一变更集里用新渲染器重写基线，挪钉子本身属门机械。理由：同一份源码，由另一个 nightly 的 rustdoc 或另一个 cargo-public-api 版本打印出来，可以逐行不同。两边各自浮动时，基线的内容取决于写它的机器上碰巧装了哪个 nightly，判它的 CI 每晚又换一个，源码一行没动也会报漂移；cargo-public-api 在工具链像 stable 时自己换成浮动的 `nightly`，而本仓库根的 `rust-toolchain.toml` 恰好钉着 stable，所以不写 `+<nightly>` 就一定落到浮动那一侧。被击败的备选有三个：①只在本机重写基线：下一晚 CI 换了 nightly，红照样回来；②只在 CI 钉住：本机 `--write` 仍按本机的 nightly 写出另一种渲染；③把 nightly 写进 `rust-toolchain.toml`：那个文件钉的是编译产品用的 stable，而 rustdoc JSON 只有 nightly 能出，两件事不能共用一个 channel。重议条件：cargo-public-api 能读 stable 工具链产出的 rustdoc JSON，或者钉住的 nightly 编译不了 workspace（某个依赖的 `rust-version` 超过它）。
-
-D7 **漂移报告列出差异行，并设上限。** 夜间作业的读者手里只有日志，只报「漂了」时，他得在另一台机器上装同一对渲染器、重算一遍才知道漂了什么。所以违规按排序后的逐行比对，列出只在一侧出现的行，最多 `DRIFT_SHOWN`（40）行，其余报条数。被击败的备选：打印完整差异。rustdoc 的渲染一变，往往整份基线的行都跟着变，几千行的日志没有人读；上限内的前几行已经足够判断是源码变了还是渲染变了。
+**重议条件**：某个 crate 发布到仓外、有本仓之外的编译读者时，重议为它恢复公开面的比较。
 -/
 
 /-! ### 8-33 `depmap` 也读一个 crate 之内的方向（`depmap::directions`，形状 1 判定）
@@ -846,7 +840,6 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>; /
 | `length` | 每个包的 `src/`、每个包目录下的 `.zig`，加 `client/src` |
 | `proof` | `in_product_graph` 的包；`cargo kani -p` 取 `package` |
 | `boundary` | 一个文件归哪个包，那个包是什么角色 |
-| `apisync` | `SEAM_CRATES` 写 lib 名，经 `find` 取那个包的 `package` 作 `-p` |
 | `spec` | 参数经 `find` 找包，`Spec.lean` 骨架写进它的 `dir` |
 | `unused`、`docnum` 的逐包计数 | 全部包的目录 |
 | `justfile` 的 `check-branch` 与 `branch-tests` | `members` 子命令 |
@@ -1339,7 +1332,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
   `tools.xtask.Spec` 与 `tools.xtask.spec.+` 两条）、门读的受限形状；§8-42、§8-43 是它的门一侧。
 - `lakefile.toml` 的 `Spec` 库：本规格进 `just models` 的地方。
 - `architecture.toml`：modmap、specalign、`crate_table` 的数据面；xtask 自己的文件不登记在那里（D9）。
-- `tools/xtask/budgets.toml`、`tools/xtask/lexicon.toml`、`tools/xtask/public-api.txt`：各自一份数据面，
+- `tools/xtask/budgets.toml`、`tools/xtask/lexicon.toml`：各自一份数据面，
   本规格只说门怎样读它们。
 - `docs/glossary.md`：退役词的 replacement 指向它的粗体词（§10 第 5 条）。
 - `skills/sdd/SKILL.md`：`spec` 骨架的十七节（§8-41）与本规格的十七节。

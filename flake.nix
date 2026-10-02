@@ -81,7 +81,6 @@
         tools = [
           pkgs.just
           pkgs.cargo-nextest
-          pkgs.cargo-public-api
           pkgs.bun
           pkgs.cargo-deny
           pkgs.git

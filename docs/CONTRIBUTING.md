@@ -142,7 +142,7 @@ The repository pins the toolchain in `rust-toolchain.toml` and names every other
 
 `.gitattributes` alone decides line endings: LF on every operating system. Give no editor, formatter or script a line-ending setting of its own; `git add --renormalize .` folds a whole-file diff caused by one back.
 
-**The compile-failure counterexamples are byte comparisons against a compiler's output, so the toolchain installation is part of them.** Installing the `rust-src` component makes rustc render a source snippet inside a `note:` that the committed `.stderr` files do not carry, and every counterexample that meets one goes red without a line of this repository changing. `cargo public-api` pulls that component in, so `just api-baseline` can turn `just check` red on the next run; remove it (`rustup component remove rust-src`) rather than blessing the longer output, which would only move the failure to CI.
+**The compile-failure counterexamples are byte comparisons against a compiler's output, so the toolchain installation is part of them.** Installing the `rust-src` component makes rustc render a source snippet inside a `note:` that the committed `.stderr` files do not carry, and every counterexample that meets one goes red without a line of this repository changing. A tool that pulls that component in can turn `just check` red on the next run; remove it (`rustup component remove rust-src`) rather than blessing the longer output, which would only move the failure to CI.
 
 Let a Rust command finish, and never kill it by PID; waiting on the build lock is expected. Time a slow build with `cargo build --timings` before tuning it, because the seconds sit in particular compilation units.
 
@@ -163,7 +163,6 @@ Let a Rust command finish, and never kill it by PID; waiting on the build lock i
 | `just budget` / `just bench` | every budget with what it costs today; the wall-clock readings, never gated |
 | `just sim` | citysim scenarios: fixed scripts on a counted clock, so a failure replays from the scenario itself |
 | `just spec <crate>` | create a crate's `Spec.lean` skeleton |
-| `just api-baseline` | recompute the public-surface baselines |
 | `cargo xtask docnum [--write]` | check every managed span against the code that decides it; `--write` rewrites them |
 | `just replay <log>` | verify a ledger chain offline, read-only |
 | `just mem [pid]` | private, peak private and working set of that process; with no pid, of a fresh empty city served idle (`--city <dir>` serves that one) |

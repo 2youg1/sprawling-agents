@@ -15,7 +15,6 @@
 //! A broken gate must fail loudly (code 2): silent passes are the worst
 //! failure mode a gate can have (xtask D1).
 
-mod apisync;
 mod architecture;
 mod artifact;
 mod attestation;
@@ -188,11 +187,6 @@ fn main() -> ExitCode {
         },
         Some("wire-ts") => report::finish("wire-ts", wire_ts::check(&root)),
         Some("wording") => report::finish("wording", wording::check(&root)),
-        Some("apisync") if args.iter().any(|a| a == "--write") => match apisync::write(&root) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(err) => report::internal_failure(&err),
-        },
-        Some("apisync") => report::finish("apisync", apisync::check(&root)),
         Some("header") => report::finish("header", header::check(&root)),
         Some("lexicon") => report::finish("lexicon", lexicon::check(&root)),
         Some("length") => report::finish("length", length::check(&root)),
@@ -296,7 +290,7 @@ const TOOLS: [Tool; 16] = [
     },
     Tool {
         call: "<gate> --write",
-        gives: "the recovery that gate names, applied: apisync, docnum, wire-ts",
+        gives: "the recovery that gate names, applied: docnum, wire-ts",
     },
     Tool {
         call: "proof --list",
