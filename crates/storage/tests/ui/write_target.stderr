@@ -1,9 +1,10 @@
 error[E0423]: cannot initialize a tuple struct which contains private fields
-  --> tests/ui/write_target.rs:11:18
+  --> tests/ui/write_target.rs:11:27
    |
 11 |     let forged = storage::WriteTarget(std::path::PathBuf::from("lab/x"));
-   |                  ^^^^^^^^^^^^^^^^^^^^
+   |                           ^^^^^^^^^^^
    |
+   = note: a struct named `storage::WriteTarget` exists in another namespace
 note: constructor is not visible here due to private fields
   --> src/alias.rs
    |
