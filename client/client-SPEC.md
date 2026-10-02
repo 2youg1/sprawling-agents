@@ -619,7 +619,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 右侧的文档项（`views/inspect/open.svelte.ts` 的 `DocumentItem`）画 `views/refrain/refrain.svelte`，它只收三个参数：楼、楼内路径、版本（`null` 是城此刻的文本）。名字取自它的来处 RefRain（由人定）。它编辑 Markdown 与纯文本，读法有四种，状态有一行，行为由 4-46 规定。
 
-**头一行**（32 px，与 7F 编辑器上方那一行同一个座位）：左边是路径，楼名淡、文件名实；接着是版本的前七位与保存回执；右端是读法的分段控件「源码／预览／diff／版本」与保存键。读法只有 Markdown 才有「预览」。**回执**一个词加一个形状：草稿（alert 圆点）、保存中、已保存 ✓、待核对（链路断在保存途中，重连后自动核对）、冲突、被拒（城的原话在提示里）；没有改动时不画。
+**头一行**（32 px，与 7F 编辑器上方那一行同一个座位）：左边是路径，楼名淡、文件名实；接着是版本的前七位与保存回执；右端是读法的分段控件「源码／预览／diff／版本」与保存键。读法只有 Markdown 才有「预览」。**回执**一个词加一个形状：草稿（alert 圆点）、保存中、已保存、待核对（链路断在保存途中，重连后用同一个键再发）、冲突、被拒；没有改动时不画。待核对与被拒在头一行下面多一行：前者说为什么还不知道结果，后者是城写的出路（12-5）。
 
 **四种读法**：
 
@@ -641,7 +641,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | | | Tab | 离开编辑区（不插入制表符），所以键盘用户出得去；缩进用 Accel-] 与 Accel-[ |
 | 读法 | `parts/segmented.svelte`（7-4） | 同 7-4 | 换读法，焦点留在控件上 |
 | 保存键 | APG Button（`parts/button.svelte`） | Enter／Space | 同 Accel-S；没有草稿或只读时 `aria-disabled="true"`，提示说为什么 |
-| 版本列表 | 两组单选（`parts/segmented.svelte`，「从」与「到」） | 同 7-4 | 换比较的两版 |
+| 版本列表 | 两个原生 `<select>`（「从」与「到」），各有可读名字 | 平台的下拉键（↑／↓、Alt-↓ 展开） | 换比较的两版；版本的名字、来处与时刻放不进等宽的分段格 |
 | 冲突条 | 三个 APG Button | Enter／Space | 各做按钮上的事；「丢弃草稿」打开确认，关上后焦点回到这个按钮 |
 
 `aria-*`：编辑区的可读名字是文件名（`aria-label`）；只读时 `aria-readonly="true"`。回执是 `role="status"`，只在它换了词时播报，打字不播报（§3-14：流式与逐键都不逐字播报）；冲突条是 `role="alert"`，出现时播报一次，不取焦点。

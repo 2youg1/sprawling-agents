@@ -6,16 +6,18 @@
 -->
 
 <script lang="ts">
-  // RefRain, the right side's document editor (client-SPEC 7F). Until the
-  // editor lands it shows the document through the building's file view,
-  // which reads the worktree's current text; `version` is part of the
-  // door already, so every opener names the version it means.
+  // RefRain, the right side's document editor (client-SPEC 7N). The
+  // three props are the whole door: which building, which path in it,
+  // and which version, `null` being the city's current text. A new
+  // document or version is a new session, so nothing of one document's
+  // draft, receipt or editor survives into the next; the same document
+  // drawn again keeps its editor, because the key does not move.
   import { Option, Schema } from "effect";
 
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import { Address, type B3Hash } from "../../wire";
-  import FileView from "../building/file.svelte";
+  import Document from "./document.svelte";
 
   interface Props {
     readonly building: Address;
@@ -23,16 +25,18 @@
     readonly version: B3Hash | null;
   }
 
-  // eslint-disable-next-line svelte/no-unused-props -- the stub reads the worktree's current text; the editor reads `version`
-  const { building, path }: Props = $props();
+  const { building, path, version }: Props = $props();
 
   const lang = ui().lang;
 
   const at = $derived(Option.getOrNull(Schema.decodeOption(Address)(`${building}/${path}`)));
+  const key = $derived(`${building}/${path}@${version ?? ""}`);
 </script>
 
 {#if at === null}
   <p class="p-pane text-text-faint">{say($lang, "file_missing")}</p>
 {:else}
-  <FileView {at} root={building} />
+  {#key key}
+    <Document {at} {building} {version} />
+  {/key}
 {/if}

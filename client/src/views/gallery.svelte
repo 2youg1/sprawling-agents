@@ -42,6 +42,7 @@
   import Inspected from "./gallery/ins.svelte";
   import Keepers from "./gallery/kept.svelte";
   import RefusedLine from "./gallery/refused_line.svelte";
+  import Rfr from "./gallery/rfr.svelte";
   import Monitor from "./gallery/monitor.svelte";
   import Parts from "./gallery/parts.svelte";
   import Presences from "./gallery/presence.svelte";
@@ -111,4 +112,5 @@
   <Resulted />
   <Streamed />
   <Tok />
+  <Rfr />
 </div>

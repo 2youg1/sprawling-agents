@@ -659,6 +659,230 @@
     "en": "first {kib} of {total}",
     "zh": "前 {kib}，共 {total}"
   },
+  "refrain_reading": {
+    "en": "how the document is read",
+    "zh": "文档的读法"
+  },
+  "refrain_source": {
+    "en": "source",
+    "zh": "源码"
+  },
+  "refrain_preview": {
+    "en": "preview",
+    "zh": "预览"
+  },
+  "refrain_diff": {
+    "en": "diff",
+    "zh": "diff"
+  },
+  "refrain_versions": {
+    "en": "versions",
+    "zh": "版本"
+  },
+  "refrain_save": {
+    "en": "save",
+    "zh": "保存"
+  },
+  "refrain_save_nothing": {
+    "en": "nothing changed since the city's version",
+    "zh": "与城里的版本相比没有改动"
+  },
+  "refrain_save_locked": {
+    "en": "this text is read only",
+    "zh": "这份文本只读"
+  },
+  "refrain_save_wait": {
+    "en": "the save in flight has no receipt yet",
+    "zh": "上一次保存还没有回执"
+  },
+  "refrain_receipt_draft": {
+    "en": "draft",
+    "zh": "草稿"
+  },
+  "refrain_receipt_saving": {
+    "en": "saving",
+    "zh": "保存中"
+  },
+  "refrain_receipt_saved": {
+    "en": "saved",
+    "zh": "已保存"
+  },
+  "refrain_receipt_pending": {
+    "en": "not confirmed",
+    "zh": "待核对"
+  },
+  "refrain_receipt_pending_why": {
+    "en": "the link dropped after the save left; it is sent again when the link is back",
+    "zh": "保存发出后链路断了；链路恢复时会再发一次核对"
+  },
+  "refrain_receipt_conflict": {
+    "en": "conflict",
+    "zh": "冲突"
+  },
+  "refrain_receipt_refused": {
+    "en": "refused",
+    "zh": "被拒"
+  },
+  "refrain_gathering": {
+    "en": "read only until the whole text arrives: {through} of {total}",
+    "zh": "全文到齐之前只读：{through}／{total}"
+  },
+  "refrain_too_large": {
+    "en": "{total} is more than RefRain edits; the first {through} is shown read only",
+    "zh": "{total} 超过 RefRain 能编辑的大小；只读显示前 {through}"
+  },
+  "refrain_recorded": {
+    "en": "version {version} is not the file's current one; read only",
+    "zh": "版本 {version} 不是这份文件此刻的版本；只读"
+  },
+  "refrain_lost": {
+    "en": "the city can no longer read version {version}",
+    "zh": "城已读不到版本 {version}"
+  },
+  "refrain_unreadable": {
+    "en": "the city cannot read this file: {reason}",
+    "zh": "城读不了这份文件：{reason}"
+  },
+  "refrain_conflict": {
+    "en": "the file is version {version} in the city now; your draft is kept",
+    "zh": "城里的这份文件已经是版本 {version}；草稿留着"
+  },
+  "refrain_conflict_unknown": {
+    "en": "the city refused the save because the file moved; your draft is kept",
+    "zh": "文件已经变了，城拒绝了这次保存；草稿留着"
+  },
+  "refrain_compare": {
+    "en": "compare",
+    "zh": "对照"
+  },
+  "refrain_rebase": {
+    "en": "move onto it",
+    "zh": "移到现版"
+  },
+  "refrain_discard": {
+    "en": "discard draft",
+    "zh": "丢弃草稿"
+  },
+  "refrain_discard_title": {
+    "en": "discard the draft of {name}?",
+    "zh": "丢弃 {name} 的草稿？"
+  },
+  "refrain_discard_detail": {
+    "en": "the editor shows the city's version and the unsaved changes are gone",
+    "zh": "编辑器改显城里的版本，未保存的改动不再保留"
+  },
+  "refrain_draft_lost": {
+    "en": "a draft kept for version {version} cannot be restored: the city can no longer read that version",
+    "zh": "为版本 {version} 留的草稿恢复不了：城已读不到那一版"
+  },
+  "refrain_preview_draft": {
+    "en": "the preview is version {version}; unsaved changes are not in it",
+    "zh": "预览的是版本 {version}；未保存的改动不在其中"
+  },
+  "refrain_preview_unsupported": {
+    "en": "this version does not read as Markdown ({encoding})",
+    "zh": "这一版不按 Markdown 读（{encoding}）"
+  },
+  "refrain_preview_empty": {
+    "en": "this version has nothing to preview",
+    "zh": "这一版没有可预览的内容"
+  },
+  "refrain_diff_same": {
+    "en": "same as version {version}",
+    "zh": "与版本 {version} 相同"
+  },
+  "refrain_from": {
+    "en": "from",
+    "zh": "从"
+  },
+  "refrain_to": {
+    "en": "to",
+    "zh": "到"
+  },
+  "refrain_version_opened": {
+    "en": "opened",
+    "zh": "打开的"
+  },
+  "refrain_version_saved": {
+    "en": "saved by you",
+    "zh": "你存下的"
+  },
+  "refrain_version_moved": {
+    "en": "changed in the city",
+    "zh": "城里换的"
+  },
+  "refrain_version_draft": {
+    "en": "your draft",
+    "zh": "你的草稿"
+  },
+  "refrain_versions_one": {
+    "en": "this page has seen one version of the file",
+    "zh": "本页只见过这份文件的一个版本"
+  },
+  "refrain_cm_find": {
+    "en": "Find",
+    "zh": "查找"
+  },
+  "refrain_cm_replace": {
+    "en": "Replace",
+    "zh": "替换"
+  },
+  "refrain_cm_next": {
+    "en": "next",
+    "zh": "下一个"
+  },
+  "refrain_cm_previous": {
+    "en": "previous",
+    "zh": "上一个"
+  },
+  "refrain_cm_all": {
+    "en": "all",
+    "zh": "全部"
+  },
+  "refrain_cm_match_case": {
+    "en": "match case",
+    "zh": "区分大小写"
+  },
+  "refrain_cm_regexp": {
+    "en": "regexp",
+    "zh": "正则"
+  },
+  "refrain_cm_by_word": {
+    "en": "by word",
+    "zh": "整词"
+  },
+  "refrain_cm_replace_one": {
+    "en": "replace",
+    "zh": "替换"
+  },
+  "refrain_cm_replace_all": {
+    "en": "replace all",
+    "zh": "全部替换"
+  },
+  "refrain_cm_close": {
+    "en": "close",
+    "zh": "关闭"
+  },
+  "refrain_cm_current": {
+    "en": "current match",
+    "zh": "当前匹配"
+  },
+  "refrain_cm_on_line": {
+    "en": "on line",
+    "zh": "在行"
+  },
+  "refrain_cm_replaced": {
+    "en": "replaced $ matches",
+    "zh": "替换了 $ 处"
+  },
+  "refrain_cm_replaced_line": {
+    "en": "replaced match on line $",
+    "zh": "替换了第 $ 行的匹配"
+  },
+  "refrain_cm_control": {
+    "en": "Control character",
+    "zh": "控制字符"
+  },
   "gallery_tip_tall": {
     "en": "This hint is deliberately long. It opens above the control, and where the window has no room above it the engine drops it below instead; a short hint halfway down a page never asks for that, so the fallback goes unseen. Read where this box lands: above the button means there was room, below it means the flip happened, and a box hanging off the top of the window means neither branch took.",
     "zh": "这条提示故意写得很长。它开在控件上方；窗口上方腾不出位置时，引擎改把它放到下方。页面中段的一条短提示从不提出这个要求，那条回退分支也就无人看见。看这个框落在哪里：在按钮上方说明位置够用，在下方说明翻转发生了，而挂在窗口上缘之外说明两条分支都没有生效。"
