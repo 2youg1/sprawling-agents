@@ -254,7 +254,7 @@ pub(crate) struct Violation {
 
 /-! #### 8-8b 上下文环的两个检查点是仅有的另外两个色相（`color.rs` 的 `CHECKPOINTS`，形状 6 数据面）
 
-D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，例外恰好两个，而且按名字给：`--color-reminder-first` 只许取色相 150（绿），`--color-reminder-second` 只许取色相 25（红）。它们是 client-SPEC 7J 上下文环上的两个检查点——第一级提醒与交接提醒——要在一圈白线上一眼分出先后，而 accent 说「在动或被选中」、alert 说「要人或少了」，两个意思都已占用。
+D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，例外恰好两个，而且按名字给：`--color-reminder-first` 只许取色相 150（绿），`--color-reminder-second` 只许取色相 25（红）。它们是 client/Spec.lean §7J 上下文环上的两个检查点——第一级提醒与交接提醒——要在一圈白线上一眼分出先后，而 accent 说「在动或被选中」、alert 说「要人或少了」，两个意思都已占用。
 
 - **按名字给，不按个数给**：放宽成「至多四个色相」会让第三个令牌借走其中一个色相而门不出声；一张两行的名字表让借用与挪位都成违例（`a_checkpoint_keeps_its_own_hue_and_lends_it_to_nobody`）。
 - **比值照旧两种**：两个检查点各取已有的一种比值（第一级 70，交接 90），断言六不动。
@@ -328,7 +328,7 @@ D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，�
 **三条断言，各修一种真实的漂移**：
 
 1. **锁文件在盘上，且与清单逐条同。** `client/bun.lock` 的 `workspaces` 块记着 bun 上次解算时看见的 `dependencies` 与 `devDependencies`；`package.json` 记着今天要的那份。一处不同就说明有人改了清单而没有重解，于是一台开发机装出来的东西与 CI 装出来的东西不是同一棵树。依据是**两张表逐键逐值相等**，缺、多、值不同各报一条。
-2. **运行时依赖恰为 `RUNTIME` 所列。** 这是 client-SPEC §1 已经写下的那条界线的机器面：devDependencies 随工具链自由变动，而进到用户浏览器里的东西是一张封闭的表，名单只写在 `tools/xtask/src/npm.rs` 的 `RUNTIME`，本节不抄它的条目与数目。**恰为**而不是**至少**——一个只查白名单不查缺失的门，会放过「svelte 被误删」这一半。
+2. **运行时依赖恰为 `RUNTIME` 所列。** 这是 client/Spec.lean §1 已经写下的那条界线的机器面：devDependencies 随工具链自由变动，而进到用户浏览器里的东西是一张封闭的表，名单只写在 `tools/xtask/src/npm.rs` 的 `RUNTIME`，本节不抄它的条目与数目。**恰为**而不是**至少**——一个只查白名单不查缺失的门，会放过「svelte 被误删」这一半。
 3. **树上每个包的许可证都在准许表内。** 准许表**不是本门新写的**，它就是 `deny.toml` 的 `[licenses] allow`：一个仓库对许可证只应有一个立场，工作区那一侧已经把它写下来了，本门读同一张表。许可证从 `client/node_modules/<包>/package.json` 的 `license` 字段读得——锁文件不带许可证，而已装的树带。
 
 **`node_modules` 不在树上时，第三条 skip 并说出理由，前两条照判。** `node_modules` 是 `.gitignore` 里的名字，一台没有跑过 `bun install` 的机器上它不存在，而**这不是缺陷**；门在自己打印的那一行里说它没看，与 `render` 缺浏览器时同一口径。前两条只读入库文件，故在任何机器上都判得动——**一道会因为环境而整体沉默的门，就是一道在 CI 之外不再存在的门**。
@@ -551,7 +551,7 @@ D17 **成熟度以一个带参数的事实进文档，两种拼法由 kernel 给
 
 **发布二进制必须带执行引擎**：`AbsentSandbox` 的恢复语让人去装一个带执行引擎的构建，而下载发布档的人开不了任何 feature。判法与 `budget::carries_client` 同形——`budget::carries_engine` 读产物的字节，找只有 wasmtime 会写下的那句燃料陷阱文案（默认 feature 集下这棵树一个 wasm crate 都没有，故别处写不出它）。`sandbox` feature 在 `crates/sprawling/Cargo.toml` 里默认关闭，发布构建（`justfile` 的 release 构建行）显式打开它；`package` 在打包前拒绝一个不带引擎的二进制。
 
-**发行归档还不带 cargo 包的许可原文。** 归档带 `LICENSE`（本仓库的 MPL-2.0）与 CycloneDX 物料清单；清单列出每个 cargo 包的名字、版本与 SPDX 标识，不带 MIT 与 Apache-2.0 要求随分发附上的版权与许可原文。npm 那一半由客户端产物里的 `THIRD-PARTY-NOTICES.txt` 随二进制发出（client-SPEC 12-13）。cargo 这一半缺的是：一个从 `cargo metadata` 的 `manifest_path` 旁读许可文件、按正文去重后写出的步骤，与 `Packaged` 里带着它的一个变体。
+**发行归档还不带 cargo 包的许可原文。** 归档带 `LICENSE`（本仓库的 MPL-2.0）与 CycloneDX 物料清单；清单列出每个 cargo 包的名字、版本与 SPDX 标识，不带 MIT 与 Apache-2.0 要求随分发附上的版权与许可原文。npm 那一半由客户端产物里的 `THIRD-PARTY-NOTICES.txt` 随二进制发出（client D13）。cargo 这一半缺的是：一个从 `cargo metadata` 的 `manifest_path` 旁读许可文件、按正文去重后写出的步骤，与 `Packaged` 里带着它的一个变体。
 
 **本节属门禁机具，与产品代码分开提交。**
 -/
@@ -1136,7 +1136,7 @@ pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<
 
 /-! ### 8-51 `motion`：曲线与时长只住 `theme.css`；`color` 判玻璃；`render` 判对话页的常驻入口（形状 1 判定）
 
-**要挡的三件事**，都是 client-SPEC 4-43 与 refrain P2、P6、P11、P12 写下、而今天没有机器读者的规则：一条过渡在视图里自己写曲线或毫秒数，于是同一种位移有五个答案；玻璃的不透明度被调低到字压不住背后；对话页长出一条固定的顶栏或浮动操作栏，或常驻入口悄悄变多。
+**要挡的三件事**，都是 client/Spec.lean §4-43 与 refrain P2、P6、P11、P12 写下、而今天没有机器读者的规则：一条过渡在视图里自己写曲线或毫秒数，于是同一种位移有五个答案；玻璃的不透明度被调低到字压不住背后；对话页长出一条固定的顶栏或浮动操作栏，或常驻入口悄悄变多。
 
 ```rust
 // xtask::motion
@@ -1159,7 +1159,7 @@ pub(super) fn talk_controls_within_register(
 - `linear(` 与 `steps(`，**只在括号里第一个非空白字符是数字、`.` 或 `-` 时算**：CSS 的这两个函数只收数，而 `{#snippet steps(each: Walk)}` 是一个名叫 `steps` 的片段，不是一条时间函数；
 - Tailwind 的 `duration-<数字>` 与 `duration-[`、`ease-[`，前一个字符不是字母、数字、`-` 或 `_`（`group-hover:duration-150` 的冒号算边界，`--transition-duration-short` 不算）。
 
-规则写「a transition's curve and duration are named once, in the client's theme file」，替代写「`duration-short|panel|page` 与 `ease-arrive|leave`（client-SPEC 4-43）；要第四种时长或第三条曲线，先在 `theme.css` 声明它」。**不读**：`style=` 里的 `animation-duration` 与 `animation-delay`（城市插画的环境动画与逐个错开的延迟，不是位移）、`delay-*`（悬停意图的门槛，4-18，不是动效的时长）。
+规则写「a transition's curve and duration are named once, in the client's theme file」，替代写「`duration-short|panel|page` 与 `ease-arrive|leave`（client/Spec.lean §4-43）；要第四种时长或第三条曲线，先在 `theme.css` 声明它」。**不读**：`style=` 里的 `animation-duration` 与 `animation-delay`（城市插画的环境动画与逐个错开的延迟，不是位移）、`delay-*`（悬停意图的门槛，4-18，不是动效的时长）。
 
 **`color` 多判一件事：玻璃按自己的不透明度盖在页面最亮的表面上，字仍够得到层级。** `judge_glass` 在每种打光的读法上各跑一次（§8-8 的 `Mode`）：读 `--glass-opacity: <n>%`（缺席、不是 1–100 的整数百分数各是一条违规），读 `--color-glass` 单跳到的那一档、`raised-hover` 单跳到的那一档、`--color-text` 的明度与 `--tier-text`；把玻璃那一档的 sRGB 按 n% 盖在 `raised-hover` 那一档上（逐通道在编码空间里线性混合，即引擎合成一层半透明底色的做法），算 `--color-text` 对合成色的 APCA Lc，低于 `--tier-text` 即红，拒词写出两种打光里哪一种、够到多少、要多少。**为什么是 `raised-hover` 而不是最亮的墨**：玻璃的模糊（24 px）把背后的字摊进它所在的表面，留下的是表面；页面画面积的表面里最亮的是悬停中的抬起控件。墨不按面积画，按墨判会把不透明度逼到 97%，玻璃就不是玻璃了。`glass` 进 `ROLES`（§8-8 的封闭词表），共 22 个。
 
@@ -1176,14 +1176,14 @@ pub(super) fn talk_controls_within_register(
 
 **测试**：`motion::tests` 判 `literal_at` 的正反例（三种函数、`steps(each`、`duration-150`、`hover:duration-[90ms]`、`ease-[`、`duration-panel`、`--transition-duration-short` 各一例）；`color::tests` 判玻璃：今天的样式表两种打光都绿，把 `--glass-opacity` 改成 40% 时浅色那一面红，缺这一行时红；`render::talk::tests` 在手写的 `Drawn` 夹具上判：对话框里的控件、滚动区里的控件、`status` 里的控件都不红，对话地标里一个不在三者之中的按钮红；三簇各两个控件计 6；计数大于登记时红、等于时不红；画廊没有对话页时红。
 
-D20 **曲线、时长与玻璃的下限各有一个机器读者，且读者读的就是层叠用的那个数。** `motion` 拒绝 `theme.css` 之外的时间函数与 Tailwind 的时长字面量，`color` 用 `--glass-opacity` 本身判玻璃的可读性，`render` 用画出来的页数对话页的常驻入口。理由：三条规则写在 client-SPEC 4-43 与 refrain P2、P6、P11、P12 里，若没有读者，第一个赶时间的视图就会写下 `duration-200`、第一次调玻璃的人就会把字调到读不清；而玻璃那一条若另立一个 `--glass-floor` 给门读，层叠用的数与门判的数就是两个可以分开的家。被击败的备选：①只拒 `cubic-bezier(` 等三个函数（路线图的原文）——同一种位移今天有 90、100、120、150、200 ms 五个答案，函数一个都没写；②按类名认对话页的三簇——类名是写下来的，门判的是画出来的页；③在探针里加 `position` 一格再判 `fixed`——那是改 `crates/browser`，与门不能同一个提交，而父链与滚动轴已经说得出同一件事。**重开参数**：`browser::survey` 下一次加读数时，对话页的两条性质迁进去（§8-38 的同一条）；客户端出现第二个产地（例如第二套主题文件），`motion` 的产地从一个文件变成一张表。
+D20 **曲线、时长与玻璃的下限各有一个机器读者，且读者读的就是层叠用的那个数。** `motion` 拒绝 `theme.css` 之外的时间函数与 Tailwind 的时长字面量，`color` 用 `--glass-opacity` 本身判玻璃的可读性，`render` 用画出来的页数对话页的常驻入口。理由：三条规则写在 client/Spec.lean §4-43 与 refrain P2、P6、P11、P12 里，若没有读者，第一个赶时间的视图就会写下 `duration-200`、第一次调玻璃的人就会把字调到读不清；而玻璃那一条若另立一个 `--glass-floor` 给门读，层叠用的数与门判的数就是两个可以分开的家。被击败的备选：①只拒 `cubic-bezier(` 等三个函数（路线图的原文）——同一种位移今天有 90、100、120、150、200 ms 五个答案，函数一个都没写；②按类名认对话页的三簇——类名是写下来的，门判的是画出来的页；③在探针里加 `position` 一格再判 `fixed`——那是改 `crates/browser`，与门不能同一个提交，而父链与滚动轴已经说得出同一件事。**重开参数**：`browser::survey` 下一次加读数时，对话页的两条性质迁进去（§8-38 的同一条）；客户端出现第二个产地（例如第二套主题文件），`motion` 的产地从一个文件变成一张表。
 
 **本节属门禁机具，与产品代码分开提交。**
 -/
 
 /-! ### 8-52 `wire-ts` 发出 Effect 4 的 `Schema`（形状 1 判定）
 
-客户端升到 Effect 4（client-SPEC 12-29），生成器随之改写它发出的表达式；读的 JSON Schema 子集、依赖排序、递归、命名与 brand 的规则都不变，变的只是每个关键字落成哪一种 Effect 4 写法：
+客户端升到 Effect 4（client D29），生成器随之改写它发出的表达式；读的 JSON Schema 子集、依赖排序、递归、命名与 brand 的规则都不变，变的只是每个关键字落成哪一种 Effect 4 写法：
 
 | JSON Schema | Effect 4 表达式 |
 |---|---|

@@ -43,7 +43,7 @@
 # 311,050 B recorded here. The ratchet is not being loosened: the slack
 # stays at 20 KB, so the next gradual regression is caught exactly as
 # before, against a figure that describes what ships today.
-# The syntax highlighter (client-SPEC 4-26) is weighed here too, though
+# The syntax highlighter (client/Spec.lean §4-26) is weighed here too, though
 # the first screen never downloads it: the directory holds it, and the
 # binary embeds every byte the directory holds. It adds 166,127 B
 # gzipped - the highlighter chunk 9,918 B and ten grammar chunks from
@@ -61,7 +61,7 @@ what = "the client the browser downloads, gzipped, the two shipped faces include
 budget_bytes = 2097152
 # The bundle the deliverable ships, gzipped, fonts included: the view
 # tree carries the storybook and its fixture tables, which ship with
-# the client on the `#/gallery` route (client-SPEC §6), and this is
+# the client on the `#/gallery` route (client/Spec.lean §7), and this is
 # what the client weighs with them. The row is a reading, not a gate:
 # runtime speed comes before size, so the bytes are printed and nothing
 # refuses them; best_bytes is the last recorded reading. The
@@ -686,7 +686,7 @@ status = "measured, not gated here: per frame with the `$state` run table 30-37 
 # What the page pays to read one event frame off the socket. Event and
 # delta frames arrive once per ledger record and once per token, so they
 # skip the Effect schema for JSON.parse and a narrow guard taken from it
-# (client-SPEC 4-6); the schema path is measured beside it so the gap the
+# (client/Spec.lean §4-6); the schema path is measured beside it so the gap the
 # guard buys stays visible.
 [client_frame_decode]
 what = "one event frame decoded from its text, by the hot decoder and by the Effect schema it stands in for"
@@ -716,7 +716,7 @@ measured_by = "bun test --conditions=browser client/src/core/results.test.ts (pr
 status = "measured, not gated here: 45-124 us per city across three runs (x86_64 desktop class, other builds running beside it). A wall-clock figure is the machine's, so this register records it and the test guards only what every machine agrees on: the read count and the ratio between two sizes"
 
 # How many controls stand on the conversation page at once (refrain P11,
-# client-SPEC 4-43): the edge keys, the composer's row and the inspect
+# client/Spec.lean §4-43): the edge keys, the composer's row and the inspect
 # side's handle, counted on every shell fixture of the gallery by
 # `cargo xtask render` (tools/xtask/Spec.lean §8-51). A control inside a
 # message, a fact's detail or an opened panel is not standing and is not

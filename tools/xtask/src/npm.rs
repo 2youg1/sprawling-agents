@@ -62,13 +62,13 @@ const PERMITTED: &str = "deny.toml";
 /// directions: a gate that only refused additions would wave through the
 /// day `svelte` is deleted by accident. The `@lezer` packages are the
 /// syntax highlighter and its grammars, which ship as a lazy chunk the
-/// first screen never downloads (client-SPEC 4-26); the `@codemirror`
+/// first screen never downloads (client/Spec.lean §4-26); the `@codemirror`
 /// packages are RefRain's text editor, its find and replace, and its
-/// version diff, another lazy chunk (client-SPEC 7N, 7-9); `pdfjs-dist`
+/// version diff, another lazy chunk (client/Spec.lean §7N, §7-9); `pdfjs-dist`
 /// and `docx-preview` draw a PDF's pages and a DOCX laid out as pages in
-/// RefRain, each its own lazy chunk (client-SPEC 4-54, 12-32).
+/// RefRain, each its own lazy chunk (client/Spec.lean §4-54, client D32).
 /// `@noble/post-quantum` is the remote device's ML-KEM and ML-DSA,
-/// loaded only when the remote group pairs or locks (client-SPEC 4-57,
+/// loaded only when the remote group pairs or locks (client/Spec.lean §4-57,
 /// `crates/remote_access/Spec.lean` D21).
 const RUNTIME: [&str; 21] = [
     "@codemirror/commands",
@@ -224,7 +224,7 @@ fn runtime_violation(what: String) -> Violation {
         ),
         violation: what,
         alternative: "put the package in devDependencies if it is toolchain, or record the \
-                      decision in client-SPEC.md before it reaches a person's browser"
+                      decision in client/Spec.lean before it reaches a person's browser"
             .to_owned(),
     }
 }

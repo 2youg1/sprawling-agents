@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Motion gate: a transition's curve and duration are named once, in the
-//! client's theme file (tools/xtask/Spec.lean §8-51, client-SPEC 4-43).
+//! client's theme file (tools/xtask/Spec.lean §8-51, client/Spec.lean §4-43).
 //!
 //! The same shape as the colour scan: one production point, and every
 //! other file in the client refused the spellings that would make it a
@@ -17,7 +17,7 @@
 //! **What it does not read**: an inline `animation-duration` or
 //! `animation-delay` (the city drawing's ambient loops and the stagger
 //! between its figures are not movements across the page), and `delay-*`
-//! (a hover hint's intent threshold, client-SPEC 4-18, not a duration of
+//! (a hover hint's intent threshold, client/Spec.lean §4-18, not a duration of
 //! motion).
 
 use std::path::Path;
@@ -56,7 +56,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                 violation: format!("`{spelling}` outside {THEME}"),
                 alternative: format!(
                     "spell `duration-short`, `duration-panel` or `duration-page` and `ease-arrive` or \
-                     `ease-leave` (client-SPEC 4-43); a fourth duration or a third curve is declared \
+                     `ease-leave` (client/Spec.lean §4-43); a fourth duration or a third curve is declared \
                      in {THEME} first"
                 ),
             });

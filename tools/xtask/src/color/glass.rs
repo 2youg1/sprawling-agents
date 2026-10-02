@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Glass: whether text on a see-through surface of the edge layer is
-//! still legible (tools/xtask/Spec.lean §8-51, client-SPEC 4-43).
+//! still legible (tools/xtask/Spec.lean §8-51, client/Spec.lean §4-43).
 //!
 //! **The opacity judged is the opacity drawn.** `--glass-opacity` is the
 //! number `theme.css` mixes the glass role with, and it is the number

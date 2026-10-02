@@ -358,7 +358,7 @@ check-desktop:
 fuzz-desktop rounds="1000000" seed="5eedf022":
     DESKTOP_FFI_FUZZ_ROUNDS={{rounds}} DESKTOP_FFI_FUZZ_SEED={{seed}} cargo nextest run -p sprawling-desktop-ffi --locked --run-ignored only -E 'test(/for_as_long_as_asked/)'
 
-# The browser client (client/client-SPEC.md): Svelte + Effect, built by
+# The browser client (client/Spec.lean): Svelte + Effect, built by
 # Vite under bun, bundled into crates/sprawling/web-dist where
 # crates/sprawling/build.rs reads it and where `cargo package` archives it. `just prereqs` names bun. `--frozen-lockfile` makes bun.lock
 # the authority, so a build cannot resolve a version nobody committed.

@@ -294,25 +294,25 @@ replacement = "checkpoint（glossary）"
 banned = "MemoryError"
 replacement = "StorageError（storage 的 SPEC：crates/storage/Spec.lean §8-14）"
 
-# 外壳重做之后，左栏与底部事实条都已删除（client-SPEC.md 7D、7E）：
+# 外壳重做之后，左栏与底部事实条都已删除（client/Spec.lean §7D、§7E）：
 # 页面的常驻入口是左下三键，读数各回到读者已经在看的地方。
 
 [[entry]]
 banned = "左栏"
-replacement = "edge keys（左下三键，client-SPEC.md 7E）"
+replacement = "edge keys（左下三键，client/Spec.lean §7E）"
 
 [[entry]]
 banned = "left rail"
-replacement = "edge keys (client-SPEC.md 7E)"
+replacement = "edge keys (client/Spec.lean §7E)"
 
 [[entry]]
 banned = "the rail"
-replacement = "edge keys (client-SPEC.md 7E)"
+replacement = "edge keys (client/Spec.lean §7E)"
 
 [[entry]]
 banned = "事实条"
-replacement = "client-SPEC.md 7D（一屏一家：每个读数在读者已经在看的地方）"
+replacement = "gauge 与它的座位表（client/Spec.lean §7D：一屏一家，每个读数在读者已经在看的地方）"
 
 [[entry]]
 banned = "fact bar"
-replacement = "client-SPEC.md 7D (each reading where its reader already looks)"
+replacement = "gauge and its seat table (client/Spec.lean §7D: each reading where its reader already looks)"

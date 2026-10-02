@@ -11,7 +11,7 @@
 //!
 //! The npm packages the client bundles are not components here; their
 //! names, versions and licence texts ship inside the binary as the
-//! client's `THIRD-PARTY-NOTICES.txt` (client-SPEC 12-13).
+//! client's `THIRD-PARTY-NOTICES.txt` (client D13).
 
 use std::path::Path;
 use std::process::Command;
