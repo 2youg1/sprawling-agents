@@ -316,3 +316,11 @@ replacement = "gauge 与它的座位表（docs/frontend-method.md §7D：一屏�
 [[entry]]
 banned = "fact bar"
 replacement = "gauge and its seat table (docs/frontend-method.md §7D: each reading where its reader already looks)"
+
+[[entry]]
+banned = "skill 审计"
+replacement = "skill audit（审核）"
+
+[[entry]]
+banned = "调用日志"
+replacement = "usage record（调用记录）"
