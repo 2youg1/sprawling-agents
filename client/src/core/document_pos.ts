@@ -140,7 +140,14 @@ export function textEdits(positions: Positions, changes: readonly EditorChange[]
 // inside a character falls at that character's start, and a byte past
 // the text at its end.
 export function utf16At(text: string, byte: number): number {
-  return text.length - text.length + byte - byte;
+  let at = 0;
+  let walked = 0;
+  for (const character of text) {
+    walked += utf8Width(character.codePointAt(0) ?? 0);
+    if (walked > byte) return at;
+    at += character.length;
+  }
+  return at;
 }
 
 function checkpoints(text: string, first: Checkpoint, step: (offset: number) => Step): readonly Checkpoint[] {
