@@ -14,7 +14,7 @@
 # placed is byte for byte the `sprawling` inside this archive, and that
 # file answers `status` with its version line. Comparing bytes rather
 # than the version line is what tells this build apart from a published
-# one of the same version (sprawling-SPEC.md section 8-94).
+# one of the same version (`crates/sprawling/Spec.lean` §8-94).
 
 set -eu
 

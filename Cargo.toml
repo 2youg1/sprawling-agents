@@ -44,7 +44,7 @@ default-members = [
 # own packages below to `=` this version, `xtask package` and `xtask
 # channel` read it, and the binary reports it. Every package may be
 # published unless its own manifest says `publish = false`, which the
-# two tools of this repository do (sprawling-SPEC.md 8-157).
+# two tools of this repository do (`crates/sprawling/Spec.lean` §8-157).
 [workspace.package]
 version = "0.0.8"
 edition = "2024"
@@ -94,7 +94,7 @@ png = "0.18"
 winapi-util = "0.1.11"
 # One Job Object per run in runtime (`crates/runtime/Spec.lean` §8-13-3), and the peak
 # memory a measured command's process reached in `sprawling gauge`
-# (sprawling-SPEC 8-129-4); the crate's public surface is safe.
+# (`crates/sprawling/Spec.lean` §8-129-4); the crate's public surface is safe.
 win32job = "2.0.3"
 # The desktop server's safe Win32 calls, and the handle and error types its
 # FFI seam hands back (`crates/desktop/Spec.lean` D9 and section 8-12): the server
@@ -227,7 +227,7 @@ argon2 = { version = "0.6", default-features = false, features = ["alloc", "zero
 schemars = { version = "1", features = ["uuid1"] }
 # The QR code `/remote pair` prints on the city's console, so a phone scans
 # the invitation instead of a person typing 80 characters into it
-# (sprawling-SPEC.md 8-140). MIT, no dependencies, no I/O.
+# (`crates/sprawling/Spec.lean` §8-140). MIT, no dependencies, no I/O.
 qrcodegen = "1.8"
 # The one Markdown grammar: a document's preview and an export are laid
 # out by the same parser, in the city rather than in the browser

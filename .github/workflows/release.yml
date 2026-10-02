@@ -198,7 +198,7 @@ jobs:
       # downloads, verifies and places the binary, and the placed file is
       # compared byte for byte with the archive's and asked its version.
       # Windows installs through install.ps1, which this step does not run
-      # (sprawling-SPEC.md section 8-94).
+      # (`crates/sprawling/Spec.lean` §8-94).
       - name: install the archive with install.sh from a loopback release
         if: runner.os != 'Windows'
         shell: bash

@@ -254,7 +254,7 @@ jobs:
   # skipped job still shows in the run, so the absence is visible rather
   # than read as a pass. Once the base URL is set the rest is owed, so
   # `SPRAWLING_E2E_REQUIRED=1` turns any missing variable into a red that
-  # names it (sprawling-SPEC.md section 8-69). A job-level `if` can read a
+  # names it (`crates/sprawling/Spec.lean` §8-69). A job-level `if` can read a
   # variable but not a secret, which is why the base URL is the switch.
   e2e:
     if: vars.SPRAWLING_E2E_BASE_URL != ''

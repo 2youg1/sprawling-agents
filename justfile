@@ -156,7 +156,7 @@ branch-tests base +packages:
 # `crates/sprawling/src/doctor/table.rs` is the one list: `sprawling
 # doctor` and the settings page install from it, and a test there holds
 # `prereqs.tsv` beside it to exactly what the table renders
-# (sprawling-SPEC.md section 8-58). This recipe reads that file rather
+# (`crates/sprawling/Spec.lean` §8-58). This recipe reads that file rather
 # than keeping a list of its own, because two lists of one fact is how a
 # person installed everything one of them named and still met a red
 # gate. Each row is one probe, so the whole recipe costs milliseconds and
@@ -234,7 +234,7 @@ clippy:
 # default features, test targets included; `sprawling` without its
 # default features, which is the binary with no execution engine -
 # `sandbox` is a default feature, so nothing else compiles that build
-# (sprawling-SPEC.md 8-157); and `wire` with `server` off - which is the
+# (`crates/sprawling/Spec.lean` §8-157); and `wire` with `server` off - which is the
 # reason that feature exists, since it keeps the TCP stack out of a
 # wasm32 build. Code behind a feature is compiled the day somebody turns
 # that feature on, and a combination that does not build is what the
@@ -442,7 +442,7 @@ budget:
 # The wall-clock readings, never gated: citysim's load scenarios, then
 # the two instruments that drive the city's own accounting loop - a relay
 # round trip and the gap a second dispatch leaves in a running one
-# (sprawling-SPEC.md 8-84).
+# (`crates/sprawling/Spec.lean` §8-84).
 bench:
     cargo run --release -p citysim --bin bench
     cargo nextest run -p sprawling -p sprawling-accounting --release --run-ignored only -E 'test(/::instrument_/)' --no-capture

@@ -39,7 +39,7 @@ jobs:
   # runner". The commit date comes from git rather than from an API, so
   # this job needs nothing but a checkout, so it was legal on ubuntu even
   # while Linux was kept out of the builds. That has since been
-  # re-argued (sprawling-SPEC.md section 8-9): a native Linux runner never
+  # re-argued (`crates/sprawling/Spec.lean` §8-9): a native Linux runner never
   # touches a cross toolchain, which was the whole of the original reason.
   moved:
     runs-on: ubuntu-latest

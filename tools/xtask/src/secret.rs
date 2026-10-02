@@ -69,7 +69,7 @@ const EXPOSE_WHITELIST: [&str; 4] = [
 /// since this path is inside the guard's protected face.
 ///
 /// - `CC_x86_64_unknown_linux_musl` — Cargo's per-target C compiler
-///   variable, quoted in `sprawling-SPEC.md` where the static Linux
+///   variable, quoted in `crates/sprawling/Spec.lean` where the static Linux
 ///   archive is argued. No workflow sets it: that archive is held back
 ///   until it is settled where a Linux install keeps a credential, and
 ///   `release.yml` says so. The entry stays because the name is not a

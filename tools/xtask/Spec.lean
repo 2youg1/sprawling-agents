@@ -482,11 +482,11 @@ D17 **成熟度以一个带参数的事实进文档，两种拼法由 kernel 给
 
 **权威落在 `crates/sprawling/build.rs` 的 `BUNDLE_DIR`，它的值是相对 `sprawling` 包目录、以 `/` 分段的路径 `web-dist`，判据两条。** 谁先需要它：任何一次 `cargo build` 都要先由 build script 找到那个目录，而门跑在其后。谁能被另一个引用：build script 是**唯一一个在已发布树里仍要工作的读者**——`release::is_scaffolding` 把 `tools/xtask/` 留在机器上，crates.io 上的 `.crate` 里也只有这个包自己的文件，所以一个住在 `xtask` 的常量在那两棵树上根本不存在，而反方向可行——`xtask::bundle` 用 `syn` 从 build script 里读出这个常量。故 `xtask` 侧零副本：`bundle::stated_path` 把它接在 build script 所在的目录后面，交出仓库相对的整条路径 `crates/sprawling/web-dist`；`render`、`budget` 与 `shots` 都调 `bundle::dist(root)`，它把这条路径逐段接在工作区根上。
 
-**包体在包里，因为 crates.io 上只有包。** `cargo package` 只把包目录里的文件打进 `.crate`，验证构建与 `cargo install` 都在那份解开的包里跑 `build.rs`；包体落在工作区的 `target/` 下时，从 crates.io 装出来的二进制只带占位页。`sprawling` 的清单用 `include` 把被 `.gitignore` 挡掉的 `web-dist/` 收进包（sprawling-SPEC 8-157）。
+**包体在包里，因为 crates.io 上只有包。** `cargo package` 只把包目录里的文件打进 `.crate`，验证构建与 `cargo install` 都在那份解开的包里跑 `build.rs`；包体落在工作区的 `target/` 下时，从 crates.io 装出来的二进制只带占位页。`sprawling` 的清单用 `include` 把被 `.gitignore` 挡掉的 `web-dist/` 收进包（`crates/sprawling/Spec.lean` §8-157）。
 
 **另外两处用另一门语言写，由闸断言相等而不代写**：`client/vite.config.ts` 与 `justfile` 必须拼出 `stated_path` 交出的那条仓库相对路径，不然 `artifact` 门红。一道门不改别人的打包器配置。**判的是整条路径而不只是目录名**：父目录若在各处各写一份，名字对得上而位置对不上，门仍是绿的。
 
-**包的位置与 cargo 的输出目录无关。** 客户端包是 bun 的产物，`build.rs` 不读 `CARGO_TARGET_DIR`，只在自己的包目录下找 `BUNDLE_DIR`（sprawling-SPEC §8-83）。若让三个读者都跟随 cargo 的目标目录，每个读者都要复刻 cargo 解析它的规则（环境变量、`build.target-dir`、相对路径按当前目录解析），而这三份复刻用两门语言写，没有门能判它们相等。
+**包的位置与 cargo 的输出目录无关。** 客户端包是 bun 的产物，`build.rs` 不读 `CARGO_TARGET_DIR`，只在自己的包目录下找 `BUNDLE_DIR`（`crates/sprawling/Spec.lean` §8-83）。若让三个读者都跟随 cargo 的目标目录，每个读者都要复刻 cargo 解析它的规则（环境变量、`build.target-dir`、相对路径按当前目录解析），而这三份复刻用两门语言写，没有门能判它们相等。
 
 **扫描面不进它**：`web-dist` 是 `walk::SKIP_DIRS` 的第五个名字，与 `target` 同为构建目录（§8「扫描面」一节）；不跳过时，`release`、`secret`、`header` 会把 Vite 压过的 JavaScript 当成入库对象来判。
 
