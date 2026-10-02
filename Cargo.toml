@@ -233,11 +233,11 @@ qrcodegen = "1.8"
 # out by the same parser, in the city rather than in the browser
 # (crates/documents/Spec.lean D20). BSD-2-Clause, CommonMark and GFM.
 # Without default features, because those are its command line and its
-# syntect highlighter, and the client already colours code. Held at 0.50:
-# from 0.51 comrak reads Unicode categories through finl_unicode, whose
-# licence adds Unicode-DFS-2016, which deny.toml does not list
-# (crates/documents/Spec.lean section 13).
-comrak = { version = "0.50", default-features = false }
+# syntect highlighter, and the client already colours code. comrak reads
+# Unicode categories through finl_unicode, whose licence adds
+# Unicode-DFS-2016, which deny.toml admits (crates/documents/Spec.lean
+# section 13).
+comrak = { version = "0.55", default-features = false }
 # The workspace's own packages: the one place their paths and published
 # names are written. Each version pins `[workspace.package] version`
 # exactly, because a path dependency without one cannot be published;
