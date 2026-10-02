@@ -95,7 +95,7 @@ pub(super) fn stored(city_root: &Path, version: &B3Hash, wanted: Span) -> Result
 }
 
 /// The bytes of one half-open span of a stored object.
-fn read(store: &Cas, version: &B3Hash, span: Span) -> Result<Vec<u8>, AxError> {
+pub(super) fn read(store: &Cas, version: &B3Hash, span: Span) -> Result<Vec<u8>, AxError> {
     if span.is_empty() {
         return Ok(Vec::new());
     }

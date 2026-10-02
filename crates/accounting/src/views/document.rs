@@ -8,9 +8,9 @@
 //!
 //! Every judgement - which version, whether the bytes are text, where
 //! the first window ends - is the `documents` crate's; this module reads
-//! the disk, keeps a version in the content store when its first window
-//! does not cover it or when it is Markdown, which is previewed by its
-//! version, and spells the answer. The same text judgement
+//! the disk, keeps every version it reads in the content store, where
+//! any later question reads it by its version (`crates/wire/spec/Answer/Document.lean`
+//! §8-69), and spells the answer. The same text judgement
 //! answers `Content` and `Prefix`, which read bytes out of the store
 //! rather than off the tree: what makes bytes readable does not depend on
 //! where they were kept.
@@ -42,16 +42,23 @@ pub(super) fn document_answer(city_root: &Path, at: Address) -> wire::DocumentAn
 fn state_of(city_root: &Path, at: &Address, bytes: &[u8]) -> DocumentState {
     let version = B3Hash::digest(bytes);
     let format = Format::of_name(at.as_str());
+    // A version the store will not keep is not one a page can read on
+    // through, compare or fetch; saying so is better than an answer
+    // whose version leads nowhere.
+    if let Err(err) = keep(city_root, bytes) {
+        return DocumentState::Unreadable {
+            reason: err.to_string(),
+        };
+    }
     if bytes.is_empty() {
         return DocumentState::Empty { version, format };
     }
     let body = match Judged::of(bytes) {
         Judged::Opaque => DocumentBody::Opaque,
-        Judged::Text(encoding) => match text_body(city_root, format, encoding, bytes) {
+        Judged::Text(encoding) => match text_body(format, encoding, bytes) {
             Ok(body) => body,
-            // A version whose head cannot be offered is not one a page
-            // can read: the store would not keep it, so a `Head` answer
-            // would promise a range read that cannot happen.
+            // A version whose head cannot be cut is not one a page can
+            // read.
             Err(err) => {
                 return DocumentState::Unreadable {
                     reason: err.to_string(),
@@ -67,11 +74,9 @@ fn state_of(city_root: &Path, at: &Address, bytes: &[u8]) -> DocumentState {
     }))
 }
 
-/// The first window of a text version, and the version kept in the
-/// store when that window does not cover it or a preview will read it
-/// (`crates/accounting/spec/Views/Document.lean` §8-21, accounting D33).
+/// The first window of a text version, and whether it covers the whole
+/// of it (`crates/accounting/spec/Views/Document.lean` §8-21).
 fn text_body(
-    city_root: &Path,
     format: Format,
     encoding: documents::Encoding,
     bytes: &[u8],
@@ -82,12 +87,6 @@ fn text_body(
     } else {
         Coverage::Whole
     };
-    match (format, coverage) {
-        (Format::Markdown, Coverage::Whole | Coverage::Head) | (Format::Plain, Coverage::Head) => {
-            keep(city_root, bytes)?;
-        }
-        (Format::Plain, Coverage::Whole) => {}
-    }
     Ok(DocumentBody::Text {
         encoding,
         head,
@@ -95,9 +94,13 @@ fn text_body(
     })
 }
 
-/// Puts one version in the city's content store, where `Query::Range`
-/// reads it by the address that is also its version.
-fn keep(city_root: &Path, bytes: &[u8]) -> Result<(), AxError> {
+/// Puts one version in the city's content store, where `Range`, `Bytes`
+/// and `Export` read it by the address that is also its version. A
+/// version already kept costs one existence check.
+///
+/// # Errors
+/// The store will not open or will not take the bytes.
+pub(crate) fn keep(city_root: &Path, bytes: &[u8]) -> Result<(), AxError> {
     let mut store = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
         .map_err(storage::StorageError::into_ax)?;
     store

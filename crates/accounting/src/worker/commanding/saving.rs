@@ -8,8 +8,10 @@
 //! 8-73).
 //!
 //! Both read the document's bytes inside its lock, hand them to the
-//! `documents` rule that decides, replace the file whole, and then record
-//! what landed. The rules are the `documents` crate's and the lock is
+//! `documents` rule that decides, keep the version that lands in the
+//! content store, replace the file whole, and then record what landed:
+//! a version the page lists can always be read back by its version
+//! (`crates/wire/spec/Answer/DocumentVersions.lean` §8-79). The rules are the `documents` crate's and the lock is
 //! `city::document`'s; this module only puts them in order and writes
 //! the lines.
 
@@ -20,6 +22,7 @@ use kernel::event::record::{DocumentWritten, ProposalDecided, SliceVerdict};
 use kernel::{Address, AxCode, AxError, EventKind, Payload};
 
 use super::super::RunWorker;
+use crate::views::document::keep;
 
 impl RunWorker {
     /// Saves a page's edits on the version they were made on, and
@@ -34,6 +37,7 @@ impl RunWorker {
         let path = self.document_path(&write.doc)?;
         let applied = city::revise_document(&path, |held, source| {
             let applied = documents::save(source, write.baseline, &write.edits)?;
+            keep(&self.city_root, applied.bytes())?;
             held.replace(applied.bytes())?;
             Ok(applied)
         })?;
@@ -71,6 +75,7 @@ impl RunWorker {
         let landed = city::revise_document(&path, |held, source| {
             let decided = documents::decide(source, &named)?;
             if let Some(applied) = &decided {
+                keep(&self.city_root, applied.bytes())?;
                 held.replace(applied.bytes())?;
             }
             Ok(decided)
