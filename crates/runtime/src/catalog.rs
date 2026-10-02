@@ -249,8 +249,9 @@ impl Catalog {
     /// the core of the mode the run sits in (`mode::core_tools`). A
     /// catalog told no mode carries no tool, so nothing reaches a model
     /// that the mode did not decide.
-    fn is_core(&self, _name: &str) -> bool {
-        true
+    fn is_core(&self, name: &str) -> bool {
+        self.mode
+            .is_some_and(|mode| crate::mode::core_tools(mode).contains(&name))
     }
 
     /// The call a `call` stands for, with the id the model gave it, so its
