@@ -1045,6 +1045,7 @@ pub fn wire::TemplateName::parse(&str) -> core::result::Result<Self, kernel::err
 pub fn wire::ToolkitSlug::as_str(&self) -> &str
 pub fn wire::ToolkitSlug::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn wire::arguments_in(&serde_json::value::Value) -> core::option::Option<wire::Output>
+pub fn wire::bundle_routes<S>(alloc::sync::Arc<wire::ClientAssets>) -> axum::routing::Router<S> where S: core::clone::Clone + core::marker::Send + core::marker::Sync + 'static
 pub fn wire::classify(&wire::Command) -> wire::ControlVerdict
 pub fn wire::decide_admission(wire::Door, core::option::Option<&str>, &wire::BindFace) -> wire::Admission
 pub fn wire::decide_bind(&core::net::socket_addr::SocketAddr, core::option::Option<kernel::locator::B3Hash>) -> wire::BindVerdict
