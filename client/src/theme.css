@@ -926,9 +926,12 @@
  * well at a measure and badly when stretched. Asking for one column
  * below a breakpoint and two above it answers the question at two
  * points and guesses in between; `auto-fit` answers it continuously,
- * from the one width that decides it - how wide a column of prose is. */
+ * from the one width that decides it - how wide a column of prose is.
+ * A room narrower than one measure gets one column as wide as the room,
+ * because a track whose floor is the measure itself draws its cards past
+ * the edge of anything narrower. */
 @utility grid-fit {
-  grid-template-columns: repeat(auto-fit, minmax(var(--container-measure), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--container-measure)), 1fr));
 }
 
 /* The three motions the city drawing makes, all on the compositor: a

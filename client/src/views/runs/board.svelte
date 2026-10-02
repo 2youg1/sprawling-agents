@@ -180,13 +180,17 @@
   </header>
 
   {#if waiting.length > 0}
-    <nav class="flex flex-wrap items-center gap-snug text-note" aria-label={say($lang, "runs_asking")}>
+    <!-- The word stands above the runs rather than in their row, so a
+    row that wraps starts every line at the same edge with a run. -->
+    <nav class="flex flex-col gap-tight text-note" aria-label={say($lang, "runs_asking")}>
       <span class="text-alert">{say($lang, "runs_asking")}</span>
-      {#each waiting as run (run.run)}
-        <button type="button" class="inline-flex items-center gap-tight rounded-pill border border-edge-input px-snug font-mono text-text" onclick={() => { pick(run); }}>
-          <Glyph name="hand" size="sm" class="text-alert" />{run.run.slice(0, 8)}
-        </button>
-      {/each}
+      <div class="flex flex-wrap items-center gap-snug">
+        {#each waiting as run (run.run)}
+          <button type="button" class="inline-flex items-center gap-tight rounded-pill border border-edge-input px-snug font-mono text-text" onclick={() => { pick(run); }}>
+            <Glyph name="hand" size="sm" class="text-alert" />{run.run.slice(0, 8)}
+          </button>
+        {/each}
+      </div>
     </nav>
   {/if}
 

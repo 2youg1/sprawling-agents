@@ -148,8 +148,12 @@
 {#each MAINS as [label, tier] (label)}
   <Case {label} width={1440}>
     <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
-      <div class="frame relative h-[760px] translate-x-0 overflow-hidden bg-page">
-        <Workspace address={ROOM} session={PAST} {tier} seat="specimen" panel={false} />
+      <!-- A container named as the shell's body is, so the specimen
+      folds to one column on its own width rather than the window's. -->
+      <div class="@container/shell">
+        <div class="frame relative h-[760px] translate-x-0 overflow-hidden bg-page">
+          <Workspace address={ROOM} session={PAST} {tier} seat="specimen" panel={false} />
+        </div>
       </div>
     </Stand>
   </Case>
