@@ -254,7 +254,7 @@ pub(crate) struct Violation {
 
 /-! #### 8-8b 上下文环的两个检查点是仅有的另外两个色相（`color.rs` 的 `CHECKPOINTS`，形状 6 数据面）
 
-D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，例外恰好两个，而且按名字给：`--color-reminder-first` 只许取色相 150（绿），`--color-reminder-second` 只许取色相 25（红）。它们是 client/Spec.lean §7J 上下文环上的两个检查点——第一级提醒与交接提醒——要在一圈白线上一眼分出先后，而 accent 说「在动或被选中」、alert 说「要人或少了」，两个意思都已占用。
+D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，例外恰好两个，而且按名字给：`--color-reminder-first` 只许取色相 150（绿），`--color-reminder-second` 只许取色相 25（红）。它们是 docs/frontend-method.md §7J 上下文环上的两个检查点——第一级提醒与交接提醒——要在一圈白线上一眼分出先后，而 accent 说「在动或被选中」、alert 说「要人或少了」，两个意思都已占用。
 
 - **按名字给，不按个数给**：放宽成「至多四个色相」会让第三个令牌借走其中一个色相而门不出声；一张两行的名字表让借用与挪位都成违例（`a_checkpoint_keeps_its_own_hue_and_lends_it_to_nobody`）。
 - **比值照旧两种**：两个检查点各取已有的一种比值（第一级 70，交接 90），断言六不动。
@@ -1136,7 +1136,7 @@ pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<
 
 /-! ### 8-51 `motion`：曲线与时长只住 `theme.css`；`color` 判玻璃；`render` 判对话页的常驻入口（形状 1 判定）
 
-**要挡的三件事**，都是 client/Spec.lean §4-43 与 refrain P2、P6、P11、P12 写下、而今天没有机器读者的规则：一条过渡在视图里自己写曲线或毫秒数，于是同一种位移有五个答案；玻璃的不透明度被调低到字压不住背后；对话页长出一条固定的顶栏或浮动操作栏，或常驻入口悄悄变多。
+**要挡的三件事**，都是 docs/frontend-method.md §4-43 与 refrain P2、P6、P11、P12 写下、而今天没有机器读者的规则：一条过渡在视图里自己写曲线或毫秒数，于是同一种位移有五个答案；玻璃的不透明度被调低到字压不住背后；对话页长出一条固定的顶栏或浮动操作栏，或常驻入口悄悄变多。
 
 ```rust
 // xtask::motion
@@ -1159,7 +1159,7 @@ pub(super) fn talk_controls_within_register(
 - `linear(` 与 `steps(`，**只在括号里第一个非空白字符是数字、`.` 或 `-` 时算**：CSS 的这两个函数只收数，而 `{#snippet steps(each: Walk)}` 是一个名叫 `steps` 的片段，不是一条时间函数；
 - Tailwind 的 `duration-<数字>` 与 `duration-[`、`ease-[`，前一个字符不是字母、数字、`-` 或 `_`（`group-hover:duration-150` 的冒号算边界，`--transition-duration-short` 不算）。
 
-规则写「a transition's curve and duration are named once, in the client's theme file」，替代写「`duration-short|panel|page` 与 `ease-arrive|leave`（client/Spec.lean §4-43）；要第四种时长或第三条曲线，先在 `theme.css` 声明它」。**不读**：`style=` 里的 `animation-duration` 与 `animation-delay`（城市插画的环境动画与逐个错开的延迟，不是位移）、`delay-*`（悬停意图的门槛，4-18，不是动效的时长）。
+规则写「a transition's curve and duration are named once, in the client's theme file」，替代写「`duration-short|panel|page` 与 `ease-arrive|leave`（docs/frontend-method.md §4-43）；要第四种时长或第三条曲线，先在 `theme.css` 声明它」。**不读**：`style=` 里的 `animation-duration` 与 `animation-delay`（城市插画的环境动画与逐个错开的延迟，不是位移）、`delay-*`（悬停意图的门槛，4-18，不是动效的时长）。
 
 **`color` 多判一件事：玻璃按自己的不透明度盖在页面最亮的表面上，字仍够得到层级。** `judge_glass` 在每种打光的读法上各跑一次（§8-8 的 `Mode`）：读 `--glass-opacity: <n>%`（缺席、不是 1–100 的整数百分数各是一条违规），读 `--color-glass` 单跳到的那一档、`raised-hover` 单跳到的那一档、`--color-text` 的明度与 `--tier-text`；把玻璃那一档的 sRGB 按 n% 盖在 `raised-hover` 那一档上（逐通道在编码空间里线性混合，即引擎合成一层半透明底色的做法），算 `--color-text` 对合成色的 APCA Lc，低于 `--tier-text` 即红，拒词写出两种打光里哪一种、够到多少、要多少。**为什么是 `raised-hover` 而不是最亮的墨**：玻璃的模糊（24 px）把背后的字摊进它所在的表面，留下的是表面；页面画面积的表面里最亮的是悬停中的抬起控件。墨不按面积画，按墨判会把不透明度逼到 97%，玻璃就不是玻璃了。`glass` 进 `ROLES`（§8-8 的封闭词表），共 22 个。
 
@@ -1176,7 +1176,7 @@ pub(super) fn talk_controls_within_register(
 
 **测试**：`motion::tests` 判 `literal_at` 的正反例（三种函数、`steps(each`、`duration-150`、`hover:duration-[90ms]`、`ease-[`、`duration-panel`、`--transition-duration-short` 各一例）；`color::tests` 判玻璃：今天的样式表两种打光都绿，把 `--glass-opacity` 改成 40% 时浅色那一面红，缺这一行时红；`render::talk::tests` 在手写的 `Drawn` 夹具上判：对话框里的控件、滚动区里的控件、`status` 里的控件都不红，对话地标里一个不在三者之中的按钮红；三簇各两个控件计 6；计数大于登记时红、等于时不红；画廊没有对话页时红。
 
-D20 **曲线、时长与玻璃的下限各有一个机器读者，且读者读的就是层叠用的那个数。** `motion` 拒绝 `theme.css` 之外的时间函数与 Tailwind 的时长字面量，`color` 用 `--glass-opacity` 本身判玻璃的可读性，`render` 用画出来的页数对话页的常驻入口。理由：三条规则写在 client/Spec.lean §4-43 与 refrain P2、P6、P11、P12 里，若没有读者，第一个赶时间的视图就会写下 `duration-200`、第一次调玻璃的人就会把字调到读不清；而玻璃那一条若另立一个 `--glass-floor` 给门读，层叠用的数与门判的数就是两个可以分开的家。被击败的备选：①只拒 `cubic-bezier(` 等三个函数（路线图的原文）——同一种位移今天有 90、100、120、150、200 ms 五个答案，函数一个都没写；②按类名认对话页的三簇——类名是写下来的，门判的是画出来的页；③在探针里加 `position` 一格再判 `fixed`——那是改 `crates/browser`，与门不能同一个提交，而父链与滚动轴已经说得出同一件事。**重开参数**：`browser::survey` 下一次加读数时，对话页的两条性质迁进去（§8-38 的同一条）；客户端出现第二个产地（例如第二套主题文件），`motion` 的产地从一个文件变成一张表。
+D20 **曲线、时长与玻璃的下限各有一个机器读者，且读者读的就是层叠用的那个数。** `motion` 拒绝 `theme.css` 之外的时间函数与 Tailwind 的时长字面量，`color` 用 `--glass-opacity` 本身判玻璃的可读性，`render` 用画出来的页数对话页的常驻入口。理由：三条规则写在 docs/frontend-method.md §4-43 与 refrain P2、P6、P11、P12 里，若没有读者，第一个赶时间的视图就会写下 `duration-200`、第一次调玻璃的人就会把字调到读不清；而玻璃那一条若另立一个 `--glass-floor` 给门读，层叠用的数与门判的数就是两个可以分开的家。被击败的备选：①只拒 `cubic-bezier(` 等三个函数（路线图的原文）——同一种位移今天有 90、100、120、150、200 ms 五个答案，函数一个都没写；②按类名认对话页的三簇——类名是写下来的，门判的是画出来的页；③在探针里加 `position` 一格再判 `fixed`——那是改 `crates/browser`，与门不能同一个提交，而父链与滚动轴已经说得出同一件事。**重开参数**：`browser::survey` 下一次加读数时，对话页的两条性质迁进去（§8-38 的同一条）；客户端出现第二个产地（例如第二套主题文件），`motion` 的产地从一个文件变成一张表。
 
 **本节属门禁机具，与产品代码分开提交。**
 -/
