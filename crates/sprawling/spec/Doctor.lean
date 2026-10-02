@@ -85,6 +85,46 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 -/
 
 /-!
+### 8-166 之一 城目录前的实时扫描（`bin::doctor::scanning`、`bin::doctor::asking`，形状 4 adapter）
+
+**原因**：一座城的目录承受大量小写入——Ledger 的追加、楼的 worktree、构建产物。Windows 上 Defender 的实时扫描在每次写入落下之前同步检查，这是小写入密集时变慢的已知来源。两种办法让扫描不挡在写入前面：把城放在受信任的 Dev Drive 上（Defender 对它改用异步的 performance mode），或把城目录加进 Defender 的排除项。doctor 是「运行中的机器有什么」的唯一权威（§8-47），所以由它说出城目录处在哪一种情况。
+
+```rust
+// bin::doctor::scanning（平台调用 + 纯解析 + 终端的词）
+pub(crate) enum Scanning { DoesNotApply, Stopped, Read { city: PathBuf, drive: Drive, exclusion: Exclusion } }
+pub(crate) enum Drive { Trusted, Untrusted { volume: String }, Not { volume: String, file_system: String }, Untold(Untold) }
+pub(crate) enum Exclusion { Inside { under: String }, Outside, Untold(Untold) }
+pub(crate) enum Untold {
+    NoDisk, AdminOnly,
+    Unread { command: &'static str }, Failed { command: &'static str, code: Option<i32> },
+    Unstarted { command: &'static str }, Unanswered { command: &'static str, stopping: Option<String> },
+}
+pub(crate) fn read(platform: Option<Platform>, city: &Path) -> Scanning;            // ThisMachine::scanning 就是它
+pub(super) fn drive_said(volume: &str, file_system: &str, ended: &Ended) -> Drive;   // 纯函数
+pub(super) fn exclusion_said(city: &Path, ended: &Ended) -> Exclusion;               // 纯函数
+pub(crate) fn lines(scanning: &Scanning) -> Vec<String>;                            // 终端的那一段
+// bin::doctor::asking（问一个程序一次：计数的等待，读退出码与标准输出）
+pub(super) enum Ended { Exited { code: Option<i32>, stdout: String }, Unstarted, Unanswered { stopping: Option<String> } }
+pub(super) fn ask(command: &mut Command, knocks: u32) -> Ended;
+// bin::doctor::probe：Machine::scanning(&self, city: &Path) -> Scanning
+// bin::doctor::screen：Asked.scanned，命令行点名的城，没点名时是 `up` 会放城的那个目录
+```
+
+- **三个平台**：Windows 读下面两件事；macOS 与 Linux 答 `Scanning::DoesNotApply`，终端只有一行 `scanning  does not apply: Dev Drive and Defender's exclusions are Windows features`，不起任何进程。
+- **判断的是哪个目录**：命令行点名了城就是那座城；没点名就是 `up` 会把城放在的地方，由路由的 `default_city_location` 交进 `screen::verb`——「没点名的城放哪」只有那一个权威。只在没点名时才调它，因为它要在二进制旁边试写一个空文件。路径先按 `monitor::volume::resolved` 规范成挂载点的写法，城还不存在时用它的绝对路径。
+- **Dev Drive 分两步读，先读不要权限的那一步**：`monitor::volume::holding` 选出挂载点是城路径最长前缀的那块盘（与 `monitor::volume::space` 同一个函数），sysinfo 给出它的文件系统名。Dev Drive 恒是 ReFS，所以不是 ReFS 就确定不是，不再起进程。是 ReFS 时才问 `fsutil devdrv query <卷>`，取以 `This is` 开头的那一句：含 `not a developer volume` 是不是；含 `trusted` 且不含 `untrusted`／`not trusted` 是受信任；其余提到 `developer volume` 的是不受信任。fsutil 在普通用户下多半拒绝打开卷，且它的话随系统语言本地化——两种都读成 `Untold`，带上那条命令，不猜。
+- **排除项只在不要管理员就能读的时候读**：Windows PowerShell 以 `-NoProfile -NonInteractive` 起动，先把输出编码设为 UTF-8、`$ErrorActionPreference='Stop'`，再取 `(Get-MpPreference).ExclusionPath`。每行一条排除路径；以 `N/A` 开头的那行读成 `Untold::AdminOnly`；空输出且退出 0 是没有排除项；退出非 0（Defender 关了或被第三方杀软替换）读成 `Failed`。一条排除路径覆盖城，当且仅当去掉末尾分隔符后不分大小写相等，或它加上 `\` 是城路径的前缀——`D:\Work` 不覆盖 `D:\Workshop\city`。含 `%` 或 `*` 的条目不展开、不算覆盖：展开要的是 Defender 自己的规则，第二份抄本会悄悄分叉。
+- **等待是计数的，有上限，且从不等人**：`asking::ask` 把 stdin 设成空、stderr 丢弃，标准输出在一条读线程上读到底（Windows 的匿名管道缓冲只有几 KB，边轮询边不读会把子进程卡在写上），按 `TICK`（50 ms）敲 `try_wait`，敲满 `knocks` 下还没退出就经 `running::stop` 停掉。本节的上限是 `PATIENCE` 300 下（15 s）：冷起动的 Windows PowerShell 读 Defender 设置要几秒。`doctor::github` 问 `gh` 走同一个 `ask`，两处「问一次、读退出码」只有一份等法。
+- **这一段是建议，从不是 doctor 的失败**：它不进任何一层的 verdict，不改退出码。报告在 `priority` 一段之后多一段 `scanning`：`city` 一行给出判断的路径，`dev drive` 与 `exclusion` 各一行说是、否或 `cannot tell: <原因>`；两者都不成立时给 `to speed it up`：建 Dev Drive 并把城挪上去，或在管理员 PowerShell 里跑 `Add-MpPreference -ExclusionPath '<城>'`（路径里的 `'` 写成 `''`）；是 Dev Drive 但不受信任时给 `fsutil devdrv trust <卷>`。
+- **与各项探测同时问**：`screen::run` 在一个作用域线程上问 `Machine::scanning`，同时 `examine_each` 问表里各项，整份报告仍只等最慢的那一个（§8-59）。线程没答话就结束时这一段说 `Scanning::Stopped`，其余各段照常。
+- **页面不显示这一段**：`wire::DoctorAnswer` 没有它的字段，加字段是一次 wire 变更（`WIRE_V`、`wire.ts`、`Door.lean`）。第三方杀毒软件的排除项读不到，那时 `exclusion` 说 `cannot tell`。
+
+**测试**：`doctor::scanning::tests` 的 `fsutil_refusing_an_ordinary_user_reads_as_cannot_tell`、`the_statement_fsutil_prints_says_whether_the_volume_is_a_dev_drive`、`defender_hiding_its_exclusions_reads_as_cannot_tell`、`an_exclusion_covers_the_city_only_at_a_directory_boundary`、`the_advice_names_the_command_that_would_exclude_the_city`；`doctor::tests::reading` 的 `slow_scanning_is_advice_and_never_a_failure`（D33）。
+
+**验收**：Windows 上 `cargo run -p sprawling -- doctor`，`scanning` 一段说出城目录所在卷的文件系统与排除项能否读到；`cargo nextest run -p sprawling -E 'test(scanning) | test(slow_scanning)'`。
+-/
+
+/-!
 ## 8-47 六处探测收成一处：doctor 是「运行中的机器有什么」的唯一权威（`bin::doctor::host`、`bin::doctor::presence`）
 
 **原因**：运行中的机器被问了六次，每次一套读法——`SPRAWLING_PYTHON_WASM` 在 `accounting::worker::mcp` 与 `doctor::table` 各拼一次（§8-166 记下的债）；`host_shell()` 与 `execution_engine()` 住 `accounting::worker::workbench::engine`；Firefox 与 `chromedriver` 由 `bin::browser_bidi::lazy` 按名字盲起（Windows 上 Firefox 不在 PATH，于是 doctor 说「有」而浏览器工具说「没有」）；`ffmpeg` 在 `crates/desktop/` 里按名字起。六个答案各自漂，一个人看到的「缺什么」与 run 撞上的「缺什么」不是同一份。
@@ -938,4 +978,9 @@ crates.io 上的 `.crate` 只是一个包目录，所以一个构建要读的每
 /-! D32 binstall 的下载地址在发布时填入 tag（§8-157）
 
 发行的 tag 是 `v<版本>-<成熟度>-<YYMMDD>`，binstall 的模板只认得 `{ version }`、`{ target }` 这类变量，拼不出日期，所以仓库里的 `pkg-url` 写 `releases/download/v{ version }/`，`crates` job 在 `cargo publish` 之前把这一段换成 `${GITHUB_REF_NAME}`，并核对三条地址都换到了。tag 只有一个权威，就是这次运行的 ref。这是 D10 的一个例外：改的只是 cargo 构建时不读的 `[package.metadata]`，包里的源码与清单的其余部分仍与提交一致，`.cargo_vcs_info.json` 照实记下 `dirty`。**被否**：①把整个 tag 写进清单——每次发版要在打 tag 之前猜出日期，清单与 tag 成了同一个事实的两份；②发版时另推一个 `v<版本>` 的 tag 并挂同一组归档——一份归档挂在两个 release 上，`gh release delete` 重发时还要收拾两处；③指向 `releases/latest/download`——本项目的每个 release 都是 pre-release，GitHub 的 latest 不指向它们。**重开参数**：tag 改成 `v<版本>`，那时删掉这一步改写，模板原样可用。
+-/
+
+/-! D33 城目录前的扫描经随系统发行的工具读，读不出就说读不出，且只是建议（§8-166 之一）
+
+文件系统名经 sysinfo 的 `Disks` 读（本 crate 已依赖它，对外全是安全接口），Dev Drive 与排除项经 `std::process::Command` 起动 `fsutil` 与 Windows PowerShell，按 AGENTS.md 平台调用次序的第一档。理由：这两样随 Windows 发行，不加依赖，也不要 `unsafe`；它们拒绝普通用户或说本地化的话时，`Untold` 带上那条命令说出读不出，人知道该以管理员再问还是不必在意。这一段从不进 verdict：慢不是坏，一台没有 Dev Drive 的机器照样跑得起这座城。**被否**：①调 `FSCTL_QUERY_PERSISTENT_VOLUME_STATE` 读 `PERSISTENT_VOLUME_STATE_DEV_VOLUME` 位——没有安全接口，要么 `unsafe` Rust 要么一片 Zig 叶子，而一次只传句柄与常量的调用没有 `(ptr, len)` 边界可放在 Zig 后面；②读 Defender 排除项的注册表键——同样要管理员，换不来任何多读到的东西。**重开参数**：一项测量表明在本地化或非管理员的机器上「说不出」占了多数答案，且 FSCTL 能在普通用户的目录句柄上答出 Dev Drive 位。
 -/
