@@ -39,7 +39,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire 的规格（`crates/wire/Spec.lean` §19-2 的 `def Command.reach`）只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | secret | 全仓加夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
 | specalign | kernel 枚举 ↔ kernel 的规格逐 variant（读 `crates/kernel/Spec.lean` 与分部里的受限形状，§8-43）：§8-1／§8-4 两张表消费真 enum（`AxCode::ALL`／`EventKind::ALL`）作证，归属、carrier／窗类逐臂同；规格里每一个与 kernel 枚举同名的 `inductive` 与 syn 解出的枚举双向对账（§8-10、§8-43）；模块图每一行的 `spec` 锚点落在盘上，已迁移的包写 Lean 模块名（§8-43） |
-| spec | 一个包恰有一份生效规格；散文里点名的 `<名>-SPEC` 在树上；Lean 的 import 纪律；`.lean` 里没有 `sorry`、`admit`、`axiom`；规格引用的仓内路径在盘上（§8-42） |
+| spec | 一个包恰有一份生效规格；散文里点名的 `<名>-SPEC` 在树上；Lean 的 import 纪律；`.lean` 里没有 `sorry`、`admit`、`axiom`；规格引用的仓内路径在盘上；状态机分部里没有定理的数与解析不到的 Rust 路径数只降不升（§8-42） |
 | budget | `tools/xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；没有构建产物可称时沉默（`just check` 不构建 release 二进制），壁钟读数只入册不入门 |
 | color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免；玻璃按 `--glass-opacity` 盖在最亮的表面上时字仍够层级（§8-51） |
 | motion | 过渡的曲线与时长只住 `client/src/theme.css`：别处的 `cubic-bezier(`、`linear(`、`steps(` 与 Tailwind 的 `duration-<数字>`、`duration-[`、`ease-[` 即红（§8-51） |
@@ -934,18 +934,32 @@ pub(crate) fn notice(leader: Leader) -> [String; 4];
 
 ```rust
 // xtask::spec
-pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError>;   // 下面五条
+pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError>;   // 下面七条
 // xtask::spec::effective —— 第一、二条
 // xtask::spec::source    —— 第三、四、五条
+// xtask::spec::ratchet   —— 第六、七条：两个数与 budgets.toml 里的钉值比
+// xtask::spec::theorems  —— 分部的四类（第六条读它）
+// xtask::spec::rustpath  —— 反引号里的 Rust 路径解析到条目（第七条读它）
 ```
 
-**五条断言**：
+**七条断言**：
 
 1. **一个包恰有一份生效规格。** `members` 列出的每个包（工具在内），以及不是包的检验器 `tools/adversary`（§8-47），目录里直接放着的 `*-SPEC.md` 与 `Spec.lean` 合起来恰好一份。两份都在，是一次迁移没有在一个变更集里完成（`skills/sdd` 迁移第 5 步）；一份都没有，是一个包没有规格。分部（`spec/` 下的 `.lean`）可以先于 `Spec.lean` 存在（ARCHITECTURE.md §11），不算一份规格。
 2. **散文不点名树上没有的 SPEC。** 散文取 `release::is_prose` 的定义（Markdown 与 HTML 的每一行、Rust 的 `//` 行、Lean 的整份）；其中每个 `<名>-SPEC`（带不带 `.md` 都算）都要有一个叫 `<名>-SPEC.md` 的文件在树上。拒词：若有一个包的目录名是 `<名>` 且它已有 `Spec.lean`，指向那份 Lean 规格（`<lib> D<n>` 或分部的路径）；否则让作者改正名字或删掉这句。`CHANGELOG.md` 豁免：它的每一节说的是那一版的树。代码里的字符串不算——测试夹具为它造的包造出 SPEC 文件，那些名字不是给读者的引用。
 3. **import 纪律。** `tools/adversary/` 下的 `.lean`，除了检验器自己的规格（§8-47），只 import `Sprawling` 或 `Sprawling.*`，以及工具链自带的 `Init`、`Std`、`Lean`；检验器的规格只 import 工具链自带的库与它自己的分部；一个包目录下的 `.lean` 只 import 工具链自带的库、本包的规格、以及 ARCHITECTURE.md §3 的 `depmap` 块允许本包依赖的包的规格。模块名到包的对应按目录：`crates.agent_protocols.spec.Harness.Session` 属于目录是 `crates/agent_protocols` 的那个包。规格 import 检验器、检验器 import 规格、一个包的规格 import 它不许依赖的包，各是一条违规。
 4. **没有 `sorry`、`admit`、`axiom`。** 每个 `.lean` 去掉注释与字符串之后，不出现 `sorry` 与 `admit` 这两个词，也没有以 `axiom`（前面可以带 `private`）开头的声明。这一条原在 `just models` 的一行 grep 里，只看 `crates/`、只在有 Lean 的机器上跑；门不要 Lean，也看得到检验器。`lakefile.toml` 的 `warningAsError` 仍让 `sorry` 在构建时失败，两者判的是同一件事的两端：门在编译之前、构建在 elaborate 之后。
 5. **规格引用的仓内路径在盘上。** 包目录下每个 `.lean` 里，以及检验器的规格里，首段是仓库根下一个目录、扩展名在 `release` 的 `CITED_EXTENSIONS` 里的路径，都指向一个存在的文件。`release` 判「首段不是这棵树的目录」，这里判「首段是，文件却不在」——规格点名它规定的 Rust 模块（ARCHITECTURE.md §11），模块搬走而规格没跟上，就是这一条。
+
+6. **状态机分部里没有定理的数只降不升（LV0）。** 每个分部（规格目录 `spec/` 下的 `.lean`，检验器自身之外）归入四类之一，判据全在去掉注释与字符串之后的文本上：**只有文字**——一条 `theorem`／`lemma` 都没有；**只核对常量**——有定理，但每一条都没有约束变量；**量化未连到 Rust**——至少一条量化定理，但没有一条被下面意义上的 Rust 检查导出；**量化且有导出检查**。一条定理**量化**，当它的头部（名字之后、`:=` 之前）有 `∀`、`∃`、`→`、`forall`，或一个 `(名 :`、`{名 :` 形状的约束；否则它**封闭**。数的是：`architecture.toml` 里形状列为 `state machine` 或 `typestate` 的每一行，它的 `spec` 锚点所指的分部，连同与那个分部同名的目录下的全部分部，去重之后「只有文字」的个数。入口 `Spec.lean` 不计：按 `skills/sdd` 它本来就是十七节注释。这个数写在 `tools/xtask/budgets.toml` 的 `[spec_parts_without_theorem] pinned`；数大于钉值是一条违规，列出全部这类分部；数小于钉值也是一条违规，要求在同一个变更集里把钉值降到新数——这是 `budgets.toml` 的棘轮写法，钉值不动就等于留出了回升的余地。行不在是一条违规，拒词给出今天的数。
+7. **反引号里的 Rust 路径解析得到（SD0）。** 读 `.lean`、`.md`（`CHANGELOG.md` 除外，理由同第二条）与 `.rs` 的 rustdoc 行（`///`、`//!`）；一对反引号里恰好是 `首段::段(::段)*`、首段是模块表里某一行名字的首段（`kernel`、`bin`、`gateway`……），就是一个 Rust 路径（尾随的 `()` 与 `!` 去掉）。解析：模块表一行的名字取第一个空白之前的部分（`kernel::ledger (port)` 是 `kernel::ledger`），每个 crate 的根文件（`lib.rs`，没有时 `main.rs`）算作与 crate 同名的模块；取与路径逐段相同的最长前缀那一行；没有剩余段即解析到模块；有剩余段时，第一段要在那一行的文件里被声明（`fn`、`struct`、`enum`、`trait`、`type`、`const`、`static`、`mod`、`union`、`macro_rules!` 之后的名字，任何可见性），之后各段要在那个文件里作为一个词出现（变体、方法、字段）；或者第一段被那个文件的一条 `pub`／`pub(…)` `use` 点名、或被一条以 `*` 结尾的 `pub use` 覆盖（重导出），这时之后各段要在同一 crate 里声明这一段的某个文件里作为词出现，同一 crate 里没有文件声明它（从别的 crate 重导出）时只判名字本身。私有的 `use` 不算：它把名字带进作用域，却不造出一条路径。没有任何一行是它的前缀（模块已删）也是解析不到。解析不到的个数写在 `[rust_paths_unresolved] pinned`，比较方式同第六条；超出时列出每一处的文件与行。
+
+D22 **「导出检查」以文本判：一个 `.rs` 文件里有 `#[test]` 或 `proptest!`，且同一个文件里写着那个分部的仓内路径与它某条量化定理的短名（最后一个点之后的部分，作为一个词）。** 理由：门只读文本（D8），一条 Rust 检查要说明它从哪条性质导出，最便宜而可核对的写法就是在测试文件里点名分部与定理；这也让读者从测试一步找到性质。被击败的备选：在测试上加一个 `#[derives("…")]` 属性——要一个过程宏或一个约定俗成的注释格式，两者都是第二套文法；按测试名与定理名的相似度匹配——不可判定。**重开参数**：导出的检查改由 Lean `#eval` 生成向量文件时，向量文件名里带分部路径即可同样计入。
+
+D23 **第六条数的是形状 `state machine` 与 `typestate`。** 模块表的形状列今天除 ARCHITECTURE.md §9 的七种之外还写着 `state machine`（13 行），它与 §9 第 5 种 `typestate` 是同一类：模块持有一个阶段转移，而 Lean 分部本该写出这个转移并对所有轨迹证明性质（D90）。协议没有单独的形状，协议模块在表里写作 `state machine`。`port`、`policy`、`grammar` 不计：一个端口的性质由它的一致性测试套件判，一条文法由解析器的往返判，把它们算进来会让这个数先被不需要状态机模型的分部撑大。**重开参数**：形状列收敛到 §9 的七种时，这里只写 `typestate`。
+
+D24 **第七条用模块表加文本扫描解析，不用 `syn`。** 模块表已经把每个模块的路径映射到文件（`modmap::anchors`，模块表唯一的读者），剩下的只是「这个名字在这个文件里有没有被声明或重导出」，词法扫描就够，并且自然认得 `pub(crate)` 条目与 `pub use` 重导出。用 `syn` 解析全部源文件要把整个工作区读成语法树，门从毫秒级变成秒级，而它多解出的只有宏生成的条目与跨文件的 glob 重导出——这两样在规格与文档里几乎不被点名。**已知的限**：同名的词出现在别处会让一个已删的变体仍算作解析得到（假阴性，数只会偏小）；`首段` 只认模块表里的 crate 名，`std::`、`tokio::` 与 `crate::` 开头的路径不计。**重开参数**：假阴性被实际漏报一次，就换成 `syn` 读那一个文件。
+
+两个数都只读文本，路径分隔符统一为 `/`，行尾不论 CRLF 还是 LF 都按行切，所以 Windows、macOS、Linux 上数出的值相同；CI 的 `gates` 在 Windows 上跑，`platforms.yml` 在 macOS 上跑。
 
 **读法**：Lean 以源文本读（D8）。注释是 `--` 到行尾，与块注释从它的开记号（斜杠后跟连字符）到配对的闭记号（连字符后跟斜杠），块注释可以嵌套，字符串是 `"…"`（认 `\"`）；这三样在判第三、四条之前抹成空格，行号不变。
 
