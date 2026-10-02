@@ -62,9 +62,15 @@ const PERMITTED: &str = "deny.toml";
 /// directions: a gate that only refused additions would wave through the
 /// day `svelte` is deleted by accident. The `@lezer` packages are the
 /// syntax highlighter and its grammars, which ship as a lazy chunk the
-/// first screen never downloads (client-SPEC 4-26); no UI library is
-/// among them (client-SPEC section 7).
-const RUNTIME: [&str; 13] = [
+/// first screen never downloads (client-SPEC 4-26); the `@codemirror`
+/// packages are RefRain's text editor, its find and replace, and its
+/// version diff, another lazy chunk (client-SPEC 7N, 7-9).
+const RUNTIME: [&str; 18] = [
+    "@codemirror/commands",
+    "@codemirror/merge",
+    "@codemirror/search",
+    "@codemirror/state",
+    "@codemirror/view",
     "@lezer/cpp",
     "@lezer/css",
     "@lezer/go",
