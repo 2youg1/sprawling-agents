@@ -171,7 +171,8 @@
 
 <div class="flex flex-col gap-base">
   <div class="flex flex-wrap items-end gap-base">
-    <div class="min-w-0 flex-1">
+    <!-- The key field wraps below the buttons before it is narrower than its label. -->
+    <div class="min-w-0 flex-[1_1_16ch]">
       <Field
         label={say($lang, "mcp_api_key")}
         kind="password"

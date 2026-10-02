@@ -127,7 +127,7 @@
   const MEASURE = "figure row-start-1 col-start-3 justify-self-end text-text-faint @min-[400px]:col-start-4";
 </script>
 
-<section class="@container flex min-h-0 flex-1 flex-col pt-snug" aria-label={say($lang, "world_timeline")}>
+<section class="@container flex min-h-0 flex-1 flex-col overflow-hidden pt-snug" aria-label={say($lang, "world_timeline")}>
   <h3 class="flex shrink-0 justify-between py-snug text-note text-text-faint">
     <span>{say($lang, "world_timeline")}</span>
     {#if day !== ""}<span class="figure">{fill(say($lang, "world_timeline_day"), { day })}</span>{/if}

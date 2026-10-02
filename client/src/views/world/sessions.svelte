@@ -136,7 +136,7 @@
   };
 </script>
 
-<section class="flex min-h-0 flex-1 flex-col overflow-y-clip" aria-label={say($lang, "world_sessions")}>
+<section class="flex min-h-0 flex-1 flex-col overflow-hidden px-snug" aria-label={say($lang, "world_sessions")}>
   {@render head()}
   {#if offered.length > 0}
     <div class="mb-snug flex flex-wrap gap-tight" role="group" aria-label={say($lang, "world_tags")}>
@@ -156,7 +156,7 @@
   {/if}
   <!-- A row reaches out by one step on each side, so its wash and its
   chosen bar stand outside the text; the column that scrolls is widened
-  by that step, and the pane clips only up and down, so neither is cut. -->
+  by that step into the pane's own inset, so the pane clips neither. -->
   <div class="-mx-snug min-h-0 flex-1 overflow-y-auto px-snug">
     {#each groups as group (group.kind === "pinned" ? "" : group.building)}
       <h3 class="mt-base mb-tight text-note text-text-faint first:mt-0">

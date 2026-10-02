@@ -341,7 +341,7 @@ taller; on one column the second row is the band, as tall as it needs. -->
       "relative -mx-wide flex min-h-0 flex-col px-wide narrow:col-span-full narrow:mx-0 narrow:px-0",
       layout.world === "workbench" ? "row-[2] pt-wide" : sheet ? "row-[2] pt-base" : "row-[1/3]",
     ]}
-    aria-label={say($lang, "region_conversation")}
+    aria-label={say($lang, past === undefined ? "region_conversation" : "region_past_session")}
   >
     {#if past === undefined}
       <Talk {address} band={sheet} />

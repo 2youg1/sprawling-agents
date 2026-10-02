@@ -6203,6 +6203,10 @@
     "en": "the conversation",
     "zh": "对话"
   },
+  "region_past_session": {
+    "en": "an earlier session",
+    "zh": "较早的会话"
+  },
   "world_row_name": {
     "en": "{room}, {when}",
     "zh": "{room}，{when}"
