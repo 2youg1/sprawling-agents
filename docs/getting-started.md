@@ -149,7 +149,7 @@ gh attestation verify sprawling-<version>-<platform>.zip --repo 2youg1/sprawling
 
 Where the binary finally lives, and what happens to `PATH`, is decided by `sprawling install`, which the script runs last; `sprawling install --uninstall` takes it back off `PATH`. Set `SPRAWLING_VERSION` to a release tag to install that release instead of the newest.
 
-With bun or node already installed, `bunx sprawling help` or `npx sprawling help` fetches the same binary from npm, byte for byte what the archive holds, and writes nothing outside the package directory.
+With bun or node already installed, `bunx sprawling help` or `npx sprawling help` fetches the same binary from npm, byte for byte what the archive holds, and writes nothing outside the package directory. With [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) installed, `cargo binstall sprawling` downloads the release archive for your system and places the binary in cargo's bin directory, without compiling anything.
 
 Nothing updates itself. `sprawling version` prints which release this is; `sprawling status --check`, or the button under **settings**, asks npm whether a newer one exists; replacing the binary stays your command to run.
 

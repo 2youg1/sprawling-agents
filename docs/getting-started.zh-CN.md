@@ -149,7 +149,7 @@ gh attestation verify sprawling-<version>-<platform>.zip --repo 2youg1/sprawling
 
 二进制最终装在哪、`PATH` 怎么改，由脚本最后调用的 `sprawling install` 决定；`sprawling install --uninstall` 把它从 `PATH` 上撤下。把 `SPRAWLING_VERSION` 设成某个发布 tag，装的就是那一版。
 
-已经装了 bun 或 node 的话，`bunx sprawling help` 或 `npx sprawling help` 从 npm 取来同一个二进制，与归档里的逐字节相同，包目录之外一字不写。
+已经装了 bun 或 node 的话，`bunx sprawling help` 或 `npx sprawling help` 从 npm 取来同一个二进制，与归档里的逐字节相同，包目录之外一字不写。装了 [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) 的话，`cargo binstall sprawling` 下载你系统的发行归档，把二进制放进 cargo 的 bin 目录，什么都不编译。
 
 没有东西会自己更新。`sprawling version` 印出这是哪一版；`sprawling status --check`，或 **设置** 里的那个按钮，去 npm 问有没有更新的一版；替换二进制始终由你来做。
 
