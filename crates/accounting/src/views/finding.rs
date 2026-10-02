@@ -37,7 +37,8 @@ pub(super) fn find_answer(city_root: &Path, under: Address, text: String) -> wir
 fn walk(root: &Path, needle: &str) -> (Vec<Address>, wire::Walked) {
     let mut found = Vec::new();
     let mut seen: usize = 0;
-    let mut levels: VecDeque<(PathBuf, String)> = VecDeque::from([(root.to_path_buf(), String::new())]);
+    let mut levels: VecDeque<(PathBuf, String)> =
+        VecDeque::from([(root.to_path_buf(), String::new())]);
     while let Some((dir, prefix)) = levels.pop_front() {
         for (name, is_dir) in entries(&dir) {
             seen = seen.saturating_add(1);
@@ -71,7 +72,12 @@ fn entries(dir: &Path) -> Vec<(String, bool)> {
         .flatten()
         .filter_map(|entry| {
             let kind = entry.file_type().ok()?;
-            (!kind.is_symlink()).then(|| (entry.file_name().to_string_lossy().into_owned(), kind.is_dir()))
+            (!kind.is_symlink()).then(|| {
+                (
+                    entry.file_name().to_string_lossy().into_owned(),
+                    kind.is_dir(),
+                )
+            })
         })
         .collect();
     names.sort_unstable();
