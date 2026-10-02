@@ -18,7 +18,7 @@ Doctor,                                   // → Answer::Doctor(Box<DoctorAnswer
 
 pub struct DoctorAnswer { pub items: Vec<DoctorItem>, pub tiers: Vec<DoctorVerdict>,
                           pub sandbox: DoctorSandbox, pub custody: DoctorCustody,
-                          pub core: DoctorCore }
+                          pub core: DoctorCore, pub scanning: DoctorScanning }
 pub struct DoctorItem { pub name: String, pub tier: DoctorTier, pub need: DoctorNeed,
                         pub homepage: Option<String>, pub state: DoctorState,
                         pub install: DoctorInstall }
@@ -33,7 +33,8 @@ pub enum DoctorInstall { Command { spelled }, Print { spelled }, Manual { how },
 pub struct DoctorVerdict { pub tier: DoctorTier, pub missing: Vec<String> }
 
 // 与逐件的 items 并列的两道整机读数：命令跑在什么盒子里、凭据住在哪里。
-pub struct DoctorSandbox { pub arm: DoctorSandboxArm, pub coverage: Vec<DoctorGuarantee> }
+pub struct DoctorSandbox { pub arm: DoctorSandboxArm, pub named: SandboxArm, pub coverage: Vec<DoctorGuarantee> }
+pub enum SandboxArm { None, CopiedTree, Native, Container, Python }   // D26
 pub enum DoctorSandboxArm { LinuxNamespaces, WindowsJobObject, CopiedTree,
                             Unavailable { missing: DoctorSandboxMissing } }
 pub enum DoctorSandboxMissing { ScratchDirectory }
@@ -53,6 +54,8 @@ pub enum DoctorCore { Raised, HeldBySetting, Refused { said }, LoweredByValve, U
 - **沙箱的保证逐轴作答，不是一句「已隔离」**：`coverage` 逐轴一行，`Kept`／`NotKept` 两个字而不是布尔——页面两态都要有词，布尔会让每个读者自己给 `false` 选一个。它存在的理由，是 agent 在动手前要读得到哪几条保证没成立。臂与轴的定义住 ``crates/runtime/Spec.lean` §8-13-2`（`Confinement` 与 `Guarantee`），线上重拼一份，逐臂对应只住 `sprawling::doctor::report` 的穷尽匹配——上游加一臂即编译红。
 - **凭据的存放与寿命一起答，`refusal` 是平台服务自己的话**：三者同出 `gateway::Custodian::probe` 的一次往返（`gateway::Custody`，`crates/gateway/Spec.lean` §8-4；寿命的全部档位见 §8-21），线上重拼 `Store` 与 `Persistence` 两套词，逐臂对应同住 `sprawling::doctor::report`；`refusal` 缺席读作服务没有拒——或该 store 由城自选，没有服务可拒。
 - **核心线程站在哪一档，`said` 是平台自己的话**：`core` 是主机此刻会给核心线程的档位（`crates/sprawling/Spec.lean` §8-93、§8-166）——升到正常档之上一级、按人的 `[core] priority` 留在正常档、平台拒绝（Unix 上没有 `CAP_SYS_NICE`）、被安全阀降回，或 doctor 没能问到。派出的命令不在这里：它们总是低一档，降档从不被拒（`crates/runtime/Spec.lean` §8-13-3）。
+- **`named` 是这一臂在选择名里的名字（D26）**：`LinuxNamespaces` 与 `WindowsJobObject` 答 `Native`，`CopiedTree` 答 `CopiedTree`，`Unavailable` 答 `None`——命令就跑在宿主机本身上，五条保证一条不守，`coverage` 逐轴说出来。`Container` 与 `Python` 今天没有臂会答出，名字先立，臂由 SB1 建。
+- **`scanning` 是城目录前的扫描（D25）**：与 `bin::doctor::scanning::Scanning` 逐臂同形；Windows 读实时扫描与城目录所在的盘，macOS 与 Linux 答 `DoesNotApply`。判的目录是 doctor 被问时的城目录；没有城目录的 doctor（不带城起的工人）答 `Stopped` 不会出现，因为那一侧答 `Unavailable`（见下一条）。
 - **服务端**：`sprawling::doctor::report` 把 findings 与这两道整机读数折成本形状，`Views` 存一份（`crates/sprawling/Spec.lean` §8-54）。
 -/
 

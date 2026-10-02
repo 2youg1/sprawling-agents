@@ -95,7 +95,7 @@ pub struct ThemeOverride { pub tokens: BTreeMap<String, String>, pub css: Option
 
 `tokens` 的键是 `client/src/theme.css` 的 `@theme` 块里的 CSS 变量名，值是一段 CSS 颜色；`css` 是人在 RefRain 里写的整段覆盖文本。空的 `ThemeOverride` 即「恢复默认」。覆盖与其余偏好一样存在人的偏好文件 `config.toml` 的 `[ui]` 里（D21 说的「人的那一层」），所以换浏览器、换设备也在；页面把它作为一段追加的样式插在内置主题之后，改动立刻生效。易读性按 `xtask color` 的规则在页面上照算，不合格只提示，不拒写。随 V0.0.9 的那一次 `WIRE_V` 进位（D22）。没有账本事件：与 D21 同一个理由，配色是人的偏好，不是城里发生过的事。
 
-**理由**：主题在构建时编进页面包，运行时没有一个 theme.css 文件可以打开（roadmap CT 已更正这条前提）；覆盖的变量集就是 `@theme` 那一组，所以键用变量名，值不在服务端解析，只校验键在名单里。
+**理由**：主题在构建时编进页面包，运行时没有一个 theme.css 文件可以打开（roadmap CT 已更正这条前提）；覆盖的变量集就是 `@theme` 那一组，所以键用变量名。键是否在 `@theme` 名单里、值是不是一段颜色，都由页面校验：`theme.css` 是客户端的文件，`wire` 包不能编进包目录以外的文件（`xtask packaged`），在服务端另抄一份名单就是这份名单的第二个权威；服务端只按 `deny_unknown_fields` 守住 `ThemeOverride` 自己的两个字段。
 
 **被否**：①把覆盖存在浏览器里：换浏览器就丢；②存在城的保留子树里（roadmap CT 的原文）：偏好文件已经是设置之门写入的地方，配色跟着人走而不是跟着城走，与标签同理；③服务端改写页面包：一份内置资源有了两个版本。
 

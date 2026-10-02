@@ -17,16 +17,23 @@ pub enum Query { /* … */ NewestRelease }
 
 pub struct ReleaseLine { pub version: String, pub released: String }
 pub enum ReleaseAnswer {
-    Stands { mine: ReleaseLine, newest: ReleaseLine, verdict: ReleaseVerdict },
-    Unreleased { newest: ReleaseLine },
+    Stands { mine: ReleaseLine, registries: Vec<RegistryNewest>, verdict: ReleaseVerdict, update: UpdateHint },
+    Unreleased { registries: Vec<RegistryNewest>, update: UpdateHint },
     Refused { refusal: AxError },
 }
+pub struct RegistryNewest { pub registry: Registry, pub reading: RegistryReading }
+pub enum Registry { Npm, CratesIo }
+pub enum RegistryReading { Read { newest: ReleaseLine }, Refused { refusal: AxError }, Unasked }
+pub enum InstallChannel { Npm, Cargo, Archive, Source }
+pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String> }
 ```
+
+`verdict` 是本城对 npm 那一行的判定：npm 的 `latest` 是发布流程最后写的那一处，也是口径 2 说的「真正解析的东西」。npm 读不到时整条答 `Refused`（口径 3）；crates.io 那一行今天答 `Unasked`——crates.io 上的版本串与 npm 的 pre 版本串怎么对应还没有一条 `kernel::Release` 的规则，比出来的先后会是猜的，所以如实说没问。`update` 今天按 `release::built` 判：源码构建答 `Source`、命令为 `None`；发布版答 `Npm` 与终端一直印的那一行 `bunx sprawling@latest up`，按二进制路径区分四种安装方式归 CON-DOC（D24）。终端 `status --check` 与页面印同一个 `command`，命令只有这一处。
 
 **五条口径：**
 
 1. **人按下才发生，此外一律不发生。** 不在连上时问，不在定时器上问，也不搭另一个查询的车。`QUICKSTART.md` 的开场承诺是「什么都没装、没注册服务、删掉文件夹就干净」，一座按自己的时间表去够注册表的城，等于拿那句承诺去换一个没人问过的问题；§8-35 口径 6 对外包目录立的是同一条规矩。客户端因此在**按钮的处理函数里**调 `asking.ask`——Solid 在那里不给响应式 owner，于是这条答复没有 watcher，重连与事件都不会替人重问。
-2. **问 npm，不问 GitHub。** 本项目每一次发布都是 pre-release，而 `GET /repos/{owner}/{repo}/releases/latest` 按设计排除 pre-release——它对本仓库答 404。看上去最像的那个端点恰是错的那个；npm 的 `latest` dist-tag 才是 `bunx sprawling` 真正解析的东西。
+2. **问注册表（npm，crates.io 一行如实答 `Unasked` 直到它有比较规则），不问 GitHub。** 本项目每一次发布都是 pre-release，而 `GET /repos/{owner}/{repo}/releases/latest` 按设计排除 pre-release——它对本仓库答 404。看上去最像的那个端点恰是错的那个；npm 的 `latest` dist-tag 才是 `bunx sprawling` 真正解析的东西。
 3. **三态穷尽，而第三态携拒绝。** 「你跑的是某个发布版，它站在这里」「你自己从源码构建的，没有可比的对象」「注册表读不到」是人接下来要做的三件不同的事。第三态不走 `Answer::Unavailable`：城是可用的、注册表不可用，页面必须能说清是哪一个，而拒绝里带的是 `kernel::reach` 已经定义的分阶段读数——名字没解析、连不上、握手失败、对方答了什么状态。
 4. **判定在 Rust，页面只画字符串。** `ReleaseLine` 携两个已渲染好的串，谁比谁新由 `kernel::Release` 的 `Ord` 判——版本在前、日期在后，与 npm 对同样两个串的排序一致。客户端因此没有第二套排序规则可以漂掉。**败给的方案**：把六个数字发给页面自己比——那是把一条领域规则复制到另一门语言里。
 5. **什么都不更新。** 归档路径归 `sprawling install`，npm 路径归 npm，第三方去覆写其中任何一条，就是「这个二进制住在哪」有了第二个权威（`tools/xtask/src/channel/shim.js` 已立此规）。因此终端与页面都只把该跑的命令印出来就停。
@@ -47,10 +54,11 @@ pub enum Query { /* … */ NewestRelease }   // 线上拼作 "newest_release"
 
 /-! D24 更新检查同时问 npm 与 crates.io，按这份二进制的安装方式给出更新命令
 
-**决定**：`ReleaseAnswer::Stands` 与 `Unreleased` 的 `newest` 换成 `registries: Vec<RegistryLine>`，并多一件 `update: UpdateHint`：
+**决定**：`ReleaseAnswer::Stands` 与 `Unreleased` 的 `newest` 换成 `registries: Vec<RegistryNewest>`，并多一件 `update: UpdateHint`：
 
 ```rust
-pub struct RegistryLine { pub registry: Registry, pub newest: Result<ReleaseLine, AxError> }
+pub struct RegistryNewest { pub registry: Registry, pub reading: RegistryReading }
+pub enum RegistryReading { Read { newest: ReleaseLine }, Refused { refusal: AxError }, Unasked }
 pub enum Registry { Npm, CratesIo }
 pub enum InstallChannel { Npm, Cargo, Archive, Source }
 pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String> }
@@ -59,6 +67,8 @@ pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String>
 安装方式从这份二进制自己的路径判：落在 npm 的全局包目录（经 `bunx`／`npx` 解出的缓存也算）是 `Npm`，命令 `npm install -g sprawling@latest`；落在 cargo 的 bin 目录（`$CARGO_HOME/bin`，缺省 `~/.cargo/bin`，Windows 上是 `%USERPROFILE%\.cargo\bin`）是 `Cargo`，命令 `cargo install sprawling --locked`；带着发行归档的兄弟文件（`skills/` 与物料清单）是 `Archive`，命令是 `sprawling install` 的那一行；都不是则 `Source`，`command` 为 `None`。三个平台用同一套规则，只有路径的展开不同。仍然只在人按下时问（§8-36 口径 1），仍然什么都不更新（口径 5）；口径 2「问 npm、不问 GitHub」扩成「问 npm 与 crates.io、不问 GitHub」。
 
 **理由**：页面只去 npm 查，而 crates.io 上也有发布（roadmap A10）；用 cargo 装的人照 npm 的命令更新，会装出第二份二进制。两边各自可能读不到，所以每个注册表各带自己的结果。
+
+每一行的读数是三臂的 `RegistryReading` 而不是 `Result`：「这一边还没有问」是第三种如实的答案，`Result` 说不出它，而 serde 给 `Result` 的 `Ok`／`Err` 外壳也不是线上其余各处的拼法。
 
 **被否**：①只问与安装方式对应的那一个注册表：源码构建的人看不到任何一边的最新版；②让页面按路径猜命令：一条领域规则抄进另一门语言。
 

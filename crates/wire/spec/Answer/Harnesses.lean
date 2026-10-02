@@ -16,11 +16,12 @@
 Query::Harnesses
 Answer::Harnesses(HarnessesAnswer)
 pub struct HarnessesAnswer { pub harnesses: Vec<HarnessLine> }
-pub struct HarnessLine { pub name: String, pub launch: Vec<String>, pub found: bool, pub docs: String }
+pub struct HarnessLine { pub name: String, pub launch: Vec<String>, pub state: HarnessState, pub docs: String }
+pub enum HarnessState { LauncherMissing { program: String }, NotSetUp { looked: Vec<String> }, Ready { at: String } }
 ```
 
 - **provider 页与 harness 页分开**（定规）：provider 页收 API key，harness 页说明五家官方 harness（`crates/agent_protocols/Spec.lean` §8-19）。
-- `name` 是 `agent_protocols::Harness::as_str` 的词；`launch` 是起它说 ACP 的那条命令，逐词；`found` 是那条命令的程序在这台电脑的搜索路径上找不找得到；`docs` 是这家自己写的登录说明。**登录是人在 harness 里做的**，这一问不答任何凭据的事。
+- `name` 是 `agent_protocols::Harness::as_str` 的词；`launch` 是起它说 ACP 的那条命令，逐词；`state` 是这台电脑能不能用它（D23 的三态）：启动程序不在搜索路径上答 `LauncherMissing`，`program` 是那个程序名；启动程序在而这家的目录表还没有登记（`agent_protocols` 里的表由 CON-DOC 照各家文档填），答 `NotSetUp`，`looked` 为空，读作「还没有查过任何目录」，而不是「查过都不在」；表登记以后同一个函数逐行查，找到即 `Ready`。`docs` 是这家自己写的登录说明。**登录是人在 harness 里做的**，这一问不答任何凭据的事。
 - 名字表多一项，schema 哈希因此而变，`WIRE_V` 不为此进位。
 -/
 
