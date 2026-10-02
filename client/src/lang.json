@@ -1581,7 +1581,7 @@
   },
   "machine_enables_gecko": {
     "en": "the browser tool, with no driver between the city and the browser; Firefox, Zen, LibreWolf, Waterfox, Floorp and Firefox Developer answer here, and Tor Browser answers too but wants confirming by hand",
-    "zh": "浏览器工具，城与浏览器之间不隔驱动；Firefox、Zen、LibreWolf、Waterfox、Floorp 与 Firefox Developer 都算，Tor Browser 也算，但要人亲手确认"
+    "zh": "浏览器工具，城与浏览器之间不隔驱动；Firefox、Zen、LibreWolf、Waterfox、Floorp 与 Firefox Developer 都算，Tor Browser 也算，但要 User 亲手确认"
   },
   "machine_enables_git": {
     "en": "version control for this repository, and restoring a discarded file from its checkpoint",
@@ -2480,7 +2480,7 @@
     "zh": "写下了一份交接"
   },
   "event_steer_received": {
-    "en": "the person steered a run",
+    "en": "the User steered a run",
     "zh": "你给一次 run 追加了话"
   },
   "event_cancel_received": {
@@ -3488,8 +3488,8 @@
     "zh": "城怎么称呼你，以及你希望 Agent 知道的背景；存在 PREFERENCES.md"
   },
   "you_user_id": {
-    "en": "user ID",
-    "zh": "用户 ID"
+    "en": "User ID",
+    "zh": "User ID"
   },
   "you_user_id_default": {
     "en": "you",
@@ -3924,8 +3924,8 @@
     "zh": "每一次调用都按代理走，包括打到这台电脑自己的地址。当这台电脑上的中继必须看到每一个请求时选它。"
   },
   "setup_proxying_note_except_local": {
-    "en": "An address on this machine is reached directly; everything else follows the proxy variables and the system setting. This is what a person who has not thought about proxies wants.",
-    "zh": "打到这台电脑自己的地址直连，其余按代理变量与系统设置走。没有专门考虑过代理的人要的就是这一档。"
+    "en": "An address on this machine is reached directly; everything else follows the proxy variables and the system setting. If you have not thought about proxies, this is the setting you want.",
+    "zh": "打到这台电脑自己的地址直连，其余按代理变量与系统设置走。没有专门考虑过代理的话，要的就是这一档。"
   },
   "setup_proxying_note_never": {
     "en": "No call follows a proxy, whatever this machine is configured with. Choose this when a virtual network adapter already carries every packet.",
@@ -4997,7 +4997,7 @@
   },
   "err_e_approval_pending": {
     "en": "this is waiting for a signature",
-    "zh": "这件事在等人签字"
+    "zh": "这件事在等签字"
   },
   "err_e_approval_denied": {
     "en": "the signature was refused",
@@ -5088,7 +5088,7 @@
     "zh": "不含工具调用"
   },
   "fork_filter_user": {
-    "en": "user turns only",
+    "en": "User turns only",
     "zh": "只看我说的"
   },
   "fork_safe_point": {
@@ -5116,8 +5116,8 @@
     "zh": "这里所有字句用哪种语言"
   },
   "setup_autonomy_note": {
-    "en": "who answers what this city puts in front of a person",
-    "zh": "这座城递给人决定的事由谁答复"
+    "en": "who answers what this city puts in front of the User",
+    "zh": "这座城递给 User 决定的事由谁答复"
   },
   "appearance_lighting_note": {
     "en": "which palette carries the page",
@@ -5269,7 +5269,7 @@
   },
   "run_doing_waiting": {
     "en": "waiting",
-    "zh": "在等人"
+    "zh": "在等答复"
   },
   "run_doing_frozen": {
     "en": "wrapped up",
@@ -5456,8 +5456,8 @@
     "zh": "j、k 上下移动，h、l 折叠与展开，Enter 打开"
   },
   "gallery_runs_board": {
-    "en": "the runs board, with runs waiting for the person",
-    "zh": "全城 run 板，有 run 在等人"
+    "en": "the runs board, with runs waiting for the User",
+    "zh": "全城 run 板，有 run 在等 User"
   },
   "gallery_runs_many": {
     "en": "the runs board with 1,200 runs: only the rows on screen are drawn",
@@ -5664,8 +5664,8 @@
     "zh": "更早"
   },
   "showing_note": {
-    "en": "Results only draws a room's words, answers, endings and what they produced, and the city's waiting, failed and finished runs. The switch on either page changes this too.",
-    "zh": "只看结果时，房间只画人的话、回答、结局与产出，城只列等你、失败、刚完成三类。两页上的开关也会改这一项。"
+    "en": "Results only draws your words in a room, the answers, the endings and what they produced, and the city's waiting, failed and finished runs. The switch on either page changes this too.",
+    "zh": "只看结果时，房间只画你的话、回答、结局与产出，城只列等你、失败、刚完成三类。两页上的开关也会改这一项。"
   },
   "run_time": {
     "en": "time",
@@ -6084,8 +6084,8 @@
     "zh": "把请求改得合乎这栋楼的目标，或者先改目标。"
   },
   "recover_e_tainted_action": {
-    "en": "A person has to confirm this step: its input came from outside the city.",
-    "zh": "这一步要由人来确认：它的输入来自城外。"
+    "en": "The User has to confirm this step: its input came from outside the city.",
+    "zh": "这一步要由 User 确认：它的输入来自城外。"
   },
   "recover_e_repair_busy": {
     "en": "Wait for the running repair to finish, then try again.",
