@@ -167,11 +167,15 @@ not, so a figure is never cut to a few letters. -->
       <dd class="text-text-faint">{DASH}</dd>
     {:else}
       <dd class="figure truncate text-text">
-        {fill(say($lang, "world_ttft"), { n: String(speed.ttft) })}{speed.tps === null
-          ? ""
-          : ` · ${fill(say($lang, "talk_tps"), { n: String(Math.round(speed.tps)) })}`}
+        {fill(say($lang, "world_ttft_spread"), { median: String(speed.ttft), mean: String(speed.ttftMean) })}
       </dd>
-      <dd class="truncate text-note text-text-faint">{fill(say($lang, "world_speed_turns"), { n: String(speed.turns) })}</dd>
+      <dd class="truncate text-note text-text-faint">{fill(say($lang, "world_ttft_turns"), { n: String(speed.turns) })}</dd>
+      {#if speed.tps !== null}
+        <dd class="figure truncate text-text">
+          {fill(say($lang, "world_tps_spread"), { p50: String(Math.round(speed.tps.p50)), p99: String(Math.round(speed.tps.p99)) })}
+        </dd>
+        <dd class="truncate text-note text-text-faint">{fill(say($lang, "world_tps_turns"), { n: String(speed.tps.turns) })}</dd>
+      {/if}
     {/if}
   </div>
   <div class="flex min-w-0 flex-col">

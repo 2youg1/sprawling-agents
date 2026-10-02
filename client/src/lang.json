@@ -6399,6 +6399,22 @@
     "en": "median of {n} turns",
     "zh": "{n} 个回合的中位数"
   },
+  "world_ttft_turns": {
+    "en": "TTFT over {n} turns",
+    "zh": "TTFT 取自 {n} 个回合"
+  },
+  "world_ttft_spread": {
+    "en": "TTFT median {median} ms · mean {mean} ms",
+    "zh": "TTFT 中位数 {median} ms · 平均 {mean} ms"
+  },
+  "world_tps_spread": {
+    "en": "{p50} t/s p50 · {p99} t/s p99",
+    "zh": "p50 {p50} t/s · p99 {p99} t/s"
+  },
+  "world_tps_turns": {
+    "en": "t/s over {n} turns",
+    "zh": "t/s 取自 {n} 个回合"
+  },
   "world_bounds": {
     "en": "bounds",
     "zh": "边界"
