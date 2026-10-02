@@ -135,11 +135,11 @@ fn an_exclusion_covers_the_city_only_at_a_directory_boundary() {
 /// a command a person can paste; a city on a trusted Dev Drive gets none.
 #[test]
 fn the_advice_names_the_command_that_would_exclude_the_city() {
-    let city = PathBuf::from(r"C:\Users\o'neil\city");
+    let city = PathBuf::from(r"D:\cities\o'neil");
     let slow = lines(&Scanning::Read {
         city: city.clone(),
         drive: Drive::Not {
-            volume: "C:".to_owned(),
+            volume: "D:".to_owned(),
             file_system: "NTFS".to_owned(),
         },
         exclusion: Exclusion::Untold(Untold::AdminOnly),
@@ -149,14 +149,14 @@ fn the_advice_names_the_command_that_would_exclude_the_city() {
         vec![
             "  scanning - whether antivirus scanning holds up the city's writes".to_owned(),
             String::new(),
-            r"    city            C:\Users\o'neil\city".to_owned(),
-            "    dev drive       no: C: is NTFS, not a Dev Drive".to_owned(),
+            r"    city            D:\cities\o'neil".to_owned(),
+            "    dev drive       no: D: is NTFS, not a Dev Drive".to_owned(),
             "    exclusion       cannot tell: Windows shows Defender's exclusions only to an administrator"
                 .to_owned(),
             "    to speed it up  move the city onto a Dev Drive (Settings > System > Storage > \
              Advanced storage settings > Disks & volumes > Create dev drive),"
                 .to_owned(),
-            r"                    or exclude it in an administrator PowerShell: Add-MpPreference -ExclusionPath 'C:\Users\o''neil\city'"
+            r"                    or exclude it in an administrator PowerShell: Add-MpPreference -ExclusionPath 'D:\cities\o''neil'"
                 .to_owned(),
             String::new(),
         ]
