@@ -190,3 +190,42 @@ pub struct Output {
 
 **被否**：给 `ResultOffloaded` 加 `tool_use_id`：同一个 id 的第二个家，而这份账目随结果整份进模型的请求字节，多出的键会让每一次被裁的调用多付这些 token。
 -/
+
+/-!
+### 8-76 外壳读的四样：缓存写、退出码、运行策略、工作树
+
+```rust
+pub struct Used {
+    // …既有字段…（`cached` 是缓存读，即 `kernel::ModelUsage::cache_read_tokens`）
+    #[serde(default)] pub cache_write: Option<Tokens>,   // 缓存写，即 `ModelUsage::cache_write_tokens`
+}
+pub struct Call {
+    // …既有字段…
+    #[serde(default)] pub exit_code: Option<i64>,        // exec 的命令以哪个码结束，照录配对的 `tool_result`
+}
+pub struct Opening {
+    // …既有字段…
+    #[serde(default)] pub policy: Option<kernel::RunPolicy>,   // `run_started` 记下的运行策略（kernel D12）
+}
+pub struct RoundsAnswer {
+    // …既有字段…
+    #[serde(default)] pub worktree: Option<String>,      // 这次 run 被借给的工作树的名字，照录 `worktree_opened`
+}
+```
+
+- **`cache_write` 与 `cached` 分开答**：两者都是 `input` 的一部分，单价不同（`gateway::market` 的 `cache_read_price` 与 `cache_write_price`），合成一个数页面就算不出命中率之外的任何东西。读法仍只有 `used_in` 一处，经 `ModelUsage` 自己的反序列化，旧行的换算由它做；`used` 在场时 `cache_write` 恒在场，`Option` 只为一个旧城答出的帧。
+- **`exit_code` 只照录结果里的 `exit_code` 键**：键的拼法与「有码才写码」的规则住 `runtime::tools::exec::outcome`；`runtime::pipeline::exec::exit_code_in` 是这个键的读者，读面经它读。信号停下的命令、城没等到的命令、非 exec 的工具、还没答的调用都是 `None`——没有码就不画码，`-1` 那种编出来的码一概没有。
+- **`policy` 照录 `run_started` 的 `policy` 键**：携 kernel 的 `RunPolicy` 本身（四个值：模式、写入限制、准入要求、落地策略），不在线上另立四个平铺字段（D4 同一条理）。写在这个键出现之前的行是 `None`。
+- **`worktree` 是 `worktree_opened` 的 `name`**：只有借到自己的工作树的 run 才有这一行；在楼自己的树里干活的 run、窗口没读到那一行的长会话都是 `None`，与 `opening` 同一口径。名字不是路径：路径是一台机器的事实（`kernel::event::record::WorktreeOpened`）。
+-/
+
+/-! D13 外壳读的字段在本版之内增加，各自可缺，各读自账本上写下它的那一行
+
+**决定**：§8-76、§8-77、§8-78 的六个字段都是 `Option`、带 `#[serde(default)]`，`WIRE_V` 不动；每个字段照录账本上写下它的那一行（或 kernel 的那个常量），读面不推断。提交的 B3 是宣告它的那一行自己的 BLAKE3（下一行的 `prev` 存的就是它），不是那一行的 `prev`。提交的 ISO 时刻不另设字段：它就是 `CommitAnswer.at`，页面用它画时刻的那一处拼成 ISO。
+
+**理由**：自上一次推送以来 `WIRE_V` 已经进过一位（D1），同一个发布之内不再进位；可缺的字段让一个缓存着的旧页面与一座新城、一个新页面与一座旧城都还连得上，旧的一端读到的只是「没有」。`prev` 是上一行的摘要，拿它当本行的身份会让每个提交都指向它前面那条无关的记录。ISO 只是 `at` 的一种拼法，线上再带一份就是一个时刻两个家，而页面在时间轴上本来就要拼毫秒精度的时刻。
+
+**被否**：①进位到 46——同一个发布里第二次进位，违背「一次发布一次进位」；②把 `cached` 改名为 `cache_read`——改名是改形，旧页面读到的是缺了一个必填字段；③线上带 `iso: String`——见上；④在 `checkpoint_committed` 里另记一个内容摘要——账本的链已经给每一行一个摘要，再记一个是同一行两个身份。
+
+**重开参数**：下一次进位 `WIRE_V` 时，`Option` 可以收紧为必填（`used` 在场时 `cache_write`、`ConfigAnswer.first`）。
+-/

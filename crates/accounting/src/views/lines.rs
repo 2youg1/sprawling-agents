@@ -70,6 +70,7 @@ pub(crate) fn config_answer(
                 domain,
             },
         ),
+        first: None,
         tuning: wire::TuningDefaults {
             from: wire::ConfigLayer::Default,
             timeout_ms: defaults.timeout_ms,
@@ -312,6 +313,20 @@ mod tests {
                     "max": kernel::consts_policy::CTX_REMINDER_SECOND_MAX,
                 },
             }))
+        );
+    }
+
+    /// Both rungs the context ring draws travel on the one answer it
+    /// reads; the page keeps no copy of the first (`crates/wire/Spec.lean`
+    /// §8-77).
+    #[test]
+    fn the_first_rung_is_answered_beside_the_second() {
+        let dir = tempfile::tempdir().unwrap();
+        let addr = Address::parse("lab/room1").unwrap();
+        let answer = config_answer(dir.path(), &addr).unwrap();
+        assert_eq!(
+            answer.first,
+            Some(kernel::consts_policy::CTX_REMINDER_FIRST_PERCENT)
         );
     }
 

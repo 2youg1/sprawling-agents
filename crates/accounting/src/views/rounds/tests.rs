@@ -335,7 +335,14 @@ fn the_rounds_carry_how_the_session_opened_and_closed() {
                 "goal": "a roadmap",
                 "job": "file:hall/mayor@0123456789abcdef0123456789abcdef01234567",
                 "dispatched_by": "person",
+                "policy": { "mode": "work", "write": "create", "admit": "tested",
+                            "landing": "experiment" },
             }),
+            TimeMs::new(10),
+        ),
+        (
+            EventKind::WorktreeOpened,
+            serde_json::json!({ "name": "hall-mayor", "disk_bytes": 4096 }),
             TimeMs::new(10),
         ),
         (
@@ -375,9 +382,16 @@ fn the_rounds_carry_how_the_session_opened_and_closed() {
             goal: "a roadmap".to_owned(),
             at: TimeMs::new(10),
             dispatched_by: Some(kernel::event::Who::Person),
+            policy: Some(kernel::RunPolicy {
+                mode: kernel::Mode::Work,
+                write: kernel::WriteLimit::Create,
+                admit: kernel::AdmissionRequirement::Tested,
+                landing: kernel::LandingPolicy::Experiment,
+            }),
         }),
-        "the opening carries who dispatched the run, as run_started records it"
+        "the opening carries who dispatched the run and its policy, as run_started records them"
     );
+    assert_eq!(answer.worktree.as_deref(), Some("hall-mayor"));
     let closing = answer.closing.expect("the window held run_frozen");
     assert_eq!(closing.completion, "done");
     assert_eq!(closing.at, TimeMs::new(12));

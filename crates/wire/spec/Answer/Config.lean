@@ -20,3 +20,18 @@
 - **`effort` 不跟着变**：没有一级说过时生效的是提供方的缺省，城不知道那个值；为它编一个级别就是说一句城说不出的话。重开条件：城自己开始为 effort 定一个缺省值。
 - **被否的方案**：保留 `Option` 并在旁边加一个 `default_percent` 字段——那样一个值有两个字段，读者要自己拼出生效值，拼法又多一个家。
 -/
+
+/-!
+### 8-77 第一级提醒也随答复一起来
+
+```rust
+pub struct ConfigAnswer {
+    // …既有字段…
+    #[serde(default)] pub first: Option<u64>,   // `kernel::consts_policy::CTX_REMINDER_FIRST_PERCENT`，窗口的整数百分比
+}
+```
+
+- **上下文环读的两级都在这一个答复上**：第二级是 `second.percent`，第一级是 `first`。页面不抄 30 这个数（client-SPEC 7J）。
+- **不带层**：第一级不可调（`crates/kernel/Spec.lean` D19），没有哪一级文件说得出它，答一个恒为 `default` 的层只是多一个读者要处理的值。
+- **`Option` 只为旧城**：这一版的城恒答 `Some`；理由与可缺的规则见 D13。
+-/

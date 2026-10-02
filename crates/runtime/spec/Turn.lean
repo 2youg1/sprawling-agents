@@ -275,6 +275,16 @@ pub fn pinned_original(result: &serde_json::Value) -> Option<Locator>;
 - **账目随它裁掉的那个结果走。** `package_exec` 把 `package` 记下的 `ResultOffloaded` 放进结果的 `sieve` 键，`package_connector` 放进 `offload` 键（§8-27、connector 一节）；这个结果写进 `tool_result`，而 `tool_result` 带着它所答那次调用的 `tool_use_id`。所以一笔账目属于哪次调用，由它所在的那一行说出，账目自己不另记调用 id：多记一份就是同一个 id 的第二个家，而且这个结果整份进模型的字节。今天没有任何写方单独写 `result_offloaded` 行。
 - **第一笔就是原文**：同一个结果先经 sieve 裁、裁后仍大再被普通搬运存一次时，账目按管线次序排——sieve 的那笔在前，它的 `original` 是命令写出的全部字节；后一笔的 `original` 是 sieve 留下的替身。读者要的是命令原本说了什么，所以取第一笔。
 - 键名的权威是这两个常量；读它们的是 `pinned_original`，写它们的是两扇 `package_*` 门。
+
+**(c) 一次 exec 以哪个码结束**
+
+```rust
+// runtime::pipeline
+/// 一次 exec 结果里的 `exit_code`；结果里没有码时为 None。
+pub fn exit_code_in(result: &serde_json::Value) -> Option<i64>;
+```
+
+- **写方只有一处，读方也只有一处。** 键名与「有码才写码」的规则住 `tools::exec::outcome` 的 `ending`；读它的是 `exit_code_in`，`package_exec` 交给 sieve 的码与读面答给页面的 `Call.exit_code`（`crates/wire/Spec.lean` §8-76）都经它读。信号停下的、没等到的命令没有码，读出 `None`，不读成某个数。
 -/
 
 namespace Runtime.Turn

@@ -147,7 +147,16 @@ impl Note {
 pub struct Used {
     pub input: Tokens,
     pub output: Tokens,
+    /// The part of `input` read from the provider's cache
+    /// (`kernel::ModelUsage::cache_read_tokens`).
     pub cached: Tokens,
+    /// The part of `input` written into the provider's cache
+    /// (`kernel::ModelUsage::cache_write_tokens`), priced apart from a
+    /// read. Always present beside the other three in this build; absent
+    /// only in a frame from a city written before it was answered
+    /// (`crates/wire/Spec.lean` D13).
+    #[serde(default)]
+    pub cache_write: Option<Tokens>,
 }
 
 /// One tool call inside a turn.
@@ -200,6 +209,13 @@ pub struct Call {
     /// a page draws such a call as generic. A diff's `locations` are the
     /// registration's and empty today - the file is [`Call::subject`].
     pub render: Option<kernel::RenderIntent>,
+    /// The code the command of an `exec` call ended with, as its paired
+    /// result recorded it. `None` for every other tool, for a command a
+    /// signal stopped or the city never waited on - which have no code -
+    /// and for a call not yet answered: no code is drawn rather than an
+    /// invented one.
+    #[serde(default)]
+    pub exit_code: Option<i64>,
 }
 
 /// One turn: the model was asked, and this is what came of it.
@@ -274,6 +290,11 @@ pub struct Opening {
     /// for a ledger written before the key existed.
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub dispatched_by: Option<kernel::event::Who>,
+    /// The run policy it was dispatched under - mode, write limit,
+    /// admission requirement and landing policy - as its `run_started`
+    /// records it; `None` for a line written before the key existed.
+    #[serde(default)]
+    pub policy: Option<kernel::RunPolicy>,
 }
 
 /// How a session ended, in the word the run froze with: `done`,
@@ -303,4 +324,10 @@ pub struct RoundsAnswer {
     /// Absent while the session is still going, or when the window did
     /// not reach its `run_frozen`.
     pub closing: Option<Closing>,
+    /// The name of the worktree this run was lent, from its own
+    /// `worktree_opened`: a name, never a path, which is a fact about one
+    /// machine. Absent for a run that worked in its building's own tree,
+    /// and when the window did not reach that line.
+    #[serde(default)]
+    pub worktree: Option<String>,
 }

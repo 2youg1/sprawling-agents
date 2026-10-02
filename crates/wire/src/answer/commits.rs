@@ -11,7 +11,7 @@
 //! listed, and a second shape for the list would be a second authority
 //! on what a commit is.
 
-use kernel::{Address, Effort, GitOid, RunId, Seq, SessionName, TimeMs, UsdMicros};
+use kernel::{Address, B3Hash, Effort, GitOid, RunId, Seq, SessionName, TimeMs, UsdMicros};
 use serde::{Deserialize, Serialize};
 
 /// Which run wrote one commit, in the words the commit's own git
@@ -70,6 +70,13 @@ pub struct CommitAnswer {
     /// the parents are and absent for the same reasons, or when it is
     /// not UTF-8 (`crates/wire/spec/Answer/Commits.lean` §8-54).
     pub message: Option<String>,
+    /// The BLAKE3 of the canonical bytes of the line that announced this
+    /// commit - the digest the next line of the chain carries as `prev`,
+    /// not this line's own `prev`. A person finds the line by it and
+    /// checks it was not altered. `None` only in a frame from a city
+    /// written before it was answered (`crates/wire/Spec.lean` §8-78).
+    #[serde(default)]
+    pub b3: Option<B3Hash>,
 }
 
 /// A commit, and where in the one history the line announcing it sits.

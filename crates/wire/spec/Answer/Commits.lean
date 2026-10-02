@@ -88,3 +88,19 @@ pub struct CommitAt { pub oid: GitOid, pub seq: Seq }
 - **`parents` 读自 git，在答问时读。** 提交对象自己记着它的父提交，账本记下的 oid 就是这个对象（连同父提交）的哈希，所以这里读的是权威本身，不是投影；五条 trailer 才是投影，本节不读它们。`Some(vec![])` 是根提交；`None` 是这座城没有仓库、仓库里没有这个对象，或者读失败——一座导出后在别处恢复、身边没有 `.git` 的城，其余各字段照答，只是画不出这一格。读 git 在快照的锁放开之后做（sprawling-SPEC 8-100），一页提交只开一次仓库。
 - **`message: Option<String>` 读自 git，与 `parents` 同一刻读。** 提交对象自己记着说明，账本从未记过它，所以它与父提交同属「答问时读 git」那一类（D3(b)）：`Some` 是提交对象里的说明原文，五条 trailer 在内；`None` 的情形与 `parents` 相同，另加说明不是 UTF-8。页面画提交行时取第一行，要读全文时读这一格。名字不变而形状变了，与本批其余改形共用 `WIRE_V` 45（D1）。
 -/
+
+/-!
+### 8-78 一次提交带出宣告它的那一行的 B3
+
+```rust
+pub struct CommitAnswer {
+    // …既有字段…
+    #[serde(default)] pub b3: Option<B3Hash>,   // 宣告这次提交的那一行（`checkpoint_committed` 或 `pr_merged`）的规范字节的 BLAKE3
+}
+```
+
+- **是那一行自己的摘要，不是它的 `prev`**：账本的每一行带着上一行的摘要（`EventRecord::prev`）；一行自己的摘要是对它的规范字节（`EventRecord::canonical_line`）求 BLAKE3，也就是下一行的 `prev`。核对链的那一处（`storage::jsonl::verify`）算的就是这个数，所以人拿它可以在账本里找到这一行、并确认它没被改过。
+- **在折叠时算**：`views::commits` 折这一行时就有它的规范字节，答问时不再读账本。
+- **`None`**：一行在折叠时序列化不出规范字节（读回来的行不会这样，那是校验过的字节），或一座旧城答出的帧（D13）。
+- **ISO 时刻就是 `at`**：见 D13。
+-/

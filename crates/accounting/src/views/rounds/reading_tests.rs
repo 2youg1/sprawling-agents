@@ -72,7 +72,7 @@ fn answered_model(seq: u64, text: &str) -> EventRecord {
                 "input_tokens": 1200,
                 "output_tokens": 340,
                 "cache_read_tokens": 800,
-                "cache_write_tokens": 0
+                "cache_write_tokens": 150
             },
             "stop": "end_turn",
             "billed_usd_micros": 3340
@@ -90,6 +90,11 @@ fn a_turn_says_what_the_model_said_and_what_it_cost() {
     assert_eq!(used.input, Tokens::new(1200));
     assert_eq!(used.output, Tokens::new(340));
     assert_eq!(used.cached, Tokens::new(800));
+    assert_eq!(
+        used.cache_write,
+        Some(Tokens::new(150)),
+        "cache reads and writes apart"
+    );
 }
 
 /// Thinking blocks are carried end to end so the provider can verify

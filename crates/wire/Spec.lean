@@ -251,6 +251,9 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-73 | `crates/wire/spec/Answer/Proposals.lean` |
 | 8-74 | `crates/wire/spec/Answer/Preview.lean` |
 | 8-75 | `crates/wire/spec/Answer/Preview.lean` |
+| 8-76 | `crates/wire/spec/Reading.lean` |
+| 8-77 | `crates/wire/spec/Answer/Config.lean` |
+| 8-78 | `crates/wire/spec/Answer/Commits.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |
@@ -316,6 +319,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D10 | 保存带基线版本与文本编辑，回执是账本行；提案按文档成批决定 | `crates/wire/spec/Command/Step.lean` |
 | D11 | Markdown 在城里读，页面按版本与窗口问它的块 | `crates/wire/spec/Answer/Preview.lean` |
 | D12 | 对话流按文字问块，不按版本，不随增量带块 | `crates/wire/spec/Answer/Preview.lean` |
+| D13 | 外壳读的字段在本版之内增加，各自可缺，各读自账本上写下它的那一行 | `crates/wire/spec/Reading.lean` |
 -/
 
 /-! ## 13 依赖选型

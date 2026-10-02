@@ -188,3 +188,37 @@ fn a_cut_output_points_at_its_original() {
         None
     );
 }
+
+/// An `exec` result names the code its command ended with; a command a
+/// signal stopped has none, and the row then draws none
+/// (`crates/wire/Spec.lean` §8-76).
+#[test]
+fn an_exec_call_carries_the_code_its_command_ended_with_and_no_code_when_it_had_none() {
+    let exec = |seq: u64, id: &str| {
+        record(
+            seq,
+            EventKind::ToolCalled,
+            serde_json::json!({ "id": id, "name": "exec", "args": { "arm": "shell" } }),
+        )
+    };
+    let result = |seq: u64, id: &str, result: serde_json::Value| {
+        record(
+            seq,
+            EventKind::ToolResult,
+            serde_json::json!({ "tool_use_id": id, "name": "exec", "result": result }),
+        )
+    };
+    let folded = turns(&[
+        asked(1),
+        exec(2, "a"),
+        exec(3, "b"),
+        result(4, "a", serde_json::json!({ "content": "", "exit_code": 2 })),
+        result(
+            5,
+            "b",
+            serde_json::json!({ "content": "", "outcome": "signalled" }),
+        ),
+    ]);
+    let codes: Vec<Option<i64>> = folded[0].calls.iter().map(|call| call.exit_code).collect();
+    assert_eq!(codes, vec![Some(2), None]);
+}

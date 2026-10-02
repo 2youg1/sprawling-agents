@@ -76,6 +76,7 @@ impl CommitFacts {
             previous: self.previous,
             parents: None,
             message: None,
+            b3: None,
         }
     }
 }
@@ -424,6 +425,23 @@ mod tests {
             .find(|commit| commit.seq == Seq::new(seq))
             .unwrap()
             .previous
+    }
+
+    /// The B3 a commit carries is the digest of the line that announced
+    /// it - what the next line of the chain holds as `prev` - and not
+    /// that line's own `prev` (`crates/wire/Spec.lean` §8-78).
+    #[test]
+    fn a_commit_carries_the_b3_of_the_line_that_announced_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut views = super::super::holding::Views::new(dir.path());
+        let line = checkpoint_by(3, &oid_at(3), 1);
+        views.fold_commit(&line);
+        let page = views.commits_answer(None, None, 20).unwrap();
+        let b3s: Vec<Option<B3Hash>> = page.commits.iter().map(|commit| commit.b3).collect();
+        assert_eq!(
+            b3s,
+            vec![Some(B3Hash::digest(&line.canonical_line().unwrap()))]
+        );
     }
 
     #[test]

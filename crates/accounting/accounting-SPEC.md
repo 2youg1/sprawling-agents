@@ -1040,6 +1040,20 @@ pub(super) fn offered(reader: &runtime::BoundReader, asked: &Offering) -> Result
 - **`withdraw` 只收这次 run 自己提出、还开着的卡。** 判它的是工具自己的一本小账（身份 ↦ 开着／收回过）：run 的身份每次派活新铸（`run_id_for` 读时刻），所以这次 run 提出的卡只出自这件工具的这一个实例。别的 run 的卡、没提出过的身份、收回过的卡都拒 `E_INVALID_ARGS`，不写行。
 - **当前状态：人在 run 还在跑时决定了它的一张卡，run 随后收回同一张卡，会多写一行 `proposal_withdrawn`。** 工具看不见那次决定；`views::proposals::Proposals::close` 照最后写下的一行把卡记成收回过。卡上的字节已经由人的决定落下，`open_on` 对两种处理都拒，所以没有字节写错，错的是折叠记下的「怎样处理的」，与 documents D19「处理过的卡不再动」不合。补法是折叠对已经处理过的卡不再改（`close` 保留第一次处理，`views/proposals.rs` 里一行），它也让任何一条迟到的收回成为被拒的一步；另一条路是收回改走记账线程的问询，像 `goal` 的登记那样由 `Governance` 当场判（sprawling-SPEC.md 8-42-8），那要在 `relay::Wake` 加一臂。
 - 验收：`worker::workbench::tools::proposal::tests`（一次 `offer` 恰写一行、文档字节不动；收回别人的卡、收回两次、重提收回过的卡都被拒；UTF-16 文档上引出的原文经 `documents::decide` 落得下）；`crates/sprawling/tests/acceptance/` 的 catalogue 里 `proposal` 一段（`views::ask` 的 `Query::Proposals` 答出这张卡，属于这次 run，文档字节不动）；citysim 的 `tests/proposal_baseline.rs`（citysim D22：文档被城外的写者挪动之后，人接受这张卡以 `E_VERSION_CONFLICT` 被拒，文档留着挪动之后的字节，卡仍开着）。
+### 8-33 外壳读的字段从哪一处折出（`accounting::views::rounds`、`accounting::views::commits`、`accounting::views::lines`，形状 7 投影；`crates/wire/Spec.lean` §8-76–§8-78）
+
+```rust
+// accounting::views::commits
+pub(crate) struct CommitFacts { /* …既有字段… */ b3: Option<B3Hash> }   // 折叠时算，进快照编码
+// accounting::views::rounds：Call.exit_code、Opening.policy、RoundsAnswer.worktree 在 `turns`／`opening` 那一次遍历里读
+// accounting::views::lines：ConfigAnswer.first = Some(CTX_REMINDER_FIRST_PERCENT)
+```
+
+- **提交的 B3 在折叠那一行时算。** `fold_commit` 手里有这一行，`canonical_line` 的 BLAKE3 就是它的身份；答问时只拷出。快照编码随之变，`VIEWS_FOLD_RULES` 由夹具摘要进位（§8-24）。
+- **退出码经 `runtime::pipeline::exit_code_in` 读**，与配对的 `tool_result` 同一刻：答复写下 `outcome` 与 `output` 的那一处。
+- **运行策略照录 `run_started` 的 `policy`**，与 `task`、`goal`、`dispatched_by` 同一次读；**工作树名照录这次 run 自己的 `worktree_opened`**，窗口里第一条为准。
+- **缓存写照 `wire::used_in` 读**：读法在 wire，本模块不另读 `usage`。
+- 验收：`views::rounds::tests`、`views::commits::tests`、`views::snapshot::tests` 里点名这几个字段的用例（第 45 条）。
 
 ## 12 决策
 
@@ -1110,3 +1124,4 @@ pub(super) fn offered(reader: &runtime::BoundReader, asked: &Offering) -> Result
     (a) 引文：模型读文件经 `read`，看到的是文字，不是字节偏移；它给出原话，区间由工具在那一版里找出，找不到或不止一处就拒，与 `edit` 的 `old` 同一种约定。被否决的做法：①收 `start`、`end` 字节偏移——模型要自己按编码数字节，数错一个就切进字符中间或切错句子；②收行号——要第二套「行怎样数」的规则，而 `documents` 的区间都按字节。
     (b) 写行经 relay：relay 是 lane 唯一能写账本的门（第 11 条），记账线程写下之后把这一行交给每个折叠，与 lane 写的 `tool_called` 同一条路。被否决的做法：把卡放进一张桌子、落地时由结算写——卡要等 run 结束才出现在人面前，而 `offer` 在行写下之前就把身份答给了模型。
     (c) 收回的判定在工具里，开着与否的权威仍是 `Governance`：工具只判「这是不是我提出的、我收回过没有」，这两件只有它知道。被否决的做法：派活时把 `Governance.proposals` 拷进工具——这次 run 在那一刻还没有任何一张卡，拷来的只会是别人的，而且拷贝是折叠的第二份。重开参数：§8-30 当前状态那一条在真实的城里出现。
+45. **外壳读的字段在折叠时读出，各自照录写下它的那一行，读不出即缺席**（§8-33）。(a) 提交的 B3 进 `CommitFacts`，在 `fold_commit` 时算。理由：那一刻规范字节就在手里；答问时再算要按 `seq` 回读账本，一页五百个提交就是五百次读。被否决的做法：答问时读——多一次读盘，只为省快照里每个提交 32 字节。(b) 退出码经 runtime 的一个读者读，不在读面另写一次 `"exit_code"`。理由：键是 `tools::exec::outcome` 写的，读法也该只有一处；被否决的做法：读面直接 `get("exit_code")`——这个键的第三处拼写。(c) 工作树名放在 `RoundsAnswer` 上、与 `opened_at` 并列，不放进 `Opening`。理由：它来自另一行（`worktree_opened`），而 `Opening` 是 `run_started` 一行的投影；放在一起就是一个投影读两种行。

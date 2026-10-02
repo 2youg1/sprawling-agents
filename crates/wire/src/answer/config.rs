@@ -122,5 +122,12 @@ pub struct ConfigAnswer {
     /// `kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT` and the
     /// layer is [`ConfigLayer::Default`].
     pub second: SettledSecond,
+    /// Where the context reminder's first rung sits, as a whole percent
+    /// of the window: `kernel::consts_policy::CTX_REMINDER_FIRST_PERCENT`.
+    /// No layer moves it, so no layer travels with it. Always answered by
+    /// this build; absent only in a frame from a city written before it
+    /// was (`crates/wire/Spec.lean` D13).
+    #[serde(default)]
+    pub first: Option<u64>,
     pub tuning: TuningDefaults,
 }

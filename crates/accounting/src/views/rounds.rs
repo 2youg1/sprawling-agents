@@ -71,6 +71,7 @@ impl LedgerAsk {
             opened_at: opened_at(&turns),
             opening: opening(&records),
             closing: closing(&records),
+            worktree: None,
             turns,
             run,
         }
@@ -150,6 +151,7 @@ fn opening(records: &[EventRecord]) -> Option<wire::Opening> {
                 goal: started.goal,
                 at: record.t(),
                 dispatched_by: started.dispatched_by,
+                policy: None,
             }
         })
 }
@@ -230,6 +232,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     render: map.get("render").and_then(|value| {
                         <kernel::RenderIntent as serde::Deserialize>::deserialize(value).ok()
                     }),
+                    exit_code: None,
                 };
                 let Some(turn) = folded.get_mut(turn_at) else {
                     continue;
