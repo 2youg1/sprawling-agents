@@ -207,6 +207,10 @@
     "en": "commits",
     "zh": "提交"
   },
+  "bld_goal": {
+    "en": "standing goal",
+    "zh": "长期目标"
+  },
   "bld_goal_placeholder": {
     "en": "give {addr} a standing goal",
     "zh": "给 {addr} 一个长期目标"
@@ -415,6 +419,38 @@
     "en": "which file this came from",
     "zh": "这段来自哪个文件"
   },
+  "commit_model": {
+    "en": "model",
+    "zh": "模型"
+  },
+  "commit_oid": {
+    "en": "commit id",
+    "zh": "提交 id"
+  },
+  "commit_parents": {
+    "en": "parents",
+    "zh": "父提交"
+  },
+  "commit_root": {
+    "en": "none, the first commit",
+    "zh": "无，这是第一个提交"
+  },
+  "commit_run": {
+    "en": "run",
+    "zh": "run"
+  },
+  "commit_session": {
+    "en": "session",
+    "zh": "会话"
+  },
+  "commit_spent": {
+    "en": "its run spent",
+    "zh": "这次 run 花费"
+  },
+  "commits_all": {
+    "en": "that is every commit this building made",
+    "zh": "这栋楼的提交都在这里了"
+  },
   "commits_empty": {
     "en": "no commits yet: a run's work lands here when it commits in this building",
     "zh": "还没有提交：派活在这栋楼里提交后，会出现在这里"
@@ -426,6 +462,14 @@
   "commits_lineage": {
     "en": "replaced",
     "zh": "接替了"
+  },
+  "commits_more": {
+    "en": "older commits arrive as you scroll",
+    "zh": "向下滚动，更早的提交随之载入"
+  },
+  "commits_no_message": {
+    "en": "no message",
+    "zh": "没有说明"
   },
   "commits_spent": {
     "en": "{usd} spent",
@@ -522,6 +566,10 @@
   "desktop_title": {
     "en": "desktop",
     "zh": "桌面"
+  },
+  "dir_earlier_runs": {
+    "en": "earlier runs, not on this page · {n}",
+    "zh": "更早的 run，不在此页 · {n}"
   },
   "dir_empty": {
     "en": "this directory is empty",
@@ -938,6 +986,14 @@
   "git_no_upstream": {
     "en": "no upstream",
     "zh": "没有上游"
+  },
+  "git_open_file": {
+    "en": "open {path} on the right",
+    "zh": "在右侧打开 {path}"
+  },
+  "git_since_checkpoint": {
+    "en": "changed since the last checkpoint",
+    "zh": "上一个检查点之后的改动"
   },
   "git_unavailable": {
     "en": "this city has no repository to read",
@@ -1987,6 +2043,18 @@
     "en": "node",
     "zh": "节点"
   },
+  "plan_node_elsewhere": {
+    "en": "{n} more runs claimed a node with this number in another building, or before this page",
+    "zh": "另有 {n} 个 run 认领过同号的节点，在别的楼，或早于此页"
+  },
+  "plan_node_spent": {
+    "en": "this node spent",
+    "zh": "这个节点花了"
+  },
+  "plan_node_unclaimed": {
+    "en": "no run in this building has claimed this node",
+    "zh": "这栋楼里还没有 run 认领过这个节点"
+  },
   "plan_progress": {
     "en": "plan progress",
     "zh": "计划进度"
@@ -2650,6 +2718,86 @@
   "run_withheld": {
     "en": "line {n} withheld · {reason}",
     "zh": "第 {n} 行不回显 · {reason}"
+  },
+  "sandbox_bad_line": {
+    "en": "not accepted: {line}",
+    "zh": "不合语法：{line}"
+  },
+  "sandbox_env": {
+    "en": "environment passed through",
+    "zh": "透传的环境变量"
+  },
+  "sandbox_env_help": {
+    "en": "One variable name per line that a child process may inherit, on top of the four every run gets.",
+    "zh": "每行一个变量名，子进程可以继承，在每个 run 都有的四个之外。"
+  },
+  "sandbox_fuel": {
+    "en": "fuel",
+    "zh": "燃料"
+  },
+  "sandbox_fuel_help": {
+    "en": "Instruction budget for one sandboxed call.",
+    "zh": "一次沙箱调用的指令预算。"
+  },
+  "sandbox_fuel_needed": {
+    "en": "fuel is a whole number above zero",
+    "zh": "燃料须是大于零的整数"
+  },
+  "sandbox_inherited": {
+    "en": "This building has no sandbox of its own, so the city's holds. Saving writes one, whole.",
+    "zh": "这栋楼没有自己的沙箱，由城那一层管。保存会写下完整的一份。"
+  },
+  "sandbox_mounts": {
+    "en": "readable mounts",
+    "zh": "可读的挂载"
+  },
+  "sandbox_mounts_help": {
+    "en": "One city address per line, readable on top of the building. Where a run may write is decided elsewhere.",
+    "zh": "每行一个城内地址，在这栋楼之外额外可读。run 能写哪里另有规定。"
+  },
+  "sandbox_save": {
+    "en": "save the sandbox",
+    "zh": "保存沙箱"
+  },
+  "sandbox_saved": {
+    "en": "saved",
+    "zh": "已保存"
+  },
+  "sandbox_shell": {
+    "en": "shell",
+    "zh": "shell"
+  },
+  "sandbox_shell_help": {
+    "en": "Whether a run may be offered a shell line at all. A shell line is the one call whose reach cannot be read off its arguments.",
+    "zh": "是否给 run 提供 shell 命令。shell 是唯一一种无法从参数读出它能碰到什么的调用。"
+  },
+  "sandbox_shell_off": {
+    "en": "off",
+    "zh": "关"
+  },
+  "sandbox_shell_on": {
+    "en": "on",
+    "zh": "开"
+  },
+  "sandbox_trusted": {
+    "en": "trusted connectors",
+    "zh": "可信的连接器"
+  },
+  "sandbox_trusted_help": {
+    "en": "One MCP server label per line that may reach what no checkpoint puts back, such as this machine's desktop.",
+    "zh": "每行一个 MCP 服务器标签，允许它碰到检查点放不回去的东西，例如这台机器的桌面。"
+  },
+  "sandbox_unchanged": {
+    "en": "nothing changed",
+    "zh": "没有改动"
+  },
+  "sandbox_unknown": {
+    "en": "the city has not answered yet",
+    "zh": "城还没有回答"
+  },
+  "sandbox_what": {
+    "en": "What a run in this building may touch. The card is written whole: every face below is what the building's sandbox will say.",
+    "zh": "这栋楼里的 run 能碰到什么。整张卡一起写入：下面每一项都是这栋楼的沙箱将要说的。"
   },
   "setup_add_row": {
     "en": "add a row",
@@ -3639,6 +3787,22 @@
     "en": "ready",
     "zh": "就绪"
   },
+  "take_back": {
+    "en": "take back",
+    "zh": "取回"
+  },
+  "take_back_detail": {
+    "en": "The file in the working tree becomes what checkpoint {oid} holds, and goes away if that checkpoint has no such file. What {path} says now is in no checkpoint.",
+    "zh": "工作树里的这个文件会变成检查点 {oid} 里的样子；那个检查点里没有这个文件时，它会被移走。{path} 现在的内容不在任何检查点里。"
+  },
+  "take_back_not_in_tree": {
+    "en": "this path is not a file of the city",
+    "zh": "这个路径不是城里的文件"
+  },
+  "take_back_title": {
+    "en": "Take {path} back to checkpoint {oid}?",
+    "zh": "把 {path} 取回到检查点 {oid}？"
+  },
   "talk_calls": {
     "en": "what it did",
     "zh": "它做了什么"
@@ -4062,6 +4226,22 @@
   "welcome_title": {
     "en": "welcome",
     "zh": "欢迎"
+  },
+  "whose_label": {
+    "en": "whose commit",
+    "zh": "谁的提交"
+  },
+  "whose_not_oid": {
+    "en": "a commit id is 40 characters, each 0-9 or a-f",
+    "zh": "提交 id 是 40 个字符，每个是 0-9 或 a-f"
+  },
+  "whose_placeholder": {
+    "en": "a 40-character commit id",
+    "zh": "40 位的提交 id"
+  },
+  "whose_unknown": {
+    "en": "this city wrote no commit {oid}",
+    "zh": "这座城没有写过提交 {oid}"
   },
   "wire_frame_undecodable": {
     "en": "this page speaks wire v{ours} and the server sent a frame it cannot read",
@@ -4671,6 +4851,10 @@
     "en": "nothing runs here now; halting refuses new work",
     "zh": "这栋楼现在没有在跑的派活；叫停会拒收新活"
   },
+  "bld_index": {
+    "en": "what this building holds",
+    "zh": "这栋楼有什么"
+  },
   "runs_title": {
     "en": "runs",
     "zh": "全城 run"
@@ -4766,6 +4950,10 @@
   "bld_remove_detail": {
     "en": "Its files move to .sprawling/removed and its history stays in the ledger. Move the folder back to the city root and adopt it to bring it back.",
     "zh": "它的文件搬到 .sprawling/removed，历史留在 ledger 里。把文件夹搬回城的根目录再收编，就能找回。"
+  },
+  "bld_sandbox": {
+    "en": "sandbox",
+    "zh": "沙箱"
   },
   "machine_spare": {
     "en": "one of a kind that needs only one, and another is here",

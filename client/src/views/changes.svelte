@@ -18,6 +18,7 @@
 <script lang="ts">
   import { readable } from "svelte/store";
   import type { Readable } from "svelte/store";
+  import type { Snippet } from "svelte";
 
   import { readAnswer } from "../core/answered";
   import { say } from "../core/lang";
@@ -33,9 +34,12 @@
     // Where a chosen line is sent: the conversation whose composer it
     // prefills. Absent where the page has no conversation to talk to.
     readonly talk?: Address | undefined;
+    // A control at the end of each file's row, handed the file's path:
+    // a building's commit list puts "take back" there (client-SPEC 4-50).
+    readonly act?: Snippet<[string]> | undefined;
   }
 
-  const { base, head, talk }: Props = $props();
+  const { base, head, talk, act }: Props = $props();
 
   const u = ui();
   const lang = u.lang;
@@ -75,18 +79,23 @@
   <ul class="text-note">
     {#each files as file (file.path)}
       <li class="border-b border-edge">
-        <button
-          type="button"
-          class="flex w-full items-center gap-base py-snug text-left hover:text-text"
-          aria-expanded={open === file.path}
-          onclick={() => {
-            toggle(file.path);
-          }}
-        >
-          <span class="w-figure shrink-0 text-text-faint">{howWord($lang, file.how)}</span>
-          <span class="flex-1 truncate font-mono text-text-quiet">{file.path}</span>
-          <span class="shrink-0 font-mono text-text-faint">{linesWord($lang, file.lines)}</span>
-        </button>
+        <div class="flex items-center gap-snug">
+          <button
+            type="button"
+            class="flex min-w-0 flex-1 items-center gap-base py-snug text-left hover:text-text"
+            aria-expanded={open === file.path}
+            onclick={() => {
+              toggle(file.path);
+            }}
+          >
+            <span class="w-figure shrink-0 text-text-faint">{howWord($lang, file.how)}</span>
+            <span class="flex-1 truncate font-mono text-text-quiet">{file.path}</span>
+            <span class="shrink-0 font-mono text-text-faint">{linesWord($lang, file.lines)}</span>
+          </button>
+          {#if act !== undefined}
+            {@render act(file.path)}
+          {/if}
+        </div>
         {#if open === file.path}
           {#if head === null}
             <p class="pb-base text-text-faint">{say($lang, "run_patch_needs_checkpoint")}</p>

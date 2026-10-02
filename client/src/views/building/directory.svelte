@@ -45,7 +45,7 @@
   import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import type { Doing } from "../../core/doing";
-  import { say } from "../../core/lang";
+  import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { clock, kib, usd } from "../../core/time";
   import { readable } from "svelte/store";
@@ -55,6 +55,7 @@
   import Path from "../parts/path.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import type { Picked } from "./tree.svelte";
+  import { transcriptOf } from "./transcript";
 
   interface Props {
     readonly at: Address;
@@ -76,6 +77,16 @@
   const cost = u.conn.asking.ask(QUERIES.cost);
 
   const runs = $derived(heldIn($belief, at).reverse());
+
+  // The runs this room's listing has a transcript for and the page holds
+  // no run for: older than the hot view, so the page names them and
+  // their number rather than calling the room empty (client-SPEC 4-50).
+  const earlier = $derived.by(() => {
+    return (entries ?? []).flatMap((entry) => {
+      const run = transcriptOf(entry.name);
+      return run === null || runs.some((held) => held.run === run) ? [] : [run];
+    });
+  });
 
   // The cost view names the active runs and the few billed most; the
   // rest of this building's runs are asked for by name, newest first,
@@ -180,7 +191,7 @@
             </li>
           {/each}
         </ul>
-      {:else}
+      {:else if earlier.length === 0}
         <EmptyState missing="dir_room_empty">
           {#snippet action()}
             <a
@@ -191,6 +202,20 @@
             </a>
           {/snippet}
         </EmptyState>
+      {/if}
+      {#if earlier.length > 0}
+        <p class="mt-base text-note text-text-faint">
+          {fill(say($lang, "dir_earlier_runs"), { n: String(earlier.length) })}
+        </p>
+        <ul class="flex flex-wrap gap-x-base text-note">
+          {#each earlier as run (run)}
+            <li>
+              <a href={toFragment({ kind: "run", run })} class="figure text-text-quiet hover:text-accent"
+                >{run.slice(0, 8)}</a
+              >
+            </li>
+          {/each}
+        </ul>
       {/if}
     {:else if entries.length > 0}
       <ul class="text-note">

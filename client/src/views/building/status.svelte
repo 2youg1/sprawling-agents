@@ -7,21 +7,25 @@
 
 <script lang="ts">
   // What this building has written since its last checkpoint, and where
-  // its branch stands. The checkpoint itself is a row naming the run,
-  // the room, the model and what that run cost, and it links into the
-  // run page - which is the way back from a line of code to the session
-  // that wrote it.
+  // its branch stands (client-SPEC 4-50). Every changed file is a way
+  // out: pressing the row opens the file's working-tree text on the
+  // right side, and "take back" returns it to what that checkpoint
+  // holds. The checkpoint itself names the run, the room and the model,
+  // and links into the run page - the way back from a line of code to
+  // the session that wrote it.
   //
   // The three states of the question are three states of the screen: a
   // city that has not answered yet says nothing rather than guessing,
   // one without git says so, and one with git gets the whole reading.
-
   import { fill, say } from "../../core/lang";
   import { roomOf, toFragment } from "../../core/route";
   import { usd } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, CommitAnswer, GitStatusAnswer } from "../../wire";
   import { howWord, linesWord, shortOid } from "../changes";
+  import { openDocument, rightItem } from "../inspect/open.svelte";
+  import EmptyState from "../parts/empty.svelte";
+  import TakeBack from "./take_back.svelte";
 
   interface Props {
     readonly building: Address;
@@ -38,40 +42,44 @@
     if (held === undefined) return undefined;
     return "git_status" in held ? held.git_status : null;
   });
+
+  // The row whose file is in front on the right side, marked the way a
+  // chosen row is marked everywhere (client-SPEC 7B).
+  function isOpen(path: string): boolean {
+    const item = rightItem();
+    return item !== null && item.kind === "document" && item.building === building && item.path === path;
+  }
 </script>
 
 {#snippet checkpoint(commit: CommitAnswer)}
-  <p class="mb-base flex flex-wrap items-baseline gap-base text-note">
-    <span class="text-text-quiet">{say($lang, "git_checkpoint")}</span>
+  <p class="flex flex-wrap items-baseline gap-x-base text-note">
+    <span class="text-text-faint">{say($lang, "git_checkpoint")}</span>
     <a
       href={toFragment({ kind: "run", run: commit.run })}
-      class="font-mono text-text-faint hover:text-text-quiet">{shortOid(commit.oid)}</a
+      class="figure text-text-quiet hover:text-text">{shortOid(commit.oid)}</a
     >
-    <a
-      href={toFragment({ kind: "talk", address: commit.actor })}
-      class="text-text-faint hover:text-text-quiet">{roomOf(commit.actor)}</a
+    <a href={toFragment({ kind: "talk", address: commit.actor })} class="text-text-quiet hover:text-text"
+      >{roomOf(commit.actor)}</a
     >
     {#if commit.model !== ""}
       <span class="text-text-faint">{commit.model}</span>
     {/if}
     {#if commit.spent > 0}
-      <span class="text-text-faint"
-        >{fill(say($lang, "commits_spent"), { usd: usd(commit.spent) })}</span
-      >
+      <span class="figure text-text-faint">{fill(say($lang, "commits_spent"), { usd: usd(commit.spent) })}</span>
     {/if}
   </p>
 {/snippet}
 
-<div>
-  <h2 class="mb-base text-heading font-heading">{say($lang, "bld_changes")}</h2>
+<div class="flex min-w-0 flex-col gap-base">
+  <h2 class="text-note text-text-faint">{say($lang, "git_since_checkpoint")}</h2>
   {#if status === undefined}
     <p class="text-text-faint">…</p>
   {:else if status === null}
-    <p class="text-text-faint">{say($lang, "git_unavailable")}</p>
+    <EmptyState missing="git_unavailable" />
   {:else}
-    <p class="mb-base flex flex-wrap items-baseline gap-base text-note">
-      <span class="text-text-quiet">{say($lang, "git_branch")}</span>
-      <span class="font-mono text-text-faint">{status.branch ?? say($lang, "git_detached")}</span>
+    <p class="flex flex-wrap items-baseline gap-x-base text-note">
+      <span class="text-text-faint">{say($lang, "git_branch")}</span>
+      <span class="font-mono text-text-quiet">{status.branch ?? say($lang, "git_detached")}</span>
       <span class="text-text-faint">
         {#if status.drift !== null && status.drift !== undefined}
           {fill(say($lang, "git_drift"), {
@@ -88,17 +96,36 @@
       {@render checkpoint(status.checkpoint)}
     {/if}
     {#if status.files.length > 0}
-      <ul class="text-note">
+      {@const point = status.checkpoint?.oid ?? null}
+      <ul class="border-t border-edge text-note">
         {#each status.files as file (file.path)}
-          <li class="flex items-center gap-base border-b border-edge py-snug">
-            <span class="w-figure shrink-0 text-text-faint">{howWord($lang, file.how)}</span>
-            <span class="flex-1 truncate font-mono text-text-quiet">{file.path}</span>
-            <span class="shrink-0 font-mono text-text-faint">{linesWord($lang, file.lines)}</span>
+          <li class="relative flex min-w-0 items-center gap-snug border-b border-edge">
+            {#if isOpen(file.path)}
+              <span class="absolute inset-y-snug left-0 w-hair rounded-pill bg-accent" aria-hidden="true"></span>
+            {/if}
+            <button
+              type="button"
+              class={[
+                "grid h-control min-w-0 flex-1 grid-cols-[16ch_minmax(0,1fr)_auto] items-center gap-x-base rounded-control pr-snug pl-base text-left hover:wash",
+                isOpen(file.path) ? "wash-strong" : "",
+              ]}
+              aria-label={fill(say($lang, "git_open_file"), { path: file.path })}
+              onclick={() => {
+                openDocument({ building, path: file.path, version: null });
+              }}
+            >
+              <span class="truncate text-text-faint">{howWord($lang, file.how)}</span>
+              <span class="truncate font-mono text-text">{file.path}</span>
+              <span class="figure text-text-faint">{linesWord($lang, file.lines)}</span>
+            </button>
+            {#if point !== null}
+              <TakeBack {building} path={file.path} {point} />
+            {/if}
           </li>
         {/each}
       </ul>
     {:else}
-      <p class="text-text-faint">{say($lang, "git_clean")}</p>
+      <EmptyState missing="git_clean" />
     {/if}
   {/if}
 </div>

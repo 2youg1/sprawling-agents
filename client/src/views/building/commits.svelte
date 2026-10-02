@@ -7,35 +7,28 @@
 
 <script lang="ts">
   // The commits a building made, newest first, and the way back from a
-  // line of code to the session that wrote it. A row names the resident
-  // on the left and the session on the right; the session is a link to
-  // that room's conversation and nothing more (D52: from a diff to a
-  // session is a jump, not a new verb). Opening a row lists the files
-  // it changed against the commit before it; opening a file shows the
-  // patch. Scrolling to the end asks for the next page.
-  //
-  // The row keeps one secondary action behind the row itself: copying
-  // the commit id is how a person carries this line into a review, and
-  // it arrives with its receipt (ux A7).
-
+  // line of code to the session that wrote it (client-SPEC 4-50). Each
+  // row is the commit as one line and opens into its facts and the
+  // files it changed; scrolling to the end asks for the next page, and
+  // the end of the list says whether it is the building's first commit
+  // or a page still coming. The box at the head asks for any commit by
+  // its oid - the command line's `whose`.
   import type { Attachment } from "svelte/attachments";
   import { SvelteSet } from "svelte/reactivity";
   import { derived } from "svelte/store";
+  import { Option, Schema } from "effect";
 
   import { readAnswer } from "../../core/answered";
   import type { Answered } from "../../core/answered";
   import { commitsQuery } from "../../core/asking";
-  import { fill, say } from "../../core/lang";
-  import { toFragment } from "../../core/route";
-  import { clock, usd } from "../../core/time";
+  import { say } from "../../core/lang";
   import { ui } from "../../ui";
-  import type { Address, Answer, CommitAnswer, CommitsAnswer, Effort, Seq } from "../../wire";
-  import Changes from "../changes.svelte";
-  import { shortOid } from "../changes";
-  import Glyph from "../parts/glyph.svelte";
-  import { RowList } from "../parts/row.svelte";
-  import Tip from "../parts/tip.svelte";
+  import { GitOid } from "../../wire";
+  import type { Address, Answer, CommitAnswer, CommitsAnswer, Seq } from "../../wire";
+  import EmptyState from "../parts/empty.svelte";
   import Unanswered from "../parts/unanswered.svelte";
+  import Commit from "./commit.svelte";
+  import Whose from "./whose.svelte";
 
   interface Props {
     readonly building: Address;
@@ -51,8 +44,9 @@
   // one is re-asked after every commit (client-SPEC 4-15).
   let befores = $state<readonly (Seq | null)[]>([null]);
   let open = $state<string | null>(null);
-  // Whose copy receipt is showing right now (ux A7).
-  let receipt = $state<string | null>(null);
+  // The oid typed into the head's box, and the one it asked about.
+  let typed = $state("");
+  let whose = $state<GitOid | null>(null);
 
   interface Pages {
     readonly rows: readonly CommitAnswer[];
@@ -79,12 +73,7 @@
     }
     const newest = readAnswer(answers.at(-1), (held) => ("commits" in held ? held.commits : undefined));
     const tail = newest.kind === "held" ? newest.value : undefined;
-    return {
-      rows,
-      more: tail?.more === true,
-      newest,
-      edge: tail?.commits.at(-1)?.seq,
-    };
+    return { rows, more: tail?.more === true, newest, edge: tail?.commits.at(-1)?.seq };
   }
 
   const pagesStore = $derived(
@@ -113,23 +102,6 @@
     };
   };
 
-  // A copy receipt lasts long enough to be seen and no longer (ux A7).
-  $effect(() => {
-    const at = receipt;
-    if (at === null) return;
-    const timer = setTimeout(() => {
-      if (receipt === at) receipt = null;
-    }, 1200);
-    return () => {
-      clearTimeout(timer);
-    };
-  });
-
-  function copy(oid: string): void {
-    void navigator.clipboard.writeText(oid);
-    receipt = oid;
-  }
-
   function toggle(commit: CommitAnswer, last: boolean): void {
     open = open === commit.oid ? null : commit.oid;
     // The oldest row on the page diffs against the next page, so
@@ -137,143 +109,74 @@
     if (last) grow();
   }
 
-  function effortTail(effort: Effort | null | undefined): string {
-    return effort === null || effort === undefined ? "" : ` · ${effort}`;
+  function holds(oid: string): boolean {
+    return pages.rows.some((row) => row.oid === oid);
   }
+
+  // A parent the page holds is opened where it stands and brought into
+  // view, so the press lands the reader on the row it named.
+  function openRow(oid: string): void {
+    open = oid;
+    requestAnimationFrame(() => {
+      document.getElementById(`commit-${oid}`)?.scrollIntoView({ block: "nearest" });
+    });
+  }
+
+  const typedOid = $derived(Option.getOrNull(Schema.decodeOption(GitOid)(typed.trim())));
 </script>
 
-{#snippet lineage(commit: CommitAnswer)}
-  {#if commit.lineage.length > 1}
-    <p class="flex flex-wrap items-baseline gap-snug pb-snug text-note text-text-faint">
-      <span>{say($lang, "commits_lineage")}</span>
-      {#each commit.lineage.slice(1) as run (run)}
-        <a
-          href={toFragment({ kind: "run", run })}
-          class="font-mono text-text-faint hover:text-text-quiet">{run.slice(0, 8)}</a
-        >
-      {/each}
-    </p>
-  {/if}
-{/snippet}
-
-{#snippet row(commit: CommitAnswer, older: CommitAnswer | null, last: boolean)}
-  {const isOpen = open === commit.oid}
-  <li class="group border-b border-edge">
-    <div class="flex items-center gap-base py-snug text-note">
-      <button
-        type="button"
-        class="flex min-w-0 flex-1 items-center gap-base text-left hover:text-text"
-        aria-expanded={isOpen}
-        onclick={() => {
-          toggle(commit, last);
+<div class="flex min-w-0 flex-col gap-base">
+  <div class="flex min-w-0 flex-wrap items-center justify-between gap-x-wide gap-y-snug">
+    <h2 class="text-note text-text-faint">{say($lang, "bld_commits")}</h2>
+    <label class="flex min-w-0 items-center gap-snug text-note">
+      <span class="text-text-faint">{say($lang, "whose_label")}</span>
+      <input
+        class="h-control-sm w-[42ch] max-w-full min-w-0 rounded-control border border-edge-input bg-raised px-snug font-mono text-note placeholder:text-text-faint aria-invalid:border-alert"
+        placeholder={say($lang, "whose_placeholder")}
+        aria-invalid={typed.trim() !== "" && typedOid === null}
+        bind:value={typed}
+        onkeydown={(event) => {
+          if (event.key === "Enter") whose = typedOid;
         }}
-      >
-        <Glyph
-          name="chevron"
-          size="sm"
-          class="shrink-0 text-text-faint transition-transform {isOpen ? 'rotate-90' : ''}"
-        />
-        <span class="truncate font-mono text-text-quiet">{commit.actor}</span>
-        <span class="shrink-0 font-mono text-text-faint">{shortOid(commit.oid)}</span>
-        {#if commit.model !== ""}
-          <span class="hidden shrink-0 truncate text-text-faint md:inline"
-            >{commit.model}{effortTail(commit.effort)}</span
-          >
-        {/if}
-        {#if commit.spent > 0}
-          <span class="hidden shrink-0 text-text-faint md:inline"
-            >{fill(say($lang, "commits_spent"), { usd: usd(commit.spent) })}</span
-          >
-        {/if}
-        {#if commit.lineage.length > 1}
-          <Tip text={say($lang, "commits_lineage")}>
-            {#snippet children(hint)}
-              <span
-                class="shrink-0 rounded-pill bg-raised px-snug text-text-faint"
-                aria-describedby={hint}
-              >
-                {fill(say($lang, "commits_succeeded"), {
-                  n: String(commit.lineage.length - 1),
-                })}
-              </span>
-            {/snippet}
-          </Tip>
-        {/if}
-      </button>
-      <Tip text={say($lang, "tree_transcript")}>
-        {#snippet children(hint)}
-          <a
-            href={toFragment({ kind: "run", run: commit.run })}
-            class="shrink-0 whitespace-nowrap text-text-faint hover:text-text-quiet"
-            aria-describedby={hint}>{clock($lang, commit.at)}</a
-          >
-        {/snippet}
-      </Tip>
-      {#if commit.session !== null && commit.session !== undefined}
-        <a
-          href={toFragment({ kind: "talk", address: commit.actor })}
-          class="inline-flex h-control-sm shrink-0 items-center rounded-control bg-raised px-snug text-label text-text-quiet hover:bg-raised-hover hover:text-text"
-          >{commit.session} →</a
-        >
-      {/if}
-      <!-- The secondary action appears with the row rather than in it
-           (ux A7): it must not compete with the row's own way in, and a
-           focus inside the row reveals it the same way a pointer does. -->
-      <span
-        class="flex shrink-0 items-center opacity-0 transition-opacity ease-leave group-hover:opacity-100 group-hover:ease-arrive group-focus-within:opacity-100 group-focus-within:ease-arrive"
-      >
-        <button
-          type="button"
-          class="inline-flex h-control-sm items-center gap-tight rounded-control bg-raised px-snug text-label text-text-quiet hover:bg-raised-hover hover:text-text"
-          onclick={() => {
-            copy(commit.oid);
-          }}
-        >
-          {#if receipt === commit.oid}
-            <Glyph name="check" size="sm" />
-            {say($lang, "run_prompt_copied")}
-          {:else}
-            {say($lang, "run_prompt_copy")}
-          {/if}
-        </button>
-      </span>
+      />
+    </label>
+  </div>
+  {#if typed.trim() !== "" && typedOid === null}
+    <p class="text-note text-text-faint" role="status">{say($lang, "whose_not_oid")}</p>
+  {/if}
+  {#if whose !== null}
+    <div class="border-l border-edge-input pl-base">
+      <Whose oid={whose} />
     </div>
-    {#if isOpen}
-      <div class="pb-base pl-wide">
-        <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-        {@render lineage(commit)}
-        {#if older !== null}
-          <Changes base={older.oid} head={commit.oid} talk={building} />
-        {:else}
-          <p class="text-text-faint">{last ? say($lang, "commits_first") : "…"}</p>
-        {/if}
-      </div>
-    {/if}
-  </li>
-{/snippet}
-
-{#snippet rows()}
-  {#each pages.rows as commit, index (commit.oid)}
-    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-    {@render row(commit, pages.rows[index + 1] ?? null, !pages.more && index === pages.rows.length - 1)}
-  {/each}
-  <li {@attach sentinel} class="h-hair" aria-hidden="true"></li>
-{/snippet}
-
-<div>
-  <h2 class="mb-base text-heading font-heading">{say($lang, "bld_commits")}</h2>
+  {/if}
   {#if pages.rows.length > 0}
-    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; the typechecker types a snippet exported from a .svelte module as unresolvable) -->
-    {@render RowList({ label: say($lang, "bld_commits"), rows })}
+    <ul class="border-t border-edge" aria-label={say($lang, "bld_commits")}>
+      {#each pages.rows as commit, index (commit.oid)}
+        {@const last = !pages.more && index === pages.rows.length - 1}
+        <Commit
+          {building}
+          {commit}
+          older={pages.rows[index + 1] ?? null}
+          first={last}
+          open={open === commit.oid}
+          onToggle={() => {
+            toggle(commit, index === pages.rows.length - 1);
+          }}
+          {holds}
+          onOpen={openRow}
+        />
+      {/each}
+      <li {@attach sentinel} class="h-hair" aria-hidden="true"></li>
+    </ul>
+    <p class="text-note text-text-faint">
+      {pages.more ? say($lang, "commits_more") : say($lang, "commits_all")}
+    </p>
   {:else if pages.newest.kind === "held"}
-    <p class="text-text-faint">{say($lang, "commits_empty")}</p>
+    <EmptyState missing="commits_empty" />
   {:else if pages.newest.kind === "asking"}
     <p class="text-text-faint">…</p>
   {/if}
   {#if pages.newest.kind === "unavailable"}
     <Unanswered query={pages.newest.query} asked={commitsQuery(building, befores.at(-1) ?? null)} />
-  {/if}
-  {#if pages.more}
-    <p class="py-base text-center text-text-faint">…</p>
   {/if}
 </div>

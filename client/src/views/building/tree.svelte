@@ -18,11 +18,8 @@
   // through `core/run_id` (client-SPEC 3-2): this file holds no grammar
   // of its own, and a name the generated `RunId` refuses is a name like
   // any other.
-  import { Option } from "effect";
-
   import { within } from "../../core/belief/live";
   import { say } from "../../core/lang";
-  import { readRunId } from "../../core/run_id";
   import { kib } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, Entry, RunId } from "../../wire";
@@ -32,6 +29,7 @@
   // The next level down. A self-import rather than `<svelte:self>`,
   // which the compiler marks deprecated in favour of exactly this.
   import Branch from "./tree.svelte";
+  import { transcriptOf } from "./transcript";
 
   // What the tree hands back when a row is picked. Stated beside the
   // component that hands it over; the neighbours that read it take it
@@ -82,14 +80,6 @@
 
   function join(at: Address, name: string): Address {
     return AddressSchema.make(`${at}/${name}`);
-  }
-
-  // A `.jsonl` name is a transcript when its stem is a run id the
-  // generated schema accepts; everything else is a name.
-  function transcriptOf(name: string): RunId | null {
-    const stem = name.replace(/\.jsonl$/, "");
-    if (stem === name) return null;
-    return Option.getOrNull(readRunId(stem));
   }
 
   // What the row is called: a transcript carries the task the run was
