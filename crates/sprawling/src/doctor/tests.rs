@@ -27,6 +27,7 @@ pub(super) struct ScriptedMachine {
     absent: BTreeSet<&'static str>,
     asked: Mutex<Vec<String>>,
     core: Standing,
+    scanning: super::scanning::Scanning,
 }
 
 impl ScriptedMachine {
@@ -35,11 +36,16 @@ impl ScriptedMachine {
             absent: absent.iter().copied().collect(),
             asked: Mutex::new(Vec::new()),
             core: Standing::Raised,
+            scanning: super::scanning::Scanning::DoesNotApply,
         }
     }
 
     pub(super) fn standing(self, core: Standing) -> ScriptedMachine {
         ScriptedMachine { core, ..self }
+    }
+
+    pub(super) fn scanning(self, scanning: super::scanning::Scanning) -> ScriptedMachine {
+        ScriptedMachine { scanning, ..self }
     }
 }
 
@@ -57,6 +63,10 @@ impl Machine for ScriptedMachine {
 
     fn core_standing(&self) -> Result<Standing, kernel::AxError> {
         Ok(self.core.clone())
+    }
+
+    fn scanning(&self, _city: &std::path::Path) -> super::scanning::Scanning {
+        self.scanning.clone()
     }
 }
 

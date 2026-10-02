@@ -24,7 +24,7 @@ use kernel::AxError;
 
 use super::family::GECKO;
 use super::table::{CHROMEDRIVER, MSEDGEDRIVER, PYTHON_WASI, REQUIREMENTS, SHELL};
-use super::{Absence, Machine, PATIENCE, Platform, Presence, ThisMachine};
+use super::{Absence, Fault, Machine, PATIENCE, Platform, Presence, ThisMachine, Version};
 
 /// Whether this binary was built with the `sandbox` feature. The one
 /// spelling of that fact; the table reads it and the engine below
@@ -159,6 +159,24 @@ fn usable_path(presence: &Presence) -> Option<PathBuf> {
         return None;
     }
     presence.at().map(std::path::Path::to_path_buf)
+}
+
+/// Whether this build carries its engine, and whether it starts.
+pub(super) fn built(carried: bool) -> Presence {
+    if !carried {
+        return Presence::Absent(Absence::NotInThisBuild);
+    }
+    let at = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("this binary"));
+    match execution_engine() {
+        Ok(_) => Presence::Present {
+            at,
+            version: Version::Said("wasmtime".to_owned()),
+        },
+        Err(err) => Presence::Broken {
+            at,
+            fault: Fault::WillNotStart(err.to_string()),
+        },
+    }
 }
 
 /// The sandbox this build carries, if it carries one.

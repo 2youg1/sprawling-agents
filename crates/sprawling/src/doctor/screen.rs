@@ -27,6 +27,7 @@ use crate::serving::standing::{Held, Standing};
 use super::explain::{Explanation, explain, explanation_lines};
 use super::needs::{lack_line, lacks};
 use super::paint::{Ink, Part, row, summary};
+use super::scanning::{self, Scanning};
 use super::visit::{Visited, unreadable_line, visit};
 use super::{
     Finding, Machine, PATIENCE, Platform, REQUIREMENTS, ThisMachine, Tier, Verdict, examine,
@@ -39,6 +40,9 @@ pub(crate) struct Asked {
     pub(crate) install: bool,
     /// A city to judge building by building.
     pub(crate) city: Option<PathBuf>,
+    /// The directory whose disk the scanning part judges: the city named
+    /// on the line, or where `up` would put one when none is.
+    pub(crate) scanned: PathBuf,
     /// A refusal code to connect to this machine, instead of a report.
     pub(crate) explain: Option<String>,
     /// Whether this report may use colour.
@@ -48,8 +52,13 @@ pub(crate) struct Asked {
 /// What the command line asked of this verb, with the one environment
 /// variable a terminal answers about colour. Checking is the default;
 /// touching the machine takes the flag; the one word that is not a flag
-/// and not a flag's value is the city.
-pub(crate) fn asked(args: &[String], no_color: Option<OsString>) -> Asked {
+/// and not a flag's value is the city. `unnamed` says where `up` puts a
+/// city nobody named, and is asked only when the line names none.
+pub(crate) fn asked(
+    args: &[String],
+    no_color: Option<OsString>,
+    unnamed: fn() -> PathBuf,
+) -> Asked {
     let mut install = false;
     let mut city = None;
     let mut explain = None;
@@ -66,6 +75,7 @@ pub(crate) fn asked(args: &[String], no_color: Option<OsString>) -> Asked {
     }
     Asked {
         install,
+        scanned: city.clone().unwrap_or_else(unnamed),
         city,
         explain,
         ink: ink.or_plain(no_color),
@@ -75,9 +85,11 @@ pub(crate) fn asked(args: &[String], no_color: Option<OsString>) -> Asked {
 /// The `doctor` verb. Exits with failure when a required item is
 /// missing, or when a building of the named city lacks what it asked
 /// for, so a script driving this learns the outcome from the exit code
-/// rather than by reading the report.
-pub fn verb(args: &[String]) -> ExitCode {
-    let asked = asked(args, std::env::var_os("NO_COLOR"));
+/// rather than by reading the report. `unnamed` is where `up` puts a
+/// city nobody named, which the scanning part judges when the line
+/// names no city.
+pub fn verb(args: &[String], unnamed: fn() -> PathBuf) -> ExitCode {
+    let asked = asked(args, std::env::var_os("NO_COLOR"), unnamed);
     let machine = ThisMachine::new(Platform::current(), PATIENCE);
     let answered = run(
         &asked,
@@ -129,9 +141,19 @@ pub(crate) fn run<R: BufRead, W: Write>(
     // waiting on a slow tool is not looking at an empty terminal.
     out.flush()?;
     let mut rows = Rows::new(out, asked.ink);
-    let findings = examine_each(machine, |index, finding| rows.answered(index, finding))?;
+    // Asked beside the items rather than after them, so the report still
+    // waits for the slowest question and not for the sum of them.
+    let (findings, scanning) = std::thread::scope(|scope| {
+        let scanning = scope.spawn(|| machine.scanning(&asked.scanned));
+        let findings = examine_each(machine, |index, finding| rows.answered(index, finding));
+        (findings, scanning.join().unwrap_or(Scanning::Stopped))
+    });
+    let findings = findings?;
     rows.close()?;
     for line in priority_lines(&machine.core_standing()) {
+        writeln!(out, "{line}")?;
+    }
+    for line in scanning::lines(&scanning) {
         writeln!(out, "{line}")?;
     }
     let mut ready = true;

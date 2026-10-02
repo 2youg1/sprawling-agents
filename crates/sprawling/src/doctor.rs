@@ -37,6 +37,7 @@ mod probe;
 mod registry;
 mod report;
 mod running;
+mod scanning;
 mod screen;
 mod table;
 mod upstream;

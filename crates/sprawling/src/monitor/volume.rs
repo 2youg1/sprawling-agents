@@ -9,7 +9,7 @@
 use std::path::{Component, Path, PathBuf, Prefix};
 
 use kernel::degradation::VolumeSpace;
-use sysinfo::Disks;
+use sysinfo::{Disk, Disks};
 
 /// Lists the disks once and reads the one that holds `city`, resolved
 /// first.
@@ -50,18 +50,23 @@ fn without_verbatim_disk(path: &Path) -> PathBuf {
     }
 }
 
-/// The free space and capacity of the disk whose mount point is the
-/// longest prefix of `city`; `None` when no disk's mount point is.
+/// The free space and capacity of the disk that holds `city`.
 pub(crate) fn space(disks: &Disks, city: &Path) -> Option<VolumeSpace> {
+    holding(disks, city).map(|disk| VolumeSpace {
+        free_bytes: disk.available_space(),
+        total_bytes: disk.total_space(),
+    })
+}
+
+/// The disk whose mount point is the longest prefix of `city`, which
+/// is the disk a write under `city` lands on; `None` when no disk's
+/// mount point is a prefix.
+pub(crate) fn holding<'d>(disks: &'d Disks, city: &Path) -> Option<&'d Disk> {
     disks
         .list()
         .iter()
         .filter(|disk| city.starts_with(disk.mount_point()))
         .max_by_key(|disk| disk.mount_point().components().count())
-        .map(|disk| VolumeSpace {
-            free_bytes: disk.available_space(),
-            total_bytes: disk.total_space(),
-        })
 }
 
 #[cfg(test)]

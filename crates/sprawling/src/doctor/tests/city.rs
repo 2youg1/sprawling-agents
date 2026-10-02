@@ -185,20 +185,34 @@ fn explain_connects_a_refusal_code_to_what_this_machine_has() {
 fn the_line_is_read_as_flag_city_and_code() {
     let words =
         |raw: &[&str]| -> Vec<String> { raw.iter().map(|word| (*word).to_owned()).collect() };
-    let plain = asked(&words(&["doctor"]), None);
+    let plain = asked(&words(&["doctor"]), None, std::env::temp_dir);
     assert!(!plain.install && plain.city.is_none() && plain.explain.is_none());
-    assert!(asked(&words(&["doctor", "--install"]), None).install);
+    assert_eq!(
+        plain.scanned,
+        std::env::temp_dir(),
+        "with no city named, the scanning part judges where `up` would put one"
+    );
+    assert!(asked(&words(&["doctor", "--install"]), None, std::env::temp_dir).install);
     assert!(
-        !asked(&words(&["doctor", "--installed"]), None).install,
+        !asked(&words(&["doctor", "--installed"]), None, std::env::temp_dir).install,
         "a flag that only looks like --install is not --install"
     );
-    let with_city = asked(&words(&["doctor", "C:/cities/one", "--install"]), None);
+    let with_city = asked(
+        &words(&["doctor", "C:/cities/one", "--install"]),
+        None,
+        std::env::temp_dir,
+    );
     assert_eq!(
         with_city.city.as_deref(),
         Some(std::path::Path::new("C:/cities/one"))
     );
+    assert_eq!(with_city.scanned, std::path::Path::new("C:/cities/one"));
     assert!(with_city.install);
-    let explained = asked(&words(&["doctor", "--explain", "E_TOOL_UNAVAILABLE"]), None);
+    let explained = asked(
+        &words(&["doctor", "--explain", "E_TOOL_UNAVAILABLE"]),
+        None,
+        std::env::temp_dir,
+    );
     assert_eq!(explained.explain.as_deref(), Some("E_TOOL_UNAVAILABLE"));
     assert!(
         explained.city.is_none(),
@@ -226,6 +240,7 @@ fn doctor_with_a_city_names_the_building_on_the_screen() {
     let asked = Asked {
         install: false,
         city: Some(dir.path().to_path_buf()),
+        scanned: std::env::temp_dir(),
         explain: None,
         ink: Ink::Plain,
     };
@@ -251,6 +266,7 @@ fn explain_on_the_screen_is_one_line_per_item_and_never_a_failure() {
     let asked = Asked {
         install: false,
         city: None,
+        scanned: std::env::temp_dir(),
         explain: Some("E_TOOL_UNAVAILABLE".to_owned()),
         ink: Ink::Plain,
     };

@@ -4,12 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a person reads off the report: four status words, two sections,
-//! the level the core's threads get, colour a terminal may refuse, and a
-//! version column no vendor banner can push off the screen
-//! (`crates/sprawling/Spec.lean` §8-59 and §8-40).
+//! the level the core's threads get, what scanning does to the city's
+//! writes, colour a terminal may refuse, and a version column no vendor
+//! banner can push off the screen (`crates/sprawling/Spec.lean` §8-59 and
+//! §8-166).
 
 use super::{ScriptedMachine, finding_for};
 use crate::doctor::paint::{Counted, Ink, Part, Status, count, row, summary};
+use crate::doctor::scanning::{Drive, Exclusion, Scanning};
 use crate::doctor::screen::{Asked, run};
 use crate::doctor::{Fault, Finding, Presence, REQUIREMENTS, Tier, Version, examine};
 use crate::serving::standing::{Held, Standing};
@@ -69,7 +71,10 @@ fn no_color_is_honoured_from_the_environment_and_from_the_flag() {
         .iter()
         .map(|word| (*word).to_owned())
         .collect();
-    assert_eq!(crate::doctor::screen::asked(&words, None).ink, Ink::Plain);
+    assert_eq!(
+        crate::doctor::screen::asked(&words, None, std::env::temp_dir).ink,
+        Ink::Plain
+    );
 }
 
 /// A version column a vendor's banner cannot push off the screen.
@@ -176,6 +181,9 @@ fn the_heading_is_written_before_any_item_is_asked() {
         fn core_standing(&self) -> Result<crate::serving::standing::Standing, kernel::AxError> {
             Ok(crate::serving::standing::Standing::Raised)
         }
+        fn scanning(&self, _city: &std::path::Path) -> Scanning {
+            Scanning::DoesNotApply
+        }
     }
     impl accounting::Machine for Watched {
         fn report(&self) -> wire::DoctorAnswer {
@@ -201,7 +209,7 @@ fn the_heading_is_written_before_any_item_is_asked() {
         written: Arc::clone(&written),
         asked_in_silence: AtomicBool::new(false),
     };
-    let asked = crate::doctor::screen::asked(&[], None);
+    let asked = crate::doctor::screen::asked(&[], None, std::env::temp_dir);
     crate::doctor::screen::run(
         &asked,
         &machine,
@@ -262,6 +270,9 @@ fn the_first_row_is_written_while_the_other_items_are_still_asked() {
         fn core_standing(&self) -> Result<Standing, kernel::AxError> {
             Ok(Standing::Raised)
         }
+        fn scanning(&self, _city: &std::path::Path) -> Scanning {
+            Scanning::DoesNotApply
+        }
     }
     impl accounting::Machine for Waiting {
         fn report(&self) -> wire::DoctorAnswer {
@@ -297,7 +308,7 @@ fn the_first_row_is_written_while_the_other_items_are_still_asked() {
         waited_in_vain: AtomicBool::new(false),
     };
     run(
-        &crate::doctor::screen::asked(&[], None),
+        &crate::doctor::screen::asked(&[], None, std::env::temp_dir),
         &machine,
         &mut std::io::empty(),
         &mut Screen(screen),
@@ -322,6 +333,7 @@ fn the_doctor_says_where_the_platform_lets_the_core_stand() {
         &Asked {
             install: false,
             city: None,
+            scanned: std::env::temp_dir(),
             explain: None,
             ink: Ink::Plain,
         },
@@ -335,6 +347,50 @@ fn the_doctor_says_where_the_platform_lets_the_core_stand() {
         shown.contains(
             "  priority - where the core's threads stand\n\n    core threads    normal, the platform refused: Operation not permitted\n\n"
         ),
+        "{shown}"
+    );
+}
+
+/// A city whose writes Defender scans one by one is told how to move the
+/// scan out of the way, and the report is still a success: the doctor
+/// gives advice about the disk, it does not refuse the machine for it.
+#[test]
+fn slow_scanning_is_advice_and_never_a_failure() {
+    let city = std::env::temp_dir().join("one");
+    let machine = ScriptedMachine::missing(&[]).scanning(Scanning::Read {
+        city: city.clone(),
+        drive: Drive::Not {
+            volume: "C:".to_owned(),
+            file_system: "NTFS".to_owned(),
+        },
+        exclusion: Exclusion::Outside,
+    });
+    let mut nobody = std::io::Cursor::new(Vec::new());
+    let mut screen: Vec<u8> = Vec::new();
+    let ready = run(
+        &Asked {
+            install: false,
+            city: None,
+            scanned: city,
+            explain: None,
+            ink: Ink::Plain,
+        },
+        &machine,
+        &mut nobody,
+        &mut screen,
+    )
+    .unwrap();
+    let shown = String::from_utf8(screen).unwrap();
+    assert!(
+        ready,
+        "advice about the disk turned the report red:
+{shown}"
+    );
+    assert!(
+        shown.contains(
+            "    dev drive       no: C: is NTFS, not a Dev Drive
+"
+        ) && shown.contains("Add-MpPreference -ExclusionPath"),
         "{shown}"
     );
 }

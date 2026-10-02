@@ -27,6 +27,7 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
         &Asked {
             install: true,
             city: None,
+            scanned: std::env::temp_dir(),
             explain: None,
             ink: Ink::Plain,
         },
@@ -61,6 +62,7 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
         &Asked {
             install: true,
             city: None,
+            scanned: std::env::temp_dir(),
             explain: None,
             ink: Ink::Plain,
         },
@@ -87,6 +89,7 @@ fn the_default_checks_and_installs_nothing() {
         &Asked {
             install: false,
             city: None,
+            scanned: std::env::temp_dir(),
             explain: None,
             ink: Ink::Plain,
         },

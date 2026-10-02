@@ -5,13 +5,15 @@
 
 //! This machine answering (`crates/sprawling/Spec.lean` §8-40 and §8-47).
 //!
-//! Four questions and one act live here, and nothing else does: is the
+//! Three questions and one act live here, and nothing else does: is the
 //! program on the search path or at a place this platform installs it,
 //! is the component where the variable or the component directory says,
-//! is the interpreter the platform names there, does this build carry
-//! its engine - and, after a person has agreed to one named command,
-//! handing that command to `doctor::running`, which is the one place
-//! this binary starts an install program.
+//! is the interpreter the platform names there - and, after a person has
+//! agreed to one named command, handing that command to
+//! `doctor::running`, which is the one place this binary starts an
+//! install program. Whether this build carries its engine is answered in
+//! `host`, beside the engine, and what scanning does to the city's
+//! writes in `scanning`.
 //!
 //! **A version call has a deadline.** A tool installed half-way can hang
 //! on start-up, and a doctor that hangs is worse than a tool that is
@@ -36,6 +38,7 @@ use kernel::{AxCode, AxError};
 
 use crate::serving::standing::{Standing, raise_this_thread};
 
+use super::scanning::Scanning;
 use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Version};
 
 /// What is asked of the machine under this city, item by item. Two
@@ -59,6 +62,10 @@ pub(crate) trait Machine: accounting::Machine + Sync {
     /// Reports a setting that does not read, and a thread that could not
     /// be started to ask.
     fn core_standing(&self) -> Result<Standing, AxError>;
+
+    /// Whether real-time scanning stands in front of the writes under
+    /// the directory `city` (`doctor::scanning`).
+    fn scanning(&self, city: &Path) -> Scanning;
 }
 
 /// The machine this process is running on.
@@ -130,7 +137,7 @@ impl Machine for ThisMachine {
                     Some(path) => ask_version(&path, "--version", self.patience),
                 }
             }
-            Detection::Built { carried } => built(*carried),
+            Detection::Built { carried } => super::host::built(*carried),
             Detection::Family(family) => super::family::look(*family, self.platform, &search_path),
         }
     }
@@ -153,6 +160,10 @@ impl Machine for ThisMachine {
             .map_err(|err| unasked(err.to_string()))?
             .join()
             .map_err(|_| unasked("the thread that asked stopped before it answered".to_owned()))
+    }
+
+    fn scanning(&self, city: &Path) -> Scanning {
+        super::scanning::read(self.platform, city)
     }
 }
 
@@ -291,24 +302,6 @@ pub(super) fn component_at(
                 },
             }
         }
-    }
-}
-
-/// Whether this build carries its engine, and whether it starts.
-fn built(carried: bool) -> Presence {
-    if !carried {
-        return Presence::Absent(Absence::NotInThisBuild);
-    }
-    let at = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("this binary"));
-    match super::host::execution_engine() {
-        Ok(_) => Presence::Present {
-            at,
-            version: Version::Said("wasmtime".to_owned()),
-        },
-        Err(err) => Presence::Broken {
-            at,
-            fault: Fault::WillNotStart(err.to_string()),
-        },
     }
 }
 
