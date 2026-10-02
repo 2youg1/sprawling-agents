@@ -8,7 +8,7 @@
 
 - `client/` 在 cargo workspace **之外**，由 bun 驱动；产物落 `sprawling` 包里的 `crates/sprawling/web-dist/`（crates.io 的包只装包目录，sprawling-SPEC 8-83），不随 `CARGO_TARGET_DIR` 移动（`index.html` 在该目录根，其余在 `assets/`），`crates/sprawling/build.rs` 递归嵌入该目录，并以 `index.html` 与 `assets/` 的存在判「完整」。
 - **两种范式不叠**：Effect 只做一件事——用生成的 `Schema` 读帧（`core/frames.ts`；`event` 与 `delta` 两种热帧先走由同一份 schema 导出的窄校验，见 4-6）。socket 阶梯、asking、belief 都是纯 TS 状态机加 `svelte/store`，视图只见 Svelte。
-- 运行时依赖的名单只有一个家：`tools/xtask/src/npm.rs` 的 `RUNTIME`，本文件不抄它的条目与数目。名单上除了 `svelte` 与 `effect`，还有 `@lezer/highlight` 与各语言的 `@lezer` 语法，因为代码视图按语法上色，而高亮器与每种语法都是按需加载的分块（4-26），不进首屏；以及图标集 `@lucide/svelte`，只经 `parts/glyph.svelte` 一处出口、按图标单独导入（4-34）。hash 路由手写，不引路由库；组件库按 §7 的判定逐个引入。`xtask npm` 门守三件事：锁文件与清单逐条同、运行时依赖恰为 `RUNTIME`、许可证在 `deny.toml` 的清单上。
+- 运行时依赖的名单只有一个家：`tools/xtask/src/npm.rs` 的 `RUNTIME`，本文件不抄它的条目与数目。名单上除了 `svelte` 与 `effect`，还有 `@lezer/highlight` 与各语言的 `@lezer` 语法，因为代码视图按语法上色，而高亮器与每种语法都是按需加载的分块（4-26），不进首屏；以及图标集 `@lucide/svelte`，只经 `parts/glyph.svelte` 一处出口、按图标单独导入（4-34）；以及 RefRain 的五个 `@codemirror` 包，只由 `views/refrain/` 读，是懒加载的一块（7N、12-23）。hash 路由手写，不引路由库；组件库按 §7 的判定逐个引入。`xtask npm` 门守三件事：锁文件与清单逐条同、运行时依赖恰为 `RUNTIME`、许可证在 `deny.toml` 的清单上。
 - Firefox 是第一浏览器：每个屏幕先在 Firefox 里验收。
 - `trustedDependencies` 留空：bun 默认不跑生命周期脚本，任何包的 postinstall 都不执行。
 
@@ -22,6 +22,7 @@
 | effect | Schema、Brand |
 | @lezer/highlight 与各语言的 @lezer 语法 | 代码视图的语法着色，按语言懒加载（4-26） |
 | @lucide/svelte | 图标；只有 `parts/glyph.svelte` 导入它，每个图标单独导入，产物只带用到的那些（4-34） |
+| @codemirror/state、view、commands、search、merge | RefRain 的编辑器：文档与改动集、视图与输入法、撤销与键表、查找替换、两版之间的 diff；只由 `views/refrain/` 读，懒加载（7N、12-23） |
 | vite / @sveltejs/vite-plugin-svelte / @tailwindcss/vite / tailwindcss | 构建 |
 | svelte-check | `bun run typecheck`：`.svelte` 与 `.ts` 同一车道（见设计 4-1） |
 | @typescript/native（别名，指向 TS 7 的 `typescript` 包） | `--tsgo` 车道的检查器（Go 版） |
@@ -174,6 +175,10 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
   **混合档的不透明度**：`--blend-opacity` 是混合档里世界层的不透明度（7H），默认 60%，只住 `theme.css`；外观组的一根滑条在 30%–90% 之间、以 5 为一步改它（U2），人没动过时根元素上没有这个属性，滑条显示页面此刻画的值。滑条是原生的 `<input type="range">`，交互即 APG Slider：←／→ 与 ↑／↓ 走一步，Home／End 到两端，`aria-valuetext` 写出百分数；每一次落定的值立即生效，卡脚出现「已保存」（4-36）。
   **强制色的退路**：玻璃见上；对话框的横线换成 `CanvasText` 的渐变；上下文环的两个检查点画成 `CanvasText` 实心，先后由它们在环上的位置说，因为强制色下绿与红都会被换掉。
 - **4-45 检视面按调用：一次调用一点就在右侧打开它的完整结果，读法由调用自己的注册决定。** 右侧的状态只有一个家，`views/inspect/open.svelte.ts`：打开的项是一组页签，按打开的先后排；最后碰过的那一项在前，编辑器区与终端区各显示本区最后碰过的那一项，所以打开一条命令不会把它上面的文件盖掉。每个打开的项一直挂载到关掉为止，滚动位置、选区与 RefRain 的草稿因此在别的页签到前面时不丢（roadmap §3-14）；代价是一个页签一个视图，所以至多 `KEPT`（8）项，多开一项就关掉最久没碰的那一项。**没有人打开任何项时，右侧跟着眼前的 run**（`reading.ts` 的 `followingIn`）：编辑器区是它最后读过或改过的文件，终端区是它最后跑的命令，还在跑的命令也跟；选其中一个页签就把两项都收下，成为人自己持有的项。**读法**（`reading.ts` 的 `readingOf`，`views/inspect/called.svelte` 按它分派）：`render = terminal` 是终端；`render = diff` 是 diff；其余的调用按它在账本里留下的形状读——结果是一张存在内容库里的图（`{ image, width, height, media_type }`）就是截图，`effect = read` 且参数恰好是 `{ path, offset?, limit? }` 就是读文件（搜索也是只读，但它带 `pattern`，多出的键让解码不成立）——都不是的是 `printed`，在终端区画工具、主体与它答的话。**diff**（`inspect/diff.svelte`）问这次调用前后两个检查点之间这个文件的 `Hunks`（`views/checkpoints.ts` 的 `bracketOf`：调用之前最新的检查点，没有时是 run 开始的树；调用之后第一个检查点），所以 diff 覆盖调用所在的那一波，编辑器上方一行写出两个提交；之后还没有检查点时说「下一个检查点后」而不猜。行号栏照 7-2 把「路径:行」接进对话的草稿，被选的行带 2 px accent 左边条；画法是 `inspect/patch.svelte`，`changes.svelte` 打开的那一行也用它，一个 diff 只有一种画法。**终端**（`inspect/terminal.svelte`）的头两行是命令（exec 的命令行与 monitor 读的是同一个解析，`monitor/trace.ts` 的 `commandOf`），以及毫秒用时、退出码、完成时刻（`HH:MM:SS.mmmZ`，`datetime` 是完整的 ISO）与被裁的行数；在跑时读 `core/live_output.ts` 的尾巴，调用一有结局就只读账本的结果（`terminal.ts` 的 `printedOf`，`terminal.test.ts` 判）。`Output.pinned` 有定位时头的右端有「原文」，经 `Query::Content { locator }` 读，不以 `cut > 0` 为条件，因为 sieve 可以不裁一行而缩短内容；没有定位而有裁剪时头里写「没有留下原文」，不把头部称为全文。**文件**（`inspect/file.svelte`）经 `Query::Document` 读工作树此刻的文本，交给 `parts/code.svelte` 只读画出，滚到调用读的那一行（`offset + 1`）并标出；那一行在城发来的开头之外时说出来，不标在别的行上。**截图**（`inspect/shot.svelte`）：wire 上没有把内容库里的图片字节交给页面的回答，所以画一个按原图比例的框、写出尺寸、格式与定位，并说这一页还画不出它——空白会读成一张什么都没有的图。**到编辑器的路**按 4-39 的 `reachOf`：diff 的行属于检查点，工作树已离开它时只给可复制的「路径:行」。键见 7-11 的检视面几行；Esc 关上检视面，焦点回到打开它的那个控件（7-7）。
+- **4-46 RefRain 编辑的是一个版本：读整份、改在浏览器、存成那一版的字节区间。** 右侧的文档项画 `views/refrain/refrain.svelte`（7N），它问 `Query::Document { at }`，`Coverage::Head` 的版本再按版本问 `Query::Range` 逐窗接齐（`core/document_windows.ts`）；接齐之前编辑器只读，因为对半份文本的改动会把另一半说成删掉了。**超过 `EDITABLE_BYTES_MAX`（4 MiB）的版本只给第一窗、只读，并说出这是第一窗、全文多大**：附录 D 要求超能力时明确降级、不静默截断保存，而一窗一个往返，4 MiB 是六十四个往返，再大的文件不是人在这一栏里逐字改的稿子；重开参数是 A11 在固定语料上量出的首个可读视口与输入至绘制时间。
+  **坐标只在 `core/document_pos.ts` 换算。** 编辑器（CodeMirror 6，12-23）的位置是 UTF-16 码元，而且它把 `\r\n`、`\r`、`\n` 都读成一个换行；线上的位置是版本里的字节（`crates/documents/Spec.lean` D2）。所以编辑器拿到的是去掉开头字节顺序标记、换行折成 `\n` 的文本，保存时 `textEdits` 把改动集（基线到此刻，`ChangeSet` 的 `iterChanges`）换成基线那一版的字节区间，插入的换行写成这一版第一个换行的写法。**被否决的**：让编辑器只按 `\n` 分行、把 `\r` 留在行里——`End` 键会停在 `\r` 之后，在那里打字就把字写进 `\r` 与 `\n` 之间；把标记交给编辑器——全选删除会删掉标记，城按 D11 拒绝这次保存（换了编码）。两处折叠因此都在换算里还原，没碰过的字节一个不动（A1）。
+  **草稿是相对基线的改动，不是全文。** `core/document_save.ts` 把 `{ version, changes }` 写进 `prefs.ts` 的草稿门（地点 `document:<地址>`），每次改动后 300 ms 写一次：改动集与文件多大无关，全文却会在一份几 MB 的文件上撞到浏览器存储的配额。重开时草稿的版本就是城此刻的版本，改动照原样恢复；不是时进冲突态，草稿留着。**保存**是 `PutRange { doc, baseline, edits, idem }`；回执只认带着这个 `idem` 的 `document_written` 行，页面在保存途中问最新一页账本（`RECEIPT_QUERY`），因为账本行不经视图的门，而 `history` 本来就随每一条记录重问（`staleness.ts`）。拒绝不带 `idem`（§8-2），所以保存途中动作是 `save a document` 的拒绝归这次保存；同一页同时在存两份文档、其中一份被拒时，另一份会误读成被拒，草稿仍在，回执晚到仍把它改成已保存，这是记下的代价。**冲突**不自动解决：页面给出对照（草稿对城此刻的版本）、移到现版（把基线到草稿的改动经 `@codemirror/merge` 的 `diff` 求出的「基线到现版」改动集映射过去，结果仍是草稿、不自动保存，人看过对照再存）与丢弃草稿三个动作；附录 E 说的「重读与三方比较」就是前两个。
+  **版本只列本页拿得到全文的那几版**：打开的、自己存下的（回执给出版本，文本是发出时编辑器里的文本）、城换掉的（`Document` 答出新版本时）。账本里的 `document_written` 只带摘要不带文本，只有 Markdown 版本与超过一窗的版本在内容库里（§8-69、accounting-SPEC §12 第 33 条），所以「这份文件的全部历史版本」今天没有一个读得出全文的入口；重开参数是一个按文档列版本、按版本读全文的查询。
 
 ## 5 `src/core/`（形状按 ARCHITECTURE §9）
 
@@ -210,6 +215,9 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | `appearance.ts` | 2 值 | `Appearance { lighting, sans, mono, sansStack, monoStack, body, density, chroma, motion, glass, blend }` 与各项的词表（`LIGHTINGS`、`FACES`、`DENSITIES`、`CHROMAS`、`MOTIONS`、`GLASSES`，按选择器画出的顺序）、`STACK_SHAPE`、`BLEND_PERCENT`（混合档滑条的下限、上限与步长，4-43）与 `blendOf(raw)`（一行存储读成一个在域内的百分数，读不出或越界答 `null`）：一条外观记录怎样才算合法；`prefs.ts` 负责存取，`prefs_city.ts` 负责带到城。`glass` 与 `blend` 只在这个浏览器里：线上的 `Appearance` 没有这两格，`setAppearance` 照旧只把其余七格告诉城 |
 | `sizing.ts` | 1 判定 | `BODY_PX`、`sizingOf(text) -> Sizing`（`cleared` \| `sized { px }` \| `refused`）：人写进字号框的一串字读成什么；偏好的读取与外观组共用这一处。 |
 | `editor.ts` | 1 判定 | `Editor = "none" \| "vscode" \| "vscode-insiders" \| "vscodium" \| "cursor" \| "windsurf" \| "zed"`、`EDITORS`、`editorLink(Opening { editor, folder, path, line }) -> string \| null`：「在我的编辑器里打开 文件:行」的唯一拼法，各编辑器的链接前缀由同文件的 `fileUrl` 给出（4-39），监视器的改动块拿它当 `href`，由浏览器把链接交给浏览器所在机器上注册了该协议的编辑器，服务端不启动任何程序。`path` 用生成的 `Address` 判（城内相对路径，无 `..`、无盘符、无反斜杠），`folder` 须是绝对路径且无 `.`／`..` 段，`line` 须是正整数；任何一条不成立答 `null`，页面不画这个链接。编辑器与城在浏览器所在机器上的文件夹由 `prefs.ts` 的 `editor()` 与 `setEditor` 保管。`reachOf(Opening, Shown) -> Reach` 是检视面问的那一句：`Shown = "current" \| "past"` 说行号读自工作树此刻的文本，还是读自工作树已不再持有的一个版本；`Reach` 是 `{ kind: "link", href }` 或 `{ kind: "copy", text }`。`past` 一律答 `copy`，`current` 在 `editorLink` 答得出时答 `link`，答不出（没选编辑器、没填文件夹、路径不在城里）时也答 `copy`；`text` 是 `路径:行`，所以人总有一个能拿走的定位，而页面从不声称已在编辑器里打开（4-39） |
+| `document_pos.ts` | 1 判定 | `EditorChange { from, to, insert }`、`Place { line, column }`、`Positions { version, encoding, editor, lineBreak, bytes(at), editorAt(byte), place(at) }`、`positionsOf(version, encoding, text) -> Positions`、`textEdits(positions, changes) -> TextEdit[]`：一个版本的三种坐标——版本里的字节、解码出的字符（`place` 的列按码点数）、编辑器里的 UTF-16 码元——只在这里换算（refrain 路线图 §4-8），每个 `Positions` 带它所属的版本，所以一个坐标不会被拿去量另一版。编辑器的文本（`editor`）是这一版的文本去掉开头的字节顺序标记、每个换行（`\r\n`、`\r`、`\n`）读成一个 `\n`；`bytes` 与 `editorAt` 把这两处折叠还原，`textEdits` 把编辑器里的改动写成基线那一版的字节区间加文本，插入的换行写成这一版第一个换行的写法（`lineBreak`，没有换行时是 `\n`），所以没碰过的字节——标记、混合换行、尾随空格——一个不动（4-46）。落在一个字符中间的位置（UTF-16 代理对的两半、多字节字符的中间、`\r\n` 的两半）退到那个字符的开头。一次换算 O(`STRIDE`)：`positionsOf` 走一遍文本，每 `STRIDE`（1024）个编辑器位置记一个检查点 |
+| `document_windows.ts` | 1 判定 | `Opened`（`missing`／`unreadable { reason }`／`opaque { version, bytes }`／`text { gathering }`）、`opened(answer: DocumentAnswer) -> Opened`、`Gathering { version, format, encoding, bytes, text, through }`、`nextSpan(gathering) -> Span \| null`、`joined(gathering, answer: RangeAnswer) -> Gathering`、`whole(gathering) -> boolean`、`EDITABLE_BYTES_MAX`：一个版本的文本由第一窗与其后按版本读的 `Range` 窗口接成（`crates/wire/Spec.lean` §8-69、§8-70）；`nextSpan` 只在没接齐、且这一版不超过 `EDITABLE_BYTES_MAX`（4 MiB）时答下一段，接不上 `through` 的窗口（别的版本、重复、乱序到达）不改变 `Gathering`。空文件是零字节、已接齐的 `Gathering`，可以写出第一版；接齐之前与超过上界的版本只读（4-46） |
+| `document_save.ts` | 1 判定 | 草稿：`Draft { version, changes }`、`draftPlace(doc) -> string`（`prefs.ts` 草稿门的地点 `document:<地址>`，冒号不在地址文法里，所以它与房间的草稿不会同名）、`writeDraft(draft) -> string`、`readDraft(stored, length) -> Draft \| null`（存的值读不出、改动乱序、重叠或越过基线的长度时答 `null`）。回执：`Receipt`（`clean`／`draft`／`saving { sent, edited }`／`pending { sent, edited }`／`saved { version }`／`conflict { current }`／`refused { error }`）、`Sent { doc, baseline, command }`、`saveOf(doc, positions, changes) -> Sent`、`receiptIn(records, sent) -> B3Hash \| null`、`RECEIPT_QUERY`、`advance(receipt, Happened) -> Receipt`，`Happened` 穷尽：`edited { empty }`、`based { empty }`、`sent { sent }`、`unsent`、`lost`、`relinked`、`landed { version }`、`refusal { error }`、`moved { version }`。只有带着这次保存的 `idem` 的 `document_written` 行能把 `saving`／`pending` 变成 `saved`（`crates/wire/Spec.lean` §8-72）；拒绝不带 `idem`，所以保存途中动作是 `save a document` 的拒绝归这次保存，`E_VERSION_CONFLICT` 变 `conflict`，其余变 `refused`，草稿都留着；链路断在保存途中是 `pending`（结果未知），重连后用同一个 `idem` 再发，城答它第一次的结果，不会落第二次；城换了版本而页面有草稿是 `conflict`，只有 `based`（草稿已改立在城此刻的版本上，或已丢弃）离开它 |
 | `results.ts` | 1 判定 | `Showing = whole \| results`、`drawsCalls(showing)`（房间在 `results` 下不挂载 `calls.svelte` 与推理折叠）、`Outcome = waiting \| failed \| done \| ended`、`outcomeOf(run)`、`resultsOf(runs, first) -> Group { outcome, first, total }[]`（一遍分四类，每类按 `started` 新到旧只留前 `first` 条，`FIRST = 5`）；`bandsOf(runs, now) -> Band { recency, runs }[]`（城在 `results` 下按时间读：新到旧，切成最近十分钟、这一小时、更早三段，空段不画；没有 `started` 的 run 落在「更早」末尾）；`producedOf(files) -> Produced { files, added, removed }`（房间在 `results` 下结局分隔线之下的产出一行：改了几个文件、共加减几行；二进制文件计入文件数、不计行数，因为 `Lines::binary` 没有行数可加）；只看结果模式「画什么」的唯一判定处。200 个 run 的夹具城分类耗时由 `results.test.ts` 判定并打印 `city_results` 行，登记于 `tools/xtask/budgets.toml` |
 | `prose.ts` | 1 判定 | `blocks(text) -> Block[]`, `inline(text) -> Inline[]`：Markdown 读成数据，永不 innerHTML；`closedUpTo(text) -> number`：流式文字里已经闭合、可以按块画出的前缀长度 |
 | `route.ts` | 1 判定 | 见 §3-2 |
@@ -251,7 +259,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 > **这是规格，不是描述。** 表里写的是部件欠使用者什么；今天的代码欠而未还的十二处，逐条点名在 7-8。模式名与键表借鉴自哪几份文档、为什么不产生许可证义务，一处记在 `docs/third-party.md` §6，本节不复述。
 
-**判定：一个库只在它替换掉一样东西、并且同一变更集里有生产读者时才进来（由人定）。** `tools/xtask/src/npm.rs` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为那张表所列，名单以表为准；加一项是门机制的一次提交，与引入它的变更集分开，好让评审看见门为什么动。**平台先来**：`parts/dialog.svelte` 把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，见设计 4-20），`parts/tip.svelte` 把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）；平台已经提供的行为不再引一个库来提供第二遍，因为同一件事两个提供者，第一次分歧就落在键盘用户身上。今天名单上的界面库只有一项：`@lucide/svelte`，它替换了 `parts/glyph.ts` 手画的那张路径表，换来人在别的软件里已经认得的图标（4-34）。引入的条件写在 7-9。
+**判定：一个库只在它替换掉一样东西、并且同一变更集里有生产读者时才进来（由人定）。** `tools/xtask/src/npm.rs` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为那张表所列，名单以表为准；加一项是门机制的一次提交，与引入它的变更集分开，好让评审看见门为什么动。**平台先来**：`parts/dialog.svelte` 把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，见设计 4-20），`parts/tip.svelte` 把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）；平台已经提供的行为不再引一个库来提供第二遍，因为同一件事两个提供者，第一次分歧就落在键盘用户身上。今天名单上的界面库有两项：`@lucide/svelte`，它替换了 `parts/glyph.ts` 手画的那张路径表，换来人在别的软件里已经认得的图标（4-34）；CodeMirror 6 的五个包，它替换了 RefRain 原本要手写的编辑面与行级 diff（12-23）。引入的条件写在 7-9。
 
 ### 7-1 不收键的部件
 
@@ -379,6 +387,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | 库 | 替换了什么 | 读数 |
 |---|---|---|
 | `@lucide/svelte` | `parts/glyph.ts` 的手画路径表（17 个图标） | 引入时在构建产物上读出，记进 `tools/xtask/budgets.toml` 的 `frontend_artifact` 行 |
+| `@codemirror/state`、`view`、`commands`、`search`、`merge` | RefRain 要手写的编辑面（改动集、撤销、输入法、查找替换）与行级 diff（12-23） | 懒加载的一块，首屏不付；`frontend_artifact` 引入前后的读数由整合记进 `tools/xtask/budgets.toml` |
 
 ### 7-10 这张表的机器读者
 
@@ -606,6 +615,39 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 **当前状态**：设置还是一页（`views/setup.svelte`，左边是十个组的竖排导航），其余页面由 Ctrl-K 与 `go.*` 键到达；设置面与设置树还没有落地。
 
+## 7N RefRain：右侧的文档编辑器
+
+右侧的文档项（`views/inspect/open.svelte.ts` 的 `DocumentItem`）画 `views/refrain/refrain.svelte`，它只收三个参数：楼、楼内路径、版本（`null` 是城此刻的文本）。名字取自它的来处 RefRain（由人定）。它编辑 Markdown 与纯文本，读法有四种，状态有一行，行为由 4-46 规定。
+
+**头一行**（32 px，与 7F 编辑器上方那一行同一个座位）：左边是路径，楼名淡、文件名实；接着是版本的前七位与保存回执；右端是读法的分段控件「源码／预览／diff／版本」与保存键。读法只有 Markdown 才有「预览」。**回执**一个词加一个形状：草稿（alert 圆点）、保存中、已保存 ✓、待核对（链路断在保存途中，重连后自动核对）、冲突、被拒（城的原话在提示里）；没有改动时不画。
+
+**四种读法**：
+
+- **源码**：CodeMirror 6 的编辑器，Markdown 与纯文本都按字面显示，纯文本没有预览（A5）。撤销与重做只在本页的草稿里；查找与替换是编辑器自己的面板，字句取自 `lang.json`。接齐之前、超过上界的版本、历史版本都只读，只读的原因写在头一行下面的一行里。
+- **预览**：`Query::Preview` 逐窗画基线那一版的块（4-26），滚到底再要下一窗；草稿不在预览里，有草稿时预览上方一行这样说。`Preview::Unsupported` 说这一版不按 Markdown 读，零个块是空态。
+- **diff**：还是那个编辑器，加上与基线的对照（删去的行是 alert 淡底、加上的行是 accent 淡底），仍可编辑；没有改动时是「与基线相同」的空态。
+- **版本**：本页拿得到全文的几版（4-46），每行写版本前七位、来处（打开的／你存下的／城换掉的）与时刻；选两行，下面是两版之间只读的 diff，默认是最近的两版。
+
+**切换读法不卸载编辑器**：源码与 diff 是同一个编辑器，换读法只换它的一个扩展；预览与版本画在它旁边，编辑器只是隐藏，所以光标、选区、撤销栈与输入法的组合都留着。位置跨读法对应：从源码到预览，光标所在的字节所在的块滚进视野；从预览回源码，视野最上面那一块的起点成为光标、滚进视野。右侧的开合、换档与窄窗口下的重排都不重建编辑器：只有 `building`、`path` 或 `version` 换了才换一份文档。
+
+**草稿与恢复**：每次改动后 300 ms 把草稿写进浏览器（4-46）；关掉右侧、换一份文档、重新载入都不丢。重开时草稿基于的版本仍是城此刻的版本就照原样恢复，否则进冲突。**冲突**是编辑器上方一条 `asks` 标记（7C）的横条：一句话说城里的文件已经换了一版、草稿留着，三个动作「对照」「移到现版」「丢弃草稿」，丢弃先经 `parts/dialog.svelte` 确认（12-1）。
+
+| 部件 | 模式 | 键 | 结果 |
+|---|---|---|---|
+| 编辑区 | 多行文本框（CodeMirror 的 `role="textbox"`、`aria-multiline="true"`） | Accel-Z／Accel-Shift-Z（Accel-Y） | 撤销／重做本页草稿里的一步 |
+| | | Accel-F | 打开查找面板，焦点进查找框；面板里 Enter 是下一处，Shift-Enter 是上一处 |
+| | | Accel-S | 保存；组合输入期间不保存，只读时不发帧 |
+| | | Escape | 先结束输入法的组合，再关查找面板，焦点回编辑区；不关右侧 |
+| | | Tab | 离开编辑区（不插入制表符），所以键盘用户出得去；缩进用 Accel-] 与 Accel-[ |
+| 读法 | `parts/segmented.svelte`（7-4） | 同 7-4 | 换读法，焦点留在控件上 |
+| 保存键 | APG Button（`parts/button.svelte`） | Enter／Space | 同 Accel-S；没有草稿或只读时 `aria-disabled="true"`，提示说为什么 |
+| 版本列表 | 两组单选（`parts/segmented.svelte`，「从」与「到」） | 同 7-4 | 换比较的两版 |
+| 冲突条 | 三个 APG Button | Enter／Space | 各做按钮上的事；「丢弃草稿」打开确认，关上后焦点回到这个按钮 |
+
+`aria-*`：编辑区的可读名字是文件名（`aria-label`）；只读时 `aria-readonly="true"`。回执是 `role="status"`，只在它换了词时播报，打字不播报（§3-14：流式与逐键都不逐字播报）；冲突条是 `role="alert"`，出现时播报一次，不取焦点。
+
+**当前状态**：右侧的页签带（7F）由检视面画，四个读法因此暂在 RefRain 自己的头一行；页签带接管读法时只搬这个控件。
+
 ## 8 验收
 
 `bun run lint`、`bun run typecheck`、`bun run test` 三样绿，`cargo xtask npm`、`cargo xtask wire-ts`、`cargo xtask color`、`cargo xtask wording`、`cargo xtask render` 绿；`just check-client` 是这三条脚本的一条线。
@@ -768,3 +810,10 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **代价**：检查点跟在一波之后，所以 diff 覆盖调用所在的整波，同一波里改同一个文件的另一次调用也在里面；那一波还没有检查点时 diff 画不出来，只说「下一个检查点后」。
 - **被击败的备选**：解析结果里的 diff（`monitor/trace.ts` 已这样读，监视器要的正是每次调用自己的改动）：精确到这一次调用、检查点之前就有，但被裁时不完整，行号对着一个不在任何提交里的版本。
 - **重开参数**：城按调用写检查点，或 `Call` 带上这次调用自己的 `Hunks` 定位（两端是内容库里的版本而不是提交）时，diff 改读这一次调用自己的改动。
+### 12-23 RefRain 的编辑器是 CodeMirror 6 的最小组合
+
+- **决策**：RefRain（7N）的编辑区是 CodeMirror 6，只取五个包：`@codemirror/state`（文档与改动集）、`@codemirror/view`（视图、输入法、选区）、`@codemirror/commands`（撤销历史与键表）、`@codemirror/search`（查找与替换）、`@codemirror/merge`（两段文本之间的 diff 与对照）。不取语言包与 `basicSetup`。五个包只由 `views/refrain/` 读，整块懒加载：第一次打开一份文档时才下载。编辑器的颜色写在 `theme.css` 末尾 RefRain 的那一块，盖过 CodeMirror 自带的基础主题，所以颜色仍只有一个家；编辑器自带的字句（查找面板、对照的提示）经 `EditorState.phrases` 取自 `lang.json`。
+- **理由**：4-46 要的四件事平台给不了：一份可编辑、按视口画的长文本（一个 4 MiB 的 `<textarea>` 在输入时整份重排）；一个能精确说出「从基线到此刻改了哪几段」的改动集（`<textarea>` 只有整份的值，改动要事后比对，而比对给出的区间不一定是人做的那一下）；不被程序改动打断的撤销栈（给 `<textarea>` 赋值会清掉浏览器的撤销）；在长文本里查找与替换（浏览器的查找不进 `<textarea>`，也不能替换）。CodeMirror 的改动集按 UTF-16 位置给出、带 `mapPos`，正是 `core/document_pos.ts` 换算的另一头；它的输入法处理在三家引擎上有自己的测试。它替换的是本客户端原本要手写的这一套编辑面与一张行级 diff（`@codemirror/merge` 的 `diff` 同时给「移到现版」用，4-46）。许可证都是 MIT，在 `deny.toml` 的清单上。
+- **被击败的备选**：①`<textarea>`——上面四件事各缺一件；②`contenteditable` 加自写的模型——输入法、选区与撤销要自己在三家引擎上重做一遍，那正是 CodeMirror 已经做完的；③Monaco——体积大一个数量级，要 worker，按 refrain 路线图附录 F 落选；④ProseMirror——富文本的文档模型，Markdown 要先解析成树再序列化回去，源文字节保不住（A1）。
+- **读数**：五个包与它们带进来的 `@codemirror/language`、`@lezer/common`、`@lezer/lr`、`style-mod`、`w3c-keyname`、`crelt` 在一块懒加载的分块里，首屏不付；`frontend_artifact` 称整个 dist，引入前后的读数由整合记进 `tools/xtask/budgets.toml`。
+- **重开参数**：Markdown 源码要语法着色时，加 `@codemirror/lang-markdown` 还是复用 `parts/paint.ts` 的 lezer 块，先过 7-9；或者出现一个同样给出改动集与输入法保证、体积小一半的编辑器。
