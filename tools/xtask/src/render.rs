@@ -59,6 +59,7 @@ mod pass;
 pub(crate) mod probe;
 mod room;
 mod sources;
+mod talk;
 
 use announced::{every_control_is_announceable, every_landmark_is_named, one_first_heading};
 use engine::{Measured, Opening, browser, measure};
@@ -139,6 +140,13 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     // finding names the line that drew it, and a survey opens the same
     // page five times.
     let sources = sources::index(root)?;
+    // The conversation page is judged where the gallery draws it; another
+    // route is a page that may not hold one (tools/xtask/Spec.lean §8-51).
+    let talk = if route == GALLERY {
+        Some((talk::Words::read(root)?, crate::budget::register(root)?))
+    } else {
+        None
+    };
     let opening = Opening {
         root,
         browser: &browser,
@@ -160,6 +168,15 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         no_key_is_underlined(&page.drawn, &at, &mut violations);
         no_text_is_crushed(&page.drawn, &at, &mut violations);
         every_popover_shows_an_option(&page.drawn, &at, &mut violations);
+        if let Some((words, register)) = &talk {
+            let counted = talk::the_conversation_page_holds_its_controls(
+                &page.drawn,
+                &at,
+                words,
+                &mut violations,
+            );
+            talk::talk_controls_within_register(counted, register, &at, &mut violations);
+        }
         let readings = survey::judge(page);
         for reading in readings.iter().filter(refusable) {
             // A refusal names the line as well as the page: a gate that

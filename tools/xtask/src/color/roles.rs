@@ -60,12 +60,15 @@ const VIEW_EXTS: [&str; 3] = ["svelte", "ts", "html"];
 /// apart, and no reader could have said which a given dot was; they are
 /// one row now. A role earns its place only when somebody can state the
 /// question it answers in a sentence that does not mention a rung.
-const ROLES: [&str; 21] = [
+const ROLES: [&str; 22] = [
     // The surfaces, outward from the page.
     "page",
     "chrome",
     "raised",
     "raised-hover",
+    // The one fill that lets the page behind it show through, at the
+    // opacity `glass.rs` judges.
+    "glass",
     // Three fills that are not a surface a person navigates.
     "speech",
     "track",
@@ -152,10 +155,16 @@ pub(super) fn judge_roles(root: &Path, source: &str) -> Result<Vec<Violation>, X
         }
     }
 
-    // 3. A role nothing spells is a name with no reader.
+    // 3. A role nothing spells is a name with no reader. A role the
+    //    stylesheet also turns into a utility of the same name (`@utility
+    //    glass`) is read wherever a view spells that utility as a class.
     let spelled = spellings(root)?;
     for role in ROLES {
-        if !spelled.iter().any(|text| names(text, role)) {
+        let utility = source.contains(&format!("@utility {role} {{"));
+        if !spelled
+            .iter()
+            .any(|text| names(text, role) || (utility && class_word(text, role)))
+        {
             violations.push(refuse(
                 "every role has at least one reader",
                 format!("--color-{role} is declared and nothing under {VIEWS} spells it"),
@@ -178,6 +187,13 @@ fn declared(source: &str) -> impl Iterator<Item = Named<'_>> {
         let name = name.trim();
         (!value.is_empty() && !name.contains('*')).then_some(Named { name, value })
     })
+}
+
+/// The rung a role hops to, as the stylesheet spells it (`g2`).
+pub(super) fn rung_of<'a>(source: &'a str, role: &str) -> Option<&'a str> {
+    declared(source)
+        .find(|held| held.name == role)
+        .and_then(|held| hop(held.value))
 }
 
 /// `var(--color-g2)` is a hop to `g2`; anything else is not a hop.
@@ -220,6 +236,20 @@ fn names(text: &str, role: &str) -> bool {
             .and_then(|tail| tail.bytes().next());
         before == Some(b'-')
             && !after.is_some_and(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    })
+}
+
+/// Whether a file spells `word` as a whole class name: nothing that can
+/// continue a class name (a letter, a digit, `-`, `_` or a variant's `:`)
+/// on either side.
+fn class_word(text: &str, word: &str) -> bool {
+    let continues = |byte: u8| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b':');
+    text.match_indices(word).any(|(at, _)| {
+        let before = text.get(..at).and_then(|head| head.bytes().next_back());
+        let after = text
+            .get(at.saturating_add(word.len())..)
+            .and_then(|tail| tail.bytes().next());
+        !before.is_some_and(continues) && !after.is_some_and(continues)
     })
 }
 

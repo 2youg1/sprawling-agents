@@ -36,6 +36,7 @@ mod lexicon;
 mod mem;
 mod members;
 mod modmap;
+mod motion;
 mod npm;
 mod package;
 mod packaged;

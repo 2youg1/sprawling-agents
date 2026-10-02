@@ -29,9 +29,11 @@ const PRODUCTION_POINTS: [&str; 1] = [THEME];
 /// case one step out: the probe hands the engine a value to resolve and
 /// reads the pixels back, so it must spell the transparent fill that
 /// clears the canvas between readings, and the test states the one
-/// spelling `Paint::to_string` promises a person.
-const SPELLS_COLOUR: [&str; 7] = [
+/// spelling `Paint::to_string` promises a person. `glass.rs` writes the
+/// rungs its tests lay glass over, for the reason `tests.rs` does.
+const SPELLS_COLOUR: [&str; 8] = [
     "tools/xtask/src/color.rs",
+    "tools/xtask/src/color/glass.rs",
     "tools/xtask/src/color/roles.rs",
     "tools/xtask/src/color/scan.rs",
     "tools/xtask/src/color/tables.rs",

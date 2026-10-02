@@ -138,9 +138,10 @@ A violation turns the check red with a message that names the rule, the violatio
 | Every dependency a manifest declares named by the code of its package, and every workspace dependency inherited by some package. | `xtask unused` |
 | The client's lockfile in step with its manifest, its runtime dependencies exactly the list `RUNTIME` in `tools/xtask/src/npm.rs` names (`svelte`, `effect`, and the `@lezer` highlighter), every licence on the list `deny.toml` permits. | `xtask npm` |
 | Credentials as `secret:realm/name` references; plaintext reaches the vault and nowhere else. | `xtask secret` |
-| Colour taken from the `@theme` block in `client/src/theme.css`, expressed as a ratio of the gamut limit. | `xtask color` |
+| Colour taken from the `@theme` block in `client/src/theme.css`, expressed as a ratio of the gamut limit, and text on glass legible over the brightest surface behind it. | `xtask color` |
+| A transition's curve and duration taken from the tokens in `client/src/theme.css`, never spelled in a view. | `xtask motion` |
 | Every word a reader is given taken from `client/src/lang.json`. | `xtask wording` |
-| Every role, accessible name and landmark a settled screen wrote down, offered by the shipped screen, with no box outside its container. | `xtask render` |
+| Every role, accessible name and landmark a settled screen wrote down, offered by the shipped screen, with no box outside its container; no fixed bar over the conversation, and its standing controls within `talk_controls`. | `xtask render` |
 | Every verb the city can carry out reached by some control, or classified on the wire seam with the reason a person may not ask for it. | `xtask wiring` |
 | `client/src/wire.ts` regenerated whenever `WIRE_V` moves. | `xtask wire-ts` |
 | Every number a document quotes, and every kernel enum table a SPEC carries, equal to the code that decides it. | `xtask docnum` |

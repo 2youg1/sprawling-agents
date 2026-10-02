@@ -35,13 +35,14 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 | depmap | crate 依赖边 ⊆ ARCHITECTURE §3 的 `depmap` 围栏块；一个 crate 之内的模块方向服从 `directions` 块（§8-33）；`pub trait` 只现于缝那一节（ARCHITECTURE §4）列出的文件 |
 | guard | 唯一一张自己的 lint 表（`crates/desktop/ffi` 的）与根 `[workspace.lints]` 逐键相等，例外只在 `RECORDED`；其余每个成员都继承根表（§8-46）；工作区自己的包在 `[workspace.dependencies]` 里各钉 `=` 加工作区版本（§8-49） |
 | wording | 读者拿到的词出自短语表 `client/src/lang.json`：`.svelte` 标记里文本节点与朗读型属性的字面量（`wording::markup`），`.ts` 里拒绝各段的实参（`wording::refusal`，§8-24），去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名；生成的文件由它的生成器作证 |
-| render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17 与 §8-38 |
+| render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17、§8-38 与 §8-51 |
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire 的规格（`crates/wire/Spec.lean` §19-2 的 `def Command.reach`）只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | secret | 全仓加夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
 | specalign | kernel 枚举 ↔ kernel 的规格逐 variant（读 `crates/kernel/Spec.lean` 与分部里的受限形状，§8-43）：§8-1／§8-4 两张表消费真 enum（`AxCode::ALL`／`EventKind::ALL`）作证，归属、carrier／窗类逐臂同；规格里每一个与 kernel 枚举同名的 `inductive` 与 syn 解出的枚举双向对账（§8-10、§8-43）；模块图每一行的 `spec` 锚点落在盘上，已迁移的包写 Lean 模块名（§8-43） |
 | spec | 一个包恰有一份生效规格；散文里点名的 `<名>-SPEC` 在树上；Lean 的 import 纪律；`.lean` 里没有 `sorry`、`admit`、`axiom`；规格引用的仓内路径在盘上（§8-42） |
 | budget | `tools/xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；没有构建产物可称时沉默（`just check` 不构建 release 二进制），壁钟读数只入册不入门 |
-| color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免 |
+| color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免；玻璃按 `--glass-opacity` 盖在最亮的表面上时字仍够层级（§8-51） |
+| motion | 过渡的曲线与时长只住 `client/src/theme.css`：别处的 `cubic-bezier(`、`linear(`、`steps(` 与 Tailwind 的 `duration-<数字>`、`duration-[`、`ease-[` 即红（§8-51） |
 | release | 公开树由过滤生成；六条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径、不得引用树里没有的文件、不得把一台机器的工作记录写进产品文档、链接的拼法与树上的名字逐字节相等（§8-15） |
 | length | 一个生产函数不得长过 `function_length`、不得多于 `argument_count` 个参数（不含接收者），一个源文件的生产行不得多过 `file_length`；三个预算都住 `tools/xtask/budgets.toml`；函数尺寸与签名以 `syn` 量得，Rust 文件尺寸是总行数减去顶层 `#[cfg(test)]` 项所跨的行；`.zig` 受函数与文件两面、不受参数面，按 Zig 的词法量，文件尺寸减去 `test` 声明所跨的行（§8-48、D15） |
 | npm | `client/` 的依赖面：锁文件在盘且与 `package.json` 逐条同、运行时依赖恰为 `npm::RUNTIME` 那张表、树上每个包的许可证都在 `deny.toml` 的准许表内（§8-12） |
@@ -380,7 +381,7 @@ D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，�
 
 /-! ### 8-14 `render` 的第六、第七条性质：一行的第一个标记，与键面上的下划线
 
-**两条都是量出来的，不是读源码读出来的。** 第六条：左栏里每个可点行的第一个被画出来的盒子，中心 x 相同。它挡的缺陷是状态点 8 px、图标 18 px，各自在同一段 12 px 内边距里居中，于是点的中心比它下面每个图标左 5 px。第七条：任何 `<kbd>` 不带下划线；键面是一张脸，不是一个链接，而样式表给指针下的链接画的那条线会一并画进它里面的标记。
+**两条都是量出来的，不是读源码读出来的。** 第六条：一列导航里每个可点行的第一个被画出来的盒子，中心 x 相同。它挡的缺陷是状态点 8 px、图标 18 px，各自在同一段 12 px 内边距里居中，于是点的中心比它下面每个图标左 5 px。第七条：任何 `<kbd>` 不带下划线；键面是一张脸，不是一个链接，而样式表给指针下的链接画的那条线会一并画进它里面的标记。
 
 **「列」与「条」分开判。** 第六条只判行与行上下堆叠的那种 nav：一排共用同一个 top 的标签页是一条横条，要求它们同一个 x 等于要求它们叠在一起，故 nav 内所有可点行的 top 相同时本条不判。
 
@@ -1129,6 +1130,53 @@ pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<
 **`xtask::package` 的 `workspace_package`**：`[workspace.package]` 的字段只经它读。`package` 与 `channel` 取 `version`，`channel` 取 `repository` 写进每个 npm 包的 `repository` 与 `homepage`（原先是 `channel.rs` 里的常量 `REPOSITORY`，与根清单是同一个事实的两个家）；guard 经 `package_field` 读已解析的根清单。
 
 **测试**：`packaged::tests` 在 `root::fixture` 上建一个小工作区：一个可发布的包的 `lib.rs` 写 `include_str!("../../x.txt")` 必须报一条违规并点名那一行；包内的 `include_str!`、`concat!(env!("OUT_DIR"), …)`、`#[cfg(test)] mod tests;` 声明的文件里的包外 `include_str!`、`#[path]` 载入的文件里的包外 `include_bytes!` 各一例，只有最后一例报；`publish = false` 的包里的包外 `include_str!` 不报。`guard::version::tests` 在夹具清单上判：工作区 `0.0.8` 而某项写 `=0.0.7` 报一条；缺 `version` 报一条；一个成员按路径点名工作区包报一条；全都对时无违规。
+
+**本节属门禁机具，与产品代码分开提交。**
+-/
+
+/-! ### 8-51 `motion`：曲线与时长只住 `theme.css`；`color` 判玻璃；`render` 判对话页的常驻入口（形状 1 判定）
+
+**要挡的三件事**，都是 client-SPEC 4-43 与 refrain P2、P6、P11、P12 写下、而今天没有机器读者的规则：一条过渡在视图里自己写曲线或毫秒数，于是同一种位移有五个答案；玻璃的不透明度被调低到字压不住背后；对话页长出一条固定的顶栏或浮动操作栏，或常驻入口悄悄变多。
+
+```rust
+// xtask::motion
+pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError>;
+fn literal_at(line: &str) -> Option<&'static str>; // 一行里第一处被拒的写法
+// xtask::color::glass
+pub(super) fn judge_glass(source: &str, mode: Mode) -> Vec<Violation>;
+// xtask::render::talk
+pub(super) fn the_conversation_page_holds_its_controls(
+    drawn: &[Drawn], at: &str, words: &Words, out: &mut Vec<Violation>,
+) -> Option<u64>;                      // 这一次开页里对话页常驻入口的最大计数
+pub(super) fn talk_controls_within_register(
+    counted: Option<u64>, register: &toml::Value, at: &str, out: &mut Vec<Violation>,
+);
+```
+
+**`motion` 判什么**：`client/src` 下每个 `.svelte`、`.ts`、`.css`、`.html` 文件（`client/src/theme.css` 是产地，豁免，与 §8-8 的产地表同形），逐行找四种写法，命中一处即一条违规，位置 `<文件>:<行>`：
+
+- `cubic-bezier(`；
+- `linear(` 与 `steps(`，**只在括号里第一个非空白字符是数字、`.` 或 `-` 时算**：CSS 的这两个函数只收数，而 `{#snippet steps(each: Walk)}` 是一个名叫 `steps` 的片段，不是一条时间函数；
+- Tailwind 的 `duration-<数字>` 与 `duration-[`、`ease-[`，前一个字符不是字母、数字、`-` 或 `_`（`group-hover:duration-150` 的冒号算边界，`--transition-duration-short` 不算）。
+
+规则写「a transition's curve and duration are named once, in the client's theme file」，替代写「`duration-short|panel|page` 与 `ease-arrive|leave`（client-SPEC 4-43）；要第四种时长或第三条曲线，先在 `theme.css` 声明它」。**不读**：`style=` 里的 `animation-duration` 与 `animation-delay`（城市插画的环境动画与逐个错开的延迟，不是位移）、`delay-*`（悬停意图的门槛，4-18，不是动效的时长）。
+
+**`color` 多判一件事：玻璃按自己的不透明度盖在页面最亮的表面上，字仍够得到层级。** `judge_glass` 在每种打光的读法上各跑一次（§8-8 的 `Mode`）：读 `--glass-opacity: <n>%`（缺席、不是 1–100 的整数百分数各是一条违规），读 `--color-glass` 单跳到的那一档、`raised-hover` 单跳到的那一档、`--color-text` 的明度与 `--tier-text`；把玻璃那一档的 sRGB 按 n% 盖在 `raised-hover` 那一档上（逐通道在编码空间里线性混合，即引擎合成一层半透明底色的做法），算 `--color-text` 对合成色的 APCA Lc，低于 `--tier-text` 即红，拒词写出两种打光里哪一种、够到多少、要多少。**为什么是 `raised-hover` 而不是最亮的墨**：玻璃的模糊（24 px）把背后的字摊进它所在的表面，留下的是表面；页面画面积的表面里最亮的是悬停中的抬起控件。墨不按面积画，按墨判会把不透明度逼到 97%，玻璃就不是玻璃了。`glass` 进 `ROLES`（§8-8 的封闭词表），共 22 个。
+
+**`render` 多判两件事，都在画廊里每一张对话页上**。对话页是这样认出来的：一个可及名等于 `lang.json` 里 `region_conversation` 值的区域，与一个可及名等于 `region_edge` 值的区域（区域是地标或带名字的 `section`：同一个词在区域里还会作别的字出现，例如对话模式也叫「对话」），二者最近的共同受测祖先（画廊里是那一个 Case 的 `section`）就是一张对话页；整次开页一张也没有，是一条违规（拒词：`the gallery draws no conversation page`），因为一道找不到对象就沉默的门会替一张没人看过的页面报绿。
+
+1. **对话区里没有固定导航，也没有浮动操作栏**（P2）：对话区域之内，一个画出来的可操作控件若在一个会滚动的祖先里（`down` 或 `across` 为 `Scrolls`：它随内容走），或在 `role` 为 `alert`、`status` 或 `dialog` 的祖先里（需要及时恢复的故障提示与展开面，P2 明说不限制它们），就不是常驻的；其余的是常驻控件。**对话框由它的文本框认出**：区域里第一个不随线程滚动的文本框（`TEXTAREA` 或 `role="textbox"`）的上缘是一条线，常驻控件的下缘越过这条线就属于对话框（同一行的硬币键、横线下的设置行），整个落在线上方就是固定导航或浮动操作栏，红，拒词给出控件与它的位置。区域里没有这样的文本框也是一条违规。探针不量 `<form>`（它既不是地标、控件，也没有 `role`），所以对话框不按表单的名字认。
+2. **常驻入口按三簇计数**（P11）：一张对话页里，对话框那一簇的常驻控件，加上可及名等于 `region_edge` 与 `region_inspect` 值的两个区域之内画出来的可操作控件。每次开页取各张对话页里最大的那个数，与 `tools/xtask/budgets.toml` 的 `[talk_controls]` 比：大于 `best_count + slack_count` 即红，规则写棘轮（与体积登记同形：数可以自由变小，变大只许在余量之内）。`region_inspect` 是右侧打开时检视面那一簇的地标名；右侧没开的对话页那一簇计 0。
+
+**为什么按区域的名字认页与簇，而不是按类名**：门读的是画出来的页（§8-13），类名是写下来的；名字既是屏幕阅读器跳转用的那个名字，也是 `lang.json` 里的一个键，门经 `lang.json` 读这个键的每一种语言的值，不另抄一份：画廊按浏览器的语言画，跑门的机器说中文时地标就叫中文名。
+
+**为什么不读 `position`**：探针今天不写计算后的 `position`（`browser::survey::Drawn` 没有这一格），而「不随内容滚动、又不属于对话框」正是 P2 要拦的那一类，用已有的读数（父链、滚动轴、地标名、角色）就说得出来；改 `crates/browser` 的探针不能与改门同一个提交（§8-38 同理）。
+
+**登记**：`[talk_controls]` 有 `what`、`measured_by`、`status`、`best_count`、`slack_count`。`status` 不是 `gated`，所以 `budget` 门不去称它（`budget::gated_rows` 只取 `status = "gated"` 的字节行）；读它的只有 `render`。`best_count` 由已验收的夹具登记，设计目标 8（refrain §5）写在行旁的注释里，不是一个门读的数。
+
+**测试**：`motion::tests` 判 `literal_at` 的正反例（三种函数、`steps(each`、`duration-150`、`hover:duration-[90ms]`、`ease-[`、`duration-panel`、`--transition-duration-short` 各一例）；`color::tests` 判玻璃：今天的样式表两种打光都绿，把 `--glass-opacity` 改成 40% 时浅色那一面红，缺这一行时红；`render::talk::tests` 在手写的 `Drawn` 夹具上判：对话框里的控件、滚动区里的控件、`status` 里的控件都不红，对话地标里一个不在三者之中的按钮红；三簇各两个控件计 6；计数大于登记时红、等于时不红；画廊没有对话页时红。
+
+D20 **曲线、时长与玻璃的下限各有一个机器读者，且读者读的就是层叠用的那个数。** `motion` 拒绝 `theme.css` 之外的时间函数与 Tailwind 的时长字面量，`color` 用 `--glass-opacity` 本身判玻璃的可读性，`render` 用画出来的页数对话页的常驻入口。理由：三条规则写在 client-SPEC 4-43 与 refrain P2、P6、P11、P12 里，若没有读者，第一个赶时间的视图就会写下 `duration-200`、第一次调玻璃的人就会把字调到读不清；而玻璃那一条若另立一个 `--glass-floor` 给门读，层叠用的数与门判的数就是两个可以分开的家。被击败的备选：①只拒 `cubic-bezier(` 等三个函数（路线图的原文）——同一种位移今天有 90、100、120、150、200 ms 五个答案，函数一个都没写；②按类名认对话页的三簇——类名是写下来的，门判的是画出来的页；③在探针里加 `position` 一格再判 `fixed`——那是改 `crates/browser`，与门不能同一个提交，而父链与滚动轴已经说得出同一件事。**重开参数**：`browser::survey` 下一次加读数时，对话页的两条性质迁进去（§8-38 的同一条）；客户端出现第二个产地（例如第二套主题文件），`motion` 的产地从一个文件变成一张表。
 
 **本节属门禁机具，与产品代码分开提交。**
 -/

@@ -69,8 +69,38 @@ pub(super) fn bronze_tier(px: u16, weight: u16, body: bool) -> Option<u16> {
 /// difference decides a boundary case; it is done in floating point so that
 /// no lossy integer conversion appears anywhere in this file.
 pub(super) fn apca_lc(text: u16, surface: u16) -> f64 {
-    let text_y = soft_clamp(axis_luminance(text));
-    let surface_y = soft_clamp(axis_luminance(surface));
+    lc_between(
+        screen_luminance(axis_encoded(text)),
+        screen_luminance(axis_encoded(surface)),
+    )
+}
+
+/// APCA lightness contrast between an on-axis text token and a fill laid
+/// at `percent` opacity over an on-axis backdrop: the glass role over the
+/// surface behind it (tools/xtask/Spec.lean §8-51).
+///
+/// The two are mixed channel by channel in the encoded space, which is
+/// how an engine composites a translucent fill over what it already drew;
+/// the result is then quantised like any other displayed colour.
+pub(super) fn apca_lc_over(text: u16, fill: u16, backdrop: u16, percent: u16) -> f64 {
+    let alpha = f64::from(percent.min(100)) / 100.0;
+    let mut mixed = [0.0; 3];
+    for (slot, (top, bottom)) in mixed
+        .iter_mut()
+        .zip(axis_encoded(fill).into_iter().zip(axis_encoded(backdrop)))
+    {
+        *slot = alpha * top + (1.0 - alpha) * bottom;
+    }
+    lc_between(
+        screen_luminance(axis_encoded(text)),
+        screen_luminance(mixed),
+    )
+}
+
+/// The APCA-W3 contrast of text on a surface, both as screen luminance.
+fn lc_between(text_y: f64, surface_y: f64) -> f64 {
+    let text_y = soft_clamp(text_y);
+    let surface_y = soft_clamp(surface_y);
     if (surface_y - text_y).abs() < 0.0005 {
         return 0.0;
     }
@@ -84,9 +114,9 @@ pub(super) fn apca_lc(text: u16, surface: u16) -> f64 {
     (raw * 100.0).abs()
 }
 
-/// Screen luminance of an on-axis token: OKLCH through OKLab to linear
-/// sRGB, quantised to eight bits, then APCA's own simple transfer curve.
-fn axis_luminance(lightness: u16) -> f64 {
+/// An on-axis token as gamma-encoded sRGB: OKLCH through OKLab to linear
+/// sRGB, clipped to the gamut, then the sRGB transfer curve.
+fn axis_encoded(lightness: u16) -> [f64; 3] {
     let l = f64::from(lightness) / 1000.0;
     let chroma = f64::from(GRAY_CHROMA) / 1000.0;
     let hue = f64::from(HUE_AXIS).to_radians();
@@ -94,24 +124,30 @@ fn axis_luminance(lightness: u16) -> f64 {
     let long = (l + 0.396_337_777_4 * a + 0.215_803_757_3 * b).powi(3);
     let medium = (l - 0.105_561_345_8 * a - 0.063_854_172_8 * b).powi(3);
     let short = (l - 0.089_484_177_5 * a - 1.291_485_548_0 * b).powi(3);
-    let linear = [
+    [
         4.076_741_662_1 * long - 3.307_711_591_3 * medium + 0.230_969_929_2 * short,
         -1.268_438_004_6 * long + 2.609_757_401_1 * medium - 0.341_319_396_5 * short,
         -0.004_196_086_3 * long - 0.703_418_614_7 * medium + 1.707_614_701_0 * short,
-    ];
-    let coefficients = [0.212_672_9, 0.715_152_2, 0.072_175_0];
-    let mut y = 0.0;
-    for (channel, weight) in linear.into_iter().zip(coefficients) {
+    ]
+    .map(|channel| {
         let clipped = channel.clamp(0.0, 1.0);
-        let encoded = if clipped <= 0.003_130_8 {
+        if clipped <= 0.003_130_8 {
             12.92 * clipped
         } else {
             1.055 * clipped.powf(1.0 / 2.4) - 0.055
-        };
-        let quantised = (encoded * 255.0).round() / 255.0;
-        y += weight * quantised.powf(2.4);
-    }
-    y
+        }
+    })
+}
+
+/// Screen luminance of an encoded colour: quantised to eight bits, as a
+/// browser displays it, then APCA's own simple transfer curve.
+fn screen_luminance(encoded: [f64; 3]) -> f64 {
+    let coefficients = [0.212_672_9, 0.715_152_2, 0.072_175_0];
+    encoded
+        .into_iter()
+        .zip(coefficients)
+        .map(|(channel, weight)| weight * ((channel * 255.0).round() / 255.0).powf(2.4))
+        .sum()
 }
 
 /// APCA lifts the darkest values so that near-black pairs do not report

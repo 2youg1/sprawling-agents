@@ -58,7 +58,7 @@ fn good() -> Vec<Drawn> {
     ]
 }
 
-/// One clickable row of the rail: where it was drawn, and the centre of
+/// One clickable row of a navigation column: where it was drawn, and the centre of
 /// the first mark inside it - the dot, or the glyph.
 fn row(name: &str, top: i64, mark: i64) -> Drawn {
     let mut held = el("A", name, [0, top, 44, 44], (5, 0));

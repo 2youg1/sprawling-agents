@@ -35,6 +35,7 @@ use crate::walk;
 
 mod contrast;
 mod disabled;
+mod glass;
 mod roles;
 mod scan;
 mod tables;
@@ -152,13 +153,12 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     }
     let source = walk::read_text(&theme_path)?;
     for mode in Mode::ALL {
-        violations.extend(judge_tokens(&reading(&source, mode), mode));
+        let read = reading(&source, mode);
+        violations.extend(judge_tokens(&read, mode));
+        violations.extend(glass::judge_glass(&source, &read, mode));
     }
-    // The role layer is judged on the stylesheet as written rather than
-    // on either mode's reading of it: a role is a hop to a rung, and the
-    // hop is what makes one declaration serve both lightings, so a
-    // per-mode reading would ask the same question twice and answer it
-    // from a text that no longer holds the hops.
+    // Roles are judged as written: the hop is what serves both lightings,
+    // and a mode's reading no longer holds the hops.
     violations.extend(roles::judge_roles(root, &source)?);
     violations.extend(scan_for_literals(root)?);
     violations.extend(disabled::judge_disabled_ink(root)?);

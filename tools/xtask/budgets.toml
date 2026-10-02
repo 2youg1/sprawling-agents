@@ -711,3 +711,19 @@ status = "measured, not gated: on windows-x86_64, 16 cores, NVMe, three runs eac
 what = "one triage of a 200-run city into waiting, failed and done, each cut to its FIRST newest (client/src/core/results.ts)"
 measured_by = "bun test --conditions=browser client/src/core/results.test.ts (prints one city_results line and holds a triage to 1600 us, a tenth of a 16 ms frame)"
 status = "measured, not gated here: 45-124 us per city across three runs (x86_64 desktop class, other builds running beside it). A wall-clock figure is the machine's, so this register records it and the test guards only what every machine agrees on: the read count and the ratio between two sizes"
+
+# How many controls stand on the conversation page at once (refrain P11,
+# client-SPEC 4-43): the edge keys, the composer's row and the inspect
+# side's handle, counted on every shell fixture of the gallery by
+# `cargo xtask render` (tools/xtask/Spec.lean §8-51). A control inside a
+# message, a fact's detail or an opened panel is not standing and is not
+# counted. The design aims at 8; the number held here is the reading of
+# the fixtures as accepted, and it is a ratchet like every other row: it
+# may fall freely and rise only within the slack. A necessary recovery
+# control is never hidden to make the count.
+[talk_controls]
+what = "the operable controls standing on the most crowded conversation page of the gallery: edge keys, composer, inspect side"
+measured_by = "cargo xtask render (the `talk` reading, on every pass)"
+status = "held by render, not weighed by budget"
+best_count = 0 # placeholder: the integrator records the accepted gallery's reading
+slack_count = 0
