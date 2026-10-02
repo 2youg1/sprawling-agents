@@ -482,9 +482,16 @@ budget:
 # the two instruments that drive the city's own accounting loop - a relay
 # round trip and the gap a second dispatch leaves in a running one
 # (`crates/sprawling/Spec.lean` §8-84).
+#
+# The instruments are library tests, so `--lib` builds only the two
+# library test binaries: an integration test would also link the
+# `sprawling` executable with the dev-dependency features (kernel and
+# agent_protocols `conformance`, storage `fault`), and on Windows and
+# macOS an executable has one output path whatever its features, so the
+# next product build relinks it.
 bench:
     cargo run --release -p citysim --bin bench
-    cargo nextest run -p sprawling -p sprawling-accounting --release --run-ignored only -E 'test(/::instrument_/)' --no-capture
+    cargo nextest run -p sprawling -p sprawling-accounting --release --lib --run-ignored only -E 'test(/::instrument_/)' --no-capture
 
 # The four-action pressure reading (tools/citysim/Spec.lean 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.
