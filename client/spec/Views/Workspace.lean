@@ -60,6 +60,14 @@ import client.spec.Views.Parts
 | 检视面 | `<aside>` 地标 | Escape（检视面里任何地方，输入法与 RefRain 自己的面板没有先拿走这个键时） | 关上检视面，焦点回到打开它的控件（7-7） |
 | 检视面的「原文」 | APG Button（开关） | Enter／Space | 在视图与原文之间切换 |
 | 栏标签的菜单 | APG Menu Button | Enter／Space／↓ | 打开「移到左边／移到右边」；Escape 关上，焦点回到标签 |
+| 会话栏一行 | 链接 | Enter | 这一段进主区（7K、D44） |
+| 会话栏一行的菜单 | APG Menu Button | Enter／Space／↓ | 打开菜单，焦点落在第一项 |
+| | | ↑／↓ | 在项间走，两端环绕 |
+| | | Enter／Space | 做这一项；「加一个标签」把菜单换成一个输入框 |
+| | | Escape／Tab | 关上；Escape 把焦点还给按钮，Tab 按文档序走 |
+| 菜单里的标签输入框 | 原生文本框 | Enter | 给这一段加上这个词并关上，读不出时留着并标 `aria-invalid`；焦点回到按钮 |
+| | | Escape | 不加，关上，焦点回到按钮 |
+| 标签筛选行 | `role="group"`，每个标签一个 `aria-pressed` 按钮 | Enter／Space | 只看带这个标签的行；再按已选的那个回到全部 |
 | 设置树 | APG Disclosure Navigation | Tab／Shift+Tab | 依次走过条目 |
 | | | ↓／↑ | 下一个或上一个看得见的条目 |
 | | | Home／End | 第一个或最后一个条目 |

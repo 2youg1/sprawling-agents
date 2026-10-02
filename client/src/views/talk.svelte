@@ -10,8 +10,10 @@
   // - words flowing down it, the box at its foot. Every run in the room
   // is a stretch of the same thread; what waits for the person is a card
   // in it; and the box either steers the run that is going or opens the
-  // next one. In the panorama tier the column is a band along the bottom:
-  // the last thing said, and the same box (docs/frontend-method.md §7I).
+  // next one. On the panorama workbench the column stands under the chosen
+  // session and draws the whole thread (client/Spec.lean §7K); only on one
+  // column, under the world layer's sheet, is it a band: the last thing
+  // said, and the same box (docs/frontend-method.md §7I).
   //
   // A session is a stretch of the room, not the room (roadmap S1): runs
   // before it fold behind one line, and how it began is drawn where the
@@ -54,8 +56,8 @@
 
   interface Props {
     readonly address: Address;
-    // The panorama tier's band: the thread steps aside and the last thing
-    // said stands above the box.
+    // The band under the world layer's sheet on one column: the thread
+    // steps aside and the last thing said stands above the box.
     readonly band: boolean;
   }
 
@@ -110,8 +112,8 @@
     });
   });
 
-  // The last thing said in this room, which the panorama band shows above
-  // the box: the newest run's reply as the rounds have it.
+  // The last thing said in this room, which the band shows above the
+  // box: the newest run's reply as the rounds have it.
   const said = $derived(answer?.turns.filter((turn) => typeof turn.said === "string").at(-1));
 
   // How this stretch began, in the words the divider draws. A branch
