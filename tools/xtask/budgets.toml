@@ -105,10 +105,10 @@ status = "reported, not gated: the person's ruling that runtime speed comes befo
 # configuration rather than in the repository. Which of the two moved
 # the figure is not separated here, and it does not need to be: a size
 # is a fact about the linker that produced it, which is why this row
-# names the platform its reading was linked on. The
-# `opt-level = "z"` decision was weighed against this row and taken on
-# 2026-09-21; the row records a binary linked the way that decision
-# chose.
+# names the platform its reading was linked on. The release profile is
+# `opt-level = 3`, chosen on runtime speed rather than against this row,
+# and the row records a binary linked that way: 26,819,584 B, against
+# 15,135,744 B for the same tree at `"z"` and 17,560,576 B at `"s"`.
 [release_binary]
 what = "the single binary a person installs, with the execution engine its sandbox needs and the web client already inside it"
 budget_bytes = 134217728
@@ -127,7 +127,7 @@ budget_bytes = 134217728
 # and best_bytes is the last reading recorded here. UI Automation (uiautomation, winsafe, chrono)
 # brought the reading to 13,524,992 B, 365,056 B over the best and inside
 # that slack, so the connector stays linked here.
-best_bytes = 13159936
+best_bytes = 26819584
 measured_by = "just build-web, just dist, then cargo xtask budget, on windows-x86_64"
 status = "reported, not gated: the person's ruling that runtime speed comes before size"
 
@@ -400,7 +400,7 @@ status = "measured, not gated: 562.3 us/record at one record per barrier, 55.2 a
 [run_history]
 what = "one session's newest 500 records, out of a ledger holding eight sessions"
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 4.232 ms (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01), against 6.009 ms on the same fixture before the run's sequences were taken lazily, and 27.6 ms before the index. The registered 3.3 ms is explained under ledger_append. A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: p50 3.287 ms, three runs 2.978-3.355 ms (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3; 4.151-4.261 ms at opt-level \"z\"), against 6.009 ms on the same fixture before the run's sequences were taken lazily, and 27.6 ms before the index. The registered 3.3 ms is explained under ledger_append. A wall-clock figure is the machine's, so it is recorded, never gated"
 
 [prefix_assembly]
 what = "assembling one frozen prefix"
@@ -514,10 +514,10 @@ status = "measured, not gated: 8,388,608 B, refused whole rather than truncated,
 what = "milliseconds to rebuild every view, per megabyte of ledger folded"
 measured_by = "just bench (citysim bench bin, release), over a ledger large enough that the fold rather than the open dominates: the bench writes 50,000 records into a scratch city and drives the whole production rebuild through `sprawling::ask`, which verifies the chain, parses every line and folds it into every view before answering one CityView"
 fold_records = 50000
-best_p50_ms = 716
-best_p95_ms = 716
-best_p99_ms = 716
-status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`), floor 713.863 ms, p50 715.493 ms, p95 and p99 715.953 ms under the nearest-rank rule, the best_* fields rounded up to whole milliseconds (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release). The reading fell from 1277.206 ms when a rebuild from genesis stopped proving the history before folding it, since the fold checks every line itself (accounting-SPEC.md item 31(b)); what remains is one line check, one parse and one fold per line. The per-megabyte figure is best_p50_ms over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
+best_p50_ms = 437
+best_p95_ms = 439
+best_p99_ms = 439
+status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`), floor 434.222 ms, p50 436.676 ms, p95 and p99 438.127 ms under the nearest-rank rule, the median of three runs whose p50 read 417.348-437.723 ms, the best_* fields rounded up to whole milliseconds (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3). The same runs read p50 676.402-707.773 ms at opt-level \"z\". The reading fell from 1277.206 ms when a rebuild from genesis stopped proving the history before folding it, since the fold checks every line itself (accounting-SPEC.md item 31(b)); what remains is one line check, one parse and one fold per line. The per-megabyte figure is best_p50_ms over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
 
 # What a dispatch spends before the model is called: opening the room,
 # writing the brief, standing the run up, and assembling the tools -
@@ -572,7 +572,7 @@ status = "measured, not gated: 58 ms median on windows-x86_64, 16 cores, NVMe (2
 [install]
 what = "the archive in place to the unpacked executable answering `version`: digest, unpack, launch"
 measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples, p50/p95/p99 nearest-rank over all of them"
-status = "measured, not gated: p50 1375.792 ms, p95 1392.718, p99 1417.450; floor 1333.937, peak 1572.503; none of the 200 above three times the middle (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). **Dominant: `launch`**, 1252.052 ms, against 116.960 ms to unpack and 6.171 ms to SHA-256 the 6,444,519 B archive: the first launch of an unpacked executable prices the on-access scanner as much as the install. One process and one file per sample, no barriers"
+status = "measured, not gated: p50 1856.382 ms, p95 1880.174, p99 1886.169; floor 1819.708, peak 1890.297; none of the 200 above three times the middle (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3; p50 1485.98-1490.38 ms at opt-level \"z\", whose executable is 11.7 MB smaller). **Dominant: `launch`**, 1674.365 ms, against 170.557 ms to unpack and 10.953 ms to SHA-256 the 11,601,869 B archive: the first launch of an unpacked executable prices the on-access scanner as much as the install. One process and one file per sample, no barriers"
 
 [startup]
 what = "`CreateProcess` sent to the light command's exit observed: create, run"
@@ -592,7 +592,7 @@ status = "measured, not gated: p50 1.540 ms, p95 1.735, p99 1.984; floor 1.358, 
 [first_byte]
 what = "`serve` spawned to the first byte of GET /, over the three fixture cities, with the product's own split of the opening"
 measured_by = "just bench-startup first-byte"
-status = "measured, not gated: the empty city p50 42.1 ms (city fixture 7e6fda8b5653dd7f); p50 in ms over three bench runs - l100k 116-119 (6615c4052f604f8c), l400k 249-259 (99909ec1f02d58fc) (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release). The l400k first byte fell from 296-298 ms and l100k from 127-130 ms when the snapshot encoding stopped carrying digests as hex text (GitOid and B3Hash are bytes in postcard): the l400k serve says fold 0 lines from the snapshots 145-149 ms (was 189-190), open the ledger 41-42, copy the views 22. The history is proved behind the first byte, its segments hashed in parallel waves of eight (storage PROOF_WAVE): l400k proof 119-121 ms (was 390-395), commands taken 335-343 ms after opening began (was 651-656); l100k proof 77-78 ms (was 98-99), bounded by one 64 MiB segment; commands wait for the proof (E_HISTORY_UNPROVEN). The remaining snapshot fold is the dominant phase (sprawling-SPEC.md 8-154)"
+status = "measured, not gated: p50 in ms over three bench runs - the empty city 45-47 (city fixture 7e6fda8b5653dd7f), l100k 110-112 (6615c4052f604f8c), l400k 210-212 (99909ec1f02d58fc) (windows-x86_64, 16 cores, NVMe, release at opt-level 3; the same runs read 47-48, 121-125 and 257-263 at opt-level \"z\"). The l400k serve says fold 0 lines from the snapshots 101 ms, open the ledger 42, copy the views 20. The history is proved behind the first byte, its segments hashed in parallel waves of eight (storage PROOF_WAVE): l400k proof 138 ms, commands taken 310 ms after opening began; l100k proof 84 ms, bounded by one 64 MiB segment; commands wait for the proof (E_HISTORY_UNPROVEN). The remaining snapshot fold is the dominant phase (sprawling-SPEC.md 8-154)"
 
 # How large this tree's dependency graph is, counted off the resolved
 # lockfile rather than off any manifest: a manifest states what was
@@ -649,7 +649,7 @@ status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized b
 [view_backlog]
 what = "how far the view fold falls behind a burst of 2,000 records while readers keep asking"
 measured_by = "just bench (instrument_view_backlog, crates/sprawling/src/serving/folding/tests/instruments.rs)"
-status = "measured, not gated: 2,003 records in an 18.618 ms burst, 90 reader questions; a record waits floor 300 us, p50 9297 us, p99 14425 us, max 14527 us for its broadcast, and at most 1,600 records wait at once (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01)"
+status = "measured, not gated: 2,003 records in a 12.255 ms burst, 60 reader questions; a record waits floor 184 us, p50 7118 us, p99 8312 us, max 8350 us for its broadcast, and at most 1,945 records wait at once; the median of three runs whose p50 read 5861-8340 us (windows-x86_64, 16 cores, NVMe, release at opt-level 3; 7853-11347 us at opt-level \"z\")"
 
 # What one beat of the monitor costs the process it watches, per kind of
 # platform reading: the summary counters, the whole page, and one
