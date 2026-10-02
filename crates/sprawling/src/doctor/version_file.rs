@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The version an installer wrote beside a browser (sprawling-SPEC.md
-//! section 8-80).
+//! The version an installer wrote beside a browser (`crates/sprawling/spec/Doctor.lean`
+//! §8-80).
 //!
 //! **A browser is never started to learn its version.** On Windows a
 //! Chromium browser given `--version` opens a window instead of

@@ -5,7 +5,7 @@
 
 //! What each building is working towards and who holds which part of its
 //! plan: the part of the worker's state that `pursuit_changed` and the
-//! `roadmap_*` records change (sprawling-SPEC.md 8-111).
+//! `roadmap_*` records change (`crates/sprawling/Spec.lean` §8-111).
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -30,7 +30,7 @@ pub(in crate::worker) struct Planning {
     /// The one door a landing replaces a building's plan through:
     /// `city::edit_against`, and in a test a writer that refuses, because
     /// a read-only file does not stop the rename over it where the
-    /// directory is writable (sprawling-SPEC.md 8-42-8).
+    /// directory is writable (`crates/sprawling/Spec.lean` §8-42-8).
     pub(in crate::worker) write_plan: PlanWriter,
 }
 
@@ -95,7 +95,7 @@ impl PlanHolders {
             }
             // A split is its parent's fate as much as a finish is: the
             // run that split the node holds nothing afterwards
-            // (sprawling-SPEC.md 8-42-8).
+            // (`crates/sprawling/Spec.lean` §8-42-8).
             EventKind::RoadmapFinished
             | EventKind::RoadmapReleased
             | EventKind::RoadmapSplit

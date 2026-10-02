@@ -12,7 +12,7 @@ keywords = ["agents", "llm", "harness", "ledger", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 # What `cargo package` puts in the archive crates.io serves. Listed rather
 # than left to git, because `web-dist/` - the client bundle the build
-# script embeds (sprawling-SPEC.md 8-83) - is build output that
+# script embeds (`crates/sprawling/Spec.lean` §8-83) - is build output that
 # `.gitignore` names, and with no `include` cargo leaves every ignored file
 # out. Cargo adds the manifest and the lockfile itself.
 include = ["build.rs", "src/**", "web-dist/**"]
@@ -35,7 +35,7 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-# The monitor's counters (sprawling-SPEC.md 8-94, 8-96): the machine's
+# The monitor's counters (`crates/sprawling/Spec.lean` §8-94, §8-96): the machine's
 # memory and the volume only, not the default component, network and user
 # tables; this process is read through its own handle below, not through
 # the whole process table.
@@ -45,27 +45,27 @@ memory-stats = "1.2"
 tokio-tungstenite = { workspace = true }
 # A core thread raises itself above the commands it dispatches; the
 # crate's surface is safe, so no foreign call lives in this crate
-# (sprawling-SPEC.md 8-93).
+# (`crates/sprawling/Spec.lean` §8-93).
 thread-priority = "3.1"
 # The desktop server this binary runs as `sprawling desktop`, a child
 # the city starts for a building whose rules ask for the desktop
-# (sprawling-SPEC.md 8-4d).
+# (`crates/sprawling/Spec.lean` §8-4d).
 desktop = { workspace = true }
 # The remote door this binary keeps and relays through, the QR code its
 # console prints an invitation as, and the device table it keeps on disk
-# (sprawling-SPEC.md 8-139, 8-140).
+# (`crates/sprawling/Spec.lean` §8-139, §8-140).
 remote_access = { workspace = true }
 qrcodegen = { workspace = true }
 toml = { workspace = true }
 
 # The peak memory a command `sprawling gauge` measured reached, read
-# after it exits and before its handle closes (sprawling-SPEC.md 8-129-4).
+# after it exits and before its handle closes (`crates/sprawling/Spec.lean` §8-129-4).
 [target.'cfg(windows)'.dependencies]
 win32job = { workspace = true }
 
 [features]
 # The execution engine is on by default, so `cargo install sprawling`
-# builds the binary the release archives carry (sprawling-SPEC.md 8-157).
+# builds the binary the release archives carry (`crates/sprawling/Spec.lean` §8-157).
 # Without it `AbsentSandbox` refuses tool execution in three parts and
 # its recovery says "install a build with the `wasm` feature" - this is
 # that feature; `--no-default-features` is the build without it, which

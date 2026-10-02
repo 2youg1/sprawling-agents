@@ -146,7 +146,7 @@ fn heard_within(
 
 /// A cut that falls due waits while the fold is further behind the writer
 /// than the bound, and is handed out again once it has caught up
-/// (sprawling-SPEC.md 8-123).
+/// (`crates/sprawling/spec/Serving.lean` §8-123).
 #[test]
 fn a_cut_waits_while_the_fold_is_behind() {
     let dir = tempfile::tempdir().unwrap();

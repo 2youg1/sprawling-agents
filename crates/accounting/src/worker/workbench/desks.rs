@@ -23,7 +23,7 @@ impl RunWorker {
     /// A second run in the same room is given a queue of its own and
     /// told so in [`Desks::holding`]: the room table lends its queue to
     /// one reader, and what arrives meanwhile waits there for that
-    /// reader to land (sprawling-SPEC.md 8-46-9).
+    /// reader to land (`crates/sprawling/Spec.lean` §8-46-9).
     ///
     /// # Errors
     /// Propagates a plan that cannot be read and a shelf that cannot be

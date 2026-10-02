@@ -12,9 +12,9 @@
 
 **行哈希买到什么、买不到什么。** 快照只经它最后一行的哈希指明自己切自哪本账本。当这个哈希与盘上同一 seq 的那一行相符，并且摘要函数在被覆盖的行上是单射（这条假设归 `Kernel.Ledger`，见 `crates/kernel/spec/Ledger.lean`），快照所折的行就是盘上账本的前缀；`resumeIsWhole` 就陈述在这个前缀事实之上，所以它根本不需要摘要函数。
 
-**两份快照，一遍读。** 服务中的城有两份快照（视图与 Standing），各切在自己的行上。开城从较早的切点读一遍，每一行只交给切点在它之前的那一份折叠；`twoCutsOnePass` 陈述这一遍的结果等于两份各自的全量折叠（sprawling-SPEC.md 8-122，`accounting::views::snapshot::start::start_both`）。
+**两份快照，一遍读。** 服务中的城有两份快照（视图与 Standing），各切在自己的行上。开城从较早的切点读一遍，每一行只交给切点在它之前的那一份折叠；`twoCutsOnePass` 陈述这一遍的结果等于两份各自的全量折叠（`crates/sprawling/Spec.lean` §8-122，`accounting::views::snapshot::start::start_both`）。
 
-**已验证前缀：不重算，也不少核对。** 快照之前的行由后台的证明走一遍（§8-30，`storage::verified_prefix`）。每段有一条记录：版本、入口状态、这段前缀字节的摘要、出口状态。记录的入口等于当前状态、版本相同、摘要相符时，证明不再逐行核对这段前缀，直接取记录的出口；否则逐行核对。`cachedVerifyIsStrict` 陈述：只要记录都由严格核对写下、摘要在段上单射，这样得到的判定与逐行核对整条链的判定相同。两个反例说明三个条件缺一不可：不比入口，删掉中间一段也被接受（`withoutLinkAcceptsSplice`）；不比版本，旧规则放过的行被沿用（`withoutVersionAcceptsStale`）。记录没有密钥：能同时改段与记录的人绕得过它，与今天无密钥的链一样（sprawling-SPEC.md §12 已验证前缀一段）。
+**已验证前缀：不重算，也不少核对。** 快照之前的行由后台的证明走一遍（§8-30，`storage::verified_prefix`）。每段有一条记录：版本、入口状态、这段前缀字节的摘要、出口状态。记录的入口等于当前状态、版本相同、摘要相符时，证明不再逐行核对这段前缀，直接取记录的出口；否则逐行核对。`cachedVerifyIsStrict` 陈述：只要记录都由严格核对写下、摘要在段上单射，这样得到的判定与逐行核对整条链的判定相同。两个反例说明三个条件缺一不可：不比入口，删掉中间一段也被接受（`withoutLinkAcceptsSplice`）；不比版本，旧规则放过的行被沿用（`withoutVersionAcceptsStale`）。记录没有密钥：能同时改段与记录的人绕得过它，与今天无密钥的链一样（sprawling D4）。
 
 **按波读段：先算摘要，再按段序走。** 证明把至多八段并成一波，各段的读与前缀哈希同时做，join 之后再按段序判入口、逐行核对（§8-37，`storage::chain_audit`）。能先算的只有摘要判定，因为它只看这一段的字节；`wavesAreCached` 陈述先算好的判定与边走边算的判定相同，`wavesAreStrict` 把它接到逐行核对上。
 -/
@@ -43,7 +43,7 @@ pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, StorageError>;
 - **核对只看一行。** 启动时按 `seq` 做一次定位读，`fit` 比较那一行的 `chain_hash` 与 `line_hash`：相等时，在摘要单射的前提下（`crates/kernel/spec/Ledger.lean` 持有这条假设），快照所折的行就是盘上账本的前缀；`Stale` 时调用方丢弃快照，全量折叠。`fold_version` 不等同样丢弃：折叠规则变了，旧状态不再是新规则折出来的。
 - **「快照加尾部 ≡ 全量折叠」** 由 `crates/storage/spec/Snapshot.lean` 对任意折叠、任意切点证明（`snapshotPlusTailIsWhole`、`resumeIsWhole`）；Rust 侧由 proptest 在随机账本与随机切点上持有同一性质，折叠取链检查本身：从 `resume()` 出发走尾部，接受的行与终态都等于从创世走全程。
 - **被否：只存 `seq` 不存 `line_hash`。** 账本被换成另一条同长的链时，只比 `seq` 会把别人的视图接到这条链的尾部上；多 32 字节换来的是一次定位读就能拒绝。
-- `Views` 与 `Standing` 都从这里起步（sprawling-SPEC 8-91、8-101）；服务中的城让两者从较早的切点一遍读起（sprawling-SPEC 8-122）。
+- `Views` 与 `Standing` 都从这里起步（`crates/sprawling/Spec.lean` §8-91、§8-101）；服务中的城让两者从较早的切点一遍读起（`crates/sprawling/Spec.lean` §8-122）。
 -/
 
 namespace Storage.Snapshot

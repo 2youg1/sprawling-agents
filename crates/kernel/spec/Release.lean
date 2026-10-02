@@ -41,7 +41,7 @@ pub const MATURITY: Maturity;                   // 这棵树切出的每一次�
 2. **排序是 semver 自己的。** 日期落在 pre-release 段，于是 `0.0.5-pre.260912` 高于 `0.0.5-pre.260911` 而低于裸的 `0.0.5`——semver 对点分数字标识符按数值比。`Ord` 按字段声明顺序派生即复现该规则，本 crate 与注册表因而对同一对发布给出同一个次序。**这正是本类型存在的理由**：二进制拿自己的裸 `0.0.5` 去比注册表的 `0.0.5-pre.260912`，会把最新的那一版读成更旧的那一版，且无声。
 3. **日期必须随版本一起走，不能摆在旁边。** 一个 pre-alpha 的版本号几乎说不出树有多旧，而树有多旧正是它的读者最需要知道的（CHANGELOG.md 开篇）。故 `released()` 是给人读的那一个渲染，`npm_version()` 是给注册表的那一个。
 4. **无钟无套接字。** 注册表此刻给的是什么，归调用方去取；本模块只判它被递到的东西（ARCHITECTURE.md 第 1 段）。
-5. **成熟度只写在 `MATURITY` 一处。** tag 的中缀、`sprawling status` 版本行里的说法（`crates/sprawling/sprawling-SPEC.md` 8-162）、文档里由 `cargo xtask docnum` 的 `maturity` 事实渲染的字样（tools/xtask/Spec.lean §8-16），都从这个常量读；npm 那一种拼法的 `-pre.` 不随它变（D18）。
+5. **成熟度只写在 `MATURITY` 一处。** tag 的中缀、`sprawling status` 版本行里的说法（`crates/sprawling/Spec.lean` §8-162）、文档里由 `cargo xtask docnum` 的 `maturity` 事实渲染的字样（tools/xtask/Spec.lean §8-16），都从这个常量读；npm 那一种拼法的 `-pre.` 不随它变（D18）。
 -/
 
 namespace Kernel.Release

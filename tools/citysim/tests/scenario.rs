@@ -591,7 +591,7 @@ fn two_reads_in_one_wave_are_two_calls() {
 /// is the second half: one chain, two runs' lines in it, and the same
 /// bytes both times. The simulator itself stays sequential — a pool of
 /// one is what keeps a scenario replaying exactly from its script
-/// (sprawling-SPEC 8-42-3), so the interleaving here is expressed as
+/// (`crates/sprawling/Spec.lean` §8-42-3), so the interleaving here is expressed as
 /// what the accounting thread would have written, not as two threads
 /// racing for it.
 #[test]

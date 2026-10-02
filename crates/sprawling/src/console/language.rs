@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The console's vocabulary, and the judgement of one typed line into a
-//! [`Line`] (sprawling-SPEC.md section 8-11).
+//! [`Line`] (`crates/sprawling/spec/Console.lean` §8-11).
 //!
 //! This module owns the console's own verbs — `CONTROL`, the six that
 //! never reach the wire — and owns nothing else about any verb. Every

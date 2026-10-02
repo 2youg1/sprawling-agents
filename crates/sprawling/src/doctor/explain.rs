@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One refusal code connected to the items on this machine that can
-//! raise it (sprawling-SPEC.md section 8-48).
+//! raise it (`crates/sprawling/spec/Doctor.lean` §8-48).
 //!
 //! A refusal's `recovery` is written where the refusal is, and it
 //! cannot know this machine. `sprawling doctor --explain <code>` is the

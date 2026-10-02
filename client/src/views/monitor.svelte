@@ -12,8 +12,8 @@
   //
   // **The panel is what makes the city sample.** `watch` is called when
   // the panel opens and what it returns is called when it closes, so a
-  // city nobody is looking at reads no counter at all (sprawling-SPEC
-  // 8-94).
+  // city nobody is looking at reads no counter at all (`crates/sprawling/Spec.lean`
+  // §8-94).
   //
   // **A curve is as long as the panel is wide.** Each point is one
   // glyph, so the panel measures one glyph and the width it has, and

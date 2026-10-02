@@ -28,7 +28,7 @@ impl RunWorker {
     /// A `Dispatch` drives in a lane here exactly as it does from the
     /// desk; what differs is that this caller waits for the lane,
     /// because a run nobody lands is a run that never finishes
-    /// (sprawling-SPEC.md 8-46-2).
+    /// (`crates/sprawling/Spec.lean` §8-46-2).
     ///
     /// # Errors
     /// Refuses a command this stage does not run yet, naming what does,
@@ -68,7 +68,7 @@ impl RunWorker {
     /// with that first answer and carried out no second time: this is
     /// the door that honours the `IdemKey` every state-changing Command
     /// carries, and it judges before any effect
-    /// (`commanding::entrance`, sprawling-SPEC.md 8-41).
+    /// (`commanding::entrance`, `crates/sprawling/Spec.lean` §8-41).
     pub(in crate::worker) fn serve_one(&mut self, posted: Posted) {
         let Posted { command, reply } = posted;
         // Before the key is judged, so the same frame sent again once
@@ -98,7 +98,7 @@ impl RunWorker {
         // because what this command does is start one: a second frame
         // under the same key arriving while the run is still driving is
         // recognised and adds no second run, which is the whole of what
-        // the door is for (sprawling-SPEC.md 8-46-2).
+        // the door is for (`crates/sprawling/Spec.lean` §8-46-2).
         let outcome = self.carry_out(command, reply.clone());
         self.doorstep.entrance.settle(&outcome);
         if let Err(err) = outcome {
@@ -109,7 +109,7 @@ impl RunWorker {
     /// Refuses `command` before it has any effect while the writer takes
     /// no line: before the proof of a served city's history, with
     /// `E_HISTORY_UNPROVEN`, and after a broken chain, with the proof's
-    /// reason (sprawling-SPEC.md 8-90). A command refused only at its
+    /// reason (`crates/sprawling/Spec.lean` §8-90). A command refused only at its
     /// first append would already have written its files.
     ///
     /// # Errors

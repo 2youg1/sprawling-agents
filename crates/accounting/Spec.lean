@@ -71,7 +71,7 @@ import crates.accounting.spec.Worker.Workbench.Tools
 | 测试 | 它钉住的事 |
 |---|---|
 | `a_dispatch_reaches_the_model_the_worker_was_handed` | run 的模型走端口。端点指向一个拒绝连接的 loopback 端口，所以一个绕过端口、自己造适配器的 worker 碰不到脚本模型，历史里也就没有脚本写下的那句回答。 |
-| `an_unnamed_dispatch_asks_the_factory_for_the_run_model_alone` | 没有 session 的 dispatch 按规则从任务的词里取房间名（sprawling-SPEC.md §8-86），不做命名调用：工厂只被问到 run 的主模型，run 在规则给出的房间里开始。 |
+| `an_unnamed_dispatch_asks_the_factory_for_the_run_model_alone` | 没有 session 的 dispatch 按规则从任务的词里取房间名（`crates/sprawling/Spec.lean` §8-86），不做命名调用：工厂只被问到 run 的主模型，run 在规则给出的房间里开始。 |
 | `a_confidential_building_refuses_before_the_factory_is_asked` | 机密楼的拒绝在 worker 的选择里，不在工厂里：端点不是 loopback 地址时 dispatch 以 `GateDenied` 被拒，脚本工厂一次也没被问到。换掉工厂不能绕开机密。 |
 
 第四条在 `crates/sprawling/tests/connectors.rs`：`a_run_is_offered_the_tools_the_worker_was_handed`。楼的配置写了一个 MCP server，它的命令在任何主机上都不存在；worker 接收了一个脚本 `Connectors`，它给出一个工具。一个绕过端口、自己启动 server 的 worker 起不来这个 server，模型收到的工具表与休眠索引里也就都没有那个工具。
@@ -104,7 +104,7 @@ import crates.accounting.spec.Worker.Workbench.Tools
 
 /-! D23 验收覆盖从模型收到的工具表与休眠索引的工具行算出应当调用的集合；城外工具不进这张表；效果层拒绝的工具按「没有东西变」判定；技能经城库装入
 
-理由：哪些工具存在，唯一的权威是工作台的那一次登记（sprawling-SPEC.md §8-27），模型第一次请求里的工具表加上休眠索引的工具行就是它的输出（不常驻的工具只在索引里留一行，`crates/runtime/Spec.lean` §8-60）。测试若照抄一份名单，下一次加工具时名单会悄悄漏掉那一件；从工具表算，漏掉的那件会被点名。城外工具的集合随楼的配置与主机而变，放进来就要在测试里配一台浏览器或一台 MCP server，而它们的路由已经各有一条端口测试。`rules` 与 `city` 声明 `Effect::Govern`，拒绝码取决于工具是否给出自己的 `subject`（`crates/city/Spec.lean` §8-2b 写了两种拒词）；钉住拒绝码，补上 `subject` 的那次改动就会打红验收，而验收要守的规矩——run 不改写审判它的规则、不立楼——在那次改动前后都成立。技能经 `city::install_skill` 装进城库：那条路把一个包的每个文件落在城内，所以验收连包里附属文件的按名读取一起判；城外书架上的一件由 catalog 携着正文交给 run（`crates/runtime/Spec.lean` §8-29-6），它的验收是另一条测试，判的是同一条阅览室、catalog、`read` 与 `SkillPin` 的链。被否决的做法：手写工具名单再逐件断言（第二个权威）；把城外工具一并覆盖（重复端口测试，并让验收依赖主机）；按拒绝码断言效果层的拒绝（钉死一个 SPEC 已说明会变的细节）。
+理由：哪些工具存在，唯一的权威是工作台的那一次登记（`crates/sprawling/Spec.lean` §8-27），模型第一次请求里的工具表加上休眠索引的工具行就是它的输出（不常驻的工具只在索引里留一行，`crates/runtime/Spec.lean` §8-60）。测试若照抄一份名单，下一次加工具时名单会悄悄漏掉那一件；从工具表算，漏掉的那件会被点名。城外工具的集合随楼的配置与主机而变，放进来就要在测试里配一台浏览器或一台 MCP server，而它们的路由已经各有一条端口测试。`rules` 与 `city` 声明 `Effect::Govern`，拒绝码取决于工具是否给出自己的 `subject`（`crates/city/Spec.lean` §8-2b 写了两种拒词）；钉住拒绝码，补上 `subject` 的那次改动就会打红验收，而验收要守的规矩——run 不改写审判它的规则、不立楼——在那次改动前后都成立。技能经 `city::install_skill` 装进城库：那条路把一个包的每个文件落在城内，所以验收连包里附属文件的按名读取一起判；城外书架上的一件由 catalog 携着正文交给 run（`crates/runtime/Spec.lean` §8-29-6），它的验收是另一条测试，判的是同一条阅览室、catalog、`read` 与 `SkillPin` 的链。被否决的做法：手写工具名单再逐件断言（第二个权威）；把城外工具一并覆盖（重复端口测试，并让验收依赖主机）；按拒绝码断言效果层的拒绝（钉死一个 SPEC 已说明会变的细节）。
 -/
 
 /-! ## 3 假设与歧义
@@ -113,7 +113,7 @@ import crates.accounting.spec.Worker.Workbench.Tools
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
 - `playback` 的导出在 40 万行的城上要 27 s，分段计时里约七成是投影对 cutoff 以内每一行做的 credential 扫描（`kernel::secret::scan`，每行约 60 µs，在 `opt-level = "z"` 下量；读数见 §8-25）。范围外的行也要扫，因为配对表（`links`）、`hidden_calls` 与 `policies` 都读一行对读者是否可见。未定的是走哪条路：让 `kernel::secret::scan` 本身变快（它是「什么像凭证」的唯一权威，每个扫描者都受益），还是让投影只扫可见性会被某张表读到的行（判定从一处变成两处）。能定下它的证据是 `kernel::secret::scan` 在这类行上的单行读数：降到几 µs，导出就只剩逐行核对的 5.5 s 与视图折叠，投影不必拆开判定。
 - `playback`（§8-12、§8-13）的两个上限是待测初值：`BUNDLE_MAX_BYTES` 与 `PAGE_MAX_BYTES` 要在多日夹具上量过导出峰值、页面解析与首屏成本才定值，定值的证据是 citysim 的多日场景读数。居民导出位置（§8-13）里崩溃留下的暂存文件 `<名>.partial-<pid>` 没有人收走：它不会被当成导出件读（`check` 只认 `.json`/`.html` 的名字），能定下要不要收的是这类文件在真实城里出现的频率。
-- **本 crate 有一百九十五个模块的接口仍写在 sprawling 的规格里。** 模块从 `sprawling` 搬过来时，它在 `crates/sprawling/sprawling-SPEC.md` 里的那一节留在原处，只把模块路径改成新的拼写（`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`）。`architecture.toml` 里这些行指向本 crate 的分部（`spec/Views.lean`、`spec/Views/Snapshot.lean`、`spec/Views/Rounds.lean`、`spec/PlanView.lean`、`spec/Worker.lean`、`spec/Worker/Attend.lean`、`spec/Worker/Workbench/Tools.lean`），每个分部末尾一张表按 sprawling 的标签列出它们；搬法见 D15。
+- **本 crate 有一百九十五个模块的接口仍写在 sprawling 的规格里。** 模块从 `sprawling` 搬过来时，它在 `crates/sprawling/Spec.lean` 里的那一节留在原处，只把模块路径改成新的拼写（`bin::views::x` 写作 `accounting::views::x`，`bin::assembly::x` 写作 `accounting::worker::x`）。`architecture.toml` 里这些行指向本 crate 的分部（`spec/Views.lean`、`spec/Views/Snapshot.lean`、`spec/Views/Rounds.lean`、`spec/PlanView.lean`、`spec/Worker.lean`、`spec/Worker/Attend.lean`、`spec/Worker/Workbench/Tools.lean`），每个分部末尾一张表按 sprawling 的标签列出它们；搬法见 D15。
 -/
 
 /-! ## 4 现状分析
@@ -153,18 +153,18 @@ Lean 里的名字与 Rust 的对应：
 
 | `bin` 里的东西 | 归属 | worker 或 `views` 用它做什么 | 依据 |
 |---|---|---|---|
-| `views` | 搬进本 crate | `Views`、`Published`、`Governance`、`pursued`、`snapshot::start` | worker 的读面；`Governance` 由读侧拥有，写侧从那里取用（sprawling-SPEC.md §8-92） |
+| `views` | 搬进本 crate | `Views`、`Published`、`Governance`、`pursued`、`snapshot::start` | worker 的读面；`Governance` 由读侧拥有，写侧从那里取用（`crates/sprawling/Spec.lean` §8-92） |
 | `lineage` | 搬进本 crate | `sprawling view` 的 run 列表，以及 playback 的共享投影 | 它只折记录，与 `views` 同形（形状 7）；二进制的 `main::view` 与本 crate 的读面都够得到它 |
 | `home` | 搬进本 crate | 阅览室与 `views::skills` 取这个人的家目录 | 只读一个环境变量、拼路径，不启动任何东西；`person` 与 `views` 都从它取路径 |
 | `person` | 搬进本 crate | `PutPreferences` 写、`Preferences` 查询读 | 人的那一层是一份文件，读写它和读写城的文件同类，不是主机的能力 |
 | `serving::standing::CorePriority` | 随 `person` 搬进本 crate | 偏好里核心线程抬不抬高的那个值 | 它是 `person` 读出来的值；真去抬高线程的 `raise_this_thread` 留在 `serving` |
 | `held_vault` | 搬进本 crate | 把一个锁着的 vault 变成解析器，锁中毒时的拒绝 | 纯函数，只碰已经打开的 vault |
 | `toolkit_broker` | 搬进本 crate | 一个外部应用的 broker 钥匙登记在哪 | 纯函数，`views::toolkits` 与连接动作读同一组事实 |
-| `doctor`（`REQUIREMENTS`、`Platform`、`host`、`Presence`、`PATIENCE`、`ThisMachine`） | 经端口：看与装经 `Machine`，需求表的查法经 `RunWorker.recipe_for`（sprawling-SPEC.md 中 `doctor_install` 那一节） | 需求表查找、执行引擎的路径 | 主机上有什么，`bin::doctor` 是唯一权威（本节上文）；`views::lines::harnesses_answer` 找一条命令的程序经 `Views.programs`，生产交的是 `bin::doctor::host::find_program`（§8-10）；exec 的主机半经 `Hands.exec_host`（§8-11） |
-| `monitor::memory::read`、`monitor::volume::read` | 经 `Hands`：`read_memory` 与 `read_volume`，都是 `fn` 指针（sprawling-SPEC.md §8-46-3、§8-94；§8-11） | 新工作进门时读内存与卷的余量 | 读主机的计数器；读数的类型 `Memory` 与记账线程的计数 `Health` 随 worker 搬进本 crate，读数的做法留在 `bin::monitor` |
-| `revealing` | 经端口：`RunWorker` 的 `reveal` 字段，一个 `fn` 指针（sprawling-SPEC.md §8-60） | `Reveal` 在主机的文件管理器里打开一个地址 | 启动主机的一个程序 |
-| `browser_tool` | 经端口：`RunWorker::with_browsers` 交进来的 `fn` 指针（sprawling-SPEC.md §8-45-2） | 按楼的规则给 run 的浏览器工具 | 启动浏览器，经 BiDi 说话 |
-| `release` | 经端口：`Views.registry`，一个由 `views::served` 放进来的 `fn` 指针（sprawling-SPEC.md 中 `Views.machine` 旁的那一条） | `views` 回答 `NewestRelease` 查询 | 向 npm 注册表发请求 |
+| `doctor`（`REQUIREMENTS`、`Platform`、`host`、`Presence`、`PATIENCE`、`ThisMachine`） | 经端口：看与装经 `Machine`，需求表的查法经 `RunWorker.recipe_for`（`crates/sprawling/Spec.lean` 中 `doctor_install` 那一节） | 需求表查找、执行引擎的路径 | 主机上有什么，`bin::doctor` 是唯一权威（本节上文）；`views::lines::harnesses_answer` 找一条命令的程序经 `Views.programs`，生产交的是 `bin::doctor::host::find_program`（§8-10）；exec 的主机半经 `Hands.exec_host`（§8-11） |
+| `monitor::memory::read`、`monitor::volume::read` | 经 `Hands`：`read_memory` 与 `read_volume`，都是 `fn` 指针（`crates/sprawling/Spec.lean` §8-46-3、§8-94；§8-11） | 新工作进门时读内存与卷的余量 | 读主机的计数器；读数的类型 `Memory` 与记账线程的计数 `Health` 随 worker 搬进本 crate，读数的做法留在 `bin::monitor` |
+| `revealing` | 经端口：`RunWorker` 的 `reveal` 字段，一个 `fn` 指针（`crates/sprawling/Spec.lean` §8-60） | `Reveal` 在主机的文件管理器里打开一个地址 | 启动主机的一个程序 |
+| `browser_tool` | 经端口：`RunWorker::with_browsers` 交进来的 `fn` 指针（`crates/sprawling/Spec.lean` §8-45-2） | 按楼的规则给 run 的浏览器工具 | 启动浏览器，经 BiDi 说话 |
+| `release` | 经端口：`Views.registry`，一个由 `views::served` 放进来的 `fn` 指针（`crates/sprawling/Spec.lean` 中 `Views.machine` 旁的那一条） | `views` 回答 `NewestRelease` 查询 | 向 npm 注册表发请求 |
 | `console` | 留在装配根 | — | 只有 `listening` 用它；它是终端，不是 worker |
 | `serving` 的其余部分（`folding`、`output_ring`、`Serving`、`open_vault`） | 留在装配根 | — | 只有 `attending`、`listening` 与 `production` 用它们 |
 | `assembly` 的 `production`（`SystemClock`、`hands`、`init_city`、`form_city`）、`listening`、`attending` 的起线程那一半（`spawn_worker`）、`chain_watch` 的起审计线程那一半、`dropping` | 留在装配根 | — | 起线程、绑端口、造生产的手：D17、D18 |
@@ -175,7 +175,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 
 /-! D9 worker 的决定与读面搬进本 crate，通往主机、网络或终端的做法留在 `sprawling`、经端口交进来（§7 归属表）
 
-理由：端口正是 citysim 插第二实现的地方；把一个适配器搬进来，它碰主机的那一步就跟着进了 citysim 驱动的 crate，脚本场景会真的起浏览器、读内存、打开文件管理器。被否决的做法：全部搬进来——本 crate 就要依赖 `thread-priority`、`sysinfo`、浏览器与终端，citysim 换不掉其中任何一个；把 `views` 留在 `sprawling`、经端口交给 worker——`Governance` 由读侧拥有，写侧在写下记录之前就要同步地从它作决定（sprawling-SPEC.md §8-92），端口会把一个 trait 放到决定路径上，并把一份折叠的权威分到两个 crate。
+理由：端口正是 citysim 插第二实现的地方；把一个适配器搬进来，它碰主机的那一步就跟着进了 citysim 驱动的 crate，脚本场景会真的起浏览器、读内存、打开文件管理器。被否决的做法：全部搬进来——本 crate 就要依赖 `thread-priority`、`sysinfo`、浏览器与终端，citysim 换不掉其中任何一个；把 `views` 留在 `sprawling`、经端口交给 worker——`Governance` 由读侧拥有，写侧在写下记录之前就要同步地从它作决定（`crates/sprawling/Spec.lean` §8-92），端口会把一个 trait 放到决定路径上，并把一份折叠的权威分到两个 crate。
 -/
 
 /-! D8 `effect` 与 `plan_view` 先于 `RunWorker` 搬进本 crate
@@ -236,7 +236,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 
 /-! ## 9 工作流程
 
-一次 dispatch 从装配根走到账本：服务面把 `wire::Command` 交给 `accounting::worker::attend` 的收件队列；记账线程判定、写下 `run_started` 之前的每一步不写账本（sprawling-SPEC.md §8-40「先判定后动手」）；lane 线程在 `accounting::worker::pool` 里驾驶 run，经 `relay` 写回；run 结束后桌子的效应经 `effect::Landing::record` 先成为账本行，再成为这座城（§8-5）。读的一侧：视图折叠线程把每一行交给 `Views::apply`，查询在锁内取小数据、在锁外读盘（§8-10）。
+一次 dispatch 从装配根走到账本：服务面把 `wire::Command` 交给 `accounting::worker::attend` 的收件队列；记账线程判定、写下 `run_started` 之前的每一步不写账本（`crates/sprawling/Spec.lean` §8-40「先判定后动手」）；lane 线程在 `accounting::worker::pool` 里驾驶 run，经 `relay` 写回；run 结束后桌子的效应经 `effect::Landing::record` 先成为账本行，再成为这座城（§8-5）。读的一侧：视图折叠线程把每一行交给 `Views::apply`，查询在锁内取小数据、在锁外读盘（§8-10）。
 -/
 
 /-! ## 10 实现逻辑
@@ -336,7 +336,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定，每一条边的
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；§3 的 `depmap` 与 §4 的端口表：本 crate 的依赖与端口。它们改了，分部的路径、`architecture.toml` 里 accounting 各行的 `spec` 锚点与 §7 一起重看。
 - `architecture.toml` 的模块图：accounting 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词（accounting thread、Ledger、playback bundle 等），`cargo xtask gates lexicon` 检查。
-- sprawling 的规格（`crates/sprawling/sprawling-SPEC.md`）：装配根、CLI 与服务面怎样调本 crate，以及 §3 那一百九十五个模块的接口；D15 说那些节怎样搬进来。
+- sprawling 的规格（`crates/sprawling/Spec.lean`）：装配根、CLI 与服务面怎样调本 crate，以及 §3 那一百九十五个模块的接口；D15 说那些节怎样搬进来。
 - 别的 crate 的规格：`crates/kernel/Spec.lean`（事件、地址、读界）、`crates/wire/Spec.lean`（查询与命令的答）、`crates/city/Spec.lean`（文档、楼规、归档）、`crates/collab/Spec.lean`（认领）、`crates/documents/Spec.lean`（窗口、预览、提案）、`crates/storage/Spec.lean`（账本索引与内容库）、`crates/runtime/Spec.lean`（读界与回合）。它们改了，引用它们的那一节一起重看。
 - `skills/playback/SKILL.md`：playback page 的数据契约与验证要求，与 §8-12、§8-13 同期改。
 - 引本规格的其他规格与 rustdoc 写 `crates/accounting/Spec.lean §8-n` 或 `accounting D<n>`；本 crate 的 rustdoc 写规定它的分部。一节换了分部，它的标签不变，引用不必改。

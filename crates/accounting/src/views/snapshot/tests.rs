@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `VIEWS_FOLD_RULES` moves whenever the encoding of `Views` does
-//! (sprawling-SPEC 8-91).
+//! (`crates/sprawling/Spec.lean` §8-91).
 
 use kernel::{Address, EventKind, RunId};
 

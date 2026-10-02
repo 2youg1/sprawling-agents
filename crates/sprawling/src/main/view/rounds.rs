@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The rounds of one run and the calls in each, folded the first time
-//! the person opens the run (sprawling-SPEC.md 8-117).
+//! the person opens the run (`crates/sprawling/spec/Main.lean` §8-117).
 
 use std::collections::BTreeMap;
 

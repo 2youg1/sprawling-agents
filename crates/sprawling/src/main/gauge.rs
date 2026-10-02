@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `sprawling gauge`: measure a served city, a running process and its
-//! descendants, or a command run n times (sprawling-SPEC.md 8-129-4).
+//! descendants, or a command run n times (`crates/sprawling/spec/Main.lean` §8-129-4).
 //!
 //! The readings never enter a Ledger: they are this machine's facts at
 //! one moment, written to stdout for whoever asked (8-129-1). Durations

@@ -11,7 +11,7 @@
 //! when it landed, so two runs in one room each took a queue, each
 //! filled it, and the one that landed second wrote over the one that
 //! landed first — signals the ledger already recorded as enqueued left
-//! no trace in memory (sprawling-SPEC.md 8-46-9).
+//! no trace in memory (`crates/sprawling/Spec.lean` §8-46-9).
 //!
 //! Three facts make that unrepresentable here. A lent queue is still in
 //! the table, marked with the run that took it, so a second borrower is
@@ -73,7 +73,7 @@ impl RoomQueues {
     /// whose queue is home has nobody in it. A second run in one room
     /// holds a spare, and the holder named here is still the one that
     /// answers - the entry it took is what the spare was issued against
-    /// (sprawling-SPEC.md 8-46-9).
+    /// (`crates/sprawling/Spec.lean` §8-46-9).
     pub(in crate::worker) fn worked_by(&self, addr: &Address) -> Option<RunId> {
         match self.rooms.get(addr) {
             Some(RoomQueue::Lent { to, .. }) => Some(*to),
@@ -234,7 +234,7 @@ impl RoomQueues {
     }
 
     /// [`RoomQueues::pending`] for every room holding anything, read at
-    /// once, for a bench laid out off this thread (sprawling-SPEC.md 8-113).
+    /// once, for a bench laid out off this thread (`crates/sprawling/Spec.lean` §8-113).
     pub(in crate::worker) fn waiting(&self) -> BTreeMap<Address, u32> {
         self.rooms
             .keys()

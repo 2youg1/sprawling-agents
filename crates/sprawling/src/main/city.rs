@@ -218,7 +218,7 @@ pub(super) fn serve_city(
     };
     // After the refusals a restart could not cure, so a mistyped line
     // is refused once here rather than spending the crash budget
-    // (sprawling-SPEC.md 8-109).
+    // (`crates/sprawling/spec/Supervising.lean` §8-109).
     // The terminal this city runs in becomes its console when `up`
     // started it, or when `serve` was asked. `--no-console` is the way
     // out for a supervisor that wants the old blocking shape.
@@ -255,7 +255,7 @@ pub(super) fn serve_city(
     };
     let token = keyed.code().map(str::to_owned);
     // The socket's workers stand above the commands the city dispatches
-    // (sprawling-SPEC.md 8-93).
+    // (`crates/sprawling/spec/Serving/Standing.lean` §8-93).
     let core = serving::setting_telling_a_refusal();
     let runtime = match serving::serving_runtime(core) {
         Ok(runtime) => runtime,
@@ -289,7 +289,7 @@ pub(super) fn serve_city(
     let (vault, vault_notice) = serving::open_vault();
     // The port and the writer are both taken before a word is printed:
     // a banner saying "running" over a port another process holds was a
-    // claim the city could not keep (sprawling-SPEC.md 8-88).
+    // claim the city could not keep (`crates/sprawling/spec/Assembly/Listening.lean` §8-88).
     let listening = match runtime.block_on(assembly::listen(serving::Serving {
         city_root: city.to_path_buf(),
         addr: bind,

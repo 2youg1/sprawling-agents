@@ -6,7 +6,7 @@
 //! A command run n times under `gauge`: each run timed from before its
 //! spawn until `wait` sees it exit, its process tree read on a beat
 //! thread meanwhile, and the spread of the runs' wall times at the end
-//! (sprawling-SPEC.md 8-129-4).
+//! (`crates/sprawling/spec/Main.lean` §8-129-4).
 
 use std::io::Write;
 use std::process::{Child, Command, Stdio};

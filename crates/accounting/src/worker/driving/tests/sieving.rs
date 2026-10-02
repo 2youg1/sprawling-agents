@@ -28,7 +28,7 @@ fn print_command(name: &str) -> (String, Vec<String>) {
 
 /// A real dispatch whose command prints more than the sieve's floor
 /// reaches the model sieved, and the way back to the original resolves
-/// (sprawling-SPEC 8-43).
+/// (`crates/sprawling/Spec.lean` §8-43).
 ///
 /// Before this, `driving` handed the bench's outcome to the turn as it
 /// came, so the sieve ran in the simulator and never in the product.
@@ -123,8 +123,8 @@ fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() 
 /// A real dispatch in a city that wrote no `[clock]`: the command's
 /// result reaches the ledger ending with the clock line, and the second
 /// it names is the one its `tool_result` line records: the turn reads
-/// the answer moment before the face accounts the result (sprawling-SPEC
-/// 8-125, `crates/runtime/Spec.lean` §8-15).
+/// the answer moment before the face accounts the result (`crates/sprawling/Spec.lean`
+/// §8-125, `crates/runtime/Spec.lean` §8-15).
 ///
 /// Before this, the product handed the pipeline no stamp at all, so a
 /// model in a real city never learned when a command ran.

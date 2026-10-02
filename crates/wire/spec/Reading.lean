@@ -48,7 +48,7 @@ pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
                           pub runs: Vec<(RunId, UsdMicros)> }
 ```
 
-**这里搬的是读法而不是接口。** 一个会话被读成回合、一次跑留下什么证据、一个计划节点花了多少钱——这三件事此前只有 `crates/web` 会算，于是「线就是全部 API」（ARCHITECTURE §8）在这三处是假的：另写一个客户端就得把折叠逻辑照抄一遍，而照抄出来的那一份迟早与这一份不一致。现在三者各是一次查询，答由 `accounting::views` 折出（sprawling-SPEC §8-47）。
+**这里搬的是读法而不是接口。** 一个会话被读成回合、一次跑留下什么证据、一个计划节点花了多少钱——这三件事此前只有 `crates/web` 会算，于是「线就是全部 API」（ARCHITECTURE §8）在这三处是假的：另写一个客户端就得把折叠逻辑照抄一遍，而照抄出来的那一份迟早与这一份不一致。现在三者各是一次查询，答由 `accounting::views` 折出（`crates/sprawling/Spec.lean` §8-47）。
 
 - **`Rounds` 的值类型住 `wire`，折叠住 `accounting::views`。** 值要上线，故必须可序列化；折叠要读账本，故必须在能读账本的那一层。两者切分开来，正是 ARCHITECTURE §9 的形状 2 与形状 7 的分界。
 - **`wire::reading` 是第三块**：把一条账本载荷读成上面这些值的那些纯函数（`said_in`／`used_in`／`output_in`／`note_of`）。它住在线这一层而不是服务端，因为**两端都要读**：服务端答 `Rounds` 要它，客户端把推来的 `model_returned` 折进自己的快照也要它（ARCHITECTURE §5 第 12 步：同一个折叠，线的两边）。一份权威，两个调用者。**`Call.subject` 不由这里算**：写方在写 `tool_called` 时把它定下（`crates/kernel/Spec.lean` §8-4：`ToolCalled::subject_of`），折叠读记录里的 `subject` 键；两个读方各按自己的 map 序推一次，同一次调用已经出现过两个名字。
@@ -57,7 +57,7 @@ pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
 - **`Evidence` 只认写下来的东西**：截图是 `tool_result` 载荷里的 `image` 定位符（`bin::browser_tool::stored` 写的那三项：定位符、两条边、media type），完成证据是 `roadmap_finished` 载荷里的 `evidence` 定位符。**答里恒不携字节**：一张图是一个 `cas:` 定位符，取它是资产端点的事，把 base64 塞进查询答会让「看一眼这次跑干了什么」付上整批像素的代价——与 §8-20 拒绝整批补丁同一条理由。
 - **`CostOf` 的分母不在这里**：答只报这个节点上归到的绝对金额与逐跑明细，不报占比。占比需要一个这一端没有的分母（整城总额是 `CostView` 的），而没有分母的百分比正是 `UnplannedProgress` 拒绝拼出来的那种东西。节点到跑的映射由 `roadmap_claimed` 折出（载荷里的 `node` 与记录的 `addr`），钱由 `storage::attribution` 的 `by_run` 给——**不新增任何计价处**。
 - **一个本城没认领过的节点答 `CostOf { spent: 0, runs: [] }` 而不是 `Unavailable`**：与 `Changes` 那一条相反，因为这里「没人认领过它」是一个真答案而不是「我读不了」；节点地址本身经 `NodeId` 的手写 `Deserialize` 把过关，读不了的形状根本上不了线。
-- **`RunCosts { runs: Vec<RunId> }` → `Answer::RunCosts(RunCostsAnswer { runs: Vec<(RunId, UsdMicros)> })`**：`CostView.by_run` 之外的跑逐个按名字问，一次最多 `RUN_COSTS_MAX`（64）个，按问的顺序答；读不出的跑不出行，零是「没花钱」。钱仍只由 `storage::attribution` 折，冷的一侧从账本折（sprawling-SPEC §8-90）。
+- **`RunCosts { runs: Vec<RunId> }` → `Answer::RunCosts(RunCostsAnswer { runs: Vec<(RunId, UsdMicros)> })`**：`CostView.by_run` 之外的跑逐个按名字问，一次最多 `RUN_COSTS_MAX`（64）个，按问的顺序答；读不出的跑不出行，零是「没花钱」。钱仍只由 `storage::attribution` 折，冷的一侧从账本折（`crates/sprawling/Spec.lean` §8-90）。
 - **`WIRE_V` 15→16，一次进位管三条查询**：名字表长了三项（17→20），故 schema 哈希无论如何都要变。旧页面在握手期被明确拒绝，这正是该机制存在的理由。
 - **被否**：（a）把 `Rounds` 并进 `RunHistory` 的答——前者是折叠后的读法，后者是原始记录页，一个答两副形状会让翻页与折叠互相牵制；（b）让 `Evidence` 直接回字节——见上一条；（c）把折叠留在 `wire` 里由客户端调用——那样新客户端仍要自己跑一遍折叠，而这一节整件事就是不要它这么做。
 -/
@@ -87,7 +87,7 @@ pub enum Note {
 - **被否：只带一个时长**。时长丢了起点，页面画不出调用在时间轴上的位置，也就排不出并发的两次调用。
 - **模型名挂在回合上，不挂在答案上**：`model_called` 每问一次记一次 `model`，一次 run 中途换模型（降级、换端点）时，逐回合的名字才是账本写下的事实；run 页统计栏的「模型」格取最后一个回合的名字，前后不同时列出各个名字。读法与 `Call.subject` 同：取那一键的文本，读不出为 `None`，页面不画名字而不猜。
 - **被否：`RoundsAnswer.model` 一个字段**。那得在折叠里挑一个回合的名字当整次 run 的名字，换过模型的 run 上它说错一半。
-- **等人从哪一刻开始，读自请求记录**：`Note::Waiting.t` 是 `approval_requested` 那条记录的 `t`，与 `Call.called` 同理不是 `Option`。等到哪一刻结束是 `answered`：`approval_resolved` 记在城自己的 run 下，服务端按 approval id 把它配回请求（sprawling-SPEC §8-50-1），配不上为 `None`，不猜。
+- **等人从哪一刻开始，读自请求记录**：`Note::Waiting.t` 是 `approval_requested` 那条记录的 `t`，与 `Call.called` 同理不是 `Option`。等到哪一刻结束是 `answered`：`approval_resolved` 记在城自己的 run 下，服务端按 approval id 把它配回请求（`crates/sprawling/Spec.lean` §8-50-1），配不上为 `None`，不猜。
 -/
 
 /-!

@@ -122,7 +122,7 @@ impl RunWorker {
                         // building is for - not a person. A
                         // `Reviewed-by:` trailer here would put the name
                         // in this machine's git config on work that
-                        // person never read (sprawling-SPEC.md 8-49).
+                        // person never read (`crates/sprawling/Spec.lean` §8-49).
                         planned
                             .apply(&storage::Landing {
                                 t: self.clock.now()?,
@@ -174,7 +174,7 @@ impl RunWorker {
     /// on the run's own branch, and a wave checkpoint is a dangling
     /// commit nobody can merge (`crates/storage/Spec.lean` §8-8). The one place a
     /// request is opened, whether a resident asked with `pr open` or the
-    /// city offers a harness run's work (sprawling-SPEC.md 8-124).
+    /// city offers a harness run's work (`crates/sprawling/Spec.lean` §8-124).
     ///
     /// # Errors
     /// Propagates a tree that will not commit, a branch that is not a

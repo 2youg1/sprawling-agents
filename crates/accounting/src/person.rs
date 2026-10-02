@@ -39,7 +39,7 @@ use crate::home::Home;
 /// spelling and read under another is a setting that never takes
 /// effect.
 const UI: &str = "ui";
-/// The section and key of the one core setting (sprawling-SPEC.md 8-93).
+/// The section and key of the one core setting (`crates/sprawling/Spec.lean` §8-93).
 const CORE: &str = "core";
 const PRIORITY: &str = "priority";
 
@@ -109,7 +109,7 @@ fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
 pub use wire::CorePriority;
 
 /// Whether the core's threads stand above normal: `priority` in the
-/// `[core]` section, `"raised"` when absent (sprawling-SPEC.md 8-93).
+/// `[core]` section, `"raised"` when absent (`crates/sprawling/Spec.lean` §8-93).
 ///
 /// # Errors
 ///

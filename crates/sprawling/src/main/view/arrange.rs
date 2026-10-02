@@ -5,7 +5,7 @@
 
 //! The lineage of a city arranged as the tree the person reads:
 //! city › building › room › session › run › round › call, a fork under
-//! the run it forked from (sprawling-SPEC.md 8-117). Every node has one
+//! the run it forked from (`crates/sprawling/spec/Main.lean` §8-117). Every node has one
 //! parent.
 
 use std::collections::BTreeMap;

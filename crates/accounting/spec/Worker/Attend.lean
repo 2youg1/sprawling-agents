@@ -6,7 +6,7 @@
 /-!
 # 记账线程与它唯一的收件队列
 
-规定 `crates/accounting/src/worker/attend.rs` 里的循环 `attend`：写一座城 Ledger 的唯一线程，以及它服务的三张嘴——一条 lane 的中转请求、一个从 lane 回家的 run、一条来自 desk 的命令——外加 desk 关门。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（sprawling-SPEC.md 8-42-4）。
+规定 `crates/accounting/src/worker/attend.rs` 里的循环 `attend`：写一座城 Ledger 的唯一线程，以及它服务的三张嘴——一条 lane 的中转请求、一个从 lane 回家的 run、一条来自 desk 的命令——外加 desk 关门。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（`crates/sprawling/Spec.lean` §8-42-4）。
 
 每张嘴都送进同一条队列。线程阻塞在第一条消息上（`recv`），取走已经排在它后面的每一条（`try_recv` 直到取空），按到达次序服务这一批。排程欠下的截止时刻到了，与来一条消息一样唤醒它。
 
@@ -157,7 +157,7 @@ theorem the_naming_wait_is_off_the_accounting_thread :
 
 /-! ## 历史证明之前，服务照常、写一条也不写
 
-服务中的城从快照起步，快照之前的历史由后台的证明走一遍（sprawling-SPEC.md 8-122）。证明有三个结局之前的状态：还在走（`pending`）、链完好（`whole`）、链断了（`broken`）。写者在 `whole` 之前与 `broken` 之后拒绝每一次追加：一条命令照样被服务——人收到 `E_HISTORY_UNPROVEN` 或断链的原因——只是什么也不写（Q3 选的是拒绝，不是扣住：扣住的命令要一个新的唤醒理由，才能不破坏 `idle_does_not_wake`）。
+服务中的城从快照起步，快照之前的历史由后台的证明走一遍（`crates/sprawling/Spec.lean` §8-122）。证明有三个结局之前的状态：还在走（`pending`）、链完好（`whole`）、链断了（`broken`）。写者在 `whole` 之前与 `broken` 之后拒绝每一次追加：一条命令照样被服务——人收到 `E_HISTORY_UNPROVEN` 或断链的原因——只是什么也不写（Q3 选的是拒绝，不是扣住：扣住的命令要一个新的唤醒理由，才能不破坏 `idle_does_not_wake`）。
 
 这里把证明状态作为服务一批的参数：它只改变追加几条，不改变谁被服务、何时醒来，所以上面三组性质原样成立（`proved_is_the_ungated_loop`）。关门在 Rust 里先等证明有结局再写交接（`attend` 的关门一臂），这一步是等待而不是服务，不在这里建模。 -/
 
@@ -223,7 +223,7 @@ end Accounting.Worker.Attend
 
 /-! ### 接口仍写在 sprawling 规格里的模块
 
-下面这些模块的接口与取舍今天写在 `crates/sprawling/sprawling-SPEC.md` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
+下面这些模块的接口与取舍今天写在 `crates/sprawling/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
 
 | sprawling 的标签 | 模块 |
 |---|---|

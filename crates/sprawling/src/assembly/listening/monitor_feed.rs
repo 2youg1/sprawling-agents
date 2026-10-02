@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The monitor a served city offers its sessions, and the thread that
-//! samples it (sprawling-SPEC.md 8-94, 8-96), apart from the listening
+//! samples it (`crates/sprawling/spec/Monitor.lean` §8-94, §8-96), apart from the listening
 //! it is handed to.
 
 use kernel::AxError;
@@ -13,7 +13,7 @@ use std::sync::Arc;
 use crate::monitor::sampler::Gauges;
 
 /// The monitor a session watches over the socket, and the thread that
-/// samples it once a second (sprawling-SPEC.md 8-94, 8-96). Whether
+/// samples it once a second (`crates/sprawling/spec/Monitor.lean` §8-94, §8-96). Whether
 /// anybody watches is the monitor's count; a session holds its
 /// [`crate::monitor::Watch`] for as long as it watches.
 ///

@@ -192,7 +192,7 @@ pub(super) const PLAN_TWO_FREE_ROWS: &str = concat!(
 
 /// Three rows nothing blocks, which is a ready set of three: what a
 /// pursuit takes the whole of rather than one node at a time
-/// (sprawling-SPEC 8-46-4).
+/// (`crates/sprawling/Spec.lean` §8-46-4).
 pub(super) const PLAN_THREE_FREE_ROWS: &str = concat!(
     "| # | Item | Weight | Needs | Status | Evidence |\n",
     "|---|---|---|---|---|---|\n",

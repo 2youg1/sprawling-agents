@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a worker inherits, as the folds a snapshot holds before they
-//! settle (sprawling-SPEC 8-101).
+//! settle (`crates/sprawling/Spec.lean` §8-101).
 
 use std::path::Path;
 

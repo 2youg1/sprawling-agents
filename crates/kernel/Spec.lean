@@ -345,7 +345,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 - `E_LOG_VERSION_UNSUPPORTED`／`E_CAS_CORRUPT`：住装载期白名单，产生地在 memory/runtime（见各自 SPEC）。
 - `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；storage 的 Io 映射已改正（storage D7）。
 - `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 storage 的写者锁先于一切读写定义掉（`crates/storage/Spec.lean` §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
-- `E_HISTORY_UNPROVEN`（服务中的城还在证明它开城时的历史，装载期）：不可定义掉——城从快照起步，快照之前的历史由后台证明走一遍（`crates/storage/Spec.lean` §8-30、sprawling-SPEC 8-122），而开城不等它。它只能住装载期白名单：证明完成之前，写者拒绝每一次追加，被拒的一方此刻恰恰写不了账本。它不能借 `E_LEDGER_HELD`：那一码的 recovery 是停下另一个进程，这一码的 recovery 是等几秒再发一次（「the city is still proving the history it opened from; send it again once the log says the history is proved」）。它也不能借 `E_BUSY`：那一码点名一条正在工作的 run，这里没有 run。
+- `E_HISTORY_UNPROVEN`（服务中的城还在证明它开城时的历史，装载期）：不可定义掉——城从快照起步，快照之前的历史由后台证明走一遍（`crates/storage/Spec.lean` §8-30、`crates/sprawling/Spec.lean` §8-122），而开城不等它。它只能住装载期白名单：证明完成之前，写者拒绝每一次追加，被拒的一方此刻恰恰写不了账本。它不能借 `E_LEDGER_HELD`：那一码的 recovery 是停下另一个进程，这一码的 recovery 是等几秒再发一次（「the city is still proving the history it opened from; send it again once the log says the history is proved」）。它也不能借 `E_BUSY`：那一码点名一条正在工作的 run，这里没有 run。
 
 其余的码（逐码答「能否定义掉」）：
 

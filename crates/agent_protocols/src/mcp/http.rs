@@ -186,7 +186,7 @@ impl HttpServer {
         // it understood the request, and it wants an account this city
         // does not yet hold. Carried as its own code so the health view
         // can say "authenticating" where it would otherwise say "failed"
-        // (sprawling-SPEC.md 8-61).
+        // (`crates/sprawling/Spec.lean` §8-61).
         if status == 401 || status == 403 {
             return AxError::failure(
                 AxCode::CredentialMissing,

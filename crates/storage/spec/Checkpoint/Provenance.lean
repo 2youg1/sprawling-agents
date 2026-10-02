@@ -79,7 +79,7 @@ pub fn effort_word(effort: kernel::Effort) -> String;
   两个 crate 各手写一次同一个键，就是两个会各说各话的权威。
 - **`checkpoint_committed` 与 `pr_merged` 携同一份归属。** 8-17 写着「trailers 是投影，
   账本是权威」，而这两个事实否则只存在于 git 提交上；带上它们，`sprawling whose`
-  才能只读账本作答（`accounting::views`，sprawling-SPEC §8-41）。两条记录 flatten 同一个结构，
+  才能只读账本作答（`accounting::views`，`crates/sprawling/Spec.lean` §8-167）。两条记录 flatten 同一个结构，
   于是「一次提交出自谁」不会在两个 kind 上长成两种说法。
 - **缺键的记录读得回**：不带这两项的 `checkpoint_committed` 没有这两个键，
   `CommitAttribution` 的 `#[serde(default)]` 对它答空 id 与 `None`——

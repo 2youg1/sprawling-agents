@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The Gecko browsers, and where each platform puts them
-//! (sprawling-SPEC.md section 8-57).
+//! (`crates/sprawling/spec/Doctor.lean` §8-57).
 //!
 //! Data, with no branch in it. Every member here takes the same four
 //! launch arguments, which is why they are one row: the engine starts

@@ -5,7 +5,7 @@
 
 //! What a page that has just opened must be able to learn from one
 //! `city_view`: which room each run works in, and whether the city is
-//! stopped (sprawling-SPEC section 8-52).
+//! stopped (`crates/sprawling/Spec.lean` §8-52).
 
 #![allow(
     clippy::unwrap_used,
@@ -94,7 +94,7 @@ fn a_run_in_the_city_view_says_which_room_it_works_in() {
 }
 
 /// A city that has run thousands of times puts a bounded view on the
-/// wire at each asking (sprawling-SPEC section 8-106): every run it ever
+/// wire at each asking (`crates/sprawling/Spec.lean` §8-106): every run it ever
 /// held would make 8,000 runs a 1.37 MB city view, fetched again after
 /// every record.
 #[test]
@@ -148,7 +148,7 @@ fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
 }
 
 /// A cost view names every active run and the few billed most rather
-/// than every run a city ever billed (sprawling-SPEC section 8-106),
+/// than every run a city ever billed (`crates/sprawling/Spec.lean` §8-106),
 /// while `total` still sums them all.
 #[test]
 fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {

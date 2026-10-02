@@ -197,7 +197,7 @@ pub enum Prepared {
 
 /// The ledger as a history reader carries it out of the snapshot: where
 /// it lives, and its index, which has a lock of its own that only
-/// readers wait on (sprawling-SPEC.md 8-100).
+/// readers wait on (`crates/sprawling/Spec.lean` §8-100).
 pub struct LedgerAsk {
     pub(super) city_root: PathBuf,
     pub(super) index: Arc<Mutex<storage::LedgerIndex>>,
@@ -211,7 +211,7 @@ impl LedgerAsk {
     /// offset pointing at another line, so the index is replaced by an
     /// empty one and the poison cleared: the refresh that follows scans
     /// the whole ledger once, and later reads refresh incrementally again
-    /// (sprawling-SPEC.md 8-100).
+    /// (`crates/sprawling/Spec.lean` §8-100).
     pub(super) fn indexed(&self) -> Option<(MutexGuard<'_, storage::LedgerIndex>, PathBuf)> {
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         let mut index = self.index.lock().unwrap_or_else(|poisoned| {
@@ -292,7 +292,7 @@ impl Prepared {
             Self::Release(Some(newest)) => wire::Answer::Release(Box::new(newest())),
             Self::Release(None) => unavailable("NewestRelease".to_owned()),
             // Read after the views are released, because it walks the
-            // search path (sprawling-SPEC.md 8-100).
+            // search path (`crates/sprawling/Spec.lean` §8-100).
             Self::Harnesses(Some(find)) => harnesses_answer(find),
             Self::Harnesses(None) => unavailable("Harnesses".to_owned()),
             Self::Upstream {

@@ -23,7 +23,7 @@ use wire::ReleaseAnswer;
 ///
 /// The production path passes `kernel::release::MATURITY`, the one place
 /// the maturity is written (kernel D18); taking it as a parameter is what
-/// lets a test see this line follow it (sprawling-SPEC.md 8-162).
+/// lets a test see this line follow it (`crates/sprawling/spec/Doctor.lean` §8-162).
 pub(super) fn headline(maturity: Maturity) -> String {
     format!(
         "sprawling {} ({}){}",

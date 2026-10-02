@@ -35,7 +35,7 @@ pub enum Reached {
 ```rust
 // accounting::worker::mcp（形状 4 适配器）
 #[derive(Default)]
-pub(crate) struct Residents;              // 生产：McpLink::open + agent_protocols::handshake + tools/list，连接在 run 之间保持（sprawling-SPEC.md §8-4）
+pub(crate) struct Residents;              // 生产：McpLink::open + agent_protocols::handshake + tools/list，连接在 run 之间保持（`crates/sprawling/Spec.lean` §8-4）
 impl RunWorker {
     pub fn with_connectors(self, connectors: Box<dyn accounting::Connectors + Send + Sync>) -> RunWorker;
 }
@@ -43,7 +43,7 @@ impl RunWorker {
 
 - **失败**：原样传 `McpLink::open`、`agent_protocols::handshake` 与 `agent_protocols::tools_from` 的 `AxError`。worker 把失败写进 diagnostics、把这个 server 留在外面，run 照常开始；端口不另造错误码。
 - **`confidential` 原样传给 `McpTool::new`**：那是工具层的权威。worker 在机密楼里一个 server 都不启动，所以生产路径上它总是 `false`；它仍在签名里，是为了任何实现都不能造出一个绕过工具层拒绝的工具。
-- **端口有状态，可被几条线程同时问**：生产适配器把连上的 server 按声明与 run root 留在表里，下一次 dispatch 直接拿它的工具；子进程已经退出的那一行在这里被丢掉、重新启动。`connect` 取 `&self`、实现是 `Sync`，因为准备派活的 lane 各自问同一张表（sprawling-SPEC.md §8-113），表自己按键上锁（sprawling-SPEC.md §8-4）。
+- **端口有状态，可被几条线程同时问**：生产适配器把连上的 server 按声明与 run root 留在表里，下一次 dispatch 直接拿它的工具；子进程已经退出的那一行在这里被丢掉、重新启动。`connect` 取 `&self`、实现是 `Sync`，因为准备派活的 lane 各自问同一张表（`crates/sprawling/Spec.lean` §8-113），表自己按键上锁（`crates/sprawling/Spec.lean` §8-4）。
 - **固定值**：`RunWorker::new` 与 `over` 装上 `Residents::default()`；`with_connectors` 是唯一换掉它的门。
 - **依赖**：本 crate 因此依赖 `agent_protocols`（ARCHITECTURE.md §3 的 `depmap`）。
 -/

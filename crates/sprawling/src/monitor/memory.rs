@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! This machine's memory, read from the platform through `sysinfo`, the
-//! one place the city reads it (sprawling-SPEC.md 8-94).
+//! one place the city reads it (`crates/sprawling/spec/Monitor.lean` §8-94).
 
 use sysinfo::{MemoryRefreshKind, System};
 

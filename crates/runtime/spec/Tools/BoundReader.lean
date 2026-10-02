@@ -12,7 +12,7 @@ import crates.runtime.spec.Tools.ChosenPath
 -/
 
 /-!
-### 8-59 runtime::tools::bound_reader：模型点名的字节，经读界判过后按字节读（形状 4 适配器；sprawling-SPEC 8-131、8-142）
+### 8-59 runtime::tools::bound_reader：模型点名的字节，经读界判过后按字节读（形状 4 适配器；`crates/sprawling/Spec.lean` §8-131、§8-142）
 
 
 **问题**：`read` 只交文本。城的工具 `ocr` 与 `transcribe` 要的是一张图、一段录音的字节，它们在读界之内的任意一栋楼里，或在连接器存进 CAS 的块里（§8-27-10、D15）。判「这条模型选的路径能不能读」的是 `chosen_path`（§8-30-1），在 accounting 里再写一份判定就是第二个权威。本节把那份判定公开成一扇按字节读的门，城里读别楼文件与 `cas:` 块的工具都只经它。

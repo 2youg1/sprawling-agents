@@ -159,7 +159,7 @@ pub struct VaultFellBack { pub component: String,     // 探针写 vault
                            pub reason: String }
 // wire::note_of 只把 Refused 记成回合上的 Note::Refused；VaultFellBack 没改变任何回合，不出 note。
 
-// record::harness：官方 harness 居民一次 run 写的两种行（sprawling-SPEC §8-4e）。
+// record::harness：官方 harness 居民一次 run 写的两种行（`crates/sprawling/Spec.lean` §8-4e）。
 // 词是本城的，不是 ACP 的：账本写下的拼写不能再改，ACP 的词跟着上游走（D9）。
 #[serde(tag = "report", rename_all = "snake_case")]
 pub enum HarnessReported {
@@ -310,7 +310,7 @@ pub struct RunStarted {
 - **一个枚举，一个家。** 这个值以前只住在 `runtime::conversation`；现在账本载荷要带它，而 runtime 依赖 kernel、kernel 不依赖 runtime，所以枚举住在本模块，`runtime::Opening` 与 `runtime::conversation::Opening` 是它的再导出，调用方的路径不变（runtime D14）。
 - **写者**：`runtime::run::Charter::open` 从 `Charter.opening` 照录。模型 run 的 charter 填 `Some(RunPlan.opening)`；harness run 的第一句话是交给 harness 自己会话的 prompt，城不为它写 user 消息，填 `None`。
 - **缺席读作「不知道」。** 加这个键之前写下的行没有它，`fold_run` 对它沿用加键之前的读法（`crates/runtime/Spec.lean` §8-58 的表）。按 `default` 加、缺席不写，所以旧账本照读，`golden-s1` 里载荷为 `{}` 的那行 `run_started` 照旧读成 `RunStarted::default()`。
-- 验收：`runtime::fork::request_tests` 的 `a_branch_first_request_opens_with_the_bytes_of_the_mothers_last`，与 `accounting::worker::freezing::tests::lineage` 的 `a_branch_first_request_carries_the_bytes_of_the_mothers_last`（sprawling-SPEC 8-141）：写出的键经真实的派活与分叉读回。
+- 验收：`runtime::fork::request_tests` 的 `a_branch_first_request_opens_with_the_bytes_of_the_mothers_last`，与 `accounting::worker::freezing::tests::lineage` 的 `a_branch_first_request_carries_the_bytes_of_the_mothers_last`（`crates/sprawling/Spec.lean` §8-141）：写出的键经真实的派活与分叉读回。
 
 #### 8-82-2 进程死后冻结的那一行：`run_frozen.cause`
 
@@ -332,7 +332,7 @@ impl RunFrozen {
 - **结局仍是三种之一。** `Completion` 的三种结局不变（§8-20），死掉的 run 冻成 `cancelled`：它没做完，`Done` 需要城自己记下的证据而它没有；也没有被上限截断，`Limit` 说的是那件事。`cancelled` 说的是「停下了，不是做完」，`cause: process_died` 把「人或 halt 叫停的」与「进程死了」分开（D14）。
 - **一处构造。** `RunFrozen::lost` 是写这一行的唯一入口，「死掉的 run 冻成哪一种结局」只在这里回答。
 - **缺席即 run 自己的冻结。** `RunFrozen::of` 写的行没有这个键，字节与加键之前相同；旧行照读。读结局的读者（`views` 的 `completion`、`city::resident` 的计数）照旧只读 `completion`。
-- 验收：`sprawling` 的崩溃验收 `a_city_killed_while_writing_an_answer_reopens_with_the_torn_line_cut_and_the_call_unknown`（sprawling-SPEC 8-127）钉住死 run 的最后一行是这一行。
+- 验收：`sprawling` 的崩溃验收 `a_city_killed_while_writing_an_answer_reopens_with_the_torn_line_cut_and_the_call_unknown`（`crates/sprawling/Spec.lean` §8-127）钉住死 run 的最后一行是这一行。
 
 ### 8-79 身份的两处入账：保存的回执与一次 run 冻下的那一版（`kernel::event::record`，形状 2 值类型）
 
@@ -369,7 +369,7 @@ pub struct DeviceRevoked { pub device: String, pub name: String }
 pub struct RemoteSessionStarted { pub device: String, pub expires: TimeMs }
 ```
 
-- **五种都是 record-only，都写在城自己名下**（`run` 为 `RunId::CITY`，无 `addr`）：谁能从外面够到这座城不决定任何一次模型请求的字节。写它们的是装配层的远程门（sprawling-SPEC 8-139），经 worker 的 relay 进同一个写者。`who` 是 `person`，只有门到时自己关上那一条是 `city`。
+- **五种都是 record-only，都写在城自己名下**（`run` 为 `RunId::CITY`，无 `addr`）：谁能从外面够到这座城不决定任何一次模型请求的字节。写它们的是装配层的远程门（`crates/sprawling/Spec.lean` §8-139），经 worker 的 relay 进同一个写者。`who` 是 `person`，只有门到时自己关上那一条是 `city`。
 - **追加在 `ALL` 末尾，次序就是一扇门一生的次序**：开、关、配对、撤销、会话开始（表按种类排，入账的次序是开、配对、会话开始、撤销、关）。不写 `ig`：0.0.7 的读者不认识这五个种类，按 D10 的规矩报 `E_LOG_VERSION_UNSUPPORTED` 而不是跳过它们。
 - **没有一行携带密钥、配对码或会话 id**：账本可以被任何人重放，带上它们等于把冒充一台设备的材料交给每一个读者。设备的公钥只在设备表里（`CityLayout::devices`）。
 - **设备与权限用正文写**：`device` 是设备 id 的 base32 正文，`authority` 是 `watch` 或 `act`。两者的类型与拼写归 `remote_access::door`（crates/remote_access/Spec.lean §8-11），kernel 不依赖它，所以这里存它给出的字。

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How far the view fold falls behind a burst of records
-//! (sprawling-SPEC.md 8-99).
+//! (`crates/sprawling/spec/Assembly/Listening.lean` §8-99).
 //!
 //! The instrument drives the fold thread the city runs, `spawn_folding`,
 //! with a writer sending a burst through `observer` and a reader asking

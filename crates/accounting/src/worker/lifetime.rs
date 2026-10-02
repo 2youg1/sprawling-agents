@@ -22,7 +22,7 @@ use kernel::{AxError, EventKind, Locator};
 use storage::{Cas, JsonlLedger, OpenReport};
 
 /// What opening the ledger repaired before this worker read a line of
-/// it (sprawling-SPEC.md 8-102). The ledger records the cut as
+/// it (`crates/sprawling/Spec.lean` §8-102). The ledger records the cut as
 /// `log_truncated`, but no page draws that line, so the worker keeps
 /// this value to tell the person at the two doors a city opens through.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -245,7 +245,7 @@ impl RunWorker {
         Ok(worker)
     }
 
-    /// Takes back the trees a crash left behind (sprawling-SPEC 8-108).
+    /// Takes back the trees a crash left behind (`crates/sprawling/Spec.lean` §8-108).
     ///
     /// Nothing is held yet: the ledger this worker holds is locked to
     /// this process, and no run has been dispatched. A tree that will
@@ -349,7 +349,7 @@ impl RunWorker {
 
     /// The same worker, taking the browser tools a building's rules ask
     /// for from `browsers` instead of starting a browser on this host
-    /// (sprawling-SPEC.md 8-45-2).
+    /// (`crates/sprawling/Spec.lean` §8-45-2).
     #[must_use]
     pub fn with_browsers(self, browsers: super::Browsers) -> RunWorker {
         RunWorker { browsers, ..self }
@@ -357,7 +357,7 @@ impl RunWorker {
 
     /// The same worker, starting the desktop server a building's rules
     /// ask for from `program` instead of from this executable
-    /// (sprawling-SPEC.md 8-4d).
+    /// (`crates/sprawling/Spec.lean` §8-4d).
     #[must_use]
     pub fn with_desktop_program(self, program: super::DesktopProgram) -> RunWorker {
         RunWorker {
@@ -367,7 +367,7 @@ impl RunWorker {
     }
 
     /// The same worker, starting the harness a room's resident names
-    /// through `start` instead of on this host (sprawling-SPEC.md 8-124).
+    /// through `start` instead of on this host (`crates/sprawling/Spec.lean` §8-124).
     /// Only a test plays a harness; production starts the vendor's own.
     #[cfg(test)]
     #[must_use]

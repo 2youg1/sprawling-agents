@@ -5,7 +5,7 @@
 
 //! CLI entry. Subcommands land with their stages and are refused honestly
 //! until then — a refusal that names what is missing beats a stub that
-//! pretends (sprawling-SPEC.md). Live now: status, replay, init, serve,
+//! pretends (`crates/sprawling/Spec.lean`). Live now: status, replay, init, serve,
 //! export, restore, resume, fork.
 
 // The city harness is the library half of this package (`src/lib.rs`);

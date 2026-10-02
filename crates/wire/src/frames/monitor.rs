@@ -29,7 +29,7 @@ pub enum Watched {
 }
 
 /// One reading of every counter the monitor shows, in integers because
-/// it travels on the wire (sprawling-SPEC.md 8-94, 8-129-6).
+/// it travels on the wire (`crates/sprawling/Spec.lean` §8-94, §8-129-6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Sample {
@@ -47,10 +47,10 @@ pub struct Sample {
     pub event_to_screen_p50_nanos: u64,
     pub queued_runs: u64,
     /// Committed records the writer has handed the view thread that are
-    /// not yet folded and broadcast (sprawling-SPEC.md 8-123).
+    /// not yet folded and broadcast (`crates/sprawling/Spec.lean` §8-123).
     pub view_backlog: u64,
     /// How long the beat before this one took to read the counters, by
     /// the sampler's own monotonic clock; 0 on the first beat
-    /// (sprawling-SPEC.md 8-129-6).
+    /// (`crates/sprawling/Spec.lean` §8-129-6).
     pub read_nanos: u64,
 }

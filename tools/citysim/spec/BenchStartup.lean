@@ -8,7 +8,7 @@
 
 规定 `just bench-startup` 的测量 Main `bin/bench_startup`（`tools/citysim/src/bin/bench_startup.rs`）与它的模块：`samples`、`actions`，以及 `actions` 下的 `archive`、`first_byte`、`footprint`、`history`（都在 `tools/citysim/src/bin/bench_startup/` 下）。本文件是 `tools/citysim/Spec.lean` 的一个分部；下面各节保留它们在 citysim 规格里的标签 §8-5、§8-5-1，别处引作 `tools/citysim/Spec.lean §8-5`。
 
-能写成定理的是读数本身不说假话的两件：可疑样本只标注不剔除，每个样本都留在读数里，标注只看它是否超过中位的倍数（`every_sample_is_kept_and_marked_by_the_cut`）；主导子步是中位最大的那一个，没有子步切分时答 `None`（`the_dominant_step_has_the_largest_middle`、`no_steps_have_no_dominant`）。分位怎样取是 sprawling 的 `Spread`（sprawling-SPEC 8-129-2），倍数 `SUSPICIOUS_TIMES` 也住那里，模型把中位与倍数之积当参数；计时与文件计数由 `samples`、`footprint`、`actions` 的测试守着（§16）。
+能写成定理的是读数本身不说假话的两件：可疑样本只标注不剔除，每个样本都留在读数里，标注只看它是否超过中位的倍数（`every_sample_is_kept_and_marked_by_the_cut`）；主导子步是中位最大的那一个，没有子步切分时答 `None`（`the_dominant_step_has_the_largest_middle`、`no_steps_have_no_dominant`）。分位怎样取是 sprawling 的 `Spread`（`crates/sprawling/Spec.lean` §8-129-2），倍数 `SUSPICIOUS_TIMES` 也住那里，模型把中位与倍数之积当参数；计时与文件计数由 `samples`、`footprint`、`actions` 的测试守着（§16）。
 -/
 
 /-!
@@ -85,7 +85,7 @@ D5 **被测可执行文件的名字在本 crate 只重述一处，注释点名�
 
 **夹具城留在 `<构建档目录>/../bench-cities/<名>`**，下次复用：40 万条是 376 MB，每次重写要付的时间比量它还多。复用只看那座城在不在；`xtask mem --city` 读的就是同一座城（`tools/xtask/Spec.lean` §8-30），于是首字节与启动峰值出自同一份历史。
 
-**每座夹具城的读数旁打印它账本的摘要**（`citysim::ledger_digest`，D8），两条首字节读数只在摘要相等时可比。每个样本那次 `serve` 的标准错误写进 `<构建档目录>/../bench-cities/<名>.serve.log`（后一个样本覆盖前一个），报告里打印这个路径。其中以 `opened the city in` 开头的那一行是产品自己拆出的开城各段耗时（sprawling-SPEC 8-121），以 `the history is proved` 开头的那一行是后台证明走完、写者开始接受命令的时刻（就绪时刻 M3，sprawling-SPEC 8-122）：本族不解析它们，只把它们和首字节读数放在同一次开城旁边给人读。所以一个样本量完首字节之后并不立刻停掉 `serve`，而是等日志里出现证明的结局（`the history is proved` 或 `the ledger stopped taking writes`），至多 300 s；首字节读数在这之前已经取下，不受这段等待影响。
+**每座夹具城的读数旁打印它账本的摘要**（`citysim::ledger_digest`，D8），两条首字节读数只在摘要相等时可比。每个样本那次 `serve` 的标准错误写进 `<构建档目录>/../bench-cities/<名>.serve.log`（后一个样本覆盖前一个），报告里打印这个路径。其中以 `opened the city in` 开头的那一行是产品自己拆出的开城各段耗时（`crates/sprawling/Spec.lean` §8-121），以 `the history is proved` 开头的那一行是后台证明走完、写者开始接受命令的时刻（就绪时刻 M3，`crates/sprawling/Spec.lean` §8-122）：本族不解析它们，只把它们和首字节读数放在同一次开城旁边给人读。所以一个样本量完首字节之后并不立刻停掉 `serve`，而是等日志里出现证明的结局（`the history is proved` 或 `the ledger stopped taking writes`），至多 300 s；首字节读数在这之前已经取下，不受这段等待影响。
 
 ```rust
 // tools/citysim/src/bin/bench_startup/actions/history.rs —— shape: adapter（一座有历史的夹具城：init 之后经产品的 Ledger 写入）

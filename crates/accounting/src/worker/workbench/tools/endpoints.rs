@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The tools that hand bytes this run may read to an endpoint the book
-//! names: `transcribe`, then `ocr` (sprawling-SPEC.md 8-131, 8-142).
+//! names: `transcribe`, then `ocr` (`crates/sprawling/Spec.lean` §8-131, §8-142).
 //!
 //! They are one phase of laying out the bench because they share one
 //! door: a `runtime::BoundReader` over the read bound `read` and

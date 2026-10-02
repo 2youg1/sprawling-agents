@@ -35,7 +35,7 @@ pub struct DoctorAnswer {
 }
 
 /// The level this machine gives the core's threads under the person's
-/// setting (sprawling-SPEC 8-93). The dispatched commands are not here:
+/// setting (`crates/sprawling/Spec.lean` §8-93). The dispatched commands are not here:
 /// they always start one level below, and lowering is never refused.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

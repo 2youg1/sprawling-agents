@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The rows a page draws as one (sprawling-SPEC.md section 8-58).
+//! The rows a page draws as one (`crates/sprawling/spec/Doctor.lean` §8-58).
 //!
 //! Each member of a pack stays a row of the table: it is detected,
 //! judged and installed on its own, and `just prereqs` reads it on its

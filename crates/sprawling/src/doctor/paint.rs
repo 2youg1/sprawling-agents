@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The report as a table: four status words, two columns of fixed
-//! width, and colour a terminal may refuse (sprawling-SPEC.md section
+//! width, and colour a terminal may refuse (`crates/sprawling/Spec.lean` section
 //! 8-58).
 //!
 //! A report that is left-aligned prose makes a person read every line

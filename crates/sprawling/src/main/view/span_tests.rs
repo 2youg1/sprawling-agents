@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The lines a span of time keeps (sprawling-SPEC.md 8-137): each line
+//! The lines a span of time keeps (`crates/sprawling/spec/Main.lean` §8-137): each line
 //! judged by its own `t`, never by where it stands in the walk.
 
 #![allow(

@@ -285,7 +285,7 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 
 **被否**：①`[resident] minutes` 与 `harness` 并列：见上，房间一层能改楼的上限；②缺省不限、只靠停摆：卡住的 harness 要人来发现。
 
-**重开参数**：车道数（sprawling-SPEC §8-46-3）变得不再稀缺，或 harness 能在回合中间报告进度、城能分辨「在做事」与「卡住了」时。
+**重开参数**：车道数（`crates/sprawling/Spec.lean` §8-46-3）变得不再稀缺，或 harness 能在回合中间报告进度、城能分辨「在做事」与「卡住了」时。
 -/
 
 /-! ## 13 依赖选型
@@ -347,6 +347,6 @@ Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第�
 - `docs/glossary.md`：本规格用的词（Resident、Neighbourhood 等），`cargo xtask gates lexicon` 检查。
 - `crates/city/templates/` 下被实例化的模板：它们与 §8-3、§8-5、§8-41 同期改，因为模板的字节就是新楼与新城的第一批字节。
 - kernel 的规格（`crates/kernel/Spec.lean`）：地址与保留子树（§8-2，`crates/kernel/spec/Address.lean`）、布局（`crates/kernel/spec/Layout.lean`）、配置梯子的胜负与冻结（§8-22）、效果层对 `Govern` 的拒（§8-27）。它们改了，这里的 `Building`、`Policy`、`ConfigLayers/Ladder` 三个模型与 §8-2、§8-4 一起重看。
-- runtime 的规格（`crates/runtime/Spec.lean` §8-29、§8-30-1）：阅览室怎样把书架上的一件交给 run、模型选的路径怎样过读界；accounting 的规格（`crates/accounting/Spec.lean`）与 sprawling 的规格（`crates/sprawling/sprawling-SPEC.md`）：装配层怎样调本 crate 的写面。
+- runtime 的规格（`crates/runtime/Spec.lean` §8-29、§8-30-1）：阅览室怎样把书架上的一件交给 run、模型选的路径怎样过读界；accounting 的规格（`crates/accounting/Spec.lean`）与 sprawling 的规格（`crates/sprawling/Spec.lean`）：装配层怎样调本 crate 的写面。
 - 引本规格的其他规格与 rustdoc 写 `crates/city/Spec.lean §8-n` 或 `city D<n>`；本 crate 的 rustdoc 写规定它的分部。一节换了分部，它的标签不变，引用不必改。
 -/

@@ -8,7 +8,7 @@
 //! interrupt it.
 //!
 //! It is a free function rather than a method because a lane is a
-//! thread that holds no worker (sprawling-SPEC.md 8-46-1): everything a
+//! thread that holds no worker (`crates/sprawling/Spec.lean` §8-46-1): everything a
 //! drive needs from the city arrives in [`DriveContext`], which is five
 //! handles that clone, and the ledger arrives as a parameter — the
 //! accounting thread hands its own, and a lane hands a
@@ -36,7 +36,7 @@ pub(crate) struct DriveContext {
     /// What the person asked of this run, read at its safe points. One
     /// handle per drive, all of them reading the same desk by run id:
     /// a steer and a cancel reach the run they name and no other
-    /// (sprawling-SPEC.md 8-42-1).
+    /// (`crates/sprawling/Spec.lean` §8-42-1).
     pub person: Option<std::sync::Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>>,
     /// What is still running while the runs go on, so a halt on a scope
     /// reaches a run inside it.
@@ -147,12 +147,12 @@ impl Interrupting {
 }
 
 /// Whether the scope a run's backlog member sits in is being stopped,
-/// for a model run and a harness run alike (sprawling-SPEC.md 8-124).
+/// for a model run and a harness run alike (`crates/sprawling/Spec.lean` §8-124).
 ///
 /// A backlog that cannot answer counts as stopped: it cannot promise the
 /// scope is still open, and a run that carried on would be running
-/// inside a scope a person may already have shut (sprawling-SPEC.md
-/// 8-73).
+/// inside a scope a person may already have shut (`crates/sprawling/Spec.lean`
+/// §8-73).
 pub(super) fn scope_stopping(
     backlog: &runtime::Backlog,
     member: Option<runtime::BacklogId>,

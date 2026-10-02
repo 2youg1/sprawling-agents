@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The proof of the whole history a served city runs beside its writer
-//! (sprawling-SPEC.md 8-90, 8-122). The halt it sets the verdict on is
+//! (`crates/sprawling/spec/Assembly/Listening.lean` §8-90, §8-122). The halt it sets the verdict on is
 //! attached by the worker (`chain_halt`); this file starts the thread
 //! and says what it found. Which outcome settles the halt how is
 //! proved in `crates/sprawling/spec/Assembly/ChainWatch.lean`.

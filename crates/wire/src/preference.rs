@@ -273,8 +273,8 @@ pub enum PreferencePatch {
     CorePriority(CorePriority),
 }
 
-/// Whether the core's threads stand above normal (sprawling-SPEC.md
-/// 8-93): the setting a person turns off. Spelled here once, for the
+/// Whether the core's threads stand above normal (`crates/sprawling/Spec.lean`
+/// §8-93): the setting a person turns off. Spelled here once, for the
 /// frame and for the `[core] priority` key the person's file holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

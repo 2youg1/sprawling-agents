@@ -206,7 +206,7 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
 }
 
 /// The content store is opened once, when the adapter is built, rather
-/// than once per picture (sprawling-SPEC.md 8-50). What that moves is
+/// than once per picture (`crates/sprawling/Spec.lean` §8-171). What that moves is
 /// where the failure lands: a city whose store cannot be opened says so
 /// while the adapter is being assembled, instead of half way through a
 /// conversation the model has already started.

@@ -26,7 +26,7 @@ use super::listing::resolve;
 /// One file of the tree as it stands at the moment of asking.
 ///
 /// Takes the city root rather than the views: it reads the disk, and
-/// runs after the view lock is released (sprawling-SPEC.md 8-100).
+/// runs after the view lock is released (`crates/sprawling/Spec.lean` §8-100).
 pub(super) fn document_answer(city_root: &Path, at: Address) -> wire::DocumentAnswer {
     let state = match std::fs::read(resolve(city_root, Some(&at))) {
         Ok(bytes) => state_of(city_root, &at, &bytes),

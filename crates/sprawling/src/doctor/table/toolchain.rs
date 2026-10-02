@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every tool a person needs to develop this code (sprawling-SPEC.md
-//! section 8-58).
+//! Every tool a person needs to develop this code (`crates/sprawling/spec/Doctor.lean`
+//! §8-58).
 //!
 //! Data, with no branch in it. `table::REQUIREMENTS` lists these rows in
 //! install order, because a later row's recipe starts a program an
@@ -123,7 +123,7 @@ pub(super) const GIT: Requirement = row(
 /// opens with `set shell := ["bash", "-uc"]`. The listing asks for the
 /// line only a real bash prints, so the WSL launcher a Windows search
 /// path can resolve first is reported as absent, which is what `just`
-/// would meet (sprawling-SPEC.md 8-130).
+/// would meet (`crates/sprawling/spec/Doctor.lean` §8-130).
 pub(super) const BASH: Requirement = row(
     "bash",
     Need::Required,
@@ -278,8 +278,8 @@ pub(super) const RENDER_BROWSER: Requirement = row(
 /// elan has no winget package, and its official installers are
 /// scripts. On Windows this city runs `elan-init.ps1` without a prompt
 /// once the person presses install, because a fresh machine has to
-/// finish in one pass; the Linux line stays printed (sprawling-SPEC.md
-/// section 8-58). `-DefaultToolchain none` leaves the Lean version to
+/// finish in one pass; the Linux line stays printed (`crates/sprawling/spec/Doctor.lean`
+/// §8-58). `-DefaultToolchain none` leaves the Lean version to
 /// the `lean` row, which installs the one `lean-toolchain` pins.
 pub(super) const ELAN: Requirement = row(
     "elan",
@@ -313,7 +313,7 @@ pub(super) const ELAN: Requirement = row(
 
 /// What `elan toolchain install` is handed for one pin: the toolchain
 /// `lean-toolchain` names, or `stable` when the build found no pin file,
-/// because elan refuses an empty toolchain name (sprawling-SPEC.md 8-162).
+/// because elan refuses an empty toolchain name (`crates/sprawling/spec/Doctor.lean` §8-162).
 const fn lean_install(pin: &'static str) -> &'static str {
     if pin.is_empty() { "stable" } else { pin }
 }
@@ -337,13 +337,13 @@ pub(super) const LEAN: Requirement = row(
 .pinned(Pin::LeanToolchain);
 
 /// The Zig version `crates/desktop/ffi/zig-version` pins, the one file the
-/// leaf's build script and CI's install step read too (sprawling-SPEC.md
-/// 8-146).
+/// leaf's build script and CI's install step read too (`crates/sprawling/spec/Doctor.lean`
+/// §8-146).
 const ZIG_PIN: &str = crate::doctor::pin::ZIG_VERSION;
 
 /// winget's arguments for Zig at one pin, without `--version` when the
 /// build found no pin file, because winget refuses an empty version
-/// (sprawling-SPEC.md 8-162). A macro rather than a `const fn`: a recipe's
+/// (`crates/sprawling/spec/Doctor.lean` §8-162). A macro rather than a `const fn`: a recipe's
 /// arguments are a `'static` slice, which a `const fn` cannot build out of
 /// its parameter, while a macro expands into a `const` item where the pin
 /// is a constant.
@@ -369,7 +369,7 @@ macro_rules! winget_zig {
 /// The compiler of the desktop server's Zig leaf. Required because a
 /// Windows build of this binary compiles the leaf, and `Need` does not
 /// vary by platform; elsewhere the leaf is not compiled and the tool is
-/// simply unused (sprawling-SPEC.md 8-146).
+/// simply unused (`crates/sprawling/spec/Doctor.lean` §8-146).
 pub(super) const ZIG: Requirement = row(
     "zig",
     Need::Required,
@@ -481,7 +481,7 @@ mod tests {
     /// A build from the crates.io archive finds none of the pin files, so
     /// both pins are empty there. The two rows then install a version
     /// nobody pinned rather than a command with an empty argument, which
-    /// elan and winget both refuse (sprawling-SPEC.md 8-162).
+    /// elan and winget both refuse (`crates/sprawling/spec/Doctor.lean` §8-162).
     #[test]
     fn a_build_without_pins_installs_lean_stable_and_any_zig() {
         const UNPINNED: &[&str] = winget_zig!("");

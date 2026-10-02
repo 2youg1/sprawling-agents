@@ -195,8 +195,8 @@ impl BuildingRules {
     }
 
     /// How many minutes a harness run in this building may take before
-    /// the city cancels it and freezes it as limit (sprawling-SPEC.md
-    /// 8-124). Absent the line, `HARNESS_MINUTES_DEFAULT`: a harness
+    /// the city cancels it and freezes it as limit (`crates/sprawling/Spec.lean`
+    /// §8-124). Absent the line, `HARNESS_MINUTES_DEFAULT`: a harness
     /// that neither speaks nor ends would otherwise hold a lane until a
     /// person noticed (city D8 (b)).
     #[must_use]

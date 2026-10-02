@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a person reads, and what they are asked (sprawling-SPEC.md
-//! section 8-40).
+//! What a person reads, and what they are asked (`crates/sprawling/spec/Accounting/Worker.lean`
+//! §8-40).
 //!
 //! The report is one line per item and one verdict per tier. A city
 //! named on the line adds one line per building that asked for what
@@ -156,7 +156,7 @@ pub(crate) fn run<R: BufRead, W: Write>(
 /// The two parts of the report, written row by row as the probes answer:
 /// a row goes out once it and every row above it on the screen have
 /// answered, so the layout is the same on every run however the answers
-/// race (sprawling-SPEC.md section 8-59).
+/// race (`crates/sprawling/spec/Doctor.lean` §8-59).
 struct Rows<'o, W: Write> {
     out: &'o mut W,
     ink: Ink,

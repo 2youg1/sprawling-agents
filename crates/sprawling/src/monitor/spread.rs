@@ -5,7 +5,7 @@
 
 //! The one reading of a set of durations: its floor, its nearest-rank
 //! shares, its peak, and how many samples sit far above the middle
-//! (sprawling-SPEC.md 8-129-2).
+//! (`crates/sprawling/spec/Main.lean` §8-129-2).
 //!
 //! Every percentile the repository prints - `sprawling gauge`'s spread
 //! line, citysim's `bench` and `bench_startup` readings - is read here,

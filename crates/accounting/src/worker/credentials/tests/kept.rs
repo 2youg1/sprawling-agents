@@ -4,13 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a credential this city already keeps does when the form
-//! sends an empty box (sprawling-SPEC.md section 8-81).
+//! sends an empty box (`crates/sprawling/Spec.lean` §8-81).
 
 use crate::worker::fixture::*;
 use crate::worker::*;
 
 /// An empty key box leaves the credential this city keeps where it is
-/// (sprawling-SPEC.md 8-81).
+/// (`crates/sprawling/Spec.lean` §8-81).
 ///
 /// The form holds the vault's reference only while it is mounted, so a
 /// person who opens the settings page again and presses "look" or

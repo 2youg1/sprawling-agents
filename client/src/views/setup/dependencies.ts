@@ -25,7 +25,7 @@ import type {
 // What the item is for, in the page's words: the wire carries the item's
 // name as its id, and the clause lives in `lang.json` under
 // `machine_enables_<name>`, a hyphen in the name spelled `_` because every
-// key is snake_case (sprawling-SPEC §12). An item this client has
+// key is snake_case (sprawling D6). An item this client has
 // no clause for is shown by its name alone.
 export function enablesKey(name: string): Key | null {
   const key = `machine_enables_${name.replaceAll("-", "_")}`;

@@ -272,7 +272,7 @@ pub(crate) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)
 }
 
 /// A commit answer the views settled, and the repository its parents
-/// are read from after the snapshot is let go (sprawling-SPEC 8-128).
+/// are read from after the snapshot is let go (`crates/sprawling/Spec.lean` §8-128).
 pub struct CommitsAsk {
     city_root: PathBuf,
     settled: Settled,
@@ -303,7 +303,7 @@ impl CommitsAsk {
 }
 
 /// The two facts of a commit only its object holds, read once the
-/// snapshot is let go (sprawling-SPEC 8-128, `crates/wire/Spec.lean` §8-54).
+/// snapshot is let go (`crates/sprawling/Spec.lean` §8-128, `crates/wire/Spec.lean` §8-54).
 fn give_git_facts(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
     give_parents(city_root, commits);
     give_messages(city_root, commits);

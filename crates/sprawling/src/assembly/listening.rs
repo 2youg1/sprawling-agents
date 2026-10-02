@@ -12,7 +12,7 @@
 //! handed the sinks it may reach the city through; and the whole of it
 //! is stopped when the person stops it ([`Listening::serve`]).
 //!
-//! The order is sprawling-SPEC.md 8-88, and this file is its one
+//! The order is `crates/sprawling/spec/Assembly/Listening.lean` §8-88, and this file is its one
 //! definition: a port another process holds is refused before a writer
 //! exists, so a refused serve leaves the Ledger exactly as it found it.
 //! The properties of that order are proved in
@@ -117,7 +117,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         None => None,
     };
     // Each phase of opening is lapped on the monotonic sampling point,
-    // and said in one line once the writer runs (sprawling-SPEC.md 8-121).
+    // and said in one line once the writer runs (`crates/sprawling/spec/Assembly/Listening.lean` §8-121).
     let mut cost = OpeningCost::begin(monotonic_now);
     // The port first: a serve refused here has opened nothing and
     // written nothing.
@@ -155,8 +155,8 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // the `Diagnostics` was, because the sink is what writes into it.
     let logs = journal.lines();
     // The views the control surface reads, and what the worker inherits, started together
-    // from their snapshots on one pass over what they have not folded (sprawling-SPEC.md
-    // 8-122); the views are folded forward by the write observer inside the worker: one fold
+    // from their snapshots on one pass over what they have not folded (`crates/sprawling/spec/Assembly/Listening.lean`
+    // §8-122); the views are folded forward by the write observer inside the worker: one fold
     // rule, two call sites, no second definition of what a view means. The history before
     // the snapshots is proved behind the first byte.
     let (mut rebuilt, held) = start_served_views(
@@ -166,17 +166,17 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         &mut cost,
     )?;
     // The fold thread alternates between two copies, so the second is
-    // made here from the first (sprawling-SPEC.md 8-99).
+    // made here from the first (`crates/sprawling/spec/Assembly/Listening.lean` §8-99).
     rebuilt.ask_the_registry_through(crate::release::answer);
     rebuilt.ask_upstream_through(crate::doctor::newest);
     rebuilt.find_programs_through(crate::doctor::host::find_program);
     rebuilt.ask_github_through(crate::doctor::github::login);
-    // One verdict for the writer and the views (sprawling-SPEC.md 8-134).
+    // One verdict for the writer and the views (`crates/sprawling/spec/Assembly.lean` §8-134).
     let halt = storage::ChainHalt::awaiting_proof();
     rebuilt.watch_proof(halt.clone());
     let spare = rebuilt.twin()?;
     cost.lap(Phase::Twin);
-    // This machine is not asked here (sprawling-SPEC.md 8-54): the
+    // This machine is not asked here (`crates/sprawling/spec/Doctor.lean` §8-54): the
     // table is thirty-two items, most of them a program started and
     // asked its version, and a serve that waited for all of them holds
     // the socket shut for seconds to answer a question only one page

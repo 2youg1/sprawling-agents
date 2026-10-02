@@ -8,7 +8,7 @@
 //
 // The page walks the list one install at a time, in the city's table
 // order, because a later row's recipe starts a program an earlier row
-// installs (sprawling-SPEC §8-58). An install ends in exactly one of two
+// installs (`crates/sprawling/Spec.lean` §8-58). An install ends in exactly one of two
 // ways (§8-64): a fresh answer about this machine in which the item is
 // present, or a refusal whose subject starts with the item's name. The
 // walk moves on at either, so it never reads the wording of a log line.

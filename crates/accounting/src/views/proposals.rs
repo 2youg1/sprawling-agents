@@ -138,7 +138,7 @@ impl super::Views {
 
 /// One document's open cards with the version its file holds now,
 /// read after the view lock is let go: the version is a digest of the
-/// whole file (sprawling-SPEC.md 8-100).
+/// whole file (`crates/sprawling/Spec.lean` §8-100).
 pub(super) fn proposals_answer(city_root: &Path, doc: Address, open: Vec<Offer>) -> wire::Answer {
     // Missing and unreadable are both "no version now"; the document
     // answer is where a page learns which, and why (`crates/wire/Spec.lean` §8-69).

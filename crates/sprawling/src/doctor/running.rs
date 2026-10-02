@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one place this binary starts an install program, under a
-//! patience it cannot outlive (sprawling-SPEC.md section 8-64).
+//! patience it cannot outlive (`crates/sprawling/spec/Doctor.lean` §8-64).
 //!
 //! **A wait here is always bounded, and a child here can never wait on
 //! a person.** The three facts that make that true are in `run` and
@@ -56,7 +56,7 @@ pub(crate) const PATIENCE: u32 = 3_600;
 /// cargo-deny compile for five to twelve minutes cold on four cores and
 /// three minutes killed every one of them half way. The writer thread is
 /// held that long; the page draws the item as installing meanwhile, and
-/// moving installs off that thread is the step sprawling-SPEC.md 8-64
+/// moving installs off that thread is the step `crates/sprawling/spec/Doctor.lean` §8-64
 /// names as left.
 const BUILD_PATIENCE: u32 = 24_000;
 

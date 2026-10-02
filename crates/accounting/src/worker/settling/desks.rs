@@ -109,8 +109,8 @@ impl RunWorker {
             // A node's claim is closed the moment its closing line is on
             // the ledger, not when `Roadmap.md` is rewritten or the whole
             // landing is: a refusal part-way leaves owed only the nodes
-            // whose last line still reads them as held (sprawling-SPEC.md
-            // 8-42-8).
+            // whose last line still reads them as held (`crates/sprawling/Spec.lean`
+            // §8-42-8).
             let mut close =
                 |closing: effect::Closing| self.record_closing(run_id, closing, open_claims);
             match effect::Claims::of(&claim_effects, &on_disk, desks.plan_path.clone(), addr, who)?

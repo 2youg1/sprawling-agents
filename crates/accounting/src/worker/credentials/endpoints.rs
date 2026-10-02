@@ -86,7 +86,7 @@ impl RunWorker {
     /// name, as it should travel now.
     ///
     /// **An empty key box means "leave the key alone", never "remove
-    /// it"** (sprawling-SPEC.md 8-81). The form answers the vault once
+    /// it"** (`crates/sprawling/Spec.lean` §8-81). The form answers the vault once
     /// and holds the reference only while it is mounted, so every
     /// later visit says nothing about the credential; reading that as
     /// `AuthSpec::None` probed without a key and wrote the endpoint
@@ -260,7 +260,7 @@ impl RunWorker {
     ///
     /// The store is opened once here rather than once per picture, so a
     /// conversation carrying four pictures holds one handle on one
-    /// immutable directory rather than four (sprawling-SPEC.md 8-50). The handle is
+    /// immutable directory rather than four (`crates/sprawling/Spec.lean` §8-171). The handle is
     /// this adapter's own rather than the worker's, because the worker's
     /// is needed elsewhere while a call is out.
     ///

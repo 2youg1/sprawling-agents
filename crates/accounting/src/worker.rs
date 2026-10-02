@@ -161,7 +161,7 @@ pub struct Serving {
     ///
     /// One handle per drive rather than one hook lent out and taken
     /// back: N runs may be asking at once, and each asks about itself
-    /// (sprawling-SPEC.md 8-46-1).
+    /// (`crates/sprawling/Spec.lean` §8-46-1).
     pub interrupts: Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>,
 }
 
@@ -173,7 +173,7 @@ pub struct RunWorker {
     /// Which city this is, as the genesis line hashes. Read from the
     /// ledger the first time a commit needs signing and remembered, so
     /// no checkpoint, landing or merge re-reads the front of the history for
-    /// it (sprawling-SPEC.md 8-51). Lazy rather than read on
+    /// it (`crates/sprawling/Spec.lean` §8-51). Lazy rather than read on
     /// open, because a worker over a city with no genesis line yet is a
     /// legal state.
     city: std::sync::OnceLock<kernel::B3Hash>,
@@ -184,7 +184,7 @@ pub struct RunWorker {
     /// The store every lane writes through: one handle, opened with the
     /// worker, because opening a store sweeps its half-written objects
     /// and a lane that opened its own would sweep another lane's put
-    /// (sprawling-SPEC.md 8-113).
+    /// (`crates/sprawling/Spec.lean` §8-113).
     lane_store: Arc<std::sync::Mutex<Cas>>,
     /// Whose identity this city can call which model under
     /// (`credentials::held`).
@@ -196,7 +196,7 @@ pub struct RunWorker {
     /// one caller in one breath and are absent together in every other
     /// worker; as four fields the type admitted sixteen states of which
     /// two were reachable, and adding a fourth sink meant remembering a
-    /// fourth setter (sprawling-SPEC.md 8-46-10).
+    /// fourth setter (`crates/sprawling/Spec.lean` §8-46-10).
     serving: Option<Serving>,
     /// What waits for a person, who may answer it, what has been
     /// allowed, which scopes are shut, and what each waiting item is
@@ -226,11 +226,11 @@ pub struct RunWorker {
     /// history through, what the city owes each one when it comes home,
     /// the one checkpoint they take turns at, and the commands they left
     /// running. One per city, so the number of runs a city drives at once
-    /// has one answer (sprawling-SPEC.md 8-46-2).
+    /// has one answer (`crates/sprawling/Spec.lean` §8-46-2).
     flight: Flight,
     /// Where each line of the history sits, folded once and refreshed
     /// with what was appended since, so a question about one line reads
-    /// that line rather than the whole history (sprawling-SPEC.md 8-82).
+    /// that line rather than the whole history (`crates/sprawling/Spec.lean` §8-82).
     pub(in crate::worker) index: storage::LedgerIndex,
     /// The keep-warm doors of runs that have landed, one per room
     /// (`keeping_warm`); empty under the default setting.
@@ -242,7 +242,7 @@ pub struct RunWorker {
     /// Connects the MCP servers a building's configuration names, and
     /// keeps them connected between runs (`mcp::Residents`). Received
     /// for the same reason `models` is. Shared, because the lane that
-    /// prepares a dispatch connects its servers (sprawling-SPEC.md 8-113).
+    /// prepares a dispatch connects its servers (`crates/sprawling/Spec.lean` §8-113).
     connectors: Arc<dyn crate::Connectors + Send + Sync>,
     /// Looks at the machine this city runs on and installs onto it
     /// (`doctor::ThisMachine`). Received for the same reason `models`
@@ -256,29 +256,29 @@ pub struct RunWorker {
     /// instants apart (`Hands.monotonic`).
     monotonic: fn() -> std::time::Instant,
     /// Reads the city's volume at the door new work enters by
-    /// (sprawling-SPEC.md 8-116).
+    /// (`crates/sprawling/Spec.lean` §8-116).
     read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,
     /// Hands one of this city's paths to the desktop's file manager
     /// (`revealing::reveal`). Received rather than called, because it
-    /// starts a program on the host (sprawling-SPEC.md 8-60).
+    /// starts a program on the host (`crates/sprawling/Spec.lean` §8-60).
     reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,
     /// Builds the browser tools a building's rules ask for
     /// (`browser_tool::for_rules`). Received rather than called, because
-    /// a browser tool starts a browser on the host (sprawling-SPEC.md
-    /// 8-45-2).
+    /// a browser tool starts a browser on the host (`crates/sprawling/Spec.lean`
+    /// §8-45-2).
     browsers: Browsers,
     /// Where the desktop server a building's rules ask for is started
     /// from (`std::env::current_exe`). Received rather than asked,
-    /// because it starts a program on the host (sprawling-SPEC.md 8-4d).
+    /// because it starts a program on the host (`crates/sprawling/Spec.lean` §8-4d).
     desktop_program: DesktopProgram,
     /// Starts the official harness a room's resident names, in the room's
     /// tree (`HarnessProcess::start`). Received as a value the tests
     /// replace, because it starts a program on the host
-    /// (sprawling-SPEC.md 8-124).
+    /// (`crates/sprawling/Spec.lean` §8-124).
     harnesses: driving::harness::StartHarness,
     /// How this build installs one named item on this platform
     /// (`doctor::recipe_for`). Received rather than read, because the
-    /// requirement table stays with the doctor (sprawling-SPEC.md,
+    /// requirement table stays with the doctor (`crates/sprawling/Spec.lean`,
     /// `doctor_install`).
     recipe_for: fn(&str) -> Result<&'static crate::Recipe, AxError>,
     /// Where the exec tool's interpreter, shell and engine come from
@@ -295,7 +295,7 @@ impl RunWorker {
     /// change without the city being a different city, so remembering it
     /// removes a re-read rather than creating a second authority - and a
     /// re-read that answered differently mid-run would be the worse
-    /// failure of the two (sprawling-SPEC.md 8-51).
+    /// failure of the two (`crates/sprawling/Spec.lean` §8-51).
     ///
     /// # Errors
     /// Propagates a ledger that cannot be read and a city with no

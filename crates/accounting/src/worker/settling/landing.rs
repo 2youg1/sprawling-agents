@@ -217,7 +217,7 @@ impl RunWorker {
             // lands rather than here: a parent that drove each of its
             // children to the end held this thread, and with it every
             // other lane's writes, for the depth of the whole tree
-            // (sprawling-SPEC.md 8-46-2).
+            // (`crates/sprawling/Spec.lean` §8-46-2).
             self.dispatch_into_lane(
                 Assignment {
                     addr: work.room,
@@ -248,7 +248,7 @@ impl RunWorker {
         // and whoever asked hears why. The refusal is noted as well as
         // handed back, because an obligation with nobody behind it
         // reaches the diagnostics log and nothing else
-        // (sprawling-SPEC.md 8-46-12). The run itself still lands below,
+        // (`crates/sprawling/Spec.lean` §8-46-12). The run itself still lands below,
         // so refusing a successor does not also take this run's ending
         // off the ledger.
         let onward = match replaced {
@@ -313,7 +313,7 @@ impl RunWorker {
             return Ok(Landed::Elsewhere);
         }
         // What this run sent stays warm for the room's next run
-        // (sprawling-SPEC 8-112).
+        // (`crates/sprawling/Spec.lean` §8-112).
         if let Some(door) = adapter {
             self.warm.keep(addr.clone(), door);
         }

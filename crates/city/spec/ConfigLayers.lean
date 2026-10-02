@@ -71,7 +71,7 @@ impl Ladder {
 - **`command`（非空）＋ `args`（缺省空表）＋ `env`（缺省空表，形如 `env = { API_KEY = "secret:mcp/apps" }`）**——城所在的机器上的一个程序。写成表而不是 `NAME=value` 行的列表：文件里一个名字只出现一次，也没有谁要去切一个人写的字符串。
 - **`url`（非空）＋ `headers`（缺省空表，写法同上）＋ `transport`（`"http"`｜`"sse"`，缺省 `"http"`）**——一个地址。`transport` 是闭集而不是自由文本，拼错在写它的地方就被拒，而不是变成一台没人够得到的服务器；缺省取 `http`，因为「发一条消息过去」正是一个 url 的本义。
 
-两组各自成行：`command` 与 `url` 同时出现即拒（读者要去猜），两者都不出现也拒。`command` 一行再写 `transport` 同样拒——命令走它自己的管道，再指一条流就是一行说了两种 transport。两张表的值都可以是 `secret:realm/name` 引用，兑付不在本模块（sprawling-SPEC §8-4／§8-15）。两条口径：①**同一层内标签不得重复**——两个同名 server 会让同一个工具名同时指向两个进程，而那是一个路由错误而不是一个偏好；②整表上梯（下层写即替换上层全表），语义住 `crates/kernel/Spec.lean` §8-22，此处不复述。**不在本模块的事**：进程怎么起、起不来怎么办、confidential 楼凭什么拒——那三件全在装配层（sprawling-SPEC §8-4），本模块只回答「三份文件说了什么」。
+两组各自成行：`command` 与 `url` 同时出现即拒（读者要去猜），两者都不出现也拒。`command` 一行再写 `transport` 同样拒——命令走它自己的管道，再指一条流就是一行说了两种 transport。两张表的值都可以是 `secret:realm/name` 引用，兑付不在本模块（`crates/sprawling/Spec.lean` §8-4／§8-15）。两条口径：①**同一层内标签不得重复**——两个同名 server 会让同一个工具名同时指向两个进程，而那是一个路由错误而不是一个偏好；②整表上梯（下层写即替换上层全表），语义住 `crates/kernel/Spec.lean` §8-22，此处不复述。**不在本模块的事**：进程怎么起、起不来怎么办、confidential 楼凭什么拒——那三件全在装配层（`crates/sprawling/Spec.lean` §8-4），本模块只回答「三份文件说了什么」。
 
 **`[sandbox]` 一节**：`CONFIG.toml` 第二节 `[sandbox]`，字段 `shell`（bool，默认 false）、`fuel`（整数，缺省取 `SANDBOX_FUEL_DEFAULT`）、`mounts`（相对 city root 的路径表，reserved prefix 在解析点即拒）。解析仍是「本版本不读的键即拒」——被写下却什么都不发生是唯一没人能诊断的状态。整节整值上梯，语义住 `crates/kernel/Spec.lean` §8-22，此处不复述。
 
@@ -83,11 +83,11 @@ impl Ladder {
 
 **`[cache]` 一节**：一个字段 `keep_warm`，取 `off` 或 `five_minute`——这一层要不要在提示缓存到期前续期。值的形状与续期判定住 `kernel::keep_warm`（`crates/kernel/spec/KeepWarm.lean` §8-74），本节只管它在 TOML 里怎么写、在哪一层写。拼写由 serde 按闭集读，拼错的词与未知键同样在解析点拒。`city::keep_warm(city_root, addr) -> Result<KeepWarm, AxError>` 爬同一张梯，下层覆盖上层；一层也没说时答 `KeepWarm::Off`——续期是人付钱的请求，默认必须是不发。与 `[context]` 不同，它不进 `FrozenConfig`：续期发生在两次 run 之间。
 
-**`[resident]` 一节**：一个字段 `harness`（字符串），点名这一层以下的房间由哪家官方 harness 当居民。值照写下的读进来：五个拼写的权威是 `agent_protocols::Harness`，本 crate 只见 `kernel`，认不认得由派活路径判（sprawling-SPEC §8-4e 第 10 条）。空串在解析点拒，与 `[model] name` 走同一条判定：空值什么也没说，写它是笔误。
+**`[resident]` 一节**：一个字段 `harness`（字符串），点名这一层以下的房间由哪家官方 harness 当居民。值照写下的读进来：五个拼写的权威是 `agent_protocols::Harness`，本 crate 只见 `kernel`，认不认得由派活路径判（`crates/sprawling/Spec.lean` §8-4e 第 10 条）。空串在解析点拒，与 `[model] name` 走同一条判定：空值什么也没说，写它是笔误。
 
 - **一层只点名一种居民**：同一层既写 `[model] name` 又写 `[resident] harness`，解析即拒（`E_CONFIG_INVALID`），拒词带两个键和各自的值。居民是模型还是 harness，要读者去猜，就是配置写错了。`ConfigLayer` 的字段私有、`parse` 是唯一构造点，所以两键并存的值构造不出来。地址就是楼时，楼层与房间层是同一个文件；人要在这样一个带着会话记录的文件里写 harness，先 `/new` 清掉会话写下的 `[model] name`。
 - **harness 爬梯子，`[model] name` 不爬**：`settled_harness` 与 `settled_effort` 爬同一条梯子，下层胜上层，连同说出它的那一级一起答。`[model] name` 仍只是地址自己那一层的会话记录（`own_layer`，§8-14），不参与求值。
-- **会话记录压过梯子**：地址自己那一层有 `[model] name` 时，`settled_harness` 答 `None`。这段会话以模型开场，就以模型走完，理由与 sprawling-SPEC §8-79「会话的形状只选一次」相同。人在楼层或城层写下的 harness，从 `/new` 开的下一段会话起生效。答案针对「一次 run 在这个地址上接着跑」；派活开新房间时，新房间自己那一层是空的，梯子的答案就是它的答案。
+- **会话记录压过梯子**：地址自己那一层有 `[model] name` 时，`settled_harness` 答 `None`。这段会话以模型开场，就以模型走完，理由与 `crates/sprawling/Spec.lean` §8-79「会话的形状只选一次」相同。人在楼层或城层写下的 harness，从 `/new` 开的下一段会话起生效。答案针对「一次 run 在这个地址上接着跑」；派活开新房间时，新房间自己那一层是空的，梯子的答案就是它的答案。
 - **城自己的写路径写不出两键并存的文件**：见 §8-4b。
 -/
 
@@ -118,7 +118,7 @@ pub fn write_session(city_root: &Path, addr: &Address, model: &str, effort: Opti
 
 - **一次写下一个会话冻下的两样东西**：`write_session` 落 `[model] name`，并在人选了强度时落 `[model] effort`。模型总写下（一个模型总在指某个东西），强度只在人说了时写下：缺席不是一个值，而是「让供应方决定」，写出来就是把一个没人做的选择记成记录。
 - **写进那一层，而不是另存一份**：选择落到会话自己房间的 `CONFIG.toml`，由已有的 city → building → room 阶梯解析。第二个存处就是第二个答案。
-- **这份记录是会话的，不是运行时的设定**：一个 Run 用哪个模型仍由 endpoint book 选，强度仍爬同一条梯子——两者决定会话从哪里开始。房间写下来的只是它当初从哪里开始，所以登记面之后搬了家，是下次派活拒掉的分歧，而不是它默默执行的变更（`sprawling-SPEC §8-79`）。
+- **这份记录是会话的，不是运行时的设定**：一个 Run 用哪个模型仍由 endpoint book 选，强度仍爬同一条梯子——两者决定会话从哪里开始。房间写下来的只是它当初从哪里开始，所以登记面之后搬了家，是下次派活拒掉的分歧，而不是它默默执行的变更（`crates/sprawling/Spec.lean` §8-79`）。
 - **只改 `[model]` 表里的键**：文件里其它键是人写的，读出来、改一个值、写回去，与其余写面同走 §8-4b 的那一条写路径。文件读不动或解析不了就**拒绝**，不覆盖——一份本构建看不懂的配置不是可以随手盖掉的配置。
 - **只写 Resident 层**，层级不由调用方给：派活按钮旁边选的强度属于这一次会话的房间。需要按层写强度时，签名要多一个 `Layer` 参数，那是一次公开面变更。
 - **落点就是地址自己的 `CONFIG.toml`**，所以这个房间跑的 Run 读得到、改不了自己的档位；地址就是楼时它就是楼自己那份文件，也就是楼根上的会话（§8-4 的 `own_layer`）。
@@ -138,14 +138,14 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 
 **拒什么**：`[clock]` 表 `deny_unknown_fields`。`zones` 与任何别的键、拼不出的值（`"minutes"`）都在解析时拒，走本模块既有的那一种拒法（`refuse::unreadable`）：主体是 serde 点名的键或值与它接受的集合，恢复语是「under `[clock]`, change the value the message names, or take that key out」。
 
-**读者**：粒度只在 `runtime::clock::StampGate` 里起作用（`crates/runtime/Spec.lean` §8-10）；生产的每一跑由装配层按冻结下来的值造一个 `StampGate`（sprawling-SPEC 8-125）。
+**读者**：粒度只在 `runtime::clock::StampGate` 里起作用（`crates/runtime/Spec.lean` §8-10）；生产的每一跑由装配层按冻结下来的值造一个 `StampGate`（`crates/sprawling/Spec.lean` §8-125）。
 -/
 
 /-! D6 定规：`[resident] harness` 上梯子，会话记录压过它
 
 **决定**：`[resident] harness` 按城／楼／房间的梯子取最近一级（`settled_harness`），`[model] name` 仍只是地址自己那一层的会话记录。同一层两键并存在解析时拒。地址自己那一层有会话记录时，`settled_harness` 答 `None`，梯子上的 harness 从 `/new` 开的下一段会话起生效。`change` 落盘前用 `ConfigLayer::parse` 读一遍自己要写下的字节，读不回的不写。
 
-**理由**：房间在派活时才开，人事先只能把 harness 写在楼层或城层，所以它必须上梯子；`[model] name` 是城在会话第一次 run 时写下的记录，别的房间继承它就把一段会话的选择变成了别人的默认。会话记录压过梯子，一段会话就只有一个居民，provider 对这段会话缓存的前缀也不会在中途失效（sprawling-SPEC §8-79）。写路径复读一次，是因为地址就是楼时楼层与房间层是同一个文件：派活路径若在别处漏了分流，把 `[model] name` 写进点名了 harness 的楼，每个读者都会拒这份文件，整栋楼派不出活；复读让这件事停在写之前，而判定仍只有 `parse` 一处。
+**理由**：房间在派活时才开，人事先只能把 harness 写在楼层或城层，所以它必须上梯子；`[model] name` 是城在会话第一次 run 时写下的记录，别的房间继承它就把一段会话的选择变成了别人的默认。会话记录压过梯子，一段会话就只有一个居民，provider 对这段会话缓存的前缀也不会在中途失效（`crates/sprawling/Spec.lean` §8-79）。写路径复读一次，是因为地址就是楼时楼层与房间层是同一个文件：派活路径若在别处漏了分流，把 `[model] name` 写进点名了 harness 的楼，每个读者都会拒这份文件，整栋楼派不出活；复读让这件事停在写之前，而判定仍只有 `parse` 一处。
 
 **被否**：①梯子上的 harness 压过会话记录：改了楼层下一次派活就换居民，一段会话前后两截的记录说的是两种居民；②把两个键收成一个枚举字段：一个是城写下的记录、只读本层，一个是人写下的设定、爬梯子，合成一个值会暗示两者按同一条规则求值，而私有字段加唯一构造点已经让两键并存的值构造不出来；③写路径只靠派活路径先分流、自己不复读：分流住在另一个 crate，一处疏漏的代价是一整栋楼。
 

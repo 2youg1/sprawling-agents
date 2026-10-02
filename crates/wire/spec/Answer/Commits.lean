@@ -67,7 +67,7 @@ pub struct CommitsAnswer {
 - **`building` 按 `actor` 地址前缀过滤，不按 session**：`actor == building` 或 `actor` 以 `<building>/` 起头；run 的 actor 是权威，session 是它的投影（`session_of`），反过来过滤会丢掉派到楼根、没开过会话的 run。`None` 列全城。
 - **答案回带 `building` 与 `before`**：线上没有请求 id，客户端按内容把答案配回问题（`ChangesAnswer` 回带 `base`／`head` 是同一个理由）；缺了这两个字段，两座楼的两页同时在飞时无法分辨谁是谁的。
 - **失联如实**：只列城自己写过的提交；人 rebase／squash 之后 trunk 上的 oid 不在其中，`Commit` 对它仍答 `Unavailable`。不读提交体的 trailer 回填——那会让投影成为第二权威（`views/commits.rs` 模块头）。
-- **服务端**：`views::holding` 给按 oid 键的 `commits` 表加一条按 `seq` 的索引（`commit_seqs: BTreeMap<Seq, GitOid>`），`fold_commit` 两表同写；sprawling-SPEC §8-53。
+- **服务端**：`views::holding` 给按 oid 键的 `commits` 表加一条按 `seq` 的索引（`commit_seqs: BTreeMap<Seq, GitOid>`），`fold_commit` 两表同写；`crates/sprawling/Spec.lean` §8-53。
 - **`CommitAnswer` 长出 `at: TimeMs`**（同版内，第二条提交）：宣告这次提交的那条记录自己的 `t`。理由来自第一张截图——一列 seq 没法扫读，而一列时间可以。与 `Opening.at`／`Closing.at` 同源、同型。
 - **客户端**：`cargo xtask wire-ts --write` 重生。
 -/
@@ -84,8 +84,8 @@ pub struct CommitAnswer {
 pub struct CommitAt { pub oid: GitOid, pub seq: Seq }
 ```
 
-- **`previous` 由账本折出。** 两条宣告提交的记录（`checkpoint_committed` 的提交一支与 `pr_merged`）按 `seq` 折进视图时，同一次 run 上一次宣告的那个提交就是它的 `previous`（sprawling-SPEC 8-128）。它与本提交围出一段：`Query::Changes { base: previous.oid, head: Some(oid) }` 答这次提交相对上一个检查点改了哪些文件，`Query::RunHistory { run, before: Some(seq) }` 往回读到 `previous.seq` 为止，答这一段里这次 run 发出的调用。这一段是候选，不是原因：同一栋楼里别的 run 与人也可能在这一段里写过文件。
-- **`parents` 读自 git，在答问时读。** 提交对象自己记着它的父提交，账本记下的 oid 就是这个对象（连同父提交）的哈希，所以这里读的是权威本身，不是投影；五条 trailer 才是投影，本节不读它们。`Some(vec![])` 是根提交；`None` 是这座城没有仓库、仓库里没有这个对象，或者读失败——一座导出后在别处恢复、身边没有 `.git` 的城，其余各字段照答，只是画不出这一格。读 git 在快照的锁放开之后做（sprawling-SPEC 8-100），一页提交只开一次仓库。
+- **`previous` 由账本折出。** 两条宣告提交的记录（`checkpoint_committed` 的提交一支与 `pr_merged`）按 `seq` 折进视图时，同一次 run 上一次宣告的那个提交就是它的 `previous`（`crates/sprawling/Spec.lean` §8-128）。它与本提交围出一段：`Query::Changes { base: previous.oid, head: Some(oid) }` 答这次提交相对上一个检查点改了哪些文件，`Query::RunHistory { run, before: Some(seq) }` 往回读到 `previous.seq` 为止，答这一段里这次 run 发出的调用。这一段是候选，不是原因：同一栋楼里别的 run 与人也可能在这一段里写过文件。
+- **`parents` 读自 git，在答问时读。** 提交对象自己记着它的父提交，账本记下的 oid 就是这个对象（连同父提交）的哈希，所以这里读的是权威本身，不是投影；五条 trailer 才是投影，本节不读它们。`Some(vec![])` 是根提交；`None` 是这座城没有仓库、仓库里没有这个对象，或者读失败——一座导出后在别处恢复、身边没有 `.git` 的城，其余各字段照答，只是画不出这一格。读 git 在快照的锁放开之后做（`crates/sprawling/Spec.lean` §8-100），一页提交只开一次仓库。
 - **`message: Option<String>` 读自 git，与 `parents` 同一刻读。** 提交对象自己记着说明，账本从未记过它，所以它与父提交同属「答问时读 git」那一类（D3(b)）：`Some` 是提交对象里的说明原文，五条 trailer 在内；`None` 的情形与 `parents` 相同，另加说明不是 UTF-8。页面画提交行时取第一行，要读全文时读这一格。名字不变而形状变了，与本批其余改形共用 `WIRE_V` 45（D1）。
 -/
 

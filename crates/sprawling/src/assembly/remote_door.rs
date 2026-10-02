@@ -3,11 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the remote door of a served city is made of (sprawling-SPEC.md
-//! 8-139): the device table's path, the writer's relay for its five
+//! What the remote door of a served city is made of (`crates/sprawling/spec/Outside/Conduit.lean`
+//! §8-139): the device table's path, the writer's relay for its five
 //! lines, this machine's clock and random source, where the city's own
 //! listener answers on this machine, and the route the city's `[remote]`
-//! table names (sprawling-SPEC.md 8-151).
+//! table names (`crates/sprawling/spec/Assembly.lean` §8-151).
 //!
 //! Assembled here because the clock is sampled in `bin::assembly` only,
 //! and because the relay exists only once the writer thread runs.
@@ -38,7 +38,7 @@ const CLOUDFLARED: &str = "cloudflared";
 /// The longest one `/remote open` waits for its route to be reachable.
 /// The console's thread waits, and the door's lock is held, for as long
 /// as this; `cloudflared` reaches its edge in one to a few seconds
-/// (sprawling-SPEC.md 8-151).
+/// (`crates/sprawling/spec/Assembly.lean` §8-151).
 const ROUTE_PATIENCE: TimeoutMs = TimeoutMs(30_000);
 
 /// The parts a remote door is kept with, gathered while the city opens.

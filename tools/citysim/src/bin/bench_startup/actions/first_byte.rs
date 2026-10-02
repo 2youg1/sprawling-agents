@@ -14,7 +14,7 @@
 //! whether it proved the history it opened from. What that serve wrote
 //! to standard error is kept in the log file the caller names, so the
 //! phases the product timed for itself - the opening line and the proof
-//! line, the moment commands are taken (sprawling-SPEC.md 8-122) - sit
+//! line, the moment commands are taken (`crates/sprawling/Spec.lean` §8-122) - sit
 //! beside the reading.
 
 use std::io::{Read as _, Write as _};
@@ -96,7 +96,7 @@ fn one(binary: &Path, city: &Path, log: &Path) -> Result<Duration, AxError> {
 }
 
 /// The lines a served city writes when the proof of its history ends:
-/// whole, or the ledger stopped (sprawling-SPEC.md 8-90).
+/// whole, or the ledger stopped (`crates/sprawling/Spec.lean` §8-90).
 const PROOF_ENDS: [&str; 2] = ["the history is proved", "the ledger stopped taking writes"];
 
 /// Waits until the serve's log says how the proof of its history ended,

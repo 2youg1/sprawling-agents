@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whether the city takes on new work while its volume is close to full
-//! (sprawling-SPEC.md 8-116).
+//! (`crates/sprawling/Spec.lean` §8-116).
 
 #[cfg(test)]
 use std::path::Path;

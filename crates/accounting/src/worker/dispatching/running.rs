@@ -20,13 +20,13 @@ use super::{Assignment, Seat};
 /// It exists because a drive may happen somewhere else. Where the
 /// dispatch runs on this thread it is a local living across one call;
 /// where a lane runs it, it waits in the pursuit that started it until
-/// that run comes home (sprawling-SPEC.md 8-46-2). Either way there is
+/// that run comes home (`crates/sprawling/Spec.lean` §8-46-2). Either way there is
 /// one per run, and nothing in it is shared.
 pub(in crate::worker) enum Continuation {
     /// A model run's desks, lent out on this thread.
     Model(Lent),
     /// A harness run borrows nothing on this thread: everything it gives
-    /// back comes home with the drive (sprawling-SPEC.md 8-124).
+    /// back comes home with the drive (`crates/sprawling/Spec.lean` §8-124).
     Harness,
 }
 
@@ -48,7 +48,7 @@ impl RunWorker {
     /// landing will need afterwards. Every line it writes goes through
     /// this worker on this thread; the review tree, the bench with its
     /// MCP servers and the frozen plan are the lane's
-    /// (sprawling-SPEC.md 8-113).
+    /// (`crates/sprawling/Spec.lean` §8-113).
     ///
     /// # Errors
     /// Propagates every refusal a dispatch can owe before it costs
@@ -76,7 +76,7 @@ impl RunWorker {
         let goal = self.take_custody(goal)?;
         // What this run will stand under reaches the history before it
         // governs anybody, and only once the city has agreed: a refused
-        // dispatch still writes nothing (sprawling-SPEC.md 8-40).
+        // dispatch still writes nothing (`crates/sprawling/Spec.lean` §8-40).
         self.book_rules(seat.building())?;
         let session = super::session::session_for(&at.addr, at.session.take(), &task)?;
         // The first thing this city writes for a dispatch, and the line
@@ -182,8 +182,8 @@ impl RunWorker {
     /// own outcome is read.** A drive that failed is exactly when the
     /// room's queue and the worktree lease are most likely to be lost:
     /// returning early at `driven?` would let a disk that went wrong take
-    /// the room's mail and a tree's lease with it (sprawling-SPEC.md
-    /// 8-46-9).
+    /// the room's mail and a tree's lease with it (`crates/sprawling/Spec.lean`
+    /// §8-46-9).
     ///
     /// The plan step closes each node of `open_claims` as that node's
     /// closing line reaches the ledger; the caller still owes the history
@@ -226,7 +226,7 @@ impl RunWorker {
         let chain = owing.knock_chain().clone();
         // Both loans go back before either failure is propagated: a
         // backlog that would not take its member back must not cost the
-        // room its mail too (sprawling-SPEC.md 8-46-9).
+        // room its mail too (`crates/sprawling/Spec.lean` §8-46-9).
         let returned = self.return_borrowed(&at, &mut site, &desks);
         let left = member.map_or(Ok(()), |id| self.flight.backlog.leave(id));
         returned?;
@@ -234,7 +234,7 @@ impl RunWorker {
         // A lane that placed the tree and then failed leaves no sweep to
         // read it, so the tree goes back before the failure does; kept,
         // it would answer every later dispatch to the room with
-        // WorktreeBusy until the worker restarts (sprawling-SPEC.md 8-113).
+        // WorktreeBusy until the worker restarts (`crates/sprawling/Spec.lean` §8-113).
         let driven = match driven {
             Ok(driven) => driven,
             Err(failure) => {

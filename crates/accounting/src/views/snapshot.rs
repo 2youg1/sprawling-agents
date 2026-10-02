@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The views as the bytes a snapshot holds (sprawling-SPEC 8-91).
+//! The views as the bytes a snapshot holds (`crates/sprawling/Spec.lean` §8-91).
 
 use std::path::Path;
 
@@ -65,7 +65,7 @@ pub(super) fn decode_index<'de, D: serde::Deserializer<'de>>(
 }
 
 /// The plan cache as a snapshot holds it: the cache itself, not the lock
-/// the two copies of the views share it through (sprawling-SPEC.md 8-99).
+/// the two copies of the views share it through (`crates/sprawling/Spec.lean` §8-99).
 pub(super) fn encode_plans<S: serde::Serializer>(
     plans: &Arc<Mutex<PlanView>>,
     serializer: S,
@@ -141,21 +141,21 @@ impl Views {
 
     /// A second copy of these views, folded to the same record and sharing
     /// their ledger index, plan cache, vault and halt, for the fold thread
-    /// to alternate with (sprawling-SPEC.md 8-99): a clone, which copies
+    /// to alternate with (`crates/sprawling/Spec.lean` §8-99): a clone, which copies
     /// every folded field and shares what sits behind an `Arc`, so the
     /// copy starts where this one stands without the history being read
     /// again (`crates/accounting/spec/Views/Snapshot.lean` §8-19).
     ///
     /// # Errors
     /// None today; the `Result` stays until its caller in
-    /// `bin::assembly::listening` drops the `?` (sprawling-SPEC.md 8-144).
+    /// `bin::assembly::listening` drops the `?` (`crates/sprawling/Spec.lean` §8-144).
     pub fn twin(&self) -> Result<Views, AxError> {
         Ok(self.clone())
     }
 
     /// Cuts a snapshot of these views at `record`, the last record they
     /// folded. Its `canonical_line` is the ledger's line, so the cut reads
-    /// nothing back from the ledger (sprawling-SPEC.md 8-91).
+    /// nothing back from the ledger (`crates/sprawling/Spec.lean` §8-91).
     ///
     /// # Errors
     /// `InvalidArgs` when the record does not serialise, and those of

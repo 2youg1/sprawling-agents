@@ -5,7 +5,7 @@
 
 //! The remote listener: a loopback port of its own, opened with the door
 //! and closed with it, that the route makes reachable from outside
-//! (sprawling-SPEC.md 8-139).
+//! (`crates/sprawling/spec/Outside/Conduit.lean` §8-139).
 //!
 //! It answers two WebSocket paths. [`PAIR_PATH`] carries one pairing
 //! handshake and ends (crates/remote_access/Spec.lean §8-6). [`SESSION_PATH`]

@@ -5,7 +5,7 @@
 
 //! The command table: every verb this binary accepts, the positional
 //! arguments and flags it reads, one line about what it does, and
-//! whether running it changes anything (sprawling-SPEC.md 8-89).
+//! whether running it changes anything (`crates/sprawling/spec/Main/Grammar.lean` §8-89).
 //!
 //! The parser (`grammar`), the overview a person reads, and each verb's
 //! own help all read this table, so a flag cannot be accepted in one
@@ -66,7 +66,7 @@ pub(super) struct Flag {
 
 /// Whether a verb takes the words after the first `--` as a command of
 /// its own, handed over without reading any of them as a flag
-/// (sprawling-SPEC.md 8-129-4).
+/// (`crates/sprawling/spec/Main.lean` §8-129-4).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum AfterDashes {
     Refused,

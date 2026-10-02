@@ -30,7 +30,7 @@ pub(super) use standing::{Lending, Placing, lend_tree};
 
 /// What laying out a run's bench reads from the city: handles that
 /// clone, and values read when the dispatch was staged, so the bench is
-/// laid out in the lane that drives the run (sprawling-SPEC.md 8-113).
+/// laid out in the lane that drives the run (`crates/sprawling/Spec.lean` §8-113).
 ///
 /// The folds the accounting thread rewrites - who has mail waiting, who
 /// holds which goal, how far the city trusts its residents - arrive as
@@ -67,7 +67,7 @@ pub(in crate::worker) struct Laying {
     locks: Vec<String>,
     /// The endpoints and the choices made from them, which the
     /// transcription and OCR tools ask under this building's rules
-    /// (sprawling-SPEC.md 8-131, 8-142).
+    /// (`crates/sprawling/Spec.lean` §8-131, §8-142).
     book: gateway::EndpointBook,
     proposing: tools::proposal::Proposing,
 }
@@ -82,7 +82,7 @@ impl Laying {
     ///
     /// The first open in a city creates its repository, and two lanes
     /// creating one race on its config lock, so the open takes the gate
-    /// a checkpoint takes (sprawling-SPEC.md 8-46-13).
+    /// a checkpoint takes (`crates/sprawling/Spec.lean` §8-46-13).
     ///
     /// # Errors
     /// Propagates a gate a dead thread left, and a repository that will
@@ -152,7 +152,7 @@ pub(super) struct Site {
     /// the whole run.
     pub(super) config: kernel::FrozenConfig,
     pub(super) model: gateway::ModelEntry,
-    /// The endpoint the model is reached through (sprawling-SPEC 8-85).
+    /// The endpoint the model is reached through (`crates/sprawling/Spec.lean` §8-85).
     pub(super) provider: String,
     pub(super) adapter: Option<super::keeping_warm::Door>,
     pub(super) identity: city::Identity,
@@ -169,10 +169,10 @@ pub(super) struct Site {
     branch: Option<String>,
     /// What survives a command's output in this run, resolved from the
     /// city's and the building's `FILTERS.toml` and frozen with the run
-    /// (sprawling-SPEC 8-43).
+    /// (`crates/sprawling/Spec.lean` §8-43).
     pub(super) filters: runtime::FilterTable,
     /// The moment this run's driver read its clock last, which `status`
-    /// and a command's clock line report (sprawling-SPEC 8-125).
+    /// and a command's clock line report (`crates/sprawling/Spec.lean` §8-125).
     pub(super) clock: runtime::ClockReading,
     /// Carried from the endpoint this run was given, frozen with
     /// everything else the run was set up with.
@@ -192,7 +192,7 @@ pub(super) struct Workbench {
     /// The bench, until the drive takes it. `Option` is the vehicle of
     /// that move and not a second state - the same handling `Site`
     /// gives its adapter - because a drive owns everything it runs on
-    /// and may leave this thread with it (sprawling-SPEC.md 8-46-1).
+    /// and may leave this thread with it (`crates/sprawling/Spec.lean` §8-46-1).
     bench: Option<ToolBench>,
     pub(super) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     /// Whether this run asked to be replaced, read when it concludes.
@@ -219,7 +219,7 @@ pub(super) struct Reach<'a> {
 /// `panic = "abort"` a thread cannot die holding a desk, so the error
 /// arm is unreachable in the shipped binary and still written, because
 /// a test build unwinds and a desk left locked there is a fact worth a
-/// stable code rather than a second panic (sprawling-SPEC 8-44).
+/// stable code rather than a second panic (`crates/sprawling/Spec.lean` §8-44).
 pub(super) fn held<'a, T>(
     desk: &'a std::sync::Mutex<T>,
     what: &'static str,
@@ -319,7 +319,7 @@ pub(super) struct Desks {
     /// to the desk, so it is counted here or not at all.
     waiting: u32,
     /// This run's tenure over its room's queue, shown when it lands:
-    /// only the holder gives a queue back (sprawling-SPEC.md 8-46-9).
+    /// only the holder gives a queue back (`crates/sprawling/Spec.lean` §8-46-9).
     pub(super) tenure: super::QueueTenure,
 }
 

@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The remote door end to end, over real sockets (sprawling-SPEC.md
-//! 8-151).
+//! The remote door end to end, over real sockets (`crates/sprawling/Spec.lean`
+//! §8-151).
 //!
 //! A served city, a person typing `/remote` on its console, a route the
 //! city's `[remote]` table chose, and a device speaking the remote door
@@ -18,7 +18,7 @@
 //! as the address outside uses, so "outside" is this machine and the
 //! test needs no tunnel and no second program.
 //!
-//! **Why Rust and not the Lean checker** (sprawling-SPEC.md section 12):
+//! **Why Rust and not the Lean checker** (`crates/sprawling/Spec.lean` section 12):
 //! the device's half of the pairing and session handshakes and of the
 //! seal exists only in `remote_access`. The lines that start the binary
 //! and open WebSockets carry the boundary waiver for that reason.
@@ -45,7 +45,7 @@ use remote_access::keys::{SigningKey, VerifyingKey};
 use remote_access::route::command::LOCAL_ENV;
 use remote_access::seal::Payload;
 use tokio::net::TcpStream;
-// boundary-ok: the device's half of the remote door exists only in remote_access, so this check speaks it from Rust (sprawling-SPEC.md 8-151)
+// boundary-ok: the device's half of the remote door exists only in remote_access, so this check speaks it from Rust (`crates/sprawling/Spec.lean` §8-151)
 use tokio_tungstenite::tungstenite::Message;
 // boundary-ok: the same device, on the remote listener this city opened
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
@@ -319,7 +319,7 @@ impl Served {
         // `:0`, so the relay reaches the city only at the port its
         // listener was given, never at the one `serve` was asked for
         // (`crates/wire/Spec.lean` §8-46, wire D16).
-        // boundary-ok: the remote door is opened from the served city's console, so the check starts the city it reaches (sprawling-SPEC.md 8-151)
+        // boundary-ok: the remote door is opened from the served city's console, so the check starts the city it reaches (`crates/sprawling/Spec.lean` §8-151)
         let mut child = Command::new(env!("CARGO_BIN_EXE_sprawling"))
             .arg("serve")
             .arg(city_root)

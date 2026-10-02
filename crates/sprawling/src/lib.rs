@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The city harness as a library, so that the assembly point has a door
-//! somebody outside this crate can enter (sprawling-SPEC.md section 8-15).
+//! somebody outside this crate can enter (`crates/sprawling/spec/Assembly.lean` §8-15).
 //!
 //! Two of the binary's modules stay with the binary rather than here:
 //! `install` puts this executable where a shell will find it, and

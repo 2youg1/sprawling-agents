@@ -51,5 +51,5 @@ impl Recogniser {
 
 /-! D13 OCR 是一项设施，形状照转写
 
-决定：`gateway::ocr` 与 `gateway::transcribe` 同形：端点账本里 `ModelTag::Ocr` 的那一次 `select` 给出 `Chosen`，`recogniser_for` 把它变成设施，`absent()` 答 `E_TOOL_UNAVAILABLE`；城的工具 `ocr` 只在那个选择成立时上 run 的工具表（sprawling-SPEC 8-142）。适配器就是 `adapter_for` 造的那一个，图片内容由所选 face 的 dialect 写（§8-34）。理由：「哪个端点答这一类活」已有账本这一个机制，「一张图在三种 face 上怎么写」已有 dialect 这一处；OCR 再写一套请求，就是这两件事的第二个权威。被否的备选：①专为 OCR 写一条请求（三种 face 各要一份图片拼法）；②让主模型自己看截图（主模型可能只读字，而 run 要的是一行可以读、可以搜的字，不是窗口里的一张图）；③把图先存进 CAS 再经城的 `ImageResolver` 兑付（读一个文件就成了一次写）。
+决定：`gateway::ocr` 与 `gateway::transcribe` 同形：端点账本里 `ModelTag::Ocr` 的那一次 `select` 给出 `Chosen`，`recogniser_for` 把它变成设施，`absent()` 答 `E_TOOL_UNAVAILABLE`；城的工具 `ocr` 只在那个选择成立时上 run 的工具表（`crates/sprawling/Spec.lean` §8-142）。适配器就是 `adapter_for` 造的那一个，图片内容由所选 face 的 dialect 写（§8-34）。理由：「哪个端点答这一类活」已有账本这一个机制，「一张图在三种 face 上怎么写」已有 dialect 这一处；OCR 再写一套请求，就是这两件事的第二个权威。被否的备选：①专为 OCR 写一条请求（三种 face 各要一份图片拼法）；②让主模型自己看截图（主模型可能只读字，而 run 要的是一行可以读、可以搜的字，不是窗口里的一张图）；③把图先存进 CAS 再经城的 `ImageResolver` 兑付（读一个文件就成了一次写）。
 -/

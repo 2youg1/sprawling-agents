@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Putting this binary where a shell will find it, and taking it back
-//! out again (sprawling-SPEC.md section 8-9; the properties the two
+//! out again (`crates/sprawling/spec/Install.lean` §8-9; the properties the two
 //! judgements keep are proved in `crates/sprawling/spec/Install.lean`).
 //!
 //! Two things happen and exactly those two are reversed: the running

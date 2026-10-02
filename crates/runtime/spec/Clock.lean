@@ -34,7 +34,7 @@ impl StampGate {
 ```
 
 - 历法纯整数（civil-from-days，无 chrono 依赖）：全程在 `i128` 上算，`u64` 毫秒加 `i32` 分钟偏移落不出它的界，所以格式化不会失败，`iso` 与 `render` 不带 `Result`；界证明携 `#[expect]`。**精度与频率分开**：戳一律到秒，粒度只决定 `Timeless` 工具多久带一次戳——同桶里第二条 `Timeless` 结果不带戳，`Timestamped` 每条都带。A18 零字节：Off 时 observe 恒 None。
-- `iso` 是本 crate 里一刻的唯一文字形：时钟行、`status` 的 `now:` 行都经它；`parse_iso` 把同一种文字读回一刻（`view --since` 与 `--until`，sprawling-SPEC 8-137），同一模块、同一精度。两者互逆：`parse_iso(&iso(t))` 是 `t` 去掉毫秒，`iso(parse_iso(s)?)` 是 `s`。`parse_iso` 只收 `YYYY-MM-DDTHH:MM:SSZ` 这 20 个字节：时区偏移、秒的小数、只有日期、小写的 `t`/`z`、历法里没有的那一天（2 月 30 日、非闰年的 2 月 29 日）、`24:00:00` 与闰秒 `:60`、1970 年之前，一律 `E_INVALID_ARGS`（action `read a UTC moment`，subject 是原文，recovery 给出正确写法）。日子在不在历法里，由把算出的日数经 `civil_from_days` 再算回来、比对年月日判定，历法只有那一份算法。
+- `iso` 是本 crate 里一刻的唯一文字形：时钟行、`status` 的 `now:` 行都经它；`parse_iso` 把同一种文字读回一刻（`view --since` 与 `--until`，`crates/sprawling/Spec.lean` §8-137），同一模块、同一精度。两者互逆：`parse_iso(&iso(t))` 是 `t` 去掉毫秒，`iso(parse_iso(s)?)` 是 `s`。`parse_iso` 只收 `YYYY-MM-DDTHH:MM:SSZ` 这 20 个字节：时区偏移、秒的小数、只有日期、小写的 `t`/`z`、历法里没有的那一天（2 月 30 日、非闰年的 2 月 29 日）、`24:00:00` 与闰秒 `:60`、1970 年之前，一律 `E_INVALID_ARGS`（action `read a UTC moment`，subject 是原文，recovery 给出正确写法）。日子在不在历法里，由把算出的日数经 `civil_from_days` 再算回来、比对年月日判定，历法只有那一份算法。
 - 时区行仍在：`FrozenConfig.clock_zones` 在真城里恒空（城配置拒 `[clock] zones`），剧本仍可冻结出非空表，所以格式化保留，偏移写成 `+HH:MM`／`-HH:MM`。
 -/
 
@@ -76,7 +76,7 @@ impl UtcSpan {
 }
 ```
 
-- **读者**：`sprawling view --since` 与 `--until`（sprawling-SPEC 8-137）；playback 的时间筛选接进来时读同一个值，不另写一份区间规则。`Default` 是两端都不设界，`contains` 恒真。
+- **读者**：`sprawling view --since` 与 `--until`（`crates/sprawling/Spec.lean` §8-137）；playback 的时间筛选接进来时读同一个值，不另写一份区间规则。`Default` 是两端都不设界，`contains` 恒真。
 - **逐个时刻判断，不假定有序**：`contains` 只看给它的那一刻。账本的 `t` 不随 `seq` 单调（D5：并行只读段的开始时刻可以早于前一条的答复；墙钟也会回拨），所以按时间选行的读者每一行都问一次，不在第一条越过 `until` 的行处停下，也不二分。
 - **矛盾的区间在构造时拒绝**：`until <= since` 的区间里没有任何一刻，按它选行只会安静地答出一段空历史；拒绝时 subject 写出两端的 `iso`。合法而恰好什么都没选中的区间照常答空。
 -/

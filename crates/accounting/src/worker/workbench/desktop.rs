@@ -5,7 +5,7 @@
 
 //! The servers a run connects to: the ones its building's configuration
 //! names, and the desktop server this binary carries when the building's
-//! rules ask for it (sprawling-SPEC.md 8-4d).
+//! rules ask for it (`crates/sprawling/Spec.lean` §8-4d).
 //!
 //! The desktop server is this same executable started as a child with
 //! the `desktop` verb, so from here on it is an ordinary stdio server:

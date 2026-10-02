@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The keep-warm door a run's model calls go through, and the doors a
-//! worker keeps once the run has landed (sprawling-SPEC.md 8-112).
+//! worker keeps once the run has landed (`crates/sprawling/Spec.lean` §8-112).
 
 use super::RunWorker;
 use kernel::event::Payload;

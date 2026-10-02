@@ -29,13 +29,13 @@ pub(super) struct Sweep<'a> {
 /// this run travel together: both are read by the same settling pass, one
 /// to report what the drive deleted and one to keep a knock chain
 /// finite, and a caller that passed them side by side had to keep two
-/// arguments in step (sprawling-SPEC.md 8-46-12).
+/// arguments in step (`crates/sprawling/Spec.lean` §8-46-12).
 pub(super) struct Settling<'a> {
     pub(super) sweep: Sweep<'a>,
     pub(super) chain: super::KnockChain,
     /// The claims booked at call time that this landing has yet to
     /// close; the plan step closes each as its closing line reaches the
-    /// ledger (sprawling-SPEC.md 8-42-8).
+    /// ledger (`crates/sprawling/Spec.lean` §8-42-8).
     pub(super) open_claims: &'a mut crate::worker::booking::OpenClaims,
 }
 

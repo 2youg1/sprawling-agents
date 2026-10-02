@@ -41,7 +41,7 @@ use super::lines::{endpoints_answer, known_hosts_answer, summarize};
 
 /// How many runs a cost view names besides every active one: a bound
 /// on the size of an answer on the wire, not a machine reading, so it is
-/// a constant (sprawling-SPEC section 8-106).
+/// a constant (`crates/sprawling/Spec.lean` §8-106).
 pub(super) const TOP_BILLED: usize = 32;
 
 impl Views {
@@ -58,7 +58,7 @@ impl Views {
     }
 
     /// One item's newest release, asked once the snapshot is let go
-    /// because it leaves this machine (sprawling-SPEC.md 8-120).
+    /// because it leaves this machine (`crates/sprawling/Spec.lean` §8-120).
     fn upstream_of(&self, item: &str) -> Prepared {
         Prepared::Upstream {
             ask: self.reach.upstream,

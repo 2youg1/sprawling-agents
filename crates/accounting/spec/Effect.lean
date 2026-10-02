@@ -51,14 +51,14 @@ impl RunWorker { fn settle(&mut self, at: &Assignment, run: RunId, landing: effe
 **形状**：先后是类型的性质，而不是写桌子的人的纪律。`Then` 只能从 `Landing::record` 里拿到，而 `record` 先把所有行送进去才返回它；要把顺序写反，得先拿到一个拿不到的值。
 
 - **批而不是逐条**：一张桌子的行全部落完，才轮到它的变化。signal 一支因此先落完所有 `signal_enqueued` 再投递；`deliver` 与 `knock` 都不写账，所以账本字节与逐条交错时相同。
-- **计划那一支是全有全无的**，所以它自己一个穷尽枚举 `Claims`：效应按次序重放、只有认领核盘上的状态（§8-27），任一条认领对不上，就一字不写，把那个节点报给人，并用 `released` 里的 `roadmap_released` 行关掉本跑已经落账的认领（sprawling-SPEC.md §8-16 的形制）。效应重放到 `on_disk` 上，而不是写回派活时的副本，所以别的 run 在此期间落下的行保留。记账线程在模型认领时已经拒绝了另一个在飞 run 持有的节点（`accounting::worker::booking`，sprawling-SPEC.md §8-42-8）；`Claims::of` 是后盾，接住从旧副本认领了已被别人落地的节点的 run。
+- **计划那一支是全有全无的**，所以它自己一个穷尽枚举 `Claims`：效应按次序重放、只有认领核盘上的状态（§8-27），任一条认领对不上，就一字不写，把那个节点报给人，并用 `released` 里的 `roadmap_released` 行关掉本跑已经落账的认领（`crates/sprawling/Spec.lean` §8-16 的形制）。效应重放到 `on_disk` 上，而不是写回派活时的副本，所以别的 run 在此期间落下的行保留。记账线程在模型认领时已经拒绝了另一个在飞 run 持有的节点（`accounting::worker::booking`，`crates/sprawling/Spec.lean` §8-42-8）；`Claims::of` 是后盾，接住从旧副本认领了已被别人落地的节点的 run。
 - **归档行不需要先写盘**：账本行要的 `kind`／`day`／`subject` 由 `city::archive_entry` 从入参算出（`crates/city/Spec.lean` §8-9）。不在装配层另算 `day_of`，因为那会是「一条归档记录长什么样」的第二个权威。
 - **`raised`（待批项）不进本模块**：它不是桌子交出来的效应，而是驱动期间暂存的项，本身就先落账后改状态。
 
 **pr 那两支不走 `Landing`，理由记在这里**：
 
 - `PrEffect::Opened` 里的 `storage::Checkpoint::land` 先于 `pr_opened` 落账，**但它不是「先动世界」**。它铸出的是那条账本行所指向的 commit，与 `run_started` 之前把 brief 放进 CAS 同形：没有任何记录指向的 git commit 不改变任何人读到的东西。
-- `PrEffect::Merged` 先经 `Worktrees::plan_merge` 定下这次合并会落在哪个 commit，干线已经动过的拒绝（`MergeStale`）在这一步就报出，然后才写 `pr_merged`。所以不会有一条 `pr_merged` 是替一次注定被拒的合并写的（sprawling-SPEC.md「合并也排到它那条行后面」）。
+- `PrEffect::Merged` 先经 `Worktrees::plan_merge` 定下这次合并会落在哪个 commit，干线已经动过的拒绝（`MergeStale`）在这一步就报出，然后才写 `pr_merged`。所以不会有一条 `pr_merged` 是替一次注定被拒的合并写的（`crates/sprawling/Spec.lean`「合并也排到它那条行后面」）。
 
 **测试**：`what_a_run_changes_is_changed_after_the_line_that_announces_it`（`accounting::worker::driving::tests::ledger`）。一跑归档一条决定、又从共享计划里拿一行；`RunWorker::observe` 的 sink 在一行耐久之后才跑，所以它正是看得见「先」的位置。断言：`asset_archived` 落时书架上还没有它，`roadmap_claimed` 落时盘上那一行还没被拿走；跑完两者都在位。
 

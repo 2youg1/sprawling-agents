@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Walking a city's buildings and reading each one's bits
-//! (sprawling-SPEC.md section 8-48).
+//! (`crates/sprawling/spec/Doctor.lean` §8-48).
 //!
 //! A building whose rules will not read is an answer about that
 //! building, carried back beside the ones that did read. The doctor is

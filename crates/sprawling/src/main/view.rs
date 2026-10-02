@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The read-only verb that shows one city's Ledger from disk
-//! (sprawling-SPEC.md 8-105).
+//! (`crates/sprawling/spec/Main.lean` §8-105).
 //!
 //! What it writes into a pipe or a file is what an agent already parses:
 //! Ledger lines byte for byte, or with `--runs` one JSON line per run
@@ -31,12 +31,12 @@ pub(super) struct Selection {
     pub(super) kind: Option<EventKind>,
     pub(super) who: Option<String>,
     pub(super) grep: Option<String>,
-    /// The moments a line's own `t` must fall in (sprawling-SPEC.md 8-137).
+    /// The moments a line's own `t` must fall in (`crates/sprawling/spec/Main.lean` §8-137).
     pub(super) span: UtcSpan,
 }
 
 /// Who reads stdout, decided once per command: an agent reading a pipe
-/// or a file, or a person at a terminal (sprawling-SPEC.md 8-105).
+/// or a file, or a person at a terminal (`crates/sprawling/spec/Main.lean` §8-105).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Audience {
     Agent,
@@ -187,7 +187,7 @@ impl Selection {
     /// Whether one raw Ledger line passes the conditions that read its
     /// bytes; the run and the lower seq bound are settled by the walk.
     /// The span is asked of every line, because `t` does not rise with
-    /// seq (sprawling-SPEC.md 8-137).
+    /// seq (`crates/sprawling/spec/Main.lean` §8-137).
     fn admits(&self, line: &[u8]) -> Result<bool, AxError> {
         if let Some(text) = &self.grep
             && !text.is_empty()
@@ -236,7 +236,7 @@ fn utc_span(read: &Arguments) -> Result<UtcSpan, String> {
 }
 
 /// The seq `flag` names. `view --from` and the playback range read a seq
-/// the same way (sprawling-SPEC.md 8-126).
+/// the same way (`crates/sprawling/spec/Main.lean` §8-126).
 pub(super) fn seq_flag(read: &Arguments, flag: &str) -> Result<Option<Seq>, String> {
     whole_number(read, flag).map(|seq| seq.map(Seq::new))
 }

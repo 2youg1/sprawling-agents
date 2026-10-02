@@ -284,7 +284,7 @@ export function tuningOf(draft: Draft): Tuning {
 // The endpoint this draft describes. `secret` is the reference the
 // vault answered with for the key typed just now, and nothing when the
 // key box is empty - which is not the same as no key: the city keeps
-// what it has archived under this id (sprawling-SPEC 8-81). Every wire
+// what it has archived under this id (`crates/sprawling/Spec.lean` §8-81). Every wire
 // a provider states now has a kind this city can call, so there is no
 // shape left for this to refuse.
 export function endpointOf(draft: Draft, secret: string | null): Endpoint {

@@ -9,7 +9,7 @@
 //! The first two adapters own a medium — `storage::jsonl` owns segments on disk, citysim's
 //! owns a `Vec`. This one owns neither. It owns a crossing: the driving pool holds `Relay`
 //! and nothing else that can write, so "a city has one writer" is held by the types rather
-//! than by discipline (ARCHITECTURE section 10, sprawling-SPEC.md 8-42).
+//! than by discipline (ARCHITECTURE section 10, `crates/sprawling/Spec.lean` §8-42).
 
 use std::collections::VecDeque;
 use std::sync::mpsc;
@@ -39,7 +39,7 @@ pub(crate) struct RelayRequest {
 ///
 /// One queue, because a thread blocks on one thing at a time: a queue
 /// per mouth is polled with timeouts that every request waits out
-/// (sprawling-SPEC.md 8-42-4, `crates/accounting/spec/Worker/Attend.lean`).
+/// (`crates/sprawling/Spec.lean` §8-42-4, `crates/accounting/spec/Worker/Attend.lean`).
 pub(crate) enum Wake {
     /// A lane's append, waiting for its answer.
     Relay(RelayRequest),
@@ -60,11 +60,11 @@ pub(crate) enum Wake {
 pub(crate) struct Drained {
     /// Every line the ledger took, in ledger order: a line a lane wrote
     /// is history as much as one the accounting thread wrote, so the
-    /// same folds are shown it (sprawling-SPEC.md 8-110).
+    /// same folds are shown it (`crates/sprawling/Spec.lean` §8-110).
     pub written: Vec<EventDraft>,
     /// Registrations in arrival order, left to the thread that holds the
     /// goal register: a copy of the register here would be a second
-    /// answer to who holds the ground (sprawling-SPEC.md 8-42-8).
+    /// answer to who holds the ground (`crates/sprawling/Spec.lean` §8-42-8).
     pub goals: Vec<GoalAsk>,
 }
 
@@ -82,8 +82,8 @@ pub(crate) enum Patience {
 /// `kernel::Ledger` it is given.
 ///
 /// Cloned per driving thread, and once for the remote door, whose five
-/// lines the assembly writes from outside any run (sprawling-SPEC.md
-/// 8-139). Nothing here decides anything: seq, prev and the bytes stay
+/// lines the assembly writes from outside any run (`crates/sprawling/Spec.lean`
+/// §8-139). Nothing here decides anything: seq, prev and the bytes stay
 /// with the adapter on the accounting side, which is what keeps one city
 /// to one writer.
 #[derive(Clone)]
@@ -130,7 +130,7 @@ pub(crate) struct RelayGate {
     issuing: mpsc::Sender<Wake>,
     pub booked: ClaimBook,
     /// How many appends wait and how many are not yet durable
-    /// (sprawling-SPEC.md 8-98).
+    /// (`crates/sprawling/Spec.lean` §8-98).
     health: Health,
 }
 
@@ -165,7 +165,7 @@ impl RelayGate {
 
     /// Waits as `patience` allows for the first wake, then takes every
     /// wake already queued: relay requests are written before anything
-    /// lands (sprawling-SPEC.md 8-42-2), claims are answered in queue
+    /// lands (`crates/sprawling/Spec.lean` §8-42-2), claims are answered in queue
     /// order, runs home go on `homes` and goal registrations into the
     /// returned [`Drained`] in arrival order, and a command or a close
     /// only ends the wait.
@@ -354,7 +354,7 @@ mod tests {
 
     /// A lane's append counts as queued until the accounting thread takes
     /// it, then as not yet durable until its batch is written, then as
-    /// neither (sprawling-SPEC.md 8-98).
+    /// neither (`crates/sprawling/Spec.lean` §8-98).
     #[test]
     fn the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable() {
         use crate::worker::health::Health;

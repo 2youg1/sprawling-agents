@@ -18,10 +18,10 @@ pub struct Views { /* 折叠状态，私有 */ }
 impl Views {
     pub fn new(city_root: &Path) -> Views;
     pub fn over(ledger_dir: &Path) -> Views;
-    /// 先审计整条链，再从合适的快照起步、只折尾部（sprawling-SPEC.md §8-91）。
+    /// 先审计整条链，再从合适的快照起步、只折尾部（`crates/sprawling/Spec.lean` §8-91）。
     pub fn rebuild(ledger_dir: &Path) -> Result<Views, AxError>;
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError>;
-    /// 锁内只取小数据；读盘、读库、出网在 `Prepared::finish` 里做（sprawling-SPEC.md §8-100）。
+    /// 锁内只取小数据；读盘、读库、出网在 `Prepared::finish` 里做（`crates/sprawling/Spec.lean` §8-100）。
     pub fn prepare(&self, query: &wire::Query) -> Prepared;
     pub fn twin(&self) -> Result<Views, AxError>;
 
@@ -72,7 +72,7 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 
 /-! ### 接口仍写在 sprawling 规格里的模块
 
-下面这些模块的接口与取舍今天写在 `crates/sprawling/sprawling-SPEC.md` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
+下面这些模块的接口与取舍今天写在 `crates/sprawling/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
 
 | sprawling 的标签 | 模块 |
 |---|---|

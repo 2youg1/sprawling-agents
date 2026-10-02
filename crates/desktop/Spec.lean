@@ -24,7 +24,7 @@ import crates.desktop.spec.Session
 
 拆成三件可独立验收的事：
 
-- **协议壳（`rpc` ＋ `session`）**：一台按行说话的 MCP server，握手与 `tools/call` 的形状与 `crates/agent_protocols/src/mcp/*` 所写的客户端逐字对齐，于是城把它当一台普通的 stdio MCP server 连：一栋楼的 `RULES.toml` 写 `desktop = true`，城就以 `sprawling desktop <DESKTOP.toml>` 起自己这个二进制（sprawling-SPEC §8-4d），之后走的是与任何 `[[mcp]]` 相同的那条路。
+- **协议壳（`rpc` ＋ `session`）**：一台按行说话的 MCP server，握手与 `tools/call` 的形状与 `crates/agent_protocols/src/mcp/*` 所写的客户端逐字对齐，于是城把它当一台普通的 stdio MCP server 连：一栋楼的 `RULES.toml` 写 `desktop = true`，城就以 `sprawling desktop <DESKTOP.toml>` 起自己这个二进制（`crates/sprawling/Spec.lean` §8-4d），之后走的是与任何 `[[mcp]]` 相同的那条路。
 - **工具表（`tools`）**：六件工具的名字、说明与入参 schema **定死**。每条说明都写明这件工具**不做**什么。
 - **拒绝故事（`scope` ＋ `platform`）**：工具名认出之后的拒绝——越界、未实现、平台做不到——都以 MCP `CallToolResult` 的 `isError` 结果回答，文字里是带稳定错误码的三段拒词；握手未完、方法或工具名不认识、行读不出，这几类协议层的错误才回 JSON-RPC error。没有 scope 文件＝全拒。
 
@@ -303,7 +303,7 @@ impl Desk {
 
 本 package 没有自己的可执行文件，公开面只有 `serve_stdio` 一个函数。
 
-- **进程从哪里起**：`sprawling desktop [scope]`（`crates/sprawling/src/main/desktop.rs`，sprawling-SPEC §8-4d）。一个位置参数是 `DESKTOP.toml` 的路径，缺席即 `Scope::Closed`。它不判定任何事：作用域归 `scope`，应答归 `session`。
+- **进程从哪里起**：`sprawling desktop [scope]`（`crates/sprawling/src/main/desktop.rs`，`crates/sprawling/Spec.lean` §8-4d）。一个位置参数是 `DESKTOP.toml` 的路径，缺席即 `Scope::Closed`。它不判定任何事：作用域归 `scope`，应答归 `session`。
 - **唯一真的把进程拉起来的测试**也住城里（`crates/sprawling/tests/desktop.rs`）：城按一栋楼的规则起 `sprawling desktop`，握手、list，模型收到六件工具。其余测试只证明库里的判断。
 
 ### 8-11 按操作准入的安全接口
@@ -331,7 +331,7 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 - **位置**：`crates/desktop/ffi/`，包名 `sprawling-desktop-ffi`，库名 `desktop_ffi`，规格是 `crates/desktop/ffi/Spec.lean`（边界规则与资源配对的定理在那里）。Zig 源码在 `crates/desktop/ffi/zig/`：`leaf.zig`（四组操作与 export）、`boundary.zig`（叶子往借来的缓冲里写什么）、`step.zig`（step 的 Zig 拼写）。
 - **一张自己的表**：两个包都是根工作区的成员，包元数据与 `winsafe` 的版本行都以 `workspace = true` 继承。本 package 的 `[lints]` 是 `workspace = true`；`desktop_ffi` 的 `[lints]` 是它自己的一张，与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`，`xtask guard` 判这一张表，例外只有那一行（tools/xtask/Spec.lean §8-46、D14）。
-- **构建**：`crates/desktop/ffi/build.rs` 只用标准库起 `zig build-lib`（`ReleaseSafe`，目标取自 cargo 的目标），只在 Windows 目标上；别的目标上本包只剩 `step`，本 package 也只在 Windows 上依赖它。Zig 的版本只写在 `crates/desktop/ffi/zig-version`：构建脚本、doctor 的 `zig` 一行（sprawling-SPEC 8-146）与 CI 的安装步骤都读它。
+- **构建**：`crates/desktop/ffi/build.rs` 只用标准库起 `zig build-lib`（`ReleaseSafe`，目标取自 cargo 的目标），只在 Windows 目标上；别的目标上本包只剩 `step`，本 package 也只在 Windows 上依赖它。Zig 的版本只写在 `crates/desktop/ffi/zig-version`：构建脚本、doctor 的 `zig` 一行（`crates/sprawling/Spec.lean` §8-146）与 CI 的安装步骤都读它。
 - **对拍与 fuzz 的配方**：`desktop_ffi::boundary` 的测试以种子化输入比对叶子与 Rust 参考（`crates/desktop/ffi/src/reference.rs`），每条规则两万个；`just fuzz-desktop <rounds> <seed>` 把同一比对按给定的轮数与种子跑下去（Rust 一侧的 fuzz）；`just check-desktop` 里的 `zig test crates/desktop/ffi/zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz）。
 
 生产代码的每一个 `unsafe` 都在这张表里，各是一次叶子调用，`SAFETY:` 写在调用旁：
@@ -455,7 +455,7 @@ D8 剪贴板：自己的 owner，有界的读，先备好再清空。
 D11 声音：ffmpeg 的 `dshow` 录 scope 文件点名的那一个设备。
 
 - **决定**：`desktop.record` 的 `audio: true` 录的是人写在 scope 文件里的那一个 DirectShow 音频设备，键为 `sound = "<设备名>"`，与 `record`、`clipboard` 同样缺省不写。设备名只从 scope 文件来：调用方的参数里没有它，本 server 也不枚举设备。scope 文件写了 `record = true` 而没写 `sound` 时，`audio: true` 以 `E_GATE_DENIED` 拒，恢复语说出去哪里查设备名（`ffmpeg -hide_banner -list_devices true -f dshow -i dummy`）与写进哪一键。声音由第二个 ffmpeg 进程录，`-f dshow -i audio=<设备名>`，写成录制目录里的一个 16 kHz 单声道 wav，与画面各成一个文件；没有 ffmpeg 时，有声音的录制以 `E_TOOL_UNAVAILABLE` 拒，因为帧序列那一支录不了声音。
-- **理由**：主线 ffmpeg 在 Windows 上的音频输入是 `dshow`（`ffmpeg -devices` 列得出），不加依赖、不加 `unsafe`。dshow 设备的名字是驱动起的，随机器而变，城里没有一处知道；替人挑一个，就是替人授权录下一个他没点名的声音源，而麦克风是比一扇窗口更重的授权。人写下名字，就是人授权了这一个设备，与 `windows` 列表授权窗口是同一种读法。画面与声音分成两个进程、两个文件：画面从 stdin 进（D7），声音是 ffmpeg 自己的输入，放进一个进程就要对齐两条时钟；wav 是 `gateway::AudioType` 认得、城的 `transcribe` 工具直接收得下的容器（sprawling-SPEC 8-131），16 kHz 单声道一分钟约 1.9 MB。
+- **理由**：主线 ffmpeg 在 Windows 上的音频输入是 `dshow`（`ffmpeg -devices` 列得出），不加依赖、不加 `unsafe`。dshow 设备的名字是驱动起的，随机器而变，城里没有一处知道；替人挑一个，就是替人授权录下一个他没点名的声音源，而麦克风是比一扇窗口更重的授权。人写下名字，就是人授权了这一个设备，与 `windows` 列表授权窗口是同一种读法。画面与声音分成两个进程、两个文件：画面从 stdin 进（D7），声音是 ffmpeg 自己的输入，放进一个进程就要对齐两条时钟；wav 是 `gateway::AudioType` 认得、城的 `transcribe` 工具直接收得下的容器（`crates/sprawling/Spec.lean` §8-131），16 kHz 单声道一分钟约 1.9 MB。
 - **击败的备选**：WASAPI 回环（能录机器正在放的任何声音，但要新依赖或新 `unsafe`）；枚举设备取第一个（替人选了授权对象）；由调用方在参数里给设备名（模型给出授权对象，scope 文件就不再是授权的唯一处）；把声音混进 mp4（两条时钟，而没有 ffmpeg 的那一支本来就没有声音可混）。
 - **重开的参数**：主线 ffmpeg 在 Windows 上有了 WASAPI 输入；或者 scope 文件要按窗口给不同的设备。
 
@@ -591,19 +591,19 @@ D16 截图 schema 的 `quality` 上限经 `IMAGE_QUALITY.admit` 读出。
 2. **`desktop.` 前缀的 MCP 工具归到「撤不回」那道门**：一次点击没有 restoration，`kernel::discard` 那套「拿得回来才准删」在这里无从谈起，故它该走的是**升给人**（Escalate），不是 Deny。落点是 `runtime::bench::admit` 里 `Effect::Connector` 那一支。
 3. **设置页写 `DESKTOP.toml`**：它是**治理文件**，不是产物——它说的是这栋楼的 runs 能碰什么。故它落在这栋楼的 reserved subtree（`<building>/.sprawling/DESKTOP.toml`），与 `RULES.toml`／`CONFIG.toml` 同处，**任何 write domain 都够不着**；写它的那一点照 `city::governed` 的形状办（一道门、整份写、不拼路径），而不是让设置页自己拼一个路径出来。这就是 `DomainReach` 立下的那条读法：一份决定「residents 能写什么」的文件，恒不由 resident 写。
 
-4. **城自己起这台 server**：`RULES.toml` 写 `desktop = true` 的楼，城以 `sprawling desktop <DESKTOP.toml>` 起它，不要人手写 `[[mcp]]`（sprawling-SPEC §8-4d）。
+4. **城自己起这台 server**：`RULES.toml` 写 `desktop = true` 的楼，城以 `sprawling desktop <DESKTOP.toml>` 起它，不要人手写 `[[mcp]]`（`crates/sprawling/Spec.lean` §8-4d）。
 
 #### 落到哪一步，还欠什么
 
-四件都已落地并各自有测试：`city::policy` 读 `desktop:`（缺省关、机密楼即拒、打字错误即拒）；`kernel::gate::undoable` 判「远端名前缀 `desktop.`」并升给人，`runtime::bench::admit` 在出网门之后叫它；设置页的框经 `ConfigureBuilding` 的 `desktop` 字段整份写 `DESKTOP.toml`，写之前先落账本一行（sprawling-SPEC 里桌面 allowlist 那一节）；城按规则起 `sprawling desktop`。
+四件都已落地并各自有测试：`city::policy` 读 `desktop:`（缺省关、机密楼即拒、打字错误即拒）；`kernel::gate::undoable` 判「远端名前缀 `desktop.`」并升给人，`runtime::bench::admit` 在出网门之后叫它；设置页的框经 `ConfigureBuilding` 的 `desktop` 字段整份写 `DESKTOP.toml`，写之前先落账本一行（`crates/sprawling/Spec.lean` 里桌面 allowlist 那一节）；城按规则起 `sprawling desktop`。
 
 **不内置任何模型（定规）**：本二进制不带 OCR、ASR 或任何视觉模型的权重，这些都经人接入的端点。模型拿到的桌面文字先是 accessibility tree；OCR 端点与本地 ASR 端点都是人接进来的。
 
-**录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（D13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（`crates/runtime/Spec.lean` §8-27-10、runtime D15）；`transcribe` 经 `runtime::BoundReader` 按这个 locator 读这一块，容器从开头的字节认（sprawling-SPEC 8-131，`crates/runtime/Spec.lean` §8-59，`crates/gateway/Spec.lean` §8-34）。
+**录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（D13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（`crates/runtime/Spec.lean` §8-27-10、runtime D15）；`transcribe` 经 `runtime::BoundReader` 按这个 locator 读这一块，容器从开头的字节认（`crates/sprawling/Spec.lean` §8-131，`crates/runtime/Spec.lean` §8-59，`crates/gateway/Spec.lean` §8-34）。
 
 **还欠的**，都是这条接口的当前状态：
 
-1. **OCR**：一张截图变成文字由城工具 `ocr` 承担（sprawling-SPEC 8-142），它读连接器存进 CAS 的截图，经人为 `ModelTag::Ocr` 选的端点；本 package 不做 OCR。
+1. **OCR**：一张截图变成文字由城工具 `ocr` 承担（`crates/sprawling/Spec.lean` §8-142），它读连接器存进 CAS 的截图，经人为 `ModelTag::Ocr` 选的端点；本 package 不做 OCR。
 2. **macOS 这条胳膊**：`platform/elsewhere.rs` 对 macOS 答 `E_TOOL_UNAVAILABLE`。它要在一台 Mac 或夜间的 `platforms.yml` 上验，Windows 上验不了。
 -/
 
@@ -635,7 +635,7 @@ D16 截图 schema 的 `quality` 上限经 `IMAGE_QUALITY.admit` 读出。
 
 /-! ## 17 文档关系
 
-`ARCHITECTURE.md` §3 depmap 块的 `desktop` 与 `desktop_ffi` 两行｜`crates/desktop/README.md`（英文，讲清城怎么起它、叶子为什么有自己的一张 lint 表）｜tools/xtask/Spec.lean §8-46（guard 判叶子那张表）｜sprawling-SPEC §8-4d｜同步本 SPEC §13 与 §8-7 的实现状态｜`crates/desktop/README.md` 的 The honest-refusal rule 一节｜`crates/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`）。
+`ARCHITECTURE.md` §3 depmap 块的 `desktop` 与 `desktop_ffi` 两行｜`crates/desktop/README.md`（英文，讲清城怎么起它、叶子为什么有自己的一张 lint 表）｜tools/xtask/Spec.lean §8-46（guard 判叶子那张表）｜`crates/sprawling/Spec.lean` §8-4d｜同步本 SPEC §13 与 §8-7 的实现状态｜`crates/desktop/README.md` 的 The honest-refusal rule 一节｜`crates/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`）。
 
-`docs/glossary.md` 的 **desktop connector** 一行；`crates/browser/Spec.lean` D9（拖拽与滚动的同一份词汇，§8-7）；`crates/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`，`EFFECT_META_KEY` 与 `PROTOCOL_VERSION` 的唯一定义）；`crates/desktop/ffi/Spec.lean`（缝本身的规格）；sprawling-SPEC §8-4d 与 8-146；`architecture.toml` 里 desktop 各行的锚点指向本文件与分部。这些改了，重读本文件对应的节与决定。
+`docs/glossary.md` 的 **desktop connector** 一行；`crates/browser/Spec.lean` D9（拖拽与滚动的同一份词汇，§8-7）；`crates/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`，`EFFECT_META_KEY` 与 `PROTOCOL_VERSION` 的唯一定义）；`crates/desktop/ffi/Spec.lean`（缝本身的规格）；`crates/sprawling/Spec.lean` §8-4d 与 §8-146；`architecture.toml` 里 desktop 各行的锚点指向本文件与分部。这些改了，重读本文件对应的节与决定。
 -/

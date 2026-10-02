@@ -969,7 +969,7 @@ export type DiscardAnswer = typeof DiscardAnswer.Type;
 
 /**
  * The level this machine gives the core's threads under the person's
- * setting (sprawling-SPEC 8-93). The dispatched commands are not here:
+ * setting (`crates/sprawling/Spec.lean` §8-93). The dispatched commands are not here:
  * they always start one level below, and lowering is never refused.
  */
 export const DoctorCore = Schema.Union([
@@ -2937,7 +2937,7 @@ export type RunCostsAnswer = typeof RunCostsAnswer.Type;
  * different results on disk, and `carry: true` at a call site says
  * neither of them. `Nothing` is the first variant and the default,
  * because that is what a person means by starting a new session — a
- * new one, here, not a continuation (`sprawling-SPEC.md` 8-82). The
+ * new one, here, not a continuation (`crates/sprawling/Spec.lean` §8-82). The
  * handoff is the exception a person states.
  */
 export const Carry = Schema.Union([
@@ -3632,7 +3632,7 @@ export const NoSecret = Schema.Never.annotate({ identifier: "NoSecret" });
 export type NoSecret = typeof NoSecret.Type;
 
 /**
- * Whether the core's threads stand above normal (sprawling-SPEC.md
+ * Whether the core's threads stand above normal (`crates/sprawling/Spec.lean`
  * 8-93): the setting a person turns off. Spelled here once, for the
  * frame and for the `[core] priority` key the person's file holds.
  */
@@ -4215,7 +4215,7 @@ export type LogLine = typeof LogLine.Type;
 
 /**
  * One reading of every counter the monitor shows, in integers because
- * it travels on the wire (sprawling-SPEC.md 8-94, 8-129-6).
+ * it travels on the wire (`crates/sprawling/Spec.lean` §8-94, §8-129-6).
  */
 export const Sample = Schema.Struct({
   core_cpu_permille: Schema.Int,

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whether a served city that just ended is left down, raised again, or
-//! handed to the person (sprawling-SPEC.md section 8-109; the budget's
+//! handed to the person (`crates/sprawling/spec/Supervising.lean` §8-109; the budget's
 //! properties are proved in `crates/sprawling/spec/Supervising.lean`).
 //!
 //! The decision alone: no process, no clock. `children` runs the

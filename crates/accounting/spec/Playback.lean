@@ -12,7 +12,7 @@
 /-!
 ### 8-12 accounting::playback：一段历史成为一份可以重算的 playback bundle（形状 7 投影）
 
-`playback` 把一座城 Ledger 的一段折成一份 **playback bundle**：带来源的、字节确定的 JSON，人或 agent 拿它回看一段工作流。它是账务读面上的一个共享投影，CLI（`sprawling playback export/check`，sprawling-SPEC.md §8-126）与以后的居民工具都是它的薄适配器。必须守住的性质的权威是 `crates/accounting/spec/Playback/Select.lean`（选择、次序与去重、cutoff 不读未来）与 `crates/accounting/spec/Playback/Project.lean`（读不到的行不流进派生表、真实关闭的单调性）；本节是接口与做法。
+`playback` 把一座城 Ledger 的一段折成一份 **playback bundle**：带来源的、字节确定的 JSON，人或 agent 拿它回看一段工作流。它是账务读面上的一个共享投影，CLI（`sprawling playback export/check`，`crates/sprawling/Spec.lean` §8-126）与以后的居民工具都是它的薄适配器。必须守住的性质的权威是 `crates/accounting/spec/Playback/Select.lean`（选择、次序与去重、cutoff 不读未来）与 `crates/accounting/spec/Playback/Project.lean`（读不到的行不流进派生表、真实关闭的单调性）；本节是接口与做法。
 
 ```rust
 // accounting::playback

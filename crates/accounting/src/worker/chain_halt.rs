@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The verdict a background proof of the history sets, attached to this
-//! worker's writer (sprawling-SPEC.md 8-90, 8-122).
+//! worker's writer (`crates/sprawling/Spec.lean` §8-90, §8-122).
 //!
 //! The proof itself runs on a thread the assembly root starts
 //! (`bin::assembly::chain_watch`); what it needs from the worker is
@@ -32,7 +32,7 @@ impl RunWorker {
     /// Attaches `halt`, which awaits the proof, to this worker's writer
     /// and hands back what a proof of the chain needs. The halt is made
     /// by the caller, so the views a served city answers from can watch
-    /// the same verdict (sprawling-SPEC.md 8-134).
+    /// the same verdict (`crates/sprawling/Spec.lean` §8-134).
     ///
     /// From this moment until the proof sets its verdict, every append
     /// is refused with `E_HISTORY_UNPROVEN`; after a broken verdict,
@@ -51,7 +51,7 @@ impl RunWorker {
     /// Waits until the proof this worker's writer awaits has a verdict;
     /// at once for a writer that awaits none. A city closing before its
     /// proof finishes writes its handoff after the verdict, rather than
-    /// having it refused (sprawling-SPEC.md 8-90).
+    /// having it refused (`crates/sprawling/Spec.lean` §8-90).
     pub fn await_proof(&self) {
         self.ledger.await_verdict();
     }

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `playback` city tool (sprawling-SPEC.md 8-132): its catalogue
+//! The `playback` city tool (`crates/sprawling/Spec.lean` §8-132): its catalogue
 //! episode, and two residents of one building - a reporter who writes
 //! the day as a playback page, and an editor who checks it against the
 //! city - with the report kept where the city keeps exports.

@@ -31,7 +31,7 @@ impl Laying {
     /// It reads the city through [`Laying`] rather than the worker, so it
     /// runs in the lane that drives the run: an MCP server that still
     /// shakes hands holds up that lane and nothing else
-    /// (sprawling-SPEC.md 8-113).
+    /// (`crates/sprawling/Spec.lean` §8-113).
     ///
     /// The catalogue and the bench are one phase because they are one
     /// registration: the catalogue is what the model was told exists,
@@ -76,7 +76,7 @@ impl Laying {
             at.policy.write,
         )?;
         // Every tool shares one keeper, so no two of them keep two keys
-        // under one name (sprawling-SPEC.md 8-87).
+        // under one name (`crates/sprawling/Spec.lean` §8-87).
         let keeper = std::sync::Arc::new(kept::Keeper::new(
             Arc::clone(&self.vault),
             self.staged_at.value(),
@@ -213,11 +213,11 @@ impl Laying {
             }
         }
         // Present only where the book names an endpoint this building
-        // may send a recording or a picture to (sprawling-SPEC.md 8-131,
-        // 8-142).
+        // may send a recording or a picture to (`crates/sprawling/Spec.lean` §8-131,
+        // §8-142).
         admitted.extend(self.endpoint_tools(site, &bound)?);
         // A look back at the history this building may read, written
-        // into the city's playback exports (sprawling-SPEC.md 8-132).
+        // into the city's playback exports (`crates/sprawling/Spec.lean` §8-132).
         admitted.push(Box::new(self.playback_tool(site, addr)?));
         admitted.push(Box::new(self.proposal_tool(site, addr, &bound)?));
         admitted.extend(self.outside_tools(site)?);

@@ -4,13 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Where a fold a snapshot holds starts: after the snapshot, or from
-//! genesis and why, and the snapshot a start cuts (sprawling-SPEC 8-91);
+//! genesis and why, and the snapshot a start cuts (`crates/sprawling/Spec.lean` §8-91);
 //! and where two such folds start together, on one pass (8-122).
 //!
 //! Held beside the views rather than in the assembly point, which also
 //! starts the worker's standing from it: a one-shot read starts the views
 //! here through `Views::rebuild`, and the read side never names the
-//! assembly point (sprawling-SPEC.md 8-92).
+//! assembly point (`crates/sprawling/Spec.lean` §8-92).
 
 use std::path::{Path, PathBuf};
 
@@ -92,7 +92,7 @@ pub enum FoldStart {
     /// From genesis, and why the snapshot was not used.
     Whole(WholeFold),
     /// From genesis on the pass another fold needed from genesis; this
-    /// fold's own snapshot was not used (sprawling-SPEC 8-122).
+    /// fold's own snapshot was not used (`crates/sprawling/Spec.lean` §8-122).
     Alongside,
 }
 
@@ -161,7 +161,7 @@ pub struct Audited<F> {
 /// [`start`] from a proved history, so a start from the snapshot never
 /// accepts a chain a whole fold would refuse: the snapshot's fit checks
 /// only the line at its seq, and the ledger open scans only the last
-/// segment (sprawling-SPEC 8-101). Before resuming, the whole chain is
+/// segment (`crates/sprawling/Spec.lean` §8-101). Before resuming, the whole chain is
 /// proved with the city's verified prefix records, read and never
 /// written: a one-shot read does not write to the disk. From genesis the
 /// whole fold checks every line through the same `LineCheck`, which is

@@ -5,7 +5,7 @@
 
 //! What `sprawling top` prints: one JSON line per sample when stdout is
 //! not a terminal, and one curve per counter when it is
-//! (sprawling-SPEC.md 8-95). Pure: the caller owns the terminal.
+//! (`crates/sprawling/spec/Monitor.lean` §8-95). Pure: the caller owns the terminal.
 
 use super::Sample;
 
@@ -75,7 +75,7 @@ struct Row {
 
 /// What a counter's integer counts, which decides how it is written.
 /// The one table of units: `gauge`'s lines for a person are written
-/// through it too (sprawling-SPEC.md 8-129-4).
+/// through it too (`crates/sprawling/spec/Main.lean` §8-129-4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Unit {
     Permille,

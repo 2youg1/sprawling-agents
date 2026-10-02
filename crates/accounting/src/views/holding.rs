@@ -34,7 +34,7 @@ use super::snapshot::start::city_root_of;
 /// startup and folded forward by the write observer, so deleting them
 /// costs nothing but the rebuild — the ledger remains the only history.
 ///
-/// The encoding a snapshot holds (sprawling-SPEC 8-91) leaves out the
+/// The encoding a snapshot holds (`crates/sprawling/Spec.lean` §8-91) leaves out the
 /// four fields that are not folded from the ledger; `Views::decode`
 /// takes them from `Views::new`.
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -87,7 +87,7 @@ pub struct Views {
     pub(super) predecessors: std::collections::BTreeMap<kernel::RunId, kernel::RunId>,
     /// The commit each run announced last, so the next one it announces
     /// names its previous commit without a walk past every other run's
-    /// (sprawling-SPEC 8-128).
+    /// (`crates/sprawling/Spec.lean` §8-128).
     pub(super) last_commit: std::collections::BTreeMap<kernel::RunId, wire::CommitAt>,
     /// Which runs were frozen with each skill pinned, by name and hash
     /// together: a skill edited between two runs is two documents under
@@ -113,7 +113,7 @@ pub struct Views {
     ///
     /// Behind a lock of its own because the fold never touches it: a
     /// query carries the `Arc` out of its snapshot of the views and
-    /// reads the ledger with only readers waiting on it (sprawling-SPEC.md 8-100).
+    /// reads the ledger with only readers waiting on it (`crates/sprawling/Spec.lean` §8-100).
     pub(super) index: std::sync::Arc<std::sync::Mutex<storage::LedgerIndex>>,
     /// Where each run's first `prompt_assembled` record sits, so the
     /// prompt a page asks for is one ledger line rather than a walk
@@ -128,7 +128,7 @@ pub struct Views {
     /// Behind a lock of its own so a reader reads a plan off the disk
     /// with the views released and puts it back afterwards; the fold
     /// holds it only to forget what a record may have moved
-    /// (sprawling-SPEC.md 8-100).
+    /// (`crates/sprawling/Spec.lean` §8-100).
     #[serde(
         serialize_with = "super::snapshot::encode_plans",
         deserialize_with = "super::snapshot::decode_plans"
@@ -287,7 +287,7 @@ impl Views {
             .map_err(storage::StorageError::into_ax)?;
         // A freeze may evict a run and a late record may land on one;
         // either way its money is folded back from the Ledger on demand
-        // (sprawling-SPEC section 8-106), so the row goes with it.
+        // (`crates/sprawling/Spec.lean` §8-106), so the row goes with it.
         if record.kind() == EventKind::RunFrozen || self.hot.was_evicted(&record.run()) {
             let hot = &self.hot;
             self.attribution.retain_runs(|run| !hot.was_evicted(run));

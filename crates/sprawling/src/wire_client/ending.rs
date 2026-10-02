@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! When a wire client stops listening, and what it heard by then
-//! (sprawling-SPEC.md section 8-10): a query ends on its one reply, a
+//! (`crates/sprawling/spec/WireClient.lean` §8-10): a query ends on its one reply, a
 //! command on the city's quiet or on the event its caller named, and a
 //! dispatch on its own run's milestone.
 

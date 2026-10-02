@@ -159,7 +159,7 @@ pub enum Command<Secret = Sealed<String>> {
     },
     /// Starts a new session at an address: same room, a fresh stretch of conversation in it, so a
     /// person who changed the model starts it on purpose rather than having the room's frozen shape
-    /// move behind their back (sprawling-SPEC.md 8-82). [`Carry`] names what crosses; the default
+    /// move behind their back (`crates/sprawling/Spec.lean` §8-82). [`Carry`] names what crosses; the default
     /// keeps nothing. Writes `session_opened`.
     OpenSession {
         addr: Address,
@@ -168,7 +168,7 @@ pub enum Command<Secret = Sealed<String>> {
         /// branch is a session whose first run begins from a line of
         /// another conversation, and everything else about it - model,
         /// effort, handoff - is what [`Carry`] and the room already say
-        /// (sprawling-SPEC.md 8-82).
+        /// (`crates/sprawling/Spec.lean` §8-82).
         from: Option<Origin>,
         idem: IdemKey,
     },

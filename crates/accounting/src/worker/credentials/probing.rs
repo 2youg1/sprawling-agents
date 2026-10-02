@@ -37,7 +37,7 @@ pub(super) struct Probing {
 /// HTTP client at all has no reading to report, and says so.
 ///
 /// How long the reading took is two reads of `monotonic` apart, a span
-/// a wall clock set mid-probe cannot stretch (sprawling-SPEC.md 8-129-2).
+/// a wall clock set mid-probe cannot stretch (`crates/sprawling/Spec.lean` §8-129-2).
 ///
 /// # Errors
 /// A transport this machine will not construct.

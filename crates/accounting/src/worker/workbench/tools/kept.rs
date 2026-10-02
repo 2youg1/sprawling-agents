@@ -5,7 +5,7 @@
 
 //! Every tool on the bench with custody on both sides of it: a key in
 //! the arguments reaches the tool as its `secret:` reference, and a key
-//! in the result reaches the model the same way (sprawling-SPEC.md 8-87).
+//! in the result reaches the model the same way (`crates/sprawling/Spec.lean` §8-87).
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};

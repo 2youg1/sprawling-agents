@@ -7,7 +7,7 @@
 # A run whose resident is an official harness.
 
 Specifies the harness run the dispatch path starts for a room whose resident
-is one of the five official harnesses (sprawling-SPEC.md sections 8-4e and
+is one of the five official harnesses (`crates/sprawling/Spec.lean` §8-4e and
 8-124). Three Rust modules hold it between them, and the Rust code is the
 authority on how these properties hold; this model is the authority on which
 properties must hold:
@@ -114,7 +114,7 @@ structure State where
 /-- A run that has just started: nothing cut, nothing frozen. -/
 def State.fresh : State := ⟨none, false⟩
 
-/-- How an answer ends the run (sprawling-SPEC.md 8-4e rules 3 and 8, 8-124).
+/-- How an answer ends the run (`crates/sprawling/Spec.lean` §8-4e rules 3 and 8, 8-124).
 An end of turn that said something is done; one that said nothing is limit,
 the reading `runtime::run::lifecycle::concluded` gives an empty model reply. A
 turn the ceiling cancelled ended against something, so it is limit; a turn a

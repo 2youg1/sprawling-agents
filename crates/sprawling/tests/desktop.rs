@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The desktop connector is a tool this binary carries and starts itself
-//! (sprawling-SPEC.md section 8-4d).
+//! (`crates/sprawling/Spec.lean` §8-4d).
 //!
 //! A city starts the real `sprawling` executable as `sprawling desktop`
 //! for a building whose rules ask for the desktop, with no `[[mcp]]` row

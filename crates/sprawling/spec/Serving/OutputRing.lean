@@ -6,7 +6,7 @@
 /-!
 # 还在跑的命令写出的字节，给后来打开页面的会话留一段
 
-规定 `crates/sprawling/src/serving/output_ring.rs` 的 `OutputRing::keep` 对一个 run 的那一段做的事（`bin::serving::output_ring`，形状：value；sprawling-SPEC.md 8-115）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `crates/sprawling/src/serving/output_ring.rs` 的 `OutputRing::keep` 对一个 run 的那一段做的事（`bin::serving::output_ring`，形状：value；§8-115）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 一个 run 留着的是到达次序的一列块。模型里块的类型是参数，`size` 是它的字节数；Rust 另存一个 `bytes` 字段免得每次求和，它恒等于各块之和，这里直接求和。按 run 分开的那张表与 `settle`（`tool_result` 落账即清空这个 run）是一次 `BTreeMap::remove`，不另建模。
 

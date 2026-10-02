@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A file a person dropped onto the composer, kept in the city so the
-//! words they send can name it (sprawling-SPEC.md 8-119).
+//! words they send can name it (`crates/sprawling/spec/Assembly.lean` §8-119).
 //!
 //! It lands at `<city>/hall/dropped/<hash>/<name>`: in the hall, which
 //! every city has, rather than in a top-level directory of its own,

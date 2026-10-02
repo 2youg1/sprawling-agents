@@ -52,7 +52,7 @@ use crate::spine_files;
 /// The two halves are [`forget_shape`] and
 /// [`crate::spine_files::clear_handoff`], and this is the call that keeps
 /// them together: it is what `Command::OpenSession` with
-/// `Carry::Nothing` performs (`sprawling-SPEC.md` 8-82).
+/// `Carry::Nothing` performs (`crates/sprawling/Spec.lean` §8-82).
 ///
 /// # Errors
 /// Propagates a room configuration that exists and cannot be read or

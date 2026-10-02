@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The second drive: a run whose turn an official harness takes, in the
-//! room's own tree (sprawling-SPEC.md 8-4e, 8-124).
+//! room's own tree (`crates/sprawling/Spec.lean` §8-4e, §8-124).
 //!
 //! It stands beside [`drive_run`](super::lane::drive_run) rather than
 //! inside it, because everything that drive is handed - the adapter,
@@ -125,12 +125,12 @@ pub(in crate::worker) struct HarnessHalf {
     /// The city's genesis line, which signs the tree's commits.
     pub(in crate::worker) city: kernel::B3Hash,
     /// The key of the command this dispatch answers, stamped on the
-    /// `worktree_opened` line (sprawling-SPEC.md 8-41).
+    /// `worktree_opened` line (`crates/sprawling/Spec.lean` §8-41).
     pub(in crate::worker) command: Option<kernel::IdemKey>,
     /// This run's place in the backlog, when somebody handed it down.
     pub(in crate::worker) member: Option<runtime::BacklogId>,
     /// How long the turn may take, from the moment the run starts: the
-    /// building's `harness_minutes` (sprawling-SPEC.md 8-124).
+    /// building's `harness_minutes` (`crates/sprawling/Spec.lean` §8-124).
     pub(in crate::worker) ceiling_ms: u64,
     pub(in crate::worker) notes: Notes,
     /// Where the ledger stood when the dispatch was staged, which a

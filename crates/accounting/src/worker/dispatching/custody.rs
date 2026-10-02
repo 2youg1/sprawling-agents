@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A key a person pastes into a dispatch goes to the vault, and the
-//! dispatch carries its `secret:` reference instead (sprawling-SPEC.md
-//! 8-87).
+//! dispatch carries its `secret:` reference instead (`crates/sprawling/Spec.lean`
+//! §8-87).
 
 use kernel::{AxCode, AxError, Sealed, SecretRef};
 use zeroize::Zeroizing;

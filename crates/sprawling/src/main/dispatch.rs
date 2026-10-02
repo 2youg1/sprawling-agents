@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `sprawling dispatch <addr> <task>`: one piece of work sent to a served
-//! city, watched until its run freezes (sprawling-SPEC.md section 8-10).
+//! city, watched until its run freezes (`crates/sprawling/spec/WireClient.lean` §8-10).
 //!
 //! The frame is built here rather than typed by the caller, so nobody
 //! transcribes the wire's key format, mode spelling or session rule; and

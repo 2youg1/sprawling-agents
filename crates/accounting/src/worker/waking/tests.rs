@@ -105,7 +105,7 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
 /// A knock that would carry one conversation past its ceiling starts
 /// nothing: the signal is already in the room's inbox, and the chain
 /// ends here rather than with another run nobody asked for
-/// (sprawling-SPEC.md 8-46-12). The first test above is the other side
+/// (`crates/sprawling/Spec.lean` §8-46-12). The first test above is the other side
 /// of the boundary: a knock below the ceiling wakes its resident.
 #[test]
 fn a_knock_past_the_conversation_ceiling_starts_no_run() {
@@ -298,7 +298,7 @@ fn move_in(city: &std::path::Path, addr: &str) {
 /// second run there would read a spare inbox that nothing is delivered
 /// into, while the signal waits for the holder. When the holder gives
 /// the queue back the same knock goes out, and the run it starts finds
-/// the signal at home (sprawling-SPEC.md 8-46-12).
+/// the signal at home (`crates/sprawling/Spec.lean` §8-46-12).
 #[test]
 fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
     let dir = tempfile::tempdir().unwrap();
@@ -337,7 +337,7 @@ fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
 /// What a delegate hands back wakes the resident who asked for it, by
 /// the same decision an ordinary signal takes: the brief names the room
 /// that spoke, so the parent's next turn is a run of its own rather
-/// than a person dispatching it again (sprawling-SPEC.md 8-46-12).
+/// than a person dispatching it again (`crates/sprawling/Spec.lean` §8-46-12).
 #[test]
 fn what_comes_back_wakes_the_resident_who_asked_for_it() {
     let dir = tempfile::tempdir().unwrap();

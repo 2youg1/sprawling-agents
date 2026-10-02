@@ -194,7 +194,7 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
     // One steer, delivered at the first safe point that asks.
     // A count the source can spend without owning it: N runs may ask
     // this one source at once, so it answers by `Fn` rather than by
-    // `FnMut` (sprawling-SPEC 8-46-1).
+    // `FnMut` (`crates/sprawling/Spec.lean` §8-46-1).
     let left = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(1));
     worker.serve(only_interrupts(std::sync::Arc::new(move |_| {
         if left
@@ -330,8 +330,8 @@ fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
 }
 
 /// What one drive is handed can leave the thread that built it
-/// (sprawling-SPEC 8-44), and owns everything it runs on, so a lane can
-/// be handed one (sprawling-SPEC 8-46-1). A bound rather than a run: a
+/// (`crates/sprawling/Spec.lean` §8-44), and owns everything it runs on, so a lane can
+/// be handed one (`crates/sprawling/Spec.lean` §8-46-1). A bound rather than a run: a
 /// value that cannot be sent is a compile error here before it is a
 /// design error in the pool.
 #[test]

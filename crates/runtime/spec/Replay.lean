@@ -34,7 +34,7 @@ pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError>;
 /// 给要原始行的读者：分叉（`fork::prefix` 吃 `VerifiedLedger`）、citysim 检查器与测试。只要结论的 `sprawling replay`
 /// 走 `storage::audit_chain`，要折叠的走 `fold_ledger_dir`：两者都一次只持一段字节。
 /// 无段目录与空账本在此同形（均得空 VerifiedLedger）——本函数的调用方均自持城根算出路径；
-/// 区分二者是「从人那里拿到路径」的一层的事（§11；sprawling-SPEC §12）。
+/// 区分二者是「从人那里拿到路径」的一层的事（§11；sprawling D2）。
 pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError>;
 /// 流式折叠：经 `storage::LedgerIndex::folding` 一次一段地读，每行过同一个 `LineCheck`，已知记录借给 `each`
 /// 后即丢；ignorable 行只入链不入折。每行只读一次、只解析一次，顺序即账本序，结果确定。
@@ -52,7 +52,7 @@ pub fn fold_ledger_dir(dir: &Path, each: impl FnMut(&EventRecord) -> Result<(), 
 
 **「没找到要验的东西」与「验过且为空」必须异形，但不在这一层异形**（issue #3）。`fold_ledger_dir` 的四个生产调用方（`fold_city`，经 `snapshot::start` 起步的 `Standing::fold` 与 `Views::rebuild`，`startup_scan`）均自持城根算出路径，而 `JsonlLedger::open` 只建目录、首次 append 才建段：**已开未写的城恰好是一个无段目录**，在此处报错会把一个合法启动当成错误（`Standing::fold` 早已以 `if ledger_dir.exists()` 记下这个状态）。若改成在此报错，四个调用方就各需一份同样的守卫——一条条件四份拷贝。
 
-故依据归给**拿到人输入路径的那一层**：`sprawling replay <ledger-dir>` 先问 `storage::ledger_segments_at`，一段都没有就报 `E_PATH_NOT_FOUND`（sprawling-SPEC §12）。先例取自本仓库：`xtask guard` 在无提交时说 `no commits yet, nothing to judge`，而不说通过。**空账本本身仍然合法**：`verify_lines(vec![])` 照旧返回空 `VerifiedLedger`。
+故依据归给**拿到人输入路径的那一层**：`sprawling replay <ledger-dir>` 先问 `storage::ledger_segments_at`，一段都没有就报 `E_PATH_NOT_FOUND`（sprawling D2）。先例取自本仓库：`xtask guard` 在无提交时说 `no commits yet, nothing to judge`，而不说通过。**空账本本身仍然合法**：`verify_lines(vec![])` 照旧返回空 `VerifiedLedger`。
 -/
 
 /-!

@@ -19,7 +19,7 @@
 //! a session writes the shape it froze; every later run reads it back
 //! and refuses to move it, because a provider caches a conversation's
 //! prefix for as long as the model and the effort behind it stay put
-//! (`sprawling-SPEC.md` 8-79 does the refusing). An address that is its
+//! (`crates/sprawling/Spec.lean` §8-79 does the refusing). An address that is its
 //! own building has one file for both rungs, so that address is its own
 //! session.
 //!

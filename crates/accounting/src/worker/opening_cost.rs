@@ -4,12 +4,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What each phase of opening a served city cost, and the one line that
-//! says it (sprawling-SPEC.md 8-121).
+//! says it (`crates/sprawling/Spec.lean` §8-121).
 //!
 //! Shape: value. It reads no clock of its own: the clock is the function
 //! [`OpeningCost::begin`] is handed, which `listen` takes from the one
 //! monotonic sampling point, `serving::standing::monotonic_now`
-//! (sprawling-SPEC.md 8-93). A phase is the difference of two monotonic
+//! (`crates/sprawling/Spec.lean` §8-93). A phase is the difference of two monotonic
 //! samples, so a wall clock set back by a person cannot make one negative.
 
 use std::time::{Duration, Instant};
@@ -25,14 +25,14 @@ pub enum Phase {
     OpenLedger,
     /// The one pass that checks and folds the lines the views and the
     /// standing have not folded yet, from the earlier of their snapshots
-    /// or from genesis (sprawling-SPEC.md 8-122).
+    /// or from genesis (`crates/sprawling/Spec.lean` §8-122).
     FoldTail { lines: u64, from: TailFrom },
     /// The standing snapshot cut at the last line folded.
     CutStanding,
     /// The views snapshot cut at the same line.
     CutViews,
     /// The second copy of the views, made through the snapshot encoding
-    /// (sprawling-SPEC.md 8-99).
+    /// (`crates/sprawling/Spec.lean` §8-99).
     Twin,
     /// The writer thread started.
     StartWorker,
@@ -69,7 +69,7 @@ impl OpeningCost {
 
     /// When opening began, the point every readiness moment is measured
     /// from, including the proof that ends after the first byte
-    /// (sprawling-SPEC.md 8-122).
+    /// (`crates/sprawling/Spec.lean` §8-122).
     pub fn began(&self) -> Instant {
         self.began
     }

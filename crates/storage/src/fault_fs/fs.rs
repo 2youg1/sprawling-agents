@@ -38,7 +38,7 @@ use super::plan::{FaultPlan, FileState, State, TornTail};
 /// Shared-state handle: clone it, hand one clone to the ledger, keep one
 /// to cut power and to reopen after the crash. `Arc<Mutex<_>>` rather
 /// than `Rc<RefCell<_>>` because the inner seam it implements is `Send`
-/// (sprawling-SPEC 8-44): a store that holds one has to cross a thread.
+/// (`crates/sprawling/Spec.lean` §8-44): a store that holds one has to cross a thread.
 #[derive(Clone)]
 pub struct FaultFs(Arc<Mutex<State>>);
 

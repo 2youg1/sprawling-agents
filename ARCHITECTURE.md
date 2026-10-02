@@ -75,7 +75,7 @@ The address the server binds is `kernel::consts_policy::DEFAULT_AT` unless a
 caller overrides it. The value is not repeated here: the CLI defaults, the
 first-run screen, the installer and `README.md` all read that one constant,
 because the address a person is told and the address actually bound may not
-be two spellings (sprawling-SPEC.md section 8-2b).
+be two spellings (`crates/sprawling/Spec.lean` §8-2b).
 
 ## 2 The stack, and what each choice costs
 
@@ -191,7 +191,7 @@ machine authority for the direction of the edges that matter there, also
 read by `cargo xtask depmap`. Each line names a module and the paths its
 production code never names; tests may still build a fixture through the
 assembly point. `bin::assembly` knows every concrete type, so the modules
-it assembles never name it back (sprawling-SPEC 8-92).
+it assembles never name it back (`crates/sprawling/Spec.lean` §8-92).
 
 ```directions
 crates/accounting/src/views: crate::worker
@@ -387,7 +387,7 @@ city commits the tree, writes `harness_answered`, and freezes through
 is offered for review as a request the city opens, because the harness
 reaches none of the city's tools, and the merge stays the one way its
 writes reach the building. That is the weak form of step 4 which
-sprawling-SPEC.md section 8-4e records and
+`crates/sprawling/Spec.lean` §8-4e records and
 `crates/agent_protocols/spec/Harness/Session.lean` proves.
 
 ### When it does not go through
@@ -815,7 +815,7 @@ large-worktree placement, and long-session streaming forward — are re-measured
 by `just bench`, one reading line per scenario and sub-metric, every line
 carrying its machine class. Multi-run parallel is read by
 `instrument_relay_round_trip`, which drives the accounting loop the city runs
-(sprawling-SPEC.md 8-84); its readings and their machine class sit in
+(`crates/sprawling/Spec.lean` §8-84); its readings and their machine class sit in
 `tools/xtask/budgets.toml` `[relay_round_trip]`. The other three are
 citysim's bench scenarios. The large-ledger fold has a register row, quoted
 below; the large-worktree placement and long-session forwarding readings are
@@ -1062,13 +1062,13 @@ sequenceDiagram
 ```
 
 `crates/sprawling/src/assembly/listening.rs` (`listen`, the one
-definition of this order, sprawling-SPEC.md 8-88),
+definition of this order, `crates/sprawling/Spec.lean` §8-88),
 `crates/accounting/src/views/snapshot/start.rs`,
 `crates/sprawling/src/assembly/attending.rs` (`spawn_worker`),
 `crates/storage/src/jsonl.rs` (`open`),
 `crates/sprawling/src/assembly/chain_watch.rs`,
 `crates/storage/src/chain_audit.rs` (`prove_chain`, `ChainHalt`),
-`crates/storage/src/verified_prefix.rs` (sprawling-SPEC.md 8-122, 8-144).
+`crates/storage/src/verified_prefix.rs` (`crates/sprawling/Spec.lean` §8-122, §8-144).
 The last segment's prefix the previous proof recorded is proved by its
 digest, so tail recovery checks line by line only what was written after
 that proof (`crates/storage/Spec.lean` §8-34). The proof reads and hashes up to

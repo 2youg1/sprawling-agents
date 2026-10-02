@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The thread the views are folded on and published from, so neither
-//! the writer nor the fold waits for a reader (sprawling-SPEC.md 8-99);
+//! the writer nor the fold waits for a reader (`crates/sprawling/spec/Assembly/Listening.lean` §8-99);
 //! it also files the session slices a served writer hands it, and
 //! counts how far it is behind the writer (8-123).
 
@@ -25,16 +25,16 @@ pub(crate) struct Folding {
     pub(crate) machine: Arc<dyn Fn(wire::DoctorAnswer) + Send + Sync>,
     pub(crate) lend: Box<dyn FnOnce(Arc<Mutex<gateway::Custodian>>) + Send>,
     /// Where a served writer hands its session slices, so the view thread
-    /// files them instead of the accounting thread (sprawling-SPEC.md 8-123).
+    /// files them instead of the accounting thread (`crates/sprawling/spec/Serving.lean` §8-123).
     pub(crate) keep_slices: Box<dyn FnOnce(storage::Sessions) + Send>,
     /// The records sent and not yet broadcast, for the monitor's
-    /// `view_backlog` (sprawling-SPEC.md 8-123, 8-129-6).
+    /// `view_backlog` (`crates/sprawling/Spec.lean` §8-123, §8-129-6).
     pub(crate) backlog: Backlog,
     pub(crate) thread: std::thread::JoinHandle<()>,
 }
 
 /// How many committed records the writer has sent the view thread that
-/// it has not yet folded and broadcast (sprawling-SPEC.md 8-123).
+/// it has not yet folded and broadcast (`crates/sprawling/spec/Serving.lean` §8-123).
 #[derive(Clone, Default)]
 pub(crate) struct Backlog(Arc<AtomicU64>);
 
@@ -67,7 +67,7 @@ impl Backlog {
 
 /// More records than this sent and not yet broadcast, and a views
 /// snapshot that falls due waits: the thread catches up first
-/// (sprawling-SPEC.md 8-123).
+/// (`crates/sprawling/spec/Serving.lean` §8-123).
 pub(crate) const CUT_WAITS_ABOVE: u64 = 256;
 
 /// What the writer thread hands the view fold, in the order it wrote it.
@@ -80,7 +80,7 @@ enum Fold {
 
 /// The two copies of the views the fold alternates between: the one
 /// readers are handed, and its unpublished twin, which must have folded
-/// the same records (sprawling-SPEC.md 8-99).
+/// the same records (`crates/sprawling/spec/Assembly/Listening.lean` §8-99).
 pub(crate) struct Copies {
     pub(crate) published: Arc<Published>,
     pub(crate) spare: Views,
@@ -167,9 +167,9 @@ pub(crate) fn spawn_folding(
 /// folds every arrival already queued into the spare copy, publishes it,
 /// broadcasts the records, and folds the same batch into the copy it
 /// replaced, until every sender is gone; the thread is lowered if it
-/// keeps a core busy (sprawling-SPEC.md 8-93). A views snapshot is cut
+/// keeps a core busy (`crates/sprawling/spec/Serving/Standing.lean` §8-93). A views snapshot is cut
 /// from the spare copy when the [`Cadence`] says one is due, and once
-/// more when the channel closes (sprawling-SPEC.md 8-91).
+/// more when the channel closes (`crates/sprawling/spec/Assembly/Listening.lean` §8-91).
 ///
 /// The broadcast follows the publication so a client that queries on
 /// hearing a record finds it already folded.
@@ -214,12 +214,12 @@ fn fold_until_closed(
 
 /// How many times the cost of one cut the fold must spend before the
 /// next: cutting takes at most a tenth of the fold thread's time
-/// (sprawling-SPEC.md 8-91).
+/// (`crates/sprawling/spec/Assembly/Listening.lean` §8-91).
 const CUT_SHARE_INVERSE: u32 = 10;
 
 /// When the fold thread cuts the next views snapshot, from the fold time
 /// spent since the last cut and what that cut cost, both measured here
-/// (sprawling-SPEC.md 8-91).
+/// (`crates/sprawling/spec/Assembly/Listening.lean` §8-91).
 #[derive(Default)]
 struct Cadence {
     folded_since_cut: Duration,

@@ -38,7 +38,7 @@ fn a_city_opened_by_a_relative_path_reads_its_free_space() {
     assert!(sample.volume_free_bytes > 0, "{sample:?}");
 }
 
-/// The regression gate of sprawling-SPEC.md 8-129-3: a count, not a
+/// The regression gate of `crates/sprawling/spec/Main.lean` §8-129-3: a count, not a
 /// time, so it holds on a loaded runner as on a quiet desk. Nobody
 /// watching reads nothing; a summary reads this process once a beat; a
 /// whole page reads this process and the machine once a beat each; the
@@ -68,7 +68,7 @@ fn a_beat_reads_the_platform_exactly_as_often_as_its_watchers_ask() {
 }
 
 /// The instrument the register's `[monitor_beat]` row is read from
-/// (sprawling-SPEC.md 8-129-3): each kind of platform reading taken 200
+/// (`crates/sprawling/spec/Main.lean` §8-129-3): each kind of platform reading taken 200
 /// times, printed as floor, p50 and p99 in microseconds. A wall-clock
 /// reading belongs to the machine that took it, so it records and does
 /// not gate; the count gate above is what holds the cost.

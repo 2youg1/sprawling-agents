@@ -153,7 +153,7 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
 /// This is what makes two runs on one ledger expressible: the second
 /// run continues the first one's chain, so the report carries both
 /// runs' lines and `seq` orders them the way one city would have
-/// written them (sprawling-SPEC.md 8-46-5).
+/// written them (`crates/sprawling/Spec.lean` §8-46-5).
 ///
 /// # Errors
 /// Propagates whatever the drive refuses.

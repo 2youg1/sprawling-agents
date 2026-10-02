@@ -47,7 +47,7 @@ pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, StorageError>;
 /// 目录里的账本段，按应读顺序（`list` 已排序，段名零填充故字典序即时序）。
 /// 空结果的意思是「这里没有账本」，与「账本里没有事件」不是同一件事；
 /// `read_raw_lines_at` 对两者都答 `Ok([])`，故需要区分的调用方问这一面。
-/// 现在只有一个：`sprawling replay`，它的路径是人敲的（sprawling-SPEC §12）。
+/// 现在只有一个：`sprawling replay`，它的路径是人敲的（sprawling D2）。
 /// 段名规则因此只住 `is_segment` 一处，不被谁再拼一遍。
 pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, StorageError>;
 /// 一段的字节，只读、不走 open；`lines()` 给出该段完整且非空的行（撕裂尾不是行，留给 open 判）。
@@ -119,10 +119,10 @@ pub struct OpenReport {
 }
 ```
 
-- **为什么。** 尾部恢复（8-1 第 ④ 步）逐行核对整个末段，末段至多 64 MiB。40 万行夹具城的末段 40,843,081 B，逐行核对它是开城的 `open the ledger` 那一段的几乎全部（sprawling-SPEC 8-144 的读数）；同一段读一遍、BLAKE3 一遍加起来不到它的十分之一。末段的前缀已经被后台的证明逐行核对过，并写下了记录（8-30）。
+- **为什么。** 尾部恢复（8-1 第 ④ 步）逐行核对整个末段，末段至多 64 MiB。40 万行夹具城的末段 40,843,081 B，逐行核对它是开城的 `open the ledger` 那一段的几乎全部（`crates/sprawling/Spec.lean` §8-144 的读数）；同一段读一遍、BLAKE3 一遍加起来不到它的十分之一。末段的前缀已经被后台的证明逐行核对过，并写下了记录（8-30）。
 - **四个条件，与证明相同。** `open_reusing` 照 `open` 取锁、探版本、从前一段的末行取入口状态，再把末段读进内存一次。`records` 里有末段的记录，且版本等于 `line_check_version()`、段长不短于记录的 `L`、记录的入口等于前一段末行给出的链状态、前 `L` 字节的 BLAKE3 等于记录的摘要时，链状态取记录的出口，从第 `L` 字节起逐行核对；四个条件有一个不成立，整段逐行核对，与 `open` 相同。被哈希的字节与之后被核对的字节出自同一次读（8-30 第一条）。判定 `chain_audit` 的 `Walked::reuse` 已经写过一次，`open_reusing` 调同一个判定，不写第二份。
 - **截断与拒开的判定不变。** 记录只覆盖证明时逐行核对过的完整行，所以前 `L` 字节里没有撕裂与断链，截断只可能落在 `L` 之后；`crates/storage/spec/Jsonl/Barrier.lean` 的 `reopenFromVerifiedPrefix` 陈述从这样一个前缀起重开与从头重开相同，`crates/storage/spec/Snapshot.lean` 的 `cachedVerifyIsStrict` 陈述出口状态与逐行核对相同（末段看作「记录覆盖的前缀」与「之后的字节」两段）。截断之后段比 `L` 短，记录就不再适用。
-- **开账本只读记录。** `open_reusing` 不写记录、不删记录；记录只由持锁的证明写（8-30）。`records` 由调用方给出：记录目录的唯一拼法是 `accounting::views::snapshot::start::proof_dir`（sprawling-SPEC 8-122），本 crate 不从城布局再推一次。服务中的城经 `open_reusing` 开账本（sprawling-SPEC 8-144）；其余打开者照旧走 `open`。
+- **开账本只读记录。** `open_reusing` 不写记录、不删记录；记录只由持锁的证明写（8-30）。`records` 由调用方给出：记录目录的唯一拼法是 `accounting::views::snapshot::start::proof_dir`（`crates/sprawling/Spec.lean` §8-122），本 crate 不从城布局再推一次。服务中的城经 `open_reusing` 开账本（`crates/sprawling/Spec.lean` §8-144）；其余打开者照旧走 `open`。
 - **读数是计数。** `OpenReport.counted` 与证明的 `ProofCount` 同形：逐行核对的行数、按摘要复用的段数（0 或 1）、尾部恢复读过的字节（末段的长度）、哈希过的字节。记录命中时逐行核对的行数等于证明之后写下的行数，与历史长度无关；`jsonl::open::tests` 在两种规模上断言它。
 - **被否：命中记录时不哈希，只比段长。** 段在两次开城之间被截短再接着写、或被外部改写同样长度时，段长照样相符；不哈希就接受了 8-30 要挡的那种意外。
 -/

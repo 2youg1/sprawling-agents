@@ -5,7 +5,7 @@
 
 //! `playback`: a resident exports a stretch of the history its building
 //! may read, as a bundle or a playback page, and checks an export of its
-//! building against the city (sprawling-SPEC.md 8-132).
+//! building against the city (`crates/sprawling/Spec.lean` §8-132).
 //!
 //! The reader is bound when the bench is laid out: the building the run
 //! stands in. No argument names a reader, and an argument this tool does

@@ -5,7 +5,7 @@
 
 //! `transcribe`: a recording this run may read - a file in the city, or
 //! a block a connector stored - turned into text by the endpoint the
-//! person chose to transcribe (sprawling-SPEC.md 8-131).
+//! person chose to transcribe (`crates/sprawling/Spec.lean` §8-131).
 //!
 //! Whether the tool exists is the book's answer to the question the
 //! composer's microphone asks, `select(ModelTag::Transcribe, policy)`,

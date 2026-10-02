@@ -312,7 +312,7 @@ fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
 /// A run that ends while holding a node spends it on
 /// `FrozeWithoutEvidence`: the row turns red instead of staying
 /// `In progress` for ever, which is what lets `pursue` see its ready
-/// set shrink (sprawling-SPEC `pursue` termination; `ClaimDesk::abandon`
+/// set shrink (`crates/sprawling/Spec.lean` `pursue` termination; `ClaimDesk::abandon`
 /// in `crates/collab/Spec.lean`).
 #[test]
 fn a_run_that_ends_holding_a_row_leaves_it_blocked_rather_than_in_progress() {

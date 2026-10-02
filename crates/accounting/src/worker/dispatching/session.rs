@@ -5,7 +5,7 @@
 
 //! Which room a dispatch works in: the session a person named, or the
 //! name this city takes from the task by rule when nobody did
-//! (sprawling-SPEC.md 8-86).
+//! (`crates/sprawling/Spec.lean` §8-86).
 
 use kernel::{Address, AxError, SessionName};
 

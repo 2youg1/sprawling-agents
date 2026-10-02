@@ -378,7 +378,7 @@ pub enum Query {
         runs: Vec<RunId>,
     },
     /// The newest release of one requirement-table item, asked of its
-    /// publisher (sprawling-SPEC 8-120).
+    /// publisher (`crates/sprawling/Spec.lean` §8-120).
     ///
     /// Asked by the dependency page for each item once the page is open,
     /// which is the person asking whether their tools are behind; the

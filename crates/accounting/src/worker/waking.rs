@@ -119,7 +119,7 @@ impl RunWorker {
         // assignment rather than by a flag on the worker: the run is
         // settled after this call has returned, and a flag cleared here
         // would waive the approvals of the very run that arrived from
-        // outside (sprawling-SPEC.md 8-46-2).
+        // outside (`crates/sprawling/Spec.lean` §8-46-2).
         // The start reports its own refusal; nothing here waits on the
         // run id, because what arrived from outside has nobody to hand
         // one back to.
@@ -157,7 +157,7 @@ impl RunWorker {
     /// that would wake the next resident past `CONVERSATION_HOPS_MAX`
     /// starts no run: the refusal names the address and the signal stays
     /// in the room's inbox, because a ring of residents waking each
-    /// other is a spend nobody agreed to (sprawling-SPEC.md 8-46-12).
+    /// other is a spend nobody agreed to (`crates/sprawling/Spec.lean` §8-46-12).
     ///
     /// # Errors
     /// Propagates a resident description that exists and cannot be read:
@@ -218,7 +218,7 @@ impl RunWorker {
     /// resident to its frozen end on the accounting thread would let a
     /// conversation between four residents hold the command desk shut
     /// for as long as it lasted, with `Halt` among the commands that
-    /// could not get in (sprawling-SPEC.md 8-46-2).
+    /// could not get in (`crates/sprawling/Spec.lean` §8-46-2).
     ///
     /// A knock that cannot be answered is noted and stepped over. The
     /// run that spoke did its part; a halted building or an unreadable
@@ -229,8 +229,8 @@ impl RunWorker {
             // Decided at the moment of dispatch rather than at the push,
             // because `conclude` may have sent other work into the room
             // since. A second run there would read a spare inbox while
-            // the signal waits for the holder (sprawling-SPEC.md
-            // 8-46-12).
+            // the signal waits for the holder (`crates/sprawling/Spec.lean`
+            // §8-46-12).
             if self.collaborating.rooms.worked_by(&knock.addr).is_some() {
                 self.doorstep.defer(knock);
                 continue;
@@ -238,7 +238,7 @@ impl RunWorker {
             // The chain is bounded here rather than at the push: a knock
             // that has already gone as far as it may is stepped over
             // like one that cannot be answered, so the run that spoke is
-            // not punished for it (sprawling-SPEC.md 8-46-12).
+            // not punished for it (`crates/sprawling/Spec.lean` §8-46-12).
             let owing = match Owing::knocked(knock.chain) {
                 Ok(owing) => owing,
                 Err(refusal) => {

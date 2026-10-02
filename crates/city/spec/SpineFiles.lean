@@ -58,7 +58,7 @@ pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   // 立�
 ```
 
 - **一个目录装城写下的全部第一批字节**：`crates/city/templates/` 下是 `RULES.toml`、`RULES-hall.toml`、`Roadmap.md`、`Memo.md`、`Handoff.md`、`SPEC.md`、`JOB.md`、`MAYOR.md`、`CLERK.md`、`URBANITE.md`、`City.md`，以及说明每份文件谁写、谁读的 `README.md`。人读的那份与城写出的那份仍是同一串字节（§8-3、§8-5），只是这串字节现在住在把它编进去的包里。
-- **为什么在包里**：crates.io 上的 `.crate` 只装包目录里的文件，验证构建与 `cargo install` 都在解开的包里编译；`include_str!` 指向包外的 `docs/` 时，那里没有这些文件，city 编不出来（sprawling-SPEC 8-157）。`packaged` 门判这一条（tools/xtask/Spec.lean §8-49）。
+- **为什么在包里**：crates.io 上的 `.crate` 只装包目录里的文件，验证构建与 `cargo install` 都在解开的包里编译；`include_str!` 指向包外的 `docs/` 时，那里没有这些文件，city 编不出来（`crates/sprawling/Spec.lean` §8-157）。`packaged` 门判这一条（tools/xtask/Spec.lean §8-49）。
 - **`City.md` 由 city 交出，accounting 来读**：立城时写下 `City.md` 的是 `accounting::worker::genesis`，但这份文件的名字（`CITY_FILE`）与它同目录的模板都归本模块。accounting 的 `CITY_MD` 是 `city::CITY_TEMPLATE`，一份字节、一个家；accounting 不能 `include_str!` 别的包目录里的文件，那在包里同样落空。
 - **失败**：没有运行期失败。模板改名或挪走，`include_str!` 在编译期就红。
 
@@ -93,7 +93,7 @@ pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   // 立�
 
 **决定**：城写下的模板与 `City.md` 住在 `crates/city/templates/`（§8-41）；`City.md` 由 `city::CITY_TEMPLATE` 交给 accounting。
 
-**理由**：模板的字节是 city 的产品：`building::create`、`spine_files::lay_out`、`write_job` 与创世都按它们写盘，编译期 `include_str!` 它们。一个包要发布，它编译时读的每个文件都得在它自己的目录里（sprawling-SPEC 8-157），而 `docs/` 这样的仓库目录不属于任何包。放进 city 而不是 accounting，因为这些文件的名字、读法与「谁写哪一份」本来就在本模块。
+**理由**：模板的字节是 city 的产品：`building::create`、`spine_files::lay_out`、`write_job` 与创世都按它们写盘，编译期 `include_str!` 它们。一个包要发布，它编译时读的每个文件都得在它自己的目录里（`crates/sprawling/Spec.lean` §8-157），而 `docs/` 这样的仓库目录不属于任何包。放进 city 而不是 accounting，因为这些文件的名字、读法与「谁写哪一份」本来就在本模块。
 
 **被否**：①模板放在 `docs/` 下给人读，发布前由脚本复制进包——仓库里的包与发布出去的包不再是同一组文件，复制那一步要自己的检查；②模板放在 `docs/` 下，city 里放一个指向它的符号链接——Windows 上建符号链接要开发者模式或管理员权限，git 在那里默认把链接检出成一个写着路径的普通文件；③`City.md` 搬进 accounting——它的文件名与同族模板都在 city，搬过去就把一族文件拆进两个包。
 

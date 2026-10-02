@@ -204,7 +204,7 @@ fn an_unnamed_dispatch_asks_the_factory_for_the_run_model_alone() {
     let (factory, asked) = scripted(ANSWER);
     let (mut worker, ledger) = city_on(dir.path(), refusing_url(), "minimal", factory);
     // No session, so the room is named from the task's own words by
-    // rule (sprawling-SPEC.md 8-86): the factory is asked for the run's
+    // rule (`crates/sprawling/Spec.lean` §8-86): the factory is asked for the run's
     // model and never for a digest model to name the room with.
     let dispatched = dispatch(&mut worker, None);
 

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A building named for what it asks and this machine lacks, rules that
-//! will not read, and a code explained (sprawling-SPEC.md section 8-48).
+//! will not read, and a code explained (`crates/sprawling/spec/Doctor.lean` §8-48).
 
 use kernel::Address;
 

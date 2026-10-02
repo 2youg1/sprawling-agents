@@ -16,7 +16,7 @@
 //!
 //! **Every path here works in three trees**: this checkout, the
 //! directory `cargo package` verifies its archive in, and the registry
-//! directory `cargo install` unpacks it into (sprawling-SPEC.md 8-157).
+//! directory `cargo install` unpacks it into (`crates/sprawling/Spec.lean` §8-157).
 //! So nothing is found by counting parent directories: the bundle is
 //! inside this package, the lockfile is found by cargo's own rule, and
 //! a pin file outside the package is read when it is there and left
@@ -55,7 +55,7 @@ const BUNDLE_DIR: &str = "web-dist";
 /// relative to the checkout's root and named by the constant `pins.rs`
 /// gives it. None is in this package, so a build from the crates.io
 /// archive finds none of them, and the doctor reports those tools as
-/// unpinned (sprawling-SPEC.md 8-157).
+/// unpinned (`crates/sprawling/Spec.lean` §8-157).
 const PINS: [(&str, &str); 3] = [
     ("RUST_TOOLCHAIN_FILE", "rust-toolchain.toml"),
     ("LEAN_TOOLCHAIN_FILE", "lean-toolchain"),

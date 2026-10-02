@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What this machine has, what this city needs, and what installing the
-//! difference would cost (sprawling-SPEC.md section 8-40).
+//! difference would cost (`crates/sprawling/spec/Accounting/Worker.lean` §8-40).
 //!
 //! Two tiers rather than one list: a person who only wants the city to
 //! run needs a browser, and a person who wants to change this code needs
@@ -251,7 +251,7 @@ pub(crate) struct Requirement {
     pub(crate) pin: Pin,
     /// Where the item's newest release is read, or why it cannot be.
     pub(crate) upstream: Upstream,
-    /// The row a page draws the item inside (sprawling-SPEC.md section 8-58).
+    /// The row a page draws the item inside (`crates/sprawling/spec/Doctor.lean` §8-58).
     pub(crate) pack: Option<Pack>,
 }
 

@@ -66,7 +66,7 @@ pub struct Charter<'a> { /* …既有字段… */ pub opening: Option<Opening> }
 
 - **只有 `FromJob` 改写，理由写在 `fold_run` 旁。** 那一句说「任务在上面的 JOB.md 里」，指的是母 run 前缀 run 段里的那份文本；分支的前缀带的是它自己的 brief，不是母 run 的 JOB.md，照抄那一句就是让分支去读一份它从没拿到的文件。改写的代价是 provider 的前缀缓存从第一条消息起不命中，这一种开篇的分支每次都付；换成把母 run 的 JOB.md 抄进分支的 run 段，run 段就与母 run 的不同，缓存在 system 那一段已经不命中，付的一样多，还在分支里多了一份没人派给它的任务（D14）。
 - **为什么不用 `goal` 是否为空来猜。** 「有目标才写 job 文件」是 `city::write_brief` 的规则；分叉里按 `goal` 猜写法，就是同一条规则的第二个权威，哪天 brief 的规则改了，分叉会悄悄猜错，而只有缓存命中率会说出来。
-- 验收：`fork::request_tests` 的 `a_branch_first_request_opens_with_the_bytes_of_the_mothers_last`（母 run 与分支都经 `drive` 真跑；分支经 `inherited_indexed` 从账本重建；分支第一个请求的消息序列以母 run 最后一个请求的消息序列开头，逐条序列化字节相同）。真实组装出来的前缀经 gateway 按兼容格式渲染后的整份请求，在 accounting 一侧比（sprawling-SPEC 8-141）。
+- 验收：`fork::request_tests` 的 `a_branch_first_request_opens_with_the_bytes_of_the_mothers_last`（母 run 与分支都经 `drive` 真跑；分支经 `inherited_indexed` 从账本重建；分支第一个请求的消息序列以母 run 最后一个请求的消息序列开头，逐条序列化字节相同）。真实组装出来的前缀经 gateway 按兼容格式渲染后的整份请求，在 accounting 一侧比（`crates/sprawling/Spec.lean` §8-141）。
 -/
 
 namespace Runtime.Fork

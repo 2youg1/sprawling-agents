@@ -4,14 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A command line becomes an `Invocation`, or a `LineError` naming the
-//! word that could not be read (sprawling-SPEC.md 8-89). Pure: it reads
+//! word that could not be read (`crates/sprawling/spec/Main/Grammar.lean` §8-89). Pure: it reads
 //! the command table and the words, and touches nothing else. The
 //! precedence below is proved in `crates/sprawling/spec/Main/Grammar.lean`.
 //!
 //! `--help`/`-h` and `--version`/`-V` win wherever they stand among
 //! sprawling's own words, so no verb can act on a request for its help.
 //! Those words end at the first `--`: what follows belongs to the
-//! command a verb such as `gauge` runs (sprawling-SPEC.md 8-129-4).
+//! command a verb such as `gauge` runs (`crates/sprawling/spec/Main.lean` §8-129-4).
 
 use super::verbs::{AfterDashes, Need, Row, Takes, VERBS, Verb};
 
@@ -147,7 +147,7 @@ pub(super) fn parse(words: &[String]) -> Result<Invocation, LineError> {
 /// The row `first` names, or `first` and the word after it name, and the
 /// words left after the name. A row whose name is two words
 /// (`playback export`) is named by two; every other row by one
-/// (sprawling-SPEC.md 8-126).
+/// (`crates/sprawling/spec/Main.lean` §8-126).
 fn find<'words>(
     first: &str,
     rest: &'words [String],

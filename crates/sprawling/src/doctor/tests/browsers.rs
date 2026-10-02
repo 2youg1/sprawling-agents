@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A browser is an engine, and one machine's brand of it
-//! (sprawling-SPEC.md section 8-57).
+//! (`crates/sprawling/spec/Doctor.lean` §8-57).
 
 use std::collections::BTreeSet;
 
@@ -82,7 +82,7 @@ fn a_found_browser_is_reported_by_the_brand_it_is() {
 }
 
 /// A browser's version is read out of the files beside it and never
-/// asked of the browser (sprawling-SPEC.md section 8-80).
+/// asked of the browser (`crates/sprawling/spec/Doctor.lean` §8-80).
 ///
 /// On Windows a Chromium browser given `--version` opens a window
 /// instead of printing a line, and when one is already running the new

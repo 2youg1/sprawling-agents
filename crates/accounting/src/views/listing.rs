@@ -20,7 +20,7 @@ use kernel::Address;
 /// absent: directories first, then files, each in name order.
 ///
 /// Takes the city root rather than the views: it reads the disk, and
-/// runs after the view lock is released (sprawling-SPEC.md 8-100).
+/// runs after the view lock is released (`crates/sprawling/Spec.lean` §8-100).
 pub(super) fn listing_answer(city_root: &Path, at: Option<Address>) -> wire::ListingAnswer {
     wire::ListingAnswer {
         entries: list(&resolve(city_root, at.as_ref())),

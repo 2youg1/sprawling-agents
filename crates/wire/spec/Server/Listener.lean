@@ -24,7 +24,7 @@ impl Bound {
 pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
 ```
 
-- **次序是装配层要的**：一座城先占住它的端口，然后才打开写者、写下第一行（sprawling-SPEC §8-88）。`ServeConfig` 里的 sink 要等写者线程开好才造得出来（转写 sink 借的是写者打开的那个金库），所以「绑定」必须能在 sink 存在之前单独做完。原先的单个 `serve(config)` 把两件事绑在一起，装配层只能先开写者、再在 `serve` 里发现端口已被占用。
+- **次序是装配层要的**：一座城先占住它的端口，然后才打开写者、写下第一行（`crates/sprawling/Spec.lean` §8-88）。`ServeConfig` 里的 sink 要等写者线程开好才造得出来（转写 sink 借的是写者打开的那个金库），所以「绑定」必须能在 sink 存在之前单独做完。原先的单个 `serve(config)` 把两件事绑在一起，装配层只能先开写者、再在 `serve` 里发现端口已被占用。
 - **`addr` 与 `token_digest` 离开 `ServeConfig`**，成为 `bind` 的两个入参。它们只被绑定判定读过；留在 `ServeConfig` 里，同一个地址就会有 `bind` 的入参和配置字段两个家。
 - **失败码不变**：判定拒绝仍是 `decide_bind` 的 `E_CONFIG_INVALID`；操作系统拒绝绑定仍是 `E_CONFIG_INVALID`，recovery 仍是「换一个空闲端口，或者停掉占着它的进程」。读不出绑定之后的地址同样是 `E_CONFIG_INVALID`，recovery 相同：那个监听器已经不可用。
 - **绑定之后的地址由 `Bound` 说出**（D16）：`serve` 被给的地址可以是 `:0`，那时只有监听器知道系统给了哪个端口；装配层要把城的地址交给别处（远程中继连回城的 `/ws`、启动横幅、控制台的 `/serving`、打开浏览器之前的探测），每一处都读 `local_addr`，不读 `serve` 被给的那个。

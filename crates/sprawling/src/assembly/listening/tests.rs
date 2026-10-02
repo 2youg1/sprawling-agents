@@ -84,7 +84,7 @@ fn a_serve_of_a_held_city_is_refused_and_lets_its_port_go() {
 }
 
 /// The phases of opening a served city, in the order `listen` does them
-/// (sprawling-SPEC.md 8-121); a city `init` just formed holds three lines.
+/// (`crates/sprawling/spec/Assembly/Listening.lean` §8-121); a city `init` just formed holds three lines.
 const OPENING_PHASES: [&str; 7] = [
     "bind",
     "open the ledger",

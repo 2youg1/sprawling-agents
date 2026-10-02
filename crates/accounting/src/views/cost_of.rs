@@ -53,7 +53,7 @@ impl Views {
     }
 
     /// What one run was billed, the one answer every view that shows a
-    /// run's money reads (sprawling-SPEC section 8-106): the
+    /// run's money reads (`crates/sprawling/Spec.lean` §8-106): the
     /// attribution's row while it holds one, the run's own records in
     /// the Ledger once the hot view evicted it, and zero for a run no
     /// priced call was attributed to. `None` when the Ledger could not

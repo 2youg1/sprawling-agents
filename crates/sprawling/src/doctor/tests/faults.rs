@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The ugly paths (sprawling-SPEC.md section 8-47): a binary that will
+//! The ugly paths (`crates/sprawling/spec/Doctor.lean` §8-47): a binary that will
 //! not start, a variable naming nothing, a half-written component, a
 //! tool that says nothing. Each one is a typed answer with its cause,
 //! never the word "absent" on its own.
@@ -173,7 +173,7 @@ fn a_program_is_looked_for_under_every_name_this_platform_gives_it() {
 /// The two recipes this city may not run say what the person does
 /// instead, and neither of them says it the same way. Asked of
 /// `Recipe::command`, which is the one place a recipe is refused for
-/// not being runnable (sprawling-SPEC.md section 8-64).
+/// not being runnable (`crates/sprawling/spec/Doctor.lean` §8-64).
 #[test]
 fn a_printed_recipe_and_a_manual_one_refuse_with_their_own_reason() {
     let printed = crate::doctor::Recipe::Print("curl -fsSL https://bun.sh/install")

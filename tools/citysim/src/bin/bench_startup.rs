@@ -142,7 +142,7 @@ first byte: `serve` spawned to the first byte of GET /, fixture cities in {}",
     println!(
         "two readings compare only when their fixture digests are equal; each serve's \
          standard error is kept beside its city, and its `opened the city in` line is the \
-         product's own split of the same opening (sprawling-SPEC.md 8-121)"
+         product's own split of the same opening (`crates/sprawling/Spec.lean` §8-121)"
     );
     println!(
         "{:<8} {:>8} {:>10} {:>10} {:>10}   {:<16}   serve log",

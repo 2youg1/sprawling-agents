@@ -127,7 +127,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 - **为什么是强类型答面而不是一团 `Payload`**：`web` 只依赖本 crate，故发帧的边界 crate 欠对方一套读帧的词汇（同 kernel 再导出的理由）。一个无类型载荷会把解析责任推给每一个视图模块，每一个都得自己猜一遍形状。
 - **`Answer::Unavailable { query }` 是一个真答案**：不求值的视图报自己的名字，而不是返回空结果——空城与未实现在界面上必须长得不一样。
 - **`CityAnswer.buildings: Vec<BuildingProgress>`**：每栋楼一行，携 `Progress` 与 `problems`。解析不出的行进 `problems` 并照显——悄悄丢掉读不懂的行，等于按一个没人选过的分母报进度。
-- **五维成本携权威总额**：`CostAnswer.total` 与 actor、segment、tool、skill 四个维度各自求和相等；`by_run` 只带活跃的跑与花得最多的前几个（sprawling-SPEC §8-90），和可以小于 `total`。界面按 `total` 算占比而不自己归一，未归因余额与列表之外的跑因此都看得见。
+- **五维成本携权威总额**：`CostAnswer.total` 与 actor、segment、tool、skill 四个维度各自求和相等；`by_run` 只带活跃的跑与花得最多的前几个（`crates/sprawling/Spec.lean` §8-90），和可以小于 `total`。界面按 `total` 算占比而不自己归一，未归因余额与列表之外的跑因此都看得见。
 - **无报价的调用单独报数**：`CostAnswer.unpriced: UnpricedCalls { calls, tokens }` 是账本上没有权威计费额的模型调用次数与它们的 token 总数（`storage::Attribution` 的 `unpriced` 原样上线）。它们不进 `total`，所以缺了这一项，一座只用订阅登录或本地模型的城跑了多少次都读作「没花钱」；界面据 `calls > 0` 说「有调用没有报价」并给出 token 数，而不是把 `$0.00` 当作量出来的数。
 
 - **採用 `broadcast` 而非每连接一个队列**：多个标签页是常态；慢客户端被拉下而不拖住写入方。**丢下的那一段不再静默**：事件流慢过城的会话收到 `ServerFrame::Lagged { from, to }`，按这个区间向账本补拉（§8-41）。三路语义不同，故这三节分开陈述：事件可补、增量与日志恒不可补、会话自己的拒绝根本不走广播。
@@ -195,5 +195,5 @@ pub enum Door { Transcribe, Enroll, Acp, Drop }
 - **文件名走查询参数，不走请求头**：请求头的值只能可靠地携带 ASCII，而人的文件名常常不是。缺 `name` 即 422。
 - **`Door::Drop` 未配对即拒**：它往城的磁盘上写字节，与另外两扇会动作的门同一个判定（8-40）。
 - **正文上限 `DROP_BYTES_MAX`（64 MiB），只加在这一条路由上**：axum 的缺省上限是 2 MiB，一张截图或一份 PDF 就会超过；更大的正文答 413。上限不放宽到其余路由，因为它们收的是一行文字或一份录音。
-- 城怎么存、存在哪里、答出哪条路径是 sprawling-SPEC 8-119 的事；这里只把名字与字节交进去，把答案或拒绝原样交回来（拒绝是 422 加 `refusal_text`）。
+- 城怎么存、存在哪里、答出哪条路径是 `crates/sprawling/Spec.lean` §8-119 的事；这里只把名字与字节交进去，把答案或拒绝原样交回来（拒绝是 422 加 `refusal_text`）。
 -/

@@ -38,7 +38,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 
 impl Views {
     /// The views of the ledger on disk, from its snapshot when one fits
-    /// and from genesis otherwise (sprawling-SPEC 8-91). A reader that
+    /// and from genesis otherwise (`crates/sprawling/Spec.lean` §8-91). A reader that
     /// serves nothing: it cuts no snapshot, so a one-shot query writes
     /// nothing to disk, and the answer is the same as if the process had
     /// been running all along.

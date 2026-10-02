@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two tiers, item by item (sprawling-SPEC.md section 8-40).
+//! The two tiers, item by item (`crates/sprawling/spec/Accounting/Worker.lean` §8-40).
 //!
 //! Data, with no branch in it: editing this table is editing what
 //! `sprawling doctor` checks and what `--install` offers. Every command
@@ -47,7 +47,7 @@ pub(crate) const SANDBOX_ENGINE: &str = "sandbox-engine";
 pub(crate) const FFMPEG: &str = "ffmpeg";
 
 /// How this build installs `item` on this platform: the table's own
-/// query, handed to the worker (sprawling-SPEC.md, `doctor_install`).
+/// query, handed to the worker (`crates/sprawling/Spec.lean`, `doctor_install`).
 ///
 /// # Errors
 /// `InvalidArgs` for a name the table does not carry - the page asked
@@ -78,7 +78,7 @@ pub(crate) fn recipe_for(item: &str) -> Result<&'static Recipe, AxError> {
 }
 
 /// The develop tier as `just prereqs` reads it, which is the whole of
-/// `prereqs.tsv` beside this file (sprawling-SPEC.md section 8-58).
+/// `prereqs.tsv` beside this file (`crates/sprawling/spec/Doctor.lean` §8-58).
 ///
 /// One line per row, in install order:
 /// `class<TAB>name<TAB>probe<TAB>windows<TAB>macos<TAB>linux<TAB>purpose`,

@@ -12,7 +12,7 @@
 /-!
 ### 8-17 accounting::playback 的时间选择、调用的耗时、运行策略与提交的证据（形状 7 投影；`diff`、`traced` 为形状 4 适配器）
 
-回看一段工作流的人还要四样东西：按 UTC 时间选一段；每次工具调用花了多久，以及这个数什么时候是量出来的；一次 run 要求了什么准入证据；一个提交改了什么、出自哪几次调用。本节定这四样在 bundle 里的形状与求法；泳道与播放怎样画是页面的事（`skills/playback/SKILL.md`）。CLI 与城工具读同一组条件（sprawling-SPEC.md §8-143）。时间条件的性质在 `crates/accounting/spec/Playback/Select.lean`。
+回看一段工作流的人还要四样东西：按 UTC 时间选一段；每次工具调用花了多久，以及这个数什么时候是量出来的；一次 run 要求了什么准入证据；一个提交改了什么、出自哪几次调用。本节定这四样在 bundle 里的形状与求法；泳道与播放怎样画是页面的事（`skills/playback/SKILL.md`）。CLI 与城工具读同一组条件（`crates/sprawling/Spec.lean` §8-143）。时间条件的性质在 `crates/accounting/spec/Playback/Select.lean`。
 
 ```rust
 // accounting::playback
@@ -109,7 +109,7 @@ pub(crate) fn trace_through(index: &LedgerIndex, ledger_dir: &Path, commit: wire
 - `playback::traced::Evidence` 在 walk 里收下每一条核对过的行（`Walked::Known`）：先折进 `trace::History`，再记下这一行是不是第一次宣告它点名的提交（`views::commits::commit_facts`）。范围内可见的 `Committed` checkpoint 是第一次宣告时，在折完这一行的那一刻问 `History::commit(oid)`：此刻的视图恰好折到这一行，`previous` 是这个 run 在它之前宣告的最近一个提交，run、`actor`、`seq` 就是这一行自己的，`parents` 由 git 按 oid 给出。答只取决于这一行与它之前的历史，以后的宣告与 cutoff 之后的行都改变不了它（`evidence_ignores_lines_after_the_cutoff`）。
 - walk 结束后，每个这样的答交给 `trace::trace_through`，经 walk 的索引读这个 run 在这一行之前的行与区间里的行，区间规则是 §8-16 那一条；读到的 seq 全都小于这一行，所以不越过 cutoff。
 - `History::absorb` 遇到视图拒绝折的第一行时停下，记住那条拒绝；之后每次 `commit` 都答它，这些提交写 `{"unread":"<错误码>"}`，导出不因此失败（§8-17）。视图折的是 walk 已核对过的同一批记录，被拒绝的行在 cutoff 以内，所以一份 bundle 里的 `unread` 只取决于 cutoff 以内的历史，复核时照样重现。
-- `whose --trace`（sprawling-SPEC.md §8-136）不变：`trace(city_root, oid)` 照旧经 `views::ask` 求这个 oid 最近一次的宣告、重建一次索引，再经 `trace_through` 按同一条区间规则读。
+- `whose --trace`（`crates/sprawling/Spec.lean` §8-136）不变：`trace(city_root, oid)` 照旧经 `views::ask` 求这个 oid 最近一次的宣告、重建一次索引，再经 `trace_through` 按同一条区间规则读。
 
 **代价。** 一份 bundle 只折一遍视图，与 walk 同一遍、同一批记录；它从不调用 `views::ask`，也不重建索引。每个范围内第一次宣告的提交另有一次视图查询（在内存里）、一次打开仓库读父提交（`storage::parents_of`），再按索引读它的 run 的行（倒着读到下界前最近的 `model_called`）与区间里的行。判同楼的别人时从区间的下界起读索引（`LedgerIndex::seqs_from`，`crates/storage/Spec.lean` §8-38），读到区间之后的第一行为止：一个提交读过的索引项是它的区间长度加一，与它之前的账本有多长无关，一次导出在这一项上的代价是各区间长度之和，不是提交数乘行数。确定性计数：`accounting::playback::tests::tracing` 在 N 与 2N 个提交的历史上各导出一次，数这次导出开始了几次视图折叠，两种规模下都是 1；再数一个提交判同楼的别人时最多读过几条索引项，两种规模下都是 6（第一个提交的区间从它的 run 的第一行起，五行，加上区间之后那一行）。两个数都只在测试里编译（`trace::counted`），理由与 D37 (c) 相同：要挡住的是按 N 增长的代价，墙钟在小夹具上看不出它。毫秒读数由同一文件的仪表 `instrument_evidence_cost` 给出（`cargo nextest run -p sprawling-accounting --release --run-ignored only -E 'test(instrument_evidence_cost)' --no-capture`）：50、100、200 个提交（1,003、2,003、4,003 行）的一次导出依次约 100–115、160–170、365–430 ms，随提交数线性增长。
 
@@ -122,7 +122,7 @@ pub(crate) fn trace_through(index: &LedgerIndex, ledger_dir: &Path, commit: wire
 
 /-! D29 playback 的时间条件比信封 `t`、逐行判断，`--day` 展开成同一个区间；调用的耗时只在 rounds 判为量出来时给出；提交的证据经 `trace` 与 `storage::hunks` 读，读不到就写明读不到
 
-(a) 时间条件读每一行信封的 `t`，与 `view --since` 与 `--until`（sprawling-SPEC.md §8-137）同一个 `UtcSpan`，不按种类去载荷里挑时间字段，也不靠 `t` 有序提前停或二分。理由：`t` 就是这一行记下的那一刻，任何种类都有；它不随 seq 单调，在第一条越过 `until` 的行处停下会漏掉回退的行。被否决的做法：只对四种记时刻的行判时间、其余行跟着它所在的回合走（同一件事两个家，且旧账本里根本分不出回合的边界）；在索引里存时间列再二分（要 `t` 有序）。
+(a) 时间条件读每一行信封的 `t`，与 `view --since` 与 `--until`（`crates/sprawling/Spec.lean` §8-137）同一个 `UtcSpan`，不按种类去载荷里挑时间字段，也不靠 `t` 有序提前停或二分。理由：`t` 就是这一行记下的那一刻，任何种类都有；它不随 seq 单调，在第一条越过 `until` 的行处停下会漏掉回退的行。被否决的做法：只对四种记时刻的行判时间、其余行跟着它所在的回合走（同一件事两个家，且旧账本里根本分不出回合的边界）；在索引里存时间列再二分（要 `t` 有序）。
 
 (b) `day` 拼成 `<day>T00:00:00Z` 交给 `parse_iso`，加一个 UTC 日的毫秒数作上界；与 `since`/`until` 同给时取交集。理由：历法与校验只有 `runtime::clock` 那一份，日期另写一个解析器就是第二份；一天在 UTC 里总是 86 400 秒（Unix 时间不计闰秒）。交集而不拒绝同给，是因为「这一天里九点以后」本来就是一个合法的问题。被否决的做法：`day` 与 `since`/`until` 互斥（把一个合法的问题拒掉）；在本模块写一个 `YYYY-MM-DD` 解析器。
 

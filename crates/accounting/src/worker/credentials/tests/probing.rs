@@ -12,7 +12,7 @@ use crate::worker::*;
 
 /// How long a probe took is a span, read off the monotonic clock: a
 /// city clock that leaps a minute at every read leaves it well under a
-/// minute (sprawling-SPEC.md 8-62, 8-129-2).
+/// minute (`crates/sprawling/Spec.lean` §8-62, §8-129-2).
 #[test]
 fn a_probe_times_itself_on_the_monotonic_clock() {
     let dir = tempfile::tempdir().unwrap();

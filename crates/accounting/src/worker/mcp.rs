@@ -14,7 +14,7 @@ use super::RunWorker;
 
 /// Every MCP server this worker has reached, kept connected between
 /// runs, so a dispatch pays for a child and a handshake only when its
-/// server was not already running (sprawling-SPEC.md 8-4).
+/// server was not already running (`crates/sprawling/Spec.lean` §8-4).
 ///
 /// Keyed by the whole declaration and the run root the child started
 /// in: a changed field is another server, and a child cannot move to
@@ -433,7 +433,7 @@ mod tests {
 
     /// Two lanes reaching two servers share one table: a handshake that
     /// has not been answered yet holds up the lanes asking for its own
-    /// server and nobody else (sprawling-SPEC.md 8-4).
+    /// server and nobody else (`crates/sprawling/Spec.lean` §8-4).
     #[test]
     #[allow(
         clippy::disallowed_methods,
@@ -513,7 +513,7 @@ mod tests {
     /// A dispatch whose server has not answered its handshake yet leaves
     /// the desk free: the command is answered on the accounting thread,
     /// and the lane that will drive the run is the one that waits for
-    /// the server (sprawling-SPEC.md 8-113).
+    /// the server (`crates/sprawling/Spec.lean` §8-113).
     #[test]
     fn a_dispatch_whose_server_still_shakes_hands_leaves_the_desk_free() {
         let dir = tempfile::tempdir().unwrap();

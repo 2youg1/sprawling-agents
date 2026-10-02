@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The verb that asks a commit which run wrote it, and with `--trace`
-//! which calls came before it (sprawling-SPEC.md 8-41, 8-136).
+//! which calls came before it (`crates/sprawling/Spec.lean` §8-167, §8-136).
 //!
 //! Its own file rather than one more arm of `data`: every verb there
 //! moves bytes or verifies a chain, while this one reads one answer out

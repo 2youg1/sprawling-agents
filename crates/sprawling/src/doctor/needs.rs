@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What one building's capability bits call for, and which of it this
-//! machine lacks (sprawling-SPEC.md section 8-48).
+//! machine lacks (`crates/sprawling/spec/Doctor.lean` §8-48).
 //!
 //! No I/O: the bits arrive read, the findings arrive examined, and what
 //! comes out is the list of things a person would otherwise learn from
@@ -19,7 +19,7 @@ use super::{Finding, Presence};
 /// The bits a building declares. One lives in `RULES.toml`, one in the
 /// building's frozen `CONFIG.toml`; they are one value here because a
 /// building is judged whole. `desktop` is not among them: everything it
-/// needs is in this binary (sprawling-SPEC.md 8-4d).
+/// needs is in this binary (`crates/sprawling/spec/Main.lean` §8-4d).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Bits {
     pub(crate) browser: bool,

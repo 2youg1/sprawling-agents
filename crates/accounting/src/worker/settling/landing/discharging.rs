@@ -49,8 +49,8 @@ impl RunWorker {
                 self.hand_down_what_is_ready(&parent, at, &owing)?;
                 // The asker is woken by the decision every signal takes,
                 // once its graph has nothing left out: each node that is
-                // still out comes back on its own (sprawling-SPEC.md
-                // 8-46-12).
+                // still out comes back on its own (`crates/sprawling/Spec.lean`
+                // §8-46-12).
                 if !self.collaborating.workshops.contains_key(&parent) {
                     self.knock(&handback, &done.addr, at.policy, owing.knock_chain())?;
                 }

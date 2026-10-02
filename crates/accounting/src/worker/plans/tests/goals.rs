@@ -71,7 +71,7 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
 /// accounting thread decides each registration at the call, so the
 /// second run to stake the same ground is refused before it spends
 /// another call, and the history holds the one registration and the
-/// clash (sprawling-SPEC.md 8-42-8).
+/// clash (`crates/sprawling/Spec.lean` §8-42-8).
 #[test]
 fn two_runs_registering_one_ground_side_by_side_leave_one_holder() {
     use kernel::Tool;

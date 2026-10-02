@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! This machine answering (sprawling-SPEC.md sections 8-40 and 8-47).
+//! This machine answering (`crates/sprawling/Spec.lean` §8-40 and §8-47).
 //!
 //! Four questions and one act live here, and nothing else does: is the
 //! program on the search path or at a place this platform installs it,
@@ -53,7 +53,7 @@ pub(crate) trait Machine: accounting::Machine + Sync {
     fn look(&self, requirement: &Requirement) -> Presence;
 
     /// Where this machine lets a core thread stand under the person's
-    /// setting (sprawling-SPEC.md 8-93).
+    /// setting (`crates/sprawling/spec/Serving/Standing.lean` §8-93).
     ///
     /// # Errors
     /// Reports a setting that does not read, and a thread that could not

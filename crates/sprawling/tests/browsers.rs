@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A run offered the browser the worker was handed
-//! (sprawling-SPEC.md section 8-45-2).
+//! (`crates/sprawling/Spec.lean` §8-45-2).
 //!
 //! The building's rules ask for a browser, and the worker was handed a
 //! source of browser tools that answers with one scripted tool. A worker

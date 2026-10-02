@@ -109,7 +109,7 @@ pub struct RunSummary {
 pub struct CityAnswer { /* …既有字段… */ pub proved: Option<Seq> }
 ```
 
-- **意思。** `Some(n)`：账本到 `n` 为止整条链已经证明完好，写者在接受命令（sprawling-SPEC 8-122 的 M3）；证明之后写下的每一行都由这个已证明的写者接在链上，所以 `n` 就是视图此刻折到的最后一条。`None`：服务中的城还在后台证明（命令此时答 `E_HISTORY_UNPROVEN`），或者证明发现链断了；视图照常答查询（S10 Q2 (a)），页面据此标明「历史还在核对」。
-- **读法。** 视图持有写者挂上的那个 `storage::ChainHalt` 的一份句柄（sprawling-SPEC 8-134）；`proved()` 为真时答视图的头。一次性查询（`views::ask`）与测试里的视图起步前已经同步证明过整条链，答它们的头。
+- **意思。** `Some(n)`：账本到 `n` 为止整条链已经证明完好，写者在接受命令（`crates/sprawling/Spec.lean` §8-122 的 M3）；证明之后写下的每一行都由这个已证明的写者接在链上，所以 `n` 就是视图此刻折到的最后一条。`None`：服务中的城还在后台证明（命令此时答 `E_HISTORY_UNPROVEN`），或者证明发现链断了；视图照常答查询（S10 Q2 (a)），页面据此标明「历史还在核对」。
+- **读法。** 视图持有写者挂上的那个 `storage::ChainHalt` 的一份句柄（`crates/sprawling/Spec.lean` §8-134）；`proved()` 为真时答视图的头。一次性查询（`views::ask`）与测试里的视图起步前已经同步证明过整条链，答它们的头。
 - 名字不变而形状变，与本批共用 `WIRE_V` 45。
 -/

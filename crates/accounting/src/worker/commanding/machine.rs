@@ -128,7 +128,7 @@ impl RunWorker {
 
 /// The package manager said it succeeded and this city still cannot
 /// find the item: the refusal that ends this install for a page walking
-/// a list of them (sprawling-SPEC.md section 8-64).
+/// a list of them (`crates/sprawling/Spec.lean` §8-64).
 fn still_absent(item: &str) -> AxError {
     AxError::failure(
         kernel::AxCode::ToolUnavailable,

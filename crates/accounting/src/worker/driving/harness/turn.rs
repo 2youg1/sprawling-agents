@@ -5,7 +5,7 @@
 
 //! One turn of a harness run over its session: the four callbacks the
 //! session asks while the harness works, what counts as a cut, and the
-//! city's words for what the harness said (sprawling-SPEC.md 8-124).
+//! city's words for what the harness said (`crates/sprawling/Spec.lean` §8-124).
 
 use std::cell::{Cell, RefCell};
 
@@ -130,7 +130,7 @@ impl<L: Ledger> Turning<'_, '_, L> {
 ///
 /// A steer is taken and not delivered: ACP gives a client nothing to
 /// send an agent in the middle of a turn, so the line says it went
-/// nowhere rather than letting it vanish (sprawling-SPEC.md 8-124).
+/// nowhere rather than letting it vanish (`crates/sprawling/Spec.lean` §8-124).
 fn cut_now(half: &HarnessHalf, context: &DriveContext, deadline: TimeMs) -> Option<Cut> {
     if context
         .clock
@@ -165,7 +165,7 @@ fn cut_now(half: &HarnessHalf, context: &DriveContext, deadline: TimeMs) -> Opti
     }
 }
 
-/// The city's answer to a permission ask (sprawling-SPEC.md 8-4e rule
+/// The city's answer to a permission ask (`crates/sprawling/Spec.lean` §8-4e rule
 /// 9): the first "allow once", else the first "reject once", else
 /// cancelled. Never "always": that would decide for later calls.
 fn permitted(ask: &PermissionAsk) -> Permit {

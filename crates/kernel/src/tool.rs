@@ -310,7 +310,7 @@ pub enum GateSubject {
 /// second adapter: citysim scripted tools.
 ///
 /// `Send`, because a bench of tools is driven on a pool thread rather
-/// than on the thread that built it (sprawling-SPEC 8-44). A tool that
+/// than on the thread that built it (`crates/sprawling/Spec.lean` §8-44). A tool that
 /// holds something a thread cannot give up has no place on a bench.
 ///
 /// `Sync`, and `invoke` takes `&self`, because the read-only calls at

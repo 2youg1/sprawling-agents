@@ -32,7 +32,7 @@ mod placing;
 /// above them saying so.
 ///
 /// **It owns every one of them, and that is what lets it leave this
-/// thread** (sprawling-SPEC.md 8-46-1). A drive that borrowed the
+/// thread** (`crates/sprawling/Spec.lean` §8-46-1). A drive that borrowed the
 /// bench, the tree or the resident's name borrowed them from locals of
 /// the call that built it, so a lane could never have been handed one.
 pub(crate) struct Driving {
@@ -46,7 +46,7 @@ pub(crate) struct Driving {
     pub bench: ToolBench,
     /// Where a steer from a resident lands while the drive is going.
     /// A handle of its own rather than a loan: the drive may leave the
-    /// thread that opened the desk (sprawling-SPEC 8-44).
+    /// thread that opened the desk (`crates/sprawling/Spec.lean` §8-44).
     pub signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
     /// The tree the run writes in: its own worktree under review, the
     /// city itself otherwise.
@@ -58,7 +58,7 @@ pub(crate) struct Driving {
     /// What every checkpoint this drive raises is signed with.
     pub of: storage::Provenance,
     /// Where a command's output is pinned before it is cut, and what
-    /// decides the cut (sprawling-SPEC 8-43).
+    /// decides the cut (`crates/sprawling/Spec.lean` §8-43).
     pub sieving: Sieving,
     /// This run's place in the backlog, when it is a run somebody handed
     /// down: the member a halt on its scope marks (`crates/runtime/Spec.lean` §8-28-2).
@@ -78,7 +78,7 @@ pub(crate) struct Driving {
 /// original in, the room the model reads the rest from, the
 /// filter table frozen with the run, and what this run already saw;
 /// and what decides a command result's clock line: the run's gate and
-/// the driver's latest reading (sprawling-SPEC 8-125).
+/// the driver's latest reading (`crates/sprawling/Spec.lean` §8-125).
 pub(crate) struct Sieving {
     /// The store the lanes share, taken for the length of one package.
     pub cas: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
@@ -214,7 +214,7 @@ impl RunWorker {
     /// Cloned rather than lent, so N drives can hold them at once and
     /// none of them holds the worker. The ledger is deliberately absent:
     /// which ledger a drive writes through is what separates the
-    /// accounting thread from a lane (sprawling-SPEC.md 8-46-1).
+    /// accounting thread from a lane (`crates/sprawling/Spec.lean` §8-46-1).
     pub(in crate::worker) fn drive_context(&self) -> lane::DriveContext {
         lane::DriveContext {
             watching: self

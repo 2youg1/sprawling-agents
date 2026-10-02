@@ -58,7 +58,7 @@ impl<'de> Deserialize<'de> for GitOid { /* 同上，20 个字节 */ }
 
 - **一条规则，两种摘要。** 两种摘要的 serde 问同一个问题 `is_human_readable()`，写与读各经一个私有函数（`write_digest`、`read_digest`），两个类型只交出各自的字节与拼写。账本行、线上帧、`serde_json::Value` 都是人读的格式，拼写照旧是小写十六进制，读回只收 `decode_hex_fixed` 认的那一种拼写；视图与 Standing 的快照经 postcard 编码，是二进制格式，写 N 个字节、读回 N 个字节，不分配字符串、不解十六进制。`RunId` 早已这样做（`kernel::event::identity` 的 `read_run_id`：uuid 在二进制格式里写 16 个字节）。
 - **什么不变。** 账本的规范字节（`canonical_line`）、线上的拼写、`golden-p0`／`golden-s1`、wire 的两份 golden 都不变：它们全经 `serde_json` 写。变的只有快照格式；快照格式由 `VIEWS_FOLD_RULES` 与 `STANDING_FOLD_RULES` 的夹具摘要钉住（`crates/accounting/Spec.lean` §8-24），所以旧快照按「版本不符」从创世折一次，没有第二种读法。
-- **为什么。** 40 万行夹具城开城时视图快照解码约 135 ms，其中约 105 ms 是提交折叠里 64,000 个 oid 的十六进制：每个 oid 在 `commits`、`commit_seqs`、`last_commit` 里各解一次（sprawling-SPEC.md 8-144）。改后的读数在 sprawling-SPEC.md 8-154。
+- **为什么。** 40 万行夹具城开城时视图快照解码约 135 ms，其中约 105 ms 是提交折叠里 64,000 个 oid 的十六进制：每个 oid 在 `commits`、`commit_seqs`、`last_commit` 里各解一次（`crates/sprawling/Spec.lean` §8-144）。改后的读数在 `crates/sprawling/Spec.lean` §8-154。
 - **被否：快照里每个摘要字段各标一个 `#[serde(with = …)]`。** 摘要散在视图的十几个字段与 wire 的类型里（例如 `wire::CommitAt`），逐个标注就是同一条规则的十几份拼写；漏标一处既不报错，也看不出慢，只是悄悄留着十六进制。serde 的 `is_human_readable` 正是为这种区分设的。**被否：给快照另起一个 `GitOidBytes` 新类型。** 视图里存的 `GitOid` 也是线上答复里的那个值，换类型就要在折叠与作答之间来回转换。
 -/
 

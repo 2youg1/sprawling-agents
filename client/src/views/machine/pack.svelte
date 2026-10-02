@@ -5,7 +5,7 @@
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
   // The Rust tools pack: every cargo subcommand this repository calls,
-  // drawn as one row with one install control (sprawling-SPEC §8-58).
+  // drawn as one row with one install control (`crates/sprawling/Spec.lean` §8-58).
   //
   // Each member is still its own item on the wire - detected, judged and
   // installed on its own - so the one press hands the page's install walk

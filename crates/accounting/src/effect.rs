@@ -311,7 +311,7 @@ fn released(
 /// The `roadmap_released` line that hands a claimed node back, saying
 /// why in `note`, or `None` for an effect that is not a claim. The one
 /// shape both a stale landing and a run that came home without landing
-/// close a claim with (sprawling-SPEC.md 8-42-8).
+/// close a claim with (`crates/sprawling/Spec.lean` §8-42-8).
 ///
 /// # Errors
 /// Propagates a payload that will not build.

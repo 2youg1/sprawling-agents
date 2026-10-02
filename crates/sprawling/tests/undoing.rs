@@ -15,7 +15,7 @@
 //! What this holds is the property that makes such a reversal safe:
 //! sending a setting twice leaves the city where sending it once did,
 //! so a reversal that crossed a reconnection and arrived twice is still
-//! one reversal (sprawling-SPEC.md 8-46-8).
+//! one reversal (`crates/sprawling/Spec.lean` §8-46-8).
 
 #![allow(
     clippy::unwrap_used,

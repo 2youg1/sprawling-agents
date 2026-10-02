@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Putting one recycle-bin row back by the way back it carries
-//! (sprawling-SPEC §8-107).
+//! (`crates/sprawling/Spec.lean` §8-107).
 
 use crate::worker::RunWorker;
 use kernel::{AxCode, AxError, EventKind, Locator, Payload, Restoration};

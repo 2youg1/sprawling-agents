@@ -11,7 +11,7 @@
 //! carried here on the accounting thread's one queue instead: the thread
 //! arbitrates it against the city's register, writes `goal_registered` or
 //! `goal_conflict`, and only then answers, so every later registration
-//! reads a register that already holds it (sprawling-SPEC.md 8-42-8).
+//! reads a register that already holds it (`crates/sprawling/Spec.lean` §8-42-8).
 
 use std::sync::mpsc;
 

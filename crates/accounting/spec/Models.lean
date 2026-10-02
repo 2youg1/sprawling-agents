@@ -36,7 +36,7 @@ impl RunWorker {
 
 - **失败**：原样传 `gateway::adapter_for` 的 `AxError`（它自带 action、subject、code 与 recovery）；端口不另造错误码。
 - **机密不归端口**：端口被问到之前，worker 已经在楼的 policy 下调过 `EndpointBook::select`；机密楼配上不是 loopback 地址的端点，在那里就以 `GateDenied` 被拒，端口根本不会被调用。所以任何一个实现——生产的也好，脚本的也好——都放不宽这条规则。`gateway` 的 `Endpoint` 在调用时按请求的 policy 再拒一次，那是适配器自己的防线，不是这条规则的权威。
-- **一个调用点**：dispatch 的同意阶段（`agreeing`）经 `RunWorker.models` 造适配器，再套上 keep-warm 门（sprawling-SPEC.md §8-112）。房间名按规则取，不调模型，所以没有第二个调用点。dialect 头只在生产适配器里算一次。
+- **一个调用点**：dispatch 的同意阶段（`agreeing`）经 `RunWorker.models` 造适配器，再套上 keep-warm 门（`crates/sprawling/Spec.lean` §8-112）。房间名按规则取，不调模型，所以没有第二个调用点。dialect 头只在生产适配器里算一次。
 - **固定值**：`RunWorker::new` 与 `over` 装上 `GatewayModels`；`with_models` 是唯一换掉它的门。
 - **一致性套件**：端口的断言就是 §2 那条测试——拿到的适配器必须就是被调用的那一个。
 -/

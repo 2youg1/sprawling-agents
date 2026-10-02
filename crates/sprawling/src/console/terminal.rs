@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The console itself: the listener's own facts, and the loop that
-//! carries judged lines into the city (sprawling-SPEC.md section 8-11).
+//! carries judged lines into the city (`crates/sprawling/spec/Console.lean` §8-11).
 //!
 //! [`Terminal`] is the one home of what the startup banner printed —
 //! URL, bound address, city directory, client source, pairing token.

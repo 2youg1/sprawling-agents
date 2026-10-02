@@ -14,7 +14,7 @@
 /-!
 ### 8-6 负载场景骨架与读数行（bench）
 
-五个负载场景都由 `just bench` 一键复测。其中四个是本 crate bench Main 的场景：大账本 fold（`large_ledger_fold`）、大 worktree 放置（`large_worktree_placement`）、再领一棵留着的 worktree（`kept_worktree_reclaim`）、长会话流式转发（`long_session_forwarding`）。第五个，多 run 并行，由 `sprawling` 的 `instrument_relay_round_trip` 量（sprawling-SPEC 8-84，D18）：它驱动城里在跑的那个记账循环 `attend`，`just bench` 在本 crate 那一行之后跑它。bench Main 产读数，`tools/xtask/budgets.toml` 记基线行，不另造仪表。剧本执行器继续用计数时钟；本 crate 内凡计时都住在 bench Main 的模块树里，采样点仍是 `bench::stamp()` 那一个。
+五个负载场景都由 `just bench` 一键复测。其中四个是本 crate bench Main 的场景：大账本 fold（`large_ledger_fold`）、大 worktree 放置（`large_worktree_placement`）、再领一棵留着的 worktree（`kept_worktree_reclaim`）、长会话流式转发（`long_session_forwarding`）。第五个，多 run 并行，由 `sprawling` 的 `instrument_relay_round_trip` 量（`crates/sprawling/Spec.lean` §8-84，D18）：它驱动城里在跑的那个记账循环 `attend`，`just bench` 在本 crate 那一行之后跑它。bench Main 产读数，`tools/xtask/budgets.toml` 记基线行，不另造仪表。剧本执行器继续用计数时钟；本 crate 内凡计时都住在 bench Main 的模块树里，采样点仍是 `bench::stamp()` 那一个。
 
 读数形（`bench::reading`，shape 2 value，一次构造点）：
 
@@ -32,7 +32,7 @@ impl Reading {
 }
 ```
 
-`Reading::of` 不自己算分位：样本交给 `sprawling::monitor::spread::Spread`（sprawling-SPEC 8-129-2），p50/p95/p99 取最近秩，即第 ⌈n·p/100⌉ 个（一起），与 `bench_startup` 的 `Samples::of`（§8-5，也经 `Spread`）和 `sprawling gauge` 的 spread 行是同一个数。登记在 `budgets.toml` 里、由旧的下标 ⌊n·p/100⌋ 量出的各行，要在最近秩下重取；同一组样本，旧读法在 n·p/100 为整数时比最近秩高一个秩。零个样本的读数被拒，而不是印成 0（`a_reading_with_no_samples_is_refused_rather_than_printed_as_zero`）。
+`Reading::of` 不自己算分位：样本交给 `sprawling::monitor::spread::Spread`（`crates/sprawling/Spec.lean` §8-129-2），p50/p95/p99 取最近秩，即第 ⌈n·p/100⌉ 个（一起），与 `bench_startup` 的 `Samples::of`（§8-5，也经 `Spread`）和 `sprawling gauge` 的 spread 行是同一个数。登记在 `budgets.toml` 里、由旧的下标 ⌊n·p/100⌋ 量出的各行，要在最近秩下重取；同一组样本，旧读法在 n·p/100 为整数时比最近秩高一个秩。零个样本的读数被拒，而不是印成 0（`a_reading_with_no_samples_is_refused_rather_than_printed_as_zero`）。
 
 一行读数的文法（`Reading::line` 是唯一权威，测试按字节对拍）：
 
@@ -83,7 +83,7 @@ bench Main 在第一项读数之前算 `REGISTERED.digest`：与 `pinned` 不等
 
 D17 **读数行一个文法、机器类属进字段，基线读数（含机器类属）记在 `tools/xtask/budgets.toml` 各场景的行里，棘轮纪律挂 `[local_latency]` 行——只降不升、放宽需单独提交。** 理由：register 的既有定规是「只有机器能两次同样测量的量才设门」（budgets.toml 头注），wall-clock 记录不设门；机器类属字段使异类机器的读数天然不进同一张表。被否：像体积那样把延迟读数设门（超标即 CI 红）——同一处定规写着「gating them would make a busy runner look like a defect」（budgets.toml 头注与 ARCHITECTURE §11 同句）；读数回归由棘轮纪律与单独提交的放宽手续治理，不由 CI 红绿治理。
 
-D18 **多 run 并行不在本 crate 里量。** relay、`serve_flight` 与 desk 都是 `sprawling` 的 `pub(crate)`，本 crate 够不到，这里的场景只能抄一份 relay 的形状：数条 lane 经 mpsc 汇到一条线程，计时只包住那条线程上的一次 `append`。抄件量的是抄件：它的 `harness` 是 MemLedger 一次追加（5 µs 量级），而一次往返的代价取决于生产循环怎么等，抄件没有那份等法，也就量不到它；它的 `persist` 每条一道屏障，生产的 `append_all` 一批一道；盘的份额由那件仪表 `store=disk` 与 `store=memory` 两行之差读出，所以 `SubMetric` 没有 `persist`。被否：给 `sprawling` 开一扇公共门让本 crate 驱动 `serve_flight`。那扇门没有生产调用者，而仪表放在 crate 内已经能驱动生产循环本身（sprawling-SPEC 8-84 的决定）。
+D18 **多 run 并行不在本 crate 里量。** relay、`serve_flight` 与 desk 都是 `sprawling` 的 `pub(crate)`，本 crate 够不到，这里的场景只能抄一份 relay 的形状：数条 lane 经 mpsc 汇到一条线程，计时只包住那条线程上的一次 `append`。抄件量的是抄件：它的 `harness` 是 MemLedger 一次追加（5 µs 量级），而一次往返的代价取决于生产循环怎么等，抄件没有那份等法，也就量不到它；它的 `persist` 每条一道屏障，生产的 `append_all` 一批一道；盘的份额由那件仪表 `store=disk` 与 `store=memory` 两行之差读出，所以 `SubMetric` 没有 `persist`。被否：给 `sprawling` 开一扇公共门让本 crate 驱动 `serve_flight`。那扇门没有生产调用者，而仪表放在 crate 内已经能驱动生产循环本身（`crates/sprawling/Spec.lean` §8-84 的决定）。
 
 D9 **被量的产品 feature 集就是 `sprawling` 包的默认 feature，只写在 `crates/sprawling/Cargo.toml` 的 `[features] default` 一处。** 人下载的二进制带执行引擎（`sandbox` feature），而 `sandbox` 是默认 feature，所以 `dist`、`bench`、`bench-startup`、`mem` 四个 recipe 不写 `--features` 就构建出人下载的那个二进制；citysim 经工作区依赖带着 `sprawling` 的默认 feature，`bench` 里的场景与仪表也在同一套 feature 下编译。于是 install 解包的、startup 拉起的、首字节服务的、内存读数量到的，与人下载的是同一个二进制。被否：①justfile 再留一个变量写 `sprawling/sandbox`——它重述清单的默认 feature，两处可以只改一处，而读数看不出它们已经分开；②每个 recipe 自己写 `--features`——漏写的那个 recipe 量的是一个没人下载的二进制。**重开参数**：人下载的二进制要带一个不是默认的 feature，那时这套 feature 回到 justfile 的一个变量里，由每个构建与测量的 recipe 读。
 
@@ -97,7 +97,7 @@ D9 **被量的产品 feature 集就是 `sprawling` 包的默认 feature，只写
 
 前后的读数（同一台机器、debug 构建、同一夹具的放置一段，四轮）：改动之前 `claim` 一次 1.18–1.30 s；改动之后 `claim` 接管备树一次 30–37 ms，`stock` 一次 1.19–1.35 s（那次全量检出，不计时）。`budgets.toml` 的 `[large_worktree_placement]` 行由 `just bench` 的发行构建读数登记。
 
-D13 **`large_worktree_placement` 量的是领树，备树在计时之外。** 放置分成两段（`crates/storage/Spec.lean` §8-35）：`Worktrees::stock` 在没人等的时候检出一棵备树，`claim` 在 run 等着的时候接管它。场景在每次计时的 `claim` 之前调一次 `stock`，计时只包住 `claim`，因为人等的是这一段；`stock` 的代价就是改动之前的那个读数（一次全量检出），它不随这次改动变，由 storage 的计数断言守着它新建多少文件，而不是由墙钟。被否：①把 `stock` 也算进同一个样本——读数就成了两段之和，看不出领树这一段降没降；②给备树另开一行读数——要在 `bench::reading` 加一个 `Load`，那一份是读数文法的唯一权威，本决定不为一行读数改它；需要那一行时在那里加。**重开参数**：产品里有了 `stock` 的调用者之后（sprawling-SPEC 8-145），如果它的位置仍让某个人等它，把它的读数加进来。
+D13 **`large_worktree_placement` 量的是领树，备树在计时之外。** 放置分成两段（`crates/storage/Spec.lean` §8-35）：`Worktrees::stock` 在没人等的时候检出一棵备树，`claim` 在 run 等着的时候接管它。场景在每次计时的 `claim` 之前调一次 `stock`，计时只包住 `claim`，因为人等的是这一段；`stock` 的代价就是改动之前的那个读数（一次全量检出），它不随这次改动变，由 storage 的计数断言守着它新建多少文件，而不是由墙钟。被否：①把 `stock` 也算进同一个样本——读数就成了两段之和，看不出领树这一段降没降；②给备树另开一行读数——要在 `bench::reading` 加一个 `Load`，那一份是读数文法的唯一权威，本决定不为一行读数改它；需要那一行时在那里加。**重开参数**：产品里有了 `stock` 的调用者之后（`crates/sprawling/Spec.lean` §8-145），如果它的位置仍让某个人等它，把它的读数加进来。
 -/
 
 namespace Citysim.Bench

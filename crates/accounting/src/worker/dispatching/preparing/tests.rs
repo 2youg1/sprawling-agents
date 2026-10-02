@@ -19,7 +19,7 @@ use super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// sprawling-SPEC.md 8-145, 8-161: the lane that drove a run in a room
+/// `crates/sprawling/Spec.lean` §8-145, §8-161: the lane that drove a run in a room
 /// under review hands the run home first and puts the stock back after.
 /// `fly` is the whole of what a lane runs and `land` is what the
 /// accounting thread runs once the run is home, so a stock that is
@@ -49,7 +49,7 @@ fn a_lane_puts_the_stock_back_after_its_run_comes_home() {
     );
 }
 
-/// sprawling-SPEC.md 8-145: the stock a lane put back is what the next
+/// `crates/sprawling/Spec.lean` §8-145: the stock a lane put back is what the next
 /// room's first placement takes over, so that placement creates,
 /// rewrites and removes no file; and the lane that drove the next room
 /// puts a new stock back in its place. The first room is dispatched the
@@ -96,7 +96,7 @@ fn the_next_room_takes_the_stock_and_creates_no_file() {
     );
 }
 
-/// sprawling-SPEC.md 8-161: a run lands while its lane is still putting
+/// `crates/sprawling/Spec.lean` §8-161: a run lands while its lane is still putting
 /// the stock back. The test holds the table of cities being stocked, so
 /// the lane's restock waits on it; the run still comes home through a
 /// real lane and lands, with no stock in the city yet. Once the table is
@@ -134,7 +134,7 @@ fn a_run_lands_while_its_lane_still_puts_the_stock_back() {
     );
 }
 
-/// sprawling-SPEC.md 8-155: a lane that finds the city's turn taken
+/// `crates/sprawling/Spec.lean` §8-155: a lane that finds the city's turn taken
 /// skips, and the turn it found stays with the lane that holds it; once
 /// that lane gives it back, the city's turn can be taken again. Two
 /// lanes of one city stocking at once is what the acceptance catalogue's
@@ -174,12 +174,12 @@ fn a_lane_that_finds_the_turn_taken_skips_and_leaves_it_standing() {
 
 /// Reads production placement and the stock put back after it, in
 /// milliseconds, over a building whose trunk carries 512 files of 16 KB
-/// (sprawling-SPEC.md 8-155). The first room's placement makes the
+/// (`crates/sprawling/Spec.lean` §8-155). The first room's placement makes the
 /// city's first commit and checks the trunk out whole; the second room's
 /// takes the stock over. Each lane then hands its run home, which is
 /// all the landing waits for after the run's last line, and puts a stock
 /// back, which lies between that hand-over and `fly` returning
-/// (sprawling-SPEC.md 8-161).
+/// (`crates/sprawling/Spec.lean` §8-161).
 #[test]
 #[ignore = "a wall-clock instrument; prints one reading line per room"]
 #[allow(

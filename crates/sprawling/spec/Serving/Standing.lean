@@ -6,13 +6,13 @@
 /-!
 # 核心线程站在正常档之上，空转就降回
 
-规定 `crates/sprawling/src/serving/standing.rs`（`bin::serving::standing`，形状：状态机）的安全阀 `Valve` 与一条核心线程 `CoreThread` 的档位（sprawling-SPEC.md 8-93）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `crates/sprawling/src/serving/standing.rs`（`bin::serving::standing`，形状：状态机）的安全阀 `Valve` 与一条核心线程 `CoreThread` 的档位（§8-93）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 时刻是自然数：Rust 的 `saturating_duration_since` 在模型里就是自然数的截断减法。`Valve` 自己不读钟，时刻作参数传进来，所以它的判定在模型里与在 `serving::standing::tests` 里一样逐点可验。平台调用（升档、降档）的结果是参数。
 
 四组性质：
 
-* **降回是吸收态**——`verdict` 一旦是 `lower`，此后每一轮都还是 `lower`（D3：降回之后不再升）；
+* **降回是吸收态**——`verdict` 一旦是 `lower`，此后每一轮都还是 `lower`（§8-93 决定 3：降回之后不再升）；
 * **窗口没关上不判**——一轮结束时离窗口开出不足 `limit`，判定不变；
 * **忙满一个窗口就判降回**，忙的时间不到窗口的 15/16 就不判；
 * **线程只降一次、拒绝之后不再试**——设置为 `normal` 时从不升档；平台拒绝降档之后，此后的轮不再调用降档。
@@ -151,3 +151,54 @@ theorem record_never_raises (t : CoreThread) (woke slept : Nat) (accepted : Bool
   · simpa using h
 
 end Sprawling.Serving.Standing
+
+/-!
+## 8-93 核心线程站在正常档之上，空转就降回（`bin::serving::standing`，形状：状态机）
+
+阀与降档必须守住的性质的权威是本文件上面的模型：降回是吸收态、窗口没关上不判、忙满一个窗口即判降回、设置为 `normal` 从不升档、平台拒绝之后不再试；本节是接口、平台的做法与理由。
+
+agent 派出的命令从低于正常的档位起动（`crates/runtime/Spec.lean` §8-13-3）；本节补上另一半：核心自己的线程起动时把自己升到正常档之上一级，于是一台被构建占满的机器上，视图的折叠与广播仍排在派出的命令前面。升在线程一级而不是进程一级：进程档位在 Windows 上要对自身句柄调 `SetPriorityClass`，没有安全接口；线程档位有。
+
+```rust
+// bin::serving::standing —— shape: state machine
+pub(crate) enum Standing { Raised, Normal(Held) } // 这条线程实际站在哪一档
+pub(crate) enum Held { ByTheSetting, Refused(String), ByTheValve }
+pub(crate) enum Verdict { Keep, Lower }
+pub(crate) const BUSY_LIMIT: Duration;            // 10 s
+pub(crate) fn raise_this_thread(setting: CorePriority) -> Standing;
+pub(crate) fn lower_this_thread() -> Result<Standing, thread_priority::Error>;
+pub(crate) struct Valve;                           // 忙了多久，是否该降回
+impl Valve {
+    pub(crate) fn new(limit: Duration, now: Instant) -> Self;
+    pub(crate) fn record(&mut self, woke: Instant, slept: Instant); // 一次醒来到下一次阻塞
+    pub(crate) fn verdict(&self) -> Verdict;
+}
+pub(crate) struct CoreThread;                      // 一条核心线程的档位与它的阀
+impl CoreThread {
+    pub(crate) fn raise(name: &'static str, setting: CorePriority, now: Instant) -> Self;
+    pub(crate) fn record_turn_lowering_when_busy(&mut self, woke: Instant, slept: Instant);
+}
+pub(crate) fn setting_telling_a_refusal() -> CorePriority; // 读不了就 Normal，并向标准错误说出拒绝
+pub(crate) fn serving_runtime(setting: CorePriority) -> std::io::Result<tokio::runtime::Runtime>;
+// bin::assembly
+pub(crate) fn monotonic_now() -> Instant; // 单调钟的唯一取样点，与墙钟的 `assembly::SystemClock` 并列；阀量的是时长，墙钟会跳
+// accounting::person（`crates/accounting/Spec.lean` §8-8）
+pub enum CorePriority { Raised, Normal }                 // 人的设置；Normal 即「关掉高优先级」
+pub fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
+```
+
+- **升到哪一档**：`thread-priority` 的跨平台值 70，在 Windows 上是 `THREAD_PRIORITY_ABOVE_NORMAL`（正常档进程里基准优先级 9，派出的 `BELOW_NORMAL_PRIORITY_CLASS` 子进程是 6）；降回用 50，即正常档。读回档位的测试（`serving::standing::tests` 里的 `a_raised_core_thread_stands_above_normal` 等）只在 Windows 上编译，Unix 上 70 与 50 各落到哪个 nice 值没有测试读回，要查它得加一条 `cfg(unix)` 的读回测试，并让它在没有 `CAP_SYS_NICE` 的 CI 主机上只断言被拒的那一支。Unix 上升档要 `CAP_SYS_NICE`；没有时操作系统拒绝，线程留在正常档，`Standing::Normal(Held::Refused(原因))` 把原因带回来，`CoreThread::raise` 向标准错误说一次——相对效果由子进程的 `nice` 给出，不靠这一步。
+- **设置**：人的配置文件（`Home::person_config`，即 `config.toml`）里 `[core]` 一节的 `priority`，`"raised"` 或 `"normal"`，缺省为 `"raised"`。`"normal"` 让 `raise_this_thread` 不调任何平台接口，返回 `Standing::Normal(Held::ByTheSetting)`。文件读不了、解析不了或值拼错时，服务照常起动，核心留在正常档，并向标准错误说出拒绝与恢复办法：升档是有全机代价的一方，要有一个说「可以」的读数才做。设置在服务起动时读一次，改了要重启服务。
+- **安全阀**：升了档的线程若空转，会拖住整台机器。每条升档线程带一个 `Valve`，每处理完一件事记一次「醒来—再次阻塞」；窗口从上一个窗口关上时开始，第一件结束在窗口开出 `BUSY_LIMIT` 之后的事关上它；关上时忙的时间占到窗口的 15/16 以上，`verdict` 变成 `Lower`，此后一直是 `Lower`。`record_turn_lowering_when_busy` 见到站在升档上的线程得了 `Lower`，就调 `lower_this_thread` 回到正常档，并向标准错误写一行说给人：哪条线程、忙满了多少秒、已降回正常档。平台拒绝降档时同样写一行，说出平台的原因，此后这条线程不再试：两个平台都不拒绝线程给自己降档，所以拒绝是一次缺陷报告，每一轮都重试只会让标准错误每轮多一行，而不会让它降下来。时间作参数传入，`Valve` 本身不读钟，所以它的判定可以用编造的时刻逐点验证。
+- **量的是墙钟，不是 CPU 时间**：线程在两次阻塞之间走过的墙钟时间是它占着核的时间的上界；升了档的线程很少被抢占，二者接近。
+- **哪些线程**：视图线程 `sprawling-views`（`bin::serving::folding`）起动时升档，每折完、广播完一件记一次。socket 服务所在的 tokio 多线程运行时由 `serving_runtime` 建（`bin::main::city` 用它代替 `Runtime::new`）：每条 worker 第一次被唤醒（`on_thread_unpark`）时升档，此后每次唤醒到下一次停放（`on_thread_park`）记一次，档位与阀放在线程本地。只在唤醒时升，因为只有 worker 会停放与唤醒：阻塞池的线程（`spawn_blocking`）从不唤醒，所以永远不会成为没有阀的升档线程；代价是一条起动后从未停放过的 worker 留在正常档，而这正是安全的一侧。
+- 证据：`crates/sprawling/src/serving/standing/tests.rs` 的 `a_raised_core_thread_stands_above_normal`（Windows 臂：升档后读回 `AboveNormal`）与 `a_thread_busy_through_the_window_is_lowered`（忙满一个窗口的线程判降回，忙一半的不判）；`a_socket_worker_stands_above_normal_once_it_has_woken`（Windows 臂：`serving_runtime` 的 worker 睡过一次之后读回 `AboveNormal`）；`crates/accounting/src/person.rs` 的 `a_person_who_turns_the_raise_off_gets_normal_priority`。
+
+**决定**
+
+1. 线程档位取第一档「安全 Rust」：`thread-priority`（MIT）对外只给安全接口，内部的 `SetThreadPriority`／`GetThreadPriority` 由它负责，本仓不写 `unsafe`。不取 Zig 叶子：一次只传句柄与常量的调用没有 `(ptr, len)` 边界可以放在 Zig 后面，Rust 侧调用 `extern` 的那一处 `unsafe` 也省不掉。被否：本仓自己写 `unsafe` 调 `SetPriorityClass`，把整个进程升到 `HIGH_PRIORITY_CLASS`——没有测量表明它全局最佳，而且会把 tokio 的每条线程连同它们的空转风险一起升上去。重开参数：线程档升满之后，后台负载占满所有核时 relay 往返 p50 与空闲之比仍大于 1.2。
+2. 安全阀量墙钟而不量 CPU 时间：读线程自己的 CPU 时间在 Windows 上是 `GetThreadTimes`，没有第一档的路；在一轮之内，墙钟只会高估忙的程度，所以对已经结束的轮，阀只会判得早，不会判得晚。阀只在一轮结束时判：一条从不停放的 tokio worker（持续有任务时，tokio 的维护性 `park_timeout(0)` 不调停放与唤醒回调）和一次不返回的折叠都没有「轮结束」，所以它们一直留在升档上，阀对它们不起作用。重开参数：出现对外只给安全接口、读线程 CPU 时间的 crate。
+3. 降回之后不再升：一条线程忙满过一个窗口，就说明它的工作量不该排在派出的命令前面；反复升降只会让人看到忽快忽慢。
+
+**尚未做到的（本节接口的当前状态）**：阀只在一轮结束时判定（决定 2），所以一条持续有任务、从不停放的 worker 和一次不返回的折叠永远不会被降回，而这正是阀要防的情形；在忙的期间也作判定——tokio worker 按每次任务轮询记（`tokio_unstable` 下的 `on_before_task_poll`／`on_after_task_poll`），或在每次唤醒与任务边界处拿正在进行的一轮已走过的时间比窗口——是这一接口余下的一步。写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。Unix 上没有 `CAP_SYS_NICE` 时，每条 worker 各说一次它留在正常档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（`crates/kernel/spec/Event/Kind.lean` 的事件种类表加一行）。doctor 还不报告每个平台实际站在哪一档。
+-/

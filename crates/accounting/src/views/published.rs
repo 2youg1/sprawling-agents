@@ -14,7 +14,7 @@ use kernel::AxError;
 use super::holding::Views;
 
 /// The views the fold last finished, handed to every reader
-/// (sprawling-SPEC.md 8-99).
+/// (`crates/sprawling/Spec.lean` §8-99).
 ///
 /// The lock covers one `Arc` copy or swap and nothing that can panic,
 /// so even a poisoned lock holds a whole `Arc`, and it is read as one.

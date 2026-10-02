@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which class of verb a frame from a remote device carries
-//! (sprawling-SPEC.md 8-139; `crates/wire/Spec.lean` §19-2).
+//! (`crates/sprawling/spec/Outside/Conduit.lean` §8-139; `crates/wire/Spec.lean` §19-2).
 //!
 //! The table in `crates/wire/Spec.lean` §19-2 states each Command's class,
 //! and `xtask wiring` reads the arms of [`command_class`] against it, so

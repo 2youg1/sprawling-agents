@@ -262,7 +262,7 @@ fn opening_reads(segments: usize) -> (Reads, Reads) {
 /// segment (the version probe), the last line of the segment before the
 /// last (one window from its end), and the last segment; the segments
 /// between are not read at all, so what an opening reads does not grow
-/// with the history (sprawling-SPEC.md 8-122).
+/// with the history (`crates/sprawling/Spec.lean` §8-122).
 #[test]
 fn an_opening_reads_one_line_of_the_segment_before_the_last_and_nothing_further_back() {
     let (short, long) = (opening_reads(4), opening_reads(8));

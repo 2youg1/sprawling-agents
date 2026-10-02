@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 /// [`crate::real_fs::RealFs`] (std) and `FaultFs` (fault injection).
 /// Never public: the seam stays inner. `Send`, because a store
 /// built on it is handed to the thread that drives a run
-/// (sprawling-SPEC 8-44).
+/// (`crates/sprawling/Spec.lean` §8-44).
 pub(crate) trait Vfs: Send {
     fn create_dir_all(&mut self, dir: &Path) -> io::Result<()>;
     /// Files only, sorted by path: deterministic traversal.

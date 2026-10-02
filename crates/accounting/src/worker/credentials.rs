@@ -124,7 +124,7 @@ pub(super) fn tuning_of(wire: wire::EndpointTuning) -> Result<gateway::EndpointT
 pub(super) enum Credential {
     /// No key was entered this time, which is not the same as no key:
     /// the city keeps what it has for this endpoint, and an empty box
-    /// never removes one (sprawling-SPEC.md 8-81). The
+    /// never removes one (`crates/sprawling/Spec.lean` §8-81). The
     /// header is the one the person named for a key, which still
     /// decides how an archived reference travels.
     Absent { header: Option<String> },
@@ -217,7 +217,7 @@ pub(super) const ANTHROPIC_VERSION: &str = "2023-06-01";
 /// earlier figure is read back out of it rather than held beside it.
 /// Read by endpoint and model id rather than by tag alone: pointing a
 /// tag at another model must not carry the old model's ceiling onto the
-/// new one (sprawling-SPEC.md 8-71).
+/// new one (`crates/sprawling/Spec.lean` §8-71).
 pub(super) fn registered_as(
     book: &gateway::EndpointBook,
     tag: kernel::ModelTag,

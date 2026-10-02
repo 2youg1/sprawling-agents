@@ -11,7 +11,7 @@
 //! here, so a city has one answer to "how many runs am I driving" and
 //! one crossing to serve. Two tables would be two ceilings and two
 //! crossings: a lane's append would wait on whichever thread happened
-//! to be serving the other one (sprawling-SPEC.md 8-46-2).
+//! to be serving the other one (`crates/sprawling/Spec.lean` §8-46-2).
 //!
 //! Nothing here decides anything. Which runs to start is the caller's,
 //! and what a landed run means is `Owed`'s — this module only keeps the
@@ -74,7 +74,7 @@ pub(in crate::worker) struct Flight {
 
 impl Flight {
     /// `read_memory` is where the pool reads how much memory is free
-    /// before it starts a run (sprawling-SPEC.md 8-46-3).
+    /// before it starts a run (`crates/sprawling/Spec.lean` §8-46-3).
     pub(in crate::worker) fn open(read_memory: fn() -> crate::worker::pool::Memory) -> Flight {
         let gate = RelayGate::open();
         Flight {
@@ -191,7 +191,7 @@ impl RunWorker {
     ///
     /// **The crossing is served first**, because a run that has already
     /// been paid for must not queue behind one that has not started
-    /// (sprawling-SPEC.md 8-42-2). Landing happens in arrival order, on
+    /// (`crates/sprawling/Spec.lean` §8-42-2). Landing happens in arrival order, on
     /// this thread, which is what makes "execute in parallel, account in
     /// series" a fact about the code.
     ///
@@ -221,7 +221,7 @@ impl RunWorker {
             return Ok(Landed::Nothing);
         };
         // A lane has just come home, so the work waiting for one starts
-        // before this run is landed (sprawling-SPEC.md 8-46-2).
+        // before this run is landed (`crates/sprawling/Spec.lean` §8-46-2).
         for (run, err) in self.flight.pool.start_waiting() {
             self.note(
                 runtime::diagnostics::Level::Refuse,
@@ -270,7 +270,7 @@ impl RunWorker {
     /// Writes the lines that give back every node a run still had booked
     /// when its landing ended without settling its plan: the claim went
     /// on the history at call time, so only this closes it
-    /// (sprawling-SPEC.md 8-42-8).
+    /// (`crates/sprawling/Spec.lean` §8-42-8).
     ///
     /// # Errors
     /// Propagates the first line the ledger refuses.
@@ -283,7 +283,7 @@ impl RunWorker {
 
     /// A write face issued by the same gate the lanes write through, for
     /// an instrument that times the crossing from outside a lane
-    /// (sprawling-SPEC.md 8-84).
+    /// (`crates/sprawling/Spec.lean` §8-84).
     #[cfg(test)]
     pub(in crate::worker) fn measuring_relay(&self) -> Relay {
         self.flight.issue()

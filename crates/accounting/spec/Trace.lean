@@ -12,7 +12,7 @@
 /-!
 ### 8-16 accounting::trace：一个提交倒推到它之前的那些调用（形状 7 投影）
 
-`trace` 回答拿着一个提交 oid 的人在 `whose` 之后问的下一句：这个提交是哪几次调用的结果。CLI（`sprawling whose --trace`，sprawling-SPEC.md §8-136）是它的薄适配器；下一轮 playback 的调用归属与验收工具从坏提交归因到写它的居民，都读同一个值。
+`trace` 回答拿着一个提交 oid 的人在 `whose` 之后问的下一句：这个提交是哪几次调用的结果。CLI（`sprawling whose --trace`，`crates/sprawling/Spec.lean` §8-136）是它的薄适配器；下一轮 playback 的调用归属与验收工具从坏提交归因到写它的居民，都读同一个值。
 
 ```rust
 // accounting::trace
@@ -31,7 +31,7 @@ pub(crate) fn trace_through(index: &LedgerIndex, ledger_dir: &Path, commit: wire
 // 逐行折到宣告行时答 `Query::Commit` 的 `History` 见 §8-25。
 ```
 
-- **提交的事实从 `views::ask` 来。** `trace` 先问 `Query::Commit`，这一步审计整条链、折叠视图（sprawling-SPEC.md §8-41），所以「这座城写没写过它」与 `whose` 同一个答案；答不是 `Answer::Commit` 时就是 `Ok(None)`。
+- **提交的事实从 `views::ask` 来。** `trace` 先问 `Query::Commit`，这一步审计整条链、折叠视图（`crates/sprawling/Spec.lean` §8-167），所以「这座城写没写过它」与 `whose` 同一个答案；答不是 `Answer::Commit` 时就是 `Ok(None)`。
 - **区间。** 上界是宣告这个提交的那一行（不含）；下界是 `commit.previous` 那一行（不含），没有 `previous`（这是这个 run 的第一个提交）时是这个 run 的第一行（含）。`previous` 是同一个 run 上一个宣告的提交（`views::commits` 的折叠）：别的 run 在中间的提交不是界，git 的父提交也不是，因为父提交可能出自别的 run 或人自己。
 - **调用。** 这个 run 在区间里的 `tool_called`，经 `views::turns` 与各自的 `tool_result` 配对成 `wire::Call`：工具、subject、参数、结局、输出、`effect`、两个时刻与 `timing` 的读法只有 rounds 那一份。`turns` 只把一条 `model_called` 之后的调用归进回合，而区间的下界可以落在一个回合中间，所以往回读过下界之后，继续读到下界之前最近的一条 `model_called` 为止（含），折完再按 `Call.at` 只留区间里的调用。读的是本 run 的行（`LedgerIndex::run_seqs_before`），不读别的 run。
 - **同楼的别人。** 区间里信封 `run` 不是这个 run、信封地址在 `city::Building::of(commit.actor)` 那栋楼里（`Address::is_within`）的 `tool_called`，按 run 计数；`actor` 是这个 run 在区间里第一条这样的行的地址。同一栋楼共用一棵工作树，这些 run 的写也可能落进这个提交，所以它们是本 run 之外的候选。只计数，不列调用。

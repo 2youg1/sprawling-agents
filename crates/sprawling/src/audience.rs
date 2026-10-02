@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Who reads stdout, decided in this one place (sprawling-SPEC.md
-//! 8-129-2): a person at a terminal, or an agent reading a pipe or a
+//! Who reads stdout, decided in this one place (`crates/sprawling/spec/Main.lean`
+//! §8-129-2): a person at a terminal, or an agent reading a pipe or a
 //! file. `view`, `gauge` and `gauge --at` all ask here, so a line meant
 //! for an agent cannot reach a terminal by one verb's rule and not by
 //! another's.

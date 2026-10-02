@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one door the rest of this binary asks what this machine has
-//! through (sprawling-SPEC.md section 8-47).
+//! through (`crates/sprawling/spec/Doctor.lean` §8-47).
 //!
 //! The exec tool wants the python component, the shell and the engine;
 //! the browser tool wants Firefox or a driver. Before this file each of
@@ -50,7 +50,7 @@ pub(crate) fn components_dir() -> Option<PathBuf> {
 const USER_BINS: [&str; 4] = [".cargo/bin", ".elan/bin", ".local/bin", ".bun/bin"];
 
 /// The search path every probe reads and every install program is
-/// started with (sprawling-SPEC.md section 8-58): this process's `PATH`,
+/// started with (`crates/sprawling/spec/Doctor.lean` §8-58): this process's `PATH`,
 /// then each per-user bin directory it does not already name, and on
 /// Windows the directory winget links a user-scope package into.
 ///
@@ -93,7 +93,7 @@ pub(crate) fn find_program(program: &str) -> Option<PathBuf> {
 }
 
 /// The file one item's install writes its output to, fresh for every
-/// install (sprawling-SPEC.md section 8-64).
+/// install (`crates/sprawling/spec/Doctor.lean` §8-64).
 ///
 /// Under the system's temporary directory rather than the component
 /// directory, because a directory named for an item there is what

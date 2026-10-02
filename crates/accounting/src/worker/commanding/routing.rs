@@ -66,7 +66,7 @@ impl RunWorker {
     /// The reply is a parameter rather than something the caller holds
     /// onto, because one verb outlives this call: a `Dispatch` starts a
     /// run in a lane and returns, so a refusal that arrives after the
-    /// drive has to know where to go (sprawling-SPEC.md 8-46-2).
+    /// drive has to know where to go (`crates/sprawling/Spec.lean` §8-46-2).
     pub(in crate::worker) fn run_command(
         &mut self,
         command: wire::Command,
@@ -279,7 +279,7 @@ impl RunWorker {
     /// is noted rather than swallowing the rest.** Returning on the first
     /// refusal after the window had closed would let one mistyped
     /// building address make every other job due that minute disappear
-    /// with nothing recorded (sprawling-SPEC.md 8-46-2).
+    /// with nothing recorded (`crates/sprawling/Spec.lean` §8-46-2).
     ///
     /// # Errors
     /// Propagates the schedule's own refusal to parse. A job that cannot

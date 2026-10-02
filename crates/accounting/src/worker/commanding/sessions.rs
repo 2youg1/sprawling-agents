@@ -15,7 +15,7 @@
 //! at all. What this verb adds is the thing that was missing - a session
 //! is a *stretch* of a room, and starting a new one is a thing a person
 //! asks for rather than a change made behind their back
-//! (`sprawling-SPEC.md` 8-82).
+//! (`crates/sprawling/Spec.lean` §8-82).
 //!
 //! **The city decides nothing about what a session keeps.** That ruling
 //! is `carry`, and the two cities-side acts it names live in
@@ -34,7 +34,7 @@
 //! room, and a record of what was *asked* would answer "did this session
 //! inherit anything" with a wish. A `--carry` with nothing to carry is
 //! not a refusal either - the person asked for a new session, which is a
-//! thing that can be done (`sprawling-SPEC.md` 8-82).
+//! thing that can be done (`crates/sprawling/Spec.lean` §8-82).
 
 use kernel::event::record::SessionOpened;
 use kernel::{Address, AxCode, AxError, EventKind, Payload};

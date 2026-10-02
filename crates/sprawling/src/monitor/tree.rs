@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A running process and every descendant it has, read beat by beat
-//! from the process table (sprawling-SPEC.md 8-129-4).
+//! from the process table (`crates/sprawling/spec/Main.lean` §8-129-4).
 //!
 //! Only `sprawling gauge` reads it, in its own process: one reading
 //! walks the whole table, 17-65 ms on Windows, so the city's sampler has
@@ -161,7 +161,7 @@ impl Tree {
         not(test),
         expect(
             dead_code,
-            reason = "the count gate's tests read it (sprawling-SPEC.md 8-129-3); a production reading only counts"
+            reason = "the count gate's tests read it (`crates/sprawling/spec/Main.lean` §8-129-3); a production reading only counts"
         )
     )]
     pub(crate) fn reads(&self) -> Reads {

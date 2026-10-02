@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `/remote` on the city's console: open, pair, close, devices, revoke
-//! (sprawling-SPEC.md 8-140).
+//! (`crates/sprawling/spec/Outside.lean` §8-140).
 //!
 //! These verbs are not on the wire, so no frame - from a browser, a
 //! remote device or a tool a resident holds - can open the door or pair

@@ -19,7 +19,7 @@ use super::Site;
 ///
 /// The city hash arrives rather than being read here: one read of the
 /// genesis line serves a whole city, and `RunWorker::city_hash` is where
-/// that read happens (sprawling-SPEC.md 8-51).
+/// that read happens (`crates/sprawling/Spec.lean` §8-51).
 pub(in crate::worker) fn provenance(
     city: kernel::B3Hash,
     addr: &Address,
@@ -35,7 +35,7 @@ pub(in crate::worker) fn provenance(
 /// A file that is not there is no layer; a file that cannot be read is
 /// reported, because a run sieving under the built-in table while the
 /// building wrote its own would be a rule silently unapplied
-/// (sprawling-SPEC 8-26).
+/// (`crates/sprawling/Spec.lean` §8-26).
 ///
 /// # Errors
 /// Propagates a file that exists and cannot be read, and a table that
@@ -94,7 +94,7 @@ impl Site {
 
 /// What placing a room's tree reads from the city, as values rather
 /// than as the worker that holds them, so the placement runs on
-/// whichever thread prepares the run (sprawling-SPEC.md 8-113).
+/// whichever thread prepares the run (`crates/sprawling/Spec.lean` §8-113).
 pub(in crate::worker) struct Placing<'a> {
     pub(in crate::worker) city_root: &'a Path,
     pub(in crate::worker) city: kernel::B3Hash,
@@ -102,7 +102,7 @@ pub(in crate::worker) struct Placing<'a> {
     pub(in crate::worker) clock: &'a (dyn crate::Clock + Send + Sync),
     /// The city's one checkpoint at a time: a first placement commits the
     /// city's index, which every checkpoint also stages and commits
-    /// (sprawling-SPEC.md 8-46-13).
+    /// (`crates/sprawling/Spec.lean` §8-46-13).
     pub(in crate::worker) checkpoint_gate: &'a std::sync::Mutex<()>,
 }
 
@@ -110,7 +110,7 @@ impl Site {
     /// Whether this run writes in the room's own tree rather than in the
     /// city: always for an experiment, which lands nothing whatever the
     /// building says, and otherwise when the building asks for review
-    /// (sprawling-SPEC.md 8-133). The one answer both `name_tree` and
+    /// (`crates/sprawling/Spec.lean` §8-133). The one answer both `name_tree` and
     /// `place_tree` read, so the branch the desks are told and the tree
     /// the run writes in cannot disagree.
     fn works_apart(&self, at: &super::super::Assignment) -> bool {
@@ -191,7 +191,7 @@ pub(in crate::worker) struct Lending<'a> {
 /// Lends a room its tree, kept between the room's runs: the city's
 /// base commit first, because a worktree branches from a commit, then
 /// the claim and the line that records it. A review building's run and
-/// a harness run take their tree here alike (sprawling-SPEC.md 8-124).
+/// a harness run take their tree here alike (`crates/sprawling/Spec.lean` §8-124).
 ///
 /// # Errors
 /// Propagates whatever the checkpoint or the worktree says about lending
@@ -236,7 +236,7 @@ impl Site {
     /// Names the branch a room that works apart writes on before its tree is
     /// placed. The branch is the tree's name, a function of the room
     /// alone, so the desks opened on the accounting thread know it while
-    /// the lane still places the tree (sprawling-SPEC.md 8-113).
+    /// the lane still places the tree (`crates/sprawling/Spec.lean` §8-113).
     ///
     /// # Errors
     /// Propagates a room whose tree name will not parse.
@@ -262,7 +262,7 @@ impl RunWorker {
     /// that renewal - so cutting it apart would move a clock sample,
     /// which a structural change may not relocate. The tree a room under
     /// review writes in is placed afterwards by [`Site::place_tree`],
-    /// which needs nothing from this worker (sprawling-SPEC.md 8-113).
+    /// which needs nothing from this worker (`crates/sprawling/Spec.lean` §8-113).
     ///
     /// The frozen configuration is read here rather than in the
     /// agreement, and the reason is the room: a dispatch that names an

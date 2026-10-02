@@ -9,7 +9,7 @@
 //! that a client which lost its socket may send the frame again without
 //! doing the work twice. `kernel::gate::dedup` judges membership and
 //! says the seen set is the caller's state; this is that caller
-//! (sprawling-SPEC.md 8-41).
+//! (`crates/sprawling/Spec.lean` §8-41).
 //!
 //! Two things are held here, and they answer two different questions.
 //! The set answers "has this city already done this"; the map answers

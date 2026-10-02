@@ -5,7 +5,7 @@
 
 // The three versions a dependency row shows - installed here, pinned by
 // this repository, newest upstream - and whether the first is behind the
-// last (sprawling-SPEC §8-120).
+// last (`crates/sprawling/Spec.lean` §8-120).
 //
 // The city reads each version and this page compares them: a reading
 // the city could not take is its own answer, and a version with no

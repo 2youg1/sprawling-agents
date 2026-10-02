@@ -87,7 +87,7 @@ impl Backlog {
 - **只有委派下去的 run 入表**。根 run 由 `Cancel` 结束，那是另一个动词（glossary「Halt」行）；把根 run 也入表会让 `halt` 与 `Cancel` 变成同一件事。
 - **`harvest` 与短窗口都跳过 run 成员**：它们收的是进程的退出码，run 的结局在账本上。
 - **`status` 的那一半**：末行 `backlog:` 追加在冻结序末尾（追加规则同 `neighbours`），报 `standing(addr)` 里属于本 run 地址的成员——`bg-3 cargo build (command)` 逐条分号相连，没有则 `none`。**不报跑了多久**：本表不采样时钟（§8-28-1 第 1 条），一个为了报时长而采样的 status 会是第二个采样点。
-- **接线在 `accounting::worker::dispatching::running`**：`at.parent.is_some()` 时先 `enrol_run`，drive 结束后 `leave`；`Driving` 携 `member: Option<BacklogId>`，中断钩子在人的打断与 steer 之前先问 `stopping`。`halt` 在记账线程上被处理而子 run 在驾驶池上跑（sprawling-SPEC §8-42）；红测试用 `attach_interrupts` 在子 run 的安全点上调 `halt`。
+- **接线在 `accounting::worker::dispatching::running`**：`at.parent.is_some()` 时先 `enrol_run`，drive 结束后 `leave`；`Driving` 携 `member: Option<BacklogId>`，中断钩子在人的打断与 steer 之前先问 `stopping`。`halt` 在记账线程上被处理而子 run 在驾驶池上跑（`crates/sprawling/Spec.lean` §8-42）；红测试用 `attach_interrupts` 在子 run 的安全点上调 `halt`。
 
 **红测试**：一轮委派下去的 run 起后，其 scope 被 `halt`，子 run 以 `cancelled` 冻结且没有再叫过模型；`status` 的第十四行报本 run 起的后台命令。
 
@@ -116,7 +116,7 @@ impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms �
 
 **页面缓冲**：`client/src/core/live_output.ts` 为每个 run 留一段 `Tail`（stdout、stderr 与丢掉的行数），每条流只留最新的 `LIVE_LINES = 400` 行；`tool_result` 一到就丢掉这个 run 的那段。监视器的终端记录把它画在仍在跑的那一条下面，丢掉的行数照 `mon_lines_cut` 说出来。
 
-**服务端缓冲**：`sprawling::serving::output_ring`（sprawling-SPEC §8-90）为每个 run 按字节留最新的一段，后来打开页面的会话在 `Welcome` 之后先经 `ServeConfig::outputs_so_far`（`crates/wire/Spec.lean` §8-48）拿到它，再接实时帧；这个 run 的 `tool_result` 落账时清空。
+**服务端缓冲**：`sprawling::serving::output_ring`（`crates/sprawling/Spec.lean` §8-90）为每个 run 按字节留最新的一段，后来打开页面的会话在 `Welcome` 之后先经 `ServeConfig::outputs_so_far`（`crates/wire/Spec.lean` §8-48）拿到它，再接实时帧；这个 run 的 `tool_result` 落账时清空。
 
 **设计**（四段共同遵守的规则）：
 

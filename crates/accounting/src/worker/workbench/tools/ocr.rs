@@ -5,7 +5,7 @@
 
 //! `ocr`: a picture this run may read - a PNG in the city, or a
 //! screenshot a connector stored - read by the model the person chose
-//! for `ocr` (sprawling-SPEC.md 8-142).
+//! for `ocr` (`crates/sprawling/Spec.lean` §8-142).
 //!
 //! Whether the tool exists is one `select(ModelTag::Ocr, policy)`, read
 //! under the rules of the building the run stands in. A run in a

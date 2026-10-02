@@ -25,8 +25,8 @@ impl RunWorker {
     /// The settings page sends the whole row on every pick, so re-picking
     /// an already registered model with an empty box must not overwrite
     /// its ceiling with nothing: the next call on the Anthropic wire
-    /// would be refused for a field it could not write (sprawling-SPEC.md
-    /// 8-71). An empty box keeps what this same model was registered
+    /// would be refused for a field it could not write (`crates/sprawling/Spec.lean`
+    /// §8-71). An empty box keeps what this same model was registered
     /// with, read back by `registered_as`.
     pub(in crate::worker) fn select_model(
         &mut self,

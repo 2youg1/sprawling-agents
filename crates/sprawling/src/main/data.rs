@@ -266,7 +266,7 @@ pub(super) fn replay(dir: Option<&String>) -> ExitCode {
 /// integrity check would otherwise score a mistyped argument as a pass.
 /// An empty ledger is a different fact and still verifies, which is why
 /// the question asked is whether a segment exists rather than whether a
-/// line does (sprawling-SPEC section 12).
+/// line does (`crates/sprawling/Spec.lean` section 12).
 ///
 /// # Errors
 /// `E_PATH_NOT_FOUND` when the directory holds no ledger segment, and

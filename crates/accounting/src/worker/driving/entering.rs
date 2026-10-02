@@ -16,11 +16,11 @@ use crate::worker::dispatching::preparing::Staged;
 impl RunWorker {
     /// Stages one dispatch on this thread and takes it into a lane, which
     /// prepares and drives it, so the desk is free again before a tree is
-    /// placed or a server has shaken hands (sprawling-SPEC.md 8-113).
+    /// placed or a server has shaken hands (`crates/sprawling/Spec.lean` §8-113).
     ///
     /// This is the person's entrance. What continues is the run, not the
     /// command, which is why the idempotency key settles at take-off
-    /// (sprawling-SPEC.md 8-46-2).
+    /// (`crates/sprawling/Spec.lean` §8-46-2).
     ///
     /// # Errors
     /// Propagates every refusal a dispatch can owe before it costs

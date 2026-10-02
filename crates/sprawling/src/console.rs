@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a line typed into a serving city means (sprawling-SPEC.md
-//! section 8-11).
+//! What a line typed into a serving city means (`crates/sprawling/spec/Console.lean`
+//! §8-11).
 //!
 //! The terminal `sprawling up` blocks in is a surface of its own: on a
 //! machine with no browser it is the only surface there is.

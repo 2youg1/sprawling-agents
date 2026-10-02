@@ -29,7 +29,7 @@ impl Transport { pub(crate) fn detoured(step: impl Fn(ClientBuilder) -> ClientBu
 - **`client_for` 的签名不变，覆写是构造之后的一步。** `client_for` 是全工作区唯一放行的 reqwest 构造点（§8-15），它的调用者在别的 crate；覆写做成一个 `Fn(ClientBuilder) -> ClientBuilder`，由 `Transport::detoured` 带着；`Transport` 第一次为某个端点建客户端时，把它接在端点自己的配置（`client_for` 加上超时）之后、`build()` 之前。这一步与带着它的字段都只编进测试。端点的配置只在 `transport` 里写一次，生产路径与测试路径走同一个函数。
 - **轮次从 `PRESETS` 算出，不另抄名单。** 测试对 `PRESETS` 的每一行、行里的每一个 face 各跑一轮：`router::normalise_entered` 按 face 规整出存下的 base URL，`provider::registry::resolve` 给出连接种类，凭据头由 `AuthSpec::for_dialect` 定，经 `adapter_for` 造出模型并 `call` 一次——与 `accounting` 的生产路径走同一串函数，只差 `Transport`。每一轮比一个整值：请求路径（face 的路径加上兼容格式自己的那一段）、`Host`、凭据头的名字与值、会话头（该主机要求的那一个在，别的主机的都不在）、正文的兼容格式（`input` 是 Responses，顶层 `system` 是 Anthropic，其余是 chat）、chat 面的上限字段名。期望值的三段兼容格式路径与上限字段名写在测试里，它们是厂商文档的说法，是测试拿来比的期望，而不是第二份实现。
 - **替身是 TLS 的，证书自签、只为那一个主机名。** 证书由测试按 DER 拼出（Ed25519，签名用 rustls 的 aws-lc-rs 后端），不引新包：锁里没有生成证书的 crate，而一张 v3、带 `subjectAltName`、不带扩展用途的叶证书只有几十个字节的结构。私钥是一个固定的 32 字节种子，因为这张证书除了这一次回环握手什么也不保护。
-- **它不跑真 provider。** 真 provider 的一轮要人在测试时填 key（D40），由 `just e2e` 按同一张表跑（sprawling-SPEC §8-69）。
+- **它不跑真 provider。** 真 provider 的一轮要人在测试时填 key（D40），由 `just e2e` 按同一张表跑（`crates/sprawling/Spec.lean` §8-69）。
 - **失败**：本模块只在测试里；替身的读写失败按测试的失败处理。改了道的 `Transport` 建客户端失败时，与没改道的同一个码（`E_CONFIG_INVALID`）。
 -/
 

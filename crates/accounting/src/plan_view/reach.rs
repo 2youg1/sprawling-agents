@@ -5,7 +5,7 @@
 
 //! How far one record reaches into the plans: whether its kind can move
 //! a plan, which building it names, and the node and stop cause it
-//! carries (sprawling-SPEC.md 8-76).
+//! carries (`crates/sprawling/Spec.lean` §8-76).
 
 use kernel::{Address, EventKind, EventRecord, NodeId, StopCause};
 
@@ -25,7 +25,7 @@ pub(super) enum PlanReach {
 
 /// Which records can move a plan. Exhaustive on purpose: a kind added
 /// to the vocabulary without an answer here is a compile error rather
-/// than a stale table nobody notices (sprawling-SPEC.md 8-76).
+/// than a stale table nobody notices (`crates/sprawling/Spec.lean` §8-76).
 pub(super) fn may_move_plan(kind: EventKind) -> PlanReach {
     match kind {
         EventKind::RoadmapFinished | EventKind::RoadmapReleased => PlanReach::NodeFreed,

@@ -85,7 +85,7 @@ pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError> {
 /// holds, and a city that has been opened but never written to has a
 /// ledger directory and no segment in it. Telling the two apart is the
 /// job of whoever took the path from a person - `sprawling replay` does
-/// it with `storage::ledger_segments_at` (sprawling-SPEC section 12).
+/// it with `storage::ledger_segments_at` (`crates/sprawling/Spec.lean` section 12).
 pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError> {
     let lines = storage::read_raw_lines_at(dir).map_err(storage::StorageError::into_ax)?;
     verify_lines(lines)

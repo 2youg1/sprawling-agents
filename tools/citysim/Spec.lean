@@ -99,7 +99,7 @@ D1 **没有种子，而不是造一个吃种子的生成器。** 种子此刻没
 - `crates/kernel/Spec.lean` §8-9：Ledger 缝与 conformance；§8-23：`ToolCall::action`，一次工具调用的动作字节。
 - `crates/runtime/Spec.lean` §8-1（驱动器与 `verify_lines`，`crates/runtime/spec/Replay.lean`）、§8-15（`run::drive`）与 §8-39（每 run 一条 `prompt_assembled`）。
 - `crates/gateway/src/endpoint/failure.rs` 的 `ProviderFailure::retry`：城重发哪些状态码。
-- sprawling 的 `monitor::spread`（sprawling-SPEC 8-129-2）：分位、地板、峰值与可疑倍数 `SUSPICIOUS_TIMES`。
+- sprawling 的 `monitor::spread`（`crates/sprawling/Spec.lean` §8-129-2）：分位、地板、峰值与可疑倍数 `SUSPICIOUS_TIMES`。
 - `tools/xtask/budgets.toml`：测量读数与它们的登记规矩。
 - ARCHITECTURE.md §10：确定性七条，本 crate 守其中的计数时钟、无随机源与键不从时钟来。
 -/
@@ -133,7 +133,7 @@ bin/bench、bin/bench_startup ──▶ sprawling、accounting、storage、wire 
 
 规格本身不加依赖：分部只 import 工具链的库与本规格的分部。`depmap` 块不列 citysim（它在产品图之外），所以本规格不 import 任何 crate 的规格；用到 kernel、runtime 的性质时在注释里引用它们的分部。
 
-D6 **评估仪器住在 citysim，不另立 crate。** 五件仪器（§8-8）没有产品调用点：`suite` 只由 `tests/evaluation.rs` 驱动，其余四件只由自己的测试驱动。为它们在产品拓扑里立一个 crate，换来的是一个不进二进制却占一格依赖图的单元，以及 `sprawling` 为一个交接探针多背一条边。citysim 本就是 dev-only 的第二个 Main，仪器与剧本同住，产品图少一个单元。交接探针有生产调用点，归它的拥有者 `accounting::worker::probing`（sprawling-SPEC §8-39）。落选方案：独立的 `eval` crate——它唯一的生产面是那个探针。**重开条件**：一件仪器得到生产调用点。
+D6 **评估仪器住在 citysim，不另立 crate。** 五件仪器（§8-8）没有产品调用点：`suite` 只由 `tests/evaluation.rs` 驱动，其余四件只由自己的测试驱动。为它们在产品拓扑里立一个 crate，换来的是一个不进二进制却占一格依赖图的单元，以及 `sprawling` 为一个交接探针多背一条边。citysim 本就是 dev-only 的第二个 Main，仪器与剧本同住，产品图少一个单元。交接探针有生产调用点，归它的拥有者 `accounting::worker::probing`（`crates/sprawling/Spec.lean` §8-39）。落选方案：独立的 `eval` crate——它唯一的生产面是那个探针。**重开条件**：一件仪器得到生产调用点。
 -/
 
 /-! ## 8 接口先行

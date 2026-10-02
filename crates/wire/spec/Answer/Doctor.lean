@@ -47,13 +47,13 @@ pub enum DoctorCustodyLifetime { AcrossReboots, WithPassphrase, UntilReboot, Thi
 pub enum DoctorCore { Raised, HeldBySetting, Refused { said }, LoweredByValve, Unasked { said } }
 ```
 
-- **每一种状态都是枚举，不是句子**。终端那份报告是一台机器的散文，而浏览器说两种语言；线上若携措辞，页面的用词就成了服务端的选择。「有了它能做什么」那一句也不上线：`name` 就是这一项的 id（需求表里的名字，如 `cargo-nextest`），页面按它从 `lang.json` 的 `machine_enables_<name>`（连字符写成 `_`）取两种语言的那一句，终端的英文留在需求表（sprawling-SPEC §12「doctor 的「能做什么」各面自持」）。线上仍携的句子只有 `said`：平台或程序自己说的话，读者推不出来。
+- **每一种状态都是枚举，不是句子**。终端那份报告是一台机器的散文，而浏览器说两种语言；线上若携措辞，页面的用词就成了服务端的选择。「有了它能做什么」那一句也不上线：`name` 就是这一项的 id（需求表里的名字，如 `cargo-nextest`），页面按它从 `lang.json` 的 `machine_enables_<name>`（连字符写成 `_`）取两种语言的那一句，终端的英文留在需求表（sprawling D6「doctor 的「能做什么」各面自持」）。线上仍携的句子只有 `said`：平台或程序自己说的话，读者推不出来。
 - **答的是城启动时看到的那一眼，不是现问现看**。每一项都是起一个进程问版本；一次查询若这么做，会把答一切读的那条线程按住数秒。城若没看过（一次一条命令驱动的工人就是），答 `Unavailable`——与「一栋没人盖过的楼」同口径：**「我没看」是它自己的答案**，而一台空机器会让页面告诉人他手上每件工具都缺。
 - **`install` 把平台不明单列一支**。三个平台之外的机器上，本项目没有任何配方；此时拼一条别的平台的命令是错的，沉默也是错的。
 - **沙箱的保证逐轴作答，不是一句「已隔离」**：`coverage` 逐轴一行，`Kept`／`NotKept` 两个字而不是布尔——页面两态都要有词，布尔会让每个读者自己给 `false` 选一个。它存在的理由，是 agent 在动手前要读得到哪几条保证没成立。臂与轴的定义住 ``crates/runtime/Spec.lean` §8-13-2`（`Confinement` 与 `Guarantee`），线上重拼一份，逐臂对应只住 `sprawling::doctor::report` 的穷尽匹配——上游加一臂即编译红。
 - **凭据的存放与寿命一起答，`refusal` 是平台服务自己的话**：三者同出 `gateway::Custodian::probe` 的一次往返（`gateway::Custody`，`crates/gateway/Spec.lean` §8-4；寿命的全部档位见 §8-21），线上重拼 `Store` 与 `Persistence` 两套词，逐臂对应同住 `sprawling::doctor::report`；`refusal` 缺席读作服务没有拒——或该 store 由城自选，没有服务可拒。
-- **核心线程站在哪一档，`said` 是平台自己的话**：`core` 是主机此刻会给核心线程的档位（sprawling-SPEC §8-93、§8-40）——升到正常档之上一级、按人的 `[core] priority` 留在正常档、平台拒绝（Unix 上没有 `CAP_SYS_NICE`）、被安全阀降回，或 doctor 没能问到。派出的命令不在这里：它们总是低一档，降档从不被拒（`crates/runtime/Spec.lean` §8-13-3）。
-- **服务端**：`sprawling::doctor::report` 把 findings 与这两道整机读数折成本形状，`Views` 存一份（sprawling-SPEC §8-54）。
+- **核心线程站在哪一档，`said` 是平台自己的话**：`core` 是主机此刻会给核心线程的档位（`crates/sprawling/Spec.lean` §8-93、§8-166）——升到正常档之上一级、按人的 `[core] priority` 留在正常档、平台拒绝（Unix 上没有 `CAP_SYS_NICE`）、被安全阀降回，或 doctor 没能问到。派出的命令不在这里：它们总是低一档，降档从不被拒（`crates/runtime/Spec.lean` §8-13-3）。
+- **服务端**：`sprawling::doctor::report` 把 findings 与这两道整机读数折成本形状，`Views` 存一份（`crates/sprawling/Spec.lean` §8-54）。
 -/
 
 /-!
@@ -91,5 +91,5 @@ pub enum DoctorUnread { WithToolchain, ManyBrands, MatchesBrowser, ThisProject, 
 - **`pack` 是一个枚举而不是一个字符串**：页面要给这一包起名字、写说明，所以它必须是页面认得的封闭集合；新的一包是每个读者处的编译错误。
 - **`DoctorUnread` 是封闭的原因**：「读不到」有几种，每一种页面各有一句话，线上不带句子（§8-25 同一条理由）。`Refused.said` 带的是网络在哪一步停下，那是平台自己的话。
 - **`pinned` 是版本号本身**，已从仓库的文件里读好；没有钉子的项为 `None`。
-- 城那一侧从哪里读、怎么记住读数，见 sprawling-SPEC §8-120。
+- 城那一侧从哪里读、怎么记住读数，见 `crates/sprawling/Spec.lean` §8-120。
 -/

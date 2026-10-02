@@ -6,7 +6,7 @@
 //! What a person reads off the report: four status words, two sections,
 //! the level the core's threads get, colour a terminal may refuse, and a
 //! version column no vendor banner can push off the screen
-//! (sprawling-SPEC.md sections 8-59 and 8-40).
+//! (`crates/sprawling/Spec.lean` §8-59 and §8-40).
 
 use super::{ScriptedMachine, finding_for};
 use crate::doctor::paint::{Counted, Ink, Part, Status, count, row, summary};

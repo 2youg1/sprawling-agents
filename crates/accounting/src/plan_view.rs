@@ -116,7 +116,7 @@ impl PlanView {
         let Some(building) = record.addr().and_then(building_of) else {
             // A record with no address could belong to any building, so
             // any kind that moves a plan, not one named kind, makes every
-            // parsed copy suspect (sprawling-SPEC.md 8-76).
+            // parsed copy suspect (`crates/sprawling/Spec.lean` §8-76).
             if !matches!(reach, PlanReach::Untouched) {
                 self.read.clear();
                 self.moved_all = self.moved_all.wrapping_add(1);
@@ -200,7 +200,7 @@ impl PlanView {
 
 /// Every named building's plan: described from the cache while it is
 /// held, read off the disk once it is released, and put back only when
-/// no record moved that plan in between (sprawling-SPEC.md 8-100).
+/// no record moved that plan in between (`crates/sprawling/Spec.lean` §8-100).
 ///
 /// A poisoned cache is taken back by [`PlanView::take_back`], so a panic
 /// under the lock costs the parsed plans and never a stop cause.

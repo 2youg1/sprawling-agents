@@ -117,7 +117,7 @@ impl Governance {
     /// would open a history written by another build as a city with work
     /// missing from its account, approvals nobody would ever be asked,
     /// and an allowance narrower than the person gave
-    /// (sprawling-SPEC.md 8-74).
+    /// (`crates/sprawling/Spec.lean` §8-74).
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "a few kinds move this fold; the rest of the event vocabulary does not"

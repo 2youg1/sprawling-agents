@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Every line `gauge` writes, and the one place each becomes text
-//! (sprawling-SPEC.md 8-129-4).
+//! (`crates/sprawling/spec/Main.lean` §8-129-4).
 //!
 //! For an agent a line is one JSON object: the `line` key first, then
 //! integers under keys that end in their unit, `null` where nothing was

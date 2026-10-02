@@ -116,7 +116,7 @@ pub(crate) struct Reading {
 impl Reading {
     /// The one construction point: the shares are read by the product's
     /// one percentile reading, `Spread`, nearest rank
-    /// (sprawling-SPEC.md 8-129-2).
+    /// (`crates/sprawling/Spec.lean` §8-129-2).
     ///
     /// # Errors
     /// Refuses a scenario that sampled nothing, because a reading with no

@@ -134,10 +134,10 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - `send` 只入队不投递：真正 `deliver` 到收件房间发生在驱动返回之后，且恒在 `signal_enqueued` 落账之后，因为投影只因一条已追加的事件而改变。
 - 发件范围由 `reach` 定界：`reach` 是发件人所属楼的地址，由装配层经 `city::Building::of` 算好传入，「一个地址归哪栋楼管」的权威在 city。越楼发件恒拒，报 `E_CROSS_BUILDING_DENIED`。`ToolMeta.effect` 是静态的（`Write { domain: room }`），逐件目标判定在工具内。
 - id 不采时钟、不取随机：`{run}-s{n}`，`n` 是 desk 自己的计数器，重放同一段历史得到同一批 id，去重才有意义。
-- `take_steer` 取走一件就当场记 `Consumed`，读不成插队信的那件也记：一件离队的信就是已读，否则同一句话会在下一个安全点再落一次。空队列与读不懂的信不合成一件事：前者 `Ok(None)`，后者 `Err`；安全点怎么处理这个拒绝由 `accounting::worker::driving::lane` 决定（sprawling-SPEC §8-73）。
+- `take_steer` 取走一件就当场记 `Consumed`，读不成插队信的那件也记：一件离队的信就是已读，否则同一句话会在下一个安全点再落一次。空队列与读不懂的信不合成一件事：前者 `Ok(None)`，后者 `Err`；安全点怎么处理这个拒绝由 `accounting::worker::driving::lane` 决定（`crates/sprawling/Spec.lean` §8-73）。
 - `pull` 的结果带 `remaining`：`status.signals_pending` 是派活那一刻的事实，一个数字比一套让 status 活起来的机制便宜得多。投递失败不静默：`Admission::Shed` 入账的是事实而非成功。
 
-**`collab::goal_tool`**（形状 4 适配器）。`GoalDesk::new(run, owner, booking)`；`GoalBooking` 是调用时判定目标登记的那个权威，城里是记账线程（sprawling-SPEC §8-42-8）；`conflict_refusal(entry, level)` 拼出 `E_GOAL_CONFLICT`，第三段是那一级的可执行说法；`GoalTool::new(room, desk)`。
+**`collab::goal_tool`**（形状 4 适配器）。`GoalDesk::new(run, owner, booking)`；`GoalBooking` 是调用时判定目标登记的那个权威，城里是记账线程（`crates/sprawling/Spec.lean` §8-42-8）；`conflict_refusal(entry, level)` 拼出 `E_GOAL_CONFLICT`，第三段是那一级的可执行说法；`GoalTool::new(room, desk)`。
 
 - 三层各守其职：`detect_conflict` 答撞没撞，`arbitrate` 答谁来仲裁，本模块只把条目拼好交给 `GoalBooking`，恒不自己判冲突、恒不自己定级。
 - 登记在调用时由 `GoalBooking` 判定，桌子不留副本：并排派出的两轮活读同一份目标表，只凭副本两轮都会登记同一片地。权威按队列次序对全城的目标表 `arbitrate`，先写账（`goal_registered` 或 `goal_conflict`）再回答；它的 `Err` 原样交给模型，桌子不排任何效应。
@@ -236,5 +236,5 @@ D2 没有草稿退回机制。房间没有版本，发言不带「作者所见�
 
 - ARCHITECTURE.md 的模块表（`architecture.toml` 里 collab 各行，锚点指向本文件与分部）与 §4 缝清单。
 - `docs/glossary.md` 的 Signal、Inbox、Workshop 等词条：词条改名时本文件与分部一起改。
-- `crates/kernel/Spec.lean` 的 goal、repair、delegation 各节（§8-15、§8-16、§8-17）与 §8-4（Signal 的线上形状）；`crates/city/Spec.lean` §8-2 的 `review` 规则（D4）；sprawling-SPEC §8-42-8（记账线程是 `Booking` 与 `GoalBooking` 的权威）与 §8-73（安全点怎么处理 `take_steer` 的拒绝）。这些节改了，重读本文件 §8 的对应条目。
+- `crates/kernel/Spec.lean` 的 goal、repair、delegation 各节（§8-15、§8-16、§8-17）与 §8-4（Signal 的线上形状）；`crates/city/Spec.lean` §8-2 的 `review` 规则（D4）；`crates/sprawling/Spec.lean` §8-42-8（记账线程是 `Booking` 与 `GoalBooking` 的权威）与 §8-73（安全点怎么处理 `take_steer` 的拒绝）。这些节改了，重读本文件 §8 的对应条目。
 -/

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Where Windows records a browser that no shell resolves
-//! (sprawling-SPEC.md section 8-57).
+//! (`crates/sprawling/spec/Doctor.lean` §8-57).
 //!
 //! Windows installs a per-user browser under a directory whose spelling
 //! carries the person's own account name, so no literal path in the

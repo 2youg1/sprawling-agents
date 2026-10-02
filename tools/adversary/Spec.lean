@@ -91,7 +91,7 @@ Rust 侧的验收测试全部是**具体轨迹**：`crates/sprawling/tests/assem
 
 **诊断**：城是诚实的——它知道拒绝没送到，并且说了出来。缺陷在门：`main.rs` 的 rustdoc 写着 *"Exits 1 when the city refused something"*，而实际语义是「**在静默窗口内没有拒绝到达**」。对一个拿退出码做分支的 agent，这两者的差别是把一次失败读成一次成功。
 
-**已修（「静默有自己的退出码」）。** Rust 侧选了三档中的第二条：`Spoken` 是一个三支穷尽枚举，`Quiet`（帧发出后窗口内一帧未回）退 **3**，而 0 与 1 的含义一个字不改。表写在 `docs/operating.md` 与 `crates/sprawling/sprawling-SPEC.md` §8-41 里。本目录的 `Door` 因此把静默解成 `quiet` 而不是 `accepted`（§8），并用 `the exit code says what the frames say` 这条检查把它钉住。
+**已修（「静默有自己的退出码」）。** Rust 侧选了三档中的第二条：`Spoken` 是一个三支穷尽枚举，`Quiet`（帧发出后窗口内一帧未回）退 **3**，而 0 与 1 的含义一个字不改。表写在 `docs/operating.md` 与 `crates/sprawling/Spec.lean` §8-41 里。本目录的 `Door` 因此把静默解成 `quiet` 而不是 `accepted`（§8），并用 `the exit code says what the frames say` 这条检查把它钉住。
 
 ### 第二个发现：一次被拒的派活写进了城里
 

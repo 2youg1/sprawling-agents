@@ -9,14 +9,14 @@
 //! command, a schedule firing, an arrival from outside, a knock, an
 //! answered approval, work handed down and a succession all take the
 //! same prepare / drive / land path; what each landing is owed is this
-//! value, and settling it is one match (sprawling-SPEC.md 8-46-2).
+//! value, and settling it is one match (`crates/sprawling/Spec.lean` §8-46-2).
 //!
 //! **Two chains can start a run with nobody in front of them, and both
 //! are bounded here.** A knock wakes the next resident in a
 //! conversation, and a succession hands one piece of work to the next
 //! run; either chain can go on spending model calls for ever unless the
 //! city counts the hops and refuses the one that would exceed its
-//! ceiling (sprawling-SPEC.md 8-46-12). The counts ride the obligation,
+//! ceiling (`crates/sprawling/Spec.lean` §8-46-12). The counts ride the obligation,
 //! not the worker: an obligation outlives the run that carried it, and a
 //! field on the worker would describe whichever run happened to be
 //! landing.
@@ -34,8 +34,8 @@ use kernel::{Address, AxCode, AxError, NodeId};
 ///
 /// **Every entrance puts its run in a lane, and they differ only
 /// here** — which is what makes "a dispatch is prepared, driven and
-/// landed" one path rather than seven copies of one (sprawling-SPEC.md
-/// 8-46-2). Exhaustive: an entrance added without deciding what its
+/// landed" one path rather than seven copies of one (`crates/sprawling/Spec.lean`
+/// §8-46-2). Exhaustive: an entrance added without deciding what its
 /// landing owes is a compile error rather than a run nobody collects.
 #[derive(Clone)]
 pub(in crate::worker) enum Owed {
@@ -130,17 +130,17 @@ pub(in crate::worker) struct KnockChain {
 
 /// The most knocks one conversation may carry. A conversation that has
 /// woken sixteen residents in a row is a ring rather than a dialogue,
-/// and every hop is a run nobody asked for (sprawling-SPEC.md 8-46-12).
+/// and every hop is a run nobody asked for (`crates/sprawling/Spec.lean` §8-46-12).
 const CONVERSATION_HOPS_MAX: u32 = 16;
 
 /// The most times one piece of work may be handed to a successor. A run
 /// may ask to be replaced while it still has work to do, so the ceiling
 /// is far above any real task: it exists to make the chain finite, not
-/// to price the work (sprawling-SPEC.md 8-46-12).
+/// to price the work (`crates/sprawling/Spec.lean` §8-46-12).
 const SUCCESSION_HOPS_MAX: u32 = 64;
 
 /// The most runs one conversation may wake across all its branches: a
-/// broadcast rather than a chain (sprawling-SPEC.md 8-46-12).
+/// broadcast rather than a chain (`crates/sprawling/Spec.lean` §8-46-12).
 const CONVERSATION_RUNS_MAX: u32 = 64;
 
 impl Relays {
@@ -257,7 +257,7 @@ impl Owing {
 
     /// A knock started this run. The conversation moves one hop on, and
     /// a chain already at its ceiling is refused here rather than opened
-    /// and abandoned (sprawling-SPEC.md 8-46-12).
+    /// and abandoned (`crates/sprawling/Spec.lean` §8-46-12).
     ///
     /// `conversation` is where the run that spoke stood.
     ///

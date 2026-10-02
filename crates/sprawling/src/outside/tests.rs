@@ -5,7 +5,7 @@
 
 //! The remote door as a served city keeps it, driven by a device written
 //! in Rust against a scripted route, on a counted clock and a counted
-//! random source (sprawling-SPEC.md 8-139, 8-140).
+//! random source (`crates/sprawling/Spec.lean` §8-139, §8-140).
 
 #![allow(
     clippy::unwrap_used,

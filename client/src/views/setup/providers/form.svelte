@@ -22,7 +22,7 @@
   // reference. **An empty key box carries no reference at all**: the
   // city reads that as "keep what is archived under this id", so this
   // form never decides "keep" out of what it happens to remember
-  // (sprawling-SPEC 8-81). The reference is held beside the id it was
+  // (`crates/sprawling/Spec.lean` §8-81). The reference is held beside the id it was
   // filed under, because a reference held alone outlives the name that
   // makes it true.
 

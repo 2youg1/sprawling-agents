@@ -53,7 +53,7 @@ pub fn free_space_floor(volume_bytes: u64) -> u64;
 - CPU 被占满：`schedule_delay > CPU_SATURATED_DELAY`，即一帧（60 Hz）——人开始看得见的延迟；它是感知常数，不随机器类别调。
 - 只有盘快满停止接新活：盘慢与 CPU 满时接活只会变慢，不会丢；内存紧已由排队处理。`admit_work` 只读卷的两个数，因为受理新活的入口只该为它付一次读卷，而不是整份读数；拒绝带着 `Degradation::DiskLow`，入口据它的 `recovery()` 告诉人至少腾出多少。
 - 写盘失败时账本不坏、重启可恢复，由 storage 承担（`crates/storage/Spec.lean` §8-1）：失败的一波由 `jsonl::unwind` 把段退回波前长度，进程接着写也不会写在半行之后；掉电留下的撕裂尾由 open 截到最长有效前缀。本模块不复述。
-- 生产的调用方：人发来的 `Dispatch` 在写下任何东西之前经 `admit_work` 读一次城所在卷（sprawling-SPEC 8-94）。未落地：性能摘要与 doctor 的显示；`Wake` 等不经人的入口；`ResourceReadings` 其余四项的生产填写者——`bin::monitor::Sample` 没有 fsync 中位数与调度延迟，它的 `durable_lag` 是条数而本模块要的是等待时长，且监视器只在有人看时采样，不能作为判定的唯一来源（sprawling-SPEC 8-90 决定 1）。
+- 生产的调用方：人发来的 `Dispatch` 在写下任何东西之前经 `admit_work` 读一次城所在卷（`crates/sprawling/Spec.lean` §8-94）。未落地：性能摘要与 doctor 的显示；`Wake` 等不经人的入口；`ResourceReadings` 其余四项的生产填写者——`bin::monitor::Sample` 没有 fsync 中位数与调度延迟，它的 `durable_lag` 是条数而本模块要的是等待时长，且监视器只在有人看时采样，不能作为判定的唯一来源（`crates/sprawling/Spec.lean` §8-90 决定 1）。
 -/
 
 /-! D5 定规：降级的线相对于设备，停止接新活的拒绝带着读数

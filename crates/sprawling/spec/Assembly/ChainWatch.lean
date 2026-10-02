@@ -8,7 +8,7 @@ import crates.storage.spec.ChainAudit
 /-!
 # 服务中的城在后台证明整条链
 
-规定 `crates/sprawling/src/assembly/chain_watch.rs` 的 `audit_in_background`（`bin::assembly::chain_watch`，形状：adapter；sprawling-SPEC.md 8-90）把证明线程的结局交给停机值的那一处。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。停机值本身（判定之前拒绝追加、第一个判定有效）的权威是 `crates/storage/spec/ChainAudit.lean`，这里只引用它。
+规定 `crates/sprawling/src/assembly/chain_watch.rs` 的 `audit_in_background`（`bin::assembly::chain_watch`，形状：adapter；§8-90）把证明线程的结局交给停机值的那一处。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。停机值本身（判定之前拒绝追加、第一个判定有效）的权威是 `crates/storage/spec/ChainAudit.lean`，这里只引用它。
 
 证明线程有四种结局：链完好、链断了、读账本本身失败、线程没给出判定就结束（恐慌；它持有的守卫在退栈时跳闸）。只有第一种让写者放行；其余三种都跳闸，因为没读完的证明既没有证明链断了，也没有证明它完好，而写在一条未经证明的链后面的行与写在断链后面的行一样收不回来。
 
@@ -57,3 +57,8 @@ theorem nothing_admitted_before_an_outcome :
     admit (awaiting : ChainHalt Reason) = .Unproven := rfl
 
 end Sprawling.Assembly.ChainWatch
+
+/-! D5 开城之后的证明在一个库 crate 里起线程
+
+证明按波读段（`crates/storage/Spec.lean` §8-37）的作用域线程起在 `storage::chain_audit` 里，不在装配根：一波的线程只读段、哈希前缀，一波 join 完才往下走，它们的寿命被一次 `prove_chain` 包住，与 `runtime::turn::wave::reorder` 的作用域线程同一类（ARCHITECTURE.md §10 第 3 条）。装配根仍只起那一条证明线程（`bin::assembly::chain_watch`）。**被否：在 `chain_watch` 里按段起线程、把各段的摘要交给 storage。** 前缀摘要与记录的判定就要分在两个 crate，`SegmentRecord` 也得公开；开账本（`crates/storage/Spec.lean` §8-34）判末段用的是同一个判定，它不经过 `chain_watch`。**重开参数**：证明要与别的后台工作共用一个有上限的线程池时。
+-/

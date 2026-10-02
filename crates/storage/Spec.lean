@@ -163,7 +163,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
   - **句柄命名的是文件，不是路径**，所以 `rename`／`remove_file`／`truncate` 之前必须松手：不松手的话，重命名之后向旧路径的追写会写进**已经改了名的那个文件**，删除之后的追写会写进**一个已不存在的文件**，两者都静默。CAS 正是靠「写 tmp 再重命名」给对象命名的，断尾修复正是靠截断与删除修段的。**Windows 不会拦住你**（Rust 开文件带共享删除与重命名），所以看着的断言问的不是「这个操作能不能做」而是「之后字节落在哪个文件里」；去掉 `release` 它当场报错。
   - **剩下的是 fsync 本身**，要再压就必须跨记录合屏障，而那是契约问题不是实现问题（下两段）。
   - 否决「跨会话组提交：一个序列化写入者收集同一时间窗内各会话的 drafts」，它针对的是多个线程争一把账本锁时的车队延迟。**这座城没有那个形状可优化**：
-  - 账本只在记账线程里打开且从不离开；驱动线程手里能写账本的只有 `accounting::worker::relay` 的 `Relay`，它把 draft 送到记账线程并等回执，所以「一座城一个写者」由类型持有（sprawling-SPEC 8-42，ARCHITECTURE §10）。探针量的是许多线程共享一个 `Mutex<JsonlLedger>`，那是本仓刻意不采用的形状。
+  - 账本只在记账线程里打开且从不离开；驱动线程手里能写账本的只有 `accounting::worker::relay` 的 `Relay`，它把 draft 送到记账线程并等回执，所以「一座城一个写者」由类型持有（`crates/sprawling/Spec.lean` §8-42，ARCHITECTURE §10）。探针量的是许多线程共享一个 `Mutex<JsonlLedger>`，那是本仓刻意不采用的形状。
   - 屏障的代价与骑在它上面的记录条数无关，所以一波一屏障：`kernel::Ledger` 端口有 `append_all`（`crates/kernel/Spec.lean` §8-51），`JsonlLedger` 覆写它为整波一次写一道屏障，`relay` 按波交付。
   - 否决的是给端口加一个显式屏障动作、让 `append` 只写不同步。**它会改掉本模块的一条必要前提**：`Ok` 即已落盘，观察者也只在落盘后才听到一条——「架上不会有历史里没有的东西」靠的就是这个，而 `EventRef` 一旦在同步前发出去，它就不再指向一条已存在的历史。
 - 不判定任何语义——kind 二分、载荷校验、规范字节全部来自 kernel；jsonl 只定 seq/prev 与介质。
@@ -321,7 +321,7 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 - `architecture.toml` 的模块图：storage 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
 - kernel 的规格（`crates/kernel/Spec.lean`）：事件表、错误码、`Ledger` 端口与 `chain_hash` 的权威；`crates/kernel/spec/Ledger.lean`：链规则与摘要单射的假设，`spec/Jsonl/Verify.lean` import 它。它们改了，这里的逐行检查与 §8-1、§8-14 一起重看。
-- sprawling 的规格（`crates/sprawling/sprawling-SPEC.md`）8-91、8-101、8-122、8-144、8-145、8-154：服务中的城怎样开账本、起证明、调 `stock`，以及证明与开城的读数；`tools/xtask/budgets.toml`：本 crate 的读数与预算。
+- sprawling 的规格（`crates/sprawling/Spec.lean`）8-91、8-101、8-122、8-144、8-145、8-154：服务中的城怎样开账本、起证明、调 `stock`，以及证明与开城的读数；`tools/xtask/budgets.toml`：本 crate 的读数与预算。
 - runtime 的规格（`crates/runtime/Spec.lean` §8-1、§8-13-2）：`replay` 与本 crate 共用 `LineCheck`，沙箱副本与本 crate 共用 `FileWork`。
 - 引本规格的其他规格与 rustdoc 写 `crates/storage/Spec.lean §8-n` 或 `storage D<n>`；一节换了分部，它的标签不变，引用不必改。
 -/

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The list half of the person's face of `sprawling view`
-//! (sprawling-SPEC.md 8-117): which tree rows are shown, how each is
+//! (`crates/sprawling/spec/Main.lean` §8-117): which tree rows are shown, how each is
 //! marked, the window of rows that keeps the cursor on screen, the
 //! ledger lines of the records lens on screen, and the list set beside
 //! the detail pane.

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A city whose process died while it was writing its history opens
-//! again by the rules (sprawling-SPEC.md 8-127): the half-written line is
+//! again by the rules (`crates/sprawling/Spec.lean` §8-127): the half-written line is
 //! cut and said, the chain verifies, a call whose answer was lost is
 //! closed as unknown rather than as failed, and the views answer from
 //! what survived, where the run that died is frozen.

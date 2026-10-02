@@ -49,7 +49,7 @@ fn a_reading_line_is_stable_and_carries_its_machine_class() {
 /// that drops the first cannot tell a slower design from a busier day.
 /// The shares are the nearest rank, `ceil(n * p / 100)` counted from
 /// one, the reading `bench_startup` and `sprawling gauge` print for the
-/// same samples (sprawling-SPEC.md 8-129-2).
+/// same samples (`crates/sprawling/Spec.lean` §8-129-2).
 #[test]
 fn a_reading_line_carries_its_floor_beside_the_middle() {
     let reading = Reading::of(

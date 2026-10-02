@@ -16,7 +16,7 @@ pub const EXTERNAL_CALL_PATIENCE: TimeoutMs = TimeoutMs(60_000);
 /// A request and a notification, both synchronous, because a tool call is a question
 /// with an answer. Where the bytes go and how long they take belongs to
 /// the adapter. `Send`, because the tool that holds one is `Send`
-/// (sprawling-SPEC 8-44).
+/// (`crates/sprawling/Spec.lean` §8-44).
 pub trait Outbound: Send {
     /// Sends one JSON-RPC line and returns the line that answered it,
     /// giving up after `patience`.

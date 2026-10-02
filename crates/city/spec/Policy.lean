@@ -43,7 +43,7 @@ impl RulesCache {
 }
 ```
 
-**`harness_minutes`**：一次 harness run 在这栋楼里最多跑多少分钟（sprawling-SPEC §8-124），正整数；缺这一行读作 `HARNESS_MINUTES_DEFAULT`（60）。`0` 由 serde 在解析时拒（`NonZeroU32`）：一个到点即停的上限是笔误。它只管 harness：模型 run 的每一回合都经城自己的安全点，停一件事是 `cancel`、停一片是 `halt`，而 harness 的回合在城之外走完，一个既不说话也不结束的 harness 没有别的路让出车道（D8 (b)）。
+**`harness_minutes`**：一次 harness run 在这栋楼里最多跑多少分钟（`crates/sprawling/Spec.lean` §8-124），正整数；缺这一行读作 `HARNESS_MINUTES_DEFAULT`（60）。`0` 由 serde 在解析时拒（`NonZeroU32`）：一个到点即停的上限是笔误。它只管 harness：模型 run 的每一回合都经城自己的安全点，停一件事是 `cancel`、停一片是 `halt`，而 harness 的回合在城之外走完，一个既不说话也不结束的 harness 没有别的路让出车道（D8 (b)）。
 
 `RulesCache`（`policy/cache.rs`，形状 1 判定）：一个 run 一份，读界的闭包持有它。`load` 先对 `RULES.toml` 做一次 stat，(mtime, len) 与上次读到的相同就交回留着的规则，不同或第一次就走 `load` 读盘求值并按这次 stat 的戳留下。文件不存在或 stat 失败时不留任何东西、每次都走 `load`，于是「没有 RULES.toml」与「被替代的旧文档」两条的答案与不缓存时逐字相同。锁中毒时同样退回 `load`。失败与 `load` 相同，失败不留。决定见 D3。
 

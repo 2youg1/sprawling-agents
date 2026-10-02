@@ -10,7 +10,7 @@
 -/
 
 /-!
-### 8-19 视图的第二份是克隆；一次性重建每行只核对一遍；房间的各段 session（`accounting::views::snapshot`、`accounting::views::snapshot::start`、`accounting::views::sessions`，形状 7 投影；sprawling-SPEC.md 8-144，`crates/wire/Spec.lean` §8-71）
+### 8-19 视图的第二份是克隆；一次性重建每行只核对一遍；房间的各段 session（`accounting::views::snapshot`、`accounting::views::snapshot::start`、`accounting::views::sessions`，形状 7 投影；`crates/sprawling/Spec.lean` §8-144，`crates/wire/Spec.lean` §8-71）
 
 ```rust
 // accounting::views
@@ -32,7 +32,7 @@ impl RoomSessions {
 }
 ```
 
-(a) **第二份视图是克隆。** 折叠线程轮换两份视图（sprawling-SPEC.md §8-99），第二份原先经快照编码复制：编码再解码，再把共享的句柄接回去。`Views` 的每个字段都能 `Clone`：折出来的字段深拷贝；账本索引、计划缓存、金库与停机值都在 `Arc` 里，克隆之后仍与原份共享；`machine`、`registry`、`upstream`、`programs` 照值带过去。所以 `#[derive(Clone)]` 给出的正是 `twin` 原先的结果，字段清单仍只写在 `Views` 的定义里。40 万行夹具城上，编码再解码 350 ms，克隆 22 ms（sprawling-SPEC.md §8-144）。为此 `storage::HotView`、`storage::Attribution`、`Governance` 与 `CommitFacts` 派生 `Clone`。
+(a) **第二份视图是克隆。** 折叠线程轮换两份视图（`crates/sprawling/Spec.lean` §8-99），第二份原先经快照编码复制：编码再解码，再把共享的句柄接回去。`Views` 的每个字段都能 `Clone`：折出来的字段深拷贝；账本索引、计划缓存、金库与停机值都在 `Arc` 里，克隆之后仍与原份共享；`machine`、`registry`、`upstream`、`programs` 照值带过去。所以 `#[derive(Clone)]` 给出的正是 `twin` 原先的结果，字段清单仍只写在 `Views` 的定义里。40 万行夹具城上，编码再解码 350 ms，克隆 22 ms（`crates/sprawling/Spec.lean` §8-144）。为此 `storage::HotView`、`storage::Attribution`、`Governance` 与 `CommitFacts` 派生 `Clone`。
 
 (b) **一次性重建每行只核对一遍。** `start_audited` 先判起点，再决定要不要先证明：
 - 快照合身（`SnapshotStart::Resume`）：先 `storage::prove_chain`（只读记录），`Whole` 才解码快照、折尾部；快照之前的行起步时不看，只有这次证明看。
@@ -40,7 +40,7 @@ impl RoomSessions {
 
 `Audited.lines_checked` 是证明逐行核对的行数加上折叠核对的行数（尾部行数，或从创世折到的最后一行的 `seq + 1`）。没有快照、没有记录时它等于账本行数，不是两倍；快照合身、记录写满时它等于记录之后长出的行数加尾部行数，与历史长度无关。两条都在 `worker::folds::views_start::tests` 以两种规模断言，这是整城重建的回退门；墙钟只进 `budgets.toml`。
 
-(c) **每个地址的各段 session 是视图里的一张表。** `accounting::views::sessions::RoomSessions` 为每个地址存一列 `wire::SessionLine`，`Views::apply` 每行调一次 `RoomSessions::absorb`：`session_opened` 在它的地址下开新的一段；`run_started` 在一个还没有任何一段的地址下开一段 `Dispatched`，否则给当前这一段的 `runs` 加一；任何带地址的记录都把这个地址当前这一段的 `last`、`at` 挪到自己。没有地址的记录不碰这张表。`Query::Sessions { room }` 由 `RoomSessions::answer` 在锁内作答（`crates/wire/Spec.lean` §8-71）。表随视图快照存取，所以视图快照的编码变了，`VIEWS_FOLD_RULES` 随之重取（sprawling-SPEC.md §8-91）；旧快照解不开就按 `WholeFold::Damaged` 从创世折一次，不报错。
+(c) **每个地址的各段 session 是视图里的一张表。** `accounting::views::sessions::RoomSessions` 为每个地址存一列 `wire::SessionLine`，`Views::apply` 每行调一次 `RoomSessions::absorb`：`session_opened` 在它的地址下开新的一段；`run_started` 在一个还没有任何一段的地址下开一段 `Dispatched`，否则给当前这一段的 `runs` 加一；任何带地址的记录都把这个地址当前这一段的 `last`、`at` 挪到自己。没有地址的记录不碰这张表。`Query::Sessions { room }` 由 `RoomSessions::answer` 在锁内作答（`crates/wire/Spec.lean` §8-71）。表随视图快照存取，所以视图快照的编码变了，`VIEWS_FOLD_RULES` 随之重取（`crates/sprawling/Spec.lean` §8-91）；旧快照解不开就按 `WholeFold::Damaged` 从创世折一次，不报错。
 -/
 
 /-!
@@ -53,7 +53,7 @@ const VIEWS_FOLD_RULES: &str = "views-fold-<16 位十六进制>";       // 视�
 const STANDING_FOLD_RULES: &str = "standing-fold-<16 位十六进制>"; // Standing 夹具编码的 blake3 前缀
 ```
 
-- **门只看得见夹具里有的类型。** 两个常量的后缀是一份固定夹具经快照编码之后的 blake3 前缀，编码一变，`the_fold_rules_name_carries_the_digest_of_the_views_encoding` 与 Standing 的同名测试给出新值并失败（sprawling-SPEC.md §8-91）。夹具里没有 `GitOid`，摘要的编码从十六进制改成字节时摘要不动，旧快照就会以同一个 `fold_version` 交给新的解码：postcard 把一个长度前缀加 40 个十六进制字符当成 20 个字节读，读错的视图可能照样解得开。
+- **门只看得见夹具里有的类型。** 两个常量的后缀是一份固定夹具经快照编码之后的 blake3 前缀，编码一变，`the_fold_rules_name_carries_the_digest_of_the_views_encoding` 与 Standing 的同名测试给出新值并失败（`crates/sprawling/Spec.lean` §8-91）。夹具里没有 `GitOid`，摘要的编码从十六进制改成字节时摘要不动，旧快照就会以同一个 `fold_version` 交给新的解码：postcard 把一个长度前缀加 40 个十六进制字符当成 20 个字节读，读错的视图可能照样解得开。
 - **所以夹具折进每一种出现在快照里的摘要。** 视图的夹具多折一条 `checkpoint_committed`（`commits`、`commit_seqs`、`last_commit` 各存一个 `GitOid`）与一条 `rules_changed`（`governance.rules` 存一个 `B3Hash`）；Standing 的夹具多折同一条 `rules_changed`（它的 `governance` 是同一个类型）。kernel 里摘要的编码再变，两道门都变红，旧快照按 `WholeFold::OtherFoldVersion` 从创世折一次。
 - **摘要在快照里是字节。** `views::snapshot::tests` 断言一个 `GitOid` 与一个 `B3Hash` 的快照编码就是它们的 20 与 32 个字节、读回相等，JSON 拼写仍是十六进制（`crates/kernel/Spec.lean` §8-84）。
 - **被否：夹具不动，改编码的人记得改常量。** 这正是两个常量带摘要后缀要免掉的那种记忆；而这次的改动在 kernel，改它的人看不见 accounting 的常量。
@@ -71,7 +71,7 @@ const STANDING_FOLD_RULES: &str = "standing-fold-<16 位十六进制>"; // Stand
 
 /-! ### 接口仍写在 sprawling 规格里的模块
 
-下面这些模块的接口与取舍今天写在 `crates/sprawling/sprawling-SPEC.md` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
+下面这些模块的接口与取舍今天写在 `crates/sprawling/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
 
 | sprawling 的标签 | 模块 |
 |---|---|

@@ -13,7 +13,7 @@
 ### 8-21 accounting::views::document 与 views::answering::range：文档的一版与它的窗口（形状 7 投影）
 
 ```rust
-// accounting::views::document（锁外，sprawling-SPEC.md §8-100）
+// accounting::views::document（锁外，`crates/sprawling/Spec.lean` §8-100）
 pub(super) fn document_answer(city_root: &Path, at: Address) -> wire::DocumentAnswer;
 pub(super) fn read_bytes(bytes: &[u8]) -> Reading;      // Content 与 Prefix 的文本判定，经 documents::Reading::of
 // accounting::views::answering::range（锁外）
@@ -31,7 +31,7 @@ pub(in crate::views) fn range_answer(city_root: &Path, version: B3Hash, range: d
 ### 8-23 accounting::views::answering::preview：一个 Markdown 版本的一个窗口读成块（形状 7 投影）
 
 ```rust
-// accounting::views::answering::preview（锁外，sprawling-SPEC.md §8-100）
+// accounting::views::answering::preview（锁外，`crates/sprawling/Spec.lean` §8-100）
 impl Views { pub(in crate::views) fn preview_ask(&self, version: B3Hash, viewport: documents::Span) -> Prepared; }
 pub(in crate::views) fn preview_answer(city_root: &Path, version: B3Hash, viewport: documents::Span) -> wire::Answer;
 ```
@@ -47,7 +47,7 @@ pub(in crate::views) fn preview_answer(city_root: &Path, version: B3Hash, viewpo
 ### 8-29 accounting::views::answering::reply：一段回复读成块（形状 7 投影）
 
 ```rust
-// accounting::views::answering::reply（锁外，sprawling-SPEC.md §8-100）
+// accounting::views::answering::reply（锁外，`crates/sprawling/Spec.lean` §8-100）
 pub(in crate::views) fn reply_answer(text: &str, state: documents::ReplyState) -> wire::Answer;
 // Views::prepare 的一臂：Query::Reply { text, state } → Prepared::Reply { text, state }
 ```

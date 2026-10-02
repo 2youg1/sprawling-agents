@@ -311,7 +311,7 @@ fn a_verdict_counts_the_required_items_of_its_own_tier_only() {
 }
 
 /// The page says what an item enables in its own words, looked up by the
-/// item's name (sprawling-SPEC §12): a row the table gains without a
+/// item's name (sprawling D6): a row the table gains without a
 /// clause in both languages would reach a reader as a bare name.
 #[test]
 fn every_item_has_the_page_clause_in_both_languages() {
@@ -353,7 +353,7 @@ fn the_prereqs_file_is_the_develop_tier_rendered() {
 /// names, so that program is a required row of the develop tier. The
 /// shell is read out of the `justfile` rather than written here, so a
 /// recipe file that moves to another shell turns this red until the
-/// table follows it (sprawling-SPEC.md 8-130).
+/// table follows it (`crates/sprawling/spec/Doctor.lean` §8-130).
 #[test]
 fn the_shell_every_recipe_runs_in_is_a_required_develop_row() {
     let justfile = std::fs::read_to_string(

@@ -24,7 +24,7 @@ use super::{Agreed, Assignment, HarnessSeat, Seat};
 /// hash itself rather than from its printed form: the round trip
 /// through hexadecimal had two failure points that both answered zero,
 /// so a digest this build could not print became run `00000…`
-/// (sprawling-SPEC.md 8-73).
+/// (`crates/sprawling/Spec.lean` §8-73).
 pub(in crate::worker) fn run_id_for(job: &Locator, addr: &Address, now: TimeMs) -> RunId {
     let seed = format!("{job}|{}|{}", addr.as_str(), now.value());
     let digest = kernel::B3Hash::digest(seed.as_bytes());
@@ -160,8 +160,8 @@ impl RunWorker {
         let provider = chosen.endpoint.name.clone();
         let adapter = self.models.build(&chosen, self.redemption()?)?;
         // Every request the run sends goes through the keep-warm door,
-        // so a landed run can have its prefix renewed (sprawling-SPEC
-        // 8-112); under the default setting the door only forwards.
+        // so a landed run can have its prefix renewed (`crates/sprawling/Spec.lean`
+        // §8-112); under the default setting the door only forwards.
         let clock = std::sync::Arc::clone(&self.clock);
         let adapter = crate::worker::keeping_warm::Door::new(
             adapter,
@@ -190,7 +190,7 @@ impl RunWorker {
     /// booked as zero bytes, the same reading `city::load` gives it. A
     /// building that does not exist opens no account: a mistyped name
     /// would otherwise leave the history holding a building the city
-    /// never had (sprawling-SPEC.md 8-40).
+    /// never had (`crates/sprawling/Spec.lean` §8-40).
     ///
     /// # Errors
     /// `E_STORAGE_FATAL` for a document or a building root that cannot
@@ -265,7 +265,7 @@ impl RunWorker {
     /// follow-up without `-m` - continues on the model its room froze
     /// while a tag still registers it, and otherwise runs on `main`:
     /// the session's shape check then refuses the moved model with the
-    /// way out a person can take (sprawling-SPEC.md 8-79), which a
+    /// way out a person can take (`crates/sprawling/Spec.lean` §8-79), which a
     /// refusal here could not name.
     ///
     /// # Errors
@@ -302,7 +302,7 @@ impl RunWorker {
 /// The harness a room's configuration names, or the refusal a dispatch
 /// to it is owed before anything is written: a spelling that names none
 /// of the five, a confidential building, and a dispatch that named a
-/// model (sprawling-SPEC.md 8-124). `file` is the layer that named it,
+/// model (`crates/sprawling/Spec.lean` §8-124). `file` is the layer that named it,
 /// which is where a person changes it.
 fn seated_harness(
     at: &Assignment,

@@ -6,7 +6,7 @@
 //! A device's first connection, as the door keeper carries it out: the
 //! code the console mints, the city's half of the pairing handshake,
 //! and the claim that makes a device paired (crates/remote_access/Spec.lean
-//! §8-6; sprawling-SPEC.md 8-139).
+//! §8-6; `crates/sprawling/spec/Outside/Conduit.lean` §8-139).
 
 use kernel::event::Who;
 use kernel::event::record::DevicePaired;

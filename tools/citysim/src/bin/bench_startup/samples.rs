@@ -44,7 +44,7 @@ const SECOND_TIER: Duration = Duration::from_millis(1);
 /// recorded.
 ///
 /// The shares, floor and peak are the product's one reading of a set,
-/// `Spread` (sprawling-SPEC.md 8-129-2); what this set adds is the
+/// `Spread` (`crates/sprawling/Spec.lean` §8-129-2); what this set adds is the
 /// arrival order. A suspicious stretch is a question about *when* in the
 /// run something happened, so each sample keeps its mark in the order it
 /// arrived.

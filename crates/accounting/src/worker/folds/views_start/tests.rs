@@ -190,7 +190,7 @@ fn a_snapshot_that_cannot_be_cut_is_reported_and_the_views_still_serve() {
 
 /// A served city whose last opening cut both snapshots opens again from
 /// them: before the first byte it checks and folds only the lines written
-/// since, not the history before them (sprawling-SPEC.md 8-122).
+/// since, not the history before them (`crates/sprawling/Spec.lean` §8-122).
 #[test]
 fn a_served_city_reopens_from_its_snapshots_and_folds_only_what_grew() {
     let dir = tempfile::tempdir().unwrap();

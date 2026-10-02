@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The second client of `wire::frames` (sprawling-SPEC.md section
+//! The second client of `wire::frames` (`crates/sprawling/Spec.lean` section
 //! 8-10).
 //!
 //! ARCHITECTURE section 8 says the wire is the whole API and that a

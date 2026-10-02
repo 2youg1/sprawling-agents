@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The ledger as the person's face of `sprawling view` reads it while it
-//! is open (sprawling-SPEC.md 8-117): the newest lines first, the whole
+//! is open (`crates/sprawling/spec/Main.lean` §8-117): the newest lines first, the whole
 //! fold on a background thread, then only the lines appended since the
 //! last look.
 

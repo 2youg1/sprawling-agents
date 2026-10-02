@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `sprawling desktop [scope]`: this machine's desktop, served as an MCP
-//! server over this process's own pipes (sprawling-SPEC.md 8-4d).
+//! server over this process's own pipes (`crates/sprawling/spec/Main.lean` §8-4d).
 //!
 //! A city starts it as a child for a building whose rules ask for the
 //! desktop, naming that building's `DESKTOP.toml`; a person can start

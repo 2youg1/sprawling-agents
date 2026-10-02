@@ -74,7 +74,7 @@ pub struct CitySettings {
 /// different results on disk, and `carry: true` at a call site says
 /// neither of them. `Nothing` is the first variant and the default,
 /// because that is what a person means by starting a new session — a
-/// new one, here, not a continuation (`sprawling-SPEC.md` 8-82). The
+/// new one, here, not a continuation (`crates/sprawling/Spec.lean` §8-82). The
 /// handoff is the exception a person states.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

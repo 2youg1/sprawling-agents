@@ -6,7 +6,7 @@
 
 ## 1 定位与边界
 
-- `client/` 在 cargo workspace **之外**，由 bun 驱动；产物落 `sprawling` 包里的 `crates/sprawling/web-dist/`（crates.io 的包只装包目录，sprawling-SPEC 8-83），不随 `CARGO_TARGET_DIR` 移动（`index.html` 在该目录根，其余在 `assets/`），`crates/sprawling/build.rs` 递归嵌入该目录，并以 `index.html` 与 `assets/` 的存在判「完整」。
+- `client/` 在 cargo workspace **之外**，由 bun 驱动；产物落 `sprawling` 包里的 `crates/sprawling/web-dist/`（crates.io 的包只装包目录，`crates/sprawling/Spec.lean` §8-83），不随 `CARGO_TARGET_DIR` 移动（`index.html` 在该目录根，其余在 `assets/`），`crates/sprawling/build.rs` 递归嵌入该目录，并以 `index.html` 与 `assets/` 的存在判「完整」。
 - **两种范式不叠**：Effect 给的是值，不是运行时——生成的 `Schema` 读帧与读城外来的 JSON，`Option` 与 `Result` 是可缺与可败的值（4-6）。socket 阶梯、asking、belief 都是纯 TS 状态机加 `svelte/store`，视图只见 Svelte。
 - 运行时依赖的名单只有一个家：`tools/xtask/src/npm.rs` 的 `RUNTIME`，本文件不抄它的条目与数目。名单上除了 `svelte` 与 `effect`，还有 `@lezer/highlight` 与各语言的 `@lezer` 语法，因为代码视图按语法上色，而高亮器与每种语法都是按需加载的分块（4-26），不进首屏；以及图标集 `@lucide/svelte`，只经 `parts/glyph.svelte` 一处出口、按图标单独导入（4-34）；以及 RefRain 的五个 `@codemirror` 包，只由 `views/refrain/` 读，是懒加载的一块（7N、12-23）；以及 `pdfjs-dist` 与 `docx-preview`，只由 `views/refrain/formats/` 读，各是一块懒加载的分块，pdf.js 的 worker、CMap、两种符号字体与三个 WebAssembly 解码器是 bundle 里单独的文件（4-54、12-32）。hash 路由手写，不引路由库；组件库按 §7 的判定逐个引入。`xtask npm` 门守三件事：锁文件与清单逐条同、运行时依赖恰为 `RUNTIME`、许可证在 `deny.toml` 的清单上。
 - Firefox 是第一浏览器：每个屏幕先在 Firefox 里验收。
@@ -799,7 +799,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 ### 12-8 对话里没有 `/goal`
 
 - **决策**（由人选定）：页面的斜杠表不设 `/goal`。
-- **理由**：目标已经有两处权威——楼的常设目标（`set_pursuit`／`pursue`，sprawling-SPEC §8-35）与每次派活的 `run_started.goal`。对话里再开一个入口，就是同一事实的第三处定义，三处之间没有东西把它们绑在一起。
+- **理由**：目标已经有两处权威——楼的常设目标（`set_pursuit`／`pursue`，`crates/sprawling/Spec.lean` §8-35）与每次派活的 `run_started.goal`。对话里再开一个入口，就是同一事实的第三处定义，三处之间没有东西把它们绑在一起。
 - **被击败的备选**：`/goal <text>|pause|resume|clear`，把 `/goal x` 翻成 `pursue{step:{set:{goal:"x"}}}`。
 - **重开参数**：常设目标与派活目标合并成一处权威时，对话入口可以指向那一处而不增加定义。
 

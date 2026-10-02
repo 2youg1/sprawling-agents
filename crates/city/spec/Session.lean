@@ -18,10 +18,10 @@ pub fn forget_shape(city_root: &Path, addr: &Address) -> Result<(), AxError>;
 ```
 两个名字而不是一个带开关的名字：`clear_session` 是 `Carry::Nothing` 的整件事（形状与交接槽位都清），
 `forget_shape` 是 `Carry::Handoff` 要的那一半（形状清、交接留）。**两者都不是「可选参数」**：
-命令行与线协议各自都有它们要的那个动词（sprawling-SPEC §8-82），而传一个 `bool` 到这里会让「带不带」
+命令行与线协议各自都有它们要的那个动词（`crates/sprawling/Spec.lean` §8-82），而传一个 `bool` 到这里会让「带不带」
 在城的接口上多出一种拼法。
 
-**原因**：房间的第一个 run 把 `[model]` 与 `effort` 写进它自己的 `CONFIG.toml`，此后形状不同的派活全被拒（§8-14），没有逆操作，换过主模型的人就永远派不出去。这个函数就是那个出口的城侧一半（动词在 sprawling-SPEC §8-82）。
+**原因**：房间的第一个 run 把 `[model]` 与 `effort` 写进它自己的 `CONFIG.toml`，此后形状不同的派活全被拒（§8-14），没有逆操作，换过主模型的人就永远派不出去。这个函数就是那个出口的城侧一半（动词在 `crates/sprawling/Spec.lean` §8-82）。
 
 - **两条写，一个决定**：新的一段开始时，房间自己写下的 `[model] name` 与 `[model] effort` 删掉（`write_session` 的逆操作），房间的 `Handoff.md` 同时清空。放在一个函数里，是因为「这一段从这里开始」是一个判断：拆成两个调用，就有一个可能没被调到，而两种半清理的状态都是假话。
 - **交接槽位必须清，否则「不带」是假话**：`accounting::worker::freezing` 无条件读 `city::handoff(root, room)` 并把它折进下一个 run 的 prompt；只清配置而留文件，新一段仍会继承上一段的摘要，于是开关不起作用。

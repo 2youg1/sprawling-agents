@@ -377,7 +377,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 - ARCHITECTURE 模块表的 wire 各行。
 - `client/client-SPEC.md`：线上形状变了的那一侧。
-- `crates/sprawling/sprawling-SPEC.md`：`serve` 子命令的装配面。
+- `crates/sprawling/Spec.lean`：`serve` 子命令的装配面。
 
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 wire 各行的 `spec` 锚点一起重看。ARCHITECTURE.md §7「The wire」与 §8 的「a new `Command` or `Query` frame」一行引 D1。
 - `architecture.toml` 的模块图：wire 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。

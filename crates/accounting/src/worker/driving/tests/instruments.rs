@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Two instruments over the accounting loop the city runs
-//! (sprawling-SPEC.md 8-84): a relay round trip, and the gap a second
+//! (`crates/sprawling/Spec.lean` §8-84): a relay round trip, and the gap a second
 //! dispatch leaves in a run that is already going.
 //!
 //! Both drive `crate::worker::attend::attend` on a thread of its own, send
@@ -37,7 +37,7 @@ use crate::worker::*;
 const APPENDS: usize = 200;
 /// What a request asking a model to name a room is held for, which is
 /// about what a remote model takes to answer a short request. Rooms are
-/// named by rule (sprawling-SPEC.md 8-86), so no dispatch sends one and
+/// named by rule (`crates/sprawling/Spec.lean` §8-86), so no dispatch sends one and
 /// the hold shows in the reading only if naming comes back.
 const NAMING: Duration = Duration::from_secs(3);
 /// The status turns run A takes before it answers.
@@ -53,7 +53,7 @@ const WITHIN: Duration = Duration::from_secs(60);
 /// The most a relay round trip over the memory store may take at its
 /// middle. Only that store is held to it: there the whole round trip is
 /// the harness, while on the disk store the middle is the device's fsync,
-/// a physical floor that differs by machine (sprawling-SPEC.md 8-84).
+/// a physical floor that differs by machine (`crates/sprawling/Spec.lean` §8-84).
 const ROUND_TRIP_P50: Duration = Duration::from_millis(1);
 
 #[derive(Debug, Clone, Copy)]

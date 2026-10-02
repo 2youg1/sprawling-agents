@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The performance monitor's history: whether anybody is watching, and
-//! the last [`CAPACITY`] samples they read (sprawling-SPEC.md 8-94;
+//! the last [`CAPACITY`] samples they read (`crates/sprawling/spec/Monitor.lean` §8-94;
 //! its properties are proved in `crates/sprawling/spec/Monitor.lean`).
 //!
 //! Nobody watching costs nothing: no counter is read and the history

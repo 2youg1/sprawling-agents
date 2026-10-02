@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The newest release of one item, asked of its publisher
-//! (sprawling-SPEC.md section 8-120).
+//! (`crates/sprawling/spec/Doctor.lean` §8-120).
 //!
 //! **Only official sources**: crates.io for a crate, the Rust and rustup
 //! release channels for those two, python.org for Python, and a

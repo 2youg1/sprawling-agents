@@ -176,7 +176,7 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 /-!
 ### 8-5 订阅额度不经本 crate
 
-本 crate 只接两种兼容格式的端点：OpenAI 兼容（chat 与 responses 两面）与 Anthropic 兼容，凭证只有人交出的 API key。**订阅额度由厂商自己的 harness 带进城**（Codex、Claude Code、Grok Build、Kimi Code、Pi 五家，人在 harness 里自己登录，见 sprawling-SPEC 的 harness 一节），本 crate 不以任何厂商客户端的身份登录，不持订阅令牌，也不续期。
+本 crate 只接两种兼容格式的端点：OpenAI 兼容（chat 与 responses 两面）与 Anthropic 兼容，凭证只有人交出的 API key。**订阅额度由厂商自己的 harness 带进城**（Codex、Claude Code、Grok Build、Kimi Code、Pi 五家，人在 harness 里自己登录，见 `crates/sprawling/Spec.lean` 的 harness 一节），本 crate 不以任何厂商客户端的身份登录，不持订阅令牌，也不续期。
 
 - **理由是厂商原文，不是口味。** Anthropic 的 Claude Code 合规页（<https://code.claude.com/docs/en/legal-and-compliance>，「Authentication and credential use」一节）写明 "Anthropic does not permit third-party developers to offer Claude.ai login into their own applications"，并且 "developers may not collect, store, or intermediate Claude.ai credentials or session tokens"。Kimi Code 的会员指南（<https://www.kimi.com/en/help/kimi-code/membership-guide>）把 OAuth 留给官方客户端，第三方工具用 API key。OpenAI 没有给第三方用 ChatGPT 凭据调用订阅后端的公开契约，它给出的嵌入方式是 `codex app-server`。借用某家官方客户端的 client id 登录、把令牌存进金库，正是前两家禁止、第三家不承诺的做法。
 - **落选**：保留四家登录表并逐家标注风险。那是替人拿他的账号去赌厂商不执行条款，执行的后果落在人身上，而不是本城。
@@ -326,6 +326,6 @@ golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返�
 - `architecture.toml` 的模块图：gateway 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
 - kernel 的规格（`crates/kernel/Spec.lean`）：canonical 会话类型（§8-24）、`InputKinds`、`ModelFacts`、`Ceiling`、`Retries` 与码表的权威；它们改了，这里的模型与 §8 相应各节一起重看。
-- sprawling 的规格（`crates/sprawling/sprawling-SPEC.md`）：选型点的窗口梯（8-71）、城的工具 `transcribe`（8-131）与 `ocr`（8-142）；它们读本规格的 §8-12、§8-17、§8-34、§8-37。
+- sprawling 的规格（`crates/sprawling/Spec.lean`）：选型点的窗口梯（8-71）、城的工具 `transcribe`（8-131）与 `ocr`（8-142）；它们读本规格的 §8-12、§8-17、§8-34、§8-37。
 - 引本规格的其他规格与 rustdoc 写 `crates/gateway/Spec.lean §8-n` 或 `gateway D<n>`；一节换了分部，它的标签不变，引用不必改。
 -/

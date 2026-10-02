@@ -7,7 +7,7 @@
 //! commands it dispatches one step below never outrank the accounting
 //! and the views, and back to normal when a turn ends having kept a core
 //! busy through a whole window; the valve judges only at a turn's end
-//! (sprawling-SPEC.md 8-93, decision 2). The valve and the one lowering
+//! (`crates/sprawling/spec/Serving/Standing.lean` §8-93, decision 2). The valve and the one lowering
 //! are modelled in `crates/sprawling/spec/Serving/Standing.lean`.
 
 use std::cell::RefCell;
@@ -16,10 +16,10 @@ use std::time::{Duration, Instant};
 use accounting::person::CorePriority;
 
 /// The monotonic sampling point: how long a thread stayed busy is a span,
-/// and a wall clock that steps would misstate it (sprawling-SPEC.md
-/// 8-93). Here rather than beside the wall clock in `bin::assembly`,
+/// and a wall clock that steps would misstate it (`crates/sprawling/spec/Serving/Standing.lean`
+/// §8-93). Here rather than beside the wall clock in `bin::assembly`,
 /// because the core threads it times are started here and in the view
-/// fold, and neither names the assembly point (sprawling-SPEC.md 8-92).
+/// fold, and neither names the assembly point (`crates/sprawling/spec/Supervising.lean` §8-92).
 #[expect(
     clippy::disallowed_methods,
     reason = "the one monotonic sampling point: a core thread's valve measures spans"

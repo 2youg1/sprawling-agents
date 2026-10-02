@@ -19,7 +19,7 @@ use super::*;
 /// An experiment lands nothing, and in a building that asks for no
 /// review that is held by where it writes: the room's own worktree, so
 /// the file it creates never appears in the building, and the ledger
-/// says which tree and which policy (sprawling-SPEC 8-133).
+/// says which tree and which policy (`crates/sprawling/Spec.lean` §8-133).
 #[test]
 fn an_experiment_writes_in_a_tree_of_its_own_in_a_building_without_review() {
     let dir = tempfile::tempdir().unwrap();

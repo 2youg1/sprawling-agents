@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The remote door as this process keeps it (sprawling-SPEC.md 8-139):
+//! The remote door as this process keeps it (`crates/sprawling/spec/Outside/Conduit.lean` §8-139):
 //! the one `remote_access::door::Door`, the city's signing key, the
 //! route, the device table and the ledger lines, behind one lock.
 //!
@@ -21,7 +21,7 @@
 //! drawn when the process starts and lives only in it. A device pins the
 //! key it paired with, so a restart is a new key and every device pairs
 //! again; keeping the key across restarts is the vault's work, which
-//! sprawling-SPEC.md 8-139 leaves open.
+//! `crates/sprawling/spec/Outside/Conduit.lean` §8-139 leaves open.
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -47,7 +47,7 @@ pub(crate) type Clock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
 /// This machine's random source, filling the slice it is given.
 pub(crate) type Entropy = Arc<dyn Fn(&mut [u8]) -> Result<(), AxError> + Send + Sync>;
 /// Builds the route one opening of the door goes out through, closed
-/// (sprawling-SPEC.md 8-151): asked once per `open`, so the route is the
+/// (`crates/sprawling/spec/Assembly.lean` §8-151): asked once per `open`, so the route is the
 /// one the city's configuration names at that moment.
 pub(crate) type Choosing = Box<dyn FnMut() -> Result<Box<dyn Route + Send>, AxError> + Send>;
 

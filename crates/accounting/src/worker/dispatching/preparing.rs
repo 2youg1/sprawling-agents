@@ -7,10 +7,10 @@
 //! another process: the review tree, the bench with its MCP servers,
 //! and the frozen plan. It runs in the lane that drives the run, so the
 //! accounting thread never waits on a handshake or a checkout
-//! (sprawling-SPEC.md 8-113). Once the run is driven and handed home,
+//! (`crates/sprawling/Spec.lean` §8-113). Once the run is driven and handed home,
 //! the same lane puts the city's stock back, so the next placement is a
 //! rename rather than a checkout and the run's landing does not wait on
-//! the checkout (sprawling-SPEC.md 8-145, 8-155, 8-161).
+//! the checkout (`crates/sprawling/Spec.lean` §8-145, §8-155, §8-161).
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -27,7 +27,7 @@ use super::super::{Assignment, DriveContext, Driven, Driving, Given, Site, Stamp
 /// One dispatch the accounting thread has decided, on its way to a
 /// lane: what was asked, and everything the lane reads, owned so the
 /// value can leave the thread. One arm per resident, decided once by
-/// `agree_to_work` (sprawling-SPEC.md 8-124).
+/// `agree_to_work` (`crates/sprawling/Spec.lean` §8-124).
 #[expect(
     clippy::large_enum_variant,
     reason = "one value per run in flight, moved a handful of times on its way to a lane; a box buys nothing a run would notice"
@@ -55,7 +55,7 @@ pub(in crate::worker) struct LaneHalf {
     pub(in crate::worker) carried_from: Option<RunId>,
     pub(in crate::worker) member: Option<runtime::BacklogId>,
     /// The key of the command this dispatch answers, stamped on every
-    /// line the lane half writes (sprawling-SPEC.md 8-41).
+    /// line the lane half writes (`crates/sprawling/Spec.lean` §8-41).
     pub(in crate::worker) command: Option<kernel::IdemKey>,
 }
 
@@ -91,7 +91,7 @@ impl Staged {
     /// borrowed a tree. The run's landing therefore never waits on the
     /// stock's checkout, and the pool's lane, the one caller outside
     /// tests, makes that checkout off the accounting thread
-    /// (sprawling-SPEC.md 8-145, 8-161).
+    /// (`crates/sprawling/Spec.lean` §8-145, §8-161).
     ///
     /// Generic in the ledger for the reason [`drive_run`] is: a lane
     /// writes through its relay, and a test on the accounting thread
@@ -134,12 +134,12 @@ impl Staged {
 }
 
 /// What a lane needs once its run is driven to put the city's stock
-/// back, and to say so when it cannot (sprawling-SPEC.md 8-155).
+/// back, and to say so when it cannot (`crates/sprawling/Spec.lean` §8-155).
 struct Restock {
     city_root: PathBuf,
     notes: Notes,
     /// Where the ledger stood when the dispatch was staged, which the
-    /// lane's diagnostic lines are anchored at (sprawling-SPEC.md 8-113).
+    /// lane's diagnostic lines are anchored at (`crates/sprawling/Spec.lean` §8-113).
     staged_at: kernel::Seq,
 }
 
@@ -190,7 +190,7 @@ impl Restock {
 /// One writer process per city, so this is who is stocking each city.
 /// Two stockings that both found no stock would race, and the loser
 /// would take back the winner's registration under a placement that is
-/// taking it over (sprawling-SPEC.md 8-155).
+/// taking it over (`crates/sprawling/Spec.lean` §8-155).
 static STOCKING: Mutex<BTreeSet<PathBuf>> = Mutex::new(BTreeSet::new());
 
 /// One lane's turn at stocking one city, given up when it is dropped.

@@ -46,17 +46,17 @@ pub(super) struct Opening {
     pub(super) held: (storage::JsonlLedger, storage::OpenReport, Standing),
     /// The chain audit's own voice: the same sink and the same floor as
     /// `log`, held apart because the audit thread never touches the
-    /// writer (sprawling-SPEC.md 8-90).
+    /// writer (`crates/sprawling/spec/Assembly/Listening.lean` §8-90).
     pub(super) audit_log: runtime::diagnostics::Diagnostics,
     /// When opening the city began, which the proof measures the moment
-    /// commands are taken from (sprawling-SPEC.md 8-122).
+    /// commands are taken from (`crates/sprawling/spec/Assembly/Listening.lean` §8-122).
     pub(super) began: std::time::Instant,
     /// The person's `[core] priority`, the reading the socket's workers
     /// already stand on.
     pub(super) core: CorePriority,
     /// The halt the writer waits on until the history is proved, made
     /// before the views so they watch the same verdict
-    /// (sprawling-SPEC.md 8-134).
+    /// (`crates/sprawling/spec/Assembly.lean` §8-134).
     pub(super) halt: storage::ChainHalt,
 }
 
@@ -70,7 +70,7 @@ pub(super) struct Outward {
     pub(super) desk: Arc<CommandDesk>,
     pub(super) views: Arc<Published>,
     /// The unpublished twin of `views`, folded over the same records
-    /// (sprawling-SPEC.md 8-99).
+    /// (`crates/sprawling/spec/Assembly/Listening.lean` §8-99).
     pub(super) spare: Views,
     pub(super) to_clients: tokio::sync::broadcast::Sender<wire::Committed>,
     pub(super) to_watchers: tokio::sync::broadcast::Sender<wire::Delta>,
@@ -89,12 +89,12 @@ pub(super) struct Outward {
 pub(super) struct Started {
     pub(super) thread: std::thread::JoinHandle<()>,
     pub(super) vault: Arc<std::sync::Mutex<gateway::Custodian>>,
-    /// The accounting queue's counts, for the monitor (sprawling-SPEC.md 8-98).
+    /// The accounting queue's counts, for the monitor (`crates/sprawling/spec/Accounting/Worker.lean` §8-98).
     pub(super) health: Health,
-    /// The view fold's backlog, for the monitor (sprawling-SPEC.md 8-123).
+    /// The view fold's backlog, for the monitor (`crates/sprawling/spec/Serving.lean` §8-123).
     pub(super) backlog: crate::serving::folding::Backlog,
     /// The crossing the remote door writes its lines through
-    /// (sprawling-SPEC.md 8-139).
+    /// (`crates/sprawling/spec/Outside/Conduit.lean` §8-139).
     pub(super) relay: accounting::worker::Relay,
 }
 
@@ -131,7 +131,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     } = outward;
     // The views are folded beside the writer rather than on it, so a
     // reader holding them never delays the next record
-    // (sprawling-SPEC.md 8-99).
+    // (`crates/sprawling/spec/Assembly/Listening.lean` §8-99).
     let Folding {
         observer,
         machine,
@@ -146,7 +146,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         },
         Broadcast { to_clients, head },
         // The views thread stands above the commands the city
-        // dispatches (sprawling-SPEC.md 8-93).
+        // dispatches (`crates/sprawling/spec/Serving/Standing.lean` §8-93).
         setting,
         crate::serving::standing::monotonic_now,
     )?;
@@ -168,7 +168,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                     // Detached: the proof holds no part of the writer,
                     // and what it finds reaches the writer through the
                     // halt it attached; until then the writer takes no
-                    // line (sprawling-SPEC.md 8-90).
+                    // line (`crates/sprawling/spec/Assembly/Listening.lean` §8-90).
                     if let Err(err) = super::chain_watch::audit_in_background(
                         worker.chain_under_audit(halt),
                         audit_log,
@@ -211,8 +211,8 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             });
             // The session slices go to the view thread before the
             // observer is attached, so every record from here on is filed
-            // there and none on the accounting thread (sprawling-SPEC.md
-            // 8-123).
+            // there and none on the accounting thread (`crates/sprawling/spec/Serving.lean`
+            // §8-123).
             // The sender is consumed either way: the fold thread ends only
             // once every sender is gone, and this thread joins it.
             match worker.hand_off_session_slices() {

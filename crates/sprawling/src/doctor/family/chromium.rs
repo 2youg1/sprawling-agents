@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The Chromium browsers, and where each platform puts them
-//! (sprawling-SPEC.md section 8-57).
+//! (`crates/sprawling/spec/Doctor.lean` §8-57).
 //!
 //! Data, with no branch in it. None of these is a way into a session on
 //! its own: the driver beside them is, and it has its own row, so this

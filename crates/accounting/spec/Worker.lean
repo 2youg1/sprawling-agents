@@ -18,13 +18,13 @@
 pub struct Hands {
     pub vault: gateway::Custodian,                       // 生产：Custodian::probe 打开的那一个；脚本：Custodian::in_memory()
     pub clock: Arc<dyn Clock + Send + Sync>,             // §8-3
-    pub monotonic: fn() -> Instant,                      // 量时长的单调钟：派活准备、mcp_tools、probe 的用时（sprawling-SPEC.md §8-129-2）
+    pub monotonic: fn() -> Instant,                      // 量时长的单调钟：派活准备、mcp_tools、probe 的用时（`crates/sprawling/Spec.lean` §8-129-2）
     pub machine: Box<dyn Machine + Send>,                // §8-4
-    pub read_memory: fn() -> Memory,                     // sprawling-SPEC.md §8-46-3
-    pub read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,   // sprawling-SPEC.md §8-116
-    pub reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,         // sprawling-SPEC.md §8-60
-    pub browsers: Browsers,                              // sprawling-SPEC.md §8-45-2
-    pub desktop_program: DesktopProgram,                 // sprawling-SPEC.md 8-4d
+    pub read_memory: fn() -> Memory,                     // `crates/sprawling/Spec.lean` §8-46-3
+    pub read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,   // `crates/sprawling/Spec.lean` §8-116
+    pub reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,         // `crates/sprawling/Spec.lean` §8-60
+    pub browsers: Browsers,                              // `crates/sprawling/Spec.lean` §8-45-2
+    pub desktop_program: DesktopProgram,                 // `crates/sprawling/Spec.lean` §8-4d
     pub recipe_for: fn(&str) -> Result<&'static Recipe, AxError>,
     pub exec_host: ExecHost,
 }
@@ -40,7 +40,7 @@ pub type DesktopProgram = fn() -> std::io::Result<PathBuf>;
 // accounting::worker::pool
 pub struct Memory { pub physical: u64, pub available: u64 }
 // accounting::worker::health
-pub struct Health(/* 私有 */);   // 记账线程的两个计数，别的线程可读（sprawling-SPEC.md §8-98）
+pub struct Health(/* 私有 */);   // 记账线程的两个计数，别的线程可读（`crates/sprawling/Spec.lean` §8-98）
 
 // accounting::worker
 pub struct RunWorker { /* 私有 */ }
@@ -122,7 +122,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
 
 /-! ### 接口仍写在 sprawling 规格里的模块
 
-下面这些模块的接口与取舍今天写在 `crates/sprawling/sprawling-SPEC.md` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
+下面这些模块的接口与取舍今天写在 `crates/sprawling/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
 
 | sprawling 的标签 | 模块 |
 |---|---|

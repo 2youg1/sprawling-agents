@@ -12,7 +12,7 @@
 //! person typing `sprawling` in a shell needs `GetConsoleProcessList`,
 //! which needs `unsafe`, which the workspace forbids. So nothing here
 //! guesses how it was started: the three ways in are each named, and they
-//! meet at `up` (sprawling-SPEC.md section 8-8).
+//! meet at `up` (`crates/sprawling/spec/Firstrun.lean` §8-8).
 
 use std::io::{BufRead, Write};
 use std::net::SocketAddr;

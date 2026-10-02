@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The person's door onto playback: `sprawling playback export` and
-//! `sprawling playback check` (sprawling-SPEC.md 8-126 and 8-132).
+//! `sprawling playback check` (`crates/sprawling/spec/Main.lean` §8-126 and §8-132).
 //!
 //! The projection, the selection, the read bound, the page, the five
 //! checks and the landing are `accounting::playback`'s (`crates/accounting/Spec.lean`

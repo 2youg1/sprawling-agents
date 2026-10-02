@@ -312,7 +312,7 @@ pub enum StopReason { EndTurn, MaxTokens, MaxTurnRequests, Refusal, Cancelled }
 - **`prompt` 在对方答出 `StopReason` 时返回**；读到输入结束而没有答，是 `E_PROVIDER` 并标 `Retry::Unknown`：对方也许已经做了事。`StopReason` 未知的词拒而不猜。
 - **停摆在对侧沉默时也要变成取消**：`BufRead` 的读没有期限，一家在跑长命令的 harness 可以几分钟一行不写，而一次停摆不能等它开口。所以读端在自己的线程上（`Lines::over`），把行交进通道；`prompt` 每次最多等 `HALT_TICK_MS` 就回头问一次 `halted`。线程在对侧关闭输出（子进程被杀）或会话丢掉通道时结束，不会泄漏。ARCHITECTURE §10 规则 3 把它列为库 crate 起线程的一处。
 - **取消的次序是 `spec/Harness/Session.lean` 定的**：`halted` 头一次答真，先调 `cancelling`（调用方在这里把 `cancel_received` 落账），再发 `session/cancel`，此后的汇报排在它后面；第二次答真什么也不发。取消之后 agent 再问 permission，一律答 `cancelled`（ACP 要求客户端这样答取消后的每一个 permission 请求），不再问调用方。
-- **`Answer.text` 是 agent 这一回合对城说的话**：`agent_message_chunk` 依次拼起来，每一块同时照常交给 `report`。它是城那次请求的回答，汇报是一路上的事，两者由调用方分别记（sprawling-SPEC §8-4e 第 8 条）。
+- **`Answer.text` 是 agent 这一回合对城说的话**：`agent_message_chunk` 依次拼起来，每一块同时照常交给 `report`。它是城那次请求的回答，汇报是一路上的事，两者由调用方分别记（`crates/sprawling/Spec.lean` §8-4e 第 8 条）。
 - **`HarnessProcess::start` 起 `Launch` 的程序与参数**：程序名由搜索路径补（`Program::name`），工作目录是调用方给的那棵 worktree，stderr 丢弃（与 `mcp::stdio` 同理：那是它的诊断，不是答案）。起不来答 `E_TOOL_UNAVAILABLE`，恢复语给出这家自己的 `docs()`。进程句柄落地时杀掉并收尸，所以「谁回收它」不需要第二份名单。
 - **测试走同一扇门**：测试用 `Lines::over` 读一条内存管道，在另一头用一条线程扮演 agent，与生产读子进程的输出是同一段代码，不另立 trait。
 
@@ -322,7 +322,7 @@ D13 跟 `agent.json` 的 `distribution`，不跟 `preview`。registry 为同一�
 
 D14 本城不向 harness 提供文件与终端：`initialize` 声明 `fs.readTextFile`、`fs.writeTextFile`、`terminal` 全为 `false`，harness 用它自己的工具。ACP 规格里工具由 agent 自己执行，`session/request_permission` 是 agent 可以不发的请求，工具名 "do not advertise a capability or grant authorization"（§5）；本城因此只能记录一家 harness 做了什么，不能管辖它。被否：声明这些能力并由城实现它们；agent 仍可用自己的工具，声明只多出一条城要实现、却管不住 harness 的路。harness 发来的其余请求（`fs/*`、`terminal/*`）以 JSON-RPC `-32601` 回答，不静默：不答的请求会把 agent 挂住。
 
-**谁用它**：派活路径上的 harness run（sprawling-SPEC §8-4e、§8-124）。`accounting::worker::driving::harness` 在房间的 worktree 里经 `HarnessProcess::start` 起一家、开会话，把 `Listener` 接到 `runtime::run::harness::HarnessRun`：`cancelling` 落 `cancel_received`，`report` 落 `harness_reported`，`permit` 照 sprawling-SPEC §8-4e 第 9 条答；会话与子进程在驱动返回时一起丢掉。它必须守住的性质在 `spec/Harness/Session.lean`，本 crate 这一侧守其中的会话半：截断先变成 `session/cancel`、第二次什么也不发、停止原因之后不再读。设置页的 harness 页说明五家在这台电脑上够不够得着、怎么起、去哪里登录。
+**谁用它**：派活路径上的 harness run（`crates/sprawling/Spec.lean` §8-4e、§8-124）。`accounting::worker::driving::harness` 在房间的 worktree 里经 `HarnessProcess::start` 起一家、开会话，把 `Listener` 接到 `runtime::run::harness::HarnessRun`：`cancelling` 落 `cancel_received`，`report` 落 `harness_reported`，`permit` 照 `crates/sprawling/Spec.lean` §8-4e 第 9 条答；会话与子进程在驱动返回时一起丢掉。它必须守住的性质在 `spec/Harness/Session.lean`，本 crate 这一侧守其中的会话半：截断先变成 `session/cancel`、第二次什么也不发、停止原因之后不再读。设置页的 harness 页说明五家在这台电脑上够不够得着、怎么起、去哪里登录。
 -/
 
 /-! ## 9 工作流程
@@ -417,7 +417,7 @@ D15 请求行与 id 是本 crate 的契约，不是序列化器的：行由 `for
 
 - `ARCHITECTURE.md` §4 缝清单（`Outbound` 一行）、§10 规则 3（库 crate 起线程的地方：`mcp::reading` 与 `mcp::sse` 的读端）与模块表的 agent_protocols 各行（`architecture.toml`，锚点指向本文件与分部）。这些改了，重读本文件 §7、§8-15 与 §8-19。
 - `docs/third-party.md` §1（ACP schema 与 registry 被看的路径）与服务外挂的边界：上游改了线或包名，重读 §5 与 §8-19。
-- `crates/kernel/Spec.lean` §8-23（`ServerLabel`、`TimeoutMs`）、`crates/gateway/Spec.lean` §8-5（订阅额度经 harness 进城）、`crates/runtime/Spec.lean` §8-27-10（窗口怎么装工具答复）与 §8-52（harness run 写的行）、sprawling-SPEC §8-4d（桌面经 stdio 接进来）、§8-4e 与 §8-124（harness run 与它的派活路径）、`crates/wire/Spec.lean` 的配对中间件。这些节改了，重读本文件对应的条目。
+- `crates/kernel/Spec.lean` §8-23（`ServerLabel`、`TimeoutMs`）、`crates/gateway/Spec.lean` §8-5（订阅额度经 harness 进城）、`crates/runtime/Spec.lean` §8-27-10（窗口怎么装工具答复）与 §8-52（harness run 写的行）、`crates/sprawling/Spec.lean` §8-4d（桌面经 stdio 接进来）、§8-4e 与 §8-124（harness run 与它的派活路径）、`crates/wire/Spec.lean` 的配对中间件。这些节改了，重读本文件对应的条目。
 - `crates/desktop/Spec.lean` §4 与 `crates/desktop/src/refusal.rs`：`isError` 与 `_meta` 的读法（§8-1c），以及本 crate 对外给出的 `EFFECT_META_KEY` 与 `PROTOCOL_VERSION`。
 - `tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]` 与 `[prepare_dispatch_ms]`：上限的推导与常驻连接省下的时间。
 -/

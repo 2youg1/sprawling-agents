@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The thread that ticks the monitor once a second and sends each fresh
-//! reading to the watching sessions (sprawling-SPEC.md 8-96).
+//! reading to the watching sessions (`crates/sprawling/spec/Monitor.lean` §8-96).
 
 use std::sync::{Mutex, PoisonError, Weak};
 use std::time::{Duration, Instant};
@@ -19,7 +19,7 @@ use accounting::worker::health::Health;
 const BEAT: Duration = Duration::from_secs(1);
 
 /// What a beat adds to the counters it read: the accounting queue's two
-/// counts (sprawling-SPEC.md 8-98), the view fold's backlog (8-123), and
+/// counts (`crates/sprawling/spec/Accounting/Worker.lean` §8-98), the view fold's backlog (8-123), and
 /// how long the beat before this one took to read (8-129-6).
 pub(crate) struct Gauges<B> {
     health: Health,

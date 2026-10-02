@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The note a person keeps for one model, and where the city keeps it
-//! (sprawling-SPEC 8-85).
+//! (`crates/sprawling/Spec.lean` §8-85).
 //!
 //! One place, in the city's reserved subtree: a directory at the city
 //! root would share its name space with the buildings, and a resident

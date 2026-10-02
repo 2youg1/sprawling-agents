@@ -190,7 +190,7 @@ impl CommandDesk {
     /// [`Self::interrupt_for`]. The thread asking here wakes on every
     /// post and a lane reads only at its safe points, so handing it out
     /// here would refuse it as though no run answered
-    /// (sprawling-SPEC.md 8-42-1).
+    /// (`crates/sprawling/Spec.lean` §8-42-1).
     pub fn next(&self, driving: impl Fn(RunId) -> bool) -> DeskWait<'_> {
         let Ok(mut waiting) = self.waiting.lock() else {
             return DeskWait::Gone;

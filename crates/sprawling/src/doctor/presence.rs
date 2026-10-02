@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! This machine's answer about one item (sprawling-SPEC.md section
+//! This machine's answer about one item (`crates/sprawling/Spec.lean` section
 //! 8-47).
 //!
 //! Three states rather than two. A binary that is on the search path

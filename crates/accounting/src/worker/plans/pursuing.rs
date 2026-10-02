@@ -10,12 +10,12 @@
 //! rule 5). Every node of the ready set gets a lane of its own; every
 //! line those lanes write crosses back to this thread, and every run
 //! that comes home is landed by `serve_flight`, in the order it
-//! arrives, which then moves every pursuit on (sprawling-SPEC.md
-//! 8-46-4).
+//! arrives, which then moves every pursuit on (`crates/sprawling/Spec.lean`
+//! §8-46-4).
 //!
 //! The lanes are the city's, not this pursuit's: a pursuit takes rows
 //! into the same table a person's dispatch goes into, so the number of
-//! runs a city drives at once has one answer (sprawling-SPEC.md 8-46-2).
+//! runs a city drives at once has one answer (`crates/sprawling/Spec.lean` §8-46-2).
 
 use kernel::{Address, AxError, NodeId};
 
@@ -75,8 +75,8 @@ impl RunWorker {
     /// through `serve_flight` like any other run, and each landing calls
     /// [`Self::advance_pursuits`], so the desk is free the moment this
     /// returns: a loop here held `Pause`, `Halt` and every other command
-    /// out until the pursuit's last row came home (sprawling-SPEC.md
-    /// 8-46-4).
+    /// out until the pursuit's last row came home (`crates/sprawling/Spec.lean`
+    /// §8-46-4).
     ///
     /// Nodes already in a lane are not in the ready set it asks about:
     /// ready means a run could take this node now, and one already

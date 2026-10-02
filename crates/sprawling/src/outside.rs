@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The remote door, wired into this binary (sprawling-SPEC.md 8-139,
-//! 8-140): how a person away from this machine reaches the city through
+//! The remote door, wired into this binary (`crates/sprawling/Spec.lean` §8-139,
+//! §8-140): how a person away from this machine reaches the city through
 //! a route, and the console verbs that open the way.
 //!
 //! `remote_access` decides who may enter and holds the cryptography; it

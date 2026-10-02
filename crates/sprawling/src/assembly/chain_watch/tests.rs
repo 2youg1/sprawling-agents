@@ -89,7 +89,7 @@ fn an_audit_that_cannot_read_the_ledger_trips_the_halt() {
 
 /// A served worker answers a command that arrives before the proof of its
 /// history with `E_HISTORY_UNPROVEN` and writes nothing, and takes the
-/// same command once the proof is whole (sprawling-SPEC.md 8-90).
+/// same command once the proof is whole (`crates/sprawling/spec/Assembly/Listening.lean` §8-90).
 #[test]
 fn a_served_worker_takes_commands_once_its_history_is_proved() {
     let dir = tempfile::tempdir().unwrap();

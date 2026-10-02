@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What guards the door one serve opens (sprawling-SPEC.md section
+//! What guards the door one serve opens (`crates/sprawling/Spec.lean` section
 //! 8-22).
 //!
 //! Pure, and pure on purpose: the entropy a minted key is made of is

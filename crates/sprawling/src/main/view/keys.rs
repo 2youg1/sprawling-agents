@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which key does what in the person's face of `sprawling view`
-//! (sprawling-SPEC.md 8-117). The run board of the WebUI uses the same
+//! (`crates/sprawling/spec/Main.lean` §8-117). The run board of the WebUI uses the same
 //! keys, so this table is the one place they are decided.
 
 /// A key press, already read off the terminal.

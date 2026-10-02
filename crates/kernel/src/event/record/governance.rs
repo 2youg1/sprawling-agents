@@ -143,7 +143,7 @@ fn city_wide() -> Scope {
 /// The two words a `city_halted` record carries are spelled here and
 /// nowhere else, so every fold reads an unrecognised word the same way;
 /// constants compared by hand at each fold let one read it as a release
-/// while another ignored the line (sprawling-SPEC.md 8-74).
+/// while another ignored the line (`crates/sprawling/Spec.lean` §8-74).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

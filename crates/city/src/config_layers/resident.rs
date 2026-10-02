@@ -8,7 +8,7 @@
 //!
 //! The five spellings are `agent_protocols::Harness`'s to answer, and
 //! this crate sees only `kernel`, so a name is read as written and
-//! judged where a dispatch is agreed (sprawling-SPEC 8-4e, rule 10).
+//! judged where a dispatch is agreed (`crates/sprawling/Spec.lean` §8-4e, rule 10).
 //! This module owns how one layer states it, the rule that a layer
 //! names a model or a harness and never both, and the rule that a
 //! session which opened on a model keeps it until `/new`

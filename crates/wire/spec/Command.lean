@@ -97,7 +97,7 @@ Command::RestoreDiscard { restoration: Restoration, idem: IdemKey }
 Dispatch { addr, task, goal, policy, idem, session, effort, model: Option<String> }
 ```
 
-- **`model` 是城已登记的一个模型 id**，登记在哪个 tag 下都行；`None` 取房间自己那层已冻结的模型，房间尚未冻结时取 `main` tag 的模型。装配按这个 id 在簿子里找到那一条登记，连同它的端点与窗口一起用，保密楼「只用回环端点」的检查照旧由 `ModelBook::select` 做（sprawling-SPEC §8-10）。
+- **`model` 是城已登记的一个模型 id**，登记在哪个 tag 下都行；`None` 取房间自己那层已冻结的模型，房间尚未冻结时取 `main` tag 的模型。装配按这个 id 在簿子里找到那一条登记，连同它的端点与窗口一起用，保密楼「只用回环端点」的检查照旧由 `ModelBook::select` 做（`crates/sprawling/Spec.lean` §8-10）。
 - **被否：借 `SelectModel` 换 tag 再派活**。`SelectModel` 改的是整座城的配置，会在同时跑着的别人的 run 底下换模型；一次派活的选择只该属于这一次派活。
 - **被否：接受任意 id，在 `main` 的端点上直接调用**。窗口与输出上限是登记时说出的，未登记的 id 没有这两个数，上下文提醒只能量一个没人给过的数。
 - **`WIRE_V` 38→39**：给既有命名帧加字段是「语法换形而名字没换」那一类，§8-1 的 golden 随之变；`client/src/wire.ts` 由 `cargo xtask wire-ts --write` 同集重生成。
@@ -114,7 +114,7 @@ Dispatch { addr, task, goal, policy: kernel::RunPolicy, idem, session, effort, m
 
 - **一个字段，四个必填的键**：`mode`（`chat｜work`）、`write`（`full｜create`）、`admit`（`standing｜tested｜contract_kept｜double_validated`）、`landing`（`ordinary｜experiment`）。值集与拼法只住 kernel（`crates/kernel/Spec.lean` §8-77、§8-78），本 crate 再导出 `RunPolicy`、`Mode`、`WriteLimit`、`AdmissionRequirement`、`LandingPolicy` 五个名字，页面按 `wire.ts` 里生成的字面量拼。缺一个键、或一个认不出的词，帧在反序列化处即拒，不落成默认值。
 - **页面怎么选**：写域选择给 `write` 的两项（普通 `full`、只读可新建 `create`）；`/admit tested|contract|double` 依次填 `tested`、`contract_kept`、`double_validated`，不说时填 `standing`；试验填 `landing: "experiment"`；计划经 `/plan` 进入固定的 SDD 工作流，帧上是 `mode: "work"`。这些控件归客户端的展开面（client-SPEC 4-41），本节只定帧。
-- **城自己派的活不经这个帧**：计划、日程、来信与编辑器经 ACP 派来的活由装配层取 `RunPolicy::of(Mode::Work)`；委派与敲门继承说话那一方的整份策略（sprawling-SPEC 8-133）。
+- **城自己派的活不经这个帧**：计划、日程、来信与编辑器经 ACP 派来的活由装配层取 `RunPolicy::of(Mode::Work)`；委派与敲门继承说话那一方的整份策略（`crates/sprawling/Spec.lean` §8-133）。
 - **账上读得到**：装配层把收到的策略原样写进这次 run 的 `run_started.policy`，所以一次派活选了什么，回放与 playback 从账本读，不从线上猜。
 - **`WIRE_V` 不另进位**：`Dispatch` 的名字没变而形状变了，这正是 D1 说的改形，与本批其余改形共用 45。
 -/

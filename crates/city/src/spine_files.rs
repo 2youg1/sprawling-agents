@@ -179,7 +179,7 @@ pub fn handoff_path(city_root: &Path, room: &Address) -> PathBuf {
 ///
 /// **A slot that is already empty is not a failure.** The caller asked
 /// for a new session, which is a thing that can be done whatever the
-/// previous one left behind (`sprawling-SPEC.md` 8-82).
+/// previous one left behind (`crates/sprawling/Spec.lean` §8-82).
 ///
 /// # Errors
 /// `E_STORAGE_FATAL` naming the path, for every failure except a file

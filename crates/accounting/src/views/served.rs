@@ -64,8 +64,8 @@ impl Views {
 
     /// Takes the one way this city asks an item's publisher for its
     /// newest release, so an `UpstreamVersion` query leaves this machine
-    /// only through what the served city handed in (sprawling-SPEC.md
-    /// 8-120).
+    /// only through what the served city handed in (`crates/sprawling/Spec.lean`
+    /// §8-120).
     pub fn ask_upstream_through(&mut self, newest: fn(&str) -> wire::DoctorUpstream) {
         self.reach.upstream = Some(newest);
     }
@@ -88,7 +88,7 @@ impl Views {
     /// Takes the halt the served city's writer is held by until the proof
     /// of its history has a verdict, so the city page says whether the
     /// history is proved from the same verdict the writer obeys
-    /// (sprawling-SPEC.md 8-134).
+    /// (`crates/sprawling/Spec.lean` §8-134).
     pub fn watch_proof(&mut self, halt: storage::ChainHalt) {
         self.proof = Some(halt);
     }

@@ -58,7 +58,7 @@ pub struct Standing {
 impl Standing {
     /// The folds of one pass over the history, from the standing
     /// snapshot when one fits and from genesis otherwise, with a new
-    /// snapshot cut at the last line folded (sprawling-SPEC 8-101).
+    /// snapshot cut at the last line folded (`crates/sprawling/Spec.lean` §8-101).
     ///
     /// One pass for all six folds: recognising a repeat, an expiry or a
     /// session's origin across a restart must not cost a second read of
@@ -92,7 +92,7 @@ pub(crate) type Held = (JsonlLedger, OpenReport, Standing);
 
 /// What a served city starts from: its views and the worker's standing,
 /// started on one pass from the earlier of their two snapshots, or from
-/// genesis when either cannot resume (sprawling-SPEC 8-122).
+/// genesis when either cannot resume (`crates/sprawling/Spec.lean` §8-122).
 ///
 /// Only the lines the snapshots have not seen are checked before the
 /// first byte; the history before them is proved behind it, and the
@@ -107,7 +107,7 @@ pub(crate) type Held = (JsonlLedger, OpenReport, Standing);
 /// folded under.
 ///
 /// A standing snapshot is cut at the last line folded, as every worker
-/// open cuts one (sprawling-SPEC 8-101), so a worker opened over this city
+/// open cuts one (`crates/sprawling/Spec.lean` §8-101), so a worker opened over this city
 /// later folds only what arrives after it; a cut that fails is in
 /// `Standing.cut`, not here. Where each fold started, and why, is one
 /// `Effect` line in `log`.
@@ -117,10 +117,10 @@ pub(crate) type Held = (JsonlLedger, OpenReport, Standing);
 ///
 /// The ledger's last segment is proved by the record the last proof of
 /// this history wrote, when it holds, rather than line by line
-/// (sprawling-SPEC 8-144).
+/// (`crates/sprawling/Spec.lean` §8-144).
 ///
 /// Opening the ledger, the pass, and the standing cut are each lapped on
-/// `cost` (sprawling-SPEC 8-121).
+/// `cost` (`crates/sprawling/Spec.lean` §8-121).
 ///
 /// # Errors
 /// Propagates opening the ledger, chain verification of the lines folded,

@@ -200,7 +200,7 @@ fn inheriting_a_branch_does_not_verify_the_history() {
 /// for byte, so a branch in the same room opens with the bytes its
 /// mother last sent: the four frozen segments, every other key of the
 /// rendered request, and each message the mother exchanged
-/// (sprawling-SPEC.md 8-141).
+/// (`crates/sprawling/Spec.lean` §8-141).
 #[test]
 fn a_branch_first_request_carries_the_bytes_of_the_mothers_last() {
     let dir = tempfile::tempdir().unwrap();
