@@ -5,11 +5,10 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The box a person writes in, written as a page (docs/frontend-method.md §7I): the
-  // words, a line under them, the settings row under the line, and the
-  // coin key in its context ring beside the words. Nothing here decides
-  // where a message goes; the page does. `composer.ts` owns what the
-  // pills offer and what a pick means, `dropping.ts` a dropped file.
+  // The box a person writes in (docs/frontend-method.md §7I): the words, a line
+  // under them, the settings row under the line, and the coin key in its context
+  // ring beside the words. Nothing here decides where a message goes; the page
+  // does. `composer.ts` owns what the pills offer, `dropping.ts` a dropped file.
   //
   // A line that begins with `/` is a command rather than a message, and
   // the menu over the box is the same list the Ctrl-K palette reads.

@@ -45,6 +45,7 @@ mod identity;
 mod known_hosts;
 mod listing;
 mod mcp_health;
+mod metrics;
 mod model_facts;
 mod prefix;
 mod preview;
@@ -86,6 +87,7 @@ pub use identity::{IdentityAnswer, StatedIdentity};
 pub use known_hosts::{KnownFace, KnownHost, KnownHostsAnswer};
 pub use listing::{Entry, EntryKind, ListingAnswer};
 pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
+pub use metrics::MetricsAnswer;
 pub use model_facts::ModelFactsSummary;
 pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
 pub use preview::PreviewAnswer;
@@ -382,24 +384,4 @@ pub struct ArchiveHit {
     pub kind: String,
     pub day: u64,
     pub subject: String,
-}
-
-/// The city's vital signs: the counts a page would otherwise assemble
-/// by asking four questions and adding up the answers.
-///
-/// Every number here is already proven by another view; this query
-/// exists so that drawing one readout costs one question. It holds no
-/// money - that is `CostView`'s, and one figure with two owners is how
-/// two figures start disagreeing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct MetricsAnswer {
-    pub events: u64,
-    pub runs_active: u64,
-    pub runs_frozen: u64,
-    pub buildings: u64,
-    pub approvals_waiting: u64,
-    pub signals_waiting: u64,
-    /// Discarded and not yet restored.
-    pub discards_outstanding: u64,
 }

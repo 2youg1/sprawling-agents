@@ -291,9 +291,7 @@ pub enum Query {
     /// pinned a skill is folded from `run_started`, so a shelf nothing
     /// has ever used says so instead of looking unused because nobody
     /// wrote it down.
-    Skills {
-        building: Address,
-    },
+    Skills { building: Address },
     /// What is uncommitted in one building right now: the branch, how
     /// far it has drifted from its upstream, the files that moved, and
     /// the last checkpoint the city checkpointed there.
@@ -303,9 +301,7 @@ pub enum Query {
     /// working tree is what a person is looking at, and the Ledger
     /// records checkpoints rather than edits. The checkpoint beside it comes
     /// from the history, for the reason [`Query::Commit`] gives.
-    GitStatus {
-        building: Address,
-    },
+    GitStatus { building: Address },
     /// Whether each tool server one address reaches is answering, and
     /// what it offers.
     ///

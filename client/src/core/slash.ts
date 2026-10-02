@@ -35,13 +35,13 @@ import {
 import type { Template } from "./commands";
 import { askFork } from "./forking";
 import { PAGES, page } from "./route";
-import { given, readTag, stripped } from "./tags";
+import { given, stripped } from "./tags";
 import type { View } from "./route";
 import { CITY } from "./scope";
 import type { Slash, SlashCall, SlashHands } from "./slash_hands";
+import { compact, fresh, retag } from "./slash_session";
 
 const ALL = "--all";
-const CARRY = "--carry";
 
 // The two spellings a button elsewhere shows as its own name: the verb
 // that cancels the run in front of the person, and the one that lets
@@ -104,49 +104,6 @@ function scoped(hands: SlashHands, call: SlashCall, frame: typeof halt): void {
   if (named === null) return;
   hands.command(frame({ building: named }));
   hands.write("");
-}
-
-// `/new` and `/clear` are one verb: a new session here, with nothing
-// from the last one unless `--carry` says so. A room with no handoff
-// answers `carried: false` rather than refusing, so the word passes on.
-function fresh(hands: SlashHands, call: SlashCall): void {
-  if (hands.here === null) return;
-  opened(hands, hands.here, call.words.includes(CARRY) ? "handoff" : "nothing");
-}
-
-// A new session at `room`, and main brought to it: sent from a past
-// session in main, the new one is where the person is going.
-function opened(hands: SlashHands, room: Address, carry: "nothing" | "handoff"): void {
-  if (!hands.command(openSession(room, carry, null))) return;
-  hands.go({ kind: "talk", address: room });
-  hands.write("");
-}
-
-// `/compact` is `/new --carry`. A run still going is stopped first and
-// the session opens once the belief holds it frozen: a frozen run has
-// written the handoff, and no session opens under a working run.
-function compact(hands: SlashHands): void {
-  const room = hands.here;
-  if (room === null) return;
-  const going = hands.live;
-  if (going === null) {
-    opened(hands, room, "handoff");
-    return;
-  }
-  if (!hands.command(cancel(going.run))) return;
-  hands.write("");
-  hands.whenFrozen(going.run, () => {
-    opened(hands, room, "handoff");
-  });
-}
-
-// `/tag` and `/untag`: one word on or off the session in main. A word
-// that is not a tag sends nothing and leaves the line to correct.
-function retag(hands: SlashHands, call: SlashCall, change: typeof given): void {
-  const tag = readTag(call.rest);
-  const session = hands.tagged;
-  if (tag === null || session === null) return;
-  if (hands.retag(change([session], session, tag))) hands.write("");
 }
 
 export const SLASH: readonly Slash[] = [

@@ -71,8 +71,12 @@ fn the_tree_a_page_reads_is_read_after_the_views_are_released() {
     let listing = views.prepare(&wire::Query::Listing { at: None });
     std::fs::write(dir.path().join("notes"), "written after the lock").unwrap();
 
+    // The listing finishes first: reading the document keeps its version
+    // in the city's content store under `.sprawling`, which a listing of
+    // the root then shows.
+    let listed = listing.finish();
     assert_eq!(
-        (document.finish(), listing.finish()),
+        (document.finish(), listed),
         (
             wire::Answer::Document(Box::new(wire::DocumentAnswer {
                 at,
