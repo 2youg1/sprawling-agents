@@ -19,6 +19,7 @@ use std::time::Instant;
 use kernel::{
     Address, AxCode, AxError, B3Hash, EventDraft, EventKind, Ledger as _, Payload, RunId, TimeMs,
 };
+use sprawling::monitor::spread::{Share, micros, nanos};
 
 mod reading;
 mod scenarios;
@@ -147,16 +148,9 @@ fn ledger_append(scratch: &std::path::Path) -> Result<(), String> {
         ledger.append(d).map_err(|e| format!("{e}"))?;
         times.push(t0.elapsed());
     }
-    times.sort();
-    let p50 = times.get(times.len() / 2).copied().unwrap_or_default();
-    let p99 = times
-        .get(times.len().saturating_mul(99) / 100)
-        .copied()
-        .unwrap_or_default();
     println!(
-        "ledger_append      p50 {:>8.3} ms   p99 {:>8.3} ms   (budget 5 / 20 ms; {SINGLES} single appends, one fsync each)",
-        p50.as_secs_f64() * 1_000.0,
-        p99.as_secs_f64() * 1_000.0
+        "{}",
+        reading::row_line("ledger_append", &reading::spread_of(times)?, "")
     );
 
     // The wave shape production actually uses: one barrier per batch.
@@ -166,11 +160,13 @@ fn ledger_append(scratch: &std::path::Path) -> Result<(), String> {
         .collect::<Result<_, _>>()?;
     let t0 = stamp();
     ledger.append_all(drafts).map_err(|e| format!("{e}"))?;
-    let took = t0.elapsed();
+    let took_us = micros(t0.elapsed());
+    let per_second = BATCH
+        .saturating_mul(1_000_000)
+        .checked_div(took_us.max(1))
+        .unwrap_or(0);
     println!(
-        "ledger_append_all  {BATCH} records in {:>8.3} ms   ({:.0} records/s group-committed)",
-        took.as_secs_f64() * 1_000.0,
-        f64::from(u32::try_from(BATCH).unwrap_or(u32::MAX)) / took.as_secs_f64()
+        "budget row=ledger_append_all records={BATCH} took_us={took_us} records_per_s={per_second}"
     );
     Ok(())
 }
@@ -182,7 +178,6 @@ fn ledger_append(scratch: &std::path::Path) -> Result<(), String> {
 /// is the design fact: a barrier is a fixed cost, so what a batch buys is
 /// the whole difference between the first row and the last.
 fn durability_barrier(scratch: &std::path::Path) -> Result<(), String> {
-    println!("durability_barrier");
     for batch in [1u64, 10, 50] {
         let dir = scratch.join(format!("barrier-{batch}"));
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -199,13 +194,15 @@ fn durability_barrier(scratch: &std::path::Path) -> Result<(), String> {
             ledger.append_all(drafts).map_err(|e| format!("{e}"))?;
             times.push(t0.elapsed());
         }
-        times.sort();
-        let p50 = times.get(times.len() / 2).copied().unwrap_or_default();
-        let per_record =
-            p50.as_secs_f64() * 1_000_000.0 / f64::from(u32::try_from(batch).unwrap_or(1));
+        let spread = reading::spread_of(times)?;
+        let per_record_ns = nanos(spread.p(Share::P50)).checked_div(batch).unwrap_or(0);
         println!(
-            "  {batch:>3} record(s) per barrier   whole wave p50 {:>8.3} ms   amortised {per_record:>9.1} µs/record",
-            p50.as_secs_f64() * 1_000.0
+            "{}",
+            reading::row_line(
+                "durability_barrier",
+                &spread,
+                &format!(" batch={batch} per_record_ns={per_record_ns}")
+            )
         );
     }
     Ok(())
@@ -242,11 +239,9 @@ fn prefix_assembly() -> Result<(), String> {
         times.push(t0.elapsed());
         std::hint::black_box(prefix);
     }
-    times.sort();
-    let p50 = times.get(times.len() / 2).copied().unwrap_or_default();
     println!(
-        "prefix_assembly    p50 {:>8.3} ms                    (budget 1 ms; 16.5 KB over four slots, {ROUNDS} rounds)",
-        p50.as_secs_f64() * 1_000.0
+        "{}",
+        reading::row_line("prefix_assembly", &reading::spread_of(times)?, "")
     );
     Ok(())
 }
@@ -311,11 +306,13 @@ fn run_history(scratch: &std::path::Path) -> Result<(), String> {
         answered = records.len();
         std::hint::black_box(&records);
     }
-    times.sort();
-    let p50 = times.get(times.len() / 2).copied().unwrap_or_default();
     println!(
-        "run_history        p50 {:>8.3} ms                    ({answered} records of 1 session, {RECORDS} in the ledger, {SESSIONS} sessions)",
-        p50.as_secs_f64() * 1_000.0
+        "{}",
+        reading::row_line(
+            "run_history",
+            &reading::spread_of(times)?,
+            &format!(" answered={answered} ledger_records={RECORDS} sessions={SESSIONS}")
+        )
     );
 
     Ok(())

@@ -813,16 +813,17 @@ that produced them, and never gated: a slow runner is not a defect, and a
 gate that says it is teaches people to ignore gates. **The full register is
 `tools/xtask/budgets.toml`**, which is the authority; `cargo xtask budget` prints
 it, and the readings below are written here by `cargo xtask docnum` rather
-than typed.
+than typed. Every duration in the register is a whole number of
+microseconds, named by its `_us` field.
 
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
 | Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->677,073 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->3.1×<!-- xtask:end --> headroom | no: a reading; speed comes before size |
 | The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->26,819,584 B<!-- xtask:end -->, client included | no: a reading; speed comes before size |
 | Resident memory, one session | ≤<!-- xtask:begin budget_bytes:resident_empty_idle -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:resident_empty_idle -->2,469,888 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
-| Ledger append plus fsync | p50 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p50_ms -->5<!-- xtask:end --> ms, p99 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p99_ms -->20<!-- xtask:end --> ms | `[ledger_append]`, with its machine class | no |
-| Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->437<!-- xtask:end --> ms for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
-| Prefix assembly | ≤<!-- xtask:begin budget_figure:prefix_assembly.budget_ms -->1<!-- xtask:end --> ms | `[prefix_assembly]`, with its machine class | no |
+| Ledger append plus fsync | p50 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p50_us -->5,000<!-- xtask:end --> µs, p99 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p99_us -->20,000<!-- xtask:end --> µs | `[ledger_append]`, with its machine class | no |
+| Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_us -->436,676<!-- xtask:end --> µs for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
+| Prefix assembly | ≤<!-- xtask:begin budget_figure:prefix_assembly.budget_us -->1,000<!-- xtask:end --> µs | `[prefix_assembly]`, with its machine class | no |
 | Runs driving at once | `DRIVING_LANES` in `accounting::worker::pool` | one thread per run, and one accounting thread taking every write | no: it is a wall this city sets, not a measurement |
 | Kernel mutation score | ≥90% | by `just mutants` | by that command, not by `just check` |
 | Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `tools/xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
@@ -844,7 +845,7 @@ only goes down.
 
 | Load scenario, sub-metric | Baseline (p50 / p95 / p99) | Machine class |
 |---|---|---|
-| large-ledger fold, `harness` | <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_ms -->437<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p95_ms -->439<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p99_ms -->439<!-- xtask:end --> ms per rebuild, from `[views_rebuild_per_mb]` | general: windows-x86_64, 16 cores, NVMe |
+| large-ledger fold, `harness` | <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_us -->436,676<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p95_us -->438,127<!-- xtask:end --> / <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p99_us -->438,127<!-- xtask:end --> µs per rebuild, from `[views_rebuild_per_mb]` | general: windows-x86_64, 16 cores, NVMe |
 
 Taken under the registered fixture (`bench::scenarios::REGISTERED`), release
 build. A reading from another machine class does not enter this table.

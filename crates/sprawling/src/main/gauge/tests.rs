@@ -177,8 +177,8 @@ fn every_reading_is_one_whole_line() {
         ],
         [
             r#"{"line":"tree","at_us":1500000,"processes":2,"cpu_permille":null,"private_bytes":100,"working_set_bytes":200,"read_bytes":300,"written_bytes":400}"#,
-            "     1.5 s  2 process(es)  cpu 12.3%  private 100 B  working set 200 B  read 300 B  written 400 B",
-            r#"{"line":"run","index":1,"exit":3,"wall_us":2500,"beats":2,"seen_cpu_ms":5,"seen_read_bytes":6,"seen_written_bytes":7,"seen_peak_private_bytes":8,"seen_peak_working_set_bytes":9,"child_peak_private_bytes":10,"child_peak_working_set_bytes":null,"read_cost_us":40}"#,
+            " 1500.0 ms  2 process(es)  cpu 12.3%  private 100 B  working set 200 B  read 300 B  written 400 B",
+            r#"{"line":"run","index":1,"exit":3,"wall_us":2500,"beats":2,"seen_cpu_us":5000,"seen_read_bytes":6,"seen_written_bytes":7,"seen_peak_private_bytes":8,"seen_peak_working_set_bytes":9,"child_peak_private_bytes":10,"child_peak_working_set_bytes":null,"read_cost_us":40}"#,
             r#"{"line":"spread","samples":3,"failed":1,"floor_us":10000,"p50_us":20000,"p95_us":30000,"p99_us":30000,"peak_us":30000,"suspicious":0,"cores":4,"physical_bytes":8589934592}"#,
         ]
         .map(str::to_owned)

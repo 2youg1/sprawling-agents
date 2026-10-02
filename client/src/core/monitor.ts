@@ -93,10 +93,23 @@ function reading(unit: Unit, value: number): string {
     case "bytes":
       return scaled(value, 1024, ["B", "KiB", "MiB", "GiB", "TiB"]);
     case "nanos":
-      return scaled(value, 1000, ["ns", "µs", "ms", "s"]);
+      return duration(value);
     case "count":
       return String(value);
   }
+}
+
+// A duration in nanoseconds as a person reads it: below 1 µs in ns,
+// below 10 ms in whole µs, from 10 ms in ms with one decimal, truncated
+// (`crates/sprawling/spec/Main.lean` §8-129-2, the unit rule).
+function duration(nanos: number): string {
+  if (nanos < 1_000) {
+    return `${String(nanos)} ns`;
+  }
+  if (nanos < 10_000_000) {
+    return `${String(Math.floor(nanos / 1_000))} µs`;
+  }
+  return `${tenths(Math.floor(nanos / 100_000))} ms`;
 }
 
 // `value` in the largest of `units` (each `base` times the one before)

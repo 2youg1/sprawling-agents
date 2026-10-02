@@ -37,5 +37,5 @@ A reading is evidence only when the load, the build and the machine class behind
 ## Reference
 
 - `sprawling help gauge` prints every flag. The first `--` ends gauge's own words; everything after it is the measured command's, `--help` and `--version` included.
-- Lines are JSON when stdout is a pipe or a file, and lines in units at a terminal. Keys end in their unit (`_us`, `_ms`, `_bytes`, `_permille`); a key with no unit is a count.
+- Lines are JSON when stdout is a pipe or a file, and lines in units at a terminal. Keys end in their unit (`_us`, `_bytes`, `_permille`); a key with no unit is a count. Every duration is a whole number of microseconds; `seen_cpu_us` moves in steps of 1,000, because the platform counts CPU time in milliseconds. At a terminal a duration below 10 ms is written in µs and one of 10 ms or more in ms.
 - Exit codes: 0 the measurement was made; 1 the program could not be started or the process does not exist; 2 the command line could not be read; 4 no city at `--at`.

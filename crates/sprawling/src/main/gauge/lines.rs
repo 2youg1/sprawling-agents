@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use sprawling::audience::Audience;
 use sprawling::monitor::Sample;
-use sprawling::monitor::spread::{Share, Spread};
+use sprawling::monitor::spread::{Share, Spread, micros, nanos};
 use sprawling::monitor::top::Unit;
 use sprawling::monitor::tree::TreeReading;
 
@@ -84,7 +84,10 @@ pub(super) fn run_line(run: &Run, audience: Audience) -> String {
                 ("exit", or_null(run.exit)),
                 ("wall_us", micros(run.wall).to_string()),
                 ("beats", run.watched.beats.to_string()),
-                ("seen_cpu_ms", or_null(seen_of(|seen| seen.cpu_ms))),
+                (
+                    "seen_cpu_us",
+                    or_null(seen_of(|seen| seen.cpu_ms.saturating_mul(1_000))),
+                ),
                 ("seen_read_bytes", or_null(seen_of(|seen| seen.read_bytes))),
                 (
                     "seen_written_bytes",
@@ -176,12 +179,4 @@ fn or_null(value: Option<impl Display>) -> String {
 
 fn in_unit(unit: Unit, value: Option<u64>) -> String {
     value.map_or_else(|| UNMEASURED.to_owned(), |value| unit.reading(value))
-}
-
-fn micros(span: Duration) -> u64 {
-    u64::try_from(span.as_micros()).unwrap_or(u64::MAX)
-}
-
-fn nanos(span: Duration) -> u64 {
-    u64::try_from(span.as_nanos()).unwrap_or(u64::MAX)
 }

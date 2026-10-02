@@ -17,7 +17,7 @@
 use std::time::Duration;
 
 use kernel::{AxCode, AxError, B3Hash};
-use sprawling::monitor::spread::{Share, Spread};
+use sprawling::monitor::spread::{Share, Spread, micros};
 
 /// The class of machine a reading was taken on.
 ///
@@ -127,13 +127,11 @@ impl Reading {
         taken: Taken,
         samples: Vec<Duration>,
     ) -> Result<Reading, String> {
-        let mut samples = samples.into_iter();
-        let head = samples.next().ok_or_else(sampled_nothing)?;
         Ok(Reading {
             load,
             sub,
             taken,
-            spread: Spread::of(head, samples),
+            spread: spread_of(samples)?,
         })
     }
 
@@ -146,12 +144,39 @@ impl Reading {
             self.taken.machine.as_str(),
             citysim::fixture_label(&self.taken.fixture),
             self.spread.samples(),
-            self.spread.floor().as_micros(),
-            self.spread.p(Share::P50).as_micros(),
-            self.spread.p(Share::P95).as_micros(),
-            self.spread.p(Share::P99).as_micros()
+            micros(self.spread.floor()),
+            micros(self.spread.p(Share::P50)),
+            micros(self.spread.p(Share::P95)),
+            micros(self.spread.p(Share::P99))
         )
     }
+}
+
+/// The spread of a register row's or a scenario's samples, read by the
+/// product's one percentile reading.
+///
+/// # Errors
+/// Refuses a set that sampled nothing, for the reason `Reading::of`
+/// gives.
+pub(crate) fn spread_of(samples: Vec<Duration>) -> Result<Spread, String> {
+    let mut samples = samples.into_iter();
+    let head = samples.next().ok_or_else(sampled_nothing)?;
+    Ok(Spread::of(head, samples))
+}
+
+/// A register row's reading line: the row, its spread in integer
+/// microseconds, then the counts the row needs beside it, each written
+/// ` key=value` by the caller (`tools/citysim/spec/Bench.lean` §8-6).
+pub(crate) fn row_line(row: &str, spread: &Spread, beside: &str) -> String {
+    format!(
+        "budget row={row} samples={} floor_us={} p50_us={} p95_us={} p99_us={} peak_us={}{beside}",
+        spread.samples(),
+        micros(spread.floor()),
+        micros(spread.p(Share::P50)),
+        micros(spread.p(Share::P95)),
+        micros(spread.p(Share::P99)),
+        micros(spread.peak())
+    )
 }
 
 /// The failure a scenario with no samples deserves: one error shape,

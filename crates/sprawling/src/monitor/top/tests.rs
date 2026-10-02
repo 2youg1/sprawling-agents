@@ -94,11 +94,11 @@ fn a_screen_shows_each_counter_in_its_unit_beside_its_curve() {
         row("volume free", "1.0 TiB", "▁▁"),
         row("ledger queue depth", "0", "▁▁"),
         row("durable lag", "5", "▁█"),
-        row("relay p50", "1.5 ms", "▁█"),
+        row("relay p50", "1500 µs", "▁█"),
         row("event to screen p50", "16.6 ms", "▁▁"),
         row("queued runs", "4", "▁█"),
         row("view backlog", "300", "▁█"),
-        row("monitor read", "2.0 µs", "▁▁"),
+        row("monitor read", "2 µs", "▁▁"),
     ]
     .join(
         "

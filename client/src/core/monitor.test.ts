@@ -61,7 +61,7 @@ describe("monitor", () => {
         { label: "monitor_volume_free", reading: "1.0 TiB", curve: "▁▁" },
         { label: "monitor_ledger_queue_depth", reading: "0", curve: "▁▁" },
         { label: "monitor_durable_lag", reading: "5", curve: "▁█" },
-        { label: "monitor_relay_p50", reading: "1.5 ms", curve: "▁█" },
+        { label: "monitor_relay_p50", reading: "1500 µs", curve: "▁█" },
         { label: "monitor_event_to_screen_p50", reading: "16.6 ms", curve: "▁▁" },
         { label: "monitor_queued_runs", reading: "4", curve: "▁█" },
       ],

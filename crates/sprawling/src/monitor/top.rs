@@ -165,15 +165,30 @@ const ROWS: [Row; 15] = [
 
 impl Unit {
     /// `value` in this unit, one decimal truncated where a larger unit
-    /// applies.
+    /// applies; a duration below 1 µs is written in ns, below 10 ms in
+    /// whole µs, and from 10 ms in ms.
     #[must_use]
     pub fn reading(&self, value: u64) -> String {
         match self {
             Self::Permille => format!("{}%", tenths(u128::from(value))),
             Self::Bytes => scaled(value, 1024, &["B", "KiB", "MiB", "GiB", "TiB"]),
-            Self::Nanos => scaled(value, 1000, &["ns", "µs", "ms", "s"]),
+            Self::Nanos => duration(value),
             Self::Count => value.to_string(),
         }
+    }
+}
+
+/// A duration in nanoseconds as a person reads it: below 1 µs in ns,
+/// below 10 ms in whole µs, from 10 ms in ms to one decimal, truncated
+/// (`crates/sprawling/spec/Main.lean` §8-129-2, *单位*).
+fn duration(nanos: u64) -> String {
+    match nanos {
+        0..1_000 => format!("{nanos} ns"),
+        1_000..10_000_000 => format!("{} µs", nanos.checked_div(1_000).unwrap_or(0)),
+        10_000_000.. => format!(
+            "{} ms",
+            tenths(u128::from(nanos.checked_div(100_000).unwrap_or(0)))
+        ),
     }
 }
 

@@ -100,6 +100,22 @@ impl Spread {
     }
 }
 
+/// A duration as the whole number of microseconds every reading line
+/// and register field carries (`crates/sprawling/spec/Main.lean`
+/// §8-129-2, *单位*); a span too long for `u64` reads as `u64::MAX`.
+#[must_use]
+pub fn micros(span: Duration) -> u64 {
+    u64::try_from(span.as_micros()).unwrap_or(u64::MAX)
+}
+
+/// A duration as a whole number of nanoseconds, for an in-process
+/// reading below one microsecond and for the display rule of
+/// `monitor::top::Unit::Nanos`.
+#[must_use]
+pub fn nanos(span: Duration) -> u64 {
+    u64::try_from(span.as_nanos()).unwrap_or(u64::MAX)
+}
+
 /// The sample of rank `ceil(n * p / 100)` in an ascending set, which
 /// over whole numbers sits at index `(n * p - 1) / 100`. `None` only for
 /// an empty set, which [`Spread::of`] cannot build.

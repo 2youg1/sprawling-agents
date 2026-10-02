@@ -41,7 +41,7 @@ impl Laying {
             );
             return Vec::new();
         }
-        // The half of `[prepare_dispatch_ms]` this file owns: starting
+        // The half of `[prepare_dispatch]` this file owns: starting
         // every server this building declares and shaking hands with
         // each of them. Held apart from the whole-phase reading because
         // it is the part the resident connection table removes on every
