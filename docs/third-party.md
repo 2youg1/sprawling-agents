@@ -22,7 +22,7 @@ Calling a face this city did not invent requires knowing the shape of the reques
 | [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Grok Build is started as an ACP agent: its package, version and arguments | `grok-build/` | `e20536b4ffaf` |
 | [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Kimi Code is started as an ACP agent: its binary and arguments | `kimi/` | `a3f02fa2243b` |
 | [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how Pi is started as an ACP agent: the adapter package and its version | `pi-acp/` | `6a8a2f424c47` |
-| [agentclientprotocol/agent-client-protocol](https://github.com/agentclientprotocol/agent-client-protocol) | Apache-2.0 | the ACP version 1 wire `agent_protocols::harness` speaks to every harness: `initialize`, `session/new`, `session/prompt` and its stop reasons, the `session/update` variants, and `session/request_permission` with its four option kinds, as its stable `schema.json` states them | `schema/v1/` | `1761180eeddf` |
+| [agentclientprotocol/agent-client-protocol](https://github.com/agentclientprotocol/agent-client-protocol) | Apache-2.0 | the ACP version 1 wire `agent_protocols::harness` speaks to every harness: `initialize`, `session/new`, `session/prompt` and its stop reasons, the `session/update` variants, and `session/request_permission` with its four option kinds, as its stable `schema.json` states them | `schema/v1/` | `59172bafdf4b` |
 
 > **Machine authority**: `.github/workflows/upstream-watch.yml` reads every
 > row above that opens with `| [` and carries a `github.com` link — the
