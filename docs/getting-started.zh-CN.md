@@ -321,7 +321,7 @@ sprawling call '{"ask":{"ask_id":1,"query":"city_view"}}'    # 发一帧线协�
 sprawling serve ~/cities/first 0.0.0.0:8787
 ```
 
-伸出这台电脑的地址需要一把配对钥匙。设了 `SPRAWLING_PAIRING_TOKEN`，城就采用它，并且从不打印；没设，城为这一次服务现铸一把，只在启动横幅里印一次，旁边附一个带着它的地址。下一次启动换一把新的。城不附带从你的网络之外连进来的隧道，信任哪一种由你决定。
+伸出这台电脑的地址需要一把配对钥匙。设了 `SPRAWLING_PAIRING_TOKEN`，城就采用它，并且从不打印；没设，城为这一次服务现铸一把，只在启动横幅里印一次，旁边附一个带着它的地址。下一次启动换一把新的。从你的网络之外，设备经远程门与一条你选的通路够到这座城：[operating.md](operating.md) 的 *Reaching the city from another device* 一节写了怎么做，以及通路被托付了什么。
 
 ## 搬一座城
 

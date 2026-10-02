@@ -50,9 +50,8 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 
 以下是这个接口今天尚未落地的部分，按阶段写成当前状态；每一段落地时，从这里删掉，写进它所属的 §8 章节。
 
-- **浏览器一侧的互通只证了 Rust 那一半。** §8-12 的向量与单向夹具由 Rust 生成、提交入库，Rust 一侧读回它们。缺的证据有两件：浏览器侧的实现（ML-KEM、ML-DSA 见 D21）对上这些文件；浏览器签的 `signature-browser.txt` 提交入库，由 Rust 一侧的同一个测试验过（§8-12）。它们随客户端阶段落地。
 - **`cloudflare` 通路没有在真的隧道上开过。** 自动测试不跑它（§2）。缺的证据有两件：在一台装了 `cloudflared`、能连上 Cloudflare 边缘的电脑上，按 §8-8 的操作者检查开、关一次；在一台出网受限（经代理、7844 端口被拦）的电脑上，`cloudflared` 在就绪之前退出时，能否给出比「它在就绪之前退出」更具体的一句拒绝。今天的拒绝给出手动跑的那一行命令，人从 `cloudflared` 自己的输出里读原因。
-- **客户端（阶段 3）未落。** 页面的配对页、握手、PWA 与窄屏布局属于 `client/`，不在本 crate；它们的交互契约写进 `client/client-SPEC.md` §7。远程监听今天只答 §8-10 的两条 WebSocket 路径，不送页面：页面经通路送达设备，与配对页同批落地。
+- **页面还到不了设备。** 设备一侧的配对页、两种握手、封装与 PWA 清单已在 `client/`（`client/client-SPEC.md` 4-57、12-35，模块 `client/src/core/remote/`），对上了 §8-12 的每一份文件。远程监听今天只答 §8-10 的两条 WebSocket 路径，不送页面，所以设备打开二维码里的地址得不到这一页；整个客户端经 `/remote/session` 说线协议（页面的 socket 换成一条封好的传输）也还没有。缺的证据：远程监听对一个不是 WebSocket 升级的 `GET` 答出客户端的 bundle（与城自己的端口同一份，`wire::ClientAssets`）；一条端到端测试由浏览器一侧（或 Rust 设备一侧）经 `/remote/session` 收到城的 `Welcome`。两件同批落地，那时这一段从这里删掉，写进 §8-10。
 - **城密钥只活在一个进程里。** 装配层在城启动时取 32 字节熵派生城的签名密钥（§8-3），不存下来；设备钉住的是配对时那把城公钥，所以城一重启，每台设备都要重新配对，`/remote open` 照实说出这一句。要跨重启保存，32 字节的种子得留在某处，下次启动读回来。未决的是留在哪里，它要人的决定，因为三条可行的路里有两条要放宽一道门、一条违反一条现行规则：
   1. **种子进 vault，兑现点在本 crate 的 `keys`。** 第一次开门时取熵、经 vault 写成 `secret:remote/city-key`，此后每次启动取回；`keys::SigningKey` 多一个 `from_sealed(&Sealed<String>)` 的构造，`crates/remote_access/src/keys.rs` 进 `xtask secret` 的 `EXPOSE_WHITELIST`（第五项）。后果：设备跨重启保持配对；明文种子只出现在派生密钥的那一个函数里，与名单上其余四处「明文只在用它的最后一格」同一个理由；放宽的是一道门，名单变长一项。vault 是进程内的那一种时（平台凭据库打不开），种子仍随进程消失，`/remote open` 照旧说出重新配对那一句。
   2. **种子进 vault，兑现点在装配层**（`bin::outside::keeper` 或 `bin::assembly::remote_door`）。后果与 1 相同，但明文种子会出现在组装根里，而那份名单的注释写明它存在就是为了不让明文出现在组装根；放宽的同样是一道门，而且放在名单最不愿收的地方。
@@ -389,6 +388,7 @@ fixture.txt           city_public, hello, x25519_private, ml_kem_private, reply,
 - **`seal.txt`**：§8-5 的封装。同一把城到设备的密钥 `key` 依次封两个负载：`frame` 是 `Payload::Frame` 的字节（首字节 `00`，后接 UTF-8 文字），计数 0；`lock` 是 `Payload::Lock`（一个字节 `01`），计数 1。nonce 是方向标签 `c->d` 的四个 ASCII 字节接 8 字节大端计数，计数不上线；AAD 为空；`*_sealed` 是密文接 16 字节的 GCM 标签。
 - **`signature-*.txt`**：一把混合公钥、一条消息与它的混合签名（§8-3）。`signature-rust.txt` 由 Rust 用 `keys.txt` 的那把密钥签；aws-lc-rs 的 ML-DSA-44 签名带随机（hedged），所以只有 Ed25519 一半能逐字节复现，浏览器验整份。浏览器一侧签的那一份由客户端提交为 `signature-browser.txt`，字段相同；Rust 的测试验目录里每一个 `signature-*.txt`，所以它落地时 Rust 一侧不改代码。
 - **`fixture.txt`**：单向夹具（D11）。`hello` 是设备的 `Hello`（设备 id、X25519 公钥、ML-KEM-768 封装密钥、nonce），`x25519_private` 与 `ml_kem_private`（FIPS 203 的 2400 字节解封装密钥）是它的两把临时私钥；`reply` 是 Rust 城对它的回答，`city_public` 是签回答的城公钥；`first_frame` 是握手之后城封给设备的第一帧（城到设备，计数 0），`plaintext` 是它打开后的负载字节（`Payload::Frame`，约定的文字）。设备走 §8-4 的设备一半：从 `hello` 与不含签名的 `reply` 算握手记录，用 `city_public` 验回答的签名，派生会话密钥，打开 `first_frame`，得出 `plaintext`。
+- **浏览器一侧**：`client/src/core/remote/interop.test.ts` 读同一组文件，以页面的实现（WebCrypto 加 `@noble/post-quantum`，D21）重算确定的三份、验 `signature-rust.txt`、用固定的临时私钥打开 `fixture.txt` 的第一帧；它还用 `keys.txt` 的种子签 `signature-rust.txt` 的那条消息，写成 `signature-browser.txt`，Rust 一侧的 `every_signature_vector_verifies` 验它。这一份只在树上那一份在浏览器一侧验不过时由 `GOLDEN_WRITE=1 bun test --conditions=browser src/core/remote/interop.test.ts`（在 `client/` 里跑）重写。
 - **重生成**：`GOLDEN_WRITE=1 cargo nextest run -p sprawling-remote-access -E 'test(/vector|fixture/)'`。确定的三份（`keys.txt`、`session-keys.txt`、`seal.txt`）每次重写，字节不变；`signature-rust.txt` 与 `fixture.txt` 带着随机（ML-DSA 的签名、城的临时密钥、新抽的 ML-KEM 密钥），只在提交入库的那一份在 Rust 一侧验不过或打不开时重写，所以协议没变时重跑一次不改一个字节，而标签、握手记录、派生或封装的任何改动都让它们打不开、随之重写。不带这个变量时，测试只读、只比，不写。
 - **固定的临时密钥只经测试的缝进来**：读写这些文件的是 `#[cfg(test)]` 的 `remote_access::handshake::agreement::interop`，它从两把私钥造出设备的临时密钥；发行二进制里设备的临时密钥只有 `generate` 一个来处，`handshake` 没有可注入随机源的接口（D20）。
 
@@ -492,7 +492,7 @@ D21 浏览器一侧的 ML-KEM 与 ML-DSA 用 `@noble/post-quantum`，精确钉�
 - `crates/remote_access/src/door/spelling.rs` 内的测试：设备 id、公钥与权限的正文各读回原值；短了的 id 与不认识的权限字以 `E_INVALID_ARGS` 拒（§8-11）。
 - `crates/remote_access/src/keys.rs`、`crates/remote_access/src/seal.rs` 内的测试与 `crates/remote_access/src/handshake/tests.rs`：§2 对 keys、handshake、seal 的各条；每条验证步骤被故意拿掉时，对应测试转红。
 - `crates/remote_access/src/handshake/pairing/tests.rs`：§2 对配对握手的各条，每条对应 `Handshake.lean` 的一组定理；`crates/remote_access/src/route/tests.rs`：§2 对通路的各条，`command` 通路对一个脚本化子进程（Windows 上是 `cmd`，其余平台是 `sh`）答出的 `Opened` 与脚本化通路答出的相同。
-- `crates/remote_access/src/handshake/agreement/interop.rs`：§8-12 的五份文件各有一条读回测试，名字里带 `vector` 或 `fixture`；带 `GOLDEN_WRITE=1` 时按 §8-12 重写。
+- `crates/remote_access/src/handshake/agreement/interop.rs`：§8-12 的五份文件各有一条读回测试，名字里带 `vector` 或 `fixture`；带 `GOLDEN_WRITE=1` 时按 §8-12 重写。浏览器一侧的同一组检查在 `client/src/core/remote/interop.test.ts`，由 `just check-client` 跑。
 - 约束：零 `unsafe`；门、配对码、密钥、握手与封装零 I/O，时间与熵从参数来，唯一例外是两种握手的临时密钥（§8-4、§8-6）；通路的 I/O 只经标准库（D14）。
 - `crates/remote_access/spec/Handshake.lean`：配对握手的三条性质，由 `just models` 证明。它不驱动 Rust 代码；Rust 一侧与它对应的是 §2 里配对的各条。
 
@@ -507,5 +507,5 @@ D11 与浏览器的互通只做组件级已知答案向量，加一条从 Rust �
 - `crates/kernel/Spec.lean` §8-76（设备表的路径）与 §8-81（远程门的五个事件）、`crates/wire/Spec.lean` §19-2 的 `class` 列与 §8-66（中继与 `Refusal`）、sprawling-SPEC 8-139 与 8-140（门的看守、远程监听、控制台的 `/remote`）、`client/client-SPEC.md` §7（配对页的交互契约落地时写在那里，§3）。§8-1 的动词类、§8-5 的负载、§8-6 的邀请写法或 §8-10 的两条路径改了，重读这几节。
 - `tools/fixtures/remote-handshake/` 与 `tools/README.md` 的 fixtures 一行（§8-12）：客户端的互通测试读这些文件；§8-3 到 §8-5 的任何字节改了，文件重生成，客户端的测试须仍过。
 - `docs/operating.md` 里控制台 `/remote` 的那一段与 `[remote]` 的写法（两种通路、`tailscale serve` 的示例）：控制台的动词以 sprawling-SPEC 8-140 为准，表的键以 `crates/city/Spec.lean` §8-39 为准，§8-8、§8-9 改了参数时三处一起改。
-- 尚未写到的文档：`README.md` 与 `README.zh-CN.md` 的「它在哪里监听」一节仍是 D3 取代的那句「本仓库不附带隧道」，要照 D3 与 D10 写明通路上剩下的那一件信任；`docs/getting-started.md` 与中文版的「另一台机器」一节还没有写。中英两份在同一个提交里改。
+- `README.md` 与 `README.zh-CN.md` 的「它在哪里监听」一节照 D3 与 D10 写远程门与通路上剩下的那一件信任，`docs/getting-started.md` 与中文版的「另一台机器」一节指向 `docs/operating.md`；D3、D10 改了，这四处一起改，中英两份在同一个提交里。
 -/

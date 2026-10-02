@@ -321,7 +321,7 @@ sprawling call '{"ask":{"ask_id":1,"query":"city_view"}}'          # one frame o
 sprawling serve ~/cities/first 0.0.0.0:8787
 ```
 
-An address that reaches past this machine needs a pairing key. If `SPRAWLING_PAIRING_TOKEN` is set, the city adopts it and never prints it; otherwise the city mints a key for this serve alone and prints it once in the banner, with an address that carries it. The next start replaces it. The city ships no tunnel for reaching it from outside your network; which one to trust is your decision.
+An address that reaches past this machine needs a pairing key. If `SPRAWLING_PAIRING_TOKEN` is set, the city adopts it and never prints it; otherwise the city mints a key for this serve alone and prints it once in the banner, with an address that carries it. The next start replaces it. From outside your network, a device reaches the city through the remote door and a route you choose: [operating.md](operating.md), *Reaching the city from another device*, says how, and what the route is trusted with.
 
 ## Moving a city
 
