@@ -373,11 +373,11 @@ mod tests {
             &root,
             "tools/xtask/budgets.toml",
             "[views_rebuild_per_mb]
-best_p50_ms = 2759
+best_p50_us = 2759
 ",
         );
         assert_eq!(
-            value(&root, "budget_figure:views_rebuild_per_mb.best_p50_ms").unwrap(),
+            value(&root, "budget_figure:views_rebuild_per_mb.best_p50_us").unwrap(),
             Some("2,759".into())
         );
         assert!(value(&root, "budget_figure:views_rebuild_per_mb").is_err());

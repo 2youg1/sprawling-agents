@@ -228,7 +228,7 @@ pub(super) fn grouped_bytes(root: &Path, row: &str, field: &str) -> Result<Strin
 
 /// One integer field of a register row, grouped the way a document
 /// writes it and without a unit, because the unit is the field's to
-/// name: `views_rebuild_per_mb.best_p50_ms` reads `2,759`.
+/// name: `views_rebuild_per_mb.best_p50_us` reads `2,759`.
 ///
 /// # Errors
 /// The argument carries no `.field`, or the row or field is absent.

@@ -11,6 +11,13 @@
 # measured and reported with their machine rather than gated; gating them
 # would make a busy runner look like a defect. Each such row says what it
 # needs, so nobody has to guess why it is not enforced.
+#
+# Every duration a field holds is a whole number of microseconds, and the
+# field's name ends in `_us` (`_ns` for an in-process reading below one
+# microsecond): a millisecond field cannot tell 0.4 ms from 0 ms, and a
+# reading taken in microseconds is never rounded twice. A page or a
+# terminal shows a duration below 10 ms in µs and one of 10 ms or more in
+# ms (`crates/sprawling/spec/Main.lean` §8-129-2, *单位*).
 
 # The reading is the bundle a browser downloads, gzipped, walked
 # recursively so every chunk the page loads is on the scale.
@@ -364,8 +371,8 @@ status = "gated by just mutants, not by just check: a full mutation run is minut
 
 [ledger_append]
 what = "append plus fsync, p50 and p99"
-budget_p50_ms = 5
-budget_p99_ms = 20
+budget_p50_us = 5000 # was 5 ms
+budget_p99_us = 20000 # was 20 ms
 measured_by = "just bench (citysim bench bin, release)"
 status = "measured, not gated: p50 0.555 ms / p99 0.688 ms, nearest rank (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01); batched append_all moves 140,934 records/s. The two readings the register used to carry (about 335k records/s batched, run_history 3.3 ms) were re-read on the two trees either side of 2ff1859b: its parent gives 206,501 records/s and 4.177 ms, 2ff1859b itself 135,831 records/s and 6.429 ms, so most of the later drop is the bench load changing shape in 2ff1859b, not the product; the parent itself sits below the old figures, a gap that is either in 2feeb2d6..2ff1859b^ or the machine and has not been bisected. A wall-clock figure is the machine's, so it is recorded, never gated"
 
@@ -407,7 +414,7 @@ status = "measured, not gated: p50 3.287 ms, three runs 2.978-3.355 ms (fixture 
 
 [prefix_assembly]
 what = "assembling one frozen prefix"
-budget_ms = 1
+budget_us = 1000 # was 1 ms
 measured_by = "just bench (citysim bench bin, release)"
 status = "measured, not gated: p50 0.009 ms for 16.5 KB over four slots, 1000 rounds (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01)"
 
@@ -486,7 +493,7 @@ status = "measured, not gated: 8,388,608 B, refused whole rather than truncated,
 # are below.
 #
 # **The p99 of an append is not among them, because it already has a
-# home.** `[ledger_append]` states `budget_p99_ms` and carries the
+# home.** `[ledger_append]` states `budget_p99_us` and carries the
 # reading; a row named `ledger_append_p99` would be a second place to
 # state one number, and the two would be edited on different days by
 # different people. Price the append where the append is already
@@ -514,13 +521,13 @@ status = "measured, not gated: 8,388,608 B, refused whole rather than truncated,
 # (`budget_figure:views_rebuild_per_mb.<field>`) rather than typing a
 # second copy.
 [views_rebuild_per_mb]
-what = "milliseconds to rebuild every view, per megabyte of ledger folded"
+what = "microseconds to rebuild every view, per megabyte of ledger folded"
 measured_by = "just bench (citysim bench bin, release), over a ledger large enough that the fold rather than the open dominates: the bench writes 50,000 records into a scratch city and drives the whole production rebuild through `sprawling::ask`, which verifies the chain, parses every line and folds it into every view before answering one CityView"
 fold_records = 50000
-best_p50_ms = 437
-best_p95_ms = 439
-best_p99_ms = 439
-status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`), floor 434.222 ms, p50 436.676 ms, p95 and p99 438.127 ms under the nearest-rank rule, the median of three runs whose p50 read 417.348-437.723 ms, the best_* fields rounded up to whole milliseconds (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3). The same runs read p50 676.402-707.773 ms at opt-level \"z\". The reading fell from 1277.206 ms when a rebuild from genesis stopped proving the history before folding it, since the fold checks every line itself (accounting D31 (b)); what remains is one line check, one parse and one fold per line. The per-megabyte figure is best_p50_ms over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
+best_p50_us = 436676 # was 437 ms, the same reading rounded up
+best_p95_us = 438127 # was 439 ms
+best_p99_us = 438127 # was 439 ms
+status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`), floor 434.222 ms, p50 436.676 ms, p95 and p99 438.127 ms under the nearest-rank rule, the median of three runs whose p50 read 417.348-437.723 ms, the best_* fields the same readings in whole microseconds (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3). The same runs read p50 676.402-707.773 ms at opt-level \"z\". The reading fell from 1277.206 ms when a rebuild from genesis stopped proving the history before folding it, since the fold checks every line itself (accounting D31 (b)); what remains is one line check, one parse and one fold per line. The per-megabyte figure is best_p50_us over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
 
 # What a dispatch spends before the model is called: opening the room,
 # writing the brief, standing the run up, and assembling the tools -
@@ -534,7 +541,7 @@ status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::sce
 # trivially or blocks the change that fixes it. What this row buys
 # today is that the reading gets taken and recorded where the next
 # person will find it.
-[prepare_dispatch_ms]
+[prepare_dispatch]
 what = "one dispatch, from the command arriving to the lane taking the drive, on the accounting thread"
 measured_by = "the instrument is two reads of the monotonic clock `Hands.monotonic` around `stage_dispatch` (crates/accounting/src/worker/dispatching/running.rs) and two more around `Laying::mcp_tools` (crates/accounting/src/worker/workbench/servers.rs), which runs in the lane that drives the run (`crates/sprawling/Spec.lean` §8-93), written out at `Level::Trace`; the assembly hands the worker that clock beside the city's own (`crates/accounting/Spec.lean` §8-11), so a span never reads a city clock that a test or a correction can move. Read it off `a_dispatch_says_what_it_spent_before_the_drive` (cargo nextest run -p sprawling-accounting --release -E 'test(a_dispatch_says_what_it_spent_before_the_drive)' --no-capture), or off any served city running at that floor"
 status = "measured, not gated: 58 ms median on windows-x86_64, 16 cores, NVMe (2026-09-21, release, four runs: 50, 50, 51, 66; ~70 ms unoptimized when idle), for a dispatch into a fresh city with **no MCP server declared** - so this figure is the floor, and the `mcp_tools` line beside it read 0 ms over 0 servers in every run. The two lines are reported apart because a resident connection table (K-05) removes only the second, and the reading is K-05's own verdict: at 0 ms the table saves nothing, so it stays unbuilt until a served building declares servers and the second line shows them dominating. Not gated - a wall-clock reading is the machine's, and this one also depends on how many MCP servers a building declares"

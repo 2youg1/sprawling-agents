@@ -284,7 +284,7 @@ mod tests {
             status = "measured, not gated: the counter differs per platform"
 
             [no_unit_this_gate_knows]
-            budget_ms = 5
+            budget_us = 5000
             status = "gated"
             "#,
         )
