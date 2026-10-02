@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { noticesText, packagesIn } from "./notices";
+import { foldersOf, noticesText, packagesIn } from "./notices";
 
 describe("third-party notices", () => {
   test("each installed package is named once, scoped and nested ones by their own name", () => {
@@ -25,6 +25,19 @@ describe("third-party notices", () => {
       { name: "effect", dir: "C:/w/client/node_modules/effect" },
       { name: "svelte", dir: "/w/client/node_modules/svelte" },
     ]);
+  });
+
+  test("an asset copied from a package's subfolder brings that folder's licence files along", () => {
+    expect(
+      foldersOf({ name: "pdfjs-dist", dir: "C:/w/client/node_modules/pdfjs-dist" }, [
+        "C:/w/client/node_modules/pdfjs-dist/cmaps/UniGB-UCS2-H.bcmap",
+        "C:/w/client/node_modules/pdfjs-dist/cmaps/Identity-H.bcmap",
+        "C:/w/client/node_modules/pdfjs-dist/wasm/openjpeg.wasm",
+        "C:/w/client/node_modules/pdfjs-dist/README.md",
+        "C:/w/client/node_modules/pdfjs-distant/x/y.js",
+        "C:/w/client/src/fonts/GeistMono-Variable.woff2",
+      ]),
+    ).toEqual(["cmaps", "wasm"]);
   });
 
   test("the file states each package with its licence texts verbatim, line endings folded", () => {

@@ -6,13 +6,17 @@
 // The notices of the npm packages inside the bundle (client-SPEC 12-13).
 // MIT and Apache-2.0 both require the copyright and licence notice to
 // travel with every copy, and a minified bundle is a copy. The packages
-// are read off the chunks the bundler emitted rather than off
-// `package.json` or `bun.lock`: the manifest misses what a runtime
+// are read off the chunks and the assets the bundler emitted rather than
+// off `package.json` or `bun.lock`: the manifest misses what a runtime
 // package brings in, and the lockfile counts the toolchain and every
-// module tree-shaking dropped.
+// module tree-shaking dropped. An asset copied out of a package's
+// subfolder - pdf.js's CMaps, its symbol faces, its WebAssembly decoders
+// (client-SPEC 12-32) - is often another project's work with its own
+// licence file beside it, so the licence files of that folder travel
+// too.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import type { Plugin } from "vite";
 
@@ -49,14 +53,26 @@ const HEAD = [
 // build and is named: a notices file that silently lacks one package is
 // the gap it exists to close.
 export function thirdPartyNotices(): Plugin {
+  // An asset names its source relative to the build's root; a chunk's
+  // module ids are absolute, and one package must have one directory.
+  let root = "";
   return {
     name: "sprawling:third-party-notices",
     apply: "build",
+    configResolved(config) {
+      root = config.root;
+    },
     generateBundle(_options, bundle) {
       const moduleIds = Object.values(bundle).flatMap((item) =>
         item.type === "chunk" ? item.moduleIds : [],
       );
-      const read = packagesIn(moduleIds).map((installed) => ({ installed, notice: noticeOf(installed) }));
+      const assets = Object.values(bundle).flatMap((item) =>
+        item.type === "asset" ? item.originalFileNames.map((name) => resolve(root, name).replaceAll("\\", "/")) : [],
+      );
+      const read = packagesIn([...moduleIds, ...assets]).map((installed) => ({
+        installed,
+        notice: noticeOf(installed, foldersOf(installed, assets)),
+      }));
       const unlicensed = read.filter((entry) => entry.notice === undefined);
       if (unlicensed.length > 0) {
         this.error(
@@ -113,20 +129,31 @@ export function noticesText(entries: readonly Notice[]): string {
   return `${[HEAD.join("\n"), ...blocks].join("\n\n")}\n`;
 }
 
+/**
+ * The folders inside a package, below its root, that an emitted asset
+ * was copied from, relative to the package and sorted.
+ */
+export function foldersOf(installed: Installed, assets: readonly string[]): readonly string[] {
+  const root = `${installed.dir}/`;
+  const folders = assets.flatMap((path) => {
+    const inside = path.startsWith(root) ? path.slice(root.length) : "";
+    const cut = inside.lastIndexOf("/");
+    return cut <= 0 ? [] : [inside.slice(0, cut)];
+  });
+  return [...new Set(folders)].sort(order);
+}
+
 /** What one installed package says about itself, or nothing when it ships no licence file. */
-function noticeOf(installed: Installed): Notice | undefined {
+function noticeOf(installed: Installed, folders: readonly string[]): Notice | undefined {
   const manifest = join(installed.dir, "package.json");
   if (!existsSync(manifest)) {
     return undefined;
   }
-  const texts = readdirSync(installed.dir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && LICENCE_FILE.test(entry.name))
-    .map((entry) => entry.name)
-    .sort(order)
-    .map((name) => readFileSync(join(installed.dir, name), "utf8"));
-  if (texts.length === 0) {
+  const own = licencesIn(installed.dir);
+  if (own.length === 0) {
     return undefined;
   }
+  const texts = [...own, ...folders.flatMap((folder) => licencesIn(join(installed.dir, folder)))];
   const stated: unknown = JSON.parse(readFileSync(manifest, "utf8"));
   return {
     name: installed.name,
@@ -134,6 +161,15 @@ function noticeOf(installed: Installed): Notice | undefined {
     license: field(stated, "license"),
     texts,
   };
+}
+
+/** The licence files directly inside one folder, verbatim, in name order. */
+function licencesIn(folder: string): readonly string[] {
+  return readdirSync(folder, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && LICENCE_FILE.test(entry.name))
+    .map((entry) => entry.name)
+    .sort(order)
+    .map((name) => readFileSync(join(folder, name), "utf8"));
 }
 
 /** A string field of a parsed `package.json`, or `unstated`. */
