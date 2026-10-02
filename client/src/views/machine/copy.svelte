@@ -9,7 +9,7 @@
 // that quietly failed shows no check rather than a lying one. Two marks
 // and no motion between them: the receipt is a cut, and the mark is
 // `parts/glyph`'s `check`, which is where every icon in this client
-// lives (client/Spec.lean §4-34).
+// lives (docs/frontend-method.md §4-34).
 
 // How long the receipt holds its check mark: long enough to see one,
 // short enough that the mark never becomes the button's face.
@@ -18,7 +18,7 @@ const RECEIPT_MS = 1200;
 // The resting paint, at the ordinary control height so the copy stands
 // level with the Button beside it in a command row. The `::before`
 // widens the touch surface to the 44-point floor while the drawn
-// control stays on the control scale (client/Spec.lean §4-34).
+// control stays on the control scale (docs/frontend-method.md §4-34).
 const WEAR =
   "relative flex h-control shrink-0 items-center gap-tight rounded-control px-base " +
   "text-label text-text-quiet before:absolute before:-inset-snug before:content-[''] " +

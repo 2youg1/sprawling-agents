@@ -5,7 +5,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The world layer as client/Spec.lean §7H and §7K draw it, in a made-up city
+  // The world layer as docs/frontend-method.md §7H and client/Spec.lean §7K draw it, in a made-up city
   // of three buildings: the panorama workbench on a building room with a
   // commit picked, the same room in the blend tier, the workbench with
   // the right pane open, and the two readings of the third pane that

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The two appearance choices the city's record has no field for: glass,
-// and the world layer's opacity in the blend tier (client/Spec.lean §4-43).
+// and the world layer's opacity in the blend tier (docs/frontend-method.md §4-43).
 // Both live in this browser alone, so what has to hold is that a stored
 // row reads back inside its domain and that the city's answer, which
 // says nothing about either, leaves them where the browser had them.

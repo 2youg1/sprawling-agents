@@ -14,7 +14,7 @@
   // **Width is the caller's.** The same reading draws a model's reply
   // inside the talk thread (the `talk` tier) and a Markdown file inside
   // the building page's file view (the `measure` tier), and the tier
-  // belongs to the screen that chose the container (client/Spec.lean §4-33).
+  // belongs to the screen that chose the container (docs/frontend-method.md §4-33).
   // A table or a code block never wraps per character - it scrolls
   // inside its own box, which `refrain/laid.svelte` holds.
   import Laid from "./refrain/laid.svelte";

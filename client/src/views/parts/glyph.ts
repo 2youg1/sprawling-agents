@@ -7,7 +7,7 @@
 // is the only thing that draws them: it maps each name to one icon of
 // the lucide set, so a shape cannot appear in two slightly different
 // versions in two files, and a person meets the icons they already know
-// from other software (client/Spec.lean §4-34). The city illustrations are
+// from other software (docs/frontend-method.md §4-34). The city illustrations are
 // drawings rather than icons and stay where they are; these are the
 // marks that name a screen, an action, or a state.
 //

@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts" module>
-  // How much of the row a composer draws (client/Spec.lean §7D, §7I): every
+  // How much of the row a composer draws (docs/frontend-method.md §7D, §7I): every
   // fact and choice before a session begins; the room, gate and sandbox
   // once it has, because the model, effort and mode are then the frozen
   // facts of its first message head; and in the panorama tier's band
@@ -14,7 +14,7 @@
 </script>
 
 <script lang="ts">
-  // The row under the composer's line (client/Spec.lean §7I): the room, the gate
+  // The row under the composer's line (docs/frontend-method.md §7I): the room, the gate
   // and the sandbox on the left, and - only before a session begins - the
   // model, the effort and the mode on the right. The room chip's menu
   // reads who is listening above the rooms it offers.

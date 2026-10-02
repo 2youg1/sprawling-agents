@@ -5,7 +5,7 @@
 
 // The properties this module must hold are proved in `client/spec/Views/Inspect/Open.lean`.
 //
-// What the right side shows (client/Spec.lean §7F, §4-45): the one state every
+// What the right side shows (docs/frontend-method.md §7F, client/Spec.lean §4-45): the one state every
 // opener writes and the inspector reads, so a tool line, a commit row and
 // a file in the world layer open the same side through the same door.
 //

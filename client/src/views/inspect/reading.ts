@@ -22,7 +22,7 @@ import type { RightItem } from "./open.svelte";
 export type Reading = "terminal" | "printed" | "diff" | "file" | "shot";
 
 // The two regions of the right side: the editor above, the terminal
-// below (7F).
+// below (docs/frontend-method.md §7F).
 export type Region = "editor" | "terminal";
 
 // One tab of the inspector's strip: the item, the name it is shown by,

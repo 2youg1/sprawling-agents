@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the inspector's terminal prints for one call (client/Spec.lean §7F).
+// What the inspector's terminal prints for one call (docs/frontend-method.md §7F).
 //
 // **The Ledger is the authority on a command's output; the live tail is a
 // preview of it.** While the call is waiting, the terminal prints what

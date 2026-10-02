@@ -5,7 +5,7 @@
 
 <script lang="ts">
   // Every page but the conversation, in the columns right of the edge
-  // keys (client/Spec.lean §4-33), until each is redesigned for the shell. The
+  // keys (docs/frontend-method.md §4-33), until each is redesigned for the shell. The
   // conversation page lays itself out by the tier and is not here
   // (`workspace.svelte`).
   import type { View } from "../core/route";

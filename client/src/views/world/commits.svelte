@@ -11,7 +11,7 @@
   // is the graph's node, the short oid, the message and the room that
   // made it; the time is the timeline's, so it is not said here.
   //
-  // The chosen session's commits and its lane take the accent (7B); a
+  // The chosen session's commits and its lane take the accent (docs/frontend-method.md §7B); a
   // node takes the phase of the run that made it (`runs/phase.ts`), so a
   // commit whose run is still going reads as going. Picking a row picks
   // its session - the conversation moves to that room when it is another

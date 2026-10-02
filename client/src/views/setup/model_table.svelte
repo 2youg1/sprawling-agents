@@ -198,7 +198,7 @@
   // column is the one that must never break: a model id is the whole of
   // what a person ticks, and the columns together are wider than the
   // measure this table sits in, so the container scrolls sideways
-  // rather than squeezing the id into a vertical word (client/Spec.lean
+  // rather than squeezing the id into a vertical word (docs/frontend-method.md
   // §4-33). Column order: id, context, output ceiling, input modalities,
   // price, role.
   const columns: readonly Column<ModelFact>[] = $derived([

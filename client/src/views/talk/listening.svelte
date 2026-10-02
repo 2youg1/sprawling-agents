@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // Who is listening in this room (client/Spec.lean §7I), read in the room
+  // Who is listening in this room (docs/frontend-method.md §7I), read in the room
   // chip's menu above the rooms it offers: the city, the building, the
   // resident and the run, one row each, and beside each the segment of
   // the prompt that the room's newest run was told for it - its size,

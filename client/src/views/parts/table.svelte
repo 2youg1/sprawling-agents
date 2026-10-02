@@ -59,7 +59,7 @@ function said(key: string): "ascending" | "descending" | "none" {
 }
 
 // The class a column's stated minimum resolves to, and nothing at all
-// when the column states none: the width rules of client/Spec.lean §4-33 have
+// when the column states none: the width rules of docs/frontend-method.md §4-33 have
 // one spelling and this is it.
 function breadthOf(min: Min | undefined): string | undefined {
   switch (min) {

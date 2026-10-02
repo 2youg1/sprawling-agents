@@ -13,7 +13,7 @@
   // the ends, and Tab still steps through them one by one.
   //
   // The performance entry carries the city's process reading in one
-  // line (7D): while the tree is drawn this page asks the monitor for
+  // line (docs/frontend-method.md §7D): while the tree is drawn this page asks the monitor for
   // its summary, and the city samples only while somebody watches.
 
   import { onDestroy } from "svelte";
@@ -106,7 +106,7 @@
   // the chevron of a branch, or nothing - so every label is as wide as
   // the next and the rows' words start on one line.
   const MARK = "flex w-glyph-sm shrink-0 justify-center text-text-faint";
-  // The 2px accent bar says which group is the one drawn (client/Spec.lean §7B).
+  // The 2px accent bar says which group is the one drawn (docs/frontend-method.md §7B).
   // The page under the panel is named too, but only in its ink: two bars
   // in one tree would leave the eye to guess which is the selection.
   const HERE = "bg-raised text-text before:absolute before:inset-y-snug before:left-0 before:w-[2px] before:rounded-pill before:bg-accent";

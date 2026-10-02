@@ -44,7 +44,7 @@
   });
 
   // The row whose file is in front on the right side, marked the way a
-  // chosen row is marked everywhere (client/Spec.lean §7B).
+  // chosen row is marked everywhere (docs/frontend-method.md §7B).
   function isOpen(path: string): boolean {
     const item = rightItem();
     return item !== null && item.kind === "document" && item.building === building && item.path === path;

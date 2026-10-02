@@ -15,7 +15,7 @@
  * One font file ships inside the binary: Geist Mono, one variable woff2
  * in client/src/fonts/, and it is the face of the whole interface - prose,
  * labels, figures and code alike, with hierarchy carried by size, weight
- * and the grey ramp (client/Spec.lean §4-37). The reason it ships at all is
+ * and the grey ramp (docs/frontend-method.md §4-37). The reason it ships at all is
  * that the client is one screen a person judges the whole product by,
  * and a stack that starts at whatever the machine happens to have gives
  * that screen a different shape on every machine, with metrics nobody
@@ -88,7 +88,7 @@
    * gamut, ALERT, the warm complement, at 70%; a hover keeps its base
    * ratio at a higher lightness. ACCENT says something is moving or
    * chosen here, ALERT that a person is needed or something is missing
-   * (client/Spec.lean §7B). */
+   * (docs/frontend-method.md §7B). */
   --color-accent: oklch(0.720 calc(0.136 * var(--chroma)) 250);
   --color-alert: oklch(0.800 calc(0.113 * var(--chroma)) 70);
   --color-accent-hover: oklch(0.790 calc(0.099 * var(--chroma)) 250);
@@ -97,7 +97,7 @@
 
   /* The two checkpoints on the context ring, and the only colours off
    * the axis: green where the first reminder sounds, red where the
-   * handoff reminder does (client/Spec.lean §7J, tools/xtask/Spec.lean 8-8b).
+   * handoff reminder does (docs/frontend-method.md §7J, tools/xtask/Spec.lean 8-8b).
    * Nothing else may take either hue. */
   --color-reminder-first: oklch(0.800 calc(0.154 * var(--chroma)) 150);
   --color-reminder-second: oklch(0.680 calc(0.187 * var(--chroma)) 25);
@@ -158,7 +158,7 @@
   --color-raised-hover: var(--color-g3);
 
   /* What fills a small surface of the edge layer that lets the page
-   * behind it show through (client/Spec.lean §4-43): the edge keys, and the
+   * behind it show through (docs/frontend-method.md §4-43): the edge keys, and the
    * mailbox and the settings sheet if they take glass. The rung is the
    * one a raised control sits on; how much of it covers what is behind
    * is `--glass-opacity` below, which `xtask color` judges. */
@@ -380,7 +380,7 @@
   --spacing-caret: 18px;
   --spacing-hair: 2px;
 
-  /* The shell's grid (client/Spec.lean §4-33): twelve columns, a margin round
+  /* The shell's grid (docs/frontend-method.md §4-33): twelve columns, a margin round
    * the window, a gutter between columns, and an eight-pixel baseline
    * the rows are counted in. Outside the density coefficient on
    * purpose: the grid is what makes two edges one line, and a tighter
@@ -421,7 +421,7 @@
    * over the page reads as an object rather than as part of a form. */
   --radius-key: 14px;
 
-  /* Motion (client/Spec.lean §4-43): three durations, named for how far a
+  /* Motion (docs/frontend-method.md §4-43): three durations, named for how far a
    * thing travels, and two easings, named for which way it goes. They
    * sit in Tailwind's own namespaces, so `duration-panel` and
    * `ease-arrive` are utilities; `xtask motion` refuses a curve or a
@@ -531,12 +531,12 @@
    * because `color-mix` takes one, and the number the colour gate reads:
    * over the brightest surface the page draws, text on glass still
    * reaches its tier in both lightings, so lowering this until it does
-   * not turns `xtask color` red (client/Spec.lean §4-43). */
+   * not turns `xtask color` red (docs/frontend-method.md §4-43). */
   --glass-opacity: 75%;
   /* How opaque the world layer is in the blend tier, while the person
-   * has not moved the appearance group's slider (client/Spec.lean §7H, U2). */
+   * has not moved the appearance group's slider (docs/frontend-method.md §7H, U2). */
   --blend-opacity: 60%;
-  /* The one corner exponent (client/Spec.lean §4-43): the parameter CSS
+  /* The one corner exponent (docs/frontend-method.md §4-43): the parameter CSS
    * `superellipse()` takes, and the one `city/shape.ts` reads for the
    * drawing, so a building on the map and the panel beside it have one
    * curvature. 1.6 is the edge keys' corner the person approved. */
@@ -796,7 +796,7 @@
  * either way. */
 @custom-variant narrow (@container shell (width < 768px));
 
-/* The shell's one grid (client/Spec.lean §4-33). Every region of the page is
+/* The shell's one grid (docs/frontend-method.md §4-33). Every region of the page is
  * placed on its column lines, so two edges that should line up are one
  * line rather than two measurements. The first row is the banners a
  * page may carry; the second is the page. A device that draws under its
@@ -832,7 +832,7 @@
 }
 
 /* Glass, for the small surfaces of the edge layer and nothing larger
- * (client/Spec.lean §4-34, §4-43): a blurred, saturated view of what is
+ * (docs/frontend-method.md §4-34, §4-43): a blurred, saturated view of what is
  * behind, the glass role at the opacity the colour gate judges, one
  * edge that separates it from the words it floats over, and one level
  * of shadow that says it floats. */
@@ -993,7 +993,7 @@
 .fade {
   animation: fade var(--transition-duration-short) var(--ease-arrive) both;
 }
-/* The line under the composer's words (client/Spec.lean §7I). It runs as far
+/* The line under the composer's words (docs/frontend-method.md §7I). It runs as far
  * as the words do and fades out after them, so an empty field shows only
  * a short lead from the left edge, the way a terminal shows its prompt,
  * and the first words draw it out like a progress bar. `--typed` is set
@@ -1026,7 +1026,7 @@
   opacity: 1;
 }
 
-/* The coin key: send on one face, stop on the other (client/Spec.lean §7I).
+/* The coin key: send on one face, stop on the other (docs/frontend-method.md §7I).
  * The faces turn about the vertical axis; with motion reduced they cross
  * fade in place instead, so the answer to "what does this key do now"
  * still changes and nothing travels. */
@@ -1091,7 +1091,7 @@
   }
 }
 
-/* The context ring's two checkpoints (client/Spec.lean §7J): a dot at its
+/* The context ring's two checkpoints (docs/frontend-method.md §7J): a dot at its
  * percent of the window, ringed in the page colour so it reads over the
  * line it sits on. The remaining arc moves rather than jumps. */
 .ring-left {
@@ -1111,7 +1111,7 @@
   transform: rotate(calc(var(--at) * 3.6deg)) translateY(-18px);
 }
 
-/* Hold to reveal (client/Spec.lean §7E): while the accelerator is held alone,
+/* Hold to reveal (docs/frontend-method.md §7E): while the accelerator is held alone,
  * the shell sets `data-expose` on the root and every hint that may be
  * revealed this way is drawn at once. Unlayered, so it outranks the
  * utilities that hide a hint at rest. */
@@ -1193,7 +1193,7 @@
 [data-motion="off"] .animate-pulse {
   animation: none;
 }
-/* Motion off is three durations at zero (client/Spec.lean §4-43): every
+/* Motion off is three durations at zero (docs/frontend-method.md §4-43): every
  * transition and entrance reads one of them, so the state still changes
  * where the eye was and nothing travels. The default duration is set
  * beside them rather than left to follow `short`, because a custom
@@ -1614,10 +1614,11 @@ main h1 {
 
 /* RFR
  * RefRain, the right side's document editor (client/Spec.lean §7N). Its head
- * line is the 32 px line 7F seats above the editor; the editor is
+ * line is the 32 px line docs/frontend-method.md §7F seats above the
+ * editor; the editor is
  * CodeMirror, whose own base theme is overruled here so every colour on
  * it is a role of this file (client D23). Inserted text takes the accent's
- * pale ground and removed text the alert's, as the diff does on 7F. */
+ * pale ground and removed text the alert's, as the diff does on §7F. */
 .refrain .refrain-head {
   display: flex;
   flex-wrap: wrap;

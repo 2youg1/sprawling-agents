@@ -13,7 +13,7 @@
   // figure the city has not told the page is a dash or is left out, never
   // a guess.
   //
-  // This is the one screen that draws cost (client/Spec.lean §7D): the session's
+  // This is the one screen that draws cost (docs/frontend-method.md §7D): the session's
   // own spend and the city's beside it, so neither appears again anywhere
   // the panorama shows.
   import { readAnswer } from "../../core/answered";

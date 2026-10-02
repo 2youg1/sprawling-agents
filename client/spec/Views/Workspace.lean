@@ -66,11 +66,13 @@ import client.spec.Views.Parts
 | | | Enter／Space（有子条目的条目） | 展开或收起 |
 | | | Enter（组或页的条目） | 组画进正文；页移动地址栏并关上面板 |
 | 设置面 | APG Dialog (Modal) | Escape、点背景、Accel-, | 关上；焦点回到打开它的控件 |
+| 外观组的混合档滑条 | APG Slider（原生 `<input type="range">`，30%–90%，一步 5） | ←／→、↑／↓ | 走一步；落定的值立即生效，卡脚写「已保存」（§4-36） |
+| | | Home／End | 到 30% 或 90% |
 | 远程组的「配对这台设备」与「锁上门」 | APG Button | Enter／Space | 走那一次握手；进行中 `aria-disabled="true"`，结果写进组里唯一的 `role="status"` |
 | 远程组的种子 | 只读文字，带 `aria-label` 的 `<output>` | 「我记下了」（APG Button）Enter／Space | 种子从页面上拿掉，焦点落到这台设备那一节的标题 |
 | 远程组的「忘掉这台设备」 | APG Button，打开 `parts/dialog.svelte` | Enter／Space | 确认后删掉本地记录，焦点回到组标题；取消时回到这个按钮 |
 
-`aria-*`：硬币键的可读名字是朝上那一面的动作——发送（steer 时写出落点）或停止——翻面时名字随之换，而换名不进实时区域，因为它不是新闻；变淡的发送面 `aria-disabled="true"`，`aria-describedby` 指向说明原因的提示。上下文环 `aria-valuemin="0"`、`aria-valuemax` 是窗口、`aria-valuenow` 是用掉的 token，`aria-valuetext` 是提示那一行。房间菜单的列表以「谁在听」那一段为 `aria-describedby`，所以读屏器在列表获得焦点时连同它一起读出；那一段里没有可聚焦的东西，菜单的键全归列表。图层键的名字是「图层 · <当前档>」。设置树是 `<nav>` 加 `aria-label`，页条目是 `<a href>`（中键与新标签页照常可用），组条目是按钮；当前页（设置面下面那一页）`aria-current="page"`，当前组 `aria-current="true"`；有子条目的条目带 `aria-expanded` 与 `aria-controls`；每个枝的列表以枝的标签为 `aria-labelledby`。设置面以当前组的标题为 `aria-labelledby`，打开时焦点落在当前组的条目上。分隔线是 `role="separator"`，带 `aria-orientation`、以栏数计的 `aria-valuenow`／`aria-valuemin`／`aria-valuemax`，`aria-controls` 指向前一栏。右侧编辑器与终端之间的分隔线以行计（一行是三个基线步，24 px）。检视面的页签带是 `role="tablist"`，整条是一个 Tab 站（游走的 `tabindex`），每个页签 `aria-selected` 说它是不是最后碰过的那一项、`aria-controls` 指向它所在的区（编辑器区与终端区各是一个 `role="tabpanel"`）；页签上的关闭记号给指针用，`tabindex="-1"`，键盘走 Delete。「原文」带 `aria-pressed`。
+`aria-*`：硬币键的可读名字是朝上那一面的动作——发送（steer 时写出落点）或停止——翻面时名字随之换，而换名不进实时区域，因为它不是新闻；变淡的发送面 `aria-disabled="true"`，`aria-describedby` 指向说明原因的提示。上下文环 `aria-valuemin="0"`、`aria-valuemax` 是窗口、`aria-valuenow` 是用掉的 token，`aria-valuetext` 是提示那一行。房间菜单的列表以「谁在听」那一段为 `aria-describedby`，所以读屏器在列表获得焦点时连同它一起读出；那一段里没有可聚焦的东西，菜单的键全归列表。图层键的名字是「图层 · <当前档>」。设置树是 `<nav>` 加 `aria-label`，页条目是 `<a href>`（中键与新标签页照常可用），组条目是按钮；当前页（设置面下面那一页）`aria-current="page"`，当前组 `aria-current="true"`；有子条目的条目带 `aria-expanded` 与 `aria-controls`；每个枝的列表以枝的标签为 `aria-labelledby`。设置面以当前组的标题为 `aria-labelledby`，打开时焦点落在当前组的条目上。分隔线是 `role="separator"`，带 `aria-orientation`、以栏数计的 `aria-valuenow`／`aria-valuemin`／`aria-valuemax`，`aria-controls` 指向前一栏。右侧编辑器与终端之间的分隔线以行计（一行是三个基线步，24 px）。检视面的页签带是 `role="tablist"`，整条是一个 Tab 站（游走的 `tabindex`），每个页签 `aria-selected` 说它是不是最后碰过的那一项、`aria-controls` 指向它所在的区（编辑器区与终端区各是一个 `role="tabpanel"`）；页签上的关闭记号给指针用，`tabindex="-1"`，键盘走 Delete。「原文」带 `aria-pressed`。混合档滑条的 `aria-valuetext` 写出百分数（画法见 `docs/frontend-method.md` §4-43）。
 -/
 
 /-!

@@ -10,7 +10,7 @@ the label weight and everything else faint, so a thread reads as a
 column of names with words under them.
 
 **Each figure is drawn only where the screen has no other home for it**
-(client/Spec.lean §7D). The model is a fact of the session, so it stands on
+(docs/frontend-method.md §7D). The model is a fact of the session, so it stands on
 the first head and again only where a turn answered with a different
 model; the time is to the second, because the tool lines carry the
 milliseconds; the cost of a turn is not drawn in the zen and blend tiers

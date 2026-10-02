@@ -5,7 +5,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The box a person writes in, written as a page (client/Spec.lean §7I): the
+  // The box a person writes in, written as a page (docs/frontend-method.md §7I): the
   // words, a line under them, the settings row under the line, and the
   // coin key in its context ring beside the words. Nothing here decides
   // where a message goes; the page does. `composer.ts` owns what the
@@ -72,7 +72,7 @@
     // on a city with none is a button whose only answer is a refusal.
     readonly hearing?: boolean | undefined;
     // In the panorama tier's band, what stands above the words (the last thing said);
-    // a box in the band draws no settings row, the session sheet says it (7D, 7I).
+    // a box in the band draws no settings row, the session sheet says it (docs/frontend-method.md §7D, §7I).
     readonly band?: Snippet | undefined;
     // The room this box speaks to, when the page holding it says so; the
     // address bar answers otherwise.

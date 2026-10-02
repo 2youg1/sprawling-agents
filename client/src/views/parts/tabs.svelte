@@ -106,7 +106,7 @@
   };
 
   // The bar beside the current tab is the one accent this control
-  // takes (client/Spec.lean §7B); every other tab is said by its own ink.
+  // takes (docs/frontend-method.md §7B); every other tab is said by its own ink.
   const ink = (lens: Lens): string =>
     lens.id === current
       ? "border-accent text-text"

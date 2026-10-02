@@ -6,7 +6,7 @@
 // The one shape the city drawing is built from: a rectangle whose
 // corners are superellipse arcs, so a building on the map has the same
 // continuous curvature the panels around it have. `theme.css` carries
-// the one exponent both sides draw with (client/Spec.lean §4-43), and
+// the one exponent both sides draw with (docs/frontend-method.md §4-43), and
 // `cornerPower` is how the drawing reads it.
 
 export interface Box {

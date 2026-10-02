@@ -7,7 +7,7 @@
 
 <script lang="ts" module>
   // One file's patch between two checkpoints, as a reader points at it
-  // (client/Spec.lean §7F, §7-2): a number column, a sign column and the line,
+  // (docs/frontend-method.md §7F, client/Spec.lean §7-2): a number column, a sign column and the line,
   // the added and removed lines on the accent and alert washes, and the
   // line a person last chose marked by a 2 px accent bar. The inspector's
   // diff and `changes.svelte`'s open row both draw a patch through this

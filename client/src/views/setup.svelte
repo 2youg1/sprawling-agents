@@ -215,7 +215,7 @@ costs the cards their width (client/Spec.lean §4-30, §4-36). -->
       <div class="flex flex-col gap-wide">
         <!-- The form takes the conversation's 760 rather than a
             measure, because what a person pastes into it is a base
-            URL and a key and 520 cut both off (client/Spec.lean §4-33,
+            URL and a key and 520 cut both off (docs/frontend-method.md §4-33,
             4-36). -->
         <div class="min-w-0 max-w-talk">
           <ProviderDoor />

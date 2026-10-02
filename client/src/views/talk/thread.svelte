@@ -50,7 +50,7 @@
     // Absent for the same reason.
     readonly onRetry?: ((task: string) => void) | undefined;
     // Whether this run opens the stretch of the room on screen, so its
-    // first head states the model the session froze (client/Spec.lean §7D).
+    // first head states the model the session froze (docs/frontend-method.md §7D).
     // A later run of the same session leaves that to the first.
     readonly opens?: boolean;
   }

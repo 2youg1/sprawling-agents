@@ -106,7 +106,7 @@
     readonly children: Snippet<[string]>;
     readonly side?: TipSide;
     // Whether holding the accelerator alone draws this hint with the
-    // others (client/Spec.lean §7E): the names of the edge keys are, a hint
+    // others (docs/frontend-method.md §7E): the names of the edge keys are, a hint
     // inside a form is not.
     readonly exposable?: boolean;
   }

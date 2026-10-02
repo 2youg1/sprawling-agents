@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Send and stop as two faces of one key, the way a player's switch is
-// play on one side and stop on the other (client/Spec.lean §7I, client D18).
+// play on one side and stop on the other (docs/frontend-method.md §7I, client D18).
 //
 // Which face is up is decided here and nowhere else: words in the box
 // turn the send face up, and a run in front of the person with an empty

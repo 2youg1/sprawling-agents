@@ -55,7 +55,7 @@ const ROWS = {
   welcomed: "sprawling.welcomed",
   // Whether the artefact panel beside a conversation is open.
   panel: "sprawling.talk.panel",
-  // How much of the world layer the page draws (client/Spec.lean §7H). Kept
+  // How much of the world layer the page draws (docs/frontend-method.md §7H). Kept
   // rather than held in memory because it is a decision about the shape
   // of the window, and a decision a reload undoes is a decision the
   // person has to take again every morning.
@@ -103,7 +103,7 @@ const ROWS = {
 // workspace with the conversation as a band along the bottom
 // (`panorama`). Named for what is drawn rather than for a share of
 // opacity, because the three are three layouts and not three points on
-// one slider (client/Spec.lean §7H, client D17).
+// one slider (docs/frontend-method.md §7H, client D17).
 export type Tier = "zen" | "blend" | "panorama";
 
 // In the order the layers key cycles them: out from the conversation

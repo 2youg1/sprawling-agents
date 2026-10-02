@@ -5,7 +5,7 @@
 
 <script lang="ts">
   // What bounds a run in this room, as two facts on the composer's
-  // settings row (client/Spec.lean §7D, §7I): who answers the gate, and the
+  // settings row (docs/frontend-method.md §7D, §7I): who answers the gate, and the
   // sandbox the room's building boxes a run in. They are read, never
   // pressed.
   //

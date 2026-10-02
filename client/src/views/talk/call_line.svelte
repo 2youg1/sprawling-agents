@@ -12,7 +12,7 @@ opener uses (`inspect/open.svelte.ts`).
 draws tenths from this page's ticker, recomputed from the call's own
 moment on every tick; once the result is in the Ledger it draws the
 Ledger's milliseconds, and the moment it finished is in the hint as an
-ISO instant (client/Spec.lean §7D). A span nobody measured draws nothing.
+ISO instant (docs/frontend-method.md §7D). A span nobody measured draws nothing.
 
 **Keys belong to the line, not to the page.** ↑ and ↓ (and j and k,
 because a list of lines is a place they mean "next") move to the line

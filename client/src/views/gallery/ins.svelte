@@ -5,7 +5,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The inspector (client/Spec.lean §7F, §4-45), at the width the right side
+  // The inspector (docs/frontend-method.md §7F, client/Spec.lean §4-45), at the width the right side
   // takes beside the conversation in zen on a 1440 window: one run that
   // read a file, changed it, ran the tests, is running a second command,
   // took a screenshot and failed a search, in a made-up city that

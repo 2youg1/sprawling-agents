@@ -5,7 +5,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The shell, whole, in the states client/Spec.lean §7H and §7I name: an empty
+  // The shell, whole, in the states docs/frontend-method.md §7H and §7I name: an empty
   // room, a working room in each of the three tiers, and the right pane
   // open. Every case mounts the conversation page and the edge keys the
   // shell mounts, on the shell's own grid at a window of 1440 by 860, in

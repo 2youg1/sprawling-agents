@@ -11,7 +11,7 @@
   // the same state the conversation's right side reads, so a file a
   // change row opened here is still open in the conversation, and
   // closing it here closes it there. The band on top is the one surface
-  // lifted to `chrome` (7A-4); the document stays on the page.
+  // lifted to `chrome` (docs/frontend-method.md §7A-4); the document stays on the page.
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import { closeRight } from "../inspect/open.svelte";

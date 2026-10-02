@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // The inspector's tab strip (client/Spec.lean §7F, §7-11): one tab per open
+  // The inspector's tab strip (docs/frontend-method.md §7F, client/Spec.lean §7-11): one tab per open
   // item, in the order they were opened, the one in front drawn on the
   // page's own fill so it reads as the sheet the region below is cut
   // from; a terminal's tab carries the terminal mark. At the right end,

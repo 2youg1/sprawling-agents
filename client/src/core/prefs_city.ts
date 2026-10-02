@@ -62,7 +62,7 @@ export function appearanceOnWire(next: Appearance): WireAppearance {
 }
 
 // The appearance fields the city keeps. The rest of a record are this
-// browser's alone (client/Spec.lean §4-43).
+// browser's alone (docs/frontend-method.md §4-43).
 type KeptByCity = Omit<Appearance, "glass" | "blend">;
 
 function appearanceOfCity(stated: WireAppearance): KeptByCity {

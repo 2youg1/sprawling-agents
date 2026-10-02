@@ -51,7 +51,7 @@ export function hhmmss(at: number): string {
 
 // A moment the ledger wrote, in UTC, as two halves: the day, written
 // once at the head of a timeline, and the time of day to the
-// millisecond, written on every row (client/Spec.lean §7D). Joined, they are
+// millisecond, written on every row (docs/frontend-method.md §7D). Joined, they are
 // the ISO 8601 instant a `<time datetime>` carries.
 export function isoDay(at: number): string {
   return new Date(at).toISOString().slice(0, 10);

@@ -6,12 +6,12 @@
 
 <script lang="ts">
   // The conversation: one room, the Mayor's unless the address says
-  // otherwise, as the column the shell's grid gives it (client/Spec.lean §4-33)
+  // otherwise, as the column the shell's grid gives it (docs/frontend-method.md §4-33)
   // - words flowing down it, the box at its foot. Every run in the room
   // is a stretch of the same thread; what waits for the person is a card
   // in it; and the box either steers the run that is going or opens the
   // next one. In the panorama tier the column is a band along the bottom:
-  // the last thing said, and the same box (client/Spec.lean §7I).
+  // the last thing said, and the same box (docs/frontend-method.md §7I).
   //
   // A session is a stretch of the room, not the room (roadmap S1): runs
   // before it fold behind one line, and how it began is drawn where the
@@ -303,7 +303,7 @@
 <!-- One column, one box. The box is the same element in an empty room and
 in a full one: in an empty room it is lifted to the middle of the column
 with the room's name above it, and the first send lets it sink to its seat
-(client/Spec.lean §7I), so neither the words being typed nor an input method's
+(docs/frontend-method.md §7I), so neither the words being typed nor an input method's
 composition is rebuilt on the way. -->
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]} style:container-type={band ? undefined : "size"}>
   {#if !band}

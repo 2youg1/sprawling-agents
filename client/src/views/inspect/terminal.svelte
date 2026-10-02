@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // A call as a terminal shows it (client/Spec.lean §7F): two lines of head -
+  // A call as a terminal shows it (docs/frontend-method.md §7F): two lines of head -
   // what ran, then how long it took in milliseconds, how it ended, the
   // moment it finished and what the view cut - and under them what it
   // printed, stderr in the alert ink, never folded, scrolling sideways.

@@ -8,7 +8,7 @@
 <script lang="ts">
   // RefRain's head line: where the document is, which version the editor
   // stands on and what became of the last save, then the readings and
-  // the save. One line, the seat 7F gives the line above the editor.
+  // the save. One line, the seat docs/frontend-method.md §7F gives the line above the editor.
   // The receipt says a word only when there is something unsaved or a
   // save to report; a document nobody touched shows none.
   import { say } from "../../core/lang";

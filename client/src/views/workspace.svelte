@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts" module>
-  // The conversation page as the shell lays it out (client/Spec.lean §4-33, §7H,
+  // The conversation page as the shell lays it out (docs/frontend-method.md §4-33, §7H,
   // 7K): the world layer, the conversation and the right pane, each placed
   // on the column lines of the shell's one grid by the tier the page is
   // in, by whether the right pane is open and, in the panorama tier, by
@@ -34,7 +34,7 @@
 
   // With the right pane open the panorama keeps the sessions and the
   // chosen session in the person's order, at two and five columns, and
-  // the commits fold away (4-33's table).
+  // the commits fold away (the table of docs/frontend-method.md §4-33).
   const BESIDE_RIGHT: Readonly<Record<Pane, number>> = { sessions: 2, session: 5, commits: 0 };
 
   export function layoutOf(tier: Tier, right: RightSide, bench: Workbench): Layout {

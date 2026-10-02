@@ -730,7 +730,10 @@ because a `.+` glob walks every directory below it, build output and
 installed packages included. The client's parts are named after its
 TypeScript modules below `client/src/` the way a crate's are named after
 its Rust modules: `views/parts/segmented.ts` is specified by
-`client/spec/Views/Parts/Segmented.lean`.
+`client/spec/Views/Parts/Segmented.lean`. The client's specification holds
+interfaces, decisions and interaction contracts; how a screen looks is
+described in English in `docs/frontend-method.md`, under the labels the
+code cites.
 
 **Where a specification lives.** A crate's entry is `crates/<dir>/Spec.lean`:
 the seventeen numbered section comments `skills/sdd` lists, and the imports
