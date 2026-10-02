@@ -290,7 +290,7 @@ theorem tf1Call_intentFirst (seen : List CallId) (c : CallId) (e : Effect) :
     intentFirst seen (tf1Call c e) = true := by
   cases e <;> simp [tf1Call, intentFirst, Step.writes, Step.intents]
 
-theorem tf1_wave_intentFirst (t i : Nat) (seen : List CallId) (calls : List Effect) :
+theorem tf1_wave_intent_first (t i : Nat) (seen : List CallId) (calls : List Effect) :
     intentFirst seen (wave tf1Call t i calls) = true := by
   induction calls generalizing i seen with
   | nil => simp [wave, intentFirst]
@@ -302,7 +302,7 @@ theorem tf1_run_intentFirst (t : Nat) (seen : List CallId) (ws : List (List Effe
   | nil => simp [run, intentFirst, Step.writes, Step.intents]
   | cons w ws ih =>
     simp [run, tf1Turn, intentFirst_append, intentFirst, Step.writes, Step.intents,
-      tf1_wave_intentFirst, ih]
+      tf1_wave_intent_first, ih]
 
 theorem intent_before_write (seen : List CallId) (done rest : List Step) (c : CallId)
     (h : intentFirst seen (done ++ .act c .write :: rest) = true) :
