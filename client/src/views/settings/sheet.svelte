@@ -43,11 +43,13 @@
 </script>
 
 <!-- A container cannot answer queries about itself, so the frame that is
-  measured and the row that is laid out are two boxes. -->
+  measured and the row that is laid out are two boxes. The tree is as
+  wide as the shell's left silver part, less half a gutter, so the group
+  beside it starts on the line the conversation starts on (12-24). -->
 <div class="@container/sheet h-full min-h-0">
 <div class="flex h-full min-h-0 @max-lg/sheet:flex-col @max-lg/sheet:overflow-y-auto">
   <div
-    class="flex w-index shrink-0 flex-col gap-base overflow-y-auto border-r border-edge px-base py-wide @max-lg/sheet:w-full @max-lg/sheet:overflow-visible @max-lg/sheet:border-r-0 @max-lg/sheet:border-b @max-lg/sheet:py-base"
+    class="flex w-[calc(var(--silver-side)-var(--spacing-gutter)/2)] shrink-0 flex-col gap-base overflow-y-auto border-r border-edge px-base py-wide @max-lg/sheet:w-full @max-lg/sheet:overflow-visible @max-lg/sheet:border-r-0 @max-lg/sheet:border-b @max-lg/sheet:py-base"
   >
     <div class="flex items-center justify-between px-snug">
       <span class="text-label font-label text-text">{say($lang, "nav_settings")}</span>

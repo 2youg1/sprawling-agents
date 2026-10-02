@@ -162,30 +162,29 @@
   />
 {/snippet}
 
-<!-- Three columns once the page holds them: the building a server is
-added for, the servers it has and the form that adds one, and the two
-other ways in - Composio and the desktop - beside them. Each section is
-a rule and a small name over its body rather than a lifted card, so the
-page reads as one sheet in columns; under the wide container the side
-column drops beneath the form. -->
+<!-- Three columns once the page holds them, on Main's silver lines
+(12-24): the building a server is added for in the left part, the
+servers it has and the form that adds one in the middle part, where the
+conversation stands, and the two other ways in - Composio and the
+desktop - in the right part. Each section is a rule and a small name
+over its body rather than a lifted card, so the page reads as one sheet
+in columns; under the wide container the columns stand one above the
+other. -->
 <Page title={say($lang, "mcp_title")} aside={scopeControl} {rank}>
   {#if banner !== null}
     <Banner text={banner} />
   {/if}
-  <!-- The building column stands beside the rest once the page is
-       wide enough to hold both, and above it when it is not. -->
   <div class="@container flex min-h-0 min-w-0 flex-1">
-  <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-wide @min-[48rem]:flex-row @min-[48rem]:items-start">
-    <BuildingColumn
-      label={say($lang, "mcp_building")}
-      buildings={$buildings}
-      chosen={chosen}
-      hall={say($lang, "city_hall")}
-      onPick={(addr) => {
-        chosen = addr;
-      }}
-    />
-    <div class="grid min-w-0 flex-1 items-start gap-wide @min-[64rem]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-wide @min-[64rem]:silver-columns @min-[64rem]:items-start">
+      <BuildingColumn
+        label={say($lang, "mcp_building")}
+        buildings={$buildings}
+        chosen={chosen}
+        hall={say($lang, "city_hall")}
+        onPick={(addr) => {
+          chosen = addr;
+        }}
+      />
       <section class="flex min-w-0 flex-col gap-wide" aria-label={say($lang, "mcp_doors")}>
         <Servers
           servers={reach.servers()}
@@ -230,6 +229,5 @@ column drops beneath the form. -->
         </section>
       </div>
     </div>
-  </div>
   </div>
 </Page>

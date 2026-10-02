@@ -4,11 +4,12 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // Every page but the conversation and the settings panel, in the
-  // columns right of the edge keys (docs/frontend-method.md §4-33). The conversation
-  // page lays itself out by the tier (`workspace.svelte`), and the panel
-  // opens over the page beneath it (`settings/hosted.svelte.ts`), so no
-  // `setup` view reaches this file.
+  // Every page but the conversation, between the first column, which
+  // the edge keys stand at the foot of, and the last one, which mirrors
+  // it (client-SPEC 4-33): a page is centred on the screen as the
+  // conversation is, and a page in columns stands them on the same
+  // silver lines (`silver-columns`, 12-24). The conversation page lays
+  // itself out by the tier and is not here (`workspace.svelte`).
   import type { View } from "../core/route";
   import { say } from "../core/lang";
   import { ui } from "../ui";
@@ -34,7 +35,7 @@
 
 <main
   id="main"
-  class="col-[2/-1] row-start-2 flex min-h-0 min-w-0 flex-col overflow-y-auto narrow:col-span-full"
+  class="col-[2/12] row-start-2 flex min-h-0 min-w-0 flex-col overflow-y-auto narrow:col-span-full"
   aria-label={say($lang, "region_main")}
 >
   {#if view.kind === "city"}

@@ -47,12 +47,14 @@
   });
 </script>
 
-<!-- One width: the page's 1040 at most, the whole window below it. The
-  arrival from the left is `.settings-panel` in `theme.css`, a transition
-  from its `@starting-style`. -->
+<!-- One width: from the window's left edge to the shell's right silver
+  line (12-24), so its tree stands where the sessions pane stands and its
+  group where the conversation stands; the whole window on one column.
+  The arrival from the left is `.settings-panel` in `theme.css`, a
+  transition from its `@starting-style`. -->
 <dialog
   bind:this={sheet}
-  class="settings-panel fixed inset-y-0 left-0 m-0 h-dvh max-h-none w-full max-w-page bg-page p-0 text-body text-text shadow-sheet backdrop:bg-transparent backdrop:backdrop-brightness-50"
+  class="settings-panel fixed inset-y-0 left-0 m-0 h-dvh max-h-none w-full max-w-[calc(var(--silver-side)*(1+var(--silver))-var(--spacing-gutter)/2)] bg-page narrow:max-w-none p-0 text-body text-text shadow-sheet backdrop:bg-transparent backdrop:backdrop-brightness-50"
   aria-labelledby={`${uid}-title`}
   oncancel={(event) => {
     // Escape asks the caller, which moves the address bar; closing the

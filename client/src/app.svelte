@@ -343,7 +343,7 @@
     {say($lang, "skip_main")}
   </a>
   {#if lostAttempt !== null || halted}
-    <div class="col-[2/-1] row-start-1 flex flex-col gap-snug pb-base narrow:col-span-full">
+    <div class="col-[2/12] row-start-1 flex flex-col gap-snug pb-base narrow:col-span-full">
       {#if lostAttempt !== null}
         <LinkBanner attempt={lostAttempt} unsent={$unsent} onRetry={u.conn.retry} />
       {/if}

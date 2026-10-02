@@ -176,79 +176,85 @@
   };
 </script>
 
-<Page title={say($lang, "welcome_title")} note={say($lang, "welcome_note")} {rank}>
-  <div class="@container min-w-0">
-  <div class="grid min-w-0 grid-cols-[repeat(11,minmax(0,1fr))] gap-x-gutter @max-[40rem]:grid-cols-1">
-    <div class="col-[1/9] flex min-w-0 flex-col @max-[40rem]:col-span-full">
-      {#if read.kind === "unavailable"}
-        <Unanswered query={read.query} asked={QUERIES.guide} />
-      {/if}
-      <ol aria-label={say($lang, "guide_steps")}>
-        {#each STEPS as step, at (step)}
-          {@const standing = standingOf(step, progress, configured)}
-          {@const word = WORD[standing]}
-          <li class="border-b border-edge">
-            <h2>
-              <button
-                id={headId(step)}
-                type="button"
-                class="grid w-full grid-cols-[4ch_minmax(0,1fr)_auto] items-baseline gap-x-base py-base text-left transition-colors hover:wash"
-                aria-expanded={open === step}
-                aria-controls={`${headId(step)}-body`}
-                onclick={() => {
-                  toggle(step);
-                }}
-              >
-                <span class="figure text-heading text-text-faint">{String(at + 1).padStart(2, "0")}</span>
-                <span class="min-w-0 text-label font-label text-text">{say($lang, TITLE[step])}</span>
-                <span class={["flex items-center gap-tight text-note", INK[standing]]}>
-                  {#if standing === "configured"}
-                    <Glyph name="check" class="size-glyph-sm" />
-                  {/if}
-                  {#if word !== null}{say($lang, word)}{/if}
-                </span>
-              </button>
-            </h2>
-            {#if open === step}
-              <section
-                id={`${headId(step)}-body`}
-                aria-labelledby={headId(step)}
-                class="flex min-w-0 flex-col gap-base pb-wide pl-[calc(4ch+var(--spacing-base))] @max-[40rem]:pl-0"
-              >
-                <p class="max-w-measure text-note text-text-quiet">{say($lang, ABOUT[step])}</p>
-                <Body {step} />
-                {#if step !== "provider"}
-                  <div class="flex justify-end">
-                    <Button
-                      label={say($lang, "guide_later")}
-                      tone="quiet"
-                      onPress={() => {
-                        later(step);
-                      }}
-                    />
-                  </div>
+<!-- One column, standing in the middle part of the shell's silver cut
+(12-24), where the conversation stands: the steps, their rules and the
+fields inside them share its two edges, so the page has one right edge
+rather than one per kind of row. -->
+<div class="flex min-w-0 flex-1 flex-col @min-[64rem]:silver-columns">
+  <div class="flex min-w-0 flex-1 flex-col @min-[64rem]:col-start-2">
+    <Page title={say($lang, "welcome_title")} note={say($lang, "welcome_note")} {rank}>
+      <div class="@container min-w-0">
+        <div class="flex min-w-0 flex-col">
+          {#if read.kind === "unavailable"}
+            <Unanswered query={read.query} asked={QUERIES.guide} />
+          {/if}
+          <ol aria-label={say($lang, "guide_steps")}>
+            {#each STEPS as step, at (step)}
+              {@const standing = standingOf(step, progress, configured)}
+              {@const word = WORD[standing]}
+              <li class="border-b border-edge">
+                <h2>
+                  <button
+                    id={headId(step)}
+                    type="button"
+                    class="grid w-full grid-cols-[4ch_minmax(0,1fr)_auto] items-baseline gap-x-base py-base text-left transition-colors hover:wash"
+                    aria-expanded={open === step}
+                    aria-controls={`${headId(step)}-body`}
+                    onclick={() => {
+                      toggle(step);
+                    }}
+                  >
+                    <span class="figure text-heading text-text-faint">{String(at + 1).padStart(2, "0")}</span>
+                    <span class="min-w-0 text-label font-label text-text">{say($lang, TITLE[step])}</span>
+                    <span class={["flex items-center gap-tight text-note", INK[standing]]}>
+                      {#if standing === "configured"}
+                        <Glyph name="check" class="size-glyph-sm" />
+                      {/if}
+                      {#if word !== null}{say($lang, word)}{/if}
+                    </span>
+                  </button>
+                </h2>
+                {#if open === step}
+                  <section
+                    id={`${headId(step)}-body`}
+                    aria-labelledby={headId(step)}
+                    class="flex min-w-0 flex-col gap-base pb-wide pl-[calc(4ch+var(--spacing-base))] @max-[40rem]:pl-0"
+                  >
+                    <p class="text-note text-text-quiet">{say($lang, ABOUT[step])}</p>
+                    <Body {step} />
+                    {#if step !== "provider"}
+                      <div class="flex justify-end">
+                        <Button
+                          label={say($lang, "guide_later")}
+                          tone="quiet"
+                          onPress={() => {
+                            later(step);
+                          }}
+                        />
+                      </div>
+                    {/if}
+                  </section>
                 {/if}
-              </section>
-            {/if}
-          </li>
-        {/each}
-      </ol>
-      <div class="flex flex-wrap items-center gap-base pt-wide">
-        <Button
-          label={say($lang, "guide_start")}
-          tone="primary"
-          {...ready ? {} : { why: say($lang, "guide_start_needs_main") }}
-          onPress={start}
-        />
-        <Button
-          label={say($lang, "guide_put_off_rest")}
-          tone="quiet"
-          onPress={() => {
-            write(putOffTheRest(progress));
-          }}
-        />
+              </li>
+            {/each}
+          </ol>
+          <div class="flex flex-wrap items-center gap-base pt-wide">
+            <Button
+              label={say($lang, "guide_start")}
+              tone="primary"
+              {...ready ? {} : { why: say($lang, "guide_start_needs_main") }}
+              onPress={start}
+            />
+            <Button
+              label={say($lang, "guide_put_off_rest")}
+              tone="quiet"
+              onPress={() => {
+                write(putOffTheRest(progress));
+              }}
+            />
+          </div>
+        </div>
       </div>
-    </div>
+    </Page>
   </div>
-  </div>
-</Page>
+</div>

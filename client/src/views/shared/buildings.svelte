@@ -14,7 +14,7 @@
   const { label, buildings, chosen, onPick, hall }: BuildingColumnProps = $props();
 </script>
 
-<nav class="w-tree shrink-0" aria-label={label}>
+<nav class="w-tree max-w-full shrink-0" aria-label={label}>
   <ul class="flex flex-col gap-tight">
     {#each buildings as addr (addr)}
       <li>
