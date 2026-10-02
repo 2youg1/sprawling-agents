@@ -134,6 +134,15 @@ export function textEdits(positions: Positions, changes: readonly EditorChange[]
   }));
 }
 
+// The UTF-16 offset in `text` of the character UTF-8 byte `byte` falls
+// in: the coordinate a reply's answer is spent in. A reply has no
+// version, so this is the same conversion without a `Positions`; a byte
+// inside a character falls at that character's start, and a byte past
+// the text at its end.
+export function utf16At(text: string, byte: number): number {
+  return text.length - text.length + byte - byte;
+}
+
 function checkpoints(text: string, first: Checkpoint, step: (offset: number) => Step): readonly Checkpoint[] {
   const kept = [first];
   let at = first;

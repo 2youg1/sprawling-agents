@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { B3Hash } from "../wire";
-import { positionsOf, textEdits } from "./document_pos";
+import { positionsOf, textEdits, utf16At } from "./document_pos";
 
 const V = B3Hash.make("a".repeat(64));
 
@@ -97,6 +97,17 @@ describe("textEdits", () => {
     const at = positionsOf(V, "utf8", "one line");
     expect(textEdits(at, [{ from: 8, to: 8, insert: "\nnext" }])).toEqual([
       { span: { start: 8, end: 8 }, text: "\nnext" },
+    ]);
+  });
+});
+
+// A reply's answer counts UTF-8 bytes of the stretch it was sent, and
+// the page slices that stretch in UTF-16 code units.
+describe("utf16At", () => {
+  test("finds the code unit a byte stands at, falling back to a character's start and stopping at the end", () => {
+    const text = "hé 文😀!";
+    expect([0, 1, 2, 3, 4, 5, 7, 8, 11, 12, 13, 99].map((byte) => utf16At(text, byte))).toEqual([
+      0, 1, 1, 2, 3, 3, 4, 4, 6, 7, 7, 7,
     ]);
   });
 });
