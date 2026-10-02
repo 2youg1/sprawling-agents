@@ -77,6 +77,27 @@ win32job = { workspace = true }
 default = ["sandbox"]
 sandbox = ["runtime/wasm"]
 
+# Where `cargo binstall sprawling` fetches the archive release.yml built for
+# this target, so it installs the same binary as the download page instead of
+# compiling the `.crate` (`crates/sprawling/Spec.lean` §8-157). The archive
+# suffixes are the ones `tools/xtask/src/platform.rs` lists. The tag is
+# written `v{ version }` here and replaced by the release's own tag when the
+# `crates` job publishes (D31); a glibc Linux host falls back to the musl row.
+[package.metadata.binstall]
+pkg-fmt = "zip"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-windows-x86_64.zip"
+bin-dir = "{ name }-{ version }-windows-x86_64/{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.aarch64-apple-darwin]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-macos-aarch64.zip"
+bin-dir = "{ name }-{ version }-macos-aarch64/{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.x86_64-unknown-linux-musl]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-x86_64-unknown-linux-musl.zip"
+bin-dir = "{ name }-{ version }-x86_64-unknown-linux-musl/{ bin }{ binary-ext }"
+
 [build-dependencies]
 flate2 = { workspace = true }
 
