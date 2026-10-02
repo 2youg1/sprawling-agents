@@ -69,11 +69,6 @@ updates:
   # which receives security fixes as patches, so its majors are ignored,
   # and so are cap-std's, which follow wasmtime-wasi's. Moving to the next
   # line is a change made by hand.
-  #
-  # idna_adapter chooses idna's Unicode backend by its version line, and
-  # the workspace holds it on the 1.1 line on purpose, so its minors and
-  # majors are ignored. Its patches are not: `ignore` applies to security
-  # updates as well, and a fix on the 1.1 line must still arrive.
   - package-ecosystem: cargo
     directory: /
     schedule:
@@ -88,8 +83,6 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "cap-fs-ext"
         update-types: ["version-update:semver-major"]
-      - dependency-name: "idna_adapter"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
       # The workspace names tokio-tungstenite at axum's version so the
       # lockfile holds one WebSocket protocol (root Cargo.toml). The axum
       # group cannot hold it there: when axum has no newer release, the
@@ -117,12 +110,8 @@ updates:
       # bump often needs the rustls bump beside it.
       rustls:
         patterns: ["rustls", "reqwest"]
-      patch-and-minor:
-        update-types: ["patch", "minor"]
-
-    commit-message:
-      prefix: "card-S0.DEPS"
-    groups:
+      # The Win32 binding moves as one family: windows-core, windows-sys
+      # and the rest share one generator release.
       windows:
         patterns: ["windows", "windows-*"]
       patch-and-minor:
