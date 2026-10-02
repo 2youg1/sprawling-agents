@@ -61,9 +61,9 @@
 </Case>
 
 <Case label="surfaces · every rounded box at the one corner exponent" width={760}>
-  <div class="flex items-end gap-wide">
+  <div class="flex flex-wrap items-end gap-wide">
     {#each CORNERS as corner (corner.box)}
-      <span class="{corner.box} {corner.size} border border-edge-panel bg-raised"></span>
+      <span class="{corner.box} {corner.size} shrink-0 border border-edge-panel bg-raised"></span>
     {/each}
   </div>
 </Case>
