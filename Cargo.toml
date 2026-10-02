@@ -49,6 +49,12 @@ default-members = [
 version = "0.0.8"
 edition = "2024"
 license = "MPL-2.0"
+# The oldest release that may build the published packages, for a person
+# running `cargo install sprawling` on a toolchain they did not move. It
+# trails `rust-toolchain.toml` on purpose: clippy's `incompatible_msrv`
+# reads it and refuses a standard-library API newer than it, so the claim
+# is checked on every lint run rather than left to the README. Raise it
+# when the code needs a newer release, never just because the pin moved.
 rust-version = "1.97"
 repository = "https://github.com/2youg1/sprawling-agents"
 homepage = "https://github.com/2youg1/sprawling-agents"

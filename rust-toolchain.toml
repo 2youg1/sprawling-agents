@@ -1,3 +1,19 @@
+# An exact stable release, moved to the newest stable at the start of each
+# version, rather than `channel = "stable"`. Four readers need the tree to
+# name its compiler: CI keys every Rust cache on this file, so a floating
+# channel would keep the key while the compiler changed beneath it, and a
+# lint added upstream would turn `main` red with no commit to blame; the
+# flake's `toolchain-version-is-derived` check finds the channel inside
+# `rustc --version`, which never prints `stable`; the doctor compares the
+# pinned version with the installed and the newest one by their numbers,
+# and `stable` has none; a release or a measurement is bound to the
+# compiler that produced it, which only a version the tree names records.
+# A contributor still gets this release without a step of their own,
+# because rustup installs whatever this file names on first use. The
+# decision is `crates/sprawling/spec/Doctor.lean` D31; the oldest release
+# that may build the published packages is `rust-version` in the root
+# `Cargo.toml`, a separate fact.
+#
 # `minimal` plus exactly what the loop uses. The default profile also
 # fetches rust-docs, which is tens of megabytes nothing here reads and
 # which every cold CI job downloaded four times a run. Naming the two
@@ -5,6 +21,6 @@
 # `just check` needs; `rustup component add` still works for anything a
 # person wants locally.
 [toolchain]
-channel = "1.97.1"
+channel = "1.99.0"
 profile = "minimal"
 components = ["rustfmt", "clippy"]
