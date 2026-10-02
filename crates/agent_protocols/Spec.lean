@@ -202,7 +202,7 @@ D7 一个读端，两条连接：stdio 与 harness 的读端是同一个 `mcp::r
 
 一次连接的开销是每台 server 两次有应答的请求（`initialize`、`tools/list`）加一条通知（`notifications/initialized`），由 `mcp::handshake` 的 `opening_one_connection_costs_two_round_trips_and_one_notification` 用一个计数 `Outbound` 钉住。断言的是条数而不是时间：条数在每台机器上相同。本 crate 为这三条消息花的 CPU 远小于子进程启动与两次往返，而后两者属于传输。
 
-D9 本 crate 不持连接表：`McpLink` 可 clone，寿命由持有者决定。持有者是装配层的 `accounting::worker::mcp::Residents`，它把一台 server 的连接与工具表留给后来的派活，子进程退出（`McpLink::has_ended`）时才重开。派活在这一步花的时间记在 `tools/xtask/budgets.toml` 的 `[prepare_dispatch_ms]`。被否：本 crate 自持一张按配置索引的连接表，那样同一台 server 的寿命有两个主人，装配层重开时本 crate 还握着旧的那条。
+D9 本 crate 不持连接表：`McpLink` 可 clone，寿命由持有者决定。持有者是装配层的 `accounting::worker::mcp::Residents`，它把一台 server 的连接与工具表留给后来的派活，子进程退出（`McpLink::has_ended`）时才重开。派活在这一步花的时间记在 `tools/xtask/budgets.toml` 的 `[prepare_dispatch]`。被否：本 crate 自持一张按配置索引的连接表，那样同一台 server 的寿命有两个主人，装配层重开时本 crate 还握着旧的那条。
 
 ### 8-17 三种传输与 `McpLink`（形状 4 适配器；实现 `Outbound`）
 
@@ -419,5 +419,5 @@ D15 请求行与 id 是本 crate 的契约，不是序列化器的：行由 `for
 - `docs/third-party.md` §1（ACP schema 与 registry 被看的路径）与服务外挂的边界：上游改了线或包名，重读 §5 与 §8-19。
 - `crates/kernel/Spec.lean` §8-23（`ServerLabel`、`TimeoutMs`）、`crates/gateway/Spec.lean` §8-5（订阅额度经 harness 进城）、`crates/runtime/Spec.lean` §8-27-10（窗口怎么装工具答复）与 §8-52（harness run 写的行）、`crates/sprawling/Spec.lean` §8-4d（桌面经 stdio 接进来）、§8-4e 与 §8-124（harness run 与它的派活路径）、`crates/wire/Spec.lean` 的配对中间件。这些节改了，重读本文件对应的条目。
 - `crates/desktop/Spec.lean` §4 与 `crates/desktop/src/refusal.rs`：`isError` 与 `_meta` 的读法（§8-1c），以及本 crate 对外给出的 `EFFECT_META_KEY` 与 `PROTOCOL_VERSION`。
-- `tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]` 与 `[prepare_dispatch_ms]`：上限的推导与常驻连接省下的时间。
+- `tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]` 与 `[prepare_dispatch]`：上限的推导与常驻连接省下的时间。
 -/

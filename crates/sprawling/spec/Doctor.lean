@@ -611,7 +611,7 @@ fn may_move_plan(kind: EventKind) -> PlanReach;
 ```
 
 - **两行而不是一行**：`mcp_tools` 是常驻连接表（F-13）唯一能省掉的那一段，混进总数就说不清省了多少。总数含协商、开房间、写简报、立 run、铺工作台与冻结计划；这一切都在会计线程上，期间没有任何车道的追加被服务。
-- **量在先，门在后**：`tools/xtask/budgets.toml [prepare_dispatch_ms]` 只记读数与机器，不设上限——上限若写在读数之前，要么形同虚设，要么挡住正是要修它的那次改动。
+- **量在先，门在后**：`tools/xtask/budgets.toml [prepare_dispatch]` 只记读数与机器，不设上限——上限若写在读数之前，要么形同虚设，要么挡住正是要修它的那次改动。
 - **读钟读不出不丢工具**：`mcp_tools` 无法报出 `Result`，因此钟失败时只是不报这一行；连接是工作，读数是诊断。
 - **本章测试**：`a_dispatch_says_what_it_spent_before_the_drive`（`accounting::worker::dispatching::tests`）盯住「读数被说出来」这一件事，不断言数值——墙钟数值属于跑它的那台机器，属于 `budgets.toml` 的那一行。
 

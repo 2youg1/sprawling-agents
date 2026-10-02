@@ -204,7 +204,7 @@ sprawling playback check <file> [--bundle <file>] [--city <city>] [--include-con
 | 读数 | 例子 | 住在哪里 | 谁读它 |
 |---|---|---|---|
 | 城里一件事发生的时刻 | `model_called`、`model_returned`、`tool_called`、`tool_result` 的 `t`（整数毫秒） | Ledger；含义只经 `EventRecord::moment` 读（`crates/kernel/Spec.lean` §8-4「信封 `t` 记的是什么」） | `view` |
-| 这台主机为城的一段内部工作花了多久，以及那段工作的确定性计数 | 开城各段（§8-121）、整链审计一遍（§8-90）、派活准备（`[prepare_dispatch_ms]`） | 诊断行，每种一个渲染处，按下限写出（`docs/logging.md` §2、§3） | 服务所在的终端、记录页的 log 透镜、`bench_startup` 留下的日志 |
+| 这台主机为城的一段内部工作花了多久，以及那段工作的确定性计数 | 开城各段（§8-121）、整链审计一遍（§8-90）、派活准备（`[prepare_dispatch]`） | 诊断行，每种一个渲染处，按下限写出（`docs/logging.md` §2、§3） | 服务所在的终端、记录页的 log 透镜、`bench_startup` 留下的日志 |
 | 机器的资源被用了多少 | CPU、private、工作集、读写字节、卷剩余空间、进程树 | 城内：监视器的 300 点历史（§8-94），有人看才采样；城外：`gauge` 的 stdout | `gauge`、WebUI 监视页 |
 
 第三种读数不常驻盘上。要一段后台记录，就让一个看的人把它写出去：`sprawling gauge --at <地址> > readings.jsonl` 在后台跑多久，城就记多久；它是一个看整页的人，停下它，采样就停（§8-94 决定 1 不变）。
@@ -214,11 +214,13 @@ sprawling playback check <file> [--bundle <file>] [--city <city>] [--include-con
 | 事实 | 唯一的采样处 | 只读的一方 | 并进来的第二份 |
 |---|---|---|---|
 | 进程、整机、卷、进程树的计数 | `bin::monitor`：`counters`、`counters::own_process`、`memory`、`volume`、`tree` | 采样线程（§8-96）、计划推进的内存闸（§8-46-3）、入口按卷卸载（§8-116）、`gauge` | 无；`xtask mem` 留在城外，见决定 4 |
-| 时长 | `bin::serving::standing::monotonic_now`，以 `fn() -> Instant` 交给用它的模块；记账一侧经 `accounting::worker::Hands.monotonic` 收下 | `OpeningCost`（§8-121）、整链审计（§8-90）、视图切快照的节奏（§8-99）、采样线程量自己一拍的读取用时、`gauge` 的 `wall_us` 与 `read_cost_us`、`stage_dispatch` 与 `Laying::mcp_tools` 的用时（`[prepare_dispatch_ms]`）、`credentials::probing` 的 `elapsed_ms`（§8-62） | 无；后三处的单位与线上字段都还是毫秒 |
+| 时长 | `bin::serving::standing::monotonic_now`，以 `fn() -> Instant` 交给用它的模块；记账一侧经 `accounting::worker::Hands.monotonic` 收下 | `OpeningCost`（§8-121）、整链审计（§8-90）、视图切快照的节奏（§8-99）、采样线程量自己一拍的读取用时、`gauge` 的 `wall_us` 与 `read_cost_us`、`stage_dispatch` 与 `Laying::mcp_tools` 的用时（`[prepare_dispatch]`）、`credentials::probing` 的 `elapsed_ms`（§8-62） | 无；后三处的单位与线上字段都还是毫秒 |
 | 时刻 | 驱动的 `RunHooks::now`，只在串行阶段采样 | Ledger 的 `t` | 无 |
 | 计数 | 由拥有它的模块自己数：`Health` 由 relay 数（§8-98），视图积压由视图线程数（§8-123），开城时核对的行数、读过与哈希过的字节由开城路径自己数（§8-122） | 采样线程读 `Health` 与积压；开城的计数随 §8-121 那一行写出 | 无 |
-| 分位数 | `bin::monitor::spread::Spread` | `gauge`、citysim 的 `bench`（`Reading::of`）与 `bench_startup`（`Samples::of`）、crate 内的仪表（§8-84、§8-99、`instrument_monitor_beat`） | 无；两处 citysim 读法都经 `Spread`，取最近秩（决定 8） |
+| 分位数 | `bin::monitor::spread::Spread` | `gauge`、citysim 的 `bench`（场景经 `Reading::of`，登记册四行经 `row_line`，两者都经 `spread_of`）与 `bench_startup`（`Samples::of`）、crate 内的仪表（§8-84、§8-99、`instrument_monitor_beat`） | 无；两处 citysim 读法都经 `Spread`，取最近秩（决定 8） |
 | stdout 那头是谁 | `bin::audience::Audience::of_stdout` | `gauge`、`wire_client::watching`（§8-97）、`view`（§8-105） | 无；`main::view` 留着自己的同名枚举（它还带写一行的方法），它的 `of_stdout` 只把库里的判定换成本地的臂 |
+
+**单位。** 时长在测量点取整数微秒，进程内不到 1 µs 的读数（一帧解码、一帧折叠）取整数纳秒；读数行、`gauge` 的 JSON 行与 `budgets.toml` 的字段都带这个整数，键名以 `_us`（或 `_ns`）结尾。给人看的写法只在显示处换算：不到 1 µs 写 `ns`，不到 10 ms 写整数 `µs`，10 ms 及以上写一位小数的 `ms`（截断）。整数微秒到文字的换算 Rust 一侧只有 `monitor::top::Unit::reading` 一处，`Duration` 到整数微秒只有 `monitor::spread::micros` 一处；TypeScript 一侧只有 `client/src/core/monitor.ts` 的 `reading`。见决定 13。
 
 时长只取单调钟，理由与 8-121「时间从哪来」相同：墙钟被人调过，一段就可能是负数；城钟又只到毫秒，而人的定规要内部热路径按微秒读。计数不是时间，所以可以在 accounting 与 storage 里累计，不必经过 `bin::assembly` 的采样点。
 
@@ -323,13 +325,13 @@ pub monotonic: fn() -> Instant,             // 生产交 monotonic_now；派活�
 
 **一次 run 从哪里量到哪里。** 从 `spawn` 之前到 `wait` 返回：可观察的端点是看到进程退出（citysim D2）。`wait` 在调用线程上阻塞，拍在一条名为 `sprawling-gauge` 的线程上走，所以一次 run 的结束由 `wait` 看到，`wall_us` 没有一拍那么大的误差。被量命令的 stdin 是空的；它的 stdout 与 stderr 都接到 `gauge` 的 stderr（`Stdio::from(io::stderr())`），`gauge` 的 stdout 上只有读数行。n 次 run 依次跑，第一次不丢：它是冷的那一次，`run` 行的 `index` 为 0，spread 里 floor 与 p50 的差有一部分是它留下的，其余是机器的负载。
 
-**给 agent 的输出（stdout 不是终端）。** 每行一个 JSON 对象，值只有整数、`null` 与 `line` 这一个字符串键，键序固定，单位写在键名末尾（`_us`、`_ms`、`_bytes`、`_permille`），没有单位的是计数。没有量到的值是 `null`，不是 0。
+**给 agent 的输出（stdout 不是终端）。** 每行一个 JSON 对象，值只有整数、`null` 与 `line` 这一个字符串键，键序固定，单位写在键名末尾（`_us`、`_bytes`、`_permille`），没有单位的是计数。没有量到的值是 `null`，不是 0。
 
 - `City`：每秒一行 `{"line":"city", …}`，其余键是 `Sample` 的字段名（§8-95 的 `json_line`，多出 `line` 一个键）。`Sample` 没读到的项仍按 §8-96 读作 0。
 - `Process`：每拍一行 `{"line":"tree","at_us":…,"processes":…,"cpu_permille":…,"private_bytes":…,"working_set_bytes":…,"read_bytes":…,"written_bytes":…}`，是这一拍还活着的整棵树。第一拍没有上一拍可比，`cpu_permille` 为 `null`；CPU 是两拍之间整棵树的 CPU 时间增量除以墙钟增量与核数，截到 `0..=1000`。根进程退出、或走满 `--samples` 拍，就结束。
-- `Command`：每次 run 结束一行 `{"line":"run","index":…,"exit":…,"wall_us":…,"beats":…,"seen_cpu_ms":…,"seen_read_bytes":…,"seen_written_bytes":…,"seen_peak_private_bytes":…,"seen_peak_working_set_bytes":…,"child_peak_private_bytes":…,"child_peak_working_set_bytes":…,"read_cost_us":…}`，最后一行 `{"line":"spread","samples":…,"failed":…,"floor_us":…,"p50_us":…,"p95_us":…,"p99_us":…,"peak_us":…,"suspicious":…,"cores":…,"physical_bytes":…}`。`exit` 是被量命令的退出码，被信号结束时为 `null`；`failed` 是 `exit` 不为 0 的 run 数。`seen_*` 取自拍：CPU 与读写字节是每个在某一拍出现过的进程最后一次读数之和，两项峰值是各拍整棵树之和里最大的那一拍，所以它们都是下界，两拍之间生灭的进程不在内；这次 run 一拍都没走（比 `--every` 短）时 `beats` 为 0，`seen_*` 全为 `null`。`child_peak_*` 是直接子进程由平台记下的峰值：在 Windows 上 `wait` 之后、句柄关闭之前经 `win32job::utils::get_process_memory_info` 读出，是精确值而不是拍上的读数；其他平台为 `null`。`read_cost_us` 是这次 run 里读进程表花掉的时间，agent 据此判断测量本身扰动了多少。`cores` 与 `physical_bytes` 写出机器的等级，不写机器是谁。
+- `Command`：每次 run 结束一行 `{"line":"run","index":…,"exit":…,"wall_us":…,"beats":…,"seen_cpu_us":…,"seen_read_bytes":…,"seen_written_bytes":…,"seen_peak_private_bytes":…,"seen_peak_working_set_bytes":…,"child_peak_private_bytes":…,"child_peak_working_set_bytes":…,"read_cost_us":…}`，最后一行 `{"line":"spread","samples":…,"failed":…,"floor_us":…,"p50_us":…,"p95_us":…,"p99_us":…,"peak_us":…,"suspicious":…,"cores":…,"physical_bytes":…}`。`exit` 是被量命令的退出码，被信号结束时为 `null`；`failed` 是 `exit` 不为 0 的 run 数。`seen_*` 取自拍：CPU 与读写字节是每个在某一拍出现过的进程最后一次读数之和，两项峰值是各拍整棵树之和里最大的那一拍，所以它们都是下界，两拍之间生灭的进程不在内；`seen_cpu_us` 的分辨率是平台计数器的 1 ms（`sysinfo` 的 `accumulated_cpu_time` 以毫秒给出），键仍记微秒，与其余时长同一单位；这次 run 一拍都没走（比 `--every` 短）时 `beats` 为 0，`seen_*` 全为 `null`。`child_peak_*` 是直接子进程由平台记下的峰值：在 Windows 上 `wait` 之后、句柄关闭之前经 `win32job::utils::get_process_memory_info` 读出，是精确值而不是拍上的读数；其他平台为 `null`。`read_cost_us` 是这次 run 里读进程表花掉的时间，agent 据此判断测量本身扰动了多少。`cores` 与 `physical_bytes` 写出机器的等级，不写机器是谁。
 
-**给人的输出（stdout 是终端）。** `City` 是 §8-95 的一屏。`Process` 每拍一行，`Command` 每次 run 一行、最后一行 spread，读数按 §8-95 的单位规则写（`µs`、`ms`、`MiB`，一位小数，截断）。单位换算只有 `monitor::top` 那一份，`lines` 调它。
+**给人的输出（stdout 是终端）。** `City` 是 §8-95 的一屏。`Process` 每拍一行，`Command` 每次 run 一行、最后一行 spread，读数按 §8-95 的单位规则写（时长按 §8-129-2 *单位*，字节一位小数，截断）。单位换算只有 `monitor::top` 那一份，`lines` 调它。
 
 **退出码**（§8-103 的 `Exit`）：0，测量做完了，被量命令失败也是 0，它的退出码是 `run` 行里的数据；1，起不了被量的程序（找不到程序是 `E_PATH_NOT_FOUND`，subject 是程序名，recovery 是检查 PATH 或写全路径；其余起不来是 `E_TOOL_UNAVAILABLE`，带平台给的原因），或者没有这个 pid 的进程（`E_INVALID_ARGS`，recovery 是给一个在跑的进程的 id）；2，命令行读不懂；4，`City` 的 `--at` 那里没有城（与 §8-97 相同）。`City` 在连续 5 s 没有读数时正常结束（§8-97 决定 2）。
 
@@ -367,10 +369,11 @@ pub monotonic: fn() -> Instant,             // 生产交 monotonic_now；派活�
 10. **没有 Lean 模型。** 采样线程的读法由看的人一次选定，`gauge` 的 run 依次进行，两处都没有交错；要守的性质是读取次数，由 §8-129-3 的计数断言与 `Subject` 这个穷尽枚举守住。重开条件：`gauge` 同时量多个对象，或采样改为多线程。
 11. **`gauge` 自己的命令行错误是它自己的枚举 `Misread`，不并进 `grammar::LineError`。** `LineError` 只说命令表判得了的事：动词、标志、位置参数各认不认得；「`--pid` 与 `--` 不能同时给」「`--every` 只配进程与命令」是 `gauge` 选对象的规则，放进 `LineError` 就要让解析器知道一个动词的对象怎么选。两者退出码相同（2），写法都是一行说明加最近的合法写法。被否：给 `LineError` 加通用的「冲突」「越界」臂——它们只有 `gauge` 一个读者，说明文字又各不相同。
 12. **记账一侧的单调钟经 `Hands.monotonic` 交进来，是一只 `fn() -> Instant`。** 与 `read_memory`、`read_volume` 同形：worker 碰这台电脑的每只手都在构造时一次交进来（`crates/accounting/Spec.lean` §8-11），生产交 `monotonic_now`，测试的 `Hands` 交测试夹具里同样读单调钟的那一只。被否：给 `accounting::Clock` 加一个返回 `Instant` 的方法——城钟是 Ledger 的 `t` 的来源，单调钟只量时长，两者放进一个端口，换城钟（测试里拨快、拨停）的地方就得同时编一个单调钟；四个实现都要改。
+13. **时长记整数微秒，显示以 10 ms 为界。** 毫秒时刻相减分不出 1 ms 以内的差别：一座测试城的 471 次工具调用里有 137 次记成 0 ms；内部热路径按微秒读（人的定规）。显示以 10 ms 为界，不到 10 ms 写整数 µs，10 ms 及以上写 ms（人的定规）。被否：读数行保留浮点毫秒（`0.555 ms`）——小数位数各处不一，比较两条读数先要换算，而浮点不进读数是本仓库的规矩；也被否：整数毫秒加一位小数——100 µs 以内的回退看不见。重开条件：要比较的读数落进纳秒（那时那一处用 `_ns`）。
 
 **测试。** `monitor::counters::tests`：按看的人走 N 拍，`Reads` 等于 §8-129-3 的精确值。`monitor::spread::tests`：n 为 1、2、100、200 时各分位与手算的最近秩相等，`suspicious` 数对。`monitor::tree::tests`：起一个子进程，第一次读数 `processes ≥ 1`、工作集非零、`cpu_permille` 为 `null`，它退出后 `read` 为 `None`，`reads().table` 等于读的次数。`audience::tests`：测试运行器的 stdout 不是终端，读作 `Agent`。`main::grammar::tests`：`--` 之后的词原样交出，其中的 `--help`、`--version` 不生效；`gauge` 与 `top` 解析成同一个动词。`main::gauge::tests`：每条命令行错误退 2；三种行按整串比较；`--samples 3` 量一个很快退出的程序，stdout 恰好三行 `run`、一行 `spread`，程序以非零退出时 `gauge` 仍退 0、`failed` 为 3。citysim：`Reading::of` 与 `Samples::of` 的既有测试按最近秩改期望。accounting：城钟每读一次拨快一分钟时，派活准备、`mcp_tools` 与 probe 的用时仍小于一分钟。
 
-**本节接口的当前状态。** §8-129-1 至 §8-129-6 的接口都已落地：`Spread` 是唯一的分位算法，citysim 两处读它；`Counters` 与 `Tree` 数自己的平台读取；`gauge` 是命令表的一行，`top` 是它的别名，`--` 之后的词原样交给被量的命令；`bin::audience` 是 TTY 规则唯一的一处；三处时长读 `Hands.monotonic`；`skills/gauge/` 随发行包走。`Sample` 带上 `view_backlog` 与 `read_nanos`（§8-129-6）；`instrument_monitor_beat` 的读数登记在 `budgets.toml` 的 `[monitor_beat]`，`[prepare_dispatch_ms]` 的 `measured_by` 写的是单调钟。还没有的：`main::view` 的同名枚举换成 `bin::audience::Audience`（它的 `write_line` 方法要随之搬走）。`xtask mem` 仍读 PowerShell（决定 4）。
+**本节接口的当前状态。** §8-129-1 至 §8-129-6 的接口都已落地：`Spread` 是唯一的分位算法，citysim 两处读它；`Counters` 与 `Tree` 数自己的平台读取；`gauge` 是命令表的一行，`top` 是它的别名，`--` 之后的词原样交给被量的命令；`bin::audience` 是 TTY 规则唯一的一处；三处时长读 `Hands.monotonic`；`skills/gauge/` 随发行包走。`Sample` 带上 `view_backlog` 与 `read_nanos`（§8-129-6）；`instrument_monitor_beat` 的读数登记在 `budgets.toml` 的 `[monitor_beat]`，`[prepare_dispatch]` 的 `measured_by` 写的是单调钟。还没有的：`main::view` 的同名枚举换成 `bin::audience::Audience`（它的 `write_line` 方法要随之搬走）。`xtask mem` 仍读 PowerShell（决定 4）。
 -/
 
 /-!

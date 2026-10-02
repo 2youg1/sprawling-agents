@@ -38,6 +38,12 @@ impl Reading {
 
 `perf load=<load> sub=<sub> machine_class=<general> fixture=<16 位十六进制> samples=<n> floor_us=<n> p50_us=<n> p95_us=<n> p99_us=<n>`
 
+登记册行的读数（`bench::reading::row_line`，同样只经 `Spread`，同样是整数微秒）：bench Main 在场景之前量 `budgets.toml` 的四行 `ledger_append`、`durability_barrier`、`prefix_assembly`、`run_history`，每行一条
+
+`budget row=<行名> samples=<n> floor_us=<n> p50_us=<n> p95_us=<n> p99_us=<n> peak_us=<n>[ <旁注>]`
+
+旁注是那一行要的附带计数，键值同形：`durability_barrier` 每种批量一条，旁注 `batch=<b> per_record_ns=<p50 的纳秒数除以 b>`（摊到一条记录上常常不到 1 µs，所以记纳秒）；`ledger_append` 之后多一条成批写入 `budget row=ledger_append_all records=<n> took_us=<n> records_per_s=<n>`，只有一个样本，不成分布。预算不印在读数行里：预算住 `budgets.toml`，读数行只给读数。
+
 `fixture` 取登记夹具摘要（D8）的前 16 位十六进制，由 `citysim::fixture_label` 拼出；完整的 64 位写在 `REGISTERED.pinned`。
 
 `floor_us` 是最小样本：机器安静时这条路径本身要花多少。它与 `p50_us` 并列，因为两者回答的不是一个问题——floor 贴着设计的下限，p50 带着机器的其余负载——而挂钟读数不设棘轮，两者就都得留在读数里，下一个读者才分得清一次回归是设计变慢了还是机器变忙了。

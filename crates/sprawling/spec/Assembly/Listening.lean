@@ -389,7 +389,7 @@ pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics, cost:
 1. 一行，不是七行。七段是同一次开城的七个部分，读的人要看的是它们之间的比例。被否：每段一条 `Trace`——默认下限看不见它们，打开 `trace` 又会被别的行淹没。
 2. 读数是诊断，不是账本记录。开城用了多久是运行这座城的主机在那一刻的事实，不属于城的历史（`docs/logging.md` §2）。被否：写一条账本事件——同一段历史在两台机器上就不再逐字节相同。
 3. `line()` 是唯一的渲染，没有读者解析它。要逐段比较的人读 `bench_startup` 留在夹具城旁边的日志（`tools/citysim/Spec.lean` §8-5-1），那一行与首字节读数出自同一次开城。
-4. 派活不在这里拆段。派活的两次读数已在 `prepare_dispatch` 那一行（`[prepare_dispatch_ms]`），它走城钟、按毫秒；把 `stage_dispatch` 内部拆成微秒级的段，要一个能在 accounting 里取单调时间的端口，那是记账线程长任务那一项自己的工作。
+4. 派活不在这里拆段。派活的两次读数已在 `prepare_dispatch` 那一行（`[prepare_dispatch]`），它走城钟、按毫秒；把 `stage_dispatch` 内部拆成微秒级的段，要一个能在 accounting 里取单调时间的端口，那是记账线程长任务那一项自己的工作。
 
 **测试。** `assembly::listening::tests::a_listening_city_says_what_opening_it_cost`：在一座刚 `init` 的城上 `listen`，`log` 取 `Effect` 下限、sink 是同一个 `Journal`，事先订阅 `Journal::lines()`；收到恰好一条以 `opened the city in ` 开头的 `Effect`，七个段名按上面的次序出现，并含 `fold 3 lines from genesis`。
 
