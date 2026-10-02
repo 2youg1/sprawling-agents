@@ -110,7 +110,7 @@ impl Residents {
 - **一台 server 一个子进程，一次 dispatch 一条命**：工具表随 Run 冻结，子进程的寿命因此就是 Run 的寿命。最后一个 `McpTool` 落地时 `Drop` 杀子进程，于是「谁来回收」不需要第二份名单。
 - **读取线程是句柄的一部分**（ARCHITECTURE 确定性规则 3 为 `agent_protocols::mcp::stdio` 与 `agent_protocols::mcp::sse` 各留一个每连接一条的 reader）。同步读一根管道没有期限，而一个不回答的 server 会把整个 Run 挂死。故 `start` 起一条只读 stdout 的线程，`call` 用 `recv_timeout` 等它；超时即杀子进程并三段式拒。**线程恒不泄漏**：杀子进程关掉管道，读到 EOF 即结束。
 - **期限从声明里来，不在适配器里另写一个数**：`ToolMeta.timeout`（`tools_from` 写的 `TimeoutMs(60_000)`）既是对模型的承诺，就应当是真正被执行的那一个；否则该字段只是装饰。故期限随 `Outbound::call` 入参。
-- **起不来的 server 缺席而不拒 dispatch**：与 `city::library` 对「楼里点名却不在架上的 SKILL」同形——模型看到的名录恒等于真能跑的工具表，缺席的那一件在诊断里留名。一个外部服务今天起不来，不是这栋楼今天不能干活。
+- **起不来的 server 缺席而不拒 dispatch**：与 `city::library` 对「楼里点名却不在架上的 SKILL」同形——模型看到的名录（工具表加休眠索引）恒等于真能跑的工具，缺席的那一件在诊断里留名。一个外部服务今天起不来，不是这栋楼今天不能干活。
 - **confidential 楼：一条规则两层后果，不是两份判定**。工具能不能存在归 `agent_protocols::McpTool::new`（构造点拒，恒是权威）；**进程该不该被拉起归装配层**，因为进程寿命本来就是这一层的职责，而一台 MCP server 可能在启动那一刻就出网。故 confidential 楼在拉起任何子进程之前就跳过整张 `[[mcp]]` 表并留一条诊断；工具层的拒仍在，它是那一层失守时的兵底。两层同向，因此不会出现「只改一处」的漂移。
 - **`Effect::Connector` 是这次接线带来的 kernel 变更**（语义住 `crates/kernel/Spec.lean` §8-23）：接线前 `tools_from` 写的是 `Effect::Egress`，而出站门从 **调用参数**里读 `host`——外部工具的参数表由 server 的 `inputSchema` 决定，里面恒没有 `host`。第一次真调用当场拿到 `E_INVALID_ARGS: declares Egress but named no host`：这就是「一个适配器是假想缝」的同一条道理在工具面上的实例——没有调用方的声明从未被那道门验过。
 - **discover 先于 list，但今天不据它分支**：它当下的作用是在把任何工具交给模型之前，先证明对侧真的会应答；版本协商要有第二个版本才成立，而字段名本库今天无法从一台真的 server 上核对。读到什么写进诊断，不写进判定。
@@ -3101,7 +3101,7 @@ book: gateway::EndpointBook,   // 派活立起那一刻的端点账本
 - **账本在 `RunWorker::laying` 里复制一份进 `Laying`。** 工作台在驾驶这个 run 的 lane 里摆（8-113），账本属于 accounting 线程；`Laying` 本来就带着「派活立起那一刻」的值（`waiting`、`locks`、`trust`），账本是同一种值，几个端点的复制是微秒量级。被否：在 `agree_to_work` 里造好设施随 `Agreed` 带过去——那样工具在一处造、在另一处登记，「这件工具有没有」就有两处答案；只把 `Transcriber` 放进 `Laying`——`laying()` 手里没有楼规，造不出对的 policy。
 - **录音从读界之内的一个文件或一个 `cas:` 块进来，只经 `runtime::BoundReader`**（`crates/runtime/Spec.lean` §8-59）。参数与 `read` 同一种写法：相对城根的路径（审查楼里是这个 run 的树）、城内的绝对路径，或 Locator。连接器把 desktop 的录音存进 CAS，窗口里那一行 `[recording attached: …, cas:…]` 的 locator 原样交给它（runtime D15）。判定是 `read` 的那一份：文法、reserved subtree、读界，链接解开后再判一次，打开后核对没换过；拒绝与 `read` 同码。读界之内的别楼也收：模型能 `read` 的东西本来就进了它对主模型的对话，录音出门去的是按本楼的 policy 选出的端点，与那段对话同一种出门；机密楼的文件楼外读不到，机密楼里的 run 只拿得到回环上的转写端点。**容器**：文件（`file:` 在内）看扩展名（`AudioType::of_file_name`），字节经 `Recording::read_from` 读到上限为止（`crates/gateway/Spec.lean` §8-33）；块没有名字，看开头的字节，经 `Recording::read_unlabelled`（`crates/gateway/Spec.lean` §8-34）。
 - **效果是 `Effect::Read`。** 它读一个文件，城里什么都不写；录音出门去的是人为这类活选定、已按本楼 policy 判过的端点，与 run 的对话去主模型端点是同一种出门，而模型调用不是工具效果。被否：`Effect::Egress`——那一类的定义是「目的地由这次调用指名」，出网门扫的是参数里的字节，而这里参数只有一条路径，出去的是录音，判它的是已经判过的 `select`。`CostTier::Heavy`：一次 provider 往返，数秒，可能计费。`timeout: None`：设施自己的 `TRANSCRIBE_TIMEOUT_MS` 已是上限，第二个期限会是第二个权威。`render: Generic`：它产出的是文字。
-- **在工具表上的位置**：内置工具与按用途加的那几件之后、城外工具（浏览器、MCP）之前。provider 按位置缓存工具数组，所以新的内置工具接在内置那一段的末尾。
+- **在目录里的位置**：它不在任何 mode 的常驻核心（`runtime::mode::core_tools`），所以不进工具表，只在休眠索引里按名字的字节序占一行，经 `describe` 与 `call` 用（`crates/runtime/Spec.lean` §8-60）；登记次序不再决定它在请求里的位置。
 - **验收**：`crates/sprawling/tests/acceptance/episodes.rs` 末尾一段。选了转写端点的城，run 调 `transcribe` 拿回脚本端点转出的字，端点收到的模型名是人选的那一个；机密楼配离机转写端点时，工具不在表上。没选转写的城不上这件工具，由 catalogue 的两条覆盖测试守着：上了表而没被调用，会被点名。连接器存下的录音：一个为这座楼存进 CAS 的 wav 块，run 以它的 `cas:` 调 `transcribe`，拿回脚本端点转出的字。工具自己的拒绝（机密楼的路径、reserved subtree、认不得的容器、不存在的文件与块）由 `transcribe` 模块的测试守着。
 
 ## 8-142 城给 run 的 OCR 工具 `ocr`（`accounting::worker::workbench::tools::ocr`；`crates/gateway/Spec.lean` §8-34，`crates/runtime/Spec.lean` §8-59）
@@ -3122,7 +3122,7 @@ impl kernel::Tool for OcrTool { … }   // 名 `ocr`；参数 `{ path }`：PNG �
 - **图只经 `runtime::BoundReader` 读进来**，与 `transcribe` 同一扇门、同一份判定（8-131）：楼里的一个 PNG、读界之内别楼的一个 PNG、连接器存进 CAS 的截图（窗口里那一行 `[picture attached: image/png WxH, cas:…]` 的 locator）都收。读进来的字节交 `runtime::pipeline::connector::png_picture`，与连接器存图同一种认法：只认 PNG，超过 `IMAGE_MAX_BYTES` 或头读不出，`E_INVALID_ARGS`。
 - **发出去的是所选 face 的图片内容**（`crates/gateway/Spec.lean` §8-34）：一条 system、一条带图的 user 消息，没有工具；`policy` 是这座楼的。选中的模型登记为只读字时，端点在发出前拒绝，拒词让人把 `ocr` 指向一个 `text_image` 的模型。
 - **效果照 8-131**：`Effect::Read`（读一个文件，城里什么都不写；图出门去的是按本楼 policy 选出的端点）、`CostTier::Heavy`（一次 provider 往返，可能计费）、`timeout: None`（端点自己的调用期限是上限）、`render: Generic`（产出的是文字）。
-- **在工具表上的位置**：紧接 `transcribe` 之后、`playback` 之前。provider 按位置缓存工具数组，所以内置工具的新成员接在内置那一段的末尾；以后的提案工具排在 `ocr` 之后。
+- **在目录里的位置**：它不在任何 mode 的常驻核心，所以不进工具表，只在休眠索引里按名字的字节序占一行，经 `describe` 与 `call` 用（`crates/runtime/Spec.lean` §8-60）。
 - **验收**：`crates/sprawling/tests/acceptance/ocr.rs`。选了 OCR 模型的城（回环端点、chat 面），run 以楼里的一个 PNG 与一个为这座楼存进 CAS 的截图各调一次 `ocr`，拿回端点读出的字；端点收到的两次请求走 `chat/completions`、带人选的模型名与那张图的 base64。没选 OCR 的城不上这件工具，由 catalogue 的两条覆盖测试守着。工具自己的拒绝（不是 PNG、机密楼的路径、没有设施）由 `ocr` 模块的测试守着。
 - **本节接口的当前状态**：线上已有的 `SelectModel` 能为 `Ocr` 选模型，登记的 `input` 是 `gateway::accepted_input` 那架梯子的答案（`crates/gateway/Spec.lean` §8-37）：钉版目录、预置表、`Text`，先说者胜。所以预置表写着 `text_image` 的模型（例如 `api.anthropic.com` 上的 `claude-sonnet-4-5`，或中转站转发的同一个 id）选为 `Ocr` 之后，`ocr` 在它上面读得出字；两张表都不认识的模型仍按 `Text` 登记，`ocr` 在它上面由端点拒绝。梯子最高的一档——人自己说「这个模型读图」——的线上字段已经落地：`SelectModel.input: Option<InputKinds>`，出现时排在目录之前，一个目录写着 `text` 的模型带 `input: TextImage` 选为 `Ocr` 之后，`ocr` 在它上面读得出字（gateway D16）。只差设置页的控件（client-SPEC 的模型表仍是三行，`crates/kernel/Spec.lean` §8-80），控件归前端；页面今天不带这一格（线上缺席即 `None`），梯子照旧。
 
@@ -3791,8 +3791,8 @@ impl kernel::Tool for Kept {
 
 | 层 | 字段 | 落点 | 只写 | 执法者 |
 |---|---|---|---|---|
-| 目录行 | `disclosure` | `catalog.render()` 进 Resident 段 | 它是什么、什么时候该用 | `claim_tool/tests.rs` 的 548 B 预算 |
-| 说明书 | `params` 各字段的 `description` | `tool_defs()` 随请求 | 怎么用：字段、取值、默认、拒绝条件 | 同上（量的是两者之和） |
+| 目录行 | `disclosure` | 常驻核心的工具随 `tool_defs()`；其余工具的第一句截成休眠索引的提示进 Resident 段，全文只经 `describe`（`crates/runtime/Spec.lean` §8-60） | 它是什么、什么时候该用 | `claim_tool/tests.rs` 的 548 B 预算 |
+| 说明书 | `params` 各字段的 `description` | 常驻核心的随 `tool_defs()`；其余只经 `describe` | 怎么用：字段、取值、默认、拒绝条件 | 同上（量的是两者之和） |
 | 二级展开 | `CatalogEntry::expansion` | 按需 `read` | 整套纪律 | — |
 
 `plan` 的六个动作就住在说明书里（`action` 那句），目录行只剩 84 B 余量而原文已占 83 B——**把动作抄进目录行既付两遍钱也放不下**，那条预算就是这个决定的执法者。`signal` 的四类 kind 同理。
@@ -4395,7 +4395,7 @@ sprawling playback check <file> [--bundle <file>] [--city <city>] [--include-con
 - **`check`**：`file` 是本楼导出目录里的一个 `<name>.json` 或 `<name>.html`，别的名字与别处的文件都拒绝。它用同一个读者对城复核，结果是 `Report::line`：五项，`bundle` 与 `browser` 为 `unchecked`（居民的门不收另一份 bundle 与观察记录）。
 - **效应与写门。** 登记 `Effect::Write { domain: 房间 }`，与 `signal`、`pr` 等写桌子的工具同样走写门；`writes` 回答 `Writes::Nothing`，因为导出件落在工作树之外，checkpoint 没有东西可收。工具的效应按登记而不是按调用，所以 `check` 也不会被推测执行提前跑（只有 `Effect::Read` 会，`crates/runtime/Spec.lean` 的 speculation）。
 - **寿命。** 导出件跟着城：它在城根的保留子树下，不在任何 worktree 里，清扫 worktree、run 冻结或重开都不碰它；没有独立 worktree 的 run 也写在同一处。两次导出用了同一个名字，后一次被拒绝。崩溃留下的暂存文件见 accounting-SPEC.md §3。
-- **登记。** 每一栋楼的工作台都有它，排在内置工具的末尾、`transcribe` 之后、城外工具之前：新工具接在末尾，前面已缓存的工具表前缀不动。
+- **登记。** 每一栋楼的工作台都有它；它不在常驻核心，所以模型在休眠索引里见到它的一行，经 `describe` 取说明、经 `call` 调用（`crates/runtime/Spec.lean` §8-60），工具表在 session 里不变。
 
 **本节测试**：`main::playback::tests`：五项写成一行 JSON，没要的项写 `unchecked` 而退出 0，失败或要了而做不了的项退出 1。`accounting::playback::tests::page`：`embed` 写出的页面逐字节带着 bundle，行里的 `</script>` 关不掉数据块，结构与静态离线两项通过；重复的数据块、重复的 `id`、指不到的链接与 `data-seq`、数据块里重复的 JSON 键在结构一项失败；外部资源（`img`、转义过的 CSS `url()`、`@import`、SVG 的 `image`、`srcset`）、`base`、`form`、外链、`meta refresh` 各是一条静态离线的发现；CSP 缺了、在别的元素之后、放进一个主机、缺 `form-action` 各是一条发现；观察记录说的是另一份字节为 `unchecked`，记下一次请求为失败。`accounting::worker::workbench::tools::playback::tests`：带 `include_confidential` 或 `reader` 的调用被拒；机密楼的行到不了居民的导出，导出用同一个读者复核通过；同名的第二次导出被拒且原文件不变，过不了静态离线的页面什么也不留；没有 worktree 的 run 把页面写进城里，`check` 只认本楼导出目录里的名字。已存在、被跟踪、不在导出位置、会进历史的目标由 `accounting::playback::tests::landing` 判定。两名居民（记者、编辑）生成、核对并留存报告由 `tests/acceptance/playback.rs` 判定。
 
