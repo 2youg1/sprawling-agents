@@ -19,12 +19,13 @@ import type { B3Hash, DocumentAnswer, Encoding, Format, RangeAnswer, Span } from
 export const EDITABLE_BYTES_MAX = 4 * 1024 * 1024;
 
 // A text version and how much of it has arrived: `through` is the byte
-// the text reaches, and the text is whole when it reaches `bytes`.
+// the text reaches, and the text is whole when it reaches `bytes`, which
+// is `null` for a version known only by its digest until its end is read.
 export interface Gathering {
   readonly version: B3Hash;
   readonly format: Format;
   readonly encoding: Encoding;
-  readonly bytes: number;
+  readonly bytes: number | null;
   readonly text: string;
   readonly through: number;
 }
@@ -66,29 +67,38 @@ export function opened(answer: DocumentAnswer): Opened {
   };
 }
 
+// A version the page knows only by its digest: one that is not the
+// file's current version. Its length is learnt from the empty window the
+// city answers past its end, and it is read as UTF-8 because only a
+// document answer states an encoding; such a version is read only, and
+// a marked UTF-8 version's mark is three bytes either way.
+export function recorded(version: B3Hash, format: Format): Gathering {
+  return { version, format, encoding: "utf8", bytes: null, text: "", through: 0 };
+}
+
 export function whole(gathering: Gathering): boolean {
-  return gathering.through >= gathering.bytes;
+  return gathering.bytes !== null && gathering.through >= gathering.bytes;
 }
 
 // The bytes to ask for next, or `null` when the text is whole or the
 // version is past what RefRain gathers. The city cuts the answer to one
 // window, so the request names the whole rest.
 export function nextSpan(gathering: Gathering): Span | null {
-  return whole(gathering) || gathering.bytes > EDITABLE_BYTES_MAX
+  const end = gathering.bytes ?? EDITABLE_BYTES_MAX;
+  return whole(gathering) || end > EDITABLE_BYTES_MAX || gathering.through >= EDITABLE_BYTES_MAX
     ? null
-    : { start: gathering.through, end: gathering.bytes };
+    : { start: gathering.through, end };
 }
 
 // The text with one more window: only a window of this version that
 // starts where the text ends, so a window answered twice, out of order
-// or for another version leaves the text as it was.
+// or for another version leaves the text as it was. An empty window is
+// the city saying the version ends there.
 export function joined(gathering: Gathering, answer: RangeAnswer): Gathering {
   const window = answer.window;
-  return answer.version !== gathering.version || window.span.start !== gathering.through || window.span.end <= window.span.start
-    ? gathering
+  if (answer.version !== gathering.version || window.span.start !== gathering.through) return gathering;
+  return window.span.end === window.span.start
+    ? { ...gathering, bytes: gathering.through }
     : { ...gathering, text: gathering.text + window.text, through: window.span.end };
 }
 
-export function recorded(version: B3Hash, format: Format): Gathering {
-  return { version, format, encoding: "utf8", bytes: 0, text: "", through: 0 };
-}
