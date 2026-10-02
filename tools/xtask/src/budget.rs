@@ -41,7 +41,7 @@ const SLACK_KEY: &str = "slack_bytes";
 
 /// The release optimisation level the register's size reading was taken
 /// with. One word, and the reason the check above exists at all.
-const PROFILE: &str = "z";
+const PROFILE: &str = "3";
 
 /// A gated row of the register, in bytes.
 struct Row {
@@ -189,15 +189,14 @@ pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
 /// reading was linked on; this check holds the other half of what a
 /// size depends on. It is a check rather than a comment because the
 /// setting is one word in a manifest and the reading it invalidates is
-/// seven megabytes,
-/// and it costs a read: the binary itself is weighed only when somebody
-/// has built one.
+/// the size of the whole binary, and it costs a read: the binary itself
+/// is weighed only when somebody has built one.
 ///
-/// `"z"` rather than `3` was decided by a criterion written down before
-/// the readings existed, so no number could talk anybody into anything.
-/// The register carried the losing arm as a row of its own until the day
-/// this setting changed; that row is gone, because once `"z"` is what
-/// ships, a second row describing the same binary is the second home the
+/// `3` rather than `"z"` or `"s"` was decided on runtime speed over the
+/// product's common operations, by a criterion written down before the
+/// readings existed (the root `Cargo.toml` states it beside the setting).
+/// The register carries no row for a losing arm, because once `3` is what
+/// ships, a second row describing another binary is the second home the
 /// register exists to prevent.
 fn release_profile(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let path = root.join("Cargo.toml");
@@ -306,7 +305,7 @@ mod tests {
             std::fs::remove_dir_all(&root).unwrap();
         }
         let write = |path: &str, text: &str| crate::root::fixture::write(&root, path, text);
-        write("Cargo.toml", "[profile.release]\nopt-level = \"z\"\n");
+        write("Cargo.toml", "[profile.release]\nopt-level = 3\n");
         write(
             REGISTER,
             "[dependency_count]\n\

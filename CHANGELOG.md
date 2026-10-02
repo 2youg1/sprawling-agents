@@ -91,6 +91,16 @@ shows both.
 Nothing asks for it yet: the city's OCR tool that will is the next piece of
 work.
 
+### The release binary is built at `opt-level = 3`
+
+`"z"`, `"s"` and `3` were measured against each other on the product's common
+operations, and `3` was the fastest: the geometric mean of nineteen workloads
+read 0.902 of `"z"`'s, against 0.945 for `"s"`. Folding a large ledger takes
+0.63 of the time it took, the first byte of a 400,000-record city 0.81, and
+startup is unchanged. The binary grows from 15.1 MB to 26.8 MB and install
+takes 1.25 times as long (windows-x86_64, 16 cores, NVMe); runtime speed comes
+before size.
+
 ### Not done in this section
 
 The GitHub CLI import of a user id, the onboarding guide's progress, and a

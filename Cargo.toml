@@ -313,14 +313,25 @@ debug = false
 
 # crash-only delivery profile
 [profile.release]
-# `"z"` rather than `3`, on a measurement rather than a preference:
-# 6,927,360 B against 11,150,336 B and a median `sprawling --version`
-# of 12.85 ms against 13.12 ms, thirty interleaved runs per arm on one
-# machine in one sitting. The criterion was written down before the
-# readings existed - at least 15% off the size and no more than 10%
-# lost on cold start - so the number could not talk anybody into
-# anything, and `"z"` passes both halves.
-opt-level = "z"
+# `3`, because it is the fastest of `"z"`, `"s"` and `3` on the product's
+# common operations, and runtime speed comes before size. The criterion
+# was written down before the readings existed: the three arms built
+# from one tree, measured in three interleaved rounds with `just bench`
+# and `just bench-startup`, the median p50 of nineteen workloads (first
+# byte of the empty, l100k and l400k cities, startup, raise_city,
+# open_session, the ledger fold, run history, ledger appends, the view
+# backlog, the monitor beat, evidence export, worktree placement and
+# reclaim, and relay) divided by `"z"`'s, and the geometric mean of
+# those ratios as the score; a lead smaller than the winner's spread
+# between its own rounds would have kept `"z"`. `3` scored 0.902 and `"s"` 0.945, and
+# `3`'s lead of 0.043 is larger than its spread of 0.027. The gain is in
+# reading history: the ledger fold 0.63, the view backlog 0.67, run
+# history 0.77, the l400k first byte 0.81; startup and city raising
+# are flat. The binary is 26.8 MB against 15.1 MB at `"z"`, and install
+# takes 1.25 times as long, because the installer unpacks and first
+# launches the larger executable; size is a reading, not a criterion
+# (windows-x86_64, 16 cores, NVMe).
+opt-level = 3
 lto = "fat"
 codegen-units = 1
 strip = "symbols"
