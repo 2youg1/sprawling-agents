@@ -55,7 +55,7 @@
   import River from "./run/river.svelte";
   import Composer from "./talk/composer.svelte";
   import Thread from "./talk/thread.svelte";
-  import { lastCheckpointIn } from "./talk/trace";
+  import { lastCheckpointIn } from "./checkpoints";
 
   interface Props {
     readonly run: RunId;

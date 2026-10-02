@@ -728,8 +728,8 @@
     "zh": "按下组合键"
   },
   "keys_inspect": {
-    "en": "the right pane",
-    "zh": "右侧"
+    "en": "the inspector",
+    "zh": "检视面"
   },
   "edge_layers": {
     "en": "layers",
@@ -3251,29 +3251,77 @@
     "en": "what {room} should work on",
     "zh": "{room} 接下来做什么"
   },
-  "talk_panel": {
-    "en": "what this run produced",
-    "zh": "这次 run 产出的东西"
+  "inspect_label": {
+    "en": "inspector",
+    "zh": "检视面"
   },
-  "talk_panel_change": {
-    "en": "what changed",
-    "zh": "改动"
+  "inspect_tabs": {
+    "en": "open in the inspector",
+    "zh": "检视面里打开的项"
   },
-  "talk_panel_code": {
-    "en": "the file it last worked on",
-    "zh": "它最近处理的文件"
+  "inspect_close": {
+    "en": "close the inspector",
+    "zh": "收起检视面"
   },
-  "talk_panel_hide": {
-    "en": "hide what it produced",
-    "zh": "收起产出"
+  "inspect_close_item": {
+    "en": "close {name}",
+    "zh": "关闭 {name}"
   },
-  "talk_panel_show": {
-    "en": "show what it produced",
-    "zh": "查看产出"
+  "inspect_editor": {
+    "en": "editor",
+    "zh": "编辑器"
   },
-  "talk_panel_terminal": {
-    "en": "what the last command printed",
-    "zh": "最近一条命令的输出"
+  "inspect_terminal": {
+    "en": "terminal",
+    "zh": "终端"
+  },
+  "inspect_split": {
+    "en": "height of the editor, in lines",
+    "zh": "编辑器的高度（行）"
+  },
+  "inspect_copy_place": {
+    "en": "copy path:line",
+    "zh": "复制 路径:行"
+  },
+  "inspect_raw": {
+    "en": "original",
+    "zh": "原文"
+  },
+  "inspect_raw_head": {
+    "en": "the original is {bytes}; this is its head",
+    "zh": "原文共 {bytes}，这里是开头"
+  },
+  "inspect_not_text": {
+    "en": "not text, {bytes}",
+    "zh": "不是文本，{bytes}"
+  },
+  "inspect_took": {
+    "en": "{ms} ms",
+    "zh": "{ms} 毫秒"
+  },
+  "inspect_cut": {
+    "en": "{n} lines cut",
+    "zh": "裁去 {n} 行"
+  },
+  "inspect_no_original": {
+    "en": "no original kept",
+    "zh": "没有留下原文"
+  },
+  "inspect_line_beyond": {
+    "en": "line {n} is past the head the city sent of this {bytes} file",
+    "zh": "第 {n} 行在城发来的开头之外，文件共 {bytes}"
+  },
+  "inspect_shot": {
+    "en": "a {media} picture, {width} × {height}",
+    "zh": "{media} 图片，{width} × {height}"
+  },
+  "inspect_shot_unserved": {
+    "en": "The city keeps this picture in its content store; this page has no way to draw it yet.",
+    "zh": "城把这张图存在内容库里；这一页还没有办法画出它。"
+  },
+  "inspect_call_gone": {
+    "en": "This call is not in its run's rounds.",
+    "zh": "这次 run 的回合里没有这次调用。"
   },
   "talk_placeholder_mayor": {
     "en": "to the Mayor…",
@@ -3694,10 +3742,6 @@
   "talk_enter_hint": {
     "en": "Enter sends - Shift+Enter newline",
     "zh": "Enter 发送，Shift+Enter 换行"
-  },
-  "talk_panel_jump": {
-    "en": "open the run page",
-    "zh": "打开 run 页"
   },
   "setup_saved": {
     "en": "saved",

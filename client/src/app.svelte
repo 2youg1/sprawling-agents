@@ -39,6 +39,7 @@
   import Button from "./views/parts/button.svelte";
   import Cheatsheet from "./views/parts/kbd.svelte";
   import Edge from "./views/edge.svelte";
+  import { closeRight, rightItem } from "./views/inspect/open.svelte";
   import LinkBanner from "./views/link_banner.svelte";
   import Notifier from "./views/notifier.svelte";
   import Pages from "./views/pages.svelte";
@@ -263,7 +264,13 @@
         mailboxAsked += 1;
         return;
       case "inspect":
-        u.prefs.setPanel(!$held.panel);
+        // An item somebody opened holds the inspector open whatever the
+        // preference says, so the key closes both or opens by the one.
+        if (rightItem() === null) u.prefs.setPanel(!$held.panel);
+        else {
+          closeRight();
+          u.prefs.setPanel(false);
+        }
         return;
       case "help":
         opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;

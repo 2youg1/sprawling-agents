@@ -35,6 +35,11 @@
       called: TimeMs.make(START + n * 1_000),
       answered: TimeMs.make(START + n * 1_000 + 412),
       timing: "measured",
+      // What the city registers the two tools as (`kernel::ToolMeta`),
+      // which every call carries on the wire.
+      ...(tool === "edit"
+        ? { effect: { write: { domain: ROOM } }, render: { diff: { locations: [] } } }
+        : { effect: "read", render: "generic" }),
     };
   }
 

@@ -37,6 +37,8 @@ const SHAPE =
 </script>
 
 <script lang="ts">
+  import type { Snippet } from "svelte";
+
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Inked from "./inked.svelte";
@@ -47,9 +49,16 @@ const SHAPE =
     // is coloured.
     readonly path: string;
     readonly text: string;
+    // The line a reader was sent to, one-based: the view scrolls it to
+    // the middle and marks it with the accent bar. The inspector's file
+    // view names the line a call read from.
+    readonly cited?: number | undefined;
+    // Controls of the caller's that belong to this file, drawn at the
+    // right end of the header.
+    readonly aside?: Snippet | undefined;
   }
 
-  const { path, text }: Props = $props();
+  const { path, text, cited, aside }: Props = $props();
 
   const { lang } = ui();
 
@@ -72,6 +81,16 @@ const SHAPE =
       .map((_line, at) => String(at + 1))
       .join("\n"),
   );
+
+  let scroller = $state<HTMLDivElement | undefined>(undefined);
+  let mark = $state<HTMLDivElement | undefined>(undefined);
+
+  // The scroller is moved rather than the mark scrolled into view, which
+  // would move every scrolling box around it as well - the page included.
+  $effect(() => {
+    if (scroller === undefined || mark === undefined) return;
+    scroller.scrollTop = Math.max(0, mark.offsetTop - scroller.clientHeight / 2);
+  });
 
   let copied = $state(false);
   let receipt: ReturnType<typeof setTimeout> | undefined = undefined;
@@ -114,13 +133,22 @@ const SHAPE =
         <svg class="size-glyph" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="2" /><path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /></svg>
       {/if}
     </button>
+    {#if aside !== undefined}<span class="flex shrink-0 items-center">{@render aside()}</span>{/if}
   </div>
   <!-- The code scrolls sideways and never folds a line in half: the
   gutter stays put at the left while the text runs under it. -->
-  <div class="min-h-0 flex-1 overflow-auto">
-    <div class="flex min-w-max font-mono text-note leading-relaxed">
+  <div class="min-h-0 flex-1 overflow-auto" bind:this={scroller}>
+    <div class="relative flex min-w-max font-mono text-note leading-relaxed">
       <pre class="sticky left-0 shrink-0 select-none bg-chrome px-snug text-right text-text-faint" aria-hidden="true">{gutter}</pre>
       <pre class="px-snug text-text-quiet"><Inked {text} source={path} /></pre>
+      {#if cited !== undefined && cited >= 1}
+        <div
+          bind:this={mark}
+          class="pointer-events-none absolute inset-x-0 h-[1lh] bg-accent/12 shadow-[inset_var(--spacing-hair)_0_0_var(--color-accent)]"
+          style:top="calc({cited - 1} * 1lh)"
+          aria-hidden="true"
+        ></div>
+      {/if}
     </div>
   </div>
 </div>

@@ -7,17 +7,15 @@
 
 <script lang="ts" module>
   // What a run did and what it left behind: the wave of tool calls
-  // folded to one line, the panel beside the conversation, and the
-  // read-only view of a file a call handed over.
+  // folded to one line, and the read-only view of a file a call handed
+  // over. The inspector that opens one call in full has its own section
+  // (`ins.svelte`).
   //
-  // The three read the same `Call` values, so the calls are written
-  // once at the top of this file and each fixture names the ones it
-  // wants. A fold that counted one set of calls while the panel drew
-  // another would be two answers to "what did this run just do".
+  // Both read the same `Call` values, so the calls are written once at
+  // the top of this file and each fixture names the ones it wants.
 
   import type { Call, Output, Turn } from "../../wire";
-  import { RunId, Seq, TimeMs } from "../../wire";
-  import type { Artifacts } from "../talk/trace";
+  import { Address, RunId, Seq, TimeMs } from "../../wire";
 
   // The run every fixture here speaks for. One id, because the link a
   // cut result offers points at a run page and two ids would point at
@@ -35,6 +33,16 @@
     return { cut, head };
   }
 
+  // What the city registers each tool as (`kernel::ToolMeta`), which is
+  // what a call carries on the wire; a tool missing here is one the city
+  // could not place, and its call carries neither.
+  const REGISTERED: Readonly<Record<string, Pick<Call, "effect" | "render">>> = {
+    read: { effect: "read", render: "generic" },
+    search: { effect: "read", render: "generic" },
+    edit: { effect: { write: { domain: Address.make("release") } }, render: { diff: { locations: [] } } },
+    exec: { effect: "egress", render: "terminal" },
+  };
+
   function call(
     at: number,
     tool: string,
@@ -42,7 +50,7 @@
     output: Output | null,
   ): Call {
     const t = TimeMs.make(at);
-    return { at: Seq.make(at), outcome: "answered", output, subject, tool, called: t, answered: t, timing: "measured" };
+    return { at: Seq.make(at), outcome: "answered", output, subject, tool, called: t, answered: t, timing: "measured", ...REGISTERED[tool] };
   }
 
   // The turn one fixture's calls live in, carrying those same calls:
@@ -114,45 +122,6 @@
     ),
   );
 
-  // A file whose last part this build's table does not hold. Drawn in
-  // one ink rather than guessed at: a comment marker borrowed from
-  // another family hides a line instead of dimming it.
-  const UNKNOWN_KIND: Call = call(
-    2,
-    "read",
-    "docs/gate.adoc",
-    said(
-      `= What a door answers
-:toc:
-
-// In AsciiDoc this line is a comment; in six other families it is not,
-// which is why this build colours none of it.
-A door answers *Allow* or *Deny*.
-`,
-      0,
-    ),
-  );
-
-  const A_TERMINAL: Call = call(
-    3,
-    "exec",
-    "cargo clippy -p sprawling-kernel --all-targets -- -D warnings",
-    said(
-      `    Checking kernel v0.0.5 (C:\\sprawling\\crates\\kernel)
-    Finished \`dev\` profile [unoptimized + debuginfo] in 4.12s
-`,
-      0,
-    ),
-  );
-
-  function panel(
-    read: Call | null,
-    terminal: Call | null,
-    wrote: Call | null = null,
-  ): Artifacts {
-    return { read, wrote, terminal };
-  }
-
   // A file with a trail long enough to wrap, so the crumbs are
   // measured as a row that has to fold rather than as three words.
   const TRAILED = "crates/sprawling/src/assembly/dispatch/lanes/admission.rs";
@@ -174,24 +143,13 @@ const HIDDEN: usize = 0;
 </script>
 
 <script lang="ts">
-  import Artifact from "../talk/artifact.svelte";
   import Calls from "../talk/calls.svelte";
   import Code from "../parts/code.svelte";
   import Case from "./case.svelte";
 </script>
 
-{#snippet card(artifacts: Artifacts)}
-  <!-- The room the talk page gives the panel: a column at a narrow
-  window and a second column beside the thread once there is width
-  for one. Without it the panel has no height to divide between its
-  two halves and neither half would scroll. -->
-  <div class="flex h-output min-h-0 flex-col @lg/page:flex-row">
-    <Artifact {artifacts} open run={RUN} />
-  </div>
-{/snippet}
-
 {#snippet framed(path: string, text: string)}
-  <!-- The room the panel gives the code view. Stated here so the code
+  <!-- The room the inspector gives the code view. Stated here so the code
   fixtures are measured at a height a person actually meets, rather
   than each growing to the length of whatever file it holds. -->
   <div class="flex h-output flex-col rounded-card border border-edge-panel">
@@ -213,21 +171,6 @@ const HIDDEN: usize = 0;
 
 <Case label="calls · a class of work the fold has no verb for">
   <Calls calls={NO_VERB} run={RUN} turn={turnOf(3, NO_VERB)} onFork={() => undefined} />
-</Case>
-
-<Case label="artifact · a file and what a command printed">
-  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-  {@render card(panel(A_FILE, A_TERMINAL))}
-</Case>
-
-<Case label="artifact · a file this build cannot colour">
-  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-  {@render card(panel(UNKNOWN_KIND, null))}
-</Case>
-
-<Case label="artifact · a run that only ran commands">
-  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-  {@render card(panel(null, A_TERMINAL))}
 </Case>
 
 <Case label="code · line numbers and a trail that wraps">

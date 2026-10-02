@@ -66,7 +66,10 @@ export type GlyphName =
   // What bounds the run in this room: who answers the gate, and the
   // sandbox it is boxed in.
   | "gate"
-  | "sandbox";
+  | "sandbox"
+  // A prompt and its cursor: what a command printed, on the inspector's
+  // tab of a terminal.
+  | "terminal";
 
 // The three paint tiers a mark may take (client-SPEC 4-32). They are
 // named here because `statusLook` below picks one per state and

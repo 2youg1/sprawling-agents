@@ -10,7 +10,7 @@
   // and hands them to that same line; only the rows drawn ask, which the
   // city's `FIRST` cut keeps to a handful.
   import Produced from "../talk/produced.svelte";
-  import { lastCheckpointIn } from "../talk/trace";
+  import { lastCheckpointIn } from "../checkpoints";
   import { ui } from "../../ui";
   import type { RunId } from "../../wire";
 

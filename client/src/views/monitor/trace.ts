@@ -133,7 +133,7 @@ export function traceOf(turns: readonly Turn[]): Trace {
   return { entries, files: [...files.values()].sort((a, b) => b.at - a.at), latest };
 }
 
-function commandOf(call: Call): Entry {
+export function commandOf(call: Call): Entry {
   const asked = call.arguments?.head ?? "";
   const text = Option.match(read(Arm, asked), {
     onNone: () => asked,

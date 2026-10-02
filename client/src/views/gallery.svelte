@@ -39,6 +39,7 @@
   import FirstRun from "./gallery/first_run.svelte";
   import Followed from "./gallery/followed.svelte";
   import Hints from "./gallery/hints.svelte";
+  import Inspected from "./gallery/ins.svelte";
   import Keepers from "./gallery/kept.svelte";
   import RefusedLine from "./gallery/refused_line.svelte";
   import Monitor from "./gallery/monitor.svelte";
@@ -94,6 +95,7 @@
   <Followed />
   <Anchored />
   <Produced />
+  <Inspected />
   <Filed />
   <Screens />
   <Runs />

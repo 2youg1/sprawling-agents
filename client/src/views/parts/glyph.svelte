@@ -41,6 +41,7 @@ import Search from "@lucide/svelte/icons/search";
 import Settings from "@lucide/svelte/icons/settings";
 import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
 import Square from "@lucide/svelte/icons/square";
+import SquareTerminal from "@lucide/svelte/icons/square-terminal";
 import Wrench from "@lucide/svelte/icons/wrench";
 import X from "@lucide/svelte/icons/x";
 
@@ -70,6 +71,7 @@ const DRAWN: Record<GlyphName, Component<{ class?: ClassValue; strokeWidth?: num
   settings: Settings,
   gate: Lock,
   sandbox: Box,
+  terminal: SquareTerminal,
 };
 
 export type GlyphSize = "sm" | "md" | "key";
