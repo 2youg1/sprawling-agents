@@ -20,15 +20,30 @@ use crate::reception::{BindFace, BindVerdict, decide_bind};
 
 use super::config::{ServeConfig, router};
 
-/// A listener already bound, and the face its judgement gave it.
+/// A listener already bound, the address it holds, and the face its
+/// judgement gave it.
 ///
-/// The two travel together because the face is the verdict about this
-/// very address: a face carried apart from its listener could be served
-/// on a socket it was never judged for.
+/// The face travels with the listener because it is the verdict about
+/// this very address: a face carried apart from its listener could be
+/// served on a socket it was never judged for. The address is read once,
+/// at bind, because a city asked to serve on `:0` holds a port only the
+/// listener knows (wire D16).
 #[must_use = "a bound port answers nobody until it is served"]
 pub struct Bound {
     listener: tokio::net::TcpListener,
+    local: SocketAddr,
     face: BindFace,
+}
+
+impl Bound {
+    /// The address the listener holds: the port the operating system
+    /// gave when `bind` was asked for port 0, the one asked for
+    /// otherwise. Every reader that hands the city's address on reads
+    /// this one, never the address `bind` was given.
+    #[must_use]
+    pub fn local_addr(&self) -> SocketAddr {
+        self.local
+    }
 }
 
 /// Judges the bind face, then binds the listener.
@@ -37,7 +52,7 @@ pub struct Bound {
 /// `E_CONFIG_INVALID` from [`decide_bind`], without touching the
 /// network, when an exposed address has no pairing token; the same code
 /// when the operating system refuses the address, most often because
-/// another process holds the port.
+/// another process holds the port, or cannot say which address it gave.
 pub async fn bind(addr: SocketAddr, token_digest: Option<B3Hash>) -> Result<Bound, AxError> {
     // The face that comes back is the whole of what this listener
     // presents and what it demands; it goes into the shell, where every
@@ -46,17 +61,21 @@ pub async fn bind(addr: SocketAddr, token_digest: Option<B3Hash>) -> Result<Boun
         BindVerdict::Serve(face) => face,
         BindVerdict::Refuse(err) => return Err(err),
     };
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|source| {
-            AxError::failure(
-                AxCode::ConfigInvalid,
-                "bind the control surface",
-                format!("{addr}: {source}"),
-            )
-            .with_recovery("choose a free port, or stop the process already holding it")
-        })?;
-    Ok(Bound { listener, face })
+    let unbound = |source: std::io::Error| {
+        AxError::failure(
+            AxCode::ConfigInvalid,
+            "bind the control surface",
+            format!("{addr}: {source}"),
+        )
+        .with_recovery("choose a free port, or stop the process already holding it")
+    };
+    let listener = tokio::net::TcpListener::bind(addr).await.map_err(unbound)?;
+    let local = listener.local_addr().map_err(unbound)?;
+    Ok(Bound {
+        listener,
+        local,
+        face,
+    })
 }
 
 /// Serves on a bound listener until the future is dropped.
@@ -67,7 +86,7 @@ pub async fn bind(addr: SocketAddr, token_digest: Option<B3Hash>) -> Result<Boun
 /// # Errors
 /// Propagates the accept failures the operating system reports.
 pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError> {
-    let Bound { listener, face } = bound;
+    let Bound { listener, face, .. } = bound;
     let app = router(&config, face).into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, app).await.map_err(|source| {
         AxError::failure(

@@ -286,16 +286,6 @@ pub(super) fn serve_city(
         Some(level) => runtime::diagnostics::Diagnostics::new(level, journal.sink()),
         None => runtime::diagnostics::Diagnostics::off(),
     };
-    let console = wanted.then(|| console::Terminal {
-        url: firstrun::local_url(bind),
-        token: token.clone(),
-        // The three facts the banner below prints. `/serving`
-        // reprints them on demand, because the event stream scrolls
-        // them away within seconds of a city getting busy.
-        city: city.display().to_string(),
-        client: client_line.clone(),
-        bind,
-    });
     let (vault, vault_notice) = serving::open_vault();
     // The port and the writer are both taken before a word is printed:
     // a banner saying "running" over a port another process holds was a
@@ -309,13 +299,25 @@ pub(super) fn serve_city(
         vault_notice,
         log,
         journal,
-        console,
         core,
     })) {
         Ok(listening) => listening,
         Err(err) => return report(err),
     };
-    let url = firstrun::local_url(bind);
+    // Read from the listener, not from `bind`: a city asked for port 0
+    // listens on the port the operating system gave (wire D16).
+    let at = listening.local_addr();
+    let url = firstrun::local_url(at);
+    let console = wanted.then(|| console::Terminal {
+        url: url.clone(),
+        token: keyed.code().map(str::to_owned),
+        // The three facts the banner below prints. `/serving`
+        // reprints them on demand, because the event stream scrolls
+        // them away within seconds of a city getting busy.
+        city: city.display().to_string(),
+        client: client_line.clone(),
+        bind: at,
+    });
     print_banner(city, &url, &client_line, &keyed);
     if let Some(level) = floor {
         println!("log: {level}");
@@ -326,10 +328,10 @@ pub(super) fn serve_city(
         println!();
     }
     match open {
-        Open::Browser => firstrun::open_when_ready(bind, url),
+        Open::Browser => firstrun::open_when_ready(at, url),
         Open::Nothing => {}
     }
-    match runtime.block_on(listening.serve()) {
+    match runtime.block_on(listening.serve(console)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => report(err),
     }

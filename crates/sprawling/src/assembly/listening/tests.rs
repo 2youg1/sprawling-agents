@@ -165,7 +165,6 @@ fn serving_at(city_root: &std::path::Path, addr: std::net::SocketAddr) -> super:
         vault_notice: None,
         log: runtime::diagnostics::Diagnostics::off(),
         journal: crate::serving::Journal::new(std::sync::Arc::new(crate::assembly::SystemClock)),
-        console: None,
         core: accounting::person::CorePriority::Normal,
     }
 }

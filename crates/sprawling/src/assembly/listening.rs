@@ -83,7 +83,6 @@ pub struct Listening {
     desk: Arc<CommandDesk>,
     answering: crate::console::Answering,
     worker: std::thread::JoinHandle<()>,
-    console: Option<crate::console::Terminal>,
     outdoors: super::remote_door::Outdoors,
 }
 
@@ -108,7 +107,6 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         vault_notice,
         mut log,
         journal,
-        console,
         core,
     } = serving;
     let city_root = city_root.as_path();
@@ -122,6 +120,10 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // The port first: a serve refused here has opened nothing and
     // written nothing.
     let bound = wire::bind(addr, token_digest).await?;
+    // Every reader past this point is handed the address the listener
+    // holds, which differs from `addr` when `addr` asked for port 0
+    // (`crates/wire/Spec.lean` §8-46, wire D16).
+    let at = bound.local_addr();
     cost.lap(Phase::Bind);
     let cas_root = kernel::layout::CityLayout::new(city_root).cas();
     std::fs::create_dir_all(&cas_root).map_err(|source| {
@@ -290,26 +292,35 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         desk,
         answering,
         worker: worker_thread,
-        console,
-        outdoors: super::remote_door::Outdoors::new(city_root, relay, addr, token),
+        outdoors: super::remote_door::Outdoors::new(city_root, relay, at, token),
     })
 }
 
 impl Listening {
+    /// The address the city's listener holds: the port the operating
+    /// system gave when `serve` was asked for port 0. The banner, the
+    /// console and the browser this process opens all read this one.
+    #[must_use]
+    pub fn local_addr(&self) -> std::net::SocketAddr {
+        self.bound.local_addr()
+    }
+
     /// Answers until the person stops the city, and returns once the
-    /// writer thread has written its handoff and ended.
+    /// writer thread has written its handoff and ended. `console` is the
+    /// terminal this city runs in, when it was asked for one; it is made
+    /// from [`Listening::local_addr`], so it is handed in here rather
+    /// than before the port exists.
     ///
     /// # Errors
     /// Propagates the accept failures the listener reports, and a
     /// signal handler that cannot be installed.
-    pub async fn serve(self) -> Result<(), AxError> {
+    pub async fn serve(self, console: Option<crate::console::Terminal>) -> Result<(), AxError> {
         let Listening {
             bound,
             config,
             desk,
             answering,
             worker,
-            console,
             outdoors,
         } = self;
         // The terminal this city is running in, if it was asked for. It gets
