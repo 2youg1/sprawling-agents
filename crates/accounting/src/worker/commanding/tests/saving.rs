@@ -323,3 +323,40 @@ fn a_stale_card_is_refused_and_rejecting_it_is_not() {
         (1, Vec::<B3Hash>::new())
     );
 }
+
+/// The deciding list: every open card of the city, newest offer first,
+/// each with the moment its line was written, and a withdrawn card gone.
+#[test]
+fn the_city_lists_its_open_cards_newest_first_with_their_offer_time() {
+    let source = "One. Two. Three.\n";
+    let (dir, mut worker) = city(source);
+    let first = offer(&mut worker, 1, source, (0, 4, "Uno."));
+    let taken_back = offer(&mut worker, 2, source, (5, 9, "Deux."));
+    let last = offer(&mut worker, 3, source, (10, 16, "Trois."));
+    worker
+        .record_for(
+            RunId::from_bytes([2; 16]),
+            crate::effect::Line {
+                who: "resident".to_owned(),
+                addr: Address::parse("hall/mayor").unwrap(),
+                kind: EventKind::ProposalWithdrawn,
+                data: Payload::of(&ProposalWithdrawn {
+                    proposal: taken_back,
+                })
+                .unwrap(),
+            },
+        )
+        .unwrap();
+    drop(worker);
+    let wire::Answer::OpenProposals(answer) =
+        crate::views::ask(dir.path(), &wire::Query::OpenProposals).unwrap()
+    else {
+        panic!("the open cards of the city");
+    };
+    let listed: Vec<(Address, B3Hash, bool)> = answer
+        .open
+        .iter()
+        .map(|card| (card.doc.clone(), card.id, card.at.is_some()))
+        .collect();
+    assert_eq!(listed, vec![(notes(), last, true), (notes(), first, true)]);
+}

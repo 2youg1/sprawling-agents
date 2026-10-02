@@ -75,7 +75,7 @@ import crates.wire.spec.Server.Listener
 
 - **wire**：Command 与 Query 的变体数由计数断言钉住，数字只写在 `tests/wire_contract.rs` 里（§16；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本规格 同集变更。
-  **当前 golden**：`9ac9baa18dc90b10b16f1083ebbe607333f0f89f9f5ac0d877c94b77d3ae2c2b`；**WIRE_V ＝ 45**（帧表与查询表的当前内容见 §8 各章）。
+  **当前 golden**：`b354b410efb5f9dd2f15f54b09143a27403a8b2618ce5e18f81cfc8794f403a1`；**WIRE_V ＝ 45**（帧表与查询表的当前内容见 §8 各章）。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`**：一个会话的历史按 run 取。`Query::History` 是城全局的最后一页，按它在客户端过滤，一个较早的会话就不在那一页里；`Query::RunView` 回答「这个 run 在不在、走到哪」，不回答「这个会话是什么」。
@@ -321,6 +321,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D11 | Markdown 在城里读，页面按版本与窗口问它的块 | `crates/wire/spec/Answer/Preview.lean` |
 | D12 | 对话流按文字问块，不按版本，不随增量带块 | `crates/wire/spec/Answer/Preview.lean` |
 | D13 | 外壳读的字段在本版之内增加，各自可缺，各读自账本上写下它的那一行 | `crates/wire/spec/Reading.lean` |
+| D14 | 档位、玻璃与混合档透明度随偏好进城，三者都可缺 | `crates/wire/spec/Preference.lean` |
+| D15 | 全城开着的提案是一问，答文档与提出时刻，不答正文 | `crates/wire/spec/Answer/Proposals.lean` |
 | D16 | `Bound` 在绑定时读下监听器的地址，`local_addr` 只是读出它 | `crates/wire/spec/Server/Listener.lean` |
 | D17 | 冻下的名字在城里读成类型，线上不带摘要 | `crates/wire/spec/Reading.lean` |
 -/

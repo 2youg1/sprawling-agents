@@ -81,6 +81,9 @@ pub struct Views {
     /// The same commits in the order the history announced them, so a
     /// page can list them newest first without walking the ledger.
     pub(super) commit_seqs: std::collections::BTreeMap<kernel::Seq, kernel::GitOid>,
+    /// When each proposal card was offered, for the city-wide list of
+    /// open cards.
+    pub(super) offer_times: super::proposals::OfferTimes,
     /// Which run each successor replaced, folded from `run_started`. A
     /// lineage is walked from here rather than stored per commit, so
     /// the chain is one fact however many commits point into it.
@@ -213,6 +216,7 @@ impl Views {
             assets: Vec::new(),
             commits: std::collections::BTreeMap::new(),
             commit_seqs: std::collections::BTreeMap::new(),
+            offer_times: super::proposals::OfferTimes::default(),
             predecessors: std::collections::BTreeMap::new(),
             last_commit: std::collections::BTreeMap::new(),
             skill_pins: std::collections::BTreeMap::new(),
@@ -297,6 +301,7 @@ impl Views {
         // worker's own copy is shown it.
         self.governance
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
+        self.offer_times.absorb(record)?;
         self.sessions.absorb(record)?;
         crate::plan_view::PlanView::take_back(&self.plans).apply(record);
         self.events = self.events.saturating_add(1);

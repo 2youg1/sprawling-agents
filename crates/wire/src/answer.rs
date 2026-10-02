@@ -83,7 +83,7 @@ pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use model_facts::ModelFactsSummary;
 pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
 pub use preview::PreviewAnswer;
-pub use proposals::{ProposalCard, ProposalsAnswer};
+pub use proposals::{OfferedCard, OpenProposalsAnswer, ProposalCard, ProposalsAnswer};
 pub use range::RangeAnswer;
 pub use release::{ReleaseAnswer, ReleaseLine};
 pub use rounds::{
@@ -226,6 +226,7 @@ pub enum Answer {
     Listing(ListingAnswer),
     Document(Box<DocumentAnswer>),
     Proposals(Box<ProposalsAnswer>),
+    OpenProposals(OpenProposalsAnswer),
     Range(Box<RangeAnswer>),
     Preview(Box<PreviewAnswer>),
     /// A reply's text laid out (`crates/wire/spec/Answer/Preview.lean` §8-75): its closed blocks, and

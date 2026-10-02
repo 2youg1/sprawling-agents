@@ -15,6 +15,13 @@
 ```rust
 // Query（紧接在 Range 之前）
 Proposals(Address),                                   // 这份文档上还没决定的提案 → Answer::Proposals(Box<ProposalsAnswer>)
+OpenProposals,                                        // 全城还开着的提案 → Answer::OpenProposals(OpenProposalsAnswer)
+pub struct OpenProposalsAnswer { pub open: Vec<OfferedCard> }   // 最新提出的在前
+pub struct OfferedCard {
+    pub doc: Address,
+    pub id: B3Hash,
+    pub at: Option<TimeMs>,                           // 写下 proposal_offered 那一行的时刻
+}
 pub struct ProposalsAnswer {
     pub doc: Address,
     pub version: Option<B3Hash>,                      // 文档此刻的版本；缺失或读不了时为 None
@@ -41,6 +48,18 @@ pub struct ProposalDecision { pub proposal: B3Hash, pub verdicts: Vec<kernel::ev
 - **落下的顺序**：有改动时先像 §8-72 一样在文档锁里换上新版本、写一行 `document_written`，再为每一张卡写一行 `proposal_decided`；都带这条命令的 `idem`，所以一次重发由 `commanding::entrance` 认出、不再写第二次。
 - **提出与收回不在线上。** 提案是 run 提出的，收回也是它；人对一张卡只有决定。`proposal_offered` 与 `proposal_withdrawn` 由提出它的 run 经工作台的 `proposal` 工具写下（`crates/accounting/Spec.lean` §8-30，`crates/city/Spec.lean` §8-40 的当前状态）。
 - **`version` 只答一次，卡上只带各自的基线。** 页面比较两者就知道哪张卡已经过期；卡本身不带「过期」这一格，因为过期是此刻的事实，一张卡在账上是什么不随文件而变。
-- **`WIRE_V` 不另进位**：`Proposals`、`DecideProposals` 是新名字（D1）。
-- 验收：accounting 的 `worker::commanding::tests::saving`——整张接受、改后接受、拒绝各落下它该落的字节与行；收回的卡不能再决定；同一个 `idem` 的重发不再写；一张卡被决定之后再决定被拒；重开的城从账本折回同样的卡；基线已动的卡被拒、拒绝它却可以。
+- **全城一问只答名字与时刻。** `OpenProposals` 答每一张还开着的卡在哪份文档上、何时提出，最新的在前；卡的正文与文档此刻的版本仍由 `Proposals(doc)` 按文档答，没人打开的卡不为了被数一遍而切句。见 D15。
+- **`WIRE_V` 不另进位**：`Proposals`、`OpenProposals`、`DecideProposals` 是新名字（D1）。
+- 验收：accounting 的 `worker::commanding::tests::saving`——整张接受、改后接受、拒绝各落下它该落的字节与行；收回的卡不能再决定；同一个 `idem` 的重发不再写；一张卡被决定之后再决定被拒；重开的城从账本折回同样的卡；基线已动的卡被拒、拒绝它却可以；全城一问按最新在前列出开着的卡、各带提出时刻，收回的卡不在其中。
+-/
+
+/-! D15 全城开着的提案是一问，答文档与提出时刻，不答正文
+
+**决定**：`Query::OpenProposals` 不带参数，答 `OpenProposalsAnswer { open: Vec<OfferedCard> }`，每张卡只带 `doc`、`id`、`at`，最新提出的在前。时刻由读面在折叠 `proposal_offered` 那一行时记下（`accounting::views::proposals::OfferTimes`），不进治理折叠：那个折叠也是工作者的，工作者不按时刻做决定。`at` 可缺，只为一张答者没见过其行的卡。
+
+**理由**：页面原先只能按它自己听到的 `proposal_offered` 去问各份文档，于是页面打开之前提出的卡只在打开那份文档时才出现，信箱的「待决」说不全。一问列全城，信箱与它的计数读同一个答案。正文按文档问，因为切句与比对版本要读文件，而计数与列表不需要。
+
+**被否**：①给 `Proposals` 的地址改成可缺——一个参数两种答案形状，页面要按形状分支；②全城一问连正文一起答——每次计数都要为每张卡读文件、切句；③在页面里继续折叠 `proposal_offered`——页面打开之前的卡永远缺。
+
+**重开参数**：开着的卡多到一次答不完（数百张）时，加分页的 `before`。
 -/

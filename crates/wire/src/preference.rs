@@ -93,6 +93,30 @@ pub enum Motion {
     Off,
 }
 
+/// Whether the edge layer's small surfaces are drawn as glass. `On`
+/// still yields to a machine that asks for less transparency, which
+/// only some engines report: that gap is why the switch exists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Glass {
+    On,
+    Off,
+}
+
+/// How much of the world layer the page draws: none of it, whole panels
+/// beside the conversation, or all of it as the workspace with the
+/// conversation as a band along its foot. Three layouts rather than
+/// three points on one slider, so three names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Tier {
+    Zen,
+    Blend,
+    Panorama,
+}
+
 /// The smallest and the largest body size a person may ask for.
 ///
 /// The floor is the smallest size the colour gate holds its contrast
@@ -125,6 +149,16 @@ pub struct Appearance {
     pub density: Density,
     pub chroma: Chroma,
     pub motion: Motion,
+    /// Absent means the person stated no opinion and the page draws
+    /// its own posture.
+    #[serde(default)]
+    pub glass: Option<Glass>,
+    /// The world layer's opacity in the blend tier, in percent. Absent
+    /// means the stylesheet's own is drawn. The domain the slider
+    /// offers is the page's to state, because the page alone draws it;
+    /// a value outside it is read back as absent there.
+    #[serde(default)]
+    pub blend_percent: Option<u32>,
 }
 
 /// One chord the person rebound: the action, and the chord as the
@@ -171,6 +205,11 @@ pub struct PreferencesAnswer {
     pub welcomed: bool,
     /// Whether the panel beside a conversation is open.
     pub panel: bool,
+    /// The tier this person last chose, and nothing when they never
+    /// chose one: the tier a first visit opens in is the page's posture,
+    /// and a stated tier here would overrule it on every machine whose
+    /// owner never pressed the key.
+    pub tier: Option<Tier>,
     pub appearance: Appearance,
     /// Which proxy rule an endpoint attached from now on starts with.
     /// An endpoint already attached keeps the rule the city recorded
@@ -193,6 +232,7 @@ impl Default for PreferencesAnswer {
             lang: None,
             welcomed: false,
             panel: true,
+            tier: None,
             appearance: Appearance::default(),
             proxying: kernel::Proxying::ExceptLocal,
             chords: Vec::new(),
@@ -212,6 +252,8 @@ impl Default for Appearance {
             density: Density::Comfortable,
             chroma: Chroma::Full,
             motion: Motion::System,
+            glass: None,
+            blend_percent: None,
         }
     }
 }
@@ -228,6 +270,7 @@ impl PreferencesAnswer {
             PreferencePatch::Lang(lang) => self.lang = Some(lang),
             PreferencePatch::Welcomed(welcomed) => self.welcomed = welcomed,
             PreferencePatch::Panel(panel) => self.panel = panel,
+            PreferencePatch::Tier(tier) => self.tier = Some(tier),
             PreferencePatch::Appearance(appearance) => self.appearance = appearance,
             PreferencePatch::Proxying(proxying) => self.proxying = proxying,
             // Not a fact of this record: it lives in the file's `[core]`
@@ -263,6 +306,7 @@ pub enum PreferencePatch {
     Lang(Lang),
     Welcomed(bool),
     Panel(bool),
+    Tier(Tier),
     Appearance(Appearance),
     Proxying(kernel::Proxying),
     /// Rebind one action, or return it to the chord this build ships by
@@ -342,6 +386,28 @@ mod tests {
         assert!(held.panel);
         assert_eq!(held.lang, None);
         assert_eq!(held.appearance, Appearance::default());
+    }
+
+    /// A section written before the page's glass, blend opacity and
+    /// tier reached the city still reads, with the three absent: every
+    /// person's file predates them.
+    #[test]
+    fn an_appearance_written_before_glass_and_blend_still_reads() {
+        let held: PreferencesAnswer = serde_json::from_str(
+            r#"{"appearance":{"lighting":"dark","sans":"geist","mono":"geist","sans_stack":"","mono_stack":"","body_px":null,"density":"compact","chroma":"full","motion":"system"}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                held.tier,
+                held.appearance.glass,
+                held.appearance.blend_percent
+            ),
+            (None, None, None)
+        );
+        let mut chosen = held;
+        chosen.apply(PreferencePatch::Tier(Tier::Panorama));
+        assert_eq!(chosen.tier, Some(Tier::Panorama));
     }
 
     /// A key this build does not read is refused where it is written.

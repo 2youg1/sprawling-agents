@@ -4,8 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The proposal cards a city's history holds, open or handled, and the
-//! answer that lists one document's open cards (`crates/accounting/spec/Worker/Commanding/Saving.lean` §8-22,
-//! `crates/wire/Spec.lean` §8-73).
+//! two answers that list them: one document's open cards, and every
+//! open card of the city by document and offer time (`crates/accounting/spec/Worker/Commanding/Saving.lean`
+//! §8-22, `crates/wire/Spec.lean` §8-73).
 //!
 //! Held inside [`super::Governance`], so the worker that judges a
 //! decision and the page that draws a card read one fold: a card is a
@@ -18,7 +19,7 @@ use std::path::Path;
 
 use documents::Offer;
 use kernel::event::record::{ProposalDecided, ProposalOffered, ProposalWithdrawn};
-use kernel::{Address, AxCode, AxError, B3Hash, Payload, RunId};
+use kernel::{Address, AxCode, AxError, B3Hash, EventKind, EventRecord, Payload, RunId, TimeMs};
 
 /// Every card the history offered: the open ones whole, the handled
 /// ones by identity alone.
@@ -122,6 +123,39 @@ impl Proposals {
         found.sort_by_key(|open| open.place);
         found.into_iter().map(|open| open.offer.clone()).collect()
     }
+
+    /// Every open card of the city, the newest offer first.
+    fn newest_first(&self) -> Vec<&Offer> {
+        let mut found: Vec<&Open> = self.open.values().collect();
+        found.sort_by_key(|open| std::cmp::Reverse(open.place));
+        found.into_iter().map(|open| &open.offer).collect()
+    }
+}
+
+/// When each card was offered, by its identity: the time of the
+/// `proposal_offered` line that first named it.
+///
+/// Beside the governance fold rather than inside it, because that fold
+/// is also the worker's, which is shown the lines it writes without
+/// their time and decides nothing by it. Never pruned, the same growth
+/// class as the handled cards [`Proposals`] remembers.
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub(crate) struct OfferTimes(BTreeMap<B3Hash, TimeMs>);
+
+impl OfferTimes {
+    /// Folds one line; only an offer moves this.
+    ///
+    /// # Errors
+    /// An offer this build cannot read, which the governance fold
+    /// refuses for the same line.
+    pub(super) fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
+        if record.kind() != EventKind::ProposalOffered {
+            return Ok(());
+        }
+        let offer = Offer::of(record.run(), &record.data().read::<ProposalOffered>()?)?;
+        self.0.entry(offer.id()).or_insert(record.t());
+        Ok(())
+    }
 }
 
 impl super::Views {
@@ -133,6 +167,25 @@ impl super::Views {
             doc: doc.clone(),
             open: self.governance.proposals.all_open_on(doc),
         }
+    }
+}
+
+impl super::Views {
+    /// Every open card of the city, read under the lock: names and
+    /// moments only, so nothing here touches a file.
+    pub(in crate::views) fn open_proposals_answer(&self) -> wire::OpenProposalsAnswer {
+        let open = self
+            .governance
+            .proposals
+            .newest_first()
+            .into_iter()
+            .map(|offer| wire::OfferedCard {
+                doc: offer.doc().clone(),
+                id: offer.id(),
+                at: self.offer_times.0.get(&offer.id()).copied(),
+            })
+            .collect();
+        wire::OpenProposalsAnswer { open }
     }
 }
 

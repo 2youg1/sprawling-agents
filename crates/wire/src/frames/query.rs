@@ -214,6 +214,9 @@ pub enum Query {
     },
     /// The proposal cards still open on one document (`crates/wire/spec/Answer/Proposals.lean` §8-73).
     Proposals(Address),
+    /// Every proposal card still open in the city, by document and
+    /// offer time (`crates/wire/spec/Answer/Proposals.lean` §8-73).
+    OpenProposals,
     /// One window of a stored version, by its version (`crates/wire/spec/Answer/Range.lean` §8-70).
     Range {
         version: B3Hash,

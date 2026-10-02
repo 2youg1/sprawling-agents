@@ -3,7 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The proposal cards still open on one document (`crates/wire/spec/Answer/Proposals.lean` §8-73).
+//! The proposal cards still open on one document, and every document of
+//! the city that has one (`crates/wire/spec/Answer/Proposals.lean` §8-73).
 //!
 //! The document's version now is answered once, and each card carries
 //! the version it was made on: a page compares the two to say which
@@ -12,7 +13,7 @@
 //! about the history.
 
 use documents::{Slice, Span};
-use kernel::{Address, B3Hash, RunId};
+use kernel::{Address, B3Hash, RunId, TimeMs};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,4 +37,28 @@ pub struct ProposalCard {
     pub baseline: B3Hash,
     pub span: Span,
     pub slices: Vec<Slice>,
+}
+
+/// Every card still open in the city, newest offer first: the list a
+/// person deciding reads before they open any one document.
+///
+/// Names and moments only. A card's sentences and the document's
+/// version are [`ProposalsAnswer`]'s, asked per document, so the diff
+/// of a card nobody looks at is never laid out to be counted.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct OpenProposalsAnswer {
+    pub open: Vec<OfferedCard>,
+}
+
+/// One open card, by the document it is on and the moment it was
+/// offered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct OfferedCard {
+    pub doc: Address,
+    pub id: B3Hash,
+    /// When the `proposal_offered` line was written; absent only for a
+    /// card the answering fold holds without having seen its line.
+    pub at: Option<TimeMs>,
 }

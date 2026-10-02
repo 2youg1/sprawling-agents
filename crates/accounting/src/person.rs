@@ -91,6 +91,7 @@ fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
             PreferencePatch::Lang(_)
             | PreferencePatch::Welcomed(_)
             | PreferencePatch::Panel(_)
+            | PreferencePatch::Tier(_)
             | PreferencePatch::Appearance(_)
             | PreferencePatch::Proxying(_)
             | PreferencePatch::Chord(_) => {

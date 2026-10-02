@@ -30,11 +30,22 @@
 
 | 帧 | 形状 | 为什么是这个形状 |
 |---|---|---|
-| `Query::Preferences` → `PreferencesAnswer` | `lang: Option<Lang>`、welcomed、panel、`Appearance`、`proxying`、改过的和弦；`#[serde(default, deny_unknown_fields)]` | 浏览器曾按行缓存这些：十二个键、三个读取器，各自处理缺省与非法值。整表一扇门，允许值表由本 crate 声明一次并经 schema 传给客户端——**能画出来的选项就是这个 build 装得回的选项** |
+| `Query::Preferences` → `PreferencesAnswer` | `lang: Option<Lang>`、welcomed、panel、`tier: Option<Tier>`（`zen｜blend｜panorama`）、`Appearance`（含 `glass: Option<Glass>` 与 `blend_percent: Option<u32>`）、`proxying`、改过的和弦；`#[serde(default, deny_unknown_fields)]` | 浏览器曾按行缓存这些：十二个键、三个读取器，各自处理缺省与非法值。整表一扇门，允许值表由本 crate 声明一次并经 schema 传给客户端——**能画出来的选项就是这个 build 装得回的选项** |
 | 同上：本类型兼任 `[ui]` 的文法 | `[ui]` 节就是 `PreferencesAnswer` 的序列化；缺席字段取 `PreferencesAnswer::default()`（`panel` 是唯一不同于类型默认的一个：没人关之前它开着）；不认的键即拒 | 文件能写的键与答案能说的字段是**同一份声明**，而不是一边一份的两张表。`lang` 缺席而不是填 `en`：没人选过之前，浏览器自己的语言标是唯一的证据，写死一种语言会在每一台从未打开过该设置的机器上盖掉它 |
-| `Command::PutPreferences { patch, idem }` | `PreferencePatch` 闭集：`lang｜welcomed｜panel｜appearance｜proxying｜chord` | 一帧一件事，不是整表写回：两个屏幕各改一件，不得互相覆盖 |
+| `Command::PutPreferences { patch, idem }` | `PreferencePatch` 闭集：`lang｜welcomed｜panel｜tier｜appearance｜proxying｜chord｜core_priority` | 一帧一件事，不是整表写回：两个屏幕各改一件，不得互相覆盖 |
 | `Query::Config { addr }` → `ConfigAnswer` | `effort: Option<SettledEffort>` ＋ `second: SettledSecond` ＋ `TuningDefaults`；`SettledEffort` 携 `ConfigLayer`（`default｜city｜building｜resident`，后三个与 `city::Layer` 同拼写，`default` 是没有任何一级文件说过、城的内建值在生效）；`SettledSecond` 同携 `ConfigLayer`，`percent` 为已过 `SecondThreshold` 构造点的整百分数，没有一级说过时是 `kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT` 且 `from = default`，`domain: SecondDomain { min, max }` 是 `SecondThreshold` 构造点的合法域（`CTX_REMINDER_SECOND_MIN`／`_MAX`）（§8-47）；`effort` 缺席仍是一句陈述：没有一级说过时回答的是提供方自己的缺省，城说不出那个值；`TuningDefaults` 为 `from: ConfigLayer`（今天恒为 `default`：梯上没有一级文件说得出这几个数，它们是 `gateway::EndpointTuning::DEFAULTS` 的读出；层随值一起答，页面才不必自己断定「这是内建的」）＋ `timeout_ms` ＋ `request_max_retries: Option<u32>`（`Retries::stated`，缺席即 `UntilHalted`）＋ `stream_idle_timeout_ms: Option<u64>`（缺席即与整通调用同界）＋ `proxying` | **层是答案的一半。** 只给解析值的页面说不出这是本层写的还是继承来的，于是要把三层再读一遍自己爬一次梯子——**一把梯子爬两次就是一个问题两个答案**。层名随 `city::Layer`：线上把楼的文件叫 `resident`、把房的文件叫 `room`，而梯子把房的文件叫 `resident`——读者与被治的那次 run 会对“这是哪一份文件”给出不同的答案；一处穷尽匹配（`accounting::views::lines::rung_of`）把两份拼写钉在一起。`TuningDefaults` 是 `gateway::EndpointTuning::DEFAULTS` 的读出，字段形状也随它：重试上限是 `Retries` 而不是一个数（“直到有人按停”没有数字拼得出来），流的那个界是**闲置界而非整答案的截止**，且可缺席 |
 | `Command::PutShelved { shelf, name, text, idem }` | `Shelf { Library, Building(addr) }`；写 `shelved_document_written` | 与 `GovernedDocument` 同一条理由：两处货架都在保留子树里，任何写域都够不着，所以帧里没有路径可拼。`name` 允许子路径，脚本因此留得住自己的文件夹 |
 
 **八、`DialectKind::OpenAiResponses`。** kernel 的兼容格式集由二变三，`gateway::dialect` 的五个入口各多一条臂。登记与调用从此说同一句话：人粘贴 responses URL，`ConnectionKind::Responses` 记住了，而 `wire()` 从前仍答 `OpenAi`——**记对了、调错了**。形状的出处归 `crates/gateway/Spec.lean` §8-20。
+-/
+
+/-! D14 档位、玻璃与混合档透明度随偏好进城，三者都可缺
+
+**决定**：`PreferencesAnswer` 加 `tier: Option<Tier>`，`PreferencePatch` 加 `Tier(Tier)` 一件；`Appearance` 加 `glass: Option<Glass>` 与 `blend_percent: Option<u32>`，两者带 `#[serde(default)]`，随整份外观一起写。三者缺席都是「这个人没说过」：档位缺席时页面开在它自己的首档，玻璃缺席时页面画它自己的姿态，透明度缺席时画样式表自己的值。滑块的取值域只由页面声明（`client/src/core/appearance.ts` 的 `BLEND_PERCENT`），城照存，页面读回时把域外的数读成缺席。`WIRE_V` 不动（D13 同理：新字段可缺；新问题 `OpenProposals` 本身已改动握手哈希）。
+
+**理由**：这三件原先只在一个浏览器里，换一个浏览器或清掉缓存就丢，而人的文件本来就是偏好的权威（§8-39 七）。档位是一件自己的事而不是外观的一格：◐ 键一按就写，单独一件补丁不会把外观整份再送一次。缺席而不是一个本 build 挑的值：与 `lang` 同理，城里写死一个首档会在每一台没按过那个键的机器上盖掉页面的首档，而页面的首档只该有一个家。
+
+**被否**：①把档位放进 `Appearance`——每按一次 ◐ 都要整份外观往返，两个屏幕一个改字体一个切档时后到的会盖掉先到的；②在城里也声明透明度的域——城不画它，也不拒它，两份域只会各自漂开；③给三者写非可缺的默认值——那是首档与玻璃姿态的第二个家。
+
+**重开参数**：城开始按档位或透明度做决定（例如服务端渲染一屏）时，域与默认值搬进本 crate。
 -/

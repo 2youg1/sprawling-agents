@@ -65,8 +65,8 @@ pub use answer::{HunksAnswer, PatchLine, Withheld};
 pub use answer::{IdentityAnswer, StatedIdentity};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
 pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
+pub use answer::{OfferedCard, OpenProposalsAnswer, ProposalCard, ProposalsAnswer};
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
-pub use answer::{ProposalCard, ProposalsAnswer};
 pub use answer::{ReleaseAnswer, ReleaseLine};
 pub use answer::{RoundsAnswer, Timing, Turn};
 pub use answer::{SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
@@ -92,7 +92,9 @@ pub use frames::{Lagged, LogLevel, LogLine, Monitoring, Sample, Watched};
 pub use frames::{QUERY_NAMES, WIRE_V, schema_hash};
 pub use guide::{GuideMark, GuideProgress, GuideState, GuideStep};
 pub use kernel::{FileChange, How, Lines};
-pub use preference::{Appearance, Chord, Chroma, Density, Face, Lang, Lighting, Motion};
+pub use preference::{
+    Appearance, Chord, Chroma, Density, Face, Glass, Lang, Lighting, Motion, Tier,
+};
 pub use preference::{BODY_PX_MAX, BODY_PX_MIN, CorePriority, PreferencePatch, PreferencesAnswer};
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in};
 pub use reading::{text, thought_in, used_in};

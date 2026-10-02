@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 45 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "9ac9baa18dc90b10b16f1083ebbe607333f0f89f9f5ac0d877c94b77d3ae2c2b" as const;
+export const WIRE_HASH = "b354b410efb5f9dd2f15f54b09143a27403a8b2618ce5e18f81cfc8794f403a1" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -2338,6 +2338,30 @@ export const MetricsAnswer = Schema.Struct({
 export type MetricsAnswer = typeof MetricsAnswer.Type;
 
 /**
+ * One open card, by the document it is on and the moment it was
+ * offered.
+ */
+export const OfferedCard = Schema.Struct({
+  at: Schema.optional(Schema.NullOr(TimeMs)),
+  doc: Address,
+  id: B3Hash,
+}).annotate({ identifier: "OfferedCard" });
+export type OfferedCard = typeof OfferedCard.Type;
+
+/**
+ * Every card still open in the city, newest offer first: the list a
+ * person deciding reads before they open any one document.
+ * 
+ * Names and moments only. A card's sentences and the document's
+ * version are [`ProposalsAnswer`]'s, asked per document, so the diff
+ * of a card nobody looks at is never laid out to be counted.
+ */
+export const OpenProposalsAnswer = Schema.Struct({
+  open: Schema.Array(OfferedCard),
+}).annotate({ identifier: "OpenProposalsAnswer" });
+export type OpenProposalsAnswer = typeof OpenProposalsAnswer.Type;
+
+/**
  * Whether colour carries meaning on these pages, or only contrast
  * does.
  */
@@ -2363,6 +2387,14 @@ export const Face = Schema.Union([
 export type Face = typeof Face.Type;
 
 /**
+ * Whether the edge layer's small surfaces are drawn as glass. `On`
+ * still yields to a machine that asks for less transparency, which
+ * only some engines report: that gap is why the switch exists.
+ */
+export const Glass = Schema.Literals(["on", "off"]).annotate({ identifier: "Glass" });
+export type Glass = typeof Glass.Type;
+
+/**
  * Which palette the pages are drawn in. `System` is the absence of an
  * opinion, resolved where the page is drawn rather than in the
  * stylesheet: the light palette is declared once, and a second
@@ -2383,9 +2415,11 @@ export type Motion = typeof Motion.Type;
  * How the pages look.
  */
 export const Appearance = Schema.Struct({
+  blend_percent: Schema.optional(Schema.NullOr(Schema.Int)),
   body_px: Schema.optional(Schema.NullOr(Schema.Int)),
   chroma: Chroma,
   density: Density,
+  glass: Schema.optional(Schema.NullOr(Glass)),
   lighting: Lighting,
   mono: Face,
   mono_stack: Schema.String,
@@ -2415,6 +2449,15 @@ export const Lang = Schema.Literals(["en", "zh"]).annotate({ identifier: "Lang" 
 export type Lang = typeof Lang.Type;
 
 /**
+ * How much of the world layer the page draws: none of it, whole panels
+ * beside the conversation, or all of it as the workspace with the
+ * conversation as a band along its foot. Three layouts rather than
+ * three points on one slider, so three names.
+ */
+export const Tier = Schema.Literals(["zen", "blend", "panorama"]).annotate({ identifier: "Tier" });
+export type Tier = typeof Tier.Type;
+
+/**
  * Everything one person settled about their own copy of the city.
  * 
  * Whole rather than a dozen readings, because that is the record the
@@ -2436,6 +2479,7 @@ export const PreferencesAnswer = Schema.Struct({
   lang: Schema.optional(Schema.NullOr(Lang)),
   panel: Schema.optional(Schema.Boolean),
   proxying: Schema.optional(Proxying),
+  tier: Schema.optional(Schema.NullOr(Tier)),
   welcomed: Schema.optional(Schema.Boolean),
 }).annotate({ identifier: "PreferencesAnswer" });
 export type PreferencesAnswer = typeof PreferencesAnswer.Type;
@@ -3235,6 +3279,9 @@ export const Answer = Schema.Union([
     proposals: ProposalsAnswer,
   }),
   Schema.Struct({
+    open_proposals: OpenProposalsAnswer,
+  }),
+  Schema.Struct({
     range: RangeAnswer,
   }),
   Schema.Struct({
@@ -3451,6 +3498,7 @@ export const Query = Schema.Union([
   Schema.Struct({
     proposals: Address,
   }),
+  Schema.Literal("open_proposals"),
   Schema.Struct({
     range: Schema.Struct({
       range: Span,
@@ -3667,6 +3715,9 @@ export const PreferencePatch = Schema.Union([
   }),
   Schema.Struct({
     panel: Schema.Boolean,
+  }),
+  Schema.Struct({
+    tier: Tier,
   }),
   Schema.Struct({
     appearance: Appearance,
