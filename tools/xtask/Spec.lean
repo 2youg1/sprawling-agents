@@ -209,7 +209,7 @@ pub(crate) struct Violation {
 | `tools/xtask/src/wire_ts/emit.rs` | 一份 JSON Schema 文档怎么变成一份 `wire.ts`（`emit`）：文件抬头与三个常量、`$defs` 按名排序后按依赖拓扑输出（`ordered`、`refs_within`）、一条定义怎么命名与打 brand（`definition`）、以及拒绝长什么样（`Refused`、`refuse`） |
 | `tools/xtask/src/wire_ts/emit/types.rs` | 一个 schema 在 TypeScript 里是什么类型（`denoted`），解码后与编码前两侧（`Side`）：只给递归定义写显式注解用，非递归定义的类型仍由 `typeof X.Type` 推出 |
 | `tools/xtask/src/wire_ts/emit/values.rs` | 一个 schema 怎么变成一个 Effect `Schema` 表达式（`expression`、`typed`、`fields`、`union`、`literals`）与它认得的关键字子集（`KNOWN`）：读 schema 的那一半，与读文档的那一半在 `expression` 处相接 |
-| `tools/xtask/src/wire_ts/tests.rs` | 具名裸 `string` 打上 brand；带 `pattern` 的 `string` 收成 `Schema.pattern`；外标签枚举成 `Union`；依赖先于引用；子集外关键字被点名拒绝；递归类型经 `Schema.suspend` 接上并带两侧的显式类型；真实文档能发出；第一处不同的行被点名 |
+| `tools/xtask/src/wire_ts/tests.rs` | 具名裸 `string` 打上 brand；带 `pattern` 的 `string` 收成 `Schema.isPattern` 检查；外标签枚举成 `Union`；依赖先于引用；子集外关键字被点名拒绝；递归类型经 `Schema.suspend` 接上并带两侧的显式类型；真实文档能发出；第一处不同的行被点名 |
 
 **只认 serde 会产出的那个子集，其余点名拒绝。** 对象（`properties`／`required`／`additionalProperties`）、`string`／`integer`／`number`／`boolean`／`null`、`array`（`items`）与元组（`prefixItems`）、`enum` 字符串表、`const`、`oneOf`／`anyOf`（外标签、内标签、邻标签三种 serde 变体形状都落在这一条上，无需分别特判）、`$ref` 指向 `#/$defs/<名>`、`type: [T, "null"]`、`true`／`false`。`pattern` 译出：`string` 上带 `pattern` 时发 `Schema.String.pipe(Schema.pattern(new RegExp(<模式>, "u")))`，`u` 不是可选的——模式里写着 Unicode 属性（`\p{Cc}`、`\p{White_Space}`），不开 `u` 的引擎把 `\p` 读成字母 `p`。**一条语法由 Rust 那一侧的类型拥有，只有生成器把它带过来，客户端才不必自备第二份**：`client/src/core/address.ts` 曾手抄 `kernel::Address::parse` 的语法，那就是这一条存在的理由。`pattern` 不是字符串则点名拒绝，不静默丢弃。`description`／`format`／`minimum`／`maximum`／`minItems`／`maxItems`／`default` 读而不译（`description` 只在顶层定义处作为 JSDoc 发出）。`default` 是 `#[serde(default)]` 字段的注解：字段可缺省这件事由 `required` 一处表达，`Schema.optional` 已据它发出，所以再读 `default` 会造出第二个权威。其它任何关键字（`allOf`、`not`、`patternProperties`……）一律 `Refused`，报出所在类型的路径与关键字——**一个会猜的生成器就是一个会静默产出错类型的生成器**。具名的裸 `string`／`integer`／`number`／`boolean` 即 newtype，打上 `Schema.brand("<名>")`。
 
@@ -1177,6 +1177,25 @@ pub(super) fn talk_controls_within_register(
 **测试**：`motion::tests` 判 `literal_at` 的正反例（三种函数、`steps(each`、`duration-150`、`hover:duration-[90ms]`、`ease-[`、`duration-panel`、`--transition-duration-short` 各一例）；`color::tests` 判玻璃：今天的样式表两种打光都绿，把 `--glass-opacity` 改成 40% 时浅色那一面红，缺这一行时红；`render::talk::tests` 在手写的 `Drawn` 夹具上判：对话框里的控件、滚动区里的控件、`status` 里的控件都不红，对话地标里一个不在三者之中的按钮红；三簇各两个控件计 6；计数大于登记时红、等于时不红；画廊没有对话页时红。
 
 D20 **曲线、时长与玻璃的下限各有一个机器读者，且读者读的就是层叠用的那个数。** `motion` 拒绝 `theme.css` 之外的时间函数与 Tailwind 的时长字面量，`color` 用 `--glass-opacity` 本身判玻璃的可读性，`render` 用画出来的页数对话页的常驻入口。理由：三条规则写在 client-SPEC 4-43 与 refrain P2、P6、P11、P12 里，若没有读者，第一个赶时间的视图就会写下 `duration-200`、第一次调玻璃的人就会把字调到读不清；而玻璃那一条若另立一个 `--glass-floor` 给门读，层叠用的数与门判的数就是两个可以分开的家。被击败的备选：①只拒 `cubic-bezier(` 等三个函数（路线图的原文）——同一种位移今天有 90、100、120、150、200 ms 五个答案，函数一个都没写；②按类名认对话页的三簇——类名是写下来的，门判的是画出来的页；③在探针里加 `position` 一格再判 `fixed`——那是改 `crates/browser`，与门不能同一个提交，而父链与滚动轴已经说得出同一件事。**重开参数**：`browser::survey` 下一次加读数时，对话页的两条性质迁进去（§8-38 的同一条）；客户端出现第二个产地（例如第二套主题文件），`motion` 的产地从一个文件变成一张表。
+
+/-! ### 8-52 `wire-ts` 发出 Effect 4 的 `Schema`（形状 1 判定）
+
+客户端升到 Effect 4（client-SPEC 12-29），生成器随之改写它发出的表达式；读的 JSON Schema 子集、依赖排序、递归、命名与 brand 的规则都不变，变的只是每个关键字落成哪一种 Effect 4 写法：
+
+| JSON Schema | Effect 4 表达式 |
+|---|---|
+| `oneOf`／`anyOf`（两项且一项是 `null` 除外） | `Schema.Union([a, b, …])` |
+| `enum`／`const`，一个值 | `Schema.Literal("a")` |
+| `enum`，多个值 | `Schema.Literals(["a", "b"])` |
+| `prefixItems` | `Schema.Tuple([a, b])` |
+| `additionalProperties`（有值） | `Schema.Record(Schema.String, v)` |
+| `string` 带 `pattern` | `Schema.String.check(Schema.isPattern(new RegExp(p, "u")))` |
+| 非裸原语的具名定义 | `….annotate({ identifier: "Name" })` |
+| 递归定义的显式类型 | `Schema.Codec<Name, NameEncoded>`，`Schema.suspend` 同注 |
+
+`Schema.optional`、`Schema.NullOr`、`Schema.Array`、`Schema.Struct`、`Schema.brand` 与五个原语的拼法 4.0 未改，照旧发出。
+
+D21 **生成器只发 Effect 4 的写法，不留 3.x 的分支。** 理由：`client/package.json` 只钉一个 `effect` 版本，生成物只有一个读者；发两种写法就是让一个永远不走的分支随门一起维护。被击败的备选：①给 `wire-ts` 加一个版本参数——一个只有一种取值的参数；②生成器只发出值、类型留给手写——那是线的第二个家（本节开头的「手写第二份线」）。重开参数：`effect` 再升一个大版本。
 
 **本节属门禁机具，与产品代码分开提交。**
 -/

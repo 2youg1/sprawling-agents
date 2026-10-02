@@ -84,7 +84,7 @@ fn a_pattern_narrows_the_string_it_is_stated_on() {
     }));
     assert!(
         text.contains(
-            "export const Address = Schema.String.pipe(Schema.pattern(new \
+            "export const Address = Schema.String.check(Schema.isPattern(new \
              RegExp(\"^[^/]+(?:/[^/]+)*$\", \"u\"))).pipe(Schema.brand(\"Address\"));\n"
         ),
         "{text}"
@@ -114,22 +114,22 @@ fn an_externally_tagged_enum_is_a_union_of_literals_and_structs() {
         ],
         }
     }));
-    let expected = "export const Query = Schema.Union(
-  Schema.Literal(\"city_view\", \"metrics\"),
+    let expected = "export const Query = Schema.Union([
+  Schema.Literals([\"city_view\", \"metrics\"]),
   Schema.Literal(\"endpoint_view\"),
   Schema.Struct({
     history: Schema.Struct({
       any: Schema.optional(Schema.Unknown),
       before: Schema.optional(Schema.NullOr(Seq)),
-      data: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+      data: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
       limit: Schema.Int,
       never: Schema.optional(Schema.Never),
-      pair: Schema.optional(Schema.Tuple(Schema.String, Seq)),
+      pair: Schema.optional(Schema.Tuple([Schema.String, Seq])),
       tags: Schema.optional(Schema.Array(Schema.String)),
       token: Schema.optional(Schema.NullOr(Schema.String)),
     }),
   }),
-).annotations({ identifier: \"Query\" });
+]).annotate({ identifier: \"Query\" });
 export type Query = typeof Query.Type;
 ";
     assert!(text.contains(expected), "{text}");
@@ -193,10 +193,10 @@ fn a_type_that_refers_to_itself_is_suspended_and_typed_on_both_sides() {
     }));
     let expected = "export interface Node { readonly id: typeof Id.Type; readonly next?: Node | undefined }
 export interface NodeEncoded { readonly id: typeof Id.Encoded; readonly next?: NodeEncoded | undefined }
-export const Node: Schema.Schema<Node, NodeEncoded> = Schema.Struct({
+export const Node: Schema.Codec<Node, NodeEncoded> = Schema.Struct({
   id: Id,
-  next: Schema.optional(Schema.suspend((): Schema.Schema<Node, NodeEncoded> => Node)),
-}).annotations({ identifier: \"Node\" });
+  next: Schema.optional(Schema.suspend((): Schema.Codec<Node, NodeEncoded> => Node)),
+}).annotate({ identifier: \"Node\" });
 ";
     assert!(text.contains(expected), "{text}");
     assert!(!text.contains("typeof Node.Type"), "{text}");
@@ -230,8 +230,8 @@ fn a_cycle_of_two_suspends_inside_itself_and_its_readers_refer_directly() {
         "export type Block = \"rule\" | { readonly list: readonly Item[] }\n",
         "export type BlockEncoded = \"rule\" | { readonly list: readonly ItemEncoded[] }\n",
         "export interface Item { readonly blocks: readonly Block[] }\n",
-        "list: Schema.Array(Schema.suspend((): Schema.Schema<Item, ItemEncoded> => Item)),",
-        "blocks: Schema.Array(Block),\n}).annotations({ identifier: \"Answer\" });",
+        "list: Schema.Array(Schema.suspend((): Schema.Codec<Item, ItemEncoded> => Item)),",
+        "blocks: Schema.Array(Block),\n}).annotate({ identifier: \"Answer\" });",
         "export type Answer = typeof Answer.Type;",
     ] {
         assert!(text.contains(expected), "{expected}\n---\n{text}");
@@ -263,7 +263,7 @@ fn the_real_wire_comes_out_whole() {
         "put_secret carries a value nothing satisfies"
     );
     assert!(text.contains(
-        "export const NoSecret = Schema.Never.annotations({ identifier: \"NoSecret\" });"
+        "export const NoSecret = Schema.Never.annotate({ identifier: \"NoSecret\" });"
     ));
 }
 
