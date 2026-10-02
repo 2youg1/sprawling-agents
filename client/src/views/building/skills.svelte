@@ -89,7 +89,7 @@
 </script>
 
 <div>
-  <h2 class="mb-base text-heading font-heading">{say($lang, "bld_skills")}</h2>
+  <h2 class="mb-base text-note text-text-faint">{say($lang, "bld_skills")}</h2>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={question} />
   {:else if answer === undefined}

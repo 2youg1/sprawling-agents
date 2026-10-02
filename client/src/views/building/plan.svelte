@@ -11,11 +11,9 @@
   // could not read is stated above the plan rather than swallowed, and
   // what is stuck is stated below it with the line that said so.
   //
-  // The rows are still drawn here rather than by `parts/table.svelte`:
-  // that component gives every column a header, and the three words
-  // this plan would need - the node number, the item, its state - are
-  // not in `lang.json` yet. The move is one edit behind those three
-  // entries.
+  // A row is a disclosure rather than a table row: it opens into what
+  // that node has cost and which runs spent it (`Query::CostOf`,
+  // client-SPEC 4-50), which a sortable table has no place for.
   //
   // The state on the right is `parts/badge.svelte`. It was five
   // hand-drawn paints here, which is the same thing that component is
@@ -31,6 +29,7 @@
   import Badge from "../parts/badge.svelte";
   import type { Weight } from "../parts/glyph";
   import Progress from "../parts/progress.svelte";
+  import NodeCost from "./node_cost.svelte";
 
   interface Props {
     readonly answer: BuildingAnswer;
@@ -39,6 +38,9 @@
   const { answer }: Props = $props();
 
   const lang = ui().lang;
+
+  // The row a hand opened: one node's cost question at a time.
+  let open = $state<string | null>(null);
 
   const STATUS_WORD: Record<RoadmapStatus, Key> = {
     not_started: "status_not_started",
@@ -85,6 +87,7 @@
 </script>
 
 <div>
+  <h2 class="mb-base text-note text-text-faint">{say($lang, "bld_plan")}</h2>
   <!-- Two figures, because either alone misleads (kernel::completion).
        The bar is the leaves, which say how many pieces the plan turned
        out to have; the figure beside it is the weighted share, which
@@ -118,29 +121,36 @@
     </ul>
   {/if}
   {#if answer.plan.length > 0}
-    <div class="overflow-x-auto">
-      <table class="w-full border-collapse text-note">
-        <tbody>
-          {#each answer.plan as row (row.node)}
-            <tr class="border-b border-edge">
-              <td
-                class="w-figure py-snug pr-snug font-mono text-text-faint"
-                style:padding-left={indentOf(row.node)}>{row.node}</td
-              >
-              <td class="py-snug pr-snug {row.status === 'done' ? 'text-text-faint' : 'text-text'}">
+    <ul class="border-t border-edge text-note">
+      {#each answer.plan as row (row.node)}
+        <li class="border-b border-edge">
+          <button
+            type="button"
+            class="-mx-snug grid min-h-control w-[calc(100%+var(--spacing-snug)*2)] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-base rounded-control px-snug py-tight text-left hover:wash"
+            aria-expanded={open === row.node}
+            onclick={() => {
+              open = open === row.node ? null : row.node;
+            }}
+          >
+            <span class="flex min-w-0 items-baseline gap-base" style:padding-left={indentOf(row.node)}>
+              <span class="w-figure shrink-0 figure text-text-faint">{row.node}</span>
+              <span class={row.status === "done" ? "text-text-faint" : "text-text"}>
                 {row.item}
                 {#if row.needs.length > 0}
                   <span class="ml-snug text-text-faint">← {row.needs.join(", ")}</span>
                 {/if}
-              </td>
-              <td class="py-snug whitespace-nowrap text-right">
-                <Badge text={statusWord(row)} weight={weightOf(row)} dot />
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
+              </span>
+            </span>
+            <Badge text={statusWord(row)} weight={weightOf(row)} dot />
+          </button>
+          {#if open === row.node}
+            <div class="pb-base pl-[calc(var(--spacing-figure)+var(--spacing-base))]">
+              <NodeCost building={answer.addr} node={row.node} />
+            </div>
+          {/if}
+        </li>
+      {/each}
+    </ul>
   {:else}
     <p class="text-text-faint">{say($lang, "plan_empty")}</p>
   {/if}

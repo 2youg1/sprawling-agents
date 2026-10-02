@@ -46,6 +46,7 @@
   import Monitor from "./gallery/monitor.svelte";
   import Parts from "./gallery/parts.svelte";
   import Mailbox from "./gallery/mailbox.svelte";
+  import Pga from "./gallery/pga.svelte";
   import Produced from "./gallery/produced.svelte";
   import Runs from "./gallery/runs.svelte";
   import Resulted from "./gallery/resulted.svelte";
@@ -101,6 +102,7 @@
   <Produced />
   <Inspected />
   <Filed />
+  <Pga />
   <Screens />
   <Runs />
   <Shelved />

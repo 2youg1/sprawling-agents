@@ -42,7 +42,7 @@
 </script>
 
 <div>
-  <h2 class="mb-base text-label font-label text-text-quiet">{say($lang, "bld_rooms")}</h2>
+  <h2 class="mb-snug text-note text-text-faint">{say($lang, "bld_rooms")}</h2>
   {#if answer.rooms.length > 0}
     <ul class="text-note">
       {#each answer.rooms as name (name)}
