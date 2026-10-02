@@ -372,7 +372,7 @@ fn refused(subject: String) -> AxError {
 
 fn unreadable(file: &str, err: &std::io::Error) -> AxError {
     AxError::failure(AxCode::StorageFatal, ACTION, format!("{file}: {err}"))
-        .with_recovery("a person has to make the city's reserved subtree readable")
+        .with_recovery("the User has to make the city's reserved subtree readable")
 }
 
 #[cfg(test)]

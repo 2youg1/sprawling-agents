@@ -79,7 +79,7 @@ impl Unasked {
             Unasked::Schedule => "the schedule said it was due",
             Unasked::Arrival(_) => "something arrived from outside",
             Unasked::Knock => "a neighbour signalled this resident",
-            Unasked::Unblocked => "a person answered the approval it was waiting on",
+            Unasked::Unblocked => "the approval it was waiting on was answered",
         }
     }
 

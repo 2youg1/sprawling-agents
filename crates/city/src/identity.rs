@@ -321,14 +321,14 @@ impl Naming {
         let mut out = String::from("## Who works here\n\n");
         if let Some(person) = self.person() {
             out.push_str(&format!(
-                "The person this city works for is called {person}.\n"
+                "The User this city works for is called {person}.\n"
             ));
         }
         if let Some(mayor) = self.mayor() {
             out.push_str(&format!("The Mayor, `{HALL_MAYOR}`, is called {mayor}.\n"));
         }
         if !self.about.is_empty() {
-            out.push_str("\nWhat the person wants every agent here to know:\n\n");
+            out.push_str("\nWhat the User wants every agent here to know:\n\n");
             out.push_str(&self.about);
             out.push('\n');
         }

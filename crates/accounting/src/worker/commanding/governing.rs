@@ -130,7 +130,7 @@ impl RunWorker {
                 )
                 .with_recovery(
                     "a resident answers only as the appointed delegate, and never its own \
-                     action; this one is the person's to answer",
+                     action; this one is the User's to answer",
                 ));
             }
         }

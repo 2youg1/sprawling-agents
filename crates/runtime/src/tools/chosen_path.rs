@@ -99,7 +99,7 @@ pub(crate) fn admit(
         )
         .with_recovery(
             "a building whose rules cannot be read is closed to every other building, because \
-             those rules may say it is confidential; a person has to fix them before anyone \
+             those rules may say it is confidential; the User has to fix them before anyone \
              outside reads there",
         )),
     }
@@ -290,7 +290,7 @@ pub(crate) fn real_location(
             action,
             format!("{subject}: its real location did not resolve ({err})"),
         )
-        .with_recovery("a person has to repair the path or the link on it")
+        .with_recovery("the User has to repair the path or the link on it")
     };
     for existing in written.ancestors() {
         match std::fs::canonicalize(existing) {
@@ -492,7 +492,7 @@ mod tests {
             .with_recovery("fix the file");
         for (verdict, says) in [
             (ReadVerdict::Confidential, "signal a resident"),
-            (ReadVerdict::RulesUnreadable(unread), "a person has to fix"),
+            (ReadVerdict::RulesUnreadable(unread), "the User has to fix"),
         ] {
             let err = admit("vault/room1/notes.md", "read", &|_| verdict.clone()).unwrap_err();
             assert_eq!(err.code(), &AxCode::GateDenied);

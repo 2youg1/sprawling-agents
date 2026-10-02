@@ -47,13 +47,13 @@ pub fn dev_entry() -> CatalogEntry {
                     `crates/<crate>/<crate>-SPEC.md`. Read that SPEC, then the code, then the \
                     tests next to the code - in that order, and before you change any of them. \
                     Where the implementation would differ from the SPEC, the SPEC changes first \
-                    and says why.\n\nThe person chooses what a change must prove before it is \
+                    and says why.\n\nThe User chooses what a change must prove before it is \
                     merged:\n- tested: the asset's own tests ran and passed.\n- contract_kept: \
                     the asset's observable contract did not move.\n- double_validated: the change \
                     holds on held-in and on held-out evidence.\nAnd where it lands: \
                     ordinary work takes the building's own road, while an experiment works in a \
                     tree of its own and nothing in it is merged.\n\nYour next step: say which \
-                    evidence this work needs and why, and wait for the person to dispatch it \
+                    evidence this work needs and why, and wait for the User to dispatch it \
                     with that requirement. Choosing a requirement does not provide the evidence."
             .to_owned(),
         // Text this build holds, not a document on a shelf: there is
@@ -70,8 +70,8 @@ pub fn dev_entry() -> CatalogEntry {
 pub fn catalog_entry(mode: Mode) -> CatalogEntry {
     let (disclosure, expansion) = match mode {
         Mode::Chat => (
-            "chat mode: focus on conversing with the person; answer what they said, in their language",
-            "Reply in the conversation. Start work, plans or dispatches only when the person asks for them.",
+            "chat mode: focus on conversing with the User; answer what they said, in their language",
+            "Reply in the conversation. Start work, plans or dispatches only when the User asks for them.",
         ),
         Mode::Work => (
             "work mode: carry out the task towards the stated goal; report when the goal is met",

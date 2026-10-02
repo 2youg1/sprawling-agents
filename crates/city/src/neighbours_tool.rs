@@ -103,7 +103,7 @@ fn render_building(seen: &Neighbourhood) -> String {
     if here.is_empty() {
         return format!(
             "Nobody else has an address in {}. You are the only place in this building; \
-             ask the person for somebody to work with, or delegate to open a room.\n",
+             ask the User for somebody to work with, or delegate to open a room.\n",
             seen.building().as_str()
         );
     }
@@ -134,7 +134,7 @@ fn render_building(seen: &Neighbourhood) -> String {
 fn render_city(seen: &Neighbourhood) -> String {
     let mut out = String::from(
         "Buildings in this city. Only the one you are in lists who is inside it; work that \
-         crosses to another building goes through the person.\n",
+         crosses to another building goes through the User.\n",
     );
     for building in seen.buildings() {
         out.push_str("- ");

@@ -43,7 +43,7 @@ pub fn command(taint: &TaintSet) -> GateOutcome {
                 ),
             )
             .with_recovery(
-                "run the command from work that did not start outside the city; a person \
+                "run the command from work that did not start outside the city; the User \
                  can hand the same task over as their own",
             ),
         ),

@@ -75,10 +75,10 @@ impl Home {
             Some(root) => Ok(Home::at(root)),
             None => Err(AxError::failure(
                 AxCode::PathNotFound,
-                "find this person's home directory",
+                "find the User's home directory",
                 NO_HOME,
             )
-            .with_recovery("set HOME to the directory this person's files live in")),
+            .with_recovery("set HOME to the directory the User's files live in")),
         }
     }
 

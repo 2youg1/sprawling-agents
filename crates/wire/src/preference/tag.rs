@@ -87,7 +87,7 @@ impl schemars::JsonSchema for Tag {
     fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
         schemars::json_schema!({
             "type": "string",
-            "description": "One word a person files sessions under: one to 24 letters of any \
+            "description": "One word the User files sessions under: one to 24 letters of any \
                 script, digits, `-` or `_`, as `wire::Tag::parse` accepts it.",
             "pattern": TAG_PATTERN,
         })

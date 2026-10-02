@@ -254,7 +254,7 @@ pub fn remedy(one: &Deviation<'_>) -> String {
              scroll inside it. A box that overflows is painted over whatever is next to it"
             .to_owned(),
         Finding::TextCut { .. } => "give the box the room the text needs, let it wrap, or draw \
-             an ellipsis so that a person can see something was held back"
+             an ellipsis so that a reader can see something was held back"
             .to_owned(),
         Finding::UndeclaredPaint { ref nearest, .. } => match nearest.as_ref() {
             Some(near) => format!("write `{}` here", near.token),

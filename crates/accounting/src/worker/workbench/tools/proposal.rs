@@ -184,9 +184,9 @@ impl<L: Ledger> ProposalTool<L> {
             }),
             meta: ToolMeta {
                 name: ToolName::parse(ACTION)?,
-                disclosure: "Suggest a change to a document for the person to decide. `offer` \
+                disclosure: "Suggest a change to a document for the User to decide. `offer` \
                              quotes `old` exactly as the city's copy of the document holds it \
-                             - not your own tree's copy - and suggests `new`; the person sees a \
+                             - not your own tree's copy - and suggests `new`; the User sees a \
                              card and accepts or rejects it sentence by sentence, and nothing in \
                              the document changes until they do. `withdraw` takes back a card \
                              you offered while it is still open."
@@ -261,7 +261,7 @@ impl<L: Ledger> ProposalTool<L> {
             None => {
                 return Err(refused(
                     format!("proposal {id} is not a card this run offered"),
-                    "withdraw only a card your own offer answered with; the person decides \
+                    "withdraw only a card your own offer answered with; the User decides \
                      every other card",
                 ));
             }

@@ -207,7 +207,7 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
     }
     if confidential && usersbrowser.is_some() {
         return Err(contradiction(
-            "a confidential building asks to drive the person's browser".to_owned(),
+            "a confidential building asks to drive the User's browser".to_owned(),
             "set `usersbrowser = false`, or drop `confidential = true`; attaching to that \
              browser reads every login it holds, so the per-building isolation this setting \
              depends on does not survive it",

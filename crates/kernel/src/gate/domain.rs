@@ -70,7 +70,7 @@ pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome {
                     ),
                 )
                 .with_recovery(
-                    "the write limit is chosen when the work is dispatched; ask the person to \
+                    "the write limit is chosen when the work is dispatched; ask the User to \
                      dispatch it again with the full write limit to change existing files",
                 ),
             ),

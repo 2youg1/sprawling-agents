@@ -168,7 +168,7 @@ impl SignalDesk {
                 to.as_str().to_owned(),
             )
             .with_recovery(format!(
-                "signal an address inside {}, or ask the person to carry it across",
+                "signal an address inside {}, or ask the User to carry it across",
                 self.reach.as_str()
             )));
         }

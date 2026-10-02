@@ -21,9 +21,9 @@ use super::building::open_cas;
 /// What the model is told about the person's browser. Two things the
 /// building's own disclosure has no room for: this one needs the person
 /// first, and the sane default is still the other tool.
-pub(super) const PERSON_DISCLOSURE: &str = "drive the browser the person is already using, with their own logins. \
-     The person must allow it first: they start that browser with remote debugging and the \
-     building declares the address. Use `browser` unless the person asked you to look at the \
+pub(super) const PERSON_DISCLOSURE: &str = "drive the browser the User is already using, with their own logins. \
+     The User must allow it first: they start that browser with remote debugging and the \
+     building declares the address. Use `browser` unless the User asked you to look at the \
      page they have open.";
 
 /// Which browser this tool drives, and therefore what its effect is.
@@ -102,7 +102,7 @@ pub(super) fn user_browser_params() -> Result<Payload, AxError> {
         "action": {
             "type": "string",
             "enum": ["open", "snapshot", "act", "screenshot", "measure", "survey", "fetch", "console", "viewport", "close"],
-            "description": "what to do; `survey` judges the whole page against what it declares - alignment, contrast, spacing, colour - and answers one edit per repair; `close` ends this run's attachment and never closes the person's browser",
+            "description": "what to do; `survey` judges the whole page against what it declares - alignment, contrast, spacing, colour - and answers one edit per repair; `close` ends this run's attachment and never closes the User's browser",
         },
         "url": text("for open: the page to open; for fetch: the absolute http(s) address the open page fetches with its own cookies, answered as readable text"),
         "kind": {

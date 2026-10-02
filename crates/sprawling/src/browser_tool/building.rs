@@ -20,7 +20,7 @@ pub(super) const BUILDING_DISCLOSURE: &str = "drive this machine's browser: open
      close. `fetch` runs in the open page, so it carries that page's cookies and keeps its \
      same-origin rules; HTML comes back as readable text, and a redirect is reported rather \
      than followed. The accessibility tree \
-     answers most questions; reach for a screenshot when the question is what a person would \
+     answers most questions; reach for a screenshot when the question is what someone looking at the page would \
      see. A screenshot covers the whole page, a `ref` from the snapshot, or a `clip` rectangle \
      in CSS pixels, and comes back at most 1920 pixels on its longest side; coordinates this \
      tool acts on are always viewport CSS pixels, whatever a picture was scaled to. An element \

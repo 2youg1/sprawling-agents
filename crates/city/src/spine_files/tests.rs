@@ -161,7 +161,7 @@ fn a_session_with_no_goal_is_the_person_and_leaves_no_job_file() {
         );
     }
     assert!(
-        RunBrief::Principal.segment_text().contains("person"),
+        RunBrief::Principal.segment_text().contains("User"),
         "the brief says what to do instead, not that a file is missing"
     );
 }

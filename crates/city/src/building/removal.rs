@@ -77,7 +77,7 @@ pub fn remove(city_root: &Path, addr: &Address) -> Result<Removed, AxError> {
     if addr.as_str() == HALL_BUILDING {
         return refuse(
             "City Hall is the city's own building",
-            "City Hall stays; remove one of the buildings a person raised",
+            "City Hall stays; remove one of the other buildings",
         );
     }
     let from = building.root(city_root);

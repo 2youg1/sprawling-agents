@@ -119,7 +119,7 @@ pub enum RunBrief {
 /// JOB.md" describes the disk and what the agent needs is what to do
 /// instead.
 const PRINCIPAL_BRIEF: &str = "No task file was written for this session. You are working with the \
-     person directly: what to do arrives in the conversation, and you \
+     User directly: what to do arrives in the conversation, and you \
      answer there.\n";
 
 impl RunBrief {

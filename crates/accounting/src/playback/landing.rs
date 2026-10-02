@@ -147,7 +147,7 @@ fn exported(city_root: &Path, file: &Path) -> Result<PathBuf, AxError> {
             parent.display().to_string(),
         )
         .with_recovery(format!(
-            "a person has to make the city's reserved subtree writable ({err})"
+            "the User has to make the city's reserved subtree writable ({err})"
         ))
     })?;
     let resolved = std::fs::canonicalize(parent).map_err(|err| {

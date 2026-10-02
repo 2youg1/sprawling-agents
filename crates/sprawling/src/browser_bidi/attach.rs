@@ -63,11 +63,11 @@ impl BrowserPort for AttachedBrowser {
         let Some(url) = self.url.as_deref() else {
             return Err(AxError::failure(
                 AxCode::BrowserUnavailable,
-                "reach the person's browser",
+                "reach the User's browser",
                 "no address is declared",
             )
             .with_recovery(
-                "the person starts their browser with remote debugging and puts the \
+                "the User starts their browser with remote debugging and puts the \
                  ws:// address it prints on a `usersbrowser` key in RULES.toml",
             ));
         };
@@ -77,7 +77,7 @@ impl BrowserPort for AttachedBrowser {
         let socket = self.socket.as_mut().ok_or_else(|| {
             AxError::failure(
                 AxCode::BrowserUnavailable,
-                "reach the person's browser",
+                "reach the User's browser",
                 "the attachment did not open",
             )
             .with_recovery("check that the browser is still running with remote debugging on")

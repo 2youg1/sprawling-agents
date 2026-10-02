@@ -64,7 +64,7 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
         Ok(Some(said)) => written(&said),
         Ok(None) => {
             eprintln!("this city has no record of writing {oid}");
-            eprintln!("recovery: the commit may be a person's own, or from another city");
+            eprintln!("recovery: the commit may be the User's own, or from another city");
             ExitCode::FAILURE
         }
         Err(err) => report(err),

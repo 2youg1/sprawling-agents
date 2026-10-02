@@ -302,7 +302,7 @@ impl ReadTool {
                         )
                         .with_recovery(
                             "this building's reading room names a skill the city cannot address; \
-                             a person has to fix the shelf",
+                             the User has to fix the shelf",
                         )
                     })?;
                     package::open_document(&self.reader.city_root, &addr, asked)

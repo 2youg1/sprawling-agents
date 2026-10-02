@@ -156,7 +156,7 @@ impl JsonSchema for SessionName {
     fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
         let pattern = session_name_pattern();
         string_schema(
-            "What a person calls one session: one address segment of at most 64 characters, \
+            "What the User calls one session: one address segment of at most 64 characters, \
              with the whitespace at either end trimmed, as `kernel::address::SessionName::parse` \
              accepts it. The city refuses the reserved directory's own name as well.",
             Some(&pattern),

@@ -191,7 +191,7 @@ impl RunWorker {
                     endpoint.models.len()
                 ),
                 Some(why) => format!(
-                    "{} at {} lists no models ({why}); attached on the {} the person named",
+                    "{} at {} lists no models ({why}); attached on the {} the User named",
                     endpoint.name,
                     endpoint.base_url,
                     endpoint.models.len()

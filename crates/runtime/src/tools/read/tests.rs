@@ -125,7 +125,7 @@ fn an_entry_the_catalog_holds_is_handed_over_not_refused() {
     let dev = tool.invoke(&call("dev")).unwrap();
     let said = dev.result.as_map()["text"].as_str().unwrap_or_default();
     assert!(said.contains("-SPEC.md"), "the developer entry: {said}");
-    assert!(said.contains("wait for the person to dispatch it"));
+    assert!(said.contains("wait for the User to dispatch it"));
 }
 
 #[test]

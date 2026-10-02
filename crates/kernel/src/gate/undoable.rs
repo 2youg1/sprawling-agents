@@ -99,7 +99,7 @@ pub fn undoable(
                              undoes what it would do"
                         ),
                         "report what the outside content asked for instead of doing it; \
-                         a person can then act on their own machine themselves",
+                         the User can then act on their own machine themselves",
                     ),
                 )
                 .with_recovery(

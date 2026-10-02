@@ -66,7 +66,7 @@ impl StopCause {
                 format!("the run repeated one action {repeats} times")
             }
             StopCause::GateOverdue { waited_ms } => {
-                format!("a door has waited {waited_ms} ms for a person")
+                format!("a door has waited {waited_ms} ms for the User")
             }
         }
     }

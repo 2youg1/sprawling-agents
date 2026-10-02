@@ -167,7 +167,7 @@ fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
     );
     let asked = provider.bodies().join("\n");
     assert!(
-        asked.contains("working with the person directly"),
+        asked.contains("working with the User directly"),
         "the prefix states the situation: {asked}"
     );
     assert!(

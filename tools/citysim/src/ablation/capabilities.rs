@@ -41,7 +41,7 @@ pub(crate) const CITY_CAPABILITIES: &[Capability] = &[
         cue: "the address it came from rather than what it claims to be",
     },
     Capability {
-        name: "find where the person's decisions arrive",
+        name: "find where the User's decisions arrive",
         cue: "The hall at `hall`",
     },
     Capability {
@@ -109,7 +109,7 @@ pub(crate) const CITY_CAPABILITIES: &[Capability] = &[
         cue: "leave yourself a point to return to",
     },
     Capability {
-        name: "know the recycle bin is the person's way back",
+        name: "know the recycle bin is the User's way back",
         cue: "the person's way back",
     },
     Capability {
@@ -121,7 +121,7 @@ pub(crate) const CITY_CAPABILITIES: &[Capability] = &[
         cue: "a leak surface",
     },
     Capability {
-        name: "tell the person to rotate a credential whose value reached it",
+        name: "tell the User to rotate a credential whose value reached it",
         cue: "rotate it at once",
     },
     Capability {
@@ -145,7 +145,7 @@ pub(crate) const CITY_CAPABILITIES: &[Capability] = &[
         cue: "against a second source",
     },
     Capability {
-        name: "reply in the language and the style the person prefers",
+        name: "reply in the language and the style the User prefers",
         cue: "the language and the style the person prefers",
     },
     Capability {

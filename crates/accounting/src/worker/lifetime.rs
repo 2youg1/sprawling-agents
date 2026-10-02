@@ -309,7 +309,7 @@ impl RunWorker {
         let standing = self.ledger.position();
         let (overview, context, next_step) = match why {
             Closing::Chosen => (
-                "the city was closed by the person running it".to_owned(),
+                "the city was closed by the User running it".to_owned(),
                 "an orderly close, not a crash: nothing was interrupted mid-command".to_owned(),
                 "`sprawling serve` on this directory continues from here".to_owned(),
             ),

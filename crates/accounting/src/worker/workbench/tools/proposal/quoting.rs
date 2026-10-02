@@ -55,7 +55,7 @@ pub(super) fn offered(
             ACTION,
             format!("{}: {err}", asked.path),
         )
-        .with_recovery("a person has to make the file readable")
+        .with_recovery("the User has to make the file readable")
     })?;
     let Reading::Text(encoding) = Reading::of(&bytes) else {
         return Err(refused(

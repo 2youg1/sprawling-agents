@@ -156,7 +156,7 @@ fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
         .expect("the ledger has a last line");
     assert!(last.contains("handoff_written"), "{last}");
     assert!(
-        !last.contains("closed by the person"),
+        !last.contains("closed by the User"),
         "a failure is recorded as a choice: {last}"
     );
     assert!(

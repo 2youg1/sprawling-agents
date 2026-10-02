@@ -68,7 +68,7 @@ fn over_budget(files: u64, bytes: u64) -> AxError {
         ),
     )
     .with_recovery(
-        "run the command with `where: host`, which is the placement a person decides \
+        "run the command with `where: host`, which is the placement the User decides \
          on, or point the room at a smaller directory",
     )
 }

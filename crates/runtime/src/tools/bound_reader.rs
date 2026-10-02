@@ -112,7 +112,7 @@ fn unopened(asked: &str, action: &'static str, err: &std::io::Error) -> AxError 
         return not_there(asked, action);
     }
     AxError::failure(AxCode::StorageFatal, action, format!("{asked}: {err}"))
-        .with_recovery("a person has to make the file readable")
+        .with_recovery("the User has to make the file readable")
 }
 
 /// The bytes one name led to, and where they came from.

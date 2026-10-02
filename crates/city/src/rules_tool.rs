@@ -80,7 +80,7 @@ impl RulesTool {
                 name: ToolName::parse("rules")?,
                 disclosure: format!(
                     "What this building's runs are judged by. No run may change it: every \
-                     call here is refused, and a person edits the {RULES_FILE}."
+                     call here is refused, and the User edits the {RULES_FILE}."
                 ),
                 params: Payload::new(params)?,
                 effect: Effect::Govern,

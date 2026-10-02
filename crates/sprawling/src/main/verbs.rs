@@ -293,7 +293,7 @@ pub(super) const VERBS: &[Row] = &[
                 "runs of the command, or beats of the process",
             ),
         ],
-        says: "measure a served city, a process tree, or a command run n times: lines a person reads on a terminal, JSON lines otherwise",
+        says: "measure a served city, a process tree, or a command run n times: lines for reading on a terminal, JSON lines otherwise",
         effect: Effect::Changes,
         after_dashes: AfterDashes::Command,
     },

@@ -76,7 +76,7 @@ impl DevLoop {
                 "continue a development loop",
                 format!("this loop already took its {LOOKS_MAX} looks"),
             )
-            .with_recovery("start a new loop, or show the page to a person"));
+            .with_recovery("start a new loop, or show the page to the User"));
         }
         self.looks = self.looks.saturating_add(1);
         if observation.complained {
@@ -213,6 +213,6 @@ mod tests {
         }
         let err = loop_.observe(&look("again")).unwrap_err();
         assert_eq!(err.code(), &AxCode::LoopSuspected);
-        assert!(err.recovery().contains("person"));
+        assert!(err.recovery().contains("User"));
     }
 }

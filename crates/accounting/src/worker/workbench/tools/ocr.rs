@@ -142,7 +142,7 @@ impl OcrTool {
             .read_to_end(&mut bytes)
             .map_err(|err| {
                 AxError::failure(AxCode::StorageFatal, ACTION, format!("{asked}: {err}"))
-                    .with_recovery("a person has to make the file readable")
+                    .with_recovery("the User has to make the file readable")
             })?;
         let seen = runtime::png_picture(&bytes)?;
         gateway::Picture::new(seen, bytes)

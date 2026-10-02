@@ -98,7 +98,7 @@ impl SucceedTool {
             meta: ToolMeta {
                 name: ToolName::parse("succeed")?,
                 disclosure: "Replace yourself with a successor at this address when the \
-                             window fills: same tools, same depth, no person asked. Write \
+                             window fills: same tools, same depth, without asking the User. Write \
                              Handoff.md in your room first; the successor starts from it and \
                              from your transcript."
                     .to_owned(),

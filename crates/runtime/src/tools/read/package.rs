@@ -90,7 +90,7 @@ pub(super) fn open_document(
             format!("{asked} is shelved behind a link"),
         )
         .with_recovery(
-            "a person has to put the skill's document itself on the shelf, not a link to it",
+            "the User has to put the skill's document itself on the shelf, not a link to it",
         ));
     }
     Ok(Found::File {

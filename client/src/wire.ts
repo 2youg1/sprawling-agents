@@ -738,7 +738,7 @@ export const Effort = Schema.Literals(["none", "low", "medium", "high", "xhigh",
 export type Effort = typeof Effort.Type;
 
 /**
- * What a person calls one session: one address segment of at most 64 characters, with the whitespace at either end trimmed, as `kernel::address::SessionName::parse` accepts it. The city refuses the reserved directory's own name as well.
+ * What the User calls one session: one address segment of at most 64 characters, with the whitespace at either end trimmed, as `kernel::address::SessionName::parse` accepts it. The city refuses the reserved directory's own name as well.
  */
 export const SessionName = Schema.String.check(Schema.isPattern(new RegExp("^\\p{White_Space}*(?:[^\\p{White_Space}/\\\\:\\p{Cc}.]|[^\\p{White_Space}/\\\\:\\p{Cc}][^/\\\\:\\p{Cc}]{0,62}[^/\\\\:\\p{Cc}.\\p{White_Space}])\\p{White_Space}*$", "u"))).pipe(Schema.brand("SessionName"));
 export type SessionName = typeof SessionName.Type;
@@ -2491,7 +2491,7 @@ export const Lang = Schema.Literals(["en", "zh"]).annotate({ identifier: "Lang" 
 export type Lang = typeof Lang.Type;
 
 /**
- * One word a person files sessions under: one to 24 letters of any script, digits, `-` or `_`, as `wire::Tag::parse` accepts it.
+ * One word the User files sessions under: one to 24 letters of any script, digits, `-` or `_`, as `wire::Tag::parse` accepts it.
  */
 export const Tag = Schema.String.check(Schema.isPattern(new RegExp("^[-_\\p{Alphabetic}\\p{N}]{1,24}$", "u"))).pipe(Schema.brand("Tag"));
 export type Tag = typeof Tag.Type;

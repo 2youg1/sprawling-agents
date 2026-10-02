@@ -126,7 +126,7 @@ impl RunWorker {
         self.start_unasked(
             landing.addr,
             task,
-            format!("answer what arrived from {source}, or say why it needs a person"),
+            format!("answer what arrived from {source}, or say why it needs the User"),
             Unasked::Arrival(arrived_from),
         );
         Ok(())

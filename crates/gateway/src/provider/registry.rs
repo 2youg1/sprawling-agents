@@ -117,7 +117,7 @@ pub fn resolve(shape: DialectHint) -> Result<ConnectionKind, AxError> {
         DialectHint::Unset => Err(AxError::failure(
             AxCode::ConfigInvalid,
             "resolve how an endpoint is connected",
-            "neither the URL nor the person said which shape this endpoint answers in",
+            "neither the URL nor the User said which shape this endpoint answers in",
         )
         .with_recovery(
             "choose the request shape on the endpoint form, or paste the full URL the \

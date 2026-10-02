@@ -146,7 +146,7 @@ impl Triage {
         Landing {
             addr: self.fallback.clone(),
             reflex: Reflex::Notify,
-            because: "no rule matched, so a person reads it".to_owned(),
+            because: "no rule matched, so the User reads it".to_owned(),
         }
     }
 }

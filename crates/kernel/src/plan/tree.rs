@@ -254,7 +254,7 @@ impl PlanTree {
     /// The third part of a refusal: a node the caller may actually take.
     fn somewhere_else(&self) -> String {
         self.ready().first().map_or_else(
-            || "nothing is ready; report to the person rather than picking a node".to_owned(),
+            || "nothing is ready; report to the User rather than picking a node".to_owned(),
             |id| format!("claim {id}, which is ready"),
         )
     }

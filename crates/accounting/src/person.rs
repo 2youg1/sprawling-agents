@@ -163,7 +163,7 @@ fn document(file: &Path) -> Result<toml::Table, AxError> {
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(toml::Table::new()),
         Err(err) => Err(AxError::failure(
             AxCode::StorageFatal,
-            "read this person's preferences",
+            "read the User's preferences",
             format!("{}: {err}", file.display()),
         )
         .with_recovery(
@@ -196,7 +196,7 @@ fn rendered(settled: &PreferencesAnswer, file: &Path) -> Result<toml::Value, AxE
 fn invalid(file: &Path, why: &impl std::fmt::Display) -> AxError {
     AxError::failure(
         AxCode::ConfigInvalid,
-        "read this person's preferences",
+        "read the User's preferences",
         format!("{}: {why}", file.display()),
     )
     .with_recovery(

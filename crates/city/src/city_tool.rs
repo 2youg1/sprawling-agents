@@ -89,7 +89,7 @@ impl CityTool {
                 name: ToolName::parse("city")?,
                 disclosure: "This city's buildings: list them, raise a new one, or adopt a \
                              directory that is already here. Every call here is refused — \
-                             the shape of the city is the person's decision, taken outside \
+                             the shape of the city is the User's decision, taken outside \
                              a run."
                     .to_owned(),
                 params: Payload::new(params)?,

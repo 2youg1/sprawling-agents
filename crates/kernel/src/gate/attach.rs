@@ -44,20 +44,20 @@ pub fn attach(endpoint: Option<&EgressTarget>) -> GateOutcome {
             question: Box::new(
                 AxError::refusal(
                     AxCode::ApprovalPending,
-                    "attach to the person's browser",
+                    "attach to the User's browser",
                     "no browser address is declared",
                     GateRefusal::new(
-                        "a run drives the person's browser only where the person has told \
+                        "a run drives the User's browser only where the User has told \
                          it to listen",
                         "this building enabled `usersbrowser` and declared no address",
-                        "ask the person for the address their browser is listening on, and \
+                        "ask the User for the address their browser is listening on, and \
                          have them put it on a `usersbrowser` key in RULES.toml",
                     ),
                 )
                 .with_recovery(
                     "start the browser with remote debugging, copy the ws://127.0.0.1:<port>/session \
                      address it prints, and add `usersbrowser = \"<that address>\"` to the building's \
-                     RULES.toml; the next dispatch picks it up. Only the person can do this, \
+                     RULES.toml; the next dispatch picks it up. Only the User can do this, \
                      because it is their logins the attachment reaches",
                 ),
             ),
@@ -67,7 +67,7 @@ pub fn attach(endpoint: Option<&EgressTarget>) -> GateOutcome {
             refusal: Box::new(
                 AxError::refusal(
                     AxCode::GateDenied,
-                    "attach to the person's browser",
+                    "attach to the User's browser",
                     subject_of(other),
                     GateRefusal::new(
                         "a browser attachment stays on this machine",

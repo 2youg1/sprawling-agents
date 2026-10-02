@@ -74,7 +74,7 @@ fn shelf_path(raw: &str, home: &Path) -> Result<PathBuf, AxError> {
             format!("`{raw}` in `{SHELVES_KEY}` {because}"),
         )
         .with_recovery(
-            "write a directory as an absolute path, or as `~/...` under this person's \
+            "write a directory as an absolute path, or as `~/...` under the User's \
              home directory",
         )
     };
