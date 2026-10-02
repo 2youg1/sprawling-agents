@@ -189,7 +189,7 @@ A local server can also be named before the city starts: with `SPRAWLING_MODEL_U
 
 ## 4 Talk to the Mayor
 
-**the Mayor**, first in the rail on the left, is the conversation with `hall/mayor`, and the page the city opens on once a model is chosen. Enter sends a message; Shift+Enter starts a new line.
+**the Mayor** is the conversation with `hall/mayor`, and the page the city opens on once a model is chosen. Enter sends a message; Shift+Enter starts a new line.
 
 Under the box, four pills say how the message runs, and a click changes each:
 
@@ -218,7 +218,7 @@ A run has its own page, with seven lenses: **time** (where the time went, turn b
 
 ## 6 Answer what residents ask
 
-**waiting on you**, in the rail when anything is waiting, holds every design question a resident asked that nothing can move without. Identical questions are grouped into one card, and **allow** or **deny** answers the whole group; what was blocked is dispatched again with your answer settled. A question that began with content from outside the city — a web page, a tool result — is marked **outside content** and never grouped, so you answer it knowing where it came from.
+**waiting on you**, behind the mailbox key at the foot of the page's first column, holds every design question a resident asked that nothing can move without. Identical questions are grouped into one card, and **allow** or **deny** answers the whole group; what was blocked is dispatched again with your answer settled. A question that began with content from outside the city — a web page, a tool result — is marked **outside content** and never grouped, so you answer it knowing where it came from.
 
 **settings** → **run** → **approvals** chooses who answers: **me**, or **the clerk**, whose decisions are listed under **answered for you**.
 
@@ -269,7 +269,7 @@ A line that begins with `/` is a command, and the menu above the box lists them:
 | `/model <id>`, `/effort <level>` | point `main` at another model; set the effort |
 | `/diff`, `/go <page>`, `/mcp`, `/doctor`, `/help` | open changes, a page, the MCP page, the machine check, the list |
 
-**everything** in the rail, or Ctrl+K (⌘K on a Mac), offers every command with every page, building and room beside it. The keys that ship: Ctrl+1 to Ctrl+6 for the Mayor, city, MCP, the record, cost and the registry; Ctrl+, for settings; Ctrl+Shift+A for **waiting on you**; Ctrl+B to fold the rail; Ctrl+. to stop the run in front of you, which on a page with no run going stops nothing and names `/halt --all`, the verb that stops the whole city; `/` to focus the box and `?` for the key list, outside a text box; `f` to fork from the entry under the pointer. **settings** → **keybindings** changes any of them.
+Ctrl+K (⌘K on a Mac) offers every command with every page, building and room beside it. The keys that ship: Ctrl+1 to Ctrl+6 for the Mayor, city, MCP, the record, cost and the registry; Ctrl+, for settings; Ctrl+Shift+A for **waiting on you**; Ctrl+B for the mailbox; `\` outside a text box to change how much of the city the page draws; Ctrl+. to stop the run in front of you, which on a page with no run going stops nothing and names `/halt --all`, the verb that stops the whole city; `/` to focus the box and `?` for the key list, outside a text box; `f` to fork from the entry under the pointer. **settings** → **keybindings** changes any of them.
 
 ## Sessions
 

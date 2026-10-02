@@ -481,6 +481,7 @@ rather than a component tree. The client speaks only the WebSocket protocol in
   appears only on a disabled control. (xtask/src/color.rs:37)
 - The cost page tells an unpriced city from an idle one. (crates/memory/src/attribution/report.rs:68)
 - A timeout's heading names the question the page asked. (client/src/views/parts/combobox.svelte:48)
+<!-- lexicon-ok: a released entry names the shell of its own version -->
 - A narrow screen keeps the risk readings, the palette and the rail in bounds. (client/src/views/palette.svelte:96)
 - The Mayor is 市长 on a Chinese screen; an empty list says where its contents
   come from; an idle building can still be halted. (client/src/lang.json:287)

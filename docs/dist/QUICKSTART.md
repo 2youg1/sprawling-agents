@@ -25,9 +25,9 @@ This program schedules agents, records what they do, and shows it to you. **It d
 
 1. **connect a provider**, on the welcome page, opens **settings** → **accounts and providers**. Fill in the provider's `base_url`, which face it answers in (`wire_api`), and the key, then **list models** and **attach**. The key goes straight into your operating system's credential service; the page only ever shows a `secret:realm/name` reference afterwards. With a subscription, choose **with a subscription** instead.
 2. Under **which model thinks**, choose the model for **main · thinks**. **digest · reads**, which reads long documents on `main`'s behalf, follows it until you choose another.
-3. **the Mayor**, at the top of the rail, is the conversation with the city's planner. Write what you want done and press Enter. The Mayor plans the work, raises the buildings it needs, and hands each one its part.
+3. **the Mayor**, the page the city opens on, is the conversation with the city's planner. Write what you want done and press Enter. The Mayor plans the work, raises the buildings it needs, and hands each one its part.
 
-Then **city** shows the buildings working, a count in the rail says how many questions wait for you, and **cost** is what it spent. A line that begins with `/` is a command: `/help` lists them.
+Then **city** shows the buildings working, a count on the mailbox key says how many questions wait for you, and **cost** is what it spent. A line that begins with `/` is a command: `/help` lists them.
 
 ## Where your data is
 

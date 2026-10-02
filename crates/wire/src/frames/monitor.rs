@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub enum Monitoring {
     /// Watch the whole monitor page.
     Watch,
-    /// Watch only the fact bar's summary, which reads this process alone.
+    /// Watch only the one-line summary beside the settings tree's performance entry, which reads this process alone.
     WatchSummary,
     Release,
 }
