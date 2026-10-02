@@ -152,12 +152,12 @@
       <li class="-mx-snug flex h-control items-center gap-snug rounded-card px-snug hover:wash">
         <a
           href={toFragment({ kind: "talk", address: row.room })}
-          class="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_var(--spacing-figure)] items-center gap-x-base rounded-control focus-visible:wash"
+          class="grid min-w-0 flex-1 grid-cols-[minmax(10ch,1fr)_minmax(0,auto)_var(--spacing-figure)] items-center gap-x-base rounded-control whitespace-nowrap focus-visible:wash"
           data-entry
           onclick={onLeave}
         >
           <span class="min-w-0 truncate">{row.room}</span>
-          <span class="text-note text-text-faint">
+          <span class="truncate text-note text-text-faint">
             {say($lang, startOf(row.line))} · {fill(say($lang, "mailbox_runs"), { n: String(row.line.runs) })}
           </span>
           <span class="figure text-right text-note text-text-faint">{ago($lang, row.line.at, u.now())}</span>

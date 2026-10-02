@@ -280,17 +280,13 @@
         return;
       }
       case "fork.here":
-        // The entry under the hand is one page's own fact, so this
-        // chord is answered where the entries are: the thread's own
-        // window handler branches from it (`talk/thread.svelte`), and
-        // the shell holds nothing to branch from.
-        return;
       case "decide.yes":
       case "decide.edit":
       case "decide.no":
-        // An answer belongs to the card that holds the focus, which hears
-        // the press first (`views/parts/decide.svelte`); the shell has no
-        // card to answer.
+        // Each is answered where its subject is - the entry under the hand
+        // by the thread (`talk/thread.svelte`), an answer by the decide
+        // card holding the focus (`parts/decide.svelte`) - and the shell
+        // holds neither.
         return;
     }
   }
