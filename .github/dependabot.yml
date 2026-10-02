@@ -90,6 +90,16 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "idna_adapter"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # The workspace names tokio-tungstenite at axum's version so the
+      # lockfile holds one WebSocket protocol (root Cargo.toml). The axum
+      # group cannot hold it there: when axum has no newer release, the
+      # group's pull request bumps tokio-tungstenite alone and adds a second
+      # copy (it did for 0.30). Both move by hand with the axum release that
+      # carries the new protocol.
+      - dependency-name: "tokio-tungstenite"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "tungstenite"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       wasmtime:
         patterns: ["wasmtime", "wasmtime-*", "cap-std", "cap-fs-ext"]
