@@ -27,6 +27,7 @@
     "@lezer/rust": "1.0.3",
     "@lezer/yaml": "1.0.4",
     "@lucide/svelte": "1.49.0",
+    "@noble/post-quantum": "0.7.1",
     "docx-preview": "0.4.1",
     "effect": "4.0.0",
     "pdfjs-dist": "6.3.289",
