@@ -14,17 +14,11 @@
 // as zero.
 
 import type { Turn } from "../../wire";
+import { ttftOf } from "../talk/timing";
 
 export interface Speed {
   readonly ttft: number;
   readonly turns: number;
-}
-
-// The time to first content of one turn, in milliseconds, as the wire
-// defines it: `first_at` less `t`.
-function ttftOf(turn: Turn): number | null {
-  const first = turn.first_at;
-  return turn.timing === "measured" && first !== undefined && first !== null && first >= turn.t ? first - turn.t : null;
 }
 
 export function speedOf(turns: readonly Turn[]): Speed | null {
