@@ -52,3 +52,27 @@ pub enum SessionStart {
 
 **重开参数**：页面要浏览一个房间全部的段（不只是最近）时，加 `before` 游标；房间数或 session 数大到这张表在视图快照里成为可见的一段解码时间时，改成按地址的索引。
 -/
+
+/-! D27 一段 session 带出显示名、模型、思考强度、工作区与最后一条回复；改名与改运行策略各是一帧命令
+
+**决定**：`SessionLine` 多五件，全是 `#[serde(default)]`：
+
+```rust
+pub struct SessionLine {
+    // …既有字段…
+    pub name: Option<String>,        // 最后一行 `session_named` 的名字（kernel D22）；缺席即显示地址
+    pub model: Option<String>,       // 这一段最后一次 run 的 `model_called.model`
+    pub effort: Option<Effort>,      // 这一段最后一次 run 的 `run_started.effort`
+    pub workspace: Option<String>,   // 这一段最后一次 run 被借给的工作树的名字（`worktree_opened`）
+    pub preview: Option<String>,     // 最后一条回复的正文开头，至多 SESSION_PREVIEW_MAX 个字符，裁剪由页面按宽度再做
+}
+```
+
+命令面多两帧，都是 `Reach::client`、`VerbClass::Act`：`Command::NameSession { room: Address, began: Seq, name: String, idem }` 写 `session_named`；`Command::ChangeRunPolicy { room: Address, policy: kernel::RunPolicy, idem }` 写 `run_policy_changed`（kernel D21），正在跑的 run 在下一个安全点生效。标签不加帧：它们照旧经 `PutPreferences` 的 `tags`（D21）；没有标签时页面按 `workspace` 给一个默认标签。两帧与上面的五件随 V0.0.9 的那一次 `WIRE_V` 进位（D22）；`Command` 的 `inductive` 由实现它们的变更集同时加臂（`specalign` 逐臂对账），`client/src/wire.ts` 与 `xtask wiring` 的可达表同改。
+
+**理由**：检阅页要每行说出模型、思考强度与工作区，预览要最后一条回复（roadmap A28）；这些都在视图已经折叠的那张按地址的表能读到的行里，所以作答仍在锁内、不读盘。`preview` 设上限，是因为一条回复可以很长，而这一答一次带至多 `SESSIONS_MAX` 段。
+
+**被否**：①页面为每段再问一次 `Rounds` 拼出这几件：一屏几十次往返；②`preview` 带整条回复：答复的大小随回复长度无界。
+
+**重开参数**：页面要一段里多个模型的历史时（会话中不换模型，今天只有一个），`model` 改成表。
+-/

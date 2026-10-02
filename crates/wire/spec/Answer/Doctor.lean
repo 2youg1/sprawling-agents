@@ -93,3 +93,45 @@ pub enum DoctorUnread { WithToolchain, ManyBrands, MatchesBrowser, ThisProject, 
 - **`pinned` 是版本号本身**，已从仓库的文件里读好；没有钉子的项为 `None`。
 - 城那一侧从哪里读、怎么记住读数，见 `crates/sprawling/Spec.lean` §8-120。
 -/
+
+/-! D25 依赖项页逐行已够；城目录前的扫描上页面，是 `DoctorAnswer` 的一件
+
+**决定**：A9（依赖项检查后不列出装了什么）不改线：`DoctorItem` 已经逐行带 `state`（含版本或缺席的原因）与 `install`，缺口在页面没有画它们，由客户端补。doctor 的扫描（`crates/sprawling/spec/Doctor.lean` §8-166 之一）上页面：`DoctorAnswer` 多一件 `scanning: DoctorScanning`，与 `bin::doctor::scanning::Scanning` 同形：
+
+```rust
+pub enum DoctorScanning { DoesNotApply, Stopped, Read { city: String, drive: DoctorDrive, exclusion: DoctorExclusion } }
+pub enum DoctorDrive { Trusted, Untrusted { volume: String }, Not { volume: String, file_system: String }, Untold { why: DoctorUntold } }
+pub enum DoctorExclusion { Inside { under: String }, Outside, Untold { why: DoctorUntold } }
+pub enum DoctorUntold { NoDisk, AdminOnly, Unread { command: String }, Failed { command: String, code: Option<i32> },
+                        Unstarted { command: String }, Unanswered { command: String, stopping: Option<String> } }
+```
+
+读法照 §8-166 之一：Windows 上读 Defender 的实时扫描与城目录所在的盘，macOS 与 Linux 答 `DoesNotApply`（这两个平台没有在每次写入前同步扫描的系统组件）；读数只是建议，不拦开城。读它的时刻与其余 doctor 行相同：`Query::Doctor` 作答时与 `Command::DoctorRefresh` 之后。`WIRE_V` 随 V0.0.9 的那一次进位（`crates/wire/Spec.lean` D22）。
+
+**理由**：扫描的读数今天只在终端里，人在页面上看不到「这座城在一块被实时扫描的盘上」（roadmap §7 第 3 条，已并进 CON-DOC）。线上的类型与 `bin::doctor::scanning` 逐臂同形，因为页面要说的正是终端说的那几种情形；路径与命令以已渲染的串上线，`&'static str` 与 `PathBuf` 不是线上的类型。
+
+**被否**：另开一个 `Query::Scanning`：同一次 doctor 读两次，答复的时刻也不同。
+
+**重开参数**：macOS 或 Linux 上出现一个会拖慢小写入的常驻扫描器并且读得到时，`DoesNotApply` 换成真读数。
+-/
+
+/-! D26 沙箱臂按机制族命名，每个名字在三个平台上都有可填的臂
+
+**决定**：设置与线上用来选沙箱臂的名字是一个闭集 `SandboxArm { None, CopiedTree, Native, Container, Python }`，线上拼作 `none｜copied_tree｜native｜container｜python`；`CONFIG.toml` 的键是 `[sandbox] arm = "<名字>"`，缺省由 SB1 按平台定，在 SB0 的表交给 User 之前缺省维持今天的行为。各名字在三个平台上的臂：
+
+| 名字 | Windows | macOS | Linux |
+|---|---|---|---|
+| `none` | 宿主机本身 | 宿主机本身 | 宿主机本身 |
+| `copied_tree` | 复制工作树 | 复制工作树 | 复制工作树 |
+| `native` | Job Object（与 SB0 选出的不要管理员权限的机制，如 AppContainer） | Seatbelt 配置 | 命名空间包装程序（今天的臂），或 Landlock 加 seccomp |
+| `container` | Docker／Podman Desktop | Docker／Podman Desktop | rootless Podman／Docker |
+| `python` | wasip1 里的 Python | wasip1 里的 Python | wasip1 里的 Python |
+
+`DoctorSandboxArm` 的 `LinuxNamespaces` 与 `WindowsJobObject` 是 `native` 在两个平台上的具体机制，留作「一台电脑上的 `native` 是什么」的说明；它们不是人选择的名字。每个臂照旧用五条保证（文件、网络、进程树、用户、资源）说明自己守住几条。
+
+**理由**：D94 要求不为一个平台选一个另外两个平台没有对应物的接口形状；按平台命名的臂（`linux_namespaces`）在另外两个平台上无从填写，于是设置里的那个控件在两个平台上是空的。按机制族命名，每个名字在三个平台上都有一个臂，平台之间的差别落在五条保证的说明里，而不是名字是否存在。默认臂与可选臂等 SB0 的表交给 User 再定，这里只定名字，后来的选择是一个配置值。
+
+**被否**：①沿用 `LinuxNamespaces｜WindowsJobObject｜CopiedTree` 作选择名：两个名字各只在一个平台上有意义；②按产品命名（`docker`、`appcontainer`）：换一个实现就要改名，且产品名与机制不是一一对应。
+
+**重开参数**：SB0 的调研发现一个机制族在某个平台上没有任何可用的臂时，那个名字在那个平台上答 `Unavailable` 并说明缺什么，不删名字。
+-/

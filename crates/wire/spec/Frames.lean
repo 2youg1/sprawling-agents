@@ -289,3 +289,14 @@ theorem no_reshaping_keeps_the_number (v : Nat) (commits : List Bool)
     rw [step (fun c member => unchanged c (List.mem_cons_of_mem _ member))]
 
 end Wire.Frames
+
+/-! D22 V0.0.9 的线上改形一次进位，由一个变更集落地
+
+**决定**：V0.0.9 的全部线上改形——`Call`／`Used` 的微秒耗时（D28）、`SessionLine` 的五件与 `NameSession`、`ChangeRunPolicy` 两帧（D27）、`HarnessLine.state`（D23）、`ReleaseAnswer` 的注册表与更新命令（D24）、`DoctorAnswer.scanning`（D25）、沙箱臂名（D26）、skill 与 MCP 的三个查询（D28）、`theme` 偏好（D29）——在同一个变更集里落地，`WIRE_V` 按 D1 只进一位；同一个变更集重生 schema golden、`client/src/wire.ts`（`cargo xtask wire-ts`）、docnum，并改 `tools/adversary/` 的 Door 与 Regression。之后的车道不再改线；确有一处必须改时，由整合者在合并时重生上面这几样，`WIRE_V` 在两次推送之间仍至多进一位。
+
+**理由**：升版的代价是 `wire.ts` 重生与客户端同改，与改动的数量无关（§8-39），分十次就付十次，而且十条车道同时改帧表会在合并时十次冲突。先把形状写定、再一次实现，是 V0.0.9 的执行规则（接口先定）。
+
+**被否**：每个功能车道各自改自己的帧：帧表、golden 与 `wire.ts` 是共享的热点文件，每次合并都要重生，`WIRE_V` 还会在一次推送里进好几位。
+
+**重开参数**：本版之后的下一版若只有一两处线上改动，按 D1 照常各自进位即可，不必再集中。
+-/

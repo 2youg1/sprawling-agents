@@ -44,3 +44,23 @@ pub enum Query { /* … */ NewestRelease }   // 线上拼作 "newest_release"
 - **`WIRE_V` 不动**：变体名进 `QUERY_NAMES`，名字一变 §8-1 的 golden 就变，旧页面在握手时被拒，而不是发出一条城不认识的查询；`WIRE_V` 只为「名字没换而语法换形」而升（D1），改名不属于那一类。新名字登记在 `docs/glossary.md` §6；旧拼法不进 `tools/xtask/lexicon.toml`，因为已发布版本的 `CHANGELOG.md` 如实记着它当时的名字，子串禁令会误伤那段历史。
 - **被否：保留 `release` 作别名**。一条查询两个拼法，就是同一个名字有两个家；握手已经把旧页面挡在门外，别名没有读者。
 -/
+
+/-! D24 更新检查同时问 npm 与 crates.io，按这份二进制的安装方式给出更新命令
+
+**决定**：`ReleaseAnswer::Stands` 与 `Unreleased` 的 `newest` 换成 `registries: Vec<RegistryLine>`，并多一件 `update: UpdateHint`：
+
+```rust
+pub struct RegistryLine { pub registry: Registry, pub newest: Result<ReleaseLine, AxError> }
+pub enum Registry { Npm, CratesIo }
+pub enum InstallChannel { Npm, Cargo, Archive, Source }
+pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String> }
+```
+
+安装方式从这份二进制自己的路径判：落在 npm 的全局包目录（经 `bunx`／`npx` 解出的缓存也算）是 `Npm`，命令 `npm install -g sprawling@latest`；落在 cargo 的 bin 目录（`$CARGO_HOME/bin`，缺省 `~/.cargo/bin`，Windows 上是 `%USERPROFILE%\.cargo\bin`）是 `Cargo`，命令 `cargo install sprawling --locked`；带着发行归档的兄弟文件（`skills/` 与物料清单）是 `Archive`，命令是 `sprawling install` 的那一行；都不是则 `Source`，`command` 为 `None`。三个平台用同一套规则，只有路径的展开不同。仍然只在人按下时问（§8-36 口径 1），仍然什么都不更新（口径 5）；口径 2「问 npm、不问 GitHub」扩成「问 npm 与 crates.io、不问 GitHub」。
+
+**理由**：页面只去 npm 查，而 crates.io 上也有发布（roadmap A10）；用 cargo 装的人照 npm 的命令更新，会装出第二份二进制。两边各自可能读不到，所以每个注册表各带自己的结果。
+
+**被否**：①只问与安装方式对应的那一个注册表：源码构建的人看不到任何一边的最新版；②让页面按路径猜命令：一条领域规则抄进另一门语言。
+
+**重开参数**：出现第三个发布渠道（例如系统包管理器）时，`Registry` 与 `InstallChannel` 各加一臂。
+-/

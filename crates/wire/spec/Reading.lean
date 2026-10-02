@@ -264,3 +264,16 @@ pub struct FrozenNames {
 
 **重开参数**：第二个需要冻下名字的答复出现时（比如 session 列表也要画名字），把读回挪到视图折叠里按 run 缓存，而不是每问一次读一次内容库。
 -/
+
+/-! D28 `Call` 带出整数微秒的耗时；skill 与 MCP 的使用各是一个查询
+
+**决定**：`Call` 多一件 `#[serde(default)] took_us: Option<u64>`，照录配对的 `tool_result.took_us`（kernel D20）；`Used` 多 `first_us` 与 `took_us` 两件，照录 `model_returned`。缺席时页面退回信封时刻之差，以毫秒显示。显示规则（不到 10 ms 用 µs，10 ms 及以上用 ms）在客户端一处实现。
+
+查询面多三帧：`Query::SkillUsage { skill: Option<String> }` 答 `SkillUsageAnswer { skills: Vec<SkillUsageLine> }`，每行是一个 skill 的内容版本（摘要、时刻、写它的那一行）、最后一次审核（`skill_audited`，kernel D23）、最后一次使用、使用列表（run、居民、时刻、读的是哪一部分）与按天的计数，书架上从没被用过的 skill 也有一行，计数为零；`Query::McpUsage { server: Option<String> }` 答按服务器与工具折叠的同形一张表；`Query::UsageExport { what: UsageKind, format: ExportFormat }` 答 JSONL 或 CSV 的正文，`UsageKind { Skills, Mcp }`、`ExportFormat { Jsonl, Csv }`。三帧都是 `VerbClass::Read`。审核本身由城在上架时做，不另开命令帧：上架已经有自己的门（`PutShelved`）。它们与本版其他改形同一次 `WIRE_V` 进位（D22）。
+
+**理由**：使用早已在 `tool_called` 里（kernel D23），视图只是按 skill 折叠；折叠住 accounting，线上只给答复的形状。导出走查询而不是让页面拼文件，是因为折叠规则只在 Rust 一处。
+
+**被否**：①页面拉全部 `tool_called` 自己折：浏览器里多一份折叠规则；②导出写进城目录的文件：城目录多一份没人清理的派生物。
+
+**重开参数**：使用列表大到一次答复装不下时，加分页游标。
+-/
