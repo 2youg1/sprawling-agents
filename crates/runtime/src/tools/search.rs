@@ -93,6 +93,10 @@ pub struct SearchTool {
 }
 
 impl SearchTool {
+    /// The name this tool answers to, read by its registration and by
+    /// `mode::core_tools`.
+    pub const NAME: &'static str = "search";
+
     /// # Errors
     /// Propagates a malformed parameter schema, which is a build-time
     /// defect rather than a runtime one.
@@ -101,7 +105,7 @@ impl SearchTool {
             city_root: city_root.to_path_buf(),
             bound,
             meta: ToolMeta {
-                name: ToolName::parse("search")?,
+                name: ToolName::parse(Self::NAME)?,
                 disclosure: "Find a substring in the files under one path. Literal text, no \
                              regular expressions; the line number it reports is the offset \
                              `read` continues from. A `grep` through `exec` returns the same \

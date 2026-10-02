@@ -115,6 +115,10 @@ pub struct StatusTool {
 }
 
 impl StatusTool {
+    /// The name this tool answers to, read by its registration and by
+    /// `mode::core_tools`.
+    pub const NAME: &'static str = "status";
+
     /// A run that hands nothing down.
     ///
     /// # Errors
@@ -148,7 +152,7 @@ impl StatusTool {
             context: ContextReading::default(),
             clock: ClockReading::default(),
             meta: ToolMeta {
-                name: ToolName::parse("status")?,
+                name: ToolName::parse(Self::NAME)?,
                 disclosure:
                     "Report your current situation in thirteen lines: who you are, where you \
                      are, your mode and run policy, context used against the window, your trust, your write \

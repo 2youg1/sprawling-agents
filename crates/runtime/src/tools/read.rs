@@ -200,6 +200,10 @@ pub struct ReadTool {
 }
 
 impl ReadTool {
+    /// The name this tool answers to, read by its registration and by
+    /// `mode::core_tools`.
+    pub const NAME: &'static str = "read";
+
     /// # Errors
     /// Propagates a malformed parameter schema, which is a build-time
     /// defect rather than a runtime one.
@@ -248,7 +252,7 @@ impl ReadTool {
             catalog,
             reader: BoundReader::new(city_root, bound, block_store),
             meta: ToolMeta {
-                name: ToolName::parse("read")?,
+                name: ToolName::parse(Self::NAME)?,
                 disclosure: "Read a file by its path, or a skill by the name the catalog lists \
                              it under. A truncated answer states the total and the offset to \
                              continue from. Reading a directory or a missing file is refused."

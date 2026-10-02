@@ -56,14 +56,14 @@ impl Catalog {
 // runtime::catalog
 pub const DORMANT_INDEX_CEILING: usize = 1024;
 impl Catalog {
-    pub fn describe(&self, asked: &str) -> String;                    // 整名命中＝完整指南；否则按关键词排序的候选
+    pub fn describe(&self, asked: &str) -> Result<String, AxError>;  // 整名命中＝完整指南；否则按关键词排序的候选；错误只有登记时已打印过的 schema 打印不出
     pub fn resolve_call(&self, call: &ToolCall) -> Result<ToolCall, AxError>; // `call` 的唯一解包与按 schema 核对（§8-61）
 }
 // runtime::mode
 pub fn core_tools(mode: kernel::Mode) -> &'static [&'static str];     // 本 mode 常驻的工具名，含两扇门
-// runtime::tools
-pub const DESCRIBE: &str = "describe";
-pub const CALL: &str = "call";
+// runtime::tools（名字是各自的关联常量，登记与 core_tools 读同一个）
+impl DescribeTool { pub const NAME: &'static str = "describe"; }
+impl CallTool { pub const NAME: &'static str = "call"; }
 pub struct DescribeTool { /* catalog: Arc<Mutex<Catalog>>、meta —— 私有 */ }
 pub struct CallTool { /* catalog: Arc<Mutex<Catalog>>、meta —— 私有 */ }
 impl DescribeTool { pub fn new(catalog: Arc<Mutex<Catalog>>) -> Result<DescribeTool, AxError>; }  // args：{name}；Effect::Read

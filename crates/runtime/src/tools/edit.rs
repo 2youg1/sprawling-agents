@@ -50,6 +50,10 @@ pub fn version_of(bytes: &[u8]) -> String {
 const CREATES: &str = "new";
 
 impl EditTool {
+    /// The name this tool answers to, read by its registration and by
+    /// `mode::core_tools`.
+    pub const NAME: &'static str = "edit";
+
     pub fn new(
         city_root: &Path,
         domain: kernel::Address,
@@ -94,7 +98,7 @@ impl EditTool {
             writable,
             limit,
             meta: ToolMeta {
-                name: ToolName::parse("edit")?,
+                name: ToolName::parse(Self::NAME)?,
                 disclosure: format!(
                     "Replace an exact string in a file, guarded by the version you last saw: \
                      `old` must match exactly once or the call fails. A file that moved under \

@@ -86,12 +86,15 @@ pub(super) fn call_ahead(
         let mut started = Vec::new();
         let mut prefix = Prefix::Reading;
         let returned = model.call_speculating(request, onto, &mut |call: &ToolCall| {
+            // Resolved as the wave resolves it, so what starts early is
+            // the call the wave will admit and compare against.
+            let call = tools.resolve_call(call.clone());
             if let Prefix::Reading = prefix
-                && reads_only(tools, call)
-                && let Some(tool) = tools.ahead(call)
+                && reads_only(tools, &call)
+                && let Some(tool) = tools.ahead(&call)
             {
                 let handed = call.clone();
-                started.push((call.clone(), scope.spawn(move || tool.invoke(&handed))));
+                started.push((call, scope.spawn(move || tool.invoke(&handed))));
             } else {
                 prefix = Prefix::Written;
             }

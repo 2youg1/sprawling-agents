@@ -65,6 +65,14 @@ pub trait ConcurrentInvoke {
     /// render (`crates/runtime/spec/Turn.lean` §8-51). `None` is a tool the bench does not
     /// know, which is not read-only.
     fn meta_of(&self, call: &ToolCall) -> Option<&ToolMeta>;
+    /// The call a call through `call` stands for, with the model's id,
+    /// resolved before anything reads its registration, so the named
+    /// tool passes its own doors and the ledger records it
+    /// (`crates/runtime/Spec.lean` §8-61). The default hands the call
+    /// back unchanged.
+    fn resolve_call(&self, call: ToolCall) -> ToolCall {
+        call
+    }
     /// The tool a read-only call would run on, lent out before the call
     /// is admitted so it can start while the model is still generating.
     /// What it returns reaches the model only if `admit` later clears the
@@ -213,7 +221,10 @@ impl<'h> Turn<'h, ToolWave> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
-        let calls = std::mem::take(&mut self.state.calls);
+        let calls: Vec<ToolCall> = std::mem::take(&mut self.state.calls)
+            .into_iter()
+            .map(|call| tools.resolve_call(call))
+            .collect();
         let t = self.journal.stamp();
         let mut exchange = self.open_exchange();
         let reads = calls

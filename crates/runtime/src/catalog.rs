@@ -3,24 +3,34 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Progressive disclosure: L2 tools, reading-room
-//! SKILL entries and the current mode, one line each in the Resident
-//! segment, expansions on demand. Only what this session can actually
-//! reach is listed — admission is the caller's evidence: the assembler
-//! reads each building's reading room off its `city::policy` rules and
-//! supplies the admitted set.
+//! Progressive disclosure and the truncation lock
+//! (`crates/runtime/Spec.lean` §8-60, §8-61). Only what this session can
+//! actually reach is listed — admission is the caller's evidence: the
+//! assembler registers the tools a building's vocation, rules and book
+//! allow, and reads each building's reading room off its `city::policy`
+//! rules. Of what is admitted, the mode's core travels as tools; the rest
+//! is one line each in the dormant index, and a run fetches a guide with
+//! `describe` and runs a dormant tool through `call`.
 //!
 //! `tool_defs` is the single source of `ChatRequest.tools`: a tool absent
-//! here does not exist for the model.
+//! here and absent from the dormant index does not exist for the model.
 
 use std::collections::BTreeMap;
 
 pub use kernel::event::record::SkillPin;
 
-use kernel::{AxCode, AxError, B3Hash, ToolDef, ToolMeta};
+use kernel::{AxCode, AxError, B3Hash, ToolCall, ToolDef, ToolMeta};
 
 use crate::mode::catalog_entry;
 use kernel::Mode;
+
+mod dormant;
+mod fit;
+mod guide;
+
+/// The most bytes the dormant index may take, header and `+N more` line
+/// included, whatever the building admits (runtime D19).
+pub const DORMANT_INDEX_CEILING: usize = 1024;
 
 /// One disclosed row: "what it is + when to use it" resident-side, the
 /// "how to use it" expansion fetched on demand.
@@ -183,29 +193,21 @@ impl Catalog {
         self.mode = Some(mode);
     }
 
-    /// The Resident-segment text: header line, then one line per entry
-    /// the request cannot carry by itself. BTreeMap order makes the
-    /// bytes a pure function of the content.
+    /// The Resident-segment text: the header line, the mode this run sits
+    /// in, the developer entry, then the dormant index. BTreeMap order
+    /// makes the bytes a pure function of the content.
     ///
-    /// **Tools are not among them.** Their name, disclosure and schema
-    /// travel in `ChatRequest.tools` on every turn, and writing the
-    /// disclosure here as well put every tool's sentence into the prompt
-    /// twice - about 700 bytes of a 1,069-byte segment, paid on every
-    /// call of every run. What stays is what that array has no field
-    /// for: the skills this building admits, the mode this run sits in,
-    /// and the one line that says the city itself can be changed.
+    /// **The core tools are not among them.** Their name, disclosure and
+    /// schema travel in `ChatRequest.tools` on every turn, and writing
+    /// them here as well put every tool's sentence into the prompt twice.
+    /// Every other admitted tool and every admitted skill is one line of
+    /// the dormant index, which stays under [`DORMANT_INDEX_CEILING`]
+    /// however much the building admits.
     pub fn render(&self) -> String {
         let mut out = String::from(
             "Catalog: what you can reach beyond the tools listed with this request. \
              Open an entry by name with `read` before first use.\n",
         );
-        for (name, admitted) in &self.skills {
-            out.push_str("- skill ");
-            out.push_str(name);
-            out.push_str(": ");
-            out.push_str(&admitted.entry.disclosure);
-            out.push('\n');
-        }
         if let Some(mode) = self.mode {
             let entry = catalog_entry(mode);
             out.push_str("- ");
@@ -222,12 +224,56 @@ impl Catalog {
         out.push_str(": ");
         out.push_str(&dev.disclosure);
         out.push('\n');
+        out.push_str(&dormant::index(&self.dormant_entries()));
         out
     }
 
-    /// The only source of `ChatRequest.tools`.
+    /// Every admitted capability a session does not carry as a tool, in
+    /// the index's order: the tools outside the core, then the skills.
+    fn dormant_entries(&self) -> Vec<dormant::Entry<'_>> {
+        self.tools
+            .iter()
+            .filter(|(name, _)| !self.is_core(name))
+            .map(|(name, def)| dormant::Entry {
+                label: name.clone(),
+                about: &def.description,
+            })
+            .chain(self.skills.iter().map(|(name, admitted)| dormant::Entry {
+                label: format!("skill {name}"),
+                about: &admitted.entry.disclosure,
+            }))
+            .collect()
+    }
+
+    /// Whether `name` travels as a tool in this run's requests: it is in
+    /// the core of the mode the run sits in (`mode::core_tools`). A
+    /// catalog told no mode carries no tool, so nothing reaches a model
+    /// that the mode did not decide.
+    fn is_core(&self, _name: &str) -> bool {
+        true
+    }
+
+    /// The call a `call` stands for, with the id the model gave it, so its
+    /// result pairs with the `call` in the conversation and its tool
+    /// passes its own doors (`crates/runtime/Spec.lean` §8-61).
+    ///
+    /// # Errors
+    /// `E_INVALID_ARGS` when the arguments name no tool or carry no
+    /// object, when they name `call` itself, when the name is not a tool
+    /// this run was admitted, and when the arguments do not fit the
+    /// tool's input schema; the last carries the schema.
+    pub fn resolve_call(&self, call: &ToolCall) -> Result<ToolCall, AxError> {
+        fit::resolve(&self.tools, call)
+    }
+
+    /// The only source of `ChatRequest.tools`: the admitted tools in the
+    /// core of this run's mode, and no other.
     pub fn tool_defs(&self) -> Vec<ToolDef> {
-        self.tools.values().cloned().collect()
+        self.tools
+            .iter()
+            .filter(|(name, _)| self.is_core(name))
+            .map(|(_, def)| def.clone())
+            .collect()
     }
 
     /// What this run was given, and what each one hashed to.
@@ -294,90 +340,4 @@ impl Catalog {
     clippy::indexing_slicing,
     reason = "test code"
 )]
-mod tests {
-    use super::*;
-    use kernel::{CostTier, Effect, Payload, RenderIntent, Temporal, ToolMeta, ToolName};
-
-    fn meta(name: &str) -> ToolMeta {
-        ToolMeta {
-            name: ToolName::parse(name).unwrap(),
-            disclosure: format!("{name} does one thing; use it when that thing is needed"),
-            params: Payload::empty(),
-            effect: Effect::Read,
-            cost_tier: CostTier::Free,
-            timeout: None,
-            render: RenderIntent::Generic,
-            temporal: Temporal::Timeless,
-        }
-    }
-
-    #[test]
-    fn render_is_deterministic_and_sorted() {
-        let mut catalog = Catalog::new();
-        catalog.admit_tool(&meta("zeta")).unwrap();
-        catalog.admit_tool(&meta("alpha")).unwrap();
-        catalog
-            .admit_skill(CatalogEntry {
-                name: "review".to_owned(),
-                disclosure: "review a diff".to_owned(),
-                expansion: "run it before merging".to_owned(),
-                hash: Some(B3Hash::digest(b"review a diff")),
-                package: None,
-            })
-            .unwrap();
-        catalog.set_mode(Mode::Work);
-        let text = catalog.render();
-        let defs = catalog.tool_defs();
-        let alpha = defs
-            .iter()
-            .position(|def| def.name.as_str() == "alpha")
-            .unwrap();
-        let zeta = defs
-            .iter()
-            .position(|def| def.name.as_str() == "zeta")
-            .unwrap();
-        assert!(alpha < zeta, "BTreeMap order");
-        assert!(text.contains("- skill review:"));
-        assert!(
-            !text.contains("does one thing"),
-            "the tools array carries it"
-        );
-        assert!(text.contains("- mode:work:"));
-        assert_eq!(text, catalog.render(), "same content, same bytes");
-        // One line says the city itself can be changed; the evidence a
-        // change can be asked for and the reading order sit behind an expansion nobody pays for
-        // until they ask.
-        assert!(text.contains("- dev: when the work is to change"));
-        assert!(!text.contains("held-out evidence"), "the detail is fetched");
-        let Some(Expansion::Said { text: detail }) = catalog.expand("dev") else {
-            panic!("the developer entry expands");
-        };
-        assert!(detail.contains("-SPEC.md"));
-        assert!(detail.contains("held-out evidence"));
-    }
-
-    #[test]
-    fn duplicates_and_empty_disclosures_are_refused() {
-        let mut catalog = Catalog::new();
-        catalog.admit_tool(&meta("probe")).unwrap();
-        assert!(catalog.admit_tool(&meta("probe")).is_err());
-        let mut empty = meta("hollow");
-        empty.disclosure = "  ".to_owned();
-        assert!(catalog.admit_tool(&empty).is_err());
-    }
-
-    #[test]
-    fn tool_defs_carry_schema_and_expand_serves_skills_and_mode() {
-        let mut catalog = Catalog::new();
-        catalog.admit_tool(&meta("probe")).unwrap();
-        catalog.set_mode(Mode::Chat);
-        let defs = catalog.tool_defs();
-        assert_eq!(defs.len(), 1);
-        assert_eq!(defs[0].name.as_str(), "probe");
-        assert!(matches!(
-            catalog.expand("mode:chat"),
-            Some(Expansion::Said { .. })
-        ));
-        assert!(catalog.expand("missing").is_none());
-    }
-}
+mod tests;

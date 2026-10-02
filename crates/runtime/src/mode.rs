@@ -95,6 +95,39 @@ pub fn catalog_entry(mode: Mode) -> CatalogEntry {
 /// that failed are different facts, and a requirement that treated them
 /// alike would let "we did not check" pass as "we checked and it was
 /// fine".
+/// The tools a session in `mode` carries in its request; every other
+/// admitted tool waits in the dormant index (`crates/runtime/Spec.lean`
+/// §8-60). A name here travels only where the building admitted it: the
+/// hall registers no `exec`, so `exec` is in no tier there.
+///
+/// The two doors of the truncation lock are in every mode, because a
+/// dormant capability is reachable only through them. Chat answers the
+/// person and reads what it is asked about; work also edits and runs
+/// commands, which is what carrying out a task is made of. `status` is in
+/// both because the city prompt sends every resident to it for its
+/// situation.
+#[must_use]
+pub fn core_tools(mode: Mode) -> &'static [&'static str] {
+    match mode {
+        Mode::Chat => &[
+            crate::tools::CallTool::NAME,
+            crate::tools::DescribeTool::NAME,
+            crate::tools::ReadTool::NAME,
+            crate::tools::SearchTool::NAME,
+            crate::tools::StatusTool::NAME,
+        ],
+        Mode::Work => &[
+            crate::tools::CallTool::NAME,
+            crate::tools::DescribeTool::NAME,
+            crate::tools::EditTool::NAME,
+            kernel::ToolName::EXEC,
+            crate::tools::ReadTool::NAME,
+            crate::tools::SearchTool::NAME,
+            crate::tools::StatusTool::NAME,
+        ],
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Produced {
     /// The asset's own tests ran and passed.
