@@ -18,15 +18,23 @@
 // operation that can fail, and the first paint cannot die on one.
 
 import { Result } from "effect";
+import { readable } from "svelte/store";
+import type { Readable } from "svelte/store";
 
 // The little of `Storage` this client needs: a test hands it a map and
 // a browser hands it `localStorage`. Narrow on purpose - nothing above
 // may enumerate or clear rows it did not write.
-export interface Rows {
+export interface Store {
   readonly getItem: (key: string) => string | null;
   readonly setItem: (key: string, value: string) => void;
   readonly removeItem: (key: string) => void;
 }
+
+export interface Rows extends Store {
+  readonly unkept: Readable<ReadonlySet<string>>;
+}
+
+const NONE: Readable<ReadonlySet<string>> = readable(new Set());
 
 // What a browser without storage remembers: this session, and no
 // longer. A choice still takes effect; it just does not outlive the
@@ -41,6 +49,7 @@ export function memory(): Rows {
     removeItem: (key) => {
       held.delete(key);
     },
+    unkept: NONE,
   };
 }
 
@@ -60,7 +69,7 @@ const PROBE_KEY = "sprawling.probe";
 // will not take is kept for this session instead, so a person typing
 // into a box never loses the sentence that filled the quota and no
 // page dies on a write.
-function guarded(store: Rows, spare: Rows): Rows {
+function guarded(store: Store, spare: Rows): Rows {
   return {
     getItem: (key) => attempted(() => store.getItem(key)) ?? spare.getItem(key),
     setItem: (key, value) => {
@@ -82,6 +91,7 @@ function guarded(store: Rows, spare: Rows): Rows {
       });
       spare.removeItem(key);
     },
+    unkept: NONE,
   };
 }
 
@@ -89,9 +99,9 @@ function guarded(store: Rows, spare: Rows): Rows {
 // by writing one and dropping it again. A store that answers the probe
 // is used; a store that throws on the reach, or takes nothing, is
 // stood in for by a map that lasts as long as the tab.
-function decided(): Rows {
+export function keptRows(reach: () => Store): Rows {
   const spare = memory();
-  const store = attempted<Rows>(() => localStorage);
+  const store = attempted<Store>(reach);
   if (store === null) {
     return spare;
   }
@@ -113,6 +123,6 @@ export function browserRows(): Rows {
   // One table for every caller, and one probe for the whole session. A
   // fresh one per call would let the shell and a settings panel each
   // write their own preferences into a map the other never reads.
-  reached ??= decided();
+  reached ??= keptRows(() => localStorage);
   return reached;
 }

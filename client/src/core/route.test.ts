@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { Option } from "effect";
 
-import { Address, RunId } from "../wire";
+import { Address, B3Hash, RunId, Seq } from "../wire";
 import {
   DEFAULT_VIEW,
   MAYOR,
@@ -23,6 +23,10 @@ import {
 const lab = Address.make("lab");
 const parser = Address.make("lab/parser");
 const seven = RunId.make("07070707-0707-0707-0707-070707070707");
+const version = B3Hash.make("b3".padEnd(64, "0"));
+const call = { kind: "call", run: seven, at: Seq.make(42) } as const;
+const file = { kind: "document", building: lab, path: "docs/a plan?.md", version } as const;
+const worktree = { kind: "document", building: lab, path: "README.md", version: null } as const;
 
 // Every view this client has, so the round trip is exhaustive by
 // construction: the lint's exhaustiveness check on `toFragment` refuses a
@@ -40,6 +44,11 @@ const EVERY_VIEW: readonly View[] = [
   ...SETUP_GROUPS.map((group): View => ({ kind: "setup", group })),
   { kind: "building", address: lab },
   { kind: "run", run: seven },
+  { kind: "talk", address: parser, item: call },
+  { kind: "talk", address: parser, item: file },
+  { kind: "talk", address: MAYOR, item: worktree },
+  { kind: "run", run: seven, lens: "changes" },
+  { kind: "welcome", step: "skills" },
 ];
 
 describe("route", () => {
@@ -172,6 +181,50 @@ describe("route", () => {
     go(bar, { kind: "record", lens: "bin" });
     expect(bar.hash).toBe("#/record/bin");
     expect(current(bar)).toEqual(Option.some({ kind: "record", lens: "bin" }));
+  });
+});
+
+describe("deep links", () => {
+  test("a call and a document version are spelled after the conversation they open beside", () => {
+    expect([
+      toFragment({ kind: "talk", address: parser, item: call }),
+      toFragment({ kind: "talk", address: MAYOR, item: worktree }),
+      toFragment({ kind: "talk", address: parser, item: file }),
+    ]).toEqual([
+      `#/talk/lab/parser?call=${seven}&at=42`,
+      "#/talk/hall/mayor?building=lab&path=README.md",
+      `#/talk/lab/parser?building=lab&path=docs%2Fa+plan%3F.md&version=${version}`,
+    ]);
+  });
+
+  test("a run lens and a guide step are a path segment", () => {
+    expect([toFragment({ kind: "run", run: seven, lens: "turns" }), toFragment({ kind: "welcome", step: "mcp" })]).toEqual([
+      `#/run/${seven}/turns`,
+      "#/welcome/mcp",
+    ]);
+  });
+
+  test("a locator with a key missing, a key too many or a value the wire refuses names nothing", () => {
+    expect(
+      [
+        `#/talk/lab/parser?call=${seven}`,
+        `#/talk/lab/parser?call=${seven}&at=42&path=x`,
+        `#/talk/lab/parser?call=${seven}&at=4.5`,
+        "#/talk/lab/parser?call=nope&at=1",
+        "#/talk/lab/parser?building=lab&path=",
+        "#/talk/lab/parser?building=lab&path=a&version=short",
+        "#/talk/lab/parser?",
+        `#/city?call=${seven}&at=1`,
+        `#/run/${seven}/nowhere`,
+        "#/welcome/nowhere",
+      ].map((raw) => Option.isNone(fromFragment(raw))),
+    ).toEqual([true, true, true, true, true, true, true, true, true, true]);
+  });
+
+  test("a room whose name holds a question mark keeps it inside the address", () => {
+    const odd = Address.make("lab/what?");
+    expect(toFragment({ kind: "talk", address: odd })).toBe("#/talk/lab/what%3F");
+    expect(fromFragment("#/talk/lab/what%3F")).toEqual(Option.some({ kind: "talk", address: odd }));
   });
 });
 
