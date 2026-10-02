@@ -221,7 +221,7 @@ covers the pane above it. -->
   this={seat === "page" ? "main" : "section"}
   id={seat === "page" ? "main" : undefined}
   {@attach (element: HTMLElement) => watchColumns(element, (next) => (columns = next))}
-  class="workspace col-span-full row-start-2 -m-margin grid min-h-0 grid-cols-subgrid grid-rows-[minmax(0,1fr)_auto] p-margin narrow:m-0 narrow:p-0"
+  class="workspace col-span-full row-start-2 -m-margin grid min-h-0 grid-cols-subgrid grid-rows-[minmax(0,1fr)_auto] p-margin narrow:relative narrow:-mx-pane narrow:mt-0 narrow:-mb-pane narrow:px-pane narrow:pt-0 narrow:pb-pane"
   aria-label={seat === "page" ? say($lang, "region_main") : title}
 >
   <!-- The page's own name: a reader arriving by keyboard or screen reader
@@ -238,7 +238,7 @@ covers the pane above it. -->
     <div
       class={[
         sheet
-          ? "sheet -mx-pane -mt-pane row-[1] grid min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-page px-pane pt-pane"
+          ? "sheet -mx-pane row-[1] grid min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-page px-pane"
           : "col-span-full row-[1/3] grid min-h-0 grid-cols-subgrid grid-rows-subgrid transition-opacity duration-page",
         layout.world === "beside" ? "pointer-events-none opacity-(--blend-opacity)" : "",
       ]}
@@ -298,14 +298,14 @@ covers the pane above it. -->
     <Talk {address} band={layout.world === "workbench" || sheet} />
   </section>
   {#if open}
-    <!-- On one column the right side is a sheet over the whole shell, from
-    the right with its close key at the top on that side; the shell's
-    frame is the box it is fixed in, the part of the page the person can
-    see (4-52). It stands on no grid line there: a line would make the
-    grid area its box, inside the frame's margins. -->
+    <!-- On one column the right side is a sheet over the whole page, from
+    the right with its close key at the top on that side (4-52): the page
+    reaches the frame's edges there, and the sheet covers the page's box.
+    It stands on no grid line: a line would make that grid area its box,
+    inside the page's padding. -->
     <div
       class={[
-        "row-[1/3] -mt-margin -mr-margin -mb-margin flex min-h-0 border-l border-edge-panel narrow:fixed narrow:inset-0 narrow:z-20 narrow:col-auto narrow:row-auto narrow:m-0 narrow:border-l-0 narrow:pt-[env(safe-area-inset-top,0px)] narrow:pb-[env(safe-area-inset-bottom,0px)]",
+        "row-[1/3] -mt-margin -mr-margin -mb-margin flex min-h-0 border-l border-edge-panel narrow:absolute narrow:inset-0 narrow:z-20 narrow:col-auto narrow:row-auto narrow:m-0 narrow:border-l-0",
         narrow ? "sheet" : "",
       ]}
       data-side="right"
