@@ -26,8 +26,18 @@
   // prunes it, which `cut needs no class` covers.
   //
   // **Over the composer, because that is where the eye is** when a send
-  // or a stop is refused: the right pane holds the editor, and the foot
-  // of the first column holds the edge keys.
+  // or a stop is refused: the stack stands on the composer's upper edge
+  // and takes the width of the column the composer is in, so it moves
+  // with that column when the right pane opens (client-SPEC 4-35). A
+  // page with no composer centres it at the foot.
+  //
+  // **When it steps forward is `core/deferral.ts`'s** (client-SPEC
+  // 12-26): what stops the work until the person acts comes at once;
+  // an ordinary refusal waits, held here, for the person to send, to
+  // leave the box empty, or to come back to this tab, and meanwhile
+  // only marks the mailbox key. The mailbox keeps every refusal
+  // whatever this stack does, so one the person read there is dropped
+  // here rather than shown late.
   //
   // **What a recovery's control says and does is
   // `notice_recovery.ts`'s**, shared with the drawer (client-SPEC
@@ -35,6 +45,7 @@
   import { SvelteMap } from "svelte/reactivity";
   import { get } from "svelte/store";
 
+  import { deliverable, momentOf, urgencyOf, wakeAt } from "../core/deferral";
   import { say } from "../core/lang";
   import { recoveryFor } from "../core/recovering";
   import { ui } from "../ui";
@@ -42,6 +53,7 @@
   import { recover, recoveryLabel, recoveryWhy } from "./notice_recovery";
   import type { AxError } from "../wire";
   import { claims } from "./talk/handing";
+  import { attending } from "./mailbox/attention";
   import Button from "./parts/button.svelte";
   import Notice from "./parts/notice.svelte";
 
@@ -131,6 +143,37 @@
     arm(next);
   }
 
+  // The refusals waiting for a moment, oldest first, and the timer that
+  // wakes when a box left empty becomes one.
+  let held: Refused[] = [];
+  let wake: number | undefined;
+  const attention = attending(u.conversing, u.now, release);
+  $effect(() => () => {
+    attention.stop();
+    window.clearTimeout(wake);
+  });
+
+  // Whether the mailbox still calls this refusal unread: one the person
+  // already read there has been told, and is not told again here.
+  function unread(error: AxError): boolean {
+    return get(belief).notices.some((notice) => notice.error === error && !notice.seen);
+  }
+
+  function release(): void {
+    window.clearTimeout(wake);
+    held = held.filter((refused) => unread(refused.error));
+    if (held.length === 0) return;
+    const seen = attention.read();
+    const now = u.now();
+    if (momentOf(seen, now) !== null) {
+      for (const refused of held) push({ kind: "refused", refused });
+      held = [];
+      return;
+    }
+    const due = wakeAt(seen, now);
+    if (due !== null) wake = window.setTimeout(release, due - now);
+  }
+
   // Every refusal the city comes back with is toasted once, except the
   // one the open conversation draws as a card where its reply would
   // have been (`talk/handing.ts`): the same refusal in two places is
@@ -143,7 +186,46 @@
     }
     heard = refusal;
     if (claims(get(u.conversing), refusal, $belief)) return;
-    push({ kind: "refused", refused: { error: refusal, about: aboutOf(refusal) } });
+    const refused: Refused = { error: refusal, about: aboutOf(refusal) };
+    if (deliverable(urgencyOf(refusal), attention.read(), u.now())) {
+      push({ kind: "refused", refused });
+      return;
+    }
+    held = [...held, refused];
+    release();
+  });
+
+  // Where the stack stands: on the composer's upper edge, as wide as its
+  // column, or nowhere in particular when the page has none. Measured
+  // only while a toast stands, and again whenever the composer's box
+  // moves or the window changes size.
+  interface Place {
+    readonly left: number;
+    readonly width: number;
+    readonly bottom: number;
+  }
+  let place = $state.raw<Place | null>(null);
+  const standing = $derived(toasts.some((toast) => !toast.gone));
+  $effect(() => {
+    if (!standing) return;
+    const box = document.querySelector("main textarea");
+    const form = box instanceof HTMLElement ? box.closest("form") : null;
+    if (form === null) {
+      place = null;
+      return;
+    }
+    const measure = (): void => {
+      const rect = form.getBoundingClientRect();
+      place = { left: rect.left, width: rect.width, bottom: window.innerHeight - rect.top };
+    };
+    measure();
+    const watching = new ResizeObserver(measure);
+    watching.observe(form);
+    window.addEventListener("resize", measure);
+    return () => {
+      watching.disconnect();
+      window.removeEventListener("resize", measure);
+    };
   });
 
   // Each press the shell counted is answered once; the count only grows.
@@ -155,10 +237,18 @@
   });
 </script>
 
-<!-- Centred over the composer and clear of it, so the stack never covers
+<!-- Standing on the composer and clear of it, so the stack never covers
 the coin key, which is the retry. -->
 <ul
-  class="fixed bottom-[calc(var(--spacing-margin)+8*var(--spacing-baseline)+var(--spacing-section)*2)] left-1/2 flex w-[min(480px,calc(100vw-2*var(--spacing-margin)))] -translate-x-1/2 flex-col items-stretch gap-snug"
+  class={[
+    "fixed flex flex-col items-stretch gap-snug",
+    place === null
+      ? "bottom-[calc(var(--spacing-margin)+8*var(--spacing-baseline)+var(--spacing-section)*2)] left-1/2 w-[min(480px,calc(100vw-2*var(--spacing-margin)))] -translate-x-1/2"
+      : "pb-snug",
+  ]}
+  style:left={place === null ? undefined : `${String(place.left)}px`}
+  style:width={place === null ? undefined : `${String(place.width)}px`}
+  style:bottom={place === null ? undefined : `${String(place.bottom)}px`}
 >
   {#each toasts as toast (toast.id)}
     <li
