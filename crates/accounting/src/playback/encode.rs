@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one encoding of a playback bundle (accounting-SPEC.md 8-12).
+//! The one encoding of a playback bundle (`crates/accounting/spec/Playback.lean` §8-12).
 //!
 //! Compact JSON in the field order `document` declares, with `<`, `>`,
 //! `&`, U+2028 and U+2029 written as `\u` escapes. Those characters only

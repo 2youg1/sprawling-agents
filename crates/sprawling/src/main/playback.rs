@@ -7,8 +7,8 @@
 //! `sprawling playback check` (sprawling-SPEC.md 8-126 and 8-132).
 //!
 //! The projection, the selection, the read bound, the page, the five
-//! checks and the landing are `accounting::playback`'s (accounting-SPEC.md
-//! 8-12 and 8-13). This module reads the command line, names the person
+//! checks and the landing are `accounting::playback`'s (`crates/accounting/Spec.lean`
+//! §8-12 and §8-13). This module reads the command line, names the person
 //! as the reader, and decides where the bytes go: to stdout once the
 //! whole export exists, or to a new file that lands whole or not at all.
 

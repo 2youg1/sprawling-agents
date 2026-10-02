@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one layer that is the person's rather than a city's
-//! (accounting-SPEC.md section 8-8).
+//! (`crates/accounting/spec/Person.lean` §8-8).
 //!
 //! What somebody settled about how they read their cities — the
 //! language, the appearance, the chords they rebound — lives in

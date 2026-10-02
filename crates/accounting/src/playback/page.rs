@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A playback page read the way a browser's parser builds it, the bundle
-//! it carries, and the references it makes (accounting-SPEC.md 8-13).
+//! it carries, and the references it makes (`crates/accounting/spec/Playback/Check.lean` §8-13).
 //!
 //! The page goes through html5ever's tree builder, so an element inside
 //! `<svg>`, a `<noscript>` or a `<template>` is the element a browser

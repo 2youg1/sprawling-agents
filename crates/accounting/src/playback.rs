@@ -5,7 +5,7 @@
 
 //! A stretch of one city's history, exported as a playback bundle, and a
 //! bundle checked against another or recomputed from its city
-//! (accounting-SPEC.md 8-12).
+//! (`crates/accounting/spec/Playback.lean` §8-12).
 //!
 //! The properties the export holds are proved in
 //! `crates/accounting/spec/Playback/Select.lean` and
@@ -13,7 +13,7 @@
 //! they hold. The command line (`bin::main::playback`) and the
 //! resident's tool (`worker::workbench::tools::playback`) are thin doors
 //! onto [`export`], [`embed`], [`check`] and [`land`]
-//! (accounting-SPEC.md 8-13).
+//! (`crates/accounting/spec/Playback/Check.lean` §8-13).
 
 use std::path::Path;
 

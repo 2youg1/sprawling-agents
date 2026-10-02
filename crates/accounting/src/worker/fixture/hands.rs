@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The hands a worker under test is built with, the clocks they read, and
-//! a city formed with them (accounting-SPEC.md 8-11, 12-19).
+//! a city formed with them (`crates/accounting/spec/Worker.lean` §8-11, accounting D19).
 
 use std::path::{Path, PathBuf};
 
@@ -15,7 +15,7 @@ use crate::worker::genesis::{Adopt, InitReport, form};
 use crate::worker::hands::{ExecHost, Hands};
 
 /// The hands a worker under test is built with: none of them reaches
-/// this machine (accounting-SPEC.md 8-11).
+/// this machine (`crates/accounting/spec/Worker.lean` §8-11).
 ///
 /// An in-memory vault, a clock that reads the wall, a machine with
 /// nothing on it, roomy memory and volume, a file manager and a desktop
@@ -127,7 +127,7 @@ impl crate::Machine for NoMachine {
 }
 
 /// A city formed with the test hands, adopting nothing: what the
-/// worker's tests stand on (accounting-SPEC.md 12-19).
+/// worker's tests stand on (accounting D19).
 pub(crate) fn init_city(city_root: &Path) -> Result<InitReport, AxError> {
     form(city_root, Adopt::Nothing, hands())
 }

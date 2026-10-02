@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a bundle or a playback page is found to be, as five separate
-//! items (accounting-SPEC.md 8-12 and 8-13, decision 25(g)).
+//! items (`crates/accounting/spec/Playback.lean` §8-12 and `crates/accounting/spec/Playback/Check.lean` §8-13, accounting D25 (g)).
 //!
 //! A bundle on its own can only be found consistent: that says nothing
 //! about whether it was changed, because a changed bundle can be made

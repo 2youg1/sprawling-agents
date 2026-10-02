@@ -5,7 +5,7 @@
 
 //! The names a request carries are the names the page reads: held for
 //! the whole session they were frozen in, and taken anew after `/new`
-//! (accounting-SPEC.md 8-15).
+//! (`crates/accounting/spec/Worker/Freezing/Naming.lean` §8-15).
 
 #![allow(clippy::wildcard_enum_match_arm, reason = "test code")]
 

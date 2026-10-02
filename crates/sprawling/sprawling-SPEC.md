@@ -81,7 +81,7 @@ impl CityAsk { fn read(self) -> wire::Answer; }                     // 放下快
 ```
 
 - **视图冷重建与热折叠共用 `apply`**：启动时把 Ledger 逐行喂进去，其后由 `JsonlLedger::observe` 喂。测试断言两条路径答案逐字段相等——这就是「projection 可弃」的可执行形式。
-- **计划的投影是 `Roadmap.md` 的缓存**：那份文件就是计划，Agent 用 edit 工具改它。`Views` 持 `Arc<Mutex<accounting::plan_view::PlanView>>`，`roadmap_*` 记录经 `apply` 让缓存失效，查询在锁外读盘回填（8-100，accounting-SPEC.md 8-6）。
+- **计划的投影是 `Roadmap.md` 的缓存**：那份文件就是计划，Agent 用 edit 工具改它。`Views` 持 `Arc<Mutex<accounting::plan_view::PlanView>>`，`roadmap_*` 记录经 `apply` 让缓存失效，查询在锁外读盘回填（8-100，`crates/accounting/Spec.lean` §8-6）。
 - **读不懂的行照显**：`problems` 随答案回到界面；没有 Roadmap 的楼答 `Progress::Unplanned`（它没有 ratio 方法，故界面画不出百分比不是守规矩，是无从下手）。
 - **保留前缀不是楼**：`.` 开头的目录跳过，`.sprawling/` 因此恒不被当成一栋楼。
 
@@ -272,7 +272,7 @@ impl Site {
 
 - **旧账本照样折得回**：旧版本写过的 `login_started` 仍是一个事件种类，没有读者；`secret_captured` 行里的 `expires_at` 与 `<provider>-subscription`／`<provider>-renewal` 来源读入时照收，本城不再据此续期。
 - **旧快照不接**：`StandingFolds` 少了到期表，`STANDING_FOLD_RULES` 随之换值，旧快照按版本不符从创世重折（8-101）。
-- **harness 页读名单与这台电脑**：`accounting::views::lines::harnesses_answer` 把 `agent_protocols::Harness::ALL` 逐家抄成 `wire::HarnessLine`，`found` 经 `Views.programs` 问服务中的城交进来的查找（accounting-SPEC.md 8-10）；生产的查找是 `bin::doctor::host::find_program`，与 doctor 找程序读同一条搜索路径（`crates/wire/Spec.lean` §8-52）。
+- **harness 页读名单与这台电脑**：`accounting::views::lines::harnesses_answer` 把 `agent_protocols::Harness::ALL` 逐家抄成 `wire::HarnessLine`，`found` 经 `Views.programs` 问服务中的城交进来的查找（`crates/accounting/Spec.lean` §8-10）；生产的查找是 `bin::doctor::host::find_program`，与 doctor 找程序读同一条搜索路径（`crates/wire/Spec.lean` §8-52）。
 - **provider 页先给厂商表**：`views::lines::known_hosts_answer` 把 `gateway::known_hosts` 逐行抄成 `wire::KnownHostsAnswer`，不加不减（`crates/wire/Spec.lean` §8-51）。
 
 ## 8-6 五个视图不再答 unavailable
@@ -319,7 +319,7 @@ pub(crate) fn local_url(bind: SocketAddr) -> String;
 - **`up <dir>`＝序列的唯一定义**：目录里没有 ledger 就先 `init`，随后 `serve`，随后开浏览器。无参屏与 `start.cmd` 都落到它，`init`／`serve` 仍各自独立可用——一段序列一处权威。
 - **genesis 要人同意**：写 Ledger 第 0 行是全系统唯一一次不可撤销的语义写入，不因「有人双击了一个文件」而发生。无参屏在按键**之前**把最终路径显示出来，人按回车才开城；`q` 退出并打印命令表。
 - **非交互 stdin 无此问**：`read_line` 得 EOF（管道、CI、无人值守）即 `Quit`，主流程打印命令表退 2。这条让该路径在没有 TTY 的地方也可测。
-- **默认位置取 exe 同级 `city/`**：整座城随文件夹可拷、可备、可删，与「一座城市就是一个目录」同构。`writability` 探到不可写（解压进 Program Files）就回退到 `Home::default_city()`（accounting-SPEC.md 8-7）；回退可见而非暗中，因为路径印在第一屏上。
+- **默认位置取 exe 同级 `city/`**：整座城随文件夹可拷、可备、可删，与「一座城市就是一个目录」同构。`writability` 探到不可写（解压进 Program Files）就回退到 `Home::default_city()`（`crates/accounting/Spec.lean` §8-7）；回退可见而非暗中，因为路径印在第一屏上。
 - **「同级目录可不可写」是二元枚举而不是 bool**（Roadmap G-25）：`writability` 产出 `BesideBinary`，`default_city` 只收它，于是这一个事实在探测端与决定端是同一个拼写，调用点读起来是 `BesideBinary::ReadOnly` 而不是一个无名的 `false`。
 - **回退路径只有 `accounting::home` 一处权威**：`~/sprawling/city` 由 `Home::default_city()` 给出，`firstrun` 不再自己拼 `join("sprawling").join("city")`（Roadmap G-10 的第四处）；目录名 `city` 由 `home::CITY_DIR` 一处定义，exe 同级与家目录两种落点共用它。
 - **开浏览器恒非致命**：`open_in_browser` 失败只记一行，`serve` 照跑——URL 在这之前已经打印。命名不取 `browser`：`crates/browser` 已占住「Agent 驱动真实浏览器」这个概念，一名一义。
@@ -757,7 +757,7 @@ pub fn key_for(bind: SocketAddr, configured: Option<String>) -> Result<Keyed, Ax
 
 ## 8-24 一条效应先成为账本行，再成为这座城（`accounting::effect`）
 
-`accounting::effect` 的接口、理由与测试住 accounting-SPEC.md 8-5，这里不留第二份。装配层那一扇门是 `RunWorker::settle(&mut self, at: &Assignment, run: RunId, landing: effect::Landing, chain: &KnockChain)`（`accounting::worker::settling::landing`）：每张桌子交出的 `Landing` 都走它，`record` 先落完行，再把 `Then` 交给一个穷尽的 match。
+`accounting::effect` 的接口、理由与测试住 `crates/accounting/Spec.lean` §8-5，这里不留第二份。装配层那一扇门是 `RunWorker::settle(&mut self, at: &Assignment, run: RunId, landing: effect::Landing, chain: &KnockChain)`（`accounting::worker::settling::landing`）：每张桌子交出的 `Landing` 都走它，`record` 先落完行，再把 `Then` 交给一个穷尽的 match。
 
 ## 8-25 一个答复接上的活，不靠重读全部历史找到，也不丢掉它的天花板
 
@@ -1079,7 +1079,7 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 ## 8-34 计划的投影（`accounting::plan_view`）
 
-`PlanView` 与 `PlanReading` 住在 `accounting`，接口、理由与测试见 accounting-SPEC.md 8-6，这里不留第二份；`views` 与 `RunWorker.plan_holders` 从那里读。哪些记录会动计划见 8-76，锁外读盘见 8-100。
+`PlanView` 与 `PlanReading` 住在 `accounting`，接口、理由与测试见 `crates/accounting/Spec.lean` §8-6，这里不留第二份；`views` 与 `RunWorker.plan_holders` 从那里读。哪些记录会动计划见 8-76，锁外读盘见 8-100。
 
 ## 8-35 谁在追一个目标，谁替它派活（`RunWorker.pursuits`）
 
@@ -1139,7 +1139,7 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **崩溃验收在盘上造死亡，不在进程里杀**（8-127）。一次 run 真跑完，丢掉 worker 释放写者锁，再把账截在一行的半途、删去其后的行；重开走 `RunWorker::new` 与 `startup_scan`，与 `sprawling resume` 同一条路。理由：被杀的进程留在盘上的就是这样一份账——锁已释放，最后一行写了一半——而盘上的截法可以精确指定死在哪一行的哪一个字节，每次重跑都是同一次死亡。被否：①起真二进制再杀掉它——那是从外面进城的检查，按边界规则归 `tools/adversary/` 的 Lean 黑盒（G1e），而且杀在哪一刻取决于调度，失败不能逐字节重演；②把账本放在 `storage` 的故障文件系统上断电——它只承载账本，`Standing::fold` 与视图读真目录，重开的不是一座完整的城，断电的耐久契约已由 storage 自己的测试证过。重开参数：账本之外的文件（检查点、快照、CAS）也要在一次死亡里与账本错开时，验收要能在同一刻截断它们，那时改为在 `Vfs` 缝之上承载整座城。
 
-**死掉的 run 在重开时冻结，验收比它的整行状态**（8-127）。启动扫描补完悬空调用之后为死掉的 run 写冻结，验收第 4 项比城景里那次 run 的冻结、结局、最后一行与序号，并读账上那一行的 `cause`。理由：ARCHITECTURE §13.7 画的 `Lost --> Frozen` 是账本上的一行，服务中的城与重开的城读同一份账本，必须对这次 run 说同一个结局；只比最后一行的种类，看不出视图把它当成仍在跑。被否：验收只比 `last_kind` 与 `last_seq`、冻结留给以后——那是在把「死掉的 run 永远未冻结」钉成规则；在验收里自己补写冻结——验收就成了它要判的那段代码的第二份。重开参数：`serve` 不经 `resume` 也要收拾死亡时（accounting-SPEC §12 第 30 条），验收改为经 `serve` 的起步路径重开。
+**死掉的 run 在重开时冻结，验收比它的整行状态**（8-127）。启动扫描补完悬空调用之后为死掉的 run 写冻结，验收第 4 项比城景里那次 run 的冻结、结局、最后一行与序号，并读账上那一行的 `cause`。理由：ARCHITECTURE §13.7 画的 `Lost --> Frozen` 是账本上的一行，服务中的城与重开的城读同一份账本，必须对这次 run 说同一个结局；只比最后一行的种类，看不出视图把它当成仍在跑。被否：验收只比 `last_kind` 与 `last_seq`、冻结留给以后——那是在把「死掉的 run 永远未冻结」钉成规则；在验收里自己补写冻结——验收就成了它要判的那段代码的第二份。重开参数：`serve` 不经 `resume` 也要收拾死亡时（accounting D30），验收改为经 `serve` 的起步路径重开。
 
 **不从别的工具的配置里读 provider 表（人的决定）**。`bin::import` 的五个文件读 Codex 的 `~/.codex/config.toml` 与 pi 的 `models.json`，把其中的 provider 折成本城的词汇；但没有任何 `mod` 声明过它们，所以它们从没被编译，clippy 与测试也从没看过它们，模块图却把它们记为 built。本城删去这五个文件，首次上手的第 1 步由人手填端点，或选一个已知主机。理由：没有调用点的代码是一份没人维护的第二文法，它记下的 Codex 与 pi 键名会随上游改版静默过时。**被否**：接上它，作为首次上手第 1 步「从别的工具已写好的配置读入」的候选来源——那要在 wire 上加一条 Query、在设置页加一行，属于线协议与页面的改动，本版不做。**重开参数**：首次上手要给出「别的工具已配置的 provider」这一步时，从 git 历史取回这两种文法，先在 `lib.rs` 声明模块，让测试与 clippy 看见它们，再接 Query。
 
@@ -1161,15 +1161,15 @@ struct Underway<'desk> { desk: &'desk CommandDesk, key: Option<IdemKey> }
 
 **`view --since/--until` 按每一行信封的 `t` 流式过滤，不建时间索引**（8-137）。时间窗读的是信封 `t`，因为它就是这一行记下的那一刻，任何种类都有它；按种类去载荷里挑时间字段，就是同一件事有两个家。不二分也不提前停：`t` 不随 `seq` 单调，在第一条越过 `until` 的行处停下会漏掉后面回退的行。**被否掉的**：在 `LedgerIndex` 里给每行多存一个 8 字节的时间列再二分——它要 `t` 有序，而 `t` 无序；也让索引多一份要维护的事实。条件变了就重议：四十万行的账本上 `view --since` 超过一秒，或页面需要按时间跳转。
 
-**`whose --trace` 读盘作答，候选就说是候选**（8-136，accounting-SPEC.md §12-28）。区间以同一个 run 的上一个提交为界，调用经 rounds 的那一份配对规则读出，同楼别的 run 只给条数。CLI 读盘而不走线上查询，城不在服务也答得出，与 `whose` 本身同一条理由。**被否掉的**：只列写调用——读调用决定了写什么；把同楼别人的调用并列出来——读者会把候选读成原因。条件变了就重议：页面要显示一个提交的调用时。
+**`whose --trace` 读盘作答，候选就说是候选**（8-136，accounting D28）。区间以同一个 run 的上一个提交为界，调用经 rounds 的那一份配对规则读出，同楼别的 run 只给条数。CLI 读盘而不走线上查询，城不在服务也答得出，与 `whose` 本身同一条理由。**被否掉的**：只列写调用——读调用决定了写什么；把同楼别人的调用并列出来——读者会把候选读成原因。条件变了就重议：页面要显示一个提交的调用时。
 
 **写文档的两条命令在远程门外**（8-152，`crates/wire/Spec.lean` §19-2）。`PutRange` 与 `DecideProposals` 的 `class` 是 `LocalOnly`：一台远程设备即使带着 `Act` 权限也不能经它们写城里的文件。`PutSpine` 是 `Act`，因为它只写一栋楼自己的四份 spine 文档，那是人离开电脑时仍要改的计划；`PutRange` 能写城里保留子树之外的任何一份文件，包括另一栋楼的源码与人的笔记，它比 `Act` 那一组宽。新命令一律 `LocalOnly` 是 §19-3 的规矩，这里写下的是没有例外的理由。**被否掉的**：随 `PutSpine` 定为 `Act`——一台被借走的手机就能改写城里任意一份文件，而撤销配对之前写下的东西只能从检查点里找回。条件变了就重议：人决定在外面也要改文档时，先给 `PutRange` 一个只写某几栋楼的范围，再谈 `Act`。
 
-**`playback` 是一个两个词的动词，导出写 stdout 或一个新文件，只在 bundle 完整之后写**（8-126、accounting-SPEC.md 8-12）。回看一段工作流有两个动作：导出与复核，它们的标志不同（导出读选择与 `--out`，复核读 `--bundle`/`--city`），所以是两行；放在一个词 `playback` 之下，是因为总览里两者挨着，人找到一个就找到另一个。命令表的一行可以带两个词，解析先试两个词，其余不变，8-89 决定 1「动词需要子动词」的重议条件因此被这一个最小的扩展满足，没有换参数库。输出不沿用 `view` 的做法：`view | head` 截断仍算成功，是因为账本原行本来就一行一行有意义；一份截断的 bundle 读不回来，却可能被当成一份完整的东西留下，所以 bundle 先整份算好、量过尺寸再写，管道中途关闭是失败，`--out` 经暂存文件与硬链接落位、已有目标不覆盖。**被否掉的**：`export --playback` 之类挂在现有动词上的标志（`export` 打包整座城，两件事的输入与输出都不同）；`--out` 默认写进城里（导出件不进 git，城里的保留导出位置由布局 owner 在居民入口落地时定）；`rename` 落位（在 Unix 上会覆盖已有目标）。条件变了就重议：人也要一个不必自己选路径的去处时，`--out` 缺省可以写到城里的保留导出位置（8-132 给居民的那一处），而不是 stdout。
+**`playback` 是一个两个词的动词，导出写 stdout 或一个新文件，只在 bundle 完整之后写**（8-126、`crates/accounting/Spec.lean` §8-12）。回看一段工作流有两个动作：导出与复核，它们的标志不同（导出读选择与 `--out`，复核读 `--bundle`/`--city`），所以是两行；放在一个词 `playback` 之下，是因为总览里两者挨着，人找到一个就找到另一个。命令表的一行可以带两个词，解析先试两个词，其余不变，8-89 决定 1「动词需要子动词」的重议条件因此被这一个最小的扩展满足，没有换参数库。输出不沿用 `view` 的做法：`view | head` 截断仍算成功，是因为账本原行本来就一行一行有意义；一份截断的 bundle 读不回来，却可能被当成一份完整的东西留下，所以 bundle 先整份算好、量过尺寸再写，管道中途关闭是失败，`--out` 经暂存文件与硬链接落位、已有目标不覆盖。**被否掉的**：`export --playback` 之类挂在现有动词上的标志（`export` 打包整座城，两件事的输入与输出都不同）；`--out` 默认写进城里（导出件不进 git，城里的保留导出位置由布局 owner 在居民入口落地时定）；`rename` 落位（在 Unix 上会覆盖已有目标）。条件变了就重议：人也要一个不必自己选路径的去处时，`--out` 缺省可以写到城里的保留导出位置（8-132 给居民的那一处），而不是 stdout。
 
-**居民的 `playback` 是一件工具、两个动作，按写登记，读者由上下文定**（8-132、accounting-SPEC.md 8-13）。导出要写文件，复核只读；工具的效应按登记而不是按调用，一件工具只能登记一种，所以取两者中较强的写：代价是复核也走写门、不被推测执行提前跑，而一次复核本来要重算整段历史，提前跑它省不下什么。导出件落在城根保留子树下的 `playback/<楼>/`，而不是居民的房间或 worktree：保留子树没有写域够得到，居民改不了一份已经写下的报告，只能另导出一份；它被城根的 `.gitignore` 挡在历史之外；它不随 worktree 清扫消失，没有 worktree 的 run 也有同一个去处。按楼分目录，是因为复核要用同一个读者重算，一栋楼的导出只有同一栋楼的居民复核得了，机密楼的导出也就不会被别的楼读到。**被否掉的**：`playback_export` 与 `playback_check` 两件工具（复核可以按 `Read` 登记，但一个动作拆成两件工具，模型要多认一个名字，而两者的参数一半相同）；写进房间并靠 `.gitignore` 挡住（worktree 会被清扫，居民能用 `edit` 改报告）；让居民在参数里选读者（读者是读界的输入，交给被读界约束的一方去选，读界就没有意义）。条件变了就重议：工具的效应可以按调用声明时，`check` 改回 `Read`。
+**居民的 `playback` 是一件工具、两个动作，按写登记，读者由上下文定**（8-132、`crates/accounting/Spec.lean` §8-13）。导出要写文件，复核只读；工具的效应按登记而不是按调用，一件工具只能登记一种，所以取两者中较强的写：代价是复核也走写门、不被推测执行提前跑，而一次复核本来要重算整段历史，提前跑它省不下什么。导出件落在城根保留子树下的 `playback/<楼>/`，而不是居民的房间或 worktree：保留子树没有写域够得到，居民改不了一份已经写下的报告，只能另导出一份；它被城根的 `.gitignore` 挡在历史之外；它不随 worktree 清扫消失，没有 worktree 的 run 也有同一个去处。按楼分目录，是因为复核要用同一个读者重算，一栋楼的导出只有同一栋楼的居民复核得了，机密楼的导出也就不会被别的楼读到。**被否掉的**：`playback_export` 与 `playback_check` 两件工具（复核可以按 `Read` 登记，但一个动作拆成两件工具，模型要多认一个名字，而两者的参数一半相同）；写进房间并靠 `.gitignore` 挡住（worktree 会被清扫，居民能用 `edit` 改报告）；让居民在参数里选读者（读者是读界的输入，交给被读界约束的一方去选，读界就没有意义）。条件变了就重议：工具的效应可以按调用声明时，`check` 改回 `Read`。
 
-**playback 的时间条件是两扇门各读三个原文、交给同一个函数**（8-143；accounting-SPEC.md 8-17 与 §12 第 29 条）。`--since`、`--until`、`--day` 与城工具的 `since`、`until`、`day` 都只是原文，`accounting::playback::Window::span` 一处把它们读成一个 `UtcSpan`；这样人与居民导出同一天时，`source.selection` 记下同样的两端，复核也按同一个区间重算。`--day` 不进 `view`：`view` 是看行的透镜，`--since/--until` 已经够它用，多一个旗标就多一种写法要维护。**被否掉的**：CLI 复用 `view` 的 `--since/--until` 读法而城工具另写一份（两扇门读同一个条件就会有两处）；`--day` 与 `--since/--until` 互斥（「这一天九点以后」是一个合法的问题，交集就是它）。条件变了就重议：人要按本地日期回看时，那时要一个时区，而城今天只认 UTC（`crates/runtime/Spec.lean` §8-10）。
+**playback 的时间条件是两扇门各读三个原文、交给同一个函数**（8-143；`crates/accounting/Spec.lean` §8-17 与 accounting D29）。`--since`、`--until`、`--day` 与城工具的 `since`、`until`、`day` 都只是原文，`accounting::playback::Window::span` 一处把它们读成一个 `UtcSpan`；这样人与居民导出同一天时，`source.selection` 记下同样的两端，复核也按同一个区间重算。`--day` 不进 `view`：`view` 是看行的透镜，`--since/--until` 已经够它用，多一个旗标就多一种写法要维护。**被否掉的**：CLI 复用 `view` 的 `--since/--until` 读法而城工具另写一份（两扇门读同一个条件就会有两处）；`--day` 与 `--since/--until` 互斥（「这一天九点以后」是一个合法的问题，交集就是它）。条件变了就重议：人要按本地日期回看时，那时要一个时区，而城今天只认 UTC（`crates/runtime/Spec.lean` §8-10）。
 
 
 ## 13 依赖选型
@@ -1713,7 +1713,7 @@ pub(crate) enum Need { Required, OneOf(Group), Optional }   // 一组任一即�
 pub enum Platform { Windows, MacOs, Linux }            // `bin::install` 经它进入，遵 lib.rs 的约定：二进制进入即公开
 pub(crate) struct PerPlatform<T> { windows: T, macos: T, linux: T }
 pub(crate) enum Detection { Program { program, version_arg, places }, Environment { variable } }
-pub(crate) struct Requirement { name, tier, need, enables, detect, homepage, recipe }   // recipe: PerPlatform<accounting::Recipe>（accounting-SPEC 8-4）
+pub(crate) struct Requirement { name, tier, need, enables, detect, homepage, recipe }   // recipe: PerPlatform<accounting::Recipe>（`crates/accounting/Spec.lean` §8-4）
 pub(crate) enum Presence { Present(String), Absent }
 pub(crate) struct Finding { requirement: &'static Requirement, presence: Presence }
 pub(crate) fn examine(machine: &dyn Machine) -> Vec<Finding>;
@@ -1732,7 +1732,7 @@ pub(crate) fn run<R: BufRead, W: Write>(asked: &Asked, machine: &dyn Machine, in
 pub(crate) fn verb(args: &[String]) -> ExitCode;              // 必需项有缺则退 1
 
 // bin::doctor::probe（形状 4 adapter：运行中的机器）
-pub(crate) trait Machine: accounting::Machine { fn look(&self, r: &Requirement) -> Presence; }   // 安装经父 trait 的 install（accounting-SPEC.md 8-4）
+pub(crate) trait Machine: accounting::Machine { fn look(&self, r: &Requirement) -> Presence; }   // 安装经父 trait 的 install（`crates/accounting/Spec.lean` §8-4）
 pub(crate) trait Machine { fn look(&self, r: &Requirement) -> Presence; fn install(&self, name: &str, recipe: &Recipe) -> Result<(), AxError>;
                            fn core_standing(&self) -> Result<Standing, AxError>; } // §8-93 的档位，由平台实际给出
 pub(crate) struct ThisMachine { platform: Option<Platform>, patience: Duration }
@@ -2226,7 +2226,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 
 **留给后续卡**：`hall` 的居民目前拿到的仍是 `workbench::tools` 给所有人的同一套工具表，`exec`／`delegate`／`workshop` 都在里面；这张表按地址裁，而不是只由写域挡住（`Documents` 拒非 `.md`），不由工具表挡住。
 
-## 8-136 `sprawling whose --trace`：一个提交倒推到产生它的调用与居民（`bin::main::whose`；accounting-SPEC.md 8-16）
+## 8-136 `sprawling whose --trace`：一个提交倒推到产生它的调用与居民（`bin::main::whose`；`crates/accounting/Spec.lean` §8-16）
 
 **形状。** `main/whose.rs` 仍是 adapter：读命令行，不带 `--trace` 时问 `accounting::views::ask`，带 `--trace` 时问 `accounting::trace::trace`，把答写成几行给人读。写 stdout 失败时与 `view` 一样：读者提前停下（`| head`）退出 0，别的写失败退出 1。
 
@@ -2376,7 +2376,7 @@ impl RunWorker {
 }
 ```
 
-`lay_out_workbench` 调的是 `RunWorker.browsers`，不直接调 `browser_tool::for_rules`：本模块起浏览器、经 BiDi 说话，worker 搬进 `accounting` 时它留在 `sprawling`（accounting-SPEC.md §7、§12-10）。换掉它放不宽机密：`city::policy` 在机密楼上拒绝 `browser` 与 `usersbrowser` 两项设置，楼的规则里就没有要浏览器的那一句。钉住它的测试是 `crates/sprawling/tests/browsers.rs` 的 `a_run_is_offered_the_browser_the_worker_was_handed`。
+`lay_out_workbench` 调的是 `RunWorker.browsers`，不直接调 `browser_tool::for_rules`：本模块起浏览器、经 BiDi 说话，worker 搬进 `accounting` 时它留在 `sprawling`（`crates/accounting/Spec.lean` §7、accounting D10）。换掉它放不宽机密：`city::policy` 在机密楼上拒绝 `browser` 与 `usersbrowser` 两项设置，楼的规则里就没有要浏览器的那一句。钉住它的测试是 `crates/sprawling/tests/browsers.rs` 的 `a_run_is_offered_the_browser_the_worker_was_handed`。
 
 ### 8-45-3 截图成为证据
 
@@ -2595,7 +2595,7 @@ impl DrivingPool {
 需要重算 api-baseline，那是一次独立的卡，不该塞进这一张。**在它落地之前，比天花板大的车道数只会让线程停在
 admission 上排队**——§8-42-3 早就写下这句话，这里把它从设计变成一个带理由的常量。
 
-**内存紧时计划的下一行排队**：`full` 在车道都占满时为真，另外在已有 run 在跑、而整机可用内存低于物理内存的十分之一时也为真（`admits(in_flight, lanes, memory)` 是这一条规则的唯一出处）。读数来自 `open` 时交给池的 `read_memory`，池自己不碰主机：生产交 `bin::monitor::memory::read`，worker 搬进 `accounting` 时 `monitor` 留在 `sprawling`、经这个 `fn` 指针进来（accounting-SPEC.md §7、§12-10），脚本场景交一个自己的读数就能造出内存紧的机器。`full` 每次被问都读一次，所以跟着实时的可用内存走；问它的有三处：`DrivingPool::start`（每一轮进车道都经过的门，满了就排队）、`start_waiting`（一轮回家后按到达顺序起排着的活）与 `Flight::full`（计划推进循环 `accounting::worker::plans::pursuing` 每次决定是否起下一行）。读一次约 1.6 µs（Windows x86-64 桌面级机器、测试档构建），只发生在起一轮之前。没有 run 在跑时总放一轮进来：否则一台内存一直紧的机器上城永远不动，而一轮自己占的内存远小于它派出的构建。排着的计划行在下一轮回家时再判一次。取物理内存的十分之一而不是一个字节数，是因为一个字节数只适合某一类机器；十分之一留给人的其他程序与页缓存。**被否**：按「每轮估计占用」算出可同时驱动的轮数——一轮的边际内存还没有测过，估计值就是一个没有来源的常数。**重开参数**：测得一轮的边际内存之后，改成「可用内存 ≥ 留给别人的那一份 + 一轮的实测边际」。证据：`crates/accounting/src/worker/pool.rs` 的 `a_new_run_waits_while_memory_is_tight` 与 `a_pool_judges_memory_by_the_reader_it_was_handed`。
+**内存紧时计划的下一行排队**：`full` 在车道都占满时为真，另外在已有 run 在跑、而整机可用内存低于物理内存的十分之一时也为真（`admits(in_flight, lanes, memory)` 是这一条规则的唯一出处）。读数来自 `open` 时交给池的 `read_memory`，池自己不碰主机：生产交 `bin::monitor::memory::read`，worker 搬进 `accounting` 时 `monitor` 留在 `sprawling`、经这个 `fn` 指针进来（`crates/accounting/Spec.lean` §7、accounting D10），脚本场景交一个自己的读数就能造出内存紧的机器。`full` 每次被问都读一次，所以跟着实时的可用内存走；问它的有三处：`DrivingPool::start`（每一轮进车道都经过的门，满了就排队）、`start_waiting`（一轮回家后按到达顺序起排着的活）与 `Flight::full`（计划推进循环 `accounting::worker::plans::pursuing` 每次决定是否起下一行）。读一次约 1.6 µs（Windows x86-64 桌面级机器、测试档构建），只发生在起一轮之前。没有 run 在跑时总放一轮进来：否则一台内存一直紧的机器上城永远不动，而一轮自己占的内存远小于它派出的构建。排着的计划行在下一轮回家时再判一次。取物理内存的十分之一而不是一个字节数，是因为一个字节数只适合某一类机器；十分之一留给人的其他程序与页缓存。**被否**：按「每轮估计占用」算出可同时驱动的轮数——一轮的边际内存还没有测过，估计值就是一个没有来源的常数。**重开参数**：测得一轮的边际内存之后，改成「可用内存 ≥ 留给别人的那一份 + 一轮的实测边际」。证据：`crates/accounting/src/worker/pool.rs` 的 `a_new_run_waits_while_memory_is_tight` 与 `a_pool_judges_memory_by_the_reader_it_was_handed`。
 
 ### 8-46-4 `pursue` 拿走整个 ready set（`accounting::worker::plans::pursuing`）
 
@@ -3012,17 +3012,17 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **`summarize` 把 `RunHot.addr`／`started`／`completion`／`pr`／`ask` 抄进 `RunSummary`**，不读账本（`crates/wire/Spec.lean` §8-48）。
 - **`rounds_answer` 多读两条记录**：窗口里第一条 `run_started` 成 `Opening { task, goal, at: record.t() }`，第一条 `run_frozen` 成 `Closing { completion, at }`；`turns()` 本身一字不动。
 - **`accounting::views::listing`**（新文件）：`at` 为 `None` 读城根，否则读 `city_root/<at>`；`read_dir` 一层，目录在前、文件在后、各按名字 UTF-8 序；读不了的目录答空表而不是拒绝——同 `read_building` 的口径，一个读不了的目录在页面上是一个空目录。符号链接按 `metadata` 判：指向目录的算目录。文件大小 `u64`。
-- **`accounting::views::document`**：路径同上；答什么、怎样判文本、在哪里切，见 accounting-SPEC §8-21 与 `crates/wire/Spec.lean` §8-69。**不经密钥扫描**：这是城内的文件给城的主人看，而 `Hunks` 的扫描针对的是把补丁文本挂上线的那条路——但 `.sprawling/CONFIG.toml` 里只有 `secret:` 引用，明文本来就不落盘（`xtask secret` 门保证），所以这里没有可泄露的东西。
-- **验收**：`views::listing::tests`——`init_city` 铺出的城根列出 `.sprawling` 与 `hall` 两个目录；`hall` 下列出 `Roadmap.md` 等文件且目录先于文件；不存在的路径答空表。`views::document::tests`——读城里 `hall` 楼自己的 `RULES.toml` 得到原文，第一个窗口盖住整份；其余见 accounting-SPEC §8-21。`views::rounds::tests`——三条记录的会话答出 `opening.task`；冻结后答出 `closing.completion == "done"`。`views::tests`——`city_halted` 后 `city_view.halted == ["city"]`，`released` 后为空。
+- **`accounting::views::document`**：路径同上；答什么、怎样判文本、在哪里切，见 `crates/accounting/Spec.lean` §8-21 与 `crates/wire/Spec.lean` §8-69。**不经密钥扫描**：这是城内的文件给城的主人看，而 `Hunks` 的扫描针对的是把补丁文本挂上线的那条路——但 `.sprawling/CONFIG.toml` 里只有 `secret:` 引用，明文本来就不落盘（`xtask secret` 门保证），所以这里没有可泄露的东西。
+- **验收**：`views::listing::tests`——`init_city` 铺出的城根列出 `.sprawling` 与 `hall` 两个目录；`hall` 下列出 `Roadmap.md` 等文件且目录先于文件；不存在的路径答空表。`views::document::tests`——读城里 `hall` 楼自己的 `RULES.toml` 得到原文，第一个窗口盖住整份；其余见 `crates/accounting/Spec.lean` §8-21。`views::rounds::tests`——三条记录的会话答出 `opening.task`；冻结后答出 `closing.completion == "done"`。`views::tests`——`city_halted` 后 `city_view.halted == ["city"]`，`released` 后为空。
 
 ## 8-152 页面保存一份文档、决定修改提案、读提交说明，服务中的城怎么做（`accounting::worker::commanding::saving`、`accounting::views::proposals`、`accounting::views::commits`；`crates/wire/Spec.lean` §8-72、§8-73、§8-54）
 
-- **两条写命令走 worker 的同一扇门。** `PutRange` 与 `DecideProposals` 经 desk 进 `run_command`，各有一臂，交给 `commanding::saving`（accounting-SPEC §8-22）；`idem` 由 `commanding::entrance` 判，所以页面丢了答复再发一次，城答第一次的结果，不写第二行。
+- **两条写命令走 worker 的同一扇门。** `PutRange` 与 `DecideProposals` 经 desk 进 `run_command`，各有一臂，交给 `commanding::saving`（`crates/accounting/Spec.lean` §8-22）；`idem` 由 `commanding::entrance` 判，所以页面丢了答复再发一次，城答第一次的结果，不写第二行。
 - **回执是事件流上的一行。** 成功的保存写 `document_written`，带这条命令的 `idem`；页面在 `core/belief` 的折叠里见到带自己 `idem` 的那一行才把「保存中」换成「已保存」，`version` 换成新的基线。`client/src/core/staleness.ts` 让这一行使 `document` 与 `proposals` 两种答复过期，页面再问一次就读到新版本与剩下的卡。
 - **`Query::Proposals` 读视图里的 `Governance.proposals`**，锁外读盘取文件此刻的版本（同 8-52 的 `document`，8-100 的锁外规矩）。
 - **提交说明随父提交一起读**：`Query::Commit` 与 `Query::Commits` 的 `CommitsAsk::read` 在锁外各补 `parents` 与 `message`（8-128）。
 - **客户端今天只有发出点，没有画面**：`client/src/core/commands/document.ts` 拼 `put_range` 与 `decide_proposals` 两种帧；编辑页与请决定卡还没有画出来，画它们的依据是 `crates/wire/Spec.lean` §8-72、§8-73 与 refrain 路线图 §4-8、§4-10。
-- 验收：见 accounting-SPEC §8-22 列的测试；远程门对两条命令的分类见 §12 「写文档的两条命令在远程门外」。
+- 验收：见 `crates/accounting/Spec.lean` §8-22 列的测试；远程门对两条命令的分类见 §12 「写文档的两条命令在远程门外」。
 
 ## 8-53 一座楼做过的提交，倒序分页（`accounting::views::commits`、`views::holding`；`crates/wire/Spec.lean` §8-24）
 
@@ -3042,8 +3042,8 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 
 - **`bin::doctor::report`**：`answer(machine: &dyn Machine) -> wire::DoctorAnswer` 问一次交给它的机器并折成答案。机器是参数，所以一个测试交一台假机器，就说出机器答了什么而不必有那样一台机器；生产的调用方是 `ThisMachine` 实现的 `accounting::Machine::report`。**它不判断任何事**——哪一项在这里、一个档次缺什么，权威在 `doctor` 与 `table`；这里只换一种说法。`screen` 把同一批 findings 折成一台机器的散文，两者从同一处折出。
 - **`Views.machine: Option<wire::DoctorAnswer>`**，由 `found_on_this_machine` 从外面放进来，**不由任何记录折出**：这是本文件里唯一一个关于机器而非关于历史的答案，所以重建账本不碰它。`None` 答 `Unavailable`。
-- **`Views.registry: Option<fn() -> wire::ReleaseAnswer>`**，由 `views::served` 的 `ask_the_registry_through` 从外面放进来，与 `machine`、`vault` 同形：serve 一座城时装配根交 `bin::release::answer`，`twin` 把它带到另一份。`NewestRelease` 在快照放开之后调它（它要出网）；`None` 是一份没人 serve 的 views（重建、测试），答 `Unavailable` 而不去问注册表。views 因此不直接碰 `bin::release`，搬进 `accounting` 时 `release` 留在 `sprawling`（accounting-SPEC.md §7）。钉住它的测试是 `a_newest_release_is_asked_of_the_registry_the_views_were_handed`。
-- **`Views.programs: Option<fn(&str) -> Option<PathBuf>>`**，由 `find_programs_through` 从外面放进来，与 `registry` 同形：serve 一座城时装配根交 `bin::doctor::host::find_program`。`Query::Harnesses` 在快照放开之后调它；`None` 答 `Unavailable`（accounting-SPEC.md 8-10、§12-13）。
+- **`Views.registry: Option<fn() -> wire::ReleaseAnswer>`**，由 `views::served` 的 `ask_the_registry_through` 从外面放进来，与 `machine`、`vault` 同形：serve 一座城时装配根交 `bin::release::answer`，`twin` 把它带到另一份。`NewestRelease` 在快照放开之后调它（它要出网）；`None` 是一份没人 serve 的 views（重建、测试），答 `Unavailable` 而不去问注册表。views 因此不直接碰 `bin::release`，搬进 `accounting` 时 `release` 留在 `sprawling`（`crates/accounting/Spec.lean` §7）。钉住它的测试是 `a_newest_release_is_asked_of_the_registry_the_views_were_handed`。
+- **`Views.programs: Option<fn(&str) -> Option<PathBuf>>`**，由 `find_programs_through` 从外面放进来，与 `registry` 同形：serve 一座城时装配根交 `bin::doctor::host::find_program`。`Query::Harnesses` 在快照放开之后调它；`None` 答 `Unavailable`（`crates/accounting/Spec.lean` §8-10、accounting D13）。
 - **探测只由 `DoctorRefresh` 触发，服务一座城时一次也不跑**：表从 12 行长到 32 行，其中大半是起一个进程问它的版本（六件 cargo 子命令各起一次 cargo），windows-x86_64 暖缓存四核一档机器上量得 3.3–4.1 s。先前的决定把它放在开门之前，给出的参数是「12 项约 2 秒」，**两个数都已经移动**：项数翻了一倍有余，而问它的那一屏不再是第一屏（`#/` 是对话，机器那一屏在设置页的「依赖项安装」组里）。它当时否决后台探测的理由是「要多一条『还没答上来』的状态」，而那条状态今天已经存在、有夹具、也有它的动作（`MachineSkeleton` 与 `MachineUnchecked`）——那笔代价早已付过。服务因此不再为一个没人问的答案把套接字关着几秒。
 - **客户端**：`client/src/views/machine.svelte` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。**那一屏每次打开都发一次 `DoctorRefresh`**（与「重新检查」同一条命令，不是第二条路），每次打开至多一次；城里已有的答案先画出来，探完的那一份到了再换上（§8-120）。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
 - **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。
@@ -3240,7 +3240,7 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError>;
 reveal: fn(&Path, &Address) -> Result<(), AxError>,
 ```
 
-- **worker 经它被交到的 `fn` 指针碰这里**：生产的 `Hands`（`bin::assembly::production::hands`）装上 `revealing::reveal`，经 `Hands.reveal` 交给 worker 的构造器，`Command::Reveal` 调的是那个字段，不直接调本函数。本模块启动主机的一个程序，worker 搬进 `accounting` 时它留在 `sprawling`（accounting-SPEC.md §7、§12-10）；脚本场景交一个自己的 `fn`，就不会在宿主上起文件管理器。钉住它的测试是 `a_reveal_reaches_the_file_manager_the_worker_was_handed`。
+- **worker 经它被交到的 `fn` 指针碰这里**：生产的 `Hands`（`bin::assembly::production::hands`）装上 `revealing::reveal`，经 `Hands.reveal` 交给 worker 的构造器，`Command::Reveal` 调的是那个字段，不直接调本函数。本模块启动主机的一个程序，worker 搬进 `accounting` 时它留在 `sprawling`（`crates/accounting/Spec.lean` §7、accounting D10）；脚本场景交一个自己的 `fn`，就不会在宿主上起文件管理器。钉住它的测试是 `a_reveal_reaches_the_file_manager_the_worker_was_handed`。
 
 - **为什么是一条命令而不是一个链接**：浏览器打不开 `file://` 之外的东西，而 `file://` 打开的是一个目录列表而不是人平时用的那个窗口。城代为执行，于是「在文件管理器里指出来」这件事在三个平台上各自用它们自己的办法完成：Windows `explorer /select,<路径>`、macOS `open -R <路径>`、其余 `xdg-open <父目录>`。
 - **文法即闸**：入参是 `Address`，它在语法上爬不出城，所以「请求城外的一个路径」这句话在线上拼不出来。此处不再加第二道路径检查——那会是同一条规则的第二个权威。
@@ -3299,7 +3299,7 @@ impl Journal {
 `Query::Doctor` 答的是开城那一刻的快照（§8-53）。于是机器页只能把一行命令复制到终端，装完还要重启城才看得见结果。两条命令补上这段，执行点是 `accounting::worker::commanding::machine`。
 
 ```rust
-// accounting::machine（Recipe 的唯一拒绝语；Runnable 只由它造，accounting-SPEC 8-4）
+// accounting::machine（Recipe 的唯一拒绝语；Runnable 只由它造，`crates/accounting/Spec.lean` §8-4）
 impl Recipe {
     pub fn command(&self, item: &str) -> Result<Runnable<'_>, AxError>;
 }
@@ -3318,7 +3318,7 @@ impl RunWorker {
 pub(crate) fn recipe_for(item: &str) -> Result<&'static accounting::Recipe, AxError>; // InvalidArgs：表里没有；ToolUnavailable：这个平台没有配方
 ```
 
-- **查表与取平台在表旁边的 `doctor::recipe_for`，写进度行在 `doctor_install`**：worker 搬进 `accounting` 时需求表留在 `sprawling`（accounting-SPEC.md §7），所以 worker 经打开时交给它的 `RunWorker.recipe_for` 这个 `fn` 指针拿配方，而不是自己读 `REQUIREMENTS`。它不是一层穿透：它是表的查法，与表同住 `doctor::table`，一个名字要不要被拒只在那里回答。进度行仍由 `doctor_install` 写，写的时刻因此就是安装到达的时刻。钉住这条的测试是 `an_install_takes_its_recipe_from_the_table_the_worker_was_handed`。
+- **查表与取平台在表旁边的 `doctor::recipe_for`，写进度行在 `doctor_install`**：worker 搬进 `accounting` 时需求表留在 `sprawling`（`crates/accounting/Spec.lean` §7），所以 worker 经打开时交给它的 `RunWorker.recipe_for` 这个 `fn` 指针拿配方，而不是自己读 `REQUIREMENTS`。它不是一层穿透：它是表的查法，与表同住 `doctor::table`，一个名字要不要被拒只在那里回答。进度行仍由 `doctor_install` 写，写的时刻因此就是安装到达的时刻。钉住这条的测试是 `an_install_takes_its_recipe_from_the_table_the_worker_was_handed`。
 - **只跑 `Recipe::Command`，走的是终端那条 `Machine::install`**，不是第二个安装器。`Print` 与 `Manual` 各自带着「人自己去做什么」被拒：管道进 shell 的脚本是没人读过的代码，这条纪律不因请求来自页面而松一格。需求表里没有的名字在起任何进程之前就被拒，因为页面问的是这份构建不认识的东西。
 - **「这条配方这座城可不可以跑」只有 `Recipe::command` 一个家**（H-12）。它要么给出 `Runnable`，要么给出那句带恢复语的拒绝；终端（`screen`）、页面（`commanding::machine`）与机器适配器（`probe`）三处都问它，所以同一条打印配方在三扇门后读到的是同一句话。`Machine::install` 收的是 `Runnable` 而不是 `Recipe`，于是「不可跑的配方」在这一层已经不可表达，`runnable()` 与 `probe` 里那第二段措辞随之删除。
 - **`bin::doctor::running` 是本二进制起安装程序的唯一一处，等待有上限**（B-25／F-10）。三件事一起成立：`stdin` 是 `Stdio::null()`，于是要人同意源协议、要人输密码的包管理器立刻读到输入结束而不是坐在一台没有人的终端前；等待是 `try_wait` 的**计数敲门**，而不是 `Command::status()` 那种没有尽头的阻塞；敲完即杀掉子进程并带着 `E_TIMEOUT` 返回，恢复语是「自己在终端里跑这一行」。**上限用敲门次数而不是墙钟，因为本二进制读时钟的地方只有 `bin::assembly` 一处**（ARCHITECTURE §10 第 4 条）；这同时让上限可断言——测试要三次敲门就得到三次，而对着墙钟的断言问的是它跑在哪台机器上。上限由 `running::patience_for(runnable)` 一处决定：`cargo install` 从源码编译，给 `BUILD_PATIENCE = 24_000` 次 × `TICK = 50ms` = 20 分钟，因为 cargo-mutants、cargo-deny 这一类在四核机器上冷编译要 5–12 分钟，3 分钟的上限让它们每次都被杀在半路；其余的包管理器下载现成的包，仍是 `PATIENCE = 3_600` 次 = 180 秒。杀不掉或收不了尸都写进那条错误的主题——本城起的一个停不掉的进程是人必须知道的事实。
@@ -3456,7 +3456,7 @@ impl RunWorker { fn halted_by(&self, addr: &Address) -> Option<kernel::event::Sc
 
 **本章测试**：`an_unreadable_approval_item_stops_the_fold`（`accounting::worker::folds::tests`）、`an_appointment_this_build_cannot_read_is_refused_rather_than_defaulted`（`kernel::event::record::governance`）。
 
-### 8-76 哪些记录会动计划，是一张穷尽表（`accounting::plan_view::reach::may_move_plan`；accounting-SPEC.md 8-6）
+### 8-76 哪些记录会动计划，是一张穷尽表（`accounting::plan_view::reach::may_move_plan`；`crates/accounting/Spec.lean` §8-6）
 
 ```rust
 enum PlanReach { Untouched, Stale, NodeFreed, NodeStopped }
@@ -3973,7 +3973,7 @@ pub(super) fn audit_in_background(
 ) -> Result<std::thread::JoinHandle<()>, AxError>; // StorageFatal「start the chain audit」：线程起不来
 ```
 
-**两步，先接上停机再起线程。** `chain_under_audit` 新建一个 `storage::ChainHalt::awaiting_proof()`，经 `JsonlLedger::halt_on` 接到这个 worker 的写者上，交回停机值、账本目录、写者此刻的位置与能写的记录（`JsonlLedger::proof_records`，记录目录由 `accounting::views::snapshot::start::proof_dir` 给出）；`audit_in_background` 再在名为 `sprawling-chain-audit` 的线程上跑 `storage::prove_chain`（`crates/storage/Spec.lean` §8-30）。前一步读写者的私有字段，所以随 worker 住；后一步起线程，所以留在装配根（accounting-SPEC.md §12-17）。线程只持有账本目录、停机值、记录和自己的 `Diagnostics`，不碰写者，所以写线程从不等证明。`serve` 的写线程在 `open_for_service` 之后依次调用这两步；起不来的线程与起不来的写线程一样，让 `serve` 失败。citysim 与测试不走这条路，所以它们的时序里没有第二个线程。
+**两步，先接上停机再起线程。** `chain_under_audit` 新建一个 `storage::ChainHalt::awaiting_proof()`，经 `JsonlLedger::halt_on` 接到这个 worker 的写者上，交回停机值、账本目录、写者此刻的位置与能写的记录（`JsonlLedger::proof_records`，记录目录由 `accounting::views::snapshot::start::proof_dir` 给出）；`audit_in_background` 再在名为 `sprawling-chain-audit` 的线程上跑 `storage::prove_chain`（`crates/storage/Spec.lean` §8-30）。前一步读写者的私有字段，所以随 worker 住；后一步起线程，所以留在装配根（accounting D17）。线程只持有账本目录、停机值、记录和自己的 `Diagnostics`，不碰写者，所以写线程从不等证明。`serve` 的写线程在 `open_for_service` 之后依次调用这两步；起不来的线程与起不来的写线程一样，让 `serve` 失败。citysim 与测试不走这条路，所以它们的时序里没有第二个线程。
 
 **证明之前写者不写。** 停机值在判定之前拒绝每一次追加，答 `E_HISTORY_UNPROVEN`：页面上发来的命令照样被服务，人收到的是这个码与它的恢复办法，账本一行不多（`crates/accounting/spec/Worker/Attend.lean` 的 `nothing_is_written_before_the_proof`）。`open_for_service` 写的开城那几行在停机值接上之前写下，它们是城自己的开门，不是按历史作出的判断。关城时写者先 `await_proof`，交接那一行在证明有了结局之后写：完好就照常写下，断链就被拒并说出断链的原因。证明线程若没有给出判定就结束（恐慌），它持有的守卫在退栈时以「证明没有走完」跳闸，关城不会永远等下去。
 
@@ -4152,7 +4152,7 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 
 **本节接口的当前状态。** M1 与 M2 是同一刻：`wire::serve` 在 `listen` 返回之后才开始应答，把静态页面的应答提前到折叠之前要改 `wire` 的服务入口，归 W 车道。尾部恢复从末段的已验证前缀起只逐行核对之后的字节（8-144，`crates/storage/Spec.lean` §8-34）。`SnapshotStart::Resume.tail` 仍把尾部整段读进内存；正常关闭的城尾部为空，崩溃后的尾部是上次切视图快照之后写下的记录。Standing 的快照只在开城时切（8-101），所以 Standing 的切点落后于视图，这一遍从 Standing 的切点读起：按与视图相同的节奏在服务中切 Standing，要先核对写者对 Standing 的增量更新与 `StandingFolds::absorb` 是同一条规则。页面从 `CityAnswer.proved` 读到历史已证明到哪一条（8-134）。
 
-### 8-144 开城的两段与一次性重建：末段按记录证明、第二份视图按值克隆、重建每行只核对一遍（`accounting::worker::folds`、`accounting::views::snapshot`、`accounting::views::snapshot::start`，形状 7 投影；`crates/storage/Spec.lean` §8-34，accounting-SPEC.md 8-19）
+### 8-144 开城的两段与一次性重建：末段按记录证明、第二份视图按值克隆、重建每行只核对一遍（`accounting::worker::folds`、`accounting::views::snapshot`、`accounting::views::snapshot::start`，形状 7 投影；`crates/storage/Spec.lean` §8-34，`crates/accounting/Spec.lean` §8-19）
 
 **原因是一组拆开的读数。** 40 万行夹具城（`bench_startup first-byte` 的 `l400k`，8-122 之后，windows-x86_64、16 核、NVMe、release）开城 1220 ms，其中 `open the ledger` 576 ms、`fold 0 lines from the snapshots` 279 ms、`copy the views` 357 ms。逐段拆开量：
 - `open the ledger` 几乎全是尾部恢复逐行核对末段（40,843,081 B）；同一段读一遍 15 ms、BLAKE3 一遍 23 ms。
@@ -4163,8 +4163,8 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 
 **四处改动，保证不变。**
 1. `fold_city` 经 `JsonlLedger::open_reusing` 开账本，记录取自 `proof_dir` 的只读一份（`crates/storage/Spec.lean` §8-34）：末段的前缀按摘要证明，逐行核对的只有上一次后台证明（8-90）之后写下的行。正常关闭的城，那几行就是关城时写的交接。
-2. `Views::twin` 是派生的 `Clone`（accounting-SPEC.md 8-19(a)）：共享的句柄在 `Arc` 里，克隆后仍共享，结果与编码再解码相同。
-3. `start_audited` 从创世折叠时不先证明，从快照起步时才先证明（accounting-SPEC.md 8-19(b)）。
+2. `Views::twin` 是派生的 `Clone`（`crates/accounting/Spec.lean` §8-19(a)）：共享的句柄在 `Arc` 里，克隆后仍共享，结果与编码再解码相同。
+3. `start_audited` 从创世折叠时不先证明，从快照起步时才先证明（`crates/accounting/Spec.lean` §8-19(b)）。
 4. `storage::tail_after` 从含快照那一行的段尾往回找它，不再从段首把整段切成行（`crates/storage/Spec.lean` §8-28）。
 
 **回退门是计数，墙钟只登记。** storage 的 `jsonl::open::tests` 在 N 与 2N 行上断言：记录覆盖末段之后再写 2 行，开账本逐行核对 2 行、按摘要复用 1 段。accounting 的 `worker::folds::views_start::tests` 在两种规模上断言：没有快照与记录时重建逐行核对的行数等于账本行数；快照与记录都在时等于之后长出的行数的两倍（证明一遍、折尾部一遍），与历史长度无关。开城各段与首字节的毫秒数由 `bench_startup first-byte` 与 `opened the city in` 那一行（8-121）读出，进 `tools/xtask/budgets.toml` 的 `[first_byte]` 与 `[views_rebuild_per_mb]`。
@@ -4172,12 +4172,12 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 **本节接口的当前状态。**
 - `copy the views` 仍在开城那一行里（8-121 的 `Phase::Twin`），`twin` 仍答 `Result`：它不再会失败，去掉 `Result` 与这一段要同时改 `bin::assembly::listening` 的调用点。
 
-### 8-154 开城与证明再降一档：快照里的摘要是字节，证明按波读段（`accounting::views::snapshot`、`accounting::worker::folds::standing_start`，形状 7 投影；`bin::assembly::chain_watch`，形状：状态机；`crates/kernel/Spec.lean` §8-84，`crates/storage/Spec.lean` §8-37，accounting-SPEC.md 8-24）
+### 8-154 开城与证明再降一档：快照里的摘要是字节，证明按波读段（`accounting::views::snapshot`、`accounting::worker::folds::standing_start`，形状 7 投影；`bin::assembly::chain_watch`，形状：状态机；`crates/kernel/Spec.lean` §8-84，`crates/storage/Spec.lean` §8-37，`crates/accounting/Spec.lean` §8-24）
 
 **原因是 8-144 留下的两处读数。** 40 万行夹具城（`bench_startup first-byte` 的 `l400k`，windows-x86_64、16 核、NVMe、release，三轮各 3 个样本）首字节 p50 296–298 ms；`opened the city in` 约 261 ms，其中 `fold 0 lines from the snapshots` 189–190 ms、`open the ledger` 41–42 ms、`copy the views` 22 ms；`the history is proved` 那一行：6 段全按记录命中、0 行逐行核对、读与哈希各 376,383,853 B，证明 390–395 ms，开城起点之后 651–656 ms 接受命令（M3）。10 万行城（`l100k`）：首字节 p50 127–130 ms，折叠 53 ms，证明 98–99 ms，M3 192–193 ms。
 
 **两处改动。**
-1. 视图与 Standing 的快照里，`GitOid` 与 `B3Hash` 写成字节本身（`crates/kernel/Spec.lean` §8-84）。两份快照的夹具里都有这两种摘要，`fold_version` 随之进位，升级之后第一次开城从创世折一次、切新快照（accounting-SPEC.md 8-24）。
+1. 视图与 Standing 的快照里，`GitOid` 与 `B3Hash` 写成字节本身（`crates/kernel/Spec.lean` §8-84）。两份快照的夹具里都有这两种摘要，`fold_version` 随之进位，升级之后第一次开城从创世折一次、切新快照（`crates/accounting/Spec.lean` §8-24）。
 2. 后台证明按波读段：一波至多 8 段，各段的读与记录前缀的哈希同时做，链仍按段序判（`crates/storage/Spec.lean` §8-37）。`chain_watch` 的那一行不变。
 
 **保证不变。** 账本行、线上帧、`golden-p0`／`golden-s1`、wire 的两份 golden 都不变；证明的判定与逐行核对相同（`crates/storage/spec/Snapshot.lean` 的 `wavesAreStrict`）。回退门仍是计数：storage 的 `chain_audit::tests` 在 N 与 2N 段上断言五个计数（逐行核对的行数、按摘要的段数、读与哈希的字节、波数），accounting 的两个 fold-rules 测试钉住快照格式。
@@ -4326,9 +4326,9 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 3. 树为主（D-15）：城 › 楼 › 房间 › 会话 › run › 回合 › 调用，分叉挂在父 run 的分叉点下，每个节点只有一个父；委派、敲门、handback 是详情里的链接，不是树的边。被否掉的：列表加详情为主（人要在交错的行里自己拼出一件活）；fx 式 JSON 树为主（就地展开推走下面的行，也看不出分叉）。
 4. 行选择与 run 折叠都消费 `storage::LedgerIndex` 这一个索引，不自己数段文件（`crates/storage/Spec.lean` §7：`storage` 不对外暴露段）。
 
-## 8-126 `sprawling playback export` 与 `sprawling playback check`（`bin::main::playback`；accounting-SPEC.md 8-12）
+## 8-126 `sprawling playback export` 与 `sprawling playback check`（`bin::main::playback`；`crates/accounting/Spec.lean` §8-12）
 
-**形状。** `main/playback.rs` 是 adapter：读命令行，把人的入口交给 `accounting::playback` 的共享投影，把字节写到 stdout 或一个新文件，把复核结果写成一行 JSON。投影、选择、读界、规范字节与复核都在 accounting-SPEC.md 8-12，本节不重述。
+**形状。** `main/playback.rs` 是 adapter：读命令行，把人的入口交给 `accounting::playback` 的共享投影，把字节写到 stdout 或一个新文件，把复核结果写成一行 JSON。投影、选择、读界、规范字节与复核都在 `crates/accounting/Spec.lean` §8-12，本节不重述。
 
 ```text
 sprawling playback export <city> [--from <seq>] [--through <seq>] [--run <run>] [--building <addr>] [--include-confidential] [--out <file>]
@@ -4344,15 +4344,15 @@ pub(super) fn check(read: &Arguments) -> ExitCode;
 - **两个词是一个动词。** 命令表的一行可以叫 `playback export`：`grammar::parse` 先看头两个词能否拼成某一行的名字，再看头一个词；只敲 `playback` 或 `playback <错词>` 是 `UnknownVerb`，近似名列出 `playback export`、`playback check`。帮助、总览与解析读的仍是同一张表（8-89）。
 - **选择。** `--from`/`--through` 是含端点的 seq，与 `view --from` 同一种读法（`view::seq_flag`）；`--run` 与 `view --run` 同一种读法（`view::run_flag`）；`--building` 经 `Address::parse`，按 `Address::is_within` 选楼，不是 `view --who` 的字符串前缀。三者交给 `Selection::new`，矛盾的区间由它拒绝。
 - **读者是人。** 入口交 `Reader::Person(Confidential::Withheld)`；带 `--include-confidential` 交 `Confidential::Included`，并在 stderr 写一行 `sprawling: playback: this bundle includes confidential buildings`，bundle 的 `source.reader` 写成 `{"person":"included"}`。`check --city` 用同一个标志决定复核时的读者，不读 bundle 自述。
-- **输出。** 不给 `--out` 时，bundle 完整、尺寸检查通过之后才开始写 stdout；写到一半管道关闭是失败（退出 1，stderr 说明 bundle 不完整），不沿用 `view | head` 的成功语义。给 `--out` 时经 `accounting::playback::land(Place::Chosen)` 写（accounting-SPEC.md 8-13）：同一目录先写一个 `<file>.partial-<pid>`，写完再以硬链接落到目标名、删掉暂存文件；目标已存在、或被 git 跟踪，则拒绝，不覆盖；目标的父目录经 `std::fs::canonicalize` 解开链接之后，路径里任一段是受保护的元数据（`kernel::PROTECTED_METADATA`：`.sprawling`、`.git`，不分大小写）则拒绝，所以账本与 git 元数据写不进去。任何失败都删掉暂存文件，不留可被误认的最终文件。
+- **输出。** 不给 `--out` 时，bundle 完整、尺寸检查通过之后才开始写 stdout；写到一半管道关闭是失败（退出 1，stderr 说明 bundle 不完整），不沿用 `view | head` 的成功语义。给 `--out` 时经 `accounting::playback::land(Place::Chosen)` 写（`crates/accounting/Spec.lean` §8-13）：同一目录先写一个 `<file>.partial-<pid>`，写完再以硬链接落到目标名、删掉暂存文件；目标已存在、或被 git 跟踪，则拒绝，不覆盖；目标的父目录经 `std::fs::canonicalize` 解开链接之后，路径里任一段是受保护的元数据（`kernel::PROTECTED_METADATA`：`.sprawling`、`.git`，不分大小写）则拒绝，所以账本与 git 元数据写不进去。任何失败都删掉暂存文件，不留可被误认的最终文件。
 - **复核。** `check` 的文件、标志、五项与它的退出码见 8-132。
 - **退出码**（8-103 的表）：0 导出完成；1 拒绝（账本坏、bundle 超限、目标已存在、被跟踪或在受保护的元数据里、stdout 中途关闭）；2 命令行读不懂。
 
-**本节测试**：`accounting::playback::tests::landing`：`--out` 的目标整份落下、不留暂存文件；已存在的目标被拒且原文件不变；指进 `.sprawling` 或 `.GIT` 被拒且没有留下文件；被 git 跟踪而已从盘上删掉的文件名被拒。`main::playback::tests`：矛盾的区间与读不了的楼、读不了的 seq 分成两种拒绝。`grammar::tests::a_verb_of_two_words_is_read_from_two_words`：`playback export` 从两个词读成一行，`help playback check` 是那一行的帮助，`playback` 单独与 `playback <错词>` 是 `UnknownVerb`、近似名恰是那两行。导出的字节、读界与复核由 `accounting::playback::tests` 判定（accounting-SPEC.md 8-12）。
+**本节测试**：`accounting::playback::tests::landing`：`--out` 的目标整份落下、不留暂存文件；已存在的目标被拒且原文件不变；指进 `.sprawling` 或 `.GIT` 被拒且没有留下文件；被 git 跟踪而已从盘上删掉的文件名被拒。`main::playback::tests`：矛盾的区间与读不了的楼、读不了的 seq 分成两种拒绝。`grammar::tests::a_verb_of_two_words_is_read_from_two_words`：`playback export` 从两个词读成一行，`help playback check` 是那一行的帮助，`playback` 单独与 `playback <错词>` 是 `UnknownVerb`、近似名恰是那两行。导出的字节、读界与复核由 `accounting::playback::tests` 判定（`crates/accounting/Spec.lean` §8-12）。
 
-## 8-143 playback 的时间选择：`--since`、`--until`、`--day` 与城工具的同名参数（`bin::main::playback`、`accounting::worker::workbench::tools::playback`；accounting-SPEC.md 8-17）
+## 8-143 playback 的时间选择：`--since`、`--until`、`--day` 与城工具的同名参数（`bin::main::playback`、`accounting::worker::workbench::tools::playback`；`crates/accounting/Spec.lean` §8-17）
 
-**形状。** 两扇门各读三个原文，交给 `accounting::playback::Window::span`，把得到的 `UtcSpan` 经 `Selection::during` 加进选择。解析、交集与拒绝都在 accounting-SPEC.md 8-17；本节只定两扇门的拼法。
+**形状。** 两扇门各读三个原文，交给 `accounting::playback::Window::span`，把得到的 `UtcSpan` 经 `Selection::during` 加进选择。解析、交集与拒绝都在 `crates/accounting/Spec.lean` §8-17；本节只定两扇门的拼法。
 
 ```text
 sprawling playback export <city> [--from <seq>] [--through <seq>] [--run <run>] [--building <addr>] [--since <utc>] [--until <utc>] [--day <yyyy-mm-dd>] [--include-confidential] [--page <template>] [--out <file>]
@@ -4366,11 +4366,11 @@ sprawling playback export <city> [--from <seq>] [--through <seq>] [--run <run>] 
 - **居民的门。** `export` 多三个可缺的字符串参数 `since`、`until`、`day`，同一种写法、同一个函数读；读不了或交集为空时工具以 `E_INVALID_ARGS` 拒绝，不写文件。
 - **不改 `view`。** `view` 的时间过滤照 8-137；两处共用 `runtime::clock::{parse_iso, UtcSpan}`，所以是同一个时间语义。`view` 没有 `--day`：它是看账本行的透镜，按天的回看是 playback 的事。
 
-**本节测试**：`main::playback::tests`：`--day` 读不了与 `--day` 和 `--since` 交出空区间，各以退出 2 拒绝。`accounting::worker::workbench::tools::playback::tests`：居民的 `day` 进到导出的 `source.selection`，写成那一天的两端。区间本身的选择由 `accounting::playback::tests::span` 判定（accounting-SPEC.md 8-17）。
+**本节测试**：`main::playback::tests`：`--day` 读不了与 `--day` 和 `--since` 交出空区间，各以退出 2 拒绝。`accounting::worker::workbench::tools::playback::tests`：居民的 `day` 进到导出的 `source.selection`，写成那一天的两端。区间本身的选择由 `accounting::playback::tests::span` 判定（`crates/accounting/Spec.lean` §8-17）。
 
-## 8-132 `playback check` 的五项、`export --page`，与居民的城工具 `playback`（`bin::main::playback`、`accounting::worker::workbench::tools::playback`；accounting-SPEC.md 8-13）
+## 8-132 `playback check` 的五项、`export --page`，与居民的城工具 `playback`（`bin::main::playback`、`accounting::worker::workbench::tools::playback`；`crates/accounting/Spec.lean` §8-13）
 
-**形状。** 两个适配器。`main/playback.rs` 给人用，城工具 `playback` 给居民用；页面嵌入、五项检查、落盘都是 `accounting::playback` 的（accounting-SPEC.md 8-13），这里只定两扇门各自读什么、写到哪、怎样报。
+**形状。** 两个适配器。`main/playback.rs` 给人用，城工具 `playback` 给居民用；页面嵌入、五项检查、落盘都是 `accounting::playback` 的（`crates/accounting/Spec.lean` §8-13），这里只定两扇门各自读什么、写到哪、怎样报。
 
 ```text
 sprawling playback export <city> [--from <seq>] [--through <seq>] [--run <run>] [--building <addr>] [--since <utc>] [--until <utc>] [--day <yyyy-mm-dd>] [--include-confidential] [--page <template>] [--out <file>]
@@ -4380,7 +4380,7 @@ sprawling playback check <file> [--bundle <file>] [--city <city>] [--include-con
 **人的门。**
 
 - **`export --page <template>`**：读模板（超过 `PAGE_MAX_BYTES` 先拒绝），经 `accounting::playback::embed` 把这次导出的 bundle 放进去，写出的是页面而不是 bundle；去处照 8-126，stdout 或 `--out`。页面过不了结构或静态离线一项时退出 1，什么也不写。
-- **`check <file>`**：文件可以是 bundle，也可以是页面（accounting-SPEC.md 8-13 按首字节分）。`--bundle` 与 `--city` 可以一起给，各自成一项；`--observed <file>` 是 skill 写下的浏览器观察记录。stdout 写一行 JSON：`file` 是被查文件的 BLAKE3（十六进制，观察记录的 `page` 要写它）；`digest`（bundle 的 BLAKE3）与 `events`（十进制字符串）在读出了 bundle 时出现；`structure`、`bundle`、`source`、`offline`、`browser` 五项各是 `{"status": "passed" | "failed" | "unchecked"}`，`failed` 带 `found`，`unchecked` 带 `why`，`browser` 通过时带 `covered`（观察走过的路径）。
+- **`check <file>`**：文件可以是 bundle，也可以是页面（`crates/accounting/Spec.lean` §8-13 按首字节分）。`--bundle` 与 `--city` 可以一起给，各自成一项；`--observed <file>` 是 skill 写下的浏览器观察记录。stdout 写一行 JSON：`file` 是被查文件的 BLAKE3（十六进制，观察记录的 `page` 要写它）；`digest`（bundle 的 BLAKE3）与 `events`（十进制字符串）在读出了 bundle 时出现；`structure`、`bundle`、`source`、`offline`、`browser` 五项各是 `{"status": "passed" | "failed" | "unchecked"}`，`failed` 带 `found`，`unchecked` 带 `why`，`browser` 通过时带 `covered`（观察走过的路径）。
 - **退出码**（8-103 的表）：0 是 `Report::holds`——没有一项失败，也没有一项要了而做不了；1 是其余，包括 `--city` 复核不了、观察记录说的是另一份字节；2 是命令行读不懂。没要的项写 `unchecked` 但不影响退出码。
 
 **居民的门：城工具 `playback`。**
@@ -4394,7 +4394,7 @@ sprawling playback check <file> [--bundle <file>] [--city <city>] [--include-con
 - **`export`**：`name` 是 1 到 64 个 ASCII 字母、数字、`-`、`_`，首字符是字母或数字；`from`、`through` 是 seq，`run` 是 run id，`building` 是楼的地址，与人的门的选择同义（8-126）；`since`、`until`、`day` 是时间条件（8-143）。给 `page` 时经 `embed` 写 `<name>.html`，否则写 `<name>.json`。落点是 `CityLayout::playback_exports()` 下以本楼地址命名的目录，经 `accounting::playback::land(Place::Exports)` 写：不覆盖、不跟随链接、在 git 仓库里时必须被忽略、失败不留半成品。结果是 `{"file", "digest", "events"}`，页面另带 `structure`、`offline` 两项；bundle 与页面的字节不进结果，因为工具结果会写进账本。
 - **`check`**：`file` 是本楼导出目录里的一个 `<name>.json` 或 `<name>.html`，别的名字与别处的文件都拒绝。它用同一个读者对城复核，结果是 `Report::line`：五项，`bundle` 与 `browser` 为 `unchecked`（居民的门不收另一份 bundle 与观察记录）。
 - **效应与写门。** 登记 `Effect::Write { domain: 房间 }`，与 `signal`、`pr` 等写桌子的工具同样走写门；`writes` 回答 `Writes::Nothing`，因为导出件落在工作树之外，checkpoint 没有东西可收。工具的效应按登记而不是按调用，所以 `check` 也不会被推测执行提前跑（只有 `Effect::Read` 会，`crates/runtime/Spec.lean` 的 speculation）。
-- **寿命。** 导出件跟着城：它在城根的保留子树下，不在任何 worktree 里，清扫 worktree、run 冻结或重开都不碰它；没有独立 worktree 的 run 也写在同一处。两次导出用了同一个名字，后一次被拒绝。崩溃留下的暂存文件见 accounting-SPEC.md §3。
+- **寿命。** 导出件跟着城：它在城根的保留子树下，不在任何 worktree 里，清扫 worktree、run 冻结或重开都不碰它；没有独立 worktree 的 run 也写在同一处。两次导出用了同一个名字，后一次被拒绝。崩溃留下的暂存文件见 `crates/accounting/Spec.lean` §3。
 - **登记。** 每一栋楼的工作台都有它；它不在常驻核心，所以模型在休眠索引里见到它的一行，经 `describe` 取说明、经 `call` 调用（`crates/runtime/Spec.lean` §8-60），工具表在 session 里不变。
 
 **本节测试**：`main::playback::tests`：五项写成一行 JSON，没要的项写 `unchecked` 而退出 0，失败或要了而做不了的项退出 1。`accounting::playback::tests::page`：`embed` 写出的页面逐字节带着 bundle，行里的 `</script>` 关不掉数据块，结构与静态离线两项通过；重复的数据块、重复的 `id`、指不到的链接与 `data-seq`、数据块里重复的 JSON 键在结构一项失败；外部资源（`img`、转义过的 CSS `url()`、`@import`、SVG 的 `image`、`srcset`）、`base`、`form`、外链、`meta refresh` 各是一条静态离线的发现；CSP 缺了、在别的元素之后、放进一个主机、缺 `form-action` 各是一条发现；观察记录说的是另一份字节为 `unchecked`，记下一次请求为失败。`accounting::worker::workbench::tools::playback::tests`：带 `include_confidential` 或 `reader` 的调用被拒；机密楼的行到不了居民的导出，导出用同一个读者复核通过；同名的第二次导出被拒且原文件不变，过不了静态离线的页面什么也不留；没有 worktree 的 run 把页面写进城里，`check` 只认本楼导出目录里的名字。已存在、被跟踪、不在导出位置、会进历史的目标由 `accounting::playback::tests::landing` 判定。两名居民（记者、编辑）生成、核对并留存报告由 `tests/acceptance/playback.rs` 判定。
@@ -4450,14 +4450,14 @@ impl RunWorker {
 1. `startup_scan` 报 `TailDropped { bytes }`，字节数就是被截的那半行的长度（8-102）；
 2. 账里多一行 `log_truncated`，整条链经 `verify_ledger_dir` 验过；
 3. 那次调用恰有一个答复，码是 `E_TOOL_OUTCOME_UNKNOWN`，`startup_scan` 报关了一个（ARCHITECTURE §5 末）；
-4. 城景列出的那次 run 已冻结，结局是 `cancelled`，`last_kind` 是启动扫描写的那行 `run_frozen`、`last_seq` 是它的序号，账上那一行带 `cause: process_died`——视图从截过、补过的历史折出，没有拿一份比账长的快照作答（8-91、8-101），死掉的 run 按 ARCHITECTURE §13.7 的 `Lost --> Frozen` 冻结（`crates/kernel/Spec.lean` §8-82-2，accounting-SPEC §8-18-1）；
+4. 城景列出的那次 run 已冻结，结局是 `cancelled`，`last_kind` 是启动扫描写的那行 `run_frozen`、`last_seq` 是它的序号，账上那一行带 `cause: process_died`——视图从截过、补过的历史折出，没有拿一份比账长的快照作答（8-91、8-101），死掉的 run 按 ARCHITECTURE §13.7 的 `Lost --> Frozen` 冻结（`crates/kernel/Spec.lean` §8-82-2，`crates/accounting/Spec.lean` §8-18-1）；
 5. 同一间房的下一个任务立起一次新 run 并冻结它：死掉的 run 没有把房间占住。
 
 **能咬住，量过。** 把 `startup_scan` 里补写结果未知的那一步拿掉再跑，测试红在第 3、4 两项上（答复为空，城景的 `last_kind` 停在 `tool_called`）；不冻结死掉的 run 时，红在第 4 项上（城景把它列为未冻结，`last_kind` 停在补写的 `tool_result`）。
 
 **断电那一半归 storage。** 断电比被杀多丢的，是平台还没落盘的字节；那是账本自己的耐久契约，由 `storage` 在它的故障文件系统上证（`power_cut_matrix_over_every_op_keeps_acknowledged_waves`，`crates/storage/Spec.lean` §8-2）。这里不重证它：故障文件系统只承载账本，城的其余文件与 `Standing::fold`、视图的折叠读的是真目录，在它上面重开的不是一座完整的城（§12「崩溃验收在盘上造死亡」）。
 
-**死掉的 run 由谁冻结。** `startup_scan` 补完悬空调用之后，为每一次有 `run_started`、没有 `run_frozen` 的 run 写一行 `RunFrozen::lost()`：结局 `cancelled`，载荷 `cause: process_died`，作者是那次 run 的居民（accounting-SPEC §8-18-1；为什么不是第四种结局，见 kernel D14）。所以第 4 项比的是城景里那次 run 的整行状态：已冻结、结局、最后一行与它的序号。
+**死掉的 run 由谁冻结。** `startup_scan` 补完悬空调用之后，为每一次有 `run_started`、没有 `run_frozen` 的 run 写一行 `RunFrozen::lost()`：结局 `cancelled`，载荷 `cause: process_died`，作者是那次 run 的居民（`crates/accounting/Spec.lean` §8-18-1；为什么不是第四种结局，见 kernel D14）。所以第 4 项比的是城景里那次 run 的整行状态：已冻结、结局、最后一行与它的序号。
 
 ## 8-109 `sprawling up --supervise`：崩溃 → `resume` → `serve`（`bin::supervising`、`bin::supervising::children`）
 
@@ -4576,7 +4576,7 @@ pub(in crate::assembly) struct Flight {
 
 ### 8-92 装配根与 serving、doctor 之间的依赖只朝一个方向
 
-`bin::assembly` 是 `sprawling` 里唯一知道所有具体类型的地方，别的模块不应当反过来知道它（ARCHITECTURE.md §3）。一条从 serving 或 doctor 指回装配根的边，意味着改装配根的内部可能改坏一个读面，而读面本来只该依赖它读的那份事实的权威。城的唯一写者与读面都住 `accounting` 之后，装配根只剩自由函数与直接碰主机的生产适配器（accounting-SPEC.md 8-11、§12-12）：`production`（`SystemClock`、`hands`、`init_city`、`form_city`）、`listening`（占端口、开写者）、`attending`（起写者线程）、`chain_watch`（起审计线程）与 `dropping`（拖进对话框的文件）。
+`bin::assembly` 是 `sprawling` 里唯一知道所有具体类型的地方，别的模块不应当反过来知道它（ARCHITECTURE.md §3）。一条从 serving 或 doctor 指回装配根的边，意味着改装配根的内部可能改坏一个读面，而读面本来只该依赖它读的那份事实的权威。城的唯一写者与读面都住 `accounting` 之后，装配根只剩自由函数与直接碰主机的生产适配器（`crates/accounting/Spec.lean` §8-11、accounting D12）：`production`（`SystemClock`、`hands`、`init_city`、`form_city`）、`listening`（占端口、开写者）、`attending`（起写者线程）、`chain_watch`（起审计线程）与 `dropping`（拖进对话框的文件）。
 
 **账本在哪，由 `kernel::layout::CityLayout::ledger` 一处回答。** 每个读账本的地方直接调用 `CityLayout::new(city_root).ledger()`，装配点不另设转发函数：转发只给同一件事换了名字，却会让读面与 serving 为了一个路径去依赖装配点。
 
@@ -4586,7 +4586,7 @@ pub(in crate::assembly) struct Flight {
 
 **serving 不往命令台投命令，所以不需要句柄。** 投命令的是 `listen` 交给 socket 的那几个闭包、控制台与 ACP 入站；前一个随 `listen` 住在装配根，后两个本来就在 serving 之外。另一种做法是把 `listen` 拆成传输的一半（留在 serving，持一个 serving 自己定义的命令发送端）与写者的一半（进装配根）；它多出一个类型和一条通道，换来的只是 `listen` 住在 serving 里，而 `listen` 的次序（8-88）恰好是「先占端口，再开写者」这一件事，拆开后这个次序要由两边共同守。
 
-**日志行的时间由构造者交进来。** `Journal::new` 收一个 `serving::journal::Clock`，即 `Arc<dyn accounting::Clock + Send + Sync>`；`main::city` 交的是 `assembly::SystemClock`，墙钟只在 `bin::assembly::production` 采样（8-63，accounting-SPEC.md 8-3）。
+**日志行的时间由构造者交进来。** `Journal::new` 收一个 `serving::journal::Clock`，即 `Arc<dyn accounting::Clock + Send + Sync>`；`main::city` 交的是 `assembly::SystemClock`，墙钟只在 `bin::assembly::production` 采样（8-63，`crates/accounting/Spec.lean` §8-3）。
 
 反方向是组装点应有的方向，保留：装配根用 serving 的 `open_vault`、`Serving`、`folding`、`output_ring::OutputRing`、`standing::monotonic_now`，用 doctor 的 `ThisMachine`、`Platform`、`PATIENCE`、`host`、`recipe_for`，用 `accounting::worker` 的 `RunWorker`、`CommandDesk`、`Hands`、`genesis::form` 与 `folds::start_served_views`。
 
@@ -4599,8 +4599,8 @@ pub(in crate::assembly) struct Flight {
 | 一个居民或房间叫什么 | `kernel::Address::name`（`crates/kernel/Spec.lean` §8-2 的 `Address`） | 地址的最后一段是地址自己的事实；城的名册与楼的页面都从这里读 |
 | 一栋楼的页面、`DOC_BYTES_MAX` | `accounting::views::building_page` | 页面是一个读面：按问的那一刻读盘，不持有第二份 |
 | 一台 MCP server 经哪种传输到达（`McpLink`） | `agent_protocols::mcp::link` | 三种传输（`agent_protocols::mcp` 下的 `stdio`、`http`、`sse`）与把它们合成 `agent_protocols::Outbound` 的那个枚举同住 `agent_protocols`；读面与装配点都经 `agent_protocols` 的握手与列工具说话 |
-| broker 的钥匙登记在哪、这座城对 broker 是谁（`broker_for`） | `accounting::toolkit_broker`（accounting-SPEC.md 8-9） | 页面与命令读同一组事实；连接动作 `connect_toolkit` 仍是 worker 的 |
-| 一个锁着的 vault 的解析器与锁中毒时的拒绝（`resolving`、`poisoned_vault`） | `accounting::held_vault`（accounting-SPEC.md 8-9） | worker、读面与 serving 都要一次性的解析器；拒绝的措辞只有一处 |
+| broker 的钥匙登记在哪、这座城对 broker 是谁（`broker_for`） | `accounting::toolkit_broker`（`crates/accounting/Spec.lean` §8-9） | 页面与命令读同一组事实；连接动作 `connect_toolkit` 仍是 worker 的 |
+| 一个锁着的 vault 的解析器与锁中毒时的拒绝（`resolving`、`poisoned_vault`） | `accounting::held_vault`（`crates/accounting/Spec.lean` §8-9） | worker、读面与 serving 都要一次性的解析器；拒绝的措辞只有一处 |
 
 
 ### 8-112 保温的门：run 的模型调用经 `Warmed` 走，落地后留在 `RunWorker` 上（`accounting::worker::keeping_warm`，形状 1 数据）
@@ -4716,7 +4716,7 @@ impl Drop for DrivingPool { /* join 每条 trailing 里的 lane */ }
 - **lane：`Staged::fly<L: Ledger>(self, ledger: &mut L, context: DriveContext) -> Flown`**（`dispatching::preparing`），先准备、再 `drive_run`，这是 lane 的全部工作；准备这一段依次做：`Site::place_tree`，`Stamping` 包着这条 lane 的 relay，于是 `worktree_opened` 经 relay 写；`lay_out_workbench`，MCP 缺表时的连接在这里；`Freezing::freeze_plan`，CAS 用 lane 共用的句柄；`probe_after`、`Sieving::for_run`、`checkpoint_scope`。`ensure_base` 在 `checkpoint_gate` 里做：城还没有提交时它提交一次城的 index，与检查点争同一把 `.git/index.lock`，8-46-13 的理由原样适用。`claim` 只动本房间的树与分支，不进这道闸。`Site` 与 `Assignment` 无论准备成败都装在 `Flown` 里、随 `Arrival` 回家，因为 `land` 要还 `Site` 借到的树；`Workbench` 经 `Driving` 进驾驶、随 `Driven` 回家，`land` 读它的 `delegates` 与 `succession`。准备失败时 `Flown.driven` 就是那个错误，`land` 照常先还房间队列与树，再把错误交给问的人，和驾驶失败走同一条路（8-46-9）。
 - **`DrivingPool` 排队与起 lane 的单位是 `Staged`**：满了的时候等着的是一份还没准备的派活，它不占线程，也还没有占树、没有连 server。`Staged` 带着 `site.run_id`，池按它认重复。
 
-**lane 借什么。** 8-110、8-111 拆出的对象里，lane 只借本来就是共享句柄的那几样，每样是一个 `Arc` 的克隆或一个值，收在 `Staged` 的 `Laying` 里：`Flight.backlog`（`exec` 与 `status` 用）、`Flight.checkpoint_gate`、`Credentials.vault`（工具解析密钥用）、`city_root`、lane 共用的 CAS 句柄、MCP 常驻表、诊断的写端、时钟。房间的六张桌子（信、目标、计划、书架、PR、作坊）本来就是 `Arc<Mutex<_>>`，`Desks::for_bench` 把它们的克隆与 `waiting` 作为 `BenchDesks` 交给 lane，`Desks` 本身（连同队列的 `tenure`）留在 `Continuation` 里，只有它还队列。常驻表：`accounting::Connectors::connect` 取 `&self`（accounting-SPEC.md 8-2），`RunWorker.connectors` 是 `Arc<dyn Connectors + Send + Sync>`，lane 借一个克隆；表的寿命仍是 worker 的寿命，最后一个 `Arc` 落地时 `Drop` 杀子进程（8-4）。CAS 是 lane 共用的一个句柄 `RunWorker::lane_store`（`Arc<Mutex<Cas>>`），随 worker 打开，冻结与筛子的 offload 都经它写，每次在锁里做完：`storage::Cas::open` 会清扫 `tmp/` 里的半成品，而一次写的半成品名只由对象哈希决定，一条 lane 自己开句柄就会扫掉另一条 lane 正在写的对象，两条 lane 写同一个对象也会共用同一个半成品文件。记账线程仍用自己的 `RunWorker::cas`，它写 brief 与 job，不写冻结的四段。检查点同理：一座城第一次打开检查点时建出仓库，两条 lane 同时建会争仓库的 config 锁，所以 `Laying` 打开检查点时拿 `checkpoint_gate`（8-46-13）。`Collaborating`、`Planning`、`Doorstep`、`Governance`、账本与 `LedgerIndex` 不借：记账线程的折叠改写它们，lane 读到的只能是 `Laying` 里的快照——`collaborating.rooms` 里挂着信的房间集合、这个居民持有的目标、治理的自治级别、`ledger.position`、`city_hash`。快照在 `stage_dispatch` 里取，lane 看到的是这个 run 被决定那一刻的城。`origins.started`（房间的会话从这个 run 起算）也在 `stage_dispatch` 里、紧跟在读 `carried_from` 之后：它改的是记账线程的折叠；准备在 lane 里失败的 run 与驾驶失败的 run 一样，都已开始了房间的会话。
+**lane 借什么。** 8-110、8-111 拆出的对象里，lane 只借本来就是共享句柄的那几样，每样是一个 `Arc` 的克隆或一个值，收在 `Staged` 的 `Laying` 里：`Flight.backlog`（`exec` 与 `status` 用）、`Flight.checkpoint_gate`、`Credentials.vault`（工具解析密钥用）、`city_root`、lane 共用的 CAS 句柄、MCP 常驻表、诊断的写端、时钟。房间的六张桌子（信、目标、计划、书架、PR、作坊）本来就是 `Arc<Mutex<_>>`，`Desks::for_bench` 把它们的克隆与 `waiting` 作为 `BenchDesks` 交给 lane，`Desks` 本身（连同队列的 `tenure`）留在 `Continuation` 里，只有它还队列。常驻表：`accounting::Connectors::connect` 取 `&self`（`crates/accounting/Spec.lean` §8-2），`RunWorker.connectors` 是 `Arc<dyn Connectors + Send + Sync>`，lane 借一个克隆；表的寿命仍是 worker 的寿命，最后一个 `Arc` 落地时 `Drop` 杀子进程（8-4）。CAS 是 lane 共用的一个句柄 `RunWorker::lane_store`（`Arc<Mutex<Cas>>`），随 worker 打开，冻结与筛子的 offload 都经它写，每次在锁里做完：`storage::Cas::open` 会清扫 `tmp/` 里的半成品，而一次写的半成品名只由对象哈希决定，一条 lane 自己开句柄就会扫掉另一条 lane 正在写的对象，两条 lane 写同一个对象也会共用同一个半成品文件。记账线程仍用自己的 `RunWorker::cas`，它写 brief 与 job，不写冻结的四段。检查点同理：一座城第一次打开检查点时建出仓库，两条 lane 同时建会争仓库的 config 锁，所以 `Laying` 打开检查点时拿 `checkpoint_gate`（8-46-13）。`Collaborating`、`Planning`、`Doorstep`、`Governance`、账本与 `LedgerIndex` 不借：记账线程的折叠改写它们，lane 读到的只能是 `Laying` 里的快照——`collaborating.rooms` 里挂着信的房间集合、这个居民持有的目标、治理的自治级别、`ledger.position`、`city_hash`。快照在 `stage_dispatch` 里取，lane 看到的是这个 run 被决定那一刻的城。`origins.started`（房间的会话从这个 run 起算）也在 `stage_dispatch` 里、紧跟在读 `carried_from` 之后：它改的是记账线程的折叠；准备在 lane 里失败的 run 与驾驶失败的 run 一样，都已开始了房间的会话。
 
 **lane 半段的诊断行。** `mcp_tools` 为每台 server 写一行（连上、已连着、拒绝）并写它自己的计时，`admit_reading_room` 为阅览室点名却不在架上的名字写一行。诊断的写端是可共享的句柄 `recording::Notes`（一个 `Arc<Mutex<Diagnostics>>`），`RunWorker.log` 就是它，lane 借一份克隆，行锚在 `Laying` 里的账本位置快照上。锚取快照是因为诊断只写不读：`runtime::diagnostics` 没有读回一行的方法，决定与恢复的代码因此不可能依赖锚；读者是人，人用 `seq` 把一行对到历史上的位置，准备阶段的行锚在准备开始的位置，正是它说的事发生的地方。锁中毒时照样取出写端：每次写在锁内一步做完，中毒只说明别的线程在锁外崩了。被否：`Prepared` 把行带回家、由 `land` 写——锚落在整个 run 之后，一台拒绝握手的 server 要等 run 落地才被人看见，而 `Refuse` 这一档写给正在看的人。
 
@@ -4803,7 +4803,7 @@ pub(crate) fn setting_telling_a_refusal() -> CorePriority; // 读不了就 Norma
 pub(crate) fn serving_runtime(setting: CorePriority) -> std::io::Result<tokio::runtime::Runtime>;
 // bin::assembly
 pub(crate) fn monotonic_now() -> Instant; // 单调钟的唯一取样点，与墙钟的 `assembly::SystemClock` 并列；阀量的是时长，墙钟会跳
-// accounting::person（accounting-SPEC.md 8-8）
+// accounting::person（`crates/accounting/Spec.lean` §8-8）
 pub enum CorePriority { Raised, Normal }                 // 人的设置；Normal 即「关掉高优先级」
 pub fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
 ```
@@ -5037,7 +5037,7 @@ pub(crate) fn top(at: &str, token: Option<&str>, audience: Audience) -> Result<(
 // bin::main::verbs / grammar
 pub(super) enum AfterDashes { Refused, Command } // Row.after_dashes：这个动词收不收 `--` 之后的词
 impl Arguments { pub(super) fn after_dashes(&self) -> Option<&[String]>; } // 没有 `--`：None；`--` 后无词：Some(&[])
-// accounting::worker::Hands（accounting-SPEC 8-11）
+// accounting::worker::Hands（`crates/accounting/Spec.lean` §8-11）
 pub monotonic: fn() -> Instant,             // 生产交 monotonic_now；派活准备与 probe 的用时都读它
 ```
 
@@ -5090,7 +5090,7 @@ pub monotonic: fn() -> Instant,             // 生产交 monotonic_now；派活�
 9. **开销用确定性计数守，墙钟只记录**（8-129-3）。被否：给一拍的用时设墙钟门——共享 CI 机器上它时红时绿，而拍的读取次数在任何机器上都一样。
 10. **没有 Lean 模型。** 采样线程的读法由看的人一次选定，`gauge` 的 run 依次进行，两处都没有交错；要守的性质是读取次数，由 8-129-3 的计数断言与 `Subject` 这个穷尽枚举守住。重开条件：`gauge` 同时量多个对象，或采样改为多线程。
 11. **`gauge` 自己的命令行错误是它自己的枚举 `Misread`，不并进 `grammar::LineError`。** `LineError` 只说命令表判得了的事：动词、标志、位置参数各认不认得；「`--pid` 与 `--` 不能同时给」「`--every` 只配进程与命令」是 `gauge` 选对象的规则，放进 `LineError` 就要让解析器知道一个动词的对象怎么选。两者退出码相同（2），写法都是一行说明加最近的合法写法。被否：给 `LineError` 加通用的「冲突」「越界」臂——它们只有 `gauge` 一个读者，说明文字又各不相同。
-12. **记账一侧的单调钟经 `Hands.monotonic` 交进来，是一只 `fn() -> Instant`。** 与 `read_memory`、`read_volume` 同形：worker 碰这台电脑的每只手都在构造时一次交进来（accounting-SPEC 8-11），生产交 `monotonic_now`，测试的 `Hands` 交测试夹具里同样读单调钟的那一只。被否：给 `accounting::Clock` 加一个返回 `Instant` 的方法——城钟是 Ledger 的 `t` 的来源，单调钟只量时长，两者放进一个端口，换城钟（测试里拨快、拨停）的地方就得同时编一个单调钟；四个实现都要改。
+12. **记账一侧的单调钟经 `Hands.monotonic` 交进来，是一只 `fn() -> Instant`。** 与 `read_memory`、`read_volume` 同形：worker 碰这台电脑的每只手都在构造时一次交进来（`crates/accounting/Spec.lean` §8-11），生产交 `monotonic_now`，测试的 `Hands` 交测试夹具里同样读单调钟的那一只。被否：给 `accounting::Clock` 加一个返回 `Instant` 的方法——城钟是 Ledger 的 `t` 的来源，单调钟只量时长，两者放进一个端口，换城钟（测试里拨快、拨停）的地方就得同时编一个单调钟；四个实现都要改。
 
 **测试。** `monitor::counters::tests`：按看的人走 N 拍，`Reads` 等于 8-129-3 的精确值。`monitor::spread::tests`：n 为 1、2、100、200 时各分位与手算的最近秩相等，`suspicious` 数对。`monitor::tree::tests`：起一个子进程，第一次读数 `processes ≥ 1`、工作集非零、`cpu_permille` 为 `null`，它退出后 `read` 为 `None`，`reads().table` 等于读的次数。`audience::tests`：测试运行器的 stdout 不是终端，读作 `Agent`。`main::grammar::tests`：`--` 之后的词原样交出，其中的 `--help`、`--version` 不生效；`gauge` 与 `top` 解析成同一个动词。`main::gauge::tests`：每条命令行错误退 2；三种行按整串比较；`--samples 3` 量一个很快退出的程序，stdout 恰好三行 `run`、一行 `spread`，程序以非零退出时 `gauge` 仍退 0、`failed` 为 3。citysim：`Reading::of` 与 `Samples::of` 的既有测试按最近秩改期望。accounting：城钟每读一次拨快一分钟时，派活准备、`mcp_tools` 与 probe 的用时仍小于一分钟。
 

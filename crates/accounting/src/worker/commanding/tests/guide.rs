@@ -10,7 +10,7 @@ use crate::worker::*;
 /// Where the person stands in the guide is the city's, not the
 /// browser's: a page opened after the worker that took the write is gone
 /// reads the progress back as it was written, and a city nobody guided
-/// reads as a guide at its start (accounting-SPEC.md 8-18-2).
+/// reads as a guide at its start (`crates/accounting/spec/Guide.lean` §8-18-2).
 #[test]
 fn the_guide_keeps_its_progress_across_a_reopen() {
     let dir = tempfile::tempdir().unwrap();

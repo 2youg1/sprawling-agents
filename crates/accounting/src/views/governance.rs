@@ -68,7 +68,7 @@ pub struct Governance {
     /// the item is answered, because an answered item holds nothing up.
     pub origins: std::collections::BTreeMap<String, BlockedJob>,
     /// The proposal cards waiting on a person, and the ones handled
-    /// (accounting-SPEC.md 8-22, decision 34).
+    /// (`crates/accounting/spec/Worker/Commanding/Saving.lean` §8-22, accounting D34).
     pub proposals: super::proposals::Proposals,
 }
 

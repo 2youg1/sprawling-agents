@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A worker stamping its lines with the clock it was handed
-//! (accounting-SPEC.md section 2).
+//! (`crates/accounting/Spec.lean` section 2).
 //!
 //! The scripted clock stands still at a moment long past, so a line
 //! stamped by any write point that still reads the wall clock carries

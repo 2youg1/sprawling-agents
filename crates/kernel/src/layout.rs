@@ -225,7 +225,7 @@ impl CityLayout {
     }
 
     /// Where residents' playback exports land, one directory per
-    /// building (accounting-SPEC.md 8-13, sprawling-SPEC.md 8-132).
+    /// building (`crates/accounting/Spec.lean` §8-13, sprawling-SPEC.md 8-132).
     ///
     /// Under the city's reserved subtree, because no write domain reaches
     /// it, so a written report is changed only by exporting another; the

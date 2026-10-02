@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The proposal cards a city's history holds, open or handled, and the
-//! answer that lists one document's open cards (accounting-SPEC.md 8-22,
+//! answer that lists one document's open cards (`crates/accounting/spec/Worker/Commanding/Saving.lean` §8-22,
 //! `crates/wire/Spec.lean` §8-73).
 //!
 //! Held inside [`super::Governance`], so the worker that judges a

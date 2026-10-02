@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A page's save of one document, and a person's decision on the
-//! proposal cards of one (accounting-SPEC.md 8-22, `crates/wire/Spec.lean` §8-72,
+//! proposal cards of one (`crates/accounting/spec/Worker/Commanding/Saving.lean` §8-22, `crates/wire/Spec.lean` §8-72,
 //! 8-73).
 //!
 //! Both read the document's bytes inside its lock, hand them to the

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What makes a bundle consistent on its own (accounting-SPEC.md 8-12):
+//! What makes a bundle consistent on its own (`crates/accounting/spec/Playback.lean` §8-12):
 //! ascending seqs, lines that are the ledger lines their entries name,
 //! and ends, members and runs that resolve inside it. Consistent says
 //! the parts agree; it does not say they were never changed.

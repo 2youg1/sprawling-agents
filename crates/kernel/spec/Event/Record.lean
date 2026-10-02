@@ -328,7 +328,7 @@ impl RunFrozen {
 }
 ```
 
-- **它说什么。** ARCHITECTURE §13.7 画的是 `Lost --> Frozen`：进程死在一次 run 的半途，那次 run 再也不会被驱动，重开的城要把它冻结。冻结的那一行由重开时的启动扫描写（accounting-SPEC §8-18），不由 run 自己写，所以载荷多一个键说明原因。
+- **它说什么。** ARCHITECTURE §13.7 画的是 `Lost --> Frozen`：进程死在一次 run 的半途，那次 run 再也不会被驱动，重开的城要把它冻结。冻结的那一行由重开时的启动扫描写（`crates/accounting/Spec.lean` §8-18），不由 run 自己写，所以载荷多一个键说明原因。
 - **结局仍是三种之一。** `Completion` 的三种结局不变（§8-20），死掉的 run 冻成 `cancelled`：它没做完，`Done` 需要城自己记下的证据而它没有；也没有被上限截断，`Limit` 说的是那件事。`cancelled` 说的是「停下了，不是做完」，`cause: process_died` 把「人或 halt 叫停的」与「进程死了」分开（D14）。
 - **一处构造。** `RunFrozen::lost` 是写这一行的唯一入口，「死掉的 run 冻成哪一种结局」只在这里回答。
 - **缺席即 run 自己的冻结。** `RunFrozen::of` 写的行没有这个键，字节与加键之前相同；旧行照读。读结局的读者（`views` 的 `completion`、`city::resident` 的计数）照旧只读 `completion`。

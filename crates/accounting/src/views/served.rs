@@ -72,7 +72,7 @@ impl Views {
 
     /// Takes the one way this city asks its search path for a program,
     /// so the harness page reads this machine only through what the
-    /// served city handed in (accounting-SPEC.md 8-10).
+    /// served city handed in (`crates/accounting/spec/Views.lean` §8-10).
     pub fn find_programs_through(&mut self, find: fn(&str) -> Option<std::path::PathBuf>) {
         self.reach.programs = Some(find);
     }
@@ -80,7 +80,7 @@ impl Views {
     /// Takes the one way this city asks the GitHub CLI on this machine for
     /// the login a host is signed in as, so a `GithubLogin` query starts a
     /// program only through what the served city handed in
-    /// (accounting-SPEC.md 8-18-3).
+    /// (`crates/accounting/spec/Views/Answering/Github.lean` §8-18-3).
     pub fn ask_github_through(&mut self, login: fn(&str) -> wire::GithubReading) {
         self.reach.github = Some(login);
     }

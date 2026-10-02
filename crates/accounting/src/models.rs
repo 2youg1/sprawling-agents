@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The model a run talks to, handed to the worker rather than built by
-//! it (accounting-SPEC.md 8-1).
+//! it (`crates/accounting/spec/Models.lean` §8-1).
 
 use kernel::AxError;
 

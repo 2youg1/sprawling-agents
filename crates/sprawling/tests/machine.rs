@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A worker looking at the machine it was handed
-//! (accounting-SPEC.md section 2).
+//! (`crates/accounting/Spec.lean` section 2).
 //!
 //! The scripted machine answers with one item, where the machine under
 //! any test answers with every item the requirement table holds, so a

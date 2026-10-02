@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a run's `proposal` calls write to the history, and what they
-//! leave alone (accounting-SPEC.md 8-30).
+//! leave alone (`crates/accounting/spec/Worker/Workbench/Tools.lean` §8-30).
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The runs a process death left open, and the line that freezes each
-//! one (accounting-SPEC.md 8-18-1, ARCHITECTURE.md 13.7 `Lost --> Frozen`).
+//! one (`crates/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1, ARCHITECTURE.md 13.7 `Lost --> Frozen`).
 //!
 //! The scan that reads them runs only once the worker holds the writer's
 //! lock and before it drives anything, so a run with a `run_started` and
@@ -98,7 +98,7 @@ mod tests {
     /// A run the process died in has its opening line and no freeze: the
     /// scan closes its call, then freezes it cancelled with the cause, as
     /// the resident whose lines it wrote; a second scan writes nothing
-    /// (accounting-SPEC.md 8-18-1).
+    /// (`crates/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1).
     #[test]
     fn a_run_the_process_died_in_is_frozen_once() {
         let dir = tempfile::tempdir().unwrap();

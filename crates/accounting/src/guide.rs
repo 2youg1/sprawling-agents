@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How far the person has got through this city's first-run guide
-//! (accounting-SPEC.md 8-18-2, `crates/wire/Spec.lean` §8-68).
+//! (`crates/accounting/spec/Guide.lean` §8-18-2, `crates/wire/Spec.lean` §8-68).
 //!
 //! **One record, one grammar.** The file is `wire::GuideProgress`
 //! serialised, so the keys the file may hold and the fields the page

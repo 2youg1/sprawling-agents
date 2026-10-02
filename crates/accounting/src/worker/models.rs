@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The production `crate::ModelFactory`, and the one door that
-//! swaps it for another (accounting-SPEC.md 8-1).
+//! swaps it for another (`crates/accounting/spec/Models.lean` §8-1).
 
 use kernel::AxError;
 

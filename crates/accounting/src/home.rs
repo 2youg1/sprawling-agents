@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! This person's home directory, and what this product keeps under it
-//! (accounting-SPEC.md section 8-7).
+//! (`crates/accounting/spec/Home.lean` §8-7).
 //!
 //! Three callers derived the same directory before this module: the
 //! doctor looking for downloaded components, the installer looking for

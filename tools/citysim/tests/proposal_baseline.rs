@@ -5,7 +5,7 @@
 
 //! A proposal made on a version its document has since left is refused
 //! when the person decides it, and the document keeps the bytes it
-//! moved to (citysim D22; documents D17, D35; accounting-SPEC 8-30).
+//! moved to (citysim D22; documents D17, D35; `crates/accounting/Spec.lean` §8-30).
 //!
 //! The city is the product's: a worker built from scripted hands - a
 //! counted clock, a vault in memory - and a scripted model. The run's

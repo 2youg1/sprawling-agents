@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A dispatch driven against the models the worker was handed
-//! (accounting-SPEC.md section 2).
+//! (`crates/accounting/Spec.lean` section 2).
 //!
 //! The endpoint the city is pointed at refuses every connection, so a
 //! scripted answer can reach the history only through the factory the

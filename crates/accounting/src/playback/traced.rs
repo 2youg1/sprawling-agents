@@ -5,7 +5,7 @@
 
 //! What a checkpoint line holds, and for a committed one the calls the
 //! commit is the result of and the commit it is compared with, as a
-//! playback bundle's reader may see them (accounting-SPEC.md 8-12, 8-17
+//! playback bundle's reader may see them (`crates/accounting/spec/Playback.lean` §8-12, `crates/accounting/spec/Playback/Traced.lean` §8-17
 //! and 8-25, decisions 24(f), 29(d) and 37(b)).
 //!
 //! Attribution is `accounting::trace`'s: this module folds the walk's
@@ -196,7 +196,7 @@ fn cited(at: Seq, known: &Known<'_>) -> Cited {
 /// What a line says about a commit or a job pin: the pin read by its own
 /// type, and every commit as `commit_facts`, the one place that tells
 /// which lines name a commit and which oid, identifies it
-/// (accounting-SPEC.md 8-12, decision 24(f)).
+/// (`crates/accounting/spec/Playback.lean` §8-12, accounting D24 (f)).
 pub(super) fn checkpoint_of(record: &EventRecord) -> Result<Option<Holds>, AxError> {
     let named = commit_facts(record).map(|(oid, _)| oid);
     if record.kind() == EventKind::CheckpointCommitted {

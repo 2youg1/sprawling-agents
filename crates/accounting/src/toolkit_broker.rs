@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The three facts both sides of connecting an outside application need
-//! (accounting-SPEC.md section 8-9).
+//! (`crates/accounting/spec/HeldVault.lean` §8-9).
 //!
 //! A page reads the shelf and a command opens a consent session. They
 //! would otherwise each decide where the project key is enrolled, which

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The names one session is frozen with (accounting-SPEC.md 8-15): what
+//! The names one session is frozen with (`crates/accounting/spec/Worker/Freezing/Naming.lean` §8-15): what
 //! the city calls the person and the Mayor, in the city slot and at the
 //! head of the resident slot.
 

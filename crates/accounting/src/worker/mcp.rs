@@ -5,7 +5,7 @@
 
 //! Reaching the MCP servers a building's configuration names: the
 //! production `crate::Connectors`, and the one door that swaps it
-//! for another (accounting-SPEC.md 8-2).
+//! for another (`crates/accounting/spec/Connectors.lean` §8-2).
 
 use crate::Reached;
 use kernel::{Address, AxError};

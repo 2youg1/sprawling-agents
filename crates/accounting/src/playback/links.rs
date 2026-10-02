@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The two ends of every key moment, every message and every call, a tool
-//! call or a model attempt (accounting-SPEC.md 8-12, 8-17 and 8-25).
+//! call or a model attempt (`crates/accounting/spec/Playback.lean` §8-12, `crates/accounting/spec/Playback/Traced.lean` §8-17 and §8-25).
 //!
 //! A key moment is a set of lines grouped under a stable key: a run, an
 //! approval, a pull request. It closes only on its real closing line,

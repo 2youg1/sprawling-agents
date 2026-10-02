@@ -87,7 +87,7 @@ pub(crate) fn search_path() -> OsString {
 }
 
 /// Where this machine's search path finds `program`: the one reading
-/// the harness page and the doctor share (accounting-SPEC.md 8-10).
+/// the harness page and the doctor share (`crates/accounting/Spec.lean` §8-10).
 pub(crate) fn find_program(program: &str) -> Option<PathBuf> {
     super::on_search_path(&search_path(), program)
 }
@@ -141,13 +141,13 @@ pub(crate) fn shell() -> Presence {
 }
 
 /// The CPython-WASI component a run may be handed: a present one, and
-/// never a broken one (accounting-SPEC.md 8-11).
+/// never a broken one (`crates/accounting/Spec.lean` §8-11).
 pub(crate) fn usable_python_wasm() -> Option<PathBuf> {
     usable_path(&python_wasm())
 }
 
 /// The shell a run may be handed: a present one, and never a broken one
-/// (accounting-SPEC.md 8-11).
+/// (`crates/accounting/Spec.lean` §8-11).
 pub(crate) fn usable_shell() -> Option<PathBuf> {
     usable_path(&shell())
 }

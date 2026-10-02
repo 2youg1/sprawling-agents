@@ -6,9 +6,9 @@
 /-!
 # playback 的选择：哪些行进 bundle、按什么次序、读到哪一行为止
 
-规定 `crates/accounting/src/playback/select.rs` 与 `crates/accounting/src/playback/walk.rs`（accounting-SPEC.md 8-12）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `crates/accounting/src/playback/select.rs` 与 `crates/accounting/src/playback/walk.rs`（`crates/accounting/Spec.lean` §8-12）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
-一次导出先固定 cutoff：严格校验（`storage::LineCheck`）走到的最后一个完整行。范围内事件恰好是「seq 不超过 cutoff」与选择条件的交集；选择条件是 seq 的闭区间 `[first, last]`、一个 run、一栋楼、一个 UTC 时间的半开区间 `[since, until)`（accounting-SPEC.md 8-17），给了几项就取几项的交集。时间条件比的是每一行信封的 `t`，而 `t` 不随 seq 单调，所以它与别的条件一样逐行判断。
+一次导出先固定 cutoff：严格校验（`storage::LineCheck`）走到的最后一个完整行。范围内事件恰好是「seq 不超过 cutoff」与选择条件的交集；选择条件是 seq 的闭区间 `[first, last]`、一个 run、一栋楼、一个 UTC 时间的半开区间 `[since, until)`（`crates/accounting/Spec.lean` §8-17），给了几项就取几项的交集。时间条件比的是每一行信封的 `t`，而 `t` 不随 seq 单调，所以它与别的条件一样逐行判断。
 
 五条性质，各一组定理：
 
@@ -18,7 +18,7 @@
 * **逐行判断**：一行在不在选择里只看它自己，与它前后的行无关（`selection_is_per_line`），所以 `t` 回退的行照样按自己的时刻取舍，读者不能在第一条越过 `until` 的行处停下（`a_line_whose_time_steps_back_is_judged_on_its_own`）；
 * **矛盾的范围与合法的空选择是两件事**：`first > last` 与 `before ≤ since`（Rust 的 `until ≤ since`）由 Rust 拒绝（`Contradictory`），合法而为空的选择输出带范围信息的空 bundle（`empty_selection_is_legal`）。
 
-模型边界：楼的判定在 Rust 里是 `Address::is_within`（按段边界的前缀），这里抽象成楼的编号相等，`lab` 与 `laboratory` 的区别由 `is_within` 自己的测试守住（`crates/kernel/Spec.lean` §8-2）。本模型不是 Rust 实现的证明。两者的一致靠一张场景表：`history` 与 `scenes` 只写在本文件里，`scenes_agree` 证明模型对每一项给出表里的 seq；`crates/accounting/src/playback/tests/model.rs` 从本文件逐行读出 `line …` 与 `scene …` 两种行，按同一张表写账本、跑生产的 `export`，比较选中的 seq（accounting-SPEC.md 8-12、§12-25(i)）。所以这三种行的写法是那个测试读的格式：一行一项，`line seq run building t`，`scene first last run building cutoff [seq, …]`，`window since before cutoff [seq, …]`，`some n` 或 `none`。`--day` 在 Rust 里展开成一个 `window`，不在本模型里。
+模型边界：楼的判定在 Rust 里是 `Address::is_within`（按段边界的前缀），这里抽象成楼的编号相等，`lab` 与 `laboratory` 的区别由 `is_within` 自己的测试守住（`crates/kernel/Spec.lean` §8-2）。本模型不是 Rust 实现的证明。两者的一致靠一张场景表：`history` 与 `scenes` 只写在本文件里，`scenes_agree` 证明模型对每一项给出表里的 seq；`crates/accounting/src/playback/tests/model.rs` 从本文件逐行读出 `line …` 与 `scene …` 两种行，按同一张表写账本、跑生产的 `export`，比较选中的 seq（`crates/accounting/Spec.lean` §8-12、accounting D25 (i)）。所以这三种行的写法是那个测试读的格式：一行一项，`line seq run building t`，`scene first last run building cutoff [seq, …]`，`window since before cutoff [seq, …]`，`some n` 或 `none`。`--day` 在 Rust 里展开成一个 `window`，不在本模型里。
 -/
 
 namespace Accounting.Playback.Select

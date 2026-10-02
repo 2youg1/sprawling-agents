@@ -4,13 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Every hand the worker reaches this machine through, handed in once
-//! when it is built (accounting-SPEC.md 8-11).
+//! when it is built (`crates/accounting/spec/Worker.lean` §8-11).
 //!
 //! Only what touches this machine is here. The judgement over it stays
 //! with the worker: whether a run is handed a shell at all is the frozen
 //! configuration's answer, and this module only says where one is. The
 //! model factory and the MCP connections are not hands: the worker builds
-//! its own from `gateway` and `agent_protocols` (accounting-SPEC.md 12-18).
+//! its own from `gateway` and `agent_protocols` (accounting D18).
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -23,7 +23,7 @@ use super::pool::Memory;
 ///
 /// The hands always arrive together and are used together, so they
 /// travel as one value rather than as a constructor's nine parameters
-/// (accounting-SPEC.md 12-20). A caller that needs one hand of its own
+/// (accounting D20). A caller that needs one hand of its own
 /// writes `Hands { clock, ..hands }`, or calls the matching `with_*`
 /// door after the worker is built.
 pub struct Hands {
@@ -31,14 +31,14 @@ pub struct Hands {
     /// opened, or an in-memory one.
     pub vault: gateway::Custodian,
     /// What time it is, for the worker and every lane it drives, from
-    /// the first line it opens with (accounting-SPEC.md 8-3).
+    /// the first line it opens with (`crates/accounting/spec/Clock.lean` §8-3).
     pub clock: Arc<dyn crate::Clock + Send + Sync>,
     /// Reads the monotonic clock, which only moves forward: how long a
     /// dispatch's preparation or a probe took is a span, and a span read
     /// off `clock` grows or shrinks when somebody sets the wall clock
     /// (sprawling-SPEC.md 8-129-2).
     pub monotonic: fn() -> std::time::Instant,
-    /// Looks at this machine and installs onto it (accounting-SPEC.md 8-4).
+    /// Looks at this machine and installs onto it (`crates/accounting/spec/Machine.lean` §8-4).
     pub machine: Box<dyn crate::Machine + Send>,
     /// Reads this machine's memory at the door new work enters by
     /// (sprawling-SPEC.md 8-46-3).

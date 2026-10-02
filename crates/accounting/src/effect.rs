@@ -231,8 +231,8 @@ impl Claims {
     /// against the plan the earlier ones left, so a leaf this run split
     /// off and then claimed is there to be claimed; the replay stops at
     /// the first claim that no longer holds, because what follows it may
-    /// stand on rows that claim's split would have made (accounting-SPEC
-    /// 8-27).
+    /// stand on rows that claim's split would have made (`crates/accounting/spec/Effect.lean`
+    /// §8-27).
     ///
     /// # Errors
     /// Propagates a claim whose payload cannot be built, or an effect
@@ -401,7 +401,7 @@ mod tests {
     /// leaves lands both, and the plan reads as the run's desk left it:
     /// the leaf's claim is checked against the plan the split left rather
     /// than the file on disk, where the leaf does not exist yet
-    /// (accounting-SPEC 8-27).
+    /// (`crates/accounting/spec/Effect.lean` §8-27).
     #[test]
     fn a_run_that_splits_its_row_and_claims_a_leaf_lands_both() {
         let run = desk(1);

@@ -6,7 +6,7 @@
 //! A model call timed by the rounds' pairing rule, and a commit's
 //! evidence read only up to the cutoff, from one fold of the views per
 //! export, and a commit's nearby walk read from its span on
-//! (accounting-SPEC.md 8-25).
+//! (`crates/accounting/spec/Playback/Traced.lean` §8-25).
 
 #![allow(
     clippy::unwrap_used,
@@ -201,7 +201,7 @@ fn a_commits_nearby_walk_takes_its_span_whatever_came_before() {
 }
 
 /// The milliseconds one export takes over [`committing`] histories of
-/// growing length, printed for the register (accounting-SPEC.md 8-25).
+/// growing length, printed for the register (`crates/accounting/spec/Playback/Traced.lean` §8-25).
 #[test]
 #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
 fn instrument_evidence_cost() {

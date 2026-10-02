@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A model's reply, sent back by the page that holds its text, laid out
-//! by the grammar a preview is (accounting-SPEC.md 8-29, `crates/wire/Spec.lean`
+//! by the grammar a preview is (`crates/accounting/spec/Views/Document.lean` §8-29, `crates/wire/Spec.lean`
 //! §8-75).
 //!
 //! Reads nothing of the city: the answer depends on the text in the

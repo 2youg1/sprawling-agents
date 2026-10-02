@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What each file a commit names became between its base and the commit
-//! (accounting-SPEC.md 8-17, decision 29(e)).
+//! (`crates/accounting/spec/Playback/Traced.lean` §8-17, accounting D29 (e)).
 //!
 //! Only two immutable oids are compared, never a working tree, and the
 //! patch text comes through `storage::hunks`, so a key-shaped line is

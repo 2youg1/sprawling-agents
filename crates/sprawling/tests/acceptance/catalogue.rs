@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Every built-in tool a run is offered is called once and answers the
-//! way its own SPEC says (accounting-SPEC.md section 2, the seventh and
+//! way its own SPEC says (`crates/accounting/Spec.lean` section 2, the seventh and
 //! eighth assertions).
 
 use std::collections::BTreeSet;

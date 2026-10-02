@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A playback export written as a new file that lands whole or not at
-//! all (accounting-SPEC.md 8-13, decision 25(h)).
+//! all (`crates/accounting/spec/Playback/Check.lean` §8-13, accounting D25 (h)).
 //!
 //! Both doors write through here: the person's `--out` and a resident's
 //! export into the city's playback exports. The bytes go to a staged

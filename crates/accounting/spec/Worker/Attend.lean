@@ -220,3 +220,12 @@ theorem gated_batch_keeps_order (p : Proof) (batch : List Message) {ledger : Lis
     · exact ih h
 
 end Accounting.Worker.Attend
+
+/-! ### 接口仍写在 sprawling 规格里的模块
+
+下面这些模块的接口与取舍今天写在 `crates/sprawling/sprawling-SPEC.md` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
+
+| sprawling 的标签 | 模块 |
+|---|---|
+| §8-84 | `accounting::worker::attend` |
+-/

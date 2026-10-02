@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a browser saw a playback page do, as the skill recorded it
-//! (accounting-SPEC.md 8-13).
+//! (`crates/accounting/spec/Playback/Check.lean` §8-13).
 //!
 //! The product never runs the page it checks. An agent opens it in the
 //! browser its host already has, walks the paths it names, and writes

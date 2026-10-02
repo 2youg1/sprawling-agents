@@ -86,7 +86,7 @@ impl LedgerIndex {
 
 - **答什么**：`seqs()` 里不小于 `from` 的那一段，次序不变（`seqs_from_answers_the_held_seqs_at_or_after`）；也就是调用方原来写的 `seqs().skip_while(|seq| *seq < from)` 交出的那一串（`seqs_from_is_the_walk_past_the_smaller`）。`from` 之后没有行时答空，`from` 不必是写过的 seq。
 - **不看 `from` 之前的格**：seq 是隐式的（8-4），`from` 所在那一格就是 `from - base`，读者从那一格起走；列外行是有序表，从 `BTreeMap::range(from..)` 起走。起步的代价是一次减法与一次 O(log 列外行数) 的查找，之后每交出一个值走一格（空洞不交出，但要走过）。答案不取决于 `from` 之前的任何一格（`seqs_from_reads_no_slot_before_its_start`），所以从某个 seq 往后读一段的代价只与那一段同阶，而与它前面的账本长度无关。
-- **消费者**：`accounting::trace` 判同楼的别人时，从区间的下界读到上界（accounting-SPEC.md 8-25）；每个提交一次，有了这个读者，一次导出在这一项上的代价是各区间长度之和，而不是提交数乘行数。
+- **消费者**：`accounting::trace` 判同楼的别人时，从区间的下界读到上界（`crates/accounting/Spec.lean` §8-25）；每个提交一次，有了这个读者，一次导出在这一项上的代价是各区间长度之和，而不是提交数乘行数。
 - **列外行与归并**：与 `seqs()` 同一个归并，列与列外行各从 `from` 起；`index/fold/tests.rs` 的 map 形 oracle 对每个探测的 `from` 判等（正反两向）。本模型只写列，列外行是有序表的区间查询，没有自己的算术。
 
 D23 从某个 seq 往后读由索引给，而不由调用方跳过前面的。理由：列里一行的位置就是它的 seq 减 `base`，索引知道 `from` 在哪一格，调用方只能从第一格数过去；`skip_while` 在每个提交上都把区间之前的全部 seq 走一遍，一次导出就是提交数乘行数。被否决的做法：①给一个闭开区间的读者 `seqs_in(Range<Seq>)`——上界是调用方的条件（`take_while` 在第一个越界的值上停），放进索引不省一格，只多一个参数；②在 playback 里留一份 walk 走过的 seq 表，按下界二分——那是同一批行的第二份索引，要与 `LedgerIndex` 各自维护；③按 run 读（`run_seqs_before`）再合并——同楼的别人是全部 run，按 run 读要先知道有哪些 run。重开参数：有调用方要从某个 seq 往前读（例如 `view --follow` 从尾部倒着取新长出来的行）时，再看要不要一个从上界往前的读者；今天的 `seqs().rev().take_while(..)` 只走新长出来的那几行，不随账本长度增长。

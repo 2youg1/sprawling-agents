@@ -5,13 +5,13 @@
 
 //! Every skill this repository ships, installed into the city library
 //! and admitted by a building's reading room, is pinned when a run
-//! starts and read by name (accounting-SPEC.md section 2, the ninth
+//! starts and read by name (`crates/accounting/Spec.lean` section 2, the ninth
 //! assertion).
 //!
 //! The set of skills is the `skills/` directory itself. They go in
 //! through the city library, the path that lands every file of a
 //! package inside the city, so a file a package carries is read here
-//! too (accounting-SPEC.md section 12, decision 23); `shelf_outside.rs`
+//! too (accounting D23); `shelf_outside.rs`
 //! mounts the same directory as a shelf outside the city.
 
 use std::path::{Path, PathBuf};

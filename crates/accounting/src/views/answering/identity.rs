@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The identity a page reads (accounting-SPEC.md 8-15): the two identity
+//! The identity a page reads (`crates/accounting/spec/Worker/Freezing/Naming.lean` §8-15): the two identity
 //! areas as they stand on disk, with the texts a save names as its base.
 
 use std::path::Path;

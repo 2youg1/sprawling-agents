@@ -5,7 +5,7 @@
 
 //! What only this machine can hand a worker: the wall clock, the hands
 //! a worker built here reaches this machine through, and a city formed
-//! with them (accounting-SPEC.md 8-11).
+//! with them (`crates/accounting/Spec.lean` §8-11).
 //!
 //! The clock is sampled *here only* (determinism rule 2): every callee
 //! takes time as a parameter or reads the clock it was handed, and the
@@ -22,7 +22,7 @@ use accounting::worker::hands::{ExecHost, Hands};
 
 /// The wall clock: the single sanctioned sampling point (clippy.toml
 /// disallowed-methods), and the production `accounting::Clock`
-/// (accounting-SPEC.md 8-3). Everything below it takes `TimeMs` as a
+/// (`crates/accounting/Spec.lean` §8-3). Everything below it takes `TimeMs` as a
 /// parameter or reads the clock it was handed; what samples it outside
 /// this module is handed it at construction, as the process log is.
 pub struct SystemClock;
@@ -57,7 +57,7 @@ impl accounting::Clock for SystemClock {
 /// The hands a worker on this machine is built with: `vault`, the wall
 /// clock, the doctor, the monitor's two counters, the file manager, the
 /// browsers, this executable, the requirement table, and the exec tool's
-/// host half as the doctor judges it (accounting-SPEC.md 8-11).
+/// host half as the doctor judges it (`crates/accounting/Spec.lean` §8-11).
 ///
 /// The one place the production value is made, so every production
 /// worker reaches this machine the same way.

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One file of the city, read once from disk and answered as a version
-//! (accounting-SPEC.md 8-21, `crates/wire/Spec.lean` §8-69).
+//! (`crates/accounting/spec/Views/Document.lean` §8-21, `crates/wire/Spec.lean` §8-69).
 //!
 //! Every judgement - which version, whether the bytes are text, where
 //! the first window ends - is the `documents` crate's; this module reads
@@ -69,7 +69,7 @@ fn state_of(city_root: &Path, at: &Address, bytes: &[u8]) -> DocumentState {
 
 /// The first window of a text version, and the version kept in the
 /// store when that window does not cover it or a preview will read it
-/// (accounting-SPEC.md 8-21, section 12 no. 33).
+/// (`crates/accounting/spec/Views/Document.lean` §8-21, accounting D33).
 fn text_body(
     city_root: &Path,
     format: Format,

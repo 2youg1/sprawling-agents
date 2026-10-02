@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 
 /// The chosen adapter, wrapped so every request a run sends enters the
 /// keep-warm account (`crates/runtime/Spec.lean` §8-4-2), timed on the worker's own
-/// clock (accounting-SPEC.md 8-3).
+/// clock (`crates/accounting/spec/Clock.lean` §8-3).
 pub(crate) type Door = runtime::prefix::warmth::Warmed<DoorClock>;
 
 /// What a door reads the time through: the worker's clock, carried into

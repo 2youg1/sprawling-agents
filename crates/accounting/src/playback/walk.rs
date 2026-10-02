@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One strict pass over a city's Ledger, from genesis to the cutoff
-//! (accounting-SPEC.md 8-12, decision 24(c)).
+//! (`crates/accounting/spec/Playback.lean` §8-12, accounting D24 (c)).
 //!
 //! Every line passes `storage::LineCheck`, the lines a selection will
 //! leave out included, so a missing line, a broken chain or a repeated

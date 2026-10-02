@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The fold that turns verified lines into a playback bundle's tables
-//! (accounting-SPEC.md 8-12).
+//! (`crates/accounting/spec/Playback.lean` §8-12).
 //!
 //! Every line up to the cutoff is folded into the run lineage and the
 //! key-moment ends, because a run's state and a moment's closing are
@@ -14,7 +14,7 @@
 //! (`crates/accounting/spec/Playback/Project.lean`). A committed
 //! checkpoint's evidence is asked of the history folded up to its line,
 //! and its diff and calls are read last, from the repository and through
-//! the walk's index (accounting-SPEC.md 8-17, 8-25).
+//! the walk's index (`crates/accounting/spec/Playback/Traced.lean` §8-17, §8-25).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;

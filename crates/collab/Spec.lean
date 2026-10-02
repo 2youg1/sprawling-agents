@@ -162,7 +162,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - `split` 只分本次 drive 握着的那一行，没握着就拒绝，拒词说这个 run 握着什么、恢复语叫它先认领那一行，桌子不排效应、不改副本（D6；`spec/Claim.lean` 的 `split_needs_hold`）。分完之后不再持有那根枝；写盘前把新文本重新解析并 `PlanTree::build` 一次，拆不出合法树就一个字节都不写。拆分结果带 `unfinished`：该节点下尚未 Done 的子节点数，由拆完的树数出。
 - `block` 与 `release` 必须带一句原因，原因随记录走（`roadmap_blocked` 的载荷），不随表格走。哪一种记录由出口决定（`ClaimEffect::kind`）：绿是 `roadmap_finished`，红是 `roadmap_blocked`，交回是 `roadmap_released`，拆是 `roadmap_split`。效应穷尽，新增一个变体应当是写入处的编译错误。
 - 效应怎么改文本只有 `ClaimEffect::apply` 一个定义：桌子在调用时用它改副本，工人落地时用它把同一组效应重放到盘上；`Split` 因此带着子节点的 weight。`PutDown` 携 `PlanExit` 而不是一个动词，把出口的两条臂抄进第二个枚举，就是对「一个节点可以怎么离开」的第二份意见。`still_true` 问的是记录答不了的那个问题：盘上的文档现在是否仍然容得下这条效应。只有认领会答「不」——它要那一行仍是 `Not started`；放下与拆分只作用于本 run 握着的那一行，它们的新鲜由握持之前的那条认领担保（D6），`still_true` 不为它们另判一个期待状态。
-- 并发口径：工人写盘前重读文件，把效应按次序重放上去，每条在前面几条留下的文本上问 `still_true`（`spec/Claim.lean` 的 `land`；accounting-SPEC §8-27）：本 run 拆出又认领的子行因此在那里；一条认领的行若已不是 `Not started` 则整组丢弃并留一条诊断，而不是覆盖；都对得上时只有本轮碰过的行改变。桌子答应的效应落在派活那份计划上全部落下（`admitted_lands`），工具答成功而落地一字不写只在别的写者动过那一行时发生，并且有那条诊断。
+- 并发口径：工人写盘前重读文件，把效应按次序重放上去，每条在前面几条留下的文本上问 `still_true`（`spec/Claim.lean` 的 `land`；`crates/accounting/Spec.lean` §8-27）：本 run 拆出又认领的子行因此在那里；一条认领的行若已不是 `Not started` 则整组丢弃并留一条诊断，而不是覆盖；都对得上时只有本轮碰过的行改变。桌子答应的效应落在派活那份计划上全部落下（`admitted_lands`），工具答成功而落地一字不写只在别的写者动过那一行时发生，并且有那条诊断。
 
 **`collab::archive_tool`**（形状 4 适配器）。`ARCHIVE_KINDS` 是封闭的四类（§14）。回忆是读，不是记：索引由 worker 从书架算出后交给桌子，桌子不留副本，盘上的文件才是真的。`ArchiveEffect::Recorded` 是桌子交回的值，落盘与记账归装配层。
 
@@ -222,7 +222,7 @@ D2 没有草稿退回机制。房间没有版本，发言不带「作者所见�
 
 /-! ## 15 影响面
 
-改一张桌子或一件工具的构造签名，波及 `crates/sprawling` 装配层造这张桌子的地方；改记录的形状（`Signal`、`OpenRequest` 一族、`ClaimEffect::payload`）波及读 Ledger 的折叠与视图。改 `still_true` 或桌子对哪些动作要求握持（D6），波及落地的那一处 `accounting::effect::Claims::of`（accounting-SPEC §8-27），两边与 `spec/Claim.lean` 一起改。改分部里的模型，先改本文件对应的要求，再改 Rust 与它的测试。
+改一张桌子或一件工具的构造签名，波及 `crates/sprawling` 装配层造这张桌子的地方；改记录的形状（`Signal`、`OpenRequest` 一族、`ClaimEffect::payload`）波及读 Ledger 的折叠与视图。改 `still_true` 或桌子对哪些动作要求握持（D6），波及落地的那一处 `accounting::effect::Claims::of`（`crates/accounting/Spec.lean` §8-27），两边与 `spec/Claim.lean` 一起改。改分部里的模型，先改本文件对应的要求，再改 Rust 与它的测试。
 -/
 
 /-! ## 16 测试与约束

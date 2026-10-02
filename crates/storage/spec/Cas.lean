@@ -57,7 +57,7 @@ impl Cas {
 }
 ```
 
-- **版本身份就是地址。** 页面读的一份文档的一版，身份是整份字节的 BLAKE3（`crates/documents/Spec.lean` D3），正是 `put` 给同一份字节的地址；读面把一版放进来走的就是 `put`，不另开目录、不另记索引（accounting-SPEC §8-21）。
+- **版本身份就是地址。** 页面读的一份文档的一版，身份是整份字节的 BLAKE3（`crates/documents/Spec.lean` D3），正是 `put` 给同一份字节的地址；读面把一版放进来走的就是 `put`，不另开目录、不另记索引（`crates/accounting/Spec.lean` §8-21）。
 - **按版本取一段，先问长度。** 一个窗口要知道这一版多长才能把请求夹在末尾之内（`documents::lift`），然后用 `get_range` 的 `B` 式读那一段；`get_range` 越界即拒的规则不变，夹取是 `documents` 的判定，不是本模块的。`size` 走 `Vfs::size`，不读内容，所以问一个两百兆对象的长度不付两百兆。
 - **不校验。** 与范围读同一条理由（§8-3）：长度来自文件系统，地址覆盖的是整份内容。
 - 验收：`cas::tests::a_stored_object_states_its_size_and_a_missing_one_is_named`。

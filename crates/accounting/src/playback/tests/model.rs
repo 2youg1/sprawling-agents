@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The scenes the Lean model of selection states, run through the
-//! production export (accounting-SPEC.md 8-12, decision 25(i)).
+//! production export (`crates/accounting/spec/Playback.lean` §8-12, accounting D25 (i)).
 //!
 //! `crates/accounting/spec/Playback/Select.lean` proves that its model
 //! selects each scene's seqs from its ledger. This test reads the same

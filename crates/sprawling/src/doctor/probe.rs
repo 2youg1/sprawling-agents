@@ -45,8 +45,8 @@ use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Version}
 ///
 /// **An install goes through the parent trait.** This trait adds only
 /// `look`, so the terminal and the worker start a package manager
-/// through the one `accounting::Machine::install` (accounting-SPEC.md
-/// 8-4), and a script that replaces it replaces every install. `Sync`,
+/// through the one `accounting::Machine::install` (`crates/accounting/Spec.lean`
+/// §8-4), and a script that replaces it replaces every install. `Sync`,
 /// because a report asks every item at once, one thread per item.
 pub(crate) trait Machine: accounting::Machine + Sync {
     /// Whether this item is here, and in what condition.

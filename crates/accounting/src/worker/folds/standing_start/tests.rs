@@ -122,7 +122,7 @@ fn a_worker_refuses_a_line_rewritten_before_the_snapshot_in_a_sealed_segment() {
 /// fold's queue, a claim in its plan holders and a digest in the
 /// governed rules, so a field added, removed or reordered among them
 /// changes the bytes, and so does the encoding of a digest
-/// (accounting-SPEC 8-24).
+/// (`crates/accounting/spec/Views/Snapshot.lean` §8-24).
 fn encoding_fixture() -> StandingFolds {
     let room = Address::parse("lab/room1").unwrap();
     let signal = collab::Signal::new(

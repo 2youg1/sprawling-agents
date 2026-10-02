@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One window of a stored Markdown version, laid out as blocks
-//! (accounting-SPEC.md 8-23, `crates/wire/Spec.lean` §8-74).
+//! (`crates/accounting/spec/Views/Document.lean` §8-23, `crates/wire/Spec.lean` §8-74).
 //!
 //! Reads the content store and nothing else, the way a range does: the
 //! version is the object's address, so a page previewing a file a
@@ -169,7 +169,7 @@ mod tests {
     }
 
     /// A Markdown file one window holds whole, opened through `Document`,
-    /// previews by the version that answer named (accounting-SPEC 33).
+    /// previews by the version that answer named (accounting D33).
     #[test]
     fn a_short_document_previews_by_its_version() {
         let dir = tempfile::tempdir().unwrap();

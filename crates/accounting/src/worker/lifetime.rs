@@ -91,7 +91,7 @@ impl Closing {
 
 impl RunWorker {
     /// Opens the city's ledger at the time `hands.clock` reads, and
-    /// builds the worker over it with `hands` (accounting-SPEC.md 8-11).
+    /// builds the worker over it with `hands` (`crates/accounting/spec/Worker.lean` §8-11).
     ///
     /// # Errors
     /// Propagates whatever opening the ledger or the store reports, and
@@ -336,7 +336,7 @@ impl RunWorker {
     }
 
     /// The same worker, reading every time through `clock` instead of
-    /// the wall clock (accounting-SPEC.md 8-3).
+    /// the wall clock (`crates/accounting/spec/Clock.lean` §8-3).
     ///
     /// The door citysim and the tests drive a worker through: when
     /// things happen is theirs to script, while what the worker writes

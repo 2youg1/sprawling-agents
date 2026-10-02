@@ -6,7 +6,7 @@
 //! Main's assembly point: what only this binary can hand the city's one
 //! writer. The writer itself is `accounting::worker::RunWorker`; this is
 //! the dirtiest component and the only omniscient one, because it knows
-//! every concrete type and nothing knows it (accounting-SPEC.md 12-12).
+//! every concrete type and nothing knows it (accounting D12).
 //!
 //! The wall clock is sampled in `production` only (determinism rule 2),
 //! and a worker receives it, with every other hand it reaches this

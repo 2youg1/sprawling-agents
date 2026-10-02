@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a playback page may load and where it may send its reader, judged
-//! without running it (accounting-SPEC.md 8-13).
+//! without running it (`crates/accounting/spec/Playback/Check.lean` §8-13).
 //!
 //! The rules read the elements a browser's parser built, never the source
 //! text, and the CSS through the CSS Syntax tokenizer. Passing them says

@@ -27,7 +27,7 @@ use kernel::TimeMs;
 use runtime::diagnostics::{Entry, Sink};
 
 /// Where a line's time comes from: the assembly point's clock
-/// (accounting-SPEC.md 8-3), shared with every sink this journal makes.
+/// (`crates/accounting/Spec.lean` §8-3), shared with every sink this journal makes.
 pub type Clock = std::sync::Arc<dyn accounting::Clock + Send + Sync>;
 
 /// How many lines a page that stopped reading may fall behind before it

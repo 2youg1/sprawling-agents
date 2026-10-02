@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a bundle carries beside the lines (accounting-SPEC.md 8-17): a
+//! What a bundle carries beside the lines (`crates/accounting/spec/Playback/Traced.lean` §8-17): a
 //! call's duration only where both its moments were measured, a run's
 //! policy, and a commit's base, diff and trace, each state kept apart.
 

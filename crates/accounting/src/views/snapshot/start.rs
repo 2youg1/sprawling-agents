@@ -120,7 +120,7 @@ enum Resuming {
 /// The one start behind [`start`] and [`start_audited`]: from the
 /// snapshot when one fits, proving the chain first when `resuming` says
 /// so; from genesis otherwise, where the whole fold checks every line and
-/// a proof would check each a second time (accounting-SPEC.md 8-19).
+/// a proof would check each a second time (`crates/accounting/spec/Views/Snapshot.lean` §8-19).
 fn begin<F: SnapshotFold>(ledger_dir: &Path, resuming: Resuming) -> Result<Audited<F>, AxError> {
     let city_root = city_root_of(ledger_dir);
     let (started, proved) = match storage::start_from_snapshot(
@@ -152,7 +152,7 @@ fn begin<F: SnapshotFold>(ledger_dir: &Path, resuming: Resuming) -> Result<Audit
 
 /// A start from a proved history, and how many lines were checked one by
 /// one on the way there: the proof's and the fold's together
-/// (accounting-SPEC.md 8-19).
+/// (`crates/accounting/spec/Views/Snapshot.lean` §8-19).
 pub struct Audited<F> {
     pub started: Started<F>,
     pub lines_checked: u64,
@@ -165,8 +165,8 @@ pub struct Audited<F> {
 /// proved with the city's verified prefix records, read and never
 /// written: a one-shot read does not write to the disk. From genesis the
 /// whole fold checks every line through the same `LineCheck`, which is
-/// the proof's verdict, so no separate proof runs (accounting-SPEC.md
-/// 8-19).
+/// the proof's verdict, so no separate proof runs (`crates/accounting/spec/Views/Snapshot.lean`
+/// §8-19).
 ///
 /// # Errors
 /// The proof's reason when the chain is broken or cannot be read, and

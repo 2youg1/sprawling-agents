@@ -251,7 +251,7 @@ kernel（features=["conformance"]）、storage（对拍与夹具）、runtime（
 
 只有节注释的分部（`spec/Nesting.lean`、`spec/Ablation.lean`）由穷尽枚举与各自的测试守住。挂钟读数不是任何断言的对象：它们入册不入门（D17）。
 
-D22 **过期基线的场景驱动一座真的城，而不是 `run::drive` 加剧本工具台。** 场景经 `accounting::worker::genesis::form` 造城、经 `accounting::worker::RunWorker` 派一次活：`Hands` 换上计数时钟与内存里的 vault，模型是剧本的 `ScriptModel`，工具台、`proposal` 工具、relay、治理折叠与人的决定都是生产件（accounting-SPEC §8-30）。理由：要判的事跨三个写者——run 的工具写下卡，城外的写者（人的编辑器）挪动文档，人的决定判基线（documents D17、D35）——三者只在 worker 里会合；在剧本工具台上用 `ScriptTool` 写一行 `proposal_offered`，判的是剧本自己，生产的工具与 relay 都不在路上。它判结局：拒绝码是 `E_VERSION_CONFLICT`，文档留着挪动之后的字节，卡仍开着；不判同一场景跑两遍账本逐字节相同，那是 accounting-SPEC §3 第一条还差的一步。代价：场景经 git 与文件系统，比只经 `run::drive` 的场景慢。被否决的做法：写进 `crates/sprawling/tests/acceptance/`——那里判每件工具答得对，过期是一个跨写者的场景，refrain 路线图 §4-10 的验收要的正是一个 citysim 场景。重开参数：场景库要逐字节重放一次 dispatch 时，本场景是它的起点。
+D22 **过期基线的场景驱动一座真的城，而不是 `run::drive` 加剧本工具台。** 场景经 `accounting::worker::genesis::form` 造城、经 `accounting::worker::RunWorker` 派一次活：`Hands` 换上计数时钟与内存里的 vault，模型是剧本的 `ScriptModel`，工具台、`proposal` 工具、relay、治理折叠与人的决定都是生产件（`crates/accounting/Spec.lean` §8-30）。理由：要判的事跨三个写者——run 的工具写下卡，城外的写者（人的编辑器）挪动文档，人的决定判基线（documents D17、D35）——三者只在 worker 里会合；在剧本工具台上用 `ScriptTool` 写一行 `proposal_offered`，判的是剧本自己，生产的工具与 relay 都不在路上。它判结局：拒绝码是 `E_VERSION_CONFLICT`，文档留着挪动之后的字节，卡仍开着；不判同一场景跑两遍账本逐字节相同，那是 `crates/accounting/Spec.lean` §3 第一条还差的一步。代价：场景经 git 与文件系统，比只经 `run::drive` 的场景慢。被否决的做法：写进 `crates/sprawling/tests/acceptance/`——那里判每件工具答得对，过期是一个跨写者的场景，refrain 路线图 §4-10 的验收要的正是一个 citysim 场景。重开参数：场景库要逐字节重放一次 dispatch 时，本场景是它的起点。
 -/
 
 /-! ## 17 文档关系

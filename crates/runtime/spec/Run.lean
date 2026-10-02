@@ -17,7 +17,7 @@
 pub struct RunPlan { /* …既有字段… */ pub naming: Option<B3Hash> }
 ```
 
-- **照录，不读。** 身份由 accounting 在冻结前缀时按 session 取定（accounting-SPEC §8-15、`crates/city/Spec.lean` §8-33），名字已经在 city 段与 resident 段的字节里；本 crate 只把那一版的摘要从 `RunPlan.naming` 抄进 `run_started.naming`（`crates/kernel/Spec.lean` §8-79），由 `Charter::open` 与运行策略同一处写。`None` 是这座城的这次 run 没有冻任何身份（测试替身、早于身份入账的构造方）。
+- **照录，不读。** 身份由 accounting 在冻结前缀时按 session 取定（`crates/accounting/Spec.lean` §8-15、`crates/city/Spec.lean` §8-33），名字已经在 city 段与 resident 段的字节里；本 crate 只把那一版的摘要从 `RunPlan.naming` 抄进 `run_started.naming`（`crates/kernel/Spec.lean` §8-79），由 `Charter::open` 与运行策略同一处写。`None` 是这座城的这次 run 没有冻任何身份（测试替身、早于身份入账的构造方）。
 - 被否：让 runtime 读两份治理文档自己算摘要——run 开始的那一刻读到的未必是前缀冻下的那一版，账上的摘要会与请求里的名字不符。
 -/
 

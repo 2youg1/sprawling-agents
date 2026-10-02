@@ -160,8 +160,8 @@ pub(crate) fn known_hosts_answer() -> wire::Answer {
 
 /// The harness page: every official harness in the roster, the command
 /// that starts it, and whether the search the served city handed in
-/// finds that command's program (`crates/wire/Spec.lean` §8-52, accounting-SPEC.md
-/// 8-10).
+/// finds that command's program (`crates/wire/Spec.lean` §8-52, `crates/accounting/spec/Views.lean`
+/// §8-10).
 pub(crate) fn harnesses_answer(find: fn(&str) -> Option<PathBuf>) -> wire::Answer {
     wire::Answer::Harnesses(wire::HarnessesAnswer {
         harnesses: agent_protocols::Harness::ALL

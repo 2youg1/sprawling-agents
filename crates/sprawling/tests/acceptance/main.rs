@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Acceptance coverage (accounting-SPEC.md section 2, the seventh to
+//! Acceptance coverage (`crates/accounting/Spec.lean` section 2, the seventh to
 //! the ninth assertion).
 //!
 //! Each test drives a worker that was handed a scripted `ModelFactory`.

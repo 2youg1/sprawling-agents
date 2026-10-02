@@ -11,7 +11,7 @@
 //! and not a dispatch (ARCHITECTURE.md section 11). The worker receives
 //! this machine as one `worker::hands::Hands` value; the production one
 //! is made in `bin::assembly::production`, and every port has a second
-//! implementation outside it (accounting-SPEC.md 8-11).
+//! implementation outside it (`crates/accounting/spec/Worker.lean` §8-11).
 //!
 //! Beside the ports live the worker's own values that reach nothing but
 //! the kernel, the city's files and the collaboration vocabulary: what a
@@ -21,10 +21,10 @@
 //! The read side lives here too: the fold every page is answered from
 //! (`views`), and every run folded into one line with its parent
 //! pointers (`lineage`), which the binary's `view` command and the
-//! views both read (accounting-SPEC.md 8-10), and a stretch of that
+//! views both read (`crates/accounting/spec/Views.lean` §8-10), and a stretch of that
 //! history exported as a playback bundle anyone can recompute
-//! (`playback`, accounting-SPEC.md 8-12), and a commit traced back to
-//! the calls its run made before it (`trace`, accounting-SPEC.md 8-16).
+//! (`playback`, `crates/accounting/spec/Playback.lean` §8-12), and a commit traced back to
+//! the calls its run made before it (`trace`, `crates/accounting/spec/Trace.lean` §8-16).
 
 mod clock;
 mod connectors;

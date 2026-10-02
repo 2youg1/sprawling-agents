@@ -41,7 +41,7 @@ pub struct StatedIdentity {
 - **卡片只写自己那几个键，其余原样。** `PutIdentity` 把卡上的值交给城，由城在 `base` 上改写身份区：卡上的键写入或删去（`None` 即删去，回到默认称呼），身份区里别的键、`about` 为 `None` 时的正文，都按 `base` 里的字节留着。页面不拼 TOML：拼身份区的只有城一处，表单与原文编辑器读到的是同一份解析结果（D5）。
 - **两个写者，一道守卫。** 原文编辑器发 `PutDocument`，卡片发 `PutIdentity`，两者都携 `base`——发信方起手时那份全文——文件已经变了就拒 `E_VERSION_CONFLICT`，什么都不写；人的草稿留在页面上，页面重读之后再发。`MAYOR.md` 与 `PREFERENCES.md` 的身份区读不出时（重复的键、没有闭合的 `+++`、名字为空或带控制字符），`PutDocument` 在落盘之前拒 `E_CONFIG_INVALID`，拒因里有行号；`CLERK.md` 没有身份区，只经基线守卫。
 - **回执是账本行。** 两条命令都写一行 `governed_document_written`，`naming` 键是写完之后城的身份版本（`crates/kernel/Spec.lean` §8-79）；页面发出之后只显示「保存中」，见到这一行才显示「已保存」，并以它判断自己读到的 `version` 是否已经过时。
-- **读的是此刻，跑的是冻下的那一版。** `Query::Identity` 每次从盘上读，所以页面显示的总是新 session 将要冻下的名字。已经开始的 session 用它第一次 run 冻下的版本（accounting-SPEC §8-15）；那一版记在每次 run 的 `run_started.naming` 上，页面拿它经 `Query::Content { locator: cas:<naming> }` 读回当时的名字。旧账本没有这个键，页面就显示地址或语言表里的角色名，不拿今天的名字冒充当时的。
+- **读的是此刻，跑的是冻下的那一版。** `Query::Identity` 每次从盘上读，所以页面显示的总是新 session 将要冻下的名字。已经开始的 session 用它第一次 run 冻下的版本（`crates/accounting/Spec.lean` §8-15）；那一版记在每次 run 的 `run_started.naming` 上，页面拿它经 `Query::Content { locator: cas:<naming> }` 读回当时的名字。旧账本没有这个键，页面就显示地址或语言表里的角色名，不拿今天的名字冒充当时的。
 - **读不出就说在哪一行。** 身份区读不出时答 `Unreadable`：哪一份文件、第几行（从文件第一行数起）、为什么。页面据此打开原文编辑器，而不是画一个默认名字再让下一次保存把人的正文盖掉。
 - **`WIRE_V` 不另进位**：`PutDocument` 加 `base` 是名字不变的改形，与本批其余改形共用 45（D1）；`PutIdentity`、`Identity` 是新名字，哈希自己会变。
 - 验收：city 的 `a_stale_identity_save_is_refused_and_the_draft_survives`（基线过期被拒、文件不变）；accounting 的 `a_new_session_freezes_the_name_the_page_shows`（实际发出的请求上下文与 `Query::Identity` 的答面同名同版本，旧 session 不改名，`/new` 之后两边一起换）。

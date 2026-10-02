@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Each address's stretches - its sessions - folded from the records the
-//! Ledger files under it, and the answer for one room (accounting-SPEC.md
-//! 8-19(c), `crates/wire/Spec.lean` §8-71).
+//! Ledger files under it, and the answer for one room (`crates/accounting/spec/Views/Snapshot.lean`
+//! §8-19(c), `crates/wire/Spec.lean` §8-71).
 //!
 //! **Held in the views rather than read back from the Ledger.** Every
 //! fact a stretch shows is settled as its lines go by, and the table

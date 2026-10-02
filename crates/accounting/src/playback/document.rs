@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The playback bundle's schema (accounting-SPEC.md 8-12): every field,
+//! The playback bundle's schema (`crates/accounting/spec/Playback.lean` §8-12): every field,
 //! in the order `encode` writes it. A field added here is a field the
 //! bundle carries, so a change to this file moves `PROJECTION_RULES`.
 //!

@@ -12,7 +12,7 @@
 //! not know is refused, so a resident cannot widen what it reads.
 //! Exports land under the city's playback exports, in the building's own
 //! directory, through the one landing every export takes
-//! (accounting-SPEC.md 8-13).
+//! (`crates/accounting/spec/Playback/Check.lean` §8-13).
 
 use std::path::{Path, PathBuf};
 

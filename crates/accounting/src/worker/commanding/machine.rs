@@ -21,7 +21,7 @@
 //! read is answered on and would do it without anybody asking.
 //!
 //! **The worker reaches the machine through `crate::Machine`**
-//! (accounting-SPEC.md 8-4); `doctor::ThisMachine` is the production
+//! (`crates/accounting/spec/Machine.lean` §8-4); `doctor::ThisMachine` is the production
 //! one, and `with_machine` is the one door that swaps it.
 
 use kernel::AxError;
@@ -30,7 +30,7 @@ use super::super::RunWorker;
 
 impl RunWorker {
     /// The same worker, looking at and installing onto `machine`
-    /// instead of the machine it runs on (accounting-SPEC.md 8-4).
+    /// instead of the machine it runs on (`crates/accounting/spec/Machine.lean` §8-4).
     ///
     /// The door citysim and the tests drive a worker through: what the
     /// machine answers and what an install does are theirs to script,

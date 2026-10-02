@@ -311,8 +311,8 @@ fn give_git_facts(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer
 
 /// Gives each commit the message its object holds, from one opening of
 /// the repository: in this crate rather than in `storage` until storage's
-/// contract can take a reader of both facts (accounting-SPEC.md decision
-/// 34(b)). A repository that cannot be opened, an object it does not hold
+/// contract can take a reader of both facts (accounting D34
+/// (b)). A repository that cannot be opened, an object it does not hold
 /// and a message that is not UTF-8 each leave `message` at `None`, as
 /// `parents` is left.
 fn give_messages(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {

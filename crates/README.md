@@ -9,7 +9,7 @@ Every Rust package of the product lives in this directory. The packages are sepa
 <!-- xtask:begin crate_table -->
 | Directory | Package | Lib | Owns | May depend on | SPEC |
 |---|---|---|---|---|---|
-| `crates/accounting` | `sprawling-accounting` | `accounting` | the city's one writer, the views every page is answered from, and the ports the writer reaches outside itself through | `agent_protocols`, `city`, `collab`, `documents`, `gateway`, `kernel`, `runtime`, `storage`, `wire` | `crates/accounting/accounting-SPEC.md` |
+| `crates/accounting` | `sprawling-accounting` | `accounting` | the city's one writer, the views every page is answered from, and the ports the writer reaches outside itself through | `agent_protocols`, `city`, `collab`, `documents`, `gateway`, `kernel`, `runtime`, `storage`, `wire` | `crates/accounting/Spec.lean` |
 | `crates/agent_protocols` | `sprawling-agent-protocols` | `agent_protocols` | MCP out to a server, ACP in from an editor, and ACP out to a harness | `gateway`, `kernel` | `crates/agent_protocols/Spec.lean` |
 | `crates/browser` | `sprawling-browser` | `browser` | a browser driven over WebDriver BiDi, and what a model may see of a page and do to it | `kernel` | `crates/browser/Spec.lean` |
 | `crates/city` | `sprawling-city` | `city` | space, identity, and the documents a building keeps | `kernel` | `crates/city/Spec.lean` |

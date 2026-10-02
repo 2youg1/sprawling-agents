@@ -6,7 +6,7 @@
 //! The machine half of the exec tool: the three things about `exec`
 //! that are this machine's rather than the city's, asked of the host
 //! the worker was handed and shaped by what the frozen configuration
-//! allows (sprawling-SPEC.md section 8-47, accounting-SPEC.md 8-11).
+//! allows (sprawling-SPEC.md section 8-47, `crates/accounting/spec/Worker.lean` §8-11).
 //!
 //! Nothing here reads the search path, a variable or a feature flag.
 //! What it holds is the judgement between the host's answer and the

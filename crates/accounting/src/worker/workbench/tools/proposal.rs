@@ -5,12 +5,12 @@
 
 //! `proposal`: a run offers a change to one stretch of a document as the
 //! city holds it, for the person to decide, and takes back a card it
-//! offered while the card is still open (accounting-SPEC.md 8-30,
+//! offered while the card is still open (`crates/accounting/spec/Worker/Workbench/Tools.lean` §8-30,
 //! `crates/documents/Spec.lean` D35, D36).
 //!
 //! The card is a line on the history and nothing else: the run never
 //! writes the document, and what the person accepts lands through their
-//! decision (accounting-SPEC.md 8-22). The line goes through the lane's
+//! decision (`crates/accounting/spec/Worker/Commanding/Saving.lean` §8-22). The line goes through the lane's
 //! relay, so the governance fold every decision is judged against is
 //! shown it the way it is shown every other line a lane writes.
 

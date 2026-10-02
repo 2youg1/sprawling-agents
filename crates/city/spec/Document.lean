@@ -56,8 +56,8 @@ pub fn revise<T>(path: &Path, act: impl FnOnce(&Held<'_>, &[u8]) -> Result<T, Ax
 
 - **一次保存要的是「此刻的字节」，不是「我起手时的正文」。** `edit_against` 拿调用方给的整份正文与盘上的比较；页面对任意一份文档的保存（`crates/wire/Spec.lean` §8-72）带的是 32 字节的版本摘要与几段编辑，判它的是 `documents::save`，它要读的是盘上此刻的全部字节。`revise` 在 `edit` 的锁里把这份文件读出来交给 `act`，`act` 判定、经 `Held::replace` 整份换上，锁在 `act` 返回之前一直持有，所以两个从同一版出发的保存只有先到的那个落下，第二个读到的已经是第一个的字节。
 - **没有文件读作空字节**，与 `edit_against` 同一条规则；`edit_against` 就是 `revise` 加一次逐字节比较，「读不到就是空」这条读法只写在 `revise` 一处。别的读错（目录、无权限）是 `E_STORAGE_FATAL`，与本模块其余的写面同一句恢复语。
-- **本 crate 不依赖 `documents`。** 判定由调用方交进来：`accounting::worker::commanding::saving` 交的是 `documents::save` 与 `documents::decide`（accounting-SPEC §8-22）。这扇门只拥有锁、读与整份换上——就是 §8-27 的两条性质。
-- **当前状态：修改提案由 run 经工作台的 `proposal` 工具提出与收回**（accounting-SPEC §8-30）：工具读城里那份文件此刻的一版（documents D35），把一行 `proposal_offered` 记在这次 run 名下，收回时记 `proposal_withdrawn`；run 不改那份文档，接受时由人的决定经 `revise` 落下。run 一边提案一边直接改同一份文档时不由 runtime 的写门判，守边界的是版本：直接的写造出新版本，人决定那张卡时以 `E_VERSION_CONFLICT` 拒（documents D36；citysim `tests/proposal_baseline.rs`）。
+- **本 crate 不依赖 `documents`。** 判定由调用方交进来：`accounting::worker::commanding::saving` 交的是 `documents::save` 与 `documents::decide`（`crates/accounting/Spec.lean` §8-22）。这扇门只拥有锁、读与整份换上——就是 §8-27 的两条性质。
+- **当前状态：修改提案由 run 经工作台的 `proposal` 工具提出与收回**（`crates/accounting/Spec.lean` §8-30）：工具读城里那份文件此刻的一版（documents D35），把一行 `proposal_offered` 记在这次 run 名下，收回时记 `proposal_withdrawn`；run 不改那份文档，接受时由人的决定经 `revise` 落下。run 一边提案一边直接改同一份文档时不由 runtime 的写门判，守边界的是版本：直接的写造出新版本，人决定那张卡时以 `E_VERSION_CONFLICT` 拒（documents D36；citysim `tests/proposal_baseline.rs`）。
 - 验收：`document::tests::a_revision_reads_the_bytes_on_disk_and_holds_the_lock_while_it_decides`——两个线程各从同一份文件出发做两百次读-判-换，计数是四百；没有文件时交给 `act` 的是空字节。
 -/
 

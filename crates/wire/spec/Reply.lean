@@ -13,7 +13,7 @@
 
 **决定**：`Reply`、`Delivered`、`AcpProgress`（`wire::reply`）与 `Pairing`（`wire::auth`）在任何 feature 组合下都编译；crate 根的名字与再导出不变。`server` feature 只带监听器：axum 的路由、WebSocket 会话、HTTP 门与把拒绝写成响应体的 `refusal_text`。
 
-**理由**：城的唯一写者搬进 `accounting` 之后（accounting-SPEC.md 8-11），它的命令入口、桌子、欠账与 ACP 受理点名这四个类型，而 `accounting` 依赖本 crate 时关掉默认 feature，因为它要的是词汇，不是 TCP 栈。四个类型本来就是词汇：`Reply` 包一个 `Fn(AxError) -> Delivered`，正是为了不把传输层写进签名（§8-2）；另外三个是普通的枚举与结构体，不持有 tokio 或 axum 的任何东西。`Pairing` 是一次配对判定的结论，与配对令牌同住 `auth`；判定本身 `decide_admission` 仍在 `reception`。
+**理由**：城的唯一写者搬进 `accounting` 之后（`crates/accounting/Spec.lean` §8-11），它的命令入口、桌子、欠账与 ACP 受理点名这四个类型，而 `accounting` 依赖本 crate 时关掉默认 feature，因为它要的是词汇，不是 TCP 栈。四个类型本来就是词汇：`Reply` 包一个 `Fn(AxError) -> Delivered`，正是为了不把传输层写进签名（§8-2）；另外三个是普通的枚举与结构体，不持有 tokio 或 axum 的任何东西。`Pairing` 是一次配对判定的结论，与配对令牌同住 `auth`；判定本身 `decide_admission` 仍在 `reception`。
 
 **被否**：①给 `accounting` 的 `wire` 依赖打开 `server`：它把 tokio 与 axum 拉进一个从不监听的 crate，`wire` 不带 `server` 的那份构建（`just features`）也就不再守住「词汇不需要监听器」；②在 `accounting` 里另写一份同形的类型再在装配根互转：同一个拒绝去向有两个定义，互转是第二个权威。
 

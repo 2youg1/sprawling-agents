@@ -25,7 +25,7 @@ pub struct PreviewAnswer { pub version: B3Hash, pub preview: documents::Preview 
 - **块是数据，不是 HTML**（documents D21）：页面按块画元素，模型或居民写的字符不进 `innerHTML`。读得出而本页不画的——HTML、公式、前置元数据、过深的嵌套——是带原文的 `Unsupported`；一个空窗口是零个块；UTF-16 的版本答 `Preview::Unsupported { encoding }`。三者形状各不相同，页面因此分得清「这里有一个不画的东西」「这里什么也没有」「这一版不按 Markdown 读」（refrain 路线图 A4）。
 - **一个版本的预览不会过时**：版本的字节不变，所以页面不因任何事件重问（`client/src/core/staleness.ts` 与 `range`、`content` 同一行）。
 - **够得到它的门**：它是一个 `Query`，经 `Ask` 帧到达，属 §19-3 的 `Read`，带 `Watch` 或 `Act` 权限的远程设备都能问。
-- **Markdown 版本不论长短都在内容库里**（accounting-SPEC §12 第 33 条）：`Document` 答一份 Markdown 文件时把这一版放进内容库，答复照旧是 `Coverage::Whole` 或 `Head`，所以一份整份放得下 64 KiB 的文件也能按它的版本预览。对话流读同一个文法，入口是 §8-75。
+- **Markdown 版本不论长短都在内容库里**（accounting D33）：`Document` 答一份 Markdown 文件时把这一版放进内容库，答复照旧是 `Coverage::Whole` 或 `Head`，所以一份整份放得下 64 KiB 的文件也能按它的版本预览。对话流读同一个文法，入口是 §8-75。
 - 验收：accounting 的 `views::answering::preview::tests`——内容库里没有的版本答 `Unavailable`；超过一个窗口的文件从 `Document` 打开后逐窗预览，每一窗止于块末，读到末尾时每一段恰好出现一次；整份放得下一个窗口的 Markdown 文件从 `Document` 打开后预览出它的块；不是文本的版本答 `Unavailable`，UTF-16 的版本答 `Preview::Unsupported`。
 -/
 

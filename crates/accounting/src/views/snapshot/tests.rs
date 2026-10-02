@@ -14,7 +14,7 @@ use crate::views::tests::{Place, view_record};
 /// A view folded from records that fill the inbox, the discard bin, the
 /// registry, the commits and the governed rules, so a field added,
 /// removed or reordered among them changes the bytes, and so does the
-/// encoding of either digest a snapshot holds (accounting-SPEC 8-24).
+/// encoding of either digest a snapshot holds (`crates/accounting/spec/Views/Snapshot.lean` §8-24).
 fn fixture(city_root: &Path) -> Views {
     let mut views = Views::new(city_root);
     let room = Address::parse("lab/room1").unwrap();
@@ -61,7 +61,7 @@ fn fixture(city_root: &Path) -> Views {
 }
 
 /// The city's configuration booked as the digest of five bytes: the
-/// governed rules hold a `B3Hash` (accounting-SPEC 8-24).
+/// governed rules hold a `B3Hash` (`crates/accounting/spec/Views/Snapshot.lean` §8-24).
 pub(crate) fn rules_changed() -> serde_json::Value {
     let changed = kernel::event::record::RulesChanged {
         scope: kernel::event::Scope::City,

@@ -144,7 +144,7 @@ impl Views {
     /// to alternate with (sprawling-SPEC.md 8-99): a clone, which copies
     /// every folded field and shares what sits behind an `Arc`, so the
     /// copy starts where this one stands without the history being read
-    /// again (accounting-SPEC.md 8-19).
+    /// again (`crates/accounting/spec/Views/Snapshot.lean` §8-19).
     ///
     /// # Errors
     /// None today; the `Result` stays until its caller in

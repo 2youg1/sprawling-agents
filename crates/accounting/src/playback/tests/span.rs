@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A selection by UTC time (accounting-SPEC.md 8-17): judged on each
+//! A selection by UTC time (`crates/accounting/spec/Playback/Traced.lean` §8-17): judged on each
 //! line's own `t`, a day crossed with `since` and `until`, and a span
 //! no line falls in exported as an empty bundle that names its ends.
 

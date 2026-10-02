@@ -58,7 +58,7 @@ pub(crate) struct DriveContext {
     /// the same city, which no mutex here can see.
     pub checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// The worker's own clock, so a run's lines and the worker's are
-    /// read from one time (accounting-SPEC.md 8-3).
+    /// read from one time (`crates/accounting/spec/Clock.lean` §8-3).
     pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
 }
 

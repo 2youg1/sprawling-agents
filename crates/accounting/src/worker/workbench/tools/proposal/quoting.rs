@@ -5,7 +5,7 @@
 
 //! What a run's quote makes of a document as the city holds it: the
 //! version read at the call, and the byte stretch of it the quote is
-//! (accounting-SPEC.md 8-30, `crates/documents/Spec.lean` D35).
+//! (`crates/accounting/spec/Worker/Workbench/Tools.lean` §8-30, `crates/documents/Spec.lean` D35).
 
 use std::io::Read as _;
 

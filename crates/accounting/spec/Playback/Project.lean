@@ -6,7 +6,7 @@
 /-!
 # playback 的投影：读者读不到的行不流进任何派生表，关键时刻只在真实结束事件上闭合
 
-规定 `crates/accounting/src/playback/project.rs`、`crates/accounting/src/playback/reader.rs`、`crates/accounting/src/playback/links.rs`、`crates/accounting/src/playback/traced.rs` 与 `crates/accounting/src/trace.rs`（accounting-SPEC.md 8-12、8-25）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `crates/accounting/src/playback/project.rs`、`crates/accounting/src/playback/reader.rs`、`crates/accounting/src/playback/links.rs`、`crates/accounting/src/playback/traced.rs` 与 `crates/accounting/src/trace.rs`（`crates/accounting/Spec.lean` §8-12、§8-25）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 **读界。** 一行碰到的每一栋楼都由读者判一次，答案复用 `kernel::ReadVerdict` 的三臂：`Open`、`Confidential`、`RulesUnreadable`。只有碰到的楼全是 `Open` 的行可见；另外两臂一律关闭，所以规则读不了不会朝宽的一侧失败。一行「碰到」哪些楼，Rust 从信封地址、它所在 run 的房间、它关闭的那一对的打开行、以及载荷里以已知楼开头的地址求出；本模型把这个集合当作行的一个字段。
 

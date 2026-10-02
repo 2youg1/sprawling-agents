@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which calls a commit is the result of (accounting-SPEC.md 8-16).
+//! Which calls a commit is the result of (`crates/accounting/spec/Trace.lean` §8-16).
 //!
 //! A commit is traced back from what `Query::Commit` already answers:
 //! the run that wrote it and the commit that run announced before it.
@@ -18,7 +18,7 @@
 //! history once, up to its cutoff, into a `History` and asks each
 //! commit of it at the line that announced it; `trace_through` then
 //! reads that commit's lines through the index the export built, so no
-//! answer reads past the cutoff (accounting-SPEC.md 8-25).
+//! answer reads past the cutoff (`crates/accounting/spec/Playback/Traced.lean` §8-25).
 
 use std::collections::BTreeMap;
 use std::ops::Range;
@@ -74,7 +74,7 @@ pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError> {
 /// A city's history folded one verified line at a time, in the order a
 /// strict pass reads it up to a cutoff. A commit is asked of it as of the
 /// lines folded so far, so what a later line says, or whether it
-/// verifies, cannot change the answer (accounting-SPEC.md 8-25).
+/// verifies, cannot change the answer (`crates/accounting/spec/Playback/Traced.lean` §8-25).
 pub(crate) struct History {
     /// The views of the lines folded so far, or the first refusal to fold
     /// one, after which nothing more is folded.
@@ -216,8 +216,8 @@ fn nearby(
 
 /// How many folds of a city's views this module began on this thread,
 /// and how many index entries each nearby walk took: the probes the
-/// count gates in `playback::tests::tracing` read (accounting-SPEC.md
-/// 8-25).
+/// count gates in `playback::tests::tracing` read (`crates/accounting/spec/Playback/Traced.lean`
+/// §8-25).
 #[cfg(test)]
 pub(crate) mod counted {
     use std::cell::{Cell, RefCell};

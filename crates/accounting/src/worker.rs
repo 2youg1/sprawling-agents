@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The city's one writer: `RunWorker`, the state it holds, the commands
-//! it carries out and the runs it drives (accounting-SPEC.md 8-11).
+//! it carries out and the runs it drives (`crates/accounting/spec/Worker.lean` §8-11).
 //!
 //! It reaches this machine only through the [`hands::Hands`] it is built
 //! with. The production value is made by the binary's assembly root
@@ -283,7 +283,7 @@ pub struct RunWorker {
     recipe_for: fn(&str) -> Result<&'static crate::Recipe, AxError>,
     /// Where the exec tool's interpreter, shell and engine come from
     /// (`bin::doctor::host`). Received rather than asked, because each
-    /// reads this machine (accounting-SPEC.md 8-11).
+    /// reads this machine (`crates/accounting/spec/Worker.lean` §8-11).
     exec_host: hands::ExecHost,
 }
 

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The machine the city runs on, asked what it has and handed one
-//! install for the worker rather than by it (accounting-SPEC.md 8-4).
+//! install for the worker rather than by it (`crates/accounting/spec/Machine.lean` §8-4).
 //!
 //! **Holding a `Runnable` proves the recipe was a `Command`.** Its
 //! constructor is private to this crate, and `Recipe::command` is the

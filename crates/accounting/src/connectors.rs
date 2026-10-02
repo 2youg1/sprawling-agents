@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The MCP servers a building's configuration names, connected for the
-//! worker rather than started by it (accounting-SPEC.md 8-2).
+//! worker rather than started by it (`crates/accounting/spec/Connectors.lean` §8-2).
 
 use kernel::AxError;
 

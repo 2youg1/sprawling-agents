@@ -365,7 +365,7 @@ pub(crate) fn lay_draft(city: &Path, setup: &Setup) {
 }
 
 /// An offer is a card the person is shown and nothing more: the
-/// document keeps its bytes (accounting-SPEC.md 8-30).
+/// document keeps its bytes (`crates/accounting/Spec.lean` §8-30).
 fn proposal(setup: &Setup) -> Episode {
     Episode {
         step: Step {

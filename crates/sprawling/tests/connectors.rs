@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A run offered the MCP tools the worker was handed
-//! (accounting-SPEC.md section 2).
+//! (`crates/accounting/Spec.lean` section 2).
 //!
 //! The building names a server whose command does not exist on any
 //! machine, so its tool can reach the model only through the connectors

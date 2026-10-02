@@ -76,8 +76,8 @@ pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing 
 ///
 /// The two genesis lines are stamped with the time `hands.clock` reads,
 /// and the worker that raises City Hall is built with the same hands, so
-/// a scripted clock and vault hold from line zero (accounting-SPEC.md
-/// 8-3, 12-19).
+/// a scripted clock and vault hold from line zero (`crates/accounting/spec/Clock.lean`
+/// §8-3, accounting D19).
 ///
 /// # Errors
 /// Refuses a directory that already has history, and propagates whatever
@@ -299,7 +299,7 @@ impl RunWorker {
     /// freezes every run that death left open, and reports what is still
     /// waiting on a person. Read-only apart from the closing `tool_result`
     /// drafts, which state E_TOOL_OUTCOME_UNKNOWN rather than guessing an
-    /// outcome, and the freezes after them (accounting-SPEC.md 8-18-1).
+    /// outcome, and the freezes after them (`crates/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1).
     ///
     /// # Errors
     /// Propagates whatever the chain says about itself: a history that

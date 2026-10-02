@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which lines a playback selection holds (accounting-SPEC.md 8-12 and
+//! Which lines a playback selection holds (`crates/accounting/spec/Playback.lean` §8-12 and
 //! 8-17). The properties are `crates/accounting/spec/Playback/Select.lean`:
 //! the selection is the intersection of every condition given, bounded
 //! by the cutoff the walk stops at, and each line is judged on its own,

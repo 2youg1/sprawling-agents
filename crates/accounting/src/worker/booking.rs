@@ -37,7 +37,7 @@ pub(crate) struct Claimant {
     pub room: Address,
     pub run: RunId,
     pub who: String,
-    /// The worker's own clock (accounting-SPEC.md 8-3).
+    /// The worker's own clock (`crates/accounting/spec/Clock.lean` §8-3).
     pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
 }
 
