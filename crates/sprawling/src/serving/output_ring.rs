@@ -4,7 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What running commands already wrote, kept per run so a page that
-//! opens mid-command sees it (sprawling-SPEC.md 8-115).
+//! opens mid-command sees it (sprawling-SPEC.md 8-115; the bound and the
+//! order it keeps are proved in `crates/sprawling/spec/Serving/OutputRing.lean`).
 
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::{Mutex, MutexGuard, PoisonError};

@@ -3954,6 +3954,8 @@ impl PrefixAsk { pub(super) fn read(self) -> wire::Answer; } // 读不到那一�
 
 ### 8-90 服务中的城在后台证明整条链，证明之前与链断之后写者都不写（`bin::assembly::chain_watch`）
 
+证明线程的四种结局（完好、断链、读不了、恐慌）怎样落到停机值上的权威是 `crates/sprawling/spec/Assembly/ChainWatch.lean`：每种结局都给出判定，只有完好才放行；停机值本身的权威是 `crates/storage/spec/ChainAudit.lean`。本节是接口、线程与理由。
+
 ```rust
 // accounting::worker::chain_halt —— shape: adapter，随 worker 住（它读写者的私有字段）
 pub struct ChainUnderAudit {
@@ -4467,6 +4469,8 @@ impl RunWorker {
 
 ## 8-109 `sprawling up --supervise`：崩溃 → `resume` → `serve`（`bin::supervising`、`bin::supervising::children`）
 
+`CrashBudget::after` 必须守住的性质的权威是 `crates/sprawling/spec/Supervising.lean`：人选的收口总是停下，重启带出的预算有界且都在窗口里，一分钟内第三次崩溃即 degraded，隔满一个窗口的崩溃总是重启；本节是接口、子进程的读法与理由。
+
 **要什么。** 一座城的服务进程崩了，人不在键盘前时没有人把它拉起来。`--supervise` 让 `up`（与 `serve`，两者共用一张 flag 表与同一个 `serve_city`）不自己服务，而是守着一个子进程：子进程就是 `sprawling serve <city> <addr> …`，崩了先跑一次 `sprawling resume <city>`（验链、收掉进程死亡留下的悬空调用），再起一个新的 `serve`。
 
 **两个模块。**
@@ -4749,6 +4753,8 @@ impl RoomQueues {
 - 客户端（`client/src/core/removal.ts`）在 City Hall 上不画这个控件，楼里有 run 在跑时画成不可用并说明原因；确认走 `parts/dialog`。城仍自己拒这两种情况，页面只是不把一个只会被拒的按钮交给人。
 
 ### 8-115 还在跑的命令写出的字节，给后来打开页面的会话留一段（`bin::serving::output_ring`）
+
+`keep` 必须守住的性质的权威是 `crates/sprawling/spec/Serving/OutputRing.lean`：最新的一块总留着，每个 run 不超过上界或只剩一块，只从最旧的整块丢起；本节是接口与理由。
 
 ```rust
 // bin::serving::output_ring —— shape: value
