@@ -64,10 +64,7 @@ under MPL-2.0, the license in `LICENSE` at the root of this tree. It states
 the playback bundle's data contract and the checks `sprawling playback check`
 runs, so it changes with the code that writes them.
 
-Its reference page, `playback/template.html`, embeds a subset of Geist Mono
-(Copyright (c) 2023 Vercel, in collaboration with basement.studio) under the
-SIL Open Font License 1.1, whose text is `playback/OFL.txt`; the rest of the
-page is MPL-2.0 with the skill.
+Its reference page, `playback/template.html`, is MPL-2.0 with the skill.
 
 ## `authority-review` — MIT
 

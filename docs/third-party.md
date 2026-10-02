@@ -146,18 +146,16 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 ## 4 What the client ships that others wrote
 
-The client draws itself in **Geist Mono** ([vercel/geist-font](https://github.com/vercel/geist-font)), one variable-weight `woff2`, under **SIL Open Font License 1.1**. It is the only binary asset in this repository that is somebody else's work; the playback skill's reference page carries a subset of the same face inside its own text.
+The client draws itself in **Geist Mono** ([vercel/geist-font](https://github.com/vercel/geist-font)), one variable-weight `woff2`, under **SIL Open Font License 1.1**. It is the only binary asset in this repository that is somebody else's work.
 
 | File | Family | Licence |
 |---|---|---|
 | `client/src/fonts/GeistMono-Variable.woff2` | Geist Mono | OFL-1.1 |
 | `client/src/fonts/OFL.txt` | the licence text, copied verbatim from upstream `LICENSE.TXT` | OFL-1.1 |
-| `skills/playback/template.html` | Geist Mono, subset to Basic Latin and a few marks with the weight axis kept, embedded as a `data:` URL | OFL-1.1 |
-| `skills/playback/OFL.txt` | the same licence text, beside the page that embeds the subset | OFL-1.1 |
 
 **The licence travels with the font, not with this document.** OFL-1.1 §2 requires the copyright notice and the licence text to accompany every copy of the font, including one embedded in a program, so `OFL.txt` sits in the same directory as the `woff2` file and `client/vite.config.ts` emits it into the bundle as `fonts/OFL.txt`. The binary embeds the bundle, so the obligation is discharged wherever the binary goes. A build whose `client/src/fonts/` is missing either name says so once per file and produces a bundle that draws in the fallback stack.
 
-**Three things OFL-1.1 asks that this repository keeps honouring**: the font is not sold on its own, the licence and the copyright line travel with every copy, and a modified copy drops any Reserved Font Name. The client's file travels unmodified, under its own name. The playback page's subset is a modified copy; upstream's licence declares no Reserved Font Name, so it keeps the name, and it carries the licence three ways: its own name table, the page's opening comment, and `OFL.txt` in the skill's directory, which the release archive carries with the page.
+**Three things OFL-1.1 asks that this repository keeps honouring**: the font is not sold on its own, the licence and the copyright line travel with every copy, and a modified copy drops any Reserved Font Name. The client's file travels unmodified, under its own name.
 
 **The JavaScript inside the bundle carries its notices the same way.** When Vite writes the bundle, `client/scripts/notices.ts` reads which npm packages the emitted chunks were built from, and writes `THIRD-PARTY-NOTICES.txt` at the bundle's root with each package's name, version, declared licence and its licence file verbatim. The binary embeds the bundle, so the notices go wherever the binary goes, and a running city serves them at `/THIRD-PARTY-NOTICES.txt`. A package that reaches the bundle without a licence file stops the build and is named, because a notice file that silently lacks one package is the gap it exists to close.
 
