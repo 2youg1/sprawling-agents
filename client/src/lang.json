@@ -4599,10 +4599,6 @@
     "en": "copy path:line",
     "zh": "复制 路径:行"
   },
-  "inspect_copy_link": {
-    "en": "copy link",
-    "zh": "复制链接"
-  },
   "inspect_raw": {
     "en": "original",
     "zh": "原文"

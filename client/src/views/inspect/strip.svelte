@@ -11,8 +11,12 @@
   // page's own fill so it reads as the sheet the region below is cut
   // from; a terminal's tab carries the terminal mark, and a document whose
   // RefRain session holds words the city has not taken carries an alert
-  // dot (7F). At the right end, the link to the item in front, to copy
-  // (4-63), and the key that closes the whole inspector.
+  // dot (7F). At the right end, the key that closes the whole inspector.
+  //
+  // **A tab is a link** to its item beside this conversation (4-63), so
+  // the browser's own "copy link" and "open in a new tab" read the
+  // locator; a press only brings the tab forward and leaves the address
+  // bar alone (client D41). An item with no spelling there has no `href`.
   //
   // An APG Tabs pattern with a roving tab stop: the strip is one stop,
   // ←/→ walk it and bring each tab forward, Home/End go to either end,
@@ -39,30 +43,14 @@
     readonly onPick: (item: RightItem) => void;
     readonly onClose: (item: RightItem) => void;
     readonly onCloseAll: () => void;
-    // The address-bar locator of the item in front, `null` for an item
-    // the address bar has no spelling for.
-    readonly link: string | null;
+    // The address-bar locator of an item, `null` for one the address bar
+    // has no spelling for.
+    readonly linkOf: (item: RightItem) => string | null;
   }
 
-  const { tabs, front, panels, onPick, onClose, onCloseAll, link }: Props = $props();
+  const { tabs, front, panels, onPick, onClose, onCloseAll, linkOf }: Props = $props();
 
   const lang = ui().lang;
-
-  // How long the copy receipt holds: long enough to see, short enough
-  // that it never becomes the control's face.
-  const RECEIPT_MS = 1200;
-  let copied = $state(false);
-
-  // The receipt appears only after the write landed, so a press that
-  // quietly failed shows no receipt rather than a lying one.
-  function copy(fragment: string): void {
-    void navigator.clipboard.writeText(new URL(fragment, document.baseURI).href).then(() => {
-      copied = true;
-      setTimeout(() => {
-        copied = false;
-      }, RECEIPT_MS);
-    });
-  }
 
   let strip = $state<HTMLDivElement | undefined>(undefined);
 
@@ -112,14 +100,15 @@
           on ? "bg-page text-text after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-page after:content-['']" : "pl-pane text-text-faint hover:text-text-quiet",
         ]}
       >
-        <button
-          type="button"
+        <a
           role="tab"
           class="flex h-full max-w-[calc(24*var(--spacing-baseline))] items-center gap-snug pl-pane whitespace-nowrap group-first/tab:pl-0"
+          href={linkOf(tab.item)}
           aria-selected={on}
           aria-controls={panels[tab.region]}
           tabindex={on || (front === null && at === 0) ? 0 : -1}
-          onclick={() => {
+          onclick={(event) => {
+            event.preventDefault();
             onPick(tab.item);
           }}
           onkeydown={(event) => {
@@ -132,7 +121,7 @@
             <span class="size-dot shrink-0 rounded-pill bg-alert" aria-hidden="true"></span>
             <span class="sr-only">{say($lang, "inspect_unsaved")}</span>
           {/if}
-        </button>
+        </a>
         <button
           type="button"
           tabindex="-1"
@@ -150,16 +139,6 @@
       </div>
     {/each}
   </div>
-  {#if link !== null}
-    {@const fragment = link}
-    <button
-      type="button"
-      class="my-auto ml-snug flex h-control-sm shrink-0 items-center rounded-control px-snug text-note text-text-faint hover:bg-raised hover:text-text"
-      onclick={() => {
-        copy(fragment);
-      }}>{say($lang, copied ? "code_copied" : "inspect_copy_link")}</button
-    >
-  {/if}
   <button
     type="button"
     class="my-auto ml-snug flex size-control-sm items-center justify-center rounded-control text-text-faint hover:bg-raised hover:text-text"

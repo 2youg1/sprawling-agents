@@ -122,19 +122,18 @@
   const tabs = $derived(items.map((item): Tab => ({ item, label: labelOf(item), region: regionOfItem(item) })));
   const front = $derived(held.length > 0 ? rightItem() : (following[0] ?? null));
 
-  // The item in front as a link to this conversation with it open on the
-  // right (4-63); what moved between two commits has no spelling there.
-  const link = $derived.by((): string | null => {
-    if (front === null) return null;
-    switch (front.kind) {
+  // An item as a link to this conversation with it open on the right
+  // (4-63); what moved between two commits has no spelling there.
+  function linkOf(item: RightItem): string | null {
+    switch (item.kind) {
       case "call":
-        return toFragment({ kind: "talk", address: talk, item: { kind: "call", run: front.run, at: front.at } });
+        return toFragment({ kind: "talk", address: talk, item: { kind: "call", run: item.run, at: item.at } });
       case "document":
-        return toFragment({ kind: "talk", address: talk, item: { kind: "document", building: front.building, path: front.path, version: front.version } });
+        return toFragment({ kind: "talk", address: talk, item: { kind: "document", building: item.building, path: item.path, version: item.version } });
       case "changes":
         return null;
     }
-  });
+  }
 
   // What each region shows: the item of that region touched last, or
   // the one the side follows.
@@ -209,7 +208,7 @@
     closeAll();
   }}
 >
-  <Strip {tabs} {front} panels={PANELS} {link} onPick={pick} onClose={close} onCloseAll={closeAll} />
+  <Strip {tabs} {front} panels={PANELS} {linkOf} onPick={pick} onClose={close} onCloseAll={closeAll} />
   <div class="flex min-h-0 flex-1 flex-col" bind:clientHeight={room}>
     {#if editorTabs.length > 0}
       <div
