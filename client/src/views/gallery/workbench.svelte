@@ -318,9 +318,13 @@
 {#each SHOWN as shown (shown.label)}
   <Case label={shown.label} width={1440}>
     <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering} {records}>
-      <div class="frame relative h-[860px] translate-x-0 overflow-hidden bg-page">
-        <Workspace address={ROOM} tier={shown.tier} seat="specimen" panel={shown.panel} />
-        <Edge tier={shown.tier} onTier={() => undefined} onPeek={() => undefined} mailboxAsked={0} />
+      <!-- A container named as the shell's body is, so the specimen's
+      silver cut is measured on its own width. -->
+      <div class="@container/shell">
+        <div class="frame relative h-[860px] translate-x-0 overflow-hidden bg-page">
+          <Workspace address={ROOM} tier={shown.tier} seat="specimen" panel={shown.panel} />
+          <Edge tier={shown.tier} onTier={() => undefined} onPeek={() => undefined} mailboxAsked={0} />
+        </div>
       </div>
     </Stand>
   </Case>

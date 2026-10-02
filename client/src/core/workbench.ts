@@ -12,9 +12,13 @@
 // **Widths are counted in grid columns, never in pixels.** A pane edge
 // that falls between two column lines is an edge no other region of the
 // page can line up with, so a drag snaps to a column line and the value
-// kept is the count. Three counts that always add up to twelve, each at
-// least `NARROWEST`, is the whole invariant, and every change below
-// keeps it rather than a reader checking it afterwards.
+// kept is the count. The columns are not equal: `theme.css` lays three
+// of them into each side part of the shell's silver cut and six into
+// the middle part, so lines 4 and 10 are the silver lines, and a count
+// names a silver proportion exactly where it lands on them. Three counts
+// that always add up to twelve, each at least `NARROWEST`, is the whole
+// invariant, and every change below keeps it rather than a reader
+// checking it afterwards.
 
 export type Pane = "sessions" | "session" | "commits";
 
@@ -34,10 +38,12 @@ const COLUMNS = 12;
 // status dot and half a name.
 export const NARROWEST = 2;
 
+// The shell's silver cut: the chosen session in the middle part, the
+// sessions and the commits in the two side parts, 1 : √2 : 1.
 export const WORKBENCH: Workbench = [
   { pane: "sessions", span: 3 },
-  { pane: "session", span: 5 },
-  { pane: "commits", span: 4 },
+  { pane: "session", span: 6 },
+  { pane: "commits", span: 3 },
 ];
 
 // The line between the first and second pane, or between the second

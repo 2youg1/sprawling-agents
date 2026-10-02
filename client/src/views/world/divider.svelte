@@ -12,9 +12,11 @@
   // back the way it ships. The panes never collapse, so Enter's
   // collapse-and-restore in the APG reads as a reset here.
   //
-  // The grid it measures is its parent, the world layer, whose columns
-  // are the shell's own twelve through `subgrid`, so the column a drag
-  // lands on is a line every other region of the page stands on too.
+  // The lines it snaps to are the shell's own: the world layer stands on
+  // them through `subgrid`, so the column a drag lands on is a line every
+  // other region of the page stands on too, the two silver lines among
+  // them. The columns are not equal (12-24), so the lines are read off
+  // the shell's grid as the engine laid it out rather than counted.
   import { fill, say } from "../../core/lang";
   import { NARROWEST, WORKBENCH, resized, widest } from "../../core/workbench";
   import type { Divider } from "../../core/workbench";
@@ -37,7 +39,6 @@
   const { lang } = u;
   const bench = u.prefs.workbench;
 
-  const COLUMNS = 12;
   // The grid line the pane before the divider starts on.
   const start = $derived(divider === 0 ? 1 : 1 + $bench[0].span);
   const span = $derived(divider === 0 ? $bench[0].span : $bench[1].span);
@@ -50,12 +51,21 @@
     u.prefs.setWorkbench(WORKBENCH);
   }
 
-  // The grid line nearest the pointer, counted from one.
+  // The grid line nearest the pointer, counted from one: the middle of
+  // the gutter before each column, read off the shell's frame, whose
+  // resolved columns are pixels where a subgrid's are only `subgrid`.
   function lineAt(grid: HTMLElement, clientX: number): number {
-    const box = grid.getBoundingClientRect();
-    const gap = Number.parseFloat(getComputedStyle(grid).columnGap) || 0;
-    const step = (box.width + gap) / COLUMNS;
-    return Math.round((clientX - box.left + gap / 2) / step) + 1;
+    const frame = grid.closest<HTMLElement>(".frame") ?? grid;
+    const style = getComputedStyle(frame);
+    const gap = Number.parseFloat(style.columnGap) || 0;
+    let edge = frame.getBoundingClientRect().left + (Number.parseFloat(style.paddingLeft) || 0) - gap / 2;
+    const lines = style.gridTemplateColumns.split(" ").map((track) => {
+      const at = edge;
+      edge += Number.parseFloat(track) + gap;
+      return at;
+    });
+    const distances = [...lines, edge].map((at) => Math.abs(clientX - at));
+    return distances.indexOf(Math.min(...distances)) + 1;
   }
 
   let dragging = $state(false);

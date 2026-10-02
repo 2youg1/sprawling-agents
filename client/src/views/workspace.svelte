@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts" module>
-  // The conversation page as the shell lays it out (docs/frontend-method.md §4-33, §7H,
+  // The conversation page as the shell lays it out (client-SPEC 4-33, 7H,
   // 7K): the world layer, the conversation and the right pane, each placed
   // on the column lines of the shell's one grid by the tier the page is
   // in, by whether the right pane is open and, in the panorama tier, by
@@ -32,25 +32,35 @@
 
   export type RightSide = "open" | "closed";
 
-  // With the right pane open the panorama keeps the sessions and the
-  // chosen session in the person's order, at two and five columns, and
-  // the commits fold away (the table of docs/frontend-method.md §4-33).
-  const BESIDE_RIGHT: Readonly<Record<Pane, number>> = { sessions: 2, session: 5, commits: 0 };
+  // The shell's silver cut (12-24): the middle part, which the
+  // conversation and the chosen session stand in, and the two side parts.
+  const MIDDLE: Lines = [4, 10];
+  const LEFT: Lines = [1, 4];
+  const RIGHT: Lines = [10, 13];
 
+  // With the right pane open the panorama keeps the sessions and the
+  // chosen session in the person's order, at the side part's three
+  // columns and the middle part's six, and the commits fold away: the
+  // right pane takes the side part they stood in.
+  const BESIDE_RIGHT: Readonly<Record<Pane, number>> = { sessions: 3, session: 6, commits: 0 };
+
+  // The conversation never moves when the right pane opens or closes: it
+  // keeps the middle part, and the right pane takes the right side part,
+  // so the two stand at √2 : 1 with the conversation the main one.
   export function layoutOf(tier: Tier, right: RightSide, bench: Workbench): Layout {
     switch (tier) {
       case "zen":
-        return { world: "none", panes: [], talk: right === "open" ? [2, 7] : [4, 10], right: [7, 13] };
+        return { world: "none", panes: [], talk: MIDDLE, right: right === "open" ? RIGHT : null };
       case "blend":
         return right === "open"
-          ? { world: "none", panes: [], talk: [2, 7], right: [7, 13] }
+          ? { world: "beside", panes: [{ pane: "sessions", lines: LEFT }], talk: MIDDLE, right: RIGHT }
           : {
               world: "beside",
               panes: [
-                { pane: "sessions", lines: [1, 4] },
-                { pane: "commits", lines: [10, 13] },
+                { pane: "sessions", lines: LEFT },
+                { pane: "commits", lines: RIGHT },
               ],
-              talk: [4, 10],
+              talk: MIDDLE,
               right: null,
             };
       case "panorama":
@@ -59,8 +69,9 @@
   }
 
   // The workbench's panes side by side from the first column line, and
-  // the conversation as a band under the chosen session. The band never
-  // starts on the first column, which the edge keys stand at the foot of.
+  // the conversation under the chosen session, the taller of the two by
+  // the silver ratio. The conversation never starts on the first column,
+  // which the edge keys stand at the foot of.
   function workbenchOf(columns: readonly { readonly pane: Pane; readonly span: number }[], right: RightSide): Layout {
     let from = 1;
     const panes = columns.flatMap((column): Placed[] => {
@@ -69,7 +80,7 @@
       from += column.span;
       return [{ pane: column.pane, lines }];
     });
-    const session = panes.find((placed) => placed.pane === "session")?.lines ?? [4, 9];
+    const session = panes.find((placed) => placed.pane === "session")?.lines ?? MIDDLE;
     return {
       world: "workbench",
       panes,
@@ -78,7 +89,7 @@
     };
   }
 
-  // One column (client/Spec.lean §4-52): the conversation alone, or in the
+  // One column (client-SPEC 4-52): the conversation alone, or in the
   // panorama tier the world as a sheet with the conversation as its band
   // under it; the right side, when open, is a sheet over both. No region
   // stands on a line of its own.
@@ -144,7 +155,7 @@
   const uid = $props.id();
 
   // A shell narrower than the grid's columns can be read in is one
-  // column (`theme.css` decides, client D30): the conversation alone, the world
+  // column (`theme.css` decides, 12-30): the conversation alone, the world
   // and the right side as sheets over it (4-52).
   let columns = $state<Columns>("twelve");
   const narrow = $derived(columns === "one");
@@ -243,15 +254,19 @@
 {/snippet}
 {#snippet unnamed()}{/snippet}
 
-<!-- Two rows: the page, and under it the panorama band. A pane that runs
-the window's height spans both; the chosen session stands in the first
-and the band in the second, so the band is as tall as it needs and never
-covers the pane above it. -->
+<!-- Two rows: the page, and under it the conversation in the panorama
+tier. A pane that runs the window's height spans both. On the workbench
+the chosen session stands in the first and the conversation in the
+second, cut 1 : √2 by the shell's one ratio so the conversation is the
+taller; on one column the second row is the band, as tall as it needs. -->
 <svelte:element
   this={seat === "page" ? "main" : "section"}
   id={seat === "page" ? "main" : undefined}
   {@attach (element: HTMLElement) => watchColumns(element, (next) => (columns = next))}
-  class="workspace col-span-full row-start-2 -m-margin grid min-h-0 grid-cols-subgrid grid-rows-[minmax(0,1fr)_auto] p-margin narrow:relative narrow:-mx-pane narrow:mt-0 narrow:-mb-pane narrow:px-pane narrow:pt-0 narrow:pb-pane"
+  class={[
+    "workspace col-span-full row-start-2 -m-margin grid min-h-0 grid-cols-subgrid p-margin narrow:relative narrow:-mx-pane narrow:mt-0 narrow:-mb-pane narrow:px-pane narrow:pt-0 narrow:pb-pane",
+    layout.world === "workbench" ? "grid-rows-[minmax(0,calc(100%/(1+var(--silver))))_minmax(0,1fr)]" : "grid-rows-[minmax(0,1fr)_auto]",
+  ]}
   aria-label={seat === "page" ? say($lang, "region_main") : title}
 >
   <!-- The page's own name: a reader arriving by keyboard or screen reader
@@ -329,9 +344,9 @@ covers the pane above it. -->
     aria-label={say($lang, "region_conversation")}
   >
     {#if past === undefined}
-      <Talk {address} band={layout.world === "workbench" || sheet} />
+      <Talk {address} band={sheet} />
     {:else}
-      <Past {address} stretch={past} band={layout.world === "workbench" || sheet} />
+      <Past {address} stretch={past} band={sheet} />
     {/if}
   </section>
   {#if open}

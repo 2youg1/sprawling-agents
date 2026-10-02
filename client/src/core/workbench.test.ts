@@ -13,19 +13,19 @@ const panes = (bench: Workbench): readonly string[] => bench.map((column) => col
 
 describe("a divider moves one pane's edge and no other", () => {
   test("the pane after the divider takes what the pane before it gave up", () => {
-    expect(spans(resized(WORKBENCH, 0, 5))).toEqual([5, 3, 4]);
+    expect(spans(resized(WORKBENCH, 0, 5))).toEqual([5, 4, 3]);
     expect(spans(resized(WORKBENCH, 1, 7))).toEqual([3, 7, 2]);
   });
 
   test("no pane is pushed under two columns from either side", () => {
-    expect(spans(resized(WORKBENCH, 0, 0))).toEqual([2, 6, 4]);
-    expect(spans(resized(WORKBENCH, 0, 11))).toEqual([6, 2, 4]);
-    expect(widest(WORKBENCH, 0)).toBe(6);
+    expect(spans(resized(WORKBENCH, 0, 0))).toEqual([2, 7, 3]);
+    expect(spans(resized(WORKBENCH, 0, 11))).toEqual([7, 2, 3]);
+    expect(widest(WORKBENCH, 0)).toBe(7);
     expect(widest(WORKBENCH, 1)).toBe(7);
   });
 
   test("a width between two column lines is not a width", () => {
-    expect(spans(resized(WORKBENCH, 0, 4.6))).toEqual([5, 3, 4]);
+    expect(spans(resized(WORKBENCH, 0, 4.6))).toEqual([5, 4, 3]);
   });
 });
 
@@ -33,7 +33,7 @@ describe("a pane moves past its neighbour with its width", () => {
   test("moving right swaps it with the pane to its right", () => {
     const bench = moved(WORKBENCH, "sessions", "right");
     expect(panes(bench)).toEqual(["session", "sessions", "commits"]);
-    expect(spans(bench)).toEqual([5, 3, 4]);
+    expect(spans(bench)).toEqual([6, 3, 3]);
   });
 
   test("a pane at the edge stays where it is", () => {

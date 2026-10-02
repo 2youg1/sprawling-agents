@@ -541,6 +541,12 @@
    * drawing, so a building on the map and the panel beside it have one
    * curvature. 1.6 is the edge keys' corner the person approved. */
   --corner-exponent: 1.6;
+  /* The one proportion the shell is cut by (client-SPEC 12-24): main
+   * against what stands beside it is the silver ratio, 1 : √2, the
+   * person's ruling over an evenly divided grid. Every silver line on
+   * every page is derived from this number and the shell's width, in
+   * `frame` below. */
+  --silver: sqrt(2);
 }
 
 /* An engine that knows the curve draws it on every rounded box; one
@@ -807,10 +813,33 @@
  * grid is decided: the script that has to know (which tier a one-column
  * shell can draw) reads it off the element rather than spelling the
  * width a second time (`views/shared/frame.ts`). */
+/* One side part of the window's silver cut, as a length: registered so
+ * the frame computes it once against its own container, and every page
+ * and panel inside inherits the pixels rather than the formula, whose
+ * `cqw` would otherwise be read again against whichever container stands
+ * nearer (`silver-columns`, the settings panel). */
+@property --silver-side {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
 @utility frame {
   --shell-columns: 12;
+  /* The window is cut once, side : main : side = 1 : √2 : 1, and the
+   * twelve columns are laid into the three parts - three, six, three -
+   * so lines 4 and 10 are the two silver lines and every region still
+   * has column lines to stand on. The cut is measured on the window,
+   * margins included, so the middle part is centred on the screen and a
+   * gutter is centred on each silver line; the middle six columns are
+   * fixed by that and the outer six share what is left, which keeps the
+   * page symmetric whatever the margins are. */
+  --silver-side: calc(100cqw / (2 + var(--silver)));
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr))
+    repeat(6, calc((var(--silver-side) * var(--silver) - 6 * var(--spacing-gutter)) / 6))
+    repeat(3, minmax(0, 1fr));
   grid-template-rows: auto minmax(0, 1fr);
   column-gap: var(--spacing-gutter);
   padding: max(var(--spacing-margin), env(safe-area-inset-top, 0px)) max(var(--spacing-margin), env(safe-area-inset-right, 0px))
@@ -829,6 +858,18 @@
     padding: max(var(--spacing-pane), env(safe-area-inset-top, 0px)) max(var(--spacing-pane), env(safe-area-inset-right, 0px))
       max(var(--spacing-pane), env(safe-area-inset-bottom, 0px)) max(var(--spacing-pane), env(safe-area-inset-left, 0px));
   }
+}
+
+/* Main's silver lines on a page that is not the conversation (12-24): a
+ * middle column exactly as wide as the shell's middle part, and the two
+ * sides sharing the rest. A page is centred in the shell, so the middle
+ * column's edges stand on the shell's two silver lines, the lines the
+ * conversation and the panes beside it stand on, and a person switching
+ * between a page and the conversation sees the same edges. */
+@utility silver-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(var(--silver-side) * var(--silver) - var(--spacing-gutter)) minmax(0, 1fr);
+  column-gap: var(--spacing-gutter);
 }
 
 /* Glass, for the small surfaces of the edge layer and nothing larger
