@@ -153,7 +153,7 @@ gh attestation verify sprawling-<version>-<platform>.zip --repo 2youg1/sprawling
 
 没有东西会自己更新。`sprawling version` 印出这是哪一版；`sprawling status --check`，或 **设置** 里的那个按钮，去 npm 问有没有更新的一版；替换二进制始终由你来做。
 
-这些二进制没有代码签名：Windows 上点 *More info*，再点 *Run anyway*；macOS 上在 Finder 里右键打开一次。不要用 `cargo install` 装它，因为页面由 bun 构建再嵌进二进制，只跑 cargo build 得到的页面一片空白。
+这些二进制没有代码签名：Windows 上点 *More info*，再点 *Run anyway*；macOS 上在 Finder 里右键打开一次。装了 1.97 或更新的 Rust 工具链，也可以用 `cargo install sprawling --locked` 从 crates.io 编出同一个程序，因为发布的包里已经带着构建好的页面；从 git 检出直接跑 `cargo build`，在 `just build-web` 构建页面之前得到的页面一片空白。
 
 ## 2 建一座城，并把它打开
 

@@ -153,7 +153,7 @@ With bun or node already installed, `bunx sprawling help` or `npx sprawling help
 
 Nothing updates itself. `sprawling version` prints which release this is; `sprawling status --check`, or the button under **settings**, asks npm whether a newer one exists; replacing the binary stays your command to run.
 
-The binaries are not code-signed: on Windows choose *More info*, then *Run anyway*; on macOS open the binary once from Finder's right-click menu. Do not `cargo install` this, because the page is built by bun and embedded into the binary, and a plain cargo build yields a blank page.
+The binaries are not code-signed: on Windows choose *More info*, then *Run anyway*; on macOS open the binary once from Finder's right-click menu. With a Rust toolchain of 1.97 or later, `cargo install sprawling --locked` builds the same program from crates.io, because the published package carries the page already built; a plain `cargo build` of a git checkout yields a blank page until `just build-web` has built the page.
 
 ## 2 Raise a city, and open it
 

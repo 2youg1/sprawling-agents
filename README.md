@@ -1,8 +1,18 @@
+<div align="center">
+
 # sprawling
 
 **Run many agents on your own machine as a city. One Rust binary; the interface is a page in your browser.**
 
-[![npm](https://img.shields.io/npm/v/sprawling?logo=npm&labelColor=171717&color=CB3837)](https://www.npmjs.com/package/sprawling)[![License](https://img.shields.io/github/license/2youg1/sprawling-agents?labelColor=171717&color=4C8BF5)](LICENSE)[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/2youg1/sprawling-agents)[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat-square&color=00b0aa&labelColor=000000)](https://zread.ai/2youg1/sprawling-agents)
+<p align="center">
+  <a href="https://crates.io/crates/sprawling"><img alt="crates.io" src="https://img.shields.io/crates/v/sprawling?logo=rust&amp;labelColor=171717&amp;color=DEA584"></a>
+  <a href="https://www.npmjs.com/package/sprawling"><img alt="npm" src="https://img.shields.io/npm/v/sprawling?logo=npm&amp;labelColor=171717&amp;color=CB3837"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/2youg1/sprawling-agents?labelColor=171717&amp;color=4C8BF5"></a>
+  <a href="https://deepwiki.com/2youg1/sprawling-agents"><img alt="Ask DeepWiki" src="https://deepwiki.com/badge.svg"></a>
+  <a href="https://zread.ai/2youg1/sprawling-agents"><img alt="Ask Zread" src="https://img.shields.io/badge/Ask_Zread-_.svg?style=flat-square&amp;color=00b0aa&amp;labelColor=000000"></a>
+</p>
+
+</div>
 
 > **Status: <!-- xtask:begin maturity:word -->pre-alpha<!-- xtask:end -->, research and development.** The main loop works: register a provider in the browser, raise a building, dispatch a job, and the model calls tools and writes files into that building. Several agents work in one city, each in its own room, and several runs of one building drive at the same time, while one accounting thread writes all of them into the Ledger. What is still missing is listed under [What works, and what does not](#what-works-and-what-does-not); read that section before you hand it real work.
 >
@@ -41,7 +51,7 @@ sprawling does not think by itself. It needs a model to call: an API key for a p
 
 4. Tell the Mayor what you want, in the box at the bottom of the page. The Mayor plans, raises buildings for the work, and hands each building its part; you watch the runs, answer what they ask, and read the changes they made.
 
-The binaries are not code-signed, so the first run trips a warning: on Windows choose **More info → Run anyway**, and on macOS open the binary once from Finder's right-click menu. Do not `cargo install` this: the page is built by bun and embedded into the binary, and a plain cargo build yields a blank page. Take a release archive, or build with `just dist`.
+The binaries are not code-signed, so the first run trips a warning: on Windows choose **More info → Run anyway**, and on macOS open the binary once from Finder's right-click menu. With a Rust toolchain of 1.97 or later, `cargo install sprawling --locked` builds the same program from crates.io: the published package carries the page already built, so no bun is needed. A plain `cargo build` of a git checkout still yields a blank page until `just build-web` has built the page; for a checkout, build with `just dist`.
 
 **[`docs/getting-started.md`](docs/getting-started.md) is the full guide** ([中文](docs/getting-started.zh-CN.md)): every concept a newcomer meets — harness, provider, model roles, skills, templates, sessions, approvals — and the whole loop from an empty directory to a reviewed merge on your branch.
 

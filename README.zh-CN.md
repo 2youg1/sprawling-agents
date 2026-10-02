@@ -1,8 +1,18 @@
+<div align="center">
+
 # sprawling
 
 **在你自己的机器上，把许多 Agent 组织成一座城。一个 Rust 二进制，界面是浏览器里的一页。**
 
-[![npm](https://img.shields.io/npm/v/sprawling?logo=npm&labelColor=171717&color=CB3837)](https://www.npmjs.com/package/sprawling)[![License](https://img.shields.io/github/license/2youg1/sprawling-agents?labelColor=171717&color=4C8BF5)](LICENSE)[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/2youg1/sprawling-agents)[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat-square&color=00b0aa&labelColor=000000)](https://zread.ai/2youg1/sprawling-agents)
+<p align="center">
+  <a href="https://crates.io/crates/sprawling"><img alt="crates.io" src="https://img.shields.io/crates/v/sprawling?logo=rust&amp;labelColor=171717&amp;color=DEA584"></a>
+  <a href="https://www.npmjs.com/package/sprawling"><img alt="npm" src="https://img.shields.io/npm/v/sprawling?logo=npm&amp;labelColor=171717&amp;color=CB3837"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/2youg1/sprawling-agents?labelColor=171717&amp;color=4C8BF5"></a>
+  <a href="https://deepwiki.com/2youg1/sprawling-agents"><img alt="Ask DeepWiki" src="https://deepwiki.com/badge.svg"></a>
+  <a href="https://zread.ai/2youg1/sprawling-agents"><img alt="Ask Zread" src="https://img.shields.io/badge/Ask_Zread-_.svg?style=flat-square&amp;color=00b0aa&amp;labelColor=000000"></a>
+</p>
+
+</div>
 
 > **状态：<!-- xtask:begin maturity:word -->pre-alpha<!-- xtask:end -->，研究与开发中。** 主回路是通的：在浏览器里注册一个 provider、盖一栋楼、派一件活，模型会调用工具并把文件写进那栋楼。多个 Agent 各在各的房间里开工；同一栋楼的几轮活可以同时跑，而写进 Ledger 的只有一条记账线程。还没做到的写在[现在能做什么、还不能做什么](#现在能做什么还不能做什么)那一节，把真活交给它之前请先读。
 >
@@ -41,7 +51,7 @@ sprawling 自己不思考，它要一个能调用的模型：一个说 OpenAI �
 
 4. 在页面底部的输入框里把你想要的告诉 Mayor。Mayor 做计划、为活盖楼、把各自的部分交给各栋楼；你看着 run 跑、回答它们的提问、读它们改了什么。
 
-这些二进制没有代码签名，第一次运行会触发警告：Windows 上选 **More info → Run anyway**，macOS 上在 Finder 里右键打开一次。**不要用 `cargo install` 装它**：页面由 bun 构建再嵌进二进制，只跑 cargo build 得到的页面一片空白。请用 release 归档，或者用 `just dist` 构建。
+这些二进制没有代码签名，第一次运行会触发警告：Windows 上选 **More info → Run anyway**，macOS 上在 Finder 里右键打开一次。装了 1.97 或更新的 Rust 工具链，也可以用 `cargo install sprawling --locked` 从 crates.io 编出同一个程序：发布的包里已经带着构建好的页面，不需要 bun。从 git 检出直接跑 `cargo build`，在 `just build-web` 构建页面之前得到的页面仍是一片空白；检出的代码请用 `just dist` 构建。
 
 **完整指南是 [`docs/getting-started.zh-CN.md`](docs/getting-started.zh-CN.md)**（[English](docs/getting-started.md)）：新手会遇到的每个概念——harness、provider、模型角色、skill、模板、会话、审批——以及从空目录到一次经过审查、落在你分支上的合并的整条回路。
 
