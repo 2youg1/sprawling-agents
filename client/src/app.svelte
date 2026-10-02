@@ -42,7 +42,9 @@
   import Workspace from "./views/workspace.svelte";
   import SettingsPanel from "./views/settings/panel.svelte";
   import { closePanel, hostSettled, panelBeneath, panelGroup, pickGroup } from "./views/settings/hosted.svelte";
+  import { followViewport, watchColumns, type Columns } from "./views/shared/frame";
   import { motionOff } from "./views/shared/motion";
+  import { keepSheets, leaveSheet, openSheet, sheetsOpen } from "./views/sheets.svelte";
 
   // The Opening `main.ts` read off the page, captured once and whole: the
   // shell never follows its fields, which the suppression below says.
@@ -97,7 +99,6 @@
     if (now.kind === "backoff") lostAttempt = now.attempt + 1;
     else if (now.kind === "live" || now.kind === "refused") lostAttempt = null;
   });
-  // How many runs this city cancelled.
   const frozen = $derived($belief.cancelled);
   // Whether this city can take a dispatch at all: a `main` model is
   // chosen. Until then the first page is the welcome, unless the person
@@ -113,9 +114,7 @@
   // step with the composer.
   function focusComposer(): void {
     const box = document.querySelector("main textarea");
-    if (box instanceof HTMLTextAreaElement) {
-      box.focus();
-    }
+    if (box instanceof HTMLTextAreaElement) box.focus();
   }
 
   // After a navigation the new page's own heading takes the focus, so a
@@ -164,13 +163,19 @@
   // The tier is the person's, kept where their other postures are kept
   // (`core/prefs.ts`), and cycled in the order `TIERS` states. Holding the
   // layers key - the edge key or its chord - shows the blend tier for as
-  // long as it is held and changes nothing (client-SPEC 7E).
+  // long as it is held and changes nothing (client-SPEC 7E). One column has
+  // no room beside the talk: the key opens the world as a sheet over it (4-52).
+  let columns = $state<Columns>("twelve");
   function cycleTier(): void {
+    if (columns === "one") {
+      (sheetsOpen().includes("world") ? leaveSheet : openSheet)("world");
+      return;
+    }
     const at = TIERS.indexOf($held.tier);
     u.prefs.setTier(TIERS[(at + 1) % TIERS.length] ?? "blend");
   }
   let peeking = $state(false);
-  const tier = $derived(peeking ? "blend" : $held.tier);
+  const tier = $derived(columns === "one" ? (peeking || sheetsOpen().includes("world") ? "panorama" : "zen") : peeking ? "blend" : $held.tier);
 
   // How many times the mailbox chord asked; the mailbox answers each one.
   let mailboxAsked = $state(0);
@@ -184,13 +189,8 @@
   function expose(on: boolean): void {
     if (exposing !== null) clearTimeout(exposing);
     exposing = null;
-    if (on) {
-      exposing = setTimeout(() => {
-        document.documentElement.dataset.expose = "";
-      }, HOLD_MS);
-    } else {
-      delete document.documentElement.dataset.expose;
-    }
+    if (!on) delete document.documentElement.dataset.expose;
+    else exposing = setTimeout(() => void (document.documentElement.dataset.expose = ""), HOLD_MS);
   }
 
   function holdTier(): void {
@@ -300,9 +300,7 @@
     // With the palette open, only a chord that holds the accelerator is
     // the shell's; everything else is being typed into its filter. The
     // text-field half of this rule lives in `core/keys`' `matches`.
-    if (paletteOpen && !accel) {
-      return;
-    }
+    if (paletteOpen && !accel) return;
     const action = bindings.acting({
       key: event.key,
       ctrlKey: event.ctrlKey,
@@ -322,9 +320,7 @@
   $effect(() => u.conn.asking.ask(QUERIES.city).subscribe(() => undefined));
 
   $effect(() => {
-    if (ready === false && !$held.welcomed && view.kind === "talk") {
-      u.go({ kind: "welcome" });
-    }
+    if (ready === false && !$held.welcomed && view.kind === "talk") u.go({ kind: "welcome" });
   });
 
   // The document title and the tab's icon carry what a hidden tab most
@@ -342,12 +338,16 @@
   });
 
   onMount(follow);
+  onMount(keepSheets);
 </script>
 
 <svelte:window onhashchange={follow} onkeydown={keys} onkeyup={letGo} onblur={forget} />
 
 <Notifier {view} />
-<div class="frame relative h-screen overflow-x-clip bg-page font-sans text-body text-text">
+<div
+  {@attach (frame: HTMLElement) => watchColumns(frame, (next) => (columns = next))}
+  {@attach (frame: HTMLElement) => (window.visualViewport === null ? undefined : followViewport(frame, window.visualViewport))}
+  class="frame visual-viewport relative overflow-x-clip bg-page font-sans text-body text-text">
   <a
     href="#main"
     class="sr-only focus:not-sr-only focus:absolute focus:top-snug focus:left-snug focus:z-30 focus:rounded-control focus:bg-raised focus:px-base focus:py-snug focus:text-label focus:text-text"

@@ -5751,6 +5751,18 @@
     "en": "files",
     "zh": "文件"
   },
+  "world_layer": {
+    "en": "the world layer",
+    "zh": "世界层"
+  },
+  "world_back": {
+    "en": "back to the conversation",
+    "zh": "回到对话"
+  },
+  "world_panes": {
+    "en": "what the world layer shows",
+    "zh": "世界层显示什么"
+  },
   "world_arrange": {
     "en": "arrange {pane}",
     "zh": "调整「{pane}」"

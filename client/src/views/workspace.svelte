@@ -24,7 +24,7 @@
   }
 
   export interface Layout {
-    readonly world: "none" | "beside" | "workbench";
+    readonly world: "none" | "beside" | "workbench" | "sheet";
     readonly panes: readonly Placed[];
     readonly talk: Lines;
     readonly right: Lines | null;
@@ -78,13 +78,23 @@
     };
   }
 
+  // One column (client-SPEC 4-52): the conversation alone, or in the
+  // panorama tier the world as a sheet with the conversation as its band
+  // under it; the right side, when open, is a sheet over both. No region
+  // stands on a line of its own.
+  export function oneColumnOf(tier: Tier, bench: Workbench): Layout {
+    return tier === "panorama"
+      ? { world: "sheet", panes: bench.map((column) => ({ pane: column.pane, lines: [1, 13] })), talk: [1, 13], right: null }
+      : { world: "none", panes: [], talk: [1, 13], right: null };
+  }
+
   export function gridColumn(lines: Lines): string {
     return `${String(lines[0])} / ${String(lines[1])}`;
   }
 </script>
 
 <script lang="ts">
-  import { MediaQuery } from "svelte/reactivity";
+  import { untrack } from "svelte";
 
   import { newestWorking } from "../core/belief/live";
   import { heldIn } from "../core/belief/rooms";
@@ -95,12 +105,15 @@
   import { rightItem } from "./inspect/open.svelte";
   import { followingIn } from "./inspect/reading";
   import Right from "./right.svelte";
+  import { watchColumns, type Columns } from "./shared/frame";
+  import { leaveSheet, openSheet } from "./sheets.svelte";
   import Talk from "./talk.svelte";
   import Divider from "./world/divider.svelte";
   import PaneMenu from "./world/pane_menu.svelte";
   import Place from "./world/place.svelte";
   import Session from "./world/session.svelte";
   import Sessions from "./world/sessions.svelte";
+  import SheetHead from "./world/sheet_head.svelte";
 
   interface Props {
     readonly address: Address;
@@ -123,9 +136,11 @@
   const bench = u.prefs.workbench;
   const uid = $props.id();
 
-  // A window narrower than the grid's columns can be read in is one
-  // column: the conversation alone, and the right pane over it whole.
-  const narrow = new MediaQuery("width < 768px");
+  // A shell narrower than the grid's columns can be read in is one
+  // column (`theme.css` decides, 12-30): the conversation alone, the world
+  // and the right side as sheets over it (4-52).
+  let columns = $state<Columns>("twelve");
+  const narrow = $derived(columns === "one");
 
   // The run the right pane speaks for: the one going, or the last one
   // this room finished; its rounds are the same question the thread
@@ -148,13 +163,32 @@
   // An item somebody opened (`inspect/open.svelte.ts`) opens the right
   // side whatever the preference says; without one, the preference opens
   // it on what the run is doing.
+  // On one column the preference does not open it: a sheet over the whole
+  // conversation opens only when somebody opened an item.
   const item = $derived(rightItem());
-  const open = $derived(item !== null || ((panel ?? $held.panel) && produced));
+  const open = $derived(item !== null || ((panel ?? (narrow ? false : $held.panel)) && produced));
 
-  const layout = $derived(layoutOf(narrow.current ? "zen" : tier, open ? "open" : "closed", $bench));
+  const layout = $derived(narrow ? oneColumnOf(tier, $bench) : layoutOf(tier, open ? "open" : "closed", $bench));
+  const sheet = $derived(layout.world === "sheet");
   // A narrow window is one column, where every region spans it whole
   // through its `narrow:` classes and stands on no line of its own.
-  const at = (lines: Lines): string | undefined => (narrow.current ? undefined : gridColumn(lines));
+  const at = (lines: Lines): string | undefined => (narrow ? undefined : gridColumn(lines));
+
+  // On the page itself the right side's sheet is an entry of the
+  // browser's history, so the back button and the edge swipe leave it
+  // (`sheets.svelte.ts`); a specimen opens and closes nothing there.
+  $effect(() => {
+    if (seat !== "page") return;
+    const sheet = narrow && open;
+    untrack(() => {
+      if (sheet) openSheet("right");
+      else if (!open) leaveSheet("right");
+    });
+  });
+
+  // The pane the world's sheet shows, one at a time: the place first,
+  // which is the git graph and the files the phone opens the world for.
+  let shown = $state<Pane>("commits");
   // The workbench's labels move its panes; beside the conversation in
   // the blend tier the world takes no input, and the labels are words.
   const arranged = $derived(layout.world === "workbench" ? "menu" : "words");
@@ -177,6 +211,7 @@
 {#snippet placeHead()}
   <PaneMenu pane="commits" label={label.commits} {arranged} />
 {/snippet}
+{#snippet unnamed()}{/snippet}
 
 <!-- Two rows: the page, and under it the panorama band. A pane that runs
 the window's height spans both; the chosen session stands in the first
@@ -185,7 +220,8 @@ covers the pane above it. -->
 <svelte:element
   this={seat === "page" ? "main" : "section"}
   id={seat === "page" ? "main" : undefined}
-  class="col-span-full row-start-2 -m-margin grid min-h-0 grid-cols-subgrid grid-rows-[minmax(0,1fr)_auto] p-margin narrow:m-0 narrow:p-0"
+  {@attach (element: HTMLElement) => watchColumns(element, (next) => (columns = next))}
+  class="workspace col-span-full row-start-2 -m-margin grid min-h-0 grid-cols-subgrid grid-rows-[minmax(0,1fr)_auto] p-margin narrow:m-0 narrow:p-0"
   aria-label={seat === "page" ? say($lang, "region_main") : title}
 >
   <!-- The page's own name: a reader arriving by keyboard or screen reader
@@ -195,14 +231,32 @@ covers the pane above it. -->
     <!-- The world layer, on the shell's own columns through `subgrid`, so
     a pane edge and a divider stand on a column line every other region
     stands on. Beside the conversation it is dimmed, outlined and takes
-    no input; as the workbench it is the page. -->
+    no input; as the workbench it is the page. On one column it is a sheet
+    from the left over the conversation, which stays under it as the band
+    (4-52); the panes are the same elements in both, so turning a phone
+    keeps them, and a draft in the band lives through. -->
     <div
       class={[
-        "col-span-full row-[1/3] grid min-h-0 grid-cols-subgrid grid-rows-subgrid transition-opacity duration-page",
+        sheet
+          ? "sheet -mx-pane -mt-pane row-[1] grid min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-page px-pane pt-pane"
+          : "col-span-full row-[1/3] grid min-h-0 grid-cols-subgrid grid-rows-subgrid transition-opacity duration-page",
         layout.world === "beside" ? "pointer-events-none opacity-(--blend-opacity)" : "",
       ]}
+      data-side="left"
+      role={sheet ? "region" : undefined}
+      aria-label={sheet ? say($lang, "world_layer") : undefined}
       inert={layout.world === "beside"}
     >
+      {#if sheet}
+        <SheetHead
+          tabs={layout.panes.map((placed) => ({ pane: placed.pane, label: label[placed.pane] }))}
+          {shown}
+          prefix={uid}
+          onShow={(pane: Pane) => {
+            shown = pane;
+          }}
+        />
+      {/if}
       {#each layout.panes as placed, index (placed.pane)}
         {#if layout.world === "workbench" && layout.right === null && (index === 1 || index === 2)}
           {@const before = layout.panes[index - 1]?.pane ?? "sessions"}
@@ -212,19 +266,22 @@ covers the pane above it. -->
           id="{uid}-{placed.pane}"
           class={[
             "flex min-h-0 flex-col",
-            placed.pane === "session" ? "row-[1]" : "row-[1/3]",
+            sheet ? "row-[2] pt-snug" : placed.pane === "session" ? "row-[1]" : "row-[1/3]",
             // The pane on the first column stops above the edge keys at its foot.
-            placed.lines[0] === 1 ? "mb-[calc(3*var(--spacing-key)+2*var(--spacing-snug)+var(--spacing-wide))]" : "",
+            !sheet && placed.lines[0] === 1 ? "mb-[calc(3*var(--spacing-key)+2*var(--spacing-snug)+var(--spacing-wide))]" : "",
             layout.world === "beside" ? "rounded-panel border border-edge-panel px-pane pt-snug" : "",
           ]}
           style:grid-column={at(placed.lines)}
+          role={sheet ? "tabpanel" : undefined}
+          aria-labelledby={sheet ? `${uid}-tab-${placed.pane}` : undefined}
+          hidden={sheet && placed.pane !== shown}
         >
           {#if placed.pane === "sessions"}
-            <Sessions here={address} narrow={open} head={sessionsHead} />
+            <Sessions here={address} narrow={open} head={sheet ? unnamed : sessionsHead} />
           {:else if placed.pane === "session"}
-            <Session here={address} {title} head={sessionHead} />
+            <Session here={address} {title} head={sheet ? unnamed : sessionHead} />
           {:else}
-            <Place here={address} head={placeHead} />
+            <Place here={address} head={sheet ? unnamed : placeHead} />
           {/if}
         </div>
       {/each}
@@ -234,15 +291,24 @@ covers the pane above it. -->
     style:grid-column={at(layout.talk)}
     class={[
       "relative -mx-wide flex min-h-0 flex-col px-wide narrow:col-span-full narrow:mx-0 narrow:px-0",
-      layout.world === "workbench" ? "row-[2] pt-wide" : "row-[1/3]",
+      layout.world === "workbench" ? "row-[2] pt-wide" : sheet ? "row-[2] pt-base" : "row-[1/3]",
     ]}
     aria-label={say($lang, "region_conversation")}
   >
-    <Talk {address} band={layout.world === "workbench"} />
+    <Talk {address} band={layout.world === "workbench" || sheet} />
   </section>
   {#if open}
+    <!-- On one column the right side is a sheet over the whole shell, from
+    the right with its close key at the top on that side; the shell's
+    frame is the box it is fixed in, the part of the page the person can
+    see (4-52). It stands on no grid line there: a line would make the
+    grid area its box, inside the frame's margins. -->
     <div
-      class="row-[1/3] -mt-margin -mr-margin -mb-margin flex min-h-0 border-l border-edge-panel narrow:fixed narrow:inset-0 narrow:col-span-full narrow:m-0"
+      class={[
+        "row-[1/3] -mt-margin -mr-margin -mb-margin flex min-h-0 border-l border-edge-panel narrow:fixed narrow:inset-0 narrow:z-20 narrow:col-auto narrow:row-auto narrow:m-0 narrow:border-l-0 narrow:pt-[env(safe-area-inset-top,0px)] narrow:pb-[env(safe-area-inset-bottom,0px)]",
+        narrow ? "sheet" : "",
+      ]}
+      data-side="right"
       style:grid-column={layout.right === null ? undefined : at(layout.right)}
     >
       <Right {following} current={answer} talk={address} />

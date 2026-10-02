@@ -46,7 +46,9 @@
 
 {#if draws !== "notice" || kept}
 <div class="mt-tight flex flex-wrap items-center justify-between gap-tight">
-  <div class="-ml-snug flex min-w-0 flex-wrap items-center narrow:ml-0">
+  <!-- On one column the edge keys stand at the start of this group, and
+  its chips flow beside them (`edge-slot`, client-SPEC 4-52). -->
+  <div class="edge-slot -ml-snug flex min-w-0 flex-wrap items-center narrow:ml-0">
     {#if draws !== "notice"}
       <PillView spec={specs[1]} told={room === null ? undefined : listening} />
       <Bounds {room} />
@@ -56,7 +58,7 @@
     {/if}
   </div>
   {#if draws === "everything"}
-    <div class="-mr-snug flex min-w-0 flex-wrap items-center narrow:mr-0">
+    <div class="-mr-snug ml-auto flex min-w-0 flex-wrap items-center narrow:mr-0">
       <PillView spec={specs[0]} />
       <PillView spec={specs[2]} />
       <PillView spec={specs[3]} />

@@ -47,6 +47,7 @@
   import Monitor from "./gallery/monitor.svelte";
   import Parts from "./gallery/parts.svelte";
   import Mailbox from "./gallery/mailbox.svelte";
+  import Mob from "./gallery/mob.svelte";
   import Pga from "./gallery/pga.svelte";
   import Pgb from "./gallery/pgb.svelte";
   import Produced from "./gallery/produced.svelte";
@@ -94,6 +95,7 @@
   <FirstRun />
   <Pgb />
   <Shell />
+  <Mob />
   <Workbench />
   <Mailbox />
   <Conversation />

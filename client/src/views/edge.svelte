@@ -71,7 +71,10 @@
   let holding: ReturnType<typeof setTimeout> | undefined;
   let peeked = false;
 
-  function press(): void {
+  // The press keeps the focus where it was: a soft keyboard open over the
+  // composer stays open while the tier changes (refrain §3-14).
+  function press(event: PointerEvent): void {
+    event.preventDefault();
     peeked = false;
     holding = setTimeout(() => {
       peeked = true;
@@ -95,7 +98,7 @@
 </script>
 
 <nav
-  class="relative z-10 col-start-1 row-start-2 flex flex-col items-start gap-snug self-end narrow:row-start-3 narrow:flex-row narrow:pt-snug"
+  class="edge-keys relative z-10 col-start-1 row-start-2 flex flex-col items-start gap-snug self-end narrow:row-start-3 narrow:flex-row narrow:pt-snug"
   aria-label={say($lang, "region_edge")}
 >
   <Tip text={named(`${say($lang, "edge_layers")} · ${say($lang, TIER_NAME[tier])}`, "tier.cycle")} side="right" exposable>

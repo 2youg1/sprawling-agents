@@ -786,28 +786,50 @@
   font-variant-numeric: var(--figures);
 }
 
+/* A shell narrower than twelve readable columns (client-SPEC 4-52,
+ * 12-30). The question is put to the shell's own box, the container
+ * named `shell` (the page's body, see the MOB block), rather than to the
+ * window: a specimen of the shell on `#/gallery` is its own `shell`, so
+ * a 390-pixel specimen draws the phone's page in a 1440-pixel window,
+ * and the gate that measures the gallery judges it. In the shell the
+ * container is the window's width, so the page itself reads the same
+ * either way. */
+@custom-variant narrow (@container shell (width < 768px));
+
 /* The shell's one grid (client-SPEC 4-33). Every region of the page is
  * placed on its column lines, so two edges that should line up are one
  * line rather than two measurements. The first row is the banners a
- * page may carry; the second is the page. */
+ * page may carry; the second is the page. A device that draws under its
+ * notch or its home indicator reserves those strips here, once, so
+ * nothing on the page has to know they exist (4-52).
+ *
+ * `--shell-columns` is how many columns the grid has, written where the
+ * grid is decided: the script that has to know (which tier a one-column
+ * shell can draw) reads it off the element rather than spelling the
+ * width a second time (`views/shared/frame.ts`). */
 @utility frame {
+  --shell-columns: 12;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-template-rows: auto minmax(0, 1fr);
   column-gap: var(--spacing-gutter);
-  padding: var(--spacing-margin);
+  padding: max(var(--spacing-margin), env(safe-area-inset-top, 0px)) max(var(--spacing-margin), env(safe-area-inset-right, 0px))
+    max(var(--spacing-margin), env(safe-area-inset-bottom, 0px)) max(var(--spacing-margin), env(safe-area-inset-left, 0px));
+  /* The edge keys sit in the composer's chip row on one column; the
+   * name they find it by is this frame's alone, so two specimens on one
+   * page never borrow each other's row. */
+  anchor-scope: --edge-slot;
 
-  /* Narrower than twelve readable columns: one column, the conversation
-   * in it, and the edge keys in a row of their own at its foot. */
-  @media (width < 768px) {
+  /* One column: the conversation in it, and the edge keys at its foot
+   * (in the composer's chip row where the engine can anchor them). */
+  @variant narrow {
+    --shell-columns: 1;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
-    padding: var(--spacing-pane);
+    padding: max(var(--spacing-pane), env(safe-area-inset-top, 0px)) max(var(--spacing-pane), env(safe-area-inset-right, 0px))
+      max(var(--spacing-pane), env(safe-area-inset-bottom, 0px)) max(var(--spacing-pane), env(safe-area-inset-left, 0px));
   }
 }
-
-/* The same width, for a region that changes where it stands below it. */
-@custom-variant narrow (@media (width < 768px));
 
 /* Glass, for the small surfaces of the edge layer and nothing larger
  * (client-SPEC 4-34, 4-43): a blurred, saturated view of what is
@@ -1450,13 +1472,10 @@ main h1 {
    * indicator, so it holds that strip clear. The height has to move with
    * the padding: a bar told to be exactly one bar tall would spend the
    * strip out of its own content rather than beside it, and its buttons
-   * would be squeezed by however much the device reserves.
-   *
-   * The reserved strip is zero until `index.html` asks for the viewport
-   * that has one, which is a change the shell has to make first: drawing
-   * under the insets means the edge keys and the banners owe their own
-   * edges the same courtesy. Until then this rule costs nothing and is already
-   * right. */
+   * would be squeezed by however much the device reserves. `index.html`
+   * asks for the viewport that has the strip, and the shell's frame keeps
+   * its own edges clear of it; a bar pinned inside a box of its own still
+   * owes the strip this padding. */
   .sticky.bottom-0 {
     padding-bottom: env(safe-area-inset-bottom, 0px);
     height: auto;
@@ -1823,4 +1842,80 @@ main h1 {
 }
 .mailbox .entry-n::before {
   content: counter(entry, mailbox-digit);
+}
+
+/* MOB */
+/* The container the `narrow` variant asks (12-30): the page's body, which
+ * is the window's width, and on `#/gallery` a specimen's own box, which a
+ * fixture names `shell` in the same way (`@container/shell`). */
+body {
+  container: shell / inline-size;
+}
+
+/* The shell is as tall as the part of the page the person can see
+ * (client-SPEC 4-52). A phone's soft keyboard shrinks the visual
+ * viewport and leaves the layout viewport, and with it `100dvh`, where
+ * it was, so a shell sized by `dvh` alone keeps its composer under the
+ * keyboard; `views/shared/frame.ts` writes the visual viewport's height
+ * and its offset into the layout viewport on the frame, and the shell
+ * stands exactly over what is visible. Until the script has run,
+ * and on an engine without the visual viewport, the shell is `100dvh`
+ * at the top, which is today's page. The translate also makes the shell
+ * the box every fixed descendant is placed in, so a sheet or a toast
+ * covers what is visible and not what the keyboard hides. */
+@utility visual-viewport {
+  height: var(--viewport-block, 100dvh);
+  translate: 0 var(--viewport-top, 0px);
+}
+
+/* A full-screen sheet of the one-column shell - the world layer from the
+ * left, the right side from the right (refrain U9) - arrives across the
+ * whole width from the side it belongs to, as a move across the page.
+ * It never animates out, for the settings panel's reason: the shell
+ * takes it away when the history entry that holds it is left, and a
+ * sheet that lingered would answer taps for a state already gone. */
+.sheet {
+  transition: translate var(--transition-duration-page) var(--ease-arrive);
+}
+@starting-style {
+  .sheet[data-side="left"] {
+    translate: -100% 0;
+  }
+  .sheet[data-side="right"] {
+    translate: 100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) .sheet {
+    transition: none;
+  }
+}
+
+/* The edge keys in the composer's chip row (refrain §3-2, the phone
+ * working): on one column the chip group opens with room for the three
+ * keys, and the keys are anchored at its start, so they sit beside the
+ * room chip wherever the composer stands - at the foot of the
+ * conversation, or under the world sheet as its band - and in the thumb's
+ * reach while the soft keyboard is open; a chip that wraps stays beside
+ * them. The group belongs to the frame's own conversation page
+ * (`.workspace`); on any other page, and on an engine that cannot
+ * anchor, the keys keep their own row at the foot. */
+@supports (anchor-name: --edge-slot) {
+  .edge-slot {
+    @variant narrow {
+      padding-inline-start: calc(3 * var(--spacing-key) + 3 * var(--spacing-snug));
+      min-block-size: var(--spacing-key);
+      anchor-name: --edge-slot;
+    }
+  }
+  .frame:has(> .workspace .edge-slot) > .edge-keys {
+    @variant narrow {
+      position: absolute;
+      position-anchor: --edge-slot;
+      inset: auto;
+      top: anchor(top);
+      left: anchor(left);
+      padding-top: 0;
+    }
+  }
 }
