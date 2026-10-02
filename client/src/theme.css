@@ -1777,7 +1777,7 @@ main h1 {
  * the shell takes it away when the address bar stops naming it, and a
  * panel that lingered would answer clicks for a page already gone. */
 .settings-panel {
-  transition: translate 250ms var(--ease-arrive);
+  transition: translate var(--transition-duration-panel) var(--ease-arrive);
 }
 @starting-style {
   .settings-panel[open] {
