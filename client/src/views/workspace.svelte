@@ -30,14 +30,14 @@
     readonly right: Lines | null;
   }
 
-  export type Right = "open" | "closed";
+  export type RightSide = "open" | "closed";
 
   // With the right pane open the panorama keeps the sessions and the
   // chosen session in the person's order, at two and five columns, and
   // the commits fold away (4-33's table).
   const BESIDE_RIGHT: Readonly<Record<Pane, number>> = { sessions: 2, session: 5, commits: 0 };
 
-  export function layoutOf(tier: Tier, right: Right, bench: Workbench): Layout {
+  export function layoutOf(tier: Tier, right: RightSide, bench: Workbench): Layout {
     switch (tier) {
       case "zen":
         return { world: "none", panes: [], talk: right === "open" ? [2, 7] : [4, 10], right: [7, 13] };
@@ -61,7 +61,7 @@
   // The workbench's panes side by side from the first column line, and
   // the conversation as a band under the chosen session. The band never
   // starts on the first column, which the edge keys stand at the foot of.
-  function workbenchOf(columns: readonly { readonly pane: Pane; readonly span: number }[], right: Right): Layout {
+  function workbenchOf(columns: readonly { readonly pane: Pane; readonly span: number }[], right: RightSide): Layout {
     let from = 1;
     const panes = columns.flatMap((column): Placed[] => {
       if (column.span === 0) return [];
