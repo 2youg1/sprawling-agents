@@ -99,7 +99,7 @@ pub enum ClockStampGranularity {
 }
 
 /// Where the context reminder's second rung sits: a whole percent of the
-/// window, `30` through `90` (the three numbers live in `consts_policy`).
+/// window, `31` through `90` (the three numbers live in `consts_policy`).
 ///
 /// One construction point, [`SecondThreshold::parse`], so a rung the city
 /// refuses cannot be spelled, and its refusal carries the domain: that is
@@ -114,7 +114,7 @@ impl SecondThreshold {
     ///
     /// # Errors
     /// `E_INVALID_ARGS`, naming the value and the domain it is outside,
-    /// when `raw` is not `30..=90`. Never clamped: a file that states 25
+    /// when `raw` is not `31..=90`. Never clamped: a file that states 30
     /// means something its writer has to be told is not accepted.
     pub fn parse(raw: u64) -> Result<SecondThreshold, AxError> {
         let floor = crate::consts_policy::CTX_REMINDER_SECOND_MIN;

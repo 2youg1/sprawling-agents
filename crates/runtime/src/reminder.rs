@@ -11,8 +11,9 @@
 //! never a tokenizer of this repository's own, which would be a second
 //! one.
 //!
-//! Two thresholds, and each sounds exactly once per run. At a quarter
-//! only the usage is reported; at the second rung — 65% of the window
+//! Two thresholds, and each sounds exactly once per run. At the first
+//! rung — 30% of the window — only the usage is reported; at the second
+//! rung — 65% of the window
 //! unless a layer moved it — the run is told that what
 //! is left is still enough to write a handoff and `succeed`, and that
 //! past this point it will not be. A gauge that jumps past both in one
@@ -31,16 +32,16 @@ use kernel::consts_policy::{CTX_REMINDER_FIRST_PERCENT, CTX_REMINDER_SECOND_DEFA
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Sounded {
     Nothing,
-    Quarter,
+    First,
     Handover,
 }
 
 /// The line the run is given, with the figures it is computed from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContextReminder {
-    /// A quarter of the window is used: the figures, nothing more.
+    /// The first rung is reached: the figures, nothing more.
     Usage { used: Tokens, window: Tokens },
-    /// Two thirds are used: still enough to hand over, not for long.
+    /// The second rung is reached: still enough to hand over, not for long.
     HandoverWindow { used: Tokens, window: Tokens },
 }
 
@@ -133,15 +134,15 @@ impl ContextGauge {
         let at = percent(used, self.window);
         let window = self.window;
         match self.sounded {
-            Sounded::Nothing | Sounded::Quarter if at >= self.second_at => {
+            Sounded::Nothing | Sounded::First if at >= self.second_at => {
                 self.sounded = Sounded::Handover;
                 Some(ContextReminder::HandoverWindow { used, window })
             }
             Sounded::Nothing if at >= CTX_REMINDER_FIRST_PERCENT => {
-                self.sounded = Sounded::Quarter;
+                self.sounded = Sounded::First;
                 Some(ContextReminder::Usage { used, window })
             }
-            Sounded::Nothing | Sounded::Quarter | Sounded::Handover => None,
+            Sounded::Nothing | Sounded::First | Sounded::Handover => None,
         }
     }
 }

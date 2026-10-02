@@ -161,7 +161,7 @@ fn windows_for(reported: Vec<u64>) -> Vec<String> {
 }
 
 #[test]
-fn the_quarter_mark_reports_usage_once_and_the_handover_mark_says_what_is_left() {
+fn the_first_rung_reports_usage_once_and_the_handover_mark_says_what_is_left() {
     let windows = windows_for(vec![100, 300, 400, 700, 800]);
     assert_eq!(windows.len(), 5);
     assert!(
@@ -171,7 +171,7 @@ fn the_quarter_mark_reports_usage_once_and_the_handover_mark_says_what_is_left()
     );
     assert!(
         windows[2].contains("30% of the window used (300 of 1000 input tokens)"),
-        "past a quarter, the usage is reported as the provider counted it: {}",
+        "at the first rung, the usage is reported as the provider counted it: {}",
         windows[2]
     );
     assert!(

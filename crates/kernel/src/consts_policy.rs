@@ -45,9 +45,16 @@ pub const PREFIX_SLOTS: std::num::NonZeroU64 = match std::num::NonZeroU64::new(4
 /// second is the one a layer may move, and these three numbers are the
 /// whole of what it may move it between — `kernel::config::SecondThreshold`
 /// enforces the domain at its one construction point.
-pub const CTX_REMINDER_FIRST_PERCENT: u64 = 25;
+///
+/// The domain starts one point above the first rung, derived rather than
+/// written: two rungs on one percent would always sound as one, and the
+/// first would never be heard (`crates/kernel/Spec.lean` D19).
+pub const CTX_REMINDER_FIRST_PERCENT: u64 = 30;
 pub const CTX_REMINDER_SECOND_DEFAULT: u64 = 65;
-pub const CTX_REMINDER_SECOND_MIN: u64 = 30;
+pub const CTX_REMINDER_SECOND_MIN: u64 = match CTX_REMINDER_FIRST_PERCENT.checked_add(1) {
+    Some(floor) => floor,
+    None => u64::MAX,
+};
 pub const CTX_REMINDER_SECOND_MAX: u64 = 90;
 
 pub const LOOP_REPEAT_THRESHOLD: u32 = 3;
@@ -65,17 +72,17 @@ pub const OFFLOAD_MIN_BYTES: u64 = 16_384;
 /// `read` and `search` hand back an interval of something the caller can
 /// ask for again, so their ceiling only paces delivery.
 ///
-/// Derived, not chosen: the context reminders sound at 25% and at the
+/// Derived, not chosen: the context reminders sound at 30% and at the
 /// second rung — `CTX_REMINDER_SECOND_DEFAULT` unless a layer moves it
 /// between `CTX_REMINDER_SECOND_MIN` and `CTX_REMINDER_SECOND_MAX` — and
 /// a ladder means nothing if one result can clear a rung unseen. The gaps
-/// one result must not cover are the second rung minus 25 into the first
-/// rung, and 100 minus the second rung past the last: 40 and 35 points at
+/// one result must not cover are the second rung minus 30 into the first
+/// rung, and 100 minus the second rung past the last: 35 and 35 points at
 /// the default pair, so one result stays under 35% of the window. At 2.5
 /// bytes per token, the worst realistic ratio (base64, hash-dense text),
 /// 64 KiB is 26.2K tokens: 20.5% of a 128K window, with 1.7x to spare.
-/// 128 KiB would be 41% and out. A rung moved off the default narrows its
-/// gap below that: under 60 one result can spend the first rung unseen,
+/// 128 KiB would be 41% and out. A rung moved off the default narrows one
+/// gap below that: under 65 one result can spend the first rung unseen,
 /// and over 65 one result can fill the window past the second while its
 /// "still enough to write a handoff" claim is still fixed text — which is
 /// the arithmetic the 90 ceiling of the legal domain is priced from.

@@ -57,7 +57,7 @@ fn the_second_rung_is_written_into_the_layers_own_file() {
 /// re-judged here.
 #[test]
 fn both_ends_of_the_domain_are_written() {
-    for (percent, landed) in [(30, 30_i64), (90, 90_i64)] {
+    for (percent, landed) in [(31, 31_i64), (90, 90_i64)] {
         let dir = tempfile::tempdir().unwrap();
         let threshold = SecondThreshold::parse(percent).unwrap();
         write_second_threshold(dir.path(), &room(), Layer::Building, threshold).unwrap();
