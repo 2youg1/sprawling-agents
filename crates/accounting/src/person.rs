@@ -214,7 +214,7 @@ fn invalid(file: &Path, why: &impl std::fmt::Display) -> AxError {
 )]
 mod tests {
     use super::*;
-    use wire::{Chord, Lang};
+    use wire::{Chord, Lang, SessionTags, Tag};
 
     /// The property `adversary`'s fourth world drives over the wire,
     /// held here against the file itself: after any sequence of
@@ -233,6 +233,12 @@ mod tests {
                 spelled: "accel+2".to_owned(),
             }),
             PreferencePatch::Panel(false),
+            PreferencePatch::Tags(SessionTags {
+                city: kernel::Address::parse("harbour").unwrap(),
+                room: kernel::Address::parse("hall/mayor").unwrap(),
+                began: kernel::Seq::new(7),
+                tags: vec![Tag::parse("重构").unwrap(), Tag::parse("pin").unwrap()],
+            }),
             PreferencePatch::Lang(Lang::En),
         ] {
             expected.apply(patch.clone());

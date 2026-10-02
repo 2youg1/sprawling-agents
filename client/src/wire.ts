@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 45 as const;
+export const WIRE_V = 46 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "3218131e6f6426af6c36a9af0b158a45c91bbbca6bfbf9afb080ad2563a56545" as const;
+export const WIRE_HASH = "1c9c23b70075efd48a0b855f13f0a09ca9c17e2fa5f8e6b9c66be40c1b4bf223" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -2500,6 +2500,25 @@ export const Tier = Schema.Literals(["zen", "blend", "panorama"]).annotate({ ide
 export type Tier = typeof Tier.Type;
 
 /**
+ * One word a person files sessions under: one to 24 letters of any script, digits, `-` or `_`, as `wire::Tag::parse` accepts it.
+ */
+export const Tag = Schema.String.check(Schema.isPattern(new RegExp("^[-_\\p{Alphabetic}\\p{N}]{1,24}$", "u"))).pipe(Schema.brand("Tag"));
+export type Tag = typeof Tag.Type;
+
+/**
+ * One session's tags: the session named by the city, the room and the
+ * line its stretch began at, and the tags the person gave it, in
+ * lexical order without repeats.
+ */
+export const SessionTags = Schema.Struct({
+  began: Seq,
+  city: Address,
+  room: Address,
+  tags: Schema.Array(Tag),
+}).annotate({ identifier: "SessionTags" });
+export type SessionTags = typeof SessionTags.Type;
+
+/**
  * Everything one person settled about their own copy of the city.
  * 
  * Whole rather than a dozen readings, because that is the record the
@@ -2521,6 +2540,7 @@ export const PreferencesAnswer = Schema.Struct({
   lang: Schema.optional(Schema.NullOr(Lang)),
   panel: Schema.optional(Schema.Boolean),
   proxying: Schema.optional(Proxying),
+  tags: Schema.optional(Schema.Array(SessionTags)),
   tier: Schema.optional(Schema.NullOr(Tier)),
   welcomed: Schema.optional(Schema.Boolean),
 }).annotate({ identifier: "PreferencesAnswer" });
@@ -3847,6 +3867,9 @@ export const PreferencePatch = Schema.Union([
   }),
   Schema.Struct({
     core_priority: CorePriority,
+  }),
+  Schema.Struct({
+    tags: SessionTags,
   }),
 ]).annotate({ identifier: "PreferencePatch" });
 export type PreferencePatch = typeof PreferencePatch.Type;

@@ -64,7 +64,7 @@ impl Tag {
 /// `Alphabetic` and `char::is_numeric` is `\p{N}`, which is what lets
 /// [`TAG_PATTERN`] state the same set to the client.
 fn belongs(c: char) -> bool {
-    !c.is_control()
+    c == '-' || c == '_' || c.is_alphabetic() || c.is_numeric()
 }
 
 impl<'de> Deserialize<'de> for Tag {
@@ -122,7 +122,16 @@ impl SessionTags {
 /// order with each set sorted and without repeats, so two machines that
 /// tagged the same sessions in a different order hold the same file.
 pub(crate) fn retagged(held: &mut Vec<SessionTags>, next: SessionTags) {
-    drop((held, next));
+    held.retain(|entry| !entry.names(&next));
+    let mut next = next;
+    next.tags.sort();
+    next.tags.dedup();
+    if !next.tags.is_empty() {
+        held.push(next);
+        held.sort_by(|one, two| {
+            (&one.city, &one.room, one.began).cmp(&(&two.city, &two.room, two.began))
+        });
+    }
 }
 
 #[cfg(test)]
