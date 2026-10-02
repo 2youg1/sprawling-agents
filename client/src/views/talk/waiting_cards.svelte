@@ -9,11 +9,10 @@
   // what a person waiting on a run sees without a run being blocked
   // (docs/frontend-method.md).
   //
-  // An approval is one of the three things in this product that stop
-  // and ask, so it is drawn in the one language they share (client-SPEC
-  // 7C): the bar on the leading edge that `asks` declares, and a glyph
-  // beside the words. The glyph is what survives a forced-colour mode;
-  // the amber is only reinforcement.
+  // A design question is one of the things in this product that stop
+  // and ask, so it is drawn on the one decide card they share
+  // (`parts/decide.svelte`, client-SPEC 7C); this file gives the card its
+  // body and its two answers, y to allow and n to deny.
   //
   // Identical questions are grouped by their cluster key so one answer
   // covers one question; a tainted item is never grouped.
@@ -60,8 +59,7 @@
   import { toFragment } from "../../core/route";
   import { ago } from "../../core/time";
   import { ui } from "../../ui";
-  import Button from "../parts/button.svelte";
-  import Glyph from "../parts/glyph.svelte";
+  import Decide from "../parts/decide.svelte";
   import Asked from "./asked.svelte";
 
   interface Props {
@@ -83,53 +81,53 @@
 </script>
 
 {#each groups as group (group.key)}
-  <div
-    class="asks my-base rounded-panel border border-alert/50 bg-raised py-base pr-pane"
-    role="group"
-    aria-label={say($lang, "wait_title")}
-  >
-    <div class="flex items-center justify-between text-note">
-      <span class="flex min-w-0 items-center gap-tight text-alert">
-        <Glyph name="hand" size="sm" />
-        <span class="truncate">{fill(say($lang, "wait_from"), { actor: group.first.actor })}</span>
-      </span>
-      <span class="shrink-0 text-text-faint">{ago($lang, group.first.created, u.now())}</span>
-    </div>
-    <p class="my-snug text-body leading-relaxed">{group.first.action_desc}</p>
-    <Asked locator={group.first.artifact} />
-    <!-- "Deny" reads like "give the files back", and it is not: it
-        stops the work and undoes nothing, so the card names the place
-        that does bring a file back. -->
-    <p class="mb-snug text-note text-text-faint">
-      {say($lang, "wait_deny_keeps")}
-      <a class="underline hover:text-text" href={toFragment({ kind: "record", lens: "bin" })}>
-        {say($lang, "wait_bin")}
-      </a>
-    </p>
-    <div class="flex flex-wrap items-center gap-snug text-note">
-      {#if group.items.length > 1}
-        <span class="text-text-faint">
-          {fill(say($lang, "wait_same"), { n: String(group.items.length) })}
-        </span>
-      {/if}
-      {#if group.first.tainted}
-        <span class="rounded-pill bg-raised px-snug text-text-quiet">{say($lang, "wait_tainted")}</span>
-      {/if}
-      <span class="flex-1"></span>
-      <Button
-        label={say($lang, "wait_deny")}
-        tone="quiet"
-        onPress={() => {
-          rule(group, "deny");
-        }}
-      />
-      <Button
-        label={say($lang, "wait_allow")}
-        tone="primary"
-        onPress={() => {
-          rule(group, "allow");
-        }}
-      />
-    </div>
+  <div class="my-base">
+    <Decide
+      kind="question"
+      asker={fill(say($lang, "wait_from"), { actor: group.first.actor })}
+      at={ago($lang, group.first.created, u.now())}
+      choices={[
+        {
+          answer: "yes",
+          label: say($lang, "wait_allow"),
+          onPress: () => {
+            rule(group, "allow");
+          },
+        },
+        {
+          answer: "no",
+          label: say($lang, "wait_deny"),
+          onPress: () => {
+            rule(group, "deny");
+          },
+        },
+      ]}
+    >
+      {#snippet body()}
+        <p class="text-body leading-relaxed">{group.first.action_desc}</p>
+        <Asked locator={group.first.artifact} />
+        <!-- "Deny" reads like "give the files back", and it is not: it
+            stops the work and undoes nothing, so the card names the place
+            that does bring a file back. -->
+        <p class="mt-snug text-note text-text-faint">
+          {say($lang, "wait_deny_keeps")}
+          <a class="underline hover:text-text" href={toFragment({ kind: "record", lens: "bin" })}>
+            {say($lang, "wait_bin")}
+          </a>
+        </p>
+        {#if group.items.length > 1 || group.first.tainted}
+          <p class="mt-snug flex flex-wrap items-center gap-snug text-note">
+            {#if group.items.length > 1}
+              <span class="text-text-faint">
+                {fill(say($lang, "wait_same"), { n: String(group.items.length) })}
+              </span>
+            {/if}
+            {#if group.first.tainted}
+              <span class="rounded-pill bg-raised px-snug text-text-quiet">{say($lang, "wait_tainted")}</span>
+            {/if}
+          </p>
+        {/if}
+      {/snippet}
+    </Decide>
   </div>
 {/each}

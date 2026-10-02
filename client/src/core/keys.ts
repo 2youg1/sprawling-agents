@@ -61,6 +61,9 @@ export const ACTIONS = [
   "composer.focus",
   "run.stop",
   "fork.here",
+  "decide.yes",
+  "decide.edit",
+  "decide.no",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -135,6 +138,12 @@ export const DEFAULTS: Readonly<Record<Action, Chord>> = {
   // with no modifier, because it is read only outside a text box and
   // only where a thread entry is hovered or focused (roadmap 4.5).
   "fork.here": plain("f"),
+  // Answer the decide card that holds the focus, as `git add -p` answers
+  // a hunk. Read only outside a text box and only by the card itself
+  // (`parts/decide.svelte`), so the letters mean nothing elsewhere.
+  "decide.yes": plain("y"),
+  "decide.edit": plain("e"),
+  "decide.no": plain("n"),
 };
 
 // The word each action is called by, which is a phrase key rather than
@@ -156,6 +165,9 @@ export const LABELS: Readonly<Record<Action, Key>> = {
   "composer.focus": "keys_composer",
   "run.stop": "run_cancel",
   "fork.here": "fork_here",
+  "decide.yes": "keys_decide_yes",
+  "decide.edit": "keys_decide_edit",
+  "decide.no": "keys_decide_no",
 };
 
 // The keys a browser keeps for itself beside the accelerator: it

@@ -185,6 +185,8 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **4-47 世界层跟随工作区，工作台只读页面已经在问的回答。** 三栏要的每一个数都出自一个已有的问题：会话栏读 `belief.rooms`，所选会话读它那个 run 的 `Query::Rounds`（与对话问的是同一句，`asking` 按内容合并）、端点表、`Query::Config` 的第二级提醒与 `CostAnswer`，地方栏读 `commitsQuery` 的第一页、`city_view` 与逐层的 `Query::Listing`；所以打开检阅档不让城多答一种问题，一个数在工作台与它的老家（环、成本页、楼页）之间也说不出两个值。**提交的范围由房间定**（`views/world/chosen.svelte.ts` 的 `commitsIn`）：市长的房间是城自己的地方，旁边是全城的提交与城的天际线；楼里的房间旁边是这栋楼的提交与文件——所选会话一栏与地方栏都问这一句，检查点的时刻与父提交因此和提交栏读同一页。**摆放是栏线而不是类名**：`workspace.svelte` 的 `layoutOf(tier, right, bench)` 答每块区域站在哪两条栏线之间（`Lines`），由内联的 `grid-column` 写出；Tailwind 只认源码里写死的类名，而人拖出来的宽度是运行时的数，写成类名就得把全部组合预先抄一遍。窄于 768 px 的窗口不写栏线，区域按各自的 `narrow:` 类占满一栏。
 - **4-48 设置面补齐后端已经答得出的设置，答不出的留在命令行并写明为什么。** 「你与主 Agent」组（`settings/you.svelte`，refrain 路线图 §3-13）是两张各自保存的卡：用户 ID、导入来源与「关于你」写进 `PREFERENCES.md` 的身份区与正文，主 Agent 的名字写进 `MAYOR.md` 的身份区；两张卡都从 `Query::Identity` 的回答开始，经 `PutIdentity` 以回答给出的那份原文为 `base` 保存，所以旧表单写不过较新的文件（城以 `E_VERSION_CONFLICT` 拒绝，草稿留着，再存一次就是对现在的文件写）；身份区读不出时回答是 `unreadable`，两张卡让位，页面写出哪份文件第几行、为什么，而不画默认名——画默认名会让下一次保存盖掉人写错的那一行。名字在新会话生效，卡脚在已保存之后说这一句。**GitHub 导入是一次显式的读**：按下才问 `Query::GithubLogin`，在运行城的那台机器上执行，卡上先说清这一点；读到的登录名与主机是候选，填进框里，由这张卡的保存使它成为设置；`gh` 不在、没登录、主机不认识、失败或卡住各有一句，框里的字不动，手填始终可用。**城层配置**（`settings/city_layer.svelte`）经 `ConfigureCity` 一次写一个事实：常设强度（`[model] effort`）与是否保持 prompt 缓存不过期（`keep_warm`）；强度的现值读 `Query::Config` 对 hall 的回答（`from` 是 `city` 时才算城层的值），`keep_warm` 不在任何回答里，所以它的控件起初什么都不选，现值在组底部的 `CONFIG.toml` 里读。4-28 说设置页没有强度选择器，是因为当时没有写城层强度的命令帧；`ConfigureCity` 写的就是城的 `CONFIG.toml` 本身，所以这里的选择器不是第二个权威。**规则组**（`settings/rules.svelte`）经 `PutRules` 整份写一栋楼的 `RULES.toml`，城先读过再落盘，`base` 守住 Mayor 的并发写；页面不写也不查 TOML。远程门上这扇门是 LocalOnly，城的拒绝就是页面读到的。**自动化组**（`settings/automation.svelte`）只读：`Query::Automation` 答出 `SCHEDULE.toml` 的任务与 `WATCH.toml` 的来源，两份文件由人在城的根目录手改，这里不画表单，因为表单会成为城独自解析的文法的第二个写者。**模型表**的「输入」一列（X6）让人说出一个模型收什么输入：`text` 或 `text_image`，经 `SelectModel.input` 送到城，是 `gateway::accepted_input` 的第一档；不说是「由城判断」，供应方自己列出的输入种类在选择下面作为证据。**开发者组**（高级）里一张说明卡（`settings/admission.svelte`，refrain 路线图 Q6）解释三个分开选、可组合的值：写入限制（`full`／`create`）回答能改什么，准入要求（`standing`／`tested`／`contract_kept`／`double_validated`）回答合入前要带什么证据——选了要求不等于有了证据，楼自己的校验照跑——落地策略（`ordinary`／`experiment`）回答改动是否进入项目；它是说明不是控件，因为三者每次派活时选，城把选择记在它开的 run 上，常设控件会成为第二个决定处。**`adopt`、`export`、`restore` 只在命令行**：`adopt` 把城所在机器上一个已有的目录收进城，`export` 把整座城打包写到一个目录，两者都要一个城外的机器路径，而线协议除 `Address` 之外不传路径（4-39），一个可能在远程的浏览器替主机点名目录，是线协议有意没有的一种触达；`restore` 在另一台机器上把包解成一座城，那时还没有一座城可以连。重开参数：线协议给出城外路径的一种受控拼法时，`adopt` 与 `export` 可以进诊断枝。`[core] priority`（`PreferencePatch.core_priority`）可写而 `PreferencesAnswer` 不答它，所以设置面不画这个开关：一个读不到现值的开关只能猜；它进回答时加在高级组。
 
+- **4-49 信箱是一栏四段，按「需要你」排序；它的键把「需要你」「有新消息」与链路分成三个记号。** 信箱键与 Accel-B 从左缘、第 1 栏右侧打开一栏宽 440 的 transient 面（`views/mailbox/`）：`popover="auto"`，所以 top layer、点外面与 Esc 关闭、关上后焦点回到信箱键都是平台行为；手机上它是一整屏、从左进来的 sheet，返回在左上。面里自上而下是：**待决**——一个门在等人亲自动手（`E_APPROVAL_PENDING`）与居民提的设计问题（`ApprovalItem`），两者是 7C 的请决定卡，其后是停住工作的故障（`core/deferral.ts` 判为 `needs_you` 的其余拒绝），画成带出路的通知；**在跑**——每个房间最新的、没冻结的 run，读 `belief.live`，一行是阶段的字形与词、跑了多久、房间与任务，点开是那个房间的对话；**最近**——本页见过的每个房间各问一次 `Query::Sessions`，按每段最后一行的时刻合并，新的在前，只挂载视口内的行（行高是 `control` 令牌，`run/lanes.ts` 的 `windowOf` 定窗），每行右端常显「从最后一轮分叉」（4-14：继续一段会话就是分叉，不加恢复命令），母 run 是这段会话里最后一个 run；那个 run 早于本页持有的范围时控件仍在、按不动并说为什么；**通知**——原抽屉（4-35）里普通的拒绝，按天分组。一条拒绝只在待决与通知之一出现，不两处画。**键的三个记号互不借用**：数字只数需要人的事（设计问题加未读的 `needs_you` 拒绝，文稿提案落地后加入）；只有普通的未读拒绝时是一个不带数的点；链路不在 `live` 时键脚有一道横杠（与 `core/mark.ts` 在标签页上给「没被告知」的形状相同），连接中会呼吸，被拒是 alert 色，它的词进键的可读名字。打开信箱就是读过：未读一并标为已读。面里的段只在开着时挂载，所以关着的信箱不向城问任何事。键表在 7-11。
+
 ## 5 `src/core/`（形状按 ARCHITECTURE §9）
 
 | 文件 | 形状 | 接口 |
@@ -231,7 +233,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | `time.ts` | 1 判定 | `ago`, `clock`, `hhmm`, `hhmmss`, `lasted`, `count`, `kilo`, `usd`, `kib`；`kilo(n)` 是一眼比较两个 token 数时的写法：千记 `k`、百万记 `M`、三位有效数字、不留尾零，千以下照写（上下文环的 `82.4k / 200k`） |
 | `notify.ts` | 1 判定 | `notices(heard, items, scene) -> [Heard, ApprovalItem[]]`：哪些待批事项变成一条浏览器通知。`Heard` 是「快照未到」或「已算过的 `ApprovalId` 集」；`Scene { notifying, focus, elapsed, watching }`。只对需要人决定的事（`approval_queue` 的答）发，四道闸全过才发：窗口失焦、过了预热期 `WARMUP_MS`、不在首个快照里也不在已算过的集里、不是正在看的那个地址（`item.actor`）。每个见过的 id 都记进 `Heard`，所以一件事在任何一道闸下被放过一次就永远不再弹。适配器是 `views/notifier.svelte`（权限为 `granted` 才 `new Notification`），开关是 `prefs.ts` 的 `notifying`，默认 `off` |
 | `deferral.ts` | 1 判定 | `Urgency = "needs_you" \| "ordinary"`、`urgencyOf(error) -> Urgency`（按 `AxCode` 穷尽的一张表：哪些拒绝不等人就动不了）；`Box = absent \| holding \| emptied { at, by: "send" \| "hand" }`（对话框此刻的状况：页面没有对话框、框里有字、从某一刻起是空的以及是发送还是人手清空的）、`Attention { box, visible, returnedAt }`、`Moment = "sent" \| "idle" \| "returned"`、`momentOf(attention, now) -> Moment \| null`、`deliverable(urgency, attention, now) -> boolean`、`wakeAt(attention, now) -> number \| null`（不再发生任何事时下一个时刻在哪一毫秒开始，只有一个事件能打开时刻时为 `null`）、`IDLE_MS = 5000`、`RETURNED_MS = 1000`：普通通知何时主动冒头的唯一判定（4-35、12-26）；`needs_you` 恒可投递，`ordinary` 只在一个时刻里投递，其余时候只动信箱键上的标记。适配器是 `views/mailbox/attention.ts`（从页面读出 `Attention`）与 toast 座位 `views/refusal.svelte` |
-| `keys.ts` | 1 判定 | `ACTIONS`、`Action`、`Chord`、`DEFAULTS`、`LABELS`：外壳听的每一个键在这一张表里；`readChord(text)`、`spell(chord)`、`marks(chord, platform)`、`platformOf(userAgent)`、`matches(chord, pressed)`、`reserved(chord)`、`conflictsOf(bound)`；`loadKeys(door, userAgent) -> Keymap` 把人的覆写（`prefs.ts` 的 `chord`）叠在默认上，`keymap()` 是页面的那一份。左下三键的名字、按住即现的提示、外壳与设置页都读它，没有一处自己拼一个键；外壳自己的动作是 `tier.cycle`（`\`，图层键）、`mailbox`（Accel-B，信箱键）、`inspect`（Accel-J，右侧的开合）与 `go.setup`（Accel-,，设置键），默认表里没有两个动作共用一个键；`run.stop` 的标签是 `run_cancel`（`/stop`），它发的是对眼前的 run 的 `cancel`，不是整城的 `halt`（12-16） |
+| `keys.ts` | 1 判定 | `ACTIONS`、`Action`、`Chord`、`DEFAULTS`、`LABELS`：外壳听的每一个键在这一张表里；`readChord(text)`、`spell(chord)`、`marks(chord, platform)`、`platformOf(userAgent)`、`matches(chord, pressed)`、`reserved(chord)`、`conflictsOf(bound)`；`loadKeys(door, userAgent) -> Keymap` 把人的覆写（`prefs.ts` 的 `chord`）叠在默认上，`keymap()` 是页面的那一份。左下三键的名字、按住即现的提示、外壳与设置页都读它，没有一处自己拼一个键；外壳自己的动作是 `tier.cycle`（`\`，图层键）、`mailbox`（Accel-B，信箱键）、`inspect`（Accel-J，右侧的开合）与 `go.setup`（Accel-,，设置键），`decide.yes`／`decide.edit`／`decide.no`（y／e／n）只由持焦点的请决定卡听，外壳不答它们，默认表里没有两个动作共用一个键；`run.stop` 的标签是 `run_cancel`（`/stop`），它发的是对眼前的 run 的 `cancel`，不是整城的 `halt`（12-16） |
 | `in_front.ts` | 1 判定 | `runInFront(belief, view) -> RunBelief \| undefined`：「眼前的 run」的唯一答案。对话页是这个房间最新的在干活的 run（`newestWorking`），run 页是地址里那个仍在干活的 run，城页、楼页、monitor 与其余页面没有——它们同时画着很多 run，替人挑一个就是替人决定停哪个。Accel-.、palette 与输入框的 `/stop`、`/steer`、`/diff` 都读它（4-41、12-16），O(L) |
 | `slash.ts` | 1 判定 | `SLASH`：页面动词的唯一表（4-41）；`parse(line) -> SlashCall \| null`、`find(verb)`、`offered(line)`（`/` 菜单与 palette 按输入过滤） |
 | `slash_hands.ts` | 2 值 | `Slash { spelling, grammar, about, section, run }`、`Section`、`SECTIONS`、`SlashCall`、`SlashHands`（视图用手上已有的东西填它，动词从不点视图的名）、`Reached`／`reached(run)`（动词能作用的那个 run 与它走到的位置）、`Offered` |
@@ -260,7 +262,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 **本节只说哪个屏用哪个部件；部件欠使用者什么写在 §7。**
 
-**`views/parts/` 的五个复合部件各有生产座位**，`#/gallery` 只是它们的第二个读者：`combobox` 在 `setup/models.svelte`、`setup/model_table.svelte`、`talk/composer.ts` 与 `talk/pill.svelte`（一个端点答两百个模型时，下拉正是它替换的那个控件）；`notice` 在 `views/notices.svelte` 与 `views/refusal.svelte`，AxError 的三段式因此只有它一个画法（4-35）；`row` 在 `building/commits.svelte`、`mcp/servers.svelte` 与 `record/ledger.svelte`；`skeleton` 在 `machine/skeleton.svelte`。`dialog` 的座位是撤不回来的删除，它们在发帧之前先问（12-1）：删除 MCP 服务器（`mcp/servers.svelte`）与移除一栋楼（`building.svelte`，楼的文件随之搬出城）。设置页没有移除端点的控件，所以这一族里没有第三个座位；`part_remove_endpoint` 只由 `#/gallery` 的 dialog 夹具读。
+**`views/parts/` 的五个复合部件各有生产座位**，`#/gallery` 只是它们的第二个读者：`combobox` 在 `setup/models.svelte`、`setup/model_table.svelte`、`talk/composer.ts` 与 `talk/pill.svelte`（一个端点答两百个模型时，下拉正是它替换的那个控件）；`notice` 在 `views/mailbox/{deciding,notices}.svelte` 与 `views/refusal.svelte`，AxError 的三段式因此只有它一个画法（4-35）；`row` 在 `building/commits.svelte`、`mcp/servers.svelte` 与 `record/ledger.svelte`；`skeleton` 在 `machine/skeleton.svelte`。`dialog` 的座位是撤不回来的删除，它们在发帧之前先问（12-1）：删除 MCP 服务器（`mcp/servers.svelte`）与移除一栋楼（`building.svelte`，楼的文件随之搬出城）。设置页没有移除端点的控件，所以这一族里没有第三个座位；`part_remove_endpoint` 只由 `#/gallery` 的 dialog 夹具读。
 
 ## 7 `views/parts/` 的交互契约
 
@@ -419,6 +421,14 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | 图层键 | APG Button | Enter／Space | 换到下一档 |
 | | | `\`（文本框之外） | 同上；按住超过 300 ms 临时进混合档，松开回原来的档 |
 | 信箱键、设置键 | APG Button | Enter／Space | 打开各自的面；面关上时焦点回到这个键 |
+| 信箱面 | 非模态的 `popover="auto"`，带 `aria-label` 的 `<aside>` | Escape／点面外 | 关上，焦点回到信箱键（平台行为） |
+| | | Accel-B | 开着时关上，关着时打开 |
+| 信箱面里的条目 | 无 APG 部件模式：一串各自可达的条目，加上 vim 的走法 | j／k | 焦点移到下一个／上一个条目，两端不环绕；条目是一行的链接或一张请决定卡本身 |
+| | | 1–9 | 前九个条目各在行尾画出自己的数字；按下是跟随那一行的链接（信箱随之关上），或把焦点放到那张卡上 |
+| | | 落在文本框里或带修饰键的同一批键 | 不接管 |
+| | | Tab | 照旧逐个控件走：一行的链接与它的「从最后一轮分叉」是两站 |
+| 请决定卡 | `role="group"`，以头一行命名 | y／e／n（焦点在卡内、不在文本框里） | 做那个答复；卡上没有的答复、或说明了为什么按不动的答复，按键落空 |
+| | | Tab | 依次走过卡里的控件与答复 |
 | 三键的名字 | APG Tooltip | 单独按住加速键 300 ms | 三个名字一起出现；松开、窗口失焦或开始组合输入即收 |
 | | | Escape | 撤下正在显示的名字 |
 | 检阅三栏的分隔线 | APG Window Splitter | ←／→ | 前一栏宽一栏或窄一栏，钳在每栏至少两栏宽 |
@@ -487,13 +497,15 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 ## 7C 需要人同意的东西，长什么样
 
-三样东西会停下来问人：附着到人自己登录着的浏览器、在沙箱外跑一条命令、队列里等签字的审批。它们**共用一套语言**，人学一次，之后每一次都是认出来而不是读出来。
+会停下来问人的东西**共用一套语言**，人学一次，之后每一次都是认出来而不是读出来。
 
 - **前缘一条 2 px 的条，加一个字形。**
 - **字形是编码，颜色只是加强。** `forced-colors` 会把每一处填充与边框颜色换成系统色，所以只用颜色说「请决定」的标记，恰好在最需要它的那些机器上什么都不说。
 - 条画在**前缘**而不是左边，因为这一页也会用从右往左的语言排。
 
-实现是 `theme.css` 的 `@utility asks`，连同 `@media (forced-colors: active)` 里把它的边换成 `CanvasText` 的那一条。读者：设置行的门与沙箱芯片、检阅档仪表的「边界」格、审批卡。
+实现是 `theme.css` 的 `@utility asks`，连同 `@media (forced-colors: active)` 里把它的边换成 `CanvasText` 的那一条。读者：设置行的门与沙箱芯片、检阅档仪表的「边界」格、请决定卡。
+
+**请决定卡是一个部件**（`views/parts/decide.svelte`）：前缘条与字形，一行头写谁在问与何时，正文按种类换，答复至多三个，各在一个键上——y 同意、e 改后同意、n 不。种类与字形是一张表：`question`（居民提的设计问题，手的字形；正文是它问的事、它问到的内容，与「拒绝不会还原文件」的那一句，y 允许、n 拒绝，同一组问题一次答完）、`ask`（一个门在等人亲自动手，门的字形；正文是那次被挡下的动作、主体与城写的出路，城那边没有可替人发的帧，所以只有 n「知道了」）。文稿修改提案是第三种，加一行字形与它自己的正文，卡的参数不变。卡在对话里（等人的事以卡片插进对话流，4-7）与信箱的待决段里是同一个部件。
 
 ## 7D 一屏一家：一个事实在一屏上只画一次
 
@@ -520,7 +532,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 第 1 栏贴底竖排三个键：图层、信箱、设置，图标取 lucide 的 `layers`、`inbox` 与 `settings`。**三键之上没有任何东西**：花费回到了所选会话的仪表（7D），连接只在断开时以横幅出现。
 
 - **图层**换档（7H）：点一下按专注 → 混合 → 检阅 → 专注循环，键下三个 4×2 的刻度用 accent 标出当前档；`\` 是同一个动作的键。在键上按住或按住 `\` 超过 300 ms 临时进混合档，松开回到原来的档，所以看一眼世界层不改变人选定的档。
-- **信箱**的角标是等人决定的事的件数。**当前状态**：三段信箱（待决、在跑、最近）还没有建成，这个键与 Accel-B 打开 4-35 的通知抽屉；信箱落地时只换它打开的面。
+- **信箱**打开信箱面（4-49），Accel-B 是它的键；角标只数需要人的事，普通的未读拒绝是一个不带数的点，链路不在 `live` 时键脚另有一道横杠。
 - **设置**打开设置面（7L），Accel-, 是它的键。
 
 **名字与键按需出现，不常驻**：指针悬停或键盘聚焦时，键的右侧弹出它的名字与键，例如「信箱 · 3 件等你 Ctrl B」；单独按住加速键超过 300 ms，三个键的名字一起出现，松开、窗口失焦或开始组合输入时收起（按住即现）。名字与键都读 `core/keys.ts`，没有第二处拼写。触屏上第一次点击就执行动作，名字不靠悬停才能读到。
@@ -712,6 +724,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **决策**：`core/notify.ts` 的纯函数只从 `approval_queue` 的答里挑新到的待批事项；四道闸（失焦、预热期、快照里的旧事不算新、正在看的地址不弹）全过才交给 `views/notifier.svelte` 发出。设置页「外观」组里的开关默认 `off`，打开时才向浏览器要权限，开关只存在这个浏览器（`sprawling.notify`），因为通知权限本身就是每个浏览器各自授予的。
 - **理由**：通知打断的是人在别处做的事，所以只配给「没有人就停下」的那一类——run 的进度、完成与拒绝都不需要人回答，已经由标签页的标题与图标承担。预热期与快照闸挡住的是同一个错：页面刚打开或重连时，答里的每一件事对这一页都是「第一次见」，却不是新发生的。
 - **被击败的备选**：对每个完成、每个拒绝也发通知，或默认打开。前者把需要回答的那一条淹在不需要回答的里面；后者让浏览器在人还没理解这一页时就弹出权限请求。
+- **与页面内投递的分工**：浏览器通知只管人不在这一页时（窗口失焦）；人在这一页时，什么在什么时刻冒头由 12-26 判定。两者不重叠：审批在页面内从不延迟，在页面外只经这里的四道闸。
 - **重开参数**：城开始产出第二类必须由人回答、却不经 `approval_queue` 的事（例如一个问句），这张表就要把它也读进来；或者通知改由城经 Web Push 发出（页面关闭时也要报），开关就该跟着偏好一起存进城。
 
 ### 12-8 对话里没有 `/goal`

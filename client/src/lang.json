@@ -979,6 +979,18 @@
     "en": "the inspector",
     "zh": "检视面"
   },
+  "keys_decide_yes": {
+    "en": "decide: yes",
+    "zh": "请决定：是"
+  },
+  "keys_decide_edit": {
+    "en": "decide: yes, as edited",
+    "zh": "请决定：改后同意"
+  },
+  "keys_decide_no": {
+    "en": "decide: no",
+    "zh": "请决定：否"
+  },
   "edge_layers": {
     "en": "layers",
     "zh": "图层"
@@ -986,6 +998,74 @@
   "edge_mailbox": {
     "en": "mailbox",
     "zh": "信箱"
+  },
+  "mailbox_deciding": {
+    "en": "deciding",
+    "zh": "待决"
+  },
+  "mailbox_working": {
+    "en": "working",
+    "zh": "在跑"
+  },
+  "mailbox_recent": {
+    "en": "recent",
+    "zh": "最近"
+  },
+  "mailbox_deciding_none": {
+    "en": "nothing waits for you to decide",
+    "zh": "没有等你决定的事"
+  },
+  "mailbox_working_none": {
+    "en": "no run is going",
+    "zh": "没有在跑的 run"
+  },
+  "mailbox_recent_none": {
+    "en": "no session has begun yet",
+    "zh": "还没有开始过会话"
+  },
+  "mailbox_earlier": {
+    "en": "{n} earlier sessions are not listed here",
+    "zh": "更早的 {n} 段会话不在此处"
+  },
+  "mailbox_runs": {
+    "en": "{n} runs",
+    "zh": "{n} 个 run"
+  },
+  "mailbox_start_dispatched": {
+    "en": "dispatched",
+    "zh": "派活开始"
+  },
+  "mailbox_start_new": {
+    "en": "new",
+    "zh": "新开"
+  },
+  "mailbox_start_carried": {
+    "en": "new, with the handoff",
+    "zh": "新开，带交接"
+  },
+  "mailbox_start_forked": {
+    "en": "forked",
+    "zh": "分叉"
+  },
+  "mailbox_fork_last": {
+    "en": "fork from the last turn",
+    "zh": "从最后一轮分叉"
+  },
+  "mailbox_fork_unheld": {
+    "en": "the last run of this session is older than what this page holds",
+    "zh": "这段会话的最后一个 run 早于本页持有的范围"
+  },
+  "mailbox_back": {
+    "en": "back",
+    "zh": "返回"
+  },
+  "mailbox_ask_title": {
+    "en": "a door waits for your own hand",
+    "zh": "一个门在等你亲自动手"
+  },
+  "mailbox_new": {
+    "en": "something new, nothing waiting for you",
+    "zh": "有新消息，没有等你的事"
   },
   "keys_reserved": {
     "en": "the browser takes this key before the page sees it",

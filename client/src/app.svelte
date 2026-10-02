@@ -285,6 +285,13 @@
         // window handler branches from it (`talk/thread.svelte`), and
         // the shell holds nothing to branch from.
         return;
+      case "decide.yes":
+      case "decide.edit":
+      case "decide.no":
+        // An answer belongs to the card that holds the focus, which hears
+        // the press first (`views/parts/decide.svelte`); the shell has no
+        // card to answer.
+        return;
     }
   }
 
