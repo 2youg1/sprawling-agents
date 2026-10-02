@@ -14,7 +14,7 @@
 // The browser's socket and its randomness are reached here and nowhere
 // below; the handshakes themselves are `handshake.ts`'s.
 
-import { claim, finish, pairHello, sessionHello, type Refused } from "./handshake";
+import { claim, finish, pairHello, sessionHello, type Refused, type Session } from "./handshake";
 import type { Invitation } from "./invitation";
 import type { DeviceKey } from "./keys";
 import { payloadBytes } from "./seal";
@@ -41,7 +41,15 @@ export interface Locked {
   readonly kind: "locked";
 }
 
-// What `lockOver` needs of a paired device.
+// A session the door admitted: the connection it runs on, and the
+// device's half of its seal.
+export interface Opened {
+  readonly kind: "opened";
+  readonly door: Door;
+  readonly session: Session;
+}
+
+// What a session needs of a paired device.
 export interface Pinned {
   readonly city: Uint8Array<ArrayBuffer>;
   readonly id: Uint8Array<ArrayBuffer>;
@@ -80,8 +88,9 @@ export async function pairOver(url: string, invitation: Invitation, key: DeviceK
     : { kind: "paired", city: claimed.city, id };
 }
 
-// One session, opened only to lock the door behind this device (D5).
-export async function lockOver(url: string, device: Pinned): Promise<Locked | Refusal> {
+// One session handshake: hello, the city's signed answer, the device's
+// finish. What travels after it is the caller's.
+export async function sessionOver(url: string, device: Pinned): Promise<Opened | Refusal> {
   const waiting = await sessionHello(device.id, fresh());
   if (waiting === null) return { kind: "refused", why: "agreement" };
   const door = await reach(url);
@@ -92,7 +101,15 @@ export async function lockOver(url: string, device: Pinned): Promise<Locked | Re
   const finished = await finish(waiting, reply, device.city, device.key);
   if (typeof finished === "string") return door.refuse(finished);
   door.send(finished.finish);
-  const lock = await finished.session.sealer.seal(payloadBytes({ kind: "lock" }));
+  return { kind: "opened", door, session: finished.session };
+}
+
+// One session, opened only to lock the door behind this device (D5).
+export async function lockOver(url: string, device: Pinned): Promise<Locked | Refusal> {
+  const opened = await sessionOver(url, device);
+  if (opened.kind !== "opened") return opened;
+  const { door, session } = opened;
+  const lock = await session.sealer.seal(payloadBytes({ kind: "lock" }));
   if (lock === null) return door.refuse("key");
   door.send(lock);
   const ended = await door.closed;
@@ -104,7 +121,7 @@ function fresh(): Uint8Array<ArrayBuffer> {
 }
 
 // A socket read one binary message at a time.
-interface Door {
+export interface Door {
   readonly send: (bytes: Uint8Array<ArrayBuffer>) => void;
   // The next binary message; null once the socket closed instead.
   readonly next: () => Promise<Uint8Array<ArrayBuffer> | null>;

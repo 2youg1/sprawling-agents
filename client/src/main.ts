@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The mount point, and nothing else: the address bar and the socket
-// address are read here once and handed in, so every module below
+// The mount point, and nothing else: the address bar and the line the
+// link speaks through are read here once and handed in, so every module below
 // takes them as parameters rather than reaching for `window`.
 //
 // What the person prefers is reached the same way, through the one
@@ -19,7 +19,8 @@ import App from "./app.svelte";
 import { langOf } from "./core/lang";
 import { preferences } from "./core/prefs";
 import { keepWithCity } from "./core/prefs_city";
-import { openConnection, socketUrl, tokenIn } from "./core/socket";
+import { dialFor } from "./core/remote/session";
+import { openConnection, tokenIn } from "./core/socket";
 import type { Opening } from "./ui";
 import { applyAppearance, watchMachineLighting } from "./views/setup/appearance";
 import "./theme.css";
@@ -37,7 +38,7 @@ if (main !== null) {
   // after the address bar changed.
   const token = tokenIn(window.location.search);
   const opening: Opening = {
-    conn: openConnection(socketUrl(window.location), token, langOf(navigator.language)),
+    conn: openConnection(dialFor(window.location), token, langOf(navigator.language)),
     prefs,
     bar: window.location,
     origin: window.location.origin,

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The browser half of the link: one socket, three listeners, and no
+// The browser half of the link: one line, three listeners, and no
 // judgements about the wire. Every judgement is `link.ts`'s; this turns
 // browser callbacks into link events, carries out the actions the machine
 // answers with, and hands what arrives to the belief and the asking.
@@ -11,10 +11,13 @@
 // The one conversation the link holds of its own, the walk over a gap,
 // is `gap_walk.ts`'s; this hands it the frames and answers it names.
 //
-// The browser's own facilities are reached here and nowhere below:
-// the socket, the frame callback, the timers, and the clock the
-// asking measures its patience by. A module that read the clock
-// itself would be a module a test cannot put in a hurry.
+// The browser's own facilities are reached here and nowhere below: the
+// frame callback, the timers, and the clock the asking measures its
+// patience by. A module that read the clock itself would be a module a
+// test cannot put in a hurry. The line the link speaks through is handed
+// in (`core/line.ts`), because a page opened from the remote door speaks
+// through a sealed session instead of this origin's `/ws` (client/Spec.lean
+// §4-64).
 //
 // Frames are folded once per animation frame rather than as they land:
 // a burst of records becomes one store update and one paint, which is
@@ -38,6 +41,7 @@ import { langOf, say } from "./lang";
 import { createGapWalk } from "./gap_walk";
 import { advance, connect as start, isLive, isRefused, newLink, unreadableRecord, unsentCommand } from "./link";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
+import type { Dial, Line } from "./line";
 import { AskId } from "../wire";
 import type { Command, Query, RunId, ServerFrame } from "../wire";
 
@@ -83,20 +87,13 @@ function hidden(): boolean {
   return typeof document !== "undefined" && document.visibilityState === "hidden";
 }
 
-// The address of this city's socket, derived from the page's own origin:
-// a client served by the city it talks to needs no configured endpoint.
-export function socketUrl(location: Location): string {
-  const scheme = location.protocol === "https:" ? "wss" : "ws";
-  return `${scheme}://${location.host}/ws`;
-}
-
 export function openConnection(
-  url: string,
+  dial: Dial,
   token: string | null,
   lang: Lang,
 ): Connection {
   let link: Link = newLink(token, lang);
-  let socket: WebSocket | null = null;
+  let line: Line | null = null;
   // One clock for this connection: the asking measures its patience by
   // it and the belief stamps each refusal with it, so a question and its
   // refusal can never disagree about when they happened.
@@ -117,7 +114,7 @@ export function openConnection(
   // opposite.
   let reconnect: ReturnType<typeof setTimeout> | null = null;
 
-  // Sends one question under a fresh id; null when the socket is not open.
+  // Sends one question under a fresh id; null when the line is not open.
   function sendAsk(query: Query): AskId | null {
     lastAsk = lastAsk >= 0xffff_ffff ? 1 : lastAsk + 1;
     const askId = AskId.make(lastAsk);
@@ -125,11 +122,7 @@ export function openConnection(
   }
 
   function sendText(text: string): boolean {
-    if (socket?.readyState !== WebSocket.OPEN) {
-      return false;
-    }
-    socket.send(text);
-    return true;
+    return line?.send(text) ?? false;
   }
   const watching = createWatching(sendText);
 
@@ -218,7 +211,7 @@ export function openConnection(
         store.refused(action.error);
         return;
       case "close":
-        socket?.close();
+        line?.close();
         return;
     }
   }
@@ -234,14 +227,14 @@ export function openConnection(
     if (isRefused(link)) {
       // The machine has stopped this link. Nothing here decides that:
       // the socket half only carries it out, by cancelling the attempt
-      // the ladder booked and dropping the socket the refusal came in
+      // the ladder booked and dropping the line the refusal came in
       // on. The person's retry is what starts it again.
       if (reconnect !== null) {
         clearTimeout(reconnect);
         reconnect = null;
       }
-      const open = socket;
-      socket = null;
+      const open = line;
+      line = null;
       open?.close();
     }
   }
@@ -257,48 +250,51 @@ export function openConnection(
   }
 
   function open(): void {
-    const opened = new WebSocket(url);
-    socket = opened;
-    opened.onopen = () => {
-      if (socket === opened) step({ kind: "opened" });
-    };
-    opened.onmessage = (message: MessageEvent) => {
-      if (socket !== opened || typeof message.data !== "string") {
-        return;
-      }
-      const frame = decodeFrame(message.data);
-      if (frame === null) {
-        // The two ends disagree about the wire. Reported as what it is,
-        // never as a close: a page told the socket dropped reconnects,
-        // and it would meet this same frame every time.
-        step({ kind: "undecodable" });
-        return;
-      }
-      // A welcome is folded at once, so the questions the page has been
-      // holding go out on the same tick the link comes up.
-      if ("welcome" in frame || "refusal" in frame) {
-        store.batch(() => {
-          drain();
-          step({ kind: "received", frame });
-        });
-        return;
-      }
-      queue.push(frame);
-      if (!scheduled) {
-        scheduled = true;
-        // A hidden tab is never painted, so it drains on a timer instead;
-        // otherwise an approval request waits for the person to come back.
-        if (hidden()) setTimeout(drain, 0);
-        else requestAnimationFrame(drain);
-      }
-    };
-    const closed = () => {
-      if (socket !== opened) return;
-      socket = null;
-      step({ kind: "closed" });
-    };
-    opened.onclose = closed;
-    opened.onerror = closed;
+    // Every callback asks whether its line is still the link's line: a
+    // line the link has dropped may still be closing.
+    const mine = () => line === opened;
+    const opened: Line = dial({
+      opened: () => {
+        if (mine()) step({ kind: "opened" });
+      },
+      heard: (text) => {
+        if (mine()) heard(text);
+      },
+      closed: () => {
+        if (!mine()) return;
+        line = null;
+        step({ kind: "closed" });
+      },
+    });
+    line = opened;
+  }
+
+  function heard(text: string): void {
+    const frame = decodeFrame(text);
+    if (frame === null) {
+      // The two ends disagree about the wire. Reported as what it is,
+      // never as a close: a page told the socket dropped reconnects,
+      // and it would meet this same frame every time.
+      step({ kind: "undecodable" });
+      return;
+    }
+    // A welcome is folded at once, so the questions the page has been
+    // holding go out on the same tick the link comes up.
+    if ("welcome" in frame || "refusal" in frame) {
+      store.batch(() => {
+        drain();
+        step({ kind: "received", frame });
+      });
+      return;
+    }
+    queue.push(frame);
+    if (!scheduled) {
+      scheduled = true;
+      // A hidden tab is never painted, so it drains on a timer instead;
+      // otherwise an approval request waits for the person to come back.
+      if (hidden()) setTimeout(drain, 0);
+      else requestAnimationFrame(drain);
+    }
   }
 
   // Either way the queue drains now: going hidden, the paint it waits
