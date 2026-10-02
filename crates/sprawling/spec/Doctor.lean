@@ -736,11 +736,12 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 - **`packaged` 门守这条线**（tools/xtask/Spec.lean §8-49）：可发布的包的生产代码里，`include!`、`include_str!`、`include_bytes!` 只指向包目录之内或 `OUT_DIR`。
 - **清单**：`[workspace.package]` 写 `repository`、`homepage`，`publish = true`；每个包写自己的 `description`，本包另写 `readme`、`keywords`、`categories` 与 `include`；`xtask` 与 `citysim` 写 `publish = false`。工作区自己的包在 `[workspace.dependencies]` 里各钉 `version = "=<工作区版本>"`，`guard` 判它们等于 `[workspace.package] version`（tools/xtask/Spec.lean §8-49）。`sprawling-remote-access` 被二进制链接，随之可发布。`sprawling-desktop-ffi` 也可发布：`sprawling-desktop` 在 Windows 上依赖它，而 crates.io 要求依赖的每个包都在 registry 上；它的包里带着 Zig 叶子的源码与 `zig-version`，构建脚本只读包内的文件，所以从 crates.io 在 Windows 上装这个二进制要先装钉住的那一版 Zig（§8-146），别的平台不编叶子。
 - **`sandbox` 是默认 feature。** `cargo install sprawling` 不写 `--features` 时也带执行引擎，与归档一致；不要引擎的构建写 `--no-default-features`，`just features` 编译这一份，因为别的命令都不再编它。
-- **发布次序**（人的发布步骤）：GitHub release 与 npm 都确认之后，先 `cargo publish --workspace --dry-run --locked`，再 `cargo publish --workspace --locked`；cargo 按依赖次序逐个发布，desktop 与它的叶子都是工作区成员，不再单独发。crates.io 的版本不能覆盖，而 `release.yml` 允许同一个 tag 重新发版，所以 crates.io 排在最后。
+- **发布次序**：`release.yml` 的 `crates` job 在 `channel`（npm）之后跑，也就排在 GitHub release 之后。它用 `rust-lang/crates-io-auth-action` 把这次运行的 OIDC 令牌换成 crates.io 的短期令牌（Trusted Publishing，每个可发布的包在 crates.io 上登记了仓库 `2youg1/sprawling-agents` 与工作流 `release.yml`），然后 `cargo publish --workspace --locked --no-verify --allow-dirty`；cargo 按依赖次序逐个发布，desktop 与它的叶子都是工作区成员，不再单独发。仓库里不存长期令牌。crates.io 的版本不能覆盖，而 `release.yml` 允许同一个 tag 重新发版，所以 crates.io 排在最后；本包这个版本已在 sparse index 上时，job 不再发布、只留一行说明。`--no-verify`：同一棵树已经过 `verify` 与 `packaged` 门（D10），验证构建只是重编一遍，还会耗掉短期令牌的时效。`--allow-dirty`：job 改写了 binstall 的下载地址（D32）。
+- **`cargo binstall sprawling` 取发行归档**：本包清单的 `[package.metadata.binstall]` 按目标三元组各写一条 `pkg-url` 与 `bin-dir`，指向 `release.yml` 打出的三份归档（`x86_64-pc-windows-msvc` → `-windows-x86_64.zip`，`aarch64-apple-darwin` → `-macos-aarch64.zip`，`x86_64-unknown-linux-musl` → `-x86_64-unknown-linux-musl.zip`，归档名的后缀表在 `tools/xtask/src/platform.rs`），`pkg-fmt = "zip"`，可执行文件在归档里的 `sprawling-<版本>-<后缀>/` 目录下。glibc 的 Linux 上 binstall 自己退到 musl 那一份；没有归档的目标，binstall 退回从 `.crate` 编译。仓库里的地址用 `v{ version }` 作 tag，`crates` job 发布前把它换成这次的 tag（D32）。
 
 **本节接口的当前状态**：从 crates.io 构建的二进制仍有两处与归档不同。`[profile.release]` 写在工作区清单里，`cargo package` 不把它带进包，`cargo install` 按 cargo 的默认 release profile 编（`opt-level = 3`，不做 fat LTO，不剥符号）；`SPRAWLING_RELEASE_TAG` 只有 `release.yml` 设，所以 `status` 如实自称 built from source，成熟度照样从 `kernel::release::MATURITY` 读（§8-162）。工具链钉子不在包里时，develop 层的 `lean` 与 `zig` 两行装不钉的版本（§8-162）。
 
-**本章测试**：`doctor::pin::tests` 读出的钉子与检出里的文件相等，空文件读成不钉；`cargo package -p sprawling --list --allow-dirty` 的列表里有包体的 `index.html`（在 `web-dist` 下）与 `Cargo.lock`；`cargo xtask gates packaged guard` 为绿；`cargo publish --workspace --dry-run --locked` 走完打包与验证构建。
+**本章测试**：`doctor::pin::tests` 读出的钉子与检出里的文件相等，空文件读成不钉；`cargo package -p sprawling --list --allow-dirty` 的列表里有包体的 `index.html`（在 `web-dist` 下）与 `Cargo.lock`；`cargo xtask gates packaged guard` 为绿；`cargo publish --workspace --dry-run --locked` 走完打包与验证构建；把清单里的 `v{ version }` 换成一个已发布的 tag 之后，`cargo binstall --dry-run --manifest-path crates/sprawling/Cargo.toml sprawling` 解析到那个 tag 下真实存在的归档地址。
 
 ### 8-162 成熟度只有一处，不钉的构建装不钉的版本（`main::version`、`bin::doctor::table::toolchain`）
 
@@ -932,4 +933,9 @@ crates.io 上的 `.crate` 只是一个包目录，所以一个构建要读的每
 /-! D31 `rust-toolchain.toml` 钉一个确切的 stable 版本，每个版本开工时升到最新 stable（§8-120、§8-58）
 
 `channel` 写确切版本（现为 1.99.0），不写 `stable`。理由：四个读者要求代码树说出自己的编译器——CI 的每一份 Rust 缓存以这份文件为键，浮动通道下键不变而编译器在底下换了，上游新增一条 lint 就让 `main` 变红，却没有哪个提交可追；flake 的 `toolchain-version-is-derived` 在 `rustc --version` 里找通道名，而它从不印出 `stable`；doctor 按数字比较钉住的、装着的与上游最新的版本（本节「比较在页面」），`stable` 没有数字可比；发行与测量要绑定产出它的编译器，只有代码树写明的版本记得住。贡献者不因此多一步：rustup 在第一次用到时自取这份文件写的版本。被否：`channel = "stable"`——它让贡献者少下载一次，但上面四处各要第二套规则，CI 的红绿也不再只由提交决定。`[workspace.package]` 的 `rust-version` 是另一件事：发布出去的包允许的最低编译器，每个成员都继承它，clippy 的 `incompatible_msrv` 据它判标准库 API，所以它不随钉子一起升，只在代码确实要更新的版本时升。重开参数：CI 改成按发布日解析编译器并把实际版本写进缓存键与读数，或 rust-overlay 与 doctor 都能读浮动通道背后的版本。
+-/
+
+/-! D32 binstall 的下载地址在发布时填入 tag（§8-157）
+
+发行的 tag 是 `v<版本>-<成熟度>-<YYMMDD>`，binstall 的模板只认得 `{ version }`、`{ target }` 这类变量，拼不出日期，所以仓库里的 `pkg-url` 写 `releases/download/v{ version }/`，`crates` job 在 `cargo publish` 之前把这一段换成 `${GITHUB_REF_NAME}`，并核对三条地址都换到了。tag 只有一个权威，就是这次运行的 ref。这是 D10 的一个例外：改的只是 cargo 构建时不读的 `[package.metadata]`，包里的源码与清单的其余部分仍与提交一致，`.cargo_vcs_info.json` 照实记下 `dirty`。**被否**：①把整个 tag 写进清单——每次发版要在打 tag 之前猜出日期，清单与 tag 成了同一个事实的两份；②发版时另推一个 `v<版本>` 的 tag 并挂同一组归档——一份归档挂在两个 release 上，`gh release delete` 重发时还要收拾两处；③指向 `releases/latest/download`——本项目的每个 release 都是 pre-release，GitHub 的 latest 不指向它们。**重开参数**：tag 改成 `v<版本>`，那时删掉这一步改写，模板原样可用。
 -/
