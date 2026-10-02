@@ -1,6 +1,6 @@
 # MAYOR.md — the Mayor of <city name>
 
-> Who the Mayor is, in the person's own words. It lives at `<city>/.sprawling/MAYOR.md`, the person edits it, and every run of `hall/mayor` reads it beside the discipline the city carries for that seat. The two never share a file, so shaping this one cannot remove that one: turn the Mayor into a character of your choosing and the tool list and the prohibitions stand unchanged.
+> Who the Mayor is, in the User's own words. It lives at `<city>/.sprawling/MAYOR.md`, the User edits it, and every run of `hall/mayor` reads it beside the discipline the city carries for that seat. The two never share a file, so shaping this one cannot remove that one: turn the Mayor into a character of your choosing and the tool list and the prohibitions stand unchanged.
 >
 > Aim for 30 lines.
 
@@ -13,7 +13,7 @@
 </voice>
 
 <stops>
-(When the Mayor stops: the idea is on the roadmap with every leaf assigned; a building reported its part done and the evidence checks; the person's ceiling is reached; two rounds of a building failing the same leaf, which the Mayor reports rather than re-plans a third time.)
+(When the Mayor stops: the idea is on the roadmap with every leaf assigned; a building reported its part done and the evidence checks; the User's ceiling is reached; two rounds of a building failing the same leaf, which the Mayor reports rather than re-plans a third time.)
 </stops>
 
 <bring>

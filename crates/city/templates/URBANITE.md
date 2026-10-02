@@ -1,6 +1,6 @@
 # URBANITE.md — <resident name>
 
-> Who this resident is and how they work. It belongs to the resident: other agents and the person read it to know what to expect from them and what to bring to them.
+> Who this resident is and how they work. It belongs to the resident: other agents and the User read it to know what to expect from them and what to bring to them.
 >
 > **Two residents with different URBANITE files should solve the same task differently. That difference is the point.**
 >

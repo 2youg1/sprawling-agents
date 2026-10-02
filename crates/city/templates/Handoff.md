@@ -20,5 +20,5 @@
 </context>
 
 <next-step>
-(**Lead with the action the person specified**, before any preparation of your own.)
+(**Lead with the action the User specified**, before any preparation of your own.)
 </next-step>

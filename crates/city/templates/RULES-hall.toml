@@ -5,14 +5,14 @@
 # who live here serve every other building, so what they may do is a
 # property of the city rather than a local convention.
 #
-# A person may still edit this file. What the person may not do is get a
+# The User may still edit this file. What the User may not do is get a
 # City Hall that builds, because nothing here has an `exec` tool to
 # build with.
 
 does = """
 City Hall holds the city's own plan and the two residents that serve \
 every other building. The Mayor turns an idea into work the buildings \
-can pursue; the clerk answers approvals the person delegated. Neither \
+can pursue; the clerk answers approvals the User delegated. Neither \
 of them holds a project: work that belongs to a subject belongs to a \
 building raised for that subject.
 """

@@ -1,13 +1,13 @@
 # RULES.toml — <building name>
 #
-# What this building is, and what it may do. A person writes this file.
+# What this building is, and what it may do. The User writes this file.
 # The city parses it and hands the same bytes to every resident, so what
 # an agent reads is what the city enforces — there is no second document
 # describing this building, and nothing here that the machine skips.
 #
 # It sits in the building's reserved subtree, which no write domain
 # reaches: residents read it and cannot change it. To propose a change,
-# use the `rules` tool and a person answers.
+# use the `rules` tool and the User answers.
 #
 # Every key this version knows is below. A key it does not know is
 # refused rather than passed over, so a misspelling is a message instead
@@ -45,7 +45,7 @@ review = false
 # starts and owns.
 browser = false
 
-# Residents may drive the browser the person is already using: `false`
+# Residents may drive the browser the User is already using: `false`
 # for off, `true` to enable it and be asked for the address, or the
 # address itself, "ws://127.0.0.1:9222/session".
 usersbrowser = false

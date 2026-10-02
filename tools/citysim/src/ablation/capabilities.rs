@@ -110,7 +110,7 @@ pub(crate) const CITY_CAPABILITIES: &[Capability] = &[
     },
     Capability {
         name: "know the recycle bin is the User's way back",
-        cue: "the person's way back",
+        cue: "the User's way back",
     },
     Capability {
         name: "use a credential without reading it",
@@ -146,7 +146,7 @@ pub(crate) const CITY_CAPABILITIES: &[Capability] = &[
     },
     Capability {
         name: "reply in the language and the style the User prefers",
-        cue: "the language and the style the person prefers",
+        cue: "the language and the style the User prefers",
     },
     Capability {
         name: "know an image arrives as an image",
