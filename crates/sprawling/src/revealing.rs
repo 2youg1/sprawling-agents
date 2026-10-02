@@ -111,8 +111,15 @@ mod tests {
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect();
+        // `xdg-open` cannot select a file, so on Linux the manager opens
+        // the directory that holds it.
+        let named = if cfg!(target_os = "linux") {
+            "hall"
+        } else {
+            "JOB.md"
+        };
         assert!(
-            written.iter().any(|arg| arg.contains("JOB.md")),
+            written.iter().any(|arg| arg.ends_with(named)),
             "the file manager is told which file: {written:?}"
         );
         if cfg!(target_os = "windows") {

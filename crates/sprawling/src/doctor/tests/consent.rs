@@ -55,8 +55,15 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
     );
 
     let machine = ScriptedMachine::missing(&["just", "git"]);
-    // The table asks about git before just: it is in install order.
-    let mut agreed = std::io::Cursor::new(b"n\ny\n".to_vec());
+    // The table asks about git before just: it is in install order. On
+    // Linux git's recipe only prints, because it needs `sudo`, so just is
+    // the one question asked there.
+    let answers: &[u8] = if cfg!(target_os = "linux") {
+        b"y\n"
+    } else {
+        b"n\ny\n"
+    };
+    let mut agreed = std::io::Cursor::new(answers.to_vec());
     let mut screen: Vec<u8> = Vec::new();
     run(
         &Asked {
