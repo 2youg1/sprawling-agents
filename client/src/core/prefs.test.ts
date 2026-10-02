@@ -9,6 +9,7 @@ import { get } from "svelte/store";
 import { loadPreferences } from "./prefs";
 import type { Preferences } from "./prefs";
 import { memory } from "./rows";
+import { WORKBENCH, moved } from "./workbench";
 
 // A record that differs from the shipped postures in every field, so a
 // value that failed to travel is visible rather than accidentally
@@ -110,6 +111,13 @@ describe("the two families read by name", () => {
     door.setChord("go.city", "");
     expect(door.chord("go.city")).toBe("");
     expect(loadPreferences(rows, "en").chord("go.city")).toBe("");
+  });
+
+  test("the workbench a person arranged is the one the next page opens with", () => {
+    const rows = memory();
+    const arranged = moved(WORKBENCH, "commits", "left");
+    loadPreferences(rows, "en").setWorkbench(arranged);
+    expect(get(loadPreferences(rows, "en").workbench)).toEqual(arranged);
   });
 
   test("a draft is kept per place a person writes", () => {

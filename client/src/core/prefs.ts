@@ -47,6 +47,8 @@ import type { Appearance } from "./appearance";
 import type { Notifying } from "./notify";
 import { SHOWINGS } from "./results";
 import type { Showing } from "./results";
+import { readWorkbench, spelledWorkbench } from "./workbench";
+import type { Workbench } from "./workbench";
 
 // ------------------------------------------------------------- the rows
 
@@ -95,6 +97,9 @@ const ROWS = {
   chord: "sprawling.key.",
   editor: "sprawling.editor",
   cityFolder: "sprawling.editor.folder",
+  // The panorama workbench's pane order and widths (client-SPEC 7K): a
+  // fact of this screen, so it stays in this browser (12-24).
+  workbench: "sprawling.workbench",
 } as const;
 
 // ------------------------------------------------------------ the shell
@@ -158,16 +163,17 @@ export type Keeper =
   | "city";
 
 // The one way to the person's preferences: the record as it stands,
-// who is keeping it, the city's answer coming the other way, six
-// named changes to it, and the two families that are read by name
-// because they have one row each per place and per action.
+// who is keeping it, the city's answer coming the other way, named
+// changes to it, and the families read by name because they have one
+// row each per place, per action, or per screen.
 //
 // Named changes rather than one `write`, because each of them is its
 // own `PutPreferences` patch: a caller that handed over a whole record
 // would send the city every field to change one, and a caller that says
 // which fact it is changing sends that fact. The tier, the bell, how a
-// conversation is shown, glass and the blend tier's opacity stay in this
-// browser, since the city's record has no field for them yet. `adopt` is the other
+// conversation is shown, glass, the blend tier's opacity and the
+// workbench stay in this browser, since the city's record has no field
+// for them yet. `adopt` is the other
 // direction and is therefore whole - an answer states every value at
 // once, and a record applied field by field could be half of one
 // answer and half of the last.
@@ -204,6 +210,8 @@ export interface PreferenceDoor {
   // Facts of the machine this browser runs on, never the city's (client-SPEC 4-39).
   readonly editor: () => Pick<Opening, "editor" | "folder">;
   readonly setEditor: (next: Pick<Opening, "editor" | "folder">) => void;
+  readonly workbench: Readable<Workbench>;
+  readonly setWorkbench: (next: Workbench) => void;
 }
 
 // A stored word, or the posture this client ships with when the row is
@@ -262,11 +270,9 @@ function writeFigure(rows: Rows, row: string, figure: number | null): void {
   else rows.setItem(row, String(figure));
 }
 
-// The two words a yes-or-no row is written with, spelled here so the
-// write and the read cannot spell them differently.
-//
-// Each of the two rows is compared against one of them, because an
-// absent row means different things: `welcomed` is false until
+// The two words a yes-or-no row is written with, spelled once for the
+// write and the read. Each row is compared against one of them, because
+// an absent row means different things: `welcomed` is false until
 // somebody has walked the welcome, and `panel` is open until somebody
 // has closed it.
 const YES = "yes";
@@ -299,11 +305,12 @@ function writePreferences(rows: Rows, next: Preferences): void {
   rows.setItem(ROWS.showing, next.showing);
 }
 
-// The door onto one store. A test hands it a map and its own language
-// tag; the page reaches the browser's through `preferences()` below.
+// The door onto one store: a test hands it a map and a language tag,
+// the page reaches the browser's through `preferences()`.
 export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor {
   const held = writable<Preferences>(readPreferences(rows, browserLang));
   const keeper = writable<Keeper>("browser");
+  const workbench = writable<Workbench>(readWorkbench(null));
   // One write path for every change, the city's answer included: the
   // cache and the store move together, so a reader that redraws and a
   // reader that reloads the page never see two different records.
@@ -380,13 +387,16 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
       rows.setItem(ROWS.editor, next.editor);
       rows.setItem(ROWS.cityFolder, next.folder);
     },
+    workbench,
+    setWorkbench() {
+      return undefined;
+    },
   };
 }
 
-// The preferences this page runs on. One per document, for the reason
-// the keymap is one per document: the shell, the settings screens and
-// the face the page is drawn in all have to be looking at the same
-// record, and a second copy would let a change go unseen.
+// The preferences this page runs on, one per document like the keymap:
+// the shell, the settings screens and the face the page is drawn in all
+// look at one record, and a second copy would let a change go unseen.
 let shared: PreferenceDoor | undefined;
 
 export function preferences(): PreferenceDoor {
