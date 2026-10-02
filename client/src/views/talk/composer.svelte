@@ -72,8 +72,8 @@
     // Whether this city has an endpoint that transcribes. A microphone
     // on a city with none is a button whose only answer is a refusal.
     readonly hearing?: boolean | undefined;
-    // In the panorama tier's band, what stands above the words (the last thing said);
-    // a box in the band draws no settings row, the session sheet says it (docs/frontend-method.md §7D, §7I).
+    // In the band under the world layer's sheet on one column, what stands above the words (the last thing said);
+    // a box in the band draws no settings row beyond the notice that a change was kept, the session sheet says it (docs/frontend-method.md §7H, §7I).
     readonly band?: Snippet | undefined;
     // The room this box speaks to, when the page holding it says so; the
     // address bar answers otherwise.

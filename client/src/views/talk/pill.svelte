@@ -184,7 +184,7 @@ long enough to scroll gets a filter; a list of six does not. -->
       <ul
         id="{uid}-list"
         bind:this={list}
-        class="max-h-[min(70vh,36rem)] overflow-y-auto outline-none"
+        class="max-h-[min(70vh,36rem)] overflow-y-auto"
         role="listbox"
         tabindex={filtered ? -1 : 0}
         aria-label={spec.label}

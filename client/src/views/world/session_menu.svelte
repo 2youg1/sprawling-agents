@@ -155,7 +155,7 @@
           <input
             bind:this={field}
             bind:value={typed}
-            class="h-control-sm rounded-control bg-page px-snug text-note text-text outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            class="h-control-sm rounded-control bg-page px-snug text-note text-text"
             aria-label={say($lang, "world_tag_name")}
             aria-invalid={wrong}
             aria-describedby="{seat}-hint"
