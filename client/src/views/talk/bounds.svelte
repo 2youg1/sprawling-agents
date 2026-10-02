@@ -9,12 +9,14 @@
   // sandbox the room's building boxes a run in. They are read, never
   // pressed.
   //
-  // **Both are risk readings, so the worrying value is marked rather than
-  // left to be noticed.** No sandbox named anywhere means the run has the
-  // machine, and a gate the city could not report is not a gate a person
-  // can trust; either one carries the mark this product uses for anything
-  // that needs a person (`asks`, client/Spec.lean §7C), which survives a forced
-  // colour mode where a colour alone would not.
+  // **A gate the city could not report is marked rather than left to be
+  // noticed**, because it is not a gate a person can trust; it carries the
+  // mark this product uses for anything that needs a person (`asks`,
+  // client/Spec.lean §7C), which survives a forced colour mode where a
+  // colour alone would not. An open sandbox is the setting the User chose
+  // for the building and nothing they must act on, so its words alone
+  // state it: the mark beside it read as a fault on a row that stands
+  // under every message.
   import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import { fill, say } from "../../core/lang";
@@ -64,12 +66,12 @@
     }
   });
 
-  const sandbox = $derived.by((): Bound => {
+  const sandbox = $derived.by((): string => {
     const held = building;
-    if (held === undefined || !("building" in held)) return { words: "—", worrying: false };
+    if (held === undefined || !("building" in held)) return "—";
     const limits = held.building.sandbox;
-    if (limits === null || limits === undefined) return { words: say($lang, "facts_sandbox_open"), worrying: true };
-    return { words: fill(say($lang, "facts_sandbox_mounts"), { n: String(limits.mounts.length) }), worrying: false };
+    if (limits === null || limits === undefined) return say($lang, "facts_sandbox_open");
+    return fill(say($lang, "facts_sandbox_mounts"), { n: String(limits.mounts.length) });
   });
 </script>
 
@@ -78,8 +80,8 @@
   <span class="sr-only">{say($lang, "facts_autonomy")}</span>
   {gate.words}
 </span>
-<span class={[FACT, sandbox.worrying ? "asks" : ""]}>
+<span class={FACT}>
   <Glyph name="sandbox" size="sm" />
   <span class="sr-only">{say($lang, "facts_sandbox")}</span>
-  {sandbox.words}
+  {sandbox}
 </span>
