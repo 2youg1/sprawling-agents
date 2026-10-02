@@ -394,6 +394,17 @@ fuzz-desktop rounds="1000000" seed="5eedf022":
 build-web:
     cd client && bun install --frozen-lockfile && bun run build
 
+# The bundle in crates/sprawling/web-dist, built only when it is absent or
+# some file under client/ (its sources, its lockfile, its configuration)
+# is newer than the bundle's index.html, which Vite writes on every
+# build after emptying the directory. A recipe that measures the binary
+# depends on this one, so a repeated run keeps the bundle's mtimes and
+# cargo keeps the binary. `check` and `dist` keep `build-web`, which
+# always builds. `find -newer`, `-prune` and `-quit` behave the same in
+# Git Bash on Windows and in the find of macOS and Linux.
+web-bundle:
+    if [ -f crates/sprawling/web-dist/index.html ] && [ -z "$(find client -path client/node_modules -prune -o -type f -newer crates/sprawling/web-dist/index.html -print -quit)" ]; then echo "web-bundle: crates/sprawling/web-dist is newer than every file under client/, kept"; else '{{just_executable()}}' --justfile '{{justfile()}}' build-web; fi
+
 # The client's own gates: lint (no `any`, no `as`, no throw, no try, no
 # non-exhaustive switch), typecheck, and its tests.
 #
@@ -496,15 +507,19 @@ bench:
 # The four-action pressure reading (tools/citysim/Spec.lean 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.
 #
-# `build-web` first, the same dependency `dist` carries: without the
-# bundle the binary embeds a placeholder page, and a placeholder is not
-# the artifact a person installs - its weight is what the install action
-# unpacks and the startup action loads.
+# `web-bundle` first: without the bundle the binary embeds a placeholder
+# page, and a placeholder is not the artifact a person installs - its
+# weight is what the install action unpacks and the startup action loads.
+# It is `web-bundle` rather than `build-web` because Vite rewrites every
+# file of the bundle on each build, `crates/sprawling/build.rs` reruns on
+# any bundle file whose mtime moved, and the release profile then relinks
+# the whole binary; a second round on an unchanged client must measure
+# the same binary rather than rebuild it.
 #
 # The shipped binary is built next and the bench measures the one that
 # lands beside its own executable, so no run can be driven by a stale
 # artifact. This recipe is where that ordering lives.
-bench-startup: build-web
+bench-startup: web-bundle
     cargo build --release -p sprawling --locked
     cargo run --release -p citysim --bin bench_startup --locked
 
