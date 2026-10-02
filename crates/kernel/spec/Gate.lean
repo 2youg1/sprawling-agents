@@ -107,3 +107,14 @@ pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &Taint
 
 **重开参数**：出现一类没有 `Restoration` 的效果——那时的正确做法是让它不可拼写，而不是把 `Escalate` 加回来。
 -/
+
+/-! D26 Govern 类工具的只读操作在 run 里放行：效果按一次调用定，不按工具定
+
+**决定**：`kernel::Tool` 多一个带默认实现的方法 `effect_of(&self, args: &Payload) -> Result<Effect, AxError>`，默认答登记里的 `ToolMeta.effect`；`rules` 与 `city` 两件治理工具覆写它，`rules read`、`city list` 这类不改规则的操作答 `Effect::Read`，改规则的操作仍答 `Effect::Govern`，在 run 里照旧被拒。`tool_called.effect`（§8-75 (b)）记的是这次调用由 `effect_of` 答出的效果。没有新的事件种类。
+
+**理由**：测试城里 `rules read` 与 `city list` 被拒（E_GATE_DENIED，Govern），而 MAYOR.md 说市长持有 rules。拒 Govern 的理由是「一个 run 不得改写审判它自己的规则」（§8 门册的 Governance 行），读规则不改写什么，拒它只是让模型看不到约束它的东西。按调用定效果是推断（roadmap §7：「F3 在 run 里放行 Govern 类工具的只读操作」）。
+
+**被否**：①改 MAYOR.md 的说法、继续全拒：市长看不到自己的规则就只能猜；②把只读操作拆成另一件工具：工具清单多一项，而它与 `rules` 说的是同一个对象。
+
+**重开参数**：User 选改说明而不放行时，删掉两件工具的覆写，默认实现即回到全拒。
+-/

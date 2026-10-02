@@ -472,3 +472,77 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 **重开参数**：账本行的长度成为开城时间里看得见的一段时，提案文本改存内容库；出现第二种写文档的入口（例如居民的 `edit` 也要记版本）时，重议 `document_written` 的写者。
 -/
+
+/-! D20 耗时记整数微秒，作为可缺席的键挂在既有的行上，不另立种类，账本版本不进位
+
+**决定**：`tool_result` 多一把 `took_us: Option<u64>`，是这次工具执行从开始到给出答案的整数微秒；`model_returned` 多两把 `first_us: Option<u64>` 与 `took_us: Option<u64>`，是从请求发出到首个非空内容、到回复收齐的整数微秒。三把键都是 `#[serde(default, skip_serializing_if = "Option::is_none")]`。读数由注入的时钟给出：`bin::assembly` 仍是唯一的采样点，它交给运行层的时钟同时带墙钟毫秒与单调计时，量程两端都在同一个时钟上读；kernel 不采样。读者显示耗时时先读微秒键，缺席时退回两个信封时刻 `t` 之差（毫秒），并照实标出单位。
+
+**理由**：账本的时刻是整数毫秒（ARCHITECTURE §10 规则 6），毫秒时刻相减分不出 1 ms 以内的差别，所以耗时要一个单独的量；记成时长而不是第二个更细的时刻，是因为墙钟会被系统调整，单调计时的差才是耗时，而单调计时的绝对值在两次开城之间没有意义，不能入账。挂在既有的行上与 §8-75 的 `first_at` 同一个理由：旧行与没量到的行字节不变，读宽即可重放，`EVENT_LOG_V` 不为一个可缺席的键进位。载荷不放浮点（确定性七条之 6），故用整数微秒而不是小数毫秒。
+
+**被否**：①新种类 `tool_timed`：每次工具调用多一行，读者要把两行配对，而这个数只属于那一个结果；②把信封的 `t` 改成微秒：全账本换单位，旧行与新行的 `t` 不可比，等于换账本版本；③记纳秒：工具与模型的耗时在微秒以上，纳秒只让数字变长。
+
+**重开参数**：出现一个读者需要工具内部分段（门、路径解析、IO、秘密扫描、检查点）的入账读数时，重议是否在 `tool_result` 里记分段，或只在仪表里记（今天只在仪表里记）。
+
+本条由 W2 的 IF-K 实现；它与线上的 `Call` 帧同一次 `WIRE_V` 进位（`crates/wire/Spec.lean` D22）。
+-/
+
+/-! D21 会话中改运行策略是一个入窗的种类 `run_policy_changed`，在下一个安全点生效
+
+**决定**：加一个种类 `run_policy_changed`（`EventKind::RunPolicyChanged`，追加在 `ALL` 末尾，不写 `ig`），载荷 `RunPolicyChanged { policy: RunPolicy, by: Who }`，`addr` 是房间，`run` 是正在跑的那次 run（房间没有 run 在跑时为 `RunId::CITY`）。写方是城：收到线上的 `Command::ChangeRunPolicy { room, policy, idem }` 时写这一行；正在跑的 run 在它下一个安全点（与 Steer 同一扇门）读到它，从那一步起按新策略过门，并在下一段消息的末尾追加一句说明，冻结的前缀不动。下一次 run 的 `run_started.policy` 取房间最后一次改过的策略。窗类：入窗，因为那一句说明决定下一次模型请求的字节。模型与思考强度在会话中不变（roadmap A15）。
+
+**理由**：改策略是城里发生过的事，重放要能说出某一步是在哪个策略下过的门；把它记在 `run_started` 里只够说一次 run 开头的策略。生效点放在安全点而不是立即，是因为一个工具波已经按旧策略过了门，半途换门会让同一波的两次调用被不同的规则判。工具定义不随策略变：会话开始时工具清单定成各模式的并集（`crates/runtime/spec/Catalog.lean` D24），所以改策略只动门与那一句说明，提示缓存不失效。
+
+**被否**：①复用 `autonomy_changed`：它回答的是「谁答设计问题」，作用域是城或楼，与一次 run 的纪律是两件事；②只改偏好文件、不入账：重放读不到，门的判决就没有来历；③立即生效：同一波工具被两套规则判。
+
+**重开参数**：出现会话中改模型或思考强度的需求时，重议是否把它们并进同一个种类（今天它们在会话中固定，因为换模型使缓存整段失效）。
+
+`specalign` 把 `spec/Event/Kind.lean` 的 `inductive EventKind` 与 kernel 枚举逐变体对账，所以这一变体由 IF-K 在同一个变更集里同时加进 Rust 与 `spec/Event/Kind.lean`（窗类 `InWindow`）；本分部只先写下它的形状。
+-/
+
+/-! D22 会话的显示名是一个 record-only 种类 `session_named`；地址仍是身份，标签仍在偏好文件里
+
+**决定**：加一个种类 `session_named`（`EventKind::SessionNamed`，record-only，追加在 `ALL` 末尾），载荷 `SessionNamed { began: Seq, name: String }`：`addr` 是房间，`began` 指认这段 session（与 `wire::SessionLine.began` 同一个值），`name` 是人给的显示名，空串即撤回显示名、退回地址。写方是城，收到 `Command::NameSession { room, began, name, idem }` 时写，名字经 `wire::CarriedName` 的规则拒空白与控制字符。同一段 session 以最后一行为准。标签不入账：它们仍是偏好文件里的 `tags`（`crates/wire/spec/Preference.lean` D21）；没有标签时读者按工作区给一个默认标签，这是读法，不是记录。
+
+**理由**：显示名是这段 session 在城里叫什么，换一台设备、导出这座城、让居民在对话里提到它，读到的都该是同一个名字，所以它属于城的历史；标签是人怎么归类自己的工作，D21 已经给了它一个家。显示名不改地址：地址决定读写域与账本身份，改它等于搬家。
+
+**被否**：①把显示名也放进偏好文件：导出的城与远程设备看不到它；②改房间地址：读写域、历史与引用全部要迁移；③一个 `session_labelled` 种类同时记名字与标签：与 D21 冲突，人的分类会随导出给下一个人。
+
+**重开参数**：居民需要按显示名找一段 session 时，重议名字的唯一性（今天同一房间两段可以同名）。
+-/
+
+/-! D23 skill 上架时的审核是一个 record-only 种类 `skill_audited`；调用记录不加种类，从已有的行折出
+
+**决定**：加一个种类 `skill_audited`（`EventKind::SkillAudited`，record-only，追加在 `ALL` 末尾），由城在一个 skill 上架（本地路径、git 地址或 skills.sh）时、以及它的内容摘要变了之后第一次被读到时写，`run` 为 `RunId::CITY`，`addr` 是书架所在的 scope。载荷：
+
+```rust
+pub struct SkillAudited {
+    pub skill: String,                 // skill 名
+    pub digest: B3Hash,                // 被审的那份内容的摘要；内容变了摘要就变，旧审核不再算数
+    pub source: AuditSource,           // SkillsSh | SkillSpector
+    pub scanner: String,               // 审核方报出的版本或名字；SkillsSh 时是合作方名，如 "socket"
+    pub verdict: AuditVerdict,         // Pass | Warn | Fail | Unreachable
+    pub risk: Option<String>,          // 审核方给的风险等级原词
+    pub audited_at: Option<String>,    // 审核方给的审核时刻原文
+    pub link: Option<String>,          // 取不到时给 skills.sh 上这个 skill 安全页的链接
+}
+```
+
+`Unreachable` 是「这次没审成」：取不到 skills.sh、SkillSpector 不在，不拦上架（D89：skills.sh 默认、SkillSpector 可选）。使用记录不入新行：`describe` 取指南与读 skill 目录下的文件都已在 `tool_called` 里，按 skill 折叠的视图由 accounting 从这些行折出；MCP 的使用同样从 `call` 与 MCP 工具调用的 `tool_called` 折出。
+
+**理由**：审核的结论要和它审的那份内容绑定，才能说「内容变了要重审」，所以摘要必须在同一行；审核来自城外，结论是城收到的事实，重放不能再去问一次外网，所以入账。使用早已入账，再记一行只是同一件事的第二份。
+
+**被否**：①每次读 skill 记一行 `skill_used`：与 `tool_called` 是两份定义；②审核结果只缓存在保留子树的文件里：重放与导出读不到，「谁在什么时候审过哪一版」没有历史；③取不到审核就拦上架：skills.sh 的无令牌接口随时可能关，拦住会让书架整个不能用。
+
+**重开参数**：审核来源超过两个、或要按 skill 记多个合作方的分项结论时，重议 `scanner` 与 `verdict` 是否改成一张表。
+-/
+
+/-! D24 `asset_archived` 在 `archive record` 被调用时写，不等 run 冻结
+
+**决定**：`asset_archived` 的写方从 run 收尾挪到工具波：`archive record` 执行时在同一个波里写这一行，同一个 run 的 `archive recall` 就读得到它。载荷与种类不变。`recall` 答复里的 `searched` 是这次真正比对过的条目数。
+
+**理由**：测试城里同一个 run 的 `record` 在 seq 251、276，`asset_archived` 在 seq 324–325，晚于 `run_frozen`（seq 321），于是 recall 答 `searched: 0`。工具说「已记下」时事情就该已经发生（ARCHITECTURE §5 第 4 步：效果先成为事件）。
+
+**被否**：保留冻结时写、让 recall 另读本 run 的待写表：同一件事在两处有状态，重开的城读不到待写表。
+
+**重开参数**：归档要与工作树检查点同进退（例如一次被回滚的 run 不该留下归档）时，重议写入时刻。
+-/
