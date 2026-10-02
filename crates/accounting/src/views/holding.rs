@@ -126,7 +126,7 @@ pub struct Views {
     /// reading the ledger back (`crates/wire/Spec.lean` §8-71).
     pub(super) sessions: super::sessions::RoomSessions,
     /// Each document's saves through a page, so its versions are
-    /// answered without reading the ledger back (§8-79).
+    /// answered without reading the ledger back (`crates/wire/Spec.lean` §8-83).
     pub(super) saves: super::versions::DocumentSaves,
     /// Every building's plan, parsed once and re-parsed only when a
     /// record says it may have moved.

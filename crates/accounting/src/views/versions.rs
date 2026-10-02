@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The versions of one document, newest first (`crates/accounting/spec/Views/Document.lean` §8-21,
-//! `crates/wire/spec/Answer/DocumentVersions.lean` §8-79).
+//! `crates/wire/spec/Answer/DocumentVersions.lean` §8-83).
 //!
 //! The saves are folded from `document_written`, so a page asking about a
 //! document never walks the ledger. The version on disk is read when the

@@ -11,7 +11,7 @@
 //! `documents` rule that decides, keep the version that lands in the
 //! content store, replace the file whole, and then record what landed:
 //! a version the page lists can always be read back by its version
-//! (`crates/wire/spec/Answer/DocumentVersions.lean` §8-79). The rules are the `documents` crate's and the lock is
+//! (`crates/wire/spec/Answer/DocumentVersions.lean` §8-83). The rules are the `documents` crate's and the lock is
 //! `city::document`'s; this module only puts them in order and writes
 //! the lines.
 

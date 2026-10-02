@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The versions of one document, newest first
-//! (`crates/wire/spec/Answer/DocumentVersions.lean` §8-79).
+//! (`crates/wire/spec/Answer/DocumentVersions.lean` §8-83).
 //!
 //! The history knows the versions a page wrote; a resident's `edit`, a
 //! command or the person's own editor writes past the city's document

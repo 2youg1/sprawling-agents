@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // A stored object's bytes as they arrive: one `Query::Bytes` window after
-// another (`crates/wire/Spec.lean` §8-80, wire D14), joined where the
+// another (`crates/wire/Spec.lean` §8-80, wire D18), joined where the
 // last one ended, until they meet the object's end (client/Spec.lean §4-61).
 // A PDF, a DOCX and a screenshot are read this way; what the bytes are is
 // the view's to judge.

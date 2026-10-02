@@ -8,7 +8,7 @@
 //! §8-80, §8-81).
 //!
 //! Bytes travel on the same socket as every other answer, so a device on
-//! the remote door reaches them through its sealed session (wire D14).
+//! the remote door reaches them through its sealed session (wire D18).
 
 use documents::Span;
 use kernel::B3Hash;

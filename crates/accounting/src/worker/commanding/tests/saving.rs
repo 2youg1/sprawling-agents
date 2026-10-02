@@ -180,7 +180,7 @@ fn a_second_save_from_the_same_version_is_refused_and_the_first_stands() {
     );
     assert!(
         kept(dir.path(), b"ONE two\n"),
-        "the version a save leaves is in the store (§8-79)"
+        "the version a save leaves is in the store (wire §8-83)"
     );
 }
 

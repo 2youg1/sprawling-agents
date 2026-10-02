@@ -219,7 +219,7 @@ pub enum Query {
     OpenProposals,
     /// One window of a stored version, by its version (`crates/wire/spec/Answer/Range.lean` §8-70).
     Range { version: B3Hash, range: documents::Span },
-    /// One document's versions, newest first (`crates/wire/spec/Answer/DocumentVersions.lean` §8-79).
+    /// One document's versions, newest first (`crates/wire/spec/Answer/DocumentVersions.lean` §8-83).
     Versions { at: Address },
     /// One window of a stored object's bytes (`crates/wire/spec/Answer/DocumentBytes.lean` §8-80).
     Bytes { version: B3Hash, range: documents::Span },

@@ -31,7 +31,7 @@ pub const BYTES_WINDOW_MAX: u64 = 1 << 20;
 - 验收：accounting 的 `views::answering::stored::tests`——一份 PDF 写进楼里，`Document` 读过之后按版本逐窗取回，接起来与盘上的字节逐字节相同；内容库里没有的对象答 `Unavailable`。
 -/
 
-/-! D14 文件的字节经一个 `Query` 回答逐窗送到页面，不开第二扇 HTTP 门
+/-! D18 文件的字节经一个 `Query` 回答逐窗送到页面，不开第二扇 HTTP 门
 
 **决定**：一个版本或一张截图的字节由 `Query::Bytes { version, range }` 答，一窗至多 1 MiB，base64 编码，走页面与城之间的同一条 socket（§8-80）；城读到或写下的每一版都存进内容库（§8-69、D8），所以文档的任何一版都有字节可取。
 
