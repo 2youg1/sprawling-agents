@@ -9,7 +9,6 @@
   <a href="https://www.npmjs.com/package/sprawling"><img alt="npm" src="https://img.shields.io/npm/v/sprawling?logo=npm&amp;labelColor=171717&amp;color=CB3837"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/2youg1/sprawling-agents?labelColor=171717&amp;color=4C8BF5"></a>
   <a href="https://deepwiki.com/2youg1/sprawling-agents"><img alt="Ask DeepWiki" src="https://deepwiki.com/badge.svg"></a>
-  <a href="https://zread.ai/2youg1/sprawling-agents"><img alt="Ask Zread" src="https://img.shields.io/badge/Ask_Zread-_.svg?style=flat-square&amp;color=00b0aa&amp;labelColor=000000"></a>
 </p>
 
 </div>
