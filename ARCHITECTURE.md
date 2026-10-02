@@ -796,7 +796,7 @@ than typed.
 
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
-| Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->599,102 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->3.5×<!-- xtask:end --> headroom | no: a reading; speed comes before size |
+| Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->677,073 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->3.1×<!-- xtask:end --> headroom | no: a reading; speed comes before size |
 | The installed binary | ≤<!-- xtask:begin budget_bytes:release_binary -->134,217,728 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:release_binary -->26,819,584 B<!-- xtask:end -->, client included | no: a reading; speed comes before size |
 | Resident memory, one session | ≤<!-- xtask:begin budget_bytes:resident_empty_idle -->31,457,280 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:resident_empty_idle -->2,469,888 B<!-- xtask:end --> idle | no: the counter means something different on each platform |
 | Ledger append plus fsync | p50 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p50_ms -->5<!-- xtask:end --> ms, p99 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p99_ms -->20<!-- xtask:end --> ms | `[ledger_append]`, with its machine class | no |
