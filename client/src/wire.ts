@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 45 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "b354b410efb5f9dd2f15f54b09143a27403a8b2618ce5e18f81cfc8794f403a1" as const;
+export const WIRE_HASH = "2c8c861d09f39d65d6f3621583e4192f35308946d441dfd7f740b4cf0fed923e" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -449,6 +449,38 @@ export const BuildingAnswer = Schema.Struct({
 export type BuildingAnswer = typeof BuildingAnswer.Type;
 
 /**
+ * A BLAKE3 digest: exactly 64 lowercase hex digits.
+ */
+export const B3Hash = Schema.String.check(Schema.isPattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
+export type B3Hash = typeof B3Hash.Type;
+
+/**
+ * A half-open byte interval `[start, end)` of one document version.
+ * 
+ * Half-open, so an empty span - an insertion point, the whole of an
+ * empty document - can be spelled, which the closed byte range of a
+ * `Locator` cannot do. [`Span::new`] is the one construction point and
+ * the wire reads through it, so a span whose start lies past its end
+ * is never held.
+ */
+export const Span = Schema.Struct({
+  end: Schema.Int,
+  start: Schema.Int,
+}).annotate({ identifier: "Span" });
+export type Span = typeof Span.Type;
+
+/**
+ * One window of a stored object's bytes.
+ */
+export const BytesAnswer = Schema.Struct({
+  base64: Schema.String,
+  size: Schema.Int,
+  span: Span,
+  version: B3Hash,
+}).annotate({ identifier: "BytesAnswer" });
+export type BytesAnswer = typeof BytesAnswer.Type;
+
+/**
  * What happened to the file.
  * 
  * `Renamed` is its own arm because a rename and a delete-plus-add are
@@ -678,12 +710,6 @@ export const CityAnswer = Schema.Struct({
   runs: Schema.Array(RunSummary),
 }).annotate({ identifier: "CityAnswer" });
 export type CityAnswer = typeof CityAnswer.Type;
-
-/**
- * A BLAKE3 digest: exactly 64 lowercase hex digits.
- */
-export const B3Hash = Schema.String.check(Schema.isPattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
-export type B3Hash = typeof B3Hash.Type;
 
 /**
  * A commit, and where in the one history the line announcing it sits.
@@ -1313,21 +1339,6 @@ export const Encoding = Schema.Union([
 export type Encoding = typeof Encoding.Type;
 
 /**
- * A half-open byte interval `[start, end)` of one document version.
- * 
- * Half-open, so an empty span - an insertion point, the whole of an
- * empty document - can be spelled, which the closed byte range of a
- * `Locator` cannot do. [`Span::new`] is the one construction point and
- * the wire reads through it, so a span whose start lies past its end
- * is never held.
- */
-export const Span = Schema.Struct({
-  end: Schema.Int,
-  start: Schema.Int,
-}).annotate({ identifier: "Span" });
-export type Span = typeof Span.Type;
-
-/**
  * One stretch of a version, and the characters it spells.
  */
 export const Window2 = Schema.Struct({
@@ -1563,6 +1574,15 @@ export const EvidenceAnswer = Schema.Struct({
   run: RunId,
 }).annotate({ identifier: "EvidenceAnswer" });
 export type EvidenceAnswer = typeof EvidenceAnswer.Type;
+
+/**
+ * A Markdown version written as one HTML file that stands alone.
+ */
+export const ExportAnswer = Schema.Struct({
+  html: Schema.String,
+  version: B3Hash,
+}).annotate({ identifier: "ExportAnswer" });
+export type ExportAnswer = typeof ExportAnswer.Type;
 
 /**
  * How far a branch has drifted from the upstream it tracks.
@@ -3188,6 +3208,46 @@ export const ToolkitsAnswer = Schema.Union([
 export type ToolkitsAnswer = typeof ToolkitsAnswer.Type;
 
 /**
+ * Where a version came from, as far as the city can say.
+ */
+export const VersionSource = Schema.Union([
+  Schema.Literal("on_disk"),
+  Schema.Struct({
+    saved: Schema.Struct({
+      at: TimeMs,
+      seq: Seq,
+    }),
+  }),
+  Schema.Struct({
+    before: Schema.Struct({
+      seq: Seq,
+    }),
+  }),
+]).annotate({ identifier: "VersionSource" });
+export type VersionSource = typeof VersionSource.Type;
+
+/**
+ * One version, and where the city learnt of it.
+ */
+export const DocumentVersion = Schema.Struct({
+  bytes: Schema.optional(Schema.NullOr(Schema.Int)),
+  kept: Schema.Boolean,
+  source: VersionSource,
+  version: B3Hash,
+}).annotate({ identifier: "DocumentVersion" });
+export type DocumentVersion = typeof DocumentVersion.Type;
+
+/**
+ * One document's versions, newest first.
+ */
+export const VersionsAnswer = Schema.Struct({
+  at: Address,
+  more: Schema.Boolean,
+  versions: Schema.Array(DocumentVersion),
+}).annotate({ identifier: "VersionsAnswer" });
+export type VersionsAnswer = typeof VersionsAnswer.Type;
+
+/**
  * What a query returns. `Unavailable` is a real answer: a view this
  * build does not evaluate yet says so by name, rather than returning an
  * empty result a reader would mistake for an empty city.
@@ -3283,6 +3343,15 @@ export const Answer = Schema.Union([
   }),
   Schema.Struct({
     range: RangeAnswer,
+  }),
+  Schema.Struct({
+    versions: VersionsAnswer,
+  }),
+  Schema.Struct({
+    bytes: BytesAnswer,
+  }),
+  Schema.Struct({
+    export: ExportAnswer,
   }),
   Schema.Struct({
     preview: PreviewAnswer,
@@ -3502,6 +3571,23 @@ export const Query = Schema.Union([
   Schema.Struct({
     range: Schema.Struct({
       range: Span,
+      version: B3Hash,
+    }),
+  }),
+  Schema.Struct({
+    versions: Schema.Struct({
+      at: Address,
+    }),
+  }),
+  Schema.Struct({
+    bytes: Schema.Struct({
+      range: Span,
+      version: B3Hash,
+    }),
+  }),
+  Schema.Struct({
+    export: Schema.Struct({
+      at: Address,
       version: B3Hash,
     }),
   }),
