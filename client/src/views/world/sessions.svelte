@@ -11,9 +11,8 @@
   // row; any other row is a link to that room's conversation.
   //
   // It reads the runs the page already believes (`belief.rooms`, the
-  // per-room index the city panel reads), so drawing it asks the city
-  // nothing. The context bar under each row needs a figure the wire does
-  // not carry yet, and is drawn when it does (7K, current state).
+  // per-room index the city panel reads); only the context bar under each
+  // row asks the city, for that row's run (`context_bar.svelte`).
   import type { Snippet } from "svelte";
 
   import { heldIn } from "../../core/belief/rooms";
@@ -23,6 +22,7 @@
   import { lasted } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
+  import ContextBar from "./context_bar.svelte";
 
   interface Props {
     // The room the conversation is in.
@@ -126,6 +126,7 @@
               {#if !narrow}
                 <span class="figure text-note text-text-faint">{when(row.run, state)}</span>
                 <span class="col-start-2 col-end-4 truncate text-note text-text-quiet">{row.run.task ?? ""}</span>
+                <ContextBar room={row.room} run={row.run.run} />
               {/if}
             </a>
           </li>

@@ -55,7 +55,9 @@
   const commits = $derived(u.conn.asking.ask(commitsIn(here)));
   const held = $derived(readAnswer($commits, (answer) => ("commits" in answer ? answer.commits.commits : undefined)));
 
-  // The commit the session's changes are measured from.
+  // Where the session works: the worktree it opened, and the commit its
+  // changes are measured from.
+  const worktree = $derived(rounds?.worktree ?? null);
   const base = $derived(rounds?.opened_at ?? null);
 
   type State = "running" | "waiting" | "frozen" | "unknown";
@@ -97,6 +99,9 @@
   </div>
   <p class="shrink-0 truncate text-note text-text-faint">
     <span class="text-text-quiet">{here}</span>
+    {#if worktree !== null}
+      · {fill(say($lang, "world_worktree"), { name: worktree })}
+    {/if}
     {#if base !== null}
       · {fill(say($lang, "world_based_on"), { oid: base.slice(0, 7) })}
     {/if}
@@ -107,7 +112,7 @@
     </div>
   {:else}
     <div class="mt-snug flex min-h-0 flex-1 flex-col">
-      <Sheet {here} {run} turns={rounds?.turns ?? []} />
+      <Sheet {here} {run} {rounds} commits={held.kind === "held" ? held.value : []} />
       <Timeline {run} turns={rounds?.turns ?? []} commits={held.kind === "held" ? held.value : []} {picked} />
     </div>
   {/if}

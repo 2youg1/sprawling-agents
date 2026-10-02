@@ -4035,6 +4035,14 @@
     "en": "not connected",
     "zh": "未连接"
   },
+  "talk_listening": {
+    "en": "who is listening",
+    "zh": "谁在听"
+  },
+  "talk_listening_note": {
+    "en": "what the room's newest run was told, segment by segment; the whole text is on its run page",
+    "zh": "房间里最新的 run 被告知的四段；全文在它的 run 页"
+  },
   "talk_opening_mayor": {
     "en": "plans, work to hand out, and what the city should do next",
     "zh": "计划、派活，以及这座城接下来做什么"
@@ -5787,6 +5795,10 @@
     "en": "read {n}",
     "zh": "读 {n}"
   },
+  "world_cache_write": {
+    "en": "write {n}",
+    "zh": "写 {n}"
+  },
   "world_cost": {
     "en": "cost",
     "zh": "成本"
@@ -5815,9 +5827,25 @@
     "en": "bounds",
     "zh": "边界"
   },
+  "world_write": {
+    "en": "write {limit}",
+    "zh": "写入 {limit}"
+  },
+  "world_admission": {
+    "en": "admission",
+    "zh": "准入"
+  },
+  "world_landing": {
+    "en": "lands {landing}",
+    "zh": "落地 {landing}"
+  },
   "world_based_on": {
     "en": "based on {oid}",
     "zh": "基于 {oid}"
+  },
+  "world_worktree": {
+    "en": "worktree {name}",
+    "zh": "工作树 {name}"
   },
   "world_no_session": {
     "en": "No session has run in this room yet.",
@@ -5854,6 +5882,10 @@
   "world_commit_oid": {
     "en": "oid",
     "zh": "oid"
+  },
+  "world_commit_b3": {
+    "en": "B3",
+    "zh": "B3"
   },
   "world_parents": {
     "en": "parents",

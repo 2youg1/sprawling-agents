@@ -12,18 +12,19 @@
   //
   // It asks three questions the page already asks elsewhere, and
   // `asking` merges them by content: the session's rounds, the
-  // endpoints with their models' windows, and the settled second
-  // threshold for this room. What it draws from them is `gauge.ts`'s.
+  // endpoints with their models' windows, and this room's settled
+  // config, which states both reminders. What it draws from them is
+  // `gauge.ts`'s.
   import type { Snippet } from "svelte";
 
   import { QUERIES } from "../../core/asking";
-  import { heldIn } from "../../core/belief/rooms";
   import { fill, say } from "../../core/lang";
   import { kilo } from "../../core/time";
   import { ui } from "../../ui";
-  import type { Address, RoundsAnswer, RunId } from "../../wire";
+  import type { Address, RoundsAnswer } from "../../wire";
   import Tip from "../parts/tip.svelte";
-  import { contextOf, remainingArc, usedPercent } from "./gauge";
+  import { contextOf, remainingArc, remindersOf, remindersSaid, sessionRunOf, usedPercent } from "./gauge";
+  import type { Reminders } from "./gauge";
 
   interface Props {
     // The room the composer speaks to; its newest session is the one the
@@ -39,16 +40,7 @@
   const belief = u.conn.belief;
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
 
-  // The session's latest run, whose turns say how full its window is:
-  // runs the room held before its newest session began belong to the
-  // earlier stretch and are not measured.
-  const run = $derived.by((): RunId | undefined => {
-    if (room === null) return undefined;
-    const began = $belief.sessions[room] ?? null;
-    return heldIn($belief, room)
-      .filter((each) => began === null || each.lastSeq > began)
-      .at(-1)?.run;
-  });
+  const run = $derived(room === null ? undefined : sessionRunOf($belief, room));
 
   let rounds = $state<RoundsAnswer | undefined>(undefined);
   $effect(() => {
@@ -60,13 +52,13 @@
     });
   });
 
-  let second = $state<number | null>(null);
+  let reminders = $state<Reminders>(remindersOf(undefined));
   $effect(() => {
     const at = room;
-    second = null;
+    reminders = remindersOf(undefined);
     if (at === null) return;
     return u.conn.asking.ask({ config: { addr: at } }).subscribe((held) => {
-      second = held !== undefined && "config" in held ? held.config.second.percent : null;
+      reminders = remindersOf(held);
     });
   });
 
@@ -74,7 +66,7 @@
     contextOf(
       rounds?.turns ?? [],
       $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.endpoints : [],
-      second,
+      reminders,
     ),
   );
   const arc = $derived(context === null ? null : remainingArc(context));
@@ -84,13 +76,11 @@
   // knows about.
   const reading = $derived.by((): string => {
     if (context === null) return "";
-    const parts = [
+    return [
       fill(say($lang, "ring_used"), { used: kilo(context.used), window: kilo(context.window) }),
       fill(say($lang, "ring_share"), { n: String(usedPercent(context)) }),
-    ];
-    if (context.first !== null) parts.push(fill(say($lang, "ring_first"), { n: String(context.first) }));
-    if (context.second !== null) parts.push(fill(say($lang, "ring_second"), { n: String(context.second) }));
-    return parts.join(" · ");
+      ...remindersSaid($lang, context),
+    ].join(" · ");
   });
 </script>
 

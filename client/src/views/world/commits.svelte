@@ -15,8 +15,10 @@
   // node takes the phase of the run that made it (`runs/phase.ts`), so a
   // commit whose run is still going reads as going. Picking a row picks
   // its session - the conversation moves to that room when it is another
-  // - and opens the commit under its row: its parents and the files it
-  // changed, each opening into its patch.
+  // - and opens the commit under its row: its full oid, the B3 of the
+  // checkpoint that announced it, its parents and the files it changed,
+  // each opening into its patch. Both hashes are written whole on one
+  // line and cut by the pane's edge, so a copy takes the whole value.
   import { readAnswer } from "../../core/answered";
   import { fill, say } from "../../core/lang";
   import { MAYOR, buildingOf, roomOf, toFragment } from "../../core/route";
@@ -134,6 +136,10 @@
               <dl class="grid grid-cols-[8ch_minmax(0,1fr)] gap-x-base text-text-quiet">
                 <dt class="text-text-faint">{say($lang, "world_commit_oid")}</dt>
                 <dd class="figure truncate">{commit.oid}</dd>
+                {#if commit.b3 !== undefined && commit.b3 !== null}
+                  <dt class="text-text-faint">{say($lang, "world_commit_b3")}</dt>
+                  <dd class="figure truncate">{commit.b3}</dd>
+                {/if}
                 <dt class="text-text-faint">{say($lang, "world_parents")}</dt>
                 <dd class="figure truncate">
                   {(commit.parents ?? []).map((oid) => oid.slice(0, SHORT)).join(" · ") || "—"}

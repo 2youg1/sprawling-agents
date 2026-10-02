@@ -8,9 +8,10 @@
   // question a person running a coding agent asks of a session - which
   // model, how full its window is, what it read and wrote, how much of
   // that the cache served, what it cost against the whole city, how fast
-  // the model answered, and what bounds it. Every figure is read from an
-  // answer the page already asks; a figure the city has not told the page
-  // is a dash, never a guess.
+  // the model answered, what bounds it and what its work must prove to
+  // land. Every figure is read from an answer the page already asks; a
+  // figure the city has not told the page is a dash or is left out, never
+  // a guess.
   //
   // This is the one screen that draws cost (client-SPEC 7D): the session's
   // own spend and the city's beside it, so neither appears again anywhere
@@ -20,19 +21,22 @@
   import { fill, say } from "../../core/lang";
   import { kilo, usd } from "../../core/time";
   import { ui } from "../../ui";
-  import type { Address, RunId, Turn } from "../../wire";
+  import type { Address, CommitAnswer, RoundsAnswer, RunId } from "../../wire";
   import { costReading, runSpend } from "../pricing";
   import Bounds from "../talk/bounds.svelte";
-  import { contextOf, usedPercent } from "../talk/gauge";
+  import { contextOf, remindersOf, remindersSaid, usedPercent } from "../talk/gauge";
   import { speedOf } from "./speed";
 
   interface Props {
     readonly here: Address;
     readonly run: RunId | null;
-    readonly turns: readonly Turn[];
+    readonly rounds: RoundsAnswer | undefined;
+    // The commits the page holds: a commit's trailers are the one answer
+    // that carries the effort its run was frozen with.
+    readonly commits: readonly CommitAnswer[];
   }
 
-  const { here, run, turns }: Props = $props();
+  const { here, run, rounds, commits }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -43,8 +47,10 @@
   const DASH = "—";
 
   const served = $derived($endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.endpoints : []);
-  const second = $derived($config !== undefined && "config" in $config ? $config.config.second.percent : null);
-  const context = $derived(contextOf(turns, served, second));
+  const turns = $derived(rounds?.turns ?? []);
+  const context = $derived(contextOf(turns, served, remindersOf($config)));
+  // The four values the run was dispatched under, from its opening.
+  const policy = $derived(rounds?.opening?.policy ?? null);
 
   // The model the session's latest turn asked, and what its endpoint
   // quotes for it, verbatim: a price is the provider's words.
@@ -54,6 +60,16 @@
     typeof facts?.input_price === "string" && typeof facts.output_price === "string"
       ? fill(say($lang, "world_price"), { input: facts.input_price, output: facts.output_price })
       : "",
+  );
+  // What the model was frozen with besides its name: the effort a commit
+  // of this run recorded, and the mode the run was dispatched in. A run
+  // that has not committed yet has no effort on any answer, so none is
+  // said rather than the room's current one.
+  const effort = $derived(commits.find((commit) => commit.run === run)?.effort ?? null);
+  const frozen = $derived(
+    [effort === null ? "" : say($lang, `effort_${effort}`), policy === null ? "" : say($lang, `mode_${policy.mode}`)]
+      .filter((part) => part !== "")
+      .join(" · "),
   );
 
   // Every turn the provider reported tokens for, summed: the input is
@@ -65,9 +81,11 @@
         input: sum.input + (turn.used?.input ?? 0),
         output: sum.output + (turn.used?.output ?? 0),
         cached: sum.cached + (turn.used?.cached ?? 0),
+        written: sum.written + (turn.used?.cache_write ?? 0),
         told: sum.told || (turn.used !== undefined && turn.used !== null),
+        toldWritten: sum.toldWritten || (turn.used?.cache_write !== undefined && turn.used.cache_write !== null),
       }),
-      { input: 0, output: 0, cached: 0, told: false },
+      { input: 0, output: 0, cached: 0, written: 0, told: false, toldWritten: false },
     ),
   );
 
@@ -101,6 +119,9 @@ not, so a figure is never cut to a few letters. -->
   <div class="flex min-w-0 flex-col">
     <dt class="text-note text-text-faint">{say($lang, "world_model")}</dt>
     <dd class="truncate text-text">{model ?? DASH}</dd>
+    {#if frozen !== ""}
+      <dd class="truncate text-note text-text-faint">{frozen}</dd>
+    {/if}
   </div>
   <div class="col-span-2 flex min-w-0 flex-col">
     <dt class="text-note text-text-faint">{say($lang, "ring_name")}</dt>
@@ -111,14 +132,7 @@ not, so a figure is never cut to a few letters. -->
         {fill(say($lang, "ring_used"), { used: kilo(context.used), window: kilo(context.window) })}
         <span class="text-text-faint">· {fill(say($lang, "ring_share"), { n: String(usedPercent(context)) })}</span>
       </dd>
-      <dd class="truncate text-note text-text-faint">
-        {[
-          context.first === null ? "" : fill(say($lang, "ring_first"), { n: String(context.first) }),
-          context.second === null ? "" : fill(say($lang, "ring_second"), { n: String(context.second) }),
-        ]
-          .filter((part) => part !== "")
-          .join(" · ")}
-      </dd>
+      <dd class="truncate text-note text-text-faint">{remindersSaid($lang, context).join(" · ")}</dd>
     {/if}
   </div>
   <div class="flex min-w-0 flex-col">
@@ -136,7 +150,14 @@ not, so a figure is never cut to a few letters. -->
       <dd class="figure truncate text-text">
         {fill(say($lang, "world_cache_hit"), { n: String(Math.round((used.cached / used.input) * 100)) })}
       </dd>
-      <dd class="truncate text-note text-text-faint">{fill(say($lang, "world_cache_read"), { n: kilo(used.cached) })}</dd>
+      <dd class="truncate text-note text-text-faint">
+        {[
+          fill(say($lang, "world_cache_read"), { n: kilo(used.cached) }),
+          used.toldWritten ? fill(say($lang, "world_cache_write"), { n: kilo(used.written) }) : "",
+        ]
+          .filter((part) => part !== "")
+          .join(" · ")}
+      </dd>
     {:else}
       <dd class="text-text-faint">{DASH}</dd>
     {/if}
@@ -157,11 +178,23 @@ not, so a figure is never cut to a few letters. -->
       <dd class="truncate text-note text-text-faint">{fill(say($lang, "world_speed_turns"), { n: String(speed.turns) })}</dd>
     {/if}
   </div>
-  <div class="col-span-2 flex min-w-0 flex-col">
+  <div class="flex min-w-0 flex-col">
     <dt class="text-note text-text-faint">{say($lang, "world_bounds")}</dt>
+    <dd class="figure truncate text-text">
+      {policy === null ? DASH : fill(say($lang, "world_write"), { limit: policy.write })}
+    </dd>
     <dd class="-ml-snug flex min-w-0 flex-wrap items-center">
       <Bounds room={here} />
     </dd>
+  </div>
+  <div class="flex min-w-0 flex-col">
+    <dt class="text-note text-text-faint">{say($lang, "world_admission")}</dt>
+    {#if policy === null}
+      <dd class="text-text-faint">{DASH}</dd>
+    {:else}
+      <dd class="figure truncate text-text">{policy.admit}</dd>
+      <dd class="truncate text-note text-text-faint">{fill(say($lang, "world_landing"), { landing: policy.landing })}</dd>
+    {/if}
   </div>
 </dl>
 </div>

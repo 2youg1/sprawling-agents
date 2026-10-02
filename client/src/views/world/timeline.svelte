@@ -9,7 +9,8 @@
   // at the instant the Ledger gave it to the millisecond. The date and
   // the zone are said once, in the head, so a row carries only the time
   // of day; a turn says how soon the model answered and what it read and
-  // wrote, a call how long it took, and a checkpoint which commit it is.
+  // wrote, a call how long it took and - a command - the code it exited
+  // with, and a checkpoint which commit it is.
   //
   // **It is redrawn on Ledger events and nothing else**: every row is
   // read from the session's rounds, which a streamed token does not
@@ -22,7 +23,7 @@
 
   import { fill, say } from "../../core/lang";
   import type { Key } from "../../core/lang";
-  import { kilo } from "../../core/time";
+  import { isoDay, isoTime, kilo } from "../../core/time";
   import { ui } from "../../ui";
   import type { Call, CommitAnswer, GitOid, RunId, Turn } from "../../wire";
   import { openCall } from "../inspect/open.svelte";
@@ -75,11 +76,23 @@
     return { kind: "checkpoint", key: `k${oid}`, at: commit?.at ?? null, oid, commit };
   }
 
-  // The session's day, said once: the first turn's date in UTC.
-  const day = $derived(turns[0] === undefined ? "" : new Date(turns[0].t).toISOString().slice(0, 10));
+  // The session's day, said once: the first turn's date in UTC. Where a
+  // row falls on a later day - a session that ran past midnight - the new
+  // date is said once above it, so no time of day reads as the head's day
+  // when it is not.
+  const day = $derived(turns[0] === undefined ? "" : isoDay(turns[0].t));
+  const dayBreaks = $derived(
+    rows.reduce<{ readonly last: string; readonly said: readonly string[] }>(
+      (held, row) => {
+        const on = row.at === null ? held.last : isoDay(row.at);
+        return { last: on, said: [...held.said, on === held.last ? "" : on] };
+      },
+      { last: day, said: [] },
+    ).said,
+  );
 
   function instant(at: number | null): string {
-    return at === null ? "—" : new Date(at).toISOString().slice(11);
+    return at === null ? "—" : isoTime(at);
   }
 
   // How long a call took, when both of its times are measurements: in
@@ -122,8 +135,11 @@
     {#if day !== ""}<span class="figure">{fill(say($lang, "world_timeline_day"), { day })}</span>{/if}
   </h3>
   <ol bind:this={list} class="min-h-0 flex-1 overflow-y-auto [mask-image:linear-gradient(to_bottom,black_calc(100%_-_48px),transparent)]">
-    {#each rows as row (row.key)}
+    {#each rows as row, index (row.key)}
       <li>
+        {#if (dayBreaks[index] ?? "") !== ""}
+          <p class="figure mt-snug py-tight text-note text-text-faint">{fill(say($lang, "world_timeline_day"), { day: dayBreaks[index] ?? "" })}</p>
+        {/if}
         {#if row.kind === "turn"}
           {@const speed = speedOf([row.turn])}
           <div class="{ROW} mt-snug text-text">
@@ -157,6 +173,11 @@
                 <span class="size-dot animate-pulse rounded-pill bg-accent" aria-hidden="true"></span>
               {/if}
               {took(row.call)}
+              {#if row.call.exit_code !== undefined && row.call.exit_code !== null}
+                <span class={row.call.exit_code === 0 ? "text-accent" : "text-alert"}>
+                  {fill(say($lang, "mon_exited"), { code: String(row.call.exit_code) })}
+                </span>
+              {/if}
               {#if outcome !== null}<span class={row.call.outcome === "failed" ? "text-alert" : ""}>{say($lang, outcome)}</span>{/if}
             </span>
           </button>
