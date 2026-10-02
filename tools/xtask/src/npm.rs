@@ -69,8 +69,10 @@ const PERMITTED: &str = "deny.toml";
 /// RefRain, each its own lazy chunk (client/Spec.lean §4-54, client D32).
 /// `@noble/post-quantum` is the remote device's ML-KEM and ML-DSA,
 /// loaded only when the remote group pairs or locks (client/Spec.lean §4-57,
-/// `crates/remote_access/Spec.lean` D21).
-const RUNTIME: [&str; 21] = [
+/// `crates/remote_access/Spec.lean` D21). `katex` lays out a formula as
+/// MathML, loaded only when a page first draws one (client/Spec.lean
+/// §4-64a).
+const RUNTIME: [&str; 22] = [
     "@codemirror/commands",
     "@codemirror/merge",
     "@codemirror/search",
@@ -90,6 +92,7 @@ const RUNTIME: [&str; 21] = [
     "@noble/post-quantum",
     "docx-preview",
     "effect",
+    "katex",
     "pdfjs-dist",
     "svelte",
 ];
