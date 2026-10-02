@@ -32,8 +32,10 @@
   import { derived } from "svelte/store";
 
   import { say } from "../core/lang";
+  import { toFragment } from "../core/route";
   import { ui } from "../ui";
   import type { Address, Call, RoundsAnswer } from "../wire";
+  import Changes from "./changes.svelte";
   import { commandOf } from "./monitor/trace";
   import Called from "./inspect/called.svelte";
   import {
@@ -103,8 +105,12 @@
     return call === null ? "editor" : regionOf(readingOf(call));
   }
 
+  // An oid as git prints it short.
+  const SHORT = 7;
+
   function labelOf(item: RightItem): string {
     if (item.kind === "document") return item.path.slice(item.path.lastIndexOf("/") + 1);
+    if (item.kind === "changes") return item.head.slice(0, SHORT);
     const call = callOf(item)?.call ?? null;
     if (call === null) return "…";
     const entry = call.render === "terminal" ? commandOf(call) : null;
@@ -115,6 +121,20 @@
 
   const tabs = $derived(items.map((item): Tab => ({ item, label: labelOf(item), region: regionOfItem(item) })));
   const front = $derived(held.length > 0 ? rightItem() : (following[0] ?? null));
+
+  // The item in front as a link to this conversation with it open on the
+  // right (4-63); what moved between two commits has no spelling there.
+  const link = $derived.by((): string | null => {
+    if (front === null) return null;
+    switch (front.kind) {
+      case "call":
+        return toFragment({ kind: "talk", address: talk, item: { kind: "call", run: front.run, at: front.at } });
+      case "document":
+        return toFragment({ kind: "talk", address: talk, item: { kind: "document", building: front.building, path: front.path, version: front.version } });
+      case "changes":
+        return null;
+    }
+  });
 
   // What each region shows: the item of that region touched last, or
   // the one the side follows.
@@ -163,6 +183,10 @@
     <div class="min-h-0 flex-1 overflow-auto bg-page">
       <RefRain building={item.building} path={item.path} version={item.version} />
     </div>
+  {:else if item.kind === "changes"}
+    <div class="min-h-0 flex-1 overflow-auto bg-page px-wide py-snug">
+      <Changes base={item.base} head={item.head} {talk} />
+    </div>
   {:else}
     {@const found = callOf(item)}
     {#if found === null}
@@ -185,7 +209,7 @@
     closeAll();
   }}
 >
-  <Strip {tabs} {front} panels={PANELS} onPick={pick} onClose={close} onCloseAll={closeAll} />
+  <Strip {tabs} {front} panels={PANELS} {link} onPick={pick} onClose={close} onCloseAll={closeAll} />
   <div class="flex min-h-0 flex-1 flex-col" bind:clientHeight={room}>
     {#if editorTabs.length > 0}
       <div

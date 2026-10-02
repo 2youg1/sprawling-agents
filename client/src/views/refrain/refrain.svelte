@@ -12,12 +12,11 @@
   // document or version is a new session, so nothing of one document's
   // draft, receipt or editor survives into the next; the same document
   // drawn again keeps its editor, because the key does not move.
-  import { Option, Schema } from "effect";
-
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
-  import { Address, type B3Hash } from "../../wire";
+  import type { Address, B3Hash } from "../../wire";
   import Document from "./document.svelte";
+  import { documentAt } from "./session.svelte";
 
   interface Props {
     readonly building: Address;
@@ -29,7 +28,7 @@
 
   const lang = ui().lang;
 
-  const at = $derived(Option.getOrNull(Schema.decodeOption(Address)(`${building}/${path}`)));
+  const at = $derived(documentAt(building, path));
   const key = $derived(`${building}/${path}@${version ?? ""}`);
 </script>
 

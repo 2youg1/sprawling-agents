@@ -2299,6 +2299,10 @@
     "en": "undo",
     "zh": "撤销"
   },
+  "part_unkept": {
+    "en": "This draft lives in this tab only: the browser would not store it, and closing the tab loses it.",
+    "zh": "这份草稿只在这个标签页里：浏览器没有存下它，关掉标签页它就没了。"
+  },
   "part_why_halted": {
     "en": "the city is stopped",
     "zh": "城已暂停，改不了"
@@ -4575,6 +4579,10 @@
     "en": "close {name}",
     "zh": "关闭 {name}"
   },
+  "inspect_unsaved": {
+    "en": ", not saved",
+    "zh": "，未保存"
+  },
   "inspect_editor": {
     "en": "editor",
     "zh": "编辑器"
@@ -4590,6 +4598,10 @@
   "inspect_copy_place": {
     "en": "copy path:line",
     "zh": "复制 路径:行"
+  },
+  "inspect_copy_link": {
+    "en": "copy link",
+    "zh": "复制链接"
   },
   "inspect_raw": {
     "en": "original",

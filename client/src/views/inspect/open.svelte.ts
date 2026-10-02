@@ -25,7 +25,7 @@
 // closing the inspector while the focus is inside it hands the focus back
 // to that element if it is still on the page (7-7).
 
-import type { Address, B3Hash, RunId, Seq } from "../../wire";
+import type { Address, B3Hash, GitOid, RunId, Seq } from "../../wire";
 
 // A call, named the way `RoundsAnswer` names one: the run it belongs to
 // and the ledger sequence of the call itself (`Call.at`).
@@ -42,7 +42,17 @@ export interface DocumentItem {
   readonly version: B3Hash | null;
 }
 
-export type RightItem = ({ readonly kind: "call" } & CallItem) | ({ readonly kind: "document" } & DocumentItem);
+// What moved between two commits: a commit picked in the workbench, read
+// against its first parent (refrain §3-9).
+export interface ChangesItem {
+  readonly base: GitOid;
+  readonly head: GitOid;
+}
+
+export type RightItem =
+  | ({ readonly kind: "call" } & CallItem)
+  | ({ readonly kind: "document" } & DocumentItem)
+  | ({ readonly kind: "changes" } & ChangesItem);
 
 // Tabs a person keeps open before the oldest is closed for them: enough
 // for a file, its diff and two commands on each side of a comparison.
@@ -68,6 +78,8 @@ export function sameItem(a: RightItem | null, b: RightItem): boolean {
       return b.kind === "call" && a.run === b.run && a.at === b.at;
     case "document":
       return b.kind === "document" && a.building === b.building && a.path === b.path && a.version === b.version;
+    case "changes":
+      return b.kind === "changes" && a.base === b.base && a.head === b.head;
   }
 }
 
@@ -79,6 +91,8 @@ export function itemKey(item: RightItem): string {
       return `call ${item.run} ${String(item.at)}`;
     case "document":
       return `document ${item.building} ${item.path} ${item.version ?? ""}`;
+    case "changes":
+      return `changes ${item.base} ${item.head}`;
   }
 }
 
@@ -105,6 +119,11 @@ export function openCall(call: CallItem): void {
 export function openDocument(document: DocumentItem): void {
   rememberOpener();
   showItem({ kind: "document", building: document.building, path: document.path, version: document.version });
+}
+
+export function openChanges(changes: ChangesItem): void {
+  rememberOpener();
+  showItem({ kind: "changes", base: changes.base, head: changes.head });
 }
 
 // Bring an item forward, opening it when it is not open yet.

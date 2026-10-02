@@ -43,6 +43,7 @@
   import G1 from "./gallery/g1.svelte";
   import G3 from "./gallery/g3.svelte";
   import Followed from "./gallery/followed.svelte";
+  import G5 from "./gallery/g5.svelte";
   import Hints from "./gallery/hints.svelte";
   import Inspected from "./gallery/ins.svelte";
   import Keepers from "./gallery/kept.svelte";
@@ -115,6 +116,7 @@
   <Anchored />
   <Produced />
   <Inspected />
+  <G5 />
   <Filed />
   <Pga />
   <Screens />

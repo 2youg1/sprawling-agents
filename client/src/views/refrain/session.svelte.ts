@@ -12,7 +12,9 @@
 // meets them. Made while `refrain.svelte` initialises, so everything it
 // asks stops with that component.
 
+import { Option, Schema } from "effect";
 import { untrack } from "svelte";
+import { SvelteSet } from "svelte/reactivity";
 import { get } from "svelte/store";
 
 import { readAnswer } from "../../core/answered";
@@ -23,7 +25,9 @@ import type { Happened, Receipt } from "../../core/document_save";
 import { nextSpan, opened, recorded, whole } from "../../core/document_windows";
 import type { Gathering, Opened } from "../../core/document_windows";
 import type { Ui } from "../../ui";
-import type { Address, Answer, AxError, B3Hash } from "../../wire";
+import { Address } from "../../wire";
+import type { Answer, AxError, B3Hash } from "../../wire";
+import type { DocumentItem } from "../inspect/open.svelte";
 import type { Editing } from "./editing";
 import { Gathered } from "./gathered.svelte";
 
@@ -52,6 +56,24 @@ export interface Opening {
 // How often a draft is written to the browser at most: once the typing
 // pauses this long.
 const DRAFT_PAUSE_MS = 300;
+
+// The address a building's document is read at: the two joined, `null`
+// when the join is not an address the city reads.
+export function documentAt(building: Address, path: string): Address | null {
+  return Option.getOrNull(Schema.decodeOption(Address)(`${building}/${path}`));
+}
+
+// The sessions that hold words the city has not taken, by document and
+// version; the inspector's tab strip marks their tabs (docs/frontend-method.md §7F).
+// A session leaves when it is saved, clean again, or closed.
+const unsaved = new SvelteSet<string>();
+
+const unsavedKey = (at: Address, version: B3Hash | null): string => `${at}@${version ?? ""}`;
+
+export function holdsDraft(document: DocumentItem): boolean {
+  const at = documentAt(document.building, document.path);
+  return at !== null && unsaved.has(unsavedKey(at, document.version));
+}
 
 export class Session {
   answer = $state<Answer | undefined>(undefined);
@@ -96,6 +118,15 @@ export class Session {
     $effect(() => this.followLink());
     $effect(() => () => {
       this.keep();
+    });
+    $effect(() => {
+      const kind = this.receipt.kind;
+      if (kind === "clean" || kind === "saved") return;
+      const key = unsavedKey(at, asked);
+      unsaved.add(key);
+      return () => {
+        unsaved.delete(key);
+      };
     });
   }
 

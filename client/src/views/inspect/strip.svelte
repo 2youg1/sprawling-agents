@@ -9,8 +9,10 @@
   // The inspector's tab strip (docs/frontend-method.md §7F, client/Spec.lean §7-11): one tab per open
   // item, in the order they were opened, the one in front drawn on the
   // page's own fill so it reads as the sheet the region below is cut
-  // from; a terminal's tab carries the terminal mark. At the right end,
-  // the key that closes the whole inspector.
+  // from; a terminal's tab carries the terminal mark, and a document whose
+  // RefRain session holds words the city has not taken carries an alert
+  // dot (7F). At the right end, the link to the item in front, to copy
+  // (4-63), and the key that closes the whole inspector.
   //
   // An APG Tabs pattern with a roving tab stop: the strip is one stop,
   // ←/→ walk it and bring each tab forward, Home/End go to either end,
@@ -25,6 +27,7 @@
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import Glyph from "../parts/glyph.svelte";
+  import { holdsDraft } from "../refrain/session.svelte";
   import { itemKey, sameItem, type RightItem } from "./open.svelte";
   import type { Region, Tab } from "./reading";
 
@@ -36,11 +39,30 @@
     readonly onPick: (item: RightItem) => void;
     readonly onClose: (item: RightItem) => void;
     readonly onCloseAll: () => void;
+    // The address-bar locator of the item in front, `null` for an item
+    // the address bar has no spelling for.
+    readonly link: string | null;
   }
 
-  const { tabs, front, panels, onPick, onClose, onCloseAll }: Props = $props();
+  const { tabs, front, panels, onPick, onClose, onCloseAll, link }: Props = $props();
 
   const lang = ui().lang;
+
+  // How long the copy receipt holds: long enough to see, short enough
+  // that it never becomes the control's face.
+  const RECEIPT_MS = 1200;
+  let copied = $state(false);
+
+  // The receipt appears only after the write landed, so a press that
+  // quietly failed shows no receipt rather than a lying one.
+  function copy(fragment: string): void {
+    void navigator.clipboard.writeText(new URL(fragment, document.baseURI).href).then(() => {
+      copied = true;
+      setTimeout(() => {
+        copied = false;
+      }, RECEIPT_MS);
+    });
+  }
 
   let strip = $state<HTMLDivElement | undefined>(undefined);
 
@@ -106,6 +128,10 @@
         >
           {#if tab.region === "terminal"}<Glyph name="terminal" size="sm" />{/if}
           <span class="truncate">{tab.label}</span>
+          {#if tab.item.kind === "document" && holdsDraft(tab.item)}
+            <span class="size-dot shrink-0 rounded-pill bg-alert" aria-hidden="true"></span>
+            <span class="sr-only">{say($lang, "inspect_unsaved")}</span>
+          {/if}
         </button>
         <button
           type="button"
@@ -124,6 +150,16 @@
       </div>
     {/each}
   </div>
+  {#if link !== null}
+    {@const fragment = link}
+    <button
+      type="button"
+      class="my-auto ml-snug flex h-control-sm shrink-0 items-center rounded-control px-snug text-note text-text-faint hover:bg-raised hover:text-text"
+      onclick={() => {
+        copy(fragment);
+      }}>{say($lang, copied ? "code_copied" : "inspect_copy_link")}</button
+    >
+  {/if}
   <button
     type="button"
     class="my-auto ml-snug flex size-control-sm items-center justify-center rounded-control text-text-faint hover:bg-raised hover:text-text"

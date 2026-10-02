@@ -15,16 +15,17 @@
   // node takes the phase of the run that made it (`runs/phase.ts`), so a
   // commit whose run is still going reads as going. Picking a row picks
   // its session - the conversation moves to that room when it is another
-  // - and opens the commit under its row: its full oid, the B3 of the
-  // checkpoint that announced it, its parents and the files it changed,
-  // each opening into its patch. Both hashes are written whole on one
-  // line and cut by the pane's edge, so a copy takes the whole value.
+  // - opens what it changed against its first parent on the right side
+  // (refrain §3-9, client/Spec.lean §4-63), and states the commit under its
+  // row: its full oid, the B3 of the checkpoint that announced it and its
+  // parents. Both hashes are written whole on one line and cut by the
+  // pane's edge, so a copy takes the whole value.
   import { readAnswer } from "../../core/answered";
   import { fill, say } from "../../core/lang";
   import { MAYOR, buildingOf, roomOf, toFragment } from "../../core/route";
   import { ui } from "../../ui";
   import type { Address, CommitAnswer, RunId } from "../../wire";
-  import Changes from "../changes.svelte";
+  import { openChanges } from "../inspect/open.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import { phaseOf } from "../runs/lineage";
   import { PHASE_FILL } from "../runs/phase";
@@ -76,6 +77,8 @@
 
   function pick(commit: CommitAnswer): void {
     pickCommit(commit);
+    const parent = commit.parents?.[0];
+    if (parent !== undefined) openChanges({ base: parent, head: commit.oid });
     if (commit.actor !== here) u.go({ kind: "talk", address: commit.actor });
   }
 </script>
@@ -131,7 +134,6 @@
             </span>
           </button>
           {#if commit.oid === picked}
-            {@const parent = commit.parents?.[0]}
             <div class="mb-base ml-[calc(var(--spacing-base)+8ch)] border-l border-edge-panel pl-base text-note">
               <dl class="grid grid-cols-[8ch_minmax(0,1fr)] gap-x-base text-text-quiet">
                 <dt class="text-text-faint">{say($lang, "world_commit_oid")}</dt>
@@ -145,11 +147,6 @@
                   {(commit.parents ?? []).map((oid) => oid.slice(0, SHORT)).join(" · ") || "—"}
                 </dd>
               </dl>
-              {#if parent !== undefined}
-                <div class="mt-snug">
-                  <Changes base={parent} head={commit.oid} talk={here} />
-                </div>
-              {/if}
             </div>
           {/if}
         </li>

@@ -10,8 +10,9 @@
   // page frame's header names it and carries the verbs that act on the
   // whole building; under it the standing goal; then three columns of
   // the shell's grid - the index and the directory tree on the left,
-  // the chosen section or file in the middle, and, when a file of this
-  // building is open on the right side, that file on the right.
+  // the chosen section or file in the middle, and, when anything is open
+  // on the right side, the right side itself: the same inspector the
+  // conversation draws, its tabs and keys included (4-50, client D27).
   //
   // What a person can ask of this building - stop it, set it a standing
   // goal, take it away - is spelled as commands (client/Spec.lean §4-10): the
@@ -61,23 +62,27 @@
   import Directory from "./building/directory.svelte";
   import FileView from "./building/file.svelte";
   import Goal from "./building/goal.svelte";
-  import Opened from "./building/opened.svelte";
   import Plan from "./building/plan.svelte";
   import Sandbox from "./building/sandbox.svelte";
   import Skills from "./building/skills.svelte";
   import Status from "./building/status.svelte";
   import Tree from "./building/tree.svelte";
   import Rooms from "./building/rooms.svelte";
-  import { rightItem } from "./inspect/open.svelte";
+  import { openItems, type RightItem } from "./inspect/open.svelte";
+  import Right from "./right.svelte";
 
   interface Props {
     readonly address: Address;
     // Whether this is the page or a fixture inside one: a document may
     // have exactly one heading of the page's own rank.
     readonly rank?: "page" | "section" | undefined;
+    // What a specimen on `#/gallery` shows on its right side while
+    // nobody opened anything; the page itself shows only what somebody
+    // opened, having no run in front of it to follow.
+    readonly beside?: readonly RightItem[] | undefined;
   }
 
-  const { address, rank = "page" }: Props = $props();
+  const { address, rank = "page", beside = [] }: Props = $props();
 
   const u = ui();
   const lang = u.lang;
@@ -119,13 +124,7 @@
     section = null;
   }
 
-  // The right side shows a file of this building, or nothing here: a
-  // call, or another building's file, belongs to the conversation's
-  // working surface (client D27).
-  const opened = $derived.by(() => {
-    const item = rightItem();
-    return item !== null && item.kind === "document" && item.building === address ? item : null;
-  });
+  const opened = $derived(openItems().length > 0 || beside.length > 0);
 
   // How many runs are working at or below a room, which is what the
   // rooms list lights its dots for.
@@ -209,7 +208,7 @@
     <section
       class={[
         "row-[1/3] flex min-w-0 flex-col narrow:col-span-full narrow:row-auto",
-        opened === null ? "col-[4/12]" : "col-[4/8]",
+        opened ? "col-[4/8]" : "col-[4/12]",
       ]}
       aria-label={shownLabel}
     >
@@ -235,8 +234,10 @@
         <Directory at={picked.at} root={address} onPick={pick} />
       {/if}
     </section>
-    {#if opened !== null}
-      <Opened item={opened} />
+    {#if opened}
+      <div class="sticky top-0 col-[8/12] row-[1/3] flex h-[calc(100dvh-var(--spacing-section)*4)] min-w-0 overflow-hidden rounded-panel border border-edge narrow:col-span-full narrow:row-auto">
+        <Right following={beside} current={undefined} talk={address} />
+      </div>
     {/if}
     <div class="col-[1/4] row-start-2 flex min-w-0 flex-col gap-wide narrow:col-span-full narrow:row-auto">
       <Tree root={address} {picked} onPick={pick} />
