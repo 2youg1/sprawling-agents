@@ -69,7 +69,10 @@ export type GlyphName =
   | "sandbox"
   // A prompt and its cursor: what a command printed, on the inspector's
   // tab of a terminal.
-  | "terminal";
+  | "terminal"
+  // A page with a pen across it: a change a run proposes to a document,
+  // waiting for the person to decide it.
+  | "propose";
 
 // The three paint tiers a mark may take (client-SPEC 4-32). They are
 // named here because `statusLook` below picks one per state and

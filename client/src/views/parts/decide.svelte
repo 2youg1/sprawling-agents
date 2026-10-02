@@ -30,8 +30,9 @@
 
   // What is being asked. `question` is a design question a resident
   // filed (`ApprovalItem`); `ask` is a door waiting on the person's own
-  // hand (`E_APPROVAL_PENDING`).
-  export type DecideKind = "question" | "ask";
+  // hand (`E_APPROVAL_PENDING`); `proposal` is a change a run offers to
+  // a document (`ProposalCard`, client-SPEC 4-55).
+  export type DecideKind = "question" | "ask" | "proposal";
 
   // The three answers, each on its key.
   export type Answer = "yes" | "edit" | "no";
@@ -49,7 +50,9 @@
     readonly kind: DecideKind;
     // Who asks, in words; the heading of the card and its name.
     readonly asker: string;
-    // When it was asked, already in the reader's clock.
+    // When it was asked, already in the reader's clock. A proposal card
+    // carries no moment on the wire, so its card states the version it
+    // was made on here instead: the one thing that places it.
     readonly at: string;
     // The kind's own body: what is asked, and what it is about.
     readonly body: Snippet;
@@ -60,6 +63,7 @@
   const GLYPH: Readonly<Record<DecideKind, GlyphName>> = {
     question: "hand",
     ask: "gate",
+    proposal: "propose",
   };
 
   const KEY: Readonly<Record<Answer, Action>> = {

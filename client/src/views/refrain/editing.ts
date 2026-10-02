@@ -66,6 +66,8 @@ export interface Editing {
   readonly cursor: () => number;
   readonly top: () => number;
   readonly reveal: (at: number) => void;
+  // Puts the keyboard in the editor.
+  readonly focus: () => void;
   readonly toBaseline: (at: number) => number;
   readonly fromBaseline: (at: number) => number;
   readonly measure: () => void;
@@ -213,6 +215,9 @@ export function openEditor(setup: EditorSetup): Editing {
     reveal: (at) => {
       const position = Math.min(Math.max(at, 0), view.state.doc.length);
       view.dispatch({ selection: { anchor: position }, effects: EditorView.scrollIntoView(position, { y: "start", yMargin: 24 }) });
+    },
+    focus: () => {
+      view.focus();
     },
     toBaseline: (at) => composed.invertedDesc.mapPos(at),
     fromBaseline: (at) => composed.mapPos(at),

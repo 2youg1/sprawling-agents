@@ -8,11 +8,12 @@
 <script lang="ts">
   // The first section of the mailbox: everything that stops until the
   // person acts (client-SPEC 4-49). A door waiting on the person's own
-  // hand and a design question a resident filed are decide cards
-  // (7C); a failure that stops the work is its notice, with the
-  // recovery the city named. Newest first within each kind, the doors
-  // and failures before the questions, because a question waits on a
-  // judgement while a door waits on a hand already at the keyboard.
+  // hand, a design question a resident filed and a change a run
+  // proposes to a document are decide cards (7C); a failure that stops
+  // the work is its notice, with the recovery the city named. Newest
+  // first within each kind, the doors and failures before the questions
+  // and the proposals, because those wait on a judgement while a door
+  // waits on a hand already at the keyboard (4-55).
   import { urgencyOf } from "../../core/deferral";
   import { say } from "../../core/lang";
   import { recoveryFor } from "../../core/recovering";
@@ -24,8 +25,17 @@
   import Notice from "../parts/notice.svelte";
   import { recoveryWords } from "../parts/notice_title";
   import { WaitingCards } from "../talk/waiting.svelte";
+  import DecidingDocument from "./deciding_document.svelte";
+  import { openCards, proposedDocs } from "./deciding_proposals";
   import Section from "./section.svelte";
   import { shown, sweep } from "./swept.svelte";
+
+  interface Props {
+    // Puts the mailbox away once the person follows a card elsewhere.
+    readonly onLeave: () => void;
+  }
+
+  const { onLeave }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -38,7 +48,10 @@
   const asks = $derived(stopped.filter((notice) => notice.error.code === "E_APPROVAL_PENDING"));
   const failures = $derived(stopped.filter((notice) => notice.error.code !== "E_APPROVAL_PENDING"));
   const questions = $derived($approvals ?? []);
-  const count = $derived(stopped.length + questions.length);
+  const offered = $derived($belief.proposed);
+  const documents = $derived(proposedDocs(offered));
+  const proposed = $derived(openCards(u.conn.asking, documents));
+  const count = $derived(stopped.length + questions.length + $proposed);
 </script>
 
 <Section title="mailbox_deciding" empty="mailbox_deciding_none" {count}>
@@ -105,4 +118,10 @@
     </div>
   {/each}
   <WaitingCards items={questions} />
+  {#each documents as doc (doc)}
+    <DecidingDocument {doc} {onLeave} />
+  {/each}
+  <!-- The city lists no document's cards but the one asked about, so a
+  card offered before this page opened shows only beside its document. -->
+  <p class="py-snug text-note text-text-faint">{say($lang, "mailbox_proposals_earlier")}</p>
 </Section>

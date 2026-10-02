@@ -1051,6 +1051,94 @@
     "en": "the two versions read the same text",
     "zh": "两版读出的文字相同"
   },
+  "proposal_from": {
+    "en": "{who} proposes a change",
+    "zh": "{who} 提议修改"
+  },
+  "proposal_on": {
+    "en": "on {version}",
+    "zh": "基于 {version}"
+  },
+  "proposal_accept": {
+    "en": "accept",
+    "zh": "接受"
+  },
+  "proposal_edit": {
+    "en": "edit, then accept",
+    "zh": "改后接受"
+  },
+  "proposal_accept_edited": {
+    "en": "accept as edited",
+    "zh": "按改过的接受"
+  },
+  "proposal_back": {
+    "en": "back to the diff",
+    "zh": "回到 diff"
+  },
+  "proposal_reject": {
+    "en": "reject",
+    "zh": "拒绝"
+  },
+  "proposal_stale": {
+    "en": "This card was made on {was}, and the document is now {now}. It can only be rejected; the run can offer it again on what the document says now.",
+    "zh": "这张卡基于 {was}，文稿现在是 {now}。它只能被拒绝；run 可以在文稿现在的文字上重新提出。"
+  },
+  "proposal_no_version": {
+    "en": "no version (the file is missing or unreadable)",
+    "zh": "没有版本（文件缺失或读不了）"
+  },
+  "proposal_stale_why": {
+    "en": "this card was made on an older version of the document",
+    "zh": "这张卡基于文稿的旧版本"
+  },
+  "proposal_deciding": {
+    "en": "deciding",
+    "zh": "决定中"
+  },
+  "proposal_busy_why": {
+    "en": "the decision on this card is on its way",
+    "zh": "这张卡的决定已经发出"
+  },
+  "proposal_pending": {
+    "en": "The link dropped before the city answered. The same decision goes again when the link is back, and the city answers it once.",
+    "zh": "城回答之前链路断了。链路恢复后同一个决定再发一次，城只答一次。"
+  },
+  "proposal_nothing_taken": {
+    "en": "nothing is taken, which is a rejection",
+    "zh": "一句都没取，这等于拒绝"
+  },
+  "proposal_take": {
+    "en": "take: {words}",
+    "zh": "取这一句：{words}"
+  },
+  "proposal_amend": {
+    "en": "the inserted sentence, as it will land",
+    "zh": "插入的这一句，落下时的文字"
+  },
+  "proposal_removed": {
+    "en": "removed",
+    "zh": "删去"
+  },
+  "proposal_added": {
+    "en": "added",
+    "zh": "加上"
+  },
+  "proposal_open": {
+    "en": "open beside the document",
+    "zh": "在文稿旁打开"
+  },
+  "proposal_show": {
+    "en": "show in the text",
+    "zh": "在原文中显示"
+  },
+  "proposal_show_why": {
+    "en": "the editor holds another version of the document",
+    "zh": "编辑器里是文稿的另一版"
+  },
+  "proposals_title": {
+    "en": "proposals: {n}",
+    "zh": "修改提案：{n}"
+  },
   "gallery_tip_tall": {
     "en": "This hint is deliberately long. It opens above the control, and where the window has no room above it the engine drops it below instead; a short hint halfway down a page never asks for that, so the fallback goes unseen. Read where this box lands: above the button means there was room, below it means the flip happened, and a box hanging off the top of the window means neither branch took.",
     "zh": "这条提示故意写得很长。它开在控件上方；窗口上方腾不出位置时，引擎改把它放到下方。页面中段的一条短提示从不提出这个要求，那条回退分支也就无人看见。看这个框落在哪里：在按钮上方说明位置够用，在下方说明翻转发生了，而挂在窗口上缘之外说明两条分支都没有生效。"
@@ -1218,6 +1306,10 @@
   "mailbox_new": {
     "en": "something new, nothing waiting for you",
     "zh": "有新消息，没有等你的事"
+  },
+  "mailbox_proposals_earlier": {
+    "en": "Cards offered before this page opened show beside their document on the right.",
+    "zh": "本页打开之前提出的修改提案，在右侧打开那份文稿时显示。"
   },
   "keys_reserved": {
     "en": "the browser takes this key before the page sees it",

@@ -151,6 +151,6 @@ pulses rather than asking for anything. -->
 
 <Case label="decide card · a door waiting on the person's hand">
   <Stand link={LIVE} unread={[ASKS]} waiting={[]}>
-    <Deciding />
+    <Deciding onLeave={ignore} />
   </Stand>
 </Case>

@@ -15,7 +15,7 @@
   import { fill, say } from "../../core/lang";
   import { kib } from "../../core/time";
   import { ui } from "../../ui";
-  import type { Address, B3Hash } from "../../wire";
+  import type { Address, B3Hash, ProposalCard } from "../../wire";
   import Empty from "../parts/empty.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import Conflict from "./conflict.svelte";
@@ -24,6 +24,7 @@
   import Opaque from "./formats/opaque.svelte";
   import Head from "./head.svelte";
   import Preview from "./preview.svelte";
+  import Proposals from "./proposals.svelte";
   import { Session } from "./session.svelte";
   import type { Locked } from "./session.svelte";
   import { phrasesIn, short, type Reading } from "./reading";
@@ -90,6 +91,23 @@
   }
 
   const editorShown = $derived(reading === "source" || reading === "diff");
+
+  // A proposal card's stretch is a byte span of its version, so the
+  // editor can be taken there only while it holds that version.
+  function unshowable(card: ProposalCard): string | undefined {
+    return session.editing !== null && session.positions?.version === card.baseline
+      ? undefined
+      : say($lang, "proposal_show_why");
+  }
+
+  function show(card: ProposalCard): void {
+    const editing = session.editing;
+    const base = session.positions;
+    if (editing === null || base === null) return;
+    if (!editorShown) pick("source");
+    editing.reveal(editing.fromBaseline(base.editorAt(card.span.start)));
+    editing.focus();
+  }
 </script>
 
 <div class="refrain flex min-h-0 flex-1 flex-col bg-page">
@@ -128,6 +146,7 @@
       }}
     />
   {/if}
+  <Proposals doc={at} {unshowable} onShow={show} />
   {#if session.read.kind === "asking"}
     <p class="p-pane text-text-faint">…</p>
   {:else if session.read.kind === "unavailable"}

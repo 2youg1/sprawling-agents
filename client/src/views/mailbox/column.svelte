@@ -76,7 +76,7 @@
   <!-- One scroller for every section, walked by j and k and reached by
   the digits (client-SPEC 7-11). -->
   <div bind:this={scroller} class="mailbox min-h-0 flex-1 overflow-y-auto px-base pb-wide">
-    <Deciding />
+    <Deciding onLeave={onClose} />
     <Working onLeave={onClose} />
     <Recent scroller={() => scroller} onLeave={onClose} />
     <Notices />
