@@ -71,8 +71,11 @@ budget_bytes = 2097152
 # more when the wire schema the client decodes grew by four queries,
 # the guide command, the versioned document and range shapes and the
 # remote door's five event kinds, and the client gained the document
-# reader and the guide command that use them.
-best_bytes = 599102
+# reader and the guide command that use them. It rose by 78 KB when the
+# shell's client halves landed: RefRain's editor chunk, the inspector,
+# the workbench, the settings panel, the mailbox and the redesigned
+# pages with their fixtures, and the move from Effect 3 to Effect 4.
+best_bytes = 677073
 measured_by = "just build-web, then cargo xtask budget (the whole dist directory, recursive)"
 status = "reported, not gated: the person's ruling that runtime speed comes before size"
 
@@ -688,7 +691,7 @@ status = "measured, not gated here: per frame with the `$state` run table 30-37 
 [client_frame_decode]
 what = "one event frame decoded from its text, by the hot decoder and by the Effect schema it stands in for"
 measured_by = "cd client && bun scripts/frame_cost.ts (prints one client_frame_decode line: the fastest of 15 batches of 2000 decodes, per path)"
-status = "measured, not gated: hot 1.8-3.9 us against 16-28 us for the schema path, interleaved on the same instrument (x86_64 desktop class, 16 cores). The same floor read 3.7-8.6 us with 32 busy loops beside it, so a wall-clock bound held as a unit test failed on a loaded machine; the register records the reading and nothing gates it"
+status = "measured, not gated: on Effect 4, hot 1.1-1.3 us against 6.9-8.4 us for the schema path, interleaved on the same instrument (x86_64 desktop class, 16 cores, other builds beside it). On Effect 3 the floor read 3.7-8.6 us with 32 busy loops beside it, so a wall-clock bound held as a unit test failed on a loaded machine; the register records the reading and nothing gates it"
 
 # What one streamed token costs the page while a reply is still arriving
 # (T12): script plus the layout the token forces. The raw shape drew the
