@@ -92,10 +92,9 @@ pub use frames::{Lagged, LogLevel, LogLine, Monitoring, Sample, Watched};
 pub use frames::{QUERY_NAMES, WIRE_V, schema_hash};
 pub use guide::{GuideMark, GuideProgress, GuideState, GuideStep};
 pub use kernel::{FileChange, How, Lines};
-pub use preference::{
-    Appearance, Chord, Chroma, Density, Face, Glass, Lang, Lighting, Motion, Tier,
-};
+pub use preference::{Appearance, Chord, Chroma, Density, Face, Lang, Lighting, Motion};
 pub use preference::{BODY_PX_MAX, BODY_PX_MIN, CorePriority, PreferencePatch, PreferencesAnswer};
+pub use preference::{Glass, Tier};
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in};
 pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]

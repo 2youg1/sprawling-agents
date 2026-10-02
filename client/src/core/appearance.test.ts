@@ -60,7 +60,7 @@ describe("the blend tier's opacity", () => {
 });
 
 describe("the city's answer", () => {
-  test("leaves glass and the blend opacity where this browser had them", () => {
+  test("from a city that keeps neither leaves glass and the blend opacity where this browser had them", () => {
     const rows = memory();
     const door = loadPreferences(rows, "en");
     const before = get(door.held);

@@ -63,9 +63,11 @@ export function appearanceOnWire(next: Appearance): WireAppearance {
   };
 }
 
-// The city keeps the opacity as a bare percent and the slider's domain
-// is this client's (`BLEND_PERCENT`), so a figure outside it - a file
-// edited by hand - reads as no opacity, as a stored row would.
+// Glass and the opacity are absent from an answer by a city that keeps
+// neither, and this browser's values stand. The city keeps the opacity
+// as a bare percent and the slider's domain is this client's
+// (`BLEND_PERCENT`), so a stated figure outside it - a file edited by
+// hand - reads as no opacity, as a stored row would.
 function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance {
   return {
     lighting: stated.lighting,
@@ -78,6 +80,6 @@ function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance 
     chroma: stated.chroma,
     motion: stated.motion,
     glass: stated.glass ?? held.glass,
-    blend: blendOf(String(stated.blend_percent ?? "")),
+    blend: stated.blend_percent === undefined ? held.blend : blendOf(String(stated.blend_percent ?? "")),
   };
 }
