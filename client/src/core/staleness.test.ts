@@ -5,6 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import type { EventKind } from "../wire";
 import { reachOf } from "./staleness";
 
 // The settings panel calls a save saved only when the city answers
@@ -26,4 +27,13 @@ describe("a write reaches the answer that reads it back", () => {
     expect(reachOf("config", "model_returned")).toBe("none");
     expect(reachOf("automation", "rules_changed")).toBe("none");
   });
+});
+
+// The sessions pane lists a room's stretches from this answer, so a
+// session opened, a run started in one, or a run ended has to reach it.
+test("a session opened or a run starting or ending makes the sessions answers stale", () => {
+  const kinds: EventKind[] = ["session_opened", "run_started", "run_frozen", "model_returned"];
+  expect(kinds.map((kind) => reachOf("sessions", kind))).toEqual(
+    ["every", "every", "every", "none"],
+  );
 });

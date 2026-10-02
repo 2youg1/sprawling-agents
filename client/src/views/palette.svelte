@@ -52,6 +52,7 @@
   import { openFinder } from "./finding.svelte";
   import Rows from "./palette/rows.svelte";
   import { askToSpeak } from "./talk/speak_asked";
+  import { sessionHands } from "./talk/session_hands";
 
   const u = ui();
   const { lang } = u;
@@ -173,6 +174,7 @@
       case "/dispatch":
       case "/new":
       case "/clear":
+      case "/compact": case "/tag": case "/untag":
         return here === null ? NEEDS_ROOM : undefined;
       // The run in hand, or else the newest run of the room in hand.
       case "/diff":
@@ -223,6 +225,7 @@
         query = line;
         cursor = 0;
       },
+      ...sessionHands(u, here, viewed?.kind === "talk" ? viewed.session : undefined),
     };
     const line = query.trim();
     const needs = chosen.grammar.startsWith("<");

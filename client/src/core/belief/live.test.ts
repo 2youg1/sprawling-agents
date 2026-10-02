@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import { get } from "svelte/store";
 
 import { createBelief } from "../belief";
-import { newestWorking } from "./live";
+import { newestWorking, onceFrozen } from "./live";
 import { heldIn, heldWithin } from "./rooms";
 import type { RunBelief } from "./shape";
 import type { CityAnswer, EventKind, EventRecord, RunSummary } from "../../wire";
@@ -183,4 +183,19 @@ test("the cancelled count costs one run a record, not the city", () => {
   store.apply({ ...record(0, 2 * reads + 3, "run_frozen"), data: { completion: "cancelled" } });
   expect({ during, once, again: get(store.belief).cancelled }).toEqual({ during: 0, once: 1, again: 1 });
   expect(perRecordUs).toBeLessThanOrEqual(BUDGET_US);
+});
+
+// `/compact` opens the session that carries a run's handoff only once
+// the run has frozen: the waiting is on the record, and it runs once.
+test("what waits on a run's end runs once, when the belief holds it frozen", () => {
+  const store = createBelief(() => 0);
+  let ran = 0;
+  store.apply({ ...record(1, 1, "run_started"), addr: Address.make("lab/a") });
+  onceFrozen(store.belief, runId(1), () => (ran += 1));
+  store.apply(record(1, 2, "model_called"));
+  expect(ran).toBe(0);
+  store.apply(record(1, 3, "run_frozen"));
+  store.apply(record(1, 4, "run_frozen"));
+  onceFrozen(store.belief, runId(1), () => (ran += 10));
+  expect(ran).toBe(11);
 });

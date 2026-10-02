@@ -26,6 +26,8 @@ import { memory } from "./core/rows";
 import type { AddressBar, View } from "./core/route";
 import { go } from "./core/route";
 import type { Connection } from "./core/socket";
+import { keepTags } from "./core/tags";
+import type { Tagging } from "./core/tags";
 import type { Answer, ApprovalItem, Command, Effort, Mode, RunPolicy } from "./wire";
 import { NOT_CONVERSING } from "./views/talk/handing";
 import type { Conversing } from "./views/talk/handing";
@@ -33,6 +35,8 @@ import type { Conversing } from "./views/talk/handing";
 export interface Ui {
   readonly conn: Connection;
   readonly prefs: PreferenceDoor;
+  // The tags the person gave sessions, as the city keeps them (`core/tags.ts`).
+  readonly tags: Tagging;
   // The language the page is drawn in. Every word subscribes to it
   // through `say($lang, key)`, which is the only thing that has to be
   // told when the person picks another language.
@@ -114,6 +118,7 @@ function readied(value: Opening): Ui {
     policy,
     mode: derived(policy, (held) => held.mode),
     conversing: writable<Conversing>(NOT_CONVERSING),
+    tags: keepTags(value.conn),
     approvals: derived(
       value.conn.asking.ask(QUERIES.approvals),
       (answer) => (answer !== undefined && "approvals" in answer ? answer.approvals.items : undefined),

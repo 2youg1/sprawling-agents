@@ -7,6 +7,8 @@ import { describe, expect, test } from "bun:test";
 import { Option } from "effect";
 
 import { Address, B3Hash, RunId, Seq } from "../wire";
+||||||| parent of 22205091 (card-S8.SS4: red: sessions as stretches, their tags and pin, /compact /tag /untag, against stubs)
+import { Address, RunId } from "../wire";
 import {
   DEFAULT_VIEW,
   MAYOR,
@@ -34,6 +36,8 @@ const worktree = { kind: "document", building: lab, path: "README.md", version: 
 const EVERY_VIEW: readonly View[] = [
   { kind: "talk", address: MAYOR },
   { kind: "talk", address: parser },
+  { kind: "talk", address: parser, session: Seq.make(12) },
+  { kind: "talk", address: MAYOR, session: Seq.make(3) },
   { kind: "city" },
   { kind: "welcome" },
   { kind: "record", lens: "ledger" },
@@ -56,6 +60,13 @@ describe("route", () => {
     for (const view of EVERY_VIEW) {
       const written = toFragment(view);
       expect(fromFragment(written), written).toEqual(Option.some(view));
+    }
+  });
+
+  test("a stretch is named after the room by a character no address can hold", () => {
+    expect(toFragment({ kind: "talk", address: parser, session: Seq.make(12) })).toBe("#/talk/lab/parser:12");
+    for (const broken of ["#/talk/lab/parser:", "#/talk/lab/parser:x", "#/talk/lab/parser:-1", "#/talk/:4"]) {
+      expect(fromFragment(broken), broken).toEqual(Option.none());
     }
   });
 

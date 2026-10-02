@@ -35,6 +35,7 @@ import {
 import type { Template } from "./commands";
 import { askFork } from "./forking";
 import { PAGES, page } from "./route";
+import { given, readTag, stripped } from "./tags";
 import type { View } from "./route";
 import { CITY } from "./scope";
 import type { Slash, SlashCall, SlashHands } from "./slash_hands";
@@ -110,9 +111,43 @@ function scoped(hands: SlashHands, call: SlashCall, frame: typeof halt): void {
 // answers `carried: false` rather than refusing, so the word passes on.
 function fresh(hands: SlashHands, call: SlashCall): void {
   if (hands.here === null) return;
-  const carry = call.words.includes(CARRY) ? "handoff" : "nothing";
-  hands.command(openSession(hands.here, carry, null));
+  opened(hands, hands.here, call.words.includes(CARRY) ? "handoff" : "nothing");
+}
+
+// A new session at `room`, and main brought to it: sent from a past
+// session in main, the new one is where the person is going.
+function opened(hands: SlashHands, room: Address, carry: "nothing" | "handoff"): void {
+  if (!hands.command(openSession(room, carry, null))) return;
   hands.write("");
+}
+
+// `/compact` is `/new --carry`. A run still going is stopped first and
+// the session opens once the belief holds it frozen: a frozen run has
+// written the handoff, and no session opens under a working run.
+function compact(hands: SlashHands): void {
+  const room = hands.here;
+  if (room === null) return;
+  const going = hands.live;
+  if (going === null) {
+    opened(hands, room, "handoff");
+    return;
+  }
+  if (!hands.command(cancel(going.run))) return;
+  hands.write("");
+
+}
+
+// `/tag` and `/untag`: one word on or off the session in main. A word
+// that is not a tag sends nothing and leaves the line to correct.
+function drop(_: typeof given): void {
+  return;
+}
+
+function retag(hands: SlashHands, call: SlashCall, change: typeof given): void {
+  const tag = readTag(call.rest);
+  const session = hands.tagged;
+  if (tag === null || session === null) return;
+  drop(change);
 }
 
 export const SLASH: readonly Slash[] = [
@@ -196,6 +231,31 @@ export const SLASH: readonly Slash[] = [
     about: "slash_new",
     section: "sessions",
     run: fresh,
+  },
+  {
+    spelling: "/compact",
+    grammar: "",
+    about: "slash_compact",
+    section: "sessions",
+    run: compact,
+  },
+  {
+    spelling: "/tag",
+    grammar: "<name>",
+    about: "slash_tag",
+    section: "sessions",
+    run: (hands, call) => {
+      retag(hands, call, given);
+    },
+  },
+  {
+    spelling: "/untag",
+    grammar: "<name>",
+    about: "slash_untag",
+    section: "sessions",
+    run: (hands, call) => {
+      retag(hands, call, stripped);
+    },
   },
   {
     spelling: "/clear",

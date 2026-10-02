@@ -53,6 +53,7 @@
     slashHands,
   } from "./composer";
   import { IDLE, hand, settle } from "./handing";
+  import { sessionHands } from "./session_hands";
   import type { Handing } from "./handing";
   import { insertAt } from "./dropping";
   import { DropZone } from "./drop_zone.svelte";
@@ -258,6 +259,7 @@
         setPolicy: u.choosePolicy,
         goal: say(get(lang), "talk_goal"),
         write,
+        ...sessionHands(u, here),
       }),
     );
     if (rest === null) return;

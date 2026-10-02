@@ -20,7 +20,7 @@ import { fill, say } from "../../core/lang";
 import { MAYOR } from "../../core/route";
 import { UNSTATED, offered, parse } from "../../core/slash";
 import { reached } from "../../core/slash_hands";
-import type { Slash, SlashHands } from "../../core/slash_hands";
+import type { SessionHands, Slash, SlashHands } from "../../core/slash_hands";
 import type { Sending } from "../../core/doing";
 import { Address } from "../../wire";
 import type { Command, Effort, Mode, RunPolicy, Seq } from "../../wire";
@@ -367,7 +367,7 @@ export function pickSlash(chosen: Slash, line: string, hands: SlashHands): strin
 // Everything a typed verb may reach for (`core/slash.ts` fills the same
 // shape from the palette), minus the one conversion this file owns: a
 // run belief becomes the run and position a verb acts on.
-export interface Reach {
+export interface Reach extends SessionHands {
   readonly command: (command: Command) => boolean;
   readonly go: (view: View) => void;
   readonly here: Address | null;
@@ -384,17 +384,9 @@ export interface Reach {
 
 export function slashHands(reach: Reach): SlashHands {
   return {
-    command: reach.command,
-    go: reach.go,
-    here: reach.here,
+    ...reach,
     live: reached(reach.live),
     newest: (room) => reached(heldIn(reach.belief, room).at(-1)),
     models: reach.models.map((each) => ({ endpoint: each.endpoint, model: each.model })),
-    effort: reach.effort,
-    setEffort: reach.setEffort,
-    policy: reach.policy,
-    setPolicy: reach.setPolicy,
-    goal: reach.goal,
-    write: reach.write,
   };
 }

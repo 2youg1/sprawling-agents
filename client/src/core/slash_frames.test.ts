@@ -75,6 +75,9 @@ function ran(line: string): Done {
     setPolicy: (policy) => policies.push(policy),
     goal: "the goal",
     write: (next) => written.push(next),
+    tagged: null,
+    retag: () => false,
+    whenFrozen: () => undefined,
   };
   const call = parse(line);
   const verb = find(call?.verb ?? "");
@@ -87,6 +90,11 @@ const sending = (...sent: ClientFrame[]): Done => ({ ...NOTHING, sent, written: 
 const going = (view: View): Done => ({ ...NOTHING, went: [view], written: [""] });
 const setting = (effort: Effort | null): Done => ({ ...NOTHING, efforts: [effort], written: [""] });
 const admitting = (admit: RunPolicy["admit"]): Done => ({ ...NOTHING, policies: [{ ...CHOSEN, admit }], written: [""] });
+// A new session here, and main brought to it.
+const opening = (carry: "nothing" | "handoff"): Done => ({
+  ...sending({ command: { open_session: { addr: ROOM, carry, from: null, idem: IDEM } } }),
+  went: [{ kind: "talk", address: ROOM }],
+});
 
 const CASES: Readonly<Record<string, readonly Case[]>> = {
   "/dispatch": [
@@ -122,8 +130,15 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
     { line: "/raise lab hall", done: sending({ command: { create_building: { addr: Address.make("lab"), template: TemplateName.make("hall"), idem: IDEM } } }) },
     { line: "/raise lab palace", done: NOTHING },
   ],
-  "/new": [{ line: "/new", done: sending({ command: { open_session: { addr: ROOM, carry: "nothing", from: null, idem: IDEM } } }) }],
-  "/clear": [{ line: "/clear", done: sending({ command: { open_session: { addr: ROOM, carry: "nothing", from: null, idem: IDEM } } }) }],
+  "/new": [{ line: "/new", done: opening("nothing") }],
+  "/clear": [{ line: "/clear", done: opening("nothing") }],
+  // The run in hand is stopped first; the session opens once it froze,
+  // which `slash_session.test.ts` follows.
+  "/compact": [{ line: "/compact", done: sending({ command: { cancel: { run: LIVE, idem: IDEM } } }) }],
+  // A tag is a preference, not a frame of its own; with no session in
+  // main the line stays.
+  "/tag": [{ line: "/tag later", done: NOTHING }],
+  "/untag": [{ line: "/untag later", done: NOTHING }],
   "/fork": [
     {
       line: "/fork hall/mayor",

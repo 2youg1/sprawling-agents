@@ -9,6 +9,9 @@
 // forward one run at a time and a reader pays for the working runs
 // rather than for the table (client D3).
 
+import type { Readable } from "svelte/store";
+
+import type { RunId } from "../../wire";
 import type { Belief, RunBelief } from "./shape";
 
 // Oldest start first, the order every reader wants: the newest working
@@ -54,4 +57,20 @@ export function newestWorking(belief: Belief, room: string): RunBelief | undefin
     (newest, run) => (run.addr === room ? run : newest),
     undefined,
   );
+}
+
+// Calls `then` once, the first time the belief holds `run` frozen, and
+// stops listening: what waits on a run's end - `/compact` opening the
+// session that carries its handoff - acts on the record, not on a guess.
+export function onceFrozen(belief: Readable<Belief>, run: RunId, then: () => void): void {
+  // A store answers at once when subscribed, before `subscribe` has
+  // returned the way to stop: an end already held is stopped after it.
+  const waiting: { done: boolean; stop: (() => void) | null } = { done: false, stop: null };
+  const stop = belief.subscribe((held) => {
+    if (waiting.done || held.runs[run]?.doing.kind !== "frozen") return;
+    waiting.done = true;
+    waiting.stop?.();
+  });
+  if (waiting.done) stop();
+  else waiting.stop = stop;
 }

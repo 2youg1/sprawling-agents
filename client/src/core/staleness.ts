@@ -117,6 +117,9 @@ export function reachOf(name: string, kind: EventKind): Reach {
     // `building_configured`.
     case "config":
       return reached(kind === "rules_changed" || kind === "building_configured");
+    // A room's stretches move when one opens and when a run in one starts
+    // or ends, which is also when its last line and run count move.
+
     default:
       return "none";
   }

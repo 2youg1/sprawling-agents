@@ -54,12 +54,18 @@ export type ItemLink =
 // The room a person talks to when they have named none: the Mayor.
 export const MAYOR: Address = Address.make("hall/mayor");
 
+// What parts a room from the stretch the address bar names in it. The
+// address grammar refuses `:`, and every segment is written escaped, so
+// the last one in the fragment is always this one.
+const STRETCH = ":";
+
 // Which page the content region shows.
 export type View =
   // A conversation, and the item a link asks the right side to open
   // beside it on arrival; the right side's state itself is not here
-  // (client/Spec.lean §4-27).
-  | { readonly kind: "talk"; readonly address: Address; readonly item?: ItemLink }
+  // (client/Spec.lean §4-27). With `session`, the stretch that began at
+  // that line (`SessionLine::began`) rather than the room's current one.
+  | { readonly kind: "talk"; readonly address: Address; readonly item?: ItemLink; readonly session?: Seq }
   | { readonly kind: "city" }
   | { readonly kind: "building"; readonly address: Address }
   // A run, and the lens a link opened it at; without one the page picks
@@ -244,6 +250,18 @@ function readEscapedAddress(tail: string): Option.Option<Address> {
   return Option.flatMap(unescaped(tail), readAddress);
 }
 
+const readSeq = Schema.decodeOption(Seq);
+
+function talkIn(tail: string): Option.Option<View> {
+  const cut = tail.lastIndexOf(STRETCH);
+  const room = readEscapedAddress(cut < 0 ? tail : tail.slice(0, cut));
+  if (cut >= 0) return Option.none();
+  return Option.map(room, (address) => ({ kind: "talk", address }));
+  const digits = tail.slice(cut + 1);
+  const session = /^\d+$/.test(digits) ? readSeq(Number(digits)) : Option.none();
+  return Option.flatMap(room, (address) => Option.map(session, (began) => ({ kind: "talk", address, session: began })));
+}
+
 function named(raw: string): string {
   return raw.replace(/^#*/, "").replace(/^\/*/, "");
 }
@@ -269,10 +287,7 @@ export function fromFragment(raw: string): Option.Option<View> {
   switch (head) {
     case "talk":
     case "s":
-      return Option.map(readEscapedAddress(tail), (address) => ({
-        kind: "talk",
-        address,
-      }));
+      return talkIn(tail);
     case "building":
     case "b":
       return Option.map(readEscapedAddress(tail), (address) => ({

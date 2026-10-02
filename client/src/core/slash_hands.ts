@@ -10,7 +10,7 @@
 import type { RunBelief } from "./belief";
 import type { Key } from "./lang";
 import type { View } from "./route";
-import type { Address, Command, Effort, RunId, RunPolicy, Seq } from "../wire";
+import type { Address, Command, Effort, RunId, RunPolicy, Seq, SessionTags } from "../wire";
 
 // A run a verb can act on: which one, and how far it has got. `/steer`,
 // `/stop` and `/diff` need the first, and a branch needs both.
@@ -34,11 +34,22 @@ export interface Offered {
   readonly model: string;
 }
 
+// What the verbs about the session in main reach for: `/tag` and
+// `/untag` change its tags, `/compact` waits for its run to freeze.
+export interface SessionHands {
+  // The session in main as its tags name it, with the tags it holds;
+  // null while its stretch is unanswered or the city has no name.
+  readonly tagged: SessionTags | null;
+  readonly retag: (next: SessionTags) => boolean;
+  // Calls `then` once, when the belief holds `run` frozen.
+  readonly whenFrozen: (run: RunId, then: () => void) => void;
+}
+
 // Everything a verb may reach for, and nothing a view could not hand
 // over from what it already has. A field that is null is a capability
 // this place does not have - there is no room to dispatch into on the
 // run page - and a verb that needs it does nothing rather than guess.
-export interface SlashHands {
+export interface SlashHands extends SessionHands {
   readonly command: (command: Command) => boolean;
   readonly go: (view: View) => void;
   // The room the box speaks to, and the run going in it.

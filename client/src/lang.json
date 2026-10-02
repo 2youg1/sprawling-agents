@@ -4211,6 +4211,18 @@
     "en": "start a new session with no handoff",
     "zh": "开新对话，不携带交接摘要"
   },
+  "slash_compact": {
+    "en": "stop the run here, then start a new session that carries its handoff",
+    "zh": "先停下这里的 run，再开一个带着交接摘要的新对话"
+  },
+  "slash_tag": {
+    "en": "give the session in view a tag",
+    "zh": "给眼前这段对话加一个标签"
+  },
+  "slash_untag": {
+    "en": "take a tag off the session in view",
+    "zh": "去掉眼前这段对话的一个标签"
+  },
   "slash_new": {
     "en": "start a new session at this address",
     "zh": "在此地址开一个新对话"
@@ -6190,6 +6202,74 @@
   "region_conversation": {
     "en": "the conversation",
     "zh": "对话"
+  },
+  "world_row_name": {
+    "en": "{room}, {when}",
+    "zh": "{room}，{when}"
+  },
+  "world_pinned": {
+    "en": "pinned",
+    "zh": "置顶"
+  },
+  "world_row_menu": {
+    "en": "Actions for {room}",
+    "zh": "{room} 的操作"
+  },
+  "world_pin": {
+    "en": "pin",
+    "zh": "置顶"
+  },
+  "world_unpin": {
+    "en": "unpin",
+    "zh": "取消置顶"
+  },
+  "world_pinned_mayor": {
+    "en": "The Mayor's current session is always pinned",
+    "zh": "市长当前这段对话总是置顶"
+  },
+  "world_tag_add": {
+    "en": "add a tag",
+    "zh": "加标签"
+  },
+  "world_tag_name": {
+    "en": "Tag",
+    "zh": "标签"
+  },
+  "world_tag_hint": {
+    "en": "One word: letters, digits, - or _, at most 24",
+    "zh": "一个词：字母、数字、- 或 _，至多 24 个"
+  },
+  "world_tag_remove": {
+    "en": "remove tag {tag}",
+    "zh": "去掉标签 {tag}"
+  },
+  "world_tags": {
+    "en": "Filter by tag",
+    "zh": "按标签筛选"
+  },
+  "world_tags_all": {
+    "en": "all",
+    "zh": "全部"
+  },
+  "world_tags_offline": {
+    "en": "Tags are kept by the city, and the city is not connected",
+    "zh": "标签由城保管，而城没有连上"
+  },
+  "talk_past": {
+    "en": "An earlier session of {room}. It is read-only: the city goes on with the room's current session.",
+    "zh": "{room} 较早的一段对话，只读：城只接着这个房间当前的一段说下去。"
+  },
+  "talk_continue": {
+    "en": "Continue from its end",
+    "zh": "从它的末尾接着说"
+  },
+  "talk_continue_unheld": {
+    "en": "This page holds none of its runs, so it has no end to branch from",
+    "zh": "本页没有它的 run，找不到可以分叉的末尾"
+  },
+  "talk_current": {
+    "en": "Back to the current session",
+    "zh": "回到当前对话"
   },
   "world_sessions": {
     "en": "sessions",

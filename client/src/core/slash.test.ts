@@ -138,6 +138,9 @@ describe("new and fork", () => {
         setPolicy: () => undefined,
         goal: "a goal",
         write: (line) => written.push(line),
+        tagged: null,
+        retag: () => false,
+        whenFrozen: () => undefined,
       },
     };
   }
