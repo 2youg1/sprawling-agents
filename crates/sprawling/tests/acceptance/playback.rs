@@ -17,19 +17,10 @@ use crate::city::{self, History};
 use crate::episodes::{Episode, Observed};
 use crate::script::{self, Step};
 
-/// A page that passes the static check: the policy first in its head,
-/// nothing it loads from outside, and the empty data block the export
-/// fills.
-fn template() -> String {
-    format!(
-        "<!doctype html><html><head><meta http-equiv=\"Content-Security-Policy\" \
-         content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; \
-         connect-src 'none'; base-uri 'none'; form-action 'none'\"><meta charset=\"utf-8\">\
-         <title>The day</title>{}</head><body><main id=\"top\"><h1>The day</h1>\
-         <a href=\"#top\">top</a></main></body></html>",
-        accounting::playback::BUNDLE_BLOCK
-    )
-}
+/// The playback skill's reference page, which a resident's page starts
+/// from: the export refuses it if it ever fails the structure or the
+/// static offline check.
+const TEMPLATE: &str = include_str!("../../../../skills/playback/template.html");
 
 /// The catalogue episode: an export of the bundle into this building's
 /// playback exports.
@@ -68,7 +59,7 @@ fn a_reporter_writes_the_day_and_an_editor_checks_it_against_the_city() {
             "action": "export",
             "name": "day-1",
             "building": "newsroom",
-            "page": template(),
+            "page": TEMPLATE,
         }),
     }]);
     let (mut worker, ledger) = city::city_with_a_model(dir.path(), reporter);
