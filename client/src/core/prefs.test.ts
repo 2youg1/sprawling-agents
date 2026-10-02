@@ -38,12 +38,12 @@ const STATED: Preferences = {
 };
 
 describe("the cache in front of the city", () => {
-  test("a record written by one door is read back whole by the next", () => {
+  test("a record written by one door is read back whole by the next, the tier as a launch", () => {
     const rows = memory();
     loadPreferences(rows, "en").adopt(STATED, []);
     // A second door over the same store is the next first paint: it
-    // reads the cache and nothing else.
-    expect(get(loadPreferences(rows, "en").held)).toEqual(STATED);
+    // reads the cache and nothing else, and a launch opens in zen.
+    expect(get(loadPreferences(rows, "en").held)).toEqual({ ...STATED, tier: "zen" });
   });
 
   test("a size nobody stated leaves no row behind for the next paint to find", () => {
@@ -61,10 +61,11 @@ describe("the cache in front of the city", () => {
     expect(get(loadPreferences(rows, "en").held).appearance.lighting).toBe("system");
   });
 
-  test("a tier this build does not draw reads as blend, the tier a first visit opens in", () => {
+  test("every launch opens in zen, whatever tier the last visit chose", () => {
     const rows = memory();
-    rows.setItem("sprawling.tier", "survey");
-    expect(get(loadPreferences(rows, "en").held).tier).toBe("blend");
+    rows.setItem("sprawling.tier", "panorama");
+    loadPreferences(rows, "en").setTier("blend");
+    expect(get(loadPreferences(rows, "en").held).tier).toBe("zen");
   });
 
   test("a browser asking in Chinese is answered in Chinese before anything is stored", () => {

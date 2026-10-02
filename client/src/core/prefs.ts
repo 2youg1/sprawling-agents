@@ -55,11 +55,6 @@ const ROWS = {
   welcomed: "sprawling.welcomed",
   // Whether the artefact panel beside a conversation is open.
   panel: "sprawling.talk.panel",
-  // How much of the world layer the page draws (docs/frontend-method.md §7H). Kept
-  // rather than held in memory because it is a decision about the shape
-  // of the window, and a decision a reload undoes is a decision the
-  // person has to take again every morning.
-  tier: "sprawling.tier",
   lighting: "sprawling.appearance.lighting",
   sans: "sprawling.appearance.sans",
   mono: "sprawling.appearance.mono",
@@ -109,10 +104,11 @@ const ROWS = {
 export type Tier = WireTier;
 export const TIERS: readonly Tier[] = TierSchema.literals;
 
-// The tier a first visit opens in, and the one an unreadable row reads
-// as: the world layer is visible as being there, and the words are not
-// covered by it.
-const FIRST_TIER: Tier = "blend";
+// The tier every launch opens in, whatever the last visit chose: the
+// page is opened to talk (client/Spec.lean D47). The tier is held by
+// this tab alone, so nothing stored or answered by the city brings an
+// earlier one back.
+const LAUNCH_TIER: Tier = "zen";
 
 // Read out of the wire's own union rather than spelled again, so a rule
 // the city adds is offered here without a second list to forget.
@@ -186,6 +182,7 @@ export interface PreferenceDoor {
   readonly setLang: (lang: Lang) => void;
   readonly setWelcomed: (done: boolean) => void;
   readonly setPanel: (open: boolean) => void;
+  // Changes this tab's tier only: nothing stored, nothing told (D47).
   readonly setTier: (tier: Tier) => void;
   readonly setAppearance: (next: Appearance) => void;
   readonly setProxying: (rule: Proxying) => void;
@@ -276,7 +273,7 @@ function readPreferences(rows: Rows, browserLang: string): Preferences {
     lang: readLang(rows.getItem(ROWS.lang), browserLang),
     welcomed: rows.getItem(ROWS.welcomed) === YES,
     panel: rows.getItem(ROWS.panel) !== NO,
-    tier: readOne(TIERS, rows.getItem(ROWS.tier), FIRST_TIER),
+    tier: LAUNCH_TIER,
     appearance: readAppearance(rows),
     proxying: readOne(PROXYING_RULES, rows.getItem(ROWS.proxying), "except_local"),
     notifying: readOne(NOTIFYINGS, rows.getItem(ROWS.notifying), "off"),
@@ -290,7 +287,6 @@ function writePreferences(rows: Rows, next: Preferences): void {
   rows.setItem(ROWS.lang, next.lang);
   rows.setItem(ROWS.welcomed, next.welcomed ? YES : NO);
   rows.setItem(ROWS.panel, next.panel ? YES : NO);
-  rows.setItem(ROWS.tier, next.tier);
   writeAppearance(rows, next.appearance);
   rows.setItem(ROWS.proxying, next.proxying);
   rows.setItem(ROWS.notifying, next.notifying);
@@ -303,7 +299,7 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
   const held = writable<Preferences>(readPreferences(rows, browserLang));
   const keeper = writable<Keeper>("browser");
   const workbench = writable<Workbench>(readWorkbench(rows.getItem(ROWS.workbench)));
-  // One write path for every change, the city's answer included: the
+  // One write path for every kept change, the city's answer included: the
   // cache and the store move together, so a reader that redraws and a
   // reader that reloads the page never see two different records.
   const settle = (next: Preferences): void => {
@@ -342,8 +338,7 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
       told({ panel });
     },
     setTier(tier) {
-      settle({ ...get(held), tier });
-      told({ tier });
+      held.set({ ...get(held), tier });
     },
     setAppearance(appearance) {
       settle({ ...get(held), appearance });

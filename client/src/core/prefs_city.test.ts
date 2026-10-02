@@ -12,7 +12,7 @@ import { memory } from "./rows";
 import type { PreferencePatch } from "../wire";
 
 describe("the preferences the city keeps", () => {
-  test("the city's answer is taken over what this browser held", () => {
+  test("the city's answer is taken over what this browser held, except the tier this tab chose", () => {
     const held = get(loadPreferences(memory(), "en").held);
     const answer = {
       lang: "zh",
@@ -38,7 +38,6 @@ describe("the preferences the city keeps", () => {
       ...held,
       lang: "zh",
       panel: false,
-      tier: "panorama",
       proxying: "always",
       appearance: {
         lighting: "light",
@@ -66,7 +65,7 @@ describe("the preferences the city keeps", () => {
     expect(adopted(held, answer)).toEqual({ ...held, appearance: { ...held.appearance, blend: null } });
   });
 
-  test("each named change is told to the city as its own patch", () => {
+  test("each named change but the tier is told to the city as its own patch", () => {
     const door = loadPreferences(memory(), "en");
     const told: PreferencePatch[] = [];
     door.tell((patch) => told.push(patch));
@@ -100,7 +99,6 @@ describe("the preferences the city keeps", () => {
       },
       { proxying: "never" },
       { chord: { action: "go.city", spelled: "accel+2" } },
-      { tier: "zen" },
     ]);
   });
 });

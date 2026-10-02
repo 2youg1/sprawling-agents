@@ -26,6 +26,7 @@
   import { RELEASE_ALL } from "./core/slash";
   import { markOf, paintMark } from "./core/mark";
   import { TIERS } from "./core/prefs";
+  import type { Tier } from "./core/prefs";
   import { cityIsShut, CITY } from "./core/scope";
   import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
   import type { View } from "./core/route";
@@ -138,7 +139,11 @@
     const was = view;
     view = Option.getOrElse(current(u.bar), () => DEFAULT_VIEW);
     const back = hostSettled(was, view, arrived);
-    if (arrived && view.kind !== "setup") void tick().then(() => { if (back === null) focusTitle(); else back.focus(); });
+    if (tierOnLanding !== null && view.kind === "talk") {
+      u.prefs.setTier(tierOnLanding);
+      tierOnLanding = null;
+      void tick().then(focusComposer);
+    } else if (arrived && view.kind !== "setup") void tick().then(() => { if (back === null) focusTitle(); else back.focus(); });
     arrived = true;
   }
 
@@ -164,19 +169,31 @@
     opener = null;
   }
 
-  // The tier is the person's, kept where their other postures are kept
-  // (`core/prefs.ts`), and cycled in the order `TIERS` states. Holding the
-  // layers key - the edge key or its chord - shows the blend tier for as
-  // long as it is held and changes nothing (docs/frontend-method.md §7E). One column has
-  // no room beside the talk: the key opens the world as a sheet over it (4-52).
+  // The tier is this tab's (`core/prefs.ts`, client/Spec.lean D47), and
+  // cycled in the order `TIERS` states. Holding the layers key - the edge
+  // key or its chord - shows the blend tier for as long as it is held and
+  // changes nothing (docs/frontend-method.md §7E). One column has no room
+  // beside the talk: the key opens the world as a sheet over it (4-52).
+  // A tier is the conversation's layout, so a press over the settings
+  // panel or another page first returns to the conversation, and the
+  // tier changes when that page settles, inside the same view transition
+  // (client/Spec.lean D48).
   let columns = $state<Columns>("twelve");
+  let tierOnLanding: Tier | null = null;
   function cycleTier(): void {
     if (columns === "one") {
       (sheetsOpen().includes("world") ? leaveSheet : openSheet)("world");
       return;
     }
-    const at = TIERS.indexOf($held.tier);
-    u.prefs.setTier(TIERS[(at + 1) % TIERS.length] ?? "blend");
+    const next = TIERS[(TIERS.indexOf($held.tier) + 1) % TIERS.length] ?? "zen";
+    if (view.kind === "talk") {
+      u.prefs.setTier(next);
+      focusComposer();
+      return;
+    }
+    tierOnLanding = next;
+    if (view.kind === "setup" && panelBeneath().kind === "talk") closePanel();
+    else u.go(DEFAULT_VIEW);
   }
   let peeking = $state(false);
   const tier = $derived(columns === "one" ? (peeking || sheetsOpen().includes("world") ? "panorama" : "zen") : peeking ? "blend" : $held.tier);

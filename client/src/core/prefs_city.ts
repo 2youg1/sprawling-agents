@@ -34,14 +34,15 @@ export function keepWithCity(door: PreferenceDoor, conn: Connection): void {
 
 // The city's answer taken over what this browser held. A field the
 // answer leaves out, or states as never chosen, is one the person never
-// settled with the city, so the browser's value stands for it.
+// settled with the city, so the browser's value stands for it. The
+// tier is this tab's alone (client/Spec.lean D47), so the answer's is
+// not read.
 export function adopted(held: Preferences, answer: PreferencesAnswer): Preferences {
   return {
     ...held,
     lang: answer.lang ?? held.lang,
     welcomed: answer.welcomed ?? held.welcomed,
     panel: answer.panel ?? held.panel,
-    tier: answer.tier ?? held.tier,
     proxying: answer.proxying ?? held.proxying,
     appearance: answer.appearance === undefined ? held.appearance : appearanceOfCity(answer.appearance, held.appearance),
   };
