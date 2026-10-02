@@ -725,5 +725,8 @@ status = "measured, not gated here: 45-124 us per city across three runs (x86_64
 what = "the operable controls standing on the most crowded conversation page of the gallery: edge keys, composer, inspect side"
 measured_by = "cargo xtask render (the `talk` reading, on every pass)"
 status = "held by render, not weighed by budget"
-best_count = 0 # placeholder: the integrator records the accepted gallery's reading
+# The reading of the gallery once the shell's edge keys, composer and
+# inspect side were built and merged together; the design's 8 is not met
+# yet, and the next change that folds a control away lowers this row.
+best_count = 13
 slack_count = 0
