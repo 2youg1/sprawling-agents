@@ -263,10 +263,10 @@ describe("new and fork", () => {
     expect(find("/steer")?.grammar).toBe("<text>");
   });
 
-  test("/diff opens the run page that holds the changes lens", () => {
+  test("/diff opens the run page at its changes lens", () => {
     const room = Address.make("lab/room1");
     const held = hands(room, (asked) => (asked === room ? { run: MOTHER, at: Seq.make(7) } : null));
     verb("/diff").run(held.filled, called("/diff"));
-    expect(held.went).toEqual([{ kind: "run", run: MOTHER }]);
+    expect(held.went).toEqual([{ kind: "run", run: MOTHER, lens: "changes" }]);
   });
 });

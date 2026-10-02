@@ -175,7 +175,7 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
   "/mcp": [{ line: "/mcp", done: going({ kind: "mcp" }) }],
   "/doctor": [{ line: "/doctor", done: going({ kind: "welcome" }) }],
   "/help": [{ line: "/help", done: { ...NOTHING, written: ["/"] } }],
-  "/diff": [{ line: "/diff", done: going({ kind: "run", run: LIVE }) }],
+  "/diff": [{ line: "/diff", done: going({ kind: "run", run: LIVE, lens: "changes" }) }],
 };
 
 describe("every / verb", () => {
