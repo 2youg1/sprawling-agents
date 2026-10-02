@@ -265,6 +265,32 @@ test *args:
 test-std:
     cargo test --workspace --locked
 
+# The suite of `test`, compiled once into an archive that `test-slice`
+# runs a part of on another machine with the same checkout path: `ci.yml`
+# builds it on one runner and runs four slices on four others, so the
+# compile is paid once and the run is a quarter of the wall clock.
+test-archive file:
+    cargo nextest archive --workspace --locked --all-features --archive-file '{{file}}'
+
+# One slice of an archive `test-archive` wrote, `partition` in nextest's
+# spelling (`count:2/4`). The archive is unpacked over this checkout's
+# own `target/`, because a test that spawns a workspace binary reads the
+# absolute path cargo baked in at compile time.
+test-slice file partition:
+    cargo nextest run --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite --partition '{{partition}}' --no-fail-fast
+
+# The packages every platform builds and tests. The desktop server
+# and its FFI seam serve a Windows desktop only, and xtask judges the
+# repository rather than shipping in it, so `ci.yml` lints and tests
+# those three on Windows alone; on macOS and Linux the two desktop
+# packages compile only as what the binary links.
+core_packages := "--workspace --exclude sprawling-desktop --exclude sprawling-desktop-ffi --exclude xtask"
+
+# Clippy and the suite over the core packages, on whatever platform runs it.
+check-core:
+    cargo clippy {{core_packages}} --all-targets --all-features --locked -- -D warnings
+    cargo nextest run {{core_packages}} --locked --all-features --no-fail-fast
+
 # The three gates that judge a built artifact rather than a source:
 # `render` opens `crates/sprawling/web-dist`, `npm` reads `client/node_modules`,
 # `budget` weighs both. The one list of them; `gates-sources` runs every
@@ -434,6 +460,16 @@ fuzz target:
 # full mutation run is minutes, and a gate nobody waits for is a gate nobody runs.
 mutants:
     cargo mutants --package sprawling-kernel --minimum-test-timeout 60 --error-value 'kernel::AxError::failure(kernel::AxCode::InvalidArgs, "mutant", "mutant")'
+
+# The mutants of the lines changed since `base`, one `shard` (`k/n`) of
+# them, so a wave's change is judged without a whole-workspace run. The
+# report lands in `mutants.out`.
+mutants-diff base shard:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p target
+    git diff "$(git merge-base '{{base}}' HEAD)" HEAD -- '*.rs' > target/mutants.diff
+    cargo mutants --workspace --in-diff target/mutants.diff --shard '{{shard}}' --test-tool nextest --minimum-test-timeout 60
 
 # The performance register: every budget, what it costs today, and what is gated.
 budget:
