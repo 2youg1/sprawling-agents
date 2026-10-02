@@ -219,7 +219,7 @@ Feedback in seconds keeps each step honest and the whole check takes minutes, so
 
 A green result belongs to the tree it ran on: record it with `git rev-parse HEAD^{tree}`, and rerun it on that tree only when something outside the tree, such as the toolchain, changed.
 
-Four workflows run on a schedule rather than on a push, and each judges something a push cannot: `nightly.yml` (advisories, fuzzing, the API baselines and the kani autoharness lead), `platforms.yml` (macOS, the Nix flake, a byte-for-byte rebuild), `adversary.yml` (the Lean adversary on a fresh seed) and `upstream-watch.yml`. A red scheduled run is news about the tree as it stands; read it the next morning and fix the cause on `main`.
+Four workflows run on a schedule rather than on a push, and each judges something a push cannot: `nightly.yml` (advisories and fuzzing), `platforms.yml` (the gates on macOS, the Nix flake, a byte-for-byte rebuild), `adversary.yml` (the Lean adversary on a fresh seed) and `upstream-watch.yml`. A red scheduled run is news about the tree as it stands; read it the next morning and fix the cause on `main`. `on-demand.yml` runs what nobody waits for on a push — mutation of a branch's diff, citysim, the screenshots, a release build of a ref — when it is dispatched with `-f job=<name>`, and the kani autoharness lead runs when `nightly.yml` is dispatched by hand.
 
 ## Commits
 
