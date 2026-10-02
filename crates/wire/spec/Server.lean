@@ -157,7 +157,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 **三个 kernel 类型的再导出**（`DialectKind`／`Effort`／`ModelTag`）。`web` 只依赖 `wire`（拓扑图），而设置页要拼写这三个词；再导出而非镜像定义，因为镜像就是同一规则的第二个权威——同 §8-0 对 `Mode` 的口径。
 -/
 
-/-! D18 送页面的两条路由是一个公开函数，城的端口与远程监听各把它并进自己的路由表
+/-! D20 送页面的两条路由是一个公开函数，城的端口与远程监听各把它并进自己的路由表
 
 **决定**：`/` 与 `/{*asset}` 两条路由连同它们的响应头由 `bundle_routes` 造出，对路由表的状态类型泛型，自带 `Arc<ClientAssets>` 作状态；`router` 把它并进来，装配层的远程监听也把它并进来。
 

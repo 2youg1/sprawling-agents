@@ -348,7 +348,7 @@ D22 本 crate 不读配置。通路的三个参数（选哪一个实现、隧道
 ```text
 /remote/pair     设备 → PairHello；城 → PairReply；设备 → 封好的认领；城 → 封好的 DeviceId（16 字节）；城关闭连接
 /remote/session  设备 → Hello；城 → Reply；设备 → Finish；其后两向都是封好的 Payload（§8-5）
-/ 与其下的路径    不是 WebSocket 升级的 GET：客户端的 bundle，与城自己的端口同一份（`wire::bundle_routes`，`crates/wire/Spec.lean` §8-2、wire D18）
+/ 与其下的路径    不是 WebSocket 升级的 GET：客户端的 bundle，与城自己的端口同一份（`wire::bundle_routes`，`crates/wire/Spec.lean` §8-2、wire D20）
 ```
 
 - **页面经同一个端口到达设备**：设备打开二维码里的 `https://<外面的地址>/#pair=…`，远程监听答出客户端的 bundle，页面在这个源上配对、存下设备密钥（`client/Spec.lean` §4-57）。页面这一半不经过门：没配对的浏览器得先拿到页面，才有地方兑配对码，这与城的端口上 `/` 不要令牌是同一个理由（`crates/wire/spec/Reception/Admission.lean`）。页面之外的 HTTP 门（`/transcribe`、`/drop`、`/enroll`、`/acp`）不在远程监听上：它们不是线协议帧，中继判不了它们的动词类，所以在远程源上答 404。
