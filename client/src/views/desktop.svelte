@@ -81,7 +81,7 @@ export function desktopScopeAt(addr: Address): Address {
 
 <div class="flex flex-col gap-snug">
   <textarea
-    class="min-h-output w-full rounded-control bg-raised px-base py-snug font-mono text-note text-text placeholder:text-text-faint"
+    class="min-h-output w-full rounded-control border border-edge-input bg-raised px-base py-snug font-mono text-note text-text placeholder:text-text-faint"
     aria-label={say($lang, "desktop_allowlist")}
     placeholder={say($lang, "desktop_empty")}
     bind:value={draft}

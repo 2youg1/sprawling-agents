@@ -102,7 +102,7 @@
     </ul>
   {/if}
   <section>
-    <h3 class="mb-tight text-label font-label text-text-quiet">{say($lang, "city_runs")}</h3>
+    <h3 class="mb-tight text-note text-text-faint">{say($lang, "city_runs")}</h3>
     {#if runs.length > 0}
       <ul class="text-note">
         {#each runs as run (run.run)}

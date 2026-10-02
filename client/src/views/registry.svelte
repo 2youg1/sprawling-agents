@@ -19,7 +19,7 @@ export { default as RegistryTable } from "./registry/table.svelte";
 <script lang="ts">
   import { QUERIES } from "../core/asking";
   import { readAnswer } from "../core/answered";
-  import { say } from "../core/lang";
+  import { fill, say } from "../core/lang";
   import { ui } from "../ui";
   import Page from "./parts/page.svelte";
   import Unanswered from "./parts/unanswered.svelte";
@@ -36,7 +36,13 @@ export { default as RegistryTable } from "./registry/table.svelte";
 <!-- The screen: the one question, and the table that draws its answer.
 A table is not capped by content kind (client-SPEC 4-33) - it grows with
 its container and scrolls sideways rather than break a value. -->
-<Page title={say($lang, "nav_registry")}>
+{#snippet count()}
+  {#if answer !== undefined && answer.assets.length > 0}
+    <span class="figure text-note text-text-quiet">{fill(say($lang, "registry_count"), { n: String(answer.assets.length) })}</span>
+  {/if}
+{/snippet}
+
+<Page title={say($lang, "nav_registry")} note={say($lang, "registry_note")} aside={count}>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.registry} />
   {:else if answer === undefined}

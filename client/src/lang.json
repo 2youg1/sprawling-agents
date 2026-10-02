@@ -387,10 +387,6 @@
     "en": "runs that worked here",
     "zh": "在这里干过活的 run"
   },
-  "city_spent": {
-    "en": "spent {usd}",
-    "zh": "已花 {usd}"
-  },
   "city_stop": {
     "en": "/halt --all",
     "zh": "/halt --all"
@@ -2523,6 +2519,10 @@
     "en": "where to go",
     "zh": "去处"
   },
+  "registry_count": {
+    "en": "{n} kept",
+    "zh": "留存 {n} 件"
+  },
   "registry_empty": {
     "en": "nothing has been filed for keeping",
     "zh": "还没有东西被登记留存"
@@ -2530,6 +2530,10 @@
   "registry_kind": {
     "en": "kind",
     "zh": "类别"
+  },
+  "registry_note": {
+    "en": "What runs filed for keeping, newest first.",
+    "zh": "run 登记留存的东西，新的在前。"
   },
   "registry_what": {
     "en": "what it is",

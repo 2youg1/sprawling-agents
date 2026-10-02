@@ -197,7 +197,7 @@ const DOCTOR = "sprawling doctor --install";
     />
     <!-- wording-ok: the one command this screen exists to hand over;
     a machine spelling, identical in both languages (client-SPEC 4-10) -->
-    <code class="rounded-control bg-chrome px-base py-tight font-mono text-note text-text">
+    <code class="flex h-control items-center rounded-control border border-edge px-base font-mono text-note text-text">
       {DOCTOR}
     </code>
     <Copy text={DOCTOR} />

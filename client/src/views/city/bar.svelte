@@ -4,10 +4,10 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The one information bar at the top of the city page: the city's
-  // name, six figures for how it stands, what it has spent, and the one
-  // control that stops or releases it. Every fact is stated once and in
-  // one place.
+  // How the city stands, as one row of figures under the page header:
+  // six counts and what the city has spent. Every fact is stated once
+  // and in one place; the city's name and the control that stops or
+  // releases it are the page header's (client-SPEC 4-50).
   //
   // **The six figures come from `Query::Metrics` and from nothing
   // else.** Each of them is also provable from a view this page could
@@ -18,16 +18,13 @@
   // the shell states it once, as a banner over every page.
 
   import { QUERIES } from "../../core/asking";
-  import { halt, release } from "../../core/commands";
   import type { Key } from "../../core/lang";
-  import { fill, say } from "../../core/lang";
+  import { say } from "../../core/lang";
   import { MAYOR, toFragment } from "../../core/route";
   import type { View } from "../../core/route";
-  import { cityIsShut, CITY } from "../../core/scope";
   import { count, usd } from "../../core/time";
   import { ui } from "../../ui";
   import type { MetricsAnswer } from "../../wire";
-  import Button from "../parts/button.svelte";
 
   // One figure on the bar: the word it is offered under, the field it
   // reads, the page a person acts on it from, and whether a figure
@@ -86,11 +83,8 @@
 
   const u = ui();
   const lang = u.lang;
-  const belief = u.conn.belief;
   const metrics = u.conn.asking.ask(QUERIES.metrics);
   const cost = u.conn.asking.ask(QUERIES.cost);
-
-  const halted = $derived(cityIsShut($belief.halted));
 
   const readings = $derived.by((): Reading[] | null => {
     const held = $metrics;
@@ -113,43 +107,30 @@
   });
 </script>
 
-<header
-  class="flex flex-wrap items-baseline gap-base border-b border-edge px-pane py-snug"
+<dl
+  class="grid grid-cols-[repeat(auto-fit,minmax(16ch,1fr))] gap-x-gutter gap-y-base border-b border-edge pb-base"
   aria-label={say($lang, "city_bar")}
 >
-  <h1 tabindex="-1" class="text-title font-title">{$belief.city ?? say($lang, "nav_city")}</h1>
   {#if readings !== null}
-    <dl class="flex flex-wrap items-baseline gap-base text-note">
-      {#each readings as reading (reading.key)}
-        <div class="flex items-baseline gap-tight">
-          <dt class="text-text-faint">{reading.label}</dt>
-          <dd class="font-mono">
-            {#if reading.href !== null}
-              <a
-                href={reading.href}
-                class={["underline decoration-edge-panel underline-offset-2 hover:decoration-accent", reading.tone]}
-              >
-                {reading.value}
-              </a>
-            {:else}
-              <span class={reading.tone}>{reading.value}</span>
-            {/if}
-          </dd>
-        </div>
-      {/each}
-    </dl>
+    {#each readings as reading (reading.key)}
+      <div class="flex min-w-0 flex-col">
+        <dt class="truncate text-note text-text-faint">{reading.label}</dt>
+        <dd class="text-heading figure">
+          {#if reading.href !== null}
+            <a href={reading.href} class={["hover:text-accent", reading.tone]}>{reading.value}</a>
+          {:else}
+            <span class={reading.tone}>{reading.value}</span>
+          {/if}
+        </dd>
+      </div>
+    {/each}
   {/if}
   {#if spent !== null}
-    <a href={toFragment({ kind: "cost" })} class="text-note text-text-faint hover:text-text-quiet">
-      {fill(say($lang, "city_spent"), { usd: usd(spent) })}
-    </a>
+    <div class="flex min-w-0 flex-col">
+      <dt class="truncate text-note text-text-faint">{say($lang, "cost_total")}</dt>
+      <dd class="text-heading figure">
+        <a href={toFragment({ kind: "cost" })} class="text-text hover:text-accent">{usd(spent)}</a>
+      </dd>
+    </div>
   {/if}
-  <span class="flex-1"></span>
-  <Button
-    label={halted ? say($lang, "city_release") : say($lang, "city_stop")}
-    tone={halted ? "secondary" : "quiet"}
-    onPress={() => {
-      u.send(halted ? release(CITY) : halt(CITY));
-    }}
-  />
-</header>
+</dl>

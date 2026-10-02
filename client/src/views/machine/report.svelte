@@ -127,7 +127,7 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
   {@const how = spelledOf(item.install)}
   {@const enables = enablesKey(item.name)}
   {@const here = "present" in item.state}
-  <li class="flex min-w-0 flex-col gap-tight rounded-card bg-raised px-base py-snug">
+  <li class="flex min-w-0 flex-col gap-tight border-t border-edge pt-snug pb-base">
     <div class="flex min-w-0 items-center gap-snug">
       {#if item.homepage === undefined || item.homepage === null}
         <span class="shrink-0 whitespace-nowrap font-mono text-label text-text">{item.name}</span>
@@ -194,7 +194,7 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
 
 {#snippet steps(each: Walk)}
   {@const done = each.filter((step) => step.state === "done" || step.state === "failed").length}
-  <div class="flex min-w-0 flex-col gap-snug rounded-card bg-raised px-base py-snug">
+  <div class="flex min-w-0 flex-col gap-snug border-y border-edge py-snug">
     <Progress label={say($lang, "machine_progress_label")} {done} total={each.length} />
     <ol class="flex min-w-0 flex-col gap-tight">
       {#each each as step (step.name)}
@@ -246,7 +246,7 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
       {@render steps(walk)}
     {/if}
-    <ul class="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] items-start gap-snug">
+    <ul class="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] items-start gap-x-gutter">
       {#each items.filter((each) => each.pack === undefined || each.pack === null) as item (item.name)}
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
         {@render row(item, absenceOf(item, missing, items))}

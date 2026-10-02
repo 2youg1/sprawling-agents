@@ -25,6 +25,8 @@
   export const PAGE_WIDTH = 1259;
   // The building page's middle column at that window: eight columns.
   export const MIDDLE_WIDTH = 915;
+  // Its right side at that window: four columns.
+  const RIGHT_WIDTH = 443;
 
   function oid(seed: string): GitOid {
     return GitOid.make(seed.repeat(40).slice(0, 40));
@@ -147,10 +149,12 @@
   import Building from "../building.svelte";
   import Commits from "../building/commits.svelte";
   import Directory from "../building/directory.svelte";
+  import Opened from "../building/opened.svelte";
   import Sandbox from "../building/sandbox.svelte";
   import Status from "../building/status.svelte";
   import Whose from "../building/whose.svelte";
   import Case from "./case.svelte";
+  import Pages from "./pga_pages.svelte";
   import Stand from "./stand.svelte";
 </script>
 
@@ -163,6 +167,9 @@
   </Case>
   <Case label="building · changes since the last checkpoint" width={MIDDLE_WIDTH}>
     <Status building={LAB} />
+  </Case>
+  <Case label="building · a changed file opening on the right" width={RIGHT_WIDTH}>
+    <Opened item={{ building: LAB, path: "Roadmap.md", version: null }} />
   </Case>
   <Case label="building · a commit asked for by its oid" width={MIDDLE_WIDTH}>
     <Whose oid={KNOWN_OID} />
@@ -180,3 +187,5 @@
     <Sandbox address={LAB} held={null} known />
   </Case>
 </Stand>
+
+<Pages />

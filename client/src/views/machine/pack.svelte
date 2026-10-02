@@ -42,7 +42,7 @@
   const complete = $derived(members.every((each) => "present" in each.state || offerOf(each) === "by_hand"));
 </script>
 
-<li class="col-span-full flex min-w-0 flex-col gap-snug rounded-card bg-raised px-base py-snug">
+<li class="col-span-full flex min-w-0 flex-col gap-snug border-t border-edge pt-snug pb-base">
   <div class="flex min-w-0 flex-wrap items-center gap-snug">
     <span class="shrink-0 text-label font-label text-text">{say($lang, "machine_pack_rust_tools")}</span>
     <Badge

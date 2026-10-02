@@ -92,7 +92,7 @@
             <span class="inline-flex shrink-0 items-center gap-tight font-mono figure text-text-quiet">
               <Glyph name="check" size="sm" />{String(row.done)}
             </span>
-            <span class="w-figure shrink-0 text-right figure text-text-quiet">
+            <span class="hidden w-[12ch] shrink-0 truncate text-right figure text-text-quiet @lg/table:block">
               {row.latest === null ? say($lang, "city_table_none") : ago($lang, row.latest, now)}
             </span>
           </span>

@@ -106,7 +106,7 @@
             <button
               type="button"
               class={[
-                "grid h-control min-w-0 flex-1 grid-cols-[16ch_minmax(0,1fr)_auto] items-center gap-x-base rounded-control pr-snug pl-base text-left hover:wash",
+                "grid h-control min-w-0 flex-1 grid-cols-[16ch_minmax(0,1fr)_auto] narrow:grid-cols-[8ch_minmax(0,1fr)_auto] items-center gap-x-base rounded-control pr-snug pl-base text-left hover:wash",
                 isOpen(file.path) ? "wash-strong" : "",
               ]}
               aria-label={fill(say($lang, "git_open_file"), { path: file.path })}

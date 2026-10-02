@@ -69,12 +69,12 @@ const TITLES: Record<Cut, Key> = {
 {#snippet cut(rows: readonly (readonly [string, UsdMicros])[], total: UsdMicros)}
   <ul class="text-note">
     {#each [...rows].sort((a, b) => b[1] - a[1]) as [name, amount] (name)}
-      <li class="settled-row my-tight">
+      <li class="settled-row py-tight">
         <div class="flex justify-between gap-base">
           <span class="truncate font-mono text-text-quiet">{name}</span>
-          <span class="shrink-0 text-text">{usd(amount)}</span>
+          <span class="shrink-0 figure text-text">{usd(amount)}</span>
         </div>
-        <div class="summary mt-tight h-dot overflow-hidden rounded-pill bg-track">
+        <div class="summary mt-tight h-hair overflow-hidden rounded-pill bg-track">
           <div class="h-full bg-accent" style:width="{total > 0 ? (amount / total) * 100 : 0}%"></div>
         </div>
       </li>
@@ -88,8 +88,8 @@ const TITLES: Record<Cut, Key> = {
   would read as a measurement. -->
   {#if answer !== undefined && reading !== undefined && reading.kind !== "idle"}
     <span class="flex items-baseline gap-snug">
-      <span class="text-note text-text-quiet">{say($lang, "cost_total")}</span>
-      <span class="text-figure font-figure">
+      <span class="text-note text-text-faint">{say($lang, "cost_total")}</span>
+      <span class="text-figure font-figure figure">
         {reading.kind === "priced" ? usd(answer.total) : say($lang, "cost_none")}
       </span>
     </span>
@@ -126,10 +126,12 @@ width in as many columns as it holds. -->
       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
       {@render unpriced(answer.unpriced)}
     {/if}
-    <div class="grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-wide">
+    <!-- The cuts are columns of the page itself, parted by a rule rather
+    than lifted onto cards (client-SPEC 7A-4, 4-50). -->
+    <div class="grid grid-fit gap-x-gutter gap-y-wide">
       {#each CUTS as each (each)}
-        <section class="flex min-w-0 flex-col gap-snug rounded-card bg-raised px-pane py-base">
-          <h2 class="text-label font-label text-text-quiet">{say($lang, TITLES[each])}</h2>
+        <section class="flex min-w-0 flex-col gap-snug border-t border-edge pt-base" aria-label={say($lang, TITLES[each])}>
+          <h2 class="text-note text-text-faint">{say($lang, TITLES[each])}</h2>
           {#if answer[each].length > 0}
             <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
             {@render cut(answer[each], answer.total)}

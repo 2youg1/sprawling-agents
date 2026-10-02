@@ -170,9 +170,13 @@
 
 <Page title={address} {above} {aside}>
   <Goal {address} />
-  <div class="grid grid-cols-11 items-start gap-x-gutter gap-y-wide narrow:grid-cols-1">
+  <!-- In source order the index, the section and the tree: one column
+       under 768 px reads them in that order, so a phone reaches the
+       section, and a file open on the right, before the whole tree; from 768 px the index and the tree
+       share the first three columns and the section spans both rows. -->
+  <div class="grid grid-cols-11 grid-rows-[auto_1fr] items-start gap-x-gutter gap-y-wide narrow:grid-cols-1 narrow:grid-rows-none">
     <nav
-      class="col-[1/4] flex min-w-0 flex-col gap-wide narrow:col-span-full"
+      class="col-[1/4] row-start-1 min-w-0 narrow:col-span-full narrow:row-auto"
       aria-label={say($lang, "bld_index")}
     >
       <ul class="flex flex-col narrow:flex-row narrow:flex-wrap narrow:gap-tight">
@@ -198,20 +202,10 @@
           </li>
         {/each}
       </ul>
-      <Tree root={address} {picked} onPick={pick} />
-      {#if building !== undefined}
-        <Rooms
-          answer={building}
-          living={livingIn}
-          onPick={(room) => {
-            pick({ at: room, kind: "directory" });
-          }}
-        />
-      {/if}
     </nav>
     <section
       class={[
-        "flex min-w-0 flex-col narrow:col-span-full",
+        "row-[1/3] flex min-w-0 flex-col narrow:col-span-full narrow:row-auto",
         opened === null ? "col-[4/12]" : "col-[4/8]",
       ]}
       aria-label={shownLabel}
@@ -241,6 +235,18 @@
     {#if opened !== null}
       <Opened item={opened} />
     {/if}
+    <div class="col-[1/4] row-start-2 flex min-w-0 flex-col gap-wide narrow:col-span-full narrow:row-auto">
+      <Tree root={address} {picked} onPick={pick} />
+      {#if building !== undefined}
+        <Rooms
+          answer={building}
+          living={livingIn}
+          onPick={(room) => {
+            pick({ at: room, kind: "directory" });
+          }}
+        />
+      {/if}
+    </div>
   </div>
 </Page>
 
