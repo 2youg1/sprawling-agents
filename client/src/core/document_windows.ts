@@ -88,3 +88,7 @@ export function joined(gathering: Gathering, answer: RangeAnswer): Gathering {
     ? gathering
     : { ...gathering, text: gathering.text + window.text, through: window.span.end };
 }
+
+export function recorded(version: B3Hash, format: Format): Gathering {
+  return { version, format, encoding: "utf8", bytes: 0, text: "", through: 0 };
+}

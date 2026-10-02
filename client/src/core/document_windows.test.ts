@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Address, B3Hash } from "../wire";
 import type { DocumentAnswer, DocumentState } from "../wire";
-import { EDITABLE_BYTES_MAX, joined, nextSpan, opened, whole } from "./document_windows";
+import { EDITABLE_BYTES_MAX, joined, nextSpan, opened, recorded, whole } from "./document_windows";
 import type { Gathering } from "./document_windows";
 
 const AT = Address.make("shop/notes.md");
@@ -76,5 +76,16 @@ describe("gathering a version", () => {
   test("asks for nothing more of a version larger than the editable bound", () => {
     const head = gathering(opened(headOf("# one\n\n", EDITABLE_BYTES_MAX + 1)));
     expect([nextSpan(head), whole(head)]).toEqual([null, false]);
+  });
+});
+
+describe("a version known only by its digest", () => {
+  test("is read from its first byte until an empty window says where it ends", () => {
+    const start = recorded(V, "plain");
+    const first = joined(start, { version: V, window: { span: { start: 0, end: 4 }, text: "abc\n" } });
+    const end = joined(first, { version: V, window: { span: { start: 4, end: 4 }, text: "" } });
+    expect([nextSpan(start), whole(first), nextSpan(first), whole(end), end.bytes, end.text]).toEqual([
+      { start: 0, end: EDITABLE_BYTES_MAX }, false, { start: 4, end: EDITABLE_BYTES_MAX }, true, 4, "abc\n",
+    ]);
   });
 });
