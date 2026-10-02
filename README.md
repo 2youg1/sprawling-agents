@@ -76,7 +76,7 @@ The **official harnesses** group in settings shows the command that starts each 
 ## How it behaves
 
 - An address answers three questions at once: `lab/room1` is a place on disk, and that place decides what the agent there may write, which documents it starts with and whom it reports to.
-- Agents find each other and talk without you relaying. A message reaches a working resident at the end of its next tool result and starts a run for an idle one. Only the person's own entrance can speak in the person's name, and a type enforces it.
+- Agents find each other and talk without you relaying. A message reaches a working resident at the end of its next tool result and starts a run for an idle one. Only the User's own entrance can speak in the User's name, and a type enforces it.
 - The Ledger is the only history: every effect is written as an event before it happens, every view on the page is rebuilt from it byte for byte, and one changed byte stops chain verification at that line.
 - Every deletion carries its way back, and the recycle bin restores a file with one press.
 - Each agent works on its own git worktree, and its change merges only after another resident has verified it; verifying your own work is a compile error.
@@ -134,9 +134,9 @@ Nothing updates itself: `sprawling status --check`, or the button in settings, t
 
 I have tried many harnesses. Some feel conceptually dated, others overshoot what is useful. Take recursive self-improvement: until the model itself leaves the stateless regime, a harness can only keep adapting to the newest models and learn a company's existing workflows so it runs them faster. The first looks like an ablation study; the second needs privacy.
 
-More and more small companies are tiny teams that ship online services with many agents, and most of them are a pile of Markdown plus a few talented people. I wanted a harness that keeps up with multi-agent work while staying practical about self-improvement and memory, so practical extensibility, saving the person's attention, cost control as agents scale up, privacy and reliability, and long-running operation sit at the core of the design, mixed with a few ideas from urban studies and sociology.
+More and more small companies are tiny teams that ship online services with many agents, and most of them are a pile of Markdown plus a few talented people. I wanted a harness that keeps up with multi-agent work while staying practical about self-improvement and memory, so practical extensibility, saving the User's attention, cost control as agents scale up, privacy and reliability, and long-running operation sit at the core of the design, mixed with a few ideas from urban studies and sociology.
 
-The stronger agents become, the more a person's attention costs, and sprawling tries not to take it. Use it by designing loops rather than writing prompts: lay out the workflow, let agents do the fixed work, and come back now and then to see how it runs. Your files, code and documents are the memory; "memory" that a harness injects into a stateless model mostly slows the model down.
+The stronger agents become, the more the User's attention costs, and sprawling tries not to take it. Use it by designing loops rather than writing prompts: lay out the workflow, let agents do the fixed work, and come back now and then to see how it runs. Your files, code and documents are the memory; "memory" that a harness injects into a stateless model mostly slows the model down.
 
 No multi-agent scheme yet delivers gains that justify the cost of scale, and the study of how models interact and behave socially inside agent clusters has only begun. Keep a city lean, with the skills, MCP servers and harnesses your work needs, and add things when a concrete problem asks for them, because the same model behaves differently under different harnesses.
 

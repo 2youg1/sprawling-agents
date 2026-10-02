@@ -4,7 +4,7 @@
 >
 > It does not cover installation ([`getting-started.md`](getting-started.md)) or the design ([`../ARCHITECTURE.md`](../ARCHITECTURE.md)). The diagnostic log has its own file ([`logging.md`](logging.md)), because it is a thing to understand once rather than a step to follow.
 
-## What a person does to running work
+## What the User does to running work
 
 Every one of these is recorded as an event like anything else. Each is a command you can type into any message box, and the pages offer the same commands as controls.
 
@@ -16,7 +16,7 @@ Every one of these is recorded as an event like anything else. Each is a command
 | `/release <addr>` or `/release --all` | lets a halted building, or the halted city, work again |
 | **allow** / **deny** | answers a design question a resident asked |
 
-Steering is not interruption. The instruction lands at the end of the next tool result, so a request already on the wire is never rewritten mid-flight; when the run is inside a command, the instruction is heard at the command's next phase boundary. What a person said arrives at the next safe point, and the run continues from where it is rather than from where it was.
+Steering is not interruption. The instruction lands at the end of the next tool result, so a request already on the wire is never rewritten mid-flight; when the run is inside a command, the instruction is heard at the command's next phase boundary. What the User said arrives at the next safe point, and the run continues from where it is rather than from where it was.
 
 The rest of the `/` menu starts and shapes work: `/dispatch <task>` opens a run in the room the box speaks to, `/new` starts a fresh session at the same address (`/new --carry` brings the room's handoff along), `/clear` drops this conversation and starts a new session here, `/fork` starts a second line from the newest run in a room, `/raise <addr>` raises a building from a template, `/model <id>` points `main` at another model, and `/effort` sets how hard the model thinks. `/diff` opens the changes of the run in this room, `/go` opens a page by name, `/mcp` opens the tool servers page, `/doctor` checks this machine again, and `/help` lists every command. `Ctrl-K` offers the same list with every page and session beside it.
 
@@ -69,7 +69,7 @@ The cost page shows shares against the billed total rather than normalising its 
 
 **The whole city is behaving oddly.** `/halt --all`. The halt is recorded, runs freeze, and nothing new starts until `/release --all`. Then read **the ledger** from before the trouble, or `sprawling view <city>` in a terminal, which filters the Ledger by run, kind, address, text, position or UTC time (`--since`, `--until`) and prints the run tree with `--runs`. When the trouble is a commit, `sprawling whose <city> <commit> --trace` names the run that wrote it and the calls that run made since its previous commit.
 
-**The process died mid-call.** `sprawling resume <city>` verifies the chain, closes tool calls whose outcome was lost as unknown rather than as failed, and reports what waits for a person. Serving with `--supervise` does this after every crash and serves the city again, until crashes come too close together; then the supervisor stops and waits for Enter.
+**The process died mid-call.** `sprawling resume <city>` verifies the chain, closes tool calls whose outcome was lost as unknown rather than as failed, and reports what waits for the User. Serving with `--supervise` does this after every crash and serves the city again, until crashes come too close together; then the supervisor stops and waits for Enter.
 
 **Something looks wrong with the history itself.** `sprawling replay <city>/.sprawling/ledger` verifies the chain offline, read-only. If a byte was changed, it names the line and refuses to go on. This is the check to run before trusting a city exported from somewhere else.
 
