@@ -67,7 +67,10 @@ const PERMITTED: &str = "deny.toml";
 /// version diff, another lazy chunk (client-SPEC 7N, 7-9); `pdfjs-dist`
 /// and `docx-preview` draw a PDF's pages and a DOCX laid out as pages in
 /// RefRain, each its own lazy chunk (client-SPEC 4-54, 12-32).
-const RUNTIME: [&str; 20] = [
+/// `@noble/post-quantum` is the remote device's ML-KEM and ML-DSA,
+/// loaded only when the remote group pairs or locks (client-SPEC 4-57,
+/// `crates/remote_access/Spec.lean` D21).
+const RUNTIME: [&str; 21] = [
     "@codemirror/commands",
     "@codemirror/merge",
     "@codemirror/search",
@@ -84,6 +87,7 @@ const RUNTIME: [&str; 20] = [
     "@lezer/rust",
     "@lezer/yaml",
     "@lucide/svelte",
+    "@noble/post-quantum",
     "docx-preview",
     "effect",
     "pdfjs-dist",
