@@ -13,11 +13,19 @@
 // `Query::Proposals(document)`'s answer; this index only says which
 // documents are worth asking about.
 
+import { offeredOn } from "../reading";
 import type { Address, EventRecord, Seq } from "../../wire";
 
 export type Proposed = ReadonlyMap<Address, Seq>;
 
+// The index after one record, answering the field this build could not
+// read. Only an offer moves it, and only forwards: a reconnecting page
+// folds the newest records before the gap behind them.
 export function proposedWith(held: Proposed, record: EventRecord): [Proposed, string | null] {
-  void record;
-  return [held, null];
+  if (record.kind !== "proposal_offered") return [held, null];
+  const [doc, unread] = offeredOn(record);
+  if (doc === null) return [held, unread];
+  const known = held.get(doc);
+  if (known !== undefined && known >= record.seq) return [held, null];
+  return [new Map(held).set(doc, record.seq), null];
 }
