@@ -264,13 +264,9 @@
         mailboxAsked += 1;
         return;
       case "inspect":
-        // An item somebody opened holds the inspector open whatever the
-        // preference says, so the key closes both or opens by the one.
-        if (rightItem() === null) u.prefs.setPanel(!$held.panel);
-        else {
-          closeRight();
-          u.prefs.setPanel(false);
-        }
+        // An open item holds the inspector open, so the key shuts both.
+        u.prefs.setPanel(rightItem() === null && !$held.panel);
+        closeRight();
         return;
       case "help":
         opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
