@@ -220,7 +220,7 @@
            (ux A7): it must not compete with the row's own way in, and a
            focus inside the row reveals it the same way a pointer does. -->
       <span
-        class="flex shrink-0 items-center opacity-0 transition-opacity duration-[120ms] ease-standard group-hover:opacity-100 group-focus-within:opacity-100"
+        class="flex shrink-0 items-center opacity-0 transition-opacity ease-leave group-hover:opacity-100 group-hover:ease-arrive group-focus-within:opacity-100 group-focus-within:ease-arrive"
       >
         <button
           type="button"

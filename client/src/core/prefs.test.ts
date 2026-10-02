@@ -28,6 +28,8 @@ const STATED: Preferences = {
     density: "compact",
     chroma: "off",
     motion: "on",
+    glass: "off",
+    blend: 45,
   },
   proxying: "always",
   notifying: "on",

@@ -172,7 +172,7 @@ const held: Snippet<Parameters<typeof drawHeld>> = drawHeld;
       <tbody>
         {#each ordered as row (keyOf(row))}
           <tr
-            class="h-control-lg border-b border-edge transition-[background-color] duration-[120ms] motion-reduce:transition-none hover:bg-raised-hover focus-within:bg-raised-hover last:border-b-0"
+            class="h-control-lg border-b border-edge transition-[background-color] motion-reduce:transition-none hover:bg-raised-hover focus-within:bg-raised-hover last:border-b-0"
           >
             {#if selection}
               {const chosen = selection}

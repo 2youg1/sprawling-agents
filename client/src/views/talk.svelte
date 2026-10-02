@@ -299,7 +299,7 @@ composition is rebuilt on the way. -->
     <div
       bind:this={scroller}
       class={[
-        "-mx-wide min-h-0 flex-1 overflow-y-auto px-wide [scrollbar-gutter:stable] narrow:mx-0 narrow:px-0 [mask-image:linear-gradient(to_bottom,transparent_0,black_160px)] transition-opacity duration-300 ease-arrive",
+        "-mx-wide min-h-0 flex-1 overflow-y-auto px-wide [scrollbar-gutter:stable] narrow:mx-0 narrow:px-0 [mask-image:linear-gradient(to_bottom,transparent_0,black_160px)] transition-opacity duration-panel",
         runs.length === 0 ? "opacity-0" : "",
       ]}
       onscroll={(event) => {
@@ -327,7 +327,7 @@ composition is rebuilt on the way. -->
     </div>
   {/if}
   <div
-    class="relative shrink-0 transition-transform duration-500 ease-arrive"
+    class="relative shrink-0 transition-transform duration-page"
     style:transform={!band && runs.length === 0 ? "translateY(calc(-50cqh + 50% + var(--spacing-margin)))" : undefined}
   >
     {#if !band && runs.length === 0}

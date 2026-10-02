@@ -6,7 +6,8 @@
 // The one shape the city drawing is built from: a rectangle whose
 // corners are superellipse arcs, so a building on the map has the same
 // continuous curvature the panels around it have. `theme.css` carries
-// the exponent per scale; this takes it as a parameter.
+// the one exponent both sides draw with (client-SPEC 4-43), and
+// `cornerPower` is how the drawing reads it.
 
 export interface Box {
   readonly x: number;
@@ -30,8 +31,19 @@ function corner(cx: number, cy: number, r: number, n: number, from: number, sx: 
   return d;
 }
 
+// The exponent of the Lamé curve the HTML boxes draw, read off the
+// stylesheet: CSS `superellipse(k)` is the curve |x|^n + |y|^n = 1 with
+// n = 2^k. A stylesheet that states no exponent draws its boxes as plain
+// arcs, and so does the drawing: 2 is the ordinary arc.
+const ARC = 2;
+
+export function cornerPower(root: Element): number {
+  const stated = Number.parseFloat(getComputedStyle(root).getPropertyValue("--corner-exponent"));
+  return Number.isFinite(stated) ? 2 ** stated : ARC;
+}
+
 // An SVG path for `box` with corner radius `r` and exponent `n`
-// (`4` is the panel's squircle, `2` an ordinary arc).
+// (`cornerPower` above; `2` is an ordinary arc).
 export function squircle(box: Box, r: number, n: number): string {
   const radius = Math.min(r, box.w / 2, box.h / 2);
   const { x, y, w, h } = box;

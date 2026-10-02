@@ -125,8 +125,8 @@ covers the pane above it. -->
   {#if layout.world !== "none"}
     <div
       class={[
-        "col-span-full row-[1/3] grid min-h-0 grid-cols-subgrid grid-rows-subgrid transition-opacity duration-300 ease-arrive",
-        layout.world === "beside" ? "pointer-events-none opacity-60" : "",
+        "col-span-full row-[1/3] grid min-h-0 grid-cols-subgrid grid-rows-subgrid transition-opacity duration-page",
+        layout.world === "beside" ? "pointer-events-none opacity-(--blend-opacity)" : "",
       ]}
     >
       <!-- The foot of the first column is the edge keys', so the sessions

@@ -48,14 +48,14 @@
   const PAINT =
     "pointer-events-none w-max max-w-measure rounded-card border border-edge-panel bg-raised " +
     "px-snug py-tight text-note text-text shadow-float " +
-    "transition-[opacity,display] transition-discrete delay-300 duration-200 ease-standard " +
+    "transition-[opacity,display] transition-discrete delay-300 duration-panel ease-leave " +
     "motion-reduce:transition-none";
 
   // Hidden costs nothing to draw and nothing to measure; shown is what
   // hover and focus both switch to.
   const WHEN_WANTED =
-    "hidden opacity-0 group-hover/tip:block group-hover/tip:opacity-100 " +
-    "group-focus-within/tip:block group-focus-within/tip:opacity-100";
+    "hidden opacity-0 group-hover/tip:block group-hover/tip:opacity-100 group-hover/tip:ease-arrive " +
+    "group-focus-within/tip:block group-focus-within/tip:opacity-100 group-focus-within/tip:ease-arrive";
 
   // After Escape: hidden past both hover and focus, with no class that
   // could bring it back under them.

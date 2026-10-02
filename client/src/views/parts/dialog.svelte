@@ -92,7 +92,7 @@
 	(client-SPEC 4-34). -->
 <dialog
 	bind:this={sheet}
-	class="m-auto hidden w-full max-w-measure flex-col gap-base rounded-panel bg-raised p-pane opacity-0 shadow-sheet transition-[opacity,display,overlay] transition-discrete duration-200 ease-standard open:flex open:opacity-100 starting:open:opacity-0 motion-reduce:transition-none backdrop:bg-transparent backdrop:backdrop-brightness-50"
+	class="m-auto hidden w-full max-w-measure flex-col gap-base rounded-panel bg-raised p-pane opacity-0 shadow-sheet transition-[opacity,display,overlay] transition-discrete duration-panel ease-leave open:flex open:opacity-100 open:ease-arrive starting:open:opacity-0 motion-reduce:transition-none backdrop:bg-transparent backdrop:backdrop-brightness-50"
 	aria-labelledby={heading}
 	aria-describedby={detail === undefined ? undefined : body}
 	oncancel={(event) => {

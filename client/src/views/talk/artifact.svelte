@@ -65,9 +65,9 @@
   const SHAPE =
     "relative flex h-control-sm w-control-sm shrink-0 items-center " +
     "justify-center rounded-control text-text-quiet opacity-0 before:absolute " +
-    "before:-inset-snug before:content-[''] transition-opacity duration-150 " +
-    "ease-standard hover:bg-raised hover:text-text pointer-events-none " +
-    "group-hover:opacity-100 group-hover:pointer-events-auto " +
+    "before:-inset-snug before:content-[''] transition-opacity ease-leave " +
+    "hover:bg-raised hover:text-text pointer-events-none " +
+    "group-hover:opacity-100 group-hover:pointer-events-auto group-hover:ease-arrive " +
     "group-focus-within:opacity-100 group-focus-within:pointer-events-auto " +
     "motion-reduce:transition-none";
 </script>

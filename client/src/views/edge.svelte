@@ -19,7 +19,7 @@
   // The key every edge control is drawn as: a glass square with a
   // rounder corner than a control, and a lift under the pointer.
   export const EDGE_KEY =
-    "glass relative grid size-key place-items-center rounded-key text-text transition-transform duration-200 ease-arrive hover:-translate-y-px";
+    "glass relative grid size-key place-items-center rounded-key text-text transition-transform hover:-translate-y-px";
 </script>
 
 <script lang="ts">

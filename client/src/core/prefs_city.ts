@@ -34,7 +34,8 @@ export function keepWithCity(door: PreferenceDoor, conn: Connection): void {
 
 // The city's answer taken over what this browser held. A field the
 // answer leaves out is one the person never settled with the city, so
-// the browser's value stands for it.
+// the browser's value stands for it; so does every appearance field the
+// city's record has no place for.
 export function adopted(held: Preferences, answer: PreferencesAnswer): Preferences {
   return {
     ...held,
@@ -42,7 +43,7 @@ export function adopted(held: Preferences, answer: PreferencesAnswer): Preferenc
     welcomed: answer.welcomed ?? held.welcomed,
     panel: answer.panel ?? held.panel,
     proxying: answer.proxying ?? held.proxying,
-    appearance: answer.appearance === undefined ? held.appearance : appearanceOfCity(answer.appearance),
+    appearance: answer.appearance === undefined ? held.appearance : { ...held.appearance, ...appearanceOfCity(answer.appearance) },
   };
 }
 
@@ -60,7 +61,11 @@ export function appearanceOnWire(next: Appearance): WireAppearance {
   };
 }
 
-function appearanceOfCity(stated: WireAppearance): Appearance {
+// The appearance fields the city keeps. The rest of a record are this
+// browser's alone (client-SPEC 4-43).
+type KeptByCity = Omit<Appearance, "glass" | "blend">;
+
+function appearanceOfCity(stated: WireAppearance): KeptByCity {
   return {
     lighting: stated.lighting,
     sans: stated.sans,

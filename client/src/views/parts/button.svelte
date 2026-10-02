@@ -72,7 +72,7 @@ const MUTED =
 // for a machine that asks for less motion.
 const SHAPE =
   "inline-flex items-center gap-snug rounded-control px-base text-label " +
-  "transition-[background-color,color,opacity,transform] duration-100 ease-standard " +
+  "transition-[background-color,color,opacity,transform] " +
   "active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100";
 </script>
 

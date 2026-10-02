@@ -134,7 +134,7 @@
           <span
             aria-hidden="true"
             class={[
-              "pointer-events-none absolute inset-y-0 left-0 rounded-pill transition-transform ease-standard motion-reduce:transition-none",
+              "pointer-events-none absolute inset-y-0 left-0 rounded-pill transition-transform motion-reduce:transition-none",
               FILL[toneOf(band.group)],
             ]}
             style:width="calc(100% / var(--cells))"

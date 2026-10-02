@@ -21,7 +21,7 @@ import type { Readable } from "svelte/store";
 
 import type { Key } from "../../core/lang";
 import { STACK_SHAPE } from "../../core/appearance";
-import type { Appearance, Chroma, Density, Face, Lighting, Motion } from "../../core/appearance";
+import type { Appearance, Chroma, Density, Face, Glass, Lighting, Motion } from "../../core/appearance";
 import type { PreferenceDoor } from "../../core/prefs";
 
 // The Local Font Access API, which Chromium offers and other engines do
@@ -42,6 +42,9 @@ export type Axis = "sans" | "mono";
 // property `theme.css` declares the default in and derives the note and
 // label steps from.
 const BODY_PROPERTY = "--text-body";
+// The custom property the world layer's opacity in the blend tier is
+// written to, which `theme.css` declares the default in.
+const BLEND_PROPERTY = "--blend-opacity";
 
 // The word each stored value is offered under. A record keyed by the
 // value rather than a list of pairs: the set of values belongs to
@@ -70,6 +73,10 @@ export const MOTION_WORDS: Record<Motion, Key> = {
   system: "appearance_motion_system",
   on: "appearance_motion_full",
   off: "appearance_motion_off",
+};
+export const GLASS_WORDS: Record<Glass, Key> = {
+  on: "appearance_glass_on",
+  off: "appearance_glass_off",
 };
 
 // One control's cells: every value this build can load, in the order
@@ -126,6 +133,12 @@ export function applyAppearance(root: HTMLElement, held: Appearance): void {
   root.dataset.density = held.density;
   root.dataset.chroma = held.chroma;
   root.dataset.motion = held.motion;
+  root.dataset.glass = held.glass;
+  if (held.blend === null) {
+    root.style.removeProperty(BLEND_PROPERTY);
+  } else {
+    root.style.setProperty(BLEND_PROPERTY, `${String(held.blend)}%`);
+  }
 }
 
 // Whether a stack box holds characters this page may not write into a
@@ -142,6 +155,16 @@ export function stackRefused(stack: string): boolean {
 export function drawnSize(root: HTMLElement): string {
   const drawn = window.getComputedStyle(root).getPropertyValue(BODY_PROPERTY);
   return /^([0-9]+)/.exec(drawn.trim())?.[1] ?? "";
+}
+
+// The world layer's opacity in the blend tier as the page draws it now,
+// in whole percent, read back off the root element for the reason
+// `drawnSize` reads the body size: the slider shows what a person is
+// looking at, and this file never repeats the stylesheet's figure.
+export function drawnBlend(root: HTMLElement): number | null {
+  const drawn = window.getComputedStyle(root).getPropertyValue(BLEND_PROPERTY).trim();
+  const percent = /^([0-9]+)%$/.exec(drawn)?.[1];
+  return percent === undefined ? null : Number(percent);
 }
 
 // ------------------------------------------------------- the receipt

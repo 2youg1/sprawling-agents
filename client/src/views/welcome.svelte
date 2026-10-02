@@ -73,7 +73,7 @@ its title and its three doors sharing one left edge. -->
     {#if !mainReady}
       <a
         href={toFragment({ kind: "setup" })}
-        class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors duration-100 ease-standard hover:bg-raised-hover"
+        class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors hover:bg-raised-hover"
         onclick={walked}
       >
         <Glyph name="setup" class="mt-tight shrink-0 text-text-quiet" />
@@ -88,7 +88,7 @@ its title and its three doors sharing one left edge. -->
     {/if}
     <a
       href={toFragment({ kind: "talk", address: MAYOR })}
-      class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors duration-100 ease-standard hover:bg-raised-hover"
+      class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors hover:bg-raised-hover"
       onclick={assignWork}
     >
       <Glyph name="talk" class="mt-tight shrink-0 text-text-quiet" />
@@ -101,7 +101,7 @@ its title and its three doors sharing one left edge. -->
     </a>
     <a
       href={toFragment({ kind: "city" })}
-      class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors duration-100 ease-standard hover:bg-raised-hover"
+      class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors hover:bg-raised-hover"
       onclick={walked}
     >
       <Glyph name="city" class="mt-tight shrink-0 text-text-quiet" />

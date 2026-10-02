@@ -57,6 +57,7 @@
   import Tables from "./gallery/tables.svelte";
   import Monitored from "./gallery/monitored.svelte";
   import Timed from "./gallery/timed.svelte";
+  import Tok from "./gallery/tok.svelte";
 
   const { lang } = ui();
 
@@ -105,4 +106,5 @@
   <Timed />
   <Resulted />
   <Streamed />
+  <Tok />
 </div>

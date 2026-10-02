@@ -29,12 +29,13 @@
  * with what the machine has, starting with the monospaced faces the
  * machine is likely to carry, so the page keeps its column widths.
  *
- * Seven things a person may change about how the page is drawn - which
+ * Nine things a person may change about how the page is drawn - which
  * way it is lit, the sans face, the mono face, the body size, the
- * amount of colour, how tight the spacing is, and whether anything
- * moves - are declared here and selected from the root element, so the
- * stylesheet stays the one authority for what the choices *are* and the
- * appearance section only says which one holds.
+ * amount of colour, how tight the spacing is, whether anything moves,
+ * whether the edge layer is glass, and how much of the world layer the
+ * blend tier shows - are declared here and selected from the root
+ * element, so the stylesheet stays the one authority for what the
+ * choices *are* and the appearance section only says which one holds.
  *
  * **The ramp is named for the page, never for the ink.** `g0` is the
  * page and `g10` is the surface furthest from it in both ways of
@@ -62,6 +63,7 @@
 @theme {
   --color-*: initial;
   --font-*: initial;
+  --ease-*: initial;
   --text-*: initial;
   --font-weight-*: initial;
   --radius-*: initial;
@@ -139,8 +141,8 @@
    * holds the contract that `g0` is the page, and nothing may sit
    * below it. So the same figure-ground reading is bought from the
    * other side: content stays on the page at `g0`, and what frames the
-   * work - the rail, the fact bar, a view's own header - rises to
-   * `chrome`. What is left deepest on the screen is the work, and the
+   * work - the right side's tab strip and terminal, a view's own header -
+   * rises to `chrome`. What is left deepest on the screen is the work, and the
    * contract is untouched.
    *
    * The distance that matters is page to raised, which is 100 per
@@ -154,6 +156,13 @@
   --color-chrome: var(--color-g1);
   --color-raised: var(--color-g2);
   --color-raised-hover: var(--color-g3);
+
+  /* What fills a small surface of the edge layer that lets the page
+   * behind it show through (client-SPEC 4-43): the edge keys, and the
+   * mailbox and the settings sheet if they take glass. The rung is the
+   * one a raised control sits on; how much of it covers what is behind
+   * is `--glass-opacity` below, which `xtask color` judges. */
+  --color-glass: var(--color-g2);
 
   /* Three fills that are not a surface a person navigates: what a
    * person said drawn as a shape, the well a value travels along, and
@@ -315,9 +324,10 @@
 
   /* The two widths at which the main region affords another column,
    * written as container widths so that `@lg:` and `@wide:` ask what
-   * the columns actually have. The window is the wrong ruler: an open
-   * rail takes 232px of it, so a page that breaks at 1440px of window
-   * lays three columns into 1208px of room and crushes the middle one.
+   * the columns actually have. The window is the wrong ruler: the
+   * shell's grid gives a page only some of its columns, so a page that
+   * broke at 1440px of window would lay three columns into the room
+   * those columns leave and crush the middle one.
    *
    * Each number is the sum of what has to fit - a tree pane beside a
    * measure of prose is 300 + 520, and a second pane on the far side of
@@ -411,19 +421,33 @@
    * over the page reads as an object rather than as part of a form. */
   --radius-key: 14px;
 
-  /* The one duration: the acknowledgement a control owes a hand. A
-   * popover and a banner take 200ms and a page-level move 400ms, both
-   * spelled where they are used. */
-  --default-transition-duration: 90ms;
+  /* Motion (client-SPEC 4-43): three durations, named for how far a
+   * thing travels, and two easings, named for which way it goes. They
+   * sit in Tailwind's own namespaces, so `duration-panel` and
+   * `ease-arrive` are utilities; `xtask motion` refuses a curve or a
+   * duration spelled anywhere else.
+   *
+   * A control changing state where it stands takes `short`; a surface
+   * appearing or turning over in its own place - a hint, a popover, a
+   * dialog, the coin key, the composer's line - takes `panel`; a move
+   * across the page - the world layer, the composer sinking, the
+   * context ring's arc - takes `page`. */
+  --transition-duration-short: 150ms;
+  --transition-duration-panel: 250ms;
+  --transition-duration-page: 350ms;
+  --default-transition-duration: var(--transition-duration-short);
 
-  /* The one easing: everything that moves leaves fast and arrives
-   * slow, so a thing entering the page is read before it stops. */
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  /* Arriving at a place the eye should rest on - the composer sinking
-   * to its seat, the world layer coming in, the coin key turning over -
-   * decelerates hard and settles late, so the thing is read before it
-   * stops. */
-  --ease-arrive: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Entering and arriving decelerate, leaving accelerates (refrain Q1),
+   * so a thing coming in is read before it stops and a thing going out
+   * does not linger. The values are Open Props' `--ease-out-4` and
+   * `--ease-in-4` (open-props 1.7.23, `src/props.easing.css`, MIT),
+   * copied rather than installed (client-SPEC 12-20). A transition that
+   * runs both ways writes `ease-leave` on its resting state and
+   * `ease-arrive` on the state it arrives in, because CSS takes the
+   * timing function of the state being entered. */
+  --ease-arrive: cubic-bezier(0, 0, 0.1, 1);
+  --ease-leave: cubic-bezier(0.9, 0, 1, 1);
+  --default-transition-timing-function: var(--ease-arrive);
 
   /* A count pinned to a glyph's corner. It has to be smaller than the
    * 16px glyph it marks, or it covers the glyph instead of marking it;
@@ -503,10 +527,46 @@
    * generic family or a stack they typed. */
   --face-sans: "Geist Mono";
   --face-mono: "Geist Mono";
-  --corner-panel-shape: superellipse(2);
-  --corner-card-shape: superellipse(1.5);
-  --corner-control-shape: superellipse(1.5);
-  --corner-pill-shape: superellipse(1);
+  /* How much of the glass role covers what is behind it. A percentage
+   * because `color-mix` takes one, and the number the colour gate reads:
+   * over the brightest surface the page draws, text on glass still
+   * reaches its tier in both lightings, so lowering this until it does
+   * not turns `xtask color` red (client-SPEC 4-43). */
+  --glass-opacity: 75%;
+  /* How opaque the world layer is in the blend tier, while the person
+   * has not moved the appearance group's slider (client-SPEC 7H, U2). */
+  --blend-opacity: 60%;
+  /* The one corner exponent (client-SPEC 4-43): the parameter CSS
+   * `superellipse()` takes, and the one `city/shape.ts` reads for the
+   * drawing, so a building on the map and the panel beside it have one
+   * curvature. 1.6 is the edge keys' corner the person approved. */
+  --corner-exponent: 1.6;
+}
+
+/* An engine that knows the curve draws it on every rounded box; one
+ * that does not keeps the plain arc of the same radius, which is what
+ * every box drew before. One rule rather than one per radius utility,
+ * because the attribute reaches the variants (`hover:`, `rounded-t-`)
+ * and the radius Tailwind derives from `--radius-key` alike. */
+@supports (corner-shape: superellipse(2)) {
+  [class*="rounded-"] {
+    corner-shape: superellipse(var(--corner-exponent));
+  }
+}
+
+/* Where the engine can draw it, arriving is a spring rather than a
+ * curve: Open Props' `--ease-spring-1`, which overshoots by 1.7% and
+ * settles, so a box that moves reads as one solid thing coming to rest
+ * (Chang & Ungar's solidity, refrain P6). Copied by value from the same
+ * file as the curves above. */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --ease-arrive: linear(
+      0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%,
+      0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%,
+      1.001
+    );
+  }
 }
 
 /* The page lit from the other side.
@@ -653,6 +713,28 @@
   .asks {
     border-inline-start-color: CanvasText;
   }
+  /* Glass becomes the system's own surface, edged in its ink: an
+   * alpha the mode keeps would let the words behind show through. */
+  .glass {
+    background-color: Canvas;
+    border-color: CanvasText;
+    backdrop-filter: none;
+  }
+  /* The composer's line and the context ring's checkpoints are drawn in
+   * fills the mode replaces. The line keeps its fade in the system ink;
+   * the two checkpoints lose their green and red and keep their order,
+   * which is where on the ring each one sits. */
+  .typed-line {
+    background: linear-gradient(
+      to right,
+      CanvasText 0,
+      CanvasText var(--typed),
+      transparent calc(var(--typed) + 160px)
+    );
+  }
+  .rung {
+    background-color: CanvasText;
+  }
 }
 
 /* **What needs a person's consent, wherever it appears.**
@@ -680,25 +762,19 @@
   padding-inline-start: var(--spacing-base);
 }
 
-/* The corners are continuous-curvature (a squircle), the way the old
- * client drew them: each radius utility carries its superellipse
- * exponent, and an engine without `corner-shape` draws a plain arc of
- * the same radius. */
+/* The four corner radii. Their curvature is one exponent for all of
+ * them, drawn by the `@supports` rule near the top of this file. */
 @utility rounded-panel {
   border-radius: var(--radius-panel);
-  corner-shape: var(--corner-panel-shape);
 }
 @utility rounded-card {
   border-radius: var(--radius-card);
-  corner-shape: var(--corner-card-shape);
 }
 @utility rounded-control {
   border-radius: var(--radius-control);
-  corner-shape: var(--corner-control-shape);
 }
 @utility rounded-pill {
   border-radius: var(--radius-pill);
-  corner-shape: var(--corner-pill-shape);
 }
 
 /* A number that changes while a person watches it keeps its columns.
@@ -733,17 +809,41 @@
 /* The same width, for a region that changes where it stands below it. */
 @custom-variant narrow (@media (width < 768px));
 
-/* Glass, for the edge keys and nothing larger (client-SPEC 4-34): a
- * blurred, saturated view of what is behind, a fill that keeps the key
- * legible over any of it, one edge that separates it from the words it
- * floats over, and one level of shadow that says it floats. */
+/* Glass, for the small surfaces of the edge layer and nothing larger
+ * (client-SPEC 4-34, 4-43): a blurred, saturated view of what is
+ * behind, the glass role at the opacity the colour gate judges, one
+ * edge that separates it from the words it floats over, and one level
+ * of shadow that says it floats. */
 @utility glass {
-  background-color: color-mix(in oklch, var(--color-raised) 68%, transparent);
+  background-color: color-mix(in oklch, var(--color-glass) var(--glass-opacity), transparent);
   border: 1px solid color-mix(in oklch, var(--color-text) 10%, transparent);
   box-shadow:
     inset 0 1px 0 color-mix(in oklch, var(--color-text) 5%, transparent),
     var(--shadow-float);
   backdrop-filter: blur(24px) saturate(170%);
+}
+
+/* Glass turned solid: the same role, covering what is behind it whole,
+ * with nothing blurred. Three reasons and one drawing - the person said
+ * `off` in the appearance group (on any element, so a fixture can say
+ * it of one specimen), the machine asks for less transparency (an
+ * answer only Chromium gives today, which is why the switch exists), or
+ * the engine cannot blur what is behind at all. Unlayered, so each
+ * outranks the utility it replaces. */
+[data-glass="off"] .glass {
+  background-color: var(--color-glass);
+  backdrop-filter: none;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background-color: var(--color-glass);
+    backdrop-filter: none;
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    background-color: var(--color-glass);
+  }
 }
 
 /* The two washes a row takes over the page: under the pointer, and
@@ -808,8 +908,9 @@
   will-change: opacity;
 }
 /* The two entrances: a popover rises into place, a page-level banner
- * drops from the edge it belongs to. Both 200ms, both only transform
- * and opacity, so neither costs a layout. */
+ * drops from the edge it belongs to. Both surfaces appearing in their
+ * own place, so both take `panel`, and both only move transform and
+ * opacity, so neither costs a layout. */
 @keyframes rise {
   from {
     opacity: 0;
@@ -831,10 +932,10 @@
   }
 }
 .rise {
-  animation: rise 200ms var(--ease-standard) both;
+  animation: rise var(--transition-duration-panel) var(--ease-arrive) both;
 }
 .drop {
-  animation: drop 200ms var(--ease-standard) both;
+  animation: drop var(--transition-duration-panel) var(--ease-arrive) both;
 }
 /* The motion vocabulary is four names and this is its whole table:
  * `cut` is no motion at all (no class - it is what a same-level page
@@ -865,10 +966,10 @@
   }
 }
 .slide {
-  animation: slide 200ms var(--ease-standard) both;
+  animation: slide var(--transition-duration-panel) var(--ease-arrive) both;
 }
 .fade {
-  animation: fade 150ms var(--ease-standard) both;
+  animation: fade var(--transition-duration-short) var(--ease-arrive) both;
 }
 /* The line under the composer's words (client-SPEC 7I). It runs as far
  * as the words do and fades out after them, so an empty field shows only
@@ -896,8 +997,8 @@
   opacity: 0.55;
   pointer-events: none;
   transition:
-    --typed 320ms var(--ease-arrive),
-    opacity 200ms var(--ease-standard);
+    --typed var(--transition-duration-panel) var(--ease-arrive),
+    opacity var(--transition-duration-short) var(--ease-arrive);
 }
 .typed-line[data-lit] {
   opacity: 1;
@@ -916,7 +1017,7 @@
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transition: transform 420ms var(--ease-arrive);
+  transition: transform var(--transition-duration-panel) var(--ease-arrive);
 }
 .coin-face {
   position: absolute;
@@ -926,9 +1027,9 @@
   border-radius: var(--radius-pill);
   backface-visibility: hidden;
   transition:
-    background-color 200ms var(--ease-standard),
-    color 200ms var(--ease-standard),
-    opacity 200ms var(--ease-standard);
+    background-color var(--transition-duration-short) var(--ease-arrive),
+    color var(--transition-duration-short) var(--ease-arrive),
+    opacity var(--transition-duration-short) var(--ease-arrive);
 }
 .coin-face[data-face="stop"] {
   transform: rotateY(180deg);
@@ -973,8 +1074,8 @@
  * line it sits on. The remaining arc moves rather than jumps. */
 .ring-left {
   transition:
-    stroke-dasharray 600ms var(--ease-arrive),
-    stroke-dashoffset 600ms var(--ease-arrive);
+    stroke-dasharray var(--transition-duration-page) var(--ease-arrive),
+    stroke-dashoffset var(--transition-duration-page) var(--ease-arrive);
 }
 .rung {
   position: absolute;
@@ -1070,15 +1171,29 @@
 [data-motion="off"] .animate-pulse {
   animation: none;
 }
-/* A transition is an acknowledgement rather than a decoration, so it is
- * shortened to a frame rather than removed: the state still changes
- * where the eye was, and nothing travels. */
-[data-motion="off"] *,
-[data-motion="off"] *::before,
-[data-motion="off"] *::after {
-  transition-duration: 1ms;
-  animation-iteration-count: 1;
+/* Motion off is three durations at zero (client-SPEC 4-43): every
+ * transition and entrance reads one of them, so the state still changes
+ * where the eye was and nothing travels. The default duration is set
+ * beside them rather than left to follow `short`, because a custom
+ * property inherits the value it computed to on the root, not the
+ * reference it was written with. The machine's own answer zeroes them
+ * too unless the person said `on`. */
+[data-motion="off"] {
+  --transition-duration-short: 0s;
+  --transition-duration-panel: 0s;
+  --transition-duration-page: 0s;
+  --default-transition-duration: 0s;
+}
+[data-motion="off"] * {
   scroll-behavior: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) {
+    --transition-duration-short: 0s;
+    --transition-duration-panel: 0s;
+    --transition-duration-page: 0s;
+    --default-transition-duration: 0s;
+  }
 }
 
 /* One route replacing another, as one page becoming the next.
@@ -1126,9 +1241,9 @@ main h1 {
     text-decoration-color: var(--color-g6);
   }
   /* A key is a picture of a key rather than a word in a sentence, so
-   * the underline a link grows under the pointer stops at its edge.
-   * The rail drew `g c` underlined for as long as the underline
-   * existed. */
+   * the underline a link grows under the pointer stops at its edge. A
+   * navigation row once drew `g c` underlined for as long as the
+   * underline existed. */
   kbd {
     display: inline-block;
     text-decoration: none;
@@ -1207,8 +1322,9 @@ main h1 {
   }
   /* The main region measures itself, so the columns inside it can ask
    * how much room they have instead of how wide the window is. The two
-   * are not the same number: an open rail takes 232px, and a layout that
-   * asked the window put three columns into a space that holds two.
+   * are not the same number: the shell's grid gives a page only some of
+   * its columns, and a layout that asked the window would put three
+   * columns into a space that holds two.
    *
    * Naming the container lets a query say which box it is asking about,
    * which matters the day a second container appears inside this one.
@@ -1246,8 +1362,8 @@ main h1 {
     height: 0;
     overflow: hidden;
     transition:
-      height 200ms var(--ease-standard),
-      content-visibility 200ms allow-discrete;
+      height var(--transition-duration-panel) var(--ease-arrive),
+      content-visibility var(--transition-duration-panel) allow-discrete;
   }
   details[open]::details-content {
     height: auto;
@@ -1338,8 +1454,8 @@ main h1 {
    *
    * The reserved strip is zero until `index.html` asks for the viewport
    * that has one, which is a change the shell has to make first: drawing
-   * under the insets means the rail and the header owe their own edges
-   * the same courtesy. Until then this rule costs nothing and is already
+   * under the insets means the edge keys and the banners owe their own
+   * edges the same courtesy. Until then this rule costs nothing and is already
    * right. */
   .sticky.bottom-0 {
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -1405,9 +1521,9 @@ main h1 {
  * and charges for every drop of ink. Three rules follow from that, and
  * each is stated once.
  *
- * **Only the main region prints.** The rail, the notice panel, the halt
- * banner, the refusal, the command palette and the key sheet are all
- * controls, and all of them are drawn outside `<main>` - so one rule
+ * **Only the main region prints.** The edge keys, the notice panel, the
+ * halt banner, the refusal, the command palette and the key sheet are
+ * all controls, and all of them are drawn outside `<main>` - so one rule
  * keeps `<main>`, everything inside it and everything that contains it,
  * and drops the rest without naming a single screen. A page added next
  * year needs no line here. The composer is the one input surface inside

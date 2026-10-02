@@ -24,6 +24,10 @@ export type Chroma = "full" | "off";
 // `system` is the absence of an opinion, which is what the stylesheet's
 // `prefers-reduced-motion` block reads.
 export type Motion = "system" | "on" | "off";
+// Whether the edge layer's small surfaces are drawn as glass. `on` still
+// yields to a machine that asks for less transparency, which only some
+// engines report - that gap is why this switch exists (client-SPEC 4-43).
+export type Glass = "on" | "off";
 
 // Every value a selector offers, in the order it is drawn, and the
 // same list each stored string is read back through: an option a
@@ -33,6 +37,11 @@ export const FACES: readonly Face[] = ["geist", "system", "custom"];
 export const DENSITIES: readonly Density[] = ["comfortable", "compact"];
 export const CHROMAS: readonly Chroma[] = ["full", "off"];
 export const MOTIONS: readonly Motion[] = ["system", "on", "off"];
+export const GLASSES: readonly Glass[] = ["on", "off"];
+// The slider that sets the world layer's opacity in the blend tier, in
+// percent. The opacity drawn while the person has said nothing is
+// `theme.css`'s `--blend-opacity`, and only there.
+export const BLEND_PERCENT = { min: 30, max: 90, step: 5 } as const;
 // What a person may write into a font stack: the characters a family
 // name and its punctuation are made of, and nothing that could close
 // the declaration it lands in. A stack with anything else in it is not
@@ -51,4 +60,15 @@ export interface Appearance {
   readonly density: Density;
   readonly chroma: Chroma;
   readonly motion: Motion;
+  readonly glass: Glass;
+  // The world layer's opacity in the blend tier in percent, or nothing
+  // when the person has stated none and the stylesheet's own is drawn.
+  readonly blend: number | null;
+}
+
+// A stored or typed opacity as a percent the slider offers, or `null`
+// for anything else: a whole number inside the slider's domain.
+export function blendOf(raw: string): number | null {
+  const said = /^[0-9]{1,3}$/.test(raw) ? Number(raw) : Number.NaN;
+  return said >= BLEND_PERCENT.min && said <= BLEND_PERCENT.max ? said : null;
 }

@@ -43,7 +43,7 @@ interface CheatsheetProps {
 const SHEET =
   "m-auto mt-section hidden w-full max-w-measure flex-col gap-base rounded-panel " +
   "bg-raised p-pane opacity-0 shadow-sheet transition-[opacity,display,overlay] " +
-  "transition-discrete duration-200 ease-standard open:flex open:opacity-100 " +
+  "transition-discrete duration-panel ease-leave open:flex open:opacity-100 open:ease-arrive " +
   "starting:open:opacity-0 motion-reduce:transition-none " +
   "backdrop:bg-transparent backdrop:backdrop-brightness-50";
 

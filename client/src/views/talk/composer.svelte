@@ -314,7 +314,7 @@
 <!-- A page, not a card: focus is said by the line coming to full
 strength, and a drag over the box by the wash it takes. -->
 <form
-  class={["relative rounded-control transition-colors duration-200 ease-standard", over ? "wash" : ""]}
+  class={["relative rounded-control transition-colors", over ? "wash" : ""]}
   aria-label={say($lang, "region_composer")}
   onsubmit={(event) => {
     event.preventDefault();

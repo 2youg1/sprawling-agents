@@ -25,7 +25,7 @@
   import { ui } from "../../ui";
   import type { Address, BuildingProgress, CityAnswer, PursuitLine } from "../../wire";
   import Mark from "./marks.svelte";
-  import { squircle } from "./shape";
+  import { cornerPower, squircle } from "./shape";
 
   const W = 128;
   const HALL_W = 196;
@@ -37,6 +37,9 @@
   const SKY = 72;
   const GROUND_DEPTH = 64;
   const MIN_WIDTH = 880;
+  // The towers' corners curve the way the page's boxes do; read once,
+  // since the exponent is a constant of the stylesheet.
+  const power = cornerPower(document.documentElement);
 
   interface SkylineProps {
     readonly city: CityAnswer;
@@ -327,7 +330,7 @@
         <circle cx={tower.x + tower.w / 2} cy={tower.top - 40} r="2" class="fill-drawn-aside" />
       {/if}
       <path
-        d={squircle({ x: tower.x, y: tower.top, w: tower.w, h: tower.h }, tower.hall ? 10 : 6, 4)}
+        d={squircle({ x: tower.x, y: tower.top, w: tower.w, h: tower.h }, tower.hall ? 10 : 6, power)}
         class={[
           tower.hall ? "fill-drawn-solid-lit" : "fill-drawn-solid",
           tower.building.addr === picked ? "stroke-accent" : "stroke-drawn-line",

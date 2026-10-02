@@ -42,7 +42,7 @@ import type { Rows } from "./rows";
 import { Proxying } from "../wire";
 import type { Chord, PreferencePatch } from "../wire";
 import { appearanceOnWire } from "./prefs_city";
-import { CHROMAS, DENSITIES, FACES, LIGHTINGS, MOTIONS, STACK_SHAPE } from "./appearance";
+import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, STACK_SHAPE, blendOf } from "./appearance";
 import type { Appearance } from "./appearance";
 import type { Notifying } from "./notify";
 import { SHOWINGS } from "./results";
@@ -73,6 +73,8 @@ const ROWS = {
   density: "sprawling.appearance.density",
   chroma: "sprawling.appearance.chroma",
   motion: "sprawling.appearance.motion",
+  glass: "sprawling.appearance.glass",
+  blend: "sprawling.appearance.blend",
   // Which rule a provider attached from now on starts with. A person
   // behind a relay settles it once, on the network screen, instead of
   // on every form they open; an endpoint already attached keeps the
@@ -163,9 +165,9 @@ export type Keeper =
 // Named changes rather than one `write`, because each of them is its
 // own `PutPreferences` patch: a caller that handed over a whole record
 // would send the city every field to change one, and a caller that says
-// which fact it is changing sends that fact. The tier, the bell and how
-// a conversation is shown stay in this browser, since the city's record
-// has no field for them yet. `adopt` is the other
+// which fact it is changing sends that fact. The tier, the bell, how a
+// conversation is shown, glass and the blend tier's opacity stay in this
+// browser, since the city's record has no field for them yet. `adopt` is the other
 // direction and is therefore whole - an answer states every value at
 // once, and a record applied field by field could be half of one
 // answer and half of the last.
@@ -234,11 +236,13 @@ function readAppearance(rows: Rows): Appearance {
     density: readOne(DENSITIES, rows.getItem(ROWS.density), "comfortable"),
     chroma: readOne(CHROMAS, rows.getItem(ROWS.chroma), "full"),
     motion: readOne(MOTIONS, rows.getItem(ROWS.motion), "system"),
+    glass: readOne(GLASSES, rows.getItem(ROWS.glass), "on"),
+    blend: blendOf(rows.getItem(ROWS.blend) ?? ""),
   };
 }
 
-// A size the person has not stated is absent from storage too, so the
-// stylesheet's own figure keeps its one home in `theme.css`.
+// A size or an opacity the person has not stated is absent from storage
+// too, so the stylesheet's own figure keeps its one home in `theme.css`.
 function writeAppearance(rows: Rows, next: Appearance): void {
   rows.setItem(ROWS.lighting, next.lighting);
   rows.setItem(ROWS.sans, next.sans);
@@ -253,6 +257,12 @@ function writeAppearance(rows: Rows, next: Appearance): void {
   rows.setItem(ROWS.density, next.density);
   rows.setItem(ROWS.chroma, next.chroma);
   rows.setItem(ROWS.motion, next.motion);
+  rows.setItem(ROWS.glass, next.glass);
+  if (next.blend === null) {
+    rows.removeItem(ROWS.blend);
+  } else {
+    rows.setItem(ROWS.blend, String(next.blend));
+  }
 }
 
 // The two words a yes-or-no row is written with, spelled here so the

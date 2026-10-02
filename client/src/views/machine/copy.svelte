@@ -22,7 +22,7 @@ const RECEIPT_MS = 1200;
 const WEAR =
   "relative flex h-control shrink-0 items-center gap-tight rounded-control px-base " +
   "text-label text-text-quiet before:absolute before:-inset-snug before:content-[''] " +
-  "transition-[background-color,color] duration-100 ease-standard hover:bg-raised " +
+  "transition-[background-color,color] hover:bg-raised " +
   "hover:text-text motion-reduce:transition-none";
 </script>
 

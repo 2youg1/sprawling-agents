@@ -4,42 +4,26 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the page is drawn: which face carries the prose, which carries
-  // a value read character by character, how large a line of body text
-  // is, how much air sits between the lines, how much colour the screen
-  // takes, and whether anything moves.
+  // How the page is drawn: faces, body size, air, colour, motion, glass,
+  // and how much of the world layer the blend tier shows.
   //
-  // Every choice is a name; what each name means is `theme.css`, which
-  // stays the one authority for a family, a size, a spacing step and a
-  // colour. This view writes an attribute on the root element and reads
-  // the result back in the same breath, so the page a person is looking
-  // at *is* the preview.
+  // Every choice is a name or a number whose meaning is `theme.css`'s.
+  // This view writes the root element and the page a person is looking
+  // at *is* the preview. **A number the person has not stated is absent
+  // here too**: an empty size box or an untouched slider removes the
+  // custom property instead of writing the stylesheet's own figure, so
+  // that figure keeps its one home. The record is `core/prefs.ts`'s and
+  // this file names no stored row; the word tables and the writing to
+  // the root element are `appearance.ts`, which `main.ts` reads too.
   //
-  // **A size the person has not stated is absent here too.** The body
-  // size is the one appearance value that is a number rather than a name,
-  // and an empty box removes the custom property instead of writing the
-  // number the stylesheet already holds - so 15px has one home, in
-  // `theme.css`, and this file cannot drift away from it.
-  //
-  // None of it is a fact about the city, so none of it goes over the
-  // wire: like the language, it is part of the record `core/prefs.ts`
-  // keeps and hands over, and this file names no stored row. What stays
-  // here is the drawing: which attribute each choice becomes, and which
-  // word it is offered under. What a choice means before it is drawn -
-  // the word tables, the cells, the writing to the root element - is
-  // `appearance.ts`, beside this file and read by `main.ts` too.
-  //
-  // Every setting below is one card (client-SPEC 4-36): a title, one
-  // line saying what the setting governs, the control, and a foot that
-  // shows the save receipt for a moment after an instant change lands
-  // (ux-upgrades A2). None of these controls needs a submit, so no foot
-  // on this screen carries a button.
+  // Every setting is one card (client-SPEC 4-36): title, one line, the
+  // control, and a foot with the save receipt; nothing needs a submit.
 
   import { onMount } from "svelte";
 
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
-  import { CHROMAS, DENSITIES, FACES, LIGHTINGS, MOTIONS } from "../../core/appearance";
+  import { BLEND_PERCENT, CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, blendOf } from "../../core/appearance";
   import { sizingOf } from "../../core/sizing";
   import { BODY_PX } from "../../wire";
   import type { Appearance } from "../../core/appearance";
@@ -55,28 +39,28 @@
     CHROMA_WORDS,
     DENSITY_WORDS,
     FACE_WORDS,
+    GLASS_WORDS,
     LIGHTING_WORDS,
     MOTION_WORDS,
     applyAppearance,
     cellsOf,
+    drawnBlend,
     drawnSize,
     saveReceipt,
     stackRefused,
   } from "./appearance";
   import type { Axis } from "./appearance";
 
-  // Which card a receipt belongs to. Named for the setting rather than
-  // the control, because one setting can grow a second control - the
-  // face cards already carry the stack box beside their track.
-  type Setting = "lighting" | "face" | "mono" | "body" | "density" | "chroma" | "motion";
+  // Which card a receipt belongs to: a setting, since one setting can
+  // grow a second control (a face card carries its stack box).
+  type Setting = "lighting" | "face" | "mono" | "body" | "density" | "chroma" | "motion" | "glass" | "blend";
 
   const u = ui();
   const lang = u.lang;
   const held = u.prefs.held;
   const root = document.documentElement;
-  // Read through the door rather than copied into state here: a copy is
-  // a second holder of one record, and the two part company the first
-  // time anything else changes a preference.
+  // Read through the door, never copied: a copy is a second holder of
+  // one record.
   const look: Appearance = $derived($held.appearance);
   const said = (key: Key): string => say($lang, key);
   const receipt = saveReceipt();
@@ -85,6 +69,9 @@
   // What is in the size box, which is not the size: a box mid-edit holds
   // text the page must not act on yet.
   let box = $state("");
+  // What the slider stands at: the person's figure, or the one the page
+  // draws while they have stated none.
+  let blend = $state<number | null>(null);
   // The faces this machine has, once a person asks for them and the
   // browser agrees. Empty until both happen.
   let installed = $state<readonly string[]>([]);
@@ -96,13 +83,27 @@
     receipt.landed(name);
   };
 
-  // The screen can be reached before whatever applies this at start-up
-  // has run, so it puts the stored choices on the page itself; from then
-  // on `write` is what moves them.
+  // The screen can be reached before start-up applied the stored
+  // choices, so it applies them itself; from then on `write` moves them.
   onMount(() => {
     applyAppearance(root, look);
     box = look.body === null ? drawnSize(root) : String(look.body);
+    blend = look.blend ?? drawnBlend(root);
   });
+
+  const reblend = (moved: string): void => {
+    const percent = blendOf(moved);
+    if (percent === null) return;
+    blend = percent;
+    write({ ...look, blend: percent }, "blend");
+  };
+
+  const blendRange = (): string =>
+    fill(say($lang, "appearance_blend_range"), {
+      min: String(BLEND_PERCENT.min),
+      max: String(BLEND_PERCENT.max),
+      step: String(BLEND_PERCENT.step),
+    });
 
   // Every keystroke in the size box is read once, and only a whole
   // number in range reaches the page.
@@ -121,10 +122,8 @@
     }
   };
 
-  // Choosing a family from this machine also pins the axis to `custom`,
-  // so the choice holds however the list was reached; the axis is the
-  // one the list is drawn under and is never inferred from which face
-  // happens to be custom already.
+  // A family from this machine pins its axis to `custom`; the axis is
+  // the one the list is drawn under, never inferred.
   const wear = (axis: Axis, family: string): void => {
     write(
       axis === "sans"
@@ -134,9 +133,8 @@
     );
   };
 
-  // Chromium answers with the faces this machine has installed, after
-  // asking the person. Any other engine has no such door, and the text
-  // field beside it is the whole fallback.
+  // Chromium lists this machine's faces after asking the person; any
+  // other engine has no such door, and the text field is the fallback.
   const offered = (): boolean => typeof window.queryLocalFonts === "function";
 
   const list = (): void => {
@@ -155,20 +153,16 @@
       });
   };
 
-  // The one line of constraint on this screen's one numeric box. The
-  // card's foot carries it (client-SPEC 4-36) and a refused box repeats
-  // it as the field's own error, because a person who typed 99 needs it
-  // where they are looking.
+  // The size box's one line of constraint: the card's foot carries it,
+  // and a refused box repeats it where the person is looking.
   const sizeRange = (): string =>
     fill(say($lang, "appearance_body_range"), {
       min: String(BODY_PX.min),
       max: String(BODY_PX.max),
     });
 
-  // A refusal the field carries, or no such property at all. An absent
-  // error and an error that is nothing are different states, and only
-  // the first one leaves the box unmarked - which is what spreading the
-  // property instead of passing `error={undefined}` keeps apart.
+  // A refusal, or no such property at all: spreading it keeps an absent
+  // error apart from `error={undefined}`, which marks the box.
   const refusal = (stack: string): Pick<FieldProps, "error"> =>
     stackRefused(stack) ? { error: say($lang, "appearance_stack_refused") } : {};
 
@@ -177,9 +171,7 @@
 </script>
 
 {#snippet foot(constraint: string | undefined, name: Setting)}
-  <!-- The `{@render}` lines below each carry one suppression of
-      `no-confusing-void-expression`, the way `parts/segmented.svelte`
-      settles it. -->
+  <!-- Each `{@render}` below carries one lint suppression, as `parts/segmented.svelte` does. -->
   <div class="mt-tight flex items-baseline justify-between gap-base">
     {#if constraint !== undefined}
       <span class="text-note text-text-faint">{constraint}</span>
@@ -217,9 +209,7 @@
       <p class="text-note text-alert" role="alert">{note}</p>
     {/if}
     {#if installed.length > 0}
-      <!-- A15: one control tier and one control radius, like every
-          other box on this screen. The families are this machine's own
-          words and are never translated. -->
+      <!-- One control tier and radius; the families are this machine's own words, never translated. -->
       <select
         class="h-control w-full min-w-0 rounded-control border border-edge-input bg-raised px-base text-body text-text"
         aria-label={fill(say($lang, "appearance_local_for"), { face: say($lang, name) })}
@@ -360,6 +350,44 @@ language card the settings page adds beside them takes the next cell. -->
     />
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {@render foot(undefined, "motion")}
+  </div>
+
+  <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
+    <span class="text-label font-label text-text">{say($lang, "appearance_glass")}</span>
+    <p class="text-note text-text-faint">{say($lang, "appearance_glass_note")}</p>
+    <Segmented
+      label={say($lang, "appearance_glass")}
+      options={cellsOf(GLASSES, GLASS_WORDS, said)}
+      held={look.glass}
+      onPick={(glass) => {
+        write({ ...look, glass }, "glass");
+      }}
+    />
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+    {@render foot(undefined, "glass")}
+  </div>
+
+  <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
+    <span class="text-label font-label text-text">{say($lang, "appearance_blend")}</span>
+    <p class="text-note text-text-faint">{say($lang, "appearance_blend_note")}</p>
+    <div class="flex h-control items-center gap-base">
+      <input
+        type="range"
+        class="min-w-0 flex-1"
+        min={BLEND_PERCENT.min}
+        max={BLEND_PERCENT.max}
+        step={BLEND_PERCENT.step}
+        value={blend ?? BLEND_PERCENT.min}
+        aria-label={say($lang, "appearance_blend")}
+        aria-valuetext={blend === null ? undefined : `${String(blend)}%`}
+        oninput={(event) => {
+          reblend(event.currentTarget.value);
+        }}
+      />
+      <span class="figure w-figure text-right text-body text-text">{blend === null ? "" : `${String(blend)}%`}</span>
+    </div>
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+    {@render foot(blendRange(), "blend")}
   </div>
   <Notifying />
 

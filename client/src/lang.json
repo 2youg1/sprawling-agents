@@ -15,6 +15,14 @@
     "en": "px",
     "zh": "px"
   },
+  "appearance_blend": {
+    "en": "the world layer in blend",
+    "zh": "混合档的世界层"
+  },
+  "appearance_blend_range": {
+    "en": "{min}% to {max}%, in steps of {step}",
+    "zh": "{min}% 到 {max}%，每步 {step}"
+  },
   "appearance_chroma": {
     "en": "colour",
     "zh": "色彩"
@@ -54,6 +62,18 @@
   "appearance_face_system": {
     "en": "the system face",
     "zh": "系统自带的字体"
+  },
+  "appearance_glass": {
+    "en": "glass",
+    "zh": "玻璃"
+  },
+  "appearance_glass_off": {
+    "en": "solid",
+    "zh": "实色"
+  },
+  "appearance_glass_on": {
+    "en": "let it show through",
+    "zh": "透出"
   },
   "appearance_lighting": {
     "en": "lighting",
@@ -128,8 +148,8 @@
     "zh": "字体栈里只能有字母、数字、空格、逗号和引号"
   },
   "ask_late": {
-    "en": "the page keeps asking; if no answer ever comes back, reconnect from the dot at the top of the rail",
-    "zh": "页面会继续追问；若始终等不到回答，就从左栏顶部那个点重连一次"
+    "en": "the page keeps asking; if no answer ever comes back, reconnect from the notice",
+    "zh": "页面会继续追问；若始终等不到回答，就从那条通知重连一次"
   },
   "autonomy_clerk": {
     "en": "the clerk",
@@ -3658,6 +3678,14 @@
   "appearance_motion_note": {
     "en": "whether anything moves",
     "zh": "要不要动起来"
+  },
+  "appearance_blend_note": {
+    "en": "how much of the world layer shows beside the conversation in the blend tier",
+    "zh": "混合档里，对话两侧的世界层显出多少"
+  },
+  "appearance_glass_note": {
+    "en": "whether the edge keys let the page behind them show through",
+    "zh": "左下三键是否透出背后的页面"
   },
   "setup_key_kept": {
     "en": "archived - leave blank to keep it",

@@ -46,6 +46,8 @@ describe("the preferences the city keeps", () => {
         density: "compact",
         chroma: "off",
         motion: "on",
+        glass: "on",
+        blend: null,
       },
     });
   });
