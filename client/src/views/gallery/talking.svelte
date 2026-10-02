@@ -6,19 +6,17 @@
 -->
 <script lang="ts" module>
   // The states of the Mayor room's box that only show once a person
-  // acts: each of the four pills with its menu open, the card a refused
-  // dispatch leaves where the reply would have been, and the line under
-  // the box opened onto the four segments the run was told.
+  // acts: each of the four pills with its menu open, and the card a
+  // refused dispatch leaves where the reply would have been.
   //
   // Each menu opens upward from the foot of its case, as it does over
   // the box at the foot of the window, so a case reserves the height
   // of the longest menu above its trigger (`pt-menu` below); a menu
   // drawn outside its case is what `xtask render` refuses.
-  import type { Answer, AxError, PrefixSegment, Query } from "../../wire";
-  import { Address, B3Hash, RunId } from "../../wire";
+  import type { AxError } from "../../wire";
+  import { Address } from "../../wire";
 
   const HERE = Address.make("hall/mayor");
-  const RUN = RunId.make("0199c0de-0000-4000-9000-00000000c0de");
 
   const NO_MODEL: AxError = {
     // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
@@ -31,32 +29,6 @@
     // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
     subject: "no model is chosen for this tag",
   };
-
-  const SLOTS: readonly PrefixSegment["slot"][] = ["city", "building", "resident", "run"];
-
-  function segment(slot: PrefixSegment["slot"], text: string, at: string): PrefixSegment {
-    return {
-      bytes: text.length,
-      // One hash per segment: the list is keyed by it.
-      hash: B3Hash.make(String(SLOTS.indexOf(slot) + 1).repeat(64)),
-      slot,
-      sources: [{ addr: Address.make(at), dropped: 0, kept: text.length }],
-      stored: true,
-      text,
-    };
-  }
-
-  // What the run was told, one segment per rung, as a city writes them.
-  const TOLD: readonly PrefixSegment[] = [
-    segment("city", "# CITY.md\nOne city, one ledger. Every resident answers to the rules of its building.", "CITY.md"),
-    segment("building", "# hall\nThe hall plans the city's work and hands it to the buildings.", "hall/BUILDING.md"),
-    segment("resident", "# mayor\nYou are the Mayor. Plan, dispatch, and say what the city does next.", "hall/mayor/URBANITE.md"),
-    segment("run", "Answer the person in the words they wrote to you.", "hall/mayor"),
-  ];
-
-  function told(query: Query): Answer | undefined {
-    return typeof query === "object" && "prefix" in query ? { prefix: { run: RUN, segments: TOLD } } : undefined;
-  }
 </script>
 
 <script lang="ts">
@@ -66,9 +38,7 @@
   import { pills } from "../talk/composer";
   import PillView from "../talk/pill.svelte";
   import Failed from "../talk/failed.svelte";
-  import ContextStrip from "../talk/context_strip.svelte";
   import Case from "./case.svelte";
-  import Stand from "./stand.svelte";
   import { CHOSEN, MODELS } from "./served";
 
   const { lang } = ui();
@@ -105,10 +75,4 @@
 
 <Case label="conversation · a dispatch refused for want of a model">
   <Failed what={say($lang, "talk_failed_model")} error={NO_MODEL} onRetry={ignore} />
-</Case>
-
-<Case label="context strip · open on the four segments the run was told">
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={told}>
-    <ContextStrip address={HERE} run={RUN} starts="open" />
-  </Stand>
 </Case>

@@ -10,8 +10,8 @@
   // taught people to expect: what is already reachable, three ways to
   // add one more, and Composio as a directory.
   //
-  // The page starts at the rail and caps itself at the page width,
-  // which is where every content column begins (docs/frontend-method.md §4-33). It
+  // The page starts where every content column begins and caps itself
+  // at the page width (docs/frontend-method.md §4-33). It
   // keeps its own address because a tool server is a thing a person
   // returns to on its own; the way in is the settings page's MCP group.
   //

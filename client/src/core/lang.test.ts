@@ -45,8 +45,8 @@ describe("lang", () => {
     }
   });
 
-  // A domain role is a word in the reader's language: the rail, the
-  // palette and the key sheet all name the Mayor's page, and a Chinese
+  // A domain role is a word in the reader's language: the palette and
+  // the key sheet both name the Mayor's page, and a Chinese
   // screen that names it in English reads as untranslated.
   test("no Chinese phrase names the Mayor in English", () => {
     for (const [key, phrase] of Object.entries(table)) {

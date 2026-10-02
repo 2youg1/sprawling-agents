@@ -4,10 +4,11 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // Every page but the conversation, in the columns right of the edge
-  // keys (docs/frontend-method.md §4-33), until each is redesigned for the shell. The
-  // conversation page lays itself out by the tier and is not here
-  // (`workspace.svelte`).
+  // Every page but the conversation and the settings panel, in the
+  // columns right of the edge keys (docs/frontend-method.md §4-33). The conversation
+  // page lays itself out by the tier (`workspace.svelte`), and the panel
+  // opens over the page beneath it (`settings/hosted.svelte.ts`), so no
+  // `setup` view reaches this file.
   import type { View } from "../core/route";
   import { say } from "../core/lang";
   import { ui } from "../ui";
@@ -19,7 +20,6 @@
   import RecordView from "./record.svelte";
   import Registry from "./registry.svelte";
   import Run from "./run.svelte";
-  import Setup from "./setup.svelte";
   import Welcome from "./welcome.svelte";
 
   interface Props {
@@ -43,8 +43,6 @@
     <Building address={view.address} />
   {:else if view.kind === "run"}
     {#key view.lens}<Run run={view.run} lens={view.lens} />{/key}
-  {:else if view.kind === "setup"}
-    <Setup />
   {:else if view.kind === "mcp"}
     <Mcp />
   {:else if view.kind === "record"}

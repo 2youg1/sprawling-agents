@@ -30,8 +30,8 @@ export type GlyphName =
   | "cost"
   // The two sliders of the settings screen.
   | "setup"
-  // A hand raised: something waits for a person. The one drawing both
-  // the rail and the `waiting` state use.
+  // A hand raised: something waits for a person. The one drawing the
+  // city table and the runs board both use for it.
   | "hand"
   // The magnifier over everything the palette can reach.
   | "search"

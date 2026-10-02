@@ -58,9 +58,10 @@ export interface Ui {
   // (`views/talk/handing.ts`). Written by the talk page alone.
   readonly conversing: Writable<Conversing>;
   // The questions this city is holding for the person, as one reading
-  // three views share: the dot on the rail, the rail's badge, and the
-  // tab's title. Before this each of them folded the same answer by
-  // hand, and a fourth reader would have folded it a fourth time.
+  // the views share: the mailbox key's badge and its deciding section,
+  // the notifier, and the tab's mark. Before this each of them folded
+  // the same answer by hand, and another reader would have folded it
+  // once more.
   // `undefined` until the city first answers: an empty list is a
   // snapshot, and a reader that took the placeholder for one (the
   // notifier's first snapshot) would raise every item that follows.

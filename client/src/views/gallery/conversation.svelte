@@ -36,8 +36,8 @@
   import { CALLS, EARLIER_SEGMENT, ONE_QUESTION, ROUND, TURNS, WAITING } from "./served";
   import { SAYING } from "./saying";
 
-  // The question the rail's dot counts stays reachable under the name
-  // it always had, for the mailbox fixture that reads it.
+  // The question the mailbox key's badge counts stays reachable under
+  // the name it always had, for the mailbox fixture that reads it.
   export { ONE_QUESTION } from "./served";
 
   // The postures a run can be in, in the order a dispatch meets them.

@@ -10,8 +10,8 @@
   //
   // Nearly every fixture on this route takes its state through props,
   // which is the whole reason a component's state is a prop. One does
-  // not: the dot at the top of the rail reads the link, the questions
-  // waiting and the refusals nobody has opened, all three through the
+  // not: the mailbox key reads the link, the questions waiting and the
+  // refusals nobody has opened, all three through the
   // door every view is handed (`src/ui.ts`) - so drawing it in a state
   // worth looking at means handing that subtree a city, and this is
   // the one place on this route where a city is made up.
@@ -22,7 +22,7 @@
   // initialisation, so every reader inside this subtree is handed this
   // stand's city before the door is handed back; a reader arriving
   // later than that meets the real city again. The install replaces
-  // exactly the five readings the dot takes off the connection - where
+  // exactly the five readings the mailbox takes off the connection - where
   // the socket stands, the notices kept, the questions asked, and the
   // two verbs below - and inherits the rest from the city before it,
   // which is why stands nest correctly: one stand inside another
@@ -35,7 +35,7 @@
   // already answers.
   //
   // **Nothing here can reach the running city.** Retrying the link and
-  // marking refusals read are the two verbs the dot offers, and both
+  // marking refusals read are the two verbs the mailbox offers, and both
   // are replaced: a fixture that can act on the city is a fixture that
   // can change it, and a gallery that changed the city would be
   // measuring something it had just altered.
@@ -46,8 +46,8 @@
   import type { Answer, ApprovalItem, AxError, EventRecord, LogLine, Query } from "../../wire";
 
   interface StandProps {
-    // Where the socket stands, which is one of the three things that
-    // turn the rail's dot yellow.
+    // Where the link stands, which the mailbox key's connection marker
+    // reads.
     readonly link: LinkState;
     // The refusals this session has seen and nobody has opened.
     readonly unread: readonly AxError[];

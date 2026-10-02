@@ -312,8 +312,8 @@ export const CALLS: readonly CallLine[] = [
 ];
 
 // The questions this city is holding for the person, as the cards and
-// the rail's dot read them. `ONE_QUESTION` is named rather than
-// reached by its position in the list, because the dot and the cards
+// the mailbox key's badge read them. `ONE_QUESTION` is named rather than
+// reached by its position in the list, because the badge and the cards
 // are two readings of the same waiting question and a reordered list
 // must not make them disagree about which one that is; the mailbox
 // fixture reads it too.

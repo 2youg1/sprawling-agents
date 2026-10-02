@@ -659,26 +659,6 @@
     "en": "door",
     "zh": "门"
   },
-  "facts_city": {
-    "en": "this city",
-    "zh": "全城"
-  },
-  "facts_link": {
-    "en": "link",
-    "zh": "连接"
-  },
-  "facts_model": {
-    "en": "model",
-    "zh": "模型"
-  },
-  "facts_region": {
-    "en": "what is running on your behalf",
-    "zh": "此刻替你在跑的是什么"
-  },
-  "facts_run": {
-    "en": "this run",
-    "zh": "本次"
-  },
   "facts_sandbox": {
     "en": "sandbox",
     "zh": "沙箱"
@@ -2131,10 +2111,6 @@
     "en": "city",
     "zh": "城市"
   },
-  "nav_everything": {
-    "en": "everything",
-    "zh": "全部去处"
-  },
   "nav_mayor": {
     "en": "the Mayor",
     "zh": "市长"
@@ -2186,10 +2162,6 @@
   "notices_today": {
     "en": "today",
     "zh": "今天"
-  },
-  "notices_unread": {
-    "en": "{n} unread",
-    "zh": "{n} 条未读"
   },
   "outcome_cancelled": {
     "en": "stopped",
@@ -2358,10 +2330,6 @@
   "plan_unplanned": {
     "en": "no plan to measure against: {steps} steps taken",
     "zh": "没有可度量的计划：已走 {steps} 步"
-  },
-  "presence_title": {
-    "en": "what the city is telling you",
-    "zh": "城里的动静"
   },
   "provider_cut": {
     "en": "the answer stopped part-way; the same request is worth sending again",
@@ -2827,10 +2795,6 @@
     "en": "the page",
     "zh": "页面"
   },
-  "region_nav": {
-    "en": "where to go",
-    "zh": "去处"
-  },
   "registry_count": {
     "en": "{n} kept",
     "zh": "留存 {n} 件"
@@ -3094,10 +3058,6 @@
   "run_context": {
     "en": "context",
     "zh": "上下文"
-  },
-  "run_cut": {
-    "en": "{n} more lines",
-    "zh": "还有 {n} 行"
   },
   "run_doing_calling": {
     "en": "using a tool",
@@ -4455,10 +4415,6 @@
     "en": "{n} discarded",
     "zh": "丢弃 {n} 个"
   },
-  "talk_effort": {
-    "en": "effort",
-    "zh": "强度"
-  },
   "talk_drop_refused": {
     "en": "{name} was not kept: {why}",
     "zh": "{name} 没有存下：{why}"
@@ -4491,18 +4447,6 @@
     "en": "send again",
     "zh": "再发一次"
   },
-  "talk_context": {
-    "en": "context",
-    "zh": "上下文"
-  },
-  "talk_context_run": {
-    "en": "run {run}",
-    "zh": "本次 run {run}"
-  },
-  "talk_context_none": {
-    "en": "no run yet",
-    "zh": "还没有 run"
-  },
   "talk_room_note_mayor": {
     "en": "the Mayor: plans the city and hands out work",
     "zh": "市长：给整座城做计划、派活"
@@ -4518,10 +4462,6 @@
   "talk_empty_mayor": {
     "en": "the Mayor",
     "zh": "市长室"
-  },
-  "talk_empty_room": {
-    "en": "room {room}",
-    "zh": "房间 {room}"
   },
   "talk_goal": {
     "en": "read the city, answer, and plan where planning is needed",
@@ -4562,10 +4502,6 @@
   "talk_opening_mayor": {
     "en": "plans, work to hand out, and what the city should do next",
     "zh": "计划、派活，以及这座城接下来做什么"
-  },
-  "talk_opening_room": {
-    "en": "what {room} should work on",
-    "zh": "{room} 接下来做什么"
   },
   "inspect_label": {
     "en": "inspector",
@@ -6030,14 +5966,6 @@
   "monitor_waiting": {
     "en": "waiting for the first sample",
     "zh": "等待第一次采样"
-  },
-  "facts_core": {
-    "en": "core",
-    "zh": "核心"
-  },
-  "facts_core_reading": {
-    "en": "{cpu} cpu · {memory}",
-    "zh": "CPU {cpu} · {memory}"
   },
   "city_view": {
     "en": "what the city page shows",
