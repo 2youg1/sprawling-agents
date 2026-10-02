@@ -1295,6 +1295,10 @@
     "en": "press keys",
     "zh": "按下组合键"
   },
+  "keys_finder": {
+    "en": "find a file",
+    "zh": "找文件"
+  },
   "keys_inspect": {
     "en": "the inspector",
     "zh": "检视面"

@@ -6,11 +6,14 @@
 // Every key the shell listens for, in one table.
 //
 // A key was three facts spread over three files: the shell matched a
-// letter, the rail drew a string, and nothing could change either. Here
+// letter, a view drew a string, and nothing could change either. Here
 // an action names what a key does, a chord says which keys reach it,
 // the person's own chord replaces the default, and one function answers
 // "which action was that". The edge keys, the shell and the settings
-// section read this table; none of them spells a key itself.
+// section read this table; none of them spells a key itself. Walking
+// the lines of a list is a second table below (`LINE_KEYS`), because
+// those keys belong to whichever list holds the focus rather than to
+// the shell.
 //
 // **A chord is what every other application on the machine means by
 // one**: the accelerator (Cmd on a Mac, Ctrl everywhere else), Shift,
@@ -64,6 +67,7 @@ export const ACTIONS = [
   "decide.yes",
   "decide.edit",
   "decide.no",
+  "finder",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -144,6 +148,10 @@ export const DEFAULTS: Readonly<Record<Action, Chord>> = {
   "decide.yes": plain("y"),
   "decide.edit": plain("e"),
   "decide.no": plain("n"),
+  // Find a file by its name, where every editor that taught the habit
+  // puts it. A browser that keeps the chord for printing leaves the
+  // palette's entry of the same name as the way in.
+  finder: accel("p"),
 };
 
 // The word each action is called by, which is a phrase key rather than
@@ -168,6 +176,7 @@ export const LABELS: Readonly<Record<Action, Key>> = {
   "decide.yes": "keys_decide_yes",
   "decide.edit": "keys_decide_edit",
   "decide.no": "keys_decide_no",
+  finder: "keys_finder",
 };
 
 // The keys a browser keeps for itself beside the accelerator: it
@@ -255,6 +264,11 @@ export function platformOf(userAgent: string): Platform {
 
 // ------------------------------------------------------------- matching
 
+// How long a key stays down before it is a hold rather than a press:
+// the layers key becomes a look at the blend tier, and the accelerator
+// alone draws every key's name (docs/frontend-method.md §7E).
+export const HOLD_MS = 300;
+
 // The part of a key press this table judges. A `KeyboardEvent` is one;
 // so is the record a test writes.
 export interface Pressed {
@@ -267,6 +281,26 @@ export interface Pressed {
   // the page at large. The caller knows the target element; this table
   // only needs the fact.
   readonly target: "field" | "page";
+}
+
+// The one reading of a key press off the event. A press that lands in a
+// text field, or arrives while an input method is composing, is the
+// person's typing, so it counts as landing in a field.
+export function pressedOf(event: KeyboardEvent): Pressed {
+  const target = event.target;
+  const writing =
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement && target.isContentEditable);
+  return {
+    key: event.key,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    shiftKey: event.shiftKey,
+    altKey: event.altKey,
+    target: writing || event.isComposing ? "field" : "page",
+  };
 }
 
 export function matches(held: Chord, pressed: Pressed): boolean {
@@ -318,6 +352,85 @@ export function conflictsOf(bound: Readonly<Record<Action, Chord>>): readonly Co
     }
   }
   return out;
+}
+
+// ------------------------------------------------------- walking lines
+
+// Moving between the lines of a list: a tool line, a mailbox entry, a
+// row of the runs board. Each list answers only the moves it has a use
+// for, and spells none of the keys itself (refrain 3-12).
+export const LINE_MOVES = ["line.next", "line.previous", "line.first", "line.last", "line.open", "line.close"] as const;
+
+export type LineMove = (typeof LINE_MOVES)[number];
+
+// The keys of each move, each key the sequence of `KeyboardEvent.key`
+// values typed one after the other. The first key of a move is the one
+// a row draws, because every keyboard labels it; the letters are the
+// terminal's and vim's (j, k, gg, G), read as typed, so g and G are two
+// keys and Shift needs no mark of its own.
+export const LINE_KEYS: Readonly<Record<LineMove, readonly (readonly string[])[]>> = {
+  "line.next": [["ArrowDown"], ["j"]],
+  "line.previous": [["ArrowUp"], ["k"]],
+  "line.first": [["Home"], ["g", "g"]],
+  "line.last": [["End"], ["G"]],
+  "line.open": [["Enter"]],
+  "line.close": [["Escape"]],
+};
+
+// How long the second key of a sequence may wait for the first, as in
+// vim's own default `timeoutlen`.
+export const SEQUENCE_MS = 1000;
+
+function sameKeys(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((key, at) => right[at] === key);
+}
+
+function moveOf(typed: readonly string[]): LineMove | undefined {
+  return LINE_MOVES.find((move) => LINE_KEYS[move].some((keys) => sameKeys(keys, typed)));
+}
+
+function begins(typed: readonly string[]): boolean {
+  return LINE_MOVES.some((move) =>
+    LINE_KEYS[move].some((keys) => keys.length > typed.length && sameKeys(keys.slice(0, typed.length), typed)),
+  );
+}
+
+// A reader of presses for one list, holding the start of a sequence
+// between two presses. `at` is the press's own time (`timeStamp`), so
+// the reader keeps no clock. A press in a field, or one holding a
+// modifier, is not a move and drops a sequence begun before it.
+export function lineWalker(): (pressed: Pressed, at: number) => LineMove | null {
+  return () => null;
+}
+
+function lineFace(key: string): string {
+  return key.length === 1 ? key : face(key);
+}
+
+// How each key of a move is drawn, in the table's order: a sequence is
+// its keys run together (gg), a letter keeps the case it is typed in.
+export function lineFaces(_move: LineMove): readonly string[] {
+  return [];
+}
+
+// --------------------------------------------------------- first letters
+
+function typeable(letter: string): boolean {
+  return /^[a-z0-9]$/.test(letter);
+}
+
+// The letter a row is reached by when a list moves by first letters:
+// the first letter of the name a person reads, when one key types it,
+// and otherwise the first letter of `slug`, the row's name in the
+// address bar, which every keyboard types (client D40).
+export function initialOf(_name: string, _slug: string): string {
+  return "";
+}
+
+// The first letter a press asks for, or none when the press is not one
+// letter typed outside a field with no modifier.
+export function initialTyped(_pressed: Pressed): string | null {
+  return null;
 }
 
 // -------------------------------------------------------------- the map
