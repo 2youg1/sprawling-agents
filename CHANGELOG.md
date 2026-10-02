@@ -20,14 +20,205 @@ release notes and their commits.
 
 ---
 
-## v<!-- xtask:begin workspace_version -->0.0.8<!-- xtask:end -->-<!-- xtask:begin maturity:titled -->Pre-alpha<!-- xtask:end --> (not yet cut)
+## v0.0.8-Pre-alpha-261002
 
-**sprawling <!-- xtask:begin workspace_version -->0.0.8<!-- xtask:end --> something (<!-- xtask:begin maturity:word -->pre-alpha<!-- xtask:end -->)**
+**sprawling 0.0.8 something (pre-alpha)**
 
-<!-- xtask:begin maturity:titled -->Pre-alpha<!-- xtask:end -->. It records what has landed after `v0.0.7-Pre-alpha-260927` so
-far. WIRE_V <!-- xtask:begin wire_v -->46<!-- xtask:end -->. Every wire change below shares that one `WIRE_V`: the
-version moved once, at the first change of shape after the last push, and
-moves again only after the next push (wire-SPEC 12.1).
+Pre-alpha. It records what landed in the repository after
+`v0.0.7-Pre-alpha-260927`. WIRE_V 46. The version moves at most once between
+two pushes, at the first change of shape (`crates/wire/Spec.lean` D1), so in
+this release it moved twice: to 45 when a turn and a call began to carry when
+the reply's first content arrived, and to 46 when the person's preferences
+began to keep session tags. Every other wire change below shares one of those
+two numbers.
+
+### One shell for every page
+
+The page stands on one grid with three tiers: **zen** shows the conversation
+alone, **blend** shows the city behind it as an outline, and **panorama** puts
+the workbench beside it. The layers key moves between them. The tier, the
+glass and the blend opacity are saved in the person's preferences file
+through `PutPreferences`, so a second browser opens on the same tier. A
+browser that has never saved one keeps its own until the city has an answer.
+
+- The page is lit in acid blue on a cooler grey ramp, set in Geist Mono, and
+  every icon comes from the lucide set through one glyph component. Motion,
+  glass and corners are tokens in `client/src/theme.css`: three durations
+  (150, 250 and 350 ms), an arriving and a leaving curve, a glass surface at
+  75 % opacity, and a corner exponent of 1.6. The appearance group switches
+  glass and motion off and sets the blend opacity.
+- Settings open as a panel over the page, from the left. A tree of groups
+  sits beside the open group, and `#/setup/<group>` opens the panel at that
+  group. The groups include the identity cards with an explicit GitHub CLI
+  import, the city layer (standing effort and `keep_warm`, written with
+  `ConfigureCity`), a building's `RULES.toml` written whole with `PutRules`,
+  the automation files read-only, what input each model accepts, and the
+  tier. A save shows its state until the city's receipt arrives.
+- The welcome page is a five-step guide. Only the first step, choosing a
+  model, is required. The others can be put off one at a time or all at
+  once, and the city keeps that progress per city. A step counts as done only
+  when the city's own configuration shows it.
+- The notices drawer is replaced by the mailbox, behind Accel-B. It has four
+  sections, ordered by what needs the person: deciding, working, recent and
+  notices. Its key shows the count of what needs the person, a dot for an
+  unread ordinary notice, and a bar when the link is down. A question, an
+  approval and a proposal are all drawn by one decide card answered with
+  y, e or n. An ordinary notice waits for a pause before it appears, and the
+  toast sits on the composer.
+- A call opens in full on the right side, in the inspector: its diff, its
+  terminal output and exit code, the file it read, or its screenshot. Each
+  open item is a tab, and each tab is a link to its item. Accel-J closes the
+  inspector. A file opens read-only at the cited line. A line from a past
+  version of the tree is offered as `path:line` to copy, never as a link that
+  would open today's file.
+- On a container narrower than 768 px the page draws one column. The world
+  becomes a sheet from the left, and the right side becomes a sheet from the
+  right only while an item is open. Each sheet is a history entry, so the
+  back button and an edge swipe close it. The frame follows the visual
+  viewport when the soft keyboard opens, and it pads the screen's safe areas.
+- The workbench in panorama shows the room's sessions, the chosen session's
+  fact sheet and timeline, and the commits as a swimlane graph built from
+  each commit's parents. The panes can be reordered and resized with a
+  splitter or the keyboard, and this browser keeps that arrangement. Picking
+  a commit scrolls the timeline to its checkpoint and opens its changes on
+  the right side.
+- The composer carries a run policy before the session starts: the write
+  limit, the admission requirement and the landing policy, in one control
+  with a three-column menu. `/dispatch` sends it, and `/admit` and `/room`
+  are new verbs. Modes are now Chat and Work.
+
+### Every other page
+
+City, building, cost, registry, the machine report, monitor, MCP, record and
+run pages are laid out on the shell's columns. Horizontal rules, not cards,
+separate their parts, and each page has one title.
+
+- The building page has a sandbox card, the cost of each plan node, and
+  commit rows that state the message, the UTC time and the facts. A change
+  row opens the file on the right side. A file can be taken back from a
+  checkpoint after a confirm dialog (`RestoreFile`). `Commit` and `CostOf`
+  have pages of their own.
+- The record is one timeline of the ledger and the process log, with a
+  filter by source. The run page shows its facts as one sheet. Its calls are
+  timed in UTC to the millisecond, and it opens on the lens that the run's
+  state calls for. `#/run/<id>/<lens>` opens a given lens, and `/diff` opens
+  the changes lens. A row of the runs board opens the page it names.
+- Accel-P finds a file by name in the building in front (`Query::Find`). The
+  city walks the tree shallow-first, in name order, skips `.git` and links,
+  and stops at 50 matches or 20,000 entries. The answer says when the walk
+  stopped before it reached the end of the tree.
+- Tool lines, mailbox entries, the runs board and the settings tree all walk
+  by one key table: ↓/j, ↑/k, Home/gg, End/G, Enter and Esc. In the settings
+  tree, a letter moves to the next group that starts with it.
+- Ctrl+. cancels the run the page is showing, or says that no run is shown.
+- The address bar can name a call (`#/talk/<addr>?call=<run>&at=<seq>`), a
+  document and its version, a run lens, or a step of the guide. The composer
+  keeps a separate draft for each room. ↑ in an empty box recalls the room's
+  newest task. A quote is added to the open box without moving the caret. A
+  draft that the browser refused to store is named under the box with a copy
+  key.
+- The palette has a "speak" entry. It records speech and writes the
+  transcript into the message box.
+- The client decodes the wire through Effect 4. `wire-ts` writes Effect 4
+  schemas, and it closes recursive types with `Schema.suspend`.
+
+### The silver cut
+
+`--silver: sqrt(2)` in `theme.css` is the one place the cut is defined. The
+twelve columns are grouped 3 | 6 | 3 and laid out in the proportion
+1 : √2 : 1 of the window's width, so at 1920 px the conversation takes the
+771 px in the middle, centred, and columns 4 and 10 are the two silver lines.
+When the right pane opens, it takes the right part and the conversation stays
+where it was. On the workbench, the session pane and the conversation are
+split 1 : √2 from top to bottom. Pages span columns 2 to 12 and are
+symmetric. The MCP page, the welcome guide and the settings panel put their
+edges on the silver lines.
+
+The conversation page is no longer a CSS query container. While it was one,
+it turned off `subgrid`, so every pane fell into the first column. One
+scrollbar rule also pushed every page 5 px left of centre, and that is fixed.
+
+### Sessions: every one listed, tagged and pinned
+
+The sessions pane lists one row per session, past sessions included: the
+pinned group first, then one group per building, newest first. A row links to
+its session at `#/talk/<room>:<began>`. An earlier session opens read-only,
+with "continue from its end", which opens a new session from its last run,
+and a screen reader names its region "an earlier session" rather than the
+conversation, since it has no box to write in. In blend, the sessions pane takes input while the rest of the world layer stays
+inert.
+
+- `/new`, `/clear` and `/compact` act on the room of the session shown in
+  main, and bring main to the new session. `/compact` cancels the run, waits
+  for it to freeze, and then opens a new session that carries a handoff. It
+  is composed in the client from existing commands, with no new kernel verb.
+- A session takes tags of 1 to 24 characters: letters, digits, `-` and `_`,
+  lower-cased on entry. The row menu and `/tag`, `/untag` add and remove
+  them, and a filter row shows one tag at a time. The tags are kept in the
+  person's preferences (`PreferencePatch::Tags`), keyed by city, room and
+  the session's start. `pin` is a reserved tag. The Mayor's current session
+  is always pinned, and its menu offers no unpin.
+- A room still has one live session: opening a session ends the previous
+  one, and opening one while a run works in the room is refused with
+  `E_BUSY`.
+
+### RefRain: documents beside the conversation
+
+A document opens on the right side in RefRain, an editor built on CodeMirror
+6. CodeMirror loads in a chunk of its own (97 KB gzipped), off the first
+screen. Markdown and text are edited as source. A text file is shown
+literally: a byte-order mark is hidden, CRLF is folded and written back
+byte-exact, and control characters are drawn. The preview is asked from the
+city window by window (`Query::Preview`), and the cursor's place carries
+between source and preview. The editor has undo, find and replace, and a
+draft for each document version. A save goes through `PutRange` and is
+confirmed by its `document_written` receipt. A document that moved in the
+city since the page read it opens a conflict, with three choices: compare,
+move the draft onto the city's version, or discard it.
+
+- Every version of a document that the city reads, saves, or lands through a
+  proposal is kept in the content store. `Query::Versions` lists up to 100,
+  newest first, with whether each one is kept and its size, and any two kept
+  versions can be compared.
+- PDF is drawn with pdf.js and DOCX with docx-preview, both in lazy chunks,
+  and HTML is drawn in a sandboxed frame with its own CSP. Two versions of a
+  PDF or DOCX are compared by their extracted text. Every preview names its
+  format, the tool and its pinned version. The bytes reach the page through
+  `Query::Bytes`: 1 MiB windows, base64, on the same socket, up to 64 MiB per
+  file. The inspector draws screenshots through the same door.
+- `Query::Export` writes a document as one self-contained HTML file with no
+  script and `default-src 'none'`. A comparison is exported as Markdown.
+- Mermaid is shown as its source, not drawn, and RefRain reads no text out
+  of an image.
+
+### Markdown has one grammar
+
+The city lays out Markdown with one grammar (comrak), for documents and for
+the conversation alike. A reply is laid out by the city (`Query::Reply`): the
+page asks only for the part of the reply not yet laid out, and while the reply
+streams it sends complete lines only. An open fence or list stays raw until
+it closes. The client's own Markdown reader, `prose.ts`, is deleted. A
+Markdown version up to 64 KiB can be previewed without being stored first.
+Formulas are drawn by KaTeX as MathML, with no KaTeX fonts or stylesheet. A
+formula KaTeX refuses is shown as its source.
+
+### Proposals
+
+A run can propose changes to a document instead of writing it. The resident
+`proposal` tool offers and withdraws cards. Each card quotes the version it was
+made against, and the city refuses a decision on a card whose version is no
+longer the document's. Four record-only kinds carry the history:
+`document_written`, `proposal_offered`, `proposal_decided` and
+`proposal_withdrawn`. `DecideProposals` answers one or more cards.
+`Query::Proposals` lists one document's cards, and `Query::OpenProposals`
+lists every open card in the city, newest first, with the time each was
+offered.
+
+On the page a proposal is the decide card's third kind. Its body is the
+city's sentence diff. y accepts it whole, e opens a per-sentence edit, and n
+rejects it. A card made against an older version shows both versions; y and e
+are disabled with the reason, and n is still allowed. Cards are listed in the
+mailbox's deciding section and above the document in RefRain.
 
 ### What the city calls the person and the Mayor
 
@@ -50,7 +241,9 @@ The page writes the names through `PutIdentity`, which sends the values and
 the text the page read; the city rewrites only the card's keys. `PutDocument`
 now carries that text too. A document that moved since the page read it is
 refused, and the draft stays on the page. `Query::Identity` reads both areas
-at the moment of asking.
+at the moment of asking. `Query::GithubLogin` reads the login the GitHub CLI
+holds, for the import the identity card offers, and `Query::Guide` and
+`PutGuide` read and write the welcome guide's progress.
 
 ### A building's rules and the city's own settings from a page
 
@@ -78,18 +271,159 @@ city proves its history in the background and refuses commands until it is
 done; until then `proved` is absent, so a page can say why a command was
 refused.
 
-### The monitor
+### A run's policy
+
+A dispatch carries one run policy: the mode, a write limit, an admission
+requirement and a landing policy, and `run_started` records it. The write
+limit `Create` lets a run create files that do not exist and change, remove
+or rename none, including one it created itself; a create claims its name
+atomically, and the limit holds on every write path. The admission
+requirement names the evidence a merge asks for on top of the building's own
+checks: that the tests ran and passed, or that the observable contract did
+not move. The landing policy `Experiment` gives the run a worktree of its
+own, even in a building without review, and nothing is ever merged from it.
+
+### The truncation lock
+
+A run is offered each tool at one of three tiers, decided per building and
+per session. A tool the building does not admit takes zero bytes anywhere. An
+admitted tool outside the mode's core takes one line in a dormant index of at
+most 1,024 bytes, written as `- name: hint`, then names alone, then `+N more`.
+The core is `call`, `describe`, `read`, `search` and `status` in Chat, plus
+`edit` and `exec` in Work. `describe` returns a tool's full guide, and `call`
+runs it. The resolved call keeps the model's call id and passes that tool's
+own checks, so `tool_called` and `tool_result` name the real tool. The
+request's tool list stays the same for the whole session, so calling
+`describe` keeps the prompt cache. On the fixture, the tools array and its
+skill lines went from 12,973 B and 316 B to 4,693 B plus a 1,021 B index.
+
+### Pictures and recordings
+
+`ModelTag::Ocr` is a slot a person fills with a model that can read images,
+and the models page names it. A run whose building the endpoint book gives
+such a model is offered the `ocr` tool, which reads a PNG in the city or a
+screenshot a connector stored. A run whose building has a transcription
+endpoint is offered `transcribe`, which reads a recording from a file in the
+city, by its extension, or from a stored block, by its leading bytes. Both
+tools open bytes through one reader that refuses whatever `read` refuses. A
+building with no such model is not offered a tool that could only fail.
+
+- An MCP picture block is stored in the content store and handed to the model
+  as an attachment, where it used to enter the window as base64. A sound
+  block is stored the same way and named by its locator.
+- A model's accepted input is one ladder: the catalogue, then the preset
+  table, then text. `SelectModel` carries what the person says a model
+  accepts, and that statement is the first rung.
+
+### Computer use
+
+- `desktop.snapshot` reads a window to the model as an outline in document
+  order, read from the UI Automation tree.
+- A snapshot's generation expires when its window moves or changes size, so
+  input aimed by an old snapshot is refused.
+- A batch of input cut short reports how far it got and releases only the
+  keys and buttons it left held.
+- The clipboard has an owner and a bounded read, and a clipboard that will
+  not lock no longer reads as empty.
+- The connector declares per-monitor DPI awareness when its desk opens, a
+  recording takes every frame from the window's own capture, and it hears
+  the one audio device the scope file names.
+- The desktop server answers `tools/call` with a `CallToolResult`. A tool that
+  reports its own failure reaches the model as a failure, and an answer lost
+  after the request left is marked as an effect nobody saw.
+- MCP over stdio, SSE and HTTP reads one message at a time under the message
+  ceiling, where an answer past the ceiling used to grow the reader without
+  bound.
+- A hard link is refused by its link count on Windows as well as Unix.
+
+### Remote pairing
+
+A city can be reached from outside the machine through a route: a named
+Cloudflare tunnel, any command that prints an https address (the documents
+show Tailscale as an example), or a scripted route for tests. The city's
+`[remote]` table chooses the route each time `/remote open` runs, and the
+terminal prints the invitation as a QR code. Every frame from a device is
+judged on its own. A device with the `Watch` authority reads; one with `Act`
+may also send the eleven verbs of the Act class: `Dispatch`, `Steer`,
+`Cancel`, `Halt`, `Release`, `Approve`, `HandOff`, `BatchByBuilding`,
+`Pursue`, `OpenSession` and `PutSpine`. Every other verb is local only. The
+door writes five record-only kinds: `remote_opened`, `remote_closed`,
+`device_paired`, `device_revoked` and `remote_session_started`.
+
+- The remote listener serves the same page as the city's own port. A paired
+  browser on https speaks the wire through the sealed session. On any other
+  connection it uses `/ws`. `/transcribe` and `/drop` answer 404 there.
+- An invitation link (`#pair=…&city=…`) opens the remote settings group. The
+  pairing code travels sealed to the city the invitation pinned. The seed is
+  shown once and never stored. The device's Ed25519 half is a WebCrypto key
+  that cannot be exported, and ML-KEM and ML-DSA come from
+  `@noble/post-quantum` in a lazy chunk. A device can lock the door from its
+  session. The page has a web app manifest and no service worker.
+- A city served on port 0 now reports the port its listener holds to the
+  door, the banner, `/serving` and the browser probe.
+
+### Playback
+
+`sprawling playback export` writes a read-only, deterministic bundle of a
+city's history. The selection can be by seq, run, building or UTC time
+(`[since, until)`), cut at the last complete line when the export starts.
+`sprawling playback check` judges a bundle or a page on five items, each
+reported as passed, failed or unchecked: structure and references,
+consistency with the bundle, a recomputation against the city, a static
+offline check, and a browser observation. Confidential buildings stay out
+unless `--include-confidential` is given, and the output says so when it is.
+A resident exports and checks through the `playback` city tool, as the run's
+building, into the city's playback exports.
+
+The `playback` skill ships with a reference page: one HTML file with the
+bundle embedded, which opens on the runs and on what needs attention. It has
+filters, narration whose every claim cites a `data-seq`, words in English and
+Chinese, and one swimlane per run. Its playhead steps in seq order or plays
+on measured moments. A line whose moment was not measured stays off the time
+axis and says why. The page uses the machine's monospaced font and embeds
+none. A local design or workflow skill may restyle it, but it may not change
+the facts in the bundle.
+
+### Timing
+
+- Every line a turn waited for records its own moment, read from the
+  driver's clock when the line was made. `EVENT_LOG_V` is 2, and a line says
+  whether its `t` is the moment it records. A 0.0.7 binary refuses to open a
+  city that 0.0.8 has written, with `E_LOG_VERSION_UNSUPPORTED`.
+- A turn carries when its reply's first content arrived (`first_at`) and
+  when the reply returned (`Turn.returned`). The first head of a session
+  reads who is speaking, the model, the effort and the mode, from the moment
+  the session starts. Each later head shows its time to first content and
+  its tokens per second, and the session sheet shows the medians of both. A
+  run's effort and the names it froze reach the page through `Opening`.
+- A running call counts up every 100 ms and shows nothing under one second.
+  Once the call lands, it shows the ledger's milliseconds. One function
+  computes a call's duration, and the thread, the timeline, the monitor and
+  the inspector all use it. A UTC instant is written one way everywhere on
+  the page.
+- An `exec` result ends with the second its call answered, in ISO UTC.
+  `[clock] stamp` sets how precise that stamp is, and `status` says what time
+  it is.
+- `sprawling view --since/--until` keeps the lines whose own time falls in a
+  UTC span, and the terminal view prints each line's chain hash.
+  `sprawling whose --trace` lists the calls a run made since its previous
+  commit.
+- The context ring sounds its first reminder at 30 %. A city may set the
+  second reminder anywhere from 31 % to 90 %.
+
+### Measuring: the monitor and `gauge`
 
 `Sample` carries two more counters: `view_backlog`, the records the writer has
 handed the view thread and the pages cannot see yet, and `read_nanos`, how
-long the sampler's previous beat took to read the counters. `sprawling top`
-shows both.
+long the sampler's previous beat took to read the counters.
 
-### A tag for a model that reads pictures
-
-`ModelTag::Ocr` is a slot a person fills with a model that can read images.
-Nothing asks for it yet: the city's OCR tool that will is the next piece of
-work.
+`sprawling gauge`, which `top` still names, measures one of three subjects: a
+served city, a process tree (`--pid`), or a command run n times (after `--`).
+It beats every 1000 ms unless `--every` sets 250 to 60,000 ms, prints lines a
+person reads on a terminal and JSON lines otherwise, and shows the two new
+counters. Dispatch preparation, MCP tool listing and the probes read a
+monotonic clock, and every spread is the nearest rank. The `gauge` skill
+teaches an agent to use it on other projects.
 
 ### The release binary is built at `opt-level = 3`
 
@@ -101,11 +435,119 @@ startup is unchanged. The binary grows from 15.1 MB to 26.8 MB and install
 takes 1.25 times as long (windows-x86_64, 16 cores, NVMe); runtime speed comes
 before size.
 
-### Not done in this section
+The readings on that machine, release build, with the readings at `"z"` in
+brackets:
 
-The GitHub CLI import of a user id, the onboarding guide's progress, and a
-per-room list of sessions are not on the wire yet; wire-SPEC section 4 lists
-them.
+- First byte of a served city: 45–47 ms empty (47–48), 110–112 ms at 100,000
+  records (121–125), 210–212 ms at 400,000 records (257–263). The history is
+  proved behind the first byte, its segments hashed in parallel waves of
+  eight: 138 ms at 400,000 records. Commands are taken 310 ms after opening
+  began, and until then they are refused with `E_HISTORY_UNPROVEN`.
+- Rebuilding the views from genesis: p50 437 ms (676–708 ms). It fell from
+  1,277 ms when a rebuild stopped proving the history before folding it, since
+  the fold checks every line itself.
+- A run's history: p50 3.3 ms (4.15–4.26 ms).
+- Install: p50 1,856 ms (1,486–1,490 ms). Most of it is the first launch of
+  the unpacked executable, which the on-access scanner checks: 1,674 ms.
+- A run lands before its lane restocks the worktree, so the wait at landing
+  went from 1,219 ms to 0. The city's first placement of a tree still takes
+  4.0–4.3 s.
+- A 500-step long turn peaks at 7.1 MiB of private memory.
+- The release binary, the client bundle and the dependency count are now
+  readings. `budgets.toml` still records them, but no gate refuses them.
+
+### Every specification is Lean
+
+Every crate's SPEC, the client's and the tools' included, is now
+`Spec.lean` with its parts under `spec/`, in one Lean package at the
+repository root, and no `-SPEC.md` file is left. Each entry file has
+seventeen sections. A decision is a `D<n>` comment above the declaration it
+governs, and the comments are in Chinese with concept names in English. The
+design models moved from the adversary into the crates they specify, and
+`tools/adversary/` now holds only the checker. The client's interaction
+contracts are state machines with proofs. How a screen looks is now described
+in English in `docs/frontend-method.md`, under the labels the code cites.
+
+Lean is required to develop the code. `just models` fails when Lean is
+absent, `just check-branch` builds the models when a `.lean` file changed,
+and `cargo xtask spec <lib>` writes a skeleton. The `spec` gate enforces one
+effective specification per crate, no citation of a specification the tree
+lacks, imports only along the crate graph, no `sorry`, `admit` or `axiom`,
+and every cited path on disk. `specalign` and `wiring` read the Lean tables.
+`docnum`, `lexicon`, `release` and `proof` read `.lean` files too.
+
+### The doctor checks the city's drive
+
+On Windows, `sprawling doctor` adds a `scanning` part after `priority`. It
+names the city's directory, the one on the command line or else the default
+city location, and answers two questions about it: is it on a Dev Drive, and
+is it inside Defender's exclusions. Each answer is yes, no, or "cannot tell"
+with the reason. When neither holds, it prints the Settings path that creates a
+Dev Drive and the `Add-MpPreference -ExclusionPath` line for the city, or
+`fsutil devdrv trust <volume>` for a Dev Drive that is not trusted. Defender
+shows its exclusions only to an administrator, so an ordinary account reads
+"cannot tell" there. The part changes no verdict and no exit code, and other
+platforms print one line saying it does not apply. The doctor's page does not
+show this part yet.
+
+### What a contributor notices
+
+- Packages carry their crates.io names, `sprawling-*`, and the directories
+  follow the library names: `channels` is `wire`, `memory` is `storage`,
+  `protocol` is `agent_protocols`, and `remote_access` and `documents` are
+  new. `tools/` holds what never ships: `xtask`, `citysim`, `adversary`,
+  `fixtures` and `fuzz`. `crates/`, `tools/`, `docs/` and `skills/` each
+  have a README.
+- `crates/desktop` is a workspace member. The four groups of Win32 calls
+  with no safe interface — enumeration, capture, the clipboard and DPI
+  awareness — go through a Zig leaf behind `crates/desktop/ffi`, the one
+  crate with a lint table of its own, and `crates/desktop/src` holds no
+  production `unsafe`. Zig is in the develop tier at the version
+  `crates/desktop/ffi/zig-version` pins, and `header`, `length` and `modmap`
+  read `.zig` files.
+- Every product package can be published. The `packaged` gate refuses a
+  package that compiles a file from outside its own directory, and `guard`
+  pins every workspace package to the workspace version. `sandbox` is a
+  default feature, the client bundle is built into `crates/sprawling/web-dist`,
+  and the templates a city writes live in the city package.
+- The maturity has one definition, `kernel::release::MATURITY`. The tag, the
+  status line, both READMEs and this file render it from there.
+- The new `motion` gate requires every transition to use the curves and
+  durations in `theme.css`. The colour gate moved to the acid-blue axis and
+  checks that text on glass stays legible over the brightest surface behind
+  it. The render gate checks the conversation page's standing controls
+  against `[talk_controls]`.
+- The client's runtime list adds the five CodeMirror packages, `pdfjs-dist`,
+  `docx-preview`, `@noble/post-quantum`, `@lucide/svelte` and `katex`, each
+  pinned exactly. The READMEs and `AGENTS.md` point to the list in
+  `tools/xtask/src/npm.rs` instead of copying it.
+- `just shots` renders every page at 1440 and 1920 px, dark and light, for a
+  person to look through.
+- A build with no pinned toolchain installs the stable Lean and winget's
+  Zig.
+
+### Known and unfixed
+
+- The city's remote key lives only as long as the process, so every device
+  pairs again after the city restarts. Keeping it needs a decision about
+  where the seed lives, and `crates/remote_access/Spec.lean` §3 sets out the
+  three options. No test opens the Cloudflare route on a real tunnel.
+- A layer may name `[resident] harness`, and a room whose resident is a
+  harness is refused before anything is written until the harness drive is
+  wired.
+- `/compact` can reach the city a moment before the room is free, and the
+  city then answers `E_BUSY`. A second `/compact` works.
+- Session tags are keyed by the city's name, so two cities with the same name
+  on one machine share their tags.
+- An earlier session whose runs are older than the runs the page holds shows
+  no thread, and its "continue" is disabled.
+- With the right pane open at 1920 px, RefRain gets 518 px, about 60
+  monospace characters.
+- A resident's `edit` or `exec` writes no line naming the version it made, so
+  RefRain can say only "written outside the page" for those versions. A
+  version written outside the page and never read by the city is listed but
+  not kept.
+- The `playback` tool takes the reference page's whole text as an argument.
 
 ---
 
