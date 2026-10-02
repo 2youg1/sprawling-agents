@@ -255,6 +255,8 @@ impl Journal {
 pub trait ConcurrentInvoke {
     /// 这次调用那件工具的登记；None 是工具台不认识的名字（它不是只读的）。
     fn meta_of(&self, call: &ToolCall) -> Option<&ToolMeta>;
+    /// 经 `call` 的一次调用换成它所指的那件；默认原样交回（§8-61）。
+    fn resolve_call(&self, call: ToolCall) -> ToolCall { call }
     // ahead、admit、tool、account 不变
 }
 ```

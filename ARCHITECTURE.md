@@ -317,7 +317,11 @@ than any diagram of boxes.
 6. **`runtime::catalog` decides what the model may see**: the built-in
    tools, the collaboration tools this building admits, the skills
    its reading room allows, and any MCP tools discovered from the
-   building's `CONFIG.toml`. `city::neighbourhood` is scanned in the same
+   building's `CONFIG.toml`. Of those, only the mode's core travels as
+   tools; the rest is one line each in a dormant index of at most 1 KiB,
+   and a run fetches a guide with `describe` and runs a dormant tool
+   through `call` (the truncation lock, `crates/runtime/Spec.lean` §8-60).
+   `city::neighbourhood` is scanned in the same
    breath, so the run also knows which addresses it can reach and who
    stands at them — without it, `signal` takes an address the model has to
    have been told.
