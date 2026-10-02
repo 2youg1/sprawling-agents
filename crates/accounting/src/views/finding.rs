@@ -12,7 +12,8 @@
 //! D17). The walk goes level by level, each level in name order, so the
 //! shallow files come first and two machines answer in one order.
 
-use std::path::Path;
+use std::collections::VecDeque;
+use std::path::{Path, PathBuf};
 
 use kernel::Address;
 
@@ -21,13 +22,60 @@ use kernel::Address;
 ///
 /// Takes the city root rather than the views: it reads the disk, and
 /// runs after the view lock is released, as `listing_answer` does.
-pub(super) fn find_answer(_city_root: &Path, under: Address, text: String) -> wire::FindAnswer {
+pub(super) fn find_answer(city_root: &Path, under: Address, text: String) -> wire::FindAnswer {
+    let (paths, walked) = walk(&city_root.join(under.as_str()), &text.to_lowercase());
     wire::FindAnswer {
         under,
         text,
-        paths: Vec::new(),
-        walked: wire::Walked::Whole,
+        paths,
+        walked,
     }
+}
+
+/// One level at a time from `root`, each level in name order, until the
+/// tree ends or a bound is reached.
+fn walk(root: &Path, needle: &str) -> (Vec<Address>, wire::Walked) {
+    let mut found = Vec::new();
+    let mut seen: usize = 0;
+    let mut levels: VecDeque<(PathBuf, String)> = VecDeque::from([(root.to_path_buf(), String::new())]);
+    while let Some((dir, prefix)) = levels.pop_front() {
+        for (name, is_dir) in entries(&dir) {
+            seen = seen.saturating_add(1);
+            if found.len() >= wire::FIND_MAX || seen > wire::FIND_WALK_MAX {
+                return (found, wire::Walked::Cut);
+            }
+            let relative = format!("{prefix}{name}");
+            if is_dir {
+                if name != kernel::GIT_METADATA {
+                    levels.push_back((dir.join(&name), format!("{relative}/")));
+                }
+            } else if name.to_lowercase().contains(needle)
+                && let Ok(path) = Address::parse(&relative)
+            {
+                found.push(path);
+            }
+        }
+    }
+    (found, wire::Walked::Whole)
+}
+
+/// One directory's names in name order, each with whether it is a
+/// directory to descend into. A link is neither descended into nor
+/// listed, because a link to a parent turns the walk into a circle; a
+/// directory that cannot be read has no names, as `listing` says.
+fn entries(dir: &Path) -> Vec<(String, bool)> {
+    let Ok(read) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut names: Vec<(String, bool)> = read
+        .flatten()
+        .filter_map(|entry| {
+            let kind = entry.file_type().ok()?;
+            (!kind.is_symlink()).then(|| (entry.file_name().to_string_lossy().into_owned(), kind.is_dir()))
+        })
+        .collect();
+    names.sort_unstable();
+    names
 }
 
 #[cfg(test)]
