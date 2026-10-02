@@ -186,7 +186,7 @@
         }}
       />
     {:else if reading === "versions"}
-      <Versions {session} label={name} {phrases} />
+      <Versions {at} {session} label={name} {phrases} />
     {/if}
   {/if}
 </div>

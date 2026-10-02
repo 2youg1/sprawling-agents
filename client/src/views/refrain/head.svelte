@@ -10,7 +10,9 @@
   // stands on and what became of the last save, then the readings and
   // the save. One line, the seat docs/frontend-method.md §7F gives the line above the editor.
   // The receipt says a word only when there is something unsaved or a
-  // save to report; a document nobody touched shows none.
+  // save to report; a document nobody touched shows none. A Markdown
+  // version can be exported as one HTML file the city writes (4-61).
+  import { readAnswer } from "../../core/answered";
   import { say } from "../../core/lang";
   import type { Key } from "../../core/lang";
   import type { Receipt } from "../../core/document_save";
@@ -20,6 +22,7 @@
   import Segmented from "../parts/segmented.svelte";
   import type { Session } from "./session.svelte";
   import { short, type Reading } from "./reading";
+  import { saveFile } from "./saved_file";
 
   interface Props {
     readonly at: Address;
@@ -82,6 +85,29 @@
     return kind === "draft" || kind === "refused" ? {} : { why: say($lang, "refrain_save_nothing") };
   });
   const version = $derived(session.positions === null ? null : short(session.positions.version));
+
+  const u = ui();
+  const markdown = $derived(session.file?.kind === "text" && session.file.gathering.format === "markdown");
+  let exporting = $state<"asking" | "refused" | null>(null);
+
+  // Asks the city once for the export of the version the editor stands
+  // on, and hands the answer to the browser to save.
+  function exportHtml(): void {
+    const standing = session.positions?.version;
+    if (standing === undefined) return;
+    exporting = "asking";
+    const asked = { finished: false };
+    let stop: (() => void) | null = null;
+    stop = u.conn.asking.ask({ export: { at, version: standing } }).subscribe((answer) => {
+      const read = readAnswer(answer, (held) => ("export" in held ? held.export : undefined));
+      if (asked.finished || read.kind === "asking") return;
+      asked.finished = true;
+      if (read.kind === "held") saveFile(`${name}.html`, "text/html", read.value.html);
+      exporting = read.kind === "held" ? null : "refused";
+      stop?.();
+    });
+    if (asked.finished) stop();
+  }
 </script>
 
 <!-- Two groups: where and what state, then the readings and the save.
@@ -104,6 +130,17 @@
     {#if session.file?.kind === "text"}
       <!-- A file that is not text has no source, diff or versions to read. -->
       <Segmented label={say($lang, "refrain_reading")} {options} held={reading} {onPick} />
+    {/if}
+    {#if exporting === "refused"}
+      <span class="text-note text-text-quiet" role="status">{say($lang, "refrain_export_refused")}</span>
+    {/if}
+    {#if markdown}
+      <Button
+        label={say($lang, "refrain_export_html")}
+        tone="quiet"
+        {...exporting === "asking" ? { why: say($lang, "refrain_export_asking") } : {}}
+        onPress={exportHtml}
+      />
     {/if}
     <Button
       label={say($lang, "refrain_save")}

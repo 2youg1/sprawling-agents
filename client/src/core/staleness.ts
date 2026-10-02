@@ -85,9 +85,10 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return reached(kind === "model_returned" || kind === "roadmap_claimed");
     // A prompt is frozen once for the life of a run and the object
     // behind a hash never changes, so none of these answers can go
-    // stale: a range and a preview are read from one stored document
-    // version, and a reply's blocks from the text the question carries.
-    case "prefix": case "content": case "range": case "preview": case "reply":
+    // stale: a range, a preview, bytes and an export are read from one
+    // stored object, and a reply's blocks from the text the question
+    // carries.
+    case "prefix": case "content": case "range": case "preview": case "reply": case "bytes": case "export":
       return "none";
     // A shelf moves when somebody edits the building's rules, and a
     // pin appears when a run starts under them.
@@ -99,7 +100,7 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return reached(kind === "checkpoint_committed" || kind === "pr_merged" || kind === "file_restored");
     case "commits":
       return kind === "checkpoint_committed" || kind === "pr_merged" ? "newest_page" : "none";
-    case "building_view": case "listing": case "document": case "archive_search":
+    case "building_view": case "listing": case "document": case "versions": case "archive_search":
       return reached(BUILDING_MOVED.has(kind));
     case "proposals":
       return reached(PROPOSALS_MOVED.has(kind));

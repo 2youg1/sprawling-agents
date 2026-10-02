@@ -15,7 +15,7 @@
   // right side has beside a conversation at 1440.
   import { draftPlace, writeDraft } from "../../core/document_save";
   import { EDITABLE_BYTES_MAX } from "../../core/document_windows";
-  import { Address, B3Hash } from "../../wire";
+  import { Address, B3Hash, Seq } from "../../wire";
   import type { Answer, DocumentState, Query } from "../../wire";
 
   const SHOP = Address.make("shop");
@@ -79,8 +79,8 @@
   };
 
   // The answers this made-up city gives: each document above, the old
-  // version of the moved one by range, and the preview of the plan as
-  // the city's Markdown grammar lays it out.
+  // version of the moved one by range and in its list of versions, and
+  // the preview of the plan as the city's Markdown grammar lays it out.
   function answering(query: Query): Answer | undefined {
     if (typeof query !== "object") return undefined;
     if ("document" in query) {
@@ -91,6 +91,13 @@
       const start = query.range.range.start;
       const window = start === 0 ? { span: { start: 0, end: bytes(BEFORE) }, text: BEFORE } : { span: { start, end: start }, text: "" };
       return { range: { version: V0, window } };
+    }
+    if ("versions" in query && query.versions.at === `shop/${MOVED}`) {
+      const versions = [
+        { version: V4, bytes: bytes(AFTER), kept: true, source: "on_disk" as const },
+        { version: V0, bytes: bytes(BEFORE), kept: true, source: { before: { seq: Seq.make(7) } } },
+      ];
+      return { versions: { at: query.versions.at, versions, more: false } };
     }
     if ("preview" in query && query.preview.version === V1) {
       return { preview: { version: V1, preview: { laid: { span: { start: 0, end: bytes(MARKDOWN) }, blocks: PLAN } } } };

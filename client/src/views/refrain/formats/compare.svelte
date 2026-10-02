@@ -13,11 +13,14 @@
   // read-only diff, so a changed word looks the way it does in a
   // Markdown version. The line above names what is and is not
   // compared, and which pages had no text to compare - a scan is not
-  // read by OCR, and its silence is not "no change".
+  // read by OCR, and its silence is not "no change". The comparison can
+  // be saved as a Markdown file a format-capable tool acts on (4-61).
   import { fill, say } from "../../../core/lang";
   import { ui } from "../../../ui";
   import type { B3Hash } from "../../../wire";
+  import Button from "../../parts/button.svelte";
   import { phrasesIn, short } from "../reading";
+  import { saveFile } from "../saved_file";
   import { NAME, TOOL } from "./format";
   import Label from "./label.svelte";
 
@@ -103,13 +106,28 @@
     const silent = [...new Set([...texts.from.silent, ...texts.to.silent])].sort((a, b) => a - b);
     return silent.length === 0 ? [versions] : [versions, fill(say($lang, "format_no_text"), { pages: silent.join(", ") })];
   });
+
+  const settings = $derived(say($lang, format === "pdf" ? "format_compare_pdf" : "format_compare_docx"));
+
+  function exportComparison(): void {
+    if (texts === null || texts === "broken") return;
+    const comparison = {
+      name,
+      from: { label: short(from.version), text: texts.from.text },
+      to: { label: short(to.version), text: texts.to.text },
+      about: [`${NAME[format]} · ${TOOL[format]} · ${settings}`, ...notes],
+    };
+    void import("./compared").then(({ comparedMarkdown, comparedName }) => {
+      saveFile(comparedName(name), "text/markdown", comparedMarkdown($lang, comparison));
+    });
+  }
 </script>
 
 <div class="refrain flex min-h-0 flex-1 flex-col">
   <Label
     {format}
     tool={TOOL[format]}
-    settings={[say($lang, format === "pdf" ? "format_compare_pdf" : "format_compare_docx")]}
+    settings={[settings]}
     version={null}
     {notes}
   />
@@ -120,6 +138,9 @@
   {:else if texts.from.text === texts.to.text}
     <p class="px-wide py-snug text-note text-text-quiet">{say($lang, "format_compare_same")}</p>
   {:else}
+    <div class="flex justify-end border-b border-edge px-wide py-tight">
+      <Button label={say($lang, "refrain_export_comparison")} tone="quiet" onPress={exportComparison} />
+    </div>
     <div class="refrain-editor min-h-0 flex-1" bind:this={host}></div>
   {/if}
 </div>

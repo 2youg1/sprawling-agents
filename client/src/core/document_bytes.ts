@@ -28,7 +28,7 @@ export interface Fetching {
 
 export type Fetched =
   | { readonly kind: "fetching"; readonly through: number; readonly size: number | null }
-  | { readonly kind: "whole"; readonly bytes: Uint8Array }
+  | { readonly kind: "whole"; readonly bytes: Uint8Array<ArrayBuffer> }
   | { readonly kind: "too_large"; readonly size: number };
 
 export function fetching(version: B3Hash): Fetching {
@@ -48,7 +48,7 @@ export function nextBytes(at: Fetching): Span | null {
 export function joinedBytes(at: Fetching, answer: BytesAnswer): Fetching {
   if (answer.version !== at.version || answer.span.start !== at.through) return at;
   const bytes = decoded(answer.base64);
-  if (bytes === null || bytes.length !== answer.span.end - answer.span.start) return at;
+  if (bytes?.length !== answer.span.end - answer.span.start) return at;
   return { version: at.version, size: answer.size, through: answer.span.end, parts: [...at.parts, bytes] };
 }
 

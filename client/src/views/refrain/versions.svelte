@@ -6,36 +6,63 @@
 -->
 
 <script lang="ts">
-  // The versions this page held whole (client/Spec.lean §4-46), and the diff
-  // between two of them: opened, saved by the person, or changed in the
-  // city, with the draft as one more when there is one. Two rows of
-  // choices name the two sides, newest last; the comparison under them
-  // is a read-only view from the editor's chunk, built again whenever
-  // either side changes.
+  // Every version the city knows of this document, newest first, and the
+  // diff between any two (client/Spec.lean §4-46, §4-61): the list is the
+  // city's `Versions` answer, with the draft as one more side. A version
+  // whose text this page already held is compared from that text; any
+  // other is gathered window by window by its version. The comparison is
+  // a read-only view from the editor's chunk, built again whenever
+  // either side changes, and it can be exported as a Markdown file.
+  import { untrack } from "svelte";
+
+  import { readAnswer } from "../../core/answered";
+  import { positionsOf } from "../../core/document_pos";
+  import { recorded, whole } from "../../core/document_windows";
   import { fill, say } from "../../core/lang";
-  import type { Key } from "../../core/lang";
-  import { clock } from "../../core/time";
+  import { isoDay, isoTime, kib } from "../../core/time";
   import { ui } from "../../ui";
+  import type { Address, DocumentVersion } from "../../wire";
+  import Button from "../parts/button.svelte";
   import Empty from "../parts/empty.svelte";
-  import type { Held, Session } from "./session.svelte";
+  import { Gathered } from "./gathered.svelte";
+  import type { Session } from "./session.svelte";
   import { short } from "./reading";
+  import { saveFile } from "./saved_file";
 
   interface Props {
+    readonly at: Address;
     readonly session: Session;
     readonly label: string;
     readonly phrases: Readonly<Record<string, string>>;
   }
 
-  const { session, label, phrases }: Props = $props();
+  const { at, session, label, phrases }: Props = $props();
 
-  const lang = ui().lang;
+  const u = ui();
+  const { lang } = u;
 
   const DRAFT = "draft";
-  const SOURCE: Record<Held["source"], Key> = {
-    opened: "refrain_version_opened",
-    saved: "refrain_version_saved",
-    moved: "refrain_version_moved",
-  };
+
+  const asked = $derived(u.conn.asking.ask({ versions: { at } }));
+  const read = $derived(readAnswer($asked, (answer) => ("versions" in answer ? answer.versions : undefined)));
+  // A version written twice is listed once, where it was written last.
+  const listed = $derived(
+    read.kind === "held"
+      ? read.value.versions.filter((each, index, all) => all.findIndex((other) => other.version === each.version) === index)
+      : [],
+  );
+
+  function sourceOf(each: DocumentVersion): string {
+    const source = each.source;
+    if (source === "on_disk") return say($lang, "refrain_version_on_disk");
+    if ("before" in source) return say($lang, "refrain_version_outside");
+    return `${say($lang, "refrain_version_saved")} · ${isoDay(source.saved.at)} ${isoTime(source.saved.at)}`;
+  }
+
+  function nameOf(each: DocumentVersion): string {
+    const parts = [short(each.version), sourceOf(each), ...(each.bytes === undefined || each.bytes === null ? [] : [kib(each.bytes)])];
+    return each.kept ? parts.join(" · ") : `${parts.join(" · ")} · ${say($lang, "refrain_version_not_kept")}`;
+  }
 
   // The draft is the editor's text when the reading opens, not as it is
   // typed: a comparison of a moving text would redraw on every key.
@@ -43,18 +70,15 @@
     session.receipt.kind === "clean" || session.receipt.kind === "saved" ? null : (session.editing?.text() ?? null),
   );
   const sides = $derived([
-    ...session.versions.map((each) => ({
-      value: each.version,
-      label: `${short(each.version)} · ${say($lang, SOURCE[each.source])} · ${clock($lang, each.at)}`,
-      text: each.text,
-    })),
-    ...(draft === null ? [] : [{ value: DRAFT, label: say($lang, "refrain_version_draft"), text: draft }]),
+    ...(draft === null ? [] : [{ value: DRAFT, label: say($lang, "refrain_version_draft"), kept: true }]),
+    ...listed.map((each) => ({ value: each.version, label: nameOf(each), kept: each.kept })),
   ]);
+  const choosable = $derived(sides.filter((each) => each.kept));
 
   let from = $state<string | null>(null);
   let to = $state<string | null>(null);
-  const left = $derived(sides.find((each) => each.value === from) ?? sides.at(-2) ?? null);
-  const right = $derived(sides.find((each) => each.value === to) ?? sides.at(-1) ?? null);
+  const right = $derived(to ?? choosable[0]?.value ?? null);
+  const left = $derived(from ?? choosable.find((each) => each.value !== right)?.value ?? null);
 
   function pickFrom(value: string): void {
     from = value;
@@ -64,26 +88,73 @@
     to = value;
   }
 
+  const format = $derived(session.file?.kind === "text" ? session.file.gathering.format : "plain");
+  const leftText = new Gathered(u.conn.asking);
+  const rightText = new Gathered(u.conn.asking);
+
+  // The text of one side: the draft, a version this page held, or the
+  // version gathered by its digest; null while it is gathered.
+  function textOf(value: string | null, gathered: Gathered): string | null {
+    if (value === null) return null;
+    if (value === DRAFT) return draft;
+    const held = session.versions.find((each) => each.version === value);
+    if (held !== undefined) return held.text;
+    const got = gathered.value;
+    if (got?.version !== value || !whole(got)) return null;
+    return positionsOf(got.version, got.encoding, got.text).editor;
+  }
+
+  $effect(() => {
+    for (const [value, gathered] of [[left, leftText], [right, rightText]] as const) {
+      const listedVersion = listed.find((each) => each.version === value)?.version;
+      const held = session.versions.some((each) => each.version === value);
+      const wanted = listedVersion === undefined || held ? null : listedVersion;
+      if (wanted !== untrack(() => gathered.value?.version ?? null)) {
+        gathered.start(wanted === null ? null : recorded(wanted, format));
+      }
+    }
+  });
+
+  const a = $derived(textOf(left, leftText));
+  const b = $derived(textOf(right, rightText));
+  const lost = $derived(leftText.lost !== null || rightText.lost !== null);
+  const nameOfSide = (value: string | null): string => sides.find((each) => each.value === value)?.label ?? "";
+
   let host = $state<HTMLDivElement>();
 
   $effect(() => {
     const parent = host;
-    const a = left;
-    const b = right;
-    if (parent === undefined || a === null || b === null) return;
+    const older = a;
+    const newer = b;
+    if (parent === undefined || older === null || newer === null) return;
     let shown: { readonly destroy: () => void } | null = null;
     let gone = false;
     void import("./editing").then(({ openComparison }) => {
-      if (!gone) shown = openComparison(parent, { from: a.text, to: b.text }, label, phrases);
+      if (!gone) shown = openComparison(parent, { from: older, to: newer }, label, phrases);
     });
     return () => {
       gone = true;
       shown?.destroy();
     };
   });
+
+  function exportComparison(): void {
+    if (a === null || b === null) return;
+    const comparison = {
+      name: label,
+      from: { label: nameOfSide(left), text: a },
+      to: { label: nameOfSide(right), text: b },
+      about: [say($lang, "refrain_compared_source")],
+    };
+    void import("./formats/compared").then(({ comparedMarkdown, comparedName }) => {
+      saveFile(comparedName(label), "text/markdown", comparedMarkdown($lang, comparison));
+    });
+  }
 </script>
 
-{#if sides.length < 2}
+{#if read.kind === "asking"}
+  <p class="p-pane text-note text-text-faint">{say($lang, "refrain_versions_asking")}</p>
+{:else if choosable.length < 2}
   <Empty missing="refrain_versions_one" />
 {:else}
   <!-- Two native lists rather than rows of cells: a version's name, where
@@ -94,20 +165,30 @@
       <select
         class="h-control-sm w-full min-w-0 rounded-control border border-edge-input bg-raised px-snug text-note text-text"
         aria-label={say($lang, side.key)}
-        value={side.held?.value ?? ""}
+        value={side.held ?? ""}
         onchange={(event) => {
           side.set(event.currentTarget.value);
         }}
       >
         {#each sides as each (each.value)}
-          <option value={each.value}>{each.label}</option>
+          <option value={each.value} disabled={!each.kept}>{each.label}</option>
         {/each}
       </select>
     {/each}
+    {#if read.kind === "held" && read.value.more}
+      <p class="col-span-2 text-note text-text-faint">{say($lang, "refrain_versions_more")}</p>
+    {/if}
   </div>
-  {#if left !== null && right !== null && left.text === right.text}
-    <p class="p-pane text-note text-text-quiet">{fill(say($lang, "refrain_diff_same"), { version: left.label })}</p>
+  {#if lost}
+    <p class="p-pane text-note text-text-quiet">{say($lang, "refrain_version_lost")}</p>
+  {:else if a === null || b === null}
+    <p class="p-pane text-note text-text-faint">{say($lang, "refrain_version_reading")}</p>
+  {:else if a === b}
+    <p class="p-pane text-note text-text-quiet">{fill(say($lang, "refrain_diff_same"), { version: nameOfSide(left) })}</p>
   {:else}
+    <div class="flex justify-end border-b border-edge px-wide py-tight">
+      <Button label={say($lang, "refrain_export_comparison")} tone="quiet" onPress={exportComparison} />
+    </div>
     <div class="refrain-editor min-h-0 flex-1" bind:this={host}></div>
   {/if}
 {/if}

@@ -863,25 +863,65 @@
     "en": "to",
     "zh": "到"
   },
-  "refrain_version_opened": {
-    "en": "opened",
-    "zh": "打开的"
-  },
   "refrain_version_saved": {
-    "en": "saved by you",
-    "zh": "你存下的"
-  },
-  "refrain_version_moved": {
-    "en": "changed in the city",
-    "zh": "城里换的"
+    "en": "saved through a page",
+    "zh": "经页面存下"
   },
   "refrain_version_draft": {
     "en": "your draft",
     "zh": "你的草稿"
   },
   "refrain_versions_one": {
-    "en": "this page has seen one version of the file",
-    "zh": "本页只见过这份文件的一个版本"
+    "en": "the city knows one version of this file",
+    "zh": "城只知道这份文件的一个版本"
+  },
+  "refrain_version_on_disk": {
+    "en": "on disk now, written outside the page",
+    "zh": "盘上此刻的一版，页面之外写下"
+  },
+  "refrain_version_outside": {
+    "en": "written outside the page",
+    "zh": "页面之外写下"
+  },
+  "refrain_version_not_kept": {
+    "en": "not kept by the city",
+    "zh": "城没有存下"
+  },
+  "refrain_versions_more": {
+    "en": "Older versions are not listed.",
+    "zh": "更早的版本没有列出。"
+  },
+  "refrain_versions_asking": {
+    "en": "asking the city for this file's versions…",
+    "zh": "正在问城这份文件的各版…"
+  },
+  "refrain_version_reading": {
+    "en": "reading the two versions…",
+    "zh": "正在读这两版…"
+  },
+  "refrain_version_lost": {
+    "en": "The city can no longer read one of these versions.",
+    "zh": "城读不出其中一版了。"
+  },
+  "refrain_export_comparison": {
+    "en": "Export comparison",
+    "zh": "导出比较"
+  },
+  "refrain_compared_source": {
+    "en": "the source text, line by line",
+    "zh": "逐行比较源文"
+  },
+  "refrain_export_html": {
+    "en": "Export HTML",
+    "zh": "导出 HTML"
+  },
+  "refrain_export_asking": {
+    "en": "the city is writing the export",
+    "zh": "城正在写导出的文件"
+  },
+  "refrain_export_refused": {
+    "en": "The city could not export this version.",
+    "zh": "城没能导出这一版。"
   },
   "refrain_cm_find": {
     "en": "Find",
@@ -975,10 +1015,6 @@
     "en": "approximate layout · tracked changes shown as their result · comments not shown",
     "zh": "近似版式 · 修订按接受后的结果显示 · 不显示批注"
   },
-  "format_no_bytes": {
-    "en": "The city does not send a file's bytes to a page yet, so this {format} is not drawn here. The file itself is unchanged.",
-    "zh": "城还不把文件的字节交给页面，所以这份 {format} 不在这里画出。文件本身不动。"
-  },
   "format_reading": {
     "en": "reading {format}…",
     "zh": "正在读 {format}…"
@@ -1046,6 +1082,54 @@
   "format_compare_same": {
     "en": "the two versions read the same text",
     "zh": "两版读出的文字相同"
+  },
+  "format_compare_with": {
+    "en": "compare with",
+    "zh": "与此比较"
+  },
+  "format_compare_none": {
+    "en": "no other version",
+    "zh": "不比较"
+  },
+  "format_too_large": {
+    "en": "This {format} is {kib}, more than the {most} the page draws. The file itself is unchanged.",
+    "zh": "这份 {format} 有 {kib}，超过页面画的 {most}。文件本身不动。"
+  },
+  "format_lost": {
+    "en": "The city no longer holds this version, so it is not drawn. The file itself is unchanged.",
+    "zh": "城不再存有这一版，所以不画。文件本身不动。"
+  },
+  "format_fetching": {
+    "en": "reading {format} from the city: {through} of {kib}…",
+    "zh": "正在从城里读 {format}：{through} / {kib}…"
+  },
+  "compared_title": {
+    "en": "Comparison of {name}",
+    "zh": "{name} 的比较"
+  },
+  "compared_from": {
+    "en": "from: {version}",
+    "zh": "从：{version}"
+  },
+  "compared_to": {
+    "en": "to: {version}",
+    "zh": "到：{version}"
+  },
+  "compared_change": {
+    "en": "Change {n}",
+    "zh": "第 {n} 处改动"
+  },
+  "compared_removed": {
+    "en": "Removed:",
+    "zh": "删去："
+  },
+  "compared_added": {
+    "en": "Added:",
+    "zh": "加入："
+  },
+  "compared_none": {
+    "en": "The two versions read the same text.",
+    "zh": "两版读出的文字相同。"
   },
   "proposal_from": {
     "en": "{who} proposes a change",
@@ -4523,9 +4607,13 @@
     "en": "a {media} picture, {width} × {height}",
     "zh": "{media} 图片，{width} × {height}"
   },
-  "inspect_shot_unserved": {
-    "en": "The city keeps this picture in its content store; this page has no way to draw it yet.",
-    "zh": "城把这张图存在内容库里；这一页还没有办法画出它。"
+  "inspect_shot_reading": {
+    "en": "reading the picture from the city…",
+    "zh": "正在从城里读这张图…"
+  },
+  "inspect_shot_lost": {
+    "en": "The city no longer holds this picture, so it is not drawn.",
+    "zh": "城不再存有这张图，所以画不出。"
   },
   "inspect_call_gone": {
     "en": "This call is not in its run's rounds.",
