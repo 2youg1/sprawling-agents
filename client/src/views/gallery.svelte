@@ -47,6 +47,7 @@
   import Parts from "./gallery/parts.svelte";
   import Mailbox from "./gallery/mailbox.svelte";
   import Pga from "./gallery/pga.svelte";
+  import Pgb from "./gallery/pgb.svelte";
   import Produced from "./gallery/produced.svelte";
   import Runs from "./gallery/runs.svelte";
   import Resulted from "./gallery/resulted.svelte";
@@ -90,6 +91,7 @@
   <h1 class="mb-wide text-heading text-text">{say($lang, "gallery_title")}</h1>
   <Hints />
   <FirstRun />
+  <Pgb />
   <Shell />
   <Workbench />
   <Mailbox />

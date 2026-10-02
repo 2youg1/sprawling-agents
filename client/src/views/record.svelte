@@ -4,40 +4,60 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The one history in four lenses: the ledger as it was written, the
-// archive as the buildings filed it, the recycle bin where every row
-// states its own way back, and the process log beside them. Nothing
-// here is folded: the record is shown as the record.
+// The one history in three readings: the timeline, where the ledger and
+// the process log stand on one axis; the archive as the buildings filed
+// it; and the recycle bin, where every row states its own way back.
+// Nothing here is folded: the record is shown as the record.
 //
-// Which lens is shown is what the address bar says, for all four of
-// them: `core/route` spells the log as `#/record/log`, so a person can
-// send somebody a link to what their machine was writing. `parts/tabs`
-// owns both halves of the tab-and-panel association (client-SPEC 7-8
-// item 6), so each reading mounts while its lens is current and
-// unmounts when the lens leaves.
+// Which reading is shown is what the address bar says. The address
+// grammar still has four record lenses (`core/route`): `ledger` and
+// `log` both open the timeline, `log` with only the process log showing,
+// so a link somebody kept to `#/record/log` reads what it always did.
+// `parts/tabs` owns both halves of the tab-and-panel association
+// (client-SPEC 7-8 item 6).
 
 import type { Key } from "../core/lang";
 import type { Lens } from "../core/route";
+import type { Source } from "./record/timeline";
 
-const LENS_NAMES: Record<Lens, Key> = {
-  ledger: "rec_ledger",
+type Reading = "timeline" | "archive" | "bin";
+
+const READINGS: readonly Reading[] = ["timeline", "archive", "bin"];
+
+const READING_NAMES: Record<Reading, Key> = {
+  timeline: "rec_timeline",
   archive: "rec_archive",
   bin: "rec_bin",
-  log: "rec_log",
 };
+
+function readingOf(lens: Lens): Reading {
+  switch (lens) {
+    case "ledger":
+    case "log":
+      return "timeline";
+    case "archive":
+      return "archive";
+    case "bin":
+      return "bin";
+  }
+}
+
+// The address a source of the timeline is kept under: the log alone has
+// the old lens's address, and both other sources are the record's own.
+function lensOf(source: Source): Lens {
+  return source === "log" ? "log" : "ledger";
+}
 </script>
 
 <script lang="ts">
-  import { LENSES } from "../core/route";
-  import type { Lens as Reading } from "./parts/tabs.svelte";
+  import type { Lens as Tab } from "./parts/tabs.svelte";
   import { say } from "../core/lang";
   import { ui } from "../ui";
   import Page from "./parts/page.svelte";
   import Tabs from "./parts/tabs.svelte";
   import Archive from "./record/archive.svelte";
   import Bin from "./record/bin.svelte";
-  import Ledger from "./record/ledger.svelte";
-  import Log from "./record/log.svelte";
+  import Timeline from "./record/timeline.svelte";
 
   interface Props {
     readonly lens: Lens;
@@ -48,32 +68,36 @@ const LENS_NAMES: Record<Lens, Key> = {
   const u = ui();
   const lang = u.lang;
 
-  const lenses = $derived(
-    LENSES.map((each) => ({ id: each, label: say($lang, LENS_NAMES[each]) })),
-  );
+  // The source the timeline reads. The address names the log; the
+  // choice between both sources and the ledger alone is this page's,
+  // and a move back from `#/record/log` drops a log-only choice.
+  let picked = $state<Source>("every");
+  const source = $derived<Source>(lens === "log" ? "log" : picked === "log" ? "every" : picked);
+
+  const tabs = $derived(READINGS.map((each) => ({ id: each, label: say($lang, READING_NAMES[each]) })));
 
   function pick(id: string): void {
-    const found = LENSES.find((each) => each === id);
-    // A name this build does not read leaves the page where it is,
-    // rather than moving somebody somewhere they did not ask for.
-    if (found === undefined) {
-      return;
-    }
-    u.go({ kind: "record", lens: found });
+    const found = READINGS.find((each) => each === id);
+    // A name this build does not read leaves the page where it is.
+    if (found === undefined || found === readingOf(lens)) return;
+    u.go({ kind: "record", lens: found === "timeline" ? lensOf(source) : found });
+  }
+
+  function choose(next: Source): void {
+    picked = next;
+    if (lensOf(next) !== lens) u.go({ kind: "record", lens: lensOf(next) });
   }
 </script>
 
 <Page title={say($lang, "nav_the_record")}>
-  <Tabs label={say($lang, "rec_lenses")} {lenses} current={lens} onPick={pick}>
-    {#snippet panel(reading: Reading)}
-      {#if reading.id === "ledger"}
-        <Ledger />
+  <Tabs label={say($lang, "rec_lenses")} lenses={tabs} current={readingOf(lens)} onPick={pick}>
+    {#snippet panel(reading: Tab)}
+      {#if reading.id === "timeline"}
+        <Timeline {source} onSource={choose} />
       {:else if reading.id === "archive"}
         <Archive />
       {:else if reading.id === "bin"}
         <Bin />
-      {:else if reading.id === "log"}
-        <Log />
       {/if}
     {/snippet}
   </Tabs>

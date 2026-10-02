@@ -43,7 +43,7 @@
   import type { Snippet } from "svelte";
 
   import type { LinkState } from "../../core/link";
-  import type { Answer, ApprovalItem, AxError, EventRecord, Query } from "../../wire";
+  import type { Answer, ApprovalItem, AxError, EventRecord, LogLine, Query } from "../../wire";
 
   interface StandProps {
     // Where the socket stands, which is one of the three things that
@@ -63,6 +63,9 @@
     // The records this made-up city has already folded, read once
     // through the belief's own door, for a fixture of the runs it holds.
     readonly records?: readonly EventRecord[];
+    // The process log lines this made-up city has sent, through the
+    // belief's own door, for a fixture of the record's timeline.
+    readonly logs?: readonly LogLine[];
     readonly children: Snippet;
   }
 </script>
@@ -76,7 +79,7 @@
   import type { Connection } from "../../core/socket";
   import { setUi, ui } from "../../ui";
 
-  const { link, unread, waiting, answers, refusing, records, children }: StandProps = $props();
+  const { link, unread, waiting, answers, refusing, records, logs, children }: StandProps = $props();
 
   // The city as this fixture meets it: the real one, or the stand
   // before this one while several stands mount in turn.
@@ -125,6 +128,7 @@
   // The records are folded once, at initialisation, like the refusals.
   kept.batch(() => {
     for (const record of records ?? []) kept.apply(record);
+    for (const line of logs ?? []) kept.logged(line);
   });
 
   // The question every stand-in answers, and the fixture's own.
