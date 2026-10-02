@@ -5083,6 +5083,22 @@
     "en": "open the run",
     "zh": "打开 run 页"
   },
+  "world_no_commits": {
+    "en": "no commit yet",
+    "zh": "还没有提交"
+  },
+  "world_commits_more": {
+    "en": "older commits are on the page of {building}",
+    "zh": "更早的提交在 {building} 的楼页上"
+  },
+  "world_commit_oid": {
+    "en": "oid",
+    "zh": "oid"
+  },
+  "world_parents": {
+    "en": "parents",
+    "zh": "父提交"
+  },
   "ring_used": {
     "en": "{used} / {window}",
     "zh": "{used} / {window}"
