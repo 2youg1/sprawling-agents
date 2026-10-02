@@ -27,7 +27,7 @@ import client.spec.Views.Parts
 | | | Escape | 右侧开着这行时收起右侧，焦点留在这行 |
 | | | Tab | 到达这行，提示写出完成（或开始）的 ISO 时刻 |
 | 未读计数 | APG Button | Enter／Space | 回到末尾并恢复跟随；按钮随计数消失，焦点落在对话列上 |
-| 图层键 | APG Button | Enter／Space | 换到下一档 |
+| 图层键 | APG Button | Enter／Space | 关上设置面、离开别的页回到对话，换到下一档；一次过渡，焦点落进对话框（client D48） |
 | | | `\`（文本框之外） | 同上；按住超过 300 ms 临时进混合档，松开回原来的档 |
 | | | 一栏上（4-52） | Enter／Space 与 `\` 打开或关上世界层的面，按住是临时看一眼那张面；按下不取焦点，软键盘留着 |
 | 世界层的面（一栏） | 带名字的 `<section>`，内含 APG Tabs | 返回键 Enter／Space、浏览器返回、边缘返回 | 退出这张面（`history.back()`），回到对话；焦点丢在 `body` 上时回到开面时持焦的控件 |
@@ -88,7 +88,7 @@ import client.spec.Views.Parts
 
 规定 §7-11 里三个外壳控件的状态机；分隔线在 `client/spec/Core/Workbench.lean`，检视面的页签带在 `client/spec/Views/Inspect/Open.lean`，请决定卡在 `client/spec/Views/Parts/Decide.lean`。
 
-1. **图层键**（`views/edge.svelte`）：按一下按 zen → blend → panorama → zen 循环（三档的名字是 client D17），按三下回到原档（`three_presses_come_home`）；按住超过 300 ms 临时进 blend，松开回到人选定的档，看一眼不改选定的档（`a_peek_keeps_the_chosen_tier`）。
+1. **图层键**（`views/edge.svelte`）：按一下按 zen → blend → panorama → zen 循环（三档的名字是 client D17），按三下回到原档（`three_presses_come_home`）；按住超过 300 ms 临时进 blend，松开回到人选定的档，看一眼不改选定的档（`a_peek_keeps_the_chosen_tier`）。每次启动从 zen 开始，存下的档不在启动时读回（`a_launch_opens_in_zen`，client D47）。不论此刻开着设置面还是别的页，按一下都回到对话、换到下一档、焦点落进对话框（`a_press_lands_in_the_conversation`、`a_press_moves_the_tier`，client D48）。
 2. **硬币键**（`views/talk/`，client D18）：做朝上那一面，变淡的发送面一按落进空操作（`a_faded_face_does_nothing`），停止面只发 `cancel`、从不发出框里的字（`stop_never_sends`）。
 3. **信箱的条目**（`client/src/views/mailbox/entries.ts`）：j／k 与 `RowList` 同一种钳住的走法，到最后一条不再走（`k_stops_at_the_last_entry`）；1–9 只落到前九个、且存在的条目上（`a_digit_reaches_only_a_drawn_entry`）。
 -/
@@ -133,6 +133,44 @@ theorem a_peek_shows_blend (layer : Layer) : shown (hold layer) = .blend := rfl
 theorem a_peek_keeps_the_chosen_tier (layer : Layer) :
     (release (hold layer)).chosen = layer.chosen ∧ shown (release (hold layer)) = layer.chosen :=
   ⟨rfl, rfl⟩
+
+/-- 启动时的图层：不论这个浏览器或城存下的是哪一档（client D47）。 -/
+def launch (_saved : Tier) : Layer := { chosen := .zen, peeking := false }
+
+theorem a_launch_opens_in_zen (saved : Tier) : shown (launch saved) = .zen := rfl
+
+/-- 对话之上盖着什么：什么都没有、设置面、或别的一页。 -/
+inductive Over where
+  | conversation
+  | settings
+  | page
+  deriving DecidableEq, Repr
+
+/-- 焦点落在哪里：对话框，或别处。 -/
+inductive Focus where
+  | composer
+  | elsewhere
+  deriving DecidableEq, Repr
+
+/-- 外壳：图层、盖在对话之上的东西、焦点。 -/
+structure Shell where
+  layer : Layer
+  over : Over
+  focus : Focus
+  deriving DecidableEq, Repr
+
+/-- 按一下图层键（宽屏）：先回到对话，再换档，焦点进对话框（client D48）。 -/
+def pressLayers (shell : Shell) : Shell :=
+  { layer := { shell.layer with chosen := nextTier shell.layer.chosen }
+    over := .conversation
+    focus := .composer }
+
+theorem a_press_lands_in_the_conversation (shell : Shell) :
+    (pressLayers shell).over = .conversation ∧ (pressLayers shell).focus = .composer :=
+  ⟨rfl, rfl⟩
+
+theorem a_press_moves_the_tier (shell : Shell) :
+    (pressLayers shell).layer.chosen = nextTier shell.layer.chosen := rfl
 
 /-- 硬币键朝上的那一面。 -/
 inductive Face where
