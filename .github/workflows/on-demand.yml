@@ -117,6 +117,18 @@ jobs:
       - id: tree
         shell: bash
         run: echo "sha=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      # The full Chrome on a hosted runner never exits from a scripted
+      # `--screenshot`, while chrome-headless-shell, the build made for
+      # windowless use, does; SPRAWLING_BROWSER is the engine's first tier
+      # (platforms.yml's render step meets the same engine).
+      - name: an engine the screenshots can finish with
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @puppeteer/browsers install chrome-headless-shell@stable --path "$RUNNER_TEMP/engines"
+          shell=$(find "$RUNNER_TEMP/engines" -type f -name 'chrome-headless-shell.exe' | head -n 1)
+          test -n "$shell"
+          echo "SPRAWLING_BROWSER=$shell" >> "$GITHUB_ENV"
       - name: every page, both widths, both schemes
         run: just shots
       - uses: actions/upload-artifact@v7
