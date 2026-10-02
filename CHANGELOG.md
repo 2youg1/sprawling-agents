@@ -336,6 +336,27 @@ building with no such model is not offered a tool that could only fail.
   bound.
 - A hard link is refused by its link count on Windows as well as Unix.
 
+### Official harnesses as residents
+
+A layer's `[resident] harness` names one of the five official harnesses, and
+the rooms below it run that harness as an ACP agent instead of a model the
+city calls. A dispatch to such a room is refused before anything is written
+when the name is not one of the five, when the building is confidential, or
+when the dispatch names a model.
+
+- The harness runs in the room's own worktree, whatever the building's
+  `review` says, and the brief is its one prompt.
+- What it reports is written as `harness_reported` after it is said, and its
+  answer as `harness_answered` once the city has committed the tree. Both
+  kinds join the handshake hash; `WIRE_V` does not move for them.
+- A halt, or the building's `harness_minutes` ceiling in `RULES.toml`,
+  becomes `cancel_received` and `session/cancel`.
+- A run frozen done is offered for review as a request the city opens,
+  because the harness reaches none of the city's tools.
+- A permission request is answered with the first `allow_once` option the
+  harness offers, or else the first `reject_once`, and never with
+  `allow_always`.
+
 ### Remote pairing
 
 A city can be reached from outside the machine through a route: a named
@@ -532,9 +553,9 @@ show this part yet.
   pairs again after the city restarts. Keeping it needs a decision about
   where the seed lives, and `crates/remote_access/Spec.lean` §3 sets out the
   three options. No test opens the Cloudflare route on a real tunnel.
-- A layer may name `[resident] harness`, and a room whose resident is a
-  harness is refused before anything is written until the harness drive is
-  wired.
+- A harness resident gets none of the city's tools and none of the
+  building's MCP servers, and a steer sent during its turn is recorded but
+  not delivered.
 - `/compact` can reach the city a moment before the room is free, and the
   city then answers `E_BUSY`. A second `/compact` works.
 - Session tags are keyed by the city's name, so two cities with the same name
