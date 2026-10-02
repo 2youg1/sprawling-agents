@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { expect, test } from "bun:test";
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 
 import { ServerFrame } from "../wire";
 import { decodeFrame } from "./frames";
@@ -27,8 +27,7 @@ const deltaText = JSON.stringify({
 });
 
 const bySchema = (text: string): ServerFrame | null => {
-  const read = Schema.decodeUnknownEither(Schema.parseJson(ServerFrame))(text);
-  return Either.isRight(read) ? read.right : null;
+  return Result.getOrNull(Schema.decodeUnknownResult(Schema.fromJsonString(ServerFrame))(text));
 };
 
 // What the hot decoder costs is a reading, not a verdict: the

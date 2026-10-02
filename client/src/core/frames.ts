@@ -9,26 +9,27 @@
 // outage, because reconnecting meets the same frame again.
 //
 // Event and delta frames are the hot path — one per ledger record, one
-// per model token — and the full Effect decode costs about twenty
-// microseconds each, most of it parser machinery rather than checking.
-// Those two frames are read with `JSON.parse` and a narrow guard whose
-// every rule is taken from the generated schema: the event-kind set from
-// the `EventKind` literals, and each identity value's pattern from the
-// refinement the schema itself carries. Every other frame, and a hot
-// frame the guard does not accept, still goes through Effect, so the
-// guard can only speed a frame up and never admit one the schema refuses.
+// per model token — and the full Effect decode costs several times the
+// guard below, most of it parser machinery rather than checking. Those
+// two frames are read with `JSON.parse` and a narrow guard whose every
+// rule is taken from the generated schema: the event-kind set from the
+// `EventKind` literals, and each identity value's pattern from the
+// checks the schema itself carries on its string node. Every other
+// frame, and a hot frame the guard does not accept, still goes through
+// Effect, so the guard can only speed a frame up and never admit one the
+// schema refuses.
 
-import { Either, Option, Schema, SchemaAST } from "effect";
+import { Result, Schema, SchemaAST } from "effect";
 
 import type { ClientFrame, Delta, EventRecord } from "../wire";
 import { Address, B3Hash, EventKind, RunId, ServerFrame } from "../wire";
 
-const readServerFrame = Schema.decodeUnknownEither(ServerFrame);
+const readServerFrame = Schema.decodeUnknownResult(ServerFrame);
 
 export function decodeFrame(text: string): ServerFrame | null {
-  const parsed = Either.try((): unknown => JSON.parse(text));
-  if (Either.isLeft(parsed)) return null;
-  const value = parsed.right;
+  const parsed = Result.try((): unknown => JSON.parse(text));
+  if (Result.isFailure(parsed)) return null;
+  const value = parsed.success;
   if (isRecord(value)) {
     if ("event" in value && isEventRecord(value.event)) {
       return { event: value.event };
@@ -37,8 +38,7 @@ export function decodeFrame(text: string): ServerFrame | null {
       return { delta: value.delta };
     }
   }
-  const read = readServerFrame(value);
-  return Either.isRight(read) ? read.right : null;
+  return Result.getOrNull(readServerFrame(value));
 }
 
 // Every frame this client builds is serialisable: nothing in the type
@@ -47,21 +47,37 @@ export function encodeFrame(frame: ClientFrame): string {
   return JSON.stringify(frame);
 }
 
-const eventKinds: ReadonlySet<unknown> = new Set(
-  EventKind.members.flatMap((member) => member.literals),
-);
-
-// The generated identity values are string refinements; their filter is
-// the pattern the Rust side declared, and calling it directly skips the
-// parser that wraps it.
-function refinedString(ast: SchemaAST.AST): (u: unknown) => boolean {
-  if (!SchemaAST.isRefinement(ast)) return () => false;
-  return (u) => typeof u === "string" && Option.isNone(ast.filter(u, {}, ast));
+// Every literal a union of literals admits, however the generator
+// grouped them: one `Literal` per documented variant, one `Literals`
+// node for the undocumented rest.
+function literalsOf(ast: SchemaAST.AST): readonly unknown[] {
+  if (SchemaAST.isLiteral(ast)) return [ast.literal];
+  if (SchemaAST.isUnion(ast)) return ast.types.flatMap(literalsOf);
+  return [];
 }
 
-const isRunIdText = refinedString(RunId.ast);
-const isB3HashText = refinedString(B3Hash.ast);
-const isAddressText = refinedString(Address.ast);
+const eventKinds: ReadonlySet<unknown> = new Set(literalsOf(EventKind.ast));
+
+// The generated identity values are strings carrying their pattern as a
+// check; running those checks directly skips the parser that wraps them.
+function checkedString(ast: SchemaAST.AST): (u: unknown) => boolean {
+  const checks = SchemaAST.isString(ast) ? ast.checks : undefined;
+  if (checks === undefined) return () => false;
+  return (u) => typeof u === "string" && checks.every((check) => passes(check, u, ast));
+}
+
+function passes(check: SchemaAST.Check<string>, u: string, ast: SchemaAST.AST): boolean {
+  switch (check._tag) {
+    case "Filter":
+      return check.run(u, ast, {}) === undefined;
+    case "FilterGroup":
+      return check.checks.every((inner) => passes(inner, u, ast));
+  }
+}
+
+const isRunIdText = checkedString(RunId.ast);
+const isB3HashText = checkedString(B3Hash.ast);
+const isAddressText = checkedString(Address.ast);
 
 function isRecord(u: unknown): u is Record<string, unknown> {
   return typeof u === "object" && u !== null && !Array.isArray(u);

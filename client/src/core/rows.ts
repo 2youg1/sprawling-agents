@@ -17,7 +17,7 @@
 // value here, so no reader above has to know that keeping a row is an
 // operation that can fail, and the first paint cannot die on one.
 
-import { Effect, Either } from "effect";
+import { Result } from "effect";
 
 // The little of `Storage` this client needs: a test hands it a map and
 // a browser hands it `localStorage`. Narrow on purpose - nothing above
@@ -45,12 +45,10 @@ export function memory(): Rows {
 }
 
 // What a browser did when asked, as a value: the result, or nothing
-// when the browser refused. This is the client's second use of Effect
-// at run time and it is the same use as the first - a failure that
-// would otherwise be thrown is read as data (client-SPEC 4-6).
+// when the browser refused. A failure that would otherwise be thrown is
+// read as data (client-SPEC 4-6).
 function attempted<T>(act: () => T): T | null {
-  const ran = Effect.runSync(Effect.either(Effect.try(act)));
-  return Either.isRight(ran) ? ran.right : null;
+  return Result.getOrNull(Result.try(act));
 }
 
 // The row written and dropped to find out whether this browser keeps

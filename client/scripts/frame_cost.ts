@@ -11,7 +11,7 @@
 //
 //   cd client && bun scripts/frame_cost.ts
 
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 
 import { decodeFrame } from "../src/core/frames";
 import { ServerFrame } from "../src/wire";
@@ -28,7 +28,7 @@ const eventText = JSON.stringify({
     who: "mayor",
   },
 });
-const bySchema = Schema.decodeUnknownEither(Schema.parseJson(ServerFrame));
+const bySchema = Schema.decodeUnknownResult(Schema.fromJsonString(ServerFrame));
 
 // The fastest of several batches: the floor the decoder reaches, which a
 // busy neighbour on the machine can slow but not lower.
@@ -44,7 +44,7 @@ function floorMicros(run: () => unknown): number {
 }
 
 const hot = floorMicros(() => decodeFrame(eventText));
-const schema = floorMicros(() => Either.isRight(bySchema(eventText)));
+const schema = floorMicros(() => Result.isSuccess(bySchema(eventText)));
 console.log(
   `client_frame_decode event_frame hot=${hot.toFixed(2)}us schema=${schema.toFixed(2)}us`,
 );

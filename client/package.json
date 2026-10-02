@@ -27,7 +27,7 @@
     "@lezer/rust": "1.0.3",
     "@lezer/yaml": "1.0.4",
     "@lucide/svelte": "1.49.0",
-    "effect": "3.22.2",
+    "effect": "4.0.0",
     "svelte": "5.57.1"
   },
   "devDependencies": {

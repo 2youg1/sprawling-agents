@@ -87,13 +87,13 @@ export interface Trace {
 const CREATES = "new";
 
 const Arm = Schema.Struct({
-  arm: Schema.Union(
+  arm: Schema.Union([
     Schema.Struct({ shell: Schema.Struct({ text: Schema.String }) }),
     Schema.Struct({
       program: Schema.Struct({ path: Schema.String, args: Schema.optional(Schema.Array(Schema.String)) }),
     }),
     Schema.Struct({ python: Schema.Struct({ code: Schema.String }) }),
-  ),
+  ]),
 });
 
 const Ran = Schema.Struct({
@@ -105,8 +105,8 @@ const Ran = Schema.Struct({
 
 const Edited = Schema.Struct({ path: Schema.String, base_version: Schema.String, diff: Schema.String });
 
-const read = <A, I>(schema: Schema.Schema<A, I>, text: string | undefined): Option.Option<A> =>
-  text === undefined ? Option.none() : Schema.decodeUnknownOption(Schema.parseJson(schema))(text);
+const read = <A>(schema: Schema.Decoder<A>, text: string | undefined): Option.Option<A> =>
+  text === undefined ? Option.none() : Schema.decodeUnknownOption(Schema.fromJsonString(schema))(text);
 
 export function traceOf(turns: readonly Turn[]): Trace {
   const calls = turns.flatMap((turn) => turn.calls);

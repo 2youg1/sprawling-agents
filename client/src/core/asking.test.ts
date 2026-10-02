@@ -15,11 +15,11 @@ import type { Answer, AskOutcome, EventRecord } from "../wire";
 // Every question the wire lets a page ask by name alone. The union is
 // generated, so this reads the same table the city answers from.
 function nullaryQueries(): readonly string[] {
-  return Query.members.flatMap((member) =>
-    "literals" in member
-      ? member.literals.filter((value) => typeof value === "string")
-      : [],
-  );
+  return Query.members.flatMap((member) => {
+    if ("literals" in member) return member.literals.filter((value) => typeof value === "string");
+    if ("literal" in member && typeof member.literal === "string") return [member.literal];
+    return [];
+  });
 }
 
 // A clock the test moves, and the timers the patience books against it.

@@ -148,7 +148,7 @@ export const PAGES: readonly string[] = Object.keys(BARE).filter((head) => head 
 // by that name. A menu that offers a page resolves it through here
 // rather than spelling a fragment of its own.
 export function page(name: string): Option.Option<View> {
-  return Option.fromNullable(BARE[name] ?? OLD[name]);
+  return Option.fromNullishOr(BARE[name] ?? OLD[name]);
 }
 
 // An address as the address bar carries it: each segment percent-encoded,

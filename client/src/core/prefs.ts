@@ -123,7 +123,7 @@ const FIRST_TIER: Tier = "blend";
 
 // Read out of the wire's own union rather than spelled again, so a rule
 // the city adds is offered here without a second list to forget.
-export const PROXYING_RULES: readonly Proxying[] = Proxying.members.flatMap((rule) => rule.literals);
+export const PROXYING_RULES: readonly Proxying[] = Proxying.members.map((rule) => rule.literal);
 
 export const NOTIFYINGS: readonly Notifying[] = ["off", "on"];
 

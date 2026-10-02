@@ -13,7 +13,7 @@
 // a fragment carrying an environment variable is refused with the same
 // sentence the command door shows.
 
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 
 import type { Draft, Pair, Transport } from "./draft";
 
@@ -25,25 +25,25 @@ const Entry = Schema.Struct({
   transport: Schema.optional(Schema.String),
   command: Schema.optional(Schema.String),
   args: Schema.optional(Schema.Array(Schema.String)),
-  env: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
+  env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   url: Schema.optional(Schema.String),
-  headers: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
+  headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
 });
 
 type Entry = typeof Entry.Type;
 
-const Servers = Schema.Record({ key: Schema.String, value: Entry });
+const Servers = Schema.Record(Schema.String, Entry);
 
-const readWrapped = Schema.decodeUnknownEither(
-  Schema.parseJson(Schema.Struct({ mcpServers: Servers })),
+const readWrapped = Schema.decodeUnknownResult(
+  Schema.fromJsonString(Schema.Struct({ mcpServers: Servers })),
 );
-const readBare = Schema.decodeUnknownEither(Schema.parseJson(Servers));
+const readBare = Schema.decodeUnknownResult(Schema.fromJsonString(Servers));
 // Whether the wrapper is there at all, asked before the block inside it
 // is judged. Without this question a settings file holding one bad
 // entry reads as a single server called `mcpServers`, because a block
 // of blocks is itself a block of servers that state nothing.
-const readKeys = Schema.decodeUnknownEither(
-  Schema.parseJson(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+const readKeys = Schema.decodeUnknownResult(
+  Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)),
 );
 
 export type Fragment =
@@ -54,15 +54,15 @@ export type Fragment =
 // `mcpServers` key, and the block alone.
 export function readFragment(text: string): Fragment {
   const keys = readKeys(text);
-  if (Either.isRight(keys) && Object.hasOwn(keys.right, "mcpServers")) {
+  if (Result.isSuccess(keys) && Object.hasOwn(keys.success, "mcpServers")) {
     const block = readWrapped(text);
-    return Either.isRight(block)
-      ? { kind: "servers", drafts: drafted(block.right.mcpServers) }
+    return Result.isSuccess(block)
+      ? { kind: "servers", drafts: drafted(block.success.mcpServers) }
       : { kind: "unreadable" };
   }
   const bare = readBare(text);
-  return Either.isRight(bare)
-    ? { kind: "servers", drafts: drafted(bare.right) }
+  return Result.isSuccess(bare)
+    ? { kind: "servers", drafts: drafted(bare.success) }
     : { kind: "unreadable" };
 }
 

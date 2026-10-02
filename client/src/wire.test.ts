@@ -8,7 +8,7 @@
 // refuse fails here with a message that names the field.
 
 import { describe, expect, test } from "bun:test";
-import { Either, ParseResult, Schema } from "effect";
+import { Result, Schema } from "effect";
 
 import { ClientFrame, ServerFrame, WIRE_HASH, WIRE_V } from "./wire";
 
@@ -16,22 +16,22 @@ const run = "01923456-7890-7abc-8def-0123456789ab";
 const idem = "idem1-0123456789abcdef0123456789abcdef";
 const hash = "f".repeat(64);
 
-const decodeClient = Schema.decodeUnknownEither(ClientFrame);
-const decodeServer = Schema.decodeUnknownEither(ServerFrame);
+const decodeClient = Schema.decodeUnknownResult(ClientFrame);
+const decodeServer = Schema.decodeUnknownResult(ServerFrame);
 
 // Both helpers hand back what an assertion can compare: the decoded value
 // or the formatted refusal, so a failing test shows the tree the client
 // would have shown.
-const accepted = <A>(result: Either.Either<A, ParseResult.ParseError>): unknown =>
-  Either.match(result, {
-    onLeft: (error) => ParseResult.TreeFormatter.formatErrorSync(error),
-    onRight: (value) => value,
+const accepted = <A>(result: Result.Result<A, Schema.SchemaError>): unknown =>
+  Result.match(result, {
+    onFailure: (error) => error.message,
+    onSuccess: (value) => value,
   });
 
-const refused = <A>(result: Either.Either<A, ParseResult.ParseError>): string =>
-  Either.match(result, {
-    onLeft: (error) => ParseResult.TreeFormatter.formatErrorSync(error),
-    onRight: () => "decoded a frame the server would refuse",
+const refused = <A>(result: Result.Result<A, Schema.SchemaError>): string =>
+  Result.match(result, {
+    onFailure: (error) => error.message,
+    onSuccess: () => "decoded a frame the server would refuse",
   });
 
 describe("the wire constants", () => {
@@ -108,21 +108,15 @@ describe("a malformed frame", () => {
   test("fails with a message that names the field and the mismatch", () => {
     const frame = { command: { steer: { run: 5, text: "x", idem } } };
     const message = refused(decodeClient(frame));
-    // The tree is named at every level the wire names: the root, the
-    // frame kind, then the field and what was found there.
-    expect(message.startsWith("ClientFrame")).toBe(true);
-    expect(message).toContain("└─ Command");
-    expect(message).toContain('["steer"]');
-    expect(message).toContain('["run"]');
-    // The run id is a pattern before it is a brand, so the mismatch is
-    // reported against the refinement the generated schema states.
-    expect(message).toContain("Expected string, actual 5");
+    // Effect 4 states each failed branch as what it expected and the
+    // path it expected it at, from the frame's own root down to the field.
+    expect(message).toContain('Expected string\n  at ["command"]["steer"]["run"]');
   });
 
-  test("with a kind the wire does not know is refused by name", () => {
+  test("with a kind the wire does not know is refused at the field, with the kinds it knows", () => {
     const frame = { event: { v: 1, run, seq: 1, prev: hash, t: 0, who: "x", kind: "run_teleported", data: {} } };
     const message = refused(decodeServer(frame));
-    expect(message).toContain('["kind"]');
-    expect(message).toContain('"run_teleported"');
+    expect(message).toContain('at ["event"]["kind"]');
+    expect(message).toContain('Expected "city_initialized" | ');
   });
 });

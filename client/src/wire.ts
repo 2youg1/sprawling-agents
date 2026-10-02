@@ -20,7 +20,7 @@ export const BODY_PX = { min: 12, max: 20 } as const;
 /**
  * A canonical relative path inside the city: `/`-separated segments, none empty, none `.` or `..`, no backslash, no `:`, no control character, and no segment ending in a dot or whitespace, as `kernel::Address::parse` accepts it.
  */
-export const Address = Schema.String.pipe(Schema.pattern(new RegExp("^(?:[^/\\\\:\\p{Cc}]*[^/\\\\:\\p{Cc}.\\p{White_Space}])(?:/[^/\\\\:\\p{Cc}]*[^/\\\\:\\p{Cc}.\\p{White_Space}])*$", "u"))).pipe(Schema.brand("Address"));
+export const Address = Schema.String.check(Schema.isPattern(new RegExp("^(?:[^/\\\\:\\p{Cc}]*[^/\\\\:\\p{Cc}.\\p{White_Space}])(?:/[^/\\\\:\\p{Cc}]*[^/\\\\:\\p{Cc}.\\p{White_Space}])*$", "u"))).pipe(Schema.brand("Address"));
 export type Address = typeof Address.Type;
 
 /**
@@ -30,18 +30,18 @@ export type Address = typeof Address.Type;
  * Choosing one does not provide the evidence; `runtime::mode::admits`
  * compares what the run produced against it at the merge.
  */
-export const AdmissionRequirement = Schema.Union(
+export const AdmissionRequirement = Schema.Union([
   Schema.Literal("standing"),
   Schema.Literal("tested"),
   Schema.Literal("contract_kept"),
   Schema.Literal("double_validated"),
-).annotations({ identifier: "AdmissionRequirement" });
+]).annotate({ identifier: "AdmissionRequirement" });
 export type AdmissionRequirement = typeof AdmissionRequirement.Type;
 
 /**
  * How a table column is aligned.
  */
-export const Align = Schema.Literal("none", "left", "center", "right").annotations({ identifier: "Align" });
+export const Align = Schema.Literals(["none", "left", "center", "right"]).annotate({ identifier: "Align" });
 export type Align = typeof Align.Type;
 
 /**
@@ -67,7 +67,7 @@ export type ApprovalId = typeof ApprovalId.Type;
  * kind of question appears a compile error at every reader rather than
  * a silent change of meaning for a field that says one thing today.
  */
-export const ApprovalClass = Schema.Literal("question").annotations({ identifier: "ApprovalClass" });
+export const ApprovalClass = Schema.Literal("question").annotate({ identifier: "ApprovalClass" });
 export type ApprovalClass = typeof ApprovalClass.Type;
 
 /**
@@ -77,7 +77,7 @@ export type ApprovalClass = typeof ApprovalClass.Type;
 export const ClusterKey = Schema.Struct({
   class: ApprovalClass,
   detail: Schema.String,
-}).annotations({ identifier: "ClusterKey" });
+}).annotate({ identifier: "ClusterKey" });
 export type ClusterKey = typeof ClusterKey.Type;
 
 /**
@@ -101,7 +101,7 @@ export const ApprovalItem = Schema.Struct({
   created: TimeMs,
   id: ApprovalId,
   tainted: Schema.Boolean,
-}).annotations({ identifier: "ApprovalItem" });
+}).annotate({ identifier: "ApprovalItem" });
 export type ApprovalItem = typeof ApprovalItem.Type;
 
 /**
@@ -116,7 +116,7 @@ export type ApprovalItem = typeof ApprovalItem.Type;
  */
 export const ApprovalsAnswer = Schema.Struct({
   items: Schema.Array(ApprovalItem),
-}).annotations({ identifier: "ApprovalsAnswer" });
+}).annotate({ identifier: "ApprovalsAnswer" });
 export type ApprovalsAnswer = typeof ApprovalsAnswer.Type;
 
 export const ArchiveHit = Schema.Struct({
@@ -124,7 +124,7 @@ export const ArchiveHit = Schema.Struct({
   day: Schema.Int,
   kind: Schema.String,
   subject: Schema.String,
-}).annotations({ identifier: "ArchiveHit" });
+}).annotate({ identifier: "ArchiveHit" });
 export type ArchiveHit = typeof ArchiveHit.Type;
 
 /**
@@ -135,13 +135,13 @@ export type ArchiveHit = typeof ArchiveHit.Type;
 export const ArchiveAnswer = Schema.Struct({
   hits: Schema.Array(ArchiveHit),
   needle: Schema.String,
-}).annotations({ identifier: "ArchiveAnswer" });
+}).annotate({ identifier: "ArchiveAnswer" });
 export type ArchiveAnswer = typeof ArchiveAnswer.Type;
 
 /**
  * How often a scheduled job runs, in UTC minutes.
  */
-export const Cadence = Schema.Union(
+export const Cadence = Schema.Union([
   Schema.Struct({
     every_minutes: Schema.Struct({
       minutes: Schema.Int,
@@ -157,7 +157,7 @@ export const Cadence = Schema.Union(
       minute: Schema.Int,
     }),
   }),
-).annotations({ identifier: "Cadence" });
+]).annotate({ identifier: "Cadence" });
 export type Cadence = typeof Cadence.Type;
 
 /**
@@ -169,7 +169,7 @@ export const ScheduledJob = Schema.Struct({
   goal: Schema.String,
   name: Schema.String,
   task: Schema.String,
-}).annotations({ identifier: "ScheduledJob" });
+}).annotate({ identifier: "ScheduledJob" });
 export type ScheduledJob = typeof ScheduledJob.Type;
 
 /**
@@ -180,7 +180,7 @@ export const WatchedSource = Schema.Struct({
   matches: Schema.String,
   name: Schema.String,
   starts_work: Schema.Boolean,
-}).annotations({ identifier: "WatchedSource" });
+}).annotate({ identifier: "WatchedSource" });
 export type WatchedSource = typeof WatchedSource.Type;
 
 /**
@@ -192,7 +192,7 @@ export const AutomationAnswer = Schema.Struct({
   jobs: Schema.Array(ScheduledJob),
   sources: Schema.Array(WatchedSource),
   unreadable: Schema.Array(Schema.String),
-}).annotations({ identifier: "AutomationAnswer" });
+}).annotate({ identifier: "AutomationAnswer" });
 export type AutomationAnswer = typeof AutomationAnswer.Type;
 
 /**
@@ -202,7 +202,7 @@ export const ArchiveLine = Schema.Struct({
   day: Schema.Int,
   kind: Schema.String,
   subject: Schema.String,
-}).annotations({ identifier: "ArchiveLine" });
+}).annotate({ identifier: "ArchiveLine" });
 export type ArchiveLine = typeof ArchiveLine.Type;
 
 /**
@@ -223,7 +223,7 @@ export const BlockedLine = Schema.Struct({
   line: Schema.String,
   source: NodeId,
   waiting: Schema.Int,
-}).annotations({ identifier: "BlockedLine" });
+}).annotate({ identifier: "BlockedLine" });
 export type BlockedLine = typeof BlockedLine.Type;
 
 /**
@@ -239,7 +239,7 @@ export const BuildingDoc = Schema.Struct({
   name: Schema.String,
   text: Schema.String,
   truncated: Schema.Boolean,
-}).annotations({ identifier: "BuildingDoc" });
+}).annotate({ identifier: "BuildingDoc" });
 export type BuildingDoc = typeof BuildingDoc.Type;
 
 /**
@@ -253,33 +253,33 @@ export type BuildingDoc = typeof BuildingDoc.Type;
  * would hide the next transport from the three modules that must
  * decide about it.
  */
-export const McpTransport = Schema.Union(
+export const McpTransport = Schema.Union([
   Schema.Struct({
     stdio: Schema.Struct({
       args: Schema.Array(Schema.String),
       command: Schema.String,
-      env: Schema.Array(Schema.Tuple(Schema.String, Schema.String)),
+      env: Schema.Array(Schema.Tuple([Schema.String, Schema.String])),
     }),
   }),
   Schema.Struct({
     http: Schema.Struct({
-      headers: Schema.Array(Schema.Tuple(Schema.String, Schema.String)),
+      headers: Schema.Array(Schema.Tuple([Schema.String, Schema.String])),
       url: Schema.String,
     }),
   }),
   Schema.Struct({
     sse: Schema.Struct({
-      headers: Schema.Array(Schema.Tuple(Schema.String, Schema.String)),
+      headers: Schema.Array(Schema.Tuple([Schema.String, Schema.String])),
       url: Schema.String,
     }),
   }),
-).annotations({ identifier: "McpTransport" });
+]).annotate({ identifier: "McpTransport" });
 export type McpTransport = typeof McpTransport.Type;
 
 /**
  * How one external tool server is named inside this city: ascii lowercase letters and digits, at least one, as `kernel::ServerLabel::parse` accepts it.
  */
-export const ServerLabel = Schema.String.pipe(Schema.pattern(new RegExp("^[a-z0-9]+$", "u"))).pipe(Schema.brand("ServerLabel"));
+export const ServerLabel = Schema.String.check(Schema.isPattern(new RegExp("^[a-z0-9]+$", "u"))).pipe(Schema.brand("ServerLabel"));
 export type ServerLabel = typeof ServerLabel.Type;
 
 /**
@@ -295,7 +295,7 @@ export type ServerLabel = typeof ServerLabel.Type;
 export const McpServer = Schema.Struct({
   label: ServerLabel,
   transport: McpTransport,
-}).annotations({ identifier: "McpServer" });
+}).annotate({ identifier: "McpServer" });
 export type McpServer = typeof McpServer.Type;
 
 /**
@@ -308,7 +308,7 @@ export type McpServer = typeof McpServer.Type;
  * and making the client carry `Awaiting approval` would put an English
  * sentence where the phrase table belongs.
  */
-export const RoadmapStatus = Schema.Literal("not_started", "in_progress", "done", "blocked", "awaiting_approval").annotations({ identifier: "RoadmapStatus" });
+export const RoadmapStatus = Schema.Literals(["not_started", "in_progress", "done", "blocked", "awaiting_approval"]).annotate({ identifier: "RoadmapStatus" });
 export type RoadmapStatus = typeof RoadmapStatus.Type;
 
 /**
@@ -328,7 +328,7 @@ export const PlanRow = Schema.Struct({
   ready: Schema.Boolean,
   share_ppb: Schema.Int,
   status: RoadmapStatus,
-}).annotations({ identifier: "PlanRow" });
+}).annotate({ identifier: "PlanRow" });
 export type PlanRow = typeof PlanRow.Type;
 
 /**
@@ -351,7 +351,7 @@ export const PlannedProgress = Schema.Struct({
   done: Schema.Int,
   done_ppb: Schema.Int,
   total: Schema.Int,
-}).annotations({ identifier: "PlannedProgress" });
+}).annotate({ identifier: "PlannedProgress" });
 export type PlannedProgress = typeof PlannedProgress.Type;
 
 /**
@@ -370,7 +370,7 @@ export type UsdMicros = typeof UsdMicros.Type;
 export const BudgetUse = Schema.Struct({
   tokens: Tokens,
   usd: UsdMicros,
-}).annotations({ identifier: "BudgetUse" });
+}).annotate({ identifier: "BudgetUse" });
 export type BudgetUse = typeof BudgetUse.Type;
 
 /**
@@ -381,20 +381,20 @@ export type BudgetUse = typeof BudgetUse.Type;
 export const UnplannedProgress = Schema.Struct({
   budget: BudgetUse,
   steps: Schema.Int,
-}).annotations({ identifier: "UnplannedProgress" });
+}).annotate({ identifier: "UnplannedProgress" });
 export type UnplannedProgress = typeof UnplannedProgress.Type;
 
 /**
  * Deliberately exhaustive: both faces must be handled by every renderer.
  */
-export const Progress = Schema.Union(
+export const Progress = Schema.Union([
   Schema.Struct({
     planned: PlannedProgress,
   }),
   Schema.Struct({
     unplanned: UnplannedProgress,
   }),
-).annotations({ identifier: "Progress" });
+]).annotate({ identifier: "Progress" });
 export type Progress = typeof Progress.Type;
 
 /**
@@ -426,7 +426,7 @@ export const SandboxLimits = Schema.Struct({
   mounts: Schema.Array(Address),
   shell: Schema.Boolean,
   trusted: Schema.optional(Schema.Array(ServerLabel)),
-}).annotations({ identifier: "SandboxLimits" });
+}).annotate({ identifier: "SandboxLimits" });
 export type SandboxLimits = typeof SandboxLimits.Type;
 
 /**
@@ -445,7 +445,7 @@ export const BuildingAnswer = Schema.Struct({
   progress: Progress,
   rooms: Schema.Array(Schema.String),
   sandbox: Schema.optional(Schema.NullOr(SandboxLimits)),
-}).annotations({ identifier: "BuildingAnswer" });
+}).annotate({ identifier: "BuildingAnswer" });
 export type BuildingAnswer = typeof BuildingAnswer.Type;
 
 /**
@@ -455,14 +455,14 @@ export type BuildingAnswer = typeof BuildingAnswer.Type;
  * different facts about the same two trees, and somebody deciding
  * whether an agent moved code or rewrote it needs the difference.
  */
-export const How = Schema.Union(
-  Schema.Literal("added", "modified", "deleted"),
+export const How = Schema.Union([
+  Schema.Literals(["added", "modified", "deleted"]),
   Schema.Struct({
     renamed: Schema.Struct({
       from: Schema.String,
     }),
   }),
-).annotations({ identifier: "How" });
+]).annotate({ identifier: "How" });
 export type How = typeof How.Type;
 
 /**
@@ -473,7 +473,7 @@ export type How = typeof How.Type;
  * measurement nobody made, and a reader would take it for a file that
  * was touched and left alone.
  */
-export const Lines = Schema.Union(
+export const Lines = Schema.Union([
   Schema.Literal("binary"),
   Schema.Struct({
     counted: Schema.Struct({
@@ -481,7 +481,7 @@ export const Lines = Schema.Union(
       removed: Schema.Int,
     }),
   }),
-).annotations({ identifier: "Lines" });
+]).annotate({ identifier: "Lines" });
 export type Lines = typeof Lines.Type;
 
 /**
@@ -491,13 +491,13 @@ export const FileChange = Schema.Struct({
   how: How,
   lines: Lines,
   path: Schema.String,
-}).annotations({ identifier: "FileChange" });
+}).annotate({ identifier: "FileChange" });
 export type FileChange = typeof FileChange.Type;
 
 /**
  * A git object id: exactly 40 lowercase hex digits.
  */
-export const GitOid = Schema.String.pipe(Schema.pattern(new RegExp("^[0-9a-f]{40}$", "u"))).pipe(Schema.brand("GitOid"));
+export const GitOid = Schema.String.check(Schema.isPattern(new RegExp("^[0-9a-f]{40}$", "u"))).pipe(Schema.brand("GitOid"));
 export type GitOid = typeof GitOid.Type;
 
 /**
@@ -511,7 +511,7 @@ export const ChangesAnswer = Schema.Struct({
   base: GitOid,
   files: Schema.Array(FileChange),
   head: Schema.optional(Schema.NullOr(GitOid)),
-}).annotations({ identifier: "ChangesAnswer" });
+}).annotate({ identifier: "ChangesAnswer" });
 export type ChangesAnswer = typeof ChangesAnswer.Type;
 
 /**
@@ -529,14 +529,14 @@ export const BuildingProgress = Schema.Struct({
   problems: Schema.Array(Schema.String),
   progress: Progress,
   ready: Schema.Int,
-}).annotations({ identifier: "BuildingProgress" });
+}).annotate({ identifier: "BuildingProgress" });
 export type BuildingProgress = typeof BuildingProgress.Type;
 
 /**
  * What a Halt, Release or Autonomy change applies to. Unlike modes and
  * providers, this set is the protocol's own and has no upstream owner.
  */
-export const HaltScope = Schema.Union(
+export const HaltScope = Schema.Union([
   Schema.Literal("city"),
   Schema.Struct({
     building: Address,
@@ -544,7 +544,7 @@ export const HaltScope = Schema.Union(
   Schema.Struct({
     workshop: Address,
   }),
-).annotations({ identifier: "HaltScope" });
+]).annotate({ identifier: "HaltScope" });
 export type HaltScope = typeof HaltScope.Type;
 
 /**
@@ -553,7 +553,7 @@ export type HaltScope = typeof HaltScope.Type;
  * Carries serde because a page renders it. The value that must not be
  * deserialisable is [`Pursuit`] itself — and that still is not.
  */
-export const PursuitState = Schema.Literal("running", "paused").annotations({ identifier: "PursuitState" });
+export const PursuitState = Schema.Literals(["running", "paused"]).annotate({ identifier: "PursuitState" });
 export type PursuitState = typeof PursuitState.Type;
 
 /**
@@ -564,7 +564,7 @@ export type PursuitState = typeof PursuitState.Type;
  * Carries serde because the page says it: the wire holds the kind, and
  * the client takes the words for each kind from its own `lang.json`.
  */
-export const PursuitVerdict = Schema.Union(
+export const PursuitVerdict = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("work"),
     next: NodeId,
@@ -579,7 +579,7 @@ export const PursuitVerdict = Schema.Union(
   Schema.Struct({
     kind: Schema.Literal("finished"),
   }),
-).annotations({ identifier: "PursuitVerdict" });
+]).annotate({ identifier: "PursuitVerdict" });
 export type PursuitVerdict = typeof PursuitVerdict.Type;
 
 /**
@@ -594,14 +594,14 @@ export const PursuitLine = Schema.Struct({
   goal: Schema.String,
   state: PursuitState,
   verdict: PursuitVerdict,
-}).annotations({ identifier: "PursuitLine" });
+}).annotate({ identifier: "PursuitLine" });
 export type PursuitLine = typeof PursuitLine.Type;
 
 /**
  * The closed event vocabulary.
  */
-export const EventKind = Schema.Union(
-  Schema.Literal("city_initialized", "building_created", "run_started", "run_forked", "prompt_assembled", "model_called", "model_returned", "tool_called", "tool_result", "result_offloaded", "gate_checked", "gate_denied", "checkpoint_committed", "handoff_written", "steer_received", "cancel_received", "watchdog_fired", "budget_limit", "run_frozen", "log_truncated", "signal_enqueued", "signal_consumed", "draft_held", "draft_resolved", "goal_registered", "goal_conflict", "arbitration_verdict", "repair_started", "repair_reused", "worktree_opened", "pr_opened", "pr_merged", "pr_rejected", "roadmap_claimed", "roadmap_finished", "roadmap_released", "approval_requested", "approval_resolved", "policy_created", "policy_revoked", "taint_promoted", "cross_building_transfer", "city_halted", "backpressure_shed", "digest_invalidated", "endpoint_attached", "endpoint_lost", "model_selected", "provider_degraded", "eval_run", "asset_archived", "credential_lent", "secret_captured", "secret_egress_blocked", "file_discarded", "discard_restored", "autonomy_changed", "went_back", "file_restored"),
+export const EventKind = Schema.Union([
+  Schema.Literals(["city_initialized", "building_created", "run_started", "run_forked", "prompt_assembled", "model_called", "model_returned", "tool_called", "tool_result", "result_offloaded", "gate_checked", "gate_denied", "checkpoint_committed", "handoff_written", "steer_received", "cancel_received", "watchdog_fired", "budget_limit", "run_frozen", "log_truncated", "signal_enqueued", "signal_consumed", "draft_held", "draft_resolved", "goal_registered", "goal_conflict", "arbitration_verdict", "repair_started", "repair_reused", "worktree_opened", "pr_opened", "pr_merged", "pr_rejected", "roadmap_claimed", "roadmap_finished", "roadmap_released", "approval_requested", "approval_resolved", "policy_created", "policy_revoked", "taint_promoted", "cross_building_transfer", "city_halted", "backpressure_shed", "digest_invalidated", "endpoint_attached", "endpoint_lost", "model_selected", "provider_degraded", "eval_run", "asset_archived", "credential_lent", "secret_captured", "secret_egress_blocked", "file_discarded", "discard_restored", "autonomy_changed", "went_back", "file_restored"]),
   Schema.Literal("building_configured"),
   Schema.Literal("building_removed"),
   Schema.Literal("session_opened"),
@@ -632,13 +632,13 @@ export const EventKind = Schema.Union(
   Schema.Literal("proposal_offered"),
   Schema.Literal("proposal_decided"),
   Schema.Literal("proposal_withdrawn"),
-).annotations({ identifier: "EventKind" });
+]).annotate({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 
 /**
  * A run's identity in the one spelling the city writes it: a hyphenated uuid in lower case, as `kernel::RunId::parse` accepts it. Bare hex, braces, the `urn:uuid:` prefix and upper case are refused.
  */
-export const RunId = Schema.String.pipe(Schema.pattern(new RegExp("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "u"))).pipe(Schema.brand("RunId"));
+export const RunId = Schema.String.check(Schema.isPattern(new RegExp("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "u"))).pipe(Schema.brand("RunId"));
 export type RunId = typeof RunId.Type;
 
 /**
@@ -665,7 +665,7 @@ export const RunSummary = Schema.Struct({
   started: Schema.optional(Schema.NullOr(TimeMs)),
   task: Schema.optional(Schema.NullOr(Schema.String)),
   who: Schema.String,
-}).annotations({ identifier: "RunSummary" });
+}).annotate({ identifier: "RunSummary" });
 export type RunSummary = typeof RunSummary.Type;
 
 export const CityAnswer = Schema.Struct({
@@ -676,13 +676,13 @@ export const CityAnswer = Schema.Struct({
   proved: Schema.optional(Schema.NullOr(Seq)),
   pursuits: Schema.Array(PursuitLine),
   runs: Schema.Array(RunSummary),
-}).annotations({ identifier: "CityAnswer" });
+}).annotate({ identifier: "CityAnswer" });
 export type CityAnswer = typeof CityAnswer.Type;
 
 /**
  * A BLAKE3 digest: exactly 64 lowercase hex digits.
  */
-export const B3Hash = Schema.String.pipe(Schema.pattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
+export const B3Hash = Schema.String.check(Schema.isPattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
 export type B3Hash = typeof B3Hash.Type;
 
 /**
@@ -691,7 +691,7 @@ export type B3Hash = typeof B3Hash.Type;
 export const CommitAt = Schema.Struct({
   oid: GitOid,
   seq: Seq,
-}).annotations({ identifier: "CommitAt" });
+}).annotate({ identifier: "CommitAt" });
 export type CommitAt = typeof CommitAt.Type;
 
 /**
@@ -708,13 +708,13 @@ export type CommitAt = typeof CommitAt.Type;
  * Absence (`Option::None`) is not `Effort::None`: absence leaves the
  * choice to the provider, `Effort::None` asks it not to think.
  */
-export const Effort = Schema.Literal("none", "low", "medium", "high", "xhigh", "max").annotations({ identifier: "Effort" });
+export const Effort = Schema.Literals(["none", "low", "medium", "high", "xhigh", "max"]).annotate({ identifier: "Effort" });
 export type Effort = typeof Effort.Type;
 
 /**
  * What a person calls one session: one address segment of at most 64 characters, with the whitespace at either end trimmed, as `kernel::address::SessionName::parse` accepts it. The city refuses the reserved directory's own name as well.
  */
-export const SessionName = Schema.String.pipe(Schema.pattern(new RegExp("^\\p{White_Space}*(?:[^\\p{White_Space}/\\\\:\\p{Cc}.]|[^\\p{White_Space}/\\\\:\\p{Cc}][^/\\\\:\\p{Cc}]{0,62}[^/\\\\:\\p{Cc}.\\p{White_Space}])\\p{White_Space}*$", "u"))).pipe(Schema.brand("SessionName"));
+export const SessionName = Schema.String.check(Schema.isPattern(new RegExp("^\\p{White_Space}*(?:[^\\p{White_Space}/\\\\:\\p{Cc}.]|[^\\p{White_Space}/\\\\:\\p{Cc}][^/\\\\:\\p{Cc}]{0,62}[^/\\\\:\\p{Cc}.\\p{White_Space}])\\p{White_Space}*$", "u"))).pipe(Schema.brand("SessionName"));
 export type SessionName = typeof SessionName.Type;
 
 /**
@@ -741,7 +741,7 @@ export const CommitAnswer = Schema.Struct({
   seq: Seq,
   session: Schema.optional(Schema.NullOr(SessionName)),
   spent: UsdMicros,
-}).annotations({ identifier: "CommitAnswer" });
+}).annotate({ identifier: "CommitAnswer" });
 export type CommitAnswer = typeof CommitAnswer.Type;
 
 /**
@@ -758,7 +758,7 @@ export const CommitsAnswer = Schema.Struct({
   building: Schema.optional(Schema.NullOr(Address)),
   commits: Schema.Array(CommitAnswer),
   more: Schema.Boolean,
-}).annotations({ identifier: "CommitsAnswer" });
+}).annotate({ identifier: "CommitsAnswer" });
 export type CommitsAnswer = typeof CommitsAnswer.Type;
 
 /**
@@ -777,12 +777,12 @@ export type CommitsAnswer = typeof CommitsAnswer.Type;
  * the ladder called the room's file that is a wire whose readers
  * disagree with the run about which file they are looking at.
  */
-export const ConfigLayer = Schema.Union(
+export const ConfigLayer = Schema.Union([
   Schema.Literal("default"),
   Schema.Literal("city"),
   Schema.Literal("building"),
   Schema.Literal("resident"),
-).annotations({ identifier: "ConfigLayer" });
+]).annotate({ identifier: "ConfigLayer" });
 export type ConfigLayer = typeof ConfigLayer.Type;
 
 /**
@@ -791,7 +791,7 @@ export type ConfigLayer = typeof ConfigLayer.Type;
 export const SettledEffort = Schema.Struct({
   effort: Effort,
   from: ConfigLayer,
-}).annotations({ identifier: "SettledEffort" });
+}).annotate({ identifier: "SettledEffort" });
 export type SettledEffort = typeof SettledEffort.Type;
 
 /**
@@ -803,7 +803,7 @@ export type SettledEffort = typeof SettledEffort.Type;
 export const SecondDomain = Schema.Struct({
   max: Schema.Int,
   min: Schema.Int,
-}).annotations({ identifier: "SecondDomain" });
+}).annotate({ identifier: "SecondDomain" });
 export type SecondDomain = typeof SecondDomain.Type;
 
 /**
@@ -813,7 +813,7 @@ export const SettledSecond = Schema.Struct({
   domain: SecondDomain,
   from: ConfigLayer,
   percent: Schema.Int,
-}).annotations({ identifier: "SettledSecond" });
+}).annotate({ identifier: "SettledSecond" });
 export type SettledSecond = typeof SettledSecond.Type;
 
 /**
@@ -830,11 +830,11 @@ export type SettledSecond = typeof SettledSecond.Type;
  * [`Never`](Proxying::Never) so a stale proxy variable cannot break a
  * call the machine would otherwise make.
  */
-export const Proxying = Schema.Union(
+export const Proxying = Schema.Union([
   Schema.Literal("except_local"),
   Schema.Literal("always"),
   Schema.Literal("never"),
-).annotations({ identifier: "Proxying" });
+]).annotate({ identifier: "Proxying" });
 export type Proxying = typeof Proxying.Type;
 
 /**
@@ -852,7 +852,7 @@ export const TuningDefaults = Schema.Struct({
   request_max_retries: Schema.optional(Schema.NullOr(Schema.Int)),
   stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),
   timeout_ms: Schema.Int,
-}).annotations({ identifier: "TuningDefaults" });
+}).annotate({ identifier: "TuningDefaults" });
 export type TuningDefaults = typeof TuningDefaults.Type;
 
 /**
@@ -870,7 +870,7 @@ export const ConfigAnswer = Schema.Struct({
   first: Schema.optional(Schema.NullOr(Schema.Int)),
   second: SettledSecond,
   tuning: TuningDefaults,
-}).annotations({ identifier: "ConfigAnswer" });
+}).annotate({ identifier: "ConfigAnswer" });
 export type ConfigAnswer = typeof ConfigAnswer.Type;
 
 /**
@@ -887,7 +887,7 @@ export const ContentAnswer = Schema.Struct({
   locator: Locator,
   text: Schema.String,
   truncated: Schema.Boolean,
-}).annotations({ identifier: "ContentAnswer" });
+}).annotate({ identifier: "ContentAnswer" });
 export type ContentAnswer = typeof ContentAnswer.Type;
 
 /**
@@ -899,7 +899,7 @@ export type ContentAnswer = typeof ContentAnswer.Type;
 export const UnpricedCalls = Schema.Struct({
   calls: Schema.Int,
   tokens: Schema.Int,
-}).annotations({ identifier: "UnpricedCalls" });
+}).annotate({ identifier: "UnpricedCalls" });
 export type UnpricedCalls = typeof UnpricedCalls.Type;
 
 /**
@@ -908,14 +908,14 @@ export type UnpricedCalls = typeof UnpricedCalls.Type;
  * to less. Shares render against `total`, so a remainder stays visible.
  */
 export const CostAnswer = Schema.Struct({
-  by_actor: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
-  by_run: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
-  by_segment: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
-  by_skill: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
-  by_tool: Schema.Array(Schema.Tuple(Schema.String, UsdMicros)),
+  by_actor: Schema.Array(Schema.Tuple([Schema.String, UsdMicros])),
+  by_run: Schema.Array(Schema.Tuple([Schema.String, UsdMicros])),
+  by_segment: Schema.Array(Schema.Tuple([Schema.String, UsdMicros])),
+  by_skill: Schema.Array(Schema.Tuple([Schema.String, UsdMicros])),
+  by_tool: Schema.Array(Schema.Tuple([Schema.String, UsdMicros])),
   total: UsdMicros,
   unpriced: UnpricedCalls,
-}).annotations({ identifier: "CostAnswer" });
+}).annotate({ identifier: "CostAnswer" });
 export type CostAnswer = typeof CostAnswer.Type;
 
 /**
@@ -923,16 +923,16 @@ export type CostAnswer = typeof CostAnswer.Type;
  */
 export const CostOfAnswer = Schema.Struct({
   node: NodeId,
-  runs: Schema.Array(Schema.Tuple(RunId, UsdMicros)),
+  runs: Schema.Array(Schema.Tuple([RunId, UsdMicros])),
   spent: UsdMicros,
-}).annotations({ identifier: "CostOfAnswer" });
+}).annotate({ identifier: "CostOfAnswer" });
 export type CostOfAnswer = typeof CostOfAnswer.Type;
 
 /**
  * Tracked rides git (`file:`), Interred rides CAS (`cas:`), Rebuildable
  * names its reason. No fourth storage authority exists.
  */
-export const Restoration = Schema.Union(
+export const Restoration = Schema.Union([
   Schema.Struct({
     tracked: Locator,
   }),
@@ -944,7 +944,7 @@ export const Restoration = Schema.Union(
       reason: Schema.String,
     }),
   }),
-).annotations({ identifier: "Restoration" });
+]).annotate({ identifier: "Restoration" });
 export type Restoration = typeof Restoration.Type;
 
 export const DiscardLine = Schema.Struct({
@@ -952,7 +952,7 @@ export const DiscardLine = Schema.Struct({
   path: Schema.String,
   restoration: Schema.optional(Schema.NullOr(Restoration)),
   restored: Schema.Boolean,
-}).annotations({ identifier: "DiscardLine" });
+}).annotate({ identifier: "DiscardLine" });
 export type DiscardLine = typeof DiscardLine.Type;
 
 /**
@@ -964,7 +964,7 @@ export type DiscardLine = typeof DiscardLine.Type;
  */
 export const DiscardAnswer = Schema.Struct({
   rows: Schema.Array(DiscardLine),
-}).annotations({ identifier: "DiscardAnswer" });
+}).annotate({ identifier: "DiscardAnswer" });
 export type DiscardAnswer = typeof DiscardAnswer.Type;
 
 /**
@@ -972,7 +972,7 @@ export type DiscardAnswer = typeof DiscardAnswer.Type;
  * setting (sprawling-SPEC 8-93). The dispatched commands are not here:
  * they always start one level below, and lowering is never refused.
  */
-export const DoctorCore = Schema.Union(
+export const DoctorCore = Schema.Union([
   Schema.Literal("raised"),
   Schema.Literal("held_by_setting"),
   Schema.Struct({
@@ -986,23 +986,23 @@ export const DoctorCore = Schema.Union(
       said: Schema.String,
     }),
   }),
-).annotations({ identifier: "DoctorCore" });
+]).annotate({ identifier: "DoctorCore" });
 export type DoctorCore = typeof DoctorCore.Type;
 
 /**
  * How long a value the store keeps stays reachable.
  */
-export const DoctorCustodyLifetime = Schema.Literal("across_reboots", "with_passphrase", "until_reboot", "this_process").annotations({ identifier: "DoctorCustodyLifetime" });
+export const DoctorCustodyLifetime = Schema.Literals(["across_reboots", "with_passphrase", "until_reboot", "this_process"]).annotate({ identifier: "DoctorCustodyLifetime" });
 export type DoctorCustodyLifetime = typeof DoctorCustodyLifetime.Type;
 
 /**
  * Which store a city writes secrets to.
  */
-export const DoctorCustodyStore = Schema.Union(
+export const DoctorCustodyStore = Schema.Union([
   Schema.Literal("platform_service"),
   Schema.Literal("encrypted_file"),
   Schema.Literal("session_memory"),
-).annotations({ identifier: "DoctorCustodyStore" });
+]).annotate({ identifier: "DoctorCustodyStore" });
 export type DoctorCustodyStore = typeof DoctorCustodyStore.Type;
 
 /**
@@ -1012,13 +1012,13 @@ export const DoctorCustody = Schema.Struct({
   keeps: DoctorCustodyLifetime,
   refusal: Schema.optional(Schema.NullOr(Schema.String)),
   store: DoctorCustodyStore,
-}).annotations({ identifier: "DoctorCustody" });
+}).annotate({ identifier: "DoctorCustody" });
 export type DoctorCustody = typeof DoctorCustody.Type;
 
 /**
  * What getting the item would cost on this machine.
  */
-export const DoctorInstall = Schema.Union(
+export const DoctorInstall = Schema.Union([
   Schema.Struct({
     command: Schema.Struct({
       spelled: Schema.String,
@@ -1035,32 +1035,32 @@ export const DoctorInstall = Schema.Union(
     }),
   }),
   Schema.Literal("unknown_platform"),
-).annotations({ identifier: "DoctorInstall" });
+]).annotate({ identifier: "DoctorInstall" });
 export type DoctorInstall = typeof DoctorInstall.Type;
 
 /**
  * Whether a tier can be reached without the item.
  */
-export const DoctorNeed = Schema.Union(
+export const DoctorNeed = Schema.Union([
   Schema.Literal("required"),
   Schema.Literal("optional"),
-).annotations({ identifier: "DoctorNeed" });
+]).annotate({ identifier: "DoctorNeed" });
 export type DoctorNeed = typeof DoctorNeed.Type;
 
 /**
  * A set of items a page draws as one row: each member is still its own
  * item here, because each is detected, judged and installed on its own.
  */
-export const DoctorPack = Schema.Union(
+export const DoctorPack = Schema.Union([
   Schema.Literal("rust_tools"),
-).annotations({ identifier: "DoctorPack" });
+]).annotate({ identifier: "DoctorPack" });
 export type DoctorPack = typeof DoctorPack.Type;
 
 /**
  * Which kind of not being here.
  */
-export const DoctorAbsence = Schema.Union(
-  Schema.Literal("not_on_search_path", "no_home", "not_in_this_build"),
+export const DoctorAbsence = Schema.Union([
+  Schema.Literals(["not_on_search_path", "no_home", "not_in_this_build"]),
   Schema.Struct({
     variable_names_nothing: Schema.Struct({
       path: Schema.String,
@@ -1072,13 +1072,13 @@ export const DoctorAbsence = Schema.Union(
       dir: Schema.String,
     }),
   }),
-).annotations({ identifier: "DoctorAbsence" });
+]).annotate({ identifier: "DoctorAbsence" });
 export type DoctorAbsence = typeof DoctorAbsence.Type;
 
 /**
  * Why a thing that is here cannot be used.
  */
-export const DoctorFault = Schema.Union(
+export const DoctorFault = Schema.Union([
   Schema.Struct({
     will_not_start: Schema.Struct({
       said: Schema.String,
@@ -1090,7 +1090,7 @@ export const DoctorFault = Schema.Union(
       said: Schema.String,
     }),
   }),
-).annotations({ identifier: "DoctorFault" });
+]).annotate({ identifier: "DoctorFault" });
 export type DoctorFault = typeof DoctorFault.Type;
 
 /**
@@ -1098,7 +1098,7 @@ export type DoctorFault = typeof DoctorFault.Type;
  * arm carries text; the other three are facts about how it did not
  * answer, and none of them makes the program absent.
  */
-export const DoctorVersion = Schema.Union(
+export const DoctorVersion = Schema.Union([
   Schema.Struct({
     said: Schema.Struct({
       text: Schema.String,
@@ -1107,13 +1107,13 @@ export const DoctorVersion = Schema.Union(
   Schema.Literal("silent"),
   Schema.Literal("unreadable"),
   Schema.Literal("late"),
-).annotations({ identifier: "DoctorVersion" });
+]).annotate({ identifier: "DoctorVersion" });
 export type DoctorVersion = typeof DoctorVersion.Type;
 
 /**
  * Whether the item is here, and in what condition.
  */
-export const DoctorState = Schema.Union(
+export const DoctorState = Schema.Union([
   Schema.Struct({
     present: Schema.Struct({
       at: Schema.String,
@@ -1131,16 +1131,16 @@ export const DoctorState = Schema.Union(
       absence: DoctorAbsence,
     }),
   }),
-).annotations({ identifier: "DoctorState" });
+]).annotate({ identifier: "DoctorState" });
 export type DoctorState = typeof DoctorState.Type;
 
 /**
  * Who needs an item, and therefore which verdict it counts towards.
  */
-export const DoctorTier = Schema.Union(
+export const DoctorTier = Schema.Union([
   Schema.Literal("use"),
   Schema.Literal("develop"),
-).annotations({ identifier: "DoctorTier" });
+]).annotate({ identifier: "DoctorTier" });
 export type DoctorTier = typeof DoctorTier.Type;
 
 /**
@@ -1155,7 +1155,7 @@ export const DoctorItem = Schema.Struct({
   pinned: Schema.optional(Schema.NullOr(Schema.String)),
   state: DoctorState,
   tier: DoctorTier,
-}).annotations({ identifier: "DoctorItem" });
+}).annotate({ identifier: "DoctorItem" });
 export type DoctorItem = typeof DoctorItem.Type;
 
 /**
@@ -1163,13 +1163,13 @@ export type DoctorItem = typeof DoctorItem.Type;
  * because a page has to word both and a wire that carried `true` would
  * make every reader choose its own word for `false`.
  */
-export const DoctorCoverage = Schema.Literal("kept", "not_kept").annotations({ identifier: "DoctorCoverage" });
+export const DoctorCoverage = Schema.Literals(["kept", "not_kept"]).annotate({ identifier: "DoctorCoverage" });
 export type DoctorCoverage = typeof DoctorCoverage.Type;
 
 /**
  * What a confinement can promise.
  */
-export const DoctorGuaranteeAxis = Schema.Literal("filesystem", "network", "process_tree", "user", "resources").annotations({ identifier: "DoctorGuaranteeAxis" });
+export const DoctorGuaranteeAxis = Schema.Literals(["filesystem", "network", "process_tree", "user", "resources"]).annotate({ identifier: "DoctorGuaranteeAxis" });
 export type DoctorGuaranteeAxis = typeof DoctorGuaranteeAxis.Type;
 
 /**
@@ -1178,20 +1178,20 @@ export type DoctorGuaranteeAxis = typeof DoctorGuaranteeAxis.Type;
 export const DoctorGuarantee = Schema.Struct({
   axis: DoctorGuaranteeAxis,
   kept: DoctorCoverage,
-}).annotations({ identifier: "DoctorGuarantee" });
+}).annotate({ identifier: "DoctorGuarantee" });
 export type DoctorGuarantee = typeof DoctorGuarantee.Type;
 
 /**
  * What a machine lacks when it can give no confinement at all.
  */
-export const DoctorSandboxMissing = Schema.Literal("scratch_directory").annotations({ identifier: "DoctorSandboxMissing" });
+export const DoctorSandboxMissing = Schema.Literal("scratch_directory").annotate({ identifier: "DoctorSandboxMissing" });
 export type DoctorSandboxMissing = typeof DoctorSandboxMissing.Type;
 
 /**
  * The backend itself. Closed, so a page has a word for every arm and
  * a new arm is a compile error at every reader.
  */
-export const DoctorSandboxArm = Schema.Union(
+export const DoctorSandboxArm = Schema.Union([
   Schema.Literal("linux_namespaces"),
   Schema.Literal("windows_job_object"),
   Schema.Literal("copied_tree"),
@@ -1200,7 +1200,7 @@ export const DoctorSandboxArm = Schema.Union(
       missing: DoctorSandboxMissing,
     }),
   }),
-).annotations({ identifier: "DoctorSandboxArm" });
+]).annotate({ identifier: "DoctorSandboxArm" });
 export type DoctorSandboxArm = typeof DoctorSandboxArm.Type;
 
 /**
@@ -1210,7 +1210,7 @@ export type DoctorSandboxArm = typeof DoctorSandboxArm.Type;
 export const DoctorSandbox = Schema.Struct({
   arm: DoctorSandboxArm,
   coverage: Schema.Array(DoctorGuarantee),
-}).annotations({ identifier: "DoctorSandbox" });
+}).annotate({ identifier: "DoctorSandbox" });
 export type DoctorSandbox = typeof DoctorSandbox.Type;
 
 /**
@@ -1219,7 +1219,7 @@ export type DoctorSandbox = typeof DoctorSandbox.Type;
 export const DoctorVerdict = Schema.Struct({
   missing: Schema.Array(Schema.String),
   tier: DoctorTier,
-}).annotations({ identifier: "DoctorVerdict" });
+}).annotate({ identifier: "DoctorVerdict" });
 export type DoctorVerdict = typeof DoctorVerdict.Type;
 
 /**
@@ -1231,26 +1231,26 @@ export const DoctorAnswer = Schema.Struct({
   items: Schema.Array(DoctorItem),
   sandbox: DoctorSandbox,
   tiers: Schema.Array(DoctorVerdict),
-}).annotations({ identifier: "DoctorAnswer" });
+}).annotate({ identifier: "DoctorAnswer" });
 export type DoctorAnswer = typeof DoctorAnswer.Type;
 
 /**
  * Why an item has no upstream version to compare with.
  */
-export const DoctorUnread = Schema.Union(
+export const DoctorUnread = Schema.Union([
   Schema.Literal("with_toolchain"),
   Schema.Literal("many_brands"),
   Schema.Literal("matches_browser"),
   Schema.Literal("this_project"),
   Schema.Literal("no_source"),
   Schema.Literal("unknown_item"),
-).annotations({ identifier: "DoctorUnread" });
+]).annotate({ identifier: "DoctorUnread" });
 export type DoctorUnread = typeof DoctorUnread.Type;
 
 /**
  * What asking the item's publisher came to.
  */
-export const DoctorNewest = Schema.Union(
+export const DoctorNewest = Schema.Union([
   Schema.Literal("asking"),
   Schema.Struct({
     read: Schema.Struct({
@@ -1267,7 +1267,7 @@ export const DoctorNewest = Schema.Union(
       said: Schema.String,
     }),
   }),
-).annotations({ identifier: "DoctorNewest" });
+]).annotate({ identifier: "DoctorNewest" });
 export type DoctorNewest = typeof DoctorNewest.Type;
 
 /**
@@ -1276,7 +1276,7 @@ export type DoctorNewest = typeof DoctorNewest.Type;
 export const DoctorUpstream = Schema.Struct({
   item: Schema.String,
   newest: DoctorNewest,
-}).annotations({ identifier: "DoctorUpstream" });
+}).annotate({ identifier: "DoctorUpstream" });
 export type DoctorUpstream = typeof DoctorUpstream.Type;
 
 /**
@@ -1286,30 +1286,30 @@ export type DoctorUpstream = typeof DoctorUpstream.Type;
  * Markdown file looks exactly like a plain file, and a Markdown file
  * with no heading is still Markdown.
  */
-export const Format = Schema.Union(
+export const Format = Schema.Union([
   Schema.Literal("markdown"),
   Schema.Literal("plain"),
-).annotations({ identifier: "Format" });
+]).annotate({ identifier: "Format" });
 export type Format = typeof Format.Type;
 
 /**
  * How much of the version the first window holds.
  */
-export const Coverage = Schema.Union(
+export const Coverage = Schema.Union([
   Schema.Literal("whole"),
   Schema.Literal("head"),
-).annotations({ identifier: "Coverage" });
+]).annotate({ identifier: "Coverage" });
 export type Coverage = typeof Coverage.Type;
 
 /**
  * The character encoding one document version is read in.
  */
-export const Encoding = Schema.Union(
+export const Encoding = Schema.Union([
   Schema.Literal("utf8"),
   Schema.Literal("utf8_bom"),
   Schema.Literal("utf16_le"),
   Schema.Literal("utf16_be"),
-).annotations({ identifier: "Encoding" });
+]).annotate({ identifier: "Encoding" });
 export type Encoding = typeof Encoding.Type;
 
 /**
@@ -1324,7 +1324,7 @@ export type Encoding = typeof Encoding.Type;
 export const Span = Schema.Struct({
   end: Schema.Int,
   start: Schema.Int,
-}).annotations({ identifier: "Span" });
+}).annotate({ identifier: "Span" });
 export type Span = typeof Span.Type;
 
 /**
@@ -1333,13 +1333,13 @@ export type Span = typeof Span.Type;
 export const Window2 = Schema.Struct({
   span: Span,
   text: Schema.String,
-}).annotations({ identifier: "Window2" });
+}).annotate({ identifier: "Window2" });
 export type Window2 = typeof Window2.Type;
 
 /**
  * What the bytes of one version are to a reader.
  */
-export const DocumentBody = Schema.Union(
+export const DocumentBody = Schema.Union([
   Schema.Struct({
     text: Schema.Struct({
       coverage: Coverage,
@@ -1348,7 +1348,7 @@ export const DocumentBody = Schema.Union(
     }),
   }),
   Schema.Literal("opaque"),
-).annotations({ identifier: "DocumentBody" });
+]).annotate({ identifier: "DocumentBody" });
 export type DocumentBody = typeof DocumentBody.Type;
 
 /**
@@ -1360,13 +1360,13 @@ export const HeldDocument = Schema.Struct({
   bytes: Schema.Int,
   format: Format,
   version: B3Hash,
-}).annotations({ identifier: "HeldDocument" });
+}).annotate({ identifier: "HeldDocument" });
 export type HeldDocument = typeof HeldDocument.Type;
 
 /**
  * What stands at an address in the tree.
  */
-export const DocumentState = Schema.Union(
+export const DocumentState = Schema.Union([
   Schema.Literal("missing"),
   Schema.Struct({
     unreadable: Schema.Struct({
@@ -1382,7 +1382,7 @@ export const DocumentState = Schema.Union(
   Schema.Struct({
     held: HeldDocument,
   }),
-).annotations({ identifier: "DocumentState" });
+]).annotate({ identifier: "DocumentState" });
 export type DocumentState = typeof DocumentState.Type;
 
 /**
@@ -1391,7 +1391,7 @@ export type DocumentState = typeof DocumentState.Type;
 export const DocumentAnswer = Schema.Struct({
   at: Address,
   state: DocumentState,
-}).annotations({ identifier: "DocumentAnswer" });
+}).annotate({ identifier: "DocumentAnswer" });
 export type DocumentAnswer = typeof DocumentAnswer.Type;
 
 /**
@@ -1413,12 +1413,12 @@ export type Ceiling = typeof Ceiling.Type;
  * asker is a setting the person can fill in and never see used. It
  * grows when a caller appears, not when a name is imagined.
  */
-export const ModelTag = Schema.Union(
+export const ModelTag = Schema.Union([
   Schema.Literal("main"),
   Schema.Literal("digest"),
   Schema.Literal("transcribe"),
   Schema.Literal("ocr"),
-).annotations({ identifier: "ModelTag" });
+]).annotate({ identifier: "ModelTag" });
 export type ModelTag = typeof ModelTag.Type;
 
 export const ChosenSummary = Schema.Struct({
@@ -1426,7 +1426,7 @@ export const ChosenSummary = Schema.Struct({
   max_output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
   model: Schema.String,
   tag: ModelTag,
-}).annotations({ identifier: "ChosenSummary" });
+}).annotate({ identifier: "ChosenSummary" });
 export type ChosenSummary = typeof ChosenSummary.Type;
 
 /**
@@ -1440,11 +1440,11 @@ export type ChosenSummary = typeof ChosenSummary.Type;
  * translates it, the wire carries it) and neither may name the other.
  * `gateway::dialect` is its evaluator, not its definition.
  */
-export const DialectKind = Schema.Union(
+export const DialectKind = Schema.Union([
   Schema.Literal("anthropic"),
   Schema.Literal("open_ai"),
   Schema.Literal("open_ai_responses"),
-).annotations({ identifier: "DialectKind" });
+]).annotate({ identifier: "DialectKind" });
 export type DialectKind = typeof DialectKind.Type;
 
 /**
@@ -1490,7 +1490,7 @@ export const ModelFactsSummary = Schema.Struct({
   input_price: Schema.optional(Schema.NullOr(Schema.String)),
   max_output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
   output_price: Schema.optional(Schema.NullOr(Schema.String)),
-}).annotations({ identifier: "ModelFactsSummary" });
+}).annotate({ identifier: "ModelFactsSummary" });
 export type ModelFactsSummary = typeof ModelFactsSummary.Type;
 
 /**
@@ -1507,7 +1507,7 @@ export const EndpointSummary = Schema.Struct({
   local: Schema.Boolean,
   models: Schema.Array(ModelFactsSummary),
   name: Schema.String,
-}).annotations({ identifier: "EndpointSummary" });
+}).annotate({ identifier: "EndpointSummary" });
 export type EndpointSummary = typeof EndpointSummary.Type;
 
 /**
@@ -1517,7 +1517,7 @@ export type EndpointSummary = typeof EndpointSummary.Type;
 export const EndpointsAnswer = Schema.Struct({
   chosen: Schema.Array(ChosenSummary),
   endpoints: Schema.Array(EndpointSummary),
-}).annotations({ identifier: "EndpointsAnswer" });
+}).annotate({ identifier: "EndpointsAnswer" });
 export type EndpointsAnswer = typeof EndpointsAnswer.Type;
 
 /**
@@ -1526,10 +1526,10 @@ export type EndpointsAnswer = typeof EndpointsAnswer.Type;
  * Exhaustive and small: a row exists because the Ledger holds a
  * locator, and there are two records that write one.
  */
-export const EvidenceKind = Schema.Union(
+export const EvidenceKind = Schema.Union([
   Schema.Literal("screenshot"),
   Schema.Literal("finished"),
-).annotations({ identifier: "EvidenceKind" });
+]).annotate({ identifier: "EvidenceKind" });
 export type EvidenceKind = typeof EvidenceKind.Type;
 
 /**
@@ -1541,7 +1541,7 @@ export const Picture = Schema.Struct({
   height: Schema.Int,
   media_type: Schema.String,
   width: Schema.Int,
-}).annotations({ identifier: "Picture" });
+}).annotate({ identifier: "Picture" });
 export type Picture = typeof Picture.Type;
 
 /**
@@ -1552,7 +1552,7 @@ export const EvidenceItem = Schema.Struct({
   kind: EvidenceKind,
   locator: Locator,
   picture: Schema.optional(Schema.NullOr(Picture)),
-}).annotations({ identifier: "EvidenceItem" });
+}).annotate({ identifier: "EvidenceItem" });
 export type EvidenceItem = typeof EvidenceItem.Type;
 
 /**
@@ -1561,7 +1561,7 @@ export type EvidenceItem = typeof EvidenceItem.Type;
 export const EvidenceAnswer = Schema.Struct({
   items: Schema.Array(EvidenceItem),
   run: RunId,
-}).annotations({ identifier: "EvidenceAnswer" });
+}).annotate({ identifier: "EvidenceAnswer" });
 export type EvidenceAnswer = typeof EvidenceAnswer.Type;
 
 /**
@@ -1575,7 +1575,7 @@ export type EvidenceAnswer = typeof EvidenceAnswer.Type;
 export const Drift = Schema.Struct({
   ahead: Schema.Int,
   behind: Schema.Int,
-}).annotations({ identifier: "Drift" });
+}).annotate({ identifier: "Drift" });
 export type Drift = typeof Drift.Type;
 
 /**
@@ -1587,7 +1587,7 @@ export const GitStatusAnswer = Schema.Struct({
   checkpoint: Schema.optional(Schema.NullOr(CommitAnswer)),
   drift: Schema.optional(Schema.NullOr(Drift)),
   files: Schema.Array(FileChange),
-}).annotations({ identifier: "GitStatusAnswer" });
+}).annotate({ identifier: "GitStatusAnswer" });
 export type GitStatusAnswer = typeof GitStatusAnswer.Type;
 
 /**
@@ -1595,7 +1595,7 @@ export type GitStatusAnswer = typeof GitStatusAnswer.Type;
  * nothing. Every reading but `Found` leaves the card as the person left
  * it, and each names the way on that the page offers.
  */
-export const GithubReading = Schema.Union(
+export const GithubReading = Schema.Union([
   Schema.Struct({
     found: Schema.Struct({
       login: Schema.String,
@@ -1614,7 +1614,7 @@ export const GithubReading = Schema.Union(
     }),
   }),
   Schema.Literal("not_a_host"),
-).annotations({ identifier: "GithubReading" });
+]).annotate({ identifier: "GithubReading" });
 export type GithubReading = typeof GithubReading.Type;
 
 /**
@@ -1625,7 +1625,7 @@ export type GithubReading = typeof GithubReading.Type;
 export const GithubLoginAnswer = Schema.Struct({
   host: Schema.String,
   reading: GithubReading,
-}).annotations({ identifier: "GithubLoginAnswer" });
+}).annotate({ identifier: "GithubLoginAnswer" });
 export type GithubLoginAnswer = typeof GithubLoginAnswer.Type;
 
 /**
@@ -1644,18 +1644,18 @@ export type ResidentId = typeof ResidentId.Type;
  * Never touches gate decisions: the gates answer from the rules, and
  * who reads the inbox cannot change what a rule says.
  */
-export const Autonomy = Schema.Union(
+export const Autonomy = Schema.Union([
   Schema.Literal("owner"),
   Schema.Struct({
     delegate: ResidentId,
   }),
-).annotations({ identifier: "Autonomy" });
+]).annotate({ identifier: "Autonomy" });
 export type Autonomy = typeof Autonomy.Type;
 
 /**
  * How a person answers one item.
  */
-export const Ruling = Schema.Literal("allow", "deny").annotations({ identifier: "Ruling" });
+export const Ruling = Schema.Literals(["allow", "deny"]).annotate({ identifier: "Ruling" });
 export type Ruling = typeof Ruling.Type;
 
 /**
@@ -1666,7 +1666,7 @@ export const Decision = Schema.Struct({
   cluster: ClusterKey,
   item: Schema.String,
   verdict: Ruling,
-}).annotations({ identifier: "Decision" });
+}).annotate({ identifier: "Decision" });
 export type Decision = typeof Decision.Type;
 
 /**
@@ -1681,29 +1681,29 @@ export type Decision = typeof Decision.Type;
 export const GovernanceAnswer = Schema.Struct({
   autonomy: Autonomy,
   decided: Schema.Array(Decision),
-}).annotations({ identifier: "GovernanceAnswer" });
+}).annotate({ identifier: "GovernanceAnswer" });
 export type GovernanceAnswer = typeof GovernanceAnswer.Type;
 
 /**
  * What the person did with one optional step. A step with no mark has
  * not been looked at.
  */
-export const GuideMark = Schema.Literal("seen", "skipped").annotations({ identifier: "GuideMark" });
+export const GuideMark = Schema.Literals(["seen", "skipped"]).annotate({ identifier: "GuideMark" });
 export type GuideMark = typeof GuideMark.Type;
 
 /**
  * Whether opening the city still offers the guide.
  */
-export const GuideState = Schema.Union(
+export const GuideState = Schema.Union([
   Schema.Literal("open"),
   Schema.Literal("left"),
-).annotations({ identifier: "GuideState" });
+]).annotate({ identifier: "GuideState" });
 export type GuideState = typeof GuideState.Type;
 
 /**
  * The five steps, in the order the guide gives them.
  */
-export const GuideStep = Schema.Literal("provider", "dependencies", "texts", "skills", "mcp").annotations({ identifier: "GuideStep" });
+export const GuideStep = Schema.Literals(["provider", "dependencies", "texts", "skills", "mcp"]).annotate({ identifier: "GuideStep" });
 export type GuideStep = typeof GuideStep.Type;
 
 /**
@@ -1722,7 +1722,7 @@ export const GuideProgress = Schema.Struct({
   skills: Schema.optional(Schema.NullOr(GuideMark)),
   state: Schema.optional(GuideState),
   texts: Schema.optional(Schema.NullOr(GuideMark)),
-}).annotations({ identifier: "GuideProgress" });
+}).annotate({ identifier: "GuideProgress" });
 export type GuideProgress = typeof GuideProgress.Type;
 
 /**
@@ -1733,7 +1733,7 @@ export const HarnessLine = Schema.Struct({
   found: Schema.Boolean,
   launch: Schema.Array(Schema.String),
   name: Schema.String,
-}).annotations({ identifier: "HarnessLine" });
+}).annotate({ identifier: "HarnessLine" });
 export type HarnessLine = typeof HarnessLine.Type;
 
 /**
@@ -1741,7 +1741,7 @@ export type HarnessLine = typeof HarnessLine.Type;
  */
 export const HarnessesAnswer = Schema.Struct({
   harnesses: Schema.Array(HarnessLine),
-}).annotations({ identifier: "HarnessesAnswer" });
+}).annotate({ identifier: "HarnessesAnswer" });
 export type HarnessesAnswer = typeof HarnessesAnswer.Type;
 
 /**
@@ -1749,7 +1749,7 @@ export type HarnessesAnswer = typeof HarnessesAnswer.Type;
  * and again on read (determinism rule 6). Keys serialize sorted
  * (serde_json's default BTreeMap), which is part of the canonical bytes.
  */
-export const Payload = Schema.Record({ key: Schema.String, value: Schema.Unknown }).annotations({ identifier: "Payload" });
+export const Payload = Schema.Record(Schema.String, Schema.Unknown).annotate({ identifier: "Payload" });
 export type Payload = typeof Payload.Type;
 
 /**
@@ -1768,7 +1768,7 @@ export const EventRecord = Schema.Struct({
   t: TimeMs,
   v: Schema.Int,
   who: Schema.String,
-}).annotations({ identifier: "EventRecord" });
+}).annotate({ identifier: "EventRecord" });
 export type EventRecord = typeof EventRecord.Type;
 
 /**
@@ -1780,7 +1780,7 @@ export type EventRecord = typeof EventRecord.Type;
 export const HistoryAnswer = Schema.Struct({
   earlier: Schema.optional(Schema.NullOr(Seq)),
   records: Schema.Array(EventRecord),
-}).annotations({ identifier: "HistoryAnswer" });
+}).annotate({ identifier: "HistoryAnswer" });
 export type HistoryAnswer = typeof HistoryAnswer.Type;
 
 /**
@@ -1800,7 +1800,7 @@ export const HistoryRangeAnswer = Schema.Struct({
   next: Schema.optional(Schema.NullOr(Seq)),
   records: Schema.Array(EventRecord),
   to: Seq,
-}).annotations({ identifier: "HistoryRangeAnswer" });
+}).annotate({ identifier: "HistoryRangeAnswer" });
 export type HistoryRangeAnswer = typeof HistoryRangeAnswer.Type;
 
 /**
@@ -1810,7 +1810,7 @@ export type HistoryRangeAnswer = typeof HistoryRangeAnswer.Type;
 export const PatchLine = Schema.Struct({
   number: Schema.Int,
   text: Schema.String,
-}).annotations({ identifier: "PatchLine" });
+}).annotate({ identifier: "PatchLine" });
 export type PatchLine = typeof PatchLine.Type;
 
 /**
@@ -1819,7 +1819,7 @@ export type PatchLine = typeof PatchLine.Type;
 export const Withheld = Schema.Struct({
   number: Schema.Int,
   reason: Schema.String,
-}).annotations({ identifier: "Withheld" });
+}).annotate({ identifier: "Withheld" });
 export type Withheld = typeof Withheld.Type;
 
 /**
@@ -1836,7 +1836,7 @@ export const HunksAnswer = Schema.Struct({
   oid_b: GitOid,
   path: Schema.String,
   withheld: Schema.Array(Withheld),
-}).annotations({ identifier: "HunksAnswer" });
+}).annotate({ identifier: "HunksAnswer" });
 export type HunksAnswer = typeof HunksAnswer.Type;
 
 /**
@@ -1849,11 +1849,11 @@ export type HunksAnswer = typeof HunksAnswer.Type;
  * its own path would be a way to write anywhere inside the one place a
  * resident may not edit.
  */
-export const GovernedDocument = Schema.Union(
+export const GovernedDocument = Schema.Union([
   Schema.Literal("mayor"),
   Schema.Literal("clerk"),
   Schema.Literal("preferences"),
-).annotations({ identifier: "GovernedDocument" });
+]).annotate({ identifier: "GovernedDocument" });
 export type GovernedDocument = typeof GovernedDocument.Type;
 
 /**
@@ -1868,7 +1868,7 @@ export const StatedIdentity = Schema.Struct({
   preferences_text: Schema.String,
   user_id: Schema.optional(Schema.NullOr(Schema.String)),
   version: Schema.String,
-}).annotations({ identifier: "StatedIdentity" });
+}).annotate({ identifier: "StatedIdentity" });
 export type StatedIdentity = typeof StatedIdentity.Type;
 
 /**
@@ -1878,7 +1878,7 @@ export type StatedIdentity = typeof StatedIdentity.Type;
  * name: a page that drew the default would let its next save write over
  * the line the person got wrong.
  */
-export const IdentityAnswer = Schema.Union(
+export const IdentityAnswer = Schema.Union([
   Schema.Struct({
     stated: StatedIdentity,
   }),
@@ -1889,7 +1889,7 @@ export const IdentityAnswer = Schema.Union(
       why: Schema.String,
     }),
   }),
-).annotations({ identifier: "IdentityAnswer" });
+]).annotate({ identifier: "IdentityAnswer" });
 export type IdentityAnswer = typeof IdentityAnswer.Type;
 
 export const SignalLine = Schema.Struct({
@@ -1897,7 +1897,7 @@ export const SignalLine = Schema.Struct({
   from: Schema.String,
   id: Schema.String,
   kind: Schema.String,
-}).annotations({ identifier: "SignalLine" });
+}).annotate({ identifier: "SignalLine" });
 export type SignalLine = typeof SignalLine.Type;
 
 /**
@@ -1911,7 +1911,7 @@ export type SignalLine = typeof SignalLine.Type;
 export const InboxAnswer = Schema.Struct({
   addr: Address,
   waiting: Schema.Array(SignalLine),
-}).annotations({ identifier: "InboxAnswer" });
+}).annotate({ identifier: "InboxAnswer" });
 export type InboxAnswer = typeof InboxAnswer.Type;
 
 /**
@@ -1922,7 +1922,7 @@ export type InboxAnswer = typeof InboxAnswer.Type;
 export const KnownFace = Schema.Struct({
   base_url: Schema.String,
   dialect: DialectKind,
-}).annotations({ identifier: "KnownFace" });
+}).annotate({ identifier: "KnownFace" });
 export type KnownFace = typeof KnownFace.Type;
 
 /**
@@ -1931,7 +1931,7 @@ export type KnownFace = typeof KnownFace.Type;
 export const KnownHost = Schema.Struct({
   faces: Schema.Array(KnownFace),
   host: Schema.String,
-}).annotations({ identifier: "KnownHost" });
+}).annotate({ identifier: "KnownHost" });
 export type KnownHost = typeof KnownHost.Type;
 
 /**
@@ -1939,19 +1939,19 @@ export type KnownHost = typeof KnownHost.Type;
  */
 export const KnownHostsAnswer = Schema.Struct({
   hosts: Schema.Array(KnownHost),
-}).annotations({ identifier: "KnownHostsAnswer" });
+}).annotate({ identifier: "KnownHostsAnswer" });
 export type KnownHostsAnswer = typeof KnownHostsAnswer.Type;
 
 /**
  * What a page is shown the source of instead of a drawing (D22, D24).
  */
-export const Construct = Schema.Union(
+export const Construct = Schema.Union([
   Schema.Literal("html"),
   Schema.Literal("math"),
   Schema.Literal("front_matter"),
   Schema.Literal("nesting"),
   Schema.Literal("extension"),
-).annotations({ identifier: "Construct" });
+]).annotate({ identifier: "Construct" });
 export type Construct = typeof Construct.Type;
 
 /**
@@ -1960,8 +1960,8 @@ export type Construct = typeof Construct.Type;
  */
 export type Inline = "soft_break" | "line_break" | { readonly text: string } | { readonly code: string } | { readonly emphasis: readonly Inline[] } | { readonly strong: readonly Inline[] } | { readonly strikethrough: readonly Inline[] } | { readonly link: { readonly content: readonly Inline[]; readonly target: string; readonly title: string } } | { readonly image: { readonly alt: string; readonly target: string; readonly title: string } } | { readonly footnote_reference: { readonly name: string } } | { readonly unsupported: { readonly construct: typeof Construct.Type; readonly source: string } }
 export type InlineEncoded = "soft_break" | "line_break" | { readonly text: string } | { readonly code: string } | { readonly emphasis: readonly InlineEncoded[] } | { readonly strong: readonly InlineEncoded[] } | { readonly strikethrough: readonly InlineEncoded[] } | { readonly link: { readonly content: readonly InlineEncoded[]; readonly target: string; readonly title: string } } | { readonly image: { readonly alt: string; readonly target: string; readonly title: string } } | { readonly footnote_reference: { readonly name: string } } | { readonly unsupported: { readonly construct: typeof Construct.Encoded; readonly source: string } }
-export const Inline: Schema.Schema<Inline, InlineEncoded> = Schema.Union(
-  Schema.Literal("soft_break", "line_break"),
+export const Inline: Schema.Codec<Inline, InlineEncoded> = Schema.Union([
+  Schema.Literals(["soft_break", "line_break"]),
   Schema.Struct({
     text: Schema.String,
   }),
@@ -1969,17 +1969,17 @@ export const Inline: Schema.Schema<Inline, InlineEncoded> = Schema.Union(
     code: Schema.String,
   }),
   Schema.Struct({
-    emphasis: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+    emphasis: Schema.Array(Schema.suspend((): Schema.Codec<Inline, InlineEncoded> => Inline)),
   }),
   Schema.Struct({
-    strong: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+    strong: Schema.Array(Schema.suspend((): Schema.Codec<Inline, InlineEncoded> => Inline)),
   }),
   Schema.Struct({
-    strikethrough: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+    strikethrough: Schema.Array(Schema.suspend((): Schema.Codec<Inline, InlineEncoded> => Inline)),
   }),
   Schema.Struct({
     link: Schema.Struct({
-      content: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+      content: Schema.Array(Schema.suspend((): Schema.Codec<Inline, InlineEncoded> => Inline)),
       target: Schema.String,
       title: Schema.String,
     }),
@@ -2002,12 +2002,12 @@ export const Inline: Schema.Schema<Inline, InlineEncoded> = Schema.Union(
       source: Schema.String,
     }),
   }),
-).annotations({ identifier: "Inline" });
+]).annotate({ identifier: "Inline" });
 
 /**
  * Whether an item is a task, and whether it is done.
  */
-export const Check = Schema.Literal("not_a_task", "open", "done").annotations({ identifier: "Check" });
+export const Check = Schema.Literals(["not_a_task", "open", "done"]).annotate({ identifier: "Check" });
 export type Check = typeof Check.Type;
 
 /**
@@ -2015,23 +2015,23 @@ export type Check = typeof Check.Type;
  */
 export interface ListItem { readonly blocks: readonly Block[]; readonly check: typeof Check.Type; readonly span: typeof Span.Type }
 export interface ListItemEncoded { readonly blocks: readonly BlockEncoded[]; readonly check: typeof Check.Encoded; readonly span: typeof Span.Encoded }
-export const ListItem: Schema.Schema<ListItem, ListItemEncoded> = Schema.Struct({
-  blocks: Schema.Array(Schema.suspend((): Schema.Schema<Block, BlockEncoded> => Block)),
+export const ListItem: Schema.Codec<ListItem, ListItemEncoded> = Schema.Struct({
+  blocks: Schema.Array(Schema.suspend((): Schema.Codec<Block, BlockEncoded> => Block)),
   check: Check,
   span: Span,
-}).annotations({ identifier: "ListItem" });
+}).annotate({ identifier: "ListItem" });
 
 /**
  * Whether a list counts its items, and from where.
  */
-export const Order = Schema.Union(
+export const Order = Schema.Union([
   Schema.Literal("bullet"),
   Schema.Struct({
     ordered: Schema.Struct({
       start: Schema.Int,
     }),
   }),
-).annotations({ identifier: "Order" });
+]).annotate({ identifier: "Order" });
 export type Order = typeof Order.Type;
 
 /**
@@ -2039,13 +2039,13 @@ export type Order = typeof Order.Type;
  */
 export const Row = Schema.Struct({
   cells: Schema.Array(Schema.Array(Inline)),
-}).annotations({ identifier: "Row" });
+}).annotate({ identifier: "Row" });
 export type Row = typeof Row.Type;
 
 /**
  * Whether a list's items are paragraphs apart or one line apart.
  */
-export const Spacing = Schema.Literal("tight", "loose").annotations({ identifier: "Spacing" });
+export const Spacing = Schema.Literals(["tight", "loose"]).annotate({ identifier: "Spacing" });
 export type Spacing = typeof Spacing.Type;
 
 /**
@@ -2054,23 +2054,23 @@ export type Spacing = typeof Spacing.Type;
  */
 export type Block = { readonly heading: { readonly inline: readonly Inline[]; readonly level: number; readonly span: typeof Span.Type } } | { readonly paragraph: { readonly inline: readonly Inline[]; readonly span: typeof Span.Type } } | { readonly list: { readonly items: readonly ListItem[]; readonly order: typeof Order.Type; readonly spacing: typeof Spacing.Type; readonly span: typeof Span.Type } } | { readonly quote: { readonly blocks: readonly Block[]; readonly span: typeof Span.Type } } | { readonly code: { readonly info: string; readonly span: typeof Span.Type; readonly text: string } } | { readonly table: { readonly align: readonly (typeof Align.Type)[]; readonly body: readonly (typeof Row.Type)[]; readonly head: typeof Row.Type; readonly span: typeof Span.Type } } | { readonly rule: { readonly span: typeof Span.Type } } | { readonly footnote: { readonly blocks: readonly Block[]; readonly name: string; readonly span: typeof Span.Type } } | { readonly unsupported: { readonly construct: typeof Construct.Type; readonly source: string; readonly span: typeof Span.Type } }
 export type BlockEncoded = { readonly heading: { readonly inline: readonly InlineEncoded[]; readonly level: number; readonly span: typeof Span.Encoded } } | { readonly paragraph: { readonly inline: readonly InlineEncoded[]; readonly span: typeof Span.Encoded } } | { readonly list: { readonly items: readonly ListItemEncoded[]; readonly order: typeof Order.Encoded; readonly spacing: typeof Spacing.Encoded; readonly span: typeof Span.Encoded } } | { readonly quote: { readonly blocks: readonly BlockEncoded[]; readonly span: typeof Span.Encoded } } | { readonly code: { readonly info: string; readonly span: typeof Span.Encoded; readonly text: string } } | { readonly table: { readonly align: readonly (typeof Align.Encoded)[]; readonly body: readonly (typeof Row.Encoded)[]; readonly head: typeof Row.Encoded; readonly span: typeof Span.Encoded } } | { readonly rule: { readonly span: typeof Span.Encoded } } | { readonly footnote: { readonly blocks: readonly BlockEncoded[]; readonly name: string; readonly span: typeof Span.Encoded } } | { readonly unsupported: { readonly construct: typeof Construct.Encoded; readonly source: string; readonly span: typeof Span.Encoded } }
-export const Block: Schema.Schema<Block, BlockEncoded> = Schema.Union(
+export const Block: Schema.Codec<Block, BlockEncoded> = Schema.Union([
   Schema.Struct({
     heading: Schema.Struct({
-      inline: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+      inline: Schema.Array(Schema.suspend((): Schema.Codec<Inline, InlineEncoded> => Inline)),
       level: Schema.Int,
       span: Span,
     }),
   }),
   Schema.Struct({
     paragraph: Schema.Struct({
-      inline: Schema.Array(Schema.suspend((): Schema.Schema<Inline, InlineEncoded> => Inline)),
+      inline: Schema.Array(Schema.suspend((): Schema.Codec<Inline, InlineEncoded> => Inline)),
       span: Span,
     }),
   }),
   Schema.Struct({
     list: Schema.Struct({
-      items: Schema.Array(Schema.suspend((): Schema.Schema<ListItem, ListItemEncoded> => ListItem)),
+      items: Schema.Array(Schema.suspend((): Schema.Codec<ListItem, ListItemEncoded> => ListItem)),
       order: Order,
       spacing: Spacing,
       span: Span,
@@ -2078,7 +2078,7 @@ export const Block: Schema.Schema<Block, BlockEncoded> = Schema.Union(
   }),
   Schema.Struct({
     quote: Schema.Struct({
-      blocks: Schema.Array(Schema.suspend((): Schema.Schema<Block, BlockEncoded> => Block)),
+      blocks: Schema.Array(Schema.suspend((): Schema.Codec<Block, BlockEncoded> => Block)),
       span: Span,
     }),
   }),
@@ -2104,7 +2104,7 @@ export const Block: Schema.Schema<Block, BlockEncoded> = Schema.Union(
   }),
   Schema.Struct({
     footnote: Schema.Struct({
-      blocks: Schema.Array(Schema.suspend((): Schema.Schema<Block, BlockEncoded> => Block)),
+      blocks: Schema.Array(Schema.suspend((): Schema.Codec<Block, BlockEncoded> => Block)),
       name: Schema.String,
       span: Span,
     }),
@@ -2116,7 +2116,7 @@ export const Block: Schema.Schema<Block, BlockEncoded> = Schema.Union(
       span: Span,
     }),
   }),
-).annotations({ identifier: "Block" });
+]).annotate({ identifier: "Block" });
 
 /**
  * A stretch of Markdown that was read, and its blocks: what a preview
@@ -2125,7 +2125,7 @@ export const Block: Schema.Schema<Block, BlockEncoded> = Schema.Union(
 export const Laid = Schema.Struct({
   blocks: Schema.Array(Block),
   span: Span,
-}).annotations({ identifier: "Laid" });
+}).annotate({ identifier: "Laid" });
 export type Laid = typeof Laid.Type;
 
 /**
@@ -2133,14 +2133,14 @@ export type Laid = typeof Laid.Type;
  * of a directory is a question about everything under it, and this
  * answer deliberately does not walk that far.
  */
-export const EntryKind = Schema.Union(
+export const EntryKind = Schema.Union([
   Schema.Literal("directory"),
   Schema.Struct({
     file: Schema.Struct({
       bytes: Schema.Int,
     }),
   }),
-).annotations({ identifier: "EntryKind" });
+]).annotate({ identifier: "EntryKind" });
 export type EntryKind = typeof EntryKind.Type;
 
 /**
@@ -2149,7 +2149,7 @@ export type EntryKind = typeof EntryKind.Type;
 export const Entry = Schema.Struct({
   kind: EntryKind,
   name: Schema.String,
-}).annotations({ identifier: "Entry" });
+}).annotate({ identifier: "Entry" });
 export type Entry = typeof Entry.Type;
 
 /**
@@ -2160,13 +2160,13 @@ export type Entry = typeof Entry.Type;
 export const ListingAnswer = Schema.Struct({
   at: Schema.optional(Schema.NullOr(Address)),
   entries: Schema.Array(Entry),
-}).annotations({ identifier: "ListingAnswer" });
+}).annotate({ identifier: "ListingAnswer" });
 export type ListingAnswer = typeof ListingAnswer.Type;
 
 /**
  * One of the closed set of error codes, as `AxCode::as_str` spells it.
  */
-export const AxCode = Schema.Literal("E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_BUSY", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_MODEL_UNCHOSEN", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_LEDGER_HELD", "E_HISTORY_UNPROVEN", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN", "E_PLAN_MISSING").annotations({ identifier: "AxCode" });
+export const AxCode = Schema.Literals(["E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_BUSY", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_MODEL_UNCHOSEN", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_LEDGER_HELD", "E_HISTORY_UNPROVEN", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN", "E_PLAN_MISSING"]).annotate({ identifier: "AxCode" });
 export type AxCode = typeof AxCode.Type;
 
 /**
@@ -2177,7 +2177,7 @@ export const GateRefusal = Schema.Struct({
   alternative: Schema.String,
   rule: Schema.String,
   violation: Schema.String,
-}).annotations({ identifier: "GateRefusal" });
+}).annotate({ identifier: "GateRefusal" });
 export type GateRefusal = typeof GateRefusal.Type;
 
 /**
@@ -2185,7 +2185,7 @@ export type GateRefusal = typeof GateRefusal.Type;
  * it. It travels on the wire so a page can say it in the reader's own
  * language; the city's recovery sentence stays beside it for the fold.
  */
-export const ProviderFailureKind = Schema.Union(
+export const ProviderFailureKind = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("exchange"),
   }),
@@ -2212,7 +2212,7 @@ export const ProviderFailureKind = Schema.Union(
   Schema.Struct({
     kind: Schema.Literal("unbuilt"),
   }),
-).annotations({ identifier: "ProviderFailureKind" });
+]).annotate({ identifier: "ProviderFailureKind" });
 export type ProviderFailureKind = typeof ProviderFailureKind.Type;
 
 /**
@@ -2221,11 +2221,11 @@ export type ProviderFailureKind = typeof ProviderFailureKind.Type;
  * `"unknown"`; a ledger record written as `retriable: true/false`
  * reads as `Yes`/`No`.
  */
-export const Retry = Schema.Union(
+export const Retry = Schema.Union([
   Schema.Literal("yes"),
   Schema.Literal("no"),
   Schema.Literal("unknown"),
-).annotations({ identifier: "Retry" });
+]).annotate({ identifier: "Retry" });
 export type Retry = typeof Retry.Type;
 
 /**
@@ -2248,7 +2248,7 @@ export const AxError = Schema.Struct({
   retry: Retry,
   retry_after_ms: Schema.optional(Schema.NullOr(Schema.Int)),
   subject: Schema.String,
-}).annotations({ identifier: "AxError" });
+}).annotate({ identifier: "AxError" });
 export type AxError = typeof AxError.Type;
 
 /**
@@ -2259,7 +2259,7 @@ export const McpToolLine = Schema.Struct({
   input_schema: Payload,
   name: Schema.String,
   remote: Schema.String,
-}).annotations({ identifier: "McpToolLine" });
+}).annotate({ identifier: "McpToolLine" });
 export type McpToolLine = typeof McpToolLine.Type;
 
 /**
@@ -2270,7 +2270,7 @@ export type McpToolLine = typeof McpToolLine.Type;
  * are three different things for a person to do next, and a shape that
  * left the reason optional would let a failure travel without one.
  */
-export const McpState = Schema.Union(
+export const McpState = Schema.Union([
   Schema.Struct({
     connected: Schema.Struct({
       protocol_version: Schema.String,
@@ -2288,7 +2288,7 @@ export const McpState = Schema.Union(
       refusal: AxError,
     }),
   }),
-).annotations({ identifier: "McpState" });
+]).annotate({ identifier: "McpState" });
 export type McpState = typeof McpState.Type;
 
 /**
@@ -2299,7 +2299,7 @@ export const McpServerHealth = Schema.Struct({
   state: McpState,
   target: Schema.String,
   transport: Schema.String,
-}).annotations({ identifier: "McpServerHealth" });
+}).annotate({ identifier: "McpServerHealth" });
 export type McpServerHealth = typeof McpServerHealth.Type;
 
 /**
@@ -2314,7 +2314,7 @@ export type McpServerHealth = typeof McpServerHealth.Type;
 export const McpHealthAnswer = Schema.Struct({
   addr: Address,
   servers: Schema.Array(McpServerHealth),
-}).annotations({ identifier: "McpHealthAnswer" });
+}).annotate({ identifier: "McpHealthAnswer" });
 export type McpHealthAnswer = typeof McpHealthAnswer.Type;
 
 /**
@@ -2334,14 +2334,14 @@ export const MetricsAnswer = Schema.Struct({
   runs_active: Schema.Int,
   runs_frozen: Schema.Int,
   signals_waiting: Schema.Int,
-}).annotations({ identifier: "MetricsAnswer" });
+}).annotate({ identifier: "MetricsAnswer" });
 export type MetricsAnswer = typeof MetricsAnswer.Type;
 
 /**
  * Whether colour carries meaning on these pages, or only contrast
  * does.
  */
-export const Chroma = Schema.Literal("full", "off").annotations({ identifier: "Chroma" });
+export const Chroma = Schema.Literals(["full", "off"]).annotate({ identifier: "Chroma" });
 export type Chroma = typeof Chroma.Type;
 
 /**
@@ -2349,17 +2349,17 @@ export type Chroma = typeof Chroma.Type;
  * a coefficient, because the coefficient is the stylesheet's to
  * choose.
  */
-export const Density = Schema.Literal("comfortable", "compact").annotations({ identifier: "Density" });
+export const Density = Schema.Literals(["comfortable", "compact"]).annotate({ identifier: "Density" });
 export type Density = typeof Density.Type;
 
 /**
  * Where one of the two typefaces comes from.
  */
-export const Face = Schema.Union(
+export const Face = Schema.Union([
   Schema.Literal("geist"),
   Schema.Literal("system"),
   Schema.Literal("custom"),
-).annotations({ identifier: "Face" });
+]).annotate({ identifier: "Face" });
 export type Face = typeof Face.Type;
 
 /**
@@ -2369,14 +2369,14 @@ export type Face = typeof Face.Type;
  * declaration of it inside a `prefers-color-scheme` block would be a
  * second authority for the same rungs.
  */
-export const Lighting = Schema.Literal("system", "dark", "light").annotations({ identifier: "Lighting" });
+export const Lighting = Schema.Literals(["system", "dark", "light"]).annotate({ identifier: "Lighting" });
 export type Lighting = typeof Lighting.Type;
 
 /**
  * Whether the pages animate. `System` is the absence of an opinion,
  * which is what the stylesheet's `prefers-reduced-motion` block reads.
  */
-export const Motion = Schema.Literal("system", "on", "off").annotations({ identifier: "Motion" });
+export const Motion = Schema.Literals(["system", "on", "off"]).annotate({ identifier: "Motion" });
 export type Motion = typeof Motion.Type;
 
 /**
@@ -2392,7 +2392,7 @@ export const Appearance = Schema.Struct({
   motion: Motion,
   sans: Face,
   sans_stack: Schema.String,
-}).annotations({ identifier: "Appearance" });
+}).annotate({ identifier: "Appearance" });
 export type Appearance = typeof Appearance.Type;
 
 /**
@@ -2405,13 +2405,13 @@ export type Appearance = typeof Appearance.Type;
 export const Chord = Schema.Struct({
   action: Schema.String,
   spelled: Schema.String,
-}).annotations({ identifier: "Chord" });
+}).annotate({ identifier: "Chord" });
 export type Chord = typeof Chord.Type;
 
 /**
  * Which language a person reads the interface in.
  */
-export const Lang = Schema.Literal("en", "zh").annotations({ identifier: "Lang" });
+export const Lang = Schema.Literals(["en", "zh"]).annotate({ identifier: "Lang" });
 export type Lang = typeof Lang.Type;
 
 /**
@@ -2437,7 +2437,7 @@ export const PreferencesAnswer = Schema.Struct({
   panel: Schema.optional(Schema.Boolean),
   proxying: Schema.optional(Proxying),
   welcomed: Schema.optional(Schema.Boolean),
-}).annotations({ identifier: "PreferencesAnswer" });
+}).annotate({ identifier: "PreferencesAnswer" });
 export type PreferencesAnswer = typeof PreferencesAnswer.Type;
 
 /**
@@ -2447,7 +2447,7 @@ export type PreferencesAnswer = typeof PreferencesAnswer.Type;
  * spelling a page had to match against a free string would let a
  * segment arrive under a name nothing draws.
  */
-export const PrefixSlot = Schema.Literal("city", "building", "resident", "run").annotations({ identifier: "PrefixSlot" });
+export const PrefixSlot = Schema.Literals(["city", "building", "resident", "run"]).annotate({ identifier: "PrefixSlot" });
 export type PrefixSlot = typeof PrefixSlot.Type;
 
 /**
@@ -2463,7 +2463,7 @@ export const PrefixSource = Schema.Struct({
   addr: Address,
   dropped: Schema.Int,
   kept: Schema.Int,
-}).annotations({ identifier: "PrefixSource" });
+}).annotate({ identifier: "PrefixSource" });
 export type PrefixSource = typeof PrefixSource.Type;
 
 /**
@@ -2481,7 +2481,7 @@ export const PrefixSegment = Schema.Struct({
   sources: Schema.Array(PrefixSource),
   stored: Schema.Boolean,
   text: Schema.String,
-}).annotations({ identifier: "PrefixSegment" });
+}).annotate({ identifier: "PrefixSegment" });
 export type PrefixSegment = typeof PrefixSegment.Type;
 
 /**
@@ -2490,13 +2490,13 @@ export type PrefixSegment = typeof PrefixSegment.Type;
 export const PrefixAnswer = Schema.Struct({
   run: RunId,
   segments: Schema.Array(PrefixSegment),
-}).annotations({ identifier: "PrefixAnswer" });
+}).annotate({ identifier: "PrefixAnswer" });
 export type PrefixAnswer = typeof PrefixAnswer.Type;
 
 /**
  * One window of a Markdown version, laid out, or the reason it was not.
  */
-export const Preview = Schema.Union(
+export const Preview = Schema.Union([
   Schema.Struct({
     laid: Laid,
   }),
@@ -2505,23 +2505,23 @@ export const Preview = Schema.Union(
       encoding: Encoding,
     }),
   }),
-).annotations({ identifier: "Preview" });
+]).annotate({ identifier: "Preview" });
 export type Preview = typeof Preview.Type;
 
 export const PreviewAnswer = Schema.Struct({
   preview: Preview,
   version: B3Hash,
-}).annotations({ identifier: "PreviewAnswer" });
+}).annotate({ identifier: "PreviewAnswer" });
 export type PreviewAnswer = typeof PreviewAnswer.Type;
 
 /**
  * The role one sentence plays on a card.
  */
-export const SliceKind = Schema.Union(
+export const SliceKind = Schema.Union([
   Schema.Literal("same"),
   Schema.Literal("delete"),
   Schema.Literal("insert"),
-).annotations({ identifier: "SliceKind" });
+]).annotate({ identifier: "SliceKind" });
 export type SliceKind = typeof SliceKind.Type;
 
 /**
@@ -2533,7 +2533,7 @@ export const Slice = Schema.Struct({
   lead: Schema.String,
   text: Schema.String,
   trail: Schema.String,
-}).annotations({ identifier: "Slice" });
+}).annotate({ identifier: "Slice" });
 export type Slice = typeof Slice.Type;
 
 /**
@@ -2546,20 +2546,20 @@ export const ProposalCard = Schema.Struct({
   run: RunId,
   slices: Schema.Array(Slice),
   span: Span,
-}).annotations({ identifier: "ProposalCard" });
+}).annotate({ identifier: "ProposalCard" });
 export type ProposalCard = typeof ProposalCard.Type;
 
 export const ProposalsAnswer = Schema.Struct({
   doc: Address,
   open: Schema.Array(ProposalCard),
   version: Schema.optional(Schema.NullOr(B3Hash)),
-}).annotations({ identifier: "ProposalsAnswer" });
+}).annotate({ identifier: "ProposalsAnswer" });
 export type ProposalsAnswer = typeof ProposalsAnswer.Type;
 
 export const RangeAnswer = Schema.Struct({
   version: B3Hash,
   window: Window2,
-}).annotations({ identifier: "RangeAnswer" });
+}).annotate({ identifier: "RangeAnswer" });
 export type RangeAnswer = typeof RangeAnswer.Type;
 
 export const RegistryLine = Schema.Struct({
@@ -2567,7 +2567,7 @@ export const RegistryLine = Schema.Struct({
   at: TimeMs,
   kind: Schema.String,
   subject: Schema.String,
-}).annotations({ identifier: "RegistryLine" });
+}).annotate({ identifier: "RegistryLine" });
 export type RegistryLine = typeof RegistryLine.Type;
 
 /**
@@ -2575,7 +2575,7 @@ export type RegistryLine = typeof RegistryLine.Type;
  */
 export const RegistryAnswer = Schema.Struct({
   assets: Schema.Array(RegistryLine),
-}).annotations({ identifier: "RegistryAnswer" });
+}).annotate({ identifier: "RegistryAnswer" });
 export type RegistryAnswer = typeof RegistryAnswer.Type;
 
 /**
@@ -2584,7 +2584,7 @@ export type RegistryAnswer = typeof RegistryAnswer.Type;
 export const ReleaseLine = Schema.Struct({
   released: Schema.String,
   version: Schema.String,
-}).annotations({ identifier: "ReleaseLine" });
+}).annotate({ identifier: "ReleaseLine" });
 export type ReleaseLine = typeof ReleaseLine.Type;
 
 /**
@@ -2599,11 +2599,11 @@ export type ReleaseLine = typeof ReleaseLine.Type;
  * already spends on where a toolkit stands: both cross the same wire,
  * and the generated client gives one name to one type.
  */
-export const ReleaseVerdict = Schema.Union(
+export const ReleaseVerdict = Schema.Union([
   Schema.Literal("current"),
   Schema.Literal("behind"),
   Schema.Literal("ahead"),
-).annotations({ identifier: "ReleaseVerdict" });
+]).annotate({ identifier: "ReleaseVerdict" });
 export type ReleaseVerdict = typeof ReleaseVerdict.Type;
 
 /**
@@ -2615,7 +2615,7 @@ export type ReleaseVerdict = typeof ReleaseVerdict.Type;
  * are three different things for a person to do next, and only the
  * first of them is a version number.
  */
-export const ReleaseAnswer = Schema.Union(
+export const ReleaseAnswer = Schema.Union([
   Schema.Struct({
     stands: Schema.Struct({
       mine: ReleaseLine,
@@ -2633,7 +2633,7 @@ export const ReleaseAnswer = Schema.Union(
       refusal: AxError,
     }),
   }),
-).annotations({ identifier: "ReleaseAnswer" });
+]).annotate({ identifier: "ReleaseAnswer" });
 export type ReleaseAnswer = typeof ReleaseAnswer.Type;
 
 /**
@@ -2643,17 +2643,17 @@ export type ReleaseAnswer = typeof ReleaseAnswer.Type;
 export const Closing = Schema.Struct({
   at: TimeMs,
   completion: Schema.String,
-}).annotations({ identifier: "Closing" });
+}).annotate({ identifier: "Closing" });
 export type Closing = typeof Closing.Type;
 
 /**
  * Whether a run's work takes the ordinary road or stays in an
  * experiment that never lands.
  */
-export const LandingPolicy = Schema.Union(
+export const LandingPolicy = Schema.Union([
   Schema.Literal("ordinary"),
   Schema.Literal("experiment"),
-).annotations({ identifier: "LandingPolicy" });
+]).annotate({ identifier: "LandingPolicy" });
 export type LandingPolicy = typeof LandingPolicy.Type;
 
 /**
@@ -2663,10 +2663,10 @@ export type LandingPolicy = typeof LandingPolicy.Type;
  * what it may write, what it must prove and whether it lands are the
  * other three values of [`RunPolicy`].
  */
-export const Mode = Schema.Union(
+export const Mode = Schema.Union([
   Schema.Literal("chat"),
   Schema.Literal("work"),
-).annotations({ identifier: "Mode" });
+]).annotate({ identifier: "Mode" });
 export type Mode = typeof Mode.Type;
 
 /**
@@ -2680,10 +2680,10 @@ export type Mode = typeof Mode.Type;
  * that makes `Create` hold is the writer's atomic create; the rule and
  * its refusal are [`crate::gate::replacing`].
  */
-export const WriteLimit = Schema.Union(
+export const WriteLimit = Schema.Union([
   Schema.Literal("full"),
   Schema.Literal("create"),
-).annotations({ identifier: "WriteLimit" });
+]).annotate({ identifier: "WriteLimit" });
 export type WriteLimit = typeof WriteLimit.Type;
 
 /**
@@ -2699,7 +2699,7 @@ export const RunPolicy = Schema.Struct({
   landing: LandingPolicy,
   mode: Mode,
   write: WriteLimit,
-}).annotations({ identifier: "RunPolicy" });
+}).annotate({ identifier: "RunPolicy" });
 export type RunPolicy = typeof RunPolicy.Type;
 
 /**
@@ -2715,15 +2715,15 @@ export const Opening = Schema.Struct({
   goal: Schema.String,
   policy: Schema.optional(Schema.NullOr(RunPolicy)),
   task: Schema.String,
-}).annotations({ identifier: "Opening" });
+}).annotate({ identifier: "Opening" });
 export type Opening = typeof Opening.Type;
 
 /**
  * What kind of boundary a call crosses — this field routes the call to
  * its gate; it is machine input, not documentation.
  */
-export const Effect = Schema.Union(
-  Schema.Literal("read", "spend"),
+export const Effect = Schema.Union([
+  Schema.Literals(["read", "spend"]),
   Schema.Struct({
     write: Schema.Struct({
       domain: Address,
@@ -2742,7 +2742,7 @@ export const Effect = Schema.Union(
       address: Schema.optional(Schema.NullOr(Schema.String)),
     }),
   }),
-).annotations({ identifier: "Effect" });
+]).annotate({ identifier: "Effect" });
 export type Effect = typeof Effect.Type;
 
 /**
@@ -2753,11 +2753,11 @@ export type Effect = typeof Effect.Type;
  * deciding whether to step in, and the pair could spell a fourth state
  * that cannot happen.
  */
-export const Outcome = Schema.Union(
+export const Outcome = Schema.Union([
   Schema.Literal("waiting"),
   Schema.Literal("answered"),
   Schema.Literal("failed"),
-).annotations({ identifier: "Outcome" });
+]).annotate({ identifier: "Outcome" });
 export type Outcome = typeof Outcome.Type;
 
 /**
@@ -2772,21 +2772,21 @@ export const Output = Schema.Struct({
   cut: Schema.Int,
   head: Schema.String,
   pinned: Schema.optional(Schema.NullOr(Schema.String)),
-}).annotations({ identifier: "Output" });
+}).annotate({ identifier: "Output" });
 export type Output = typeof Output.Type;
 
 /**
  * Presentation intent; per-call `locations` are a pure function of args
  * (tool side). Meta-level declarations use an empty list.
  */
-export const RenderIntent = Schema.Union(
-  Schema.Literal("generic", "terminal"),
+export const RenderIntent = Schema.Union([
+  Schema.Literals(["generic", "terminal"]),
   Schema.Struct({
     diff: Schema.Struct({
       locations: Schema.Array(Address),
     }),
   }),
-).annotations({ identifier: "RenderIntent" });
+]).annotate({ identifier: "RenderIntent" });
 export type RenderIntent = typeof RenderIntent.Type;
 
 /**
@@ -2796,10 +2796,10 @@ export type RenderIntent = typeof RenderIntent.Type;
  * how long it took, or draw no duration at all. The times themselves
  * travel either way; they still give the row its order.
  */
-export const Timing = Schema.Union(
+export const Timing = Schema.Union([
   Schema.Literal("measured"),
   Schema.Literal("unmeasured"),
-).annotations({ identifier: "Timing" });
+]).annotate({ identifier: "Timing" });
 export type Timing = typeof Timing.Type;
 
 /**
@@ -2818,7 +2818,7 @@ export const Call = Schema.Struct({
   subject: Schema.optional(Schema.NullOr(Schema.String)),
   timing: Timing,
   tool: Schema.String,
-}).annotations({ identifier: "Call" });
+}).annotate({ identifier: "Call" });
 export type Call = typeof Call.Type;
 
 /**
@@ -2830,7 +2830,7 @@ export type Call = typeof Call.Type;
  * than a reader's. Without that line this enum would grow to one arm
  * per event kind and stop meaning anything.
  */
-export const Note = Schema.Union(
+export const Note = Schema.Union([
   Schema.Struct({
     refused: Schema.Struct({
       at: Seq,
@@ -2869,7 +2869,7 @@ export const Note = Schema.Union(
       cause: Schema.String,
     }),
   }),
-).annotations({ identifier: "Note" });
+]).annotate({ identifier: "Note" });
 export type Note = typeof Note.Type;
 
 /**
@@ -2885,7 +2885,7 @@ export const Used = Schema.Struct({
   cached: Tokens,
   input: Tokens,
   output: Tokens,
-}).annotations({ identifier: "Used" });
+}).annotate({ identifier: "Used" });
 export type Used = typeof Used.Type;
 
 /**
@@ -2905,7 +2905,7 @@ export const Turn = Schema.Struct({
   thought: Schema.optional(Schema.NullOr(Schema.String)),
   timing: Timing,
   used: Schema.optional(Schema.NullOr(Used)),
-}).annotations({ identifier: "Turn" });
+}).annotate({ identifier: "Turn" });
 export type Turn = typeof Turn.Type;
 
 /**
@@ -2918,7 +2918,7 @@ export const RoundsAnswer = Schema.Struct({
   run: RunId,
   turns: Schema.Array(Turn),
   worktree: Schema.optional(Schema.NullOr(Schema.String)),
-}).annotations({ identifier: "RoundsAnswer" });
+}).annotate({ identifier: "RoundsAnswer" });
 export type RoundsAnswer = typeof RoundsAnswer.Type;
 
 /**
@@ -2926,8 +2926,8 @@ export type RoundsAnswer = typeof RoundsAnswer.Type;
  */
 export const RunCostsAnswer = Schema.Struct({
   asked: Schema.Array(RunId),
-  runs: Schema.Array(Schema.Tuple(RunId, UsdMicros)),
-}).annotations({ identifier: "RunCostsAnswer" });
+  runs: Schema.Array(Schema.Tuple([RunId, UsdMicros])),
+}).annotate({ identifier: "RunCostsAnswer" });
 export type RunCostsAnswer = typeof RunCostsAnswer.Type;
 
 /**
@@ -2940,10 +2940,10 @@ export type RunCostsAnswer = typeof RunCostsAnswer.Type;
  * new one, here, not a continuation (`sprawling-SPEC.md` 8-82). The
  * handoff is the exception a person states.
  */
-export const Carry = Schema.Union(
+export const Carry = Schema.Union([
   Schema.Literal("nothing"),
   Schema.Literal("handoff"),
-).annotations({ identifier: "Carry" });
+]).annotate({ identifier: "Carry" });
 export type Carry = typeof Carry.Type;
 
 /**
@@ -2963,13 +2963,13 @@ export type Carry = typeof Carry.Type;
 export const Origin = Schema.Struct({
   at_seq: Seq,
   run: RunId,
-}).annotations({ identifier: "Origin" });
+}).annotate({ identifier: "Origin" });
 export type Origin = typeof Origin.Type;
 
 /**
  * How a stretch began.
  */
-export const SessionStart = Schema.Union(
+export const SessionStart = Schema.Union([
   Schema.Literal("dispatched"),
   Schema.Struct({
     opened: Schema.Struct({
@@ -2977,7 +2977,7 @@ export const SessionStart = Schema.Union(
       from: Schema.optional(Schema.NullOr(Origin)),
     }),
   }),
-).annotations({ identifier: "SessionStart" });
+]).annotate({ identifier: "SessionStart" });
 export type SessionStart = typeof SessionStart.Type;
 
 /**
@@ -2990,7 +2990,7 @@ export const SessionLine = Schema.Struct({
   last: Seq,
   runs: Schema.Int,
   start: SessionStart,
-}).annotations({ identifier: "SessionLine" });
+}).annotate({ identifier: "SessionLine" });
 export type SessionLine = typeof SessionLine.Type;
 
 /**
@@ -3002,7 +3002,7 @@ export const SessionsAnswer = Schema.Struct({
   earlier: Schema.Int,
   room: Address,
   sessions: Schema.Array(SessionLine),
-}).annotations({ identifier: "SessionsAnswer" });
+}).annotate({ identifier: "SessionsAnswer" });
 export type SessionsAnswer = typeof SessionsAnswer.Type;
 
 /**
@@ -3022,7 +3022,7 @@ export type SessionsAnswer = typeof SessionsAnswer.Type;
  * is not.** A skill on a shelf outside the city has no address, and one
  * invented for it would send a reader to a file that is not there.
  */
-export const SkillShelf = Schema.Union(
+export const SkillShelf = Schema.Union([
   Schema.Struct({
     library: Address,
   }),
@@ -3035,7 +3035,7 @@ export const SkillShelf = Schema.Union(
       path: Schema.String,
     }),
   }),
-).annotations({ identifier: "SkillShelf" });
+]).annotate({ identifier: "SkillShelf" });
 export type SkillShelf = typeof SkillShelf.Type;
 
 /**
@@ -3049,7 +3049,7 @@ export const SkillLine = Schema.Struct({
   pinned_by: Schema.Array(RunId),
   section: Schema.String,
   shelf: SkillShelf,
-}).annotations({ identifier: "SkillLine" });
+}).annotate({ identifier: "SkillLine" });
 export type SkillLine = typeof SkillLine.Type;
 
 /**
@@ -3059,7 +3059,7 @@ export const SkillsAnswer = Schema.Struct({
   building: Address,
   missing: Schema.Array(Schema.String),
   skills: Schema.Array(SkillLine),
-}).annotations({ identifier: "SkillsAnswer" });
+}).annotate({ identifier: "SkillsAnswer" });
 export type SkillsAnswer = typeof SkillsAnswer.Type;
 
 /**
@@ -3071,7 +3071,7 @@ export type SkillsAnswer = typeof SkillsAnswer.Type;
  * than something this city remembered - the page a person left open
  * yesterday is not evidence that they finished with it.
  */
-export const Standing = Schema.Union(
+export const Standing = Schema.Union([
   Schema.Literal("absent"),
   Schema.Struct({
     awaiting: Schema.Struct({
@@ -3088,7 +3088,7 @@ export const Standing = Schema.Union(
       refusal: AxError,
     }),
   }),
-).annotations({ identifier: "Standing" });
+]).annotate({ identifier: "Standing" });
 export type Standing = typeof Standing.Type;
 
 /**
@@ -3105,7 +3105,7 @@ export const ToolkitLine = Schema.Struct({
   name: Schema.String,
   slug: ToolkitSlug,
   standing: Standing,
-}).annotations({ identifier: "ToolkitLine" });
+}).annotate({ identifier: "ToolkitLine" });
 export type ToolkitLine = typeof ToolkitLine.Type;
 
 /**
@@ -3117,7 +3117,7 @@ export type ToolkitLine = typeof ToolkitLine.Type;
  * different things for a person to do next, and an empty `Vec` says
  * all three at once.
  */
-export const ToolkitsAnswer = Schema.Union(
+export const ToolkitsAnswer = Schema.Union([
   Schema.Literal("unenrolled"),
   Schema.Struct({
     shelf: Schema.Struct({
@@ -3129,7 +3129,7 @@ export const ToolkitsAnswer = Schema.Union(
       refusal: AxError,
     }),
   }),
-).annotations({ identifier: "ToolkitsAnswer" });
+]).annotate({ identifier: "ToolkitsAnswer" });
 export type ToolkitsAnswer = typeof ToolkitsAnswer.Type;
 
 /**
@@ -3141,7 +3141,7 @@ export type ToolkitsAnswer = typeof ToolkitsAnswer.Type;
  * JSON, and JSON has no total equality. Nothing compared two answers
  * for equality outside a test.
  */
-export const Answer = Schema.Union(
+export const Answer = Schema.Union([
   Schema.Struct({
     history: HistoryAnswer,
   }),
@@ -3285,7 +3285,7 @@ export const Answer = Schema.Union(
       query: Schema.String,
     }),
   }),
-).annotations({ identifier: "Answer" });
+]).annotate({ identifier: "Answer" });
 export type Answer = typeof Answer.Type;
 
 /**
@@ -3300,14 +3300,14 @@ export type AskId = typeof AskId.Type;
  * travels here rather than as a bare `Refusal` frame, so the page knows
  * which question fell through.
  */
-export const AskOutcome = Schema.Union(
+export const AskOutcome = Schema.Union([
   Schema.Struct({
     answer: Answer,
   }),
   Schema.Struct({
     refusal: AxError,
   }),
-).annotations({ identifier: "AskOutcome" });
+]).annotate({ identifier: "AskOutcome" });
 export type AskOutcome = typeof AskOutcome.Type;
 
 /**
@@ -3322,23 +3322,23 @@ export const Answered = Schema.Struct({
   as_of: Seq,
   ask_id: AskId,
   outcome: AskOutcome,
-}).annotations({ identifier: "Answered" });
+}).annotate({ identifier: "Answered" });
 export type Answered = typeof Answered.Type;
 
 /**
  * Whether a model's reply is still arriving (D30).
  */
-export const ReplyState = Schema.Union(
+export const ReplyState = Schema.Union([
   Schema.Literal("streaming"),
   Schema.Literal("settled"),
-).annotations({ identifier: "ReplyState" });
+]).annotate({ identifier: "ReplyState" });
 export type ReplyState = typeof ReplyState.Type;
 
 /**
  * A read of the city; the module documentation says what all of them share.
  */
-export const Query = Schema.Union(
-  Schema.Literal("city_view", "approval_queue", "metrics", "cost_view", "registry_view", "discard_view"),
+export const Query = Schema.Union([
+  Schema.Literals(["city_view", "approval_queue", "metrics", "cost_view", "registry_view", "discard_view"]),
   Schema.Struct({
     history: Schema.Struct({
       before: Schema.optional(Schema.NullOr(Seq)),
@@ -3509,7 +3509,7 @@ export const Query = Schema.Union(
       item: Schema.String,
     }),
   }),
-).annotations({ identifier: "Query" });
+]).annotate({ identifier: "Query" });
 export type Query = typeof Query.Type;
 
 /**
@@ -3518,7 +3518,7 @@ export type Query = typeof Query.Type;
 export const Ask = Schema.Struct({
   ask_id: AskId,
   query: Query,
-}).annotations({ identifier: "Ask" });
+}).annotate({ identifier: "Ask" });
 export type Ask = typeof Ask.Type;
 
 /**
@@ -3533,22 +3533,22 @@ export type Ask = typeof Ask.Type;
 export const BodyOverride = Schema.Struct({
   pointer: Schema.String,
   value: Schema.String,
-}).annotations({ identifier: "BodyOverride" });
+}).annotate({ identifier: "BodyOverride" });
 export type BodyOverride = typeof BodyOverride.Type;
 
 /**
  * The deduplication key of one outward action: `idem1-` then 32 lowercase hex digits.
  */
-export const IdemKey = Schema.String.pipe(Schema.pattern(new RegExp("^idem1-[0-9a-f]{32}$", "u"))).pipe(Schema.brand("IdemKey"));
+export const IdemKey = Schema.String.check(Schema.isPattern(new RegExp("^idem1-[0-9a-f]{32}$", "u"))).pipe(Schema.brand("IdemKey"));
 export type IdemKey = typeof IdemKey.Type;
 
 /**
  * Whether this city renews a warm prompt cache before it expires.
  */
-export const KeepWarm = Schema.Union(
+export const KeepWarm = Schema.Union([
   Schema.Literal("off"),
   Schema.Literal("five_minute"),
-).annotations({ identifier: "KeepWarm" });
+]).annotate({ identifier: "KeepWarm" });
 export type KeepWarm = typeof KeepWarm.Type;
 
 /**
@@ -3559,7 +3559,7 @@ export const CitySettings = Schema.Struct({
   effort: Schema.optional(Schema.NullOr(Effort)),
   idem: IdemKey,
   keep_warm: Schema.optional(Schema.NullOr(KeepWarm)),
-}).annotations({ identifier: "CitySettings" });
+}).annotate({ identifier: "CitySettings" });
 export type CitySettings = typeof CitySettings.Type;
 
 /**
@@ -3573,7 +3573,7 @@ export type CitySettings = typeof CitySettings.Type;
 export const HeaderPair = Schema.Struct({
   name: Schema.String,
   value: Schema.String,
-}).annotations({ identifier: "HeaderPair" });
+}).annotate({ identifier: "HeaderPair" });
 export type HeaderPair = typeof HeaderPair.Type;
 
 /**
@@ -3591,7 +3591,7 @@ export const EndpointTuning = Schema.Struct({
   request_max_retries: Schema.optional(Schema.NullOr(Schema.Int)),
   stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),
   timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),
-}).annotations({ identifier: "EndpointTuning" });
+}).annotate({ identifier: "EndpointTuning" });
 export type EndpointTuning = typeof EndpointTuning.Type;
 
 /**
@@ -3601,7 +3601,7 @@ export type EndpointTuning = typeof EndpointTuning.Type;
  * name back. What a name may be is the city's answer (`city::Naming`),
  * so a value here is the text the person typed.
  */
-export const IdentityCard = Schema.Union(
+export const IdentityCard = Schema.Union([
   Schema.Struct({
     person: Schema.Struct({
       about: Schema.optional(Schema.NullOr(Schema.String)),
@@ -3614,7 +3614,7 @@ export const IdentityCard = Schema.Union(
       name: Schema.optional(Schema.NullOr(Schema.String)),
     }),
   }),
-).annotations({ identifier: "IdentityCard" });
+]).annotate({ identifier: "IdentityCard" });
 export type IdentityCard = typeof IdentityCard.Type;
 
 /**
@@ -3625,10 +3625,10 @@ export type IdentityCard = typeof IdentityCard.Type;
  * default is the narrow one, because guessing narrow costs a refusal a
  * person can act on and guessing wide costs a 400 from the provider.
  */
-export const InputKinds = Schema.Literal("text", "text_image").annotations({ identifier: "InputKinds" });
+export const InputKinds = Schema.Literals(["text", "text_image"]).annotate({ identifier: "InputKinds" });
 export type InputKinds = typeof InputKinds.Type;
 
-export const NoSecret = Schema.Never.annotations({ identifier: "NoSecret" });
+export const NoSecret = Schema.Never.annotate({ identifier: "NoSecret" });
 export type NoSecret = typeof NoSecret.Type;
 
 /**
@@ -3636,7 +3636,7 @@ export type NoSecret = typeof NoSecret.Type;
  * 8-93): the setting a person turns off. Spelled here once, for the
  * frame and for the `[core] priority` key the person's file holds.
  */
-export const CorePriority = Schema.Literal("raised", "normal").annotations({ identifier: "CorePriority" });
+export const CorePriority = Schema.Literals(["raised", "normal"]).annotate({ identifier: "CorePriority" });
 export type CorePriority = typeof CorePriority.Type;
 
 /**
@@ -3647,7 +3647,7 @@ export type CorePriority = typeof CorePriority.Type;
  * a frame that names a fact this build does not keep is refused at the
  * boundary rather than merged.
  */
-export const PreferencePatch = Schema.Union(
+export const PreferencePatch = Schema.Union([
   Schema.Struct({
     lang: Lang,
   }),
@@ -3669,21 +3669,21 @@ export const PreferencePatch = Schema.Union(
   Schema.Struct({
     core_priority: CorePriority,
   }),
-).annotations({ identifier: "PreferencePatch" });
+]).annotate({ identifier: "PreferencePatch" });
 export type PreferencePatch = typeof PreferencePatch.Type;
 
 /**
  * Take the sentence's change, or take an inserted sentence after
  * rewriting it.
  */
-export const Verdict = Schema.Union(
+export const Verdict = Schema.Union([
   Schema.Literal("accept"),
   Schema.Struct({
     amend: Schema.Struct({
       text: Schema.String,
     }),
   }),
-).annotations({ identifier: "Verdict" });
+]).annotate({ identifier: "Verdict" });
 export type Verdict = typeof Verdict.Type;
 
 /**
@@ -3693,7 +3693,7 @@ export type Verdict = typeof Verdict.Type;
 export const SliceVerdict = Schema.Struct({
   slice: Schema.Int,
   verdict: Verdict,
-}).annotations({ identifier: "SliceVerdict" });
+}).annotate({ identifier: "SliceVerdict" });
 export type SliceVerdict = typeof SliceVerdict.Type;
 
 /**
@@ -3703,7 +3703,7 @@ export type SliceVerdict = typeof SliceVerdict.Type;
 export const ProposalDecision = Schema.Struct({
   proposal: B3Hash,
   verdicts: Schema.Array(SliceVerdict),
-}).annotations({ identifier: "ProposalDecision" });
+}).annotate({ identifier: "ProposalDecision" });
 export type ProposalDecision = typeof ProposalDecision.Type;
 
 /**
@@ -3714,7 +3714,7 @@ export const ProposalDecisions = Schema.Struct({
   decisions: Schema.Array(ProposalDecision),
   doc: Address,
   idem: IdemKey,
-}).annotations({ identifier: "ProposalDecisions" });
+}).annotate({ identifier: "ProposalDecisions" });
 export type ProposalDecisions = typeof ProposalDecisions.Type;
 
 /**
@@ -3731,14 +3731,14 @@ export type ProviderName = typeof ProviderName.Type;
  * away. Cancelling a *run* is a third thing again, and it has its own
  * command.
  */
-export const PursuitStep = Schema.Union(
-  Schema.Literal("pause", "resume", "clear"),
+export const PursuitStep = Schema.Union([
+  Schema.Literals(["pause", "resume", "clear"]),
   Schema.Struct({
     set: Schema.Struct({
       goal: Schema.String,
     }),
   }),
-).annotations({ identifier: "PursuitStep" });
+]).annotate({ identifier: "PursuitStep" });
 export type PursuitStep = typeof PursuitStep.Type;
 
 /**
@@ -3748,7 +3748,7 @@ export type PursuitStep = typeof PursuitStep.Type;
 export const TextEdit = Schema.Struct({
   span: Span,
   text: Schema.String,
-}).annotations({ identifier: "TextEdit" });
+}).annotate({ identifier: "TextEdit" });
 export type TextEdit = typeof TextEdit.Type;
 
 /**
@@ -3760,7 +3760,7 @@ export const RangeWrite = Schema.Struct({
   doc: Address,
   edits: Schema.Array(TextEdit),
   idem: IdemKey,
-}).annotations({ identifier: "RangeWrite" });
+}).annotate({ identifier: "RangeWrite" });
 export type RangeWrite = typeof RangeWrite.Type;
 
 /**
@@ -3773,7 +3773,7 @@ export const RulesWrite = Schema.Struct({
   body: Schema.String,
   building: Address,
   idem: IdemKey,
-}).annotations({ identifier: "RulesWrite" });
+}).annotate({ identifier: "RulesWrite" });
 export type RulesWrite = typeof RulesWrite.Type;
 
 /**
@@ -3787,12 +3787,12 @@ export type RulesWrite = typeof RulesWrite.Type;
  * city turns a shelf and a name into a path; the sender never spells
  * one.
  */
-export const Shelf = Schema.Union(
+export const Shelf = Schema.Union([
   Schema.Literal("library"),
   Schema.Struct({
     building: Address,
   }),
-).annotations({ identifier: "Shelf" });
+]).annotate({ identifier: "Shelf" });
 export type Shelf = typeof Shelf.Type;
 
 /**
@@ -3805,12 +3805,12 @@ export type Shelf = typeof Shelf.Type;
  * the others through `edit` — so a write to one of them is a write that
  * can lose a race, and the caller says which text it started from.
  */
-export const SpineDocument = Schema.Union(
+export const SpineDocument = Schema.Union([
   Schema.Literal("roadmap"),
   Schema.Literal("memo"),
   Schema.Literal("handoff"),
   Schema.Literal("spec"),
-).annotations({ identifier: "SpineDocument" });
+]).annotate({ identifier: "SpineDocument" });
 export type SpineDocument = typeof SpineDocument.Type;
 
 /**
@@ -3828,7 +3828,7 @@ export type TemplateName = typeof TemplateName.Type;
  * That is the rule that keeps a button off the client until the city can
  * answer the frame behind it.
  */
-export const Command = Schema.Union(
+export const Command = Schema.Union([
   Schema.Struct({
     dispatch: Schema.Struct({
       addr: Address,
@@ -4077,7 +4077,7 @@ export const Command = Schema.Union(
       token: Schema.String,
     }),
   }),
-).annotations({ identifier: "Command" });
+]).annotate({ identifier: "Command" });
 export type Command = typeof Command.Type;
 
 /**
@@ -4087,23 +4087,23 @@ export const Hello = Schema.Struct({
   schema: B3Hash,
   token: Schema.optional(Schema.NullOr(Schema.String)),
   wire_v: Schema.Int,
-}).annotations({ identifier: "Hello" });
+}).annotate({ identifier: "Hello" });
 export type Hello = typeof Hello.Type;
 
 /**
  * Whether this session counts as somebody watching the monitor.
  */
-export const Monitoring = Schema.Union(
+export const Monitoring = Schema.Union([
   Schema.Literal("release"),
   Schema.Literal("watch"),
   Schema.Literal("watch_summary"),
-).annotations({ identifier: "Monitoring" });
+]).annotate({ identifier: "Monitoring" });
 export type Monitoring = typeof Monitoring.Type;
 
 /**
  * Everything a client may send.
  */
-export const ClientFrame = Schema.Union(
+export const ClientFrame = Schema.Union([
   Schema.Struct({
     hello: Hello,
   }),
@@ -4116,7 +4116,7 @@ export const ClientFrame = Schema.Union(
   Schema.Struct({
     monitor: Monitoring,
   }),
-).annotations({ identifier: "ClientFrame" });
+]).annotate({ identifier: "ClientFrame" });
 export type ClientFrame = typeof ClientFrame.Type;
 
 /**
@@ -4130,14 +4130,14 @@ export type ClientFrame = typeof ClientFrame.Type;
  * empty thread for three minutes. Which stream a piece came from is
  * therefore part of the piece, and no reader has to guess.
  */
-export const Increment = Schema.Union(
+export const Increment = Schema.Union([
   Schema.Struct({
     said: Schema.String,
   }),
   Schema.Struct({
     thought: Schema.String,
   }),
-).annotations({ identifier: "Increment" });
+]).annotate({ identifier: "Increment" });
 export type Increment = typeof Increment.Type;
 
 /**
@@ -4150,7 +4150,7 @@ export type Increment = typeof Increment.Type;
 export const Delta = Schema.Struct({
   increment: Increment,
   run: RunId,
-}).annotations({ identifier: "Delta" });
+}).annotate({ identifier: "Delta" });
 export type Delta = typeof Delta.Type;
 
 /**
@@ -4166,13 +4166,13 @@ export type Delta = typeof Delta.Type;
 export const Lagged = Schema.Struct({
   from: Seq,
   to: Seq,
-}).annotations({ identifier: "Lagged" });
+}).annotate({ identifier: "Lagged" });
 export type Lagged = typeof Lagged.Type;
 
 /**
  * Which of a command's two outputs a piece came from.
  */
-export const OutputStream = Schema.Literal("out", "err").annotations({ identifier: "OutputStream" });
+export const OutputStream = Schema.Literals(["out", "err"]).annotate({ identifier: "OutputStream" });
 export type OutputStream = typeof OutputStream.Type;
 
 /**
@@ -4185,7 +4185,7 @@ export const LiveOutput = Schema.Struct({
   run: RunId,
   stream: OutputStream,
   text: Schema.String,
-}).annotations({ identifier: "LiveOutput" });
+}).annotate({ identifier: "LiveOutput" });
 export type LiveOutput = typeof LiveOutput.Type;
 
 /**
@@ -4197,7 +4197,7 @@ export type LiveOutput = typeof LiveOutput.Type;
  * mapping between the two lives at the assembly layer, where a test
  * holds the two spellings equal name for name.
  */
-export const LogLevel = Schema.Literal("refuse", "effect", "decide", "trace", "wire").annotations({ identifier: "LogLevel" });
+export const LogLevel = Schema.Literals(["refuse", "effect", "decide", "trace", "wire"]).annotate({ identifier: "LogLevel" });
 export type LogLevel = typeof LogLevel.Type;
 
 /**
@@ -4210,7 +4210,7 @@ export const LogLine = Schema.Struct({
   run: Schema.optional(Schema.NullOr(RunId)),
   seq: Seq,
   t: Schema.optional(Schema.NullOr(TimeMs)),
-}).annotations({ identifier: "LogLine" });
+}).annotate({ identifier: "LogLine" });
 export type LogLine = typeof LogLine.Type;
 
 /**
@@ -4233,7 +4233,7 @@ export const Sample = Schema.Struct({
   relay_p50_nanos: Schema.Int,
   view_backlog: Schema.Int,
   volume_free_bytes: Schema.Int,
-}).annotations({ identifier: "Sample" });
+}).annotate({ identifier: "Sample" });
 export type Sample = typeof Sample.Type;
 
 /**
@@ -4245,7 +4245,7 @@ export const Welcome = Schema.Struct({
   resume_from: Schema.optional(Schema.NullOr(Seq)),
   schema: B3Hash,
   wire_v: Schema.Int,
-}).annotations({ identifier: "Welcome" });
+}).annotate({ identifier: "Welcome" });
 export type Welcome = typeof Welcome.Type;
 
 /**
@@ -4259,7 +4259,7 @@ export type Welcome = typeof Welcome.Type;
  * is what keeps that true — folded into the event stream it would
  * become a second, unverifiable history of what the model said.
  */
-export const ServerFrame = Schema.Union(
+export const ServerFrame = Schema.Union([
   Schema.Struct({
     welcome: Welcome,
   }),
@@ -4287,6 +4287,6 @@ export const ServerFrame = Schema.Union(
   Schema.Struct({
     monitor: Sample,
   }),
-).annotations({ identifier: "ServerFrame" });
+]).annotate({ identifier: "ServerFrame" });
 export type ServerFrame = typeof ServerFrame.Type;
 

@@ -18,10 +18,10 @@ import { readRunId } from "./run_id";
 
 const read = Schema.decodeOption(Address);
 
-const Spelling = Schema.parseJson(
+const Spelling = Schema.fromJsonString(
   Schema.Struct({
     address: Schema.String,
-    verdict: Schema.Literal("accepted", "refused"),
+    verdict: Schema.Literals(["accepted", "refused"]),
   }),
 );
 

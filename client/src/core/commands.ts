@@ -56,7 +56,7 @@ export const EFFORTS: readonly Effort[] = EffortSchema.literals;
 
 // The modes a run may work in, in the order a control offers
 // them (kernel `Mode::ALL`); the first is the one a page starts with.
-export const MODES: readonly Mode[] = ModeSchema.members.flatMap((member) => member.literals);
+export const MODES: readonly Mode[] = ModeSchema.members.map((member) => member.literal);
 
 // A dispatch names a room: `addr` is the room itself (`hall/mayor`),
 // and the city opens no second room inside it. A room a person names on

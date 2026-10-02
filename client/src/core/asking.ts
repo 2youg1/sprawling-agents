@@ -120,7 +120,7 @@ function minted(code: AxCode, action: string, subject: string): Reported {
 
 export const keyOf = (query: Query): string => JSON.stringify(query);
 
-const readKey = Schema.decodeOption(Schema.parseJson(Query));
+const readKey = Schema.decodeOption(Schema.fromJsonString(Query));
 
 // The wire name of the question a refusal this page minted names, read
 // back from the subject `minted` was given; `null` for a subject the
