@@ -6,10 +6,11 @@
 -->
 
 <script lang="ts">
-  // One box that reaches everything the bar does not show: every page,
+  // One box that reaches everything the shell does not show: every page,
   // every building, every room with a run in it, the brake, the
-  // language, and - the moment a line begins with `/` - every verb this
-  // client understands. The verbs are not a list of their own: they
+  // language, speaking into the composer where the city transcribes,
+  // and - the moment a line begins with `/` - every verb this client
+  // understands. The verbs are not a list of their own: they
   // come from `core/slash.ts`, which is the same table the composer's
   // `/` menu reads, so a spelling learned in one place works in the
   // other.
@@ -23,8 +24,7 @@
   // hidden** (ux 7-8): `/steer` with nothing running and `/dispatch`
   // outside a room do nothing rather than guess (`SlashHands`), and a
   // list that omits them teaches that the verb does not exist. The
-  // reason is drawn where the row's hint is, and the row stays
-  // focusable with `aria-disabled` so the reason is reachable (7-2).
+  // reason is drawn where the row's hint is (`palette/rows.svelte`).
   import { Option, Schema } from "effect";
   import { onMount } from "svelte";
   import { heldIn } from "../core/belief/rooms";
@@ -35,6 +35,7 @@
   import { LABELS } from "../core/keys";
   import type { Action } from "../core/keys";
   import type { Key } from "../core/lang";
+  import { canRecord } from "../core/speaking";
   import { LANGS, endonym, say } from "../core/lang";
   import { MAYOR, current, toFragment } from "../core/route";
   import type { View } from "../core/route";
@@ -42,25 +43,15 @@
   import { completed } from "../core/completion";
   import { RELEASE_ALL, offered } from "../core/slash";
   import { SECTIONS, reached } from "../core/slash_hands";
-  import type { Reached, Section, Slash, SlashHands } from "../core/slash_hands";
+  import type { Reached, Slash, SlashHands } from "../core/slash_hands";
   import { ui } from "../ui";
   import { Address } from "../wire";
   import Empty from "./parts/empty.svelte";
+  import type { Entry, Group } from "./palette/entry";
   import { nothingFound } from "./palette/nothing_found";
-  import { SECTION_WORD } from "./palette/sections";
-  import { Kbd } from "./parts/kbd.svelte";
   import { openFinder } from "./finding.svelte";
-
-  interface Entry {
-    readonly label: string;
-    readonly hint: string;
-    // Present on a page a key reaches: the row shows that key's chord
-    // where other rows show their hint.
-    readonly action?: Action | undefined;
-    readonly act: () => void;
-    // Present means the verb cannot run here, and names why.
-    readonly why?: Key | undefined;
-  }
+  import Rows from "./palette/rows.svelte";
+  import { askToSpeak } from "./talk/speak_asked";
 
   const u = ui();
   const { lang } = u;
@@ -85,6 +76,13 @@
 
   const halted = $derived(cityIsShut($belief.halted));
 
+  // What a verb typed here may reach. The palette is attached to no
+  // room, so `here` is the room the address bar names and `live` is
+  // the run in front of the person (`core/in_front`).
+  const viewed = $derived(Option.getOrNull(current(u.bar)));
+  const here = $derived(viewed !== null && viewed.kind === "talk" ? viewed.address : null);
+  const live = $derived(reached(viewed === null ? undefined : runInFront($belief, viewed)));
+
   const entries = $derived.by((): Entry[] => {
     // The hint beside a page is the address bar's own spelling of it,
     // read from the router rather than written again here.
@@ -95,8 +93,8 @@
         u.go(to);
       },
     });
-    // A page a key reaches is called what the key sheet and the rail
-    // call it, and shows the chord rather than its address.
+    // A page a key reaches is called what the key sheet calls it, and
+    // shows the chord rather than its address.
     const page = (action: Action, to: View): Entry => ({ ...goTo(to, say($lang, LABELS[action])), action });
     const out: Entry[] = [
       page("go.talk", { kind: "talk", address: MAYOR }),
@@ -111,6 +109,12 @@
       goTo({ kind: "welcome" }, say($lang, "setup_rerun")),
       { label: say($lang, LABELS.finder), hint: "", action: "finder", act: openFinder },
     ];
+    // Speaking from the keyboard: the composer on this page records,
+    // exactly as its microphone does, where the city transcribes
+    // (client/Spec.lean §4-64b).
+    if (here !== null && u.hearing() && canRecord()) {
+      out.push({ label: say($lang, "palette_transcribe"), hint: here, act: askToSpeak });
+    }
     out.push({
       label: halted ? RELEASE_ALL : say($lang, "city_stop"),
       hint: "halt",
@@ -147,9 +151,6 @@
     return out;
   });
 
-  // What a verb typed here may reach. The palette is attached to no
-  // room, so `here` is the room the address bar names and `live` is
-  // the run in front of the person (`core/in_front`).
   const models = $derived.by(() => {
     const answer = $endpoints;
     if (answer === undefined || !("endpoints" in answer)) return [];
@@ -157,10 +158,6 @@
       endpoint.models.map((row) => ({ endpoint: endpoint.name, model: row.id })),
     );
   });
-  const viewed = $derived(Option.getOrNull(current(u.bar)));
-  const here = $derived(viewed !== null && viewed.kind === "talk" ? viewed.address : null);
-  const live = $derived(reached(viewed === null ? undefined : runInFront($belief, viewed)));
-
   function newest(room: string): Reached | null {
     return reached(heldIn($belief, room).at(-1));
   }
@@ -247,7 +244,7 @@
   // question is usually asked: what to do, where to go, what session.
   // Each verb names its section itself, and the flat list the cursor
   // walks is read in the same order the sections draw it.
-  const grouped = $derived.by((): { section: Section; entries: Entry[] }[] => {
+  const grouped = $derived.by((): Group[] => {
     const typed = offered(query.trim());
     return SECTIONS.map((section) => ({
       section,
@@ -288,9 +285,7 @@
 </script>
 
 <!-- Escape, answered by the shell's key handler, closes this box; the
-click on the scrim is the pointer's extra way out, not the only one.
-It stands above the rail, whose drawer is `z-10`: on a narrow window the
-rail would otherwise cover the left half of the box. -->
+click on the scrim is the pointer's extra way out, not the only one. -->
 <div
   class="fixed inset-0 z-20 flex items-start justify-center bg-page/70 px-snug pt-section"
   role="presentation"
@@ -329,70 +324,15 @@ rail would otherwise cover the left half of the box. -->
         }
       }}
     />
-    <ul class="mt-snug max-h-palette overflow-y-auto">
-      {#if query.trim().startsWith("/")}
-        {#each grouped as group (group.section)}
-          <li>
-            <h2 class="px-base pt-snug text-label font-label text-text-faint">
-              {say($lang, SECTION_WORD[group.section])}
-            </h2>
-          </li>
-          {#each group.entries as entry (entry.label)}
-            {@const at = shown.indexOf(entry)}
-            <li>
-              <button
-                type="button"
-                class={[
-                  "flex w-full items-center justify-between gap-snug rounded-control px-base py-snug text-left text-body",
-                  entry.why === undefined ? "hover:bg-raised" : "aria-disabled:text-text-disabled",
-                  at === cursor ? "bg-raised" : "",
-                ]}
-                aria-disabled={entry.why !== undefined}
-                onmouseenter={() => {
-                  if (at >= 0) cursor = at;
-                }}
-                onclick={() => {
-                  pick(entry);
-                }}
-              >
-                <span class="truncate font-mono">{entry.label}</span>
-                <span class="shrink-0 text-note text-text-faint">
-                  {entry.why === undefined ? entry.hint : say($lang, entry.why)}
-                </span>
-              </button>
-            </li>
-          {/each}
-        {/each}
-      {:else}
-        {#each shown as entry, at (entry.label)}
-          <li>
-            <button
-              type="button"
-              class={[
-                "flex w-full items-center justify-between gap-snug rounded-control px-base py-snug text-left text-body hover:bg-raised",
-                at === cursor ? "bg-raised" : "",
-              ]}
-              onmouseenter={() => {
-                cursor = at;
-              }}
-              onclick={() => {
-                pick(entry);
-              }}
-            >
-              <span class="truncate font-mono">{entry.label}</span>
-              <span class="shrink-0 text-note text-text-faint">
-                {#if entry.action === undefined}
-                  {entry.hint}
-                {:else}
-                  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; svelte-check types this imported snippet fine, and typescript-eslint does not resolve exports of another .svelte module) -->
-                  {@render Kbd({ action: entry.action })}
-                {/if}
-              </span>
-            </button>
-          </li>
-        {/each}
-      {/if}
-    </ul>
+    <Rows
+      listing={query.trim().startsWith("/") ? { kind: "verbs", groups: grouped } : { kind: "places" }}
+      {shown}
+      {cursor}
+      onHover={(at) => {
+        cursor = at;
+      }}
+      onPick={pick}
+    />
     {#if shown.length === 0}
       <Empty missing={nothingFound(query)} />
     {/if}

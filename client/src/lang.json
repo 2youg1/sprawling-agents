@@ -2227,6 +2227,10 @@
     "en": "room",
     "zh": "房间"
   },
+  "palette_transcribe": {
+    "en": "speak, transcribed into the message box",
+    "zh": "说话，转写进输入框"
+  },
   "panel_close": {
     "en": "close",
     "zh": "收起"

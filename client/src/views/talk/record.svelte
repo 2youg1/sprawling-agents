@@ -8,9 +8,13 @@
   // The microphone beside the composer. One press records and a second
   // stops; what the city heard comes back as words for the box, and a
   // city that refused to transcribe says so beside the button.
+  import { onMount } from "svelte";
+  import { get } from "svelte/store";
+
   import { say } from "../../core/lang";
   import { dictation } from "../../core/speaking";
   import { ui } from "../../ui";
+  import { speakAsked } from "./speak_asked";
 
   const { onWords }: { readonly onWords: (words: string) => void } = $props();
 
@@ -22,6 +26,22 @@
   const taking = heard.taking;
   const transcribing = heard.hearing;
   const refused = heard.refused;
+
+  function press(): void {
+    if (get(transcribing)) return;
+    heard.speak();
+  }
+
+  // The palette's "speak" (`speak_asked.ts`): only a request made after
+  // this microphone was drawn presses it.
+  onMount(() => {
+    let seen = get(speakAsked);
+    return speakAsked.subscribe((count) => {
+      if (count === seen) return;
+      seen = count;
+      press();
+    });
+  });
 </script>
 
 <button
@@ -31,10 +51,7 @@
     $taking ? "bg-alert text-on-accent" : $transcribing ? "bg-raised aria-disabled:text-text-disabled" : "bg-raised text-text-quiet hover:bg-raised-hover",
   ]}
   aria-disabled={$transcribing}
-  onclick={() => {
-    if ($transcribing) return;
-    heard.speak();
-  }}
+  onclick={press}
 >
   {$transcribing ? say($lang, "talk_hearing") : $taking ? say($lang, "talk_recording") : say($lang, "talk_record")}
 </button>
