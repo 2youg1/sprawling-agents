@@ -129,7 +129,7 @@
   <div class="flex min-w-0 flex-wrap items-center justify-between gap-x-wide gap-y-snug">
     <h2 class="text-note text-text-faint">{say($lang, "bld_commits")}</h2>
     <label class="flex min-w-0 items-center gap-snug text-note">
-      <span class="text-text-faint">{say($lang, "whose_label")}</span>
+      <span class="shrink-0 whitespace-nowrap text-text-faint">{say($lang, "whose_label")}</span>
       <input
         class="h-control-sm w-[42ch] max-w-full min-w-0 rounded-control border border-edge-input bg-raised px-snug font-mono text-note placeholder:text-text-faint aria-invalid:border-alert"
         placeholder={say($lang, "whose_placeholder")}
