@@ -27,6 +27,7 @@ long enough to scroll gets a filter; a list of six does not. -->
 
 <script lang="ts">
   import { untrack } from "svelte";
+  import type { Snippet } from "svelte";
 
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
@@ -41,9 +42,14 @@ long enough to scroll gets a filter; a list of six does not. -->
     // The gallery draws a menu open so it is measured; every screen
     // starts closed.
     readonly starts?: "open" | "closed";
+    // What the menu reads out above its choices, when the fact the pill
+    // stands for has more to it than its value: the room chip's who is
+    // listening (client-SPEC 7I). The list is described by it, so a
+    // screen reader hears it with the list.
+    readonly told?: Snippet | undefined;
   }
 
-  const { spec, starts = "closed" }: Props = $props();
+  const { spec, starts = "closed", told }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -154,6 +160,9 @@ long enough to scroll gets a filter; a list of six does not. -->
       ]}
     >
       <p class="px-base pt-tight pb-snug text-note text-text-faint">{spec.about ?? spec.label}</p>
+      {#if told !== undefined}
+        <div id="{uid}-told" class="mb-tight border-b border-edge">{@render told()}</div>
+      {/if}
       {#if filtered}
         <input
           bind:this={filter}
@@ -164,6 +173,7 @@ long enough to scroll gets a filter; a list of six does not. -->
           role="combobox"
           aria-expanded={open}
           aria-controls="{uid}-list"
+          aria-describedby={told === undefined ? undefined : `${uid}-told`}
           aria-activedescendant={rows.length > 0 ? `${uid}-${String(cursor)}` : undefined}
           oninput={() => {
             at = 0;
@@ -178,6 +188,7 @@ long enough to scroll gets a filter; a list of six does not. -->
         role="listbox"
         tabindex={filtered ? -1 : 0}
         aria-label={spec.label}
+        aria-describedby={told === undefined ? undefined : `${uid}-told`}
         aria-activedescendant={filtered || rows.length === 0 ? undefined : `${uid}-${String(cursor)}`}
         onkeydown={onKeydown}
         onmousedown={(event) => {

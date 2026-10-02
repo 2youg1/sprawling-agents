@@ -71,15 +71,15 @@
     // Whether this city has an endpoint that transcribes. A microphone
     // on a city with none is a button whose only answer is a refusal.
     readonly hearing?: boolean | undefined;
-    // What stands above the words: in the panorama tier, the last thing
-    // said, set the way the thread sets a message (client-SPEC 7I).
-    readonly above?: Snippet | undefined;
+    // In the panorama tier's band, what stands above the words (the last thing said);
+    // a box in the band draws no settings row, the session sheet says it (7D, 7I).
+    readonly band?: Snippet | undefined;
     // The room this box speaks to, when the page holding it says so; the
     // address bar answers otherwise.
     readonly room?: Address | undefined;
   }
 
-  const { placeholder, sending, draft, onSend, onStop, hearing, above, room }: ComposerProps = $props();
+  const { placeholder, sending, draft, onSend, onStop, hearing, band, room }: ComposerProps = $props();
 
   const u = ui();
   const { lang } = u;
@@ -348,7 +348,7 @@ strength, and a drag over the box by the wash it takes. -->
       }}
     />
   {/if}
-  {#if above !== undefined}{@render above()}{/if}
+  {#if band !== undefined}{@render band()}{/if}
   <div class="relative pb-snug">
     <div class="flex min-h-key items-end gap-base">
       <!-- svelte-ignore a11y_autofocus (the box is what the page exists for, and the shell's own focus chord reaches it the same way) -->
@@ -396,5 +396,5 @@ strength, and a drag over the box by the wash it takes. -->
       </p>
     {/if}
   {/each}
-  <SettingsRow {specs} room={here} begun={session !== null} {kept} />
+  <SettingsRow {specs} room={here} draws={band !== undefined ? "notice" : session === null ? "everything" : "facts"} {kept} />
 </form>

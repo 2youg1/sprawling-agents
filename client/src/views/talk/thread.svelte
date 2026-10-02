@@ -132,12 +132,18 @@
     whole && (run.doing.kind === "calling" || run.doing.kind === "waiting") &&
       (turns.at(-1)?.calls.some((call) => call.outcome === "waiting") ?? false),
   );
-  // The model each round's head states: the session's on the first head,
-  // and again only where a round answered with a different one.
+  // The frozen facts each round's head states: the session's model and
+  // the mode its run was dispatched in on the first head, and the model
+  // again only where a round answered with a different one.
+  const mode = $derived(answer?.opening?.policy?.mode ?? null);
+  const firstModel = $derived(turns.at(0)?.model ?? null);
+  const firstStated = $derived(
+    firstModel === null || mode === null ? firstModel : `${firstModel} · ${say($lang, `mode_${mode}`)}`,
+  );
   const stated = $derived(
     turns.map((turn, at) => {
       const model = turn.model ?? null;
-      if (at === 0) return opens ? model : null;
+      if (at === 0) return opens ? firstStated : null;
       return model !== null && model !== (turns[at - 1]?.model ?? null) ? model : null;
     }),
   );

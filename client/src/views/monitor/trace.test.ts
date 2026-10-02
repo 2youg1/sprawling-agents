@@ -35,6 +35,7 @@ const exec = turn(1, [
     outcome: "answered",
     called: 1000,
     answered: 1250,
+    exit_code: 101,
     arguments: { cut: 0, head: JSON.stringify({ arm: { shell: { text: "cargo test" } } }, null, 2) },
     output: {
       cut: 0,
@@ -77,6 +78,26 @@ describe("a run's turns read as a terminal record and a code column", () => {
     expect(entries).toEqual([
       { kind: "command", at: at(11), text: "cargo test", stdout: "ok\n", stderr: "warn\n", ending: { kind: "code", code: 101 }, cut: 0, took: 250 },
       { kind: "command", at: at(12), text: "git status", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0, took: null },
+    ]);
+  });
+
+  // The line the wire carries can be cut short of valid JSON; the code
+  // the command ended with is the call's own and survives the cut.
+  test("a command whose result line was cut still ends with the code its call carries", () => {
+    const cut = turn(3, [
+      {
+        at: 31,
+        tool: "exec",
+        outcome: "answered",
+        called: 3000,
+        answered: 3100,
+        exit_code: 2,
+        arguments: { cut: 0, head: JSON.stringify({ arm: { shell: { text: "just check" } } }) },
+        output: { cut: 40, head: '{"stdout":"error[E0308]' },
+      },
+    ]);
+    expect(traceOf([cut]).entries.map((entry) => (entry.kind === "command" ? entry.ending : null))).toEqual([
+      { kind: "code", code: 2 },
     ]);
   });
 

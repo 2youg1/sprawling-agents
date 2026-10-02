@@ -26,8 +26,9 @@ it lives. -->
   interface Props {
     readonly who: string;
     readonly at: number;
-    // The model this message was said with, where the head is the one
-    // that states it; `null` elsewhere.
+    // The frozen facts this message was said under - the model, and on a
+    // session's first head the mode - where the head is the one that
+    // states them; `null` elsewhere.
     readonly model: string | null;
     // Time to first content, once the Ledger holds a measured one.
     readonly ttft: number | null;

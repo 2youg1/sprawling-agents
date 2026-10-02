@@ -7,7 +7,9 @@
 // a terminal record of every call in the order it was made, and a
 // column of the files it changed, cut to the stretches that moved.
 //
-// Everything here comes from the turns the wire already carries. The
+// Everything here comes from the turns the wire already carries. A
+// command's exit code is the call's own (`Call.exit_code`, which the city
+// reads off the whole result even where the line here was cut). The
 // runtime writes an exec result as `{stdout, stderr, exit_code}` and an
 // edit result as `{path, base_version, diff}` (crates/runtime/src/tools/
 // exec/outcome.rs and edit.rs), and the channel hands each over as
@@ -99,7 +101,6 @@ const Arm = Schema.Struct({
 const Ran = Schema.Struct({
   stdout: Schema.optional(Schema.String),
   stderr: Schema.optional(Schema.String),
-  exit_code: Schema.optional(Schema.Int),
   outcome: Schema.optional(Schema.String),
 });
 
@@ -152,17 +153,16 @@ export function commandOf(call: Call): Entry {
     text,
     stdout: Option.match(ran, { onNone: () => raw, onSome: (r) => r.stdout ?? "" }),
     stderr: Option.match(ran, { onNone: () => "", onSome: (r) => r.stderr ?? "" }),
-    ending: endingOf(call.outcome, ran),
+    ending: endingOf(call, ran),
     cut: call.output?.cut ?? 0,
     took: tookOf(call),
   };
 }
 
-function endingOf(outcome: Outcome, ran: Option.Option<typeof Ran.Type>): Ending {
-  if (outcome === "waiting") return { kind: "running" };
-  if (Option.isNone(ran)) return { kind: "unread" };
-  const { exit_code: code, outcome: why } = ran.value;
-  if (code !== undefined) return { kind: "code", code };
+function endingOf(call: Call, ran: Option.Option<typeof Ran.Type>): Ending {
+  if (call.outcome === "waiting") return { kind: "running" };
+  if (call.exit_code !== undefined && call.exit_code !== null) return { kind: "code", code: call.exit_code };
+  const why = Option.isSome(ran) ? ran.value.outcome : undefined;
   return why === undefined ? { kind: "unread" } : { kind: "stopped", why };
 }
 

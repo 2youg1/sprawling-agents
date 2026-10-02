@@ -291,7 +291,7 @@
     draft={address}
     hearing={u.hearing()}
     room={address}
-    above={band ? lastSaid : undefined}
+    band={band ? lastSaid : undefined}
     onSend={send}
     onStop={() => {
       const going = live;

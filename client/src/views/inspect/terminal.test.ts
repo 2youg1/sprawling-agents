@@ -48,7 +48,7 @@ describe("the inspector's terminal", () => {
   test("drops the tail once the result lands, and prints the Ledger's", () => {
     const result = JSON.stringify({ stdout: "41 passed\n", stderr: "", exit_code: 0 });
     const pinned = `cas:b3-${"a".repeat(64)}`;
-    expect(printedOf(exec("answered", { head: result, cut: 0, pinned }, 4_412), TAIL)).toEqual({
+    expect(printedOf({ ...exec("answered", { head: result, cut: 0, pinned }, 4_412), exit_code: 0 }, TAIL)).toEqual({
       line: "cargo nextest -p city",
       out: "41 passed\n",
       err: "",
