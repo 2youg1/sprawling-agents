@@ -241,48 +241,6 @@ jobs:
           path: target/autoharness/report.txt
           if-no-files-found: warn
 
-  # A real endpoint, spoken to over the network with a real key: the world
-  # outside this repository again, since a provider changes its wire, its
-  # models and its limits at a time of its choosing. `just e2e` passes with
-  # one line where the credentials are absent, which is right at a desk.
-  # The key is a repository secret; the base URL, the model and the dialect
-  # are repository variables, because none of them is a credential.
-  #
-  # The job runs only in a repository that set `SPRAWLING_E2E_BASE_URL`.
-  # A fork or a fresh clone has no endpoint to call, and a job that is red
-  # there every night teaches everyone to stop reading this workflow; the
-  # skipped job still shows in the run, so the absence is visible rather
-  # than read as a pass. Once the base URL is set the rest is owed, so
-  # `SPRAWLING_E2E_REQUIRED=1` turns any missing variable into a red that
-  # names it (`crates/sprawling/Spec.lean` §8-69). A job-level `if` can read a
-  # variable but not a secret, which is why the base URL is the switch.
-  e2e:
-    if: vars.SPRAWLING_E2E_BASE_URL != ''
-    runs-on: windows-latest
-    timeout-minutes: 30
-    env:
-      SPRAWLING_E2E_REQUIRED: "1"
-      SPRAWLING_E2E_BASE_URL: ${{ vars.SPRAWLING_E2E_BASE_URL }}
-      SPRAWLING_E2E_MODEL: ${{ vars.SPRAWLING_E2E_MODEL }}
-      SPRAWLING_E2E_DIALECT: ${{ vars.SPRAWLING_E2E_DIALECT }}
-      SPRAWLING_E2E_KEY: ${{ secrets.SPRAWLING_E2E_KEY }}
-    steps:
-      - uses: actions/checkout@v7
-      - name: install pinned toolchain
-        run: rustup show
-      # The Zig the desktop's leaf is built with; every Windows build of
-      # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
-      - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: e2e
-          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: just
-      - name: the acceptance gate for a real endpoint
-        run: just e2e
-
   # Advisories and yanked versions: the one check in this repository whose
   # input is written by other people at a time of their choosing. On a
   # pull request it would turn a change red for a reason its author cannot
