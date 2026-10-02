@@ -309,7 +309,6 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
     toolchain::PYTHON,
     toolchain::CARGO_MUTANTS,
     toolchain::CARGO_FUZZ,
-    toolchain::CARGO_PUBLIC_API,
     toolchain::KANI,
 ];
 

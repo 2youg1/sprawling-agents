@@ -450,16 +450,6 @@ pub(super) const CARGO_FUZZ: Requirement = row(
 )
 .packed("cargo-fuzz");
 
-pub(super) const CARGO_PUBLIC_API: Requirement = row(
-    "cargo-public-api",
-    Need::Optional,
-    "`cargo xtask apisync`, which the nightly job runs; it reads a nightly rustdoc as well",
-    program("cargo-public-api"),
-    "https://github.com/cargo-public-api/cargo-public-api",
-    same_command("cargo", &["install", "cargo-public-api", "--locked"]),
-)
-.packed("cargo-public-api");
-
 pub(super) const KANI: Requirement = row(
     "kani",
     Need::Optional,
