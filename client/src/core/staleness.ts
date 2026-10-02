@@ -49,7 +49,7 @@ const GOVERNANCE_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
 ]);
 
 const BUILDING_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
-  "building_created", "building_configured", "building_removed", "roadmap_claimed", "roadmap_finished",
+  "building_created", "building_configured", "building_removed", "roadmap_claimed", "roadmap_finished", "file_restored",
   "roadmap_released", "roadmap_split", "roadmap_blocked", "pursuit_changed",
   "checkpoint_committed", "handoff_written", "run_started", "run_frozen",
   "pr_merged", "asset_archived", "governed_document_written", "document_written", "rules_changed",
@@ -94,9 +94,9 @@ export function reachOf(name: string, kind: EventKind): Reach {
     case "skills":
       return reached(kind === "building_configured" || kind === "run_started");
     // The working tree moves whenever a wave writes, and every wave
-    // ends in a checkpoint.
+    // ends in a checkpoint; a file taken back from one moves it too.
     case "git_status":
-      return reached(kind === "checkpoint_committed" || kind === "pr_merged");
+      return reached(kind === "checkpoint_committed" || kind === "pr_merged" || kind === "file_restored");
     case "commits":
       return kind === "checkpoint_committed" || kind === "pr_merged" ? "newest_page" : "none";
     case "building_view": case "listing": case "document": case "archive_search":

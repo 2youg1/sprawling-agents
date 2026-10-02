@@ -346,7 +346,16 @@ export function configureContext(addr: Address, percent: number): Command {
 // value, so a layer that speaks about it speaks about all of it
 // (`kernel::config::SandboxLimits`), and the card sends what it shows.
 export function configureSandbox(addr: Address, limits: SandboxLimits): Command {
-  return configureMcp(addr, []);
+  return {
+    configure_building: {
+      addr,
+      mcp: null,
+      sandbox: limits,
+      desktop: null,
+      context_second_threshold: null,
+      idem: mintIdem(),
+    },
+  };
 }
 
 // One of the three governed documents, whole. `base` is the text the
