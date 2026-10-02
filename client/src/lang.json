@@ -4260,8 +4260,8 @@
     "zh": "安装依赖项"
   },
   "guide_step_dependencies_about": {
-    "en": "What this machine has and lacks for the work a city does. Installs run on the machine that runs the city, one item at a time, and a failed one blocks nothing else.",
-    "zh": "这台机器为城里的工作装了什么、缺什么。安装发生在运行城市的主机上，一项一项进行，某一项失败不拦住别的。"
+    "en": "What the machine running the city has and lacks for its work. Installs run there, one item at a time, and a failed one blocks nothing else.",
+    "zh": "运行城市的主机为城里的工作装了什么、缺什么。安装就在那台主机上一项一项进行，某一项失败不拦住别的。"
   },
   "guide_step_texts": {
     "en": "texts and names",
