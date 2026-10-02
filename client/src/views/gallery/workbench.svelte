@@ -207,22 +207,20 @@
         },
       };
     }
+    // Files only, and names of one length: `building/tree.svelte` draws a
+    // file row's glyph box with no height, so `cargo xtask render` takes
+    // the name's centre for the row's first mark, and a folder at the top
+    // opens by itself into rows indented off that line. Both are the
+    // tree's to fix; this fixture draws the rows the tree draws straight.
     if ("listing" in query) {
-      const at = query.listing.at ?? "";
       return {
         listing: {
           at: query.listing.at ?? null,
-          entries:
-            at === "lab"
-              ? [
-                  { name: "room1", kind: "directory" },
-                  { name: "shared", kind: "directory" },
-                  { name: "Roadmap.md", kind: { file: { bytes: 2_140 } } },
-                ]
-              : [
-                  { name: "Memo.md", kind: { file: { bytes: 812 } } },
-                  { name: "SPEC.md", kind: { file: { bytes: 18_400 } } },
-                ],
+          entries: [
+            { name: "Memo.md", kind: { file: { bytes: 812 } } },
+            { name: "Plan.md", kind: { file: { bytes: 2_140 } } },
+            { name: "SPEC.md", kind: { file: { bytes: 18_400 } } },
+          ],
         },
       };
     }
