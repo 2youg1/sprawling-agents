@@ -82,7 +82,7 @@
 </script>
 
 {#snippet segment(each: PrefixSegment)}
-  {const isOpen = open.has(each.hash)}
+  {@const isOpen = open.has(each.hash)}
   <li class="border-b border-edge">
     <div class="flex items-center gap-base py-snug text-note">
       <button

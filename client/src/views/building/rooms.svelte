@@ -46,7 +46,7 @@
   {#if answer.rooms.length > 0}
     <ul class="text-note">
       {#each answer.rooms as name (name)}
-        {const room = AddressSchema.make(`${answer.addr}/${name}`)}
+        {@const room = AddressSchema.make(`${answer.addr}/${name}`)}
         <li>
           <button
             type="button"

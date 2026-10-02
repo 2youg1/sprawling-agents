@@ -104,7 +104,7 @@ const held: Snippet<Parameters<typeof drawHeld>> = drawHeld;
      column's own drawing, or the input a corrected column hands back. -->
 {#snippet drawHeld(column: Column<T>, row: T)}
   {#if column.editable}
-    {const editable = column.editable}
+    {@const editable = column.editable}
     <input
       class="w-full min-w-0 rounded-control bg-chrome px-snug py-tight font-mono text-note text-text"
       aria-label="{column.header} {keyOf(row)}"
@@ -128,7 +128,7 @@ const held: Snippet<Parameters<typeof drawHeld>> = drawHeld;
       <thead class="sticky top-0 bg-raised">
         <tr class="border-b border-edge">
           {#if selection}
-            {const chosen = selection}
+            {@const chosen = selection}
             <th class="w-glyph px-base py-tight text-left">
               <input
                 type="checkbox"
@@ -175,7 +175,7 @@ const held: Snippet<Parameters<typeof drawHeld>> = drawHeld;
             class="h-control-lg border-b border-edge transition-[background-color] motion-reduce:transition-none hover:bg-raised-hover focus-within:bg-raised-hover last:border-b-0"
           >
             {#if selection}
-              {const chosen = selection}
+              {@const chosen = selection}
               <td class="px-base py-tight">
                 <input
                   type="checkbox"

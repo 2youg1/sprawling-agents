@@ -98,7 +98,7 @@
     {#if answer.skills.length > 0}
       <ul>
         {#each answer.skills as skill (skillId(skill))}
-          {const place = placeOf(skill.shelf, $lang)}
+          {@const place = placeOf(skill.shelf, $lang)}
           <li class="border-b border-edge">
             <button
               type="button"

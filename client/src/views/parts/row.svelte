@@ -173,7 +173,7 @@ function landing(rows: readonly Element[], step: Step, from: number): HTMLElemen
   class="flex min-h-[44px] w-full min-w-0 items-center gap-base border-b border-edge px-base py-snug hover:bg-chrome has-[:focus-visible]:bg-chrome"
 >
   {#if onOpen}
-    {const open = onOpen}
+    {@const open = onOpen}
     <button type="button" class="flex min-w-0 flex-1 flex-col text-left" onclick={() => {
         open();
       }}>

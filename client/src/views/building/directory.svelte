@@ -145,7 +145,7 @@
 {:else if entries === undefined}
   <p class="text-text-faint">…</p>
 {:else}
-  {const kind = kindOf(at, entries)}
+  {@const kind = kindOf(at, entries)}
   <div>
     <div class="mb-base flex flex-wrap items-baseline gap-base">
       <h2 class="text-heading font-heading">{roomOf(at)}</h2>
@@ -167,7 +167,7 @@
       {#if runs.length > 0}
         <ul class="text-note">
           {#each runs as run (run.run)}
-            {const micros = spent(run.run)}
+            {@const micros = spent(run.run)}
             <li class="border-b border-edge py-snug">
               <a
                 href={toFragment({ kind: "run", run: run.run })}
@@ -220,7 +220,7 @@
     {:else if entries.length > 0}
       <ul class="text-note">
         {#each entries as entry (entry.name)}
-          {const here = AddressSchema.make(`${at}/${entry.name}`)}
+          {@const here = AddressSchema.make(`${at}/${entry.name}`)}
           <li class="flex items-center gap-base border-b border-edge py-snug">
             <Path
               path={here}

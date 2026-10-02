@@ -120,11 +120,11 @@
       </li>
     {:else}
       {#each entries as entry (entry.name)}
-        {const here = join(dir, entry.name)}
-        {const transcript = transcriptOf(entry.name)}
-        {const isDir = entry.kind === "directory"}
-        {const hidden = entry.name.startsWith(".")}
-        {const openNow = opened[here] ?? (nesting === 0 && !hidden)}
+        {@const here = join(dir, entry.name)}
+        {@const transcript = transcriptOf(entry.name)}
+        {@const isDir = entry.kind === "directory"}
+        {@const hidden = entry.name.startsWith(".")}
+        {@const openNow = opened[here] ?? (nesting === 0 && !hidden)}
         <li>
           <button
             type="button"
