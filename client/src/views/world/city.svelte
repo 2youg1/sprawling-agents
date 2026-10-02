@@ -18,17 +18,13 @@
   import { heldWithin } from "../../core/belief/rooms";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
-  import Skyline from "../city/skyline.svelte";
+  import Skyline, { MIN_WIDTH } from "../city/skyline.svelte";
   import Unanswered from "../parts/unanswered.svelte";
 
   const u = ui();
   const belief = u.conn.belief;
   const city = u.conn.asking.ask(QUERIES.city);
   const read = $derived(readAnswer($city, (held) => ("city" in held ? held.city : undefined)));
-
-  // The skyline's own narrowest width, copied from `city/skyline.svelte`'s
-  // `MIN_WIDTH` until that file exports it.
-  const DRAWN = 880;
 
   // City Hall stands at the centre of the avenue, so the pane opens there.
   function centred(box: HTMLDivElement): void {
@@ -48,7 +44,7 @@
   <Unanswered query={read.query} asked={QUERIES.city} />
 {:else if read.kind === "held"}
   <div class="min-h-0 overflow-x-auto" {@attach centred}>
-    <div style:min-width="{DRAWN}px">
+    <div style:min-width="{MIN_WIDTH}px">
       <Skyline city={read.value} picked={null} onPick={enter} />
     </div>
   </div>

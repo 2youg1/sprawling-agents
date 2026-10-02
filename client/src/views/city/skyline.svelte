@@ -3,6 +3,11 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
+<script module lang="ts">
+  // The narrowest the skyline draws; a pane that holds it scrolls past this.
+  export const MIN_WIDTH = 880;
+</script>
+
 <script lang="ts">
   // The city, drawn as a skyline at night: one tower per building along
   // one avenue, City Hall at its centre under a dome, a window per run
@@ -36,7 +41,6 @@
   const PLINTH = 14;
   const SKY = 72;
   const GROUND_DEPTH = 64;
-  const MIN_WIDTH = 880;
   // The towers' corners curve the way the page's boxes do; read once,
   // since the exponent is a constant of the stylesheet.
   const power = cornerPower(document.documentElement);
