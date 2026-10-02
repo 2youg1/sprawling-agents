@@ -43,7 +43,7 @@ export function stretchesOf(
         room: answer.room,
         line,
         current: at === 0,
-        runs: next === undefined ? runs : [],
+        runs: runs.filter((run) => run.lastSeq >= line.began && (next === undefined || run.lastSeq < next.began)),
       };
     });
   });
@@ -55,7 +55,7 @@ export function stretchesOf(
 // does not hold it.
 export function lineIn(answer: SessionsAnswer | undefined, asked: Seq | undefined): SessionLine | null {
   const lines = answer?.sessions ?? [];
-  return lines[0] ?? null;
+  return (asked === undefined ? lines[0] : lines.find((line) => line.began === asked)) ?? null;
 }
 
 // Why a row stands in the pinned group: the Mayor's current session
@@ -64,6 +64,7 @@ export function lineIn(answer: SessionsAnswer | undefined, asked: Seq | undefine
 export type Pinning = "mayor" | "tagged" | "none";
 
 export function pinningOf(stretch: Stretch, tags: readonly Tag[]): Pinning {
+  if (stretch.room === MAYOR && stretch.current) return "mayor";
   return tags.includes(PIN) ? "tagged" : "none";
 }
 
@@ -79,7 +80,7 @@ export function grouped(
   tagsFor: (stretch: Stretch) => readonly Tag[],
   filter: Tag | null,
 ): Group[] {
-  const kept = stretches;
+  const kept = filter === null ? stretches : stretches.filter((stretch) => tagsFor(stretch).includes(filter));
   const pinned = kept.filter((stretch) => pinningOf(stretch, tagsFor(stretch)) !== "none");
   const rest = kept.filter((stretch) => !pinned.includes(stretch));
   const buildings = [...new Set(rest.map((stretch) => buildingOf(stretch.room)))];
@@ -97,5 +98,5 @@ export function grouped(
 // `null` when this page holds none of its runs.
 export function tailOf(stretch: Stretch): Origin | null {
   const last = stretch.runs.at(-1);
-  return last === undefined ? null : { run: last.run, at_seq: stretch.line.began };
+  return last === undefined ? null : { run: last.run, at_seq: last.lastSeq };
 }

@@ -97,7 +97,11 @@ export const DEFAULT_VIEW: View = { kind: "talk", address: MAYOR };
 export function toFragment(view: View): string {
   switch (view.kind) {
     case "talk":
-      if (view.item !== undefined) return `#/talk/${escaped(view.address)}?${itemQuery(view.item)}`;
+      if (view.item !== undefined || view.session !== undefined) {
+        const stretch = view.session === undefined ? "" : `${STRETCH}${String(view.session)}`;
+        const item = view.item === undefined ? "" : `?${itemQuery(view.item)}`;
+        return `#/talk/${escaped(view.address)}${stretch}${item}`;
+      }
       return view.address === MAYOR ? "#/" : `#/talk/${escaped(view.address)}`;
     case "city":
       return "#/city";
@@ -255,8 +259,7 @@ const readSeq = Schema.decodeOption(Seq);
 function talkIn(tail: string): Option.Option<View> {
   const cut = tail.lastIndexOf(STRETCH);
   const room = readEscapedAddress(cut < 0 ? tail : tail.slice(0, cut));
-  if (cut >= 0) return Option.none();
-  return Option.map(room, (address) => ({ kind: "talk", address }));
+  if (cut < 0) return Option.map(room, (address) => ({ kind: "talk", address }));
   const digits = tail.slice(cut + 1);
   const session = /^\d+$/.test(digits) ? readSeq(Number(digits)) : Option.none();
   return Option.flatMap(room, (address) => Option.map(session, (began) => ({ kind: "talk", address, session: began })));
@@ -316,17 +319,15 @@ export function fromFragment(raw: string): Option.Option<View> {
   }
 }
 
-// A conversation with an item to open beside it: the only view a query
-// follows. The address is escaped, so its own question marks are `%3F`
+// A conversation, or one of its earlier stretches, with an item to open
+// beside it: the only view a query follows. The address is escaped, so its own question marks are `%3F`
 // and the first bare one starts the query.
 function talkWith(path: string, query: string): Option.Option<View> {
   const head = ["talk/", "s/"].find((prefix) => path.startsWith(prefix));
   if (head === undefined) return Option.none();
-  return Option.map(Option.all([readEscapedAddress(path.slice(head.length)), readItem(query)]), ([address, item]) => ({
-    kind: "talk",
-    address,
-    item,
-  }));
+  return Option.flatMap(talkIn(path.slice(head.length)), (view) =>
+    view.kind === "talk" ? Option.map(readItem(query), (item): View => ({ ...view, item })) : Option.none(),
+  );
 }
 
 // What the address bar says, when this build cannot resolve it. `None`

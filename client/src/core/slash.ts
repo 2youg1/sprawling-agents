@@ -118,6 +118,7 @@ function fresh(hands: SlashHands, call: SlashCall): void {
 // session in main, the new one is where the person is going.
 function opened(hands: SlashHands, room: Address, carry: "nothing" | "handoff"): void {
   if (!hands.command(openSession(room, carry, null))) return;
+  hands.go({ kind: "talk", address: room });
   hands.write("");
 }
 
@@ -134,20 +135,18 @@ function compact(hands: SlashHands): void {
   }
   if (!hands.command(cancel(going.run))) return;
   hands.write("");
-
+  hands.whenFrozen(going.run, () => {
+    opened(hands, room, "handoff");
+  });
 }
 
 // `/tag` and `/untag`: one word on or off the session in main. A word
 // that is not a tag sends nothing and leaves the line to correct.
-function drop(_: typeof given): void {
-  return;
-}
-
 function retag(hands: SlashHands, call: SlashCall, change: typeof given): void {
   const tag = readTag(call.rest);
   const session = hands.tagged;
   if (tag === null || session === null) return;
-  drop(change);
+  if (hands.retag(change([session], session, tag))) hands.write("");
 }
 
 export const SLASH: readonly Slash[] = [

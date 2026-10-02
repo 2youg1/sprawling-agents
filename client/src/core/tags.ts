@@ -48,7 +48,7 @@ export function namedIn(city: string | null, room: Address, began: Seq): Named |
 // nowhere else, so `Bug` typed twice is one tag; the grammar is the
 // city's and arrives through the generated schema.
 export function readTag(raw: string): Tag | null {
-  return Option.getOrNull(readOne(raw));
+  return Option.getOrNull(readOne(raw.trim().toLowerCase()));
 }
 
 function same(entry: Named, session: Named): boolean {
@@ -63,12 +63,12 @@ export function tagsOf(held: readonly SessionTags[], session: Named): readonly T
 // `PreferencePatch::Tags` carries.
 export function given(held: readonly SessionTags[], session: Named, tag: Tag): SessionTags {
   const tags = tagsOf(held, session);
-  return named(session, tags);
+  return named(session, tags.includes(tag) ? tags : [...tags, tag].sort());
 }
 
 // The session's whole new set with `tag` taken off; empty removes it.
 export function stripped(held: readonly SessionTags[], session: Named, tag: Tag): SessionTags {
-  return named(session, tagsOf(held, session));
+  return named(session, tagsOf(held, session).filter((each) => each !== tag));
 }
 
 function named(session: Named, tags: readonly Tag[]): SessionTags {
@@ -81,14 +81,14 @@ function named(session: Named, tags: readonly Tag[]): SessionTags {
 // reads it.
 export function retagged(held: readonly SessionTags[], next: SessionTags): readonly SessionTags[] {
   const others = held.filter((entry) => !same(entry, next));
-  return others;
+  return next.tags.length === 0 ? others : [...others, next];
 }
 
 // Every tag this city's sessions carry but the pin, once each and in
 // lexical order: the row a person filters the sessions pane by.
 export function inUse(held: readonly SessionTags[], city: string): readonly Tag[] {
   const all = held.filter((entry) => entry.city === city).flatMap((entry) => entry.tags);
-  return all;
+  return [...new Set(all)].filter((tag) => tag !== PIN).sort();
 }
 
 export interface Tagging {
@@ -107,6 +107,7 @@ export function keepTags(conn: Pick<Connection, "asking" | "command">): Tagging 
     held,
     retag: (next) => {
       if (!conn.command(putPreferences({ tags: next }))) return false;
+      held.update((now) => retagged(now, next));
       return true;
     },
   };

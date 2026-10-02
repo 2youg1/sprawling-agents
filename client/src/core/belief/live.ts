@@ -70,6 +70,7 @@ export function onceFrozen(belief: Readable<Belief>, run: RunId, then: () => voi
     if (waiting.done || held.runs[run]?.doing.kind !== "frozen") return;
     waiting.done = true;
     waiting.stop?.();
+    then();
   });
   if (waiting.done) stop();
   else waiting.stop = stop;
