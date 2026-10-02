@@ -42,7 +42,10 @@
   });
 </script>
 
-<div class="@container/sheet flex h-full min-h-0 @max-lg/sheet:flex-col @max-lg/sheet:overflow-y-auto">
+<!-- A container cannot answer queries about itself, so the frame that is
+  measured and the row that is laid out are two boxes. -->
+<div class="@container/sheet h-full min-h-0">
+<div class="flex h-full min-h-0 @max-lg/sheet:flex-col @max-lg/sheet:overflow-y-auto">
   <div
     class="flex w-index shrink-0 flex-col gap-base overflow-y-auto border-r border-edge px-base py-wide @max-lg/sheet:w-full @max-lg/sheet:overflow-visible @max-lg/sheet:border-r-0 @max-lg/sheet:border-b @max-lg/sheet:py-base"
   >
@@ -66,4 +69,5 @@
   >
     <Setup {group} {titleId} />
   </section>
+</div>
 </div>
