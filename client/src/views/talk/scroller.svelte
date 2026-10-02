@@ -118,7 +118,7 @@ the following state the view is at the foot either way. -->
     data-thread=""
     tabindex="-1"
     class={[
-      "h-full overflow-y-auto px-wide [scrollbar-width:none] narrow:px-0 narrow:[scrollbar-width:auto] [mask-image:linear-gradient(to_bottom,transparent_0,black_160px)] transition-opacity duration-300 ease-arrive",
+      "h-full overflow-y-auto px-wide [scrollbar-width:none] narrow:px-0 narrow:[scrollbar-width:auto] [mask-image:linear-gradient(to_bottom,transparent_0,black_160px)] transition-opacity duration-panel",
       empty ? "opacity-0" : "",
     ]}
     onscroll={(event) => {
