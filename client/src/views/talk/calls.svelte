@@ -20,6 +20,8 @@ S2). -->
   import type { Doing } from "../../core/doing";
   import type { Call, RunId, Turn } from "../../wire";
   import { ui } from "../../ui";
+  import Glyph from "../parts/glyph.svelte";
+  import Tip from "../parts/tip.svelte";
   import CallLine from "./call_line.svelte";
   import type { ForkEntry } from "./forking";
 
@@ -44,21 +46,24 @@ S2). -->
 
 <ul class="my-tight flex flex-col" aria-label={say($lang, "talk_calls")}>
   {#each calls as call (call.at)}
-    <li class="group flex items-center [&>span]:flex-1">
+    <li class="group flex items-center [&>span:first-child]:flex-1">
       <CallLine {call} {run} {doing} />
       {#if onFork !== undefined}
-        <button
-          type="button"
-          class="h-control w-control shrink-0 rounded-control text-note text-text-faint opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus:opacity-100 hover:bg-chrome hover:text-text-quiet"
-          aria-label={say($lang, "fork_here")}
-          onclick={() => {
-            onFork({ kind: "call", turn, call });
-          }}
-        >
-          <!-- wording-ok: a drawing in type, not a word; the action's
-               name is the aria-label above. -->
-          ⑂
-        </button>
+        <Tip text={say($lang, "fork_here_hint")}>
+          {#snippet children(hint: string)}
+            <button
+              type="button"
+              class="flex h-control shrink-0 items-center gap-tight rounded-control px-tight text-note whitespace-nowrap text-text-faint opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus:opacity-100 hover:bg-chrome hover:text-text-quiet"
+              aria-describedby={hint}
+              onclick={() => {
+                onFork({ kind: "call", turn, call });
+              }}
+            >
+              <Glyph name="branch" size="sm" />
+              {say($lang, "fork_here")}
+            </button>
+          {/snippet}
+        </Tip>
       {/if}
     </li>
   {/each}

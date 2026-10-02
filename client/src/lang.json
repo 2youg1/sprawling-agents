@@ -4887,6 +4887,10 @@
     "en": "fork from here",
     "zh": "从这里分叉"
   },
+  "fork_here_hint": {
+    "en": "Fork from here: a new session that keeps the conversation up to this point",
+    "zh": "从这里分叉：开一个新会话，保留到这里为止的对话"
+  },
   "fork_pick_title": {
     "en": "choose a point to fork from",
     "zh": "选择分叉点"

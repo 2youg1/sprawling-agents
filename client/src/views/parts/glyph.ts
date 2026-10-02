@@ -76,7 +76,9 @@ export type GlyphName =
   // A pushpin: a session the person keeps above the others.
   | "pin"
   // Three dots in a row: the menu of what can be done to one row.
-  | "more";
+  | "more"
+  // A line that splits in two: branch the conversation from this point.
+  | "branch";
 
 // The three paint tiers a mark may take (client/Spec.lean §4-32). They are
 // named here because `statusLook` below picks one per state and

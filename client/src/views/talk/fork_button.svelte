@@ -4,8 +4,9 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- The one branch action, revealed where a hand rests or a focus lands
-(ux A7). It is named in words for a screen reader and drawn as the
-branch mark for the eye.
+(ux A7). Like every button (D55) it carries a mark the eye knows - the
+branch glyph -, its name in words beside the mark, and a hint on hover
+and focus that says what the branch keeps.
 
 `onHover` reports the entry under the hand - entered or focused, and
 cleared as the hand leaves - which is the one the `fork.here` chord
@@ -14,6 +15,8 @@ reach a stale entry. -->
 <script lang="ts">
   import { ui } from "../../ui";
   import { say } from "../../core/lang";
+  import Glyph from "../parts/glyph.svelte";
+  import Tip from "../parts/tip.svelte";
   import { planFork } from "./forking";
   import type { ForkEntry, ForkPlan } from "./forking";
   import type { RunId } from "../../wire";
@@ -31,26 +34,32 @@ reach a stale entry. -->
   const { lang } = u;
 </script>
 
-<button
-  type="button"
-  class="absolute top-0 right-0 rounded-control px-tight text-note text-text-faint opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus:opacity-100 hover:bg-chrome hover:text-text-quiet"
-  aria-label={say($lang, "fork_here")}
-  onmouseenter={() => {
-    onHover(entry);
-  }}
-  onmouseleave={() => {
-    onHover(null);
-  }}
-  onfocus={() => {
-    onHover(entry);
-  }}
-  onblur={() => {
-    onHover(null);
-  }}
-  onclick={() => {
-    onFork?.(planFork(run, entry));
-  }}
->
-  <!-- wording-ok: a drawing in type, not a word; the action's name is the aria-label beside it. -->
-  ⑂
-</button>
+<div class="absolute top-0 right-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-within:opacity-100">
+  <Tip text={say($lang, "fork_here_hint")}>
+    {#snippet children(hint: string)}
+      <button
+        type="button"
+        class="flex items-center gap-tight rounded-control px-tight text-note text-text-faint hover:bg-chrome hover:text-text-quiet"
+        aria-describedby={hint}
+        onmouseenter={() => {
+          onHover(entry);
+        }}
+        onmouseleave={() => {
+          onHover(null);
+        }}
+        onfocus={() => {
+          onHover(entry);
+        }}
+        onblur={() => {
+          onHover(null);
+        }}
+        onclick={() => {
+          onFork?.(planFork(run, entry));
+        }}
+      >
+        <Glyph name="branch" size="sm" />
+        {say($lang, "fork_here")}
+      </button>
+    {/snippet}
+  </Tip>
+</div>
