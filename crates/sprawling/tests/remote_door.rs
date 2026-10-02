@@ -18,6 +18,14 @@
 //! as the address outside uses, so "outside" is this machine and the
 //! test needs no tunnel and no second program.
 //!
+//! **The console is typed at once the history is proved.** A served city
+//! refuses every append with `E_HISTORY_UNPROVEN` until the proof of the
+//! history it opened from ends (`crates/sprawling/spec/Assembly/Listening.lean`
+//! §8-90), and that proof runs on its own thread, so on a loaded machine
+//! a line typed straight after the start is refused. The harness reads
+//! the city's log and types nothing before the log says the history is
+//! proved.
+//!
 //! **Why Rust and not the Lean checker** (`crates/sprawling/Spec.lean` section 12):
 //! the device's half of the pairing and session handshakes and of the
 //! seal exists only in `remote_access`. The lines that start the binary
@@ -35,7 +43,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::Path;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use futures_util::{SinkExt, StreamExt};
 use kernel::{Address, AxCode, EventKind, EventRecord, IdemKey, RunId, Seq};
@@ -52,9 +60,18 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 
 type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
-/// How long any one step may take: a debug binary opening a city, the
-/// route starting, a frame crossing the relay.
+/// How long any one step may take: a debug binary opening a city and
+/// proving its history, a console line answered, the route starting, a
+/// frame crossing the relay.
 const PATIENCE: Duration = Duration::from_secs(60);
+
+/// The log line a served city writes once its history is proved and it
+/// takes commands (`crates/sprawling/src/assembly/chain_watch.rs`).
+const PROVED: &str = "the history is proved";
+
+/// The log line a served city writes when the proof found the history
+/// broken or unreadable; every append is refused from then on.
+const STOPPED: &str = "the ledger stopped taking writes";
 
 /// What the device is called when it pairs.
 const PHONE: &str = "phone";
@@ -351,15 +368,54 @@ fn between(printed: &str, from: &str, end: fn(char) -> bool) -> String {
     after.split(end).next().unwrap_or_default().to_owned()
 }
 
+/// The lines `stream` carries, read on a thread of their own so the
+/// child never blocks on a full pipe.
+fn lines_of(stream: impl Read + Send + 'static) -> Receiver<String> {
+    let (sender, lines) = mpsc::channel();
+    std::thread::spawn(move || {
+        for line in BufReader::new(stream).lines() {
+            let Ok(line) = line else { return };
+            if sender.send(line).is_err() {
+                return;
+            }
+        }
+    });
+    lines
+}
+
+/// What `lines` carried up to and including the first line holding one
+/// of `ends`, and the end it held; `None` when no such line came within
+/// [`PATIENCE`] or the stream ended first.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "test code: the patience is read off the wall clock"
+)]
+fn read_until<'a>(lines: &Receiver<String>, ends: &[&'a str]) -> (String, Option<&'a str>) {
+    let deadline = Instant::now().checked_add(PATIENCE).unwrap();
+    let mut read = String::new();
+    while let Ok(next) = lines.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+        read.push_str(&next);
+        read.push('\n');
+        if let Some(end) = ends.iter().copied().find(|end| next.contains(end)) {
+            return (read, Some(end));
+        }
+    }
+    (read, None)
+}
+
 /// A served city with its console on this test's pipes, ended when
 /// dropped.
 struct Served {
     child: Child,
     console: ChildStdin,
     printed: Receiver<String>,
+    /// Held so the log keeps draining after the proof is read.
+    logged: Receiver<String>,
 }
 
 impl Served {
+    /// Starts the city and returns once its log says the history is
+    /// proved, so the first line typed is not refused as unproven.
     fn start(city_root: &Path) -> Served {
         // `:0`, so the relay reaches the city only at the port its
         // listener was given, never at the one `serve` was asked for
@@ -372,44 +428,37 @@ impl Served {
             .arg("--console")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()
             .unwrap();
-        let stdout = child.stdout.take().unwrap();
-        let (sender, printed) = mpsc::channel();
-        std::thread::spawn(move || {
-            for line in BufReader::new(stdout).lines() {
-                let Ok(line) = line else { return };
-                if sender.send(line).is_err() {
-                    return;
-                }
-            }
-        });
+        let printed = lines_of(child.stdout.take().unwrap());
+        let logged = lines_of(child.stderr.take().unwrap());
         let console = child.stdin.take().unwrap();
-        Served {
+        // Bound before the wait, so a failed wait still ends the child.
+        let served = Served {
             child,
             console,
             printed,
-        }
+            logged,
+        };
+        let (log, end) = read_until(&served.logged, &[PROVED, STOPPED]);
+        assert_eq!(
+            end,
+            Some(PROVED),
+            "the served city did not prove its history within {PATIENCE:?}; its log:\n{log}"
+        );
+        served
     }
 
     /// Types `line` at the console and answers what it printed up to the
-    /// first line holding `answer`, waiting up to [`PATIENCE`] for each
-    /// line it prints.
+    /// first line holding `answer`, waiting up to [`PATIENCE`] in all.
     fn type_line(&mut self, line: &str, answer: &str) -> String {
         writeln!(self.console, "{line}").unwrap();
         self.console.flush().unwrap();
-        let mut printed = String::new();
-        while let Ok(next) = self.printed.recv_timeout(PATIENCE) {
-            printed.push_str(&next);
-            printed.push('\n');
-            if next.contains(answer) {
-                return printed;
-            }
-        }
+        let (printed, end) = read_until(&self.printed, &[answer]);
         assert!(
-            printed.contains(answer),
-            "`{line}` was not answered with `{answer}`; the console printed:\n{printed}"
+            end.is_some(),
+            "`{line}` was not answered with `{answer}` within {PATIENCE:?}; the console printed:\n{printed}"
         );
         printed
     }
