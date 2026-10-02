@@ -34,7 +34,7 @@ It is built for small teams who want agents to keep running fixed work, and for 
    irm https://raw.githubusercontent.com/2youg1/sprawling/main/install.ps1 | iex         # Windows PowerShell
    ```
 
-   The other ways in are the archive for your system from the [latest release](../../releases/latest) (Windows x86-64, macOS on Apple silicon, Linux x86-64), `bunx sprawling up` or `npx sprawling up`, and `cargo install sprawling --locked` with Rust 1.97 or later. The binaries are not code-signed: on Windows choose **More info → Run anyway**, and on macOS open the binary once from Finder's right-click menu.
+   The other ways in are the archive for your system from the [latest release](../../releases/latest) (Windows x86-64, macOS on Apple silicon, Linux x86-64), `bunx sprawling up` or `npx sprawling up`, `cargo binstall sprawling`, which fetches that same archive, and `cargo install sprawling --locked` with Rust 1.97 or later. The binaries are not code-signed: on Windows choose **More info → Run anyway**, and on macOS open the binary once from Finder's right-click menu.
 
 2. Raise a city and open it:
 

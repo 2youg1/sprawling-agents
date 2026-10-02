@@ -34,7 +34,7 @@ Claude Code、Codex CLI 这类终端 agent 一次给你一个 agent：一个模�
    irm https://raw.githubusercontent.com/2youg1/sprawling/main/install.ps1 | iex         # Windows PowerShell
    ```
 
-   其他途径：从[最新 release](../../releases/latest) 下载你系统的归档（Windows x86-64、Apple 芯片的 macOS、Linux x86-64）；`bunx sprawling up` 或 `npx sprawling up`；装了 1.97 或更新的 Rust，用 `cargo install sprawling --locked`。这些二进制没有代码签名：Windows 上选 **More info → Run anyway**，macOS 上在 Finder 里右键打开一次。
+   其他途径：从[最新 release](../../releases/latest) 下载你系统的归档（Windows x86-64、Apple 芯片的 macOS、Linux x86-64）；`bunx sprawling up` 或 `npx sprawling up`；`cargo binstall sprawling`，取的就是那份归档；装了 1.97 或更新的 Rust，用 `cargo install sprawling --locked`。这些二进制没有代码签名：Windows 上选 **More info → Run anyway**，macOS 上在 Finder 里右键打开一次。
 
 2. 建一座城并打开它：
 
