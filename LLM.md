@@ -110,10 +110,10 @@ under it:
 {"ask":{"ask_id":2,"query":{"run_view":{"run":"<run id>"}}}}
 ```
 
-Queries, every one the city answers (<!-- xtask:begin query_frames -->47<!-- xtask:end --> in all):
+Queries, every one the city answers (<!-- xtask:begin query_frames -->52<!-- xtask:end --> in all):
 
 <!-- xtask:begin query_names -->
-`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `history_range`, `sessions`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `known_hosts`, `harnesses`, `building_view`, `identity`, `automation`, `github_login`, `guide`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `document`, `proposals`, `range`, `preview`, `reply`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `newest_release`, `preferences`, `config`, `run_costs`, `upstream_version`
+`city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `history_range`, `sessions`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `known_hosts`, `harnesses`, `building_view`, `identity`, `automation`, `github_login`, `guide`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `find`, `document`, `proposals`, `open_proposals`, `range`, `versions`, `bytes`, `export`, `preview`, `reply`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `newest_release`, `preferences`, `config`, `run_costs`, `upstream_version`
 <!-- xtask:end -->
 
 A bounded answer says how many rows it left out. `city_view` and `cost_view`

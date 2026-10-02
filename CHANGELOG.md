@@ -25,7 +25,7 @@ release notes and their commits.
 **sprawling <!-- xtask:begin workspace_version -->0.0.8<!-- xtask:end --> something (<!-- xtask:begin maturity:word -->pre-alpha<!-- xtask:end -->)**
 
 <!-- xtask:begin maturity:titled -->Pre-alpha<!-- xtask:end -->. It records what has landed after `v0.0.7-Pre-alpha-260927` so
-far. WIRE_V <!-- xtask:begin wire_v -->45<!-- xtask:end -->. Every wire change below shares that one `WIRE_V`: the
+far. WIRE_V <!-- xtask:begin wire_v -->46<!-- xtask:end -->. Every wire change below shares that one `WIRE_V`: the
 version moved once, at the first change of shape after the last push, and
 moves again only after the next push (wire-SPEC 12.1).
 
