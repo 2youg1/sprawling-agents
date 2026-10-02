@@ -12,12 +12,14 @@ use super::THEME;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The colour production point: the client names colour once, and this is
-/// where. A table with one row rather than a bare constant, because the
-/// question it answers - which files the scan walks past - is not the
-/// question `THEME` answers, and a second client would add a row here
-/// without touching which file the token assertions read.
-const PRODUCTION_POINTS: [&str; 1] = [THEME];
+/// The colour production points: each client names colour once, and these
+/// are where. The second row is the playback skill's reference page, a
+/// single file a city hands a person, which names its colours once in its
+/// own `:root` blocks because it cannot load the client's stylesheet. The
+/// question this table answers - which files the scan walks past - is not
+/// the question `THEME` answers, so the page joins it without touching
+/// which file the token assertions read.
+const PRODUCTION_POINTS: [&str; 2] = [THEME, "skills/playback/template.html"];
 
 /// The files that spell colour because reading a colour means naming
 /// it, and the one test that writes the spelling it asserts. Same shape
