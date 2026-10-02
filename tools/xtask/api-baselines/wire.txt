@@ -1012,6 +1012,7 @@ pub fn wire::Aggregate::merge(alloc::vec::Vec<(wire::CityLabel, alloc::vec::Vec<
 pub fn wire::Aggregate::new() -> Self
 pub fn wire::Appearance::default() -> Self
 pub fn wire::BindFace::token_digest(&self) -> core::option::Option<&kernel::locator::B3Hash>
+pub fn wire::Bound::local_addr(&self) -> core::net::socket_addr::SocketAddr
 pub fn wire::CityLabel::as_str(&self) -> &str
 pub fn wire::CityLabel::parse(&str) -> core::result::Result<Self, kernel::error::shape::AxError>
 pub fn wire::ClientAssets::lookup(&self, &str) -> wire::AssetReply
