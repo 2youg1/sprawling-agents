@@ -5,7 +5,7 @@
 
 <script lang="ts">
   // A workbench pane's label, which is also the menu that moves the pane
-  // (client-SPEC 7K, 7-11): APG Menu Button. Enter, Space or Down opens
+  // (client/Spec.lean §7K, §7-11): APG Menu Button. Enter, Space or Down opens
   // it on its first item, Up and Down walk the items, Enter or Space
   // moves the pane, and Escape or Tab closes it with the focus back on
   // the label. The order is the person's and is kept in this browser

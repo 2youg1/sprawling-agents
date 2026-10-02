@@ -50,7 +50,7 @@
     // Absent for the same reason.
     readonly onRetry?: ((task: string) => void) | undefined;
     // Whether this run opens the stretch of the room on screen, so its
-    // first head states the model the session froze (client-SPEC 7D).
+    // first head states the model the session froze (client/Spec.lean §7D).
     // A later run of the same session leaves that to the first.
     readonly opens?: boolean;
   }
@@ -285,7 +285,7 @@
   {#if emptyRun}
     <!-- The zero-output run: what happened where the reply would have
          been, and one way out, the verb spelled as the command it sends
-         (client-SPEC 4-10). A run the person stopped says so rather
+         (client/Spec.lean §4-10). A run the person stopped says so rather
          than blaming the model. -->
     {@const stopped = (answer?.closing?.completion ?? (run.doing.kind === "frozen" ? run.doing.completion : null)) === "cancelled"}
     <Failed

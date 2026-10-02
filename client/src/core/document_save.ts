@@ -5,7 +5,7 @@
 
 // What became of a person's unsaved work on one document: the draft the
 // browser keeps, the save the page sent, and the city's receipt for it
-// (client-SPEC 4-46, `crates/wire/Spec.lean` §8-72).
+// (client/Spec.lean §4-46, `crates/wire/Spec.lean` §8-72).
 //
 // **Only the city says "saved".** A save is a `PutRange` on the version
 // it was made on; the city answers a refusal or nothing, and records a

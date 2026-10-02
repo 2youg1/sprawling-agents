@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { reachOf } from "./staleness";
 
 // The settings panel calls a save saved only when the city answers
-// again (client-SPEC 7L), so each write the panel makes has to reach
+// again (client/Spec.lean §7L), so each write the panel makes has to reach
 // the answer the panel reads it back from.
 describe("a write reaches the answer that reads it back", () => {
   test("a saved identity card makes the identity answer stale", () => {

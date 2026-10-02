@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The switch for browser notifications (client-SPEC 12-7). Off until
+  // The switch for browser notifications (client D7). Off until
   // the person turns it on, and the browser is asked for its permission
   // only at that moment, never when the page opens.
   import type { Key } from "../../core/lang";

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The figures a thread draws about time, and the one clock that moves
-// the figures still running (client-SPEC 4-44).
+// the figures still running (client/Spec.lean §4-44).
 //
 // **Every figure is a difference of two moments the Ledger wrote, or
 // nothing.** A call that answered took `answered - called`; a turn's

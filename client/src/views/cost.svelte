@@ -12,7 +12,7 @@
 // $0.00 as if it were a measurement or calling the city idle.
 //
 // **The total and the by-run cut are two questions and stay apart**
-// (client-SPEC 7D): one is what this city has spent, the other is who
+// (client/Spec.lean §7D): one is what this city has spent, the other is who
 // spent it. The figure beside the title is the total and never a sum of
 // the rows below it.
 //
@@ -135,7 +135,7 @@ width in as many columns as it holds. -->
       {@render unpriced(answer.unpriced)}
     {/if}
     <!-- The cuts are columns of the page itself, parted by a rule rather
-    than lifted onto cards (client-SPEC 7A-4, 4-50). -->
+    than lifted onto cards (client/Spec.lean §7A-4, §4-50). -->
     <div class="grid grid-fit gap-x-gutter gap-y-wide">
       {#each CUTS as each (each)}
         <section class="flex min-w-0 flex-col gap-snug border-t border-edge pt-base" aria-label={say($lang, TITLES[each])}>

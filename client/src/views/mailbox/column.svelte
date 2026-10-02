@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // What the mailbox holds, as one scrolling column (client-SPEC 4-49):
+  // What the mailbox holds, as one scrolling column (client/Spec.lean §4-49):
   // its head - the name, the link when it is not live, and on a phone
   // the way back - then deciding, working, recent and the notices, in
   // the order of what needs the person. `mailbox.svelte` seats it in the
@@ -74,7 +74,7 @@
     {/if}
   </header>
   <!-- One scroller for every section, walked by j and k and reached by
-  the digits (client-SPEC 7-11). -->
+  the digits (client/Spec.lean §7-11). -->
   <div bind:this={scroller} class="mailbox min-h-0 flex-1 overflow-y-auto px-base pb-wide">
     <Deciding onLeave={onClose} />
     <Working onLeave={onClose} />

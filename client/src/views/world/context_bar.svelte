@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The third line of a sessions row (client-SPEC 7K): a 2 px bar of how
+  // The third line of a sessions row (client/Spec.lean §7K): a 2 px bar of how
   // much of the window the room's newest run used, with a tick where the
   // handoff reminder sounds, so a person scanning the pane sees which
   // session is about to hand off. It is the context ring's reading drawn

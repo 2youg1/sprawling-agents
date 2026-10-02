@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // A model's reply as the page lays it out: the page's half of
-// `Query::Reply` (client-SPEC 4-26, 12-31). The city reads the Markdown
+// `Query::Reply` (client/Spec.lean §4-26, client D31). The city reads the Markdown
 // and says where the blocks it read end; this decides which stretch of
 // the text the next question carries and how an answer joins the blocks
 // already drawn. Nothing here reads Markdown.

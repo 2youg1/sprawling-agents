@@ -7,7 +7,7 @@
 
 <script lang="ts" module>
   // The way from one line of the inspector to the person's own editor
-  // (client-SPEC 4-39): a link when the line belongs to the worktree's
+  // (client/Spec.lean §4-39): a link when the line belongs to the worktree's
   // current text and an editor is chosen, and otherwise the location
   // written out to copy, so the page never claims an editor opened
   // something (`core/editor.ts`'s `reachOf`).

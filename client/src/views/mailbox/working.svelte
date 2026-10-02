@@ -8,7 +8,7 @@
 <script lang="ts">
   // The second section of the mailbox: what is going now, one row per
   // room - its newest run that has not frozen, read from `belief.live`,
-  // the one answer to which runs are working (client-SPEC §5). A row
+  // the one answer to which runs are working (client/Spec.lean §7). A row
   // names the room, the phase in its mark and word, how long the run has
   // gone, and its task; it is a link to that room's conversation. The
   // newest room first, the order a person who just dispatched looks in.

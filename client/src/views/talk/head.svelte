@@ -5,12 +5,12 @@ Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- The head of one message: who said it, the frozen facts it was said
 under, when, and - once the turn is in the Ledger - how fast it came
-(refrain §3-3, client-SPEC 4-44). One line of note text, the speaker in
+(refrain §3-3, client/Spec.lean §4-44). One line of note text, the speaker in
 the label weight and everything else faint, so a thread reads as a
 column of names with words under them.
 
 **Each figure is drawn only where the screen has no other home for it**
-(client-SPEC 7D). The model is a fact of the session, so it stands on
+(client/Spec.lean §7D). The model is a fact of the session, so it stands on
 the first head and again only where a turn answered with a different
 model; the time is to the second, because the tool lines carry the
 milliseconds; the cost of a turn is not drawn in the zen and blend tiers

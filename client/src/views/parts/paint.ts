@@ -7,7 +7,7 @@
 // It is a lazy chunk: `code.ts` imports it on the first piece of code a
 // screen shows, and each grammar below is a chunk of its own, so a page
 // that only ever shows Rust downloads the Rust grammar and no other
-// (client-SPEC 4-26).
+// (client/Spec.lean §4-26).
 
 import { highlightCode, tagHighlighter, tags } from "@lezer/highlight";
 

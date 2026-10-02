@@ -5,7 +5,7 @@
 
 // Which entry of a room's listing is a run's transcript: the directory
 // tree names those rows by their task, and the room's directory counts
-// the ones the page holds no run for (client-SPEC 4-50).
+// the ones the page holds no run for (client/Spec.lean §4-50).
 
 import { Option } from "effect";
 

@@ -158,7 +158,7 @@ A violation turns the check red with a message that names the rule, the violatio
 
 ## The view layer
 
-`client/` is held to colour from `theme.css`, wording from `lang.json`, the size budget, and the eslint rules the client's own config sets (no `any`, no `as`, no `throw`, no `try`, no non-exhaustive switch). It is exempt from SPEC-first and from red-before-green, because cheap iteration is what makes an interface good, and a SPEC and a failing test for every visual change would tax that iteration to buy correctness the view layer was not losing. The interaction contract of each part — its ARIA pattern, its keys, where focus returns — is the half that is not exempt, and `client/client-SPEC.md` section 7 holds it.
+`client/` is held to colour from `theme.css`, wording from `lang.json`, the size budget, and the eslint rules the client's own config sets (no `any`, no `as`, no `throw`, no `try`, no non-exhaustive switch). It is exempt from SPEC-first and from red-before-green, because cheap iteration is what makes an interface good, and a SPEC and a failing test for every visual change would tax that iteration to buy correctness the view layer was not losing. The interaction contract of each part — its ARIA pattern, its keys, where focus returns — is the half that is not exempt, and `client/Spec.lean` holds it: section 9 names the parts under `client/spec/` where each contract is a state machine with its proofs.
 
 Read [`docs/frontend-method.md`](docs/frontend-method.md) before you change a screen. It says how a screen is built here: settled against the shipped stylesheet, given a fixture on `#/gallery`, and accepted by `cargo xtask render`, which measures where the boxes landed in a real engine.
 

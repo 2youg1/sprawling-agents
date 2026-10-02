@@ -15,7 +15,7 @@
   // treat that box as its window.
   //
   // **The three notice seats live here because one refusal has three
-  // homes on screen and no seat of its own file** (client-SPEC 4-35):
+  // homes on screen and no seat of its own file** (client/Spec.lean §4-35):
   // the drawer that keeps a day of them, the corner a toast rises
   // into, and the line under a field that a person is still typing in.
   // Each draws the same `parts/notice.svelte`, so the three cases read
@@ -183,7 +183,7 @@
 
   // The label of one recovery action. A command is spelled as itself
   // in both languages; a link action has no spelling and takes the
-  // word its own row carries, and so does a form (client-SPEC 4-10,
+  // word its own row carries, and so does a form (client/Spec.lean §4-10,
   // 4-35a, `core/recovering.ts`).
   function wordOf(lang: Lang, recovery: Recovery): string {
     switch (recovery.kind) {

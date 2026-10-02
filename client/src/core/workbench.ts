@@ -3,7 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// How the panorama tier's workbench is arranged (client-SPEC 7K, 12-24):
+// The properties this module must hold are proved in `client/spec/Core/Workbench.lean`.
+//
+// How the panorama tier's workbench is arranged (client/Spec.lean §7K, client D24):
 // which of its three panes stands where, and how many of the shell's
 // twelve columns each one takes.
 //

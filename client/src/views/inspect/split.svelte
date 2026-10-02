@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // The line between the editor and the terminal (client-SPEC 7-11): an
+  // The line between the editor and the terminal (client/Spec.lean §7-11): an
   // APG Window Splitter that moves in whole lines of the code below it,
   // so the two regions always end on a line rather than through one. A
   // drag starts on the line and nowhere else, so selecting text in either

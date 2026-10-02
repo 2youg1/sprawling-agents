@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The head of the world's sheet on one column (client-SPEC 4-52): the
+  // The head of the world's sheet on one column (client/Spec.lean §4-52): the
   // back key at the top of the side the sheet came from, and one tab per
   // pane in the person's order, one pane shown at a time. The panes are
   // the workbench's own, mounted by `workspace.svelte` and laid out there,

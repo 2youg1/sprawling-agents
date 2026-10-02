@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The one-pixel line under the composer's words (client-SPEC 7I). It is
+  // The one-pixel line under the composer's words (client/Spec.lean §7I). It is
   // drawn out to the end of the longest line written and fades after it,
   // so an empty box shows only a lead from the left edge and the first
   // words draw the line out like a progress bar; after a send it shrinks

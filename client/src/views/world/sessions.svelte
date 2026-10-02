@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The world layer's sessions pane (client-SPEC 7K): every room that has
+  // The world layer's sessions pane (client/Spec.lean §7K): every room that has
   // run anything, grouped by building, one row each - a state dot, the
   // room, how long its run has been going or that it waits or is done,
   // and the task under it. The room the conversation is in is the chosen

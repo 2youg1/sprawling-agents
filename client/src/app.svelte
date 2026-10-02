@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The shell: one twelve-column grid (client-SPEC 4-33), the page on its
+  // The shell: one twelve-column grid (client/Spec.lean §4-33), the page on its
   // columns, the three edge keys at the foot of the first column, and what
   // may float over them - the settings panel, a refusal, the palette, the
   // sheet of keys. Which page shows is the address bar's decision, read on
@@ -163,7 +163,7 @@
   // The tier is the person's, kept where their other postures are kept
   // (`core/prefs.ts`), and cycled in the order `TIERS` states. Holding the
   // layers key - the edge key or its chord - shows the blend tier for as
-  // long as it is held and changes nothing (client-SPEC 7E). One column has
+  // long as it is held and changes nothing (client/Spec.lean §7E). One column has
   // no room beside the talk: the key opens the world as a sheet over it (4-52).
   let columns = $state<Columns>("twelve");
   function cycleTier(): void {

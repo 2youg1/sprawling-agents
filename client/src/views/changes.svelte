@@ -35,7 +35,7 @@
     // prefills. Absent where the page has no conversation to talk to.
     readonly talk?: Address | undefined;
     // A control at the end of each file's row, handed the file's path:
-    // a building's commit list puts "take back" there (client-SPEC 4-50).
+    // a building's commit list puts "take back" there (client/Spec.lean §4-50).
     readonly act?: Snippet<[string]> | undefined;
   }
 

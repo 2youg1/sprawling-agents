@@ -8,7 +8,7 @@
 // both from `kernel::ToolMeta` through the `tool_called` line), never off
 // the tool's name. A tool added tomorrow is drawn by its registration the
 // day it lands; a table of names here would be a second registry that
-// learns of it later (client-SPEC 4-26).
+// learns of it later (client/Spec.lean §4-26).
 //
 // **The drawing intent comes first** because it is the more specific of
 // the two: a terminal is an `exec` whatever boundary it crosses, and a

@@ -15,7 +15,7 @@
   // One instance draws one directory level and hands each open folder
   // the next instance, so every level owns one question (`Query::
   // Listing`) and one store subscription. The transcript reading goes
-  // through `core/run_id` (client-SPEC 3-2): this file holds no grammar
+  // through `core/run_id` (client/Spec.lean §3-2): this file holds no grammar
   // of its own, and a name the generated `RunId` refuses is a name like
   // any other.
   import { within } from "../../core/belief/live";
@@ -49,7 +49,7 @@
     // passes both. A region rather than a `nav`: the tree is what the
     // building holds, read level by level, not a way between pages, and
     // its rows step in by depth where a navigation column's rows share
-    // one left edge (client-SPEC 4-50).
+    // one left edge (client/Spec.lean §4-50).
     readonly at?: Address | undefined;
     readonly depth?: number | undefined;
   }

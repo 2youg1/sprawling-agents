@@ -147,7 +147,7 @@ D10 `usersbrowser` 驱动人已经开着的那个浏览器，用的是那个人�
 
 D11 一页哪里画错了，由一份测量、一套判决回答，门（`xtask render`）与工具（`survey` 动作）读同一份；它住产品 crate，门与工具各留一份就会分叉到「门说干净、住户说坏」而二者各自诚实。`probe::body` 是注入页面的 ES5，返回三个字符串（元素、声明的词、绘制条件）：门渲染一次并 dump DOM，三串写进三个 `<pre>`；住户勘察的是人自己打开的页面，不许往上加任何东西，所以 `probe::evaluated` 把同一段包进一个 promise，三串作为一次 `script.evaluate` 的值回来。主题由调用方决定：门为每个 pass 强制一个主题，住户传 `None`，因为强制主题报的是没人看过的那一页；`PaintSource` 同理。源码索引在有源码树的那一侧：`Sources` 的查找随判决进产品 crate，走源码树的那一步留在 `xtask`，住户得到的每条发现只点名盒子，这是诚实的空状态（`Sources::default()`）。结果答一个 tagged 字符串（一个 `<edit>` 一处修复、一个 `<at>` 一个落点），拆成结构化载荷等于第二种渲染。量具的两条规则：容差 `SLACK`（1 px）在每一次缘比较上都加；群体先从几何读出容器的堆叠方向，只比容器不分发的那一轴。行容器的交叉轴不扫：带里的位置由 `align-items` 决定，本库到处用居中，不同行高的子元素按设计就有不同顶缘；正确读它要比较顶、中、底里多数实际持有的那一个，这把尺子还没有这个读数（§3）。
 
-D12 一个 run 能按键：`Action::Press { key, modifiers }`，一帧 `input.performActions` 的 `key` 源（`spec/Keyboard.lean`）。客户端的键表（`client/client-SPEC.md` §7）因此有了机器读者，验收可以由本产品驱动本产品。键名与修饰键名取 DOM `KeyboardEvent.key` 的值，一个字符键就写那个字符；名字、WebDriver 码位与枚举在 `keyboard` 的一处对应，`Key::parse`、`Modifier::parse` 与 `key_frame` 都读它，`verb::read` 经这两个 `parse` 取值。按键落在焦点上：`Press` 不带 ref，不需要第二帧；要先让某个元素得到焦点，是先做一次 `click`。没有快照即拒，没有 ref 所以不核 generation。不换算大小写：`K` 送出的就是 `K`，`Shift` 另是一个修饰键。读参：`kind` 为 `press`，`key` 必填，`modifiers` 可选、是字符串数组；未知的名字各以 `E_INVALID_ARGS` 拒绝，恢复语列出能用的名字。被否决的备选：在 `Type` 的文字里夹转义（同一个字符串既是文字又是键）；`"Ctrl+K"` 形式的小语言（键名之外的第二套文法）。
+D12 一个 run 能按键：`Action::Press { key, modifiers }`，一帧 `input.performActions` 的 `key` 源（`spec/Keyboard.lean`）。客户端的键表（`client/Spec.lean` §9）因此有了机器读者，验收可以由本产品驱动本产品。键名与修饰键名取 DOM `KeyboardEvent.key` 的值，一个字符键就写那个字符；名字、WebDriver 码位与枚举在 `keyboard` 的一处对应，`Key::parse`、`Modifier::parse` 与 `key_frame` 都读它，`verb::read` 经这两个 `parse` 取值。按键落在焦点上：`Press` 不带 ref，不需要第二帧；要先让某个元素得到焦点，是先做一次 `click`。没有快照即拒，没有 ref 所以不核 generation。不换算大小写：`K` 送出的就是 `K`，`Shift` 另是一个修饰键。读参：`kind` 为 `press`，`key` 必填，`modifiers` 可选、是字符串数组；未知的名字各以 `E_INVALID_ARGS` 拒绝，恢复语列出能用的名字。被否决的备选：在 `Type` 的文字里夹转义（同一个字符串既是文字又是键）；`"Ctrl+K"` 形式的小语言（键名之外的第二套文法）。
 
 成本：`to_text` 一行三个字段，因为模型下一件事是把 ref 抄回来；拒词报出可用 ref 的数量与起点。
 -/
@@ -195,6 +195,6 @@ D12 一个 run 能按键：`Action::Press { key, modifiers }`，一帧 `input.pe
 
 - `architecture.toml` 里 browser 各行（锚点指向本文件与分部）与 ARCHITECTURE.md §4 缝清单（`BrowserPort`）；ARCHITECTURE.md §11 的 V3 一行引 D1。
 - `docs/glossary.md` 的 **browser** 行（D4）与新增词汇。
-- `crates/desktop/Spec.lean` §8-7（拖拽与滚动的同一份词汇，D9）；client-SPEC §7（键表，D12）；`crates/city/Spec.lean` §8-2 的 policy（confidential 与 `usersbrowser`，D10）；`tools/xtask/Spec.lean` 的 `render` 一节与 §8-26 `survey`（D11）；`crates/sprawling/Spec.lean` 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
+- `crates/desktop/Spec.lean` §8-7（拖拽与滚动的同一份词汇，D9）；client/Spec.lean §9（键表，D12）；`crates/city/Spec.lean` §8-2 的 policy（confidential 与 `usersbrowser`，D10）；`tools/xtask/Spec.lean` 的 `render` 一节与 §8-26 `survey`（D11）；`crates/sprawling/Spec.lean` 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
 - 本 crate 没有 `conformance` feature（D1）。
 -/

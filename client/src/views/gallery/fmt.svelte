@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // The formats RefRain draws besides text (client-SPEC 4-54), at the
+  // The formats RefRain draws besides text (client/Spec.lean §4-54), at the
   // width the right side has beside a conversation at 1440: a PDF's
   // pages, a DOCX laid out as pages with what it leaves out counted, an
   // HTML page in RefRain's preview with its script and outside picture

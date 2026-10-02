@@ -7,7 +7,7 @@
 // that control may be pressed, and what pressing it does. `core/
 // recovering.ts` says which actions a refusal offers; this file is the
 // view's single answer to what they mean, read by both notice seats -
-// the drawer and the toast (client-SPEC 4-35). Two seats that each
+// the drawer and the toast (client/Spec.lean §4-35). Two seats that each
 // wired a deed would give one refusal two answers.
 //
 // **A command recovery is labelled in the person's own words and does
@@ -25,10 +25,10 @@
 // address, or the room of the run a run page follows - because that is
 // where the refused request was sent from. The address grammar accepts
 // a sentence with spaces and backquotes, so a subject read as a room
-// once opened a building named after an error message (client-SPEC 4-35).
+// once opened a building named after an error message (client/Spec.lean §4-35).
 //
-// **A form recovery writes and moves; it never sends** (client-SPEC
-// 4-35a). It fills the draft door of the room it names and moves there,
+// **A form recovery writes and moves; it never sends** (client/Spec.lean
+// §4-35a). It fills the draft door of the room it names and moves there,
 // and the dispatch that follows is the one the person presses.
 
 import { Option } from "effect";
@@ -145,7 +145,7 @@ export function recoveryWhy(u: Ui, recovery: Recovery, refused: Refused): Key | 
 // What one recovery does. `/new` opens the session itself - `open_session`
 // is the command behind `/new`, sent without a line through a box - and
 // `/stop` cancels the run the refusal names and nothing wider: halting a
-// room is `/halt`, a separate verb (client-SPEC 4-41).
+// room is `/halt`, a separate verb (client/Spec.lean §4-41).
 export function recover(u: Ui, recovery: Recovery, refused: Refused): void {
   if (recovery.kind === "reconnect") {
     u.conn.retry();

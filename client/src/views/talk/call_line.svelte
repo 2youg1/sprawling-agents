@@ -4,7 +4,7 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- One tool call, pressed to one line: `kind  subject  time  result`
-(refrain §3-4, client-SPEC 4-44). The line is the trigger of the right
+(refrain §3-4, client/Spec.lean §4-44). The line is the trigger of the right
 side: pressing it shows the whole call there, through the one door every
 opener uses (`inspect/open.svelte.ts`).
 
@@ -12,7 +12,7 @@ opener uses (`inspect/open.svelte.ts`).
 draws tenths from this page's ticker, recomputed from the call's own
 moment on every tick; once the result is in the Ledger it draws the
 Ledger's milliseconds, and the moment it finished is in the hint as an
-ISO instant (client-SPEC 7D). A span nobody measured draws nothing.
+ISO instant (client/Spec.lean §7D). A span nobody measured draws nothing.
 
 **Keys belong to the line, not to the page.** ↑ and ↓ (and j and k,
 because a list of lines is a place they mean "next") move to the line
@@ -135,8 +135,8 @@ is still standing where they were reading. -->
         {/if}
         {#if pinned}
           <!-- The steer pin: a small accent wedge pointing at this line.
-          It repeats what the coin's name already says (client-SPEC
-          4-13), so it is drawn for the eye and hidden from a reader. -->
+          It repeats what the coin's name already says (client/Spec.lean
+          §4-13), so it is drawn for the eye and hidden from a reader. -->
           <span class="steer-pin" aria-hidden="true"></span>
         {/if}
       </span>

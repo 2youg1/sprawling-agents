@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The context ring round the coin key (client-SPEC 7J): where the eye
+  // The context ring round the coin key (client/Spec.lean §7J): where the eye
   // already is, without taking a place of its own. A whole one-pixel
   // ring is an empty window; the used part is eaten away clockwise from
   // twelve o'clock, and two checkpoints mark where the reminders sound.

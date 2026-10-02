@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // The proposal cards open on one document, in the mailbox's deciding
-  // section (client-SPEC 4-55): each card leads with the document's path
+  // section (client/Spec.lean §4-55): each card leads with the document's path
   // and the way to it, which opens the document on the right side with
   // the same cards above its text.
   import { readAnswer } from "../../core/answered";

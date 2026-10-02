@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // The third section of the mailbox: the sessions of every room this
-  // page knows, newest activity first (client-SPEC 4-49). Each room is
+  // page knows, newest activity first (client/Spec.lean §4-49). Each room is
   // asked once (`Query::Sessions`, wire §8-71) and the answers are
   // merged by the time of each session's last line. A row is a link to
   // the room, and beside it, always visible rather than on hover, the

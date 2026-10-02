@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts" module>
-  // The three edge keys at the foot of the first column (client-SPEC 7E):
+  // The three edge keys at the foot of the first column (client/Spec.lean §7E):
   // layers, which changes the tier; the mailbox; settings. They are the
   // only standing buttons on the page besides the composer's, and
   // nothing stands above them.

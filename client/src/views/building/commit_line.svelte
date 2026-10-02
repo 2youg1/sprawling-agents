@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // One commit as one line (client-SPEC 4-50, UC2): its short oid, the
+  // One commit as one line (client/Spec.lean §4-50, UC2): its short oid, the
   // first line of its message, the room that wrote it and the moment,
   // in ISO form to the second. The cells sit on the grid of whatever
   // draws the line - a row of the commit list, or the head of a commit

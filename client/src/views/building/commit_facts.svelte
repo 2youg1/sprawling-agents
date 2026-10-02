@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // What one commit is, as a sheet of facts (client-SPEC 4-50, UC2): the
+  // What one commit is, as a sheet of facts (client/Spec.lean §4-50, UC2): the
   // run that wrote it, the session and the model, what that run cost,
   // the runs it succeeded, its parents and its whole oid. A parent the
   // page already holds opens its own row; one it does not is asked for

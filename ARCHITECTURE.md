@@ -540,7 +540,7 @@ the part worth knowing before starting, not after.
 | a new seam | §4, and the trait's file | `depmap` refuses a `pub trait` outside the files §4 names |
 | a new module, or a deleted one | `architecture.toml` | `modmap` refuses a file with no entry, and an entry whose file is gone |
 | a platform the release ships | `xtask::platform`'s `PLATFORMS` | one row per platform; the npm scope and the bare root name are asserted there |
-| the page | `client/` + client-SPEC | its own lint, typecheck and tests; the bundle is measured against a byte budget |
+| the page | `client/` + `client/Spec.lean` | its own lint, typecheck and tests; the bundle is measured against a byte budget |
 | what a module must hold on every input | the part under the crate's `spec/` that names the module (§11, *Specifications in Lean*) | `just models` proves it with no `sorry`, `admit` or `axiom`; the module's rustdoc names the part |
 | a gate itself | `tools/xtask/` + `tools/xtask/Spec.lean` | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
 
@@ -713,20 +713,24 @@ and `lake-manifest.json` sit at the root; they are the only Lean package
 and the only Lean version pin in the tree. The manifest lists no packages,
 so every import is this tree's or the toolchain's own. The package has
 four targets. The library `Spec` is every module under `crates/`, the
-checker's own specification, the simulator's and the gates', and `just models` builds it inside
+checker's own specification, the simulator's, the gates' and the browser
+client's, and `just models` builds it inside
 `just check`. The library `Sprawling` (`tools/adversary/src`) and the
 executables `adversary` and `acceptance` (`tools/adversary/test`) are the
 checker, which only `just adversary`, `just acceptance` and the nightly
 schedule build. The library `Spec` reaches its modules by the glob
 `crates.+`, for the checker's specification by `tools.adversary.Spec` and
 `tools.adversary.spec.+`, for the simulator's by `tools.citysim.Spec` and
-`tools.citysim.spec.+`, and for the gates' by `tools.xtask.Spec` and
-`tools.xtask.spec.+`. When the specification of `client` moves to Lean,
-the change that
-moves one adds the two globs `<dir>.Spec` and `<dir>.spec.+` for it, with
-`<dir>` its path in dotted form, and never a glob over a whole `tools`
-or `client` tree, because a `.+` glob walks every directory
-below it, build output and installed packages included.
+`tools.citysim.spec.+`, for the gates' by `tools.xtask.Spec` and
+`tools.xtask.spec.+`, and for the client's by `client.Spec` and
+`client.spec.+`. A specification outside `crates/` is reached by exactly
+these two globs, `<dir>.Spec` and `<dir>.spec.+` with `<dir>` its path in
+dotted form, and never by a glob over a whole `tools` or `client` tree,
+because a `.+` glob walks every directory below it, build output and
+installed packages included. The client's parts are named after its
+TypeScript modules below `client/src/` the way a crate's are named after
+its Rust modules: `views/parts/segmented.ts` is specified by
+`client/spec/Views/Parts/Segmented.lean`.
 
 **Where a specification lives.** A crate's entry is `crates/<dir>/Spec.lean`:
 the seventeen numbered section comments `skills/sdd` lists, and the imports

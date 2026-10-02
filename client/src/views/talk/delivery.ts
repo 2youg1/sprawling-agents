@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Where the words a person just sent stand, between the box and the run
-// that answers them (refrain §3-14, "送达、断线与恢复"; client-SPEC 4-44).
+// that answers them (refrain §3-14, "送达、断线与恢复"; client/Spec.lean §4-44).
 //
 // Five states, and two of them are not this file's: a **draft** is the
 // words still in the box, and **running** is the run's own thread, which

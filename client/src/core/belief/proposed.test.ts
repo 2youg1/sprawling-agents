@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Which documents the mailbox asks about (client-SPEC 4-55): the ones a
+// Which documents the mailbox asks about (client/Spec.lean §4-55): the ones a
 // `proposal_offered` line this page folded named, at the newest such
 // line. Driven through the belief's own door, the way the socket and a
 // gap walk fold records.

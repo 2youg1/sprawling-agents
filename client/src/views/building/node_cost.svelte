@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // What one plan node has cost, and which runs spent it
-  // (`Query::CostOf`, client-SPEC 4-50). The city keys the answer by
+  // (`Query::CostOf`, client/Spec.lean §4-50). The city keys the answer by
   // the node's number alone and sums every building's node of that
   // number, so the page draws the runs it can place inside this
   // building, adds those, and counts the rest in one line rather than

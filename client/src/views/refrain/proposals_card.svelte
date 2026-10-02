@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // One proposal card, the decide card's third kind (client-SPEC 7C,
+  // One proposal card, the decide card's third kind (client/Spec.lean §7C,
   // 4-55): its body is the city's sentence-by-sentence diff, and its
   // answers are accept (y), edit then accept (e) and reject (n). The same
   // card stands in the mailbox and above the document in RefRain; the

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// How the inspector reads one call (client-SPEC 4-45). The tool's own
+// How the inspector reads one call (client/Spec.lean §4-45). The tool's own
 // registration is the authority on what a call is: `Call.render` says a
 // call is a terminal or a diff, `Call.effect` that it only read
 // (`kernel::ToolMeta`), and nothing here keeps a table of tool names. The

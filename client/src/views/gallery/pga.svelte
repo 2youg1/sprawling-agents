@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // The building page and its sections (client-SPEC 4-50), standing in a
+  // The building page and its sections (client/Spec.lean §4-50), standing in a
   // made-up city: a page at the width `<main>` has in a 1440 window, then
   // each section at the width the middle column gives it - the commits
   // with and without messages, the changes since the last checkpoint,

@@ -7,7 +7,7 @@
 
 <script lang="ts" module>
   // The one card for everything that stops and asks the person
-  // (client-SPEC 7C): a 2 px bar down the leading edge and a glyph, a
+  // (client/Spec.lean §7C): a 2 px bar down the leading edge and a glyph, a
   // heading that says who asks and when, a body that is the kind's own,
   // and at most three answers on the keys `git add -p` taught - y, e and
   // n. A person learns the card once; every later one is recognised
@@ -31,7 +31,7 @@
   // What is being asked. `question` is a design question a resident
   // filed (`ApprovalItem`); `ask` is a door waiting on the person's own
   // hand (`E_APPROVAL_PENDING`); `proposal` is a change a run offers to
-  // a document (`ProposalCard`, client-SPEC 4-55).
+  // a document (`ProposalCard`, client/Spec.lean §4-55).
   export type DecideKind = "question" | "ask" | "proposal";
 
   // The three answers, each on its key.
@@ -41,7 +41,7 @@
     readonly answer: Answer;
     readonly label: string;
     // Why the answer cannot be given now; the control stays reachable
-    // and says so (client-SPEC 7-2).
+    // and says so (client/Spec.lean §7-2).
     readonly why?: string | undefined;
     readonly onPress: () => void;
   }
@@ -133,7 +133,7 @@
 
 <!-- The card is one region for a reader, named by its heading, and one
 entry of whatever list it stands in: its own focus is where `j`/`k` and
-the digits of the mailbox land (client-SPEC 7-11), and where y, e and n
+the digits of the mailbox land (client/Spec.lean §7-11), and where y, e and n
 are heard. -->
 <div
   class="asks flex min-w-0 flex-col gap-snug rounded-card py-base pr-pane focus-visible:wash"

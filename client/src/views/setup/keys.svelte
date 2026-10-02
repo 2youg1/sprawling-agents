@@ -82,7 +82,7 @@
                  a drawn chord while it waits and the listening posture
                  while it records. Enter and Space reach the one click
                  guard below through the platform, as every button's do
-                 (client-SPEC 7-2). -->
+                 (client/Spec.lean §7-2). -->
             <button
               type="button"
               class="h-control-sm rounded-control border border-edge px-snug hover:bg-raised aria-pressed:bg-raised-hover"

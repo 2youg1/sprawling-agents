@@ -5,7 +5,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The box a person writes in, written as a page (client-SPEC 7I): the
+  // The box a person writes in, written as a page (client/Spec.lean §7I): the
   // words, a line under them, the settings row under the line, and the
   // coin key in its context ring beside the words. Nothing here decides
   // where a message goes; the page does. `composer.ts` owns what the

@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // What a run in this building may touch: the building's own sandbox,
-  // as one card (client-SPEC 4-50, UG; `ConfigureBuilding.sandbox`).
+  // as one card (client/Spec.lean §4-50, UG; `ConfigureBuilding.sandbox`).
   //
   // **Whole, because the city reads it whole.** A layer that speaks
   // about the sandbox speaks about all of it (`kernel::config::

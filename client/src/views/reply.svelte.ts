@@ -5,7 +5,7 @@
 
 // A reply laid out by the city, as a component holds it: the questions
 // `core/replying.ts` decides on, asked one at a time through the page's
-// `asking`, and the blocks their answers bring (client-SPEC 4-26, 12-31).
+// `asking`, and the blocks their answers bring (client/Spec.lean §4-26, client D31).
 //
 // **A settled reply starts from what the streamed one last drew.** The
 // thread draws a reply in `talk/saying.svelte` while it streams and in

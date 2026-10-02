@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The remote group drawn from one standing (client-SPEC 4-57): what
+  // The remote group drawn from one standing (client/Spec.lean §4-57): what
   // the door is and the console verbs that open it, an invitation to
   // pair, the seed shown once, and the device this browser holds. Every
   // press goes back to the caller; the one status line is always

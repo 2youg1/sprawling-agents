@@ -196,7 +196,7 @@ const DOCTOR = "sprawling doctor --install";
       onPress={recheck}
     />
     <!-- wording-ok: the one command this screen exists to hand over;
-    a machine spelling, identical in both languages (client-SPEC 4-10) -->
+    a machine spelling, identical in both languages (client/Spec.lean §4-10) -->
     <code class="flex h-control items-center rounded-control border border-edge px-base font-mono text-note text-text">
       {DOCTOR}
     </code>

@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // What this building has written since its last checkpoint, and where
-  // its branch stands (client-SPEC 4-50). Every changed file is a way
+  // its branch stands (client/Spec.lean §4-50). Every changed file is a way
   // out: pressing the row opens the file's working-tree text on the
   // right side, and "take back" returns it to what that checkpoint
   // holds. The checkpoint itself names the run, the room and the model,
@@ -44,7 +44,7 @@
   });
 
   // The row whose file is in front on the right side, marked the way a
-  // chosen row is marked everywhere (client-SPEC 7B).
+  // chosen row is marked everywhere (client/Spec.lean §7B).
   function isOpen(path: string): boolean {
     const item = rightItem();
     return item !== null && item.kind === "document" && item.building === building && item.path === path;

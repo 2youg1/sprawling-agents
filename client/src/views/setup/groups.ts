@@ -15,7 +15,7 @@ import type { SetupGroup } from "../../core/route";
 
 export type Group = SetupGroup;
 
-// What each group is called (client-SPEC 4-36).
+// What each group is called (client/Spec.lean §4-36).
 export const HEADING: Record<Group, Key> = {
   you: "setup_group_you",
   accounts: "setup_group_accounts",
@@ -34,7 +34,7 @@ export const HEADING: Record<Group, Key> = {
 };
 
 // The line under the heading, saying what the group governs - the one
-// kind of sentence this panel is allowed (client-SPEC 4-10).
+// kind of sentence this panel is allowed (client/Spec.lean §4-10).
 export const HINT: Record<Group, Key | null> = {
   you: "setup_group_hint_you",
   accounts: "setup_group_hint_accounts",
@@ -73,5 +73,5 @@ export const WIDTH: Record<Group, string> = {
   about: "max-w-talk",
 };
 
-// The groups whose answers `core/prefs.ts` keeps (client-SPEC 4-29).
+// The groups whose answers `core/prefs.ts` keeps (client/Spec.lean §4-29).
 export const PREFERRED: readonly Group[] = ["network", "appearance", "keys"];

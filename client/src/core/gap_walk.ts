@@ -46,7 +46,7 @@ const GAP_PAGE = 200;
 
 // How many gap pages a reconnect fetches before a snapshot is the
 // cheaper way to the present: past this, asking every watched question
-// again moves fewer bytes than walking the range (client-SPEC 4-40).
+// again moves fewer bytes than walking the range (client/Spec.lean §4-40).
 const RESUME_PAGES = 2;
 
 export interface GapWalk {

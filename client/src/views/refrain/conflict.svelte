@@ -7,10 +7,10 @@
 
 <script lang="ts">
   // The draft stands on a version the city no longer holds. Nothing is
-  // decided for the person (client-SPEC 4-46): they compare the draft
+  // decided for the person (client/Spec.lean §4-46): they compare the draft
   // with the city's version, carry it over onto that version as a draft
   // still to be saved, or drop it - the last after a question, because
-  // a dropped draft is gone (12-1). The bar carries the `asks` mark of
+  // a dropped draft is gone (client D1). The bar carries the `asks` mark of
   // everything that waits on a person (7C) and is announced once.
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";

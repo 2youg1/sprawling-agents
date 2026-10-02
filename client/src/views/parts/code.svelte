@@ -74,7 +74,7 @@ const SHAPE =
   // Line numbers start at one because the wire hands over the head of a
   // result and says nothing about where in the file it began. The day a
   // call carries that offset, this becomes a prop rather than a fact
-  // decided here (client-SPEC 4-26).
+  // decided here (client/Spec.lean §4-26).
   const gutter = $derived(
     text
       .split("\n")

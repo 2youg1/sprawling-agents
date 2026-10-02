@@ -6,7 +6,7 @@
 // Where the work a page dispatched actually started. A dispatch at a
 // bare building opens a room the city names (`<building>/<room>`), so
 // the page that sent it is not where the run is; this is the one place
-// that recognises the run as the one sent from here (client-SPEC 12-6).
+// that recognises the run as the one sent from here (client D6).
 
 import type { Address, RunId } from "../wire";
 import type { RunBelief } from "./belief";

@@ -160,7 +160,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 /-! ## 8 接口先行
 
-客户端是 TypeScript 的 `client/`，它的 SPEC 是 `client/client-SPEC.md`。
+客户端是 TypeScript 的 `client/`，它的 SPEC 是 `client/Spec.lean`。
 
 三条不可动摇的形状约定，它们决定接口而非被接口决定：
 
@@ -376,7 +376,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 /-! ## 17 文档关系
 
 - ARCHITECTURE 模块表的 wire 各行。
-- `client/client-SPEC.md`：线上形状变了的那一侧。
+- `client/Spec.lean`：线上形状变了的那一侧。
 - `crates/sprawling/Spec.lean`：`serve` 子命令的装配面。
 
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 wire 各行的 `spec` 锚点一起重看。ARCHITECTURE.md §7「The wire」与 §8 的「a new `Command` or `Query` frame」一行引 D1。

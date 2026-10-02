@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // Proposal cards, the decide card's third kind (client-SPEC 4-55), on
+  // Proposal cards, the decide card's third kind (client/Spec.lean §4-55), on
   // a made-up city: a run in `shop/east` offered two cards on one plan,
   // one on the version the plan holds and one on a version it has since
   // left. Each card alone, one opened for editing, both above the

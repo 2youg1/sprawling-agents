@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The shell's frame as the browser lays it out (client-SPEC 4-52, 12-30):
+// The shell's frame as the browser lays it out (client/Spec.lean §4-52, client D30):
 // how many columns its grid has, and how much of the page the person can
 // see while a soft keyboard is open.
 

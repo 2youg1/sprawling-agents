@@ -120,7 +120,7 @@ export const LOG_WINDOW = 500;
 // arrives again as itself is the same notice, counted: two dispatches
 // refused by one frozen shape used to draw the same four fields twice,
 // and a person could not tell a city that failed once from one that
-// failed twenty times (client-SPEC 4-35).
+// failed twenty times (client/Spec.lean §4-35).
 export interface Notice {
   readonly error: AxError;
   // Whether the bell has been read since the last arrival. A repeat

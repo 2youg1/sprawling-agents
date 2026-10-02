@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The heading of one notice (client-SPEC 4-35), and the next step under
+// The heading of one notice (client/Spec.lean §4-35), and the next step under
 // it: the sentences this client can say in the reader's own language,
 // found under `err_` and `recover_` plus the code in lower case.
 //

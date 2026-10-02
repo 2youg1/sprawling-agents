@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // The mailbox: the edge key at the foot of the first column and the
-  // transient column it opens from the left (client-SPEC 4-49, 7E). One
+  // transient column it opens from the left (client/Spec.lean §4-49, §7E). One
   // column, ordered by what needs the person: deciding, working, recent,
   // and under them the notices the drawer used to hold (4-35).
   //

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // When a notice may step forward on its own, and when it only marks the
-// mailbox key (client-SPEC 12-26). The one judgement; the toast seat
+// mailbox key (client D26). The one judgement; the toast seat
 // and the mailbox key both read it, and `views/mailbox/attention.ts`
 // reads the page into the `Attention` it judges.
 //
@@ -113,7 +113,7 @@ export type Moment = "sent" | "idle" | "returned";
 export const IDLE_MS = 5_000;
 // How long a return to the tab counts as the return itself: long enough
 // for what queued while it was hidden to fold in the first frame after
-// it is shown (client-SPEC 4-11), short enough that typing resumed
+// it is shown (client/Spec.lean §4-11), short enough that typing resumed
 // after it is no longer interrupted.
 export const RETURNED_MS = 1_000;
 

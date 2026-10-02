@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The formats RefRain draws as a page besides its text, and the tool
-// that draws each (client-SPEC 4-54). The wire's `Format` says only
+// that draws each (client/Spec.lean §4-54). The wire's `Format` says only
 // whether a text is Markdown, so which drawing a file gets is read off
 // its name here, once; the tool's version is the one `package.json`
 // pins, so the label on a preview cannot name a version the bundle does

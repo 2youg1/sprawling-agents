@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The whole text of one document version, gathered from the windows the
-// city answers (client-SPEC 4-46). `Query::Document` answers the first
+// city answers (client/Spec.lean §4-46). `Query::Document` answers the first
 // window; a version longer than one is in the city's content store and
 // the rest is read by version through `Query::Range`, each window
 // starting where the last one ended (`crates/wire/Spec.lean` §8-69,

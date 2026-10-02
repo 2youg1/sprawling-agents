@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // What a person's answer to one proposal card sends, and where the
-// answer stands until the card is gone (client-SPEC 4-55,
+// answer stands until the card is gone (client/Spec.lean §4-55,
 // `crates/wire/Spec.lean` §8-73).
 //
 // **The verdicts are spelled here and nowhere else.** The city refuses

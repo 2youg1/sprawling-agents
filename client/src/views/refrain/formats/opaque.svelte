@@ -6,8 +6,8 @@
 -->
 
 <script lang="ts">
-  // A file whose bytes are not text, as RefRain opens it (client-SPEC
-  // 4-54). A PDF or a DOCX is drawn by `pdf.svelte` or `docx.svelte`
+  // A file whose bytes are not text, as RefRain opens it (client/Spec.lean
+  // §4-54). A PDF or a DOCX is drawn by `pdf.svelte` or `docx.svelte`
   // from its bytes, and no answer on the wire carries a file's bytes to
   // the page yet (§3-4), so here the format's line says which tool would
   // draw it and that the page has nothing to draw it from. Any other

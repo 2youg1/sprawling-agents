@@ -13,7 +13,7 @@ import { configureSandbox } from "./commands";
 // the city reads `null` as "leave this face as it is". The sandbox card
 // must therefore speak about the sandbox and nothing else, or saving it
 // would wipe the building's MCP servers, desktop allowlist or context
-// rung (client-SPEC 4-50).
+// rung (client/Spec.lean §4-50).
 describe("configureSandbox", () => {
   test("states the sandbox whole and leaves the other three faces alone", () => {
     const limits: SandboxLimits = {

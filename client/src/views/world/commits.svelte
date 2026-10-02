@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The commits pane's graph (client-SPEC 7K, refrain roadmap S7.9): the
+  // The commits pane's graph (client/Spec.lean §7K, refrain roadmap S7.9): the
   // commits of the place the conversation is in - the whole city from
   // the Mayor's room, the building from a room inside one - newest
   // first, as a swimlane graph drawn from each commit's parents. A row

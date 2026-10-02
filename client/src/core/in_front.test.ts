@@ -31,7 +31,7 @@ function listed(run: RunId, addr: Address, started: number, frozen: boolean): Ru
   };
 }
 
-// The regression client-SPEC 12-16 names: a stop pressed in one room
+// The regression client D16 names: a stop pressed in one room
 // reached the newest run anywhere in the city, and a stop pressed where
 // no run is shown reached one all the same.
 test("the run in front of the person is the one the page shows, never the newest anywhere", () => {

@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // A call that took a screenshot (client-SPEC 4-45). The browser tool
+  // A call that took a screenshot (client/Spec.lean §4-45). The browser tool
   // records the picture's place in the content store and its two sides;
   // the wire has no answer that carries a picture's bytes to the page, so
   // this view draws the frame the picture would fill, at its own

@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The chosen session's instrument sheet (client-SPEC 7K): one cell per
+  // The chosen session's instrument sheet (client/Spec.lean §7K): one cell per
   // question a person running a coding agent asks of a session - which
   // model, how full its window is, what it read and wrote, how much of
   // that the cache served, what it cost against the whole city, how fast
@@ -13,7 +13,7 @@
   // figure the city has not told the page is a dash or is left out, never
   // a guess.
   //
-  // This is the one screen that draws cost (client-SPEC 7D): the session's
+  // This is the one screen that draws cost (client/Spec.lean §7D): the session's
   // own spend and the city's beside it, so neither appears again anywhere
   // the panorama shows.
   import { readAnswer } from "../../core/answered";

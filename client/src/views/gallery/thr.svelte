@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // The thread as the template draws it (client-SPEC 4-44): message heads
+  // The thread as the template draws it (client/Spec.lean §4-44): message heads
   // with the frozen model on the first and the time to first content on
   // each reply, tool lines of every kind a registration names - with a
   // failed one and one whose line carried no registration - and a call

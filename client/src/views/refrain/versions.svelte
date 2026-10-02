@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // The versions this page held whole (client-SPEC 4-46), and the diff
+  // The versions this page held whole (client/Spec.lean §4-46), and the diff
   // between two of them: opened, saved by the person, or changed in the
   // city, with the draft as one more when there is one. Two rows of
   // choices name the two sides, newest last; the comparison under them

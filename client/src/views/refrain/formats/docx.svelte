@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // A DOCX laid out as its pages, approximately, in a sandboxed frame
-  // (client-SPEC 4-54). The line above says the layout is approximate
+  // (client/Spec.lean §4-54). The line above says the layout is approximate
   // and counts what the file holds that the pages do not show: tracked
   // changes drawn as their result, comments and embedded objects left
   // out. An archive past the bounds is refused unopened, and the line

@@ -11,7 +11,7 @@
   // `parts/tip.svelte` places a hint twice over: against the anchor
   // where the engine implements anchor positioning, and against the
   // wrapper where it does not. Until now neither branch had a fixture,
-  // which `client-SPEC` §8 records under what nobody has verified - a
+  // which `client/Spec.lean` §2 records under what nobody has verified - a
   // hint that lands outside the window, or one clipped away by the box
   // it sits in, is invisible in exactly the way a person cannot report.
   //
@@ -32,7 +32,7 @@
   // A hint is `display: none` until a pointer or the keyboard wants
   // it, so `xtask render` measures no box for either today. What these
   // two give the gate is the page in the state a person meets, ready
-  // for the first pass that presses a key (client-SPEC 7-10).
+  // for the first pass that presses a key (client/Spec.lean §7-10).
 
   import { say } from "../../core/lang";
   import { ui } from "../../ui";

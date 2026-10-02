@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // The preview of the version the editor stands on, a window at a time
-  // (client-SPEC 4-26, 7N): `Query::Preview` reads one window into
+  // (client/Spec.lean §4-26, §7N): `Query::Preview` reads one window into
   // blocks, and the next is asked from where that one ended once the
   // reader nears the bottom, or when the place carried over from the
   // source lies further on. A version's preview never goes stale, so

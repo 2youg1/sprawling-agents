@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // The first section of the mailbox: everything that stops until the
-  // person acts (client-SPEC 4-49). A door waiting on the person's own
+  // person acts (client/Spec.lean §4-49). A door waiting on the person's own
   // hand, a design question a resident filed and a change a run
   // proposes to a document are decide cards (7C); a failure that stops
   // the work is its notice, with the recovery the city named. Newest

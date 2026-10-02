@@ -3,6 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+// The properties this module must hold are proved in `client/spec/Views/Parts/Segmented.lean`.
+//
 // What the segmented control decides before anything is drawn: the
 // vocabulary a track is built from, where a track begins and ends,
 // where an arrow key lands, and which cell a keyboard arrives at. The

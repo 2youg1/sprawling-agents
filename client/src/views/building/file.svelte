@@ -13,7 +13,7 @@
   //
   // **Rendered Markdown is a reading column and the source is not.**
   // The prose takes the `measure` tier and is centred inside its pane -
-  // one of the two seats `mx-auto` is allowed in (client-SPEC 4-33) -
+  // one of the two seats `mx-auto` is allowed in (client/Spec.lean §4-33) -
   // while numbered lines grow to their longest line and scroll, because
   // code and tables are never capped.
   import { putSpine } from "../../core/commands";

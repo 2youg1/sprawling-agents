@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The city page, on the shell's column lines (client-SPEC 4-50): the
+  // The city page, on the shell's column lines (client/Spec.lean §4-50): the
   // page header names the city and carries the one control that stops
   // or releases it; under it one row of figures; then the building
   // table or the drawing in columns 1-8 of the page, the picked

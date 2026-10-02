@@ -6,7 +6,7 @@
 // One document open in RefRain: which version the editor stands on, the
 // draft kept for it, the save in flight and its receipt, the versions
 // this page has held, and the city's version when it moved underneath
-// (client-SPEC 4-46, 7N). The rules are the core's - coordinates in
+// (client/Spec.lean §4-46, §7N). The rules are the core's - coordinates in
 // `document_pos.ts`, windows in `document_windows.ts`, the receipt in
 // `document_save.ts` - and this file only puts them in the order a page
 // meets them. Made while `refrain.svelte` initialises, so everything it

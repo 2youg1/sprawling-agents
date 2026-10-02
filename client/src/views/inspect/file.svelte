@@ -7,7 +7,7 @@
 
 <script lang="ts" module>
   // A call that read one file, as that file opened at the line it read
-  // from (client-SPEC 4-45). The text is the worktree's as it stands now
+  // from (client/Spec.lean §4-45). The text is the worktree's as it stands now
   // (`Query::Document`), read-only through the one code view, so its line
   // numbers are the ones the person's editor will open; the call's own
   // answer stays in the Ledger, where the run page reads it.

@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The first-run guide (refrain §3-15, client-SPEC 7G): five steps in
+  // The first-run guide (refrain §3-15, client/Spec.lean §7G): five steps in
   // one column, only the first required. Each step is the city's real
   // door for that job - the provider form and the `main` model choice,
   // the doctor's report with its installs, the governing documents, the

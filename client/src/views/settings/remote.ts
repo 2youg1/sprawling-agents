@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the remote group can be showing (client-SPEC 4-57), and the one
+// What the remote group can be showing (client/Spec.lean §4-57), and the one
 // sentence each refusal is told in. The group's component drives the
 // standing; the gallery draws each one on its own.
 

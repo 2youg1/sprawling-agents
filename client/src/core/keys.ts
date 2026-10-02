@@ -108,7 +108,7 @@ function accelShift(key: string): Chord {
 // **Six pages sit on the six digits**, with settings taken out:
 // settings is on the comma that every browser and every editor puts it
 // on, which leaves the sixth digit for the registry. The settings tree
-// reaches the same pages (client-SPEC 7L); the digits are the fast way.
+// reaches the same pages (client/Spec.lean §7L); the digits are the fast way.
 //
 // The three edge keys borrow their chords from the habits a person
 // already has: the mailbox is the side panel on B, the right pane is

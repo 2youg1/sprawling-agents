@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A DOCX read for a page (client-SPEC 4-54, 12-32): its archive checked
+// A DOCX read for a page (client/Spec.lean §4-54, client D32): its archive checked
 // and unpacked within bounds first (`zip.ts`), then laid out as pages by
 // docx-preview into elements this page never shows, and handed on as
 // one HTML document for the sandboxed frame, so nothing the file holds

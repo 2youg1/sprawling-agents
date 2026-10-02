@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // One row of a building's commit list (client-SPEC 4-50): the commit
+  // One row of a building's commit list (client/Spec.lean §4-50): the commit
   // as one line, a disclosure that opens its sheet of facts and the
   // files it changed against the commit before it, and on each of those
   // files the way to take it back to this checkpoint (UC8).

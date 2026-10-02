@@ -4,8 +4,8 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The chosen session, the panorama workbench's middle pane (client-SPEC
-  // 7K): its name and state, one line saying where it works and which
+  // The chosen session, the panorama workbench's middle pane (client/Spec.lean
+  // §7K): its name and state, one line saying where it works and which
   // commit it started from, the instrument sheet, and the timeline.
   //
   // The session is `chosen.svelte.ts`'s answer - a picked commit's run, or

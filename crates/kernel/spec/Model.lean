@@ -209,7 +209,7 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 ```
 
 - **一个标签，不是一个模型。** 二进制里不带任何模型（D18）：人接一个端点、为 `Ocr` 选一个能读图的模型，城的 OCR 工具（X6）按这一次选择调用它，与转写读 `Transcribe` 是同一个机制（`crates/wire/Spec.lean` §8-27）。没有选时（或选中的端点已经摘下、机密楼的端点不在运行这座城的机器上），这栋楼的 run 的工具表里没有 `ocr`，模型看不到一件用不了的工具；`gateway::Recogniser::absent()` 是这种城里的识别器，每次识别都答 `E_TOOL_UNAVAILABLE`。两条路都不回落到 `Main`——一个只会读字的模型被递上一张图，答的是它猜的东西。
-- **先有登记位，调用方随 X6 来。** 这条与本枚举「有人问才长」的规矩相违，理由是线上形状：`ModelTag` 在线上，加一个值要进位，本批（`WIRE_V` 45）一次带上，X6 落地时不再为它另进一位（`crates/wire/Spec.lean` D1）。在 X6 落地之前，页面不画这一行（client-SPEC 的模型表照旧三行）。
+- **先有登记位，调用方随 X6 来。** 这条与本枚举「有人问才长」的规矩相违，理由是线上形状：`ModelTag` 在线上，加一个值要进位，本批（`WIRE_V` 45）一次带上，X6 落地时不再为它另进一位（`crates/wire/Spec.lean` D1）。在 X6 落地之前，页面不画这一行（client/Spec.lean 的模型表照旧三行）。
 - `ALL` 的顺序就是设置页给出它们的顺序，`Ocr` 在最后。
 -/
 

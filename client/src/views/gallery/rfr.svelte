@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // RefRain, the right side's document editor (client-SPEC 7N), on a
+  // RefRain, the right side's document editor (client/Spec.lean §7N), on a
   // made-up city: a Markdown document in its source and in its preview,
   // a plain text file read literally (a byte-order mark, CRLF lines, a
   // tab), a file larger than RefRain edits, a missing file, and a draft

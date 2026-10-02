@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the speed cell of the session's sheet says (client-SPEC 7K): the
+// What the speed cell of the session's sheet says (client/Spec.lean §7K): the
 // median time to first content over the turns that measured one, and
 // how many turns that is.
 //

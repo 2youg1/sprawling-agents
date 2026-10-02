@@ -14,7 +14,7 @@
   // healthy. The three states come from the city's own handshake, so
   // what a person reads here and what a model is given cannot disagree.
   //
-  // **The row is `parts/row`'s** (client-SPEC 6 names this seat): the
+  // **The row is `parts/row`'s** (client/Spec.lean §7 names this seat): the
   // list draws `RowList` and each server draws a `Row`, so a keyboard
   // walks the list and the remove control stays separately reachable.
   // What the row cannot hold - the opened tool list - is the one row

@@ -11,7 +11,7 @@
   //
   // A design question is one of the things in this product that stop
   // and ask, so it is drawn on the one decide card they share
-  // (`parts/decide.svelte`, client-SPEC 7C); this file gives the card its
+  // (`parts/decide.svelte`, client/Spec.lean §7C); this file gives the card its
   // body and its two answers, y to allow and n to deny.
   //
   // Identical questions are grouped by their cluster key so one answer

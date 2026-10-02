@@ -7,7 +7,7 @@
 
 <script lang="ts" module>
   // A call that changed a file, as the patch of that file between the two
-  // checkpoints around it (client-SPEC 4-45, 7F). The checkpoint after the
+  // checkpoints around it (client/Spec.lean §4-45, §7F). The checkpoint after the
   // call is the tree the patch reads into, so the patch covers the whole
   // wave the call was part of, and the line above it names both trees.
   //

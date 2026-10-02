@@ -7,9 +7,9 @@
 
 <script lang="ts">
   // Take one file of this building back to what one checkpoint holds
-  // (client-SPEC 4-50, UC8). The command rewrites the file in the
+  // (client/Spec.lean §4-50, UC8). The command rewrites the file in the
   // working tree, and what the file says now is in no checkpoint, so it
-  // is asked through `parts/dialog` before it leaves (12-1). The city
+  // is asked through `parts/dialog` before it leaves (client D1). The city
   // refuses while a run works in the building; that refusal is a toast,
   // because nothing on this row can answer it.
   import { Option, Schema } from "effect";

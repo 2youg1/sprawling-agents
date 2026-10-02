@@ -5,7 +5,7 @@
 
 <script lang="ts">
   // The world layer's third pane follows the workspace (refrain roadmap
-  // Q10, client-SPEC 7K): it draws the place the conversation is in. Its
+  // Q10, client/Spec.lean §7K): it draws the place the conversation is in. Its
   // first reading is always that place's commits as a graph; its second
   // is the city itself from the Mayor's room, whose place is the city,
   // and the building's files from a room inside a building.

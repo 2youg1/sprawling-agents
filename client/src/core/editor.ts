@@ -8,7 +8,7 @@
 // The page hands the browser a link and the browser hands it to the
 // editor this machine registered for the scheme; the city starts
 // nothing. Only editors whose own documentation or source code reads a
-// file-and-line URL are offered (client-SPEC 4-39 cites each one),
+// file-and-line URL are offered (client/Spec.lean §4-39 cites each one),
 // because a guessed scheme fails silently: the browser asks for an
 // application nobody installed, or opens the file at its first line.
 //
@@ -118,7 +118,7 @@ export type Reach = { readonly kind: "link"; readonly href: string } | { readonl
 //
 // An editor opens the worktree's file as it is now, so a line read from
 // a past version would land on whatever line stands there today and say
-// nothing about it (client-SPEC 4-39). That line, and any line no link
+// nothing about it (client/Spec.lean §4-39). That line, and any line no link
 // can be spelled for, is offered as `path:line` to copy, so the person
 // always has a location to carry and the page never claims an editor
 // opened something.

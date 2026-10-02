@@ -10,8 +10,8 @@
   export type Weight = "info" | "alert";
 
   // Hugging the field it belongs to, floating over the page for a few
-  // seconds, or standing in the drawer that keeps it (client-SPEC
-  // 4-35). The seat changes the drawing and nothing else: the role is
+  // seconds, or standing in the drawer that keeps it (client/Spec.lean
+  // §4-35). The seat changes the drawing and nothing else: the role is
   // the weight's to decide (7-1).
   export type Seat = "inline" | "toast" | "drawer";
 
@@ -37,7 +37,7 @@
   // kept where they can look again. One component draws every notice
   // the client has - inline beside a field, a toast in the corner, an
   // entry in the notification drawer - so a notice cannot be shown in
-  // one place and shaped differently in another (client-SPEC 4-35).
+  // one place and shaped differently in another (client/Spec.lean §4-35).
   //
   // **The reader's own title is the heading; the city's way out is the
   // body; the rest of its words are the fold.** The heading comes from

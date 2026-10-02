@@ -5,7 +5,7 @@ Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- The column the conversation scrolls in, and the one place that
 decides where its view stands while words arrive (refrain §3-14, the
-first row; client-SPEC 4-44).
+first row; client/Spec.lean §4-44).
 
 **The view follows only a person standing at the foot.** Scrolling up to
 read, or holding a selection inside the thread, keeps the place; what

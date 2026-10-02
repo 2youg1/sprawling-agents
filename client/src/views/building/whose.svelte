@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // One commit asked for by its oid (`Query::Commit`, client-SPEC 4-24,
+  // One commit asked for by its oid (`Query::Commit`, client/Spec.lean §4-24,
   // 4-50): the question the command line spells `whose`. The city
   // answers it from the Ledger, so a commit it never wrote is
   // `Unavailable`, and the page says that rather than "nothing changed".

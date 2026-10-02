@@ -8,12 +8,12 @@
 <script lang="ts">
   // The one thing that may float over a page uninvited: a refusal, in
   // the three parts the city wrote it in, standing over the composer
-  // (client-SPEC 4-35). Three may stand at once; a fourth pushes the
+  // (client/Spec.lean §4-35). Three may stand at once; a fourth pushes the
   // oldest away, and every refusal that reached a corner is in the
   // drawer afterwards whatever happens here.
   //
   // **The page's answer to a stop key with no run in front of it stands
-  // in the same stack and nowhere else** (client-SPEC 12-16): it says
+  // in the same stack and nowhere else** (client D16): it says
   // what the person just did, and the drawer keeps what the city said.
   //
   // **A toast leaves by itself.** Eight seconds, paused while the
@@ -28,11 +28,11 @@
   // **Over the composer, because that is where the eye is** when a send
   // or a stop is refused: the stack stands on the composer's upper edge
   // and takes the width of the column the composer is in, so it moves
-  // with that column when the right pane opens (client-SPEC 4-35). A
+  // with that column when the right pane opens (client/Spec.lean §4-35). A
   // page with no composer centres it at the foot.
   //
-  // **When it steps forward is `core/deferral.ts`'s** (client-SPEC
-  // 12-26): what stops the work until the person acts comes at once;
+  // **When it steps forward is `core/deferral.ts`'s** (client
+  // D26): what stops the work until the person acts comes at once;
   // an ordinary refusal waits, held here, for the person to send, to
   // leave the box empty, or to come back to this tab, and meanwhile
   // only marks the mailbox key. The mailbox keeps every refusal
@@ -40,8 +40,8 @@
   // here rather than shown late.
   //
   // **What a recovery's control says and does is
-  // `notice_recovery.ts`'s**, shared with the drawer (client-SPEC
-  // 4-35).
+  // `notice_recovery.ts`'s**, shared with the drawer (client/Spec.lean
+  // §4-35).
   import { SvelteMap } from "svelte/reactivity";
   import { get } from "svelte/store";
 

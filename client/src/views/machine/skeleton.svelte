@@ -5,7 +5,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Twelve rows in the shape the real ones take, while the city is being
-// asked. The bars are `parts/skeleton`'s own (client-SPEC 6: that
+// asked. The bars are `parts/skeleton`'s own (client/Spec.lean §7: that
 // component's seat is this machine's waiting state) - a skeleton is the
 // shape of the thing it waits for, so a person watches the page fill
 // rather than jump.

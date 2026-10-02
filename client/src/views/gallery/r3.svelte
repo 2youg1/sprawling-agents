@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts" module>
-  // The remote group in each standing it can take (client-SPEC 4-57):
+  // The remote group in each standing it can take (client/Spec.lean §4-57):
   // the door explained on the city's own machine, an invitation that
   // does not read, a browser lacking a curve, an invitation the city
   // answered with someone else's key, the seed shown once, and a paired

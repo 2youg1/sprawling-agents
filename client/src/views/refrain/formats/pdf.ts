@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// pdf.js, set up once for this client (client-SPEC 4-54, 12-32). This
+// pdf.js, set up once for this client (client/Spec.lean §4-54, client D32). This
 // module is its own lazy chunk: nothing of pdf.js is fetched until a
 // PDF is drawn. The worker parses in its own thread; the resources it
 // asks for by name - the Adobe CMaps a font without its own encoding

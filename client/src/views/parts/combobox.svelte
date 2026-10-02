@@ -108,7 +108,7 @@
 		close("opener");
 	}
 
-	// The key table of client-SPEC 7-5, an if-chain over the one string a
+	// The key table of client/Spec.lean §7-5, an if-chain over the one string a
 	// keyboard event carries; a key outside the table is the platform's,
 	// not this component's. The trigger shares this handler only so that
 	// Escape answers there too; every other key belongs to the combobox

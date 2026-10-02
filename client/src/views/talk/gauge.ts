@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the context ring round the coin key draws (client-SPEC 7J): how
+// What the context ring round the coin key draws (client/Spec.lean §7J): how
 // much of this session's window its latest turn used, and where the two
 // reminders sound.
 //

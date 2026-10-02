@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // A model's reply as the thread draws it (client-SPEC 4-26, 4-53), on
+  // A model's reply as the thread draws it (client/Spec.lean §4-26, §4-53), on
   // a made-up city that answers `Query::Reply` with the blocks the
   // city's grammar lays out for each text below, written out by hand:
   // a settled reply with every kind of block, a streaming one whose

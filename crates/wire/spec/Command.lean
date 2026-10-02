@@ -113,7 +113,7 @@ Dispatch { addr, task, goal, policy: kernel::RunPolicy, idem, session, effort, m
 ```
 
 - **一个字段，四个必填的键**：`mode`（`chat｜work`）、`write`（`full｜create`）、`admit`（`standing｜tested｜contract_kept｜double_validated`）、`landing`（`ordinary｜experiment`）。值集与拼法只住 kernel（`crates/kernel/Spec.lean` §8-77、§8-78），本 crate 再导出 `RunPolicy`、`Mode`、`WriteLimit`、`AdmissionRequirement`、`LandingPolicy` 五个名字，页面按 `wire.ts` 里生成的字面量拼。缺一个键、或一个认不出的词，帧在反序列化处即拒，不落成默认值。
-- **页面怎么选**：写域选择给 `write` 的两项（普通 `full`、只读可新建 `create`）；`/admit tested|contract|double` 依次填 `tested`、`contract_kept`、`double_validated`，不说时填 `standing`；试验填 `landing: "experiment"`；计划经 `/plan` 进入固定的 SDD 工作流，帧上是 `mode: "work"`。这些控件归客户端的展开面（client-SPEC 4-41），本节只定帧。
+- **页面怎么选**：写域选择给 `write` 的两项（普通 `full`、只读可新建 `create`）；`/admit tested|contract|double` 依次填 `tested`、`contract_kept`、`double_validated`，不说时填 `standing`；试验填 `landing: "experiment"`；计划经 `/plan` 进入固定的 SDD 工作流，帧上是 `mode: "work"`。这些控件归客户端的展开面（client/Spec.lean §4-41），本节只定帧。
 - **城自己派的活不经这个帧**：计划、日程、来信与编辑器经 ACP 派来的活由装配层取 `RunPolicy::of(Mode::Work)`；委派与敲门继承说话那一方的整份策略（`crates/sprawling/Spec.lean` §8-133）。
 - **账上读得到**：装配层把收到的策略原样写进这次 run 的 `run_started.policy`，所以一次派活选了什么，回放与 playback 从账本读，不从线上猜。
 - **`WIRE_V` 不另进位**：`Dispatch` 的名字没变而形状变了，这正是 D1 说的改形，与本批其余改形共用 45。

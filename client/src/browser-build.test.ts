@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The tests run against the browser build of `svelte`, and this file
-// pins that (client-SPEC 4-2). `svelte`'s entry points carry a
+// pins that (client/Spec.lean §4-2). `svelte`'s entry points carry a
 // browser/worker/default condition split, and a plain `bun test` takes
 // the default one: the server build, where `SvelteMap` is `Map` and
 // `mount` is a throwing stub. A suite green on that build has been

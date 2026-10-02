@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // One building, on the shell's column lines (client-SPEC 4-50): the
+  // One building, on the shell's column lines (client/Spec.lean §4-50): the
   // page frame's header names it and carries the verbs that act on the
   // whole building; under it the standing goal; then three columns of
   // the shell's grid - the index and the directory tree on the left,
@@ -14,7 +14,7 @@
   // building is open on the right side, that file on the right.
   //
   // What a person can ask of this building - stop it, set it a standing
-  // goal, take it away - is spelled as commands (client-SPEC 4-10): the
+  // goal, take it away - is spelled as commands (client/Spec.lean §4-10): the
   // verbs a person reads are the commands they would type, so the
   // screen teaches the command line rather than a private vocabulary.
   //
@@ -22,7 +22,7 @@
   // type. typescript-eslint resolves no named export of a `.svelte`
   // module in its type program, so the type-aware rules below see
   // `Picked` as an error type; `svelte-check` is the type gate and
-  // resolves it (client-SPEC 4-1). Each suppression names that gap and
+  // resolves it (client/Spec.lean §4-1). Each suppression names that gap and
   // nothing else.
   import type { Key } from "../core/lang";
   import type { Picked } from "./building/tree.svelte";
@@ -121,7 +121,7 @@
 
   // The right side shows a file of this building, or nothing here: a
   // call, or another building's file, belongs to the conversation's
-  // working surface (client-SPEC 12-27).
+  // working surface (client D27).
   const opened = $derived.by(() => {
     const item = rightItem();
     return item !== null && item.kind === "document" && item.building === address ? item : null;

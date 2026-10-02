@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // RefRain, the right side's document editor (client-SPEC 7N). The
+  // RefRain, the right side's document editor (client/Spec.lean §7N). The
   // three props are the whole door: which building, which path in it,
   // and which version, `null` being the city's current text. A new
   // document or version is a new session, so nothing of one document's

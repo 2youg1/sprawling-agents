@@ -20,7 +20,7 @@
   //
   // **This file is the outermost drawing component, so every id a
   // gradient needs is declared once in the `defs` below and referenced
-  // by name** (client-SPEC 4-12). Nothing else in the drawing spells
+  // by name** (client/Spec.lean §4-12). Nothing else in the drawing spells
   // `glow` or `ground` a second time.
 
   import type { RunBelief } from "../../core/belief";

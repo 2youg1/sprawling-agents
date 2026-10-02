@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The typecheck lane, sealed (client-SPEC 4-1). `svelte-check --tsgo`
+// The typecheck lane, sealed (client/Spec.lean §4-1). `svelte-check --tsgo`
 // reads `.svelte` and `.ts` in one pass on the TypeScript 7 checker
 // that `@typescript/native` installs, but the lane has one measured
 // defect: when its setup fails - TypeScript 7 missing from the

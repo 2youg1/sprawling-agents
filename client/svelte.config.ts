@@ -13,7 +13,7 @@ const SOURCE = `${import.meta.dirname.replaceAll("\\", "/")}/src/`;
 
 /**
  * The compiler options a component at `filename` adds to the shared
- * ones (client-SPEC 12-11): runes mode for every component under
+ * ones (client D11): runes mode for every component under
  * `src/`, so one there that uses no rune cannot fall back to the
  * legacy reading of `let` and `export let`. A component from
  * `node_modules` is left to the compiler's own inference, which a

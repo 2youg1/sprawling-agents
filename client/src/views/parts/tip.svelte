@@ -43,7 +43,7 @@
   //
   // The 300 ms delay is the whole point of the transition: it stops a
   // pointer crossing a row from lighting its hints one after another,
-  // and client-SPEC 4-18 pins it. Only opacity moves, so the reveal
+  // and client/Spec.lean §4-18 pins it. Only opacity moves, so the reveal
   // costs no layout, and `motion-reduce` cuts it to nothing.
   const PAINT =
     "pointer-events-none w-max max-w-measure rounded-card border border-edge-panel bg-raised " +
@@ -85,7 +85,7 @@
   // branch fails silently: the hint keeps a static position and can land
   // outside the window.
   //
-  // **Escape dismisses the hint and nothing else** (client-SPEC 7-3,
+  // **Escape dismisses the hint and nothing else** (client/Spec.lean §7-3,
   // WCAG 1.4.13). It stays away while the pointer or the focus stays,
   // and the next re-engagement summons it back. The dismissal listens
   // at the window because a hint raised by hover has no focused element
@@ -106,7 +106,7 @@
     readonly children: Snippet<[string]>;
     readonly side?: TipSide;
     // Whether holding the accelerator alone draws this hint with the
-    // others (client-SPEC 7E): the names of the edge keys are, a hint
+    // others (client/Spec.lean §7E): the names of the edge keys are, a hint
     // inside a form is not.
     readonly exposable?: boolean;
   }

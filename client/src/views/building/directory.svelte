@@ -80,7 +80,7 @@
 
   // The runs this room's listing has a transcript for and the page holds
   // no run for: older than the hot view, so the page names them and
-  // their number rather than calling the room empty (client-SPEC 4-50).
+  // their number rather than calling the room empty (client/Spec.lean §4-50).
   const earlier = $derived.by(() => {
     return (entries ?? []).flatMap((entry) => {
       const run = transcriptOf(entry.name);

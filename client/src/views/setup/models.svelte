@@ -15,7 +15,7 @@
   // One choice per role, each a `parts/combobox.svelte`: an endpoint
   // that answers with two hundred rows is not a list anybody scrolls,
   // and the search box the popup opens with is the control that
-  // replaces the arrow (client-SPEC 6 names this seat).
+  // replaces the arrow (client/Spec.lean §7 names this seat).
   import type { EndpointsAnswer, ModelTag } from "../../wire";
 
   interface ModelChoiceProps {

@@ -336,7 +336,7 @@ export function openConnection(
         case "live":
           return sendText(encodeFrame({ command }));
         // Words are held only while the link is on its way back by
-        // itself (client-SPEC, socket.ts); a refused link waits for the
+        // itself (client/Spec.lean, socket.ts); a refused link waits for the
         // person, and an idle one has not been started.
         case "idle":
         case "refused":

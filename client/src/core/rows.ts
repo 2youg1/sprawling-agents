@@ -46,7 +46,7 @@ export function memory(): Rows {
 
 // What a browser did when asked, as a value: the result, or nothing
 // when the browser refused. A failure that would otherwise be thrown is
-// read as data (client-SPEC 4-6).
+// read as data (client/Spec.lean §4-6).
 function attempted<T>(act: () => T): T | null {
   return Result.getOrNull(Result.try(act));
 }

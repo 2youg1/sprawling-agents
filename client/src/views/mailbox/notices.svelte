@@ -7,8 +7,8 @@
 
 <script lang="ts">
   // The foot of the mailbox: every ordinary refusal of the session,
-  // newest first and grouped by the day it first arrived (client-SPEC
-  // 4-35, the drawer seat). A refusal that stops the work is not here:
+  // newest first and grouped by the day it first arrived (client/Spec.lean
+  // §4-35, the drawer seat). A refusal that stops the work is not here:
   // it stands in the deciding section, and one refusal has one place on
   // the screen. What a recovery's control says, when it may be pressed
   // and what it does is `notice_recovery.ts`'s, shared with the toast.

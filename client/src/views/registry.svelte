@@ -42,7 +42,7 @@ export { default as RegistryTable } from "./registry/table.svelte";
 </script>
 
 <!-- The screen: the one question, and the table that draws its answer.
-A table is not capped by content kind (client-SPEC 4-33) - it grows with
+A table is not capped by content kind (client/Spec.lean §4-33) - it grows with
 its container and scrolls sideways rather than break a value. -->
 {#snippet count()}
   {#if answer !== undefined && answer.assets.length > 0}

@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Which waiting approvals become a browser notification (client-SPEC
-// 12-5). Only things that need the person's decision are raised; the
+// Which waiting approvals become a browser notification (client
+// D5). Only things that need the person's decision are raised; the
 // progress of runs already reaches a hidden tab through its title and
 // icon. Four gates, all of which must pass: the window is not focused,
 // the page is past its warm-up, the item is new to this page rather

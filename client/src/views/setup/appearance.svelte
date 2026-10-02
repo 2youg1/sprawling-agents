@@ -16,7 +16,7 @@
   // this file names no stored row; the word tables and the writing to
   // the root element are `appearance.ts`, which `main.ts` reads too.
   //
-  // Every setting is one card (client-SPEC 4-36): title, one line, the
+  // Every setting is one card (client/Spec.lean §4-36): title, one line, the
   // control, and a foot with the save receipt; nothing needs a submit.
 
   import { onMount } from "svelte";

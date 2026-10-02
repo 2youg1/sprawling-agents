@@ -14,7 +14,7 @@
   interface Props {
     readonly face: Face;
     // Where a send lands: `/dispatch`, `/steer`, or a steer after the tool
-    // call (client-SPEC 4-13), said by the send face's name.
+    // call (client/Spec.lean §4-13), said by the send face's name.
     readonly sending: Sending;
     readonly onStop: () => void;
   }

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Which documents the mailbox asks about, and how many cards are open on
-// them (client-SPEC 4-55). The mailbox key counts them and the deciding
+// them (client/Spec.lean §4-55). The mailbox key counts them and the deciding
 // section lists them, so both read this one reading: two counts of the
 // same cards would be the first thing to disagree.
 //

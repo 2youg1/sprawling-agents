@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // The proposal cards open on the document RefRain shows, above its
-  // text (client-SPEC 4-55). Nothing is drawn while the document has no
+  // text (client/Spec.lean §4-55). Nothing is drawn while the document has no
   // open card. The band takes at most two fifths of the right side and
   // scrolls on its own, so a long card never pushes the editor out.
   import { readAnswer } from "../../core/answered";

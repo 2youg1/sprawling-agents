@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Where the settings panel stands in the shell (client-SPEC 7L). The
+// Where the settings panel stands in the shell (client/Spec.lean §7L). The
 // panel opens over a page rather than in place of one: the page the
 // person was on, or the conversation with the Mayor when the panel's own
 // address was the first thing opened. Open and closed are the address
@@ -56,7 +56,7 @@ export function pickGroup(group: SetupGroup): void {
 }
 
 // Closing steps back off the panel's address when this page pushed it,
-// and otherwise puts the page beneath in its place (client-SPEC 7-7).
+// and otherwise puts the page beneath in its place (client/Spec.lean §7-7).
 export function closePanel(): void {
   closing = true;
   if (pushed) history.back();

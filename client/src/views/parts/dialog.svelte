@@ -89,7 +89,7 @@
 	`display` and `overlay` are discrete properties: without
 	`transition-discrete` the box would vanish on the first frame of the
 	closing and take its fade with it. A shadowed face draws no border
-	(client-SPEC 4-34). -->
+	(client/Spec.lean §4-34). -->
 <dialog
 	bind:this={sheet}
 	class="m-auto hidden w-full max-w-measure flex-col gap-base rounded-panel bg-raised p-pane opacity-0 shadow-sheet transition-[opacity,display,overlay] transition-discrete duration-panel ease-leave open:flex open:opacity-100 open:ease-arrive starting:open:opacity-0 motion-reduce:transition-none backdrop:bg-transparent backdrop:backdrop-brightness-50"

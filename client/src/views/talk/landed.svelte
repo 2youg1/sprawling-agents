@@ -7,7 +7,7 @@
   // One line where the person sent from, when the work they dispatched
   // started in another room: the room is a link, and the page stays put
   // so the box and its draft stay under the person's hands
-  // (client-SPEC 12-6). A run that started here needs no line, because
+  // (client D6). A run that started here needs no line, because
   // the thread already draws it.
   import { say } from "../../core/lang";
   import type { Landing } from "../../core/landing";

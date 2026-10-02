@@ -55,7 +55,7 @@ const ROWS = {
   welcomed: "sprawling.welcomed",
   // Whether the artefact panel beside a conversation is open.
   panel: "sprawling.talk.panel",
-  // How much of the world layer the page draws (client-SPEC 7H). Kept
+  // How much of the world layer the page draws (client/Spec.lean §7H). Kept
   // rather than held in memory because it is a decision about the shape
   // of the window, and a decision a reload undoes is a decision the
   // person has to take again every morning.
@@ -77,7 +77,7 @@ const ROWS = {
   // rule the city recorded for it.
   proxying: "sprawling.network.proxying",
   // Whether this browser raises a notification for an approval that
-  // arrives while the window is away (client-SPEC 12-7).
+  // arrives while the window is away (client D7).
   notifying: "sprawling.notify",
   // Whether a room and the city open drawing the whole of what runs did
   // or only their results. The switch on either page writes it, so the
@@ -91,8 +91,8 @@ const ROWS = {
   chord: "sprawling.key.",
   editor: "sprawling.editor",
   cityFolder: "sprawling.editor.folder",
-  // The panorama workbench's pane order and widths (client-SPEC 7K): a
-  // fact of this screen, so it stays in this browser (12-24).
+  // The panorama workbench's pane order and widths (client/Spec.lean §7K): a
+  // fact of this screen, so it stays in this browser (client D24).
   workbench: "sprawling.workbench",
 } as const;
 
@@ -103,7 +103,7 @@ const ROWS = {
 // workspace with the conversation as a band along the bottom
 // (`panorama`). Named for what is drawn rather than for a share of
 // opacity, because the three are three layouts and not three points on
-// one slider (client-SPEC 7H, 12-17).
+// one slider (client/Spec.lean §7H, client D17).
 export type Tier = "zen" | "blend" | "panorama";
 
 // In the order the layers key cycles them: out from the conversation
@@ -200,7 +200,7 @@ export interface PreferenceDoor {
   // the box that owns it reads it once when it mounts.
   readonly draft: (at: string) => string;
   readonly setDraft: (at: string, text: string) => void;
-  // Facts of the machine this browser runs on, never the city's (client-SPEC 4-39).
+  // Facts of the machine this browser runs on, never the city's (client/Spec.lean §4-39).
   readonly editor: () => Pick<Opening, "editor" | "folder">;
   readonly setEditor: (next: Pick<Opening, "editor" | "folder">) => void;
   readonly workbench: Readable<Workbench>;

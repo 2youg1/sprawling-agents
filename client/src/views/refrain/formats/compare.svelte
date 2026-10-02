@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // Two versions of a PDF or a DOCX compared by the text each yields
-  // (client-SPEC 4-54, 12-32): a PDF by the text of its pages in reading
+  // (client/Spec.lean §4-54, client D32): a PDF by the text of its pages in reading
   // order, a page mark between pages; a DOCX by its body's paragraphs as
   // the tracked changes leave them. The comparison is RefRain's own
   // read-only diff, so a changed word looks the way it does in a

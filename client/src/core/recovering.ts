@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // What a person can do about a refusal, as one table read by every
-// notice surface (client-SPEC 4-35). A drawer and a toast that each
+// notice surface (client/Spec.lean §4-35). A drawer and a toast that each
 // mapped codes to actions of their own would give one refusal two
 // answers; this file is the one answer, and it draws nothing.
 //
@@ -14,7 +14,7 @@
 // page already has - so its label is a word, and the word's key travels
 // with the action to keep the choice of that word in one home.
 //
-// **A form is filled, not sent** (client-SPEC 4-35a): its row names the
+// **A form is filled, not sent** (client/Spec.lean §4-35a): its row names the
 // label on its control, the words it prefills and the room they land
 // in, and the refusal's subject supplies the building and the missing
 // name. A code joins a form row only when every subject it is raised
@@ -143,7 +143,7 @@ const RECOVERIES: Readonly<Record<AxCode, readonly Recovery[]>> = {
 
 // The form a `form` recovery opens for one refusal, or none when its
 // subject does not read as `<building address>: <missing name>`
-// (client-SPEC 4-35a). `words` is the pattern the recovery's `words`
+// (client/Spec.lean §4-35a). `words` is the pattern the recovery's `words`
 // key says in the person's language.
 export function formOf(room: FormRoom, subject: string, words: string): Option.Option<Form> {
   // An address never holds a colon, so the first one ends it.
@@ -160,7 +160,7 @@ export function formOf(room: FormRoom, subject: string, words: string): Option.O
 
 // The actions a person can take about one refusal, in the order a
 // notice offers them. `/stop` cancels the run a refusal names and
-// nothing wider (client-SPEC 4-41), so a refusal whose subject is not a
+// nothing wider (client/Spec.lean §4-41), so a refusal whose subject is not a
 // run does not offer it: a control that can never run is not an action.
 export function recoveryFor(error: Pick<AxError, "code" | "subject">): readonly Recovery[] {
   const offered = RECOVERIES[error.code];

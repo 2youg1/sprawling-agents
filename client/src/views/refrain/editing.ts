@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // RefRain's editor: one CodeMirror view over the editor text of one
-// version, and the changes made on it since that version (client-SPEC
-// 7N, 12-23). The page never holds a second copy of what the person
+// version, and the changes made on it since that version (client/Spec.lean
+// §7N, client D23). The page never holds a second copy of what the person
 // typed: the view's document is the draft, and the change set from the
 // baseline is what is kept, saved and moved to another version.
 //

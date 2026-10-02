@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // What the settings panel holds (client-SPEC 7L): the tree in a column
+  // What the settings panel holds (client/Spec.lean §7L): the tree in a column
   // of its own on the left, under the panel's name and its close key,
   // and the group the tree points at beside it. The two scroll apart, so
   // a long group never scrolls the tree out of reach; a panel narrower

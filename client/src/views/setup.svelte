@@ -5,15 +5,15 @@
 
 <script lang="ts">
   // One settings group, drawn in the settings panel's body beside the
-  // tree (client-SPEC 7L): its heading, the one line saying what it
+  // tree (client/Spec.lean §7L): its heading, the one line saying what it
   // governs, its cards, and the city's own `config.toml` folded at the
   // foot. Which group is the panel's to say (`views/settings/panel.svelte`);
   // this file only draws the one it is handed.
   //
   // Every setting drawn here is one card: a title, one line saying what
   // the setting governs, the control, and a foot with the constraint or
-  // state on the left and the save receipt on the right (client-SPEC
-  // 4-36).
+  // state on the left and the save receipt on the right (client/Spec.lean
+  // §4-36).
 
   import type { Snippet } from "svelte";
 
@@ -195,7 +195,7 @@
 
 <!-- The group's header, its cards, and the city's own `config.toml`
 folded at the foot: a proofing tool rather than a setting, so it never
-costs the cards their width (client-SPEC 4-30, 4-36). -->
+costs the cards their width (client/Spec.lean §4-30, §4-36). -->
 <div class="flex min-w-0 flex-col gap-wide px-wide py-wide narrow:px-base">
   <header class="flex min-w-0 flex-col gap-tight border-b border-edge pb-base">
     <div class="flex flex-wrap items-center gap-base">
@@ -215,7 +215,7 @@ costs the cards their width (client-SPEC 4-30, 4-36). -->
       <div class="flex flex-col gap-wide">
         <!-- The form takes the conversation's 760 rather than a
             measure, because what a person pastes into it is a base
-            URL and a key and 520 cut both off (client-SPEC 4-33,
+            URL and a key and 520 cut both off (client/Spec.lean §4-33,
             4-36). -->
         <div class="min-w-0 max-w-talk">
           <ProviderDoor />

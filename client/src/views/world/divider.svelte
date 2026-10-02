@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // One divider of the panorama workbench (client-SPEC 7K, 7-11): APG
+  // One divider of the panorama workbench (client/Spec.lean §7K, §7-11): APG
   // Window Splitter over the gutter between two panes. A drag snaps the
   // edge to the nearest column line of the shell's grid; Left and Right
   // move it one column, Home and End to the narrowest and widest the

@@ -8,7 +8,7 @@
   // facts the wire carries about a filed asset, and every column that can
   // be ordered by reorders from the newest first below - which is
   // `parts/table`'s own behaviour and not a second sort written here
-  // (client-SPEC 4-24).
+  // (client/Spec.lean §4-24).
 
   import { MAYOR, toFragment } from "../../core/route";
   import { clock } from "../../core/time";

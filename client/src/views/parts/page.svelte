@@ -17,7 +17,7 @@
 // that holds prose caps itself at the measure where it is drawn.
 //
 // **The frame adds no inset of its own.** It stands in the shell's
-// `<main>`, whose left edge is the line of column 2 (client-SPEC 4-33,
+// `<main>`, whose left edge is the line of column 2 (client/Spec.lean §4-33,
 // 4-50), so the title, the rule under it and the body all start on that
 // line rather than a padding's width to the right of it.
 

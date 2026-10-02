@@ -7,7 +7,7 @@ import { say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
 import type { B3Hash } from "../../wire";
 
-// The four ways RefRain reads a document (client-SPEC 7N).
+// The four ways RefRain reads a document (client/Spec.lean §7N).
 export type Reading = "source" | "preview" | "diff" | "versions";
 
 // A version as a person names it on the screen: its first seven hex
@@ -16,7 +16,7 @@ export function short(version: B3Hash): string {
   return version.slice(0, 7);
 }
 
-// CodeMirror's own words, in the page's language (client-SPEC 12-23):
+// CodeMirror's own words, in the page's language (client D23):
 // the editor and every comparison drawn with it read this one table.
 const PHRASES: Readonly<Record<string, Key>> = {
   Find: "refrain_cm_find",

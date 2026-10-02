@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The chosen session's timeline (client-SPEC 7K): every turn, every
+  // The chosen session's timeline (client/Spec.lean §7K): every turn, every
   // call and every checkpoint, in the order the Ledger wrote them, each
   // at the instant the Ledger gave it to the millisecond. The date and
   // the zone are said once, in the head, so a row carries only the time

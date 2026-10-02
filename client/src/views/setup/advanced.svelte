@@ -9,7 +9,7 @@
   // bounds a run's work (refrain roadmap Q6).
   //
   // The editor and the city's folder are kept by this browser, because
-  // they are facts of the machine it runs on (client-SPEC 4-39). The
+  // they are facts of the machine it runs on (client/Spec.lean §4-39). The
   // page only writes links; the browser hands each one to the editor
   // this machine registered for the scheme.
 

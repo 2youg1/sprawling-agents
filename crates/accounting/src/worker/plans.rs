@@ -221,7 +221,7 @@ impl RunWorker {
                 // building with no plan it would finish at once having
                 // done nothing. The subject is `<building>: <goal>`, the
                 // shape the client's form recovery reads to prefill the
-                // mayor's request for a plan (client-SPEC 4-35a).
+                // mayor's request for a plan (client/Spec.lean §4-35a).
                 self.require_plan_to_pursue(addr, &goal)?;
                 // Declared through the depth-zero position this worker
                 // holds. That is the runtime half of the guard the type

@@ -12,7 +12,7 @@
 //
 // `@noble/post-quantum` is fetched here, by dynamic import, the first
 // time a key is made or checked, so a page that never pairs never
-// downloads it (client-SPEC 4-57).
+// downloads it (client/Spec.lean §4-57).
 
 import { Result } from "effect";
 

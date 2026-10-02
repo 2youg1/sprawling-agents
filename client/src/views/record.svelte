@@ -14,7 +14,7 @@
 // `log` both open the timeline, `log` with only the process log showing,
 // so a link somebody kept to `#/record/log` reads what it always did.
 // `parts/tabs` owns both halves of the tab-and-panel association
-// (client-SPEC 7-8 item 6).
+// (client/Spec.lean §7-8 item 6).
 
 import type { Key } from "../core/lang";
 import type { Lens } from "../core/route";

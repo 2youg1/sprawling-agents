@@ -18,7 +18,7 @@
   // alike, and arrives before the click rather than as a refusal after
   // it.
   //
-  // The key table is the APG Radio Group one (client-SPEC 7-4): the
+  // The key table is the APG Radio Group one (client/Spec.lean §7-4): the
   // arrows Right, Left, Down and Up all move to the next or previous
   // choosable cell and select it, wrapping once around, and Space
   // selects the focused cell. Selection follows focus, so a cell that
@@ -168,7 +168,7 @@
           <!-- One definition of the cell, drawn bare or inside its
               reason. `Tip` wraps the cell in a box of its own and hands
               the hint's id to its children snippet, which is the
-              `aria-describedby` half of the contract (client-SPEC 7-4):
+              `aria-describedby` half of the contract (client/Spec.lean §7-4):
               the cell is named by its own text, and the hint says why it
               cannot be chosen. -->
           {#if choice.why !== undefined}

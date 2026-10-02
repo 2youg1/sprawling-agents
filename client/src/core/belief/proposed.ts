@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The documents a run offered a change to while this page listened,
-// each with the ledger position of the newest offer (client-SPEC 4-55).
+// each with the ledger position of the newest offer (client/Spec.lean §4-55).
 //
 // **It records documents, not cards.** A card's identity is a digest the
 // city computes (documents D13), and the lines that close a card carry

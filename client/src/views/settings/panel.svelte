@@ -6,7 +6,7 @@
 <script lang="ts">
   // The settings panel: a native modal `<dialog>` that arrives from the
   // left edge, the settings tree on its left and one group drawn beside
-  // it (client-SPEC 7L). The platform owns the modality the way
+  // it (client/Spec.lean §7L). The platform owns the modality the way
   // `parts/dialog.svelte` lets it (4-20): `showModal()` gives the top
   // layer, the focus trap, the rest of the page `inert` and Escape, so
   // this file holds no scrim, no keydown for Escape and no z-index.

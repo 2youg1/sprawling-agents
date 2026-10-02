@@ -5,12 +5,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  // The shell on one column (client-SPEC 4-52, refrain U9): a phone of
+  // The shell on one column (client/Spec.lean §4-52, refrain U9): a phone of
   // 390 by 844 with the conversation, an empty room, the world's sheet and
   // the right side's sheet; the same phone with a soft keyboard taking
   // the lower 344 pixels; and a 1440 by 900 window at 200 % zoom, which
   // is a shell of 720 by 450 CSS pixels. Each specimen is a `shell`
-  // container of its own (12-30), so it draws the one-column page in a
+  // container of its own (client D30), so it draws the one-column page in a
   // window of any width, in the made-up city of `shelled.ts`.
   import type { Tier } from "../../core/prefs";
   import { ui } from "../../ui";

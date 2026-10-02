@@ -16,7 +16,7 @@
   // path as a click without needing a line of their own.
   //
   // **The tab and its panel are one fact, so this component owns both
-  // halves of the association (client-SPEC 7-8 item 6).** The caller
+  // halves of the association (client/Spec.lean §7-8 item 6).** The caller
   // attaches each reading through the `panel` snippet and an optional
   // `mark` beside a tab's name; this component draws the panel inside
   // the wrapper that carries `role="tabpanel"` and `aria-labelledby`.
@@ -106,7 +106,7 @@
   };
 
   // The bar beside the current tab is the one accent this control
-  // takes (client-SPEC 7B); every other tab is said by its own ink.
+  // takes (client/Spec.lean §7B); every other tab is said by its own ink.
   const ink = (lens: Lens): string =>
     lens.id === current
       ? "border-accent text-text"

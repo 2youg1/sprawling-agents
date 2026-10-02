@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { selectModel } from "./commands";
 
 // What a person states about a model reaches the frame, and what they
-// did not state is absent rather than guessed (client-SPEC §5).
+// did not state is absent rather than guessed (client/Spec.lean §7).
 describe("choosing a model", () => {
   test("carries the input kinds the person stated", () => {
     const frame = selectModel("zenmux", "vision-1", "main", { contextTokens: null, maxOutputTokens: null, input: "text_image" });

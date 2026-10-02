@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The three coordinates of one version of a text document, and the one
-// place they are converted (client-SPEC 4-46, refrain roadmap §4-8).
+// place they are converted (client/Spec.lean §4-46, refrain roadmap §4-8).
 //
 // **The wire counts bytes, the editor counts UTF-16 code units of a
 // folded text.** A version's bytes are its identity

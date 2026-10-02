@@ -11,7 +11,7 @@
   // is mounted once and hidden rather than unmounted while the preview
   // or the versions are drawn, so the cursor, the selection, the undo
   // history and an input method's composition all survive a change of
-  // reading (client-SPEC 7N).
+  // reading (client/Spec.lean §7N).
   import { fill, say } from "../../core/lang";
   import { kib } from "../../core/time";
   import { ui } from "../../ui";
@@ -54,7 +54,7 @@
   const name = $derived(at.slice(at.lastIndexOf("/") + 1));
   const markdown = $derived(session.file?.kind === "text" && session.file.gathering.format === "markdown");
   // An HTML text is previewed by this browser rather than by the city
-  // (client-SPEC 4-54).
+  // (client/Spec.lean §4-54).
   const html = $derived(session.file?.kind === "text" && drawnAs(at) === "html");
 
   const phrases = $derived(phrasesIn($lang));

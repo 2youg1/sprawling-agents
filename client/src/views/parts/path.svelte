@@ -21,7 +21,7 @@
   //
   // The second control asks the city to hand the path to the desktop's
   // own file manager. A path this build cannot turn into an address
-  // stays text with the control saying why (client-SPEC 7-2): the
+  // stays text with the control saying why (client/Spec.lean §7-2): the
   // control keeps its seat in the Tab order under `aria-disabled`, so a
   // keyboard reaches it and a screen reader reads the reason through the
   // hint, and pressing it lands in a no-op rather than in a surprise.

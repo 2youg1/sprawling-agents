@@ -7,7 +7,7 @@
   // How the city stands, as one row of figures under the page header:
   // six counts and what the city has spent. Every fact is stated once
   // and in one place; the city's name and the control that stops or
-  // releases it are the page header's (client-SPEC 4-50).
+  // releases it are the page header's (client/Spec.lean §4-50).
   //
   // **The six figures come from `Query::Metrics` and from nothing
   // else.** Each of them is also provable from a view this page could

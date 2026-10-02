@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The notices of the npm packages inside the bundle (client-SPEC 12-13).
+// The notices of the npm packages inside the bundle (client D13).
 // MIT and Apache-2.0 both require the copyright and licence notice to
 // travel with every copy, and a minified bundle is a copy. The packages
 // are read off the chunks and the assets the bundler emitted rather than
@@ -11,7 +11,7 @@
 // package brings in, and the lockfile counts the toolchain and every
 // module tree-shaking dropped. An asset copied out of a package's
 // subfolder - pdf.js's CMaps, its symbol faces, its WebAssembly decoders
-// (client-SPEC 12-32) - is often another project's work with its own
+// (client D32) - is often another project's work with its own
 // licence file beside it, so the licence files of that folder travel
 // too.
 

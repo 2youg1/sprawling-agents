@@ -10,7 +10,7 @@ import { reachOf } from "./staleness";
 // A file taken back from a checkpoint changes the working tree, so the
 // building page's list of changes and the file's own text are asked
 // again: otherwise the row a person just took back stays on the list
-// and reads as a take-back that did not happen (client-SPEC 4-50).
+// and reads as a take-back that did not happen (client/Spec.lean §4-50).
 describe("a file taken back from a checkpoint", () => {
   test("makes the working tree, the listing and the document stale", () => {
     expect([

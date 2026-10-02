@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Which session the panorama workbench speaks for, and which commit in
-// it a person picked (client-SPEC 7K). The session pane, the commits
+// it a person picked (client/Spec.lean §7K). The session pane, the commits
 // pane and the timeline all read the one answer here, so the lane the
 // commits pane marks and the session the middle pane draws cannot be two
 // different runs.

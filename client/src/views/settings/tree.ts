@@ -4,10 +4,10 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The settings tree: five branches that never fold, the entries under
-// each, and the two entries that open a level of their own (client-SPEC
-// 7L). An entry is either a group the panel draws in its body, or a
+// each, and the two entries that open a level of their own (client/Spec.lean
+// §7L). An entry is either a group the panel draws in its body, or a
 // page the address bar moves to; the tree is the one way every page but
-// the conversation is reached (4-8, 12-19), so this table is also the
+// the conversation is reached (4-8, client D19), so this table is also the
 // list of those pages.
 //
 // The branches answer one question each: the city's own facts, what
@@ -83,7 +83,7 @@ export const TREE: readonly Branch[] = [
 ];
 
 // The group a panel opened without one shows: the first the tree
-// offers, which is who the person and the Mayor are (client-SPEC 7L).
+// offers, which is who the person and the Mayor are (client/Spec.lean §7L).
 export const FIRST_GROUP: SetupGroup = "you";
 
 // The nest the page beneath the panel belongs to, which starts open so

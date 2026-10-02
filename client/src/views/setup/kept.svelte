@@ -17,7 +17,7 @@
   //
   // The word comes from the door rather than from the group: the keeper
   // is one fact about the whole record, and a group that reads the door
-  // reads whichever keeper the door reports (client-SPEC 4-29).
+  // reads whichever keeper the door reports (client/Spec.lean §4-29).
 
   import type { Key } from "../../core/lang";
   import { say } from "../../core/lang";

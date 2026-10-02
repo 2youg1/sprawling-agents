@@ -11,7 +11,7 @@
 //           only when the record takes over;
 //   block - the blocks that have closed drawn as blocks, the open tail
 //           as text (what `talk/saying.svelte` draws).
-// The page reads no Markdown: the city does (client-SPEC 4-26), and
+// The page reads no Markdown: the city does (client/Spec.lean §4-26), and
 // this probe prices layout, not reading. The reply is fixed, and its
 // blocks are the stretches between its blank lines - it has no blank
 // line inside a code block - so a block closes where the blank line

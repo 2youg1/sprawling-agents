@@ -24,7 +24,7 @@
 // either would be a second authority for where this binary lives.
 
 // wording-ok: the update recipe printed for a person to run; a machine
-// spelling, identical in both languages (client-SPEC 4-10)
+// spelling, identical in both languages (client/Spec.lean §4-10)
 const UPDATE_NPM = "bunx sprawling@latest up";
 // wording-ok: the project's own release page; a proper noun identical
 // in both languages

@@ -8,7 +8,7 @@
 <script lang="ts" module>
   // The city, cost and registry pages and the desktop allowlist, each at
   // the width `<main>` has in a 1440 window, standing in a made-up city
-  // (client-SPEC 4-50): a city with three buildings and one picked, a
+  // (client/Spec.lean §4-50): a city with three buildings and one picked, a
   // city that has spent across every cut, and a registry with three
   // assets.
   import type { Answer, CityAnswer, CostAnswer, Query, RegistryLine } from "../../wire";

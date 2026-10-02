@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The page a sandboxed frame is given to draw (client-SPEC 4-54, 12-32).
+// The page a sandboxed frame is given to draw (client/Spec.lean §4-54, client D32).
 // The frame's `sandbox` attribute already runs no script, submits no
 // form, opens no window and gives the page an origin of its own; what
 // it leaves open is reading and going elsewhere, and this closes both

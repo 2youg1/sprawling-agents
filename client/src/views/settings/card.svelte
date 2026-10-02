@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // One settings card that is saved by a press (client-SPEC 4-36): a
+  // One settings card that is saved by a press (client/Spec.lean §4-36): a
   // title, one line saying what it governs, its fields, and a foot with
   // where the save stands on the left and the save button on the right.
   // The standing is a live region, so the receipt is announced when it

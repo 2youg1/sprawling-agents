@@ -51,7 +51,7 @@ pub enum ServerFrame {
 }
 pub struct Hello   { pub wire_v: u32, pub schema: B3Hash, pub token: Option<Sealed<String>> }
 pub struct Welcome { pub wire_v: u32, pub schema: B3Hash, pub resume_from: Option<Seq>, pub city: Option<Address>, pub epoch: Option<B3Hash> }
-// resume_from：账本头（最后广播的记录）的 seq，读自 ServeConfig.head: Arc<LedgerHead>；客户端据此把断线期间的缺口经 HistoryRange 补齐（client-SPEC 4-40）。
+// resume_from：账本头（最后广播的记录）的 seq，读自 ServeConfig.head: Arc<LedgerHead>；客户端据此把断线期间的缺口经 HistoryRange 补齐（client/Spec.lean §4-40）。
 ```
 
 **三个形状决定及其理由**：

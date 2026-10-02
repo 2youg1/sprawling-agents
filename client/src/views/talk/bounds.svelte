@@ -5,7 +5,7 @@
 
 <script lang="ts">
   // What bounds a run in this room, as two facts on the composer's
-  // settings row (client-SPEC 7D, 7I): who answers the gate, and the
+  // settings row (client/Spec.lean §7D, §7I): who answers the gate, and the
   // sandbox the room's building boxes a run in. They are read, never
   // pressed.
   //
@@ -13,7 +13,7 @@
   // left to be noticed.** No sandbox named anywhere means the run has the
   // machine, and a gate the city could not report is not a gate a person
   // can trust; either one carries the mark this product uses for anything
-  // that needs a person (`asks`, client-SPEC 7C), which survives a forced
+  // that needs a person (`asks`, client/Spec.lean §7C), which survives a forced
   // colour mode where a colour alone would not.
   import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";

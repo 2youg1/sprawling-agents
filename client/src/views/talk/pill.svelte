@@ -20,7 +20,7 @@ long enough to scroll gets a filter; a list of six does not. -->
   // A fact on the composer's settings row, and the shape a pill's trigger
   // takes there: no frame and no fill at rest, a wash under the pointer,
   // so the row reads as words under a line rather than as a toolbar
-  // (client-SPEC 7I). `bounds.svelte` draws its read-only facts in it too.
+  // (client/Spec.lean §7I). `bounds.svelte` draws its read-only facts in it too.
   export const FACT =
     "inline-flex h-control-sm max-w-[16rem] min-w-0 items-center gap-tight rounded-control px-snug text-note text-text-quiet";
 </script>
@@ -44,7 +44,7 @@ long enough to scroll gets a filter; a list of six does not. -->
     readonly starts?: "open" | "closed";
     // What the menu reads out above its choices, when the fact the pill
     // stands for has more to it than its value: the room chip's who is
-    // listening (client-SPEC 7I). The list is described by it, so a
+    // listening (client/Spec.lean §7I). The list is described by it, so a
     // screen reader hears it with the list.
     readonly told?: Snippet | undefined;
   }

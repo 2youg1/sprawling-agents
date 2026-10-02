@@ -51,7 +51,7 @@
        column of prose has a width below which it stops being prose: the
        flex row let the reading pane shrink toward nothing at a narrow
        window, and the empty state under it wrapped one character per
-       line (client-SPEC 4-33's third rule). On a wide page the
+       line (client/Spec.lean §4-33's third rule). On a wide page the
        building list keeps its own width and the reading pane takes
        the rest, as the MCP page draws the same pair. -->
   <div class="grid items-start gap-wide @wide/page:grid-cols-[var(--spacing-tree)_minmax(0,1fr)]">

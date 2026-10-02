@@ -51,7 +51,7 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 以下是这个接口今天尚未落地的部分，按阶段写成当前状态；每一段落地时，从这里删掉，写进它所属的 §8 章节。
 
 - **`cloudflare` 通路没有在真的隧道上开过。** 自动测试不跑它（§2）。缺的证据有两件：在一台装了 `cloudflared`、能连上 Cloudflare 边缘的电脑上，按 §8-8 的操作者检查开、关一次；在一台出网受限（经代理、7844 端口被拦）的电脑上，`cloudflared` 在就绪之前退出时，能否给出比「它在就绪之前退出」更具体的一句拒绝。今天的拒绝给出手动跑的那一行命令，人从 `cloudflared` 自己的输出里读原因。
-- **页面还到不了设备。** 设备一侧的配对页、两种握手、封装与 PWA 清单已在 `client/`（`client/client-SPEC.md` 4-57、12-35，模块 `client/src/core/remote/`），对上了 §8-12 的每一份文件。远程监听今天只答 §8-10 的两条 WebSocket 路径，不送页面，所以设备打开二维码里的地址得不到这一页；整个客户端经 `/remote/session` 说线协议（页面的 socket 换成一条封好的传输）也还没有。缺的证据：远程监听对一个不是 WebSocket 升级的 `GET` 答出客户端的 bundle（与城自己的端口同一份，`wire::ClientAssets`）；一条端到端测试由浏览器一侧（或 Rust 设备一侧）经 `/remote/session` 收到城的 `Welcome`。两件同批落地，那时这一段从这里删掉，写进 §8-10。
+- **页面还到不了设备。** 设备一侧的配对页、两种握手、封装与 PWA 清单已在 `client/`（`client/Spec.lean` §4-57、client D35，模块 `client/src/core/remote/`），对上了 §8-12 的每一份文件。远程监听今天只答 §8-10 的两条 WebSocket 路径，不送页面，所以设备打开二维码里的地址得不到这一页；整个客户端经 `/remote/session` 说线协议（页面的 socket 换成一条封好的传输）也还没有。缺的证据：远程监听对一个不是 WebSocket 升级的 `GET` 答出客户端的 bundle（与城自己的端口同一份，`wire::ClientAssets`）；一条端到端测试由浏览器一侧（或 Rust 设备一侧）经 `/remote/session` 收到城的 `Welcome`。两件同批落地，那时这一段从这里删掉，写进 §8-10。
 - **城密钥只活在一个进程里。** 装配层在城启动时取 32 字节熵派生城的签名密钥（§8-3），不存下来；设备钉住的是配对时那把城公钥，所以城一重启，每台设备都要重新配对，`/remote open` 照实说出这一句。要跨重启保存，32 字节的种子得留在某处，下次启动读回来。未决的是留在哪里，它要人的决定，因为三条可行的路里有两条要放宽一道门、一条违反一条现行规则：
   1. **种子进 vault，兑现点在本 crate 的 `keys`。** 第一次开门时取熵、经 vault 写成 `secret:remote/city-key`，此后每次启动取回；`keys::SigningKey` 多一个 `from_sealed(&Sealed<String>)` 的构造，`crates/remote_access/src/keys.rs` 进 `xtask secret` 的 `EXPOSE_WHITELIST`（第五项）。后果：设备跨重启保持配对；明文种子只出现在派生密钥的那一个函数里，与名单上其余四处「明文只在用它的最后一格」同一个理由；放宽的是一道门，名单变长一项。vault 是进程内的那一种时（平台凭据库打不开），种子仍随进程消失，`/remote open` 照旧说出重新配对那一句。
   2. **种子进 vault，兑现点在装配层**（`bin::outside::keeper` 或 `bin::assembly::remote_door`）。后果与 1 相同，但明文种子会出现在组装根里，而那份名单的注释写明它存在就是为了不让明文出现在组装根；放宽的同样是一道门，而且放在名单最不愿收的地方。
@@ -504,7 +504,7 @@ D11 与浏览器的互通只做组件级已知答案向量，加一条从 Rust �
 - `ARCHITECTURE.md`：§3 的 `depmap` 块（`remote_access: kernel`，`sprawling` 一行带着本 crate）、§4 的缝表（`remote_access::route` 一行）、§10 规则 3（`route::command` 的读线程与 `bin::outside::listener` 的任务）。这些改了，重读本文件 §7 与 §8-7。
 - `architecture.toml`：本 crate 各行与 `[family.remote_access]`，锚点指向本文件或两个分部。新模块先在那里登记。
 - `docs/glossary.md`：远程门、纪元、配对码、邀请、设备、通路、远程会话，并写明远程门与 Gate 的 door、远程会话与房间的 Session 不是一物（§6）。§6 的词改了，两处一起改。
-- `crates/kernel/Spec.lean` §8-76（设备表的路径）与 §8-81（远程门的五个事件）、`crates/wire/Spec.lean` §19-2 的 `class` 列与 §8-66（中继与 `Refusal`）、`crates/sprawling/Spec.lean` §8-139 与 §8-140（门的看守、远程监听、控制台的 `/remote`）、`client/client-SPEC.md` §7（配对页的交互契约落地时写在那里，§3）。§8-1 的动词类、§8-5 的负载、§8-6 的邀请写法或 §8-10 的两条路径改了，重读这几节。
+- `crates/kernel/Spec.lean` §8-76（设备表的路径）与 §8-81（远程门的五个事件）、`crates/wire/Spec.lean` §19-2 的 `class` 列与 §8-66（中继与 `Refusal`）、`crates/sprawling/Spec.lean` §8-139 与 §8-140（门的看守、远程监听、控制台的 `/remote`）、`client/Spec.lean` §9（配对页的交互契约落地时写在那里，§3）。§8-1 的动词类、§8-5 的负载、§8-6 的邀请写法或 §8-10 的两条路径改了，重读这几节。
 - `tools/fixtures/remote-handshake/` 与 `tools/README.md` 的 fixtures 一行（§8-12）：客户端的互通测试读这些文件；§8-3 到 §8-5 的任何字节改了，文件重生成，客户端的测试须仍过。
 - `docs/operating.md` 里控制台 `/remote` 的那一段与 `[remote]` 的写法（两种通路、`tailscale serve` 的示例）：控制台的动词以 `crates/sprawling/Spec.lean` §8-140 为准，表的键以 `crates/city/Spec.lean` §8-39 为准，§8-8、§8-9 改了参数时三处一起改。
 - `README.md` 与 `README.zh-CN.md` 的「它在哪里监听」一节照 D3 与 D10 写远程门与通路上剩下的那一件信任，`docs/getting-started.md` 与中文版的「另一台机器」一节指向 `docs/operating.md`；D3、D10 改了，这四处一起改，中英两份在同一个提交里。

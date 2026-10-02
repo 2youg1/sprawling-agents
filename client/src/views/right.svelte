@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // The right side, the inspector (client-SPEC 7F, 4-45): a strip of the
+  // The right side, the inspector (client/Spec.lean §7F, §4-45): a strip of the
   // items open on it, the editor region above and the terminal region
   // below, and the line between them. Where it stands on the grid is the
   // workspace's decision (4-27); what is open on it is

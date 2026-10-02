@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // A PDF drawn page by page with pdf.js (client-SPEC 4-54). Every page
+  // A PDF drawn page by page with pdf.js (client/Spec.lean §4-54). Every page
   // has its place from the start, at the first page's proportions until
   // it is drawn, so the scroll bar is the length of the document; a page
   // is drawn only as it nears the view, and drawn again when the pane's

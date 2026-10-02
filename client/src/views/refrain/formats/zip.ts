@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // A DOCX is a ZIP archive, and a ZIP archive says how large each part
-// will be before anything is inflated - and may lie (client-SPEC 4-54).
+// will be before anything is inflated - and may lie (client/Spec.lean §4-54).
 // This reads the archive's own directory, refuses one that promises
 // more than a page should hold, and then inflates every part through
 // the platform's `DecompressionStream`, stopping a part the moment it

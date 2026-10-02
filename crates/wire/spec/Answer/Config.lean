@@ -31,7 +31,7 @@ pub struct ConfigAnswer {
 }
 ```
 
-- **上下文环读的两级都在这一个答复上**：第二级是 `second.percent`，第一级是 `first`。页面不抄 30 这个数（client-SPEC 7J）。
+- **上下文环读的两级都在这一个答复上**：第二级是 `second.percent`，第一级是 `first`。页面不抄 30 这个数（client/Spec.lean §7J）。
 - **不带层**：第一级不可调（`crates/kernel/Spec.lean` D19），没有哪一级文件说得出它，答一个恒为 `default` 的层只是多一个读者要处理的值。
 - **`Option` 只为旧城**：这一版的城恒答 `Some`；理由与可缺的规则见 D13。
 -/

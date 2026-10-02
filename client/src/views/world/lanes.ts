@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Where each commit of a page sits in the commits pane's swimlane graph
-// (client-SPEC 7K): one row per commit, newest first, each on a lane, and
+// (client/Spec.lean §7K): one row per commit, newest first, each on a lane, and
 // the lines that join it to its parents (`CommitAnswer.parents`).
 //
 // The walk is git's own `log --graph`, one row at a time: every lane

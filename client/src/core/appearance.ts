@@ -26,7 +26,7 @@ export type Chroma = "full" | "off";
 export type Motion = "system" | "on" | "off";
 // Whether the edge layer's small surfaces are drawn as glass. `on` still
 // yields to a machine that asks for less transparency, which only some
-// engines report - that gap is why this switch exists (client-SPEC 4-43).
+// engines report - that gap is why this switch exists (client/Spec.lean §4-43).
 export type Glass = "on" | "off";
 
 // Every value a selector offers, in the order it is drawn, and the

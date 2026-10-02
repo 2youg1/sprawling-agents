@@ -3,7 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Walking the mailbox's entries from the keyboard (client-SPEC 7-11):
+// The properties this module must hold are proved in `client/spec/Views/Workspace.lean`.
+//
+// Walking the mailbox's entries from the keyboard (client/Spec.lean §7-11):
 // `j` and `k` move to the next and the previous entry, and a digit
 // reaches the entry it is drawn beside. An entry is any element marked
 // `data-entry`, in document order, so the sections need not know how

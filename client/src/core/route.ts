@@ -27,7 +27,7 @@ export type Lens = "ledger" | "archive" | "bin" | "log";
 export const LENSES: readonly Lens[] = ["ledger", "archive", "bin", "log"];
 
 // The groups the settings panel draws in its body, as the address bar
-// spells them: `#/setup/<group>` opens the panel at one (client-SPEC 7L).
+// spells them: `#/setup/<group>` opens the panel at one (client/Spec.lean §7L).
 // The order the settings tree offers them in is the tree's own
 // (`views/settings/tree.ts`); this is only the set the address bar reads.
 export const SETUP_GROUPS = [
@@ -184,7 +184,7 @@ function named(raw: string): string {
 // without ever admitting it.
 export function fromFragment(raw: string): Option.Option<View> {
   // The link `/remote pair` prints carries its invitation in a fragment
-  // of its own shape; it opens the group that pairs (client-SPEC 3-2).
+  // of its own shape; it opens the group that pairs (client/Spec.lean §3-2).
   if (isInvitation(raw)) return Option.some({ kind: "setup", group: "remote" });
   const path = named(raw);
   const slash = path.indexOf("/");

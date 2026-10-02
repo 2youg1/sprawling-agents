@@ -30,7 +30,7 @@ import type { PopoverColumn } from "../parts/popover";
 // What the send control is spelled, for each of the three places a
 // message can land. `queued` is the one a streaming page would
 // otherwise hide: the run is inside a tool call, and the words wait for
-// a boundary (client-SPEC 4-13).
+// a boundary (client/Spec.lean §4-13).
 export const SPELLING: Record<Sending, Key> = {
   dispatch: "talk_send",
   steer: "talk_steer",
@@ -172,8 +172,8 @@ function modelRows(lang: Lang, around: Around): { choices: Choice[]; value: stri
 
 // The level in force, spelled as the row that offers it: nobody having
 // chosen is a row of its own (`core/slash.ts`'s `UNSTATED`), so the pill
-// and the `/effort` line name the states the same way (client-SPEC
-// 4-28). An id that is no level this build offers reads as unstated
+// and the `/effort` line name the states the same way (client/Spec.lean
+// §4-28). An id that is no level this build offers reads as unstated
 // rather than as a level the frame would refuse.
 export function effortLevel(value: string): Effort | null {
   if (value === UNSTATED) return null;
@@ -181,8 +181,8 @@ export function effortLevel(value: string): Effort | null {
 }
 
 // What sending to a room means, in one line: the Mayor's own room, a
-// bare building (a dispatch there opens a room of its own, client-SPEC
-// 12-6), or a room that carries on a conversation.
+// bare building (a dispatch there opens a room of its own, client
+// D6), or a room that carries on a conversation.
 function roomNote(lang: Lang, room: string): string {
   if (room === MAYOR) return say(lang, "talk_room_note_mayor");
   const slash = room.indexOf("/");
@@ -281,7 +281,7 @@ export interface Around {
 
 // The four pills - model, workspace, effort, mode - in the order they stand
 // in the row. The effort rows carry what a level costs beside the level
-// itself, because this is where a person decides (client-SPEC 4-28).
+// itself, because this is where a person decides (client/Spec.lean §4-28).
 export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill, Pill, Pill, Pill] {
   const levels: readonly (typeof UNSTATED | Effort)[] = [UNSTATED, ...EFFORTS];
   return [

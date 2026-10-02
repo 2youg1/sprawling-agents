@@ -358,7 +358,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 - `E_DELEGATION_DEPTH`：不消解（明裁：边界反馈优于沉默缺席）。
 - `E_APPROVAL_PENDING`／`E_APPROVAL_DENIED`：不可——一个设计问题停住提问的那个 run，而人可以答「不」；两者都是用户可达状态。`E_APPROVAL_PENDING` 有一个门的生产者：`gate::attach` 的 Ask（§8-27），它请求的是人的动作而不是 Approval Inbox 里的一条答案，所以不产生 `ApprovalItem`；`E_APPROVAL_DENIED` 仍只由人答题面对产生。
 - `E_EVIDENCE_MISSING`：部分定义掉——无证据 Done 已不可构造（类型半）；构造时拒绝仍需此码（运行时半，A6 双守）。
-- `E_PLAN_MISSING`：不可——没有计划的楼上设常设目标，pursuit 找不到一步可做就当场「完成」，人看到的是一句 `finished` 而什么也没发生。这一码只在计划缺席或为空时于设目标处拒绝：`Roadmap.md` 读不出来保留它自己的码（`E_STORAGE_FATAL`），表格不成形是 `E_INVALID_ARGS` 并列出坏行——那份计划是人写的，恢复动作不该请市长另写一份盖掉它。`subject` 恒为 `<楼地址>: <常设目标>`，客户端据此给出「让市长写计划」的预填表单（client-SPEC 4-35a），由人提交。人定的是拒绝加按钮，胜过「先让市长自动写计划」：后者替人派出一次有成本的 run，而人只是想设一个目标。
+- `E_PLAN_MISSING`：不可——没有计划的楼上设常设目标，pursuit 找不到一步可做就当场「完成」，人看到的是一句 `finished` 而什么也没发生。这一码只在计划缺席或为空时于设目标处拒绝：`Roadmap.md` 读不出来保留它自己的码（`E_STORAGE_FATAL`），表格不成形是 `E_INVALID_ARGS` 并列出坏行——那份计划是人写的，恢复动作不该请市长另写一份盖掉它。`subject` 恒为 `<楼地址>: <常设目标>`，客户端据此给出「让市长写计划」的预填表单（client/Spec.lean §4-35a），由人提交。人定的是拒绝加按钮，胜过「先让市长自动写计划」：后者替人派出一次有成本的 run，而人只是想设一个目标。
 - `E_SECRET_EGRESS`／`E_DISCARD_IRREVERSIBLE`：不可——两门存在的理由即这两类越界可发生；类型已把「无 Restoration 的 Discard 值」定义掉，Unplanned 请求（exec 预判路）是剩余不可消部分。
 - `E_CONFIG_INVALID`：不可——SecretRef 形状非法与明文入配置必须在反序列化即拒。
 - `E_MODEL_UNCHOSEN`（这一类模型还没有人选定）：不可——城在没接供应方、没选模型时也要能开，所以「这一类没有模型」是人可达的状态。它不并进 `E_CONFIG_INVALID`：那一码还答「会话中途换了模型」「端点已不在」等情形，出路各不相同（去设置 对 开新对话），而客户端只能按码给出路。生产者只有 `gateway::router` 的 `EndpointBook::select`；账本此刻可写，所以 carrier 是 `tool_result`，不进装载期白名单。

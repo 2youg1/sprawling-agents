@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // The commits a building made, newest first, and the way back from a
-  // line of code to the session that wrote it (client-SPEC 4-50). Each
+  // line of code to the session that wrote it (client/Spec.lean §4-50). Each
   // row is the commit as one line and opens into its facts and the
   // files it changed; scrolling to the end asks for the next page, and
   // the end of the list says whether it is the building's first commit
@@ -41,7 +41,7 @@
 
   // One `before` per page asked; the first page has none. A page is
   // its own question, so an older page stays valid while the newest
-  // one is re-asked after every commit (client-SPEC 4-15).
+  // one is re-asked after every commit (client/Spec.lean §4-15).
   let befores = $state<readonly (Seq | null)[]>([null]);
   let open = $state<string | null>(null);
   // The oid typed into the head's box, and the one it asked about.

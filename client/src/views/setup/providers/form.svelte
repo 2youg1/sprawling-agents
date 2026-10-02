@@ -117,7 +117,7 @@
   // The face control, with the cells a known host does not answer in
   // refused under the pointer and saying which shapes it does speak. A
   // host the city does not know keeps every cell open: the form makes
-  // the widest judgement and never a narrower one (client-SPEC 4-25).
+  // the widest judgement and never a narrower one (client/Spec.lean §4-25).
   const faces = $derived.by((): readonly Choice<WireApi>[] => {
     const offered = row === null ? null : facesOf(row);
     return wireChoices().map((choice) =>

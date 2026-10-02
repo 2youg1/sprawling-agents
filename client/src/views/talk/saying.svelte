@@ -8,7 +8,7 @@
   // The words of a turn while they are still arriving. The city reads
   // the blocks that can no longer change (a list, a table, a code block)
   // as they close, so they are laid out as they close and the reply does
-  // not jump when the record takes over (client-SPEC 4-26, 4-53); only
+  // not jump when the record takes over (client/Spec.lean §4-26, §4-53); only
   // the open tail is drawn as raw text, its last few characters faint so
   // text emerges instead of appearing. No timer, no queue, no
   // per-character node.

@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // The building page's right side: the file of this building that the
-  // right-side state has in front (client-SPEC 4-50, 12-27). It reads
+  // right-side state has in front (client/Spec.lean §4-50, client D27). It reads
   // the same state the conversation's right side reads, so a file a
   // change row opened here is still open in the conversation, and
   // closing it here closes it there. The band on top is the one surface

@@ -7,7 +7,7 @@
 // inks, and where to fetch the highlighter that assigns them. The
 // highlighter and its grammars are a lazy chunk (`paint.ts`), fetched
 // the first time a file, a code block or the monitor shows code, so a
-// screen that shows none downloads none of it (client-SPEC 4-26).
+// screen that shows none downloads none of it (client/Spec.lean §4-26).
 
 // What a stretch of code is, as far as the grammar says. Four classes
 // and a fifth for everything else, because the theme offers four inks

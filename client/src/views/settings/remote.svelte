@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The remote group (client-SPEC 4-57): the device's half of the remote
+  // The remote group (client/Spec.lean §4-57): the device's half of the remote
   // door. The door's own verbs live at the city's console and nowhere
   // else (`crates/remote_access/Spec.lean` D4), so this group pairs the
   // browser it runs in when the address bar carries an invitation, locks

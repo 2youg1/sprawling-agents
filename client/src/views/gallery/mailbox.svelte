@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // The mailbox (client-SPEC 4-49): its key in each of the ways it is
+  // The mailbox (client/Spec.lean §4-49): its key in each of the ways it is
   // marked, its column with every section holding something and with
   // nothing in it, and the decide card in the conversation's width. The
   // key and the column read the city instead of their props, so each

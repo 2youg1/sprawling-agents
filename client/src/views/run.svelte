@@ -13,7 +13,7 @@
   // the first page draws, so a run reads the same from both doors.
   //
   // The lens set is `parts/tabs.svelte`, which owns both halves of the
-  // tab-and-panel association (client-SPEC 7-8 item 6).
+  // tab-and-panel association (client/Spec.lean §7-8 item 6).
 
   import { Option, Schema } from "effect";
   import { SvelteMap } from "svelte/reactivity";
@@ -114,7 +114,7 @@
   // down, and both state a ledger position - so which is newer is a
   // comparison rather than a preference, and `core/belief` owns that
   // comparison because the city page folds the same two readings
-  // (client-SPEC 4-24 third).
+  // (client/Spec.lean §4-24 third).
   const mine = $derived($belief.runs[run]);
   const shown = $derived(summary === null ? mine : adopted(summary, mine));
 
@@ -133,7 +133,7 @@
   // when it never checkpointed, so edits made after it ended are not counted.
   const changedTo = $derived(live ? (lastCheckpoint === checkpoint ? null : lastCheckpoint) : (lastCheckpoint ?? checkpoint));
 
-  // The lens a run opens on (client-SPEC 12-28): a run still going is
+  // The lens a run opens on (client D28): a run still going is
   // watched where its time goes; a run that is over and checkpointed
   // past its opening is read for what it changed, which is what a link
   // from a finished run, a commit or `/diff` is followed for; a run that

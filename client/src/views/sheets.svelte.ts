@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The full-screen sheets of a one-column shell (client-SPEC 4-52, refrain
+// The full-screen sheets of a one-column shell (client/Spec.lean §4-52, refrain
 // U9): the world layer, entering from the left, and the right side,
 // entering from the right. Each open sheet is an entry of the browser's
 // own history, so the sheet's back key, the browser's back button and an
@@ -21,7 +21,7 @@ const KEY = "sheets";
 
 let open = $state.raw<readonly Sheet[]>([]);
 // What had the focus when the world sheet opened, which takes it back
-// when the sheet closes with the focus lost inside it (client-SPEC 7-7).
+// when the sheet closes with the focus lost inside it (client/Spec.lean §7-7).
 // The right side keeps its own opener (`inspect/open.svelte.ts`).
 let opener: HTMLElement | null = null;
 

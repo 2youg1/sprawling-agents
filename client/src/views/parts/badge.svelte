@@ -32,7 +32,7 @@ export interface BadgeTierProps {
   readonly text: string;
   readonly status?: undefined;
   // Nothing in particular, something going on, something wrong. The
-  // three tiers of client-SPEC 4-32, painted below.
+  // three tiers of client/Spec.lean §4-32, painted below.
   readonly weight?: Weight;
   // A state reads better with a mark beside it; a count does not.
   readonly dot?: boolean;

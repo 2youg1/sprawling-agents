@@ -13,7 +13,7 @@
   //
   // A row is a disclosure rather than a table row: it opens into what
   // that node has cost and which runs spent it (`Query::CostOf`,
-  // client-SPEC 4-50), which a sortable table has no place for.
+  // client/Spec.lean §4-50), which a sortable table has no place for.
   //
   // The state on the right is `parts/badge.svelte`. It was five
   // hand-drawn paints here, which is the same thing that component is
@@ -63,7 +63,7 @@
   // the word beside it, which is why two states may share a weight:
   // `ready` and `in_progress` are both the city working, and `blocked`
   // and `awaiting_approval` are both the city stopped until somebody
-  // acts (client-SPEC 4-32).
+  // acts (client/Spec.lean §4-32).
   function weightOf(row: PlanRow): Weight {
     switch (row.status) {
       case "in_progress":
