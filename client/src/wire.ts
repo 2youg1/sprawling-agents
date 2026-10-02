@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 45 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "5b719bf37a82e571ec1e901a04c1fbb8d6355db885a351fd9eb9b35101ddfb04" as const;
+export const WIRE_HASH = "3218131e6f6426af6c36a9af0b158a45c91bbbca6bfbf9afb080ad2563a56545" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -1574,6 +1574,15 @@ export const EvidenceAnswer = Schema.Struct({
   run: RunId,
 }).annotate({ identifier: "EvidenceAnswer" });
 export type EvidenceAnswer = typeof EvidenceAnswer.Type;
+
+/**
+ * A Markdown version written as one HTML file that stands alone.
+ */
+export const ExportAnswer = Schema.Struct({
+  html: Schema.String,
+  version: B3Hash,
+}).annotate({ identifier: "ExportAnswer" });
+export type ExportAnswer = typeof ExportAnswer.Type;
 
 /**
  * Whether the walk looked at everything under the address.
@@ -3800,7 +3809,7 @@ export type NoSecret = typeof NoSecret.Type;
 
 /**
  * Whether the core's threads stand above normal (`crates/sprawling/Spec.lean`
- * 8-93): the setting a person turns off. Spelled here once, for the
+ * §8-93): the setting a person turns off. Spelled here once, for the
  * frame and for the `[core] priority` key the person's file holds.
  */
 export const CorePriority = Schema.Literals(["raised", "normal"]).annotate({ identifier: "CorePriority" });
