@@ -142,10 +142,11 @@ jobs:
   # Windows, because that is where the nondeterminism lives: link.exe
   # mints a PE header timestamp and a debug-directory PDB GUID per run,
   # and a build records the absolute path of every source it compiled.
-  # The switches that settle all three - `/Brepro` and
-  # `--remap-path-prefix` - are in `.cargo/config.toml`, so every build
-  # of this tree carries what this job judges, the release archives
-  # included.
+  # `/Brepro` in `.cargo/config.toml` settles the first two, so every
+  # build of this tree carries what this job judges, the release
+  # archives included. The third needs no switch here, because both
+  # builds run in one checkout and record the same paths; it is why
+  # this job claims one machine and not two.
   #
   # Nightly rather than on a push: `cargo xtask repro` clears the
   # release artefacts of one crate and builds twice, and nobody waits on

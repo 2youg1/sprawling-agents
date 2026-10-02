@@ -16,11 +16,12 @@
 //! zeroed and the tables are sorted. The link step is not deterministic
 //! on its own, and neither is the debug information: link.exe mints a
 //! PE header timestamp and a debug-directory PDB GUID per run, and a
-//! compile records the absolute path of every source it read. Those
-//! three are settled by `/Brepro` and `--remap-path-prefix` in
-//! `.cargo/config.toml`, where every build of this tree reads them,
-//! rather than by the two commands below - a switch this fixture passed
-//! to its own builds would prove an artifact no release ships.
+//! compile records the absolute path of every source it read. The first
+//! two are settled by `/Brepro` in `.cargo/config.toml`, where every
+//! build of this tree reads it, rather than by the two commands below -
+//! a switch this fixture passed to its own builds would prove an
+//! artifact no release ships. The third is equal for two builds in one
+//! checkout, so this fixture proves one machine, not two.
 //!
 //! `platforms.yml` runs this nightly, which is the only automated
 //! reader: two links are minutes, and nobody waits on the verdict.
