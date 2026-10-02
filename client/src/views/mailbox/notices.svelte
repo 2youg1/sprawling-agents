@@ -23,7 +23,6 @@
   import { ui } from "../../ui";
   import { recover, recoveryLabel, recoveryWhy } from "../notice_recovery";
   import Button from "../parts/button.svelte";
-  import Empty from "../parts/empty.svelte";
   import Notice from "../parts/notice.svelte";
   import Section from "./section.svelte";
   import { shown, sweep } from "./swept.svelte";
@@ -66,7 +65,7 @@
   }
 </script>
 
-<Section title="notices" count={visible.length}>
+<Section title="notices" empty="notices_none" count={visible.length}>
   {#snippet tools()}
     {#if visible.length > 0}
       <Button
@@ -78,9 +77,6 @@
       />
     {/if}
   {/snippet}
-  {#if visible.length === 0}
-    <Empty missing="notices_none" seat="inset" />
-  {/if}
   {#each days as day (day.id)}
     <h4 class="pt-snug text-note text-text-faint">{day.label}</h4>
     <ul>

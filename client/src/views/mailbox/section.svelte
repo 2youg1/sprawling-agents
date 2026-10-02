@@ -8,7 +8,11 @@
 <script lang="ts">
   // One section of the mailbox column: a heading that stays at the top
   // of the column while its entries scroll under it, how many entries
-  // it holds, and the section's own controls at its right end.
+  // it holds, and the section's own controls at its right end. With
+  // nothing in it, one line under the heading says what is missing, on
+  // the column's own left edge: the section is one part of a screen
+  // whose heading already names it, so the empty seat of a whole screen
+  // (`parts/empty.svelte`, with its outline and inset) is not its shape.
   import type { Snippet } from "svelte";
 
   import type { Key } from "../../core/lang";
@@ -18,11 +22,13 @@
   interface Props {
     readonly title: Key;
     readonly count: number;
+    // What the line says when the section holds nothing.
+    readonly empty: Key;
     readonly tools?: Snippet | undefined;
     readonly children: Snippet;
   }
 
-  const { title, count, tools, children }: Props = $props();
+  const { title, count, empty, tools, children }: Props = $props();
 
   const { lang } = ui();
   const id = $props.id();
@@ -37,5 +43,8 @@
     <span class="flex-1"></span>
     {#if tools !== undefined}{@render tools()}{/if}
   </h3>
+  {#if count === 0}
+    <p class="py-snug text-note text-text-quiet">{say($lang, empty)}</p>
+  {/if}
   {@render children()}
 </section>

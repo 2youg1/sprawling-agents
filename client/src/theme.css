@@ -1815,6 +1815,7 @@ main h1 {
 .entry-n {
   flex-shrink: 0;
   min-width: 1ch;
+  margin-inline-start: var(--spacing-snug);
   font-family: var(--font-mono);
   font-size: var(--text-note);
   line-height: 1;

@@ -17,7 +17,7 @@
   import { toFragment } from "../../core/route";
   import { lasted } from "../../core/time";
   import { ui } from "../../ui";
-  import Empty from "../parts/empty.svelte";
+  import type { Address } from "../../wire";
   import Glyph from "../parts/glyph.svelte";
   import type { Weight } from "../parts/glyph";
   import { phaseOf } from "../runs/lineage";
@@ -41,11 +41,11 @@
   // `live` runs oldest to newest, so the last run seen in a room is its
   // newest; a run with no room yet has nowhere to link to.
   const rows = $derived.by(() => {
-    const newest: Record<string, RunBelief> = {};
+    const newest: Record<string, { readonly room: Address; readonly run: RunBelief }> = {};
     for (const run of $belief.live) {
-      if (run.addr !== null) newest[run.addr] = run;
+      if (run.addr !== null) newest[run.addr] = { room: run.addr, run };
     }
-    return Object.values(newest).sort((a, b) => (b.started ?? 0) - (a.started ?? 0));
+    return Object.values(newest).sort((a, b) => (b.run.started ?? 0) - (a.run.started ?? 0));
   });
 
   // How long each row's run has gone, redrawn once a second while any
@@ -62,23 +62,20 @@
   });
 </script>
 
-<Section title="mailbox_working" count={rows.length}>
-  {#if rows.length === 0}
-    <Empty missing="mailbox_working_none" seat="inset" />
-  {/if}
+<Section title="mailbox_working" empty="mailbox_working_none" count={rows.length}>
   <ul>
-    {#each rows as run (run.run)}
+    {#each rows as { room, run } (run.run)}
       {@const phase = phaseOf(run.doing)}
       {@const mark = PHASE_MARK[phase]}
       <li>
         <a
-          href={run.addr === null ? undefined : toFragment({ kind: "talk", address: run.addr })}
+          href={toFragment({ kind: "talk", address: room })}
           class="-mx-snug grid grid-cols-[var(--spacing-glyph-sm)_minmax(0,1fr)_auto_auto] items-center gap-x-snug rounded-card px-snug py-tight hover:wash focus-visible:wash"
           data-entry
           onclick={onLeave}
         >
           <Glyph name={mark.glyph} size="sm" class={INK[mark.weight]} />
-          <span class="min-w-0 truncate font-label">{run.addr}</span>
+          <span class="min-w-0 truncate font-label">{room}</span>
           <span class="figure text-note text-text-faint">
             {say($lang, PHASE_WORD[phase])} · {run.started === null ? "" : lasted(now - run.started)}
           </span>

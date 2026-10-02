@@ -52,6 +52,7 @@
   const link = u.conn.state;
   const approvals = u.approvals;
 
+  const uid = $props.id();
   let open = $state(false);
   let column = $state<HTMLElement | undefined>(undefined);
 
@@ -108,7 +109,7 @@
       aria-expanded={open}
       aria-label={name}
       aria-describedby={id}
-      onclick={toggle}
+      popovertarget="{uid}-column"
     >
       <Glyph name="inbox" size="key" />
       {#if needs > 0}
@@ -136,8 +137,12 @@
   {/snippet}
 </Tip>
 
+<!-- The key is the column's invoker (`popovertarget`), so a press on it
+while the column is open closes it rather than being read as a click
+outside that closes it and then a press that opens it again. -->
 <aside
   bind:this={column}
+  id="{uid}-column"
   popover="auto"
   aria-label={say($lang, "edge_mailbox")}
   class="slide fixed inset-y-0 right-auto left-[calc(var(--spacing-margin)+var(--spacing-key)+var(--spacing-pane))] m-0 flex h-full w-[440px] max-w-[100vw] flex-col overflow-hidden bg-raised text-body text-text shadow-sheet narrow:left-0 narrow:w-full"

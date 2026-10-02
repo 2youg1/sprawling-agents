@@ -30,7 +30,6 @@
   import { ago } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, Origin, SessionLine, SessionsAnswer } from "../../wire";
-  import Empty from "../parts/empty.svelte";
   import Tip from "../parts/tip.svelte";
   import { OVERSCAN, windowOf } from "../run/lanes";
   import Section from "./section.svelte";
@@ -73,7 +72,9 @@
     // Asked again when the set of rooms changes, and not on every record.
     const stops = (roomsKey === "" ? [] : untrack(() => rooms)).map((room) =>
       u.conn.asking.ask({ sessions: { room } }).subscribe((answer) => {
-        if (answer !== undefined && "sessions" in answer) answers = { ...answers, [room]: answer.sessions };
+        // Read without following: the store answers inside this effect,
+        // and the effect must not wait on what it writes.
+        if (answer !== undefined && "sessions" in answer) answers = { ...untrack(() => answers), [room]: answer.sessions };
       }),
     );
     return () => {
@@ -124,9 +125,10 @@
     if (held === undefined || column === undefined) return;
     const total = rows.length;
     const measure = (): void => {
-      rowPx = Number.parseFloat(getComputedStyle(held).getPropertyValue("--spacing-control"));
+      const row = Number.parseFloat(getComputedStyle(held).getPropertyValue("--spacing-control"));
       const top = held.getBoundingClientRect().top - column.getBoundingClientRect().top;
-      shown = windowOf(total, rowPx, Math.max(0, -top), column.clientHeight);
+      rowPx = row;
+      shown = windowOf(total, row, Math.max(0, -top), column.clientHeight);
     };
     measure();
     const watching = new ResizeObserver(measure);
@@ -139,10 +141,7 @@
   });
 </script>
 
-<Section title="mailbox_recent" count={rows.length}>
-  {#if rows.length === 0}
-    <Empty missing="mailbox_recent_none" seat="inset" />
-  {/if}
+<Section title="mailbox_recent" empty="mailbox_recent_none" count={rows.length}>
   <ul
     bind:this={list}
     style:height={`${String(rows.length * rowPx)}px`}
@@ -153,15 +152,15 @@
       <li class="-mx-snug flex h-control items-center gap-snug rounded-card px-snug hover:wash">
         <a
           href={toFragment({ kind: "talk", address: row.room })}
-          class="flex min-w-0 flex-1 items-center gap-snug rounded-control focus-visible:wash"
+          class="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_var(--spacing-figure)] items-center gap-x-base rounded-control focus-visible:wash"
           data-entry
           onclick={onLeave}
         >
-          <span class="min-w-0 flex-1 truncate">{row.room}</span>
-          <span class="shrink-0 text-note text-text-faint">
+          <span class="min-w-0 truncate">{row.room}</span>
+          <span class="text-note text-text-faint">
             {say($lang, startOf(row.line))} · {fill(say($lang, "mailbox_runs"), { n: String(row.line.runs) })}
           </span>
-          <span class="figure w-figure shrink-0 text-right text-note text-text-faint">{ago($lang, row.line.at, u.now())}</span>
+          <span class="figure text-right text-note text-text-faint">{ago($lang, row.line.at, u.now())}</span>
         </a>
         <Tip text={why ?? say($lang, "mailbox_fork_last")}>
           {#snippet children(hint)}

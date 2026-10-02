@@ -97,7 +97,7 @@
   import Deciding from "../mailbox/deciding.svelte";
 
   const LIVE = { kind: "live", city: "sprawling" } as const;
-  const COLUMN = "flex h-[760px] flex-col bg-raised";
+  const COLUMN = "flex h-[1480px] flex-col bg-raised";
   const ignore = (): void => undefined;
 </script>
 

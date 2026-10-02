@@ -21,7 +21,6 @@
   import { recover, recoveryLabel, recoveryWhy } from "../notice_recovery";
   import Button from "../parts/button.svelte";
   import Decide from "../parts/decide.svelte";
-  import Empty from "../parts/empty.svelte";
   import Notice from "../parts/notice.svelte";
   import { recoveryWords } from "../parts/notice_title";
   import { WaitingCards } from "../talk/waiting.svelte";
@@ -42,10 +41,7 @@
   const count = $derived(stopped.length + questions.length);
 </script>
 
-<Section title="mailbox_deciding" {count}>
-  {#if count === 0}
-    <Empty missing="mailbox_deciding_none" seat="inset" />
-  {/if}
+<Section title="mailbox_deciding" empty="mailbox_deciding_none" {count}>
   {#each asks as notice (notice.key)}
     <div class="my-base">
       <Decide
