@@ -52,6 +52,7 @@
   import Streamed from "./gallery/streamed.svelte";
   import Screens from "./gallery/screens.svelte";
   import Settings from "./gallery/settings.svelte";
+  import SettingsPanel from "./gallery/set.svelte";
   import Shell from "./gallery/shell.svelte";
   import Shelved from "./gallery/shelved.svelte";
   import Switches from "./gallery/switches.svelte";
@@ -105,6 +106,7 @@
   <Shelved />
   <Keepers />
   <Settings />
+  <SettingsPanel />
   <Tables />
   <Monitor />
   <Parts />

@@ -5,19 +5,13 @@
 
 <script lang="ts">
   // The shell: one twelve-column grid (client-SPEC 4-33), the page on its
-  // columns, the three edge keys at the foot of the first column, and the
-  // three things that may float over them - a refusal, the palette, and
-  // the sheet of keys. Which page shows is the address bar's decision,
-  // read on every `hashchange`; the conversation page lays itself out by
-  // the tier (`views/workspace.svelte`), every other page takes the
-  // columns right of the edge keys.
-  //
-  // The keys are not spelled here. `core/keys` holds the action, the
-  // chord that reaches it and the person's own chord if they set one;
-  // this file asks it which action a press was and does that one thing.
-  // A stopped city is said once, here, as a banner over every page: the
-  // city page used to draw a crescent nobody could read and dim itself
-  // to 40%, which is a mood rather than a message.
+  // columns, the three edge keys at the foot of the first column, and what
+  // may float over them - the settings panel, a refusal, the palette, the
+  // sheet of keys. Which page shows is the address bar's decision, read on
+  // every `hashchange`; the conversation page lays itself out by the tier
+  // (`views/workspace.svelte`). The keys are spelled in `core/keys`; this
+  // file asks which action a press was and does that one thing. A stopped
+  // city is said once, here, as a banner over every page.
 
   import { Option } from "effect";
   import { onMount, tick } from "svelte";
@@ -46,6 +40,8 @@
   import Palette from "./views/palette.svelte";
   import Refusal from "./views/refusal.svelte";
   import Workspace from "./views/workspace.svelte";
+  import SettingsPanel from "./views/settings/panel.svelte";
+  import { closePanel, hostSettled, panelBeneath, panelGroup, pickGroup } from "./views/settings/hosted.svelte";
   import { motionOff } from "./views/shared/motion";
 
   // The Opening `main.ts` read off the page once. Taken as one prop
@@ -63,14 +59,11 @@
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const bindings = keymap();
 
-  // The actions that move the address bar. Derived from `Action` rather
-  // than written out, so an action named `go.*` in `core/keys` has to
-  // land somewhere here before this file compiles.
+  // The actions that move the address bar, derived from `Action` so a
+  // new `go.*` action has to land somewhere here before this compiles.
   type GoAction = Extract<Action, `go.${string}`>;
 
-  // Where each of them lands; every other action moves the shell and is
-  // answered by `act` below. Keyed by `GoAction`, so a key spelled wrong
-  // is not an action and an action left out is a missing property.
+  // Where each of them lands; every other action is answered by `act`.
   const GOES: Readonly<Record<GoAction, View>> = {
     "go.talk": { kind: "talk", address: MAYOR },
     "go.waiting": { kind: "talk", address: MAYOR },
@@ -131,8 +124,7 @@
 
   // After a navigation the new page's own heading takes the focus, so a
   // keyboard or a screen-reader user lands in the page that just opened
-  // rather than back at the top of the rail (ux-upgrades A12). The
-  // heading is focusable but stands outside the Tab order.
+  // (ux-upgrades A12); the heading stands outside the Tab order.
   function focusTitle(): void {
     const heading = document.querySelector("main h1");
     if (heading instanceof HTMLElement) {
@@ -141,9 +133,13 @@
     }
   }
 
+  // The settings panel takes the focus itself, inside the top layer;
+  // closing it gives the focus back to the control that opened it.
   function settle(): void {
+    const was = view;
     view = Option.getOrElse(current(u.bar), () => DEFAULT_VIEW);
-    if (arrived) void tick().then(focusTitle);
+    const back = hostSettled(was, view, arrived);
+    if (arrived && view.kind !== "setup") void tick().then(() => { if (back === null) focusTitle(); else back.focus(); });
     arrived = true;
   }
 
@@ -242,17 +238,19 @@
 
   function act(action: Action): void {
     switch (action) {
-      // The eight arms that share a body are exactly `GoAction`, so
-      // the lookup is checked here rather than guarded at run time.
+      // These arms are `GoAction`, so the lookup is checked at compile time.
       case "go.talk":
       case "go.city":
       case "go.mcp":
       case "go.record":
       case "go.cost":
       case "go.registry":
-      case "go.setup":
       case "go.waiting":
         u.go(GOES[action]);
+        return;
+      case "go.setup":
+        if (view.kind === "setup") closePanel();
+        else u.go(GOES[action]);
         return;
       case "palette":
         paletteOpen = !paletteOpen;
@@ -321,10 +319,8 @@
     }
   }
 
-  // The run list is the ground every page stands on: asked here and
-  // watched for the life of the shell, so it is refreshed whenever it
-  // goes stale whatever page is open, and folded into what the page
-  // believes.
+  // The run list is the ground every page stands on: asked and watched
+  // here for the life of the shell, whatever page is open.
   $effect(() => u.conn.asking.ask(QUERIES.city).subscribe(() => undefined));
 
   $effect(() => {
@@ -380,7 +376,15 @@
       {/if}
     </div>
   {/if}
-  {#if view.kind === "talk"}
+  {#if view.kind === "setup"}
+    {@const beneath = panelBeneath()}
+    {#if beneath.kind === "talk"}
+      <Workspace address={beneath.address} {tier} />
+    {:else}
+      <Pages view={beneath} />
+    {/if}
+    <SettingsPanel group={panelGroup(view)} {beneath} onPick={pickGroup} onClose={closePanel} />
+  {:else if view.kind === "talk"}
     <Workspace address={view.address} {tier} />
   {:else}
     <Pages {view} />

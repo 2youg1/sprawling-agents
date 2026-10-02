@@ -1770,3 +1770,22 @@ main h1 {
     border-inline-start: var(--spacing-hair) solid CanvasText;
   }
 }
+
+/* SET */
+/* The settings panel arrives from the left edge it belongs to, as an
+ * arrival rather than a cut (client-SPEC 7L). It never animates out:
+ * the shell takes it away when the address bar stops naming it, and a
+ * panel that lingered would answer clicks for a page already gone. */
+.settings-panel {
+  transition: translate 250ms var(--ease-arrive);
+}
+@starting-style {
+  .settings-panel[open] {
+    translate: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) .settings-panel {
+    transition: none;
+  }
+}

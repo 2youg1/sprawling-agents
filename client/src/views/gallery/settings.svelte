@@ -216,9 +216,7 @@ has asked. -->
 
 <Case label="settings · accounts, and the models the city may call" width={1440}>
   <Setup
-    rank="section"
     group="accounts"
-    onPick={() => undefined}
     endpoints={ENDPOINTS}
     autonomy={undefined}
     onAutonomy={() => undefined}
@@ -232,9 +230,7 @@ draws it where a person meets it. -->
 
 <Case label="settings · dependencies, one card per program" width={1440}>
   <Setup
-    rank="section"
     group="tools"
-    onPick={() => undefined}
     endpoints={undefined}
     autonomy={undefined}
     onAutonomy={() => undefined}
@@ -244,9 +240,7 @@ draws it where a person meets it. -->
 
 <Case label="settings · dependencies, nobody has looked yet" width={1440}>
   <Setup
-    rank="section"
     group="tools"
-    onPick={() => undefined}
     endpoints={undefined}
     autonomy={undefined}
     onAutonomy={() => undefined}
@@ -256,9 +250,7 @@ draws it where a person meets it. -->
 
 <Case label="settings · about, one row and the check that is never automatic" width={1440}>
   <Setup
-    rank="section"
     group="about"
-    onPick={() => undefined}
     endpoints={undefined}
     autonomy={undefined}
     onAutonomy={() => undefined}
@@ -273,9 +265,7 @@ drops beside it; 820 is the narrow one, where the group navigation
 turns into a row across the top and every grid is down to one column. -->
 <Case label="setup · accounts at 1280" width={1280}>
   <Setup
-    rank="section"
     group="accounts"
-    onPick={() => undefined}
     endpoints={ENDPOINTS}
     autonomy={undefined}
     onAutonomy={() => undefined}
@@ -285,9 +275,7 @@ turns into a row across the top and every grid is down to one column. -->
 
 <Case label="setup · accounts at 820" width={820}>
   <Setup
-    rank="section"
     group="accounts"
-    onPick={() => undefined}
     endpoints={ENDPOINTS}
     autonomy={undefined}
     onAutonomy={() => undefined}
@@ -297,9 +285,7 @@ turns into a row across the top and every grid is down to one column. -->
 
 <Case label="setup · tools at 1280" width={1280}>
   <Setup
-    rank="section"
     group="tools"
-    onPick={() => undefined}
     endpoints={undefined}
     autonomy={undefined}
     onAutonomy={() => undefined}
@@ -309,9 +295,7 @@ turns into a row across the top and every grid is down to one column. -->
 
 <Case label="setup · tools at 820" width={820}>
   <Setup
-    rank="section"
     group="tools"
-    onPick={() => undefined}
     endpoints={undefined}
     autonomy={undefined}
     onAutonomy={() => undefined}
@@ -322,10 +306,8 @@ turns into a row across the top and every grid is down to one column. -->
 <Case label="setup · skills at 1280" width={1280}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answered}>
     <Setup
-      rank="section"
-      group="skills"
-      onPick={() => undefined}
-      endpoints={undefined}
+        group="skills"
+        endpoints={undefined}
       autonomy={undefined}
       onAutonomy={() => undefined}
       dependency={unchecked}
@@ -336,10 +318,8 @@ turns into a row across the top and every grid is down to one column. -->
 <Case label="setup · skills at 820" width={820}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answered}>
     <Setup
-      rank="section"
-      group="skills"
-      onPick={() => undefined}
-      endpoints={undefined}
+        group="skills"
+        endpoints={undefined}
       autonomy={undefined}
       onAutonomy={() => undefined}
       dependency={unchecked}
