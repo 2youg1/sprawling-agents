@@ -151,8 +151,10 @@ export function recover(u: Ui, recovery: Recovery, refused: Refused): void {
     u.conn.retry();
     return;
   }
+  // The settings recovery is "choose a model", which is the accounts
+  // group's model choice.
   if (recovery.kind === "settings") {
-    u.go({ kind: "setup" });
+    u.go({ kind: "setup", group: "accounts" });
     return;
   }
   if (recovery.kind === "reload") {

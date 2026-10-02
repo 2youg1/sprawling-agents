@@ -241,14 +241,9 @@ export function wireApiOf(dialect: DialectKind): WireApi {
   }
 }
 
-
-// What one model row states beyond the model's name: the two ceilings,
-// and what the model takes as input. They travel together because a
-// context window without an output ceiling describes no model that can
-// be called, and all three are absent until somebody states them: the
-// catalogue holds two rows, so a provider outside it is only as good as
-// the figures a person read off its own model list. Input kinds nobody
-// stated are the city's to look up (`gateway::accepted_input`).
+// What one model row states beyond its name: two ceilings, which travel
+// together because a window without an output ceiling describes no model
+// that can be called, and the input it takes; each absent until stated.
 export interface Stated {
   readonly contextTokens: number | null;
   readonly maxOutputTokens: number | null;
