@@ -151,18 +151,19 @@
     return { live: $link.kind === "live", newest: newestSeq($belief), refusal: $belief.refusal };
   }
   let delivery = $state<Delivery>(NONE);
+  // Accepted words leave the foot once the run they started is on screen
+  // (or went to another room, which `Landed` says); a steer is heard by a
+  // run already on screen.
   $effect(() => {
     const kind = delivery.kind;
-    if (kind === "none" || kind === "accepted") return;
+    if (kind === "none") return;
+    if (kind === "accepted") {
+      if (sent === null || landing.kind !== "pending") delivery = NONE;
+      return;
+    }
     delivery = delivered(untrack(() => delivery), hear());
   });
-  // Accepted words are drawn only while the run they started is not yet
-  // on screen; a steer is heard by a run already on screen.
-  const echo = $derived(
-    delivery.kind === "none" || (delivery.kind === "accepted" && (sent === null || landing.kind !== "pending"))
-      ? null
-      : delivery,
-  );
+  const echo = $derived(delivery.kind === "none" ? null : delivery);
 
   // An empty room: nothing to read and nothing just sent, so the box
   // stands in the middle. The first send lets it sink at once, before
