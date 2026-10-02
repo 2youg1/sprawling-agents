@@ -5,7 +5,8 @@
 
 //! A command line becomes an `Invocation`, or a `LineError` naming the
 //! word that could not be read (sprawling-SPEC.md 8-89). Pure: it reads
-//! the command table and the words, and touches nothing else.
+//! the command table and the words, and touches nothing else. The
+//! precedence below is proved in `crates/sprawling/spec/Main/Grammar.lean`.
 //!
 //! `--help`/`-h` and `--version`/`-V` win wherever they stand among
 //! sprawling's own words, so no verb can act on a request for its help.
