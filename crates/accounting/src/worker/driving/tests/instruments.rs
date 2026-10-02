@@ -275,7 +275,7 @@ fn raise_lab(root: &std::path::Path) {
 }
 
 /// The accounting loop on a thread of its own, as `spawn_worker` runs it.
-fn attending(worker: RunWorker, desk: &Arc<CommandDesk>) -> std::thread::JoinHandle<()> {
+pub(super) fn attending(worker: RunWorker, desk: &Arc<CommandDesk>) -> std::thread::JoinHandle<()> {
     let desk = Arc::clone(desk);
     std::thread::spawn(move || {
         let mut worker = worker;
@@ -283,7 +283,7 @@ fn attending(worker: RunWorker, desk: &Arc<CommandDesk>) -> std::thread::JoinHan
     })
 }
 
-fn dispatch(addr: &str, task: &str, key: &[u8]) -> wire::Command {
+pub(super) fn dispatch(addr: &str, task: &str, key: &[u8]) -> wire::Command {
     wire::Command::Dispatch {
         addr: Address::parse(addr).unwrap(),
         task: task.to_owned(),
@@ -301,7 +301,7 @@ fn nowhere() -> wire::Reply {
 }
 
 /// One record with nothing in it but its position.
-fn marker() -> kernel::EventDraft {
+pub(super) fn marker() -> kernel::EventDraft {
     kernel::EventDraft {
         run: RunId::CITY,
         t: crate::Clock::now(&crate::worker::fixture::WallClock).unwrap(),
@@ -368,7 +368,7 @@ fn report(instrument: &str, fields: &str, mut taken: Vec<Duration>) -> Duration 
     p50
 }
 
-fn machine() -> String {
+pub(super) fn machine() -> String {
     let cores = std::thread::available_parallelism().map_or(0, std::num::NonZero::get);
     format!(
         "machine={}-{}, {cores} core(s)",
