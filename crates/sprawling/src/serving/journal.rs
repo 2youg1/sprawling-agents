@@ -59,7 +59,6 @@ impl Journal {
     /// A city with no page open still writes to the terminal, because
     /// the send failing means nobody subscribed and that is what a city
     /// nobody is looking at looks like.
-    #[must_use]
     pub fn sink(&self) -> Sink {
         let lines = self.lines.clone();
         let clock = std::sync::Arc::clone(&self.clock);

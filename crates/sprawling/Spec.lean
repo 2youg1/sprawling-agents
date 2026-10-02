@@ -390,6 +390,7 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D28 | `crates/sprawling/spec/Main.lean` |
 | D29 | `crates/sprawling/spec/Main.lean` |
 | D30 | `crates/sprawling/Spec.lean` |
+| D31 | `crates/sprawling/spec/Doctor.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）

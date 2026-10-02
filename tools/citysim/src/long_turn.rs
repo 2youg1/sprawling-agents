@@ -202,7 +202,7 @@ impl Tool for Notes {
 /// that turn by one with every step, [`STEP_BYTES`] in all.
 fn notes_at(read: u32) -> String {
     let head = format!("step {read:06} ");
-    let turn = usize::try_from(read % 26).map_or(0, |turn| turn);
+    let turn = usize::try_from(read % 26).unwrap_or(0);
     head.chars()
         .chain(
             ('a'..='z')

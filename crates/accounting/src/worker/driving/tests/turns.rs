@@ -198,7 +198,7 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
     let left = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(1));
     worker.serve(only_interrupts(std::sync::Arc::new(move |_| {
         if left
-            .fetch_update(
+            .try_update(
                 std::sync::atomic::Ordering::SeqCst,
                 std::sync::atomic::Ordering::SeqCst,
                 |held| held.checked_sub(1),

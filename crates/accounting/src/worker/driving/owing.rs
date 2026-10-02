@@ -162,7 +162,7 @@ impl Relays {
         // nothing from the width every other branch still draws on.
         self.chain
             .woken
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |woken| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |woken| {
                 woken
                     .checked_add(1)
                     .filter(|next| *next <= CONVERSATION_RUNS_MAX)
