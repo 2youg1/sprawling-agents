@@ -739,6 +739,14 @@
     "en": "versions",
     "zh": "版本"
   },
+  "refrain_task_done": {
+    "en": "done",
+    "zh": "已完成"
+  },
+  "refrain_task_open": {
+    "en": "to do",
+    "zh": "待办"
+  },
   "refrain_save": {
     "en": "save",
     "zh": "保存"

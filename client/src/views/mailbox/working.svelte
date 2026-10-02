@@ -70,7 +70,7 @@
       <li>
         <a
           href={toFragment({ kind: "talk", address: room })}
-          class="-mx-snug grid grid-cols-[var(--spacing-glyph-sm)_minmax(0,1fr)_auto_auto] items-center gap-x-snug rounded-card px-snug py-tight hover:wash focus-visible:wash"
+          class="grid grid-cols-[var(--spacing-glyph-sm)_minmax(0,1fr)_auto_auto] items-center gap-x-snug rounded-card px-snug py-tight hover:wash focus-visible:wash"
           data-entry
           onclick={onLeave}
         >

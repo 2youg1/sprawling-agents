@@ -204,10 +204,10 @@
         {/if}
         {#if entry.kind === "record"}
           {@const record = entry.record}
-          <li class="settled-row">
+          <li>
             <button
               type="button"
-              class="{ROW} -mx-snug w-[calc(100%+2*var(--spacing-snug))] rounded-card px-snug text-left transition-colors hover:wash"
+              class="{ROW} w-full rounded-card px-snug text-left transition-colors hover:wash"
               aria-expanded={open === record.seq}
               onclick={() => {
                 open = open === record.seq ? null : record.seq;
@@ -232,7 +232,7 @@
           </li>
         {:else}
           {@const logged = entry.line}
-          <li class="settled-row {ROW} font-mono">
+          <li class="{ROW} font-mono">
             {#if entry.t === null}
               <span class="text-text-faint"></span>
             {:else}

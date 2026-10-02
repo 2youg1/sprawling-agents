@@ -145,7 +145,7 @@ outside that closes it and then a press that opens it again. -->
   id="{uid}-column"
   popover="auto"
   aria-label={say($lang, "edge_mailbox")}
-  class="slide fixed inset-y-0 right-auto left-[calc(var(--spacing-margin)+var(--spacing-key)+var(--spacing-pane))] m-0 flex h-full w-[440px] max-w-[100vw] flex-col overflow-hidden bg-raised text-body text-text shadow-sheet narrow:left-0 narrow:w-full"
+  class="slide fixed inset-y-0 right-auto left-[calc(var(--spacing-margin)+var(--spacing-key)+var(--spacing-pane))] m-0 open:flex h-full w-[440px] max-w-[100vw] flex-col overflow-hidden bg-raised text-body text-text shadow-sheet narrow:left-0 narrow:w-full"
   ontoggle={(event) => {
     open = event.currentTarget.matches(":popover-open");
     // Opening the mailbox is reading it: an unread mark that outlived

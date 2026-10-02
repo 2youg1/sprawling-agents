@@ -42,14 +42,14 @@ S2). -->
   const { lang } = ui();
 </script>
 
-<ul class="my-tight -mx-snug flex flex-col" aria-label={say($lang, "talk_calls")}>
+<ul class="my-tight flex flex-col" aria-label={say($lang, "talk_calls")}>
   {#each calls as call (call.at)}
     <li class="group flex items-center [&>span]:flex-1">
       <CallLine {call} {run} {doing} />
       {#if onFork !== undefined}
         <button
           type="button"
-          class="h-control shrink-0 rounded-control px-tight text-note text-text-faint opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus:opacity-100 hover:bg-chrome hover:text-text-quiet"
+          class="h-control w-control shrink-0 rounded-control text-note text-text-faint opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus:opacity-100 hover:bg-chrome hover:text-text-quiet"
           aria-label={say($lang, "fork_here")}
           onclick={() => {
             onFork({ kind: "call", turn, call });

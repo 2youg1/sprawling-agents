@@ -102,6 +102,10 @@
   const ENTRY =
     "relative flex min-h-control-sm w-full items-center gap-snug rounded-control px-snug text-left text-label " +
     "text-text-quiet hover:bg-raised hover:text-text";
+  // Every row ends in one slot of the same width - the arrow of a page,
+  // the chevron of a branch, or nothing - so every label is as wide as
+  // the next and the rows' words start on one line.
+  const MARK = "flex w-glyph-sm shrink-0 justify-center text-text-faint";
   // The 2px accent bar says which group is the one drawn (client-SPEC 7B).
   // The page under the panel is named too, but only in its ink: two bars
   // in one tree would leave the eye to guess which is the selection.
@@ -119,7 +123,7 @@
     {#if page.view.kind === "monitor" && reading !== null}
       <span class="shrink-0 font-mono text-note text-text-faint">{reading}</span>
     {/if}
-    <span class="shrink-0 text-text-faint" aria-hidden="true">→</span>
+    <span class={MARK} aria-hidden="true">→</span>
   </a>
 {/snippet}
 
@@ -149,6 +153,7 @@
                 }}
               >
                 <span class="min-w-0 flex-1 truncate">{say($lang, HEADING[entry.group])}</span>
+                <span class={MARK} aria-hidden="true"></span>
               </button>
             {:else if entry.kind === "page"}
               <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
@@ -165,11 +170,9 @@
                 }}
               >
                 <span class="min-w-0 flex-1 truncate">{say($lang, entry.word)}</span>
-                <Glyph
-                  name="chevron"
-                  size="sm"
-                  class={["shrink-0 text-text-faint transition-transform", open[entry.nest] && "rotate-90"]}
-                />
+                <span class={MARK} aria-hidden="true">
+                  <Glyph name="chevron" size="sm" class={["transition-transform", open[entry.nest] && "rotate-90"]} />
+                </span>
               </button>
               {#if open[entry.nest]}
                 <ul id={`${uid}-${entry.nest}`} class="ml-base flex flex-col gap-hair border-l border-edge pl-tight">

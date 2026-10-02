@@ -16,6 +16,8 @@
   // names on the right side, through `onOpen`.
   import type { Snippet } from "svelte";
 
+  import { say } from "../../core/lang";
+  import { ui } from "../../ui";
   import Inked from "../parts/inked.svelte";
   import Laid from "./laid.svelte";
   import type { Block, Inline } from "../../wire";
@@ -31,6 +33,7 @@
   }
 
   const { blocks, onOpen, placed = false }: Props = $props();
+  const { lang } = ui();
 
   const ABSOLUTE = /^(?:https?|mailto):/iu;
 
@@ -143,7 +146,13 @@
           ]}
         >
           {#if item.check !== "not_a_task"}
-            <input type="checkbox" disabled checked={item.check === "done"} class="w-glyph-sm shrink-0" />
+            <input
+              type="checkbox"
+              disabled
+              checked={item.check === "done"}
+              aria-label={say($lang, item.check === "done" ? "refrain_task_done" : "refrain_task_open")}
+              class="w-glyph-sm shrink-0"
+            />
           {/if}
           <div class="min-w-0 flex-1"><Laid blocks={item.blocks} {onOpen} /></div>
         </li>

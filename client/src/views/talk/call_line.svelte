@@ -117,7 +117,7 @@ is still standing where they were reading. -->
         {kind.kind === "registered" ? say($lang, kind.word) : kind.tool}
       </span>
       <span class={["truncate", call.outcome === "waiting" ? "text-text" : ""]}>{call.subject ?? ""}</span>
-      <span class="figure flex items-center justify-end gap-tight text-text-faint">
+      <span class="figure flex items-center justify-end gap-tight whitespace-nowrap text-text-faint">
         {#if call.outcome === "waiting"}
           <span class="inline-block size-dot shrink-0 animate-pulse rounded-pill bg-accent" aria-hidden="true"></span>
         {/if}
