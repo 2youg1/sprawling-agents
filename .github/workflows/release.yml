@@ -450,7 +450,7 @@ jobs:
       # binstall's templates cannot spell this project's tag, which carries
       # the maturity and a date, so the manifest says `v{ version }` and the
       # tag this run was cut from replaces it here (`crates/sprawling/Spec.lean`
-      # D31). Only `[package.metadata]` changes, which cargo does not build from.
+      # D32). Only `[package.metadata]` changes, which cargo does not build from.
       - name: point the binstall address at this tag
         if: steps.pending.outputs.packages != ''
         shell: bash
