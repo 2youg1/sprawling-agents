@@ -66,20 +66,25 @@
 
   const phrases = $derived(phrasesIn($lang));
 
-  // Switching reading keeps the place: the source's cursor becomes the
-  // preview's first block, and the preview's first block the cursor.
+  // Switching reading keeps the place: the line at the top of the
+  // editor becomes the preview's first block, and the preview's first
+  // block the editor's top line. The caret stays where it was, and the
+  // editor scrolls only once it is shown, because a hidden editor has no
+  // height to scroll in.
   function pick(next: Reading): void {
     const editing = session.editing;
     const base = session.positions;
+    let scrollTo: number | null = null;
     if (editing !== null && base !== null) {
-      const place = { cursor: editing.toBaseline(editing.cursor()), top: editing.toBaseline(editing.top()) };
-      const carry: Carried = markdown ? carried(reading, next, place, top) : { kind: "nothing" };
+      const carry: Carried = markdown
+        ? carried(reading, next, { top: editing.toBaseline(editing.top()) }, top)
+        : { kind: "nothing" };
       switch (carry.kind) {
         case "preview_at":
           anchor = base.bytes(carry.offset);
           break;
         case "editor_at":
-          editing.reveal(editing.fromBaseline(base.editorAt(carry.byte)));
+          scrollTo = editing.fromBaseline(base.editorAt(carry.byte));
           break;
         case "nothing":
           break;
@@ -87,7 +92,12 @@
       editing.diffing(next === "diff");
     }
     reading = next;
-    if (next === "source" || next === "diff") queueMicrotask(() => editing?.measure());
+    if (next === "source" || next === "diff") {
+      queueMicrotask(() => {
+        editing?.measure();
+        if (scrollTo !== null) editing?.scrollTop(scrollTo);
+      });
+    }
   }
 
   function lockedLine(locked: Locked): string {

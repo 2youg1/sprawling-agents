@@ -61,11 +61,13 @@ export interface Editing {
   readonly diffing: (on: boolean) => void;
   readonly readOnly: (on: boolean) => void;
   readonly composing: () => boolean;
-  // Editor positions: where the cursor is, the first visible one, and
-  // the baseline's position for a draft's one and back.
-  readonly cursor: () => number;
+  // Editor positions: the first visible one, and the baseline's
+  // position for a draft's one and back.
   readonly top: () => number;
   readonly reveal: (at: number) => void;
+  // Scroll so the line holding `at` is the first in view, leaving the
+  // caret where it is.
+  readonly scrollTop: (at: number) => void;
   // Puts the keyboard in the editor.
   readonly focus: () => void;
   readonly toBaseline: (at: number) => number;
@@ -210,11 +212,14 @@ export function openEditor(setup: EditorSetup): Editing {
       view.contentDOM.setAttribute("aria-readonly", String(on));
     },
     composing: () => view.composing,
-    cursor: () => view.state.selection.main.head,
     top: () => view.lineBlockAtHeight(view.scrollDOM.scrollTop).from,
     reveal: (at) => {
       const position = Math.min(Math.max(at, 0), view.state.doc.length);
       view.dispatch({ selection: { anchor: position }, effects: EditorView.scrollIntoView(position, { y: "start", yMargin: 24 }) });
+    },
+    scrollTop: (at) => {
+      const position = Math.min(Math.max(at, 0), view.state.doc.length);
+      view.dispatch({ effects: EditorView.scrollIntoView(position, { y: "start" }) });
     },
     focus: () => {
       view.focus();

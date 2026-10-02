@@ -9,10 +9,11 @@
 
 import type { Reading } from "./reading";
 
-// Where the reader stands in the editor: the caret, and the first line
-// in view, both as editor offsets in the baseline.
+// Where the reader stands in the editor: the first line in view, as an
+// editor offset in the baseline. The caret is not the place, because a
+// reader scrolls away from it to read, and the switch keeps what they
+// read at the top.
 export interface EditorPlace {
-  readonly cursor: number;
   readonly top: number;
 }
 
@@ -26,7 +27,7 @@ export type Carried =
 const EDITOR: ReadonlySet<Reading> = new Set(["source", "diff"]);
 
 export function carried(from: Reading, to: Reading, editor: EditorPlace, previewTop: number): Carried {
-  if (EDITOR.has(from) && to === "preview") return { kind: "preview_at", offset: editor.cursor };
+  if (EDITOR.has(from) && to === "preview") return { kind: "preview_at", offset: editor.top };
   if (from === "preview" && EDITOR.has(to)) return { kind: "editor_at", byte: previewTop };
   return { kind: "nothing" };
 }

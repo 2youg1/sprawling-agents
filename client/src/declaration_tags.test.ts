@@ -25,7 +25,7 @@ function svelteFiles(dir: string): readonly string[] {
 
 describe("declaration tags", () => {
   test("no template declares a value with a plain {const} or {let} tag", () => {
-    const src = join(import.meta.dirname, "src");
+    const src = import.meta.dirname;
     const found = svelteFiles(src).flatMap((file) =>
       readFileSync(file, "utf8")
         .split("\n")
