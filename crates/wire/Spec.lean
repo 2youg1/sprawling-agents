@@ -262,6 +262,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-80 | `crates/wire/spec/Answer/DocumentBytes.lean` |
 | 8-81 | `crates/wire/spec/Answer/DocumentBytes.lean` |
 | 8-82 | `crates/wire/spec/Answer/Find.lean` |
+| 8-80 | `crates/wire/spec/Preference.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |
@@ -335,6 +336,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D18 | 文件的字节经一个 `Query` 回答逐窗送到页面，不开第二扇 HTTP 门 | `crates/wire/spec/Answer/DocumentBytes.lean` |
 | D19 | 找文件是城里的一次有界走树，不是页面一层一层地问 `Listing` | `crates/wire/spec/Answer/Find.lean` |
 | D20 | 送页面的两条路由是一个公开函数，城的端口与远程监听各把它并进自己的路由表 | `crates/wire/spec/Server.lean` |
+| D18 | session 的标签住在人的偏好文件里，按 `(city, room, began)` 存 | `crates/wire/spec/Preference.lean` |
 -/
 
 /-! ## 13 依赖选型

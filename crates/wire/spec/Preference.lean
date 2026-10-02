@@ -30,9 +30,9 @@
 
 | 帧 | 形状 | 为什么是这个形状 |
 |---|---|---|
-| `Query::Preferences` → `PreferencesAnswer` | `lang: Option<Lang>`、welcomed、panel、`tier: Option<Tier>`（`zen｜blend｜panorama`）、`Appearance`（含 `glass: Option<Glass>` 与 `blend_percent: Option<u32>`）、`proxying`、改过的和弦；`#[serde(default, deny_unknown_fields)]` | 浏览器曾按行缓存这些：十二个键、三个读取器，各自处理缺省与非法值。整表一扇门，允许值表由本 crate 声明一次并经 schema 传给客户端——**能画出来的选项就是这个 build 装得回的选项** |
+| `Query::Preferences` → `PreferencesAnswer` | `lang: Option<Lang>`、welcomed、panel、`tier: Option<Tier>`（`zen｜blend｜panorama`）、`Appearance`（含 `glass: Option<Glass>` 与 `blend_percent: Option<u32>`）、`proxying`、改过的和弦、session 的标签（§8-80）；`#[serde(default, deny_unknown_fields)]` | 浏览器曾按行缓存这些：十二个键、三个读取器，各自处理缺省与非法值。整表一扇门，允许值表由本 crate 声明一次并经 schema 传给客户端——**能画出来的选项就是这个 build 装得回的选项** |
 | 同上：本类型兼任 `[ui]` 的文法 | `[ui]` 节就是 `PreferencesAnswer` 的序列化；缺席字段取 `PreferencesAnswer::default()`（`panel` 是唯一不同于类型默认的一个：没人关之前它开着）；不认的键即拒 | 文件能写的键与答案能说的字段是**同一份声明**，而不是一边一份的两张表。`lang` 缺席而不是填 `en`：没人选过之前，浏览器自己的语言标是唯一的证据，写死一种语言会在每一台从未打开过该设置的机器上盖掉它 |
-| `Command::PutPreferences { patch, idem }` | `PreferencePatch` 闭集：`lang｜welcomed｜panel｜tier｜appearance｜proxying｜chord｜core_priority` | 一帧一件事，不是整表写回：两个屏幕各改一件，不得互相覆盖 |
+| `Command::PutPreferences { patch, idem }` | `PreferencePatch` 闭集：`lang｜welcomed｜panel｜tier｜appearance｜proxying｜chord｜core_priority｜tags`（后两件见 §8-61、§8-80） | 一帧一件事，不是整表写回：两个屏幕各改一件，不得互相覆盖 |
 | `Query::Config { addr }` → `ConfigAnswer` | `effort: Option<SettledEffort>` ＋ `second: SettledSecond` ＋ `TuningDefaults`；`SettledEffort` 携 `ConfigLayer`（`default｜city｜building｜resident`，后三个与 `city::Layer` 同拼写，`default` 是没有任何一级文件说过、城的内建值在生效）；`SettledSecond` 同携 `ConfigLayer`，`percent` 为已过 `SecondThreshold` 构造点的整百分数，没有一级说过时是 `kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT` 且 `from = default`，`domain: SecondDomain { min, max }` 是 `SecondThreshold` 构造点的合法域（`CTX_REMINDER_SECOND_MIN`／`_MAX`）（§8-47）；`effort` 缺席仍是一句陈述：没有一级说过时回答的是提供方自己的缺省，城说不出那个值；`TuningDefaults` 为 `from: ConfigLayer`（今天恒为 `default`：梯上没有一级文件说得出这几个数，它们是 `gateway::EndpointTuning::DEFAULTS` 的读出；层随值一起答，页面才不必自己断定「这是内建的」）＋ `timeout_ms` ＋ `request_max_retries: Option<u32>`（`Retries::stated`，缺席即 `UntilHalted`）＋ `stream_idle_timeout_ms: Option<u64>`（缺席即与整通调用同界）＋ `proxying` | **层是答案的一半。** 只给解析值的页面说不出这是本层写的还是继承来的，于是要把三层再读一遍自己爬一次梯子——**一把梯子爬两次就是一个问题两个答案**。层名随 `city::Layer`：线上把楼的文件叫 `resident`、把房的文件叫 `room`，而梯子把房的文件叫 `resident`——读者与被治的那次 run 会对“这是哪一份文件”给出不同的答案；一处穷尽匹配（`accounting::views::lines::rung_of`）把两份拼写钉在一起。`TuningDefaults` 是 `gateway::EndpointTuning::DEFAULTS` 的读出，字段形状也随它：重试上限是 `Retries` 而不是一个数（“直到有人按停”没有数字拼得出来），流的那个界是**闲置界而非整答案的截止**，且可缺席 |
 | `Command::PutShelved { shelf, name, text, idem }` | `Shelf { Library, Building(addr) }`；写 `shelved_document_written` | 与 `GovernedDocument` 同一条理由：两处货架都在保留子树里，任何写域都够不着，所以帧里没有路径可拼。`name` 允许子路径，脚本因此留得住自己的文件夹 |
 
@@ -48,4 +48,39 @@
 **被否**：①把档位放进 `Appearance`——每按一次 ◐ 都要整份外观往返，两个屏幕一个改字体一个切档时后到的会盖掉先到的；②在城里也声明透明度的域——城不画它，也不拒它，两份域只会各自漂开；③给三者写非可缺的默认值——那是首档与玻璃姿态的第二个家。
 
 **重开参数**：城开始按档位或透明度做决定（例如服务端渲染一屏）时，域与默认值搬进本 crate。
+-/
+
+/-!
+### 8-80 人给 session 的标签：`PreferencesAnswer::tags`、`PreferencePatch::Tags`
+
+```rust
+pub const TAG_MAX: usize = 24;
+pub struct Tag(String);                // 唯一构造点 `Tag::parse`
+pub struct SessionTags {
+    pub city: Address,                 // 握手 `Welcome::city` 说出的那座城
+    pub room: Address,                 // 这一段所在的房间
+    pub began: Seq,                    // 这一段的第一行，即 `SessionLine::began`（§8-71）
+    pub tags: Vec<Tag>,                // 人给它的标签，按字典序、无重复
+}
+pub struct PreferencesAnswer { /* … §8-39 的各字段 … */ pub tags: Vec<SessionTags> }
+pub enum PreferencePatch { /* … */ Tags(SessionTags) }
+```
+
+- **标签是人的分类，不是城的历史。** 它不改变任何 run 能观察到的东西，所以不进账本、没有事件，住在人自己的 `~/.sprawling/config.toml` 的 `[ui]` 节里，与和弦同一扇门（§8-39 七）。手机连到同一座城，问 `Query::Preferences` 得到的是同一份。
+- **一段 session 的身份是 `(city, room, began)`。** `began` 是账本给这一段第一行的序号，由 `Query::Sessions` 答出（§8-71），一座城里一行一个序号，所以 `(room, began)` 在一座城里唯一，且这一段后来再长多少行都不变。`city` 不能省：人的文件在他所有的城之间共用，而每座城的 `hall/mayor` 第一段都从很小的序号开始，只按 `(room, began)` 存，两座城的标签会落到彼此身上。
+- **`Tags` 是整段的标签集，不是加一个或减一个。** 它把这一段的标签换成帧里那一组；空组删除这一条。与 `Chord` 同一个理由：一帧说一件事，这件事是「这一段的标签」。`apply` 之后整表按 `(city, room, began)` 排序，每段的标签按字典序且去重，所以两台机器以不同顺序打上同样的标签，写出同一份文件。
+- **`Tag` 的文法：1 到 `TAG_MAX` 个字符，每个字符是字母（Unicode `Alphabetic`，任何文字）、数字（`\p{N}`）、`-` 或 `_`。** 没有空白，所以 `/tag <name>` 读一个词，一个标签在窄窗格里画成一枚不折行的小签；24 个字符放得下一个英文复合词或十来个汉字，再长就是一句话而不是一个分类。大小写不在文法里：页面在人输入时把它折成小写（`client/src/core/tags.ts`），所以 `Bug` 与 `bug` 是同一个标签；手写进文件的大写标签照读，只是另一个标签。模式（`^[-_\p{Alphabetic}\p{N}]{1,24}$`）与构造点逐字符同义：`char::is_alphabetic` 即 `Alphabetic`，`char::is_numeric` 即 `\p{N}`，两边都按码点计长度——客户端读得懂城写下的每一个标签，城不会收下客户端读不懂的。
+- **`pin` 是页面的保留词，不是线上的。** 置顶是页面怎么排这些行的事（`client/src/core/tags.ts`）；线上的 `pin` 只是一个合法的标签。Mayor 当前那一段的置顶由页面推出、不存储。
+- **线形变了，`WIRE_V` 升一（D1）。** `PreferencesAnswer` 多一个字段，`PreferencePatch` 多一个变体；旧客户端读不懂带 `tags` 的答案（`deny_unknown_fields` 的对面是生成的严格 schema）。
+-/
+
+/-! D18 session 的标签住在人的偏好文件里，按 `(city, room, began)` 存
+
+**决定**：标签是 `PreferencesAnswer::tags`，经 `PutPreferences` 写入 `config.toml` 的 `[ui]`，一段 session 以 `(city, room, began)` 命名（§8-80）。
+
+**理由**：标签是人怎么归类自己的工作，不是城里发生过的事；放进账本就要一个事件、一次折叠与一份视图，而它改变不了任何 run 的行为。偏好文件已经是「人的那一层」（`crates/accounting/spec/Person.lean` §8-8），浏览器与手机都从同一个答案读它。`began` 是 `Query::Sessions` 已经答出的稳定序号，不必为 session 另造一个 id。
+
+**被否**：①账本事件 `session_tagged`——让人的分类变成城的历史，导出一座城会把人的标签带给下一个人；②存在浏览器里——手机看不到；③以 `(room, began)` 为键——人的文件在多座城之间共用，各城 `hall/mayor` 的第一段序号相近，会相撞。
+
+**重开参数**：一个人在同一台机器上有两座同名的城、并且都打标签时，`city` 不再能区分它们，那时改用城的密钥指纹做键。
 -/

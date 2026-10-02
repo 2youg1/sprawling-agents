@@ -25,6 +25,9 @@
 
 use serde::{Deserialize, Serialize};
 
+mod tag;
+pub use tag::{SessionTags, TAG_MAX, Tag};
+
 /// Which language a person reads the interface in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -217,6 +220,9 @@ pub struct PreferencesAnswer {
     pub proxying: kernel::Proxying,
     /// The chords this person rebound, action order.
     pub chords: Vec<Chord>,
+    /// The tags this person gave sessions, in session order
+    /// (`crates/wire/spec/Preference.lean` §8-80).
+    pub tags: Vec<SessionTags>,
 }
 
 /// What a person who has settled nothing is answered.
@@ -236,6 +242,7 @@ impl Default for PreferencesAnswer {
             appearance: Appearance::default(),
             proxying: kernel::Proxying::ExceptLocal,
             chords: Vec::new(),
+            tags: Vec::new(),
         }
     }
 }
@@ -276,6 +283,7 @@ impl PreferencesAnswer {
             // Not a fact of this record: it lives in the file's `[core]`
             // section, which `accounting::person` writes beside `[ui]`.
             PreferencePatch::CorePriority(_) => {}
+            PreferencePatch::Tags(next) => tag::retagged(&mut self.tags, next),
             PreferencePatch::Chord(chord) => {
                 self.chords.retain(|held| held.action != chord.action);
                 // An action returned to the chord this build ships has
@@ -315,6 +323,9 @@ pub enum PreferencePatch {
     /// Whether the core's threads stand above normal. Lands in the
     /// file's `[core]` section, not in `[ui]` (`crates/wire/spec/Command/Step.lean` §8-61).
     CorePriority(CorePriority),
+    /// Replace one session's tags with these; an empty set removes them
+    /// (`crates/wire/spec/Preference.lean` §8-80).
+    Tags(SessionTags),
 }
 
 /// Whether the core's threads stand above normal (`crates/sprawling/Spec.lean`
