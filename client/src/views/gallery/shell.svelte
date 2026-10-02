@@ -11,7 +11,7 @@
   // shell mounts, on the shell's own grid at a window of 1440 by 860, in
   // a made-up city (`stand.svelte`): the runs of `resulted.svelte`'s six
   // rooms, a session whose last turn used a fifth of a 204,800-token
-  // window, a second reminder at 65%, and a page of commits.
+  // window, the two reminders at 30% and 65%, and a page of commits.
   import type { Answer, Call, CommitAnswer, Query, Turn } from "../../wire";
   import { Address, GitOid, RunId, Seq, TimeMs, Tokens, UsdMicros } from "../../wire";
   import { ENDPOINTS } from "./served";
@@ -87,6 +87,7 @@
         return {
           config: {
             addr: query.config.addr,
+            first: 30,
             second: { percent: 65, domain: { min: 31, max: 90 }, from: "city" },
             tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000 },
           },
