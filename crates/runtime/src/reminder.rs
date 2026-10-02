@@ -164,18 +164,18 @@ mod tests {
     #[test]
     fn each_threshold_sounds_once_and_only_on_the_way_up() {
         let mut gauge = gauge();
-        assert_eq!(gauge.observe(Tokens::new(240)), None);
+        assert_eq!(gauge.observe(Tokens::new(290)), None);
         assert_eq!(
-            gauge.observe(Tokens::new(250)),
+            gauge.observe(Tokens::new(300)),
             Some(ContextReminder::Usage {
-                used: Tokens::new(250),
+                used: Tokens::new(300),
                 window: Tokens::new(1_000)
             })
         );
         assert_eq!(
             gauge.observe(Tokens::new(400)),
             None,
-            "the quarter sounded already"
+            "the first rung sounded already"
         );
         assert_eq!(
             gauge.observe(Tokens::new(650)),
@@ -201,7 +201,7 @@ mod tests {
         assert_eq!(
             gauge.observe(Tokens::new(300)),
             None,
-            "the quarter is spent too"
+            "the first rung is spent too"
         );
     }
 
@@ -210,19 +210,19 @@ mod tests {
     /// is the city's to set (`crates/kernel/Spec.lean` §8-22).
     #[test]
     fn the_second_rung_moves_when_a_layer_moved_it() {
-        let moved = kernel::config::SecondThreshold::parse(30).unwrap();
+        let moved = kernel::config::SecondThreshold::parse(31).unwrap();
         let mut gauge = ContextGauge::new(Tokens::new(1_000), Some(moved));
         assert_eq!(
-            gauge.observe(Tokens::new(260)),
+            gauge.observe(Tokens::new(300)),
             Some(ContextReminder::Usage {
-                used: Tokens::new(260),
+                used: Tokens::new(300),
                 window: Tokens::new(1_000)
             })
         );
         assert_eq!(
-            gauge.observe(Tokens::new(300)),
+            gauge.observe(Tokens::new(310)),
             Some(ContextReminder::HandoverWindow {
-                used: Tokens::new(300),
+                used: Tokens::new(310),
                 window: Tokens::new(1_000)
             }),
             "the moved rung sounds where it was moved to"

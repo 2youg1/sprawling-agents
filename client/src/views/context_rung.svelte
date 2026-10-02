@@ -8,7 +8,7 @@
 <script lang="ts" module>
   // Where the context reminder's second rung sits: a whole percent of
   // the window. The span and its reason are
-  // `kernel::config::SecondThreshold`'s one construction point - thirty
+  // `kernel::config::SecondThreshold`'s one construction point - thirty-one
   // through ninety, so the line about a handoff can still be said
   // before the window closes - and this page states the span the city
   // answers with rather than judging it: the city's refusal comes back

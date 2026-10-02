@@ -246,9 +246,9 @@ mod tests {
     #[test]
     fn the_landed_policies_hold_their_documented_values() {
         assert_eq!(STARTUP_BUDGET_TOKENS, 2000);
-        assert_eq!(CTX_REMINDER_FIRST_PERCENT, 25);
+        assert_eq!(CTX_REMINDER_FIRST_PERCENT, 30);
         assert_eq!(CTX_REMINDER_SECOND_DEFAULT, 65);
-        assert_eq!(CTX_REMINDER_SECOND_MIN, 30);
+        assert_eq!(CTX_REMINDER_SECOND_MIN, 31);
         assert_eq!(CTX_REMINDER_SECOND_MAX, 90);
         assert_eq!(LOOP_REPEAT_THRESHOLD, 3);
         assert_eq!(OFFLOAD_MIN_BYTES, 16_384);

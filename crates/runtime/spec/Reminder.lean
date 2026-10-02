@@ -17,10 +17,10 @@
 
 | 阈值 | 说的话 |
 |---|---|
-| 25%（`CTX_REMINDER_FIRST_PERCENT`，恒不可调） | 只报用量：`[context] 25% of the window used (N of M input tokens).` |
-| 第二道：缺省 65%（`CTX_REMINDER_SECOND_DEFAULT`），合法域 30–90、可由配置梯子调（`crates/kernel/Spec.lean` §8-22） | 报用量，并说明剩余预算仍够写 handoff 并 `succeed`，过了这一点就不够了 |
+| 30%（`CTX_REMINDER_FIRST_PERCENT`，恒不可调；`crates/kernel/Spec.lean` D19） | 只报用量：`[context] 30% of the window used (N of M input tokens).` |
+| 第二道：缺省 65%（`CTX_REMINDER_SECOND_DEFAULT`），合法域 31–90、可由配置梯子调（`crates/kernel/Spec.lean` §8-22） | 报用量，并说明剩余预算仍够写 handoff 并 `succeed`，过了这一点就不够了 |
 
-**每道阈值一跑恰响一次**。状态是穷尽枚举 `Sounded { Nothing, Quarter, Handover }` 而不是两个布尔；一跳越过两道（0→70%）时只响高的那一道，低的一并作废——两句话叠在一起是噪声。
+**每道阈值一跑恰响一次**。状态是穷尽枚举 `Sounded { Nothing, First, Handover }` 而不是两个布尔；一跳越过两道（0→70%）时只响高的那一道，低的一并作废——两句话叠在一起是噪声。
 
 ```rust
 pub struct ContextGauge { window: Tokens, second_at: u64, sounded: Sounded }

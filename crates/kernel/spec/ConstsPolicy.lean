@@ -17,9 +17,9 @@
 ```rust
 pub struct Ratio { pub num: u32, pub den: u32 }   // 分子/分母；恒不约简
 pub const STARTUP_BUDGET_TOKENS: u64 = 2000;
-pub const CTX_REMINDER_FIRST_PERCENT: u64 = 25;                     // 上下文提醒第一道阈值（窗口百分比，恒不可调）
+pub const CTX_REMINDER_FIRST_PERCENT: u64 = 30;                     // 上下文提醒第一道阈值（窗口百分比，恒不可调；D19）
 pub const CTX_REMINDER_SECOND_DEFAULT: u64 = 65;                     // 第二道阈值的缺省（窗口百分比）
-pub const CTX_REMINDER_SECOND_MIN: u64 = 30;                         // 第二道阈值合法域下端（含）
+pub const CTX_REMINDER_SECOND_MIN: u64 = CTX_REMINDER_FIRST_PERCENT + 1;  // 第二道阈值合法域下端（含），即 31（D19）
 pub const CTX_REMINDER_SECOND_MAX: u64 = 90;                         // 第二道阈值合法域上端（含）
 pub const LOOP_REPEAT_THRESHOLD: u32 = 3;
 pub const OFFLOAD_MIN_BYTES: u64 = 16_384;

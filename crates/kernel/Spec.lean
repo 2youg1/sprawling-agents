@@ -386,6 +386,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | D15 | 一份文档的一次写是一个种类，修改提案的一生是三个种类，都是 record-only | `crates/kernel/spec/Event/Record.lean` |
 | D16 | 摘要在二进制格式里写字节，在人读的格式里写十六进制 | `crates/kernel/spec/Locator.lean` |
 | D18 | 成熟度是 kernel 的一个枚举常量，每一个读者从它渲染 | `crates/kernel/spec/Release.lean` |
+| D19 | 定规：第一道上下文提醒在窗口的 30%，第二道的合法域从 31% 起 | `crates/kernel/spec/Config.lean` |
 -/
 
 /-! ## 13 依赖选型

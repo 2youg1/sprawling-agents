@@ -41,17 +41,17 @@ mod tests {
 
     /// The refusal is the only sentence a person editing this file
     /// gets, so it carries the legal domain (`crates/kernel/Spec.lean` §8-22). No
-    /// clamping: a file that states 25 means something its writer has
+    /// clamping: a file that states 30 means something its writer has
     /// to be told is not accepted.
     #[test]
-    fn a_second_threshold_outside_30_through_90_is_refused_with_the_domain() {
-        for refused in [29, 91] {
+    fn a_second_threshold_outside_31_through_90_is_refused_with_the_domain() {
+        for refused in [30, 91] {
             let text = format!("[context]\nsecond_threshold = {refused}\n");
             let err = ConfigLayer::parse(&text)
                 .expect_err("a percent outside the legal domain is refused");
             let recovery = err.recovery();
             assert!(
-                recovery.contains("30") && recovery.contains("90"),
+                recovery.contains("31") && recovery.contains("90"),
                 "{refused}: {recovery}"
             );
         }
@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn the_domain_ends_of_the_second_threshold_are_taken() {
-        for taken in [30, 90] {
+        for taken in [31, 90] {
             let text = format!("[context]\nsecond_threshold = {taken}\n");
             assert!(
                 ConfigLayer::parse(&text).is_ok(),

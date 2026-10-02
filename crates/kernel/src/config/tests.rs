@@ -305,15 +305,15 @@ fn the_second_rung_resolves_down_the_same_ladder() {
 /// gets, so it carries the legal domain; nothing is clamped.
 #[test]
 fn a_stated_rung_is_refused_outside_its_domain_with_the_domain_in_the_refusal() {
-    for refused in [29, 91] {
+    for refused in [30, 91] {
         let err = SecondThreshold::parse(refused).expect_err("outside the domain");
         let recovery = err.recovery();
         assert!(
-            recovery.contains("30") && recovery.contains("90"),
+            recovery.contains("31") && recovery.contains("90"),
             "{refused}: {recovery}"
         );
     }
-    for taken in [30, 90] {
+    for taken in [31, 90] {
         assert_eq!(SecondThreshold::parse(taken).unwrap().percent(), taken);
     }
 }
