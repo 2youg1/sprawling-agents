@@ -3,6 +3,8 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
+import crates.sprawling.spec.Accounting.Landing
+
 /-!
 # accounting::worker：写在 sprawling 规格里的那些节
 
@@ -1177,6 +1179,17 @@ provider 的并发上限），配置值是人写的。取小的那个：比天�
 线程每次醒来都先服务口子，再看 desk，desk 空时才再睡。一条被 `pursue` 的内层循环吃掉的 `Command`
 不会丢命令：命令在 desk 上，外层循环回来时先看 desk，再睡。这个枚举不叫 `Inbox`：词汇表里 Inbox 是
 Approval Inbox，人的待答队列。
+
+**落 run 的重活要离开记账线程（未定的接口）。** 代码里第二张嘴做的是整次落 run：`serve_flight` 取到一个 `Arrival`
+之后在记账线程上调 `RunWorker::land`，而 `land` 写 transcript、还树、答复派活者、往下派活；这期间到达的 relay
+请求排在队列里，等这一次落 run 做完。三张嘴的次序与 ARCHITECTURE §13.4 一致（relay 先、再至多一个回家、再 desk），
+问题不在次序，在第二张嘴上做的事有多重。目标的形状由 `crates/sprawling/spec/Accounting/Landing.lean` 定：重活
+（transcript、最后一道检查点、合并）在这个 run 的 lane 上做完，结果作为一组记录草稿随 `Wake::Home` 回来；记账线程
+只追加这组草稿，再把 run 记成已冻结。模型证明 relay 请求在账本里的位置与重活多重无关、记录仍只有一个追加者与一个全局
+次序、run 被看见冻结时它落 run 的记录已在账上、视图广播按帧取走全部未发记录且正在看的 session 先走。
+没定的是切线：`land` 里哪些步骤改写记账线程的折叠（房间队列的归还、认领的归还、`advance_pursuits`），它们必须留在
+记账线程上；哪些只读 `Flown` 与盘（transcript、合并），它们可以搬进 lane。判定的证据是逐步列出 `land` 每一步读写的
+状态，与 relay 排队的 p99/p999、记账线程忙占比在搬之前与之后的读数。
 
 ### 8-42-5 被否决的备选
 
