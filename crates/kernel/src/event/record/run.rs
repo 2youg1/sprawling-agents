@@ -12,7 +12,7 @@ use crate::event::identity::{RunId, Seq};
 use crate::event::kind::EventKind;
 use crate::event::who::Who;
 use crate::locator::{B3Hash, Locator};
-use crate::model::RunPolicy;
+use crate::model::{Effort, RunPolicy};
 use crate::origin::Origin;
 
 /// One skill a run was dispatched with, pinned to the bytes it read.
@@ -88,6 +88,13 @@ pub struct RunStarted {
     /// harness run, whose first words are the harness's own prompt.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub opening: Option<Opening>,
+    /// The effort the run's requests froze (`crates/kernel/spec/Event/Record.lean`
+    /// §8-85): the session's, which no turn may change. Absent when the
+    /// dispatch stated none and the provider chooses - which is not
+    /// [`Effort::None`], asking it not to think - on a harness run, and
+    /// in a record written before the key existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<Effort>,
 }
 
 /// How a run's first user message opens.

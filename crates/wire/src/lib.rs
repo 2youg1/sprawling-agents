@@ -43,7 +43,9 @@ pub use answer::{Answer, ApprovalsAnswer, ArchiveLine, BlockedLine, BuildingProg
 pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
 pub use answer::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
 pub use answer::{BuildingAnswer, BuildingDoc};
-pub use answer::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn};
+pub use answer::{
+    Call, Closing, FrozenNames, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn,
+};
 pub use answer::{ChangesAnswer, CommitAnswer, CommitAt, CommitsAnswer, HISTORY_MAX};
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer};
 pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary};

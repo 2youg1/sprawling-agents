@@ -16,6 +16,8 @@
 #[cfg(test)]
 mod carried_tests;
 #[cfg(test)]
+mod opening_tests;
+#[cfg(test)]
 mod reading_tests;
 #[cfg(test)]
 mod tests;
@@ -152,6 +154,8 @@ fn opening(records: &[EventRecord]) -> Option<wire::Opening> {
                 at: record.t(),
                 dispatched_by: started.dispatched_by,
                 policy: started.policy,
+                effort: None,
+                names: None,
             }
         })
 }
@@ -215,6 +219,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     t: record.t(),
                     timing: timing_of(record),
                     first_at: None,
+                    returned: None,
                     model: wire::text(record.data().as_map().get("model")),
                     said: None,
                     thought: None,

@@ -74,6 +74,7 @@ fn typed_started(parent: Option<RunId>, predecessor: Option<RunId>) -> RunStarte
         policy: None,
         naming: None,
         opening: None,
+        effort: None,
         skills: vec![
             SkillPin {
                 name: "read".to_owned(),
@@ -177,6 +178,25 @@ fn a_run_started_line_records_the_naming_it_froze() {
     assert_eq!(payload.read::<RunStarted>().unwrap(), started);
     let bare = Payload::of(&typed_started(None, None)).unwrap();
     assert!(!bytes(&bare).contains("naming"), "{}", bytes(&bare));
+}
+
+/// The effort a run's requests froze is on its first line, and a run
+/// that stated none writes no key, so "the provider chooses" never reads
+/// back as asking it not to think.
+#[test]
+fn a_run_started_line_records_the_effort_it_froze() {
+    let started = RunStarted {
+        effort: Some(crate::model::Effort::High),
+        ..typed_started(None, None)
+    };
+    let payload = Payload::of(&started).unwrap();
+    assert_eq!(
+        serde_json::to_value(&payload).unwrap()["effort"],
+        serde_json::json!("high")
+    );
+    assert_eq!(payload.read::<RunStarted>().unwrap(), started);
+    let bare = Payload::of(&typed_started(None, None)).unwrap();
+    assert!(!bytes(&bare).contains("effort"), "{}", bytes(&bare));
 }
 
 #[test]

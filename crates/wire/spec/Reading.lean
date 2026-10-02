@@ -229,3 +229,38 @@ pub struct RoundsAnswer {
 
 **重开参数**：下一次进位 `WIRE_V` 时，`Option` 可以收紧为必填（`used` 在场时 `cache_write`、`ConfigAnswer.first`）。
 -/
+
+/-!
+### 8-79 对话头读的三样冻结事实：回复几时返回、派出时的强度、冻下的名字
+
+```rust
+pub struct Turn {
+    // …既有字段…
+    #[serde(default)] pub returned: Option<TimeMs>,   // 回答这个回合的 model_returned 自己那一刻；那一行没量过即 None
+}
+pub struct Opening {
+    // …既有字段…
+    #[serde(default)] pub effort: Option<kernel::Effort>,   // `run_started.effort`（`crates/kernel/Spec.lean` §8-85）
+    #[serde(default)] pub names: Option<FrozenNames>,       // `run_started.naming` 那一版，从内容库读回
+}
+pub struct FrozenNames {
+    pub mayor: Option<String>,   // 冻下的主 Agent 名字；缺席即那时没人起名，页面画语言表的默认名
+}
+```
+
+- **`returned` 是答复那一行的 `moment`**（`EventRecord::moment`），与 `first_at` 来自同一行：回合里最后一条 `model_returned`。那一行没量过（账本版本 1）即 `None`，不拿信封的 `t` 顶替。输出速率是 `used.output ÷ (returned − first_at)`，线上不带这个商（D3 同一条理：页面手里已有三个数）。
+- **`effort` 照录 `run_started.effort`**：缺席读作「这次派活没说强度」或「这一行早于这个键」，页面都不画强度。
+- **`names` 是冻下的那一版，不是今天的。** 读面拿 `run_started.naming` 的摘要从城的内容库取回字节，经 `city::Naming::from_bytes` 读成名字；`naming` 缺席、内容库不再存着那一版、或字节读不成名字，`names` 都是 `None`，页面回退到地址与本地化的角色名（refrain §3-13），不用今天的名字顶替。
+- 验收：accounting `views::rounds` 的 `a_turn_reports_when_its_reply_returned`、`the_opening_carries_the_effort_and_the_names_the_run_froze`。
+-/
+
+/-! D17 冻下的名字在城里读成类型，线上不带摘要
+
+**决定**：`Opening.names` 携带读好的名字（`FrozenNames`），由读面在作答时从内容库读出；线上不带 `naming` 摘要，页面也不经 `Query::Content` 自己取那份字节。
+
+**理由**：那份字节是 `city::Naming` 的私有编码，读它的规则住 `city`；页面若自己取字节再解析，就是同一种编码的第二个读者，而且读到的是无类型的 JSON。读面本来就在作答时开内容库（前缀、文档范围都这样读），多读一个对象不改锁的次序。
+
+**被否**：①`Opening.naming: B3Hash`，页面再问 `Query::Content`：第二个读者、第二次往返，且内容库的答复是给人看的文本截断，不是给程序读的值；②作答时读今天的 `IdentityAnswer`：一个已经开始的 session 会被改名，与模型请求里冻下的名字不符。
+
+**重开参数**：第二个需要冻下名字的答复出现时（比如 session 列表也要画名字），把读回挪到视图折叠里按 run 缓存，而不是每问一次读一次内容库。
+-/

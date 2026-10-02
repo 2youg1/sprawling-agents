@@ -234,6 +234,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | 8-79 | `crates/kernel/spec/Event/Record.lean` |
 | 8-81 | `crates/kernel/spec/Event/Record.lean` |
 | 8-83 | `crates/kernel/spec/Event/Record.lean` |
+| 8-85 | `crates/kernel/spec/Event/Record.lean` |
 | 8-5 | `crates/kernel/spec/Version.lean` |
 | 8-6 | `crates/kernel/spec/Idem.lean` |
 | 8-7 | `crates/kernel/spec/ConstsExternal.lean` |

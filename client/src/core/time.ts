@@ -61,6 +61,10 @@ export function isoTime(at: number): string {
   return new Date(at).toISOString().slice(11);
 }
 
+export function isoInstant(at: number): string {
+  return "";
+}
+
 // Whole numbers with a thin separator, and money from micro-dollars.
 export function count(n: number): string {
   return n.toLocaleString("en-US");

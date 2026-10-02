@@ -252,6 +252,15 @@ pub struct Turn {
     /// only tool calls, or was written before the key existed - the page
     /// then draws no figure rather than a guessed one.
     pub first_at: Option<TimeMs>,
+    /// When the reply that answered this turn was whole, as that
+    /// `model_returned` measured its own moment
+    /// (`kernel::EventRecord::moment`). The output rate is
+    /// `used.output` over `returned - first_at`. `None` when no reply
+    /// answered in this window and when the reply's line measured no
+    /// moment of its own - the envelope stamp of such a line is the
+    /// turn's, and a rate drawn from it would be invented.
+    #[serde(default)]
+    pub returned: Option<TimeMs>,
     /// The endpoint's model id the `model_called` that opened this turn
     /// recorded. Per turn because a session can change model midway,
     /// and a name for the whole session would be wrong for half of it.
@@ -295,6 +304,28 @@ pub struct Opening {
     /// records it; `None` for a line written before the key existed.
     #[serde(default)]
     pub policy: Option<kernel::RunPolicy>,
+    /// The effort the run's requests froze, as its `run_started`
+    /// records it (`crates/kernel/Spec.lean` §8-85); `None` when the
+    /// dispatch stated none, and for a line written before the key
+    /// existed.
+    #[serde(default)]
+    pub effort: Option<kernel::Effort>,
+    /// The names the run's session froze, read back from the version its
+    /// `run_started` names (`crates/wire/Spec.lean` D17). `None` for a
+    /// line written before the city recorded names, and for a version
+    /// the store no longer holds or cannot read: the page then falls
+    /// back to the address and the role's name, never to today's names.
+    #[serde(default)]
+    pub names: Option<FrozenNames>,
+}
+
+/// The names a session froze, as a page draws them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct FrozenNames {
+    /// What the Mayor was called; `None` when nobody had named it, and
+    /// the page then draws the name its language table ships.
+    pub mayor: Option<String>,
 }
 
 /// How a session ended, in the word the run froze with: `done`,

@@ -107,6 +107,8 @@ impl Chartered {
             // session; the city writes it no first message to record
             // (`crates/kernel/Spec.lean` §8-82-1).
             opening: None,
+            // Nor does it send this city's requests, so no effort froze.
+            effort: None,
         }
     }
 }

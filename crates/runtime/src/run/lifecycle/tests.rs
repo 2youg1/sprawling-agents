@@ -76,6 +76,21 @@ fn plan() -> RunPlan {
     }
 }
 
+/// The effort a run's requests froze is the one its first line records
+/// (`crates/kernel/Spec.lean` §8-85), so a page can say it before the run
+/// commits anything.
+#[test]
+fn the_charter_carries_the_effort_the_request_froze() {
+    let mut frozen = plan();
+    frozen.shape.effort = Some(kernel::Effort::High);
+    assert_eq!(frozen.charter().effort, Some(kernel::Effort::High));
+    assert_eq!(
+        plan().charter().effort,
+        None,
+        "an unstated effort stays unstated"
+    );
+}
+
 /// What a dispatch costs before the model is asked anything, counted
 /// rather than timed: two ledger lines and two clock samples, and the
 /// two lines are a fact about the city and a fact about the run.

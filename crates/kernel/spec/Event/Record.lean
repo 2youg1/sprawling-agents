@@ -23,6 +23,7 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub skills: Vec<SkillPin>,          // 空亦写出
     pub dispatched_by: Option<Who>,     // 由谁派来：person／city／派活的居民地址；缺键为 None
     pub policy: Option<RunPolicy>,      // 这次 run 的运行策略（§8-77）；缺键即这一行早于策略入账
+    pub effort: Option<Effort>,         // §8-85
 }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
 pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64 }
@@ -355,6 +356,23 @@ pub struct RunStarted {
 - **一次 run 用的是哪一版。** `run_started.naming` 由 `runtime::run::Charter::open` 从 `RunPlan.naming` 照录（`crates/runtime/Spec.lean` §8-56）。旧行没有这个键，读作「这一行早于身份入账」，页面回退到地址或角色名，不用今天的名字。
 - 两个键都按 `default` 加、缺席不写，所以旧账本照读，旧构建读新行时把它们当未知键拒（§8-40 的方向门照旧）。
 - 验收：`record::run` 的 `a_run_started_line_records_the_naming_it_froze`（写出、读回、缺席不写）。
+-/
+
+/-!
+### 8-85 `run_started` 记下这次 run 派出时冻下的推理强度（`kernel::event::record::run`，形状 2 值类型）
+
+```rust
+pub struct RunStarted {
+    // …既有字段…
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<Effort>,     // 这次 run 的请求冻下的强度（`runtime::CallShape.effort`）；缺席即没有说，由提供方自定
+}
+```
+
+- **照录冻下的那一个值。** 强度随模型一起在 session 冻结（`runtime::turn::report` 拒绝 run 中途改它），所以 run 开头记一次就是整次 run 的事实。`runtime::run::Charter::open` 从 `RunPlan.shape.effort` 抄进来，与 `policy`、`naming` 同一处写（`crates/runtime/Spec.lean` §8-56）。
+- **缺席有两种来历，读法相同。** 一是这次派活没有说强度，提供方自定——这与 `Effort::None`（请它不思考）是两件事，所以不写成 `none`；二是这一行早于这个键。页面两种都不画强度，不猜。harness run 没有本城的请求，恒缺席。
+- **被否：读这次 run 的第一个提交的 `effort`**（`CommitAttribution`）。还没提交过的 run 说不出强度，而提交上的那个值写的是 `Effort::None` 兼指「没说」，读回来分不清。**被否：读 `model_selected`**：那是房间的选择，后来的派活可以在帧上另带强度，房间的选择不等于这次 run 用的那一个。
+- 验收：`record::run` 的 `a_run_started_line_records_the_effort_it_froze`（写出、读回、缺席不写）。
 -/
 
 /-!

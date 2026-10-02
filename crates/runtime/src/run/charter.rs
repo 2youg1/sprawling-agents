@@ -47,6 +47,10 @@ pub struct Charter<'a> {
     /// back (`crates/kernel/Spec.lean` §8-82-1); `None` for a run the city writes no
     /// first message for.
     pub opening: Option<Opening>,
+    /// The effort `run_started` records (`crates/kernel/Spec.lean` §8-85):
+    /// the one the run's requests froze; `None` when none was stated, and
+    /// for a run that sends this city no requests.
+    pub effort: Option<kernel::Effort>,
 }
 
 impl RunPlan {
@@ -67,6 +71,7 @@ impl RunPlan {
             policy: self.run_policy,
             naming: self.naming,
             opening: Some(self.opening),
+            effort: None,
         }
     }
 }
@@ -106,6 +111,7 @@ impl Charter<'_> {
             policy: Some(self.policy),
             naming: self.naming,
             opening: self.opening,
+            effort: self.effort,
         };
         ledger.append(EventDraft {
             run: self.run,

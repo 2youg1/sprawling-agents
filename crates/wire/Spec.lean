@@ -254,6 +254,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-76 | `crates/wire/spec/Reading.lean` |
 | 8-77 | `crates/wire/spec/Answer/Config.lean` |
 | 8-78 | `crates/wire/spec/Answer/Commits.lean` |
+| 8-79 | `crates/wire/spec/Reading.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |
@@ -321,6 +322,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D12 | 对话流按文字问块，不按版本，不随增量带块 | `crates/wire/spec/Answer/Preview.lean` |
 | D13 | 外壳读的字段在本版之内增加，各自可缺，各读自账本上写下它的那一行 | `crates/wire/spec/Reading.lean` |
 | D16 | `Bound` 在绑定时读下监听器的地址，`local_addr` 只是读出它 | `crates/wire/spec/Server/Listener.lean` |
+| D17 | 冻下的名字在城里读成类型，线上不带摘要 | `crates/wire/spec/Reading.lean` |
 -/
 
 /-! ## 13 依赖选型

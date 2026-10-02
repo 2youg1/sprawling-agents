@@ -81,6 +81,23 @@ fn a_turn_reports_when_its_first_content_arrived() {
     );
 }
 
+/// The reply's own moment is when it was whole; a line that measured no
+/// moment of its own gives none, because its stamp is the turn's.
+#[test]
+fn a_turn_reports_when_its_reply_returned() {
+    let folded = turns(&[asked(1), returned(4, Some(2))]);
+    assert_eq!(folded[0].returned, Some(TimeMs::new(4)));
+    let older = [
+        at_version_one(&asked(1)),
+        at_version_one(&returned(4, Some(2))),
+    ];
+    assert_eq!(
+        turns(&older)[0].returned,
+        None,
+        "a version-one reply carries its turn's stamp, not when it returned"
+    );
+}
+
 #[test]
 fn a_ledger_written_before_per_line_moments_reads_as_unmeasured() {
     let current = [asked(1), called(2, "a"), answered(3, "a")];

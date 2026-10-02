@@ -86,7 +86,9 @@ pub use preview::PreviewAnswer;
 pub use proposals::{ProposalCard, ProposalsAnswer};
 pub use range::RangeAnswer;
 pub use release::{ReleaseAnswer, ReleaseLine};
-pub use rounds::{Call, Closing, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn, Used};
+pub use rounds::{
+    Call, Closing, FrozenNames, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn, Used,
+};
 pub use sessions::{SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
