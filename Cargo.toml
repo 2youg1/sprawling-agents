@@ -130,7 +130,7 @@ tower = { version = "0.5", features = ["util"] }
 # certificate, renewing it, and choosing cipher suites here would put
 # "how the control surface is protected" in two homes at once - the
 # proxy's configuration and the city's.
-tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "handshake"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 # OS entropy: the vault file's salt and nonce, a served door's minted
 # pairing token, and the idempotency key of a dispatch typed at the CLI
