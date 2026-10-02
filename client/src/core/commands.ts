@@ -31,13 +31,11 @@ import type {
   IdentityCard,
   InputKinds,
   KeepWarm,
-  McpServer,
   ModelTag,
   PreferencePatch,
   PursuitStep,
   Restoration,
   RunId,
-  SandboxLimits,
   ToolkitSlug,
 } from "../wire";
 import {
@@ -295,68 +293,7 @@ export function connectToolkit(toolkit: ToolkitSlug): Command {
   return { connect_toolkit: { toolkit, idem: mintIdem() } };
 }
 
-export function configureMcp(addr: Address, mcp: readonly McpServer[]): Command {
-  return {
-    configure_building: {
-      addr,
-      mcp: [...mcp],
-      sandbox: null,
-      desktop: null,
-      context_second_threshold: null,
-      idem: mintIdem(),
-    },
-  };
-}
-
-// The windows on this person's own machine a building's connector may
-// touch. Sent as text, because the connector that reads the file is the
-// authority on its syntax and this page must not become a second one.
-export function configureDesktop(addr: Address, allowlist: string): Command {
-  return {
-    configure_building: {
-      addr,
-      mcp: null,
-      sandbox: null,
-      desktop: allowlist,
-      context_second_threshold: null,
-      idem: mintIdem(),
-    },
-  };
-}
-
-// Where the context reminder's second rung sits: a whole percent of the
-// window. Sent as a raw number because the domain is
-// `kernel::config::SecondThreshold`'s one construction point - a form
-// that enforced it here would be the second place that rule lives - and
-// the refusal comes back carrying the legal span.
-export function configureContext(addr: Address, percent: number): Command {
-  return {
-    configure_building: {
-      addr,
-      mcp: null,
-      sandbox: null,
-      desktop: null,
-      context_second_threshold: percent,
-      idem: mintIdem(),
-    },
-  };
-}
-
-// A building's sandbox, whole: the city resolves the sandbox as one
-// value, so a layer that speaks about it speaks about all of it
-// (`kernel::config::SandboxLimits`), and the card sends what it shows.
-export function configureSandbox(addr: Address, limits: SandboxLimits): Command {
-  return {
-    configure_building: {
-      addr,
-      mcp: null,
-      sandbox: limits,
-      desktop: null,
-      context_second_threshold: null,
-      idem: mintIdem(),
-    },
-  };
-}
+export { configureContext, configureDesktop, configureMcp, configureSandbox } from "./commands/building";
 
 // One of the three governed documents, whole. `base` is the text the
 // box started from: the raw editor and the identity cards both write

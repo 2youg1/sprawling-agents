@@ -191,10 +191,6 @@
     "en": "in git at",
     "zh": "在 git 里，位于"
   },
-  "bld_bar": {
-    "en": "what this building is doing",
-    "zh": "这栋楼的状态栏"
-  },
   "bld_changes": {
     "en": "changes",
     "zh": "变更"
@@ -470,10 +466,6 @@
   "commits_spent": {
     "en": "{usd} spent",
     "zh": "花了 {usd}"
-  },
-  "commits_succeeded": {
-    "en": "×{n} handoff",
-    "zh": "×{n} 接替"
   },
   "cost_by_actor": {
     "en": "by resident",
@@ -2788,8 +2780,8 @@
     "zh": "可信的连接器"
   },
   "sandbox_trusted_help": {
-    "en": "One MCP server label per line that may reach what no checkpoint puts back, such as this machine's desktop.",
-    "zh": "每行一个 MCP 服务器标签，允许它碰到检查点放不回去的东西，例如这台机器的桌面。"
+    "en": "One MCP server label per line that may reach what no checkpoint puts back, such as the desktop of the computer the city runs on.",
+    "zh": "每行一个 MCP 服务器标签，允许它碰到检查点放不回去的东西，例如运行这座城的电脑的桌面。"
   },
   "sandbox_unchanged": {
     "en": "nothing changed",
