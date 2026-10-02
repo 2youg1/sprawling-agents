@@ -13,6 +13,7 @@ import crates.wire.spec.Answer.Document
 import crates.wire.spec.Answer.DocumentBytes
 import crates.wire.spec.Answer.DocumentVersions
 import crates.wire.spec.Answer.Endpoints
+import crates.wire.spec.Answer.Find
 import crates.wire.spec.Answer.Github
 import crates.wire.spec.Answer.Harnesses
 import crates.wire.spec.Answer.Hunks
@@ -260,6 +261,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-83 | `crates/wire/spec/Answer/DocumentVersions.lean` |
 | 8-80 | `crates/wire/spec/Answer/DocumentBytes.lean` |
 | 8-81 | `crates/wire/spec/Answer/DocumentBytes.lean` |
+| 8-82 | `crates/wire/spec/Answer/Find.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |
@@ -331,6 +333,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D16 | `Bound` 在绑定时读下监听器的地址，`local_addr` 只是读出它 | `crates/wire/spec/Server/Listener.lean` |
 | D17 | 冻下的名字在城里读成类型，线上不带摘要 | `crates/wire/spec/Reading.lean` |
 | D18 | 文件的字节经一个 `Query` 回答逐窗送到页面，不开第二扇 HTTP 门 | `crates/wire/spec/Answer/DocumentBytes.lean` |
+| D19 | 找文件是城里的一次有界走树，不是页面一层一层地问 `Listing` | `crates/wire/spec/Answer/Find.lean` |
 -/
 
 /-! ## 13 依赖选型
