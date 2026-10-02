@@ -86,3 +86,40 @@ export function putOffTheRest(progress: GuideProgress): GuideProgress {
 export function left(progress: GuideProgress): GuideProgress {
   return { ...progress, state: "left" };
 }
+
+// The person put off everything optional at once: that is a choice to
+// leave, so the guide is left too and the shell opens the conversation
+// (client/Spec.lean D54).
+export function skipAll(progress: GuideProgress): GuideProgress {
+  return putOffTheRest(progress);
+}
+
+// The step that was open just became done in the city's answer: the
+// guide opens the next step nobody has done or put off, and the open one
+// folds (client/Spec.lean D55). `null` when the step was done already,
+// is not known yet, or nothing is left to open. A step whose answer
+// only now arrived (`null` before) is not a step the person just did.
+export function advanced(
+  progress: GuideProgress,
+  open: GuideStep,
+  before: Configured,
+  after: Configured,
+): GuideProgress | null {
+  return null;
+}
+
+// What the shell reads once, when the city first answers with its
+// endpoints, to decide whether a launch opens the guide.
+export interface Launch {
+  readonly endpoints: number;
+  readonly main: boolean;
+  readonly welcomed: boolean;
+}
+
+// A city with no provider endpoint can do nothing, so the guide opens
+// whatever the city remembers about leaving it; with an endpoint but no
+// `main` model it opens only in a browser that has not walked it
+// (client/Spec.lean D54, `client/spec/Views/Guide.lean`).
+export function opensGuide(launch: Launch): boolean {
+  return !launch.main && !launch.welcomed;
+}

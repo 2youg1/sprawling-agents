@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { GuideProgress } from "../../wire";
 import type { Configured } from "./guide";
-import { currentOf, opened, putOff, putOffTheRest, standingOf } from "./guide";
+import { advanced, currentOf, opened, opensGuide, putOff, putOffTheRest, skipAll, standingOf } from "./guide";
 
 const NOTHING: Configured = { provider: false, dependencies: false, texts: false, skills: null, mcp: null };
 
@@ -50,5 +50,44 @@ describe("the guide's standing", () => {
     expect(currentOf({}, { ...NOTHING, provider: true })).toBe("dependencies");
     expect(currentOf({ dependencies: "skipped" }, { ...NOTHING, provider: true })).toBe("texts");
     expect(currentOf({ at: "mcp" }, NOTHING)).toBe("mcp");
+  });
+
+  test("skipping every optional step leaves the guide", () => {
+    expect(skipAll({ texts: "seen" })).toEqual({
+      texts: "seen",
+      dependencies: "skipped",
+      skills: "skipped",
+      mcp: "skipped",
+      state: "left",
+    });
+  });
+
+  test("a step done while open opens the next step nobody did or put off", () => {
+    const before = { ...NOTHING, dependencies: true };
+    const after = { ...before, provider: true };
+    expect(advanced({ at: "provider", texts: "skipped" }, "provider", before, after)).toEqual({
+      at: "skills",
+      texts: "skipped",
+      skills: "seen",
+    });
+  });
+
+  test("an answer that only now arrived does not move the guide", () => {
+    const unknown = { ...NOTHING, provider: null };
+    expect(advanced({ at: "provider" }, "provider", unknown, { ...NOTHING, provider: true })).toBeNull();
+    expect(advanced({ at: "provider" }, "provider", NOTHING, NOTHING)).toBeNull();
+  });
+});
+
+describe("the launch", () => {
+  test("opens the guide whenever the city has no provider endpoint", () => {
+    for (const main of [false, true])
+      for (const welcomed of [false, true]) expect(opensGuide({ endpoints: 0, main, welcomed })).toBe(true);
+  });
+
+  test("with an endpoint, opens it only where nobody walked it and no main model is chosen", () => {
+    expect(opensGuide({ endpoints: 1, main: false, welcomed: false })).toBe(true);
+    expect(opensGuide({ endpoints: 1, main: false, welcomed: true })).toBe(false);
+    expect(opensGuide({ endpoints: 2, main: true, welcomed: false })).toBe(false);
   });
 });
