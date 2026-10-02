@@ -13,30 +13,28 @@
 
 </div>
 
-> **Status: <!-- xtask:begin maturity:word -->pre-alpha<!-- xtask:end -->, research and development.** The main loop works: register a provider in the browser, raise a building, dispatch a job, and the model calls tools and writes files into that building. Several agents work in one city, each in its own room, and several runs of one building drive at the same time, while one accounting thread writes all of them into the Ledger. What is still missing is listed under [What works, and what does not](#what-works-and-what-does-not); read that section before you hand it real work.
+> **Status: <!-- xtask:begin maturity:word -->pre-alpha<!-- xtask:end -->, research and development.** The main loop works: connect a provider or a harness, raise a building, dispatch work, and several agents call tools and write files there at once. Read [What works today, and what does not](#what-works-today-and-what-does-not) before you hand it real work.
 >
 > 中文：[README.zh-CN.md](README.zh-CN.md) · For an agent driving a city from outside: [LLM.md](LLM.md) · To change the code: [AGENTS.md](AGENTS.md)
 
 ## What it is
 
-If you have used Claude Code, Codex CLI or a similar terminal agent, you know the shape of one agent: a model, a set of tools, one working folder, one conversation. sprawling keeps that shape and puts many of them in one place. A **city** is a directory on your machine. Each project in it is a **building**, each agent works in a **room** of a building, and each piece of work is a **run** with a start and an end. You talk to the city through a page that the binary serves on `127.0.0.1:8787`.
+Claude Code, Codex CLI and similar terminal agents give you one agent at a time: a model, a set of tools, one working folder and one conversation. sprawling runs many of them on one machine as a city. The **city** is a directory, each project in it is a **building**, each agent works in a **room** of a building, and each piece of work is a **run** with a start and an end. You describe a result and what counts as done, and the agents read, run commands and write code and documents, asking you only for decisions your written rules cannot settle. Everything they do goes into one append-only **Ledger**, which you follow on a page the binary serves to your browser.
 
-If you have only used a chat window, the difference is that an agent does work rather than answering. You describe a result and what counts as done; the model then reads files, runs commands, writes code and documents, and asks you only when it reaches a decision it cannot make from the rules you wrote down. Everything it did is recorded, and every file it deleted can be put back.
+A resident is either a model the city drives itself, through an API key for any provider that speaks the OpenAI or the Anthropic format or through a local model server, or an official harness such as Claude Code, which the city starts over the Agent Client Protocol (ACP) and which you sign in to with your own subscription. sprawling schedules, hands out tools, keeps the history and shows it to you; the thinking is the model's.
 
-sprawling does not think by itself. It needs a model to call: an API key for a provider that speaks the OpenAI or the Anthropic format, or a local model server. It schedules the agents, gives them tools, keeps the history, and shows you all of it.
-
-**Who it is for.** Small teams who want a set of agents to keep running fixed work for them, and researchers — in computer science or in the humanities and social sciences — who want to watch how agents divide work and talk to each other. It is designed for modest hardware, so an old laptop or a cheap cloud machine can hold a city.
+It is built for small teams who want agents to keep running fixed work, and for researchers, in computer science or in the humanities and social sciences, who want to watch how agents divide work and talk to each other. An old laptop or a cheap cloud machine can hold a city.
 
 ## Quick start
 
-1. Download the archive for your system from the [latest release](../../releases/latest) — Windows (x86-64), macOS (Apple silicon) or Linux (x86-64) — and unpack it anywhere. Or install in one line:
+1. Install:
 
    ```bash
    curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling/main/install.sh | sh    # macOS, Linux
    irm https://raw.githubusercontent.com/2youg1/sprawling/main/install.ps1 | iex         # Windows PowerShell
    ```
 
-   With bun or node already installed, `bunx sprawling up` or `npx sprawling up` fetches the same binary from npm.
+   The other ways in are the archive for your system from the [latest release](../../releases/latest) (Windows x86-64, macOS on Apple silicon, Linux x86-64), `bunx sprawling up` or `npx sprawling up`, and `cargo install sprawling --locked` with Rust 1.97 or later. The binaries are not code-signed: on Windows choose **More info → Run anyway**, and on macOS open the binary once from Finder's right-click menu.
 
 2. Raise a city and open it:
 
@@ -44,15 +42,13 @@ sprawling does not think by itself. It needs a model to call: an API key for a p
    sprawling up ~/cities/first
    ```
 
-   The terminal becomes the city's console, and the browser opens at `http://127.0.0.1:8787`. `Ctrl-C` in the console stops the city. Run with no arguments, the binary names the folder it would create and waits for you to agree first.
+   The terminal becomes the city's console and prints the address it serves, and the browser opens the page. `Ctrl-C` in the console stops the city.
 
-3. On the page, **connect a provider**: a base URL, the format it speaks, and a key. The key goes into your operating system's credential store, and the page only ever sees a reference of the form `secret:realm/name`. Choose a model for the `main` role.
+3. On the page, connect a provider with a base URL, the format it speaks and a key, then choose a model for the `main` role. The key goes into your operating system's credential store, and the page only ever sees a reference of the form `secret:realm/name`.
 
-4. Tell the Mayor what you want, in the box at the bottom of the page. The Mayor plans, raises buildings for the work, and hands each building its part; you watch the runs, answer what they ask, and read the changes they made.
+4. Tell the Mayor what you want, in the box at the bottom of the page. The Mayor plans, raises buildings for the work and hands each building its part; you watch the runs, answer what they ask and review what they changed.
 
-The binaries are not code-signed, so the first run trips a warning: on Windows choose **More info → Run anyway**, and on macOS open the binary once from Finder's right-click menu. With a Rust toolchain of 1.97 or later, `cargo install sprawling --locked` builds the same program from crates.io: the published package carries the page already built, so no bun is needed. A plain `cargo build` of a git checkout still yields a blank page until `just build-web` has built the page; for a checkout, build with `just dist`.
-
-**[`docs/getting-started.md`](docs/getting-started.md) is the full guide** ([中文](docs/getting-started.zh-CN.md)): every concept a newcomer meets — harness, provider, model roles, skills, templates, sessions, approvals — and the whole loop from an empty directory to a reviewed merge on your branch.
+A git checkout builds with `just dist`, because a plain `cargo build` embeds a blank page until `just build-web` has built it. [`docs/getting-started.md`](docs/getting-started.md) ([中文](docs/getting-started.zh-CN.md)) is the full guide, from an empty directory to a reviewed merge on your branch.
 
 ## Five words
 
@@ -66,140 +62,111 @@ The binaries are not code-signed, so the first run trips a warning: on Windows c
 
 The rest of the vocabulary is in [`docs/glossary.md`](docs/glossary.md).
 
+## Bring your own harness over ACP
+
+A room's resident can be one of five official harnesses, Claude Code, Codex, Grok Build, Kimi Code and Pi, which the city starts as an ACP agent. This is how a subscription reaches a city: you sign in inside the harness, and the city itself signs in to nothing. Name the harness in a building's `.sprawling/CONFIG.toml`, and the rooms opened in that building from then on take it as their resident:
+
+```toml
+[resident]
+harness = "claude_code"   # or "codex", "grok_build", "kimi_code", "pi"
+```
+
+The **official harnesses** group in settings shows the command that starts each harness (Node's `npx` for four of them, the `kimi` binary for Kimi Code), whether this machine can run it, and where the vendor explains signing in. A harness runs its own tools, so the city decides where it writes but not what it does: the harness works in its room's own git worktree, the city records what it reports, a halt or the building's `harness_minutes` ceiling becomes an ACP cancel, and when the harness answers, the city commits the tree and offers the work for review before it merges. A confidential building refuses harness residents, because a harness sends the room's content to its own vendor.
+
 ## How it behaves
 
-**One address answers three questions at once.** `lab/room1` names a place on disk, and that place settles which files the agent there may write, which documents it starts with, and whom it reports to. Nothing has to keep the three answers consistent, because they are read off one fact.
+- An address answers three questions at once: `lab/room1` is a place on disk, and that place decides what the agent there may write, which documents it starts with and whom it reports to.
+- Agents find each other and talk without you relaying. A message reaches a working resident at the end of its next tool result and starts a run for an idle one. Only the person's own entrance can speak in the person's name, and a type enforces it.
+- The Ledger is the only history: every effect is written as an event before it happens, every view on the page is rebuilt from it byte for byte, and one changed byte stops chain verification at that line.
+- Every deletion carries its way back, and the recycle bin restores a file with one press.
+- Each agent works on its own git worktree, and its change merges only after another resident has verified it; verifying your own work is a compile error.
+- Your git history keeps its shape. Checkpoints live under `refs/sprawling/runs/`, and a branch moves only for the first commit of an empty repository or the merge of reviewed work. `Sprawling-*` trailers name each commit's run, resident and model, and `sprawling whose <city> <commit>` answers from the Ledger which run wrote it.
+- Cost is cut by run, resident, prefix segment, tool and skill, from the provider's bill or else the price sheet. With no price at all, as with a subscription, the page says so instead of printing `$0.00`.
+- A browser notification is raised only for a decision that needs you.
+- Some mistakes cannot be written: sending a credential over the wire, a deletion with no way back, finishing without evidence, giving part of a plan more weight than its parent and verifying your own work are unrepresentable in the types, as <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-fail tests prove.
 
-**Agents find each other and speak without you relaying.** A run can ask who shares its building and gets back every address it can reach, each with the line that resident's own `URBANITE.md` offers about what to bring them. Speaking to somebody who is working slips the message under their door: it lands at the end of their next tool result. Speaking to somebody who is not starts a run for them. Either way the message arrives labelled with the sender's address. A resident can never write as you: only the person's own entrance can build a message that speaks as the person, and that is a property of the type rather than a convention.
+## What works today, and what does not
 
-**The Ledger is the only history.** Every effect first becomes an event and then becomes an effect. Every view in the page is a projection of that event stream: delete one, rebuild it from the Ledger, and the bytes match. Change a single byte in the log, and chain verification names the line and refuses to go on.
-
-**Deletion carries its own way back.** The type that means "discard a file" has no constructor without a restoration, so "deleted and gone for ever" cannot be written. Every row in the recycle bin states its way back, and one press puts the file back where it was, unless a file you made since stands at that path.
-
-**The work you merge was reviewed by somebody else.** Several agents work in one city, each on its own git worktree, and their changes merge back only after another resident has verified them. Verifying your own work is a compile error, not a rule anybody has to remember.
-
-**Cost is cut five ways**: by run, by resident, by prefix segment, by tool and by skill. Each amount is what the provider billed when it reports one, and the price sheet's figure when it does not. When a provider supplies no price at all, as with a subscription, the page says there is no price instead of printing `$0.00`, and it counts the calls and tokens that went unpriced.
-
-**The page is designed not to take your attention.** A browser notification is raised for one kind of thing only: a decision that needs you. Progress reaches a hidden tab through its title and icon, and everything else waits where you will find it.
-
-**Some states are unrepresentable rather than validated.** Sending a credential over the wire, discarding a file with no way back, putting a sealed credential into a Ledger payload, claiming work is done without evidence, giving part of a plan more weight than its parent had, and verifying your own work cannot be expressed in the type system. The tests hold <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-fail cases, because "cannot be written" is itself an assertion that has to be proven.
-
-## What works, and what does not
-
-**Works**: registering a provider and choosing models; raising a building, dispatching work, and letting the model call tools and write files into that building; residents that find each other, speak, and wake each other without a person relaying a message; attaching an external MCP server to a building; several agents at work in one city, each on its own git worktree, their changes merged only after another resident reviewed them; a building working towards a standing goal, driving its whole ready set at once; a run given no model continuing on the one its room started with; a new run that waits while memory is tight, and a dispatch refused before anything is written when the city's disk is close to full; pausing a city and releasing it; putting a discarded file back from the recycle bin; taking a building out of the city with its files kept under the reserved subtree and its history kept in the Ledger; offline chain verification; exporting a city and restoring it on another machine; opening a file the monitor shows at its line in VS Code, VS Code Insiders, VSCodium, Cursor, Windsurf or Zed.
-
-The page has a conversation with any room (the Mayor's by default), the city, each building, each run, the record (Ledger, archive, recycle bin, log), cost, the registry, MCP, a performance monitor, and settings.
-
-**Not done, and why**:
-
-| Missing piece | Reason |
+| Area | What works |
 |---|---|
-| An OS sandbox on every platform | A command the agent runs is confined by what the platform offers, and the exec tool's own description names which arm it got and what that arm does not hold. On Linux with a namespace wrapper installed, the command runs in namespaces of its own. On Windows and macOS it runs in a copy of the working tree, so your files are safe from it but the network is open to it. Isolation that nobody verified is worse than none, because people treat it as a defence, so the claim today is "a deletion can be undone", not "a deletion cannot happen". |
-| A page laid out for a phone | The render gate judges the page at 768, 1280 and 2560 CSS pixels, so a tablet held upright is the narrowest screen it is known to fit. A phone is narrower than anything that gate checks, and a city reached from outside your own network goes through the remote door and a route you choose (see below). |
-| Browser end-to-end in CI | CI opens every settled screen in a real browser engine on fixtures (`cargo xtask render`), but no CI job drives a live city through a browser. |
-| Byte-identical builds across machines | `cargo xtask repro` builds the release binary twice from one tree and compares the bytes, and a nightly job runs it. Two machines building the same tree still record different source paths, and removing them needs a compiler switch the pinned toolchain does not offer. |
-| Attributing spend to skills | A tool call does not happen "under" a skill: a skill is a disclosure line in the prefix, not a calling context. The cost page keeps a by-skill cut, and every call lands in its `no_skill` bucket. |
+| Residents | Any provider that speaks the OpenAI or the Anthropic format, a local model server, and the five official harnesses over ACP. |
+| Work | Several runs at once, each on its own git worktree and merged after review; a standing goal that drives every ready part of a plan; residents that talk to and wake each other. |
+| Tools | Built-in tools, the skills a building admits, any MCP server over stdio, HTTP or SSE, a browser the city drives, and the Windows desktop behind an allowlist. |
+| Running | New runs wait while memory is tight, and a dispatch is refused before anything is written when the disk is nearly full; a city can be paused, and `up --supervise` brings it back after a crash. |
+| Recovery | The recycle bin, `resume` after a crash, offline chain verification, and export and restore onto another machine. |
+| The page | A conversation with any room, the city, buildings, runs, the record, cost, MCP, a performance monitor, settings, and a document workspace that edits Markdown and text and previews PDF and DOCX, with versions and diffs. |
+| Reach | Machines on the same network with a pairing key, and the remote door through a route you choose. |
+
+| Not yet | Where it stands |
+|---|---|
+| An OS sandbox on Windows and macOS | Commands run in a copy of the working tree: your files are safe, but the network is open. Linux with a namespace wrapper also closes the network and contains the process tree. The promise today is that a deletion can be undone, not that it cannot happen. |
+| Harness residents with the city's tools | A harness gets neither the city's collaboration tools nor the building's MCP servers, a steer sent during its turn is recorded but not delivered, and its permission requests get the first allow-once option, inside its own worktree. |
+| Pairing that survives a restart | The remote key lives only as long as the process, so every device pairs again after the city restarts. |
+| A checked phone layout | Below 768 px the page draws one column, but the render gate checks nothing narrower than 768 px. |
+| Browser end-to-end tests in CI | CI renders every settled screen in a real browser engine on fixtures, but no job drives a live city. |
+| Byte-identical builds across machines | Two builds on one machine match, checked nightly. Across machines the recorded source paths differ until `trim-paths` reaches the stable toolchain this project pins. |
+| Spend attributed to skills | A skill is a line in the prefix, not a calling context, so every call lands in the `no_skill` bucket. |
 
 ## From the terminal
 
-The page is not the only door. Every verb below talks to the same city, and [`LLM.md`](LLM.md) documents the wire for an agent or a script.
+The page is not the only door. A few of the verbs, each talking to the same city:
 
 ```bash
 sprawling up [city-dir] [addr]        # raise the city if it is not there, serve it, open the page
-sprawling init <city-dir>             # found a city; the name is written into the genesis record
-sprawling serve <city-dir> [addr]     # serve a city that already exists; loopback only by default
-sprawling dispatch <addr> <task>      # send one task to a served city and print its events until the run ends; -m <id> picks the model
-sprawling call '<frame>'              # send one wire frame, print every frame back; the exit code is the answer
-sprawling gauge -- <program> [arg...] # time a command over --samples runs; --pid watches a process, --at a served city (alias: top)
-sprawling view <city>                 # read a city's Ledger lines or its run tree, read-only; --since/--until keep a UTC span
-sprawling check <city>                # read every TOML file a city holds; print each error as path:line:column
-sprawling doctor [<city>] [--install] # what this machine has against what a city needs
-sprawling enrol <realm>/<name>        # read a credential from stdin and hand it to a city
+sprawling dispatch <addr> <task>      # send one task to a served city and print its events until the run ends
+sprawling view <city>                 # read a city's Ledger lines or its run tree, read-only
+sprawling doctor [<city>]             # what this machine has against what a city needs
 sprawling resume <city-dir>           # after a crash: verify the chain, close lost tool calls, report who waits for you
-sprawling fork <city> <run> <seq> <addr>  # branch a lineage from one step of a run
-sprawling adopt <city> <addr>         # take a directory already inside the city in as a building
-sprawling whose <city> <commit>       # which run wrote a commit this city made, answered from the Ledger; --trace adds its calls
-sprawling replay <ledger-dir>         # offline chain verification, read-only
 sprawling export <city> <bundle-dir>  # pack a whole city; `restore` unpacks it on another machine
-sprawling install [--uninstall]       # put `sprawling` on your PATH, or take it back off
-sprawling status [--check]            # this binary; --check asks npm whether a newer release exists
-sprawling help [<verb>]               # every command, or one explained
+sprawling help [<verb>]               # every verb, or one explained
 ```
 
-`up --supervise` serves the city in a child process and, after a crash, resumes it and serves again, until the crashes come too fast to be worth another try. Nothing updates itself: `sprawling status --check`, or the button under **settings**, tells you whether a newer release is published, and replacing the binary stays your command to run.
+Nothing updates itself: `sprawling status --check`, or the button in settings, tells you whether a newer release is published, and replacing the binary stays your command to run. [`LLM.md`](LLM.md) documents the wire for a script or another agent.
 
-## History in git
+## Security and privacy
 
-A city usually works inside a git repository that is yours, and it leaves your history the shape you left it. Before each wave of tool calls it commits what is there, so anything that disappears has a commit to come back from, but those checkpoints are commits nobody's `HEAD` points at, kept under `refs/sprawling/runs/`. Only two things move a branch: the first commit of a repository that had none, and the merge that lands a reviewed piece of work.
-
-Every commit the city makes names the resident that made it, and carries git trailers that `git interpret-trailers --parse` reads without help:
-
-```
-Sprawling-Run: <run id>
-Sprawling-Actor: lab/parser
-Sprawling-Model: <model id>
-Sprawling-Effort: high
-Sprawling-City: <city hash>
-```
-
-The trailers are a projection for readers outside the city; where a trailer and the Ledger disagree, the trailer is wrong. The question also reads backwards: `sprawling whose <city> <commit>` answers which run wrote a commit, out of the Ledger, so a city restored somewhere with no `.git` beside it still answers. With `--trace` it also lists the calls that run made since its previous commit, and counts the calls other runs made in the same building in that span: their writes share the building's tree, so they are candidates too, and the output says so.
-
-## Where it listens, where credentials live
-
-**It listens on loopback only by default.** To let another machine on the same network connect, bind a non-loopback address. Such an address always needs a pairing key: the city adopts `SPRAWLING_PAIRING_TOKEN` when it is set, and otherwise mints a key for this serve and prints the address to open with it. The port is never open without one.
-
-**From outside your network, through the remote door.** A phone or a second computer reaches the city through the remote door, which is opened, and devices paired and revoked, only at the city's own console. A route makes the door reachable: a Cloudflare named tunnel by default, or a command you write, such as one that wraps `tailscale serve`. The route is trusted with less than a tunnel usually is. Pairing and every frame of a session are encrypted end to end, with keys that a device makes and a city pins and that the route never holds, so a route that only forwards bytes sees handshakes and ciphertext and cannot pose as either side. One trust is left on the route: that it delivers the page unchanged, because a route that rewrites the page reads whatever the page reads. Choose the route with that in mind; [`docs/operating.md`](docs/operating.md) shows both kinds.
-
-**Credential plaintext never enters a file, an event, or a log.** Keys go into the OS credential store, and configuration keeps only `secret:realm/name`. What a model says passes a secret scan before it becomes a Ledger payload, the log passes the same scan, and content staged for a git checkpoint is scanned before it is committed, so a key the model happens to echo never becomes permanent history.
-
-**Everything stays on your machine.** There is no account, no telemetry and no hosted service. A **confidential** building stops a run before any call to a remote provider and starts no outside tool server, so paired with a local model it can work on private data.
-
-## What you can swap
-
-Everything external sits on a seam and can be replaced without touching the rest:
-
-| Piece | Lives in | How to replace |
-|---|---|---|
-| Model endpoint and format | `gateway::endpoint`, `gateway::dialect` | Enter a base URL and a format on the settings page. A model served on this machine is called directly rather than through the machine's proxy, and a setting changes that. |
-| SaaS and external tools ([Composio](https://composio.dev) is one MCP server among others) | the `agent_protocols::mcp` `Outbound` seam and its stdio, HTTP and SSE adapters; a building's `CONFIG.toml` | Change one URL or one command to switch servers; confidential buildings start none. |
-| Sandbox | the `runtime::sandbox` seam (wasmtime with a fuel budget today); `runtime::tools` confinement for host commands | Implement the seam and pass its conformance suite. |
-| Client | the `sprawling-wire` crate is the whole API | Write a second client against the wire; [`LLM.md`](LLM.md) is the same surface written for an agent. |
-
-Where each piece lives and how to replace it is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+- The city listens on loopback only by default. Binding any other address needs a pairing key: the city adopts `SPRAWLING_PAIRING_TOKEN` when it is set, and otherwise mints a key and prints the address to open with it.
+- A phone or a second computer outside your network reaches the city through the remote door, opened and paired only at the city's own console, over a route you choose: a Cloudflare named tunnel, or a command you write, such as one that wraps `tailscale serve`. Pairing and every frame are encrypted end to end with keys the route never holds, so the one thing you trust the route with is delivering the page unchanged. [`docs/operating.md`](docs/operating.md) shows both kinds of route.
+- Keys live in the OS credential store, and configuration holds only `secret:realm/name`. Model output, the log and the content of every git checkpoint pass a secret scan before they are written.
+- There is no account, no telemetry and no hosted service. A confidential building calls no remote provider, starts no outside tool server and takes no harness resident, so with a local model it can work on private data.
 
 ## Why this exists
 
-I have tried many harnesses. Some feel conceptually dated, others overshoot what is useful. Take recursive self-improvement: until the model itself leaves the stateless regime, a harness can only keep adapting to the newest models and learn a company's existing workflows so it runs them faster. The first trend looks like an ablation study; the second needs privacy.
+I have tried many harnesses. Some feel conceptually dated, others overshoot what is useful. Take recursive self-improvement: until the model itself leaves the stateless regime, a harness can only keep adapting to the newest models and learn a company's existing workflows so it runs them faster. The first looks like an ablation study; the second needs privacy.
 
-More and more small companies are tiny teams shipping online services with many agents, and most of them are a pile of Markdown plus a few talented people. I wanted a harness that keeps up with multi-agent work while staying practical about self-improvement and memory: practical extensibility, saving the person's attention, cost control while agents scale up, privacy and reliability, and long-running operation sit at the core of the design, mixed with a few ideas from urban studies and sociology.
+More and more small companies are tiny teams that ship online services with many agents, and most of them are a pile of Markdown plus a few talented people. I wanted a harness that keeps up with multi-agent work while staying practical about self-improvement and memory, so practical extensibility, saving the person's attention, cost control as agents scale up, privacy and reliability, and long-running operation sit at the core of the design, mixed with a few ideas from urban studies and sociology.
 
-The stronger agents become, the more expensive human attention gets, and sprawling is not meant to be one more application that tries to take it. The best way to use it is to move from writing prompts to designing loops: lay out the workflow, let agents do the fixed work, and come back now and then to see how it runs. Your files, code and documents are the memory; a harness that injects "memory" into a stateless model mostly slows the model down.
+The stronger agents become, the more a person's attention costs, and sprawling tries not to take it. Use it by designing loops rather than writing prompts: lay out the workflow, let agents do the fixed work, and come back now and then to see how it runs. Your files, code and documents are the memory; "memory" that a harness injects into a stateless model mostly slows the model down.
 
-No multi-agent scheme yet delivers gains that justify the cost of scale, and the study of how models interact, collaborate and behave socially inside agent clusters has only begun. Apart from the skills, MCP servers and ACP pieces your work needs, keep a city lean and add things when a concrete problem asks for them: the same model behaves differently under different harnesses. If you prefer a harness you already like, try RefRain.
+No multi-agent scheme yet delivers gains that justify the cost of scale, and the study of how models interact and behave socially inside agent clusters has only begun. Keep a city lean, with the skills, MCP servers and harnesses your work needs, and add things when a concrete problem asks for them, because the same model behaves differently under different harnesses.
 
 **Strengths**: a small footprint, concepts that are fun to work with, and a design built for many agents from the start rather than one agent with a pile of extensions. **Weaknesses**: a student project with no lab or sponsor behind it, a page that still lags what it wants to be, and stability and usability that both need work.
 
-## A sister repository: [kusanagi](https://github.com/2youg1/kusanagi)
-
-Inside one city, history is one chain. Every effect becomes an event on a single append-only Ledger, and the single total order is what makes ordinary questions answerable: who claimed this work, whose edits collided, which goal wins, has this message been delivered, did anybody write since I read. Between machines, that total order is what you must not have. `kusanagi` is a decentralised collaboration network for agents with one chain per pair, every address derived so that no two drops of one conversation are relatable by the host carrying them. One chain inside a city, one chain per pair between cities: the two repositories are halves of one answer to how agents keep a history they can trust.
+Two sister projects are on hold. [RefRain](https://github.com/2youg1/RefRain), a writing workbench where an agent proposes and only you merge, is delayed, and its document features are moving into this page. [kusanagi](https://github.com/2youg1/kusanagi), agent messaging that needs no trusted server, is paused.
 
 ## Documentation
 
-Apart from this page and the getting-started guide, the docs are in English.
-
-| You want to | Read |
+| Document | What it holds |
 |---|---|
-| know what this is | this page, then [`docs/glossary.md`](docs/glossary.md) |
-| put it to work | [`docs/getting-started.md`](docs/getting-started.md), then [`docs/operating.md`](docs/operating.md) |
-| drive a city from a script or another agent | [`LLM.md`](LLM.md) |
-| change it | [`ARCHITECTURE.md`](ARCHITECTURE.md), [`AGENTS.md`](AGENTS.md), [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) |
-| change a screen | [`docs/frontend-method.md`](docs/frontend-method.md) |
-
-Also: [`CHANGELOG.md`](CHANGELOG.md) (what each release changed), [`SECURITY.md`](SECURITY.md) (how to report a vulnerability), [`docs/logging.md`](docs/logging.md) (why logs are not history), [`docs/third-party.md`](docs/third-party.md) (whose shoulders this stands on, and the licence obligations). [`City.md`](crates/city/templates/City.md) and the rest of [`crates/city/templates/`](crates/city/templates/) are the documents the city writes into buildings: agents read them, and so can you.
+| [`docs/getting-started.md`](docs/getting-started.md) ([中文](docs/getting-started.zh-CN.md)) | The guide for a newcomer: every concept met on the way, from installing to a reviewed merge |
+| [`docs/operating.md`](docs/operating.md) | Daily use: steering and stopping work, answering residents, swapping providers and MCP servers, remote access, recovering from failures |
+| [`docs/glossary.md`](docs/glossary.md) | One meaning for each word the code, the page and the documents use |
+| [`LLM.md`](LLM.md) | The wire and the command line, written for an agent or a script that drives a city from outside |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | The crates and their dependency rules, the seams, one dispatch end to end, what is on disk, how it is verified, and where each kind of change goes |
+| [`AGENTS.md`](AGENTS.md) | The rules every change follows and the commands that check them, read first by people and agents alike |
+| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | The longer form of `AGENTS.md`: each rule with the gate that holds it |
+| [`docs/frontend-method.md`](docs/frontend-method.md) | How a screen is built and accepted, and the approved visual design |
+| [`crates/README.md`](crates/README.md) | Every crate, what it owns and where its specification is; each specification, `crates/<dir>/Spec.lean`, holds that crate's interfaces, decisions and proofs, with comments in Chinese |
+| [`crates/city/templates/`](crates/city/templates/) | The documents the city writes into each building, which agents read and so can you |
+| [`skills/`](skills/) | The skills that ship with the release |
+| [`docs/logging.md`](docs/logging.md) | What goes into the diagnostic log, what goes into the Ledger, and why the two stay apart |
+| [`docs/third-party.md`](docs/third-party.md) | The upstream facts this tree follows, credits and licence obligations |
+| [`CHANGELOG.md`](CHANGELOG.md) | What each release changed, and what it left known and unfixed |
+| [`SECURITY.md`](SECURITY.md) | How to report a vulnerability |
 
 ## Contributing
 
-Start with [`AGENTS.md`](AGENTS.md). The short version:
+Start with [`AGENTS.md`](AGENTS.md):
 
 ```bash
 cargo install just --locked
@@ -207,21 +174,32 @@ just prereqs        # every other tool the loop needs, with the install line for
 just check          # a change is finished when this is green
 ```
 
-Pull request descriptions, issues and review comments may be written in your own language. If you can, attach a parallel translation — English if your language is not English, Chinese if it is — because side by side both people and agents read faster, and a mistranslation is visible instead of silent. [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) has the rest.
+Pull request descriptions, issues and review comments may be written in your own language. A parallel translation, English if your language is not English and Chinese if it is, lets people and agents read faster and makes a mistranslation visible. [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) has the rest.
 
-## Standing on the shoulders of others
+## Credits
 
-Reaching a vendor by host name requires knowing the path its API hangs under and which format it answers in. Those are facts, and where a vendor's own client states them more precisely than its documentation, the client is followed rather than copied: which repository, which path inside it, and which commit has been read live in one place, [`docs/third-party.md`](docs/third-party.md) §1, which a daily workflow parses to ask each upstream whether it moved. No vendor's login is followed. The city signs in to no subscription; a key is the only credential it takes, and its custody is implemented here.
+Facts about vendors, such as the path an API hangs under, the format it answers in and how each official harness starts, are followed from the ACP registry and, where a vendor's own client is more precise than its documentation, from that client, without copying its code; [`docs/third-party.md`](docs/third-party.md) §1 names each repository, path and commit, and a daily workflow asks each upstream whether it moved. Every control on the page is this repository's own, and its keyboard behaviour follows the W3C's ARIA Authoring Practices and the Kobalte and Ark UI documentation, read as prose.
 
-The browser page stands on the same kind of thing. Its runtime dependencies are exactly the list `RUNTIME` in `tools/xtask/src/npm.rs` names, and `client/Spec.lean` §7-9 records what each one replaced and what it adds to the page. No component library is among them, and every control in `client/src/views/parts/` is this repository's own. What is taken from the W3C's ARIA Authoring Practices and from the Kobalte and Ark UI documentation is behaviour published as prose: which pattern a control implements, what each key does, where the focus returns when it closes. Not one line of their code is in this tree, so nothing is owed for it, and the keyboard table that reading produced is specified in [`client/Spec.lean`](client/Spec.lean).
+Of the skills under [`skills/`](skills/), `sdd`, `tutor` and `translation` are English adaptations of Chinese skills I published under AGPL-3.0-or-later (the translation skill's original byline also credits Claude Fable 5), here under MPL-2.0. `why`, `how` and `blast-radius` are my modified adaptations of [pstack](https://github.com/cursor/plugins/tree/main/pstack) by Lauren Tan (poteto), and `authority-review` adapts the Thermos plugin from the same `cursor/plugins` tree; all four keep MIT. [`docs/third-party.md`](docs/third-party.md) §5 gives the terms.
 
-The skills under [`skills/`](skills/) stand on earlier work, and say so. Three of them — `sdd`, `tutor`, `translation` — are English translations and adaptations of Chinese-language skills I wrote and published under AGPL-3.0-or-later (the translation skill's original byline also credits Claude Fable 5); here they carry MPL-2.0 like the rest of this tree. Three more — `why`, `how`, `blast-radius` — are my modified adaptations of [pstack](https://github.com/cursor/plugins/tree/main/pstack) (Lauren Tan (poteto), MIT); they keep their licence, and every file names me as the one who modified it. `authority-review` is a modified adaptation of the Thermos plugin in the same `cursor/plugins` tree (MIT): its second pass is recut as the one-fact-one-authority audit I wrote for the configuration this city was built against. `skills/LICENSES.md` travels with the directory, in the release archive too. This paragraph is the acknowledgment; [`docs/third-party.md`](docs/third-party.md) §5 is the terms.
+## Build on sprawling
 
-Connections to outside applications are outsourced in the same way: the city speaks MCP to any MCP server, and Composio is one of them. This repository carries no one's keys, pays for no one, and acts as no proxy. Licences of code dependencies are checked one by one by `cargo deny`, against the allow-list in [`deny.toml`](deny.toml).
+sprawling is meant to be built on. Most of it sits behind a seam or in a single file, so you can replace one part without touching the rest:
+
+| Layer | What you can replace |
+|---|---|
+| The page | The whole client, because the wire in `crates/wire` is the entire API and a client in any language can stand in for the shipped one; or keep it and change its colours and motion (`client/src/theme.css`) or every word it shows (`client/src/lang.json`). |
+| Residents | The official harnesses and how each one starts (`agent_protocols::harness`), the documents a building is raised with (`crates/city/templates/`), and the skills a building admits. |
+| Tools | The built-in tools behind `kernel::tool`, any MCP server, the browser driver behind `browser::port`, and the Windows desktop server (`crates/desktop`). |
+| Models | The known provider hosts (`gateway::provider::preset`), the request formats (`gateway::dialect`), and the endpoint itself, a local model included. |
+| Execution | The WebAssembly sandbox behind `runtime::sandbox`, and the confinement host commands run under (`runtime::tools::exec::confinement`). |
+| History and reach | The Ledger store behind `kernel::ledger`, and the remote route behind `remote_access::route`, such as a tunnel of your own. |
+
+How to replace each part is in [`ARCHITECTURE.md`](ARCHITECTURE.md): §4 lists the seams and the second implementation each one already has, and §8 names the first file to open for each kind of change and the check that turns red when the change is wrong. Hand an agent that file, the crate's specification and [`AGENTS.md`](AGENTS.md) together with what you need, and it can usually carry the change through.
 
 ## License
 
-MPL-2.0 — see [`LICENSE`](LICENSE). Under [`skills/`](skills/), my three skills carry MPL-2.0 like the rest of the tree, and the four adaptations of `cursor/plugins` keep MIT; all seven ship in the release archive with `skills/LICENSES.md`. Terms and credit: [`docs/third-party.md`](docs/third-party.md) §5.
+MPL-2.0, see [`LICENSE`](LICENSE). Each skill under [`skills/`](skills/) states its own licence, and [`skills/LICENSES.md`](skills/LICENSES.md), which ships in the release archive, gives each one's terms and credit.
 
 ---
 
