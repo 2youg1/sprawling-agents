@@ -3,6 +3,8 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
+import crates.storage.spec.Checkpoint.Concurrent
+
 /-!
 # storage::checkpoint
 
@@ -80,7 +82,7 @@ impl Checkpoint {
   地址是 `Address::is_reserved` 的（`.sprawling/`、`.git/` 等受保护子树）即拒绝，先于任何盘上动作：还原的 `restoration` 来自线上，城不拿它比对账本，而受保护子树只经 spine 与治理写门写入——与 `sessions` 跳过保留地址是同一条规则。
   `Address` 只管路径的拼写，不管盘上把它解析到哪（kernel 把链接解析交给效应层），所以路径上工作区根以下已存在的任一段是符号链接或 junction 就拒绝（`StorageError::Alias`），不跟随——这条问的是 `alias::WriteTarget::within`，写落在它放行的那个值上，与其它写门同一条链接规则；
   目标处已有文件且字节与 blob 不同时拒绝（恢复：把现有文件挪开再还原），字节相同即视为已还原；写用 `create_new`，不覆盖在检查之后出现的文件。
-  还原不持 `checkpoint_gate`：与同一栋楼里正在跑的波并发时，由上面的 `create_new` 拒绝而不是覆盖。
+  还原不取任何锁：与同一栋楼里正在跑的波并发时，由上面的 `create_new` 拒绝而不是覆盖。
   提交能被找到，靠的是上一条的引用；没有它，`git gc` 之后 `restore` 答「找不到提交」。
 - **被否的另一条路：把检查点留在 HEAD。** 它让人的历史被机器的簿记淹没——一天的工作里
   几百个 `checkpoint:` 行，人自己的提交夹在中间找不到。留在 HEAD 唯一买到的是
