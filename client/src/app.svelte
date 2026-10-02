@@ -25,8 +25,7 @@
   import { fill, say } from "./core/lang";
   import { RELEASE_ALL } from "./core/slash";
   import { markOf, paintMark } from "./core/mark";
-  import { TIERS } from "./core/prefs";
-  import type { Tier } from "./core/prefs";
+  import { TIERS, type Tier } from "./core/prefs";
   import { cityIsShut, CITY } from "./core/scope";
   import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
   import type { View } from "./core/route";
@@ -169,15 +168,10 @@
     opener = null;
   }
 
-  // The tier is this tab's (`core/prefs.ts`, client/Spec.lean D47), and
-  // cycled in the order `TIERS` states. Holding the layers key - the edge
-  // key or its chord - shows the blend tier for as long as it is held and
-  // changes nothing (docs/frontend-method.md §7E). One column has no room
-  // beside the talk: the key opens the world as a sheet over it (4-52).
-  // A tier is the conversation's layout, so a press over the settings
-  // panel or another page first returns to the conversation, and the
-  // tier changes when that page settles, inside the same view transition
-  // (client/Spec.lean D48).
+  // The tier is this tab's (`core/prefs.ts`, client/Spec.lean D47), cycled in `TIERS` order;
+  // holding the layers key shows blend and changes nothing (docs/frontend-method.md §7E), and
+  // one column opens the world as a sheet instead (4-52). A tier is the conversation's layout,
+  // so a press elsewhere returns there first and the tier lands as it settles (D48).
   let columns = $state<Columns>("twelve");
   let tierOnLanding: Tier | null = null;
   function cycleTier(): void {
@@ -192,8 +186,7 @@
       return;
     }
     tierOnLanding = next;
-    if (view.kind === "setup" && panelBeneath().kind === "talk") closePanel();
-    else u.go(DEFAULT_VIEW);
+    (view.kind === "setup" && panelBeneath().kind === "talk" ? closePanel : () => { u.go(DEFAULT_VIEW); })();
   }
   let peeking = $state(false);
   const tier = $derived(columns === "one" ? (peeking || sheetsOpen().includes("world") ? "panorama" : "zen") : peeking ? "blend" : $held.tier);
