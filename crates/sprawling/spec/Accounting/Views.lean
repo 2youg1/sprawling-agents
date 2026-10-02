@@ -171,7 +171,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 
 ### 8-46-13 检查点不排队：每条 lane 一个自己的 index（`accounting::worker::driving::lane`、`accounting::worker::driving::harness`、`accounting::worker::workbench`、`accounting::worker::workbench::standing`）
 
-**这一节是 sprawling 一侧关于检查点并发的唯一一处规则**；它依赖的性质由 `crates/storage/spec/Checkpoint/Concurrent.lean`（`crates/storage/Spec.lean` §8-39，storage D24）证明，§8-113 与 §8-110 只引用这里。
+**这一节是 sprawling 一侧关于检查点并发的唯一一处规则**；它依赖的性质由 `crates/storage/spec/Checkpoint/Concurrent.lean`（`crates/storage/Spec.lean` §8-39，storage D25）证明，§8-113 与 §8-110 只引用这里。
 
 **一轮检查点是一个动作，不是一个 run 的一部分，而它不必与别的 run 的检查点排队。** 一个 ready set 里的每个节点各占一条 lane 同时跑（§8-46-4），它们都落在**同一个仓库**里。两条 lane 共用仓库的那一份 index 时，libgit2 为暂存取 `.git/index.lock`，后到的一条拿到「the index is locked; this might be due to a concurrent or crashed process」，以 `cancelled` 冻结，它的节点被当作「自己的 done check 没过」交回——所以检查点之间必须有一个次序。这个次序不需要一把全城的锁给：每条 lane 用 `Checkpoint::open_writer(city_root, run)` 开一个自己 index 的句柄，暂存、写树、建提交只碰它自己的 index，共享的对象库与以 oid 为名的引用在任何交错下都等于某个串行次序（storage D24）。于是：
 

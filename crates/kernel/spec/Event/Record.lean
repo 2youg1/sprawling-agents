@@ -490,7 +490,7 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 **决定**：加一个种类 `run_policy_changed`（`EventKind::RunPolicyChanged`，追加在 `ALL` 末尾，不写 `ig`），载荷 `RunPolicyChanged { policy: RunPolicy, by: Who }`，`addr` 是房间，`run` 是正在跑的那次 run（房间没有 run 在跑时为 `RunId::CITY`）。写方是城：收到线上的 `Command::ChangeRunPolicy { room, policy, idem }` 时写这一行；正在跑的 run 在它下一个安全点（与 Steer 同一扇门）读到它，从那一步起按新策略过门，并在下一段消息的末尾追加一句说明，冻结的前缀不动。下一次 run 的 `run_started.policy` 取房间最后一次改过的策略。窗类：入窗，因为那一句说明决定下一次模型请求的字节。模型与思考强度在会话中不变（roadmap A15）。
 
-**理由**：改策略是城里发生过的事，重放要能说出某一步是在哪个策略下过的门；把它记在 `run_started` 里只够说一次 run 开头的策略。生效点放在安全点而不是立即，是因为一个工具波已经按旧策略过了门，半途换门会让同一波的两次调用被不同的规则判。工具定义不随策略变：会话开始时工具清单定成各模式的并集（`crates/runtime/spec/Catalog.lean` D24），所以改策略只动门与那一句说明，提示缓存不失效。
+**理由**：改策略是城里发生过的事，重放要能说出某一步是在哪个策略下过的门；把它记在 `run_started` 里只够说一次 run 开头的策略。生效点放在安全点而不是立即，是因为一个工具波已经按旧策略过了门，半途换门会让同一波的两次调用被不同的规则判。工具定义不随策略变：会话开始时工具清单定成各模式的并集（`crates/runtime/spec/Catalog.lean` D25），所以改策略只动门与那一句说明，提示缓存不失效。
 
 **被否**：①复用 `autonomy_changed`：它回答的是「谁答设计问题」，作用域是城或楼，与一次 run 的纪律是两件事；②只改偏好文件、不入账：重放读不到，门的判决就没有来历；③立即生效：同一波工具被两套规则判。
 

@@ -303,7 +303,7 @@ end Runtime.Catalog
 - **不在 v1 里（截断锁的现状）**：一件在一栋楼的多数 session 里都被用到的能力，升格为那栋楼的常驻工具——等账本里按能力计的调用次数量出来再定（`tool_called` 记的是换出来的那件，所以计数按能力而不是按 `call`）；派活时点名子 agent 要用的能力，让它一开始就带着它们的指南——今天子 agent 是一次自己的 session，它自己 `describe`。
 -/
 
-/-! D24 会话中可改运行策略之后，常驻核心是各 mode 核心的并集，mode 只改门与追加的一句
+/-! D25 会话中可改运行策略之后，常驻核心是各 mode 核心的并集，mode 只改门与追加的一句
 
 **决定**：`ChatRequest.tools` 的常驻核心在 session 开始时定成 `Mode::ALL` 各自 `core_tools` 的并集（今天即 `work` 的那一组：`read`、`search`、`status`、`describe`、`call`、`edit`、`exec`，仍只取楼已准入的）；`mode::core_tools(mode)` 继续回答「这个 mode 允许哪些常驻工具真正执行」，由效果层在过门时读，不再决定工具表。会话中改运行策略（kernel D21）只改两件事：门按新策略判，下一段消息末尾追加一句说明新策略。工具表与冻结的前缀一个字节都不动，所以提示缓存不失效。
 

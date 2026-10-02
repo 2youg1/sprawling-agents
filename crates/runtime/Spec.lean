@@ -307,6 +307,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D22 | 搜索是确定的关键词排序，skill 正文仍只经 `read` | `crates/runtime/spec/Catalog.lean` |
 | D23 | 命令行程序不另立目录 | `crates/runtime/spec/Catalog.lean` |
 | D24 | 只读工具不在执行前等落盘，写调用的意图先落盘，一波一道屏障 | `crates/runtime/spec/Turn.lean`（§8-3），性质在 `crates/runtime/spec/Turn/Durability.lean` |
+| D25 | 会话中可改运行策略之后，常驻核心是各 mode 核心的并集 | `crates/runtime/spec/Catalog.lean` |
 -/
 
 /-! ## 13 依赖选型

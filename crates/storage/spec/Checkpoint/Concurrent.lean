@@ -43,7 +43,7 @@ impl Checkpoint {
 - **验收（W2–W3 实现时加）**：从本模型导出的 Rust 检查——两个写者各开 `open_writer`，在同一座城里交错 `wave_pre`（线程上真交错），各自的 `checkpoint_committed.oid` 的树等于各自暂存的写域，两条引用都在；一个写者在写对象之后、钉引用之前被丢掉，城的引用集合不变；两个写者同时 `ensure_base` 一座没有提交的城，HEAD 恰是其中一个的提交，另一个答 `None`。
 -/
 
-/-! D24 一座城的检查点由多个写者同时做，每个写者一个自己的 index，共享的只有对象库与引用更新；`accounting` 的 `checkpoint_gate` 因此拆掉。
+/-! D25 一座城的检查点由多个写者同时做，每个写者一个自己的 index，共享的只有对象库与引用更新；`accounting` 的 `checkpoint_gate` 因此拆掉。
 **为什么。** 那把锁让一座城的每一次检查点排成一列，理由是「一个仓库只有一个 index」：两条 lane 同时取 `.git/index.lock`，后者被拒。可那把锁护的是 index 这一个文件，而 index 不必共享：一个写者用自己的 index（或像 `base_checkpoint` 那样在 mempack 里直接写树），它的暂存、写树、建提交就不碰任何别的写者能看见的东西。剩下共享的两样各自是原子的：对象按内容寻址，同名即同字节，先写后写一样；检查点引用以 oid 为名，同名即同值。本模型证明这两样加上 HEAD 的比较后交换，在任何交错下都等于某个串行次序（`independent_steps_commute`、`a_lost_base_race_is_the_serial_order`）。
 **被否：保留全城的 `checkpoint_gate`。** 它的代价随并发的 run 数线性涨：测试城里一个 run 独占这把锁时，写入波前的检查点已占 p50 18 ms、最大 64 ms，N 条 lane 同时有写入波时，排在最后的一条要等 N−1 次检查点。**被否：每个 run 一个仓库。** 对象不再共享，worktree 无从分枝，合并要跨仓库搬对象。
 **文件系统的前提。** 对象：libgit2 先写临时文件，再改名到 `objects/<xx>/<rest>`（或一个 pack 与它的 `.idx`）；目标已在时，后来者丢掉自己的临时文件。引用：libgit2 以 `O_EXCL` 创建 `<ref>.lock` 取得排他，写完改名覆盖。这两步要的是「独占创建」与「同卷改名是原子的」：Windows 的 NTFS 上是 `CreateFileW(CREATE_NEW)` 与 `MoveFileExW(MOVEFILE_REPLACE_EXISTING)`，macOS 的 APFS 与 Linux 的 ext4 上是 `open(O_CREAT|O_EXCL)` 与 `rename(2)`，三者都满足。不满足的地方是城放在网络盘（SMB、NFS）上：两个写者可能都以为拿到了 `<ref>.lock`。检查点引用以 oid 为名，两个写者写的是同一个值，所以仍然不坏；HEAD 的比较后交换失去保证，那时 `ensure_base` 与 `land` 仍要经同一进程里的一把锁，这把锁只护 HEAD，不护检查点。私有 index 在保留子树之下，不进任何树。

@@ -312,7 +312,11 @@ than any diagram of boxes.
    could take leaves no room behind for a person to find.
 4. **The city writes `run_started` before anything happens.** Every effect
    becomes an event first; that ordering is the design's load-bearing rule,
-   not a logging preference.
+   not a logging preference. A tool that only reads (`Effect::Read`) runs
+   before its `tool_called` is durable; every record of a wave is durable
+   before the next outside effect — a model call, a write, the run's
+   freeze — and a write's `tool_called` is durable before the write runs
+   (runtime D24, `crates/runtime/spec/Turn/Durability.lean`).
 5. **`runtime::prefix` assembles the frozen prefix** in four segments —
    city, building, resident, run — from `city::spine_files`, `city::policy`
    and `city::resident`. Assembling it is itself an event, and the result
@@ -360,15 +364,22 @@ than any diagram of boxes.
     arrives is answered from views that already hold it. The client folds
     the event into what it believes. The same fold, on both sides of the
     wire.
-13. **A signal reaches whoever it names, working or not.** After the run
-    freezes, each signal it sent is recorded and then delivered. A
-    steer-kind signal slips under the door of a run that is already going,
-    landing at that run's next safe point with `@` and the sender's address
-    in front of it; anyone else who was spoken to is *knocked* —
-    `bin::assembly` starts a run for them, whose brief names the resident
-    who spoke. Only the person's own entrance can render as `user`, which
-    is what makes an answer go to the right place. A knock addresses a
-    resident, never a frozen run: history is read, not woken.
+13. **A signal reaches whoever it names, working or not, when it is sent.**
+    `signal send` and `delegate` are recorded at the call (`signal_enqueued`),
+    then delivered into the named room's queue. A run working in that room
+    receives it at its next safe point, through the same door a steer uses,
+    with `@` and the sender's address in front of it and the sender run's
+    state at delivery (running, frozen, cancelled, failed); a room with no
+    run is *knocked*, once — `bin::assembly` starts a run whose brief names
+    the resident who spoke, or waits for the room's current reader to leave.
+    The sender carries on, unless it asked to wait: then it parks at a safe
+    point, calls no model, and resumes on a reply or on the injected clock's
+    deadline, whichever comes first. A signal counts as consumed only when a
+    model answer that read it is recorded; a run that leaves before that
+    gives it back and the room is knocked again. Only the person's own
+    entrance can render as `user`. A knock addresses a resident, never a
+    frozen run: history is read, not woken. (collab D7–D11,
+    `crates/collab/spec/Delivery.lean`.)
 
 When the process dies mid-call, `sprawling resume` verifies the chain,
 closes tool calls whose outcome was lost as *unknown* rather than as
