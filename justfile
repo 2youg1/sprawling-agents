@@ -275,8 +275,11 @@ test-archive file:
 # One slice of an archive `test-archive` wrote, `partition` in nextest's
 # spelling (`count:2/4`). The archive is unpacked over this checkout's
 # own `target/`, because a test that spawns a workspace binary reads the
-# absolute path cargo baked in at compile time.
+# absolute path cargo baked in at compile time. The fetch first, because
+# the trybuild suites compile a project of their own offline and find no
+# dependency on a runner that never resolved one.
 test-slice file partition:
+    cargo fetch --locked
     cargo nextest run --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite --partition '{{partition}}' --no-fail-fast
 
 # The packages every platform builds and tests. The desktop server
