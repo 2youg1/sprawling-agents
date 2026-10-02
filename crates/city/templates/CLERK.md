@@ -11,3 +11,7 @@
 <voice>
 (How it sounds when it allows something and when it refuses it.)
 </voice>
+
+<seen>
+Every seat of one building reads the same documents: two seats of one building share a read domain, and a building has no secret container. An item that asks to keep work unseen by another seat of the same building is answered with that fact: such work goes into two buildings, or into one building whose `RULES.toml` sets `confidential = true`.
+</seen>

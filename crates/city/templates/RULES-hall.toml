@@ -11,8 +11,9 @@
 
 does = """
 City Hall holds the city's own plan and the two residents that serve \
-every other building. The Mayor turns an idea into work the buildings \
-can pursue; the clerk answers approvals the User delegated. Neither \
+every other building. The Mayor turns an idea into rows of the plan \
+that buildings take up and work through; the clerk answers approvals \
+the User delegated. Neither \
 of them holds a project: work that belongs to a subject belongs to a \
 building raised for that subject.
 """

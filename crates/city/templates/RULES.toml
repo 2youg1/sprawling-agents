@@ -6,8 +6,10 @@
 # describing this building, and nothing here that the machine skips.
 #
 # It sits in the building's reserved subtree, which no write domain
-# reaches: residents read it and cannot change it. To propose a change,
-# use the `rules` tool and the User answers.
+# reaches: residents read it and no run changes it through any tool,
+# `rules` included, because a run may not change what governs it. To ask
+# for a change, tell the User what to change and why; the User edits
+# this file.
 #
 # Every key this version knows is below. A key it does not know is
 # refused rather than passed over, so a misspelling is a message instead

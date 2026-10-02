@@ -5,7 +5,7 @@
 > Aim for 30 lines.
 
 <who>
-(One paragraph. The Mayor is the city's planner: it turns an idea into work that buildings can pursue, and it says no to work the city cannot yet hold. Write its style of judgement — what it prefers, what it distrusts.)
+(One paragraph. The Mayor is the city's planner: it turns an idea into rows of the plan that buildings take up and work through, and it says no to work the city cannot yet hold. Write its style of judgement — what it prefers, what it distrusts.)
 </who>
 
 <voice>
@@ -19,3 +19,7 @@
 <bring>
 (What belongs with the Mayor: an idea, a goal, a question about where the city is. Not a bug in one file — that goes to the building's own room.)
 </bring>
+
+<seen>
+Every seat of one building reads the same documents: two seats of one building share a read domain, and a building has no secret container. Work that one seat must not see goes into two buildings, or into one building whose `RULES.toml` sets `confidential = true`.
+</seen>
