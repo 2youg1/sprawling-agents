@@ -3031,13 +3031,89 @@
     "en": "ready",
     "zh": "就绪"
   },
-  "talk_call_open": {
-    "en": "read the whole thing on the run page",
-    "zh": "到 run 页看全文"
-  },
   "talk_calls": {
     "en": "what it did",
     "zh": "它做了什么"
+  },
+  "talk_call_failed": {
+    "en": "failed",
+    "zh": "失败"
+  },
+  "talk_call_finished": {
+    "en": "finished {at}",
+    "zh": "完成于 {at}"
+  },
+  "talk_call_started": {
+    "en": "started {at}, still running",
+    "zh": "开始于 {at}，仍在运行"
+  },
+  "talk_kind_browser": {
+    "en": "browser",
+    "zh": "browser"
+  },
+  "talk_kind_connector": {
+    "en": "mcp",
+    "zh": "mcp"
+  },
+  "talk_kind_edit": {
+    "en": "edit",
+    "zh": "edit"
+  },
+  "talk_kind_egress": {
+    "en": "net",
+    "zh": "net"
+  },
+  "talk_kind_exec": {
+    "en": "exec",
+    "zh": "exec"
+  },
+  "talk_kind_govern": {
+    "en": "govern",
+    "zh": "govern"
+  },
+  "talk_kind_read": {
+    "en": "read",
+    "zh": "read"
+  },
+  "talk_kind_spawn": {
+    "en": "spawn",
+    "zh": "spawn"
+  },
+  "talk_kind_spend": {
+    "en": "spend",
+    "zh": "spend"
+  },
+  "talk_kind_write": {
+    "en": "write",
+    "zh": "write"
+  },
+  "talk_delivery_held": {
+    "en": "not connected - sent when the city is back",
+    "zh": "未连接，城回来后发出"
+  },
+  "talk_delivery_pending": {
+    "en": "sent - waiting for the city",
+    "zh": "已发出，等城接收"
+  },
+  "talk_delivery_accepted": {
+    "en": "received by the city",
+    "zh": "城已接收"
+  },
+  "talk_delivery_unknown": {
+    "en": "the connection dropped before the city answered - not sent again",
+    "zh": "城回答之前连接断了，不会重发"
+  },
+  "talk_ttft": {
+    "en": "TTFT",
+    "zh": "TTFT"
+  },
+  "talk_unread": {
+    "en": "{n} new",
+    "zh": "{n} 条新内容"
+  },
+  "talk_unread_follow": {
+    "en": "jump to the newest",
+    "zh": "回到最新"
   },
   "talk_choose": {
     "en": "model, workspace and effort",
@@ -3066,22 +3142,6 @@
   "talk_cut_off": {
     "en": "cut off · {why}",
     "zh": "被截断 · {why}"
-  },
-  "talk_deed_explored": {
-    "en": "explored {n} files",
-    "zh": "探索 {n} 次文件"
-  },
-  "talk_deed_other": {
-    "en": "{n} other calls",
-    "zh": "其他 {n} 次调用"
-  },
-  "talk_deed_ran": {
-    "en": "ran {n} commands",
-    "zh": "运行 {n} 条命令"
-  },
-  "talk_deed_wrote": {
-    "en": "wrote {n} files",
-    "zh": "写入 {n} 次文件"
   },
   "talk_discarded": {
     "en": "{n} discarded",
@@ -3934,10 +3994,6 @@
   "change_line_quote": {
     "en": "quote line {n} in the conversation",
     "zh": "在对话里引用第 {n} 行"
-  },
-  "talk_call_arguments": {
-    "en": "called with",
-    "zh": "调用参数"
   },
   "decided_title": {
     "en": "answered for you",

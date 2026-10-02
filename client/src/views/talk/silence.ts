@@ -8,6 +8,17 @@
 
 import type { Turn } from "../../wire";
 
+// The provider's own words for a reply that ended the way replies end.
+// Anything else - the ceiling, and whatever a provider adds next - is a
+// reply that was cut off, and a reader is told so.
+const FINISHED: readonly string[] = ["end_turn", "tool_use"];
+
+// Why a reply was cut off, in the provider's word, or `null` when it ended
+// the way replies end or the provider said nothing.
+export function cutOff(stopped: string | null | undefined): string | null {
+  return stopped === null || stopped === undefined || FINISHED.includes(stopped) ? null : stopped;
+}
+
 // Whether the run behind a thread has stopped for good.
 export type Phase = "live" | "frozen";
 

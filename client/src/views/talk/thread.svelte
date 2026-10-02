@@ -6,10 +6,11 @@
 
 <script lang="ts">
   // One run, read as a stretch of conversation: what the person asked,
-  // what the resident said turn by turn, what it did folded into one
-  // quiet line per turn, and - while it is still going - the words as
-  // they arrive. The rounds come from the server; only the live text and
-  // the posture come from what this page has folded itself.
+  // what the resident said turn by turn under a head naming who and when,
+  // one quiet line per call it made, and - while it is still going - the
+  // words as they arrive. The rounds come from the server; only the live
+  // text, the posture and the rhythm the words arrived in come from what
+  // this page has seen itself.
   //
   // Every entry a person could have branched the conversation at - their
   // own words, a reply, a call - carries the one fork action. Hovering
@@ -22,29 +23,22 @@
   import { drawsCalls } from "../../core/results";
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
-  import { clock, count, usd } from "../../core/time";
-  import type { Snippet } from "svelte";
-  import type { Query, RunId, Turn } from "../../wire";
+  import { clock, count } from "../../core/time";
+  import { untrack } from "svelte";
+  import type { Query, RunId, Seq } from "../../wire";
   import { ui } from "../../ui";
   import Failed from "./failed.svelte";
   import Unanswered from "../parts/unanswered.svelte";
-  import Prose from "../prose.svelte";
-  import Calls from "./calls.svelte";
-  import ForkButton from "./fork_button.svelte";
-  import NoteLine from "./note_line.svelte";
   import Person from "./person.svelte";
   import Saying from "./saying.svelte";
+  import { phaseOf } from "../runs/lineage";
+  import TurnView from "./turn.svelte";
+  import { heard, landed, lost } from "./arrivals.svelte";
   import { callWord } from "./calls";
-  import { noteAt } from "./note_line";
   import { planFork } from "./forking";
-  import { silentRun, silentTurn } from "./silence";
+  import { cutOff, silentRun } from "./silence";
   import type { Phase } from "./silence";
   import type { ForkEntry, ForkPlan } from "./forking";
-
-  // The provider's own words for a reply that ended the way replies end.
-  // Anything else - the ceiling, and whatever a provider adds next - is
-  // a reply that was cut off, and a reader is told so.
-  const FINISHED: readonly string[] = ["end_turn", "tool_use"];
 
   interface Props {
     readonly run: RunBelief;
@@ -55,9 +49,13 @@
     // The run came back with no words: say the task again as a new run.
     // Absent for the same reason.
     readonly onRetry?: ((task: string) => void) | undefined;
+    // Whether this run opens the stretch of the room on screen, so its
+    // first head states the model the session froze (client-SPEC 7D).
+    // A later run of the same session leaves that to the first.
+    readonly opens?: boolean;
   }
 
-  const { run, who, onFork, onRetry }: Props = $props();
+  const { run, who, onFork, onRetry, opens = true }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -126,9 +124,49 @@
   // A frozen run that said nothing at all is one card with the reason
   // and a way out, not one grey box per turn (ux: the zero-output run).
   const emptyRun = $derived(read.kind === "held" && silentRun(turns, phase));
-  const why = $derived.by((): string | null => {
-    const stopped = turns.at(-1)?.stopped ?? null;
-    return stopped === null || FINISHED.includes(stopped) ? null : stopped;
+  const why = $derived(cutOff(turns.at(-1)?.stopped));
+  const whole = $derived(drawsCalls($held.showing));
+  // A call still running is already a line of its own, with its timer and
+  // what it waits for; the posture line under it would say it twice.
+  const lineSaysIt = $derived(
+    whole && (run.doing.kind === "calling" || run.doing.kind === "waiting") &&
+      (turns.at(-1)?.calls.some((call) => call.outcome === "waiting") ?? false),
+  );
+  // The model each round's head states: the session's on the first head,
+  // and again only where a round answered with a different one.
+  const stated = $derived(
+    turns.map((turn, at) => {
+      const model = turn.model ?? null;
+      if (at === 0) return opens ? model : null;
+      return model !== null && model !== (turns[at - 1]?.model ?? null) ? model : null;
+    }),
+  );
+
+  // What this page sees of the reply while it streams, filed under the
+  // round it becomes (`arrivals.svelte.ts`). That round is opened before
+  // its first word arrives, so it is the newest round still wordless
+  // while the words grow; a reply whose round the page never saw is
+  // dropped rather than drawn on another round.
+  let streamedInto: Seq | null = null;
+  let wasStreaming = false;
+  $effect(() => {
+    const length = run.saying.length;
+    untrack(() => {
+      heard(run.run, length, u.now());
+    });
+  });
+  $effect(() => {
+    const now = streaming;
+    const newest = turns.at(-1);
+    if (now && newest !== undefined && (newest.said ?? "") === "") streamedInto = newest.opened;
+    if (now || !wasStreaming) {
+      wasStreaming = now;
+      return;
+    }
+    wasStreaming = false;
+    if (streamedInto === null) lost(run.run);
+    else landed(run.run, streamedInto);
+    streamedInto = null;
   });
   // What the run is doing, in words. A run this page knows is live and
   // cannot place says it is working and claims nothing about the phase.
@@ -185,87 +223,9 @@
     onFork(planFork(run.run, entry));
   }
 
-  // The checker types a `{#snippet}` name as a void call, which the
-  // lint lane rejects inside a render tag. Each name is taken again as
-  // its `Snippet` type, and the template renders that.
-  const reasoning: Snippet<Parameters<typeof drawReasoning>> = drawReasoning;
-  const turnView: Snippet<Parameters<typeof drawTurnView>> = drawTurnView;
 </script>
 
 <svelte:window onkeydown={forkKey} />
-
-<!-- How the model got to what it said, folded away.
-
-Folded by default and never by exception: reasoning is most of what some
-models produce, and a thread that opened it would be a thread whose
-answer a person has to search for. While it is still arriving is the one
-case worth watching, so that fold starts open. `<details>` owns the
-disclosure, the keyboard and the reported state, exactly as the calls
-fold below it does. -->
-{#snippet drawReasoning(text: string, live: boolean)}
-  <details class="my-tight text-note text-text-faint" open={live}>
-    <summary
-      class="cursor-pointer rounded-control px-tight marker:text-text-faint hover:bg-chrome hover:text-text-quiet"
-    >
-      <span class="text-text-faint">{say($lang, "talk_reasoning")}</span>
-      {fill(say($lang, "talk_reasoning_length"), { n: count(text.length) })}
-    </summary>
-    <div class="mt-tight border-l border-edge-panel pl-base whitespace-pre-wrap break-words">
-      {text}
-    </div>
-  </details>
-{/snippet}
-
-<!-- One round of the model: what it reasoned, what it called, what it
-said, and what that cost. -->
-{#snippet drawTurnView(turn: Turn, showEmpty: boolean)}
-  {@const tokens = turn.used === null || turn.used === undefined ? null : turn.used.input + turn.used.output}
-  {@const spent = turn.spent === null || turn.spent === undefined || turn.spent === 0 ? null : turn.spent}
-  {@const empty = silentTurn(turn, phase)}
-  {@const cut = turn.stopped === null || turn.stopped === undefined || FINISHED.includes(turn.stopped) ? null : turn.stopped}
-  <div class="group relative my-base">
-    {#if onFork !== undefined}
-      <ForkButton entry={{ kind: "turn", turn }} run={run.run} {onFork} onHover={hoverFork} />
-    {/if}
-    {#each turn.notes.filter((note) => "arrived" in note) as note (noteAt(note))}
-      <NoteLine {note} {turn} run={run.run} {onFork} onHover={hoverFork} />
-    {/each}
-    {#if turn.thought && drawsCalls($held.showing)}
-      {@render reasoning(turn.thought, false)}
-    {/if}
-    {#if turn.calls.length > 0 && drawsCalls($held.showing)}
-      <Calls
-        calls={turn.calls}
-        run={run.run}
-        {turn}
-        onFork={onFork === undefined ? undefined : planCall}
-      />
-    {/if}
-    {#if turn.said}
-      <div class="text-body">
-        <div class="mb-tight text-note text-text-faint">
-          {who}
-          {#if tokens !== null} · {fill(say($lang, "talk_tokens"), { n: count(tokens) })}{/if}
-          {#if spent !== null} · {usd(spent)}{/if}
-        </div>
-        <Prose text={turn.said} />
-      </div>
-    {/if}
-    {#if empty && showEmpty}
-      <div class="my-snug rounded-card border border-alert/40 px-base py-snug text-note text-alert">
-        {ceiling === null
-          ? say($lang, "talk_said_nothing")
-          : fill(say($lang, "talk_said_nothing_capped"), { n: count(ceiling) })}
-      </div>
-    {/if}
-    {#if cut !== null}
-      <div class="my-snug text-note text-alert">{fill(say($lang, "talk_cut_off"), { why: cut })}</div>
-    {/if}
-    {#each turn.notes.filter((note) => !("arrived" in note)) as note (noteAt(note))}
-      <NoteLine {note} {turn} run={run.run} {onFork} onHover={hoverFork} />
-    {/each}
-  </div>
-{/snippet}
 
 <section aria-label={run.run} class={frozen ? "settled" : undefined}>
   {#if task !== ""}
@@ -282,17 +242,39 @@ said, and what that cost. -->
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={question} />
   {/if}
-  {#each turns as turn (turn.opened)}
-    {@render turnView(turn, !emptyRun)}
+  {#each turns as turn, at (turn.opened)}
+    <TurnView
+      {turn}
+      run={run.run}
+      {who}
+      model={stated[at] ?? null}
+      live={phase}
+      doing={at === turns.length - 1 && !frozen ? run.doing : undefined}
+      showEmpty={!emptyRun}
+      {ceiling}
+      {whole}
+      {onFork}
+      onCall={onFork === undefined ? undefined : planCall}
+      onHover={hoverFork}
+    />
   {/each}
   <!-- No `aria-live` on the growing text: a screen reader told every
        token hears noise (ux B2). The frozen line below is what speaks,
        and it speaks once. -->
-  {#if !frozen && run.thinking.length > 0 && drawsCalls($held.showing)}
-    {@render reasoning(run.thinking, true)}
+  {#if !frozen && run.thinking.length > 0 && whole}
+    <details class="my-tight text-note text-text-faint" open>
+      <summary class="cursor-pointer rounded-control px-tight marker:text-text-faint hover:bg-chrome hover:text-text-quiet">
+        <span class="text-text-faint">{say($lang, "talk_reasoning")}</span>
+        {fill(say($lang, "talk_reasoning_length"), { n: count(run.thinking.length) })}
+      </summary>
+      <div class="mt-tight border-l border-edge-panel pl-base whitespace-pre-wrap break-words">{run.thinking}</div>
+    </details>
   {/if}
   {#if streaming}
     <Saying text={run.saying} {who} />
+    <!-- While the model is still saying this, a steer is heard at the
+         end of it: the pin stands where the words stop (refrain §3-5). -->
+    <span class="steer-pin" aria-hidden="true"></span>
   {/if}
   {#if emptyRun}
     <!-- The zero-output run: what happened where the reply would have
@@ -315,14 +297,17 @@ said, and what that cost. -->
       <div class="text-note text-text-faint">{fill(say($lang, "talk_cut_off"), { why })}</div>
     {/if}
   {/if}
-  {#if !frozen && !streaming}
+  {#if !frozen && !streaming && !lineSaysIt}
     <div class="my-snug flex items-center gap-snug text-note text-text-faint">
       <span class="inline-block size-dot animate-pulse rounded-pill bg-accent"></span>
       <span>{posture}</span>
+      {#if run.doing.kind === "thinking"}
+        <span class="steer-pin" aria-hidden="true"></span>
+      {/if}
     </div>
   {/if}
   {#if frozen}
-    <div class="my-wide flex items-center gap-base text-note text-text-faint" role="status">
+    <div class="my-wide flex items-center gap-base text-note text-text-faint" role="status" data-wear={phaseOf(run.doing)}>
       <span class="h-px flex-1 bg-raised"></span>
       <a href={toFragment({ kind: "run", run: run.run })} class="hover:text-text-quiet">
         {completion}{#if closedAt !== null} · {clock($lang, closedAt)}{/if}

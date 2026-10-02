@@ -13,7 +13,7 @@
   // asks only for its own runs.
   import Glyph from "../parts/glyph.svelte";
   import Produced from "./produced.svelte";
-  import { lastCheckpointIn } from "./trace";
+  import { lastCheckpointIn } from "./checkpoint";
   import { OUTCOME_GLYPH, OUTCOME_INK } from "../shared/outcome";
   import { fill, say } from "../../core/lang";
   import type { RunBelief } from "../../core/belief";
