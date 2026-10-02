@@ -103,7 +103,7 @@ fn built(
     ))
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(windows, target_os = "linux")))]
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
     use super::*;

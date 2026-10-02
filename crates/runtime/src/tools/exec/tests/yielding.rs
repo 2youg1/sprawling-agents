@@ -26,7 +26,13 @@ fn reads_its_own_priority() -> (String, Vec<String>, Vec<&'static str>) {
             vec!["SystemRoot"],
         )
     } else {
-        ("nice".to_owned(), Vec::new(), Vec::new())
+        // `ps` rather than a bare `nice`: BSD `nice` without a utility
+        // prints nothing on macOS, while `ps -o nice=` answers on both.
+        (
+            "sh".to_owned(),
+            vec!["-c".to_owned(), "ps -o nice= -p $$".to_owned()],
+            Vec::new(),
+        )
     }
 }
 
