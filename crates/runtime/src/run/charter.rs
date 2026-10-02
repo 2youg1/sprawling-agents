@@ -71,7 +71,7 @@ impl RunPlan {
             policy: self.run_policy,
             naming: self.naming,
             opening: Some(self.opening),
-            effort: None,
+            effort: self.shape.effort,
         }
     }
 }

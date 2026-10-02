@@ -2647,6 +2647,14 @@ export const Closing = Schema.Struct({
 export type Closing = typeof Closing.Type;
 
 /**
+ * The names a session froze, as a page draws them.
+ */
+export const FrozenNames = Schema.Struct({
+  mayor: Schema.optional(Schema.NullOr(Schema.String)),
+}).annotate({ identifier: "FrozenNames" });
+export type FrozenNames = typeof FrozenNames.Type;
+
+/**
  * Whether a run's work takes the ordinary road or stays in an
  * experiment that never lands.
  */
@@ -2712,7 +2720,9 @@ export type RunPolicy = typeof RunPolicy.Type;
 export const Opening = Schema.Struct({
   at: TimeMs,
   dispatched_by: Schema.optional(Schema.NullOr(Schema.String)),
+  effort: Schema.optional(Schema.NullOr(Effort)),
   goal: Schema.String,
+  names: Schema.optional(Schema.NullOr(FrozenNames)),
   policy: Schema.optional(Schema.NullOr(RunPolicy)),
   task: Schema.String,
 }).annotate({ identifier: "Opening" });
@@ -2898,6 +2908,7 @@ export const Turn = Schema.Struct({
   notes: Schema.Array(Note),
   number: Schema.Int,
   opened: Seq,
+  returned: Schema.optional(Schema.NullOr(TimeMs)),
   said: Schema.optional(Schema.NullOr(Schema.String)),
   spent: Schema.optional(Schema.NullOr(UsdMicros)),
   stopped: Schema.optional(Schema.NullOr(Schema.String)),

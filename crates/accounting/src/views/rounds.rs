@@ -23,6 +23,7 @@ mod reading_tests;
 mod tests;
 
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use kernel::event::record::ApprovalResolved;
 use wire::{EventKind, EventRecord, RunId, UsdMicros};
@@ -71,9 +72,9 @@ impl LedgerAsk {
         }
         wire::RoundsAnswer {
             opened_at: opened_at(&turns),
-            opening: opening(&records),
             closing: closing(&records),
             worktree: worktree(&records),
+            opening: opening(&records, &self.city_root),
             turns,
             run,
         }
@@ -134,9 +135,10 @@ fn answer_waits(turns: &mut [wire::Turn], asked: &[EventRecord], city: &[EventRe
     }
 }
 
-/// How the session opened, from the first `run_started` in the window.
+/// How the session opened, from the first `run_started` in the window,
+/// with the names its session froze read back from `city_root`'s store.
 #[must_use]
-fn opening(records: &[EventRecord]) -> Option<wire::Opening> {
+fn opening(records: &[EventRecord], city_root: &Path) -> Option<wire::Opening> {
     records
         .iter()
         .find(|record| record.kind() == EventKind::RunStarted)
@@ -154,10 +156,25 @@ fn opening(records: &[EventRecord]) -> Option<wire::Opening> {
                 at: record.t(),
                 dispatched_by: started.dispatched_by,
                 policy: started.policy,
-                effort: None,
-                names: None,
+                effort: started.effort,
+                names: started
+                    .naming
+                    .and_then(|version| frozen_names(city_root, &version)),
             }
         })
+}
+
+/// The names a session froze under `version`, as the content store holds
+/// them (`crates/wire/Spec.lean` D17). A store that will not open, a
+/// version it no longer holds and bytes that are not a frozen naming
+/// answer no names: the page then falls back to the address and the
+/// role's name, never to the names as they are today.
+fn frozen_names(city_root: &Path, version: &kernel::B3Hash) -> Option<wire::FrozenNames> {
+    let store = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).ok()?;
+    let naming = city::Naming::from_bytes(&store.get(version).ok()?).ok()?;
+    Some(wire::FrozenNames {
+        mayor: naming.mayor().map(str::to_owned),
+    })
 }
 
 /// The name of the tree the run was lent, from its first
@@ -287,6 +304,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     .get("first_at")
                     .and_then(serde_json::Value::as_u64)
                     .map(kernel::TimeMs::new);
+                turn.returned = record.moment();
             }
             EventKind::ToolResult => {
                 let map = record.data().as_map();

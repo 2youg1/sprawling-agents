@@ -62,7 +62,7 @@ export function isoTime(at: number): string {
 }
 
 export function isoInstant(at: number): string {
-  return "";
+  return `${isoDay(at)}T${isoTime(at)}`;
 }
 
 // Whole numbers with a thin separator, and money from micro-dollars.
