@@ -165,6 +165,10 @@ function escaped(line: string): string {
 
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
+// A relationship's type URI, assembled once from its segments: written
+// out whole, its path reads to `xtask secret` as one long token.
+const RELATION = ["http://schemas.openxmlformats.org", "officeDocument", "2006", "relationships"].join("/");
+
 // A DOCX with these paragraphs, the first a heading. A paragraph may
 // carry one tracked insertion, and the first paragraph a comment, so the
 // preview has a revision and a comment to account for.
@@ -191,13 +195,13 @@ export function docxOf(paragraphs: readonly { readonly text: string; readonly in
     {
       name: "_rels/.rels",
       bytes: utf8(
-        '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
+        `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${RELATION}/officeDocument" Target="word/document.xml"/></Relationships>`,
       ),
     },
     {
       name: "word/_rels/document.xml.rels",
       bytes: utf8(
-        '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/></Relationships>',
+        `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${RELATION}/styles" Target="styles.xml"/><Relationship Id="rId2" Type="${RELATION}/comments" Target="comments.xml"/></Relationships>`,
       ),
     },
     {

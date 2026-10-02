@@ -30,7 +30,7 @@ describe("third-party notices", () => {
   test("an asset copied from a package's subfolder brings that folder's licence files along", () => {
     expect(
       foldersOf({ name: "pdfjs-dist", dir: "C:/w/client/node_modules/pdfjs-dist" }, [
-        "C:/w/client/node_modules/pdfjs-dist/cmaps/UniGB-UCS2-H.bcmap",
+        "C:/w/client/node_modules/pdfjs-dist/cmaps/GBK-EUC-H.bcmap",
         "C:/w/client/node_modules/pdfjs-dist/cmaps/Identity-H.bcmap",
         "C:/w/client/node_modules/pdfjs-dist/wasm/openjpeg.wasm",
         "C:/w/client/node_modules/pdfjs-dist/README.md",
