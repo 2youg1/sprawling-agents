@@ -6,6 +6,7 @@
 <script lang="ts">
   import type { Sending } from "../../core/doing";
   import { say } from "../../core/lang";
+  import { STOP } from "../../core/slash";
   import { ui } from "../../ui";
   import Glyph from "../parts/glyph.svelte";
   import type { Face } from "./coin_face";
@@ -22,7 +23,7 @@
   const { face, sending, onStop }: Props = $props();
   const { lang } = ui();
 
-  const name = $derived(face === "stop" ? say($lang, "talk_stop") : say($lang, SPELLING[sending]));
+  const name = $derived(face === "stop" ? STOP : say($lang, SPELLING[sending]));
 </script>
 
 <!-- The send face submits the form the key stands in, so Enter in the

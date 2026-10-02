@@ -30,6 +30,7 @@
   import type { Snippet } from "svelte";
 
   import type { Lang } from "../../core/lang";
+  import { STOP } from "../../core/slash";
   import { fill, say } from "../../core/lang";
   import type { Column } from "../parts/table";
 
@@ -234,7 +235,7 @@ third state it has: neither all nor none. -->
       <Badge text={say($lang, "status_in_progress")} weight="live" dot />
     {/snippet}
     {#snippet actions()}
-      <Button label={say($lang, "talk_stop")} tone="quiet" />
+      <Button label={STOP} tone="quiet" />
     {/snippet}
   </Row>
   <Row primary="openai/gpt-nucleus-6" secondary={say($lang, "tree_no_runs")}>

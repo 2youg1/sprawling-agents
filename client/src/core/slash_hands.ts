@@ -10,7 +10,7 @@
 import type { RunBelief } from "./belief";
 import type { Key } from "./lang";
 import type { View } from "./route";
-import type { Address, Command, Effort, Mode, RunId, Seq } from "../wire";
+import type { Address, Command, Effort, RunId, RunPolicy, Seq } from "../wire";
 
 // A run a verb can act on: which one, and how far it has got. `/steer`,
 // `/stop` and `/diff` need the first, and a branch needs both.
@@ -53,9 +53,10 @@ export interface SlashHands {
   // that is where the person set it.
   readonly effort: Effort | null;
   readonly setEffort: (effort: Effort | null) => void;
-  // The discipline a run this verb opens works under, from the pill
-  // beside the box.
-  readonly mode: Mode;
+  // The run policy a run this verb opens works under, from the row
+  // beside the box, and the way to change it for the next one.
+  readonly policy: RunPolicy;
+  readonly setPolicy: (policy: RunPolicy) => void;
   // What a new run is told to aim at, already in the person's language.
   readonly goal: string;
   // The line in the box: emptied by a verb that ran, refilled by `/help`.

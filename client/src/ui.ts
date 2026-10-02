@@ -16,7 +16,7 @@ import { derived, get, readable, writable } from "svelte/store";
 import type { Readable, Writable } from "svelte/store";
 
 import { QUERIES } from "./core/asking";
-import { MODES } from "./core/commands";
+import { FIRST_POLICY } from "./core/commands";
 import { createBelief } from "./core/belief";
 import type { Lang } from "./core/lang";
 import type { LinkState } from "./core/link";
@@ -26,7 +26,7 @@ import { memory } from "./core/rows";
 import type { AddressBar, View } from "./core/route";
 import { go } from "./core/route";
 import type { Connection } from "./core/socket";
-import type { Answer, ApprovalItem, Command, Effort, Mode } from "./wire";
+import type { Answer, ApprovalItem, Command, Effort, Mode, RunPolicy } from "./wire";
 import { NOT_CONVERSING } from "./views/talk/handing";
 import type { Conversing } from "./views/talk/handing";
 
@@ -47,8 +47,11 @@ export interface Ui {
   // overrule the city's file without saying so; what the selector over
   // the composer states is the session it is about to open.
   readonly effort: Readable<Effort | null>;
-  // The discipline the next dispatch runs under, held for this page the
-  // way effort is; it starts at the first a control offers.
+  // The run policy the next dispatch runs under - its mode, write
+  // limit, admission requirement and landing - held for this page the
+  // way effort is; it starts at the first each control offers. `mode` is
+  // its first value, read on its own by the mode pill.
+  readonly policy: Readable<RunPolicy>;
   readonly mode: Readable<Mode>;
   // What the open conversation waits on, so the corner leaves the
   // refusal the conversation draws to the conversation
@@ -73,6 +76,7 @@ export interface Ui {
   readonly now: () => number;
   readonly chooseEffort: (level: Effort | null) => void;
   readonly chooseMode: (mode: Mode) => void;
+  readonly choosePolicy: (policy: RunPolicy) => void;
   readonly go: (view: View) => void;
   // Sends a command, and says so when it could not be sent.
   readonly send: (command: Command) => boolean;
@@ -100,20 +104,24 @@ export interface Opening {
 // statement of what a page reads.
 function readied(value: Opening): Ui {
   const effort = writable<Effort | null>(null);
-  const mode = writable<Mode>(MODES[0] ?? "chat");
+  const policy = writable<RunPolicy>(FIRST_POLICY);
   const hearing = value.conn.asking.ask(QUERIES.endpoints);
   return {
     ...value,
     lang: derived(value.prefs.held, (held) => held.lang),
     effort,
-    mode,
+    policy,
+    mode: derived(policy, (held) => held.mode),
     conversing: writable<Conversing>(NOT_CONVERSING),
     approvals: derived(
       value.conn.asking.ask(QUERIES.approvals),
       (answer) => (answer !== undefined && "approvals" in answer ? answer.approvals.items : undefined),
     ),
     chooseEffort: effort.set,
-    chooseMode: mode.set,
+    chooseMode: (mode) => {
+      policy.update((held) => ({ ...held, mode }));
+    },
+    choosePolicy: policy.set,
     go: (view) => {
       go(value.bar, view);
     },

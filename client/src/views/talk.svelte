@@ -65,7 +65,7 @@
   const { lang } = u;
   const belief = u.conn.belief;
   const effort = u.effort;
-  const mode = u.mode;
+  const policy = u.policy;
   const held = u.prefs.held;
 
   // The runs of this room, oldest first. A run whose room is not yet
@@ -192,7 +192,7 @@
       return steered;
     }
     const went = u.send(
-      dispatch({ addr: address, task: text, goal: say($lang, "talk_goal"), effort: $effort, mode: $mode }),
+      dispatch({ addr: address, task: text, goal: say($lang, "talk_goal"), effort: $effort, policy: $policy }),
     );
     if (went) {
       sent = sentFrom(address, text, $belief.runs);

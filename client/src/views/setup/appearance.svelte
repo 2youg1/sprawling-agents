@@ -34,6 +34,7 @@
   import Glyph from "../parts/glyph.svelte";
   import Segmented from "../parts/segmented.svelte";
   import Notifying from "./notifying.svelte";
+  import Tier from "./tier.svelte";
   import Showing from "../shared/showing.svelte";
   import {
     CHROMA_WORDS,
@@ -351,7 +352,7 @@ language card the settings page adds beside them takes the next cell. -->
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {@render foot(undefined, "motion")}
   </div>
-
+  <Tier />
   <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
     <span class="text-label font-label text-text">{say($lang, "appearance_glass")}</span>
     <p class="text-note text-text-faint">{say($lang, "appearance_glass_note")}</p>

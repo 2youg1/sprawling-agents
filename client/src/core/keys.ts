@@ -163,7 +163,7 @@ export const LABELS: Readonly<Record<Action, Key>> = {
   inspect: "keys_inspect",
   help: "keys_help",
   "composer.focus": "keys_composer",
-  "run.stop": "run_cancel",
+  "run.stop": "slash_stop",
   "fork.here": "fork_here",
   "decide.yes": "keys_decide_yes",
   "decide.edit": "keys_decide_edit",

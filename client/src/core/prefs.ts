@@ -37,7 +37,7 @@ import { EDITORS, type Opening } from "./editor";
 import { langOf, type Lang } from "./lang";
 import { browserRows, type Rows } from "./rows";
 import { sizingOf } from "./sizing";
-import { Proxying, type Chord, type PreferencePatch } from "../wire";
+import { Proxying, Tier as TierSchema, type Chord, type PreferencePatch, type Tier as WireTier } from "../wire";
 import { appearanceOnWire } from "./prefs_city";
 import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, STACK_SHAPE, blendOf, type Appearance } from "./appearance";
 import type { Notifying } from "./notify";
@@ -104,11 +104,10 @@ const ROWS = {
 // (`panorama`). Named for what is drawn rather than for a share of
 // opacity, because the three are three layouts and not three points on
 // one slider (docs/frontend-method.md §7H, client D17).
-export type Tier = "zen" | "blend" | "panorama";
-
-// In the order the layers key cycles them: out from the conversation
-// alone to the world as the workspace, then back.
-export const TIERS: readonly Tier[] = ["zen", "blend", "panorama"];
+// Spelled by the wire (`wire::Tier`), in whose order the layers key
+// cycles them: out from the conversation alone to the world, then back.
+export type Tier = WireTier;
+export const TIERS: readonly Tier[] = TierSchema.literals;
 
 // The tier a first visit opens in, and the one an unreadable row reads
 // as: the world layer is visible as being there, and the words are not
@@ -164,10 +163,11 @@ export type Keeper =
 // Named changes rather than one `write`, because each of them is its
 // own `PutPreferences` patch: a caller that handed over a whole record
 // would send the city every field to change one, and a caller that says
-// which fact it is changing sends that fact. The tier, the bell, how a
-// conversation is shown, glass, the blend tier's opacity and the
-// workbench stay in this browser, since the city's record has no field
-// for them yet. `adopt` is the other direction and is therefore whole -
+// which fact it is changing sends that fact. The bell and how a
+// conversation is shown stay in this browser, since the city's record
+// has no field for them; the workbench's order and widths stay here
+// because they are a fact of this screen (client D24). `adopt` is the other
+// direction and is therefore whole -
 // an answer states every value at once, and a record applied field by
 // field could be half of one answer and half of the last.
 export interface PreferenceDoor {
@@ -341,6 +341,7 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
     },
     setTier(tier) {
       settle({ ...get(held), tier });
+      told({ tier });
     },
     setAppearance(appearance) {
       settle({ ...get(held), appearance });

@@ -25,6 +25,7 @@
   import { cancel, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
   import { fill, say } from "../core/lang";
+  import { STOP } from "../core/slash";
   import type { Key } from "../core/lang";
   import { buildingOf, roomOf } from "../core/route";
   import { count } from "../core/time";
@@ -121,7 +122,6 @@
   const turns = $derived(rounds?.turns ?? []);
   const checkpoint = $derived(rounds?.opened_at ?? null);
   const lastCheckpoint = $derived(lastCheckpointIn(turns));
-
 
   const peak = $derived(peakOf(turns));
   const seen = $derived(seenOf(turns));
@@ -378,7 +378,7 @@
       <p class="figure truncate text-note text-text-faint">{run}</p>
     </div>
     {#if live}
-      <Button label={say($lang, "run_cancel")} tone="secondary" onPress={() => u.send(cancel(run))} />
+      <Button label={STOP} tone="secondary" onPress={() => u.send(cancel(run))} />
     {/if}
   </div>
   <Head

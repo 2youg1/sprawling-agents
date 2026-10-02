@@ -37,6 +37,7 @@
   import Conversation from "./gallery/conversation.svelte";
   import Filed from "./gallery/filed.svelte";
   import FirstRun from "./gallery/first_run.svelte";
+  import G2 from "./gallery/g2.svelte";
   import Fmt from "./gallery/fmt.svelte";
   import G1 from "./gallery/g1.svelte";
   import Followed from "./gallery/followed.svelte";
@@ -120,6 +121,7 @@
   <Keepers />
   <Settings />
   <SettingsPanel />
+  <G2 />
   <R3 />
   <Tables />
   <Monitor />

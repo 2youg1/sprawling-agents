@@ -103,6 +103,10 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return reached(BUILDING_MOVED.has(kind));
     case "proposals":
       return reached(PROPOSALS_MOVED.has(kind));
+    // The city's list names cards and offer times, which a save does not
+    // move: a stale card is still open.
+    case "open_proposals":
+      return reached(kind === "proposal_offered" || kind === "proposal_decided" || kind === "proposal_withdrawn");
     // An identity card lands as a governed document written, and the
     // answer read back after it is the save's receipt.
     case "identity":

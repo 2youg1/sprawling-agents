@@ -32,7 +32,7 @@
   import Glyph from "../parts/glyph.svelte";
   import Tip from "../parts/tip.svelte";
   import Column from "./column.svelte";
-  import { openCards, proposedDocs } from "./deciding_proposals";
+  import { openCards } from "./deciding_proposals";
   import { linkWord } from "./link_word";
 
   interface Props {
@@ -86,9 +86,8 @@
   );
   // The cards open on the documents this page saw proposals for: the
   // only questions a closed mailbox asks (4-49, 4-55).
-  const offered = $derived($belief.proposed);
-  const proposed = $derived(openCards(u.conn.asking, proposedDocs(offered)));
-  const needs = $derived(($approvals?.length ?? 0) + blocking + $proposed);
+  const proposed = openCards(u.conn.asking);
+  const needs = $derived(($approvals?.length ?? 0) + blocking + $proposed.length);
   const fresh = $derived(
     $belief.notices.some((notice) => !notice.seen && urgencyOf(notice.error) === "ordinary"),
   );

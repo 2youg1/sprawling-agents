@@ -34,7 +34,6 @@ import { adopted } from "./belief/adopted";
 import { livened, liveOf } from "./belief/live";
 import { roomed, roomsOf } from "./belief/rooms";
 import { cancelledOf, recounted } from "./belief/cancelled";
-import { proposedWith } from "./belief/proposed";
 import { fold, unseen } from "./belief/fold";
 export type { Belief, Notice, RunBelief } from "./belief/shape";
 
@@ -74,7 +73,6 @@ export function createBelief(now: () => number): BeliefStore {
     notices: [],
     city: null,
     sessions: {},
-    proposed: new Map(),
     probed: null,
     logs: [],
   });
@@ -192,12 +190,10 @@ export function createBelief(now: () => number): BeliefStore {
       if (found !== null) written({ ...held, probed: found });
       return null;
     }
-    const [proposed, unread] = proposedWith(held.proposed, record);
-    if (proposed !== held.proposed) written({ ...held, proposed });
     if (record.run === CITY_RUN) {
-      return unread;
+      return null;
     }
-    return foldRun(record) ?? unread;
+    return foldRun(record);
   }
 
   // One record into the run that wrote it, unless the run has already

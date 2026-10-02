@@ -23,7 +23,7 @@ import { reached } from "../../core/slash_hands";
 import type { Slash, SlashHands } from "../../core/slash_hands";
 import type { Sending } from "../../core/doing";
 import { Address } from "../../wire";
-import type { Command, Effort, Mode, Seq } from "../../wire";
+import type { Command, Effort, Mode, RunPolicy, Seq } from "../../wire";
 import type { View } from "../../core/route";
 import type { PopoverColumn } from "../parts/popover";
 
@@ -376,7 +376,8 @@ export interface Reach {
   readonly models: readonly Served[];
   readonly effort: Effort | null;
   readonly setEffort: (effort: Effort | null) => void;
-  readonly mode: Mode;
+  readonly policy: RunPolicy;
+  readonly setPolicy: (policy: RunPolicy) => void;
   readonly goal: string;
   readonly write: (line: string) => void;
 }
@@ -391,7 +392,8 @@ export function slashHands(reach: Reach): SlashHands {
     models: reach.models.map((each) => ({ endpoint: each.endpoint, model: each.model })),
     effort: reach.effort,
     setEffort: reach.setEffort,
-    mode: reach.mode,
+    policy: reach.policy,
+    setPolicy: reach.setPolicy,
     goal: reach.goal,
     write: reach.write,
   };

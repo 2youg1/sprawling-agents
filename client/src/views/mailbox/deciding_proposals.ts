@@ -3,35 +3,41 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Which documents the mailbox asks about, and how many cards are open on
-// them (client/Spec.lean §4-55). The mailbox key counts them and the deciding
+// Every proposal card open in the city, and the documents they are on
+// (client/Spec.lean §4-55). The mailbox key counts them and the deciding
 // section lists them, so both read this one reading: two counts of the
 // same cards would be the first thing to disagree.
 //
-// The city answers open cards one document at a time, and no question
-// lists the documents that carry them; the documents asked about are
-// the ones a `proposal_offered` line this page folded named
-// (`core/belief/proposed.ts`), newest offer first.
+// The city answers the whole list (`Query::OpenProposals`, wire D15),
+// newest offer first, so a card offered before this page opened is
+// listed like one offered while it listened. Each card's sentences are
+// still asked per document, by the section that draws them.
 
 import { derived } from "svelte/store";
 import type { Readable } from "svelte/store";
 
+import { QUERIES } from "../../core/asking";
 import type { Asking } from "../../core/asking";
-import type { Proposed } from "../../core/belief/proposed";
-import type { Address } from "../../wire";
+import type { Address, OfferedCard, TimeMs } from "../../wire";
 
-// A reader derives this from `belief.proposed` alone, whose identity
-// moves only when an offer is folded, so the questions below are not
-// asked afresh on every record the belief takes.
-export function proposedDocs(proposed: Proposed): Address[] {
-  return [...proposed].sort(([, left], [, right]) => right - left).map(([doc]) => doc);
+export function openCards(asking: Asking): Readable<readonly OfferedCard[]> {
+  return derived(asking.ask(QUERIES.openProposals), (answer) =>
+    answer !== undefined && "open_proposals" in answer ? answer.open_proposals.open : [],
+  );
 }
 
-// How many cards are open on these documents, as the city last answered
-// for each; a document not yet answered counts none.
-export function openCards(asking: Asking, docs: readonly Address[]): Readable<number> {
-  return derived(
-    docs.map((doc) => asking.ask({ proposals: doc })),
-    (answers) => answers.reduce((sum, answer) => sum + (answer !== undefined && "proposals" in answer ? answer.proposals.open.length : 0), 0),
-  );
+// One document with open cards, and when its newest card was offered;
+// `null` when the city could not say.
+export interface Offered {
+  readonly doc: Address;
+  readonly at: TimeMs | null;
+}
+
+// The documents the cards are on, each once, in the order of its newest
+// card: the list arrives newest first, so the first card of a document
+// is its newest.
+export function documentsOf(cards: readonly OfferedCard[]): readonly Offered[] {
+  const seen = new Map<Address, TimeMs | null>();
+  for (const card of cards) if (!seen.has(card.doc)) seen.set(card.doc, card.at ?? null);
+  return [...seen].map(([doc, at]) => ({ doc, at }));
 }

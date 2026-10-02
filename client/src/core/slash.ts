@@ -19,6 +19,7 @@
 import { Option, Schema } from "effect";
 
 import { Address } from "../wire";
+import type { AdmissionRequirement } from "../wire";
 import {
   EFFORTS,
   TEMPLATES,
@@ -40,6 +41,24 @@ import type { Slash, SlashCall, SlashHands } from "./slash_hands";
 
 const ALL = "--all";
 const CARRY = "--carry";
+
+// The two spellings a button elsewhere shows as its own name: the verb
+// that cancels the run in front of the person, and the one that lets
+// the whole city work again. Written here once, so the button and the
+// line a person types are one spelling.
+export const STOP = "/stop";
+const RELEASE = "/release";
+export const RELEASE_ALL = `${RELEASE} ${ALL}`;
+
+// The short words `/admit` takes, each naming the admission requirement
+// the next run's work must meet; the bare verb goes back to the
+// building's own checks.
+const ADMITS: Readonly<Record<string, AdmissionRequirement>> = {
+  standing: "standing",
+  tested: "tested",
+  contract: "contract_kept",
+  double: "double_validated",
+};
 
 // The word for an effort nobody chose. The page keeps that state as
 // `null` and the frame leaves the field out; this is its one written
@@ -110,7 +129,7 @@ export const SLASH: readonly Slash[] = [
           task: call.rest,
           goal: hands.goal,
           effort: hands.effort,
-          mode: hands.mode,
+          policy: hands.policy,
         }),
       );
       hands.write("");
@@ -129,7 +148,7 @@ export const SLASH: readonly Slash[] = [
   },
   {
     // Cancel, the run in front of the person; the wider brake is `/halt`.
-    spelling: "/stop",
+    spelling: STOP,
     grammar: "",
     about: "slash_stop",
     section: "sessions",
@@ -149,7 +168,7 @@ export const SLASH: readonly Slash[] = [
     },
   },
   {
-    spelling: "/release",
+    spelling: RELEASE,
     grammar: "[addr|--all]",
     about: "slash_release",
     section: "actions",
@@ -245,6 +264,30 @@ export const SLASH: readonly Slash[] = [
       const level = EFFORTS.find((known) => known === asked);
       if (level === undefined) return;
       hands.setEffort(level);
+      hands.write("");
+    },
+  },
+  {
+    spelling: "/admit",
+    grammar: `[${Object.keys(ADMITS).join("|")}]`,
+    about: "slash_admit",
+    section: "actions",
+    run: (hands, call) => {
+      const admit = ADMITS[call.words.at(0) ?? "standing"];
+      if (admit === undefined) return;
+      hands.setPolicy({ ...hands.policy, admit });
+      hands.write("");
+    },
+  },
+  {
+    spelling: "/room",
+    grammar: "<addr>",
+    about: "slash_room",
+    section: "navigation",
+    run: (hands, call) => {
+      const address = addressed(call.words.at(0));
+      if (address === null) return;
+      hands.go({ kind: "talk", address });
       hands.write("");
     },
   },

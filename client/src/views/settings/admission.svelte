@@ -8,16 +8,16 @@
   // roadmap Q6): three values that are chosen apart and combine - what a
   // run may write, what evidence its work must carry before a merge lets
   // it in, and whether that work lands at all. An explanation rather
-  // than a control: each is chosen per dispatch where the work is
-  // handed out, and the city records the choice on the run it starts,
+  // than a control: each is chosen per dispatch on the composer's
+  // settings row, and the city records the choice on the run it starts,
   // so a standing control here would be a second place that decides it.
   // The spellings are the wire's (`WriteLimit`, `AdmissionRequirement`,
   // `LandingPolicy`), drawn as code because a person types them.
 
+  import { ADMISSIONS, LANDINGS, WRITE_LIMITS } from "../../core/commands";
   import { say } from "../../core/lang";
   import type { Key } from "../../core/lang";
   import { ui } from "../../ui";
-  import type { AdmissionRequirement, LandingPolicy, WriteLimit } from "../../wire";
 
   const { lang } = ui();
 
@@ -27,13 +27,9 @@
     readonly values: readonly string[];
   }
 
-  const WRITES: readonly WriteLimit[] = ["full", "create"];
-  const REQUIRES: readonly AdmissionRequirement[] = ["standing", "tested", "contract_kept", "double_validated"];
-  const LANDINGS: readonly LandingPolicy[] = ["ordinary", "experiment"];
-
   const ROWS: readonly Row[] = [
-    { term: "admission_write", says: "admission_write_says", values: WRITES },
-    { term: "admission_require", says: "admission_require_says", values: REQUIRES },
+    { term: "admission_write", says: "admission_write_says", values: WRITE_LIMITS },
+    { term: "admission_require", says: "admission_require_says", values: ADMISSIONS },
     { term: "admission_landing", says: "admission_landing_says", values: LANDINGS },
   ];
 </script>

@@ -22,6 +22,7 @@
   import { keymap } from "./core/keys";
   import type { Action } from "./core/keys";
   import { fill, say } from "./core/lang";
+  import { RELEASE_ALL } from "./core/slash";
   import { markOf, paintMark } from "./core/mark";
   import { TIERS } from "./core/prefs";
   import { cityIsShut, CITY } from "./core/scope";
@@ -366,7 +367,7 @@
           weight="alert"
         >
           {#snippet action()}
-            <Button label={say($lang, "city_release")} tone="secondary" onPress={() => u.send(release(CITY))} />
+            <Button label={RELEASE_ALL} tone="secondary" onPress={() => u.send(release(CITY))} />
           {/snippet}
         </Banner>
       {/if}

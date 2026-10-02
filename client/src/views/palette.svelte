@@ -40,7 +40,7 @@
   import type { View } from "../core/route";
   import { cityIsShut, CITY } from "../core/scope";
   import { completed } from "../core/completion";
-  import { offered } from "../core/slash";
+  import { RELEASE_ALL, offered } from "../core/slash";
   import { SECTIONS, reached } from "../core/slash_hands";
   import type { Reached, Section, Slash, SlashHands } from "../core/slash_hands";
   import { ui } from "../ui";
@@ -66,7 +66,7 @@
   const belief = u.conn.belief;
   const held = u.prefs.held;
   const effort = u.effort;
-  const mode = u.mode;
+  const policy = u.policy;
 
   const { onClose }: { readonly onClose: () => void } = $props();
 
@@ -110,7 +110,7 @@
       goTo({ kind: "welcome" }, say($lang, "setup_rerun")),
     ];
     out.push({
-      label: halted ? say($lang, "city_release") : say($lang, "city_stop"),
+      label: halted ? RELEASE_ALL : say($lang, "city_stop"),
       hint: "halt",
       // wording-ok: `halt` is the command frame's own verb and is
       // spelled alike in both languages (design 4-10).
@@ -216,7 +216,8 @@
         written.acted = true;
         u.chooseEffort(level);
       },
-      mode: $mode,
+      policy: $policy,
+      setPolicy: u.choosePolicy,
       goal: say($lang, "talk_goal"),
       write: (line) => {
         written.line = line;

@@ -14,6 +14,7 @@ import { providerName } from "./commands/endpoint";
 export { providerName };
 import type {
   Address,
+  AdmissionRequirement,
   ApprovalId,
   Autonomy,
   Carry,
@@ -31,15 +32,21 @@ import type {
   IdentityCard,
   InputKinds,
   KeepWarm,
+  LandingPolicy,
   ModelTag,
   PreferencePatch,
   PursuitStep,
   Restoration,
   RunId,
+  RunPolicy,
   ToolkitSlug,
+  WriteLimit,
 } from "../wire";
 import {
+  AdmissionRequirement as AdmissionSchema,
   Ceiling as CeilingSchema,
+  LandingPolicy as LandingSchema,
+  WriteLimit as WriteLimitSchema,
   Effort as EffortSchema,
   Mode as ModeSchema,
   Window as WindowSchema,
@@ -58,6 +65,20 @@ export const EFFORTS: readonly Effort[] = EffortSchema.literals;
 // them (kernel `Mode::ALL`); the first is the one a page starts with.
 export const MODES: readonly Mode[] = ModeSchema.members.map((member) => member.literal);
 
+// The other three values of a run policy, each in the wire's order; the
+// first of each is the one that adds nothing (`crates/wire/Spec.lean`
+// §8-57): the full write limit, the building's own checks, the ordinary
+// landing. A page starts on those, which is `FIRST_POLICY`.
+export const WRITE_LIMITS: readonly WriteLimit[] = WriteLimitSchema.members.map((member) => member.literal);
+export const ADMISSIONS: readonly AdmissionRequirement[] = AdmissionSchema.members.map((member) => member.literal);
+export const LANDINGS: readonly LandingPolicy[] = LandingSchema.members.map((member) => member.literal);
+export const FIRST_POLICY: RunPolicy = {
+  mode: MODES[0] ?? "chat",
+  write: WRITE_LIMITS[0] ?? "full",
+  admit: ADMISSIONS[0] ?? "standing",
+  landing: LANDINGS[0] ?? "ordinary",
+};
+
 // A dispatch names a room: `addr` is the room itself (`hall/mayor`),
 // and the city opens no second room inside it. A room a person names on
 // the building page is an address like any other (`lab/first try`,
@@ -72,7 +93,9 @@ export interface Dispatch {
   // nothing about effort and the provider decides, which is not the
   // same request as `"none"`, an instruction not to think.
   readonly effort: Effort | null;
-  readonly mode: Mode;
+  // The four values the run works under, as the person chose them
+  // beside the box.
+  readonly policy: RunPolicy;
 }
 
 // The goal a dispatch in this mode states. A chat is the person talking,
@@ -96,11 +119,8 @@ export function dispatch(d: Dispatch): Command {
     dispatch: {
       addr: d.addr,
       task: d.task,
-      goal: statedGoal(d.mode, d.goal),
-      // The page offers the mode alone today; the other three values
-      // are the ones that add nothing (`crates/wire/Spec.lean` §8-57): the full write
-      // limit, the building's own checks, the ordinary landing.
-      policy: { mode: d.mode, write: "full", admit: "standing", landing: "ordinary" },
+      goal: statedGoal(d.policy.mode, d.goal),
+      policy: d.policy,
       session: null,
       effort: d.effort,
       idem: mintIdem(),

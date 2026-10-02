@@ -23,6 +23,7 @@
   import { QUERIES } from "../core/asking";
   import { readAnswer } from "../core/answered";
   import { say } from "../core/lang";
+  import { RELEASE_ALL } from "../core/slash";
   import { halt, release } from "../core/commands";
   import { MAYOR, toFragment } from "../core/route";
   import { cityIsShut, CITY } from "../core/scope";
@@ -80,7 +81,7 @@
 
 {#snippet aside()}
   <Button
-    label={halted ? say($lang, "city_release") : say($lang, "city_stop")}
+    label={halted ? RELEASE_ALL : say($lang, "city_stop")}
     tone={halted ? "secondary" : "quiet"}
     onPress={() => {
       u.send(halted ? release(CITY) : halt(CITY));

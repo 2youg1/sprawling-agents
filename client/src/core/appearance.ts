@@ -9,6 +9,8 @@
 // between visits and `prefs_city.ts` carries it to the city; this file
 // only says what a valid one is.
 
+import { Glass as GlassSchema, type Glass as WireGlass } from "../wire";
+
 // `system` is the absence of an opinion, and it is resolved where the
 // page is drawn rather than in the stylesheet: the light palette is
 // declared once, and a second declaration of it inside a
@@ -24,10 +26,9 @@ export type Chroma = "full" | "off";
 // `system` is the absence of an opinion, which is what the stylesheet's
 // `prefers-reduced-motion` block reads.
 export type Motion = "system" | "on" | "off";
-// Whether the edge layer's small surfaces are drawn as glass. `on` still
-// yields to a machine that asks for less transparency, which only some
-// engines report - that gap is why this switch exists (docs/frontend-method.md §4-43).
-export type Glass = "on" | "off";
+// Whether the edge layer's small surfaces are drawn as glass, spelled by
+// the wire (`wire::Glass`, docs/frontend-method.md §4-43).
+export type Glass = WireGlass;
 
 // Every value a selector offers, in the order it is drawn, and the
 // same list each stored string is read back through: an option a
@@ -37,7 +38,7 @@ export const FACES: readonly Face[] = ["geist", "system", "custom"];
 export const DENSITIES: readonly Density[] = ["comfortable", "compact"];
 export const CHROMAS: readonly Chroma[] = ["full", "off"];
 export const MOTIONS: readonly Motion[] = ["system", "on", "off"];
-export const GLASSES: readonly Glass[] = ["on", "off"];
+export const GLASSES: readonly Glass[] = GlassSchema.literals;
 // The slider that sets the world layer's opacity in the blend tier, in
 // percent. The opacity drawn while the person has said nothing is
 // `theme.css`'s `--blend-opacity`, and only there.

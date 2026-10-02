@@ -24,6 +24,7 @@
 
   import type { DoctorAnswer } from "../../wire";
   import type { Lang } from "../../core/lang";
+  import { RELEASE_ALL } from "../../core/slash";
   import { say } from "../../core/lang";
   import type { Recovery } from "../../core/recovering";
   import type { BuildingAnswer, CityAnswer } from "../../wire";
@@ -241,7 +242,7 @@
     weight="alert"
   >
     {#snippet action()}
-      <Button label={say($lang, "city_release")} tone="secondary" />
+      <Button label={RELEASE_ALL} tone="secondary" />
     {/snippet}
   </Banner>
 </Case>

@@ -236,10 +236,9 @@
         belief: get(belief),
         models,
         effort: get(effort),
-        setEffort: (level) => {
-          u.chooseEffort(level);
-        },
-        mode: get(mode),
+        setEffort: u.chooseEffort,
+        policy: get(u.policy),
+        setPolicy: u.choosePolicy,
         goal: say(get(lang), "talk_goal"),
         write,
       }),

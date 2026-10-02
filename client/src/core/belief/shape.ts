@@ -96,10 +96,6 @@ export interface Belief {
   city: string | null;
   // Where the newest session in each room began (core/session.ts reads it).
   sessions: Record<string, Seq>;
-  // Every document a card was offered on while this page listened, and
-  // where the newest offer sits (`proposed.ts`). It says somebody
-  // proposed a change there, not how many cards are still open.
-  proposed: ReadonlyMap<Address, Seq>;
   // The last probe's answer: which endpoint, what it serves, what each
   // row stated, and where the call stopped. Held here rather than read
   // off the history's tail, where a long city would push it out.

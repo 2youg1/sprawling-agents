@@ -64,7 +64,6 @@ export interface Refused {
 const VERBS: Readonly<Record<string, Key>> = {
   "/new": "act_open_session",
   "/fork": "act_fork",
-  "/stop": "talk_stop",
 };
 
 // Why a deed cannot run: the refusal named nothing it can act on.

@@ -59,6 +59,7 @@ export const QUERIES = {
   toolkits: "toolkits",
   release: "newest_release",
   preferences: "preferences",
+  openProposals: "open_proposals",
   identity: "identity",
   automation: "automation",
   guide: "guide",

@@ -375,10 +375,6 @@
     "en": "{n} ready to start",
     "zh": "{n} 件可以开工"
   },
-  "city_release": {
-    "en": "/release --all",
-    "zh": "/release --all"
-  },
   "city_runs": {
     "en": "runs that worked here",
     "zh": "在这里干过活的 run"
@@ -1306,10 +1302,6 @@
   "mailbox_new": {
     "en": "something new, nothing waiting for you",
     "zh": "有新消息，没有等你的事"
-  },
-  "mailbox_proposals_earlier": {
-    "en": "Cards offered before this page opened show beside their document on the right.",
-    "zh": "本页打开之前提出的修改提案，在右侧打开那份文稿时显示。"
   },
   "keys_reserved": {
     "en": "the browser takes this key before the page sees it",
@@ -2987,10 +2979,6 @@
     "en": "cached",
     "zh": "缓存命中"
   },
-  "run_cancel": {
-    "en": "/stop",
-    "zh": "/stop"
-  },
   "run_changes": {
     "en": "changes",
     "zh": "改动"
@@ -3598,6 +3586,38 @@
   "admission_apart": {
     "en": "the write limit says what may change; the landing policy says whether the change enters the project",
     "zh": "写入限制回答能改什么，落地策略回答改动是否进入项目"
+  },
+  "admission_value_full": {
+    "en": "full write",
+    "zh": "常规写入"
+  },
+  "admission_value_create": {
+    "en": "create only",
+    "zh": "只读可新建"
+  },
+  "admission_value_standing": {
+    "en": "building's checks",
+    "zh": "楼的校验"
+  },
+  "admission_value_tested": {
+    "en": "tested",
+    "zh": "已测试"
+  },
+  "admission_value_contract_kept": {
+    "en": "contract kept",
+    "zh": "守约"
+  },
+  "admission_value_double_validated": {
+    "en": "double validated",
+    "zh": "双重验证"
+  },
+  "admission_value_ordinary": {
+    "en": "lands",
+    "zh": "照常落地"
+  },
+  "admission_value_experiment": {
+    "en": "experiment",
+    "zh": "试验"
   },
   "setup_header_name": {
     "en": "header name",
@@ -4535,10 +4555,6 @@
     "en": "stop",
     "zh": "停"
   },
-  "talk_release": {
-    "en": "/release --all",
-    "zh": "/release --all"
-  },
   "talk_resident": {
     "en": "resident",
     "zh": "居民"
@@ -4562,10 +4578,6 @@
   "talk_steer_queued": {
     "en": "/steer · after the tool call",
     "zh": "/steer · 工具调用之后"
-  },
-  "talk_stop": {
-    "en": "/stop",
-    "zh": "/stop"
   },
   "talk_thinking": {
     "en": "{who} is thinking…",
@@ -5079,6 +5091,14 @@
     "en": "whether the edge keys let the page behind them show through",
     "zh": "左下三键是否透出背后的页面"
   },
+  "appearance_tier": {
+    "en": "tier",
+    "zh": "档位"
+  },
+  "appearance_tier_note": {
+    "en": "how much of the world layer the page draws; the layers key moves through the same three",
+    "zh": "页面画出多少世界层；图层键在同样的三档之间切换"
+  },
   "setup_key_kept": {
     "en": "archived - leave blank to keep it",
     "zh": "已归档，留空则沿用"
@@ -5387,6 +5407,14 @@
     "en": "open the changes of the run in this room",
     "zh": "打开此房间 run 的改动"
   },
+  "slash_admit": {
+    "en": "the evidence the next run's work must carry before a merge lets it in",
+    "zh": "下一个 run 的工作在合入之前要带的证据"
+  },
+  "slash_room": {
+    "en": "open the conversation of another room",
+    "zh": "打开另一个房间的对话"
+  },
   "ask_late_title": {
     "en": "no answer came back to the {query} question",
     "zh": "{query} 这个问题没有等到回答"
@@ -5398,6 +5426,10 @@
   "talk_model_locked": {
     "en": "model, kept by this session: another model opens a new session",
     "zh": "模型，本会话固定：换模型会开一个新会话"
+  },
+  "talk_policy": {
+    "en": "what bounds the run",
+    "zh": "这次 run 的边界"
   },
   "bld_remove": {
     "en": "Remove {addr}",

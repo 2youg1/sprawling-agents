@@ -26,7 +26,7 @@
   import { recoveryWords } from "../parts/notice_title";
   import { WaitingCards } from "../talk/waiting.svelte";
   import DecidingDocument from "./deciding_document.svelte";
-  import { openCards, proposedDocs } from "./deciding_proposals";
+  import { documentsOf, openCards } from "./deciding_proposals";
   import Section from "./section.svelte";
   import { shown, sweep } from "./swept.svelte";
 
@@ -48,10 +48,9 @@
   const asks = $derived(stopped.filter((notice) => notice.error.code === "E_APPROVAL_PENDING"));
   const failures = $derived(stopped.filter((notice) => notice.error.code !== "E_APPROVAL_PENDING"));
   const questions = $derived($approvals ?? []);
-  const offered = $derived($belief.proposed);
-  const documents = $derived(proposedDocs(offered));
-  const proposed = $derived(openCards(u.conn.asking, documents));
-  const count = $derived(stopped.length + questions.length + $proposed);
+  const cards = openCards(u.conn.asking);
+  const documents = $derived(documentsOf($cards));
+  const count = $derived(stopped.length + questions.length + $cards.length);
 </script>
 
 <Section title="mailbox_deciding" empty="mailbox_deciding_none" {count}>
@@ -118,10 +117,7 @@
     </div>
   {/each}
   <WaitingCards items={questions} />
-  {#each documents as doc (doc)}
-    <DecidingDocument {doc} {onLeave} />
+  {#each documents as offered (offered.doc)}
+    <DecidingDocument doc={offered.doc} at={offered.at} {onLeave} />
   {/each}
-  <!-- The city lists no document's cards but the one asked about, so a
-  card offered before this page opened shows only beside its document. -->
-  <p class="py-snug text-note text-text-faint">{say($lang, "mailbox_proposals_earlier")}</p>
 </Section>

@@ -17,7 +17,7 @@ import { get } from "svelte/store";
 
 import { QUERIES } from "./asking";
 import { putPreferences } from "./commands";
-import type { Appearance } from "./appearance";
+import { blendOf, type Appearance } from "./appearance";
 import type { PreferenceDoor, Preferences } from "./prefs";
 import type { Connection } from "./socket";
 import type { Appearance as WireAppearance, PreferencesAnswer } from "../wire";
@@ -33,17 +33,17 @@ export function keepWithCity(door: PreferenceDoor, conn: Connection): void {
 }
 
 // The city's answer taken over what this browser held. A field the
-// answer leaves out is one the person never settled with the city, so
-// the browser's value stands for it; so does every appearance field the
-// city's record has no place for.
+// answer leaves out, or states as never chosen, is one the person never
+// settled with the city, so the browser's value stands for it.
 export function adopted(held: Preferences, answer: PreferencesAnswer): Preferences {
   return {
     ...held,
     lang: answer.lang ?? held.lang,
     welcomed: answer.welcomed ?? held.welcomed,
     panel: answer.panel ?? held.panel,
+    tier: answer.tier ?? held.tier,
     proxying: answer.proxying ?? held.proxying,
-    appearance: answer.appearance === undefined ? held.appearance : { ...held.appearance, ...appearanceOfCity(answer.appearance) },
+    appearance: answer.appearance === undefined ? held.appearance : appearanceOfCity(answer.appearance, held.appearance),
   };
 }
 
@@ -58,14 +58,15 @@ export function appearanceOnWire(next: Appearance): WireAppearance {
     density: next.density,
     chroma: next.chroma,
     motion: next.motion,
+    glass: next.glass,
+    blend_percent: next.blend,
   };
 }
 
-// The appearance fields the city keeps. The rest of a record are this
-// browser's alone (docs/frontend-method.md §4-43).
-type KeptByCity = Omit<Appearance, "glass" | "blend">;
-
-function appearanceOfCity(stated: WireAppearance): KeptByCity {
+// The city keeps the opacity as a bare percent and the slider's domain
+// is this client's (`BLEND_PERCENT`), so a figure outside it - a file
+// edited by hand - reads as no opacity, as a stored row would.
+function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance {
   return {
     lighting: stated.lighting,
     sans: stated.sans,
@@ -76,5 +77,7 @@ function appearanceOfCity(stated: WireAppearance): KeptByCity {
     density: stated.density,
     chroma: stated.chroma,
     motion: stated.motion,
+    glass: stated.glass ?? held.glass,
+    blend: blendOf(String(stated.blend_percent ?? "")),
   };
 }
