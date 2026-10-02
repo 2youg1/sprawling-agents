@@ -1338,8 +1338,12 @@ main h1 {
    * column centred with `mx-auto` stays centred once the page grows past
    * the fold instead of sliding half a scrollbar to the left. An engine
    * that does not know `both-edges` drops this line and keeps the single
-   * gutter declared above it. */
-  main {
+   * gutter declared above it. The page's `<main>` carries
+   * `overflow-y-auto`, whose class outranks an element rule, so the
+   * class is named here too: with one gutter a page stood half a
+   * scrollbar left of the shell's centre and off Main's silver lines. */
+  main,
+  main.overflow-y-auto {
     scrollbar-gutter: stable both-edges;
   }
   /* The main region measures itself, so the columns inside it can ask
@@ -1360,6 +1364,16 @@ main h1 {
   main {
     container-type: inline-size;
     container-name: page;
+  }
+  /* **The conversation page is no container.** It is the shell's grid
+   * continued through `subgrid`, and a query container is laid out in
+   * containment, which the engine treats as a grid of its own: its
+   * columns read as `none`, every pane falls into an implicit column
+   * and the sessions and commits panes are drawn over each other at
+   * the left edge. Nothing inside it asks `page`; each region that
+   * measures itself names its own container. */
+  main.workspace {
+    container-type: normal;
   }
   /* A fold that opens at a readable speed.
    *
