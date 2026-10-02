@@ -7,8 +7,6 @@ import { describe, expect, test } from "bun:test";
 import { Option } from "effect";
 
 import { Address, B3Hash, RunId, Seq } from "../wire";
-||||||| parent of 22205091 (card-S8.SS4: red: sessions as stretches, their tags and pin, /compact /tag /untag, against stubs)
-import { Address, RunId } from "../wire";
 import {
   DEFAULT_VIEW,
   MAYOR,

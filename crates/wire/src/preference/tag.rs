@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The words a person files sessions under (`crates/wire/spec/Preference.lean`
-//! §8-80, wire D18).
+//! §8-84, wire D21).
 //!
 //! **A tag is the person's classification, not the city's history.** It
 //! changes nothing a run can observe, so it rides in the person's own

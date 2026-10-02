@@ -7,7 +7,7 @@
 //
 // **The tags are the person's, kept by the city** in the person's own
 // `config.toml` beside the chords they rebound (`crates/wire/Spec.lean`
-// §8-80), so a phone reaching the same city reads the same tags. This
+// §8-84), so a phone reaching the same city reads the same tags. This
 // page draws its own copy at once and sends the change; every answer the
 // city gives replaces the copy whole, as every other preference does.
 //
@@ -76,7 +76,7 @@ function named(session: Named, tags: readonly Tag[]): SessionTags {
 }
 
 // One session's set landed on this page's copy, in the patch's meaning
-// (wire §8-80): it replaces the session's set, and an empty set removes
+// (wire §8-84): it replaces the session's set, and an empty set removes
 // the entry. The order of the list is the city's to keep; nothing here
 // reads it.
 export function retagged(held: readonly SessionTags[], next: SessionTags): readonly SessionTags[] {

@@ -221,7 +221,7 @@ pub struct PreferencesAnswer {
     /// The chords this person rebound, action order.
     pub chords: Vec<Chord>,
     /// The tags this person gave sessions, in session order
-    /// (`crates/wire/spec/Preference.lean` §8-80).
+    /// (`crates/wire/spec/Preference.lean` §8-84).
     pub tags: Vec<SessionTags>,
 }
 
@@ -324,7 +324,7 @@ pub enum PreferencePatch {
     /// file's `[core]` section, not in `[ui]` (`crates/wire/spec/Command/Step.lean` §8-61).
     CorePriority(CorePriority),
     /// Replace one session's tags with these; an empty set removes them
-    /// (`crates/wire/spec/Preference.lean` §8-80).
+    /// (`crates/wire/spec/Preference.lean` §8-84).
     Tags(SessionTags),
 }
 
