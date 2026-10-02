@@ -30,6 +30,8 @@
 </script>
 
 <script lang="ts">
+  import { Option } from "effect";
+
   import { fill, say } from "../../core/lang";
   import { SvelteSet } from "svelte/reactivity";
 
@@ -37,11 +39,12 @@
   import Glyph from "../parts/glyph.svelte";
   import { FOLDS, along } from "./fold";
   import type { Row } from "./lineage";
-  import { phaseOf, rowsOf, windowOf } from "./lineage";
+  import { phaseOf, rowsOf, viewOf, windowOf } from "./lineage";
   import { PHASES, PHASE_FILL as FILL, PHASE_MARK as MARK, PHASE_WORD as WORD } from "./phase";
 
   const { runs, now, level = 1 }: RunsBoardProps = $props();
-  const { lang } = ui();
+  const u = ui();
+  const { lang } = u;
 
   // Rows drawn beyond each edge of the viewport, so a fast scroll meets
   // drawn rows rather than padding.
@@ -111,10 +114,18 @@
       case "ArrowRight":
         if (openable) foldAt(row.key, false);
         break;
+      case "Enter":
+        if (row !== undefined) open(row);
+        break;
       default:
         return;
     }
     event.preventDefault();
+  }
+
+  // A row opens the page of what it names (S07 E36).
+  function open(row: Row): void {
+    Option.map(viewOf(row), u.go);
   }
 
   function pick(run: BoardRun): void {
@@ -188,13 +199,18 @@
   >
     {#each rows.slice(shown.from, shown.to) as row, at (row.key)}
       {@const current = shown.from + at === cursor}
+      <!-- svelte-ignore a11y_click_events_have_key_events (the tree owns the keys: Enter opens the row the keyboard holds, through `pressed`) -->
       <li
         id="runs-row-{row.key}"
         role="treeitem"
         aria-level={levelOf(row)}
         aria-expanded={row.kind === "run" ? undefined : !folded.has(row.key)}
         aria-selected={current}
-        class={["flex h-step min-w-0 items-center gap-snug pr-snug text-note", current ? "bg-raised shadow-[inset_2px_0_0_var(--color-accent)]" : ""]}
+        class={["flex h-step min-w-0 cursor-pointer items-center gap-snug pr-snug text-note hover:wash", current ? "bg-raised shadow-[inset_2px_0_0_var(--color-accent)]" : ""]}
+        onclick={() => {
+          cursorKey = row.key;
+          open(row);
+        }}
       >
         <span class="shrink-0 pl-snug font-mono whitespace-pre text-text-quiet" aria-hidden="true">{row.guide}</span>
         {#if row.kind === "building"}

@@ -14,11 +14,13 @@
 // has to act on. The address is the directory tree, so its first
 // segment is the building and the rest is the room.
 
-import { Option } from "effect";
+import { Option, Schema } from "effect";
 
 import type { RunBelief } from "../../core/belief";
 import type { Doing } from "../../core/doing";
 import type { View } from "../../core/route";
+import { readRunId } from "../../core/run_id";
+import { Address } from "../../wire";
 
 // One run as the board needs it: what the belief already holds about
 // it. `ended` is null until the wire carries a run's last moment.
@@ -170,7 +172,17 @@ export function windowOf(total: number, scrolled: number, viewport: number, rowP
 }
 
 // Where a row leads when it is opened: a run to its page, a room to its
-// conversation, a building to its page.
+// conversation, a building to its page. `None` for a name the address
+// grammar refuses, which a row built from the ledger should never carry.
 export function viewOf(row: Row): Option.Option<View> {
-  return Option.none();
+  switch (row.kind) {
+    case "building":
+      return Option.map(readAddress(row.key), (address): View => ({ kind: "building", address }));
+    case "room":
+      return Option.map(readAddress(row.key), (address): View => ({ kind: "talk", address }));
+    case "run":
+      return Option.map(readRunId(row.run.run), (run): View => ({ kind: "run", run }));
+  }
 }
+
+const readAddress = Schema.decodeOption(Address);

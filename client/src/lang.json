@@ -4964,8 +4964,8 @@
     "zh": "现在"
   },
   "runs_keys": {
-    "en": "j and k move, h and l fold",
-    "zh": "j、k 上下移动，h、l 折叠与展开"
+    "en": "j and k move, h and l fold, Enter opens",
+    "zh": "j、k 上下移动，h、l 折叠与展开，Enter 打开"
   },
   "gallery_runs_board": {
     "en": "the runs board, with runs waiting for the person",
