@@ -41,7 +41,8 @@
 # onward, so an entry would fail on every run instead of opening pull
 # requests. It goes in once the updater reads version 2. Until then the
 # runtime dependencies `RUNTIME` in `tools/xtask/src/npm.rs` lists are
-# pinned to exact versions and the npm gate refuses any other.
+# held on caret ranges in `client/package.json`, and the npm gate checks
+# that the lockfile agrees with them.
 version: 2
 
 updates:
