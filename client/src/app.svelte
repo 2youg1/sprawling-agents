@@ -44,9 +44,8 @@
   import { closePanel, hostSettled, panelBeneath, panelGroup, pickGroup } from "./views/settings/hosted.svelte";
   import { motionOff } from "./views/shared/motion";
 
-  // The Opening `main.ts` read off the page once. Taken as one prop
-  // object and captured in one piece: the shell never follows its
-  // fields reactively, which is what the suppression below is about.
+  // The Opening `main.ts` read off the page, captured once and whole: the
+  // shell never follows its fields, which the suppression below says.
   const props: { opening: Opening } = $props();
   // svelte-ignore state_referenced_locally (the shell captures this value once at mount and never follows the prop)
   setUi(props.opening);
@@ -78,14 +77,11 @@
   let view = $state.raw<View>(DEFAULT_VIEW);
   let paletteOpen = $state(false);
   let sheetOpen = $state(false);
-  // How many times the stop key found no run in front of the person;
-  // the corner answers each one.
+  // How many times the stop key found no run in front; each is answered.
   let stopsWithoutRun = $state(0);
-  // What opened the sheet, so closing it puts the focus back where the
-  // person left it.
+  // What opened the sheet, which takes the focus back when it closes.
   let opener: HTMLElement | null = null;
-  // Whether a page has been drawn yet: the first paint is not a
-  // navigation, and the focus it lands on is the page's own choice.
+  // Whether a page was drawn yet: the first paint is not a navigation.
   let arrived = false;
 
   const waiting = $derived($approvals?.length ?? 0);
@@ -176,8 +172,7 @@
   let peeking = $state(false);
   const tier = $derived(peeking ? "blend" : $held.tier);
 
-  // How many times the mailbox chord asked for the drawer; the drawer
-  // answers each one where it stands.
+  // How many times the mailbox chord asked; the mailbox answers each one.
   let mailboxAsked = $state(0);
 
   // A press is held when its key stays down this long: the layers chord
@@ -336,9 +331,7 @@
   // needs to say: how many things wait for the person, and whether the
   // city is working at all.
   $effect(() => {
-    // A city nobody has named is still a city, and the word for it is
-    // the one the city page shows: the tab's title and the rail read
-    // the same key as the page's own heading.
+    // A city nobody has named is called what the city page calls it.
     const name = $belief.city ?? say($lang, "nav_city");
     document.title = waiting > 0 ? `(${String(waiting)}) ${name}` : name;
     document.documentElement.lang = $lang;
