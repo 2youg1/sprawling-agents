@@ -24,30 +24,44 @@
 ### 8-39 storage::checkpoint 的并发写者：每个写者一个 index，共享的只有对象库与引用（形状 4 适配器；git2）
 
 ```rust
+// crates/storage/src/checkpoint/opening.rs
 impl Checkpoint {
+    /// 城的那一份 index 上的句柄：仓库不在时建它，并把行尾钉成原样（`core.autocrlf = false`）。
+    /// 配置只在值不同时写，所以城开过一次之后，再开只读不写，不与别的句柄争配置的锁。
+    pub fn open(city_root: &Path) -> Result<Checkpoint, StorageError>;
     /// 一个写者的检查点句柄：仓库与对象库是城的那一个，index 是这个写者自己的
-    /// `<city>/.sprawling/index/<run>`（`git2::Index::open` 加 `Repository::set_index`）。
-    /// 文件不在时从城的 `.git/index` 复制一份，于是第一道检查点仍按 stat 跳过没变的文件，
-    /// 而不是为写域里的每个文件求一次哈希。城没有仓库即 `StorageError::Checkpoint`：
-    /// 仓库只在开城时由 `Checkpoint::open` 建一次，写者不建仓库。
-    pub fn open_writer(city_root: &Path, writer: RunId) -> Result<Checkpoint, StorageError>;
-    /// 写者的 run 落地后删掉它的 index 文件；不在即成功。
+    /// `<root>/.sprawling/index/<run>`（`git2::Index::open` 加 `Repository::set_index`）。
+    /// 文件不在时从仓库的 index 复制一份，于是第一道检查点仍按 stat 跳过没变的文件，
+    /// 而不是为写域里的每个文件求一次哈希。没有仓库即 `StorageError::Checkpoint`：
+    /// 写者不建仓库，仓库在开城时由 `Checkpoint::open` 建一次。
+    pub fn open_writer(root: &Path, writer: RunId) -> Result<Checkpoint, StorageError>;
+    /// 写者的 run 落地后删掉它的 index 文件；不在即成功；`open` 开的句柄什么也不删。
     pub fn close_writer(self) -> Result<(), StorageError>;
+    /// 开城时删掉 `.sprawling/index/` 下的每一个文件，答删了几个：开城时没有活的 run。
+    pub fn sweep_writers(root: &Path) -> Result<usize, StorageError>;
 }
 ```
 
-- **`wave_pre` 的引用只建不改。** 引用名是提交自己的 oid（§8-8），建的时候 `force = false`：名字已在且值相同即成功（同一个检查点），值不同不可能发生（名字就是值）。所以检查点引用之间没有冲突，`pins_only_grow` 与 `independent_steps_commute` 说的就是这一点。
-- **HEAD 的改写是比较后交换。** `ensure_base` 与 `land` 以 `Repository::commit(Some("HEAD"), …, parents)` 提交，libgit2 在当前 HEAD 不是第一个父提交时拒绝（无父提交时，HEAD 已在即拒）。`ensure_base` 被拒即重读 HEAD：HEAD 已在就返回 `None`，与赢家先做的串行次序相同（`a_lost_base_race_is_the_serial_order`）。`land` 被拒是 `StorageError::Checkpoint { op: "land on the trunk" }`（→ `E_WORKTREE_BUSY`，恢复：重试这一次落地），因为它的树是对旧 HEAD 暂存的，静默重做会把别人刚落下的改动当成这次要退回的。
-- **失败不动引用。** 暂存与写对象都不改引用（`before_the_pin_no_reference_moves`），所以在钉引用之前失败的检查点留下的引用与开始时相同；崩溃写下的对象没有引用够得着，`git gc` 收走（`a_crash_reaches_nothing_new`）。私有 index 在崩溃后留在盘上：开城时 `.sprawling/index/` 下不属于任何活 run 的文件一并删掉，与 `sweep_abandoned` 收走崩溃留下的树同一个时机。
+`root` 是 run 写的那棵树：城自己，或借给房间的 worktree。worktree 本来就有自己的 index，私有 index 放在它自己的 `.sprawling/index/` 下，随 worktree 一起被收走；城的私有 index 由 `sweep_writers` 在开城时收。
+
+- **`wave_pre` 的引用只建不冲突。** 引用名是提交自己的 oid（§8-8），建的时候 `force = true`：名字就是值，覆盖只可能写下同一个值。`force = false` 反而会让同一刻、同一棵树、同一父提交的第二次检查点（同一个 oid）被「引用已在」拒掉。所以检查点引用之间没有冲突，`pins_only_grow` 与 `independent_steps_commute` 说的就是这一点。
+- **HEAD 的改写是比较后交换。** `ensure_base` 与 `land` 以 `Repository::commit(Some("HEAD"), …, parents)` 提交，libgit2 在当前 HEAD 不是第一个父提交时拒绝（无父提交时，HEAD 已在即拒）。`ensure_base` 被拒即重读 HEAD：HEAD 已在就返回 `None`，与赢家先做的串行次序相同（`a_lost_base_race_is_the_serial_order`）。`land` 被拒是 `StorageError::Checkpoint { op: "move HEAD" }`（→ `E_WORKTREE_BUSY`，恢复：重试这一次落地），因为它的树是对旧 HEAD 暂存的，静默重做会把别人刚落下的改动当成这次要退回的。引用的锁文件被别人占着（libgit2 的 `Locked`；Windows 上改名撞上一个开着的文件也报在这里）答的是同一个错误与同一个恢复。
+- **失败不动引用。** 暂存与写对象都不改引用（`before_the_pin_no_reference_moves`），所以在钉引用之前失败的检查点留下的引用与开始时相同；崩溃写下的对象没有引用够得着，`git gc` 收走（`a_crash_reaches_nothing_new`）。私有 index 在崩溃后留在盘上：worker 开城时 `sweep_writers` 删掉它们，与 `sweep_abandoned` 收走崩溃留下的树同一个时机。
 - **增量检查点等于整个写域的检查点。** 只暂存这一波写过的路径由 `crates/runtime/Spec.lean` §8-45 决定（lane 把各调用的 `Writes::Paths` 并起来，`Domain` 与失败的调用暂存整个写域）；它依赖的性质在这里证明：这一波在写域里只碰了这些路径时，两种暂存得到同一棵树（`staging_the_touched_paths_is_staging_the_scope`）。exec 声明 `Domain`，它的检查点暂存整个写域，libgit2 按修改时间与尺寸跳过没变的文件，是同一个定理以「stat 变了的路径」为 `touched` 的实例。
-- **验收（W2–W3 实现时加）**：从本模型导出的 Rust 检查——两个写者各开 `open_writer`，在同一座城里交错 `wave_pre`（线程上真交错），各自的 `checkpoint_committed.oid` 的树等于各自暂存的写域，两条引用都在；一个写者在写对象之后、钉引用之前被丢掉，城的引用集合不变；两个写者同时 `ensure_base` 一座没有提交的城，HEAD 恰是其中一个的提交，另一个答 `None`。
+- **验收**：从本模型导出的 Rust 检查在 `crates/storage/src/checkpoint/opening/tests.rs`——两个写者各开 `open_writer`，在同一座城里的两个线程上交错 `wave_pre`，各自的提交的树等于各自暂存的写域，两条引用都在（`others_never_touch_an_index`、`a_pin_holds_what_its_writer_staged`）；一个写者暂存并写下树对象之后、提交与钉引用之前被丢掉，城的引用集合不变（`before_the_pin_no_reference_moves`、`a_crash_reaches_nothing_new`）；两个写者在两个线程上同时 `ensure_base` 一座没有提交的城，HEAD 恰是其中一个的提交，另一个答 `None`（`a_lost_base_race_is_the_serial_order`）。
 -/
 
 /-! D25 一座城的检查点由多个写者同时做，每个写者一个自己的 index，共享的只有对象库与引用更新；`accounting` 的 `checkpoint_gate` 因此拆掉。
 **为什么。** 那把锁让一座城的每一次检查点排成一列，理由是「一个仓库只有一个 index」：两条 lane 同时取 `.git/index.lock`，后者被拒。可那把锁护的是 index 这一个文件，而 index 不必共享：一个写者用自己的 index（或像 `base_checkpoint` 那样在 mempack 里直接写树），它的暂存、写树、建提交就不碰任何别的写者能看见的东西。剩下共享的两样各自是原子的：对象按内容寻址，同名即同字节，先写后写一样；检查点引用以 oid 为名，同名即同值。本模型证明这两样加上 HEAD 的比较后交换，在任何交错下都等于某个串行次序（`independent_steps_commute`、`a_lost_base_race_is_the_serial_order`）。
 **被否：保留全城的 `checkpoint_gate`。** 它的代价随并发的 run 数线性涨：测试城里一个 run 独占这把锁时，写入波前的检查点已占 p50 18 ms、最大 64 ms，N 条 lane 同时有写入波时，排在最后的一条要等 N−1 次检查点。**被否：每个 run 一个仓库。** 对象不再共享，worktree 无从分枝，合并要跨仓库搬对象。
-**文件系统的前提。** 对象：libgit2 先写临时文件，再改名到 `objects/<xx>/<rest>`（或一个 pack 与它的 `.idx`）；目标已在时，后来者丢掉自己的临时文件。引用：libgit2 以 `O_EXCL` 创建 `<ref>.lock` 取得排他，写完改名覆盖。这两步要的是「独占创建」与「同卷改名是原子的」：Windows 的 NTFS 上是 `CreateFileW(CREATE_NEW)` 与 `MoveFileExW(MOVEFILE_REPLACE_EXISTING)`，macOS 的 APFS 与 Linux 的 ext4 上是 `open(O_CREAT|O_EXCL)` 与 `rename(2)`，三者都满足。不满足的地方是城放在网络盘（SMB、NFS）上：两个写者可能都以为拿到了 `<ref>.lock`。检查点引用以 oid 为名，两个写者写的是同一个值，所以仍然不坏；HEAD 的比较后交换失去保证，那时 `ensure_base` 与 `land` 仍要经同一进程里的一把锁，这把锁只护 HEAD，不护检查点。私有 index 在保留子树之下，不进任何树。
+**文件系统的前提。** 对象：libgit2 先写临时文件，再改名到 `objects/<xx>/<rest>`（或一个 pack 与它的 `.idx`）；目标已在时，后来者丢掉自己的临时文件。引用：libgit2 以 `O_EXCL` 创建 `<ref>.lock` 取得排他，写完改名覆盖。这两步要的是「独占创建」与「同卷改名是原子的」：Windows 的 NTFS 上是 `CreateFileW(CREATE_NEW)` 与 `MoveFileExW(MOVEFILE_REPLACE_EXISTING)`，macOS 的 APFS 与 Linux 的 ext4 上是 `open(O_CREAT|O_EXCL)` 与 `rename(2)`，三者都满足。不满足的地方是城放在网络盘（SMB、NFS）上：两个写者可能都以为拿到了 `<ref>.lock`。检查点引用以 oid 为名，两个写者写的是同一个值，所以仍然不坏；HEAD 的比较后交换失去保证，所以 `ensure_base` 与 `land` 还经同一进程里的一把锁，这把锁只护 HEAD，不护检查点（D26）。私有 index 在保留子树之下，不进任何树。
 **重开参数。** libgit2 不再以内容寻址写对象，或检查点引用的名字不再由 oid 决定。
+-/
+
+/-! D26 移动 HEAD 的两步（`ensure_base`、`land`）在每一座城上都经同一进程里的一把只护 HEAD 的锁（`opening::HEAD_MOVES`），不按城是否在网络盘上分两条路。
+**为什么。** 认出网络盘要问平台：Windows 是 `GetDriveTypeW`，macOS 与 Linux 是 `statfs` 的文件系统类型，三者都只有 `unsafe` 的 FFI 或一个新依赖，标准库没有安全接口（AGENTS.md 平台调用的次序）。这把锁护的两步一个 run 至多各走一次，从不在写入波的路上：检查点（`wave_pre`）不取它，所以它不是被拆掉的那把全城的锁。本地盘上它多余而无害，网络盘上它是同一进程里唯一的保证。
+**被否：按盘的种类分路。** 多一个平台调用，少一把几乎不被争用的锁。
+**重开参数。** 移动 HEAD 的步骤进了写入波，或标准库有了认出网络盘的安全接口。
 -/
 
 namespace Storage.Checkpoint.Concurrent

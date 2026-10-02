@@ -218,6 +218,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | 8-34 | `crates/storage/spec/Jsonl.lean` |
 | 8-37 | `crates/storage/spec/ChainAudit.lean` |
 | 8-38 | `crates/storage/spec/Index.lean` |
+| 8-39 | `crates/storage/spec/Checkpoint/Concurrent.lean` |
 -/
 
 /-! ## 9 工作流程
@@ -282,6 +283,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | D23 | 从某个 seq 往后读由索引给，而不由调用方跳过前面的（8-38） | `crates/storage/spec/Index.lean` |
 | D24 | 屏障本身按平台各有一臂，每一臂守同一条持久语义 | `crates/storage/spec/Jsonl/Barrier.lean` |
 | D25 | 一座城的检查点由多个写者同时做，每个写者一个自己的 index，共享的只有对象库与引用更新 | `crates/storage/spec/Checkpoint/Concurrent.lean` |
+| D26 | 移动 HEAD 的两步在每一座城上都经同一进程里一把只护 HEAD 的锁，不按盘的种类分路 | `crates/storage/spec/Checkpoint/Concurrent.lean` |
 -/
 
 /-! ## 13 依赖选型

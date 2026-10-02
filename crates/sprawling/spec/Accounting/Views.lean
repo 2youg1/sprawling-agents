@@ -171,19 +171,19 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 
 ### 8-46-13 检查点不排队：每条 lane 一个自己的 index（`accounting::worker::driving::lane`、`accounting::worker::driving::harness`、`accounting::worker::workbench`、`accounting::worker::workbench::standing`）
 
-**这一节是 sprawling 一侧关于检查点并发的唯一一处规则**；它依赖的性质由 `crates/storage/spec/Checkpoint/Concurrent.lean`（`crates/storage/Spec.lean` §8-39，storage D25）证明，§8-113 与 §8-110 只引用这里。
+**这一节是 sprawling 一侧关于检查点并发的唯一一处规则**；它依赖的性质由 `crates/storage/spec/Checkpoint/Concurrent.lean`（`crates/storage/Spec.lean` §8-39，storage D25、D26）证明，§8-113 与 §8-110 只引用这里。
 
-**一轮检查点是一个动作，不是一个 run 的一部分，而它不必与别的 run 的检查点排队。** 一个 ready set 里的每个节点各占一条 lane 同时跑（§8-46-4），它们都落在**同一个仓库**里。两条 lane 共用仓库的那一份 index 时，libgit2 为暂存取 `.git/index.lock`，后到的一条拿到「the index is locked; this might be due to a concurrent or crashed process」，以 `cancelled` 冻结，它的节点被当作「自己的 done check 没过」交回——所以检查点之间必须有一个次序。这个次序不需要一把全城的锁给：每条 lane 用 `Checkpoint::open_writer(city_root, run)` 开一个自己 index 的句柄，暂存、写树、建提交只碰它自己的 index，共享的对象库与以 oid 为名的引用在任何交错下都等于某个串行次序（storage D24）。于是：
+**一轮检查点是一个动作，不是一个 run 的一部分，而它不必与别的 run 的检查点排队。** 一个 ready set 里的每个节点各占一条 lane 同时跑（§8-46-4），它们都落在**同一个仓库**里。两条 lane 共用仓库的那一份 index 时，libgit2 为暂存取 `.git/index.lock`，后到的一条拿到「the index is locked; this might be due to a concurrent or crashed process」，以 `cancelled` 冻结，它的节点被当作「自己的 done check 没过」交回——所以检查点之间必须有一个次序。这个次序不需要一把全城的锁给：每条 lane 用 `Checkpoint::open_writer(city_root, run)` 开一个自己 index 的句柄，暂存、写树、建提交只碰它自己的 index，共享的对象库与以 oid 为名的引用在任何交错下都等于某个串行次序（storage D25）。于是：
 
 - **lane 的波前检查点**（`driving::lane` 的 `checkpoint` 闭包，`wave_pre`）、**harness run 的提交**（`driving::harness::commit`）各用这个 run 的写者句柄，不取任何锁。run 落地时 `close_writer` 删掉它的 index 文件。
-- **打开检查点仓库**只在开城时做一次（`bin::assembly`，城还没有仓库时 `Checkpoint::open` 建它），lane 不建仓库，所以 `workbench::open_checkpoint` 不再与别的 lane 争仓库的 config 锁。
-- **`ensure_base`**（`workbench::standing::lend_tree`）改写 HEAD，HEAD 是比较后交换：两条 lane 同时见到一座没有提交的城，一条的提交成为 HEAD，另一条重读后什么也不做（storage §8-39）。它用的是城的 index，与人自己的 `git add` 是同一个文件，所以它仍走 `storage::checkpoint::scan::write_index` 的等待。
+- **打开检查点仓库**只在开城时做一次（`RunWorker` 打开时，`accounting::worker::lifetime`，城还没有仓库时 `Checkpoint::open` 建它），lane 只用 `open_writer`，不建仓库、不写仓库配置，所以 `workbench::Laying::open_checkpoint` 不再与别的 lane 争仓库的 config 锁。同一时刻 `Checkpoint::sweep_writers` 删掉崩溃留下的私有 index。
+- **`ensure_base`**（`workbench::standing::lend_tree`）改写 HEAD，HEAD 是比较后交换：两条 lane 同时见到一座没有提交的城，一条的提交成为 HEAD，另一条重读后什么也不做（storage §8-39）；同一进程里它还经那把只护 HEAD 的锁（storage D26），这把锁不在写入波的路上。它用的是城的 index，与人自己的 `git add` 是同一个文件，所以它仍走 `storage::checkpoint::scan::write_index` 的等待。
 
-**两道保险各管一个对手，理由写在各自的位置**：同一个进程里两条 lane 之间，现在由各自的 index 隔开；`storage::checkpoint::scan::write_index` 的等待管**城的那一份 index 上的另一个进程**——人自己的 git，或误开在同一座城上的另一个 sprawling——那是任何进程内的机制都看不见的对手。
+**两道保险各管一个对手，理由写在各自的位置**：同一个进程里两条 lane 之间，由各自的 index 隔开；`storage::checkpoint::scan::write_index` 的等待管**城的那一份 index 上的另一个进程**——人自己的 git，或误开在同一座城上的另一个 sprawling——那是任何进程内的机制都看不见的对手。
 
 **被否：保留 `checkpoint_gate`（一个仓一次检查点）。** 锁的宽度只是一次检查点（stage＋commit＋读回），可它是全城的：测试城里一个 run 独占这把锁时，写入波前的检查点 p50 18 ms、最大 64 ms，N 条 lane 同时有写入波时，排在最后的一条要多等 N−1 次检查点：并发的 run 越多，写入波在锁上等得越久。
 
-**当前状态。** 代码仍是那把全城的锁：`Flight.checkpoint_gate`（`crates/accounting/src/worker/driving/flight.rs`）由 `driving::lane`、`driving::harness`、`workbench::open_checkpoint` 与 `workbench::standing::lend_tree` 四处取用，`Checkpoint::open_writer` 尚不存在。实现按上面三条改，同一变更集删掉 `checkpoint_gate` 与它在 `DriveContext`、`Laying`、`Placing` 里的克隆；完成的读数是 N 个 run 同时有写入波时，检查点的等锁时间为 0。
+**一个 run 的写者句柄。** `driving::lane::drive_run` 为这个 run 开一个写者句柄，驾驶结束后 `close_writer`；bench 的检查点网（`workbench::Laying::open_checkpoint`）是同一个 run 的第二个句柄，在同一条 lane、同一个线程上，与 lane 的句柄共用这个 run 的 index 文件，两者从不同时暂存；harness run 的提交开它自己的写者句柄，提交后关掉。整个进程里没有一把护检查点的锁，N 个 run 同时有写入波时检查点的等锁时间为 0。
 
 ### 8-46-9 一个房间一个队列：`accounting::worker::rooms`
 
