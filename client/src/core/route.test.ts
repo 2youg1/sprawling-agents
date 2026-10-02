@@ -14,6 +14,7 @@ import {
   fromFragment,
   go,
   roomIn,
+  SETUP_GROUPS,
   toFragment,
   unresolved,
   type View,
@@ -36,6 +37,7 @@ const EVERY_VIEW: readonly View[] = [
   { kind: "record", lens: "bin" },
   { kind: "cost" },
   { kind: "setup" },
+  ...SETUP_GROUPS.map((group): View => ({ kind: "setup", group })),
   { kind: "building", address: lab },
   { kind: "run", run: seven },
 ];
@@ -136,9 +138,17 @@ describe("route", () => {
       "#/city/extra",
       "#/record/nowhere",
       "#/welcome/extra",
+      "#/setup/nowhere",
+      "#/setup/you/extra",
     ]) {
       expect(fromFragment(wrong), wrong).toEqual(Option.none());
     }
+  });
+
+  test("the settings panel opens at the group its address names", () => {
+    expect(fromFragment("#/setup/you")).toEqual(Option.some({ kind: "setup", group: "you" }));
+    expect(toFragment({ kind: "setup", group: "rules" })).toBe("#/setup/rules");
+    expect(toFragment({ kind: "setup" })).toBe("#/setup");
   });
 
   test("an unresolved fragment is reported by name, an empty one is not", () => {

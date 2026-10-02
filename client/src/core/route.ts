@@ -25,6 +25,17 @@ export type Lens = "ledger" | "archive" | "bin" | "log";
 
 export const LENSES: readonly Lens[] = ["ledger", "archive", "bin", "log"];
 
+// The groups the settings panel draws in its body, as the address bar
+// spells them: `#/setup/<group>` opens the panel at one (client-SPEC 7L).
+// The order the settings tree offers them in is the tree's own
+// (`views/settings/tree.ts`); this is only the set the address bar reads.
+export const SETUP_GROUPS = [
+  "you", "accounts", "harnesses", "network", "run", "rules", "automation",
+  "skills", "tools", "appearance", "keys", "advanced", "about",
+] as const;
+
+export type SetupGroup = (typeof SETUP_GROUPS)[number];
+
 // The room a person talks to when they have named none: the Mayor.
 export const MAYOR: Address = Address.make("hall/mayor");
 
@@ -34,7 +45,10 @@ export type View =
   | { readonly kind: "city" }
   | { readonly kind: "building"; readonly address: Address }
   | { readonly kind: "run"; readonly run: RunId }
-  | { readonly kind: "setup" }
+  // The settings panel, open over the page beneath it. Without a group
+  // the panel opens at the one it drew last: the address bar names a
+  // group only when somebody chose one.
+  | { readonly kind: "setup"; readonly group?: SetupGroup }
   | { readonly kind: "mcp" }
   | { readonly kind: "record"; readonly lens: Lens }
   | { readonly kind: "cost" }
@@ -63,7 +77,7 @@ export function toFragment(view: View): string {
     case "run":
       return `#/run/${view.run}`;
     case "setup":
-      return "#/setup";
+      return view.group === undefined ? "#/setup" : `#/setup/${view.group}`;
     case "mcp":
       return "#/mcp";
     case "record":
@@ -188,6 +202,11 @@ export function fromFragment(raw: string): Option.Option<View> {
         kind: "building",
         address,
       }));
+    case "setup":
+    case "settings": {
+      const group = SETUP_GROUPS.find((named) => named === tail);
+      return group === undefined ? Option.none() : Option.some({ kind: "setup", group });
+    }
     case "record": {
       const lens = LENSES.find((named) => named === tail && named !== "ledger");
       return lens === undefined ? Option.none() : Option.some({ kind: "record", lens });

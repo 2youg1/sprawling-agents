@@ -56,9 +56,12 @@ export function fill(pattern: string, slots: Readonly<Record<string, string>>): 
 export type Lens = "ledger" | "archive" | "bin" | "log";
 export const LENSES: readonly Lens[];
 export const MAYOR: Address;                              // hall/mayor
+export const SETUP_GROUPS: readonly SetupGroup[];         // 设置面画在正文里的组，地址栏认得的全部拼写
+export type SetupGroup = "you" | "accounts" | "harnesses" | "network" | "run" | "rules"
+  | "automation" | "skills" | "tools" | "appearance" | "keys" | "advanced" | "about";
 export type View =
   | { kind: "talk"; address: Address } | { kind: "city" } | { kind: "building"; address: Address }
-  | { kind: "run"; run: RunId } | { kind: "setup" } | { kind: "mcp" } | { kind: "record"; lens: Lens }
+  | { kind: "run"; run: RunId } | { kind: "setup"; group?: SetupGroup } | { kind: "mcp" } | { kind: "record"; lens: Lens }
   | { kind: "cost" } | { kind: "registry" } | { kind: "welcome" } | { kind: "monitor" } | { kind: "gallery" };
 export const DEFAULT_VIEW: View;                          // 与 MAYOR 的对话
 export function toFragment(view: View): string;           // 恒以 `#/` 开头，每个 View 恰一种写法
@@ -76,6 +79,7 @@ export function roomIn(building: Address, name: string): Option<Address>;
 export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与转写文件名唯一的读法
 ```
 
+- **设置面开着是一个地址**（7L）：`#/setup` 是设置面开在它自己选的组上，`#/setup/<组>` 开在那一组上，刷新与外部链接都回到同一组；组名不在 `SETUP_GROUPS` 里的片段答 `None`，与认不出的页一样不悄悄落到别处。`group` 缺席而不是一个「默认组」值，是因为「开在哪一组」在缺席时由设置面自己判（它上次画的组），地址栏不替它说。
 - 写一种、读全部旧写法：`overview`／`city`／`live`／空片段都读作与 `hall/mayor` 的对话，`approvals` 读作对话（等人的事插在流里），`ledger`／`archive`／`recycle-bin` 读作 record 三透镜，`dashboard` 读作 cost，`settings` 读作 setup。
 - **两个身份值都由 `client/src/wire.ts` 生成，且都带 pattern 精炼**：`Address` 是 `kernel::Address::parse` 的路径文法，`RunId` 只收连字符小写 uuid（两者都是 `client/src/wire.ts` 里的同名导出）。客户端不再自带文法：`core/run_id.ts` 的 `readRunId` 是 `Schema.decodeOption` 于生成的 `RunId`，`route.ts` 的片段读法与 `building/tree.svelte` 的转写文件名读法都调它，认不出答 `None`。**裸 32 位十六进制、`{…}`、`urn:uuid:` 与全大写由此都读不出**，与城收窄后的 `kernel::RunId::parse` 一致；地址栏与目录树的 `Address` 直接来自 wire.ts。
 
