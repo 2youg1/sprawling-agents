@@ -1134,6 +1134,8 @@ pub(crate) struct Drained { pub(crate) written: Vec<EventDraft>, pub(crate) goal
 **服务顺序：relay 请求排在 desk 命令之前**。理由是一个已经在跑、已经花了钱的活，不该排在一条还没开始的命令后面；
 反过来排会让一次 `Dispatch` 命令挡住三轮正在写 `tool_result` 的活。
 
+**一道屏障带一回合攒下的记录（runtime D24）**。今天 `Relay` 用 `kernel::Ledger::append_all` 的默认实现，一条 draft 一次往返；一条车道上每次往返就是一道屏障，只有别的车道恰好同时排队时才合进同一道。runtime D24 让回合把只读调用的 `tool_called`／`tool_result` 与 `model_returned` 留在回合自己的账本门里，到下一个对外可见的效果之前用一次 `append_all` 交下来（`crates/runtime/Spec.lean` §8-3，性质在 `crates/runtime/spec/Turn/Durability.lean`）。于是 relay 的那一半是：`Relay` 覆写 `append_all`，把整批 draft 装进**一个** `RelayRequest`（`drafts: Vec<EventDraft>`，回信 `Result<Vec<EventRef>, AxError>`，按位置对应），记账线程把它与同时排队的别的请求一起写进同一道屏障。契约一字不改：回信仍在整批落盘之后才发，`Ok(refs)` 里每一条都已耐久；一批中途被拒时，拒绝之前的那些可能已经落盘，与 `append_all` 在端口上的承诺相同。落选的是「relay 收下就回信、回合另发一个只等屏障的请求」：那等于在 relay 上开一个「已排队」的回信，`EventRef` 就不再指向一段存在的历史。
+
 ### 8-42-3 `accounting::worker::pool`
 
 形状：**adapter**。N 条 `std::thread`，从 `bin` 里那唯一的 spawn 点起（ARCH §10 规则 3）。

@@ -33,6 +33,7 @@ import crates.runtime.spec.Tools.Search
 import crates.runtime.spec.Tools.Succeed
 import crates.runtime.spec.Transcript
 import crates.runtime.spec.Turn
+import crates.runtime.spec.Turn.Durability
 import crates.runtime.spec.Turn.Recovery
 import crates.runtime.spec.Turn.Speculation
 import crates.runtime.spec.Watchdog
@@ -43,7 +44,7 @@ import crates.runtime.spec.Watchdog
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部的末尾，别处引作 `runtime D<n>`；D1 到 D16 沿用这份规格在 Markdown 时 §12 的条目号，D12 空着，§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：回合的边界（`spec/Turn.lean`）、开头只读段的提前起跑（`spec/Turn/Speculation.lean`）、run 的唯一出口与结局判定（`spec/Run.lean`）、一波之前立不立 checkpoint（`spec/Run/Checkpoint.lean`）、分叉的前缀、切点与开篇写法（`spec/Fork.lean`）、打戳与按 UTC 选一段时间（`spec/Clock.lean`）、合并时的准入（`spec/Mode.lean`）、模型选路的判定（`spec/Tools/ChosenPath.lean`）与按字节读的门（`spec/Tools/BoundReader.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：回合的边界（`spec/Turn.lean`）、开头只读段的提前起跑（`spec/Turn/Speculation.lean`）、一个回合付几道落盘屏障（`spec/Turn/Durability.lean`）、run 的唯一出口与结局判定（`spec/Run.lean`）、一波之前立不立 checkpoint（`spec/Run/Checkpoint.lean`）、分叉的前缀、切点与开篇写法（`spec/Fork.lean`）、打戳与按 UTC 选一段时间（`spec/Clock.lean`）、合并时的准入（`spec/Mode.lean`）、模型选路的判定（`spec/Tools/ChosenPath.lean`）与按字节读的门（`spec/Tools/BoundReader.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -88,6 +89,7 @@ import crates.runtime.spec.Watchdog
 
 - `spec/Turn.lean`：没有人喊停的一波按调用序给每条调用记下 `tool_called` 与 `tool_result`（`an_uninterrupted_wave_accounts_every_call`）；取消落在第 k 条调用之前，账本上恰是前 k 条调用的两行再一条 `cancel_received`（`a_cancel_before_a_call_accounts_exactly_the_calls_before_it`），被取消的波以它的 `cancel_received` 结束（`a_cancelled_wave_ends_with_its_cancel`）；Steer 不结束回合（`a_steer_never_ends_a_turn`）。
 - `spec/Turn/Speculation.lean`：推测结果不是事件，Ledger 顺序即串行顺序。
+- `spec/Turn/Durability.lean`：只读调用不等落盘、写调用意图先落盘时，任一崩溃点上对外效果之前的记录都已落盘，写动手时它的 `tool_called` 已在盘上，盘上的记录是逐条落盘的参照次序的前缀，`EventRef` 只给已落盘的记录；一个回合 `1 + 写调用数` 道屏障，参照是 `2 + 2 × 调用数`。
 - `spec/Run.lean`：`handoff_written`＋`run_frozen` 是唯一出口，`run_frozen` 只写一次（`freeze_is_the_only_exit`）；`Done` 要说了话、又不是停在输出上限上（`done_needs_words_and_no_ceiling`）；收尾两行相隔一毫秒，时钟到顶时拒绝（`run_frozen_follows_its_handoff_by_one_millisecond`、`a_clock_at_its_ceiling_cannot_close`）。
 - `spec/Run/Checkpoint.lean`：判定表恰好在上一次提交之后跑过可能写的一波、或还没有提交过而这一波可能写时立 checkpoint（`stages_exactly_when_needed`、`every_wave_stages_exactly_when_needed`）。
 - `spec/Fork.lean`：分叉点过了尾就拒绝，前缀恰是母序列的头 `at_seq + 1` 行（A19）；切点不晚于要求的那一行、能切、并且只退到必须退的地方（`the_cut_never_splits_a_wave`、`retreat_goes_back_no_further_than_needed`）；只有 `FromJob` 被改写（`only_from_job_is_rewritten`）。
@@ -304,6 +306,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D21 | 工具表在 session 里恒不变，第三档经 `describe` 与 `call` 走会话 | `crates/runtime/spec/Catalog.lean` |
 | D22 | 搜索是确定的关键词排序，skill 正文仍只经 `read` | `crates/runtime/spec/Catalog.lean` |
 | D23 | 命令行程序不另立目录 | `crates/runtime/spec/Catalog.lean` |
+| D24 | 只读工具不在执行前等落盘，写调用的意图先落盘，一波一道屏障 | `crates/runtime/spec/Turn.lean`（§8-3），性质在 `crates/runtime/spec/Turn/Durability.lean` |
 -/
 
 /-! ## 13 依赖选型
