@@ -8,9 +8,10 @@
 <script lang="ts">
   // The blocks the city read out of a stretch of Markdown, drawn as
   // elements and never through `innerHTML` (client/Spec.lean §4-26,
-  // `crates/documents/Spec.lean` D21). What the city read and does not
-  // draw - HTML, maths, front matter, nesting too deep - is its own
-  // source in the mono face, so "something is here that this page does
+  // `crates/documents/Spec.lean` D21). A formula is drawn by KaTeX
+  // (`formula.svelte`, §4-64a). What the city read and this page does not
+  // draw - HTML, front matter, nesting too deep, and a formula KaTeX
+  // refuses - is its own source in the mono face, so "something is here that this page does
   // not draw" never reads as "nothing is here". A link's target was
   // judged by the city (D23); a relative one opens the document it
   // names on the right side, through `onOpen`.
@@ -19,6 +20,7 @@
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Inked from "../parts/inked.svelte";
+  import Formula from "./formula.svelte";
   import Laid from "./laid.svelte";
   import type { Block, Inline } from "../../wire";
 
@@ -55,7 +57,7 @@
   // One inline mark, read once into a shape the template can switch on.
   type Piece =
     | { readonly kind: "space" | "break" }
-    | { readonly kind: "text" | "code" | "image" | "note" | "raw"; readonly text: string }
+    | { readonly kind: "text" | "code" | "image" | "note" | "formula" | "raw"; readonly text: string }
     | { readonly kind: "emphasis" | "strong" | "strikethrough"; readonly parts: readonly Inline[] }
     | { readonly kind: "link"; readonly target: string; readonly parts: readonly Inline[] };
 
@@ -70,7 +72,8 @@
     if ("link" in part) return { kind: "link", target: part.link.target, parts: part.link.content };
     if ("image" in part) return { kind: "image", text: part.image.alt };
     if ("footnote_reference" in part) return { kind: "note", text: part.footnote_reference.name };
-    return { kind: "raw", text: part.unsupported.source };
+    const { construct, source } = part.unsupported;
+    return { kind: construct === "math" ? "formula" : "raw", text: source };
   }
 
   // The checker types a `{#snippet}` name as a void call, which the lint
@@ -116,6 +119,8 @@
       <span class="text-text-faint">{piece.text}</span>
     {:else if piece.kind === "note"}
       <sup class="text-text-faint">{piece.text}</sup>
+    {:else if piece.kind === "formula"}
+      <Formula source={piece.text} />
     {:else if piece.kind === "raw"}
       <code class="font-mono text-note text-text-faint">{piece.text}</code>
     {/if}

@@ -30,6 +30,7 @@
     "@noble/post-quantum": "0.7.1",
     "docx-preview": "0.4.1",
     "effect": "4.0.0",
+    "katex": "0.19.0",
     "pdfjs-dist": "6.3.289",
     "svelte": "5.57.1"
   },
