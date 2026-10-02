@@ -41,6 +41,13 @@ pub(crate) fn still_judged(asked: &str, judged: &Path, opened: &same_file::Handl
 // 照旧过 admit 与 land。
 pub(crate) fn within_city<'a>(city_root: &Path, asked: &'a str, action: &'static str)
     -> Result<Cow<'a, str>, AxError>;
+// 遍历者（search）对一个条目的判定：不是链接的条目只问盘一次，是目录交 Directory、否则交 File
+// （盘说不出类型的也交 File，让随后的打开说出看不了的原因）；链接经 land 判，落到文件交 File(真实路径)，
+// 落到目录或不存在交 Passed（走链接可能绕回走过的地方），land 以 E_GATE_DENIED 拒的交 Passed，
+// land 的其余拒绝原样返回，由遍历者计入看不了的项。
+pub(crate) fn walked(city_root: &Path, path: PathBuf, rel: &str,
+    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Walked, AxError>;
+pub(crate) enum Walked { Directory(PathBuf), File(PathBuf), Passed }
 ```
 
 **城内的绝对路径换成它的地址，再走同一道判定。** 页面把拖进输入框的文件存到城里（`hall/dropped/…`），插进消息的是文件在盘上的绝对路径；模型照抄它看到的路径，于是 `read` 以文法拒绝一个本就在城里的文件，resident 只能回头让人重打一遍。`read`、`search` 的起点与 `edit` 因此先调 `within_city`，再把交回的拼写交给 `admit`（`edit` 交给 `Address::parse` 与写域门）。换算只做「这是城里的哪个地址」这一件事，保留区、读界与链接仍由原来那一处判，所以没有第二个权威。落选的方案：在页面上把路径改写成城相对地址——页面不知道城根的真实位置（链接、junction、大小写），而且模型从别处（`exec` 的输出、日志）拿到的绝对路径同样会被拒。
