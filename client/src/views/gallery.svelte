@@ -38,6 +38,7 @@
   import Filed from "./gallery/filed.svelte";
   import FirstRun from "./gallery/first_run.svelte";
   import G2 from "./gallery/g2.svelte";
+  import Gd from "./gallery/gd.svelte";
   import Fmt from "./gallery/fmt.svelte";
   import G1 from "./gallery/g1.svelte";
   import G3 from "./gallery/g3.svelte";
@@ -137,4 +138,5 @@
   <Fmt />
   <G3 />
   <Prop />
+  <Gd />
 </div>
