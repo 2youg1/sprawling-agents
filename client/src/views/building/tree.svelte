@@ -45,8 +45,11 @@
     readonly onPick: (picked: Picked) => void;
     // Where this instance reads, and how deep it stands. A caller
     // outside this file passes neither: that is the top of the tree,
-    // which draws the `nav` around the root level. The recursion below
-    // passes both.
+    // which draws the region around the root level. The recursion below
+    // passes both. A region rather than a `nav`: the tree is what the
+    // building holds, read level by level, not a way between pages, and
+    // its rows step in by depth where a navigation column's rows share
+    // one left edge (client-SPEC 4-50).
     readonly at?: Address | undefined;
     readonly depth?: number | undefined;
   }
@@ -104,9 +107,9 @@
 </script>
 
 {#if at === undefined}
-  <nav aria-label={say($lang, "bld_tree")} class="text-note">
+  <section aria-label={say($lang, "bld_tree")} class="text-note">
     <Branch {root} {picked} {onPick} at={root} depth={0} />
-  </nav>
+  </section>
 {:else}
   <ul class={nesting === 0 ? "" : "ml-base border-l border-edge pl-tight"}>
     {#if entries === undefined}

@@ -50,6 +50,14 @@
   // it opens on.
   const VIEWS = ["table", "drawing"] as const;
 
+  interface Props {
+    // Whether this is the page or a fixture inside one: a document may
+    // have exactly one heading of the page's own rank.
+    readonly rank?: "page" | "section" | undefined;
+  }
+
+  const { rank = "page" }: Props = $props();
+
   const u = ui();
   const { lang } = u;
   const belief = u.conn.belief;
@@ -80,7 +88,7 @@
   />
 {/snippet}
 
-<Page title={$belief.city ?? say($lang, "nav_city")} {aside}>
+<Page title={$belief.city ?? say($lang, "nav_city")} {rank} {aside}>
   <Bar />
   <div class="grid grid-cols-11 items-start gap-x-gutter gap-y-wide narrow:grid-cols-1">
     <section

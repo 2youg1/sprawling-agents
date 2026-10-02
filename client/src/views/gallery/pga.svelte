@@ -160,7 +160,7 @@
 
 <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers}>
   <Case label="building · the page, on the plan" width={PAGE_WIDTH}>
-    <Building address={LAB} />
+    <Building address={LAB} rank="section" />
   </Case>
   <Case label="building · commits, one without a message" width={MIDDLE_WIDTH}>
     <Commits building={LAB} />

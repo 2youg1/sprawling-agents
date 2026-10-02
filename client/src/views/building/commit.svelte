@@ -45,7 +45,7 @@
 <li class="border-b border-edge" id="commit-{commit.oid}">
   <button
     type="button"
-    class="-mx-snug grid h-control w-[calc(100%+var(--spacing-snug)*2)] grid-cols-[var(--spacing-glyph-sm)_8ch_minmax(0,1fr)_auto_auto] items-center gap-x-base rounded-control px-snug text-left text-note hover:wash narrow:grid-cols-[var(--spacing-glyph-sm)_8ch_minmax(0,1fr)]"
+    class="grid h-control w-full grid-cols-[var(--spacing-glyph-sm)_8ch_minmax(0,1fr)_auto_auto] items-center gap-x-base rounded-control px-snug text-left text-note hover:wash narrow:grid-cols-[var(--spacing-glyph-sm)_8ch_minmax(0,1fr)]"
     aria-expanded={open}
     onclick={onToggle}
   >

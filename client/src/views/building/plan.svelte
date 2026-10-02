@@ -126,7 +126,7 @@
         <li class="border-b border-edge">
           <button
             type="button"
-            class="-mx-snug grid min-h-control w-[calc(100%+var(--spacing-snug)*2)] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-base rounded-control px-snug py-tight text-left hover:wash"
+            class="grid min-h-control w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-base rounded-control py-tight pr-snug text-left hover:wash"
             aria-expanded={open === row.node}
             onclick={() => {
               open = open === row.node ? null : row.node;

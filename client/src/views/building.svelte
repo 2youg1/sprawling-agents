@@ -72,9 +72,12 @@
 
   interface Props {
     readonly address: Address;
+    // Whether this is the page or a fixture inside one: a document may
+    // have exactly one heading of the page's own rank.
+    readonly rank?: "page" | "section" | undefined;
   }
 
-  const { address }: Props = $props();
+  const { address, rank = "page" }: Props = $props();
 
   const u = ui();
   const lang = u.lang;
@@ -168,7 +171,7 @@
   {/if}
 {/snippet}
 
-<Page title={address} {above} {aside}>
+<Page title={address} {rank} {above} {aside}>
   <Goal {address} />
   <!-- In source order the index, the section and the tree: one column
        under 768 px reads them in that order, so a phone reaches the
@@ -185,7 +188,7 @@
             <button
               type="button"
               class={[
-                "relative -mx-snug flex h-control w-[calc(100%+var(--spacing-snug)*2)] items-center rounded-control px-snug text-left text-note narrow:mx-0 narrow:w-auto",
+                "relative flex h-control w-full items-center rounded-control px-snug text-left text-note narrow:w-auto",
                 section === each ? "wash-strong text-text" : "text-text-quiet hover:wash",
               ]}
               aria-current={section === each ? "true" : undefined}

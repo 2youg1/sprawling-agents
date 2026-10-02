@@ -51,6 +51,14 @@ const TITLES: Record<Cut, Key> = {
   import Unanswered from "./parts/unanswered.svelte";
   import { costReading } from "./pricing";
 
+  interface Props {
+    // Whether this is the page or a fixture inside one: a document may
+    // have exactly one heading of the page's own rank.
+    readonly rank?: "page" | "section" | undefined;
+  }
+
+  const { rank = "page" }: Props = $props();
+
   const u = ui();
   const lang = u.lang;
   const asked = u.conn.asking.ask(QUERIES.cost);
@@ -99,7 +107,7 @@ const TITLES: Record<Cut, Key> = {
 <!-- The total stands at the right end of the header line, the one place
 a figure about the whole page goes; the cuts under it take the page's
 width in as many columns as it holds. -->
-<Page title={say($lang, "cost_title")} aside={total}>
+<Page title={say($lang, "cost_title")} {rank} aside={total}>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.cost} />
   {:else if answer === undefined || reading === undefined}

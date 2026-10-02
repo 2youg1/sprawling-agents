@@ -82,13 +82,13 @@
 
 <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers}>
   <Case label="city · the page, on the building table" width={PAGE_WIDTH}>
-    <City />
+    <City rank="section" />
   </Case>
   <Case label="cost · the page, five cuts of one total" width={PAGE_WIDTH}>
-    <Cost />
+    <Cost rank="section" />
   </Case>
   <Case label="registry · the page, three assets" width={PAGE_WIDTH}>
-    <Registry />
+    <Registry rank="section" />
   </Case>
   <Case label="desktop · a building with no allowlist yet">
     <Desktop addr={Address.make("lab")} />
