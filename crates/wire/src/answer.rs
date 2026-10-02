@@ -39,6 +39,7 @@ mod git_status;
 mod github;
 mod harnesses;
 mod history;
+mod find;
 mod hunks;
 mod identity;
 mod known_hosts;
@@ -75,6 +76,7 @@ pub use document_bytes::{BYTES_WINDOW_MAX, BytesAnswer, ExportAnswer};
 pub use document_versions::{DocumentVersion, VERSIONS_MAX, VersionSource, VersionsAnswer};
 pub use endpoints::{ChosenSummary, EndpointSummary, EndpointsAnswer};
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
+pub use find::{FIND_MAX, FIND_WALK_MAX, FindAnswer, Walked};
 pub use git_status::{Drift, GitStatusAnswer};
 pub use github::{GithubLoginAnswer, GithubReading};
 pub use harnesses::{HarnessLine, HarnessesAnswer};
@@ -228,6 +230,7 @@ pub enum Answer {
     CostOf(CostOfAnswer),
     RunCosts(RunCostsAnswer),
     Listing(ListingAnswer),
+    Find(FindAnswer),
     Document(Box<DocumentAnswer>),
     Proposals(Box<ProposalsAnswer>),
     OpenProposals(OpenProposalsAnswer),

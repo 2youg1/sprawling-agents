@@ -205,6 +205,13 @@ pub enum Query {
     Listing {
         at: Option<Address>,
     },
+    /// The files under `under` whose name holds `text`, found by one
+    /// bounded walk of the tree `Listing` reads
+    /// (`crates/wire/spec/Answer/Find.lean` §8-82).
+    Find {
+        under: Address,
+        text: String,
+    },
     /// One file of the city as a version, with its first window
     /// (`crates/wire/spec/Answer/Document.lean` §8-69). The path is an `Address`, so it cannot leave the
     /// city root; the reserved subtree is readable on purpose, because

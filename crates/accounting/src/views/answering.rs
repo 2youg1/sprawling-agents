@@ -219,6 +219,13 @@ impl Views {
                 };
             }
             wire::Query::Document { at } => return self.document_ask(at),
+            wire::Query::Find { under, text } => {
+                return Prepared::Find {
+                    city_root: self.city_root.clone(),
+                    under: under.clone(),
+                    text: text.clone(),
+                };
+            }
             wire::Query::Proposals(doc) => return self.proposals_ask(doc),
             wire::Query::OpenProposals => wire::Answer::OpenProposals(self.open_proposals_answer()),
             wire::Query::Range { version, range } => return self.range_ask(*version, *range),

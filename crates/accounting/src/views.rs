@@ -32,6 +32,7 @@ pub mod commits;
 pub mod cost_of;
 pub mod document;
 pub mod evidence;
+mod finding;
 pub mod git_status;
 pub mod governance;
 #[cfg(test)]
