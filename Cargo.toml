@@ -155,7 +155,7 @@ cap-fs-ext = "4"
 # CSS Syntax tokenizer itself; its default features buy a faster byte
 # match and a colour table, worth less than a microsecond on a page's
 # kilobytes of CSS and not a proc macro and a phf table
-# (accounting-SPEC.md 8-13, decision 25).
+# (`crates/accounting/Spec.lean` §8-13, accounting D25).
 html5ever = "0.40"
 cssparser = { version = "0.38", default-features = false }
 # One HTTP client for the whole workspace: gateway speaks to providers,
