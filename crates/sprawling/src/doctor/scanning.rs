@@ -184,13 +184,58 @@ fn volume_named(mount: &Path) -> String {
 ///
 /// The answer is the first line that opens with `This is`; the lines
 /// after it list filters and say nothing about this volume's standing.
-pub(super) fn drive_said(_volume: &str, _file_system: &str, _ended: &Ended) -> Drive {
-    Drive::Untold(Untold::NoDisk)
+pub(super) fn drive_said(volume: &str, file_system: &str, ended: &Ended) -> Drive {
+    let stdout = match printed(DEV_DRIVE_QUERY, ended) {
+        Ok(stdout) => stdout,
+        Err(why) => return Drive::Untold(why),
+    };
+    let statement = stdout
+        .lines()
+        .map(|line| line.trim().to_ascii_lowercase())
+        .find(|line| line.starts_with("this is"));
+    let Some(said) = statement.filter(|said| said.contains("developer volume")) else {
+        return Drive::Untold(Untold::Unread {
+            command: DEV_DRIVE_QUERY,
+        });
+    };
+    let distrusted = ["untrusted", "not trusted", "not a trusted"]
+        .iter()
+        .any(|denial| said.contains(denial));
+    if said.contains("not a developer volume") {
+        Drive::Not {
+            volume: volume.to_owned(),
+            file_system: file_system.to_owned(),
+        }
+    } else if said.contains("trusted") && !distrusted {
+        Drive::Trusted
+    } else {
+        Drive::Untrusted {
+            volume: volume.to_owned(),
+        }
+    }
 }
 
 /// What `Get-MpPreference` said about the exclusions that hold `city`.
-pub(super) fn exclusion_said(_city: &Path, _ended: &Ended) -> Exclusion {
-    Exclusion::Outside
+pub(super) fn exclusion_said(city: &Path, ended: &Ended) -> Exclusion {
+    let stdout = match printed(EXCLUSION_QUERY, ended) {
+        Ok(stdout) => stdout,
+        Err(why) => return Exclusion::Untold(why),
+    };
+    let entries: Vec<&str> = stdout
+        .lines()
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .collect();
+    if entries.iter().any(|entry| entry.starts_with("N/A")) {
+        return Exclusion::Untold(Untold::AdminOnly);
+    }
+    let city = city.display().to_string();
+    entries
+        .into_iter()
+        .find(|entry| covers(entry, &city))
+        .map_or(Exclusion::Outside, |under| Exclusion::Inside {
+            under: under.to_owned(),
+        })
 }
 
 /// Whether the excluded path `entry` holds `city`: the same directory,
@@ -212,25 +257,55 @@ fn covers(entry: &str, city: &str) -> bool {
             .is_some_and(|rest| rest.starts_with(['\\', '/']))
 }
 
-/// Why a tool that did not exit cleanly gave no answer.
-fn untold(command: &'static str, ended: &Ended) -> Untold {
+/// What a tool that exited cleanly printed, or why there is nothing
+/// of it to read.
+fn printed<'e>(command: &'static str, ended: &'e Ended) -> Result<&'e str, Untold> {
     match ended {
-        Ended::Exited { code, .. } => Untold::Failed {
+        Ended::Exited {
+            code: Some(0),
+            stdout,
+        } => Ok(stdout),
+        Ended::Exited { code, .. } => Err(Untold::Failed {
             command,
             code: *code,
-        },
-        Ended::Unstarted => Untold::Unstarted { command },
-        Ended::Unanswered { stopping } => Untold::Unanswered {
+        }),
+        Ended::Unstarted => Err(Untold::Unstarted { command }),
+        Ended::Unanswered { stopping } => Err(Untold::Unanswered {
             command,
             stopping: stopping.clone(),
-        },
+        }),
     }
 }
 
 /// The part of the terminal report that says it, closed by a blank
 /// line.
-pub(crate) fn lines(_scanning: &Scanning) -> Vec<String> {
-    Vec::new()
+pub(crate) fn lines(scanning: &Scanning) -> Vec<String> {
+    let mut lines = vec![
+        "  scanning - whether antivirus scanning holds up the city's writes".to_owned(),
+        String::new(),
+    ];
+    match scanning {
+        Scanning::DoesNotApply => lines.push(line(
+            "scanning",
+            "does not apply: Dev Drive and Defender's exclusions are Windows features",
+        )),
+        Scanning::Stopped => lines.push(line(
+            "scanning",
+            "cannot tell: its probe stopped before it answered",
+        )),
+        Scanning::Read {
+            city,
+            drive,
+            exclusion,
+        } => {
+            lines.push(line("city", &city.display().to_string()));
+            lines.push(line("dev drive", &drive_words(drive)));
+            lines.push(line("exclusion", &exclusion_words(exclusion)));
+            lines.extend(advice(city, drive, exclusion));
+        }
+    }
+    lines.push(String::new());
+    lines
 }
 
 fn line(label: &str, value: &str) -> String {
