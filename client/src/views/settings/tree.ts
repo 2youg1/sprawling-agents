@@ -78,6 +78,9 @@ export const TREE: readonly Branch[] = [
       { kind: "page", view: { kind: "monitor" }, word: "monitor_title" },
       group("advanced"),
       group("about"),
+      // The guide stays reachable after the person has left it
+      // (refrain 3-15): its steps are where a skipped setting is made.
+      { kind: "page", view: { kind: "welcome" }, word: "welcome_title" },
     ],
   },
 ];

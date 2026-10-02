@@ -10,7 +10,11 @@
   // so a middle click and a new tab work, and it carries an arrow because
   // following it leaves the panel; a nest is a button that opens its
   // own list. ↓/↑ walk the entries a person can see, Home/End jump to
-  // the ends, and Tab still steps through them one by one.
+  // the ends, and Tab still steps through them one by one; the keys are
+  // the line keys of `core/keys.ts`. A letter here is a first letter: it
+  // moves to the next group that starts with it, wrapping at the end, and
+  // each group draws its letter at the row's end (client D40), so
+  // j, k, g and G do not walk this tree.
   //
   // The performance entry carries the city's process reading in one
   // line (docs/frontend-method.md §7D): while the tree is drawn this page asks the monitor for
@@ -18,12 +22,15 @@
 
   import { onDestroy } from "svelte";
 
+  import { initialOf, initialTyped, lineWalker, pressedOf } from "../../core/keys";
   import { summary } from "../../core/monitor";
   import { LENSES, toFragment } from "../../core/route";
   import type { SetupGroup, View } from "../../core/route";
+  import type { LineMove } from "../../core/keys";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Glyph from "../parts/glyph.svelte";
+  import { Kbd } from "../parts/kbd.svelte";
   import { HALL, useBuildings } from "../shared/buildings";
   import { HEADING } from "../setup/groups";
   import { TREE, nestOf } from "./tree";
@@ -76,27 +83,46 @@
 
   let nav = $state<HTMLElement | null>(null);
 
+  const lines = lineWalker();
+
+  // The letter each group is reached by, in the language on the page.
+  function initial(named: SetupGroup): string {
+    return initialOf(say($lang, HEADING[named]), named);
+  }
+
   function walk(event: KeyboardEvent): void {
     if (nav === null) return;
+    const pressed = pressedOf(event);
     const entries = [...nav.querySelectorAll<HTMLElement>("[data-entry]")];
     const at = entries.findIndex((each) => each === document.activeElement);
-    const next = (() => {
-      switch (event.key) {
-        case "ArrowDown":
-          return entries[Math.min(at + 1, entries.length - 1)];
-        case "ArrowUp":
-          return entries[Math.max(at - 1, 0)];
-        case "Home":
-          return entries[0];
-        case "End":
-          return entries.at(-1);
-        default:
-          return undefined;
-      }
-    })();
+    const letter = initialTyped(pressed);
+    const next = letter === null ? step(entries, at, lines(pressed, event.timeStamp)) : byInitial(entries, at, letter);
     if (next === undefined) return;
     event.preventDefault();
     next.focus();
+  }
+
+  function step(entries: readonly HTMLElement[], at: number, move: LineMove | null): HTMLElement | undefined {
+    switch (move) {
+      case "line.next":
+        return entries[Math.min(at + 1, entries.length - 1)];
+      case "line.previous":
+        return entries[Math.max(at - 1, 0)];
+      case "line.first":
+        return entries[0];
+      case "line.last":
+        return entries.at(-1);
+      case "line.open":
+      case "line.close":
+      case null:
+        return undefined;
+    }
+  }
+
+  // The next group after the focus whose letter this is, from the top
+  // again past the last one.
+  function byInitial(entries: readonly HTMLElement[], at: number, letter: string): HTMLElement | undefined {
+    return [...entries.slice(at + 1), ...entries.slice(0, at + 1)].find((each) => each.dataset.initial === letter);
   }
 
   const ENTRY =
@@ -146,6 +172,7 @@
               <button
                 type="button"
                 data-entry
+                data-initial={initial(entry.group)}
                 class={[ENTRY, group === entry.group && HERE]}
                 aria-current={group === entry.group ? "true" : undefined}
                 onclick={() => {
@@ -153,7 +180,10 @@
                 }}
               >
                 <span class="min-w-0 flex-1 truncate">{say($lang, HEADING[entry.group])}</span>
-                <span class={MARK} aria-hidden="true"></span>
+                <span class={MARK} aria-hidden="true">
+                  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; typescript-eslint does not resolve exports of another .svelte module) -->
+                  {@render Kbd({ initial: initial(entry.group) })}
+                </span>
               </button>
             {:else if entry.kind === "page"}
               <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->

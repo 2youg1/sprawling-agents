@@ -14,17 +14,22 @@ moment on every tick; once the result is in the Ledger it draws the
 Ledger's milliseconds, and the moment it finished is in the hint as an
 ISO instant (docs/frontend-method.md §7D). A span nobody measured draws nothing.
 
-**Keys belong to the line, not to the page.** ↑ and ↓ (and j and k,
-because a list of lines is a place they mean "next") move to the line
-above or below inside the same conversation; Enter and Space press it;
-Escape puts the right side away and keeps the focus here, so the person
-is still standing where they were reading. -->
+**Keys belong to the line, not to the page.** The line walks by the one
+table of line keys (`core/keys.ts`): ↑ and ↓ (and j and k) move to the
+line above or below inside the same conversation, Home and End (and gg
+and G) to the first and the last; Enter and Space press it; Escape puts
+the right side away and keeps the focus here, so the person is still
+standing where they were reading. The line that holds the focus, and the
+line the right side shows, draw those keys at their end (refrain 3-12's
+third layer). -->
 <script lang="ts">
   import { fill, say } from "../../core/lang";
   import type { Doing } from "../../core/doing";
   import type { Call, RunId } from "../../wire";
   import { isoInstant } from "../../core/time";
+  import { lineWalker, pressedOf } from "../../core/keys";
   import { ui } from "../../ui";
+  import { Kbd } from "../parts/kbd.svelte";
   import Tip from "../parts/tip.svelte";
   import { closeRight, openCall, rightItem } from "../inspect/open.svelte";
   import { kindOf } from "./call_kind";
@@ -65,34 +70,44 @@ is still standing where they were reading. -->
       : fill(say($lang, "talk_call_finished"), { at: isoInstant(call.answered) }),
   );
 
-  // The next line in reading order, in the conversation this line sits in.
-  function step(from: HTMLElement, by: 1 | -1): void {
+  const walk = lineWalker();
+  // The keys the line draws at its end, in the order refrain 3-12 names
+  // them: up, down, open, close.
+  const MOVES_DRAWN = ["line.previous", "line.next", "line.open", "line.close"] as const;
+
+  function linesBeside(from: HTMLElement): HTMLElement[] {
     const root = from.closest("[data-thread]") ?? document;
-    const lines = [...root.querySelectorAll<HTMLElement>("[data-call-line]")];
-    lines[lines.indexOf(from) + by]?.focus();
+    return [...root.querySelectorAll<HTMLElement>("[data-call-line]")];
   }
 
   function onKeydown(event: KeyboardEvent): void {
     const line = event.currentTarget;
-    if (!(line instanceof HTMLElement) || event.ctrlKey || event.metaKey || event.altKey) return;
-    switch (event.key) {
-      case "ArrowDown":
-      case "j":
-        event.preventDefault();
-        step(line, 1);
-        return;
-      case "ArrowUp":
-      case "k":
-        event.preventDefault();
-        step(line, -1);
-        return;
-      case "Escape":
-        if (!opened) return;
-        event.preventDefault();
-        closeRight();
-        return;
-      default:
-        return;
+    if (!(line instanceof HTMLElement)) return;
+    const lines = linesBeside(line);
+    const at = lines.indexOf(line);
+    const move = walk(pressedOf(event), event.timeStamp);
+    const next = (() => {
+      switch (move) {
+        case "line.next":
+          return lines[at + 1];
+        case "line.previous":
+          return lines[at - 1];
+        case "line.first":
+          return lines[0];
+        case "line.last":
+          return lines.at(-1);
+        case "line.open":
+        case "line.close":
+        case null:
+          return undefined;
+      }
+    })();
+    if (move === "line.close" && opened) {
+      event.preventDefault();
+      closeRight();
+    } else if (next !== undefined) {
+      event.preventDefault();
+      next.focus();
     }
   }
 </script>
@@ -105,7 +120,7 @@ is still standing where they were reading. -->
       aria-describedby={id}
       aria-pressed={opened}
       class={[
-        "relative grid h-control w-full grid-cols-[7ch_minmax(0,1fr)_9ch_auto] items-center gap-x-pane rounded-control px-snug text-left text-note narrow:grid-cols-[6ch_minmax(0,1fr)_auto_auto] narrow:gap-x-snug",
+        "group relative grid h-control w-full grid-cols-[7ch_minmax(0,1fr)_9ch_auto] items-center gap-x-pane rounded-control px-snug text-left text-note narrow:grid-cols-[6ch_minmax(0,1fr)_auto_auto] narrow:gap-x-snug",
         "before:absolute before:inset-y-snug before:left-0 before:w-hair before:rounded-pill",
         opened ? "bg-raised text-text before:bg-accent" : "text-text-quiet hover:wash",
       ]}
@@ -134,6 +149,16 @@ is still standing where they were reading. -->
         {:else if waitsForYou}
           <span class="text-alert">{say($lang, "talk_waiting_you")}</span>
         {/if}
+        <span
+          data-line-keys
+          class={["items-center gap-hair narrow:hidden", opened ? "inline-flex" : "hidden group-focus-visible:inline-flex"]}
+          aria-hidden="true"
+        >
+          {#each MOVES_DRAWN as move (move)}
+            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; typescript-eslint does not resolve exports of another .svelte module) -->
+            {@render Kbd({ move })}
+          {/each}
+        </span>
         {#if pinned}
           <!-- The steer pin: a small accent wedge pointing at this line.
           It repeats what the coin's name already says (client/Spec.lean

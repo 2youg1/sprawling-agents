@@ -6,8 +6,10 @@
 
 // How a key is drawn, in the two places a key is ever drawn: beside the
 // thing it reaches, and all together on the sheet `?` opens. Both read
-// `core/keys`, so a rebind moves the mark on the rail and the row on the
-// sheet at once, and neither file spells a key of its own.
+// `core/keys`, so a rebind moves the mark beside a control and the row on
+// the sheet at once, and neither file spells a key of its own. The same
+// mark draws a list's own keys at a row's end: a line move, or the first
+// letter a row is reached by.
 //
 // **The sheet is a modal dialog the platform owns.** `showModal()` puts
 // it in the top layer, traps the focus, marks the rest of the page
@@ -69,29 +71,33 @@ $effect(() => {
 </script>
 
 <script module>
-import type { Action } from "../../core/keys";
-import { keymap, marks } from "../../core/keys";
+import type { Action, LineMove } from "../../core/keys";
+import { keymap, lineFaces, marks } from "../../core/keys";
 
-export interface KbdProps {
-  // The action whose chord is drawn.
-  readonly action: Action;
-  readonly class?: string;
-}
+// What is drawn: the chord of a shell action, the key a row draws for a
+// line move (the first of that move's keys), or a row's first letter.
+export type KbdProps = (
+  | { readonly action: Action }
+  | { readonly move: LineMove }
+  | { readonly initial: string }
+) & { readonly class?: string };
 
 export { Kbd };
 
 // The chord that reaches one action, as this machine writes it: `⌘` on
 // a Mac and `Ctrl` everywhere else, and a prefixed chord as the two
 // keystrokes it is.
-function chordMarks(action: Action): readonly string[] {
+function chordMarks(props: KbdProps): readonly string[] {
   const keys = keymap();
-  return marks(keys.chord(action), keys.platform);
+  if ("move" in props) return lineFaces(props.move).slice(0, 1);
+  if ("initial" in props) return marks({ accel: false, shift: false, key: props.initial }, keys.platform);
+  return marks(keys.chord(props.action), keys.platform);
 }
 </script>
 
 {#snippet Kbd(props: KbdProps)}
   <span class={["inline-flex items-center gap-tight", props.class]}>
-    {#each chordMarks(props.action) as mark (mark)}
+    {#each chordMarks(props) as mark (mark)}
       <kbd
         class="rounded-control px-tight font-mono text-note leading-none text-text-quiet no-underline"
         >{mark}</kbd

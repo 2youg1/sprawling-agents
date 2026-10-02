@@ -8,7 +8,8 @@
 <script lang="ts" module>
   // The city's runs board: the lineage tree of `sprawling view` with a
   // time bar on every run, the runs waiting for the person pinned above
-  // it and leading the tree. The keys are the terminal's - j and k move,
+  // it and leading the tree. The keys are the terminal's - the line keys
+  // of `core/keys.ts` move (j and k, gg and G, the arrows, Home and End),
   // h and l fold - so a person who learned one learned both.
   //
   // **Only the rows on screen are drawn.** A city of a thousand runs is
@@ -32,6 +33,7 @@
 <script lang="ts">
   import { Option } from "effect";
 
+  import { lineWalker, pressedOf } from "../../core/keys";
   import { fill, say } from "../../core/lang";
   import { SvelteSet } from "svelte/reactivity";
 
@@ -94,18 +96,39 @@
     else folded.delete(key);
   }
 
+  const walk = lineWalker();
+
   function pressed(event: KeyboardEvent): void {
     const row = rows[cursor];
-    const openable = row !== undefined && row.kind !== "run";
-    switch (event.key) {
-      case "j":
-      case "ArrowDown":
+    switch (walk(pressedOf(event), event.timeStamp)) {
+      case "line.next":
         moveTo(cursor + 1);
         break;
-      case "k":
-      case "ArrowUp":
+      case "line.previous":
         moveTo(cursor - 1);
         break;
+      case "line.first":
+        moveTo(0);
+        break;
+      case "line.last":
+        moveTo(rows.length - 1);
+        break;
+      case "line.open":
+        if (row !== undefined) open(row);
+        break;
+      case "line.close":
+      case null:
+        folding(event, row);
+        return;
+    }
+    event.preventDefault();
+  }
+
+  // h and l, and the side arrows, fold and unfold the row under the
+  // cursor: the tree's own keys, not a list's.
+  function folding(event: KeyboardEvent, row: Row | undefined): void {
+    const openable = row !== undefined && row.kind !== "run";
+    switch (event.key) {
       case "h":
       case "ArrowLeft":
         if (openable) foldAt(row.key, true);
@@ -113,9 +136,6 @@
       case "l":
       case "ArrowRight":
         if (openable) foldAt(row.key, false);
-        break;
-      case "Enter":
-        if (row !== undefined) open(row);
         break;
       default:
         return;
