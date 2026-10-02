@@ -23,7 +23,8 @@
 </script>
 
 <script lang="ts">
-  import { HOLD_MS, keymap, marks } from "../core/keys";
+  import { keymap, marks } from "../core/keys";
+  import { HOLD_MS } from "../core/press";
   import type { Action } from "../core/keys";
   import { say } from "../core/lang";
   import type { Key } from "../core/lang";

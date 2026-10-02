@@ -9,7 +9,7 @@
   // The city's runs board: the lineage tree of `sprawling view` with a
   // time bar on every run, the runs waiting for the person pinned above
   // it and leading the tree. The keys are the terminal's - the line keys
-  // of `core/keys.ts` move (j and k, gg and G, the arrows, Home and End),
+  // of `core/lines.ts` move (j and k, gg and G, the arrows, Home and End),
   // h and l fold - so a person who learned one learned both.
   //
   // **Only the rows on screen are drawn.** A city of a thousand runs is
@@ -33,7 +33,8 @@
 <script lang="ts">
   import { Option } from "effect";
 
-  import { lineWalker, pressedOf } from "../../core/keys";
+  import { lineWalker } from "../../core/lines";
+  import { pressedOf } from "../../core/press";
   import { fill, say } from "../../core/lang";
   import { SvelteSet } from "svelte/reactivity";
 

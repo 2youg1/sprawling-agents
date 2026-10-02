@@ -15,7 +15,7 @@ Ledger's milliseconds, and the moment it finished is in the hint as an
 ISO instant (docs/frontend-method.md §7D). A span nobody measured draws nothing.
 
 **Keys belong to the line, not to the page.** The line walks by the one
-table of line keys (`core/keys.ts`): ↑ and ↓ (and j and k) move to the
+table of line keys (`core/lines.ts`): ↑ and ↓ (and j and k) move to the
 line above or below inside the same conversation, Home and End (and gg
 and G) to the first and the last; Enter and Space press it; Escape puts
 the right side away and keeps the focus here, so the person is still
@@ -27,7 +27,8 @@ third layer). -->
   import type { Doing } from "../../core/doing";
   import type { Call, RunId } from "../../wire";
   import { isoInstant } from "../../core/time";
-  import { lineWalker, pressedOf } from "../../core/keys";
+  import { lineWalker } from "../../core/lines";
+  import { pressedOf } from "../../core/press";
   import { ui } from "../../ui";
   import { Kbd } from "../parts/kbd.svelte";
   import Tip from "../parts/tip.svelte";

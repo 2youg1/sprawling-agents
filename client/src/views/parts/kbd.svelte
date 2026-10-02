@@ -71,8 +71,10 @@ $effect(() => {
 </script>
 
 <script module>
-import type { Action, LineMove } from "../../core/keys";
-import { keymap, lineFaces, marks } from "../../core/keys";
+import type { Action } from "../../core/keys";
+import { keymap, marks } from "../../core/keys";
+import type { LineMove } from "../../core/lines";
+import { lineFaces } from "../../core/lines";
 
 // What is drawn: the chord of a shell action, the key a row draws for a
 // line move (the first of that move's keys), or a row's first letter.

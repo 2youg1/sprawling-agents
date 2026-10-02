@@ -11,7 +11,7 @@
   // following it leaves the panel; a nest is a button that opens its
   // own list. ↓/↑ walk the entries a person can see, Home/End jump to
   // the ends, and Tab still steps through them one by one; the keys are
-  // the line keys of `core/keys.ts`. A letter here is a first letter: it
+  // the line keys of `core/lines.ts`. A letter here is a first letter: it
   // moves to the next group that starts with it, wrapping at the end, and
   // each group draws its letter at the row's end (client D40), so
   // j, k, g and G do not walk this tree.
@@ -22,11 +22,12 @@
 
   import { onDestroy } from "svelte";
 
-  import { initialOf, initialTyped, lineWalker, pressedOf } from "../../core/keys";
+  import { initialOf, initialTyped, lineWalker } from "../../core/lines";
+  import { pressedOf } from "../../core/press";
   import { summary } from "../../core/monitor";
   import { LENSES, toFragment } from "../../core/route";
   import type { SetupGroup, View } from "../../core/route";
-  import type { LineMove } from "../../core/keys";
+  import type { LineMove } from "../../core/lines";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Glyph from "../parts/glyph.svelte";

@@ -19,7 +19,8 @@
   import { QUERIES } from "./core/asking";
   import { cancel, release } from "./core/commands";
   import { runInFront } from "./core/in_front";
-  import { HOLD_MS, keymap, pressedOf } from "./core/keys";
+  import { keymap } from "./core/keys";
+  import { HOLD_MS, pressedOf } from "./core/press";
   import type { Action } from "./core/keys";
   import { fill, say } from "./core/lang";
   import { RELEASE_ALL } from "./core/slash";

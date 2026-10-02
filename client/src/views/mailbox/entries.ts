@@ -3,8 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+// The properties this module must hold are proved in `client/spec/Views/Workspace.lean`.
+//
 // Walking the mailbox's entries from the keyboard (client/Spec.lean §7-11):
-// the line keys of `core/keys.ts` move to the next, the previous, the
+// the line keys of `core/lines.ts` move to the next, the previous, the
 // first and the last entry, and a digit reaches the entry it is drawn
 // beside. An entry is any element marked `data-entry`, in document
 // order, so the sections need not know how many entries stand above
@@ -17,7 +19,8 @@
 // and an entry the virtual list has not mounted is not one yet. Enter
 // and Escape stay the entry's and the panel's own.
 
-import { initialTyped, lineWalker, pressedOf } from "../../core/keys";
+import { initialTyped, lineWalker } from "../../core/lines";
+import { pressedOf } from "../../core/press";
 
 // How many entries a digit can reach: one to nine.
 const DIGITS = 9;
