@@ -76,6 +76,7 @@
   import Timed from "./gallery/timed.svelte";
   import Tok from "./gallery/tok.svelte";
   import Workbench from "./gallery/workbench.svelte";
+  import Ss from "./gallery/ss.svelte";
 
   const { lang } = ui();
 
@@ -106,6 +107,7 @@
   <Shell />
   <Mob />
   <Workbench />
+  <Ss />
   <Mailbox />
   <Conversation />
   <Md />

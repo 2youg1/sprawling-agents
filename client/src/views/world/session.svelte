@@ -19,7 +19,7 @@
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
-  import type { Address, RoundsAnswer } from "../../wire";
+  import type { Address, RoundsAnswer, RunId } from "../../wire";
   import Empty from "../parts/empty.svelte";
   import { commitsIn, pickedCommit, sessionRun } from "./chosen.svelte";
   import Sheet from "./sheet.svelte";
@@ -27,19 +27,22 @@
 
   interface Props {
     readonly here: Address;
+    // The run of an earlier session in main, which this pane speaks for
+    // instead of the room's (`null`: that session's runs are not held).
+    readonly shown?: RunId | null | undefined;
     // The room's name as the conversation calls it.
     readonly title: string;
     // The pane's label: a menu that moves it, in the panorama tier.
     readonly head: Snippet;
   }
 
-  const { here, title, head }: Props = $props();
+  const { here, shown, title, head }: Props = $props();
 
   const u = ui();
   const { lang } = u;
   const belief = u.conn.belief;
 
-  const run = $derived(sessionRun($belief, here));
+  const run = $derived(shown === undefined ? sessionRun($belief, here) : shown);
   const picked = $derived(pickedCommit(here));
 
   let rounds = $state<RoundsAnswer | undefined>(undefined);

@@ -26,19 +26,17 @@
   // row the virtual list has not mounted is still found. A room this
   // page never saw a run in was never asked, and the line under the box
   // says so rather than let an empty result read as "no such session".
-  import { untrack } from "svelte";
-
-  import { heldIn } from "../../core/belief/rooms";
-  import type { RunBelief } from "../../core/belief";
   import { openSession } from "../../core/commands";
   import { fill, say } from "../../core/lang";
   import type { Key } from "../../core/lang";
   import { toFragment } from "../../core/route";
+  import { tailOf } from "../../core/stretches";
   import { ago } from "../../core/time";
   import { ui } from "../../ui";
-  import type { Address, Origin, SessionLine, SessionsAnswer } from "../../wire";
+  import type { Address, Origin, SessionLine } from "../../wire";
   import Tip from "../parts/tip.svelte";
   import { OVERSCAN, windowOf } from "../run/lanes";
+  import { askStretches } from "../world/stretches.svelte";
   import Section from "./section.svelte";
 
   interface Props {
@@ -54,7 +52,6 @@
   const u = ui();
   const { lang } = u;
   const uid = $props.id();
-  const belief = u.conn.belief;
 
   interface Row {
     readonly room: Address;
@@ -67,53 +64,22 @@
     readonly text: string;
   }
 
-  // Every room this page has seen a run in, spelled as the address its
-  // runs carry. A key of the joined names, so the asking below follows
-  // the set of rooms and not every record that moves a run.
-  const rooms = $derived(
-    [...$belief.rooms.keys()].flatMap((room) => {
-      const addr = heldIn($belief, room).at(-1)?.addr ?? null;
-      return addr === null ? [] : [addr];
-    }),
-  );
-  const roomsKey = $derived(rooms.join("\n"));
-
-  let answers = $state.raw<Readonly<Record<string, SessionsAnswer>>>({});
-  $effect(() => {
-    // Asked again when the set of rooms changes, and not on every record.
-    const stops = (roomsKey === "" ? [] : untrack(() => rooms)).map((room) =>
-      u.conn.asking.ask({ sessions: { room } }).subscribe((answer) => {
-        // Read without following: the store answers inside this effect,
-        // and the effect must not wait on what it writes.
-        if (answer !== undefined && "sessions" in answer) answers = { ...untrack(() => answers), [room]: answer.sessions };
-      }),
-    );
-    return () => {
-      for (const stop of stops) stop();
-    };
-  });
-
-  // The run a session ended with: the newest run of the room whose last
-  // line falls between this session's first line and the next one's.
-  function runsOf(runs: readonly RunBelief[], line: SessionLine, next: SessionLine | undefined): RunBelief[] {
-    return runs.filter((run) => run.lastSeq >= line.began && (next === undefined || run.lastSeq < next.began));
-  }
-
+  // Every session of every room this page knows, the one reading the
+  // sessions pane takes too (`world/stretches.svelte.ts`).
+  const stretches = askStretches(u);
   let search = $state("");
   const rows = $derived.by((): Row[] => {
-    const all = Object.values(answers).flatMap((answer) => {
-      const runs = heldIn($belief, answer.room);
-      return answer.sessions.map((line, at): Row => {
-        const its = runsOf(runs, line, answer.sessions[at - 1]);
-        const run = its.at(-1);
-        const text = [answer.room, ...its.map((each) => each.task ?? "")].join("\n").toLowerCase();
-        return { room: answer.room, line, origin: run === undefined ? null : { run: run.run, at_seq: run.lastSeq }, text };
-      });
-    });
     const needle = search.trim().toLowerCase();
-    return all.filter((row) => row.text.includes(needle)).sort((a, b) => b.line.at - a.line.at);
+    return stretches.all
+      .map((stretch): Row => ({
+        room: stretch.room,
+        line: stretch.line,
+        origin: tailOf(stretch),
+        text: [stretch.room, ...stretch.runs.map((each) => each.task ?? "")].join("\n").toLowerCase(),
+      }))
+      .filter((row) => row.text.includes(needle));
   });
-  const earlier = $derived(Object.values(answers).reduce((sum, answer) => sum + answer.earlier, 0));
+  const earlier = $derived(stretches.earlier);
 
   function startOf(line: SessionLine): Key {
     if (line.start === "dispatched") return "mailbox_start_dispatched";

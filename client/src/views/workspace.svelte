@@ -100,14 +100,16 @@
   import { heldIn } from "../core/belief/rooms";
   import { say } from "../core/lang";
   import { MAYOR, buildingOf, roomOf, type ItemLink } from "../core/route";
+  import { stretchesOf } from "../core/stretches";
   import { ui } from "../ui";
-  import type { Address, RoundsAnswer } from "../wire";
+  import type { Address, RoundsAnswer, Seq } from "../wire";
   import { openCall, openDocument, rightItem } from "./inspect/open.svelte";
   import { followingIn } from "./inspect/reading";
   import Right from "./right.svelte";
   import { watchColumns, type Columns } from "./shared/frame";
   import { leaveSheet, openSheet } from "./sheets.svelte";
   import Talk from "./talk.svelte";
+  import Past from "./talk/past.svelte";
   import Divider from "./world/divider.svelte";
   import PaneMenu from "./world/pane_menu.svelte";
   import Place from "./world/place.svelte";
@@ -117,6 +119,8 @@
 
   interface Props {
     readonly address: Address;
+    // The session of that room in main: absent is its current session.
+    readonly session?: Seq | undefined;
     readonly tier: Tier;
     // Where the page stands: as the page itself, the one `<main>` and its
     // `<h1>`, or as a specimen on `#/gallery`, a named region under the
@@ -130,7 +134,7 @@
     readonly item?: ItemLink | undefined;
   }
 
-  const { address, tier, seat = "page", panel, item: linked }: Props = $props();
+  const { address, session, tier, seat = "page", panel, item: linked }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -145,10 +149,23 @@
   let columns = $state<Columns>("twelve");
   const narrow = $derived(columns === "one");
 
-  // The run the right pane speaks for: the one going, or the last one
-  // this room finished; its rounds are the same question the thread
-  // asks, merged by `asking`.
-  const current = $derived(newestWorking($belief, address) ?? heldIn($belief, address).at(-1));
+  // An earlier session the address bar names, which main reads rather
+  // than talks to (`talk/past.svelte`): `undefined` is the room's current
+  // session, `null` one the city has not answered for.
+  const stretches = $derived(u.conn.asking.ask({ sessions: { room: address } }));
+  const past = $derived.by(() => {
+    if (session === undefined) return undefined;
+    const answer = $stretches !== undefined && "sessions" in $stretches ? [$stretches.sessions] : [];
+    const found = stretchesOf(answer, (room) => heldIn($belief, room)).find((each) => each.line.began === session);
+    return found?.current === true ? undefined : (found ?? null);
+  });
+
+  // The run the right pane speaks for: the past session's last, else the
+  // one going, or the last one this room finished; its rounds are the
+  // same question the thread asks, merged by `asking`.
+  const current = $derived(
+    past === undefined ? (newestWorking($belief, address) ?? heldIn($belief, address).at(-1)) : past?.runs.at(-1),
+  );
   let answer = $state<RoundsAnswer | undefined>(undefined);
   $effect(() => {
     const run = current?.run;
@@ -253,12 +270,10 @@ covers the pane above it. -->
         sheet
           ? "sheet -mx-pane row-[1] grid min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-page px-pane"
           : "col-span-full row-[1/3] grid min-h-0 grid-cols-subgrid grid-rows-subgrid transition-opacity duration-page",
-        layout.world === "beside" ? "pointer-events-none opacity-(--blend-opacity)" : "",
       ]}
       data-side="left"
       role={sheet ? "region" : undefined}
       aria-label={sheet ? say($lang, "world_layer") : undefined}
-      inert={layout.world === "beside"}
     >
       {#if sheet}
         <SheetHead
@@ -283,16 +298,21 @@ covers the pane above it. -->
             // The pane on the first column stops above the edge keys at its foot.
             !sheet && placed.lines[0] === 1 ? "mb-[calc(3*var(--spacing-key)+2*var(--spacing-snug)+var(--spacing-wide))]" : "",
             layout.world === "beside" ? "rounded-panel border border-edge-panel px-pane pt-snug" : "",
+            // Beside the conversation the world is dimmed and takes no
+            // input, but for the sessions, which move main to a session.
+            layout.world === "beside" && placed.pane !== "sessions" ? "pointer-events-none opacity-(--blend-opacity)" : "",
+            layout.world === "beside" && placed.pane === "sessions" ? "opacity-(--blend-opacity) transition-opacity duration-page hover:opacity-100 focus-within:opacity-100" : "",
           ]}
+          inert={layout.world === "beside" && placed.pane !== "sessions"}
           style:grid-column={at(placed.lines)}
           role={sheet ? "tabpanel" : undefined}
           aria-labelledby={sheet ? `${uid}-tab-${placed.pane}` : undefined}
           hidden={sheet && placed.pane !== shown}
         >
           {#if placed.pane === "sessions"}
-            <Sessions here={address} narrow={open} head={sheet ? unnamed : sessionsHead} />
+            <Sessions here={address} {session} narrow={open} head={sheet ? unnamed : sessionsHead} />
           {:else if placed.pane === "session"}
-            <Session here={address} {title} head={sheet ? unnamed : sessionHead} />
+            <Session here={address} shown={past === undefined ? undefined : (current?.run ?? null)} {title} head={sheet ? unnamed : sessionHead} />
           {:else}
             <Place here={address} head={sheet ? unnamed : placeHead} />
           {/if}
@@ -308,7 +328,11 @@ covers the pane above it. -->
     ]}
     aria-label={say($lang, "region_conversation")}
   >
-    <Talk {address} band={layout.world === "workbench" || sheet} />
+    {#if past === undefined}
+      <Talk {address} band={layout.world === "workbench" || sheet} />
+    {:else}
+      <Past {address} stretch={past} band={layout.world === "workbench" || sheet} />
+    {/if}
   </section>
   {#if open}
     <!-- On one column the right side is a sheet over the whole page, from

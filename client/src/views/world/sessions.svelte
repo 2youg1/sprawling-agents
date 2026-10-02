@@ -4,30 +4,41 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The world layer's sessions pane (client/Spec.lean §7K): every room that has
-  // run anything, grouped by building, one row each - a state dot, the
-  // room, how long its run has been going or that it waits or is done,
-  // and the task under it. The room the conversation is in is the chosen
-  // row; any other row is a link to that room's conversation.
+  // The world layer's sessions pane (client/Spec.lean §7K): one row per session,
+  // the stretches of every room including the past ones, newest first -
+  // the pinned above, then grouped by building. A row is a link that makes
+  // its session the one in main: the room's current session is talked to,
+  // an earlier one is read (`talk/past.svelte`). Beside each row its menu
+  // pins it and gives and strips tags (`session_menu.svelte`); a row of the
+  // tags in use above the list filters it by one.
   //
-  // It reads the runs the page already believes (`belief.rooms`, the
-  // per-room index the city panel reads); only the context bar under each
-  // row asks the city, for that row's run (`context_bar.svelte`).
+  // The rows are `core/stretches.ts`'s reading of the city's answers
+  // (`stretches.svelte.ts`), and the tags are the person's preferences
+  // as the city keeps them (`core/tags.ts`).
   import type { Snippet } from "svelte";
 
-  import { heldIn } from "../../core/belief/rooms";
   import type { RunBelief } from "../../core/belief";
-  import { say } from "../../core/lang";
-  import { buildingOf, roomOf, toFragment } from "../../core/route";
-  import { lasted } from "../../core/time";
+  import { fill, say } from "../../core/lang";
+  import type { Key } from "../../core/lang";
+  import { roomOf, toFragment } from "../../core/route";
+  import { grouped, pinningOf } from "../../core/stretches";
+  import type { Stretch } from "../../core/stretches";
+  import { PIN, inUse, namedIn, tagsOf } from "../../core/tags";
+  import type { Named } from "../../core/tags";
+  import { ago, lasted } from "../../core/time";
   import { ui } from "../../ui";
-  import type { Address } from "../../wire";
+  import type { Address, Seq, Tag } from "../../wire";
+  import Glyph from "../parts/glyph.svelte";
   import ContextBar from "./context_bar.svelte";
   import { ticker } from "../talk/timing";
+  import SessionMenu from "./session_menu.svelte";
+  import { askStretches } from "./stretches.svelte";
 
   interface Props {
-    // The room the conversation is in.
+    // The room whose session is in main, and which of its sessions:
+    // absent is the room's current one.
     readonly here: Address;
+    readonly session?: Seq | undefined;
     // Whether the pane is as narrow as the right pane leaves it, which
     // drops the second line and the time.
     readonly narrow: boolean;
@@ -35,16 +46,22 @@
     readonly head: Snippet;
   }
 
-  const { here, narrow, head }: Props = $props();
+  const { here, session, narrow, head }: Props = $props();
 
   const u = ui();
   const { lang } = u;
   const belief = u.conn.belief;
+  const held = u.tags.held;
+  const stretches = askStretches(u);
 
   type State = "run" | "ask" | "done";
 
-  function stateOf(run: RunBelief): State {
-    switch (run.doing.kind) {
+  // A past session is done whatever its last run says: the city goes on
+  // only with the current one.
+  function stateOf(stretch: Stretch): State {
+    const last = stretch.runs.at(-1);
+    if (!stretch.current || last === undefined) return "done";
+    switch (last.doing.kind) {
       case "frozen":
         return "done";
       case "waiting":
@@ -61,30 +78,55 @@
   // every reading is recomputed from the run's own start (client/Spec.lean §4-59).
   const tick = ticker(u.now);
 
-  // One row per room, the room's newest run speaking for it, grouped by
-  // building in the order buildings first ran something.
-  const groups = $derived.by(() => {
-    const rows = [...$belief.rooms.keys()].flatMap((room): { building: string; room: Address; run: RunBelief }[] => {
-      const run = heldIn($belief, room).at(-1);
-      const addr = run?.addr ?? null;
-      return run === undefined || addr === null ? [] : [{ building: buildingOf(addr), room: addr, run }];
-    });
-    const buildings = rows.map((row) => row.building).filter((building, at, all) => all.indexOf(building) === at);
-    return buildings.map((building) => ({
-      building,
-      rows: rows.filter((row) => row.building === building).sort((a, b) => (b.run.started ?? 0) - (a.run.started ?? 0)),
-    }));
-  });
+  const city = $derived($belief.city);
+  function named(stretch: Stretch): Named | null {
+    return namedIn(city, stretch.room, stretch.line.began);
+  }
+  function tagsFor(stretch: Stretch): readonly Tag[] {
+    const name = named(stretch);
+    return name === null ? [] : tagsOf($held, name);
+  }
 
-  function when(run: RunBelief, state: State): string {
+  // One tag the pane is filtered by, or every row. A tag nobody carries
+  // any more filters nothing.
+  let filter = $state<Tag | null>(null);
+  const offered = $derived(city === null ? [] : inUse($held, city));
+  const by = $derived(filter !== null && offered.includes(filter) ? filter : null);
+  const groups = $derived(grouped(stretches.all, tagsFor, by));
+
+  function chosen(stretch: Stretch): boolean {
+    return stretch.room === here && (session === undefined ? stretch.current : stretch.line.began === session);
+  }
+
+  function hrefOf(stretch: Stretch): string {
+    return toFragment(
+      stretch.current ? { kind: "talk", address: stretch.room } : { kind: "talk", address: stretch.room, session: stretch.line.began },
+    );
+  }
+
+  function when(stretch: Stretch, state: State): string {
+    const started = stretch.runs.at(-1)?.started ?? null;
     switch (state) {
       case "run":
-        return run.started === null ? "" : lasted($tick - run.started);
+        return started === null ? "" : lasted($tick - started);
       case "ask":
         return say($lang, "world_waiting");
       case "done":
-        return say($lang, "world_frozen");
+        return ago($lang, stretch.line.at, $tick);
     }
+  }
+
+  // What the second line says: the task of the session's last run, or how
+  // the session began when this page holds none of its runs.
+  function about(stretch: Stretch, last: RunBelief | undefined): string {
+    return last?.task ?? say($lang, startOf(stretch));
+  }
+
+  function startOf(stretch: Stretch): Key {
+    const start = stretch.line.start;
+    if (start === "dispatched") return "mailbox_start_dispatched";
+    if (start.opened.from !== undefined && start.opened.from !== null) return "mailbox_start_forked";
+    return start.opened.carry === "handoff" ? "mailbox_start_carried" : "mailbox_start_new";
   }
 
   const DOT: Record<State, string> = {
@@ -94,34 +136,75 @@
   };
 </script>
 
-<section class="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label={say($lang, "world_sessions")}>
+<section class="flex min-h-0 flex-1 flex-col overflow-y-clip" aria-label={say($lang, "world_sessions")}>
   {@render head()}
-  <div class="min-h-0 flex-1 overflow-y-auto">
-    {#each groups as group (group.building)}
-      <h3 class="mt-base mb-tight text-note text-text-faint first:mt-0">{group.building}</h3>
+  {#if offered.length > 0}
+    <div class="mb-snug flex flex-wrap gap-tight" role="group" aria-label={say($lang, "world_tags")}>
+      {#each [null, ...offered] as tag (tag ?? "")}
+        <button
+          type="button"
+          class="h-control-sm rounded-pill px-snug text-note text-text-quiet hover:wash hover:text-text aria-pressed:wash-strong aria-pressed:text-text"
+          aria-pressed={by === tag}
+          onclick={() => {
+            filter = by === tag ? null : tag;
+          }}
+        >
+          {tag ?? say($lang, "world_tags_all")}
+        </button>
+      {/each}
+    </div>
+  {/if}
+  <!-- A row reaches out by one step on each side, so its wash and its
+  chosen bar stand outside the text; the column that scrolls is widened
+  by that step, and the pane clips only up and down, so neither is cut. -->
+  <div class="-mx-snug min-h-0 flex-1 overflow-y-auto px-snug">
+    {#each groups as group (group.kind === "pinned" ? "" : group.building)}
+      <h3 class="mt-base mb-tight text-note text-text-faint first:mt-0">
+        {group.kind === "pinned" ? say($lang, "world_pinned") : group.building}
+      </h3>
       <ul>
-        {#each group.rows as row (row.room)}
-          {@const state = stateOf(row.run)}
-          <li>
+        {#each group.rows as stretch (`${stretch.room}:${String(stretch.line.began)}`)}
+          {@const state = stateOf(stretch)}
+          {@const last = stretch.runs.at(-1)}
+          {@const tags = tagsFor(stretch)}
+          {@const pinning = pinningOf(stretch, tags)}
+          {@const inMain = chosen(stretch)}
+          <li class={["group relative -mx-snug flex items-start rounded-card", inMain ? "wash-strong" : "hover:wash"]}>
             <a
-              href={toFragment({ kind: "talk", address: row.room })}
-              class={[
-                "relative -mx-snug grid grid-cols-[12px_minmax(0,1fr)_auto] gap-x-base rounded-card px-snug py-snug",
-                row.room === here ? "wash-strong" : "hover:wash",
-              ]}
-              aria-current={row.room === here ? "page" : undefined}
+              href={hrefOf(stretch)}
+              class="grid min-w-0 flex-1 grid-cols-[12px_minmax(0,1fr)_auto] gap-x-base rounded-card px-snug py-snug"
+              aria-current={inMain ? "page" : undefined}
             >
-              {#if row.room === here}
+              {#if inMain}
                 <span class="absolute top-[10px] bottom-[10px] left-0 w-hair rounded-pill bg-accent" aria-hidden="true"></span>
               {/if}
               <span class={["mt-snug size-dot rounded-pill", DOT[state]]} aria-hidden="true"></span>
-              <span class="truncate font-label text-text">{roomOf(row.room)}</span>
+              <span class="flex min-w-0 items-center gap-tight">
+                <span class={["truncate font-label", stretch.current ? "text-text" : "text-text-quiet"]}>{roomOf(stretch.room)}</span>
+                {#if pinning !== "none"}
+                  <span class="shrink-0 text-text-faint" title={pinning === "mayor" ? say($lang, "world_pinned_mayor") : undefined}>
+                    <Glyph name="pin" size="sm" />
+                  </span>
+                {/if}
+              </span>
               {#if !narrow}
-                <span class="figure text-note text-text-faint">{when(row.run, state)}</span>
-                <span class="col-start-2 col-end-4 truncate text-note text-text-quiet">{row.run.task ?? ""}</span>
-                <ContextBar room={row.room} run={row.run.run} />
+                <span class="figure text-note text-text-faint">{when(stretch, state)}</span>
+                <span class="col-start-2 col-end-4 truncate text-note text-text-quiet">{about(stretch, last)}</span>
+                {#if tags.some((tag) => tag !== PIN)}
+                  <span class="col-start-2 col-end-4 mt-tight flex flex-wrap gap-tight">
+                    {#each tags.filter((tag) => tag !== PIN) as tag (tag)}
+                      <span class="rounded-pill border border-edge-panel px-tight text-note text-text-faint">{tag}</span>
+                    {/each}
+                  </span>
+                {/if}
+                {#if stretch.current && last !== undefined}
+                  <ContextBar room={stretch.room} run={last.run} />
+                {/if}
               {/if}
             </a>
+            <div class={["shrink-0 pt-tight pr-tight", inMain ? "" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"]}>
+              <SessionMenu named={named(stretch)} label={fill(say($lang, "world_row_name"), { room: roomOf(stretch.room), when: ago($lang, stretch.line.at, $tick) })} {tags} {pinning} />
+            </div>
           </li>
         {/each}
       </ul>

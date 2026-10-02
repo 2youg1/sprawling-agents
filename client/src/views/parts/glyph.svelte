@@ -31,6 +31,7 @@ import ChartLine from "@lucide/svelte/icons/chart-line";
 import Check from "@lucide/svelte/icons/check";
 import ChevronRight from "@lucide/svelte/icons/chevron-right";
 import Circle from "@lucide/svelte/icons/circle";
+import Ellipsis from "@lucide/svelte/icons/ellipsis";
 import FilePenLine from "@lucide/svelte/icons/file-pen-line";
 import FolderOutput from "@lucide/svelte/icons/folder-output";
 import Hand from "@lucide/svelte/icons/hand";
@@ -38,6 +39,7 @@ import Inbox from "@lucide/svelte/icons/inbox";
 import Layers from "@lucide/svelte/icons/layers";
 import Lock from "@lucide/svelte/icons/lock";
 import MessageSquare from "@lucide/svelte/icons/message-square";
+import Pin from "@lucide/svelte/icons/pin";
 import Search from "@lucide/svelte/icons/search";
 import Settings from "@lucide/svelte/icons/settings";
 import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
@@ -74,6 +76,8 @@ const DRAWN: Record<GlyphName, Component<{ class?: ClassValue; strokeWidth?: num
   sandbox: Box,
   terminal: SquareTerminal,
   propose: FilePenLine,
+  pin: Pin,
+  more: Ellipsis,
 };
 
 export type GlyphSize = "sm" | "md" | "key";
