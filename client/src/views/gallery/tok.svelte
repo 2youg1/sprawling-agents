@@ -70,9 +70,7 @@
 
 <Case label="surfaces · the appearance group, where glass and the blend opacity are chosen" width={1280}>
   <Setup
-    rank="section"
     group="appearance"
-    onPick={() => undefined}
     endpoints={ENDPOINTS}
     autonomy={undefined}
     onAutonomy={() => undefined}
