@@ -23,6 +23,7 @@
 //! path, an environment variable naming a program, or a feature flag
 //! naming an engine.
 
+mod asking;
 mod explain;
 mod family;
 pub(crate) mod github;

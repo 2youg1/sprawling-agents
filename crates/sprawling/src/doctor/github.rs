@@ -9,23 +9,21 @@
 //!
 //! **It never waits on a person and never keeps a secret.** stdin is
 //! empty and `GH_PROMPT_DISABLED` is set, so `gh` fails rather than asks;
-//! the wait is a counted set of knocks, as `doctor::running`'s is, and a
-//! `gh` still running when they run out is stopped through
-//! `running::stop`. stderr is never read and stdout keeps one line, the
-//! login, so nothing `gh` prints about its credentials reaches the city.
+//! the wait is `doctor::asking`'s counted one, and a `gh` still running
+//! when it ends is stopped there. stderr is never read and stdout keeps
+//! one line, the login, so nothing `gh` prints about its credentials
+//! reaches the city.
 
-use std::io::Read as _;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
-use std::time::Duration;
+use std::process::Command;
+
+use super::asking::Ended;
 
 /// How many times `gh` is asked whether it has finished: `PATIENCE *
-/// TICK` is fifteen seconds, longer than one API round trip on a slow
-/// link and short enough that a person still watching the card is told.
+/// asking::TICK` is fifteen seconds, longer than one API round trip on a
+/// slow link and short enough that a person still watching the card is
+/// told.
 const PATIENCE: u32 = 300;
-
-/// How long this city waits between two knocks.
-const TICK: Duration = Duration::from_millis(50);
 
 /// The exit code `gh` documents for a command that needs a login it does
 /// not have.
@@ -43,17 +41,6 @@ fn login_through(find: fn(&str) -> Option<PathBuf>, host: &str) -> wire::GithubR
         None => wire::GithubReading::NoCli,
         Some(gh) => reading(&ask(&gh, host)),
     }
-}
-
-/// How one `gh` call ended.
-enum Ended {
-    /// It exited; `code` is absent when a signal ended it.
-    Exited { code: Option<i32>, stdout: String },
-    /// It would not start.
-    Unstarted,
-    /// It did not answer in time, or could not be watched, and was
-    /// stopped; `stopping` is what went wrong while stopping it.
-    Unanswered { stopping: Option<String> },
 }
 
 /// What one ending says about the host.
@@ -97,56 +84,14 @@ fn is_login(line: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
 }
 
-/// Starts `gh api --hostname <host> user --jq .login` and waits for it,
-/// a counted number of knocks at most.
+/// Starts `gh api --hostname <host> user --jq .login` and waits for it.
 fn ask(gh: &Path, host: &str) -> Ended {
-    let started = Command::new(gh)
-        .args(["api", "--hostname", host, "user", "--jq", ".login"])
-        .env("GH_PROMPT_DISABLED", "1")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn();
-    let Ok(mut child) = started else {
-        return Ended::Unstarted;
-    };
-    let mut knocks = PATIENCE;
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                return Ended::Exited {
-                    code: status.code(),
-                    stdout: drained(&mut child),
-                };
-            }
-            Ok(None) => {}
-            Err(_unwatchable) => {
-                return Ended::Unanswered {
-                    stopping: super::running::stop(&mut child),
-                };
-            }
-        }
-        let Some(left) = knocks.checked_sub(1) else {
-            return Ended::Unanswered {
-                stopping: super::running::stop(&mut child),
-            };
-        };
-        knocks = left;
-        std::thread::sleep(TICK);
-    }
-}
-
-/// What an exited `gh` wrote to stdout. A pipe that will not read gives
-/// nothing, which reads as no login.
-fn drained(child: &mut Child) -> String {
-    let mut out = String::new();
-    match child.stdout.take() {
-        Some(mut stdout) => match stdout.read_to_string(&mut out) {
-            Ok(_) => out,
-            Err(_unreadable) => String::new(),
-        },
-        None => out,
-    }
+    super::asking::ask(
+        Command::new(gh)
+            .args(["api", "--hostname", host, "user", "--jq", ".login"])
+            .env("GH_PROMPT_DISABLED", "1"),
+        PATIENCE,
+    )
 }
 
 #[cfg(test)]
