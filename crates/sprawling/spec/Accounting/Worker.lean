@@ -223,7 +223,7 @@ fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> 
 - **内容哈希整个退出 prompt**。它在 Ledger 里记了两遍（`run.rs:126` 的 pin 与 `:141` 的 started），溯源不依赖模型看见它；`FULL READ:` 那一行随之消失。
 - **CAS 的 pin 改钉 brief 的正文**，两条臂都钉：一次没人派任务的会话，pin 里是「说明没有人派」的那几句，于是 Ledger 的 `job` locator 恒解析得到 Run 段真正携带过的字节，而不是一个从未被写出的文件。
 
-**本章测试**：一次真派活后，provider 收到的请求里含楼规原文（`confidential = false`）、含上一场的 Handoff 正文、含本次 Goal，且**不含** `FULL READ` 与 `cas:b3-`；一次无 Goal 的派活不写 `JOB.md`，请求里说出「working with the person directly」且不把人那句话包成 `Task:` 表单。
+**本章测试**：一次真派活后，provider 收到的请求里含楼规原文（`confidential = false`）、含上一场的 Handoff 正文、含本次 Goal，且**不含** `FULL READ` 与 `cas:b3-`；一次无 Goal 的派活不写 `JOB.md`，请求里说出「working with the User directly」且不把人那句话包成 `Task:` 表单。
 -/
 
 /-!
