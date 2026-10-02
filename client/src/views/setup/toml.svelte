@@ -4,30 +4,38 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The city's own file, as this build can speak of it.
+  // The city's own `CONFIG.toml`, as the city's tree holds it.
   //
   // **A proofing tool, not a setting.** It is collapsed at the foot of
-  // the body rather than standing as a third column: a block that costs
-  // the body its width is a block nobody reads (client-SPEC 4-36). What
-  // stands inside is the one sentence this build can say about the file
-  // - this page does not print it - and no second spelling of the file
-  // itself. `Query::Config` answers one setting at a time beside the
-  // control that owns it, such as the context rung, each value beside
-  // the layer it came from (client-SPEC 4-30); nothing here hand-spells
-  // a line of `config.toml`.
+  // every group rather than standing as a column: a block that costs the
+  // cards their width is a block nobody reads (client-SPEC 4-36). What
+  // stands inside is the file itself, read through `Query::Document`
+  // and never spelled by this page, so it cannot disagree with the
+  // file; a setting's value and the layer it came from are answered
+  // beside the control that owns it (4-30).
 
+  import { readDocument } from "../../core/document";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import EmptyState from "../parts/empty.svelte";
+  import { CITY_CONFIG } from "../settings/files";
 
-  const { lang } = ui();
+  const u = ui();
+  const { lang } = u;
+  const file = u.conn.asking.ask({ document: { at: CITY_CONFIG } });
+  const read = $derived(readDocument($file));
 </script>
 
 <aside class="min-w-0" aria-label={say($lang, "setup_toml")}>
   <details class="rounded-card bg-chrome/60 px-base py-tight">
     <summary class="cursor-pointer text-label text-text-quiet hover:text-text">
       {say($lang, "setup_toml_toggle")}
+      <code class="ml-snug font-mono text-note text-text-faint">{CITY_CONFIG}</code>
     </summary>
-    <EmptyState missing="setup_toml_unread" />
+    {#if read.kind === "held" && read.value.text !== ""}
+      <pre class="overflow-x-auto py-snug font-mono text-note text-text-quiet">{read.value.text}</pre>
+    {:else}
+      <EmptyState missing="setup_toml_unread" />
+    {/if}
   </details>
 </aside>

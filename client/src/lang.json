@@ -335,6 +335,30 @@
     "en": "City Hall",
     "zh": "市政厅"
   },
+  "city_layer": {
+    "en": "the city's own layer",
+    "zh": "城层配置"
+  },
+  "city_layer_note": {
+    "en": "what every run in this city starts with unless its building or session says otherwise; written to CONFIG.toml",
+    "zh": "城里每个 run 开始时的默认，楼或会话另有设定时以它们为准；写进 CONFIG.toml"
+  },
+  "city_effort": {
+    "en": "standing thinking level",
+    "zh": "常设思考强度"
+  },
+  "city_keep_warm": {
+    "en": "keep the prompt cache warm",
+    "zh": "保持 prompt 缓存不过期"
+  },
+  "city_keep_warm_off": {
+    "en": "off",
+    "zh": "关"
+  },
+  "city_keep_warm_five_minute": {
+    "en": "renew every five minutes",
+    "zh": "每五分钟续一次"
+  },
   "city_no_buildings": {
     "en": "no buildings",
     "zh": "没有楼"
@@ -2659,6 +2683,18 @@
     "en": "a subscription reaches the city through its vendor's own harness, signed in there",
     "zh": "订阅经厂商自己的 harness 进城，在那里登录"
   },
+  "setup_group_hint_you": {
+    "en": "what the city calls you and the Mayor; a change takes effect in the next session",
+    "zh": "城怎么称呼你与市长；改动在下一个会话生效"
+  },
+  "setup_group_hint_rules": {
+    "en": "what a building's runs are allowed, in its RULES.toml",
+    "zh": "一栋楼里的 run 被允许做什么，写在它的 RULES.toml"
+  },
+  "setup_group_hint_automation": {
+    "en": "what the city starts by itself, from SCHEDULE.toml and WATCH.toml",
+    "zh": "城自己开始的事，来自 SCHEDULE.toml 与 WATCH.toml"
+  },
   "setup_group_keys": {
     "en": "keybindings",
     "zh": "快捷键"
@@ -2679,9 +2715,265 @@
     "en": "dependencies",
     "zh": "依赖项安装"
   },
+  "setup_group_you": {
+    "en": "you and the main agent",
+    "zh": "你与主 Agent"
+  },
+  "setup_group_rules": {
+    "en": "rules",
+    "zh": "规则"
+  },
+  "setup_group_automation": {
+    "en": "automation",
+    "zh": "自动化"
+  },
   "setup_groups": {
     "en": "settings groups",
     "zh": "设置分组"
+  },
+  "settings_tree": {
+    "en": "settings tree",
+    "zh": "设置树"
+  },
+  "settings_close": {
+    "en": "close settings",
+    "zh": "关闭设置"
+  },
+  "settings_branch_city": {
+    "en": "city",
+    "zh": "城"
+  },
+  "settings_branch_access": {
+    "en": "access",
+    "zh": "接入"
+  },
+  "settings_branch_running": {
+    "en": "running",
+    "zh": "运行"
+  },
+  "settings_branch_preferences": {
+    "en": "preferences",
+    "zh": "偏好"
+  },
+  "settings_branch_diagnosis": {
+    "en": "diagnosis",
+    "zh": "诊断"
+  },
+  "settings_city_overview": {
+    "en": "overview",
+    "zh": "总览"
+  },
+  "settings_buildings": {
+    "en": "buildings",
+    "zh": "楼"
+  },
+  "settings_next_run": {
+    "en": "takes effect for the runs that start after this",
+    "zh": "此后开始的 run 生效"
+  },
+  "saving_draft": {
+    "en": "not saved",
+    "zh": "未保存"
+  },
+  "saving_sent": {
+    "en": "saving…",
+    "zh": "保存中…"
+  },
+  "saving_saved": {
+    "en": "saved",
+    "zh": "已保存"
+  },
+  "saving_refused": {
+    "en": "not saved: the city refused it",
+    "zh": "未保存：城拒绝了"
+  },
+  "saving_unverified": {
+    "en": "sent, but no receipt came back; check before saving again",
+    "zh": "已发出但没等到回执，待核对"
+  },
+  "saving_save": {
+    "en": "save",
+    "zh": "保存"
+  },
+  "saving_nothing": {
+    "en": "nothing changed yet",
+    "zh": "还没有改动"
+  },
+  "you_person": {
+    "en": "your ID",
+    "zh": "你的 ID"
+  },
+  "you_person_note": {
+    "en": "what the city calls you, and what you want its agents to know about you; kept in PREFERENCES.md",
+    "zh": "城怎么称呼你，以及你希望 Agent 知道的背景；存在 PREFERENCES.md"
+  },
+  "you_user_id": {
+    "en": "user ID",
+    "zh": "用户 ID"
+  },
+  "you_user_id_default": {
+    "en": "you",
+    "zh": "你"
+  },
+  "you_about": {
+    "en": "about you",
+    "zh": "关于你"
+  },
+  "you_mayor": {
+    "en": "the main agent",
+    "zh": "主 Agent"
+  },
+  "you_mayor_note": {
+    "en": "the name the Mayor goes by; kept in MAYOR.md",
+    "zh": "市长对外的名字；存在 MAYOR.md"
+  },
+  "you_mayor_name": {
+    "en": "name",
+    "zh": "名称"
+  },
+  "you_mayor_address": {
+    "en": "its address stays hall/mayor: a name changes what it is called, not what it may do",
+    "zh": "它的地址仍是 hall/mayor：名字只改称呼，不改职责"
+  },
+  "you_next_session": {
+    "en": "takes effect in new sessions; a session already going keeps the name it started with",
+    "zh": "新会话生效；已经开始的会话沿用开始时的名字"
+  },
+  "you_unreadable": {
+    "en": "the identity area does not read",
+    "zh": "身份区读不出来"
+  },
+  "you_unreadable_open": {
+    "en": "fix it in the documents that govern the city",
+    "zh": "到治理城的文档里改正"
+  },
+  "you_import": {
+    "en": "import from the GitHub CLI",
+    "zh": "从 GitHub CLI 导入"
+  },
+  "you_import_note": {
+    "en": "runs gh on the machine the city runs on, not on this browser's; only the login is read, and nothing is kept until you save the card",
+    "zh": "在运行城的那台机器上执行 gh，不是这个浏览器所在的机器；只读登录名，保存这张卡之前什么都不写"
+  },
+  "you_import_host": {
+    "en": "GitHub host",
+    "zh": "GitHub 主机"
+  },
+  "you_import_host_default": {
+    "en": "github.com",
+    "zh": "github.com"
+  },
+  "you_import_take": {
+    "en": "use this ID",
+    "zh": "用这个 ID"
+  },
+  "you_import_no_cli": {
+    "en": "gh is not installed on the city's machine; type your ID instead",
+    "zh": "城的机器上没有装 gh；请直接输入你的 ID"
+  },
+  "you_import_signed_out": {
+    "en": "gh is not signed in to {host} on the city's machine; sign in there, or type your ID",
+    "zh": "城的机器上 gh 没有登录 {host}；到那里登录，或直接输入 ID"
+  },
+  "you_import_not_a_host": {
+    "en": "{host} is not a host gh knows",
+    "zh": "gh 不认识 {host} 这台主机"
+  },
+  "you_import_failed": {
+    "en": "gh failed (exit {exit}); type your ID instead",
+    "zh": "gh 运行失败（退出码 {exit}）；请直接输入 ID"
+  },
+  "you_import_stuck": {
+    "en": "gh did not answer: {why}",
+    "zh": "gh 没有回答：{why}"
+  },
+  "rules_building": {
+    "en": "the building whose rules are shown",
+    "zh": "显示哪栋楼的规则"
+  },
+  "rules_title": {
+    "en": "the building's rules",
+    "zh": "这栋楼的规则"
+  },
+  "rules_note": {
+    "en": "the whole file, written at once; the city reads it before it lands and refuses one it cannot read",
+    "zh": "整份文件一次写入；城先读过再落盘，读不懂的会被拒绝"
+  },
+  "automation_jobs": {
+    "en": "scheduled jobs",
+    "zh": "定时任务"
+  },
+  "automation_sources": {
+    "en": "watched sources",
+    "zh": "监听的来源"
+  },
+  "automation_every": {
+    "en": "every {n} min",
+    "zh": "每 {n} 分钟"
+  },
+  "automation_daily": {
+    "en": "daily at {at} UTC",
+    "zh": "每天 {at} UTC"
+  },
+  "automation_weekly": {
+    "en": "weekly, {day} {at} UTC",
+    "zh": "每周 {day} {at} UTC"
+  },
+  "automation_starts_work": {
+    "en": "starts work",
+    "zh": "开始干活"
+  },
+  "automation_tells": {
+    "en": "tells the city",
+    "zh": "告知城"
+  },
+  "automation_no_jobs": {
+    "en": "SCHEDULE.toml lists no jobs",
+    "zh": "SCHEDULE.toml 没有列任务"
+  },
+  "automation_no_sources": {
+    "en": "WATCH.toml lists no sources",
+    "zh": "WATCH.toml 没有列来源"
+  },
+  "automation_by_hand": {
+    "en": "SCHEDULE.toml and WATCH.toml are edited by hand at the city's root; this page only reads them",
+    "zh": "SCHEDULE.toml 与 WATCH.toml 在城的根目录手改；这一页只读"
+  },
+  "admission_title": {
+    "en": "what bounds a run's work",
+    "zh": "什么约束一个 run 的产出"
+  },
+  "admission_note": {
+    "en": "three values, chosen apart for each dispatch, that combine",
+    "zh": "三个值，每次派活分别选，可以组合"
+  },
+  "admission_write": {
+    "en": "write limit",
+    "zh": "写入限制"
+  },
+  "admission_write_says": {
+    "en": "what the run may change: full writes as usual; create may only add new files and never overwrite one",
+    "zh": "run 能改什么：full 照常写；create 只能新建文件，不能覆盖任何已有文件"
+  },
+  "admission_require": {
+    "en": "admission requirement",
+    "zh": "准入要求"
+  },
+  "admission_require_says": {
+    "en": "the evidence the work must carry before a merge lets it in; choosing one does not provide it, and the building's own checks still run",
+    "zh": "合入前产出必须带的证据；选了要求不等于有了证据，楼自己的校验照跑"
+  },
+  "admission_landing": {
+    "en": "landing policy",
+    "zh": "落地策略"
+  },
+  "admission_landing_says": {
+    "en": "whether the work lands: ordinary takes the usual road, experiment stays in its worktree and never lands",
+    "zh": "产出是否落地：ordinary 走常规路，experiment 留在它的工作树里，永不落地"
+  },
+  "admission_apart": {
+    "en": "the write limit says what may change; the landing policy says whether the change enters the project",
+    "zh": "写入限制回答能改什么，落地策略回答改动是否进入项目"
   },
   "setup_header_name": {
     "en": "header name",
@@ -2786,6 +3078,18 @@
   "setup_model_modalities": {
     "en": "input modalities",
     "zh": "输入模态"
+  },
+  "setup_input_unstated": {
+    "en": "as the city finds",
+    "zh": "由城判断"
+  },
+  "setup_input_text": {
+    "en": "text",
+    "zh": "文本"
+  },
+  "setup_input_text_image": {
+    "en": "text and images",
+    "zh": "文本与图片"
   },
   "setup_model_needed": {
     "en": "An empty ceiling is safe to leave empty. Where the provider's model list states one, the city uses it. Otherwise, on the OpenAI-compatible formats the request carries no ceiling and the provider applies its own default for that model, usually the largest it allows; on the Anthropic-compatible format, which needs a number, the city takes the vendor's documented figure, then its policy default. Type a number here only to set your own.",
@@ -3079,25 +3383,13 @@
     "en": "the same in config.toml",
     "zh": "等价的 config.toml"
   },
-  "setup_input_unstated": {
-    "en": "as the city finds",
-    "zh": "由城判断"
-  },
-  "setup_input_text": {
-    "en": "text",
-    "zh": "文本"
-  },
-  "setup_input_text_image": {
-    "en": "text and images",
-    "zh": "文本与图片"
-  },
   "setup_toml_toggle": {
-    "en": "the equivalent config.toml",
-    "zh": "等价的 config.toml"
+    "en": "the city's CONFIG.toml",
+    "zh": "城的 CONFIG.toml"
   },
   "setup_toml_unread": {
-    "en": "this page does not print config.toml line by line",
-    "zh": "这一页不逐行列出 config.toml"
+    "en": "the city's CONFIG.toml states nothing yet",
+    "zh": "城的 CONFIG.toml 还什么都没写"
   },
   "setup_transcribe": {
     "en": "transcribe · hears (needs an ASR model such as whisper; a text model cannot go here)",

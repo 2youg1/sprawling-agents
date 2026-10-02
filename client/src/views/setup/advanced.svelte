@@ -4,8 +4,9 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The advanced group: the way back into the welcome walk, and the
-  // editor a link in the monitor opens a file in.
+  // The advanced group, the developer's: the way back into the welcome
+  // walk, the editor a link in the monitor opens a file in, and what
+  // bounds a run's work (refrain roadmap Q6).
   //
   // The editor and the city's folder are kept by this browser, because
   // they are facts of the machine it runs on (client-SPEC 4-39). The
@@ -19,6 +20,7 @@
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
   import Field from "../parts/field.svelte";
+  import Admission from "../settings/admission.svelte";
 
   // One word per editor, keyed by the editor: an editor added to
   // `core/editor.ts` leaves this table refusing to compile until it has
@@ -77,6 +79,7 @@
       }}
     />
   </div>
+  <Admission />
   <!-- The door back into the welcome walk: a link, because it moves the
       address bar like every other way off this page. -->
   <a
