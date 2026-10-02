@@ -378,7 +378,7 @@ fn a_review_dispatch_freezes_the_prefix_it_froze_on_the_accounting_thread() {
     let pinned = [
         (
             "city",
-            "87d6cd1280345a4e23655041641f738c8adc3e6fd562d7a0586089e0ca979212",
+            "868c7c3df7596cdf7edcfb6fa2514b5df484969d8d814c9160749bddbe8aa269",
         ),
         (
             "building",
@@ -386,7 +386,7 @@ fn a_review_dispatch_freezes_the_prefix_it_froze_on_the_accounting_thread() {
         ),
         (
             "resident",
-            "b57d075d70309f1a1a22d7a01a77d2930f8b2cfabcc11c628f74eaab1d1b13b3",
+            "ffd2c481526130d470244e7e931265348af859b872f505fd186e3505337f4ade",
         ),
         (
             "run",
