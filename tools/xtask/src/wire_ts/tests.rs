@@ -262,9 +262,11 @@ fn the_real_wire_comes_out_whole() {
         text.contains("value: NoSecret,"),
         "put_secret carries a value nothing satisfies"
     );
-    assert!(text.contains(
-        "export const NoSecret = Schema.Never.annotate({ identifier: \"NoSecret\" });"
-    ));
+    assert!(
+        text.contains(
+            "export const NoSecret = Schema.Never.annotate({ identifier: \"NoSecret\" });"
+        )
+    );
 }
 
 #[test]

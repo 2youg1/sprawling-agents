@@ -7,7 +7,7 @@
 //!
 //! Only a recursive definition needs this: TypeScript cannot infer the
 //! type of a value whose initialiser refers to itself, so Effect asks
-//! for `Schema.Schema<X, XEncoded>` written out. Every keyword here
+//! for `Schema.Codec<X, XEncoded>` written out. Every keyword here
 //! mirrors the expression `values` writes for the same schema, because
 //! the annotation and the value are checked against each other and a
 //! difference is a type error in the client.

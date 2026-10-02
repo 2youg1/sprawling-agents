@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One JSON Schema document in, one `wire.ts` out.
+//! One JSON Schema document in, one `wire.ts` out, written for Effect 4.
 //!
 //! The emitter reads the subset serde produces for this wire and nothing
 //! more: objects, the five primitive types, arrays and tuples, string
@@ -210,14 +210,14 @@ fn definition(name: &str, schema: &Value, recursive: &BTreeSet<String>) -> Resul
     let body = if is_bare_primitive(schema) {
         format!("{body}.pipe(Schema.brand(\"{name}\"))")
     } else {
-        format!("{body}.annotations({{ identifier: \"{name}\" }})")
+        format!("{body}.annotate({{ identifier: \"{name}\" }})")
     };
     if is_recursive {
         out.push_str(&declared(name, Side::Type, schema, recursive)?);
         out.push_str(&declared(name, Side::Encoded, schema, recursive)?);
         let _ = writeln!(
             out,
-            "export const {name}: Schema.Schema<{name}, {name}Encoded> = {body};\n"
+            "export const {name}: Schema.Codec<{name}, {name}Encoded> = {body};\n"
         );
     } else {
         let _ = writeln!(out, "export const {name} = {body};");

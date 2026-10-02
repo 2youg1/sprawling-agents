@@ -3,7 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One schema in, one Effect expression out.
+//! One schema in, one Effect 4 expression out
+//! (`tools/xtask/Spec.lean` section 8-52).
 //!
 //! The half of the emitter that reads a schema rather than a document:
 //! which keywords the subset allows, and what each one becomes. Naming,
@@ -85,7 +86,7 @@ impl Values<'_> {
             .filter(|name| is_identifier(name))
             .ok_or_else(|| refuse(at, format!("`$ref` {target} does not point into `$defs`")))?;
         Ok(if self.suspended.contains(name) {
-            format!("Schema.suspend((): Schema.Schema<{name}, {name}Encoded> => {name})")
+            format!("Schema.suspend((): Schema.Codec<{name}, {name}Encoded> => {name})")
         } else {
             name.to_owned()
         })
@@ -112,7 +113,7 @@ impl Values<'_> {
                 ));
             }
         }
-        let mut out = String::from("Schema.Union(\n");
+        let mut out = String::from("Schema.Union([\n");
         for (index, member) in members.iter().enumerate() {
             let member = self.expression(
                 member,
@@ -121,7 +122,7 @@ impl Values<'_> {
             )?;
             let _ = writeln!(out, "{}{member},", pad(indent.saturating_add(1)));
         }
-        let _ = write!(out, "{})", pad(indent));
+        let _ = write!(out, "{}])", pad(indent));
         Ok(out)
     }
 
@@ -157,7 +158,7 @@ impl Values<'_> {
             "string" => match map.get("pattern") {
                 None => "Schema.String".to_owned(),
                 Some(Value::String(pattern)) => format!(
-                    "Schema.String.pipe(Schema.pattern(new RegExp({}, \"u\")))",
+                    "Schema.String.check(Schema.isPattern(new RegExp({}, \"u\")))",
                     serde_json::to_string(pattern).map_err(|e| refuse(at, e.to_string()))?
                 ),
                 Some(other) => {
@@ -189,7 +190,7 @@ impl Values<'_> {
                     indent,
                 )?);
             }
-            return Ok(format!("Schema.Tuple({})", spelled.join(", ")));
+            return Ok(format!("Schema.Tuple([{}])", spelled.join(", ")));
         }
         let item = match map.get("items") {
             Some(items) => self.expression(items, &format!("{at}/items"), indent)?,
@@ -207,11 +208,9 @@ impl Values<'_> {
             Some(values) => {
                 let value =
                     self.expression(values, &format!("{at}/additionalProperties"), indent)?;
-                Ok(format!(
-                    "Schema.Record({{ key: Schema.String, value: {value} }})"
-                ))
+                Ok(format!("Schema.Record(Schema.String, {value})"))
             }
-            None => Ok("Schema.Record({ key: Schema.String, value: Schema.Unknown })".to_owned()),
+            None => Ok("Schema.Record(Schema.String, Schema.Unknown)".to_owned()),
         }
     }
 
@@ -263,7 +262,11 @@ fn literals(values: &Value, at: &str) -> Result<String, Refused> {
             .ok_or_else(|| refuse(at, format!("literal {value} is not a string")))?;
         spelled.push(serde_json::to_string(text).map_err(|e| refuse(at, e.to_string()))?);
     }
-    Ok(format!("Schema.Literal({})", spelled.join(", ")))
+    // Effect 4 spells one value and a list of values apart.
+    Ok(match spelled.as_slice() {
+        [one] => format!("Schema.Literal({one})"),
+        _ => format!("Schema.Literals([{}])", spelled.join(", ")),
+    })
 }
 
 fn pad(indent: usize) -> String {
