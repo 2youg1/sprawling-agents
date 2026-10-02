@@ -94,7 +94,7 @@
 
   // Each list decoded line by line; the first line its schema refuses
   // is named, so the person knows which one to fix.
-  function decoded<T>(text: string, schema: Schema.Schema<T, string>): { ok: T[] } | { bad: string } {
+  function decoded<T>(text: string, schema: Schema.Codec<T, string>): { ok: T[] } | { bad: string } {
     const ok: T[] = [];
     for (const line of lines(text)) {
       const one = Schema.decodeOption(schema)(line);

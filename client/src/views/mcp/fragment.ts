@@ -8,7 +8,7 @@
 //
 // The block is other software's file format, so it is read with the
 // same door every wire frame is read with: a Schema that answers
-// `Either`, never a parse that throws. What comes back is drafts -
+// `Result`, never a parse that throws. What comes back is drafts -
 // `encode` alone decides which of them this city can be told about, so
 // a fragment carrying an environment variable is refused with the same
 // sentence the command door shows.

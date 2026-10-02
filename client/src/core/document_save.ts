@@ -52,7 +52,7 @@ const Stored = Schema.Struct({
 // value that is not is no draft, because applying it would put text
 // where the person never typed it.
 export function readDraft(stored: string, length: number): Draft | null {
-  const parsed = Option.getOrNull(Schema.decodeOption(Schema.parseJson(Stored))(stored));
+  const parsed = Option.getOrNull(Schema.decodeOption(Schema.fromJsonString(Stored))(stored));
   if (parsed === null) return null;
   let reached = 0;
   for (const change of parsed.changes) {

@@ -73,7 +73,7 @@ export interface ReadFrom {
 export function readFrom(call: Call): ReadFrom | null {
   const asked = call.arguments;
   if (call.effect !== "read" || asked === null || asked === undefined || asked.cut > 0) return null;
-  return Option.match(Schema.decodeUnknownOption(Schema.parseJson(ReadOne), { onExcessProperty: "error" })(asked.head), {
+  return Option.match(Schema.decodeUnknownOption(Schema.fromJsonString(ReadOne), { onExcessProperty: "error" })(asked.head), {
     onNone: () => null,
     onSome: (read) => ({ path: read.path, line: (read.offset ?? 0) + 1 }),
   });
@@ -81,7 +81,7 @@ export function readFrom(call: Call): ReadFrom | null {
 
 export function pictureOf(call: Call): Picture | null {
   const head = call.output?.head;
-  return head === undefined ? null : Option.getOrNull(Schema.decodeUnknownOption(Schema.parseJson(Picture))(head));
+  return head === undefined ? null : Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(Picture))(head));
 }
 
 export function readingOf(call: Call): Reading {
