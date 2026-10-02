@@ -893,6 +893,14 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | `pdfjs-dist` | 本客户端画不出的 PDF 页与读不出的 PDF 文字；落选的是浏览器自带的阅读器（D32） | 与 `docx-preview` 一起，`frontend_artifact`（每个文件 `gzip -9` 后相加）从 676,051 B 到 2,416,686 B，其中 CMap 约占一半；分块与资源都懒加载，首屏不付（D32） |
 | `docx-preview` | 一个自写的 DOCX 排版器；落选的是只抽语义不排页的 Mammoth（D32） | 见上一行 |
 | `@noble/post-quantum` | 页面要自己实现的 ML-KEM-768 与 ML-DSA-44：WebCrypto 在三家引擎上都没有这两种算法（4-57、`crates/remote_access/Spec.lean` D21） | 懒加载的一块，只在远程组按下配对或锁门时下载；`frontend_artifact` 的读数由整合记进 `tools/xtask/budgets.toml` |
+
+**版本范围**：`client/package.json` 的每一项写插入号范围（`^x.y.z`），装进来的树由 `client/bun.lock` 定，`just build-web` 以 `bun install --frozen-lockfile` 安装，所以范围放宽不让两台机器装出两棵树；锁文件不算钉子。精确版本防的是锁文件已经防住的事，因此不写。留下的上限只有一条，各写明它防什么、什么时候拿掉：
+
+| 包 | 上限 | 防的是什么 | 拿掉的条件 |
+|---|---|---|---|
+| `typescript` | `^6.0.3`，即低于 7 | typescript-eslint 8 读 TypeScript 的 JS 编译器 API，遇到 TS 7 在加载配置时就拒绝运行（“typescript-eslint does not support TS 7.0”），`bun run lint` 因此整个不跑；TS 7 的检查器另由 `@typescript/native` 别名供 `--tsgo` 车道用 | typescript-eslint 的某个版本支持 TS 7 时，把 `typescript` 升到 7，并删去 `@typescript/native` 别名，由 `typescript` 一项同时供两条车道 |
+
+`@noble/post-quantum` 是 0.x 版本，插入号范围本身只放补丁号（`^0.7.1` 即 0.7.x），这正是要的界：ML-KEM-768 与 ML-DSA-44 的算法由 FIPS 203 与 FIPS 204 定，补丁不改线上的字节，次版本号可以改接口。它在最终产物里是 `core/remote/` 动态 `import()` 的两块懒加载分块（`ml-kem`、`ml-dsa`，共用一块 `_crystals`），首屏不带。
 -/
 
 /-! ## 14 硬编码声明
