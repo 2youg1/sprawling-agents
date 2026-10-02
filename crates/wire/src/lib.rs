@@ -116,7 +116,7 @@ pub use server::{Bound, Committed, LedgerHead, ServeConfig};
 #[cfg(feature = "server")]
 pub use server::{DROP_BYTES_MAX, DropSink};
 #[cfg(feature = "server")]
-pub use server::{bind, router, serve};
+pub use server::{bind, bundle_routes, router, serve};
 
 pub use kernel::WriteLimit;
 pub use kernel::model::{AdmissionRequirement, LandingPolicy, Mode, RunPolicy, Window};

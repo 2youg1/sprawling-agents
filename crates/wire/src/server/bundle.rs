@@ -8,24 +8,44 @@
 
 use std::sync::Arc;
 
+use axum::Router;
 use axum::extract::State;
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
+use axum::routing::get;
 
-use crate::assets::AssetReply;
+use crate::assets::{AssetReply, ClientAssets};
 
-use super::config::ShellState;
 use super::config::refusal_text;
 
-pub(crate) async fn serve_index(State(state): State<Arc<ShellState>>) -> Response {
-    asset_response(state.client.lookup("index.html"))
+/// The two routes that answer the client bundle: `/` and every path
+/// below it that no other route of the same table claims.
+///
+/// The city's own port and the remote listener (`bin::outside`) serve
+/// the page through this one table, so a device that opens the remote
+/// address gets the same bytes, under the same headers, as a browser on
+/// this machine (`crates/wire/Spec.lean` §8-2). The routes take no
+/// pairing token: a browser has to load the page before it has
+/// anywhere to type the code.
+pub fn bundle_routes<S>(client: Arc<ClientAssets>) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    Router::new()
+        .route("/", get(serve_index))
+        .route("/{*asset}", get(serve_asset))
+        .with_state(client)
 }
 
-pub(crate) async fn serve_asset(
-    State(state): State<Arc<ShellState>>,
+async fn serve_index(State(client): State<Arc<ClientAssets>>) -> Response {
+    asset_response(client.lookup("index.html"))
+}
+
+async fn serve_asset(
+    State(client): State<Arc<ClientAssets>>,
     axum::extract::Path(asset): axum::extract::Path<String>,
 ) -> Response {
-    asset_response(state.client.lookup(&asset))
+    asset_response(client.lookup(&asset))
 }
 
 /// The shell around [`ClientAssets::lookup`]: headers on, policy out.

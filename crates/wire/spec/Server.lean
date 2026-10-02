@@ -64,9 +64,13 @@ pub enum AssetReply {
     Miss(AxError),
 }
 impl ClientAssets { pub fn lookup(&self, request_path: &str) -> AssetReply; }
+// 送页面的两条路由：`/` 与同一张表里没有别的路由认领的每一条路径。
+pub fn bundle_routes<S: Clone + Send + Sync + 'static>(client: Arc<ClientAssets>) -> Router<S>;
 ```
 
 **客户端是一张资产表，不是一个文件**：`ServeConfig` 携 `client: Arc<ClientAssets>`，因为 `client/` 的构建产物是 `index.html` 加它引用的脚本、样式与字体，只携一个文件的形状会让页面壳引用一条服务端没有的路由。资产表是封闭清单：路径穿越（`..`、空段、盘符、点头文件）在判定层拒，miss 报文件名并给出重建口令。`Disk` 臂逐请求读盘，专供开发回路（改前端刷新即见），发布路径恒不构造它。
+
+**送页面的路由只有一张表**（D18）：城自己的端口把 `bundle_routes` 并进 `router`，远程监听（`crates/remote_access/Spec.lean` §8-10）也并进它自己的那张表，所以设备打开远程地址拿到的字节与响应头，与这台电脑上的浏览器拿到的相同。
 
 **公开签名不携传输层的类型**：sink 收 `Vec<u8>` 而不是 `axum::body::Bytes`。**一个泄露自己传输层的公开签名，会把「换掉 HTTP 库」变成对每一个从未选过它的调用方的破坏性变更**。
 
@@ -151,6 +155,17 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 **三帧登记面**（§8-1 golden 同集更新）——`AttachEndpoint`（人刚输入的 URL＋兼容格式＋`secret:` 引用；**引用有字节形，凭证没有**）、`SelectModel`（标签→模型＋两个探不到的 token 数＋人说的「收得下什么」；输出上限是 `Option<Ceiling>`，缺席即「没人登记过」，零在类型上不存在；`input: Option<kernel::InputKinds>` 紧接在 `max_output_tokens` 之后，出现时是 `gateway::accepted_input` 的第一档，缺席时梯子从目录开始，`crates/gateway/Spec.lean` §8-37、gateway D16）、`EndpointView`（设置页的读；`EndpointsAnswer` 里 `has_credential` 是关于凭证能回答的全部）。
 
 **三个 kernel 类型的再导出**（`DialectKind`／`Effort`／`ModelTag`）。`web` 只依赖 `wire`（拓扑图），而设置页要拼写这三个词；再导出而非镜像定义，因为镜像就是同一规则的第二个权威——同 §8-0 对 `Mode` 的口径。
+-/
+
+/-! D18 送页面的两条路由是一个公开函数，城的端口与远程监听各把它并进自己的路由表
+
+**决定**：`/` 与 `/{*asset}` 两条路由连同它们的响应头由 `bundle_routes` 造出，对路由表的状态类型泛型，自带 `Arc<ClientAssets>` 作状态；`router` 把它并进来，装配层的远程监听也把它并进来。
+
+**理由**：设备从二维码打开的是远程监听的地址，那里要答出与城的端口同一份页面（`crates/remote_access/Spec.lean` §8-10）。哪个路径答哪些字节已经只在 `ClientAssets::lookup` 一处判；路由的拼写与「gzip 的字节要带 `Content-Encoding`」这两件事若在装配层再写一份，两个端口送页面的方式就有两个家，一边加了一个响应头，另一边不会知道。
+
+**被否**：①远程监听把非升级的 `GET` 反向代理到城的端口——多一跳 HTTP 客户端，且城的端口在局域网面上要配对令牌，中继还得替设备出示它；②`wire` 只公开 `asset_response`，装配层自己拼两条路由——路径的拼写成了两份。
+
+**重开参数**：两个端口送页面的方式需要不同（例如远程地址要加一条只对外的 CSP 或缓存头）时，在这里加一个参数，而不是在装配层另写一张表。
 -/
 
 /-!

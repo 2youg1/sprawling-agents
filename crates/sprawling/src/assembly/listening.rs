@@ -23,6 +23,7 @@ use std::sync::Arc;
 use kernel::{AxCode, AxError};
 
 use super::attending::{Opening, Outward, Started, spawn_worker};
+use super::remote_door::{CityPort, Outdoors};
 use crate::monitor::sampler::Gauges;
 use crate::serving::Serving;
 use crate::serving::output_ring::OutputRing;
@@ -85,7 +86,7 @@ pub struct Listening {
     desk: Arc<CommandDesk>,
     answering: crate::console::Answering,
     worker: std::thread::JoinHandle<()>,
-    outdoors: super::remote_door::Outdoors,
+    outdoors: Outdoors,
 }
 
 /// Takes the city's port, then opens its one writer.
@@ -249,8 +250,9 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
 
     let audio_views = Arc::clone(&views);
     let audio_vault = city_vault;
+    let page = Arc::new(client);
     let config = wire::ServeConfig {
-        client: Arc::new(client),
+        client: Arc::clone(&page),
         commands: Arc::new(move |command: wire::WireCommand, reply: wire::Reply| {
             commands_desk.post(command.into(), reply);
             Ok(())
@@ -294,7 +296,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         desk,
         answering,
         worker: worker_thread,
-        outdoors: super::remote_door::Outdoors::new(city_root, relay, at, token),
+        outdoors: Outdoors::new(city_root, relay, CityPort { at, token, page }),
     })
 }
 

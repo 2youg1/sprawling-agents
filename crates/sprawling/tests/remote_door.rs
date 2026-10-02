@@ -8,9 +8,9 @@
 //!
 //! A served city, a person typing `/remote` on its console, a route the
 //! city's `[remote]` table chose, and a device speaking the remote door
-//! through the loopback listener: pairing, a session, one frame of each
-//! verb class, and the door closed again. The Ledger is read last,
-//! because what the door did is what its history says.
+//! through the loopback listener: the page, pairing, a session, one frame
+//! of each verb class, and the door closed again. The Ledger is read
+//! last, because what the door did is what its history says.
 //!
 //! **The route is this test binary.** The table names [`route_stand_in`]
 //! as a command route; started by the city, it reads the loopback
@@ -31,7 +31,7 @@
     reason = "test code"
 )]
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::Path;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver};
@@ -83,6 +83,9 @@ fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
 
     let opened = city.type_line("/remote open --for 1h", "the remote door is open");
     let at = between(&opened, "at https://", char::is_whitespace);
+    let home = between(&opened, "WebUI    http://", char::is_whitespace);
+    let page = fetched(&at, "/");
+    let served_at_home = fetched(&home, "/");
     let invited = city.type_line(&format!("/remote pair {PHONE}"), "pairing code");
     let invitation = Invitation {
         city: CityFingerprint::read(&between(&invited, "&city=", char::is_whitespace)).unwrap(),
@@ -111,8 +114,10 @@ fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
         })
         .collect();
     assert_eq!(
-        (answered, door),
+        (page.0.contains(" 200 "), page, answered, door),
         (
+            true,
+            served_at_home,
             Visit {
                 welcomed: true,
                 read_answered: true,
@@ -129,6 +134,46 @@ fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
         ),
         "the console printed, closing:\n{closed}"
     );
+}
+
+/// What a browser reads from `GET <path>` on `at` by a request that is
+/// not a WebSocket upgrade: the status line, every header but the date in
+/// a fixed order, and the body. Two listeners that serve the same page
+/// answer the same value. An answer with no end of headers - a listener
+/// that only speaks WebSocket closes the connection - reads as what came,
+/// with no headers and no body.
+fn fetched(at: &str, path: &str) -> (String, Vec<String>, Vec<u8>) {
+    // boundary-ok: the page is fetched from the remote listener the way a device's browser fetches it (`crates/sprawling/Spec.lean` §8-151)
+    let mut stream = match std::net::TcpStream::connect(at) {
+        Ok(stream) => stream,
+        Err(refused) => return (format!("{at}: {refused}"), Vec::new(), Vec::new()),
+    };
+    stream.set_read_timeout(Some(PATIENCE)).unwrap();
+    write!(
+        stream,
+        "GET {path} HTTP/1.1\r\nHost: {at}\r\nConnection: close\r\n\r\n"
+    )
+    .unwrap();
+    let mut answer = Vec::new();
+    // A listener that drops the connection instead of answering is a
+    // value the assertion names, not a failure here.
+    drop(stream.read_to_end(&mut answer));
+    let Some(split) = answer.windows(4).position(|each| each == b"\r\n\r\n") else {
+        return (
+            String::from_utf8_lossy(&answer).into_owned(),
+            Vec::new(),
+            Vec::new(),
+        );
+    };
+    let head = String::from_utf8_lossy(&answer[..split]).into_owned();
+    let mut lines = head.split("\r\n");
+    let status = lines.next().unwrap_or_default().to_owned();
+    let mut headers: Vec<String> = lines
+        .map(str::to_ascii_lowercase)
+        .filter(|line| !line.starts_with("date:"))
+        .collect();
+    headers.sort();
+    (status, headers, answer[split.saturating_add(4)..].to_vec())
 }
 
 /// What the device saw in its one session.

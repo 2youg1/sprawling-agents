@@ -28,6 +28,9 @@ city = { workspace = true }
 collab = { workspace = true }
 browser = { workspace = true }
 agent_protocols = { workspace = true }
+# The remote listener answers its two WebSocket paths and the page on one
+# port (crates/remote_access/Spec.lean §8-10).
+axum = { workspace = true, features = ["ws"] }
 crossterm = { workspace = true }
 futures-util = { workspace = true }
 getrandom = { workspace = true }

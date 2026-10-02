@@ -51,7 +51,6 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 以下是这个接口今天尚未落地的部分，按阶段写成当前状态；每一段落地时，从这里删掉，写进它所属的 §8 章节。
 
 - **`cloudflare` 通路没有在真的隧道上开过。** 自动测试不跑它（§2）。缺的证据有两件：在一台装了 `cloudflared`、能连上 Cloudflare 边缘的电脑上，按 §8-8 的操作者检查开、关一次；在一台出网受限（经代理、7844 端口被拦）的电脑上，`cloudflared` 在就绪之前退出时，能否给出比「它在就绪之前退出」更具体的一句拒绝。今天的拒绝给出手动跑的那一行命令，人从 `cloudflared` 自己的输出里读原因。
-- **页面还到不了设备。** 设备一侧的配对页、两种握手、封装与 PWA 清单已在 `client/`（`client/Spec.lean` §4-57、client D35，模块 `client/src/core/remote/`），对上了 §8-12 的每一份文件。远程监听今天只答 §8-10 的两条 WebSocket 路径，不送页面，所以设备打开二维码里的地址得不到这一页；整个客户端经 `/remote/session` 说线协议（页面的 socket 换成一条封好的传输）也还没有。缺的证据：远程监听对一个不是 WebSocket 升级的 `GET` 答出客户端的 bundle（与城自己的端口同一份，`wire::ClientAssets`）；一条端到端测试由浏览器一侧（或 Rust 设备一侧）经 `/remote/session` 收到城的 `Welcome`。两件同批落地，那时这一段从这里删掉，写进 §8-10。
 - **城密钥只活在一个进程里。** 装配层在城启动时取 32 字节熵派生城的签名密钥（§8-3），不存下来；设备钉住的是配对时那把城公钥，所以城一重启，每台设备都要重新配对，`/remote open` 照实说出这一句。要跨重启保存，32 字节的种子得留在某处，下次启动读回来。未决的是留在哪里，它要人的决定，因为三条可行的路里有两条要放宽一道门、一条违反一条现行规则：
   1. **种子进 vault，兑现点在本 crate 的 `keys`。** 第一次开门时取熵、经 vault 写成 `secret:remote/city-key`，此后每次启动取回；`keys::SigningKey` 多一个 `from_sealed(&Sealed<String>)` 的构造，`crates/remote_access/src/keys.rs` 进 `xtask secret` 的 `EXPOSE_WHITELIST`（第五项）。后果：设备跨重启保持配对；明文种子只出现在派生密钥的那一个函数里，与名单上其余四处「明文只在用它的最后一格」同一个理由；放宽的是一道门，名单变长一项。vault 是进程内的那一种时（平台凭据库打不开），种子仍随进程消失，`/remote open` 照旧说出重新配对那一句。
   2. **种子进 vault，兑现点在装配层**（`bin::outside::keeper` 或 `bin::assembly::remote_door`）。后果与 1 相同，但明文种子会出现在组装根里，而那份名单的注释写明它存在就是为了不让明文出现在组装根；放宽的同样是一道门，而且放在名单最不愿收的地方。
@@ -344,12 +343,16 @@ pub struct CommandRoute { /* 私有 */ }  // new(command: RouteCommand, permanen
 
 D22 本 crate 不读配置。通路的三个参数（选哪一个实现、隧道名与地址或命令、`permanence`）写在城那一层的 `[remote]` 表里，由 `city::config_layers` 读成字符串（`crates/city/Spec.lean` §8-39），由装配层在每次 `/remote open` 时经 `TunnelName::parse`、`PublicUrl::parse` 造成这里的类型（`crates/sprawling/Spec.lean` §8-151）。配置的层次、缺键与错键的拒法、哪一层能写哪张表，在 city 有唯一的家；本 crate 若给 `Tunnel`、`RouteCommand` 加上 serde 的读法，就是第二个配置读者，梯子与拒法要再写一遍。落选的另一条路是 city 依赖本 crate、在解析点直接造出类型化的值：它让写错的地址在读文件时就被拒，代价是 city 的拓扑多一条边（city 今天只依赖 kernel）。city 被允许依赖本 crate 时，重新考虑这一条。
 
-### 8-10 远程监听：两条路径与它们上面的消息（装配层 `bin::outside::listener`；`crates/sprawling/Spec.lean` §8-139）
+### 8-10 远程监听：两条路径、页面与它们上面的消息（装配层 `bin::outside::listener`；`crates/sprawling/Spec.lean` §8-139）
 
 ```text
 /remote/pair     设备 → PairHello；城 → PairReply；设备 → 封好的认领；城 → 封好的 DeviceId（16 字节）；城关闭连接
 /remote/session  设备 → Hello；城 → Reply；设备 → Finish；其后两向都是封好的 Payload（§8-5）
+/ 与其下的路径    不是 WebSocket 升级的 GET：客户端的 bundle，与城自己的端口同一份（`wire::bundle_routes`，`crates/wire/Spec.lean` §8-2、wire D18）
 ```
+
+- **页面经同一个端口到达设备**：设备打开二维码里的 `https://<外面的地址>/#pair=…`，远程监听答出客户端的 bundle，页面在这个源上配对、存下设备密钥（`client/Spec.lean` §4-57）。页面这一半不经过门：没配对的浏览器得先拿到页面，才有地方兑配对码，这与城的端口上 `/` 不要令牌是同一个理由（`crates/wire/spec/Reception/Admission.lean`）。页面之外的 HTTP 门（`/transcribe`、`/drop`、`/enroll`、`/acp`）不在远程监听上：它们不是线协议帧，中继判不了它们的动词类，所以在远程源上答 404。
+- **配对之后整个客户端经 `/remote/session` 说线协议**：页面在 `https:` 源上、这个源的 IndexedDB 存着一台配对过的设备时，链路的每一次连接都是一次会话握手，此后每一帧线协议文本封成 `Payload::Frame` 发出，城发回的每一帧打开后交给链路；没有配对过的源照旧连 `/ws`（`client/Spec.lean` §4-64）。中继把设备的 `Hello` 帧连同城的配对令牌一起交给城的 `/ws`，所以设备不持有令牌。端到端的证据是 `crates/sprawling/tests/remote_door.rs`：从远程地址取到的 `/` 与城的端口上的 `/` 逐字节相同，设备经 `/remote/session` 收到城的 `Welcome`。
 
 - **监听在回环上，随门开关**：`/remote open` 在 `127.0.0.1` 上绑一个系统给的端口，通路把外面引到它（§8-7）；门关上（控制台、设备锁门或到时）监听随之停止。城自己的端口不经通路，仍由它的配对令牌守着。
 - **每条消息都是二进制 WebSocket 消息**，正文就是 §8-4、§8-6、§8-5 的定长消息或封装；文本消息被拒（`E_WIRE_MISMATCH`），连接结束。

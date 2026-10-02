@@ -6,8 +6,9 @@
 //! What the remote door of a served city is made of (`crates/sprawling/spec/Outside/Conduit.lean`
 //! §8-139): the device table's path, the writer's relay for its five
 //! lines, this machine's clock and random source, where the city's own
-//! listener answers on this machine, and the route the city's `[remote]`
-//! table names (`crates/sprawling/spec/Assembly.lean` §8-151).
+//! listener answers on this machine and the page it serves, and the
+//! route the city's `[remote]` table names (`crates/sprawling/spec/Assembly.lean`
+//! §8-151).
 //!
 //! Assembled here because the clock is sampled in `bin::assembly` only,
 //! and because the relay exists only once the writer thread runs.
@@ -45,24 +46,30 @@ const ROUTE_PATIENCE: TimeoutMs = TimeoutMs(30_000);
 pub(super) struct Outdoors {
     city_root: PathBuf,
     relay: accounting::worker::Relay,
-    /// The address the city's own listener was bound to.
-    city: SocketAddr,
-    /// The pairing token that listener asks for, if it asks.
-    token: Option<String>,
+    port: CityPort,
+}
+
+/// The city's own listener, as the remote relay on this machine reaches
+/// it and as the remote listener repeats its page.
+pub(super) struct CityPort {
+    /// The address that listener holds.
+    pub(super) at: SocketAddr,
+    /// The pairing token it asks for, if it asks.
+    pub(super) token: Option<String>,
+    /// The client bundle it serves, which the remote listener serves too.
+    pub(super) page: Arc<wire::ClientAssets>,
 }
 
 impl Outdoors {
     pub(super) fn new(
         city_root: &Path,
         relay: accounting::worker::Relay,
-        city: SocketAddr,
-        token: Option<String>,
+        port: CityPort,
     ) -> Outdoors {
         Outdoors {
             city_root: city_root.to_path_buf(),
             relay,
-            city,
-            token,
+            port,
         }
     }
 
@@ -74,8 +81,7 @@ impl Outdoors {
         let Outdoors {
             city_root,
             relay,
-            city,
-            token,
+            port: CityPort { at, token, page },
         } = self;
         let doorway = Doorway::keep(Keeping {
             devices: kernel::layout::CityLayout::new(&city_root).devices(),
@@ -97,10 +103,10 @@ impl Outdoors {
         })?;
         // A city bound to every interface is reached on this machine at
         // loopback, where its relay connects from.
-        let city = if city.ip().is_unspecified() {
-            SocketAddr::from((Ipv4Addr::LOCALHOST, city.port()))
+        let city = if at.ip().is_unspecified() {
+            SocketAddr::from((Ipv4Addr::LOCALHOST, at.port()))
         } else {
-            city
+            at
         };
         let runtime = tokio::runtime::Handle::try_current().map_err(|outside| {
             AxError::failure(
@@ -116,6 +122,7 @@ impl Outdoors {
                 runtime,
                 city,
                 token,
+                page,
             },
         })
     }

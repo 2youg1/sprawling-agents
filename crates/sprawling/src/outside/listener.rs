@@ -7,13 +7,16 @@
 //! and closed with it, that the route makes reachable from outside
 //! (`crates/sprawling/spec/Outside/Conduit.lean` §8-139).
 //!
-//! It answers two WebSocket paths. [`PAIR_PATH`] carries one pairing
-//! handshake and ends (crates/remote_access/Spec.lean §8-6). [`SESSION_PATH`]
-//! carries a session handshake, then relays: each sealed frame from the
-//! device is judged by the conduit and, when the door permits it, sent
-//! to the city's own `/ws` on this machine as a client would send it;
-//! each frame the city sends comes back sealed. Every message on either
-//! path is binary.
+//! It answers two WebSocket paths and the page. [`PAIR_PATH`] carries one
+//! pairing handshake and ends (crates/remote_access/Spec.lean §8-6).
+//! [`SESSION_PATH`] carries a session handshake, then relays: each sealed
+//! frame from the device is judged by the conduit and, when the door
+//! permits it, sent to the city's own `/ws` on this machine as a client
+//! would send it; each frame the city sends comes back sealed. Every
+//! message on either path is binary. Every other `GET` is answered with
+//! the client bundle through `wire::bundle_routes`, the same table the
+//! city's own port serves it with, so the address in the pairing code
+//! opens the page that pairs (crates/remote_access/Spec.lean §8-10).
 //!
 //! The listener is its own port rather than a route on the city's port
 //! because the route makes it reachable from outside while the city's
@@ -25,16 +28,20 @@
 //! a socket task that waited with it would hold a reactor thread.
 
 use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 use std::time::Duration;
 
+use axum::Router;
+use axum::extract::State;
+use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade, close_code};
+use axum::response::Response;
+use axum::routing::get;
 use futures_util::{SinkExt, StreamExt};
 use kernel::event::record::RemoteClosing;
 use kernel::{AxCode, AxError};
 use remote_access::handshake::{Finish, Hello, PairHello};
 use remote_access::route::Opened;
-use tokio_tungstenite::WebSocketStream;
-use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};
+use tokio_tungstenite::tungstenite::Message as CityMessage;
 
 use super::conduit::{Conduit, Step};
 use super::console::Lasting;
@@ -48,8 +55,6 @@ pub(crate) const SESSION_PATH: &str = "/remote/session";
 /// How often the listener asks the door whether its time is up.
 const TICK: Duration = Duration::from_secs(1);
 
-type Device = WebSocketStream<tokio::net::TcpStream>;
-
 /// What the relay needs to reach the city it serves.
 #[derive(Clone)]
 pub(crate) struct Reaching {
@@ -59,6 +64,8 @@ pub(crate) struct Reaching {
     pub(crate) city: SocketAddr,
     /// The pairing token the city's port asks for, if it asks for one.
     pub(crate) token: Option<String>,
+    /// The client bundle the city's port serves, served here too.
+    pub(crate) page: Arc<wire::ClientAssets>,
 }
 
 /// Binds the remote listener, opens the door through the route, then
@@ -103,69 +110,82 @@ impl Drop for Answering {
     }
 }
 
+/// What every route of the listener reads.
+#[derive(Clone)]
+struct Serving {
+    doorway: Doorway,
+    reaching: Reaching,
+}
+
+/// Serves the two paths and the page until the door says its time is up.
 async fn answer(listener: tokio::net::TcpListener, doorway: Doorway, reaching: Reaching) {
+    let routes = Router::new()
+        .route(PAIR_PATH, get(pair_upgrade))
+        .route(SESSION_PATH, get(session_upgrade))
+        .merge(wire::bundle_routes(Arc::clone(&reaching.page)))
+        .with_state(Serving {
+            doorway: doorway.clone(),
+            reaching,
+        });
+    tokio::select! {
+        served = axum::serve(listener, routes) => {
+            if let Err(lost) = served {
+                eprintln!("  the remote listener stopped answering: {lost}");
+            }
+        }
+        () = keep_time(doorway) => {}
+    }
+}
+
+/// Asks the door each [`TICK`] whether its time is up, and returns once
+/// it is closed.
+async fn keep_time(doorway: Doorway) {
     let now = tokio::time::Instant::now();
     let mut ticks = tokio::time::interval_at(now.checked_add(TICK).unwrap_or(now), TICK);
     loop {
-        tokio::select! {
-            accepted = listener.accept() => {
-                // A connection that fails before it is accepted is that
-                // connection's loss; the listener keeps answering.
-                if let Ok((stream, _)) = accepted {
-                    drop(tokio::spawn(connection(stream, doorway.clone(), reaching.clone())));
-                }
-            }
-            _ = ticks.tick() => {
-                let door = doorway.clone();
-                match tokio::task::spawn_blocking(move || door.tick()).await {
-                    Ok(Ok(Phase::Open)) => {}
-                    Ok(Ok(Phase::Closed)) => return,
-                    Ok(Err(refused)) => {
-                        eprintln!("  the remote door could not close at its time: {refused}");
-                        eprintln!("  {}", refused.recovery());
-                        return;
-                    }
-                    Err(_) => return,
-                }
+        ticks.tick().await;
+        let door = doorway.clone();
+        match tokio::task::spawn_blocking(move || door.tick()).await {
+            Ok(Ok(Phase::Open)) => {}
+            Ok(Ok(Phase::Closed)) | Err(_) => return,
+            Ok(Err(refused)) => {
+                eprintln!("  the remote door could not close at its time: {refused}");
+                eprintln!("  {}", refused.recovery());
+                return;
             }
         }
     }
 }
 
-#[expect(
-    clippy::result_large_err,
-    reason = "the handshake callback's error type is tungstenite's own response"
-)]
-async fn connection(stream: tokio::net::TcpStream, doorway: Doorway, reaching: Reaching) {
-    let mut asked = String::new();
-    let shook =
-        tokio_tungstenite::accept_hdr_async(stream, |request: &Request, response: Response| {
-            request.uri().path().clone_into(&mut asked);
-            Ok(response)
-        })
-        .await;
-    let Ok(mut device) = shook else { return };
-    let ended = match asked.as_str() {
-        PAIR_PATH => pairing(&mut device, &doorway).await,
-        SESSION_PATH => session(&mut device, &doorway, &reaching).await,
-        other => Err(AxError::failure(
-            AxCode::WireMismatch,
-            "answer a remote device",
-            format!("no path `{other}`"),
-        )
-        .with_recovery(format!("connect to {PAIR_PATH} or {SESSION_PATH}"))),
-    };
-    // The device learns why in the close frame's reason, a stable code
-    // and nothing else: a stranger on the route reads it too.
-    let reason = ended.err().map_or("", |refused| refused.code().as_str());
-    let close = tokio_tungstenite::tungstenite::protocol::CloseFrame {
-        code: tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode::Normal,
-        reason: reason.into(),
-    };
-    drop(device.close(Some(close)).await);
+async fn pair_upgrade(State(serving): State<Serving>, upgrade: WebSocketUpgrade) -> Response {
+    upgrade.on_upgrade(move |mut device| async move {
+        let ended = pairing(&mut device, &serving.doorway).await;
+        close(device, ended).await;
+    })
 }
 
-async fn pairing(device: &mut Device, doorway: &Doorway) -> Result<(), AxError> {
+async fn session_upgrade(State(serving): State<Serving>, upgrade: WebSocketUpgrade) -> Response {
+    upgrade.on_upgrade(move |mut device| async move {
+        let ended = session(&mut device, &serving.doorway, &serving.reaching).await;
+        close(device, ended).await;
+    })
+}
+
+/// Ends a connection. The device learns why in the close frame's
+/// reason, a stable code and nothing else: a stranger on the route
+/// reads it too.
+async fn close(mut device: WebSocket, ended: Result<(), AxError>) {
+    let reason = ended
+        .err()
+        .map_or_else(String::new, |refused| refused.code().as_str().to_owned());
+    let frame = CloseFrame {
+        code: close_code::NORMAL,
+        reason: reason.into(),
+    };
+    drop(device.send(Message::Close(Some(frame))).await);
+}
+
+async fn pairing(device: &mut WebSocket, doorway: &Doorway) -> Result<(), AxError> {
     let hello = PairHello::from_bytes(&next_binary(device).await?)?;
     let (reply, waiting) = doorway.pair_reply(&hello)?;
     send(device, reply.as_bytes().to_vec()).await?;
@@ -176,7 +196,7 @@ async fn pairing(device: &mut Device, doorway: &Doorway) -> Result<(), AxError> 
 }
 
 async fn session(
-    device: &mut Device,
+    device: &mut WebSocket,
     doorway: &Doorway,
     reaching: &Reaching,
 ) -> Result<(), AxError> {
@@ -199,9 +219,9 @@ async fn session(
     let mut conduit = Conduit::new(doorway.clone(), admitted, reaching.token.clone());
     loop {
         tokio::select! {
-            from_device = device.next() => match from_device {
+            from_device = device.recv() => match from_device {
                 Some(Ok(Message::Binary(sealed))) => match conduit.judge(&sealed)? {
-                    Step::Forward(text) => city.send(Message::Text(text.into())).await.map_err(|source| lost(&source))?,
+                    Step::Forward(text) => city.send(CityMessage::Text(text.into())).await.map_err(|source| lost(&source))?,
                     Step::Answer(sealed) => send(device, sealed).await?,
                     Step::Lock => {
                         let door = doorway.clone();
@@ -209,24 +229,24 @@ async fn session(
                         return Ok(());
                     }
                 },
-                Some(Ok(Message::Ping(_) | Message::Pong(_) | Message::Frame(_))) => {}
+                Some(Ok(Message::Ping(_) | Message::Pong(_))) => {}
                 Some(Ok(Message::Text(_))) => return Err(binary_only()),
                 Some(Ok(Message::Close(_)) | Err(_)) | None => return Ok(()),
             },
             from_city = city.next() => match from_city {
-                Some(Ok(Message::Text(text))) => send(device, conduit.seal_for_device(text.as_str())?).await?,
-                Some(Ok(Message::Binary(_) | Message::Ping(_) | Message::Pong(_) | Message::Frame(_))) => {}
-                Some(Ok(Message::Close(_)) | Err(_)) | None => return Ok(()),
+                Some(Ok(CityMessage::Text(text))) => send(device, conduit.seal_for_device(text.as_str())?).await?,
+                Some(Ok(CityMessage::Binary(_) | CityMessage::Ping(_) | CityMessage::Pong(_) | CityMessage::Frame(_))) => {}
+                Some(Ok(CityMessage::Close(_)) | Err(_)) | None => return Ok(()),
             },
         }
     }
 }
 
-async fn next_binary(device: &mut Device) -> Result<Vec<u8>, AxError> {
+async fn next_binary(device: &mut WebSocket) -> Result<Vec<u8>, AxError> {
     loop {
-        match device.next().await {
+        match device.recv().await {
             Some(Ok(Message::Binary(bytes))) => return Ok(bytes.to_vec()),
-            Some(Ok(Message::Ping(_) | Message::Pong(_) | Message::Frame(_))) => {}
+            Some(Ok(Message::Ping(_) | Message::Pong(_))) => {}
             Some(Ok(Message::Text(_))) => return Err(binary_only()),
             Some(Ok(Message::Close(_)) | Err(_)) | None => {
                 return Err(AxError::failure(
@@ -240,7 +260,7 @@ async fn next_binary(device: &mut Device) -> Result<Vec<u8>, AxError> {
     }
 }
 
-async fn send(device: &mut Device, bytes: Vec<u8>) -> Result<(), AxError> {
+async fn send(device: &mut WebSocket, bytes: Vec<u8>) -> Result<(), AxError> {
     device
         .send(Message::Binary(bytes.into()))
         .await
@@ -269,7 +289,7 @@ fn binary_only() -> AxError {
     .with_recovery("reload the page: it speaks another version of the remote door")
 }
 
-fn lost(source: &tokio_tungstenite::tungstenite::Error) -> AxError {
+fn lost(source: &dyn std::fmt::Display) -> AxError {
     AxError::failure(
         AxCode::WireMismatch,
         "relay a remote session",

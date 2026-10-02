@@ -22,6 +22,7 @@ mod listener;
 mod socket;
 mod uploads;
 
+pub use bundle::bundle_routes;
 pub use committed::Committed;
 pub use config::{
     AcpSink, Answering, DROP_BYTES_MAX, DropSink, LedgerHead, MonitorFeed, ServeConfig,

@@ -2819,6 +2819,7 @@ dependencies = [
 name = "sprawling"
 version = "0.0.8"
 dependencies = [
+ "axum",
  "cpu-time",
  "crossterm",
  "flate2",

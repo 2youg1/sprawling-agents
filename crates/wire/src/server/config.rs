@@ -42,7 +42,7 @@ use super::committed::Committed;
 
 mod enrolment;
 
-use super::bundle::{serve_asset, serve_index};
+use super::bundle::bundle_routes;
 use super::socket::upgrade;
 use super::uploads::{accept_acp, accept_drop, accept_recording};
 use enrolment::accept_enrolment;
@@ -186,7 +186,6 @@ impl LedgerHead {
 }
 
 pub(crate) struct ShellState {
-    pub(crate) client: Arc<ClientAssets>,
     pub(crate) commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Sync>,
     pub(crate) events: broadcast::Sender<Committed>,
     pub(crate) deltas: broadcast::Sender<crate::frames::Delta>,
@@ -275,7 +274,6 @@ pub struct EnrollBody {
 /// from the face the listener presents.
 pub fn router(config: &ServeConfig, face: BindFace) -> Router {
     let state = Arc::new(ShellState {
-        client: Arc::clone(&config.client),
         commands: Arc::clone(&config.commands),
         events: config.events.clone(),
         deltas: config.deltas.clone(),
@@ -294,10 +292,6 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         epoch: config.epoch,
     });
     Router::new()
-        // The client bundle is the page itself: a browser that has not
-        // been given the pairing code yet still has to load the form it
-        // types the code into, so these two doors stay open by design.
-        .route("/", get(serve_index))
         .route("/ws", get(upgrade))
         .route(
             "/transcribe",
@@ -320,7 +314,10 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         // than as a header, and an unpaired editor is answered by
         // `agent_protocols::admit` rather than at the door.
         .route("/acp", post(accept_acp))
-        .route("/{*asset}", get(serve_asset))
+        // The client bundle is the page itself: a browser that has not
+        // been given the pairing code yet still has to load the form it
+        // types the code into, so these two doors stay open by design.
+        .merge(bundle_routes(Arc::clone(&config.client)))
         .with_state(state)
 }
 
