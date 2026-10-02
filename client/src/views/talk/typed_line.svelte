@@ -26,11 +26,13 @@
 
   const { text, box, lit }: Props = $props();
 
-  // One measuring surface for the life of the component.
-  let ruler: CanvasRenderingContext2D | null | undefined;
+  // One measuring surface for the life of the component, made on first
+  // use; its type is read off the call that makes it.
+  const measuring = () => document.createElement("canvas").getContext("2d");
+  let ruler: ReturnType<typeof measuring> | undefined;
 
   function reach(words: string, field: HTMLTextAreaElement): number {
-    ruler ??= document.createElement("canvas").getContext("2d");
+    ruler ??= measuring();
     const pen = ruler;
     if (pen === null) return field.clientWidth;
     pen.font = getComputedStyle(field).font;
