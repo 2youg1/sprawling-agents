@@ -400,7 +400,24 @@ function begins(typed: readonly string[]): boolean {
 // the reader keeps no clock. A press in a field, or one holding a
 // modifier, is not a move and drops a sequence begun before it.
 export function lineWalker(): (pressed: Pressed, at: number) => LineMove | null {
-  return () => null;
+  let held: readonly string[] = [];
+  let heldAt = Number.NEGATIVE_INFINITY;
+  return (pressed, at) => {
+    const was = held;
+    held = [];
+    if (pressed.target === "field" || pressed.ctrlKey || pressed.metaKey || pressed.altKey) return null;
+    const continued = at - heldAt <= SEQUENCE_MS ? [...was, pressed.key] : [pressed.key];
+    heldAt = at;
+    for (const typed of [continued, [pressed.key]]) {
+      const move = moveOf(typed);
+      if (move !== undefined) return move;
+      if (begins(typed)) {
+        held = typed;
+        return null;
+      }
+    }
+    return null;
+  };
 }
 
 function lineFace(key: string): string {
@@ -409,8 +426,8 @@ function lineFace(key: string): string {
 
 // How each key of a move is drawn, in the table's order: a sequence is
 // its keys run together (gg), a letter keeps the case it is typed in.
-export function lineFaces(_move: LineMove): readonly string[] {
-  return [];
+export function lineFaces(move: LineMove): readonly string[] {
+  return LINE_KEYS[move].map((keys) => keys.map(lineFace).join(""));
 }
 
 // --------------------------------------------------------- first letters
@@ -423,14 +440,17 @@ function typeable(letter: string): boolean {
 // the first letter of the name a person reads, when one key types it,
 // and otherwise the first letter of `slug`, the row's name in the
 // address bar, which every keyboard types (client D40).
-export function initialOf(_name: string, _slug: string): string {
-  return "";
+export function initialOf(name: string, slug: string): string {
+  const first = folded(name.trim().slice(0, 1));
+  return typeable(first) ? first : folded(slug.slice(0, 1));
 }
 
 // The first letter a press asks for, or none when the press is not one
 // letter typed outside a field with no modifier.
-export function initialTyped(_pressed: Pressed): string | null {
-  return null;
+export function initialTyped(pressed: Pressed): string | null {
+  if (pressed.target === "field" || pressed.ctrlKey || pressed.metaKey || pressed.altKey) return null;
+  const letter = folded(pressed.key);
+  return typeable(letter) ? letter : null;
 }
 
 // -------------------------------------------------------------- the map
