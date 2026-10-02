@@ -1,0 +1,1396 @@
+<!doctype html>
+<!--
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  Copyright (c) 2026 2youg1 and the sprawling contributors
+
+  The playback skill's reference page (skills/playback/SKILL.md). The
+  export puts a bundle into the empty data block near the end of <body>;
+  everything else here is yours to change. What a page owes the bundle -
+  the data contract, the citations, the checks - is in the skill, not
+  here.
+
+  Narration goes in <section id="narration">: plain HTML, each claim
+  citing its evidence on an element with data-seq="<seq>". The page shows
+  the section above the runs, and shows each cited paragraph again beside
+  the line it cites while the playback stands on that line.
+
+  Words are in the WORDS table at the top of the script, English and
+  Chinese; <html lang> chooses. The face is a subset of Geist Mono
+  (Basic Latin and a few marks, the weight axis kept), embedded below as
+  a data: URL under the SIL Open Font License 1.1, whose text is
+  skills/playback/OFL.txt: Copyright (c) 2023 Vercel, in collaboration
+  with basement.studio (https://github.com/vercel/geist-font). Delete the @font-face rule to
+  draw in the machine's own monospaced face; Chinese always falls back
+  to the system's fonts.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src data:; img-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Playback</title>
+<style>
+@font-face {
+  font-family: "Geist Mono";
+  src: url("data:font/woff2;base64,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") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
+:root {
+  --m: 32px; --g: 24px; --u: 8px;
+  --face: "Geist Mono", ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  --page: oklch(0.145 0.014 262); --plate: oklch(0.172 0.016 262);
+  --ink: oklch(0.94 0.008 262); --quiet: oklch(0.78 0.012 262); --faint: oklch(0.61 0.014 262); --ghost: oklch(0.52 0.014 262);
+  --rule: oklch(1 0 0 / .07); --rule-2: oklch(1 0 0 / .13); --hover: oklch(1 0 0 / .045); --pick: oklch(1 0 0 / .08);
+  --acid: oklch(0.78 0.17 252); --acid-soft: oklch(0.78 0.17 252 / .14);
+  --warm: oklch(0.80 0.12 70); --warm-soft: oklch(0.80 0.12 70 / .12);
+  --stop: oklch(0.70 0.19 25); --stop-soft: oklch(0.70 0.19 25 / .13);
+  --go: oklch(0.80 0.15 150); --go-soft: oklch(0.80 0.15 150 / .12);
+  --add: oklch(0.80 0.13 150 / .10); --del: oklch(0.70 0.17 25 / .12);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --page: oklch(0.982 0.004 255); --plate: oklch(0.962 0.005 255);
+    --ink: oklch(0.21 0.02 262); --quiet: oklch(0.38 0.018 262); --faint: oklch(0.50 0.016 262); --ghost: oklch(0.56 0.014 262);
+    --rule: oklch(0.21 0.03 262 / .09); --rule-2: oklch(0.21 0.03 262 / .16); --hover: oklch(0.21 0.03 262 / .035); --pick: oklch(0.21 0.03 262 / .07);
+    --acid: oklch(0.52 0.20 258); --acid-soft: oklch(0.52 0.20 258 / .10);
+    --warm: oklch(0.55 0.13 60); --warm-soft: oklch(0.58 0.14 60 / .12);
+    --stop: oklch(0.55 0.20 25); --stop-soft: oklch(0.55 0.20 25 / .10);
+    --go: oklch(0.52 0.14 150); --go-soft: oklch(0.52 0.14 150 / .10);
+    --add: oklch(0.62 0.14 150 / .12); --del: oklch(0.58 0.20 25 / .10);
+  }
+}
+
+* { box-sizing: border-box; }
+html { background: var(--page); color: var(--ink); scroll-padding-top: var(--m); }
+body { margin: 0; font: 400 14px/24px var(--face); font-variant-numeric: tabular-nums slashed-zero; -webkit-font-smoothing: antialiased; }
+button, select, input { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--acid); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3, p, dl, dd, ol, ul, figure { margin: 0; }
+ol, ul { padding: 0; list-style: none; }
+code, pre { font: inherit; }
+.lbl { font-size: 11px; line-height: 16px; letter-spacing: .06em; text-transform: uppercase; color: var(--ghost); }
+.q { color: var(--quiet); }
+.f { color: var(--faint); }
+.n { color: var(--ink); }
+.u { color: var(--faint); }
+.mono-cut { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[hidden] { display: none !important; }
+
+/* the one grid */
+.frame { max-width: 1920px; margin: 0 auto; padding: var(--m); display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--g); row-gap: 0; }
+.masthead { grid-column: 1 / -1; padding-bottom: 24px; border-bottom: 1px solid var(--rule); }
+.masthead h1 { font-size: 20px; line-height: 32px; font-weight: 500; margin-top: 8px; overflow-wrap: anywhere; }
+.masthead .sub { color: var(--faint); margin-top: 0; overflow-wrap: anywhere; }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 16px var(--g); margin-top: 24px; }
+.facts div { display: flex; flex-direction: column; }
+.facts dd { font-size: 16px; line-height: 24px; }
+.facts dd small { display: block; font-size: 12px; line-height: 16px; color: var(--faint); }
+.chapters { grid-column: 1 / 3; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 24px 0; }
+.chapters ol { display: flex; flex-direction: column; gap: 0; }
+.chapters a { display: block; padding: 4px 8px; margin: 0 -8px; border-radius: 6px; color: var(--faint); text-decoration: none; }
+.chapters a:hover { background: var(--hover); color: var(--ink); }
+.chapters .lbl { margin: 16px 0 4px; }
+.chapters .lbl:first-child { margin-top: 0; }
+.chapters button { display: grid; grid-template-columns: 8px minmax(0, 1fr); column-gap: 8px; align-items: baseline; width: calc(100% + 16px); text-align: left; padding: 4px 8px; margin: 0 -8px; border-radius: 6px; color: var(--quiet); }
+.chapters button:hover { background: var(--hover); }
+.chapters button[aria-pressed="true"] { background: var(--pick); color: var(--ink); }
+.chapters button small { grid-column: 2; font-size: 11px; line-height: 16px; color: var(--ghost); }
+main { grid-column: 3 / -1; min-width: 0; padding-bottom: 96px; }
+main > section { padding-top: 32px; margin-top: 32px; border-top: 1px solid var(--rule); }
+main > section:first-child, main > section[hidden] + section { border-top: 0; margin-top: 0; padding-top: 24px; }
+main > section > h2 { font-size: 11px; line-height: 16px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); font-weight: 500; margin-bottom: 16px; display: flex; justify-content: space-between; gap: 16px; }
+main > section > h2 span { text-transform: none; letter-spacing: 0; color: var(--ghost); font-weight: 400; }
+.note { color: var(--faint); font-size: 12px; line-height: 16px; margin-top: 8px; max-width: 80ch; }
+.empty { color: var(--ghost); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ghost); }
+.dot.active { background: var(--acid); }
+.dot.frozen { background: transparent; box-shadow: inset 0 0 0 1px var(--faint); }
+
+/* narration: written by an agent, never a record */
+.narration { position: relative; padding-left: 16px !important; }
+.narration::before { content: ""; position: absolute; left: 0; top: 32px; bottom: 0; width: 2px; background: var(--warm); border-radius: 1px; }
+.narration > h2 { color: var(--warm) !important; }
+.narration p, .narration li { color: var(--quiet); max-width: 80ch; margin-top: 8px; }
+.narration [data-seq] { color: var(--warm); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+
+/* tables */
+.table { width: 100%; border-collapse: collapse; }
+.table th { text-align: left; font-weight: 400; font-size: 11px; line-height: 16px; letter-spacing: .06em; text-transform: uppercase; color: var(--ghost); padding: 0 16px 8px 0; vertical-align: bottom; white-space: nowrap; }
+.table td { padding: 4px 16px 4px 0; vertical-align: top; border-top: 1px solid var(--rule); overflow-wrap: break-word; }
+.table td.num, .table th.num { text-align: right; white-space: nowrap; }
+.table td.nw { white-space: nowrap; }
+.small { font-size: 12px; line-height: 16px; display: inline-block; }
+.table tr.on td { background: var(--pick); }
+.table tr.ctx td { color: var(--faint); }
+.more { margin-top: 8px; color: var(--acid); }
+.link { color: var(--acid); text-align: left; }
+.more:hover, .link:hover { text-decoration: underline; }
+
+/* evidence: a seq, and the five ends */
+.cite { display: inline-flex; align-items: baseline; gap: 4px; padding: 0 6px; border-radius: 4px; color: var(--acid); background: var(--acid-soft); white-space: nowrap; }
+.cite:hover { text-decoration: underline; }
+.cite.outside { background: none; box-shadow: inset 0 0 0 1px var(--acid-soft); border: 1px dashed var(--acid); padding: 0 5px; }
+.end { display: inline-flex; gap: 4px; align-items: baseline; padding: 0 6px; border-radius: 4px; white-space: nowrap; font-size: 12px; }
+.end.withheld { color: var(--warm); background: repeating-linear-gradient(135deg, var(--warm-soft) 0 4px, transparent 4px 8px); }
+.end.pending { color: var(--quiet); box-shadow: inset 0 0 0 1px var(--rule-2); }
+.end.missing { color: var(--stop); text-decoration: line-through; text-decoration-thickness: 1px; }
+.tag { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 12px; white-space: nowrap; }
+.tag.refused, .tag.failed { color: var(--stop); background: var(--stop-soft); }
+.tag.conflict { color: var(--warm); background: var(--warm-soft); }
+.tag.person { color: var(--go); background: var(--go-soft); }
+.tag.waiting { color: var(--quiet); box-shadow: inset 0 0 0 1px var(--rule-2); }
+.tag.commit { color: var(--acid); background: var(--acid-soft); }
+
+/* runs */
+.attention { display: flex; flex-direction: column; gap: 4px; margin-bottom: 24px; }
+.attention li { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+
+/* timeline */
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 16px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: 10px; background: var(--hover); }
+.seg button { height: 28px; padding: 0 12px; border-radius: 8px; color: var(--faint); font-size: 12px; line-height: 28px; }
+.seg button[aria-pressed="true"] { background: var(--pick); color: var(--ink); }
+.seg button:hover { color: var(--ink); }
+.where { color: var(--faint); font-size: 12px; }
+.lanes { display: grid; grid-template-columns: minmax(120px, 2fr) minmax(0, 8fr); column-gap: 16px; }
+.lane-names li { height: 24px; line-height: 24px; font-size: 12px; color: var(--quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-names li.on { color: var(--ink); }
+.lane-names li small { color: var(--ghost); }
+.plot { position: relative; min-width: 0; }
+.plot canvas { display: block; width: 100%; cursor: crosshair; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; font-size: 12px; color: var(--faint); }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+.card { margin-top: 24px; padding: 16px; border-radius: 12px; background: var(--plate); box-shadow: inset 0 0 0 1px var(--rule); }
+.card dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0 24px; margin-top: 8px; }
+.card dt { color: var(--ghost); font-size: 12px; }
+.card dd { overflow-wrap: anywhere; }
+.card .head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; }
+.card .head b { font-weight: 500; }
+.card .said { margin-top: 16px; padding-left: 16px; border-left: 2px solid var(--warm); color: var(--quiet); }
+.card .said .lbl { color: var(--warm); }
+details > summary { cursor: pointer; color: var(--faint); list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: "+ "; color: var(--ghost); }
+details[open] > summary::before { content: "\2212 "; }
+pre.line { margin: 8px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--page); color: var(--quiet); font-size: 12px; line-height: 16px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; }
+
+/* filters */
+.filters { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 16px; }
+.filters select, .filters input[type=search] { height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--rule-2); background: var(--page); }
+.filters input[type=search] { min-width: 16ch; }
+.filters label { display: inline-flex; gap: 8px; align-items: center; color: var(--faint); font-size: 12px; }
+
+/* commits */
+.checkpoint { display: grid; grid-template-columns: 14ch minmax(0, 1fr); column-gap: 16px; padding: 8px 0; border-top: 1px solid var(--rule); }
+.checkpoint:first-child { border-top: 0; }
+.checkpoint > .tag { justify-self: start; align-self: start; margin-top: 4px; }
+.checkpoint .head { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+.checkpoint .oid { font-weight: 500; }
+.facts-line { display: flex; flex-wrap: wrap; gap: 0 24px; font-size: 12px; color: var(--quiet); }
+.facts-line .fact { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; min-width: 0; overflow-wrap: anywhere; }
+.file { margin-top: 8px; }
+.file > summary { display: flex; gap: 16px; align-items: baseline; }
+.file > summary .path { color: var(--ink); overflow-wrap: anywhere; }
+.diff { margin: 8px 0 0; border-radius: 8px; background: var(--page); font-size: 12px; line-height: 16px; overflow-x: auto; }
+.diff div { display: grid; grid-template-columns: 5ch minmax(0, 1fr); column-gap: 12px; padding: 0 12px; white-space: pre; }
+.diff div > span:first-child { color: var(--ghost); text-align: right; user-select: none; }
+.diff .add { background: var(--add); }
+.diff .del { background: var(--del); }
+.diff .hunk { color: var(--acid); }
+.diff .held { color: var(--warm); background: repeating-linear-gradient(135deg, var(--warm-soft) 0 4px, transparent 4px 8px); white-space: normal; }
+.diff .cut { color: var(--faint); white-space: normal; }
+
+.fail { padding: 24px; margin: var(--m); border-radius: 12px; background: var(--stop-soft); color: var(--ink); }
+
+@media (max-width: 1023px) {
+  .chapters { grid-column: 1 / -1; min-width: 0; position: static; max-height: none; padding: 16px 0 0; overflow-x: auto; }
+  .chapters ol { flex-direction: row; flex-wrap: nowrap; gap: 8px; }
+  .chapters .lbl, .chapters .runs-nav { display: none; }
+  .chapters a { margin: 0; white-space: nowrap; }
+  main { grid-column: 1 / -1; }
+}
+@media (max-width: 719px) {
+  :root { --m: 16px; --g: 16px; }
+  .lanes { grid-template-columns: minmax(72px, 1fr) minmax(0, 3fr); column-gap: 8px; }
+  .table.stack thead { display: none; }
+  .table.stack tr { display: block; padding: 8px 0; border-top: 1px solid var(--rule); }
+  .table.stack td { display: block; border: 0; padding: 0; white-space: normal; overflow-wrap: anywhere; }
+  .checkpoint { grid-template-columns: minmax(0, 1fr); row-gap: 4px; }
+  .table.stack td.num { text-align: left; }
+  .table.stack td[data-label]::before { content: attr(data-label) " "; color: var(--ghost); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
+@media (forced-colors: active) {
+  .cite, .tag, .end, .dot { forced-color-adjust: none; border: 1px solid CanvasText; color: CanvasText; background: Canvas; }
+}
+</style>
+</head>
+<body>
+<div class="frame">
+  <header class="masthead" id="top">
+    <p class="lbl" data-word="playback">Playback</p>
+    <h1 id="title">Playback</h1>
+    <p class="sub" id="subtitle"></p>
+    <dl class="facts" id="facts"></dl>
+  </header>
+
+  <nav class="chapters" aria-label="Chapters" data-word-label="chapters">
+    <p class="lbl" data-word="sections">Sections</p>
+    <ol>
+      <li><a href="#runs" data-word="runs">Runs</a></li>
+      <li><a href="#timeline" data-word="timeline">Timeline</a></li>
+      <li><a href="#moments" data-word="moments">Key moments</a></li>
+      <li><a href="#commits" data-word="commits">Commits</a></li>
+      <li><a href="#messages" data-word="messages">Messages</a></li>
+      <li><a href="#calls" data-word="calls">Calls</a></li>
+      <li><a href="#log" data-word="log">Every line</a></li>
+      <li><a href="#cost" data-word="cost">Cost</a></li>
+      <li><a href="#withheld" data-word="withheld">Withheld</a></li>
+      <li><a href="#source" data-word="source">Source</a></li>
+    </ol>
+    <p class="lbl runs-nav" data-word="chapter_runs">Chapters</p>
+    <ol class="runs-nav" id="chapter-list"></ol>
+  </nav>
+
+  <main>
+    <section id="narration" class="narration" aria-labelledby="narration-title" hidden>
+      <h2 id="narration-title"><b data-word="narration">Narration</b><span data-word="narration_said">written for this page; not a record of the city</span></h2>
+    </section>
+
+    <section id="runs" aria-labelledby="runs-title">
+      <h2 id="runs-title"><b data-word="runs">Runs</b><span id="runs-count"></span></h2>
+      <ul class="attention" id="attention"></ul>
+      <div id="runs-body"></div>
+    </section>
+
+    <section id="timeline" aria-labelledby="timeline-title">
+      <h2 id="timeline-title"><b data-word="timeline">Timeline</b><span id="timeline-span"></span></h2>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Step" data-word-label="step">
+          <button type="button" id="first" data-word="first">First</button>
+          <button type="button" id="prev" data-word="previous">Previous</button>
+          <button type="button" id="play" aria-pressed="false" data-word="play">Play</button>
+          <button type="button" id="next" data-word="next">Next</button>
+          <button type="button" id="last" data-word="last">Last</button>
+        </div>
+        <div class="seg" role="group" aria-label="Axis" data-word-label="axis">
+          <button type="button" id="axis-order" aria-pressed="true" data-word="axis_order">In order</button>
+          <button type="button" id="axis-time" aria-pressed="false" data-word="axis_time">In time</button>
+        </div>
+        <div class="seg" role="group" aria-label="Speed" data-word-label="speed" id="speeds"></div>
+        <span class="where" id="where" aria-live="off"></span>
+      </div>
+      <div class="lanes">
+        <ol class="lane-names" id="lane-names"></ol>
+        <div class="plot"><canvas id="plot" role="img" tabindex="0" aria-label="Swimlanes"></canvas></div>
+      </div>
+      <p class="legend" id="legend"></p>
+      <p class="note" id="axis-note"></p>
+      <article class="card" id="card" aria-live="polite"></article>
+    </section>
+
+    <section id="moments" aria-labelledby="moments-title">
+      <h2 id="moments-title"><b data-word="moments">Key moments</b><span id="moments-count"></span></h2>
+      <div id="moments-body"></div>
+    </section>
+
+    <section id="commits" aria-labelledby="commits-title">
+      <h2 id="commits-title"><b data-word="commits">Commits</b><span id="commits-count"></span></h2>
+      <div id="commits-body"></div>
+    </section>
+
+    <section id="messages" aria-labelledby="messages-title">
+      <h2 id="messages-title"><b data-word="messages">Messages</b><span id="messages-count"></span></h2>
+      <div id="messages-body"></div>
+    </section>
+
+    <section id="calls" aria-labelledby="calls-title">
+      <h2 id="calls-title"><b data-word="calls">Calls</b><span id="calls-count"></span></h2>
+      <div id="calls-body"></div>
+    </section>
+
+    <section id="log" aria-labelledby="log-title">
+      <h2 id="log-title"><b data-word="log">Every line</b><span id="log-count"></span></h2>
+      <div class="filters" id="filters"></div>
+      <div id="log-body"></div>
+    </section>
+
+    <section id="cost" aria-labelledby="cost-title">
+      <h2 id="cost-title"><b data-word="cost">Cost</b></h2>
+      <div id="cost-body"></div>
+    </section>
+
+    <section id="withheld" aria-labelledby="withheld-title">
+      <h2 id="withheld-title"><b data-word="withheld">Withheld</b></h2>
+      <div id="withheld-body"></div>
+    </section>
+
+    <section id="source" aria-labelledby="source-title">
+      <h2 id="source-title"><b data-word="source">Source</b><span><a class="more" href="#top" data-word="to_top">Back to the top</a></span></h2>
+      <div id="source-body"></div>
+    </section>
+  </main>
+</div>
+<noscript><p class="fail">This page draws its bundle with JavaScript. The bundle itself is the JSON in the element with id playback-bundle.</p></noscript>
+<script type="application/json" id="playback-bundle"></script>
+<script>
+"use strict";
+// Every word the page draws, in each language it speaks; <html lang> picks one.
+const WORDS = {
+  en: {
+    playback: "Playback", sections: "Sections", chapters: "Chapters", chapter_runs: "Chapters",
+    runs: "Runs", timeline: "Timeline", moments: "Key moments", commits: "Commits", messages: "Messages",
+    calls: "Calls", log: "Every line", cost: "Cost", withheld: "Withheld", source: "Source", to_top: "Back to the top",
+    narration: "Narration", narration_said: "written for this page; not a record of the city",
+    step: "Step", axis: "Axis", speed: "Speed", first: "First", previous: "Previous", play: "Play", pause: "Pause",
+    next: "Next", last: "Last", axis_order: "In order", axis_time: "In time",
+    title_city: "City {city}", subtitle: "seq {from} to {through} · {span} · cutoff seq {cutoff} · {reader}",
+    span: "{first} to {last}", span_none: "no line records its own time",
+    reader_person: "read as the person, confidential buildings withheld",
+    reader_person_all: "read as the person, confidential buildings included",
+    reader_resident: "read as the resident of {addr}",
+    fact_events: "lines", fact_context: "{n} outside the selection", fact_runs: "runs", fact_calls: "calls",
+    fact_measured: "{n} measured", fact_commits: "commits", fact_messages: "messages", fact_cost: "billed",
+    fact_unpriced: "{n} calls unpriced", fact_withheld: "withheld lines", fact_timed: "timed lines",
+    fact_timed_of: "of {m}",
+    empty_bundle: "This is the template: the export puts a bundle into its data block. Nothing to show yet.",
+    bad_bundle: "The data block does not read as a playback bundle: {why}",
+    bad_schema: "This page reads {want}; the bundle says {got}. Export it again with a matching build, or read it with a page written for that schema.",
+    attention: "Needs attention", nothing_waits: "Nothing in this selection waits on anyone, and nothing was refused or failed.",
+    att_approval: "an approval waits for an answer", att_pr: "a pull request is still open",
+    att_unanswered: "{n} unanswered in {run}", att_flag: "show these {n} in the log",
+    col_room: "Room", col_run: "Run", col_task: "Task", col_state: "State", col_outcome: "Outcome", col_policy: "Policy",
+    col_lines: "Lines", col_cost: "Cost", col_seq: "Seq", col_time: "Time (UTC)", col_kind: "Kind", col_who: "Who",
+    col_what: "What", col_family: "Family", col_key: "Key", col_opened: "Opened", col_closed: "Closed",
+    col_members: "Lines", col_id: "Id", col_from: "From", col_to: "Room", col_sent: "Sent", col_consumed: "Taken",
+    col_callee: "Called", col_called: "Asked", col_answered: "Answered", col_took: "Took",
+    state_active: "active", state_frozen: "frozen", state_unknown: "state unknown",
+    no_addr: "no address", city_lane: "city", task_unseen: "its task line is not in this bundle",
+    unanswered: "{n} unanswered", forked: "forked from {run} at seq {seq}", child_of: "child of {run}",
+    after: "after {run}", withheld_run: "a run this reader may not see", missing_run: "a run the history lacks",
+    policy: "{mode} · write {write} · admit {admit} · landing {landing}", policy_none: "no policy recorded",
+    outcome_frozen: "{why}", outcome_died: "its process died", outcome_running: "running at the cutoff",
+    end_at: "seq {seq}", end_outside: "seq {seq}, outside the selection", end_withheld: "withheld",
+    end_pending: "not yet, by the cutoff", end_missing: "missing from the history",
+    tag_refused: "refused", tag_failed: "failed", tag_conflict: "conflict", tag_person: "the person",
+    tag_waiting: "waiting", tag_commit: "commit",
+    family_run: "run", family_approval: "approval", family_pr: "pull request",
+    moment_none: "No key moment opens or closes in this selection.",
+    took_measured: "{d}", took_unknown: "not measured",
+    took_note: "A duration is drawn only when both of a call's moments were measured. Not measured: an older ledger, an answer the city wrote after a restart, a call not answered yet, or a withheld end.",
+    model_pending_note: "A model call still pending may be an attempt a resend replaced: the next model call of the same run carries the reply.",
+    callee_tool: "tool {name}", callee_model: "model {name}", name_unseen: "name not visible",
+    commit_pinned: "job pinned", commit_committed: "commit", commit_merged: "merged",
+    commit_job: "job {job} (a stored object; this page cannot open it offline)",
+    commit_scope: "Scope", commit_files: "Files", commit_base: "Compared with", commit_trace: "Made by",
+    commit_nearby: "Nearby", commit_outcome: "Pull request",
+    base_previous: "this run's previous commit {oid}", base_parent: "its parent {oid}", base_none: "nothing: no earlier commit",
+    trace_untraced: "the trace knows no such commit", trace_unread: "the trace failed: {code}",
+    trace_elsewhere: "seq {seq}, outside the selection; widen it to read the line", trace_withheld: "a withheld call",
+    trace_none: "no call is named", nearby_note: "other runs that called tools in this building: candidates, not causes",
+    nearby_row: "{who}: {n} calls",
+    change_patch: "+{add} −{del}", change_truncated: "{shown} lines shown, {cut} cut",
+    change_empty: "no change", change_binary: "binary", change_missing: "the repository lacks an object",
+    change_withheld: "withheld: a building this reader may not see",
+    held_line: "line {n} held back: {why}", cut_lines: "{n} more lines did not fit the export's budget",
+    merged_by: "reviewed {reviewed}, landed {commit}, verified by {by}", rejected_by: "rejected by {by}: {why}",
+    pr_open: "open at the cutoff",
+    messages_none: "No message was sent or taken in this selection.",
+    calls_none: "No call was made in this selection.",
+    commits_none: "No checkpoint in this selection.",
+    filter_all: "Everything", filter_run: "Run", filter_chapter: "Chapter", filter_text: "Find", filter_context: "Lines outside the selection",
+    all_runs: "every run", all_chapters: "every chapter",
+    show_more: "Show {n} more", shown: "{shown} of {all}",
+    unknown_seqs: "{n} lines a newer writer wrote, which this build cannot read: seq {seqs}",
+    cost_total: "Billed", cost_by_run: "By run", cost_unpriced: "{calls} calls and {tokens} tokens have no price: they are not free, and are not in the total.",
+    cost_cover: "Covers only what this reader sees in this selection.",
+    withheld_events: "{n} lines withheld from this reader", withheld_credential: "{n} lines held back because they looked like a credential",
+    withheld_buildings: "Closed buildings", withheld_kinds: "Withheld lines by kind",
+    reason_confidential: "confidential", reason_rules_unreadable: "its rules could not be read",
+    withheld_note: "Names and counts are shown: this page does not hide that something happened there.",
+    withheld_none: "Nothing was withheld from this reader.",
+    src_schema: "Schema", src_city: "City", src_selection: "Selection", src_cutoff: "Cutoff", src_rules: "Projection rules",
+    src_reader: "Reader", src_check: "Check",
+    src_check_line: "sprawling playback check <this file> --city <city>",
+    src_note: "A consistent bundle says its parts agree; only a check against the city, or against a bundle you trust, says it was not changed. Neither proves a line's claim about the world.",
+    sel_everything: "everything up to the cutoff", sel_from: "from seq {v}", sel_through: "through seq {v}",
+    sel_run: "run {v}", sel_building: "within {v}", sel_since: "since {v}", sel_until: "until {v}",
+    card_none: "No line in this selection.", card_seq: "seq {seq}", card_place_event: "in the selection",
+    card_place_context: "outside the selection, carried to explain it",
+    card_time: "Time", card_no_time: "no time recorded for this line",
+    card_time_note: "Measured when it happened. Each line keeps its own precision.",
+    card_unmeasured_note: "A call or an answer whose moment was not measured: a line written before this ledger measured moments. Nothing is guessed for it.",
+    card_untimed_note: "Only model and tool calls and their answers record a moment of their own; this kind of line does not.",
+    card_run: "Run", card_who: "Who", card_addr: "Where", card_kind: "Kind", card_call: "Call",
+    card_line: "The ledger line", card_said: "Narration",
+    where: "line {i} of {n} · seq {seq}", where_time: "line {i} of {n} timed · seq {seq}",
+    axis_order_note: "Each mark is one line, in the order the ledger booked it; bars join a call to its answer.",
+    axis_time_note: "Each mark sits at its own measured moment. {untimed} lines record none (only calls and their answers do) and stay off this axis. Gaps longer than a minute are shortened, and each says how long it was. Bars are measured call durations only.",
+    axis_time_none: "No line in this selection records its own moment, so there is no time axis; read it in order.",
+    gap: "+{d}", legend_line: "line", legend_flag: "refused or failed", legend_conflict: "conflict",
+    legend_person: "the person", legend_commit: "commit", legend_call: "call",
+    plot_label: "Swimlanes: {lanes} runs and {n} lines. Use the step controls or the arrow keys to move through them.",
+    keys: "Keys: ← → step, Space plays, Home and End jump.",
+    ms: "{n} ms", s: "{n} s", min: "{m} min {s} s", h: "{h} h {m} min", d: "{d} d {h} h",
+  },
+  zh: {
+    playback: "回放", sections: "章节", chapters: "章节", chapter_runs: "分章",
+    runs: "运行", timeline: "时间线", moments: "关键时刻", commits: "提交", messages: "消息",
+    calls: "调用", log: "全部记录", cost: "费用", withheld: "隐去", source: "来源", to_top: "回到顶部",
+    narration: "解说", narration_said: "为本页写的说明，不是城的记录",
+    step: "步进", axis: "坐标", speed: "速度", first: "最前", previous: "上一条", play: "播放", pause: "暂停",
+    next: "下一条", last: "最后", axis_order: "按次序", axis_time: "按时间",
+    title_city: "城 {city}", subtitle: "seq {from} 至 {through} · {span} · 截止 seq {cutoff} · {reader}",
+    span: "{first} 至 {last}", span_none: "没有一行记下自己的时刻",
+    reader_person: "以人的身份读，机密楼已隐去",
+    reader_person_all: "以人的身份读，含机密楼",
+    reader_resident: "以 {addr} 的居民身份读",
+    fact_events: "记录", fact_context: "范围外 {n} 条", fact_runs: "运行", fact_calls: "调用",
+    fact_measured: "{n} 次量过", fact_commits: "提交", fact_messages: "消息", fact_cost: "已计费",
+    fact_unpriced: "{n} 次调用无报价", fact_withheld: "隐去的行", fact_timed: "有时刻的行",
+    fact_timed_of: "共 {m} 条",
+    empty_bundle: "这是模板：导出时 bundle 会放进它的数据块。现在没有可显示的内容。",
+    bad_bundle: "数据块读不成 playback bundle：{why}",
+    bad_schema: "本页读 {want}，bundle 写的是 {got}。用匹配的版本重新导出，或用为那个 schema 写的页面来读。",
+    attention: "需要留意", nothing_waits: "这段选择里没有在等人的事，也没有被拒绝或失败的事。",
+    att_approval: "一项审批在等答复", att_pr: "一个合并请求仍未关闭",
+    att_unanswered: "{run} 有 {n} 处未答", att_flag: "在记录里看这 {n} 条",
+    col_room: "房间", col_run: "运行", col_task: "任务", col_state: "状态", col_outcome: "结果", col_policy: "策略",
+    col_lines: "记录", col_cost: "费用", col_seq: "Seq", col_time: "时间（UTC）", col_kind: "种类", col_who: "谁",
+    col_what: "内容", col_family: "类别", col_key: "键", col_opened: "开始", col_closed: "结束",
+    col_members: "记录", col_id: "编号", col_from: "发自", col_to: "房间", col_sent: "发出", col_consumed: "收下",
+    col_callee: "调用对象", col_called: "发起", col_answered: "答复", col_took: "耗时",
+    state_active: "进行中", state_frozen: "已冻结", state_unknown: "状态不明",
+    no_addr: "无地址", city_lane: "城", task_unseen: "它的任务那一行不在这份 bundle 里",
+    unanswered: "{n} 处未答", forked: "从 {run} 的 seq {seq} 分叉", child_of: "{run} 的子运行",
+    after: "接续 {run}", withheld_run: "本读者看不到的运行", missing_run: "历史里缺的运行",
+    policy: "{mode} · 写 {write} · 准入 {admit} · 落地 {landing}", policy_none: "没有记录策略",
+    outcome_frozen: "{why}", outcome_died: "进程中止", outcome_running: "截止时仍在运行",
+    end_at: "seq {seq}", end_outside: "seq {seq}，在范围外", end_withheld: "已隐去",
+    end_pending: "截止时尚未发生", end_missing: "历史里没有",
+    tag_refused: "被拒绝", tag_failed: "失败", tag_conflict: "冲突", tag_person: "人的介入",
+    tag_waiting: "等待中", tag_commit: "提交",
+    family_run: "运行", family_approval: "审批", family_pr: "合并请求",
+    moment_none: "这段选择里没有关键时刻开始或结束。",
+    took_measured: "{d}", took_unknown: "未量",
+    took_note: "只有调用的两端都量过时刻才画耗时。未量：较早的账本、城在重启后补写的答复、尚未答复、或一端被隐去。",
+    model_pending_note: "仍未答复的模型调用可能是被重发取代的一次尝试：同一运行的下一次模型调用带着答复。",
+    callee_tool: "工具 {name}", callee_model: "模型 {name}", name_unseen: "名字不可见",
+    commit_pinned: "钉住任务", commit_committed: "提交", commit_merged: "已合并",
+    commit_job: "任务 {job}（存储里的对象；本页离线时打不开）",
+    commit_scope: "范围", commit_files: "文件", commit_base: "比较基准", commit_trace: "出自",
+    commit_nearby: "附近", commit_outcome: "合并请求",
+    base_previous: "本运行上一个提交 {oid}", base_parent: "它的父提交 {oid}", base_none: "无：没有更早的提交",
+    trace_untraced: "溯源里没有这个提交", trace_unread: "溯源失败：{code}",
+    trace_elsewhere: "seq {seq}，在范围外；放宽选择才能读这一行", trace_withheld: "一次被隐去的调用",
+    trace_none: "没有点名任何调用", nearby_note: "同楼里其他运行的工具调用：是候选，不是原因",
+    nearby_row: "{who}：{n} 次调用",
+    change_patch: "+{add} −{del}", change_truncated: "显示 {shown} 行，截去 {cut} 行",
+    change_empty: "无变化", change_binary: "二进制", change_missing: "仓库里缺对象",
+    change_withheld: "已隐去：本读者看不到的楼",
+    held_line: "第 {n} 行未显示：{why}", cut_lines: "另有 {n} 行超出导出预算",
+    merged_by: "审阅 {reviewed}，落地 {commit}，验证者 {by}", rejected_by: "{by} 拒绝：{why}",
+    pr_open: "截止时仍开着",
+    messages_none: "这段选择里没有消息发出或收下。",
+    calls_none: "这段选择里没有调用。",
+    commits_none: "这段选择里没有检查点。",
+    filter_all: "全部", filter_run: "运行", filter_chapter: "章节", filter_text: "查找", filter_context: "范围外的记录",
+    all_runs: "所有运行", all_chapters: "所有章节",
+    show_more: "再显示 {n} 条", shown: "{all} 条中的 {shown} 条",
+    unknown_seqs: "{n} 条由更新的写者写下，本版本读不懂：seq {seqs}",
+    cost_total: "已计费", cost_by_run: "按运行", cost_unpriced: "{calls} 次调用、{tokens} 个 token 没有报价：它们不是免费的，也不在合计里。",
+    cost_cover: "只涵盖本读者在这段选择里看得到的部分。",
+    withheld_events: "对本读者隐去 {n} 条", withheld_credential: "{n} 行因像凭据而未显示",
+    withheld_buildings: "关闭的楼", withheld_kinds: "按种类计的隐去条数",
+    reason_confidential: "机密", reason_rules_unreadable: "规则读不了",
+    withheld_note: "名字与计数照常显示：本页不隐瞒那里发生过事情。",
+    withheld_none: "没有对本读者隐去任何内容。",
+    src_schema: "Schema", src_city: "城", src_selection: "选择", src_cutoff: "截止", src_rules: "投影规则",
+    src_reader: "读者", src_check: "复核",
+    src_check_line: "sprawling playback check <本文件> --city <城>",
+    src_note: "自洽只说明各部分彼此一致；只有对照城或一份你信任的 bundle 复核，才能说明它没被改过。两者都不证明一行记录所说的事在现实中为真。",
+    sel_everything: "截止前的全部", sel_from: "从 seq {v}", sel_through: "到 seq {v}",
+    sel_run: "运行 {v}", sel_building: "{v} 之内", sel_since: "自 {v}", sel_until: "到 {v} 前",
+    card_none: "这段选择里没有记录。", card_seq: "seq {seq}", card_place_event: "在选择之内",
+    card_place_context: "在选择之外，为说明它而带上",
+    card_time: "时间", card_no_time: "这一行没有记录时刻",
+    card_time_note: "发生时量下的时刻。每一行保留自己的精度。",
+    card_unmeasured_note: "这次调用或答复没有量下时刻：它写于账本开始逐行量时刻之前。本页不替它猜。",
+    card_untimed_note: "只有模型与工具的调用及其答复记下自己的时刻；这一种行不记。",
+    card_run: "运行", card_who: "谁", card_addr: "地点", card_kind: "种类", card_call: "调用",
+    card_line: "账本原行", card_said: "解说",
+    where: "第 {i}/{n} 条 · seq {seq}", where_time: "有时刻的第 {i}/{n} 条 · seq {seq}",
+    axis_order_note: "每个刻度是一行，按账本记下的次序；横条连起一次调用和它的答复。",
+    axis_time_note: "每个刻度在它自己量下的时刻。{untimed} 行没有时刻（只有调用与答复才有），不放在这条轴上。超过一分钟的空档被缩短，并标出原本多长。横条只画量过的调用耗时。",
+    axis_time_none: "这段选择里没有一行记下自己的时刻，所以没有时间轴；请按次序读。",
+    gap: "+{d}", legend_line: "记录", legend_flag: "被拒绝或失败", legend_conflict: "冲突",
+    legend_person: "人的介入", legend_commit: "提交", legend_call: "调用",
+    plot_label: "泳道：{lanes} 个运行，{n} 行。用步进按钮或方向键逐条移动。",
+    keys: "按键：← → 步进，空格播放，Home 与 End 跳到两端。",
+    ms: "{n} 毫秒", s: "{n} 秒", min: "{m} 分 {s} 秒", h: "{h} 小时 {m} 分", d: "{d} 天 {h} 小时",
+  },
+};
+const LANG = document.documentElement.lang.toLowerCase().startsWith("zh") ? "zh" : "en";
+function say(key, fill) {
+  const text = WORDS[LANG][key] ?? WORDS.en[key] ?? key;
+  return fill ? text.replace(/\{(\w+)\}/g, (_, name) => String(fill[name] ?? "")) : text;
+}
+
+// The schema this page was written for.
+const SCHEMA = "sprawling.playback/3";
+const CITY_RUN = "00000000-0000-0000-0000-000000000000";
+// The kinds of line that record the moment their own event happened.
+const MOMENT_KINDS = new Set(["model_called", "model_returned", "tool_called", "tool_result"]);
+// How the lanes look and move.
+const LANE = 24;
+const GAP_MS = 60000;
+const PAGE = 200;
+const SPEEDS = [1, 10, 100];
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)");
+
+// ---------------------------------------------------------------- reading
+
+// A ledger line's own JSON, with every integer too large for a Number
+// kept as the digits it was written with.
+function parseLine(text) {
+  return JSON.parse(text, (_, value, context) =>
+    typeof value === "number" && !Number.isSafeInteger(value) && context && typeof context.source === "string"
+      ? context.source : value);
+}
+const big = (decimal) => BigInt(decimal);
+// The seq an end or a cited call names, when it names one: ends are
+// objects ({"at"}, {"outside"}, {"elsewhere"}) or one of the plain words.
+const seqIn = (end, key) => (end !== null && typeof end === "object" && typeof end[key] === "string" ? end[key] : null);
+const bySeq = (a, b) => (big(a) < big(b) ? -1 : big(a) > big(b) ? 1 : 0);
+const el = (tag, props, ...children) => {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props ?? {})) {
+    if (value === undefined || value === null || value === false) continue;
+    if (key === "class") node.className = value;
+    else if (key === "text") node.textContent = value;
+    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+    else node.setAttribute(key, value === true ? "" : String(value));
+  }
+  for (const child of children.flat()) if (child !== null && child !== undefined && child !== false) node.append(child);
+  return node;
+};
+const $ = (id) => document.getElementById(id);
+// Replaces a node's children, skipping the absent ones a view leaves out.
+const put = (node, ...children) => node.replaceChildren(...children.flat(Infinity).filter((child) => child !== null && child !== undefined && child !== false));
+
+function readBundle() {
+  const text = $("playback-bundle").textContent.trim();
+  if (text === "") return { problem: say("empty_bundle") };
+  let data;
+  try { data = JSON.parse(text); } catch (err) { return { problem: say("bad_bundle", { why: err.message }) }; }
+  if (data === null || typeof data !== "object") return { problem: say("bad_bundle", { why: typeof data }) };
+  if (data.schema !== SCHEMA) return { problem: say("bad_schema", { want: SCHEMA, got: String(data.schema) }) };
+  return { bundle: data };
+}
+
+// Everything the page draws, derived once from the bundle.
+function model(bundle) {
+  const lines = new Map();
+  const add = (entry, place) => {
+    let record = null;
+    try { record = parseLine(entry.line); } catch (_) { record = null; }
+    lines.set(entry.seq, { seq: entry.seq, moment: entry.moment, line: entry.line, place, record });
+  };
+  bundle.events.forEach((entry) => add(entry, "event"));
+  bundle.context.forEach((entry) => add(entry, "context"));
+  const events = bundle.events.map((entry) => lines.get(entry.seq));
+  events.forEach((line, index) => { line.index = index; });
+  const runs = new Map(bundle.runs.map((run) => [run.run, run]));
+  const calls = bundle.calls;
+  const callAt = new Map();
+  calls.forEach((call) => {
+    [call.called, call.answered].forEach((end) => { if (seqIn(end, "at")) callAt.set(seqIn(end, "at"), call); });
+  });
+  const cost = new Map(bundle.costs.by_run.map((row) => [row.run, row.usd_micros]));
+  const laneIds = [...runs.keys()];
+  if (events.some((line) => line.record && line.record.run === CITY_RUN) && !runs.has(CITY_RUN)) laneIds.unshift(CITY_RUN);
+  events.forEach((line) => { const run = line.record && line.record.run; if (run && !laneIds.includes(run)) laneIds.push(run); });
+  laneIds.sort((a, b) => {
+    if (a === CITY_RUN) return -1;
+    if (b === CITY_RUN) return 1;
+    const ra = runs.get(a); const rb = runs.get(b);
+    return ra && rb ? bySeq(ra.first_seq, rb.first_seq) : 0;
+  });
+  // What each run holds, and what each line answers to, read once.
+  const ofRun = new Map();
+  lines.forEach((line) => {
+    const run = line.record && line.record.run;
+    if (!run) return;
+    const held = ofRun.get(run) ?? { count: 0, started: null, frozen: null };
+    if (line.place === "event") held.count += 1;
+    if (line.record.kind === "run_started") held.started = line;
+    if (line.record.kind === "run_frozen" && line.place === "event") held.frozen = line;
+    ofRun.set(run, held);
+  });
+  const open = new Set([
+    ...bundle.moments.filter((m) => m.closed === "pending").map((m) => seqIn(m.opened, "at")),
+    ...bundle.messages.filter((m) => m.consumed === "pending").map((m) => seqIn(m.sent, "at")),
+    ...calls.filter((c) => c.answered === "pending").map((c) => seqIn(c.called, "at")),
+  ]);
+  lines.forEach((line) => { line.flags = flagsOf(line); if (open.has(line.seq)) line.flags.push("waiting"); });
+  const timed = events.filter((line) => line.moment !== null).sort((a, b) => bySeq(a.moment, b.moment) || bySeq(a.seq, b.seq));
+  timed.forEach((line, index) => { line.timeIndex = index; });
+  return { bundle, lines, events, runs, calls, callAt, cost, laneIds, timed, ofRun };
+}
+
+// ---------------------------------------------------------------- facts
+
+const short = (id) => (id === CITY_RUN ? say("city_lane") : "…" + String(id).slice(-6));
+const shortOid = (oid) => String(oid).slice(0, 12);
+function iso(ms) {
+  if (ms === null || ms === undefined) return null;
+  const n = Number(ms);
+  return Number.isSafeInteger(n) ? new Date(n).toISOString() : String(ms);
+}
+function duration(ms) {
+  const n = Number(ms);
+  if (!Number.isSafeInteger(n)) return say("ms", { n: ms });
+  if (n < 1000) return say("ms", { n });
+  if (n < 60000) return say("s", { n: (n / 1000).toFixed(n < 10000 ? 3 : 1) });
+  if (n < 3600000) return say("min", { m: Math.floor(n / 60000), s: String(Math.floor(n / 1000) % 60).padStart(2, "0") });
+  if (n < 86400000) return say("h", { h: Math.floor(n / 3600000), m: String(Math.floor(n / 60000) % 60).padStart(2, "0") });
+  return say("d", { d: Math.floor(n / 86400000), h: Math.floor(n / 3600000) % 24 });
+}
+function usd(micros) {
+  const m = big(micros);
+  const whole = m / 1000000n;
+  const part = String(m % 1000000n).padStart(6, "0").replace(/0{1,4}$/, "");
+  return "$" + whole.toString() + "." + part;
+}
+const thousands = (decimal) => String(decimal).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+// Which of the reader's filters a line answers to: the one table of them.
+function flagsOf(line) {
+  const record = line.record;
+  if (!record) return [];
+  const data = record.data ?? {};
+  const flags = [];
+  switch (record.kind) {
+    case "gate_denied": case "budget_limit": case "secret_egress_blocked": case "backpressure_shed": case "pr_rejected":
+      flags.push("refused"); break;
+    case "provider_degraded": if (data.error || data.code) flags.push("refused"); break;
+    case "approval_resolved": if (data.verdict === "deny") flags.push("refused"); break;
+    case "tool_result": if (data.error) flags.push("failed"); break;
+    case "watchdog_fired": case "roadmap_blocked": case "endpoint_lost": flags.push("failed"); break;
+    case "run_frozen": if (data.cause) flags.push("failed"); break;
+    case "goal_conflict": case "arbitration_verdict": flags.push("conflict"); break;
+    case "checkpoint_committed": if (data.oid) flags.push("commit"); break;
+    case "pr_merged": flags.push("commit"); break;
+    default: break;
+  }
+  if (record.who === "person" || record.kind === "steer_received" || record.kind === "cancel_received") flags.push("person");
+  return flags;
+}
+
+// One line of what a record says, for the log and the card.
+function summaryOf(line) {
+  const record = line.record;
+  if (!record) return "";
+  const data = record.data ?? {};
+  const code = (err) => (err && typeof err === "object" ? [err.code, err.subject].filter(Boolean).join(" ") : "");
+  let text;
+  switch (record.kind) {
+    case "run_started": text = data.task; break;
+    case "tool_called": text = [data.name, data.subject].filter(Boolean).join(" "); break;
+    case "tool_result": text = data.error ? [data.name, code(data.error)].join(" ") : data.name; break;
+    case "model_called": text = data.model; break;
+    case "model_returned": text = [data.stop, data.usage ? Object.entries(data.usage).map(([k, v]) => k + " " + v).join(" · ") : ""].filter(Boolean).join(" · "); break;
+    case "signal_enqueued": text = [data.from, "→", data.room].join(" "); break;
+    case "signal_consumed": text = data.by; break;
+    case "checkpoint_committed": text = data.oid ? shortOid(data.oid) + " " + (data.files ?? []).join(" ") : data.job; break;
+    case "pr_opened": text = [data.branch, data.commit && shortOid(data.commit)].filter(Boolean).join(" "); break;
+    case "pr_merged": text = say("merged_by", { reviewed: shortOid(data.reviewed_commit || "?"), commit: shortOid(data.commit || "?"), by: data.verified_by }); break;
+    case "pr_rejected": text = say("rejected_by", { by: data.by, why: data.why }); break;
+    case "approval_resolved": text = data.verdict; break;
+    case "steer_received": text = data.text; break;
+    case "gate_denied": case "budget_limit": case "provider_degraded": text = code(data.error ?? data); break;
+    case "run_frozen": text = data.completion; break;
+    default: text = "";
+  }
+  return clip(text === undefined || text === null ? "" : String(text), 200);
+}
+function clip(text, most) { return text.length > most ? text.slice(0, most - 1) + "…" : text; }
+
+function policyText(policy) {
+  return policy ? say("policy", policy) : say("policy_none");
+}
+function relatedText(related, key, fill) {
+  if (!related) return null;
+  if (related.run) return say(key, Object.assign({ run: short(related.run) }, fill));
+  return related === "withheld" ? say("withheld_run") : say("missing_run");
+}
+
+// ---------------------------------------------------------------- drawing helpers
+
+let M;
+const state = { current: 0, axis: "order", speed: 1, playing: false, filter: "all", run: "", chapter: "", text: "", context: false, shown: PAGE };
+
+function cite(seq) {
+  const line = M.lines.get(seq);
+  const outside = line && line.place === "context";
+  return el("button", {
+    type: "button", class: outside ? "cite outside" : "cite", "data-seq": seq,
+    title: outside ? say("end_outside", { seq }) : say("end_at", { seq }),
+    onclick: () => show(seq),
+  }, "#" + seq);
+}
+function end(value) {
+  if (value === "withheld") return el("span", { class: "end withheld" }, say("end_withheld"));
+  if (value === "pending") return el("span", { class: "end pending" }, say("end_pending"));
+  if (value === "missing") return el("span", { class: "end missing" }, say("end_missing"));
+  if (seqIn(value, "at")) return cite(seqIn(value, "at"));
+  if (seqIn(value, "outside")) return cite(seqIn(value, "outside"));
+  return el("span", { class: "end missing" }, say("end_missing"));
+}
+function tag(flag) { return el("span", { class: "tag " + flag }, say("tag_" + flag)); }
+function table(columns, rows, opts) {
+  return el("table", { class: "table" + (opts && opts.stack ? " stack" : "") },
+    el("thead", null, el("tr", null, columns.map((col) => el("th", { class: col.num ? "num" : null, scope: "col" }, say(col.key))))),
+    el("tbody", null, rows));
+}
+function cell(col, content) {
+  return el("td", { class: col.num ? "num" : col.nw ? "nw" : null, "data-label": say(col.key) }, content);
+}
+function runLabel(runId) {
+  return runId === CITY_RUN ? say("city_lane") : laneName(runId) + " " + short(runId);
+}
+function laneName(runId) {
+  if (runId === CITY_RUN) return say("city_lane");
+  const run = M.runs.get(runId);
+  return run && run.addr ? run.addr : say("no_addr");
+}
+
+// ---------------------------------------------------------------- the page
+
+function drawHeader() {
+  const { bundle, events } = M;
+  const src = bundle.source;
+  const reader = src.reader.person
+    ? say(src.reader.person === "included" ? "reader_person_all" : "reader_person")
+    : say("reader_resident", { addr: src.reader.resident });
+  $("title").textContent = say("title_city", { city: String(src.city).slice(0, 12) });
+  $("subtitle").textContent = say("subtitle", {
+    from: events.length ? events[0].seq : "—", through: events.length ? events[events.length - 1].seq : "—",
+    cutoff: src.cutoff.seq, reader,
+    span: M.timed.length ? say("span", { first: iso(M.timed[0].moment), last: iso(M.timed[M.timed.length - 1].moment) }) : say("span_none"),
+  });
+  document.title = say("playback") + " · " + say("title_city", { city: String(src.city).slice(0, 12) });
+  const measured = M.calls.filter((call) => call.took && call.took.measured).length;
+  const commits = bundle.checkpoints.filter((c) => c.holds.committed).length;
+  const fact = (label, value, small) => el("div", null, el("dt", { class: "lbl" }, label), el("dd", null, value, small ? el("small", null, " " + small) : null));
+  put($("facts"), 
+    fact(say("fact_events"), thousands(events.length), bundle.context.length ? say("fact_context", { n: bundle.context.length }) : null),
+    fact(say("fact_runs"), thousands(bundle.runs.length)),
+    fact(say("fact_calls"), thousands(M.calls.length), say("fact_measured", { n: measured })),
+    fact(say("fact_commits"), thousands(commits)),
+    fact(say("fact_messages"), thousands(bundle.messages.length)),
+    fact(say("fact_cost"), usd(bundle.costs.billed_usd_micros), big(bundle.costs.unpriced_calls) > 0n ? say("fact_unpriced", { n: bundle.costs.unpriced_calls }) : null),
+    fact(say("fact_withheld"), thousands(bundle.withheld.events)),
+    fact(say("fact_timed"), thousands(M.timed.length), say("fact_timed_of", { m: events.length })),
+  );
+}
+
+function drawNarration() {
+  const section = $("narration");
+  const said = [...section.children].filter((child) => child.tagName !== "H2");
+  section.hidden = said.length === 0;
+  section.querySelectorAll("[data-seq]").forEach((node) => {
+    node.setAttribute("role", "button");
+    node.tabIndex = 0;
+    const go = () => show(node.getAttribute("data-seq"));
+    node.addEventListener("click", go);
+    node.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); go(); } });
+  });
+}
+
+function drawRuns() {
+  const { bundle } = M;
+  $("runs-count").textContent = String(bundle.runs.length);
+  const counts = { refused: 0, failed: 0, conflict: 0, person: 0 };
+  M.events.forEach((line) => line.flags.forEach((flag) => { if (flag in counts) counts[flag] += 1; }));
+  const items = [];
+  bundle.moments.filter((m) => m.family === "approval" && m.closed === "pending").forEach((m) =>
+    items.push(el("li", null, tag("waiting"), say("att_approval"), " ", end(m.opened))));
+  bundle.moments.filter((m) => m.family === "pr" && m.closed === "pending").forEach((m) =>
+    items.push(el("li", null, tag("waiting"), say("att_pr"), " ", el("span", { class: "q" }, m.key), " ", end(m.opened))));
+  bundle.runs.filter((run) => big(run.unanswered) > 0n).forEach((run) =>
+    items.push(el("li", null, tag("waiting"), say("att_unanswered", { n: run.unanswered, run: (run.addr ?? "") + " " + short(run.run) }))));
+  Object.entries(counts).filter(([, n]) => n > 0).forEach(([flag, n]) =>
+    items.push(el("li", null, tag(flag), el("button", { type: "button", class: "link", onclick: () => { setFilter(flag); $("log").scrollIntoView(); } }, say("att_flag", { n, tag: say("tag_" + flag) })))));
+  put($("attention"), el("li", { class: "lbl" }, say("attention")), ...(items.length ? items : [el("li", { class: "f" }, say("nothing_waits"))]));
+  const cols = [{ key: "col_room", nw: true }, { key: "col_run" }, { key: "col_task" }, { key: "col_state", nw: true }, { key: "col_outcome" }, { key: "col_policy" }, { key: "col_lines", num: true }, { key: "col_cost", num: true }];
+  const rows = bundle.runs.map((run) => {
+    const held = M.ofRun.get(run.run) ?? { count: 0, started: null, frozen: null };
+    const started = held.started;
+    const task = started ? started.record.data.task : null;
+    const frozen = held.frozen;
+    const outcome = run.state === "frozen"
+      ? (frozen ? (frozen.record.data.cause ? say("outcome_died") : say("outcome_frozen", { why: frozen.record.data.completion ?? "" })) : say("state_frozen"))
+      : run.state === "active" ? say("outcome_running") : say("state_unknown");
+    const relations = [
+      relatedText(run.parent, "child_of"),
+      run.forked_at ? say("forked", { run: run.parent && run.parent.run ? short(run.parent.run) : "?", seq: run.forked_at }) : null,
+      relatedText(run.predecessor, "after"),
+    ].filter(Boolean);
+    return el("tr", null,
+      cell(cols[0], el("span", null, el("span", { class: "dot " + (run.state ?? "") }), " ", run.addr ?? say("no_addr"))),
+      cell(cols[1], el("button", { type: "button", class: "cite", title: run.run, onclick: () => { setChapter("run:" + run.run); } }, short(run.run))),
+      cell(cols[2], el("span", null, task ? el("span", { title: String(task) }, clip(String(task), 140), " ", cite(started.seq)) : el("span", { class: "f" }, say("task_unseen")), relations.length ? el("div", { class: "note" }, relations.join(" · ")) : null)),
+      cell(cols[3], el("span", null, say(run.state ? "state_" + run.state : "state_unknown"), big(run.unanswered) > 0n ? el("div", { class: "note" }, say("unanswered", { n: run.unanswered })) : null)),
+      cell(cols[4], el("span", null, outcome, " ", frozen ? cite(frozen.seq) : null)),
+      cell(cols[5], el("span", { class: "q small" }, policyText(run.policy))),
+      cell(cols[6], el("span", null, cite(run.first_seq), " – ", cite(run.last_seq), el("div", { class: "note" }, thousands(held.count)))),
+      cell(cols[7], M.cost.has(run.run) ? usd(M.cost.get(run.run)) : "—"),
+    );
+  });
+  put($("runs-body"), rows.length ? table(cols, rows, { stack: true }) : el("p", { class: "empty" }, "—"));
+}
+
+function chapters() {
+  const list = [];
+  M.bundle.runs.forEach((run) => list.push({ id: "run:" + run.run, label: run.addr ?? say("no_addr"), sub: say("family_run") + " " + short(run.run), seqs: null, run: run.run }));
+  M.bundle.moments.filter((m) => m.family !== "run").forEach((m) => list.push({ id: m.family + ":" + m.key, label: m.key, sub: say("family_" + m.family), seqs: new Set(m.seqs) }));
+  return list;
+}
+
+function drawChapters() {
+  const list = chapters();
+  put($("chapter-list"), ...list.map((chapter) => el("li", null,
+    el("button", { type: "button", "aria-pressed": String(state.chapter === chapter.id), onclick: () => setChapter(state.chapter === chapter.id ? "" : chapter.id) },
+      el("span", { class: "dot" }), el("span", { class: "mono-cut" }, chapter.label), el("small", null, chapter.sub)))));
+}
+
+function drawMoments() {
+  const moments = M.bundle.moments;
+  $("moments-count").textContent = String(moments.length);
+  if (!moments.length) { put($("moments-body"), el("p", { class: "empty" }, say("moment_none"))); return; }
+  const cols = [{ key: "col_family" }, { key: "col_key" }, { key: "col_opened" }, { key: "col_closed" }, { key: "col_members", num: true }];
+  const rows = moments.map((m) => {
+    const id = m.family + ":" + m.key;
+    const closing = seqIn(m.closed, "at") ? M.lines.get(seqIn(m.closed, "at")) : null;
+    const outcome = closing && closing.record ? summaryOf(closing) : m.family === "pr" && m.closed === "pending" ? say("pr_open") : "";
+    return el("tr", { class: state.chapter === id || state.chapter === "run:" + m.key ? "on" : null },
+      cell(cols[0], say("family_" + m.family)),
+      cell(cols[1], el("span", null, el("button", { type: "button", class: "link", onclick: () => setChapter(m.family === "run" ? "run:" + m.key : id) }, m.family === "run" ? (runLabel(m.key)) : m.key), outcome ? el("div", { class: "note" }, outcome) : null)),
+      cell(cols[2], end(m.opened)),
+      cell(cols[3], end(m.closed)),
+      cell(cols[4], thousands(m.seqs.length)),
+    );
+  });
+  put($("moments-body"), table(cols, rows, { stack: true }));
+}
+
+function drawCommits() {
+  const points = M.bundle.checkpoints;
+  $("commits-count").textContent = String(points.length);
+  if (!points.length) { put($("commits-body"), el("p", { class: "empty" }, say("commits_none"))); return; }
+  put($("commits-body"), ...points.map(commitView));
+}
+
+function commitView(point) {
+  const holds = point.holds;
+  const kind = holds.pinned ? "commit_pinned" : holds.merged ? "commit_merged" : "commit_committed";
+  const oid = holds.committed ? holds.committed.oid : holds.merged ? holds.merged.oid : null;
+  const fact = (key, value) => el("span", { class: "fact" }, el("span", { class: "lbl" }, say(key)), " ", value);
+  const facts = [];
+  if (holds.pinned) facts.push(el("span", { class: "fact" }, say("commit_job", { job: holds.pinned.job })));
+  if (holds.merged) {
+    const line = M.lines.get(point.seq);
+    if (line && line.record) facts.push(fact("commit_outcome", summaryOf(line)));
+  }
+  const c = holds.committed;
+  if (c) {
+    facts.push(fact("commit_base", c.base === "none" ? say("base_none") : c.base.previous !== undefined ? say("base_previous", { oid: shortOid(c.base.previous) }) : say("base_parent", { oid: shortOid(c.base.parent) })));
+    let trace;
+    if (c.trace === "untraced") trace = say("trace_untraced");
+    else if (c.trace.unread) trace = say("trace_unread", { code: c.trace.unread });
+    else {
+      const named = c.trace.traced.calls.map((call) => seqIn(call, "at") ? cite(seqIn(call, "at"))
+        : seqIn(call, "elsewhere") ? el("span", { class: "end pending" }, say("trace_elsewhere", { seq: seqIn(call, "elsewhere") }))
+        : el("span", { class: "end withheld" }, say("trace_withheld")));
+      trace = named.length ? named : say("trace_none");
+    }
+    facts.push(fact("commit_trace", trace));
+    if (c.scope.length) facts.push(fact("commit_scope", c.scope.join(" ")));
+    if (c.trace.traced && c.trace.traced.nearby.length) {
+      facts.push(fact("commit_nearby", el("span", { title: say("nearby_note") },
+        c.trace.traced.nearby.map((near) => say("nearby_row", { who: near.actor ?? (near.run && near.run.run ? short(near.run.run) : relatedText(near.run, "after")), n: near.calls })).join(" · "),
+        el("span", { class: "f" }, " (" + say("nearby_note") + ")"))));
+    }
+  }
+  return el("article", { class: "checkpoint" },
+    el("span", { class: "tag " + (holds.pinned ? "waiting" : holds.merged ? "person" : "commit") }, say(kind)),
+    el("div", null,
+      el("div", { class: "head" },
+        oid ? el("b", { class: "oid", title: oid }, shortOid(oid)) : null,
+        el("span", { class: "f" }, runLabel(point.run)),
+        cite(point.seq),
+        c ? el("span", { class: "f" }, say("commit_files") + " " + thousands(c.files.length)) : null),
+      el("p", { class: "facts-line" }, facts),
+      c ? c.diff.map(fileView) : null));
+}
+
+function fileView(file) {
+  const change = file.change;
+  const kind = typeof change === "string" ? change : Object.keys(change)[0];
+  const body = typeof change === "string" ? null : change[kind];
+  let label;
+  if (kind === "patch") {
+    const add = body.lines.filter((l) => l.text.startsWith("+") && !l.text.startsWith("+++")).length;
+    const del = body.lines.filter((l) => l.text.startsWith("-") && !l.text.startsWith("---")).length;
+    label = say("change_patch", { add, del });
+  } else if (kind === "truncated") label = say("change_truncated", { shown: body.lines.length, cut: body.cut });
+  else label = say("change_" + kind);
+  const summary = el("summary", null, el("span", { class: "path" }, file.path), el("span", { class: kind === "withheld" ? "end withheld" : kind === "missing" ? "end missing" : "f" }, label));
+  if (!body) return el("details", { class: "file" }, summary);
+  const rows = [];
+  const held = new Map(body.credential.map((h) => [h.number, h.reason]));
+  const numbers = [...body.lines.map((l) => l.number), ...held.keys()].sort(bySeq);
+  const texts = new Map(body.lines.map((l) => [l.number, l.text]));
+  numbers.forEach((number) => {
+    if (held.has(number)) { rows.push(el("div", { class: "held" }, el("span", null, number), el("span", null, say("held_line", { n: number, why: held.get(number) })))); return; }
+    const text = texts.get(number);
+    const cls = text.startsWith("@@") ? "hunk" : text.startsWith("+") && !text.startsWith("+++") ? "add" : text.startsWith("-") && !text.startsWith("---") ? "del" : null;
+    rows.push(el("div", { class: cls }, el("span", null, number), el("span", null, text)));
+  });
+  if (kind === "truncated") rows.push(el("div", { class: "cut" }, el("span", null, "…"), el("span", null, say("cut_lines", { n: body.cut }))));
+  return el("details", { class: "file" }, summary, el("div", { class: "diff" }, rows));
+}
+
+function drawMessages() {
+  const messages = M.bundle.messages;
+  $("messages-count").textContent = String(messages.length);
+  if (!messages.length) { put($("messages-body"), el("p", { class: "empty" }, say("messages_none"))); return; }
+  const cols = [{ key: "col_id" }, { key: "col_from" }, { key: "col_to" }, { key: "col_sent" }, { key: "col_consumed" }];
+  put($("messages-body"), table(cols, messages.map((m) => el("tr", null,
+    cell(cols[0], m.id), cell(cols[1], m.from ?? "—"), cell(cols[2], m.room ?? "—"),
+    cell(cols[3], end(m.sent)), cell(cols[4], end(m.consumed)))), { stack: true }));
+}
+
+let callsShown = PAGE;
+function drawCalls() {
+  const calls = M.calls.filter((call) => !state.run || call.run === state.run);
+  $("calls-count").textContent = String(M.calls.length);
+  if (!M.calls.length) { put($("calls-body"), el("p", { class: "empty" }, say("calls_none"))); return; }
+  const cols = [{ key: "col_run" }, { key: "col_callee" }, { key: "col_called" }, { key: "col_answered" }, { key: "col_took", num: true }];
+  const rows = calls.slice(0, callsShown).map((call) => {
+    const callee = call.callee.tool ? say("callee_tool", { name: call.callee.tool.name ?? say("name_unseen") }) : say("callee_model", { name: call.callee.model.name ?? say("name_unseen") });
+    const took = call.took.measured ? say("took_measured", { d: duration(call.took.measured) }) : el("span", { class: "f", title: say("took_note") }, say("took_unknown"));
+    return el("tr", null, cell(cols[0], runLabel(call.run)), cell(cols[1], callee), cell(cols[2], end(call.called)), cell(cols[3], end(call.answered)), cell(cols[4], took));
+  });
+  const more = calls.length > callsShown
+    ? el("button", { type: "button", class: "more", onclick: () => { callsShown += PAGE; drawCalls(); } }, say("show_more", { n: Math.min(PAGE, calls.length - callsShown) }))
+    : null;
+  const pendingModel = calls.some((call) => call.callee.model && call.answered === "pending");
+  put($("calls-body"), table(cols, rows, { stack: true }), more, el("p", { class: "note" }, say("took_note")), pendingModel ? el("p", { class: "note" }, say("model_pending_note")) : null);
+}
+
+// ---------------------------------------------------------------- the log
+
+function filtered() {
+  const chapter = chapters().find((c) => c.id === state.chapter);
+  const text = state.text.toLowerCase();
+  const pool = state.context ? [...M.lines.values()].sort((a, b) => bySeq(a.seq, b.seq)) : M.events;
+  return pool.filter((line) => {
+    const run = line.record && line.record.run;
+    if (state.run && run !== state.run) return false;
+    if (chapter && chapter.seqs && !chapter.seqs.has(line.seq)) return false;
+    if (chapter && chapter.run && run !== chapter.run) return false;
+    if (state.filter !== "all" && !line.flags.includes(state.filter)) return false;
+    if (text) {
+      const hay = [line.seq, line.record && line.record.kind, line.record && line.record.who, line.record && line.record.addr, summaryOf(line)].join(" ").toLowerCase();
+      if (!hay.includes(text)) return false;
+    }
+    return true;
+  });
+}
+
+function drawFilters() {
+  const kinds = ["all", "refused", "failed", "conflict", "person", "waiting", "commit"];
+  const runs = el("select", { "aria-label": say("filter_run"), onchange: (event) => { state.run = event.target.value; state.shown = PAGE; callsShown = PAGE; drawLog(); drawCalls(); } },
+    el("option", { value: "" }, say("all_runs")),
+    M.laneIds.map((id) => el("option", { value: id, selected: state.run === id }, runLabel(id))));
+  const search = el("input", { type: "search", placeholder: say("filter_text"), "aria-label": say("filter_text"), value: state.text, oninput: (event) => { state.text = event.target.value; state.shown = PAGE; drawLog(); } });
+  const ctx = el("label", null, el("input", { type: "checkbox", checked: state.context, onchange: (event) => { state.context = event.target.checked; state.shown = PAGE; drawLog(); } }), say("filter_context"));
+  put($("filters"), 
+    el("div", { class: "seg", role: "group", "aria-label": say("filter_all") }, kinds.map((kind) =>
+      el("button", { type: "button", "aria-pressed": String(state.filter === kind), onclick: () => setFilter(kind) }, kind === "all" ? say("filter_all") : say("tag_" + kind)))),
+    runs, search, ctx);
+}
+
+function drawLog() {
+  const rows = filtered();
+  $("log-count").textContent = say("shown", { shown: thousands(Math.min(rows.length, state.shown)), all: thousands(rows.length) });
+  const cols = [{ key: "col_seq", nw: true }, { key: "col_time", nw: true }, { key: "col_run", nw: true }, { key: "col_kind" }, { key: "col_who" }, { key: "col_what" }];
+  const current = M.events[state.current];
+  const body = rows.slice(0, state.shown).map((line) => {
+    const record = line.record ?? {};
+    return el("tr", { id: "line-" + line.seq, class: [line === current ? "on" : "", line.place === "context" ? "ctx" : ""].join(" ").trim() || null },
+      cell(cols[0], cite(line.seq)),
+      cell(cols[1], line.moment !== null ? iso(line.moment) : el("span", { class: "f" }, "—")),
+      cell(cols[2], record.run ? runLabel(record.run) : "—"),
+      cell(cols[3], el("span", null, record.kind ?? "?", " ", line.flags.map(tag))),
+      cell(cols[4], record.addr && record.addr !== record.who ? record.who + " · " + record.addr : record.who),
+      cell(cols[5], summaryOf(line)));
+  });
+  const unknown = M.bundle.unknown.length ? el("p", { class: "note" }, say("unknown_seqs", { n: M.bundle.unknown.length, seqs: M.bundle.unknown.join(", ") })) : null;
+  const more = rows.length > state.shown
+    ? el("button", { type: "button", class: "more", onclick: () => { state.shown += PAGE; drawLog(); } }, say("show_more", { n: Math.min(PAGE, rows.length - state.shown) }))
+    : null;
+  put($("log-body"), table(cols, body, { stack: true }), more, unknown);
+}
+
+function setFilter(kind) { state.filter = kind; state.shown = PAGE; drawFilters(); drawLog(); }
+function setChapter(id) {
+  state.chapter = id; state.shown = PAGE;
+  drawChapters(); drawMoments(); drawLog(); drawPlot();
+  const chapter = chapters().find((c) => c.id === id);
+  if (chapter) {
+    const first = M.events.find((line) => chapter.seqs ? chapter.seqs.has(line.seq) : line.record && line.record.run === chapter.run);
+    if (first) setCurrent(first.index);
+  }
+}
+
+// ---------------------------------------------------------------- cost, withheld, source
+
+function drawCost() {
+  const costs = M.bundle.costs;
+  const cols = [{ key: "col_run" }, { key: "col_cost", num: true }];
+  put($("cost-body"), 
+    el("p", { style: "margin-bottom:16px" }, el("span", { class: "lbl" }, say("cost_total")), " ", el("b", null, usd(costs.billed_usd_micros))),
+    costs.by_run.length ? table(cols, costs.by_run.map((row) => el("tr", null, cell(cols[0], runLabel(row.run)), cell(cols[1], usd(row.usd_micros))))) : null,
+    big(costs.unpriced_calls) > 0n || big(costs.unpriced_tokens) > 0n ? el("p", { class: "note" }, say("cost_unpriced", { calls: thousands(costs.unpriced_calls), tokens: thousands(costs.unpriced_tokens) })) : null,
+    el("p", { class: "note" }, say("cost_cover")));
+}
+
+function drawWithheld() {
+  const w = M.bundle.withheld;
+  const nothing = big(w.events) === 0n && big(w.credential) === 0n && !w.buildings.length && !w.kinds.length;
+  if (nothing) { put($("withheld-body"), el("p", { class: "empty" }, say("withheld_none"))); return; }
+  const cols = [{ key: "col_room" }, { key: "col_what" }];
+  const kinds = [{ key: "col_kind" }, { key: "col_lines", num: true }];
+  put($("withheld-body"), 
+    el("p", null, say("withheld_events", { n: thousands(w.events) })),
+    big(w.credential) > 0n ? el("p", null, say("withheld_credential", { n: thousands(w.credential) })) : null,
+    w.buildings.length ? [el("p", { class: "lbl", style: "margin-top:16px" }, say("withheld_buildings")), table(cols, w.buildings.map((b) => el("tr", null, cell(cols[0], b.building), cell(cols[1], say("reason_" + b.reason)))))] : null,
+    w.kinds.length ? [el("p", { class: "lbl", style: "margin-top:16px" }, say("withheld_kinds")), table(kinds, w.kinds.map((k) => el("tr", null, cell(kinds[0], k.kind), cell(kinds[1], thousands(k.count)))))] : null,
+    el("p", { class: "note" }, say("withheld_note")));
+}
+
+function drawSource() {
+  const src = M.bundle.source;
+  const sel = src.selection;
+  const parts = [
+    sel.from && say("sel_from", { v: sel.from }), sel.through && say("sel_through", { v: sel.through }),
+    sel.run && say("sel_run", { v: sel.run }), sel.building && say("sel_building", { v: sel.building }),
+    sel.since && say("sel_since", { v: iso(sel.since) }), sel.until && say("sel_until", { v: iso(sel.until) }),
+  ].filter(Boolean);
+  const reader = src.reader.person ? say(src.reader.person === "included" ? "reader_person_all" : "reader_person") : say("reader_resident", { addr: src.reader.resident });
+  const row = (key, value) => [el("dt", null, say(key)), el("dd", null, value)];
+  put($("source-body"), el("div", { class: "card", style: "margin-top:0" }, el("dl", null,
+    row("src_schema", M.bundle.schema), row("src_city", src.city),
+    row("src_selection", parts.length ? parts.join(" · ") : say("sel_everything")),
+    row("src_cutoff", el("span", null, "seq " + src.cutoff.seq + " · ", el("span", { class: "f" }, src.cutoff.chain_hash))),
+    row("src_rules", String(src.rules)), row("src_reader", reader),
+    row("src_check", el("code", null, say("src_check_line"))))), el("p", { class: "note" }, say("src_note")));
+}
+
+// ---------------------------------------------------------------- the lanes
+
+// Where each line sits on the axis now drawn: x in [0, 1], or null when
+// the axis cannot place it.
+function axis() {
+  if (state.axis === "order") {
+    const n = Math.max(M.events.length - 1, 1);
+    return { at: (line) => line.index / n, breaks: [] };
+  }
+  // A gap longer than GAP_MS is drawn at one width, so a quiet night
+  // does not squeeze the minutes around it into a line; it says how
+  // long it really was.
+  const gaps = M.timed.slice(1).map((line, i) => Math.max(Number(line.moment) - Number(M.timed[i].moment), 0));
+  const long = gaps.filter((gap) => gap > GAP_MS).length;
+  const busy = gaps.filter((gap) => gap <= GAP_MS).reduce((sum, gap) => sum + gap, 0);
+  const shortened = Math.max(busy, 1) / Math.max(8, 2 * long);
+  const virtual = new Map();
+  const breaks = [];
+  let v = 0;
+  M.timed.forEach((line, i) => {
+    const gap = i === 0 ? 0 : gaps[i - 1];
+    if (gap > GAP_MS) { breaks.push({ v: v + shortened / 2, real: gap }); v += shortened; } else v += gap;
+    virtual.set(line.seq, v);
+  });
+  const total = Math.max(v, 1);
+  return { at: (line) => (virtual.has(line.seq) ? virtual.get(line.seq) / total : null), breaks: breaks.map((b) => ({ x: b.v / total, real: b.real })), total, virtual };
+}
+
+function colour(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function drawPlot() {
+  const canvas = $("plot");
+  const lanes = M.laneIds;
+  const width = canvas.parentElement.clientWidth;
+  const height = lanes.length * LANE + 24;
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.round(width * ratio));
+  canvas.height = Math.round(height * ratio);
+  canvas.style.height = height + "px";
+  const g = canvas.getContext("2d");
+  g.setTransform(ratio, 0, 0, ratio, 0, 0);
+  g.clearRect(0, 0, width, height);
+  const pad = 8;
+  const span = Math.max(width - 2 * pad, 1);
+  const a = axis();
+  const x = (line) => { const at = a.at(line); return at === null ? null : pad + at * span; };
+  const laneOf = new Map(lanes.map((id, i) => [id, i]));
+  const chapter = chapters().find((c) => c.id === state.chapter);
+  const inChapter = (line) => !chapter || (chapter.seqs ? chapter.seqs.has(line.seq) : line.record && line.record.run === chapter.run);
+  const c = { rule: colour("--rule"), line: colour("--faint"), ghost: colour("--ghost"), stop: colour("--stop"), warm: colour("--warm"), go: colour("--go"), acid: colour("--acid"), call: colour("--rule-2"), ink: colour("--ink") };
+  lanes.forEach((_, i) => { g.fillStyle = c.rule; g.fillRect(0, (i + 1) * LANE - 0.5, width, 1); });
+  // calls first, under the marks
+  M.calls.forEach((call) => {
+    const from = seqIn(call.called, "at") ? M.lines.get(seqIn(call.called, "at")) : null;
+    if (!from || !from.record) return;
+    const lane = laneOf.get(from.record.run);
+    if (lane === undefined) return;
+    let x0 = x(from); let x1 = null;
+    if (state.axis === "order") {
+      const to = seqIn(call.answered, "at") ? M.lines.get(seqIn(call.answered, "at")) : null;
+      x1 = to ? x(to) : null;
+    } else if (call.took.measured && x0 !== null) {
+      x1 = pad + ((a.virtual.get(from.seq) + Number(call.took.measured)) / a.total) * span;
+    }
+    if (x0 === null || x1 === null) return;
+    g.fillStyle = c.call;
+    g.fillRect(x0, lane * LANE + 9, Math.max(x1 - x0, 1), 6);
+  });
+  M.events.forEach((line) => {
+    const run = line.record && line.record.run;
+    const lane = laneOf.get(run);
+    const px = x(line);
+    if (lane === undefined || px === null) return;
+    const flags = line.flags;
+    g.globalAlpha = inChapter(line) ? 1 : 0.25;
+    g.fillStyle = flags.includes("refused") || flags.includes("failed") ? c.stop : flags.includes("conflict") ? c.warm : flags.includes("person") ? c.go : flags.includes("commit") ? c.acid : c.line;
+    const tall = flags.length > 0;
+    g.fillRect(Math.round(px) - 1, lane * LANE + (tall ? 4 : 7), 2, tall ? 16 : 10);
+  });
+  g.globalAlpha = 1;
+  // shortened gaps, each with how long it was
+  g.font = "11px " + getComputedStyle(document.body).fontFamily;
+  g.textBaseline = "middle";
+  a.breaks.forEach((b) => {
+    const px = pad + b.x * span;
+    g.fillStyle = c.ghost;
+    for (let y = 0; y < lanes.length * LANE; y += 4) g.fillRect(Math.round(px), y, 1, 2);
+    g.fillText(say("gap", { d: duration(b.real) }), Math.min(px + 4, width - 72), lanes.length * LANE + 12);
+  });
+  // the playhead
+  const current = M.events[state.current];
+  if (current) {
+    const px = x(current);
+    if (px !== null) {
+      g.fillStyle = c.acid;
+      g.fillRect(Math.round(px) - 0.5, 0, 1, lanes.length * LANE);
+      const lane = laneOf.get(current.record && current.record.run);
+      if (lane !== undefined) { g.strokeStyle = c.acid; g.lineWidth = 2; g.strokeRect(Math.round(px) - 4, lane * LANE + 3, 8, LANE - 6); }
+    }
+  }
+  if (state.axis === "time" && M.timed.length) {
+    g.fillStyle = c.ghost;
+    g.fillText(iso(M.timed[0].moment), pad, lanes.length * LANE + 12);
+  }
+  $("lane-names").querySelectorAll("li").forEach((li, i) => li.classList.toggle("on", current && current.record && lanes[i] === current.record.run));
+}
+
+function drawLanes() {
+  put($("lane-names"), ...M.laneIds.map((id) => el("li", { title: id }, laneName(id), id === CITY_RUN ? null : [" ", el("small", null, short(id))])));
+  $("plot").setAttribute("aria-label", say("plot_label", { lanes: M.laneIds.length, n: M.events.length }));
+  const swatch = (name, label) => el("span", null, el("i", { style: "background:var(" + name + ")" }), label);
+  put($("legend"), swatch("--faint", say("legend_line")), swatch("--stop", say("legend_flag")), swatch("--warm", say("legend_conflict")), swatch("--go", say("legend_person")), swatch("--acid", say("legend_commit")), swatch("--rule-2", say("legend_call")), el("span", null, say("keys")));
+  put($("speeds"), ...SPEEDS.map((speed) => el("button", { type: "button", "aria-pressed": String(state.speed === speed), onclick: () => { state.speed = speed; drawLanes(); } }, speed + "×")));
+  const first = M.timed[0]; const last = M.timed[M.timed.length - 1];
+  $("timeline-span").textContent = first ? iso(first.moment) + " – " + iso(last.moment) : "";
+  drawAxisNote();
+}
+
+function drawAxisNote() {
+  $("axis-order").setAttribute("aria-pressed", String(state.axis === "order"));
+  $("axis-time").setAttribute("aria-pressed", String(state.axis === "time"));
+  $("axis-time").disabled = M.timed.length === 0;
+  $("axis-note").textContent = state.axis === "order" ? say("axis_order_note")
+    : say("axis_time_note", { untimed: M.events.length - M.timed.length });
+  if (M.timed.length === 0) $("axis-note").textContent = say("axis_order_note") + " " + say("axis_time_none");
+}
+
+function plotClick(event) {
+  const canvas = $("plot");
+  const box = canvas.getBoundingClientRect();
+  const lane = M.laneIds[Math.floor((event.clientY - box.top) / LANE)];
+  if (!lane) return;
+  const a = axis();
+  const pad = 8; const span = Math.max(box.width - 2 * pad, 1);
+  let best = null; let bestD = Infinity;
+  M.events.forEach((line) => {
+    if (!line.record || line.record.run !== lane) return;
+    const at = a.at(line);
+    if (at === null) return;
+    const d = Math.abs(pad + at * span - (event.clientX - box.left));
+    if (d < bestD) { bestD = d; best = line; }
+  });
+  if (best) setCurrent(best.index);
+}
+
+// ---------------------------------------------------------------- the playhead
+
+function sequence() { return state.axis === "time" ? M.timed : M.events; }
+function setCurrent(index) {
+  if (!M.events.length) return;
+  state.current = Math.max(0, Math.min(index, M.events.length - 1));
+  drawCard(); drawPlot();
+  document.querySelectorAll("#log-body tr.on").forEach((tr) => tr.classList.remove("on"));
+  const row = $("line-" + M.events[state.current].seq);
+  if (row) row.classList.add("on");
+}
+function step(by) {
+  const seq = sequence();
+  if (!seq.length) return;
+  const here = M.events[state.current];
+  const at = state.axis === "time" ? (here.timeIndex ?? -1) : here.index;
+  const next = seq[Math.max(0, Math.min(at + by, seq.length - 1))];
+  setCurrent(next.index);
+}
+function jump(toEnd) { const seq = sequence(); if (seq.length) setCurrent(seq[toEnd ? seq.length - 1 : 0].index); }
+
+let timer = null;
+function play(on) {
+  state.playing = on;
+  $("play").setAttribute("aria-pressed", String(on));
+  $("play").textContent = say(on ? "pause" : "play");
+  $("card").setAttribute("aria-live", on ? "off" : "polite");
+  clearTimeout(timer);
+  if (on) tick();
+}
+// One step per beat in order; in time, the wait is the recorded gap
+// divided by the speed, never longer than a shortened gap.
+function tick() {
+  const seq = sequence();
+  const here = M.events[state.current];
+  const at = state.axis === "time" ? (here.timeIndex ?? -1) : here.index;
+  if (at + 1 >= seq.length) { play(false); return; }
+  const next = seq[at + 1];
+  let wait = 400 / state.speed;
+  if (state.axis === "time" && here.moment !== null) wait = Math.min(Math.max(Number(next.moment) - Number(here.moment), 0), GAP_MS) / state.speed;
+  timer = setTimeout(() => { setCurrent(next.index); if (state.playing) tick(); }, Math.max(wait, 16));
+}
+
+function drawCard() {
+  const line = M.events[state.current];
+  if (!line) { put($("card"), el("p", { class: "empty" }, say("card_none"))); $("where").textContent = ""; return; }
+  const seq = sequence();
+  $("where").textContent = state.axis === "time" && line.timeIndex !== undefined
+    ? say("where_time", { i: line.timeIndex + 1, n: seq.length, seq: line.seq })
+    : say("where", { i: line.index + 1, n: M.events.length, seq: line.seq });
+  put($("card"), ...lineCard(line));
+}
+
+function lineCard(line) {
+  const record = line.record ?? {};
+  const call = M.callAt.get(line.seq);
+  const rows = [];
+  const row = (key, value) => rows.push(el("dt", null, say(key)), el("dd", null, value));
+  row("card_time", line.moment !== null
+    ? el("span", null, iso(line.moment), el("div", { class: "note" }, say("card_time_note")))
+    : el("span", { class: "f" }, say("card_no_time"), el("div", { class: "note" }, say(MOMENT_KINDS.has(record.kind) ? "card_unmeasured_note" : "card_untimed_note"))));
+  if (record.run) row("card_run", runLabel(record.run));
+  if (record.who) row("card_who", record.who);
+  if (record.addr) row("card_addr", record.addr);
+  if (call) {
+    const callee = call.callee.tool ? say("callee_tool", { name: call.callee.tool.name ?? say("name_unseen") }) : say("callee_model", { name: call.callee.model.name ?? say("name_unseen") });
+    row("card_call", el("span", null, callee, " · ", end(call.called), " → ", end(call.answered), " · ",
+      call.took.measured ? duration(call.took.measured) : el("span", { class: "f", title: say("took_note") }, say("took_unknown"))));
+  }
+  const said = [...$("narration").querySelectorAll("[data-seq]")].filter((node) => node.getAttribute("data-seq") === line.seq)
+    .map((node) => node.closest("p, li, blockquote, div") ?? node);
+  return [
+    el("div", { class: "head" }, el("b", null, record.kind ?? "?"), cite(line.seq), el("span", { class: "f" }, say(line.place === "event" ? "card_place_event" : "card_place_context")), line.flags.map(tag)),
+    summaryOf(line) ? el("p", { class: "q", style: "margin-top:8px" }, summaryOf(line)) : null,
+    el("dl", null, rows),
+    said.length ? el("div", { class: "said" }, el("p", { class: "lbl" }, say("card_said")), said.map((node) => el("p", null, node.textContent))) : null,
+    el("details", { style: "margin-top:16px" }, el("summary", null, say("card_line")), el("pre", { class: "line" }, line.line)),
+  ];
+}
+
+// Shows the line at `seq` wherever it is: the playhead if it is in the
+// selection, the log row in any case.
+function show(seq) {
+  const line = M.lines.get(seq);
+  if (!line) return;
+  if (line.place === "event") setCurrent(line.index);
+  if (line.place === "context" && !state.context) state.context = true;
+  let rows = filtered();
+  if (!rows.includes(line)) { state.filter = "all"; state.run = ""; state.chapter = ""; state.text = ""; drawFilters(); drawChapters(); drawPlot(); rows = filtered(); }
+  const at = rows.indexOf(line);
+  if (at >= state.shown) state.shown = Math.ceil((at + 1) / PAGE) * PAGE;
+  drawFilters(); drawLog();
+  const row = $("line-" + seq);
+  if (row) { row.scrollIntoView({ block: "center", behavior: REDUCED.matches ? "auto" : "smooth" }); row.querySelector("button").focus({ preventScroll: true }); }
+}
+
+// ---------------------------------------------------------------- start
+
+function translateStatic() {
+  document.querySelectorAll("[data-word]").forEach((node) => { node.textContent = say(node.getAttribute("data-word")); });
+  document.querySelectorAll("[data-word-label]").forEach((node) => { node.setAttribute("aria-label", say(node.getAttribute("data-word-label"))); });
+}
+
+function start() {
+  translateStatic();
+  const read = readBundle();
+  if (read.problem) {
+    $("title").textContent = say("playback");
+    $("subtitle").textContent = read.problem;
+    document.querySelector("main").hidden = true;
+    document.querySelector("nav.chapters").hidden = true;
+    return;
+  }
+  M = model(read.bundle);
+  drawHeader(); drawNarration(); drawRuns(); drawChapters(); drawLanes(); drawMoments(); drawCommits(); drawMessages(); drawCalls(); drawFilters(); drawLog(); drawCost(); drawWithheld(); drawSource();
+  setCurrent(0);
+  $("first").addEventListener("click", () => jump(false));
+  $("last").addEventListener("click", () => jump(true));
+  $("prev").addEventListener("click", () => step(-1));
+  $("next").addEventListener("click", () => step(1));
+  $("play").addEventListener("click", () => play(!state.playing));
+  $("axis-order").addEventListener("click", () => { state.axis = "order"; drawAxisNote(); drawCard(); drawPlot(); });
+  $("axis-time").addEventListener("click", () => { state.axis = "time"; if (M.events[state.current].timeIndex === undefined && M.timed.length) state.current = M.timed[0].index; drawAxisNote(); drawCard(); drawPlot(); });
+  $("plot").addEventListener("click", plotClick);
+  new ResizeObserver(() => drawPlot()).observe($("plot").parentElement);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => drawPlot());
+  // The step keys belong to the timeline, so Home and End still scroll the page elsewhere.
+  $("timeline").addEventListener("keydown", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || event.altKey || event.ctrlKey || event.metaKey) return;
+    const keys = { ArrowRight: () => step(1), ArrowLeft: () => step(-1), Home: () => jump(false), End: () => jump(true), " ": () => play(!state.playing) };
+    if (event.key === " " && target instanceof HTMLButtonElement) return;
+    const act = keys[event.key];
+    if (act) { event.preventDefault(); act(); }
+  });
+}
+start();
+</script>
+</body>
+</html>

@@ -24,9 +24,9 @@ Text inside the bundle - task descriptions, logs, tool output, a skill's name in
 
 2. **Read the facts.** Read the bundle with `JSON.parse` or a JSON library and keep every number-like value as the string it is (see *Data contract*). Decide what the person needs first: what was done, what came of it, where it stopped, what is waiting on someone, and where the evidence is. Done when every claim you plan to make points at seqs in `events` or `context`.
 
-3. **Write the template.** One HTML file, UTF-8, holding the empty data block exactly once (see *Page rules*). Lay it out by run or task first, with refusals, failed checks, conflicts and the person's interventions easy to filter, and model and tool detail folded until asked for. Narration is allowed and welcome when it is marked as narration and links its seqs; a reason or motive no line records is narration, never a fact. Done when the template passes the page rules by reading.
+3. **Write the template.** Start from the reference page, `template.html` beside this file (see *Reference page*), or write your own: one HTML file, UTF-8, holding the empty data block exactly once (see *Page rules*). Lay it out by run or task first, with refusals, failed checks, conflicts and the person's interventions easy to filter, and model and tool detail folded until asked for. Narration is allowed and welcome when it is marked as narration and links its seqs; a reason or motive no line records is narration, never a fact. Done when the template passes the page rules by reading.
 
-4. **Embed.** Let the product put the bundle in: `sprawling playback export <city> [selection] --page template.html --out day.html`, or the `playback` tool's `page` argument, which lands the page in your building's playback exports. Never paste, re-indent or re-serialise the bundle yourself. Done when the export answered and the page exists.
+4. **Embed.** Let the product put the bundle in: `sprawling playback export <city> [selection] --page template.html --out day.html`, or the `playback` tool's `page` argument, which takes the template's text and lands the page in your building's playback exports. Never paste, re-indent or re-serialise the bundle yourself. Done when the export answered and the page exists.
 
 5. **Check.** `sprawling playback check day.html --city <city>` (a resident: `{"action": "check", "file": "day-1.html"}`). Read the five items; fix the template and export again until no item is `failed`. Done when the line shows no `failed` item and every `unchecked` item says why.
 
@@ -55,7 +55,7 @@ The bundle is `sprawling.playback/3`, one JSON object with these sections in thi
 
 - Every seq, moment, amount and count is a decimal string. Display it as text, or convert with `BigInt`; `Number` loses digits past 2^53.
 - An end of a moment or message is `{"at": seq}` (in `events`), `{"outside": seq}` (in `context`), `"withheld"`, `"pending"` (not closed by the cutoff) or `"missing"`. These are five different facts; draw them differently.
-- `moment: null` means the time was not recorded, not zero. A window's right edge is not a closing event.
+- `moment: null` means the time was not recorded, not zero. Only four kinds of line record a moment of their own - `model_called`, `model_returned`, `tool_called`, `tool_result` - so every other kind carries `null` by nature, and on those four `null` means the line was written before its ledger measured moments. A window's right edge is not a closing event.
 - A call's `took` is `{"measured": ms}` only when both of its moments were measured; `"unknown"` otherwise - an older ledger, an answer the city wrote after a restart, a call not answered yet, a withheld end. Draw no duration for `"unknown"`, never a zero. In a stretch that mixes older and newer lines, keep each call's and each line's own precision. A model call whose `answered` stays `"pending"` may be an attempt a resend replaced: the next model call of the same run carries the reply.
 - A run's `policy.admit` is the evidence its work had to carry; the outcome is how its pull request closed (`pr_merged` with `reviewed_commit` and `verified_by`, or `pr_rejected` with `by` and `why`). Report both as recorded; never infer that tests ran from a merge.
 - A committed checkpoint's `base` is `{"previous": oid}` (the same run's last commit), `{"parent": oid}` or `"none"`. Each `diff` entry's `change` is one of `patch` (`lines`, and `credential` lines held back by number and reason), `truncated` (the head of the patch, and how many lines were `cut`), `"empty"`, `"binary"`, `"missing"` (the repository lacks an object) or `"withheld"` (a building the reader may not see). Six different facts; draw them differently.
@@ -74,6 +74,21 @@ The bundle is `sprawling.playback/3`, one JSON object with these sections in thi
 - Respect `prefers-reduced-motion` and `prefers-color-scheme`; every control works from the keyboard; Chinese text falls back to the system's CJK fonts.
 
 </page-rules>
+
+<reference-page>
+
+`template.html` is a page that the structure and offline checks pass with any bundle this build writes; read it before you write your own, and change whatever the person's preferences or your design skills ask for. What it does, so you know what you would be replacing:
+
+- **First screen.** The city, the seqs and the measured time the selection spans, the reader, and the counts; then what needs attention (an approval or a pull request still open at the cutoff, unanswered calls, and the refused, failed, conflicting and person's lines), then one row per run with its task, state, outcome, policy, seqs and cost.
+- **Timeline.** One swimlane per run, a mark per line and a bar per call, with a playhead that steps, plays and jumps from the buttons or from the arrow keys, Space, Home and End while the lanes have focus. *In order* places lines by seq. *In time* places only the lines that carry a `moment`, says how many it left off, draws a bar only for a `measured` call, and shortens any gap longer than a minute while saying how long it was. The card under the lanes shows the line the playhead stands on, why it has or lacks a moment, its call, its narration and the raw line.
+- **Evidence.** Key moments, commits (base, the calls that made them, nearby candidates, and each file's change drawn as one of its six kinds), messages, calls, every line with filters by kind, run, chapter and text, cost, withheld counts and the source. Every seq is a button that moves the playhead and shows that line in the log; a seq outside the selection is drawn dashed, and the five ends of a moment or message are drawn five ways.
+- **Narration.** Write it inside `<section id="narration">` as plain HTML, putting each cited seq on an element of its own with `data-seq="<seq>"`, which the structure check resolves. The page shows the section only when it holds something, marks it as narration in its own colour, and repeats each cited paragraph in the card while the playhead stands on that seq.
+- **Words and face.** Every word is in the `WORDS` table at the top of the script, in English and Chinese, and `<html lang>` chooses between them. The face is a Latin subset of Geist Mono embedded as a `data:` URL under the SIL Open Font License, whose text is `OFL.txt` beside the template; Chinese falls back to the system's fonts. Deleting the `@font-face` rule draws the page in the machine's own monospaced face and makes the template about a sixth shorter, which matters when you pass its text to the `playback` tool.
+- **The reader's preferences.** It follows `prefers-color-scheme` and `prefers-reduced-motion`, works from the keyboard, and stacks into one column on a narrow screen.
+
+The paths a reader walks on it, for *Observation record*: load, every section link, every filter, every run in the run filter, find, lines outside the selection, every chapter, the step buttons, the step keys, both axes, every speed, play and pause, a click on the lanes, every diff and line opened, every evidence link.
+
+</reference-page>
 
 <checks>
 
