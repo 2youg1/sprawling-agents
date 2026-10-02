@@ -2807,6 +2807,182 @@
     "en": "which release this is",
     "zh": "这是哪一版"
   },
+  "remote_about": {
+    "en": "The remote door lets a phone or a second computer reach this city from outside its network. It is opened, and devices are paired and revoked, at the city's own console and nowhere else: no page, device or resident can do it.",
+    "zh": "远程门让手机或另一台电脑从这座城的网络之外够到它。开门、配对与撤销设备只在城自己的控制台上做，别处都做不了：页面、设备与居民都不能。"
+  },
+  "remote_console": {
+    "en": "At the city's console",
+    "zh": "在城的控制台上"
+  },
+  "remote_verb_open": {
+    "en": "opens the door for a while and prints the address a device opens",
+    "zh": "把门开一段时间，印出设备要打开的地址"
+  },
+  "remote_verb_pair": {
+    "en": "prints a code a device scans, good once, for ten minutes",
+    "zh": "印出一个设备扫的码，只用一次，十分钟内有效"
+  },
+  "remote_verb_devices": {
+    "en": "lists the devices paired with this city",
+    "zh": "列出与这座城配对过的设备"
+  },
+  "remote_verb_revoke": {
+    "en": "forgets a device; its sessions end",
+    "zh": "忘掉一台设备，它的会话随之结束"
+  },
+  "remote_verb_close": {
+    "en": "closes the door; paired devices stay paired",
+    "zh": "关上门；配对过的设备仍是配对的"
+  },
+  "remote_route": {
+    "en": "The door needs an https:// route, named in the [remote] table of the city's own CONFIG.toml; docs/operating.md shows the two kinds.",
+    "zh": "门要一条 https:// 的通路，写在城自己的 CONFIG.toml 的 [remote] 表里；docs/operating.md 写了两种通路的写法。"
+  },
+  "remote_not_paired": {
+    "en": "This browser holds no device for this city. On a phone, scan the code /remote pair prints.",
+    "zh": "这个浏览器里没有这座城的设备。在手机上扫 /remote pair 印出的码。"
+  },
+  "remote_invited": {
+    "en": "Pair this device",
+    "zh": "配对这台设备"
+  },
+  "remote_invited_city": {
+    "en": "city {fingerprint}…",
+    "zh": "城 {fingerprint}…"
+  },
+  "remote_invited_about": {
+    "en": "This device makes its own key and proves it to the city. The code in the link is used once; the city never sees this device's private key.",
+    "zh": "这台设备自己生成密钥，并向城证明它持有这把钥匙。链接里的码只用一次；城从不见到这台设备的私钥。"
+  },
+  "remote_pair": {
+    "en": "Pair this device",
+    "zh": "配对这台设备"
+  },
+  "remote_pairing": {
+    "en": "pairing…",
+    "zh": "正在配对…"
+  },
+  "remote_unreadable": {
+    "en": "This link does not read as an invitation. Scan the code on the city's console again.",
+    "zh": "这个链接读不成一份邀请。在城的控制台上重新扫码。"
+  },
+  "remote_lacks_insecure": {
+    "en": "Pairing needs an https:// address, and this page was opened at another kind.",
+    "zh": "配对要一个 https:// 的地址，而这一页不是从那样的地址打开的。"
+  },
+  "remote_lacks_crypto": {
+    "en": "This browser cannot hold a device key: its WebCrypto lacks Ed25519 or X25519.",
+    "zh": "这个浏览器存不了设备密钥：它的 WebCrypto 没有 Ed25519 或 X25519。"
+  },
+  "remote_lacks_storage": {
+    "en": "This browser keeps no IndexedDB for this page, so a paired key would be lost at once.",
+    "zh": "这个浏览器不给这一页 IndexedDB，配对得到的钥匙会立刻丢掉。"
+  },
+  "remote_seed": {
+    "en": "Your device seed",
+    "zh": "你的设备种子"
+  },
+  "remote_seed_about": {
+    "en": "Shown once and kept nowhere. Reinstalling this page means pairing again.",
+    "zh": "只显示这一次，哪里都不保存。重装这一页就要重新配对。"
+  },
+  "remote_seed_seen": {
+    "en": "I have written it down",
+    "zh": "我记下了"
+  },
+  "remote_persist_refused": {
+    "en": "The browser did not promise to keep this page's storage. It may clear it when space runs short, and then this device pairs again.",
+    "zh": "浏览器没有答应保留这一页的存储。空间吃紧时它可能清掉，那时这台设备要重新配对。"
+  },
+  "remote_device": {
+    "en": "This device",
+    "zh": "这台设备"
+  },
+  "remote_device_city": {
+    "en": "city",
+    "zh": "城"
+  },
+  "remote_device_id": {
+    "en": "device id",
+    "zh": "设备 id"
+  },
+  "remote_device_at": {
+    "en": "paired",
+    "zh": "配对于"
+  },
+  "remote_lock": {
+    "en": "Lock the door",
+    "zh": "锁上门"
+  },
+  "remote_locking": {
+    "en": "locking…",
+    "zh": "正在锁门…"
+  },
+  "remote_locked": {
+    "en": "The door is locked. Paired devices stay paired; the console opens it again.",
+    "zh": "门锁上了。配对过的设备仍是配对的；在控制台上可以再开。"
+  },
+  "remote_forget": {
+    "en": "Forget this device",
+    "zh": "忘掉这台设备"
+  },
+  "remote_forget_title": {
+    "en": "Forget this device?",
+    "zh": "忘掉这台设备？"
+  },
+  "remote_forget_detail": {
+    "en": "This browser drops its key. The city still knows the device until /remote revoke at its console.",
+    "zh": "这个浏览器丢掉它的钥匙。在城的控制台上 /remote revoke 之前，城仍记着这台设备。"
+  },
+  "remote_forget_confirm": {
+    "en": "Forget",
+    "zh": "忘掉"
+  },
+  "remote_unkept": {
+    "en": "This browser could not keep the device, so it is not paired here. Pair again with a fresh code.",
+    "zh": "这个浏览器存不下这台设备，所以这里没有配对成功。换一个新码重新配对。"
+  },
+  "remote_refused_fingerprint": {
+    "en": "The city that answered is not the one the code names, so the code never left this device. Scan again; if this repeats, the route is changing what it forwards.",
+    "zh": "答话的城不是码里指的那一座，所以码没有离开这台设备。重新扫码；反复出现说明通路在改动它转发的内容。"
+  },
+  "remote_refused_signature": {
+    "en": "The city's answer is not signed by its key, so the code never left this device. Scan again; if this repeats, the route is changing what it forwards.",
+    "zh": "城的回答不是它的钥匙签的，所以码没有离开这台设备。重新扫码；反复出现说明通路在改动它转发的内容。"
+  },
+  "remote_refused_length": {
+    "en": "The city speaks another version of the remote door. Reload the page.",
+    "zh": "城说的是另一个版本的远程门。重新载入这一页。"
+  },
+  "remote_refused_agreement": {
+    "en": "The key exchange did not agree. Start again; if it repeats, pair again.",
+    "zh": "密钥交换没有对上。再来一次；反复出现就重新配对。"
+  },
+  "remote_refused_key": {
+    "en": "This browser's key would not sign. Reload the page and pair again.",
+    "zh": "这个浏览器的钥匙签不出。重新载入这一页，再配对一次。"
+  },
+  "remote_closed_denied": {
+    "en": "The door refused: the code was used or has expired, or the door is closed. Run /remote pair at the console again.",
+    "zh": "门拒绝了：码已用过或已过期，或者门关着。在控制台上重新 /remote pair。"
+  },
+  "remote_closed_code": {
+    "en": "The door ended the connection: {code}.",
+    "zh": "门结束了这次连接：{code}。"
+  },
+  "remote_closed_silent": {
+    "en": "The door ended the connection without saying why.",
+    "zh": "门结束了这次连接，没有说原因。"
+  },
+  "remote_unreachable": {
+    "en": "Nothing answers here. Is the door open, and is this the address the console printed?",
+    "zh": "这里没有回答。门开着吗？这是控制台印出的那个地址吗？"
+  },
+  "remote_again": {
+    "en": "Try again",
+    "zh": "再试一次"
+  },
   "run_cached": {
     "en": "cached",
     "zh": "缓存命中"
@@ -3103,6 +3279,10 @@
     "en": "what leaves this machine, and through what",
     "zh": "什么会出网，走哪条路"
   },
+  "setup_group_hint_remote": {
+    "en": "Pairing a phone or a second computer with this city through the remote door.",
+    "zh": "经远程门，让手机或另一台电脑与这座城配对。"
+  },
   "setup_group_hint_keys": {
     "en": "the keyboard, and what each key does",
     "zh": "键盘，以及每个键做什么"
@@ -3142,6 +3322,10 @@
   "setup_group_network": {
     "en": "network",
     "zh": "网络"
+  },
+  "setup_group_remote": {
+    "en": "Remote",
+    "zh": "远程"
   },
   "setup_group_run": {
     "en": "run",

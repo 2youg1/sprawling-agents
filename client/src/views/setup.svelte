@@ -28,6 +28,7 @@
   import Segmented from "./parts/segmented.svelte";
   import Release from "./release.svelte";
   import Automation from "./settings/automation.svelte";
+  import Remote from "./settings/remote.svelte";
   import CityLayer from "./settings/city_layer.svelte";
   import Rules from "./settings/rules.svelte";
   import You from "./settings/you.svelte";
@@ -258,6 +259,8 @@ costs the cards their width (client-SPEC 4-30, 4-36). -->
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
         {@render foot(ruleNote !== undefined ? say($lang, ruleNote) : undefined, "proxying")}
       </div>
+    {:else if shown === "remote"}
+      <Remote />
     {:else if shown === "tools"}
       {#if dependency !== undefined}
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->

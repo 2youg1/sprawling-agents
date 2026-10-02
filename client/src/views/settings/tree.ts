@@ -60,6 +60,7 @@ export const TREE: readonly Branch[] = [
       group("harnesses"),
       { kind: "page", view: { kind: "mcp" }, word: "nav_mcp" },
       group("network"),
+      group("remote"),
     ],
   },
   {

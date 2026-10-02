@@ -52,6 +52,7 @@
   import Mob from "./gallery/mob.svelte";
   import Pga from "./gallery/pga.svelte";
   import Pgb from "./gallery/pgb.svelte";
+  import R3 from "./gallery/r3.svelte";
   import Produced from "./gallery/produced.svelte";
   import Runs from "./gallery/runs.svelte";
   import Resulted from "./gallery/resulted.svelte";
@@ -117,6 +118,7 @@
   <Keepers />
   <Settings />
   <SettingsPanel />
+  <R3 />
   <Tables />
   <Monitor />
   <Parts />
