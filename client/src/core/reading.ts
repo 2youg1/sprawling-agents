@@ -26,7 +26,10 @@
 // `core/socket.ts` reports it the way a frame it cannot decode is
 // reported.
 
+import { Option, Schema } from "effect";
+
 import { scopeOf } from "./scope";
+import { Address } from "../wire";
 import type { EventRecord, HaltScope, Seq } from "../wire";
 
 // One field of a payload, with the name that field is known by when this
@@ -191,4 +194,15 @@ export function sessionStart(record: EventRecord): SessionStart | null {
 export interface SessionStart {
   readonly addr: string;
   readonly seq: Seq;
+}
+
+// `ProposalOffered::doc`: the document a run offered a change to, read
+// in the generated address grammar, because the page asks the city
+// about it by that address and a string that is not one is a question
+// the city would refuse.
+export function offeredOn(record: EventRecord): [Address | null, string | null] {
+  const held = required(record, "doc");
+  if (held.value === null) return [null, held.at];
+  const doc = Option.getOrNull(Schema.decodeOption(Address)(held.value));
+  return doc === null ? [null, where(record, "doc")] : [doc, null];
 }
