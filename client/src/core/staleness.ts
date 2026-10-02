@@ -100,7 +100,7 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return reached(kind === "checkpoint_committed" || kind === "pr_merged" || kind === "file_restored");
     case "commits":
       return kind === "checkpoint_committed" || kind === "pr_merged" ? "newest_page" : "none";
-    case "building_view": case "listing": case "document": case "versions": case "archive_search":
+    case "building_view": case "listing": case "find": case "document": case "versions": case "archive_search":
       return reached(BUILDING_MOVED.has(kind));
     case "proposals":
       return reached(PROPOSALS_MOVED.has(kind));

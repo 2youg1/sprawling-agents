@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 45 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "2c8c861d09f39d65d6f3621583e4192f35308946d441dfd7f740b4cf0fed923e" as const;
+export const WIRE_HASH = "5b719bf37a82e571ec1e901a04c1fbb8d6355db885a351fd9eb9b35101ddfb04" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -1576,13 +1576,26 @@ export const EvidenceAnswer = Schema.Struct({
 export type EvidenceAnswer = typeof EvidenceAnswer.Type;
 
 /**
- * A Markdown version written as one HTML file that stands alone.
+ * Whether the walk looked at everything under the address.
  */
-export const ExportAnswer = Schema.Struct({
-  html: Schema.String,
-  version: B3Hash,
-}).annotate({ identifier: "ExportAnswer" });
-export type ExportAnswer = typeof ExportAnswer.Type;
+export const Walked = Schema.Union([
+  Schema.Literal("whole"),
+  Schema.Literal("cut"),
+]).annotate({ identifier: "Walked" });
+export type Walked = typeof Walked.Type;
+
+/**
+ * The files found, shallow first and in name order within one level,
+ * each relative to `under`. `under` and `text` echo the question,
+ * which the wire carries no id for.
+ */
+export const FindAnswer = Schema.Struct({
+  paths: Schema.Array(Address),
+  text: Schema.String,
+  under: Address,
+  walked: Walked,
+}).annotate({ identifier: "FindAnswer" });
+export type FindAnswer = typeof FindAnswer.Type;
 
 /**
  * How far a branch has drifted from the upstream it tracks.
@@ -3333,6 +3346,9 @@ export const Answer = Schema.Union([
     listing: ListingAnswer,
   }),
   Schema.Struct({
+    find: FindAnswer,
+  }),
+  Schema.Struct({
     document: DocumentAnswer,
   }),
   Schema.Struct({
@@ -3557,6 +3573,12 @@ export const Query = Schema.Union([
   Schema.Struct({
     listing: Schema.Struct({
       at: Schema.optional(Schema.NullOr(Address)),
+    }),
+  }),
+  Schema.Struct({
+    find: Schema.Struct({
+      text: Schema.String,
+      under: Address,
     }),
   }),
   Schema.Struct({

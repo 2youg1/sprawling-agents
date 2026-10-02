@@ -49,6 +49,7 @@
   import { nothingFound } from "./palette/nothing_found";
   import { SECTION_WORD } from "./palette/sections";
   import { Kbd } from "./parts/kbd.svelte";
+  import { openFinder } from "./finding.svelte";
 
   interface Entry {
     readonly label: string;
@@ -108,6 +109,7 @@
       goTo({ kind: "record", lens: "bin" }, say($lang, "rec_bin")),
       page("go.cost", { kind: "cost" }),
       goTo({ kind: "welcome" }, say($lang, "setup_rerun")),
+      { label: say($lang, LABELS.finder), hint: "", action: "finder", act: openFinder },
     ];
     out.push({
       label: halted ? RELEASE_ALL : say($lang, "city_stop"),

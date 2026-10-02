@@ -1343,6 +1343,18 @@
     "en": "no run is going",
     "zh": "没有在跑的 run"
   },
+  "mailbox_search": {
+    "en": "search sessions by room or task",
+    "zh": "按房间或任务找会话"
+  },
+  "mailbox_search_reach": {
+    "en": "Searches every session asked of the rooms this page has seen; a room with no run on this page was not asked.",
+    "zh": "在本页见过的房间问回来的全部会话里找；本页没见过 run 的房间没有问过，不在其中。"
+  },
+  "mailbox_search_none": {
+    "en": "No session asked here matches.",
+    "zh": "问回来的会话里没有匹配的。"
+  },
   "mailbox_recent_none": {
     "en": "no session has begun yet",
     "zh": "还没有开始过会话"
@@ -5910,6 +5922,22 @@
   "city_buildings": {
     "en": "buildings",
     "zh": "楼"
+  },
+  "finder_title": {
+    "en": "find a file in {building}",
+    "zh": "在 {building} 里找文件"
+  },
+  "finder_placeholder": {
+    "en": "part of a file name",
+    "zh": "文件名的一部分"
+  },
+  "finder_none": {
+    "en": "No file name here holds “{text}”.",
+    "zh": "这里没有哪个文件名含有「{text}」。"
+  },
+  "finder_cut": {
+    "en": "Only part of this tree was looked at; a file not listed may match too.",
+    "zh": "只看了这棵树的一部分，没列出的文件也可能匹配。"
   },
   "file_missing": {
     "en": "missing",

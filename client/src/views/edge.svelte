@@ -23,7 +23,7 @@
 </script>
 
 <script lang="ts">
-  import { keymap, marks } from "../core/keys";
+  import { HOLD_MS, keymap, marks } from "../core/keys";
   import type { Action } from "../core/keys";
   import { say } from "../core/lang";
   import type { Key } from "../core/lang";
@@ -67,7 +67,6 @@
   // A press on the layers key is a change of tier unless it was held
   // long enough to be a look: the same hand that taps to switch holds to
   // peek, and letting go of a peek must not switch as well.
-  const HOLD_MS = 300;
   let holding: ReturnType<typeof setTimeout> | undefined;
   let peeked = false;
 

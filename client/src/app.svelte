@@ -19,7 +19,7 @@
   import { QUERIES } from "./core/asking";
   import { cancel, release } from "./core/commands";
   import { runInFront } from "./core/in_front";
-  import { keymap } from "./core/keys";
+  import { HOLD_MS, keymap, pressedOf } from "./core/keys";
   import type { Action } from "./core/keys";
   import { fill, say } from "./core/lang";
   import { RELEASE_ALL } from "./core/slash";
@@ -34,6 +34,8 @@
   import Button from "./views/parts/button.svelte";
   import Cheatsheet from "./views/parts/kbd.svelte";
   import Edge from "./views/edge.svelte";
+  import Finder from "./views/finder.svelte";
+  import { closeFinder, finderShown, openFinder, underOf } from "./views/finding.svelte";
   import { closeRight, rightItem } from "./views/inspect/open.svelte";
   import LinkBanner from "./views/link_banner.svelte";
   import Notifier from "./views/notifier.svelte";
@@ -181,9 +183,6 @@
   // How many times the mailbox chord asked; the mailbox answers each one.
   let mailboxAsked = $state(0);
 
-  // A press is held when its key stays down this long: the layers chord
-  // becomes a look, and the accelerator alone draws every key's name.
-  const HOLD_MS = 300;
   let tierHeld: ReturnType<typeof setTimeout> | null = null;
   let exposing: ReturnType<typeof setTimeout> | null = null;
 
@@ -223,15 +222,6 @@
     peeking = false;
   }
 
-  function typing(target: EventTarget | null): boolean {
-    return (
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement ||
-      (target instanceof HTMLElement && target.isContentEditable)
-    );
-  }
-
   function act(action: Action): void {
     switch (action) {
       // These arms are `GoAction`, so the lookup is checked at compile time.
@@ -269,6 +259,9 @@
       case "composer.focus":
         focusComposer();
         return;
+      case "finder":
+        (finderShown() ? closeFinder : openFinder)();
+        return;
       case "run.stop": {
         const going = runInFront($belief, view);
         if (going === undefined) stopsWithoutRun += 1;
@@ -302,14 +295,7 @@
     // the shell's; everything else is being typed into its filter. The
     // text-field half of this rule lives in `core/keys`' `matches`.
     if (paletteOpen && !accel) return;
-    const action = bindings.acting({
-      key: event.key,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey,
-      shiftKey: event.shiftKey,
-      altKey: event.altKey,
-      target: typing(event.target) ? "field" : "page",
-    });
+    const action = bindings.acting(pressedOf(event));
     if (action !== null) {
       event.preventDefault();
       act(action);
@@ -395,6 +381,9 @@
   {/if}
   {#if sheetOpen}
     <Cheatsheet onClose={closeSheet} />
+  {/if}
+  {#if finderShown()}
+    <Finder under={underOf(view)} onClose={closeFinder} />
   {/if}
   <span class="sr-only">{toFragment(view)}</span>
 </div>
