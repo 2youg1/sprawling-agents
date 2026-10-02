@@ -129,7 +129,12 @@ pub(crate) const WORKFLOW: &str = ".github/workflows/release.yml";
 const SHIM: &str = "tools/xtask/src/channel/shim.js";
 
 /// Every file that writes an archive name out in full.
-const SPELLERS: [&str; 3] = [WORKFLOW, "install.sh", "install.ps1"];
+const SPELLERS: [&str; 4] = [
+    WORKFLOW,
+    "install.sh",
+    "install.ps1",
+    "crates/sprawling/Cargo.toml",
+];
 
 /// The register row that records the suffixes spelled before this rule.
 const REGISTER_ROW: &str = "archive_naming";
