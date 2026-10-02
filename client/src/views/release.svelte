@@ -78,7 +78,10 @@ const RELEASES = "https://github.com/2youg1/sprawling-agents/releases";
   }
 </script>
 
-<div class="flex min-w-0 flex-col gap-snug rounded-card bg-raised p-base">
+<!-- "About this version" stands on the page surface under its group's
+heading and rule, rather than lifted onto a card (docs/frontend-method.md §7A-4,
+client/Spec.lean §4-50). -->
+<section class="flex min-w-0 flex-col gap-snug">
   <div class="flex flex-wrap items-center gap-snug">
     <Button label={say($lang, "release_check")} tone="secondary" loading={asking} onPress={check} />
     <a class="text-note text-accent underline" href={RELEASES} target="_blank" rel="noreferrer">
@@ -121,10 +124,10 @@ const RELEASES = "https://github.com/2youg1/sprawling-agents/releases";
             released: stands.newest.released,
           })}
         </p>
-        <code class="block w-fit rounded-control bg-chrome px-base py-tight font-mono text-note text-text">
+        <code class="block w-fit border-l-2 border-edge-input pl-base font-mono text-note text-text">
           {UPDATE_NPM}
         </code>
       {/if}
     </div>
   {/if}
-</div>
+</section>
