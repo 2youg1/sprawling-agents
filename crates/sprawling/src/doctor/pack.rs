@@ -84,6 +84,11 @@ mod tests {
         "xtask",
     ];
 
+    /// The subcommands a document names as a way for the person to install
+    /// sprawling itself, which no recipe, workflow or check runs, so no
+    /// contributor needs them.
+    const WAYS_IN: &[&str] = &["binstall"];
+
     fn repository() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
     }
@@ -143,6 +148,7 @@ mod tests {
                     .chars()
                     .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
                 && !BUILT_IN.contains(&word)
+                && !WAYS_IN.contains(&word)
         };
         for line in lines {
             let words: Vec<&str> = line.split_whitespace().collect();
