@@ -37,6 +37,7 @@ import type {
   PursuitStep,
   Restoration,
   RunId,
+  SandboxLimits,
   ToolkitSlug,
 } from "../wire";
 import {
@@ -339,6 +340,13 @@ export function configureContext(addr: Address, percent: number): Command {
       idem: mintIdem(),
     },
   };
+}
+
+// A building's sandbox, whole: the city resolves the sandbox as one
+// value, so a layer that speaks about it speaks about all of it
+// (`kernel::config::SandboxLimits`), and the card sends what it shows.
+export function configureSandbox(addr: Address, limits: SandboxLimits): Command {
+  return configureMcp(addr, []);
 }
 
 // One of the three governed documents, whole. `base` is the text the
