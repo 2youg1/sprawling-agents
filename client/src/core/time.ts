@@ -54,11 +54,11 @@ export function hhmmss(at: number): string {
 // millisecond, written on every row (client-SPEC 7D). Joined, they are
 // the ISO 8601 instant a `<time datetime>` carries.
 export function isoDay(at: number): string {
-  return "";
+  return new Date(at).toISOString().slice(0, 10);
 }
 
 export function isoTime(at: number): string {
-  return "";
+  return new Date(at).toISOString().slice(11);
 }
 
 // Whole numbers with a thin separator, and money from micro-dollars.
