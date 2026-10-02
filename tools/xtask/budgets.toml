@@ -751,8 +751,14 @@ slack_count = 0
 
 # Text-only spec parts under the anchors of `state machine` and `typestate` modules; may only fall (tools/xtask/Spec.lean §8-42, assertion 6).
 [spec_parts_without_theorem]
+what = "text-only specification parts under the anchors of `state machine` and `typestate` modules"
+measured_by = "cargo xtask gates spec (spec::ratchet, assertion 6)"
+status = "held by spec, not weighed by budget"
 pinned = 9
 
 # Backticked crate paths in .lean, .md and rustdoc that resolve to no item; may only fall (§8-42, assertion 7). TP2 removes the gateway::admission ones.
 [rust_paths_unresolved]
+what = "backticked crate paths in .lean, .md and rustdoc that resolve to no item"
+measured_by = "cargo xtask gates spec (spec::ratchet, assertion 7)"
+status = "held by spec, not weighed by budget"
 pinned = 78
