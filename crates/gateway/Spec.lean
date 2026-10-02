@@ -194,6 +194,17 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 **代价**：429 的等待由对端的 `retry-after` 提示与 watchdog 的退避表给出（D2），`provider_degraded` 事件由 `E_PROVIDER` 的 carrier 产出。
 -/
 
+/-! D17 每个端点一个并发上限：可配置，缺省取厂商文档的值，遇 429 收窄、恢复后放宽
+
+**决定**：§8-6 的「不设 provider 侧准入」由 V0.0.9 的 TP2 推翻，形状如下；实现它的变更集落地时 §8-6 改写为现状，本条留作理由。端点配置（`endpoint/config.rs`）多一把 `max_in_flight: Option<NonZeroU32>`，配置里拼作 `max_in_flight`，合法域 1 到 `IN_FLIGHT_MAX`（256）；缺席时取这一类连接的厂商文档给出的并发值，厂商不给并发值的连接取 `IN_FLIGHT_DEFAULT`（16）。收窄与放宽是一个纯判定 `gateway::concurrency`：收到 429 或 `Retry-After` 时把当下的名额减半（至少 1），在 `Retry-After` 给出的时刻之前不再放宽；之后每连续 `WIDEN_AFTER`（8）次成功加 1，直到配置的上限。判定答两臂：名额已满（排队并计数）与等到某一刻（带时刻），不让调用方忙等（§8-6「要接时接在哪」）。状态随端点名住装配层的 run 工人，名额在 `runtime::run::drive` 的每次模型调用前取、后还；排队数与等待时长是仪表的读数之一，页面在 provider 一处显示。
+
+**理由**：车道不设上限之后（`crates/sprawling/Spec.lean` D34），排队只该发生在 provider 一处，因为那是对方限流与计费的地方；不设闸，429 就由每条 lane 各自撞墙、各自退避。缺省取厂商的值而不是城内一个常数，是因为不同端点的上限差一两个数量级。判定与平台无关，三个平台相同。
+
+**被否**：①一个城级的总车道数（今天的 `DRIVING_LANES = 4`）：第五个准备好的 run 等一个与任何 provider 都无关的名额；②只靠 watchdog 的退避（D2）：退避是一条 run 自己的事，挡不住其余 run 继续撞同一个端点。
+
+**重开参数**：厂商在响应头里给出当下余量时，缺省改读响应头，`IN_FLIGHT_DEFAULT` 只作没有头时的退路。256、16 与 8 是推断值，各是一个常量，改它们不改形状。
+-/
+
 /-!
 ### 8-14 gateway 目录化（形状：主类型居索引，方法按簇归文件）
 
@@ -279,6 +290,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D14 一个模型收得下什么只在 `provider::input` 判一次（§8-37）：`crates/gateway/spec/Provider/Input.lean`，在 `accepted_input` 正上方
 - D16 人那一档是 `SelectModel` 的一个可选字段，出现即作答，缺席即「这一次没人说」（§8-37）：`crates/gateway/spec/Provider/Input.lean`，在 D14 之后
 - D15 凭证库经 `keyring-core` 与各平台 store 接入，不经 `keyring`：`crates/gateway/spec/Credential.lean`
+- D17 每个端点一个并发上限：可配置，缺省取厂商文档的值，遇 429 收窄、恢复后放宽：本文件 §8-6 之后
 -/
 
 /-! ## 13 依赖选型

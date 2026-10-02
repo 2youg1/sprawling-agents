@@ -101,6 +101,17 @@ import crates.sprawling.spec.WireClient
 一百多个模块从 `sprawling` 搬进 `accounting` 时，写它们的节留在本 crate 的规格里，只把模块路径改成新的拼写。本 crate 迁到 Lean 时，这些节按它们写的那个 accounting 模块的顶层收进 `spec/Accounting/Worker.lean`、`spec/Accounting/Views.lean`、`spec/Accounting/Effect.lean` 与 `spec/Accounting/PlanView.lean`，标签不变，所以 accounting 分部末尾那几张「标签 → 模块」的表与别处的引用都仍然找得到它们。理由：两个 crate 的标签在 §8-17、§8-24 这些号上撞车，把节搬进 accounting 的分部就要给它们重新编号，并改写每一处引用；那是 accounting D15 记下的那一步，与格式转换分开做，转换就不夹带语义变化。被否的做法：转换时直接搬进 accounting 的分部（一次改动里既换格式又重编号）；把它们留在一份 Markdown 里（一个 crate 就有两份生效的规格）。重开的条件：accounting D15 那一步做完，`spec/Accounting/` 就删掉。
 -/
 
+/-! D34 车道不设上限：准备好的 run 立即得到一条 lane，放行只看内存与端点的并发名额
+
+**决定**：`accounting::worker::pool::DRIVING_LANES` 删去，没有配置键取代它；一个准备好的 run 立即得到一条 lane（一个线程）。放行只问两件事：内存（既有的 `RESERVE_SHARE`，§8-46-3 的内存闸）与这次模型调用要去的端点的并发名额（`crates/gateway/Spec.lean` D17）。排队于是只发生在 provider 一处，在那里计数并显示；lane 大多阻塞在网络上，每条只多占一个线程栈。实现它的变更集同时删掉 `pool.rs` 与各份 Lean 规格里对已不存在的 `gateway::admission` 的引用，并把 §8-46-3 改写为现状。三个平台相同：线程栈用标准库的缺省大小，内存读数经 `bin::monitor::memory`，它在三个平台上各有实现。
+
+**理由**：User 定了车道不设上限（roadmap TP2）。`DRIVING_LANES = 4` 的 rustdoc 说它等于 `gateway::admission` 的每 provider 上限，而那个模块已经不在，于是第五个准备好的 run 在等一个与任何 provider 都无关的名额。
+
+**被否**：①把车道数改成可配置：仍是一个与 provider 无关的闸，只是把选数的事交给人；②按 CPU 核数定车道：lane 的时间几乎都在等网络，核数不是它的约束。
+
+**重开参数**：吞吐台（roadmap TP1）在 N = 64 时量到线程栈或调度本身成了等待的来源时，重议 lane 是否改为任务而不是线程。
+-/
+
 /-! ## 4 现状分析
 
 各节的「本节接口的当前状态」写该接口还没做完的部分，本节不另列。
@@ -393,6 +404,7 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D31 | `crates/sprawling/spec/Doctor.lean` |
 | D32 | `crates/sprawling/spec/Doctor.lean` |
 | D33 | `crates/sprawling/spec/Doctor.lean` |
+| D34 | `crates/sprawling/Spec.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）
