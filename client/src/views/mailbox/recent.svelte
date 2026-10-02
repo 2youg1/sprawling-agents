@@ -19,6 +19,13 @@
   // height and draws the rows the column shows plus `OVERSCAN` on each
   // side, so a city of a thousand sessions costs the paint of a screen.
   // The row height is the `control` token, read from the stylesheet.
+  //
+  // **The search box filters what the page fetched, not what it drew**
+  // (refrain 3-14 row 9): every session of every room asked is matched
+  // by its room and by the task of each run of it this page holds, so a
+  // row the virtual list has not mounted is still found. A room this
+  // page never saw a run in was never asked, and the line under the box
+  // says so rather than let an empty result read as "no such session".
   import { untrack } from "svelte";
 
   import { heldIn } from "../../core/belief/rooms";
@@ -46,6 +53,7 @@
 
   const u = ui();
   const { lang } = u;
+  const uid = $props.id();
   const belief = u.conn.belief;
 
   interface Row {
@@ -54,6 +62,9 @@
     // Where a fork of this session would cut: its last run's tail, or
     // nothing when that run is older than the runs this page holds.
     readonly origin: Origin | null;
+    // What the search box matches: the room, then the task of each run
+    // of this session the page holds, folded to one case.
+    readonly text: string;
   }
 
   // Every room this page has seen a run in, spelled as the address its
@@ -84,19 +95,23 @@
 
   // The run a session ended with: the newest run of the room whose last
   // line falls between this session's first line and the next one's.
-  function lastRun(runs: readonly RunBelief[], line: SessionLine, next: SessionLine | undefined): RunBelief | undefined {
-    return [...runs].reverse().find((run) => run.lastSeq >= line.began && (next === undefined || run.lastSeq < next.began));
+  function runsOf(runs: readonly RunBelief[], line: SessionLine, next: SessionLine | undefined): RunBelief[] {
+    return runs.filter((run) => run.lastSeq >= line.began && (next === undefined || run.lastSeq < next.began));
   }
 
+  let search = $state("");
   const rows = $derived.by((): Row[] => {
     const all = Object.values(answers).flatMap((answer) => {
       const runs = heldIn($belief, answer.room);
       return answer.sessions.map((line, at): Row => {
-        const run = lastRun(runs, line, answer.sessions[at - 1]);
-        return { room: answer.room, line, origin: run === undefined ? null : { run: run.run, at_seq: run.lastSeq } };
+        const its = runsOf(runs, line, answer.sessions[at - 1]);
+        const run = its.at(-1);
+        const text = [answer.room, ...its.map((each) => each.task ?? "")].join("\n").toLowerCase();
+        return { room: answer.room, line, origin: run === undefined ? null : { run: run.run, at_seq: run.lastSeq }, text };
       });
     });
-    return all.sort((a, b) => b.line.at - a.line.at);
+    const needle = search.trim().toLowerCase();
+    return all.filter((row) => row.text.includes(needle)).sort((a, b) => b.line.at - a.line.at);
   });
   const earlier = $derived(Object.values(answers).reduce((sum, answer) => sum + answer.earlier, 0));
 
@@ -141,7 +156,18 @@
   });
 </script>
 
-<Section title="mailbox_recent" empty="mailbox_recent_none" count={rows.length}>
+<Section title="mailbox_recent" empty={search.trim() === "" ? "mailbox_recent_none" : "mailbox_search_none"} count={rows.length}>
+  {#if Object.keys(answers).length > 0}
+    <input
+      type="search"
+      class="mt-snug w-full rounded-control bg-page px-snug py-tight text-label placeholder:text-text-faint"
+      aria-label={say($lang, "mailbox_search")}
+      aria-describedby="{uid}-reach"
+      placeholder={say($lang, "mailbox_search")}
+      bind:value={search}
+    />
+    <p id="{uid}-reach" class="py-tight text-note text-text-faint">{say($lang, "mailbox_search_reach")}</p>
+  {/if}
   <ul
     bind:this={list}
     style:height={`${String(rows.length * rowPx)}px`}

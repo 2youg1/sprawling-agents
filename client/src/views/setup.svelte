@@ -47,7 +47,7 @@
   import ProviderDoor from "./shared/provider.svelte";
   import HarnessList from "./setup/harnesses.svelte";
   import { HEADING, HINT, PREFERRED, WIDTH } from "./setup/groups";
-  import type { Group } from "./setup/groups";
+  import type { SetupGroup } from "../core/route";
 
   type Setting = "proxying" | "autonomy" | "language";
 
@@ -79,7 +79,7 @@
   // one is optional, so the panel's bare `<Setup {group} />` asks its
   // own questions.
   interface Props {
-    readonly group?: Group | undefined;
+    readonly group?: SetupGroup | undefined;
     // The id the heading carries, so the panel can name its dialog by it.
     readonly titleId?: string | undefined;
     readonly endpoints?: EndpointsAnswer | undefined;

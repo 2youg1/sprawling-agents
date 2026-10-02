@@ -13,10 +13,8 @@
 import type { Key } from "../../core/lang";
 import type { SetupGroup } from "../../core/route";
 
-export type Group = SetupGroup;
-
 // What each group is called (client/Spec.lean §4-36).
-export const HEADING: Record<Group, Key> = {
+export const HEADING: Record<SetupGroup, Key> = {
   you: "setup_group_you",
   accounts: "setup_group_accounts",
   harnesses: "setup_group_harnesses",
@@ -35,7 +33,7 @@ export const HEADING: Record<Group, Key> = {
 
 // The line under the heading, saying what the group governs - the one
 // kind of sentence this panel is allowed (client/Spec.lean §4-10).
-export const HINT: Record<Group, Key | null> = {
+export const HINT: Record<SetupGroup, Key | null> = {
   you: "setup_group_hint_you",
   accounts: "setup_group_hint_accounts",
   harnesses: "setup_group_hint_harnesses",
@@ -56,7 +54,7 @@ export const HINT: Record<Group, Key | null> = {
 // its cards in as many measure-wide columns as it holds (`grid-fit`);
 // a group that is one list, one form or one text reads badly stretched
 // and stops at the conversation's width.
-export const WIDTH: Record<Group, string> = {
+export const WIDTH: Record<SetupGroup, string> = {
   you: "",
   accounts: "",
   harnesses: "max-w-talk",
@@ -74,4 +72,4 @@ export const WIDTH: Record<Group, string> = {
 };
 
 // The groups whose answers `core/prefs.ts` keeps (client/Spec.lean §4-29).
-export const PREFERRED: readonly Group[] = ["network", "appearance", "keys"];
+export const PREFERRED: readonly SetupGroup[] = ["network", "appearance", "keys"];

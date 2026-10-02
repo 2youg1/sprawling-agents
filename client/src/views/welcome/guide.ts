@@ -22,7 +22,7 @@ export const STEPS: readonly GuideStep[] = GuideStep.literals;
 // city's saved endpoint and `main` model answer it.
 export type Optional = Exclude<GuideStep, "provider">;
 
-export const OPTIONAL: readonly Optional[] = STEPS.flatMap((step) => (step === "provider" ? [] : [step]));
+const OPTIONAL: readonly Optional[] = STEPS.flatMap((step) => (step === "provider" ? [] : [step]));
 
 // What the city's configuration says of each step: `true` done, `false`
 // not done, `null` when this page has no reading that could say - the
@@ -56,7 +56,7 @@ export function currentOf(progress: GuideProgress, configured: Configured): Guid
 }
 
 // The step after this one, `null` after the last.
-export function nextOf(step: GuideStep): GuideStep | null {
+function nextOf(step: GuideStep): GuideStep | null {
   return STEPS[STEPS.indexOf(step) + 1] ?? null;
 }
 
