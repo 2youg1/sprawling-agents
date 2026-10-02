@@ -15,7 +15,7 @@ import crates.remote_access.spec.Door
 四条性质：
 
 * **到城的只有放行的帧**——转发出去的若不是问候，就是设备的权限 `permits` 的那一类；
-* **只看的设备从不转发一个动手的动词**，只能在本机做的动词谁也不转发；
+* **只看的设备从不转发一个动手的动词**，只在城所在的机器上做的动词（`localOnly`）谁也不转发；
 * **读不懂的帧不到城**；
 * **会话已不被门持有时什么也不转发**，连接结束。
 -/
@@ -79,7 +79,7 @@ theorem forwarded_only_if_permitted (authority : Option Authority) (o : Opened)
 /-- 只看的设备从不转发一个动手的动词。 -/
 theorem watching_never_acts : judge (some .watch) (.judged .act) = .ok (.refuseVerb .act) := rfl
 
-/-- 只能在本机做的动词谁也不转发。 -/
+/-- 只在城所在的机器上做的动词（`localOnly`）谁也不转发。 -/
 theorem local_only_is_refused (a : Authority) :
     judge (some a) (.judged .localOnly) = .ok (.refuseVerb .localOnly) := by
   simp [judge, local_only_is_never_remote]
