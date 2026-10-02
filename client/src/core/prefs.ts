@@ -34,21 +34,15 @@ import { get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 import { EDITORS, type Opening } from "./editor";
-import type { Lang } from "./lang";
-import { langOf } from "./lang";
-import { browserRows } from "./rows";
+import { langOf, type Lang } from "./lang";
+import { browserRows, type Rows } from "./rows";
 import { sizingOf } from "./sizing";
-import type { Rows } from "./rows";
-import { Proxying } from "../wire";
-import type { Chord, PreferencePatch } from "../wire";
+import { Proxying, type Chord, type PreferencePatch } from "../wire";
 import { appearanceOnWire } from "./prefs_city";
-import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, STACK_SHAPE, blendOf } from "./appearance";
-import type { Appearance } from "./appearance";
+import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, STACK_SHAPE, blendOf, type Appearance } from "./appearance";
 import type { Notifying } from "./notify";
-import { SHOWINGS } from "./results";
-import type { Showing } from "./results";
-import { readWorkbench, spelledWorkbench } from "./workbench";
-import type { Workbench } from "./workbench";
+import { SHOWINGS, type Showing } from "./results";
+import { readWorkbench, spelledWorkbench, type Workbench } from "./workbench";
 
 // ------------------------------------------------------------- the rows
 
@@ -173,10 +167,9 @@ export type Keeper =
 // which fact it is changing sends that fact. The tier, the bell, how a
 // conversation is shown, glass, the blend tier's opacity and the
 // workbench stay in this browser, since the city's record has no field
-// for them yet. `adopt` is the other
-// direction and is therefore whole - an answer states every value at
-// once, and a record applied field by field could be half of one
-// answer and half of the last.
+// for them yet. `adopt` is the other direction and is therefore whole -
+// an answer states every value at once, and a record applied field by
+// field could be half of one answer and half of the last.
 export interface PreferenceDoor {
   readonly held: Readable<Preferences>;
   readonly keeper: Readable<Keeper>;
@@ -270,11 +263,9 @@ function writeFigure(rows: Rows, row: string, figure: number | null): void {
   else rows.setItem(row, String(figure));
 }
 
-// The two words a yes-or-no row is written with, spelled once for the
-// write and the read. Each row is compared against one of them, because
-// an absent row means different things: `welcomed` is false until
-// somebody has walked the welcome, and `panel` is open until somebody
-// has closed it.
+// The two words a yes-or-no row is written and read with. Each row is
+// compared against one of them, because an absent `welcomed` is false
+// (nobody walked the welcome yet) and an absent `panel` is open.
 const YES = "yes";
 const NO = "no";
 
@@ -291,9 +282,8 @@ function readPreferences(rows: Rows, browserLang: string): Preferences {
   };
 }
 
-// The whole record into the cache, which `readPreferences` reads back.
-// The two are inverse, and that is what makes the cache a cache: what
-// the city last answered is what the next first paint draws.
+// The whole record into the cache, the inverse of `readPreferences`:
+// what the city last answered is what the next first paint draws.
 function writePreferences(rows: Rows, next: Preferences): void {
   rows.setItem(ROWS.lang, next.lang);
   rows.setItem(ROWS.welcomed, next.welcomed ? YES : NO);
