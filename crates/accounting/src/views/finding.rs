@@ -17,12 +17,26 @@ use std::path::{Path, PathBuf};
 
 use kernel::Address;
 
+use super::holding::Views;
+use super::prepared::Prepared;
+
+impl Views {
+    /// The walk reads the disk, so it runs after the views are released.
+    pub(in crate::views) fn find_ask(&self, under: &Address, text: &str) -> Prepared {
+        Prepared::Find(self.city_root.clone(), under.clone(), text.to_owned())
+    }
+}
+
 /// The files under `under` whose name holds `text`, without regard to
 /// case.
 ///
 /// Takes the city root rather than the views: it reads the disk, and
 /// runs after the view lock is released, as `listing_answer` does.
-pub(super) fn find_answer(city_root: &Path, under: Address, text: String) -> wire::FindAnswer {
+pub(in crate::views) fn find_answer(
+    city_root: &Path,
+    under: Address,
+    text: String,
+) -> wire::FindAnswer {
     let (paths, walked) = walk(&city_root.join(under.as_str()), &text.to_lowercase());
     wire::FindAnswer {
         under,

@@ -22,6 +22,7 @@ use super::building_page::read_building;
 use super::city::CityAsk;
 use super::commits::CommitsAsk;
 use super::document::document_answer;
+use super::finding::find_answer;
 use super::git_status::GitStatusAsk;
 use super::hunks::hunks_answer;
 use super::lines::buildings_of;
@@ -129,12 +130,8 @@ pub enum Prepared {
         city_root: PathBuf,
         at: Option<Address>,
     },
-    /// The files under one address whose name holds a text.
-    Find {
-        city_root: PathBuf,
-        under: Address,
-        text: String,
-    },
+    /// The files under one address whose name holds a text: city root, address, text.
+    Find(PathBuf, Address, String),
     /// One file of the tree, as a version.
     Document { city_root: PathBuf, at: Address },
     /// One document's open proposal cards, with its version still to
@@ -313,11 +310,7 @@ impl Prepared {
             Self::Listing { city_root, at } => {
                 wire::Answer::Listing(listing_answer(&city_root, at))
             }
-            Self::Find {
-                city_root,
-                under,
-                text,
-            } => wire::Answer::Find(super::finding::find_answer(&city_root, under, text)),
+            Self::Find(root, under, text) => wire::Answer::Find(find_answer(&root, under, text)),
             // Missing, unreadable and empty are answers of their own
             // (`crates/wire/Spec.lean` §8-69), so this read always answers a document.
             Self::Document { city_root, at } => {
