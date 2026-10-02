@@ -123,7 +123,7 @@
 </script>
 
 <Section title="mailbox_recent" empty={search.trim() === "" ? "mailbox_recent_none" : "mailbox_search_none"} count={rows.length}>
-  {#if Object.keys(answers).length > 0}
+  {#if stretches.all.length > 0}
     <input
       type="search"
       class="mt-snug w-full rounded-control bg-page px-snug py-tight text-label placeholder:text-text-faint"

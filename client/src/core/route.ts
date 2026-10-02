@@ -254,14 +254,12 @@ function readEscapedAddress(tail: string): Option.Option<Address> {
   return Option.flatMap(unescaped(tail), readAddress);
 }
 
-const readSeq = Schema.decodeOption(Seq);
-
 function talkIn(tail: string): Option.Option<View> {
   const cut = tail.lastIndexOf(STRETCH);
   const room = readEscapedAddress(cut < 0 ? tail : tail.slice(0, cut));
   if (cut < 0) return Option.map(room, (address) => ({ kind: "talk", address }));
   const digits = tail.slice(cut + 1);
-  const session = /^\d+$/.test(digits) ? readSeq(Number(digits)) : Option.none();
+  const session = readSeq(digits);
   return Option.flatMap(room, (address) => Option.map(session, (began) => ({ kind: "talk", address, session: began })));
 }
 

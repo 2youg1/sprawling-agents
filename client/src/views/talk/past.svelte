@@ -49,7 +49,7 @@
 
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]}>
   {#if !band}
-    <Scroller empty={false} rejoined={0}>
+    <Scroller empty={false} rejoined={0} place={stretch === null ? address : `${address}:${String(stretch.line.began)}`}>
       {#each stretch?.runs ?? [] as run, at (run.run)}
         <Thread
           {run}
