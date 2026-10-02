@@ -234,7 +234,7 @@ Markdown（`markdown::lowering::tests`、`markdown::target::tests`、`markdown::
 
 `kernel`（`AxError`、`B3Hash` 与它的 BLAKE3）、`serde`（线上携带的类型，D1）、可选的 `schemars`（`schema` feature，只由 `wire` 的 `schema` 打开）、`comrak`（Markdown 的文法，D20、D22）。不引入编码探测库：它会猜（D4）。
 
-comrak（BSD-2-Clause）关掉默认 feature 取用：默认的是它的命令行与 syntect 高亮器，而代码的颜色归页面的 lezer（client/Spec.lean §4-26）。它把 CommonMark 规范的全部例子当作自己的测试，GFM 的扩展同样；它的树是一个 arena，读完即丢，不比一次调用活得久。被比较过的：pulldown-cmark——事件流而不是树，源位置是字节区间而不是行列，但它的扩展里没有前置元数据与 CJK 友好的强调；markdown-rs——mdast 树更完整，但传递依赖更多、更新更慢。版本在根 `Cargo.toml`，锁在 `Cargo.lock`，停在 0.50：从 0.51 起 comrak 经 `finl_unicode` 读 Unicode 的字符类别，它的许可声明是 `(MIT OR Apache-2.0) AND Unicode-DFS-2016`，而 `deny.toml` 的清单只有 Unicode-3.0；往清单里加一条许可是放宽一道门，要人的定规。0.50 读字符类别用的是 `unicode_categories`（MIT OR Apache-2.0），本文法开的扩展它都有，所以这条定规只决定文法能不能升过 0.50。块的两条规则（D6）仍是本 crate 自己的：它们给 `head` 与预览的窗口找块末，只要字节，不要一棵 CommonMark 树。规格的分部不 import 任何别的 crate 的规格。
+comrak（BSD-2-Clause）关掉默认 feature 取用：默认的是它的命令行与 syntect 高亮器，而代码的颜色归页面的 lezer（client/Spec.lean §4-26）。它把 CommonMark 规范的全部例子当作自己的测试，GFM 的扩展同样；它的树是一个 arena，读完即丢，不比一次调用活得久。被比较过的：pulldown-cmark——事件流而不是树，源位置是字节区间而不是行列，但它的扩展里没有前置元数据与 CJK 友好的强调；markdown-rs——mdast 树更完整，但传递依赖更多、更新更慢。版本在根 `Cargo.toml`，锁在 `Cargo.lock`。comrak 经 `finl_unicode` 读 Unicode 的字符类别，它的许可声明是 `(MIT OR Apache-2.0) AND Unicode-DFS-2016`；`deny.toml` 收下 Unicode-DFS-2016 是人的定规：它是清单里已有的 Unicode-3.0 的 2016 年文本，同样宽松，只要求声明随数据同行，而图里只有 `finl_unicode` 带来它。块的两条规则（D6）仍是本 crate 自己的：它们给 `head` 与预览的窗口找块末，只要字节，不要一棵 CommonMark 树。规格的分部不 import 任何别的 crate 的规格。
 -/
 
 /-! ## 14 硬编码声明

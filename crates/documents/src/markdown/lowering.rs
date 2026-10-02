@@ -142,6 +142,8 @@ impl Lowering<'_> {
             | NodeValue::Underline
             | NodeValue::Subscript
             | NodeValue::SpoileredText
+            | NodeValue::Insert
+            | NodeValue::BlockDirective(_)
             | NodeValue::EscapedTag(_) => self.unsupported(span, Construct::Extension, ""),
         }
     }
@@ -255,6 +257,7 @@ impl Lowering<'_> {
             | NodeValue::Subscript
             | NodeValue::Underline
             | NodeValue::SpoileredText
+            | NodeValue::Insert
             | NodeValue::WikiLink(_) => out.extend(self.inlines(node, inner)),
             NodeValue::Document
             | NodeValue::FrontMatter(_)
@@ -277,6 +280,7 @@ impl Lowering<'_> {
             | NodeValue::TaskItem(_)
             | NodeValue::MultilineBlockQuote(_)
             | NodeValue::Alert(_)
+            | NodeValue::BlockDirective(_)
             | NodeValue::Subtext => out.push(Inline::Unsupported {
                 construct: Construct::Extension,
                 source: plain(node),
