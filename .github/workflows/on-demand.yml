@@ -1,0 +1,154 @@
+# The runs a person asks for, on the ref they name, and never on a push.
+#
+# Each answers a question nobody needs answered for every commit, and
+# each is too heavy for the desk the project is developed on:
+#
+#   mutants   the mutants of the lines a branch changed since `base`,
+#             in four shards (`just mutants-diff`)
+#   sim       the citysim scenarios (`just sim`)
+#   shots     every page at 1440 and 1920, dark and light; the PNG files
+#             and their index are the artifact `shots-<tree>`
+#   release   the shipped Windows binary and its archive (`just package`),
+#             the artifact `release-<tree>`, for measurement on the
+#             machine the readings belong to
+#
+# Ask with `gh workflow run on-demand.yml --ref <branch> -f job=<name>`;
+# `mutants` also takes `-f base=<ref>` (default `main`). An artifact is
+# named for the tree it was built from (`git rev-parse HEAD^{tree}`), so
+# a reading taken from a download names the tree it measured.
+#
+# Every job here runs on Windows, the platform a person reproduces a red
+# on, except that nothing stops a later job from naming another runner.
+# The three-stage PGO build is not here yet: it belongs to the release
+# build it optimises, and arrives with the measurement that judges it.
+name: on-demand
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: which run
+        required: true
+        type: choice
+        options: [mutants, sim, shots, release]
+      base:
+        description: the ref `mutants` diffs against
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  mutants:
+    if: inputs.job == 'mutants'
+    name: mutants (${{ matrix.shard }}/4)
+    runs-on: windows-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      # The whole history, so the merge base with `base` is in the clone.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: ./.github/actions/zig
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mutants
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: false
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants,cargo-nextest,just
+      - uses: ./.github/actions/client-artifacts
+      - name: the mutants of this branch's change
+        shell: bash
+        run: just mutants-diff "origin/${{ inputs.base }}" "${{ matrix.shard }}/4"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mutants-${{ matrix.shard }}
+          path: mutants.out
+          if-no-files-found: warn
+
+  sim:
+    if: inputs.job == 'sim'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: ./.github/actions/zig
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: sim
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: false
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - name: the citysim scenarios
+        run: just sim
+
+  shots:
+    if: inputs.job == 'shots'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gates
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: false
+      - uses: ./.github/actions/client-artifacts
+      - id: tree
+        shell: bash
+        run: echo "sha=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - name: every page, both widths, both schemes
+        run: just shots
+      - uses: actions/upload-artifact@v7
+        with:
+          name: shots-${{ steps.tree.outputs.sha }}
+          path: target/shots
+          if-no-files-found: error
+
+  release:
+    if: inputs.job == 'release'
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: ./.github/actions/zig
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: false
+      - uses: ./.github/actions/client-artifacts
+      - id: tree
+        shell: bash
+        run: echo "sha=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - name: the binary and the archive a person downloads
+        run: just package
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ steps.tree.outputs.sha }}
+          path: |
+            target/release/sprawling.exe
+            target/package/*
+          if-no-files-found: error
