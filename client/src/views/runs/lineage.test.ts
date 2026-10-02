@@ -6,7 +6,10 @@
 import { describe, expect, test } from "bun:test";
 
 import type { BoardRun } from "./lineage";
-import { rowsOf, windowOf } from "./lineage";
+import { Option } from "effect";
+
+import { Address, RunId } from "../../wire";
+import { rowsOf, viewOf, windowOf } from "./lineage";
 
 function run(id: string, addr: string, started: number, doing: BoardRun["doing"]): BoardRun {
   return { run: id, addr, task: null, goal: null, started, ended: null, doing };
@@ -37,5 +40,17 @@ describe("lineage", () => {
   test("a thousand rows draw only the viewport and its margin", () => {
     expect(windowOf(1200, 2800, 560, 28, 8)).toEqual({ from: 92, to: 128 });
     expect(windowOf(1200, 0, 560, 0, 8)).toEqual({ from: 0, to: 8 });
+  });
+
+  // A row on the board is a way in (S07 E36): Enter or a click on a run
+  // opens its page, on a room its conversation, on a building its page.
+  test("each row opens the page of what it names", () => {
+    const id = "3f2a9c4e-0d1b-4e7a-9a55-1c2b3d4e5f60";
+    const views = rowsOf([run(id, "shop/notes", 1, THINKING)], new Set()).map((row) => Option.getOrNull(viewOf(row)));
+    expect(views).toEqual([
+      { kind: "building", address: Address.make("shop") },
+      { kind: "talk", address: Address.make("shop/notes") },
+      { kind: "run", run: RunId.make(id) },
+    ]);
   });
 });

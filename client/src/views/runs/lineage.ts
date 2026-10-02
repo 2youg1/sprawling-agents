@@ -14,8 +14,11 @@
 // has to act on. The address is the directory tree, so its first
 // segment is the building and the rest is the room.
 
+import { Option } from "effect";
+
 import type { RunBelief } from "../../core/belief";
 import type { Doing } from "../../core/doing";
+import type { View } from "../../core/route";
 
 // One run as the board needs it: what the belief already holds about
 // it. `ended` is null until the wire carries a run's last moment.
@@ -164,4 +167,10 @@ export function windowOf(total: number, scrolled: number, viewport: number, rowP
   const from = Math.max(0, Math.floor(scrolled / rowPx) - margin);
   const to = Math.min(total, Math.ceil((scrolled + viewport) / rowPx) + margin);
   return { from, to };
+}
+
+// Where a row leads when it is opened: a run to its page, a room to its
+// conversation, a building to its page.
+export function viewOf(row: Row): Option.Option<View> {
+  return Option.none();
 }
