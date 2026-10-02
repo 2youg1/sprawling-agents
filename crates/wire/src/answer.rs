@@ -31,6 +31,8 @@ mod cost;
 mod cost_of;
 mod doctor;
 mod document;
+mod document_bytes;
+mod document_versions;
 mod endpoints;
 mod evidence;
 mod git_status;
@@ -69,6 +71,8 @@ pub use doctor::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSand
 pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use doctor::{DoctorNewest, DoctorPack, DoctorUnread, DoctorUpstream};
 pub use document::{Coverage, DocumentAnswer, DocumentBody, DocumentState, HeldDocument};
+pub use document_bytes::{BYTES_WINDOW_MAX, BytesAnswer, ExportAnswer};
+pub use document_versions::{DocumentVersion, VERSIONS_MAX, VersionSource, VersionsAnswer};
 pub use endpoints::{ChosenSummary, EndpointSummary, EndpointsAnswer};
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use git_status::{Drift, GitStatusAnswer};
@@ -228,6 +232,9 @@ pub enum Answer {
     Proposals(Box<ProposalsAnswer>),
     OpenProposals(OpenProposalsAnswer),
     Range(Box<RangeAnswer>),
+    Versions(Box<VersionsAnswer>),
+    Bytes(Box<BytesAnswer>),
+    Export(Box<ExportAnswer>),
     Preview(Box<PreviewAnswer>),
     /// A reply's text laid out (`crates/wire/spec/Answer/Preview.lean` §8-75): its closed blocks, and
     /// the bytes they cover.

@@ -48,6 +48,13 @@ fn reopen(root: &Path) -> RunWorker {
     .unwrap()
 }
 
+/// Whether the city's content store holds these bytes.
+fn kept(root: &Path, bytes: &[u8]) -> bool {
+    storage::Cas::open(&kernel::layout::CityLayout::new(root).cas())
+        .unwrap()
+        .contains(&B3Hash::digest(bytes))
+}
+
 fn on_disk(root: &Path) -> String {
     std::fs::read_to_string(root.join(NOTES)).unwrap()
 }
@@ -171,6 +178,10 @@ fn a_second_save_from_the_same_version_is_refused_and_the_first_stands() {
             "bytes": 8,
         })]
     );
+    assert!(
+        kept(dir.path(), b"ONE two\n"),
+        "the version a save leaves is in the store (§8-79)"
+    );
 }
 
 /// The receipt a page waits for carries the key it sent, and the same
@@ -245,6 +256,7 @@ fn cards_accepted_amended_and_rejected_land_as_one_save_after_a_reopen() {
         ))
         .unwrap();
     assert_eq!(on_disk(dir.path()), "Uno. Zwei. Three.\n");
+    assert!(kept(dir.path(), b"Uno. Zwei. Three.\n"));
     assert_eq!(lines(dir.path(), "document_written").len(), 1);
     assert_eq!(lines(dir.path(), "proposal_decided").len(), 3);
     assert_eq!(open_cards(dir.path()).1, Vec::<B3Hash>::new());

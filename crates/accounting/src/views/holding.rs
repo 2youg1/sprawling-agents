@@ -125,6 +125,9 @@ pub struct Views {
     /// Each address's stretches, so a room's sessions are answered without
     /// reading the ledger back (`crates/wire/Spec.lean` §8-71).
     pub(super) sessions: super::sessions::RoomSessions,
+    /// Each document's saves through a page, so its versions are
+    /// answered without reading the ledger back (§8-79).
+    pub(super) saves: super::versions::DocumentSaves,
     /// Every building's plan, parsed once and re-parsed only when a
     /// record says it may have moved.
     ///
@@ -225,6 +228,7 @@ impl Views {
             index,
             first_prompts: std::collections::BTreeMap::new(),
             sessions: super::sessions::RoomSessions::default(),
+            saves: super::versions::DocumentSaves::default(),
             plans,
             pursuits: std::collections::BTreeMap::new(),
             decided: Vec::new(),
@@ -367,6 +371,7 @@ impl Views {
                 }
             }
             EventKind::ApprovalResolved => self.fold_ruling(record)?,
+            EventKind::DocumentWritten => self.saves.absorb(record)?,
             EventKind::PromptAssembled => {
                 self.first_prompts
                     .entry(record.run())

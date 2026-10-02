@@ -56,6 +56,7 @@ mod standing_tests;
 #[cfg(test)]
 mod tests;
 pub mod toolkits;
+pub mod versions;
 
 pub use asking::ask;
 pub use governance::Governance;

@@ -218,15 +218,15 @@ pub enum Query {
     /// offer time (`crates/wire/spec/Answer/Proposals.lean` §8-73).
     OpenProposals,
     /// One window of a stored version, by its version (`crates/wire/spec/Answer/Range.lean` §8-70).
-    Range {
-        version: B3Hash,
-        range: documents::Span,
-    },
+    Range { version: B3Hash, range: documents::Span },
+    /// One document's versions, newest first (`crates/wire/spec/Answer/DocumentVersions.lean` §8-79).
+    Versions { at: Address },
+    /// One window of a stored object's bytes (`crates/wire/spec/Answer/DocumentBytes.lean` §8-80).
+    Bytes { version: B3Hash, range: documents::Span },
+    /// A stored Markdown version as one HTML file (`crates/wire/spec/Answer/DocumentBytes.lean` §8-81).
+    Export { at: Address, version: B3Hash },
     /// One window of a stored Markdown version, laid out (`crates/wire/spec/Answer/Preview.lean` §8-74).
-    Preview {
-        version: B3Hash,
-        viewport: documents::Span,
-    },
+    Preview { version: B3Hash, viewport: documents::Span },
     /// A reply's text, laid out by the preview's grammar (`crates/wire/spec/Answer/Preview.lean` §8-75).
     Reply {
         text: String,

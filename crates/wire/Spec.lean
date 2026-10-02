@@ -10,6 +10,8 @@ import crates.wire.spec.Answer.Commits
 import crates.wire.spec.Answer.Config
 import crates.wire.spec.Answer.Doctor
 import crates.wire.spec.Answer.Document
+import crates.wire.spec.Answer.DocumentBytes
+import crates.wire.spec.Answer.DocumentVersions
 import crates.wire.spec.Answer.Endpoints
 import crates.wire.spec.Answer.Github
 import crates.wire.spec.Answer.Harnesses
@@ -255,6 +257,9 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-77 | `crates/wire/spec/Answer/Config.lean` |
 | 8-78 | `crates/wire/spec/Answer/Commits.lean` |
 | 8-79 | `crates/wire/spec/Reading.lean` |
+| 8-79 | `crates/wire/spec/Answer/DocumentVersions.lean` |
+| 8-80 | `crates/wire/spec/Answer/DocumentBytes.lean` |
+| 8-81 | `crates/wire/spec/Answer/DocumentBytes.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |
@@ -323,6 +328,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D13 | 外壳读的字段在本版之内增加，各自可缺，各读自账本上写下它的那一行 | `crates/wire/spec/Reading.lean` |
 | D14 | 档位、玻璃与混合档透明度随偏好进城，三者都可缺 | `crates/wire/spec/Preference.lean` |
 | D15 | 全城开着的提案是一问，答文档与提出时刻，不答正文 | `crates/wire/spec/Answer/Proposals.lean` |
+| D14 | 文件的字节经一个 `Query` 回答逐窗送到页面，不开第二扇 HTTP 门 | `crates/wire/spec/Answer/DocumentBytes.lean` |
 | D16 | `Bound` 在绑定时读下监听器的地址，`local_addr` 只是读出它 | `crates/wire/spec/Server/Listener.lean` |
 | D17 | 冻下的名字在城里读成类型，线上不带摘要 | `crates/wire/spec/Reading.lean` |
 -/

@@ -275,6 +275,22 @@ mod tests {
         assert_eq!(held.version, B3Hash::digest(&long));
     }
 
+    /// Every version a read sees is kept, whole or not, text or not, so
+    /// an older version of any file can be read back by its version.
+    #[test]
+    fn every_version_a_read_sees_is_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+        std::fs::write(dir.path().join("lab/notes.txt"), b"short\n").unwrap();
+        std::fs::write(dir.path().join("lab/scan.pdf"), b"%PDF\0\x01").unwrap();
+        let notes = held(ask(dir.path(), "lab/notes.txt"));
+        let scan = held(ask(dir.path(), "lab/scan.pdf"));
+        assert_eq!(scan.body, DocumentBody::Opaque);
+        let store = storage::Cas::open(&kernel::layout::CityLayout::new(dir.path()).cas()).unwrap();
+        assert!(store.contains(&notes.version), "a small whole text is kept");
+        assert!(store.contains(&scan.version), "an opaque version is kept");
+    }
+
     /// `Content` and `Prefix` keep their shape and take the same text
     /// judgement: a NUL without a mark is not text, a long text is cut.
     #[test]

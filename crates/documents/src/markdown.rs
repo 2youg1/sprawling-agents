@@ -13,11 +13,13 @@
 //! because a block names its bytes and only there do the bytes of the
 //! text read from a window line up with the version's.
 
+mod export;
 mod lowering;
 mod position;
 mod target;
 mod tree;
 
+pub use export::{EXPORT_BYTES_MAX, export};
 pub use tree::{Align, Block, Check, Construct, Inline, Laid, ListItem, Order, Preview};
 pub use tree::{ReplyState, Row, Spacing};
 

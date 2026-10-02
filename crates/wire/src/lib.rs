@@ -42,6 +42,7 @@ pub use answer::Used;
 pub use answer::{Answer, ApprovalsAnswer, ArchiveLine, BlockedLine, BuildingProgress};
 pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
 pub use answer::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
+pub use answer::{BYTES_WINDOW_MAX, BytesAnswer, DocumentVersion, ExportAnswer};
 pub use answer::{BuildingAnswer, BuildingDoc};
 pub use answer::{Call, Closing, FrozenNames, Note, Opening, Outcome, Output};
 pub use answer::{ChangesAnswer, CommitAnswer, CommitAt, CommitsAnswer, HISTORY_MAX};
@@ -72,6 +73,7 @@ pub use answer::{RoundsAnswer, Timing, Turn};
 pub use answer::{SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use answer::{SecondDomain, SettledEffort, SettledSecond, TuningDefaults};
 pub use answer::{Standing, ToolkitLine, ToolkitsAnswer};
+pub use answer::{VERSIONS_MAX, VersionSource, VersionsAnswer};
 #[cfg(feature = "server")]
 pub use assets::{AssetReply, ClientAssets, EmbeddedFile};
 pub use auth::{Pairing, PairingToken, verify};

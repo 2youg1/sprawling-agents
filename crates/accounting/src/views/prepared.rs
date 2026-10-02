@@ -150,6 +150,10 @@ pub enum Prepared {
         version: B3Hash,
         viewport: documents::Span,
     },
+    /// One stored object's bytes, or a stored version exported.
+    Stored(super::answering::stored::StoredAsk),
+    /// One document's versions: its saves, with the disk still to read.
+    Versions(super::versions::VersionsAsk),
     /// A reply's text the page sent, still to be laid out.
     Reply {
         text: String,
@@ -324,6 +328,8 @@ impl Prepared {
                 viewport,
             } => super::answering::preview::preview_answer(&city_root, version, viewport),
             Self::Reply { text, state } => super::answering::reply::reply_answer(&text, state),
+            Self::Stored(ask) => ask.answer(),
+            Self::Versions(ask) => ask.answer(),
             Self::Building {
                 city_root,
                 addr,

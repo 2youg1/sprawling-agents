@@ -37,6 +37,7 @@ pub(crate) mod identity;
 pub(super) mod preview;
 pub(super) mod range;
 pub(super) mod reply;
+pub(super) mod stored;
 use super::lines::{endpoints_answer, known_hosts_answer, summarize};
 
 /// How many runs a cost view names besides every active one: a bound
@@ -226,6 +227,9 @@ impl Views {
             wire::Query::Proposals(doc) => return self.proposals_ask(doc),
             wire::Query::OpenProposals => wire::Answer::OpenProposals(self.open_proposals_answer()),
             wire::Query::Range { version, range } => return self.range_ask(*version, *range),
+            wire::Query::Versions { at } => return self.versions_ask(at),
+            wire::Query::Bytes { version, range } => return self.bytes_ask(*version, *range),
+            wire::Query::Export { at, version } => return self.export_ask(at, *version),
             wire::Query::Preview { version, viewport } => {
                 return self.preview_ask(*version, *viewport);
             }

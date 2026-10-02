@@ -2854,6 +2854,7 @@ dependencies = [
 name = "sprawling-accounting"
 version = "0.0.8"
 dependencies = [
+ "base64 0.23.1",
  "cssparser",
  "git2",
  "html5ever",
