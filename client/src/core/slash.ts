@@ -327,7 +327,7 @@ export function find(verb: string): Slash | undefined {
 
 // What the menu shows for a line. A verb already typed in full, with a
 // space after it, narrows the list to itself: what a person needs then
-// is its grammar, not thirteen other verbs.
+// is its grammar, not every other verb.
 export function offered(line: string): readonly Slash[] {
   const call = parse(line);
   if (call === null) {
