@@ -12,13 +12,24 @@
 #   models    the Lean specifications under `crates/`
 #   clippy    the zero-warning build of every target and feature, and the
 #             feature combinations `just features` runs
-#   test      the suite
+#   test build, test (1/4) .. test (4/4), test
+#             the suite, compiled once into a nextest archive and run in
+#             four slices on four runners; `test` only collects the four
+#             verdicts, so the check a branch protection names stays one
+#   core      clippy and the suite of the packages every platform ships
+#             (`just check-core`), on ubuntu and macOS
 #   gates     the gates that judge the built client bundle
 #   supply    licences, bans and sources; compiles nothing
 #   client    the client's own linter, typecheck and tests
 #   desktop   the desktop server's Zig leaf, whose tests no cargo command runs
 #   proof     the kernel propositions kani can hold; `changes` decides
 #             whether a change touched anything a proof is about
+#
+# The nine phases of `just check-all` map onto these jobs one to one or
+# into a job that holds several: fmt -> fast, build-web -> gates (its
+# recipe builds the bundle), clippy and features -> clippy, test -> the
+# test jobs, gates -> fast (sources), gates (artifacts) and supply
+# (`just deny`), models -> models, client -> client, desktop -> desktop.
 #
 # The order a red arrives in is fmt, then the source gates, then clippy,
 # then the suite, then the client, because every job starts in the first
@@ -35,8 +46,15 @@
 # the platform the project is developed on, so a red job is a red local run.
 # Three jobs run on ubuntu because the tool they drive runs better or only
 # there: `client` drives bun, `models` drives Lean, `proof` drives kani,
-# whose upstream builds for Linux only. macOS byte-identity and the Nix leg
-# are `platforms.yml`, nightly.
+# whose upstream builds for Linux only; `core` runs on ubuntu and macOS
+# because a person on either runs the same binary. The macOS source
+# gates, byte-identity and the Nix leg are `platforms.yml`, nightly, and
+# the runs nobody waits for on every push - mutation, citysim, the
+# screenshots, a release build of a ref - are `on-demand.yml`.
+#
+# Any branch can ask for this run by hand (`gh workflow run ci.yml --ref
+# wave/<name>`); nothing below assumes the ref is `main` except the cache
+# writes, which only `main` makes.
 #
 # Every Rust cache is keyed on `Cargo.lock` and `rust-toolchain.toml` (the
 # two files that decide what a build produces), every bun cache on
@@ -146,6 +164,13 @@ jobs:
                 exit 1
               fi
               ;;
+            workflow_dispatch)
+              # A branch asked for by hand is judged from where it left
+              # main, which is the range a wave or a fix branch adds.
+              if git rev-parse -q --verify origin/main >/dev/null; then
+                range="$(git merge-base origin/main '${{ github.sha }}')..${{ github.sha }}"
+              fi
+              ;;
             push)
               before='${{ github.event.before }}'
               if reachable "$before"; then
@@ -200,9 +225,19 @@ jobs:
       - name: the feature combinations
         run: just features
 
-  test:
+  # The suite, compiled once. The archive carries every test binary and
+  # the workspace binaries they spawn; the four slices below run it on
+  # runners whose checkout path is the same as this one, which is what
+  # lets a path cargo baked in at compile time resolve there. Debug
+  # information is cut to line tables: it is most of the archive's bytes,
+  # and a backtrace still names the file and the line.
+  test-build:
+    name: test build
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+      CARGO_PROFILE_TEST_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
@@ -218,31 +253,103 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest,just
+      # The binary embeds the bundle, so the archive carries the one a
+      # person runs rather than the placeholder page.
+      - uses: ./.github/actions/client-artifacts
+      - name: the suite, compiled once
+        run: just test-archive target/nextest-archive.tar.zst
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nextest-archive
+          path: target/nextest-archive.tar.zst
+          retention-days: 1
+          if-no-files-found: error
+
+  # One quarter of the suite each, by nextest's count partition, which
+  # deals the tests out in turn so the slices hold equal numbers. The
+  # toolchain, Zig and the client tree are installed because some tests
+  # compile (trybuild), build the leaf, or read `client/node_modules`.
+  test-slice:
+    name: test (${{ matrix.slice }}/4)
+    needs: test-build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        slice: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: ./.github/actions/zig
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,just
       # The trybuild suites are cold rather than slow: one suite is 21.4s
-      # against an empty scratch and 0.9s against a warm one. The scratch
-      # is deleted below so that rust-cache can save, so it is restored and
-      # saved explicitly, around the tests that fill it and before the step
-      # that empties it; a post-step cannot be placed between two ordinary
-      # ones.
+      # against an empty scratch and 0.9s against a warm one, so the
+      # scratch is cached on its own, keyed per slice because each slice
+      # fills a different part of it.
       - uses: actions/cache/restore@v6
         id: trybuild-scratch
         with:
           path: target/tests
-          key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
-          restore-keys: trybuild-${{ runner.os }}-
+          key: trybuild-${{ runner.os }}-${{ matrix.slice }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          restore-keys: trybuild-${{ runner.os }}-${{ matrix.slice }}-
       # xtask's npm gate has tests that read the installed client tree and
       # refuse when it is missing, which is what a bare runner has.
       - uses: ./.github/actions/client-artifacts
+      - uses: actions/download-artifact@v8
+        with:
+          name: nextest-archive
+          path: target
       - name: tests
-        run: just test
+        run: just test-slice target/nextest-archive.tar.zst count:${{ matrix.slice }}/4
       - uses: actions/cache/save@v6
         if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:
           path: target/tests
-          key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
-      # trybuild's scratch holds an entry that does not survive the cache's
-      # own pruning pass, and the save step then stops on it: a job whose
-      # every test was green reported failure (rust-cache#193).
+          key: trybuild-${{ runner.os }}-${{ matrix.slice }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+
+  # The one verdict of the suite, under the name branch protection
+  # requires. It reads the four slices and nothing else, so a slice that
+  # failed, or never started because the build failed, fails it.
+  test:
+    needs: test-slice
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: every slice passed
+        run: test "${{ needs.test-slice.result }}" = success
+
+  # The packages a person on macOS or Linux runs, linted and tested
+  # where they run. Not a required check: a red here is read and fixed
+  # forward, and the required set stays the one a Windows desk reproduces.
+  core:
+    name: core (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: core
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,just
+      - name: clippy and the suite of the core packages
+        run: just check-core
+      # See the test slices: the cache's save step cannot walk trybuild's
+      # scratch (rust-cache#193).
       - name: clear the trybuild scratch before the cache is saved
         if: always()
         shell: bash
