@@ -7,7 +7,8 @@
 //! commands it dispatches one step below never outrank the accounting
 //! and the views, and back to normal when a turn ends having kept a core
 //! busy through a whole window; the valve judges only at a turn's end
-//! (sprawling-SPEC.md 8-93, decision 2).
+//! (sprawling-SPEC.md 8-93, decision 2). The valve and the one lowering
+//! are modelled in `crates/sprawling/spec/Serving/Standing.lean`.
 
 use std::cell::RefCell;
 use std::time::{Duration, Instant};

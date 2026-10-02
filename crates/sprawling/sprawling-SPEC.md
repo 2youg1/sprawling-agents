@@ -331,6 +331,8 @@ pub(crate) fn local_url(bind: SocketAddr) -> String;
 
 ## 8-9 让二进制成为一个词
 
+必须守住的性质的权威是 `crates/sprawling/spec/Install.lean`：追加幂等、追加不遮挡、追加再移除回到原值、移除只动那一个目录；本节是接口与做法。
+
 **原因**：解压之后，那个 exe 不在任何搜索路径上。唯一的入口是找到那个文件夹再双击 `start.cmd`——找一个脚本比敲一条命令难，而桌面快捷方式比两者都难。`sprawling` 今天不是一个可以敲出来的词。
 
 ```rust
@@ -4192,6 +4194,8 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 
 ## 8-89 一张命令表，一个纯解析器（`bin::main::verbs`、`bin::main::grammar`）
 
+优先规则的权威是 `crates/sprawling/spec/Main/Grammar.lean`：版本先于一切，帮助先于任何动词运行，`--` 之后的词不参与这两个判断，空行是首屏；本节是接口与做法。
+
 **形状。** `main/verbs.rs` 是 data：一张静态表 `VERBS`，每个动词一行 `Row { verb, name, aliases, positionals, flags, says, effect }`。位置参数是 `(名字, Need::Required | Need::Optional)`；标志是 `Flag { name, takes: Takes::Nothing | Takes::Value(<占位名>), says }`；`effect` 是 `Effect::ReadsOnly | Effect::Changes`，标出这个动词运行时会不会改一座城或它所在的主机。总览（`help`、`--help`）、单个动词的帮助（`help <verb>`、`<verb> --help`）与首屏退出时的清单都由这张表生成，没有第二份手写的命令清单或用法字符串。
 
 `main/grammar.rs` 是 grammar：纯函数，不做 I/O。
@@ -4252,6 +4256,8 @@ impl RunWorker {
 **本节测试**：`accounting::worker::lifetime::tests::a_torn_tail_is_told_in_the_startup_scan`：写一座城，在账尾追加半行，`RunWorker::new` 后 `startup_scan().summary()` 必须说出截掉的字节数。
 
 ## 8-103 退出码是一张表（`bin::main::exit`、`bin::main::calling`、`bin::main::refusal`、`bin::wire_client`）
+
+五个码两两不同、`Unheard` 落到哪个码、决定 1–3 的权威是 `crates/sprawling/spec/Main/Exit.lean`；本节是接口、文字的写法与理由。
 
 ```rust
 pub(super) enum Exit { Done, Refused, Line, Quiet, NoCity }   // 0 1 2 3 4
@@ -4778,6 +4784,8 @@ impl OutputRing {
 
 ## 8-93 核心线程站在正常档之上，空转就降回（`bin::serving::standing`，形状：状态机）
 
+阀与降档必须守住的性质的权威是 `crates/sprawling/spec/Serving/Standing.lean`：降回是吸收态、窗口没关上不判、忙满一个窗口即判降回、设置为 `normal` 从不升档、平台拒绝之后不再试；本节是接口、平台的做法与理由。
+
 agent 派出的命令从低于正常的档位起动（`crates/runtime/Spec.lean` §8-13-3）；本节补上另一半：核心自己的线程起动时把自己升到正常档之上一级，于是一台被构建占满的机器上，视图的折叠与广播仍排在派出的命令前面。升在线程一级而不是进程一级：进程档位在 Windows 上要对自身句柄调 `SetPriorityClass`，没有安全接口；线程档位有。
 
 ```rust
@@ -4824,6 +4832,8 @@ pub fn core_priority() -> Result<CorePriority, AxError>; // ConfigInvalid：prio
 **尚未做到的（本节接口的当前状态）**：阀只在一轮结束时判定（决定 2），所以一条持续有任务、从不停放的 worker 和一次不返回的折叠永远不会被降回，而这正是阀要防的情形；在忙的期间也作判定——tokio worker 按每次任务轮询记（`tokio_unstable` 下的 `on_before_task_poll`／`on_after_task_poll`），或在每次唤醒与任务边界处拿正在进行的一轮已走过的时间比窗口——是这一接口余下的一步。写线程 `sprawling-runs`（记账）还没有升档——它的循环在 `serve_flight` 里面阻塞，循环看不到它醒来的时刻，而没有阀的升档线程正是本节禁止的；把醒来的时刻从 `serve_flight` 交出来之后，它按视图线程的办法升档。Unix 上没有 `CAP_SYS_NICE` 时，每条 worker 各说一次它留在正常档。降回时写的是标准错误，还不是一条类型化的 Ledger 事件（`crates/kernel/spec/Event/Kind.lean` 的事件种类表加一行）。doctor 还不报告每个平台实际站在哪一档。
 
 ## 8-94 性能监视器的历史：有人看才采样，每项 300 点（`bin::monitor`，形状：状态机）
+
+`tick` 必须守住的性质的权威是 `crates/sprawling/spec/Monitor.lean`：没人看不读也不留历史，看整页读整页、只有看摘要的人才只读摘要，历史不超过 300 点、新的在最后；本节是接口与理由。
 
 WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge --at <地址>` 读的是同一份历史：每秒一个 `Sample`，最近 300 个（5 分钟）。`bin::monitor` 只管两件事：此刻有没有人在看，以及看的人读到的那 300 个点。计数器从哪里读（核心进程、Job Object、整机、城所在的卷、记账线程）由调用方传进来的读取函数决定，本模块不碰平台接口。
 
