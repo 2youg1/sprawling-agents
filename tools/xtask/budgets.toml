@@ -731,5 +731,8 @@ status = "held by render, not weighed by budget"
 # The reading of the gallery once the shell's edge keys, composer and
 # inspect side were built and merged together; the design's 8 is not met
 # yet, and the next change that folds a control away lowers this row.
-best_count = 13
+# 14: the run policy's one control in the settings row before a session
+# starts (client/Spec.lean §4-60), which folds the write limit, the
+# admission requirement and the landing policy into one menu.
+best_count = 14
 slack_count = 0
