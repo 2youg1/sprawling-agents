@@ -92,7 +92,7 @@ impl Harness {
             },
             Harness::Codex => Launch {
                 program: Program::Npx,
-                args: &["-y", "@agentclientprotocol/codex-acp@2.0.1"],
+                args: &["-y", "@agentclientprotocol/codex-acp@2.1.1"],
             },
             Harness::GrokBuild => Launch {
                 program: Program::Npx,
