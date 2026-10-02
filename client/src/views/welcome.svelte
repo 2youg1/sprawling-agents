@@ -46,9 +46,11 @@
     // Whether this layout is the page or a region inside one: a
     // document may have exactly one heading of the page's own rank.
     readonly rank?: "page" | "section" | undefined;
+    // The step a `#/welcome/<step>` link opens (client/Spec.lean §4-63).
+    readonly step?: GuideStep | undefined;
   }
 
-  const { rank = "page" }: Props = $props();
+  const { rank = "page", step }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -91,7 +93,18 @@
   const current = $derived(currentOf(progress, configured));
   // The one step drawn open: the current one, unless the person folded it.
   let folded = $state(false);
-  const open = $derived(folded ? null : current);
+  // A step a link named is drawn open without telling the city the guide
+  // moved there: a link opens, it does not write. Choosing a step clears it.
+  let linked = $state<GuideStep | null>(null);
+  $effect(() => {
+    const asked = step ?? null;
+    untrack(() => {
+      linked = asked;
+      folded = false;
+      if (asked !== null) void tick().then(() => document.getElementById(headId(asked))?.focus());
+    });
+  });
+  const open = $derived(folded ? null : (linked ?? current));
   const ready = $derived(configured.provider === true);
 
   function write(next: GuideProgress): void {
@@ -101,7 +114,9 @@
   }
 
   function toggle(step: GuideStep): void {
-    if (open === step) {
+    const shown = open;
+    linked = null;
+    if (shown === step) {
       folded = true;
       return;
     }
@@ -113,6 +128,7 @@
   // the guide moved on to rather than to the top of the document.
   function later(step: Exclude<GuideStep, "provider">): void {
     folded = false;
+    linked = null;
     const next = putOff(progress, step);
     write(next);
     void tick().then(() => {

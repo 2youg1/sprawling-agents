@@ -33,6 +33,7 @@
   import { numbered, quoteLine } from "../changes";
   import type { CodeLine } from "../changes";
   import Inked from "../parts/inked.svelte";
+  import { quoteInto } from "../talk/quoting";
 
   interface Props {
     readonly patch: HunksAnswer;
@@ -64,12 +65,10 @@
   const SIGN: Record<CodeLine["kind"], string> = { added: "+", removed: "−", context: "" };
 
   // A chosen line joins whatever the person had already started to
-  // write there; the link then opens that conversation, whose composer
-  // reads the draft door when it mounts.
+  // write there - in the box when one is open there, in its draft
+  // otherwise - and the link then opens that conversation.
   function choose(to: Address, line: CodeLine): void {
-    const draft = u.prefs.draft(to);
-    const quote = quoteLine(patch, line);
-    u.prefs.setDraft(to, draft === "" ? quote : [draft, quote].join("\n"));
+    quoteInto(u.prefs, to, quoteLine(patch, line));
     onCursor?.(line);
   }
 </script>

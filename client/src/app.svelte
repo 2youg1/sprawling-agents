@@ -363,13 +363,13 @@
   {#if view.kind === "setup"}
     {@const beneath = panelBeneath()}
     {#if beneath.kind === "talk"}
-      <Workspace address={beneath.address} {tier} />
+      <Workspace address={beneath.address} item={beneath.item} {tier} />
     {:else}
       <Pages view={beneath} />
     {/if}
     <SettingsPanel group={panelGroup(view)} {beneath} onPick={pickGroup} onClose={closePanel} />
   {:else if view.kind === "talk"}
-    <Workspace address={view.address} {tier} />
+    <Workspace address={view.address} item={view.item} {tier} />
   {:else}
     <Pages {view} />
   {/if}

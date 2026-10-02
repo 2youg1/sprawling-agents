@@ -318,7 +318,7 @@ with the room's name above it, and the first send lets it sink to its seat
 composition is rebuilt on the way. -->
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]} style:container-type={band ? undefined : "size"}>
   {#if !band}
-    <Scroller empty={blank} {rejoined}>
+    <Scroller empty={blank} {rejoined} place={address}>
       {#if runs.length > 0}
         <div class="mb-base flex justify-end"><Showing /></div>
         {#if drawsCalls($held.showing)}

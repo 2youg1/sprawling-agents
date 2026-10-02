@@ -27,7 +27,7 @@
   import { fill, say } from "../core/lang";
   import { STOP } from "../core/slash";
   import type { Key } from "../core/lang";
-  import { buildingOf, roomOf } from "../core/route";
+  import { RUN_LENSES, buildingOf, roomOf, type RunLens } from "../core/route";
   import { count } from "../core/time";
   import { ui } from "../ui";
   import { Address } from "../wire";
@@ -60,13 +60,11 @@
 
   interface Props {
     readonly run: RunId;
+    readonly lens?: RunLens | undefined;
   }
 
-  const { run }: Props = $props();
+  const { run, lens }: Props = $props();
 
-  type RunLens = "time" | "turns" | "monitor" | "prompt" | "context" | "changes" | "evidence";
-
-  const EVERY: readonly RunLens[] = ["time", "turns", "monitor", "prompt", "context", "changes", "evidence"];
   const WORDS: Record<RunLens, Key> = {
     time: "run_time",
     turns: "run_turns",
@@ -84,8 +82,9 @@
 
   // The lens the person chose; until they choose, the run's own state
   // picks one (`firstLens` below).
-  let chosen = $state<RunLens | null>(null);
-  const lenses = $derived(EVERY.map((id) => ({ id, label: say($lang, WORDS[id]) })));
+  // svelte-ignore state_referenced_locally (a link's lens is where the page opens; pages.svelte remounts it for another)
+  let chosen = $state<RunLens | null>(lens ?? null);
+  const lenses = $derived(RUN_LENSES.map((id) => ({ id, label: say($lang, WORDS[id]) })));
 
   const u = ui();
   const lang = u.lang;
@@ -230,7 +229,7 @@
   }
 
   function pick(id: string): void {
-    const picked = EVERY.find((each) => each === id);
+    const picked = RUN_LENSES.find((each) => each === id);
     if (picked !== undefined) chosen = picked;
   }
 </script>

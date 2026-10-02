@@ -99,10 +99,10 @@
   import { newestWorking } from "../core/belief/live";
   import { heldIn } from "../core/belief/rooms";
   import { say } from "../core/lang";
-  import { MAYOR, buildingOf, roomOf } from "../core/route";
+  import { MAYOR, buildingOf, roomOf, type ItemLink } from "../core/route";
   import { ui } from "../ui";
   import type { Address, RoundsAnswer } from "../wire";
-  import { rightItem } from "./inspect/open.svelte";
+  import { openCall, openDocument, rightItem } from "./inspect/open.svelte";
   import { followingIn } from "./inspect/reading";
   import Right from "./right.svelte";
   import { watchColumns, type Columns } from "./shared/frame";
@@ -125,9 +125,12 @@
     // fixture draws the same thing in every browser.
     readonly seat?: "page" | "specimen";
     readonly panel?: boolean;
+    // The item a link asked the right side to open beside this
+    // conversation (client/Spec.lean §4-63).
+    readonly item?: ItemLink | undefined;
   }
 
-  const { address, tier, seat = "page", panel }: Props = $props();
+  const { address, tier, seat = "page", panel, item: linked }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -165,6 +168,16 @@
   // it on what the run is doing.
   // On one column the preference does not open it: a sheet over the whole
   // conversation opens only when somebody opened an item.
+  // A link opens its item once, when the page arrives at it; nothing a
+  // link names is sent or saved, and what is open stays the inspector's.
+  $effect(() => {
+    const asked = linked;
+    if (asked === undefined) return;
+    untrack(() => {
+      if (asked.kind === "call") openCall(asked);
+      else openDocument(asked);
+    });
+  });
   const item = $derived(rightItem());
   const open = $derived(item !== null || ((panel ?? (narrow ? false : $held.panel)) && produced));
 

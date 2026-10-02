@@ -42,7 +42,7 @@
   {:else if view.kind === "building"}
     <Building address={view.address} />
   {:else if view.kind === "run"}
-    <Run run={view.run} />
+    {#key view.lens}<Run run={view.run} lens={view.lens} />{/key}
   {:else if view.kind === "setup"}
     <Setup />
   {:else if view.kind === "mcp"}
@@ -54,7 +54,7 @@
   {:else if view.kind === "registry"}
     <Registry />
   {:else if view.kind === "welcome"}
-    <Welcome />
+    <Welcome step={view.step} />
   {:else if view.kind === "monitor"}
     <Monitor samples={$samples} watch={u.conn.monitor.watch} />
   {:else if view.kind === "gallery"}

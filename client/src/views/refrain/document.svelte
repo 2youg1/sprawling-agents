@@ -12,12 +12,14 @@
   // or the versions are drawn, so the cursor, the selection, the undo
   // history and an input method's composition all survive a change of
   // reading (client/Spec.lean §7N).
+  import { draftPlace } from "../../core/document_save";
   import { fill, say } from "../../core/lang";
   import { kib } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, B3Hash, ProposalCard } from "../../wire";
   import Empty from "../parts/empty.svelte";
   import Unanswered from "../parts/unanswered.svelte";
+  import Unkept from "../parts/unkept.svelte";
   import Conflict from "./conflict.svelte";
   import { drawnAs } from "./formats/format";
   import HtmlPreview from "./formats/html.svelte";
@@ -44,6 +46,10 @@
   const lang = u.lang;
   // svelte-ignore state_referenced_locally (a session belongs to one document and version; refrain.svelte keys this component on both)
   const session = new Session(u, at, version);
+  // Whether the browser refused to keep this document's draft (4-63).
+  // svelte-ignore state_referenced_locally (one document per component, as above)
+  const unkept = u.prefs.draftUnkept(draftPlace(at));
+  const drafted = $derived(session.receipt.kind !== "clean" && session.receipt.kind !== "saved");
 
   // svelte-ignore state_referenced_locally (the first reading only; the person picks the rest)
   let reading = $state<Reading>(first);
@@ -127,6 +133,9 @@
   {:else if session.receipt.kind === "pending"}
     <p class="refrain-line text-note text-text-faint">{say($lang, "refrain_receipt_pending_why")}</p>
   {/if}
+  {#if $unkept && drafted}
+    <div class="refrain-line"><Unkept words={() => session.editing?.text() ?? ""} /></div>
+  {/if}
   {#if session.lostDraft !== null}
     <p class="refrain-line text-note text-alert">
       {fill(say($lang, "refrain_draft_lost"), { version: short(session.lostDraft) })}
@@ -170,7 +179,7 @@
     {#if reading === "preview" && html && session.positions !== null}
       <HtmlPreview
         text={session.editing?.text() ?? session.positions.editor}
-        drafted={session.receipt.kind !== "clean" && session.receipt.kind !== "saved"}
+        {drafted}
         {name}
       />
     {:else if reading === "preview" && session.positions !== null}
@@ -178,7 +187,7 @@
         positions={session.positions}
         {building}
         {at}
-        drafted={session.receipt.kind !== "clean" && session.receipt.kind !== "saved"}
+        {drafted}
         {anchor}
         onTop={(byte) => {
           top = byte;

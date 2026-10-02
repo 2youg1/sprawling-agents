@@ -13,15 +13,12 @@
   //
   // A line that begins with `/` is a command rather than a message, and
   // the menu over the box is the same list the Ctrl-K palette reads.
-
-  // How long the send receipt holds its words.
-  const RECEIPT_MS = 400;
 </script>
 
 <script lang="ts">
   import { Option } from "effect";
   import { onDestroy, onMount, untrack } from "svelte";
-  import { get } from "svelte/store";
+  import { get, readable } from "svelte/store";
 
   import { QUERIES } from "../../core/asking";
   import type { Snippet } from "svelte";
@@ -40,9 +37,11 @@
   import Coin from "./coin.svelte";
   import { faceOf } from "./coin_face";
   import Gauge from "./gauge.svelte";
+  import Handed from "./handed.svelte";
   import Record from "./record.svelte";
   import TypedLine from "./typed_line.svelte";
   import Popover from "../parts/popover.svelte";
+  import Unkept from "../parts/unkept.svelte";
   import {
     draftAt,
     menuColumns,
@@ -55,8 +54,10 @@
   } from "./composer";
   import { IDLE, hand, settle } from "./handing";
   import type { Handing } from "./handing";
-  import { dropped, insertAt } from "./dropping";
-  import type { Kept } from "./dropping";
+  import { insertAt } from "./dropping";
+  import { DropZone } from "./drop_zone.svelte";
+  import { hearQuotes, joined } from "./quoting";
+  import { keepSelection, recalled, restoreSelection } from "./standing";
 
   interface ComposerProps {
     readonly placeholder: string;
@@ -87,16 +88,18 @@
   const mode = u.mode;
   const belief = u.conn.belief;
 
-  // The words in the box, and where they are kept while unsent. The
-  // place is read once, at mount: a box that moved to another room
-  // keeps the words in it rather than swapping them under the writer.
-  // svelte-ignore state_referenced_locally (the draft's place is read once at mount and never followed)
-  const keptDraft = draftAt(u.prefs, draft);
+  // The words in the box, and where they are kept while unsent: the
+  // place the page names, followed when it names another, so a room
+  // switched to in this tab gets back its own words and selection (4-63).
+  // svelte-ignore state_referenced_locally (the first place; the effect below follows the rest)
+  let place = draft;
+  let keptDraft = draftAt(u.prefs, place);
   let text = $state(keptDraft.read);
   let box = $state<HTMLTextAreaElement | undefined>(undefined);
   // A message the connection would not take: the words stay in the box.
   let kept = $state(false);
-  let handed = $state(false);
+  // How many times words were handed, which the send receipt counts.
+  let sent = $state(0);
   // Whether the box has the focus, which draws its line at full strength.
   let focused = $state(false);
   // Which list is over the box: the `/` menu is the only one left here.
@@ -107,8 +110,42 @@
   // prefix takes into the box.
   let pointed = $state<string | undefined>(undefined);
   let menuKeys: ((event: KeyboardEvent) => boolean) | null = null;
-  let receipt: ReturnType<typeof setTimeout> | undefined = undefined;
 
+  $effect(() => {
+    const next = draft;
+    untrack(() => {
+      if (next !== place) moveTo(next);
+    });
+  });
+
+  function moveTo(next: string | undefined): void {
+    keptDraft.flush();
+    keepSelection(place, box);
+    place = next;
+    keptDraft = draftAt(u.prefs, next);
+    text = keptDraft.read;
+    open = text.startsWith("/");
+    requestAnimationFrame(arrived);
+  }
+
+  // A box that arrived at its place: grown to the words, the caret where
+  // the person left it there.
+  function arrived(): void {
+    grow();
+    restoreSelection(place, box);
+  }
+
+  // A line quoted from the inspector while this box is open joins the
+  // words where they end, and the caret stays where the person left it.
+  $effect(() => (draft === undefined ? undefined : hearQuotes(draft, quoted)));
+  function quoted(quote: string): void {
+    keepSelection(place, box);
+    write(joined(text, quote));
+    requestAnimationFrame(arrived);
+  }
+
+  // Whether the browser refused to keep this place's words (4-63).
+  const unkept = $derived(draft === undefined ? readable(false) : u.prefs.draftUnkept(draft));
   // `field-sizing: content` grows the box before the frame is painted
   // where the engine has it; this is the path for the engines without it.
   function grow(): void {
@@ -144,7 +181,7 @@
       handing = hand(words, get(belief));
       write("");
       kept = false;
-      landed();
+      sent += 1;
     } else {
       kept = true;
     }
@@ -158,19 +195,6 @@
     handing = next.handing;
     if (next.box !== null) write(next.box);
   });
-
-  // The receipt: for a moment a screen reader is told where the words
-  // went, so a press is heard to land; nowhere to name, no receipt.
-  function landed(): void {
-    const room = here;
-    if (room === null) return;
-    handed = true;
-    if (receipt !== undefined) clearTimeout(receipt);
-    receipt = setTimeout(() => {
-      handed = false;
-      receipt = undefined;
-    }, RECEIPT_MS);
-  }
 
   // ------------------------------------------------- what the city offers
 
@@ -200,16 +224,9 @@
   // The run in front of the person: what a typed `/stop` and `/steer` reach.
   const live = $derived(shown === null ? undefined : runInFront($belief, shown));
 
-  const session = $derived(
-    here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null),
-  );
-  const specs = $derived(
-    pills(
-      $lang,
-      { served: models, chosen: main, session, rooms, here, effort: $effort, mode: $mode },
-      picksFor(u, here, session),
-    ),
-  );
+  const session = $derived(here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null));
+  const offered = $derived({ served: models, chosen: main, session, rooms, here, effort: $effort, mode: $mode });
+  const specs = $derived(pills($lang, offered, picksFor(u, here, session)));
 
   // ------------------------------------------------------- the `/` menu
 
@@ -262,6 +279,13 @@
         return;
       }
     }
+    // ↑ in an empty box brings back what was last sent here.
+    const last = event.key === "ArrowUp" && text === "" && !event.isComposing && here !== null ? recalled(get(belief), here) : null;
+    if (last !== null) {
+      event.preventDefault();
+      write(last);
+      return;
+    }
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
       event.preventDefault();
       submit();
@@ -276,36 +300,17 @@
 
   // ----------------------------------------------------------- dropping
 
-  // Whether a drag is over the box, and what the last drop could not keep.
-  let over = $state(false);
-  let unkept = $state<readonly Kept[]>([]);
-
-  function onDrop(event: DragEvent): void {
-    over = false;
-    const drop = dropped(event.dataTransfer, u.origin, u.pairing);
-    if (drop.kind === "nothing") return;
-    event.preventDefault();
-    unkept = [];
-    const place = (paths: readonly string[]): void => {
-      write(insertAt(text, box?.selectionStart ?? text.length, paths));
-      box?.focus();
-    };
-    if (drop.kind === "named") {
-      place(drop.paths);
-      return;
-    }
-    void drop.kept.then((kept) => {
-      place(kept.flatMap((each) => (each.kind === "path" ? [each.path] : [])));
-      unkept = kept.filter((each) => each.kind === "refused");
-    });
-  }
+  const zone = new DropZone(u, (paths) => {
+    write(insertAt(text, box?.selectionStart ?? text.length, paths));
+    box?.focus();
+  });
 
   onMount(() => {
-    // A draft restored on mount is taller than one row.
-    requestAnimationFrame(grow);
+    requestAnimationFrame(arrived);
   });
 
   onDestroy(() => {
+    keepSelection(place, box);
     keptDraft.flush();
   });
 </script>
@@ -313,21 +318,15 @@
 <!-- A page, not a card: focus is said by the line coming to full
 strength, and a drag over the box by the wash it takes. -->
 <form
-  class={["relative rounded-control transition-colors", over ? "wash" : ""]}
+  class={["relative rounded-control transition-colors", zone.over ? "wash" : ""]}
   aria-label={say($lang, "region_composer")}
   onsubmit={(event) => {
     event.preventDefault();
     submit();
   }}
-  ondragover={(event) => {
-    event.preventDefault();
-    over = true;
-  }}
-  ondragleave={(event) => {
-    const next = event.relatedTarget;
-    if (!(next instanceof Node && event.currentTarget.contains(next))) over = false;
-  }}
-  ondrop={onDrop}
+  ondragover={zone.enter}
+  ondragleave={zone.leave}
+  ondrop={zone.drop}
 >
   {#if open && showing.length > 0}
     <Popover
@@ -385,10 +384,11 @@ strength, and a drag over the box by the wash it takes. -->
     </div>
     <TypedLine {text} {box} lit={focused || text !== ""} />
   </div>
-  <span role="status" class="sr-only">
-    {#if handed && here !== null}{fill(say($lang, "talk_handed"), { room: here })}{/if}
-  </span>
-  {#each unkept as each (each.kind === "refused" ? each.name : "")}
+  <Handed room={here} {sent} />
+  {#if $unkept && text !== ""}
+    <Unkept words={() => text} />
+  {/if}
+  {#each zone.refused as each (each.kind === "refused" ? each.name : "")}
     {#if each.kind === "refused"}
       <p class="text-note text-alert" role="alert">
         {fill(say($lang, "talk_drop_refused"), { name: each.name, why: each.said === "" ? say($lang, "talk_not_live") : each.said })}
