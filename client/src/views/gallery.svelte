@@ -45,7 +45,7 @@
   import Rfr from "./gallery/rfr.svelte";
   import Monitor from "./gallery/monitor.svelte";
   import Parts from "./gallery/parts.svelte";
-  import Presences from "./gallery/presence.svelte";
+  import Mailbox from "./gallery/mailbox.svelte";
   import Produced from "./gallery/produced.svelte";
   import Runs from "./gallery/runs.svelte";
   import Resulted from "./gallery/resulted.svelte";
@@ -91,7 +91,7 @@
   <FirstRun />
   <Shell />
   <Workbench />
-  <Presences />
+  <Mailbox />
   <Conversation />
   <RefusedLine />
   <Talking />

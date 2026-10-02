@@ -1,0 +1,93 @@
+<!--
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+-->
+
+<script lang="ts">
+  // The second section of the mailbox: what is going now, one row per
+  // room - its newest run that has not frozen, read from `belief.live`,
+  // the one answer to which runs are working (client-SPEC §5). A row
+  // names the room, the phase in its mark and word, how long the run has
+  // gone, and its task; it is a link to that room's conversation. The
+  // newest room first, the order a person who just dispatched looks in.
+  import type { RunBelief } from "../../core/belief";
+  import { say } from "../../core/lang";
+  import { toFragment } from "../../core/route";
+  import { lasted } from "../../core/time";
+  import { ui } from "../../ui";
+  import Empty from "../parts/empty.svelte";
+  import Glyph from "../parts/glyph.svelte";
+  import type { Weight } from "../parts/glyph";
+  import { phaseOf } from "../runs/lineage";
+  import { PHASE_MARK, PHASE_WORD } from "../runs/phase";
+  import Section from "./section.svelte";
+
+  interface Props {
+    // Following a row leaves the mailbox for the room.
+    readonly onLeave: () => void;
+  }
+
+  const { onLeave }: Props = $props();
+
+  // The tier a phase's mark is painted in, as the runs board paints it.
+  const INK: Readonly<Record<Weight, string>> = { quiet: "text-text-quiet", live: "text-accent", alert: "text-alert" };
+
+  const u = ui();
+  const { lang } = u;
+  const belief = u.conn.belief;
+
+  // `live` runs oldest to newest, so the last run seen in a room is its
+  // newest; a run with no room yet has nowhere to link to.
+  const rows = $derived.by(() => {
+    const newest: Record<string, RunBelief> = {};
+    for (const run of $belief.live) {
+      if (run.addr !== null) newest[run.addr] = run;
+    }
+    return Object.values(newest).sort((a, b) => (b.started ?? 0) - (a.started ?? 0));
+  });
+
+  // How long each row's run has gone, redrawn once a second while any
+  // runs and not at all otherwise.
+  let now = $state(u.now());
+  $effect(() => {
+    if (rows.length === 0) return;
+    const tick = setInterval(() => {
+      now = u.now();
+    }, 1000);
+    return () => {
+      clearInterval(tick);
+    };
+  });
+</script>
+
+<Section title="mailbox_working" count={rows.length}>
+  {#if rows.length === 0}
+    <Empty missing="mailbox_working_none" seat="inset" />
+  {/if}
+  <ul>
+    {#each rows as run (run.run)}
+      {@const phase = phaseOf(run.doing)}
+      {@const mark = PHASE_MARK[phase]}
+      <li>
+        <a
+          href={run.addr === null ? undefined : toFragment({ kind: "talk", address: run.addr })}
+          class="-mx-snug grid grid-cols-[var(--spacing-glyph-sm)_minmax(0,1fr)_auto_auto] items-center gap-x-snug rounded-card px-snug py-tight hover:wash focus-visible:wash"
+          data-entry
+          onclick={onLeave}
+        >
+          <Glyph name={mark.glyph} size="sm" class={INK[mark.weight]} />
+          <span class="min-w-0 truncate font-label">{run.addr}</span>
+          <span class="figure text-note text-text-faint">
+            {say($lang, PHASE_WORD[phase])} · {run.started === null ? "" : lasted(now - run.started)}
+          </span>
+          <kbd class="entry-n" aria-hidden="true"></kbd>
+          {#if run.task !== null}
+            <span class="col-start-2 col-end-5 truncate text-note text-text-quiet">{run.task}</span>
+          {/if}
+        </a>
+      </li>
+    {/each}
+  </ul>
+</Section>

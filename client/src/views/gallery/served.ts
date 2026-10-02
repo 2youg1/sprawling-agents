@@ -315,7 +315,7 @@ export const CALLS: readonly CallLine[] = [
 // the rail's dot read them. `ONE_QUESTION` is named rather than
 // reached by its position in the list, because the dot and the cards
 // are two readings of the same waiting question and a reordered list
-// must not make them disagree about which one that is; the presences
+// must not make them disagree about which one that is; the mailbox
 // fixture reads it too.
 function question(
   id: string,

@@ -31,7 +31,7 @@
   import type { Tier } from "../core/prefs";
   import { toFragment } from "../core/route";
   import { ui } from "../ui";
-  import Notices from "./notices.svelte";
+  import Mailbox from "./mailbox/mailbox.svelte";
   import Glyph from "./parts/glyph.svelte";
   import Tip from "./parts/tip.svelte";
 
@@ -119,7 +119,7 @@
       </button>
     {/snippet}
   </Tip>
-  <Notices asked={mailboxAsked} hint={(words: string) => named(words, "mailbox")} />
+  <Mailbox asked={mailboxAsked} hint={(words: string) => named(words, "mailbox")} />
   <Tip text={named(say($lang, "nav_settings"), "go.setup")} side="right" exposable>
     {#snippet children(hint)}
       <a
