@@ -70,7 +70,7 @@ pub fn bundle_routes<S: Clone + Send + Sync + 'static>(client: Arc<ClientAssets>
 
 **客户端是一张资产表，不是一个文件**：`ServeConfig` 携 `client: Arc<ClientAssets>`，因为 `client/` 的构建产物是 `index.html` 加它引用的脚本、样式与字体，只携一个文件的形状会让页面壳引用一条服务端没有的路由。资产表是封闭清单：路径穿越（`..`、空段、盘符、点头文件）在判定层拒，miss 报文件名并给出重建口令。`Disk` 臂逐请求读盘，专供开发回路（改前端刷新即见），发布路径恒不构造它。
 
-**送页面的路由只有一张表**（D18）：城自己的端口把 `bundle_routes` 并进 `router`，远程监听（`crates/remote_access/Spec.lean` §8-10）也并进它自己的那张表，所以设备打开远程地址拿到的字节与响应头，与这台电脑上的浏览器拿到的相同。
+**送页面的路由只有一张表**（D20）：城自己的端口把 `bundle_routes` 并进 `router`，远程监听（`crates/remote_access/Spec.lean` §8-10）也并进它自己的那张表，所以设备打开远程地址拿到的字节与响应头，与这台电脑上的浏览器拿到的相同。
 
 **公开签名不携传输层的类型**：sink 收 `Vec<u8>` 而不是 `axum::body::Bytes`。**一个泄露自己传输层的公开签名，会把「换掉 HTTP 库」变成对每一个从未选过它的调用方的破坏性变更**。
 
