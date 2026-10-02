@@ -201,7 +201,7 @@
 <aside
   {...{ [INSPECTOR]: "" }}
   aria-label={say($lang, "inspect_label")}
-  class="flex h-full min-h-0 w-full flex-col bg-chrome"
+  class="side-in flex h-full min-h-0 w-full flex-col bg-chrome"
   onkeydown={(event) => {
     if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
     event.preventDefault();
@@ -209,7 +209,7 @@
   }}
 >
   <Strip {tabs} {front} panels={PANELS} {linkOf} onPick={pick} onClose={close} onCloseAll={closeAll} />
-  <div class="flex min-h-0 flex-1 flex-col" bind:clientHeight={room}>
+  <div class="side-in-then flex min-h-0 flex-1 flex-col" bind:clientHeight={room}>
     {#if editorTabs.length > 0}
       <div
         id={PANELS.editor}

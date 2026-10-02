@@ -69,7 +69,12 @@
     class="@container/page flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto @max-lg/sheet:overflow-visible"
     aria-labelledby={titleId}
   >
-    <Setup {group} {titleId} />
+    <!-- Each group picked arrives with a short shift (docs/frontend-method.md §4-43). -->
+    {#key group}
+      <div class="shift">
+        <Setup {group} {titleId} />
+      </div>
+    {/key}
   </section>
 </div>
 </div>

@@ -1003,11 +1003,15 @@
 .drop {
   animation: drop var(--transition-duration-panel) var(--ease-arrive) both;
 }
-/* The motion vocabulary is four names and this is its whole table:
+/* The motion vocabulary is six names and this is its whole table:
  * `cut` is no motion at all (no class - it is what a same-level page
  * switch does), `rise` above comes up from below, `slide` comes in
- * from the left edge a revealed page belongs to, and `fade` is a state
- * change that keeps its position. Every one moves only transform and
+ * from the left edge a revealed page belongs to, `fade` is a state
+ * change that keeps its position, `shift` is one body replacing another
+ * in the same place (a settings group picked from the tree), and
+ * `side-in` is a side panel arriving from the right edge it stands on,
+ * with `side-in-then` for the level inside it, which starts when the
+ * panel is halfway so the two read as one movement in two steps. Every one moves only transform and
  * opacity, and every one goes still under the two reduction lists
  * below. An exit is deliberately not in this table: a leaving element
  * animates through `transition-behavior: allow-discrete` plus a
@@ -1036,6 +1040,45 @@
 }
 .fade {
   animation: fade var(--transition-duration-short) var(--ease-arrive) both;
+}
+@keyframes shift {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.shift {
+  animation: shift var(--transition-duration-short) var(--ease-arrive) backwards;
+}
+@keyframes side-in {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.side-in {
+  animation: side-in var(--transition-duration-page) var(--ease-arrive) backwards;
+}
+.side-in-then {
+  animation: side-in var(--transition-duration-page) var(--ease-arrive) calc(var(--transition-duration-page) / 2) backwards;
+}
+/* The three fill backwards only: once arrived, no transform stays on
+ * the box, so it does not become the containing block of a fixed menu
+ * inside it. */
+/* On one column the side is a sheet that already travels in whole
+ * (`.sheet`), and a second movement inside it would be the same arrival
+ * told twice. */
+.sheet .side-in,
+.sheet .side-in-then {
+  animation: none;
 }
 /* The line under the composer's words (docs/frontend-method.md §7I). It runs as far
  * as the words do and fades out after them, so an empty field shows only
@@ -1211,6 +1254,9 @@
   :root:not([data-motion="on"]) .drop,
   :root:not([data-motion="on"]) .slide,
   :root:not([data-motion="on"]) .fade,
+  :root:not([data-motion="on"]) .shift,
+  :root:not([data-motion="on"]) .side-in,
+  :root:not([data-motion="on"]) .side-in-then,
   :root:not([data-motion="on"]) .shimmer,
   :root:not([data-motion="on"]) .animate-pulse {
     animation: none;
@@ -1233,6 +1279,9 @@
 [data-motion="off"] .drop,
 [data-motion="off"] .slide,
 [data-motion="off"] .fade,
+[data-motion="off"] .shift,
+[data-motion="off"] .side-in,
+[data-motion="off"] .side-in-then,
 [data-motion="off"] .shimmer,
 [data-motion="off"] .animate-pulse {
   animation: none;
