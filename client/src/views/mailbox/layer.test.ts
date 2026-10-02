@@ -51,7 +51,7 @@ describe("the mailbox layer", () => {
   });
 
   test("two presses come home", () => {
-    expect(STARTS.map((start) => run(start, ["toggle", "toggle"]))).toEqual(STARTS);
+    expect(STARTS.map((start) => run(start, ["toggle", "toggle"]))).toEqual([...STARTS]);
   });
 
   test("a press outside closes", () => {

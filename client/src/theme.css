@@ -1007,7 +1007,7 @@
 .drop {
   animation: drop var(--transition-duration-panel) var(--ease-arrive) both;
 }
-/* The motion vocabulary is six names and this is its whole table:
+/* The motion vocabulary is seven names and this is its whole table:
  * `cut` is no motion at all (no class - it is what a same-level page
  * switch does), `rise` above comes up from below, `slide` comes in
  * from the left edge a revealed page belongs to, `fade` is a state
@@ -1015,7 +1015,9 @@
  * in the same place (a settings group picked from the tree), and
  * `side-in` is a side panel arriving from the right edge it stands on,
  * with `side-in-then` for the level inside it, which starts when the
- * panel is halfway so the two read as one movement in two steps. Every one moves only transform and
+ * panel is halfway so the two read as one movement in two steps, and
+ * `push` is a layer of the edge arriving whole from the left edge it
+ * stands on (the mailbox, client D60). Every one moves only transform and
  * opacity, and every one goes still under the two reduction lists
  * below. An exit is deliberately not in this table: a leaving element
  * animates through `transition-behavior: allow-discrete` plus a
@@ -1074,7 +1076,18 @@
 .side-in-then {
   animation: side-in var(--transition-duration-page) var(--ease-arrive) calc(var(--transition-duration-page) / 2) backwards;
 }
-/* The three fill backwards only: once arrived, no transform stays on
+@keyframes push {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.push {
+  animation: push var(--transition-duration-page) var(--ease-arrive) backwards;
+}
+/* The four fill backwards only: once arrived, no transform stays on
  * the box, so it does not become the containing block of a fixed menu
  * inside it. */
 /* On one column the side is a sheet that already travels in whole
@@ -1261,6 +1274,7 @@
   :root:not([data-motion="on"]) .shift,
   :root:not([data-motion="on"]) .side-in,
   :root:not([data-motion="on"]) .side-in-then,
+  :root:not([data-motion="on"]) .push,
   :root:not([data-motion="on"]) .shimmer,
   :root:not([data-motion="on"]) .animate-pulse {
     animation: none;
@@ -1286,6 +1300,7 @@
 [data-motion="off"] .shift,
 [data-motion="off"] .side-in,
 [data-motion="off"] .side-in-then,
+[data-motion="off"] .push,
 [data-motion="off"] .shimmer,
 [data-motion="off"] .animate-pulse {
   animation: none;
