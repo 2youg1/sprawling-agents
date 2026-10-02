@@ -15,6 +15,7 @@
   import { say } from "../../core/lang";
   import { roomOf } from "../../core/route";
   import { ui } from "../../ui";
+  import { isoInstant } from "../../core/time";
   import type { CommitAnswer } from "../../wire";
   import { shortOid } from "../changes";
 
@@ -31,7 +32,7 @@
   const subject = $derived(commit.message?.split("\n", 1)[0]?.trim() ?? "");
   // To the second: the milliseconds are the ledger's, and a commit row
   // is read for the moment, not for the order within one second.
-  const iso = $derived(new Date(commit.at).toISOString());
+  const iso = $derived(isoInstant(commit.at));
 </script>
 
 <span class="figure text-text-quiet">{shortOid(commit.oid)}</span>

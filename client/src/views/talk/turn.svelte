@@ -30,7 +30,7 @@ bar and the thread cannot disagree about where a round is. -->
   import { cutOff, silentTurn } from "./silence";
   import type { Phase as Live } from "./silence";
   import type { ForkEntry, ForkPlan } from "./forking";
-  import { ttftOf } from "./timing";
+  import { tpsOf, ttftOf } from "./timing";
 
   interface Props {
     readonly turn: Turn;
@@ -78,7 +78,14 @@ bar and the thread cannot disagree about where a round is. -->
     <NoteLine {note} {turn} {run} {onFork} {onHover} />
   {/each}
   {#if said !== "" || model !== null}
-    <Head {who} at={turn.t} {model} ttft={said === "" ? null : ttftOf(turn)} {rhythm} />
+    <Head
+      {who}
+      at={turn.t}
+      {model}
+      ttft={said === "" ? null : ttftOf(turn)}
+      tps={said === "" ? null : tpsOf(turn)}
+      {rhythm}
+    />
   {/if}
   {#if turn.thought && whole}
     <details class="text-note text-text-faint">

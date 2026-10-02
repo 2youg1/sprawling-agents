@@ -23,6 +23,7 @@
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
   import ContextBar from "./context_bar.svelte";
+  import { ticker } from "../talk/timing";
 
   interface Props {
     // The room the conversation is in.
@@ -55,18 +56,10 @@
     }
   }
 
-  // A running row says how long its run has gone, so the pane is redrawn
-  // once a second while anything runs and not at all otherwise.
-  let now = $state(u.now());
-  $effect(() => {
-    if ($belief.live.length === 0) return;
-    const tick = setInterval(() => {
-      now = u.now();
-    }, 1000);
-    return () => {
-      clearInterval(tick);
-    };
-  });
+  // A running row says how long its run has gone, on the page's one
+  // clock: it moves only while a row reads it and the page is seen, and
+  // every reading is recomputed from the run's own start (client/Spec.lean §4-59).
+  const tick = ticker(u.now);
 
   // One row per room, the room's newest run speaking for it, grouped by
   // building in the order buildings first ran something.
@@ -86,7 +79,7 @@
   function when(run: RunBelief, state: State): string {
     switch (state) {
       case "run":
-        return run.started === null ? "" : lasted(now - run.started);
+        return run.started === null ? "" : lasted($tick - run.started);
       case "ask":
         return say($lang, "world_waiting");
       case "done":

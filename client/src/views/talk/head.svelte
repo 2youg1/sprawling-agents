@@ -4,8 +4,9 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- The head of one message: who said it, the frozen facts it was said
-under, when, and - once the turn is in the Ledger - how fast it came
-(refrain §3-3, client/Spec.lean §4-44). One line of note text, the speaker in
+under, when, and - once the turn is in the Ledger - how fast it came:
+time to first content, then the output rate (refrain §3-3, client/Spec.lean
+§4-44). One line of note text, the speaker in
 the label weight and everything else faint, so a thread reads as a
 column of names with words under them.
 
@@ -17,26 +18,28 @@ milliseconds; the cost of a turn is not drawn in the zen and blend tiers
 at all (the person's ruling), and the panorama's session sheet is where
 it lives. -->
 <script lang="ts">
-  import { say } from "../../core/lang";
-  import { hhmmss } from "../../core/time";
+  import { fill, say } from "../../core/lang";
+  import { hhmmss, isoInstant } from "../../core/time";
   import { ui } from "../../ui";
   import Sparkline from "./sparkline.svelte";
-  import { isoOf, landedWords } from "./timing";
+  import { landedWords } from "./timing";
 
   interface Props {
     readonly who: string;
     readonly at: number;
     // The frozen facts this message was said under - the model, and on a
-    // session's first head the mode - where the head is the one that
-    // states them; `null` elsewhere.
+    // session's first head its effort and mode - where the head is the
+    // one that states them; `null` elsewhere.
     readonly model: string | null;
     // Time to first content, once the Ledger holds a measured one.
     readonly ttft: number | null;
+    // Output tokens a second, once the Ledger holds both moments.
+    readonly tps: number | null;
     // The rhythm this page watched the reply arrive in, if it watched.
     readonly rhythm: readonly number[] | null;
   }
 
-  const { who, at, model, ttft, rhythm }: Props = $props();
+  const { who, at, model, ttft, tps, rhythm }: Props = $props();
 
   const { lang } = ui();
 </script>
@@ -46,9 +49,12 @@ it lives. -->
   {#if model !== null}
     <span class="min-w-0 truncate">{model}</span>
   {/if}
-  <time class="figure shrink-0" datetime={isoOf(at)}>{hhmmss(at)}</time>
+  <time class="figure shrink-0" datetime={isoInstant(at)}>{hhmmss(at)}</time>
   {#if ttft !== null}
-    <span class="figure shrink-0">{say($lang, "talk_ttft")} {landedWords(ttft)}</span>
+    <span class="figure shrink-0">{say($lang, "talk_ttft")} {landedWords(ttft, $lang)}</span>
+  {/if}
+  {#if tps !== null}
+    <span class="figure shrink-0">{fill(say($lang, "talk_tps"), { n: String(Math.round(tps)) })}</span>
   {/if}
   {#if rhythm !== null}
     <Sparkline {rhythm} />

@@ -35,6 +35,8 @@
   import TurnView from "./turn.svelte";
   import { heard, landed, lost } from "./arrivals.svelte";
   import { callWord } from "./calls";
+  import { frozenSaid } from "./frozen";
+  import { called } from "./naming";
   import { planFork } from "./forking";
   import { cutOff, silentRun } from "./silence";
   import type { Phase } from "./silence";
@@ -42,7 +44,6 @@
 
   interface Props {
     readonly run: RunBelief;
-    readonly who: string;
     // Absent where the page holding the thread cannot branch: the run
     // page draws the same conversation with nowhere to fork to.
     readonly onFork?: ((plan: ForkPlan) => void) | undefined;
@@ -55,7 +56,7 @@
     readonly opens?: boolean;
   }
 
-  const { run, who, onFork, onRetry, opens = true }: Props = $props();
+  const { run, onFork, onRetry, opens = true }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -132,14 +133,19 @@
     whole && (run.doing.kind === "calling" || run.doing.kind === "waiting") &&
       (turns.at(-1)?.calls.some((call) => call.outcome === "waiting") ?? false),
   );
-  // The frozen facts each round's head states: the session's model and
-  // the mode its run was dispatched in on the first head, and the model
-  // again only where a round answered with a different one.
-  const mode = $derived(answer?.opening?.policy?.mode ?? null);
-  const firstModel = $derived(turns.at(0)?.model ?? null);
-  const firstStated = $derived(
-    firstModel === null || mode === null ? firstModel : `${firstModel} · ${say($lang, `mode_${mode}`)}`,
+  // Who speaks in this run: the name its session froze, which a rename
+  // after the session began does not reach (refrain §3-13).
+  const who = $derived(
+    run.addr === null ? say($lang, "talk_resident") : called(run.addr, answer?.opening?.names?.mayor, $lang),
   );
+  // The frozen facts each round's head states: the session's model, its
+  // effort and the mode its run was dispatched in on the first head, and
+  // the model again only where a round answered with a different one.
+  const firstModel = $derived(turns.at(0)?.model ?? null);
+  const firstStated = $derived.by(() => {
+    const frozen = frozenSaid(answer?.opening, $lang);
+    return firstModel === null || frozen === "" ? firstModel : `${firstModel} · ${frozen}`;
+  });
   const stated = $derived(
     turns.map((turn, at) => {
       const model = turn.model ?? null;

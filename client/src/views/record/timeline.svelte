@@ -51,7 +51,7 @@
 <script lang="ts">
   import { readAnswer } from "../../core/answered";
   import { fill, say } from "../../core/lang";
-  import { isoDay, isoTime } from "../../core/time";
+  import { isoDay, isoInstant, isoTime } from "../../core/time";
   import { ui } from "../../ui";
   import type { EventRecord, Query, RunId, Seq } from "../../wire";
   import Button from "../parts/button.svelte";
@@ -213,7 +213,7 @@
                 open = open === record.seq ? null : record.seq;
               }}
             >
-              <time class="figure text-text-faint" datetime={`${isoDay(record.t)}T${isoTime(record.t)}`}>{isoTime(record.t)}</time>
+              <time class="figure text-text-faint" datetime={isoInstant(record.t)}>{isoTime(record.t)}</time>
               <span class={SEQ}>#{record.seq}</span>
               <span class={WHAT}>
                 <span class="text-text">{say($lang, whatHappened(record.kind))}</span>
@@ -236,7 +236,7 @@
             {#if entry.t === null}
               <span class="text-text-faint"></span>
             {:else}
-              <time class="figure text-text-faint" datetime={`${isoDay(entry.t)}T${isoTime(entry.t)}`}>{isoTime(entry.t)}</time>
+              <time class="figure text-text-faint" datetime={isoInstant(entry.t)}>{isoTime(entry.t)}</time>
             {/if}
             <span class={SEQ}>#{logged.seq}</span>
             <span class={WHAT}>

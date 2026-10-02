@@ -38,6 +38,7 @@
   import Filed from "./gallery/filed.svelte";
   import FirstRun from "./gallery/first_run.svelte";
   import Fmt from "./gallery/fmt.svelte";
+  import G1 from "./gallery/g1.svelte";
   import Followed from "./gallery/followed.svelte";
   import Hints from "./gallery/hints.svelte";
   import Inspected from "./gallery/ins.svelte";
@@ -106,6 +107,7 @@
   <RefusedLine />
   <Talking />
   <Thr />
+  <G1 />
   <Followed />
   <Anchored />
   <Produced />

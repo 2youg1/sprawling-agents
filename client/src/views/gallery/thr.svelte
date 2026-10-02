@@ -169,7 +169,7 @@
 </Case>
 
 <Case label="thread · a head with the time to first content and the rhythm the reply arrived in" width={760}>
-  <Head who="Cat" at={now} model={null} ttft={412} rhythm={RHYTHM} />
+  <Head who="Cat" at={now} model={null} ttft={412} tps={58} rhythm={RHYTHM} />
 </Case>
 
 <Case label="thread · words just sent: held, pending, accepted, unknown" width={760}>

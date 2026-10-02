@@ -245,7 +245,7 @@
   {:else if eye.id === "turns"}
     <div class="mx-auto max-w-talk">
       {#if shown !== undefined}
-        <Thread run={shown} who={roomWord(room)} />
+        <Thread run={shown} />
       {:else}
         <p class="text-text-faint">…</p>
       {/if}

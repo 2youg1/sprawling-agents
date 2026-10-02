@@ -133,6 +133,7 @@
     opened: Seq.make(10 * (index + 1)),
     t: TimeMs.make(START + (index * 10 + 10) * 1_000),
     first_at: TimeMs.make(START + (index * 10 + 10) * 1_000 + first),
+    returned: TimeMs.make(START + (index * 10 + 10) * 1_000 + first + 18_000),
     timing: "measured",
     model: MODEL,
     said: "Done.",
@@ -145,6 +146,7 @@
     goal: "",
     task: "change the city's document reading contract",
     policy: { admit: "tested", landing: "ordinary", mode: "work", write: "full" },
+    effort: "medium",
   };
 
   // What the live run was told, segment by segment; the building's

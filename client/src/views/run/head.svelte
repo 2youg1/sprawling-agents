@@ -19,7 +19,7 @@
   import { POSTURE_WORD } from "../../core/doing";
   import { fill, say } from "../../core/lang";
   import { buildingOf, roomOf, toFragment } from "../../core/route";
-  import { count, isoDay, isoTime, lasted, usd } from "../../core/time";
+  import { count, isoDay, isoInstant, isoTime, lasted, usd } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, Closing, Turn } from "../../wire";
   import { figuresOf, modelsOf } from "./lanes";
@@ -67,7 +67,7 @@
       <dt class={NAME}>{say($lang, "run_head_took")}</dt>
       <dd class={VALUE}>{lasted(to - from)}</dd>
       <dd class="{MORE} figure">
-        <time datetime={`${isoDay(from)}T${isoTime(from)}`}
+        <time datetime={isoInstant(from)}
           >{fill(say($lang, "run_head_started"), { clock: `${isoDay(from)} ${isoTime(from)}` })}</time
         >
       </dd>

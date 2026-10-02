@@ -25,7 +25,7 @@
   import type { Readable } from "svelte/store";
 
   import { readAnswer } from "../../core/answered";
-  import { count, kib } from "../../core/time";
+  import { count, isoInstant, isoTime, kib } from "../../core/time";
   import { fill, say } from "../../core/lang";
   import type { Tail } from "../../core/live_output";
   import { ui } from "../../ui";
@@ -96,8 +96,7 @@
         <span class={end.ink}>{end.word}</span>
       {/if}
       {#if printed.finished !== null}
-        {@const iso = new Date(printed.finished).toISOString()}
-        <time class="figure" datetime={iso}>{iso.slice(11)}</time>
+        <time class="figure" datetime={isoInstant(printed.finished)}>{isoTime(printed.finished)}</time>
       {/if}
       {#if printed.cut > 0}
         <span>{fill(say($lang, "inspect_cut"), { n: count(printed.cut) })}</span>

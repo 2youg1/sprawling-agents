@@ -24,7 +24,8 @@
   import { hhmmss } from "../core/time";
   import { landingOf, sentFrom } from "../core/landing";
   import type { Landing, Sent } from "../core/landing";
-  import { MAYOR, roomOf } from "../core/route";
+  import { MAYOR } from "../core/route";
+  import { QUERIES } from "../core/asking";
   import { forkAsked } from "../core/forking";
   import { untrack } from "svelte";
   import type { Snippet } from "svelte";
@@ -36,6 +37,7 @@
   import Landed from "./talk/landed.svelte";
   import type { Boundary, ForkPlan } from "./talk/forking";
   import Thread from "./talk/thread.svelte";
+  import { called } from "./talk/naming";
   import Showing from "./shared/showing.svelte";
   import Stream from "./talk/stream.svelte";
   import { drawsCalls } from "../core/results";
@@ -71,7 +73,16 @@
   const runs = $derived(heldIn($belief, address));
   const live = $derived(newestWorking($belief, address));
   const isMayor = $derived(address === MAYOR);
-  const who = $derived(roomOf(address));
+  // Whom the next session here will speak with: the name a new session
+  // would freeze, which is today's (refrain §3-13). A session already
+  // going is drawn under the name it froze, which its thread reads.
+  const identity = u.conn.asking.ask(QUERIES.identity);
+  const stated = $derived(
+    $identity !== undefined && "identity" in $identity && "stated" in $identity.identity
+      ? $identity.identity.stated.mayor
+      : null,
+  );
+  const who = $derived(called(address, stated, $lang));
 
   // Where the newest session in this room began. Runs the fold places at
   // or before it are the earlier stretch, folded away (roadmap S1-3);
@@ -249,7 +260,7 @@
   // fork returned to the box arrive there, since the box reads its
   // draft once, when it mounts.
   const placeholder = $derived(
-    isMayor
+    isMayor && stated === null
       ? say($lang, "talk_placeholder_mayor")
       : fill(say($lang, "talk_placeholder_room"), { room: who }),
   );
@@ -264,7 +275,7 @@
   {#if said !== undefined}
     <div class="mb-snug flex flex-col gap-tight">
       <div class="flex items-baseline gap-base text-note text-text-faint">
-        <span class="font-label text-text">{isMayor ? say($lang, "talk_empty_mayor") : who}</span>
+        <span class="font-label text-text">{called(address, answer?.opening?.names?.mayor, $lang)}</span>
         <span class="figure">{hhmmss(said.t)}</span>
       </div>
       <p class="truncate text-body text-text">{said.said}</p>
@@ -311,9 +322,9 @@ composition is rebuilt on the way. -->
       {#if runs.length > 0}
         <div class="mb-base flex justify-end"><Showing /></div>
         {#if drawsCalls($held.showing)}
-          <Divider {earlier} {who} boundary={story} onFork={doFork} onRetry={send} />
+          <Divider {earlier} boundary={story} onFork={doFork} onRetry={send} />
           {#each shown as run, at (run.run)}
-            <Thread {run} {who} opens={at === 0} onFork={doFork} onRetry={send} />
+            <Thread {run} opens={at === 0} onFork={doFork} onRetry={send} />
           {/each}
         {:else}
           <Stream {shown} {earlier} boundary={story} />
@@ -335,7 +346,7 @@ composition is rebuilt on the way. -->
   >
     {#if !band && blank}
       <div class="absolute inset-x-0 bottom-full mb-wide text-center">
-        <p class="text-title font-title text-text">{isMayor ? say($lang, "talk_empty_mayor") : who}</p>
+        <p class="text-title font-title text-text">{who}</p>
         <p class="text-note text-text-faint">{address}</p>
       </div>
     {/if}

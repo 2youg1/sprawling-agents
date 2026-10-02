@@ -5,10 +5,10 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { Address, Seq, TimeMs, type Call, type Timing, type Turn } from "../../wire";
+import { Address, Seq, TimeMs, Tokens, type Call, type Timing, type Turn } from "../../wire";
 import { kindOf } from "./call_kind";
 import { rhythmOf } from "./rhythm";
-import { callTime, landedWords, lastedOf, runningWords, ttftOf } from "./timing";
+import { callTime, landedWords, lastedOf, runningWords, tpsOf, ttftOf } from "./timing";
 
 function call(outcome: Call["outcome"], called: number, answered: number | null, timing: Timing = "measured"): Call {
   return {
@@ -22,8 +22,10 @@ function call(outcome: Call["outcome"], called: number, answered: number | null,
   };
 }
 
-function turn(t: number, first: number | null, timing: Timing = "measured"): Turn {
+function turn(t: number, first: number | null, timing: Timing = "measured", returned: number | null = null, output = 0): Turn {
   return {
+    returned: returned === null ? null : TimeMs.make(returned),
+    used: { input: Tokens.make(10), output: Tokens.make(output), cached: Tokens.make(0) },
     calls: [],
     notes: [],
     number: 1,
@@ -61,8 +63,21 @@ describe("a figure is a difference of two measured moments, or nothing", () => {
     expect(ttftOf(turn(5_000, 4_000))).toBeNull();
   });
 
+  test("the output rate is the output count over first content to return, in seconds", () => {
+    expect(tpsOf(turn(5_000, 5_400, "measured", 7_400, 120))).toBe(60);
+  });
+
+  test("no rate without both moments, a count, or a span that moves forward", () => {
+    expect(tpsOf(turn(5_000, 5_400, "measured", null, 120))).toBeNull();
+    expect(tpsOf(turn(5_000, null, "measured", 7_400, 120))).toBeNull();
+    expect(tpsOf(turn(5_000, 5_400, "measured", 7_400, 0))).toBeNull();
+    expect(tpsOf(turn(5_000, 5_400, "measured", 5_400, 120))).toBeNull();
+    expect(tpsOf(turn(5_000, 5_400, "measured", 5_000, 120))).toBeNull();
+    expect(tpsOf({ ...turn(5_000, 5_400, "measured", 7_400, 120), used: null })).toBeNull();
+  });
+
   test("a landed figure is milliseconds under a second, seconds to the millisecond above", () => {
-    expect([landedWords(31), landedWords(999), landedWords(3_412)]).toEqual(["31 ms", "999 ms", "3.412 s"]);
+    expect([landedWords(31, "en"), landedWords(999, "en"), landedWords(3_412, "en")]).toEqual(["31 ms", "999 ms", "3.412 s"]);
     expect([runningWords(4_749), runningWords(10_000)]).toEqual(["4.7 s", "10.0 s"]);
   });
 });

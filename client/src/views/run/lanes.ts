@@ -150,14 +150,6 @@ export interface Placed {
   readonly call: Call;
 }
 
-// How long a call took, as the ledger measured it; `null` while it has
-// not answered, and for a call the ledger did not time (`Timing`), whose
-// two stamps are not a duration anyone measured.
-export function tookOf(call: Call): number | null {
-  const answered = call.answered ?? null;
-  return answered === null || call.timing === "unmeasured" ? null : answered - call.called;
-}
-
 export function callsOf(turns: readonly Turn[]): readonly Placed[] {
   return turns.flatMap((turn) => turn.calls.map((call) => ({ turn: turn.number, call })));
 }

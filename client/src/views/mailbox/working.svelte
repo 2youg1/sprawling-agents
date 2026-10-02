@@ -23,6 +23,7 @@
   import { phaseOf } from "../runs/lineage";
   import { PHASE_MARK, PHASE_WORD } from "../runs/phase";
   import Section from "./section.svelte";
+  import { ticker } from "../talk/timing";
 
   interface Props {
     // Following a row leaves the mailbox for the room.
@@ -48,18 +49,10 @@
     return Object.values(newest).sort((a, b) => (b.run.started ?? 0) - (a.run.started ?? 0));
   });
 
-  // How long each row's run has gone, redrawn once a second while any
-  // runs and not at all otherwise.
-  let now = $state(u.now());
-  $effect(() => {
-    if (rows.length === 0) return;
-    const tick = setInterval(() => {
-      now = u.now();
-    }, 1000);
-    return () => {
-      clearInterval(tick);
-    };
-  });
+  // How long each row's run has gone, on the page's one clock: it moves
+  // only while a row reads it and the page is seen, and every reading is
+  // recomputed from the run's own start (client/Spec.lean §4-59).
+  const tick = ticker(u.now);
 </script>
 
 <Section title="mailbox_working" empty="mailbox_working_none" count={rows.length}>
@@ -77,7 +70,7 @@
           <Glyph name={mark.glyph} size="sm" class={INK[mark.weight]} />
           <span class="min-w-0 truncate font-label">{room}</span>
           <span class="figure text-note text-text-faint">
-            {say($lang, PHASE_WORD[phase])} · {run.started === null ? "" : lasted(now - run.started)}
+            {say($lang, PHASE_WORD[phase])} · {run.started === null ? "" : lasted($tick - run.started)}
           </span>
           <kbd class="entry-n" aria-hidden="true"></kbd>
           {#if run.task !== null}

@@ -19,6 +19,7 @@ import { Option, Schema } from "effect";
 import type { Tail } from "../../core/live_output";
 import { Locator } from "../../wire";
 import type { Call, TimeMs } from "../../wire";
+import { lastedOf } from "../talk/timing";
 import { commandOf, type Ending } from "../monitor/trace";
 
 export interface Printed {
@@ -42,7 +43,7 @@ export interface Printed {
 
 export function printedOf(call: Call, tail: Tail): Printed {
   const finished = call.answered ?? null;
-  const took = finished === null ? null : finished - call.called;
+  const took = lastedOf(call);
   const pinned = Option.getOrNull(Schema.decodeUnknownOption(Locator)(call.output?.pinned));
   const live = call.outcome === "waiting";
   const entry = call.render === "terminal" ? commandOf(call) : null;

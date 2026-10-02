@@ -23,7 +23,7 @@
 import { Option, Schema } from "effect";
 
 import type { Call, Outcome, Seq, Turn } from "../../wire";
-import { tookOf } from "../run/lanes";
+import { lastedOf } from "../talk/timing";
 
 export type Ending =
   | { readonly kind: "code"; readonly code: number }
@@ -155,7 +155,7 @@ export function commandOf(call: Call): Entry {
     stderr: Option.match(ran, { onNone: () => "", onSome: (r) => r.stderr ?? "" }),
     ending: endingOf(call, ran),
     cut: call.output?.cut ?? 0,
-    took: tookOf(call),
+    took: lastedOf(call),
   };
 }
 

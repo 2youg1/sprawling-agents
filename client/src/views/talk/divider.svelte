@@ -19,13 +19,12 @@
     // neither a dialog nor a route is the right weight for a scroll
     // (ux B7).
     readonly earlier: readonly RunBelief[];
-    readonly who: string;
     readonly boundary: Boundary | null;
     readonly onFork: (plan: ForkPlan) => void;
     readonly onRetry: (task: string) => void;
   }
 
-  const { earlier, who, boundary, onFork, onRetry }: Props = $props();
+  const { earlier, boundary, onFork, onRetry }: Props = $props();
 
   const { lang, conn } = ui();
   const belief = conn.belief;
@@ -66,7 +65,7 @@
   {#if open}
     <div class="fade">
       {#each earlier as run (run.run)}
-        <Thread {run} {who} {onFork} {onRetry} />
+        <Thread {run} {onFork} {onRetry} />
       {/each}
     </div>
   {/if}

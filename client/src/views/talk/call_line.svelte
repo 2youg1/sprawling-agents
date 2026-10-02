@@ -23,11 +23,12 @@ is still standing where they were reading. -->
   import { fill, say } from "../../core/lang";
   import type { Doing } from "../../core/doing";
   import type { Call, RunId } from "../../wire";
+  import { isoInstant } from "../../core/time";
   import { ui } from "../../ui";
   import Tip from "../parts/tip.svelte";
   import { closeRight, openCall, rightItem } from "../inspect/open.svelte";
   import { kindOf } from "./call_kind";
-  import { NAMED_AFTER_MS, callTime, isoOf, landedWords, runningWords, ticker } from "./timing";
+  import { NAMED_AFTER_MS, callTime, landedWords, runningWords, ticker } from "./timing";
 
   interface Props {
     readonly call: Call;
@@ -60,8 +61,8 @@ is still standing where they were reading. -->
   );
   const hint = $derived(
     call.answered === null || call.answered === undefined
-      ? fill(say($lang, "talk_call_started"), { at: isoOf(call.called) })
-      : fill(say($lang, "talk_call_finished"), { at: isoOf(call.answered) }),
+      ? fill(say($lang, "talk_call_started"), { at: isoInstant(call.called) })
+      : fill(say($lang, "talk_call_finished"), { at: isoInstant(call.answered) }),
   );
 
   // The next line in reading order, in the conversation this line sits in.
@@ -122,7 +123,7 @@ is still standing where they were reading. -->
           <span class="inline-block size-dot shrink-0 animate-pulse rounded-pill bg-accent" aria-hidden="true"></span>
         {/if}
         {#if time.kind === "landed"}
-          {landedWords(time.ms)}
+          {landedWords(time.ms, $lang)}
         {:else if time.kind === "running"}
           <span class="text-text">{runningWords(time.ms)}</span>
         {/if}

@@ -4275,6 +4275,18 @@
     "en": "TTFT",
     "zh": "TTFT"
   },
+  "talk_tps": {
+    "en": "{n} t/s",
+    "zh": "{n} t/s"
+  },
+  "talk_took_ms": {
+    "en": "{n} ms",
+    "zh": "{n} ms"
+  },
+  "talk_took_s": {
+    "en": "{n} s",
+    "zh": "{n} s"
+  },
   "talk_unread": {
     "en": "{n} new",
     "zh": "{n} 条新内容"
@@ -6246,14 +6258,6 @@
   "world_timeline_day": {
     "en": "{day} · UTC",
     "zh": "{day} · UTC"
-  },
-  "world_ms": {
-    "en": "{n} ms",
-    "zh": "{n} ms"
-  },
-  "world_s": {
-    "en": "{n} s",
-    "zh": "{n} s"
   },
   "world_checkpoint": {
     "en": "checkpoint",

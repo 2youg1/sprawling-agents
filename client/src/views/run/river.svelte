@@ -16,11 +16,12 @@
   import { POSTURE_WORD } from "../../core/doing";
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
-  import { count, isoDay, isoTime, lasted } from "../../core/time";
+  import { count, isoInstant, isoTime, lasted } from "../../core/time";
   import { ui } from "../../ui";
   import type { Turn } from "../../wire";
   import type { Share } from "./lanes";
-  import { SHARES, callsOf, columnsOf, stretchesOf, tookOf, windowOf } from "./lanes";
+  import { SHARES, callsOf, columnsOf, stretchesOf, windowOf } from "./lanes";
+  import { lastedOf } from "../talk/timing";
 
   interface Props {
     readonly turns: readonly Turn[];
@@ -156,13 +157,13 @@
       <div style:height="calc(var({ROW_TOKEN}) * {rows.first})"></div>
       <ol class="@container text-note">
         {#each calls.slice(rows.first, rows.end) as placed, at (rows.first + at)}
-          {@const took = tookOf(placed.call)}
+          {@const took = lastedOf(placed.call)}
           {@const landed = placed.call.answered ?? null}
           <li class="grid h-control-sm grid-cols-[14ch_minmax(0,1fr)_10ch] items-center gap-x-base whitespace-nowrap @min-[40rem]:grid-cols-[14ch_9ch_12ch_minmax(0,1fr)_10ch]">
             {#if landed === null}
               <span class="figure text-text-faint">{say($lang, "run_call_running")}</span>
             {:else}
-              <time class="figure text-text-faint" datetime={`${isoDay(landed)}T${isoTime(landed)}`}>{isoTime(landed)}</time>
+              <time class="figure text-text-faint" datetime={isoInstant(landed)}>{isoTime(landed)}</time>
             {/if}
             <span class="hidden truncate text-text-faint @min-[40rem]:block"
               >{fill(say($lang, "run_turn_n"), { n: String(placed.turn) })}</span

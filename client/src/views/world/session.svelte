@@ -112,7 +112,7 @@
     </div>
   {:else}
     <div class="mt-snug flex min-h-0 flex-1 flex-col">
-      <Sheet {here} {run} {rounds} commits={held.kind === "held" ? held.value : []} />
+      <Sheet {here} {run} {rounds} />
       <Timeline {run} turns={rounds?.turns ?? []} commits={held.kind === "held" ? held.value : []} {picked} />
     </div>
   {/if}

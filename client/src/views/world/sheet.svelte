@@ -21,22 +21,20 @@
   import { fill, say } from "../../core/lang";
   import { kilo, usd } from "../../core/time";
   import { ui } from "../../ui";
-  import type { Address, CommitAnswer, RoundsAnswer, RunId } from "../../wire";
+  import type { Address, RoundsAnswer, RunId } from "../../wire";
   import { costReading, runSpend } from "../pricing";
   import Bounds from "../talk/bounds.svelte";
   import { contextOf, remindersOf, remindersSaid, usedPercent } from "../talk/gauge";
+  import { frozenSaid } from "../talk/frozen";
   import { speedOf } from "./speed";
 
   interface Props {
     readonly here: Address;
     readonly run: RunId | null;
     readonly rounds: RoundsAnswer | undefined;
-    // The commits the page holds: a commit's trailers are the one answer
-    // that carries the effort its run was frozen with.
-    readonly commits: readonly CommitAnswer[];
   }
 
-  const { here, run, rounds, commits }: Props = $props();
+  const { here, run, rounds }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -61,16 +59,10 @@
       ? fill(say($lang, "world_price"), { input: facts.input_price, output: facts.output_price })
       : "",
   );
-  // What the model was frozen with besides its name: the effort a commit
-  // of this run recorded, and the mode the run was dispatched in. A run
-  // that has not committed yet has no effort on any answer, so none is
-  // said rather than the room's current one.
-  const effort = $derived(commits.find((commit) => commit.run === run)?.effort ?? null);
-  const frozen = $derived(
-    [effort === null ? "" : say($lang, `effort_${effort}`), policy === null ? "" : say($lang, `mode_${policy.mode}`)]
-      .filter((part) => part !== "")
-      .join(" · "),
-  );
+  // What the model was frozen with besides its name: the effort its
+  // requests froze and the mode the run was dispatched in, as its opening
+  // records them - so a run that has not committed yet says its effort.
+  const frozen = $derived(frozenSaid(rounds?.opening, $lang));
 
   // Every turn the provider reported tokens for, summed: the input is
   // every prompt token of each call, cached or not, so the share of it
@@ -174,7 +166,11 @@ not, so a figure is never cut to a few letters. -->
     {#if speed === null}
       <dd class="text-text-faint">{DASH}</dd>
     {:else}
-      <dd class="figure truncate text-text">{fill(say($lang, "world_ttft"), { n: String(speed.ttft) })}</dd>
+      <dd class="figure truncate text-text">
+        {fill(say($lang, "world_ttft"), { n: String(speed.ttft) })}{speed.tps === null
+          ? ""
+          : ` · ${fill(say($lang, "talk_tps"), { n: String(Math.round(speed.tps)) })}`}
+      </dd>
       <dd class="truncate text-note text-text-faint">{fill(say($lang, "world_speed_turns"), { n: String(speed.turns) })}</dd>
     {/if}
   </div>
