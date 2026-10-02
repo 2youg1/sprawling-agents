@@ -5,11 +5,14 @@
 
 <script lang="ts">
   // The settings tree, drawn: APG Disclosure Navigation (client/Spec.lean
-  // §7-11). A branch is a label and never folds; a group entry is a
-  // button that draws its group beside the tree; a page entry is a link,
-  // so a middle click and a new tab work, and it carries an arrow because
-  // following it leaves the panel; a nest is a button that opens its
-  // own list. ↓/↑ walk the entries a person can see, Home/End jump to
+  // §7-11). A branch is a button, and one branch is open at a time - the
+  // one the panel stands in when it opens (client D53, the fold of
+  // `client/spec/Views/Fold.lean`); a group entry is a button that draws
+  // its group beside the tree; a page entry is a link, so a middle click
+  // and a new tab work, and it carries an arrow because following it
+  // leaves the panel; a nest and a branch's "more" are buttons that open
+  // their own list. What opens arrives with `drop`; what folds goes at
+  // once. ↓/↑ walk the entries a person can see, Home/End jump to
   // the ends, and Tab still steps through them one by one; the keys are
   // the line keys of `core/lines.ts`. A letter here is a first letter: it
   // moves to the next group that starts with it, wrapping at the end, and
@@ -32,10 +35,10 @@
   import { ui } from "../../ui";
   import Glyph from "../parts/glyph.svelte";
   import { Kbd } from "../parts/kbd.svelte";
-  import { HALL, useBuildings } from "../shared/buildings";
+  import { useBuildings } from "../shared/buildings";
   import { HEADING } from "../setup/groups";
-  import { TREE, nestOf } from "./tree";
-  import type { Nest, Page } from "./tree";
+  import { TREE, buildingPages, nestOf, standingOf } from "./tree";
+  import type { Entry, Leaf, Nest, Page } from "./tree";
 
   interface Props {
     // The group drawn in the body now.
@@ -63,12 +66,21 @@
   // svelte-ignore state_referenced_locally (the nest the panel opened over starts open; the person folds it after)
   const first = nestOf(beneath);
   const open = $state<Record<Nest, boolean>>({ buildings: first === "buildings", record: first === "record" });
+  // svelte-ignore state_referenced_locally (the branch the panel opened in starts open; picking a group inside it keeps it so)
+  const standing = standingOf(group, beneath);
+  let branchOpen = $state<number | null>(standing.branch);
+  let moreOpen = $state(standing.more);
+
+  // One branch at a time: opening another folds the one that was open,
+  // and its "more" with it; pressing the open one folds it.
+  function toggleBranch(at: number): void {
+    branchOpen = branchOpen === at ? null : at;
+    moreOpen = false;
+  }
 
   // The pages under each nest, read when the nest is drawn.
   const leaves = $derived<Record<Nest, readonly Page[]>>({
-    buildings: $buildings
-      .filter((addr) => addr !== HALL)
-      .map((address) => ({ kind: "page", view: { kind: "building", address }, word: "settings_buildings" })),
+    buildings: buildingPages($buildings),
     record: LENSES.map((lens) => ({ kind: "page", view: { kind: "record", lens }, word: `rec_${lens}` })),
   });
 
@@ -137,6 +149,7 @@
   // The page under the panel is named too, but only in its ink: two bars
   // in one tree would leave the eye to guess which is the selection.
   const HERE = "bg-raised text-text before:absolute before:inset-y-snug before:left-0 before:w-[2px] before:rounded-pill before:bg-accent";
+  const keyOf = (entry: Entry): string => (entry.kind === "group" ? entry.group : entry.word);
 </script>
 
 {#snippet leave(page: Page)}
@@ -154,69 +167,120 @@
   </a>
 {/snippet}
 
+{#snippet chevron(shown: boolean)}
+  <span class={MARK} aria-hidden="true">
+    <Glyph name="chevron" size="sm" class={["transition-transform motion-reduce:transition-none", shown && "rotate-90"]} />
+  </span>
+{/snippet}
+
+{#snippet leaf(entry: Leaf)}
+  {#if entry.kind === "group"}
+    <button
+      type="button"
+      data-entry
+      data-initial={initial(entry.group)}
+      class={[ENTRY, group === entry.group && HERE]}
+      aria-current={group === entry.group ? "true" : undefined}
+      onclick={() => {
+        onPick(entry.group);
+      }}
+    >
+      <span class="min-w-0 flex-1 truncate">{say($lang, HEADING[entry.group])}</span>
+      <span class={MARK} aria-hidden="true">
+        <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; typescript-eslint does not resolve exports of another .svelte module) -->
+        {@render Kbd({ initial: initial(entry.group) })}
+      </span>
+    </button>
+  {:else}
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+    {@render leave(entry)}
+  {/if}
+{/snippet}
+
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions (the arrow keys move between the links and buttons inside, the APG pattern for this navigation) -->
 <nav
   bind:this={nav}
-  class="flex flex-col gap-base"
+  class="flex flex-col gap-hair"
   aria-label={say($lang, "settings_tree")}
   onkeydown={walk}
 >
   {#each TREE as branch, index (branch.word)}
     <div class="flex flex-col gap-hair">
-      <span id={`${uid}-${String(index)}`} class="px-snug pb-tight text-note tracking-wide text-text-faint uppercase">
-        {say($lang, branch.word)}
-      </span>
-      <ul class="flex flex-col gap-hair" aria-labelledby={`${uid}-${String(index)}`}>
-        {#each branch.entries as entry (entry.kind === "group" ? entry.group : entry.word)}
-          <li>
-            {#if entry.kind === "group"}
-              <button
-                type="button"
-                data-entry
-                data-initial={initial(entry.group)}
-                class={[ENTRY, group === entry.group && HERE]}
-                aria-current={group === entry.group ? "true" : undefined}
-                onclick={() => {
-                  onPick(entry.group);
-                }}
-              >
-                <span class="min-w-0 flex-1 truncate">{say($lang, HEADING[entry.group])}</span>
-                <span class={MARK} aria-hidden="true">
-                  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; typescript-eslint does not resolve exports of another .svelte module) -->
-                  {@render Kbd({ initial: initial(entry.group) })}
-                </span>
-              </button>
-            {:else if entry.kind === "page"}
-              <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-              {@render leave(entry)}
-            {:else if entry.kind === "nest"}
+      <button
+        type="button"
+        data-entry
+        class={[ENTRY, "text-note tracking-wide uppercase", branchOpen === index ? "text-text-quiet" : "text-text-faint"]}
+        aria-expanded={branchOpen === index}
+        aria-controls={`${uid}-${String(index)}`}
+        onclick={() => {
+          toggleBranch(index);
+        }}
+      >
+        <span class="min-w-0 flex-1 truncate">{say($lang, branch.word)}</span>
+        <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+        {@render chevron(branchOpen === index)}
+      </button>
+      {#if branchOpen === index}
+        <ul id={`${uid}-${String(index)}`} class="drop flex flex-col gap-hair pb-base">
+          {#each branch.entries as entry (keyOf(entry))}
+            <li>
+              {#if entry.kind === "nest"}
+                <button
+                  type="button"
+                  data-entry
+                  class={ENTRY}
+                  aria-expanded={open[entry.nest]}
+                  aria-controls={`${uid}-${entry.nest}`}
+                  onclick={() => {
+                    open[entry.nest] = !open[entry.nest];
+                  }}
+                >
+                  <span class="min-w-0 flex-1 truncate">{say($lang, entry.word)}</span>
+                  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                  {@render chevron(open[entry.nest])}
+                </button>
+                {#if open[entry.nest]}
+                  <ul id={`${uid}-${entry.nest}`} class="drop ml-base flex flex-col gap-hair border-l border-edge pl-tight">
+                    {#each leaves[entry.nest] as page (toFragment(page.view))}
+                      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                      <li>{@render leave(page)}</li>
+                    {/each}
+                  </ul>
+                {/if}
+              {:else}
+                <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                {@render leaf(entry)}
+              {/if}
+            </li>
+          {/each}
+          {#if branch.more.length > 0}
+            <li>
               <button
                 type="button"
                 data-entry
                 class={ENTRY}
-                aria-expanded={open[entry.nest]}
-                aria-controls={`${uid}-${entry.nest}`}
+                aria-expanded={moreOpen}
+                aria-controls={`${uid}-${String(index)}-more`}
                 onclick={() => {
-                  open[entry.nest] = !open[entry.nest];
+                  moreOpen = !moreOpen;
                 }}
               >
-                <span class="min-w-0 flex-1 truncate">{say($lang, entry.word)}</span>
-                <span class={MARK} aria-hidden="true">
-                  <Glyph name="chevron" size="sm" class={["transition-transform", open[entry.nest] && "rotate-90"]} />
-                </span>
+                <span class="min-w-0 flex-1 truncate">{say($lang, "settings_more")}</span>
+                <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+                {@render chevron(moreOpen)}
               </button>
-              {#if open[entry.nest]}
-                <ul id={`${uid}-${entry.nest}`} class="ml-base flex flex-col gap-hair border-l border-edge pl-tight">
-                  {#each leaves[entry.nest] as page (toFragment(page.view))}
+              {#if moreOpen}
+                <ul id={`${uid}-${String(index)}-more`} class="drop ml-base flex flex-col gap-hair border-l border-edge pl-tight">
+                  {#each branch.more as entry (keyOf(entry))}
                     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-                    <li>{@render leave(page)}</li>
+                    <li>{@render leaf(entry)}</li>
                   {/each}
                 </ul>
               {/if}
-            {/if}
-          </li>
-        {/each}
-      </ul>
+            </li>
+          {/if}
+        </ul>
+      {/if}
     </div>
   {/each}
 </nav>

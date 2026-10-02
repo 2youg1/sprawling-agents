@@ -226,15 +226,20 @@ costs the cards their width (client/Spec.lean §4-30, §4-36). -->
             <ModelChoice {answer} />
           {/if}
         </div>
+        <!-- The default thinking level sits beside the default model,
+            because both answer what the city reaches for by default
+            (client D52). -->
+        <div class="grid grid-fit items-start gap-base">
+          <div class="min-w-0 rounded-card bg-raised px-base py-snug">
+            <EffortSection />
+          </div>
+          <CityLayer />
+        </div>
       </div>
     {:else if shown === "harnesses"}
       <HarnessList />
     {:else if shown === "run"}
       <div class="grid grid-fit items-start gap-base">
-        <div class="min-w-0 rounded-card bg-raised px-base py-snug">
-          <EffortSection />
-        </div>
-        <CityLayer />
         <GovernedSection />
         <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
           <span class="text-label font-label text-text">{say($lang, "setup_autonomy")}</span>

@@ -104,15 +104,34 @@ export interface Standing {
 // The branch the panel opens on: the one holding the page beneath when
 // the tree offers that page, else the one holding the group drawn.
 export function standingOf(drawn: SetupGroup, beneath: View): Standing {
-  return { branch: 0, more: false };
+  return placeOf((leaf) => offers(leaf, beneath)) ?? placeOf((leaf) => leaf.kind === "group" && leaf.group === drawn) ?? FIRST;
+}
+
+const FIRST: Standing = { branch: 0, more: false };
+
+function placeOf(holds: (entry: Entry) => boolean): Standing | null {
+  const branch = TREE.findIndex((each) => each.entries.some(holds) || each.more.some(holds));
+  const found = TREE[branch];
+  return found === undefined ? null : { branch, more: !found.entries.some(holds) };
+}
+
+// Whether an entry of the tree is the way to the page beneath. A nest
+// offers every page of its kind; the conversation is offered by none.
+function offers(entry: Entry, beneath: View): boolean {
+  switch (entry.kind) {
+    case "group":
+      return false;
+    case "page":
+      return entry.view.kind === beneath.kind;
+    case "nest":
+      return entry.nest === nestOf(beneath);
+  }
 }
 
 // One page per building the city names, the hall among them, so a city
 // of one building still lists it.
 export function buildingPages(addresses: readonly Address[]): readonly Page[] {
-  return addresses
-    .filter((address) => address !== "hall")
-    .map((address) => ({ kind: "page", view: { kind: "building", address }, word: "settings_buildings" }));
+  return addresses.map((address) => ({ kind: "page", view: { kind: "building", address }, word: "settings_buildings" }));
 }
 
 // The group a panel opened without one shows: the first the tree

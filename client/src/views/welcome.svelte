@@ -19,9 +19,16 @@
   // writes no ledger record, so after each write the page asks for it
   // again, and until that answer lands it draws the write it sent.
   //
-  // **Leaving is one choice.** "Start the conversation" opens the
-  // Mayor's room with nothing sent and nothing written into the box;
-  // the guide is then left, and opening the city no longer offers it.
+  // **Leaving is one choice, made two ways.** "Start the conversation"
+  // and "skip all optional" both open the Mayor's room with nothing sent
+  // and nothing written into the box, and the guide is then left; the
+  // shell still opens it at launch while the city has no provider
+  // endpoint (client D54).
+  //
+  // **A step done moves the guide on.** When the open step turns done in
+  // the city's answer, the next step nobody has done or put off opens and
+  // the done one folds (client D55); a body arrives with `drop` and goes
+  // at once.
 
   import { tick, untrack } from "svelte";
 
@@ -39,7 +46,7 @@
   import Unanswered from "./parts/unanswered.svelte";
   import { outstanding } from "./setup/dependencies";
   import type { Configured, Standing } from "./welcome/guide";
-  import { STEPS, currentOf, left, opened, putOff, putOffTheRest, standingOf } from "./welcome/guide";
+  import { STEPS, advanced, currentOf, left, opened, putOff, skipAll, standingOf } from "./welcome/guide";
   import Body from "./welcome/body.svelte";
 
   interface Props {
@@ -107,6 +114,24 @@
   const open = $derived(folded ? null : (linked ?? current));
   const ready = $derived(configured.provider === true);
 
+  // The city's previous reading, to tell a step the person just did from
+  // an answer that only now arrived.
+  let before: Configured | null = null;
+  $effect(() => {
+    const after = configured;
+    untrack(() => {
+      const was = before;
+      const shown = open;
+      before = after;
+      if (was === null || shown === null) return;
+      const next = advanced(progress, shown, was, after);
+      if (next === null) return;
+      linked = null;
+      folded = false;
+      write(next);
+    });
+  });
+
   function write(next: GuideProgress): void {
     sent = next;
     u.send(putGuide(next));
@@ -136,8 +161,8 @@
     });
   }
 
-  function start(): void {
-    write(left(progress));
+  function leave(next: GuideProgress): void {
+    write(next);
     u.prefs.setWelcomed(true);
     u.go({ kind: "talk", address: MAYOR });
   }
@@ -218,7 +243,7 @@ rather than one per kind of row. -->
                   <section
                     id={`${headId(step)}-body`}
                     aria-labelledby={headId(step)}
-                    class="flex min-w-0 flex-col gap-base pb-wide pl-[calc(4ch+var(--spacing-base))] @max-[40rem]:pl-0"
+                    class="drop flex min-w-0 flex-col gap-base pb-wide pl-[calc(4ch+var(--spacing-base))] @max-[40rem]:pl-0"
                   >
                     <p class="text-note text-text-quiet">{say($lang, ABOUT[step])}</p>
                     <Body {step} />
@@ -243,13 +268,15 @@ rather than one per kind of row. -->
               label={say($lang, "guide_start")}
               tone="primary"
               {...ready ? {} : { why: say($lang, "guide_start_needs_main") }}
-              onPress={start}
+              onPress={() => {
+                leave(left(progress));
+              }}
             />
             <Button
               label={say($lang, "guide_put_off_rest")}
               tone="quiet"
               onPress={() => {
-                write(putOffTheRest(progress));
+                leave(skipAll(progress));
               }}
             />
           </div>

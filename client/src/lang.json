@@ -6478,5 +6478,13 @@
   "ring_name": {
     "en": "context",
     "zh": "上下文"
+  },
+  "settings_branch_extensions": {
+    "en": "extensions",
+    "zh": "扩展"
+  },
+  "settings_more": {
+    "en": "more",
+    "zh": "更多"
   }
 }

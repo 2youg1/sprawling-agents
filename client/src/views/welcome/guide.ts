@@ -14,7 +14,7 @@
 // draws it as done.
 
 import { GuideStep } from "../../wire";
-import type { GuideMark, GuideProgress } from "../../wire";
+import type { EndpointsAnswer, GuideMark, GuideProgress } from "../../wire";
 
 export const STEPS: readonly GuideStep[] = GuideStep.literals;
 
@@ -91,7 +91,7 @@ export function left(progress: GuideProgress): GuideProgress {
 // leave, so the guide is left too and the shell opens the conversation
 // (client/Spec.lean D54).
 export function skipAll(progress: GuideProgress): GuideProgress {
-  return putOffTheRest(progress);
+  return left(putOffTheRest(progress));
 }
 
 // The step that was open just became done in the city's answer: the
@@ -105,7 +105,12 @@ export function advanced(
   before: Configured,
   after: Configured,
 ): GuideProgress | null {
-  return null;
+  if (before[open] !== false || after[open] !== true) return null;
+  const next = STEPS.slice(STEPS.indexOf(open) + 1).find((step) => {
+    const standing = standingOf(step, progress, after);
+    return standing !== "configured" && standing !== "skipped";
+  });
+  return next === undefined ? null : opened(progress, next);
 }
 
 // What the shell reads once, when the city first answers with its
@@ -116,10 +121,14 @@ export interface Launch {
   readonly welcomed: boolean;
 }
 
+export function launchOf(answer: EndpointsAnswer, welcomed: boolean): Launch {
+  return { endpoints: answer.endpoints.length, main: answer.chosen.some((each) => each.tag === "main"), welcomed };
+}
+
 // A city with no provider endpoint can do nothing, so the guide opens
 // whatever the city remembers about leaving it; with an endpoint but no
 // `main` model it opens only in a browser that has not walked it
 // (client/Spec.lean D54, `client/spec/Views/Guide.lean`).
 export function opensGuide(launch: Launch): boolean {
-  return !launch.main && !launch.welcomed;
+  return launch.endpoints === 0 || (!launch.main && !launch.welcomed);
 }

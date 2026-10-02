@@ -48,6 +48,7 @@
   import { closePanel, hostSettled, panelBeneath, panelGroup, pickGroup } from "./views/settings/hosted.svelte";
   import { followViewport, watchColumns, type Columns } from "./views/shared/frame";
   import { motionOff } from "./views/shared/motion";
+  import { launchOf, opensGuide } from "./views/welcome/guide";
   import { keepSheets, leaveSheet, openSheet, sheetsOpen } from "./views/sheets.svelte";
 
   // The Opening `main.ts` read off the page, captured once and whole: the
@@ -104,14 +105,8 @@
     else if (now.kind === "live" || now.kind === "refused") lostAttempt = null;
   });
   const frozen = $derived($belief.cancelled);
-  // Whether this city can take a dispatch at all: a `main` model is
-  // chosen. Until then the first page is the welcome, unless the person
-  // has already walked it and asked to be left alone.
-  const ready = $derived.by(() => {
-    const answer = $endpoints;
-    if (answer === undefined || !("endpoints" in answer)) return undefined;
-    return answer.endpoints.chosen.some((chosen) => chosen.tag === "main");
-  });
+  // What a launch reads to decide whether it opens the guide (client D54).
+  const launch = $derived($endpoints !== undefined && "endpoints" in $endpoints ? launchOf($endpoints.endpoints, $held.welcomed) : undefined);
 
   // The box a person writes in, wherever the page put it. Reached by the
   // element it is rather than by a name this file would have to keep in
@@ -317,8 +312,13 @@
   // here for the life of the shell, whatever page is open.
   $effect(() => u.conn.asking.ask(QUERIES.city).subscribe(() => undefined));
 
+  // Decided once per launch, so the conversation a skip lands in is not
+  // sent back by the next answer (`client/spec/Views/Guide.lean`).
+  let launched = false;
   $effect(() => {
-    if (ready === false && !$held.welcomed && view.kind === "talk") u.go({ kind: "welcome" });
+    if (launch === undefined || launched) return;
+    launched = true;
+    if (opensGuide(launch) && view.kind === "talk") u.go({ kind: "welcome" });
   });
 
   // The document title and the tab's icon carry what a hidden tab most
