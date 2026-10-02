@@ -680,6 +680,12 @@ export const CityAnswer = Schema.Struct({
 export type CityAnswer = typeof CityAnswer.Type;
 
 /**
+ * A BLAKE3 digest: exactly 64 lowercase hex digits.
+ */
+export const B3Hash = Schema.String.pipe(Schema.pattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
+export type B3Hash = typeof B3Hash.Type;
+
+/**
  * A commit, and where in the one history the line announcing it sits.
  */
 export const CommitAt = Schema.Struct({
@@ -723,6 +729,7 @@ export type SessionName = typeof SessionName.Type;
 export const CommitAnswer = Schema.Struct({
   actor: Address,
   at: TimeMs,
+  b3: Schema.optional(Schema.NullOr(B3Hash)),
   effort: Schema.optional(Schema.NullOr(Effort)),
   lineage: Schema.Array(RunId),
   message: Schema.optional(Schema.NullOr(Schema.String)),
@@ -860,6 +867,7 @@ export type TuningDefaults = typeof TuningDefaults.Type;
 export const ConfigAnswer = Schema.Struct({
   addr: Address,
   effort: Schema.optional(Schema.NullOr(SettledEffort)),
+  first: Schema.optional(Schema.NullOr(Schema.Int)),
   second: SettledSecond,
   tuning: TuningDefaults,
 }).annotations({ identifier: "ConfigAnswer" });
@@ -1270,12 +1278,6 @@ export const DoctorUpstream = Schema.Struct({
   newest: DoctorNewest,
 }).annotations({ identifier: "DoctorUpstream" });
 export type DoctorUpstream = typeof DoctorUpstream.Type;
-
-/**
- * A BLAKE3 digest: exactly 64 lowercase hex digits.
- */
-export const B3Hash = Schema.String.pipe(Schema.pattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
-export type B3Hash = typeof B3Hash.Type;
 
 /**
  * The grammar a document's blocks are read by.
@@ -2645,6 +2647,62 @@ export const Closing = Schema.Struct({
 export type Closing = typeof Closing.Type;
 
 /**
+ * Whether a run's work takes the ordinary road or stays in an
+ * experiment that never lands.
+ */
+export const LandingPolicy = Schema.Union(
+  Schema.Literal("ordinary"),
+  Schema.Literal("experiment"),
+).annotations({ identifier: "LandingPolicy" });
+export type LandingPolicy = typeof LandingPolicy.Type;
+
+/**
+ * Whether a run is talking with the person or carrying out work.
+ * 
+ * It decides how the run's catalog row introduces it and nothing else:
+ * what it may write, what it must prove and whether it lands are the
+ * other three values of [`RunPolicy`].
+ */
+export const Mode = Schema.Union(
+  Schema.Literal("chat"),
+  Schema.Literal("work"),
+).annotations({ identifier: "Mode" });
+export type Mode = typeof Mode.Type;
+
+/**
+ * What a run may do to a file that already exists inside its write
+ * domain (`crates/kernel/spec/WriteDomain.lean` §8-78).
+ * 
+ * It narrows the domain and never widens it: the domain answers where
+ * a run may write and what kind of file, this answers whether a write
+ * may change a file that is already there. Whether the target exists
+ * is the filesystem's fact at the moment of the write, so the check
+ * that makes `Create` hold is the writer's atomic create; the rule and
+ * its refusal are [`crate::gate::replacing`].
+ */
+export const WriteLimit = Schema.Union(
+  Schema.Literal("full"),
+  Schema.Literal("create"),
+).annotations({ identifier: "WriteLimit" });
+export type WriteLimit = typeof WriteLimit.Type;
+
+/**
+ * The four values one run works under, chosen when it is dispatched
+ * and written into its `run_started` line.
+ * 
+ * One value because the four always travel together — on the wire, in
+ * the ledger and through the dispatch — and are chosen independently,
+ * so every combination has a meaning.
+ */
+export const RunPolicy = Schema.Struct({
+  admit: AdmissionRequirement,
+  landing: LandingPolicy,
+  mode: Mode,
+  write: WriteLimit,
+}).annotations({ identifier: "RunPolicy" });
+export type RunPolicy = typeof RunPolicy.Type;
+
+/**
  * How a session began: what the person asked for, in their words.
  * 
  * The rounds start at the first `model_called`, so without this the
@@ -2655,6 +2713,7 @@ export const Opening = Schema.Struct({
   at: TimeMs,
   dispatched_by: Schema.optional(Schema.NullOr(Schema.String)),
   goal: Schema.String,
+  policy: Schema.optional(Schema.NullOr(RunPolicy)),
   task: Schema.String,
 }).annotations({ identifier: "Opening" });
 export type Opening = typeof Opening.Type;
@@ -2752,6 +2811,7 @@ export const Call = Schema.Struct({
   at: Seq,
   called: TimeMs,
   effect: Schema.optional(Schema.NullOr(Effect)),
+  exit_code: Schema.optional(Schema.NullOr(Schema.Int)),
   outcome: Outcome,
   output: Schema.optional(Schema.NullOr(Output)),
   render: Schema.optional(Schema.NullOr(RenderIntent)),
@@ -2821,6 +2881,7 @@ export type Note = typeof Note.Type;
  * spell, and it would be no more honest here.
  */
 export const Used = Schema.Struct({
+  cache_write: Schema.optional(Schema.NullOr(Tokens)),
   cached: Tokens,
   input: Tokens,
   output: Tokens,
@@ -2856,6 +2917,7 @@ export const RoundsAnswer = Schema.Struct({
   opening: Schema.optional(Schema.NullOr(Opening)),
   run: RunId,
   turns: Schema.Array(Turn),
+  worktree: Schema.optional(Schema.NullOr(Schema.String)),
 }).annotations({ identifier: "RoundsAnswer" });
 export type RoundsAnswer = typeof RoundsAnswer.Type;
 
@@ -3713,62 +3775,6 @@ export const RulesWrite = Schema.Struct({
   idem: IdemKey,
 }).annotations({ identifier: "RulesWrite" });
 export type RulesWrite = typeof RulesWrite.Type;
-
-/**
- * Whether a run's work takes the ordinary road or stays in an
- * experiment that never lands.
- */
-export const LandingPolicy = Schema.Union(
-  Schema.Literal("ordinary"),
-  Schema.Literal("experiment"),
-).annotations({ identifier: "LandingPolicy" });
-export type LandingPolicy = typeof LandingPolicy.Type;
-
-/**
- * Whether a run is talking with the person or carrying out work.
- * 
- * It decides how the run's catalog row introduces it and nothing else:
- * what it may write, what it must prove and whether it lands are the
- * other three values of [`RunPolicy`].
- */
-export const Mode = Schema.Union(
-  Schema.Literal("chat"),
-  Schema.Literal("work"),
-).annotations({ identifier: "Mode" });
-export type Mode = typeof Mode.Type;
-
-/**
- * What a run may do to a file that already exists inside its write
- * domain (`crates/kernel/spec/WriteDomain.lean` §8-78).
- * 
- * It narrows the domain and never widens it: the domain answers where
- * a run may write and what kind of file, this answers whether a write
- * may change a file that is already there. Whether the target exists
- * is the filesystem's fact at the moment of the write, so the check
- * that makes `Create` hold is the writer's atomic create; the rule and
- * its refusal are [`crate::gate::replacing`].
- */
-export const WriteLimit = Schema.Union(
-  Schema.Literal("full"),
-  Schema.Literal("create"),
-).annotations({ identifier: "WriteLimit" });
-export type WriteLimit = typeof WriteLimit.Type;
-
-/**
- * The four values one run works under, chosen when it is dispatched
- * and written into its `run_started` line.
- * 
- * One value because the four always travel together — on the wire, in
- * the ledger and through the dispatch — and are chosen independently,
- * so every combination has a meaning.
- */
-export const RunPolicy = Schema.Struct({
-  admit: AdmissionRequirement,
-  landing: LandingPolicy,
-  mode: Mode,
-  write: WriteLimit,
-}).annotations({ identifier: "RunPolicy" });
-export type RunPolicy = typeof RunPolicy.Type;
 
 /**
  * Where a [`Command::PutShelved`](crate::Command) writes.

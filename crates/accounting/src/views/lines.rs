@@ -70,7 +70,7 @@ pub(crate) fn config_answer(
                 domain,
             },
         ),
-        first: None,
+        first: Some(kernel::consts_policy::CTX_REMINDER_FIRST_PERCENT),
         tuning: wire::TuningDefaults {
             from: wire::ConfigLayer::Default,
             timeout_ms: defaults.timeout_ms,

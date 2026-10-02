@@ -76,7 +76,7 @@ pub use mode::{Admission, Produced, admits};
 pub use offload::{OffloadRecord, OffloadSite, offload, rematerialize};
 pub use pipeline::connector::{CONNECTOR_CAP_BYTES, package_connector, png_picture};
 pub use pipeline::exec::{EXEC_CAP_BYTES, SieveSite, package_exec};
-pub use pipeline::{PackContext, Packaged, SieveRequest, package, pinned_original};
+pub use pipeline::{PackContext, Packaged, SieveRequest, exit_code_in, package, pinned_original};
 pub use prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
 pub use prefix::{PrefixPlan, SegmentCaps, SegmentSource, SourceDoc, build_prefix};
 pub use reminder::{ContextGauge, ContextReading, ContextReminder};

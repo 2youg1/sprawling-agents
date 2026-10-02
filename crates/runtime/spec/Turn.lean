@@ -281,7 +281,7 @@ pub fn pinned_original(result: &serde_json::Value) -> Option<Locator>;
 ```rust
 // runtime::pipeline
 /// 一次 exec 结果里的 `exit_code`；结果里没有码时为 None。
-pub fn exit_code_in(result: &serde_json::Value) -> Option<i64>;
+pub fn exit_code_in(result: &serde_json::Map<String, serde_json::Value>) -> Option<i64>;
 ```
 
 - **写方只有一处，读方也只有一处。** 键名与「有码才写码」的规则住 `tools::exec::outcome` 的 `ending`；读它的是 `exit_code_in`，`package_exec` 交给 sieve 的码与读面答给页面的 `Call.exit_code`（`crates/wire/Spec.lean` §8-76）都经它读。信号停下的、没等到的命令没有码，读出 `None`，不读成某个数。

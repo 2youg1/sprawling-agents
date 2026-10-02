@@ -53,6 +53,15 @@ pub fn pinned_original(result: &serde_json::Value) -> Option<Locator> {
         .map(|account| account.original)
 }
 
+/// The code an `exec` result says its command ended with. The key and
+/// the rule that a code is written only when there is one are
+/// `tools::exec::outcome`'s; this is the one reader of that key, so a
+/// command a signal stopped reads as `None` rather than as a number.
+#[must_use]
+pub fn exit_code_in(result: &serde_json::Map<String, serde_json::Value>) -> Option<i64> {
+    result.get("exit_code")?.as_i64()
+}
+
 /// Attachments beyond this many bytes are cut with the truncation
 /// marker: attachments ride the envelope, they do not become the body.
 pub(crate) const ENVELOPE_ATTACH_MAX_BYTES: usize = 1024;

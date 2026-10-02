@@ -41,6 +41,9 @@ pub(crate) struct CommitFacts {
     chosen: storage::ModelChoice,
     /// The commit the same run announced last before this one.
     previous: Option<wire::CommitAt>,
+    /// The digest of the announcing line's canonical bytes: the B3 a
+    /// person finds that line by (`crates/wire/Spec.lean` §8-78).
+    b3: Option<kernel::B3Hash>,
 }
 
 impl CommitFacts {
@@ -76,7 +79,7 @@ impl CommitFacts {
             previous: self.previous,
             parents: None,
             message: None,
-            b3: None,
+            b3: self.b3,
         }
     }
 }
@@ -173,7 +176,7 @@ impl super::holding::Views {
             })
             .map_or_else(
                 || Prepared::Held(unavailable(format!("Commit({oid})"))),
-                |commit| Prepared::Commits(self.parents_ask(Settled::One(commit))),
+                |commit| Prepared::Commits(self.parents_ask(Settled::One(Box::new(commit)))),
             )
     }
 
@@ -257,6 +260,13 @@ pub(crate) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)
                 effort: by.effort,
             },
             previous: None,
+            // A line read back from the ledger re-serialises to the
+            // bytes the chain verified; one that does not has no B3 to
+            // give, and the answer says so rather than naming another.
+            b3: match record.canonical_line() {
+                Ok(line) => Some(kernel::B3Hash::digest(&line)),
+                Err(_unserialisable) => None,
+            },
         },
     ))
 }
@@ -270,7 +280,7 @@ pub struct CommitsAsk {
 
 /// Which of the two questions about commits was asked.
 enum Settled {
-    One(wire::CommitAnswer),
+    One(Box<wire::CommitAnswer>),
     Page(wire::CommitsAnswer),
 }
 
@@ -281,8 +291,8 @@ impl CommitsAsk {
         let CommitsAsk { city_root, settled } = self;
         match settled {
             Settled::One(mut commit) => {
-                give_git_facts(&city_root, std::slice::from_mut(&mut commit));
-                wire::Answer::Commit(Box::new(commit))
+                give_git_facts(&city_root, std::slice::from_mut(&mut *commit));
+                wire::Answer::Commit(commit)
             }
             Settled::Page(mut page) => {
                 give_git_facts(&city_root, &mut page.commits);

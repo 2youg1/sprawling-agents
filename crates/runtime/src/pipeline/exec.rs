@@ -60,7 +60,7 @@ pub fn package_exec(
         return Ok(outcome);
     }
     let key = CommandKey::of(&crate::tools::parse_arm(call.args.as_map())?);
-    let exit_code = result.get("exit_code").and_then(Value::as_i64);
+    let exit_code = super::exit_code_in(&result);
     let mut text = text_field(&result, "stdout").to_owned();
     let stderr = text_field(&result, "stderr");
     if !stderr.is_empty() {

@@ -71,7 +71,7 @@ impl LedgerAsk {
             opened_at: opened_at(&turns),
             opening: opening(&records),
             closing: closing(&records),
-            worktree: None,
+            worktree: worktree(&records),
             turns,
             run,
         }
@@ -151,9 +151,26 @@ fn opening(records: &[EventRecord]) -> Option<wire::Opening> {
                 goal: started.goal,
                 at: record.t(),
                 dispatched_by: started.dispatched_by,
-                policy: None,
+                policy: started.policy,
             }
         })
+}
+
+/// The name of the tree the run was lent, from its first
+/// `worktree_opened` in the window; a line this build cannot read
+/// answers no name rather than a guessed one.
+#[must_use]
+fn worktree(records: &[EventRecord]) -> Option<String> {
+    let opened = records
+        .iter()
+        .find(|record| record.kind() == EventKind::WorktreeOpened)?;
+    match opened
+        .data()
+        .read::<kernel::event::record::WorktreeOpened>()
+    {
+        Ok(opened) => Some(opened.name),
+        Err(_unreadable) => None,
+    }
 }
 
 /// How the session closed, from the first `run_frozen` in the window.
@@ -288,6 +305,10 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                         pinned: map.get("result").and_then(runtime::pinned_original),
                         ..shown
                     });
+                    call.exit_code = map
+                        .get("result")
+                        .and_then(serde_json::Value::as_object)
+                        .and_then(runtime::exit_code_in);
                     call.answered = Some(record.t());
                     call.timing = answered_timing(call.timing, record);
                 }
