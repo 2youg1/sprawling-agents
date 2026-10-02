@@ -14,6 +14,8 @@
   // per-room index the city panel reads), so drawing it asks the city
   // nothing. The context bar under each row needs a figure the wire does
   // not carry yet, and is drawn when it does (7K, current state).
+  import type { Snippet } from "svelte";
+
   import { heldIn } from "../../core/belief/rooms";
   import type { RunBelief } from "../../core/belief";
   import { say } from "../../core/lang";
@@ -28,9 +30,11 @@
     // Whether the pane is as narrow as the right pane leaves it, which
     // drops the second line and the time.
     readonly narrow: boolean;
+    // The pane's label: a menu that moves it, in the panorama tier.
+    readonly head: Snippet;
   }
 
-  const { here, narrow }: Props = $props();
+  const { here, narrow, head }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -97,8 +101,8 @@
   };
 </script>
 
-<section class="flex min-h-0 flex-col overflow-hidden" aria-label={say($lang, "world_sessions")}>
-  <h2 class="flex h-control shrink-0 items-center text-note text-text-faint">{say($lang, "world_sessions")}</h2>
+<section class="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label={say($lang, "world_sessions")}>
+  {@render head()}
   <div class="min-h-0 flex-1 overflow-y-auto">
     {#each groups as group (group.building)}
       <h3 class="mt-base mb-tight text-note text-text-faint first:mt-0">{group.building}</h3>

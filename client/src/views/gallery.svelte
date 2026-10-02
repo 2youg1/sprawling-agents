@@ -61,6 +61,7 @@
   import Monitored from "./gallery/monitored.svelte";
   import Timed from "./gallery/timed.svelte";
   import Tok from "./gallery/tok.svelte";
+  import Workbench from "./gallery/workbench.svelte";
 
   const { lang } = ui();
 
@@ -88,6 +89,7 @@
   <Hints />
   <FirstRun />
   <Shell />
+  <Workbench />
   <Presences />
   <Conversation />
   <RefusedLine />

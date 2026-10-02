@@ -5075,13 +5075,121 @@
     "en": "running",
     "zh": "运行中"
   },
-  "world_session_pending": {
-    "en": "This session's instruments and timeline appear once the wire carries their figures.",
-    "zh": "这个会话的仪表与时间轴，等线协议带上它们的数字后出现。"
-  },
   "world_open_run": {
     "en": "open the run",
     "zh": "打开 run 页"
+  },
+  "world_place": {
+    "en": "where this work happens",
+    "zh": "这份工作在哪里"
+  },
+  "world_city": {
+    "en": "city",
+    "zh": "城"
+  },
+  "world_files": {
+    "en": "files",
+    "zh": "文件"
+  },
+  "world_arrange": {
+    "en": "arrange {pane}",
+    "zh": "调整「{pane}」"
+  },
+  "world_move_left": {
+    "en": "move left",
+    "zh": "移到左边"
+  },
+  "world_move_right": {
+    "en": "move right",
+    "zh": "移到右边"
+  },
+  "world_divider": {
+    "en": "width of {pane}",
+    "zh": "「{pane}」的宽度"
+  },
+  "world_model": {
+    "en": "model",
+    "zh": "模型"
+  },
+  "world_tokens": {
+    "en": "tokens",
+    "zh": "Token"
+  },
+  "world_tokens_io": {
+    "en": "{input} in · {output} out",
+    "zh": "{input} 入 · {output} 出"
+  },
+  "world_price": {
+    "en": "{input} in / {output} out, as the provider quotes it",
+    "zh": "{input} 入 / {output} 出，供应方报价"
+  },
+  "world_cache": {
+    "en": "cache",
+    "zh": "缓存"
+  },
+  "world_cache_hit": {
+    "en": "{n}% hit",
+    "zh": "命中 {n}%"
+  },
+  "world_cache_read": {
+    "en": "read {n}",
+    "zh": "读 {n}"
+  },
+  "world_cost": {
+    "en": "cost",
+    "zh": "成本"
+  },
+  "world_cost_city": {
+    "en": "city {usd}",
+    "zh": "全城 {usd}"
+  },
+  "world_unreadable": {
+    "en": "could not read",
+    "zh": "读不出"
+  },
+  "world_speed": {
+    "en": "speed",
+    "zh": "速度"
+  },
+  "world_ttft": {
+    "en": "{n} ms TTFT",
+    "zh": "TTFT {n} ms"
+  },
+  "world_speed_turns": {
+    "en": "median of {n} turns",
+    "zh": "{n} 个回合的中位数"
+  },
+  "world_bounds": {
+    "en": "bounds",
+    "zh": "边界"
+  },
+  "world_based_on": {
+    "en": "based on {oid}",
+    "zh": "基于 {oid}"
+  },
+  "world_no_session": {
+    "en": "No session has run in this room yet.",
+    "zh": "这个房间还没有跑过会话。"
+  },
+  "world_timeline": {
+    "en": "timeline",
+    "zh": "时间轴"
+  },
+  "world_timeline_day": {
+    "en": "{day} · UTC",
+    "zh": "{day} · UTC"
+  },
+  "world_ms": {
+    "en": "{n} ms",
+    "zh": "{n} ms"
+  },
+  "world_s": {
+    "en": "{n} s",
+    "zh": "{n} s"
+  },
+  "world_checkpoint": {
+    "en": "checkpoint",
+    "zh": "检查点"
   },
   "world_no_commits": {
     "en": "no commit yet",

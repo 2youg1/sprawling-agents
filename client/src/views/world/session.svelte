@@ -4,62 +4,111 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The chosen session, the middle pane of the panorama workbench
-  // (client-SPEC 7K): its title and state, then the instrument sheet and
-  // the timeline. The sheet and the timeline need six figures the wire
-  // does not carry yet (7K, current state), so today the pane names the
-  // session and says what is missing, with the run's own page one step
-  // away - a pane that drew a sheet of dashes would read as a session
-  // that has nothing in it.
-  import { newestWorking } from "../../core/belief/live";
-  import { heldIn } from "../../core/belief/rooms";
-  import { say } from "../../core/lang";
+  // The chosen session, the panorama workbench's middle pane (client-SPEC
+  // 7K): its name and state, one line saying where it works and which
+  // commit it started from, the instrument sheet, and the timeline.
+  //
+  // The session is `chosen.svelte.ts`'s answer - a picked commit's run, or
+  // the room's newest - and this pane asks that run's rounds once for the
+  // sheet and the timeline both, so the two cannot be reading different
+  // turns. The same question is the one the conversation asks, and
+  // `asking` merges them by content.
+  import type { Snippet } from "svelte";
+
+  import { readAnswer } from "../../core/answered";
+  import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
-  import type { Address } from "../../wire";
+  import type { Address, RoundsAnswer } from "../../wire";
   import Empty from "../parts/empty.svelte";
+  import { commitsIn, pickedCommit, sessionRun } from "./chosen.svelte";
+  import Sheet from "./sheet.svelte";
+  import Timeline from "./timeline.svelte";
 
   interface Props {
     readonly here: Address;
     // The room's name as the conversation calls it.
     readonly title: string;
+    // The pane's label: a menu that moves it, in the panorama tier.
+    readonly head: Snippet;
   }
 
-  const { here, title }: Props = $props();
+  const { here, title, head }: Props = $props();
 
   const u = ui();
   const { lang } = u;
   const belief = u.conn.belief;
 
-  const live = $derived(newestWorking($belief, here));
-  const latest = $derived(live ?? heldIn($belief, here).at(-1));
+  const run = $derived(sessionRun($belief, here));
+  const picked = $derived(pickedCommit(here));
+
+  let rounds = $state<RoundsAnswer | undefined>(undefined);
+  $effect(() => {
+    const at = run;
+    rounds = undefined;
+    if (at === null) return;
+    return u.conn.asking.ask({ rounds: { run: at } }).subscribe((held) => {
+      rounds = held !== undefined && "rounds" in held ? held.rounds : undefined;
+    });
+  });
+
+  const commits = $derived(u.conn.asking.ask(commitsIn(here)));
+  const held = $derived(readAnswer($commits, (answer) => ("commits" in answer ? answer.commits.commits : undefined)));
+
+  // The commit the session's changes are measured from.
+  const base = $derived(rounds?.opened_at ?? null);
+
+  type State = "running" | "waiting" | "frozen" | "unknown";
+
+  const posture = $derived.by((): State => {
+    const doing = run === null ? undefined : $belief.runs[run]?.doing;
+    if (doing === undefined) return rounds?.closing === undefined || rounds.closing === null ? "unknown" : "frozen";
+    switch (doing.kind) {
+      case "frozen":
+        return "frozen";
+      case "waiting":
+        return "waiting";
+      case "unknown":
+      case "thinking":
+      case "calling":
+        return "running";
+    }
+  });
 </script>
 
-<section
-  class="flex min-h-0 flex-col overflow-hidden pb-[calc(var(--spacing-band)+var(--spacing-wide))]"
-  aria-label={say($lang, "world_session")}
->
+<section class="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label={say($lang, "world_session")}>
+  {@render head()}
   <div class="flex shrink-0 items-baseline justify-between gap-pane">
-    <h2 class="text-heading font-heading text-text">{title}</h2>
-    <span class="flex items-center gap-snug text-note text-text-quiet">
-      {#if live !== undefined}
+    <h3 class="truncate text-heading font-heading text-text">{title}</h3>
+    <span class="flex shrink-0 items-center gap-snug text-note text-text-quiet">
+      {#if posture === "running"}
         <span class="size-dot animate-pulse rounded-pill bg-accent" aria-hidden="true"></span>
         {say($lang, "world_running")}
-      {:else if latest !== undefined}
+      {:else if posture === "waiting"}
+        <span class="size-dot rounded-pill bg-alert" aria-hidden="true"></span>
+        {say($lang, "world_waiting")}
+      {:else if posture === "frozen"}
         {say($lang, "world_frozen")}
+      {/if}
+      {#if run !== null}
+        <a class="text-accent hover:text-accent-hover" href={toFragment({ kind: "run", run })}>{say($lang, "world_open_run")}</a>
       {/if}
     </span>
   </div>
-  <p class="shrink-0 text-note text-text-faint">{here}</p>
-  <div class="mt-snug border-t border-edge">
-    <Empty missing="world_session_pending" seat="inset">
-      {#snippet action()}
-        {#if latest !== undefined}
-          <a class="text-note text-accent hover:text-accent-hover" href={toFragment({ kind: "run", run: latest.run })}>
-            {say($lang, "world_open_run")}
-          </a>
-        {/if}
-      {/snippet}
-    </Empty>
-  </div>
+  <p class="shrink-0 truncate text-note text-text-faint">
+    <span class="text-text-quiet">{here}</span>
+    {#if base !== null}
+      · {fill(say($lang, "world_based_on"), { oid: base.slice(0, 7) })}
+    {/if}
+  </p>
+  {#if run === null}
+    <div class="mt-snug border-t border-edge">
+      <Empty missing="world_no_session" seat="inset" />
+    </div>
+  {:else}
+    <div class="mt-snug flex min-h-0 flex-1 flex-col">
+      <Sheet {here} {run} turns={rounds?.turns ?? []} />
+      <Timeline {run} turns={rounds?.turns ?? []} commits={held.kind === "held" ? held.value : []} {picked} />
+    </div>
+  {/if}
 </section>
