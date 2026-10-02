@@ -26,6 +26,7 @@
   import type { Landing, Sent } from "../core/landing";
   import { MAYOR, roomOf } from "../core/route";
   import { forkAsked } from "../core/forking";
+  import { untrack } from "svelte";
   import type { Snippet } from "svelte";
   import type { Address, RoundsAnswer, Seq } from "../wire";
   import { ui } from "../ui";
@@ -38,12 +39,14 @@
   import Showing from "./shared/showing.svelte";
   import Stream from "./talk/stream.svelte";
   import { drawsCalls } from "../core/results";
-  import { anchorAt, footOf } from "./talk/anchoring";
-  import type { Anchoring } from "./talk/anchoring";
+  import Scroller from "./talk/scroller.svelte";
+  import Delivered from "./talk/delivered.svelte";
+  import { NONE, delivered, sent as leftTheBox } from "./talk/delivery";
+  import type { Delivery, Heard } from "./talk/delivery";
   import Inbox from "./talk/inbox.svelte";
   import Waiting from "./talk/waiting.svelte";
   import Failed from "./talk/failed.svelte";
-  import { IDLE, NOT_CONVERSING, hand, settle } from "./talk/handing";
+  import { IDLE, NOT_CONVERSING, hand, newestSeq, settle } from "./talk/handing";
   import type { Handing } from "./talk/handing";
   import type { AxError } from "../wire";
 
@@ -140,11 +143,40 @@
     return found.kind === "elsewhere" && $belief.runs[found.run]?.doing.kind === "frozen" ? { kind: "pending" } : found;
   });
 
+  // Where the words last sent stand (`talk/delivery.ts`): read off the
+  // link and the belief while there is something to settle, and drawn at
+  // the foot of the thread until the run's own thread holds them.
+  const link = u.conn.state;
+  function hear(): Heard {
+    return { live: $link.kind === "live", newest: newestSeq($belief), refusal: $belief.refusal };
+  }
+  let delivery = $state<Delivery>(NONE);
+  $effect(() => {
+    const kind = delivery.kind;
+    if (kind === "none" || kind === "accepted") return;
+    delivery = delivered(untrack(() => delivery), hear());
+  });
+  // Accepted words are drawn only while the run they started is not yet
+  // on screen; a steer is heard by a run already on screen.
+  const echo = $derived(
+    delivery.kind === "none" || (delivery.kind === "accepted" && (sent === null || landing.kind !== "pending"))
+      ? null
+      : delivery,
+  );
+
+  // An empty room: nothing to read and nothing just sent, so the box
+  // stands in the middle. The first send lets it sink at once, before
+  // the city has answered, because the words it shows are already there.
+  const blank = $derived(runs.length === 0 && echo === null);
+
   function send(text: string): boolean {
     const going = live;
     if (going !== undefined) {
       const steered = u.send(steer(going.run, text));
-      if (steered) sent = null;
+      if (steered) {
+        sent = null;
+        delivery = leftTheBox(text, hear());
+      }
       return steered;
     }
     const went = u.send(
@@ -152,6 +184,7 @@
     );
     if (went) {
       sent = sentFrom(address, text, $belief.runs);
+      delivery = leftTheBox(text, hear());
       refused = null;
       handing = hand(text, $belief);
       u.conversing.set({ kind: "waiting", handing });
@@ -186,9 +219,8 @@
     ours = true;
     story = { kind: "forked", at: u.now(), turn: plan.turn, mother: plan.mother };
     picking = false;
-    // The branch is where the person just went: its divider sits at the
-    // foot, above the box, so the view follows there even from far back.
-    anchoring = anchorAt({ kind: "opened" });
+    // The branch is where the person just went.
+    rejoined += 1;
   }
 
   // `/fork` with no argument cannot name a line from inside the verb
@@ -204,32 +236,10 @@
     }
   });
 
-  // Keep the newest words in view while the person is at the foot, and
-  // leave them alone once they have scrolled up to read. The column
-  // grows when answers land as well as when records do, so its size is
-  // what is watched; the judgement itself is `talk/anchoring`'s (ux B1).
-  let scroller = $state<HTMLDivElement | undefined>(undefined);
-  let column = $state<HTMLDivElement | undefined>(undefined);
-  let anchoring = $state<Anchoring>("follow");
-  $effect(() => {
-    const held = column;
-    const box = scroller;
-    if (held === undefined || box === undefined) return;
-    // A room opens at its newest words; only the person's own scroll
-    // moves it to reading back.
-    anchoring = anchorAt({ kind: "opened" });
-    // This write fires the column's scroll event, which measures the foot
-    // again and agrees with follow; the second measurement is expected.
-    box.scrollTop = box.scrollHeight;
-    const watcher = new ResizeObserver(() => {
-      const now = scroller;
-      if (anchoring === "follow" && now !== undefined) now.scrollTop = now.scrollHeight;
-    });
-    watcher.observe(held);
-    return () => {
-      watcher.disconnect();
-    };
-  });
+  // Where the view stands while words arrive is the scroller's
+  // (`talk/scroller.svelte`); this page only sends it to the foot when a
+  // branch it made opens there.
+  let rejoined = $state(0);
 
   // One composer, drawn in the middle of an empty room and in the bar
   // once the room has a thread. Two call sites, one instance at a time:
@@ -296,41 +306,33 @@ with the room's name above it, and the first send lets it sink to its seat
 composition is rebuilt on the way. -->
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]} style:container-type={band ? undefined : "size"}>
   {#if !band}
-    <div
-      bind:this={scroller}
-      class={[
-        "-mx-wide min-h-0 flex-1 overflow-y-auto px-wide [scrollbar-gutter:stable] narrow:mx-0 narrow:px-0 [mask-image:linear-gradient(to_bottom,transparent_0,black_160px)] transition-opacity duration-panel",
-        runs.length === 0 ? "opacity-0" : "",
-      ]}
-      onscroll={(event) => {
-        anchoring = anchorAt({ kind: "scrolled", foot: footOf(event.currentTarget) });
-      }}
-    >
-      <div bind:this={column} class="flex min-h-full w-full flex-col justify-end pt-section pb-section">
-        {#if runs.length > 0}
-          <div class="mb-base flex justify-end"><Showing /></div>
-          {#if drawsCalls($held.showing)}
-            <Divider {earlier} {who} boundary={story} onFork={doFork} onRetry={send} />
-            {#each shown as run (run.run)}
-              <Thread {run} {who} onFork={doFork} onRetry={send} />
-            {/each}
-          {:else}
-            <Stream {shown} {earlier} boundary={story} />
-          {/if}
+    <Scroller empty={blank} {rejoined}>
+      {#if runs.length > 0}
+        <div class="mb-base flex justify-end"><Showing /></div>
+        {#if drawsCalls($held.showing)}
+          <Divider {earlier} {who} boundary={story} onFork={doFork} onRetry={send} />
+          {#each shown as run, at (run.run)}
+            <Thread {run} {who} opens={at === 0} onFork={doFork} onRetry={send} />
+          {/each}
+        {:else}
+          <Stream {shown} {earlier} boundary={story} />
         {/if}
-        <!-- The queue is drawn in an empty room too: "N waiting" links to
-        the mayor's room, which a person who only worked in a building has
-        never spoken in. -->
-        <Waiting />
-        <Inbox addr={address} />
-      </div>
-    </div>
+      {/if}
+      {#if echo !== null}
+        <Delivered delivery={echo} />
+      {/if}
+      <!-- The queue is drawn in an empty room too: "N waiting" links to
+      the mayor's room, which a person who only worked in a building has
+      never spoken in. -->
+      <Waiting />
+      <Inbox addr={address} />
+    </Scroller>
   {/if}
   <div
     class="relative shrink-0 transition-transform duration-page"
-    style:transform={!band && runs.length === 0 ? "translateY(calc(-50cqh + 50% + var(--spacing-margin)))" : undefined}
+    style:transform={!band && blank ? "translateY(calc(-50cqh + 50% + var(--spacing-margin)))" : undefined}
   >
-    {#if !band && runs.length === 0}
+    {#if !band && blank}
       <div class="absolute inset-x-0 bottom-full mb-wide text-center">
         <p class="text-title font-title text-text">{isMayor ? say($lang, "talk_empty_mayor") : who}</p>
         <p class="text-note text-text-faint">{address}</p>

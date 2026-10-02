@@ -77,6 +77,8 @@ export function claims(conversing: Conversing, refusal: AxError, belief: Belief)
   }
 }
 
-function newestSeq(belief: Belief): number {
+// The newest record this page has folded: what "the city wrote something
+// after the send" is measured against, here and in `delivery.ts`.
+export function newestSeq(belief: Belief): number {
   return Object.values(belief.runs).reduce((most, run) => Math.max(most, run.lastSeq), 0);
 }
