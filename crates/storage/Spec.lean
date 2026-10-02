@@ -21,6 +21,7 @@ import crates.storage.spec.Hunks
 import crates.storage.spec.Index
 import crates.storage.spec.Jsonl
 import crates.storage.spec.Jsonl.Barrier
+import crates.storage.spec.Jsonl.Preallocate
 import crates.storage.spec.Jsonl.Verify
 import crates.storage.spec.Queue
 import crates.storage.spec.RealFs
@@ -39,7 +40,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被 `architecture.toml` 模块图的旧锚点与别的规格里的引用锚住，所以不重排：8-6 是空号。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部的末尾，别处引作 `storage D<n>`；§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：逐行检查与链（`spec/Jsonl/Verify.lean`）、屏障与重开（`spec/Jsonl/Barrier.lean`）、已命名对象恒不腐蚀（`spec/Cas.lean`）与范围读（`spec/Cas/Ranges.lean`）、快照与已验证前缀（`spec/Snapshot.lean`）、停机值与证明的波（`spec/ChainAudit.lean`）、工作树的租约（`spec/Worktree.lean`）、接管备树的断点（`spec/Worktree/Trees/Stock.lean`）、回到过去（`spec/Worktree/Back.lean`）、每个错误答哪个码（`spec/Error.lean`）、按 seq 往后读索引（`spec/Index.lean` §8-38）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：逐行检查与链（`spec/Jsonl/Verify.lean`）、屏障与重开（`spec/Jsonl/Barrier.lean`）、预分配段的段尾零（`spec/Jsonl/Preallocate.lean`）、已命名对象恒不腐蚀（`spec/Cas.lean`）与范围读（`spec/Cas/Ranges.lean`）、快照与已验证前缀（`spec/Snapshot.lean`）、停机值与证明的波（`spec/ChainAudit.lean`）、工作树的租约（`spec/Worktree.lean`）、接管备树的断点（`spec/Worktree/Trees/Stock.lean`）、回到过去（`spec/Worktree/Back.lean`）、每个错误答哪个码（`spec/Error.lean`）、按 seq 往后读索引（`spec/Index.lean` §8-38）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -88,6 +89,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 
 - `spec/Jsonl/Verify.lean`：`advance` 收下的一行恰好接上链（`an_accepted_line_extends_the_chain`）；版本超前在一切链检之前答出（`a_line_from_a_newer_writer_is_refused_before_any_chain_check`）；`ig:true` 的未知 kind 照样入链（`an_ignorable_line_joins_the_chain`）；从创世走完而不拒的账本满足 kernel 的 `Chained`（`a_walked_ledger_is_chained`）；`open` 只截掉不带信封的字节，留下的是逐行收下的前缀（`truncation_drops_no_enveloped_line`、`truncation_keeps_a_walked_prefix`）。
 - `spec/Jsonl/Barrier.lean`：句柄答过 `Ok` 的每个 seq 重开后都在（`answered_survives_reopen`），不守屏障有反例（`withoutBarrier`）；从已验证前缀起重开与从头重开相同（`reopenFromVerifiedPrefix`）。
+- `spec/Jsonl/Preallocate.lean`：预分配段尾的零不改变尾段扫描的结论（`trailing_zeros_change_no_scan`），撕裂照样被截（`a_tear_before_zeros_is_still_truncated`），夹在中间的零读作撕裂（`zeros_before_a_line_are_not_the_end`）。
 - `spec/Cas.lean`：临时件名对写者单射时，任何交错的 `put` 与崩溃之后已命名的对象恒不腐蚀（`named_objects_never_corrupt`），只按内容哈希命名有反例（`shared_temporary_names_corrupt_an_object`）；一次 `put` 名下恰是它的字节，二次 `put` 不写（`a_put_names_its_bytes`、`a_second_put_of_the_same_bytes_writes_nothing`）。
 - `spec/Cas/Ranges.lean`：短答即越界的实现与区间规格相同（`a_short_answer_is_out_of_bounds`），答出来的不夹取（`never_clamps`）。
 - `spec/Snapshot.lean`：快照加尾部就是全量折叠（`snapshotPlusTailIsWhole`、`resumeIsWhole`、`twoCutsOnePass`）；带记录的证明等于逐行核对（`cachedVerifyIsStrict`），入口与版本缺一不可（`withoutLinkAcceptsSplice`、`withoutVersionAcceptsStale`）；按波先算摘要，判定不变（`wavesAreCached`、`wavesAreStrict`）。
@@ -179,7 +181,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 
 | 标签 | 分部 |
 |---|---|
-| 8-1 | `crates/storage/spec/Jsonl.lean`、`crates/storage/spec/Jsonl/Verify.lean`、`crates/storage/spec/Jsonl/Barrier.lean` |
+| 8-1 | `crates/storage/spec/Jsonl.lean`、`crates/storage/spec/Jsonl/Verify.lean`、`crates/storage/spec/Jsonl/Barrier.lean`、`crates/storage/spec/Jsonl/Preallocate.lean` |
 | 8-2 | `crates/storage/spec/FaultFs.lean` |
 | 8-3 | `crates/storage/spec/Cas.lean` |
 | 8-36 | `crates/storage/spec/Cas.lean` |
@@ -278,6 +280,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | D21 | 证明并行的只是各段前缀的摘要，链仍按段序判 | `crates/storage/spec/ChainAudit.lean` |
 | D22 | 开账本借用证明写下的记录，不另起一种记录 | `crates/storage/spec/Jsonl.lean` |
 | D23 | 从某个 seq 往后读由索引给，而不由调用方跳过前面的（8-38） | `crates/storage/spec/Index.lean` |
+| D24 | 屏障本身按平台各有一臂，每一臂守同一条持久语义 | `crates/storage/spec/Jsonl/Barrier.lean` |
 -/
 
 /-! ## 13 依赖选型

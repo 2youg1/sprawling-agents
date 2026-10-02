@@ -211,3 +211,20 @@ end Storage.Jsonl.Barrier
 
 `LedgerBroken`→`E_STORAGE_FATAL`：不可定义掉——写与 sync 的失败来自介质；能定义掉的那部分（失败之后再写的一波被下次 open 截掉，却已答了 `Ok`）已由 `Barrier` 定义掉。recovery 是修好盘之后重启，由 open 修段尾。
 -/
+
+/-! D24 屏障本身按平台各有一臂，每一臂守同一条持久语义
+
+**每一臂必须守的不变式**：`append_all` 答 `Ok` 时，这一波的每个字节在掉电之后仍在介质上，与今天 `Vfs::sync_data` 之后的保证相同；一臂若只保证「离开了进程」或「进了磁盘的易失缓存」，它就是一道更弱的屏障，不能入选（D94）。屏障之后才把 `Barrier` 置回 `whole`、才答 `Ok`，这一点对每一臂都不变，所以上面的 `answered_survives_reopen` 对每一臂成立；预分配的那一臂另须守 `crates/storage/spec/Jsonl/Preallocate.lean` 的三条性质（段尾零不改变扫描结论、撕裂照样被截、中间的零读作撕裂），并且写者的位置取剥零之后的长度。
+
+**今天的臂**：三个平台都走 `std::fs::File::sync_data`（`crates/storage/src/real_fs.rs` 的 `Vfs::sync_data`）。标准库在三个平台上把它落到（读自 Rust 1.97.1 的 `library/std/src/sys/fs/unix.rs` 与 `library/std/src/sys/fs/windows.rs`，`File::datasync`）：
+* Windows：`datasync` 调 `fsync`，即 `FlushFileBuffers`；
+* Linux：`fdatasync`；
+* macOS（`target_vendor = "apple"`）：`fcntl(fd, F_FULLFSYNC)`，不是普通的 `fsync`——所以今天在 macOS 上 `sync_data` 已经要求磁盘清空它的写缓存，不是一道更弱的屏障。
+
+**候选臂**（TF2 在 W5 按测量选，每个平台选最快且守住上面不变式的一臂，或保留今天的臂并写明理由）：
+* Windows：`FlushFileBuffers`（今天）；`FILE_FLAG_WRITE_THROUGH`，经 `std::os::windows::fs::OpenOptionsExt::custom_flags` 这个安全接口打开段文件，每次写直达介质，屏障本身变成空操作；两者都可加段文件预分配（`File::set_len`）。
+* Linux：`fdatasync`（今天）；`O_DSYNC`，经 `std::os::unix::fs::OpenOptionsExt::custom_flags`，每次写带数据同步；两者都可加预分配，预分配让 `fdatasync` 不必再写文件长度这条元数据。
+* macOS：`F_FULLFSYNC`（今天）；`F_BARRIERFSYNC` 只给次序不给持久，是更弱的屏障，不入选；预分配可选。
+
+**落选**：一个平台用一臂、其余平台跟着它——三个平台的系统调用与它们的持久语义各不相同，同一个名字在三处是三件事。重新打开它的参数：标准库改变 `File::sync_data` 在某个平台上落到的系统调用（W5 的实现者先在 `rust-toolchain.toml` 钉住的版本上重读上面两个源文件），或某一臂的测量在 p99 上不再胜出。
+-/
