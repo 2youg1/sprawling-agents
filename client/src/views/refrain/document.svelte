@@ -20,6 +20,7 @@
   import Empty from "../parts/empty.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import Unkept from "../parts/unkept.svelte";
+  import { carried, type Carried } from "./carry";
   import Conflict from "./conflict.svelte";
   import { drawnAs } from "./formats/format";
   import HtmlPreview from "./formats/html.svelte";
@@ -71,11 +72,17 @@
     const editing = session.editing;
     const base = session.positions;
     if (editing !== null && base !== null) {
-      // Only a Markdown preview has blocks to carry a place to and from.
-      if (markdown && (reading === "source" || reading === "diff") && next === "preview") {
-        anchor = base.bytes(editing.toBaseline(editing.cursor()));
-      } else if (markdown && reading === "preview" && (next === "source" || next === "diff")) {
-        editing.reveal(editing.fromBaseline(base.editorAt(top)));
+      const place = { cursor: editing.toBaseline(editing.cursor()), top: editing.toBaseline(editing.top()) };
+      const carry: Carried = markdown ? carried(reading, next, place, top) : { kind: "nothing" };
+      switch (carry.kind) {
+        case "preview_at":
+          anchor = base.bytes(carry.offset);
+          break;
+        case "editor_at":
+          editing.reveal(editing.fromBaseline(base.editorAt(carry.byte)));
+          break;
+        case "nothing":
+          break;
       }
       editing.diffing(next === "diff");
     }
