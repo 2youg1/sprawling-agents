@@ -5354,6 +5354,8 @@ pub(crate) fn newest(item: &str) -> wire::DoctorUpstream;   // 不失败、不�
 
 ## 8-139 远程门进城：门的看守、远程监听与逐帧授权（`bin::outside`，形状：adapter；crates/remote_access/Spec.lean §8-10、§8-11，`crates/kernel/Spec.lean` §8-81，`crates/wire/Spec.lean` §8-65、§8-66）
 
+逐帧授权（`Conduit::judge`）必须守住的性质的权威是 `crates/sprawling/spec/Outside/Conduit.lean`：到城的只有放行的帧，只看的设备从不转发动手的动词，读不懂的帧与会话已结束时都不到城；谁能做什么的权威是 `crates/remote_access/spec/Door.lean`。本节是门的看守、监听与设备表的接口与做法。
+
 一个人把城留在家里出门，要从手机上看城、答提问、叫停。`remote_access` 判谁能进、持有密码学，但它不认识帧、不开端口；这一节是只有本二进制做得了的那一半。
 
 ```rust
