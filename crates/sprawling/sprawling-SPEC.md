@@ -3809,6 +3809,8 @@ impl kernel::Tool for Kept {
 
 ## 8-88 开城的次序：先占端口，再写第一行，最后才说 running（`bin::assembly::listening`、`main::city`）
 
+这个次序必须守住的性质的权威是 `crates/sprawling/spec/Assembly/Listening.lean`：锁之前的拒绝一行不写，横幅只在 `listen` 成功之后印，第二个进程在写任何东西之前被拒；本节是接口、次序的理由与被否的方案。
+
 **原因**：一座城曾经可以同时有两个写者。第二个进程对同一座城执行 `serve` 时，写者线程在 bind 之前就已经打开；bind 失败后它照常收口，往账本里写了一行「人主动关城」的 handoff。那是没有人做过的事，而且是一次分叉：两个进程各自用同一个 `prev` 写了同一个 seq。`sprawling is running.` 这行横幅则在这一切之前就印了出来。
 
 **次序**，`assembly::listen` 是它唯一的定义：

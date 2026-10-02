@@ -15,6 +15,8 @@
 //! The order is sprawling-SPEC.md 8-88, and this file is its one
 //! definition: a port another process holds is refused before a writer
 //! exists, so a refused serve leaves the Ledger exactly as it found it.
+//! The properties of that order are proved in
+//! `crates/sprawling/spec/Assembly/Listening.lean`.
 
 use std::sync::Arc;
 
