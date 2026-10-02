@@ -32,7 +32,6 @@
 )]
 
 use std::io::{BufRead, BufReader, Write};
-use std::net::{Ipv4Addr, TcpListener};
 use std::path::Path;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver};
@@ -208,7 +207,8 @@ async fn exchange(
         .sealer
         .seal(&Payload::Frame(text).to_bytes())
         .unwrap();
-    send(socket, sealed).await;
+    // A relay that dropped the session is a frame nobody answered.
+    socket.send(Message::Binary(sealed.into())).await.ok()?;
     let deadline = tokio::time::Instant::now().checked_add(PATIENCE)?;
     loop {
         let message = tokio::time::timeout_at(deadline, socket.next())
@@ -316,19 +316,14 @@ struct Served {
 
 impl Served {
     fn start(city_root: &Path) -> Served {
-        // A port of its own rather than `:0`: the remote door's relay
-        // reaches the city at the address `serve` was given
-        // (sprawling-SPEC.md 8-151).
-        let port = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
-            .unwrap()
-            .local_addr()
-            .unwrap()
-            .port();
+        // `:0`, so the relay reaches the city only at the port its
+        // listener was given, never at the one `serve` was asked for
+        // (`crates/wire/Spec.lean` §8-46, wire D16).
         // boundary-ok: the remote door is opened from the served city's console, so the check starts the city it reaches (sprawling-SPEC.md 8-151)
         let mut child = Command::new(env!("CARGO_BIN_EXE_sprawling"))
             .arg("serve")
             .arg(city_root)
-            .arg(format!("127.0.0.1:{port}"))
+            .arg("127.0.0.1:0")
             .arg("--console")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
