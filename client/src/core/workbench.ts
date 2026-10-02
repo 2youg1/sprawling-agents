@@ -44,22 +44,63 @@ export type Divider = 0 | 1;
 
 export type Side = "left" | "right";
 
+// The most columns the pane before `divider` may take: the pair it
+// shares with the pane after, less the narrowest that one may be.
 export function widest(bench: Workbench, divider: Divider): number {
-  return NARROWEST;
+  const [before, after] = pairAt(bench, divider);
+  return before.span + after.span - NARROWEST;
 }
 
+// The pane before `divider` set to `span` columns, rounded to a column
+// line and clamped so neither pane of the pair is narrower than
+// `NARROWEST`; the pane after takes the rest of the pair, so the third
+// pane never moves.
 export function resized(bench: Workbench, divider: Divider, span: number): Workbench {
-  return bench;
+  const [before, after] = pairAt(bench, divider);
+  const pair = before.span + after.span;
+  const held = Math.min(widest(bench, divider), Math.max(NARROWEST, Math.round(span)));
+  const next: readonly [Column, Column] = [
+    { pane: before.pane, span: held },
+    { pane: after.pane, span: pair - held },
+  ];
+  return divider === 0 ? [next[0], next[1], bench[2]] : [bench[0], next[0], next[1]];
 }
 
+// `pane` swapped with its neighbour on `side`, its width going with it.
+// A pane already at that edge stays where it is.
 export function moved(bench: Workbench, pane: Pane, side: Side): Workbench {
+  const at = bench.findIndex((column) => column.pane === pane);
+  // The left pane of the pair that trades places.
+  const left = side === "left" ? at - 1 : at;
+  if (left === 0) return [bench[1], bench[0], bench[2]];
+  if (left === 1) return [bench[0], bench[2], bench[1]];
   return bench;
 }
 
-export function spelledWorkbench(bench: Workbench): string {
-  return "";
+function pairAt(bench: Workbench, divider: Divider): readonly [Column, Column] {
+  return divider === 0 ? [bench[0], bench[1]] : [bench[1], bench[2]];
 }
 
+// The row a browser keeps: each pane and its width, left to right.
+export function spelledWorkbench(bench: Workbench): string {
+  return bench.map((column) => `${column.pane}:${String(column.span)}`).join(" ");
+}
+
+const PANES: readonly Pane[] = ["sessions", "session", "commits"];
+
+// A kept row read back, or the shipped arrangement when the row is
+// anything `spelledWorkbench` could not have written: a guess this
+// build cannot read is dropped rather than repaired.
 export function readWorkbench(raw: string | null): Workbench {
-  return WORKBENCH;
+  const words = (raw ?? "").split(" ");
+  const read = words.flatMap((word): Column[] => {
+    const [name, width] = word.split(":");
+    const pane = PANES.find((each) => each === name);
+    const span = Number(width);
+    return pane === undefined || !Number.isInteger(span) || span < NARROWEST ? [] : [{ pane, span }];
+  });
+  const [first, second, third] = read;
+  if (words.length !== 3 || first === undefined || second === undefined || third === undefined) return WORKBENCH;
+  const whole = new Set(read.map((column) => column.pane)).size === 3;
+  return whole && first.span + second.span + third.span === COLUMNS ? [first, second, third] : WORKBENCH;
 }

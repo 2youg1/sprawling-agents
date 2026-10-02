@@ -310,7 +310,7 @@ function writePreferences(rows: Rows, next: Preferences): void {
 export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor {
   const held = writable<Preferences>(readPreferences(rows, browserLang));
   const keeper = writable<Keeper>("browser");
-  const workbench = writable<Workbench>(readWorkbench(null));
+  const workbench = writable<Workbench>(readWorkbench(rows.getItem(ROWS.workbench)));
   // One write path for every change, the city's answer included: the
   // cache and the store move together, so a reader that redraws and a
   // reader that reloads the page never see two different records.
@@ -388,8 +388,9 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
       rows.setItem(ROWS.cityFolder, next.folder);
     },
     workbench,
-    setWorkbench() {
-      return undefined;
+    setWorkbench(next) {
+      rows.setItem(ROWS.workbench, spelledWorkbench(next));
+      workbench.set(next);
     },
   };
 }
