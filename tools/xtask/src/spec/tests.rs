@@ -36,6 +36,17 @@ fn the_skeleton_opens_with_the_notice_and_numbers_the_seventeen_sections_in_orde
 /// Everything the gate reports on a fixture, as `location: violation`,
 /// sorted; the fixture is removed before anything is asserted.
 fn judged(root: &std::path::Path) -> Result<Vec<String>, String> {
+    for (path, text) in [
+        ("architecture.toml", "module = []\n"),
+        (
+            "tools/xtask/budgets.toml",
+            "[spec_parts_without_theorem]\npinned = 0\n\n[rust_paths_unresolved]\npinned = 0\n",
+        ),
+    ] {
+        if !root.join(path).exists() {
+            crate::root::fixture::write(root, path, text);
+        }
+    }
     let found = super::check(root);
     std::fs::remove_dir_all(root).unwrap();
     let mut texts: Vec<String> = found
@@ -170,6 +181,113 @@ fn the_checker_has_one_specification_that_imports_its_parts_and_never_the_checke
                 .to_owned(),
             "tools/adversary: tools/adversary holds tools/adversary/adversary-SPEC.md and \
              tools/adversary/Spec.lean"
+                .to_owned(),
+        ])
+    );
+}
+
+/// The four classes, read off the text: a theorem in a comment is prose,
+/// a head with no binder is closed, and a check is derived only from a
+/// Rust file that holds a test and names the part and the theorem.
+#[test]
+fn a_part_is_text_closed_quantified_or_checked() {
+    use super::theorems::Class;
+    let files = |pairs: &[(&str, &str)]| -> std::collections::BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(path, text)| ((*path).to_owned(), (*text).to_owned()))
+            .collect()
+    };
+    let tree = super::ratchet::Tree {
+        lean: files(&[
+            (
+                "a/spec/T.lean",
+                "-- theorem fake : x\n/-! theorem prose : y -/\n",
+            ),
+            ("a/spec/C.lean", "theorem two : 1 + 1 = 2 := rfl\n"),
+            (
+                "a/spec/Q.lean",
+                "theorem keeps (n : Nat) : n = n := rfl\n\
+                 theorem all : ∀ n : Nat, n = n := fun _ => rfl\n",
+            ),
+            (
+                "a/spec/D.lean",
+                "@[simp] private theorem grows {s : S}\n    (h : s.ok) : P s := by\n  simp\n",
+            ),
+            ("tools/adversary/src/X.lean", ""),
+            ("tools/adversary/spec/Y.lean", ""),
+        ]),
+        rust: files(&[
+            ("a/tests.rs", "#[test]\nfn f() {} // a/spec/D.lean grows\n"),
+            ("a/doc.rs", "// a/spec/Q.lean keeps\n"),
+        ]),
+        markdown: files(&[]),
+    };
+    let classes: Vec<(String, Class)> = super::ratchet::classes(&tree).into_iter().collect();
+    assert_eq!(
+        classes,
+        vec![
+            ("a/spec/C.lean".to_owned(), Class::ClosedOnly),
+            ("a/spec/D.lean".to_owned(), Class::QuantifiedChecked),
+            ("a/spec/Q.lean".to_owned(), Class::QuantifiedUnchecked),
+            ("a/spec/T.lean".to_owned(), Class::TextOnly),
+            ("tools/adversary/spec/Y.lean".to_owned(), Class::TextOnly),
+        ]
+    );
+}
+
+/// Both ratchets on one fixture: the stateful module's two parts prove
+/// nothing and exceed their pin, so each is named; three backticked paths
+/// name nothing, below a pin of five, so the pin is asked to fall. A
+/// re-export, a crate-root item, a variant, a module named with a note,
+/// a path outside the workspace and the history resolve or are not read.
+#[test]
+fn the_two_counts_are_held_to_their_pins() {
+    let root = crate::root::fixture::relocated("spec-ratchet");
+    let write = |path: &str, text: &str| crate::root::fixture::write(&root, path, text);
+    write("tools/k/k-SPEC.md", "# k\n");
+    write("crates/j/Spec.lean", "");
+    write(
+        "architecture.toml",
+        "module = [\n\
+         { name = \"j::machine (port)\", file = \"crates/j/src/machine.rs\", owns = \"m\", \
+         shape = \"state machine\", status = \"built\", spec = \"crates.j.spec.Machine\" },\n\
+         { name = \"j::plain\", file = \"crates/j/src/plain.rs\", owns = \"p\", \
+         shape = \"decision\", status = \"planned\", spec = \"crates.j.spec.Plain\" },\n\
+         ]\n",
+    );
+    write(
+        "tools/xtask/budgets.toml",
+        "[spec_parts_without_theorem]\npinned = 1\n\n[rust_paths_unresolved]\npinned = 5\n",
+    );
+    write("crates/j/src/lib.rs", "pub use machine::Phase;\n");
+    write(
+        "crates/j/src/machine.rs",
+        "pub(crate) enum Phase {\n    Idle,\n}\npub(crate) use other::{Thing, More};\n\
+         /// see `j::plain::Gone`\n",
+    );
+    write(
+        "crates/j/spec/Machine.lean",
+        "/-! `j::machine::Phase::Idle`, `j::gone::X()` and `j::machine::Missing` -/\n",
+    );
+    write("crates/j/spec/Machine/Step.lean", "/-! steps -/\n");
+    write("crates/j/spec/Plain.lean", "/-! plain -/\n");
+    write(
+        "docs/a.md",
+        "`j::machine::Thing`, `j::Phase::Idle`, `std::mem::swap` and `j::machine`\n",
+    );
+    write("CHANGELOG.md", "`j::gone`\n");
+    assert_eq!(
+        judged(&root),
+        Ok(vec![
+            "crates/j/spec/Machine.lean: [spec_parts_without_theorem] counts 2 against a pin of \
+             1; this is one of them"
+                .to_owned(),
+            "crates/j/spec/Machine/Step.lean: [spec_parts_without_theorem] counts 2 against a \
+             pin of 1; this is one of them"
+                .to_owned(),
+            "tools/xtask/budgets.toml: [rust_paths_unresolved]: [rust_paths_unresolved] counts \
+             3, below its pin of 5"
                 .to_owned(),
         ])
     );

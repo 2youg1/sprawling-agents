@@ -22,7 +22,10 @@ use crate::members;
 use crate::report::{Violation, XtaskError};
 
 mod effective;
+mod ratchet;
+mod rustpath;
 mod source;
+mod theorems;
 
 /// The checker's directory. Its own specification sits in it, beside the
 /// checker, and is held to the rules a crate's is (tools/xtask/Spec.lean
@@ -53,12 +56,14 @@ const SECTIONS: [&str; 17] = [
 
 /// The `spec` gate: one effective specification per package, no prose
 /// naming a SPEC the tree lacks, the import discipline, no `sorry`,
-/// `admit` or `axiom`, and every path a specification cites on disk.
+/// `admit` or `axiom`, every path a specification cites on disk, and
+/// the two counts that may only fall.
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
     effective::one_per_package(root, &mut violations)?;
     effective::no_dangling_names(root, &mut violations)?;
     source::check(root, &mut violations)?;
+    ratchet::check(root, &mut violations)?;
     Ok(violations)
 }
 
