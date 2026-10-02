@@ -52,7 +52,7 @@ const BUILDING_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
   "building_created", "building_configured", "building_removed", "roadmap_claimed", "roadmap_finished",
   "roadmap_released", "roadmap_split", "roadmap_blocked", "pursuit_changed",
   "checkpoint_committed", "handoff_written", "run_started", "run_frozen",
-  "pr_merged", "asset_archived", "governed_document_written", "document_written",
+  "pr_merged", "asset_archived", "governed_document_written", "document_written", "rules_changed",
 ]);
 
 // What moves the proposal cards open on a document: a card offered,
@@ -103,6 +103,15 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return reached(BUILDING_MOVED.has(kind));
     case "proposals":
       return reached(PROPOSALS_MOVED.has(kind));
+    // An identity card lands as a governed document written, and the
+    // answer read back after it is the save's receipt.
+    case "identity":
+      return reached(kind === "governed_document_written");
+    // A layer moves when its file is written: the city's own and a
+    // building's through `rules_changed`, a building's settings through
+    // `building_configured`.
+    case "config":
+      return reached(kind === "rules_changed" || kind === "building_configured");
     default:
       return "none";
   }
