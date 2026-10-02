@@ -48,7 +48,7 @@
 </script>
 
 <!-- One width: from the window's left edge to the shell's right silver
-  line (12-24), so its tree stands where the sessions pane stands and its
+  line (client D24), so its tree stands where the sessions pane stands and its
   group where the conversation stands; the whole window on one column.
   The arrival from the left is `.settings-panel` in `theme.css`, a
   transition from its `@starting-style`. -->

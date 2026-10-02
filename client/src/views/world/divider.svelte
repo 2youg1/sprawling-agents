@@ -15,7 +15,7 @@
   // The lines it snaps to are the shell's own: the world layer stands on
   // them through `subgrid`, so the column a drag lands on is a line every
   // other region of the page stands on too, the two silver lines among
-  // them. The columns are not equal (12-24), so the lines are read off
+  // them. The columns are not equal (client D24), so the lines are read off
   // the shell's grid as the engine laid it out rather than counted.
   import { fill, say } from "../../core/lang";
   import { NARROWEST, WORKBENCH, resized, widest } from "../../core/workbench";

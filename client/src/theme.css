@@ -541,7 +541,7 @@
    * drawing, so a building on the map and the panel beside it have one
    * curvature. 1.6 is the edge keys' corner the person approved. */
   --corner-exponent: 1.6;
-  /* The one proportion the shell is cut by (client-SPEC 12-24): main
+  /* The one proportion the shell is cut by (client D24): main
    * against what stands beside it is the silver ratio, 1 : √2, the
    * person's ruling over an evenly divided grid. Every silver line on
    * every page is derived from this number and the shell's width, in
@@ -860,7 +860,7 @@
   }
 }
 
-/* Main's silver lines on a page that is not the conversation (12-24): a
+/* Main's silver lines on a page that is not the conversation (client D24): a
  * middle column exactly as wide as the shell's middle part, and the two
  * sides sharing the rest. A page is centred in the shell, so the middle
  * column's edges stand on the shell's two silver lines, the lines the

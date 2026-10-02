@@ -45,7 +45,7 @@
 <!-- A container cannot answer queries about itself, so the frame that is
   measured and the row that is laid out are two boxes. The tree is as
   wide as the shell's left silver part, less half a gutter, so the group
-  beside it starts on the line the conversation starts on (12-24). -->
+  beside it starts on the line the conversation starts on (client D24). -->
 <div class="@container/sheet h-full min-h-0">
 <div class="flex h-full min-h-0 @max-lg/sheet:flex-col @max-lg/sheet:overflow-y-auto">
   <div

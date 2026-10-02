@@ -163,7 +163,7 @@
 {/snippet}
 
 <!-- Three columns once the page holds them, on Main's silver lines
-(12-24): the building a server is added for in the left part, the
+(client D24): the building a server is added for in the left part, the
 servers it has and the form that adds one in the middle part, where the
 conversation stands, and the two other ways in - Composio and the
 desktop - in the right part. Each section is a rule and a small name

@@ -177,7 +177,7 @@
 </script>
 
 <!-- One column, standing in the middle part of the shell's silver cut
-(12-24), where the conversation stands: the steps, their rules and the
+(client D24), where the conversation stands: the steps, their rules and the
 fields inside them share its two edges, so the page has one right edge
 rather than one per kind of row. -->
 <div class="flex min-w-0 flex-1 flex-col @min-[64rem]:silver-columns">

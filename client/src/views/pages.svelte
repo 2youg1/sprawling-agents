@@ -6,9 +6,9 @@
 <script lang="ts">
   // Every page but the conversation, between the first column, which
   // the edge keys stand at the foot of, and the last one, which mirrors
-  // it (client-SPEC 4-33): a page is centred on the screen as the
+  // it (docs/frontend-method.md §4-33): a page is centred on the screen as the
   // conversation is, and a page in columns stands them on the same
-  // silver lines (`silver-columns`, 12-24). The conversation page lays
+  // silver lines (`silver-columns`, client D24). The conversation page lays
   // itself out by the tier and is not here (`workspace.svelte`).
   import type { View } from "../core/route";
   import { say } from "../core/lang";

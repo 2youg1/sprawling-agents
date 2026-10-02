@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts" module>
-  // The conversation page as the shell lays it out (client-SPEC 4-33, 7H,
+  // The conversation page as the shell lays it out (docs/frontend-method.md §4-33, §7H,
   // 7K): the world layer, the conversation and the right pane, each placed
   // on the column lines of the shell's one grid by the tier the page is
   // in, by whether the right pane is open and, in the panorama tier, by
@@ -32,7 +32,7 @@
 
   export type RightSide = "open" | "closed";
 
-  // The shell's silver cut (12-24): the middle part, which the
+  // The shell's silver cut (client D24): the middle part, which the
   // conversation and the chosen session stand in, and the two side parts.
   const MIDDLE: Lines = [4, 10];
   const LEFT: Lines = [1, 4];
@@ -89,7 +89,7 @@
     };
   }
 
-  // One column (client-SPEC 4-52): the conversation alone, or in the
+  // One column (client/Spec.lean §4-52): the conversation alone, or in the
   // panorama tier the world as a sheet with the conversation as its band
   // under it; the right side, when open, is a sheet over both. No region
   // stands on a line of its own.
@@ -155,7 +155,7 @@
   const uid = $props.id();
 
   // A shell narrower than the grid's columns can be read in is one
-  // column (`theme.css` decides, 12-30): the conversation alone, the world
+  // column (`theme.css` decides, client D30): the conversation alone, the world
   // and the right side as sheets over it (4-52).
   let columns = $state<Columns>("twelve");
   const narrow = $derived(columns === "one");
