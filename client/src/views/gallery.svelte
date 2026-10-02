@@ -37,6 +37,7 @@
   import Conversation from "./gallery/conversation.svelte";
   import Filed from "./gallery/filed.svelte";
   import FirstRun from "./gallery/first_run.svelte";
+  import Fmt from "./gallery/fmt.svelte";
   import Followed from "./gallery/followed.svelte";
   import Hints from "./gallery/hints.svelte";
   import Inspected from "./gallery/ins.svelte";
@@ -125,4 +126,5 @@
   <Streamed />
   <Tok />
   <Rfr />
+  <Fmt />
 </div>

@@ -26,11 +26,13 @@
     readonly building: Address;
     readonly session: Session;
     readonly reading: Reading;
-    readonly markdown: boolean;
+    // Whether the document has a preview: Markdown, read by the city, or
+    // HTML, drawn by this browser.
+    readonly previewed: boolean;
     readonly onPick: (reading: Reading) => void;
   }
 
-  const { at, building, session, reading, markdown, onPick }: Props = $props();
+  const { at, building, session, reading, previewed, onPick }: Props = $props();
 
   const lang = ui().lang;
 
@@ -45,7 +47,7 @@
     { value: "versions", key: "refrain_versions" },
   ];
   const options = $derived(
-    READINGS.filter((each) => markdown || each.value !== "preview").map((each) => ({
+    READINGS.filter((each) => previewed || each.value !== "preview").map((each) => ({
       value: each.value,
       label: say($lang, each.key),
     })),
@@ -99,7 +101,10 @@
     {/if}
   </div>
   <div class="flex shrink-0 items-center gap-snug">
-    <Segmented label={say($lang, "refrain_reading")} {options} held={reading} {onPick} />
+    {#if session.file?.kind === "text"}
+      <!-- A file that is not text has no source, diff or versions to read. -->
+      <Segmented label={say($lang, "refrain_reading")} {options} held={reading} {onPick} />
+    {/if}
     <Button
       label={say($lang, "refrain_save")}
       tone="quiet"

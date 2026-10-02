@@ -951,6 +951,106 @@
     "en": "Control character",
     "zh": "控制字符"
   },
+  "format_tool_browser": {
+    "en": "this browser",
+    "zh": "本浏览器"
+  },
+  "format_version": {
+    "en": "version {version}",
+    "zh": "版本 {version}"
+  },
+  "format_from_draft": {
+    "en": "drawn from the unsaved draft",
+    "zh": "按未保存的草稿画出"
+  },
+  "format_html_settings": {
+    "en": "scripts off · outside resources not read · links do not open",
+    "zh": "脚本关闭 · 不读外部资源 · 链接不打开"
+  },
+  "format_pdf_settings": {
+    "en": "Adobe CMaps · fonts the file leaves out drawn with the device's own faces",
+    "zh": "Adobe CMap · 文件没带的字体用设备自带的字体画"
+  },
+  "format_width": {
+    "en": "{width} px wide",
+    "zh": "宽 {width} px"
+  },
+  "format_docx_settings": {
+    "en": "approximate layout · tracked changes shown as their result · comments not shown",
+    "zh": "近似版式 · 修订按接受后的结果显示 · 不显示批注"
+  },
+  "format_no_bytes": {
+    "en": "The city does not send a file's bytes to a page yet, so this {format} is not drawn here. The file itself is unchanged.",
+    "zh": "城还不把文件的字节交给页面，所以这份 {format} 不在这里画出。文件本身不动。"
+  },
+  "format_reading": {
+    "en": "reading {format}…",
+    "zh": "正在读 {format}…"
+  },
+  "format_locked": {
+    "en": "This PDF is protected by a password. The page does not open it; the file itself is unchanged.",
+    "zh": "这份 PDF 有密码保护，页面不打开它；文件本身不动。"
+  },
+  "format_broken": {
+    "en": "This {format} could not be read ({reason}). The file itself is unchanged.",
+    "zh": "读不出这份 {format}（{reason}）。文件本身不动。"
+  },
+  "format_zip_too_large": {
+    "en": "it unpacks to more than {limit}",
+    "zh": "解压后超过 {limit}"
+  },
+  "format_zip_shape": {
+    "en": "it is not a ZIP archive this page reads",
+    "zh": "它不是本页读得懂的 ZIP 包"
+  },
+  "format_pages": {
+    "en": "{n} pages",
+    "zh": "{n} 页"
+  },
+  "format_page": {
+    "en": "page {n} of {total}",
+    "zh": "第 {n} 页，共 {total} 页"
+  },
+  "format_page_mark": {
+    "en": "page {n}",
+    "zh": "第 {n} 页"
+  },
+  "format_no_text": {
+    "en": "pages with no text layer are not compared and not read (a scan or drawn letters; no OCR is done): {pages}",
+    "zh": "没有文字层的页不比较也不朗读（扫描件或画出的字；不做 OCR）：{pages}"
+  },
+  "format_docx_revisions": {
+    "en": "{n} tracked changes, shown as their result",
+    "zh": "{n} 处修订，按结果显示"
+  },
+  "format_docx_comments": {
+    "en": "{n} comments, not shown",
+    "zh": "{n} 条批注，未显示"
+  },
+  "format_docx_objects": {
+    "en": "{n} embedded objects, not shown",
+    "zh": "{n} 个嵌入对象，未显示"
+  },
+  "format_compare_pdf": {
+    "en": "compared: the text of each page in reading order; layout, pictures and fonts are not compared",
+    "zh": "比较的是每页按阅读顺序的文字；版式、图片与字体不比较"
+  },
+  "format_compare_docx": {
+    "en": "compared: the body's paragraphs as their tracked changes leave them; headers, footers, comments and objects are not compared",
+    "zh": "比较的是正文段落按修订接受后的文字；页眉、页脚、批注与对象不比较"
+  },
+  "format_compared_versions": {
+    "en": "from {from} to {to}",
+    "zh": "从 {from} 到 {to}"
+  },
+  "format_compare_broken": {
+    "en": "One of the two versions could not be read, so they are not compared.",
+    "zh": "两版里有一版读不出，所以不比较。"
+  },
+  "format_compare_same": {
+    "en": "the two versions read the same text",
+    "zh": "两版读出的文字相同"
+  },
   "gallery_tip_tall": {
     "en": "This hint is deliberately long. It opens above the control, and where the window has no room above it the engine drops it below instead; a short hint halfway down a page never asks for that, so the fallback goes unseen. Read where this box lands: above the button means there was room, below it means the flip happened, and a box hanging off the top of the window means neither branch took.",
     "zh": "这条提示故意写得很长。它开在控件上方；窗口上方腾不出位置时，引擎改把它放到下方。页面中段的一条短提示从不提出这个要求，那条回退分支也就无人看见。看这个框落在哪里：在按钮上方说明位置够用，在下方说明翻转发生了，而挂在窗口上缘之外说明两条分支都没有生效。"

@@ -13,18 +13,20 @@
   // history and an input method's composition all survive a change of
   // reading (client-SPEC 7N).
   import { fill, say } from "../../core/lang";
-  import type { Key } from "../../core/lang";
   import { kib } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, B3Hash } from "../../wire";
   import Empty from "../parts/empty.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import Conflict from "./conflict.svelte";
+  import { drawnAs } from "./formats/format";
+  import HtmlPreview from "./formats/html.svelte";
+  import Opaque from "./formats/opaque.svelte";
   import Head from "./head.svelte";
   import Preview from "./preview.svelte";
   import { Session } from "./session.svelte";
   import type { Locked } from "./session.svelte";
-  import { short, type Reading } from "./reading";
+  import { phrasesIn, short, type Reading } from "./reading";
   import Versions from "./versions.svelte";
 
   interface Props {
@@ -50,27 +52,11 @@
 
   const name = $derived(at.slice(at.lastIndexOf("/") + 1));
   const markdown = $derived(session.file?.kind === "text" && session.file.gathering.format === "markdown");
+  // An HTML text is previewed by this browser rather than by the city
+  // (client-SPEC 4-54).
+  const html = $derived(session.file?.kind === "text" && drawnAs(at) === "html");
 
-  // CodeMirror's own words, in the page's language (client-SPEC 12-23).
-  const PHRASES: Readonly<Record<string, Key>> = {
-    Find: "refrain_cm_find",
-    Replace: "refrain_cm_replace",
-    next: "refrain_cm_next",
-    previous: "refrain_cm_previous",
-    all: "refrain_cm_all",
-    "match case": "refrain_cm_match_case",
-    regexp: "refrain_cm_regexp",
-    "by word": "refrain_cm_by_word",
-    replace: "refrain_cm_replace_one",
-    "replace all": "refrain_cm_replace_all",
-    close: "refrain_cm_close",
-    "current match": "refrain_cm_current",
-    "on line": "refrain_cm_on_line",
-    "replaced $ matches": "refrain_cm_replaced",
-    "replaced match on line $": "refrain_cm_replaced_line",
-    "Control character": "refrain_cm_control",
-  };
-  const phrases = $derived(Object.fromEntries(Object.entries(PHRASES).map(([phrase, key]) => [phrase, say($lang, key)])));
+  const phrases = $derived(phrasesIn($lang));
 
   // Switching reading keeps the place: the source's cursor becomes the
   // preview's first block, and the preview's first block the cursor.
@@ -78,9 +64,10 @@
     const editing = session.editing;
     const base = session.positions;
     if (editing !== null && base !== null) {
-      if ((reading === "source" || reading === "diff") && next === "preview") {
+      // Only a Markdown preview has blocks to carry a place to and from.
+      if (markdown && (reading === "source" || reading === "diff") && next === "preview") {
         anchor = base.bytes(editing.toBaseline(editing.cursor()));
-      } else if (reading === "preview" && (next === "source" || next === "diff")) {
+      } else if (markdown && reading === "preview" && (next === "source" || next === "diff")) {
         editing.reveal(editing.fromBaseline(base.editorAt(top)));
       }
       editing.diffing(next === "diff");
@@ -111,7 +98,7 @@
     {building}
     {session}
     {reading}
-    {markdown}
+    previewed={markdown || html}
     onPick={pick}
   />
   {#if session.locked !== null && session.file?.kind === "text"}
@@ -152,7 +139,7 @@
   {:else if session.file?.kind === "unreadable"}
     <p class="p-pane text-note text-text-quiet">{fill(say($lang, "refrain_unreadable"), { reason: session.file.reason })}</p>
   {:else if session.file?.kind === "opaque"}
-    <p class="p-pane text-note text-text-quiet">{fill(say($lang, "file_binary"), { kib: kib(session.file.bytes) })}</p>
+    <Opaque path={at} version={session.file.version} bytes={session.file.bytes} />
   {:else if session.opening === null}
     <p class="p-pane text-text-faint">…</p>
   {:else}
@@ -161,7 +148,13 @@
         <Source {session} label={name} {phrases} />
       {/await}
     </div>
-    {#if reading === "preview" && session.positions !== null}
+    {#if reading === "preview" && html && session.positions !== null}
+      <HtmlPreview
+        text={session.editing?.text() ?? session.positions.editor}
+        drafted={session.receipt.kind !== "clean" && session.receipt.kind !== "saved"}
+        {name}
+      />
+    {:else if reading === "preview" && session.positions !== null}
       <Preview
         positions={session.positions}
         {building}
