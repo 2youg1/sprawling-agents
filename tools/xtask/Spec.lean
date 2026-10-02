@@ -505,7 +505,7 @@ D17 **成熟度以一个带参数的事实进文档，两种拼法由 kernel 给
 
 1. **矩阵**：`release.yml` 的 `- os:`／`target:` 成对读出，与 `(runner, cargo_target)` 集合双向相等。
 2. **shim**：`tools/xtask/src/channel/shim.js` 的每个条目读成「键、包、可执行文件」，与 `("<os> <cpu>", package, binary)` 双向相等。
-3. **写全的后缀**：`release.yml`、`install.sh`、`install.ps1` 里每一个**写全**的归档后缀，必须是某一行的后缀。
+3. **写全的后缀**：`release.yml`、`install.sh`、`install.ps1`、`crates/sprawling/Cargo.toml`（`[package.metadata.binstall]` 的各行）里每一个**写全**的归档后缀，必须是某一行的后缀。
 
 **只判写全的那些，插值拼出来的不判。** `"-${os}-${arch}.zip"` 不是一个可比对的拼法，猜它就会判错一份正确的脚本。这是漏报而非误报，也是赔得起的那一半：拼错的归档名是已经发生过的缺陷，而插值拼出来的那个由下载本身拒绝，并告诉读者这次发布实际带了什么。
 
