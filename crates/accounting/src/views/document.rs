@@ -21,7 +21,19 @@ use documents::{Format, Lifted, Reading as Judged, Span};
 use kernel::{Address, AxError, B3Hash};
 use wire::{Coverage, DocumentBody, DocumentState, HeldDocument};
 
+use super::holding::Views;
 use super::listing::resolve;
+use super::prepared::Prepared;
+
+impl Views {
+    /// A document is read off the disk after the views are released.
+    pub(in crate::views) fn document_ask(&self, at: &Address) -> Prepared {
+        Prepared::Document {
+            city_root: self.city_root.clone(),
+            at: at.clone(),
+        }
+    }
+}
 
 /// One file of the tree as it stands at the moment of asking.
 ///

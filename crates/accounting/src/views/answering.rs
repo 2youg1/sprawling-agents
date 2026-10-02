@@ -218,12 +218,7 @@ impl Views {
                     at: at.clone(),
                 };
             }
-            wire::Query::Document { at } => {
-                return Prepared::Document {
-                    city_root: self.city_root.clone(),
-                    at: at.clone(),
-                };
-            }
+            wire::Query::Document { at } => return self.document_ask(at),
             wire::Query::Proposals(doc) => return self.proposals_ask(doc),
             wire::Query::OpenProposals => wire::Answer::OpenProposals(self.open_proposals_answer()),
             wire::Query::Range { version, range } => return self.range_ask(*version, *range),
