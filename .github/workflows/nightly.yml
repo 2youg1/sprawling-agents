@@ -15,6 +15,11 @@
 # backend wants libdbus headers the runner does not carry, so it had
 # failed every night since it was written. platforms.yml states the rule
 # it broke: a gate that repeats a gate teaches nobody anything.
+#
+# Gone by a ruling: the public-API comparison of kernel and wire against a
+# baseline rendered by a pinned nightly rustdoc. The project keeps no
+# nightly toolchain for its own checks, and fuzzing, which needs one for
+# its sanitizers, installs it inside its own job.
 name: nightly
 on:
   schedule:
@@ -25,44 +30,6 @@ permissions:
   contents: read
 
 jobs:
-  # The public surface of the two seam crates, kernel and wire, against
-  # its committed baseline (tools/xtask/Spec.lean §8-32). It is not a gate:
-  # whether an interface change belongs in a SPEC is the reviewer's call,
-  # and a drift here is read the next morning.
-  #
-  # A baseline is a rendering, and the renderer is part of it: the same
-  # source printed by another nightly's rustdoc can differ line by line.
-  # So the job installs exactly the pair `tools/xtask/public-api.txt`
-  # names - a dated nightly and a cargo-public-api release - and
-  # `cargo xtask apisync` refuses any other (xtask D6).
-  # cargo-public-api is built from that version rather than taken from an
-  # install action, whose `tool:` line would carry a second copy of it.
-  apisync:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-      - name: read the renderer the baselines are written with
-        shell: bash
-        run: grep -E '^PUBLIC_API_[A-Z]+=' tools/xtask/public-api.txt >> "$GITHUB_ENV"
-      - name: install the pinned toolchain and the pinned nightly
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustup show
-          rustup toolchain install "$PUBLIC_API_RUSTDOC" --profile minimal
-      - uses: actions/cache@v6
-        id: public-api-cache
-        with:
-          path: ~/.cargo/bin/cargo-public-api
-          key: cargo-public-api-${{ runner.os }}-${{ env.PUBLIC_API_VERSION }}
-      - name: install the pinned cargo-public-api
-        if: steps.public-api-cache.outputs.cache-hit != 'true'
-        shell: bash
-        run: cargo install --locked "cargo-public-api@$PUBLIC_API_VERSION"
-      - name: apisync
-        run: cargo xtask apisync
-
   # V4: hostile bytes against the three parse surfaces. A new draw of
   # random input every night is what makes this a schedule rather than a
   # push gate; sixty seconds a target is a smoke length, and a real
@@ -153,7 +120,13 @@ jobs:
   # there: upstream builds kani for Linux only. A lead read against one
   # kani and a verdict held by another would disagree for a reason
   # nobody could see in the report.
+  #
+  # It runs when asked for (`gh workflow run nightly.yml`) and not on the
+  # schedule: a lead that reads red every night teaches a reader to skip
+  # the nightly verdict, and the advisories beside it are the red that
+  # must be read the next morning.
   autoharness:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     continue-on-error: true

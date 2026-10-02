@@ -1,8 +1,9 @@
 # What ci.yml deliberately does not ask on every push.
 #
 # Three claims live here, and each is about machines rather than about a
-# change. The gates hold on macOS, which ci.yml never sees, so a platform
-# this workflow does not run is a promise rather than a fact. The flake
+# change. The repository's gates hold on macOS, where ci.yml lints and
+# tests the core packages but never runs xtask, so a platform this
+# workflow does not run is a promise rather than a fact. The flake
 # claims a person on NixOS can build this tree with the Rust version
 # `rust-toolchain.toml` names, and only an evaluation of the flake can say
 # whether that is so. And two builds of one tree are one artifact, which
@@ -65,13 +66,13 @@ jobs:
               >> "$GITHUB_STEP_SUMMARY"
           fi
 
-  # The same commands ci.yml runs, on the platform ci.yml never sees.
+  # The repository's own gates, on macOS.
   #
-  # macOS alone: this matrix used to carry a windows leg as well, which
-  # was the same four commands ci.yml already runs on windows for every
-  # push. A gate that repeats a gate teaches nobody anything and costs a
-  # runner an hour a night, so the leg is gone rather than kept for
-  # symmetry.
+  # Only the gates: ci.yml's `core` job lints and tests on macOS for every
+  # push, and the desktop server is not a macOS target, so its
+  # packages are judged on Windows alone. What is left for this job is
+  # xtask, which judges the tree the same way on every platform and has
+  # to be shown to.
   macos:
     needs: moved
     if: needs.moved.outputs.verdict == 'run'
@@ -88,20 +89,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: . -> target
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest,just
-      # One job rather than ci.yml's five: nobody is waiting for this
-      # one, and the sum of two builds costs a schedule nothing.
-      # Every check after the setup runs even when an earlier one failed,
-      # and the tests do not stop at the first failure: a night that stops
-      # at its first red leaves every later check unread until the next
-      # night, which is why `just check-all` runs every phase as well.
-      - name: fmt
-        run: cargo fmt --all --check
-      - name: clippy
-        if: ${{ !cancelled() }}
-        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       # What the npm and render gates judge. This job repeats the commands
       # ci.yml runs, and repeated its omission as well: both gates refuse
       # an absent tree rather than skipping it, so without this step the
@@ -128,14 +115,6 @@ jobs:
       - name: xtask gates
         if: ${{ !cancelled() }}
         run: cargo xtask gates
-      - name: tests
-        if: ${{ !cancelled() }}
-        run: cargo nextest run --workspace --locked --all-features --no-fail-fast
-      # See ci.yml: the cache's save step cannot walk trybuild's scratch.
-      - name: clear the trybuild scratch before the cache is saved
-        if: always()
-        shell: bash
-        run: rm -rf target/tests
 
   # Two builds of one tree, byte for byte (release item three).
   #
