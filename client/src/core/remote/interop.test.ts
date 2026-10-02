@@ -21,13 +21,13 @@ import { opener, payloadBytes, payloadOf, sealer } from "./seal";
 
 const DIR = new URL("../../../../tools/fixtures/remote-handshake/", import.meta.url);
 
-type Fields = ReadonlyMap<string, Uint8Array>;
+type Fields = ReadonlyMap<string, Uint8Array<ArrayBuffer>>;
 
-function bytesOf(hex: string): Uint8Array {
+function bytesOf(hex: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(hex.match(/../g) ?? [], (pair) => Number.parseInt(pair, 16));
 }
 
-function hexOf(bytes: Uint8Array): string {
+function hexOf(bytes: Uint8Array<ArrayBuffer>): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -42,13 +42,13 @@ function read(name: string): Fields {
   );
 }
 
-function field(fields: Fields, name: string): Uint8Array {
+function field(fields: Fields, name: string): Uint8Array<ArrayBuffer> {
   return fields.get(name) ?? new Uint8Array();
 }
 
 // The fixed X25519 private key of the fixture, in the one form WebCrypto
 // imports a raw X25519 private key from: PKCS #8 (RFC 8410).
-async function x25519From(raw: Uint8Array): Promise<CryptoKey> {
+async function x25519From(raw: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   const pkcs8 = new Uint8Array([...bytesOf("302e020100300506032b656e04220420"), ...raw]);
   return crypto.subtle.importKey("pkcs8", pkcs8, { name: "X25519" }, false, ["deriveBits"]);
 }
@@ -142,7 +142,7 @@ describe("a signature", () => {
         (await verifies(field(vector, "public"), message, field(vector, "signature")))
       );
     };
-    if (process.env["GOLDEN_WRITE"] === "1" && !(await holds()) && key !== null) {
+    if (process.env.GOLDEN_WRITE === "1" && !(await holds()) && key !== null) {
       const signature = (await sign(key, message)) ?? new Uint8Array();
       const lines = [
         `public ${hexOf(key.public)}`,

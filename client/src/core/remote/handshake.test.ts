@@ -24,7 +24,7 @@ const CODE = "abcdefghijklmnopqrstuvwxyz";
 
 interface City {
   readonly key: DeviceKey;
-  readonly fingerprint: Uint8Array;
+  readonly fingerprint: Uint8Array<ArrayBuffer>;
 }
 
 async function city(): Promise<City> {
@@ -41,8 +41,8 @@ async function nothing(): Promise<CryptoKey> {
 // The city's reply to a pairing hello, and the keys it then holds.
 async function reply(
   at: City,
-  hello: Uint8Array,
-): Promise<{ readonly reply: Uint8Array; readonly transcript: Uint8Array; readonly deviceToCity: Uint8Array }> {
+  hello: Uint8Array<ArrayBuffer>,
+): Promise<{ readonly reply: Uint8Array<ArrayBuffer>; readonly transcript: Uint8Array<ArrayBuffer>; readonly deviceToCity: Uint8Array<ArrayBuffer> }> {
   const devicePublic = hello.slice(0, 32);
   const encapsulationKey = hello.slice(32, 32 + 1184);
   const mine = await crypto.subtle.generateKey({ name: "X25519" }, true, ["deriveBits"]);

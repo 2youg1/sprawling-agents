@@ -12,6 +12,7 @@ import { Option, Schema } from "effect";
 
 import { Address, SessionName } from "../wire";
 import type { RunId } from "../wire";
+import { isInvitation } from "./remote/invitation";
 import { readRunId } from "./run_id";
 
 // The address grammar is the server's, carried in the schema `cargo
@@ -30,7 +31,7 @@ export const LENSES: readonly Lens[] = ["ledger", "archive", "bin", "log"];
 // The order the settings tree offers them in is the tree's own
 // (`views/settings/tree.ts`); this is only the set the address bar reads.
 export const SETUP_GROUPS = [
-  "you", "accounts", "harnesses", "network", "run", "rules", "automation",
+  "you", "accounts", "harnesses", "network", "remote", "run", "rules", "automation",
   "skills", "tools", "appearance", "keys", "advanced", "about",
 ] as const;
 
@@ -182,6 +183,9 @@ function named(raw: string): string {
 // lands somewhere else teaches people their bookmarks are unreliable
 // without ever admitting it.
 export function fromFragment(raw: string): Option.Option<View> {
+  // The link `/remote pair` prints carries its invitation in a fragment
+  // of its own shape; it opens the group that pairs (client-SPEC 3-2).
+  if (isInvitation(raw)) return Option.some({ kind: "setup", group: "remote" });
   const path = named(raw);
   const slash = path.indexOf("/");
   const head = slash < 0 ? path : path.slice(0, slash);

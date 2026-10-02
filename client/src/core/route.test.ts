@@ -152,15 +152,10 @@ describe("route", () => {
   });
 
   test("a pairing invitation opens the remote group, readable or not", () => {
-    expect([
-      fromFragment("#pair=abcdefghijklmnopqrstuvwxyz&city=aaaa"),
-      fromFragment("#pair="),
-      unresolved("#pair=abc&city=def"),
-    ]).toEqual([
-      Option.some({ kind: "setup", group: "remote" }),
-      Option.some({ kind: "setup", group: "remote" }),
-      Option.none(),
-    ]);
+    const remote: View = { kind: "setup", group: "remote" };
+    expect(fromFragment("#pair=abcdefghijklmnopqrstuvwxyz&city=aaaa")).toEqual(Option.some(remote));
+    expect(fromFragment("#pair=")).toEqual(Option.some(remote));
+    expect(unresolved("#pair=abc&city=def")).toEqual(Option.none());
   });
 
   test("an unresolved fragment is reported by name, an empty one is not", () => {
