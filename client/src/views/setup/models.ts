@@ -12,7 +12,7 @@
 // for a `.svelte` reader, and the shapes must not be written down
 // twice.
 
-import type { Ceilings } from "../../core/commands";
+import type { Stated } from "../../core/commands";
 import type { ModelFact } from "../../core/probed";
 import type { ModelTag } from "../../wire";
 
@@ -20,10 +20,11 @@ export { default as ModelChoice } from "./models.svelte";
 export { default as ModelTable } from "./model_table.svelte";
 
 // One ticked row: the model, the two ceilings a person read off the
-// provider's own documentation, and the role it is to fill if any.
+// provider's own documentation and the input kinds they stated, and the
+// role it is to fill if any.
 export interface ModelRow {
   readonly id: string;
-  readonly ceilings: Ceilings;
+  readonly stated: Stated;
   readonly tag: ModelTag | null;
 }
 

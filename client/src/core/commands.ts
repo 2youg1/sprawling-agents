@@ -29,6 +29,7 @@ import type {
   GovernedDocument,
   HaltScope,
   IdentityCard,
+  InputKinds,
   KeepWarm,
   McpServer,
   ModelTag,
@@ -241,17 +242,20 @@ export function wireApiOf(dialect: DialectKind): WireApi {
 }
 
 
-// The two ceilings one model row states. They travel together because a
+// What one model row states beyond the model's name: the two ceilings,
+// and what the model takes as input. They travel together because a
 // context window without an output ceiling describes no model that can
-// be called, and both are absent until somebody states them: the
+// be called, and all three are absent until somebody states them: the
 // catalogue holds two rows, so a provider outside it is only as good as
-// the figures a person read off its own model list.
-export interface Ceilings {
+// the figures a person read off its own model list. Input kinds nobody
+// stated are the city's to look up (`gateway::accepted_input`).
+export interface Stated {
   readonly contextTokens: number | null;
   readonly maxOutputTokens: number | null;
+  readonly input: InputKinds | null;
 }
 
-export const UNSTATED: Ceilings = { contextTokens: null, maxOutputTokens: null };
+export const UNSTATED: Stated = { contextTokens: null, maxOutputTokens: null, input: null };
 
 // A ceiling reaches the wire only as a whole positive number. Anything
 // else is nobody's figure, and absence is what the city reads as "take
@@ -272,15 +276,16 @@ export function selectModel(
   endpoint: string,
   model: string,
   tag: ModelTag,
-  ceilings: Ceilings = UNSTATED,
+  stated: Stated = UNSTATED,
 ): Command {
   return {
     select_model: {
       endpoint: providerName(endpoint),
       model,
       tag,
-      context_tokens: window(ceilings.contextTokens),
-      max_output_tokens: ceiling(ceilings.maxOutputTokens),
+      context_tokens: window(stated.contextTokens),
+      max_output_tokens: ceiling(stated.maxOutputTokens),
+      input: stated.input,
       idem: mintIdem(),
     },
   };

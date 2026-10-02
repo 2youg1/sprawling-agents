@@ -210,7 +210,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | `reading.ts` | 4 适配器 | `taskOf(record)`、`toolCall(record)`、`modelOf(record)`、`completionOf(record)`、`askOf(record)`、`branchOf(record)`、`haltOf(record)`，各答 `[值, 读不出的字段名 \| null]`；`sessionStart(record) -> SessionStart \| null`（不是会话开头、或没说房间的记录答 `null`）；`kernel::event::record` 的字段名与 serde 属性（`Option` 与 `#[serde(default)]` 各是什么意思）在客户端只有这一处拼写 |
 | `scope.ts` | 4 适配器 | `scopeOf(spelled) -> HaltScope \| null`（Ledger 拼法→frame 拼法，唯一相遇点）、`sameScope`、`buildingIsShut`、`cityIsShut`、`CITY`；`CITY` 是两套拼法共同的那一个词，五个视图改读它，不再手写 `"city"` |
 | `run_id.ts` | 4 适配器 | `readRunId(raw) -> Option<RunId>`：`Schema.decodeOption` 于生成的 `RunId`，地址栏与转写文件名的唯一文法 |
-| `commands.ts` | 2 值 | 每个命令帧一个构造函数，自铸 `IdemKey` |
+| `commands.ts` | 2 值 | 每个命令帧一个构造函数，自铸 `IdemKey`；`selectModel(endpoint, model, tag, stated)` 的 `Stated { contextTokens, maxOutputTokens, input }` 是人对一个模型在名字之外说的三件事：两个上限与它收什么输入（`InputKinds`，`text`／`text_image`，即 `SelectModel.input`，`gateway::accepted_input` 的第一档）；`input` 为 `null` 是没说，由城往下一档问 |
 | `enrol.ts` | 4 适配器 | `enrol(Enrolling { origin, token, realm, name, value, lang }) -> Promise<Enrolment>`；`referenceFor(provider)` 是 realm／name 唯一的选词处（realm 是本页选的词，城只判字母表），`referenceText(at)` 是页面预演用的唯一拼法，`keyField`／`secretFor` 保证存的引用只用在它被归档的那个 id 上。**引用来自城**：201 正文是 `kernel::SecretRef` 读回后写出的那一句，本页不自己拼一份存起来 |
 | `speaking.ts` | 4 适配器 | `canRecord()`, `record(origin, token) -> Promise<Recording \| null>`；`Recording.stop() -> Promise<Heard>`，`Heard` 穷尽（text／refused／silent）；`dictation(origin, pairing, into) -> Dictation`：composer 的麦克风，听到的一句交给 `into`，落进输入框而不直接发出（4-16） |
 | `idem.ts` | 2 值 | `mintIdem()` |

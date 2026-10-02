@@ -3079,6 +3079,18 @@
     "en": "the same in config.toml",
     "zh": "等价的 config.toml"
   },
+  "setup_input_unstated": {
+    "en": "as the city finds",
+    "zh": "由城判断"
+  },
+  "setup_input_text": {
+    "en": "text",
+    "zh": "文本"
+  },
+  "setup_input_text_image": {
+    "en": "text and images",
+    "zh": "文本与图片"
+  },
   "setup_toml_toggle": {
     "en": "the equivalent config.toml",
     "zh": "等价的 config.toml"

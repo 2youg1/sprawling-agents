@@ -244,7 +244,7 @@
       const before = get(attached);
       if (!u.send(attachEndpoint(e, rows.map((row) => row.id)))) return;
       for (const row of rows) {
-        if (row.tag !== null) u.send(selectModel(e.id, row.id, row.tag, row.ceilings));
+        if (row.tag !== null) u.send(selectModel(e.id, row.id, row.tag, row.stated));
       }
       // Only a registration that went through clears the form: a
       // refusal keeps every field, which is the one thing a person

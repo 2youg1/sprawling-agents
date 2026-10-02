@@ -19,7 +19,8 @@
   // called with when nobody typed one.
   import { fill, say } from "../../core/lang";
   import type { ModelFact } from "../../core/probed";
-  import type { ModelTag } from "../../wire";
+  import { InputKinds as InputKindsSchema } from "../../wire";
+  import type { InputKinds, ModelTag } from "../../wire";
   import { ui } from "../../ui";
   import Combobox from "../parts/combobox.svelte";
   import Field from "../parts/field.svelte";
@@ -32,16 +33,20 @@
   // wording-ok: model ids, which are the same letters in every language.
   const MANUAL_PLACEHOLDER = "gpt-5-mini, claude-sonnet-4";
 
+  // The input kinds a person may state, in the wire's own order.
+  const INPUTS: readonly InputKinds[] = InputKindsSchema.literals;
+
   interface Filled {
     ticked: Record<string, boolean>;
     context: Record<string, string>;
     output: Record<string, string>;
     role: Record<string, string>;
+    input: Record<string, InputKinds | null>;
   }
 
   // Mutated through its properties only, so the binding itself is
   // never reassigned.
-  const filled = $state<Filled>({ ticked: {}, context: {}, output: {}, role: {} });
+  const filled = $state<Filled>({ ticked: {}, context: {}, output: {}, role: {}, input: {} });
   let search = $state<string>("");
   let textOnly = $state<boolean>(true);
   let manual = $state<string>("");
@@ -170,7 +175,7 @@
   const rows = $derived<readonly ModelRow[]>(
     ticked.map((row) => ({
       id: row.id,
-      ceilings: { contextTokens: windowOf(row), maxOutputTokens: ceilingOf(row) },
+      stated: { contextTokens: windowOf(row), maxOutputTokens: ceilingOf(row), input: filled.input[row.id] ?? null },
       tag: tagOf(filled.role[row.id] ?? ""),
     })),
   );
@@ -277,12 +282,30 @@
   />
 {/snippet}
 
+<!-- What the model takes as input, as the person states it (X6): a
+     model that reads pictures is the one a picture may be sent to, and
+     an unstated row is the city's to look up. The provider's own list,
+     when it gave one, stands under the choice as the evidence. -->
 {#snippet renderModalities(row: ModelFact)}
-  <!-- wording-ok: the modalities the provider itself stated, spelled
-       as the provider spelled them -->
-  <span class="text-note text-text-faint">
-    {row.inputModalities.length === 0 ? "—" : row.inputModalities.join(" ")}
-  </span>
+  <div class="flex flex-col gap-hair">
+    <select
+      class="h-control-sm min-w-0 rounded-control border border-edge-input bg-raised px-snug text-note text-text"
+      aria-label={`${say($lang, "setup_model_modalities")} ${row.id}`}
+      value={filled.input[row.id] ?? ""}
+      onchange={(event) => {
+        const picked = INPUTS.find((each) => each === event.currentTarget.value);
+        filled.input[row.id] = picked ?? null;
+      }}
+    >
+      <option value="">{say($lang, "setup_input_unstated")}</option>
+      {#each INPUTS as each (each)}
+        <option value={each}>{say($lang, `setup_input_${each}`)}</option>
+      {/each}
+    </select>
+    <!-- wording-ok: the modalities the provider itself stated, spelled
+         as the provider spelled them -->
+    <span class="text-note text-text-faint">{row.inputModalities.join(" ")}</span>
+  </div>
 {/snippet}
 
 {#snippet renderPrice(row: ModelFact)}
