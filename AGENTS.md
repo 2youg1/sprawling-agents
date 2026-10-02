@@ -136,7 +136,7 @@ A violation turns the check red with a message that names the rule, the violatio
 | Every file a publishable package compiles in production, through `include!`, `include_str!` or `include_bytes!`, inside that package's own directory or its build script's `OUT_DIR`, because crates.io carries the package directory and nothing else. | `xtask packaged` |
 | `pub(crate)` by default; `pub` traits only on the seam list. | `xtask depmap` |
 | Every dependency a manifest declares named by the code of its package, and every workspace dependency inherited by some package. | `xtask unused` |
-| The client's lockfile in step with its manifest, its runtime dependencies exactly the list `RUNTIME` in `tools/xtask/src/npm.rs` names (`svelte`, `effect`, and the `@lezer` highlighter), every licence on the list `deny.toml` permits. | `xtask npm` |
+| The client's lockfile in step with its manifest, its runtime dependencies exactly the list `RUNTIME` in `tools/xtask/src/npm.rs` names, each one admitted with the reason `client/Spec.lean` §7-9 records for it, every licence on the list `deny.toml` permits. | `xtask npm` |
 | Credentials as `secret:realm/name` references; plaintext reaches the vault and nowhere else. | `xtask secret` |
 | Colour taken from the `@theme` block in `client/src/theme.css`, expressed as a ratio of the gamut limit, and text on glass legible over the brightest surface behind it. | `xtask color` |
 | A transition's curve and duration taken from the tokens in `client/src/theme.css`, never spelled in a view. | `xtask motion` |

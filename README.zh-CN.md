@@ -204,7 +204,7 @@ PR 描述、issue、评审意见都可以用你自己的语言写。能的话附
 
 按主机名接上一家厂商，要知道它的 API 挂在哪条路径下、说哪种兼容格式。这些是事实；厂商自己的客户端写得比文档更准时，跟随的是那个客户端，而不是抄它的代码：读的是哪个仓库、仓库里哪条路径、哪个提交，只写在一个地方：[`docs/third-party.md`](docs/third-party.md) §1，每天有一个工作流解析它，去问每个上游有没有变。不跟随任何厂商的登录。这座城不登录任何订阅，只收 API key，凭据托管在这里实现。
 
-浏览器页面站在同一类东西上。它的运行时依赖恰为 `tools/xtask/src/npm.rs` 的 `RUNTIME` 所列——Svelte、Effect 与 `@lezer` 语法高亮器，页面第一次显示代码时才下载后者；其中没有组件库，`client/src/views/parts/` 里的每一个控件都是本仓库自己的。从 W3C 的 ARIA Authoring Practices 以及 Kobalte 与 Ark UI 的文档里取来的，是以文字发表的行为：一个控件实现哪种模式、每个键做什么、关闭时焦点回到哪里。它们的代码一行都不在这棵树里，所以不欠什么；读它们得出的键盘表写在 [`client/Spec.lean`](client/Spec.lean)。
+浏览器页面站在同一类东西上。它的运行时依赖恰为 `tools/xtask/src/npm.rs` 的 `RUNTIME` 所列，`client/Spec.lean` §7-9 记下每一个替换了什么、给页面添了多少。其中没有组件库，`client/src/views/parts/` 里的每一个控件都是本仓库自己的。从 W3C 的 ARIA Authoring Practices 以及 Kobalte 与 Ark UI 的文档里取来的，是以文字发表的行为：一个控件实现哪种模式、每个键做什么、关闭时焦点回到哪里。它们的代码一行都不在这棵树里，所以不欠什么；读它们得出的键盘表写在 [`client/Spec.lean`](client/Spec.lean)。
 
 [`skills/`](skills/) 下的 skill 站在更早的工作上，并且写明了。其中三个——`sdd`、`tutor`、`translation`——是我此前以 AGPL-3.0-or-later 开源发布的中文 skill 的英文翻译与改编（translation 这一件的原署名还有 Claude Fable 5）；在这里它们与这棵树其余部分一样是 MPL-2.0。另外三个——`why`、`how`、`blast-radius`——是我对 [pstack](https://github.com/cursor/plugins/tree/main/pstack)（Lauren Tan (poteto)，MIT）的修改改编；它们保留原许可，每个文件都写明由我修改。`authority-review` 是对同一个 `cursor/plugins` 树里 Thermos 的修改改编（MIT）：它的第二遍被改写成我为这座城所依据的配置写的「一个事实一个权威」审查。`skills/LICENSES.md` 随这个目录走，也在发布归档里。这一段是致谢；条款见 [`docs/third-party.md`](docs/third-party.md) §5。
 
