@@ -116,7 +116,7 @@ covers the pane above it. -->
 <svelte:element
   this={seat === "page" ? "main" : "section"}
   id={seat === "page" ? "main" : undefined}
-  class="col-span-full row-start-2 grid min-h-0 grid-cols-subgrid grid-rows-[minmax(0,1fr)_auto]"
+  class="col-span-full row-start-2 -m-margin grid min-h-0 grid-cols-subgrid grid-rows-[minmax(0,1fr)_auto] p-margin narrow:m-0 narrow:p-0"
   aria-label={seat === "page" ? say($lang, "region_main") : title}
 >
   <!-- The page's own name: a reader arriving by keyboard or screen reader
@@ -149,7 +149,7 @@ covers the pane above it. -->
   <section
     class={[
       layout.talk,
-      "relative flex min-h-0 flex-col narrow:col-span-full",
+      "relative -mx-wide flex min-h-0 flex-col px-wide narrow:col-span-full narrow:mx-0 narrow:px-0",
       layout.world === "workbench" ? "row-[2] pt-wide" : "row-[1/3]",
     ]}
     aria-label={say($lang, "region_conversation")}
@@ -160,7 +160,7 @@ covers the pane above it. -->
     <div
       class={[
         layout.right,
-        "row-[1/3] -mt-margin -mr-margin -mb-margin min-h-0 border-l border-edge-panel narrow:fixed narrow:inset-0 narrow:m-0",
+        "row-[1/3] -mt-margin -mr-margin -mb-margin min-h-0 border-l border-edge-panel narrow:fixed narrow:inset-0 narrow:col-span-full narrow:m-0",
         open ? "flex" : "hidden",
         item?.kind === "document" ? "flex-col bg-page" : "",
       ]}

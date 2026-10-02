@@ -1378,10 +1378,15 @@ main h1 {
 }
 
 /* A frozen stretch of conversation out of view is not laid out until
- * it scrolls in; the reserved height keeps the scrollbar honest. */
+ * it scrolls in; the reserved height keeps the scrollbar honest.
+ * `content-visibility: auto` already contains paint, which clips to the
+ * box; `overflow: clip` states that clip in the computed style, so a
+ * reader of the page (the render gate) sees the reserved box hold what
+ * it will hold once laid out instead of words spilling out of 160px. */
 .settled {
   content-visibility: auto;
   contain-intrinsic-size: auto 160px;
+  overflow: clip;
 }
 
 /* The same deferral for one row of a long list - the record, the ledger,

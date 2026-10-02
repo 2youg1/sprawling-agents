@@ -33,7 +33,7 @@
 </script>
 
 <div class="mt-tight flex flex-wrap items-center justify-between gap-tight">
-  <div class="-ml-snug flex min-w-0 flex-wrap items-center">
+  <div class="-ml-snug flex min-w-0 flex-wrap items-center narrow:ml-0">
     <PillView spec={specs[1]} />
     <Bounds {room} />
     {#if kept}
@@ -41,7 +41,7 @@
     {/if}
   </div>
   {#if !begun}
-    <div class="-mr-snug flex min-w-0 flex-wrap items-center">
+    <div class="-mr-snug flex min-w-0 flex-wrap items-center narrow:mr-0">
       <PillView spec={specs[0]} />
       <PillView spec={specs[2]} />
       <PillView spec={specs[3]} />

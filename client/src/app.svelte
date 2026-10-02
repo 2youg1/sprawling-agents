@@ -352,7 +352,7 @@
 <svelte:window onhashchange={follow} onkeydown={keys} onkeyup={letGo} onblur={forget} />
 
 <Notifier {view} />
-<div class="frame relative h-screen overflow-hidden bg-page font-sans text-body text-text">
+<div class="frame relative h-screen overflow-x-clip bg-page font-sans text-body text-text">
   <a
     href="#main"
     class="sr-only focus:not-sr-only focus:absolute focus:top-snug focus:left-snug focus:z-30 focus:rounded-control focus:bg-raised focus:px-base focus:py-snug focus:text-label focus:text-text"
