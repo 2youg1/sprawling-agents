@@ -16,7 +16,7 @@
   import { POSTURE_WORD } from "../../core/doing";
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
-  import { lasted } from "../../core/time";
+  import { count, isoDay, isoTime, lasted } from "../../core/time";
   import { ui } from "../../ui";
   import type { Turn } from "../../wire";
   import type { Share } from "./lanes";
@@ -141,8 +141,9 @@
     {/each}
   </div>
 
-  <h2 class="text-label font-label text-text-quiet">
-    {say($lang, "run_calls")} <span class="font-mono">{calls.length}</span>
+  <h2 class="flex justify-between text-note text-text-faint">
+    <span>{say($lang, "run_calls")} <span class="figure text-text-quiet">{calls.length}</span></span>
+    <span>{say($lang, "run_calls_axis")}</span>
   </h2>
   {#if calls.length > 0}
     <div
@@ -153,20 +154,24 @@
       }}
     >
       <div style:height="calc(var({ROW_TOKEN}) * {rows.first})"></div>
-      <ol class="text-note">
+      <ol class="@container text-note">
         {#each calls.slice(rows.first, rows.end) as placed, at (rows.first + at)}
           {@const took = tookOf(placed.call)}
-          <li class="flex h-control-sm items-center gap-snug">
-            <span class="w-figure shrink-0 font-mono text-text-faint"
+          {@const landed = placed.call.answered ?? null}
+          <li class="grid h-control-sm grid-cols-[14ch_minmax(0,1fr)_10ch] items-center gap-x-base whitespace-nowrap @min-[40rem]:grid-cols-[14ch_9ch_12ch_minmax(0,1fr)_10ch]">
+            {#if landed === null}
+              <span class="figure text-text-faint">{say($lang, "run_call_running")}</span>
+            {:else}
+              <time class="figure text-text-faint" datetime={`${isoDay(landed)}T${isoTime(landed)}`}>{isoTime(landed)}</time>
+            {/if}
+            <span class="hidden truncate text-text-faint @min-[40rem]:block"
               >{fill(say($lang, "run_turn_n"), { n: String(placed.turn) })}</span
             >
-            <span class={["shrink-0 font-mono", placed.call.outcome === "failed" ? "text-alert" : "text-text"]}
+            <span class={["hidden truncate font-mono @min-[40rem]:block", placed.call.outcome === "failed" ? "text-alert" : "text-text"]}
               >{placed.call.tool}</span
             >
-            <span class="min-w-0 flex-1 truncate font-mono text-text-quiet">{placed.call.subject ?? ""}</span>
-            <span class="shrink-0 font-mono text-text-faint"
-              >{took === null ? "" : lasted(took)}</span
-            >
+            <span class="min-w-0 truncate font-mono text-text-quiet">{placed.call.subject ?? placed.call.tool}</span>
+            <span class="figure text-right text-text-faint">{took === null ? "" : fill(say($lang, "run_call_ms"), { n: count(took) })}</span>
           </li>
         {/each}
       </ol>

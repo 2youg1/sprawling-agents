@@ -27,7 +27,7 @@
   import { fill, say } from "../core/lang";
   import type { Key } from "../core/lang";
   import { buildingOf, roomOf } from "../core/route";
-  import { count, usd } from "../core/time";
+  import { count } from "../core/time";
   import { ui } from "../ui";
   import { Address } from "../wire";
   import type {
@@ -41,6 +41,7 @@
     Used,
   } from "../wire";
   import Changes from "./changes.svelte";
+  import Button from "./parts/button.svelte";
   import EmptyState from "./parts/empty.svelte";
   import Path from "./parts/path.svelte";
   import Unanswered from "./parts/unanswered.svelte";
@@ -50,7 +51,6 @@
   import Monitor from "./monitor/monitor.svelte";
   import { NO_TAIL } from "../core/live_output";
   import type { Share } from "./run/lanes";
-  import { figuresOf } from "./run/lanes";
   import Prompt from "./run/prompt.svelte";
   import River from "./run/river.svelte";
   import Composer from "./talk/composer.svelte";
@@ -81,7 +81,9 @@
   };
   const NOTHING: Readable<Answer | undefined> = readable(undefined);
 
-  let current = $state<RunLens>("time");
+  // The lens the person chose; until they choose, the run's own state
+  // picks one (`firstLens` below).
+  let chosen = $state<RunLens | null>(null);
   const lenses = $derived(EVERY.map((id) => ({ id, label: say($lang, WORDS[id]) })));
 
   const u = ui();
@@ -120,6 +122,28 @@
   const checkpoint = $derived(rounds?.opened_at ?? null);
   const lastCheckpoint = $derived(lastCheckpointIn(turns));
 
+
+  const peak = $derived(peakOf(turns));
+  const seen = $derived(seenOf(turns));
+  const live = $derived(shown !== undefined && shown.doing.kind !== "frozen");
+  const room = $derived(shown?.addr ?? null);
+  // Where the changes lens stops. A live run that has not checkpointed past
+  // its opening is read against the working tree, which is where its
+  // edits are; a closed run stops at its last checkpoint, or at its opening
+  // when it never checkpointed, so edits made after it ended are not counted.
+  const changedTo = $derived(live ? (lastCheckpoint === checkpoint ? null : lastCheckpoint) : (lastCheckpoint ?? checkpoint));
+
+  // The lens a run opens on (client-SPEC 12-28): a run still going is
+  // watched where its time goes; a run that is over and checkpointed
+  // past its opening is read for what it changed, which is what a link
+  // from a finished run, a commit or `/diff` is followed for; a run that
+  // is over and changed nothing is read for what it said.
+  const firstLens = $derived.by((): RunLens => {
+    if (live) return "time";
+    return lastCheckpoint !== null && lastCheckpoint !== checkpoint ? "changes" : "turns";
+  });
+  const current = $derived(chosen ?? firstLens);
+
   // The evidence question exists only while its lens is open: a
   // watched answer is refreshed when stale, and nobody is looking at
   // this one between visits.
@@ -129,17 +153,6 @@
     readAnswer($evidenceStore, (held) => ("evidence" in held ? held.evidence.items : undefined)),
   );
   const items = $derived(evidenceRead.kind === "held" ? evidenceRead.value : undefined);
-
-  const peak = $derived(peakOf(turns));
-  const seen = $derived(seenOf(turns));
-  const spent = $derived(figuresOf(turns).usd);
-  const live = $derived(shown !== undefined && shown.doing.kind !== "frozen");
-  const room = $derived(shown?.addr ?? null);
-  // Where the changes lens stops. A live run that has not checkpointed past
-  // its opening is read against the working tree, which is where its
-  // edits are; a closed run stops at its last checkpoint, or at its opening
-  // when it never checkpointed, so edits made after it ended are not counted.
-  const changedTo = $derived(live ? (lastCheckpoint === checkpoint ? null : lastCheckpoint) : (lastCheckpoint ?? checkpoint));
 
   // The run's clock as the page knows it: from the opening (or the
   // first turn) to the closing, or to now while the run is live.
@@ -213,12 +226,12 @@
   // and reads the draft as it mounts, is brought forward.
   function draftSteer(text: string): void {
     u.prefs.setDraft(run, text);
-    current = "turns";
+    chosen = "turns";
   }
 
   function pick(id: string): void {
-    const chosen = EVERY.find((each) => each === id);
-    if (chosen !== undefined) current = chosen;
+    const picked = EVERY.find((each) => each === id);
+    if (picked !== undefined) chosen = picked;
   }
 </script>
 
@@ -258,7 +271,7 @@
   {:else if eye.id === "context"}
     <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-wide">
       <section>
-        <h2 class="mb-base text-label font-label text-text-quiet">{say($lang, "run_window")}</h2>
+        <h2 class="mb-base text-note text-text-faint">{say($lang, "run_window")}</h2>
         {#if turns.some((turn) => turn.used !== null && turn.used !== undefined)}
           <ul class="text-note">
             {#each turns as turn (turn.number)}
@@ -297,14 +310,9 @@
         {:else}
           <p class="text-text-faint">{say($lang, "run_no_usage")}</p>
         {/if}
-        {#if spent > 0}
-          <p class="mt-base text-note text-text-quiet">
-            {fill(say($lang, "run_spent"), { usd: usd(spent) })}
-          </p>
-        {/if}
       </section>
       <section>
-        <h2 class="mb-base text-label font-label text-text-quiet">{say($lang, "run_read_files")}</h2>
+        <h2 class="mb-base text-note text-text-faint">{say($lang, "run_read_files")}</h2>
         {#if seen.length > 0}
           <ul class="text-note">
             {#each seen as [file, n] (file)}
@@ -351,24 +359,26 @@
   {/if}
 {/snippet}
 
-<div class="flex min-h-0 w-full max-w-page flex-1 flex-col px-pane pt-wide">
-  <div class="flex flex-wrap items-center gap-base pb-base">
-    <!-- The run's own id when nothing has named the task yet. The
-         summary's `who` is not offered here: it is the resident, and a
-         resident's name standing where the task stands reads as a task
-         somebody set. -->
-    <h1 tabindex="-1" class="truncate text-heading font-heading">
-      {rounds?.opening?.task ?? shown?.task ?? run}
-    </h1>
-    <span class="flex-1"></span>
+<div class="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-base px-wide py-wide">
+  <div class="flex min-w-0 items-start justify-between gap-wide">
+    <div class="flex min-w-0 flex-col gap-tight">
+      <!-- The run's own id when nothing has named the task yet. The
+           summary's `who` is not offered here: it is the resident, and a
+           resident's name standing where the task stands reads as a task
+           somebody set. -->
+      <h1 tabindex="-1" class="truncate text-title font-title">
+        {rounds?.opening?.task ?? shown?.task ?? run}
+      </h1>
+      {#if rounds?.opening?.goal}
+        <p class="text-note text-text-quiet">
+          <span class="text-text-faint">{say($lang, "run_goal")}</span>
+          {rounds.opening.goal}
+        </p>
+      {/if}
+      <p class="figure truncate text-note text-text-faint">{run}</p>
+    </div>
     {#if live}
-      <button
-        type="button"
-        class="h-control-sm rounded-control px-base text-label text-text-quiet hover:bg-chrome hover:text-alert"
-        onclick={() => u.send(cancel(run))}
-      >
-        {say($lang, "run_cancel")}
-      </button>
+      <Button label={say($lang, "run_cancel")} tone="secondary" onPress={() => u.send(cancel(run))} />
     {/if}
   </div>
   <Head
@@ -380,9 +390,6 @@
     {from}
     {to}
   />
-  {#if rounds?.opening?.goal}
-    <p class="mb-base text-note text-text-faint">{say($lang, "run_goal")}: {rounds.opening.goal}</p>
-  {/if}
   <Tabs
     label={say($lang, "run_lenses")}
     {lenses}

@@ -2715,10 +2715,6 @@
     "en": "nothing read",
     "zh": "没读过"
   },
-  "run_spent": {
-    "en": "spent {usd}",
-    "zh": "花了 {usd}"
-  },
   "run_turn_n": {
     "en": "turn {n}",
     "zh": "第 {n} 回合"
@@ -5230,6 +5226,18 @@
   "run_no_calls": {
     "en": "no tool calls yet",
     "zh": "还没有工具调用"
+  },
+  "run_calls_axis": {
+    "en": "UTC when it answered · how long",
+    "zh": "UTC 答复时刻 · 用时"
+  },
+  "run_call_running": {
+    "en": "running",
+    "zh": "在跑"
+  },
+  "run_call_ms": {
+    "en": "{n} ms",
+    "zh": "{n} 毫秒"
   },
   "run_no_turns": {
     "en": "no turns yet",
