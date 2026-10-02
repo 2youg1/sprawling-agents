@@ -230,14 +230,20 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
             "the hall was offered {absent}; the Mayor plans, it does not build"
         );
     }
+    // Both wait in the dormant index, a line each, and the hall reaches
+    // them through `describe` and `call` (`crates/runtime/Spec.lean` §8-60).
+    let listed = |name: &str| {
+        offered.contains(&format!("- {name}:")) || offered.contains(&format!("- {name}\\n"))
+    };
     assert!(
-        offered.contains("\"city\""),
+        listed("city"),
         "raising a building is the one thing the hall is for, and it needs a door to it"
     );
     assert!(
-        offered.contains("\"plan\""),
+        listed("plan"),
         "and the plan tool, which is what the hall writes"
     );
+    assert!(offered.contains("\"describe\"") && offered.contains("\"call\""));
 }
 
 /// The symptom this pins came out of a live city: the Mayor wrote a

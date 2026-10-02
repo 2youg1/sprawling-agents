@@ -106,6 +106,8 @@ fn shared(setup: &Setup) -> Vec<Episode> {
         signal(setup),
         crate::playback::episode(),
         proposal(setup),
+        describe(),
+        call(),
     ]
 }
 
@@ -490,6 +492,44 @@ fn succeed() -> Episode {
                     .iter()
                     .any(|started| started.record.predecessor == Some(seen.lead)),
                 "no run started as this run's successor".to_owned(),
+            )
+        },
+    }
+}
+
+/// The guide of a dormant tool: its whole disclosure, its schema, and
+/// the door it is run through (`crates/runtime/Spec.lean` §8-60).
+fn describe() -> Episode {
+    Episode {
+        step: Step {
+            tool: "describe",
+            args: json!({ "name": "archive" }),
+        },
+        holds: |seen| {
+            let text = answered_text(seen.answer)?;
+            ensure(
+                text.starts_with("tool archive: run it with `call`")
+                    && text.contains("input schema:"),
+                format!("the guide of a dormant tool read {text:?}"),
+            )
+        },
+    }
+}
+
+/// A call through `call` that stands for nothing reaches `call` itself
+/// and is refused by the catalog's own sentence (§8-61); every builder
+/// call above that named a dormant tool directly passed that tool's doors.
+fn call() -> Episode {
+    Episode {
+        step: Step {
+            tool: "call",
+            args: json!({ "name": "call", "args": {} }),
+        },
+        holds: |seen| {
+            let error = failed(seen.answer)?;
+            ensure(
+                error.get("subject") == Some(&json!("`call` cannot run itself")),
+                format!("a call through `call` naming itself answered {error:?}"),
             )
         },
     }

@@ -91,6 +91,7 @@ impl Model for Lead {
                     .iter()
                     .map(|tool| tool.name.as_str().to_owned()),
             );
+            offered.extend(dormant_tools(req));
         }
         drop(offered);
         self.heard.lock().unwrap().extend(
@@ -150,4 +151,20 @@ fn says(text: &str) -> Result<ModelReturn, AxError> {
         }])?,
         Vec::new(),
     ))
+}
+
+/// The tools the request's dormant index names: offered too, through
+/// `describe` and `call` (`crates/runtime/Spec.lean` §8-60). Skills are
+/// opened rather than called, so they are left out.
+pub(crate) fn dormant_tools(req: &ModelRequest) -> Vec<String> {
+    req.chat
+        .system
+        .iter()
+        .filter_map(|block| block.text.split_once("Dormant,"))
+        .flat_map(|(_, index)| index.lines().skip(1))
+        .filter_map(|line| line.strip_prefix("- "))
+        .map(|entry| entry.split_once(':').map_or(entry, |(name, _)| name))
+        .filter(|name| !name.starts_with("skill "))
+        .map(str::to_owned)
+        .collect()
 }

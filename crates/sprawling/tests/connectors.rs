@@ -34,8 +34,8 @@ const MODEL: &str = "scripted";
 const LISTING: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[{\"name\":\"ping\",\"description\":\"answer with pong\",\"inputSchema\":{\"type\":\"object\"}}]}}";
 const OFFERED: &str = "apps_ping";
 
-/// Keeps the name of every tool it is offered, and ends the run on its
-/// first turn.
+/// Keeps the name of every tool it is offered, in its tool list or its
+/// dormant index, and ends the run on its first turn.
 struct Listening(Arc<Mutex<Vec<String>>>);
 
 impl Model for Listening {
@@ -45,6 +45,22 @@ impl Model for Listening {
                 .tools
                 .iter()
                 .map(|tool| tool.name.as_str().to_owned()),
+        );
+        // A tool outside the mode's core is offered as a line of the
+        // dormant index (`crates/runtime/Spec.lean` §8-60).
+        self.0.lock().unwrap().extend(
+            req.chat
+                .system
+                .iter()
+                .filter_map(|block| block.text.split_once("Dormant,"))
+                .flat_map(|(_, index)| index.lines().skip(1))
+                .filter_map(|line| line.strip_prefix("- "))
+                .map(|entry| {
+                    entry
+                        .split_once(':')
+                        .map_or(entry, |(name, _)| name)
+                        .to_owned()
+                }),
         );
         Ok(ModelReturn::bare(
             kernel::model::message_payload(&[ContentBlock::Text {

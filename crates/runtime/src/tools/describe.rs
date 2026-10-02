@@ -98,7 +98,7 @@ impl Tool for DescribeTool {
             .map_err(|_| poisoned())?
             .describe(asked)?;
         Ok(ToolOutcome {
-            result: Payload::of(&serde_json::json!({ "guide": guide }))?,
+            result: Payload::of(&serde_json::json!({ "text": guide }))?,
             attachments: Vec::new(),
         })
     }

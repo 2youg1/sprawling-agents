@@ -41,9 +41,9 @@ fn tool_tables(bodies: &[String]) -> Vec<Vec<String>> {
 }
 
 /// Three successions, no person in the loop. The successor's tool table
-/// equals its predecessor's name for name — `delegate` included, because
-/// succession conserves depth — and the commit the fourth run checkpoints
-/// answers a lineage of four.
+/// equals its predecessor's name for name, and every dormant index names
+/// `delegate`, because succession conserves depth — and the commit the
+/// fourth run checkpoints answers a lineage of four.
 #[test]
 fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
     let dir = tempfile::tempdir().unwrap();
@@ -140,8 +140,15 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
     let tables = tool_tables(&bodies);
     let first = tables.first().expect("the first run called the model");
     let last = tables.last().expect("the fourth run called the model");
-    assert!(first.contains(&"delegate".to_owned()), "{first:?}");
-    assert!(first.contains(&"succeed".to_owned()), "{first:?}");
+    assert!(first.contains(&"call".to_owned()), "{first:?}");
+    // `delegate` and `succeed` wait in every run's dormant index, which a
+    // successor freezes from the same table (`crates/runtime/Spec.lean`
+    // §8-60).
+    let indexed = bodies
+        .iter()
+        .filter(|body| body.contains("- delegate") && body.contains("- succeed"))
+        .count();
+    assert!(indexed >= 4, "{indexed} requests named both in their index");
     assert_eq!(
         first, last,
         "the successor's tools equal its predecessor's, name for name"

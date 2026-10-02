@@ -12,12 +12,13 @@
 //! counts as one that ran them in turn.
 
 use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 
 use kernel::{
     AxError, Effect, IdemKey, RunId, Seq, Temporal, TimeMs, Tool, ToolCall, ToolOutcome, Writes,
 };
 use runtime::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
-use runtime::{Admitted, ConcurrentInvoke};
+use runtime::{Admitted, CallTool, Catalog, ConcurrentInvoke};
 
 use super::Sieving;
 
@@ -88,6 +89,9 @@ pub(super) struct Placing<'f> {
     /// told, and being told is what a mode is supposed to check.
     ran: (u32, u32),
     checkpointing: &'f Checkpointing,
+    /// What the run was told it can reach: the one authority on what a
+    /// call through `call` stands for (`crates/runtime/Spec.lean` §8-61).
+    catalog: Arc<Mutex<Catalog>>,
 }
 
 impl<'f> Placing<'f> {
@@ -104,7 +108,17 @@ impl<'f> Placing<'f> {
             next: 0,
             ran: (0, 0),
             checkpointing,
+            catalog: Arc::new(Mutex::new(Catalog::new())),
         }
+    }
+
+    /// Resolves calls through `call` against the run's own catalog. A
+    /// face built without it resolves nothing, and a call through `call`
+    /// then reaches no tool.
+    #[must_use]
+    pub(super) fn resolving(mut self, catalog: Arc<Mutex<Catalog>>) -> Placing<'f> {
+        self.catalog = catalog;
+        self
     }
 
     /// The commands this run ran: (passed, failed).
@@ -193,6 +207,19 @@ impl<'f> Placing<'f> {
 impl ConcurrentInvoke for Placing<'_> {
     fn meta_of(&self, call: &ToolCall) -> Option<&kernel::ToolMeta> {
         self.bench.meta_of(&call.name)
+    }
+
+    fn resolve_call(&self, call: ToolCall) -> ToolCall {
+        if call.name.as_str() != CallTool::NAME {
+            return call;
+        }
+        // A call the catalog will not resolve goes on as it came and
+        // reaches `call` itself, which asks the catalog the same question
+        // and answers its refusal: the refusal has one author.
+        match self.catalog.lock() {
+            Ok(catalog) => catalog.resolve_call(&call).unwrap_or(call),
+            Err(_) => call,
+        }
     }
 
     fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted {

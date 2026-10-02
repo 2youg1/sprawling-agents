@@ -193,6 +193,13 @@ impl Laying {
             Box::new(read),
             Box::new(search),
             Box::new(succeed),
+            // The two doors of the truncation lock: every admitted tool
+            // outside the mode's core and every skill is one line of the
+            // dormant index, and these are how a run reaches one
+            // (`crates/runtime/Spec.lean` §8-60). They hold the catalog
+            // rather than a copy, as `read` does.
+            Box::new(runtime::DescribeTool::new(Arc::clone(&catalog))?),
+            Box::new(runtime::CallTool::new(Arc::clone(&catalog))?),
         ];
         // What this building's residents are for decides the rest of
         // the bench. City Hall writes Markdown and plans: it gets no
