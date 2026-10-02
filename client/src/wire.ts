@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 46 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "1c9c23b70075efd48a0b855f13f0a09ca9c17e2fa5f8e6b9c66be40c1b4bf223" as const;
+export const WIRE_HASH = "77a2071b8a2e7094b3a9bcc7e570421609592f1a332111134aed1b9022ccb532" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -2491,15 +2491,6 @@ export const Lang = Schema.Literals(["en", "zh"]).annotate({ identifier: "Lang" 
 export type Lang = typeof Lang.Type;
 
 /**
- * How much of the world layer the page draws: none of it, whole panels
- * beside the conversation, or all of it as the workspace with the
- * conversation as a band along its foot. Three layouts rather than
- * three points on one slider, so three names.
- */
-export const Tier = Schema.Literals(["zen", "blend", "panorama"]).annotate({ identifier: "Tier" });
-export type Tier = typeof Tier.Type;
-
-/**
  * One word a person files sessions under: one to 24 letters of any script, digits, `-` or `_`, as `wire::Tag::parse` accepts it.
  */
 export const Tag = Schema.String.check(Schema.isPattern(new RegExp("^[-_\\p{Alphabetic}\\p{N}]{1,24}$", "u"))).pipe(Schema.brand("Tag"));
@@ -2517,6 +2508,15 @@ export const SessionTags = Schema.Struct({
   tags: Schema.Array(Tag),
 }).annotate({ identifier: "SessionTags" });
 export type SessionTags = typeof SessionTags.Type;
+
+/**
+ * How much of the world layer the page draws: none of it, whole panels
+ * beside the conversation, or all of it as the workspace with the
+ * conversation as a band along its foot. Three layouts rather than
+ * three points on one slider, so three names.
+ */
+export const Tier = Schema.Literals(["zen", "blend", "panorama"]).annotate({ identifier: "Tier" });
+export type Tier = typeof Tier.Type;
 
 /**
  * Everything one person settled about their own copy of the city.
