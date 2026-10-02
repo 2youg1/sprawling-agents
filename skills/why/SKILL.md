@@ -14,7 +14,7 @@ Companion to `how`. `how` answers what the code does. `why` answers what forces 
 
 ## Why this is hard
 
-Historical context is scattered across seven kinds of system, and you cannot tell from the question alone which one holds the answer. So the method is coverage, not minimalism: search every category you can reach, and treat a null result as a finding rather than a dead end. "The issue tracker has no ticket for this threshold" tells the user something real about how the decision was made.
+Historical context is scattered across seven kinds of system, and you cannot tell from the question alone which one holds the answer. So the method is coverage, not minimalism: search every category you can reach, and treat a null result as a finding rather than a dead end. "The issue tracker has no ticket for this threshold" tells the User something real about how the decision was made.
 
 ## Operating posture
 
@@ -79,7 +79,7 @@ Sort every claim into a confidence tier from `references/epistemics.md`, then wr
 
 **What we don't know.** The concrete gaps: what you were trying to answer, what you searched, what you searched for, and what came back. "We searched the tracker for 'rate limit' and found no ticket discussing this threshold" is worth far more than "we don't know."
 
-**Sources consulted.** One line per category, including the empty ones, formatted as `- <category>: <what was searched>. <what was found, or "no relevant results", or "skipped. reason">.` This coverage map is what lets the user judge breadth and redirect you.
+**Sources consulted.** One line per category, including the empty ones, formatted as `- <category>: <what was searched>. <what was found, or "no relevant results", or "skipped. reason">.` This coverage map is what lets the User judge breadth and redirect you.
 
 When the question is a precursor to changing the code, close by converting the findings into a Preserve / Change / Avoid / Risk constraint set for the change.
 
@@ -88,6 +88,6 @@ When the question is a precursor to changing the code, close by converting the f
 - **Confident storytelling.** A plausible narrative from thin evidence. An uncited bullet belongs in "inferred" or "hypotheses", never in "what we found".
 - **Citing code as evidence of its own intent.** "It handles null because it checks for null" is mechanics, not motivation.
 - **Recency bias.** The newest commit is not authoritative; the current shape is usually accreted. Trace back.
-- **Sycophantic agreement.** When the user's question embeds a hypothesis ("I assume this is for performance?"), treat it as one candidate and check it independently.
+- **Sycophantic agreement.** When the User's question embeds a hypothesis ("I assume this is for performance?"), treat it as one candidate and check it independently.
 - **Skipping the gaps section.** The honest accounting of what you could not find out is part of the value.
 - **Skipping a search by anticipation.** A null result is a data point; an unrun search is a blind spot.

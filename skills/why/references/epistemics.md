@@ -4,7 +4,7 @@
 
 How to reason about confidence when evidence is historical, fragmentary, and sometimes contradictory, and how to communicate it without flattening it into false certainty.
 
-Code doesn't carry its own motivation. You can read what code does; you can't read *why it exists*. That lives in commits, PRs, tickets, docs, and conversations, all incomplete, biased, and sometimes missing entirely. Pretending otherwise produces confident-sounding guesses that mislead the user.
+Code doesn't carry its own motivation. You can read what code does; you can't read *why it exists*. That lives in commits, PRs, tickets, docs, and conversations, all incomplete, biased, and sometimes missing entirely. Pretending otherwise produces confident-sounding guesses that mislead the User.
 
 ## Confidence Tiers
 
@@ -90,7 +90,7 @@ These signal that you're interpreting, not reporting. Use them liberally in the 
 
 ### Words to avoid
 
-- "obviously". If it were obvious, the user wouldn't be asking
+- "obviously". If it were obvious, the User wouldn't be asking
 - "clearly". Almost always precedes a claim that isn't clear
 - "of course". Same
 - "just" (as in "it's just X for performance"). Dismissive and usually hides uncertainty
@@ -109,7 +109,7 @@ Resist the urge to:
 
 Users often phrase `why` questions with an embedded hypothesis: "Why do we do it this way, I assume it's for performance?" Don't simply confirm it. Treat it as one candidate among others and check the evidence independently. If the evidence supports it, say so with citations; if not, say so and present what the evidence *does* support.
 
-The user's guess is a prompt for investigation, not a conclusion to validate.
+The User's guess is a prompt for investigation, not a conclusion to validate.
 
 ## When Evidence Contradicts
 
@@ -118,17 +118,17 @@ If two sources disagree (the PR description says one thing, the ticket says anot
 - **The ticket says** "we need this for customer X's compliance requirement"
 - **The PR says** "cleaning up tech debt in this area"
 
-Both may be true (the ticket motivated the work, the PR is the author's framing of it), or one may be wrong. Present both with their citations and let the user make the call.
+Both may be true (the ticket motivated the work, the PR is the author's framing of it), or one may be wrong. Present both with their citations and let the User make the call.
 
 ## When Evidence Is Missing
 
-An honest "we don't know" is one of the most valuable outputs this skill can produce. The user now knows:
+An honest "we don't know" is one of the most valuable outputs this skill can produce. The User now knows:
 
 - The answer isn't in the obvious places
 - They'll need to ask a human (the original author, the product owner, the team lead) to find out
 - Or they can decide the question isn't worth pursuing further
 
-Failing to mark a gap and filling it with a confident guess actively harms the user; they'll act on the guess.
+Failing to mark a gap and filling it with a confident guess actively harms the User; they'll act on the guess.
 
 When you hit a gap, name it concretely:
 - What question you were trying to answer

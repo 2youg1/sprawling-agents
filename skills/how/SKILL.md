@@ -27,7 +27,7 @@ Read the question for what kind of answer it wants:
 - "How is the auth service structured?" — an architectural overview
 - "Walk me through what happens when a user submits a form" — a runtime trace
 
-If the target is ambiguous, state your best-guess reading in one line and start working. Do not ask; let the user redirect you if you guessed wrong.
+If the target is ambiguous, state your best-guess reading in one line and start working. Do not ask; let the User redirect you if you guessed wrong.
 
 Then size the work. A single module or a narrow "how does function X work" is **simple**: explore and explain in one pass, skip to Step 3. A subsystem spanning several files or services, a cross-cutting feature, or a full overview is **complex**: run Step 2 first. When in doubt, treat it as simple, because you can always widen after the first pass hits a wall.
 
@@ -61,7 +61,7 @@ Reconcile the passes into one picture and write the explanation. Follow this str
 
 ## Critique mode
 
-Trigger this when the user asks for architectural problems or improvements rather than understanding.
+Trigger this when the User asks for architectural problems or improvements rather than understanding.
 
 ### Step 1. Explain first
 

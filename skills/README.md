@@ -8,7 +8,7 @@ Agent skills that ship with sprawling. Each directory holds one skill, and its `
 | [`blast-radius`](blast-radius/SKILL.md) | What a change could break outside its diff, proved by running code |
 | [`gauge`](gauge/SKILL.md) | Measuring a performance change with `sprawling gauge`: a pinned load, a baseline, alternating rounds, and a gate on a count rather than a clock |
 | [`how`](how/SKILL.md) | How a subsystem works, and where a piece of code should live |
-| [`playback`](playback/SKILL.md) | A stretch of a city's history made into one self-contained HTML page a person reviews offline, the reference page to start from, and the five checks it passes |
+| [`playback`](playback/SKILL.md) | A stretch of a city's history made into one self-contained HTML page the User reviews offline, the reference page to start from, and the five checks it passes |
 | [`sdd`](sdd/SKILL.md) | Specification-first development with Lean contracts |
 | [`translation`](translation/SKILL.md) | Translating texts whose form carries the thought into Chinese |
 | [`tutor`](tutor/SKILL.md) | Teaching one person a subject through dialogue until they can diagnose it |

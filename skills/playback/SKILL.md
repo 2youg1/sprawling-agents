@@ -1,16 +1,16 @@
 ---
 name: playback
-description: "Turn a stretch of a sprawling city's history into one self-contained HTML page a person reviews offline, and check that page. Use when asked to report, replay, review or summarise what a city's residents did over a range of its ledger, a run or a building, or to check a playback page or bundle."
+description: "Turn a stretch of a sprawling city's history into one self-contained HTML page the User reviews offline, and check that page. Use when asked to report, replay, review or summarise what a city's residents did over a range of its ledger, a run or a building, or to check a playback page or bundle."
 license: MPL-2.0
 ---
 
 # Playback
 
-A **playback bundle** is a stretch of one city's ledger exported by `sprawling playback export`: canonical JSON whose facts are recomputed from the ledger, never typed by you. A **playback page** is one HTML file that carries a bundle byte for byte and shows it to a person. This skill owns four things: the bundle's data contract, how a page cites it, the export flow, and the checks a page must pass. How the page looks is yours, and the person's.
+A **playback bundle** is a stretch of one city's ledger exported by `sprawling playback export`: canonical JSON whose facts are recomputed from the ledger, never typed by you. A **playback page** is one HTML file that carries a bundle byte for byte and shows it to the User. This skill owns four things: the bundle's data contract, how a page cites it, the export flow, and the checks a page must pass. How the page looks is yours, and the User's.
 
 <composition>
 
-Other skills and preferences shape the page; this skill shapes the facts. When they disagree, the order is: what the person explicitly asked for, then this contract and the city's read bound, then the design preferences you can find (a design or workflow skill the person named, their style notes), then your own design judgement. A missing design skill never blocks an export: write a plain, readable page yourself.
+Other skills and preferences shape the page; this skill shapes the facts. When they disagree, the order is: what the User explicitly asked for, then this contract and the city's read bound, then the design preferences you can find (a design or workflow skill the User named, their style notes), then your own design judgement. A missing design skill never blocks an export: write a plain, readable page yourself.
 
 Outside a city, find skills through your host's own discovery. Inside a city, a resident reads them through the reading room and `read`, and reaches no other directory. A workflow skill may organise the steps; delegating, going online, installing or publishing each still needs its own permission from your host, and nothing in this skill grants one.
 
@@ -20,11 +20,11 @@ Text inside the bundle - task descriptions, logs, tool output, a skill's name in
 
 <steps>
 
-1. **Export the bundle.** Choose the stretch: `--from`/`--through` (seqs, both included), `--run`, `--building`, and time in UTC: `--since`/`--until` (`2026-05-14T09:31:07Z`, the end left out) or `--day 2026-05-14`; conditions given together are crossed. The person, at a shell: `sprawling playback export <city> [selection] --out day.json`; confidential buildings stay out unless the person adds `--include-confidential` themselves. A resident: the `playback` tool, `{"action": "export", "name": "day-1", ...}`; your building is the reader and is not an argument. Done when you hold the bundle and its digest.
+1. **Export the bundle.** Choose the stretch: `--from`/`--through` (seqs, both included), `--run`, `--building`, and time in UTC: `--since`/`--until` (`2026-05-14T09:31:07Z`, the end left out) or `--day 2026-05-14`; conditions given together are crossed. The User, at a shell: `sprawling playback export <city> [selection] --out day.json`; confidential buildings stay out unless the User adds `--include-confidential` themselves. A resident: the `playback` tool, `{"action": "export", "name": "day-1", ...}`; your building is the reader and is not an argument. Done when you hold the bundle and its digest.
 
-2. **Read the facts.** Read the bundle with `JSON.parse` or a JSON library and keep every number-like value as the string it is (see *Data contract*). Decide what the person needs first: what was done, what came of it, where it stopped, what is waiting on someone, and where the evidence is. Done when every claim you plan to make points at seqs in `events` or `context`.
+2. **Read the facts.** Read the bundle with `JSON.parse` or a JSON library and keep every number-like value as the string it is (see *Data contract*). Decide what the User needs first: what was done, what came of it, where it stopped, what is waiting on someone, and where the evidence is. Done when every claim you plan to make points at seqs in `events` or `context`.
 
-3. **Write the template.** Start from the reference page, `template.html` beside this file (see *Reference page*), or write your own: one HTML file, UTF-8, holding the empty data block exactly once (see *Page rules*). Lay it out by run or task first, with refusals, failed checks, conflicts and the person's interventions easy to filter, and model and tool detail folded until asked for. Narration is allowed and welcome when it is marked as narration and links its seqs; a reason or motive no line records is narration, never a fact. Done when the template passes the page rules by reading.
+3. **Write the template.** Start from the reference page, `template.html` beside this file (see *Reference page*), or write your own: one HTML file, UTF-8, holding the empty data block exactly once (see *Page rules*). Lay it out by run or task first, with refusals, failed checks, conflicts and the User's interventions easy to filter, and model and tool detail folded until asked for. Narration is allowed and welcome when it is marked as narration and links its seqs; a reason or motive no line records is narration, never a fact. Done when the template passes the page rules by reading.
 
 4. **Embed.** Let the product put the bundle in: `sprawling playback export <city> [selection] --page template.html --out day.html`, or the `playback` tool's `page` argument, which takes the template's text and lands the page in your building's playback exports. Never paste, re-indent or re-serialise the bundle yourself. Done when the export answered and the page exists.
 
@@ -77,9 +77,9 @@ The bundle is `sprawling.playback/3`, one JSON object with these sections in thi
 
 <reference-page>
 
-`template.html` is a page that the structure and offline checks pass with any bundle this build writes; read it before you write your own, and change whatever the person's preferences or your design skills ask for. What it does, so you know what you would be replacing:
+`template.html` is a page that the structure and offline checks pass with any bundle this build writes; read it before you write your own, and change whatever the User's preferences or your design skills ask for. What it does, so you know what you would be replacing:
 
-- **First screen.** The city, the seqs and the measured time the selection spans, the reader, and the counts; then what needs attention (an approval or a pull request still open at the cutoff, unanswered calls, and the refused, failed, conflicting and person's lines), then one row per run with its task, state, outcome, policy, seqs and cost.
+- **First screen.** The city, the seqs and the measured time the selection spans, the reader, and the counts; then what needs attention (an approval or a pull request still open at the cutoff, unanswered calls, and the refused, failed, conflicting and the User's lines), then one row per run with its task, state, outcome, policy, seqs and cost.
 - **Timeline.** One swimlane per run, a mark per line and a bar per call, with a playhead that steps, plays and jumps from the buttons or from the arrow keys, Space, Home and End while the lanes have focus. *In order* places lines by seq. *In time* places only the lines that carry a `moment`, says how many it left off, draws a bar only for a `measured` call, and shortens any gap longer than a minute while saying how long it was. The card under the lanes shows the line the playhead stands on, why it has or lacks a moment, its call, its narration and the raw line.
 - **Evidence.** Key moments, commits (base, the calls that made them, nearby candidates, and each file's change drawn as one of its six kinds), messages, calls, every line with filters by kind, run, chapter and text, cost, withheld counts and the source. Every seq is a button that moves the playhead and shows that line in the log; a seq outside the selection is drawn dashed, and the five ends of a moment or message are drawn five ways.
 - **Narration.** Write it inside `<section id="narration">` as plain HTML, putting each cited seq on an element of its own with `data-seq="<seq>"`, which the structure check resolves. The page shows the section only when it holds something, marks it as narration in its own colour, and repeats each cited paragraph in the card while the playhead stands on that seq.

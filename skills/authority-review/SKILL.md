@@ -56,7 +56,7 @@ Six shapes carry most of the findings. Each is a labelled heuristic — "possibl
 | Primitive Obsession | a primitive or string stands in for a domain concept, or a cast and an optional make the contract indirect | give the concept its own small type; make the boundary explicit |
 | Repeated Switches | the same switch on the same type recurs across the change | one map, or one polymorphism, shared by every site |
 
-A script finds classes 2 to 4; only reading finds class 1. Script the literals repeated across files, the constants grouped by value and by name, the `Option` clusters, the wildcard arms, the `let _ =`. Then trace every fact a script flagged, and every setting a person can enter, from where it is set to where it takes effect, comparing each stop on the way. The copy that disagrees is the one no script could see.
+A script finds classes 2 to 4; only reading finds class 1. Script the literals repeated across files, the constants grouped by value and by name, the `Option` clusters, the wildcard arms, the `let _ =`. Then trace every fact a script flagged, and every setting the User can enter, from where it is set to where it takes effect, comparing each stop on the way. The copy that disagrees is the one no script could see.
 
 **Ambitious about structure.** Do not stop at "this could be a bit cleaner." Look for the restructuring that makes whole branches, helpers, modes, or layers disappear — the move that makes the change feel inevitable in hindsight. When there is a path to deleting complexity rather than rearranging it, push for that path.
 

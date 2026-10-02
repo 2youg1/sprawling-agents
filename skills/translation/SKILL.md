@@ -15,9 +15,9 @@ metadata:
 
 Form-as-content text (形式即内容): text in which the author's wording, syntax, and difficulty ARE the content. This skill does one thing: render such text into Chinese without loss — and without variance, across segments, sessions, and compression events.
 
-Language protocol: this document is in English because that is where the executing model reasons most precisely. Everything delivered to the user — Charter (弁言), translation, audit — is in Chinese.
+Language protocol: this document is in English because that is where the executing model reasons most precisely. Everything delivered to the User — Charter (弁言), translation, audit — is in Chinese.
 
-Authority: the defaults encode kl9's stance. **Domestication is 0 — permanently.** No fluent register, no reader-friendly mode, no text-type dial. When the user rules otherwise, the user governs; absent instruction, execute strictly.
+Authority: the defaults encode kl9's stance. **Domestication is 0 — permanently.** No fluent register, no reader-friendly mode, no text-type dial. When the User rules otherwise, the User governs; absent instruction, execute strictly.
 
 <defects>
 You do not tire and you do not slide on habit. You have three defects of your own; every discipline here exists to catch them:
@@ -31,13 +31,13 @@ You do not tire and you do not slide on habit. You have three defects of your ow
 
 <source-text mandate="translate from the original language">
 
-What you restore is the original's color — its syntax, structure, lexicon. A relay translation is one translator's decisions already made; translating the relay compounds two distortions and overfits you to the relay language's habits. Verify at Phase 0: if the text in hand is a relay, name the original and ask the user to rule. Received renderings are tested against the original, never its English gloss — the Marx case under Law 2 shows a relay corrupting a concept net. Exception: quotations the author himself read in relay are translated from his relay, because his argument runs on the wording he read.
+What you restore is the original's color — its syntax, structure, lexicon. A relay translation is one translator's decisions already made; translating the relay compounds two distortions and overfits you to the relay language's habits. Verify at Phase 0: if the text in hand is a relay, name the original and ask the User to rule. Received renderings are tested against the original, never its English gloss — the Marx case under Law 2 shows a relay corrupting a concept net. Exception: quotations the author himself read in relay are translated from his relay, because his argument runs on the wording he read.
 
 </source-text>
 
 <overview>
 
-The pipeline in one breath: **Charter → segment loop → chapter settlement → mechanical audit → conditional review.** Phase 0 reads strategically and puts every governing decision — terms, conventions, grammar stance — before the user; nothing is translated before the user rules. Phase 1 translates segment by segment, verbatim source from disk, every decision written through to disk the moment it is made. Phase 1.5 settles deferred flags at chapter boundaries. Phase 2 is a deterministic audit (grep and scripts, zero model tokens). Phase 3 fires only on named triggers. Disk is the truth; the conversation is a cache — the workflow survives context compression and session death by construction.
+The pipeline in one breath: **Charter → segment loop → chapter settlement → mechanical audit → conditional review.** Phase 0 reads strategically and puts every governing decision — terms, conventions, grammar stance — before the User; nothing is translated before the User rules. Phase 1 translates segment by segment, verbatim source from disk, every decision written through to disk the moment it is made. Phase 1.5 settles deferred flags at chapter boundaries. Phase 2 is a deterministic audit (grep and scripts, zero model tokens). Phase 3 fires only on named triggers. Disk is the truth; the conversation is a cache — the workflow survives context compression and session death by construction.
 
 Scale routing, by volume of content to be translated (characters):
 
@@ -45,7 +45,7 @@ Scale routing, by volume of content to be translated (characters):
 |---|---|
 | **< 100K** | Read the full text before translating. Charter as a message block; workspace optional; no scripts. Segment loop and audit run unchanged — scale changes preparation, never discipline. |
 | **100K–150K** | Full workspace `source/ segments/ translated/ charter.md glossary.md flags.md manifest.json`. Strategic-position reading (~10%) + zero-token scripts (segmenter, KWIC concordance, n-gram, cast scan) replace full pre-reading. Expect compression events; the revival pack is routine. |
-| **150K+** | Everything above, plus: **translate the appendices and bibliography first.** They are name-dense and context-light — rendering them (bibliography keeps searchable source form; only connective tissue is translated) yields the book's proper-noun and term inventory as a concrete artifact the user can rule on at Charter time, instead of an abstract table. Chapter settlements are mandatory; plan for multiple compression cycles; the guillotine standard is the acceptance test. |
+| **150K+** | Everything above, plus: **translate the appendices and bibliography first.** They are name-dense and context-light — rendering them (bibliography keeps searchable source form; only connective tissue is translated) yields the book's proper-noun and term inventory as a concrete artifact the User can rule on at Charter time, instead of an abstract table. Chapter settlements are mandatory; plan for multiple compression cycles; the guillotine standard is the acceptance test. |
 
 </overview>
 
@@ -212,11 +212,11 @@ Residue, honest and bounded: *they*/concealed gender forces 他/她 — most con
 
 **The period is the assertion boundary.** One source sentence, one target sentence, every language; an added period is a fabricated assertion, and the comma is the trapdoor for covert splitting.
 
-Below the period, one principle replaces per-language legislation: **one-to-one is the ideal; every departure must be explainable to the user.** Grammar-mandated commas (DE subordinate clauses), rhythmic 読点, editorial LA punctuation, list commas → 顿号, a level-2 recovery borrowing a comma slot — all legitimate departures; what makes them legitimate is that you can name the reason. A departure you cannot justify in one line is a departure you do not make. Semicolons, dashes, colons: preserve at their own level.
+Below the period, one principle replaces per-language legislation: **one-to-one is the ideal; every departure must be explainable to the User.** Grammar-mandated commas (DE subordinate clauses), rhythmic 読点, editorial LA punctuation, list commas → 顿号, a level-2 recovery borrowing a comma slot — all legitimate departures; what makes them legitimate is that you can name the reason. A departure you cannot justify in one line is a departure you do not make. Semicolons, dashes, colons: preserve at their own level.
 
 **Script normalization**: the translation uses Chinese punctuation throughout — ，。；？！「」（）—— regardless of source conventions; half-width marks survive only inside retained source-script material (names, citations, formulas). Normalization is mechanical and auditable: a half-width mark adjacent to a CJK character is residue.
 
-**Punctuation as leak detector.** Period conservation guarantees sentence-level 1:1 alignment: period delta is forced to 0. Quotation marks are conceptually binding, so quote-mark delta is forced to 0. Within each aligned pair, comma count is a free integrity signal: the allowance is at most 1 comma per 1,000 Chinese characters; beyond that, a target sentence several commas short of its source has usually dropped a clause (漏译), and one several commas over has usually grown an explanation (改译). Any newly introduced punctuation mark — period, comma, quote mark, semicolon, dash, colon, question/exclamation mark, ellipsis, bracket — must be reported to the user with a concrete reason; silent punctuation repair is forbidden. After every section, run a command-line/Python count against the source and target; mental checking does not pass the gate.
+**Punctuation as leak detector.** Period conservation guarantees sentence-level 1:1 alignment: period delta is forced to 0. Quotation marks are conceptually binding, so quote-mark delta is forced to 0. Within each aligned pair, comma count is a free integrity signal: the allowance is at most 1 comma per 1,000 Chinese characters; beyond that, a target sentence several commas short of its source has usually dropped a clause (漏译), and one several commas over has usually grown an explanation (改译). Any newly introduced punctuation mark — period, comma, quote mark, semicolon, dash, colon, question/exclamation mark, ellipsis, bracket — must be reported to the User with a concrete reason; silent punctuation repair is forbidden. After every section, run a command-line/Python count against the source and target; mental checking does not pass the gate.
 
 <exhibit source="Gibbon, Decline and Fall, ch. I" lang="EN" teaches="the audit catching the translator's own hand">
 > The various tribes of Britons possessed valour without conduct, and the love of freedom without the spirit of union. They took up arms with savage fierceness; they laid them down, or turned them against each other with wild inconstancy; and while they fought singly, they were successively subdued. Neither the fortitude of Caractacus, nor the despair of Boadicea, nor the fanaticism of the Druids, could avert the slavery of their country, or resist the steady progress of the Imperial generals, who maintained the national glory, when the throne was disgraced by the weakest or the most vicious of mankind.
@@ -230,13 +230,13 @@ Below the period, one principle replaces per-language legislation: **one-to-one 
 
 <workflow>
 
-<phase n="0" name="Charter 弁言" gate="hard: not one segment translated before user ruling">
+<phase n="0" name="Charter 弁言" gate="hard: not one segment translated before User ruling">
 
 Scale routing. **Paper**: read the full text; a charter block and a translated file suffice. **Book**: build workspace `source/ segments/ translated/ charter.md glossary.md flags.md manifest.json`; read the strategic positions — opening, ending, densest chapter (~10%; endings are read because narrative-stance revelations live there); run per-project zero-token scripts over the whole text: segmenter, KWIC concordance (candidate terms, every occurrence ±50 words), repeated n-gram detector (motifs, refrains, officialese), cast/name frequency scan. The concordance replaces full pre-reading: adjudicate terms against the whole book's evidence lines — the lexicographer's method.
 
 **Segmentation follows the author's joints**: chapter, section, scene, argument-step. A division that runs long is subdivided at semantic seams, targeting roughly 5K characters per segment — never inside a sentence, a dialogue exchange, or a breathing unit. Uneven lengths are fine; severed units are not.
 
-The Charter ships with the translation: the reader's contract and **the sole truth for any resumed or compressed session**. Contents (delivered in Chinese; translation begins after the user rules):
+The Charter ships with the translation: the reader's contract and **the sole truth for any resumed or compressed session**. Contents (delivered in Chinese; translation begins after the User rules):
 
 1. **Source verification**: original vs. relay.
 2. **Term verdict table — frequency head only** (30–50 rows): `term | proposed | received | reasoning | banned variants`, the author's own defining passage quoted alongside. The long tail is governed by item 3, not enumerated.
@@ -277,7 +277,7 @@ At each chapter boundary and at book end: adjudicate every open flags.md entry �
 | Banned term variants | grep the verdict table, term by term |
 | Banned grammar variants | grep 为……所 / 遭 / 受; modals outside the fixed four |
 | Marker conservation | per segment: source passives vs 被; perfects vs 已; unlicensed 了 |
-| Assertion-punctuation conservation | per section, script/Python-count periods/quote marks/semicolon/question/exclaim/dash/colon/ellipsis/brackets, source vs target; period delta must be 0, quote-mark delta must be 0, and any newly introduced punctuation mark requires a user-facing reason (the Gibbon dash was caught exactly this way) |
+| Assertion-punctuation conservation | per section, script/Python-count periods/quote marks/semicolon/question/exclaim/dash/colon/ellipsis/brackets, source vs target; period delta must be 0, quote-mark delta must be 0, and any newly introduced punctuation mark requires a reason given to the User (the Gibbon dash was caught exactly this way) |
 | Comma leak detection | within period-aligned sentence pairs, script/Python-count comma delta; allowed total drift ≤ 1 comma per 1,000 Chinese characters, anything beyond → verbatim source comparison (deficit ≈ dropped clause, surplus ≈ explanatory inflation) |
 | Punctuation script normalization | half-width marks adjacent to CJK; unpaired ellipsis; whitelist retained source-script spans |
 | Stray foreign tokens | scan against the conventions whitelist |
@@ -290,7 +290,7 @@ Every row is deterministic — script or grep, zero model tokens. This audit IS 
 
 <phase n="3" name="source-comparison review" trigger="conditional — never a default stage">
 
-Triggers: user reports errors; number/date/name-dense segments; flags.md density spikes; legal/medical/political risk; pre-publication; a late narrative-stance revelation (review only stance-sensitive segments). Scope: only triggered segments, against verbatim source, in this session. Fix real errors — omissions, inversions, subject-object swaps, drifted names and numbers. Never wash the strangeness the laws protect: a reviewer who "improves fluency" is running domestication, and domestication is 0.
+Triggers: User reports errors; number/date/name-dense segments; flags.md density spikes; legal/medical/political risk; pre-publication; a late narrative-stance revelation (review only stance-sensitive segments). Scope: only triggered segments, against verbatim source, in this session. Fix real errors — omissions, inversions, subject-object swaps, drifted names and numbers. Never wash the strangeness the laws protect: a reviewer who "improves fluency" is running domestication, and domestication is 0.
 
 </phase>
 

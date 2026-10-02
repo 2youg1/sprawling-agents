@@ -30,7 +30,7 @@ A reading is evidence only when the load, the build and the machine class behind
    - A served city: `sprawling gauge --at <addr> > city.jsonl` records in the background for as long as it runs; a 0 in a `city` line can mean "not read", while `null` in every other line means "not measured".
    - `read_cost_us` on a `run` line is the time spent reading the process table: how much the measuring itself disturbed the run. `--every` is 250 ms at the shortest for that reason.
 
-6. **On sprawling itself.** How long a model or tool call took is in the Ledger: `sprawling view <city>` shows the `t` of `model_called` and `model_returned`, and of `tool_called` and `tool_result`. How long the city took to open is the `opened the city in` line `serve` writes. A dispatch's preparation is a trace line; serve with `--log trace` to see it. Operations a person waits on belong in milliseconds and internal hot paths in microseconds; a reading in seconds is a finding to act on.
+6. **On sprawling itself.** How long a model or tool call took is in the Ledger: `sprawling view <city>` shows the `t` of `model_called` and `model_returned`, and of `tool_called` and `tool_result`. How long the city took to open is the `opened the city in` line `serve` writes. A dispatch's preparation is a trace line; serve with `--log trace` to see it. Operations the User waits on belong in milliseconds and internal hot paths in microseconds; a reading in seconds is a finding to act on.
 
 7. **Report.** Give the machine class — cores, memory, disk kind — and the load's digest, with floor, p50 and the number of samples. Leave out machine names, account names and absolute paths.
 

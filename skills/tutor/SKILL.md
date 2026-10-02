@@ -1,6 +1,6 @@
 ---
 name: tutor
-description: "Discovery teaching: take one specific person to the level where they can diagnose a subject, driven by dialogue, verifiable outcomes, and the learner's own words as evidence, producing no courseware. Use when the user asks to be taught something, to start or continue a learning track, to record its progress, or to judge how far someone has gotten."
+description: "Discovery teaching: take one specific person to the level where they can diagnose a subject, driven by dialogue, verifiable outcomes, and the learner's own words as evidence, producing no courseware. Use when the User asks to be taught something, to start or continue a learning track, to record its progress, or to judge how far someone has gotten."
 license: MPL-2.0
 ---
 

@@ -10,7 +10,7 @@ license: MPL-2.0
 
 <principle>
 
-Translate the requirements and decisions already agreed upon by the user and the primary agent into a module specification whose substantive content is formally verified Lean code, so that subsequent implementers can distinguish binding decisions from implementation details left to their discretion.
+Translate the requirements and decisions already agreed upon by the User and the primary agent into a module specification whose substantive content is formally verified Lean code, so that subsequent implementers can distinguish binding decisions from implementation details left to their discretion.
 
 The specification precedes the production implementation. Constructing, executing, and proving Lean models are activities within specification design; a model that serves as a specification is a maintained project artifact.
 
@@ -26,7 +26,7 @@ Preserve the seventeen responsibilities below in their stated order, organizing 
 
 Before designing or modifying a specification, read `AGENTS.md`, the architecture documents, the glossary, relevant decision records, existing specifications, Lean models, and neighboring modules, and adopt their established concepts and conventions.
 
-Distinguish user decisions, established project constraints, and agent inferences, recording their sources in the comments accompanying the relevant declarations; retain inferences as explicit assumptions rather than presenting them as matters already agreed upon.
+Distinguish User decisions, established project constraints, and agent inferences, recording their sources in the comments accompanying the relevant declarations; retain inferences as explicit assumptions rather than presenting them as matters already agreed upon.
 
 Reuse existing definitions and verification mechanisms. When a design conflicts with an established decision, revise that decision and its rationale before changing the specifications and implementations that depend on it.
 
@@ -139,7 +139,7 @@ The subagent selects an implementation within the contract's permitted scope; wh
 
 Unless the task explicitly includes specification design, the subagent implements the existing contract; when it finds a contradiction or an unsatisfiable requirement, it submits evidence and proposed revisions for the primary agent, which retains the context of the agreement, to resolve.
 
-The primary agent handles revisions under the authorization already given, consulting the user only on matters that remain undecided or exceed that authorization.
+The primary agent handles revisions under the authorization already given, consulting the User only on matters that remain undecided or exceed that authorization.
 
 </delegation>
 
