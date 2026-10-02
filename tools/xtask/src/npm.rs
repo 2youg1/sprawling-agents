@@ -64,8 +64,10 @@ const PERMITTED: &str = "deny.toml";
 /// syntax highlighter and its grammars, which ship as a lazy chunk the
 /// first screen never downloads (client-SPEC 4-26); the `@codemirror`
 /// packages are RefRain's text editor, its find and replace, and its
-/// version diff, another lazy chunk (client-SPEC 7N, 7-9).
-const RUNTIME: [&str; 18] = [
+/// version diff, another lazy chunk (client-SPEC 7N, 7-9); `pdfjs-dist`
+/// and `docx-preview` draw a PDF's pages and a DOCX laid out as pages in
+/// RefRain, each its own lazy chunk (client-SPEC 4-54, 12-32).
+const RUNTIME: [&str; 20] = [
     "@codemirror/commands",
     "@codemirror/merge",
     "@codemirror/search",
@@ -82,7 +84,9 @@ const RUNTIME: [&str; 18] = [
     "@lezer/rust",
     "@lezer/yaml",
     "@lucide/svelte",
+    "docx-preview",
     "effect",
+    "pdfjs-dist",
     "svelte",
 ];
 
