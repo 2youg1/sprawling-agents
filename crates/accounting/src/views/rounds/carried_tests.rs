@@ -222,3 +222,23 @@ fn an_exec_call_carries_the_code_its_command_ended_with_and_no_code_when_it_had_
     let codes: Vec<Option<i64>> = folded[0].calls.iter().map(|call| call.exit_code).collect();
     assert_eq!(codes, vec![Some(2), None]);
 }
+
+/// What the provider read from its cache and what it wrote into it are
+/// priced apart, so a turn answers both (`crates/wire/Spec.lean` §8-76).
+#[test]
+fn a_turn_carries_cache_reads_and_cache_writes_apart() {
+    let returned = record(
+        2,
+        EventKind::ModelReturned,
+        serde_json::json!({ "message": { "content": [] }, "calls": 0, "usage": {
+            "input_tokens": 1200, "output_tokens": 340,
+            "cache_read_tokens": 800, "cache_write_tokens": 150 } }),
+    );
+    let used = turns(&[asked(1), returned])[0]
+        .used
+        .expect("usage is on the wire");
+    assert_eq!(
+        (used.cached, used.cache_write),
+        (wire::Tokens::new(800), Some(wire::Tokens::new(150)))
+    );
+}
