@@ -54,6 +54,7 @@
   import Shelved from "./gallery/shelved.svelte";
   import Switches from "./gallery/switches.svelte";
   import Talking from "./gallery/talking.svelte";
+  import Thr from "./gallery/thr.svelte";
   import Tables from "./gallery/tables.svelte";
   import Monitored from "./gallery/monitored.svelte";
   import Timed from "./gallery/timed.svelte";
@@ -89,6 +90,7 @@
   <Conversation />
   <RefusedLine />
   <Talking />
+  <Thr />
   <Followed />
   <Anchored />
   <Produced />
