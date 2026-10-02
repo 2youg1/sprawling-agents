@@ -9,7 +9,7 @@
 //!
 //! The disk is the authority, as it is for `listing`: an index kept
 //! beside the tree would be a second copy of what the tree says (wire
-//! D18). The walk goes level by level, each level in name order, so the
+//! D19). The walk goes level by level, each level in name order, so the
 //! shallow files come first and two machines answer in one order.
 
 use std::collections::VecDeque;
