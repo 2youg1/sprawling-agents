@@ -57,7 +57,7 @@ pub fn revise<T>(path: &Path, act: impl FnOnce(&Held<'_>, &[u8]) -> Result<T, Ax
 - **一次保存要的是「此刻的字节」，不是「我起手时的正文」。** `edit_against` 拿调用方给的整份正文与盘上的比较；页面对任意一份文档的保存（`crates/wire/Spec.lean` §8-72）带的是 32 字节的版本摘要与几段编辑，判它的是 `documents::save`，它要读的是盘上此刻的全部字节。`revise` 在 `edit` 的锁里把这份文件读出来交给 `act`，`act` 判定、经 `Held::replace` 整份换上，锁在 `act` 返回之前一直持有，所以两个从同一版出发的保存只有先到的那个落下，第二个读到的已经是第一个的字节。
 - **没有文件读作空字节**，与 `edit_against` 同一条规则；`edit_against` 就是 `revise` 加一次逐字节比较，「读不到就是空」这条读法只写在 `revise` 一处。别的读错（目录、无权限）是 `E_STORAGE_FATAL`，与本模块其余的写面同一句恢复语。
 - **本 crate 不依赖 `documents`。** 判定由调用方交进来：`accounting::worker::commanding::saving` 交的是 `documents::save` 与 `documents::decide`（accounting-SPEC §8-22）。这扇门只拥有锁、读与整份换上——就是 §8-27 的两条性质。
-- **当前状态：修改提案的提出与收回还没有写者。** 提案由 run 提出（`crates/kernel/Spec.lean` §8-83 的 `proposal_offered`），这需要一件工作台工具：它读那一版、切出原文、经 `documents::Offer::of` 判长度，把一行 `proposal_offered` 记在这次 run 名下，收回时记 `proposal_withdrawn`。这件工具还没有落地，所以今天账本上的提案只来自测试。refrain 路线图 §4-10 说「文稿审阅期间 `edit`、`exec` 对该文稿的写入受同一边界约束，否则只在候选工作树里操作」：本轮按后一条走——提案只是账本上的一行，run 不改那份文档，接受时由人的决定经 `revise` 落下。前一条若要成立，要由 runtime 的写门判「这份文档有开着的提案」，那是 runtime 规格的事，决定它的证据是那件工具落地时一次 run 同时提案又直接改同一份文档的情形。
+- **当前状态：修改提案由 run 经工作台的 `proposal` 工具提出与收回**（accounting-SPEC §8-30）：工具读城里那份文件此刻的一版（documents D35），把一行 `proposal_offered` 记在这次 run 名下，收回时记 `proposal_withdrawn`；run 不改那份文档，接受时由人的决定经 `revise` 落下。run 一边提案一边直接改同一份文档时不由 runtime 的写门判，守边界的是版本：直接的写造出新版本，人决定那张卡时以 `E_VERSION_CONFLICT` 拒（documents D36；citysim `tests/proposal_baseline.rs`）。
 - 验收：`document::tests::a_revision_reads_the_bytes_on_disk_and_holds_the_lock_while_it_decides`——两个线程各从同一份文件出发做两百次读-判-换，计数是四百；没有文件时交给 `act` 的是空字节。
 -/
 
