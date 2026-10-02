@@ -88,7 +88,7 @@ impl Harness {
         match self {
             Harness::ClaudeCode => Launch {
                 program: Program::Npx,
-                args: &["-y", "@agentclientprotocol/claude-agent-acp@0.84.0"],
+                args: &["-y", "@agentclientprotocol/claude-agent-acp@0.85.1"],
             },
             Harness::Codex => Launch {
                 program: Program::Npx,
