@@ -4,30 +4,43 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The first screen: three things a person can do next, each one a
-  // card they can click rather than a hint line they read past (ux
-  // A4). Each card leaves this screen by doing the thing it names, so
-  // there is no separate "next" to press: walking the welcome and
-  // starting the work are the same gesture.
+  // The first-run guide (refrain §3-15, client-SPEC 7G): five steps in
+  // one column, only the first required. Each step is the city's real
+  // door for that job - the provider form and the `main` model choice,
+  // the doctor's report with its installs, the governing documents, the
+  // shelves, the MCP page - so finishing a step here and finishing it in
+  // the settings are one act with one receipt.
   //
-  // **Without a main model the provider card comes first and says so**
-  // - it is the one step every other card waits on, and a person who
-  // assigns work before it meets a refusal instead of a run. The work
-  // card stays a link, but its hint says what it is waiting for. Once a
-  // main model exists the provider card goes away: a card pointing at a
-  // finished errand is a card nobody should meet.
+  // **Done is the city's answer; put off is the person's.** `guide.ts`
+  // keeps the two apart: a step is drawn done only when the city's
+  // configuration says so, and the progress the city keeps for this
+  // guide (`Query::Guide`, `Command::PutGuide`) records only what the
+  // person looked at, put off, and where the guide reopens. The progress
+  // writes no ledger record, so after each write the page asks for it
+  // again, and until that answer lands it draws the write it sent.
   //
-  // **`assign work` writes through the draft door.** The composer box
-  // in the room the card opens reads its first text from
-  // `PreferenceDoor.draft`, so this is the same unsent-message row a
-  // reload keeps - one door, one row per room, never a second place a
-  // draft is kept.
+  // **Leaving is one choice.** "Start the conversation" opens the
+  // Mayor's room with nothing sent and nothing written into the box;
+  // the guide is then left, and opening the city no longer offers it.
 
-  import Glyph from "./parts/glyph.svelte";
+  import { tick, untrack } from "svelte";
+
   import { QUERIES } from "../core/asking";
+  import { readAnswer } from "../core/answered";
+  import { putGuide } from "../core/commands";
   import { say } from "../core/lang";
-  import { MAYOR, toFragment } from "../core/route";
+  import type { Key } from "../core/lang";
+  import { MAYOR } from "../core/route";
   import { ui } from "../ui";
+  import type { GuideProgress, GuideStep } from "../wire";
+  import Button from "./parts/button.svelte";
+  import Glyph from "./parts/glyph.svelte";
+  import Page from "./parts/page.svelte";
+  import Unanswered from "./parts/unanswered.svelte";
+  import { outstanding } from "./setup/dependencies";
+  import type { Configured, Standing } from "./welcome/guide";
+  import { STEPS, currentOf, left, opened, putOff, putOffTheRest, standingOf } from "./welcome/guide";
+  import Body from "./welcome/body.svelte";
 
   interface Props {
     // Whether this layout is the page or a region inside one: a
@@ -39,76 +52,187 @@
 
   const u = ui();
   const { lang } = u;
-  const endpoints = u.conn.asking.ask(QUERIES.endpoints);
+  const uid = $props.id();
 
-  const mainReady = $derived.by((): boolean => {
-    const held = $endpoints;
-    if (held === undefined || !("endpoints" in held)) return false;
-    return held.endpoints.chosen.some((each) => each.tag === "main");
+  const endpoints = u.conn.asking.ask(QUERIES.endpoints);
+  const doctor = u.conn.asking.ask(QUERIES.doctor);
+  const identity = u.conn.asking.ask(QUERIES.identity);
+  const guide = u.conn.asking.ask(QUERIES.guide);
+
+  const configured = $derived.by((): Configured => {
+    const chosen = $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.chosen : null;
+    const missing = $doctor !== undefined && "doctor" in $doctor ? outstanding($doctor.doctor, "use") : null;
+    const stated = $identity !== undefined && "identity" in $identity && "stated" in $identity.identity
+      ? $identity.identity.stated
+      : null;
+    return {
+      provider: chosen === null ? null : chosen.some((each) => each.tag === "main"),
+      dependencies: missing === null ? null : missing.length === 0,
+      texts: stated === null ? null : named(stated.user_id) || named(stated.mayor),
+      skills: null,
+      mcp: null,
+    };
   });
 
-  // The card is a link like any other and the draft is written before
-  // the address bar moves; marking the welcome walked is what keeps the
-  // shell from sending the person back here in the next breath.
-  function assignWork(): void {
-    u.prefs.setDraft(MAYOR, say($lang, "welcome_card_work_draft"));
-    u.prefs.setWelcomed(true);
+  function named(value: string | null | undefined): boolean {
+    return value !== null && value !== undefined && value.trim() !== "";
   }
 
-  function walked(): void {
-    u.prefs.setWelcomed(true);
+  const read = $derived(readAnswer($guide, (held) => ("guide" in held ? held.guide : undefined)));
+  // The write this page sent and the city has not answered yet.
+  let sent = $state<GuideProgress | null>(null);
+  $effect(() => {
+    if ($guide === undefined) return;
+    untrack(() => {
+      sent = null;
+    });
+  });
+  const progress = $derived(sent ?? (read.kind === "held" ? read.value : {}));
+  const current = $derived(currentOf(progress, configured));
+  // The one step drawn open: the current one, unless the person folded it.
+  let folded = $state(false);
+  const open = $derived(folded ? null : current);
+  const ready = $derived(configured.provider === true);
+
+  function write(next: GuideProgress): void {
+    sent = next;
+    u.send(putGuide(next));
+    u.conn.asking.refresh(QUERIES.guide);
   }
+
+  function toggle(step: GuideStep): void {
+    if (open === step) {
+      folded = true;
+      return;
+    }
+    folded = false;
+    write(opened(progress, step));
+  }
+
+  // Putting a step off closes its body, so the focus moves to the step
+  // the guide moved on to rather than to the top of the document.
+  function later(step: Exclude<GuideStep, "provider">): void {
+    folded = false;
+    const next = putOff(progress, step);
+    write(next);
+    void tick().then(() => {
+      document.getElementById(headId(next.at ?? step))?.focus();
+    });
+  }
+
+  function start(): void {
+    write(left(progress));
+    u.prefs.setWelcomed(true);
+    u.go({ kind: "talk", address: MAYOR });
+  }
+
+  function headId(step: GuideStep): string {
+    return `${uid}-${step}`;
+  }
+
+  const TITLE: Record<GuideStep, Key> = {
+    provider: "guide_step_provider",
+    dependencies: "guide_step_dependencies",
+    texts: "guide_step_texts",
+    skills: "guide_step_skills",
+    mcp: "guide_step_mcp",
+  };
+  const ABOUT: Record<GuideStep, Key> = {
+    provider: "guide_step_provider_about",
+    dependencies: "guide_step_dependencies_about",
+    texts: "guide_step_texts_about",
+    skills: "guide_step_skills_about",
+    mcp: "guide_step_mcp_about",
+  };
+  const WORD: Record<Standing, Key | null> = {
+    configured: "guide_standing_configured",
+    required: "guide_standing_required",
+    skipped: "guide_standing_skipped",
+    seen: "guide_standing_seen",
+    untouched: null,
+  };
+  const INK: Record<Standing, string> = {
+    configured: "text-text",
+    required: "text-alert",
+    skipped: "text-text-faint",
+    seen: "text-text-quiet",
+    untouched: "text-text-faint",
+  };
 </script>
 
-<!-- The welcome has no rail and no strip of facts, so it is the one
-page drawn in the middle of the window: one column the width of a page,
-its title and its three doors sharing one left edge. -->
-<div class="mx-auto flex w-full max-w-page min-w-0 flex-1 flex-col px-wide pt-[18vh] pb-section">
-  {#if rank === "page"}
-    <h1 tabindex="-1" class="mb-wide text-title font-title">{say($lang, "welcome_title")}</h1>
-  {:else}
-    <h2 class="mb-wide text-title font-title">{say($lang, "welcome_title")}</h2>
-  {/if}
-  <div class="grid w-full grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] gap-base">
-    {#if !mainReady}
-      <a
-        href={toFragment({ kind: "setup" })}
-        class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors hover:bg-raised-hover"
-        onclick={walked}
-      >
-        <Glyph name="setup" class="mt-tight shrink-0 text-text-quiet" />
-        <span class="flex min-w-0 flex-col gap-tight">
-          <span class="flex min-w-0 flex-wrap items-baseline gap-snug">
-            <span class="text-label font-label">{say($lang, "welcome_card_provider")}</span>
-            <span class="text-note font-label text-text">{say($lang, "welcome_card_provider_first")}</span>
-          </span>
-          <span class="text-note text-text-quiet">{say($lang, "welcome_card_provider_hint")}</span>
-        </span>
-      </a>
-    {/if}
-    <a
-      href={toFragment({ kind: "talk", address: MAYOR })}
-      class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors hover:bg-raised-hover"
-      onclick={assignWork}
-    >
-      <Glyph name="talk" class="mt-tight shrink-0 text-text-quiet" />
-      <span class="flex min-w-0 flex-col gap-tight">
-        <span class="text-label font-label">{say($lang, "welcome_card_work")}</span>
-        <span class="text-note text-text-quiet">
-          {say($lang, mainReady ? "welcome_card_work_hint" : "welcome_card_work_hint_unready")}
-        </span>
-      </span>
-    </a>
-    <a
-      href={toFragment({ kind: "city" })}
-      class="rise flex items-start gap-base rounded-card bg-raised px-pane py-base transition-colors hover:bg-raised-hover"
-      onclick={walked}
-    >
-      <Glyph name="city" class="mt-tight shrink-0 text-text-quiet" />
-      <span class="flex min-w-0 flex-col gap-tight">
-        <span class="text-label font-label">{say($lang, "welcome_card_city")}</span>
-        <span class="text-note text-text-quiet">{say($lang, "welcome_card_city_hint")}</span>
-      </span>
-    </a>
+<Page title={say($lang, "welcome_title")} note={say($lang, "welcome_note")} {rank}>
+  <div class="@container min-w-0">
+  <div class="grid min-w-0 grid-cols-[repeat(11,minmax(0,1fr))] gap-x-gutter @max-[40rem]:grid-cols-1">
+    <div class="col-[1/9] flex min-w-0 flex-col @max-[40rem]:col-span-full">
+      {#if read.kind === "unavailable"}
+        <Unanswered query={read.query} asked={QUERIES.guide} />
+      {/if}
+      <ol aria-label={say($lang, "guide_steps")}>
+        {#each STEPS as step, at (step)}
+          {@const standing = standingOf(step, progress, configured)}
+          {@const word = WORD[standing]}
+          <li class="border-b border-edge">
+            <h2>
+              <button
+                id={headId(step)}
+                type="button"
+                class="grid w-full grid-cols-[4ch_minmax(0,1fr)_auto] items-baseline gap-x-base py-base text-left transition-colors hover:wash"
+                aria-expanded={open === step}
+                aria-controls={`${headId(step)}-body`}
+                onclick={() => {
+                  toggle(step);
+                }}
+              >
+                <span class="figure text-heading text-text-faint">{String(at + 1).padStart(2, "0")}</span>
+                <span class="min-w-0 text-label font-label text-text">{say($lang, TITLE[step])}</span>
+                <span class={["flex items-center gap-tight text-note", INK[standing]]}>
+                  {#if standing === "configured"}
+                    <Glyph name="check" class="size-glyph-sm" />
+                  {/if}
+                  {#if word !== null}{say($lang, word)}{/if}
+                </span>
+              </button>
+            </h2>
+            {#if open === step}
+              <section
+                id={`${headId(step)}-body`}
+                aria-labelledby={headId(step)}
+                class="flex min-w-0 flex-col gap-base pb-wide pl-[calc(4ch+var(--spacing-base))] @max-[40rem]:pl-0"
+              >
+                <p class="max-w-measure text-note text-text-quiet">{say($lang, ABOUT[step])}</p>
+                <Body {step} />
+                {#if step !== "provider"}
+                  <div class="flex justify-end">
+                    <Button
+                      label={say($lang, "guide_later")}
+                      tone="quiet"
+                      onPress={() => {
+                        later(step);
+                      }}
+                    />
+                  </div>
+                {/if}
+              </section>
+            {/if}
+          </li>
+        {/each}
+      </ol>
+      <div class="flex flex-wrap items-center gap-base pt-wide">
+        <Button
+          label={say($lang, "guide_start")}
+          tone="primary"
+          {...ready ? {} : { why: say($lang, "guide_start_needs_main") }}
+          onPress={start}
+        />
+        <Button
+          label={say($lang, "guide_put_off_rest")}
+          tone="quiet"
+          onPress={() => {
+            write(putOffTheRest(progress));
+          }}
+        />
+      </div>
+    </div>
   </div>
-</div>
+  </div>
+</Page>

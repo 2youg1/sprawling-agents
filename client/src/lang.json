@@ -2116,12 +2116,32 @@
     "zh": "账本"
   },
   "rec_lenses": {
-    "en": "four lenses",
-    "zh": "四个透镜"
+    "en": "three readings",
+    "zh": "三种读法"
   },
   "rec_log": {
     "en": "the log",
     "zh": "日志"
+  },
+  "rec_timeline": {
+    "en": "the timeline",
+    "zh": "时间线"
+  },
+  "rec_source": {
+    "en": "source",
+    "zh": "来源"
+  },
+  "rec_source_every": {
+    "en": "ledger and log",
+    "zh": "账本与日志"
+  },
+  "rec_utc": {
+    "en": "UTC · ledger position",
+    "zh": "UTC · 账本位置"
+  },
+  "rec_newest": {
+    "en": "back to the newest",
+    "zh": "回到最新"
   },
   "rec_nothing": {
     "en": "nothing",
@@ -4220,8 +4240,92 @@
     "zh": "等你的事"
   },
   "welcome_title": {
-    "en": "welcome",
-    "zh": "欢迎"
+    "en": "getting started",
+    "zh": "上手指南"
+  },
+  "welcome_note": {
+    "en": "Five steps. Only the first is required; the others can wait, and the settings bring you back to any of them.",
+    "zh": "五步。只有第一步必做；其余可以稍后再做，设置里随时能回到任何一步。"
+  },
+  "guide_steps": {
+    "en": "steps",
+    "zh": "步骤"
+  },
+  "guide_step_provider": {
+    "en": "connect a provider and choose the main model",
+    "zh": "连接 provider，选定主模型"
+  },
+  "guide_step_provider_about": {
+    "en": "Pick a provider or a local endpoint, give it the credentials it asks for, then choose the model the main tag answers with. The other roles keep their defaults until you change them.",
+    "zh": "选择 provider 或本地端点，填上它要的凭据，再为 main 选一个对话模型。其他角色保持默认，以后再改。"
+  },
+  "guide_step_dependencies": {
+    "en": "install dependencies",
+    "zh": "安装依赖项"
+  },
+  "guide_step_dependencies_about": {
+    "en": "What this machine has and lacks for the work a city does. Installs run on the machine that runs the city, one item at a time, and a failed one blocks nothing else.",
+    "zh": "这台机器为城里的工作装了什么、缺什么。安装发生在运行城市的主机上，一项一项进行，某一项失败不拦住别的。"
+  },
+  "guide_step_texts": {
+    "en": "texts and names",
+    "zh": "文本与称呼"
+  },
+  "guide_step_texts_about": {
+    "en": "The documents that tell residents who you are and how the Mayor works. Each saves on its own, and a name takes effect in new sessions.",
+    "zh": "告诉居民你是谁、市长怎么工作的几份文档。每份单独保存，称呼在新会话里生效。"
+  },
+  "guide_step_skills": {
+    "en": "import skills",
+    "zh": "导入 skill"
+  },
+  "guide_step_skills_about": {
+    "en": "Skills sit on shelves: the city library, a building's own shelf, or an outside folder mounted read-only. A skill on a shelf is not yet one a building may use.",
+    "zh": "skill 放在书架上：城库、某栋楼自己的书架，或只读挂载的外部目录。上了书架，不等于某栋楼已经允许使用。"
+  },
+  "guide_step_mcp": {
+    "en": "connect MCP",
+    "zh": "连接 MCP"
+  },
+  "guide_step_mcp_about": {
+    "en": "Tool servers a building may reach, added by command, by address or as JSON, and checked before anyone uses them.",
+    "zh": "楼能够到的工具服务器，按命令、地址或 JSON 加入，用之前先测连接。"
+  },
+  "guide_step_mcp_open": {
+    "en": "open the MCP page →",
+    "zh": "打开 MCP 页 →"
+  },
+  "guide_standing_configured": {
+    "en": "done",
+    "zh": "已完成"
+  },
+  "guide_standing_required": {
+    "en": "required",
+    "zh": "必做"
+  },
+  "guide_standing_skipped": {
+    "en": "put off",
+    "zh": "稍后再做"
+  },
+  "guide_standing_seen": {
+    "en": "looked at",
+    "zh": "看过"
+  },
+  "guide_later": {
+    "en": "set up later",
+    "zh": "稍后设置"
+  },
+  "guide_put_off_rest": {
+    "en": "put off the optional steps",
+    "zh": "跳过全部可选项"
+  },
+  "guide_start": {
+    "en": "start the conversation",
+    "zh": "开始对话"
+  },
+  "guide_start_needs_main": {
+    "en": "the conversation needs a main model first",
+    "zh": "先选定主模型，才能开始对话"
   },
   "whose_label": {
     "en": "whose commit",
@@ -4678,42 +4782,6 @@
   "palette_no_tafuri": {
     "en": "no command called tafuri. There is no design here, only its critique.",
     "zh": "没有叫 tafuri 的命令。这里没有设计，只有对设计的批判。"
-  },
-  "welcome_card_work": {
-    "en": "assign work",
-    "zh": "派活"
-  },
-  "welcome_card_work_hint": {
-    "en": "Write what needs doing and hand it to the Mayor.",
-    "zh": "写下要做的事，交给市长。"
-  },
-  "welcome_card_work_hint_unready": {
-    "en": "Available once a provider is connected.",
-    "zh": "接上供应商后可用。"
-  },
-  "welcome_card_work_draft": {
-    "en": "Ask the city to …",
-    "zh": "让这座城去办……"
-  },
-  "welcome_card_provider": {
-    "en": "connect a provider",
-    "zh": "接上一家供应商"
-  },
-  "welcome_card_provider_first": {
-    "en": "do this first",
-    "zh": "先做这一步"
-  },
-  "welcome_card_provider_hint": {
-    "en": "Point this city at a model it may call.",
-    "zh": "给这座城指定一个能调用的模型。"
-  },
-  "welcome_card_city": {
-    "en": "see the city",
-    "zh": "看看这座城"
-  },
-  "welcome_card_city_hint": {
-    "en": "Every building, and every run going on in it.",
-    "zh": "每一栋楼，以及楼里正在跑的每一次 run。"
   },
   "run_doing_waiting": {
     "en": "waiting",

@@ -6,40 +6,67 @@
 -->
 
 <script lang="ts" module>
-  // The path from an empty city to the first assignment, in the three
-  // states a person can meet it in: no provider attached, a provider
-  // attached and no main model chosen, and a main model chosen. Each is
-  // drawn at the two windows the path is judged at - a phone at 390 and
-  // a desktop at 1440 - because the order of the welcome cards is the
-  // whole point of the first two states, and a grid that reflows at 390
-  // is where that order could quietly change.
+  // The first-run guide in the three states a person meets it in: a
+  // fresh city, where the one required step is open and nothing else is
+  // marked; a city with a main model, the dependencies put off and the
+  // texts step open over a name already written; and a guide walked to
+  // its end, every optional step either looked at or put off. Each is
+  // drawn at a phone's 390 and a desktop's 1440, because the step list
+  // is one column at both and its order is the whole point.
   //
   // The refusal below is the one a person meets when they assign work
-  // before any of this: the city's way out stands under the heading,
+  // before the first step: the city's way out stands under the heading,
   // unfolded, since it is the only sentence that knows the cause.
 
   import { QUERIES } from "../../core/asking";
-  import type { Answer, EndpointsAnswer, Query } from "../../wire";
+  import type { Answer, EndpointsAnswer, GuideProgress, IdentityAnswer, Query } from "../../wire";
   import { ENDPOINTS } from "./served";
 
   const BARE: EndpointsAnswer = { chosen: [], endpoints: [] };
-  const UNCHOSEN: EndpointsAnswer = { chosen: [], endpoints: ENDPOINTS.endpoints };
+
+  const NAMED: IdentityAnswer = {
+    stated: {
+      about: "",
+      user_id: "ada",
+      mayor: "Cat",
+      mayor_text: "",
+      preferences_text: "",
+      version: "b3:0000000000000000000000000000000000000000000000000000000000000001",
+    },
+  };
 
   interface State {
     readonly name: string;
-    readonly held: EndpointsAnswer;
+    readonly endpoints: EndpointsAnswer;
+    readonly guide: GuideProgress;
+    readonly identity: IdentityAnswer | undefined;
   }
 
   const STATES: readonly State[] = [
-    { name: "no provider", held: BARE },
-    { name: "a provider, no main model", held: UNCHOSEN },
-    { name: "a main model", held: ENDPOINTS },
+    { name: "a fresh city", endpoints: BARE, guide: {}, identity: undefined },
+    {
+      name: "a main model, dependencies put off, texts open",
+      endpoints: ENDPOINTS,
+      guide: { at: "texts", dependencies: "skipped", texts: "seen" },
+      identity: NAMED,
+    },
+    {
+      name: "walked to the end",
+      endpoints: ENDPOINTS,
+      guide: { at: "mcp", dependencies: "skipped", texts: "seen", skills: "skipped", mcp: "seen" },
+      identity: NAMED,
+    },
   ];
 
   const WIDTHS: readonly number[] = [390, 1440];
 
-  function answering(held: EndpointsAnswer): (query: Query) => Answer | undefined {
-    return (query) => (query === QUERIES.endpoints ? { endpoints: held } : undefined);
+  function answering(state: State): (query: Query) => Answer | undefined {
+    return (query) => {
+      if (query === QUERIES.endpoints) return { endpoints: state.endpoints };
+      if (query === QUERIES.guide) return { guide: state.guide };
+      if (query === QUERIES.identity && state.identity !== undefined) return { identity: state.identity };
+      return undefined;
+    };
   }
 </script>
 
@@ -52,13 +79,8 @@
 
 {#each STATES as state (state.name)}
   {#each WIDTHS as width (width)}
-    <Case label={`welcome · ${state.name} at ${String(width)}`} {width}>
-      <Stand
-        link={{ kind: "live", city: "sprawling" }}
-        unread={[]}
-        waiting={[]}
-        answers={answering(state.held)}
-      >
+    <Case label={`guide · ${state.name} at ${String(width)}`} {width}>
+      <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(state)}>
         <Welcome rank="section" />
       </Stand>
     </Case>
