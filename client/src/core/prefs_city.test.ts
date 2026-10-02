@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
 
 import { loadPreferences } from "./prefs";
-import { adopted } from "./prefs_city";
+import { adopted, appearanceOnWire } from "./prefs_city";
 import { memory } from "./rows";
 import type { PreferencePatch } from "../wire";
 
@@ -17,6 +17,7 @@ describe("the preferences the city keeps", () => {
     const answer = {
       lang: "zh",
       panel: false,
+      tier: "panorama",
       proxying: "always",
       appearance: {
         lighting: "light",
@@ -28,6 +29,8 @@ describe("the preferences the city keeps", () => {
         density: "compact",
         chroma: "off",
         motion: "on",
+        glass: "off",
+        blend_percent: 45,
       },
     } as const;
 
@@ -35,6 +38,7 @@ describe("the preferences the city keeps", () => {
       ...held,
       lang: "zh",
       panel: false,
+      tier: "panorama",
       proxying: "always",
       appearance: {
         lighting: "light",
@@ -46,10 +50,20 @@ describe("the preferences the city keeps", () => {
         density: "compact",
         chroma: "off",
         motion: "on",
-        glass: "on",
-        blend: null,
+        glass: "off",
+        blend: 45,
       },
     });
+  });
+
+  test("a city that never heard of the tier or the glass leaves this browser's, and an opacity outside the slider is no opacity", () => {
+    const door = loadPreferences(memory(), "en");
+    door.setTier("zen");
+    door.setAppearance({ ...get(door.held).appearance, glass: "off", blend: 60 });
+    const held = get(door.held);
+    const answer = { tier: null, appearance: { ...appearanceOnWire(held.appearance), glass: null, blend_percent: 7 } };
+
+    expect(adopted(held, answer)).toEqual({ ...held, appearance: { ...held.appearance, blend: null } });
   });
 
   test("each named change is told to the city as its own patch", () => {
@@ -80,10 +94,13 @@ describe("the preferences the city keeps", () => {
           density: appearance.density,
           chroma: appearance.chroma,
           motion: appearance.motion,
+          glass: appearance.glass,
+          blend_percent: appearance.blend,
         },
       },
       { proxying: "never" },
       { chord: { action: "go.city", spelled: "accel+2" } },
+      { tier: "zen" },
     ]);
   });
 });

@@ -16,7 +16,7 @@ import { describe, expect, test } from "bun:test";
 import { Schema } from "effect";
 
 import { Address, ClientFrame, IdemKey, ProviderName, RunId, Seq, TemplateName } from "../wire";
-import type { Effort } from "../wire";
+import type { Effort, RunPolicy } from "../wire";
 import { encodeFrame } from "./frames";
 import type { View } from "./route";
 import { SLASH, find, parse } from "./slash";
@@ -39,9 +39,14 @@ interface Done {
   readonly went: readonly View[];
   readonly written: readonly string[];
   readonly efforts: readonly (Effort | null)[];
+  readonly policies: readonly RunPolicy[];
 }
 
-const NOTHING: Done = { sent: [], went: [], written: [], efforts: [] };
+const NOTHING: Done = { sent: [], went: [], written: [], efforts: [], policies: [] };
+
+// What the person chose beside the box: a create-only experiment that
+// must show its tests, so a verb that drops a value is seen dropping it.
+const CHOSEN: RunPolicy = { mode: "work", write: "create", admit: "tested", landing: "experiment" };
 
 interface Case {
   readonly line: string;
@@ -53,6 +58,7 @@ function ran(line: string): Done {
   const went: View[] = [];
   const written: string[] = [];
   const efforts: (Effort | null)[] = [];
+  const policies: RunPolicy[] = [];
   const hands: SlashHands = {
     command: (command) => {
       sent.push(readFrame(JSON.parse(encodeFrame({ command }).replace(IDEM_RE, `"idem":"${IDEM}"`))));
@@ -65,20 +71,22 @@ function ran(line: string): Done {
     models: [{ endpoint: "local", model: "m-local" }],
     effort: "high",
     setEffort: (effort) => efforts.push(effort),
-    mode: "work",
+    policy: CHOSEN,
+    setPolicy: (policy) => policies.push(policy),
     goal: "the goal",
     write: (next) => written.push(next),
   };
   const call = parse(line);
   const verb = find(call?.verb ?? "");
   if (call !== null && verb !== undefined) verb.run(hands, call);
-  return { sent, went, written, efforts };
+  return { sent, went, written, efforts, policies };
 }
 
 // A verb that did its one thing and emptied the line.
 const sending = (...sent: ClientFrame[]): Done => ({ ...NOTHING, sent, written: [""] });
 const going = (view: View): Done => ({ ...NOTHING, went: [view], written: [""] });
 const setting = (effort: Effort | null): Done => ({ ...NOTHING, efforts: [effort], written: [""] });
+const admitting = (admit: RunPolicy["admit"]): Done => ({ ...NOTHING, policies: [{ ...CHOSEN, admit }], written: [""] });
 
 const CASES: Readonly<Record<string, readonly Case[]>> = {
   "/dispatch": [
@@ -90,7 +98,7 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
             addr: ROOM,
             task: "add the parser",
             goal: "the goal",
-            policy: { mode: "work", write: "full", admit: "standing", landing: "ordinary" },
+            policy: CHOSEN,
             session: null,
             effort: "high",
             idem: IDEM,
@@ -149,6 +157,16 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
     { line: "/effort", done: setting(null) },
     { line: "/effort unstated", done: setting(null) },
     { line: "/effort bogus", done: NOTHING },
+  ],
+  "/admit": [
+    { line: "/admit contract", done: admitting("contract_kept") },
+    { line: "/admit double", done: admitting("double_validated") },
+    { line: "/admit", done: admitting("standing") },
+    { line: "/admit everything", done: NOTHING },
+  ],
+  "/room": [
+    { line: "/room hall/mayor", done: going({ kind: "talk", address: MAYOR }) },
+    { line: "/room", done: NOTHING },
   ],
   "/go": [
     { line: "/go cost", done: going({ kind: "cost" }) },
