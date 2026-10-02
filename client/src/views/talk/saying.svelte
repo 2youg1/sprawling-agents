@@ -5,14 +5,15 @@
 -->
 
 <script lang="ts">
-  // The words of a turn while they are still arriving. Blocks that can no
-  // longer change (a list, a table, a code block) are laid out as they
-  // close, so the reply does not jump when the record takes over; only
+  // The words of a turn while they are still arriving. The city reads
+  // the blocks that can no longer change (a list, a table, a code block)
+  // as they close, so they are laid out as they close and the reply does
+  // not jump when the record takes over (client-SPEC 4-26, 4-53); only
   // the open tail is drawn as raw text, its last few characters faint so
-  // text emerges instead of appearing. Derived from the text and nothing
-  // else: no timer, no queue, no per-character node.
-  import { closedUpTo } from "../../core/prose";
-  import Prose from "../prose.svelte";
+  // text emerges instead of appearing. No timer, no queue, no
+  // per-character node.
+  import Laid from "../refrain/laid.svelte";
+  import { laidReply } from "../reply.svelte";
 
   interface Props {
     readonly text: string;
@@ -26,20 +27,16 @@
   // reader's eye sits on is not the shimmering one.
   const EDGE = 10;
 
-  // `laid` is a string, so `Prose` re-reads it only when a block closes,
-  // not on every token.
-  const laid = $derived(text.slice(0, closedUpTo(text)));
-  const open = $derived(text.slice(laid.length));
+  const laid = laidReply(() => text, "streaming");
+  const open = $derived(text.slice(laid.reached));
   const settled = $derived(open.slice(0, -EDGE));
   const edge = $derived(open.slice(-EDGE));
 </script>
 
 <div class="my-base text-body">
   <div class="mb-tight text-note text-text-faint">{who}</div>
-  {#if laid !== ""}
-    <Prose text={laid} />
-  {/if}
-  <div class="whitespace-pre-wrap leading-relaxed">
+  <Laid blocks={laid.blocks} />
+  <div class="whitespace-pre-wrap break-words leading-relaxed">
     {settled}<span class="text-text-faint">{edge}</span><span
       class="blink ml-tight inline-block size-[6px] bg-accent align-baseline"
     ></span>

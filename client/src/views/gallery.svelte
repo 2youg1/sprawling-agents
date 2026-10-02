@@ -43,6 +43,7 @@
   import Keepers from "./gallery/kept.svelte";
   import RefusedLine from "./gallery/refused_line.svelte";
   import Rfr from "./gallery/rfr.svelte";
+  import Md from "./gallery/md.svelte";
   import Monitor from "./gallery/monitor.svelte";
   import Parts from "./gallery/parts.svelte";
   import Mailbox from "./gallery/mailbox.svelte";
@@ -96,6 +97,7 @@
   <Workbench />
   <Mailbox />
   <Conversation />
+  <Md />
   <RefusedLine />
   <Talking />
   <Thr />

@@ -25,8 +25,9 @@
   interface Props {
     readonly blocks: readonly Block[];
     // Opens a link relative to the document; absent where links cannot
-    // be followed.
-    readonly onOpen: (target: string) => void;
+    // be followed - a reply has no document a relative link could be
+    // relative to, so its link is drawn as its words (client-SPEC 4-53).
+    readonly onOpen?: ((target: string) => void) | undefined;
     // Whether these are a window's top-level blocks, which carry the
     // byte they start at so a reading can find its place among them.
     readonly placed?: boolean;
@@ -100,6 +101,8 @@
       {@const target = piece.target}
       {#if ABSOLUTE.test(target)}
         <a href={target} rel="noreferrer" target="_blank" class="text-accent underline">{@render drawn(piece.parts)}</a>
+      {:else if onOpen === undefined}
+        {@render drawn(piece.parts)}
       {:else}
         <button
           type="button"
@@ -188,7 +191,7 @@
   {:else if "rule" in block}
     <hr data-start={start} class="my-base border-edge" />
   {:else if "footnote" in block}
-    <div data-start={start} class="my-snug flex gap-snug text-note text-text-quiet">
+    <div data-start={start} class="my-snug flex items-baseline gap-snug text-note text-text-quiet">
       <sup class="text-text-faint">{block.footnote.name}</sup>
       <div class="min-w-0 flex-1"><Laid blocks={block.footnote.blocks} {onOpen} /></div>
     </div>

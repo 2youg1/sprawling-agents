@@ -9,14 +9,17 @@
 // the clock:
 //   raw   - the whole text in one pre-wrapped node, laid out as blocks
 //           only when the record takes over;
-//   block - the blocks `closedUpTo` has closed drawn as blocks, the open
-//           tail as text (what `talk/saying.svelte` draws).
-// Both shapes build their blocks with `blocks` and the element each
-// `prose.svelte` branch uses, so the laid-out part costs what the real
-// page costs, less the styling the stylesheet adds to both alike. The two run interleaved, so a slow moment lands on both.
-
-import { blocks, closedUpTo } from "../src/core/prose";
-import type { Block } from "../src/core/prose";
+//   block - the blocks that have closed drawn as blocks, the open tail
+//           as text (what `talk/saying.svelte` draws).
+// The page reads no Markdown: the city does (client-SPEC 4-26), and
+// this probe prices layout, not reading. The reply is fixed, and its
+// blocks are the stretches between its blank lines - it has no blank
+// line inside a code block - so a block closes where the blank line
+// after it arrives, which is the city's closure point for this reply
+// (`crates/documents/Spec.lean` D31) but for its heading, which the
+// city closes one line earlier. Each block is drawn with the element
+// `refrain/laid.svelte` gives its kind. The two shapes run interleaved,
+// so a slow moment lands on both.
 
 const TOKEN = 4;
 const ROUNDS = 7;
@@ -54,49 +57,46 @@ function element(tag: string, text: string): HTMLElement {
   return node;
 }
 
-function words(block: Block): string {
-  switch (block.kind) {
-    case "heading":
-    case "paragraph":
-    case "quote":
-      return block.inline.map((part) => part.text).join("");
-    case "code":
-      return block.text;
-    case "list":
-      return "";
-    case "table":
-      return "";
+// The element `refrain/laid.svelte` gives a block, told by how its
+// source begins - enough for this reply, whose every block is one of
+// these five.
+function drawBlock(source: string): HTMLElement {
+  const lines = source.split("\n");
+  if (source.startsWith("- ")) {
+    const list = document.createElement("ul");
+    for (const line of lines) list.append(element("li", line.slice(2)));
+    return list;
   }
+  if (source.startsWith("|")) {
+    const table = document.createElement("table");
+    for (const line of lines.filter((each) => !each.startsWith("|---"))) {
+      const row = document.createElement("tr");
+      for (const cell of line.split("|").slice(1, -1)) row.append(element("td", cell.trim()));
+      table.append(row);
+    }
+    return table;
+  }
+  if (source.startsWith("```")) return element("pre", lines.slice(1, -1).join("\n"));
+  return element("p", source.replace(/^#+ /u, ""));
 }
 
-function drawBlock(block: Block): HTMLElement {
-  switch (block.kind) {
-    case "list": {
-      const list = document.createElement(block.ordered ? "ol" : "ul");
-      for (const item of block.items) list.append(element("li", item.map((part) => part.text).join("")));
-      return list;
-    }
-    case "table": {
-      const table = document.createElement("table");
-      for (const row of block.rows) {
-        const line = document.createElement("tr");
-        for (const cell of row) line.append(element("td", cell));
-        table.append(line);
-      }
-      return table;
-    }
-    case "code":
-      return element("pre", words(block));
-    case "quote":
-      return element("blockquote", words(block));
-    case "heading":
-    case "paragraph":
-      return element("p", words(block));
-  }
+// The blocks of the stretch before `end`, which ends on a blank line.
+function blocksBefore(text: string, end: number): string[] {
+  return text
+    .slice(0, end)
+    .split("\n\n")
+    .filter((each) => each.trim() !== "");
+}
+
+// Where the blocks that can no longer change end: just past the last
+// blank line that has arrived.
+function closedIn(text: string): number {
+  const blank = text.lastIndexOf("\n\n");
+  return blank < 0 ? 0 : blank + 2;
 }
 
 function draw(host: HTMLElement, text: string): void {
-  host.replaceChildren(...blocks(text).map(drawBlock));
+  host.replaceChildren(...blocksBefore(text, text.length).map(drawBlock));
 }
 
 interface Turn {
@@ -129,11 +129,11 @@ function blockTurn(root: HTMLElement): Turn {
   return {
     root,
     feed(text) {
-      const closed = closedUpTo(text);
+      const closed = closedIn(text);
       if (closed !== laidLength) {
-        // `prose.svelte` re-reads every closed block, and its unkeyed
-        // each leaves the DOM of a block it already drew untouched.
-        laid.append(...blocks(text.slice(0, closed)).slice(laid.childElementCount).map(drawBlock));
+        // `saying.svelte` appends the blocks each answer brings and
+        // leaves the DOM of a block it already drew untouched.
+        laid.append(...blocksBefore(text, closed).slice(laid.childElementCount).map(drawBlock));
         laidLength = closed;
       }
       words.data = text.slice(closed);
