@@ -34,8 +34,9 @@ import client.spec.Views.Parts
 | | | 页签上 ←／→、Home／End | 换一栏显示，同 `parts/tabs.svelte` |
 | 右侧的面（一栏） | 同检视面 | 关闭键、Escape、浏览器返回、边缘返回 | 关上右侧并退出它的历史格，焦点回到打开它的控件 |
 | 信箱键、设置键 | APG Button | Enter／Space | 打开各自的面；面关上时焦点回到这个键 |
-| 信箱面 | 非模态的 `popover="auto"`，带 `aria-label` 的 `<aside>` | Escape／点面外 | 关上，焦点回到信箱键（平台行为） |
-| | | Accel-B | 开着时关上，关着时打开 |
+| 信箱面 | 非模态的一层，带 `aria-label` 的 `<aside>`，画在三个边缘键之下（D60） | Escape | 关上；焦点在面里时回到信箱键 |
+| | | 点面外（包括另两个边缘键） | 关上，焦点留在点到的地方 |
+| | | 信箱键、Accel-B | 开着时关上（焦点在面里时回到信箱键），关着时打开，焦点不动 |
 | 信箱面里的条目 | 无 APG 部件模式：一串各自可达的条目，加上 vim 的走法 | j／k | 焦点移到下一个／上一个条目，两端不环绕；条目是一行的链接或一张请决定卡本身 |
 | | | 1–9 | 前九个条目各在行尾画出自己的数字；按下是跟随那一行的链接（信箱随之关上），或把焦点放到那张卡上 |
 | | | 落在文本框里或带修饰键的同一批键 | 不接管 |
@@ -91,6 +92,7 @@ import client.spec.Views.Parts
 1. **图层键**（`views/edge.svelte`）：按一下按 zen → blend → panorama → zen 循环（三档的名字是 client D17），按三下回到原档（`three_presses_come_home`）；按住超过 300 ms 临时进 blend，松开回到人选定的档，看一眼不改选定的档（`a_peek_keeps_the_chosen_tier`）。每次启动从 zen 开始，存下的档不在启动时读回（`a_launch_opens_in_zen`，client D47）。不论此刻开着设置面还是别的页，按一下都回到对话、换到下一档、焦点落进对话框（`a_press_lands_in_the_conversation`、`a_press_moves_the_tier`，client D48）。
 2. **硬币键**（`views/talk/`，client D18）：做朝上那一面，变淡的发送面一按落进空操作（`a_faded_face_does_nothing`），停止面只发 `cancel`、从不发出框里的字（`stop_never_sends`）。
 3. **信箱的条目**（`client/src/views/mailbox/entries.ts`）：j／k 与 `RowList` 同一种钳住的走法，到最后一条不再走（`k_stops_at_the_last_entry`）；1–9 只落到前九个、且存在的条目上（`a_digit_reaches_only_a_drawn_entry`）。
+4. **信箱面这一层**（`client/src/views/mailbox/layer.ts`，D60）：不论按什么顺序按键，关上的信箱里不留焦点（`no_focus_stays_in_a_closed_mailbox`）；Escape 总是关上它，焦点在面里时回到信箱键（`escape_closes_and_returns_focus`）；信箱键与 Accel-B 是同一个开关，按两下回到原样（`two_presses_come_home`）；点面外——另两个边缘键也在面外——总是关上它（`a_press_outside_closes`）。
 -/
 
 namespace Client.Views.Workspace
@@ -208,5 +210,95 @@ theorem a_digit_reaches_only_a_drawn_entry (count digit entry : Nat)
   split at h
   · cases h; omega
   · cases h
+
+/-! D60 信箱面是一层普通的 fixed 元素，挂在边缘键的 `<nav>` 里、画在三个键之下，点面外与 Escape 由它自己判。
+理由：User 要信箱从左缘推出、贴左对齐、三个边缘键浮在它上面（Roadmap A19）；`popover="auto"` 把面放进 top layer，top layer 之上只能再是 top layer，键要浮上去就得把三个键也做成 popover，而 popover 离开网格，键在宽屏与手机上的位置都得重拼一份。被否决的另一条路正是这个。
+代价是平台不再替它判点面外与 Escape：本模型就是那份判定，`layer.ts` 照它写，测试按迹重放同样的性质。
+重新打开的条件：边缘键本身改成 top layer 里的东西（例如整条边缘层进 popover）时，信箱回到 `popover="auto"`。 -/
+
+/-- 焦点在哪：信箱键、面里、别处。 -/
+inductive MailFocus where
+  | key
+  | inside
+  | elsewhere
+  deriving DecidableEq, Repr
+
+/-- 信箱面这一层：开着没有，焦点在哪。 -/
+structure Mail where
+  shown : Bool
+  focus : MailFocus
+  deriving DecidableEq, Repr
+
+/-- 落到这一层的输入。`toggle` 是信箱键与 Accel-B；`outside` 是面外的一次按下，另两个边缘键也算；`enter` 是焦点走进面里；`follow` 是跟随一行的链接。 -/
+inductive MailInput where
+  | toggle
+  | escape
+  | outside
+  | enter
+  | follow
+  deriving DecidableEq, Repr
+
+/-- 收起面：焦点在面里时回到信箱键，否则不动。 -/
+def stow (mail : Mail) : Mail :=
+  { shown := false, focus := if mail.focus = .inside then .key else mail.focus }
+
+/-- 一个输入之后的这一层。 -/
+def stepMail (mail : Mail) : MailInput → Mail
+  | .toggle => if mail.shown then stow mail else { mail with shown := true }
+  | .escape => stow mail
+  | .outside => { shown := false, focus := .elsewhere }
+  | .enter => if mail.shown then { mail with focus := .inside } else mail
+  | .follow => stow mail
+
+/-- 按顺序走完一串输入。 -/
+def runMail (mail : Mail) (inputs : List MailInput) : Mail := inputs.foldl stepMail mail
+
+/-- 焦点只在开着的面里。 -/
+def FocusHeld (mail : Mail) : Prop := mail.shown = true ∨ mail.focus ≠ .inside
+
+theorem stow_holds_focus (mail : Mail) : FocusHeld (stow mail) := by
+  unfold FocusHeld stow
+  right
+  by_cases h : mail.focus = .inside <;> simp [h]
+
+theorem step_holds_focus (mail : Mail) (input : MailInput) (h : FocusHeld mail) :
+    FocusHeld (stepMail mail input) := by
+  cases input with
+  | toggle =>
+    unfold stepMail
+    by_cases s : mail.shown = true
+    · simp only [s, if_true]; exact stow_holds_focus mail
+    · simp only [s]; left; rfl
+  | escape => exact stow_holds_focus mail
+  | outside => right; simp [stepMail]
+  | enter =>
+    unfold stepMail
+    by_cases s : mail.shown = true
+    · simp only [s, if_true]; left; rfl
+    · simp only [s]; exact h
+  | follow => exact stow_holds_focus mail
+
+theorem no_focus_stays_in_a_closed_mailbox (mail : Mail) (inputs : List MailInput)
+    (h : FocusHeld mail) : FocusHeld (runMail mail inputs) := by
+  induction inputs generalizing mail with
+  | nil => exact h
+  | cons input rest ih => exact ih (stepMail mail input) (step_holds_focus mail input h)
+
+theorem escape_closes_and_returns_focus (mail : Mail) (inputs : List MailInput)
+    (inside : (runMail mail inputs).focus = .inside) :
+    runMail mail (inputs ++ [.escape]) = { shown := false, focus := .key } := by
+  simp [runMail, List.foldl_append, stepMail, stow] at *
+  simp [inside]
+
+theorem two_presses_come_home (mail : Mail) (closed : mail.shown = false)
+    (away : mail.focus ≠ .inside) :
+    runMail mail [.toggle, .toggle] = mail := by
+  cases mail with
+  | mk shown focus =>
+    cases focus <;> simp_all [runMail, stepMail, stow]
+
+theorem a_press_outside_closes (mail : Mail) (inputs : List MailInput) :
+    (runMail mail (inputs ++ [.outside])).shown = false := by
+  simp [runMail, List.foldl_append, stepMail]
 
 end Client.Views.Workspace
