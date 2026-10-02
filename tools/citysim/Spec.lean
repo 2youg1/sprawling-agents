@@ -13,6 +13,7 @@ import tools.citysim.spec.Metabolism
 import tools.citysim.spec.Nesting
 import tools.citysim.spec.RedTeam
 import tools.citysim.spec.Suite
+import tools.citysim.spec.Throughput
 import tools.citysim.spec.WireScript
 import tools.citysim.spec.WireScript.Exchange
 
@@ -39,6 +40,7 @@ import tools.citysim.spec.WireScript.Exchange
 | `suite`、`score`、`metabolism`、`nesting`、`ablation` | 评估仪器（§8-8）；除 `suite` 外只在测试下编译 | `spec/Suite.lean`、`spec/Metabolism.lean`、`spec/Nesting.lean`、`spec/Ablation.lean` |
 | `bin/bench`、`fixture_digest` | 负载场景与读数行（§8-6），两族 bench 共用的夹具摘要 | `spec/Bench.lean` |
 | `bin/bench_startup` | 四个动作的冷启动测量与首字节（§8-5） | `spec/BenchStartup.lean` |
+| 吞吐台（仪表住 `sprawling-accounting`） | N 个并发 run 的吞吐与等待读数（§8-14） | `spec/Throughput.lean` |
 | `long_turn`、`bin/long_turn` | 长回合：一个 run 连续读一个在变的文件，逐次记下模型请求的字节上界；内存读数经 `just mem long-turn`（§8-9） | `spec/LongTurn.lean` |
 | `wire_script` | provider 线上 JSON 的脚本，与在回环地址上逐条回放它、把每次交换记进文件的替身（§8-10、§8-13） | `spec/WireScript.lean`、`spec/WireScript/Exchange.lean` |
 | `bin/provider` | 替身的进程：绑一个回环端口，印出 `SPRAWLING_PROVIDER=<url>`，然后回放（§8-10） | `spec/WireScript.lean` |
@@ -63,6 +65,7 @@ import tools.citysim.spec.WireScript.Exchange
 - `spec/Suite.lean`：每个 outcome 恰好记一次（`every_outcome_is_counted_once`），不认识的只进 `unknown`（`an_outcome_nobody_asked_for_is_unknown`）。
 - `spec/Metabolism.lean`：没有资产在第一次被注意到的那一轮退场（`nothing_retires_the_round_it_is_first_noticed`），留下当且仅当用得上又付得起（`an_asset_is_kept_exactly_when_it_is_used_and_pays`），警告过仍未改善的下一轮退场（`a_warned_asset_that_did_not_recover_retires`）。
 - `spec/Bench.lean`：bench 印出的每条读数都在钉住的字节上量（`every_reading_is_taken_under_the_pinned_fixture`），字节离开钉子就在量之前拒绝（`a_moved_fixture_is_refused_before_any_reading`）。
+- `spec/Throughput.lean`：p999 只在样本够多时印出（`a_p999_is_printed_only_over_enough_samples`），不够时印 max（`under_the_floor_the_max_is_printed`），印出的尾部总是一个真实样本（`the_printed_tail_is_a_sample`）。
 - `spec/BenchStartup.lean`：每个样本都留在读数里、按中位的倍数标注（`every_sample_is_kept_and_marked_by_the_cut`）；主导子步是中位最大的那一个（`the_dominant_step_has_the_largest_middle`），没有子步时没有主导（`no_steps_have_no_dominant`）。
 
 每个模型都带一个可实现的正常路径（`every_cancel_point_is_reached`、`an_opening_takes_the_next_run`、`a_run_appended_after_the_script_ran_out_is_opened`、`spec/WireScript.lean` 里两个 run 交错作答的 `example`），所以这些保证不是从一个无法满足的前提推出来的。生产实现与模型的对应由 §16 列出的 Rust 测试检查；一条 Lean 定理证明的是模型，不是 Rust。
@@ -159,6 +162,7 @@ D6 **评估仪器住在 citysim，不另立 crate。** 五件仪器（§8-8）�
 | 8-10 | `tools/citysim/spec/WireScript.lean`，一次交换的那一半在 `tools/citysim/spec/WireScript/Exchange.lean` |
 | 8-12 | `tools/citysim/spec/Bench.lean` |
 | 8-13 | `tools/citysim/spec/WireScript.lean` |
+| 8-14 | `tools/citysim/spec/Throughput.lean` |
 
 8-11 没有用过。
 -/
@@ -216,6 +220,8 @@ MemLedger 的 append 是 from_draft→canonical_line→chain_hash 推进；无�
 | D20 | 一次工具调用的键：每跑一个的位次，加上整个动作的字节 | `tools/citysim/spec/Executor.lean` |
 | D21 | 仪器只在测试构型里编译 | `tools/citysim/spec/Suite.lean` §8-8 |
 | D22 | 过期基线的场景驱动一座真的城，而不是 `run::drive` 加剧本工具台 | 本文件 §16 |
+| D23 | 吞吐台住在 `sprawling-accounting` 的仪表里，本规格只规定它 | `tools/citysim/spec/Throughput.lean` §8-14 |
+| D24 | 这一段的等待从账本与仪表外侧读，生产代码不加测量点 | `tools/citysim/spec/Throughput.lean` §8-14 |
 -/
 
 /-! ## 13 依赖选型
