@@ -96,7 +96,7 @@ namespace Runtime.Catalog
 
 /-- D19（推断，见下）：休眠索引整份的上限，字节，按 UTF-8 计。
 
-截断锁的三档与「约 1 KiB」这个量级是本人的裁定；以下是从裁定推出的选择。上限管**整份索引**而不是每一件：按件封顶时四十件休眠工具仍要四十 KiB，不是「降低到最小」。用字节而不是 token：每家 provider 的分词不同，字节是确定的、与 provider 无关的，重放与分叉逐字节一致。被否的备选：每件 1 KiB；按 token 计的上限（每家一个数）；让模型概括（定规：二进制里没有模型；而且重放要确定）。重新打开它的参数：脚本化的 run 显示 agent 找不到它需要的能力时，上限改为 4 KiB（按裁定「约 1K token」的另一种读法）。 -/
+定规：截断锁的三档，与休眠索引约 1 KiB 的量级；以下是从这条定规推出的选择。上限管**整份索引**而不是每一件：按件封顶时四十件休眠工具仍要四十 KiB，不是「降低到最小」。用字节而不是 token：每家 provider 的分词不同，字节是确定的、与 provider 无关的，重放与分叉逐字节一致。被否的备选：每件 1 KiB；按 token 计的上限（每家一个数）；让模型概括（定规：二进制里没有模型；而且重放要确定）。重新打开它的参数：脚本化的 run 显示 agent 找不到它需要的能力时，上限改为 4 KiB（把量级读作约 1K token 时的字节数）。 -/
 def dormantCeiling : Nat := 1024
 
 /-- 索引里的一件，以它两种写法的字节数记：带提示的那行与只有名字的那行。 -/
@@ -253,7 +253,7 @@ def callName : String := "call"
 
 /-- `Catalog::resolve_call` 的模型：`schemaOf` 答已准入工具的入参 schema（没准入＝`none`），`fits` 是 `catalog::fit`。
 
-D21（推断）：**请求的工具表在 session 里恒不变**，第三档经会话而不经工具表。provider 把工具定义放在缓存前缀的最前（tools、system、messages），session 中途加一件定义会在每次启用时丢掉整份 prompt cache，代价可能大过它省下的字节。所以 `describe` 的答复是一次普通的工具结果，追加在缓存本来就在长的末尾；休眠的工具经一扇调度门 `call` 调用，城按那件的 schema 核参数，不合就带着 schema 拒。两者都是普通的工具调用，账本本来就记，重放与分叉逐字节一致，启用不需要新的事件种类。被否的备选：把启用的定义追加进工具表（毁缓存，还要一种启用事件）；provider 自家的延迟加载（只有一张脸有，而城说三种方言）。重新打开它的参数：某家 provider 让工具表中途增长而不失效缓存。 -/
+D21（推断）：**请求的工具表在 session 里恒不变**，第三档经会话而不经工具表。provider 把工具定义放在缓存前缀的最前（tools、system、messages），session 中途加一件定义会在每次启用时丢掉整份 prompt cache，代价可能大过它省下的字节。所以 `describe` 的答复是一次普通的工具结果，追加在缓存本来就在长的末尾；休眠的工具经一扇调度门 `call` 调用，城按那件的 schema 核参数，不合就带着 schema 拒。两者都是普通的工具调用，账本本来就记，重放与分叉逐字节一致，启用不需要新的事件种类。被否的备选：把启用的定义追加进工具表（毁缓存，还要一种启用事件）；provider 自家的延迟加载（只有一张脸有，而城说三种兼容格式）。重新打开它的参数：某家 provider 让工具表中途增长而不失效缓存。 -/
 def resolveCall {α σ : Type} (schemaOf : String → Option σ) (fits : σ → α → Bool) (o : Outer α) :
     Except Refusal (Routed α) :=
   if o.target = callName then .error .itself

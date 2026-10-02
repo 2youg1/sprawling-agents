@@ -50,8 +50,7 @@ pub fn version_of(bytes: &[u8]) -> String {
 const CREATES: &str = "new";
 
 impl EditTool {
-    /// The name this tool answers to, read by its registration and by
-    /// `mode::core_tools`.
+    /// The name this tool answers to, read by `mode::core_tools` too.
     pub const NAME: &'static str = "edit";
 
     pub fn new(
@@ -60,39 +59,20 @@ impl EditTool {
         writable: kernel::WriteDomain,
         limit: kernel::WriteLimit,
     ) -> Result<EditTool, AxError> {
-        let mut params = Map::new();
-        params.insert("type".to_owned(), Value::String("object".to_owned()));
-        let mut properties = Map::new();
-        for (field, description) in [
-            ("path", "file to edit, relative to the city root"),
-            (
-                "base_version",
-                "version you last saw; refuses if it moved. Pass \"new\" to create the file",
-            ),
-            (
-                "old",
-                "exact text to replace; must match exactly once. \"\" when creating",
-            ),
-            ("new", "replacement text, or the whole file when creating"),
-        ] {
-            let mut spec = Map::new();
-            spec.insert("type".to_owned(), Value::String("string".to_owned()));
-            spec.insert(
-                "description".to_owned(),
-                Value::String(description.to_owned()),
-            );
-            properties.insert(field.to_owned(), Value::Object(spec));
-        }
-        params.insert("properties".to_owned(), Value::Object(properties));
-        params.insert(
-            "required".to_owned(),
-            Value::Array(
-                ["path", "base_version", "old", "new"]
-                    .into_iter()
-                    .map(|f| Value::String(f.to_owned()))
-                    .collect(),
-            ),
-        );
+        let params = Payload::of(&serde_json::json!({
+            "type": "object",
+            "properties": {
+                "path": { "type": "string",
+                    "description": "file to edit, relative to the city root" },
+                "base_version": { "type": "string", "description":
+                    "version you last saw; refuses if it moved. Pass \"new\" to create the file" },
+                "old": { "type": "string", "description":
+                    "exact text to replace; must match exactly once. \"\" when creating" },
+                "new": { "type": "string",
+                    "description": "replacement text, or the whole file when creating" },
+            },
+            "required": ["path", "base_version", "old", "new"],
+        }))?;
         Ok(EditTool {
             city_root: city_root.to_path_buf(),
             writable,
@@ -106,7 +86,7 @@ impl EditTool {
                      `base_version` of `new` creates the file.{}",
                     limited_by(limit)
                 ),
-                params: Payload::new(params)?,
+                params,
                 effect: Effect::Write { domain },
                 cost_tier: CostTier::Light,
                 timeout: None,

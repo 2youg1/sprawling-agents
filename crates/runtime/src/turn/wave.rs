@@ -28,6 +28,7 @@ use crate::compaction::Exchange;
 
 use super::{Carried, Interrupt, PhaseOutcome, Recording, ToolWave, Turn};
 
+mod closure;
 mod reorder;
 
 use reorder::all_at_once;
@@ -65,11 +66,8 @@ pub trait ConcurrentInvoke {
     /// render (`crates/runtime/spec/Turn.lean` §8-51). `None` is a tool the bench does not
     /// know, which is not read-only.
     fn meta_of(&self, call: &ToolCall) -> Option<&ToolMeta>;
-    /// The call a call through `call` stands for, with the model's id,
-    /// resolved before anything reads its registration, so the named
-    /// tool passes its own doors and the ledger records it
-    /// (`crates/runtime/Spec.lean` §8-61). The default hands the call
-    /// back unchanged.
+    /// The call behind a call through `call`, resolved before anything
+    /// reads a registration (`crates/runtime/Spec.lean` §8-61).
     fn resolve_call(&self, call: ToolCall) -> ToolCall {
         call
     }
@@ -107,47 +105,9 @@ pub enum Admitted {
     Cleared(Ticket),
 }
 
-/// A closure is a tool face that answers every call as it admits it:
-/// it declares no effect, so its waves are serial. citysim and the tests
-/// that script a tool's answer drive a run through this one.
-impl<F> ConcurrentInvoke for F
-where
-    F: FnMut(&ToolCall, TimeMs) -> Result<ToolOutcome, AxError>,
-{
-    fn meta_of(&self, _call: &ToolCall) -> Option<&ToolMeta> {
-        None
-    }
-
-    fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted {
-        Admitted::Answered(self(call, t))
-    }
-
-    fn tool(&self, _ticket: &Ticket) -> Result<&dyn Tool, AxError> {
-        Err(unheld_ticket())
-    }
-
-    fn account(
-        &mut self,
-        _call: &ToolCall,
-        _ticket: Ticket,
-        _answered: Result<ToolOutcome, AxError>,
-    ) -> Result<ToolOutcome, AxError> {
-        Err(unheld_ticket())
-    }
-}
-
 /// Whether the call's tool is registered as only reading.
 pub(super) fn reads_only(tools: &dyn ConcurrentInvoke, call: &ToolCall) -> bool {
     matches!(tools.meta_of(call), Some(meta) if meta.effect == Effect::Read)
-}
-
-fn unheld_ticket() -> AxError {
-    AxError::failure(
-        AxCode::ToolUnavailable,
-        "run a cleared tool call",
-        "a tool face that answers every call as it admits it was handed a ticket",
-    )
-    .with_recovery("report this against runtime::turn::wave: only a bench issues tickets")
 }
 
 /// A call, the moments it started (after admission, before its tool

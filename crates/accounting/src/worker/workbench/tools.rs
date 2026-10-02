@@ -174,12 +174,7 @@ impl Laying {
         // makes, so a name on one list and not the other is either a
         // tool nobody can call or a call nobody was told about; one list
         // leaves nothing to agree by hand.
-        //
-        // The order is the catalogue's: `render` puts the tools in front
-        // of the model in this order and the resident segment is hashed,
-        // so this sequence is part of what stays cacheable across a run.
-        // A new tool joins at the end for that reason: inserting one in
-        // the middle would move every line after it.
+        // Both key by name, so this order reaches no model.
         let mut admitted: Vec<Box<dyn kernel::Tool>> = vec![
             Box::new(archive_tool),
             Box::new(claim_tool),
@@ -193,11 +188,7 @@ impl Laying {
             Box::new(read),
             Box::new(search),
             Box::new(succeed),
-            // The two doors of the truncation lock: every admitted tool
-            // outside the mode's core and every skill is one line of the
-            // dormant index, and these are how a run reaches one
-            // (`crates/runtime/Spec.lean` §8-60). They hold the catalog
-            // rather than a copy, as `read` does.
+            // The doors to the dormant index (`crates/runtime/Spec.lean` §8-60).
             Box::new(runtime::DescribeTool::new(Arc::clone(&catalog))?),
             Box::new(runtime::CallTool::new(Arc::clone(&catalog))?),
         ];
@@ -208,12 +199,6 @@ impl Laying {
         // tool table rather than in the wording of `MAYOR.md` is the
         // whole point - an invariant a prompt is asked to keep is not
         // an invariant (`crates/city/Spec.lean` §8-22).
-        //
-        // These join at the end of the table for the same reason a new
-        // tool does: the order above is hashed with the resident
-        // segment, and what keeps its position keeps its cache. Two
-        // buildings of different vocations never shared a prefix
-        // anyway, because every address in it starts with the building.
         match city::vocation_of(site.building.addr()) {
             city::Vocation::Builds => {
                 admitted.push(Box::new(self.exec_tool(site, at)?));
