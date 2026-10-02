@@ -82,7 +82,7 @@ sandbox = ["runtime/wasm"]
 # compiling the `.crate` (`crates/sprawling/Spec.lean` §8-157). The archive
 # suffixes are the ones `tools/xtask/src/platform.rs` lists. The tag is
 # written `v{ version }` here and replaced by the release's own tag when the
-# `crates` job publishes (D31); a glibc Linux host falls back to the musl row.
+# `crates` job publishes (D32); a glibc Linux host falls back to the musl row.
 [package.metadata.binstall]
 pkg-fmt = "zip"
 
