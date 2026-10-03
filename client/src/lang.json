@@ -6721,7 +6721,7 @@
   },
   "machine_scan_drive": {
     "en": "Dev Drive",
-    "zh": "Dev Drive"
+    "zh": "开发驱动器（Dev Drive）"
   },
   "machine_scan_exclusion": {
     "en": "Defender exclusion",
