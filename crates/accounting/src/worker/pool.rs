@@ -18,6 +18,11 @@
 //! evidence that a run is still going, and one in `trailing` that its
 //! lane is still finishing after the run came home (`crates/sprawling/Spec.lean`
 //! §8-161).
+//!
+//! **The pool holds no lane count** (`crates/sprawling/Spec.lean` D34): a
+//! prepared run gets a lane at once, and only memory holds it back. The
+//! concurrency wall is the endpoint's, where the provider rate-limits and
+//! bills (`crates/gateway/Spec.lean` D17).
 
 use std::collections::VecDeque;
 use std::sync::mpsc;
@@ -36,18 +41,6 @@ pub struct Memory {
     pub physical: u64,
     pub available: u64,
 }
-
-/// How many runs a city drives at once, whichever entrance started
-/// them: past it, a prepared drive waits in the pool for a lane.
-///
-/// It equals `gateway::admission`'s per-provider ceiling on purpose,
-/// and it is deliberately *not* read from there: that ceiling is
-/// `pub` inside `gateway`, and publishing it is a change to that
-/// crate's public surface with a baseline of its own to recompute
-/// (`crates/sprawling/Spec.lean` §8-46-3, §8-46-8). Until that card lands, a wider
-/// pool would only park lanes in admission — which moves the queue from
-/// somewhere that can count to somewhere that cannot.
-pub(crate) const DRIVING_LANES: u32 = 4;
 
 /// The share of physical memory a new run leaves free: one part in
 /// this many. A share rather than a byte count, because a byte count
@@ -69,7 +62,6 @@ pub(crate) struct Arrival {
 /// with one that came home are the caller's, and both of those are
 /// judgements about a plan rather than about a thread.
 pub(crate) struct DrivingPool {
-    lanes: u32,
     /// Handed to each lane: a run comes home on the accounting
     /// thread's one queue, beside the relay requests it wrote.
     home: mpsc::Sender<Wake>,
@@ -79,14 +71,13 @@ pub(crate) struct DrivingPool {
     running: std::collections::BTreeMap<RunId, std::thread::JoinHandle<()>>,
     /// The lanes whose run came home and that are still putting the
     /// city's stock back. Joined once they have finished, and all of
-    /// them when the pool is dropped. Not counted against `lanes`: one
+    /// them when the pool is dropped. Not counted in `in_flight`: one
     /// lane per city stocks at a time, and counting it would make a new
     /// run wait on a checkout (`crates/sprawling/Spec.lean` §8-161).
     trailing: Vec<(RunId, std::thread::JoinHandle<()>)>,
-    /// Drives prepared while every lane was taken, oldest first. A
-    /// waiting drive holds no thread: the queue is here, where it can be
-    /// counted, rather than in threads parked on the provider's
-    /// admission.
+    /// Drives prepared while memory was tight, oldest first. A waiting
+    /// drive holds no thread: the queue is here, where it can be
+    /// counted.
     waiting: VecDeque<Waiting>,
     /// Where `full` reads how much memory this machine has free. Handed
     /// in rather than read here, because reading it reaches the host
@@ -103,9 +94,8 @@ struct Waiting {
 }
 
 impl DrivingPool {
-    pub fn open(lanes: u32, home: mpsc::Sender<Wake>, read_memory: fn() -> Memory) -> DrivingPool {
+    pub fn open(home: mpsc::Sender<Wake>, read_memory: fn() -> Memory) -> DrivingPool {
         DrivingPool {
-            lanes: lanes.max(1),
             home,
             running: std::collections::BTreeMap::new(),
             trailing: Vec::new(),
@@ -128,14 +118,14 @@ impl DrivingPool {
         u32::try_from(self.running.len()).unwrap_or(u32::MAX)
     }
 
-    /// Whether a new run waits: every lane is taken, or memory is
-    /// tight while another run is driving (`crates/sprawling/Spec.lean` §8-46-3).
+    /// Whether a new run waits: memory is tight while another run is
+    /// driving (`crates/sprawling/Spec.lean` §8-46-3).
     pub fn full(&self) -> bool {
-        !admits(self.in_flight(), self.lanes, (self.read_memory)())
+        !admits(self.in_flight(), (self.read_memory)())
     }
 
-    /// Takes one drive into a lane of its own, or into the queue when
-    /// every lane is taken.
+    /// Takes one drive into a lane of its own, or into the queue while
+    /// memory is tight.
     ///
     /// The relay is this run's write face and is moved in with it: a
     /// lane that could be handed a second one could write for a run it
@@ -176,8 +166,8 @@ impl DrivingPool {
         self.open_lane(staged, ledger, context)
     }
 
-    /// Starts the drives that waited for a lane, oldest first, until the
-    /// lanes are full again. Called once a lane has come home, and
+    /// Starts the drives that waited for memory, oldest first, until
+    /// memory is tight again. Called once a lane has come home, and
     /// before the run it carried is landed, so work that landing sends
     /// out queues behind work that was already waiting.
     ///
@@ -283,14 +273,14 @@ impl Drop for DrivingPool {
     }
 }
 
-/// Whether one more run may start: a lane is free, and either no run is
-/// driving or the machine keeps a tenth of its physical memory free.
-fn admits(in_flight: u32, lanes: u32, memory: Memory) -> bool {
+/// Whether one more run may start: no run is driving, or the machine
+/// keeps a tenth of its physical memory free.
+fn admits(in_flight: u32, memory: Memory) -> bool {
     let tight = memory
         .physical
         .checked_div(RESERVE_SHARE)
         .is_some_and(|reserve| memory.available < reserve);
-    in_flight < lanes && (in_flight == 0 || !tight)
+    in_flight == 0 || !tight
 }
 
 #[cfg(test)]
@@ -316,7 +306,7 @@ mod tests {
     #[test]
     fn a_pool_judges_memory_by_the_reader_it_was_handed() {
         let (home, _arrivals) = std::sync::mpsc::channel();
-        let mut pool = DrivingPool::open(4, home, tight);
+        let mut pool = DrivingPool::open(home, tight);
         pool.running
             .insert(RunId::from_bytes([1u8; 16]), std::thread::spawn(|| {}));
 
@@ -338,12 +328,12 @@ mod tests {
         };
         assert_eq!(
             [
-                admits(0, 4, tight),
-                admits(1, 4, tight),
-                admits(1, 4, roomy),
-                admits(4, 4, roomy)
+                admits(0, tight),
+                admits(1, tight),
+                admits(1, roomy),
+                admits(64, roomy)
             ],
-            [true, false, true, false]
+            [true, false, true, true]
         );
     }
 }

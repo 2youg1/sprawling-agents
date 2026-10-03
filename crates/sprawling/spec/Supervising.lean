@@ -334,7 +334,7 @@ impl Drop for DrivingPool { /* join 每条 trailing 里的 lane */ }
 ```
 
 - **次序在一个函数里。** lane 驾驶完，先把 `Flown` 交给 `home`，再补备树。池起的 lane 交给 `home` 的是「送上记账线程的队列」，测试交的是「放进一个局部变量」。次序就是这一节要的性质，所以它写在 `fly` 一处，而不是让 `fly` 返回一个待补的值、由每个调用者自己记得先送回再补。
-- **落地不 `join` 还在跑的 lane。** `landed` 把回家的 run 的 lane 从 `running` 挪进 `trailing`，再 `join` `trailing` 里已经结束的 lane（`JoinHandle::is_finished`）；一条异常结束的 lane 仍是一次 `E_STORAGE_FATAL`，与改之前一样（§8-46-3）。`in_flight` 只数 `running`，所以排空判定（`kernel::pursuit` 的 `in_flight`、`land_the_rest`）仍只等还在驾驶的 run。`trailing` 不占 `DRIVING_LANES`：一座城一次只有一条 lane 真在补（§8-155），别的 lane 见位置被占就跳过、随即结束。
+- **落地不 `join` 还在跑的 lane。** `landed` 把回家的 run 的 lane 从 `running` 挪进 `trailing`，再 `join` `trailing` 里已经结束的 lane（`JoinHandle::is_finished`）；一条异常结束的 lane 仍是一次 `E_STORAGE_FATAL`，与改之前一样（§8-46-3）。`in_flight` 只数 `running`，所以排空判定（`kernel::pursuit` 的 `in_flight`、`land_the_rest`）仍只等还在驾驶的 run。`trailing` 不算进 `in_flight`：一座城一次只有一条 lane 真在补（§8-155），别的 lane 见位置被占就跳过、随即结束。
 - **丢掉池时 `join` 还在补的 lane。** 同一个进程里再开这座城时，`RunWorker::over` 先由 `lift_abandoned_leases` 解开每棵树的锁，`+spare` 也在其中（§8-155）；一棵检出到一半的备树解了锁就读作「备好了」，下一次放置会接管它。`join` 让关城等正在补的那一棵，这与改之前关城的 `land_the_rest` 等 lane 回家时付的是同一笔。进程在补到一半时死掉照 §8-155 的崩溃规则收回，账本上不记，补树不加事件。
 - **被否：**`fly` 返回一个待补的值，由池的 lane 先送回再补——次序就分到了 `fly` 的每个调用者，测试里的调用者不送回也不补；为补树另起一条线程——ARCHITECTURE §10 第 3 条点名的起线程处里没有它，lane 已经在那里；把 `trailing` 计入车道上限——一次补树会挡住一个新 run 的开始，那正是这一节要挪走的等待；关城不 `join`——同进程再开城会接管一棵半成品备树，理由见上。
 - **检验。** `preparing::tests::a_run_lands_while_its_lane_still_puts_the_stock_back`：测试线程握住 `STOCKING` 表，lane 的补树在表上等；run 仍然经真 lane 落地（`driving()` 为假），此时城里没有备树；放开表、丢掉 worker（池 `join` 那条 lane）之后备树就位。断言的是次序，不读墙钟；`Patience::For` 的轮询上限只让红的时候不挂住。`a_lane_puts_the_stock_back_after_its_run_comes_home` 在 `fly` 一处断言同一个次序：交回 `Flown` 时没有备树，`fly` 返回时有。

@@ -32,7 +32,7 @@ pub enum AnswerVerdict { May, NotTheDelegate, SelfApprovalBarred }
 pub fn may_answer(autonomy: &Autonomy, item: &ApprovalItem, answerer: &Answerer) -> AnswerVerdict;
 ```
 
-- **身份取自 run 与位次，不取自时钟**：`DRIVING_LANES = 4` 是默认值，四条车道常在同一毫秒各提第一个问题；毫秒形状的 id 会让两条成为一个键，先那条从只增账本里消失，而事后无人能把「丢了」与「从未发生」分开。`seq` 是该 run 自己的单调位次——run 已经用来 derive `IdemKey` 的那一个计数器，在一个 run 内计数、从不跨 run 传递。两个输入都不是采样值，重放逐字节重算出同一 id。位次按 `u64::MAX` 的宽度补零书写，于是同一 run 两条 id 的派生 `Ord` 读出的就是它们被提出的先后。
+- **身份取自 run 与位次，不取自时钟**：车道不设上限（`crates/sprawling/Spec.lean` D34），几条车道常在同一毫秒各提第一个问题；毫秒形状的 id 会让两条成为一个键，先那条从只增账本里消失，而事后无人能把「丢了」与「从未发生」分开。`seq` 是该 run 自己的单调位次——run 已经用来 derive `IdemKey` 的那一个计数器，在一个 run 内计数、从不跨 run 传递。两个输入都不是采样值，重放逐字节重算出同一 id。位次按 `u64::MAX` 的宽度补零书写，于是同一 run 两条 id 的派生 `Ord` 读出的就是它们被提出的先后。
 - **清扫槽位**：一次 drive 至多一条，占最高位次（`of_sweep`），调用计数器永远数不到那里。位次空间的这条划分只有 kernel 这一个家；调用方不自拼字符串。
 - **`ApprovalClass` 只剩一个臂而枚举留下**：cluster key 是线上数据，类别写在载荷里；第二种问题出现的那天要在每一个读者处编译失败，而不是让一个字段悄悄改变含义。
 - **`ApprovalItem.tainted` 是给人看的出处，不是判决位**：污染改变的是效果的判决（`gate::undoable` 与 `gate::discard` 的 Deny），而一个问题不是效果。

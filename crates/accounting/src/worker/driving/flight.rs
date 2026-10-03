@@ -26,7 +26,7 @@ use super::super::{Continuation, Owed, Owing, RunWorker};
 use super::lane::DriveContext;
 use crate::worker::booking::OpenClaims;
 use crate::worker::dispatching::preparing::{Flown, Staged};
-use crate::worker::pool::{Arrival, DRIVING_LANES, DrivingPool};
+use crate::worker::pool::{Arrival, DrivingPool};
 use crate::worker::relay::{Drained, Patience, Relay, RelayGate, Wake};
 
 /// One run in a lane: everything the city does once the drive is home,
@@ -75,7 +75,7 @@ impl Flight {
     pub(in crate::worker) fn open(read_memory: fn() -> crate::worker::pool::Memory) -> Flight {
         let gate = RelayGate::open();
         Flight {
-            pool: DrivingPool::open(DRIVING_LANES, gate.bell(), read_memory),
+            pool: DrivingPool::open(gate.bell(), read_memory),
             gate,
             driving: BTreeMap::new(),
             homes: VecDeque::new(),
@@ -88,7 +88,7 @@ impl Flight {
         self.pool.in_flight()
     }
 
-    /// Whether a new run waits: every lane is taken, or memory is tight.
+    /// Whether a new run waits: memory is tight while a run is driving.
     /// The concurrency wall a caller reads before it prepares work it
     /// cannot start; the memory is read here, at the moment it decides.
     pub(in crate::worker) fn full(&self) -> bool {

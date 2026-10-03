@@ -146,7 +146,7 @@ impl RunWorker { pub(crate) fn with_harnesses(self, start: StartHarness) -> RunW
 - **`Listener` 的四个回调**：`halted` 读这个 run 的截断：罩住房间的停摆（`driving::lane::scope_stopping`，与模型 run 同一条规则）或人对这个 run 的 `Cancel` 是 `Cut::Halt`，墙钟上限到了是 `Cut::Deadline`，先查墙钟；`cancelling` 调 `HarnessRun::cancel`；`report` 把 `Update` 穷尽映射成 `HarnessReported` 交给 `HarnessRun::report`；`permit` 照 §8-4e 第 9 条选，问与答各记一条 `harness_reported`。记不进账本的问答让这一问答 `cancelled`，失败在回合结束后照会话失败处理。
 - **回合结束**：答出停止原因后，在城的那把 checkpoint 闸下把树 `wave_pre` 成检查点，交给 `HarnessRun::conclude`（`checkpoint_committed`、`harness_answered`、冻结）。会话在答出停止原因之前断了（`E_PROVIDER`、`E_WIRE_MISMATCH`），或检查点提交不了，`HarnessRun::abandon` 冻成 `Cancelled`，原错误照模型 run 的做法向上抛：账本得到判决，调用方得到诊断。会话与子进程在驱动返回时一起丢掉，丢掉即杀（`crates/agent_protocols/Spec.lean` §8-19）。
 - **落地**（账本线程）：离开 backlog；冻成 `Done` 时城替它开请求：把树落成房间分支上的一个 commit，写 `pr_opened`，进请求簿，与居民自己 `pr open` 的那一臂是同一段代码（`reviewing::offer`），核与合并走已有的评审流程；这条分支已有一份请求在等时不开第二份，只记一行诊断；然后归还树，按 `Owing` 付账。模型 run 落地要放回的适配器、工作台与转录，harness run 一样都没有。
-- **墙钟上限**：楼规 `RULES.toml` 的 `harness_minutes`（`crates/city/Spec.lean` §8-2），缺省 60 分钟。车道从 `run_started` 那一刻起算，到时按停摆同一条路走：先 `cancel_received`，再 `session/cancel`，读到 harness 答出 `cancelled`，冻成 `Limit`。一个既不说话也不结束的 harness 占着 `DRIVING_LANES` 条车道之一（§8-46-3），上限是它自己让出车道的唯一一条路。
+- **墙钟上限**：楼规 `RULES.toml` 的 `harness_minutes`（`crates/city/Spec.lean` §8-2），缺省 60 分钟。车道从 `run_started` 那一刻起算，到时按停摆同一条路走：先 `cancel_received`，再 `session/cancel`，读到 harness 答出 `cancelled`，冻成 `Limit`。一个既不说话也不结束的 harness 占着一条车道与一份内存（§8-46-3），上限是它自己让出车道的唯一一条路。
 - **缝**：`StartHarness` 的生产值是 `HarnessProcess::start` 在那棵树里起那一家；测试在管道另一头用一条线程扮演 agent，经 `Lines::over` 与 `AcpSession::open` 开会话，与 `agent_protocols` 的会话测试同法，不起真的 harness。用闭包而不立 trait：第二个实现是测试的，只有一个调用方。
 
 **未决**：
@@ -1148,10 +1148,9 @@ pub(crate) struct Drained { pub(crate) written: Vec<EventDraft>, pub(crate) goal
 **线程 panic 不是一种情况**：发布档是 `panic = "abort"`（ARCH §2），没有可以接住的东西；
 一次失败作为 `Driven::Failed` 走回来，而不是作为一个 join 出来的 `Err(Box<dyn Any>)`。
 
-**池大小 = `min(准入天花板, 配置值)`**。准入天花板住在记账线程上（`gateway::admission` 已经持有
-provider 的并发上限），配置值是人写的。取小的那个：比天花板大的池只会让线程停在 admission 上排队，
-那是把排队从一个会算数的地方搬到一个不会算数的地方。**citysim 跑池大小 1**——
-六个场景必须逐字节重放同样的账本，而池大小 1 时 `Driven` 的到达顺序就是发起顺序，
+**池不设车道数**（`crates/sprawling/Spec.lean` D34）：准备好的 run 立即得到一条车道，放行只问内存（§8-46-3）；
+并发的闸是每个端点的名额（`crates/gateway/Spec.lean` D17），排队只发生在 provider 那一处，在那里计数。
+**citysim 不起车道**——场景是一份在一条线程上重放的固定脚本，`Driven` 的到达顺序就是发起顺序，
 于是确定性不依赖调度器。
 
 ### 8-42-4 记账线程的三张嘴
@@ -1493,8 +1492,8 @@ fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 ```
 
 **一张表而不是两张，改掉的是第二个权威**。窄形里 `pursue` 自带一个池与一道口子，主循环若再开一套，
-`DRIVING_LANES` 就有两个主语（一座城因而能同时跑八轮），而主循环服务不到 `pursue` 那道口子——
-一条车道在它的 append 上停多久，取决于另一条线正好在做什么。收成一张之后：车道数是一个数，
+池就有两个主语（两套各自的内存闸与等待队列），而主循环服务不到 `pursue` 那道口子——
+一条车道在它的 append 上停多久，取决于另一条线正好在做什么。收成一张之后：池是一个，
 口子是一道，`pursue` 与 desk 派的活在同一批车道里排队，谁回家由 `Owed` 决定接着做什么。
 
 **幂等键在「活起飞」那一刻落定**（§8-41 欠的那条语义）。理由：`Dispatch` 这条命令做完的事就是
@@ -1571,19 +1570,21 @@ impl DrivingPool {
 ```rust
 /// 一轮跑完的活回到记账线程时带的两样东西。它们成对，因为
 /// 一个 `Driven` 不说自己属于哪一轮，一个 run id 也不说要归位什么。
-pub(crate) struct Arrival { run: RunId, driven: Result<Driven, AxError> }
+pub(crate) struct Arrival { run: RunId, flown: Flown }
 
-pub(crate) struct DrivingPool { /* lanes、回家的那一头、每条车道的 JoinHandle、排着的活、read_memory */ }
+pub(crate) struct DrivingPool { /* 回家的那一头、在驾驶与在补货的车道的 JoinHandle、内存紧时排着的活、read_memory */ }
 impl DrivingPool {
     /// `read_memory` 是池判断内存紧不紧时唯一的读数来源；生产交 `bin::monitor::memory::read`。
-    pub(crate) fn open(lanes: u32, home: mpsc::Sender<Wake>, read_memory: fn() -> Memory) -> DrivingPool;
+    pub(crate) fn open(home: mpsc::Sender<Wake>, read_memory: fn() -> Memory) -> DrivingPool;
     pub(crate) fn full(&self) -> bool;
     pub(crate) fn in_flight(&self) -> u32;
-    /// 交出一次驾驶：起一条车道。run id 取自 `driving` 自己，不另传一份——
+    /// 交出一次驾驶：起一条车道，内存紧时排队。run id 取自 `staged` 自己，不另传一份——
     /// 两处说同一件事就有两处说错的机会。
-    pub(crate) fn start(&mut self, driving: Driving, ledger: Relay, context: DriveContext) -> Result<(), AxError>;
-    /// 取回下一轮跑完的活；`wait` 内没有就返回 `None`，让调用者去服务 relay。
-    pub(crate) fn arrived(&mut self, wait: Duration) -> Option<Result<Arrival, AxError>>;
+    pub(crate) fn start(&mut self, staged: Staged, ledger: Relay, context: DriveContext) -> Result<(), AxError>;
+    /// 一轮回家后按到达顺序起排着的活，直到内存又紧。
+    pub(crate) fn start_waiting(&mut self) -> Vec<(RunId, AxError)>;
+    /// 把回家的那一轮从驾驶表上取下，不等它的车道补完货。
+    pub(crate) fn landed(&mut self, arrival: Arrival) -> Result<Arrival, AxError>;
 }
 ```
 
@@ -1594,13 +1595,12 @@ impl DrivingPool {
 **线程 panic 不是一种情况**：发布档 `panic = "abort"`（ARCH §2）。车道把 `Result<Driven, AxError>` 送回来，
 送不回来（`join` 报错）在测试档下也只是一次 `E_STORAGE_FATAL`，而不是一个 `Box<dyn Any>` 的分支。
 
-**车道数 `DRIVING_LANES = 4`，写在本模块里，并且如实说明它不是 provider 天花板的第二个权威**：
-`gateway::admission` 的 `ADMISSION_MAX_IN_FLIGHT` 是 `pub(crate)`，`bin` 读不到它。
-两个数字今天相等是刻意的，而把 provider 的天花板变成一个可读的公开值会改动 `gateway` 的公开面，
-那是一次独立的卡，不该塞进这一张。**在它落地之前，比天花板大的车道数只会让线程停在
-admission 上排队**——§8-42-3 早就写下这句话，这里把它从设计变成一个带理由的常量。
+**车道不设上限**（`crates/sprawling/Spec.lean` D34）：一个准备好的 run 立即得到一条车道，池里没有车道数。
+并发的闸是这次模型调用要去的端点的名额（`crates/gateway/Spec.lean` D17）：lane 的时间大多阻塞在网络上，
+每条只多占一个缺省大小的线程栈，排队只发生在 provider 那一处，在那里计数。`accounting::worker::driving::tests::flight` 的
+`tp2_more_than_four_runs_start_at_once` 守着「五轮以上同时起，没有一轮等车道」。
 
-**内存紧时计划的下一行排队**：`full` 在车道都占满时为真，另外在已有 run 在跑、而整机可用内存低于物理内存的十分之一时也为真（`admits(in_flight, lanes, memory)` 是这一条规则的唯一出处）。读数来自 `open` 时交给池的 `read_memory`，池自己不碰主机：生产交 `bin::monitor::memory::read`，worker 搬进 `accounting` 时 `monitor` 留在 `sprawling`、经这个 `fn` 指针进来（`crates/accounting/Spec.lean` §7、accounting D10），脚本场景交一个自己的读数就能造出内存紧的机器。`full` 每次被问都读一次，所以跟着实时的可用内存走；问它的有三处：`DrivingPool::start`（每一轮进车道都经过的门，满了就排队）、`start_waiting`（一轮回家后按到达顺序起排着的活）与 `Flight::full`（计划推进循环 `accounting::worker::plans::pursuing` 每次决定是否起下一行）。读一次约 1.6 µs（Windows x86-64 桌面级机器、测试档构建），只发生在起一轮之前。没有 run 在跑时总放一轮进来：否则一台内存一直紧的机器上城永远不动，而一轮自己占的内存远小于它派出的构建。排着的计划行在下一轮回家时再判一次。取物理内存的十分之一而不是一个字节数，是因为一个字节数只适合某一类机器；十分之一留给人的其他程序与页缓存。**被否**：按「每轮估计占用」算出可同时驱动的轮数——一轮的边际内存还没有测过，估计值就是一个没有来源的常数。**重开参数**：测得一轮的边际内存之后，改成「可用内存 ≥ 留给别人的那一份 + 一轮的实测边际」。证据：`crates/accounting/src/worker/pool.rs` 的 `a_new_run_waits_while_memory_is_tight` 与 `a_pool_judges_memory_by_the_reader_it_was_handed`。
+**内存紧时计划的下一行排队**：`full` 只在已有 run 在跑、而整机可用内存低于物理内存的十分之一时为真（`admits(in_flight, memory)` 是这一条规则的唯一出处）。三个平台的读数都经 `sysinfo`：Windows 读 `GlobalMemoryStatusEx` 的总物理内存与可用物理内存，Linux 读 `/proc/meminfo` 的 `MemTotal` 与 `MemAvailable`，macOS 读 `hw.memsize` 与 Mach 的 `vm_statistics64`（可用量把 inactive 与 purgeable 页算在内，因此比另两个平台的口径宽）。读数来自 `open` 时交给池的 `read_memory`，池自己不碰主机：生产交 `bin::monitor::memory::read`，worker 搬进 `accounting` 时 `monitor` 留在 `sprawling`、经这个 `fn` 指针进来（`crates/accounting/Spec.lean` §7、accounting D10），脚本场景交一个自己的读数就能造出内存紧的机器。`full` 每次被问都读一次，所以跟着实时的可用内存走；问它的有三处：`DrivingPool::start`（每一轮进车道都经过的门，内存紧就排队）、`start_waiting`（一轮回家后按到达顺序起排着的活）与 `Flight::full`（计划推进循环 `accounting::worker::plans::pursuing` 每次决定是否起下一行）。读一次约 1.6 µs（Windows x86-64 桌面级机器、测试档构建），只发生在起一轮之前。没有 run 在跑时总放一轮进来：否则一台内存一直紧的机器上城永远不动，而一轮自己占的内存远小于它派出的构建。排着的计划行在下一轮回家时再判一次。取物理内存的十分之一而不是一个字节数，是因为一个字节数只适合某一类机器；十分之一留给人的其他程序与页缓存。**被否**：按「每轮估计占用」算出可同时驱动的轮数——一轮的边际内存还没有测过，估计值就是一个没有来源的常数。**重开参数**：测得一轮的边际内存之后，改成「可用内存 ≥ 留给别人的那一份 + 一轮的实测边际」。证据：`crates/accounting/src/worker/pool.rs` 的 `a_new_run_waits_while_memory_is_tight` 与 `a_pool_judges_memory_by_the_reader_it_was_handed`。
 
 ### 8-46-4 `pursue` 拿走整个 ready set（`accounting::worker::plans::pursuing`）
 
@@ -1664,12 +1664,10 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
    `cargo nextest run -p sprawling --locked --all-features`、`cargo nextest run -p citysim --locked --all-features` 绿。
 5. `cargo xtask modmap`、`length`、`header` 绿。
 
-### 8-46-8 车道数今天为什么是一个写死的常数
+### 8-46-8 车道数不是一个常数
 
-`DRIVING_LANES` 与 `gateway::admission` 的 provider 并发上限今天相等，而且是分开写的两个数。
-让 `bin` 取 `min(天花板, 配置)` 要求 `gateway` 多一个公开的读法，那是它公开面的一次变更，
-属于另一张卡。在那之前，比天花板大的车道数只会让线程停在 admission 上排队——
-把队列从一个会算数的地方搬到一个不会算数的地方。
+池不持有车道数（D34）。并发上限只有一个权威，是每个端点的名额 `gateway::concurrency`（`crates/gateway/Spec.lean` D17）；
+池若再持有一个数，它就成了与任何 provider 都无关的第二道闸，队列会停在一个不知道为什么在等的地方。
 -/
 
 /-!

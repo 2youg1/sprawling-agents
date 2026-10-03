@@ -191,7 +191,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 
 `RunWorker.inboxes` 从前是 `BTreeMap<Address, Inbox>`，字段注释写着「一个房间恰好一个队列」，而**没有任何东西执行这句话**：
 `open_desks` 以 `remove` ＋ `unwrap_or_else(new_inbox)` 借队列，`settle_desks` 以 `insert` 还队列。
-在 `DRIVING_LANES = 4` 下，`pursue` 把同一栋楼的多行派到**同一个房间地址**，于是第二轮活借到一个空队列，
+在多条车道同时驾驶时，`pursue` 把同一栋楼的多行派到**同一个房间地址**，于是第二轮活借到一个空队列，
 先落地那一份被后落地的整份覆盖——账本上写着 `signal_enqueued`，内存里那条信号不存在，而只增账本无法区分
 「本来就没有」与「被覆盖了」。
 

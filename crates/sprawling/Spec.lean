@@ -103,9 +103,9 @@ import crates.sprawling.spec.WireClient
 
 /-! D34 车道不设上限：准备好的 run 立即得到一条 lane，放行只看内存与端点的并发名额
 
-**决定**：`accounting::worker::pool::DRIVING_LANES` 删去，没有配置键取代它；一个准备好的 run 立即得到一条 lane（一个线程）。放行只问两件事：内存（既有的 `RESERVE_SHARE`，§8-46-3 的内存闸）与这次模型调用要去的端点的并发名额（`crates/gateway/Spec.lean` D17）。排队于是只发生在 provider 一处，在那里计数并显示；lane 大多阻塞在网络上，每条只多占一个线程栈。实现它的变更集同时删掉 `pool.rs` 与各份 Lean 规格里对已不存在的 `gateway::admission` 的引用，并把 §8-46-3 改写为现状。三个平台相同：线程栈用标准库的缺省大小，内存读数经 `bin::monitor::memory`，它在三个平台上各有实现。
+**决定**：`accounting::worker::pool` 不持有车道数，也没有配置键给它一个；一个准备好的 run 立即得到一条 lane（一个线程）。放行只问两件事：内存（`RESERVE_SHARE`，§8-46-3 的内存闸）与这次模型调用要去的端点的并发名额（`crates/gateway/Spec.lean` D17）。排队于是只发生在 provider 一处，在那里计数并显示；lane 大多阻塞在网络上，每条只多占一个线程栈。三个平台相同：线程栈用标准库的缺省大小；内存读数经 `bin::monitor::memory`（`sysinfo`），Windows 读 `GlobalMemoryStatusEx`，Linux 读 `/proc/meminfo` 的 `MemAvailable`，macOS 读 Mach 的 `vm_statistics64`，可用量的口径在 macOS 上较宽（§8-46-3）。
 
-**理由**：User 定了车道不设上限（roadmap TP2）。`DRIVING_LANES = 4` 的 rustdoc 说它等于 `gateway::admission` 的每 provider 上限，而那个模块已经不在，于是第五个准备好的 run 在等一个与任何 provider 都无关的名额。
+**理由**：User 定了车道不设上限（roadmap TP2）。写死的四条车道说自己等于一个 provider 准入模块的上限，而那个模块已经不在，于是第五个准备好的 run 在等一个与任何 provider 都无关的名额。
 
 **被否**：①把车道数改成可配置：仍是一个与 provider 无关的闸，只是把选数的事交给人；②按 CPU 核数定车道：lane 的时间几乎都在等网络，核数不是它的约束。
 
