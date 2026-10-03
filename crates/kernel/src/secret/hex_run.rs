@@ -37,7 +37,7 @@ pub(super) fn is_labelled_hex_secret(bytes: &[u8], start: usize, end: usize) -> 
 
 /// The name a value follows: the name, optional blanks and quotes, one
 /// `=` or `:`, then optional blanks and quotes up to the value.
-fn label_before(head: &[u8]) -> Option<&str> {
+pub(super) fn label_before(head: &[u8]) -> Option<&str> {
     let (separator, head) = without_padding(head).split_last()?;
     if !matches!(separator, b'=' | b':') {
         return None;

@@ -328,6 +328,191 @@ mod tests {
                 prop_assert!(hit.start.checked_add(hit.len).unwrap() <= bytes.len());
             }
         }
+
+        /// The scanner reports exactly the spans the reference reports,
+        /// on text built to reach every detector and every boundary.
+        #[test]
+        fn scan_reports_what_the_reference_reports(pieces in proptest::collection::vec(piece(), 0..24)) {
+            let text = pieces.concat();
+            prop_assert_eq!(scan(text.as_bytes()), reference::scan(text.as_bytes()));
+        }
+
+        /// The same on arbitrary bytes, which reach the boundaries no
+        /// generator above was written for.
+        #[test]
+        fn scan_matches_the_reference_on_any_bytes(bytes in proptest::collection::vec(any::<u8>(), 0..512)) {
+            prop_assert_eq!(scan(&bytes), reference::scan(&bytes));
+        }
+    }
+
+    /// The probes the other tests of this module and of `hex_run` use,
+    /// each assembled at runtime so this file holds no scannable span.
+    #[test]
+    fn scan_matches_the_reference_on_the_test_corpus() {
+        let mixed = "a1B2c3D4e5".repeat(9);
+        let hex40 = ["9f3c1a7e5b", "20d48c6f1e", "a7b3905d2c", "e81f64b07a"].concat();
+        let hex64 = "0f1e2d3c".repeat(8);
+        let token = ["kJ8vQ2xR9m", "W4nZ7pL3sT", "6yB1cD5fG0", "hN8aE2iU4o"].concat();
+        let mut corpus = vec![
+            format!("config = \"sk-ant-{mixed}\" # key"),
+            format!("token = {token} ok"),
+            format!("prev: {}", "ab".repeat(32)),
+            "run: 0198f6a2-7c4a-7bbb-9d1e-000000000001".to_owned(),
+            format!("HMAC_KEY={hex40}"),
+            format!("api_token: \"{hex40}\""),
+            format!("{{\"secret\": \"{hex40}\"}}"),
+            format!("commit {hex40} oid={hex40} KEY={}", "0f1e2d3c".repeat(5)),
+            format!("KEY=gsk_{}", "a1B2c3D4e5".repeat(5)),
+            format!("密钥 KEY = '{hex40}' 和 {token}é {mixed}"),
+        ];
+        for shape in &SECRET_SHAPES {
+            corpus.push(format!("KEY={}{hex64}{mixed}", shape.prefix));
+            corpus.push(format!("{}{}{}", shape.prefix, shape.prefix, &mixed[..12]));
+        }
+        for text in corpus {
+            assert_eq!(
+                scan(text.as_bytes()),
+                reference::scan(text.as_bytes()),
+                "{text}"
+            );
+        }
+    }
+
+    /// One piece of generated text: a provider shape with a body of its
+    /// own charset (some too short), a hex run behind a credential name
+    /// or another name (some of low entropy), a mixed token, prose with
+    /// multibyte characters, or a separator.
+    fn piece() -> impl Strategy<Value = String> {
+        let shape = (0..SECRET_SHAPES.len(), "[A-Za-z0-9_=-]{0,90}").prop_map(|(at, body)| {
+            let prefix = SECRET_SHAPES.get(at).map_or("", |s| s.prefix);
+            format!("{prefix}{body}")
+        });
+        let label = prop_oneof![
+            Just("HMAC_KEY"),
+            Just("api_token"),
+            Just("\"secret\""),
+            Just("oid"),
+            Just("commit"),
+            Just("name.session"),
+            Just("x")
+        ];
+        let separator = prop_oneof![Just("="), Just(": "), Just(" = '"), Just(":\""), Just(" ")];
+        let hex = prop_oneof!["[0-9a-f]{28,70}", "(0f1e2d3c){4,6}", "[0-9A-F]{32,40}"];
+        let labelled = (label, separator, hex).prop_map(|(l, s, h)| format!("{l}{s}{h}"));
+        prop_oneof![
+            shape,
+            labelled,
+            "[A-Za-z0-9+/_-]{15,60}",
+            "[a-z ]{0,30}",
+            Just("密钥 é 🔑 ".to_owned()),
+            prop_oneof![
+                Just(" "),
+                Just(
+                    "
+"
+                ),
+                Just("\""),
+                Just("="),
+                Just(":")
+            ]
+            .prop_map(str::to_owned),
+        ]
+    }
+
+    /// Today's scanner, kept verbatim as the judge of every faster one:
+    /// a shape pass per table entry, the overlap test against every hit,
+    /// and the hex run's entropy read before its label.
+    mod reference {
+        use super::super::{
+            ENTROPY_SPAN_MIN_BYTES, charset_admits, entropy_millibits_per_char, entropy_passes,
+            mixed_alphabet, overlaps, token_byte,
+        };
+        use crate::consts_external::SECRET_SHAPES;
+        use crate::secret::hex_run::{HEX_ENTROPY_MIN_MILLIBITS, HEX_SPAN_MIN_BYTES, label_before};
+        use crate::secret::names_a_credential;
+        use crate::secret::span::SecretSpan;
+
+        fn is_labelled_hex_secret(bytes: &[u8], start: usize, end: usize) -> bool {
+            let Some(run) = bytes.get(start..end) else {
+                return false;
+            };
+            run.len() >= HEX_SPAN_MIN_BYTES
+                && run.iter().all(u8::is_ascii_hexdigit)
+                && entropy_millibits_per_char(run) >= HEX_ENTROPY_MIN_MILLIBITS
+                && bytes
+                    .get(..start)
+                    .and_then(label_before)
+                    .is_some_and(names_a_credential)
+        }
+
+        fn find_shape_hits(bytes: &[u8]) -> Vec<SecretSpan> {
+            let mut hits = Vec::new();
+            for shape in &SECRET_SHAPES {
+                let prefix = shape.prefix.as_bytes();
+                if prefix.is_empty() || bytes.len() < prefix.len() {
+                    continue;
+                }
+                let mut at = 0usize;
+                while let Some(window) = bytes.get(at..) {
+                    let Some(rel) = window.windows(prefix.len()).position(|w| w == prefix) else {
+                        break;
+                    };
+                    let start = at + rel;
+                    let body_start = start + prefix.len();
+                    let mut end = body_start;
+                    while bytes
+                        .get(end)
+                        .is_some_and(|b| charset_admits(shape.charset, *b))
+                    {
+                        end += 1;
+                    }
+                    let total = end - start;
+                    let (min_len, max_len) = (usize::from(shape.len.0), usize::from(shape.len.1));
+                    if total >= min_len {
+                        hits.push(SecretSpan {
+                            start,
+                            len: total.min(max_len),
+                            provider: Some(shape.provider),
+                        });
+                    }
+                    at = body_start;
+                }
+            }
+            hits.sort_by_key(|h| (h.start, h.len));
+            hits
+        }
+
+        pub(super) fn scan(bytes: &[u8]) -> Vec<SecretSpan> {
+            let mut hits = find_shape_hits(bytes);
+            let mut at = 0usize;
+            while at < bytes.len() {
+                if !bytes.get(at).copied().is_some_and(token_byte) {
+                    at += 1;
+                    continue;
+                }
+                let mut end = at;
+                while bytes.get(end).copied().is_some_and(token_byte) {
+                    end += 1;
+                }
+                let len = end - at;
+                if len >= ENTROPY_SPAN_MIN_BYTES
+                    && !hits.iter().any(|h| overlaps(h, at, len))
+                    && (bytes
+                        .get(at..end)
+                        .is_some_and(|run| mixed_alphabet(run) && entropy_passes(run))
+                        || is_labelled_hex_secret(bytes, at, end))
+                {
+                    hits.push(SecretSpan {
+                        start: at,
+                        len,
+                        provider: None,
+                    });
+                }
+                at = end;
+            }
+            hits.sort_by_key(|h| (h.start, h.len));
+            hits
+        }
     }
 }
 
