@@ -1299,6 +1299,85 @@ fn a_policy_change_is_told_after_the_wave_and_leaves_the_sent_request_untouched(
     );
 }
 
+/// A policy change that reaches a running run gates the next wave's
+/// edit: the tool reads the run's policy cell at the call, not the write
+/// limit the run was dispatched under (runtime §8-62).
+#[test]
+fn a_policy_changed_mid_run_gates_the_next_waves_edit() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+    let room = Address::parse("lab/room1").unwrap();
+    std::fs::create_dir_all(root.join("lab").join("room1")).unwrap();
+    let kept = root.join("lab").join("room1").join("kept.md");
+    std::fs::write(
+        &kept,
+        "the User's own
+",
+    )
+    .unwrap();
+    let edit = runtime::EditTool::new(
+        root,
+        room.clone(),
+        kernel::WriteDomain::new(vec![room]).unwrap(),
+        kernel::WriteLimit::Full,
+    )
+    .unwrap();
+    let mut args = serde_json::Map::new();
+    for (key, value) in [
+        ("path", "lab/room1/kept.md".to_owned()),
+        (
+            "base_version",
+            runtime::version_of(
+                b"the User's own
+",
+            ),
+        ),
+        ("old", "own".to_owned()),
+        ("new", "changed".to_owned()),
+    ] {
+        args.insert(key.to_owned(), serde_json::Value::String(value));
+    }
+    let editing = ToolCall {
+        id: "t-1".to_owned(),
+        name: ToolName::parse("edit").unwrap(),
+        args: Payload::new(args).unwrap(),
+    };
+    let mut ledger = RecordingLedger::new();
+    let mut model = ScriptedModel {
+        seen: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+        waves: vec![vec![editing]],
+    };
+    let mut now = counter();
+    let tighter = kernel::RunPolicy {
+        write: kernel::WriteLimit::Create,
+        ..kernel::RunPolicy::of(kernel::Mode::Work)
+    };
+    let mut interrupt = |point: SafePoint| match point {
+        SafePoint::BeforeCall { turn: 0 } => Interrupt::Policy { policy: tighter },
+        _ => Interrupt::None,
+    };
+    let mut invoke = |call: &ToolCall, _: TimeMs| kernel::Tool::invoke(&edit, call);
+    let mut hooks = RunHooks {
+        now: &mut now,
+        monotonic_us: &mut || 0,
+        interrupt: &mut interrupt,
+        checkpoint: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
+        invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+
+    drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+
+    assert_eq!(
+        std::fs::read_to_string(&kept).unwrap(),
+        "the User's own
+",
+        "the wave after the change is judged under create, which changes no file"
+    );
+}
+
 /// How long the generating model writes text after it hands its read
 /// over, and how long that read takes to answer.
 const WRITING: std::time::Duration = std::time::Duration::from_millis(500);
