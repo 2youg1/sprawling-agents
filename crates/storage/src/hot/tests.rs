@@ -277,3 +277,89 @@ fn iteration_is_runid_ordered_not_insertion_ordered() {
     let seen: Vec<RunId> = view.runs().map(|(id, _)| *id).collect();
     assert_eq!(seen, ids);
 }
+
+/// One record of the `waiting` fold, as `crates/storage/spec/Hot.lean`'s
+/// `Line` names it: which of two rooms a start waits on, and its deadline.
+#[derive(Debug, Clone, Copy)]
+enum Line {
+    WaitStarted(bool, u64),
+    WaitEnded,
+    Frozen,
+    Other,
+}
+
+fn line() -> impl proptest::strategy::Strategy<Value = Line> {
+    use proptest::prelude::*;
+    prop_oneof![
+        (any::<bool>(), 0u64..1_000_000).prop_map(|(on, deadline)| Line::WaitStarted(on, deadline)),
+        Just(Line::WaitEnded),
+        Just(Line::Frozen),
+        Just(Line::Other),
+    ]
+}
+
+fn room(first: bool) -> kernel::Address {
+    kernel::Address::parse(if first { "lab/one" } else { "lab/two" }).unwrap()
+}
+
+fn written(run: RunId, seq: u64, line: Line) -> EventRecord {
+    match line {
+        Line::WaitStarted(on, deadline) => {
+            let mut data = serde_json::Map::new();
+            data.insert("on".to_owned(), room(on).as_str().into());
+            data.insert("signal".to_owned(), "s-1".into());
+            data.insert("deadline_ms".to_owned(), deadline.into());
+            let draft = EventDraft {
+                run,
+                t: TimeMs::new(seq),
+                who: "resident".to_owned(),
+                addr: None,
+                kind: EventKind::SignalWaitStarted,
+                data: Payload::new(data).unwrap(),
+                ig: false,
+            };
+            EventRecord::from_draft(draft, Seq::new(seq), B3Hash::digest(b""))
+        }
+        Line::WaitEnded => record(run, seq, EventKind::SignalWaitEnded),
+        Line::Frozen => record(run, seq, EventKind::RunFrozen),
+        Line::Other => record(run, seq, EventKind::ToolCalled),
+    }
+}
+
+/// `step` of the Lean model, word for word.
+fn model(trace: &[Line]) -> Option<RunWaiting> {
+    let (_, waiting) = trace
+        .iter()
+        .fold((false, None), |(frozen, waiting), line| match *line {
+            Line::WaitStarted(on, deadline) if !frozen => (
+                frozen,
+                Some(RunWaiting {
+                    on: room(on),
+                    until: TimeMs::new(deadline),
+                }),
+            ),
+            Line::WaitStarted(..) | Line::Other => (frozen, waiting),
+            Line::WaitEnded => (frozen, None),
+            Line::Frozen => (true, None),
+        });
+    waiting
+}
+
+proptest::proptest! {
+    /// The fold agrees with the model on every trace, and so carries its
+    /// theorem `frozen_run_never_waits` (storage D29).
+    #[test]
+    fn waiting_folds_as_the_model_does(trace in proptest::collection::vec(line(), 0..24)) {
+        let run = RunId::from_bytes([9u8; 16]);
+        let mut view = HotView::new();
+        view.apply(&record(run, 0, EventKind::RunStarted)).unwrap();
+        for (at, line) in trace.iter().enumerate() {
+            view.apply(&written(run, u64::try_from(at).unwrap() + 1, *line)).unwrap();
+        }
+        let hot = view.get(&run).unwrap();
+        proptest::prop_assert_eq!(&hot.waiting, &model(&trace));
+        if hot.phase == RunPhase::Frozen {
+            proptest::prop_assert_eq!(&hot.waiting, &None);
+        }
+    }
+}

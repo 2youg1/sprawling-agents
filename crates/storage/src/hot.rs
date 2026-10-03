@@ -55,6 +55,22 @@ pub struct RunHot {
     /// What finishing looks like, from the same record's `goal`, read
     /// the same way.
     pub goal: Option<String>,
+    /// The room this run stopped on a synchronous `send` to hear from,
+    /// and until when: present from a `signal_wait_started` until a
+    /// `signal_wait_ended` or the freeze, so a frozen run never waits
+    /// (`crates/storage/spec/Hot.lean` D29, `frozen_run_never_waits`).
+    /// Defaulted, because a hot view stored before the field existed
+    /// had no waits to remember.
+    #[serde(default)]
+    pub waiting: Option<RunWaiting>,
+}
+
+/// What a run waits for: the room it spoke to and the instant on the
+/// city's clock at which it stops waiting.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RunWaiting {
+    pub on: Address,
+    pub until: TimeMs,
 }
 
 impl RunHot {
@@ -71,6 +87,7 @@ impl RunHot {
             ask: None,
             task: None,
             goal: None,
+            waiting: None,
         }
     }
 

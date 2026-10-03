@@ -61,6 +61,7 @@ pub use hot::HotView;
 pub use hot::RECENT_FROZEN;
 pub use hot::RunHot;
 pub use hot::RunPhase;
+pub use hot::RunWaiting;
 
 mod attribution;
 
