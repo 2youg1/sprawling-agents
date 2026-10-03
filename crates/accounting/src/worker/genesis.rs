@@ -365,3 +365,7 @@ mod tests;
     reason = "test code"
 )]
 mod adoption_tests;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod shipped_tests;
