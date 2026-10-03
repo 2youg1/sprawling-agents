@@ -160,6 +160,23 @@ impl<'de> Deserialize<'de> for Who {
 )]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Escaped text holds no angle bracket, so it cannot close the
+        /// section it is written into, and reading the three entities
+        /// back gives the text that was written.
+        #[test]
+        fn escaped_text_holds_no_bracket_and_reads_back(text in "[a-z<>&; ]{0,24}") {
+            let escaped = escape_markup(&text);
+            prop_assert!(!escaped.contains(['<', '>']), "{}", escaped);
+            let read = escaped
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&amp;", "&");
+            prop_assert_eq!(read, text);
+        }
+    }
 
     #[test]
     fn the_three_parties_write_the_words_the_histories_already_hold() {
