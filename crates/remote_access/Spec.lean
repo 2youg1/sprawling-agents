@@ -11,6 +11,10 @@ import crates.remote_access.spec.Handshake
 `sprawling-remote-access`（库名 `remote_access`，目录 `crates/remote_access`）是远程接入：一个人离开这台电脑时，从外面够到自己这座城——谁能进、进来能做什么、何时失效、如何一键关上。模块：door（门的状态）／pairing（一次性配对码）／keys（混合签名密钥）／handshake（每次连接的握手，以及设备第一次连接时的配对握手）／seal（帧封装）／route（通路缝与它的三个实现）；尚未落地的部分写在 §3。
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」：`spec/Door.lean` 证明远程门的六条性质，`spec/Handshake.lean` 证明配对握手的三条性质。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定。决定写作 `D<n>`，别处引作 `remote_access D<n>`；D1 到 D21 沿用这份规格在 Markdown 时 §12 的条目号，所以旧的引用改写之后号不变；D22 起是迁移之后的决定。§8 的各条保留 `8-1` 到 `8-12` 的编号，别处引作 `crates/remote_access/Spec.lean` §8-n。
+
+本文件本身是描述，不是被证明的规格：它不含 Lean 定义与定理，被证明的只有两个分部里的性质；其余每一条由 §16 列出的测试判，`cloudflare` 通路由 §8-8 的操作者检查判。
+
+**三个平台**：门、配对码、密钥、两种握手与封装零 I/O，只读参数，在 Windows、macOS、Linux 上逐字节相同（§8-12 的向量在三个平台的 CI 上都读回）。各平台不同的只有两处：城钥匙的种子存在哪里、能留多久，由 vault 的平台表决定（`crates/gateway/spec/Credential.lean` §8-4，D23）；通路起的子进程是各平台自己的 `cloudflared` 或人写的命令，结束它用标准库的 `Child::kill`（Windows 上是 `TerminateProcess`，macOS 与 Linux 上是 `SIGKILL`），三处语义相同。
 -/
 
 /-! ## 1 需求分解
@@ -51,11 +55,7 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 以下是这个接口今天尚未落地的部分，按阶段写成当前状态；每一段落地时，从这里删掉，写进它所属的 §8 章节。
 
 - **`cloudflare` 通路没有在真的隧道上开过。** 自动测试不跑它（§2）。缺的证据有两件：在一台装了 `cloudflared`、能连上 Cloudflare 边缘的电脑上，按 §8-8 的操作者检查开、关一次；在一台出网受限（经代理、7844 端口被拦）的电脑上，`cloudflared` 在就绪之前退出时，能否给出比「它在就绪之前退出」更具体的一句拒绝。今天的拒绝给出手动跑的那一行命令，人从 `cloudflared` 自己的输出里读原因。
-- **城密钥只活在一个进程里。** 装配层在城启动时取 32 字节熵派生城的签名密钥（§8-3），不存下来；设备钉住的是配对时那把城公钥，所以城一重启，每台设备都要重新配对，`/remote open` 照实说出这一句。要跨重启保存，32 字节的种子得留在某处，下次启动读回来。未决的是留在哪里，它要人的决定，因为三条可行的路里有两条要放宽一道门、一条违反一条现行规则：
-  1. **种子进 vault，兑现点在本 crate 的 `keys`。** 第一次开门时取熵、经 vault 写成 `secret:remote/city-key`，此后每次启动取回；`keys::SigningKey` 多一个 `from_sealed(&Sealed<String>)` 的构造，`crates/remote_access/src/keys.rs` 进 `xtask secret` 的 `EXPOSE_WHITELIST`（第五项）。后果：设备跨重启保持配对；明文种子只出现在派生密钥的那一个函数里，与名单上其余四处「明文只在用它的最后一格」同一个理由；放宽的是一道门，名单变长一项。vault 是进程内的那一种时（平台凭据库打不开），种子仍随进程消失，`/remote open` 照旧说出重新配对那一句。
-  2. **种子进 vault，兑现点在装配层**（`bin::outside::keeper` 或 `bin::assembly::remote_door`）。后果与 1 相同，但明文种子会出现在组装根里，而那份名单的注释写明它存在就是为了不让明文出现在组装根；放宽的同样是一道门，而且放在名单最不愿收的地方。
-  3. **种子写进保留子树里的一份文件**，靠文件权限守着。后果：不动任何门；可种子是一份明文凭据，落在 vault 之外，违反「明文只到 vault」这条规则（AGENTS.md 的 `xtask secret` 一行），`sprawling export` 打的包也会带走它，一份拷贝的城就能冒充原来那座。
-  不放宽任何门的做法就是今天的做法：设备在城每次重启之后重新配对。人选 1 时，本 crate 加 `from_sealed` 与它的测试，`EXPOSE_WHITELIST` 的那一行单独提交（门机制）；选 2、3 的前提改动同理写在那时的决定里。
+- **城钥匙的保存已定（D23），尚未落地。** 今天装配层（`crates/sprawling/src/outside/keeper.rs` 的 `Doorway::keep`）在城每次启动时取 32 字节熵派生城的签名密钥，不存下来，所以城一重启，每台设备都要重新配对，`/remote open` 照实说出这一句。落地时要有的四件：`keys::SigningKey` 的 `from_sealed` 构造与它的测试（§8-3）；`xtask secret` 的 `EXPOSE_WHITELIST` 加 `crates/remote_access/src/keys.rs` 一项，单独一个门机制提交，带 `Verdict: user-approved`；装配层第一次需要城钥匙时取熵、经 vault 写进 D23 的引用，之后每次启动取回；设置里的「更换城钥匙」。落地之后这一段从这里删掉。
 -/
 
 /-! ## 4 现状分析
@@ -98,7 +98,7 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 
 - 帧的类型、编码与握手版本归 `wire::frames`；本 crate 只在帧外封一层，不认识任何一个帧。
 - 一帧属于哪个动词类（`Read`／`Act`／`LocalOnly`）的对照表住在 `crates/wire/Spec.lean` §19-2，是 reach 旁边的 `class` 一列，`xtask wiring` 读那一张表并对照代码；逐帧查表、再问 `door::permits` 的中继在装配层，因为只有 `sprawling` 同时依赖 wire 与本 crate。本 crate 只给出 `door::permits(Authority, VerbClass)` 这条判定。
-- 随机字节、时钟、远程监听与它的路径、设备表的落盘与城密钥的保管归装配层（`bin::assembly` 取时钟与熵，`bin::outside` 持有门、远程监听与设备表，`crates/sprawling/Spec.lean` §8-139）；本 crate 只收参数、只给判定。通路是唯一的例外：通路缝（§8-7）与它的三个实现都在本 crate，两个生产实现在这里起子进程（`cloudflared`、人写的命令）、读它们的输出、在回环上问就绪（D14）。它们只用标准库的 `std::process` 与 `std::net`，本 crate 仍只依赖 kernel 与 aws-lc-rs。装配层选哪一条通路、把配置读成类型化的参数交给它。
+- 随机字节、时钟、远程监听与它的路径、设备表的落盘与城钥匙种子的存取（何时生成、写进 vault、取回、更换）归装配层，种子的解封与派生归本 crate 的 `keys`（D23）（`bin::assembly` 取时钟与熵，`bin::outside` 持有门、远程监听与设备表，`crates/sprawling/Spec.lean` §8-139）；本 crate 只收参数、只给判定。通路是唯一的例外：通路缝（§8-7）与它的三个实现都在本 crate，两个生产实现在这里起子进程（`cloudflared`、人写的命令）、读它们的输出、在回环上问就绪（D14）。它们只用标准库的 `std::process` 与 `std::net`，本 crate 仍只依赖 kernel 与 aws-lc-rs。装配层选哪一条通路、把配置读成类型化的参数交给它。
 
 依赖：`remote_access: kernel`（ARCHITECTURE §3 的 depmap）。`sprawling` 是唯一消费者。
 
@@ -117,10 +117,10 @@ D14 通路缝的三个实现与缝同在本 crate。一条缝要带着它的第�
 
 ```rust
 pub struct Epoch([u8; 16]);        // from_entropy
-pub struct DeviceId([u8; 16]);     // from_entropy
+pub struct DeviceId([u8; 16]);     // from_entropy；as_bytes
 pub struct SessionId([u8; 16]);    // from_entropy
-pub struct DeviceKey(Vec<u8>);     // 设备公钥的原始字节；1b 起由 keys 解释
-pub struct DeviceName(String);     // parse：去首尾空白后 1..=64 个字符
+pub struct DeviceKey(Vec<u8>);     // from_bytes／as_bytes；设备公钥的原始字节，由 keys 解释
+pub struct DeviceName(String);     // parse：去首尾空白后 1..=MAX_CHARS（64）个字符；as_str
 pub enum Authority { Watch, Act }
 pub enum VerbClass { Read, Act, LocalOnly }
 pub fn permits(authority: Authority, class: VerbClass) -> bool;
@@ -173,11 +173,16 @@ impl PairingCode {
 
 ```rust
 pub const SEED_BYTES: usize = 32;
-pub const PUBLIC_BYTES: usize = 32 + 1312;      // Ed25519，然后 ML-DSA-44
-pub const SIGNATURE_BYTES: usize = 64 + 2420;   // Ed25519，然后 ML-DSA-44
+pub const ED25519_PUBLIC_BYTES: usize = 32;
+pub const ML_DSA_44_PUBLIC_BYTES: usize = 1312;          // FIPS 204 表 2
+pub const ED25519_SIGNATURE_BYTES: usize = 64;
+pub const ML_DSA_44_SIGNATURE_BYTES: usize = 2420;       // FIPS 204 表 2
+pub const PUBLIC_BYTES: usize = ED25519_PUBLIC_BYTES + ML_DSA_44_PUBLIC_BYTES;            // Ed25519 在前
+pub const SIGNATURE_BYTES: usize = ED25519_SIGNATURE_BYTES + ML_DSA_44_SIGNATURE_BYTES;   // Ed25519 在前
 pub struct SigningKey { /* 两半密钥对 —— 私有 */ }
 impl SigningKey {
     pub fn from_seed(seed: &[u8; SEED_BYTES]) -> Result<SigningKey, AxError>;
+    pub fn from_sealed(seed: &Sealed<String>) -> Result<SigningKey, AxError>;   // D23，尚未落地（§3）
     pub fn public(&self) -> VerifyingKey;
     pub fn sign(&self, message: &[u8]) -> Result<Signature, AxError>;
 }
@@ -188,14 +193,19 @@ pub struct Signature(Box<[u8; SIGNATURE_BYTES]>);   // from_bytes／as_bytes
 - **一个种子派生两半**：HKDF-SHA256，盐 `sprawling remote key v1`，两半各用自己的标签（`ed25519`、`ml-dsa-44`），所以两半不共享任何密钥材料；盐里的版本号保证以后的派生不会产出以前的密钥。人要保存的只是这 32 字节。
 - **验证两半都要成立，并且只给一个答案**：调用方从拒绝里得不出是哪一半没过。
 
+- **城钥匙**（D23）：城自己的 `SigningKey` 由 vault 里的一份种子派生。`from_sealed` 读的正文是种子的 base32 写法（§8-2 的字母表，52 个字符）；它是本 crate 唯一一处 `.expose(`，明文种子只活在这个函数里，派生完即随 `Zeroizing` 清掉。正文读不成 → `E_CONFIG_INVALID`，恢复语是在设置里更换城钥匙、再重新配对设备。
+
+D23 城钥匙的种子存进城已有的 vault，兑现点在本 crate 的 `keys`（定规：采用 §3 当时列出的第一种做法）。引用的 realm 是 `remote`，name 是 `city-key.` 接这座城的创世 id，即 Ledger 创世行的链哈希（wire 的 `Welcome.epoch` 读的同一个值）的小写十六进制，由 `SecretRef::new` 在装配层一处造出，所以两座城不共用一把，`sprawling export` 打的包里没有 vault 条目，也就带不走它。设置里的「更换城钥匙」删掉旧种子、生成新种子：每台设备都要重新配对，已撤销的设备仍是撤销状态（设备表不随钥匙变）。每个平台上种子能留多久，就是 vault 在那个平台上能留多久（`crates/gateway/spec/Credential.lean` §8-4 的平台表）：Windows 凭据管理器与 macOS 钥匙串跨重启保留；Linux 的内核 keyutils 只留到这次开机结束，重启电脑后设备要重新配对，除非这座城用加密的 vault 文件（`crates/gateway/Spec.lean` §8-21）；vault 退回进程内时每次城重启都要重新配对，`/remote open` 照实说出这一句。局限：同一个系统用户下运行的程序都能读这个用户的凭据存放处，与 provider key 相同。落选的两种：兑现点放在装配层（`bin::outside::keeper`），明文种子会出现在组装根里，而 `EXPOSE_WHITELIST` 的注释写明它存在就是为了不让明文出现在那里；种子写进保留子树里的一份文件，明文凭据落在 vault 之外，`sprawling export` 也会把它带走，一份拷贝的城就能冒充原来那座。vault 有了跨机同步时重新考虑这一条，因为那时「两座城不共用一把」要由同步来守。
+
 D6 设备密钥在设备上生成。城只存公钥，城的存储泄露不让任何人登录；人要保存的恢复种子是设备自己的，城从未见过它。
 
 ### 8-4 remote_access::handshake（形状 1 判定＋形状 5 状态）
 
 ```rust
+pub const NONCE_BYTES: usize = 32;
 pub const HELLO_BYTES: usize = 16 + 32 + 1184 + 32;         // 设备 id、X25519、ML-KEM-768 封装密钥、nonce
 pub const REPLY_BYTES: usize = 32 + 1088 + 32 + 2484;        // X25519、ML-KEM 密文、nonce、城的签名
-pub struct Hello; pub struct Reply; pub struct Finish;       // from_bytes／as_bytes，定长
+pub struct Hello; pub struct Reply; pub struct Finish;       // from_bytes／as_bytes，定长；Hello::device() 读出设备 id
 pub struct Session { pub sealer: Sealer, pub opener: Opener }
 pub fn device_hello(device: DeviceId, nonce: [u8; 32]) -> Result<DeviceWaiting, AxError>;
 impl DeviceWaiting {
