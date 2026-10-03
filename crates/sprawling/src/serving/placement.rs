@@ -132,7 +132,7 @@ pub(crate) fn seat_lane() -> Box<dyn std::any::Any> {
 fn first_table() -> SeatTable {
     match setting() {
         CorePlacement::Off => SeatTable::new(Vec::new()),
-        CorePlacement::Soft => soft_table(),
+        CorePlacement::Soft | CorePlacement::SoftShares => soft_table(),
     }
 }
 
@@ -168,7 +168,7 @@ pub(crate) fn report() -> String {
             "CPU: placement is off ([core] placement = \"none\"); the operating system places every thread"
                 .to_owned()
         }
-        Ok(CorePlacement::Soft) => describe(&reading::read()),
+        Ok(CorePlacement::Soft | CorePlacement::SoftShares) => describe(&reading::read()),
         Err(err) => format!(
             "{} ([core] placement does not read, so placement stays on: {err})",
             describe(&reading::read())

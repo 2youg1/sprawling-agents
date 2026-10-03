@@ -14,11 +14,14 @@
 //! is not kill-on-close: dropping it at `release` stops nothing, because
 //! stopping belongs to `release` and `halt` alone.
 //!
-//! Each job is made with a weighted CPU share, the same weight for every
-//! run, so a run whose build starts sixteen compilers takes one share of
-//! the processors and not sixteen (D29 in the same part).
+//! Each job is made with the shares the backlog was given (D29 in the
+//! same part): a CPU weight, the same for every run, so a run whose build
+//! starts sixteen compilers takes one share of the processors and not
+//! sixteen, and with it, when asked, a limit on the memory the run's
+//! processes commit together.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroU64;
 
 use kernel::{AxError, RunId};
 
@@ -37,21 +40,30 @@ pub struct RunProcesses {
     /// not be read), and every one of them elsewhere, where there is
     /// no Job Object.
     pub unfollowed: u32,
-    /// Whether the run's processes share the processors by weight with
-    /// the other runs' processes.
-    pub share: CpuShare,
+    /// The shares the run's processes hold right now: the ones the
+    /// backlog asked for when the platform gave them, otherwise `Unset`.
+    pub share: Shares,
 }
 
-/// A run's share of the processors (D29).
+/// How a run's processes share this machine with the other runs'
+/// processes (D29). The backlog is given the shares to ask for by the
+/// assembly, which takes them from the person's `[core] placement`
+/// (`crates/sprawling/spec/Serving/Placement.lean` D47); this crate reads
+/// no setting.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum CpuShare {
-    /// Its job holds the weight every run's job holds.
-    Weighted,
-    /// No weight: there is no Job Object on this platform, the run has
-    /// no job yet, or the job refused the weight; its processes compete
-    /// thread by thread, as they did before shares.
+pub enum Shares {
+    /// Nothing set: the processes compete thread by thread. Also what a
+    /// run reads as when the platform has no shares or refused them.
     #[default]
     Unset,
+    /// Every run's processes hold the same CPU weight.
+    Cpu,
+    /// The same CPU weight, and all of one run's processes together
+    /// commit at most `limit` bytes.
+    CpuAndMemory {
+        /// The bytes the run's processes may commit together.
+        limit: NonZeroU64,
+    },
 }
 
 /// Each run's job, and how many of its commands did not get into it.
@@ -159,7 +171,7 @@ const RUN_CPU_WEIGHT: u32 = 5;
 struct RunJob {
     job: Option<win32job::Job>,
     unjoined: u32,
-    share: CpuShare,
+    share: Shares,
 }
 
 #[cfg(windows)]
@@ -176,8 +188,8 @@ impl RunJob {
                 // A job that refuses the weight still follows the run's
                 // processes; the run is read as unshared (D29).
                 self.share = match desktop_ffi::cpu::job_share(job.handle(), RUN_CPU_WEIGHT, 0) {
-                    Ok(()) => CpuShare::Weighted,
-                    Err(_refused) => CpuShare::Unset,
+                    Ok(()) => Shares::Cpu,
+                    Err(_refused) => Shares::Unset,
                 };
                 job
             }
