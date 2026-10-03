@@ -275,7 +275,9 @@ impl SeatTable {
 }
 pub(crate) struct Seat;                         // 析构即交还
 pub(crate) fn seat_this_thread(name: &'static str) -> Seat; // 要座位并设理想处理器；平台拒绝时向标准错误说一次
-pub(crate) fn report() -> String;               // doctor 的一行：读到的拓扑与计划做了什么（D47）
+pub(crate) fn seat_lane() -> Box<dyn std::any::Any>; // lane 经 `Hands::seat_lane` 要座位（D46）
+pub(crate) fn report() -> String;               // doctor 的一行：读设置与拓扑，说出计划做了什么（D47）
+pub(crate) fn describe(read: &Result<Topology, Unread>) -> String; // 同一行，对一次已有的读数
 ```
 
 全进程一张座位表，放在一个 `Mutex` 后面，第一次要座位时读设置与拓扑、算计划、建表：只在线程起动与退出时取锁，不在热路径上。哪一臂由人的配置 `[core] placement` 定，见 D47。
