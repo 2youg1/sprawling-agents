@@ -10,7 +10,7 @@
 
 按下「开门」发 `OpenRemoteDoor{lasting_ms}`，按下「更换城钥匙」发 `ReplaceCityKey`。城答 `E_APPROVAL_PENDING` 时页面显示一个确认码输入框，焦点进框，说明码印在城的控制台上；Escape 取消，焦点回到按下的那个控件；提交发 `ConfirmRemoteDoor{code}`；城答一个拒绝（`E_GATE_DENIED` 或别的码）时清空输入框，焦点回到那个控件，状态行说再按一次。关门发 `CloseRemoteDoor`，不要码，不经这台状态机（D4：关门在线上不设防）。
 
-拒绝在页面上只有一条全局的 `refusal`，不带是哪条命令招来的；所以只在请求或确认在途时，一条拒绝才算这台机器的回答，别的时候来的拒绝什么也不改（`a_stray_refusal_changes_nothing`）。确认在途时，城没有拒绝、页面的耐心（`RECEIPT_MS`）到了，算作做成（`settled`），因为门的状态今天没有一个可问的回答。
+拒绝在页面上只有一条全局的 `refusal`，不带是哪条命令招来的；所以只在请求或确认在途时，一条拒绝才算这个状态机的回答，别的时候来的拒绝什么也不改（`a_stray_refusal_changes_nothing`）。确认在途时，城没有拒绝、页面的耐心（`RECEIPT_MS`）到了，算作做成（`settled`），因为门的状态今天没有一个可问的回答。
 
 性质：
 
@@ -30,7 +30,7 @@ inductive Opener where
   | key
   deriving DecidableEq, Repr
 
-/-- 这台机器停在哪：没事、请求在途、等码、确认在途、被拒（等人再按一次）。 -/
+/-- 这个状态机停在哪：没事、请求在途、等码、确认在途、被拒（等人再按一次）。 -/
 inductive Phase where
   | idle
   | requesting (o : Opener)
@@ -39,7 +39,7 @@ inductive Phase where
   | refused (o : Opener)
   deriving DecidableEq, Repr
 
-/-- 焦点在哪：这台机器之外、某个控件上、输入框里。 -/
+/-- 焦点在哪：这个状态机之外、某个控件上、输入框里。 -/
 inductive Focus where
   | elsewhere
   | opener (o : Opener)
@@ -54,7 +54,7 @@ structure Door where
 
 def initial : Door := ⟨.idle, "", .elsewhere⟩
 
-/-- 这台机器发出的命令。 -/
+/-- 这个状态机发出的命令。 -/
 inductive Sent where
   | openDoor
   | replaceKey
@@ -183,7 +183,7 @@ theorem the_input_lives_only_while_a_code_is_asked (es : List Event) : Asked (ru
   | nil => exact start
   | cons e es ih => exact ih _ (step_keeps_asked d e start)
 
-/-- Escape 把焦点放到这台机器之外的写法。 -/
+/-- Escape 把焦点放到这个状态机之外的写法。 -/
 def stepLoose (d : Door) : Event → Door × Option Sent
   | .escape =>
     match d.phase with
