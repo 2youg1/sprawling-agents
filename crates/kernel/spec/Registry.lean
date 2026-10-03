@@ -16,6 +16,8 @@
 
 ```rust
 pub struct ResidentId(String);               // 非空；`role@building.n` 文法 P1 随 city::resident 收紧
+impl ResidentId { pub fn new(raw: impl Into<String>) -> Option<ResidentId>;  // 空串即 None
+                  pub fn as_str(&self) -> &str; }
 pub struct Claim { pub locator: Locator, pub by: String }        // 证词：未验证产出
 pub struct Artifact { /* locator, verified_by —— 私有 */ }
 impl Artifact {
@@ -34,10 +36,13 @@ impl Registry {
     pub fn promote_asset(&mut self, locator: &Locator) -> Result<RegisterVerdict, AxError>; // 未登记 → E_PATH_NOT_FOUND
     pub fn register_resident(&mut self, id: ResidentId) -> RegisterVerdict;
     pub fn artifact(&self, locator: &Locator) -> Option<&Artifact>;
-    pub fn is_asset(&self, locator: &Locator) -> bool;           // Discard 门的查询面
+    pub fn is_asset(&self, locator: &Locator) -> bool;
+    pub fn is_asset_at(&self, addr: &Address) -> bool;           // 有一条 file: 资产恰在此地址（内容钉不同，地方相同）
+    pub fn is_resident(&self, id: &ResidentId) -> bool;
 }
 ```
 
 - Registry 是值不是存储：状态住调用方；kernel 只定登记规则与查询面。
 - 评分归 eval（P3）；promotion 只登记不评分。
+- **资产不让删除停下来**：Discard 门不读 `is_asset` 与 `is_asset_at`（§8-26「规模与归属不改答」）；登记的用处是保存把资产放回去所需的凭据。两个查询只回答登记里有什么。
 -/
