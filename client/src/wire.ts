@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 47 as const;
+export const WIRE_V = 48 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "e897b2cb123486479d243e6eafa857c316ccc193bf22467bf6a9b1f9af5d7609" as const;
+export const WIRE_HASH = "24fb05fe052a4f70244be1a5f7ffef18c2228fe2ebb41f52d71f16de282c8d5c" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -667,6 +667,8 @@ export const EventKind = Schema.Union([
   Schema.Literal("run_policy_changed"),
   Schema.Literal("session_named"),
   Schema.Literal("skill_audited"),
+  Schema.Literal("signal_wait_started"),
+  Schema.Literal("signal_wait_ended"),
 ]).annotate({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 
@@ -3990,6 +3992,7 @@ export type HeaderPair = typeof HeaderPair.Type;
 export const EndpointTuning = Schema.Struct({
   headers: Schema.Array(HeaderPair),
   label: Schema.optional(Schema.NullOr(Schema.String)),
+  max_in_flight: Schema.optional(Schema.NullOr(Schema.Int)),
   overrides: Schema.Array(BodyOverride),
   proxying: Schema.optional(Schema.NullOr(Proxying)),
   request_max_retries: Schema.optional(Schema.NullOr(Schema.Int)),
