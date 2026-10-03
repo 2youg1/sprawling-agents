@@ -88,7 +88,6 @@ pub struct SignalDesk {
     post: Post,
     held: Vec<Signal>,
     unread: Vec<Signal>,
-    sent: Vec<Signal>,
     minted: u32,
 }
 
@@ -127,7 +126,6 @@ impl SignalDesk {
             post,
             held: Vec::new(),
             unread: Vec::new(),
-            sent: Vec::new(),
             minted: 0,
         }
     }
@@ -232,14 +230,6 @@ impl SignalDesk {
         std::mem::take(&mut self.unread)
     }
 
-    /// The signals this run sent, each already on the ledger and in its
-    /// room: the rooms nobody is working in are knocked for them when
-    /// the run lands, because the knock carries the sender's place in
-    /// its conversation, which the landing holds.
-    pub fn take_sent(&mut self) -> Vec<Signal> {
-        std::mem::take(&mut self.sent)
-    }
-
     /// Moves what the city dropped into the slot since the last safe
     /// point into the lent queue.
     fn collect(&mut self) -> Result<(), AxError> {
@@ -309,8 +299,7 @@ impl SignalDesk {
             "kind".to_owned(),
             Value::String(signal.kind().as_str().to_owned()),
         );
-        (self.post.0)(&SignalEffect::Enqueued(signal.clone()))?;
-        self.sent.push(signal);
+        (self.post.0)(&SignalEffect::Enqueued(signal))?;
         result.insert("delivered".to_owned(), Value::Bool(true));
         Payload::new(result)
     }

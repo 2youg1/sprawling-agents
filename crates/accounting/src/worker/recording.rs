@@ -257,6 +257,9 @@ impl RunWorker {
                 );
             }
         }
+        // A knock the delivery queued starts its run now, while the
+        // sender is still driving (collab D7).
+        self.answer_knocks();
     }
 
     /// Shows one line this worker wrote to the origins, governance,

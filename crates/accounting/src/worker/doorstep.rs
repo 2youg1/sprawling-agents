@@ -20,9 +20,9 @@ pub(in crate::worker) struct Doorstep {
     /// Folded from the history, so a client retrying across a restart
     /// is still asking for one thing.
     pub(in crate::worker) entrance: Entrance,
-    /// Residents who were spoken to while nobody was home. Held between
-    /// the run that spoke and the runs that answer, because delivery
-    /// happens after the speaker has frozen.
+    /// Residents who were spoken to while nobody was home. Queued when
+    /// the signal is delivered, while the speaker still drives, and
+    /// drained by `answer_knocks` once that delivery has been shown.
     pub(in crate::worker) knocks: Vec<Knock>,
     /// Residents spoken to while a run was working in their room, one
     /// knock per room, sent again when that run gives the room back.

@@ -247,7 +247,7 @@ impl RunWorker {
 | 收信人的状态 | 机制 | 落点 |
 |---|---|---|
 | 正在跑 | 信从门缝塞进去——发出时 `signal_enqueued` 经 relay 落账，记账线程展示这一行时把信投进他那份借出队列的 `Mailslot`，`SignalDesk::take_steer` 在下一个安全点取走 | 追在下一次工具结果末尾，前缀 `@发件人地址` |
-| 没在跑 | 敲门——发出时投进房间队列，发信这一跑落地时入 `knocks`（敲门携发信方的 `KnockChain`，它只在落地处可读），`answer_knocks` 为他开一跑；队列已空的敲门跳过，信已被读过 | 新 Run 的 brief，同样写明 `@发件人地址` |
+| 没在跑 | 敲门——发出时投进房间队列，记账线程投递时就入 `knocks`（敲门携发信方的房间、run policy 与 `KnockChain`，`Flight` 在那一跑开着时记着它们），同一次展示之后 `answer_knocks` 为他开一跑，发信方还在跑；队列已空的敲门跳过，信已被读过 | 新 Run 的 brief，同样写明 `@发件人地址` |
 
 - **取走不是消费**（collab D8）：安全点取走的信被那一跑拿着，下一次 `SafePoint::BeforeWave`（这一回合的 `model_returned` 已落盘）才写 `signal_consumed`；那一跑先离开，信回到队列最前，落地时为本房间敲一次门（`RunWorker::knock_for_returned`）。
 

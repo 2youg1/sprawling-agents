@@ -36,6 +36,24 @@ pub(super) struct InLane {
     pub(super) owing: Owing,
 }
 
+/// Who a driving run speaks as when a signal it sends knocks on an
+/// empty room: its room, the policy it runs under, and its place in the
+/// conversation. Kept beside the run for as long as it drives, so the
+/// accounting thread knocks when it delivers the signal rather than
+/// when the sender lands (collab D7).
+pub(in crate::worker) struct Speaker<'a> {
+    pub(in crate::worker) room: &'a Address,
+    pub(in crate::worker) policy: kernel::RunPolicy,
+    pub(in crate::worker) chain: &'a super::super::KnockChain,
+}
+
+/// One driving run: what its landing needs, and where it stands.
+struct Driving {
+    lane: InLane,
+    room: Address,
+    policy: kernel::RunPolicy,
+}
+
 /// What one pass over the crossing and the lanes did.
 ///
 /// Exhaustive because the two callers act on different parts of it: the
@@ -58,7 +76,7 @@ pub(crate) enum Landed {
 pub(in crate::worker) struct Flight {
     pool: DrivingPool,
     pub(in crate::worker) gate: RelayGate,
-    driving: BTreeMap<RunId, InLane>,
+    driving: BTreeMap<RunId, Driving>,
     /// Runs home that one drain found beyond the one it landed, in
     /// arrival order. Kept rather than re-queued, so arrival order is
     /// landing order.
@@ -110,7 +128,7 @@ impl Flight {
     pub(in crate::worker) fn rows_of(&self, addr: &Address) -> std::collections::BTreeSet<NodeId> {
         self.driving
             .values()
-            .filter_map(|lane| match lane.owing.owed() {
+            .filter_map(|driving| match driving.lane.owing.owed() {
                 Owed::Row { addr: at, node } if at == addr => Some(node.clone()),
                 Owed::Row { .. } | Owed::Asked | Owed::Unasked(_) | Owed::Child { .. } => None,
             })
@@ -129,9 +147,27 @@ impl Flight {
         carried: InLane,
     ) -> Result<RunId, AxError> {
         let run = staged.run_id();
+        let at = staged.assignment();
+        let (room, policy) = (at.addr.clone(), at.policy);
         self.pool.start(staged, self.issue(), context)?;
-        self.driving.insert(run, carried);
+        self.driving.insert(
+            run,
+            Driving {
+                lane: carried,
+                room,
+                policy,
+            },
+        );
         Ok(run)
+    }
+
+    /// Who `run` speaks as, while it drives.
+    pub(in crate::worker) fn speaker(&self, run: RunId) -> Option<Speaker<'_>> {
+        self.driving.get(&run).map(|driving| Speaker {
+            room: &driving.room,
+            policy: driving.policy,
+            chain: driving.lane.owing.knock_chain(),
+        })
     }
 
     /// One write face for one lane.
@@ -152,9 +188,12 @@ impl Flight {
             Ok(arrival) => arrival,
             Err(err) => return Some(Err(err)),
         };
-        let Some(InLane {
-            continuation,
-            owing,
+        let Some(Driving {
+            lane: InLane {
+                continuation,
+                owing,
+            },
+            ..
         }) = self.driving.remove(&run)
         else {
             return Some(Err(AxError::failure(
@@ -232,8 +271,8 @@ impl RunWorker {
                     err.subject()
                 ),
             );
-            if let Some(lane) = self.flight.driving.remove(&run) {
-                self.hand_back(&lane.owing.reply(), err);
+            if let Some(driving) = self.flight.driving.remove(&run) {
+                self.hand_back(&driving.lane.owing.reply(), err);
             }
         }
         let Home {

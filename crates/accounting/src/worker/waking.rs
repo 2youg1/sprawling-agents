@@ -200,16 +200,27 @@ impl RunWorker {
     /// empty, the reader's slot when a run is working there, which
     /// reads it at its next safe point (collab D7).
     ///
+    /// The knock goes out here too, while the sender still drives: the
+    /// flight keeps who the sender speaks as, so a resident who is not
+    /// working is woken by the delivery rather than by the sender's
+    /// landing (collab D7, `spec/Delivery.lean` `knock_once`). The caller
+    /// answers the knocks this queued.
+    ///
     /// # Errors
-    /// Propagates a line that does not read back as a signal, and the
-    /// room's refusal of it.
+    /// Propagates a line that does not read back as a signal, the
+    /// room's refusal of it, and a resident description that cannot be
+    /// read.
     pub(super) fn deliver_sent(&mut self, line: &kernel::EventDraft) -> Result<(), AxError> {
         if !matches!(line.kind, kernel::EventKind::SignalEnqueued) {
             return Ok(());
         }
-        self.collaborating
-            .rooms
-            .deliver(&collab::Signal::from_payload(&line.data)?)
+        let signal = collab::Signal::from_payload(&line.data)?;
+        self.collaborating.rooms.deliver(&signal)?;
+        let Some(speaker) = self.flight.speaker(line.run) else {
+            return Ok(());
+        };
+        let (room, policy, chain) = (speaker.room.clone(), speaker.policy, speaker.chain.clone());
+        self.knock(&signal, &room, policy, &chain)
     }
 
     fn knock_resident(

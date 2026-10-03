@@ -83,6 +83,13 @@ pub(crate) enum Flown {
 }
 
 impl Staged {
+    /// What this run was asked to do, as the stage settled it.
+    pub(in crate::worker) fn assignment(&self) -> &Assignment {
+        match self {
+            Staged::Model { at, .. } | Staged::Harness { at, .. } => at,
+        }
+    }
+
     pub(crate) fn run_id(&self) -> RunId {
         match self {
             Staged::Model { site, .. } => site.run_id,
