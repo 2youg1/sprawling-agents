@@ -147,7 +147,19 @@ impl WarmUp {
     /// model list, read to the end so the connection goes back to the
     /// pool. Blocks for that one round trip; start it on a thread of
     /// its own.
-    pub fn open(self) {}
+    ///
+    /// Reports nothing: a client that cannot be built, a connection
+    /// refused, any status and a body cut short each end this warm-up
+    /// alone, and the endpoint's first call meets the same failure and
+    /// reports it with its own action and recovery.
+    pub fn open(self) {
+        let Ok(client) = self.transport.client(&self.shape) else {
+            return;
+        };
+        if let Ok(answer) = client.get(&self.models_url).send() {
+            drop(answer.bytes());
+        }
+    }
 }
 
 /// A step after a client's configuration, held so a transport stays
