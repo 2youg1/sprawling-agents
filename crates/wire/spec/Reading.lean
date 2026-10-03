@@ -320,3 +320,98 @@ pub struct FrozenNames {
 
 **重开参数**：一个 run 可以同时等两个房间时，`waiting` 改成一张表。
 -/
+
+/-! D36 一条到达的话按 `SignalId` 配回它的发出：说话的是谁、说了什么、几时到
+
+```rust
+pub enum Note {
+    // …
+    Arrived {
+        from: Option<String>,   // steer：source；signal：配上的 signal_enqueued 的 from；配不上为 None
+        said: Option<String>,   // steer：text；signal：配上的那一行载荷里的 text；配不上为 None
+        by: Speaker,            // User 或 Resident
+        t: TimeMs,              // 这一行（steer_received／signal_consumed）的 t
+        handback: Option<HandbackNote>,   // D38
+        at: Seq,
+    },
+}
+#[serde(rename_all = "snake_case")]
+pub enum Speaker { User, Resident }
+```
+
+**决定**：`signal_consumed` 的载荷只有 `{id, by}`（kernel `SignalConsumed`），话本身在发信那一行 `signal_enqueued` 里，而那一行记在发信者的 run 下，不在收信者的会话里。所以 `wire::note_of` 读到 `signal_consumed` 时只读出 `by: Resident`、`t` 与 `at`，`from` 与 `said` 留 `None`；服务端的 rounds 折叠（`accounting::views::rounds::paired`）按 `SignalId` 在账本里从这一行往前找配对的 `signal_enqueued`，找到了才填 `from`（发信者）与 `said`（载荷的 `text`）。往前找有界：最多 `HISTORY_MAX` 行，界外配不上就留 `None`，页面写「不知道」而不猜。`steer_received` 一行自带 `source` 与 `text`（kernel `SteerReceived`），直接读；读不回这个形状的载荷是一条 `Note::Unreadable`。`by` 是 `User` 当且仅当 steer 的 `source` 是 User 入口写下的 `user`；居民的 steer（`@id`）与每一条 signal 都是 `Resident`，因为 User 只经 steer 说话。
+
+**理由**：原来的读法在 `signal_consumed` 上读 `source`／`from`／`text` 三个它根本不带的键，于是 `said` 恒为空、`from` 落到这一行的作者——也就是收信者自己：页面上每一条到达的话都像是收信者对自己说了一句空话。
+
+**被否**：①让 kernel 在 `signal_consumed` 里再抄一遍 `from` 与 `text`：同一句话在账本里存两份，kernel `SignalConsumed` 的文档明说历史不需要它两次；②从 `SignalId` 的字面（`<run>-s<n>`）解析出发信者的 run 再去读那个 run：id 的拼法是 collab 的铸造约定，不是一条文法，交接（`handback-<run>`）与阻塞通知已经用了别的拼法。
+
+**重开参数**：一座城里一条信从发出到被取走之间隔的账本行常常超过 `HISTORY_MAX` 时，给索引加一张按 `SignalId` 的表。
+
+**三个平台**：只读账本、只折叠，Windows、macOS、Linux 相同。
+-/
+
+/-! D37 一次同步 `send` 的等待是回合上的一条 note
+
+```rust
+pub enum Note {
+    // …
+    AwaitingReply {
+        on: Address,                 // signal_wait_started 的 on
+        until: TimeMs,               // 它的 deadline_ms（D34：本来就是墙钟毫秒）
+        t: TimeMs,                   // 这一行的 t
+        ended: Option<ReplyEnded>,   // 同一 run 里按 signal 配上的 signal_wait_ended
+        at: Seq,
+    },
+}
+pub struct ReplyEnded { pub by: ReplyEnd, pub t: TimeMs }
+#[serde(rename_all = "snake_case")]
+pub enum ReplyEnd { Reply, Timeout, Left }
+```
+
+**决定**：`signal_wait_started` 出一条 `AwaitingReply`；`signal_wait_ended` 不出 note，折叠在同一会话里按 `signal` 把它配到那条等待上，写 `ended`。三臂与 kernel `WaitEnd` 一一对应（kernel D32 的 `waits_end`），回信那一臂不带回信的 id：回信本身是同一回合里的一条 `Arrived`。窗口里没有结束行为 `None`：还在等，或者结束落在窗口外。
+
+**理由**：一个停在 `send` 上的回合，页面原来只看得见一次调用后什么都没发生；等的是谁、等到几时、怎么结束的，账本里都有。
+
+**被否**：把 `WaitEnd` 原样搬上线：它的 `Reply` 臂带 `SignalId`，而线上的 `Note` 有 JSON schema，kernel 的这个类型没有；页面也用不上那个 id。
+
+**三个平台**：相同。
+-/
+
+/-! D38 一条交接（handback）到达时说它完成了还是停了，以及是哪一次会话
+
+```rust
+pub enum HandbackNote {
+    Finished { verified_by: String, session: RunId },
+    Stopped { because: String, session: RunId },
+}
+```
+
+**决定**：交接的标记由 collab 写在 signal 载荷里（`handback` 标签，collab `Handback::signal`），唯一的逆读是 `collab::Handback::from_signal`。rounds 折叠在 D36 配上 `signal_enqueued` 之后，用这个逆读读那条 signal：是交接就填 `Arrived.handback`，不是就 `None`。`session` 是那一行 `signal_enqueued` 的 run——派活台把交接记在子会话的 run 下（`accounting::worker::dispatching::handback`）。`said` 仍是载荷的 `text`。
+
+**理由**：父会话收到的交接原来与普通一句话没有区别；完成与停下、谁验的、为什么停，是父会话接下来要做什么的依据。
+
+**被否**：在线上再读一遍 `handback` 标签：那是 collab 写法的第二份读法。
+
+**三个平台**：相同。
+-/
+
+/-! D39 收件箱的一行带上那条话的第一行
+
+```rust
+pub struct SignalLine {
+    // …既有字段…
+    #[serde(default)]
+    pub first_line: Option<String>,   // 载荷 text 的第一行；没有 text 为 None
+}
+```
+
+**决定**：`InboxAnswer.waiting` 的每一行带 `first_line`：发信那一行载荷里 `text` 的第一行（按 `\n` 切，去掉行尾 `\r`），载荷没有 `text` 时为 `None`。整段话不上线：收件箱是「有什么在等」，读全文是打开那条信的事。
+
+**理由**：只有 id、种类、发信者与时刻的一行，User 看不出要不要先处理它。
+
+**重开参数**：页面要按字数而不是按行截断时，改成一个字符上限。
+
+**三个平台**：`\r\n` 与 `\n` 都按一行切，三个平台相同。
+
+D36 至 D39 与本版其他改形同一次 `WIRE_V` 进位（D22）：51 → 52。
+-/
