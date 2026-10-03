@@ -41,8 +41,9 @@ pub enum GateSubject { Area(Address), Room(Address), Scope(String), Host(String)
 // 文法读不出的调用返回 `Err`，bench 原样拒收。
 pub enum Temporal { Timeless, Timestamped }
 pub enum CostTier { Free, Light, Heavy }        // 三档
-pub enum RenderIntent { Generic, Terminal, Diff { locations: Vec<Address> } }
+pub enum RenderIntent { Generic, Terminal, Diff { locations: Vec<Address> }, Signal, Delegate }
                                     // meta 级声明用空 locations；逐调用的 locations 是 args 的纯函数（工具侧）
+                                    // Signal：一行读作发给谁、说了什么；Delegate：一行读作交给哪个房间、什么活（D37）
 pub struct ToolMeta { pub name: ToolName, pub disclosure: String, pub params: Payload,
                       pub effect: Effect, pub cost_tier: CostTier, pub timeout: Option<TimeoutMs>,
                       pub render: RenderIntent, pub temporal: Temporal }   // 八字段，缺一不可
@@ -104,4 +105,15 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
 **字节不在这里**：`ImageRef` 携定位符与两个整数边长，字节住 `storage::cas`，出线前的最后一刻才由 `gateway::endpoint` 取出来编码。账本因此仍是一份人能读的文件。
 
 **唯一的生产者是 `browser` 工具的 `screenshot`**（`bin::browser_tool`）；其余每一个工具显式写空表，因为「没有图」是一句要说出口的话，不是一个可以省略的默认。
+-/
+
+/-! D37 发信与派活各有自己的呈现意图
+
+**决定**：`RenderIntent` 多两个单元变体 `Signal` 与 `Delegate`。`signal` 工具登记 `Signal`，`delegate` 工具登记 `Delegate`（`crates/collab/Spec.lean` D17）；`tool_called` 行照旧在调用那一刻抄下登记的 `render`，线上 `Call.render` 原样带它。变体不带字段：收信地址、正文、房间与任务都在这一次调用的 `args` 里，页面从 `Call.arguments` 读，与 `Diff` 的 meta 级空 `locations` 同一条规矩——逐调用的东西是 args 的纯函数，不进登记。三个平台上是同一份登记数据与同一种序列化，没有平台分支；写在这两个变体之前的旧账本行带的是 `generic`，页面照旧按 `effect` 画。
+
+**理由**：页面按登记选词，不按工具名（client/Spec.lean §4-26）。两件工具登记为 `Generic` 时，页面只剩 `effect` 可读：发信是 `Write`，读作「写入 send」；派活是 `Spawn`，读作「派生 <goal>」。人看不出信发给了谁、活交给了哪个房间。一个呈现意图说的就是「这一行该怎么画」，所以加在这里，而不是让页面认工具名。
+
+**被否**：①页面按工具名 `signal`／`delegate` 分支——那是 §4-26 拒掉的第二张登记表，换一个名字或多一件发信工具就静悄悄落回「写入」；②变体带上 `to`／`room` 字段——登记是一件工具的，不是一次调用的，填不出来；要让它逐调用，就得让工具波另写一份逐调用的意图，同一个事实在 `args` 与 `render` 里各写一遍；③只改 `ToolCalled::subject_of` 的键序让主体读成地址——主体只有一个字符串，放不下正文与任务。
+
+**重开参数**：出现第三件「对另一个居民说话」的工具，或页面需要的逐调用数据不再能从 `args` 读出（例如投递结果要在调用行上画，而它只在 `signal_enqueued` 之后才知道）。
 -/
