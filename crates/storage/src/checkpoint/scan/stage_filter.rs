@@ -16,15 +16,26 @@ pub(super) fn workdir(repo: &git2::Repository) -> Result<&std::path::Path, Stora
     })
 }
 
+/// Whether `relative` is the staging file of a write still under way:
+/// a document's (`kernel::layout`) or a replaced file's
+/// (`bundle::landing`). Its writer renames it away whenever it likes, so
+/// libgit2 must never open it (`crates/storage/spec/Checkpoint.lean` D30).
+fn is_half_a_write(relative: &std::path::Path) -> bool {
+    relative.file_name().is_some_and(|name| {
+        kernel::layout::is_document_staging_name(name)
+            || crate::bundle::landing::is_staging_name(name)
+    })
+}
+
 /// The checkpoint's admission rule for one staged path: what enters a
 /// checkpoint, what is skipped, and what refuses the wave (`crates/storage/spec/Checkpoint.lean` §8-8).
 ///
 /// git asks with 1 for skip and 0 for stage, and hands over paths
 /// relative to the repository's working tree - so the alias question is
 /// asked of the joined path, or it asks about the process's directory
-/// instead of the city's. Session projections and protected metadata
-/// are skipped - their bytes have another home and a checkpoint has no
-/// business carrying them. A link is never skipped: one anywhere in the
+/// instead of the city's. Session projections, protected metadata and
+/// the staging files of writes under way are skipped - their bytes have
+/// another home and a checkpoint has no business carrying them. A link is never skipped: one anywhere in the
 /// scope refuses the whole wave, because a name that leads into a
 /// reserved file would capture reserved bytes under a lying name, and
 /// the `file_discarded` restoration would write back through it
@@ -47,6 +58,7 @@ impl StageFilter {
     pub(super) fn admit(&mut self, relative: &std::path::Path) -> i32 {
         if crate::sessions::is_session_projection(relative)
             || !crate::reserved::outside_reserved(relative)
+            || is_half_a_write(relative)
         {
             return 1;
         }
