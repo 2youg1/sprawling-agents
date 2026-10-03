@@ -31,8 +31,9 @@
 # `pgo` runs on Windows, the platform the readings belong to. The same
 # three stages run unchanged on macOS and Linux (the rustc flags and
 # `llvm-profdata` from the `llvm-tools` component are the same there,
-# and the triple is the runner's host triple); their release builds
-# stay without PGO until a reading on that platform judges it.
+# `just pgo-train` closes its served city with SIGINT there instead of
+# Ctrl-Break; only TRIPLE and the `.exe` suffix change); their release
+# builds stay without PGO until a reading on that platform judges it.
 name: on-demand
 on:
   workflow_dispatch:
