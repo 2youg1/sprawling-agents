@@ -7,7 +7,7 @@
 //!
 //! The wire makes all 23 state-changing commands carry an `IdemKey` so
 //! that a client which lost its socket may send the frame again without
-//! doing the work twice. `kernel::gate::dedup` judges membership and
+//! doing the work twice. `kernel::idem::claim` judges membership and
 //! says the seen set is the caller's state; this is that caller
 //! (`crates/sprawling/Spec.lean` §8-41).
 //!

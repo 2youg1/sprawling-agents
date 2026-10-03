@@ -85,7 +85,7 @@ impl Turn<Recording> {
 - **四取消点**：组装前／provider 调用前／工具执行前／派生前，四点全住本模块。第四点由 `Turn<Recording>::record` 收边界快照，故 `record` 与前三相同形——收 `Interrupt`、答 `PhaseOutcome`。它买到的是别处买不到的一件事：**一个回合把活派下去之后、子 Run 起来之前，仍停得住**；`calls_made == 0` 的收尾回合尤其如此，那一刻在第四点之前根本没有下一个边界。
 - **model_called 载荷**：segments 哈希（与 prompt_assembled 同源）；model_returned 载荷＝message＋calls 数。
 - **前缀冻结是运行时不变量，不只是测试。** `assemble` 走 `prefix.verified_segment_hashes()?`：从 `bytes()` 重算四段哈希并与构造时记录的对拍，不等即 `E_CAS_CORRUPT` **拒绝**（不是警告），恢复语指名一条走得通的路——换一个地址派这件活（§8-4-1）；`call` 在写 `model_called` 之前对 `chat.system` 的四块做同一断言（`prefix::verified_system_hashes`），哈希不等或某块丢掉断点同拒。**两处都接在既有的每回合摘要上，不另起记录点**；离线口径同一条断言（`replay::rebuild_prefix` 从载荷与同源文档重算对拍）。
-- **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `accounting::worker::dispatching::running` → `city::write_effort`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
+- **CallShape 的冻结由 `CallShape::verified_against(frozen)` 一处判定。** model／effort／`max_tokens` 三个上线字段任一变了即 `E_CONFIG_INVALID` 拒绝，恢复语先指「把动过的那一项改回去」，再指同一句换地址（§8-4-1）；`context_tokens` 只喂本地提醒、不上线，不参与比较。派活面的拦截点（`Command::Dispatch { effort }` → `accounting::worker::dispatching::running` → `city::config_layers::write_session`）在放行写房间 effort 之前问这一句；运行时只立判定与拒绝路径，拦在哪里归装配层。
 - **只读调用并行执行，按调用序入账（确定性 5）。** 效果由工具自己声明（`kernel::Effect`），执行器不猜：一波开头连续的 `Effect::Read` 调用同时起跑，第一条在本线程跑，其余各占一个 `std::thread::scope` 线程，scope 返回前全部 join；结果按调用序进重排缓冲，再逐条经 `account` 写 `tool_called`＋`tool_result`——入账只此一处，串行段与并行段共用，所以事件的次序与载荷与串行执行一致；各行的时刻是量出来的，并行时本就不同（§8-15）。`tests/run_driver.rs` 与 `turn/tests/concurrent.rs` 在停住的时钟下对拍，逐字节相同。第一条非只读调用就是 checkpoint：它等前面的只读调用收齐才开始，此后整波串行，因为写与写、写与读之间的先后是可观察的。`still_going` 对开头那段只读调用在起跑前逐条先问，Cancel 落在第 k 条就只起跑前 k 条——正是串行波在同一处停下之前会做的那几条；各条的答案留到该条入账之前才交给 `consume_boundary`，所以 Steer 的 `steer_received` 落在串行波写它的同一位置。线程崩溃不是回合错误：该条以 `E_TOOL_UNAVAILABLE` 回给模型。
 - **`ConcurrentInvoke` 是三段，不是一个闭包。** 放行（`admit`，`&mut`，按调用序）、执行（`tool` 借出 `&dyn Tool`，`&self`，各条在 scope 线程上调它的 `invoke`）、记账（`account`，`&mut`，按调用序）。一个包着 bench 的闭包表达不了这个次序：放行与记账写同一张去重表与同一份 taint，而 bench 不是 `Sync`（checkpoint 持有 git 仓库句柄），工具是（`kernel::Tool: Send + Sync`，`invoke(&self)`；有内部状态的工具把状态放在自己的锁后）。三个闭包也不行：三者要借同一个 bench，一个要 `&`、两个要 `&mut`。所以它是 trait——第二实现在缝上已经存在：闭包的全覆盖实现（放行即作答，不报效果，于是 citysim 与脚本化工具的测试走串行、字节不动），与装配层 `accounting::worker::driving::placing` 的 bench 实现（`crates/sprawling/Spec.lean` §8-31）。只读调用的门不读 taint，所以先放行后记账不改变任何一扇门的判定；`IdemKey` 的位置在放行时按调用序定下，exec 计数与 checkpoint 记录在记账时按调用序累加，所以它们与串行波逐字相同。落选的是「lane 把整个 bench 放进锁、闭包取 `Sync`」：锁把三条读排成一条队，并行只剩名字。生产路径由 `tests/run_driver.rs` 的三读测试守着：`drive` 走 `lifecycle` 到 `execute_concurrent`，三条读彼此重叠，次序与载荷与串行逐行相同。
 
@@ -221,7 +221,7 @@ pub fn outcome_unknown_draft(call: &EventRecord, t: TimeMs) -> Result<EventDraft
 ### 8-41 回合带进账本的明文，必经打码那道门
 
 
-**不变量：`tool_called`、`tool_result`、`model_returned` 三类事件的载荷，在写进账本之前逐串跑过 `kernel::scan`，命中的区段换成 `secret:redacted/<b3-16>` 标记。** 三类都要：工具参数与工具结果若**逐字**入账，一次 `read` 读出的别人项目的 `.env` 正文、一次 `exec` 的 stdout，就会进入只增且可导出的历史。账本不可重写，所以这类损害不可逆——这是它排在安全清单最前的理由。
+**不变量：`tool_called`、`tool_result`、`model_returned` 三类事件的载荷，在写进账本之前逐串跑过 `kernel::secret::scan::scan`，命中的区段换成 `secret:redacted/<b3-16>` 标记。** 三类都要：工具参数与工具结果若**逐字**入账，一次 `read` 读出的别人项目的 `.env` 正文、一次 `exec` 的 stdout，就会进入只增且可导出的历史。账本不可重写，所以这类损害不可逆——这是它排在安全清单最前的理由。
 
 ```rust
 // turn/ledger.rs —— 本模块通往账本的唯一一道门
@@ -240,7 +240,7 @@ impl Journal {
 **四条口径：**
 
 1. **「必经」由类型保证，不由注释约定。** `Authored` 与 `Carried` 把本模块写的七类事件切成互不相交的两半，各自只在一个 append 函数里出现；`EventDraft` 的构造收进私有的 `Journal::append`。于是「不打码就写 `tool_called`」这件事在本模块里**没有可写出来的形式**——要绕过它，得先手写一个 `EventDraft`，那是一个审阅时看得见的动作。
-2. **打码器只有一个。** `Journal::append_redacted` 调 `runtime::redact::redact`，后者调 `kernel::scan`；本 crate 不存在第二个扫描器或第二套标记文法。
+2. **打码器只有一个。** `Journal::append_redacted` 调 `runtime::redact::redact`，后者调 `kernel::secret::scan::scan`；本 crate 不存在第二个扫描器或第二套标记文法。
 3. **计数进 `TurnReport::redacted()`，内容不进。** 一个数目足以让诊断行说出「打掉了 N 段」，而说不出打掉的是什么；`Journal` 用饱和加法累计，跨相随 `journal` 一起搬。
 4. **窗口留住账本丢掉的。** `wave_results` 与 `assistant` 在打码之前就已从 `ToolOutcome` 与 `ModelReturn` 取出，模型因此仍看得见工具的真实输出，思考块的签名也不受影响——历史与上下文是两个汇，只有账本是永久的。
 

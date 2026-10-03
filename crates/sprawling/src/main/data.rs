@@ -15,7 +15,7 @@
 //! for an agent driving this binary, the exit code is the result.
 //!
 //! Exit codes are the vocabulary `exit::Exit` defines. A refusal
-//! carrying an `AxError` is printed by `city::report`, so its failure
+//! carrying an `AxError` is printed by `bin::main::city::report`, so its failure
 //! line and its recovery line have one spelling across the whole binary.
 //!
 //! The point a reader most often gets wrong: `fork`, `adopt`, `replay`

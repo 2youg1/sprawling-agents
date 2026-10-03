@@ -6,7 +6,7 @@
 //! What a run wrote down that somebody can check it by.
 //!
 //! Two records write a locator a reader can go and look at: the browser
-//! tool storing a screenshot (`bin::browser_tool::stored`) and a plan
+//! tool storing a screenshot (`bin::browser_tool::storing::stored`) and a plan
 //! node being closed with a completion (`collab::ClaimEffect::PutDown`).
 //! This folds those two and nothing else, so the answer is exactly the
 //! set of things the Ledger says can be looked at again.

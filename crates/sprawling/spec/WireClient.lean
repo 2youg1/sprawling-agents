@@ -86,7 +86,7 @@ impl Heard { pub(crate) fn spoken(&self) -> Spoken; }
 
 ### 发现二：一把必须带而无人读的钥匙
 
-**原因**：23 个状态变更命令每一个都带 `IdemKey`，`kernel::gate::dedup` 把这道门实现成纯函数，
+**原因**：23 个状态变更命令每一个都带 `IdemKey`，`kernel::idem::claim` 把这道门实现成纯函数，
 而它在自身模块之外**没有调用者**。同一条 `Halt` 发两次，账本里两条 `city_halted`。
 `accounting::worker::desk` 只合并**还在队列上或正在被执行**的同键命令（`clockwork.rs` 那条测试钉的就是它），
 一旦第一条跑完，重放就是第二次副作用。
@@ -114,7 +114,7 @@ pub(in crate::assembly) const IDEM_FIELD: &str = "idem";
   是它在产品里的唯一调用方。`handle` 是执行者，留给夹具与内部调用方按顺序驱动一座城；
   **门与执行者分开，是因为「判过了吗」与「怎么做」是两个问题**，而把它们合成一个方法会让
   每一个内部调用方都被迫带一把它并没有从人那里收到的钥匙。
-- **判定借 `kernel::gate::dedup`，不在这里重写**。`Entrance` 持有那个 `BTreeSet`，kernel 只回答成员关系——
+- **判定借 `kernel::idem::claim`，不在这里重写**。`Entrance` 持有那个 `BTreeSet`，kernel 只回答成员关系——
   这正是那个纯函数的 SPEC 说的「seen 集合是调用方的状态」。因此不改 kernel 的立面。
 - **重复的键得到第一次的答案，且不再写第二次**。第一次是 `Ok` 就答 `Ok`（沉默地成功，因为那件事已经做过了）；
   第一次是拒绝就把**同一份** `AxError` 再交一次，于是重试的人两次读到同一句话，而不是第二次读到

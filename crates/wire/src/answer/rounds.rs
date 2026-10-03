@@ -46,7 +46,7 @@ pub enum Outcome {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Timing {
     /// Every time on the row is the moment its own record measured
-    /// (`kernel::EventRecord::moment`).
+    /// (`kernel::event::moment`).
     Measured,
     /// At least one is not: a line written before each line recorded
     /// its own moment carries its turn's stamp, which every line of that
@@ -272,7 +272,7 @@ pub struct Turn {
     pub first_at: Option<TimeMs>,
     /// When the reply that answered this turn was whole, as that
     /// `model_returned` measured its own moment
-    /// (`kernel::EventRecord::moment`). The output rate is
+    /// (`kernel::event::moment`). The output rate is
     /// `used.output` over `returned - first_at`. `None` when no reply
     /// answered in this window and when the reply's line measured no
     /// moment of its own - the envelope stamp of such a line is the

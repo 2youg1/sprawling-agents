@@ -17,7 +17,7 @@
 3. **一行被别人动过，这个 run 对它的拆分落不下**（`split_of_moved_row_is_stale`）：每条拆分之前都有本 run 对同一行的认领，而且那条认领是这一行的第一条效应（`first_touch_is_claim`），所以盘上那一行已不是 `Not started` 时，整次落地判过时。
 4. **拿掉握持守卫，两个 run 把同一行各分一次**（`withoutHold_splits_twice`）：本模型咬得动的演示。从同一份计划派出的两个 run 都不认领就分第 1 行，两次落地都核不出什么，第二次在第一次的子行之后再长一组。
 
-模型的简化：计划的一行只有状态，依赖与叶子判定（`kernel::PlanTree::claim` 的就绪集）收成「`Not started`」一条；拆分只记「这一行被分过一次」（`divided`），子行怎样编号是 `kernel::spine::insert_children` 的事，本模型不重述。`add`（collab D12）不在本模型里：它只在根下写一个新编号的行，不碰已有的行，落地时 `still_true` 对它答真，所以它不改变这里任何一条关于认领与拆分的性质；守恒由 `crates/kernel/spec/Share.lean` 的 `Kernel.Share.Root` 证明。拆分在 Rust 里还要求新表能解析、能建树，那是一次与握持无关的拒绝，`ClaimDesk::split` 在改副本之前判它（`crates/collab/src/claim_tool.rs`）；握持的拒绝由 `crates/collab/src/claim_tool/split_tests.rs` 经生产入口断言。
+模型的简化：计划的一行只有状态，依赖与叶子判定（`kernel::plan::tree::claim` 的就绪集）收成「`Not started`」一条；拆分只记「这一行被分过一次」（`divided`），子行怎样编号是 `kernel::spine::insert_children` 的事，本模型不重述。`add`（collab D12）不在本模型里：它只在根下写一个新编号的行，不碰已有的行，落地时 `still_true` 对它答真，所以它不改变这里任何一条关于认领与拆分的性质；守恒由 `crates/kernel/spec/Share.lean` 的 `Kernel.Share.Root` 证明。拆分在 Rust 里还要求新表能解析、能建树，那是一次与握持无关的拒绝，`ClaimDesk::split` 在改副本之前判它（`crates/collab/src/claim_tool.rs`）；握持的拒绝由 `crates/collab/src/claim_tool/split_tests.rs` 经生产入口断言。
 -/
 
 namespace Collab.Claim

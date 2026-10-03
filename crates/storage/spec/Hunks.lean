@@ -26,7 +26,7 @@ pub fn of_file(city_root: &Path, base: GitOid, head: Head, path: &str)
 **补丁文本是 `storage::changes` 之外的一次独立请求。** `storage::changes` 只计数、不搬补丁文本；一段补丁必须是它自己的一次请求，经同一次扫描作答。本模块就是那次请求，逐字兑现它开出的三个条件：
 
 1. **一次一个文件**，`path` 必填，没有「整批补丁」这个形状。理由是代价：`changes` 的代价与改动文件数同阶，本函数与一个文件的大小同阶，合成一个答会让「这次改了哪些文件」付上整批补丁的钱。
-2. **同一次凭证判定**，不是第二份。`checkpoint::scan_staged` 用 `kernel::scan` 判一个 staged blob，本模块判每一行补丁文本用的是同一个函数。命中的行**不回显**，只报行号与命中原因（provider 名，或熵判定）——理由与 `scan_staged` 对自己的命中说的同一句：把字节打出来以证明泄漏，本身就是泄漏。
+2. **同一次凭证判定**，不是第二份。`checkpoint::scan_staged` 用 `kernel::secret::scan::scan` 判一个 staged blob，本模块判每一行补丁文本用的是同一个函数。命中的行**不回显**，只报行号与命中原因（provider 名，或熵判定）——理由与 `scan_staged` 对自己的命中说的同一句：把字节打出来以证明泄漏，本身就是泄漏。
 3. **两端都是 commit 时，答可永久缓存**（同 `changes` 的理由）；`Head::WorkingTree` 答的是此刻的工作树，那是一波还没提交完的样子，也正是审阅进行中的改动时人看的那一份。
 
 - **一个两次 checkpoint 之间没动过的文件答空补丁**，而不是报错：「它没动」是一个答案。「这座城没写过这个 oid」是另一个答案，由调用方（`accounting::views`）答 `Unavailable`——只有调用方知道人问的是什么。

@@ -111,7 +111,7 @@ impl Ladder {
     /// One concern across the whole ladder, each rung in the slot it
     /// speaks for.
     ///
-    /// `kernel::freeze` takes it from here and decides which rung wins
+    /// `kernel::config::freeze` takes it from here and decides which rung wins
     /// and what an unstated concern falls back to.
     pub(crate) fn resolve<T>(&self, stated: impl Fn(&ConfigLayer) -> Option<T>) -> LayeredValue<T> {
         let tagged = self.tagged(stated);

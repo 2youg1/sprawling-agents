@@ -306,7 +306,7 @@ mod tests {
 
     /// The fallback is the home's own answer rather than a second
     /// spelling of it, so a city under the home directory has one
-    /// definition (`bin::home`).
+    /// definition (`accounting::home::Home::default_city`).
     #[test]
     fn city_falls_back_when_the_binary_directory_is_read_only() {
         let fallback = default_city(

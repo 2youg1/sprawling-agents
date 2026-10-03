@@ -39,7 +39,7 @@ pub const SECRET_SHAPES: [SecretShape; N] = [ /* 公开 provider 令牌形状，
 
 namespace Kernel.ConstsExternal
 
-/-- 一个账本版本在本构建眼里是什么。与 `kernel::LogVersion` 逐变体同名。 -/
+/-- 一个账本版本在本构建眼里是什么。与 `kernel::consts_external::LogVersion` 逐变体同名。 -/
 inductive LogVersion where
   | Current
   | Older

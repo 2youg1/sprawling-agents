@@ -502,7 +502,7 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 /-! D22 会话的显示名是一个 record-only 种类 `session_named`；地址仍是身份，标签仍在偏好文件里
 
-**决定**：加一个种类 `session_named`（`EventKind::SessionNamed`，record-only，追加在 `ALL` 末尾），载荷 `SessionNamed { began: Seq, name: String }`：`addr` 是房间，`began` 指认这段 session（与 `wire::SessionLine.began` 同一个值），`name` 是人给的显示名，空串即撤回显示名、退回地址。写方是城，收到 `Command::NameSession { room, began, name, idem }` 时写，名字经 `wire::CarriedName` 的规则拒空白与控制字符。同一段 session 以最后一行为准。标签不入账：它们仍是偏好文件里的 `tags`（`crates/wire/spec/Preference.lean` D21）；没有标签时读者按工作区给一个默认标签，这是读法，不是记录。
+**决定**：加一个种类 `session_named`（`EventKind::SessionNamed`，record-only，追加在 `ALL` 末尾），载荷 `SessionNamed { began: Seq, name: String }`：`addr` 是房间，`began` 指认这段 session（与 `wire::SessionLine.began` 同一个值），`name` 是人给的显示名，空串即撤回显示名、退回地址。写方是城，收到 `Command::NameSession { room, began, name, idem }` 时写，名字经 `crates/wire/spec/CarriedName.lean` 的规则拒空白与控制字符。同一段 session 以最后一行为准。标签不入账：它们仍是偏好文件里的 `tags`（`crates/wire/spec/Preference.lean` D21）；没有标签时读者按工作区给一个默认标签，这是读法，不是记录。
 
 **理由**：显示名是这段 session 在城里叫什么，换一台设备、导出这座城、让居民在对话里提到它，读到的都该是同一个名字，所以它属于城的历史；标签是人怎么归类自己的工作，D21 已经给了它一个家。显示名不改地址：地址决定读写域与账本身份，改它等于搬家。
 

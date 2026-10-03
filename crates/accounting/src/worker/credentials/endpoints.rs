@@ -94,7 +94,7 @@ impl RunWorker {
     /// own, which the wire does not carry yet.
     ///
     /// The reference is kept and the header is worked out again by
-    /// [`gateway::AuthSpec::for_dialect`], because the same key moves between faces: one archived as
+    /// `AuthSpec::for_dialect` (`gateway::endpoint::auth`), because the same key moves between faces: one archived as
     /// `Authorization: Bearer` under the chat face travels as
     /// `x-api-key` under the messages face, and carrying the old
     /// spelling over answers 401 for a key that is good.

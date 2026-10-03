@@ -347,7 +347,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 
 /-! ## 14 硬编码声明
 
-`transcribe::recording::RECORDING_MAX_BYTES = 25 MiB`（§8-12：OpenAI 音频面自己印的上限，provider 侧工程参数，非城策口径，不入 `consts_policy`；改须本规格同集）与 `wire::BOUNDARY_SEED`（同上，分界线种子）；`EndpointTuning::DEFAULTS` 三个默认值（§8-16，端点调优默认值的唯一住处，改须本规格同集）；market 内置目录（`builtin()`，收录城内实际使用的模型行）。这些全是 pub(crate) 数据面，改动须本规格同集变更。
+`transcribe::recording::RECORDING_MAX_BYTES = 25 MiB`（§8-12：OpenAI 音频面自己印的上限，provider 侧工程参数，非城策口径，不入 `consts_policy`；改须本规格同集）与 `gateway::transcribe::wire::BOUNDARY_SEED`（同上，分界线种子）；`EndpointTuning::DEFAULTS` 三个默认值（§8-16，端点调优默认值的唯一住处，改须本规格同集）；market 内置目录（`builtin()`，收录城内实际使用的模型行）。这些全是 pub(crate) 数据面，改动须本规格同集变更。
 -/
 
 /-! ## 15 影响面

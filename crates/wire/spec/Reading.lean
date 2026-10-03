@@ -54,7 +54,7 @@ pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
 - **`wire::reading` 是第三块**：把一条账本载荷读成上面这些值的那些纯函数（`said_in`／`used_in`／`output_in`／`note_of`）。它住在线这一层而不是服务端，因为**两端都要读**：服务端答 `Rounds` 要它，客户端把推来的 `model_returned` 折进自己的快照也要它（ARCHITECTURE §5 第 12 步：同一个折叠，线的两边）。一份权威，两个调用者。**`Call.subject` 不由这里算**：写方在写 `tool_called` 时把它定下（`crates/kernel/Spec.lean` §8-4：`ToolCalled::subject_of`），折叠读记录里的 `subject` 键；两个读方各按自己的 map 序推一次，同一次调用已经出现过两个名字。
 - **读不出的载荷是一条 `Note::Unreadable { cause, at }`，不是没有 note**：`note_of` 认下的种类（被拒、检查点）若载荷读不回它该有的形状，答里留一行，`cause` 说哪一种事件、读到哪一步失败，`at` 指向账本里那条记录。被否：返回 `None`——那样一次被拒在人眼里就是「什么都没发生」，而失败本身被这一层抹掉了。`CheckpointCommitted` 的 `JobPinned` 是一个真答案（派发钉住的是作业不是提交），仍然没有 note。
 - **`Changes` 早已在线上**（§8-20），`storage::changes` 一直是它唯一的权威；查过之后不动它——把一件已经做完的事再做一遍就是造第二个权威。
-- **`Evidence` 只认写下来的东西**：截图是 `tool_result` 载荷里的 `image` 定位符（`bin::browser_tool::stored` 写的那三项：定位符、两条边、media type），完成证据是 `roadmap_finished` 载荷里的 `evidence` 定位符。**答里恒不携字节**：一张图是一个 `cas:` 定位符，取它是资产端点的事，把 base64 塞进查询答会让「看一眼这次跑干了什么」付上整批像素的代价——与 §8-20 拒绝整批补丁同一条理由。
+- **`Evidence` 只认写下来的东西**：截图是 `tool_result` 载荷里的 `image` 定位符（`bin::browser_tool::storing::stored` 写的那三项：定位符、两条边、media type），完成证据是 `roadmap_finished` 载荷里的 `evidence` 定位符。**答里恒不携字节**：一张图是一个 `cas:` 定位符，取它是资产端点的事，把 base64 塞进查询答会让「看一眼这次跑干了什么」付上整批像素的代价——与 §8-20 拒绝整批补丁同一条理由。
 - **`CostOf` 的分母不在这里**：答只报这个节点上归到的绝对金额与逐跑明细，不报占比。占比需要一个这一端没有的分母（整城总额是 `CostView` 的），而没有分母的百分比正是 `UnplannedProgress` 拒绝拼出来的那种东西。节点到跑的映射由 `roadmap_claimed` 折出（载荷里的 `node` 与记录的 `addr`），钱由 `storage::attribution` 的 `by_run` 给——**不新增任何计价处**。
 - **一个本城没认领过的节点答 `CostOf { spent: 0, runs: [] }` 而不是 `Unavailable`**：与 `Changes` 那一条相反，因为这里「没人认领过它」是一个真答案而不是「我读不了」；节点地址本身经 `NodeId` 的手写 `Deserialize` 把过关，读不了的形状根本上不了线。
 - **`RunCosts { runs: Vec<RunId> }` → `Answer::RunCosts(RunCostsAnswer { runs: Vec<(RunId, UsdMicros)> })`**：`CostView.by_run` 之外的跑逐个按名字问，一次最多 `RUN_COSTS_MAX`（64）个，按问的顺序答；读不出的跑不出行，零是「没花钱」。钱仍只由 `storage::attribution` 折，冷的一侧从账本折（`crates/sprawling/Spec.lean` §8-90）。
@@ -214,7 +214,7 @@ pub struct RoundsAnswer {
 ```
 
 - **`cache_write` 与 `cached` 分开答**：两者都是 `input` 的一部分，单价不同（`gateway::market` 的 `cache_read_price` 与 `cache_write_price`），合成一个数页面就算不出命中率之外的任何东西。读法仍只有 `used_in` 一处，经 `ModelUsage` 自己的反序列化，旧行的换算由它做；`used` 在场时 `cache_write` 恒在场，`Option` 只为一个旧城答出的帧。
-- **`exit_code` 只照录结果里的 `exit_code` 键**：键的拼法与「有码才写码」的规则住 `runtime::tools::exec::outcome`；`runtime::pipeline::exec::exit_code_in` 是这个键的读者，读面经它读。信号停下的命令、城没等到的命令、非 exec 的工具、还没答的调用都是 `None`——没有码就不画码，`-1` 那种编出来的码一概没有。
+- **`exit_code` 只照录结果里的 `exit_code` 键**：键的拼法与「有码才写码」的规则住 `runtime::tools::exec::outcome`；`runtime::pipeline::exit_code_in` 是这个键的读者，读面经它读。信号停下的命令、城没等到的命令、非 exec 的工具、还没答的调用都是 `None`——没有码就不画码，`-1` 那种编出来的码一概没有。
 - **`policy` 照录 `run_started` 的 `policy` 键**：携 kernel 的 `RunPolicy` 本身（四个值：模式、写入限制、准入要求、落地策略），不在线上另立四个平铺字段（D4 同一条理）。写在这个键出现之前的行是 `None`。
 - **`worktree` 是 `worktree_opened` 的 `name`**：只有借到自己的工作树的 run 才有这一行；在楼自己的树里干活的 run、窗口没读到那一行的长会话都是 `None`，与 `opening` 同一口径。名字不是路径：路径是一台机器的事实（`kernel::event::record::WorktreeOpened`）。
 -/
