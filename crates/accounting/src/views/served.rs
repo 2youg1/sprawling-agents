@@ -28,8 +28,9 @@ pub(super) struct Reach {
     pub(super) registry: Option<fn() -> wire::ReleaseAnswer>,
     /// Asks one item's publisher for its newest release.
     pub(super) upstream: Option<fn(&str) -> wire::DoctorUpstream>,
-    /// Asks this machine's search path for one program.
-    pub(super) programs: Option<fn(&str) -> Option<std::path::PathBuf>>,
+    /// Asks this machine's search path for a launcher, and where one
+    /// harness's set-up directory is.
+    pub(super) programs: Option<super::lines::HarnessReach>,
     /// Asks the GitHub CLI which login one host is signed in as.
     pub(super) github: Option<fn(&str) -> wire::GithubReading>,
 }
@@ -71,10 +72,15 @@ impl Views {
     }
 
     /// Takes the one way this city asks its search path for a program,
-    /// so the harness page reads this machine only through what the
-    /// served city handed in (`crates/accounting/spec/Views.lean` §8-10).
-    pub fn find_programs_through(&mut self, find: fn(&str) -> Option<std::path::PathBuf>) {
-        self.reach.programs = Some(find);
+    /// and the one way it places a harness's set-up directory on this
+    /// machine, so the harness page reads this machine only through what
+    /// the served city handed in (`crates/accounting/spec/Views.lean` §8-10).
+    pub fn look_for_harnesses_through(
+        &mut self,
+        find: fn(&str) -> Option<std::path::PathBuf>,
+        place: fn(&agent_protocols::SetUpDir) -> Option<std::path::PathBuf>,
+    ) {
+        self.reach.programs = Some(super::lines::HarnessReach { find, place });
     }
 
     /// Takes the one way this city asks the GitHub CLI on this machine for
@@ -120,35 +126,69 @@ mod tests {
         );
     }
 
-    /// How many programs the scripted search was asked for.
-    static ASKED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    /// The fake home directory the scripted placement puts every
+    /// set-up directory under.
+    static HOME: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
 
-    /// A search that finds every program, and counts the asking.
+    /// A search that finds every program.
     fn found_everywhere(program: &str) -> Option<std::path::PathBuf> {
-        ASKED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Some(std::path::PathBuf::from(program))
     }
 
+    /// A placement under the fake home, with no variable set.
+    fn under_the_fake_home(dir: &agent_protocols::SetUpDir) -> Option<std::path::PathBuf> {
+        dir.on(HOME.get().map(tempfile::TempDir::path), None)
+    }
+
+    /// A5: a launcher on the search path is not a harness set up. With
+    /// Claude Code's directory under the home and nothing else, Claude
+    /// Code is ready, Codex and Pi name the paths looked at, and the two
+    /// harnesses with no registered directory say nothing was looked at.
     #[test]
-    fn a_harness_is_looked_for_through_the_search_the_views_were_handed() {
+    fn a_harness_is_set_up_only_where_its_vendor_directory_exists() {
+        let home = HOME.get_or_init(|| tempfile::tempdir().unwrap()).path();
+        std::fs::create_dir_all(home.join(".claude")).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let mut views = Views::new(dir.path());
-        views.find_programs_through(found_everywhere);
+        views.look_for_harnesses_through(found_everywhere, under_the_fake_home);
 
         let wire::Answer::Harnesses(page) = views.prepare(&wire::Query::Harnesses).finish() else {
             panic!("Harnesses answers with the harness page");
         };
-        let found: Vec<wire::HarnessState> =
-            page.harnesses.into_iter().map(|line| line.state).collect();
+        let shown = |path: std::path::PathBuf| path.display().to_string();
         assert_eq!(
-            (found, ASKED.load(std::sync::atomic::Ordering::Relaxed)),
-            (
-                vec![
-                    wire::HarnessState::NotSetUp { looked: Vec::new() };
-                    agent_protocols::Harness::ALL.len()
-                ],
-                agent_protocols::Harness::ALL.len()
-            ),
+            page.harnesses
+                .into_iter()
+                .map(|line| (line.name, line.state))
+                .collect::<Vec<_>>(),
+            vec![
+                (
+                    "claude_code".to_owned(),
+                    wire::HarnessState::Ready {
+                        at: shown(home.join(".claude"))
+                    }
+                ),
+                (
+                    "codex".to_owned(),
+                    wire::HarnessState::NotSetUp {
+                        looked: vec![shown(home.join(".codex"))]
+                    }
+                ),
+                (
+                    "grok_build".to_owned(),
+                    wire::HarnessState::NotSetUp { looked: Vec::new() }
+                ),
+                (
+                    "kimi_code".to_owned(),
+                    wire::HarnessState::NotSetUp { looked: Vec::new() }
+                ),
+                (
+                    "pi".to_owned(),
+                    wire::HarnessState::NotSetUp {
+                        looked: vec![shown(home.join(".pi").join("agent"))]
+                    }
+                ),
+            ],
         );
     }
 

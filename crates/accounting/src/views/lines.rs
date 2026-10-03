@@ -158,11 +158,20 @@ pub(crate) fn known_hosts_answer() -> wire::Answer {
     })
 }
 
+/// How the harness page reads this machine, as the served city hands it
+/// in: the search path for a launcher, and where one set-up directory
+/// sits on this machine.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct HarnessReach {
+    pub(crate) find: fn(&str) -> Option<PathBuf>,
+    pub(crate) place: fn(&agent_protocols::SetUpDir) -> Option<PathBuf>,
+}
+
 /// The harness page: every official harness in the roster, the command
-/// that starts it, and whether the search the served city handed in
-/// finds that command's program (`crates/wire/Spec.lean` §8-52, `crates/accounting/spec/Views.lean`
-/// §8-10).
-pub(crate) fn harnesses_answer(find: fn(&str) -> Option<PathBuf>) -> wire::Answer {
+/// that starts it, and how far this machine has it set up
+/// (`crates/wire/spec/Answer/Harnesses.lean` §8-52 and D23,
+/// `crates/accounting/spec/Views.lean` §8-10).
+pub(crate) fn harnesses_answer(reach: HarnessReach) -> wire::Answer {
     wire::Answer::Harnesses(wire::HarnessesAnswer {
         harnesses: agent_protocols::Harness::ALL
             .iter()
@@ -174,10 +183,7 @@ pub(crate) fn harnesses_answer(find: fn(&str) -> Option<PathBuf>) -> wire::Answe
                         .chain(launch.args.iter().copied())
                         .map(str::to_owned)
                         .collect(),
-                    // No harness registers its install or sign-in
-                    // directories yet, so a present launcher is a harness
-                    // nobody has looked for (`crates/wire/spec/Answer/Harnesses.lean` §8-52).
-                    state: match find(launch.program.name()) {
+                    state: match (reach.find)(launch.program.name()) {
                         None => wire::HarnessState::LauncherMissing {
                             program: launch.program.name().to_owned(),
                         },

@@ -270,7 +270,10 @@ impl Harness {
     pub const fn registry_id(self) -> &'static str;   // ACP registry 里的 id
     pub const fn docs(self) -> &'static str;      // 这家自己写的登录说明
     pub fn parse(word: &str) -> Option<Harness>;  // as_str 的逆；不认识的词答 None，拒词由调用方按它的场合写
+    pub const fn set_up(self) -> &'static [SetUpDir];   // 装好或登录后这家写下的目录，逐行引厂商文档；空表读作「没查」
 }
+pub struct SetUpDir { pub variable: Option<&'static str>, pub under_home: &'static [&'static str], pub source: &'static str }
+impl SetUpDir { pub fn on(&self, home: Option<&Path>, variable: Option<OsString>) -> Option<PathBuf>; }   // 非空变量优先，否则家目录下；两者都没有答 None
 pub struct Launch { pub program: Program, pub args: &'static [&'static str] }
 pub enum Program { Npx, Kimi }
 impl Program { pub const fn name(self) -> &'static str; }   // Windows 上 npx 是 npx.cmd，kimi 是 kimi.exe 由搜索路径补

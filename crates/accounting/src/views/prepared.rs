@@ -78,7 +78,7 @@ pub enum Prepared {
     /// The release page, which leaves this machine.
     Release(Option<fn() -> wire::ReleaseAnswer>),
     /// The harness page, which walks this machine's search path.
-    Harnesses(Option<fn(&str) -> Option<PathBuf>>),
+    Harnesses(Option<super::lines::HarnessReach>),
     /// One item's publisher, which leaves this machine too.
     Upstream {
         ask: Option<fn(&str) -> wire::DoctorUpstream>,
@@ -298,7 +298,7 @@ impl Prepared {
             Self::Release(None) => unavailable("NewestRelease".to_owned()),
             // Read after the views are released, because it walks the
             // search path (`crates/sprawling/Spec.lean` §8-100).
-            Self::Harnesses(Some(find)) => harnesses_answer(find),
+            Self::Harnesses(Some(reach)) => harnesses_answer(reach),
             Self::Harnesses(None) => unavailable("Harnesses".to_owned()),
             Self::Upstream {
                 ask: Some(newest),

@@ -19,7 +19,7 @@ mod mcp;
 
 pub use acp::{Admitted, Incoming, Progress, admit};
 pub use harness::{AcpSession, Answer, HarnessProcess, Listener};
-pub use harness::{Harness, Launch, Program, StopReason, Update};
+pub use harness::{Harness, Launch, Program, SetUpDir, StopReason, Update};
 pub use harness::{PermissionAsk, Permit, PermitKind, PermitOption};
 pub use mcp::{Broker, Connection, Toolkit};
 pub use mcp::{EFFECT_META_KEY, Rpc, ScriptedOutbound, tools_from};

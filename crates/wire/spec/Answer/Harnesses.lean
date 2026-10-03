@@ -21,7 +21,7 @@ pub enum HarnessState { LauncherMissing { program: String }, NotSetUp { looked: 
 ```
 
 - **provider 页与 harness 页分开**（定规）：provider 页收 API key，harness 页说明五家官方 harness（`crates/agent_protocols/Spec.lean` §8-19）。
-- `name` 是 `agent_protocols::Harness::as_str` 的词；`launch` 是起它说 ACP 的那条命令，逐词；`state` 是这台电脑能不能用它（D23 的三态）：启动程序不在搜索路径上答 `LauncherMissing`，`program` 是那个程序名；启动程序在而这家的目录表还没有登记（`agent_protocols` 里的表由 CON-DOC 照各家文档填），答 `NotSetUp`，`looked` 为空，读作「还没有查过任何目录」，而不是「查过都不在」；表登记以后同一个函数逐行查，找到即 `Ready`。`docs` 是这家自己写的登录说明。**登录是人在 harness 里做的**，这一问不答任何凭据的事。
+- `name` 是 `agent_protocols::Harness::as_str` 的词；`launch` 是起它说 ACP 的那条命令，逐词；`state` 是这台电脑能不能用它（D23 的三态）：启动程序不在搜索路径上答 `LauncherMissing`，`program` 是那个程序名；启动程序在时，按 `agent_protocols::Harness::set_up` 那张表逐行查：第一个存在的目录答 `Ready { at }`；一个都不在答 `NotSetUp`，`looked` 是查过的路径，已展开；这家的表是空的（厂商文档没写这样一个目录），`looked` 为空，读作「没有查过任何目录」，而不是「查过都不在」。`docs` 是这家自己写的登录说明。**登录是人在 harness 里做的**，这一问不答任何凭据的事。
 - 名字表多一项，schema 哈希因此而变，`WIRE_V` 不为此进位。
 -/
 
@@ -37,7 +37,19 @@ pub enum HarnessState {
 }
 ```
 
-每家 harness 查哪些目录是 `agent_protocols` 里这家登记的一张表，按平台分三栏（Windows 以 `%USERPROFILE%`、`%APPDATA%` 展开，macOS 与 Linux 以 `$HOME` 与各家文档写的环境变量展开，例如 Codex 的 `CODEX_HOME`）；表里的每一行引这家的官方文档，实现这一行的车道读文档填表，不猜。判定是只读的文件存在检查，三个平台同一个函数。改形不改名，`WIRE_V` 随 V0.0.9 的那一次进位（`crates/wire/Spec.lean` D22）。
+当前的表（`agent_protocols::Harness::set_up`），每行的出处就是行里的那页：
+
+| harness | 变量 | 家目录下 | 出处 |
+|---|---|---|---|
+| `claude_code` | `CLAUDE_CONFIG_DIR` | `.claude` | https://code.claude.com/docs/en/settings |
+| `codex` | `CODEX_HOME` | `.codex` | https://developers.openai.com/codex/auth |
+| `pi` | `PI_CODING_AGENT_DIR` | `.pi/agent` | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/environment-variables.md |
+| `grok_build` | — | —（未登记） | https://docs.x.ai/build/overview 没有写这样一个目录 |
+| `kimi_code` | — | —（未登记） | 启动程序 `kimi` 本身就是这家的二进制，`LauncherMissing` 已说明有没有装 |
+
+这三家的文档对三个平台写的是同一个位置：家目录（Windows 的 `%USERPROFILE%`，macOS 与 Linux 的 `$HOME`）下的一个目录，设了变量就换成变量的值，所以三栏合成一栏；某家给某个平台另写了位置时，这一行按平台分开。家目录由 `bin::doctor::host` 读（`accounting::Home::detect`，先 `USERPROFILE` 后 `HOME`），变量由它读环境；views 只经 served city 交进来的那个函数读这台电脑。
+
+表里的每一行引这家的官方文档，不猜。判定是只读的文件存在检查，三个平台同一个函数。改形不改名，`WIRE_V` 随 V0.0.9 的那一次进位（`crates/wire/Spec.lean` D22）。
 
 **理由**：四家 harness 的启动程序都是 `npx.cmd`，装了 Node 就都显示「找到」（roadmap A5）。人要做的三件事不同：装 Node、装或登录这家 harness、直接用，所以要三态而不是两态；带上查过的路径，页面才能说「我们在这里找过」。
 

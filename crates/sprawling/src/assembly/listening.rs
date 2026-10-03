@@ -170,7 +170,10 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // made here from the first (`crates/sprawling/spec/Assembly/Listening.lean` §8-99).
     rebuilt.ask_the_registry_through(crate::release::answer);
     rebuilt.ask_upstream_through(crate::doctor::newest);
-    rebuilt.find_programs_through(crate::doctor::host::find_program);
+    rebuilt.look_for_harnesses_through(
+        crate::doctor::host::find_program,
+        crate::doctor::host::place_set_up,
+    );
     rebuilt.ask_github_through(crate::doctor::github::login);
     // One verdict for the writer and the views (`crates/sprawling/spec/Assembly.lean` §8-134).
     let halt = storage::ChainHalt::awaiting_proof();

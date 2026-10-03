@@ -53,6 +53,47 @@ impl Program {
     }
 }
 
+/// One directory a harness writes once it is installed or signed in, as
+/// its vendor documents it.
+///
+/// The vendors named here document one location for all three
+/// platforms: a directory under the User's home (`%USERPROFILE%` on
+/// Windows, `$HOME` on macOS and Linux), moved by one environment
+/// variable when that is set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SetUpDir {
+    /// The variable the vendor documents as moving the directory.
+    pub variable: Option<&'static str>,
+    /// The directory under the home directory, one component per entry.
+    pub under_home: &'static [&'static str],
+    /// The vendor page that states the directory.
+    pub source: &'static str,
+}
+
+impl SetUpDir {
+    /// Where this directory is on a machine whose home directory and
+    /// whose value of [`SetUpDir::variable`] are given.
+    ///
+    /// A variable set to something non-empty wins, as each vendor
+    /// documents; with none, the directory is under the home, and with
+    /// no home either it is nowhere this machine can name.
+    #[must_use]
+    pub fn on(
+        &self,
+        home: Option<&std::path::Path>,
+        variable: Option<std::ffi::OsString>,
+    ) -> Option<std::path::PathBuf> {
+        match variable.filter(|value| !value.is_empty()) {
+            Some(moved) => Some(std::path::PathBuf::from(moved)),
+            None => home.map(|home| {
+                self.under_home
+                    .iter()
+                    .fold(home.to_path_buf(), |path, part| path.join(part))
+            }),
+        }
+    }
+}
+
 /// One command that starts a harness as an ACP agent on stdio.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Launch {
@@ -106,6 +147,35 @@ impl Harness {
                 program: Program::Npx,
                 args: &["-y", "pi-acp@0.0.34"],
             },
+        }
+    }
+
+    /// The directories whose presence says this harness is installed or
+    /// signed in on this machine (`crates/wire/spec/Answer/Harnesses.lean`
+    /// D23).
+    ///
+    /// Each row is read from the vendor page it cites. A harness whose
+    /// vendor documents no such directory has an empty table, which the
+    /// harness page reads as "not looked for" rather than "not there".
+    #[must_use]
+    pub const fn set_up(self) -> &'static [SetUpDir] {
+        match self {
+            Harness::ClaudeCode => &[SetUpDir {
+                variable: Some("CLAUDE_CONFIG_DIR"),
+                under_home: &[".claude"],
+                source: "https://code.claude.com/docs/en/settings",
+            }],
+            Harness::Codex => &[SetUpDir {
+                variable: Some("CODEX_HOME"),
+                under_home: &[".codex"],
+                source: "https://developers.openai.com/codex/auth",
+            }],
+            Harness::Pi => &[SetUpDir {
+                variable: Some("PI_CODING_AGENT_DIR"),
+                under_home: &[".pi", "agent"],
+                source: "https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/environment-variables.md",
+            }],
+            Harness::GrokBuild | Harness::KimiCode => &[],
         }
     }
 
@@ -170,6 +240,28 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// A variable the vendor documents moves the directory; an empty one
+    /// is unset, and with neither a variable nor a home there is no path.
+    #[test]
+    fn a_set_up_directory_is_moved_by_its_variable_and_otherwise_under_home() {
+        let row = Harness::Pi.set_up()[0];
+        let home = std::path::Path::new("home");
+        assert_eq!(
+            [
+                row.on(Some(home), None),
+                row.on(Some(home), Some("".into())),
+                row.on(Some(home), Some("moved".into())),
+                row.on(None, None),
+            ],
+            [
+                Some(home.join(".pi").join("agent")),
+                Some(home.join(".pi").join("agent")),
+                Some(std::path::PathBuf::from("moved")),
+                None,
+            ]
+        );
     }
 
     #[test]

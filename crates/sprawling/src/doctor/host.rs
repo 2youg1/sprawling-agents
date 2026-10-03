@@ -92,6 +92,23 @@ pub(crate) fn find_program(program: &str) -> Option<PathBuf> {
     super::on_search_path(&search_path(), program)
 }
 
+/// Where one harness's set-up directory is on this machine: the
+/// variable its vendor documents when that is set, else the directory
+/// under the User's home (`crates/wire/spec/Answer/Harnesses.lean` D23).
+pub(crate) fn place_set_up(dir: &agent_protocols::SetUpDir) -> Option<PathBuf> {
+    // A machine with no home directory can still name a directory a
+    // variable moved; a row under the home is then nowhere to look, and
+    // the page lists what it could look at.
+    let home = match accounting::home::Home::detect() {
+        Ok(home) => Some(home),
+        Err(_no_home) => None,
+    };
+    dir.on(
+        home.as_ref().map(accounting::home::Home::path),
+        dir.variable.and_then(std::env::var_os),
+    )
+}
+
 /// The file one item's install writes its output to, fresh for every
 /// install (`crates/sprawling/spec/Doctor.lean` §8-64).
 ///

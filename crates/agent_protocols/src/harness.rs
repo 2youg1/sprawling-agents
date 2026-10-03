@@ -12,7 +12,7 @@ mod roster;
 mod session;
 
 pub use process::HarnessProcess;
-pub use roster::{Harness, Launch, Program};
+pub use roster::{Harness, Launch, Program, SetUpDir};
 pub use session::{
     AcpSession, Answer, Listener, PermissionAsk, Permit, PermitKind, PermitOption, StopReason,
     Update,
