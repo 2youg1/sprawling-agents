@@ -10,9 +10,11 @@
 
 **读界。** 一行碰到的每一栋楼都由读者判一次，答案复用 `kernel::ReadVerdict` 的三臂：`Open`、`Confidential`、`RulesUnreadable`。只有碰到的楼全是 `Open` 的行可见；另外两臂一律关闭，所以规则读不了不会朝宽的一侧失败。一行「碰到」哪些楼，Rust 从信封地址、它所在 run 的房间、它关闭的那一对的打开行、以及载荷里以已知楼开头的地址求出；本模型把这个集合当作行的一个字段。
 
+**凭据扫描不在模型里。** Rust 里碰到的楼全是 `Open` 的行，还要过 `kernel::secret::scan`：扫出凭据的行同样隐去，只记一条 `credential` 计数（`playback::project` 的 `Fate::Credential`）。这一条读的是行的内容，而本模型的 `readable` 只读 `touches`，所以 `hidden_content_never_reaches_the_bundle` 说的是「关闭的楼」这一半；凭据那一半只由 `playback::project` 里那一处判定持有，「什么像凭据」的权威是 `kernel::secret::scan`。
+
 **派生表只读可见行。** 事件表、run 表、关键时刻、消息、费用与 checkpoint 表都是 `derive` 在可见行上的值；被隐去的行只留下条数（以及 Rust 里列明的楼名与种类计数，这些是明示的元数据披露）。`hidden_content_never_reaches_the_bundle` 陈述的是：把被隐去的行改成任何别的内容（只要它仍被隐去、seq 不变），bundle 一字不变——所以被隐去的内容没有任何一条路流进 bundle。
 
-**真实关闭的单调性。** 一个关键时刻（一个 run、一次审批、一个 PR、一封信）在 cutoff `c` 闭合，当且仅当某一行 seq ≤ c 且它是这个键的关闭事件。闭合只看关闭事件，不看选择窗口的右端（`closure_ignores_the_window`）；在 cutoff c 闭合的键，在更晚的 cutoff、在追加了行的账本上仍闭合（`closure_is_monotone`、`closure_survives_appends`）。前缀扩展只对这些已真实闭合的对象成立：还开着的对象在更晚的 cutoff 可能闭合，那是变化而不是矛盾。
+**真实关闭的单调性。** 一个关键时刻（一个 run、一次审批、一个 PR、一封信）在 cutoff `c` 闭合，当且仅当某一行 seq ≤ c 且它是这个键的关闭事件。闭合只看关闭事件，不看选择窗口的右端：`closedAt` 的参数里没有窗口，这是定义的形状，不另立定理；在 cutoff c 闭合的键，在更晚的 cutoff、在追加了行的账本上仍闭合（`closure_is_monotone`、`closure_survives_appends`）。前缀扩展只对这些已真实闭合的对象成立：还开着的对象在更晚的 cutoff 可能闭合，那是变化而不是矛盾。
 
 **调用的耗时。** 工具调用与模型调用的 `took` 是同一条规则：两端的时刻都量过、答复不是城补写的、答复不早于调用，才给出两者之差；其余一律是 unknown，从不是零（`took_is_measured`、`an_unmeasured_end_is_unknown`）。一条答复配哪一次调用是 Rust 的配对规则（工具调用按 id，模型调用按 `views::rounds::Attempts`），本模型把配好的两端当作输入。
 

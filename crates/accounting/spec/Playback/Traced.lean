@@ -7,6 +7,10 @@
 # accounting::playback::traced
 
 规定 playback 的时间选择、调用的耗时、运行策略与提交的证据：`playback::traced`、`playback::diff`，以及它们在 `playback::select`、`playback::links`、`playback::project` 与 `views::rounds::Attempts` 里的那一部分。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它要守住的性质证在 `crates/accounting/spec/Playback/Select.lean` 与 `crates/accounting/spec/Playback/Project.lean`，其余由 Rust 的类型与 `accounting::playback::tests` 守住（`crates/accounting/Spec.lean` §16）。
+
+**平台**：时间条件只读每行信封的 `t`，不读本机时钟；提交的证据只读 git 对象。下面每一句在 Windows、macOS 与 Linux 上相同。
 -/
 
 /-!
@@ -52,12 +56,12 @@ impl Window<'_> {
 - **`trace`**（`playback::traced`）：这一行是 cutoff 以内第一次宣告这个 oid 的行时，是 `accounting::trace` 按这一行求出的答（8-25：视图折到这一行时的 `Query::Commit`，调用与同楼的别人经 walk 的索引读），写 `{"traced":{"calls","nearby"}}`：`calls` 是这个 run 在区间里的每次调用，各是 `{"at":seq}`（在 `events` 里）、`{"elsewhere":seq}`（读者看得到，在选择之外，行不随 bundle 携带，要看它就把选择放宽到它）或 `"withheld"`（读者看不到那条 `tool_called`）；`nearby` 是同一栋楼里别的 run 的调用数，各是 `{"run","actor","calls"}`，`run` 照 `runs` 的写法是 `{"run":id}`、`"withheld"` 或 `"missing"`，`actor` 只在 `run` 读得到时写出。这一行之前已经宣告过同一个 oid（同一棵树再次宣告，它的调用归在第一次宣告上），或视图答「没有这个提交」时，写 `"untraced"`；`trace` 失败（视图拒绝折 cutoff 以内的某一行，或这一段的行读不了）写 `{"unread":"<错误码>"}`，导出不因此失败。这两种情形下没有 `trace` 的答，`base` 是 `"none"`，`diff` 为空表。
 - **`base`**：`trace` 答的 `commit.previous`（同一 run 的上一个提交），写 `{"previous":oid}`；没有时，`commit.parents` 恰好一个，写 `{"parent":oid}`；否则 `"none"`。全城紧邻的上一个提交不是基准：它可能属于别的 run。
 - **`diff`**（`playback::diff`）：`base` 是 `"none"` 时为空表；否则按 `files` 的次序，每个路径一项 `{"path","change"}`。`change` 是六种之一，互不混同：
-  - `{"patch":{"lines","credential"}}`：经 `storage::hunks::of_file(city_root, base, Head::Commit(oid), path)` 读出的整段 patch。它只比较两个不可变的 oid，从不读工作区；`lines` 是 `{"number","text"}`，`credential` 是被凭据扫描隐去的行的 `{"number","reason"}`，与 `storage::hunks` 同一个扫描，不回显字节。
-  - `{"truncated":{"lines","credential","cut"}}`：这一个提交显示的 patch 文字超过 `DIFF_MAX_BYTES`，这个文件只给出预算之内的头几行，`cut` 是没给出的行数。之后的文件照样读、照样分类，只是它们的行都在预算之外。
+  - `{"patch":{"lines","credential"}}`：经 `storage::of_file(city_root, base, Head::Commit(oid), path)`（`storage::hunks`）读出的整段 patch。它只比较两个不可变的 oid，从不读工作区；`lines` 是 `{"number","text"}`，`credential` 是被凭据扫描隐去的行的 `{"number","reason"}`，与 `storage::hunks` 同一个扫描，不回显字节。
+  - `{"truncated":{"lines","credential","cut"}}`：这一个提交显示的 patch 文字超过 `DIFF_MAX_BYTES`，这个文件只给出预算之内的头几行，`cut` 是没给出的行数；第一行放不下之后，这个文件余下的行都不给出，即使其中有更短的行。之后的文件照样读、照样分类，只是它们的行都在预算之外。
   - `"empty"`：两个提交之间这个文件没有动。
   - `"binary"`：patch 没有文字行，而提交（文件被删时是基准）里的这个 blob 是二进制。
-  - `"missing"`：仓库不在城根，或它没有这两个对象之一。
-  - `"withheld"`：这个路径所在的楼对读者关闭，文件不读。
+  - `"missing"`：仓库不在城根、它没有这两个对象之一，或 patch 读不出（`of_file` 的任何失败）。
+  - `"withheld"`：这个路径所在的楼对读者关闭，或这个路径读不成一个地址（说不出它在哪栋楼，就当作关闭），文件不读。
   预算按 UTF-8 字节计，只限 bundle 里 diff 的文字，不限 git 读取本身。
 
 **失败。** `Window::span` 的失败是 `E_INVALID_ARGS`：`since`/`until` 是 `parse_iso` 的拒绝；`day` 读不了时 action 是 `select a playback day`，subject 是原文，recovery 给出 `2026-05-14` 的写法；交集为空时是 `UtcSpan::new` 的拒绝。`diff` 与 `trace` 从不让导出失败：账本之外的输入缺了、读不了，各有一个写明的状态。
@@ -106,12 +110,12 @@ pub(crate) fn trace_through(index: &LedgerIndex, ledger_dir: &Path, commit: wire
 **只读到 cutoff 的提交证据。**
 
 - `playback::walk` 交回它经 `storage::LedgerIndex::folding` 建出的索引，`project` 把它交给证据那一步。cutoff 只有一处定义，是 walk 停下的那一行（§8-12）；证据那一步不另读一遍账本，也不另建索引。
-- `playback::traced::Evidence` 在 walk 里收下每一条核对过的行（`Walked::Known`）：先折进 `trace::History`，再记下这一行是不是第一次宣告它点名的提交（`views::commits::commit_facts`）。范围内可见的 `Committed` checkpoint 是第一次宣告时，在折完这一行的那一刻问 `History::commit(oid)`：此刻的视图恰好折到这一行，`previous` 是这个 run 在它之前宣告的最近一个提交，run、`actor`、`seq` 就是这一行自己的，`parents` 由 git 按 oid 给出。答只取决于这一行与它之前的历史，以后的宣告与 cutoff 之后的行都改变不了它（`evidence_ignores_lines_after_the_cutoff`）。
+- `playback::traced::Evidence` 在 walk 里收下每一条核对过的行（`Walked::Known`）：先折进 `trace::History`，再记下这一行是不是第一次宣告它点名的提交（`views::commits::commit_facts`）。范围内可见的 `Committed` checkpoint 是第一次宣告时，在折完这一行的那一刻问 `History::commit(oid)`：此刻的视图恰好折到这一行，`previous` 是这个 run 在它之前宣告的最近一个提交，run、`actor`、`seq` 就是这一行自己的，`parents` 与 `message` 由 git 按 oid 给出。答只取决于这一行与它之前的历史，以后的宣告与 cutoff 之后的行都改变不了它（`evidence_ignores_lines_after_the_cutoff`）。
 - walk 结束后，每个这样的答交给 `trace::trace_through`，经 walk 的索引读这个 run 在这一行之前的行与区间里的行，区间规则是 §8-16 那一条；读到的 seq 全都小于这一行，所以不越过 cutoff。
 - `History::absorb` 遇到视图拒绝折的第一行时停下，记住那条拒绝；之后每次 `commit` 都答它，这些提交写 `{"unread":"<错误码>"}`，导出不因此失败（§8-17）。视图折的是 walk 已核对过的同一批记录，被拒绝的行在 cutoff 以内，所以一份 bundle 里的 `unread` 只取决于 cutoff 以内的历史，复核时照样重现。
 - `whose --trace`（`crates/sprawling/Spec.lean` §8-136）不变：`trace(city_root, oid)` 照旧经 `views::ask` 求这个 oid 最近一次的宣告、重建一次索引，再经 `trace_through` 按同一条区间规则读。
 
-**代价。** 一份 bundle 只折一遍视图，与 walk 同一遍、同一批记录；它从不调用 `views::ask`，也不重建索引。每个范围内第一次宣告的提交另有一次视图查询（在内存里）、一次打开仓库读父提交（`storage::parents_of`），再按索引读它的 run 的行（倒着读到下界前最近的 `model_called`）与区间里的行。判同楼的别人时从区间的下界起读索引（`LedgerIndex::seqs_from`，`crates/storage/Spec.lean` §8-38），读到区间之后的第一行为止：一个提交读过的索引项是它的区间长度加一，与它之前的账本有多长无关，一次导出在这一项上的代价是各区间长度之和，不是提交数乘行数。确定性计数：`accounting::playback::tests::tracing` 在 N 与 2N 个提交的历史上各导出一次，数这次导出开始了几次视图折叠，两种规模下都是 1；再数一个提交判同楼的别人时最多读过几条索引项，两种规模下都是 6（第一个提交的区间从它的 run 的第一行起，五行，加上区间之后那一行）。两个数都只在测试里编译（`trace::counted`），理由与 D37 (c) 相同：要挡住的是按 N 增长的代价，墙钟在小夹具上看不出它。毫秒读数由同一文件的仪表 `instrument_evidence_cost` 给出（`cargo nextest run -p sprawling-accounting --release --run-ignored only -E 'test(instrument_evidence_cost)' --no-capture`）：50、100、200 个提交（1,003、2,003、4,003 行）的一次导出依次约 100–115、160–170、365–430 ms，随提交数线性增长。
+**代价。** 一份 bundle 只折一遍视图，与 walk 同一遍、同一批记录；它从不调用 `views::ask`，也不重建索引。每个范围内第一次宣告的提交另有一次视图查询（在内存里），它经 `Prepared::finish` 两次打开仓库：读父提交（`storage::parents_of`）与提交消息（`views::commits`，`crates/sprawling/Spec.lean` §8-128），再按索引读它的 run 的行（倒着读到下界前最近的 `model_called`）与区间里的行。判同楼的别人时从区间的下界起读索引（`LedgerIndex::seqs_from`，`crates/storage/Spec.lean` §8-38），读到区间之后的第一行为止：一个提交读过的索引项是它的区间长度加一，与它之前的账本有多长无关，一次导出在这一项上的代价是各区间长度之和，不是提交数乘行数。确定性计数：`accounting::playback::tests::tracing` 在 N 与 2N 个提交的历史上各导出一次，数这次导出开始了几次视图折叠，两种规模下都是 1；再数一个提交判同楼的别人时最多读过几条索引项，两种规模下都是 6（第一个提交的区间从它的 run 的第一行起，五行，加上区间之后那一行）。两个数都只在测试里编译（`trace::counted`），理由与 D37 (c) 相同：要挡住的是按 N 增长的代价，墙钟在小夹具上看不出它。毫秒读数由同一文件的仪表 `instrument_evidence_cost` 给出（`cargo nextest run -p sprawling-accounting --release --run-ignored only -E 'test(instrument_evidence_cost)' --no-capture`）：50、100、200 个提交（1,003、2,003、4,003 行）的一次导出依次约 100–115、160–170、365–430 ms，随提交数线性增长。
 
 **在 40 万行的城上。** 读数取自 40 万行夹具城（`bench_startup first-byte` 的 `l400k`：400,003 行、64,000 个提交；windows-x86_64、16 线程的笔记本处理器、release，`opt-level = 3`）：`sprawling playback export` 选 `--from 2 --through 8`（范围里没有提交）26.8–27.2 s，选 `--from 399000`（1,003 行、约 160 个提交）26.9–27.0 s，选 `--from 380000`（20,003 行、约 3,200 个提交）31.2 s，各三次。同一座城上分段计时（在 `opt-level = "z"` 下量，那时同一次导出是 34 s）：只走 walk（逐行核对）5.5 s；walk 加视图折叠 6.6–7.3 s，所以视图折叠约 1.1–1.8 s，是一次导出的 4% 上下；walk 加整个投影 33–37 s，其中 credential 扫描约 25 s、`named_in_payload` 2.3 s、视图折叠 1.4 s、`links` 0.9 s。导出的秒数因此不在视图折叠里，而在投影对每一行的扫描（§3），范围里没有提交时不折视图最多省下这 4%（D37 (b)）。范围里每多一个提交，另付约 1.3 ms（读父提交、区间里的行与同楼的别人）。
 

@@ -7,6 +7,10 @@
 # accounting::playback::check
 
 规定 playback page 的嵌入、五项复核与导出件落盘：`playback::check`、`playback::page`、`playback::page::sink`、`playback::offline`、`playback::observed`、`playback::landing`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `accounting::playback::tests` 守住（`crates/accounting/Spec.lean` §16）。
+
+**平台**：页面、复核与浏览器观察只读字节，在 Windows、macOS 与 Linux 上相同；落盘碰文件系统，三个平台的差别写在「落盘」那一段。
 -/
 
 /-!
@@ -81,13 +85,15 @@ pub fn land(place: Place<'_>, bytes: &[u8]) -> Result<(), AxError>;
 
 `requests` 是页面自身之外发出的请求（`data:`、`blob:` 不算），`navigations` 是离开页面的导航，`popups` 是打开的新窗口，`unresolved` 是点了之后什么也没指到的证据链接。`page` 与被查文件的摘要（`Report.file`，复核那一行的 `file`）不同、`paths` 为空，是 `Unable`；四张表都空是 `Passed`，`Report.covered` 是 `paths`；否则 `Failed`，给出第一项。记录是跑浏览器的 agent 自报的：产品核对的是它说的是这一份字节，不核对浏览器真的跑过；它也只说在这些路径下没看到，不说别的路径。
 
-**落盘**（`playback::landing`）。两种落点，一个做法：同一目录写 `<文件名>.partial-<pid>`，`sync_all`，以硬链接落到目标名，删掉暂存文件；任何一步失败都删暂存文件，目标要么整份出现，要么不出现。
+**落盘**（`playback::landing`）。两种落点，一个做法：同一目录以 `create_new` 写 `<文件名>.partial-<pid>`，`sync_all`，以硬链接落到目标名，删掉暂存文件；任何一步失败都删暂存文件，目标要么整份出现，要么不出现。目标名已有任何东西（`symlink_metadata` 读得到，断开的链接也算）就拒绝，硬链接本身也不覆盖已有的名字，所以检查与落下之间另一个写者抢先时同样不覆盖。落下之后暂存文件删不掉时，`land` 返回 `E_STORAGE_FATAL`，recovery 说导出已落下、暂存文件要手删。
 
-- `Place::Chosen(path)` 是人的 `--out`：父目录经 `std::fs::canonicalize` 解开链接之后，路径里任一段是受保护的元数据（`kernel::PROTECTED_METADATA`）则以 `E_OUTSIDE_WRITE_DOMAIN` 拒绝；目标已存在、或目标在某个 git 仓库里且被索引跟踪，以 `E_INVALID_ARGS` 拒绝。被删掉而仍被跟踪的文件名不存在于盘上，落下去却等于改了历史里的那个文件，所以存在与跟踪分开查。
-- `Place::Exports { city_root, file }` 是城里的保留导出位置，`file` 在 `CityLayout::playback_exports()` 之下：从城根到 `file` 的每一段经 `storage::WriteTarget::within` 查，链接与 junction 一律拒绝；缺的目录建出来；目标已存在、被跟踪以 `E_INVALID_ARGS` 拒绝；目标在 git 仓库里而没有被忽略，以 `E_OUTSIDE_WRITE_DOMAIN` 拒绝，因为它会进历史。`/.sprawling/` 在城根的 `.gitignore` 里（`crates/city/Spec.lean` §8-21），所以正常的城里这一条成立。
-- git 的两问经 `git2` 读：从目标的父目录向上找仓库，找不到就两问都不适用；工作区与目标都先 canonicalize 再求相对路径。
+  平台：硬链接要求文件系统支持它——NTFS、APFS、ext4 都支持，FAT 与 exFAT 不支持，落点在这类卷上时 `land` 以 `E_STORAGE_FATAL` 拒绝、什么也不留。落下之后不对父目录做 `sync`，所以断电之后新的名字可能不在，数据本身已经 `sync_all`；三个平台都如此，账本那样的目录 `sync`（Linux 与 macOS 上 `storage` 做，Windows 上是空操作）这里不做。受保护元数据的段名比较不分 ASCII 大小写，因为 Windows 与 macOS 的默认卷不分大小写，`.GIT` 与 `.git` 是同一个目录；Linux 上这多拒绝了一些本可写的名字。
 
-**失败与资源。** `check` 不返回错误；`embed` 与 `land` 的失败是 `AxError`，subject 是第一条发现或目标路径，不交回部分的页面或文件。被查文件的上限是 `PAGE_MAX_BYTES`：bundle 的上限加 16 MiB 留给页面自身与内嵌的字体、图，与 `BUNDLE_MAX_BYTES` 一样是待测初值（§3）。解析一遍建一张平面元素表，常驻量与页面字节同阶；CSS 的嵌套深度由 `cssparser` 的上限截住。
+- `Place::Chosen(path)` 是人的 `--out`：父目录不存在时以 `E_PATH_NOT_FOUND` 拒绝；父目录经 `std::fs::canonicalize` 解开链接之后，路径里任一段是受保护的元数据（`kernel::PROTECTED_METADATA`）则以 `E_OUTSIDE_WRITE_DOMAIN` 拒绝；目标已存在、或目标在某个 git 仓库里且被索引跟踪，以 `E_INVALID_ARGS` 拒绝。被删掉而仍被跟踪的文件名不存在于盘上，落下去却等于改了历史里的那个文件，所以存在与跟踪分开查。
+- `Place::Exports { city_root, file }` 是城里的保留导出位置，`file` 在 `CityLayout::playback_exports()` 之下，不在其下以 `E_OUTSIDE_WRITE_DOMAIN` 拒绝：从城根到 `file` 的每一段经 `storage::WriteTarget::within` 查，链接与 junction 一律拒绝；缺的目录建出来；目标已存在、被跟踪以 `E_INVALID_ARGS` 拒绝；目标在 git 仓库里而没有被忽略，以 `E_OUTSIDE_WRITE_DOMAIN` 拒绝，因为它会进历史。`/.sprawling/` 在城根的 `.gitignore` 里（`crates/city/Spec.lean` §8-21），所以正常的城里这一条成立。
+- git 的两问经 `git2` 读：从目标的父目录向上找仓库，找不到就两问都不适用；工作区与目标都先 canonicalize 再求相对路径，目标不在工作区之下（裸仓库、或工作区读不出）时两问也不适用。
+
+**失败与资源。** `check` 不返回错误；`embed` 与 `land` 的失败是 `AxError`，subject 是第一条发现或目标路径，不交回部分的页面或文件。被查文件与 `embed` 交出的页面的上限都是 `PAGE_MAX_BYTES`：bundle 的上限加 16 MiB 留给页面自身与内嵌的字体、图，与 `BUNDLE_MAX_BYTES` 一样是待测初值（§3）。解析一遍建一张平面元素表，常驻量与页面字节同阶；CSS 的嵌套深度由 `cssparser` 的上限截住。
 -/
 
 /-! D25 playback page 由产品嵌入、用浏览器的解析算法查、五项分开报，导出件经一个落盘函数写下

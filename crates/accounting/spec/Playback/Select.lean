@@ -16,7 +16,7 @@
 * **次序与去重**：LineCheck 让账本的 seq 严格递增（`Chained`），被选中的行仍严格递增，所以每个 seq 恰好出现一次（`selected_chained`、`selected_seqs_nodup`）；
 * **截止线不读未来**：cutoff 之后追加的行改变不了这次选择（`cutoff_ignores_future`）；
 * **逐行判断**：一行在不在选择里只看它自己，与它前后的行无关（`selection_is_per_line`），所以 `t` 回退的行照样按自己的时刻取舍，读者不能在第一条越过 `until` 的行处停下（`a_line_whose_time_steps_back_is_judged_on_its_own`）；
-* **矛盾的范围与合法的空选择是两件事**：`first > last` 与 `before ≤ since`（Rust 的 `until ≤ since`）由 Rust 拒绝（`Contradictory`），合法而为空的选择输出带范围信息的空 bundle（`empty_selection_is_legal`）。
+* **矛盾的范围与合法的空选择是两件事**：`first > last` 与 `before ≤ since`（Rust 的 `until ≤ since`）由 Rust 拒绝（`Contradictory`），合法而为空的选择输出带范围信息的空 bundle。后一半不是本模型的定理：在模型里它只是 `selected` 交出空表，重述一个定义；它由 `accounting::playback::tests::span` 的 `a_span_no_line_falls_in_is_an_empty_bundle_that_names_its_ends` 在生产的 `export` 上守住。
 
 模型边界：楼的判定在 Rust 里是 `Address::is_within`（按段边界的前缀），这里抽象成楼的编号相等，`lab` 与 `laboratory` 的区别由 `is_within` 自己的测试守住（`crates/kernel/Spec.lean` §8-2）。本模型不是 Rust 实现的证明。两者的一致靠一张场景表：`history` 与 `scenes` 只写在本文件里，`scenes_agree` 证明模型对每一项给出表里的 seq；`crates/accounting/src/playback/tests/model.rs` 从本文件逐行读出 `line …` 与 `scene …` 两种行，按同一张表写账本、跑生产的 `export`，比较选中的 seq（`crates/accounting/Spec.lean` §8-12、accounting D25 (i)）。所以这三种行的写法是那个测试读的格式：一行一项，`line seq run building t`，`scene first last run building cutoff [seq, …]`，`window since before cutoff [seq, …]`，`some n` 或 `none`。`--day` 在 Rust 里展开成一个 `window`，不在本模型里。
 -/

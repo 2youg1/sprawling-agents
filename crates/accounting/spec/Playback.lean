@@ -7,6 +7,10 @@
 # accounting::playback
 
 规定 `crates/accounting/src/playback.rs` 与它的 bundle：`playback::select`、`playback::reader`、`playback::walk`、`playback::project`、`playback::links`、`playback::document`、`playback::encode`、`playback::consistency`。必须守住的性质在 `crates/accounting/spec/Playback/Select.lean` 与 `crates/accounting/spec/Playback/Project.lean`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；必须守住的性质证在上面两个分部，其余由 Rust 的类型与 `accounting::playback::tests` 守住（`crates/accounting/Spec.lean` §16）。
+
+**平台**：导出只读账本、楼的规则文件与检查点仓库，不读本机时钟，不写盘（落盘见 §8-13）；下面每一句在 Windows、macOS 与 Linux 上相同。
 -/
 
 /-!
@@ -76,7 +80,7 @@ pub enum Reader { Person(Confidential), Resident(Address) }
 | `costs` | 范围内可见行上折的 `storage::Attribution`：`billed_usd_micros`、`by_run`、`unpriced_calls`、`unpriced_tokens`；只涵盖所选可见范围 |
 | `withheld` | 见上 |
 
-一端的状态分五种，互不混同：`{"at":seq}`（在范围内）、`{"outside":seq}`（cutoff 以内、范围外，行在 `context`）、`"withheld"`、`"pending"`（关闭端到 cutoff 还没有出现）、`"missing"`（打开端不在本账到 cutoff 的历史里）。关键时刻、消息与调用只在至少一个成员在范围内可见时出现。闭合只看真实的关闭事件（`run_frozen`、`approval_resolved`、`pr_merged`/`pr_rejected`、`signal_consumed`），窗口的右端不是关闭（`Project.lean` 的 `closure_ignores_the_window`）。PR 按 `branch` 与打开它的那一行识别，所以同一分支重开是另一个关键时刻。
+一端的状态分五种，互不混同：`{"at":seq}`（在范围内）、`{"outside":seq}`（cutoff 以内、范围外，行在 `context`）、`"withheld"`、`"pending"`（关闭端到 cutoff 还没有出现）、`"missing"`（打开端不在本账到 cutoff 的历史里）。关键时刻、消息与调用只在至少一个成员在范围内可见时出现。闭合只看真实的关闭事件（`run_frozen`、`approval_resolved`、`pr_merged`/`pr_rejected`、`signal_consumed`），窗口的右端不是关闭（`Project.lean` 的 `closedAt` 不读选择）。PR 按 `branch` 与打开它的那一行识别，所以同一分支重开是另一个关键时刻。
 
 **规范字节与安全嵌入。** `playback::encode` 是唯一的序列化：serde 按结构体字段次序写紧凑 JSON，再把字符串里的 `<`、`>`、`&`、U+2028、U+2029 写成 `\u` 转义，所以同一份字节原样放进 HTML 的 `<script type="application/json">` 也不会提前结束那个块。所有 u64（seq、时刻、金额、计数）写成十进制字符串，JS 的 `Number` 不经手它们；`rules` 是小整数。摘要是这份字节的 BLAKE3（`B3Hash::digest`）。读回时先比尺寸上限，再按 `deny_unknown_fields` 解析，再重新编码并与原字节逐字节比较：重复键、多余空白、字段次序、未知字段、非规范的十进制都在这一步被拒。
 
