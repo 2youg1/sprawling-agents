@@ -151,22 +151,35 @@ fn attach_sample() -> Option<GateOutcome> {
     outcome_of(super::attach(None))
 }
 
-/// Which doors a taint set alone turns into a refusal.
+/// Which doors a taint set alone turns into a refusal: for each door
+/// that reads taint, whether the same input is refused with a taint set
+/// and not refused without one.
 ///
 /// The one place an effect derived from outside content is stopped
 /// is [`super::undoable`]; the discard door stops it too, through
 /// `DiscardVerdict`. A caller that wants to know whether taint is
-/// wired at all asks here instead of grepping.
+/// wired at all asks here instead of grepping. Both halves are asked,
+/// because a door that refused every input would refuse a tainted one
+/// too and still read nothing.
 #[must_use]
 pub fn taint_readers() -> BTreeMap<DoorId, bool> {
     let source = TaintSource::new("web:evil");
     let tainted = source.map_or_else(TaintSet::empty, TaintSet::of);
+    let clean = TaintSet::empty();
+    let command_denies =
+        |taint: &TaintSet| matches!(super::command(taint), GateOutcome::Deny { .. });
     let mut readers = BTreeMap::new();
-    readers.insert(DoorId::Undoable, undoable_taint_denies(&tainted));
-    readers.insert(DoorId::Discard, discard_taint_denies(&tainted));
+    readers.insert(
+        DoorId::Undoable,
+        undoable_taint_denies(&tainted) && !undoable_taint_denies(&clean),
+    );
+    readers.insert(
+        DoorId::Discard,
+        discard_taint_denies(&tainted) && !discard_taint_denies(&clean),
+    );
     readers.insert(
         DoorId::Command,
-        matches!(super::command(&tainted), GateOutcome::Deny { .. }),
+        command_denies(&tainted) && !command_denies(&clean),
     );
     readers
 }

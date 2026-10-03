@@ -103,7 +103,7 @@ pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &Taint
 
 **同集删净**：`GateContext`、`gate::item`、`gate::commitment`、`gate::govern`、`gate::delegation`、`gate::dedup`（由 `idem::claim` 与 `IdemGuard` 接替，§8-6）、`PolicyClass`／`PolicyMatcher`／`Policy`／`PolicyApplication`／`PolicyExpiry`／`PolicyRevocation`／`match_item`／`expiry`／`POLICY_IDLE_DAYS`、`ApprovalSource`、`AnswerVerdict::HumanOnly`、`Autonomy::Deferred`、`EscalateReason`／`DISCARD_BYTES_MAX`。
 
-**「tainted → Deny」是真分支**：`gate::undoable` 与 `gate::discard` 按 taint 改答，`gate::conformance::taint_readers` 是这条的机器面，单测逐门断言。
+**「tainted → Deny」是真分支**：`gate::undoable`、`gate::discard` 与 `gate::command` 按 taint 改答——同一输入，taint 为空时不拒、非空时拒；`gate::conformance::taint_readers` 对每道门两样都问，是这条的机器面，单测逐门断言。
 
 **重开参数**：出现一类没有 `Restoration` 的效果——那时的正确做法是让它不可拼写，而不是把 `Escalate` 加回来。
 -/

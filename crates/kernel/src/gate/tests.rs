@@ -54,13 +54,14 @@ fn the_roster_holds_every_door_exactly_once() {
 /// both doors that see a taint set refuse on it (C15).
 #[test]
 fn the_doors_that_see_taint_refuse_on_it() {
-    for (door, denies) in conformance::taint_readers() {
-        assert!(
-            denies,
-            "{}: taint changed no verdict, so C15 is a false branch there",
-            door.as_str()
-        );
-    }
+    assert_eq!(
+        conformance::taint_readers(),
+        [DoorId::Undoable, DoorId::Discard, DoorId::Command]
+            .into_iter()
+            .map(|door| (door, true))
+            .collect(),
+        "a door whose verdict taint does not change makes C15 a false branch there"
+    );
 }
 
 /// The attach door's own three answers, one test apiece: the
