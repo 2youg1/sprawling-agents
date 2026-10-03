@@ -1083,6 +1083,8 @@ settling::tests 已有、waking::tests）；`crates/city/Spec.lean` 的 schedule
 pub(crate) struct RelayRequest {
     drafts: Vec<EventDraft>,
     back: std::sync::mpsc::SyncSender<Result<Vec<EventRef>, AxError>>,
+    /// lane 放它进队那一刻的单调钟读数；记账线程取到它时减出排队等待（§8-98）。
+    queued: std::time::Instant,
 }
 
 /// 池那一侧的脸：唯一的 `kernel::Ledger` 实现，池线程只有它。
@@ -1905,16 +1907,18 @@ impl OutputRing {
 - `Health`：`Clone`，同一只 `Arc` 里的两个 `AtomicU64`；克隆是同一份计数的另一个句柄。
 - 写（只由 `accounting::worker::relay` 调）：`asked(&self)`——一条 append 进队之前；`withdrawn(&self)`——进队失败（记账线程已不在），收回那一次 `asked`；`taken(&self, n: u64)`——记账线程取出 `n` 条放进一批，队列减 `n`、未持久加 `n`；`answered(&self, n: u64)`——这一批的屏障返回、答复发出，未持久减 `n`。
 - 读：`read(&self, into: Sample) -> Sample`——把此刻的两项填进 `into`，其余字段原样。
-- `RelayGate::open()` 开一份新的 `Health`，`RelayGate::health()` 交出它的句柄；worker 起好时把 `Flight` 里那只 gate 的句柄经 `Started.health` 交给 `listening`，`listening` 交给采样线程：`spawn_sampler(monitor, samples, volume, health)`，每一拍的读数都经 `Health::read`，摘要与整页都有，因为读它只是两次原子读。
+- `RelayGate::open(monotonic)` 开一份新的 `Health`，`RelayGate::health()` 交出它的句柄；worker 起好时把 `Flight` 里那只 gate 的句柄经 `Started.health` 交给 `listening`，`listening` 交给采样线程：`spawn_sampler(monitor, samples, volume, health)`，每一拍的读数都经 `Health::read`，摘要与整页都有，因为读它只是两次原子读。
 - 没有失败路径。减法饱和：计数是给人看的读数，两条线程各自的加减在某一刻读到的先后可以错开，饱和让一个瞬间的错位读成 0 而不是一个巨大的数。
+- 两项等待（roadmap M2），都按整数微秒、都读 worker 注入的单调钟（`Hands.monotonic`，经 `Flight::open` 交给 `RelayGate::open(monotonic)`，再经 `issue` 交给每个 `Relay`）：`relay_queue_us(&self) -> Vec<u64>`——每个 relay 请求从 lane 把它放进队列（`Relay::append_all` 发送之前读一次钟）到记账线程把它取进一批（`RelayGate::serve` 取到它时读一次钟）之间的等待，只留最近的 `RELAY_QUEUE_KEPT` 个，先进先出；`idle_us(&self) -> u64`——记账线程开城以来睡在这一个队列上的累计时长，即 `serve` 里等第一个 wake 的那一段。记账线程的忙占比由读者算：两次读 `idle_us` 之差除以同一段墙钟之外的部分。两项都只由 `accounting::worker::relay` 在记账线程上写，样本表的锁因此只在读者读时有第二个人碰。
 
 **决定。**
 
 1. 计数放在 relay 进队、取出、答复这三处，而不是去数 `mpsc` 队列的长度：标准库的 `mpsc` 不报长度，而且队列里还有 claim、回家的 run 与命令，它们不是 append。被否：记账线程每一轮开头把自己看到的队列长度写进一个原子数——它只在记账线程醒着时更新，而队列最长的时候正是记账线程在写盘、没醒的时候。
 2. 计数的类型放在 `bin::monitor`，由 assembly 持有并写入：依赖朝 assembly → monitor，与 `monitor::memory` 相同；monitor 不点名 assembly。
 3. 用 `Relaxed` 次序：两项互不约束，读数不参与任何决定（与 §8-96 决定 3 同一个重开条件）。
+4. 等待留原始样本而不是直方图：吞吐台要的是 n 与精确的 p50/p99/p999（M0 的单位），而只留最近 `RELAY_QUEUE_KEPT` 个让内存有界；样本由记账线程写、由读者复制一份再排序，排序的钱付在读者那边。被否：对数分桶的直方图——p999 落在一个桶里只能报桶的边，M0 要的是读数本身。重开参数：要把这项等待送上线（`Sample.relay_p50_nanos`）时，再议在写的一侧维护分位数。
 
-**测试。** `accounting::worker::relay::tests` 的 `the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable`：一条 lane 的 append 进队后，记账线程服务之前读到队列 1、未持久 0；服务之后两项都回到 0，append 拿到了答复。
+**测试。** `accounting::worker::relay::tests` 的 `the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable`：一条 lane 的 append 进队后，记账线程服务之前读到队列 1、未持久 0；服务之后两项都回到 0，append 拿到了答复。同一处的 `a_relay_request_waits_on_the_gates_clock`：钟是一个每读一次走一微秒的计数钟，一条 append 进队后再服务，`relay_queue_us` 恰好是一个样本，值等于两次读钟之间的步数；读数来自注入的钟而不是墙钟，所以每个平台的 CI 读到同一个数。吞吐台（`driving::tests::throughput` 的 `instrument_throughput`）把 `relay_queue` 与 `ledger_thread_busy` 两行和其余等待一起打出。
 
 **本节接口的当前状态。** `Sample` 余下的核心健康字段仍读作 0：`relay_p50_nanos` 与 `event_to_screen_p50_nanos` 要一个按次记录往返时间的直方图，属主分别是 relay 与 socket 的发送一侧，都还没有；`queued_runs` 没有一处权威的计数——计划行在 `Flight::full` 为真时停在 `pursue` 的循环外，没有被数进任何队列，人派的 run 在满时的去向见 §8-46-3。S5.9M 的降级状态没有 `Sample` 字段。
 -/
