@@ -231,11 +231,14 @@ fn an_unnamed_dispatch_asks_the_factory_for_the_run_model_alone() {
 fn a_confidential_building_refuses_before_the_factory_is_asked() {
     let dir = tempfile::tempdir().unwrap();
     let (factory, asked) = scripted(ANSWER);
-    // A documentation address (RFC 5737): not on this machine, and
-    // never dialled, because the refusal comes before any adapter.
+    // A name in the reserved `.invalid` domain (RFC 6761): not on this
+    // machine, so the confidential gate refuses it, and its lookup fails
+    // at once on every platform. Attaching the endpoint probes it; a
+    // documentation address (RFC 5737) was dropped rather than refused
+    // on some hosts, so that probe waited out its whole deadline.
     let (mut worker, _) = city_on(
         dir.path(),
-        "http://192.0.2.1/v1".to_owned(),
+        "http://confidential.invalid/v1".to_owned(),
         "confidential",
         factory,
     );
