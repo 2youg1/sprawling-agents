@@ -19,13 +19,10 @@
 // opens with on a question nobody asked.
 //
 // Nothing here updates anything. The command under a `behind` verdict
-// is printed for a person to run, because `sprawling install` owns the
+// is the city's `update.command`, printed for a person to run, because `sprawling install` owns the
 // archive path and npm owns its own, and a third party writing over
 // either would be a second authority for where this binary lives.
 
-// wording-ok: the update recipe printed for a person to run; a machine
-// spelling, identical in both languages (client/Spec.lean §4-10)
-const UPDATE_NPM = "bunx sprawling@latest up";
 // wording-ok: the project's own release page; a proper noun identical
 // in both languages
 const RELEASES = "https://github.com/2youg1/sprawling-agents/releases";
@@ -38,7 +35,7 @@ const RELEASES = "https://github.com/2youg1/sprawling-agents/releases";
   import { QUERIES } from "../core/asking";
   import { fill, say } from "../core/lang";
   import { ui } from "../ui";
-  import type { Answer, ReleaseAnswer } from "../wire";
+  import type { Answer, RegistryNewest, ReleaseAnswer, ReleaseLine } from "../wire";
   import Button from "./parts/button.svelte";
 
   const u = ui();
@@ -57,9 +54,21 @@ const RELEASES = "https://github.com/2youg1/sprawling-agents/releases";
   // happen on one value: asking `"stands" in answer` and then reading
   // `answer.stands` are two calls, and the second is not narrowed by
   // the first.
+  // npm's reading, which the verdict judges (wire D24); the page draws
+  // the other registries once it renders them.
+  function npmNewest(registries: readonly RegistryNewest[]): ReleaseLine | undefined {
+    for (const line of registries) {
+      if (line.registry === "npm" && typeof line.reading === "object" && "read" in line.reading) {
+        return line.reading.read.newest;
+      }
+    }
+    return undefined;
+  }
   const refused = $derived(answer !== undefined && "refused" in answer ? answer.refused : undefined);
   const unreleased = $derived(answer !== undefined && "unreleased" in answer ? answer.unreleased : undefined);
   const stands = $derived(answer !== undefined && "stands" in answer ? answer.stands : undefined);
+  const unreleasedNewest = $derived(unreleased === undefined ? undefined : npmNewest(unreleased.registries));
+  const standsNewest = $derived(stands === undefined ? undefined : npmNewest(stands.registries));
 
   // A fresh answer ends the wait, whoever asked for it.
   $effect(() => {
@@ -97,10 +106,12 @@ client/Spec.lean §4-50). -->
   {#if unreleased !== undefined}
     <p class="text-note text-text-quiet">
       {say($lang, "release_source")}
-      {fill(say($lang, "release_newest"), {
-        version: unreleased.newest.version,
-        released: unreleased.newest.released,
-      })}
+      {#if unreleasedNewest !== undefined}
+        {fill(say($lang, "release_newest"), {
+          version: unreleasedNewest.version,
+          released: unreleasedNewest.released,
+        })}
+      {/if}
     </p>
   {/if}
   {#if stands !== undefined}
@@ -115,17 +126,17 @@ client/Spec.lean §4-50). -->
         <p class="text-note text-accent">{say($lang, "release_current")}</p>
       {:else if stands.verdict === "ahead"}
         <p class="text-note text-text-quiet">
-          {fill(say($lang, "release_ahead"), { version: stands.newest.version })}
+          {fill(say($lang, "release_ahead"), { version: standsNewest?.version ?? "" })}
         </p>
       {:else if stands.verdict === "behind"}
         <p class="text-note text-alert">
           {fill(say($lang, "release_behind"), {
-            version: stands.newest.version,
-            released: stands.newest.released,
+            version: standsNewest?.version ?? "",
+            released: standsNewest?.released ?? "",
           })}
         </p>
         <code class="block w-fit border-l-2 border-edge-input pl-base font-mono text-note text-text">
-          {UPDATE_NPM}
+          {stands.update.command ?? ""}
         </code>
       {/if}
     </div>

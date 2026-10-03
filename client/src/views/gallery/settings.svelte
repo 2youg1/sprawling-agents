@@ -46,8 +46,10 @@
   const MACHINE: DoctorAnswer = {
     core: "raised",
     custody: { keeps: "across_reboots", store: "platform_service" },
+    scanning: "does_not_apply",
     sandbox: {
       arm: "windows_job_object",
+      named: "native",
       coverage: [
         { axis: "filesystem", kept: "kept" },
         { axis: "process_tree", kept: "kept" },

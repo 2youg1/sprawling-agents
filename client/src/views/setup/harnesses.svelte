@@ -48,9 +48,10 @@
       <li class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
         <div class="flex items-center gap-snug">
           <span class="text-label font-label text-text">{NAMES[line.name] ?? line.name}</span>
+          <!-- The launcher's presence, as before wire D23; the three states are drawn by the page that renders them. -->
           <Badge
-            text={say($lang, line.found ? "harness_found" : "harness_missing")}
-            status={line.found ? "done" : "idle"}
+            text={say($lang, "launcher_missing" in line.state ? "harness_missing" : "harness_found")}
+            status={"launcher_missing" in line.state ? "idle" : "done"}
           />
         </div>
         <span class="font-mono text-note text-text-quiet">{line.launch.join(" ")}</span>

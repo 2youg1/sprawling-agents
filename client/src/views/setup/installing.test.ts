@@ -20,9 +20,10 @@ const item = (name: string, here: boolean): DoctorItem => ({
 const machine = (items: readonly DoctorItem[]): DoctorAnswer => ({
   items: [...items],
   tiers: [],
-  sandbox: { arm: "copied_tree", coverage: [] },
+  sandbox: { arm: "copied_tree", named: "copied_tree", coverage: [] },
   custody: { store: "session_memory", keeps: "this_process", refusal: null },
   core: "raised",
+  scanning: "does_not_apply",
 });
 
 const refusal = (subject: string): AxError => ({

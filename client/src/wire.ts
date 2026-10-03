@@ -1230,14 +1230,119 @@ export const DoctorSandboxArm = Schema.Union([
 export type DoctorSandboxArm = typeof DoctorSandboxArm.Type;
 
 /**
+ * The names a sandbox arm is chosen by, one per mechanism family, so
+ * that every name has an arm to fill on Windows, macOS and Linux
+ * (`crates/wire/spec/Answer/Doctor.lean` D26).
+ */
+export const SandboxArm = Schema.Union([
+  Schema.Literals(["copied_tree", "container"]),
+  Schema.Literal("none"),
+  Schema.Literal("native"),
+  Schema.Literal("python"),
+]).annotate({ identifier: "SandboxArm" });
+export type SandboxArm = typeof SandboxArm.Type;
+
+/**
  * Which backend a host command runs under on this machine, and what
  * that arm promises.
  */
 export const DoctorSandbox = Schema.Struct({
   arm: DoctorSandboxArm,
   coverage: Schema.Array(DoctorGuarantee),
+  named: SandboxArm,
 }).annotate({ identifier: "DoctorSandbox" });
 export type DoctorSandbox = typeof DoctorSandbox.Type;
+
+/**
+ * Why a question about scanning has no answer here. `command` is the
+ * tool as a person reads its name, such as `fsutil devdrv query`.
+ */
+export const DoctorUntold = Schema.Union([
+  Schema.Literal("no_disk"),
+  Schema.Literal("admin_only"),
+  Schema.Struct({
+    unread: Schema.Struct({
+      command: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    failed: Schema.Struct({
+      code: Schema.optional(Schema.NullOr(Schema.Int)),
+      command: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    unstarted: Schema.Struct({
+      command: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    unanswered: Schema.Struct({
+      command: Schema.String,
+      stopping: Schema.optional(Schema.NullOr(Schema.String)),
+    }),
+  }),
+]).annotate({ identifier: "DoctorUntold" });
+export type DoctorUntold = typeof DoctorUntold.Type;
+
+/**
+ * Whether the city's volume is a Dev Drive.
+ */
+export const DoctorDrive = Schema.Union([
+  Schema.Literal("trusted"),
+  Schema.Struct({
+    untrusted: Schema.Struct({
+      volume: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    not: Schema.Struct({
+      file_system: Schema.String,
+      volume: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    untold: Schema.Struct({
+      why: DoctorUntold,
+    }),
+  }),
+]).annotate({ identifier: "DoctorDrive" });
+export type DoctorDrive = typeof DoctorDrive.Type;
+
+/**
+ * Whether one of Defender's exclusions holds the city.
+ */
+export const DoctorExclusion = Schema.Union([
+  Schema.Literal("outside"),
+  Schema.Struct({
+    inside: Schema.Struct({
+      under: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    untold: Schema.Struct({
+      why: DoctorUntold,
+    }),
+  }),
+]).annotate({ identifier: "DoctorExclusion" });
+export type DoctorExclusion = typeof DoctorExclusion.Type;
+
+/**
+ * What this machine says about scanning in front of the city's
+ * directory.
+ */
+export const DoctorScanning = Schema.Union([
+  Schema.Literal("does_not_apply"),
+  Schema.Literal("stopped"),
+  Schema.Struct({
+    read: Schema.Struct({
+      city: Schema.String,
+      drive: DoctorDrive,
+      exclusion: DoctorExclusion,
+    }),
+  }),
+]).annotate({ identifier: "DoctorScanning" });
+export type DoctorScanning = typeof DoctorScanning.Type;
 
 /**
  * Whether one tier is reachable on this machine.
@@ -1256,6 +1361,7 @@ export const DoctorAnswer = Schema.Struct({
   custody: DoctorCustody,
   items: Schema.Array(DoctorItem),
   sandbox: DoctorSandbox,
+  scanning: DoctorScanning,
   tiers: Schema.Array(DoctorVerdict),
 }).annotate({ identifier: "DoctorAnswer" });
 export type DoctorAnswer = typeof DoctorAnswer.Type;
@@ -1768,13 +1874,36 @@ export const GuideProgress = Schema.Struct({
 export type GuideProgress = typeof GuideProgress.Type;
 
 /**
+ * What a person does next about one harness: install its launcher,
+ * install or sign in to the harness, or use it.
+ */
+export const HarnessState = Schema.Union([
+  Schema.Struct({
+    launcher_missing: Schema.Struct({
+      program: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    not_set_up: Schema.Struct({
+      looked: Schema.Array(Schema.String),
+    }),
+  }),
+  Schema.Struct({
+    ready: Schema.Struct({
+      at: Schema.String,
+    }),
+  }),
+]).annotate({ identifier: "HarnessState" });
+export type HarnessState = typeof HarnessState.Type;
+
+/**
  * One harness as the page draws it.
  */
 export const HarnessLine = Schema.Struct({
   docs: Schema.String,
-  found: Schema.Boolean,
   launch: Schema.Array(Schema.String),
   name: Schema.String,
+  state: HarnessState,
 }).annotate({ identifier: "HarnessLine" });
 export type HarnessLine = typeof HarnessLine.Type;
 
@@ -2510,6 +2639,20 @@ export const SessionTags = Schema.Struct({
 export type SessionTags = typeof SessionTags.Type;
 
 /**
+ * Colours laid over the theme the page ships with. The empty value is
+ * the built-in theme.
+ * 
+ * The values are CSS, and the city does not parse them: the page owns
+ * both the theme and the stylesheet that reads it, and checks the keys
+ * against the `@theme` block and the legibility of the result.
+ */
+export const ThemeOverride = Schema.Struct({
+  css: Schema.optional(Schema.NullOr(Schema.String)),
+  tokens: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+}).annotate({ identifier: "ThemeOverride" });
+export type ThemeOverride = typeof ThemeOverride.Type;
+
+/**
  * How much of the world layer the page draws: none of it, whole panels
  * beside the conversation, or all of it as the workspace with the
  * conversation as a band along its foot. Three layouts rather than
@@ -2541,6 +2684,7 @@ export const PreferencesAnswer = Schema.Struct({
   panel: Schema.optional(Schema.Boolean),
   proxying: Schema.optional(Proxying),
   tags: Schema.optional(Schema.Array(SessionTags)),
+  theme: Schema.optional(ThemeOverride),
   tier: Schema.optional(Schema.NullOr(Tier)),
   welcomed: Schema.optional(Schema.Boolean),
 }).annotate({ identifier: "PreferencesAnswer" });
@@ -2685,6 +2829,12 @@ export const RegistryAnswer = Schema.Struct({
 export type RegistryAnswer = typeof RegistryAnswer.Type;
 
 /**
+ * A registry this project publishes to.
+ */
+export const Registry = Schema.Literals(["npm", "crates_io"]).annotate({ identifier: "Registry" });
+export type Registry = typeof Registry.Type;
+
+/**
  * One release, in the two spellings a person reads.
  */
 export const ReleaseLine = Schema.Struct({
@@ -2692,6 +2842,34 @@ export const ReleaseLine = Schema.Struct({
   version: Schema.String,
 }).annotate({ identifier: "ReleaseLine" });
 export type ReleaseLine = typeof ReleaseLine.Type;
+
+/**
+ * What one registry answered.
+ */
+export const RegistryReading = Schema.Union([
+  Schema.Struct({
+    read: Schema.Struct({
+      newest: ReleaseLine,
+    }),
+  }),
+  Schema.Struct({
+    refused: Schema.Struct({
+      refusal: AxError,
+    }),
+  }),
+  Schema.Literal("unasked"),
+]).annotate({ identifier: "RegistryReading" });
+export type RegistryReading = typeof RegistryReading.Type;
+
+/**
+ * What one registry said about the newest release
+ * (`crates/wire/spec/Answer/Release.lean` D24).
+ */
+export const RegistryNewest = Schema.Struct({
+  reading: RegistryReading,
+  registry: Registry,
+}).annotate({ identifier: "RegistryNewest" });
+export type RegistryNewest = typeof RegistryNewest.Type;
 
 /**
  * Where one release stands against the newest one published.
@@ -2713,6 +2891,23 @@ export const ReleaseVerdict = Schema.Union([
 export type ReleaseVerdict = typeof ReleaseVerdict.Type;
 
 /**
+ * How this binary was installed, which decides the command that
+ * updates it.
+ */
+export const InstallChannel = Schema.Literals(["npm", "cargo", "archive", "source"]).annotate({ identifier: "InstallChannel" });
+export type InstallChannel = typeof InstallChannel.Type;
+
+/**
+ * The command a person runs to update, printed and never run: the
+ * channel that installed the binary owns updating it.
+ */
+export const UpdateHint = Schema.Struct({
+  channel: InstallChannel,
+  command: Schema.optional(Schema.NullOr(Schema.String)),
+}).annotate({ identifier: "UpdateHint" });
+export type UpdateHint = typeof UpdateHint.Type;
+
+/**
  * Where this city stands against the release channel.
  * 
  * Exhaustive rather than a pair of optional fields: "you are running a
@@ -2725,13 +2920,15 @@ export const ReleaseAnswer = Schema.Union([
   Schema.Struct({
     stands: Schema.Struct({
       mine: ReleaseLine,
-      newest: ReleaseLine,
+      registries: Schema.Array(RegistryNewest),
+      update: UpdateHint,
       verdict: ReleaseVerdict,
     }),
   }),
   Schema.Struct({
     unreleased: Schema.Struct({
-      newest: ReleaseLine,
+      registries: Schema.Array(RegistryNewest),
+      update: UpdateHint,
     }),
   }),
   Schema.Struct({
@@ -3870,6 +4067,9 @@ export const PreferencePatch = Schema.Union([
   }),
   Schema.Struct({
     tags: SessionTags,
+  }),
+  Schema.Struct({
+    theme: ThemeOverride,
   }),
 ]).annotate({ identifier: "PreferencePatch" });
 export type PreferencePatch = typeof PreferencePatch.Type;
