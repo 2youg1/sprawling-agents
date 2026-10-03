@@ -75,23 +75,23 @@
 * 盘读的延迟峰：在交互路径上（切换 session、打开信箱、滚动）读回被逐出的项时，那个交互的 p99 不超过 16 ms。
 * 分配器对照：系统分配器（Windows 的堆、glibc 或 musl 的 malloc、macOS 的 libmalloc）与 mimalloc 两臂，同一负载，比私有字节的 p99、斜率与工具调用的 p99；mimalloc 只作对照臂，读数明显更好时再交人定默认。Linux 的发行件是静态 musl，musl 的 malloc 慢且归还内存的行为不同，所以 Linux 臂的结论单独写。
 
-### 待做（W6b）
+### 待做
 
-1. 把 storage 的新模块 `resident` 登记进模块图，按本模型建它，加上面的 proptest 与它的改坏版。
-2. `own_process` 按 D43 改 Linux 臂（`smaps_rollup`），macOS 臂标明读数是虚拟大小。
-3. 内存节拍：100 ms 的采样与 p50／p99／max／高于 p50 的时长／每小时斜率，进 `bin::monitor`。
-4. 清点表里随城增长的四项（视图、墓碑、`sent`、旁索引）逐一改成经 storage 的新模块 `resident` 读回，每一项一个上表的常量。
-5. playback 导出把 `Document` 改成边走边编码，doctor 扫描按行读子进程的输出，不整份读进内存。
-6. `tools/xtask/budgets.toml` 加内存节拍与一小时斜率的两行（由那一波拥有 budgets.toml 的车道提交）。
+1. 内存节拍：100 ms 的采样与 p50／p99／max／高于 p50 的时长／每小时斜率，进 `bin::monitor`。
+2. 清点表里随城增长的四项（视图、墓碑、`sent`、旁索引）逐一改成经 `storage::resident` 读回，每一项一个上表的常量，读回用上面的定位读。
+3. playback 导出把 `Document` 改成边走边编码，doctor 扫描按行读子进程的输出，不整份读进内存。
+4. `tools/xtask/budgets.toml` 加内存节拍与一小时斜率的两行（由那一波拥有 budgets.toml 的车道提交）。
 -/
 
-/-! D43 私有字节在三个平台上各读什么：Windows 照旧，Linux 改读 smaps_rollup，macOS 在有安全接口之前标明是虚拟大小
+/-! D43 私有字节在三个平台上各读什么：Windows 读提交的私有字节，Linux 读 smaps_rollup，macOS 在有安全接口之前读虚拟大小并标明
 
-今天 `bin::monitor::counters::own_process` 经 `memory-stats` 读 `private_bytes`：Windows 上是 `PROCESS_MEMORY_COUNTERS.PagefileUsage`，就是私有提交字节（`PrivateUsage`）；Linux 上是 `/proc/self/smaps` 各段 `Size` 之和，macOS 上是 `task_basic_info.virtual_size`，这两个是虚拟大小，不是私有字节（§8-96 写的就是这一点）。验收标准要的是私有字节，所以 W6b 换成：
+`bin::monitor::counters::own_process` 报的 `private_bytes` 按平台读：
 
-* Windows：照旧 `memory-stats` 的 `PagefileUsage`（安全接口，已在依赖树里）。
-* Linux：std 读 `/proc/self/smaps_rollup`，取 `Private_Clean` 与 `Private_Dirty` 之和（内核 4.14 起有）；没有这个文件时读 `/proc/self/status` 的 `RssAnon`。都是普通文件，std 读它们不需要 `unsafe`，与 §8-96 读 `/proc/self/io` 同一种做法。
-* macOS：`phys_footprint` 只能经 `task_info(TASK_VM_INFO)` 取得，那是一次 FFI 调用。按 AGENTS.md 平台调用的次序先找对外只给安全接口的 crate；没有找到之前，macOS 上照旧报 `memory-stats` 的读数并在读数旁标明它是虚拟大小，不为它写 `unsafe`。
+* Windows：`memory-stats` 的 `PagefileUsage`（`PROCESS_MEMORY_COUNTERS`），就是私有提交字节（`PrivateUsage`）；安全接口，已在依赖树里。
+* Linux：std 读 `/proc/self/smaps_rollup`，取 `Private_Clean` 与 `Private_Dirty` 之和（内核 4.14 起有，容器里也有）；没有这个文件或它不给这两行时，读 `/proc/self/status` 的 `RssAnon`（匿名驻留页，不含换出的私有页，所以偏低）；两个都读不到时读作 0。都是普通文件，std 读它们不需要 `unsafe`，与 §8-96 读 `/proc/self/io` 同一种做法。
+* macOS：`phys_footprint` 只能经 `task_info(TASK_VM_INFO)` 取得，那是一次 FFI 调用。按 AGENTS.md 平台调用的次序先找对外只给安全接口的 crate；没有找到之前，macOS 上报 `memory-stats` 的 `task_basic_info.virtual_size`，它是虚拟大小，比私有字节大得多，不为它写 `unsafe`。
+
+读数用的是哪一种，由平台决定（Linux 的 `RssAnon` 退路在运行时决定）；`wire::frames::monitor::Sample` 没有携带来源的字段，所以这一点写在这里与 `crates/sprawling/spec/Monitor.lean` §8-96，屏幕上不标。给 `Sample` 加来源字段是一次线上协议的改动，等下一次改监视帧时一起做。
 
 理由：Linux 的两个文件 std 就能读，代价是一次小文件读（smaps_rollup 在内核里按段求和，段多时比 status 慢）；macOS 的 `phys_footprint` 是活动监视器报的那个数，但它要 FFI。被否的做法：三个平台都报 RSS（工作集）：RSS 包括可回收的文件页，缓存交给操作系统的文件缓存之后 RSS 会随读盘上升，而这正是本设计要鼓励的。重开的条件：出现以安全接口读 `phys_footprint` 的 crate。
 -/
