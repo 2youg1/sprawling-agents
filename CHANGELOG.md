@@ -29,7 +29,7 @@ releases, and the section takes its tag, `v0.0.9-Alpha-<YYMMDD>`, when the
 release is cut. Alpha means usable: a User can hand the city real work, and
 data formats, the wire and the screens may still change between versions. It
 records what landed after `v0.0.8-Pre-alpha-261002`. The wire moved from
-WIRE_V 46 to 53, once for each push in which its shape changed
+WIRE_V 46 to 54, once for each push in which its shape changed
 (`crates/wire/Spec.lean` D1): 47 when sessions began to carry a display name
 and their last run, together with the harness states, registry lines, the
 doctor's scanning answer, the sandbox arm names and a colour theme; 48 when
@@ -38,8 +38,10 @@ an endpoint's tuning gained `max_in_flight`; 49 when `RunSummary` gained
 `ReplaceCityKey`, `ConfirmRemoteDoor` and `CloseRemoteDoor` arrived; 51 when
 a cache count could say it was not reported; 52 when a tool call could render
 as a send or a delegation and the thread's notes gained arrivals, reply waits
-and handbacks; 53 when a sent letter's delivery outcome reached the page.
-<!-- integrator: if the letter-landing work of the closing wave moves WIRE_V, extend this range and add its sentence; otherwise strike this comment. -->
+and handbacks; 53 when a sent letter's delivery outcome reached the page; 54
+when a send carried where its letter landed, an arrival its kind and sending
+session, a proposal card the line that offered it, the usage of skills and
+tool servers became three queries, and the sampling beat became settable.
 `EVENT_LOG_V` stays at 2: every new payload field is optional, and a line
 written by 0.0.8 reads unchanged.
 
@@ -75,8 +77,8 @@ written by 0.0.8 reads unchanged.
   each with where the letter landed: delivered to a working run, queued, or
   knocked for a new run. The city records that **delivery outcome** as a
   `signal_landed` line right after the `signal_enqueued` line, one for every
-  sent letter (kernel D38).
-  <!-- integrator: if the closing wave's letter-landing lane merged, add that letters a handback or a settled landing sends also record where they landed; otherwise strike this comment. -->
+  sent letter (kernel D38). A letter that a handback or a settled landing
+  sends records where it landed in the same way.
 - A reply wait is visible: the thread shows the room waited on and the time
   left, and how the wait ended (a reply, the patience running out, or the run
   leaving); the mailbox, the runs board and the session row say which room a
@@ -335,25 +337,36 @@ digest and machine class. These readings are owed and not stated here:
   it is a description, and theorems that only re-evaluated a definition are
   gone.
 
-### Planned in the closing wave
+### Letters, usage, storage, gateway, runs and placement
 
-<!-- integrator: each line below is planned work of the closing wave's lanes. After merging, keep a line whose lane landed it (and strike the matching "Designed, not yet built" line), strike a line whose lane did not, then delete this comment and, when no line is left, the heading. -->
 - A letter's arrival note carries its kind and the run that sent it, and a
   letter opened on the right shows the sending run's conversation around the
   send.
 - The skill page and the MCP page show the usage record folded from the
   Ledger, and export it as JSONL or CSV; the monitor's sampling beat can be
-  set per city, 100 ms by default (A18).
+  set per city between 10 ms and 1 s, 100 ms by default, and the city keeps
+  it for the next serve (A18).
 - The checkpoint scan never stages a document's staging file, and a segment
   can be preallocated behind one configuration value that defaults to off.
 - `NO_PROXY` reads `example.com` as that domain and its subdomains and never
-  as `badexample.com`, on Windows, macOS and Linux.
+  as `badexample.com`, on Windows, macOS and Linux. A request to OpenAI's
+  API carries the conversation's id as its prompt cache key.
 - `[sandbox] interpreter = "pwsh"` runs `exec` under PowerShell 7 where it
-  is installed, and refuses with the install line where it is not.
+  is installed, and refuses with the install line where it is not;
+  `sprawling view --shells` counts each shell's failures.
 - A remote door that expires closes on its own while the city serves.
-- The resident cache carries the growing working sets, and broadcast frames
-  are merged per frame with the watched session first; their readings are
-  owed.
+- A socket writes every record queued when it wakes and flushes once. The
+  doctor reads a program's output a line at a time, a playback export
+  encodes into one buffer, and a frozen run keeps no task in memory. Their
+  readings are owed.
+- On Windows the city reads each core's efficiency class, and its hot
+  threads and each run's lane prefer the fastest class as a soft
+  preference; one class, or a topology it cannot read, leaves placement to
+  the operating system. Each run's job gets a CPU weight below the city's
+  on Windows, and a run's commands run at utility QoS on macOS.
+  `[core] placement = "none"` turns placement off, and `sprawling doctor`
+  says what it read. No reading compares the arms yet.
+- The rules tool no longer offers `propose`, which it could not carry out.
 
 ### Designed, not yet built
 
@@ -363,22 +376,23 @@ digest and machine class. These readings are owed and not stated here:
   with AppContainer) and Linux (`bwrap`), `copied_tree` on macOS. Until that
   arm lands, every platform resolves `copied_tree`, or `native` on Linux
   where `bwrap` is present.
-- Skill audit and the usage record: the `skill_audited` kind and the audit
-  state exist; no auditor (the skills.sh partner audits, or SkillSpector when
-  installed) runs yet, and the usage table is not folded.
-- A CPU weight and memory limit per run's job and `[sandbox] interpreter =
-  "pwsh"` for PowerShell 7 are specified in Lean and wait for their code.
-- Hot-thread placement takes seats, but every core has one rank until a
-  leaf reads the efficiency classes, so on Windows it spreads the hot
-  threads and does not yet put them on the faster cores first; a run's
-  lane takes no seat yet. macOS and Linux place nothing.
+- Skill audit: the `skill_audited` kind and the audit state exist; no
+  auditor (the skills.sh partner audits, or SkillSpector when installed)
+  runs yet.
+- A memory limit per run's job, and a cgroup CPU weight per run on Linux,
+  are specified in Lean and wait for their code.
+- macOS and Linux have no soft placement call, so they read the topology
+  for the doctor and place nothing; the `soft_shares` and `pinned`
+  placement arms are named and refused until they are built.
 - The byte-budgeted resident cache (`storage::resident`) exists and keeps
-  its budget, and nothing reads through it yet.
+  its budget; the views, the hot view's tombstones and the Ledger's side
+  index do not read through it yet.
+- Warming an endpoint's connection when the city opens, and the Responses
+  WebSocket mode, are open questions in the gateway specification.
 - macOS reports the process's virtual size where the other platforms
   report private bytes, until a safe interface reaches its physical
   footprint.
-- The skill wire: `InstallSkill`, shelving a skill, and the skill, MCP and
-  usage exports have no command yet.
+- The skill wire: `InstallSkill` and shelving a skill have no command yet.
 
 ### Known and unfixed
 

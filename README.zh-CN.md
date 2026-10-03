@@ -101,7 +101,7 @@ harness = "claude_code"   # 或 "codex"、"grok_build"、"kimi_code"、"pi"
 |---|---|
 | Windows 与 macOS 上的操作系统沙箱 | 命令在工作树的一份拷贝里执行：你的文件伤不着，但网络是敞开的。装了命名空间封装的 Linux 还会关掉网络、收住整个进程树。今天的承诺是「删除可以撤销」，不是「删除不会发生」。沙箱臂的名字与每个平台的缺省已经定了（[`docs/operating.md`](docs/operating.md) 的 *How `exec` is confined* 一节），Windows 与 macOS 的臂还没做。 |
 | harness 居民用上城的工具 | harness 拿不到城的协作工具，也拿不到楼里的 MCP server；它一回合进行中收到的 steer 会记下来，但送不到；它请求权限时，城一律答第一个 allow-once 选项，范围限在它自己的 worktree 里。 |
-| skill 审核与调用记录 | 账本里有记 skill 审核的那一行，skill 的审核状态也从它读出，但还没有任何代码去问 skills.sh 或 SkillSpector，所以每件 skill 都显示未审；按 skill 的调用记录表也还没有。 |
+| skill 审核 | 账本里有记 skill 审核的那一行，skill 的审核状态也从它读出，但还没有任何代码去问 skills.sh 或 SkillSpector，所以每件 skill 都显示未审。skill 页与 MCP 页按账本折出每一件被用过几次。 |
 | 经过检查的手机布局 | 窄于 768 px 时页面排成一栏，但渲染门不检查比 768 px 更窄的宽度。 |
 | CI 里的浏览器端到端测试 | CI 用真实浏览器引擎在样例上渲染每个定稿的屏，但没有哪个作业去驱动一座活着的城。 |
 | 跨机器逐字节一致的构建 | 同一台机器上构建两次结果一致，夜间作业会查。跨机器时记下的源码路径不同，要等 `trim-paths` 进入本项目钉住的 stable 工具链才能去掉。 |
