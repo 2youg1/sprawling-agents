@@ -18,8 +18,9 @@
 
 use kernel::Locator;
 use kernel::event::record::{RoadmapMoved, RoadmapStep};
-use wire::{EventKind, EventRecord, RunId};
+use wire::{EventRecord, RunId};
 
+use super::kinds::Evidence;
 use super::prepared::LedgerAsk;
 
 impl LedgerAsk {
@@ -39,15 +40,11 @@ impl LedgerAsk {
 /// A record whose locator will not parse produces no row: inventing a
 /// row that points at nothing is worse than one row fewer, and the
 /// record itself is still in the history where the reader can see it.
-#[expect(
-    clippy::wildcard_enum_match_arm,
-    reason = "a few kinds produce evidence; the rest of the event vocabulary does not"
-)]
 fn evidence_in(record: &EventRecord) -> Option<wire::EvidenceItem> {
     let map = record.data().as_map();
     let at = record.seq();
-    match record.kind() {
-        EventKind::ToolResult => {
+    match Evidence::of(record.kind()) {
+        Evidence::ToolResult => {
             let result = map.get("result")?.as_object()?;
             let locator = Locator::parse(result.get("image")?.as_str()?).ok()?;
             Some(wire::EvidenceItem {
@@ -57,7 +54,7 @@ fn evidence_in(record: &EventRecord) -> Option<wire::EvidenceItem> {
                 picture: picture_in(result),
             })
         }
-        EventKind::RoadmapFinished => {
+        Evidence::Finished => {
             let RoadmapStep::Finished {
                 evidence: locator, ..
             } = record.data().read::<RoadmapMoved>().ok()?.step
@@ -71,7 +68,7 @@ fn evidence_in(record: &EventRecord) -> Option<wire::EvidenceItem> {
                 picture: None,
             })
         }
-        _ => None,
+        Evidence::Nothing => None,
     }
 }
 

@@ -40,6 +40,7 @@ mod governance_tests;
 pub mod hearing;
 pub mod holding;
 pub mod hunks;
+mod kinds;
 pub mod lines;
 pub mod listing;
 pub mod mcp_health;

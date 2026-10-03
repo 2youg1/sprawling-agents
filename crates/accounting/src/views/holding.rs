@@ -27,6 +27,7 @@ use std::path::{Path, PathBuf};
 use kernel::event::record::PursuitChanged;
 use kernel::{Address, AxError, EventKind, EventRecord};
 
+use super::kinds::Holding;
 use super::lines::{discard_lines, pursued, registry_line, restored_paths, signal_line};
 use super::snapshot::start::city_root_of;
 
@@ -278,10 +279,6 @@ impl Views {
     ///
     /// # Errors
     /// Propagates a view's own refusal to fold a malformed record.
-    #[expect(
-        clippy::wildcard_enum_match_arm,
-        reason = "a few kinds change what a room holds; the rest of the event vocabulary does not"
-    )]
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
         // Before the first change, so an overflow leaves nothing half
         // folded.
@@ -310,15 +307,15 @@ impl Views {
         crate::plan_view::PlanView::take_back(&self.plans).apply(record);
         self.events = self.events.saturating_add(1);
         self.next_unfolded = next_unfolded;
-        match record.kind() {
-            EventKind::CityInitialized => {
+        match Holding::of(record.kind()) {
+            Holding::City => {
                 self.city = record.addr().cloned();
             }
-            EventKind::SignalEnqueued => {
+            Holding::SignalQueued => {
                 let (room, line) = signal_line(record)?;
                 self.waiting.entry(room).or_default().push(line);
             }
-            EventKind::SignalConsumed => {
+            Holding::SignalTaken => {
                 let taken = record
                     .data()
                     .read::<kernel::event::record::SignalConsumed>()?;
@@ -326,7 +323,7 @@ impl Views {
                     queue.retain(|held| held.id != taken.id.as_str());
                 }
             }
-            EventKind::PursuitChanged => {
+            Holding::Pursuit => {
                 let addr = pursued(record)?;
                 match record.data().read::<PursuitChanged>()?.held()? {
                     Some(entry) => {
@@ -337,19 +334,19 @@ impl Views {
                     }
                 }
             }
-            EventKind::FileDiscarded => {
+            Holding::Discarded => {
                 for line in discard_lines(record) {
                     self.discards.insert(line.path.clone(), line);
                 }
             }
-            EventKind::DiscardRestored => {
+            Holding::Restored => {
                 for path in restored_paths(record) {
                     if let Some(held) = self.discards.get_mut(&path) {
                         held.restored = true;
                     }
                 }
             }
-            EventKind::RoadmapClaimed => {
+            Holding::Claimed => {
                 // The claim names the node; the record names the run
                 // that made it. Nothing is removed when the node is put
                 // down: what a node cost is what it cost, and a run that
@@ -360,24 +357,24 @@ impl Views {
                     .node;
                 self.claims.entry(node).or_default().insert(record.run());
             }
-            EventKind::CheckpointCommitted | EventKind::PrMerged => self.fold_commit(record)?,
-            EventKind::RunStarted => {
+            Holding::Commit => self.fold_commit(record)?,
+            Holding::RunStarted => {
                 self.fold_predecessor(record);
                 self.fold_skill_pins(record);
             }
-            EventKind::AssetArchived => {
+            Holding::Asset => {
                 if let Some(line) = registry_line(record) {
                     self.assets.push(line);
                 }
             }
-            EventKind::ApprovalResolved => self.fold_ruling(record)?,
-            EventKind::DocumentWritten => self.saves.absorb(record)?,
-            EventKind::PromptAssembled => {
+            Holding::Ruling => self.fold_ruling(record)?,
+            Holding::Document => self.saves.absorb(record)?,
+            Holding::Prompt => {
                 self.first_prompts
                     .entry(record.run())
                     .or_insert(record.seq());
             }
-            _ => {}
+            Holding::Nothing => {}
         }
         Ok(())
     }
