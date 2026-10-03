@@ -85,7 +85,7 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 
 **本章验收**：`cargo run -p sprawling -- doctor`，输出逐项与两句判定，Use 层必需项有缺则退 1。
 
-- **退出码只看 Use 层。** 退出码回答「一个 User 能不能在这台机器上用这座城」；Develop 层回答「能不能改这份代码」，它的判定行照样印出，但缺一样不改退出码。三个平台同一条规则。原因：新机器上 Use 层齐全时 doctor 印着「ready to use」却因为缺 zig、lean、just 退 1，脚本与 fresh 作业读到的是一个与屏幕相反的答案。被否：给 Develop 层一个开关（`--develop`）让它也进退出码——今天没有调用方要它；`just prereqs` 读的是 `prereqs.tsv`，不经 doctor 的退出码。钉住它的测试是 `doctor::tests::city::only_a_missing_required_use_item_makes_the_doctor_not_ready`。
+- **退出码只看 Use 层。** 退出码回答「一个 User 能不能在运行中的机器上用这座城」；Develop 层回答「能不能改这份代码」，它的判定行照样印出，但缺一样不改退出码。三个平台同一条规则。原因：新机器上 Use 层齐全时 doctor 印着「ready to use」却因为缺 zig、lean、just 退 1，脚本与 fresh 作业读到的是一个与屏幕相反的答案。被否：给 Develop 层一个开关（`--develop`）让它也进退出码——今天没有调用方要它；`just prereqs` 读的是 `prereqs.tsv`，不经 doctor 的退出码。钉住它的测试是 `doctor::tests::city::only_a_missing_required_use_item_makes_the_doctor_not_ready`。
 -/
 
 /-!
