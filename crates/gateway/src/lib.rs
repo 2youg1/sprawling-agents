@@ -9,6 +9,7 @@
 
 mod adviser;
 mod anthropic;
+mod concurrency;
 mod cost;
 mod credential;
 mod dialect;

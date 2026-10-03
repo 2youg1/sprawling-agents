@@ -4,6 +4,7 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import crates.gateway.spec.Adviser
+import crates.gateway.spec.Concurrency
 import crates.gateway.spec.Cost
 import crates.gateway.spec.Credential
 import crates.gateway.spec.Credential.Vault.File
