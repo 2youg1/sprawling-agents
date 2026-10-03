@@ -14,7 +14,7 @@ function turn(opened: number): Turn {
 
 const FIVE = [10, 20, 30, 40, 50].map(turn);
 
-describe("a letter draws the turns around the line that sent it (client D90)", () => {
+describe("a letter draws the turns around the line that sent it (client D91)", () => {
   test("the turn holding the line, with one turn either side", () => {
     expect(turnsAround(FIVE, Seq.make(34))).toEqual({ from: 1, to: 4, cut: true });
   });

@@ -11,7 +11,7 @@
   // a reply wait in progress and each of its three endings, a child's
   // handback finished and stopped, and two queued signals with their
   // first lines. A letter names its kind and links the session that sent
-  // it, and one from an older Ledger names neither (client D89); four
+  // it, and one from an older Ledger names neither (client D90); four
   // sends say where each letter landed - delivered, queued, knocked - and
   // what the tool answered when the Ledger recorded no landing (wire
   // D42). Each case is one room with one run, so each thread shows only

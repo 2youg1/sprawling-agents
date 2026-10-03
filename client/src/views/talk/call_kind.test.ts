@@ -79,7 +79,7 @@ describe("a send and a delegation read as what they did (client D85)", () => {
   });
 });
 
-describe("a send reads where its letter landed when the city recorded it (wire D42, client D89)", () => {
+describe("a send reads where its letter landed when the city recorded it (wire D42, client D90)", () => {
   test("each landing replaces what the tool answered", () => {
     expect([
       words({ ...sent, landing: "delivered" }),

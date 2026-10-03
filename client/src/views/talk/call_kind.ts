@@ -71,7 +71,7 @@ export function lineOf(call: Call): CallLine {
 }
 
 // What the result cell says. A send whose letter's landing the city
-// recorded reads that landing (wire D42, client D89), even while a sync
+// recorded reads that landing (wire D42, client D90), even while a sync
 // send still waits for its reply: the letter is delivered by then.
 // Otherwise, once the tool answered, what the tool itself reported - a
 // Ledger older than the landing line, or a landing outside the window.

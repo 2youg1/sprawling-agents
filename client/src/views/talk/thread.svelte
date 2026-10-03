@@ -56,7 +56,7 @@
     // A later run of the same session leaves that to the first.
     readonly opens?: boolean;
     // A letter's line in this run: only the turns around it are drawn,
-    // with a link to the whole session (client D90). Absent everywhere
+    // with a link to the whole session (client D91). Absent everywhere
     // else, where the thread is the whole session.
     readonly around?: Seq | null;
   }

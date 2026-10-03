@@ -77,7 +77,7 @@ pub struct ProposalCard {
 }
 ```
 
-**决定**：`Proposals(doc)` 作答时，读面在每张卡的 `run` 的会话窗口里（`LedgerAsk::records_of`，与 `Rounds` 同一个窗口）找身份等于这张卡的 `proposal_offered`，填它的 `seq`；一个 run 的窗口只读一次，同一个 run 的几张卡共用。找不到（窗口外、行读不回）为 `None`。信件的「对话」读法（client D90）按它只画提出这张卡的那一回合与前后各一回合，并给出整段会话的链接；`None` 时画整段，与以前一样。
+**决定**：`Proposals(doc)` 作答时，读面在每张卡的 `run` 的会话窗口里（`LedgerAsk::records_of`，与 `Rounds` 同一个窗口）找身份等于这张卡的 `proposal_offered`，填它的 `seq`；一个 run 的窗口只读一次，同一个 run 的几张卡共用。找不到（窗口外、行读不回）为 `None`。信件的「对话」读法（client D91）按它只画提出这张卡的那一回合与前后各一回合，并给出整段会话的链接；`None` 时画整段，与以前一样。
 
 **理由**：A25 要的是发信 run「相关的」对话：一段长会话里，这张卡是哪一回合提出的、提出之前读了什么、之后说了什么。整段画出来，人要自己在几十个回合里找那一处。行的 seq 是回合与调用共用的坐标（`Turn.opened`、`Call.at`），页面不需要第二种对齐法。
 

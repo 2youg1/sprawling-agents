@@ -17,7 +17,7 @@
   // conversation is the run page's own thread, drawn with no fork and
   // no retry, so it is read-only here as it is there, and only the turns
   // around the line that offered the card, with a link to the whole
-  // session (client D90).
+  // session (client D91).
   //
   // The heading takes the focus when the letter opens, so the mailbox
   // that stowed for it does not hand the focus to its key, and Escape

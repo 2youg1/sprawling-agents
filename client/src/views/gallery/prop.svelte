@@ -52,7 +52,7 @@
       slice("insert", "It saves the bytes of the version it was made on.", ""),
     ],
     // Offered in the run's third turn: the letter's conversation draws
-    // that turn with one either side (client D90).
+    // that turn with one either side (client D91).
     offered: Seq.make(9),
   };
 
