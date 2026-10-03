@@ -20,16 +20,16 @@ release notes and their commits.
 
 ---
 
-## 0.0.9
+## v0.0.9-Alpha-261004
 
 **sprawling 0.0.9 something and nothing**
 
-Not cut yet: the workspace manifest carries 0.0.9, the tree cuts alpha
-releases, and the section takes its tag, `v0.0.9-Alpha-<YYMMDD>`, when the
-release is cut. Alpha means usable: a User can hand the city real work, and
+Alpha. The workspace manifest carries 0.0.9 and the tree cuts alpha
+releases; this section is the release, cut as `v0.0.9-Alpha-261004`. Alpha
+means usable: a User can hand the city real work, and
 data formats, the wire and the screens may still change between versions. It
 records what landed after `v0.0.8-Pre-alpha-261002`. The wire moved from
-WIRE_V 46 to 54, once for each push in which its shape changed
+WIRE_V 46 to 56, once for each push in which its shape changed
 (`crates/wire/Spec.lean` D1): 47 when sessions began to carry a display name
 and their last run, together with the harness states, registry lines, the
 doctor's scanning answer, the sandbox arm names and a colour theme; 48 when
@@ -41,7 +41,10 @@ as a send or a delegation and the thread's notes gained arrivals, reply waits
 and handbacks; 53 when a sent letter's delivery outcome reached the page; 54
 when a send carried where its letter landed, an arrival its kind and sending
 session, a proposal card the line that offered it, the usage of skills and
-tool servers became three queries, and the sampling beat became settable.
+tool servers became three queries, and the sampling beat became settable; 55
+when the shells tally became a query of its own and an unavailable answer
+began to carry its reason; and 56 when the kernel's `skill_shelved` kind
+arrived, with the author every skill version now names.
 `EVENT_LOG_V` stays at 2: every new payload field is optional, and a line
 written by 0.0.8 reads unchanged.
 
@@ -364,13 +367,22 @@ digest and machine class. These readings are owed and not stated here:
   doctor reads a program's output a line at a time, a playback export
   encodes into one buffer, and a frozen run keeps no task in memory. Their
   readings are owed.
-- On Windows the city reads each core's efficiency class, and its hot
-  threads and each run's lane prefer the fastest class as a soft
-  preference; one class, or a topology it cannot read, leaves placement to
-  the operating system. Each run's job gets a CPU weight below the city's
-  on Windows, and a run's commands run at utility QoS on macOS.
-  `[core] placement = "none"` turns placement off, and `sprawling doctor`
-  says what it read. No reading compares the arms yet.
+- The city reads each core's efficiency class, its processor group, its
+  cache group and whether the process may use it, and works the placement
+  plan out as a pure function: one class, or a reading it cannot
+  reconcile, leaves the threads to the operating system. The seats go in
+  two pools — the accounting thread and the view fold hold the plan's last
+  ones, a run's lane holds one of the rest and gives it back when the run
+  ends, and a tokio worker holds none. `[core] placement` takes `"none"`,
+  `"soft"` (the default), `"soft_shares"` and `"pinned"`: the default
+  leaves power throttling lifted and each run's commands an even CPU
+  share, `"soft_shares"` holds each run's processes to half the physical
+  memory as well, and `"pinned"` is the hard-affinity comparison arm.
+  Runs' commands share the processors by weight on Windows (each run's job
+  takes weight 5), by cgroup `cpu.weight` on Linux where the cgroup is
+  delegated and `nice 10` alone where it is not, and by `taskpolicy -c
+  utility` on macOS. `sprawling doctor` says what was read and what each
+  run's commands share. No reading compares the arms yet.
 - The rules tool no longer offers `propose`, which it could not carry out.
 
 ### Designed, not yet built
@@ -384,16 +396,26 @@ digest and machine class. These readings are owed and not stated here:
 - Skill audit: the `skill_audited` kind and the audit state exist; no
   auditor (the skills.sh partner audits, or SkillSpector when installed)
   runs yet.
-- A memory limit per run's job, and a cgroup CPU weight per run on Linux,
-  are specified in Lean and wait for their code.
-- macOS and Linux have no soft placement call, so they read the topology
-  for the doctor and place nothing; the `soft_shares` and `pinned`
-  placement arms are named and refused until they are built.
+- No reading of the four-arm comparison exists: the p50, p99 and p999 of
+  the main features, how much the per-run shares cut the waits under heavy
+  load, and how often a step of work changed core mid-step. The default
+  `"soft"` is what the design supports, not what a measurement settled.
+- The fourth arm, `"pinned"`, is one step short: each run's job has to
+  take the mask of the remaining processors, and the place that makes a
+  run's job (`runtime::backlog::jobs`) is in `runtime`, which may not
+  depend on `sprawling`; a seam handing the mask into `Backlog` comes
+  first. Until then a run's processes leave the harness's job and land in
+  the operating system's hands, which is no worse than `"soft"` but is not
+  the whole arm.
+- Storage still reads whole segments in places — `recover_tail` in
+  `jsonl/open.rs` and two other read paths — so opening a city that was
+  preallocated reads tens of MiB of zero tail with the records.
+- macOS has no counterpart of the per-run memory limit.
 - The byte-budgeted resident cache (`storage::resident`) exists and keeps
   its budget; the views, the hot view's tombstones and the Ledger's side
   index do not read through it yet.
-- Warming an endpoint's connection when the city opens, and the Responses
-  WebSocket mode, are open questions in the gateway specification.
+- The Responses WebSocket mode is an open question in the gateway
+  specification.
 - macOS reports the process's virtual size where the other platforms
   report private bytes, until a safe interface reaches its physical
   footprint.
