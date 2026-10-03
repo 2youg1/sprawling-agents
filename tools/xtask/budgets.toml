@@ -648,7 +648,7 @@ status = "measured, not gated: 58 ms median on windows-x86_64, 16 cores, NVMe (2
 # stays inside the install boundary, and no fsync was removed to move a
 # number.
 [install]
-what = "the archive in place to the unpacked executable answering `version`: digest, unpack, launch"
+what = "the archive in place to the unpacked executable answering `version`: digest, unpack, system (the spawn call, scanner wait included), product (version to its exit)"
 measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples, p50/p95/p99 nearest-rank over all of them"
 status = "measured, not gated: p50 1856.382 ms, p95 1880.174, p99 1886.169; floor 1819.708, peak 1890.297; none of the 200 above three times the middle (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3; p50 1485.98-1490.38 ms at opt-level \"z\", whose executable is 11.7 MB smaller). **Dominant: `launch`**, 1674.365 ms, against 170.557 ms to unpack and 10.953 ms to SHA-256 the 11,601,869 B archive: the first launch of an unpacked executable prices the on-access scanner as much as the install. One process and one file per sample, no barriers. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench-startup retakes it"
 
