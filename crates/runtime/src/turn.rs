@@ -106,6 +106,15 @@ impl<'h> Turn<'h, Assembling> {
         }
     }
 
+    /// Records how long this turn's model call and tool calls took, in
+    /// microseconds read off `monotonic_us` (kernel D20). A turn opened
+    /// without it records the moments and no durations.
+    #[must_use]
+    pub fn timed(mut self, monotonic_us: &'h mut dyn FnMut() -> u64) -> Turn<'h, Assembling> {
+        self.journal.time_with(monotonic_us);
+        self
+    }
+
     /// Boundary 1 (before assembly). Builds the canonical request from
     /// the frozen prefix (system blocks), the window (messages) and the
     /// catalog's tool defs; appends `prompt_assembled` with the prefix's
@@ -199,8 +208,10 @@ impl<'h> Turn<'h, Calling<'_>> {
             returned: returned_value,
             speculated,
             first_at,
+            first_us,
+            sent_us,
         } = call.ask(&mut [&mut repair], generating)?;
-        let arrived = self.journal.read_clock()?;
+        let arrived = self.journal.read_moment()?;
         let ModelReturn {
             message,
             calls,
@@ -223,10 +234,12 @@ impl<'h> Turn<'h, Calling<'_>> {
             stop,
             billed_usd_micros,
             first_at,
+            first_us,
+            took_us: arrived.since(sent_us),
         };
         let model_returned = self.journal.append_redacted(
             ledger,
-            Carried::ModelReturned { at: arrived },
+            Carried::ModelReturned { at: arrived.at },
             Payload::of(&returned)?,
         )?;
         Ok(PhaseOutcome::Advanced(Turn {

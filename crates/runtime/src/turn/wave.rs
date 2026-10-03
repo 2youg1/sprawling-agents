@@ -26,6 +26,7 @@ use crate::bench::Ticket;
 
 use crate::compaction::Exchange;
 
+use super::ledger::Moment;
 use super::{Carried, Interrupt, PhaseOutcome, Recording, ToolWave, Turn};
 
 mod closure;
@@ -115,8 +116,8 @@ pub(super) fn reads_only(tools: &dyn ConcurrentInvoke, call: &ToolCall) -> bool 
 /// tool's registration, which `tool_called` copies.
 struct Timed<'c> {
     call: &'c ToolCall,
-    started: TimeMs,
-    answered: TimeMs,
+    started: Moment,
+    answered: Moment,
     effect: Option<Effect>,
     render: Option<RenderIntent>,
 }
@@ -124,8 +125,8 @@ struct Timed<'c> {
 impl<'c> Timed<'c> {
     fn of(
         call: &'c ToolCall,
-        started: TimeMs,
-        answered: TimeMs,
+        started: Moment,
+        answered: Moment,
         tools: &dyn ConcurrentInvoke,
     ) -> Timed<'c> {
         let meta = tools.meta_of(call);
@@ -207,7 +208,7 @@ impl<'h> Turn<'h, ToolWave> {
         let mut started = Vec::with_capacity(leading.len());
         for call in &leading {
             admitted.push(tools.admit(call, t));
-            started.push(self.journal.read_clock()?);
+            started.push(self.journal.read_moment()?);
         }
         let early = std::mem::take(&mut self.state.speculated).answers_for(&leading);
         let mut answers = all_at_once(&*tools, &leading, &admitted, &early).into_iter();
@@ -221,7 +222,7 @@ impl<'h> Turn<'h, ToolWave> {
             if let Some(cancelled) = self.consume_boundary(standing, ledger)? {
                 return Ok(PhaseOutcome::Cancelled(cancelled));
             }
-            let answered_at = self.journal.read_clock()?;
+            let answered_at = self.journal.read_moment()?;
             let answered = match admission {
                 Admitted::Answered(answered) => answered,
                 Admitted::Cleared(ticket) => {
@@ -261,12 +262,12 @@ impl<'h> Turn<'h, ToolWave> {
         call: &'c ToolCall,
     ) -> Result<(Timed<'c>, Result<ToolOutcome, AxError>), AxError> {
         let admission = tools.admit(call, self.journal.stamp());
-        let started = self.journal.read_clock()?;
+        let started = self.journal.read_moment()?;
         let (answered_at, answered) = match admission {
-            Admitted::Answered(answered) => (self.journal.read_clock()?, answered),
+            Admitted::Answered(answered) => (self.journal.read_moment()?, answered),
             Admitted::Cleared(ticket) => {
                 let ran = tools.tool(&ticket).and_then(|tool| tool.invoke(call));
-                let answered_at = self.journal.read_clock()?;
+                let answered_at = self.journal.read_moment()?;
                 (answered_at, tools.account(call, ticket, ran))
             }
         };
@@ -300,7 +301,7 @@ impl<'h> Turn<'h, ToolWave> {
         };
         self.journal.append_redacted(
             ledger,
-            Carried::ToolCalled { at: started },
+            Carried::ToolCalled { at: started.at },
             Payload::of(&called)?,
         )?;
         let mut pictures = Vec::new();
@@ -333,6 +334,7 @@ impl<'h> Turn<'h, ToolWave> {
             tool_use_id: call.id.clone(),
             name: call.name.clone(),
             answer,
+            took_us: answered_at.since(started.us),
         };
         exchange.push_result(ContentBlock::ToolResult {
             tool_use_id: call.id.clone(),
@@ -345,7 +347,7 @@ impl<'h> Turn<'h, ToolWave> {
         });
         self.journal.append_redacted(
             ledger,
-            Carried::ToolResult { at: answered_at },
+            Carried::ToolResult { at: answered_at.at },
             Payload::of(&result)?,
         )?;
         Ok(())

@@ -95,6 +95,21 @@ impl Carried {
     }
 }
 
+/// One reading of the turn's two clocks. `us` is absent on a turn the
+/// driver gave no monotonic clock, and then no duration is recorded.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Moment {
+    pub(super) at: TimeMs,
+    pub(super) us: Option<u64>,
+}
+
+impl Moment {
+    /// Whole microseconds from `earlier` to this reading.
+    pub(super) fn since(self, earlier: Option<u64>) -> Option<u64> {
+        Some(self.us?.saturating_sub(earlier?))
+    }
+}
+
 /// One turn's line of history: the turn's stamp, the clock the lines it
 /// waited for are read from, the refs it has collected, and how many
 /// secret-shaped spans it kept out of the ledger.
@@ -107,6 +122,7 @@ pub(super) struct Journal<'h> {
     who: String,
     t: TimeMs,
     now: &'h mut dyn FnMut() -> Result<TimeMs, AxError>,
+    stopwatch: Option<&'h mut dyn FnMut() -> u64>,
     refs: Vec<EventRef>,
     redacted: u32,
 }
@@ -135,9 +151,17 @@ impl<'h> Journal<'h> {
             who,
             t,
             now,
+            stopwatch: None,
             refs: Vec::new(),
             redacted: 0,
         }
+    }
+
+    /// Times the turn's waits on `monotonic_us` from here on: microseconds
+    /// on a clock that only moves forward, from an origin of the
+    /// driver's choosing (kernel D20).
+    pub(super) fn time_with(&mut self, monotonic_us: &'h mut dyn FnMut() -> u64) {
+        self.stopwatch = Some(monotonic_us);
     }
 
     /// How many secret-shaped spans this turn replaced so far.
@@ -197,13 +221,16 @@ impl<'h> Journal<'h> {
         self.t
     }
 
-    /// One reading of the clock the driver handed to the turn, for a
-    /// line the turn waited for.
+    /// One reading of both clocks: the moment a line carries, and the
+    /// monotonic microseconds a duration is the difference of.
     ///
     /// # Errors
     /// Propagates the clock's failure, such as a clock past `u64`.
-    pub(super) fn read_clock(&mut self) -> Result<TimeMs, AxError> {
-        (self.now)()
+    pub(super) fn read_moment(&mut self) -> Result<Moment, AxError> {
+        Ok(Moment {
+            at: (self.now)()?,
+            us: self.stopwatch.as_mut().map(|read| read()),
+        })
     }
 
     /// The turn module's single `Ledger::append` call, and the single

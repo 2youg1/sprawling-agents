@@ -60,6 +60,9 @@ pub(crate) struct DriveContext {
     /// The worker's own clock, so a run's lines and the worker's are
     /// read from one time (`crates/accounting/spec/Clock.lean` §8-3).
     pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
+    /// The monotonic clock a run's durations are read off
+    /// (`Hands.monotonic`, kernel D20).
+    pub monotonic: fn() -> std::time::Instant,
 }
 
 /// Who may interrupt one drive, in rank order: the halt that reached
@@ -223,11 +226,18 @@ pub(crate) fn drive_run<L: Ledger>(
         backlog,
         checkpoint_gate,
         clock,
+        monotonic,
     } = context;
     // Every reading the driver takes is kept where a command's clock
     // line and `status` read it, so neither needs a clock of its own.
     let reading = sieving.clock.clone();
     let mut now = || clock.now().inspect(|at| reading.keep(*at));
+    let origin = monotonic();
+    // Saturates rather than fails: u64 microseconds reach past half a
+    // million years, so the cap is never a reading a run can take.
+    let mut monotonic_us = || {
+        u64::try_from(monotonic().saturating_duration_since(origin).as_micros()).unwrap_or(u64::MAX)
+    };
     let declared = bench.declared_writes();
     let mut checkpoint_handle =
         storage::Checkpoint::open(&write_root).map_err(storage::StorageError::into_ax)?;
@@ -300,6 +310,7 @@ pub(crate) fn drive_run<L: Ledger>(
         };
         let mut hooks = RunHooks {
             now: &mut now,
+            monotonic_us: &mut monotonic_us,
             interrupt: &mut interrupt,
             checkpoint: Some(&mut checkpoint),
             writes: &|call: &kernel::ToolCall| declared.of(call),

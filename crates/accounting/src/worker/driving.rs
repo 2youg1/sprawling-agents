@@ -228,6 +228,7 @@ impl RunWorker {
             checkpoint_gate: std::sync::Arc::clone(&self.flight.checkpoint_gate),
             backlog: self.flight.backlog.clone(),
             clock: std::sync::Arc::clone(&self.clock),
+            monotonic: self.monotonic,
         }
     }
 }

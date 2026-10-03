@@ -136,3 +136,50 @@ fn the_blocking_door_records_no_first_content() {
         "a door that reports nothing before it settles has no first content to time"
     );
 }
+
+/// With a monotonic clock that moves 250 µs each time it is read, the
+/// reply line records the first content 250 µs and the whole reply
+/// 500 µs after the attempt went out (kernel D20); the moments stay the
+/// wall clock's.
+#[test]
+fn a_timed_turn_records_its_reply_in_microseconds_from_the_attempt() {
+    let micros: &'static mut u64 = Box::leak(Box::new(1_000));
+    let monotonic_us: &'static mut dyn FnMut() -> u64 = Box::leak(Box::new(move || {
+        *micros = micros.saturating_add(250);
+        *micros
+    }));
+    let mut ledger = TestLedger::new();
+    let turn = advance(
+        ticking()
+            .timed(monotonic_us)
+            .assemble(
+                Interrupt::None,
+                &mut ledger,
+                RunPrompt::new(&prefix(), &mut PromptRecord::default()),
+                blank_conversation(),
+                &[],
+                &shape(),
+            )
+            .unwrap(),
+    );
+    let mut page = |_: &Increment| {};
+    drop(advance(
+        turn.call(
+            Interrupt::None,
+            &mut ledger,
+            &mut Streaming,
+            &BuildingPolicy::default(),
+            Generating::Watched(&mut page),
+        )
+        .unwrap(),
+    ));
+    let returned: serde_json::Value = serde_json::from_slice(&ledger.lines[2]).unwrap();
+    assert_eq!(
+        (
+            returned["t"].as_u64(),
+            returned["data"]["first_us"].as_u64(),
+            returned["data"]["took_us"].as_u64(),
+        ),
+        (Some(30), Some(250), Some(500))
+    );
+}

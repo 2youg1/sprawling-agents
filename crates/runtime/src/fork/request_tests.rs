@@ -126,6 +126,7 @@ fn run(ledger: &mut storage::JsonlLedger, model: &mut Recorded, plan: RunPlan) {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &ToolCall| kernel::Writes::Nothing,

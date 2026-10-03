@@ -250,6 +250,7 @@ fn a_run_that_finishes_writes_dispatch_turns_and_freeze_in_that_order() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -330,6 +331,7 @@ fn a_retriable_failure_is_made_again_up_to_the_number_the_person_set() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -377,6 +379,7 @@ fn a_ceiling_that_is_reached_ends_the_run() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -414,6 +417,7 @@ fn a_run_ends_when_its_work_runs_out_rather_than_at_a_ceiling() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -451,6 +455,7 @@ fn a_cancel_at_a_safe_point_freezes_inside_the_interrupted_turn() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -497,6 +502,7 @@ fn a_checkpoint_runs_before_the_wave_and_carries_the_turns_stamp() {
     {
         let mut hooks = RunHooks {
             now: &mut now,
+            monotonic_us: &mut || 0,
             interrupt: &mut interrupt,
             checkpoint: Some(&mut checkpoint),
             writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -540,6 +546,7 @@ fn a_run_that_calls_nothing_puts_up_no_checkpoint() {
     {
         let mut hooks = RunHooks {
             now: &mut now,
+            monotonic_us: &mut || 0,
             interrupt: &mut interrupt,
             checkpoint: Some(&mut checkpoint),
             writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -579,6 +586,7 @@ fn a_read_only_wave_puts_up_no_checkpoint() {
     {
         let mut hooks = RunHooks {
             now: &mut now,
+            monotonic_us: &mut || 0,
             interrupt: &mut interrupt,
             checkpoint: Some(&mut checkpoint),
             writes: &|_: &kernel::ToolCall| kernel::Writes::Nothing,
@@ -609,6 +617,7 @@ fn advance_reports_each_turn_so_a_caller_can_stop_between_them() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -658,6 +667,7 @@ fn a_steer_at_a_safe_point_reaches_the_next_window_and_not_only_the_ledger() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -710,6 +720,7 @@ fn a_cancel_after_the_wave_stops_the_run_before_anything_it_handed_down_starts()
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -761,6 +772,7 @@ fn a_run_that_dies_of_a_loadtime_failure_still_writes_its_verdict() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -814,6 +826,7 @@ fn a_provider_failure_writes_its_carrier_and_then_the_verdict() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -864,6 +877,7 @@ fn failures_in_a_row_back_off_and_a_halt_during_the_wait_stops_the_run() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -930,6 +944,7 @@ fn a_steer_inside_a_tool_wave_is_recorded_before_the_model_reads_it() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -1142,6 +1157,7 @@ fn three_reads_driven(invoke: &mut dyn runtime::ConcurrentInvoke) -> RecordingLe
     let mut interrupt = |_: SafePoint| Interrupt::None;
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -1195,6 +1211,7 @@ fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
     };
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -1297,6 +1314,7 @@ fn one_read_while_generating(
     let mut interrupt = |_: SafePoint| Interrupt::None;
     let mut hooks = RunHooks {
         now: &mut now,
+        monotonic_us: &mut || 0,
         interrupt: &mut interrupt,
         checkpoint: None,
         writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,

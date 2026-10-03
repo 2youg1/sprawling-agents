@@ -15,7 +15,7 @@ use kernel::{
     AxCode, AxError, Increment, Ledger, Model, ModelRequest, ModelReturn, Payload, TimeMs,
 };
 
-use super::ledger::{Authored, Journal};
+use super::ledger::{Authored, Journal, Moment};
 use super::speculation::{Generating, Speculated, call_ahead};
 
 /// What one segment answered when it was offered a failed call.
@@ -49,13 +49,18 @@ pub(super) struct Settled {
     pub(super) returned: ModelReturn,
     pub(super) speculated: Speculated,
     pub(super) first_at: Option<TimeMs>,
+    /// Microseconds from `sent_us` to the first content.
+    pub(super) first_us: Option<u64>,
+    /// The monotonic reading taken when the attempt that returned went
+    /// out; the reply's whole duration is measured from it.
+    pub(super) sent_us: Option<u64>,
 }
 
 /// Whether an attempt has reported content yet, and the reading taken
 /// the moment it first did.
 enum FirstContent {
     Unseen,
-    Read(Result<TimeMs, AxError>),
+    Read(Result<Moment, AxError>),
 }
 
 impl FirstContent {
@@ -66,12 +71,12 @@ impl FirstContent {
             Increment::Said(text) | Increment::Thought(text) => !text.is_empty(),
         };
         if content && let FirstContent::Unseen = self {
-            *self = FirstContent::Read(journal.read_clock());
+            *self = FirstContent::Read(journal.read_moment());
         }
     }
 
     /// When the first content arrived; `None` when none did.
-    fn moment(self) -> Result<Option<TimeMs>, AxError> {
+    fn moment(self) -> Result<Option<Moment>, AxError> {
         match self {
             FirstContent::Unseen => Ok(None),
             FirstContent::Read(reading) => reading.map(Some),
@@ -88,6 +93,7 @@ pub(super) struct ModelCall<'a, 'h> {
     model: &'a mut dyn Model,
     request: &'a ModelRequest<'a>,
     streamed: bool,
+    sent_us: Option<u64>,
 }
 
 impl<'a, 'h> ModelCall<'a, 'h> {
@@ -105,6 +111,7 @@ impl<'a, 'h> ModelCall<'a, 'h> {
             model,
             request,
             streamed: false,
+            sent_us: None,
         }
     }
 
@@ -177,11 +184,16 @@ impl<'a, 'h> ModelCall<'a, 'h> {
         };
         self.streamed = streamed;
         match attempt {
-            Ok((returned, speculated)) => Ok(Settled {
-                returned,
-                speculated,
-                first_at: first.moment()?,
-            }),
+            Ok((returned, speculated)) => {
+                let first = first.moment()?;
+                Ok(Settled {
+                    returned,
+                    speculated,
+                    first_at: first.map(|moment| moment.at),
+                    first_us: first.and_then(|moment| moment.since(self.sent_us)),
+                    sent_us: self.sent_us,
+                })
+            }
             // The failed attempt's first content, and any failure to read
             // the clock for it, belong to no record: the repair's return
             // came through a door with no stream (`crates/runtime/spec/Turn/Recovery.lean` §8-50).
@@ -190,6 +202,8 @@ impl<'a, 'h> ModelCall<'a, 'h> {
                     returned,
                     speculated: Speculated::default(),
                     first_at: None,
+                    first_us: None,
+                    sent_us: self.sent_us,
                 }),
                 SegmentOutcome::Failed(err) | SegmentOutcome::Skipped(err) => Err(err),
             },
@@ -205,10 +219,11 @@ impl<'a, 'h> ModelCall<'a, 'h> {
             segments: self.request.segments.to_vec(),
             model: self.request.chat.model.clone(),
         };
-        let at = self.journal.read_clock()?;
+        let sent = self.journal.read_moment()?;
+        self.sent_us = sent.us;
         self.journal.append_authored(
             self.ledger,
-            Authored::ModelCalled { at },
+            Authored::ModelCalled { at: sent.at },
             Payload::of(&called)?,
         )?;
         Ok(())

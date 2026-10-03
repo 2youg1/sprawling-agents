@@ -160,6 +160,13 @@ pub struct RunHooks<'a> {
     /// starts and once when it answers, and once per freeze that is not a
     /// cancellation.
     pub now: &'a mut dyn FnMut() -> Result<TimeMs, AxError>,
+    /// Microseconds on a clock that only moves forward, from an origin
+    /// of the caller's choosing, read beside `now` each time a model
+    /// attempt goes out, its first content arrives and its reply is
+    /// whole, and each time a tool call starts and answers. Their
+    /// differences are the durations `model_returned` and `tool_result`
+    /// record (kernel D20); the absolute value is never recorded.
+    pub monotonic_us: &'a mut dyn FnMut() -> u64,
     /// Answers what arrived at a safe point.
     pub interrupt: &'a mut dyn FnMut(SafePoint) -> Interrupt,
     /// The pre-wave checkpoint. `None` runs without a net, which
