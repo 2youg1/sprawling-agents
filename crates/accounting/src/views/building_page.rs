@@ -9,13 +9,6 @@ use std::path::Path;
 
 use kernel::Address;
 
-/// How much of one document travels to a page.
-///
-/// These files grow for as long as a building works, and the interface
-/// reads them rather than edits them. A cut is stated on the answer, so
-/// a reader who needs the rest knows there is a rest.
-pub(crate) const DOC_BYTES_MAX: usize = 64 * 1024;
-
 /// One building, as the files in it say it is.
 ///
 /// The files are the authority, so the documents, the rooms and the
@@ -112,14 +105,21 @@ pub(crate) fn read_building(
     })
 }
 
-/// One document as a page receives it, cut to what travels.
+/// One document as a page receives it, cut to the bytes one document
+/// answer carries, `documents::WINDOW_BYTES_MAX`.
+///
+/// These files grow for as long as a building works, and the interface
+/// reads them rather than edits them. A cut is stated on the answer, so
+/// a reader who needs the rest knows there is a rest.
 pub(super) fn doc_from(name: String, bytes: &[u8]) -> wire::BuildingDoc {
-    let head = bytes.get(..bytes.len().min(DOC_BYTES_MAX)).unwrap_or(bytes);
+    let size = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+    let head = usize::try_from(size.min(documents::WINDOW_BYTES_MAX))
+        .map_or(bytes, |cut| bytes.get(..cut).unwrap_or(bytes));
     wire::BuildingDoc {
         name,
         text: String::from_utf8_lossy(head).into_owned(),
-        bytes: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-        truncated: bytes.len() > DOC_BYTES_MAX,
+        bytes: size,
+        truncated: size > documents::WINDOW_BYTES_MAX,
     }
 }
 
