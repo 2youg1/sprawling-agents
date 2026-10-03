@@ -4,7 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The thread that ticks the monitor once a second and sends each fresh
-//! reading to the watching sessions (`crates/sprawling/spec/Monitor.lean` §8-96).
+//! reading to the watching sessions, and notes this process's private
+//! bytes on every memory beat in between (`crates/sprawling/spec/Monitor.lean` §8-96).
 
 use std::sync::{Mutex, PoisonError, Weak};
 use std::time::{Duration, Instant};
@@ -16,7 +17,14 @@ use super::counters::Counters;
 use super::{Monitor, Sample};
 use accounting::worker::health::Health;
 
-const BEAT: Duration = Duration::from_secs(1);
+/// How often private bytes are read while somebody watches: the memory
+/// beat of `crates/sprawling/spec/Serving/Memory.lean`'s measuring plan.
+const MEMORY_BEAT: Duration = Duration::from_millis(100);
+
+/// Memory beats in one beat of the monitor.
+const MEMORY_BEATS_PER_BEAT: u32 = 10;
+
+const BEAT: Duration = MEMORY_BEAT.saturating_mul(MEMORY_BEATS_PER_BEAT);
 
 /// What a beat adds to the counters it read: the accounting queue's two
 /// counts (`crates/sprawling/spec/Accounting/Worker.lean` §8-98), the view fold's backlog (8-123), and
@@ -89,7 +97,13 @@ fn sample_until_dropped(
 ) {
     let mut counters: Option<Counters> = None;
     loop {
-        std::thread::sleep(BEAT);
+        std::thread::sleep(MEMORY_BEAT);
+        (1..MEMORY_BEATS_PER_BEAT).for_each(|_| {
+            if let Some(open) = counters.as_mut() {
+                open.note_private();
+            }
+            std::thread::sleep(MEMORY_BEAT);
+        });
         let Some(monitor) = monitor.upgrade() else {
             return;
         };

@@ -90,6 +90,12 @@ impl Counters {
         }
     }
 
+    /// Notes this process's private bytes between two readings, so the
+    /// next [`Self::read`] reports the highest of them.
+    pub(crate) fn note_private(&mut self) {
+        self.own.note_private();
+    }
+
     /// The platform readings taken since this was opened. The table
     /// count stays 0: the city's sampler has no path to the process
     /// table, which only `monitor::tree` reads.

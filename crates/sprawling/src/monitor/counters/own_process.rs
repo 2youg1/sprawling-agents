@@ -62,7 +62,8 @@ impl OwnProcess {
         let storage = storage_bytes();
         OwnReading {
             cpu_permille,
-            private_bytes: private_bytes(memory.as_ref()),
+            private_bytes: private_bytes(memory.as_ref())
+                .max(std::mem::take(&mut self.peak_private)),
             working_set_bytes: memory.map_or(0, |stats| widen(stats.physical_mem)),
             read_bytes: storage.read,
             written_bytes: storage.written,
