@@ -45,13 +45,13 @@ box and a press here are one path; the stop face is a plain button. -->
 >
   <span class="coin-faces" aria-hidden="true">
     <span
-      class="coin-face bg-page text-text group-hover:wash-strong group-aria-disabled:text-text-disabled group-aria-disabled:group-hover:bg-page"
+      class="coin-face bg-page text-text group-aria-disabled:text-text-disabled"
       data-face="send"
     >
       <Glyph name="send" size="key" />
     </span>
-    <span class="coin-face bg-page text-text group-hover:wash-strong" data-face="stop">
-      <Glyph name="stop" size="sm" solid />
+    <span class="coin-face bg-page text-text" data-face="stop">
+      <Glyph name="stop" size="stop" solid />
     </span>
   </span>
 </button>

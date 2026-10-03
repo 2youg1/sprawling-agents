@@ -82,7 +82,7 @@ const DRAWN: Record<GlyphName, Component<{ class?: ClassValue; strokeWidth?: num
   branch: GitBranch,
 };
 
-export type GlyphSize = "sm" | "md" | "key";
+export type GlyphSize = "sm" | "md" | "key" | "stop";
 
 export interface GlyphProps {
   readonly name: GlyphName;
@@ -93,7 +93,12 @@ export interface GlyphProps {
   readonly class?: ClassValue;
 }
 
-const BOX: Record<GlyphSize, string> = { sm: "size-glyph-sm", md: "size-glyph", key: "size-glyph-key" };
+const BOX: Record<GlyphSize, string> = {
+  sm: "size-glyph-sm",
+  md: "size-glyph",
+  key: "size-glyph-key",
+  stop: "size-glyph-stop",
+};
 </script>
 
 <script lang="ts">

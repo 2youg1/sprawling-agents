@@ -401,6 +401,11 @@
   --spacing-key: 40px;
   --spacing-coin: 32px;
   --spacing-glyph-key: 18px;
+  /* The stop face's square: lucide's square fills three quarters of its
+   * box and the stroke adds a pixel and a half, so an 8.5 px box draws
+   * the 7.9 px square the template draws - seven sixteenths of the
+   * 18 px key glyph. A larger stop reads as a second, heavier key. */
+  --spacing-glyph-stop: 8.5px;
   /* The conversation as a band along the bottom of the panorama tier:
    * the last thing said, the field, and its line. */
   --spacing-band: 112px;
@@ -425,7 +430,7 @@
    * over the page reads as an object rather than as part of a form. */
   --radius-key: 14px;
 
-  /* Motion (docs/frontend-method.md §4-43): three durations, named for how far a
+  /* Motion (docs/frontend-method.md §4-43): durations named for how far a
    * thing travels, and two easings, named for which way it goes. They
    * sit in Tailwind's own namespaces, so `duration-panel` and
    * `ease-arrive` are utilities; `xtask motion` refuses a curve or a
@@ -435,10 +440,13 @@
    * appearing or turning over in its own place - a hint, a popover, a
    * dialog, the coin key, the composer's line - takes `panel`; a move
    * across the page - the world layer, the composer sinking, the
-   * context ring's arc - takes `page`. */
+   * context ring's arc - takes `page`. The coin key alone turns over
+   * in `coin`, the template's 420 ms: a half turn in 250 ms reads as a
+   * blink rather than as the key flipping to its other face. */
   --transition-duration-short: 150ms;
   --transition-duration-panel: 250ms;
   --transition-duration-page: 350ms;
+  --transition-duration-coin: 420ms;
   --default-transition-duration: var(--transition-duration-short);
 
   /* Entering and arriving decelerate, leaving accelerates (refrain Q1),
@@ -1143,7 +1151,7 @@
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transition: transform var(--transition-duration-panel) var(--ease-arrive);
+  transition: transform var(--transition-duration-coin) var(--ease-arrive);
 }
 .coin-face {
   position: absolute;
@@ -1159,6 +1167,15 @@
 }
 .coin-face[data-face="stop"] {
   transform: rotateY(180deg);
+}
+/* Hover lays 8 % of the ink over the page colour itself, as the
+ * template does, so the face reads the same over any surface behind
+ * the composer; a key that cannot be pressed keeps its ground. */
+.coin:hover .coin-face {
+  background-color: color-mix(in oklch, var(--color-text) 8%, var(--color-page));
+}
+.coin[aria-disabled="true"]:hover .coin-face {
+  background-color: var(--color-page);
 }
 .coin[data-up="stop"] .coin-faces {
   transform: rotateY(180deg);
@@ -1305,7 +1322,7 @@
 [data-motion="off"] .animate-pulse {
   animation: none;
 }
-/* Motion off is three durations at zero (docs/frontend-method.md §4-43): every
+/* Motion off is every duration at zero (docs/frontend-method.md §4-43): every
  * transition and entrance reads one of them, so the state still changes
  * where the eye was and nothing travels. The default duration is set
  * beside them rather than left to follow `short`, because a custom
@@ -1316,6 +1333,7 @@
   --transition-duration-short: 0s;
   --transition-duration-panel: 0s;
   --transition-duration-page: 0s;
+  --transition-duration-coin: 0s;
   --default-transition-duration: 0s;
 }
 [data-motion="off"] * {
@@ -1326,6 +1344,7 @@
     --transition-duration-short: 0s;
     --transition-duration-panel: 0s;
     --transition-duration-page: 0s;
+    --transition-duration-coin: 0s;
     --default-transition-duration: 0s;
   }
 }
