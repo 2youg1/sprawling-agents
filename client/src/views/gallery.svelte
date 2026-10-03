@@ -73,6 +73,7 @@
   import Switches from "./gallery/switches.svelte";
   import Talking from "./gallery/talking.svelte";
   import Thr from "./gallery/thr.svelte";
+  import AgentMessages from "./gallery/agent_messages.svelte";
   import Tables from "./gallery/tables.svelte";
   import Monitored from "./gallery/monitored.svelte";
   import Timed from "./gallery/timed.svelte";
@@ -116,6 +117,7 @@
   <RefusedLine />
   <Talking />
   <Thr />
+  <AgentMessages />
   <G1 />
   <Folded />
   <Followed />
