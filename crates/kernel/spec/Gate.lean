@@ -51,7 +51,7 @@ pub mod conformance {
 }
 ```
 
-- **门只答 Allow 或 Deny（D1「默认 YOLO」这条规则），`attach` 是唯一的具名例外**：一个需要人点「可以」的动作，要么本来就该做，要么本来就不该做，两者都是规则。随之删去 `GateOutcome::Escalate`、`GateContext`、`gate::item`、`gate::commitment`、`gate::govern`、`gate::delegation`、`gate::dedup`。`attach` 例外所授予的不是一个动作，是那个人自己的浏览器里**全部登录态的读取权**——邮箱、银行、公司后台；`browser::Profile` 整套按楼隔离在附着的那一刻全部失效，所以没有任何一条城的规则答得了它，而人的动作（在运行中的浏览器里亲自打开远程调试并声明地址）就是答案。`attach` 的 Ask 经 bench 原样回到模型：`E_APPROVAL_PENDING` 加一句 recovery，那个 run 不往下走，而人在城之外完成授权。**会问人的门有且只有这一道，数量本身是一条可断言的性质**：`refusal_matrix` 遍历 `DOORS` 断言 Ask 恰好一条。今天六类升级各得的固定答案与其理由：
+- **门只答 Allow 或 Deny（D1「默认 YOLO」这条规则），`attach` 是唯一的具名例外**：一个需要人点「可以」的动作，要么本来就该做，要么本来就不该做，两者都是规则。所以 `GateOutcome` 没有「升级给人」的一臂，门册里也没有专为承诺、治理、委派或去重而设的门；这几类各得的固定答案见下表。`attach` 例外所授予的不是一个动作，是那个人自己的浏览器里**全部登录态的读取权**——邮箱、银行、公司后台；`browser::Profile` 整套按楼隔离在附着的那一刻全部失效，所以没有任何一条城的规则答得了它，而人的动作（在运行中的浏览器里亲自打开远程调试并声明地址）就是答案。`attach` 的 Ask 经 bench 原样回到模型：`E_APPROVAL_PENDING` 加一句 recovery，那个 run 不往下走，而人在城之外完成授权。**会问人的门有且只有这一道，数量本身是一条可断言的性质**：`refusal_matrix` 遍历 `DOORS` 断言 Ask 恰好一条。今天六类升级各得的固定答案与其理由：
 
   | 类别 | 答案 | 为什么 | 人在哪里改 |
   |---|---|---|---|
