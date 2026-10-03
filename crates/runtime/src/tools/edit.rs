@@ -36,17 +36,18 @@ pub struct EditTool {
     meta: ToolMeta,
 }
 
-/// The version stamp a caller must present: the first 16 hex of the
-/// content hash. Short enough to read aloud, long enough that a
-/// collision is not the failure mode anyone will meet.
+/// The version stamp a caller must present: the whole content hash with
+/// its tag, `b3-<hex64>`. `read` prints the same value, and `plan finish`
+/// takes it as `cas:<version>`, so a model copies one string between
+/// three tools and never shortens or completes it (kernel
+/// `spec/Locator.lean` D27).
 pub fn version_of(bytes: &[u8]) -> String {
-    let full = B3Hash::digest(bytes).to_string();
-    full.get(..16).unwrap_or(&full).to_owned()
+    B3Hash::digest(bytes).tagged()
 }
 
 /// The version word that means "I expect this file to not exist yet".
-/// Sixteen hex digits can never spell it, so it cannot collide with a
-/// real version.
+/// A tagged digest can never spell it, so it cannot collide with a real
+/// version.
 const CREATES: &str = "new";
 
 impl EditTool {
@@ -65,7 +66,7 @@ impl EditTool {
                 "path": { "type": "string",
                     "description": "file to edit, relative to the city root" },
                 "base_version": { "type": "string", "description":
-                    "version you last saw; refuses if it moved. Pass \"new\" to create the file" },
+                    "the `version` read printed for this file; refuses if it moved. Pass \"new\" to create the file" },
                 "old": { "type": "string", "description":
                     "exact text to replace; must match exactly once. \"\" when creating" },
                 "new": { "type": "string",

@@ -28,6 +28,9 @@ use serde::{Deserialize, Serialize};
 use crate::address::Address;
 use crate::error::{AxCode, AxError};
 
+/// The algorithm tag a `cas:` locator writes before its digest.
+const B3_TAG: &str = "b3-";
+
 /// BLAKE3 digest, 32 bytes; displayed as 64 lowercase hex digits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct B3Hash([u8; 32]);
@@ -46,6 +49,14 @@ impl B3Hash {
     /// exactly one home outside `chain_hash`.
     pub fn digest(bytes: &[u8]) -> Self {
         B3Hash(*blake3::hash(bytes).as_bytes())
+    }
+
+    /// The digest with its algorithm tag, `b3-<hex64>`: the form a tool
+    /// prints as a version and `cas:` takes after its colon
+    /// (`crates/kernel/spec/Locator.lean` D27).
+    #[must_use]
+    pub fn tagged(&self) -> String {
+        format!("{B3_TAG}{self}")
     }
 }
 
@@ -236,7 +247,7 @@ impl Locator {
     fn parse_inner(raw: &str) -> Result<Self, AxError> {
         if let Some(rest) = raw.strip_prefix("cas:") {
             let (body, range) = split_range(raw, rest)?;
-            let hex = body.strip_prefix("b3-").ok_or_else(|| {
+            let hex = body.strip_prefix(B3_TAG).ok_or_else(|| {
                 invalid(
                     raw,
                     "unknown or missing algorithm tag; the only tag is `b3-`",
@@ -279,7 +290,7 @@ impl std::fmt::Display for Locator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Locator::Cas { hash, range } => {
-                write!(f, "cas:b3-{hash}")?;
+                write!(f, "cas:{B3_TAG}{hash}")?;
                 write_range(f, range)
             }
             Locator::File {

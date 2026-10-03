@@ -447,6 +447,9 @@ fn the_version_read_prints_is_the_one_edit_and_plan_finish_take() {
     let conflict = edit(&seen).unwrap_err();
     assert_eq!(
         conflict.subject(),
-        format!("work/a.txt is at {}, not {seen}", read_version("work/a.txt"))
+        format!(
+            "work/a.txt is at {}, not {seen}",
+            read_version("work/a.txt")
+        )
     );
 }

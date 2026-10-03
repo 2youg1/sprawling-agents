@@ -21,7 +21,7 @@
 
 **取 64 KiB 的推导与实测见 `crates/kernel/Spec.lean` §8-8 该常量的 doc**；一句话是：上下文提醒按 30%／65% 排成梯子，没有哪一步可以整级跨过，故单条结果 < 35% 窗口，而 64 KiB 在最坏字节-token 比率下是 128K 窗口的 20.5%。
 
-`ReadTool` 增 `offset`（0 基行号，缺省 0）与 `limit`（缺省与上限**均为 512 行**）。被截断时结果携 `total_lines` 与 `next_offset`，所以「我拿到的是不是全部」不需要猜。`bytes` 字段的语义不变，仍是本次返回文本的长度。
+`ReadTool` 增 `offset`（0 基行号，缺省 0）与 `limit`（缺省与上限**均为 512 行**）。被截断时结果携 `total_lines` 与 `next_offset`，所以「我拿到的是不是全部」不需要猜。`bytes` 字段的语义不变，仍是本次返回文本的长度。读到盘上的一个文件时，结果另携 `version`：整份文件的 `edit::version_of`，与切出哪一段无关，因为 `edit` 守的和 `plan finish` 引的都是整份文件（kernel D27）；catalog 条目与 Locator 读出的字节不携它，前者不是可编辑的文件，后者本身已是一个版本。
 
 理由：整读一份千行级的 SPEC 或数十 KB 的 ARCHITECTURE，要么吃掉整个窗口，要么被管线从中间剪掉，而剪掉的往往正是要改的那一段。512 是选定值。
 
