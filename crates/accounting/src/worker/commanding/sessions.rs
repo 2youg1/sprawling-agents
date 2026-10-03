@@ -128,8 +128,8 @@ impl RunWorker {
 
     /// Records the room's new run policy (kernel D21) and hands it to the
     /// run working in the room, which takes it at its next
-    /// `SafePoint::BeforeWave` (runtime D28); the next dispatch into the
-    /// room starts under it. The line goes first, so a run never acts on
+    /// `SafePoint::BeforeWave` (runtime D28); every later dispatch the
+    /// User sends into the room's session starts under it. The line goes first, so a run never acts on
     /// a change the ledger does not hold.
     ///
     /// # Errors
@@ -148,6 +148,7 @@ impl RunWorker {
                 by: Who::Person,
             })?,
         )?;
+        self.origins.policy_changed(room, policy);
         self.collaborating.rooms.post_policy(room, policy);
         Ok(())
     }

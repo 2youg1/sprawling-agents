@@ -265,8 +265,8 @@ impl RoomQueues {
     }
 
     /// Hands a new run policy for the room at `addr` to the run working
-    /// there, if one is; a room nobody works in keeps it on the ledger
-    /// alone, where the next dispatch reads it.
+    /// there, if one is; a room nobody works in has nothing to hand it
+    /// to, and the next dispatch reads it from the session fold.
     pub(in crate::worker) fn post_policy(&self, addr: &Address, policy: kernel::RunPolicy) {
         match self.rooms.get(addr) {
             Some(RoomQueue::Lent { policy: slot, .. }) => slot.post(policy),

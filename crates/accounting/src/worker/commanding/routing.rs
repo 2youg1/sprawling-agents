@@ -118,11 +118,13 @@ impl RunWorker {
                     // by the page: a session that branched off another
                     // said so once, at the moment it began.
                     origin: self.origins.get(&addr),
+                    // The session's last change, on the ledger, outranks
+                    // the copy the page sent (`crates/sprawling/spec/Accounting/Worker.lean` §8-133).
+                    policy: self.origins.policy(&addr).unwrap_or(policy),
                     addr,
                     session,
                     effort,
                     model,
-                    policy,
                     parent: None,
                     succession: None,
                     taint: kernel::TaintSet::empty(),

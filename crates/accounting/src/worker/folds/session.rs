@@ -3,7 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What each room's current session branched from, if it branched.
+//! What each room's current session branched from, if it branched, and
+//! the run policy the User last changed it to.
 //!
 //! **A branch belongs to the session and is spent by the run that
 //! begins it.** A session is a stretch of a room, and the person who
@@ -27,6 +28,13 @@
 //! room's last `run_started` names the run, `session_opened` with
 //! `carried` marks it owed, and the next `run_started` there spends it.
 //!
+//! The run policy is the session's in the same way: `run_policy_changed`
+//! sets it, `session_opened` clears it, and a dispatch the User sends
+//! starts under it rather than under the policy its frame carries,
+//! because the ledger's line is what the session menu shows as the
+//! room's state and the page's copy is a second one
+//! (`crates/sprawling/spec/Accounting/Worker.lean` §8-133).
+//!
 //! **The map is not a second authority for the lineage.** What run
 //! continues what is in the ledger, and stays there; this holds only
 //! the question a dispatch asks before it has a run to name - "is this
@@ -37,8 +45,8 @@ use std::collections::BTreeMap;
 
 use kernel::{Address, AxError, EventKind, Origin, RunId};
 
-/// What each room's current session branched from, and whether the run
-/// that begins it has been started yet.
+/// What each room's current session branched from, whether the run that
+/// begins it has been started yet, and the run policy it was changed to.
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(in crate::worker) struct SessionOrigins {
     pending: BTreeMap<Address, Origin>,
@@ -46,6 +54,8 @@ pub(in crate::worker) struct SessionOrigins {
     last_run: BTreeMap<Address, RunId>,
     /// The run whose transcript a carried session's first run is told about.
     carried: BTreeMap<Address, RunId>,
+    /// The run policy each room's session was last changed to.
+    policies: BTreeMap<Address, kernel::RunPolicy>,
 }
 
 impl SessionOrigins {
@@ -83,6 +93,7 @@ impl SessionOrigins {
                         self.pending.remove(addr);
                     }
                 }
+                self.policies.remove(addr);
                 match self.last_run.get(addr).filter(|_| opened.carried) {
                     Some(last) => {
                         self.carried.insert(addr.clone(), *last);
@@ -102,6 +113,13 @@ impl SessionOrigins {
             EventKind::RunForked => {
                 if let Some(addr) = addr {
                     self.spent(addr);
+                }
+                Ok(())
+            }
+            EventKind::RunPolicyChanged => {
+                if let Some(addr) = addr {
+                    let changed = data.read::<kernel::event::record::RunPolicyChanged>()?;
+                    self.policy_changed(addr, changed.policy);
                 }
                 Ok(())
             }
@@ -194,7 +212,6 @@ impl SessionOrigins {
             | EventKind::ProposalOffered
             | EventKind::ProposalDecided
             | EventKind::ProposalWithdrawn
-            | EventKind::RunPolicyChanged
             | EventKind::SessionNamed
             | EventKind::SkillAudited
             | EventKind::SignalWaitStarted
@@ -205,6 +222,20 @@ impl SessionOrigins {
     /// What this room's session is still owed, if anything.
     pub(in crate::worker) fn get(&self, addr: &Address) -> Option<Origin> {
         self.pending.get(addr).copied()
+    }
+
+    /// The run policy this room's session was last changed to, if it was.
+    pub(in crate::worker) fn policy(&self, addr: &Address) -> Option<kernel::RunPolicy> {
+        self.policies.get(addr).copied()
+    }
+
+    /// Records `policy` as the room's session policy.
+    ///
+    /// Called by the fold on `run_policy_changed` and directly by the
+    /// command that writes it, because a worker is not shown its own
+    /// appends by the fold that reads the history back.
+    pub(in crate::worker) fn policy_changed(&mut self, addr: &Address, policy: kernel::RunPolicy) {
+        self.policies.insert(addr.clone(), policy);
     }
 
     /// The run whose transcript this room's carried session has not yet
