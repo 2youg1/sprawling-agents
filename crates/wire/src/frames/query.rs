@@ -64,8 +64,7 @@ pub enum Query {
         to: Seq,
         limit: u32,
     },
-    /// The stretches of one room, newest first, which a page loses on a
-    /// reload: [`SessionsAnswer`](crate::SessionsAnswer) (`crates/wire/spec/Answer/Sessions.lean` §8-71).
+    /// The stretches of one room, newest first (`crates/wire/spec/Answer/Sessions.lean` §8-71).
     Sessions {
         room: Address,
     },
@@ -302,46 +301,16 @@ pub enum Query {
     /// records checkpoints rather than edits. The checkpoint beside it comes
     /// from the history, for the reason [`Query::Commit`] gives.
     GitStatus { building: Address },
-    /// Whether each tool server one address reaches is answering, and
-    /// what it offers.
-    ///
-    /// One handshake per configured server, run at the moment of
-    /// asking: a server's state is a fact about now - a program that
-    /// starts, a host that answers, an account that is still valid -
-    /// and a remembered one would tell a person their server is up an
-    /// hour after it stopped. It is the same handshake a run opens with
-    /// (`agent_protocols::handshake`, then `tools/list`), so what this answers
-    /// and what a model is given cannot disagree.
-    ///
-    /// **This is the one query that costs seconds.** A page asks it
-    /// when a person opens the MCP page or adds a server, never on a
-    /// timer.
+    /// Whether each tool server one address reaches is answering, and what it offers, handshaken
+    /// once at the moment of asking (`crates/wire/spec/Answer/McpHealth.lean` §8-34).
     McpHealth {
         addr: Address,
     },
-    /// Which outside applications the broker offers, and where each one stands for this city.
-    ///
-    /// **The second query that costs a round trip to somebody else**, and it is asked on the same
-    /// terms as [`Query::McpHealth`]: when a person opens the page, and when they come back to it
-    /// from the consent page they were sent to. Never on a timer - a city that asked the broker
-    /// "anything new?" on a schedule would be generating traffic nobody reads, which
-    /// `docs/third-party.md` rules out.
-    ///
-    /// Carries no key: the project key is enrolled in the vault and redeemed on the host machine,
-    /// so a frame from a socket names nothing secret and an unenrolled city answers
-    /// `ToolkitsAnswer::Unenrolled` rather than failing.
+    /// Which outside applications the broker offers, and where each one stands for this city
+    /// (`crates/wire/spec/Answer/Toolkits.lean` §8-35b).
     Toolkits,
-    /// Which release this city is running, and which ones npm and crates.io offer.
-    ///
-    /// **Asked when a person presses the button, and at no other time**: not on connect, not on a
-    /// timer, not folded into another query. `QUICKSTART.md` promises that nothing outside the
-    /// folder was written, and a city that reached a registry on its own schedule would spend that
-    /// promise on a question nobody asked; `docs/third-party.md` rules out the same traffic.
-    ///
-    /// The slowest query here, and the only one whose cost a person chose. A registry that cannot
-    /// be reached is [`ReleaseAnswer::Refused`](crate::ReleaseAnswer::Refused) rather than
-    /// [`Answer::Unavailable`](crate::Answer::Unavailable): the city is available, the registry is
-    /// not. Nothing it answers updates anything; this reports and stops.
+    /// Which release this city is running, and which ones npm and crates.io offer
+    /// (`crates/wire/spec/Answer/Release.lean` §8-36).
     NewestRelease,
     /// Everything this person settled about their own reading of the
     /// city: the language, the appearance, the chords they rebound.
