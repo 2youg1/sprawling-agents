@@ -43,10 +43,20 @@ fn a_place_holding_no_ledger_is_refused_rather_than_verified() {
 fn replay_names_the_lines_it_verified_and_the_tail_seq() {
     let dir = tempfile::tempdir().unwrap();
     sprawling::assembly::init_city(dir.path()).unwrap();
-    let ledger_dir = kernel::layout::CityLayout::new(dir.path()).ledger();
+    let layout = kernel::layout::CityLayout::new(dir.path());
+    let ledger_dir = layout.ledger();
+    // Three lines of its own, and one `skill_shelved` per shipped skill
+    // (kernel D23).
+    let shipped = std::fs::read_dir(layout.library().join(city::SHIPPED_SECTION))
+        .unwrap()
+        .count();
+    let lines = 3 + shipped;
     assert_eq!(
         verified_chain(&ledger_dir),
-        Ok("chain verified: 3 line(s), tail seq 2".to_owned())
+        Ok(format!(
+            "chain verified: {lines} line(s), tail seq {}",
+            lines - 1
+        ))
     );
 
     // One hex digit of the third line's prev changes: the line still
