@@ -17,6 +17,45 @@ use crate::vfs::Vfs;
 /// files are cut, never any observable semantics (`crates/storage/Spec.lean` §14).
 pub(crate) const SEGMENT_ROLL_BYTES: u64 = 64 * 1024 * 1024;
 
+/// How a segment's file is sized while it is written (storage D31).
+///
+/// Both arms keep the same durability and the same history on disk; an
+/// arm changes only what the barrier has to flush. The preallocated
+/// segment ends in zero bytes past its last record, which the reader
+/// strips (`crates/storage/spec/Jsonl/Preallocate.lean`), so the writer's
+/// position is the end of the records, never the end of the file.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SegmentPreallocation {
+    /// The file grows by one append at its end per wave.
+    Grow,
+    /// A new segment is set to the roll size (`File::set_len`) when it is
+    /// created, and each wave writes at the end of its records, inside
+    /// that length: `SetFileInformationByHandle(FileEndOfFileInfo)` on
+    /// Windows, `ftruncate` on Linux and macOS.
+    ToRollSize,
+}
+
+impl SegmentPreallocation {
+    /// The length `open` leaves the last segment at, given the end of its
+    /// records (`keep`), the bytes of tear it drops after them
+    /// (`dropped`, zeros not counted) and its length on disk (`total`).
+    /// A grown segment ends at its records, because the next append writes
+    /// at the end of the file. A preallocated one keeps its zero tail when
+    /// nothing was torn, because the next wave writes at `keep` anyway.
+    pub(crate) fn length_after_open(self, keep: u64, dropped: u64, total: u64) -> u64 {
+        match (self, dropped) {
+            (SegmentPreallocation::ToRollSize, 0) => total,
+            (SegmentPreallocation::ToRollSize | SegmentPreallocation::Grow, _) => keep,
+        }
+    }
+}
+
+/// The arm every ledger this build opens writes with. It stays `Grow`
+/// until the release-build reading of the barrier with each arm (storage
+/// D31) chooses; choosing is this one value, on Windows, macOS and Linux
+/// alike.
+pub(crate) const SEGMENT_PREALLOCATION: SegmentPreallocation = SegmentPreallocation::Grow;
+
 /// What open found and repaired, and what its tail recovery read and
 /// checked (`crates/storage/spec/Jsonl.lean` §8-34).
 pub struct OpenReport {
@@ -37,6 +76,9 @@ pub struct JsonlLedger {
     pub(crate) next_seq: Seq,
     pub(crate) prev: B3Hash,
     pub(crate) roll_bytes: u64,
+    /// How this ledger sizes its segments; [`SEGMENT_PREALLOCATION`]
+    /// outside tests.
+    pub(crate) preallocation: SegmentPreallocation,
     /// Whether `seg_len`, `next_seq` and `prev` still name the end of
     /// the segments; a failed wave leaves it broken until a reopen.
     pub(crate) barrier: super::barrier::Barrier,

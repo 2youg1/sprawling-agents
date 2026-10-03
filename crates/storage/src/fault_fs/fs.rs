@@ -79,6 +79,27 @@ impl FaultFs {
         self.state().bytes_read
     }
 
+    /// Charges a write whose bytes are already on the live plane, so the
+    /// tear model can bite exactly this write: the content needle first,
+    /// then the op count.
+    fn charge_write(&self, bytes: &[u8], op_name: &'static str) -> io::Result<()> {
+        {
+            let mut state = self.state();
+            if let Some(needle) = state.plan.cut_on_write
+                && contains(bytes, needle.as_bytes())
+            {
+                state.plan.cut_on_write = None;
+                state.op = state.op.saturating_add(1);
+                cut(&mut state);
+                return Err(io::Error::other(format!(
+                    "power lost during {op_name} carrying `{needle}` (op {})",
+                    state.op
+                )));
+            }
+        }
+        self.charge(op_name)
+    }
+
     /// Counts the op; when it hits the plan, power dies: the cut applies
     /// and the op itself fails.
     fn charge(&self, op_name: &'static str) -> io::Result<()> {
@@ -100,13 +121,23 @@ fn cut(state: &mut State) {
     let torn = state.plan.torn_tail;
     state.files.retain(|_, file| file.durable_entry);
     for file in state.files.values_mut() {
-        let delta = file.live.get(file.durable.len()..).unwrap_or(&[]);
+        // The unsynced write starts where the live plane first differs
+        // from the durable one: the end of the file for an append, inside
+        // it for a write over preallocated space.
+        let common = file
+            .durable
+            .iter()
+            .zip(&file.live)
+            .take_while(|(durable, live)| durable == live)
+            .count();
+        let delta = file.live.get(common..).unwrap_or(&[]);
         let keep = match torn {
             TornTail::None => 0,
             TornTail::KeepBytes(k) => usize::try_from(k).unwrap_or(usize::MAX).min(delta.len()),
         };
-        let mut settled = file.durable.clone();
-        settled.extend_from_slice(delta.get(..keep).unwrap_or(&[]));
+        let reached = common.saturating_add(keep);
+        let mut settled = file.live.get(..reached).unwrap_or(&[]).to_vec();
+        settled.extend_from_slice(file.durable.get(reached..).unwrap_or(&[]));
         file.durable = settled.clone();
         file.live = settled;
     }
@@ -212,31 +243,37 @@ impl Vfs for FaultFs {
             });
             file.live.extend_from_slice(bytes);
         }
-        // Bytes are on the live plane before either check: the tear model
-        // can bite exactly this write.
+        self.charge_write(bytes, "append")
+    }
+
+    fn write_at(&mut self, path: &Path, offset: u64, bytes: &[u8]) -> io::Result<()> {
         {
             let mut state = self.state();
-            if let Some(needle) = state.plan.cut_on_write
-                && contains(bytes, needle.as_bytes())
-            {
-                state.plan.cut_on_write = None;
-                state.op = state.op.saturating_add(1);
-                cut(&mut state);
-                return Err(io::Error::other(format!(
-                    "power lost during append carrying `{needle}` (op {})",
-                    state.op
-                )));
+            let file = state.files.entry(path.to_path_buf()).or_insert(FileState {
+                durable: Vec::new(),
+                live: Vec::new(),
+                durable_entry: false,
+            });
+            let from = usize::try_from(offset).map_err(io::Error::other)?;
+            let end = from
+                .checked_add(bytes.len())
+                .ok_or_else(|| io::Error::other("a write past the address space"))?;
+            if file.live.len() < end {
+                file.live.resize(end, 0);
+            }
+            if let Some(slot) = file.live.get_mut(from..end) {
+                slot.copy_from_slice(bytes);
             }
         }
-        self.charge("append")
+        self.charge_write(bytes, "write_at")
     }
 
     fn truncate(&mut self, path: &Path, len: u64) -> io::Result<()> {
         {
             let mut state = self.state();
             let file = state.files.get_mut(path).ok_or_else(|| not_found(path))?;
-            let len = usize::try_from(len).unwrap_or(usize::MAX);
-            file.live.truncate(len);
+            let len = usize::try_from(len).map_err(io::Error::other)?;
+            file.live.resize(len, 0);
         }
         self.charge("truncate")
     }

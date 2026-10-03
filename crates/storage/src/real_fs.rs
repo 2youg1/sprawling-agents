@@ -35,13 +35,22 @@ use crate::vfs::Vfs;
 /// removes the file, because this process's own open handle is enough to
 /// make Windows refuse all three.
 pub(crate) struct RealFs {
-    open: Option<OpenAppend>,
+    open: Option<HeldWriter>,
 }
 
-/// The file `RealFs` is appending to, and where it lives.
-struct OpenAppend {
+/// The file `RealFs` is writing to, where it lives, and how it writes.
+struct HeldWriter {
     path: PathBuf,
     file: std::fs::File,
+    mode: WriteMode,
+}
+
+/// How the held handle writes: at the end of the file, or where the
+/// caller says.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum WriteMode {
+    Append,
+    Positional,
 }
 
 impl RealFs {
@@ -49,18 +58,27 @@ impl RealFs {
         RealFs { open: None }
     }
 
-    /// The handle on `path`, opening it when the one held is for another
-    /// file. Append mode, so the offset is the end of the file at every
-    /// write and no position has to be remembered across calls.
-    fn writer(&mut self, path: &Path) -> io::Result<&mut std::fs::File> {
-        if self.open.as_ref().is_none_or(|held| held.path != path) {
+    /// The handle on `path` in `mode`, opening it when the one held is
+    /// for another file or writes another way. In append mode the offset
+    /// is the end of the file at every write and no position has to be
+    /// remembered across calls; a positional write seeks first.
+    fn writer(&mut self, path: &Path, mode: WriteMode) -> io::Result<&mut std::fs::File> {
+        if self
+            .open
+            .as_ref()
+            .is_none_or(|held| held.path != path || held.mode != mode)
+        {
             let mut options = std::fs::OpenOptions::new();
-            options.create(true).append(true);
+            match mode {
+                WriteMode::Append => options.create(true).append(true),
+                WriteMode::Positional => options.create(true).write(true),
+            };
             write_through(&mut options);
             let file = options.open(path)?;
-            self.open = Some(OpenAppend {
+            self.open = Some(HeldWriter {
                 path: path.to_path_buf(),
                 file,
+                mode,
             });
         }
         match self.open.as_mut() {
@@ -139,7 +157,14 @@ impl Vfs for RealFs {
 
     fn append(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()> {
         use std::io::Write as _;
-        self.writer(path)?.write_all(bytes)
+        self.writer(path, WriteMode::Append)?.write_all(bytes)
+    }
+
+    fn write_at(&mut self, path: &Path, offset: u64, bytes: &[u8]) -> io::Result<()> {
+        use std::io::Write as _;
+        let file = self.writer(path, WriteMode::Positional)?;
+        file.seek(SeekFrom::Start(offset))?;
+        file.write_all(bytes)
     }
 
     fn truncate(&mut self, path: &Path, len: u64) -> io::Result<()> {
@@ -148,10 +173,14 @@ impl Vfs for RealFs {
         file.set_len(len)
     }
 
-    /// The same handle the append went through, so the bytes made
+    /// The same handle the write went through, so the bytes made
     /// durable are the ones this adapter just wrote.
     fn sync_data(&mut self, path: &Path) -> io::Result<()> {
-        self.writer(path)?.sync_data()
+        let mode = match self.open.as_ref() {
+            Some(held) if held.path == path => held.mode,
+            Some(_) | None => WriteMode::Append,
+        };
+        self.writer(path, mode)?.sync_data()
     }
 
     fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()> {

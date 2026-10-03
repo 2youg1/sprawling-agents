@@ -168,6 +168,9 @@ impl Vfs for CountingFs {
     fn append(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()> {
         self.disk().append(path, bytes)
     }
+    fn write_at(&mut self, path: &Path, offset: u64, bytes: &[u8]) -> io::Result<()> {
+        self.disk().write_at(path, offset, bytes)
+    }
     fn truncate(&mut self, path: &Path, len: u64) -> io::Result<()> {
         self.disk().truncate(path, len)
     }

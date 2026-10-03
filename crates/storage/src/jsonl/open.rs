@@ -7,7 +7,6 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::consts_external::{LogVersion, readable_log_v};
 use kernel::{AxCode, AxError, GENESIS_PREV, Seq, TimeMs};
 
 use crate::chain_audit::ProofCount;
@@ -16,10 +15,9 @@ use crate::real_fs::RealFs;
 use crate::verified_prefix::{ProofRecords, TailStart};
 use crate::vfs::Vfs;
 
-use super::first_line::first_line;
 use super::ledger::{
-    JsonlLedger, OpenReport, SEGMENT_ROLL_BYTES, TailTruncation, WriterLock, complete_lines,
-    is_segment, segment_file_name, u64_count,
+    JsonlLedger, OpenReport, SEGMENT_PREALLOCATION, SEGMENT_ROLL_BYTES, TailTruncation, WriterLock,
+    complete_lines, is_segment, segment_file_name, u64_count,
 };
 use super::verify::{LineCheck, LineFault};
 
@@ -96,11 +94,18 @@ impl JsonlLedger {
     }
 
     fn open_through(
-        mut vfs: Box<dyn Vfs>,
+        vfs: Box<dyn Vfs>,
         dir: &Path,
         now: TimeMs,
         proof: TailProof<'_>,
     ) -> Result<(Self, OpenReport), StorageError> {
+        let (ledger, segments) = JsonlLedger::unopened(vfs, dir)?;
+        ledger.resume(&segments, now, proof)
+    }
+
+    /// The ledger at the root of an empty chain, with the segments `dir`
+    /// holds, before anything on them is read.
+    fn unopened(mut vfs: Box<dyn Vfs>, dir: &Path) -> Result<(Self, Vec<PathBuf>), StorageError> {
         vfs.create_dir_all(dir)
             .map_err(io_err("create ledger dir", dir))?;
         let segments: Vec<PathBuf> = vfs
@@ -110,7 +115,7 @@ impl JsonlLedger {
             .filter(|p| is_segment(p))
             .collect();
 
-        let mut ledger = JsonlLedger {
+        let ledger = JsonlLedger {
             vfs,
             dir: dir.to_path_buf(),
             seg_path: dir.join(segment_file_name(Seq::FIRST)),
@@ -118,6 +123,7 @@ impl JsonlLedger {
             next_seq: Seq::FIRST,
             prev: GENESIS_PREV,
             roll_bytes: SEGMENT_ROLL_BYTES,
+            preallocation: SEGMENT_PREALLOCATION,
             barrier: super::barrier::Barrier::Whole,
             // The projection exists only when this ledger is a city's:
             // it is what tells a writer handed the ledger directory
@@ -129,22 +135,31 @@ impl JsonlLedger {
             halt: crate::chain_audit::ChainHalt::default(),
             pending_unwind: None,
         };
+        Ok((ledger, segments))
+    }
 
-        let Some(last) = segments.last().cloned() else {
+    /// Reads the version and the tail of `segments` and puts the writer
+    /// at the end of the surviving records.
+    fn resume(
+        mut self,
+        segments: &[PathBuf],
+        now: TimeMs,
+        proof: TailProof<'_>,
+    ) -> Result<(Self, OpenReport), StorageError> {
+        let Some(last) = segments.last() else {
             return Ok((
-                ledger,
+                self,
                 OpenReport {
                     recovered: None,
                     counted: ProofCount::default(),
                 },
             ));
         };
-
-        ledger.probe_version(&segments)?;
-        let (dropped, counted) = ledger.recover_tail(&segments, &last, proof)?;
+        self.probe_version(segments)?;
+        let (dropped, counted) = self.recover_tail(segments, last, proof)?;
         let recovered = if dropped > 0 {
-            if ledger.next_seq != Seq::FIRST {
-                ledger.append_log_truncated(now, dropped)?;
+            if self.next_seq != Seq::FIRST {
+                self.append_log_truncated(now, dropped)?;
             }
             Some(TailTruncation {
                 dropped_bytes: dropped,
@@ -152,62 +167,7 @@ impl JsonlLedger {
         } else {
             None
         };
-        Ok((ledger, OpenReport { recovered, counted }))
-    }
-
-    /// Direction-aware version refusal, before any repair or parse
-    /// (never a partial read of a newer ledger).
-    fn probe_version(&mut self, segments: &[PathBuf]) -> Result<(), StorageError> {
-        let Some(first) = segments.first() else {
-            return Ok(());
-        };
-        let Some(first_line) =
-            first_line(self.vfs.as_ref(), first).map_err(io_err("read segment", first))?
-        else {
-            // Empty or torn-before-first-line segment: version unknowable;
-            // tail recovery decides what remains.
-            return Ok(());
-        };
-        // A mangled first line in a single-segment ledger is tail damage:
-        // it carries no version information, and tail recovery owns it.
-        // With more segments behind it the same damage is non-tail and
-        // must refuse instead (`crates/storage/spec/Jsonl.lean` §8-1).
-        let probed = serde_json::from_slice::<serde_json::Value>(&first_line)
-            .ok()
-            .and_then(|value| value.get("v").and_then(serde_json::Value::as_u64));
-        let v = match probed {
-            Some(v) => v,
-            None if segments.len() > 1 => {
-                return Err(StorageError::Envelope {
-                    path: first.clone(),
-                    line: 1,
-                    source: AxError::failure(
-                        AxCode::InvalidArgs,
-                        "probe ledger version",
-                        "first line is not a version-bearing record",
-                    )
-                    .with_recovery(
-                        "restore this segment from its checkpoint commit, then run \
-                         `sprawling replay <ledger-dir>`: line 1 of every segment carries `v`",
-                    ),
-                });
-            }
-            None => return Ok(()),
-        };
-        match readable_log_v(v) {
-            // An older ledger opens: the history is append-only and the
-            // lines an earlier build wrote are still its history.
-            LogVersion::Current | LogVersion::Older => Ok(()),
-            LogVersion::Ahead => Err(StorageError::VersionAhead {
-                path: first.clone(),
-                v,
-            }),
-            LogVersion::NotAVersion => Err(StorageError::Envelope {
-                path: first.clone(),
-                line: 1,
-                source: unversioned(v),
-            }),
-        }
+        Ok((self, OpenReport { recovered, counted }))
     }
 
     /// Tail-truncation recovery over the last segment, taking its
@@ -310,7 +270,7 @@ impl JsonlLedger {
         let dropped = measure(filled.saturating_sub(valid_len))?;
         let keep = measure(valid_len)?;
 
-        if total > keep {
+        if self.preallocation.length_after_open(keep, dropped, total) < total {
             if valid_len == 0 {
                 // Whole last segment is torn. Remove it; the tail falls
                 // back to the prior segment (or to an empty city when this
@@ -349,7 +309,7 @@ impl JsonlLedger {
             }
         } else {
             self.seg_path = last.to_path_buf();
-            self.seg_len = total;
+            self.seg_len = keep;
         }
         self.prev = run_prev;
         self.next_seq = run_seq;
@@ -384,7 +344,7 @@ impl TailProof<'_> {
 ///
 /// One sentence for both readers, because "nobody ever wrote this" is
 /// one fact whether the probe or the tail scan meets it first.
-fn unversioned(v: u64) -> AxError {
+pub(super) fn unversioned(v: u64) -> AxError {
     AxError::failure(
         AxCode::InvalidArgs,
         "read a ledger line's version",
@@ -412,3 +372,19 @@ mod tests;
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod preallocated;
+
+#[cfg(test)]
+impl JsonlLedger {
+    /// The `fault` entrance with the preallocating arm, whatever
+    /// [`SEGMENT_PREALLOCATION`] says, so its tests judge the arm the
+    /// build does not select (storage D31).
+    pub(crate) fn open_preallocated(
+        fs: crate::fault_fs::FaultFs,
+        dir: &Path,
+        now: TimeMs,
+    ) -> Result<(Self, OpenReport), StorageError> {
+        let (mut ledger, segments) = JsonlLedger::unopened(Box::new(fs), dir)?;
+        ledger.preallocation = super::ledger::SegmentPreallocation::ToRollSize;
+        ledger.resume(&segments, now, TailProof::Strict)
+    }
+}

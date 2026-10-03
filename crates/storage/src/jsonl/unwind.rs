@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use crate::error::{StorageError, io_err};
 
 use super::barrier::Barrier;
-use super::ledger::JsonlLedger;
+use super::ledger::{JsonlLedger, SegmentPreallocation};
 
 impl JsonlLedger {
     /// Appends one wave's bytes and makes them durable. On failure the
@@ -19,7 +19,7 @@ impl JsonlLedger {
     /// fails too stays pending for [`Self::finish_unwind`].
     pub(crate) fn write_wave(
         &mut self,
-        writes: &[(PathBuf, Vec<u8>)],
+        writes: &[(PathBuf, u64, Vec<u8>)],
         created: Vec<PathBuf>,
     ) -> Result<(), StorageError> {
         let written = self.land(writes, &created);
@@ -53,17 +53,30 @@ impl JsonlLedger {
         }
     }
 
+    /// Each write is `(segment, offset, bytes)`: the offset is the end of
+    /// the segment's records, which a preallocated segment writes at and
+    /// a growing one reaches by appending (storage D31).
     fn land(
         &mut self,
-        writes: &[(PathBuf, Vec<u8>)],
+        writes: &[(PathBuf, u64, Vec<u8>)],
         created: &[PathBuf],
     ) -> Result<(), StorageError> {
-        for (path, bytes) in writes {
-            self.vfs
-                .append(path, bytes)
-                .map_err(io_err("append event line", path))?;
+        for (path, offset, bytes) in writes {
+            match self.preallocation {
+                SegmentPreallocation::Grow => self.vfs.append(path, bytes),
+                SegmentPreallocation::ToRollSize => self.vfs.write_at(path, *offset, bytes),
+            }
+            .map_err(io_err("append event line", path))?;
+            if self.preallocation == SegmentPreallocation::ToRollSize && created.contains(path) {
+                let end = offset.saturating_add(u64::try_from(bytes.len()).unwrap_or(u64::MAX));
+                if end < self.roll_bytes {
+                    self.vfs
+                        .truncate(path, self.roll_bytes)
+                        .map_err(io_err("preallocate a new segment", path))?;
+                }
+            }
         }
-        for (path, _) in writes {
+        for (path, _, _) in writes {
             self.vfs
                 .sync_data(path)
                 .map_err(io_err("sync segment", path))?;

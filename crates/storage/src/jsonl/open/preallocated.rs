@@ -15,6 +15,7 @@ use kernel::{EventDraft, EventKind, Payload, RunId, TimeMs};
 use proptest::prelude::*;
 
 use crate::error::StorageError;
+use crate::fault_fs::{FaultFs, FaultPlan, TornTail};
 use crate::jsonl::JsonlLedger;
 
 fn draft(t: u64) -> EventDraft {
@@ -132,5 +133,89 @@ proptest! {
             opened.map(|(_, report)| report.recovered.is_some())
         );
         prop_assert_eq!(fs::read(dir.join(&name)).unwrap(), bytes, "a refused open repaired the segment");
+    }
+}
+
+/// The ledger behind `fs`, reopened with the preallocating arm until an
+/// opening survives the power cut the plan may still hold.
+fn reopened(fs: &FaultFs, dir: &Path, roll: u64) -> JsonlLedger {
+    let (mut ledger, _) = JsonlLedger::open_preallocated(fs.clone(), dir, TimeMs::new(9))
+        .or_else(|_| JsonlLedger::open_preallocated(fs.clone(), dir, TimeMs::new(9)))
+        .unwrap();
+    ledger.roll_bytes = roll;
+    ledger
+}
+
+/// Every record of the ledger behind `ledger`, each with its seq, the
+/// chain checked line by line. A cut the waves never reached may fall on
+/// this read, so it is read again once.
+fn chained(ledger: &JsonlLedger) -> Vec<u64> {
+    let mut prev = kernel::GENESIS_PREV;
+    ledger
+        .read_raw_lines()
+        .or_else(|_| ledger.read_raw_lines())
+        .unwrap()
+        .iter()
+        .map(|line| {
+            let record = kernel::EventRecord::parse_line(line).unwrap();
+            assert_eq!(record.prev(), prev);
+            prev = kernel::ledger::chain_hash(line);
+            record.seq().value()
+        })
+        .collect()
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig { cases: 48, ..ProptestConfig::default() })]
+
+    /// Derived from `a_record_written_at_the_stripped_end_resumes_the_segment`
+    /// and `writer_position_is_the_stripped_end`: with the preallocating
+    /// arm (storage D31), a writer that reopens between any two waves, or
+    /// after power is lost at any operation, resumes at the end of its
+    /// records. Every wave that answered `Ok` reads back, the seqs run
+    /// without a gap and the chain holds; a log_truncated line appears
+    /// only where a cut tore a wave, and the last segment keeps its
+    /// preallocated length when nothing was torn.
+    #[test]
+    fn a_preallocated_writer_resumes_after_every_reopen_and_every_cut(
+        waves in proptest::collection::vec(1u64..4, 1..6),
+        roll in 300u64..3000,
+        cut in proptest::option::of(1u64..80),
+    ) {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("ledger");
+        let fs = FaultFs::new(FaultPlan {
+            cut_at_op: cut,
+            cut_on_write: None,
+            torn_tail: TornTail::KeepBytes(7),
+        });
+        let mut ledger = reopened(&fs, &dir, roll);
+        let mut acknowledged = 0u64;
+        let mut t = 0u64;
+        for wave in waves {
+            let drafts = (0..wave).map(|i| draft(t.saturating_add(i))).collect();
+            t = t.saturating_add(wave);
+            // A refused wave is what the cut tore; it owes nothing back.
+            if let Ok(refs) = ledger.append_all(drafts) {
+                acknowledged = acknowledged.saturating_add(u64::try_from(refs.len()).unwrap());
+            }
+            drop(ledger);
+            ledger = reopened(&fs, &dir, roll);
+        }
+
+        let seqs = chained(&ledger);
+        let expected: Vec<u64> = (0..u64::try_from(seqs.len()).unwrap()).collect();
+        let read = u64::try_from(seqs.len()).unwrap();
+        prop_assert_eq!(&seqs, &expected);
+        prop_assert!(read >= acknowledged);
+        if cut.is_none() {
+            prop_assert_eq!(read, acknowledged);
+            let last = crate::vfs::Vfs::list(&fs, &dir)
+                .unwrap()
+                .into_iter()
+                .rfind(|path| super::super::ledger::is_segment(path))
+                .unwrap();
+            prop_assert!(crate::vfs::Vfs::size(&fs, &last).unwrap() >= roll);
+        }
     }
 }

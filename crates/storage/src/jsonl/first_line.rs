@@ -12,11 +12,16 @@
 //! doubles, so a line of any length costs at most twice its own bytes.
 
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use kernel::consts_external::{LogVersion, readable_log_v};
+use kernel::{AxCode, AxError};
+
+use crate::error::{StorageError, io_err};
 use crate::vfs::Vfs;
 
-use super::ledger::u64_count;
+use super::ledger::{JsonlLedger, u64_count};
+use super::open::unversioned;
 
 /// The first window a reader of a line of unknown length asks for; each
 /// next window is twice the last. `jsonl::tail` reads backwards by the
@@ -46,6 +51,63 @@ pub(crate) fn first_line(vfs: &dyn Vfs, path: &Path) -> io::Result<Option<Vec<u8
         }
         line.extend_from_slice(&chunk);
         window = window.saturating_mul(2);
+    }
+}
+
+impl JsonlLedger {
+    /// Direction-aware version refusal, before any repair or parse
+    /// (never a partial read of a newer ledger).
+    pub(super) fn probe_version(&mut self, segments: &[PathBuf]) -> Result<(), StorageError> {
+        let Some(first) = segments.first() else {
+            return Ok(());
+        };
+        let Some(first_line) =
+            first_line(self.vfs.as_ref(), first).map_err(io_err("read segment", first))?
+        else {
+            // Empty or torn-before-first-line segment: version unknowable;
+            // tail recovery decides what remains.
+            return Ok(());
+        };
+        // A mangled first line in a single-segment ledger is tail damage:
+        // it carries no version information, and tail recovery owns it.
+        // With more segments behind it the same damage is non-tail and
+        // must refuse instead (`crates/storage/spec/Jsonl.lean` §8-1).
+        let probed = serde_json::from_slice::<serde_json::Value>(&first_line)
+            .ok()
+            .and_then(|value| value.get("v").and_then(serde_json::Value::as_u64));
+        let v = match probed {
+            Some(v) => v,
+            None if segments.len() > 1 => {
+                return Err(StorageError::Envelope {
+                    path: first.clone(),
+                    line: 1,
+                    source: AxError::failure(
+                        AxCode::InvalidArgs,
+                        "probe ledger version",
+                        "first line is not a version-bearing record",
+                    )
+                    .with_recovery(
+                        "restore this segment from its checkpoint commit, then run \
+                         `sprawling replay <ledger-dir>`: line 1 of every segment carries `v`",
+                    ),
+                });
+            }
+            None => return Ok(()),
+        };
+        match readable_log_v(v) {
+            // An older ledger opens: the history is append-only and the
+            // lines an earlier build wrote are still its history.
+            LogVersion::Current | LogVersion::Older => Ok(()),
+            LogVersion::Ahead => Err(StorageError::VersionAhead {
+                path: first.clone(),
+                v,
+            }),
+            LogVersion::NotAVersion => Err(StorageError::Envelope {
+                path: first.clone(),
+                line: 1,
+                source: unversioned(v),
+            }),
+        }
     }
 }
 

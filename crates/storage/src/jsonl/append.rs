@@ -57,7 +57,7 @@ impl JsonlLedger {
         let mut prev = self.prev;
         let mut cur_path = self.seg_path.clone();
         let mut cur_len = self.seg_len;
-        let mut writes: Vec<(PathBuf, Vec<u8>)> = Vec::new();
+        let mut writes: Vec<(PathBuf, u64, Vec<u8>)> = Vec::new();
         let mut created: Vec<PathBuf> = Vec::new();
         let mut records = Vec::with_capacity(drafts.len());
 
@@ -86,8 +86,10 @@ impl JsonlLedger {
             let mut terminated = line;
             terminated.push(b'\n');
             match writes.last_mut() {
-                Some((path, buffer)) if *path == cur_path => buffer.extend_from_slice(&terminated),
-                _ => writes.push((cur_path.clone(), terminated)),
+                Some((path, _, buffer)) if *path == cur_path => {
+                    buffer.extend_from_slice(&terminated);
+                }
+                _ => writes.push((cur_path.clone(), cur_len, terminated)),
             }
             cur_len = cur_len.saturating_add(line_len);
         }

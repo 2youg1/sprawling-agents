@@ -62,6 +62,14 @@ impl crate::vfs::Vfs for LosesRoadmap {
     fn append(&mut self, path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
         self.0.append(path, bytes)
     }
+    fn write_at(
+        &mut self,
+        path: &std::path::Path,
+        offset: u64,
+        bytes: &[u8],
+    ) -> std::io::Result<()> {
+        self.0.write_at(path, offset, bytes)
+    }
     fn truncate(&mut self, path: &std::path::Path, len: u64) -> std::io::Result<()> {
         self.0.truncate(path, len)
     }

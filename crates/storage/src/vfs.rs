@@ -53,6 +53,13 @@ pub(crate) trait Vfs: Send {
     fn read_at(&self, path: &Path, offset: u64, len: u64) -> io::Result<Vec<u8>>;
     /// Creates the file when absent.
     fn append(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()>;
+    /// Writes `bytes` at `offset`, over what is there and past the end
+    /// when they run beyond it; creates the file when absent. The writer
+    /// of a preallocated segment writes here, at the end of its records
+    /// rather than at the end of the file (storage D31).
+    fn write_at(&mut self, path: &Path, offset: u64, bytes: &[u8]) -> io::Result<()>;
+    /// Sets the length of `path`: cuts it, or extends it with zero bytes
+    /// (`File::set_len` on every platform).
     fn truncate(&mut self, path: &Path, len: u64) -> io::Result<()>;
     fn sync_data(&mut self, path: &Path) -> io::Result<()>;
     /// Atomic replace; durability of the new entry still needs sync_dir.
