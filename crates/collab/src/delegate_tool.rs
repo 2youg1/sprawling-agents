@@ -267,7 +267,8 @@ impl Tool for DelegateTool {
                 "the desk was left locked by a thread that died",
             )
             .with_recovery(
-                "end this run and resume it: the delegation desk cannot be reached again \n                 inside a process where a thread died holding it",
+                "end this run and resume it: the delegation desk cannot be reached again \
+                 inside a process where a thread died holding it",
             )
         })?;
         let accepted = desk.ask(work)?;
@@ -278,7 +279,7 @@ impl Tool for DelegateTool {
         );
         out.insert(
             "starts".to_owned(),
-            Value::String("when this turn settles".to_owned()),
+            Value::String("now: the city starts it while this run goes on".to_owned()),
         );
         Ok(ToolOutcome {
             result: Payload::new(out)?,

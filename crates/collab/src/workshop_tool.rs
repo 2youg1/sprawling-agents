@@ -50,7 +50,8 @@ pub struct WorkshopDesk {
 impl WorkshopDesk {
     /// `joined` is what the room's earlier runs got back and `handed` what
     /// it already handed down. Both outlive one run because the nodes do:
-    /// a child starts after its parent froze.
+    /// a child may still work, and hand back, after the run that asked
+    /// for it is over.
     #[must_use]
     pub fn new(who: String, joined: FanIn, handed: BTreeSet<NodeId>) -> WorkshopDesk {
         WorkshopDesk {
@@ -85,7 +86,8 @@ impl WorkshopDesk {
                 "this run already laid one out",
             )
             .with_recovery(
-                "one graph per session; add the work to the next session's graph, or hand a                  single extra piece down with `delegate`",
+                "one graph per session; add the work to the next session's graph, or hand a \
+                 single extra piece down with `delegate`",
             ));
         }
         let done: BTreeSet<NodeId> = self
@@ -352,7 +354,8 @@ impl Tool for WorkshopTool {
                 out.insert(
                     "starts".to_owned(),
                     Value::String(
-                        "`handed` when this turn settles; `waiting` once its dependencies hand                          back and a later session lays this graph out again"
+                        "`handed` now, while this run goes on; each of `waiting` once its \
+                         dependencies hand back, unless this run ends cancelled or failed"
                             .to_owned(),
                     ),
                 );
