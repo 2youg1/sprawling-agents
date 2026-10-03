@@ -428,21 +428,23 @@ theorem tf1_turn_at_most_two (t : Nat) (calls : List Effect) (h : writes calls �
     barriers (tf1Turn t calls) ≤ 2 := by
   rw [tf1_turn_barriers]; omega
 
-/-! ## 回合以一道屏障收尾（Rust 今天的形状）
+/-! ## 回合在 run 写行的两处各付一道屏障（Rust 今天的形状）
 
-`runtime::turn` 的 `Journal` 只活一个回合：回合把 `TurnReport` 交给 run 时要交出全部 ref，而 run 在两个回合之间还要自己追加记录（`crates/runtime/src/run/lifecycle.rs`），所以 Rust 在回合的 `record` 处多付一道屏障，不把没落盘的记录带进下一回合。多一道屏障只会让记录更早落盘：下面证明前三组性质原样成立，屏障数是 `2 + 写调用数`。把这道屏障并进下一回合的 `model_called` 屏障，要让 run 把攒下的记录交给下一个回合，并让 run 自己的那几行也走同一个门。 -/
+`runtime::turn` 的 `Journal` 只活一个回合，而 run 在回合的相与相之间还直接追加自己的行（`crates/runtime/src/run/lifecycle.rs`：组装之后的 `prompt_shape_compared`，模型回答之后、工具波之前的 `checkpoint_committed`）。回合若把记录留到那之后，账本的 seq 就不再是追加的次序，所以 Rust 在每个相交还给 run 之前把攒下的记录落盘：`model_returned` 自己付一道屏障，回合收尾再付一道（组装之后那道只在 run 的第一回合有 `prompt_assembled` 时才真去碰账本）。多出的屏障只会让记录更早落盘：下面证明前三组性质原样成立，屏障数是 `3 + 写调用数`，只读调用仍然一道也不加。回到模型里的 `1 + 写调用数`，要让 run 自己的行也经回合的账本门追加，让攒下的记录跨过相与回合。 -/
 
-/-- Rust 的回合：TF1 的回合，再加收尾的一道屏障。 -/
-def closedTurn (t : Nat) (calls : List Effect) : List Step := tf1Turn t calls ++ [.barrier]
+/-- Rust 的回合：`model_returned` 之后与回合收尾各一道屏障。 -/
+def closedTurn (t : Nat) (calls : List Effect) : List Step :=
+  [.append (.modelCalled t), .barrier, .boundary, .append (.modelReturned t), .barrier] ++
+    wave tf1Call t 0 calls ++ [.barrier]
 
 theorem closed_run_guarded (t p : Nat) (ws : List (List Effect)) :
     guarded p (run closedTurn t ws) = true := by
   induction ws generalizing t p with
   | nil => simp [run, guarded]
   | cons w ws ih =>
-    simp [run, closedTurn, tf1Turn, guarded_append, guarded, tf1_wave_guarded, ih]
+    simp [run, closedTurn, guarded_append, guarded, tf1_wave_guarded, ih]
 
-/-- 收尾屏障之下，对外效果之前此前追加的每条记录仍都已落盘。 -/
+/-- 两处屏障之下，对外效果之前此前追加的每条记录仍都已落盘。 -/
 theorem closed_effect_after_durability (ws : List (List Effect)) (done rest : List Step) (v : Step)
     (h : done ++ v :: rest = run closedTurn 0 ws) (hv : v.visible = true) :
     (exec State.empty done).pending = [] ∧ (exec State.empty done).durable = appended done := by
@@ -459,10 +461,10 @@ theorem closed_run_intentFirst (t : Nat) (seen : List CallId) (ws : List (List E
   induction ws generalizing t seen with
   | nil => simp [run, intentFirst, Step.writes, Step.intents]
   | cons w ws ih =>
-    simp [run, closedTurn, tf1Turn, intentFirst_append, intentFirst, Step.writes, Step.intents,
+    simp [run, closedTurn, intentFirst_append, intentFirst, Step.writes, Step.intents,
       tf1_wave_intent_first, ih]
 
-/-- 收尾屏障之下，任一条写动手时它的 `tool_called` 仍已在盘上。 -/
+/-- 两处屏障之下，任一条写动手时它的 `tool_called` 仍已在盘上。 -/
 theorem closed_write_intent_durable (ws : List (List Effect)) (done rest : List Step) (c : CallId)
     (h : done ++ .act c .write :: rest = run closedTurn 0 ws) :
     Record.toolCalled c ∈ (exec State.empty done).durable := by
@@ -475,15 +477,17 @@ theorem closed_write_intent_durable (ws : List (List Effect)) (done rest : List 
 
 theorem closed_records_match_reference (t : Nat) (ws : List (List Effect)) :
     appended (run closedTurn t ws) = appended (run refTurn t ws) := by
-  rw [← tf1_records_match_reference]
   induction ws generalizing t with
   | nil => rfl
   | cons w ws ih =>
-    simp only [run, closedTurn, appended, List.filterMap_append] at ih ⊢
+    simp only [run, closedTurn, refTurn, appended, List.filterMap_append] at ih ⊢
     rw [ih]
+    have := wave_records t 0 w
+    simp only [appended] at this
+    rw [this]
     simp [Step.appended]
 
-/-- 收尾屏障之下，盘上的记录仍是参照次序追加记录的前缀。 -/
+/-- 两处屏障之下，盘上的记录仍是参照次序追加记录的前缀。 -/
 theorem closed_durable_is_reference_prefix (ws : List (List Effect)) (done rest : List Step)
     (h : done ++ rest = run closedTurn 0 ws) :
     (exec State.empty done).durable <+: appended (run refTurn 0 ws) := by
@@ -491,10 +495,10 @@ theorem closed_durable_is_reference_prefix (ws : List (List Effect)) (done rest 
   rw [h, closed_records_match_reference] at this
   exact this
 
-/-- Rust 的一个回合付 `2 + 写调用数` 道屏障（`closed_turn_barriers`）；`tf1_turn_barriers` 的 `1 + 写调用数` 要等收尾屏障并进下一回合。 -/
+/-- Rust 的一个回合付 `3 + 写调用数` 道屏障；`tf1_turn_barriers` 的 `1 + 写调用数` 要等 run 的行也走回合的账本门。 -/
 theorem closed_turn_barriers (t : Nat) (calls : List Effect) :
-    barriers (closedTurn t calls) = 2 + writes calls := by
-  have := tf1_turn_barriers t calls
+    barriers (closedTurn t calls) = 3 + writes calls := by
+  have := tf1_wave_barriers t 0 calls
   simp only [barriers] at this ⊢
   simp [closedTurn, this]
   omega

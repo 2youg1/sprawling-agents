@@ -315,7 +315,9 @@ than any diagram of boxes.
    not a logging preference. A tool that only reads (`Effect::Read`) runs
    before its `tool_called` is durable; every record of a wave is durable
    before the next outside effect — a model call, a write, the run's
-   freeze — and a write's `tool_called` is durable before the write runs
+   freeze — and before the run appends a line of its own between two
+   phases, so seq stays the order of appending; a write's `tool_called`
+   is durable before the write runs
    (runtime D24, `crates/runtime/spec/Turn/Durability.lean`).
 5. **`runtime::prefix` assembles the frozen prefix** in four segments —
    city, building, resident, run — from `city::spine_files`, `city::policy`
