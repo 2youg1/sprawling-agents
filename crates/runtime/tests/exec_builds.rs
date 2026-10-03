@@ -117,7 +117,18 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
     // the table, not in the answered call. The harvest ends at the build's
     // exit; its bound keeps the short window and the harvest together
     // (160 s) under the suite's three-minute limit, so a build that hangs
-    // fails here with its own message.
+    // fails here with its own message. A build that settles between the
+    // window closing and the call's own harvest is answered in this same
+    // call, as its `background` row, and the table is then empty.
+    if result.get("exit_code").is_none()
+        && let Some(code) = result["background"]
+            .as_array()
+            .and_then(|rows| rows.first())
+            .and_then(|row| row.get("exit_code"))
+            .cloned()
+    {
+        result["exit_code"] = code;
+    }
     if result.get("exit_code").is_none() {
         for _ in 0..1_500 {
             let done = backlog.harvest(run).unwrap();
