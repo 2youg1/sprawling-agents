@@ -72,11 +72,11 @@ pub use library::{Installed, Placed, PlannedInstall, SHIPPED_SECTION, Slot, shel
 pub use library::{install as install_skill, plan_install as plan_skill_install};
 pub use neighbourhood::{Neighbour, Neighbourhood, Occupancy};
 pub use neighbours_tool::NeighboursTool;
+pub use policy::write_rules_against;
 pub use policy::{BuildingRules, DomainReach, ModelPool, RULES_FILE, RulesCache};
 pub use policy::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
 pub use policy::{UserBrowser, UserBrowserEndpoint};
 pub use policy::{agents_path, city_agents_path, evaluate, load, rules_path};
-pub use policy::{write_rules, write_rules_against};
 pub use resident::{Dossier, Identity, Resident, urbanite_path};
 pub use room::all as rooms;
 pub use room::claim as claim_room;

@@ -184,9 +184,11 @@ fn a_run_is_offered_the_browser_the_worker_was_handed() {
             idem: idem(b"create"),
         })
         .unwrap();
-    city::write_rules(
+    city::write_rules_against(
         dir.path(),
         &Address::parse(LAB).unwrap(),
+        &std::fs::read_to_string(city::rules_path(dir.path(), &Address::parse(LAB).unwrap()))
+            .unwrap_or_default(),
         "confidential = false\nwrite = \"everything\"\nbrowser = true\n",
     )
     .unwrap();

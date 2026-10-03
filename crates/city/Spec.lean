@@ -272,6 +272,7 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 | D20 | User 加 skill 只经 `InstallSkill` 一扇门，自带的 skill 编进二进制 | `crates/city/spec/Library/Install.lean` |
 | D21 | JOB.md 用 `<from>` 写明交活的人，任务与目标转义后放进各自的节 | `crates/city/spec/SpineFiles.lean` |
 | D22 | `City.md` 写明哪种形状是 User 的话，信与居民交下的活只带那个居民的身份 | `crates/city/spec/SpineFiles.lean` |
+| D23 | `rules` 工具只读：说明不提供它恒拒的操作，也不留写面 | `crates/city/spec/RulesTool.lean` |
 -/
 
 /-! D8 定规：拒词的恢复语归写拒词的那一处

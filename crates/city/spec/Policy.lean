@@ -40,7 +40,7 @@ impl BuildingRules {
 }
 pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError>;
 pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError>;
-pub fn write_rules(city_root: &Path, addr: &Address, text: &str) -> Result<BuildingRules, AxError>;
+// 楼规唯一的写门 write_rules_against 见 §8-34
 pub fn rules_path(city_root: &Path, addr: &Address) -> PathBuf;
 pub struct RulesCache { /* city_root、按楼存的 (mtime, len) 与规则 —— 私有 */ }
 impl RulesCache {
@@ -65,7 +65,7 @@ impl RulesCache {
 - **执行点与缺口要分清**：provider 路径由 `endpoint` 的 confidential 拒守住；Agent 自己发起的出网是否被拦，取决于 exec 所在的那一臂 `runtime::tools::exec::Confinement` 是否承诺关网（`Guarantee::Network`，每一臂在工具描述里说出自己不承诺什么），浏览器则没有拦截处。判定在这里，拦截不在——不承诺关网的地方不要说「出网已管住」。
 - **`usersbrowser` 一键同时是开关与地址**：值 `"ws://127.0.0.1:<port>/session"` 启用并声明地址，`true` 启用而地址未定（工具每次调用都得到门的问题），absent／`false` 即无此工具。**confidential 楼写这一键即拒**（`E_CONFIG_INVALID`）——附着读的是那个人浏览器里全部登录态，本楼的隔离在那一刻失效。地址的**语法**（`ws://`、主机形状）在此读一次并把 `url`／`host` 一起交出；**loopback 与否是 `kernel::gate::attach` 的政策**，语法不替政策作答。
 - **`browser` 与 `usersbrowser` 是两个键**：前者是城自己拉起的浏览器（profile 按楼隔离），后者是人已经开着的那个（人的真 profile）。`browser` 不是 `usersbrowser` 的前缀截断——TOML 的键是文法给出的整体，两个设置因此互不误读。
-- **`write_rules` 先求值再落盘**：一份写到一半就不再求值的治理文档会把它那栋楼一起带走。且**整份文档才是单位**：confidential 楼不得列域名，故两行可以各自合法而合在一起非法。
+- **`write_rules_against` 先求值再落盘**：一份写到一半就不再求值的治理文档会把它那栋楼一起带走。且**整份文档才是单位**：confidential 楼不得列域名，故两行可以各自合法而合在一起非法。
 -/
 
 /-!
@@ -142,7 +142,7 @@ pub enum CitySetting { KeepWarm(KeepWarm), Effort(Effort) }
 pub fn write_city_setting(city_root: &Path, setting: CitySetting) -> Result<(), AxError>;
 ```
 
-- **楼规：先求值，再守基线。** `write_rules_against` 先 `evaluate(addr, text)`，拒了就什么都不写；通过之后经 `document::edit_against` 落盘，文件已经不是 `base` 就拒 `E_VERSION_CONFLICT`。`write_rules` 不带基线，是 `rules` 工具 `propose` 一臂的写面；这一臂在效果层恒被拒（§8-2b，D1 定规），run 到不了它，所以楼规在生产里只经 `write_rules_against` 落盘（`accounting::worker::commanding::configure`，人经 `ConfigureBuilding`）。两扇门共用同一个求值器与同一个落盘函数，所以「盘上的楼规永远读得懂」只有一条规则。
+- **楼规：先求值，再守基线。** `write_rules_against` 先 `evaluate(addr, text)`，拒了就什么都不写；通过之后经 `document::edit_against` 落盘，文件已经不是 `base` 就拒 `E_VERSION_CONFLICT`。它是楼规唯一的写门（`accounting::worker::commanding::configure`，人经 `ConfigureBuilding`）；`rules` 工具只读，没有写面（§8-2b，D23），所以「盘上的楼规永远读得懂」只有一条规则。
 - **城一层：两个键各一臂。** `write_city_setting` 经 `config_layers::write` 那一个读改写入口改城自己的 `CONFIG.toml`：`KeepWarm` 写 `[cache] keep_warm`，`Effort` 写 `[model] effort`；同一文件里别的键原样留着，写出的字节先过 `ConfigLayer::parse` 才落盘。城一层不是 session 的记录处，所以这里写 `[model] effort` 不碰 `[model] name`。
 - 验收：`config_layers::city_layer` 的 `a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it`；楼规两道判定的组合在 accounting 的 `a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing` 里经真实命令观察。
 -/

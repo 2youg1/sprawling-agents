@@ -95,9 +95,11 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
             idem: idem(b"create"),
         })
         .unwrap();
-    city::write_rules(
+    city::write_rules_against(
         dir.path(),
         &Address::parse(LAB).unwrap(),
+        &std::fs::read_to_string(city::rules_path(dir.path(), &Address::parse(LAB).unwrap()))
+            .unwrap_or_default(),
         "confidential = false\nwrite = \"everything\"\ndesktop = true\n",
     )
     .unwrap();

@@ -88,9 +88,10 @@ fn a_building_whose_rules_will_not_read_is_reported_not_skipped() {
     let dir = tempfile::tempdir().unwrap();
     crate::assembly::init_city(dir.path()).unwrap();
     city::create_building(dir.path(), &lab(), city::BuildingTemplate::Minimal).unwrap();
-    city::write_rules(
+    city::write_rules_against(
         dir.path(),
         &lab(),
+        &std::fs::read_to_string(city::rules_path(dir.path(), &lab())).unwrap_or_default(),
         "confidential = false\nwrite = \"everything\"\nbrowser = true\n",
     )
     .unwrap();
@@ -228,9 +229,10 @@ fn doctor_with_a_city_names_the_building_on_the_screen() {
     let dir = tempfile::tempdir().unwrap();
     crate::assembly::init_city(dir.path()).unwrap();
     city::create_building(dir.path(), &lab(), city::BuildingTemplate::Minimal).unwrap();
-    city::write_rules(
+    city::write_rules_against(
         dir.path(),
         &lab(),
+        &std::fs::read_to_string(city::rules_path(dir.path(), &lab())).unwrap_or_default(),
         "confidential = false\nwrite = \"everything\"\nbrowser = true\n",
     )
     .unwrap();

@@ -106,9 +106,12 @@ pub(crate) fn raise(worker: &mut accounting::worker::RunWorker, addr: &str, temp
         .unwrap();
 }
 
-/// Writes the building's own `RULES.toml`, as a person would.
+/// Writes the building's own `RULES.toml` through the door the User's
+/// page writes it through.
 pub(crate) fn rules(dir: &Path, building: &str, text: &str) {
-    city::write_rules(dir, &Address::parse(building).unwrap(), text).unwrap();
+    let addr = Address::parse(building).unwrap();
+    let base = std::fs::read_to_string(city::rules_path(dir, &addr)).unwrap_or_default();
+    city::write_rules_against(dir, &addr, &base, text).unwrap();
 }
 
 /// Gives the room at `addr` a resident.
