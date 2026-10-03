@@ -7,6 +7,8 @@
 # storage::digest_cache
 
 规定 `digest_cache`（`crates/storage/src/` 下同名的文件）。内容哈希→摘要 Artifact；同哈希终生一次。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与模块旁的测试守住（`crates/storage/Spec.lean` §16）。
 -/
 
 /-!

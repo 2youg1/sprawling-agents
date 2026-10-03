@@ -7,6 +7,8 @@
 # storage::jsonl
 
 规定 `jsonl`、`jsonl::ledger`、`jsonl::open`、`jsonl::boundary`、`jsonl::first_line`、`jsonl::reading`、`jsonl::append`、`jsonl::unwind`、`jsonl::tail`（`crates/storage/src/` 下同名的文件）。kernel Ledger 的落盘实现：组提交、断尾、版本方向判定、分段滚动、写者锁，以及开账本时按摘要证明末段的已验证前缀。逐行检查住 `crates/storage/spec/Jsonl/Verify.lean`，屏障状态住 `crates/storage/spec/Jsonl/Barrier.lean`。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与模块旁的测试守住（`crates/storage/Spec.lean` §16）。逐行检查、屏障与预分配段的性质是被证明的，住 `crates/storage/spec/Jsonl/Verify.lean`、`crates/storage/spec/Jsonl/Barrier.lean` 与 `crates/storage/spec/Jsonl/Preallocate.lean`。
 -/
 
 /-!

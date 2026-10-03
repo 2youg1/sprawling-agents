@@ -9,6 +9,8 @@ import crates.storage.spec.Checkpoint.Concurrent
 # storage::checkpoint
 
 规定 `checkpoint`、`checkpoint::base`、`checkpoint::commit`、`checkpoint::scan`、`checkpoint::scan::pathspec`、`checkpoint::scan::stage_filter`（`crates/storage/src/` 下同名的文件）；`checkpoint::opening` 的写者 index 住 `crates/storage/spec/Checkpoint/Concurrent.lean` §8-39，`checkpoint::provenance` 住 `crates/storage/spec/Checkpoint/Provenance.lean` §8-17、§8-18。git2 波前 add -A、波后补记、staged diff 的凭证扫描、重启后的比较基准，以及从检查点取回一个文件。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与模块旁的测试守住（`crates/storage/Spec.lean` §16）。检查点的并发性质是被证明的，住 `crates/storage/spec/Checkpoint/Concurrent.lean`。
 -/
 
 /-!
