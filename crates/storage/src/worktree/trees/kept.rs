@@ -10,6 +10,7 @@ use super::super::lease::{FileWork, WorktreeLease};
 use super::super::name::WorktreeName;
 use super::super::weight::measure;
 use super::Worktrees;
+use super::open_tree;
 use crate::error::StorageError;
 
 /// Why a tree is locked: a run holds it.
@@ -202,8 +203,7 @@ pub(super) fn restore(
         op,
         detail: format!("{branch}: {err}"),
     };
-    let repo = git2::Repository::open_from_worktree(tree)
-        .map_err(|err| refuse("open a kept worktree", err))?;
+    let repo = open_tree(tree).map_err(|err| refuse("open a kept worktree", err))?;
     let wanted = format!("refs/heads/{branch}");
     let pointed = repo
         .find_reference("HEAD")

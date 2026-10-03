@@ -20,6 +20,7 @@ use super::super::name::WorktreeName;
 use super::super::weight::Weight;
 use super::Worktrees;
 use super::kept::restore;
+use super::open_tree;
 use crate::error::StorageError;
 
 /// The stock's id: its registration, its directory under the tree home
@@ -275,8 +276,7 @@ impl Worktrees {
 /// data of every entry whose blob and mode are unchanged, and writing the
 /// index after the checkout's last file leaves no entry racily clean.
 fn cache_trees(tree: &git2::Worktree) -> Result<(), StorageError> {
-    let repo = git2::Repository::open_from_worktree(tree)
-        .map_err(|err| git("open the stock", STOCK, &err))?;
+    let repo = open_tree(tree).map_err(|err| git("open the stock", STOCK, &err))?;
     let head = repo
         .head()
         .and_then(|head| head.peel_to_tree())

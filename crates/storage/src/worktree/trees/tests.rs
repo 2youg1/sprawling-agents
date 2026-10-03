@@ -365,3 +365,34 @@ fn a_merge_keeps_the_persons_uncommitted_edit_and_names_it_in_the_refusal() {
     assert_eq!(err.code(), &kernel::AxCode::VersionConflict);
     assert!(err.to_string().contains("lab/notes.md"), "{err}");
 }
+
+/// A User's global, XDG and system git files can vanish between libgit2's
+/// look and its read on a fresh machine or a runner; the city's handle
+/// reads its own repository's file and nothing else, so neither the
+/// city's trees nor the stock can fail on a file the city never owned.
+#[test]
+fn the_citys_git_reads_its_repository_config_and_no_file_of_the_users() {
+    let dir = tempfile::tempdir().unwrap();
+    let trees = city(dir.path());
+    let lease = trees.claim(&name("node-1"), &[]).unwrap();
+    let tree = trees.repo.find_worktree(lease.name().as_str()).unwrap();
+    let handles = [
+        trees.repo.config().unwrap(),
+        super::open_tree(&tree).unwrap().config().unwrap(),
+    ];
+    let levels: std::collections::BTreeSet<String> = handles
+        .iter()
+        .flat_map(|config| {
+            let mut levels = Vec::new();
+            let mut entries = config.entries(None).unwrap();
+            while let Some(entry) = entries.next() {
+                levels.push(format!("{:?}", entry.unwrap().level()));
+            }
+            levels
+        })
+        .collect();
+    assert_eq!(
+        levels,
+        std::collections::BTreeSet::from(["Local".to_owned()])
+    );
+}

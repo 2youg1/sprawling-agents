@@ -10,6 +10,7 @@ use std::path::Path;
 
 use kernel::ByteLen;
 
+use super::trees::open_tree;
 use crate::error::StorageError;
 use crate::reserved::outside_reserved;
 
@@ -44,8 +45,7 @@ pub(super) fn written(tree: &git2::Worktree) -> Result<Written, StorageError> {
         op,
         detail: format!("{}: {err}", tree.path().display()),
     };
-    let repo = git2::Repository::open_from_worktree(tree)
-        .map_err(|err| refuse("open a new worktree", err))?;
+    let repo = open_tree(tree).map_err(|err| refuse("open a new worktree", err))?;
     let index = repo
         .index()
         .map_err(|err| refuse("read a new worktree's index", err))?;

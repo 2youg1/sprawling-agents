@@ -382,6 +382,11 @@ impl Worktrees {
     }
 }
 
+/// Opens the repository of one of the city's trees.
+pub(super) fn open_tree(tree: &git2::Worktree) -> Result<git2::Repository, git2::Error> {
+    git2::Repository::open_from_worktree(tree)
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
