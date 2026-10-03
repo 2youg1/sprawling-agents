@@ -46,8 +46,10 @@ pub struct ChatRequest<'a> { pub model: String, pub max_tokens: Option<Ceiling>,
                          pub breakpoint: MessageBreakpoint }
 impl ChatRequest<'_> { pub fn carries_breakpoint(&self, index: usize) -> bool; }  // 该下标的消息是否带断点：Tail 且为末条
 pub struct ModelRequest<'a> { pub policy: BuildingPolicy, pub segments: [B3Hash; 4], pub chat: ChatRequest<'a> }
+pub enum CacheCount { Reported(Tokens), Unreported }  // 缓存读／写的一个数：报了多少，或没报（D36）
+impl CacheCount { pub fn reported(self) -> Option<Tokens>; pub fn or_zero(self) -> Tokens; }
 pub struct ModelUsage { pub input_tokens: Tokens, pub output_tokens: Tokens,
-                        pub cache_read_tokens: Tokens, pub cache_write_tokens: Tokens,
+                        pub cache_read_tokens: CacheCount, pub cache_write_tokens: CacheCount,
                         pub dialect: Option<DialectKind> }
 pub struct ChatResponse { pub content: Vec<ContentBlock>, pub stop: StopReason, pub usage: ModelUsage }
 pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError>;  // model_returned 载荷的唯一成形处
@@ -55,7 +57,7 @@ pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError>;  /
 
 `ModelUsage.input_tokens` 在每种兼容格式下都是**这次请求的全部输入 token，含缓存读与缓存写**。OpenAI 两个兼容格式本来就这样报；Anthropic 的 `input_tokens` 只数未缓存的部分，由它的解析器加上两个缓存数。选这个口径是因为上下文量表读的正是它（一次请求占了多大的窗口），而按价单结算时用 `input_tokens - cache_read_tokens - cache_write_tokens` 求未缓存部分只需一次减法。`dialect` 记下是哪个兼容格式报的；脚本模型与测试不经兼容格式，记 `None`。
 
-账本只追加：`model_returned.usage` 在写时带 `"v": 1`（本口径）与 `dialect`，旧行字节不改。读者一律经 `ModelUsage` 的 `Deserialize` 读这一格，版本换算只在那里做：没有 `v` 的旧行没有兼容格式可查，当 `cache_read_tokens + cache_write_tokens > input_tokens` 时它只可能是 Anthropic 的旧口径（全部输入不会小于其中的缓存部分），读成三者之和；否则照写的读。两种旧口径在没有缓存时一致，所以照读只会把「有缓存、且缓存部分不超过未缓存部分」的 Anthropic 旧行读小，这种行在带长前缀的会话里少见。
+账本只追加：`model_returned.usage` 在写时带 `"v": 1`（本口径）与 `dialect`，旧行字节不改。读者一律经 `ModelUsage` 的 `Deserialize` 读这一格，版本换算只在那里做：没有 `v` 的旧行没有兼容格式可查，当 `cache_read_tokens + cache_write_tokens > input_tokens` 时它只可能是 Anthropic 的旧口径（全部输入不会小于其中的缓存部分），读成三者之和；否则照写的读。两种旧口径在没有缓存时一致，所以照读只会把「有缓存、且缓存部分不超过未缓存部分」的 Anthropic 旧行读小，这种行在带长前缀的会话里少见。缓存两数在行里是可缺的键：`Unreported` 不写这个键，读时缺键与 `null` 都读作 `Unreported`，在场的 `0` 读作 `Reported(0)`（D36）；换算旧口径时 `Unreported` 按 0 计，因为这样的行在本格式出现之前都写着数。
 
 浮点禁令只有一个家：`Payload::new`（及其 `Deserialize`）。wire 面把 `serde_json::Value` 转成
 `Payload` 即受判，故 seam 不再另设判定原语，拒绝理由与错误码也只有一处。
@@ -211,6 +213,17 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 - **一个标签，不是一个模型。** 二进制里不带任何模型（D18）：人接一个端点、为 `Ocr` 选一个能读图的模型，城的 OCR 工具（X6）按这一次选择调用它，与转写读 `Transcribe` 是同一个机制（`crates/wire/Spec.lean` §8-27）。没有选时（或选中的端点已经摘下、机密楼的端点不在运行这座城的机器上），这栋楼的 run 的工具表里没有 `ocr`，模型看不到一件用不了的工具；`gateway::Recogniser::absent()` 是这种城里的识别器，每次识别都答 `E_TOOL_UNAVAILABLE`。两条路都不回落到 `Main`——一个只会读字的模型被递上一张图，答的是它猜的东西。
 - **先有登记位，调用方随 X6 来。** 这条与本枚举「有人问才长」的规矩相违，理由是线上形状：`ModelTag` 在线上，加一个值要进位，本批（`WIRE_V` 45）一次带上，X6 落地时不再为它另进一位（`crates/wire/Spec.lean` D1）。在 X6 落地之前，页面不画这一行（client/Spec.lean 的模型表照旧三行）。
 - `ALL` 的顺序就是设置页给出它们的顺序，`Ocr` 在最后。
+-/
+
+/-! D36 没报的缓存数是「没报」，不是 0
+
+**决定**：`ModelUsage` 的 `cache_read_tokens` 与 `cache_write_tokens` 是 `CacheCount`：`Reported(n)` 或 `Unreported`。兼容格式的解析器在 provider 没给这个字段（或给了 `null`）时记 `Unreported`；给了 `0` 记 `Reported(0)`。OpenAI chat 格式没有缓存写的位置，恒记 `Unreported`。账本行里 `Unreported` 不写这个键，旧行一律写着数，所以读旧行不变。按价单结算与上下文量表只做减法，经 `or_zero` 把没报读成没有缓存，结算口径不变；线上 `Used.cached`／`cache_write` 与页面经 `reported` 把没报读成「不知道」，页面写 lang.json 的「未知」字样而不是 0%。三个平台上记录、折叠、页面的行为相同，没有平台分支。
+
+**理由**：一个从不报缓存的 provider 与一个报了「零命中」的 provider 对用户是两件不同的事：前者的命中率不知道，后者的命中率是 0。把没报记成 0，页面就把「不知道」说成「全没命中」，用户会去查一个不存在的缓存问题。
+
+**被否**：①照旧记 0——就是上面的错；②在 `ModelUsage` 上另加一个「缓存报了没有」的布尔——读和写两个数时都得记得先看旗标，忘了就又读出 0，而枚举让没看旗标的读法写不出来；③`Option<Tokens>`——`None` 不说出它的意思，调用处会写成 `unwrap_or_default`。
+
+**重开参数**：某个兼容格式报了缓存读却不报总输入，使「缓存部分不超过总输入」不再成立。
 -/
 
 /-! D6 定规：请求借用会话与工具表，断点是请求的注记

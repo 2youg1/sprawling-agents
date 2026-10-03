@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
+use crate::budget::Tokens;
 use crate::error::AxCode;
 use crate::event::Payload;
 use crate::locator::{B3Hash, Locator};
@@ -179,5 +180,48 @@ fn an_unversioned_usage_row_reads_in_the_one_meaning() {
     assert_eq!(
         [read(anthropic_row), read(uncached_row), read(versioned_row)],
         [105, 10, 10]
+    );
+}
+
+#[test]
+fn a_cache_count_absent_from_a_row_reads_as_unreported_and_a_zero_stays_reported() {
+    let read = |row: serde_json::Value| {
+        let usage = serde_json::from_value::<ModelUsage>(row).unwrap();
+        (usage.cache_read_tokens, usage.cache_write_tokens)
+    };
+    let silent = serde_json::json!({ "input_tokens": 10, "output_tokens": 1, "v": 1 });
+    let null = serde_json::json!({
+        "input_tokens": 10, "output_tokens": 1, "v": 1,
+        "cache_read_tokens": null, "cache_write_tokens": null,
+    });
+    let zero = serde_json::json!({
+        "input_tokens": 10, "output_tokens": 1,
+        "cache_read_tokens": 0, "cache_write_tokens": 0,
+    });
+    assert_eq!(
+        [read(silent), read(null), read(zero)],
+        [
+            (CacheCount::Unreported, CacheCount::Unreported),
+            (CacheCount::Unreported, CacheCount::Unreported),
+            (
+                CacheCount::Reported(Tokens::new(0)),
+                CacheCount::Reported(Tokens::new(0))
+            ),
+        ]
+    );
+    let unreported = ModelUsage {
+        input_tokens: Tokens::new(10),
+        output_tokens: Tokens::new(1),
+        cache_read_tokens: CacheCount::Unreported,
+        cache_write_tokens: CacheCount::Reported(Tokens::new(2)),
+        dialect: None,
+    };
+    let row = serde_json::to_value(unreported).unwrap();
+    assert_eq!(
+        (
+            row.get("cache_read_tokens"),
+            serde_json::from_value::<ModelUsage>(row.clone()).unwrap()
+        ),
+        (None, unreported)
     );
 }

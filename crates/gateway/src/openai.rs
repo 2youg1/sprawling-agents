@@ -29,8 +29,8 @@
 //! asserted in tests.
 
 use kernel::{
-    AxCode, AxError, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort, ModelUsage,
-    Role, StopReason, Tokens,
+    AxCode, AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort,
+    ModelUsage, Role, StopReason, Tokens,
 };
 use serde_json::{Map, Value, json};
 
@@ -354,9 +354,9 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
     let usage = ModelUsage {
         input_tokens: tokens_or_zero(usage_value, "prompt_tokens", "response.usage")?,
         output_tokens: tokens_or_zero(usage_value, "completion_tokens", "response.usage")?,
-        cache_read_tokens: cache_read,
+        cache_read_tokens: CacheCount::Reported(cache_read),
         // No OpenAI wire slot: cache writes are not reported distinctly.
-        cache_write_tokens: Tokens::new(0),
+        cache_write_tokens: CacheCount::Reported(Tokens::new(0)),
         dialect: Some(DialectKind::OpenAi),
     };
     Ok(ChatResponse {
@@ -403,7 +403,7 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
         "usage": {
             "prompt_tokens": resp.usage.input_tokens.get(),
             "completion_tokens": resp.usage.output_tokens.get(),
-            "prompt_tokens_details": { "cached_tokens": resp.usage.cache_read_tokens.get() },
+            "prompt_tokens_details": { "cached_tokens": resp.usage.cache_read_tokens.reported() },
         },
     }))
 }

@@ -13,11 +13,58 @@ use serde::{Deserialize, Serialize};
 use crate::budget::Tokens;
 use crate::model::wire::DialectKind;
 
-/// Provider-reported token counts; absent wire fields read as zero.
+/// One cache count as a provider reported it: a number, or nothing at all.
+///
+/// A provider that never reports its cache and one that reports a zero
+/// hit are different facts to the User, so the two do not share a value
+/// (`crates/kernel/spec/Model.lean` D36). A stored row spells
+/// `Unreported` by leaving the key out; an absent key or `null` reads
+/// back as `Unreported`, a present `0` as `Reported(0)`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CacheCount {
+    Reported(Tokens),
+    #[default]
+    Unreported,
+}
+
+impl CacheCount {
+    /// The count when the provider gave one.
+    #[must_use]
+    pub const fn reported(self) -> Option<Tokens> {
+        match self {
+            CacheCount::Reported(tokens) => Some(tokens),
+            CacheCount::Unreported => None,
+        }
+    }
+
+    /// The count for arithmetic that subtracts the cached part from the
+    /// whole prompt (pricing, the context gauge): an unreported count is
+    /// read as nothing cached, the reading those sums had before the
+    /// distinction existed.
+    #[must_use]
+    pub const fn or_zero(self) -> Tokens {
+        match self {
+            CacheCount::Reported(tokens) => tokens,
+            CacheCount::Unreported => Tokens::new(0),
+        }
+    }
+}
+
+impl From<Option<Tokens>> for CacheCount {
+    fn from(count: Option<Tokens>) -> CacheCount {
+        match count {
+            Some(tokens) => CacheCount::Reported(tokens),
+            None => CacheCount::Unreported,
+        }
+    }
+}
+
+/// Provider-reported token counts.
 ///
 /// `input_tokens` is every prompt token of the request, cached or not,
 /// whichever dialect reported it; `cache_read_tokens` and
-/// `cache_write_tokens` are parts of it. `dialect` is `None` for a
+/// `cache_write_tokens` are parts of it, each [`CacheCount::Unreported`]
+/// when the provider gave no number. `dialect` is `None` for a
 /// count no provider wire produced (scripted models, tests).
 ///
 /// Serialised rows carry the meaning's version as `v`. A row without `v` was
@@ -29,8 +76,8 @@ use crate::model::wire::DialectKind;
 pub struct ModelUsage {
     pub input_tokens: Tokens,
     pub output_tokens: Tokens,
-    pub cache_read_tokens: Tokens,
-    pub cache_write_tokens: Tokens,
+    pub cache_read_tokens: CacheCount,
+    pub cache_write_tokens: CacheCount,
     pub dialect: Option<DialectKind>,
 }
 
@@ -45,8 +92,10 @@ const USAGE_MEANING: u8 = 1;
 struct UsageRow {
     input_tokens: Tokens,
     output_tokens: Tokens,
-    cache_read_tokens: Tokens,
-    cache_write_tokens: Tokens,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cache_read_tokens: Option<Tokens>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cache_write_tokens: Option<Tokens>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     v: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -58,8 +107,8 @@ impl From<ModelUsage> for UsageRow {
         UsageRow {
             input_tokens: usage.input_tokens,
             output_tokens: usage.output_tokens,
-            cache_read_tokens: usage.cache_read_tokens,
-            cache_write_tokens: usage.cache_write_tokens,
+            cache_read_tokens: usage.cache_read_tokens.reported(),
+            cache_write_tokens: usage.cache_write_tokens.reported(),
             v: Some(USAGE_MEANING),
             dialect: usage.dialect,
         }
@@ -79,9 +128,9 @@ impl TryFrom<UsageRow> for ModelUsage {
                 ));
             }
             None => {
-                let cached = row
-                    .cache_read_tokens
-                    .checked_add(row.cache_write_tokens)
+                let cached = CacheCount::from(row.cache_read_tokens)
+                    .or_zero()
+                    .checked_add(CacheCount::from(row.cache_write_tokens).or_zero())
                     .ok_or("usage row cache counts overflow a token count")?;
                 if cached > row.input_tokens {
                     row.input_tokens
@@ -95,8 +144,8 @@ impl TryFrom<UsageRow> for ModelUsage {
         Ok(ModelUsage {
             input_tokens,
             output_tokens: row.output_tokens,
-            cache_read_tokens: row.cache_read_tokens,
-            cache_write_tokens: row.cache_write_tokens,
+            cache_read_tokens: CacheCount::from(row.cache_read_tokens),
+            cache_write_tokens: CacheCount::from(row.cache_write_tokens),
             dialect: row.dialect,
         })
     }

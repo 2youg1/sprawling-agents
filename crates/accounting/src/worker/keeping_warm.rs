@@ -136,8 +136,8 @@ mod tests {
         ModelUsage {
             input_tokens: Tokens::new(3),
             output_tokens: Tokens::new(1),
-            cache_read_tokens: Tokens::new(4096),
-            cache_write_tokens: Tokens::new(0),
+            cache_read_tokens: kernel::CacheCount::Reported(Tokens::new(4096)),
+            cache_write_tokens: kernel::CacheCount::Reported(Tokens::new(0)),
             dialect: None,
         }
     }

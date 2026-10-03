@@ -111,7 +111,7 @@ pub(crate) fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<Va
 mod tests {
     use super::super::request::{request_wire, sample_request};
     use super::*;
-    use kernel::{AxCode, ContentBlock, ModelUsage, StopReason};
+    use kernel::{AxCode, CacheCount, ContentBlock, ModelUsage, StopReason};
     use kernel::{Payload, Tokens, ToolName};
     use proptest::prelude::*;
     use serde_json::{Map, json};
@@ -187,7 +187,10 @@ mod tests {
             "usage": { "input_tokens": 7, "output_tokens": 3 },
         });
         let resp = response_from_wire(DialectKind::Anthropic, &wire).unwrap();
-        assert_eq!(resp.usage.cache_read_tokens, Tokens::new(0));
+        assert_eq!(
+            resp.usage.cache_read_tokens,
+            CacheCount::Reported(Tokens::new(0))
+        );
         assert_eq!(resp.usage.input_tokens, Tokens::new(7));
     }
     /// Anthropic counts only the uncached input in `input_tokens`; the
@@ -241,8 +244,8 @@ mod tests {
             ModelUsage {
                 input_tokens: Tokens::new(i + r + write),
                 output_tokens: Tokens::new(o),
-                cache_read_tokens: Tokens::new(r),
-                cache_write_tokens: Tokens::new(write),
+                cache_read_tokens: CacheCount::Reported(Tokens::new(r)),
+                cache_write_tokens: CacheCount::Reported(Tokens::new(write)),
                 dialect: Some(dialect),
             }
         })
@@ -366,9 +369,9 @@ mod tests {
         fn usage_is_preserved_verbatim(usage in usage_strategy(DialectKind::Anthropic)) {
             let resp = ChatResponse { content: vec![], stop: StopReason::EndTurn, usage };
             let wire = response_wire(DialectKind::Anthropic, &resp).unwrap();
-            let uncached = usage.input_tokens.get() - usage.cache_read_tokens.get() - usage.cache_write_tokens.get();
+            let uncached = usage.input_tokens.get() - usage.cache_read_tokens.or_zero().get() - usage.cache_write_tokens.or_zero().get();
             prop_assert_eq!(wire["usage"]["input_tokens"].as_u64().unwrap(), uncached);
-            prop_assert_eq!(wire["usage"]["cache_creation_input_tokens"].as_u64().unwrap(), usage.cache_write_tokens.get());
+            prop_assert_eq!(wire["usage"]["cache_creation_input_tokens"].as_u64().unwrap(), usage.cache_write_tokens.or_zero().get());
             let back = response_from_wire(DialectKind::Anthropic, &wire).unwrap();
             prop_assert_eq!(back.usage, usage);
         }

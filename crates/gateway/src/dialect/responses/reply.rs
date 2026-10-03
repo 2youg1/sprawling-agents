@@ -6,8 +6,8 @@
 //! The responses face's answer, in both directions.
 
 use kernel::{
-    AxCode, AxError, ChatResponse, ContentBlock, DialectKind, ModelUsage, StopReason, Tokens,
-    ToolName,
+    AxCode, AxError, CacheCount, ChatResponse, ContentBlock, DialectKind, ModelUsage, StopReason,
+    Tokens, ToolName,
 };
 use serde_json::Value;
 #[cfg(test)]
@@ -216,8 +216,8 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
         usage: ModelUsage {
             input_tokens: tokens_or_zero(usage_value, "input_tokens", "response.usage")?,
             output_tokens: tokens_or_zero(usage_value, "output_tokens", "response.usage")?,
-            cache_read_tokens: cache_read,
-            cache_write_tokens: cache_write,
+            cache_read_tokens: CacheCount::Reported(cache_read),
+            cache_write_tokens: CacheCount::Reported(cache_write),
             dialect: Some(DialectKind::OpenAiResponses),
         },
     })
@@ -266,8 +266,8 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
             "input_tokens": resp.usage.input_tokens.get(),
             "output_tokens": resp.usage.output_tokens.get(),
             "input_tokens_details": {
-                "cached_tokens": resp.usage.cache_read_tokens.get(),
-                "cache_write_tokens": resp.usage.cache_write_tokens.get(),
+                "cached_tokens": resp.usage.cache_read_tokens.reported(),
+                "cache_write_tokens": resp.usage.cache_write_tokens.reported(),
             },
         },
     });
@@ -327,8 +327,8 @@ mod tests {
             usage: ModelUsage {
                 input_tokens: Tokens::new(11),
                 output_tokens: Tokens::new(7),
-                cache_read_tokens: Tokens::new(3),
-                cache_write_tokens: Tokens::new(2),
+                cache_read_tokens: CacheCount::Reported(Tokens::new(3)),
+                cache_write_tokens: CacheCount::Reported(Tokens::new(2)),
                 dialect: Some(DialectKind::OpenAiResponses),
             },
         };
@@ -348,8 +348,8 @@ mod tests {
             usage: ModelUsage {
                 input_tokens: Tokens::new(1),
                 output_tokens: Tokens::new(1),
-                cache_read_tokens: Tokens::new(0),
-                cache_write_tokens: Tokens::new(0),
+                cache_read_tokens: CacheCount::Reported(Tokens::new(0)),
+                cache_write_tokens: CacheCount::Reported(Tokens::new(0)),
                 dialect: Some(DialectKind::OpenAiResponses),
             },
         };

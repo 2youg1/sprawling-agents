@@ -19,7 +19,7 @@ mod wire;
 pub use image::{ImageRef, ImageType};
 pub use mode::{AdmissionRequirement, LandingPolicy, Mode, RunPolicy};
 pub use seam::{ModelRequest, ModelReturn, content_from_message, message_payload};
-pub use usage::ModelUsage;
+pub use usage::{CacheCount, ModelUsage};
 pub use window::Window;
 pub use wire::{
     BuildingPolicy, Ceiling, ChatMessage, ChatRequest, ChatResponse, ContentBlock, DialectKind,

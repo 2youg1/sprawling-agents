@@ -25,8 +25,8 @@
 //!   <https://platform.claude.com/docs/en/build-with-claude/vision>
 
 use kernel::{
-    AxError, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort, ModelUsage, Role,
-    StopReason, Tokens,
+    AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort, ModelUsage,
+    Role, StopReason, Tokens,
 };
 use serde_json::{Map, Value, json};
 
@@ -264,14 +264,21 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
         "response.stop_reason",
     )?;
     let usage_value = require(wire, "response", "usage")?;
-    let cache_read_tokens =
-        tokens_or_zero(usage_value, "cache_read_input_tokens", "response.usage")?;
-    let cache_write_tokens =
-        tokens_or_zero(usage_value, "cache_creation_input_tokens", "response.usage")?;
+    let cache_read_tokens = CacheCount::Reported(tokens_or_zero(
+        usage_value,
+        "cache_read_input_tokens",
+        "response.usage",
+    )?);
+    let cache_write_tokens = CacheCount::Reported(tokens_or_zero(
+        usage_value,
+        "cache_creation_input_tokens",
+        "response.usage",
+    )?);
     // This wire's `input_tokens` counts only what missed the cache; the
     // city's count is the whole prompt (`crates/kernel/Spec.lean` §8-24, `ModelUsage`).
     let input_tokens = [cache_read_tokens, cache_write_tokens]
         .into_iter()
+        .map(CacheCount::or_zero)
         .try_fold(
             tokens_or_zero(usage_value, "input_tokens", "response.usage")?,
             Tokens::checked_add,
@@ -315,11 +322,11 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
         "stop_reason": stop_str(resp.stop),
         "usage": {
             "input_tokens": resp.usage.input_tokens.get()
-                .saturating_sub(resp.usage.cache_read_tokens.get())
-                .saturating_sub(resp.usage.cache_write_tokens.get()),
+                .saturating_sub(resp.usage.cache_read_tokens.or_zero().get())
+                .saturating_sub(resp.usage.cache_write_tokens.or_zero().get()),
             "output_tokens": resp.usage.output_tokens.get(),
-            "cache_read_input_tokens": resp.usage.cache_read_tokens.get(),
-            "cache_creation_input_tokens": resp.usage.cache_write_tokens.get(),
+            "cache_read_input_tokens": resp.usage.cache_read_tokens.reported(),
+            "cache_creation_input_tokens": resp.usage.cache_write_tokens.reported(),
         },
     }))
 }

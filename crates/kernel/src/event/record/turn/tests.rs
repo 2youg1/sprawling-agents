@@ -189,8 +189,8 @@ fn a_reply_line_writes_the_bytes_the_hand_written_map_wrote() {
     let usage = ModelUsage {
         input_tokens: Tokens::new(1200),
         output_tokens: Tokens::new(64),
-        cache_read_tokens: Tokens::new(0),
-        cache_write_tokens: Tokens::new(0),
+        cache_read_tokens: crate::model::CacheCount::Reported(Tokens::new(0)),
+        cache_write_tokens: crate::model::CacheCount::Reported(Tokens::new(0)),
         dialect: None,
     };
     let returned = ModelReturned {
