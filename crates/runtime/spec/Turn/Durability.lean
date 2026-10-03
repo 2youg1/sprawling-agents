@@ -669,7 +669,7 @@ theorem tf1_run_refs_complete (ws : List (List Effect)) :
 
 **生成器。** proptest 生成 `List (List Effect)`：0 到 5 个有调用的回合，每回合 1 到 7 条调用，每条 `read` 或 `write`，再加一个没有调用的回合结束 run（Rust 里没有调用的回合就是 run 的最后一回合，所以模型里「每回合 0 条」只能出现在末尾）。每一份经 `run::drive` 跑一个完整的 run：计数账本（`Tape`）数每次 `append`／`append_all`，模型与写工具在动手时读下屏障数和盘上的最后一条记录。检查：两次模型调用之间的屏障数等于 `1 + 写调用数`，最后一次模型调用之后与没有工具波的 run 相同（`tf1_turn_barriers`，run 末尾一次）；run 结束时盘上的记录 kind 逐条等于参照次序，所以每条追加的记录都有 ref（`tf1_records_match_reference`、`tf1_run_refs_complete`）；每次模型调用、每条写动手时，盘上最后一条是它自己的意图，于是此前追加的都已落盘（`tf1_effect_after_durability`、`tf1_write_intent_durable`）；在任一行掉电，盘上是不掉电那次的前缀（`held_cut_is_closed_cut` 的前缀一半）。
 
-**还没派生的一条。** 崩溃点重放：在每一次 `append_all` 之后截断，用截断的历史跑 `resume`，结论（`replay::DanglingCalls` 补出的 `E_TOOL_OUTCOME_UNKNOWN`、下一回合的编号、会话）与 `closedTurn` 在 `held_cut_is_closed_cut` 给出的对应崩溃点截断时相同；两边的盘上记录由 `cutsOf` 在 Lean 里算出，Rust 测试逐条重放。补上它要的证据：一个从 `cutsOf` 向量构造截断账本、再经 `resume` 读出结论的测试。
+**崩溃点重放。** `Tape` 在每次 `append`／`append_all` 之后记下盘上的行数，这就是 `cutsOf` 在 Rust 一侧的向量。对每个截断点，测试用截断的历史跑 resume 的检测与修补两半：每条记录经 `replay::DanglingCalls` 观察，每条悬空调用由 `replay::outcome_unknown_draft` 补成 `E_TOOL_OUTCOME_UNKNOWN`，下一回合的编号数盘上的 `model_returned`。结论（补出的调用、下一回合、补行所属的会话）必须等于 `closedTurn` 在同一盘面的崩溃点给出的结论（`held_cut_is_closed_cut`）：某回合 `model_called` 之后，什么都不悬空，该回合重跑；某写调用的 `tool_called` 之后，恰好它悬空，下一回合跟上；回合最后一行之后，什么都不悬空。第一回合之前的派发行与最后一回合之后的收尾行不在回合模型里，它们什么都不补、下一回合停在回合留下的位置。截断点若落在 `closedTurn` 没有的位置，或结论不同，测试变红（`tf1_resume_over_every_held_cut_agrees_with_a_closed_cut`）；一个不让 `tool_result` 关闭调用的 `DanglingCalls` 在第一个写调用之后的截断点上就让它变红。
 
 **必须变红的坏实现。** 写调用的 `tool_called` 留到下一道屏障（`leakyCall`）：`guarded` 为假，见 `leaky_wave_is_caught`；追加时就交出 ref（`eagerStep`）：交出的 ref 指向未落盘的记录，见 `eager_ref_is_not_durable`；回合收尾仍付一道（`closedTurn`）：两次模型调用之间多一道，计数检查变红。 -/
 

@@ -7,8 +7,10 @@
 //! `crates/runtime/spec/Turn/Durability.lean` (runtime D36), driven
 //! through a whole run: the lines a turn holds cross into the next
 //! turn, so each turn pays `1 + writes` barriers and the run one more at
-//! its end, and a power cut at any line still leaves a prefix of the
-//! uncut history with no write ahead of its intent.
+//! its end, a power cut at any line still leaves a prefix of the
+//! uncut history with no write ahead of its intent, and resume over the
+//! history any barrier left concludes what `closedTurn` concludes at
+//! the crash point with the same disk.
 
 #![allow(clippy::arithmetic_side_effects, reason = "test code")]
 
@@ -21,7 +23,7 @@ use super::helpers::*;
 use crate::conversation::Opening;
 use crate::handoff::Handoff;
 use crate::run::{RunHooks, RunPlan, SafePoint};
-use kernel::{EventDraft, EventRef, ModelRequest};
+use kernel::{EventDraft, EventRef, ModelRequest, RunId};
 use proptest::prelude::*;
 
 /// A ledger whose every call is one disk barrier, counted where the
@@ -33,6 +35,9 @@ struct Tape {
     durable: Durable,
     barriers: Arc<AtomicUsize>,
     cut_at: usize,
+    /// How many lines were on disk after each barrier: the Rust half of
+    /// `cutsOf`.
+    cuts: Vec<usize>,
 }
 
 impl Tape {
@@ -42,6 +47,7 @@ impl Tape {
             durable: Arc::default(),
             barriers: Arc::default(),
             cut_at: line,
+            cuts: Vec::new(),
         }
     }
 
@@ -68,12 +74,16 @@ impl Tape {
 impl Ledger for Tape {
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
         self.barriers.fetch_add(1, Ordering::SeqCst);
-        self.keep(draft)
+        let echo = self.keep(draft);
+        self.cuts.push(self.inner.lines.len());
+        echo
     }
 
     fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
         self.barriers.fetch_add(1, Ordering::SeqCst);
-        drafts.into_iter().map(|draft| self.keep(draft)).collect()
+        let echoes = drafts.into_iter().map(|draft| self.keep(draft)).collect();
+        self.cuts.push(self.inner.lines.len());
+        echoes
     }
 }
 
@@ -161,6 +171,8 @@ struct Ran {
     barriers: usize,
     asked: Vec<Asked>,
     tools_saw: Vec<Vec<String>>,
+    lines: Vec<Vec<u8>>,
+    cuts: Vec<usize>,
 }
 
 fn run_of(waves: &[Vec<bool>], cut_at: usize) -> Ran {
@@ -207,6 +219,8 @@ fn run_of(waves: &[Vec<bool>], cut_at: usize) -> Ran {
         barriers: ledger.barriers.load(Ordering::SeqCst),
         asked: model.asked,
         tools_saw,
+        lines: ledger.inner.lines,
+        cuts: ledger.cuts,
     }
 }
 
@@ -221,6 +235,106 @@ fn reference(waves: &[Vec<bool>]) -> Vec<String> {
         }
     }
     lines
+}
+
+/// What resume concludes from a history: the calls it closes with
+/// `E_TOOL_OUTCOME_UNKNOWN`, the turn the run takes next, and the run
+/// the closing lines are written for.
+#[derive(Debug, Clone, PartialEq)]
+struct Verdict {
+    unknown: Vec<String>,
+    next_turn: usize,
+    sessions: Vec<RunId>,
+}
+
+impl Verdict {
+    fn settled(next_turn: usize) -> Verdict {
+        Verdict {
+            unknown: Vec::new(),
+            next_turn,
+            sessions: Vec::new(),
+        }
+    }
+}
+
+/// Resume over the first `cut` lines: every record verified on the way
+/// through `DanglingCalls`, every dangling call closed by
+/// `outcome_unknown_draft`, and the next turn counted from the replies
+/// that reached the disk.
+fn resume_over(lines: &[Vec<u8>], cut: usize) -> Verdict {
+    let mut calls = crate::replay::DanglingCalls::default();
+    let mut next_turn = 0;
+    for line in &lines[..cut] {
+        let record = kernel::EventRecord::parse_line(line).unwrap();
+        next_turn += usize::from(record.kind() == kernel::EventKind::ModelReturned);
+        calls.observe(&record);
+    }
+    let drafts: Vec<EventDraft> = calls
+        .into_calls()
+        .iter()
+        .map(|call| crate::replay::outcome_unknown_draft(call, TimeMs::new(2)).unwrap())
+        .collect();
+    let unknown = drafts
+        .iter()
+        .map(|draft| {
+            let result = draft
+                .data
+                .read::<kernel::event::record::ToolResult>()
+                .unwrap();
+            let kernel::event::record::ToolAnswer::Failed { error } = result.answer else {
+                panic!("a closing line answers with a failure");
+            };
+            assert_eq!(
+                *error.read::<AxError>().unwrap().code(),
+                AxCode::ToolOutcomeUnknown
+            );
+            result.tool_use_id
+        })
+        .collect();
+    Verdict {
+        unknown,
+        next_turn,
+        sessions: drafts.iter().map(|draft| draft.run).collect(),
+    }
+}
+
+/// `closedTurn`'s crash points over the uncut history, each with the
+/// verdict the model gives it: after a turn's `model_called` nothing is
+/// open and the turn reruns; after a write's `tool_called` that write
+/// is open and the next turn follows; after a turn's last line nothing
+/// is open. Lines before the first turn and after the last, which the
+/// turn model does not cover, close nothing and leave the next turn
+/// where the turns left it.
+fn closed_cuts(waves: &[Vec<bool>], whole: usize) -> std::collections::BTreeMap<usize, Verdict> {
+    let dispatch = 3;
+    let mut cuts: std::collections::BTreeMap<usize, Verdict> =
+        (0..=dispatch).map(|at| (at, Verdict::settled(0))).collect();
+    let mut at = dispatch;
+    let turns: Vec<&[bool]> = waves.iter().map(Vec::as_slice).chain([&[][..]]).collect();
+    for (turn, writes) in turns.iter().enumerate() {
+        at += 2;
+        cuts.insert(at, Verdict::settled(turn));
+        at += 1;
+        for (i, write) in writes.iter().enumerate() {
+            at += 1;
+            if *write {
+                cuts.insert(
+                    at,
+                    Verdict {
+                        unknown: vec![format!("c{turn}-{i}")],
+                        next_turn: turn + 1,
+                        sessions: vec![run_id()],
+                    },
+                );
+            }
+            at += 1;
+        }
+        cuts.insert(at, Verdict::settled(turn + 1));
+    }
+    for tail in at..=whole {
+        cuts.insert(tail, Verdict::settled(turns.len()));
+    }
+    cuts
 }
 
 fn waves() -> impl Strategy<Value = Vec<Vec<bool>>> {
@@ -281,6 +395,21 @@ proptest! {
             if calls[i] {
                 prop_assert_eq!(seen.last().map(String::as_str), Some("tool_called"));
             }
+        }
+    }
+
+    /// The crash-point replay `held_cut_is_closed_cut` licenses: cut
+    /// the held run after every barrier, resume over what reached the
+    /// disk, and the verdict is the one `closedTurn` gives at the crash
+    /// point that left the same disk.
+    #[test]
+    fn tf1_resume_over_every_held_cut_agrees_with_a_closed_cut(waves in waves()) {
+        let ran = run_of(&waves, usize::MAX);
+        prop_assert!(ran.froze);
+        let closed = closed_cuts(&waves, ran.lines.len());
+        prop_assert!(!ran.cuts.is_empty());
+        for cut in &ran.cuts {
+            prop_assert_eq!(Some(&resume_over(&ran.lines, *cut)), closed.get(cut), "cut {}", cut);
         }
     }
 }
