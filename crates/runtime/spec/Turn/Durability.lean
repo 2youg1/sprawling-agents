@@ -25,7 +25,7 @@
 * **记录按调用序**——TF1 与参照追加的记录逐条相同，落盘的总是这串记录的前缀（`tf1_records_match_reference`、`tf1_durable_is_reference_prefix`）；所以崩溃后 `resume` 读到的，是参照次序在某个崩溃点也会留下的历史：缺的只有只读调用的记录，而只读调用没有对外效果，重做它们不改变世界；写调用的 `tool_called` 已落盘，`replay::DanglingCalls` 照旧把没有结果的那条补成 `E_TOOL_OUTCOME_UNKNOWN`；
 * **`EventRef` 只给已落盘的记录**（`refs_are_durable`）；
 * **屏障数**（`tf1_turn_barriers`、`reference_turn_barriers`、`tf1_turn_at_most_two`）；
-* **攒下的记录跨过回合**（D36，末两节）：ref 在下一个对外效果之前到齐、run 结束时每条记录都有 ref，任一崩溃点盘上的历史是今天的 `closedTurn` 也会留下的历史，以及待实现的派生检查与它必须抓到的坏实现。
+* **攒下的记录跨过回合**（D36，末两节）：ref 在下一个对外效果之前到齐、run 结束时每条记录都有 ref，任一崩溃点盘上的历史是落选的 `closedTurn`（回合收尾付一道屏障）也会留下的历史，以及派生检查与它必须抓到的坏实现。
 
 崩溃点写成「轨迹 = 已做 ++ 未做」：`exec State.empty done` 是在 `done` 之后掉电时的状态，`durable` 是重启后还在盘上的记录。只读调用的执行在模型里排成一列，因为它们没有对外效果、不改变状态，所以它们实际并行时彼此怎样交错不影响任何一条性质。
 -/
@@ -435,11 +435,11 @@ theorem tf1_turn_at_most_two (t : Nat) (calls : List Effect) (h : writes calls �
     barriers (tf1Turn t calls) ≤ 2 := by
   rw [tf1_turn_barriers]; omega
 
-/-! ## 回合收尾付一道屏障（Rust 今天的形状）
+/-! ## 回合收尾付一道屏障（落选的形状）
 
-`runtime::turn` 的 `Journal` 只活一个回合：run 自己的两行经回合的账本门（`Turn::hold_run_line`）追加，攒下的记录于是跨过组装、调用、工具波这几个相，但不跨回合——回合收尾（`record` 与取消的 `Journal::close`）付一道屏障，因为 `TurnReport` 交出的每个 ref 都必须指向已落盘的记录。run 的第一回合多攒一条 `prompt_assembled`，它搭 `model_called` 那道屏障，不多付。下面证明前三组性质对这个形状原样成立，屏障数是 `2 + 写调用数`，只读调用一道也不加。收尾那道是 `tf1Turn` 的 `1 + 写调用数` 之外多出的一道：要省掉它，攒下的记录得跨过回合，而 `TurnReport` 的 ref 得改成不必全部已落盘。 -/
+`closedTurn` 是攒下的记录只活一个回合时的形状：回合收尾付一道屏障，让 `TurnReport` 交出的每个 ref 都已落盘。下面证明前三组性质对它原样成立，屏障数是 `2 + 写调用数`。它落选（D36，下一节），留在这里是因为 `held_cut_is_closed_cut` 拿它作比较：Rust 的形状在任一崩溃点留下的盘，都是它在某个崩溃点也会留下的盘。 -/
 
-/-- Rust 的回合：TF1 的一个回合，再加收尾的一道屏障。 -/
+/-- 收尾付屏障的回合：TF1 的一个回合，再加收尾的一道屏障。 -/
 def closedTurn (t : Nat) (calls : List Effect) : List Step :=
   tf1Turn t calls ++ [.barrier]
 
@@ -503,7 +503,7 @@ theorem closed_durable_is_reference_prefix (ws : List (List Effect)) (done rest 
   rw [h, closed_records_match_reference] at this
   exact this
 
-/-- Rust 的一个回合付 `2 + 写调用数` 道屏障：`model_called` 一道，每条写一道，收尾一道。 -/
+/-- 收尾付屏障的回合付 `2 + 写调用数` 道屏障：`model_called` 一道，每条写一道，收尾一道。 -/
 theorem closed_turn_barriers (t : Nat) (calls : List Effect) :
     barriers (closedTurn t calls) = 2 + writes calls := by
   have := tf1_turn_barriers t calls
@@ -513,15 +513,15 @@ theorem closed_turn_barriers (t : Nat) (calls : List Effect) :
 
 /-! ## 攒下的记录跨过回合：`1 + 写调用数`（D36）
 
-D36：`Journal` 改由 `Run<Active>` 持有、活整个 run，回合收尾不再付屏障；回合 t 工具波攒下的只读记录，搭回合 t+1 在 `model_called` 之后、模型调用之前的那一道屏障（或下一条写动手前的那一道，或冻结前的那一道）落盘，`TurnReport` 交出的是 `Entry`，它们的 ref 在下一道屏障处才换出来。这个形状就是上面的 `run tf1Turn`：它本来就不在回合之间放屏障。所以「对外效果之前全部落盘」「写的意图先落盘」「记录次序同参照」「`1 + 写调用数`」已由前几节对它证完；本节补三件 D36 要的事：
+D36：攒下的记录（`turn::ledger::HeldLines`）归 `Run<Active>`、活整个 run，每个回合的 `Journal` 只借它一回合（回合自己的时钟、戳与秘密计数不跨回合，所以借的是记录而不是整个 `Journal`）；回合收尾（`Turn::record`）不付屏障。回合 t 工具波攒下的记录，搭回合 t+1 在 `model_called` 之后、模型调用之前的那一道屏障（或下一条写动手前的那一道，或冻结前的那一道）落盘：没有调用的回合结束 run 之前先付一道，好让 `Completion::Done` 引用的 `model_returned` 有 ref；`Run::freeze` 进门先付一道（已空时不问账本）；取消在 `cancel_received` 之后付一道；`run::drive` 在把失败写成承载事件之前先付一道，让承载事件排在攒下的记录之后。`TurnReport` 交出的是 `model_returned` 的 `Entry`，它的 ref 由 `HeldLines::durable` 在下一道屏障之后换出来。这个形状就是上面的 `run tf1Turn`：它本来就不在回合之间放屏障。所以「对外效果之前全部落盘」「写的意图先落盘」「记录次序同参照」「`1 + 写调用数`」已由前几节对它证完；本节补三件 D36 要的事：
 
 * **ref 在下一个对外效果之前到齐**（`tf1_refs_before_effect`）：任一个对外效果发生时，此前追加的每条记录都已有 ref，ref 也只指向已落盘的记录；
 * **run 结束时每条记录都有 ref**（`tf1_run_refs_complete`）；
-* **任一崩溃点，盘上的历史是今天的形状（`closedTurn`）在某个崩溃点也会留下的历史**（`held_cut_is_closed_cut`）。`resume` 与重放只读盘上的记录，所以它们在新形状的任一崩溃点得出的结论，就是今天的形状在那个对应崩溃点得出的结论；缺的只是收尾屏障之前那段只读记录，而那是今天在收尾屏障之前掉电也会缺的。
+* **任一崩溃点，盘上的历史是收尾付屏障的形状（`closedTurn`）在某个崩溃点也会留下的历史**（`held_cut_is_closed_cut`）。`resume` 与重放只读盘上的记录，所以它们在新形状的任一崩溃点得出的结论，就是 `closedTurn` 在那个对应崩溃点得出的结论；缺的只是收尾屏障之前那段记录，而那是 `closedTurn` 在收尾屏障之前掉电也会缺的。
 
-落选：每回合收尾仍付一道（今天的 `closedTurn`）——安全，但只读回合要付 2 道而不是 1 道，而它不换来任何可恢复性，因为下一道屏障在任何对外效果之前；把 ref 在追加时就交出（`eagerStep`）——`EventRef` 会指向可能不存在的历史，违反 `kernel::ledger` 的「`Ok(ref)` 即已落盘」，见 `eager_ref_is_not_durable`。重新打开的参数：一个回合的 ref 必须在回合内被对外读到（例如 `TurnReport` 的 ref 在下一道屏障之前就被发上 wire），或者一次屏障的价钱与它带的记录数变得成正比。三个平台相同：本模型只决定屏障的次数与位置，屏障本身是 `File::sync_data`（Windows 上 `FlushFileBuffers`，Linux 上 `fdatasync`，macOS 上走哪一个由 `crates/storage/spec/Jsonl/Barrier.lean` 与 storage §8-1 决定），计数上界 `1 + 写调用数` 在三个平台上都成立。
+落选：每回合收尾付一道（`closedTurn`）——安全，但只读回合要付 2 道而不是 1 道，而它不换来任何可恢复性，因为下一道屏障在任何对外效果之前；把 ref 在追加时就交出（`eagerStep`）——`EventRef` 会指向可能不存在的历史，违反 `kernel::ledger` 的「`Ok(ref)` 即已落盘」，见 `eager_ref_is_not_durable`。重新打开的参数：一个回合的 ref 必须在回合内被对外读到（例如 `TurnReport` 的 ref 在下一道屏障之前就被发上 wire），或者一次屏障的价钱与它带的记录数变得成正比。三个平台相同：本模型只决定屏障的次数与位置，屏障本身是 `File::sync_data`（Windows 上 `FlushFileBuffers`，Linux 上 `fdatasync`，macOS 上走哪一个由 `crates/storage/spec/Jsonl/Barrier.lean` 与 storage §8-1 决定），计数上界 `1 + 写调用数` 在三个平台上都成立，崩溃点的等价也一样，因为它只依赖屏障的位置。
 
-**storage 一侧的开放问题**：跨回合攒下的记录在两回合之间只在进程内存里，这不改变 storage 的任何契约（`append_all` 仍是一批一屏障、成功即落盘）；若 storage 要为「两次 `append_all` 之间隔着一次模型调用」写下任何保证（例如段轮换不得在批内发生），那是 `crates/storage/spec/Jsonl/Barrier.lean` 的一个问题，不在本模型里。 -/
+**storage 一侧**：跨回合攒下的记录在两回合之间只在进程内存里，这不改变 storage 的任何契约（`append_all` 仍是一批一屏障、成功即落盘）。两次 `append_all` 之间隔着一次模型调用、段轮换落在其间，都不需要 storage 多守什么：`crates/storage/spec/Jsonl/Barrier.lean` 的 `answered_survives_a_pause`。 -/
 
 /-- 一道屏障之后的状态。 -/
 def flush (s : State) : State := s.step .barrier
@@ -585,7 +585,7 @@ theorem cut_in_turn (s : State) (t : Nat) (calls : List Effect) (done rest : Lis
     rw [exec_append, exec_append]
     exact Or.inr (exec_sameDisk _ _ _ (head_forgets_flush s t))
 
-/-- 新形状从 `s` 起的任一崩溃点：要么盘上什么也没多，要么今天的形状从 `flush s` 起在某个崩溃点留下同样的盘。 -/
+/-- 新形状从 `s` 起的任一崩溃点：要么盘上什么也没多，要么 `closedTurn` 从 `flush s` 起在某个崩溃点留下同样的盘。 -/
 theorem held_cut_from (ws : List (List Effect)) (s : State) (t : Nat) (done rest : List Step)
     (h : done ++ rest = run tf1Turn t ws) :
     (exec s done).durable = s.durable ∨
@@ -626,7 +626,7 @@ theorem held_cut_from (ws : List (List Effect)) (s : State) (t : Nat) (done rest
         rw [exec_append, exec_append, exec_append, ← hdur]
         exact (exec_sameDisk _ _ cut hb).1
 
-/-- **任一崩溃点，新形状盘上的历史是今天的形状在某个崩溃点也会留下的历史**：`resume` 与重放从它得出的，就是今天会得出的。 -/
+/-- **任一崩溃点，新形状盘上的历史是 `closedTurn` 在某个崩溃点也会留下的历史**：`resume` 与重放从它得出的，就是 `closedTurn` 会得出的。 -/
 theorem held_cut_is_closed_cut (ws : List (List Effect)) (done rest : List Step)
     (h : done ++ rest = run tf1Turn 0 ws) :
     ∃ cut more, cut ++ more = run closedTurn 0 ws ∧
@@ -665,11 +665,13 @@ theorem tf1_run_refs_complete (ws : List (List Effect)) :
   simp only [appended, List.filterMap_append]
   rfl
 
-/-! ## 派生检查的规格（待实现，`turn::tests::durability`）
+/-! ## 派生检查（`turn::tests::held`）
 
-**生成器。** proptest 生成 `List (List Effect)`：0 到 6 个回合，每回合 0 到 8 条调用，每条 `read` 或 `write`；对每一份，用计数账本（`turn::tests::durability` 的 `Barriers`，另记下每次 `append_all`、每次模型调用、每次写动手的先后）跑一个 run，把记下的先后译成本模型的 `Step` 轨迹。检查五条，每条对应一个定理：`guarded 0 trace`（`tf1_effect_after_durability`）；`intentFirst [] trace`（`tf1_write_intent_durable`）；每个回合两次模型调用之间的 `append_all` 次数等于 `1 + 写调用数`，run 末尾一次（`tf1_turn_barriers`）；记录的 kind 序列等于参照次序（`tf1_records_match_reference`）；run 结束时交出的 ref 条数等于追加条数（`tf1_run_refs_complete`）。**崩溃点重放**：在轨迹里每一次 `append_all` 之后截断，用截断的历史跑 `resume`，结论（`replay::DanglingCalls` 补出的 `E_TOOL_OUTCOME_UNKNOWN`、下一回合的编号、会话）与今天的形状在 `held_cut_is_closed_cut` 给出的对应崩溃点截断时相同；两边的盘上记录由 `cutsOf` 在 Lean 里算出，Rust 测试逐条重放。
+**生成器。** proptest 生成 `List (List Effect)`：0 到 5 个有调用的回合，每回合 1 到 7 条调用，每条 `read` 或 `write`，再加一个没有调用的回合结束 run（Rust 里没有调用的回合就是 run 的最后一回合，所以模型里「每回合 0 条」只能出现在末尾）。每一份经 `run::drive` 跑一个完整的 run：计数账本（`Tape`）数每次 `append`／`append_all`，模型与写工具在动手时读下屏障数和盘上的最后一条记录。检查：两次模型调用之间的屏障数等于 `1 + 写调用数`，最后一次模型调用之后与没有工具波的 run 相同（`tf1_turn_barriers`，run 末尾一次）；run 结束时盘上的记录 kind 逐条等于参照次序，所以每条追加的记录都有 ref（`tf1_records_match_reference`、`tf1_run_refs_complete`）；每次模型调用、每条写动手时，盘上最后一条是它自己的意图，于是此前追加的都已落盘（`tf1_effect_after_durability`、`tf1_write_intent_durable`）；在任一行掉电，盘上是不掉电那次的前缀（`held_cut_is_closed_cut` 的前缀一半）。
 
-**必须变红的坏实现。** 写调用的 `tool_called` 留到下一道屏障（`leakyCall`）：`guarded` 为假，见 `leaky_wave_is_caught`；追加时就交出 ref（`eagerStep`）：交出的 ref 指向未落盘的记录，见 `eager_ref_is_not_durable`。实现时先提交用其中一个坏实现跑红的测试，再提交实现。 -/
+**还没派生的一条。** 崩溃点重放：在每一次 `append_all` 之后截断，用截断的历史跑 `resume`，结论（`replay::DanglingCalls` 补出的 `E_TOOL_OUTCOME_UNKNOWN`、下一回合的编号、会话）与 `closedTurn` 在 `held_cut_is_closed_cut` 给出的对应崩溃点截断时相同；两边的盘上记录由 `cutsOf` 在 Lean 里算出，Rust 测试逐条重放。补上它要的证据：一个从 `cutsOf` 向量构造截断账本、再经 `resume` 读出结论的测试。
+
+**必须变红的坏实现。** 写调用的 `tool_called` 留到下一道屏障（`leakyCall`）：`guarded` 为假，见 `leaky_wave_is_caught`；追加时就交出 ref（`eagerStep`）：交出的 ref 指向未落盘的记录，见 `eager_ref_is_not_durable`；回合收尾仍付一道（`closedTurn`）：两次模型调用之间多一道，计数检查变红。 -/
 
 /-- 一段轨迹每道屏障之后盘上的记录：崩溃点重放的向量。 -/
 def cutsOf (steps : List Step) : List (List Record) :=

@@ -205,6 +205,16 @@ theorem answered_survives_reopen (steps : List Step) :
   | nil => exact fun _ h => h
   | cons s rest ih => exact fun l h => ih _ (step_sound l s h)
 
+/-! ## 两波之间隔着一次模型调用
+
+runtime D36 让一个回合攒下的记录跨过回合，于是两次 `append_all` 之间可能隔着一次模型调用，下一波也可能落在段轮换之后的新段里。这不需要 storage 多守什么：轮换只发生在一波之内（写满的段由这一波关上、新段由这一波建、`sync_dir` 在置回 `Whole` 之前），两波之间句柄不碰磁盘，所以模型调用在 storage 看来只是两步之间什么也没发生。`answered_survives_reopen` 对任意一串波成立，在任一处断开再接上也成立，下面这条把它写成停顿的形式。要重新打开它，得有一件在两波之间碰磁盘的事，例如后台组提交或后台轮换。 -/
+
+/-- 两串波之间停多久、进程做了什么，都不改变答过的 seq 重开后都在。 -/
+theorem answered_survives_a_pause (before after : List Step) :
+    (after.foldl Ledger.step (before.foldl Ledger.step Ledger.empty)).Sound := by
+  rw [← List.foldl_append]
+  exact answered_survives_reopen (before ++ after)
+
 /-- 不守屏障的 handle：一波失败后位置不动，下一波照写。 -/
 def Ledger.appendAnyway (l : Ledger) : Outcome → Ledger
   | .synced => ⟨l.disk ++ [.record l.next], l.next + 1, .whole, l.claimed ++ [l.next]⟩
