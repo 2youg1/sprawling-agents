@@ -6,7 +6,7 @@
 /-!
 # accounting::views::usage：skill 与 MCP 的使用表
 
-规定 `crates/accounting/src/views/usage.rs` 与 `crates/accounting/src/views/usage/export.rs`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+规定 `crates/accounting/src/views/usage.rs` 与它的三个子模块 `answers`、`export`、`shelves`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 
 前半是接口与决定，后半是折叠的模型：一次读在没有钉住那件 skill 的 run 里不算使用，折叠只往使用列表的末尾加，每一次使用都有一个钉住它的 run。Rust 侧由 `accounting::views::usage::tests` 的 proptest 从同一个输入空间抽轨迹，判同三条性质。
 -/
@@ -20,10 +20,12 @@ pub(crate) struct Usage { /* 折叠状态，私有 */ }
 impl Usage {
     pub(crate) fn fold<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Usage;
     pub(crate) fn skills(&self, shelves: &[Shelved], only: Option<&str>) -> wire::SkillUsageAnswer;
-    pub(crate) fn mcp(&self, configured: &[ServerLabel], only: Option<&str>) -> wire::McpUsageAnswer;
+    pub(crate) fn mcp(&self, configured: &BTreeSet<String>, only: Option<&str>) -> wire::McpUsageAnswer;
 }
 // accounting::views::usage::export
-pub(crate) fn export(answer: Exported<'_>, format: wire::ExportFormat) -> String;
+pub(super) fn skill_rows(answer: &wire::SkillUsageAnswer) -> Vec<Row>;
+pub(super) fn mcp_rows(answer: &wire::McpUsageAnswer) -> Vec<Row>;
+pub(super) fn write(rows: &[Row], format: wire::ExportFormat) -> String;
 ```
 
 - **一遍读完整本账。** `Query::SkillUsage`、`McpUsage` 与 `UsageExport` 在快照放开之后由 `LedgerAsk` 从第一行读到最后一行，交给 `Usage::fold`；读不下去的一行结束这一遍，已经读到的照答（与 `history` 同一条规则）。
@@ -31,7 +33,7 @@ pub(crate) fn export(answer: Exported<'_>, format: wire::ExportFormat) -> String
 - **一个内容版本**是某件 skill 在某个 `run_started` 里第一次以某个哈希出现：摘要、那一行的 `seq` 与时刻、钉住它的 run。账本里还没有一种行记录「谁把这一版放上书架」（kernel D23 预留的 `skill_shelved`），所以版本说的是「从哪一刻起有 run 读到它」。
 - **书架上的每一件都有一行**，没被用过的计数为零；书架上已经没有、但账上用过的名字也有一行，`held` 为空。同名的件在几格书架上时，`held` 每格一项，各带此刻的摘要与审核状态。
 - **审核状态**照 `city::library::audit_state` 判（`crates/city/spec/Library/Audit.lean`），输入是账上这个名字的每一行 `skill_audited`。此刻的摘要与任何一次审核都不同、而审核存在时，状态是 `Stale`：页面据此请 User 重新审核。
-- **MCP 的一次使用**是一行 `tool_called`，它记下的 `effect` 是 `Connector { label }`：服务器就是那个 `label`，工具名是行上的名字去掉 `<label>_` 前缀。`call` 一行指名的工具，按已知服务器名（账上见过的与此刻配置的）取最长的那个 `<label>_` 前缀归属；没有服务器名能前缀它时，归在 `server: None` 下，工具写完整的名字。
+- **MCP 的一次使用**是一行 `tool_called`，它记下的 `effect` 是 `Connector { label }`：服务器就是那个 `label`，工具名是行上的名字去掉 `<label>_` 前缀。`call` 一行指名的工具按第一个 `_` 拆（`kernel::ServerLabel` 不收 `_`），拆出的头是已知服务器名（账上见过的与此刻配置的）才归属；否则归在 `server: None` 下，工具写完整的名字。
 - **结果**：同一个 run 里 `tool_use_id` 与它配对的 `tool_result` 答了是 `Ok`，拒了是 `Failed`，没有配对行是 `Unknown`。
 - **按天数**：信封时刻的 UTC 日历日，`YYYY-MM-DD`，由 `runtime::clock::iso` 的前十个字符读出，不另写一份历法。
 - **从没用过的 MCP 服务器**：每栋楼的配置（`city::load_config`）里列出的服务器各有一项，没有用过的工具表为空；此刻提供哪些工具要一次握手，那是 `McpHealth` 的问题。
@@ -46,7 +48,7 @@ pub(crate) fn export(answer: Exported<'_>, format: wire::ExportFormat) -> String
 
 **理由**：使用表只有 skill 页与 MCP 页打开时才问，常驻折叠要为每一行 `tool_called` 付代价、为快照多编一张随账本线性增长的表；答问时读一遍是 wire D33 写下的形状，它的重开参数就是本决定的重开参数。服务器读 `effect`，是因为工具注册时 `agent_protocols::mcp::tools` 写下的 `Connector { label }` 随行进了账本：它说的是调用那一刻的服务器，配置改过、服务器删掉之后仍然对；而「此刻的登记」要握一次手才知道工具名，答一次使用表要等几秒。
 
-**被否**：①常驻折叠：快照多一张表，`VIEWS_FOLD_RULES` 进位，而这两页不常开；②按此刻的配置拆名字：服务器删掉后它的使用全变成「已移除」，且要握手；③按第一个 `_` 拆：服务器名可以含 `_`（wire D33 ③）。
+**被否**：①常驻折叠：快照多一张表，`VIEWS_FOLD_RULES` 进位，而这两页不常开；②按此刻的配置拆名字：服务器删掉后它的使用全变成「已移除」，且要握手；③凡 `<x>_<y>` 都归给服务器 `x`：城自己的工具名里也有 `_`（wire D33 ③）。
 
 **重开参数**：一座城的使用表答复超过 100 ms 时（wire D33），改成常驻折叠。
 -/
