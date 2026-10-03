@@ -358,3 +358,18 @@ fn the_attribution_holds_only_the_runs_the_hot_view_holds() {
         })
     );
 }
+
+/// An evicted run whose records can no longer be read is "I could not
+/// look", and the answer says what stopped it (wire D47).
+#[test]
+fn an_evicted_run_the_ledger_cannot_give_back_answers_unavailable_with_its_reason() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = a_city_whose_first_billed_run_was_evicted(dir.path());
+    std::fs::remove_dir_all(kernel::layout::CityLayout::new(dir.path()).ledger()).unwrap();
+    let answer = views.answer(&wire::Query::RunView { run: billed_run(0) });
+    let wire::Answer::Unavailable { query, reason } = answer else {
+        panic!("a run whose records cannot be read is not a run view: {answer:?}");
+    };
+    assert_eq!(query, format!("RunView({})", billed_run(0)));
+    assert!(reason.is_some_and(|reason| !reason.is_empty()));
+}

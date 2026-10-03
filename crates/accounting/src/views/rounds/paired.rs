@@ -86,7 +86,7 @@ impl LedgerAsk {
         newest: kernel::Seq,
     ) -> BTreeMap<String, Sending> {
         let mut found = BTreeMap::new();
-        let Some((index, dir)) = self.indexed() else {
+        let Ok((index, dir)) = self.indexed() else {
             return found;
         };
         let mut reader = index.reader(&dir);

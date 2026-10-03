@@ -12,7 +12,7 @@
 //! answer to what a city spent, and the one that drifted would be the
 //! one nobody was looking at.
 
-use kernel::{NodeId, RunId, UsdMicros};
+use kernel::{AxError, NodeId, RunId, UsdMicros};
 
 use super::holding::Views;
 
@@ -21,8 +21,8 @@ impl Views {
     ///
     /// A node nobody has claimed answers zero with an empty list rather
     /// than `Unavailable`: "no run has held this node" is a true answer,
-    /// while `None` says the view could not read a run's records.
-    pub(super) fn cost_of_answer(&self, node: &NodeId) -> Option<wire::CostOfAnswer> {
+    /// while an error says the view could not read a run's records.
+    pub(super) fn cost_of_answer(&self, node: &NodeId) -> Result<wire::CostOfAnswer, AxError> {
         let held = self.claims.get(node).cloned().unwrap_or_default();
         let mut runs: Vec<(RunId, UsdMicros)> = Vec::with_capacity(held.len());
         let mut spent: u64 = 0;
@@ -31,7 +31,7 @@ impl Views {
             spent = spent.saturating_add(billed.get());
             runs.push((run, billed));
         }
-        Some(wire::CostOfAnswer {
+        Ok(wire::CostOfAnswer {
             node: node.clone(),
             spent: UsdMicros::new(spent),
             runs,
@@ -40,14 +40,15 @@ impl Views {
 
     /// What each named run was billed, in the order asked and cut at
     /// `wire::RUN_COSTS_MAX`; a run whose records cannot be read has
-    /// no row.
+    /// no row, because one unreadable run must not blank the others and
+    /// the answer has no place for a reason per row.
     pub(super) fn run_costs_answer(&self, runs: &[RunId]) -> wire::RunCostsAnswer {
         wire::RunCostsAnswer {
             asked: runs.to_vec(),
             runs: runs
                 .iter()
                 .take(wire::RUN_COSTS_MAX)
-                .filter_map(|run| self.billed_to(*run).map(|billed| (*run, billed)))
+                .filter_map(|run| self.billed_to(*run).ok().map(|billed| (*run, billed)))
                 .collect(),
         }
     }
@@ -56,13 +57,13 @@ impl Views {
     /// run's money reads (`crates/sprawling/Spec.lean` §8-106): the
     /// attribution's row while it holds one, the run's own records in
     /// the Ledger once the hot view evicted it, and zero for a run no
-    /// priced call was attributed to. `None` when the Ledger could not
+    /// priced call was attributed to. An error when the Ledger could not
     /// be read.
-    pub(super) fn billed_to(&self, run: RunId) -> Option<UsdMicros> {
+    pub(super) fn billed_to(&self, run: RunId) -> Result<UsdMicros, AxError> {
         match self.attribution.billed_to(&run) {
-            Some(billed) => Some(billed),
+            Some(billed) => Ok(billed),
             None if self.hot.was_evicted(&run) => self.ledger_ask().recalled_bill(run),
-            None => Some(UsdMicros::default()),
+            None => Ok(UsdMicros::default()),
         }
     }
 }

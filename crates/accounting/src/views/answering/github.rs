@@ -122,6 +122,7 @@ mod tests {
                     answered("ghe.example.com:8443", found()),
                     wire::Answer::Unavailable {
                         query: "GithubLogin(github.com)".to_owned(),
+                        reason: None,
                     },
                 ],
                 vec!["github.com".to_owned(), "ghe.example.com:8443".to_owned()],

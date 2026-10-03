@@ -11,6 +11,8 @@
 //! `run_started` pinned it, and a call whose recorded effect names a tool
 //! server. The fold reads the ledger alone; the shelves and the
 //! configuration are read once the fold is done, by [`UsageAsk::answer`].
+//! The same pass hands every tool result to `runtime::ShellTally`, whose
+//! reading is the shell table (wire D48).
 
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
@@ -58,6 +60,7 @@ pub enum UsageQuestion {
     Skills(Option<String>),
     Mcp(Option<String>),
     Export(wire::UsageKind, wire::ExportFormat),
+    Shells,
 }
 
 /// What the usage questions need once the view lock is let go.
@@ -105,14 +108,22 @@ pub(crate) struct Usage {
     calls: Vec<McpCall>,
     audits: BTreeMap<String, Vec<(B3Hash, AuditVerdict, Seq)>>,
     outcomes: BTreeMap<(RunId, String), wire::UseOutcome>,
+    shells: runtime::ShellTally,
 }
 
 impl UsageAsk {
     /// Folds the whole ledger, reads the shelves and the configuration,
-    /// and answers. A ledger this city cannot index is "I could not look".
+    /// and answers. A ledger this city cannot index is "I could not look",
+    /// with the reason (wire D47).
     pub(super) fn answer(self) -> wire::Answer {
-        let Some(usage) = self.ledger.usage() else {
-            return super::prepared::unavailable("Usage".to_owned());
+        let usage = match self.ledger.usage() {
+            Ok(usage) => usage,
+            Err(stopped) => {
+                return super::prepared::unavailable_because(
+                    "Usage".to_owned(),
+                    &stopped.into_ax(),
+                );
+            }
         };
         let city_root = &self.ledger.city_root;
         match self.question {
@@ -122,6 +133,7 @@ impl UsageAsk {
                 }
                 None => super::prepared::unavailable("SkillUsage".to_owned()),
             },
+            UsageQuestion::Shells => wire::Answer::Shells(Box::new(usage.shells())),
             UsageQuestion::Mcp(only) => wire::Answer::McpUsage(Box::new(
                 usage.mcp(&shelves::configured(city_root), only.as_deref()),
             )),
@@ -149,14 +161,14 @@ impl LedgerAsk {
     /// Every record from the first to the tail, folded. A line that will
     /// not read ends the fold rather than emptying it: what was read is
     /// still true, the rule `history` follows.
-    fn usage(&self) -> Option<Usage> {
+    fn usage(&self) -> Result<Usage, storage::StorageError> {
         let (index, dir) = self.indexed()?;
         let Some(tail) = index.tail_seq() else {
-            return Some(Usage::default());
+            return Ok(Usage::default());
         };
         let mut reader = index.reader(&dir);
         let mut next = Seq::FIRST.value();
-        Some(Usage::fold(std::iter::from_fn(|| {
+        Ok(Usage::fold(std::iter::from_fn(|| {
             if next > tail.value() {
                 return None;
             }
@@ -188,6 +200,15 @@ impl Usage {
     /// the test is by kind rather than a match over every kind there is.
     fn apply(&mut self, record: &EventRecord) {
         let kind = record.kind();
+        if kind == EventKind::ToolResult
+            && let Some(result) = record
+                .data()
+                .as_map()
+                .get("result")
+                .and_then(serde_json::Value::as_object)
+        {
+            self.shells.absorb(result);
+        }
         if kind == EventKind::RunStarted
             && let Ok(started) = record.data().read::<RunStarted>()
         {

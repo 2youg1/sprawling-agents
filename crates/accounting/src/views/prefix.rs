@@ -85,7 +85,7 @@ impl PrefixAsk {
     fn first_prompt(&self) -> Option<EventRecord> {
         let seq = self.first?;
         let line = {
-            let (index, dir) = self.ledger.indexed()?;
+            let (index, dir) = self.ledger.indexed().ok()?;
             index.reader(&dir).line_at(seq).ok()?
         };
         EventRecord::parse_line(&line)

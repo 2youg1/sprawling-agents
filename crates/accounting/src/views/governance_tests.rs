@@ -93,7 +93,7 @@ fn a_hunk_of_a_commit_this_city_never_wrote_is_unavailable() {
         oid_b: kernel::GitOid::from_bytes([2u8; 20]),
         path: "lab/lex.rs".to_owned(),
     });
-    let wire::Answer::Unavailable { query } = answer else {
+    let wire::Answer::Unavailable { query, .. } = answer else {
         panic!("a city with no repository cannot answer with a patch");
     };
     assert!(query.starts_with("Hunks("), "the answer names the question");

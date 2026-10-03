@@ -112,6 +112,7 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
                 kernel::Seq::FIRST,
                 Ok(Answer::Unavailable {
                     query: "none".to_owned(),
+                    reason: None,
                 }),
             )
         }),

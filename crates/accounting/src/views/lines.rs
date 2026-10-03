@@ -138,9 +138,7 @@ pub(crate) fn known_hosts_answer() -> wire::Answer {
     let hosts = match gateway::known_hosts() {
         Ok(hosts) => hosts,
         Err(fault) => {
-            return wire::Answer::Unavailable {
-                query: format!("KnownHosts({})", fault.subject()),
-            };
+            return super::prepared::unavailable(format!("KnownHosts({})", fault.subject()));
         }
     };
     wire::Answer::KnownHosts(wire::KnownHostsAnswer {

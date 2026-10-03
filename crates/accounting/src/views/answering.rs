@@ -28,9 +28,9 @@ use std::collections::BTreeSet;
 use kernel::UsdMicros;
 
 use super::holding::Views;
-use super::prepared::{LedgerAsk, LiveAsk, Prepared, unavailable};
+use super::prepared::{LedgerAsk, LiveAsk, Prepared, unavailable, unavailable_because};
 use super::usage::UsageAsk;
-use super::usage::UsageQuestion::{self, Export, Mcp, Skills};
+use super::usage::UsageQuestion::{self, Export, Mcp, Shells, Skills};
 
 pub(crate) mod automation;
 pub(crate) mod github;
@@ -218,8 +218,8 @@ impl Views {
             }
             wire::Query::RunCosts { runs } => wire::Answer::RunCosts(self.run_costs_answer(runs)),
             wire::Query::CostOf { node } => match self.cost_of_answer(node) {
-                Some(answer) => wire::Answer::CostOf(answer),
-                None => unavailable(format!("CostOf({node})")),
+                Ok(answer) => wire::Answer::CostOf(answer),
+                Err(stopped) => unavailable_because(format!("CostOf({node})"), &stopped),
             },
             // The tree itself, one level and one file at a time.
             wire::Query::Listing { at } => {
@@ -285,8 +285,10 @@ impl Views {
                 };
             }
             wire::Query::GitStatus { building } => match self.git_status_ask(building) {
-                Some(ask) => return Prepared::GitStatus(ask),
-                None => unavailable(format!("GitStatus({})", building.as_str())),
+                Ok(ask) => return Prepared::GitStatus(ask),
+                Err(stopped) => {
+                    unavailable_because(format!("GitStatus({})", building.as_str()), &stopped)
+                }
             },
             wire::Query::EndpointView => wire::Answer::Endpoints(endpoints_answer(&self.book)),
             wire::Query::KnownHosts => known_hosts_answer(),
@@ -302,6 +304,7 @@ impl Views {
             wire::Query::SkillUsage { skill } => return self.usage(Skills(skill.clone())),
             wire::Query::McpUsage { server } => return self.usage(Mcp(server.clone())),
             wire::Query::UsageExport { what, format } => return self.usage(Export(*what, *format)),
+            wire::Query::Shells => return self.usage(Shells),
             wire::Query::NewestRelease => return Prepared::Release(self.reach.registry),
             wire::Query::UpstreamVersion { item } => return self.upstream_of(item),
             wire::Query::BuildingView { addr } => {

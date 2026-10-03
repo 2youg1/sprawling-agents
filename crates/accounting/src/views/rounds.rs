@@ -45,7 +45,7 @@ impl LedgerAsk {
     /// not read ends the slice rather than emptying it - what was read is
     /// still true.
     pub(super) fn records_of(&self, run: RunId) -> Vec<EventRecord> {
-        let Some((index, dir)) = self.indexed() else {
+        let Ok((index, dir)) = self.indexed() else {
             return Vec::new();
         };
         let want = usize::try_from(wire::HISTORY_MAX).unwrap_or(1);

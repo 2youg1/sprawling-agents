@@ -69,6 +69,7 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
                 kernel::Seq::FIRST,
                 Ok(Answer::Unavailable {
                     query: "none".to_owned(),
+                    reason: None,
                 }),
             )
         }),

@@ -27,7 +27,7 @@ use kernel::{
     Address, AxError, EventKind, EventRecord, GitOid, RunId, Seq, SessionName, UsdMicros,
 };
 
-use super::prepared::{Prepared, unavailable};
+use super::prepared::{Prepared, unavailable, unavailable_because};
 
 /// What one commit's own record says about the run that made it.
 ///
@@ -123,14 +123,14 @@ impl super::holding::Views {
     /// `before` is exclusive; `limit` is clamped to the same ceiling as
     /// `History`. `more` says whether a further page exists, found by
     /// walking one commit past the page rather than by counting: the
-    /// filter makes the count meaningless. `None` when a row's run was
+    /// filter makes the count meaningless. An error when a row's run was
     /// evicted and its records could not be read.
     pub(super) fn commits_answer(
         &self,
         building: Option<&Address>,
         before: Option<Seq>,
         limit: u32,
-    ) -> Option<wire::CommitsAnswer> {
+    ) -> Result<wire::CommitsAnswer, AxError> {
         let want = usize::try_from(limit.clamp(1, wire::HISTORY_MAX)).unwrap_or(usize::MAX);
         let mut rows = self
             .commit_seqs
@@ -139,17 +139,15 @@ impl super::holding::Views {
             .filter_map(|(_, oid)| self.commits.get(oid).map(|facts| (*oid, facts)))
             .filter(|(_, facts)| building.is_none_or(|at| facts.worked_under(at)))
             .take(want.saturating_add(1))
-            .map(|(oid, facts)| (oid, facts.run))
             .collect::<Vec<_>>();
         let more = rows.len() > want;
         rows.truncate(want);
         let mut page = Vec::with_capacity(rows.len());
-        for (oid, run) in rows {
-            let spent = self.billed_to(run)?;
-            let facts = self.commits.get(&oid)?;
-            page.push(facts.answer(oid, self.lineage_of(run), spent));
+        for (oid, facts) in rows {
+            let spent = self.billed_to(facts.run)?;
+            page.push(facts.answer(oid, self.lineage_of(facts.run), spent));
         }
-        Some(wire::CommitsAnswer {
+        Ok(wire::CommitsAnswer {
             building: building.cloned(),
             before,
             commits: page,
@@ -175,16 +173,17 @@ impl super::holding::Views {
     /// `Changes` gives: "I did not write it" and "it changed nothing"
     /// are different answers, and a reader acts differently on each.
     pub(super) fn prepare_commit(&self, oid: GitOid) -> Prepared {
-        self.commits
-            .get(&oid)
-            .and_then(|facts| {
-                self.billed_to(facts.run)
-                    .map(|spent| facts.answer(oid, self.lineage_of(facts.run), spent))
-            })
-            .map_or_else(
-                || Prepared::Held(unavailable(format!("Commit({oid})"))),
-                |commit| Prepared::Commits(self.parents_ask(Settled::One(Box::new(commit)))),
-            )
+        let query = || format!("Commit({oid})");
+        let Some(facts) = self.commits.get(&oid) else {
+            return Prepared::Held(unavailable(query()));
+        };
+        match self.billed_to(facts.run) {
+            Ok(spent) => {
+                let commit = facts.answer(oid, self.lineage_of(facts.run), spent);
+                Prepared::Commits(self.parents_ask(Settled::One(Box::new(commit))))
+            }
+            Err(stopped) => Prepared::Held(unavailable_because(query(), &stopped)),
+        }
     }
 
     /// One page of the commits, with their parents still to read once
@@ -196,8 +195,11 @@ impl super::holding::Views {
         limit: u32,
     ) -> Prepared {
         match self.commits_answer(building, before, limit) {
-            Some(page) => Prepared::Commits(self.parents_ask(Settled::Page(page))),
-            None => Prepared::Held(unavailable(format!("Commits({before:?})"))),
+            Ok(page) => Prepared::Commits(self.parents_ask(Settled::Page(page))),
+            Err(stopped) => Prepared::Held(unavailable_because(
+                format!("Commits({before:?})"),
+                &stopped,
+            )),
         }
     }
 

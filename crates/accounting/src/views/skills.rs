@@ -260,7 +260,7 @@ mod tests {
         let answer = views.answer(&wire::Query::Skills {
             building: lab.clone(),
         });
-        let wire::Answer::Unavailable { query } = answer else {
+        let wire::Answer::Unavailable { query, .. } = answer else {
             panic!("rules that will not load are not a building that admits nothing");
         };
         assert_eq!(query, format!("Skills({})", lab.as_str()));
