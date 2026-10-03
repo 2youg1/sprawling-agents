@@ -160,8 +160,6 @@ pub(crate) fn run<R: BufRead, W: Write>(
     let mut ready = true;
     for tier in Tier::ALL {
         let verdict = verdict(&findings, tier);
-        // The exit code answers whether a User can use this machine; the
-        // develop tier is reported for contributors and gates nothing.
         ready = match tier {
             Tier::Use => ready && verdict == Verdict::Ready,
             Tier::Develop => ready,
