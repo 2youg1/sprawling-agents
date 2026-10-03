@@ -98,6 +98,12 @@ impl Cgroups {
     /// `parent/cgroup.subtree_control` opens `cpu` and `memory`, so the
     /// runs' children can hold both. A `parent` that may not be written
     /// adopts nothing, and its runs read as unshared (D33).
+    ///
+    /// The tests' door onto the same adoption: a real machine reaches it
+    /// through [`Cgroups::this_machine`] and its own delegated parent, so
+    /// this takes the root a test lent it, which no build outside a test
+    /// has a caller for.
+    #[cfg(test)]
     pub(super) fn adopt(parent: &Path, pid: u32) -> Cgroups {
         let mut cgroups = Cgroups {
             parent: None,
