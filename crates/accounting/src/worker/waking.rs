@@ -387,4 +387,7 @@ mod sending_tests;
 mod delegating_tests;
 
 #[cfg(test)]
+mod vector_tests;
+
+#[cfg(test)]
 mod landing_tests;
