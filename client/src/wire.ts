@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 48 as const;
+export const WIRE_V = 49 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "24fb05fe052a4f70244be1a5f7ffef18c2228fe2ebb41f52d71f16de282c8d5c" as const;
+export const WIRE_HASH = "604beb64d0238b8826d95f0114151f9055fa2603c6d1c9672b00d1438df506be" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -685,6 +685,18 @@ export const Seq = Schema.Int.pipe(Schema.brand("Seq"));
 export type Seq = typeof Seq.Type;
 
 /**
+ * What a run waits for: the room it spoke to, and the instant on the
+ * city's clock at which the wait ends without a reply. An instant
+ * rather than the time left, because an answer is cached and carried,
+ * and a count of milliseconds left is wrong once it leaves the city.
+ */
+export const Waiting = Schema.Struct({
+  on: Address,
+  until: TimeMs,
+}).annotate({ identifier: "Waiting" });
+export type Waiting = typeof Waiting.Type;
+
+/**
  * One run, as a reader needs it. The client folds the live stream for
  * itself; this shape is what a query answers about runs it never saw,
  * which is why it carries the position rather than the whole history.
@@ -701,6 +713,7 @@ export const RunSummary = Schema.Struct({
   run: RunId,
   started: Schema.optional(Schema.NullOr(TimeMs)),
   task: Schema.optional(Schema.NullOr(Schema.String)),
+  waiting: Schema.optional(Schema.NullOr(Waiting)),
   who: Schema.String,
 }).annotate({ identifier: "RunSummary" });
 export type RunSummary = typeof RunSummary.Type;
