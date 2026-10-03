@@ -31,7 +31,6 @@
 use std::collections::BTreeMap;
 
 use crate::node_id::NodeId;
-use crate::share::WHOLE_PPB;
 
 mod blocking;
 mod node;
@@ -44,7 +43,3 @@ pub use node::{Held, PlanExit, PlanNode, StopCause};
 pub struct PlanTree {
     pub(crate) nodes: BTreeMap<NodeId, PlanNode>,
 }
-
-/// The whole plan in billionths, re-exported where progress is read so a
-/// renderer does not have to know which module the constant lives in.
-pub const PLAN_WHOLE_PPB: u64 = WHOLE_PPB;

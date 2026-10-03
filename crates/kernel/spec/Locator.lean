@@ -16,6 +16,8 @@
 
 ```rust
 pub struct B3Hash([u8; 32]);            // 全库唯一哈希值类型；hex64 小写呈现
+impl B3Hash { pub const fn from_bytes(bytes: [u8; 32]) -> Self;  pub fn as_bytes(&self) -> &[u8; 32];
+              pub fn digest(bytes: &[u8]) -> Self; }   // 链之外的全部内容哈希只经 digest 产出
 pub struct GitOid([u8; 20]);            // 40 位十六进制小写；serde 与 B3Hash 同形
 impl GitOid { pub fn parse(raw: &str) -> Option<Self> }   // 长度不对即拒，恒不补零
 pub enum Range { Lines { from: u64, to: u64 },   // 1 起、闭区间

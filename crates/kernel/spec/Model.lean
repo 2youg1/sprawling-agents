@@ -230,7 +230,7 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 
 /-! D6 定规：请求借用会话与工具表，断点是请求的注记
 
-**决定**：`ChatRequest<'a>` 的 `messages` 与 `tools` 是 `Cow<'a, [_]>`；回合组请求时借用 `Conversation` 与 catalog 的工具表，不复制。消息断点从 `ChatMessage` 挪到请求上的 `MessageBreakpoint`，兼容格式经 `ChatRequest::carries_breakpoint(index)` 问某条消息是否带断点。要跨调用留住请求的地方（保温续约）持 `ModelRequest<'static>`，自己付一次拷贝。
+**决定**：`ChatRequest<'a>` 的 `messages` 与 `tools` 是 `Cow<'a, [_]>`；回合组请求时借用 `Conversation` 与 catalog 的工具表，不复制。消息断点从 `ChatMessage` 挪到请求上的 `MessageBreakpoint`，兼容格式经 `ChatRequest::carries_breakpoint(index)` 问某条消息是否带断点。要跨调用留住请求的地方（保温续约）持 `ModelRequest<'static>`，经 `ModelRequest::into_owned`（它调 `ChatRequest::into_owned`）自己付一次拷贝。
 
 **理由**：请求若持有会话与工具表，每一回合就把整段会话与整张工具表各复制一次，会话越长复制越多，而请求活不过这一次调用。断点标在消息上时，标记就得先拿到一份可写的拷贝；标在请求上，借用才成立。计划只锚尾消息，所以一个两值枚举就够，也写不出越界的下标。
 

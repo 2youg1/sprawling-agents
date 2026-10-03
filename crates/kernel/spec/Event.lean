@@ -17,7 +17,8 @@ import crates.kernel.spec.Event.Kind
 ```rust
 pub struct RunId(Uuid);                 // uuid v7 仅人读标识；kernel 不生成
 impl RunId { pub const CITY: RunId;     // nil UUID：city 级事件哨兵
-             pub fn from_bytes([u8;16]) -> Self;  pub fn parse(&str) -> Result<Self, AxError>; }
+             pub fn from_bytes([u8;16]) -> Self;  pub fn parse(&str) -> Result<Self, AxError>;
+             pub fn as_bytes(&self) -> &[u8; 16]; }
 // 反序列化：人读格式（JSON 行、帧）只收 parse 认的那一种拼写；二进制格式（views 快照的 postcard）
 // 按 uuid 的 16 字节读回，与序列化对称——否则存着 RunId 的 views 快照与 twin 都解不回来。
 pub struct Seq(u64);
@@ -46,6 +47,9 @@ impl Payload {
     /// 借出而不复制：serde_json 的 `&Map` 反序列化器直接读持有的载荷，
     /// 读一次只分配 T 自己拥有的字段，不先克隆整张 map。
     pub fn read<T: DeserializeOwned>(&self) -> Result<T, AxError>;
+    pub fn as_map(&self) -> &Map<String, Value>;
+    /// 交出 map 本身：就地改写再造新载荷的读者不必多复制一份。
+    pub fn into_map(self) -> Map<String, Value>;
 }
 
 pub struct EventDraft {                 // 调用方给的一半：语义内容
@@ -68,6 +72,8 @@ impl EventRecord {
 impl EventKind { pub fn records_a_moment(&self) -> bool; }   // model_called、model_returned、tool_called、tool_result
 impl EventRecord { pub fn moment(&self) -> Option<TimeMs>; }  // 记时刻的种类且 v ≥ 2 → Some(t)；其余 None
 pub struct EventRef { seq: Seq, kind: EventKind }   // 字段私有；无公开构造子
+// kernel::origin：一个 session 从哪里分出来
+pub struct Origin { pub run: RunId, pub at_seq: Seq }   // 来源 run，与分支继承的它的最后一行
 // event::who：载荷里一行的行动者（信封的 who 仍是字符串，见 kernel 规格 §3 第 5 条）
 pub enum Who { City, Person, Resident(Address) }    // 线上 "city" | "person" | 居民地址，与账本旧行同拼
 impl Who {

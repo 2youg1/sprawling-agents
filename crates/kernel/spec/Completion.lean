@@ -24,9 +24,14 @@ impl Evidence {
     pub fn refs(&self) -> &[EventRef];
 }
 pub enum Completion { Done(Evidence), Limit, Cancelled }
+impl Completion { pub fn name(&self) -> &'static str;
+                  pub fn extend_payload(&self, map: &mut Map<String, Value>) -> Result<(), AxError>; }
+                  // 单向投影进事件载荷：`completion`，Done 另带证据的 {seq, kind}；刻意不 serde——反序列化会凭空铸出 EventRef
 
-pub struct PlannedProgress { pub done: u32, pub blocked: u32, pub total: u32 }
-impl PlannedProgress { pub fn ratio(&self) -> (u32, u32); }      // (done, total)；呈现方自算百分比
+pub struct PlannedProgress { pub done: u32, pub blocked: u32, pub total: u32,
+                             pub done_ppb: u64, pub blocked_ppb: u64 }   // 按计划自己的份额加权，十亿分之一（share::WHOLE_PPB）
+impl PlannedProgress { pub fn ratio(&self) -> (u32, u32);        // (done, total)；呈现方自算百分比
+                       pub fn weighted(&self) -> (u64, u64); }   // (done_ppb, WHOLE_PPB)：按份额而不是按行数
 pub struct UnplannedProgress { pub steps: u32, pub budget: BudgetUse }   // 无 ratio 方法：类型层诚实（A17）
 pub enum Progress { Planned(PlannedProgress), Unplanned(UnplannedProgress) }
 ```
