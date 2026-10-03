@@ -66,8 +66,14 @@ impl SigningKey {
     /// `E_CONFIG_INVALID` for text [`written`] cannot produce: a wrong
     /// length, a character outside the alphabet, or stray bits at the end.
     pub fn from_sealed(seed: &Sealed<String>) -> Result<Self, AxError> {
-        let _ = seed;
-        Err(unreadable_seed())
+        let text = seed.expose();
+        let bytes = Zeroizing::new(crate::pairing::decode(text).ok_or_else(unreadable_seed)?);
+        let seed: Zeroizing<[u8; SEED_BYTES]> =
+            Zeroizing::new(bytes.as_slice().try_into().map_err(|_| unreadable_seed())?);
+        if written(&seed).as_str() != text.as_str() {
+            return Err(unreadable_seed());
+        }
+        Self::from_seed(&seed)
     }
 
     /// The public half, as a device or the city publishes it.
@@ -238,7 +244,12 @@ pub(crate) fn crypto_failure(action: &str) -> AxError {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    clippy::string_slice,
+    reason = "test code"
+)]
 mod tests {
     use super::*;
 
