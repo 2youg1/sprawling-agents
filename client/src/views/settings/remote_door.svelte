@@ -68,21 +68,27 @@
       clearTimeout(patience);
       patience = undefined;
     }
-    if (sent !== null) send(sent);
+    if (sent !== null && !send(sent)) {
+      // Nothing left the page, so the request ends as a refusal does,
+      // and the line says why in the page's own words rather than in a
+      // code the city never sent.
+      move({ kind: "refusal", code: "E_WIRE_MISMATCH" });
+      told = { key: "remote_door_unsent", code: "" };
+      return;
+    }
     told = toldOf(before, next);
     if (next.focus !== before.focus) void tick().then(() => {
         focus(next);
       });
   }
 
-  function send(sent: DoorSent): void {
-    if (!u.send(doorCommand(sent, lastingMs()))) {
-      move({ kind: "refusal", code: "E_WIRE_MISMATCH" });
-      return;
-    }
+  // Whether the command left the page; a closed link sends nothing.
+  function send(sent: DoorSent): boolean {
+    if (!u.send(doorCommand(sent, lastingMs()))) return false;
     if (sent.kind === "confirm") patience = setTimeout(() => {
         move({ kind: "settled" });
       }, RECEIPT_MS);
+    return true;
   }
 
   function lastingMs(): number {
@@ -109,7 +115,7 @@
   }
 
   function close(): void {
-    told = u.send(doorCommand("close", 0)) ? { key: "remote_door_closing", code: "" } : { key: "remote_door_unknown", code: "" };
+    told = u.send(doorCommand("close", 0)) ? { key: "remote_door_closing", code: "" } : { key: "remote_door_unsent", code: "" };
   }
 
   const asking = $derived(door.phase.kind === "awaiting" || door.phase.kind === "confirming");

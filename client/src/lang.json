@@ -6970,5 +6970,9 @@
   "context_second_building": {
     "en": "the building whose second reminder is shown",
     "zh": "显示哪栋楼的第二级提醒"
+  },
+  "remote_door_unsent": {
+    "en": "the page is not connected to the city, so nothing was sent; try again once it reconnects",
+    "zh": "页面没有连上城，所以什么也没送出；重新连上后再试"
   }
 }
