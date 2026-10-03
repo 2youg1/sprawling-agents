@@ -48,7 +48,7 @@ pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str>;
 
 | 动作 | 起点 | 终点 | 子步 |
 |---|---|---|---|
-| ① install | 归档已就位（zip 在 scratch，网络不计） | 解出的可执行文件拉起 `version` 应答并退出 | 归档摘要校验（sha256）｜解包写可执行文件｜落位确认（进程创建＋运行到退出） |
+| ① install | 归档已就位（zip 在 scratch，网络不计） | 解出的可执行文件拉起 `version` 应答并退出 | 归档摘要校验（sha256，`digest`）｜解包写可执行文件（`unpack`）｜系统（`system`：spawn 调用发出到返回，进程创建与按需扫描器读新映像的等待都落在这里）｜产品（`product`：spawn 返回到 `version` 退出，产品自己的执行），见 D6 |
 | ② startup | `CreateProcess` 发出 | 轻命令 `version` 退出被观察到 | 进程创建（spawn 返回）｜程序运行（返回→退出） |
 | ③ raise_city | `assembly::init_city` 调用发出 | 调用返回（创世记录落盘，每条账各带自己的屏障） | 无子步切分（不插桩产品）；主导件由计数×地板归因 |
 | ④ open_session | `RunWorker::handle(Command::OpenSession)` 发出 | 调用返回（`session_opened` 已落账，房内下一 run 可开工即可接输入） | 同上 |
@@ -68,6 +68,8 @@ D2 **计时边界取「动作的可观察端点」，进程动作以退出为端
 D3 **安装边界含归档摘要校验、不含 PATH 写入。** 摘要校验（sha256）是 `install.sh`／`install.ps1` 从归档就位到解包之间必经的一步，删掉它测的就是不验摘要的安装，故计为安装的子步并单列读数。签名验签不在这次测量里：发行件签名的验签侧有设计而签名动作未接（`tools/xtask/Spec.lean` §8-29），读数里这一子步记 **0** 并注明；签名动作接上之后，此子步只增不删。PATH 写入（`sprawling install` 的注册表写与桌面广播）在边界外：它是一次性的桌面状态写入，第二次运行幂等（`PathEdit::AlreadyPresent`），计进每样本会把桌面状态写入误报成安装成本。被击败的备选：整段 `install.sh` 全测——含网络下载与 shell 启动，而网络不在本族的计时口径内。
 
 D4 **计量主语是 Rust measuring Main，不是 tools/adversary/ 也不是 criterion。** 四动作零行为断言，只计时；`tools/adversary/` 量化行为轨迹，Lean 侧不为墙钟定价。criterion 会是第二套仪表：本族挂 `just bench` 族，同一 wall-clock 口径（测而不门）。它拉起产品二进制——被测动作本身即进程边界；boundary 门判的是**检查**站哪一侧，其越过面 token（`CARGO_BIN_EXE`／`SPRAWLING_BIN` 等）本族一个不写，被测二进制取自构建档目录（`cargo build` 同时放置两个产物的地方），`just bench-startup` 先构建后测量，故不接手工路径也不会测到旧产物。被击败的备选：把四动作写进 `tools/adversary/`——那里没有秒表也没有本仓词汇，量出来的东西无法与 `just bench` 对表。
+
+D6 **安装的落位确认拆成「系统」与「产品」两步，读数不在本条里。** 旧的一步 `launch` 把首次拉起的整段算作一件，读出来它占了安装的九成（`tools/xtask/budgets.toml` 的 `[install]` 行），可是这九成里多少是本产品自己在跑、多少是操作系统在新映像第一次被执行时扫描它，从一件里分不出来，而两者的对策完全不同：前者改产品，后者只能改发布方式（签名、信誉）或交给 User 的机器设置。拆法沿用 ② startup 已有的分界：`spawn_version` 早就分别量出 spawn 调用的时长与此后到退出的时长，安装只是把这两段分别记下，不再相加。三个平台上的含义（推断，读数时核对）：Windows 上按需扫描在 `CreateProcess` 里阻塞，落在 `system`；macOS 上 Rust 的 spawn 在 exec 成功之后才返回，内核与 `syspolicyd` 对首次执行的评估若在 exec 之内就落在 `system`，若推迟到第一条指令之后就落在 `product`；Linux 上默认没有扫描器，`system` 只是 fork／exec 本身。被否决的做法：在产品里加计时点（`sprawling version` 打印自己的启动时刻）——那是为了测量往发给 User 的二进制里写东西，`xtask artifact` 不收；用 ETW 或 `fs_usage` 读扫描器——一份只在一个平台上存在的第二仪表。本条只加计时点，不取读数：读数由 `just bench-startup` 在测量那一轮取（`[install]` 行的 status）。
 
 D5 **被测可执行文件的名字在本 crate 只重述一处，注释点名它的权威。** `executable_name()` 拼的是 `install.rs` 装出来的那个名字：`INSTALLED_STEM` 的值 `sprawling` 加本平台后缀。该事实的权威是 `tools/xtask/src/platform.rs` 每平台的 `binary` 字段，`cargo xtask artifact` 把发行侧的四种拼法（工作流矩阵、两个安装脚本、npm shim）钉在它上面；citysim 这一处不在那四种之内，它是唯一需要这个名字的**测量**读者。够不到权威的原因是位置而非取舍：`install` 模块（`crates/sprawling/src/install.rs`）由 `crates/sprawling/src/main.rs` 声明，是二进制的模块，不可 import，而 `xtask` 是工具不是依赖。本 crate 内只留这一处拼写——`shipped_binary` 找的路径名与 `archive_of` 写出的 zip 成员名都读它。**重开参数**：这个名字若移进 `sprawling` lib 成为公共面，本函数改为读它，重述随之删除。
 -/
