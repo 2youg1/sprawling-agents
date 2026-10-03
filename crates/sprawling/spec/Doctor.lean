@@ -164,19 +164,21 @@ pub(crate) fn firefox() -> Presence;        // Gecko 族里运行中的机器有
 pub(crate) fn chromedriver() -> Presence;   // chromedriver 或 msedgedriver，先答上来的那个
 pub(crate) fn python_wasm() -> Presence;
 pub(crate) fn shell() -> Presence;
+pub(crate) fn pwsh() -> Presence;              // 表里的 `pwsh` 行（runtime D30）
+pub(crate) fn usable_pwsh() -> Option<PathBuf>; // 只在 `pwsh --version` 读出的主版本不小于 7 时
 pub(crate) fn execution_engine() -> Result<Box<dyn runtime::Sandbox>, AxError>;   // 从 workbench::engine 搬来
 pub(crate) const ENGINE_CARRIED: bool;                                             // cfg!(feature = "sandbox") 的唯一拼写
 pub(crate) fn components_dir() -> Option<PathBuf>;                                 // ~/.sprawling/components
 
 // accounting::worker::workbench::engine（仍是 adapter，但不再自己探测）
-pub(super) struct MachineHalf { python_wasm: Option<PathBuf>, shell: Option<PathBuf>, engine: Box<dyn Sandbox> }
-pub(super) fn machine_half(limits: &kernel::SandboxLimits) -> Result<MachineHalf, AxError>;
+pub(super) struct MachineHalf { python_wasm: Option<PathBuf>, shell: runtime::Shell, engine: Box<dyn Sandbox> }
+pub(super) fn machine_half(limits: &kernel::SandboxLimits, host: &ExecHost) -> Result<MachineHalf, AxError>;
 
 // bin::browser_bidi::engine（decision）：吃 doctor 的三态答案，拒绝时说出是哪一种
 pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Result<Engine, AxError>;
 ```
 
-- **谁问谁**：`workbench::engine::machine_half` 问 `doctor::host` 三次（组件、shell、引擎），它自己只留一条判定——shell 只在冻结配置说 `shell = true` 时才递给 bench，组件缺席不拦派活（python 臂在被调用时才拒），引擎起不来则拒派活。`browser_bidi::lazy::start` 不再按名字盲起，改为 `Engine::choose(&host::firefox(), &host::chromedriver())` 后按路径起。accounting 的 mcp 模块里的 `PYTHON_WASM_ENV` 删除。
+- **谁问谁**：`workbench::engine::machine_half` 问 `doctor::host` 三次（组件、shell、引擎），它自己只留一条判定——shell 只在冻结配置说 `shell = true` 时才递给 bench，问的是 `shell` 还是 `pwsh` 由冻结配置的 `interpreter` 定（`crates/runtime/Spec.lean` §8-13-2 D30），组件缺席不拦派活（python 臂在被调用时才拒），引擎起不来则拒派活。`browser_bidi::lazy::start` 不再按名字盲起，改为 `Engine::choose(&host::firefox(), &host::chromedriver())` 后按路径起。accounting 的 mcp 模块里的 `PYTHON_WASM_ENV` 删除。
 - **`SPRAWLING_PYTHON_WASM` 只拼一次，且保留为兼容读法**：拼写唯一处是 `doctor::table::PYTHON_WASM_VARIABLE`。**选的是「变量优先、组件目录次之」**：一个人显式指了一处，就该用那一处；指错了（变量设了但文件不在）报 `Absent(VariableNamesNothing)` 而**不悄悄落到组件目录**——被否决的备选是「目录优先、变量兜底」，它会让一个设错的变量永远没人发现。没设变量时看 `~/.sprawling/components/python-wasi/python.wasm`。测试遍历本 crate 的 `src/`，断言含该字面量的文件恰好一个。
 - **`Broken` 是第三态，不是 `Absent` 的别名**：一个在 PATH 上却起不来的二进制（权限、坏文件、架构不符）、一个存在却没有那份文件的组件目录（下载中断）、一个读不了的目录（权限），三者对 verdict 都算缺，但每一个都带着自己的原因进报告行——**绝不以「absent」一词吞掉一个可以说清的故障**。`Version` 的四态同理：说了、没说、说的不是文本、超时没说；后三者仍算 Present（§8-166 已定：不说话的工具仍是装了的工具）。
 - **本二进制起的每个子进程都由 `doctor::running::stop` 结束**：`ask_version` 读到第一行后杀掉子进程，用的是安装程序超时后走的同一段——杀不掉或收不了尸都不是可以丢掉的 `Result`，而是一句带进 `Fault::Unreadable` 的话，于是「本城起了一个它停不掉的进程」这件事排在它印出的版本号之前给人看。`Fault::Unreadable` 因此是「这台电脑不让本城把这一项做完」的那一态，它携带的那句话就是全部解释，`describe` 原样印出。

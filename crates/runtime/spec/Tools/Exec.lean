@@ -145,11 +145,12 @@ pub struct ExecSetup {                 // 形状 2 值类型
     pub workdir: PathBuf,
     pub mounts: Vec<Mount>,
     pub python_wasm: Option<PathBuf>,
-    pub shell: Option<PathBuf>,
+    pub shell: Shell,                  // D30：缺席、要了而没有、或找到的那一个与它是哪种解释器
     pub fuel: Fuel,
     pub env_passthrough: Vec<EnvVarName>,
     pub domain: Address,
     pub run: RunId,                    // 这张工具台服务的 run：它起的后台命令只交还给它（§8-28-1 第 4 条）
+    pub policy: PolicyReader,          // 这个 run 的策略格（§8-55、§8-62）
 }
 pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Result<ExecTool, AxError>;
 ```
@@ -207,13 +208,25 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 
 - **配置项**：楼的 `CONFIG.toml` 里 `[sandbox]` 一节加 `interpreter`，取 `"system"`（缺省）或 `"pwsh"`。它与 `shell` 是两件事：`shell` 决定 shell 臂给不给，`interpreter` 决定给的时候是哪一个。字段在 `kernel::config::SandboxLimits` 上，规格的所有者是 `crates/kernel/spec/Config.lean` §8-22，按层解析的规则与 `SandboxLimits` 的其余字段相同。写的是名字而不是路径：`SandboxLimits` 的文档说，哪个 shell 程序存在、装在哪里属于机器而不属于城，城搬到另一台机器上不能带着原来那台主机上的路径。
 - **校验**：拼写只有这两种，别的拼写在解析处以 `E_CONFIG_INVALID` 拒绝，主语是这一个键，恢复语给出两种拼法；不猜，也不当作缺省。
-- **在主机上解析**：`"system"` 照今天：Windows 上 `%COMSPEC%`（缺省 `cmd.exe`）加 `/C`，macOS 与 Linux 上 `$SHELL`（缺省 `/bin/sh`）加 `-c`（doctor 的 SHELL 行，`crates/sprawling/src/doctor/table.rs`）。`"pwsh"` 在三个平台上都是 `PATH` 上的 `pwsh`，加 `-NoLogo -NoProfile -NonInteractive -Command`；doctor 加一行探它，并以 `pwsh -NoLogo -NoProfile -NonInteractive -Command $PSVersionTable.PSVersion.Major` 读出主版本，小于 7 算坏的。楼要了 `"pwsh"` 而所在的主机上没有能用的 pwsh 7 时，shell 臂缺席，调用时以 `E_TOOL_UNAVAILABLE` 拒绝，原因点名 pwsh 7，恢复语是「装 PowerShell 7，或把 `interpreter` 改回 `"system"`」。不退回 cmd：为 pwsh 写的命令行在 cmd 下是另一种语言，退回只会把一次清楚的拒绝换成一次看不懂的失败。
-- **账本上留什么**：shell 臂的结果载荷加 `interpreter` 字段，值是实际起动的解释器的程序名（去掉扩展名、小写：`cmd`、`pwsh`、`sh`、`bash`、`zsh`……）。配置不入账本（§8-31），所以要按 shell 统计，这次跑的是哪一个只能记在结果上。加这个字段之前的记录没有它，按它们实际跑的那一个计：那时只有 `"system"`。
-- **失败类别**：一个纯函数按 `interpreter`、`exit_code` 与 `stderr` 把一次 shell 臂的结果分进 `CommandNotFound`、`Syntax`、`Encoding` 或不分类，住在 `tools::exec` 里，与 shell 臂同一个所有者，因为每个解释器打印什么只该有一处权威；按 shell 统计的折叠是账本的一个只读视图，住在 accounting 的视图里，W6 先登记进模块图。规则：
+- **在主机上解析**：`"system"` 照今天：Windows 上 `%COMSPEC%`（缺省 `cmd.exe`）加 `/C`，macOS 与 Linux 上 `$SHELL`（缺省 `/bin/sh`）加 `-c`（doctor 的 `shell` 行，`crates/sprawling/src/doctor/table.rs`）。`"pwsh"` 在三个平台上都是搜索路径上的 `pwsh`，加 `-NoLogo -NoProfile -NonInteractive -Command`；doctor 的 `pwsh` 行以 `pwsh --version` 探它（印 `PowerShell 7.4.6` 一类的一行），`doctor::host::usable_pwsh` 只在这一行的主版本不小于 7 时给出路径，主版本读不出也不给。机器那一半（`accounting::worker::workbench::engine::machine_half`）按 `interpreter` 问 `ExecHost` 的 `shell` 或 `pwsh`，交给 bench 的是一个值：
+
+```rust
+pub enum Shell {                                    // runtime::tools::exec，ExecSetup.shell
+    Absent,                                         // 没有一层要 shell 臂，或平台的 shell 在这台机器上不能用
+    Missing { asked: kernel::Interpreter },         // 楼要了这个解释器，这台机器上没有能用的
+    Found { program: PathBuf, interpreter: kernel::Interpreter },
+}
+```
+
+  `Missing { asked: Pwsh }` 在调用时以 `E_TOOL_UNAVAILABLE` 拒绝，主语点名 pwsh 7，恢复语是「install PowerShell 7, or set `[sandbox] interpreter = "system"` in this building's CONFIG.toml」。不退回 cmd：为 pwsh 写的命令行在 cmd 下是另一种语言，退回只会把一次清楚的拒绝换成一次看不懂的失败。三个平台行为相同，只有 `"system"` 指的程序随平台变。
+- **账本上留什么**：shell 臂的结果载荷加 `interpreter` 字段，值是实际起动的解释器的程序名（去掉扩展名、小写：`cmd`、`pwsh`、`sh`、`bash`、`zsh`……），拼写只在 `tools::exec::outcome::interpreter_name` 一处。配置不入账本（§8-31），所以要按 shell 统计，这次跑的是哪一个只能记在结果上。加这个字段之前的记录没有它，按它们实际跑的那一个计：那时只有 `"system"`，折叠把它们计在 `system` 名下。转进后台的 shell 命令（`outcome: backgrounded`）当时没有退出码，不计。
+- **失败类别**：`tools::exec::outcome` 的纯函数 `FailureClass::of(interpreter, exit_code, stdout, stderr)` 把一次 shell 臂的结果分进 `CommandNotFound`、`Syntax`、`Encoding` 或不分类（`None`）；按 shell 统计的折叠 `ShellTally::absorb(result)` 读一条 `ToolResult` 载荷里的 `result`。两者住 `outcome`，因为那个文件是 exec 结果键名（`arm`、`exit_code`、`stdout`、`stderr`、`interpreter`）的唯一主人，折叠读的正是这几个键；每个解释器打印什么也只在这一处。`runtime` 在根上导出 `FailureClass`、`ShellTally`。账本的视图（accounting 的 views）读记录、把每条 `result` 交给 `ShellTally`，折出来的是每个解释器的调用数与每类失败数。规则：
   - `CommandNotFound`：cmd 退出码 9009；sh 系退出码 127；pwsh 的 stderr 带错误 id `CommandNotFoundException`。
   - `Syntax`：sh 系退出码 2 且 stderr 带 `syntax error`；pwsh 的 stderr 带 `ParserError`；cmd 的 stderr 带 `was unexpected at this time.` 或 `The syntax of the command is incorrect.`。
   - `Encoding`：`stdout` 或 `stderr` 里有 U+FFFD。载荷里的文字经 `String::from_utf8_lossy` 写下（`crates/runtime/src/tools/exec/outcome.rs`），所以替换字符就是一段不是 UTF-8 的字节——cmd 按控制台代码页输出，中文 Windows 上是 936。一个真的打印了 U+FFFD 的程序也会被计进来，这是多计的一侧。
   - 先看退出码，再看不随语言变的错误 id，最后才看英文文字：cmd 的提示随 Windows 的显示语言变，非英文系统上 cmd 的语法错误落进「不分类」，这一点照实写在视图的说明里。本仓不收一张各语言提示的表：那会是第二份 Microsoft 文字的权威。
+  - 退出码为 0 的结果不分类：一条成功的命令即使输出里有 U+FFFD 也不算失败。
+- **现状**：配置项、`Shell`、拒绝、`interpreter` 字段、分类与 `ShellTally` 已落地，测试在 `tools::exec::tests` 与 `crates/city/src/config_layers/tests.rs`。把 `ShellTally` 接成一个线上查询（一条 `Query` 与它的 `Answer`、`WIRE_V`、`client/src/wire.ts`）与页面上的一张表尚未做；楼页的沙箱卡只把读到的 `interpreter` 原样送回，不给选择控件，改它今天靠手写 `CONFIG.toml`。
 - **何时再定默认**：视图按解释器给出每类失败占 shell 臂调用的比例；pwsh 7 的成功率明显更高时，把读数交 User 再定缺省（D88 第 7 条读作这样，待 User 确认）。不做 pwsh 预热池：启动时间不是问题（D88 第 7 条）。
 - **program 臂在 `CopiedTree` 下每条命令前同步副本的成本**：计数已经有了（`Placed::work()`，§8-13-2），读数归波后的 mid 读数，判定它的证据与重开参数写在 §8-13-2 的「未决」与 D10。
 
