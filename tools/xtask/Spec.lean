@@ -1008,16 +1008,25 @@ pub(super) struct Shot { /* route, fold, folds, frame, lighting, states */ }
 pub(super) fn routes_in(route_ts: &str) -> Vec<String>;   // BARE 的键，去掉空键，按表序
 pub(super) fn missing(dir: &Path, shots: &[Shot]) -> Vec<String>;   // 没写出或写空的文件
 pub(super) fn index(shots: &[Shot]) -> String;
-// xtask::shots::camera —— 形状 4 适配器：开引擎、量页、拍一张
+// xtask::shots::camera —— 形状 4 适配器：开引擎、量页、拍一张；每次开页一个资料目录、一个 stderr 文件，失败的一例重拍一次
+pub(super) const CASE_PATIENCE: Duration;   // 45 s：一例的上限
+fn twice<T>(case: &str, attempt: impl FnMut(Attempt) -> Result<T, XtaskError>) -> Result<(T, Took), XtaskError>;
+// xtask::render::engine::launch —— 形状 4 适配器：起一个引擎进程，等它（与它的进程树）走完
+pub(crate) struct Launch<'a> { cmd: &'a str, stderr: Stderr<'a>, patience: Duration, after_exit: AfterExit }
+pub(crate) enum Stderr<'a> { Discarded, KeptIn(&'a Path) }
+pub(crate) enum AfterExit { Drain, AwaitTree(Duration) }
+pub(crate) fn run(command: Command, launch: &Launch) -> Result<Vec<u8>, XtaskError>;
 ```
 
 - **一页是一条路由在一个窗口里画出的样子，一页里的状态按屏往下拍。** 内容在 `<main>` 里滚动，所以先用 `--dump-dom` 开一次，量 `<main>` 的滚动高度与可见高度，得出要几屏（`fold`）；再每屏、每种光照开一次，用 `--screenshot` 拍下 `<main>` 滚到那一屏时的窗口。量的那一次同时记下每个顶层 `section[aria-label]` 的位置，索引里每张图后面列出落在这一屏里的状态名。文件名 `<route>-<fold 两位>-<宽>-<光照>.png`。
-- **光照经引擎的配色偏好给，不改页面。** 每次运行用一个新的引擎资料目录，页面里的光照设置因此是缺省的 `system`，按 `prefers-color-scheme` 画；引擎开关 `--blink-settings=preferredColorScheme=0` 是暗、`=1` 是亮。这台机器自己的明暗设置于是不影响结果：不带这个开关时，无头引擎跟着操作系统走。
+- **光照经引擎的配色偏好给，不改页面。** 每次开页用一个新的引擎资料目录，页面里的光照设置因此是缺省的 `system`，按 `prefers-color-scheme` 画；引擎开关 `--blink-settings=preferredColorScheme=0` 是暗、`=1` 是亮。这台机器自己的明暗设置于是不影响结果：不带这个开关时，无头引擎跟着操作系统走。
 - **两种来源**：缺省开 `just build-web` 产出的包，与 `render` 一样给包旁边写一份插了脚本的副本（`sprawling-shots.html`，带 `render::engine::preloads` 给出的预取行），跑完删掉；给了 `--origin` 时，路由页开 `<origin>/#/<route>`，那是一座正在服务的城，页面上是真数据，页面不能插脚本，所以每页只拍一屏。
 - **拍完核对**：每张计划中的图都要在、都不为空，否则整次运行以 `XtaskError::Cmd` 失败并列出缺的文件名——引擎有时退出了却没写图，一份缺图的索引读起来像是那一页什么都没有。
-- **失败**：没有包时 `XtaskError::Doc`，recovery 是 `just build-web`；没有引擎时 `XtaskError::Doc`，recovery 是装一个 Chromium 一族的浏览器或设 `SPRAWLING_BROWSER`；读不出 `BARE` 时 `XtaskError::Doc` 点名 `route.ts`；引擎失败沿用 `render::engine::dump` 的 `XtaskError::Cmd`。
+- **每次开页互不相扰。** 资料目录取标准库的 `std::env::temp_dir()` 下 `sprawling-shots-<pid>/<序号>`，拍完删掉，运行结束时连上一级一起删；引擎的 stderr 写进 `target/shots/engine/<图名>.log`（量屏那一次是 `<route>-<宽>-folds.log`），随图一起上传，卡住的一例因此留下引擎自己说的话。等引擎退出之后，再等它的进程树放开 stdout 管道（`AfterExit::AwaitTree`，上限 10 s），下一次开页才开始：浏览器先退出、辅助进程后走，是 `render::engine::launch` 已知的行为。
+- **一例超时就杀整棵树，重拍一次，点名这一例。** 一例（量一次屏或拍一张图）超过 `CASE_PATIENCE` 就杀掉引擎的进程树——Windows 用 `taskkill /T /F /PID <pid>`，macOS 与 Linux 把引擎放进自己的进程组（`CommandExt::process_group(0)`）再 `kill -KILL -- -<pid>`——然后同一例重来一次，重拍的 stderr 写进 `<图名>.retry.log`。第二次也失败时整次运行以 `XtaskError::Cmd` 失败，`cmd` 点名这一例，`msg` 给出两次各自的原因；重拍成功的例在输出里逐个列出。
+- **失败**：没有包时 `XtaskError::Doc`，recovery 是 `just build-web`；没有引擎时 `XtaskError::Doc`，recovery 是装一个 Chromium 一族的浏览器或设 `SPRAWLING_BROWSER`；读不出 `BARE` 时 `XtaskError::Doc` 点名 `route.ts`；引擎失败沿用 `render::engine::launch::run` 的 `XtaskError::Cmd`。
 
-**测试**：`shots::pages::tests::every_route_gets_four_pictures`：一份夹具 `route.ts` 读出的每条路由，在两个宽度、两种光照下各有一张图，夹具目录里缺一张时 `missing` 恰好点名那一张。真跑要先 `just build-web`，归整合者或前端会话。
+**测试**：`shots::pages::tests::every_route_gets_four_pictures_and_a_missing_one_is_named`：一份夹具 `route.ts` 读出的每条路由，在两个宽度、两种光照下各有一张图，夹具目录里缺一张时 `missing` 恰好点名那一张。`shots::camera::tests`：`twice` 第一次失败第二次成功时报 `Took::Retried`，两次都失败时的错误点名这一例。`render::engine::launch::tests` 用测试二进制自己当夹具进程：stderr 进了 `KeptIn` 的文件；一个超时的进程连同它的子进程被杀掉，管道随即关闭；`AwaitTree` 收得到辅助进程在浏览器退出之后才写的输出。真跑要先 `just build-web`，归整合者或前端会话。
 
 **本节属门禁机具，与产品代码分开提交。**
 
