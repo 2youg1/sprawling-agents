@@ -45,6 +45,8 @@ Rust 实现对模型的一致性由测试检查，不由证明：每个模块旁
 一层深（delegate 值上没有 delegate 方法）已在 `kernel::delegation` 定下，本 crate 只把它当作前提，不重议。
 
 **未定：验证节点。** 今天 `Handback::of` 收一个 `done_check_passed: bool` 与验证者的名字，装配层以 `CITY_VERIFIER` 为验证者（`crates/accounting/src/worker/dispatching/handback.rs`）。要定的是：验证是否改由另一地址上一个全新会话跑 `done_check` 后才铸 `Artifact`；验证者是否不得是图中任何实现者、改了代码须第三方再验；JOB 是否钉住被审文档的 Locator。能定下它的证据是一条测试：子 run 以 Done 结束而 `done_check` 失败时不铸 `Artifact`。
+
+**未定：停下的节点对图做什么。** 一个节点以 `Handback::Stopped` 回程时，信投进父房间，join 不收它，所以依赖它的节点永远不就绪、图永远不汇合；装配层只在图删去之后才为父房间敲门（`crates/accounting/src/worker/settling/landing/discharging.rs`），父房间因此不被叫醒，直到别的信到达。`spec/Workshop.lean` 的 `vectorStopped` 记着这条 trace。要定的是：停下的节点是让图关掉（与 D14 的父 run 被取消同一种关法），还是让父房间照样被敲门、由父 run 决定重摆或放弃。能定下它的证据是一次真实的图里停下的节点之后，父 run 读到了什么、它做了什么。
 -/
 
 /-! ## 4 现状分析
@@ -52,6 +54,8 @@ Rust 实现对模型的一致性由测试检查，不由证明：每个模块旁
 十八个模块（§1）。**`send` 在调用时生效，取走的信被拿着直到读过它的回答落账（D7、D8 已落进 Rust）。** `SignalDesk` 经它的 `Post` 写 `signal_enqueued`：城里的 `Post` 经 relay 把那一行交给记账线程，记账线程在把这一行展示给各个 fold 时把信投进收信房间（`accounting::worker::waking` 的 `deliver_sent`）：房间空着就进队列，有 run 在读就进那个 run 的 `Mailslot`，它在下一个安全点经 steer 那扇门或 `pull` 读到。安全点取走的信被 desk 拿着（`held`），run 的下一次 `SafePoint::BeforeWave`（此时这一回合的 `model_returned` 已落盘）才为它们各写一行 `signal_consumed`；run 在那之前离开，`take_inbox` 把它们放回队列最前，落地时为本房间敲一次门（`knock_for_returned`）。
 
 敲门也在投递时：记账线程为每个在跑的 run 记着它说话的身份（房间、run policy、`KnockChain`，`accounting::worker::driving::flight` 的 `Speaker`），`deliver_sent` 投完信就为没人在跑的收信房间敲门，同一次展示之后 `answer_knocks` 开出那一跑，所以收信 run 的 `run_started` 在发信 run 的 `run_frozen` 之前。仍与意图不符的有两处。其一，`delegate` 仍只答「在哪个房间开」，子 run 在父 run 落地时才开、父 run 被取消就不开（`accounting::worker::settling::landing`）。其二，`send` 没有同步开关（D9）。D10 的投递时状态由投递处盖在信上（`Signal::delivered`，`SenderState`）：经 relay 投递的信盖 `running`，回程（handback）按子 run 的结局盖 `frozen` 或 `cancelled`；落地文字在 `@<address>` 之后、`pull` 的每一行在 `sender` 里写出它；从账本重建的信不带这个状态，因为账本不记它。失败的子 run 不回程，所以 `failed` 今天无处可盖。一个敲门在房间队列已空时被跳过（`answer_knocks`），因为它要叫醒读的那封信可能已被在场的 run 读过。
+
+workshop 与 `spec/Workshop.lean` 的整段 trace 模型（性质 4–7，D14）还差三处。其一，图在父 run 以 Done 或 Limit 落地时才登记进 `Collaborating.workshops`，父 run 被取消或失败时连同没派的节点一起丢掉；模型要它在 `lay_out` 那一刻登记、父 run 被取消或失败时关图而在飞的节点照跑。只把节点改成调用时派出、登记仍留在落地，是 `withoutCallRegistration_strands` 那条反例：比父先落地的节点读不到图，后继不派。其二，`delegate` 与 `workshop` 经同一张 `DelegateDesk` 派活，桌子的 `take` 在回合落定后一次取走；调用时派出要一个只交出新增的游标，`asked` 仍须看见这一回合的全部请求，`status.children` 才不少报。其三，`Underway::hand_next` 在中途被桌子拒绝时，已问过的节点留在已派集与桌子里，这一次调用不交出它们；模型里「已派」就是「已派出」，两者不能分开。
 
 本 crate 消费 kernel 的判定面：`kernel::gate::spawn`（经 `delegate_tool`）、`kernel::goal::detect_conflict`（经 `arbiter`）、`kernel::delegation`、`kernel::PlanTree`（经 `claim_tool`）。生产消费者是 `crates/sprawling` 的装配层：`accounting::worker::collaborating` 按房间保存 join、图与目标表，工人把各张桌子借给工具，在一轮活落地时取走效应并写账。
 -/
@@ -106,7 +110,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - workshop 是派生的扇出，不是第二条派生通路：每个节点都过 `DelegateDesk::ask`，一层深与准入两道门是同一段代码，工具的 `Effect` 也是 `Spawn`。
 - 节点 id 就是它的房间地址，与 `Handback::node()` 同一取法。
 - `lay_out` 只派 `Underway::hand_next(done)`，`done` 是这个房间的 join 已收下 Artifact 的节点。回答里 `schedule` 是整张图的序，`handed` 是这次派出的那一组，其余在 `waiting`。
-- 下一组就绪集在 handback 到达时派出：摆出的 `Underway` 在 run 结束时由装配层收走，按房间与 join 并排保存（`Collaborating.workshops`）；一个节点的 handback 汇入父房间的 join 之后，装配层对同一个 `Underway` 调 `hand_next`，新就绪的节点按上一个兄弟节点的派法（同一个父 run、同一个 mode）派出；全部汇合后这张图删去。再摆同一张图仍然允许，桌子带着这个房间的已派集开张，在飞的节点不会再派一次，新的 `Underway` 取代旧的。图只在内存里：进程重启后由这个房间后来的某个 run 再摆一次，join 已收下的节点被跳过。
+- 下一组就绪集在 handback 到达时派出：摆出的 `Underway` 在 run 结束时由装配层收走，按房间与 join 并排保存（`Collaborating.workshops`）；一个节点的 handback 汇入父房间的 join 之后，装配层对同一个 `Underway` 调 `hand_next`，新就绪的节点按上一个兄弟节点的派法（同一个父 run、同一个 run policy）派出；全部汇合后这张图删去。父 run 被取消或失败时，它摆出的图不被收走，没派的节点就此不派；登记时刻与模型的差别见 §4。再摆同一张图仍然允许，桌子带着这个房间的已派集开张，在飞的节点不会再派一次，新的 `Underway` 取代旧的。图只在内存里：进程重启后由这个房间后来的某个 run 再摆一次，join 已收下的节点被跳过。
 - 一个 run 一张图：第二次 `lay_out` 即拒，一个 session 里两张图是「这次在造什么」的两个答案。不认的动词被拒绝，不舍入到无害的那个。两张桌子取锁失败时的拒词只有 `poisoned(which)` 一个家。
 - join 属房间而不属 run：子 run 可能比派它的父 run 活得久，回程可能落在父房间的下一个 run 里，所以 `FanIn` 由装配层按房间保存，并与 Inbox 折自同一批 `signal_enqueued` 行。
 
@@ -128,7 +132,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 
 **`collab::handback`**（形状 1 判定）。`Handback::Finished(Artifact)` 与 `Stopped { claim, because }`；`of`、`by`、`node`（即子房间的地址）、`signal`、`from_signal`（`signal` 的唯一逆）。
 
-- 父拿得到子的结果，经房间的 Inbox：回程走 `Signal`，父 run 还在跑就在它下一个安全点经 steer 那扇门收到，已经离开就为父房间敲门开 run（D7）；`status.signals_pending` 自动报数。
+- 父拿得到子的结果，经房间的 Inbox：回程走 `Signal`，父房间有 run 在读就在它下一个安全点经 steer 那扇门收到；没有，信留在房间队列里，装配层在这个房间的图删去之后才为它敲门（`crates/accounting/src/worker/settling/landing/discharging.rs` 的 `discharge`）：还有节点在外时每个节点各自回程，图汇合时叫醒一次，父 run 读到的是全部结果，而不是每回一个节点就开一跑。父房间没有图（单个 `delegate`）时，每次回程都敲门。`status.signals_pending` 自动报数。
 - 城市做验证者，不是子自己：`Claim::verified` 拒生产者自验，而 `Completion::Done(Evidence)` 是城市观察到的事实。
 - 一个拒不是一个错误：`of` 把 `verified` 的 `Err` 收成 `Stopped`，`because` 携拒词原文，因为在这条路上它是一个结果。不新增 EventKind：回程落在 `signal_enqueued` 里。
 - `from_signal`：不是 handback 的信号答 `None`，是 handback 而读不出的答 `E_WIRE_MISMATCH`；两者都答 `None`，「子停了」与「这一行本 build 读不懂」在父那里就是同一种沉默。载荷的键住内部标签枚举 `HandbackBody`，写读两端同经它。
@@ -184,7 +188,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 
 /-! ## 9 工作流程
 
-装配层为一轮活造桌子（`SignalDesk`、`GoalDesk`、`PrDesk`、`ClaimDesk`、`DelegateDesk`、`WorkshopDesk`、`ArchiveDesk`），把 `Arc<Mutex<..>>` 句柄交给对应工具注册进 bench；模型调工具，桌子判定并排效应（登记与认领在调用时问记账线程的 `GoalBooking` 与 `Booking`，归档在调用时经 `Filer` 落账落盘）；这轮活落地时工人取走效应，先写账再改投影；派出的代理在父回合落定后开 run，结束时经 `Handback::signal` 回到父房间的 Inbox，并汇入那个房间的 `FanIn` 与 `Underway`。
+装配层为一轮活造桌子（`SignalDesk`、`GoalDesk`、`PrDesk`、`ClaimDesk`、`DelegateDesk`、`WorkshopDesk`、`ArchiveDesk`），把 `Arc<Mutex<..>>` 句柄交给对应工具注册进 bench；模型调工具，桌子判定并排效应（登记与认领在调用时问记账线程的 `GoalBooking` 与 `Booking`，归档在调用时经 `Filer` 落账落盘）；这轮活落地时工人取走效应，先写账再改投影；派出的代理今天在父回合落定后开 run（D7 要它在调用时开，差别见 §4），结束时经 `Handback::signal` 回到父房间的 Inbox，并汇入那个房间的 `FanIn` 与 `Underway`。
 -/
 
 /-! ## 10 实现逻辑
@@ -199,7 +203,7 @@ D5 三件工具还是一件多臂工具：每个机制一件。被否决的是�
 
 D6 分一行计划要不要握着它：要，由桌子在调用时判，落地不再判。`ClaimDesk::split` 只分本次 drive 握着的那一行，没握着就以 `E_INVALID_ARGS` 拒绝，三段式的主体说这个 run 握着什么，恢复语叫它先认领那一行（`spec/Claim.lean` 的 `split_needs_hold`）；`still_true` 只问认领，不为拆分另判一个期待状态。理由有三条。其一，拆分于是走过认领，而认领在调用时由 `Booking` 对全城判、落地时对盘上那份判，所以从同一份计划派出的两个 run 不会把同一行各分一次（`split_of_moved_row_is_stale`）；不经认领的两次拆分都会落下，`kernel::spine::insert_children` 在已有子行之后接着编号，第二组子行不报错地长出来（`withoutHold_splits_twice`）。其二，拒绝在模型调用的那一刻到达，模型当场拿到下一步，而不是被告知分好了、落地时才被丢掉（`tools/adversary/Spec.lean` §4 第八个发现）。其三，`split` 本来就是一个干着活的 run 发现活更多时说的话（`collab::claim_tool` 的模块注释），握着那一行是它的前提。被否决的是让落地按桌子看到的状态判、允许分一行没人认领的计划：那样的拆分绕过 `Booking`，并发的两次拆分都按 `Not started` 落下；要挡住它就得给拆分另立一种预订，那是「谁在动这一行」的第二个权威。代价是一个只想分计划的 run 多付一次 `claim` 调用。重开参数：出现只分计划、不干那一行活的角色（例如市长把一件事分给几栋楼，G4），而 `Booking` 能为一次拆分预订那一行时，改由预订判，桌子不再要求握着。
 
-D7 信与派活在发出时生效（ruling）。`signal send` 与 `delegate` 在调用时写账（`signal_enqueued`，派活另有父的 `tool_called`），收信房间或子房间有 run 在跑，信在它下一个安全点经 steer 那扇门到达（`runtime::turn` 的同一个 `consume_boundary`，`crates/runtime/spec/Turn.lean`）；没有 run 在跑，装配层当场敲门开 run；发信方接着做自己的事。这是人的 ruling：原本的设计意图就是「发一个 steer 出去」。被否决的是今天的做法：信留在发信方的桌上，发信 run 冻结之后才落账、投递、敲门。它把一段多步的对话变成一串串行的 run，每一步都要等上一个 run 整个跑完；它也让派出的子 run 在父冻结之后才开，父因此看不到自己派出的活在跑。模型证明的是：信不丢（`Collab.Delivery.no_loss`、`sent_grows`）、不被消费两次（`consumed_once`）、一个房间按 seq 取（`take_is_oldest`，同一发信方的信因此按发出次序到达），重放读账本按 seq 得同一次序（`seq_is_send_order`）。投递只读注入的时钟与账本次序，与平台无关：Windows、macOS、Linux 上同一段 trace 得同一结果。重开参数：出现一种信，它在发信方的工作落定之前到达会让收信方读到不成立的事实（例如引用一个还没写盘的文件）；那种信另立一个「落定后投递」的 kind，而不是改回全体。
+D7 信与派活在发出时生效（ruling）。`signal send` 与 `delegate` 在调用时写账（`signal_enqueued`，派活另有父的 `tool_called`），收信房间或子房间有 run 在跑，信在它下一个安全点经 steer 那扇门到达（`runtime::turn` 的同一个 `consume_boundary`，`crates/runtime/spec/Turn.lean`）；没有 run 在跑，装配层当场敲门开 run；发信方接着做自己的事。这是人的 ruling：原本的设计意图就是「发一个 steer 出去」。被否决的是今天的做法：信留在发信方的桌上，发信 run 冻结之后才落账、投递、敲门。它把一段多步的对话变成一串串行的 run，每一步都要等上一个 run 整个跑完；它也让派出的子 run 在父冻结之后才开，父因此看不到自己派出的活在跑。模型证明的是：信不丢（`Collab.Delivery.no_loss`、`sent_grows`）、不被消费两次（`consumed_once`）、一个房间按 seq 取（`take_is_oldest`，同一发信方的信因此按发出次序到达），重放读账本按 seq 得同一次序（`seq_is_send_order`）。workshop 摆出的图同理在调用时登记给父房间，节点与父 run 谁先落地都行（`spec/Workshop.lean` 性质 4–7，父 run 被取消或失败时怎样见 D14）。投递只读注入的时钟与账本次序，与平台无关：Windows、macOS、Linux 上同一段 trace 得同一结果。重开参数：出现一种信，它在发信方的工作落定之前到达会让收信方读到不成立的事实（例如引用一个还没写盘的文件）；那种信另立一个「落定后投递」的 kind，而不是改回全体。
 
 D8 取走不等于消费：读过它的那次模型回答落账，才是消费（F8）。安全点取走的信由取走它的 run 拿着；那个 run 下一次模型回答落账（`model_returned`）时，它拿着的每一件各写一行 `signal_consumed`；run 在那之前离开房间（Done、失败、取消一样），它拿着的信回到房间队列，并为房间敲一次门（`Collab.Delivery.leave_requeues`）。已消费的不再回来（`consumed_stays`）。被否决的有两种。其一是今天的「取走即消费」：被取消的 run 取走的信既不在队列里，也没有模型读过它，信就丢了（`withoutRequeue_loses`）。其二是「run 以 Done 结束才算消费」：一个模型已经读过、已经照着做了一半的信，在 run 被取消后会再投一次，副作用发生两次。以模型回答落账为界，被读过的信留在 transcript 里，下一个 run 从 handoff 读到它；没被读过的信重新投递。
 
@@ -210,6 +214,8 @@ D12 空计划的第一行由谁写：这栋楼的 Mayor，经 `plan add`（roadm
 D10 发信方之后被取消或失败：信已经是历史，不撤回。收信方看到的信带着发信 run 在投递那一刻的状态（仍在跑、已冻结、被取消、失败），由投递处从账本读出，写进落地文字 `@<address>` 之后；收信方据此决定还要不要照做。被否决的是取消时撤回已发的信：账本只追加，撤回要写第二条事实去否定第一条，而收信方可能已经照着做了，撤回只能让两边对「发生了什么」各持一份。
 
 D11 一个房间同一时刻只有一个 run 读它的队列，连锁敲门由此有界。对账的结论：「一个房间同一时刻只有一个 run」在今天的代码里不成立：人的派活与 pursuit 可以在一个有人的房间再开一个 run，那个 run 拿到一份空的备用队列（`accounting::worker::rooms::RoomQueues::lend` 的 `QueueTenure::ASpare`）。成立的是更窄的那条：房间的队列同一时刻只借给一个 run，敲门在房间有人时推迟、等那个 run 离开再敲（`accounting::worker::waking` 的 `answer_knocks`），一个房间至多挂一次敲门（`accounting::worker::doorstep::Doorstep::queue`）。模型证明的正是这条（`knock_once`：敲门在 `knocks` 里不重复，有 run 在跑的房间不挂敲门）。A→B→C→A 的连锁因此不会在一个房间里叠出第二个 run：信落进那个房间的队列，由正在读它的 run 在安全点收到；连锁的长度另由 `CONVERSATION_HOPS_MAX` 封顶（`crates/sprawling/Spec.lean` §8-46-12）。被否决的是把规则加强成「一个房间一个 run」：它会拒掉人对一个忙房间的直接派活，而那是人有权要的东西。
+
+D14 父 run 被取消或失败时，它的图关掉：不再派新节点，已派出的节点照跑完、照回程（推断选择，待人确认）。D7 之后节点在调用时就在跑，所以要定的不再是「派不派第一批」，而是父 run 以 `Cancelled` 或失败落地之后，后来就绪的节点还派不派。选关图有两条理由。其一，取消说的是人不要这一回合接着做下去，今天的代码为此让被取消的回合什么也不派（`crates/accounting/src/worker/settling/landing.rs` 的 `conclude`）；照派后继，就是在人喊停之后替那一回合开新活。其二，失败的回合没有落下它读过 handback 之后会说的话，图的后半段建在一个没写完的回合上；与取消同一种关法，「父 run 没有以 Done 或 Limit 落地就不再派」是一条规则而不是两条。已派出的节点不撤回，理由同 D10：它们已经是历史，各自有自己的 `Cancel`；它们的 handback 照样投进父房间，带着子 run 的结局。被否决的有两种。其一是不论父 run 怎样落地都派到图汇合：它让一次取消只停下父 run 自己，图照样把城里的活一节一节开下去。其二是取消父 run 时连带取消在飞的节点：那是一次撤回，一个子 run 已经写下的东西不会因此消失，且它把「停一件」变成「停一棵树」，后者已有 `Halt`。关法是 `spec/Workshop.lean` 的 `holds` 一处：要改成照派，只改它对 `cancelled` 或 `failed` 的答。模型只读动作次序，次序取自账本 seq 与注入的时钟，Windows、macOS、Linux 上同一段 trace 得同一结果。重开参数：人要一次取消也停下整张图里在飞的节点，或者失败的父 run 大多死在摆完图之后的一次 provider 瞬时错误上、而后半段图仍然成立。
 
 成本：每件工具在 catalog 里占一行，坐在缓存前缀里，一行背后的动词数不增加常驻成本，行数与字节数才增加（§14）。Signal 在 prefix 里占零字节，常驻的只有 `status` 的 `signals_pending`；pull 的 bandwidth 在接收方。拒词报出此刻的状态与一条可执行的下一步，因为只说「不行」的拒绝会让模型换个说法再试。
 -/
@@ -247,7 +253,7 @@ D2 没有草稿退回机制。房间没有版本，发言不带「作者所见�
 
 /-! ## 16 测试与约束
 
-证明：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`，`spec` 门判后两条的文本形状。咬得动的演示：`Collab.Inbox.withoutSeen_duplicates`、`Collab.Fanin.withoutGuard_self_verifies`、`Collab.Workshop.withoutHanded_hands_twice`、`Collab.Triage.withoutCap_starts_work`、`Collab.Claim.withoutHold_splits_twice`、`Collab.Delivery.withoutRequeue_loses`，各自说明拿掉哪条守卫后对应的性质不再成立。
+证明：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`，`spec` 门判后两条的文本形状。咬得动的演示：`Collab.Inbox.withoutSeen_duplicates`、`Collab.Fanin.withoutGuard_self_verifies`、`Collab.Workshop.withoutHanded_hands_twice`、`Collab.Workshop.withoutCallRegistration_strands`、`Collab.Triage.withoutCap_starts_work`、`Collab.Claim.withoutHold_splits_twice`、`Collab.Delivery.withoutRequeue_loses`，各自说明拿掉哪条守卫后对应的性质不再成立。
 
 实现一致性：逐模块 `tests.rs`；`tests/ui/` 钉住两条判负线；`tests/pr_flow.rs` 走一遍 PR；`cargo nextest run -p sprawling-collab`。模型的证明不是 Rust 实现的证明：两者之间由这些测试连着。
 -/

@@ -1526,7 +1526,7 @@ fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 | `Command::Dispatch` | `Asked` | 醒来的邻居接着答 |
 | `pursue` 的一行 | `Row { addr, node }` | 该行仍 ready 则追求停下 |
 | `tick`／`wake`／`answer_knocks`／`answer_approval` | `Unasked(_)` | 无人可答，起不来时记一条 `Refuse` 诊断 |
-| 委派子活 | `Child { parent }` | 向提问的房间投 handback |
+| 委派子活 | `Child { parent }` | 向提问的房间投 handback 并汇入它的 join，派出那个房间的图因此就绪的节点；房间没有图、或图已汇合删去时为它敲门（`crates/collab/Spec.lean` §8 `collab::handback`、`crates/collab/spec/Workshop.lean`） |
 | 继任 | 继承前任的 `Owing` | 义务随活走：链条结束时才兑现 |
 
 **义务跟着活走，不跟着轮次走**：继任者是同一件工作接着做，所以要 handback 或要回信的那一位，
