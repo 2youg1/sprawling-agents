@@ -97,7 +97,7 @@ pub(super) fn one_level_down(Command) -> Command;
 
 **决定（平台调用的取法）**：子进程的 CPU 优先级取第一档「安全 Rust」——`creation_flags` 与 `nice` 都是对外只给安全接口的现成路，不需要 Zig 叶子，也不需要 Lean 证明边界。**被否**：①起动后再对子进程调 `SetPriorityClass`／`setpriority`——要 FFI（`unsafe` 或 Zig 叶子），且子进程在改档之前已经以正常档跑了一段；②Unix 上用 `CommandExt::pre_exec` 调 `nice(2)`——`pre_exec` 本身是 `unsafe`。**重开参数**：Unix 主机上出现不带 `nice` 的受支持平台，或测得多包一层 `nice` 的起动开销占到一条命令墙钟时间的可见比例。
 
-**逐 run 的 Job Object（`runtime::backlog::jobs`，形状 4 adapter）**：派出的命令起动之后，谁在吃内存要能归到派出它的 run，而一条 `cargo test` 真正吃内存的是它起的 `rustc` 与测试进程，不是 `cargo` 自己。所以 Windows 上每个 run 一个匿名 Job Object：`Backlog::run` 起动的子进程在登记进表的同一时刻装进它 owner 的 job（第一次装时创建），job 里的进程再起的进程由系统自动装进同一个 job，于是 job 的进程表就是这个 run 的整棵进程树。`Backlog::release(owner)` 丢掉这只 job 的句柄；job 不设 kill-on-close，丢句柄不杀进程，杀进程仍只归 `release` 与 `halt`。macOS 与 Linux 上没有 Job Object：今天两者都只读到命令自己的 pid（下面的 `unfollowed` 计每一条）；按 run 的 CPU 份额在 macOS 上是 `taskpolicy -c utility`，在 Linux 上是 cgroup v2 的 `cpu.weight`，都在 D29，进程组作为读数的对应物尚未接入。
+**逐 run 的 Job Object（`runtime::backlog::jobs`，形状 4 adapter）**：派出的命令起动之后，谁在吃内存要能归到派出它的 run，而一条 `cargo test` 真正吃内存的是它起的 `rustc` 与测试进程，不是 `cargo` 自己。所以 Windows 上每个 run 一个匿名 Job Object：`Backlog::run` 起动的子进程在登记进表的同一时刻装进它 owner 的 job（第一次装时创建），job 里的进程再起的进程由系统自动装进同一个 job，于是 job 的进程表就是这个 run 的整棵进程树。`Backlog::release(owner)` 丢掉这只 job 的句柄；job 不设 kill-on-close，丢句柄不杀进程，杀进程仍只归 `release` 与 `halt`。macOS 与 Linux 上没有 Job Object：两者都只读到命令自己的 pid（下面的 `unfollowed` 计每一条），因为进程组与 cgroup 的进程表都还没有接成读数；按 run 的 CPU 份额在 macOS 上是 `taskpolicy -c utility`，在 Linux 上是 cgroup v2 的 `cpu.weight`（没有委派时只有 `nice` 一档），分别在 D29 与 D33。
 
 ```rust
 pub struct RunProcesses { pub pids: BTreeSet<u32>, pub unfollowed: u32, pub share: Shares }
@@ -113,14 +113,14 @@ impl Backlog {
 - `RunProcesses.share` 是这个 run 此刻实际拿到的份额：要了而平台给了，就是要的那一个；要了而平台拒绝（叶子调用失败、cgroup 不可写）或这个平台没有份额，就是 `Unset`。
 - `processes` 按 run 给出它此刻在表里的进程：owner 是这个 run（窗口内或已转后台）的每条命令自己的 pid，并上这个 run 的 job 的进程表（job 只列还活着的进程）。已经结束、还没被 `harvest` 的命令仍列出自己的 pid，读数的一方在它后面读不到计数。已 `release` 的命令（owner 为 nobody）不归任何 run。
 - `unfollowed` 是这个 run 的命令里有几条只读到了命令本身、没读到它起的进程：Windows 上创建 job、装进 job 或读 job 的进程表失败的那几条（这一次读数里整个 run 的命令都算），Unix 上是每一条，因为 Unix 上没有 Job Object（进程组是它的对应物，尚未接入）。装不进 job 不让命令起动失败：job 只服务于读数，为读数让一条构建失败是把代价付错了地方，失败落在 `unfollowed` 里给读数的人看。
-- `share`：Windows 上 job 在创建的同一刻经 `desktop_ffi::cpu::job_share` 设权重 `RUN_CPU_WEIGHT`（5），设上了是 `Weighted`；job 拒了权重时 job 照旧跟进程树，这个 run 读作 `Unset`。macOS 与 Linux 上恒为 `Unset`：macOS 没有按 run 的份额（D29），Linux 的 cgroup 份额还没有接上。作业级内存上限只属四臂对照的 ③ 臂，本构建传 0，即不设。
+- `share`：Windows 上 job 在创建的同一刻经 `desktop_ffi::cpu::job_share` 设权重 `RUN_CPU_WEIGHT`（5）与 `Shares::CpuAndMemory { limit }` 要的内存上限，设上了这个 run 读到的就是要的那一个值；job 拒了时 job 照旧跟进程树，这个 run 读作 `Unset`。Linux 上 harness 自己的 cgroup 可写时，这个 run 的 `cpu.weight` 与（要了内存上限时的）`memory.max` 就是它读到的份额（`runtime::backlog::cgroup`，D33）；不可写或收不下时读作 `Unset`。macOS 上恒为 `Unset`：`taskpolicy` 是命令外面的一层包装，没有 job 或 cgroup 可以读回（D29）。
 - 失败：表够不着时 `E_STORAGE_FATAL`，与 `Backlog` 的其他读法相同。
 - 每个进程的内存与 CPU 不在这里读：本 crate 不读平台计数（见下），由 sprawling 的 `bin::monitor` 按这里给出的 pid 去读。
-- 证据：`crates/runtime/src/backlog/tests.rs` 的 `a_run_owns_the_processes_its_commands_started`——一条经 `run` 转后台的命令，其 pid 出现在它 owner 的那一项里，别的 run 那一项里没有；Windows 上 `unfollowed` 为 0、`share` 为 `Weighted`，别处为 `Unset`；`release` 之后这个 run 不再出现。
+- 证据：`crates/runtime/src/backlog/tests.rs` 的 `a_run_owns_the_processes_its_commands_started`——一条经 `run` 转后台的命令，其 pid 出现在它 owner 的那一项里，别的 run 那一项里没有；Windows 上 `unfollowed` 为 0、`share` 是要的那一个，Linux 上 cgroup 委派时同样、macOS 上与不可写的 Linux 上是 `Unset`；`release` 之后这个 run 不再出现。
 
 **决定（job 的取法）**：Job Object 经 `win32job` 2.0.3（`Job::create`、`assign_process`、`query_process_id_list`，对外只给安全接口），本 crate 不写 `unsafe`；子进程的句柄经标准库的 `AsRawHandle` 取得。**被否**：①一整座城一只 job——分不出 run，而分解到 run 正是要它的原因；②只记直接子进程的 pid——`cargo`、`npm`、`sh -c` 这类命令自己几乎不占内存，读数会把一条吃掉几 GiB 的构建报成几 MiB；③`CREATE_SUSPENDED` 起动再装 job 再恢复——恢复线程要 FFI。代价：子进程从起动到装进 job 之间有一小段时间，那一段里它再起的进程不在 job 里（`cmd /C` 这类命令的第一个孙进程在这一段里起动的可能很小，但不为零）。**重开参数**：一个对外只给安全接口的 crate 能以挂起态起动子进程并在恢复前装进 job，或者读数显示 `unfollowed` 之外还有漏掉的孙进程。
 
-**未决（§3 口径）**：核心线程升到正常档之上一级与空转安全阀在 `crates/sprawling/Spec.lean` §8-93；派出进程的 CPU 份额在 Windows 上已经按 D29 落地（每个 run 的 job 带权重 5，经 `crates/desktop/ffi` 的 Zig 叶子），作业级内存上限的叶子函数也已在（`desktop_ffi::cpu::job_share` 的 `memory`），但只属四臂对照的 ③ 臂，物理内存的读数还没有经 `bin::assembly` 交进本 crate，所以本构建不设；macOS 上派出的命令已包在 `/usr/sbin/taskpolicy -c utility` 里（`yielding` 的 `start_below_the_core`，找不到它时只包 `nice`），Linux 的 cgroup `cpu.weight` 尚未落地；这条路不在第一档，是因为 `win32job` 2.0.3 的安全接口够得着 Job Object 本身（上文「job 的取法」），够不着这两项限额：它对外给出的内存限额只有按进程的工作集上限（`limit_working_memory`，即 `JOB_OBJECT_LIMIT_WORKINGSET`），限的是常驻页而不是提交量，不兑现「资源」一轴，且设它要不要特权随账户令牌而变（§8-13-2 记着两次读数：经 `win32job` 得 os error 1314，直接调 `SetInformationJobObject` 得成功），所以它不是任何一项限额的取法。作业级提交上限（`JOB_OBJECT_LIMIT_JOB_MEMORY`）不要特权，但设它的字段在 `win32job` 里是 crate 私有的，`process-wrap` 10.0.1 与 `windows-spawn` 0.1.0 也不设它。一个对外只给安全接口的 crate 公开 `JOB_OBJECT_LIMIT_JOB_MEMORY` 与 CPU 速率控制时，D29 的叶子函数换成它。重命令共用的额度池尚未落地：池的大小由测得的核数与可用内存推出，哪些命令算重由城配置给默认表；可用内存的读数只在 sprawling 的 `bin::monitor::memory` 里读（`crates/sprawling/Spec.lean` §8-94），由 `bin::assembly` 交给本 crate，本 crate 不读平台。内存紧时新 run 排队已在 `crates/sprawling/Spec.lean` §8-46-3。
+**未决（§3 口径）**：核心线程升到正常档之上一级与空转安全阀在 `crates/sprawling/Spec.lean` §8-93；派出进程的 CPU 份额在 Windows 上已经按 D29 落地（每个 run 的 job 带权重 5，经 `crates/desktop/ffi` 的 Zig 叶子），作业级内存上限的叶子函数也已在（`desktop_ffi::cpu::job_share` 的 `memory`），要不要它由人的 `[core] placement` 那一臂定（`crates/sprawling/spec/Serving/Placement.lean` D47）；macOS 上派出的命令已包在 `/usr/sbin/taskpolicy -c utility` 里（`yielding` 的 `start_below_the_core`，找不到它时只包 `nice`），Linux 的 cgroup 委派由 `runtime::backlog::cgroup` 读（D33）；这条路不在第一档，是因为 `win32job` 2.0.3 的安全接口够得着 Job Object 本身（上文「job 的取法」），够不着这两项限额：它对外给出的内存限额只有按进程的工作集上限（`limit_working_memory`，即 `JOB_OBJECT_LIMIT_WORKINGSET`），限的是常驻页而不是提交量，不兑现「资源」一轴，且设它要不要特权随账户令牌而变（§8-13-2 记着两次读数：经 `win32job` 得 os error 1314，直接调 `SetInformationJobObject` 得成功），所以它不是任何一项限额的取法。作业级提交上限（`JOB_OBJECT_LIMIT_JOB_MEMORY`）不要特权，但设它的字段在 `win32job` 里是 crate 私有的，`process-wrap` 10.0.1 与 `windows-spawn` 0.1.0 也不设它。一个对外只给安全接口的 crate 公开 `JOB_OBJECT_LIMIT_JOB_MEMORY` 与 CPU 速率控制时，D29 的叶子函数换成它。重命令共用的额度池尚未落地：池的大小由测得的核数与可用内存推出，哪些命令算重由城配置给默认表；可用内存的读数只在 sprawling 的 `bin::monitor::memory` 里读（`crates/sprawling/Spec.lean` §8-94），由 `bin::assembly` 交给本 crate，本 crate 不读平台。内存紧时新 run 排队已在 `crates/sprawling/Spec.lean` §8-46-3。
 -/
 
 /-!
@@ -202,13 +202,40 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
   - **内存上限**：`Shares::CpuAndMemory { limit }` 时设，`limit` 是物理内存的一半；物理内存由 sprawling 的 `bin::monitor::memory` 读出，`bin::serving::placement::run_shares` 算出上限放进这个值，本 crate 不读平台。超过时是这个 run 的进程树里的分配失败（编译器报内存不足），城与别的 run 照常。只有 `"soft_shares"` 打开它（D47），默认按读数定。
   - **退路**：叶子调用失败时 job 不设份额、不设上限，命令照常起动（与装不进 job 同一条判断：为读数或份额让一条构建失败是把代价付错了地方），这个 run 的 `RunProcesses.share` 读作 `Unset`。
 - **macOS (d)**：没有 Job Object。派出的命令在 `nice` 外面再包一层 `/usr/sbin/taskpolicy -c utility`，把它与它的后代的 QoS 压到 utility，系统于是先把它们放到效率核上（外部命令，第一档，与 `nice` 同一种做法，§8-13-3）；这一层是 macOS 的 CPU 份额一项，`Shares::Unset` 时不包；找不到 `taskpolicy` 时只包 `nice`。没有不要特权的内存上限：`setrlimit` 要在 `pre_exec` 里调，`pre_exec` 是 `unsafe`，而且 macOS 不执行 `RLIMIT_AS`；所以 macOS 上这一项不可用，`CpuAndMemory` 在 macOS 上只兑现 CPU 一半，doctor 照实说。
-- **Linux (d)**：harness 自己所在的 cgroup（`/proc/self/cgroup` 的 `0::` 行，挂在 `/sys/fs/cgroup` 下）可写时，harness 先把自己移进一个子 cgroup `core`（cgroup v2 规定有进程的 cgroup 不能再往下分资源），在父 cgroup 的 `cgroup.subtree_control` 打开 `cpu` 与 `memory`，每个 run 建一个子 cgroup，写 `cpu.weight`（每个 run 一样，100）与 `memory.max`（同 `RUN_JOB_MEMORY_SHARE`），子进程起动后把 pid 写进那个 cgroup 的 `cgroup.procs`；全是标准库读写文件，第一档。与 Windows 的 job 一样，起动到写进 cgroup 之间有一小段，那一段里起的孙进程留在 `core` 里。不可写时（没有 systemd 的委派，CI 主机与许多桌面都是这样）只靠 `nice 10`，doctor 说「每个 run 的 CPU 份额：只有 nice（cgroup v2 未委派）」。
+- **Linux (d)**：harness 自己所在的 cgroup 是 `/proc/self/cgroup` 的 `0::` 行所指的那一个，挂在 `/sys/fs/cgroup` 下（`runtime::backlog::cgroup`，D33）。它可写时，harness 先把自己移进一个子 cgroup `core`（cgroup v2 规定有进程的 cgroup 不能再往下分资源，`core` 把父 cgroup 空出来），在父 cgroup 的 `cgroup.subtree_control` 打开 `cpu` 与 `memory`，然后每个 run 建一个子 cgroup `run-<RunId>`：`cpu.weight` 写 100（每个 run 一样），`memory.max` 只在 `Shares::CpuAndMemory { limit }` 时写 `limit`（D47 的 `"soft_shares"` 臂给的是物理内存的一半），命令起动后把它的 pid 写进这个子 cgroup 的 `cgroup.procs`（同一 run 的后续命令只写自己的 pid，份额在建 cgroup 时已经写下）。全是标准库读写文件，第一档。与 Windows 的 job 一样，起动到写进 cgroup 之间有一小段，那一段里起的孙进程留在 `core` 里。不可写时（没有 systemd 的委派，CI 主机与许多桌面都是这样）只靠 `nice 10`，doctor 说「runs' commands compete thread by thread and run below the core: the cgroup is not delegated」。cgroup 收不下一个 run 时（建目录或写文件失败）这个 run 读作 `Unset`，命令照常起动：与 Windows 的叶子失败同一条判断。委派与否由 `runtime::platform_shares` 一处读出，doctor 与接线读同一个答案。
 - **(e) `WindowsJobObject` 臂**：今天不构造，理由按 `win32job` 2.0.3 今天公开的接口重新判过（§8-13-2），仍是两轴兑现不了。资源一轴由上面的叶子兑现；进程树一轴要「挂起态起动、装进 job、再恢复」：挂起态起动有安全接口（`CommandExt::creation_flags` 加 `CREATE_SUSPENDED`），装 job 有（`win32job::Job::assign_process`），恢复没有——`std::process::Child` 不交出主线程句柄，`ResumeThread` 或 `NtResumeProcess` 都要 FFI，而 `PROC_THREAD_ATTRIBUTE_JOB_LIST` 要的 `CommandExt::raw_attribute` 既是 `unsafe` 又只在 nightly 上。于是同一个叶子再加一个「恢复这个进程」的函数之后，这一臂按原清单构造：文件系统（副本）、进程树、CPU 与内存上限都保，网络与用户不保；那时 Windows 上 `choose` 有了它就选它。
 - **为什么不缩清单**：一只只保文件系统与「起动之后的进程树」的 job 臂，对 Agent 来说与 `CopiedTree` 几乎一样，多出的只是 kill-on-close；多一臂只多一句要读的话，不多一项保证。
 
 **被否**：①`win32job` 的调度级别（`limit_scheduling_class`，安全接口）当作 CPU 份额——它只改同一优先级类里各 job 线程的时间片长短，每个 run 的级别都一样时什么也没分；②工作集上限（`limit_working_memory`）——限的是常驻页，不是提交量，而且要不要特权随账户令牌而变（§8-13-2）；③硬的 CPU 速率上限（`JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP`）——机器空着时也让核闲着，与「忙了立刻换下一个核」相反；④每条命令一只 job——份额要按 session 分，不是按命令；⑤Linux 上用 `systemd-run --user --scope -p CPUWeight=…` 包每条命令——每条命令多一次 D-Bus 往返与一个 scope 的起动，而且要有用户级 systemd，不是每台机器都有；直接写委派的 cgroup 文件更少依赖。
 
 **重开参数**：四臂对照里 ② 臂（缺省，含 CPU 份额）的 p99 与 p999 不优于 ① 臂，而把份额单独拆出来也无益——那就整个 (d) 都不做；③ 臂（再加内存上限）不比 ② 差、也没有让真实构建失败——那就把内存上限放进缺省；或者一个对外只给安全接口的 crate 公开 job 的 CPU 速率控制与作业级内存上限（叶子函数换成它）；或者 Rust 稳定版提供 `raw_attribute`（(e) 的恢复函数就不需要了）。
+-/
+
+/-! D33 每个 Linux run 的 cgroup 由 `runtime::backlog::cgroup` 一个模块建，根是参数（D29）
+
+**接口**（`crates/runtime/src/backlog/cgroup.rs`，形状 4 adapter）
+
+```rust
+pub enum PlatformShares { None, Cpu, CpuAndMemory }  // 这台机器给得了哪几半（D29）；根上导出
+pub fn platform_shares() -> PlatformShares;          // 一处读委派：Linux 的 cgroup 可写给 CpuAndMemory，否则 None
+struct Cgroups { ... }                                // 每个 run 一个子 cgroup，父 cgroup 由建它的那一方给
+impl Cgroups {
+    fn adopt(parent: &Path, pid: u32) -> Cgroups;     // 移进 core、打开 cpu 与 memory
+    fn enter(&mut self, run: RunId, pid: u32, asked: Shares) -> Shares;  // 这个 run 现在拿到的份额
+    fn held(&self, run: RunId) -> Shares;
+}
+```
+
+**决定**：
+
+- **根是参数**：`Cgroups::adopt` 收一个父 cgroup 路径，生产路径给的是 `/sys/fs/cgroup` 接上 `/proc/self/cgroup` 的 `0::` 行，测试给的是一个临时目录。于是这个模块的全部读写能在 Windows 上用一个仿 `/sys/fs/cgroup` 的目录树验证，不必等一台 Linux 机器：cgroup v2 的接口就是几个普通文件，读写它们用的也是普通文件读写。
+- **可写性是干读**：`platform_shares` 与 `adopt` 都先看父 cgroup 的 `cgroup.procs` 与 `cgroup.subtree_control` 能不能以写方式打开；打开失败即没有委派，什么也不建。这是在不改动机器状态的前提下能问的问题，也是 doctor（另一个进程，只知道这台机器、不知道服务进程建过什么）读到的同一个答案。真正动状态的是 `adopt` 的三步：建 `core`、把自己的 pid 写进 `core/cgroup.procs`、把 `+cpu +memory` 写进父 cgroup 的 `cgroup.subtree_control`。
+- **一个 run 一个孩子，名字是 `run-<RunId>`**：第一条命令进表时建目录并写下份额，之后同一条 run 的每条命令只把自己的 pid 写进 `cgroup.procs`——cgroup 是进程表，不是每个命令一张。第一条命令的 pid 与份额同一次写进，所以这个 run 从第一条命令起就在自己的份额里；写 pid 失败不让命令失败，这个 run 读作它已经拿到的份额（Windows 的 job 装不下时同样只落在 `unfollowed` 里）。
+- **读回**：`RunProcesses.share` 读的是这个模块记下的、当时确实写下的值；`Shares::Unset` 一个字节也不写，一个目录也不建，所以四臂对照的 ① 臂在 Linux 上不留任何 cgroup。`release` 丢掉这个 run 的记录，不删目录：cgroup 里有活进程时目录删不掉，而停进程仍只归 `release` 与 `halt`。
+
+**被否**：①`systemd-run --user --scope` 包每条命令：要用户级 systemd、每条命令一次 D-Bus 往返（D29 已否）；②对每条命令建一个 cgroup：份额按 run 分，不按命令分（与 job 同理）；③建之前用 `stat` 的权限位判断可写：cgroup 文件系统的权限位由内核按挂载参数报出，不以写方式打开一次就问不出「写下去会不会被拒」；④把父 cgroup 的位置编译进常量：容器与 systemd 的用户实例把 harness 放在哪一层各不相同，`/proc/self/cgroup` 是唯一的权威。
+
+**重开参数**：Linux 的读数显示按权重分与 `nice` 相比没有差别（与 D29 的四臂对照同一个判据）；或者一个文件系统事件使 harness 的 cgroup 在进程中途变得可写——那时才需要重试 `adopt`，今天 `adopt` 只在第一条要份额的命令进表时试一次。
 -/
 
 /-! D30 shell 默认仍是平台的 shell；一栋楼可以在 `CONFIG.toml` 里换成 pwsh 7；exec 的失败按 shell 分类，从账本折出（TF5，D88 第 1、7 条，D83 第 10 条，D94）
