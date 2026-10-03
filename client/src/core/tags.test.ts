@@ -9,7 +9,7 @@ import { get, readable } from "svelte/store";
 import { Address, Seq, Tag } from "../wire";
 import type { Answer, Command, SessionTags } from "../wire";
 import type { Asking } from "./asking";
-import { PIN, given, inUse, keepTags, readTag, retagged, stripped } from "./tags";
+import { PIN, given, inUse, keepTags, kept, readTag, retagged, stripped, tagsOf } from "./tags";
 
 const CITY = Address.make("harbour");
 const MAYOR_ROOM = Address.make("hall/mayor");
@@ -37,13 +37,17 @@ describe("the tags a person gives sessions", () => {
     expect(retagged(held, { ...at(3), tags: [] })).toEqual([{ ...at(9), tags: tags("x") }]);
   });
 
-  test("the filter row offers this city's tags once each, without the pin", () => {
-    const held: SessionTags[] = [
-      { ...at(3), tags: tags("pin", "zeta") },
-      { ...at(9), tags: tags("alpha", "zeta") },
-      { city: Address.make("fjord"), room: MAYOR_ROOM, began: Seq.make(3), tags: tags("elsewhere") },
-    ];
-    expect(inUse(held, CITY)).toEqual(tags("alpha", "zeta"));
+  test("the filter row offers the listed sessions' tags once each, without the pin", () => {
+    expect(inUse([tags("pin", "zeta"), tags("alpha", "zeta"), []])).toEqual(tags("alpha", "zeta"));
+  });
+
+  test("a session nobody tagged carries its workspace, and the first change writes the default down", () => {
+    const lab = { ...at(9), usual: Tag.make("lab-3") };
+    const held: SessionTags[] = [{ ...at(3), tags: tags("bug") }];
+    expect([tagsOf(held, lab), kept(held, lab)]).toEqual([tags("lab-3"), false]);
+    expect(given(held, lab, Tag.make("bug"))).toEqual({ ...at(9), tags: tags("bug", "lab-3") });
+    expect(tagsOf(held, { ...at(3), usual: Tag.make("lab-3") })).toEqual(tags("bug"));
+    expect(tagsOf(held, { ...at(9), usual: null })).toEqual([]);
   });
 
   test("the city's answer is what the page holds, and a change is drawn once it is sent", () => {

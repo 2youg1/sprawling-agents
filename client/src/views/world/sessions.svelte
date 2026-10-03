@@ -12,6 +12,11 @@
   // pins it and gives and strips tags (`session_menu.svelte`); a row of the
   // tags in use above the list filters it by one.
   //
+  // A row is titled by the session's name, or its room when it has none,
+  // and says the model, effort and workspace of its last run and the
+  // start of its last reply, cut to the width the row has
+  // (`crates/wire/spec/Answer/Sessions.lean` D27).
+  //
   // The rows are `core/stretches.ts`'s reading of the city's answers
   // (`stretches.svelte.ts`), and the tags are the person's preferences
   // as the city keeps them (`core/tags.ts`).
@@ -80,7 +85,7 @@
 
   const city = $derived($belief.city);
   function named(stretch: Stretch): Named | null {
-    return namedIn(city, stretch.room, stretch.line.began);
+    return namedIn(city, stretch.room, stretch.line.began, stretch.line.workspace ?? null);
   }
   function tagsFor(stretch: Stretch): readonly Tag[] {
     const name = named(stretch);
@@ -90,7 +95,7 @@
   // One tag the pane is filtered by, or every row. A tag nobody carries
   // any more filters nothing.
   let filter = $state<Tag | null>(null);
-  const offered = $derived(city === null ? [] : inUse($held, city));
+  const offered = $derived(city === null ? [] : inUse(stretches.all.map(tagsFor)));
   const by = $derived(filter !== null && offered.includes(filter) ? filter : null);
   const groups = $derived(grouped(stretches.all, tagsFor, by));
 
@@ -116,10 +121,25 @@
     }
   }
 
-  // What the second line says: the task of the session's last run, or how
-  // the session began when this page holds none of its runs.
+  // What the second line says: the start of the session's last reply,
+  // else the task of its last run, else how the session began when this
+  // page holds none of its runs.
   function about(stretch: Stretch, last: RunBelief | undefined): string {
-    return last?.task ?? say($lang, startOf(stretch));
+    return stretch.line.preview ?? last?.task ?? say($lang, startOf(stretch));
+  }
+
+  function titleOf(stretch: Stretch): string {
+    const name = stretch.line.name ?? "";
+    return name === "" ? roomOf(stretch.room) : name;
+  }
+
+  // What the session ran on: model, effort and workspace, each left out
+  // when the city does not say it.
+  function ranOn(stretch: Stretch): string {
+    const { model, effort, workspace } = stretch.line;
+    return [model ?? null, effort === undefined || effort === null ? null : say($lang, `effort_${effort}`), workspace ?? null]
+      .filter((each) => each !== null && each !== "")
+      .join(" · ");
   }
 
   function startOf(stretch: Stretch): Key {
@@ -180,7 +200,7 @@
               {/if}
               <span class={["mt-snug size-dot rounded-pill", DOT[state]]} aria-hidden="true"></span>
               <span class="flex min-w-0 items-center gap-tight">
-                <span class={["truncate font-label", stretch.current ? "text-text" : "text-text-quiet"]}>{roomOf(stretch.room)}</span>
+                <span class={["truncate font-label", stretch.current ? "text-text" : "text-text-quiet"]} title={stretch.room}>{titleOf(stretch)}</span>
                 {#if pinning !== "none"}
                   <span class="shrink-0 text-text-faint" title={pinning === "mayor" ? say($lang, "world_pinned_mayor") : undefined}>
                     <Glyph name="pin" size="sm" />
@@ -189,7 +209,10 @@
               </span>
               {#if !narrow}
                 <span class="figure text-note text-text-faint">{when(stretch, state)}</span>
-                <span class="col-start-2 col-end-4 truncate text-note text-text-quiet">{about(stretch, last)}</span>
+                <span class="col-start-2 col-end-4 line-clamp-2 text-note text-text-quiet">{about(stretch, last)}</span>
+                {#if ranOn(stretch) !== ""}
+                  <span class="col-start-2 col-end-4 truncate text-note text-text-faint">{ranOn(stretch)}</span>
+                {/if}
                 {#if tags.some((tag) => tag !== PIN)}
                   <span class="col-start-2 col-end-4 mt-tight flex flex-wrap gap-tight">
                     {#each tags.filter((tag) => tag !== PIN) as tag (tag)}
@@ -203,7 +226,13 @@
               {/if}
             </a>
             <div class={["shrink-0 pt-tight pr-tight", inMain ? "" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"]}>
-              <SessionMenu named={named(stretch)} label={fill(say($lang, "world_row_name"), { room: roomOf(stretch.room), when: ago($lang, stretch.line.at, $tick) })} {tags} {pinning} />
+              <SessionMenu
+                named={named(stretch)}
+                label={fill(say($lang, "world_row_name"), { room: titleOf(stretch), when: ago($lang, stretch.line.at, $tick) })}
+                {tags}
+                {pinning}
+                session={{ name: stretch.line.name ?? "", run: stretch.current ? (last?.run ?? null) : null }}
+              />
             </div>
           </li>
         {/each}

@@ -6554,5 +6554,25 @@
   "skills_empty_next": {
     "en": "no shelf this building reads holds a skill yet: put a folder with a SKILL.md into the city's library or this building's shelf - Settings, Skills shows both folders - and it appears here",
     "zh": "这栋楼读的书架上还没有技能：把带 SKILL.md 的文件夹放进城的书库或这栋楼的书架（两个文件夹在「设置 → 技能」里），它就会出现在这里"
+  },
+  "world_rename": {
+    "en": "rename",
+    "zh": "改名"
+  },
+  "world_rename_field": {
+    "en": "Session name",
+    "zh": "会话名"
+  },
+  "world_rename_hint": {
+    "en": "Shown in place of the address. Leave it empty to show the address again",
+    "zh": "代替地址显示。留空则重新显示地址"
+  },
+  "world_mode_to": {
+    "en": "{mode} mode from the next step",
+    "zh": "从下一步起改为{mode}模式"
+  },
+  "world_write_to": {
+    "en": "{limit} from the next step",
+    "zh": "从下一步起改为{limit}"
   }
 }

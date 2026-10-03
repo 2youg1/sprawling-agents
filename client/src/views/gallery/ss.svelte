@@ -9,8 +9,9 @@
   // made-up city of three buildings: the Mayor's current session pinned
   // by being current, an earlier session of `lab/room1` pinned by its tag,
   // tags on four sessions, and the pane filtered by one of them; the row
-  // menu held open; and an earlier session in main, beside the pane in
-  // the blend tier and under the session pane in the panorama tier, with
+  // menu held open, on an earlier session and on the current one, whose
+  // menu also renames it and changes its run policy; and an earlier
+  // session in main, beside the pane in the blend tier and under the session pane in the panorama tier, with
   // its offer to continue from its end.
   import type { Answer, EventKind, EventRecord, Query, SessionLine, SessionTags, Turn } from "../../wire";
   import { Address, B3Hash, RunId, Seq, Tag, TimeMs } from "../../wire";
@@ -50,10 +51,21 @@
     ];
   }
 
+  // What the city says of a session beyond its lines: a display name on
+  // one, and the model, effort, workspace and last reply on most, so a
+  // row with none of them sits beside rows with all of them.
+  const SAID: Readonly<Record<number, Partial<SessionLine>>> = {
+    30: { name: "document contract", model: "claude-opus-4-1", effort: "high", workspace: "lab-1", preview: "The reading contract now names every field the document page draws, and the three it used to guess are asked of the city." },
+    10: { model: "claude-sonnet-4-5", effort: "medium", workspace: "lab-1", preview: "Error positions are byte offsets from the start of the input." },
+    12: { model: "gpt-5", workspace: "lab-2", preview: "Coverage is 81 % of lines." },
+    14: { model: "claude-sonnet-4-5", effort: "low", preview: "Waiting for the User to allow the dry run." },
+  };
+
   // The rooms' stretches, newest first, as `Query::Sessions` answers.
   function linesOf(room: string, now: number): SessionLine[] {
     return RUNS.filter(([, at]) => at === room)
       .map(([, , , seq], index): SessionLine => ({
+        ...SAID[seq],
         began: Seq.make(seq),
         last: Seq.make(seq + 1),
         at: TimeMs.make(now - (40 - seq) * 120_000 + 90_000),
@@ -82,7 +94,7 @@
       if ("rounds" in query) {
         const found = RUNS.find(([n]) => run(n) === query.rounds.run);
         const said = found === undefined ? "" : `The work on ${found[2]} is written down in the room's Memo.md.`;
-        return { rounds: { run: query.rounds.run, turns: [turn(found?.[0] ?? 0, said, now)], opened_at: null, opening: null, worktree: null } };
+        return { rounds: { run: query.rounds.run, turns: [turn(found?.[0] ?? 0, said, now)], opened_at: null, opening: { at: TimeMs.make(now), goal: "", task: found?.[2] ?? "", policy: { mode: "work", write: "full", admit: "standing", landing: "ordinary" } }, worktree: null } };
       }
       return undefined;
     };
@@ -133,7 +145,7 @@
 
 <Case label="sessions · a pinned group, tags, and the pane filtered by one" width={360}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
-    <div class="flex h-[560px] flex-col" {@attach pressing('[role="group"] button:nth-of-type(3)')}>
+    <div class="flex h-[560px] flex-col" {@attach pressing('[role="group"] button:nth-of-type(4)')}>
       <Sessions here={ROOM} narrow={false} {head} />
     </div>
   </Stand>
@@ -141,6 +153,13 @@
 <Case label="sessions · every session, the row menu open" width={360}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
     <div class="flex h-[640px] flex-col" {@attach pressing('ul li:nth-of-type(2) button[aria-haspopup="menu"]')}>
+      <Sessions here={ROOM} narrow={false} {head} />
+    </div>
+  </Stand>
+</Case>
+<Case label="sessions · the current session's menu: rename, mode and write limit" width={360}>
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
+    <div class="flex h-[640px] flex-col" {@attach pressing('li:has(a[aria-current="page"]) button[aria-haspopup="menu"]')}>
       <Sessions here={ROOM} narrow={false} {head} />
     </div>
   </Stand>

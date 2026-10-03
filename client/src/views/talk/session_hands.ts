@@ -23,9 +23,9 @@ export function sessionHands(u: Ui, room: Address | null, asked?: Seq): SessionH
   const city = get(u.conn.belief).city;
   const answer = room === null ? undefined : get(u.conn.asking.ask({ sessions: { room } }));
   const line = lineIn(answer !== undefined && "sessions" in answer ? answer.sessions : undefined, asked);
-  const named = room === null || line === null ? null : namedIn(city, room, line.began);
+  const named = room === null || line === null ? null : namedIn(city, room, line.began, line.workspace ?? null);
   return {
-    tagged: named === null ? null : { ...named, tags: tagsOf(get(u.tags.held), named) },
+    tagged: named === null ? null : { city: named.city, room: named.room, began: named.began, tags: tagsOf(get(u.tags.held), named) },
     retag: u.tags.retag,
     whenFrozen: (run, then) => {
       onceFrozen(u.conn.belief, run, then);

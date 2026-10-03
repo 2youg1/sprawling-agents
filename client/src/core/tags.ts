@@ -13,6 +13,12 @@
 //
 // **A session is named the way the ledger files it**: the city, the room,
 // and the line its stretch began at (`SessionLine::began`).
+//
+// **A session the person never tagged carries its workspace as a tag**
+// (`crates/wire/spec/Answer/Sessions.lean` D27): the default is derived
+// here and stored nowhere, so the first change the person makes to the
+// set writes it down with the rest, and from then on the stored set is
+// the whole truth.
 
 import { Option, Schema } from "effect";
 import { writable } from "svelte/store";
@@ -33,6 +39,9 @@ export interface Named {
   readonly city: Address;
   readonly room: Address;
   readonly began: Seq;
+  // The tag the session carries while the city keeps none for it: its
+  // workspace, when that name reads as a tag.
+  readonly usual?: Tag | null;
 }
 
 const readOne = Schema.decodeOption(Tag);
@@ -40,8 +49,9 @@ const readCity = Schema.decodeOption(Address);
 
 // A session of the city the handshake named, as its tags name it; `null`
 // when the city stated no name, which leaves nowhere to keep a tag.
-export function namedIn(city: string | null, room: Address, began: Seq): Named | null {
-  return city === null ? null : Option.getOrNull(Option.map(readCity(city), (named) => ({ city: named, room, began })));
+export function namedIn(city: string | null, room: Address, began: Seq, workspace: string | null): Named | null {
+  const usual = workspace === null ? null : readTag(workspace);
+  return city === null ? null : Option.getOrNull(Option.map(readCity(city), (named) => ({ city: named, room, began, usual })));
 }
 
 // What a person typed, as the tag it means. Folded to lower case here and
@@ -56,7 +66,15 @@ function same(entry: Named, session: Named): boolean {
 }
 
 export function tagsOf(held: readonly SessionTags[], session: Named): readonly Tag[] {
-  return held.find((entry) => same(entry, session))?.tags ?? [];
+  const usual = session.usual ?? null;
+  return held.find((entry) => same(entry, session))?.tags ?? (usual === null ? [] : [usual]);
+}
+
+// Whether the city keeps a set for the session. A tag drawn from the
+// default alone cannot be taken off - an empty set removes the entry,
+// and the default comes back - so the menu offers no removal then.
+export function kept(held: readonly SessionTags[], session: Named): boolean {
+  return held.some((entry) => same(entry, session));
 }
 
 // The session's whole new set with `tag` added: the value one
@@ -84,11 +102,12 @@ export function retagged(held: readonly SessionTags[], next: SessionTags): reado
   return next.tags.length === 0 ? others : [...others, next];
 }
 
-// Every tag this city's sessions carry but the pin, once each and in
-// lexical order: the row a person filters the sessions pane by.
-export function inUse(held: readonly SessionTags[], city: string): readonly Tag[] {
-  const all = held.filter((entry) => entry.city === city).flatMap((entry) => entry.tags);
-  return [...new Set(all)].filter((tag) => tag !== PIN).sort();
+// Every tag the listed sessions carry but the pin, once each and in
+// lexical order: the row a person filters the sessions pane by. Read off
+// the rows rather than the stored sets, so a workspace's default tag
+// filters as well as a given one.
+export function inUse(sets: readonly (readonly Tag[])[]): readonly Tag[] {
+  return [...new Set(sets.flat())].filter((tag) => tag !== PIN).sort();
 }
 
 export interface Tagging {

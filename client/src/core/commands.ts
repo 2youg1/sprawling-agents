@@ -39,6 +39,7 @@ import type {
   Restoration,
   RunId,
   RunPolicy,
+  Seq,
   ToolkitSlug,
   WriteLimit,
 } from "../wire";
@@ -211,6 +212,20 @@ export function removeBuilding(addr: Address): Command {
 // `/fork` is this verb with an origin rather than a second one.
 export function openSession(addr: Address, carry: Carry, from: Origin | null): Command {
   return { open_session: { addr, carry, from, idem: mintIdem() } };
+}
+
+// A display name for the session of `room` that began at `began`, or the
+// name taken back with an empty one (kernel D22). The address stays the
+// session's identity; the name is what a page draws in its place.
+export function nameSession(room: Address, began: Seq, name: string): Command {
+  return { name_session: { room, began, name: name.trim(), idem: mintIdem() } };
+}
+
+// The room's run policy from here on (kernel D21): the run under way
+// reads it at its next safe point, and the next dispatch starts under
+// it. Model and effort are not in it - they stay frozen for the session.
+export function changeRunPolicy(room: Address, policy: RunPolicy): Command {
+  return { change_run_policy: { room, policy, idem: mintIdem() } };
 }
 
 export function setAutonomy(scope: HaltScope, autonomy: Autonomy): Command {
