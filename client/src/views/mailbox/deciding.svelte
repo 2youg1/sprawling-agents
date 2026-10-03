@@ -13,9 +13,10 @@
   // the work is its notice, with the recovery the city named. Newest
   // first within each kind, the doors and failures before the questions
   // and the proposals, because those wait on a judgement while a door
-  // waits on a hand already at the keyboard (4-55).
-  import { urgencyOf } from "../../core/deferral";
-  import { say } from "../../core/lang";
+  // waits on a hand already at the keyboard (4-55). Every card says
+  // under its head which event or refusal put it here and which rule
+  // keeps it here (`pending.ts`).
+  import { fill, say } from "../../core/lang";
   import { recoveryFor } from "../../core/recovering";
   import { ago } from "../../core/time";
   import { ui } from "../../ui";
@@ -27,6 +28,7 @@
   import { WaitingCards } from "../talk/waiting.svelte";
   import DecidingDocument from "./deciding_document.svelte";
   import { documentsOf, openCards } from "./deciding_proposals";
+  import { stoppedOf, WHY } from "./pending";
   import Section from "./section.svelte";
   import { shown, sweep } from "./swept.svelte";
 
@@ -42,15 +44,13 @@
   const belief = u.conn.belief;
   const approvals = u.approvals;
 
-  const stopped = $derived(
-    [...$belief.notices].reverse().filter((notice) => urgencyOf(notice.error) === "needs_you" && shown(notice)),
-  );
-  const asks = $derived(stopped.filter((notice) => notice.error.code === "E_APPROVAL_PENDING"));
-  const failures = $derived(stopped.filter((notice) => notice.error.code !== "E_APPROVAL_PENDING"));
+  const stopped = $derived(stoppedOf($belief.notices.filter(shown)));
+  const asks = $derived(stopped.asks);
+  const failures = $derived(stopped.failures);
   const questions = $derived($approvals ?? []);
   const cards = openCards(u.conn.asking);
   const documents = $derived(documentsOf($cards));
-  const count = $derived(stopped.length + questions.length + $cards.length);
+  const count = $derived(asks.length + failures.length + questions.length + $cards.length);
 </script>
 
 <Section title="mailbox_deciding" empty="mailbox_deciding_none" {count}>
@@ -74,6 +74,7 @@
           <p class="text-body">{notice.error.action}</p>
           <p class="font-mono text-note wrap-anywhere text-text-quiet">{notice.error.subject}</p>
           <p class="mt-snug text-note text-text">{recoveryWords($lang, notice.error.code, notice.error.recovery)}</p>
+          <p class="mt-snug text-note text-text-quiet">{say($lang, WHY.ask)}</p>
         {/snippet}
       </Decide>
     </div>
@@ -112,10 +113,14 @@
             />
           {/snippet}
         </Notice>
+        <p class="mt-tight text-note text-text-quiet">{fill(say($lang, WHY.failure), { code: notice.error.code })}</p>
       </div>
       <kbd class="entry-n mt-snug" aria-hidden="true"></kbd>
     </div>
   {/each}
+  {#if questions.length > 0}
+    <p class="mt-base text-note text-text-quiet">{say($lang, WHY.question)}</p>
+  {/if}
   <WaitingCards items={questions} />
   {#each documents as offered (offered.doc)}
     <DecidingDocument doc={offered.doc} at={offered.at} {onLeave} />

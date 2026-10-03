@@ -19,6 +19,7 @@
   import { openDocument } from "../inspect/open.svelte";
   import Button from "../parts/button.svelte";
   import Card from "../refrain/proposals_card.svelte";
+  import { WHY } from "./pending";
 
   interface Props {
     readonly doc: Address;
@@ -46,6 +47,7 @@
     <div class="my-base">
       <Card {doc} {card} version={read.value.version ?? null}>
         {#snippet lead()}
+          <p class="text-note text-text-quiet">{say($lang, WHY.proposal)}</p>
           <div class="flex min-w-0 items-center gap-snug">
             <span class="min-w-0 flex-1 truncate font-mono text-note text-text-quiet" title={doc}>{doc}</span>
             {#if at !== null}

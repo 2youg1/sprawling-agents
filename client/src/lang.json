@@ -6510,5 +6510,21 @@
   "settings_more": {
     "en": "more",
     "zh": "更多"
+  },
+  "mailbox_why_ask": {
+    "en": "Here because of the refusal E_APPROVAL_PENDING: a door waits for the User's own hand, and the run waits with it.",
+    "zh": "在这里是因为拒绝 E_APPROVAL_PENDING：一扇门等 User 亲自动手，run 跟着等。"
+  },
+  "mailbox_why_failure": {
+    "en": "Here because of the refusal {code}: the work stays stopped until the User acts, and the city does not retry it.",
+    "zh": "在这里是因为拒绝 {code}：User 动手之前工作一直停着，城不会自己重试。"
+  },
+  "mailbox_why_question": {
+    "en": "Here because of the event approval_requested: a resident asks the User to approve a step it may not take alone.",
+    "zh": "在这里是因为事件 approval_requested：一位居民请 User 批准一步它不能独自走的操作。"
+  },
+  "mailbox_why_proposal": {
+    "en": "Here because of the event proposal_offered: a run offered this change instead of writing the document, and the card stays open until the User accepts or rejects it.",
+    "zh": "在这里是因为事件 proposal_offered：run 没有直接改这份文稿，而是提出了这处修改；User 接受或拒绝之前，卡一直开着。"
   }
 }
