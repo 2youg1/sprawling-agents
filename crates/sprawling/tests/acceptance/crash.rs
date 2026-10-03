@@ -196,3 +196,121 @@ fn die_while_answering(ledger_dir: &Path, call: &str) -> u64 {
     }
     u64::try_from(kept).unwrap()
 }
+
+/// What a city that reopened after a death between two whole lines says
+/// about itself.
+#[derive(Debug, PartialEq)]
+struct ReopenedWhole {
+    opening: String,
+    closed_calls: usize,
+    listed: Vec<(bool, Option<String>, EventKind)>,
+    death_recorded: bool,
+    verifies: bool,
+    room_works_again: bool,
+}
+
+/// A city killed after the dispatch's job was put in the content store
+/// and before the `checkpoint_committed` line that cites it reached the
+/// history (`crates/storage/spec/Checkpoint.lean`). The blob is on disk
+/// and nothing in the history names it, so no run had started: the city
+/// opens with no line to cut and no run to freeze, the history
+/// verifies, and the room takes the same task again. The kill is made on the disk, so it is the same
+/// on Windows, macOS and Linux: a killed process (`TerminateProcess`
+/// on Windows, `SIGKILL` elsewhere) leaves exactly these bytes.
+#[test]
+fn a_city_killed_between_a_job_put_and_its_checkpoint_line_reopens_with_nothing_to_cut() {
+    let dir = tempfile::tempdir().unwrap();
+    let (factory, _, _) = script::scripted(vec![Step {
+        tool: "status",
+        args: json!({}),
+    }]);
+    let (mut worker, ledger) = city::city_with_a_model(dir.path(), factory);
+    city::raise(&mut worker, "lab", "minimal");
+    city::rules(
+        dir.path(),
+        "lab",
+        "confidential = false\nwrite = \"everything\"\n",
+    );
+    city::dispatch(&mut worker, "lab/lead").unwrap();
+    drop(worker);
+
+    die_before(&ledger, "\"kind\":\"checkpoint_committed\"", "\"job\"");
+
+    let mut reopened = city::open_worker(dir.path(), Box::new(script::scripted(Vec::new()).0));
+    let scan = reopened.startup_scan().unwrap();
+    let view = city_view(dir.path());
+    city::dispatch(&mut reopened, "lab/lead").unwrap();
+    drop(reopened);
+    let history = History::read(&ledger);
+    let started: Vec<RunId> = history.started().iter().map(|one| one.run).collect();
+    assert_eq!(
+        ReopenedWhole {
+            opening: format!("{:?}", scan.opening),
+            closed_calls: scan.closed_calls,
+            listed: view
+                .runs
+                .iter()
+                .map(|summary| (
+                    summary.frozen,
+                    summary.completion.clone(),
+                    summary.last_kind
+                ))
+                .collect(),
+            death_recorded: history.says(EventKind::RunFrozen, "\"cause\":\"process_died\""),
+            verifies: runtime::replay::verify_ledger_dir(&ledger).is_ok(),
+            room_works_again: started.len() == 1 && history.wrote(started[0], EventKind::RunFrozen),
+        },
+        ReopenedWhole {
+            opening: "Intact".to_owned(),
+            closed_calls: 0,
+            listed: Vec::new(),
+            death_recorded: false,
+            verifies: true,
+            room_works_again: true,
+        },
+    );
+}
+
+/// Cuts the history at the start of the first line that carries both
+/// `kind` and `marker`, as a process killed before writing that line
+/// leaves it: every line before it whole, nothing after it.
+fn die_before(ledger_dir: &Path, kind: &str, marker: &str) {
+    let hit = |line: &str| line.contains(kind) && line.contains(marker);
+    let segment = storage::ledger_segments_at(ledger_dir)
+        .unwrap()
+        .into_iter()
+        .find(|segment| {
+            String::from_utf8_lossy(&std::fs::read(segment).unwrap())
+                .lines()
+                .any(hit)
+        })
+        .unwrap_or_else(|| {
+            let kinds: Vec<String> = storage::ledger_segments_at(ledger_dir)
+                .unwrap()
+                .iter()
+                .flat_map(|segment| {
+                    String::from_utf8_lossy(&std::fs::read(segment).unwrap())
+                        .lines()
+                        .filter(|line| line.contains("checkpoint"))
+                        .map(str::to_owned)
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            panic!("no line carries {kind} and {marker}: {kinds:#?}")
+        });
+    let bytes = std::fs::read(&segment).unwrap();
+    let text = String::from_utf8_lossy(&bytes);
+    let kept: usize = text
+        .split_inclusive('\n')
+        .take_while(|line| !hit(line))
+        .map(str::len)
+        .sum();
+    std::fs::write(&segment, &bytes[..kept]).unwrap();
+    for later in storage::ledger_segments_at(ledger_dir)
+        .unwrap()
+        .into_iter()
+        .filter(|later| *later > segment)
+    {
+        std::fs::remove_file(later).unwrap();
+    }
+}
