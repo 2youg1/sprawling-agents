@@ -18,8 +18,9 @@
 //! the split cost no field its privacy. What stays here is what every
 //! submodule needs and no submodule owns: the worker itself, the two
 //! hooks a live control surface installs, and the door a `Command`
-//! enters by. The lines it appends live in `recording`; opening and
-//! closing in `lifetime`; the test fixtures in `fixture`. The writer's
+//! enters by. The lines it appends live in `recording`;
+//! opening in `lifetime` and closing in `lifetime::closing`; the test
+//! fixtures in `fixture`. The writer's
 //! loop is `attend`, commands wait on the `desk`, and runs are driven on
 //! the lanes of the `pool` and write back through the `relay`.
 //!
