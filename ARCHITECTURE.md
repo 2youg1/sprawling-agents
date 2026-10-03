@@ -837,6 +837,28 @@ it, and the readings below are written here by `cargo xtask docnum` rather
 than typed. Every duration in the register is a whole number of
 microseconds, named by its `_us` field.
 
+Every reading is taken on one basis. A duration is an integer microsecond
+off a monotonic clock, with nanoseconds only for sub-microsecond work inside
+the process, and a reader sees µs below 10 ms and ms from 10 ms up.
+Percentiles are nearest rank, computed only in `bin::monitor::spread::Spread`,
+and every figure carries its sample count n. Ordinary latency reports p50
+and p99; the high-frequency operations (each tool, Ledger append and its
+barrier, the relay round trip, a claim, fold and broadcast lag, the client's
+frame decode and fold) and the key interactions report p50, p99, p999 and
+max, where p999 needs n ≥ 1,000 and a smaller sample reports max alone and
+says so. Model time is read apart and never counted in the harness's
+budget: TTFT as median and mean, tokens per second as p50 and p99. Each
+duration splits into waiting, work and the durability barrier, because a
+total alone cannot show a wait the harness caused. Memory is private bytes
+sampled on a fixed tick, 100 ms unless set, reported as p50, p99, max, time
+spent above p50 and slope per hour. Each set of readings names its tree,
+toolchain, feature set, target platform, fixture digest, binary, machine
+class and load (idle, N concurrent runs, a build in the background); the
+criterion is written before the reading, rounds of the two arms interleave,
+and the measurement has the machine to itself. Target numbers are not set
+in advance: a target enters `budgets.toml` once its baseline is read and the
+User accepts it.
+
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
 | Client bundle, gzipped | ≤<!-- xtask:begin budget_bytes:frontend_artifact -->2,097,152 B<!-- xtask:end --> | <!-- xtask:begin budget_reading:frontend_artifact -->677,073 B<!-- xtask:end --> — <!-- xtask:begin budget_headroom:frontend_artifact -->3.1×<!-- xtask:end --> headroom | no: a reading; speed comes before size |
@@ -845,7 +867,7 @@ microseconds, named by its `_us` field.
 | Ledger append plus fsync | p50 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p50_us -->5,000<!-- xtask:end --> µs, p99 ≤<!-- xtask:begin budget_figure:ledger_append.budget_p99_us -->20,000<!-- xtask:end --> µs | `[ledger_append]`, with its machine class | no |
 | Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_us -->436,676<!-- xtask:end --> µs for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
 | Prefix assembly | ≤<!-- xtask:begin budget_figure:prefix_assembly.budget_us -->1,000<!-- xtask:end --> µs | `[prefix_assembly]`, with its machine class | no |
-| Runs driving at once | `DRIVING_LANES` in `accounting::worker::pool` | one thread per run, and one accounting thread taking every write | no: it is a wall this city sets, not a measurement |
+| Runs driving at once | no lane count: a prepared run gets a lane at once, and `accounting::worker::pool` asks only for memory (`crates/sprawling/Spec.lean` D34) | one thread per run, one accounting thread taking every write, and each endpoint's `max_in_flight` permits (`gateway::concurrency`) | no: the one concurrency limit is the endpoint's, not a measurement |
 | Kernel mutation score | ≥90% | by `just mutants` | by that command, not by `just check` |
 | Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `tools/xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
 
@@ -874,9 +896,10 @@ build. A reading from another machine class does not enter this table.
 **One honest trade.** With network and model time removed, the throughput
 ceiling of a city is the throughput ceiling of its Ledger. That is the
 price of "the Ledger is the only history", stated in the open. The first
-wall is one this city sets itself: it drives `DRIVING_LANES` runs at a time
-(`accounting::worker::pool`), and past it a prepared drive waits in the pool for
-a lane. Then come the walls outside:
+wall is the endpoint's own: each endpoint hands out `max_in_flight` permits
+in arrival order (`gateway::concurrency`), and the pool sets no lane count of
+its own, so a prepared run gets a lane at once and waits, if it waits, in that
+endpoint's provider queue. Then come the walls outside:
 provider-side rate limits, Ledger fsync, worktree disk, file-descriptor
 limits, then the blocking pool. RAM is not among them. **Runs are driven in
 parallel and accounted for in series** — every line a lane writes crosses to
