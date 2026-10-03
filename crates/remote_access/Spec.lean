@@ -58,7 +58,7 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 
 - **`cloudflare` 通路没有在真的隧道上开过。** 自动测试不跑它（§2）。缺的证据有两件：在一台装了 `cloudflared`、能连上 Cloudflare 边缘的电脑上，按 §8-8 的操作者检查开、关一次；在一台出网受限（经代理、7844 端口被拦）的电脑上，`cloudflared` 在就绪之前退出时，能否给出比「它在就绪之前退出」更具体的一句拒绝。今天的拒绝给出手动跑的那一行命令，人从 `cloudflared` 自己的输出里读原因。
 - **没有控制台时的恢复语说的命令给不出控制台。** `bin::outside::asking` 对开门、换钥匙与确认的拒绝（`E_TOOL_UNAVAILABLE`）写「在城自己的终端里跑 `sprawling serve`」，而 `serve` 只在带 `--console`、或由 `sprawling up` 启动时才有控制台（`crates/sprawling/src/main/city.rs` 的 `wanted`）；照这句恢复语做的人仍然没有控制台。改法是让恢复语写出 `sprawling up`，或 `sprawling serve --console`；它住在装配层的那一个函数里，改它时把 D4 里的同一句一起改。
-- **macOS 上更新之后，城在钥匙串的对话框前停住，`SIGINT` 关不掉它。** 二进制更新后第一次读城钥匙，钥匙串弹出一次对话框（§8-3 的 D23 写了这个事实与证据）。有图形会话时 User 答一次就过去；没有图形会话（经 ssh 起的城、无人值守的 Mac）时没有人答，`.github/workflows/on-demand.yml` 的 `keychain` 作业里第二次 serve 印出「commands are taken」之后读钥匙，对 `SIGINT` 十秒内没有退出，被 `SIGKILL` 结束（退出码 137）。门在 Ctrl-C 处理器装好之前读钥匙，所以读钥匙等着的时候城不按序关闭。能定下这一条的证据：读钥匙移到 Ctrl-C 处理器之后，或者读钥匙有一个时限、到时把门记为「钥匙读不到」而不是停住，然后同一个作业的判词里第二次 serve 不再出现「did not close in order」。Windows 与 Linux 不需要这一条：凭据管理器与内核 keyring 不按二进制的签名给读取权限，更新后的读取不弹任何对话框。
+- 城钥匙等钥匙串对话框时 Ctrl-C 照样有序收口：装配层先装信号、在一条自己的线程上读钥匙（`crates/sprawling/spec/Console.lean` 的「信号先装，钥匙在旁读」）；`.github/workflows/on-demand.yml` 的 `keychain` 作业是它在 macOS 上的见证，判词里第二次 serve 不再出现「did not close in order」之前，这一条留在这里。
 -/
 
 /-! ## 4 现状分析
