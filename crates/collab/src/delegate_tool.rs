@@ -203,7 +203,7 @@ impl DelegateTool {
                 effect: Effect::Spawn,
                 cost_tier: CostTier::Heavy,
                 timeout: None,
-                render: RenderIntent::Generic,
+                render: RenderIntent::Delegate,
                 temporal: Temporal::Timeless,
             },
         })

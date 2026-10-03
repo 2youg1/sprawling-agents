@@ -98,7 +98,7 @@ impl SignalTool {
                 effect: Effect::Write { domain: room },
                 cost_tier: CostTier::Free,
                 timeout: None,
-                render: RenderIntent::Generic,
+                render: RenderIntent::Signal,
                 temporal: Temporal::Timeless,
             },
             desk,
