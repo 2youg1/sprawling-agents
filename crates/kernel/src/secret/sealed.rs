@@ -34,8 +34,8 @@ impl Sealed<String> {
     /// and the result is still a type that zeroizes on drop.
     ///
     /// It lives here rather than at the enrolment site because that is
-    /// what keeps the expose whitelist to three files: plaintext leaves
-    /// this type in the module that defines the type.
+    /// what keeps the enrolment site off the expose whitelist: plaintext
+    /// leaves this type in the module that defines the type.
     #[must_use]
     pub fn into_vault_value(self) -> Zeroizing<String> {
         Zeroizing::new(self.expose().clone())
