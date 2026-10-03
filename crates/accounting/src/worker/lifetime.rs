@@ -225,7 +225,7 @@ impl RunWorker {
             log: super::recording::Notes::over(log),
             doorstep: Doorstep::opened(entrance),
             origins,
-            flight: Flight::open(read_memory),
+            flight: Flight::open(read_memory, monotonic),
             index: storage::LedgerIndex::empty(),
             warm: super::keeping_warm::Kept::default(),
             models: Box::new(GatewayModels),

@@ -72,8 +72,13 @@ pub(in crate::worker) struct Flight {
 impl Flight {
     /// `read_memory` is where the pool reads how much memory is free
     /// before it starts a run (`crates/sprawling/Spec.lean` §8-46-3).
-    pub(in crate::worker) fn open(read_memory: fn() -> crate::worker::pool::Memory) -> Flight {
-        let gate = RelayGate::open();
+    /// `monotonic` is the clock every wait the crossing records is read
+    /// off (`crates/sprawling/spec/Accounting/Worker.lean` §8-98).
+    pub(in crate::worker) fn open(
+        read_memory: fn() -> crate::worker::pool::Memory,
+        monotonic: fn() -> std::time::Instant,
+    ) -> Flight {
+        let gate = RelayGate::open(monotonic);
         Flight {
             pool: DrivingPool::open(gate.bell(), read_memory),
             gate,

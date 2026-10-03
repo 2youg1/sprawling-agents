@@ -13,7 +13,7 @@
 
 use std::collections::VecDeque;
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use kernel::{AxCode, AxError, EventDraft, EventRef, Ledger};
 
@@ -34,6 +34,10 @@ pub(crate) struct RelayRequest {
     /// A rendezvous channel, so there is no third state between "the
     /// accounting thread wrote it" and "the driving thread knows".
     back: mpsc::SyncSender<Result<Vec<EventRef>, AxError>>,
+    /// When the lane queued it, on the gate's monotonic clock: the
+    /// accounting thread reads its queue wait off it
+    /// (`crates/sprawling/spec/Accounting/Worker.lean` §8-98).
+    queued: Instant,
 }
 
 /// Everything that wakes the accounting thread, on the one queue it
@@ -92,6 +96,7 @@ pub(crate) enum Patience {
 pub struct Relay {
     asking: mpsc::Sender<Wake>,
     health: Health,
+    monotonic: fn() -> Instant,
 }
 
 impl Ledger for Relay {
@@ -125,9 +130,16 @@ impl Ledger for Relay {
             return Ok(Vec::new());
         }
         let (back, answer) = mpsc::sync_channel(0);
+        // Read before the count rises, so a reader that sees the request
+        // queued sees a wait that has already started.
+        let queued = (self.monotonic)();
         self.health.asked();
         self.asking
-            .send(Wake::Relay(RelayRequest { drafts, back }))
+            .send(Wake::Relay(RelayRequest {
+                drafts,
+                back,
+                queued,
+            }))
             .map_err(|_| {
                 self.health.withdrawn();
                 gone("the accounting thread is no longer taking writes")
@@ -150,16 +162,20 @@ pub(crate) struct RelayGate {
     /// How many appends wait and how many are not yet durable
     /// (`crates/sprawling/Spec.lean` §8-98).
     health: Health,
+    /// The worker's monotonic clock (`Hands.monotonic`), which every
+    /// wait this gate records is read off.
+    monotonic: fn() -> Instant,
 }
 
 impl RelayGate {
-    pub fn open() -> RelayGate {
+    pub fn open(monotonic: fn() -> Instant) -> RelayGate {
         let (issuing, wakes) = mpsc::channel();
         RelayGate {
             wakes,
             issuing,
             booked: ClaimBook::default(),
             health: Health::default(),
+            monotonic,
         }
     }
 
@@ -173,6 +189,7 @@ impl RelayGate {
         Relay {
             asking: self.issuing.clone(),
             health: self.health.clone(),
+            monotonic: self.monotonic,
         }
     }
 
@@ -199,11 +216,14 @@ impl RelayGate {
         homes: &mut VecDeque<Arrival>,
     ) -> Drained {
         // The gate's own sender keeps the queue connected: empty is "not yet".
+        let asleep = (self.monotonic)();
         let first = match patience {
             Patience::Now => self.wakes.try_recv().ok(),
             Patience::For(wait) => self.wakes.recv_timeout(wait).ok(),
             Patience::Unbounded => self.wakes.recv().ok(),
         };
+        self.health
+            .slept((self.monotonic)().saturating_duration_since(asleep));
         let mut written = Vec::new();
         let mut goals = Vec::new();
         let mut drafts = Vec::new();
@@ -215,7 +235,10 @@ impl RelayGate {
                 Wake::Relay(RelayRequest {
                     drafts: batch,
                     back,
+                    queued,
                 }) => {
+                    self.health
+                        .queue_waited((self.monotonic)().saturating_duration_since(queued));
                     sizes.push(batch.len());
                     drafts.extend(batch);
                     senders.push(back);
@@ -303,7 +326,7 @@ mod tests {
         fn open() -> Relayed {
             let dir = tempfile::tempdir().expect("a temporary directory");
             let root = dir.path().to_path_buf();
-            let mut gate = RelayGate::open();
+            let mut gate = RelayGate::open(crate::worker::fixture::monotonic);
             let relay = gate.issue();
             let bell = gate.bell();
             let (closing, closed) = mpsc::channel::<()>();
@@ -370,7 +393,7 @@ mod tests {
     #[test]
     fn a_relay_whose_accounting_thread_is_gone_refuses() {
         let mut orphan = {
-            let gate = RelayGate::open();
+            let gate = RelayGate::open(crate::worker::fixture::monotonic);
             gate.issue()
         };
         let refused = orphan.append(EventDraft {
@@ -423,7 +446,7 @@ mod tests {
             }
         }
 
-        let mut gate = RelayGate::open();
+        let mut gate = RelayGate::open(crate::worker::fixture::monotonic);
         let health = gate.health();
         let mut relay = gate.issue();
         let lane = std::thread::spawn(move || {
@@ -459,6 +482,58 @@ mod tests {
             (before, store.during, standing(&health)),
             ((1, 0), Some((0, 1)), (0, 0))
         );
+    }
+
+    /// A relay request's queue wait is read off the gate's clock at both
+    /// ends (`crates/sprawling/spec/Accounting/Worker.lean` §8-98). The
+    /// clock steps one microsecond per reading: the lane reads it once
+    /// as it queues, the gate once before and once after its sleep and
+    /// once as it takes the request, so the wait is three steps on every
+    /// platform, whatever the machine's own clock does.
+    #[test]
+    fn a_relay_request_waits_on_the_gates_clock() {
+        #[allow(
+            clippy::disallowed_methods,
+            reason = "test code: the counted clock's origin"
+        )]
+        fn counted() -> std::time::Instant {
+            static ORIGIN: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+            static READ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            *ORIGIN.get_or_init(std::time::Instant::now)
+                + std::time::Duration::from_micros(
+                    READ.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+                )
+        }
+        let mut gate = RelayGate::open(counted);
+        let health = gate.health();
+        let mut relay = gate.issue();
+        let lane = std::thread::spawn(move || {
+            relay.append(EventDraft {
+                run: kernel::RunId::CITY,
+                t: kernel::TimeMs::new(1),
+                who: "city".to_owned(),
+                addr: None,
+                kind: kernel::EventKind::CityInitialized,
+                data: kernel::Payload::empty(),
+                ig: false,
+            })
+        });
+        for _ in 0..500 {
+            if health.read(wire::Sample::default()).ledger_queue_depth == 1 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let (mut ledger, _opened) =
+            storage::JsonlLedger::open(dir.path(), kernel::TimeMs::new(0)).unwrap();
+        gate.serve(
+            Patience::Unbounded,
+            &mut ledger,
+            &mut std::collections::VecDeque::new(),
+        );
+        assert!(lane.join().unwrap().is_ok(), "the lane is answered");
+        assert_eq!(health.relay_queue_us(), vec![3]);
     }
 
     /// **The measurement this batching exists for, expressed as a
@@ -507,13 +582,14 @@ mod tests {
         // batching failed on CI for being unlucky rather than for being wrong. The requests are
         // therefore put on the channel directly, which is the state the property is about -
         // `serve` drains what it finds, and what it finds here is four.
-        let mut gate = RelayGate::open();
+        let mut gate = RelayGate::open(crate::worker::fixture::monotonic);
         let mut answers = Vec::new();
         for stamp in 1..=4 {
             let (back, answer) = mpsc::sync_channel(1);
             answers.push(answer);
             gate.issuing
                 .send(Wake::Relay(RelayRequest {
+                    queued: crate::worker::fixture::monotonic(),
                     drafts: vec![EventDraft {
                         run: kernel::RunId::CITY,
                         t: kernel::TimeMs::new(stamp),
@@ -581,7 +657,7 @@ mod tests {
             }
         }
 
-        let mut gate = RelayGate::open();
+        let mut gate = RelayGate::open(crate::worker::fixture::monotonic);
         let mut relay = gate.issue();
         let draft = |stamp| EventDraft {
             run: kernel::RunId::CITY,

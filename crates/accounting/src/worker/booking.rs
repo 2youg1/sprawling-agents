@@ -296,7 +296,7 @@ mod tests {
     #[test]
     fn two_runs_claiming_one_node_through_the_served_gate_leave_one_holder() {
         use kernel::Tool;
-        let mut gate = crate::worker::relay::RelayGate::open();
+        let mut gate = crate::worker::relay::RelayGate::open(crate::worker::fixture::monotonic);
         let (first, second) = (plan_tool(gate.bell(), 1), plan_tool(gate.bell(), 2));
         let call = kernel::ToolCall {
             id: "tu_1".to_owned(),

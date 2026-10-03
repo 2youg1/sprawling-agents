@@ -85,6 +85,12 @@ impl Latency {
 struct Taken {
     lines: Vec<serde_json::Value>,
     relay: Vec<Duration>,
+    /// Each relay request's wait in the accounting thread's queue, read
+    /// off the worker's monotonic clock (Worker.lean §8-98).
+    relay_queue: Vec<u64>,
+    /// How long the accounting thread slept on its queue while the runs
+    /// drove, on the same clock.
+    idle_us: u64,
     posted_ms: u64,
     wall: Duration,
 }
@@ -122,6 +128,7 @@ fn instrument_throughput() {
             let taken = scenario(runs, latency);
             let head = format!("n_runs={runs} latency={}", latency.name());
             println!("{}", throughput_line(&head, &taken));
+            println!("{}", busy_line(&head, &taken));
             for (wait, samples) in waits(&taken, &idle) {
                 println!("{}", wait_line(&head, wait, samples));
             }
@@ -165,9 +172,12 @@ fn scenario(runs: usize, latency: Latency) -> Taken {
     );
     let worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     let relay = worker.measuring_relay();
+    let health = worker.health();
     let desk = Arc::new(CommandDesk::default());
     let attending = attending(worker, &desk);
     let before = history(dir.path()).len();
+    let queue_before = health.relay_queue_us().len();
+    let idle_before = health.idle_us();
     let posted_ms = crate::Clock::now(&WallClock).unwrap().value();
     let started = Instant::now();
     for room in 0..runs {
@@ -184,6 +194,14 @@ fn scenario(runs: usize, latency: Latency) -> Taken {
     let sampler = sample_relay(relay, Arc::clone(&done));
     let lines = until_frozen(dir.path(), runs);
     let wall = started.elapsed();
+    let idle_us = health.idle_us().saturating_sub(idle_before);
+    // A reading past `RELAY_QUEUE_KEPT` loses its oldest waits; the
+    // bench's arms stay below it.
+    let relay_queue = health
+        .relay_queue_us()
+        .into_iter()
+        .skip(queue_before)
+        .collect();
     done.store(true, Ordering::SeqCst);
     let relay = sampler.join().unwrap();
     desk.close(Closing::Chosen);
@@ -192,6 +210,8 @@ fn scenario(runs: usize, latency: Latency) -> Taken {
     Taken {
         lines: lines.into_iter().skip(before).collect(),
         relay,
+        relay_queue,
+        idle_us,
         posted_ms,
         wall,
     }
@@ -320,6 +340,19 @@ fn throughput_line(head: &str, taken: &Taken) -> String {
     )
 }
 
+/// The accounting thread's busy share over the reading: the wall time
+/// it did not spend asleep on its queue, in permille.
+fn busy_line(head: &str, taken: &Taken) -> String {
+    let wall_us = u64::try_from(taken.wall.as_micros()).unwrap().max(1);
+    let busy_us = wall_us.saturating_sub(taken.idle_us);
+    format!(
+        "throughput_busy {head} wait=ledger_thread_busy wall_us={wall_us} idle_us={} busy_us={busy_us} busy_permille={} {}",
+        taken.idle_us,
+        busy_us * 1000 / wall_us,
+        machine()
+    )
+}
+
 /// Each wait the bench reads, in microseconds (§8-14's table).
 fn waits(taken: &Taken, idle: &[Duration]) -> Vec<(&'static str, Vec<u64>)> {
     let micros = |samples: &[Duration]| {
@@ -355,6 +388,7 @@ fn waits(taken: &Taken, idle: &[Duration]) -> Vec<(&'static str, Vec<u64>)> {
         ("lane", lane),
         ("first_call", to_first_call),
         ("relay_under_load", micros(&taken.relay)),
+        ("relay_queue", taken.relay_queue.clone()),
         ("relay_idle", micros(idle)),
     ]
 }
