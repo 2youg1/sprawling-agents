@@ -174,11 +174,10 @@ impl<'h> Turn<'h, ToolWave> {
     /// answers is consumed through the one boundary consumer, so a steer
     /// between two calls is recorded here, before the next assembly
     /// hands it to the model. For the leading reads it is asked for every
-    /// call before any of them starts, in call order, and a cancel starts
-    /// only the calls before it: the calls a serial wave would have made
-    /// before the same cancel. Each answer is consumed just before its
-    /// call is accounted, so a steer lands on the ledger where a serial
-    /// wave writes it.
+    /// call before any starts, in call order, and a cancel starts only
+    /// the calls a serial wave would have made before it. Each answer is
+    /// consumed just before its call is accounted, so a steer lands on
+    /// the ledger where a serial wave writes it.
     pub fn execute_concurrent(
         mut self,
         interrupt: Interrupt,
