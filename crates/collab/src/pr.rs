@@ -6,9 +6,10 @@
 //! Getting a node's work into the building, with the verification taken
 //! out of the implementer's hands.
 //!
-//! The phases are types: a pull request that has not been verified has
-//! no method that merges it, so "verified before merged" is not a rule
-//! anybody has to remember. Verification itself is not re-decided here -
+//! The phases are types: the one merge, `check` in
+//! [`pr_tool`](crate::pr_tool), records it only with a `Pr<Verified>` in
+//! hand, and only [`Pr::verified`] builds one, so "verified before
+//! merged" is not a rule anybody has to remember. Verification itself is not re-decided here -
 //! an [`Artifact`](crate::fanin::Artifact) already carries the fact that
 //! somebody other than the producer ran the done check, and this module
 //! reuses that judgment rather than making a second one.

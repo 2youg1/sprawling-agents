@@ -6,7 +6,7 @@
 //! Two goals want the same resource. Who decides, and how far up.
 //!
 //! Detection is `kernel::goal`'s and stays there; this module holds the
-//! three levels and the way between them. The split is the point:
+//! two levels and the way between them. The split is the point:
 //! deciding *that* two goals clash is mechanical, deciding *what to do*
 //! usually is not.
 //!

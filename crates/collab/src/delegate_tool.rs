@@ -267,7 +267,8 @@ impl Tool for DelegateTool {
                 "the desk was left locked by a thread that died",
             )
             .with_recovery(
-                "end this run and resume it: the delegation desk cannot be reached again \n                 inside a process where a thread died holding it",
+                "end this run and resume it: the delegation desk cannot be reached again \
+                 inside a process where a thread died holding it",
             )
         })?;
         let accepted = desk.ask(work)?;
@@ -278,7 +279,7 @@ impl Tool for DelegateTool {
         );
         out.insert(
             "starts".to_owned(),
-            Value::String("when this turn settles".to_owned()),
+            Value::String("now: the city starts it while this run goes on".to_owned()),
         );
         Ok(ToolOutcome {
             result: Payload::new(out)?,
@@ -347,6 +348,40 @@ mod tests {
         assert_eq!(taken.len(), 1);
         assert_eq!(taken[0].kind, DelegateKind::Ephemeral);
         assert!(desk.lock().unwrap().take().is_empty(), "taken once");
+    }
+
+    /// collab D7: the child's run opens at the call, while this run goes
+    /// on, so the answer must not tell the model to wait for its turn.
+    #[test]
+    fn the_answer_says_the_delegate_starts_while_this_run_goes_on() {
+        let tool = DelegateTool::new(desk(Depth::Root)).unwrap();
+        let outcome = tool.invoke(&call("lab/helper", None)).unwrap();
+        let starts = outcome.result.as_map()["starts"].as_str().unwrap();
+        assert!(!starts.contains("settles"), "{starts}");
+    }
+
+    /// The refusal a desk left locked by a dead thread gives reaches the
+    /// model as written, on one line.
+    #[test]
+    fn a_desk_a_dead_thread_held_is_refused_in_one_plain_line() {
+        let desk = desk(Depth::Root);
+        let held = std::sync::Arc::clone(&desk);
+        std::thread::spawn(move || {
+            let _guard = held.lock().unwrap();
+            panic!("die holding the desk");
+        })
+        .join()
+        .unwrap_err();
+        let err = DelegateTool::new(desk)
+            .unwrap()
+            .invoke(&call("lab/helper", None))
+            .unwrap_err();
+        assert_eq!(err.code(), &AxCode::StorageFatal);
+        assert!(
+            !err.recovery().contains('\n') && !err.recovery().contains("  "),
+            "{:?}",
+            err.recovery()
+        );
     }
 
     /// The rule this whole mechanism exists to hold, now with a caller:

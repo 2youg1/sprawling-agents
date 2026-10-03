@@ -17,8 +17,9 @@
 //!
 //! A refusal is where the design lives. "No" alone teaches a model to
 //! rephrase and try again, so the refusal carries the level that decides
-//! the clash — wait for the other goal, go and agree with its owner, or
-//! ask the person — and the model can act on exactly one of those.
+//! the clash — wait for the other goal, or go and agree with its owner
+//! (collab D1 leaves no third level) — and the model can act on exactly
+//! the one it is given.
 
 use std::sync::{Arc, Mutex};
 

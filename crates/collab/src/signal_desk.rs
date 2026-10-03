@@ -149,13 +149,13 @@ impl SignalDesk {
     /// Takes one steer waiting for this run, ready to land at its next
     /// safe point, or `None` when nothing is waiting for it.
     ///
-    /// The landing is the same one the person's steer uses, and the
-    /// attribution is what keeps them apart: [`crate::Steer::from_signal`]
-    /// can only write `@<the sender's address>`, and only
-    /// `Steer::from_person` can write `user`. A resident reading its own
-    /// window can therefore tell who spoke, and the prefix it reads is
-    /// the address it answers to — which is what makes a reply
-    /// possible at all.
+    /// The landing is the same one the User's steer uses, and the type
+    /// is what keeps them apart: [`crate::Letter::from_signal`] carries
+    /// the sender's address as the city stamped it, and only a
+    /// [`crate::Steer`] renders as `user` (collab D16). A resident
+    /// reading its own window can therefore tell who spoke, and the
+    /// letter's `from` is the address it answers to — which is what
+    /// makes a reply possible at all.
     ///
     /// A steer the run can read is *held*, not consumed: the model reads
     /// it in its next request, and [`SignalDesk::answered`] records the
@@ -165,7 +165,7 @@ impl SignalDesk {
     /// be refused again at the next safe point.
     ///
     /// # Errors
-    /// Propagates [`crate::Steer::from_signal`]'s refusal when a consumed
+    /// Propagates [`crate::Letter::from_signal`]'s refusal when a consumed
     /// signal is not a steer this run can read. `Ok(None)` and `Err` are
     /// two facts — an empty queue and a message that arrived unreadable —
     /// and folding the second into the first is what this refuses to do.

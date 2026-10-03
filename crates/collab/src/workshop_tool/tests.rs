@@ -131,6 +131,22 @@ fn one_run_lays_out_one_graph() {
         .invoke(&lay_out(serde_json::json!([node("lab/b", &[])])))
         .unwrap_err();
     assert!(err.recovery().contains("one graph per session"));
+    assert!(!err.recovery().contains("  "), "{:?}", err.recovery());
+}
+
+/// collab D7 and D14: the handed nodes start at the call, while this run
+/// goes on, and a waiting node is handed down when its dependencies hand
+/// back; the answer is what the model plans its next step on.
+#[test]
+fn the_lay_out_answer_says_when_each_group_starts() {
+    let (tool, _desk, _delegates) = tool();
+    let outcome = tool
+        .invoke(&lay_out(serde_json::json!([node("lab/a", &[])])))
+        .unwrap();
+    let starts = outcome.result.as_map()["starts"].as_str().unwrap();
+    assert!(!starts.contains("settles"), "{starts}");
+    assert!(!starts.contains("lays this graph out again"), "{starts}");
+    assert!(!starts.contains("  "), "{starts:?}");
 }
 
 /// The join's checkpoint, reached through the tool: an answer that could
