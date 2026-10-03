@@ -130,7 +130,7 @@ bin 子命令面；装配层是 Main；ARCHITECTURE.md §2（客户端嵌入链�
 
 /-! ## 6 命名统一
 
-**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。（`gateway::credential::Custodian` 住 `custodian` 同例，公共拼写不变）。（`wire::command::Command` 住 `kind` 同例）。
+**跨 crate 类型住处**：本 crate 引用别的 crate 的类型，用那个 crate 公开的拼写：它的顶层重导出（如 `kernel::AxError`），或它声明为 `pub mod` 的模块路径（如 `kernel::layout::CityLayout`）；定义实际住在哪个更深的子模块（如 `AxError` 住 `error::shape`）是那个 crate 的内政，搬家不改这里的任何一行。`gateway` 与 `wire` 同理。
 -/
 
 /-! ## 7 模块边界

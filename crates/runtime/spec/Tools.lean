@@ -136,8 +136,8 @@ pub fn redact_text(text: &str, marker: Marker) -> (String, u32);
 // 而金库里没有这个 realm——顺着标记去兑的读者得到的是一句诚实的「这里没有」。
 pub fn fingerprint(found: &[u8]) -> String;      // b3 前十六位
 
-pub struct ToolBench { /* route: kernel::tool::route::ToolRoute、domain: WriteDomain、
-                          taint: TaintSet、seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>、
+pub struct ToolBench { /* tools: BTreeMap<ToolName, Box<dyn Tool>>、domain: WriteDomain、
+                          taint: TaintSet、sandbox: kernel::SandboxLimits、seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>、
                           prior_public_egress: bool —— 私有。`seen` 是「这把键答过没有、答了什么」的唯一一张表：键只在工具真正答过之后才写入，门拒/语法拒不留条目，故重试不算重放。 */ }
 impl ToolBench {
     pub fn new(domain: WriteDomain) -> ToolBench;

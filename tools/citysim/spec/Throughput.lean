@@ -35,7 +35,7 @@
 | `relay_under_load` | 负载期间，仪表经 `measuring_relay` 发出的一次 relay 往返 | 等待＋工作＋屏障 | 单调时钟，测试侧；减去空载的 `relay_idle` 就是排队的份额 |
 | `relay_idle` | 同样的往返，城里没有 run | 工作＋屏障 | 同上 |
 
-`lane` 一行在 N > `DRIVING_LANES` 时看得见车道排队：超出的 run 要等前面的 run 回家。
+`lane` 一行不含车道排队：pool 不设车道数（`crates/sprawling/Spec.lean` D34），投出的 run 立刻开车，N 再大也不等前面的 run 回家。一个 run 只在 provider 的准入处等，那是 `gateway::concurrency` 按端点给的并发许可，遇 429 收窄、持续应答后放宽（`crates/gateway/Spec.lean` D17）；替身 provider 不回 429，所以本台读到的 `lane` 是准备的工作，不是排队。
 
 **还没有读到的等待**：车道等待里「准备好」到「拿到 lane」的纯等待段、relay 从请求到账本线程取走的纯排队段、账本线程忙占比、折叠滞后、广播滞后与私有字节节拍采样，都要在生产代码的测量点上取时刻（经注入给 worker 的那一个时钟，ARCHITECTURE §10），本节的读数从外侧只能读出它们的和。它们是 M2 的下一段，W2 接着做。
 
