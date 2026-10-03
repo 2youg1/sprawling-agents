@@ -34,6 +34,7 @@
 
 mod base;
 pub(crate) mod commit;
+mod opening;
 mod provenance;
 pub(crate) mod scan;
 

@@ -29,12 +29,21 @@ pub(crate) struct CommitPlan<'a> {
     pub(crate) t: TimeMs,
     pub(crate) of: &'a Provenance,
     pub(crate) subject: &'a str,
-    /// Whether the branch follows this commit. A wave checkpoint says no: it
-    /// is filed under its own reference so a person's `git log` does not
-    /// grow a line per tool wave. A base commit and a landing
-    /// say yes, because a worktree branches from a branch and offered
-    /// work has to be on one.
-    pub(crate) onto_head: bool,
+    pub(crate) head: HeadMove,
+}
+
+/// What a commit does to HEAD. A wave checkpoint leaves it: it is filed
+/// under its own reference so a person's `git log` does not grow a line per
+/// tool wave. A base commit and a landing move it, because a worktree
+/// branches from a branch and offered work has to be on one.
+pub(crate) enum HeadMove {
+    Leave,
+    /// From where HEAD stands when the commit is made: a landing.
+    Advance,
+    /// Only where the city has no HEAD: the base commit. A writer that finds
+    /// HEAD made by another between its read and its swap is refused, so a
+    /// city gets one base however many writers race for it (storage §8-39).
+    Found,
 }
 
 impl Checkpoint {
@@ -272,10 +281,16 @@ impl Checkpoint {
         let email = plan.of.email();
         let signature = git2::Signature::new(plan.of.actor().as_str(), &email, &when)
             .map_err(git_err("build signature"))?;
-        let parents: Vec<git2::Commit> = Self::head_commit(&self.repo)?.into_iter().collect();
+        let (update, parents): (_, Vec<git2::Commit>) = match plan.head {
+            HeadMove::Leave => (None, Self::head_commit(&self.repo)?.into_iter().collect()),
+            HeadMove::Advance => (
+                Some("HEAD"),
+                Self::head_commit(&self.repo)?.into_iter().collect(),
+            ),
+            HeadMove::Found => (Some("HEAD"), Vec::new()),
+        };
         let parent_refs: Vec<&git2::Commit> = parents.iter().collect();
         let full_message = format!("{}\n\n{}", plan.subject, plan.of.trailers());
-        let update = if plan.onto_head { Some("HEAD") } else { None };
         let oid = self
             .repo
             .commit(
@@ -286,7 +301,25 @@ impl Checkpoint {
                 &tree,
                 &parent_refs,
             )
-            .map_err(git_err("commit checkpoint"))?;
+            .map_err(|err| {
+                // HEAD moved since it was read, or its lock file is held (on
+                // Windows, also a rename onto a file someone has open): the
+                // compare-and-swap refused, and a silent redo would treat the
+                // other writer's work as this commit's to undo (storage §8-39).
+                let lost = update.is_some()
+                    && matches!(
+                        err.code(),
+                        git2::ErrorCode::Modified | git2::ErrorCode::Locked
+                    );
+                if lost {
+                    StorageError::Checkpoint {
+                        op: "move HEAD",
+                        detail: format!("another writer moved or holds HEAD: {}", err.message()),
+                    }
+                } else {
+                    git_err("commit checkpoint")(err)
+                }
+            })?;
         self.last = Some(oid);
         Ok(oid)
     }
@@ -317,13 +350,14 @@ impl Checkpoint {
         of: &Provenance,
         subject: &str,
     ) -> Result<String, StorageError> {
+        let _head_moves = super::opening::moving_head()?;
         self.stage_scopes(scopes)?;
         self.scan_staged()?;
         let oid = self.commit(&CommitPlan {
             t,
             of,
             subject,
-            onto_head: true,
+            head: HeadMove::Advance,
         })?;
         Ok(oid.to_string())
     }

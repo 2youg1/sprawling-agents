@@ -13,7 +13,7 @@ use crate::error::StorageError;
 
 use super::commit::{Checkpoint, checkpoint_ref, committed, git_err, subject_of};
 use super::provenance::Provenance;
-use super::scan::CommitPlan;
+use super::scan::{CommitPlan, HeadMove};
 
 /// How far a base checkpoint has got, reported as each step lands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,7 +73,7 @@ impl Checkpoint {
             t,
             of,
             subject: &subject_of(scopes),
-            onto_head: false,
+            head: HeadMove::Leave,
         })?;
 
         let mut pack = git2::Buf::new();

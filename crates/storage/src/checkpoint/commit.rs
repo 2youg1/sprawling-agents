@@ -17,7 +17,7 @@ use crate::error::StorageError;
 use crate::real_fs::RealFs;
 
 use super::provenance::Provenance;
-use super::scan::CommitPlan;
+use super::scan::{CommitPlan, HeadMove};
 
 /// How a checkpoint names itself in a commit subject. The whole set, because
 /// a checkpoint that showed one of several prefixes would read like a checkpoint
@@ -70,6 +70,8 @@ pub struct Checkpoint {
     /// The last commit this handle made, checkpoint or landing. The scan
     /// compares against it, because a checkpoint does not move HEAD.
     pub(crate) last: Option<git2::Oid>,
+    /// Which index this handle stages into (`checkpoint::opening`).
+    pub(crate) index: super::opening::IndexOwner,
 }
 
 pub(crate) fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
@@ -80,28 +82,6 @@ pub(crate) fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageEr
 }
 
 impl Checkpoint {
-    /// Opens the city repository, initialising one when absent. The
-    /// genesis commit is the first wave's, not this call's: an empty
-    /// repository is a valid state, and inventing history here would
-    /// make the first checkpoint unattributable.
-    pub fn open(city_root: &Path) -> Result<Checkpoint, StorageError> {
-        let repo = match git2::Repository::open(city_root) {
-            Ok(repo) => repo,
-            Err(_) => git2::Repository::init(city_root).map_err(git_err("init repository"))?,
-        };
-        // The city's files round-trip byte for byte, whatever this
-        // machine's git is configured to do to other people's
-        // repositories. A checkout that rewrote line endings would make
-        // a file disagree with the hash the ledger holds for it, and the
-        // disagreement would look like corruption rather than like a
-        // setting. Set on every open, because the setting is a property
-        // of this repository rather than of the moment it was created.
-        repo.config()
-            .and_then(|mut config| config.set_bool("core.autocrlf", false))
-            .map_err(git_err("pin the repository's line endings"))?;
-        Ok(Checkpoint { repo, last: None })
-    }
-
     /// Makes sure the city has one commit, and makes no more than that.
     ///
     /// A worktree branches from a commit, so a city that has never been
@@ -120,17 +100,27 @@ impl Checkpoint {
         if self.repo.head().is_ok() {
             return Ok(None);
         }
+        let _head_moves = super::opening::moving_head()?;
+        if self.repo.head().is_ok() {
+            return Ok(None);
+        }
         let files = self.stage_scopes(scopes)?;
         self.scan_staged()?;
         // The one checkpoint that moves the branch: a worktree branches from a
         // commit, and a city that has none can lend no tree.
-        let oid = self.commit(&CommitPlan {
+        let made = self.commit(&CommitPlan {
             t,
             of,
             subject: &subject_of(scopes),
-            onto_head: true,
-        })?;
-        committed(oid, of, scopes, files).map(Some)
+            head: HeadMove::Found,
+        });
+        match made {
+            Ok(oid) => committed(oid, of, scopes, files).map(Some),
+            // Another writer made the base between the read and the swap:
+            // the same city as if it had gone first (storage §8-39).
+            Err(_) if self.repo.head().is_ok() => Ok(None),
+            Err(refused) => Err(refused),
+        }
     }
 
     /// The pre-wave checkpoint: stage everything under `scopes`, scan it, and
@@ -165,7 +155,7 @@ impl Checkpoint {
             t,
             of,
             subject: &subject_of(scopes),
-            onto_head: false,
+            head: HeadMove::Leave,
         })?;
         self.repo
             .reference(
