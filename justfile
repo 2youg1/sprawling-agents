@@ -721,9 +721,11 @@ adversary *args:
 # because one run of it names a branch only the city knows, and the walk
 # appends that run to the script once it has read the branch from the
 # history (tools/adversary/Spec.lean D7). The servings that are not the
-# crash end with SIGINT on macOS and Linux and are terminated only when
-# they do not exit within ten seconds; on Windows they are terminated, and
-# the walk prints a `note` line for every such fallback (D8). Once every
+# crash end with SIGINT on macOS and Linux; on Windows each city is started
+# through the launcher `serve_grouped` in a process group of its own, which
+# the walk asks to send it Ctrl-Break. A city that does not exit within ten
+# seconds is terminated, and the walk prints a `note` line for every such
+# fallback (D8). Once every
 # step held, the checklist a person works through by hand is written to
 # target/acceptance/checklist.md.
 #
@@ -760,17 +762,22 @@ acceptance archive:
     }
     binary="${binaries[0]}"
     shelf="$(dirname "$binary")/skills"
-    cargo build --package citysim --bin provider --locked
+    cargo build --package citysim --bin provider --bin serve_grouped --locked
     targets="${CARGO_TARGET_DIR:-target}"
     case "$targets" in /* | ?:*) ;; *) targets="$PWD/$targets" ;; esac
     provider="$targets/debug/provider"
     [ -f "$provider" ] || provider="$provider.exe"
+    # The launcher is named only on Windows, where a city closes in order
+    # only on a Ctrl-Break to a process group of its own; macOS and Linux
+    # send SIGINT to the city itself (tools/adversary/Spec.lean D8).
+    launcher=""
     # The paths are handed to programs that are not a shell; under Git Bash
     # they are `/c/...`, which only that shell resolves (see `adversary`).
     if command -v cygpath >/dev/null 2>&1; then
         out="$(cygpath -m "$out")"
         binary="$(cygpath -m "$binary")"
         shelf="$(cygpath -m "$shelf")"
+        launcher="$(cygpath -m "$targets/debug/serve_grouped.exe")"
     fi
     lake exe acceptance script "$shelf" "$out/script.json"
     "$provider" "$out/script.json" "$out/record.jsonl" > "$out/provider.out" 2> "$out/provider.err" &
@@ -786,7 +793,7 @@ acceptance archive:
         sleep 0.1
     done
     [ -n "$url" ] || { echo "acceptance: the stand-in printed no URL within ten seconds" >&2; exit 1; }
-    SPRAWLING_BIN="$binary" SPRAWLING_PROVIDER="$url" \
+    SPRAWLING_BIN="$binary" SPRAWLING_PROVIDER="$url" SPRAWLING_LAUNCHER="$launcher" \
         lake exe acceptance walk "$shelf" "$out/script.json" "$out/record.jsonl" "$out/checklist.md"
 
 # The PGO training load (Roadmap P2): what the instrumented release
@@ -802,10 +809,11 @@ acceptance archive:
 # `%m` in it, because several instrumented processes run at once and a
 # shared name would let the last one overwrite the rest. A process that
 # is killed writes no profile: the walk closes its first and third
-# servings with SIGINT on macOS and Linux, so they write theirs, and
-# terminates them on Windows, where they contribute nothing (the walk's
-# `note` lines say so; tools/adversary/Spec.lean D8); the city of its
-# own is closed in order, and the one-shot verbs exit normally. The held-out load below shares no
+# servings in order, with SIGINT on macOS and Linux and through the
+# launcher's Ctrl-Break on Windows, so they write theirs; a serving that
+# had to be terminated instead is named by a `note` line of the walk
+# (tools/adversary/Spec.lean D8). The city of its own is closed in order
+# the same way, and the one-shot verbs exit normally. The held-out load below shares no
 # step with this one, so a gain it shows is not a gain on the training
 # script alone.
 # The loopback port the training load serves its city on; one constant,
@@ -834,35 +842,25 @@ pgo-train archive:
     "$binary" check "$city"
     # The served city: queries, commands, eight clients at once, the
     # metrics beat, then the orderly close, so this process exits normally
-    # and writes its profile. On Windows a console process takes an orderly
-    # close only as Ctrl-Break delivered on its own console: it is started
-    # hidden in one by Start-Process, and a helper attaches to that console
-    # to raise the event. Elsewhere SIGINT is the orderly close.
+    # and writes its profile. On Windows the city is started through the
+    # walk's launcher `serve_grouped` (built by `acceptance` above) in a
+    # process group of its own, and the line `close` on the launcher's stdin
+    # has it send Ctrl-Break to that group; elsewhere SIGINT is the orderly
+    # close (tools/adversary/Spec.lean D8).
     at="127.0.0.1:{{pgo_port}}"
     taken() { grep -q 'commands are taken' "$city/../serve.err" 2>/dev/null; }
     if command -v cygpath >/dev/null 2>&1; then
-        cat > "$city/../break.ps1" <<'EOF'
-    param([uint32]$Target)
-    Add-Type -Namespace Pgo -Name Con -MemberDefinition @"
-    [DllImport("kernel32.dll")] public static extern bool FreeConsole();
-    [DllImport("kernel32.dll")] public static extern bool AttachConsole(uint p);
-    [DllImport("kernel32.dll")] public static extern bool GenerateConsoleCtrlEvent(uint e, uint g);
-    "@
-    [void][Pgo.Con]::FreeConsole()
-    if (-not [Pgo.Con]::AttachConsole($Target)) { exit 3 }
-    [void][Pgo.Con]::GenerateConsoleCtrlEvent(1, 0)
-    EOF
-        win="$(cygpath -w "$city/..")"
-        powershell -NoProfile -Command "\$p = Start-Process -FilePath '$(cygpath -w "$binary")' -ArgumentList 'serve','$(cygpath -m "$city")','$at','--no-open' -RedirectStandardOutput '$win\serve.out' -RedirectStandardError '$win\serve.err' -WindowStyle Hidden -PassThru; Set-Content -Path '$win\serve.pid' -Value \$p.Id" > /dev/null
-        server="$(tr -dc 0-9 < "$city/../serve.pid")"
-        stop() { powershell -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$city/../break.ps1")" "$server" > /dev/null 2>&1 || true; }
-        alive() { powershell -NoProfile -Command "if (Get-Process -Id $server -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"; }
+        targets="${CARGO_TARGET_DIR:-target}"
+        case "$targets" in /* | ?:*) ;; *) targets="$PWD/$targets" ;; esac
+        exec {closer}> >("$targets/debug/serve_grouped.exe" "$binary" serve "$(cygpath -m "$city")" "$at" --no-open > "$city/../serve.out" 2> "$city/../serve.err")
+        server=$!
+        stop() { echo close >&"$closer"; exec {closer}>&-; }
     else
         "$binary" serve "$city" "$at" --no-open > "$city/../serve.out" 2> "$city/../serve.err" &
         server=$!
         stop() { kill -INT "$server"; }
-        alive() { kill -0 "$server" 2>/dev/null; }
     fi
+    alive() { kill -0 "$server" 2>/dev/null; }
     for _ in $(seq 1 100); do taken && break; sleep 0.1; done
     taken || { cat "$city/../serve.err" >&2; echo "pgo-train: the served city took no command within ten seconds" >&2; exit 1; }
     ask() { "$binary" call "$1" --at "$at" --quiet-ms 300 > /dev/null 2>&1; }
