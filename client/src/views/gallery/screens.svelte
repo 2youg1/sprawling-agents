@@ -136,12 +136,10 @@
   // a machine that says it is boxed in while the box has no lid is
   // worse than one that says it has no box.
   const MACHINE: DoctorAnswer = {
-    core: "raised",
+    core: "raised", scanning: "does_not_apply",
     custody: { keeps: "across_reboots", store: "platform_service" },
-    scanning: "does_not_apply",
     sandbox: {
-      arm: "windows_job_object",
-      named: "native",
+      arm: "windows_job_object", named: "native",
       coverage: [
         { axis: "filesystem", kept: "kept" },
         { axis: "process_tree", kept: "kept" },
