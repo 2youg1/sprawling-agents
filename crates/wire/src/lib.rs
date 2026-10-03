@@ -74,7 +74,7 @@ pub use answer::{OfferedCard, OpenProposalsAnswer, ProposalCard, ProposalsAnswer
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
 pub use answer::{ReleaseAnswer, ReleaseLine, UpdateHint};
 pub use answer::{RoundsAnswer, Timing, Turn};
-pub use answer::{SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
+pub use answer::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use answer::{SecondDomain, SettledEffort, SettledSecond, TuningDefaults};
 pub use answer::{Standing, ToolkitLine, ToolkitsAnswer};
 pub use answer::{VERSIONS_MAX, VersionSource, VersionsAnswer};
@@ -86,7 +86,7 @@ pub use command::COMMAND_NAMES;
 pub use command::{BodyOverride, EndpointTuning, HeaderPair};
 pub use command::{Carry, Command, WireCommand};
 pub use command::{CitySettings, GovernedDocument, HaltScope, IdentityCard, NoSecret, RulesWrite};
-pub use command::{ProposalDecision, ProposalDecisions, RangeWrite};
+pub use command::{PolicyChange, ProposalDecision, ProposalDecisions, RangeWrite, SessionNaming};
 pub use command::{PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};
 #[cfg(feature = "schema")]

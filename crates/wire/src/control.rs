@@ -155,6 +155,11 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // live run holds the tool table it was assembled with, and an
         // application connected halfway through it joins the one after.
         | Command::ConnectToolkit { .. }
+        // A session's name is what a page shows. A policy change is a
+        // ledger line the run under way reads at its own next safe
+        // point, so it interrupts no turn and owes no handoff.
+        | Command::NameSession(_)
+        | Command::ChangeRunPolicy(_)
         | Command::Auth { .. } => ControlVerdict::NotAnIntervention,
     }
 }

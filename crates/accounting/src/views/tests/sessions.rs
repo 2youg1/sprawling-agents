@@ -91,6 +91,11 @@ fn a_room_s_sessions_are_answered_from_the_fold() {
         runs,
         last: kernel::Seq::new(last),
         at: kernel::TimeMs::new(1_000),
+        name: None,
+        model: None,
+        effort: None,
+        workspace: None,
+        preview: None,
     };
     let asked = |room: &Address| wire::Query::Sessions { room: room.clone() };
 
@@ -133,4 +138,85 @@ fn a_room_s_sessions_are_answered_from_the_fold() {
             }),
         ]
     );
+}
+
+/// A stretch carries the name its last `session_named` gave it, the model
+/// and effort of its last run, and the start of its last reply cut to
+/// `SESSION_PREVIEW_MAX` characters; an empty name takes the name back
+/// (`crates/wire/spec/Answer/Sessions.lean` D27).
+#[test]
+fn a_session_line_carries_its_name_model_effort_and_last_reply() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut views = Views::new(dir.path());
+    let room = Address::parse("lab/room1").unwrap();
+    let run = RunId::from_bytes([1; 16]);
+    let map = |value: serde_json::Value| value.as_object().unwrap().clone();
+    let long = "x".repeat(wire::SESSION_PREVIEW_MAX + 10);
+    let lines = [
+        (
+            1,
+            EventKind::RunStarted,
+            map(serde_json::json!({ "effort": "high" })),
+        ),
+        (
+            2,
+            EventKind::ModelCalled,
+            map(serde_json::json!({ "segments": [], "model": "m-1" })),
+        ),
+        (
+            3,
+            EventKind::ModelReturned,
+            map(serde_json::json!({
+                "message": { "role": "assistant", "content": [{ "kind": "text", "text": long }] },
+                "calls": 0
+            })),
+        ),
+        (
+            4,
+            EventKind::SessionNamed,
+            map(serde_json::json!({ "began": 1, "name": "first" })),
+        ),
+        (
+            5,
+            EventKind::SessionNamed,
+            map(serde_json::json!({ "began": 1, "name": "renamed" })),
+        ),
+    ];
+    for (seq, kind, data) in lines {
+        views
+            .apply(&view_record(Place { seq, run }, kind, &room, data))
+            .unwrap();
+    }
+    let answered = views.answer(&wire::Query::Sessions { room: room.clone() });
+    let wire::Answer::Sessions(sessions) = answered else {
+        panic!("a sessions question is answered with sessions: {answered:?}");
+    };
+    let line = &sessions.sessions[0];
+    assert_eq!(
+        (
+            line.name.as_deref(),
+            line.model.as_deref(),
+            line.effort,
+            line.preview.as_ref().map(|said| said.chars().count()),
+        ),
+        (
+            Some("renamed"),
+            Some("m-1"),
+            Some(kernel::Effort::High),
+            Some(wire::SESSION_PREVIEW_MAX)
+        )
+    );
+
+    views
+        .apply(&view_record(
+            Place { seq: 6, run },
+            EventKind::SessionNamed,
+            &room,
+            map(serde_json::json!({ "began": 1, "name": "" })),
+        ))
+        .unwrap();
+    let wire::Answer::Sessions(sessions) = views.answer(&wire::Query::Sessions { room }) else {
+        panic!("a sessions question is answered with sessions");
+    };
+    assert_eq!(sessions.sessions[0].name, None);
 }

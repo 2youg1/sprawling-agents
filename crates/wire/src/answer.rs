@@ -100,7 +100,7 @@ pub use rounds::{
     Call, Closing, FrozenNames, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn, Used,
 };
 pub use scanning::{DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold};
-pub use sessions::{SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
+pub use sessions::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
 

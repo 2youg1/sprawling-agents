@@ -14,8 +14,9 @@
 
 use std::collections::BTreeMap;
 
+use kernel::event::record::{ModelCalled, RunStarted, SessionNamed, WorktreeOpened};
 use kernel::{Address, AxError, EventKind, EventRecord};
-use wire::{Carry, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
+use wire::{Carry, SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 
 /// Every address's stretches, oldest first.
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -62,8 +63,23 @@ impl RoomSessions {
                     runs: 0,
                     last: seq,
                     at,
+                    name: None,
+                    model: None,
+                    effort: None,
+                    workspace: None,
+                    preview: None,
                 });
             return Ok(());
+        }
+        if kind == EventKind::SessionNamed {
+            let named = record.data().read::<SessionNamed>()?;
+            if let Some(stretch) = self
+                .by_room
+                .get_mut(room)
+                .and_then(|held| held.iter_mut().find(|line| line.began == named.began))
+            {
+                stretch.name = (!named.name.is_empty()).then_some(named.name);
+            }
         }
         let runs = u64::from(kind == EventKind::RunStarted);
         match self.by_room.get_mut(room).and_then(|held| held.last_mut()) {
@@ -71,18 +87,23 @@ impl RoomSessions {
                 current.runs = current.runs.saturating_add(runs);
                 current.last = seq;
                 current.at = at;
+                describe(current, record)?;
             }
             None if runs > 0 => {
-                self.by_room.insert(
-                    room.clone(),
-                    vec![SessionLine {
-                        began: seq,
-                        start: SessionStart::Dispatched,
-                        runs,
-                        last: seq,
-                        at,
-                    }],
-                );
+                let mut opened = SessionLine {
+                    began: seq,
+                    start: SessionStart::Dispatched,
+                    runs,
+                    last: seq,
+                    at,
+                    name: None,
+                    model: None,
+                    effort: None,
+                    workspace: None,
+                    preview: None,
+                };
+                describe(&mut opened, record)?;
+                self.by_room.insert(room.clone(), vec![opened]);
             }
             None => {}
         }
@@ -101,4 +122,30 @@ impl RoomSessions {
             sessions,
         }
     }
+}
+
+/// Keeps what a stretch's line says about its last run: the effort it
+/// froze, the model it called, the worktree it was lent and the start of
+/// its last reply (`crates/wire/spec/Answer/Sessions.lean` D27). A line of
+/// any other kind says none of these.
+///
+/// # Errors
+/// Refuses a `run_started`, `model_called` or `worktree_opened` whose
+/// payload cannot be read, for the reason `absorb` refuses an unreadable
+/// `session_opened`.
+fn describe(stretch: &mut SessionLine, record: &EventRecord) -> Result<(), AxError> {
+    let data = record.data();
+    let kind = record.kind();
+    if kind == EventKind::RunStarted {
+        stretch.effort = data.read::<RunStarted>()?.effort;
+    } else if kind == EventKind::ModelCalled {
+        stretch.model = Some(data.read::<ModelCalled>()?.model);
+    } else if kind == EventKind::WorktreeOpened {
+        stretch.workspace = Some(data.read::<WorktreeOpened>()?.name);
+    } else if kind == EventKind::ModelReturned
+        && let Some(said) = data.as_map().get("message").and_then(wire::said_in)
+    {
+        stretch.preview = Some(said.chars().take(SESSION_PREVIEW_MAX).collect());
+    }
+    Ok(())
 }

@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
 use crate::command::step::{
-    Carry, CitySettings, GovernedDocument, HaltScope, IdentityCard, ProposalDecisions, PursuitStep,
-    RangeWrite, RulesWrite, SpineDocument,
+    Carry, CitySettings, GovernedDocument, HaltScope, IdentityCard, PolicyChange,
+    ProposalDecisions, PursuitStep, RangeWrite, RulesWrite, SessionNaming, SpineDocument,
 };
 use crate::command::tuning::EndpointTuning;
 use crate::guide::GuideProgress;
@@ -49,12 +49,10 @@ pub enum Command<Secret = Sealed<String>> {
         idem: IdemKey,
         /// What this session is called, when it is a new one.
         ///
-        /// `Some` means `addr` names a building and the city opens a
-        /// room of this name under it; `None` means `addr` already
-        /// names the room, which is how an earlier session is
-        /// continued. Two dispatches to one room are one session with a
-        /// history, and that is a different thing from two sessions
-        /// sharing a folder.
+        /// `Some` means `addr` names a building and the city opens a room of this name
+        /// under it; `None` means `addr` already names the room, which is how an earlier
+        /// session is continued. Two dispatches to one room are one session with a
+        /// history, and that is a different thing from two sessions sharing a folder.
         session: Option<SessionName>,
         /// How hard the model is asked to think in this session.
         ///
@@ -108,11 +106,10 @@ pub enum Command<Secret = Sealed<String>> {
         sandbox: Option<SandboxLimits>,
         mcp: Option<Vec<McpServer>>,
         desktop: Option<String>,
-        /// Where the context reminder's second rung sits, as one layer
-        /// states it: a raw percent on the wire. The domain is
-        /// `kernel::config::SecondThreshold`'s one construction point,
-        /// and a deserializer that enforced it here would be the second
-        /// place that rule lives.
+        /// Where the context reminder's second rung sits, as one layer states it: a raw
+        /// percent on the wire. The domain is `kernel::config::SecondThreshold`'s one
+        /// construction point, and a deserializer that enforced it here would be the
+        /// second place that rule lives.
         context_second_threshold: Option<u64>,
         idem: IdemKey,
     },
@@ -384,6 +381,10 @@ pub enum Command<Secret = Sealed<String>> {
         text: String,
         idem: IdemKey,
     },
+    /// Names one session of a room; writes `session_named` (`spec/Answer/Sessions.lean` D27).
+    NameSession(SessionNaming),
+    /// Changes a room's run policy; writes `run_policy_changed` (same decision).
+    ChangeRunPolicy(PolicyChange),
     /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token is plain here because a
     /// token that must cross a wire has, by definition, no secrecy left to protect in transit - it
     /// is sealed the moment it lands (see `server::decide_handshake`).

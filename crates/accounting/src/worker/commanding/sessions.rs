@@ -36,8 +36,9 @@
 //! not a refusal either - the person asked for a new session, which is a
 //! thing that can be done (`crates/sprawling/Spec.lean` §8-82).
 
-use kernel::event::record::SessionOpened;
-use kernel::{Address, AxCode, AxError, EventKind, Payload};
+use kernel::event::Who;
+use kernel::event::record::{RunPolicyChanged, SessionNamed, SessionOpened};
+use kernel::{Address, AxCode, AxError, EventKind, Payload, Seq};
 
 use super::super::RunWorker;
 
@@ -91,6 +92,58 @@ impl RunWorker {
             EventKind::SessionOpened,
             addr.clone(),
             Payload::of(&SessionOpened { carried, from })?,
+        )
+    }
+}
+
+impl RunWorker {
+    /// Gives the session of `room` that began at `began` a display name,
+    /// or takes it back with an empty one (kernel D22). The address stays
+    /// the session's identity.
+    ///
+    /// # Errors
+    /// Refuses `E_INVALID_ARGS` for a name holding a control character,
+    /// which no page can draw on one line, and propagates a ledger that
+    /// refuses the record.
+    pub(in crate::worker) fn name_session(
+        &mut self,
+        room: &Address,
+        began: Seq,
+        name: String,
+    ) -> Result<(), AxError> {
+        if name.chars().any(char::is_control) {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "name a session",
+                name.escape_debug().to_string(),
+            )
+            .with_recovery("write the name on one line, without tabs or control characters"));
+        }
+        self.record_at(
+            EventKind::SessionNamed,
+            room.clone(),
+            Payload::of(&SessionNamed { began, name })?,
+        )
+    }
+
+    /// Records the room's new run policy (kernel D21). The run under way
+    /// reads the line at its next safe point; the next dispatch into the
+    /// room starts under it.
+    ///
+    /// # Errors
+    /// Propagates a ledger that refuses the record.
+    pub(in crate::worker) fn change_run_policy(
+        &mut self,
+        room: &Address,
+        policy: kernel::model::RunPolicy,
+    ) -> Result<(), AxError> {
+        self.record_at(
+            EventKind::RunPolicyChanged,
+            room.clone(),
+            Payload::of(&RunPolicyChanged {
+                policy,
+                by: Who::Person,
+            })?,
         )
     }
 }

@@ -157,6 +157,18 @@ pub struct Used {
     /// (`crates/wire/Spec.lean` D13).
     #[serde(default)]
     pub cache_write: Option<Tokens>,
+    /// Whole microseconds from the attempt going out to the reply's first
+    /// content, as `model_returned.first_us` recorded it (kernel D20).
+    /// `None` on a line written before the key existed, and wherever
+    /// `Turn::first_at` is `None`.
+    #[serde(default)]
+    pub first_us: Option<u64>,
+    /// Whole microseconds from the attempt going out to the reply being
+    /// whole, as `model_returned.took_us` recorded it. `None` on a line
+    /// written before the key existed: a page then shows the difference
+    /// of the moments, in milliseconds (`crates/wire/spec/Reading.lean` D28).
+    #[serde(default)]
+    pub took_us: Option<u64>,
 }
 
 /// One tool call inside a turn.
@@ -216,6 +228,12 @@ pub struct Call {
     /// invented one.
     #[serde(default)]
     pub exit_code: Option<i64>,
+    /// Whole microseconds the call took, as its paired `tool_result.took_us`
+    /// recorded it (kernel D20). `None` for a call not yet answered and for
+    /// a line written before the key existed: a page then shows
+    /// `answered - called` in milliseconds (`crates/wire/spec/Reading.lean` D28).
+    #[serde(default)]
+    pub took_us: Option<u64>,
 }
 
 /// One turn: the model was asked, and this is what came of it.

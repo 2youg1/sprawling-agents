@@ -231,6 +231,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                         <kernel::RenderIntent as serde::Deserialize>::deserialize(value).ok()
                     }),
                     exit_code: None,
+                    took_us: None,
                 };
                 let Some(turn) = folded.get_mut(turn_at) else {
                     continue;
@@ -257,7 +258,15 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     .get("billed_usd_micros")
                     .and_then(serde_json::Value::as_u64)
                     .map(UsdMicros::new);
-                turn.used = map.get("usage").and_then(wire::used_in);
+                let micros = |key: &str| map.get(key).and_then(serde_json::Value::as_u64);
+                turn.used = map
+                    .get("usage")
+                    .and_then(wire::used_in)
+                    .map(|used| wire::Used {
+                        first_us: micros("first_us"),
+                        took_us: micros("took_us"),
+                        ..used
+                    });
                 turn.stopped = wire::text(map.get("stop"));
                 turn.first_at = map
                     .get("first_at")
@@ -292,6 +301,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                         .and_then(serde_json::Value::as_object)
                         .and_then(runtime::exit_code_in);
                     call.answered = Some(record.t());
+                    call.took_us = map.get("took_us").and_then(serde_json::Value::as_u64);
                     call.timing = answered_timing(call.timing, record);
                 }
             }

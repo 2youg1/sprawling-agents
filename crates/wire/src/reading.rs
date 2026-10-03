@@ -76,6 +76,8 @@ fn blocks_of(message: &serde_json::Value, kind: &str, field: &str) -> Option<Str
 /// `input_tokens` is converted by the one reader that knows the versions.
 /// Absent when the row carries no usage it can read, which is a
 /// different fact from having spent nothing.
+/// The two durations are not usage: `model_returned` keeps them beside
+/// it, and the fold that holds the whole line fills them in.
 #[must_use]
 pub fn used_in(usage: &serde_json::Value) -> Option<Used> {
     let usage = <kernel::ModelUsage as serde::Deserialize>::deserialize(usage).ok()?;
@@ -84,6 +86,8 @@ pub fn used_in(usage: &serde_json::Value) -> Option<Used> {
         output: usage.output_tokens,
         cached: usage.cache_read_tokens,
         cache_write: Some(usage.cache_write_tokens),
+        first_us: None,
+        took_us: None,
     })
 }
 

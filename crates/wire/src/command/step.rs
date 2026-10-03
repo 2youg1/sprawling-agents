@@ -27,6 +27,27 @@ pub struct RangeWrite {
     pub idem: IdemKey,
 }
 
+/// A display name for the session of `room` that began at `began`; an
+/// empty name takes it back (`crates/wire/spec/Answer/Sessions.lean` D27).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SessionNaming {
+    pub room: Address,
+    pub began: kernel::Seq,
+    pub name: String,
+    pub idem: IdemKey,
+}
+
+/// A room's new run policy, which the run under way takes at its next
+/// safe point (`crates/wire/spec/Answer/Sessions.lean` D27).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct PolicyChange {
+    pub room: Address,
+    pub policy: kernel::model::RunPolicy,
+    pub idem: IdemKey,
+}
+
 /// A person's decision on proposal cards of one document, landed as one
 /// save (`crates/wire/spec/Answer/Proposals.lean` §8-73).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

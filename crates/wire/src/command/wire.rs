@@ -27,7 +27,9 @@ use kernel::IdemKey;
 
 use super::kind::Command;
 use super::no_secret::NoSecret;
-use super::step::{CitySettings, ProposalDecisions, RangeWrite, RulesWrite};
+use super::step::{
+    CitySettings, PolicyChange, ProposalDecisions, RangeWrite, RulesWrite, SessionNaming,
+};
 
 /// The Command set a socket can carry. `PutSecret` is unreachable because
 /// `NoSecret` has no values.
@@ -72,7 +74,9 @@ impl<Secret> Command<Secret> {
             | Self::RestoreDiscard { ref idem, .. }
             | Self::DoctorInstall { ref idem, .. }
             | Self::DoctorRefresh { ref idem, .. }
-            | Self::ConnectToolkit { ref idem, .. } => Some(idem),
+            | Self::ConnectToolkit { ref idem, .. }
+            | Self::NameSession(SessionNaming { ref idem, .. })
+            | Self::ChangeRunPolicy(PolicyChange { ref idem, .. }) => Some(idem),
             Self::PutSecret { .. } | Self::Auth { .. } => None,
         }
     }
@@ -267,6 +271,8 @@ impl From<WireCommand> for Command {
                 idem,
             },
             Command::PutPreferences { patch, idem } => Self::PutPreferences { patch, idem },
+            Command::NameSession(naming) => Self::NameSession(naming),
+            Command::ChangeRunPolicy(change) => Self::ChangeRunPolicy(change),
             Command::PutShelved {
                 shelf,
                 name,

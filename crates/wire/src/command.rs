@@ -34,8 +34,8 @@ pub use shelf::Shelf;
 pub use step::PursuitStep;
 pub use step::SpineDocument;
 pub use step::{
-    Carry, CitySettings, GovernedDocument, HaltScope, IdentityCard, ProposalDecision,
-    ProposalDecisions, RangeWrite, RulesWrite,
+    Carry, CitySettings, GovernedDocument, HaltScope, IdentityCard, PolicyChange, ProposalDecision,
+    ProposalDecisions, RangeWrite, RulesWrite, SessionNaming,
 };
 pub use tuning::{BodyOverride, EndpointTuning, HeaderPair};
 pub use wire::WireCommand;

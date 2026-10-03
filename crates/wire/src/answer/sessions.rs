@@ -6,7 +6,7 @@
 //! The stretches of one room, newest first: where each began, how, its
 //! runs and its last line (`crates/wire/spec/Answer/Sessions.lean` §8-71).
 
-use kernel::{Address, Origin, Seq, TimeMs};
+use kernel::{Address, Effort, Origin, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
 
 use crate::command::Carry;
@@ -15,6 +15,11 @@ use crate::command::Carry;
 /// on the wire, not a machine reading: the page that reads it shows a
 /// room's recent stretches, and `earlier` says how many more there are.
 pub const SESSIONS_MAX: usize = 64;
+
+/// How many characters of a stretch's last reply [`SessionLine::preview`]
+/// carries. A bound on the answer, not on what a page shows: the page cuts
+/// again to the width it has (`crates/wire/spec/Answer/Sessions.lean` D27).
+pub const SESSION_PREVIEW_MAX: usize = 240;
 
 /// One room's stretches, newest first, and how many older ones the answer
 /// leaves out. `room` echoes the question, which the wire carries no id
@@ -42,6 +47,24 @@ pub struct SessionLine {
     /// its time: the room's slice ends there (`crates/storage/Spec.lean` §8-24).
     pub last: Seq,
     pub at: TimeMs,
+    /// The name the last `session_named` for this stretch gave it; `None`
+    /// when it has none, and a page shows the room's address.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// The model the stretch's last run called.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// The effort the stretch's last run froze; `None` when it left the
+    /// provider to choose, and on lines written before the key existed.
+    #[serde(default)]
+    pub effort: Option<Effort>,
+    /// The worktree the stretch's last run was lent.
+    #[serde(default)]
+    pub workspace: Option<String>,
+    /// The start of the stretch's last reply, at most
+    /// [`SESSION_PREVIEW_MAX`] characters.
+    #[serde(default)]
+    pub preview: Option<String>,
 }
 
 /// How a stretch began.

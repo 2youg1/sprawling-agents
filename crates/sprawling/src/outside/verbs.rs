@@ -59,6 +59,8 @@ pub(super) fn command_class(command: &wire::WireCommand) -> VerbClass {
         | wire::Command::BatchByBuilding { .. }
         | wire::Command::Pursue { .. }
         | wire::Command::OpenSession { .. }
+        | wire::Command::NameSession(_)
+        | wire::Command::ChangeRunPolicy(_)
         | wire::Command::PutSpine { .. } => VerbClass::Act,
         wire::Command::ProbeEndpoint { .. }
         | wire::Command::ConfigureBuilding { .. }

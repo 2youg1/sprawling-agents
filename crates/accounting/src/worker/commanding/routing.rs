@@ -200,6 +200,12 @@ impl RunWorker {
             wire::Command::OpenSession {
                 addr, carry, from, ..
             } => self.open_session(&addr, carry, from),
+            wire::Command::NameSession(wire::SessionNaming {
+                room, began, name, ..
+            }) => self.name_session(&room, began, name),
+            wire::Command::ChangeRunPolicy(wire::PolicyChange { room, policy, .. }) => {
+                self.change_run_policy(&room, policy)
+            }
             wire::Command::PutDocument {
                 which,
                 ref base,
