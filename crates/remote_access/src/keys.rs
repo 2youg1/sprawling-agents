@@ -15,7 +15,8 @@ use aws_lc_rs::hkdf::{HKDF_SHA256, KeyType, Salt};
 use aws_lc_rs::signature::{
     ED25519, Ed25519KeyPair, KeyPair, ML_DSA_44, ML_DSA_44_SIGNING, PqdsaKeyPair, UnparsedPublicKey,
 };
-use kernel::{AxCode, AxError};
+use kernel::{AxCode, AxError, Sealed};
+use zeroize::Zeroizing;
 
 /// Bytes in the seed a key is derived from, and in its written form a
 /// person may keep: 52 base32 characters.
@@ -58,6 +59,17 @@ impl SigningKey {
         Ok(Self { ed25519, ml_dsa })
     }
 
+    /// Derives the city's key from the seed the vault keeps, in the form
+    /// [`written`] gives it (crates/remote_access/Spec.lean D23).
+    ///
+    /// # Errors
+    /// `E_CONFIG_INVALID` for text [`written`] cannot produce: a wrong
+    /// length, a character outside the alphabet, or stray bits at the end.
+    pub fn from_sealed(seed: &Sealed<String>) -> Result<Self, AxError> {
+        let _ = seed;
+        Err(unreadable_seed())
+    }
+
     /// The public half, as a device or the city publishes it.
     #[must_use]
     pub fn public(&self) -> VerifyingKey {
@@ -85,6 +97,25 @@ impl SigningKey {
         }
         Ok(Signature(Box::new(bytes)))
     }
+}
+
+/// The text the vault keeps for a seed: lower-case base32 without
+/// padding, 52 characters, cleared when the caller drops it.
+#[must_use]
+pub fn written(seed: &[u8; SEED_BYTES]) -> Zeroizing<String> {
+    Zeroizing::new(crate::pairing::encode(seed))
+}
+
+fn unreadable_seed() -> AxError {
+    AxError::failure(
+        AxCode::ConfigInvalid,
+        "read the city key",
+        "the seed the vault keeps for it",
+    )
+    .with_recovery(
+        "replace the city key with `/remote replace-key` on the city's console, \
+         then pair every device again",
+    )
 }
 
 /// The public half of a hybrid key, in its wire form.
@@ -246,6 +277,42 @@ mod tests {
             ],
             [true, false, false, false]
         );
+    }
+
+    fn sealed(text: &str) -> Sealed<String> {
+        Sealed::new(Box::new(text.to_owned()))
+    }
+
+    #[test]
+    fn a_written_seed_reads_back_as_the_key_its_seed_derives() {
+        let seed = [7; SEED_BYTES];
+        let text = written(&seed);
+        let read = SigningKey::from_sealed(&sealed(&text))
+            .ok()
+            .map(|key| key.public());
+        assert_eq!(
+            (text.len(), read),
+            (52, Some(SigningKey::from_seed(&seed).unwrap().public()))
+        );
+    }
+
+    #[test]
+    fn a_seed_written_any_other_way_is_refused() {
+        let text = written(&[7; SEED_BYTES]);
+        let short = &text[..51];
+        let long = format!("{}a", text.as_str());
+        let foreign = format!("{short}1");
+        let stray = format!("{short}{}", if text.ends_with('a') { "b" } else { "r" });
+        let codes: Vec<Option<AxCode>> =
+            [short, long.as_str(), foreign.as_str(), stray.as_str(), ""]
+                .iter()
+                .map(|each| {
+                    SigningKey::from_sealed(&sealed(each))
+                        .err()
+                        .map(|e| *e.code())
+                })
+                .collect();
+        assert_eq!(codes, vec![Some(AxCode::ConfigInvalid); 5]);
     }
 
     #[test]

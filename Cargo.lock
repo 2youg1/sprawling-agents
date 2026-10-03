@@ -2990,6 +2990,7 @@ version = "0.0.8"
 dependencies = [
  "aws-lc-rs",
  "sprawling-kernel",
+ "zeroize",
 ]
 
 [[package]]
