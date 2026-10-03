@@ -393,6 +393,16 @@ what = "one fsync barrier, amortised over the records under it"
 measured_by = "just bench (citysim bench bin, release)"
 status = "measured, not gated: 562.3 us/record at one record per barrier, 55.2 at ten, 14.8 at fifty (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01). A wall-clock figure is the machine's, so it is recorded, never gated"
 
+# The barriers one turn of a run pays once a turn's lines are held across
+# turns (runtime D36): one for the next model call and one for each write
+# the wave made, and the run one more at its end for the held lines and
+# the freeze. A count, not a time, so every machine reads the same number
+# and the property test holds it.
+[turn_barriers]
+what = "fsync barriers paid from one model call to the next, and from the last model call to the end of the run"
+measured_by = "cargo nextest run -p sprawling-runtime -E 'test(tf1_held_lines_cost_one_barrier_plus_one_per_write)'"
+status = "measured, held by that test rather than weighed by budget: 1 + writes per turn, 2 at the end of the run; the same count on windows, macos and linux, because the barrier is File::sync_data on all three and only its count and position are decided here"
+
 # Opening yesterday's session: the whole of what `bin::assembly`'s
 # `run_history` does, over the same public faces it calls - refresh the
 # resident index, name the newest `limit` sequences that session wrote,
@@ -771,6 +781,16 @@ status = "held by render, not weighed by budget"
 # admission requirement and the landing policy into one menu.
 best_count = 14
 slack_count = 0
+
+# What a narrow playback export reads off the ledger. The full scan read
+# every line to pair calls with results; the lazy scan reads the selected
+# lines, the lines a table reads without pairing (tool_called), and the
+# far ends of the selected pairs. A count of lines, so every machine reads
+# the same number on the same fixture and the test holds it.
+[playback_export_scan]
+what = "ledger lines a narrow playback export scans, on a 1004-line fixture of 200 rounds with a five-line selection"
+measured_by = "cargo nextest run -p sprawling-accounting -E 'test(a_narrow_export_scans_only_what_its_tables_read)'"
+status = "measured, held by that test rather than weighed by budget: 208 lines lazy against 1004 full; the same on windows, macos and linux, because the count depends on the fixture alone. The wall clock of a narrow export of a long city is not recorded yet"
 
 # Text-only spec parts under the anchors of `state machine` and `typestate` modules; may only fall (tools/xtask/Spec.lean §8-42, assertion 6).
 [spec_parts_without_theorem]
