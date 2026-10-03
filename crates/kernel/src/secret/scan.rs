@@ -332,6 +332,40 @@ mod tests {
         assert_eq!(&text.as_bytes()[hit.start..prefix_end], b"sk-ant-");
     }
 
+    /// A shape's body runs over every byte of its charset: the `-`, `_`
+    /// and `=` a base64url key carries, and both the capitals and the
+    /// digits of an upper-base36 one. A body cut at the first of them
+    /// would leave the rest of the key outside the span, or drop the hit.
+    #[test]
+    fn a_shape_s_body_runs_over_every_byte_of_its_charset() {
+        let url_body = format!("ab-cd_ef={}", "x".repeat(20));
+        let anthropic = format!("sk-ant-{url_body}");
+        let aws = format!("AKIA{}", "AB12CD34EF56");
+        for (text, provider) in [(anthropic, "anthropic"), (aws, "aws")] {
+            assert_eq!(
+                scan(text.as_bytes()),
+                vec![SecretSpan {
+                    start: 0,
+                    len: text.len(),
+                    provider: Some(provider),
+                }],
+                "{text}"
+            );
+        }
+    }
+
+    /// A scan looks at every byte it is given at least once, and counts
+    /// that it did: the work the growth test compares is work done.
+    #[test]
+    fn a_scan_counts_every_byte_it_reads() {
+        let text = format!("note: {} and prose", "a1B2c3D4e5".repeat(3));
+        let (_, work) = scan_counting(text.as_bytes());
+        assert!(
+            work.bytes_read >= u64::try_from(text.len()).unwrap(),
+            "{work:?}"
+        );
+    }
+
     #[test]
     fn high_entropy_tokens_hit_and_prose_does_not() {
         // The probe token is assembled at runtime so the source file
