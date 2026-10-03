@@ -199,6 +199,10 @@ digest and machine class. These readings are owed and not stated here:
   hidden behind zeros is refused; a restore makes its truncation and its
   removals durable. Each platform's segment durability arm is one constant.
 - A staged blob the scan cannot read refuses the checkpoint.
+- `resume` over a run cut by power loss after any line it held closes the
+  same tool calls as unknown, and continues with the same turn and
+  session, as it does for a run cut at the same place under the old
+  barrier per turn; a property test checks every cut.
 
 ### What a contributor notices
 
@@ -246,8 +250,7 @@ digest and machine class. These readings are owed and not stated here:
   code.
 - The skill wire: `InstallSkill`, shelving a skill, and the skill, MCP and
   usage exports have no command yet.
-- A clean tool payload is still copied once by the redaction step, and
-  `resume` is not yet compared with every power-cut prefix of a run.
+- A clean tool payload is still copied once by the redaction step.
 
 ### Known and unfixed
 
