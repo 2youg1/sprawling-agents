@@ -13,6 +13,10 @@
 //! so the job's process list is the run's whole process tree. The job
 //! is not kill-on-close: dropping it at `release` stops nothing, because
 //! stopping belongs to `release` and `halt` alone.
+//!
+//! Each job is made with a weighted CPU share, the same weight for every
+//! run, so a run whose build starts sixteen compilers takes one share of
+//! the processors and not sixteen (D29 in the same part).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -33,6 +37,21 @@ pub struct RunProcesses {
     /// not be read), and every one of them elsewhere, where there is
     /// no Job Object.
     pub unfollowed: u32,
+    /// Whether the run's processes share the processors by weight with
+    /// the other runs' processes.
+    pub share: CpuShare,
+}
+
+/// A run's share of the processors (D29).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CpuShare {
+    /// Its job holds the weight every run's job holds.
+    Weighted,
+    /// No weight: there is no Job Object on this platform, the run has
+    /// no job yet, or the job refused the weight; its processes compete
+    /// thread by thread, as they did before shares.
+    #[default]
+    Unset,
 }
 
 /// Each run's job, and how many of its commands did not get into it.
@@ -114,6 +133,7 @@ impl Jobs {
                     .pids
                     .extend(pids.into_iter().filter_map(|pid| u32::try_from(pid).ok()));
                 reading.unfollowed = reading.unfollowed.saturating_add(run.unjoined);
+                reading.share = run.share;
             } else {
                 reading.unfollowed = u32::try_from(reading.pids.len()).unwrap_or(u32::MAX);
             }
@@ -128,12 +148,18 @@ impl Jobs {
     }
 }
 
+/// The weight every run's job holds, from 1 to 9: the same for every
+/// run, so the runs share the processors evenly among themselves.
+#[cfg(windows)]
+const RUN_CPU_WEIGHT: u32 = 5;
+
 /// One run's job, created when its first command joins.
 #[cfg(windows)]
 #[derive(Default)]
 struct RunJob {
     job: Option<win32job::Job>,
     unjoined: u32,
+    share: CpuShare,
 }
 
 #[cfg(windows)]
@@ -145,7 +171,13 @@ impl RunJob {
         let handle = isize::try_from(child.as_raw_handle().addr()).ok()?;
         let job = match self.job.take() {
             Some(job) => job,
-            None => win32job::Job::create().ok()?,
+            None => {
+                let job = win32job::Job::create().ok()?;
+                // A job that refuses the weight still follows the run's
+                // processes; the run is read as unshared (D29).
+                self.share = CpuShare::Unset;
+                job
+            }
         };
         let joined = job.assign_process(handle).ok();
         self.job = Some(job);

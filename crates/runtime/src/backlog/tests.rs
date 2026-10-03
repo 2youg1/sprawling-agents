@@ -264,6 +264,15 @@ fn a_run_owns_the_processes_its_commands_started() {
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
     assert!(followed(&seen), "read {seen:?}");
+    // On Windows the run's job holds the weight every run's job holds;
+    // elsewhere there is no job to hold one (D29).
+    let share = backlog.processes().unwrap().get(&mine).map(|run| run.share);
+    let weighted = if cfg!(windows) {
+        crate::CpuShare::Weighted
+    } else {
+        crate::CpuShare::Unset
+    };
+    assert_eq!(share, Some(weighted));
     backlog.release(mine);
     assert!(!backlog.processes().unwrap().contains_key(&mine));
 }

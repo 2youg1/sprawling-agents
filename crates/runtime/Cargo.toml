@@ -47,6 +47,9 @@ wasmtime-wasi = { version = "48.0.3", optional = true }
 # (`crates/runtime/Spec.lean` §8-13-3); the crate's public surface is safe.
 [target.'cfg(windows)'.dependencies]
 win32job = { workspace = true }
+# Each run's job takes a weighted CPU share through the one FFI seam
+# (`crates/runtime/spec/Tools/Exec.lean` D29).
+desktop_ffi = { workspace = true }
 
 [features]
 wasm = ["dep:wasmtime", "dep:wasmtime-wasi"]

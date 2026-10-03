@@ -389,7 +389,7 @@ mod report;
 mod scratch;
 mod tail;
 pub mod waiting;
-pub use jobs::RunProcesses;
+pub use jobs::{CpuShare, RunProcesses};
 use member::{Body, Claim, Member, RunState, collect, storage};
 pub use report::{BacklogKind, Finished, Standing, Started};
 use scratch::Scratch;
