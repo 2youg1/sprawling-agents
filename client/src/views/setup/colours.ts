@@ -32,15 +32,13 @@ const TOKEN_PREFIX = "--color-";
 
 // The declarations `theme.css` states for `xtask color` beside the
 // values it judges: a text token's tier is `--tier-<name>` for
-// `--color-<name>`, and the ceiling names a rung of the grey ramp.
+// `--color-<name>`, the ceiling names a rung of the grey ramp, and the
+// slack is how far under its tier a reading may fall - the rounding the
+// gate allows, so a value it passes is not warned about here.
 const TIER_PREFIX = "--tier-";
 const CEILING = "--surface-ceiling";
+const SLACK = "--tier-slack";
 const TEXT_TOKEN = `${TOKEN_PREFIX}text`;
-
-// How far below its tier a token may read before it is short: the
-// rounding `xtask color` allows, so a value the gate passes is not
-// warned about here.
-const LC_SLACK = 0.05;
 
 // The one element the person's stylesheet is written into.
 const SHEET_ID = "sprawling-theme-override";
@@ -73,6 +71,8 @@ export interface Claim {
 // judged on, or `null` when the theme names none.
 export interface Claims {
   readonly surface: string | null;
+  // Read off `--tier-slack`; a theme that states none allows none.
+  readonly slack: number;
   readonly claims: readonly Claim[];
 }
 
@@ -153,7 +153,12 @@ export function textClaims(tokens: readonly string[], read: (name: string) => st
     const tier = Number(read(`${TIER_PREFIX}${token.slice(TOKEN_PREFIX.length)}`).trim());
     return Number.isFinite(tier) && tier > 0 ? [{ token, tier }] : [];
   });
-  return { surface: rung !== "" && tokens.includes(surface) ? surface : null, claims };
+  const slack = Number(read(SLACK).trim());
+  return {
+    surface: rung !== "" && tokens.includes(surface) ? surface : null,
+    slack: Number.isFinite(slack) && slack > 0 ? slack : 0,
+    claims,
+  };
 }
 
 // The text tokens that, as drawn now, do not reach their tier on the
@@ -165,7 +170,7 @@ export function shortfalls(judged: Claims, resolve: (token: string) => Rgb | nul
     const text = resolve(claim.token);
     if (text === null) return [];
     const reached = apcaLc(text, surface);
-    return reached + LC_SLACK < claim.tier ? [{ token: claim.token, claimed: claim.tier, reached }] : [];
+    return reached + judged.slack < claim.tier ? [{ token: claim.token, claimed: claim.tier, reached }] : [];
   });
 }
 

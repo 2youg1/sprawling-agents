@@ -513,6 +513,11 @@
    * the rule stated above, now applied to the step that used to be the
    * exception to it. */
   --tier-note: 90;
+  /* How far under its tier a reading may fall and still reach it: the
+   * rounding of the published APCA figures, so a pair the tables give
+   * Lc 90 is not refused at 89.96. `xtask color` and the colour page
+   * both read it here. */
+  --tier-slack: 0.05;
 
   /* The brightest surface that may carry text. G3 reaches only Lc 89.9
    * against the ramp ceiling while body text needs 90, so G3 stays a

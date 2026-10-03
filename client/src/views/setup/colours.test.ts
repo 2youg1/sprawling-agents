@@ -98,10 +98,11 @@ describe("legibility", () => {
   });
 
   test("a text token claims the tier its --tier- twin states, and one that falls short on the surface ceiling is warned about", () => {
-    const declared: Record<string, string> = { "--tier-text": "90", "--tier-text-quiet": "75", "--surface-ceiling": "g2" };
+    const declared: Record<string, string> = { "--tier-text": "90", "--tier-text-quiet": "75", "--surface-ceiling": "g2", "--tier-slack": "0.05" };
     const claims = textClaims(["--color-g2", "--color-text", "--color-text-quiet", "--color-accent"], (name) => declared[name] ?? "");
     expect(claims).toEqual({
       surface: "--color-g2",
+      slack: 0.05,
       claims: [
         { token: "--color-text", tier: 90 },
         { token: "--color-text-quiet", tier: 75 },
