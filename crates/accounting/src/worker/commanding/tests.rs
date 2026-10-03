@@ -10,4 +10,5 @@ mod guide;
 mod restoring;
 mod revealing;
 mod saving;
+mod sessions;
 mod shedding;
