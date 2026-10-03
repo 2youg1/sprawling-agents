@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 import type { DoctorCustodyLifetime } from "../../wire";
-import { restartOf } from "./remote";
+import { restartOf, VERBS } from "./remote";
 
 describe("restartOf", () => {
   test("each vault lifetime says what a restart does to a pairing", () => {
@@ -20,3 +20,16 @@ describe("restartOf", () => {
   });
 });
 
+
+describe("VERBS", () => {
+  test("names every sub-verb the console's /remote owns", () => {
+    expect(VERBS.map(([spelling]) => spelling.split(" ")[1])).toEqual([
+      "open",
+      "pair",
+      "devices",
+      "revoke",
+      "close",
+      "replace-key",
+    ]);
+  });
+});
