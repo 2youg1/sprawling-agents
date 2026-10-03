@@ -96,6 +96,9 @@ The ones whose arguments need saying:
 | `remove_building {addr, idem}` | take a building out of the city: its files move under the reserved subtree and its history stays in the Ledger. A building with a run going is refused |
 | `restore_discard {restoration, idem}` | put one recycle-bin row back, by the restoration the row carries |
 | `put_spine {building, which, base, body, idem}` | replace a building's `Roadmap.md`, `Memo.md`, `Handoff.md` or `SPEC.md` whole. `base` is the text you started from; a file that moved since is refused rather than overwritten |
+| `open_remote_door {lasting_ms, idem}` · `replace_city_key {idem}` | ask for the remote door open for `lasting_ms`, one minute to seven days, or for a new city key. The request does nothing by itself: the city prints a code on its own console and answers `E_APPROVAL_PENDING`. Only the User at that console can read the code, so an agent cannot finish this step |
+| `confirm_remote_door {code, idem}` | carry back the code the console printed, within two minutes; every answer, right or wrong, ends the request it answers |
+| `close_remote_door {idem}` | close the remote door; no code, because closing only takes access away |
 | `wake {source, subject, body, idem}` | something happened outside; the city's own routing decides which room hears it, and what it carries arrives as data from outside |
 
 An `idem` is `idem1-` followed by 32 lowercase hexadecimal characters. Mint
