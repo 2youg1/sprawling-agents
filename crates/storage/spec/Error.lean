@@ -35,7 +35,7 @@ pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) ->
 - **为什么是独立模块**：见 §7，全 crate 的模块都用它。
 - **为什么带着 `io_err` 走**：它是 `StorageError::Io` 的构造子，而一个值的构造子与它的定义同住。四个模块（cas／bundle／digest_cache／index）只为取它而 import jsonl，那是一条指错了方向的依赖。
 - **快照的 I/O 失败有自己的变体**：`Io` 的恢复建议说的是账本（停机，重开会截掉撕裂的尾巴），对快照是错的——快照是账本随时能重建的缓存。`Snapshot` 与 `Io` 同码（盘拒绝了写，多半账本也写不进），恢复则说：删掉这份快照、腾出盘，下次启动从创世折叠。被否：让 `Io` 的恢复按 `op` 分支——一个变体两种建议，读恢复的人得先知道 `op` 的全集。
-- **公开名是 `storage::StorageError`**（`lib.rs` 重导出）：模块住处不进公共面，api-baseline 不随它动。
+- **公开名是 `storage::StorageError`**（`lib.rs` 重导出）：模块住处不进公共拼写，下游的引用不随它动。
 -/
 
 /-!

@@ -917,7 +917,7 @@ before、after 与字节数，恒不携正文；`before` 缺席即开账行，�
 
 本节；`ARCHITECTURE.md` §5 第 3–4 步（派活先答应再写，房间是第一件被写下的东西）；
 §8-31 的相位表（`stand_up` 多收一个归位值）。
-`city` 与 `wire` 的公开面不变，故 `api-baselines` 不动。
+`city` 与 `wire` 的公开面不变。
 -/
 
 /-!
@@ -1018,7 +1018,7 @@ epoch／LOADING／UNLOADING 是**「Assembly 显式化」那一步的
    autonomy／approval／fork）与 `settling` 一分为二（`desks` 四桌顺序；
    `landing` 单落点＋结论）只搬家：跨文件调用的可见性收成
    `pub(in crate::assembly)`，行为零变，`sprawling` 158 全绿。
-3. `just check` 绿；`city` 公开面只增一函数（`api-baselines` 同集改写）。
+3. `just check` 绿；`city` 公开面只增一函数。
 
 ### 文档同步
 
@@ -1391,7 +1391,7 @@ citysim 的 `sieving.rs` 改为调它；旧函数删除（迁移做完，不留�
 - **一条派活不再有回合上限**，`runtime::run::drive` 循环到这次跑自己结束为止：一回合作出结论、一次带 carrier 的失败、或一个安全点送到的中断。停一件正在跑的事仍是 `Cancel`，停一片仍是 `Halt`——后者现在真的会终止那片里的后台成员。
 - **`assembly/freezing/tests/ceilings.rs` 删去两条断言**（派下去的活与被批准接着跑的活各自「在派它的上限下」跑）。它们检验的性质不存在了，留着就是在检验一个没有主语的句子；文件保留 effort 那一条，模块头写明删了什么、为什么。
 - **golden-p0 账本随之重生**（`GOLDEN_WRITE=1`）：`run_started` 少两个整数键。V8 跨版本字节夹具本来就为这种形状变更而存在。
-- **未做（不在此范围）**：`tools/xtask/api-baselines/` 下 kernel／wire／web／sprawling 四份基线需 `just api-baseline` 重生——kernel 去掉 `BudgetCap` 一族、增 `GovernedDocumentWritten`，wire 去掉 `BudgetCap` 再导出、增本线三帧与三个答面类型，web 增 `put_document_command`。
+- **公开面变动**：kernel 去掉 `BudgetCap` 一族、增 `GovernedDocumentWritten`，wire 去掉 `BudgetCap` 再导出、增本线三帧与三个答面类型，web 增 `put_document_command`；下游 crate 随之编译，是公开面变更唯一的守门（`tools/xtask/Spec.lean` §8-32）。
 
 ### 8-169 治理两帧的执行与答
 
@@ -1596,8 +1596,8 @@ impl DrivingPool {
 
 **车道数 `DRIVING_LANES = 4`，写在本模块里，并且如实说明它不是 provider 天花板的第二个权威**：
 `gateway::admission` 的 `ADMISSION_MAX_IN_FLIGHT` 是 `pub(crate)`，`bin` 读不到它。
-两个数字今天相等是刻意的，而把 provider 的天花板变成一个可读的公开值会改动 `gateway` 的公开面、
-需要重算 api-baseline，那是一次独立的卡，不该塞进这一张。**在它落地之前，比天花板大的车道数只会让线程停在
+两个数字今天相等是刻意的，而把 provider 的天花板变成一个可读的公开值会改动 `gateway` 的公开面，
+那是一次独立的卡，不该塞进这一张。**在它落地之前，比天花板大的车道数只会让线程停在
 admission 上排队**——§8-42-3 早就写下这句话，这里把它从设计变成一个带理由的常量。
 
 **内存紧时计划的下一行排队**：`full` 在车道都占满时为真，另外在已有 run 在跑、而整机可用内存低于物理内存的十分之一时也为真（`admits(in_flight, lanes, memory)` 是这一条规则的唯一出处）。读数来自 `open` 时交给池的 `read_memory`，池自己不碰主机：生产交 `bin::monitor::memory::read`，worker 搬进 `accounting` 时 `monitor` 留在 `sprawling`、经这个 `fn` 指针进来（`crates/accounting/Spec.lean` §7、accounting D10），脚本场景交一个自己的读数就能造出内存紧的机器。`full` 每次被问都读一次，所以跟着实时的可用内存走；问它的有三处：`DrivingPool::start`（每一轮进车道都经过的门，满了就排队）、`start_waiting`（一轮回家后按到达顺序起排着的活）与 `Flight::full`（计划推进循环 `accounting::worker::plans::pursuing` 每次决定是否起下一行）。读一次约 1.6 µs（Windows x86-64 桌面级机器、测试档构建），只发生在起一轮之前。没有 run 在跑时总放一轮进来：否则一台内存一直紧的机器上城永远不动，而一轮自己占的内存远小于它派出的构建。排着的计划行在下一轮回家时再判一次。取物理内存的十分之一而不是一个字节数，是因为一个字节数只适合某一类机器；十分之一留给人的其他程序与页缓存。**被否**：按「每轮估计占用」算出可同时驱动的轮数——一轮的边际内存还没有测过，估计值就是一个没有来源的常数。**重开参数**：测得一轮的边际内存之后，改成「可用内存 ≥ 留给别人的那一份 + 一轮的实测边际」。证据：`crates/accounting/src/worker/pool.rs` 的 `a_new_run_waits_while_memory_is_tight` 与 `a_pool_judges_memory_by_the_reader_it_was_handed`。
@@ -1668,7 +1668,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 
 `DRIVING_LANES` 与 `gateway::admission` 的 provider 并发上限今天相等，而且是分开写的两个数。
 让 `bin` 取 `min(天花板, 配置)` 要求 `gateway` 多一个公开的读法，那是它公开面的一次变更，
-要连带重算 api-baseline。在那之前，比天花板大的车道数只会让线程停在 admission 上排队——
+属于另一张卡。在那之前，比天花板大的车道数只会让线程停在 admission 上排队——
 把队列从一个会算数的地方搬到一个不会算数的地方。
 -/
 

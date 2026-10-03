@@ -119,7 +119,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 `README.md` 的 History 一节；`tools/adversary/Spec.lean` §2 的线面计数。
 公开面：`wire` 增 `Query::Commit`／`Answer::Commit`／`CommitAnswer`，
 `storage` 增 `Provenance::model_fields`／`model_choice_of`／`effort_word`，
-`sprawling` 增 `ask`，故 `api-baselines` 三份随之重算。
+`sprawling` 增 `ask`。
 
 **接线到哪一步了，以及四处 `#[expect]` 的账**：记账那一侧已经接上——`spawn_worker` 在循环外开一个 `RelayGate`，
 循环里第一件事是 `worker.serve_relay(&relay)`，然后才 `worker_desk.wait(...)`，

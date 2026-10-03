@@ -130,7 +130,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 
 /-! ## 6 命名统一
 
-**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。**本 crate 同例**：`storage` 六面切目录后，同一类型的 inherent impl 若住不同簇文件，基线为每个 impl 块各记一行 `impl`（如 `Checkpoint` 两行），公共面不变。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，类型定义住在簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。**本 crate 同例**：`storage` 六面切目录后，同一类型的 inherent impl 可以住不同簇文件（如 `Checkpoint` 的两个 impl 块），公共面不变。
 
 Vfs、RealFs、FaultFs、FaultPlan、power cut、tail-truncation recovery（断尾恢复）、direction-aware refusal（方向感知拒绝）、segment（分段）、group commit（组提交）、CAS、dedup。crate 根错误 `StorageError`（每 crate 一根，跨界映射 AxError 不透传）。
 

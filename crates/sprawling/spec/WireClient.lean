@@ -149,14 +149,14 @@ socket 上的一次对话与 HTTP 上的一次托管是两件事，同处一个�
 
 - **`unreachable_city` 仍只有一个家**：它留在父模块，`enrolment.rs` 经 `use super::unreachable_city` 取用，于是「城连不上」这句话不会有第二种说法。
 - 父模块以 `pub(crate) use enrolment::{enrol, split_reference};` 转出，`main/data.rs` 的两处调用路径一字未改。
-- 公开面不涉：两项都在二进制内部，`api-baselines` 不动。
+- 公开面不涉：两项都在二进制内部。
 
 ### 文档同步
 
 本节；`ARCHITECTURE.md` §12 增 `accounting::worker::commanding::entrance` 与两个测试文件的行；
 kernel D1 记下 `gate::dedup` 由 `idem::claim` 与 `IdemGuard` 接替；`tools/adversary/Spec.lean` §4 两条发现标注已修。
 `docs/operating.md` 增退出码表。公开面：`bin::wire_client` 与 `bin::assembly` 都是二进制内部（`pub(crate)`
-以下），`RunWorker::handle` 的签名不变，故 `api-baselines` 不动。
+以下），`RunWorker::handle` 的签名不变。
 -/
 
 /-!
