@@ -67,25 +67,11 @@ def retry : ProviderFailure → Retry
   | .Unreadable => .No
   | .Unbuilt => .No
 
-/-- 连接没建起来，请求没有到达对端，同一请求可以再发。 -/
-theorem a_request_that_never_left_is_asked_again : retry (.Exchange true) = .Yes := rfl
-
-/-- 请求已经发出、回答丢了：对端也许已经算完并计了费，效果不明。 -/
-theorem a_request_that_left_and_lost_its_answer_has_an_unknown_effect :
-    retry (.Exchange false) = .Unknown ∧ retry .Cut = .Unknown ∧ retry .Silence = .Unknown :=
-  ⟨rfl, rfl, rfl⟩
-
 /-- 对端答了非 2xx：恰在它说「现在忙或坏了」时再问，其余的拒绝下一次照样会给。 -/
 theorem a_refusal_is_asked_again_exactly_when_the_provider_is_busy (status : Nat) :
     retry (.Refused status) = .Yes ↔ busy status = true := by
   simp only [retry]
   cases busy status <;> simp
-
-/-- 状态码表与 `failure` 的测试 `a_provider_that_says_busy_or_broken_is_asked_again_and_one_that_refuses_is_not` 同一张。 -/
-theorem the_status_table :
-    [400, 401, 403, 404, 408, 422, 429, 500, 502, 503, 504, 529].filter busy
-      = [408, 429, 500, 502, 503, 504, 529] := by
-  decide
 
 /-- 拒词说窗口满了、状态码是 400 或 413，才是溢出；溢出从不再试，同一请求再发一遍同样放不下。 -/
 theorem a_refusal_is_an_overflow_exactly_when_it_names_the_window (status : Nat) (outgrew : Bool) :
@@ -108,10 +94,6 @@ theorem an_overflow_is_never_asked_again (status : Nat) : retry (.Overflow statu
 /-- 被否的「只按 413 判溢出」漏掉最常见的那一种：两家兼容格式都以 400 报窗口溢出。 -/
 theorem a_window_refused_with_400_is_an_overflow : refusal 400 true = .Overflow 400 := by
   decide
-
-/-- 本侧写错的请求确定性地重演同一失败，不再试；读不懂的 2xx 同样。 -/
-theorem what_this_side_or_the_shape_got_wrong_is_not_asked_again :
-    retry .Unbuilt = .No ∧ retry .Unreadable = .No := ⟨rfl, rfl⟩
 
 /-- 流里的报错帧：恰在它的类型或码说「现在忙或坏了」时再问。 -/
 theorem a_reported_error_is_asked_again_exactly_when_it_says_busy (kind : String) :

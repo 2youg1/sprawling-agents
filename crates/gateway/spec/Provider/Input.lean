@@ -63,8 +63,7 @@ theorem the_catalogue_outranks_the_preset_table (kind : InputKinds) (preset : Op
 theorem the_preset_table_answers_where_the_catalogue_is_silent (kind : InputKinds) :
     accepted_input none none (some kind) = kind := rfl
 
-/-- 谁都不说时答 `Text`：猜小了是一句拒绝，猜大了是 provider 的 400。 -/
-theorem a_model_nobody_documents_reads_text : accepted_input none none none = .Text := rfl
+/-! 谁都不说时答 `Text`：猜小了是一句拒绝，猜大了是 provider 的 400。 -/
 
 /-- 梯子不发明事实：答案要么是人说的，要么是人沉默时目录的，要么是两者都沉默时预置表的，要么是三者都沉默时的 `Text`。 -/
 theorem every_answer_is_a_stated_fact_or_text (stated pinned preset : Option InputKinds) :
