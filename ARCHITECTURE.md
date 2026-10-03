@@ -1183,8 +1183,11 @@ what may start early and in which order results reach the Ledger is
 stateDiagram-v2
     [*] --> Refused: agree_to_work says no; nothing written
     [*] --> Prepared: room opened, brief written
-    Prepared --> Driving: a lane is free
-    Driving --> Driving: a Steer lands at a safe point
+    Prepared --> Driving: memory admits it; a lane starts at once
+    Driving --> Driving: a Steer or a run policy change lands at a safe point
+    Driving --> Waiting: a send with wait stops at its next safe point
+    Waiting --> Driving: the reply came, or patience ran out
+    Waiting --> Frozen: a stop while waiting, the wait ends as left
     Driving --> Frozen: Completion done or limit
     Driving --> Frozen: Cancel, Completion cancelled
     Driving --> Frozen: a harness answered, or its session ended with no answer
@@ -1194,7 +1197,9 @@ stateDiagram-v2
 ```
 
 A frozen run is history and is never woken: a succession or a knock
-starts a new run. A harness run freezes the way its answer and its first
+starts a new run. A waiting run calls no model and spends no tokens; its
+`signal_wait_started` line is closed by exactly one `signal_wait_ended`, and
+`RunSummary.waiting` tells it apart from a stuck run (collab D9, D15). A harness run freezes the way its answer and its first
 cut say: done only on an end of turn that said something, limit when the
 building's ceiling cut it, cancelled when a halt did. A run whose
 process died is frozen by the next `resume`: cancelled, with
@@ -1205,7 +1210,8 @@ process died is frozen by the next `resume`: cancelled, with
 `crates/kernel/src/completion.rs`,
 `crates/accounting/src/worker/freezing.rs`,
 `crates/accounting/src/worker/genesis.rs`,
-`crates/accounting/src/worker/genesis/lost.rs`.
+`crates/accounting/src/worker/genesis/lost.rs`,
+`crates/collab/src/reply_wait.rs`.
 
 ### 13.8 The client's fold
 
