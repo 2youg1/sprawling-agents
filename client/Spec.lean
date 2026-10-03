@@ -4,6 +4,7 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import client.spec.Core.Workbench
+import client.spec.Views.Door
 import client.spec.Views.Fold
 import client.spec.Views.Guide
 import client.spec.Views.Inspect.Open
@@ -51,6 +52,7 @@ import client.spec.Views.Workspace
 | `client/spec/Core/Workbench.lean` | 工作台分隔线的宽度 | （§7-11、D24） |
 | `client/spec/Views/Fold.lean` | 设置树的枝与上手指南的步骤一次只展开一项 | （§7L、§7G、D53、D55） |
 | `client/spec/Views/Guide.lean` | 启动时进不进上手指南，跳过之后落在哪 | （§7G、D54） |
+| `client/spec/Views/Door.lean` | 远程组的门开关、「更换城钥匙」与确认码输入框：焦点、Escape 与拒绝 | （4-57） |
 
 其余标签都在本文件：§3-1、§3-2 在 §8，§3-4 在 §3，其余 §4-n 与 §7C、§7G、§7K、§7L、§7N 在 §10，§7-8 在 §4，§7-9 在 §13；决定 D1 至 D48（含 D42a）、D52 至 D55、D72、D78 与 D80 在 §10 之后，D60 与 D73 在 `client/spec/Views/Workspace.lean`。
 -/
@@ -72,6 +74,7 @@ import client.spec.Views.Workspace
 - `spec/Views/Workspace.lean`：图层键三下回原档、看一眼不改选定的档；变淡的发送面什么都不做、停止面不发字；信箱的数字只落到画出来的条目。
 - `spec/Views/Inspect/Open.lean`：至多 `KEPT` 项、刚打开的那一项在、Delete 之后焦点落在一个页签上。
 - `spec/Core/Workbench.lean`：分隔线不改一对栏的总宽、两栏都不窄于两栏。
+- `spec/Views/Door.lean`：任意一段按键与回答之后，Escape 把焦点还给按下的那个控件；码只从等码的输入框发出、且不空；在途时的拒绝清空输入框；焦点在框里、框里有字，只在码被要着的时候。
 
 这些是模型的证明，不是 TypeScript 的证明：实现与模型的对应由各模块旁的 `bun test`（`segmented.test.ts`、`workbench.test.ts` 等）与 `#/gallery` 的夹具承担（§16）。
 -/
@@ -276,7 +279,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 /-! ## 9 工作流程
 
-收键部件的状态机是本规格形式化的那一部分，各在自己的分部：`views/parts/` 的键表与焦点还原在 `client/spec/Views/Parts.lean`（§7、§7-1 至 §7-7、§7-10），每个复合部件的模型在 `client/spec/Views/Parts/` 下，外壳的控件在 `client/spec/Views/Workspace.lean`（§7-11），检视面的页签带在 `client/spec/Views/Inspect/Open.lean`，工作台的分隔线在 `client/spec/Core/Workbench.lean`。模型只保留键与焦点的次序，不规定一帧里先画什么：画法由视图决定，`cargo xtask render` 量它落在哪。
+收键部件的状态机是本规格形式化的那一部分，各在自己的分部：`views/parts/` 的键表与焦点还原在 `client/spec/Views/Parts.lean`（§7、§7-1 至 §7-7、§7-10），每个复合部件的模型在 `client/spec/Views/Parts/` 下，外壳的控件在 `client/spec/Views/Workspace.lean`（§7-11），检视面的页签带在 `client/spec/Views/Inspect/Open.lean`，工作台的分隔线在 `client/spec/Core/Workbench.lean`，远程组的门开关与确认码输入框在 `client/spec/Views/Door.lean`。模型只保留键与焦点的次序，不规定一帧里先画什么：画法由视图决定，`cargo xtask render` 量它落在哪。
 -/
 
 /-! ## 10 实现逻辑
@@ -378,8 +381,8 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
   - **不是文本、也不是这两种格式的文件**仍只写「二进制」与长度，RefRain 头一行不给读法（`formats/opaque.svelte`）。
   - **城里的文件**（4-61）：`formats/opaque.svelte` 经 `Query::Bytes` 逐窗取回这一版的字节，交给 `pdf.svelte` 或 `docx.svelte`；超过 `DRAWN_BYTES_MAX`（64 MiB）的不取，说出它多大。两版比较从这份文档的版本列表里选另一版，两版的字节都取回之后交给 `compare.svelte`。
 - **4-55 修改提案是请决定卡的第三种：正文是逐句的 diff，决定逐句，基线过期的卡只能拒绝。** 一张卡（`ProposalCard`，`crates/wire/Spec.lean` §8-73）画在两处，都是 `views/refrain/proposals_card.svelte`：右侧 RefRain 的文稿上方（`views/refrain/proposals.svelte`，问 `Query::Proposals(这份文稿)`），与信箱的待决段（`views/mailbox/deciding_document.svelte`，一份文稿一个）。**正文是 diff**：`Slice` 按序接成一段，`same` 是原样的字，`delete` 是 `<del>`（alert 淡底加删除线），`insert` 是 `<ins>`（accent 淡底），每句前后的空白照原样（`lead`、`text`、`trail`），所以人读到的就是城会落下的字。**三个答复**：y 接受整张（每一句改动 `accept`）；e 进入改后接受——每一句改动一行，带一个「取」的勾选，插入的句子是可改的文本框，再按 y 发出（改过的插入句 `amend`，没改的 `accept`，没勾的不点名，即拒绝；一句都没取时 y 按不动并说这等于拒绝），再按 e 回到 diff；n 拒绝整张（`verdicts` 为空）。判词由 `views/refrain/proposals.ts` 的 `verdictsOf` 一处拼出：只点名改动过的句子、每句至多一次、`amend` 只给插入句，因为城对另外三种点名一律以 `E_INVALID_ARGS` 拒绝（documents D16）。**过期的卡说出来，不替人去试**：卡的 `baseline` 不等于回答的 `version`（或文稿此刻没有版本）时，卡头下一行写出它基于哪一版、文稿现在是哪一版，y 与 e 置灰并说为什么，n 仍可按——城对有接受的过期决定整次拒绝 `E_VERSION_CONFLICT`，拒绝一张过期的卡却不看基线。页面判得比城早（另一个页面刚存了一版、回答还没重来）时城的拒绝照样会回来：卡读 `belief.refusal`，动作是 `decide proposals`、subject 点名这张卡或没点名任何一张时，把城写的出路画在卡上，并重问这份文稿的提案。**发出之后**卡上的答复都置灰，卡头下写「决定中」；城落下 `proposal_decided`，`staleness.ts` 让这一问失效，重答里没有这张卡，卡就消失——卡消失就是回执。链路在途中断开时写「待核对」，重连后以同一个 `idem` 再发一次：城按键认出重发、只答第一次的结果（§8-73 的落下顺序），所以重发不会决定两次。这一步一步的判定是同一文件的 `advance`。**哪些文稿进信箱**：城答全城开着的每一张卡在哪份文稿上、何时提出（`Query::OpenProposals`，wire D15，最新的在前）；信箱按这张表列出文稿，一份一次，按它最新那张卡的先后，卡的正文仍按文稿问 `Query::Proposals`。键上的数与待决段的数读同一处（`views/mailbox/deciding_proposals.ts` 的 `openCards`，即这张表的长度），所以信箱关着时也只问这一问（4-49），本页打开之前提出的卡与之后提出的一样进信箱。**卡头**：谁在问写提出它的 run 所在的房间（本页不认识那个 run 时写 run id 的前八位）；卡本身不带提出的时刻，所以头右端写它基于的版本前七位。在信箱里，卡的正文上方多一行文稿的路径、这份文稿最新那张卡提出的时刻（全城那一问答的）、「读这封信」与「在文稿旁打开」（`openDocument`）。**读这封信**（`openLetter`，`views/inspect/letter.svelte`）在右侧只打开这一张卡，一个页签就是一封信：三种读法——卡自己的 diff、卡写成时所依的那一版的全文（RefRain 按 `baseline` 打开）、文稿现在的全文——diff 是其中一种；头上一行是文稿的路径与去发信 run 页面的链接。信件打开时信箱收起，因为右侧在面外；关上信件时信箱重新打开、焦点回到打开它的那一行，行按卡的 `id` 认出（`mailbox/layer.ts` 的 `stepLetter`，`client/spec/Views/Workspace.lean` D73）；在 RefRain 里多一个「在原文中显示」，基线就是编辑器此刻那一版时把光标放到这张卡改的那一段的开头并滚进视野。提案一栏在 RefRain 里至多占右侧高度的五分之二、自己滚动，编辑器不被挤没。
-- **4-57 远程设备的配对页是设置面的「远程」组；页面只做设备那一半，开门、配对与撤销仍只在城的控制台。** 设置树「城够得到什么」一枝在「网络」之后有一条「远程」（`views/settings/remote.svelte`），城所在的机器与一台设备打开的是同一组，画法按这个浏览器手里有什么分开：
-  **没有邀请、也没有配对过**（存储读不出、浏览器缺一样能力时也是这一画法，前面多一句缺的是什么）：一段说明，然后是一次配对的编号步骤，再是控制台上的五个动词（`/remote open`、`/remote pair <名字>`、`/remote devices`、`/remote revoke`、`/remote close`，以 `docs/operating.md` 为准）。**步骤**是 `views/settings/remote.ts` 的 `STEPS`，一处定序：门要一条写在城层 `CONFIG.toml` 的 `[remote]` 表里的 `https://` 通路；在控制台 `/remote open`；在控制台 `/remote pair <名字>`，它印出二维码与一条只用一次、十分钟内有效的链接；在另一台设备上扫码或打开那条链接（画出链接的形状 `https://<host>/#pair=<code>&city=<fingerprint>`）；在设备上按「配对」、抄下只显示一次的种子。在控制台上做的那几步带它的拼写与复制键（`machine/copy.svelte`），不带按钮：门的动词不上线协议（`crates/remote_access/Spec.lean` D4），所以这一组没有开门或配对的按钮。**末一步说城所在的电脑重启时配对会怎样**，读 doctor 答的 `DoctorAnswer.custody.keeps`（`remote.ts` 的 `restartOf`，一个 `DoctorCustodyLifetime` 一句）：跨重启保管（Windows 凭据管理器、macOS 钥匙串）时配对仍在；用加密的 vault 文件时启动输入口令后配对仍在；Linux keyutils 只到这次开机结束；只在城的内存里时城一重启就要重新配对；doctor 还没答时一句话写出三个平台各是哪一种。所以这一句按城真有的保管方式说，不按平台猜（D94）。
+- **4-57 远程设备的配对页是设置面的「远程」组；页面做设备那一半，再加门开关与「更换城钥匙」，配对与撤销仍只在城的控制台。** 设置树「城够得到什么」一枝在「网络」之后有一条「远程」（`views/settings/remote.svelte`），城所在的机器与一台设备打开的是同一组，画法按这个浏览器手里有什么分开：
+  **没有邀请、也没有配对过**（存储读不出、浏览器缺一样能力时也是这一画法，前面多一句缺的是什么）：一段说明，然后是一次配对的编号步骤，再是门的控件，再是控制台上的六个动词（`/remote open`、`/remote pair <名字>`、`/remote devices`、`/remote revoke`、`/remote close`、`/remote replace-key`，以 `docs/operating.md` 为准）。**步骤**是 `views/settings/remote.ts` 的 `STEPS`，一处定序：门要一条写在城层 `CONFIG.toml` 的 `[remote]` 表里的 `https://` 通路；在控制台 `/remote open`；在控制台 `/remote pair <名字>`，它印出二维码与一条只用一次、十分钟内有效的链接；在另一台设备上扫码或打开那条链接（画出链接的形状 `https://<host>/#pair=<code>&city=<fingerprint>`）；在设备上按「配对」、抄下只显示一次的种子。在控制台上做的那几步带它的拼写与复制键（`machine/copy.svelte`），不带按钮：配对不上线协议（`crates/remote_access/Spec.lean` D4 ③：邀请显示在页面上，驱动页面的工具就读得到它），所以这一组没有配对的按钮。**门的控件**（`views/settings/remote_door.ts`，状态机是 `client/spec/Views/Door.lean`）：「开门」旁一个开多久的选择（`LASTINGS`，与 `/remote open --for` 同一写法，最长一周，缺省 12h），按下发 `OpenRemoteDoor{lasting_ms}`；「更换城钥匙」按下发 `ReplaceCityKey`；城答 `E_APPROVAL_PENDING` 时两者都画一个确认码输入框，说明码印在城的控制台上，焦点进框，Esc 取消并回到按下的那个控件，提交发 `ConfirmRemoteDoor{code}`；城的拒绝清空输入框、焦点回到那个控件，`E_GATE_DENIED` 说再按一次、照控制台上新印的码输入，`E_TOOL_UNAVAILABLE` 说要在城自己的终端里跑 `sprawling serve`。确认发出后没有拒绝、过了 `RECEIPT_MS` 即算做成：门开没开着今天没有一个可问的回答，所以这里不画一个开或关的状态，开与关是两个控件（D4 ②，开门要码）。「关门」按下发 `CloseRemoteDoor`，不要码（D4 ①）。页面上只有一条全局的拒绝，所以只在请求或确认在途时一条拒绝才算门的回答。**末一步说城所在的电脑重启时配对会怎样**，读 doctor 答的 `DoctorAnswer.custody.keeps`（`remote.ts` 的 `restartOf`，一个 `DoctorCustodyLifetime` 一句）：跨重启保管（Windows 凭据管理器、macOS 钥匙串）时配对仍在；用加密的 vault 文件时启动输入口令后配对仍在；Linux keyutils 只到这次开机结束；只在城的内存里时城一重启就要重新配对；doctor 还没答时一句话写出三个平台各是哪一种。所以这一句按城真有的保管方式说，不按平台猜（D94）。
   **带着邀请打开**（`#pair=…&city=…`，§3-2）：先画城的指纹的前 12 个符号，再画「配对这台设备」。按下时页面取 32 字节熵作种子，`keyFrom` 派生两半密钥，在 `/remote/pair` 上走配对握手（`core/remote/connect.ts`）。成功时把结果存进这个源的 IndexedDB（`core/remote/device.ts`），请浏览器把这个源的存储标为持久（`navigator.storage.persist()`，被拒时照实说一句：浏览器可能在存储吃紧时清掉它），把地址栏换成 `#/setup/remote`（`history.replaceState`，配对码不留在历史里），然后把种子按四个一组画出来，只这一次，旁边一句「不保存；重装这个页面就要重新配对」，人按「我记下了」它就从页面上消失。种子在配对成功之后才画：先画的种子若配对失败，对应的是一把谁也没钉住的密钥。
   **配对过**：画城的指纹、这台设备的 id、配对的时刻，其下是同一句重启说明（`restartOf`），两个按钮。「锁上门」在 `/remote/session` 上握手一次，发一帧封好的 `Lock`（`crates/remote_access/Spec.lean` D5：任何设备都可以锁门离开）。「忘掉这台设备」经 `parts/dialog.svelte` 确认后删掉本地记录，并说城那边仍记着它，要在控制台 `/remote revoke` 才算撤销。
   **拒绝按原因各说一句**：指纹不符或城的签名不对（设备在发出认领之前就停下，码没有离开设备）→ 重新扫码，反复出现说明通路在改动它转发的内容；城以关闭帧给出的码（`E_GATE_DENIED` 是码已用过、过期或门已关）→ 在控制台重新 `/remote pair`；连不上 → 门是否开着、地址是否是控制台印的那个；不是安全上下文、浏览器不给 Ed25519 或 X25519、没有 IndexedDB → 说缺的是哪一样，因为这三样缺一样就做不成配对（D8）。
