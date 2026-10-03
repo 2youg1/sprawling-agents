@@ -23,9 +23,9 @@
 //! delegated, and a machine that has none, or may not write it, sets
 //! nothing and says so instead.
 
-use std::path::{Path, PathBuf};
 #[cfg(any(not(windows), test))]
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 #[cfg(any(not(windows), test))]
 use std::sync::OnceLock;
 
