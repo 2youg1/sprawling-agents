@@ -162,7 +162,7 @@ pub(crate) fn known_hosts_answer() -> wire::Answer {
 /// in: the search path for a launcher, and where one set-up directory
 /// sits on this machine.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct HarnessReach {
+pub struct HarnessReach {
     pub(crate) find: fn(&str) -> Option<PathBuf>,
     pub(crate) place: fn(&agent_protocols::SetUpDir) -> Option<PathBuf>,
 }
@@ -187,13 +187,31 @@ pub(crate) fn harnesses_answer(reach: HarnessReach) -> wire::Answer {
                         None => wire::HarnessState::LauncherMissing {
                             program: launch.program.name().to_owned(),
                         },
-                        Some(_) => wire::HarnessState::NotSetUp { looked: Vec::new() },
+                        Some(_) => set_up_state(*harness, reach.place),
                     },
                     docs: harness.docs().to_owned(),
                 }
             })
             .collect(),
     })
+}
+
+/// A harness whose launcher is present: the first of its set-up
+/// directories that exists, or every path looked at. An empty table
+/// gives an empty `looked`, which the page reads as "not looked for".
+fn set_up_state(
+    harness: agent_protocols::Harness,
+    place: fn(&agent_protocols::SetUpDir) -> Option<PathBuf>,
+) -> wire::HarnessState {
+    let looked: Vec<PathBuf> = harness.set_up().iter().filter_map(place).collect();
+    match looked.iter().find(|dir| dir.is_dir()) {
+        Some(at) => wire::HarnessState::Ready {
+            at: at.display().to_string(),
+        },
+        None => wire::HarnessState::NotSetUp {
+            looked: looked.iter().map(|dir| dir.display().to_string()).collect(),
+        },
+    }
 }
 
 /// The building a `pursuit_changed` record is about.
