@@ -29,6 +29,10 @@ impl LineCheck {
 `）；过则链前进，错则状态不动。
     pub fn advance(&mut self, raw: &[u8]) -> Result<CheckedLine, LineFault>;
 }
+/// 不经链判一行：与 `advance` 对这一行自身字节的回答相同，给经索引找到这一行的读者（索引的折叠已走过链）。
+pub fn read_line(raw: &[u8]) -> Result<CheckedLine, LineFault>;
+/// 一行信封里声称的 seq，只说读者去哪里找，不说这一行好不好。
+pub(crate) fn claimed_seq(raw: &[u8]) -> Option<Seq>;
 impl LineFault { pub fn into_ax(self, line_no: u64) -> AxError; }  // 整本读者的拒词：更新的写者＝E_LOG_VERSION_UNSUPPORTED，其余＝E_CAS_CORRUPT
 ```
 
