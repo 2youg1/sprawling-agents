@@ -512,11 +512,11 @@ branch's work is its children.
 
 One WebSocket, three kinds of frame, and a schema hash that both ends check
 on connect: a page from a different build refuses rather than misreads.
-`WIRE_V` is <!-- xtask:begin wire_v -->46<!-- xtask:end -->.
+`WIRE_V` is <!-- xtask:begin wire_v -->47<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
-| `Command` | <!-- xtask:begin command_frames -->36<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
+| `Command` | <!-- xtask:begin command_frames -->38<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
 | `Query` | <!-- xtask:begin query_frames -->52<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |
@@ -681,7 +681,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->3050<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->3054<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (decision D1 of `crates/browser/Spec.lean`) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `tools/fuzz/fuzz_targets` |
 | V5 formal | termination, absence of overflow and monotonicity in the code; a design rule false on some input nobody tried | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape; the Lean specifications under `crates/`, proved by `just models` in every `just check` |
