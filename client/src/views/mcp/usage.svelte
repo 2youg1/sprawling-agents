@@ -45,6 +45,7 @@
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Query } from "../../wire";
+  import EmptyState from "../parts/empty.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import UsageExport from "../parts/usage_export.svelte";
   import UsageUses from "../parts/usage_uses.svelte";
@@ -65,6 +66,8 @@
     <Unanswered query={read.query} asked={question} />
   {:else if read.kind === "asking"}
     <p class="text-text-faint">…</p>
+  {:else if read.value.length === 0}
+    <EmptyState missing="usage_mcp_none" seat="region" />
   {:else}
     <ul class="flex flex-col">
       {#each read.value as server (server.server ?? "")}

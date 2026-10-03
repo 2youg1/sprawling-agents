@@ -8,8 +8,10 @@
 <script lang="ts" module>
   // The performance panel before its first sample, with ten seconds
   // behind it whose readings run from a few nanoseconds to terabytes,
-  // and with a full five minutes behind it. The history is a fixed script rather than a
-  // random one, so the render gate sees the same curves every time.
+  // and with a full five minutes behind it; then the sampling beat
+  // control in its header, on one of its steps and off all of them.
+  // The history is a fixed script rather than a random one, so the
+  // render gate sees the same curves every time.
 
   import type { Sample } from "../../wire";
 
@@ -58,10 +60,18 @@
     beat_ms: 100,
   }));
 
+  // Ten seconds sampled at 75 ms, a beat another device set that is
+  // none of the five steps the page offers, so no step is chosen.
+  const OFF_STEP: readonly Sample[] = SHORT.map((sample) => ({ ...sample, beat_ms: 75 }));
+
   // The gallery has no city to ask, so opening the panel starts nothing.
   function watch(): () => void {
     return () => undefined;
   }
+
+  // Nor any city to set a beat on: the control is drawn, and a pick
+  // sends nothing, so the step stays where the last reading put it.
+  const beat = (): void => undefined;
 </script>
 
 <script lang="ts">
@@ -79,4 +89,12 @@
 
 <Case label="monitor · five minutes of samples">
   <Monitor samples={FULL} {watch} rank="section" />
+</Case>
+
+<Case label="monitor · the sampling beat on its 100 ms step">
+  <Monitor samples={FULL} {watch} {beat} rank="section" />
+</Case>
+
+<Case label="monitor · a beat of 75 ms, none of the five steps">
+  <Monitor samples={OFF_STEP} {watch} {beat} rank="section" />
 </Case>

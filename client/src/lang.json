@@ -7222,5 +7222,13 @@
   "letter_whole_talk": {
     "en": "the whole conversation, on the run's page",
     "zh": "整段会话在 run 页上"
+  },
+  "usage_skills_none": {
+    "en": "no skill is on a shelf, and no run has read one",
+    "zh": "书架上没有 skill，也没有 run 读过 skill"
+  },
+  "usage_mcp_none": {
+    "en": "no building names a tool server, and no run has called one",
+    "zh": "没有楼配置工具服务器，也没有 run 调用过"
   }
 }
