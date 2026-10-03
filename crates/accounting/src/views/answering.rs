@@ -40,7 +40,7 @@ pub(super) mod preview;
 pub(super) mod range;
 pub(super) mod reply;
 pub(super) mod stored;
-use super::lines::{endpoints_answer, known_hosts_answer, summarize};
+use super::lines::{endpoints_answer, known_hosts_answer};
 
 /// How many runs a cost view names besides every active one: a bound
 /// on the size of an answer on the wire, not a machine reading, so it is
@@ -138,18 +138,7 @@ impl Views {
     pub fn prepare(&self, query: &wire::Query) -> Prepared {
         Prepared::Held(match query {
             wire::Query::CityView => return Prepared::City(self.city_ask()),
-            // An evicted run always has records in the Ledger, so a recall that
-            // cannot read them, after the snapshot is let go, is "I could not look".
-            wire::Query::RunView { run } => match self.hot.get(run) {
-                Some(hot) => wire::Answer::Run(Some(Box::new(summarize(*run, hot)))),
-                None if self.hot.was_evicted(run) => {
-                    return Prepared::Recalled {
-                        ledger: self.ledger_ask(),
-                        run: *run,
-                    };
-                }
-                None => wire::Answer::Run(None),
-            },
+            wire::Query::RunView { run } => return self.run_view_ask(*run),
             wire::Query::ApprovalQueue => wire::Answer::Approvals(wire::ApprovalsAnswer {
                 items: self.governance.pending.values().cloned().collect(),
             }),
@@ -158,44 +147,17 @@ impl Views {
                 decided: self.decided.clone(),
             }),
             wire::Query::CostView => wire::Answer::Cost(Box::new(self.cost_answer())),
-            wire::Query::History { before, limit } => {
-                return Prepared::History {
-                    ledger: self.ledger_ask(),
-                    before: *before,
-                    limit: *limit,
-                };
-            }
+            wire::Query::History { before, limit } => return self.history_ask(*before, *limit),
             wire::Query::HistoryRange { from, to, limit } => {
-                return Prepared::HistoryRange {
-                    ledger: self.ledger_ask(),
-                    from: *from,
-                    to: *to,
-                    limit: *limit,
-                };
+                return self.history_range_ask(*from, *to, *limit);
             }
             wire::Query::Sessions { room } => wire::Answer::Sessions(self.sessions.answer(room)),
             wire::Query::RunHistory { run, before, limit } => {
-                return Prepared::RunHistory {
-                    ledger: self.ledger_ask(),
-                    run: *run,
-                    before: *before,
-                    limit: *limit,
-                };
+                return self.run_history_ask(*run, *before, *limit);
             }
-            wire::Query::Changes { base, head } => {
-                return Prepared::Changes {
-                    city_root: self.city_root.clone(),
-                    base: *base,
-                    head: *head,
-                };
-            }
+            wire::Query::Changes { base, head } => return self.changes_ask(*base, *head),
             wire::Query::Hunks { oid_a, oid_b, path } => {
-                return Prepared::Hunks {
-                    city_root: self.city_root.clone(),
-                    oid_a: *oid_a,
-                    oid_b: *oid_b,
-                    path: path.clone(),
-                };
+                return self.hunks_ask(*oid_a, *oid_b, path.clone());
             }
             wire::Query::Commit { oid } => return self.prepare_commit(*oid),
             wire::Query::Commits {
@@ -337,6 +299,27 @@ impl Views {
                 };
             }
         })
+    }
+
+    /// What changed between a checkpoint and a later one, or the
+    /// working tree, read once the snapshot is let go.
+    fn changes_ask(&self, base: kernel::GitOid, head: Option<kernel::GitOid>) -> Prepared {
+        Prepared::Changes {
+            city_root: self.city_root.clone(),
+            base,
+            head,
+        }
+    }
+
+    /// The patch text of one file between two checkpoints, read once
+    /// the snapshot is let go.
+    fn hunks_ask(&self, oid_a: kernel::GitOid, oid_b: kernel::GitOid, path: String) -> Prepared {
+        Prepared::Hunks {
+            city_root: self.city_root.clone(),
+            oid_a,
+            oid_b,
+            path,
+        }
     }
 
     /// The city's cost view: the attribution report, with `by_run`
