@@ -207,7 +207,7 @@ impl JsonSchema for Locator {
     }
     fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
         string_schema(
-            "Where content is: `cas:b3-<hash>` or `file:<address>@<oid>`, each with an              optional `#L<a>-<b>` or `#B<a>-<b>` range, as `kernel::locator` parses it.",
+            "Where content is: `cas:b3-<hash>` or `file:<address>@<oid>`, each with an optional `#L<a>-<b>` or `#B<a>-<b>` range, as `kernel::locator` parses it.",
             None,
         )
     }
