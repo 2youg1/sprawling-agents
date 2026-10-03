@@ -26,6 +26,7 @@ use super::attending::{Opening, Outward, Started, spawn_worker};
 use super::remote_door::{CityPort, Outdoors};
 use crate::doctor::host;
 use crate::monitor::sampler::Gauges;
+use crate::outside::keeper::CityKey;
 use crate::serving::Serving;
 use crate::serving::output_ring::OutputRing;
 use crate::serving::standing::monotonic_now;
@@ -250,9 +251,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     );
 
     let audio_views = Arc::clone(&views);
-    // The remote door's key is named by this city's genesis line and kept
-    // in the same vault as every other credential (remote_access D23).
-    let remote_key = crate::outside::keeper::CityKey::of(Arc::clone(&city_vault), epoch);
+    let remote_key = CityKey::of(Arc::clone(&city_vault), epoch);
     let audio_vault = city_vault;
     let page = Arc::new(client);
     let config = wire::ServeConfig {

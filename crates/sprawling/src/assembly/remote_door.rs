@@ -11,7 +11,9 @@
 //! §8-151).
 //!
 //! Assembled here because the clock is sampled in `bin::assembly` only,
-//! and because the relay exists only once the writer thread runs.
+//! and because the relay exists only once the writer thread runs. The
+//! city key arrives already named (`CityKey::of`, by the genesis line and
+//! in the city's one vault), because the vault is handed out only there.
 //!
 //! [`chosen`] is the one place a route is built: the door asks it at
 //! each `/remote open`, so a person who edits the table opens the door
