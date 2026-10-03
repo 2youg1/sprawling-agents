@@ -158,12 +158,72 @@ fn exclusions(read: impl Fn(&str) -> Result<String, std::env::VarError>) -> Excl
         .unwrap_or_else(|listed| listed)
 }
 
-/// Whether a `NO_PROXY` list covers this host.
+/// Whether a `NO_PROXY` list covers this host, by the client's rules
+/// (gateway D23): an address is covered by an equal address or by a
+/// network that holds it; a name is covered by `*`, by an entry equal to
+/// it, or by an entry it ends in after a dot, a leading dot on the entry
+/// meaning the same, ASCII case ignored. `example.com` therefore covers
+/// `api.example.com` and not `badexample.com`.
 fn excluded_by(host: &str, list: &str) -> bool {
-    list.split(',')
+    let mut entries = list
+        .split(',')
         .map(str::trim)
-        .filter(|entry| !entry.is_empty())
-        .any(|entry| entry == "*" || host == entry || host.ends_with(entry))
+        .filter(|entry| !entry.is_empty());
+    match host.parse::<std::net::IpAddr>() {
+        Ok(address) => entries.any(|entry| network_covers(entry, address)),
+        Err(_) => entries.any(|entry| domain_covers(entry, host)),
+    }
+}
+
+fn domain_covers(entry: &str, host: &str) -> bool {
+    let domain = entry.strip_prefix('.').unwrap_or(entry);
+    entry == "*"
+        || host.eq_ignore_ascii_case(domain)
+        || domain
+            .len()
+            .checked_add(1)
+            .and_then(|tail| host.len().checked_sub(tail))
+            .and_then(|cut| host.get(cut..))
+            .and_then(|tail| tail.strip_prefix('.'))
+            .is_some_and(|parent| parent.eq_ignore_ascii_case(domain))
+}
+
+/// Whether an address entry (`10.0.0.1`) or a network entry
+/// (`10.0.0.0/8`) holds this address. An entry of the other family, or
+/// one that does not parse, holds nothing.
+fn network_covers(entry: &str, address: std::net::IpAddr) -> bool {
+    use std::net::IpAddr;
+    let (network, prefix) = match entry.split_once('/') {
+        Some((network, prefix)) => (network, Some(prefix)),
+        None => (entry, None),
+    };
+    match (network.parse::<IpAddr>(), address) {
+        (Ok(IpAddr::V4(network)), IpAddr::V4(address)) => same_prefix(
+            u128::from(u32::from(network)),
+            u128::from(u32::from(address)),
+            32,
+            prefix,
+        ),
+        (Ok(IpAddr::V6(network)), IpAddr::V6(address)) => {
+            same_prefix(u128::from(network), u128::from(address), 128, prefix)
+        }
+        (Ok(IpAddr::V4(_)), IpAddr::V6(_)) | (Ok(IpAddr::V6(_)), IpAddr::V4(_)) | (Err(_), _) => {
+            false
+        }
+    }
+}
+
+/// Whether two addresses `width` bits wide agree on their first
+/// `prefix` bits; no prefix means the whole address.
+fn same_prefix(network: u128, address: u128, width: u32, prefix: Option<&str>) -> bool {
+    let kept = match prefix.map(str::parse::<u32>) {
+        None => width,
+        Some(Ok(bits)) if bits <= width => bits,
+        Some(Ok(_) | Err(_)) => return false,
+    };
+    width
+        .checked_sub(kept)
+        .is_some_and(|dropped| network.checked_shr(dropped) == address.checked_shr(dropped))
 }
 
 #[cfg(test)]
