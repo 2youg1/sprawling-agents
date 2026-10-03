@@ -16,6 +16,7 @@ use crate::bundle::landing::{Bits, land};
 use crate::error::StorageError;
 use crate::real_fs::RealFs;
 
+use super::base::{BaseOf, BaseTarget};
 use super::opening::HeadMove;
 use super::provenance::Provenance;
 use super::scan::CommitPlan;
@@ -90,36 +91,41 @@ impl Checkpoint {
     /// move the trunk under every request already waiting. Returns the
     /// commit it made, or `None` when there already was one.
     ///
+    /// The commit is written the way [`Checkpoint::base_checkpoint`] writes
+    /// one: every object in memory, then one pack, then the index and the
+    /// branch, so a city of N files pays one file write for its objects
+    /// rather than N, and a refusal leaves the index and HEAD as they were.
+    ///
     /// # Errors
-    /// Propagates whatever staging and committing report.
+    /// Propagates whatever staging, scanning, packing and committing report.
     pub fn ensure_base(
         &mut self,
         scopes: &[String],
         t: TimeMs,
         of: &Provenance,
     ) -> Result<Option<Payload>, StorageError> {
-        if self.repo.head().is_ok() {
+        if Self::head_commit(&self.repo)?.is_some() {
             return Ok(None);
         }
         let _head_moves = super::opening::moving_head()?;
-        if self.repo.head().is_ok() {
+        if Self::head_commit(&self.repo)?.is_some() {
             return Ok(None);
         }
-        let files = self.stage_scopes(scopes)?;
-        self.scan_staged()?;
-        // The one checkpoint that moves the branch: a worktree branches from a
-        // commit, and a city that has none can lend no tree.
-        let made = self.commit(&CommitPlan {
-            t,
-            of,
-            subject: &subject_of(scopes),
-            head: HeadMove::Found,
-        });
+        // The one checkpoint that moves the branch, written as one pack on a
+        // second handle so this one keeps a disk-backed store (storage D27).
+        let made =
+            self.reopened()?
+                .write_held(&BaseOf { scopes, t, of }, BaseTarget::Head, &mut |_| {});
+        // The base wrote the index file through the other handle.
+        self.repo
+            .index()
+            .and_then(|mut index| index.read(true))
+            .map_err(git_err("read the index the base wrote"))?;
         match made {
-            Ok(oid) => committed(oid, of, scopes, files).map(Some),
+            Ok(payload) => Ok(Some(payload)),
             // Another writer made the base between the read and the swap:
             // the same city as if it had gone first (storage §8-39).
-            Err(_) if self.repo.head().is_ok() => Ok(None),
+            Err(_) if Self::head_commit(&self.repo)?.is_some() => Ok(None),
             Err(refused) => Err(refused),
         }
     }

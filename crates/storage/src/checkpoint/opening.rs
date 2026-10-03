@@ -31,7 +31,8 @@ pub(crate) enum IndexOwner {
     Writer(PathBuf),
 }
 
-/// The two steps that move HEAD, `ensure_base` and `land`, take this in one
+/// The steps that move HEAD, a base (`ensure_base`, `base_checkpoint`) and
+/// `land`, take this in one
 /// process, around their staging as well as their commit: both stage an index
 /// another writer may stage at the same moment (the city's own, for a base),
 /// and on Windows two handles rewriting one index file refuse each other's
@@ -52,29 +53,27 @@ pub(crate) fn moving_head() -> Result<MutexGuard<'static, ()>, StorageError> {
     })
 }
 
-/// What a commit does to HEAD. A wave checkpoint leaves it: it is filed
-/// under its own reference so a person's `git log` does not grow a line per
-/// tool wave. A base commit and a landing move it, because a worktree
-/// branches from a branch and offered work has to be on one.
+/// What a commit does to HEAD. A wave checkpoint, and a base before its pack
+/// is on disk, leave it: a wave checkpoint is filed under its own reference so
+/// a person's `git log` does not grow a line per tool wave. A landing moves
+/// it, because offered work has to be on a branch; a base moves it by
+/// creating the branch afterwards (`checkpoint::base`).
 pub(crate) enum HeadMove {
     Leave,
     /// From where HEAD stands when the commit is made: a landing.
     Advance,
-    /// Only where the city has no HEAD: the base commit. A writer that finds
-    /// HEAD made by another between its read and its swap is refused, so a
-    /// city gets one base however many writers race for it (storage §8-39).
-    Found,
 }
 
-/// What a refused commit says. HEAD moved since it was read, or its lock file
-/// is held (on Windows, also a rename onto a file someone has open): the
+/// What a refused commit says. HEAD moved since it was read, the branch a
+/// base would create already exists, or its lock file is held (on Windows,
+/// also a rename onto a file someone has open): the
 /// compare-and-swap refused, and a silent redo would treat the other writer's
 /// work as this commit's to undo (storage §8-39).
 pub(crate) fn commit_refused(update: Option<&str>, err: git2::Error) -> StorageError {
     let lost = update.is_some()
         && matches!(
             err.code(),
-            git2::ErrorCode::Modified | git2::ErrorCode::Locked
+            git2::ErrorCode::Modified | git2::ErrorCode::Locked | git2::ErrorCode::Exists
         );
     if lost {
         StorageError::Checkpoint {

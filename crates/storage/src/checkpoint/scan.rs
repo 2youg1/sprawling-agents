@@ -118,7 +118,9 @@ impl Checkpoint {
     /// anything else that stops HEAD being read is an error, because
     /// reading it as "none" would turn the next checkpoint into a parentless
     /// root commit cut off from the history before it (`crates/storage/spec/Checkpoint/Provenance.lean` §8-17).
-    fn head_commit(repo: &git2::Repository) -> Result<Option<git2::Commit<'_>>, StorageError> {
+    pub(super) fn head_commit(
+        repo: &git2::Repository,
+    ) -> Result<Option<git2::Commit<'_>>, StorageError> {
         match repo.head() {
             Ok(head) => head
                 .peel_to_commit()
@@ -274,7 +276,6 @@ impl Checkpoint {
                 Some("HEAD"),
                 Self::head_commit(&self.repo)?.into_iter().collect(),
             ),
-            HeadMove::Found => (Some("HEAD"), Vec::new()),
         };
         let parent_refs: Vec<&git2::Commit> = parents.iter().collect();
         let full_message = format!("{}\n\n{}", plan.subject, plan.of.trailers());
