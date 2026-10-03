@@ -361,7 +361,12 @@ jobs:
           binary="$(find "$fresh/unpacked" -type f \( -name sprawling.exe -o -name sprawling \) | head -n 1)"
           test -n "$binary"
           case "$RUNNER_OS" in
-            Windows) system="/c/Windows/System32:/c/Windows:/c/Windows/System32/Wbem:/c/Windows/System32/WindowsPowerShell/v1.0" ;;
+            Windows)
+              root=/c/Windows
+              sys="$root/System32"
+              powershell="$sys/WindowsPowerShell"
+              system="$sys:$root:$sys/Wbem:$powershell/v1.0"
+              ;;
             macOS) system="/usr/bin:/bin:/usr/sbin:/sbin" ;;
             Linux) system="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" ;;
           esac
