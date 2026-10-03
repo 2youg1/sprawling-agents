@@ -288,11 +288,11 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 
 **决定**：`RULES.toml` 的 `harness_minutes` 给一栋楼里每次 harness run 的墙钟上限，缺省 `HARNESS_MINUTES_DEFAULT = 60`，`0` 在解析时拒。
 
-**理由**：上限回答的是「这栋楼肯让一个外来居民占一条车道多久」，与 `review`、`confidential` 同是楼对它的居民立的规矩，而楼规由人写、run 改不了（D1）。放在 `CONFIG.toml` 的 `[resident]` 表里，它会爬城／楼／房间的梯子，一间房自己的那一层就能把上限写大，而那一层是会话写记录的地方。缺省给一个值而不是「不限」：不限时一个卡住的 harness 占着车道直到人发现，60 分钟够一次大的改动做完。
+**理由**：上限回答的是「这栋楼肯让一个外来居民占一条 lane 和它的进程吃掉的内存多久」（pool 不设车道数，`crates/sprawling/Spec.lean` D34；新 run 的放行只看可用内存，§8-46-3 的内存闸），与 `review`、`confidential` 同是楼对它的居民立的规矩，而楼规由人写、run 改不了（D1）。放在 `CONFIG.toml` 的 `[resident]` 表里，它会爬城／楼／房间的梯子，一间房自己的那一层就能把上限写大，而那一层是会话写记录的地方。缺省给一个值而不是「不限」：不限时一个卡住的 harness 一直吃着别的 run 放行要看的那份可用内存，直到人发现，60 分钟够一次大的改动做完。
 
 **被否**：①`[resident] minutes` 与 `harness` 并列：见上，房间一层能改楼的上限；②缺省不限、只靠停摆：卡住的 harness 要人来发现。
 
-**重开参数**：车道数（`crates/sprawling/Spec.lean` §8-46-3）变得不再稀缺，或 harness 能在回合中间报告进度、城能分辨「在做事」与「卡住了」时。
+**重开参数**：放行不再看可用内存（`crates/sprawling/Spec.lean` §8-46-3 的内存闸），于是一个卡住的 harness 挡不住别的 run，或 harness 能在回合中间报告进度、城能分辨「在做事」与「卡住了」时。
 -/
 
 /-! ## 13 依赖选型

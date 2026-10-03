@@ -70,7 +70,7 @@ pub fn rules_path(city_root, addr) -> PathBuf;      // <building>/.sprawling/RUL
 pub fn agents_path(city_root, addr) -> PathBuf;     // <building>/AGENTS.md（项目的，故在保留区之外）
 pub fn city_agents_path(city_root) -> PathBuf;      // <city>/AGENTS.md：城围起来的工作区自己的那份
 pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
-// 三层统一为 <scope>/.sprawling/CONFIG.toml；city 层因此不再是特例
+// 三层都是 <scope>/.sprawling/CONFIG.toml；city 层与另两层同一个式子
 ```
 
 - **三层一个表达式**：`path()` 先算出 scope 目录（城根、楼根、房间目录），再一律 `.join(RESERVED_PREFIX).join(CONFIG_FILE)`。只有 City 层在保留区里、另两层不在，就是一个 Agent 写域够得着自己配置的洞口。
