@@ -95,6 +95,23 @@ impl Interrupting {
         scope_stopping(&self.backlog, self.member)
     }
 
+    /// A model answer has just landed (`model_returned` is on the
+    /// ledger before the wave it asked for), so every steer this run
+    /// held has been read and is recorded as consumed (collab D8).
+    ///
+    /// A post that refuses leaves the signals held, and they go back to
+    /// the room when the run leaves: a signal recorded as read that no
+    /// answer read is the loss D8 exists to prevent, and the run's next
+    /// append meets the same refusal and ends it.
+    fn answered(&mut self) {
+        let Ok(mut desk) = self.steers.lock() else {
+            return;
+        };
+        match desk.answered() {
+            Ok(()) | Err(_) => {}
+        }
+    }
+
     fn ask(&mut self) -> Interrupt {
         if self.scope_stopping() {
             return Interrupt::Cancel;
@@ -226,7 +243,13 @@ pub(crate) fn drive_run<L: Ledger>(
         held: None,
     });
     let (driven, ran) = {
-        let mut interrupt = |_: SafePoint| asking.borrow_mut().ask();
+        let mut interrupt = |point: SafePoint| {
+            let mut asking = asking.borrow_mut();
+            if let SafePoint::BeforeWave { .. } = point {
+                asking.answered();
+            }
+            asking.ask()
+        };
         // How late a halt may land while a run waits out a provider. It
         // is the scale a person notices, not a reading of this machine.
         const HALT_SLICE_MS: u64 = 50;

@@ -249,6 +249,13 @@ impl RunWorker {
                     &format!("a fold refused a {:?} line a lane wrote: {err}", line.kind),
                 );
             }
+            if let Err(err) = self.deliver_sent(&line) {
+                self.note(
+                    runtime::diagnostics::Level::Refuse,
+                    "collab::inbox",
+                    &format!("a signal a lane sent reached no room: {err}"),
+                );
+            }
         }
     }
 

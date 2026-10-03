@@ -58,7 +58,11 @@ impl RunWorker {
             site.who.clone(),
             site.building.addr().clone(),
             self.clock.now()?,
-            lent.inbox,
+            collab::RoomMail {
+                inbox: lent.inbox,
+                slot: lent.slot,
+                post: self.post(site.run_id, addr, &site.who),
+            },
         )));
         let goals = std::sync::Arc::new(std::sync::Mutex::new(self.goal_desk(
             site.run_id,
@@ -140,6 +144,30 @@ impl RunWorker {
             plan_path,
             waiting,
             tenure: lent.tenure,
+        })
+    }
+
+    /// The post a run's signal desk writes through: each line crosses
+    /// the relay at the call, so it is on the ledger while the run is
+    /// still going, and the accounting thread delivers what it sent
+    /// when it shows the line (collab D7).
+    fn post(&self, run: kernel::RunId, room: &Address, who: &str) -> collab::Post {
+        let mut relay = self.flight.gate.issue();
+        let clock = std::sync::Arc::clone(&self.clock);
+        let (room, who) = (room.clone(), who.to_owned());
+        collab::Post::new(move |line: &collab::SignalEffect| {
+            let landing = crate::effect::Landing::signals(vec![line.clone()], &room, &who)?;
+            let mut stamping = crate::worker::recording::Stamping {
+                ledger: &mut relay,
+                command: None,
+                clock: clock.as_ref(),
+            };
+            match landing.record(&mut |line| stamping.record_for(run, line))? {
+                // Delivered on the accounting thread, which shows the
+                // relayed line to the room table (`RunWorker::show_relayed`).
+                crate::effect::Then::Deliver(_) | crate::effect::Then::Nothing => Ok(()),
+                crate::effect::Then::Roadmap { .. } | crate::effect::Then::Shelf(_) => Ok(()),
+            }
         })
     }
 

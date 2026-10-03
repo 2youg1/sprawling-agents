@@ -42,13 +42,23 @@ impl RunWorker {
         } = settling;
         let (addr, who, run_id) = (&at.addr, site.who.as_str(), site.run_id);
         let (write_root, building) = (site.write_root.as_path(), &site.building);
-        let signal_effects = held(&desks.signals, "settle the signal desk")?.take_effects();
+        // What the run said is already on the ledger and in its rooms:
+        // each line crossed the relay at the call (collab D7). What is
+        // left is the knock, which carries this run's place in its
+        // conversation, and the one knock on this run's own room when it
+        // left with signals no recorded answer read (collab D8).
+        let (sent, unread) = {
+            let mut desk = held(&desks.signals, "settle the signal desk")?;
+            (desk.take_sent(), desk.take_unread())
+        };
+        for signal in &sent {
+            self.knock(signal, addr, at.policy, &chain)?;
+        }
+        self.knock_for_returned(&unread, at.policy, &chain)?;
         // Every desk below settles through one door, and that door
         // appends before it changes anything: `effect::Then` has no
         // other source than `Landing::record`, so a change that outran
         // its own line cannot be written here.
-        let spoken = effect::Landing::signals(signal_effects, addr, who)?;
-        self.settle(at, run_id, spoken, &chain)?;
         // The sweep the forecast cannot replace. A command can be
         // obfuscated past a text prediction; what is missing from the
         // working tree cannot be talked out of. The base is the first

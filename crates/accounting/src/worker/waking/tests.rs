@@ -369,6 +369,24 @@ fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
     let hana = Address::parse("market/hana").unwrap();
     let working = RunId::from_bytes([7u8; 16]);
     let lent = worker.collaborating.rooms.lend(&hana, working);
+    // What the knock is for: delivered while the room is lent, so it
+    // waits in the holder's slot and comes home with the queue.
+    worker
+        .collaborating
+        .rooms
+        .deliver(
+            &collab::Signal::new(
+                kernel::event::record::SignalId::parse("s-1").unwrap(),
+                kernel::event::record::SignalKind::Mention,
+                "market/ito".to_owned(),
+                hana.clone(),
+                kernel::Version::new(1),
+                kernel::Payload::empty(),
+                kernel::TimeMs::new(1),
+            )
+            .unwrap(),
+        )
+        .unwrap();
     worker.doorstep.knocks.push(Knock {
         addr: hana.clone(),
         from: "market/ito".to_owned(),

@@ -246,8 +246,10 @@ impl RunWorker {
 
 | 收信人的状态 | 机制 | 落点 |
 |---|---|---|
-| 正在跑 | 信从门缝塑进去——steer 型 Signal，`SignalDesk::take_steer` 在安全点取走 | 追在下一次工具结果末尾，前缀 `@发件人地址` |
-| 没在跑 | 敲门——投递后入 `knocks`，这次派活结束后 `answer_knocks` 为他开一跑 | 新 Run 的 brief，同样写明 `@发件人地址` |
+| 正在跑 | 信从门缝塞进去——发出时 `signal_enqueued` 经 relay 落账，记账线程展示这一行时把信投进他那份借出队列的 `Mailslot`，`SignalDesk::take_steer` 在下一个安全点取走 | 追在下一次工具结果末尾，前缀 `@发件人地址` |
+| 没在跑 | 敲门——发出时投进房间队列，发信这一跑落地时入 `knocks`（敲门携发信方的 `KnockChain`，它只在落地处可读），`answer_knocks` 为他开一跑；队列已空的敲门跳过，信已被读过 | 新 Run 的 brief，同样写明 `@发件人地址` |
+
+- **取走不是消费**（collab D8）：安全点取走的信被那一跑拿着，下一次 `SafePoint::BeforeWave`（这一回合的 `model_returned` 已落盘）才写 `signal_consumed`；那一跑先离开，信回到队列最前，落地时为本房间敲一次门（`RunWorker::knock_for_returned`）。
 
 - **人压过居民**：中断源先问人的命令队列（Cancel 再 Steer），空手才问本屋信箱。
 - **属名不是装饰，是回信地址**：另一个 agent 的话氒不得以人的身份进窗口。类型已经把它变成判定（只有 `Steer::from_person` 写得出 `user`）；同一条规则延到敲门路上——被叫醒的一跑，其 brief 第一句就是「@X signalled you. This run exists because that signal arrived: nobody else asked for it.」。一份读起来像人写的 brief 会让每一封回信寄错地方。

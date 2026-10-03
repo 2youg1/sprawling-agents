@@ -168,10 +168,16 @@ impl Signal {
     }
 }
 
-/// The receiving side: two lines and a bandwidth.
+/// The receiving side: two lines, what a leaving run gave back, and a
+/// bandwidth.
 pub struct Inbox {
     urgent: EventQueue,
     ordinary: EventQueue,
+    /// Signals a run took and left with before any recorded answer read
+    /// them (collab D8). They are older than anything in the two lines,
+    /// so they are taken first; they bypass the lines because the
+    /// lines' `seen` set would drop a second delivery of the same id.
+    returned: std::collections::VecDeque<Signal>,
     bandwidth: u32,
 }
 
@@ -182,6 +188,7 @@ impl std::fmt::Debug for Inbox {
         f.debug_struct("Inbox")
             .field("urgent", &self.urgent.len())
             .field("ordinary", &self.ordinary.len())
+            .field("returned", &self.returned.len())
             .field("bandwidth", &self.bandwidth)
             .finish()
     }
@@ -195,6 +202,7 @@ impl Inbox {
         Inbox {
             urgent: EventQueue::new(QueueLane::Signal, capacity),
             ordinary: EventQueue::new(QueueLane::Signal, capacity),
+            returned: std::collections::VecDeque::new(),
             bandwidth: bandwidth.max(1),
         }
     }
@@ -217,13 +225,27 @@ impl Inbox {
             .map_err(storage::StorageError::into_ax)
     }
 
-    /// Takes up to the receiver's bandwidth, urgent first.
+    /// Puts back a signal a run took and left with unread, ahead of
+    /// everything still queued, because it was sent before all of it
+    /// (`spec/Delivery.lean` `leave_requeues`).
+    pub fn give_back(&mut self, signals: Vec<Signal>) {
+        for signal in signals.into_iter().rev() {
+            self.returned.push_front(signal);
+        }
+    }
+
+    /// Takes up to the receiver's bandwidth: what was given back first,
+    /// then urgent, then ordinary.
     ///
     /// # Errors
     /// Propagates a queued payload that does not read back as a signal.
     pub fn pull(&mut self) -> Result<Vec<Signal>, AxError> {
         let mut out = Vec::new();
         while u32::try_from(out.len()).unwrap_or(u32::MAX) < self.bandwidth {
+            if let Some(signal) = self.returned.pop_front() {
+                out.push(signal);
+                continue;
+            }
             let item = match self.urgent.consume() {
                 Some(item) => item,
                 None => match self.ordinary.consume() {
@@ -251,6 +273,13 @@ impl Inbox {
     /// corrupt entry. The same payload still fails loudly through
     /// [`Inbox::pull`], which is the door the model itself uses.
     pub fn take_steer(&mut self) -> Option<Signal> {
+        let given_back = self
+            .returned
+            .iter()
+            .position(|signal| matches!(signal.lane(), Lane::Urgent));
+        if let Some(signal) = given_back.and_then(|at| self.returned.remove(at)) {
+            return Some(signal);
+        }
         let item = self.urgent.consume()?;
         Signal::from_payload(&item.payload).ok()
     }
@@ -259,8 +288,55 @@ impl Inbox {
     #[must_use]
     pub fn pending(&self) -> u32 {
         let total = self.urgent.len().saturating_add(self.ordinary.len());
-        u32::try_from(total).unwrap_or(u32::MAX)
+        u32::try_from(total)
+            .unwrap_or(u32::MAX)
+            .saturating_add(u32::try_from(self.returned.len()).unwrap_or(u32::MAX))
     }
+}
+
+/// Where the city drops a signal for a room whose queue is lent to a
+/// running run, so that run finds it at its next safe point (collab D7).
+///
+/// Shared between the accounting thread, which drops signals in, and the
+/// run's signal desk, which empties it into the lent queue. It is a
+/// lock of its own rather than the desk's, because a desk is locked for
+/// the length of a tool call and a `send` from that call blocks until
+/// the accounting thread has delivered it, which may be into this room.
+#[derive(Debug, Clone, Default)]
+pub struct Mailslot(std::sync::Arc<std::sync::Mutex<Vec<Signal>>>);
+
+impl Mailslot {
+    /// Drops one signal in, or sheds it once `capacity` are waiting.
+    ///
+    /// # Errors
+    /// Refuses when the slot was left locked by a thread that died.
+    pub fn drop_in(&self, signal: Signal, capacity: u64) -> Result<Admission, AxError> {
+        let mut waiting = self.0.lock().map_err(|_| poisoned())?;
+        if u64::try_from(waiting.len()).unwrap_or(u64::MAX) >= capacity {
+            return Ok(Admission::Shed {
+                reason: kernel::ShedReason::CapacityExhausted,
+            });
+        }
+        waiting.push(signal);
+        Ok(Admission::Admit)
+    }
+
+    /// Takes everything waiting, in the order it arrived.
+    ///
+    /// # Errors
+    /// Refuses when the slot was left locked by a thread that died.
+    pub fn take(&self) -> Result<Vec<Signal>, AxError> {
+        Ok(std::mem::take(&mut *self.0.lock().map_err(|_| poisoned())?))
+    }
+}
+
+fn poisoned() -> AxError {
+    AxError::failure(
+        AxCode::StorageFatal,
+        "reach a room's mailslot",
+        "the slot was left locked by a thread that died",
+    )
+    .with_recovery("restart this city")
 }
 
 #[cfg(test)]

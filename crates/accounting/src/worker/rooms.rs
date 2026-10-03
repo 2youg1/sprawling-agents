@@ -17,12 +17,14 @@
 //! the table, marked with the run that took it, so a second borrower is
 //! answered rather than served. Only the run named on the mark may give
 //! a queue back. And what is delivered to a room while its queue is out
-//! waits in the same entry, so the holder takes it home rather than
-//! somebody discovering it was never held.
+//! goes into the slot the entry shares with the holder's desk, so the
+//! holder reads it at its next safe point (collab D7) and takes home
+//! whatever it did not reach, rather than somebody discovering it was
+//! never held.
 
 use std::collections::BTreeMap;
 
-use kernel::{Address, Admission, AxCode, AxError, RunId, ShedReason};
+use kernel::{Address, Admission, AxCode, AxError, RunId};
 
 use super::{INBOX_CAPACITY, new_inbox};
 
@@ -31,11 +33,9 @@ enum RoomQueue {
     /// Nobody is working in this room, so the queue is here.
     Home(collab::Inbox),
     /// One run holds this room's queue at its signal desk, and what
-    /// arrived since waits to be handed over when that run lands.
-    Lent {
-        to: RunId,
-        waiting: Vec<collab::Signal>,
-    },
+    /// arrives meanwhile is dropped into the slot that desk empties at
+    /// each safe point.
+    Lent { to: RunId, slot: collab::Mailslot },
 }
 
 /// This run's tenure over its room's queue.
@@ -55,6 +55,9 @@ pub(in crate::worker) enum QueueTenure {
 /// What a dispatch was given when it asked for its room's queue.
 pub(in crate::worker) struct Lent {
     pub(in crate::worker) inbox: collab::Inbox,
+    /// Where the city drops what arrives for the room while the run
+    /// reads; a spare's slot is one nothing is dropped into.
+    pub(in crate::worker) slot: collab::Mailslot,
     pub(in crate::worker) tenure: QueueTenure,
 }
 
@@ -110,17 +113,20 @@ impl RoomQueues {
         match self.rooms.get_mut(addr) {
             Some(RoomQueue::Lent { to: holder, .. }) => Lent {
                 inbox: new_inbox(),
+                slot: collab::Mailslot::default(),
                 tenure: QueueTenure::ASpare { held_by: *holder },
             },
             Some(entry) => {
+                let slot = collab::Mailslot::default();
                 let lent = std::mem::replace(
                     entry,
                     RoomQueue::Lent {
                         to,
-                        waiting: Vec::new(),
+                        slot: slot.clone(),
                     },
                 );
                 Lent {
+                    slot,
                     inbox: match lent {
                         RoomQueue::Home(inbox) => inbox,
                         // Unreachable by the arm above, and answered
@@ -133,15 +139,17 @@ impl RoomQueues {
                 }
             }
             None => {
+                let slot = collab::Mailslot::default();
                 self.rooms.insert(
                     addr.clone(),
                     RoomQueue::Lent {
                         to,
-                        waiting: Vec::new(),
+                        slot: slot.clone(),
                     },
                 );
                 Lent {
                     inbox: new_inbox(),
+                    slot,
                     tenure: QueueTenure::TheRoomQueue,
                 }
             }
@@ -149,7 +157,8 @@ impl RoomQueues {
     }
 
     /// Takes the queue of the room at `addr` back from `from`, and
-    /// delivers into it everything that arrived while it was out.
+    /// delivers into it whatever is still in the slot: what arrived
+    /// after the holder's desk last emptied it.
     ///
     /// # Errors
     /// Refuses a return from a run that was not holding the queue, and
@@ -160,8 +169,8 @@ impl RoomQueues {
         from: RunId,
         mut returned: collab::Inbox,
     ) -> Result<(), AxError> {
-        let waiting = match self.rooms.get_mut(addr) {
-            Some(RoomQueue::Lent { to, waiting }) if *to == from => std::mem::take(waiting),
+        let slot = match self.rooms.get(addr) {
+            Some(RoomQueue::Lent { to, slot }) if *to == from => slot.clone(),
             Some(RoomQueue::Lent { to, .. }) => {
                 return Err(not_the_holder(addr, from, &format!("{to} is")));
             }
@@ -172,7 +181,10 @@ impl RoomQueues {
         // The queue comes home whatever the signals that waited do to
         // it: a queue that failed on its way back must not become a
         // queue the city forgets it has.
-        let mut refused = None;
+        let (waiting, mut refused) = match slot.take() {
+            Ok(waiting) => (waiting, None),
+            Err(err) => (Vec::new(), Some(err)),
+        };
         for signal in &waiting {
             let delivered = returned
                 .deliver(signal)
@@ -206,16 +218,7 @@ impl RoomQueues {
             .or_insert_with(|| RoomQueue::Home(new_inbox()))
         {
             RoomQueue::Home(inbox) => inbox.deliver(signal)?,
-            RoomQueue::Lent { waiting, .. } => {
-                if u64::try_from(waiting.len()).unwrap_or(u64::MAX) >= INBOX_CAPACITY {
-                    Admission::Shed {
-                        reason: ShedReason::CapacityExhausted,
-                    }
-                } else {
-                    waiting.push(signal.clone());
-                    Admission::Admit
-                }
-            }
+            RoomQueue::Lent { slot, .. } => slot.drop_in(signal.clone(), INBOX_CAPACITY)?,
         };
         admitted(admission, signal)
     }

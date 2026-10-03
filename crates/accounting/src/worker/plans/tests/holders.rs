@@ -119,8 +119,8 @@ fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands
 /// A claim's line is written when the model makes it, so a run whose
 /// landing fails before its plan settles still owes the history the
 /// line that closes it: the claim, then the node handed back
-/// (`crates/sprawling/Spec.lean` §8-42-8). The signal's line is the one lost here
-/// because landing writes it before the plan's.
+/// (`crates/sprawling/Spec.lean` §8-42-8). The plan's own closing line is the
+/// one lost here, so the landing fails at the plan.
 #[test]
 fn a_claim_whose_landing_failed_is_handed_back() {
     use crate::worker::fixture::*;
@@ -147,7 +147,7 @@ fn a_claim_whose_landing_failed_is_handed_back() {
             completion("done", None),
         ],
     );
-    let worker = worker_over_faults(dir.path(), Some("signal_enqueued"));
+    let worker = worker_over_faults(dir.path(), Some("roadmap_blocked"));
     let mut worker = attach_provider(worker, &base_url, "m-local").unwrap();
     let landed = worker.handle(wire::Command::Dispatch {
         addr: Address::parse("lab/room1").unwrap(),

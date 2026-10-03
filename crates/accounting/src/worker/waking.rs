@@ -170,10 +170,55 @@ impl RunWorker {
         policy: kernel::RunPolicy,
         chain: &super::KnockChain,
     ) -> Result<(), AxError> {
-        let room = signal.room();
-        if room == speaker {
+        if signal.room() == speaker {
             return Ok(());
         }
+        self.knock_resident(signal, policy, chain)
+    }
+
+    /// Knocks once on the room a leaving run gave signals back to, so
+    /// somebody reads them (collab D8, `spec/Delivery.lean`
+    /// `leave_requeues`). The room is the leaving run's own: the knock
+    /// [`RunWorker::knock`] refuses a speaker is the one this owes.
+    ///
+    /// # Errors
+    /// As [`RunWorker::knock`].
+    pub(super) fn knock_for_returned(
+        &mut self,
+        returned: &[collab::Signal],
+        policy: kernel::RunPolicy,
+        chain: &super::KnockChain,
+    ) -> Result<(), AxError> {
+        match returned.first() {
+            Some(signal) => self.knock_resident(signal, policy, chain),
+            None => Ok(()),
+        }
+    }
+
+    /// A signal a lane sent, on the ledger since the relay took its
+    /// line, put in the room it names: the queue when the room is
+    /// empty, the reader's slot when a run is working there, which
+    /// reads it at its next safe point (collab D7).
+    ///
+    /// # Errors
+    /// Propagates a line that does not read back as a signal, and the
+    /// room's refusal of it.
+    pub(super) fn deliver_sent(&mut self, line: &kernel::EventDraft) -> Result<(), AxError> {
+        if !matches!(line.kind, kernel::EventKind::SignalEnqueued) {
+            return Ok(());
+        }
+        self.collaborating
+            .rooms
+            .deliver(&collab::Signal::from_payload(&line.data)?)
+    }
+
+    fn knock_resident(
+        &mut self,
+        signal: &collab::Signal,
+        policy: kernel::RunPolicy,
+        chain: &super::KnockChain,
+    ) -> Result<(), AxError> {
+        let room = signal.room();
         if !matches!(
             city::Identity::load(&self.city_root, room)?,
             city::Identity::Resident(_)
@@ -233,6 +278,13 @@ impl RunWorker {
             // §8-46-12).
             if self.collaborating.rooms.worked_by(&knock.addr).is_some() {
                 self.doorstep.defer(knock);
+                continue;
+            }
+            // A signal is delivered when it is sent (collab D7), so the
+            // run that was working in the room may already have read
+            // what this knock was for; a run woken for nothing would be
+            // a spend nobody asked for.
+            if self.collaborating.rooms.pending(&knock.addr) == 0 {
                 continue;
             }
             // The chain is bounded here rather than at the push: a knock

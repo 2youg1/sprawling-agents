@@ -2899,6 +2899,7 @@ dependencies = [
 name = "sprawling-collab"
 version = "0.0.8"
 dependencies = [
+ "proptest",
  "serde",
  "serde_json",
  "sprawling-kernel",
