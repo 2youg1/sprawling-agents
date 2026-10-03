@@ -80,7 +80,17 @@ fn private_bytes(_memory: Option<&memory_stats::MemoryStats>) -> u64 {
 /// the text carries none of them.
 #[cfg(any(target_os = "linux", test))]
 fn kib_sum(text: &str, fields: &[&str]) -> Option<u64> {
-    None
+    text.lines()
+        .filter_map(|line| {
+            fields
+                .iter()
+                .find_map(|field| line.strip_prefix(field))
+                .and_then(|value| value.trim().strip_suffix("kB"))
+                .and_then(|kib| kib.trim().parse::<u64>().ok())
+        })
+        .fold(None, |sum: Option<u64>, kib| {
+            Some(sum.unwrap_or(0).saturating_add(kib.saturating_mul(1024)))
+        })
 }
 
 /// The bytes this process has read from and written to storage.
