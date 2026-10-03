@@ -55,7 +55,7 @@
   <p class="text-note text-text-faint">{say($lang, "you_import_note")}</p>
   <div class="flex flex-wrap items-center gap-snug">
     <input
-      class="h-control min-w-0 flex-1 rounded-control border border-edge-input bg-page px-base font-mono text-note text-text"
+      class="h-control min-w-[16ch] flex-1 rounded-control border border-edge-input bg-page px-base font-mono text-note text-text"
       aria-label={say($lang, "you_import_host")}
       placeholder={say($lang, "you_import_host_default")}
       bind:value={host}

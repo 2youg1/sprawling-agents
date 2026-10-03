@@ -116,7 +116,15 @@
     turns: [{ calls: [READ], notes: [], number: 1, opened: Seq.make(2), t: TimeMs.make(NOW - 8 * 60_000), timing: "measured" }],
   };
 
+  // Every card open in the city, newest first, so the mailbox's deciding
+  // section and its key have the plan to list.
+  const OPEN = [
+    { doc: DOC, id: CURRENT.id, at: TimeMs.make(NOW - 5 * 60_000) },
+    { doc: DOC, id: STALE.id, at: TimeMs.make(NOW - 6 * 60_000) },
+  ];
+
   function answering(query: Query): Answer | undefined {
+    if (query === "open_proposals") return { open_proposals: { open: OPEN } };
     if (typeof query !== "object") return undefined;
     if ("rounds" in query) return query.rounds.run === RUN ? { rounds: ROUNDS } : undefined;
     if ("proposals" in query) return query.proposals === DOC ? { proposals: PROPOSALS } : undefined;

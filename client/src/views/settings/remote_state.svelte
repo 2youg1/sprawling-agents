@@ -61,7 +61,9 @@
   );
 
   const LABEL = "text-note text-text-faint";
-  const VALUE = "font-mono text-note text-text break-all";
+  // Spaces first, then anywhere: a fingerprint wraps between its groups of
+  // four, and a device id with no space still fits a phone.
+  const VALUE = "font-mono text-note text-text wrap-anywhere";
 </script>
 
 <div class="flex flex-col gap-wide">

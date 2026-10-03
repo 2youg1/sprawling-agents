@@ -150,7 +150,7 @@
         >
           <span class="min-w-0 truncate">{row.room}</span>
           <span class="truncate text-note text-text-faint">
-            {say($lang, startOf(row.line))} · {fill(say($lang, "mailbox_runs"), { n: String(row.line.runs) })}
+            {say($lang, startOf(row.line))} · {row.line.runs === 1 ? say($lang, "mailbox_run_one") : fill(say($lang, "mailbox_runs"), { n: String(row.line.runs) })}
           </span>
           <span class="figure text-right text-note text-text-faint">{ago($lang, row.line.at, u.now())}</span>
         </a>

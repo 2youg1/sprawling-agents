@@ -6579,6 +6579,10 @@
     "en": "conversation",
     "zh": "对话"
   },
+  "mailbox_run_one": {
+    "en": "1 run",
+    "zh": "1 个 run"
+  },
   "setup_group_colours": {
     "en": "colours",
     "zh": "配色"

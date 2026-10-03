@@ -116,15 +116,19 @@
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={question} />
   {/if}
+  <!-- The key keeps its one-line name: the domain sentence beside it
+    is what wraps when the column is narrow. -->
   <div class="flex items-center gap-base">
-    <Button
-      label={say($lang, "context_second_save")}
-      tone="primary"
-      {...(edited ? {} : { why: say($lang, "context_second_unchanged") })}
-      onPress={save}
-    />
+    <div class="shrink-0">
+      <Button
+        label={say($lang, "context_second_save")}
+        tone="primary"
+        {...(edited ? {} : { why: say($lang, "context_second_unchanged") })}
+        onPress={save}
+      />
+    </div>
     {#if settled !== undefined}
-      <span class="text-note text-text-faint">{span(settled.domain)}</span>
+      <span class="min-w-0 text-note text-text-faint">{span(settled.domain)}</span>
     {/if}
   </div>
 </div>
