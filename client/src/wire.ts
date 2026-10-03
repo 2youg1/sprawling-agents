@@ -2887,6 +2887,7 @@ export type Slice = typeof Slice.Type;
 export const ProposalCard = Schema.Struct({
   baseline: B3Hash,
   id: B3Hash,
+  offered: Schema.optional(Schema.NullOr(Seq)),
   run: RunId,
   slices: Schema.Array(Slice),
   span: Span,

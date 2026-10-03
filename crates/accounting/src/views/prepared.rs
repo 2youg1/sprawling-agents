@@ -137,7 +137,7 @@ pub enum Prepared {
     /// One document's open proposal cards, with its version still to
     /// read.
     Proposals {
-        city_root: PathBuf,
+        ledger: LedgerAsk,
         doc: Address,
         open: Vec<documents::Offer>,
     },
@@ -314,11 +314,9 @@ impl Prepared {
             Self::Document { city_root, at } => {
                 wire::Answer::Document(Box::new(document_answer(&city_root, at)))
             }
-            Self::Proposals {
-                city_root,
-                doc,
-                open,
-            } => super::proposals::proposals_answer(&city_root, doc, open),
+            Self::Proposals { ledger, doc, open } => {
+                super::proposals::proposals_answer(&ledger, doc, open)
+            }
             Self::Range {
                 city_root,
                 version,

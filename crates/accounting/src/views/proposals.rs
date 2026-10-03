@@ -15,7 +15,6 @@
 //! `documents` crate's; this module only remembers which cards are open.
 
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use documents::Offer;
 use kernel::event::record::{ProposalDecided, ProposalOffered, ProposalWithdrawn};
@@ -163,7 +162,7 @@ impl super::Views {
     /// is read once the lock is let go.
     pub(in crate::views) fn proposals_ask(&self, doc: &Address) -> super::prepared::Prepared {
         super::prepared::Prepared::Proposals {
-            city_root: self.city_root.clone(),
+            ledger: self.ledger_ask(),
             doc: doc.clone(),
             open: self.governance.proposals.all_open_on(doc),
         }
@@ -191,14 +190,21 @@ impl super::Views {
 
 /// One document's open cards with the version its file holds now,
 /// read after the view lock is let go: the version is a digest of the
-/// whole file (`crates/sprawling/Spec.lean` §8-100).
-pub(super) fn proposals_answer(city_root: &Path, doc: Address, open: Vec<Offer>) -> wire::Answer {
+/// whole file (`crates/sprawling/Spec.lean` §8-100). Each card names
+/// the line that offered it, found in its run's session window
+/// (wire D44).
+pub(super) fn proposals_answer(
+    ledger: &super::prepared::LedgerAsk,
+    doc: Address,
+    open: Vec<Offer>,
+) -> wire::Answer {
     // Missing and unreadable are both "no version now"; the document
     // answer is where a page learns which, and why (`crates/wire/Spec.lean` §8-69).
-    let version = match std::fs::read(super::listing::resolve(city_root, Some(&doc))) {
+    let version = match std::fs::read(super::listing::resolve(&ledger.city_root, Some(&doc))) {
         Ok(bytes) => Some(B3Hash::digest(&bytes)),
         Err(_no_version_now) => None,
     };
+    let offered = offered_lines(ledger, &open);
     let open = open
         .into_iter()
         .map(|offer| wire::ProposalCard {
@@ -207,8 +213,27 @@ pub(super) fn proposals_answer(city_root: &Path, doc: Address, open: Vec<Offer>)
             baseline: offer.baseline(),
             span: offer.span(),
             slices: offer.review().into_slices(),
-            offered: None,
+            offered: offered.get(&offer.id()).copied(),
         })
         .collect();
     wire::Answer::Proposals(Box::new(wire::ProposalsAnswer { doc, version, open }))
+}
+
+/// The seq of the `proposal_offered` line of each card in `open`, read
+/// from its run's session window once per run. A line outside the
+/// window, or one that does not read back as an offer, names no card.
+fn offered_lines(
+    ledger: &super::prepared::LedgerAsk,
+    open: &[Offer],
+) -> BTreeMap<B3Hash, kernel::Seq> {
+    let runs: std::collections::BTreeSet<RunId> = open.iter().map(Offer::run).collect();
+    runs.into_iter()
+        .flat_map(|run| ledger.records_of(run))
+        .filter(|record| record.kind() == EventKind::ProposalOffered)
+        .filter_map(|record| {
+            let offered = record.data().read::<ProposalOffered>().ok()?;
+            let offer = Offer::of(record.run(), &offered).ok()?;
+            Some((offer.id(), record.seq()))
+        })
+        .collect()
 }
