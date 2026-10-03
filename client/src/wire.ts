@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 54 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "20bfbea9859e6ad9665663f0a3c6a92b94d5c7e4e717fbc660124001fb08d437" as const;
+export const WIRE_HASH = "b98b124426ce8fe8927fc5dda4e97d62fd0f022c9ba96c3098d0395a75bde86c" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
