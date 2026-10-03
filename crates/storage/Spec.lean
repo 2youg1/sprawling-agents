@@ -294,6 +294,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | D30 | 检查点的暂存过滤在 libgit2 打开之前跳过文件写者与落盘门的暂存名 | `crates/storage/spec/Checkpoint.lean` |
 | D31 | 段的预分配是一个可选的臂，默认仍是生长；选它就是改 `SEGMENT_PREALLOCATION` 一个值 | `crates/storage/spec/Jsonl/Preallocate.lean` |
 | D32 | 索引的刷新逐窗向前读，在预分配段的零尾那一窗停 | `crates/storage/spec/Index.lean` |
+| D33 | 建表的那一遍扫描与刷新共用同一支窗读，在预分配段的零尾那一窗停 | `crates/storage/spec/Index.lean` |
 -/
 
 /-! ## 13 依赖选型

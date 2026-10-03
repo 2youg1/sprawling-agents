@@ -27,7 +27,7 @@ import crates.storage.spec.Jsonl.Verify
 /-! D31 段的预分配是一个可选的臂：`SegmentPreallocation { Grow, ToRollSize }`，每一个本构建打开的账本都用常量 `jsonl::ledger::SEGMENT_PREALLOCATION` 给的那一臂，今天是 `Grow`，即预分配之前的行为。
 **两臂。** `Grow`：段随每一波在文件末尾 `append` 而长，`open` 截去段尾的零。`ToRollSize`：新段建好、写下第一波之后，以 `Vfs::truncate`（`File::set_len`）把它设到滚动尺寸 `SEGMENT_ROLL_BYTES`；之后每一波以 `Vfs::write_at` 写在记录末尾（写者的位置，`writer_position_is_the_stripped_end`），`open` 没有撕裂时留着段尾的零，有撕裂时截到最后一条有效记录，与 `Grow` 相同。失败的一波照样由 `jsonl::unwind` 截回波前的长度，截掉的是预分配的零与撕裂的字节，之后的写越过文件尾即延长。
 **为什么可能更快。** 文件长度不变时，屏障不必把长度这一项元数据一起落盘：Linux 的 `fdatasync` 只在长度变了时写 inode，Windows 的 `FlushFileBuffers` 与 macOS 的 `F_FULLFSYNC` 在长度变了时同样多写一次文件系统的元数据。三个平台的 `set_len` 都是延长文件的逻辑长度：Windows 是 `SetFileInformationByHandle(FileEndOfFileInfo)`，Linux 与 macOS 是 `ftruncate`；ext4 与 APFS 上那是一个稀疏的洞，块不在这时分配，所以省下的是长度的更新，不是块的分配（推断：依据 `fdatasync(2)` 的文档与三个平台的 `set_len` 实现，未在掉电下测过）。
-**为什么默认仍是 `Grow`。** 选哪一臂要一份发布构建上、每个平台各一份的屏障读数，这一份读数还欠着（本版本不跑基准）；没有读数时保留已经在用的行为。`index::ledger` 的刷新逐窗读、在零尾那一窗停（storage D32），所以预分配的段每次刷新多读的至多是一窗的零，而不是记录末尾到段尾的零。
+**为什么默认仍是 `Grow`。** 选哪一臂要一份发布构建上、每个平台各一份的屏障读数，这一份读数还欠着（本版本不跑基准）；没有读数时保留已经在用的行为。`index::ledger` 的刷新（storage D32）与建表的那一遍扫描（storage D33）都逐窗读、在零尾那一窗停，所以预分配的段每次读多读的至多是一窗的零，而不是记录末尾到段尾的零。
 **被否：用 `fallocate` 或 `F_PREALLOCATE` 真正分配块。** 标准库没有安全接口，要 `unsafe` 的 FFI 或新的依赖（AGENTS.md 平台调用的次序），而要读的问题是长度元数据的代价，不是块分配。**被否：让 `Grow` 也按位置写。** 那会改变默认臂的写法，而这一项的范围是加一个臂、默认不变。
 **重开参数。** 发布构建上屏障的读数（每个平台、每一臂）显示 `ToRollSize` 在某个平台上明显更快；那时改的只是 `SEGMENT_PREALLOCATION` 这一个值。
 -/

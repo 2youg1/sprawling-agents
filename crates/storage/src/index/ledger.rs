@@ -195,7 +195,7 @@ impl LedgerIndex {
         let mut bytes_read: u64 = 0;
         for span in spans {
             let path = dir.join(&span.name);
-            let (tail, read) = read_records(self.seam().as_ref(), &path, &span)
+            let (tail, read) = read_records(self.seam().as_ref(), &path, span.from, span.size)
                 .map_err(io_err("read segment", &path))?;
             bytes_read = bytes_read.saturating_add(read);
             let indexed = self.folded.fold_segment(&span.name, span.from, &tail);
@@ -280,25 +280,30 @@ struct Span {
     size: u64,
 }
 
-/// The records of `span`, read forward one window at a time, with the
-/// count of bytes lifted off the disk to find them.
+/// The records of the segment at `path` from `from` to `size`, read
+/// forward one window at a time, with the count of bytes lifted off the
+/// disk to find them.
 ///
-/// The read is bounded by the length this refresh stat'ed, so a record
-/// appended between the stat and the read stays for the next refresh
+/// The read is bounded by the length the caller stat'ed (`size`), so a
+/// record appended between the stat and the read stays for a later pass
 /// rather than being folded at an offset this pass never confirmed. It
 /// stops at the window whose records end before the window does: past
 /// that point a preallocated segment (storage D31) holds only zeros, so
-/// a refresh of one reads its new records and at most one window of
-/// zeros, never every zero up to the roll size (storage D32). The window
-/// starts at `FIRST_WINDOW_BYTES` and doubles, so a long stretch of new
-/// records costs a number of reads logarithmic in its length.
-fn read_records(vfs: &dyn Vfs, path: &Path, span: &Span) -> io::Result<(Vec<u8>, u64)> {
+/// a reader of one takes its records and at most one window of zeros,
+/// never every zero up to the roll size (storage D32 and D33). The
+/// window starts at `FIRST_WINDOW_BYTES` and doubles, so a long stretch
+/// of records costs a number of reads logarithmic in its length.
+///
+/// The refresh and the full scan both read through here, so the
+/// zero-tail rule is `jsonl::records_end` alone and neither caller
+/// reads a preallocated segment the other way.
+fn read_records(vfs: &dyn Vfs, path: &Path, from: u64, size: u64) -> io::Result<(Vec<u8>, u64)> {
     let mut records = Vec::new();
     let mut read: u64 = 0;
     let mut window = FIRST_WINDOW_BYTES;
     loop {
-        let at = span.from.saturating_add(read);
-        let asked = window.min(span.size.saturating_sub(at));
+        let at = from.saturating_add(read);
+        let asked = window.min(size.saturating_sub(at));
         if asked == 0 {
             return Ok((records, read));
         }
@@ -338,8 +343,13 @@ fn walk<E>(
     let mut folded = Folded::empty();
     for name in segment_names(vfs, dir).map_err(&lift)? {
         let path = dir.join(&name);
-        let bytes = vfs
-            .read(&path)
+        let size = vfs
+            .size(&path)
+            .map_err(io_err("stat segment", &path))
+            .map_err(&lift)?;
+        // The records, not a preallocated segment's zero tail: the same
+        // window read and the same stop the refresh takes (storage D33).
+        let (bytes, _lifted) = read_records(vfs, &path, 0, size)
             .map_err(io_err("read segment", &path))
             .map_err(&lift)?;
         let mut offset: u64 = 0;
@@ -393,3 +403,13 @@ impl<'de> serde::Deserialize<'de> for LedgerIndex {
     reason = "test code"
 )]
 mod tests;
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod scan_tests;
