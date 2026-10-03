@@ -121,6 +121,33 @@ fn letter(from: &str, to: &str, n: u32) -> Signal {
     .unwrap()
 }
 
+/// A sends to B with `wait`, and B replies before A reaches the stop: a
+/// later safe point of A's wave empties the slot first (`take_steer`).
+/// The reply is kept for the wait rather than queued, so the stop ends on
+/// it instead of running to the deadline (collab D15, `spec/Delivery.lean`
+/// §8 `kept_is_first_reply`), and a letter from a third room still queues.
+#[test]
+fn a_reply_that_lands_before_the_stop_still_ends_the_wait() {
+    let (a, b) = (room("lab/a"), room("lab/b"));
+    a.send("lab/b", "is the kiln free?", true);
+    b.send("lab/a", "free now", false);
+    b.deliver_to(&a);
+    a.slot.drop_in(letter("lab/c", "lab/a", 1), 64).unwrap();
+    assert_eq!(a.desk.lock().unwrap().take_steer().unwrap(), None);
+    assert_eq!(
+        a.turn(START + 1),
+        WaitTurn::Ended {
+            source: "@lab/b".to_owned(),
+            text: "lab/b replied: free now".to_owned(),
+        }
+    );
+    assert_eq!(
+        a.desk.lock().unwrap().pending(),
+        1,
+        "the third room's letter queues"
+    );
+}
+
 /// A sends to B with `wait`; B replies; A's next safe point ends the
 /// wait with B's words, and the ledger pairs the start with a reply end.
 #[test]
