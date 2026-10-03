@@ -24,6 +24,7 @@ pub(super) mod door;
 pub(crate) mod folding;
 pub(crate) mod journal;
 pub(crate) mod output_ring;
+pub(crate) mod placement;
 pub(super) mod serve;
 pub mod standing;
 #[cfg(test)]

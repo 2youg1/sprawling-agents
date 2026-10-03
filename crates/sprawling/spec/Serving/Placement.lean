@@ -6,9 +6,9 @@
 /-!
 # 热线程的理想处理器：好核在先，最空的先给，坐下就不换
 
-规定核心热线程的软放置（§8-93 的放置一半，AF1 的 (b) 与 (c)）。实现它的模块是 W6 新建的 bin::serving::placement（先登记进模块图，再建文件；建好之后本段改成指向那个文件的路径）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `crates/sprawling/src/serving/placement.rs`（`bin::serving::placement`，形状：状态机）里核心热线程的软放置（§8-93 的放置一半，AF1 的 (b) 与 (c)）。`crates/sprawling/src/serving/placement/tests.rs` 在 Rust 的放置表上逐条检查下面两组性质：至多四个处理器、三档等级、任意顺序给出的每一张处理器表，三条线程五次起动与退出的每一条轨迹，穷举而不抽样，所以缺陷躲不到某个随机种子后面。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
-热线程是：账本线程 `sprawling-runs`、视图折叠线程 `sprawling-views`、socket 服务的 tokio worker，以及每个 run 的 lane 线程。每条热线程起动时向放置表要一个座位（一个逻辑处理器的下标），把它设成自己的理想处理器，退出时交还。
+热线程是：账本线程 `sprawling-runs`（`bin::assembly::attending`）、视图折叠线程 `sprawling-views`（`bin::serving::folding`）与 socket 服务的 tokio worker（`serving_runtime`）。run 的 lane 不是各自的 OS 线程，它们是 tokio 任务，坐在 worker 的座位上。每条热线程起动时向放置表要一个座位（一个逻辑处理器的下标），把它设成自己的理想处理器，退出时交还：后两种由 `CoreThread::raise` 要座位，座位随 `CoreThread` 析构交还；`sprawling-runs` 在线程闭包开头要一个 `Seat`，线程结束时交还。
 
 处理器表是一张按「好坏」排好的表：每一项是一个逻辑处理器的等级 `rank`，数越小越好，表按等级从小到大排。等级由平台给出（见 D41）；模型只要求表是排好的（`RankedBest`），不关心等级是怎么来的，所以三档、两档、一档（不是混合架构的机器）都在模型里。
 
@@ -259,6 +259,34 @@ end Sprawling.Serving.Placement
 
 /-! D41 热线程设软的理想处理器，好核在先、最空的先给、坐下不换；一步计算不跨线程；硬亲和只作对照臂
 
+**接口**
+
+```rust
+// bin::serving::placement —— shape: state machine
+pub(crate) struct Core { pub(crate) rank: u8, pub(crate) processor: u32 } // 等级越小越好；processor 是平台的处理器号
+pub(crate) struct Cores;                        // 处理器表；构造时按等级排好，所以排好由构造保证（RankedBest）
+impl Cores { pub(crate) fn ranked(cores: Vec<Core>) -> Self; pub(crate) fn get(&self, index: usize) -> Option<Core>; }
+pub(crate) struct Holder(pub(crate) u64);       // 一条热线程，活多久就坐多久
+pub(crate) struct SeatTable;                    // 模型的 Seats 与 step
+impl SeatTable {
+    pub(crate) fn new(cores: Cores) -> Self;
+    pub(crate) fn start(&mut self, holder: Holder); // 最空的先给，一样空取靠前的；已有座位不换；空表不给
+    pub(crate) fn exit(&mut self, holder: Holder);  // 交还座位，别的座位不动
+    pub(crate) fn seat_of(&self, holder: Holder) -> Option<usize>;
+    pub(crate) fn core(&self, index: usize) -> Option<Core>;
+}
+pub(crate) struct Seat;                         // 析构即交还
+pub(crate) fn seat_this_thread(name: &'static str) -> Seat; // 要座位并设理想处理器；平台拒绝时向标准错误说一次
+```
+
+全进程一张放置表，放在一个 `Mutex` 后面：只在线程起动与退出时取锁，不在热路径上。哪一臂由常量 `ARM` 定（`Off` 不要座位、不调平台；`Soft` 是默认），对照时只改这一个值；读数定下来之后它挪到人的配置 `[core] placement`（见下面四臂对照）。
+
+**现在的状态，三个平台**
+
+- Windows：热线程拿到座位，并以 `set_current_thread_ideal_processor` 设成理想处理器。处理器表现在走 (b) 里写的退路：第 0 组里 `available_parallelism` 个处理器全是 0 级，所以放置表现在只做「最空的先给」的分散，好核在先要等读 `EfficiencyClass` 的 Zig 叶子（`crates/desktop/ffi`）建成；建成之后只换 `platform_cores` 这一处，放置表与性质检查不变。Windows 上的 User 现在得到：热线程分散在不同的核上，各自坐定不跳，核忙时由调度器立刻换到别的核。
+- macOS：处理器表是空的，放置表不给座位，不调任何平台接口；User 得到的是调度器自己的放置，性能核由 D40 的 QoS 争取。
+- Linux：同 macOS，处理器表是空的；User 得到的是内核调度器自己的放置（ITMT／EAS 在混合架构上本来把忙线程放到大核上）。`/sys/devices/system/cpu/*/cpu_capacity` 能给等级，但 Linux 没有软的理想处理器调用，有了等级也没处交给内核，所以不读。
+
 **决定**（AF1 的 (b) 与 (c)，D88 第 3 条）：
 
 - **(b) 理想处理器，三个平台。**
@@ -275,7 +303,7 @@ end Sprawling.Serving.Placement
 
 /-! ## 四臂对照（AF1 的完成条件，测量计划）
 
-测量归波后的 mid 读数（Roadmap §0 第 7 条），这里只写计划，W6 的实现照它留出开关与采样点。
+测量归波后的 mid 读数（Roadmap §0 第 7 条），这里只写计划，实现照它留出开关与采样点。
 
 - **开关是一个配置值**：人的配置文件 `[core]` 一节的 `placement`，与 `priority` 同处（`accounting::person`，`crates/accounting/Spec.lean` §8-8），取 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"`，分别是下面四臂。读数出来之前的默认是 `"soft"`；读数定下默认之后只改这一个默认值。
 - **四臂**：①不做——不关 EcoQoS、不设理想处理器、run 的 job 不设份额；②(a)+(b)+(c)；③再加 (d)，即 `crates/runtime/spec/Tools/Exec.lean` D29 的按 run CPU 权重与作业级内存上限；④硬亲和（D41 的对照臂）。
