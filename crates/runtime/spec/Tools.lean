@@ -121,6 +121,9 @@ pub fn admits(mode: Mode, produced: &Produced) -> Admission;
 pub enum Marker { Plain, Fingerprinted }         // 两个汇只差这一个参数，不差第二份实现
 impl Marker { pub fn spell(self, found: &[u8]) -> String; }
 pub fn redact(payload: &Map<String, Value>) -> (Map<String, Value>, u32);
+// 零命中时 `redact` 仍逐串复制、逐层重建整张 map，扫描之外再付一次整份载荷的拷贝。只拷被打码的那一支、
+// 零命中原样交回，要让它接收并交回载荷的所有权，两个调用者 `turn::ledger::Journal::append_redacted`
+// 与 `transcript` 随之改；这一步还没有做。
 pub fn redact_text(text: &str, marker: Marker) -> (String, u32);
 // 「什么绝不可被打印」在本 crate 只有这一个家：账本走 `Fingerprinted`，诊断行走 `Plain`。
 // 历史被检索与比对，故标记要能分辨两个值；一行日志写一次读一次，哈希后缀在那里只是一个
