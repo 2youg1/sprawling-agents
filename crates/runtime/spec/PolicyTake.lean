@@ -6,7 +6,7 @@
 /-!
 # runtime：会话中改运行策略，在下一个 `BeforeWave` 取用
 
-本文件是 `crates/runtime/Spec.lean` 的一个分部；下面一节保留它在 runtime 规格里的标签 §8-62，别处引作 `crates/runtime/Spec.lean §8-62`。它规定 `crates/runtime/src/mode.rs`（策略格 `PolicyCell`）、`crates/runtime/src/run.rs`（安全点上的取用）与 `crates/runtime/src/tools/edit.rs`、`crates/runtime/src/tools/exec.rs`（写门读格）。
+本文件是 `crates/runtime/Spec.lean` 的一个分部；下面一节保留它在 runtime 规格里的标签 §8-62，别处引作 `crates/runtime/Spec.lean §8-62`。它规定 `crates/runtime/src/mode.rs`（策略格 `PolicyCell`）、`crates/runtime/src/run/lifecycle.rs`（安全点上的取用）与 `crates/runtime/src/tools/edit.rs`、`crates/runtime/src/tools/exec.rs`（写门读格）。
 -/
 
 /-!
@@ -14,11 +14,12 @@
 
 ```rust
 // runtime::mode
-pub struct PolicyCell { /* Arc<RwLock<kernel::RunPolicy>> —— 私有 */ }
+pub struct PolicyCell { /* 生效的 Arc<RwLock<kernel::RunPolicy>> 与到了还没取用的最后一条 —— 私有 */ }
 impl PolicyCell {
-    pub fn new(start: kernel::RunPolicy) -> PolicyCell;      // run_started.policy
-    pub fn reader(&self) -> PolicyReader;                    // 交给 EditTool 与 ExecSetup，只读
-    pub(crate) fn take(&self, policy: kernel::RunPolicy);    // 只有 run 的驱动循环在 SafePoint::BeforeWave 调
+    pub fn new(start: kernel::RunPolicy) -> PolicyCell;               // run_started.policy
+    pub fn reader(&self) -> PolicyReader;                             // 交给 EditTool 与 ExecSetup，只读
+    pub(crate) fn arrive(&mut self, policy: kernel::RunPolicy);       // 任一安全点到的改动，后到的盖过先到的
+    pub(crate) fn take_at_wave(&mut self) -> Option<kernel::RunPolicy>; // 只有 run 的驱动循环在 SafePoint::BeforeWave 调；返回取用的那条，供追加说明
 }
 pub struct PolicyReader { /* 同一个格 —— 私有 */ }
 impl PolicyReader { pub fn now(&self) -> kernel::RunPolicy; }  // 每次写时问一次
@@ -34,7 +35,7 @@ pub enum Interrupt { None, Cancel, Steer { source: String, text: String },
 - **合并时的准入读 run 结束时格里的策略**（§8-54）：那是这个 run 最后一次取用的；run 最后一个 `BeforeWave` 之后才到的改动没被它取用，落到下一个 run 的 `run_started.policy`。
 - **平台**：纯内存与账本次序上的判定，Windows、macOS、Linux 行为一致。
 
-- **W6 的派生检查**（Rust，`crates/runtime/src/run.rs` 的测试旁）：一个 proptest 生成器在 `{change(随机 RunPolicy), wave, call}` 上抽序列，用测试的 `Interrupt` 源按序列在安全点投递改动、用一个记录每次 `PolicyReader::now` 的替身工具扮演写门，断言三件事——同一 `BeforeWave` 之后到下一个之前的每次读数相同且等于那一刻格里的值；每个 `BeforeWave` 取的是它之前最后一条改动；每次请求的 `tools` 与此前已发出的消息字节是上一次请求的前缀。坏的变体：让 `PolicyReader::now` 读信箱里最新的那条（被否①），第一条断言在序列 `[call, change, call]` 上红。
+- **派生检查**（Rust，`crates/runtime/src/mode.rs` 的测试 `policy_take_holds_on_every_trace`）：一个 proptest 生成器在 `{change(随机 RunPolicy), wave, call}` 上抽序列，按序列调 `arrive`、`take_at_wave` 与 `PolicyReader::now`，断言两件事——同一 `BeforeWave` 之后到下一个之前的每次读数相同且等于那一波开始时生效的策略；每个 `BeforeWave` 取的是它之前最后一条改动，没有改动就什么也不取。坏的变体：`arrive` 当场写进生效的策略，即工具读信箱里最新的那条（被否①），第一条断言在序列 `[change, call]` 与 `[call, change, call]` 上红。「每次请求的 `tools` 与已发出的字节是上一次请求的前缀」由驱动循环的测试担，见 §3。
 
 下面的模型对任意一条输入序列证明：工具表与已发出的字节只增不改；一波里每次调用按这一波开始时格里的策略判；一波之中到的改动不改这一波；下一个 `BeforeWave` 取的是最后一条改动。
 -/
