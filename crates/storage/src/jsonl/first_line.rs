@@ -25,8 +25,9 @@ use super::open::unversioned;
 
 /// The first window a reader of a line of unknown length asks for; each
 /// next window is twice the last. `jsonl::tail` reads backwards by the
-/// same rule (`crates/storage/spec/Jsonl.lean` §8-1).
-pub(super) const FIRST_WINDOW_BYTES: u64 = 4096;
+/// same rule (`crates/storage/spec/Jsonl.lean` §8-1), and the side
+/// index reads a segment's new records forward by it (storage D32).
+pub(crate) const FIRST_WINDOW_BYTES: u64 = 4096;
 
 /// The first `\n`-terminated line of `path`, without its `\n`.
 ///

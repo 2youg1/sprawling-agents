@@ -212,6 +212,60 @@ fn a_refresh_reads_the_appended_tail_rather_than_the_segment() {
     assert_eq!(index.refresh(tmp.path()).unwrap(), Refreshed::Rebuilt);
 }
 
+/// A preallocated segment (storage D31) is the roll size from the
+/// moment it is created, so its length no longer says whether a record
+/// arrived. The refresh reads forward and stops at the window that
+/// reaches the zero tail (storage D32): one window per refresh, whether
+/// a record arrived or not, rather than every zero up to the roll size.
+#[test]
+fn a_refresh_stops_at_the_zero_tail_of_a_preallocated_segment() {
+    use crate::fault_fs::{FaultFs, FaultPlan, TornTail};
+    use crate::jsonl::{FIRST_WINDOW_BYTES, JsonlLedger};
+    use crate::vfs::Vfs as _;
+
+    let roll: u64 = 1024 * 1024;
+    let fs = FaultFs::new(FaultPlan {
+        cut_at_op: None,
+        cut_on_write: None,
+        torn_tail: TornTail::KeepBytes(0),
+    });
+    let dir = Path::new("ledger");
+    let draft = |t: u64| EventDraft {
+        run: RunId::CITY,
+        t: TimeMs::new(t),
+        who: "city".to_owned(),
+        addr: None,
+        kind: EventKind::GateChecked,
+        data: Payload::empty(),
+        ig: false,
+    };
+    let (mut ledger, _) = JsonlLedger::open_preallocated(fs.clone(), dir, TimeMs::new(0)).unwrap();
+    ledger.set_roll_bytes_for_test(roll);
+    ledger.append_all((0..3).map(draft).collect()).unwrap();
+    let mut index = LedgerIndex {
+        folded: super::scan(&fs, dir).unwrap(),
+        vfs: std::sync::Mutex::new(Box::new(fs.clone())),
+    };
+
+    ledger.append_all(vec![draft(3)]).unwrap();
+    let arrived = index.refresh(dir).unwrap();
+    let idle = index.refresh(dir).unwrap();
+    let segment = dir.join("ledger-00000000000000000000.jsonl");
+    assert_eq!(
+        (arrived, idle, index.len(), fs.size(&segment).unwrap()),
+        (
+            Refreshed::Appended {
+                bytes_read: FIRST_WINDOW_BYTES
+            },
+            Refreshed::Appended {
+                bytes_read: FIRST_WINDOW_BYTES
+            },
+            4,
+            roll
+        )
+    );
+}
+
 /// A folded segment that is no longer listed holds offsets into bytes
 /// that are gone, so the refresh rebuilds rather than keeps them.
 #[test]

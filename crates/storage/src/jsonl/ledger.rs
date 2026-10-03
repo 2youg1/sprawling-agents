@@ -56,6 +56,19 @@ impl SegmentPreallocation {
 /// alike.
 pub(crate) const SEGMENT_PREALLOCATION: SegmentPreallocation = SegmentPreallocation::Grow;
 
+/// Where the records in `segment` end: its length without the run of
+/// zero bytes a preallocated segment holds past its last record. A zero
+/// byte is space no write has reached yet, never a byte of a record, so
+/// `open` scans the last segment up to here and the side index stops
+/// reading at the first window whose records end before the window does
+/// (`crates/storage/spec/Jsonl/Preallocate.lean`, storage D31 and D32).
+pub(crate) fn records_end(segment: &[u8]) -> usize {
+    segment
+        .iter()
+        .rposition(|byte| *byte != 0)
+        .map_or(0, |at| at.saturating_add(1))
+}
+
 /// What open found and repaired, and what its tail recovery read and
 /// checked (`crates/storage/spec/Jsonl.lean` §8-34).
 pub struct OpenReport {
@@ -222,7 +235,6 @@ pub(crate) fn segment_names(vfs: &dyn Vfs, dir: &Path) -> Result<Vec<String>, St
     Ok(names)
 }
 
-/// Complete (`\n`-terminated) lines and the leftover tail bytes.
 /// A count of segment bytes or lines as the `u64` a file offset and a
 /// line number are. `usize` is at most 64 bits wide on every target this
 /// crate builds for, so this refuses only on a wider one, and it refuses
@@ -234,6 +246,7 @@ pub(crate) fn u64_count(count: usize) -> io::Result<u64> {
     u64::try_from(count).map_err(io::Error::other)
 }
 
+/// Complete (`\n`-terminated) lines and the leftover tail bytes.
 pub(crate) fn complete_lines(bytes: &[u8]) -> (Vec<&[u8]>, usize) {
     let mut lines = Vec::new();
     let mut consumed = 0usize;
