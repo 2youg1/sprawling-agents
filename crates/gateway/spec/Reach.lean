@@ -30,10 +30,20 @@ pub fn is_local(base_url: &str) -> bool;                                        
 - **`is_local` 是全城唯一的那一条判断**：`client_for` 的代理豁免（`Through::LocalAddress`）、地址规整时缺省的 scheme 与兼容格式提示、设置页上那个 `local` 标记，读的是同一个函数。回环按 `IpAddr::is_loopback` 判，外加 `localhost` 与 `*.localhost`，所以 `127.0.0.2` 在每一处都算这台电脑；两份判断只会在某一处先被改掉时各说各的。
 - **每个出站请求报出这座城的名字**：`client_for` 给 builder 设 user agent `sprawling/<CARGO_PKG_VERSION>`，一处写给全城。服务端会拒绝不报名字的请求：有的 provider 要求客户端报自己的名字而不是 HTTP 库的名字，CDN 后面的 MCP 服务器对没有 user agent 的请求答 403。
 - **三个平台读代理的方式不同，读数只报本侧看得见的那一部分。** 环境变量（`HTTPS_PROXY`／`HTTP_PROXY`／`ALL_PROXY`，大小写两种，`NO_PROXY` 排除）在 Windows、macOS、Linux 上一样读；reqwest 的 `system-proxy` 另在 Windows 读系统代理设置（注册表里的 WinINet 设置），在 macOS 读 System Configuration，在 Linux 不读别的来源，只剩环境变量。系统设置由 HTTP 客户端自己读，`through` 看不见，所以一格 `direct` 只说「本侧看得见的东西里没有点名代理」，不是说请求一定直连。
+- **`NO_PROXY` 照客户端的规则读**（D23）：`through` 读的名单与判定一个主机在不在名单里的规则，都与真正发请求的客户端（reqwest 之下 hyper-util 的代理匹配器）相同，所以读数报的 `Excluded` 就是请求不走代理的那一条路。
 - **5 秒一段**：设置页上有人在等，一个在这个时间里答不出来的主机，人要的是知道，而不是继续等。
 -/
 
 /-! D10 TLS 后端的权威是一次调用，不是一个 feature
 
 决定：reqwest 取 `rustls-no-provider`，由 `reach::tls::install_provider` 显式安装 aws-lc-rs（§8-15）。理由：reqwest 的 `rustls` feature 顺带打开 `quinn?/rustls-aws-lc-rs`，锁里多出一族从不编译的 quinn；更要紧的是后端藏在一个 feature 名里，远程门与 HTTP 用的是不是同一个 aws-lc-rs，要去读 reqwest 的清单才知道。被否的备选：自建一份 `rustls::ClientConfig`，经 `tls_backend_preconfigured` 交给 reqwest——那要在本 crate 重写 reqwest 已有的平台证书校验与 ALPN 选择，且 reqwest 自己的文档说这条路要求两边 rustls 版本逐一同步，版本一错就是运行期的 unknown TLS backend。
+-/
+
+/-! D23 `NO_PROXY` 的读法与匹配规则跟着客户端走：域名按点为界，非 Unicode 的值读作没设
+
+决定：`reach::proxy` 先按 `NO_PROXY`、`no_proxy` 的次序取第一个装着 Unicode 的值（`Exclusions::Listed`）；一个拼法没设就看下一个，一个拼法的值不是 Unicode 也看下一个，两个都没有可读的值时，读数分出「都没设」（`Unset`）与「设了却读不出」（`Unreadable`），两者都不排除任何主机。名单按逗号切开、去掉空白；主机是地址时只比地址项：相等的地址，或装着它的网段（`10.0.0.0/8`、`fd00::/8`）；主机是名字时只比名字项：`*` 盖住一切，一项盖住与它相等的名字，以及以「`.`＋这一项」结尾的名字，项开头的 `.` 意思相同，ASCII 大小写不计。所以 `example.com` 盖住 `api.example.com`，不盖 `badexample.com`。
+
+理由：§8-15 要求读数说的是请求真走的路。客户端（reqwest 0.13 的 `system-proxy` 与环境读取都落在 hyper-util 的 `Matcher`）正是这样读：`get_first_env` 对 `NotUnicode` 与 `NotPresent` 一样跳过，`DomainMatcher::contains` 以点为界、不计大小写，`IpMatcher` 比地址与网段。旧的 `host.ends_with(entry)` 让 `example.com` 排除了 `badexample.com`，读数就报一条请求不走的路；`unwrap_or_default` 把读不出的值和没设混成一个空串，读数与客户端碰巧一致，却说不出这是一个读不出的值。非 Unicode 的值是一次被记下的拒绝：它在类型里是 `Unreadable` 这一臂，`through` 的那一臂注明客户端照样走代理。被否：①读不出时报错——`through` 的答案是 kernel 的 `Through`，它说的是请求走哪条路，而客户端此时照样走代理变量，一个错误会让读数说出一条不存在的路；②把非 Unicode 的值有损地转成字符串再匹配——客户端不这样做，读数又会与请求分叉。重开参数：客户端换了 `NO_PROXY` 的读法或匹配规则（升级 reqwest 或 hyper-util 时读它们的 `NoProxy` 文档与测试），或 kernel 的 `Through` 长出一臂能带「名单读不出」的原因。
+
+三个平台：环境变量在 Windows、macOS、Linux 上一样读；不是 Unicode 的值在 macOS 与 Linux 上是不合法的 UTF-8 字节，在 Windows 上是落单的代理项（UTF-16 的 unpaired surrogate），`std::env::var` 在三处都答 `VarError::NotUnicode`，所以三处读数相同。
 -/

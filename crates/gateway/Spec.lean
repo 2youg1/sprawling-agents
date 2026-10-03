@@ -333,6 +333,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D20 名额的接线：一个注入的单调时钟，取在门里、按先来后到排队，等待有界：本文件 §8-6 之后
 - D21 `max_in_flight` 进端点的 tuning 与 `endpoint_attached`；排队数与等待时长是每个端点的一份读数：本文件 §8-6 之后
 - D22 探针落到会话内存时，编不出的 `provider_degraded` 通告并进 `custody()` 的拒词，不被丢掉：`crates/gateway/spec/Credential.lean`
+- D23 `NO_PROXY` 的读法与匹配规则跟着客户端走：域名按点为界，非 Unicode 的值读作没设：`crates/gateway/spec/Reach.lean`
 -/
 
 /-! ## 13 依赖选型

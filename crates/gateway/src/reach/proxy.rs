@@ -92,11 +92,15 @@ pub fn client_for(rule: Proxying, base_url: &str) -> reqwest::blocking::ClientBu
 
 /// Which proxy variable, if any, this host's requests will read.
 fn named_by_environment(host: &str, tls: bool) -> Through {
-    let excluded = std::env::var("NO_PROXY")
-        .or_else(|_| std::env::var("no_proxy"))
-        .unwrap_or_default();
-    if excluded_by(host, &excluded) {
-        return Through::Excluded;
+    match exclusions(|name| std::env::var(name)) {
+        Exclusions::Listed(list) if excluded_by(host, &list) => return Through::Excluded,
+        // A list that does not cover this host leaves the variables in force.
+        Exclusions::Listed(_) | Exclusions::Unset => {}
+        // The client reads a `NO_PROXY` that is not Unicode as unset, so
+        // it excludes nothing and the variables apply; the reading states
+        // the path the request takes rather than one it does not
+        // (gateway D23).
+        Exclusions::Unreadable => {}
     }
     let ordered: [&str; 6] = if tls {
         [
@@ -123,6 +127,35 @@ fn named_by_environment(host: &str, tls: bool) -> Through {
         }
     }
     Through::Direct
+}
+
+/// The `NO_PROXY` list the HTTP client reads for every request.
+///
+/// The client (hyper-util's proxy matcher, under reqwest) takes the first
+/// of `NO_PROXY` and `no_proxy` that holds Unicode and treats the rest as
+/// absent; this reads the same two names in the same order, so the
+/// reading cannot name a list the request does not use (gateway D23).
+#[derive(Debug, PartialEq, Eq)]
+enum Exclusions {
+    /// A spelling held this list.
+    Listed(String),
+    /// Neither spelling is set.
+    Unset,
+    /// A spelling is set to a value that is not Unicode (invalid UTF-8
+    /// on macOS and Linux, an unpaired surrogate on Windows) and no
+    /// spelling after it holds one. The client excludes nothing.
+    Unreadable,
+}
+
+fn exclusions(read: impl Fn(&str) -> Result<String, std::env::VarError>) -> Exclusions {
+    ["NO_PROXY", "no_proxy"]
+        .into_iter()
+        .try_fold(Exclusions::Unset, |seen, name| match read(name) {
+            Ok(list) => Err(Exclusions::Listed(list)),
+            Err(std::env::VarError::NotPresent) => Ok(seen),
+            Err(std::env::VarError::NotUnicode(_)) => Ok(Exclusions::Unreadable),
+        })
+        .unwrap_or_else(|listed| listed)
 }
 
 /// Whether a `NO_PROXY` list covers this host.
@@ -166,6 +199,72 @@ mod tests {
         assert!(excluded_by("api.openai.com", "localhost, .openai.com"));
         assert!(!excluded_by("api.openai.com", "localhost"));
         assert!(excluded_by("anything", "*"));
+    }
+
+    /// Found in review: a suffix test let `example.com` exclude
+    /// `badexample.com`, so the reading said "excluded" for a request the
+    /// client sent through the proxy. The cases follow the client's own
+    /// (hyper-util's `NoProxy` tests), so the two do not drift silently.
+    #[test]
+    fn an_entry_covers_its_domain_and_subdomains_and_never_a_longer_name() {
+        let list = "example.com, .corp.test, 10.0.0.0/8, 192.168.1.7, ::1, fd00::/8";
+        let asked = [
+            "example.com",
+            "api.example.com",
+            "API.Example.COM",
+            "badexample.com",
+            "corp.test",
+            "x.corp.test",
+            "xcorp.test",
+            "10.200.3.4",
+            "11.0.0.1",
+            "192.168.1.7",
+            "192.168.1.8",
+            "::1",
+            "fd12::1",
+            "fe80::1",
+        ];
+        let covered: Vec<bool> = asked.iter().map(|host| excluded_by(host, list)).collect();
+        assert_eq!(
+            covered,
+            vec![
+                true, true, true, false, true, true, false, true, false, true, false, true, true,
+                false,
+            ]
+        );
+    }
+
+    /// A `NO_PROXY` that is not Unicode is read the way the client reads
+    /// it: as absent, so the lower-case spelling answers when it is set and
+    /// nothing is excluded when it is not (gateway D23). The reader is
+    /// injected because setting a process variable is a fact about the
+    /// whole test process.
+    #[test]
+    fn a_no_proxy_that_is_not_unicode_excludes_nothing_as_the_client_reads_it() {
+        use std::env::VarError;
+        let not_unicode = || VarError::NotUnicode(std::ffi::OsString::from("x"));
+        let read = |upper: Result<String, VarError>, lower: Result<String, VarError>| {
+            exclusions(|name| match name {
+                "NO_PROXY" => upper.clone(),
+                _ => lower.clone(),
+            })
+        };
+        assert_eq!(
+            [
+                read(Err(not_unicode()), Err(VarError::NotPresent)),
+                read(Err(not_unicode()), Ok("example.com".to_owned())),
+                read(Ok("a.test".to_owned()), Ok("b.test".to_owned())),
+                read(Err(VarError::NotPresent), Err(VarError::NotPresent)),
+                read(Err(VarError::NotPresent), Err(not_unicode())),
+            ],
+            [
+                Exclusions::Unreadable,
+                Exclusions::Listed("example.com".to_owned()),
+                Exclusions::Listed("a.test".to_owned()),
+                Exclusions::Unset,
+                Exclusions::Unreadable,
+            ]
+        );
     }
 
     /// The two settings that do not consult the environment answer the
