@@ -15,11 +15,16 @@ export type Columns = "one" | "twelve";
 
 // Calls `onColumns` with the columns `element` stands in now, and again
 // whenever its size changes, until the returned function is called. An
-// element outside any frame stands in twelve.
+// element outside any frame stands in twelve. "Now" is before this
+// returns: a ResizeObserver first reports at the next rendering step,
+// and until then a one-column specimen stood in twelve and drew the
+// workbench's dividers outside its box.
 export function watchColumns(element: Element, onColumns: (columns: Columns) => void): () => void {
-  const observer = new ResizeObserver(() => {
+  const report = (): void => {
     onColumns(getComputedStyle(element).getPropertyValue("--shell-columns").trim() === "1" ? "one" : "twelve");
-  });
+  };
+  report();
+  const observer = new ResizeObserver(report);
   observer.observe(element);
   return () => {
     observer.disconnect();
