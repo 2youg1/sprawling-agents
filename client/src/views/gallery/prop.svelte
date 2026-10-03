@@ -189,6 +189,16 @@
       <Letter doc={DOC} card={CURRENT.id} opening="talk" />
     </div>
   </Case>
+  <Case label="letter · the same card read as the whole text it was written against" width={600}>
+    <div class="flex h-[640px] flex-col overflow-hidden bg-page">
+      <Letter doc={DOC} card={CURRENT.id} opening="before" />
+    </div>
+  </Case>
+  <Case label="letter · the same card read beside the whole text as it stands now" width={600}>
+    <div class="flex h-[640px] flex-col overflow-hidden bg-page">
+      <Letter doc={DOC} card={CURRENT.id} opening="now" />
+    </div>
+  </Case>
   <Case label="mailbox key · two proposal cards waiting">
     <Mailbox asked={0} hint={(words: string) => words} />
   </Case>
