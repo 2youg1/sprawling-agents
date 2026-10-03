@@ -16,7 +16,7 @@
 /-!
 ### 8-13 accounting::playback 的页面、分项复核与导出件落盘（形状 1 决策，`page`、`landing` 为形状 4 适配器）
 
-agent 把一份 bundle 做成一个自包含的单文件 HTML，叫 **playback page**。它的数据契约、引用规则、导出流程与验证要求写在随发行包发出的 `skills/playback/SKILL.md`；画面不在本节。本节定三件事：产品怎样把 bundle 放进页面，怎样把一份文件查成五个分开的结论，导出件怎样落盘。CLI（`crates/sprawling/Spec.lean` §8-126、§8-132）与居民的城工具 `playback`（`crates/sprawling/Spec.lean` §8-132）都是这些函数的薄适配器。
+agent 把一份 bundle 做成一个自包含的单文件 HTML，叫 **playback page**。它的数据契约、引用规则、导出流程与验证要求写在随发行包发出的 `crates/city/skills/playback/SKILL.md`；画面不在本节。本节定三件事：产品怎样把 bundle 放进页面，怎样把一份文件查成五个分开的结论，导出件怎样落盘。CLI（`crates/sprawling/Spec.lean` §8-126、§8-132）与居民的城工具 `playback`（`crates/sprawling/Spec.lean` §8-132）都是这些函数的薄适配器。
 
 ```rust
 // accounting::playback

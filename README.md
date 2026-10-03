@@ -158,7 +158,7 @@ Two sister projects are on hold. [RefRain](https://github.com/2youg1/RefRain), a
 | [`docs/frontend-method.md`](docs/frontend-method.md) | How a screen is built and accepted, and the approved visual design |
 | [`crates/README.md`](crates/README.md) | Every crate, what it owns and where its specification is; each specification, `crates/<dir>/Spec.lean`, holds that crate's interfaces, decisions and proofs, with comments in Chinese |
 | [`crates/city/templates/`](crates/city/templates/) | The documents the city writes into each building, which agents read and so can you |
-| [`skills/`](skills/) | The skills that ship with the release |
+| [`crates/city/skills/`](crates/city/skills/) | The skills that ship with the release |
 | [`docs/logging.md`](docs/logging.md) | What goes into the diagnostic log, what goes into the Ledger, and why the two stay apart |
 | [`docs/third-party.md`](docs/third-party.md) | The upstream facts this tree follows, credits and licence obligations |
 | [`CHANGELOG.md`](CHANGELOG.md) | What each release changed, and what it left known and unfixed |
@@ -180,7 +180,7 @@ Pull request descriptions, issues and review comments may be written in your own
 
 Facts about vendors, such as the path an API hangs under, the format it answers in and how each official harness starts, are followed from the ACP registry and, where a vendor's own client is more precise than its documentation, from that client, without copying its code; [`docs/third-party.md`](docs/third-party.md) §1 names each repository, path and commit, and a daily workflow asks each upstream whether it moved. Every control on the page is this repository's own, and its keyboard behaviour follows the W3C's ARIA Authoring Practices and the Kobalte and Ark UI documentation, read as prose.
 
-Of the skills under [`skills/`](skills/), `sdd`, `tutor` and `translation` are English adaptations of Chinese skills I published under AGPL-3.0-or-later (the translation skill's original byline also credits Claude Fable 5), here under MPL-2.0. `why`, `how` and `blast-radius` are my modified adaptations of [pstack](https://github.com/cursor/plugins/tree/main/pstack) by Lauren Tan (poteto), and `authority-review` adapts the Thermos plugin from the same `cursor/plugins` tree; all four keep MIT. [`docs/third-party.md`](docs/third-party.md) §5 gives the terms.
+Of the skills under [`crates/city/skills/`](crates/city/skills/), `sdd`, `tutor` and `translation` are English adaptations of Chinese skills I published under AGPL-3.0-or-later (the translation skill's original byline also credits Claude Fable 5), here under MPL-2.0. `why`, `how` and `blast-radius` are my modified adaptations of [pstack](https://github.com/cursor/plugins/tree/main/pstack) by Lauren Tan (poteto), and `authority-review` adapts the Thermos plugin from the same `cursor/plugins` tree; all four keep MIT. [`docs/third-party.md`](docs/third-party.md) §5 gives the terms.
 
 ## Build on sprawling
 
@@ -199,7 +199,7 @@ How to replace each part is in [`ARCHITECTURE.md`](ARCHITECTURE.md): §4 lists t
 
 ## License
 
-MPL-2.0, see [`LICENSE`](LICENSE). Each skill under [`skills/`](skills/) states its own licence, and [`skills/LICENSES.md`](skills/LICENSES.md), which ships in the release archive, gives each one's terms and credit.
+MPL-2.0, see [`LICENSE`](LICENSE). Each skill under [`crates/city/skills/`](crates/city/skills/) states its own licence, and [`crates/city/skills/LICENSES.md`](crates/city/skills/LICENSES.md), which ships in the release archive, gives each one's terms and credit.
 
 ---
 

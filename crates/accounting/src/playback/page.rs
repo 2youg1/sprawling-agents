@@ -44,7 +44,7 @@ pub fn embed(template: &[u8], bundle: &Bundle) -> Result<Vec<u8>, AxError> {
         AxError::failure(AxCode::InvalidArgs, "embed a playback bundle", subject).with_recovery(
             "write the template as UTF-8 HTML with one empty playback-bundle block, a \
              Content-Security-Policy first in its head, and nothing it loads from outside \
-             (skills/playback/SKILL.md)",
+             (crates/city/skills/playback/SKILL.md)",
         )
     };
     let text = std::str::from_utf8(template)

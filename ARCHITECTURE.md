@@ -736,7 +736,7 @@ today no harness carries one.
 ### Specifications in Lean
 
 A crate's specification moves from Markdown to Lean one crate at a time,
-by the method in `skills/sdd`, and every crate that has moved, and every
+by the method in `crates/city/skills/sdd`, and every crate that has moved, and every
 new crate, uses this layout.
 
 **One package, at the repository root.** `lakefile.toml`, `lean-toolchain`
@@ -767,7 +767,7 @@ described in English in `docs/frontend-method.md`, under the labels the
 code cites.
 
 **Where a specification lives.** A crate's entry is `crates/<dir>/Spec.lean`:
-the seventeen numbered section comments `skills/sdd` lists, and the imports
+the seventeen numbered section comments `crates/city/skills/sdd` lists, and the imports
 of its parts. A part is `crates/<dir>/spec/<Path>.lean`, where `<Path>` is
 the Rust module path below `src/` with every segment in UpperCamelCase:
 `storage::jsonl::barrier` is specified by

@@ -335,9 +335,9 @@ pub monotonic: fn() -> Instant,             // 生产交 monotonic_now；派活�
 
 **退出码**（§8-103 的 `Exit`）：0，测量做完了，被量命令失败也是 0，它的退出码是 `run` 行里的数据；1，起不了被量的程序（找不到程序是 `E_PATH_NOT_FOUND`，subject 是程序名，recovery 是检查 PATH 或写全路径；其余起不来是 `E_TOOL_UNAVAILABLE`，带平台给的原因），或者没有这个 pid 的进程（`E_INVALID_ARGS`，recovery 是给一个在跑的进程的 id）；2，命令行读不懂；4，`City` 的 `--at` 那里没有城（与 §8-97 相同）。`City` 在连续 5 s 没有读数时正常结束（§8-97 决定 2）。
 
-### 8-129-5 skill `skills/gauge/`
+### 8-129-5 skill `crates/city/skills/gauge/`
 
-`skills/gauge/SKILL.md`，许可 MPL-2.0，列进 `skills/README.md` 的表与 `skills/LICENSES.md`；发行包按目录收 `skills/`，不必另列。它教 agent 按这个次序做：
+`crates/city/skills/gauge/SKILL.md`，许可 MPL-2.0，列进 `crates/city/skills/README.md` 的表与 `crates/city/skills/LICENSES.md`；发行包按目录收 `skills/`，不必另列。它教 agent 按这个次序做：
 
 1. 先把负载钉住：同一份输入、同一个构建（产品的 feature 集，citysim D9）；输入是文件时记下它的摘要，两条读数只在摘要相同时可比（citysim D8）。
 2. 取基线：`sprawling gauge --samples 20 -- <命令> > before.jsonl`，读最后那行 spread。floor 贴着设计的下限，p50 带着机器其余的负载（`tools/citysim/Spec.lean` §8-6）；`suspicious` 不为 0 时先看是哪几次、是不是第一次。

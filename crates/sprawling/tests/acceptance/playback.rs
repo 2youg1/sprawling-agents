@@ -20,7 +20,7 @@ use crate::script::{self, Step};
 /// The playback skill's reference page, which a resident's page starts
 /// from: the export refuses it if it ever fails the structure or the
 /// static offline check.
-const TEMPLATE: &str = include_str!("../../../../skills/playback/template.html");
+const TEMPLATE: &str = include_str!("../../../city/skills/playback/template.html");
 
 /// The catalogue episode: an export of the bundle into this building's
 /// playback exports.

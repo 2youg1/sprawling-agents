@@ -16,7 +16,7 @@
 /-!
 ### 8-17 accounting::playback 的时间选择、调用的耗时、运行策略与提交的证据（形状 7 投影；`diff`、`traced` 为形状 4 适配器）
 
-回看一段工作流的人还要四样东西：按 UTC 时间选一段；每次工具调用花了多久，以及这个数什么时候是量出来的；一次 run 要求了什么准入证据；一个提交改了什么、出自哪几次调用。本节定这四样在 bundle 里的形状与求法；泳道与播放怎样画是页面的事（`skills/playback/SKILL.md`）。CLI 与城工具读同一组条件（`crates/sprawling/Spec.lean` §8-143）。时间条件的性质在 `crates/accounting/spec/Playback/Select.lean`。
+回看一段工作流的人还要四样东西：按 UTC 时间选一段；每次工具调用花了多久，以及这个数什么时候是量出来的；一次 run 要求了什么准入证据；一个提交改了什么、出自哪几次调用。本节定这四样在 bundle 里的形状与求法；泳道与播放怎样画是页面的事（`crates/city/skills/playback/SKILL.md`）。CLI 与城工具读同一组条件（`crates/sprawling/Spec.lean` §8-143）。时间条件的性质在 `crates/accounting/spec/Playback/Select.lean`。
 
 ```rust
 // accounting::playback

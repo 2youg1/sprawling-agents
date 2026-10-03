@@ -101,7 +101,7 @@ pub(crate) struct Shipped {
 }
 
 pub(crate) fn skills_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../city/skills")
 }
 
 /// Every directory under `skills/` that holds a `SKILL.md`, by name.

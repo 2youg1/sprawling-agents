@@ -160,7 +160,7 @@ Agent 越强，User 的注意力就越贵，sprawling 不打算成为又一个�
 | [`docs/frontend-method.md`](docs/frontend-method.md) | 一个屏怎样搭建与验收，以及已批准的视觉设计 |
 | [`crates/README.md`](crates/README.md) | 每个 crate 管什么、规格在哪；规格 `crates/<dir>/Spec.lean` 写着该 crate 的接口、决定与证明，注释用中文 |
 | [`crates/city/templates/`](crates/city/templates/) | 城写进每栋楼的文档，agent 读它们，你也可以读 |
-| [`skills/`](skills/) | 随发布分发的 skill |
+| [`crates/city/skills/`](crates/city/skills/) | 随发布分发的 skill |
 | [`docs/logging.md`](docs/logging.md) | 什么进诊断日志、什么进 Ledger，以及两者为什么分开 |
 | [`docs/third-party.md`](docs/third-party.md) | 本仓库跟随的上游事实、致谢与许可义务 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 每一版改了什么，以及留下了哪些已知未修的问题 |
@@ -182,7 +182,7 @@ PR 描述、issue、评审意见都可以用你自己的语言写。附一份对
 
 厂商相关的事实，比如 API 挂在哪条路径下、说哪种兼容格式、每家官方 harness 怎样启动，取自 ACP registry；厂商自己的客户端比文档写得更准时，就跟随那个客户端，但不抄它的代码。读的是哪个仓库、哪条路径、哪个提交，都写在 [`docs/third-party.md`](docs/third-party.md) §1，每天有一个工作流去问每个上游有没有变。页面上的每个控件都是本仓库自己写的，键盘行为参照 W3C 的 ARIA Authoring Practices 以及 Kobalte 与 Ark UI 的文档，读的是文字。
 
-[`skills/`](skills/) 下，`sdd`、`tutor`、`translation` 是我此前以 AGPL-3.0-or-later 发布的中文 skill 的英文改编（translation 的原署名还有 Claude Fable 5），在这里用 MPL-2.0。`why`、`how`、`blast-radius` 是我对 Lauren Tan（poteto）的 [pstack](https://github.com/cursor/plugins/tree/main/pstack) 所做的修改改编，`authority-review` 改编自同一个 `cursor/plugins` 树里的 Thermos，四个都保留 MIT。条款见 [`docs/third-party.md`](docs/third-party.md) §5。
+[`crates/city/skills/`](crates/city/skills/) 下，`sdd`、`tutor`、`translation` 是我此前以 AGPL-3.0-or-later 发布的中文 skill 的英文改编（translation 的原署名还有 Claude Fable 5），在这里用 MPL-2.0。`why`、`how`、`blast-radius` 是我对 Lauren Tan（poteto）的 [pstack](https://github.com/cursor/plugins/tree/main/pstack) 所做的修改改编，`authority-review` 改编自同一个 `cursor/plugins` 树里的 Thermos，四个都保留 MIT。条款见 [`docs/third-party.md`](docs/third-party.md) §5。
 
 ## 基于 sprawling 开发
 
@@ -201,7 +201,7 @@ sprawling 欢迎在它之上开发。它的大部分部件要么在一条缝后�
 
 ## 许可
 
-MPL-2.0，见 [`LICENSE`](LICENSE)。[`skills/`](skills/) 下每个 skill 各自写明许可，[`skills/LICENSES.md`](skills/LICENSES.md) 随发布归档一起分发，给出每一个的条款与署名。
+MPL-2.0，见 [`LICENSE`](LICENSE)。[`crates/city/skills/`](crates/city/skills/) 下每个 skill 各自写明许可，[`crates/city/skills/LICENSES.md`](crates/city/skills/LICENSES.md) 随发布归档一起分发，给出每一个的条款与署名。
 
 ---
 

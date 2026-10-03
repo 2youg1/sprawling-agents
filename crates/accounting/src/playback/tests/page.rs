@@ -310,8 +310,8 @@ fn a_template_without_exactly_one_empty_block_or_with_a_way_out_is_not_embedded(
     );
 }
 
-/// `skills/playback/SKILL.md`, which ships beside the binary.
-const SKILL: &str = include_str!("../../../../../skills/playback/SKILL.md");
+/// `crates/city/skills/playback/SKILL.md`, which ships beside the binary.
+const SKILL: &str = include_str!("../../../../city/skills/playback/SKILL.md");
 
 #[test]
 fn the_skill_states_the_contract_this_build_writes() {

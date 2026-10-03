@@ -86,7 +86,7 @@ import crates.accounting.spec.Worker.Workbench.Tools
 |---|---|
 | `every_tool_a_builder_is_offered_is_called_and_answered` | 一栋 `Builds` 楼里的 run，第一次请求收到的每一件工具都被脚本调用一次；每条 `tool_called` 恰有一条同 id 的 `tool_result`；每件工具的回答与它自己的 SPEC 一致，逐件的判定在 `episodes.rs`。该调用哪些工具不写名单，取模型收到的工具表加上休眠索引里的工具行（`crates/runtime/Spec.lean` §8-60），`describe` 与 `call` 本身各由脚本调一次：工作台多登记一件工具而脚本里没有它的一段，这条测试点名那件工具变红。 |
 | `every_tool_city_hall_is_offered_is_called_and_answered` | 同一条验收标准，对 `Plans` 楼（市政厅）。多出的 `city` 和 `rules` 一样在效果层被拒（`crates/city/Spec.lean` §8-2b、§8-23）；判定看的是调用之后城根下的目录与楼的 `RULES.toml` 一字未变，不钉拒绝码。 |
-| `every_shipped_skill_a_building_admits_is_read_by_name_and_pinned` | 仓库 `skills/` 下每个技能包经 `city::install_skill` 装进城库、由楼的阅览室按名准入之后：`run_started.skills` 按目录顺序列出每一件，哈希等于装入时 `Installed::holding` 报告的 `SKILL.md` 哈希（整包哈希是 CAS 的键，答的是另一个问题，`crates/city/Spec.lean` §8-28）；`read <名>` 交给模型的就是那份 `SKILL.md`；包内附属文件按 `<名>/<相对路径>` 读得到。技能集合取 `skills/` 目录本身，不另写名单。 |
+| `every_shipped_skill_a_building_admits_is_read_by_name_and_pinned` | 仓库 `crates/city/skills/` 下每个技能包经 `city::install_skill` 装进城库、由楼的阅览室按名准入之后：`run_started.skills` 按目录顺序列出每一件，哈希等于装入时 `Installed::holding` 报告的 `SKILL.md` 哈希（整包哈希是 CAS 的键，答的是另一个问题，`crates/city/Spec.lean` §8-28）；`read <名>` 交给模型的就是那份 `SKILL.md`；包内附属文件按 `<名>/<相对路径>` 读得到。技能集合取 `skills/` 目录本身，不另写名单。 |
 
 城外工具（浏览器、MCP、桌面）不在这张覆盖表里：它们经端口交进来的路由各有一条测试（`browsers.rs`、`connectors.rs`、`desktop.rs`），在真实浏览器与真实 MCP server 上的行为不由白盒判定。
 
@@ -340,6 +340,6 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定，每一条边的
 - `docs/glossary.md`：本规格用的词（accounting thread、Ledger、playback bundle 等），`cargo xtask gates lexicon` 检查。
 - sprawling 的规格（`crates/sprawling/Spec.lean`）：装配根、CLI 与服务面怎样调本 crate，以及 §3 那一百九十五个模块的接口；D15 说那些节怎样搬进来。
 - 别的 crate 的规格：`crates/kernel/Spec.lean`（事件、地址、读界）、`crates/wire/Spec.lean`（查询与命令的答）、`crates/city/Spec.lean`（文档、楼规、归档）、`crates/collab/Spec.lean`（认领）、`crates/documents/Spec.lean`（窗口、预览、提案）、`crates/storage/Spec.lean`（账本索引与内容库）、`crates/runtime/Spec.lean`（读界与回合）。它们改了，引用它们的那一节一起重看。
-- `skills/playback/SKILL.md`：playback page 的数据契约与验证要求，与 §8-12、§8-13 同期改。
+- `crates/city/skills/playback/SKILL.md`：playback page 的数据契约与验证要求，与 §8-12、§8-13 同期改。
 - 引本规格的其他规格与 rustdoc 写 `crates/accounting/Spec.lean §8-n` 或 `accounting D<n>`；本 crate 的 rustdoc 写规定它的分部。一节换了分部，它的标签不变，引用不必改。
 -/
