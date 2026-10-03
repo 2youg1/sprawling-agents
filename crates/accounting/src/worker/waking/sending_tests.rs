@@ -154,8 +154,31 @@ fn a_signal_to_an_empty_room_starts_its_run_before_the_sender_freezes() {
     .unwrap();
     move_in(dir.path(), "market/ito");
     move_in(dir.path(), "market/hana");
-    let (base_url, _provider) = fake_openai(
+    // The provider holds its second call until a third arrives, so
+    // whichever of the sender's last call and the woken run's first
+    // comes second, the woken run has started before the sender can
+    // freeze: what is measured is where the knock goes out, not which
+    // lane wins a race.
+    let calls = std::sync::Arc::new((std::sync::Mutex::new(0u32), std::sync::Condvar::new()));
+    let pace: Pace = std::sync::Arc::new(move |request: &str| {
+        if !request.starts_with("POST ") {
+            return;
+        }
+        let (count, arrived) = &*calls;
+        let mut count = count.lock().unwrap();
+        *count += 1;
+        arrived.notify_all();
+        if *count == 2 {
+            drop(
+                arrived
+                    .wait_timeout_while(count, std::time::Duration::from_secs(30), |seen| *seen < 3)
+                    .unwrap(),
+            );
+        }
+    });
+    let (base_url, _provider) = fake_openai_paced(
         &["m-local"],
+        Vec::new(),
         vec![
             tool_completion(
                 "asking hana",
@@ -170,6 +193,7 @@ fn a_signal_to_an_empty_room_starts_its_run_before_the_sender_freezes() {
             completion("done", None),
             completion("hana answers", None),
         ],
+        pace,
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
