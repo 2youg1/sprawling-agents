@@ -78,7 +78,7 @@ theorem withoutHanded_hands_twice :
 
 上面三条只看一次 `hand_next`。下面的模型看父房间的一张图从摆出到关掉的整段 trace，规定 `crates/accounting/src/worker/waking/handing.rs`（调用时登记与派出，`end_hand_over` 按父 run 的结局关图）与 `crates/accounting/src/worker/dispatching/handback.rs`（`hand_down_what_is_ready`）。
 
-- `layOut`：父 run 调 `workshop lay_out` 的那一刻。图就在这时登记给父房间（状态 `live`），就绪的节点当场派出，不等父 run 落地（D7）。同一个 run 再摆一次，新图取代旧图，已派集照带。构造时重名的图被拒（`Workshop::new`），模型里是一个空操作。
+- `layOut`：父 run 调 `workshop lay_out` 的那一刻。图就在这时登记给父房间（状态 `live`），就绪的节点当场派出，不等父 run 落地（D7）。图还开着时这个房间后来的 run 再摆一次，新图取代旧图，已派集照带；同一个 run 的第二次摆出在 Rust 里当场被拒（`WorkshopDesk::lay_out`），模型不分 run，所以不写这道拒。构造时重名的图被拒（`Workshop::new`），模型里是一个空操作。
 - `land x back`：在飞的子节点 `x` 落地。它的 handback 投进父房间（`backs`）；`Finished` 才汇入 join（`done`），`Stopped` 只投信不汇合。图还开着，就按新的 `done` 再派一次就绪集；全部汇合就关图。子节点落地与父 run 落地的先后不受约束。
 - `parentEnds e`：父 run 落地。`Done` 与 `Limit` 不改图；`Cancelled` 与 `Failed` 关图（`holds`，D14）：不再派新节点，在飞的节点照跑完、照回程。
 

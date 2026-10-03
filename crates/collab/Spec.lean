@@ -104,7 +104,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - 中断源先问人、再问本屋 Inbox（`SignalDesk::take_steer`），人压过居民；只读人的命令队列的中断源会让 `Letter::from_signal` 与整个 `AgentSteer` 永远不发生。
 - 属名就是回信地址：模型读到 `<letter from="@market/hana" …>` 时，读到的既是「这句话不是人说的」，也是 `signal` 的 `to` 该填什么。
 
-**`collab::workshop`、`collab::workshop::underway`**（形状 2、形状 1；性质见 `spec/Workshop.lean`）。`NodeContract` 带 id、goal、depends_on、reads、write_domain、owner、done_check、budget、stop；`job_text` 落盘即该节点的 JOB.md，契约本身就是任务权威，机制在 prefix 零常驻。goal、owner、done_check、stop 四个字段不许空：空的停止条件是一个不会停的 run。图的权威是 `Roadmap.md`，本模块不另设存储；从路线图行生成契约的那一步没有，因为路线图的表格不携 `depends_on`。
+**`collab::workshop`、`collab::workshop::underway`**（形状 2、形状 1；性质见 `spec/Workshop.lean`）。`NodeContract` 带 id、goal、depends_on、reads、write_domain、owner、done_check、stop 八个字段；`job_text` 落盘即该节点的 JOB.md，契约本身就是任务权威，机制在 prefix 零常驻。goal、owner、done_check、stop 四个字段不许空：空的停止条件是一个不会停的 run。图的权威是 `Roadmap.md`，本模块不另设存储；从路线图行生成契约的那一步没有，因为路线图的表格不携 `depends_on`。
 
 **`collab::workshop_tool`**（形状 4 适配器）。`WorkshopDesk::new(who, joined, handed)`、`lay_out`、`take_underway`、`question`、`judge`、`accept`；`WorkshopTool` 的动词是穷尽枚举 `Op`：`lay_out`、`question`、`judge`。
 

@@ -90,7 +90,7 @@ impl NodeContract {
     /// no done check. Each of the four is what somebody would otherwise
     /// have to guess, and a guessed stop condition is a run that does
     /// not stop.
-    #[allow(
+    #[expect(
         clippy::too_many_arguments,
         reason = "the contract is eight fields by design; a builder would hide which are required"
     )]
