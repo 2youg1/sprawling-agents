@@ -178,7 +178,7 @@ fn the_lent_inbox_comes_back() {
 /// A signal the run cannot read is not the same fact as an empty queue.
 ///
 /// A steer-kind signal whose payload carries no words goes into the urgent
-/// line and then fails `Steer::from_signal`. Answering "nothing waiting"
+/// line and then fails `Letter::from_signal`. Answering "nothing waiting"
 /// with that signal already out of the queue and no effect written would
 /// make the history say the steer never arrived: the sender would see a
 /// queued signal and the receiver silence. One assertion per
