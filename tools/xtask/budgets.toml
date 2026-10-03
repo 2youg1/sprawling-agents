@@ -18,6 +18,12 @@
 # reading taken in microseconds is never rounded twice. A page or a
 # terminal shows a duration below 10 ms in µs and one of 10 ms or more in
 # ms (`crates/sprawling/spec/Main.lean` §8-129-2, *单位*).
+#
+# The User ruled to skip measurement in this version. A row whose reading
+# was never taken says `owed` in its status and names the recipe that
+# takes it; a row that carries figures from an earlier tree says that
+# this version's reading is owed. No figure here was taken on this
+# version's tree unless its row says so, and none is estimated.
 
 # The reading is the bundle a browser downloads, gzipped, walked
 # recursively so every chunk the page loads is on the scale.
@@ -84,7 +90,7 @@ budget_bytes = 2097152
 # pages with their fixtures, and the move from Effect 3 to Effect 4.
 best_bytes = 677073
 measured_by = "just build-web, then cargo xtask budget (the whole dist directory, recursive)"
-status = "reported, not gated: the person's ruling that runtime speed comes before size"
+status = "reported, not gated: the person's ruling that runtime speed comes before size. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just build-web, then cargo xtask budget retakes it"
 
 # The remediation pass found the single-binary promise was hollow: build.rs
 # embedded a 1,306-byte placeholder and the real client never shipped. The
@@ -139,7 +145,7 @@ budget_bytes = 134217728
 # that slack, so the connector stays linked here.
 best_bytes = 26819584
 measured_by = "just build-web, just dist, then cargo xtask budget, on windows-x86_64"
-status = "reported, not gated: the person's ruling that runtime speed comes before size"
+status = "reported, not gated: the person's ruling that runtime speed comes before size. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just build-web, just dist, then cargo xtask budget retakes it"
 
 # The unit is a production function because the alternative was measured:
 # any honest file threshold lights up eight files across four crates at
@@ -349,7 +355,7 @@ budget_bytes = 31457280
 best_bytes = 2469888
 slack_bytes = 2097152
 measured_by = "just mem"
-status = "measured, not gated: private 2,469,888 B, peak private 2,469,888 B, working set 8,331,264 B on windows-x86_64, 16 cores, NVMe (release). The counter differs per platform, so one number cannot mean the same thing on three of them"
+status = "measured, not gated: private 2,469,888 B, peak private 2,469,888 B, working set 8,331,264 B on windows-x86_64, 16 cores, NVMe (release). The counter differs per platform, so one number cannot mean the same thing on three of them. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just mem retakes it"
 
 # The memory beat (crates/sprawling/spec/Serving/Memory.lean, measuring
 # plan): the sampler reads private bytes every 100 ms while somebody
@@ -358,12 +364,12 @@ status = "measured, not gated: private 2,469,888 B, peak private 2,469,888 B, wo
 [private_memory_beat]
 what = "a served city's private memory read on the 100 ms memory beat under TP1 load: p50, p99, max, and the time spent above p50"
 measured_by = "not instrumented: the samples come from bin::monitor::sampler over the monitor frames; no reader computes the statistics yet"
-status = "not measured; the budget waits for the M0 target numbers"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version, and no recipe computes these statistics yet (measured_by names what is missing); a budget waits for the first reading and the User's target"
 
 [private_memory_slope]
 what = "the least-squares slope of a served city's private memory over one hour of TP1 load, in bytes per hour, against the difference between two idle one-hour readings"
 measured_by = "not instrumented: one hour of the private_memory_beat samples, fitted on the reading side"
-status = "not measured; the budget waits for the M0 target numbers"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version, and no recipe fits the slope yet (measured_by names what is missing); a budget waits for the first reading and the User's target"
 
 # The long turn (citysim D10): the gate is the per-step
 # window increment its tests assert; this row is the reading, and its
@@ -375,7 +381,7 @@ budget_bytes = 33554432
 best_bytes = 7487488
 slack_bytes = 2097152
 measured_by = "just mem long-turn 500 100 (citysim long_turn bin, release): the last pause's peak private"
-status = "measured, not gated: 500 steps peak private 7,487,488 B (7.1 MiB), 1000 steps 13,660,160 B (13.0 MiB); the simulator's own MemLedger holds 1,420,487 B and 2,840,417 B of those, and the last request window is 636,723 B and 1,273,223 B, on windows-x86_64, 16 cores, NVMe (release). Between steps 500 and 1000 of one run private grows 9,945 B a step, of which 2,840 B is the simulator's ledger line and 1,273 B the request window"
+status = "measured, not gated: 500 steps peak private 7,487,488 B (7.1 MiB), 1000 steps 13,660,160 B (13.0 MiB); the simulator's own MemLedger holds 1,420,487 B and 2,840,417 B of those, and the last request window is 636,723 B and 1,273,223 B, on windows-x86_64, 16 cores, NVMe (release). Between steps 500 and 1000 of one run private grows 9,945 B a step, of which 2,840 B is the simulator's ledger line and 1,273 B the request window. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just mem long-turn 500 100 retakes it"
 
 # The modules held to a mutation score, one row each. `mutation_files`
 # is the one list of what each row scores: `just mutants-modules` hands
@@ -426,7 +432,7 @@ what = "append plus fsync, p50 and p99"
 budget_p50_us = 5000 # was 5 ms
 budget_p99_us = 20000 # was 20 ms
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 0.555 ms / p99 0.688 ms, nearest rank (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01); batched append_all moves 140,934 records/s. The two readings the register used to carry (about 335k records/s batched, run_history 3.3 ms) were re-read on the two trees either side of 2ff1859b: its parent gives 206,501 records/s and 4.177 ms, 2ff1859b itself 135,831 records/s and 6.429 ms, so most of the later drop is the bench load changing shape in 2ff1859b, not the product; the parent itself sits below the old figures, a gap that is either in 2feeb2d6..2ff1859b^ or the machine and has not been bisected. A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: p50 0.555 ms / p99 0.688 ms, nearest rank (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01); batched append_all moves 140,934 records/s. The two readings the register used to carry (about 335k records/s batched, run_history 3.3 ms) were re-read on the two trees either side of 2ff1859b: its parent gives 206,501 records/s and 4.177 ms, 2ff1859b itself 135,831 records/s and 6.429 ms, so most of the later drop is the bench load changing shape in 2ff1859b, not the product; the parent itself sits below the old figures, a gap that is either in 2feeb2d6..2ff1859b^ or the machine and has not been bisected. A wall-clock figure is the machine's, so it is recorded, never gated. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench retakes it"
 
 # What one durability barrier costs per record as the batch under
 # it grows. The absolute figures belong to the disk class they were
@@ -443,7 +449,7 @@ status = "measured, not gated: p50 0.555 ms / p99 0.688 ms, nearest rank (fixtur
 [durability_barrier]
 what = "one fsync barrier, amortised over the records under it"
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: 562.3 us/record at one record per barrier, 55.2 at ten, 14.8 at fifty (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01). A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: 562.3 us/record at one record per barrier, 55.2 at ten, 14.8 at fifty (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01). A wall-clock figure is the machine's, so it is recorded, never gated. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench, on each of the three platforms retakes it"
 
 # The barriers one turn of a run pays once a turn's lines are held across
 # turns (runtime D36): one for the next model call and one for each write
@@ -453,7 +459,7 @@ status = "measured, not gated: 562.3 us/record at one record per barrier, 55.2 a
 [turn_barriers]
 what = "fsync barriers paid from one model call to the next, and from the last model call to the end of the run"
 measured_by = "cargo nextest run -p sprawling-runtime -E 'test(tf1_held_lines_cost_one_barrier_plus_one_per_write)'"
-status = "measured, held by that test rather than weighed by budget: 1 + writes per turn, 2 at the end of the run; the same count on windows, macos and linux, because the barrier is File::sync_data on all three and only its count and position are decided here"
+status = "measured, held by that test rather than weighed by budget: 1 + writes per turn, 2 at the end of the run; the same count on windows, macos and linux, because the barrier is File::sync_data on all three and only its count and position are decided here. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench (the runtime's instrument_read_phases), for the wall clock a read pays around the barriers this row counts retakes it"
 
 # Opening yesterday's session: the whole of what `bin::assembly`'s
 # `run_history` does, over the same public faces it calls - refresh the
@@ -472,7 +478,7 @@ status = "measured, held by that test rather than weighed by budget: 1 + writes 
 [run_history]
 what = "one session's newest 500 records, out of a ledger holding eight sessions"
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 3.287 ms, three runs 2.978-3.355 ms (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3; 4.151-4.261 ms at opt-level \"z\"), against 6.009 ms on the same fixture before the run's sequences were taken lazily, and 27.6 ms before the index. The registered 3.3 ms is explained under ledger_append. A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: p50 3.287 ms, three runs 2.978-3.355 ms (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3; 4.151-4.261 ms at opt-level \"z\"), against 6.009 ms on the same fixture before the run's sequences were taken lazily, and 27.6 ms before the index. The registered 3.3 ms is explained under ledger_append. A wall-clock figure is the machine's, so it is recorded, never gated. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench retakes it"
 
 [prefix_assembly]
 what = "assembling one frozen prefix"
@@ -589,7 +595,7 @@ fold_records = 50000
 best_p50_us = 436676 # was 437 ms, the same reading rounded up
 best_p95_us = 438127 # was 439 ms
 best_p99_us = 438127 # was 439 ms
-status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`), floor 434.222 ms, p50 436.676 ms, p95 and p99 438.127 ms under the nearest-rank rule, the median of three runs whose p50 read 417.348-437.723 ms, the best_* fields the same readings in whole microseconds (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3). The same runs read p50 676.402-707.773 ms at opt-level \"z\". The reading fell from 1277.206 ms when a rebuild from genesis stopped proving the history before folding it, since the fold checks every line itself (accounting D31 (b)); what remains is one line check, one parse and one fold per line. The per-megabyte figure is best_p50_us over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit"
+status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::scenarios::REGISTERED`), floor 434.222 ms, p50 436.676 ms, p95 and p99 438.127 ms under the nearest-rank rule, the median of three runs whose p50 read 417.348-437.723 ms, the best_* fields the same readings in whole microseconds (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3). The same runs read p50 676.402-707.773 ms at opt-level \"z\". The reading fell from 1277.206 ms when a rebuild from genesis stopped proving the history before folding it, since the fold checks every line itself (accounting D31 (b)); what remains is one line check, one parse and one fold per line. The per-megabyte figure is best_p50_us over the ledger's size, which the bench does not print yet; a ceiling waits on `xtask budget` learning a time unit. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench retakes it"
 
 # What a dispatch spends before the model is called: opening the room,
 # writing the brief, standing the run up, and assembling the tools -
@@ -606,7 +612,7 @@ status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::sce
 [prepare_dispatch]
 what = "one dispatch, from the command arriving to the lane taking the drive, on the accounting thread"
 measured_by = "the instrument is two reads of the monotonic clock `Hands.monotonic` around `stage_dispatch` (crates/accounting/src/worker/dispatching/running.rs) and two more around `Laying::mcp_tools` (crates/accounting/src/worker/workbench/servers.rs), which runs in the lane that drives the run (`crates/sprawling/Spec.lean` §8-93), written out at `Level::Trace`; the assembly hands the worker that clock beside the city's own (`crates/accounting/Spec.lean` §8-11), so a span never reads a city clock that a test or a correction can move. Read it off `a_dispatch_says_what_it_spent_before_the_drive` (cargo nextest run -p sprawling-accounting --release -E 'test(a_dispatch_says_what_it_spent_before_the_drive)' --no-capture), or off any served city running at that floor"
-status = "measured, not gated: 58 ms median on windows-x86_64, 16 cores, NVMe (2026-09-21, release, four runs: 50, 50, 51, 66; ~70 ms unoptimized when idle), for a dispatch into a fresh city with **no MCP server declared** - so this figure is the floor, and the `mcp_tools` line beside it read 0 ms over 0 servers in every run. The two lines are reported apart because a resident connection table (K-05) removes only the second, and the reading is K-05's own verdict: at 0 ms the table saves nothing, so it stays unbuilt until a served building declares servers and the second line shows them dominating. Not gated - a wall-clock reading is the machine's, and this one also depends on how many MCP servers a building declares"
+status = "measured, not gated: 58 ms median on windows-x86_64, 16 cores, NVMe (2026-09-21, release, four runs: 50, 50, 51, 66; ~70 ms unoptimized when idle), for a dispatch into a fresh city with **no MCP server declared** - so this figure is the floor, and the `mcp_tools` line beside it read 0 ms over 0 servers in every run. The two lines are reported apart because a resident connection table (K-05) removes only the second, and the reading is K-05's own verdict: at 0 ms the table saves nothing, so it stays unbuilt until a served building declares servers and the second line shows them dominating. Not gated - a wall-clock reading is the machine's, and this one also depends on how many MCP servers a building declares. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and the nextest command in measured_by retakes it"
 
 # T14's four-action pressure reading (deepening plan section 3 T14): the
 # first path a person walks - install, start, raise a city, open a session
@@ -644,27 +650,27 @@ status = "measured, not gated: 58 ms median on windows-x86_64, 16 cores, NVMe (2
 [install]
 what = "the archive in place to the unpacked executable answering `version`: digest, unpack, launch"
 measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples, p50/p95/p99 nearest-rank over all of them"
-status = "measured, not gated: p50 1856.382 ms, p95 1880.174, p99 1886.169; floor 1819.708, peak 1890.297; none of the 200 above three times the middle (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3; p50 1485.98-1490.38 ms at opt-level \"z\", whose executable is 11.7 MB smaller). **Dominant: `launch`**, 1674.365 ms, against 170.557 ms to unpack and 10.953 ms to SHA-256 the 11,601,869 B archive: the first launch of an unpacked executable prices the on-access scanner as much as the install. One process and one file per sample, no barriers"
+status = "measured, not gated: p50 1856.382 ms, p95 1880.174, p99 1886.169; floor 1819.708, peak 1890.297; none of the 200 above three times the middle (fixture 1dc560ad5766de65, windows-x86_64, 16 cores, NVMe, release at opt-level 3; p50 1485.98-1490.38 ms at opt-level \"z\", whose executable is 11.7 MB smaller). **Dominant: `launch`**, 1674.365 ms, against 170.557 ms to unpack and 10.953 ms to SHA-256 the 11,601,869 B archive: the first launch of an unpacked executable prices the on-access scanner as much as the install. One process and one file per sample, no barriers. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench-startup retakes it"
 
 [startup]
 what = "`CreateProcess` sent to the light command's exit observed: create, run"
 measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples"
-status = "measured, not gated: p50 15.586 ms, p95 16.201, p99 16.775; floor 14.791, peak 26.498; none of the 200 above three times the middle (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). **Dominant: `run`**, 13.498 ms against 2.041 ms for the spawn call. One process per sample, no files, no barriers"
+status = "measured, not gated: p50 15.586 ms, p95 16.201, p99 16.775; floor 14.791, peak 26.498; none of the 200 above three times the middle (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). **Dominant: `run`**, 13.498 ms against 2.041 ms for the spawn call. One process per sample, no files, no barriers. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench-startup retakes it"
 
 [raise_city]
 what = "`assembly::init_city` called to the genesis record on disk, its barrier included"
 measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples"
-status = "measured, not gated: p50 36.774 ms, p95 40.794, p99 46.569; floor 25.573, peak 60.448; none of the 200 above three times the middle (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). No sub-step split, so the dominant cost is attributed rather than measured: one sample writes 12 files and 3 barriers, and 3 barriers at the durability_barrier floor are about 1.7 ms of the middle; the rest is creating the tree and reading the config layers. 0 processes per sample"
+status = "measured, not gated: p50 36.774 ms, p95 40.794, p99 46.569; floor 25.573, peak 60.448; none of the 200 above three times the middle (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). No sub-step split, so the dominant cost is attributed rather than measured: one sample writes 12 files and 3 barriers, and 3 barriers at the durability_barrier floor are about 1.7 ms of the middle; the rest is creating the tree and reading the config layers. 0 processes per sample. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench-startup retakes it"
 
 [open_session]
 what = "`Command::OpenSession` arriving to the call returning, `session_opened` on disk"
 measured_by = "just bench-startup (citysim bench_startup bin, release), 200 samples"
-status = "measured, not gated: p50 1.540 ms, p95 1.735, p99 1.984; floor 1.358, peak 7.968; 1 of 200 above three times the middle, at #0 (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). No sub-step split: one sample writes 2 files and 1 barrier, and that barrier is about 0.6 ms of the middle. 0 processes per sample"
+status = "measured, not gated: p50 1.540 ms, p95 1.735, p99 1.984; floor 1.358, peak 7.968; 1 of 200 above three times the middle, at #0 (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-09-30). No sub-step split: one sample writes 2 files and 1 barrier, and that barrier is about 0.6 ms of the middle. 0 processes per sample. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench-startup retakes it"
 
 [first_byte]
 what = "`serve` spawned to the first byte of GET /, over the three fixture cities, with the product's own split of the opening"
-measured_by = "just bench-startup first-byte"
-status = "measured, not gated: p50 in ms over three bench runs - the empty city 45-47 (city fixture 7e6fda8b5653dd7f), l100k 110-112 (6615c4052f604f8c), l400k 210-212 (99909ec1f02d58fc) (windows-x86_64, 16 cores, NVMe, release at opt-level 3; the same runs read 47-48, 121-125 and 257-263 at opt-level \"z\"). The l400k serve says fold 0 lines from the snapshots 101 ms, open the ledger 42, copy the views 20. The history is proved behind the first byte, its segments hashed in parallel waves of eight (storage PROOF_WAVE): l400k proof 138 ms, commands taken 310 ms after opening began; l100k proof 84 ms, bounded by one 64 MiB segment; commands wait for the proof (E_HISTORY_UNPROVEN). The remaining snapshot fold is the dominant phase (`crates/sprawling/Spec.lean` §8-154)"
+measured_by = "just web-bundle, cargo build --release -p sprawling --locked, then cargo run --release -p citysim --bin bench_startup --locked -- first-byte (the `bench-startup` recipe takes no argument, so it reads the four actions and not this one)"
+status = "measured, not gated: p50 in ms over three bench runs - the empty city 45-47 (city fixture 7e6fda8b5653dd7f), l100k 110-112 (6615c4052f604f8c), l400k 210-212 (99909ec1f02d58fc) (windows-x86_64, 16 cores, NVMe, release at opt-level 3; the same runs read 47-48, 121-125 and 257-263 at opt-level \"z\"). The l400k serve says fold 0 lines from the snapshots 101 ms, open the ledger 42, copy the views 20. The history is proved behind the first byte, its segments hashed in parallel waves of eight (storage PROOF_WAVE): l400k proof 138 ms, commands taken 310 ms after opening began; l100k proof 84 ms, bounded by one 64 MiB segment; commands wait for the proof (E_HISTORY_UNPROVEN). The remaining snapshot fold is the dominant phase (`crates/sprawling/Spec.lean` §8-154). This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and the bench_startup first-byte command in measured_by retakes it"
 
 # How large this tree's dependency graph is, counted off the resolved
 # lockfile rather than off any manifest: a manifest states what was
@@ -716,37 +722,74 @@ status = "staged targets, not gated: a wall-clock figure is the machine's. Basel
 [relay_round_trip]
 what = "one relay append from a lane to the accounting thread and back, while a run is in flight, with `attend` as the city runs it"
 measured_by = "cargo nextest run -p sprawling-accounting --run-ignored only -E 'test(/::instrument_relay/)' --no-capture (crates/accounting/src/worker/driving/tests/instruments.rs, `crates/sprawling/Spec.lean` §8-84), 200 samples per store"
-status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized build, windows-x86_64, 16 cores, three other builds running beside it. Polling loop before the one queue: store=disk p50 31198 us, store=memory p50 31313 us, both the two timed waits. The one queue: store=memory p50 45 us against 29 us for the store's own append with no crossing; store=disk p50 2351 us, floor 1458 us, which is the device's fsync, a physical floor. The release reading and the 10 us memory target are not yet taken"
+status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized build, windows-x86_64, 16 cores, three other builds running beside it. Polling loop before the one queue: store=disk p50 31198 us, store=memory p50 31313 us, both the two timed waits. The one queue: store=memory p50 45 us against 29 us for the store's own append with no crossing; store=disk p50 2351 us, floor 1458 us, which is the device's fsync, a physical floor. The release reading and the 10 us memory target are not yet taken. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench (instrument_relay_round_trip), for the release reading the figures above lack retakes it"
 
 [throughput]
 what = "N runs dispatched at once (N in 1, 4, 16, 64), three model-latency arms, 4 tool calls per run alternating status and edit: runs/s, records/s, tool calls/s, the waits lane, first_call, relay_under_load, relay_queue (a relay request queued to taken, on the worker's monotonic clock), lane_pure (the [lane_wait] row), relay_idle at p50/p99/p999 (p999 only at n >= 1000) and max, and the accounting thread's busy share in permille"
 measured_by = "cargo nextest run -p sprawling-accounting --run-ignored only -E 'test(instrument_throughput)' --no-capture (crates/accounting/src/worker/driving/tests/throughput.rs, tools/citysim/spec/Throughput.lean section 8-14); SPRAWLING_TP1_RUNS and SPRAWLING_TP1_LATENCY narrow the arms"
-status = "measured, not gated: no target until the baseline is read and the User confirms one (M0 item 9)"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it (instrument_throughput), and a target waits for that first reading and the User's confirmation of one"
 
 [view_backlog]
 what = "how far the view fold falls behind a burst of 2,000 records while readers keep asking"
 measured_by = "just bench (instrument_view_backlog, crates/sprawling/src/serving/folding/tests/instruments.rs)"
-status = "measured, not gated: 2,003 records in a 12.255 ms burst, 60 reader questions; a record waits floor 184 us, p50 7118 us, p99 8312 us, max 8350 us for its broadcast, and at most 1,945 records wait at once; the median of three runs whose p50 read 5861-8340 us (windows-x86_64, 16 cores, NVMe, release at opt-level 3; 7853-11347 us at opt-level \"z\")"
+status = "measured, not gated: 2,003 records in a 12.255 ms burst, 60 reader questions; a record waits floor 184 us, p50 7118 us, p99 8312 us, max 8350 us for its broadcast, and at most 1,945 records wait at once; the median of three runs whose p50 read 5861-8340 us (windows-x86_64, 16 cores, NVMe, release at opt-level 3; 7853-11347 us at opt-level \"z\"). This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench retakes it"
 
 [provider_queue]
 what = "one model call's wait at its endpoint's permit gate, from taking a ticket to holding a permit, on the injected monotonic clock, p50/p99/p999 and max, at 16 and 64 callers against four permits"
 measured_by = "just bench (instrument_provider_queue, crates/gateway/src/endpoint/permit.rs, `crates/gateway/Spec.lean` D21)"
-status = "measured, not gated: the mid reading fills it"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it (instrument_provider_queue)"
 
 [lane_wait]
 what = "the pure lane wait: a staged run's time in the driving pool's queue before its lane opens, zero for a run that waited for nothing, p50/p99/p999 and max"
 measured_by = "just bench (instrument_throughput, wait=lane_pure, crates/accounting/src/worker/driving/tests/throughput.rs)"
-status = "measured, not gated: the mid reading fills it"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it (instrument_throughput, wait=lane_pure)"
 
 [fold_lag]
 what = "a record's wait from the writer's send to the first reader answer that has folded it, during the 2,000-record burst of view_backlog, p50/p99/p999 and max"
 measured_by = "just bench (instrument_view_backlog, line instrument_fold_lag, crates/sprawling/src/serving/folding/tests/instruments.rs)"
-status = "measured, not gated: the mid reading fills it"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it (instrument_view_backlog, line instrument_fold_lag)"
 
 [broadcast_lag]
 what = "a record's wait from the first reader answer that has folded it to its arrival on a client's channel, during the burst of view_backlog, p50/p99/p999 and max"
 measured_by = "just bench (instrument_view_backlog, line instrument_broadcast_lag, crates/sprawling/src/serving/folding/tests/instruments.rs)"
-status = "measured, not gated: the mid reading fills it"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it (instrument_view_backlog, line instrument_broadcast_lag)"
+
+# Each tool's phases (`crates/runtime/Spec.lean` §10): the call through
+# the tool's own face, then the secret scan of its result, which every
+# tool shares, so the remaining cost of each tool has a reading.
+[tool_phases]
+what = "one call of read, write, edit, exec and search in two phases, in microseconds: the call through the tool's face (path resolution, IO and the envelope together) and the secret scan of its result"
+measured_by = "just bench (instrument_read_phases, instrument_write_and_edit_phases, instrument_exec_phases, instrument_search_phases in crates/runtime/src/redact.rs)"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it, and a target waits for that first reading and the User's confirmation of one"
+
+# What a playback export costs in wall-clock time over histories of
+# growing length; `[playback_export_scan]` holds the line count, which
+# every machine agrees on.
+[playback_export_time]
+what = "milliseconds one playback export takes over histories of growing length"
+measured_by = "just bench (instrument_evidence_cost, crates/accounting/src/playback/tests/tracing.rs, crates/accounting/spec/Playback/Traced.lean section 8-25)"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it"
+
+# Production placement of a room and the stock put back after it, over a
+# trunk of 512 files of 16 KB (`crates/sprawling/Spec.lean` §8-155).
+[production_placement]
+what = "milliseconds to place the first and the second room in production and to put the stock back, over 512 files of 16 KB"
+measured_by = "just bench (instrument_production_placement, crates/accounting/src/worker/dispatching/preparing/tests.rs)"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it"
+
+# The gap a second dispatch leaves in a run already driving
+# (`crates/sprawling/Spec.lean` §8-84).
+[dispatch_gap]
+what = "the gap a second dispatch leaves in a running one"
+measured_by = "just bench (instrument_dispatch_gap, crates/accounting/src/worker/driving/tests/instruments.rs)"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it"
+
+# What an endpoint's first request pays to resolve, connect and shake
+# hands, against its second (`crates/gateway/spec/Endpoint/Transport.lean` §8-35).
+[first_call_connect]
+what = "an endpoint's first request against its second through one client, over fresh clients"
+measured_by = "just bench (instrument_first_call_connect, crates/gateway/src/endpoint/transport.rs)"
+status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it"
 
 # What one beat of the monitor costs the process it watches, per kind of
 # platform reading: the summary counters, the whole page, and one
@@ -756,7 +799,7 @@ status = "measured, not gated: the mid reading fills it"
 [monitor_beat]
 what = "one platform reading of the monitor's beat: the summary counters, the whole page, or one process tree"
 measured_by = "just bench (instrument_monitor_beat, crates/sprawling/src/monitor/counters/tests.rs), 200 samples per reading, nearest rank through `bin::monitor::spread::Spread`"
-status = "measured, not gated: summary floor 2 us, p50 2 us, p99 3 us; page floor 95 us, p50 121 us, p99 440 us; tree floor 5019 us, p50 5738 us, p99 9441 us (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01)"
+status = "measured, not gated: summary floor 2 us, p50 2 us, p99 3 us; page floor 95 us, p50 121 us, p99 440 us; tree floor 5019 us, p50 5738 us, p99 9441 us (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01). This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench retakes it"
 
 # The wall time of a tool wave whose leading calls only read. The
 # concurrent-wave test judges the behaviour (every read of the wave in
@@ -842,7 +885,7 @@ slack_count = 0
 [playback_export_scan]
 what = "ledger lines a narrow playback export scans, on a 1004-line fixture of 200 rounds with a five-line selection"
 measured_by = "cargo nextest run -p sprawling-accounting -E 'test(a_narrow_export_scans_only_what_its_tables_read)'"
-status = "measured, held by that test rather than weighed by budget: 208 lines lazy against 1004 full; the same on windows, macos and linux, because the count depends on the fixture alone. The wall clock of a narrow export of a long city is not recorded yet"
+status = "measured, held by that test rather than weighed by budget: 208 lines lazy against 1004 full; the same on windows, macos and linux, because the count depends on the fixture alone. The wall clock of a narrow export of a long city is not recorded yet. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench (instrument_evidence_cost), for the wall clock of an export, which this row's count does not carry retakes it"
 
 # Text-only spec parts under the anchors of `state machine` and `typestate` modules; may only fall (tools/xtask/Spec.lean §8-42, assertion 6).
 [spec_parts_without_theorem]
