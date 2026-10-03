@@ -13,5 +13,6 @@ export function noteAt(note: Note): number {
   if ("checkpointed" in note) return note.checkpointed.at;
   if ("waiting" in note) return note.waiting.at;
   if ("unreadable" in note) return note.unreadable.at;
+  if ("awaiting_reply" in note) return note.awaiting_reply.at;
   return note.discarded.at;
 }

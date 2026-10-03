@@ -263,6 +263,8 @@ pub(crate) fn signal_line(record: &EventRecord) -> Result<(Address, wire::Signal
             kind: signal.kind().as_str().to_owned(),
             from: signal.from().to_owned(),
             at: record.t(),
+            first_line: wire::text(signal.payload().as_map().get("text"))
+                .and_then(|said| said.lines().next().map(str::to_owned)),
         },
     ))
 }

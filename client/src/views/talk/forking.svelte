@@ -81,9 +81,9 @@
         if (!("arrived" in note)) continue;
         out.push({
           id: `m:${String(note.arrived.at)}`,
-          entry: { kind: "message", turn, text: note.arrived.said },
-          label: note.arrived.said,
-          secondary: note.arrived.from,
+          entry: { kind: "message", turn, text: note.arrived.said ?? "" },
+          label: note.arrived.said ?? "",
+          secondary: note.arrived.from ?? "",
           tools,
         });
       }

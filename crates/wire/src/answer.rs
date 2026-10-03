@@ -47,6 +47,7 @@ mod listing;
 mod mcp_health;
 mod metrics;
 mod model_facts;
+mod note;
 mod prefix;
 mod preview;
 mod proposals;
@@ -91,6 +92,7 @@ pub use listing::{Entry, EntryKind, ListingAnswer};
 pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use metrics::MetricsAnswer;
 pub use model_facts::ModelFactsSummary;
+pub use note::{HandbackNote, Note, ReplyEnd, ReplyEnded, Speaker};
 pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
 pub use preview::PreviewAnswer;
 pub use proposals::{OfferedCard, OpenProposalsAnswer, ProposalCard, ProposalsAnswer};
@@ -98,7 +100,7 @@ pub use range::RangeAnswer;
 pub use release::{InstallChannel, Registry, RegistryNewest, RegistryReading};
 pub use release::{ReleaseAnswer, ReleaseLine, UpdateHint};
 pub use rounds::{
-    Call, Closing, FrozenNames, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn, Used,
+    Call, Closing, FrozenNames, Opening, Outcome, Output, RoundsAnswer, Timing, Turn, Used,
 };
 pub use run_summary::{RunSummary, Waiting};
 pub use scanning::{DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold};
@@ -291,6 +293,10 @@ pub struct SignalLine {
     pub kind: String,
     pub from: String,
     pub at: TimeMs,
+    /// The first line of the signal's `text`; `None` when its payload
+    /// carries no text (`crates/wire/spec/Reading.lean` D39).
+    #[serde(default)]
+    pub first_line: Option<String>,
 }
 
 /// The Recycle Bin: what was discarded and how each row gets back.

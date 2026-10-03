@@ -14,6 +14,7 @@
 //! reading has to have one authority.
 
 mod opening;
+mod paired;
 
 #[cfg(test)]
 mod carried_tests;
@@ -26,7 +27,6 @@ mod tests;
 
 use std::collections::BTreeMap;
 
-use kernel::event::record::ApprovalResolved;
 use wire::{EventKind, EventRecord, RunId, UsdMicros};
 
 use super::prepared::LedgerAsk;
@@ -74,8 +74,10 @@ impl LedgerAsk {
             .iter()
             .any(|record| record.kind() == EventKind::ApprovalRequested)
         {
-            answer_waits(&mut turns, &records, &self.records_of(RunId::CITY));
+            paired::answer_waits(&mut turns, &records, &self.records_of(RunId::CITY));
         }
+        self.pair_arrivals(&mut turns, &records);
+        paired::end_reply_waits(&mut turns, &records);
         Ok(wire::RoundsAnswer {
             opened_at: opened_at(&turns),
             closing: closing(&records)?,
@@ -100,45 +102,15 @@ fn opened_at(turns: &[wire::Turn]) -> Option<kernel::GitOid> {
         .flat_map(|turn| turn.notes.iter())
         .find_map(|note| match note {
             wire::Note::Checkpointed { oid, .. } => Some(*oid),
-            // The other four notes say what happened in the session;
+            // The other notes say what happened in the session;
             // none of them names the commit it opened at.
             wire::Note::Refused { .. }
             | wire::Note::Waiting { .. }
             | wire::Note::Arrived { .. }
+            | wire::Note::AwaitingReply { .. }
             | wire::Note::Discarded { .. }
             | wire::Note::Unreadable { .. } => None,
         })
-}
-
-/// Writes onto each wait in `turns` when its answer was recorded.
-///
-/// `approval_resolved` is recorded under the city's own run, not under
-/// the session that asked, so `asked` (the session's records) gives each
-/// request's approval id and `city` gives each answer's time. A request
-/// or answer outside its window, or a payload that will not read back,
-/// leaves `answered` at `None` rather than a guessed end.
-fn answer_waits(turns: &mut [wire::Turn], asked: &[EventRecord], city: &[EventRecord]) {
-    let ids: BTreeMap<kernel::Seq, String> = asked
-        .iter()
-        .filter(|record| record.kind() == EventKind::ApprovalRequested)
-        .filter_map(|record| {
-            let item = record.data().read::<kernel::ApprovalItem>().ok()?;
-            Some((record.seq(), item.id.as_str().to_owned()))
-        })
-        .collect();
-    let answers: BTreeMap<String, kernel::TimeMs> = city
-        .iter()
-        .filter(|record| record.kind() == EventKind::ApprovalResolved)
-        .filter_map(|record| {
-            let ruled = record.data().read::<ApprovalResolved>().ok()?;
-            Some((ruled.id.as_str().to_owned(), record.t()))
-        })
-        .collect();
-    for note in turns.iter_mut().flat_map(|turn| turn.notes.iter_mut()) {
-        if let wire::Note::Waiting { at, answered, .. } = note {
-            *answered = ids.get(at).and_then(|id| answers.get(id)).copied();
-        }
-    }
 }
 
 /// The name of the tree the run was lent, from its first

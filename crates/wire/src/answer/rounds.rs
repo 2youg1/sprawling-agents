@@ -13,8 +13,10 @@
 //! They live on the wire because a second client must be able to draw a
 //! session without folding the ledger itself.
 
-use kernel::{AxError, GitOid, Locator, RunId, Seq, TimeMs, Tokens, UsdMicros};
+use kernel::{GitOid, Locator, RunId, Seq, TimeMs, Tokens, UsdMicros};
 use serde::{Deserialize, Serialize};
+
+use super::Note;
 
 /// What a tool call has come to so far.
 ///
@@ -76,64 +78,6 @@ pub struct Output {
     /// accounts, and always on a call's arguments, which never leave.
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub pinned: Option<Locator>,
-}
-
-/// What a turn came to besides the calls it made.
-///
-/// **The criterion is closed on purpose**: an event earns a `Note` when
-/// it changed what this turn did, or what it is waiting on. Everything
-/// else stays in the event stream, which is the Ledger's shape rather
-/// than a reader's. Without that line this enum would grow to one arm
-/// per event kind and stop meaning anything.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum Note {
-    /// A door refused something. The error travels whole because the
-    /// interface has one place where a refusal becomes the three parts a
-    /// person needs; taking it apart here would be the second.
-    Refused { error: AxError, at: Seq },
-    /// A checkpoint went up, and this is the commit it made. It is
-    /// what a change list is addressed by.
-    Checkpointed { oid: GitOid, at: Seq },
-    /// This turn stopped for a person. What waits and who answers is the
-    /// approval queue's; copying it here would be a third authority.
-    /// `t` is when the Ledger recorded the request and `answered` when
-    /// it recorded the answer, paired back by approval id from the
-    /// city's own run; `None` when the answer is outside that window or
-    /// has not come, and the page then draws no guessed end.
-    Waiting {
-        at: Seq,
-        t: TimeMs,
-        answered: Option<TimeMs>,
-    },
-    /// A word arrived - from the person watching, or from another
-    /// address that reached this one.
-    Arrived { from: String, said: String, at: Seq },
-    /// Files went away. Every one carries its way back, which is the
-    /// Recycle Bin's to state.
-    Discarded { count: usize, at: Seq },
-    /// A record of a kind that earns a note, whose payload did not read
-    /// back as that kind. The failure stays visible here instead of the
-    /// turn reading as if nothing happened; `cause` names the kind and
-    /// what the reading stopped at.
-    Unreadable { cause: String, at: Seq },
-}
-
-impl Note {
-    /// Where in the Ledger this note is, so every row can be read
-    /// further.
-    #[must_use]
-    pub fn at(&self) -> Seq {
-        match *self {
-            Self::Refused { at, .. }
-            | Self::Checkpointed { at, .. }
-            | Self::Waiting { at, .. }
-            | Self::Arrived { at, .. }
-            | Self::Discarded { at, .. }
-            | Self::Unreadable { at, .. } => at,
-        }
-    }
 }
 
 /// What one turn cost in tokens.

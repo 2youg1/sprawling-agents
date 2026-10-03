@@ -22,7 +22,14 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
         "lab/room2".to_owned(),
         room.clone(),
         kernel::Version::new(1),
-        Payload::new(serde_json::Map::new()).unwrap(),
+        Payload::new(
+            serde_json::json!({ "text": "the lexer is yours
+it passes" })
+            .as_object()
+            .unwrap()
+            .clone(),
+        )
+        .unwrap(),
         kernel::TimeMs::new(1_000),
     )
     .unwrap();
@@ -43,6 +50,11 @@ fn the_five_views_that_used_to_say_unavailable_answer_from_the_record() {
     };
     assert_eq!(inbox.waiting.len(), 1);
     assert_eq!(inbox.waiting[0].kind, "thread");
+    // The row carries the first line of what was said (wire D39).
+    assert_eq!(
+        inbox.waiting[0].first_line.as_deref(),
+        Some("the lexer is yours")
+    );
 
     // Taking a signal empties the row; the view never took it itself.
     views

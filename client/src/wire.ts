@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 51 as const;
+export const WIRE_V = 52 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "c5141b2991cfeecd1bea46be208fc2ad715210727f9fe6738829027829d4a704" as const;
+export const WIRE_HASH = "41aebd7fbcd47151913ed34dbfd877a528c0fa7469988258a112026dcfab7f79" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -2083,6 +2083,7 @@ export type IdentityAnswer = typeof IdentityAnswer.Type;
 
 export const SignalLine = Schema.Struct({
   at: TimeMs,
+  first_line: Schema.optional(Schema.NullOr(Schema.String)),
   from: Schema.String,
   id: Schema.String,
   kind: Schema.String,
@@ -3153,6 +3154,49 @@ export const Call = Schema.Struct({
 export type Call = typeof Call.Type;
 
 /**
+ * How a child session's handed-back work ended, read through
+ * `collab::Handback::from_signal`, and which session it was (D38).
+ */
+export const HandbackNote = Schema.Union([
+  Schema.Struct({
+    finished: Schema.Struct({
+      session: RunId,
+      verified_by: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    stopped: Schema.Struct({
+      because: Schema.String,
+      session: RunId,
+    }),
+  }),
+]).annotate({ identifier: "HandbackNote" });
+export type HandbackNote = typeof HandbackNote.Type;
+
+/**
+ * What ended a reply wait, one arm per arm of `kernel`'s `WaitEnd`;
+ * the reply itself is an `Arrived` note of its own.
+ */
+export const ReplyEnd = Schema.Literals(["reply", "timeout", "left"]).annotate({ identifier: "ReplyEnd" });
+export type ReplyEnd = typeof ReplyEnd.Type;
+
+/**
+ * The end of a reply wait, and when the Ledger recorded it (D37).
+ */
+export const ReplyEnded = Schema.Struct({
+  by: ReplyEnd,
+  t: TimeMs,
+}).annotate({ identifier: "ReplyEnded" });
+export type ReplyEnded = typeof ReplyEnded.Type;
+
+/**
+ * Who spoke a word that arrived: the person who owns the city, through
+ * a steer, or a resident, through a steer or a signal (D36).
+ */
+export const Speaker = Schema.Literals(["user", "resident"]).annotate({ identifier: "Speaker" });
+export type Speaker = typeof Speaker.Type;
+
+/**
  * What a turn came to besides the calls it made.
  * 
  * **The criterion is closed on purpose**: an event earns a `Note` when
@@ -3184,8 +3228,20 @@ export const Note = Schema.Union([
   Schema.Struct({
     arrived: Schema.Struct({
       at: Seq,
-      from: Schema.String,
-      said: Schema.String,
+      by: Speaker,
+      from: Schema.optional(Schema.NullOr(Schema.String)),
+      handback: Schema.optional(Schema.NullOr(HandbackNote)),
+      said: Schema.optional(Schema.NullOr(Schema.String)),
+      t: TimeMs,
+    }),
+  }),
+  Schema.Struct({
+    awaiting_reply: Schema.Struct({
+      at: Seq,
+      ended: Schema.optional(Schema.NullOr(ReplyEnded)),
+      on: Address,
+      t: TimeMs,
+      until: TimeMs,
     }),
   }),
   Schema.Struct({

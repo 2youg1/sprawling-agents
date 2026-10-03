@@ -33,10 +33,10 @@ question is what this turn did or waits on. -->
 
 {#if "arrived" in note}
   <Person
-    text={note.arrived.said}
-    label={note.arrived.from}
+    text={note.arrived.said ?? ""}
+    label={note.arrived.from ?? ""}
     at={undefined}
-    entry={{ kind: "message", turn, text: note.arrived.said }}
+    entry={{ kind: "message", turn, text: note.arrived.said ?? "" }}
     {run}
     {onFork}
     {onHover}

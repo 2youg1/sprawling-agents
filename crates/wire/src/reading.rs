@@ -20,11 +20,17 @@
 //! about what happened.
 
 use kernel::event::record::{
-    CheckpointCommitted, FileDiscarded, FiredAction, ProviderDegraded, WatchdogFired,
+    CheckpointCommitted, FileDiscarded, FiredAction, ProviderDegraded, SignalConsumed,
+    SignalWaitStarted, SteerReceived, WatchdogFired,
 };
-use kernel::{AxCode, AxError, EventKind, EventRecord, Seq};
+use kernel::{AxCode, AxError, EventKind, EventRecord, Seq, TimeMs};
 
-use crate::answer::{Note, Output, Used};
+use crate::answer::{Note, Output, Speaker, Used};
+
+/// The `source` a `steer_received` line carries when the User spoke:
+/// the token `collab::Steer::from_person` writes, the only entrance
+/// that can produce it. A resident's steer carries `@` and its id.
+const USER_SOURCE: &str = "user";
 
 /// The most lines of one tool's output a row carries.
 pub const OUTPUT_LINES: usize = 12;
@@ -158,7 +164,6 @@ fn bounded(whole: &str) -> Option<Output> {
 )]
 pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
     let at = record.seq();
-    let map = record.data().as_map();
     match kind {
         // The carrier table in `kernel::error` decides which codes land
         // under which kind, and `runtime::run` writes the error flat
@@ -200,12 +205,45 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
             Ok(CheckpointCommitted::JobPinned { .. }) => None,
             Err(err) => Some(unreadable(kind, &err, at)),
         },
-        EventKind::SteerReceived | EventKind::SignalConsumed => Some(Note::Arrived {
-            from: text(map.get("source"))
-                .or_else(|| text(map.get("from")))
-                .unwrap_or_else(|| record.who().to_owned()),
-            said: text(map.get("text")).unwrap_or_default(),
-            at,
+        EventKind::SteerReceived => Some(match record.data().read::<SteerReceived>() {
+            Ok(steer) => Note::Arrived {
+                by: match steer.source.as_str() {
+                    USER_SOURCE => Speaker::User,
+                    _resident => Speaker::Resident,
+                },
+                from: Some(steer.source),
+                said: Some(steer.text),
+                t: record.t(),
+                handback: None,
+                at,
+            },
+            Err(err) => unreadable(kind, &err, at),
+        }),
+        // The words are on the sending line, under the sender's run;
+        // the server's fold pairs it by id (D36). The User speaks only
+        // through a steer, so a signal is always a resident's.
+        EventKind::SignalConsumed => Some(match record.data().read::<SignalConsumed>() {
+            Ok(_taken) => Note::Arrived {
+                from: None,
+                said: None,
+                by: Speaker::Resident,
+                t: record.t(),
+                handback: None,
+                at,
+            },
+            Err(err) => unreadable(kind, &err, at),
+        }),
+        // Its end is a line of its own in the same session, paired by
+        // the server's fold (D37).
+        EventKind::SignalWaitStarted => Some(match record.data().read::<SignalWaitStarted>() {
+            Ok(started) => Note::AwaitingReply {
+                on: started.on,
+                until: TimeMs::new(started.deadline_ms),
+                t: record.t(),
+                ended: None,
+                at,
+            },
+            Err(err) => unreadable(kind, &err, at),
         }),
         EventKind::FileDiscarded => Some(match record.data().read::<FileDiscarded>() {
             Ok(discarded) => Note::Discarded {
