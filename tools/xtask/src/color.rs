@@ -46,7 +46,7 @@ use contrast::{apca_lc, bronze_tier};
 use scan::scan_for_literals;
 use tables::{
     colour_tokens_without_ratio, grey_chromas, parse_colour_tokens, parse_text_tokens,
-    parse_type_scale, text_surface_ceiling,
+    parse_type_scale, text_surface_ceiling, tier_slack,
 };
 
 const THEME: &str = concat!(crate::walk::client_src!(), "/theme.css");
@@ -343,9 +343,17 @@ fn judge_readability(source: &str, greys: &[(String, u16)], mode: Mode) -> Vec<V
         return violations;
     };
 
+    let Some(slack) = tier_slack(source) else {
+        violations.push(named(
+            "the rounding a tier allows is declared",
+            "`--tier-slack` is not declared as a number from 0".to_owned(),
+        ));
+        return violations;
+    };
+
     for (name, lightness, claimed) in &tokens {
         let reached = apca_lc(*lightness, surface);
-        if reached + 0.05 < f64::from(*claimed) {
+        if reached + slack < f64::from(*claimed) {
             violations.push(named(
                 "a text token reaches the tier it claims",
                 format!("{name} claims Lc {claimed} and reaches {reached:.1}"),

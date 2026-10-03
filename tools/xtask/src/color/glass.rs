@@ -20,7 +20,7 @@
 
 use super::contrast::apca_lc_over;
 use super::roles::rung_of;
-use super::tables::{grey_ramp, parse_text_tokens};
+use super::tables::{grey_ramp, parse_text_tokens, tier_slack};
 use super::{Mode, THEME};
 use crate::report::Violation;
 
@@ -59,19 +59,22 @@ pub(super) fn judge_glass(written: &str, read: &str, mode: Mode) -> Vec<Violatio
     let text = parse_text_tokens(read)
         .into_iter()
         .find(|(name, _, _)| name == TEXT);
-    let (Some(fill), Some(backdrop), Some((_, ink, tier))) =
-        (lightness(GLASS), lightness(BACKDROP), text)
-    else {
+    let (Some(fill), Some(backdrop), Some((_, ink, tier)), Some(slack)) = (
+        lightness(GLASS),
+        lightness(BACKDROP),
+        text,
+        tier_slack(read),
+    ) else {
         return vec![refuse(
             format!(
-                "{}: the glass role, the backdrop role or the text token cannot be read",
+                "{}: the glass role, the backdrop role, the text token or the tier slack cannot be read",
                 mode.name()
             ),
-            "keep `--color-glass` and `--color-raised-hover` as single hops to a rung, and `--color-text` with its `--tier-text`",
+            "keep `--color-glass` and `--color-raised-hover` as single hops to a rung, `--color-text` with its `--tier-text`, and `--tier-slack`",
         )];
     };
     let reached = apca_lc_over(ink, fill, backdrop, percent);
-    if reached + 0.05 >= f64::from(tier) {
+    if reached + slack >= f64::from(tier) {
         return Vec::new();
     }
     vec![refuse(
@@ -133,6 +136,7 @@ mod tests {
   --color-glass: var(--color-g2);
   --color-text: oklch(0.930 0.014 250);
   --tier-text: 90;
+  --tier-slack: 0.05;
   {percent}
 :root[data-theme=\"light\"] {{
   --color-g0: oklch(0.978 0.014 250);

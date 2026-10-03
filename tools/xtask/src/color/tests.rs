@@ -78,6 +78,7 @@ const GOOD: &str = r"
   --tier-label: 90;
   --tier-body: 90;
   --tier-note: 75;
+  --tier-slack: 0.05;
 
   --surface-ceiling: g2;
 }

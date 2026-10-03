@@ -111,6 +111,16 @@ pub(super) fn text_surface_ceiling(source: &str) -> Option<String> {
         .map(canonical)
 }
 
+/// `--tier-slack`: how far under its tier an APCA reading may fall and
+/// still reach it. The colour page reads the same declaration, so a
+/// value this gate passes is not warned about there.
+pub(super) fn tier_slack(source: &str) -> Option<f64> {
+    declaration(source, "tier-slack")?
+        .parse::<f64>()
+        .ok()
+        .filter(|slack| slack.is_finite() && *slack >= 0.0)
+}
+
 /// The rungs of the grey ramp: `--color-g<n>`.
 fn rungs(source: &str) -> Vec<(String, Oklch)> {
     colour_declarations(source)
