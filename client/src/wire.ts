@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 46 as const;
+export const WIRE_V = 47 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "77a2071b8a2e7094b3a9bcc7e570421609592f1a332111134aed1b9022ccb532" as const;
+export const WIRE_HASH = "e897b2cb123486479d243e6eafa857c316ccc193bf22467bf6a9b1f9af5d7609" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -664,6 +664,9 @@ export const EventKind = Schema.Union([
   Schema.Literal("proposal_offered"),
   Schema.Literal("proposal_decided"),
   Schema.Literal("proposal_withdrawn"),
+  Schema.Literal("run_policy_changed"),
+  Schema.Literal("session_named"),
+  Schema.Literal("skill_audited"),
 ]).annotate({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 
@@ -3130,6 +3133,7 @@ export const Call = Schema.Struct({
   render: Schema.optional(Schema.NullOr(RenderIntent)),
   subject: Schema.optional(Schema.NullOr(Schema.String)),
   timing: Timing,
+  took_us: Schema.optional(Schema.NullOr(Schema.Int)),
   tool: Schema.String,
 }).annotate({ identifier: "Call" });
 export type Call = typeof Call.Type;
@@ -3196,8 +3200,10 @@ export type Note = typeof Note.Type;
 export const Used = Schema.Struct({
   cache_write: Schema.optional(Schema.NullOr(Tokens)),
   cached: Tokens,
+  first_us: Schema.optional(Schema.NullOr(Schema.Int)),
   input: Tokens,
   output: Tokens,
+  took_us: Schema.optional(Schema.NullOr(Schema.Int)),
 }).annotate({ identifier: "Used" });
 export type Used = typeof Used.Type;
 
@@ -3301,9 +3307,14 @@ export type SessionStart = typeof SessionStart.Type;
 export const SessionLine = Schema.Struct({
   at: TimeMs,
   began: Seq,
+  effort: Schema.optional(Schema.NullOr(Effort)),
   last: Seq,
+  model: Schema.optional(Schema.NullOr(Schema.String)),
+  name: Schema.optional(Schema.NullOr(Schema.String)),
+  preview: Schema.optional(Schema.NullOr(Schema.String)),
   runs: Schema.Int,
   start: SessionStart,
+  workspace: Schema.optional(Schema.NullOr(Schema.String)),
 }).annotate({ identifier: "SessionLine" });
 export type SessionLine = typeof SessionLine.Type;
 
@@ -4025,6 +4036,17 @@ export const NoSecret = Schema.Never.annotate({ identifier: "NoSecret" });
 export type NoSecret = typeof NoSecret.Type;
 
 /**
+ * A room's new run policy, which the run under way takes at its next
+ * safe point (`crates/wire/spec/Answer/Sessions.lean` D27).
+ */
+export const PolicyChange = Schema.Struct({
+  idem: IdemKey,
+  policy: RunPolicy,
+  room: Address,
+}).annotate({ identifier: "PolicyChange" });
+export type PolicyChange = typeof PolicyChange.Type;
+
+/**
  * Whether the core's threads stand above normal (`crates/sprawling/Spec.lean`
  * §8-93): the setting a person turns off. Spelled here once, for the
  * frame and for the `[core] priority` key the person's file holds.
@@ -4177,6 +4199,18 @@ export const RulesWrite = Schema.Struct({
   idem: IdemKey,
 }).annotate({ identifier: "RulesWrite" });
 export type RulesWrite = typeof RulesWrite.Type;
+
+/**
+ * A display name for the session of `room` that began at `began`; an
+ * empty name takes it back (`crates/wire/spec/Answer/Sessions.lean` D27).
+ */
+export const SessionNaming = Schema.Struct({
+  began: Seq,
+  idem: IdemKey,
+  name: Schema.String,
+  room: Address,
+}).annotate({ identifier: "SessionNaming" });
+export type SessionNaming = typeof SessionNaming.Type;
 
 /**
  * Where a [`Command::PutShelved`](crate::Command) writes.
@@ -4473,6 +4507,12 @@ export const Command = Schema.Union([
       shelf: Shelf,
       text: Schema.String,
     }),
+  }),
+  Schema.Struct({
+    name_session: SessionNaming,
+  }),
+  Schema.Struct({
+    change_run_policy: PolicyChange,
   }),
   Schema.Struct({
     auth: Schema.Struct({
