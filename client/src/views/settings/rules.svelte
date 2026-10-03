@@ -19,7 +19,7 @@
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
-  import { BuildingColumn, HALL, useBuildings } from "../shared/buildings";
+  import { HALL, useBuildings } from "../shared/buildings";
   import Card from "./card.svelte";
   import { rulesAt } from "./files";
   import { HELD, RECEIPT_MS, answered, edited, refused, sent, waited } from "./saving";
@@ -71,16 +71,25 @@
   }
 </script>
 
+<!-- The building is picked in a native <select> rather than the column
+     the skills and MCP pages draw (client D78): a column of one row reads
+     as a label, so a city with only the hall showed nothing to open,
+     while a select is a control with one option or with fifty, and the
+     platform owns its keys. -->
 <div class="flex flex-col gap-base">
-  <BuildingColumn
-    label={say($lang, "rules_building")}
-    buildings={$buildings}
-    {chosen}
-    hall={say($lang, "city_hall")}
-    onPick={(addr: Address) => {
-      chosen = addr;
+  <select
+    class="h-control w-tree max-w-full rounded-control border border-edge-input bg-raised px-base text-body text-text"
+    aria-label={say($lang, "rules_building")}
+    value={chosen}
+    onchange={(event) => {
+      const picked = $buildings.find((addr) => addr === event.currentTarget.value);
+      if (picked !== undefined) chosen = picked;
     }}
-  />
+  >
+    {#each $buildings as addr (addr)}
+      <option value={addr}>{addr === HALL ? say($lang, "city_hall") : addr}</option>
+    {/each}
+  </select>
   <Card title="rules_title" note="rules_note" {saving} settled="settings_next_run" onSave={save}>
     <textarea
       class="min-h-output w-full rounded-control border border-edge-input bg-page px-base py-snug font-mono text-note text-text"

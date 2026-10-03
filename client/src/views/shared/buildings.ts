@@ -21,20 +21,22 @@ import type { Readable } from "svelte/store";
 import { QUERIES } from "../../core/asking";
 import { MAYOR, buildingOf } from "../../core/route";
 import { ui } from "../../ui";
-import type { Address } from "../../wire";
+import type { Address, Answer } from "../../wire";
 
 export const HALL = buildingOf(MAYOR);
 
-// The list above as one reading two screens share. A store rather than
+// The list above as one reading the screens share. A store rather than
 // a value, because the city's answer arrives after this is called; a
 // template consumes it as `$buildings`.
 export function useBuildings(): Readable<readonly Address[]> {
-  const city = ui().conn.asking.ask(QUERIES.city);
-  return derived(city, (answer) => {
-    if (answer === undefined || !("city" in answer)) return [HALL];
-    const all = answer.city.buildings.map((each) => each.addr);
-    return [HALL, ...all.filter((addr) => addr !== HALL).sort((a, b) => a.localeCompare(b))];
-  });
+  return derived(ui().conn.asking.ask(QUERIES.city), buildingsOf);
+}
+
+// The order itself, read from whatever the city question last answered.
+export function buildingsOf(answer: Answer | undefined): readonly Address[] {
+  if (answer === undefined || !("city" in answer)) return [HALL];
+  const all = answer.city.buildings.map((each) => each.addr);
+  return [HALL, ...all.filter((addr) => addr !== HALL).sort((a, b) => a.localeCompare(b))];
 }
 
 export interface BuildingColumnProps {
