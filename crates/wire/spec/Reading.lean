@@ -283,16 +283,38 @@ pub struct FrozenNames {
 /-! D33 一次 skill 使用与一次 MCP 使用各从哪一行折出，按天怎么数，导出的每一行长什么样
 
 **决定**：折叠是 accounting 里一个读账本的纯函数，`SkillUsage`、`McpUsage` 与 `UsageExport` 三帧读同一个函数的结果（D28）。
+
+```rust
+// wire::answer::usage
+pub struct SkillUsageAnswer { pub skills: Vec<SkillUsageLine> }                 // 名字序
+pub struct SkillUsageLine { name: String, held: Vec<HeldSkill>, versions: Vec<SkillVersion>, uses: Vec<SkillUse>, per_day: Vec<DayCount> }
+pub struct HeldSkill { shelf: SkillShelf, digest: B3Hash, audit: SkillAudit }   // 每格书架一项；书架上没有了为空
+#[serde(tag = "state")] pub enum SkillAudit { Unaudited, Audited { verdict: AuditVerdict, at: Seq }, Stale { audited: B3Hash } }
+pub struct SkillVersion { digest: B3Hash, seq: Seq, at: TimeMs, run: RunId }    // 第一个钉住这一版的 run_started
+pub struct SkillUse { run: RunId, resident: Option<Address>, seq: Seq, at: TimeMs, part: String, digest: B3Hash, outcome: UseOutcome }
+pub enum UseOutcome { Ok, Failed, Unknown }
+pub struct DayCount { day: String, count: u32 }                                  // `YYYY-MM-DD`，旧日在前
+pub struct McpUsageAnswer { servers: Vec<McpServerUsage> }                       // 服务器序，`None` 在最后
+pub struct McpServerUsage { server: Option<String>, configured: bool, tools: Vec<McpToolUsage> }
+pub struct McpToolUsage { tool: String, uses: Vec<McpUse>, per_day: Vec<DayCount> }
+pub struct McpUse { run: RunId, resident: Option<Address>, seq: Seq, at: TimeMs, outcome: UseOutcome }
+pub enum UsageKind { Skills, Mcp }
+pub enum ExportFormat { Jsonl, Csv }
+pub struct UsageExportAnswer { what: UsageKind, format: ExportFormat, body: String }
+```
+
+- **内容版本**是第一个以某个哈希钉住这件 skill 的 `run_started`：摘要、那一行的 `seq` 与时刻、它的 run。账本里还没有一种行记下「谁把这一版放上书架」（kernel D23 预留的 `skill_shelved`），所以版本说的是「从哪一刻起有 run 读到它」；那种行落地时，`SkillVersion` 多一件写它的那一行。
+- **审核**按每格书架此刻的摘要，由 `city::library::audit_state` 读账上这个名字的每一行 `skill_audited` 判出；`Stale` 就是「内容改过，请再审一次」。
 - **一次 skill 使用**是一行 `tool_called`，它所在的 run 的 `run_started` 钉住了一件 skill（名字与哈希，`crates/runtime/Spec.lean` §8-11），而这一行是：`describe`，问的就是那个名字（部分记作 `guide`）；或 `read`，路径是那个名字（部分记作 `SKILL.md`）或 `<名字>/<相对路径>`（部分记作那个相对路径）。认的是「这个 run 钉住了这个名字」，不从路径的写法猜：一个恰好与某件 skill 同名的普通文件，在没钉住它的 run 里不是一次使用。使用的内容版本是钉住时的哈希，所以 skill 改过之后，旧的使用仍指向它当时读到的那一版。
-- **一次 MCP 使用**是一行 `tool_called`，它的工具名是某个 MCP 服务器登记的工具，或者是 `call`、而 `call` 指名的那件是这样的工具。名字到 `(服务器, 工具)` 的对应读城此刻的 MCP 登记（`agent_protocols::mcp` 唯一造这个名字的那一处），不拆字符串：服务器名可以含 `_`，`<server>_<tool>` 的拆法有歧义。此刻没有服务器登记的名字归在 `server: None` 下，页面写作「已移除」并给出完整工具名。
+- **一次 MCP 使用**是一行 `tool_called`，它记下的 `effect` 是 `Connector { label }`：服务器就是那个 `label`，工具是行上的名字去掉 `<label>_` 前缀。这个 `effect` 是 `agent_protocols::mcp::tools` 注册工具时写下、随行进账本的，所以它说的是调用那一刻的服务器，配置改过、服务器删掉之后仍然对，答问也不必握手。`call` 一行指名的工具，按已知的服务器名（账上见过的与此刻配置的）取最长的 `<label>_` 前缀归属，不按第一个 `_` 拆：服务器名可以含 `_`。没有服务器名能前缀它的，归在 `server: None` 下，页面写作「已移除」并给出完整工具名（accounting D49）。
 - **结果**也算：每次使用带上配对的 `tool_result` 是否成功；没有配对行（run 被杀）记作未知。
 - **按天数**：按信封时刻的 UTC 日历日分桶，`day` 写作 `YYYY-MM-DD`；导出带每一行的毫秒时刻，要按本地时区重新分桶的分析自己做。
-- **从没用过的**：每一格书架（城库、每栋楼的楼架、城外书架）上扫到的每一件 skill 都有一行，没被用过的计数为零、使用列表为空；MCP 是此刻登记的每个服务器的每件工具。
+- **从没用过的**：每一格书架（城库、每栋楼的楼架、城外书架）上扫到的每一件 skill 都有一行，没被用过的计数为零、使用列表为空；MCP 是每栋楼的配置此刻列出的每个服务器，没用过的服务器工具表为空：它此刻提供哪些工具要握一次手，那是 `McpHealth` 的问题。
 - **导出**：每次使用一行，列序固定：`kind`（`skill`｜`mcp`）、`name`、`server`、`part`、`run`、`resident`（房间地址）、`seq`、`at_ms`、`digest`、`outcome`（`ok`｜`failed`｜`unknown`）。JSONL 每行一个对象、键即列名、缺席的值写 `null`；CSV 首行是列名，按 RFC 4180 加引号，行尾 `\r\n`，缺席的值为空。正文以 UTF-8 回答，页面经浏览器的下载交给 User，城目录里不写文件（D28）。
 
 **理由**：一次使用必须能在重放时由同一个函数算出同一张表，所以只读账本里已有的行；用 `run_started` 钉住的名字来认，是因为那是 run 自己说过「我能读这几件」的唯一一处，路径的写法会把巧合当成使用。按 UTC 分桶，是因为折叠在 Rust 一处、在城里算，城不知道页面在哪个时区，而导出的毫秒时刻让任何分桶都做得出来。
 
-**被否**：①读文件系统的访问时间：Windows、macOS 与 Linux 上 atime 的语义各不相同，Linux 默认 `relatime` 一天只更新一次，而且它说不出是哪个 run；②按页面所在时区分桶：同一个城在两台设备上答两张表；③MCP 名字按第一个 `_` 拆：服务器名含 `_` 时把工具归错服务器。
+**被否**：①读文件系统的访问时间：Windows、macOS 与 Linux 上 atime 的语义各不相同，Linux 默认 `relatime` 一天只更新一次，而且它说不出是哪个 run；②按页面所在时区分桶：同一个城在两台设备上答两张表；③MCP 名字按第一个 `_` 拆：服务器名含 `_` 时把工具归错服务器；④按此刻的 MCP 登记认服务器：要握手才知道工具名，服务器删掉之后它的使用全成了「已移除」。
 
 **重开参数**：一次查询在一座大城里要读的行多到答复超过 100 ms 时，把折叠改成随账本增量维护；User 要求按本地日历日看时，加一个由页面送来的 UTC 偏移参数。
 

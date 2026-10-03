@@ -24,6 +24,7 @@ import crates.accounting.spec.Views.Answering.Github
 import crates.accounting.spec.Views.Document
 import crates.accounting.spec.Views.Rounds
 import crates.accounting.spec.Views.Snapshot
+import crates.accounting.spec.Views.Usage
 import crates.accounting.spec.Worker
 import crates.accounting.spec.Worker.Attend
 import crates.accounting.spec.Worker.Commanding.Saving
@@ -222,6 +223,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 | 8-29 | `crates/accounting/spec/Views/Document.lean` |
 | 8-30 | `crates/accounting/spec/Worker/Workbench/Tools.lean` |
 | 8-33 | `crates/accounting/spec/Views/Rounds.lean` |
+| 8-34 | `crates/accounting/spec/Views/Usage.lean` |
 
 §8-18 分成三小节，各住规定它的那个模块的分部：§8-18-1、§8-18-2、§8-18-3。`spec/Playback/Select.lean`、`spec/Playback/Project.lean` 与 `spec/Worker/Attend.lean` 没有标签：前两个是 §8-12、§8-17、§8-25 的性质，后一个是记账线程循环的模型。
 -/
@@ -303,6 +305,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 | D42 | `crates/accounting/spec/Worker/Workbench/Tools.lean` |
 | D45 | `crates/accounting/spec/Views/Rounds.lean` |
 | D47 | `crates/accounting/spec/Playback/Project.lean` |
+| D49 | `crates/accounting/spec/Views/Usage.lean` |
 -/
 
 /-! ## 13 依赖选型
