@@ -85,5 +85,8 @@ pub type DesktopProgram = fn() -> std::io::Result<PathBuf>;
 pub struct ExecHost {
     pub python_wasm: fn() -> Option<PathBuf>,
     pub shell: fn() -> Option<PathBuf>,
+    /// PowerShell 7, for a building whose `[sandbox] interpreter` is
+    /// `pwsh`; a pwsh older than 7 arrives as `None`.
+    pub pwsh: fn() -> Option<PathBuf>,
     pub engine: fn() -> Result<Box<dyn runtime::Sandbox>, AxError>,
 }

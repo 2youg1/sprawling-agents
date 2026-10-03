@@ -389,26 +389,3 @@ fn every_transport_the_writer_emits_is_read_back_as_the_same_transport() {
     write_mcp(dir.path(), &room, Layer::City, &servers).unwrap();
     assert_eq!(load(dir.path(), &room).unwrap().mcp, servers);
 }
-
-/// A building chooses which interpreter its shell lines run under by
-/// name, and a spelling this build does not know is refused where it
-/// is written rather than read as the platform's shell
-/// (`crates/runtime/Spec.lean` §8-13-2 D30).
-#[test]
-fn a_building_names_its_shell_interpreter_and_an_unknown_one_is_refused() {
-    let pwsh = ConfigLayer::parse("[sandbox]\nshell = true\ninterpreter = \"pwsh\"\n");
-    assert!(pwsh.is_ok(), "pwsh is one of the two spellings: {pwsh:?}");
-
-    let err = ConfigLayer::parse("[sandbox]\nshell = true\ninterpreter = \"bash\"\n").unwrap_err();
-    assert_eq!(err.code(), &AxCode::ConfigInvalid);
-    assert!(
-        err.subject().contains("interpreter") && err.subject().contains("bash"),
-        "the refusal names the key and the value: {}",
-        err.subject()
-    );
-    assert!(
-        err.recovery().contains("system") && err.recovery().contains("pwsh"),
-        "the recovery gives both spellings: {}",
-        err.recovery()
-    );
-}

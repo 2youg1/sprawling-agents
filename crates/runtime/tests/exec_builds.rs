@@ -84,7 +84,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
         workdir: crate_dir,
         mounts: Vec::new(),
         python_wasm: None,
-        shell: None,
+        shell: runtime::Shell::Absent,
         fuel: Fuel(1_000_000),
         env_passthrough: declared,
         domain: Address::parse("lab").unwrap(),

@@ -7,6 +7,7 @@ use super::*;
 use crate::sandbox::{EchoSandbox, FaultSandbox};
 use kernel::Address;
 
+mod shell;
 mod yielding;
 
 fn call(arm: Value) -> ToolCall {
@@ -42,7 +43,10 @@ fn setup(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathB
         workdir: workdir.to_path_buf(),
         mounts: Vec::new(),
         python_wasm: python,
-        shell,
+        shell: shell.map_or(Shell::Absent, |program| Shell::Found {
+            program,
+            interpreter: kernel::Interpreter::System,
+        }),
         fuel: Fuel(1_000_000),
         env_passthrough: Vec::new(),
         domain: Address::parse("work").unwrap(),

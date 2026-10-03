@@ -33,3 +33,28 @@ fn a_build_with_the_engine_feature_carries_one() {
         "the feature is on and the run still met the absent engine: {said}"
     );
 }
+
+/// A building that asks for PowerShell 7 is handed a `pwsh` only when
+/// its version line reads 7 or later (`crates/runtime/Spec.lean`
+/// §8-13-2 D30): a pwsh 6, or one that would not say, is refused at the
+/// call instead.
+#[test]
+fn pwsh_is_handed_to_a_run_only_at_major_seven_or_later() {
+    use crate::doctor::host::seven_or_later;
+    use crate::doctor::{Presence, Version};
+    let at = std::path::PathBuf::from("pwsh");
+    let said = |text: &str| Presence::Present {
+        at: at.clone(),
+        version: Version::Said(text.to_owned()),
+    };
+    assert_eq!(seven_or_later(&said("PowerShell 7.4.6")), Some(at.clone()));
+    assert_eq!(seven_or_later(&said("PowerShell 10.0.0")), Some(at.clone()));
+    assert_eq!(seven_or_later(&said("PowerShell 6.2.7")), None);
+    assert_eq!(
+        seven_or_later(&Presence::Present {
+            at: at.clone(),
+            version: Version::Silent,
+        }),
+        None
+    );
+}

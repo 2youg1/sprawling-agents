@@ -6,7 +6,7 @@
 /-!
 # runtime::tools::exec
 
-规定 `tools::exec`、`tools::exec::outcome`、`tools::exec::confinement`、`tools::exec::yielding`（`crates/runtime/src/` 下同名的文件）。exec 的三臂、宿主进程沙箱、派出的命令降一级与环境声明。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `tools::exec`、`tools::exec::outcome`、`tools::exec::shell`、`tools::exec::confinement`、`tools::exec::yielding`（`crates/runtime/src/` 下同名的文件）。exec 的三臂、宿主进程沙箱、派出的命令降一级与环境声明。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `tools::exec`、`backlog` 旁的测试守住（`crates/runtime/Spec.lean` §16）。
 -/
@@ -211,9 +211,9 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 - **在主机上解析**：`"system"` 照今天：Windows 上 `%COMSPEC%`（缺省 `cmd.exe`）加 `/C`，macOS 与 Linux 上 `$SHELL`（缺省 `/bin/sh`）加 `-c`（doctor 的 `shell` 行，`crates/sprawling/src/doctor/table.rs`）。`"pwsh"` 在三个平台上都是搜索路径上的 `pwsh`，加 `-NoLogo -NoProfile -NonInteractive -Command`；doctor 的 `pwsh` 行以 `pwsh --version` 探它（印 `PowerShell 7.4.6` 一类的一行），`doctor::host::usable_pwsh` 只在这一行的主版本不小于 7 时给出路径，主版本读不出也不给。机器那一半（`accounting::worker::workbench::engine::machine_half`）按 `interpreter` 问 `ExecHost` 的 `shell` 或 `pwsh`，交给 bench 的是一个值：
 
 ```rust
-pub enum Shell {                                    // runtime::tools::exec，ExecSetup.shell
-    Absent,                                         // 没有一层要 shell 臂，或平台的 shell 在这台机器上不能用
-    Missing { asked: kernel::Interpreter },         // 楼要了这个解释器，这台机器上没有能用的
+pub enum Shell {                                    // runtime::tools::exec::shell，ExecSetup.shell；根上导出
+    Absent,                                         // 没有一层要 shell 臂
+    Missing { asked: kernel::Interpreter },         // 楼要了这个解释器（含 System），所在的主机上没有能用的
     Found { program: PathBuf, interpreter: kernel::Interpreter },
 }
 ```
@@ -226,7 +226,7 @@ pub enum Shell {                                    // runtime::tools::exec，Ex
   - `Encoding`：`stdout` 或 `stderr` 里有 U+FFFD。载荷里的文字经 `String::from_utf8_lossy` 写下（`crates/runtime/src/tools/exec/outcome.rs`），所以替换字符就是一段不是 UTF-8 的字节——cmd 按控制台代码页输出，中文 Windows 上是 936。一个真的打印了 U+FFFD 的程序也会被计进来，这是多计的一侧。
   - 先看退出码，再看不随语言变的错误 id，最后才看英文文字：cmd 的提示随 Windows 的显示语言变，非英文系统上 cmd 的语法错误落进「不分类」，这一点照实写在视图的说明里。本仓不收一张各语言提示的表：那会是第二份 Microsoft 文字的权威。
   - 退出码为 0 的结果不分类：一条成功的命令即使输出里有 U+FFFD 也不算失败。
-- **现状**：配置项、`Shell`、拒绝、`interpreter` 字段、分类与 `ShellTally` 已落地，测试在 `tools::exec::tests` 与 `crates/city/src/config_layers/tests.rs`。把 `ShellTally` 接成一个线上查询（一条 `Query` 与它的 `Answer`、`WIRE_V`、`client/src/wire.ts`）与页面上的一张表尚未做；楼页的沙箱卡只把读到的 `interpreter` 原样送回，不给选择控件，改它今天靠手写 `CONFIG.toml`。
+- **现状**：配置项、`Shell`、拒绝、`interpreter` 字段、分类与 `ShellTally` 已落地，测试在 `tools::exec::tests::shell`、`kernel::config::interpreter`、`crates/city/src/config_layers/write/tests.rs` 与 `doctor::tests::host`。把 `ShellTally` 接成一个线上查询（一条 `Query` 与它的 `Answer`、`WIRE_V`、`client/src/wire.ts`）与页面上的一张表尚未做；楼页的沙箱卡只把读到的 `interpreter` 原样送回，不给选择控件，改它今天靠手写 `CONFIG.toml`。
 - **何时再定默认**：视图按解释器给出每类失败占 shell 臂调用的比例；pwsh 7 的成功率明显更高时，把读数交 User 再定缺省（D88 第 7 条读作这样，待 User 确认）。不做 pwsh 预热池：启动时间不是问题（D88 第 7 条）。
 - **program 臂在 `CopiedTree` 下每条命令前同步副本的成本**：计数已经有了（`Placed::work()`，§8-13-2），读数归波后的 mid 读数，判定它的证据与重开参数写在 §8-13-2 的「未决」与 D10。
 

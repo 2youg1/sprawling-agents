@@ -86,6 +86,7 @@ fn effort_resolves_down_the_same_ladder() {
 fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
     let permissive = SandboxLimits {
         shell: true,
+        interpreter: Interpreter::Pwsh,
         fuel: 10,
         mounts: vec![Address::parse("lab/docs").unwrap()],
         env_passthrough: vec![EnvVarName::parse("ProgramFiles").unwrap()],
@@ -114,6 +115,7 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
         "a layer that speaks about the sandbox speaks about all of it, and silence is the              closed answer"
     );
     assert!(frozen.sandbox.mounts.is_empty());
+    assert_eq!(frozen.sandbox.interpreter, Interpreter::System);
 }
 
 #[test]

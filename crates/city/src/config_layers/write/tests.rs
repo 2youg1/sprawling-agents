@@ -156,3 +156,39 @@ fn a_write_the_reader_would_refuse_is_not_written() {
     );
     assert_eq!(std::fs::read_to_string(&file).unwrap(), original);
 }
+
+/// A building's shell interpreter survives the write face and the
+/// reader, and a spelling the reader does not know is refused there
+/// rather than read as the platform's shell (`crates/runtime/Spec.lean`
+/// §8-13-2 D30).
+#[test]
+fn the_shell_interpreter_is_written_and_read_back_by_name() {
+    let dir = tempfile::tempdir().unwrap();
+    let limits = SandboxLimits {
+        shell: true,
+        interpreter: kernel::Interpreter::Pwsh,
+        ..SandboxLimits::default()
+    };
+    write_sandbox(dir.path(), &room(), Layer::Building, &limits).unwrap();
+    let file = path(dir.path(), &room(), Layer::Building).unwrap();
+    let layer = ConfigLayer::parse(&std::fs::read_to_string(file).unwrap()).unwrap();
+    assert_eq!(layer.sandbox(), Some(&limits));
+
+    let unstated = ConfigLayer::parse(
+        "[sandbox]
+shell = true
+",
+    )
+    .unwrap();
+    assert_eq!(
+        unstated.sandbox().map(|read| read.interpreter),
+        Some(kernel::Interpreter::System)
+    );
+    let err = ConfigLayer::parse(
+        "[sandbox]
+interpreter = \"bash\"
+",
+    )
+    .unwrap_err();
+    assert_eq!(err.code(), &kernel::AxCode::ConfigInvalid);
+}

@@ -137,8 +137,13 @@ impl ConfigLayer {
                         .map_err(|err| refuse(format!("{raw}: {}", err.recovery())))?;
                     trusted.push(label);
                 }
+                let interpreter = section
+                    .interpreter
+                    .as_deref()
+                    .map_or(Ok(kernel::Interpreter::System), kernel::Interpreter::parse)?;
                 Some(SandboxLimits {
                     shell: section.shell,
+                    interpreter,
                     fuel: section
                         .fuel
                         .unwrap_or(kernel::consts_policy::SANDBOX_FUEL_DEFAULT),
@@ -318,6 +323,10 @@ struct SkillsSection {
 struct SandboxSection {
     #[serde(default)]
     shell: bool,
+    /// Read as text and judged by `kernel::Interpreter::parse`, so the
+    /// refusal names both spellings rather than serde's variant list.
+    #[serde(default)]
+    interpreter: Option<String>,
     #[serde(default)]
     fuel: Option<u64>,
     #[serde(default)]

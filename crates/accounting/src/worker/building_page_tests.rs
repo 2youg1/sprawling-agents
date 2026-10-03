@@ -125,6 +125,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
             addr: room.clone(),
             sandbox: Some(kernel::SandboxLimits {
                 shell: true,
+                interpreter: kernel::Interpreter::Pwsh,
                 fuel: 4096,
                 mounts: vec![Address::parse("lab/shared").unwrap()],
                 env_passthrough: Vec::new(),
@@ -147,6 +148,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
     // to is what the building's own rung now says.
     let after = city::load_config(dir.path(), &room).unwrap();
     assert!(after.sandbox.shell);
+    assert_eq!(after.sandbox.interpreter, kernel::Interpreter::Pwsh);
     assert_eq!(after.sandbox.fuel, 4096);
     assert_eq!(after.mcp.len(), 1);
     assert_eq!(after.mcp[0].label.as_str(), "docs");

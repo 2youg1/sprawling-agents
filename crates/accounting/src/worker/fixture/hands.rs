@@ -38,6 +38,7 @@ pub(crate) fn hands() -> Hands {
         exec_host: ExecHost {
             python_wasm: absent_path,
             shell: absent_path,
+            pwsh: absent_path,
             engine: absent_engine,
         },
     }

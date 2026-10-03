@@ -7110,5 +7110,9 @@
   "event_signal_landed": {
     "en": "a signal reached its room",
     "zh": "一个信号到了它的房间"
+  },
+  "machine_enables_pwsh": {
+    "en": "the exec tool's shell arm under PowerShell 7, where a building's CONFIG.toml sets interpreter = \"pwsh\"",
+    "zh": "exec 工具的 shell 一支改用 PowerShell 7，用于 CONFIG.toml 写了 interpreter = \"pwsh\" 的楼"
   }
 }

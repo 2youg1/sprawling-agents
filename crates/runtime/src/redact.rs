@@ -472,7 +472,7 @@ mod phases {
             workdir: chamber.path().to_path_buf(),
             mounts: Vec::new(),
             python_wasm: None,
-            shell: None,
+            shell: crate::Shell::Absent,
             fuel: Fuel(1_000_000),
             env_passthrough: Vec::new(),
             domain: Address::parse("work").unwrap(),

@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use kernel::AxError;
 
 use super::family::GECKO;
-use super::table::{CHROMEDRIVER, MSEDGEDRIVER, PYTHON_WASI, REQUIREMENTS, SHELL};
+use super::table::{CHROMEDRIVER, MSEDGEDRIVER, PWSH, PYTHON_WASI, REQUIREMENTS, SHELL};
 use super::{Absence, Fault, Machine, PATIENCE, Platform, Presence, ThisMachine, Version};
 
 /// Whether this binary was built with the `sandbox` feature. The one
@@ -152,6 +152,33 @@ pub(crate) fn python_wasm() -> Presence {
 /// The interpreter this platform calls a shell.
 pub(crate) fn shell() -> Presence {
     look(SHELL)
+}
+
+/// PowerShell, as `pwsh --version` answers on this machine's search path.
+pub(crate) fn pwsh() -> Presence {
+    look(PWSH)
+}
+
+/// The PowerShell 7 a run may be handed: a present `pwsh` whose version
+/// line reads major 7 or later (`crates/runtime/Spec.lean` §8-13-2 D30).
+/// A pwsh 6, and one whose version this machine could not read, is
+/// `None`, because the flags and error ids the exec tool relies on are
+/// PowerShell 7's.
+pub(crate) fn usable_pwsh() -> Option<PathBuf> {
+    seven_or_later(&pwsh())
+}
+
+/// The path of a present PowerShell whose version is 7 or later.
+pub(super) fn seven_or_later(presence: &Presence) -> Option<PathBuf> {
+    let Presence::Present { at, version } = presence else {
+        return None;
+    };
+    let major = version
+        .number()
+        .split('.')
+        .next()
+        .and_then(|major| major.parse::<u32>().ok())?;
+    (major >= 7).then(|| at.clone())
 }
 
 /// The CPython-WASI component a run may be handed: a present one, and

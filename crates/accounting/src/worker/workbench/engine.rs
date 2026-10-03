@@ -16,19 +16,21 @@
 
 use std::path::PathBuf;
 
-use kernel::{AxError, SandboxLimits};
+use kernel::{AxError, Interpreter, SandboxLimits};
+use runtime::Shell;
 
 use crate::worker::hands::ExecHost;
 
 /// What the exec tool takes from this machine.
 pub(super) struct MachineHalf {
     pub(super) python_wasm: Option<PathBuf>,
-    pub(super) shell: Option<PathBuf>,
+    pub(super) shell: Shell,
     pub(super) engine: Box<dyn runtime::Sandbox>,
 }
 
 /// Asks the host for the component, the shell and the engine; the
-/// shell only where a layer asked for one.
+/// shell only where a layer asked for one, and then the interpreter
+/// that layer named (`crates/runtime/Spec.lean` §8-13-2 D30).
 ///
 /// A broken component or shell arrives here as `None`: the exec tool's
 /// own refusal names the arm, and `sprawling doctor --explain
@@ -40,7 +42,19 @@ pub(super) fn machine_half(
     limits: &SandboxLimits,
     host: &ExecHost,
 ) -> Result<MachineHalf, AxError> {
-    let shell = if limits.shell { (host.shell)() } else { None };
+    let shell = match (limits.shell, limits.interpreter) {
+        (false, _) => Shell::Absent,
+        (true, asked) => {
+            let found = match asked {
+                Interpreter::System => (host.shell)(),
+                Interpreter::Pwsh => (host.pwsh)(),
+            };
+            found.map_or(Shell::Missing { asked }, |program| Shell::Found {
+                program,
+                interpreter: asked,
+            })
+        }
+    };
     Ok(MachineHalf {
         python_wasm: (host.python_wasm)(),
         shell,

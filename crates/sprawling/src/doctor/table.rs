@@ -43,6 +43,7 @@ pub(crate) const CHROMEDRIVER: &str = "chromedriver";
 pub(crate) const MSEDGEDRIVER: &str = "msedgedriver";
 pub(crate) const PYTHON_WASI: &str = "python-wasi";
 pub(crate) const SHELL: &str = "shell";
+pub(crate) const PWSH: &str = "pwsh";
 pub(crate) const SANDBOX_ENGINE: &str = "sandbox-engine";
 pub(crate) const FFMPEG: &str = "ffmpeg";
 
@@ -260,6 +261,39 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
             windows: Recipe::Manual("set COMSPEC to a command interpreter"),
             macos: Recipe::Manual("set SHELL to a shell, or restore /bin/sh"),
             linux: Recipe::Manual("set SHELL to a shell, or restore /bin/sh"),
+        },
+        pin: Pin::Unpinned,
+        upstream: Upstream::Unread(DoctorUnread::NoSource),
+        pack: None,
+    },
+    Requirement {
+        name: PWSH,
+        tier: Tier::Use,
+        need: Need::Optional,
+        enables: "the exec tool's shell arm under PowerShell 7, where a building's CONFIG.toml                   sets `[sandbox] interpreter = \"pwsh\"`",
+        detect: Detection::Program {
+            program: "pwsh",
+            version_arg: "--version",
+            places: NOWHERE,
+        },
+        homepage: Some("https://github.com/PowerShell/PowerShell"),
+        recipe: PerPlatform {
+            windows: Recipe::Command {
+                program: "winget",
+                args: &[
+                    "install",
+                    "--id",
+                    "Microsoft.PowerShell",
+                    "-e",
+                    "--scope",
+                    "user",
+                ],
+            },
+            macos: Recipe::Command {
+                program: "brew",
+                args: &["install", "powershell"],
+            },
+            linux: Recipe::Manual("install PowerShell 7 from your distribution's packages"),
         },
         pin: Pin::Unpinned,
         upstream: Upstream::Unread(DoctorUnread::NoSource),

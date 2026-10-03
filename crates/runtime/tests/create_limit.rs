@@ -87,7 +87,7 @@ fn an_existing_file_is_unchanged_under_create_by_edit_exec_and_link() {
             workdir: root.join("work"),
             mounts: Vec::new(),
             python_wasm: None,
-            shell: None,
+            shell: runtime::Shell::Absent,
             fuel: runtime::Fuel(1_000_000),
             env_passthrough: Vec::new(),
             domain: work,

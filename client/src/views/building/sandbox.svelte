@@ -31,7 +31,7 @@
   import type { Key } from "../../core/lang";
   import { ui } from "../../ui";
   import { Address, EnvVarName, ServerLabel } from "../../wire";
-  import type { SandboxLimits } from "../../wire";
+  import type { Interpreter, SandboxLimits } from "../../wire";
   import Button from "../parts/button.svelte";
   import Field from "../parts/field.svelte";
   import Segmented from "../parts/segmented.svelte";
@@ -57,6 +57,9 @@
 
   interface Draft {
     readonly shell: (typeof SHELL)[number];
+    // Carried, not shown: a building chooses pwsh in its CONFIG.toml
+    // (runtime D30), and saving the card must not undo that choice.
+    readonly interpreter: Interpreter;
     readonly fuel: string;
     readonly lists: Readonly<Record<ListKey, string>>;
   }
@@ -64,6 +67,7 @@
   function draftOf(limits: SandboxLimits | null): Draft {
     return {
       shell: limits?.shell === true ? "on" : "off",
+      interpreter: limits?.interpreter ?? "system",
       fuel: limits === null ? "" : String(limits.fuel),
       lists: {
         mounts: (limits?.mounts ?? []).join("\n"),
@@ -113,6 +117,7 @@
       ? null
       : {
           shell: draft.shell === "on",
+          interpreter: draft.interpreter,
           fuel,
           mounts: mounts.ok,
           env_passthrough: lines(draft.lists.env).map((name) => EnvVarName.make(name)),

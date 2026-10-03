@@ -77,6 +77,7 @@ pub fn hands(vault: gateway::Custodian) -> Hands {
         exec_host: ExecHost {
             python_wasm: crate::doctor::host::usable_python_wasm,
             shell: crate::doctor::host::usable_shell,
+            pwsh: crate::doctor::host::usable_pwsh,
             engine: crate::doctor::host::execution_engine,
         },
     }

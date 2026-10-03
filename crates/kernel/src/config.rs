@@ -15,6 +15,9 @@ use crate::error::{AxCode, AxError};
 use crate::model::Effort;
 use crate::tool::ServerLabel;
 
+mod interpreter;
+pub use interpreter::Interpreter;
+
 /// One environment variable name a scope declares its runs may inherit.
 ///
 /// A `String` would put the judgement in whichever caller remembered it.
@@ -210,6 +213,9 @@ pub struct SandboxLimits {
     /// shell line is the one arm whose reach cannot be read off its
     /// arguments.
     pub shell: bool,
+    /// Which interpreter the shell arm runs a line under: a name, never a path.
+    #[serde(default)]
+    pub interpreter: Interpreter,
     /// Instruction budget for one sandboxed call.
     pub fuel: u64,
     /// Extra readable paths, relative to the city root. The write domain
@@ -249,6 +255,7 @@ impl Default for SandboxLimits {
     fn default() -> Self {
         SandboxLimits {
             shell: false,
+            interpreter: Interpreter::System,
             fuel: crate::consts_policy::SANDBOX_FUEL_DEFAULT,
             mounts: Vec::new(),
             env_passthrough: Vec::new(),

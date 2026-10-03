@@ -32,6 +32,7 @@ pub struct Hands {
 pub struct ExecHost {
     pub python_wasm: fn() -> Option<PathBuf>,            // 可用的那一份，坏的不算
     pub shell: fn() -> Option<PathBuf>,
+    pub pwsh: fn() -> Option<PathBuf>,                   // PowerShell 7；低于 7 的不算（runtime D30）
     pub engine: fn() -> Result<Box<dyn runtime::Sandbox>, AxError>,
 }
 pub type Browsers = fn(&Path, &storage::BlockOrigin, &city::BuildingRules) -> Result<Vec<Box<dyn kernel::Tool>>, AxError>;
@@ -69,7 +70,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
 - **`Hands` 只装直接碰这台电脑的东西。** 墙钟、doctor、内存与卷的计数器、文件管理器、浏览器、正在运行的可执行文件、需求表、exec 的解释器与引擎，以及 vault。它们各自的生产实现住在 `sprawling`，由 `bin::assembly::production::hands` 一处装好。`ModelFactory` 与 `Connectors` 的生产实现不在里面：`GatewayModels` 与 `Residents` 随 worker 住在本 crate，由 `new` 装上（D18）。
 - **构造器收一个值，不收九个参数。** 生产的调用方写 `RunWorker::new(root, log, bin::assembly::hands(vault))`；换掉一只手写 `Hands { clock: …, ..hands(vault) }`，或者构造之后调原有的 `with_*` 门。
 - **worker 读的每一个时刻都经 `hands.clock`**，包括打开账本、`holding` 为 `last_tick` 取起点、`form` 写创世两行的时刻（§8-3）。
-- **exec 的判定留在 worker，读数来自主机。** `limits.shell` 为假时 worker 根本不问 `exec_host.shell`；「坏掉的不交给 run」是 doctor 的判定，所以 `ExecHost` 的两个路径函数只交可用的那一份（`bin::doctor::host::usable_python_wasm`、`usable_shell`），引擎按本构建带不带 `sandbox` feature 由 `bin::doctor::host::execution_engine` 选。
+- **exec 的判定留在 worker，读数来自主机。** `limits.shell` 为假时 worker 根本不问 `exec_host.shell`；「坏掉的不交给 run」是 doctor 的判定，所以 `ExecHost` 的三个路径函数只交可用的那一份（`bin::doctor::host::usable_python_wasm`、`usable_shell`、`usable_pwsh`），`limits.interpreter` 决定问 `shell` 还是 `pwsh`，引擎按本构建带不带 `sandbox` feature 由 `bin::doctor::host::execution_engine` 选。
 - **装配根只留自由函数与直接碰主机的生产适配器。** `bin::assembly` 里剩下：`production`（上面四项）、`listening`（占端口、开写者）、`attending`（起写者线程、接上视图折叠线程与广播，交回 vault 与 `Health`）、`chain_watch`（起审计线程并报告）、`dropping`（拖进对话框的文件）。它们只经本节与 §8-10 列出的 `pub` 面碰 worker。
 - **失败**：构造器与 `form` 原样传账本、CAS、`city` 与 `Standing::fold` 的 `AxError`，本节不另造错误码。
 - **测试的手**：`accounting::worker::fixture::hands()` 交一份不碰主机的 `Hands`——内存里的 vault、读墙钟的测试钟、一台什么都没有的机器、宽裕的内存与卷、拒绝的文件管理器、空的浏览器表、拒绝的桌面程序、拒绝的需求表、没有解释器与 shell、`runtime::AbsentSandbox`。要真的某一只手的测试，自己换上那一只。

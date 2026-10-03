@@ -35,12 +35,15 @@ use crate::backlog::{Backlog, Exit, Started};
 use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 
 mod confinement;
+mod shell;
 mod yielding;
 
 pub use confinement::{
     Assurances, Confined, Confinement, Guarantee, Kept, Missing, Offerings, Placed, Placement,
     parse_placement,
 };
+pub use outcome::{FailureClass, ShellCount, ShellTally};
+pub use shell::Shell;
 
 /// Environment variables a child may inherit. Everything else is
 /// dropped: an allowlist stays safe when the process environment grows,
@@ -57,7 +60,7 @@ pub struct ExecSetup {
     pub workdir: PathBuf,
     pub mounts: Vec<Mount>,
     pub python_wasm: Option<PathBuf>,
-    pub shell: Option<PathBuf>,
+    pub shell: Shell,
     pub fuel: Fuel,
     /// The names this building declared its children may inherit, on top
     /// of [`ENV_ALLOWLIST`].
@@ -284,18 +287,10 @@ impl ExecTool {
     }
 
     fn run_shell(&self, text: &str, placement: Placement) -> Result<ToolOutcome, AxError> {
-        let Some(shell) = &self.setup.shell else {
-            return Err(AxError::failure(
-                AxCode::ToolUnavailable,
-                "run shell",
-                "no shell interpreter was found",
-            )
-            .with_recovery("use the program arm with an explicit executable"));
-        };
-        let flag = if cfg!(windows) { "/C" } else { "-c" };
-        let mut command = std::process::Command::new(shell);
-        command.current_dir(&self.setup.workdir).arg(flag).arg(text);
-        self.through_the_backlog(command, text.to_owned(), "shell", placement)
+        let (mut command, interpreter) = self.setup.shell.command(text)?;
+        command.current_dir(&self.setup.workdir);
+        let answer = self.through_the_backlog(command, text.to_owned(), "shell", placement)?;
+        with_interpreter(answer, &interpreter)
     }
 }
 /// Every result payload this tool can return has its own file: the
@@ -303,7 +298,9 @@ impl ExecTool {
 /// written down.
 mod outcome;
 
-use outcome::{backgrounded, exceptional, settled, with_backlog, with_environment};
+use outcome::{
+    backgrounded, exceptional, settled, with_backlog, with_environment, with_interpreter,
+};
 
 /// The refusal the Python arm gives when asked for a host interpreter.
 fn no_host_python() -> AxError {

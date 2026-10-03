@@ -35,7 +35,7 @@ fn a_run_at(backlog: &Backlog, building: &str, run: u8, workdir: &std::path::Pat
         // the python arm is here as a call that settles without a child
         // process, so it reads the table and nothing else.
         python_wasm: Some(PathBuf::from("python.wasm")),
-        shell: None,
+        shell: runtime::Shell::Absent,
         fuel: Fuel(1_000_000),
         env_passthrough: Vec::new(),
         domain: Address::parse(building).unwrap(),

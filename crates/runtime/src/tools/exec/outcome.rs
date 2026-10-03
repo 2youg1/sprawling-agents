@@ -8,8 +8,10 @@
 //!
 //! One file owns the key names — `arm`, `stdout`, `stderr`,
 //! `exit_code`, `outcome`, `handle`, `what`, `detail`, `background`,
-//! `env` — so an arm cannot spell a result differently from its
-//! neighbour.
+//! `env`, `interpreter` — so an arm cannot spell a result differently
+//! from its neighbour, and the tally that reads shell results back out
+//! of the ledger reads them under the same spellings
+//! (`crates/runtime/Spec.lean` §8-13-2 D30).
 
 use std::collections::BTreeMap;
 
@@ -162,6 +164,156 @@ pub(super) fn with_environment(
         result: Payload::new(result)?,
         attachments: Vec::new(),
     })
+}
+
+/// Adds which interpreter ran a shell line to its result.
+pub(super) fn with_interpreter(
+    outcome: ToolOutcome,
+    interpreter: &str,
+) -> Result<ToolOutcome, AxError> {
+    let mut result = outcome.result.as_map().clone();
+    result.insert(
+        INTERPRETER.to_owned(),
+        Value::String(interpreter.to_owned()),
+    );
+    Ok(ToolOutcome {
+        result: Payload::new(result)?,
+        attachments: Vec::new(),
+    })
+}
+
+const INTERPRETER: &str = "interpreter";
+
+/// What a record written before results named their interpreter is
+/// counted under: then the shell arm only ever ran the platform's own.
+const BEFORE_INTERPRETERS: &str = "system";
+
+/// One class of shell failure a reader can act on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FailureClass {
+    /// The interpreter found no command by the name the line gave.
+    CommandNotFound,
+    /// The interpreter could not parse the line.
+    Syntax,
+    /// The output held bytes that were not UTF-8, written down as U+FFFD.
+    Encoding,
+}
+
+/// The interpreter families whose failures read alike.
+enum Family {
+    Cmd,
+    Pwsh,
+    Posix,
+    /// A record from before results named their interpreter.
+    Unnamed,
+}
+
+impl Family {
+    fn of(interpreter: &str) -> Family {
+        match interpreter {
+            "cmd" => Family::Cmd,
+            "pwsh" | "powershell" => Family::Pwsh,
+            BEFORE_INTERPRETERS => Family::Unnamed,
+            _ => Family::Posix,
+        }
+    }
+}
+
+impl FailureClass {
+    /// Which class a shell result's failure falls in, or `None` for a
+    /// success and for a failure no rule recognises.
+    ///
+    /// The exit code is read first, then the error ids that do not change
+    /// with the display language, then the replacement character, and
+    /// English text last: cmd prints its syntax errors in the language
+    /// Windows is set to, so on another language they stay unclassified
+    /// rather than this file carrying a second copy of Microsoft's text.
+    #[must_use]
+    pub fn of(interpreter: &str, exit_code: i64, stdout: &str, stderr: &str) -> Option<Self> {
+        if exit_code == 0 {
+            return None;
+        }
+        let family = Family::of(interpreter);
+        let not_found = match family {
+            Family::Cmd => exit_code == 9009,
+            Family::Posix => exit_code == 127,
+            Family::Pwsh => stderr.contains("CommandNotFoundException"),
+            Family::Unnamed => exit_code == 9009 || exit_code == 127,
+        };
+        let parser = matches!(family, Family::Pwsh) && stderr.contains("ParserError");
+        let cmd_text = stderr.contains("was unexpected at this time.")
+            || stderr.contains("The syntax of the command is incorrect.");
+        let posix_text = exit_code == 2 && stderr.contains("syntax error");
+        let syntax_text = match family {
+            Family::Cmd => cmd_text,
+            Family::Posix => posix_text,
+            Family::Pwsh => false,
+            Family::Unnamed => cmd_text || posix_text,
+        };
+        if not_found {
+            Some(FailureClass::CommandNotFound)
+        } else if parser {
+            Some(FailureClass::Syntax)
+        } else if stdout.contains('\u{FFFD}') || stderr.contains('\u{FFFD}') {
+            Some(FailureClass::Encoding)
+        } else if syntax_text {
+            Some(FailureClass::Syntax)
+        } else {
+            None
+        }
+    }
+}
+
+/// How one interpreter's shell lines ended.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ShellCount {
+    /// Lines that ended with a code.
+    pub calls: u64,
+    /// Of those, how many failed in each class.
+    pub failures: BTreeMap<FailureClass, u64>,
+}
+
+/// Shell results folded per interpreter: the reading that decides
+/// whether PowerShell 7 should become the default (D30).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ShellTally {
+    by_interpreter: BTreeMap<String, ShellCount>,
+}
+
+impl ShellTally {
+    /// Counts one exec result, the `result` object of a tool result
+    /// record. Any other arm, and a shell line that ended without a code
+    /// (handed to the background, or stopped by a signal), is not
+    /// counted: there is nothing yet to classify.
+    pub fn absorb(&mut self, result: &Map<String, Value>) {
+        if result.get("arm").and_then(Value::as_str) != Some("shell") {
+            return;
+        }
+        let Some(code) = result.get("exit_code").and_then(Value::as_i64) else {
+            return;
+        };
+        let text = |key: &str| result.get(key).and_then(Value::as_str).unwrap_or("");
+        let interpreter = result
+            .get(INTERPRETER)
+            .and_then(Value::as_str)
+            .unwrap_or(BEFORE_INTERPRETERS);
+        let count = self
+            .by_interpreter
+            .entry(interpreter.to_owned())
+            .or_default();
+        count.calls = count.calls.saturating_add(1);
+        if let Some(class) = FailureClass::of(interpreter, code, text("stdout"), text("stderr")) {
+            let failed = count.failures.entry(class).or_default();
+            *failed = failed.saturating_add(1);
+        }
+    }
+
+    /// Every interpreter seen, by name, with its count.
+    pub fn interpreters(&self) -> impl Iterator<Item = (&str, &ShellCount)> {
+        self.by_interpreter
+            .iter()
+            .map(|(name, count)| (name.as_str(), count))
+    }
 }
 
 pub(super) fn exceptional(

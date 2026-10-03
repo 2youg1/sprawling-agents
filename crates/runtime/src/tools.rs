@@ -27,6 +27,7 @@ pub use edit::version_of;
 pub use exec::parse_arm;
 pub use exec::parse_placement;
 pub use exec::{ExecSetup, ExecTool};
+pub use exec::{FailureClass, Shell, ShellCount, ShellTally};
 pub use exec::{Placed, Placement};
 // Where a host command runs is public through this module for the two
 // readers outside the tool: the machine's own dependency report, and a

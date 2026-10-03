@@ -410,6 +410,20 @@ export const EnvVarName = Schema.String.pipe(Schema.brand("EnvVarName"));
 export type EnvVarName = typeof EnvVarName.Type;
 
 /**
+ * Which interpreter a building's shell lines run under
+ * (`crates/kernel/spec/Config.lean` §8-22, `crates/runtime/Spec.lean`
+ * §8-13-2 D30).
+ * 
+ * `System` is the platform's own shell, `%COMSPEC%` on Windows and
+ * `$SHELL` elsewhere; `Pwsh` is PowerShell 7 on every platform. A
+ * building that asks for one this machine lacks is refused at the
+ * call rather than given the other, because a line written for one
+ * interpreter is a different language under the other.
+ */
+export const Interpreter = Schema.Literals(["system", "pwsh"]).annotate({ identifier: "Interpreter" });
+export type Interpreter = typeof Interpreter.Type;
+
+/**
  * What a run's execution boundary allows. Resolved as one value rather
  * than field by field: a layer that speaks about the sandbox speaks
  * about all of it, so an under-specified layer can only ever reduce
@@ -423,6 +437,7 @@ export type EnvVarName = typeof EnvVarName.Type;
 export const SandboxLimits = Schema.Struct({
   env_passthrough: Schema.optional(Schema.Array(EnvVarName)),
   fuel: Schema.Int,
+  interpreter: Schema.optional(Interpreter),
   mounts: Schema.Array(Address),
   shell: Schema.Boolean,
   trusted: Schema.optional(Schema.Array(ServerLabel)),
