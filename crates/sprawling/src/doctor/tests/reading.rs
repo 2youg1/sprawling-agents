@@ -394,28 +394,3 @@ fn slow_scanning_is_advice_and_never_a_failure() {
         "{shown}"
     );
 }
-
-/// The page's answer carries the scanning reading the terminal prints:
-/// `DoctorRefresh` reaches `accounting::Machine::report`, and that is
-/// the fold the page reads (`crates/wire/spec/Answer/Doctor.lean` D25).
-#[test]
-fn the_page_carries_the_scanning_reading_the_doctor_took() {
-    let city = std::env::temp_dir().join("one");
-    let machine = ScriptedMachine::missing(&[]).scanning(Scanning::Read {
-        city: city.clone(),
-        drive: Drive::Untrusted {
-            volume: "D:".to_owned(),
-        },
-        exclusion: Exclusion::Outside,
-    });
-    assert_eq!(
-        accounting::Machine::report(&machine, &city).scanning,
-        wire::DoctorScanning::Read {
-            city: city.display().to_string(),
-            drive: wire::DoctorDrive::Untrusted {
-                volume: "D:".to_owned()
-            },
-            exclusion: wire::DoctorExclusion::Outside,
-        }
-    );
-}

@@ -15,7 +15,8 @@
 )]
 
 use super::super::Records;
-use super::super::terminal::{printed, serving};
+use super::super::stream::printed;
+use super::super::terminal::serving;
 use super::helpers::*;
 
 /// **The defect this card closes.** The console holds the same desk

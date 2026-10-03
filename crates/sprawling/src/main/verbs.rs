@@ -125,8 +125,17 @@ const INCLUDE_CONFIDENTIAL: Flag = flag(
     "read confidential buildings too; the bundle and stderr say so",
 );
 /// The switch that widens the console's event stream from one line per
-/// record to the record whole; `serve_city` reads it by this name.
-pub(super) const WHOLE_RECORDS: &str = "--whole-records";
+/// record to the record whole.
+const WHOLE_RECORDS: &str = "--whole-records";
+
+/// How much of each record the console of a served line prints.
+pub(super) fn records(args: &[String]) -> sprawling::console::Records {
+    if args.iter().any(|arg| arg == WHOLE_RECORDS) {
+        sprawling::console::Records::Whole
+    } else {
+        sprawling::console::Records::Summary
+    }
+}
 /// `up` forwards its line to the same `serve_city` that `serve` runs, so the
 /// two rows share one flag set and cannot drift apart.
 const SERVED: &[Flag] = &[

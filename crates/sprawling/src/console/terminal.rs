@@ -49,21 +49,7 @@ pub struct Terminal {
     /// what decides whether strangers can reach it.
     pub bind: SocketAddr,
     /// How much of each committed record the event stream prints.
-    pub records: Records,
-}
-
-/// How much of each committed record the console prints.
-///
-/// A record carries what the User typed and what a model answered, and a
-/// terminal is read over a shoulder, scrolled into a recording and kept in
-/// a scrollback file, so the default is the line that says what happened
-/// and where, and the payload is shown only when the User asks for it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Records {
-    /// One line per record: its seq, its kind and its address.
-    Summary,
-    /// The record whole, payload included, as `sprawling call` prints it.
-    Whole,
+    pub records: super::stream::Records,
 }
 
 use kernel::Address;
@@ -167,23 +153,9 @@ pub(crate) fn web_url(terminal: &Terminal) -> String {
 pub(crate) fn start(
     terminal: Terminal,
     inside: Inside,
-    mut watching: tokio::sync::broadcast::Receiver<wire::Committed>,
+    watching: tokio::sync::broadcast::Receiver<wire::Committed>,
 ) {
-    let records = terminal.records;
-    std::thread::spawn(move || {
-        while let Ok(committed) = watching.blocking_recv() {
-            match printed(committed.record(), records) {
-                Ok(text) => println!("{text}"),
-                // The record is on the ledger and reached every socket as
-                // its frame; only this printout lacks it, so the gap is
-                // named rather than left silent.
-                Err(error) => eprintln!(
-                    "  seq {} is in the history but could not be printed here: {error}",
-                    committed.record().seq().value()
-                ),
-            }
-        }
-    });
+    super::stream::print(terminal.records, watching);
     std::thread::spawn(move || {
         let stdin = std::io::stdin();
         drive(
@@ -193,26 +165,6 @@ pub(crate) fn start(
             &mut std::io::stdout(),
         );
     });
-}
-
-/// One committed record, as the event stream prints it.
-///
-/// The kind is spelled by its serde name, the one the ledger and the wire
-/// use, so the summary line names no kind a second way; the whole record
-/// is the shape `sprawling call` prints.
-pub(super) fn printed(
-    record: &kernel::EventRecord,
-    records: Records,
-) -> Result<String, serde_json::Error> {
-    match records {
-        Records::Whole => serde_json::to_string(record),
-        Records::Summary => {
-            let kind = serde_json::to_value(record.kind())?;
-            let kind = kind.as_str().unwrap_or("?");
-            let at = record.addr().map_or("city", Address::as_str);
-            Ok(format!("  seq {}  {kind}  {at}", record.seq().value()))
-        }
-    }
 }
 
 /// One line to the console.

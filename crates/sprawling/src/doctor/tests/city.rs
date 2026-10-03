@@ -12,6 +12,7 @@ use super::ScriptedMachine;
 use crate::doctor::explain::{Explanation, explain};
 use crate::doctor::needs::{Bits, Capability, lack_line, lacks};
 use crate::doctor::paint::Ink;
+use crate::doctor::scanning::{Drive, Exclusion, Scanning};
 use crate::doctor::screen::{Asked, asked, run};
 use crate::doctor::visit::{Visited, visit};
 use crate::doctor::{Platform, examine};
@@ -275,4 +276,29 @@ fn explain_on_the_screen_is_one_line_per_item_and_never_a_failure() {
     let shown = String::from_utf8(screen).unwrap();
     assert!(shown.contains("python-wasi"), "{shown}");
     assert!(shown.contains("E_TOOL_UNAVAILABLE"), "{shown}");
+}
+
+/// The page's answer carries the scanning reading the terminal prints:
+/// `DoctorRefresh` reaches `accounting::Machine::report`, and that is
+/// the fold the page reads (`crates/wire/spec/Answer/Doctor.lean` D25).
+#[test]
+fn the_page_carries_the_scanning_reading_the_doctor_took() {
+    let city = std::env::temp_dir().join("one");
+    let machine = ScriptedMachine::missing(&[]).scanning(Scanning::Read {
+        city: city.clone(),
+        drive: Drive::Untrusted {
+            volume: "D:".to_owned(),
+        },
+        exclusion: Exclusion::Outside,
+    });
+    assert_eq!(
+        accounting::Machine::report(&machine, &city).scanning,
+        wire::DoctorScanning::Read {
+            city: city.display().to_string(),
+            drive: wire::DoctorDrive::Untrusted {
+                volume: "D:".to_owned()
+            },
+            exclusion: wire::DoctorExclusion::Outside,
+        }
+    );
 }
