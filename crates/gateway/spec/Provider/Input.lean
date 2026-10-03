@@ -12,7 +12,7 @@
 /-!
 ### 8-37 一个模型收得下什么：`gateway::provider::input`（形状 1 判定）
 
-`ocr` 能不能用在一个模型上，取决于这个模型登记时的 `InputKinds`（§8-34「能不能把图交给这个模型，由端点判」）。这个值原先只从钉版目录读，目录里收图的只有一行，而预置表的每个模型行都已写着 `input`；于是一个厂商文档写明能读图的模型选为 `Ocr` 之后仍按 `Text` 登记，端点拒绝每一张图。上下文窗口与输出上限早已是一架从目录到预置表再到缺省的梯子（`window_for`、`OutputCeiling::resolve`，§8-17）；「收得下什么」走同一种梯子，判定只写在这里。
+`ocr` 能不能用在一个模型上，取决于这个模型登记时的 `InputKinds`（§8-34「能不能把图交给这个模型，由端点判」）。钉版目录里收图的只有一行，而预置表的每个模型行都写着 `input`，所以只读目录会把一个厂商文档写明能读图的模型按 `Text` 登记，端点拒绝每一张图。上下文窗口与输出上限是一架从目录到预置表再到缺省的梯子（`window_for`、`OutputCeiling::resolve`，§8-17）；「收得下什么」走同一种梯子，判定只写在这里。
 
 ```rust
 // provider::input —— 判定，先命中者胜
@@ -26,6 +26,8 @@ pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds>;
 - **不读这个模型以前登记的 `input`。** 以前登记的值是当时梯子的答案，不是谁说过的话；读回它，一个在预置表学会它之前按 `Text` 登记的模型就永远按 `Text` 登记。重选同一个模型因此总按今天的表重新作答。
 - **不记是哪一档答的。** `model_selected` 记 `input`，不记它的来处：读它的只有端点发图前的那道检查，那道检查不因来处而异；上限要记来处（`ceiling_from`），是因为一次被截断的跑要读得出原因。
 - **唯一的生产调用者是选型点**（`accounting::worker::credentials::endpoints::choosing` 的 `select_model`）：登记行的 `input` 就是本函数的答案。
+- **平台**：纯判定，三个平台相同。
+- **派生检查**：`every_answer_is_a_stated_fact_or_text` 在 Rust 一侧只有 `the_first_rung_that_states_a_fact_answers` 那张表的几行，没有走遍人、目录、预置表三档各三种取值的检查，记为债。
 - **验收**：`provider::input` 的测试比一张表——人说了的那一档胜过目录与预置表（两个方向各一次）、目录说 `Text` 而预置表说 `TextImage` 时答 `Text`、目录沉默而预置表说 `TextImage` 时答 `TextImage`（厂商主机上与中转站上各一次）、这台电脑上的服务与两表都不认识的 id 答 `Text`；`accounting` 的 `a_preset_model_that_reads_pictures_is_registered_as_reading_them`：一个目录没有、预置表写着 `text_image` 的模型选为 `Ocr` 之后，端点账本里那一次选择的 `input` 是 `TextImage`；`a_model_the_person_says_reads_pictures_is_registered_as_reading_them`：一个目录写着 `text` 的模型，`SelectModel` 带 `input: TextImage` 选为 `Ocr`，登记的 `input` 是 `TextImage`。
 -/
 
@@ -51,21 +53,9 @@ inductive InputKinds where
 def accepted_input (stated pinned preset : Option InputKinds) : InputKinds :=
   ((stated.or pinned).or preset).getD .Text
 
-/-- 人说了，人作答，目录与预置表说什么都不改它：读图与不读图两个方向都是。 -/
-theorem the_person_outranks_both_tables (kind : InputKinds) (pinned preset : Option InputKinds) :
-    accepted_input (some kind) pinned preset = kind := rfl
+/-- 每一档压过下一档是 `accepted_input` 的定义本身（`Option.or` 的次序），不另写定理；谁都不说时答 `Text`：猜小了是一句拒绝，猜大了是 provider 的 400。Rust 用 `unwrap_or_default`，`InputKinds` 的 `#[default]` 是 `Text`。
 
-/-- 人没说时目录作答，预置表说什么都不改它。 -/
-theorem the_catalogue_outranks_the_preset_table (kind : InputKinds) (preset : Option InputKinds) :
-    accepted_input none (some kind) preset = kind := rfl
-
-/-- 目录沉默时预置表作答：`ocr` 用得上一个目录之外、厂商文档写明读图的模型。 -/
-theorem the_preset_table_answers_where_the_catalogue_is_silent (kind : InputKinds) :
-    accepted_input none none (some kind) = kind := rfl
-
-/-! 谁都不说时答 `Text`：猜小了是一句拒绝，猜大了是 provider 的 400。 -/
-
-/-- 梯子不发明事实：答案要么是人说的，要么是人沉默时目录的，要么是两者都沉默时预置表的，要么是三者都沉默时的 `Text`。 -/
+梯子不发明事实：答案要么是人说的，要么是人沉默时目录的，要么是两者都沉默时预置表的，要么是三者都沉默时的 `Text`。 -/
 theorem every_answer_is_a_stated_fact_or_text (stated pinned preset : Option InputKinds) :
     stated = some (accepted_input stated pinned preset)
       ∨ (stated = none ∧ pinned = some (accepted_input stated pinned preset))
@@ -73,19 +63,5 @@ theorem every_answer_is_a_stated_fact_or_text (stated pinned preset : Option Inp
       ∨ (stated = none ∧ pinned = none ∧ preset = none
           ∧ accepted_input stated pinned preset = .Text) := by
   cases stated <;> cases pinned <;> cases preset <;> simp [accepted_input, Option.or]
-
-/-- 被否的「只读目录」是 D14 那条缺陷本身：一个只有预置表写明读图的模型，只读目录时按 `Text` 登记，梯子按 `TextImage` 登记。 -/
-theorem the_catalogue_alone_registers_a_documented_reader_as_text :
-    (none : Option InputKinds).getD .Text ≠ accepted_input none none (some .TextImage) := by
-  decide
-
-/-- 没有人那一档的梯子：目录、预置表、`Text`。 -/
-def acceptedWithoutPerson (pinned preset : Option InputKinds) : InputKinds :=
-  (pinned.or preset).getD .Text
-
-/-- 没有人那一档时，人说「这个模型读图」被目录的 `Text` 盖掉：`ocr` 在一个人知道能读图的模型上仍被端点拒绝。 -/
-theorem withoutPerson_loses_the_statement :
-    acceptedWithoutPerson (some .Text) none ≠ accepted_input (some .TextImage) (some .Text) none := by
-  decide
 
 end Gateway.Provider.Input

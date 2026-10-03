@@ -36,7 +36,7 @@ import crates.gateway.spec.Transcribe.Recording
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部，并写下四节不属于任何一个模块的 crate 级接口。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `gateway D<n>`；D1 到 D15 是这份规格在 Markdown 时 §12 各段按出现顺序的编号，D16 起是迁到 Lean 之后的决定，§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：输出上限的事实梯（`spec/Provider/Ceiling.lean`）、一个模型收得下什么（`spec/Provider/Input.lean`）、预置表里哪一行为一个模型 id 作答（`spec/Provider/Preset.lean`）、一次失败能不能再试（`spec/Endpoint/Failure.lean`）、一次调用的结算（`spec/Cost.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：输出上限的事实梯（`spec/Provider/Ceiling.lean`）、一个模型收得下什么（`spec/Provider/Input.lean`）、预置表里哪一行为一个模型 id 作答（`spec/Provider/Preset.lean`）、一次失败能不能再试（`spec/Endpoint/Failure.lean`）、一次调用的结算（`spec/Cost.lean`）、一个端点的并发名额与排队（`spec/Concurrency.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -67,11 +67,12 @@ import crates.gateway.spec.Transcribe.Recording
 
 分部里的定理是模型对性质的证明：
 
-- `spec/Provider/Ceiling.lean`：人填的数压过其余三档（`the_person_outranks_every_other_rung`），人没说时上游压过本城钉下的数（`upstream_outranks_what_this_city_pinned`）；不要这个字段的一面上没人说就不写（`a_face_that_takes_no_figure_is_sent_none_nobody_stated`），要它的一面上恒有一个数（`a_face_that_needs_a_figure_always_gets_one`）；目录在预置表之前（`the_catalogue_outranks_the_preset_table`）；本城钉下的数与策略缺省只在这一面要一个数时作答（`the_city_states_a_figure_only_where_the_face_needs_one`）。
-- `spec/Provider/Input.lean`：目录在预置表之前、目录沉默时预置表作答、两者都沉默时答 `Text`；答案要么是一个说过的事实，要么是 `Text`（`every_answer_is_a_stated_fact_or_text`）；只读目录的被否设计把一个文档写明读图的模型登记成 `Text`（`the_catalogue_alone_registers_a_documented_reader_as_text`）。
+- `spec/Provider/Ceiling.lean`：要这个字段的一面上恒有一个数（`a_face_that_needs_a_figure_always_gets_one`），本城钉下的数与策略缺省只在这一面要一个数时作答（`the_city_states_a_figure_only_where_the_face_needs_one`）；每一档压过下一档是 `resolve` 的一条臂。
+- `spec/Provider/Input.lean`：答案要么是一个说过的事实（人、目录、预置表，先说者胜），要么是 `Text`（`every_answer_is_a_stated_fact_or_text`）。
 - `spec/Provider/Preset.lean`：这台电脑上的服务不借厂商的行（`a_server_on_this_machine_borrows_no_vendor_row`）；host 有自己的行时只由它们作答（`a_host_with_rows_of_its_own_answers_from_them`）；作答的行的前缀是这个 id 的前缀（`the_answer_is_a_prefix_of_the_id`）。
 - `spec/Endpoint/Failure.lean`：没发出去的请求再发，发出去丢了回答的效果不明；非 2xx 恰在 408、429 与 5xx 时再问（`a_refusal_is_asked_again_exactly_when_the_provider_is_busy`、`the_status_table`）；溢出恰是 400 或 413 且拒词说窗口满了（`a_refusal_is_an_overflow_exactly_when_it_names_the_window`），从不再试。
 - `spec/Cost.lean`：权威计费额在场恒胜（`the_authoritative_amount_always_wins`）；价目推算答出的数是精确的和、装得进 `u64`（`a_settled_sheet_is_the_exact_sum`）。
+- `spec/Concurrency.lean`：一个端点的名额在任意轨迹上上限留在 1 到配置值之间（`run_valid`）、没有收窄时在用数不超过上限（`run_keeps_within`）、`Retry-After` 的时刻之前不放宽（`no_widening_before_hold`）、等到的时刻严格晚于此刻（`wait_is_later`）；排队的号按拿号的次序取到（`grants_follow_arrival`）。
 
 每个模型都带一个可实现的正常路径（`example`：一个两表都不认识的模型在 messages 面上以策略缺省叫得通、转发厂商 id 的中转站读到厂商那一行、`cost` 测试里那一次结算），所以这些保证不是从一个无法满足的前提推出来的。生产实现与模型的对应由 §16 列出的 Rust 测试检查；一条 Lean 定理证明的是模型，不是 Rust。
 -/

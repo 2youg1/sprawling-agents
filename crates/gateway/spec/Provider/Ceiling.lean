@@ -9,6 +9,10 @@
 规定 `provider::ceiling`（`crates/gateway/src/provider/ceiling.rs`）：关于一次调用输出上限的几种说法谁胜、是谁说的。本文件是 `crates/gateway/Spec.lean` 的一个分部；别处引它的决定作 `gateway D<n>`。
 
 §8-17（`crates/gateway/spec/Provider.lean`）写这架梯子的接口与理由；本分部是它的模型：人填 → 上游陈述 → 钉版目录与预置表 → 策略缺省，后两档只在这一面要一个数时作答。
+
+这里没有状态机：`resolve` 是一架梯子，每一档压过下一档是它的一条 `match` 臂，读定义即可，不另写定理。证明的是两条跨过所有臂的性质：要这个字段的一面恒得到一个数（`a_face_that_needs_a_figure_always_gets_one`），本城钉下的数与策略缺省只在那样的一面上作答（`the_city_states_a_figure_only_where_the_face_needs_one`）。Rust 的 `resolve` 取 `Target`（`base_url`、`id`、`wire`），在梯子走到那一档时才问预置表；模型把预置表的答案当作一个值传进来，结果相同。平台：纯判定，三个平台相同。
+
+派生检查：`provider::ceiling` 的测试各判一个输入（`the_higher_rung_wins_and_says_that_it_did`、`on_a_face_that_takes_no_figure_the_provider_picks_when_nobody_stated_one`、`an_unknown_model_at_an_unknown_host_is_still_callable`）；两条性质还没有覆盖整个输入空间的 proptest（人、上游、钉版、预置各有无，三面），记为债。
 -/
 
 namespace Gateway.Provider.Ceiling
@@ -71,30 +75,6 @@ def resolve (stated : Stated) (pinned preset : Option Ceiling) (policy : Nat)
     | some tokens => some (.Sent tokens .Preset)
     | none => (Ceiling.new policy).map (fun tokens => .Sent tokens .Policy)
 
-/-- 人填的数压过其余三档：那是一个决定，不是推断。 -/
-theorem the_person_outranks_every_other_rung (stated : Stated) (pinned preset : Option Ceiling)
-    (policy : Nat) (wire : DialectKind) (tokens : Ceiling) (said : stated.person = some tokens) :
-    resolve stated pinned preset policy wire = some (.Sent tokens .Person) := by
-  unfold resolve
-  rw [said]
-
-/-- 人没说时，上游 `/models` 说过的话压过本城钉下的任何数字。 -/
-theorem upstream_outranks_what_this_city_pinned (stated : Stated) (pinned preset : Option Ceiling)
-    (policy : Nat) (wire : DialectKind) (tokens : Ceiling) (silent : stated.person = none)
-    (said : stated.upstream = some tokens) :
-    resolve stated pinned preset policy wire = some (.Sent tokens .Upstream) := by
-  unfold resolve
-  rw [silent, said]
-
-/-- 不要这个字段的一面上，人与上游都没说就不写：本城的任何数字要么低于厂商按模型给的缺省，要么在对话变长后被拒。 -/
-theorem a_face_that_takes_no_figure_is_sent_none_nobody_stated (stated : Stated)
-    (pinned preset : Option Ceiling) (policy : Nat) (wire : DialectKind)
-    (person : stated.person = none) (upstream : stated.upstream = none)
-    (optional : field_on wire = .Optional) :
-    resolve stated pinned preset policy wire = some .ProviderDefault := by
-  unfold resolve
-  rw [person, upstream, optional]
-
 /-- 要这个字段的一面上，梯子恒给一个数：一个目录不认识的模型照样叫得通。前提是策略缺省不为零。 -/
 theorem a_face_that_needs_a_figure_always_gets_one (stated : Stated)
     (pinned preset : Option Ceiling) (policy : Nat) (wire : DialectKind)
@@ -111,15 +91,6 @@ theorem a_face_that_needs_a_figure_always_gets_one (stated : Stated)
       cases hr : pinned.or preset with
       | some tokens => exact ⟨tokens, .Preset, rfl⟩
       | none => exact ⟨⟨policy, positive⟩, .Policy, by simp [Ceiling.new, positive]⟩
-
-/-- 钉版目录与预置表是同一档的两个索引，目录在前。 -/
-theorem the_catalogue_outranks_the_preset_table (stated : Stated) (preset : Option Ceiling)
-    (policy : Nat) (wire : DialectKind) (tokens : Ceiling) (person : stated.person = none)
-    (upstream : stated.upstream = none) (required : field_on wire = .Required) :
-    resolve stated (some tokens) preset policy wire = some (.Sent tokens .Preset) := by
-  unfold resolve
-  rw [person, upstream, required]
-  rfl
 
 /-- 本城钉下的数与策略缺省只在这一面要一个数时作答。 -/
 theorem the_city_states_a_figure_only_where_the_face_needs_one (stated : Stated)

@@ -10,13 +10,15 @@
 
 模型是一个端点的名额状态在一条事件轨迹上的演变。事件五种：取（take）、还（give back）、被限流（429，带或不带 `Retry-After`）、一次成功、时间流逝（tick）。每个带时刻的事件自带它发生的时刻，状态不持有时钟，所以三个平台相同。
 
-下面证明五条性质，各在一条轨迹上量化：
+下面证明六条性质，各在一条轨迹上量化：
 1. 取到的名额从不让在用数超过当下的上限；没有收窄的轨迹上，在用数始终不超过上限。收窄不收回已在飞的调用，所以「在用数 ≤ 上限」在一次收窄之后可以暂时不成立，直到在飞的调用陆续归还——这是对 D17「名额在用不超过上限」的精确读法。
 2. 上限始终在 1 到配置值之间。
 3. 在 `Retry-After` 给出的时刻之前，上限不会变大；上限变大的唯一一步是那个时刻之后的一次成功。
 4. 连续 `WIDEN_AFTER` 次成功（在那个时刻之后）让上限加一，直到配置值。
 5. 一次取答「取到」「已满」或「等到某一刻」：已满只在名额都在用时答（由一次归还唤醒），等到的时刻严格晚于此刻，所以调用方不会忙等。
 6. 排队按号先来后到：取到名额的号严格按拿号的次序（文末「排队」一节，D20）。
+
+与 Rust 的对应：`holdUntil` 为 0 读作 Rust 的 `hold_until: None`（任何时刻都不早于 0）；`giveBack` 的自然数减法即 Rust 的 `saturating_sub`；Rust 的 `Instant` 加法溢出时不设 `hold_until`，模型的 `Nat` 没有这一档。派生检查：`concurrency::tests` 的 proptest `permits_keep_the_lean_properties` 对随机轨迹每走一步断言性质 1（取到之后在用数不超过上限）、2、3、5，以及性质 4 的「每次放宽恰加一」；`a_narrowed_limit_widens_after_the_retry_after_instant` 在 `Retry-After` 前后各判一次性质 4。性质 1 的轨迹形（`run_keeps_within`，没有收窄的整条轨迹上在用数不超过上限）没有派生检查，记为债。
 -/
 
 namespace Gateway.Concurrency
@@ -290,7 +292,7 @@ theorem successes_stop_at_cap (s : Permits) (trace : List Event) (hv : Valid s) 
 `Full` 时调用拿一张号排队，名额空出时只有队首那张号取到；排得太久的号被拒出队（`QUEUE_WAIT_MAX`）。模型只看号：到达、给队首一个名额、拒掉某张号。下面证明，在任意一条轨迹上，取到名额的号按拿号的次序排列——后到的调用从不先于先到的取到（`grants_follow_arrival`）。派生检查：`crates/gateway/src/endpoint/permit.rs` 的 proptest `grants_follow_arrival` 对随机的到达、任一排队者的尝试、归还与超时轨迹驱动 `Gate` 的号队列（`admit` 的每一步都是它），断言取到的号严格递增；它先对一个把名额给最新那张号的队列变红过。
 -/
 
-/-- 一个端点的排队（`Transport` 里的号与队列）。 -/
+/-- 一个端点的排队（`endpoint::permit` 的 `Queue`，在 `Gate` 里）。`granted` 是观察用的影子：Rust 不留已取到的号，proptest 自己记下它们。 -/
 structure Queue where
   next : Nat
   waiting : List Nat
