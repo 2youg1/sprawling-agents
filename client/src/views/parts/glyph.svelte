@@ -31,6 +31,7 @@ import ChartLine from "@lucide/svelte/icons/chart-line";
 import Check from "@lucide/svelte/icons/check";
 import ChevronRight from "@lucide/svelte/icons/chevron-right";
 import Circle from "@lucide/svelte/icons/circle";
+import Copy from "@lucide/svelte/icons/copy";
 import Ellipsis from "@lucide/svelte/icons/ellipsis";
 import FilePenLine from "@lucide/svelte/icons/file-pen-line";
 import FolderOutput from "@lucide/svelte/icons/folder-output";
@@ -80,6 +81,7 @@ const DRAWN: Record<GlyphName, Component<{ class?: ClassValue; strokeWidth?: num
   pin: Pin,
   more: Ellipsis,
   branch: GitBranch,
+  copy: Copy,
 };
 
 export type GlyphSize = "sm" | "md" | "key" | "stop";

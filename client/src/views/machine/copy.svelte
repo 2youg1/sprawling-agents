@@ -4,12 +4,20 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The copy control of a command, and its receipt. The face turns into a
-// check for a moment after the write lands (ux-upgrades A7), so a press
-// that quietly failed shows no check rather than a lying one. Two marks
-// and no motion between them: the receipt is a cut, and the mark is
-// `parts/glyph`'s `check`, which is where every icon in this client
-// lives (docs/frontend-method.md §4-34).
+// The copy control of a command, and its receipt. Every press-to-copy
+// key in the client is this one control, so it carries the three marks
+// D55 asks of a button once: a recognisable icon (`parts/glyph`'s
+// `copy`, where every icon in this client lives,
+// docs/frontend-method.md §4-34), a visible name, and a note that says
+// what lands on the clipboard (`parts/tip`, shown on hover and on
+// keyboard focus, because a touch screen has no hover). The note
+// quotes the text, so a row with two copy keys says which is which
+// without the User pressing either.
+//
+// The face turns into a check and the name into "copied" for a moment
+// after the write lands (ux-upgrades A7), so a press that quietly
+// failed shows no check rather than a lying one. Two faces and no
+// motion between them: the receipt is a cut.
 
 // How long the receipt holds its check mark: long enough to see one,
 // short enough that the mark never becomes the button's face.
@@ -20,16 +28,17 @@ const RECEIPT_MS = 1200;
 // widens the touch surface to the 44-point floor while the drawn
 // control stays on the control scale (docs/frontend-method.md §4-34).
 const WEAR =
-  "relative flex h-control shrink-0 items-center gap-tight rounded-control px-base " +
+  "relative flex h-control shrink-0 items-center gap-tight rounded-control px-snug " +
   "text-label text-text-quiet before:absolute before:-inset-snug before:content-[''] " +
   "transition-[background-color,color] hover:bg-raised " +
   "hover:text-text motion-reduce:transition-none";
 </script>
 
 <script lang="ts">
-  import { say } from "../../core/lang";
+  import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import Glyph from "../parts/glyph.svelte";
+  import Tip from "../parts/tip.svelte";
 
   interface Props {
     // The command, exactly as a person would type it.
@@ -55,10 +64,11 @@ const WEAR =
   }
 </script>
 
-<button type="button" class={WEAR} aria-label={say($lang, copied ? "setup_copied" : "setup_copy")} onclick={copy}>
-  {#if copied}
-    <Glyph name="check" size="sm" class="shrink-0" />
-  {:else}
-    {say($lang, "setup_copy")}
-  {/if}
-</button>
+<Tip text={fill(say($lang, "copy_note"), { text })}>
+  {#snippet children(hint: string)}
+    <button type="button" class={WEAR} aria-describedby={hint} onclick={copy}>
+      <Glyph name={copied ? "check" : "copy"} size="sm" class="shrink-0" />
+      {say($lang, copied ? "setup_copied" : "setup_copy")}
+    </button>
+  {/snippet}
+</Tip>

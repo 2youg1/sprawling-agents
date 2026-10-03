@@ -111,10 +111,17 @@
     ["macOS and Linux · does not apply", "does_not_apply"],
   ];
 
+  // The copy key beside the two kinds of text it carries: a command a
+  // User runs, and an object name too long to read aloud. Its note
+  // appears on hover and on keyboard focus; the resting face is the
+  // icon and the name.
+  const COPIED: readonly string[] = ["sprawling doctor --install", "9f2c4e1a7b3d5f60812e4a9c0b7d6e5f43a2b1c0"];
+
   const WIDTHS = [1040, 390] as const;
 </script>
 
 <script lang="ts">
+  import Copy from "../machine/copy.svelte";
   import Scanning from "../machine/scanning.svelte";
   import ReleaseAnswerView from "../release/answer.svelte";
   import HarnessCards from "../setup/harness_cards.svelte";
@@ -139,4 +146,16 @@
       <Scanning {scanning} />
     </Case>
   {/each}
+{/each}
+{#each WIDTHS as width (width)}
+  <Case label={`doctor · the copy key beside a command and an oid at ${String(width)}`} {width}>
+    <div class="flex flex-col gap-snug">
+      {#each COPIED as text (text)}
+        <div class="flex min-w-0 items-start gap-tight">
+          <code class="min-w-0 flex-1 break-all rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet">{text}</code>
+          <Copy {text} />
+        </div>
+      {/each}
+    </div>
+  </Case>
 {/each}

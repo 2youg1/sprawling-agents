@@ -2851,10 +2851,6 @@
     "en": "This city asks npm only when you press this, and it never updates itself.",
     "zh": "只有你按下这个按钮，这座城市才会去问 npm；它从不自行更新。"
   },
-  "release_newest": {
-    "en": "newest published: {version}, cut {released}",
-    "zh": "已发布的最新版：{version}，{released} 切出"
-  },
   "release_refused": {
     "en": "npm could not be asked, so nothing here was checked.",
     "zh": "没能问到 npm，所以这里什么都没有核对过。"
@@ -5187,14 +5183,6 @@
     "en": "pick a provider",
     "zh": "选一家供应方"
   },
-  "harness_found": {
-    "en": "on this computer",
-    "zh": "这台电脑上有"
-  },
-  "harness_missing": {
-    "en": "not found on this computer",
-    "zh": "这台电脑上没找到"
-  },
   "harness_sign_in": {
     "en": "how to sign in",
     "zh": "怎么登录"
@@ -6870,5 +6858,9 @@
   "remote_restart_process": {
     "en": "When the city restarts, every device pairs again: no system credential store answered, so the city key lives only in the city's memory.",
     "zh": "城重启后，每台设备都要重新配对：没有系统凭据存放处应答，城钥匙只在城的内存里。"
+  },
+  "copy_note": {
+    "en": "Puts this on the clipboard exactly as written: {text}",
+    "zh": "把这段原样放进剪贴板：{text}"
   }
 }
