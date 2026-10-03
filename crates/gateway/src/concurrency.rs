@@ -252,6 +252,46 @@ mod tests {
         }
     }
 
+    proptest! {
+        /// `run_keeps_within` of `crates/gateway/spec/Concurrency.lean`:
+        /// from any state a trace can reach with no more permits in use
+        /// than the limit, a trace with no narrowing in it keeps it so
+        /// after every step. The prefix may narrow, so the suffix starts
+        /// from every limit a 429 can leave behind.
+        #[test]
+        fn a_trace_without_narrowing_keeps_in_use_within_the_limit(
+            cap in 1u32..=12,
+            prefix in proptest::collection::vec(event(), 0..100),
+            suffix in proptest::collection::vec(event(), 0..200),
+        ) {
+            let base = Instant::now();
+            let at = |ms: u64| base + Duration::from_millis(ms);
+            let mut permits = Permits::new(MaxInFlight::try_from(cap).unwrap());
+            let apply = |permits: &mut Permits, step: &Event| match step {
+                Event::Take(ms) => {
+                    permits.take(at(*ms));
+                }
+                Event::GiveBack => permits.give_back(),
+                Event::RateLimited(ms, wait) => {
+                    permits.rate_limited(at(*ms), wait.map(Duration::from_millis));
+                }
+                Event::Success(ms) => permits.succeeded(at(*ms)),
+                Event::Tick => {}
+            };
+            for step in &prefix {
+                apply(&mut permits, step);
+            }
+            prop_assume!(permits.in_use() <= permits.limit());
+            for step in suffix
+                .iter()
+                .filter(|step| !matches!(step, Event::RateLimited(..)))
+            {
+                apply(&mut permits, step);
+                prop_assert!(permits.in_use() <= permits.limit());
+            }
+        }
+    }
+
     /// Eight successes after a narrowing widen by one, and not while the
     /// provider's Retry-After still holds.
     #[test]

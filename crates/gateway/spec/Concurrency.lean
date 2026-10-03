@@ -18,7 +18,7 @@
 5. 一次取答「取到」「已满」或「等到某一刻」：已满只在名额都在用时答（由一次归还唤醒），等到的时刻严格晚于此刻，所以调用方不会忙等。
 6. 排队按号先来后到：取到名额的号严格按拿号的次序（文末「排队」一节，D20）。
 
-与 Rust 的对应：`holdUntil` 为 0 读作 Rust 的 `hold_until: None`（任何时刻都不早于 0）；`giveBack` 的自然数减法即 Rust 的 `saturating_sub`；Rust 的 `Instant` 加法溢出时不设 `hold_until`，模型的 `Nat` 没有这一档。派生检查：`concurrency::tests` 的 proptest `permits_keep_the_lean_properties` 对随机轨迹每走一步断言性质 1（取到之后在用数不超过上限）、2、3、5，以及性质 4 的「每次放宽恰加一」；`a_narrowed_limit_widens_after_the_retry_after_instant` 在 `Retry-After` 前后各判一次性质 4。性质 1 的轨迹形（`run_keeps_within`，没有收窄的整条轨迹上在用数不超过上限）没有派生检查，记为债。
+与 Rust 的对应：`holdUntil` 为 0 读作 Rust 的 `hold_until: None`（任何时刻都不早于 0）；`giveBack` 的自然数减法即 Rust 的 `saturating_sub`；Rust 的 `Instant` 加法溢出时不设 `hold_until`，模型的 `Nat` 没有这一档。派生检查：`concurrency::tests` 的 proptest `permits_keep_the_lean_properties` 对随机轨迹每走一步断言性质 1（取到之后在用数不超过上限）、2、3、5，以及性质 4 的「每次放宽恰加一」；`a_narrowed_limit_widens_after_the_retry_after_instant` 在 `Retry-After` 前后各判一次性质 4。性质 1 的轨迹形（`run_keeps_within`）由 proptest `a_trace_without_narrowing_keeps_in_use_within_the_limit` 检查：一段随机前缀（可以收窄）把状态带到任意可达处，在用数不超过上限时，再走一段去掉收窄的随机轨迹，每一步断言在用数不超过上限；它先对一个在 `in_use == limit` 时仍放行的 `take` 变红过。
 -/
 
 namespace Gateway.Concurrency
