@@ -6511,6 +6511,10 @@
     "en": "a skill was audited",
     "zh": "审了一个 skill"
   },
+  "event_skill_shelved": {
+    "en": "a skill was shelved",
+    "zh": "上架了一个 skill"
+  },
   "setup_skills_building": {
     "en": "this building's own shelf",
     "zh": "这栋楼自己的书架"
