@@ -45,13 +45,13 @@ fn exposed() -> SocketAddr {
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
-    assert_eq!(COMMAND_NAMES.len(), 36, "command table");
+    assert_eq!(COMMAND_NAMES.len(), 38, "command table");
     assert_eq!(QUERY_NAMES.len(), 52, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 36, "command names are distinct");
+    assert_eq!(sorted.len(), 38, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 46,
+        WIRE_V, 47,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "77a2071b8a2e7094b3a9bcc7e570421609592f1a332111134aed1b9022ccb532";
+const WIRE_SCHEMA_GOLDEN: &str = "e897b2cb123486479d243e6eafa857c316ccc193bf22467bf6a9b1f9af5d7609";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "24204652b5d3276e01ded7ea5f3390e7fd3b240c98eddac421eb83987efc6bff";
+const WIRE_SHAPE_GOLDEN: &str = "396c28639a696f13926e6803d610cd963dc81251be6f29485ec2663fa7c1e0eb";
 
 // -------------------------------------------------------------- binding face
 
@@ -603,6 +603,17 @@ title = \"a window\"
             toolkit: wire::ToolkitSlug::parse("github").unwrap(),
             idem,
         },
+        Command::NameSession(wire::SessionNaming {
+            room: Address::parse("acme/floor1").unwrap(),
+            began: Seq::new(3),
+            name: "east wing review".to_owned(),
+            idem,
+        }),
+        Command::ChangeRunPolicy(wire::PolicyChange {
+            room: Address::parse("acme/floor1").unwrap(),
+            policy: wire::RunPolicy::of(Mode::Work),
+            idem,
+        }),
     ]
 }
 
