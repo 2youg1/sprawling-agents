@@ -40,7 +40,10 @@ long enough to scroll gets a filter; a list of six does not. -->
   interface Props {
     readonly spec: Pill;
     // The gallery draws a menu open so it is measured; every screen
-    // starts closed.
+    // starts closed. A menu drawn open takes no focus until somebody
+    // opens it themselves: the gallery holds several open at once, and
+    // each one taking focus would close the one before it on blur,
+    // leaving every case but the last an empty frame.
     readonly starts?: "open" | "closed";
     // What the menu reads out above its choices, when the fact the pill
     // stands for has more to it than its value: the room chip's who is
@@ -56,6 +59,7 @@ long enough to scroll gets a filter; a list of six does not. -->
   const uid = $props.id();
 
   let open = $state(untrack(() => starts) === "open");
+  let drawnOpen = untrack(() => starts) === "open";
   let query = $state("");
   let at = $state(0);
   // Which edge the menu hangs from: the trigger's left edge, unless the
@@ -83,6 +87,10 @@ long enough to scroll gets a filter; a list of six does not. -->
     if (box !== undefined) edge = box.left + 448 > window.innerWidth ? "right" : "left";
     const chosenAt = spec.choices.findIndex((each) => each.value === untrack(() => spec.value));
     at = Math.max(0, chosenAt);
+    if (drawnOpen) {
+      drawnOpen = false;
+      return;
+    }
     (filtered ? filter : list)?.focus({ preventScroll: true });
   });
 

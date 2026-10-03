@@ -317,6 +317,14 @@ export const CALLS: readonly CallLine[] = [
 // are two readings of the same waiting question and a reordered list
 // must not make them disagree about which one that is; the mailbox
 // fixture reads it too.
+//
+// A card says how long ago its question was raised, measured on the
+// clock the gallery runs on, which is the wall clock; so `at` places a
+// question that many minutes into the last ten, in the order the list
+// gives, rather than at that many milliseconds after 1970, which a card
+// reads as fifty-odd years of waiting.
+const RAISED_FROM = Date.now() - 10 * 60_000;
+
 function question(
   id: string,
   actor: string,
@@ -333,7 +341,7 @@ function question(
       "cas:b3-0000000000000000000000000000000000000000000000000000000000000000",
     ),
     cluster_key: { class: key[0], detail: key[1] },
-    created: TimeMs.make(at),
+    created: TimeMs.make(RAISED_FROM + at * 60_000),
     tainted,
   };
 }
