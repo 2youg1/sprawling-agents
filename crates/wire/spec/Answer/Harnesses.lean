@@ -44,10 +44,10 @@ pub enum HarnessState {
 | `claude_code` | `CLAUDE_CONFIG_DIR` | `.claude` | https://code.claude.com/docs/en/settings |
 | `codex` | `CODEX_HOME` | `.codex` | https://developers.openai.com/codex/auth |
 | `pi` | `PI_CODING_AGENT_DIR` | `.pi/agent` | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/environment-variables.md |
-| `grok_build` | — | —（未登记） | https://docs.x.ai/build/overview 没有写这样一个目录 |
-| `kimi_code` | — | —（未登记） | 启动程序 `kimi` 本身就是这家的二进制，`LauncherMissing` 已说明有没有装 |
+| `grok_build` | `GROK_HOME` | `.grok` | https://docs.x.ai/build/settings/reference |
+| `kimi_code` | `KIMI_CODE_HOME` | `.kimi-code` | https://moonshotai.github.io/kimi-code/en/configuration/data-locations |
 
-这三家的文档对三个平台写的是同一个位置：家目录（Windows 的 `%USERPROFILE%`，macOS 与 Linux 的 `$HOME`）下的一个目录，设了变量就换成变量的值，所以三栏合成一栏；某家给某个平台另写了位置时，这一行按平台分开。家目录由 `bin::doctor::host` 读（`accounting::home::Home::detect`，先 `USERPROFILE` 后 `HOME`），变量由它读环境；views 只经 served city 交进来的那个函数读这台电脑。
+这五家的文档对三个平台写的是同一个位置：家目录（Windows 的 `%USERPROFILE%`，macOS 与 Linux 的 `$HOME`）下的一个目录，设了变量就换成变量的值，所以三栏合成一栏；某家给某个平台另写了位置时，这一行按平台分开。家目录由 `bin::doctor::host` 读（`accounting::home::Home::detect`，先 `USERPROFILE` 后 `HOME`），变量由它读环境；views 只经 served city 交进来的那个函数读这台电脑。
 
 表里的每一行引这家的官方文档，不猜。判定是只读的文件存在检查，三个平台同一个函数。改形不改名，`WIRE_V` 随 V0.0.9 的那一次进位（`crates/wire/Spec.lean` D22）。
 
