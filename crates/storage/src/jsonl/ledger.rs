@@ -5,6 +5,7 @@
 
 //! Ledger types: the struct, its reports, and segment grammar.
 
+use std::io;
 use std::path::{Path, PathBuf};
 
 use kernel::{B3Hash, EventRecord, Seq};
@@ -180,6 +181,17 @@ pub(crate) fn segment_names(vfs: &dyn Vfs, dir: &Path) -> Result<Vec<String>, St
 }
 
 /// Complete (`\n`-terminated) lines and the leftover tail bytes.
+/// A count of segment bytes or lines as the `u64` a file offset and a
+/// line number are. `usize` is at most 64 bits wide on every target this
+/// crate builds for, so this refuses only on a wider one, and it refuses
+/// rather than substitute a number the count is not.
+///
+/// # Errors
+/// `io::Error` when `count` does not fit a `u64`.
+pub(crate) fn u64_count(count: usize) -> io::Result<u64> {
+    u64::try_from(count).map_err(io::Error::other)
+}
+
 pub(crate) fn complete_lines(bytes: &[u8]) -> (Vec<&[u8]>, usize) {
     let mut lines = Vec::new();
     let mut consumed = 0usize;

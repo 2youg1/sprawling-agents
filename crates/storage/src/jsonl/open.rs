@@ -19,7 +19,7 @@ use crate::vfs::Vfs;
 use super::first_line::first_line;
 use super::ledger::{
     JsonlLedger, OpenReport, SEGMENT_ROLL_BYTES, TailTruncation, WriterLock, complete_lines,
-    is_segment, segment_file_name,
+    is_segment, segment_file_name, u64_count,
 };
 use super::verify::{LineCheck, LineFault};
 
@@ -230,10 +230,12 @@ impl JsonlLedger {
             .iter()
             .rposition(|byte| *byte != 0)
             .map_or(0, |at| at.saturating_add(1));
-        let bytes = file.get(..filled).unwrap_or_default();
+        let total = u64_count(file.len()).map_err(io_err("measure segment", last))?;
+        let mut bytes = file;
+        bytes.truncate(filled);
         let start = proof.start(
             last,
-            bytes,
+            &bytes,
             LineCheck::after(boundary.prev, boundary.next_seq),
         );
         let mut check = start.check;
@@ -242,8 +244,8 @@ impl JsonlLedger {
 
         let mut valid_len = start.from;
         for (index, line) in lines.iter().enumerate() {
-            let at = u64::try_from(index)
-                .unwrap_or(u64::MAX)
+            let at = u64_count(index)
+                .map_err(io_err("number a segment line", last))?
                 .saturating_add(1)
                 .saturating_add(start.lines);
             counted.lines_checked = counted.lines_checked.saturating_add(1);
@@ -304,10 +306,11 @@ impl JsonlLedger {
         let run_prev = check.prev();
         let run_seq = check.expected();
 
-        let total = file.len();
-        let dropped = u64::try_from(filled.saturating_sub(valid_len)).unwrap_or(u64::MAX);
+        let measure = |count: usize| u64_count(count).map_err(io_err("measure segment", last));
+        let dropped = measure(filled.saturating_sub(valid_len))?;
+        let keep = measure(valid_len)?;
 
-        if total > valid_len {
+        if total > keep {
             if valid_len == 0 {
                 // Whole last segment is torn. Remove it; the tail falls
                 // back to the prior segment (or to an empty city when this
@@ -335,7 +338,6 @@ impl JsonlLedger {
                     }
                 }
             } else {
-                let keep = u64::try_from(valid_len).unwrap_or(u64::MAX);
                 self.vfs
                     .truncate(last, keep)
                     .map_err(io_err("truncate segment", last))?;
@@ -347,7 +349,7 @@ impl JsonlLedger {
             }
         } else {
             self.seg_path = last.to_path_buf();
-            self.seg_len = u64::try_from(total).unwrap_or(u64::MAX);
+            self.seg_len = total;
         }
         self.prev = run_prev;
         self.next_seq = run_seq;

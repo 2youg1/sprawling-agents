@@ -21,10 +21,9 @@ use crate::error::{StorageError, io_err};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
+use super::first_line::FIRST_WINDOW_BYTES;
 use super::ledger::is_segment;
 use super::verify::{CheckedLine, LineCheck, LineFault};
-
-const FIRST_WINDOW_BYTES: u64 = 4096;
 
 /// One line of the ledger, newest first: its bytes and what it is.
 #[derive(Debug, Clone, PartialEq)]

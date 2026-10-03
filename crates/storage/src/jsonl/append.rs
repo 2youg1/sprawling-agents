@@ -15,7 +15,9 @@ use kernel::{
 use crate::error::{StorageError, io_err};
 
 use super::barrier::Barrier;
-use super::ledger::{JsonlLedger, WriteObserver, complete_lines, is_segment, segment_file_name};
+use super::ledger::{
+    JsonlLedger, WriteObserver, complete_lines, is_segment, segment_file_name, u64_count,
+};
 
 impl JsonlLedger {
     pub(crate) fn append_log_truncated(
@@ -68,8 +70,8 @@ impl JsonlLedger {
             let line = record
                 .canonical_line()
                 .map_err(|source| StorageError::Draft { source })?;
-            let line_len = u64::try_from(line.len())
-                .unwrap_or(u64::MAX)
+            let line_len = u64_count(line.len())
+                .map_err(io_err("measure an event line", &cur_path))?
                 .saturating_add(1);
             if cur_len > 0 && cur_len.saturating_add(line_len) > self.roll_bytes {
                 cur_path = self.dir.join(segment_file_name(seq));

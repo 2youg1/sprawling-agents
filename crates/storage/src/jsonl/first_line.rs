@@ -16,7 +16,12 @@ use std::path::Path;
 
 use crate::vfs::Vfs;
 
-const FIRST_WINDOW_BYTES: u64 = 4096;
+use super::ledger::u64_count;
+
+/// The first window a reader of a line of unknown length asks for; each
+/// next window is twice the last. `jsonl::tail` reads backwards by the
+/// same rule (`crates/storage/spec/Jsonl.lean` §8-1).
+pub(super) const FIRST_WINDOW_BYTES: u64 = 4096;
 
 /// The first `\n`-terminated line of `path`, without its `\n`.
 ///
@@ -24,18 +29,19 @@ const FIRST_WINDOW_BYTES: u64 = 4096;
 /// one whose first line is torn, which is tail recovery's to judge.
 ///
 /// # Errors
-/// Propagates a read the filesystem refuses.
+/// Propagates a read the filesystem refuses, and a line longer than a
+/// `u64` counts.
 pub(crate) fn first_line(vfs: &dyn Vfs, path: &Path) -> io::Result<Option<Vec<u8>>> {
     let mut line = Vec::new();
     let mut window = FIRST_WINDOW_BYTES;
     loop {
-        let offset = u64::try_from(line.len()).unwrap_or(u64::MAX);
+        let offset = u64_count(line.len())?;
         let chunk = vfs.read_at(path, offset, window)?;
         if let Some(end) = chunk.iter().position(|byte| *byte == b'\n') {
             line.extend(chunk.iter().take(end));
             return Ok(Some(line));
         }
-        if u64::try_from(chunk.len()).unwrap_or(u64::MAX) < window {
+        if u64_count(chunk.len())? < window {
             return Ok(None);
         }
         line.extend_from_slice(&chunk);
