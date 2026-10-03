@@ -141,6 +141,13 @@ pub(crate) fn read(platform: Option<Platform>, city: &Path) -> Scanning {
             .args(["-NoProfile", "-NonInteractive", "-Command"])
             .arg(LIST_EXCLUSIONS),
         PATIENCE,
+        {
+            let city = city.display().to_string();
+            move |entry: &str| {
+                let entry = entry.trim();
+                entry.starts_with("N/A") || covers(entry, &city)
+            }
+        },
     );
     Scanning::Read {
         drive: drive(&city),
@@ -166,6 +173,7 @@ fn drive(city: &Path) -> Drive {
     let asked = asking::ask(
         Command::new("fsutil").args(["devdrv", "query", volume.as_str()]),
         PATIENCE,
+        |line: &str| line.trim().to_ascii_lowercase().starts_with("this is"),
     );
     drive_said(&volume, &file_system, &asked)
 }
@@ -263,8 +271,8 @@ fn printed<'e>(command: &'static str, ended: &'e Ended) -> Result<&'e str, Untol
     match ended {
         Ended::Exited {
             code: Some(0),
-            stdout,
-        } => Ok(stdout),
+            kept,
+        } => Ok(kept),
         Ended::Exited { code, .. } => Err(Untold::Failed {
             command,
             code: *code,

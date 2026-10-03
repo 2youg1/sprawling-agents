@@ -27,7 +27,7 @@
 | 监视页历史 | `bin::monitor` | 300 个点，没人看时释放（§8-94） | 无 |
 | 摘要缓存（`DigestCache`） | `storage::digest_cache` | 在盘上，进程里不留 | 无 |
 | playback 导出 | `accounting::playback` | 走账本是流式的，但整份 `Document` 与整份 `Bundle` 在内存里，上界 `BUNDLE_MAX_BYTES`（32 MiB） | 选中的记录数 |
-| doctor 扫描 | `bin::doctor` | 子进程的输出整份读进内存（`doctor::asking`） | 输出的字节 |
+| doctor 扫描 | `bin::doctor` | 子进程的输出逐行读，每行至多 4 KiB，只留调用者选中的行（`doctor::asking`，`crates/sprawling/spec/Doctor.lean` §8-166 之一） | 选中的行数 |
 
 账本与 CAS 已经在盘上，所以上表里随城增长的几项（视图、墓碑、`sent`、旁索引）都可以改成「在盘上，按需读回」；它们读回时走下面的缓存模型。
 

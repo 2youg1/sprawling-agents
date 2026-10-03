@@ -52,8 +52,8 @@ fn reading(ended: &Ended) -> wire::GithubReading {
     match ended {
         Ended::Exited {
             code: Some(0),
-            stdout,
-        } => match stdout.lines().next().map(str::trim) {
+            kept,
+        } => match kept.lines().next().map(str::trim) {
             Some(login) if is_login(login) => wire::GithubReading::Found {
                 login: login.to_owned(),
             },
@@ -84,6 +84,13 @@ fn is_login(line: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
 }
 
+/// A keeper that chooses the first line `gh` prints and no other: the
+/// login is that line, and nothing after it is read into this process.
+fn first_line() -> impl FnMut(&str) -> bool + Send + 'static {
+    let mut offered = false;
+    move |_line| !std::mem::replace(&mut offered, true)
+}
+
 /// Starts `gh api --hostname <host> user --jq .login` and waits for it.
 fn ask(gh: &Path, host: &str) -> Ended {
     super::asking::ask(
@@ -91,6 +98,7 @@ fn ask(gh: &Path, host: &str) -> Ended {
             .args(["api", "--hostname", host, "user", "--jq", ".login"])
             .env("GH_PROMPT_DISABLED", "1"),
         PATIENCE,
+        first_line(),
     )
 }
 
@@ -111,7 +119,7 @@ mod tests {
         assert_eq!(
             reading(&Ended::Exited {
                 code: Some(4),
-                stdout: String::new(),
+                kept: String::new(),
             }),
             wire::GithubReading::NotLoggedIn
         );
@@ -122,7 +130,7 @@ mod tests {
         assert_eq!(
             reading(&Ended::Exited {
                 code: Some(0),
-                stdout: "octocat\n".to_owned(),
+                kept: "octocat\n".to_owned(),
             }),
             wire::GithubReading::Found {
                 login: "octocat".to_owned(),

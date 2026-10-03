@@ -11,7 +11,7 @@ use crate::doctor::asking::Ended;
 fn exited(code: i32, stdout: &str) -> Ended {
     Ended::Exited {
         code: Some(code),
-        stdout: stdout.to_owned(),
+        kept: stdout.to_owned(),
     }
 }
 
@@ -32,7 +32,7 @@ const REFUSED_IN_GBK: [u8; 34] = [
 fn fsutil_refusing_an_ordinary_user_reads_as_cannot_tell() {
     let refused = Ended::Exited {
         code: Some(1),
-        stdout: String::from_utf8_lossy(&REFUSED_IN_GBK).into_owned(),
+        kept: String::from_utf8_lossy(&REFUSED_IN_GBK).into_owned(),
     };
     assert_eq!(
         drive_said("D:", "ReFS", &refused),

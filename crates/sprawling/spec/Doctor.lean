@@ -108,8 +108,9 @@ pub(super) fn drive_said(volume: &str, file_system: &str, ended: &Ended) -> Driv
 pub(super) fn exclusion_said(city: &Path, ended: &Ended) -> Exclusion;               // 纯函数
 pub(crate) fn lines(scanning: &Scanning) -> Vec<String>;                            // 终端的那一段
 // bin::doctor::asking（问一个程序一次：计数的等待，读退出码与标准输出）
-pub(super) enum Ended { Exited { code: Option<i32>, stdout: String }, Unstarted, Unanswered { stopping: Option<String> } }
-pub(super) fn ask(command: &mut Command, knocks: u32) -> Ended;
+pub(super) enum Ended { Exited { code: Option<i32>, kept: String }, Unstarted, Unanswered { stopping: Option<String> } }
+pub(super) const LINE_MAX_BYTES: usize = 4096;
+pub(super) fn ask(command: &mut Command, knocks: u32, keep: impl FnMut(&str) -> bool + Send + 'static) -> Ended;
 // bin::doctor::probe：Machine::scanning(&self, city: &Path) -> Scanning
 // bin::doctor::screen：Asked.scanned，命令行点名的城，没点名时是 `up` 会放城的那个目录
 ```
@@ -118,7 +119,7 @@ pub(super) fn ask(command: &mut Command, knocks: u32) -> Ended;
 - **判断的是哪个目录**：命令行点名了城就是那座城；没点名就是 `up` 会把城放在的地方，由路由的 `default_city_location` 交进 `screen::verb`——「没点名的城放哪」只有那一个权威。只在没点名时才调它，因为它要在二进制旁边试写一个空文件。路径先按 `monitor::volume::resolved` 规范成挂载点的写法，城还不存在时用它的绝对路径。
 - **Dev Drive 分两步读，先读不要权限的那一步**：`monitor::volume::holding` 选出挂载点是城路径最长前缀的那块盘（与 `monitor::volume::space` 同一个函数），sysinfo 给出它的文件系统名。Dev Drive 恒是 ReFS，所以不是 ReFS 就确定不是，不再起进程。是 ReFS 时才问 `fsutil devdrv query <卷>`，取以 `This is` 开头的那一句：含 `not a developer volume` 是不是；含 `trusted` 且不含 `untrusted`／`not trusted` 是受信任；其余提到 `developer volume` 的是不受信任。fsutil 在普通用户下多半拒绝打开卷，且它的话随系统语言本地化——两种都读成 `Untold`，带上那条命令，不猜。
 - **排除项只在不要管理员就能读的时候读**：Windows PowerShell 以 `-NoProfile -NonInteractive` 起动，先把输出编码设为 UTF-8、`$ErrorActionPreference='Stop'`，再取 `(Get-MpPreference).ExclusionPath`。每行一条排除路径；以 `N/A` 开头的那行读成 `Untold::AdminOnly`；空输出且退出 0 是没有排除项；退出非 0（Defender 关了或被第三方杀软替换）读成 `Failed`。一条排除路径覆盖城，当且仅当去掉末尾分隔符后不分大小写相等，或它加上 `\` 是城路径的前缀——`D:\Work` 不覆盖 `D:\Workshop\city`。含 `%` 或 `*` 的条目不展开、不算覆盖：展开要的是 Defender 自己的规则，第二份抄本会悄悄分叉。
-- **等待是计数的，有上限，且从不等人**：`asking::ask` 把 stdin 设成空、stderr 丢弃，标准输出在一条读线程上读到底（Windows 的匿名管道缓冲只有几 KB，边轮询边不读会把子进程卡在写上），按 `TICK`（50 ms）敲 `try_wait`，敲满 `knocks` 下还没退出就经 `running::stop` 停掉。本节的上限是 `PATIENCE` 300 下（15 s）：冷起动的 Windows PowerShell 读 Defender 设置要几秒。`doctor::github` 问 `gh` 走同一个 `ask`，两处「问一次、读退出码」只有一份等法。
+- **等待是计数的，有上限，且从不等人**：`asking::ask` 把 stdin 设成空、stderr 丢弃，标准输出在一条读线程上逐行读到底（Windows 的匿名管道缓冲只有几 KB，边轮询边不读会把子进程卡在写上），每行至多留 `LINE_MAX_BYTES`（4 KiB）字节、超出的部分读过即丢，再交调用者的 `keep` 判一次，只有它选中的行进 `Ended::Exited.kept`：`fsutil` 那一问只留以 `This is` 开头的句子，排除项那一问只留以 `N/A` 开头或覆盖城的条目，`gh` 那一问只留第一行。于是一次扫描在进程里至多同时持有一行与选中的几行，不把子进程的整份输出读进内存（`crates/sprawling/spec/Serving/Memory.lean` §8-173 清点表的 doctor 一行）。按 `TICK`（50 ms）敲 `try_wait`，敲满 `knocks` 下还没退出就经 `running::stop` 停掉。本节的上限是 `PATIENCE` 300 下（15 s）：冷起动的 Windows PowerShell 读 Defender 设置要几秒。`doctor::github` 问 `gh` 走同一个 `ask`，两处「问一次、读退出码」只有一份等法。
 - **这一段是建议，从不是 doctor 的失败**：它不进任何一层的 verdict，不改退出码。报告在 `priority` 一段之后多一段 `scanning`：`city` 一行给出判断的路径，`dev drive` 与 `exclusion` 各一行说是、否或 `cannot tell: <原因>`；两者都不成立时给 `to speed it up`：建 Dev Drive 并把城挪上去，或在管理员 PowerShell 里跑 `Add-MpPreference -ExclusionPath '<城>'`（路径里的 `'` 写成 `''`）；是 Dev Drive 但不受信任时给 `fsutil devdrv trust <卷>`。
 - **与各项探测同时问**：`screen::run` 在一个作用域线程上问 `Machine::scanning`，同时 `examine_each` 问表里各项，整份报告仍只等最慢的那一个（§8-59）。线程没答话就结束时这一段说 `Scanning::Stopped`，其余各段照常。
 - **页面不显示这一段**：`wire::DoctorAnswer` 没有它的字段，加字段是一次 wire 变更（`WIRE_V`、`wire.ts`、`Door.lean`）。第三方杀毒软件的排除项读不到，那时 `exclusion` 说 `cannot tell`。
