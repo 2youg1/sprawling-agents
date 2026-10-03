@@ -154,23 +154,26 @@ export function callsOf(turns: readonly Turn[]): readonly Placed[] {
   return turns.flatMap((turn) => turn.calls.map((call) => ({ turn: turn.number, call })));
 }
 
-// What the whole run came to, summed over its turns.
+// What the whole run came to, summed over its turns. `cached` is null
+// when no turn's provider reported a cache read: unknown, not zero
+// (crates/wire/spec/Reading.lean D35).
 export interface Figures {
   readonly input: number;
   readonly output: number;
-  readonly cached: number;
+  readonly cached: number | null;
   readonly usd: number;
 }
 
 export function figuresOf(turns: readonly Turn[]): Figures {
-  return turns.reduce(
+  return turns.reduce<Figures>(
     (sum, turn) => ({
       input: sum.input + (turn.used?.input ?? 0),
       output: sum.output + (turn.used?.output ?? 0),
-      cached: sum.cached + (turn.used?.cached ?? 0),
+      cached:
+        turn.used?.cached === undefined || turn.used.cached === null ? sum.cached : (sum.cached ?? 0) + turn.used.cached,
       usd: sum.usd + (turn.spent ?? 0),
     }),
-    { input: 0, output: 0, cached: 0, usd: 0 },
+    { input: 0, output: 0, cached: null, usd: 0 },
   );
 }
 

@@ -6974,5 +6974,13 @@
   "remote_door_unsent": {
     "en": "the page is not connected to the city, so nothing was sent; try again once it reconnects",
     "zh": "页面没有连上城，所以什么也没送出；重新连上后再试"
+  },
+  "run_head_cached_unknown": {
+    "en": "cache not reported",
+    "zh": "缓存未报告"
+  },
+  "world_cache_unknown": {
+    "en": "unknown: the provider did not report its cache",
+    "zh": "未知：provider 没有报告缓存"
   }
 }

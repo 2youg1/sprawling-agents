@@ -84,7 +84,7 @@ import crates.gateway.spec.Transcribe.Recording
 - **只有 Anthropic 兼容格式在结算前交出调用。** `Endpoint` 经 `Model::call_speculating`（kernel SPEC「模型端口第三扇门」）在 `content_block_stop` 到达时交出完整调用，消费方是 `runtime::turn::speculation`（`crates/runtime/Spec.lean` §8-3），它守的性质由 `crates/runtime/spec/Turn/Speculation.lean` 证明。OpenAI 两种兼容格式在结算前不交出调用：它们的调用在哪一帧完整，线上没有一帧明说。
 - **加密金库文件还没有探针选它**：`Custodian::probe` 只试平台服务，何时向人要口令、口令从哪里来未定（§8-21）。
 - **上游 `/models` 说了 `image` 算不算「收得下什么」的一档，未定。** 探测把每一行的 `input_modalities` 原样记进 `ModelFacts`（§8-16），`AttachedEndpoint.models` 带着它，而 `accepted_input`（§8-37）不读它：那是供应方自己的词（`image`、`audio`），一个中转站可能为一个厂商自己拒图的 id 写上 `image`。若定为一档，它排在人之后、目录之前，与上限梯的 `Upstream` 同位；要定下它，需要一份真实中转站的 `/models` 记录，其中写着 `image` 的模型在那条线上确实收图。
-- **responses 面答 `usage: null` 时算不算「供应方没报用量」，未定。** `openai-openapi` 把 `Response.usage` 写作 `ResponseUsage` 或 `null`。`dialect::responses::reply` 在 `usage` 缺席时报 `E_WIRE_MISMATCH`，为 `null` 时经 `mismatch::tokens_or_zero` 把输入与输出都读成 0 token：两种缺法得到相反的结论，后一种让这次调用的用量从账上静默消失。规格没有说 `status` 为 `completed` 的 response 会不会带 `null`，所以读法暂不改；要定下它，需要一个真实供应方在已完成的 response 里答出 `usage: null` 的记录。
+- **responses 面答 `usage: null` 时算不算「供应方没报用量」，未定。** `openai-openapi` 把 `Response.usage` 写作 `ResponseUsage` 或 `null`。`dialect::responses::reply` 在 `usage` 缺席时报 `E_WIRE_MISMATCH`，为 `null` 时经 `mismatch::tokens_or_zero` 把输入与输出都读成 0 token（缓存两数经 `mismatch::cache_count` 读成 `Unreported`，kernel D36）：两种缺法得到相反的结论，后一种让这次调用的用量从账上静默消失。规格没有说 `status` 为 `completed` 的 response 会不会带 `null`，所以读法暂不改；要定下它，需要一个真实供应方在已完成的 response 里答出 `usage: null` 的记录。
 
 模型自己的假设写在各分部的定义与定理假设里，不写成公理：`InputKinds`、`DialectKind`、`Ceiling` 是 kernel 的类型，kernel 的规格还没有迁到 Lean，所以分部照它们的变体与不变量各写一份模型里的类型，拼写与 Rust 相同；预置表按 host 与前缀查到的答案、`reach::is_local` 的判断、拒词里有没有窗口标记，都当作参数交给模型，它们各自的读法由 Rust 的测试检查。
 -/
@@ -101,7 +101,7 @@ import crates.gateway.spec.Transcribe.Recording
 
 /-! ## 6 命名统一
 
-**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政。**本 crate 同例**：同一类型的 inherent impl 住不同簇文件时基线为每块各记一行 `impl`（`Endpoint` 两行）；下游 `sprawling` 基线记 `gateway` 内定义位簇路径（如 `credential::custodian::Custodian`），公共拼写不变。
+**跨 crate 类型住处**：本 crate 经 `kernel` 顶层重导出引用 kernel 的类型（如 `kernel::AxError`），类型定义在 kernel 的哪个文件是 kernel 内政，公共拼写不随它变。没有公开面基线在跑：`cargo public-api` 不在任何门或工作流里（退役的理由在 `tools/xtask/Spec.lean`），公开面由 `lib.rs` 的再导出与 `xtask depmap` 守。
 
 Dialect／Endpoint／Custody／Vault／SecretRef／Sealed／Retries／HeaderValue／market snapshot／UsdMicros／权威计费额（authoritative billed amount）。概念名英文原词；「兑付」＝resolve+expose 的合称。
 

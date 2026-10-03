@@ -30,12 +30,14 @@
 
 use kernel::{
     AxCode, AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort,
-    ModelUsage, Role, StopReason, Tokens,
+    ModelUsage, Role, StopReason,
 };
 use serde_json::{Map, Value, json};
 
 use crate::dialect::ImageBytes;
-use crate::mismatch::{as_str, mismatch, mismatch_found, payload_from, require, tokens_or_zero};
+use crate::mismatch::{
+    as_str, cache_count, mismatch, mismatch_found, payload_from, require, tokens_or_zero,
+};
 use crate::provider::preset::{CeilingField, ChatSpelling, EffortField, ReasoningReturn};
 
 mod stream;
@@ -340,23 +342,17 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
         other => return Err(mismatch("response.choices[0].finish_reason", other)),
     };
     let usage_value = require(wire, "response", "usage")?;
-    let cache_read = usage_value
-        .get("prompt_tokens_details")
-        .map(|details| {
-            tokens_or_zero(
-                details,
-                "cached_tokens",
-                "response.usage.prompt_tokens_details",
-            )
-        })
-        .transpose()?
-        .unwrap_or(Tokens::new(0));
+    let cache_read = cache_count(
+        usage_value.get("prompt_tokens_details"),
+        "cached_tokens",
+        "response.usage.prompt_tokens_details",
+    )?;
     let usage = ModelUsage {
         input_tokens: tokens_or_zero(usage_value, "prompt_tokens", "response.usage")?,
         output_tokens: tokens_or_zero(usage_value, "completion_tokens", "response.usage")?,
-        cache_read_tokens: CacheCount::Reported(cache_read),
-        // No OpenAI wire slot: cache writes are not reported distinctly.
-        cache_write_tokens: CacheCount::Reported(Tokens::new(0)),
+        cache_read_tokens: cache_read,
+        // No OpenAI chat wire slot: a cache write is never reported.
+        cache_write_tokens: CacheCount::Unreported,
         dialect: Some(DialectKind::OpenAi),
     };
     Ok(ChatResponse {

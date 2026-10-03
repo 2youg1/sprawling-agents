@@ -6,14 +6,15 @@
 //! The responses face's answer, in both directions.
 
 use kernel::{
-    AxCode, AxError, CacheCount, ChatResponse, ContentBlock, DialectKind, ModelUsage, StopReason,
-    Tokens, ToolName,
+    AxCode, AxError, ChatResponse, ContentBlock, DialectKind, ModelUsage, StopReason, ToolName,
 };
 use serde_json::Value;
 #[cfg(test)]
 use serde_json::json;
 
-use crate::mismatch::{as_str, mismatch, mismatch_found, payload_from, require, tokens_or_zero};
+use crate::mismatch::{
+    as_str, cache_count, mismatch, mismatch_found, payload_from, require, tokens_or_zero,
+};
 
 /// The provider took the request, answered 200, and put nothing in
 /// it: the envelope is this face's and `output` is null. The chat face
@@ -196,28 +197,24 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
     let stop = stop_of(wire, made_a_call)?;
     let usage_value = require(wire, "response", "usage")?;
     let details = usage_value.get("input_tokens_details");
-    let cache_read = details
-        .map(|held| tokens_or_zero(held, "cached_tokens", "response.usage.input_tokens_details"))
-        .transpose()?
-        .unwrap_or(Tokens::new(0));
-    let cache_write = details
-        .map(|held| {
-            tokens_or_zero(
-                held,
-                "cache_write_tokens",
-                "response.usage.input_tokens_details",
-            )
-        })
-        .transpose()?
-        .unwrap_or(Tokens::new(0));
+    let cache_read = cache_count(
+        details,
+        "cached_tokens",
+        "response.usage.input_tokens_details",
+    )?;
+    let cache_write = cache_count(
+        details,
+        "cache_write_tokens",
+        "response.usage.input_tokens_details",
+    )?;
     Ok(ChatResponse {
         content,
         stop,
         usage: ModelUsage {
             input_tokens: tokens_or_zero(usage_value, "input_tokens", "response.usage")?,
             output_tokens: tokens_or_zero(usage_value, "output_tokens", "response.usage")?,
-            cache_read_tokens: CacheCount::Reported(cache_read),
-            cache_write_tokens: CacheCount::Reported(cache_write),
+            cache_read_tokens: cache_read,
+            cache_write_tokens: cache_write,
             dialect: Some(DialectKind::OpenAiResponses),
         },
     })
@@ -296,7 +293,7 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
 )]
 mod tests {
     use super::*;
-    use kernel::Payload;
+    use kernel::{CacheCount, Payload, Tokens};
 
     fn call(name: &str, id: &str) -> ContentBlock {
         let mut args = serde_json::Map::new();

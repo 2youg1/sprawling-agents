@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 50 as const;
+export const WIRE_V = 51 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "d53226e5036a950212b29b54a7586aca2d94ba993d8e053dedb9551bc05e5121" as const;
+export const WIRE_HASH = "c5141b2991cfeecd1bea46be208fc2ad715210727f9fe6738829027829d4a704" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -3214,7 +3214,7 @@ export type Note = typeof Note.Type;
  */
 export const Used = Schema.Struct({
   cache_write: Schema.optional(Schema.NullOr(Tokens)),
-  cached: Tokens,
+  cached: Schema.optional(Schema.NullOr(Tokens)),
   first_us: Schema.optional(Schema.NullOr(Schema.Int)),
   input: Tokens,
   output: Tokens,

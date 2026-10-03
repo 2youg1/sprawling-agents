@@ -66,18 +66,22 @@
 
   // Every turn the provider reported tokens for, summed: the input is
   // every prompt token of each call, cached or not, so the share of it
-  // the cache served is the hit rate.
+  // the cache served is the hit rate. Only turns whose provider reported
+  // a cache read count toward the rate (`hitInput`); when none did, the
+  // rate is unknown rather than 0% (crates/wire/spec/Reading.lean D35).
   const used = $derived(
     turns.reduce(
       (sum, turn) => ({
         input: sum.input + (turn.used?.input ?? 0),
         output: sum.output + (turn.used?.output ?? 0),
         cached: sum.cached + (turn.used?.cached ?? 0),
+        hitInput: sum.hitInput + (turn.used?.cached === undefined || turn.used.cached === null ? 0 : turn.used.input),
+        toldCached: sum.toldCached || (turn.used?.cached !== undefined && turn.used.cached !== null),
         written: sum.written + (turn.used?.cache_write ?? 0),
         told: sum.told || (turn.used !== undefined && turn.used !== null),
         toldWritten: sum.toldWritten || (turn.used?.cache_write !== undefined && turn.used.cache_write !== null),
       }),
-      { input: 0, output: 0, cached: 0, written: 0, told: false, toldWritten: false },
+      { input: 0, output: 0, cached: 0, hitInput: 0, toldCached: false, written: 0, told: false, toldWritten: false },
     ),
   );
 
@@ -138,9 +142,11 @@ not, so a figure is never cut to a few letters. -->
   </div>
   <div class="flex min-w-0 flex-col">
     <dt class="text-note text-text-faint">{say($lang, "world_cache")}</dt>
-    {#if used.input > 0}
+    {#if used.input > 0 && !used.toldCached}
+      <dd class="truncate text-text-faint">{say($lang, "world_cache_unknown")}</dd>
+    {:else if used.hitInput > 0}
       <dd class="figure truncate text-text">
-        {fill(say($lang, "world_cache_hit"), { n: String(Math.round((used.cached / used.input) * 100)) })}
+        {fill(say($lang, "world_cache_hit"), { n: String(Math.round((used.cached / used.hitInput) * 100)) })}
       </dd>
       <dd class="truncate text-note text-text-faint">
         {[

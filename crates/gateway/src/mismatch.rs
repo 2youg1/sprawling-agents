@@ -16,7 +16,7 @@
 //! endpoint's declared dialect does not match what answered it, so the
 //! recovery says exactly that rather than "try again".
 
-use kernel::{AxCode, AxError, Payload, Tokens};
+use kernel::{AxCode, AxError, CacheCount, Payload, Tokens};
 use serde_json::Value;
 
 pub(crate) fn mismatch(path: &str, detail: &str) -> AxError {
@@ -111,10 +111,25 @@ fn as_u64(value: &Value, path: &str) -> Result<u64, AxError> {
         .ok_or_else(|| mismatch(path, "expected unsigned integer"))
 }
 
+/// A count every reply carries; a provider that leaves it out spent none.
 pub(crate) fn tokens_or_zero(usage: &Value, key: &str, path: &str) -> Result<Tokens, AxError> {
-    match usage.get(key) {
-        None | Some(Value::Null) => Ok(Tokens::new(0)),
-        Some(value) => Ok(Tokens::new(as_u64(value, &format!("{path}.{key}"))?)),
+    Ok(cache_count(Some(usage), key, path)?.or_zero())
+}
+
+/// A cache count, which a provider may not report at all: an absent
+/// object, an absent key and `null` are each `Unreported`, never a zero
+/// hit (`crates/kernel/spec/Model.lean` D36).
+pub(crate) fn cache_count(
+    usage: Option<&Value>,
+    key: &str,
+    path: &str,
+) -> Result<CacheCount, AxError> {
+    match usage.and_then(|held| held.get(key)) {
+        None | Some(Value::Null) => Ok(CacheCount::Unreported),
+        Some(value) => Ok(CacheCount::Reported(Tokens::new(as_u64(
+            value,
+            &format!("{path}.{key}"),
+        )?))),
     }
 }
 

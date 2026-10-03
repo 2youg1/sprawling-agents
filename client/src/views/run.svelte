@@ -200,7 +200,7 @@
 
   function barOf(used: Used | null | undefined, top: number, part: "cached" | "input" | "output"): number {
     if (used === null || used === undefined) return 0;
-    const held = Math.min(used.cached, used.input);
+    const held = Math.min(used.cached ?? 0, used.input);
     const value = part === "cached" ? held : part === "input" ? used.input - held : used.output;
     return (value / top) * 100;
   }

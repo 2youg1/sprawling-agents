@@ -76,7 +76,9 @@
   <div class={CELL}>
     <dt class={NAME}>{say($lang, "run_head_tokens")}</dt>
     <dd class={VALUE}>{count(figures.input)} / {count(figures.output)}</dd>
-    <dd class="{MORE} figure">{fill(say($lang, "run_head_cached"), { n: count(figures.cached) })}</dd>
+    <dd class="{MORE} figure">
+      {figures.cached === null ? say($lang, "run_head_cached_unknown") : fill(say($lang, "run_head_cached"), { n: count(figures.cached) })}
+    </dd>
   </div>
   <div class={CELL}>
     <dt class={NAME}>{say($lang, "run_head_spent")}</dt>

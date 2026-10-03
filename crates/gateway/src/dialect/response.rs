@@ -266,11 +266,19 @@ mod tests {
             } else {
                 0
             };
+            // The chat face has no slot for a cache write, so it never
+            // reports one; the other two report what they were given.
+            let cache_write_tokens = match dialect {
+                DialectKind::OpenAi => CacheCount::Unreported,
+                DialectKind::Anthropic | DialectKind::OpenAiResponses => {
+                    CacheCount::Reported(Tokens::new(write))
+                }
+            };
             ModelUsage {
                 input_tokens: Tokens::new(i + r + write),
                 output_tokens: Tokens::new(o),
                 cache_read_tokens: CacheCount::Reported(Tokens::new(r)),
-                cache_write_tokens: CacheCount::Reported(Tokens::new(write)),
+                cache_write_tokens,
                 dialect: Some(dialect),
             }
         })

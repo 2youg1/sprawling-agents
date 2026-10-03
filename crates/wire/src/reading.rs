@@ -84,8 +84,8 @@ pub fn used_in(usage: &serde_json::Value) -> Option<Used> {
     Some(Used {
         input: usage.input_tokens,
         output: usage.output_tokens,
-        cached: Some(usage.cache_read_tokens.or_zero()),
-        cache_write: Some(usage.cache_write_tokens.or_zero()),
+        cached: usage.cache_read_tokens.reported(),
+        cache_write: usage.cache_write_tokens.reported(),
         first_us: None,
         took_us: None,
     })
