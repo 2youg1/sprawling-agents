@@ -38,22 +38,35 @@
   const LEFT: Lines = [1, 4];
   const RIGHT: Lines = [10, 13];
 
-  // With the right pane open the panorama keeps the sessions and the
-  // chosen session in the person's order, at the side part's three
-  // columns and the middle part's six, and the commits fold away: the
-  // right pane takes the side part they stood in.
-  const BESIDE_RIGHT: Readonly<Record<Pane, number>> = { sessions: 3, session: 6, commits: 0 };
+  // The line the open right side starts on (client D72): two middle
+  // columns past the right silver line, so a file or a letter reads at
+  // about ninety monospace characters at 1920 px where the side part alone
+  // held sixty. The conversation gives up those two columns and takes the
+  // left side part's last two instead, keeping column 1 for the edge keys;
+  // it stays wider than its 760 px reading column. Moving this one line
+  // moves every tier's right side.
+  const RIGHT_FROM = 8;
+  const RIGHT_OPEN: Lines = [RIGHT_FROM, 13];
+  const TALK_BESIDE_RIGHT: Lines = [2, RIGHT_FROM];
 
-  // The conversation never moves when the right pane opens or closes: it
-  // keeps the middle part, and the right pane takes the right side part,
-  // so the two stand at √2 : 1 with the conversation the main one.
+  // With the right side open the panorama keeps the sessions and the
+  // chosen session in the person's order, at two and five columns, and
+  // the commits fold away: together they end on the right side's line.
+  const BESIDE_RIGHT: Readonly<Record<Pane, number>> = { sessions: 2, session: RIGHT_FROM - 3, commits: 0 };
+
+  // The conversation keeps the middle part while the right side is
+  // closed; opening the right side moves it left by the two columns the
+  // right side takes, and in blend the sessions fold away with the
+  // commits, because a text panel never lies under the conversation.
   export function layoutOf(tier: Tier, right: RightSide, bench: Workbench): Layout {
     switch (tier) {
       case "zen":
-        return { world: "none", panes: [], talk: MIDDLE, right: right === "open" ? RIGHT : null };
+        return right === "open"
+          ? { world: "none", panes: [], talk: TALK_BESIDE_RIGHT, right: RIGHT_OPEN }
+          : { world: "none", panes: [], talk: MIDDLE, right: null };
       case "blend":
         return right === "open"
-          ? { world: "beside", panes: [{ pane: "sessions", lines: LEFT }], talk: MIDDLE, right: RIGHT }
+          ? { world: "none", panes: [], talk: TALK_BESIDE_RIGHT, right: RIGHT_OPEN }
           : {
               world: "beside",
               panes: [
