@@ -65,8 +65,8 @@ impl Beat {
     /// beat holds until the city stops either way.
     pub(crate) fn set(&self, beat: BeatMs) {
         self.ms.store(beat.ms(), Ordering::Relaxed);
-        if self.file.as_os_str().is_empty() {
-            drop(write(&self.file, beat));
+        if let Err(error) = write(&self.file, beat) {
+            eprintln!("{error}");
         }
     }
 }

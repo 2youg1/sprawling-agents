@@ -4217,6 +4217,14 @@ export const Ask = Schema.Struct({
 export type Ask = typeof Ask.Type;
 
 /**
+ * How often the monitor reads this process's private bytes, and a tenth
+ * of how often it sends a reading (§8-47h). Only a beat inside
+ * [`BEAT_MIN_MS`]`..=`[`BEAT_MAX_MS`] can be made, on the wire as off it.
+ */
+export const BeatMs = Schema.Int.pipe(Schema.brand("BeatMs"));
+export type BeatMs = typeof BeatMs.Type;
+
+/**
  * One field written into every request body this endpoint receives.
  * 
  * `pointer` is a JSON pointer (`/temperature`, `/reasoning/effort`),
@@ -4869,6 +4877,9 @@ export const Monitoring = Schema.Union([
   Schema.Literal("release"),
   Schema.Literal("watch"),
   Schema.Literal("watch_summary"),
+  Schema.Struct({
+    beat: BeatMs,
+  }),
 ]).annotate({ identifier: "Monitoring" });
 export type Monitoring = typeof Monitoring.Type;
 
@@ -4990,6 +5001,7 @@ export type LogLine = typeof LogLine.Type;
  * it travels on the wire (`crates/sprawling/Spec.lean` §8-94, §8-129-6).
  */
 export const Sample = Schema.Struct({
+  beat_ms: Schema.Int,
   core_cpu_permille: Schema.Int,
   core_private_bytes: Schema.Int,
   core_read_bytes: Schema.Int,
