@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 49 as const;
+export const WIRE_V = 50 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "604beb64d0238b8826d95f0114151f9055fa2603c6d1c9672b00d1438df506be" as const;
+export const WIRE_HASH = "d53226e5036a950212b29b54a7586aca2d94ba993d8e053dedb9551bc05e5121" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -3982,6 +3982,37 @@ export const CitySettings = Schema.Struct({
 export type CitySettings = typeof CitySettings.Type;
 
 /**
+ * What `ConfirmRemoteDoor` carries: the code the city's console printed, read however it was
+ * retyped. Every answer, right or wrong, ends the request it answers.
+ */
+export const DoorAnswer = Schema.Struct({
+  code: Schema.String,
+  idem: IdemKey,
+}).annotate({ identifier: "DoorAnswer" });
+export type DoorAnswer = typeof DoorAnswer.Type;
+
+/**
+ * What `OpenRemoteDoor` asks for: the remote door open for `lasting_ms`, one minute to seven
+ * days. The request does nothing by itself; the city prints a code at its own console and
+ * refuses the frame with `E_APPROVAL_PENDING` (`crates/wire/spec/Command/Kind.lean`,
+ * remote_access D4).
+ */
+export const DoorOpening = Schema.Struct({
+  idem: IdemKey,
+  lasting_ms: Schema.Int,
+}).annotate({ identifier: "DoorOpening" });
+export type DoorOpening = typeof DoorOpening.Type;
+
+/**
+ * A door verb with nothing to say but its key: `ReplaceCityKey`, guarded the way opening is,
+ * and `CloseRemoteDoor`, unguarded because closing only takes access away (remote_access D5).
+ */
+export const DoorStep = Schema.Struct({
+  idem: IdemKey,
+}).annotate({ identifier: "DoorStep" });
+export type DoorStep = typeof DoorStep.Type;
+
+/**
  * One header every request to this endpoint carries.
  * 
  * The value may be a `secret:realm/name` reference, which the vault
@@ -4272,13 +4303,8 @@ export const TemplateName = Schema.String.pipe(Schema.brand("TemplateName"));
 export type TemplateName = typeof TemplateName.Type;
 
 /**
- * Commands change state, require authorization, and are idempotent.
- * 
- * Deliberately *not* `#[non_exhaustive]`: the schema hash is this type's
- * version mechanism, so the assembly layer must handle every one of them
- * and a new one fails to compile until somebody decides what it does.
- * That is the rule that keeps a button off the client until the city can
- * answer the frame behind it.
+ * Commands change state, require authorization, and are idempotent. Deliberately *not*
+ * `#[non_exhaustive]`, for the reason the module documentation of `command::wire` gives.
  */
 export const Command = Schema.Union([
   Schema.Struct({
@@ -4529,6 +4555,18 @@ export const Command = Schema.Union([
   }),
   Schema.Struct({
     change_run_policy: PolicyChange,
+  }),
+  Schema.Struct({
+    open_remote_door: DoorOpening,
+  }),
+  Schema.Struct({
+    replace_city_key: DoorStep,
+  }),
+  Schema.Struct({
+    confirm_remote_door: DoorAnswer,
+  }),
+  Schema.Struct({
+    close_remote_door: DoorStep,
   }),
   Schema.Struct({
     auth: Schema.Struct({
