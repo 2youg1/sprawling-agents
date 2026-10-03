@@ -95,7 +95,7 @@ pub(crate) fn handoff_probe() -> Result<Probe, AxError>;   // 名 handoff、版�
 - **适配器随值来去**：`Driving` 拥有它的适配器（`accounting::worker::keeping_warm::Door`），drive 结束时经 `Driven.adapter` 交回，调用方拆开归位；`&mut` 出借会把「谁拥有适配器」悬在一次调用上。`Site` 一侧的 `adapter` 是 `Option<Door>`，只是这次搬运的载具，跨过调用时两端皆为 `Some`；`None` 分支以 `E_CONFIG_INVALID` 拒绝而不 panic（§8-40 的先例）。
 - **定时只有一个 `last_*`**：`last_tick` 的读写只在 `commanding::routing` 的 `tick`（读表→判断到期→推进）；它是写者状态而不是散装轮询，删它等于删掉「开机不补跑昨日」这条产品语义（§8-6）。
 - **LOADING／UNLOADING 有名有主**：LOADING 是 `RunWorker::over` 里的 `Standing::fold`（一次验证、三折叠），UNLOADING 是 `close_city` 写 handoff；不给它们另起名字，因为给已存在的东西改名是第二个权威。
-- **判据**：`a_loopback_endpoint_with_a_credential_sends_it_on_every_call` 与 `a_dispatch_without_a_provider_fails_saying_what_to_configure` 咬的正是这条装配线。
+- **看守它的测试**：`a_loopback_endpoint_with_a_credential_sends_it_on_every_call` 与 `a_dispatch_without_a_provider_fails_saying_what_to_configure` 咬的正是这条装配线。
 -/
 
 /-!
