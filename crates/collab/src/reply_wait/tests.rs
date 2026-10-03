@@ -245,7 +245,7 @@ fn the_wait_input_is_a_yes_or_a_no_and_one_at_a_time() {
 /// A letter from a third room that lands before the stop is not kept
 /// for the wait, even when it is the first to arrive: the wait is kept
 /// for the room it spoke to, and the third room's letter queues
-/// (`spec/Delivery.lean` §8 `kept_is_first_reply`).
+/// (`spec/Delivery.lean` §9 `kept_is_first_reply`).
 #[test]
 fn a_third_room_landing_first_is_not_kept_for_the_wait() {
     let (a, b) = (room("lab/a"), room("lab/b"));

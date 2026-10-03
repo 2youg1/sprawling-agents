@@ -29,7 +29,7 @@ use crate::signal_tool::PATIENCE_MS;
 /// injected clock that ends it. The deadline is taken at the stop, not
 /// at the send, as `Collab.Delivery.step`'s `park` takes `clock`.
 /// `kept` is a reply that arrived after the send and before the stop,
-/// held here rather than queued (collab D15, `spec/Delivery.lean` §8).
+/// held here rather than queued (collab D15, `spec/Delivery.lean` §9).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ReplyWait {
     on: Address,

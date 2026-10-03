@@ -30,6 +30,7 @@
 7. **F8：被取消的 run 拿过的信重新投递**（`leave_requeues`、`consumed_stays`）：一个 run 无论以 Done、失败还是取消结束，它拿着而没被落账的回答读过的信回到房间队列，并为那个房间敲一次门；已消费的不再回来。
 
 8. **每封信恰一行落点**（`one_landing_per_signal`、`landings_once`、`knocked_is_the_knock`、`delivered_is_running`）：每一行 `signal_enqueued` 恰配一行 `signal_landed`，按 `SignalId` 配；落点是 `knocked` 当且仅当这次 `send` 敲了门，是 `delivered` 当且仅当收信房间有 run 在跑。模型里的 `send` 不分路径：lane 经 relay 发出的信、子房间交接回父房间的信、一次落定里投递的信（kernel `spec/Event/Record.lean` D38）在装配层都经 `accounting::worker::waking::landing` 的同一个判定，所以性质在整座城成立，不只在 relay 一条路上。
+9. **等待问出之后、停下之前到的回信被留着**（`arrive_perm`、`kept_is_first_reply`）：见 §9，collab D15。
 
 `withoutRequeue_loses` 是咬得动的演示：照 D8 否决的「取走即消费」在安全点取走就记消费，被取消的 run 拿走的那件就既不在队列里，也没有人读过。
 
@@ -498,7 +499,7 @@ theorem withoutRequeue_loses :
   decide
 
 /-!
-## 8 等待问出之后、停下之前到的回信被留着（collab D15）
+## 9 等待问出之后、停下之前到的回信被留着（collab D15）
 
 `send` 带 `wait` 之后，run 要到下一个 `BeforeAssemble` 才停下；同一波里更晚的安全点（`BeforeToolCall`、`BeforeSpawn`）照样把 `Mailslot` 倒进队列。下面这个模型只管一个 run 的桌子在这段窗口里怎样收信：`on` 是问出的等待在等谁，`kept` 是留给它的回信，`queue` 是借来的队列。等待问出之后，第一件来自 `on` 的信不进队列，留在等待里（`collect`）；别的照常进队列。停下时（`park`）留着的那件结束等待，被 run 拿着，按 D8 在读过它的回答落账时消费；run 先离开（`leave`），它回到队列。
 
