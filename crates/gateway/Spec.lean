@@ -109,8 +109,8 @@ Dialect／Endpoint／Custody／Vault／SecretRef／Sealed／Retries／HeaderValu
 Lean 里的名字与 Rust 的对应：
 
 - `Gateway.Provider.Ceiling.resolve` ↔ `OutputCeiling::resolve`，其参数 `preset` ↔ `preset::ceiling_for(target.base_url, target.id)`，`policy` ↔ `OUTPUT_CEILING_DEFAULT`，`wire` ↔ `Target.wire`；`field_on`、`Field` ↔ 同名的私有函数与枚举；`Ceiling.new` ↔ `kernel::Ceiling::new`。
-- `Gateway.Provider.Input.accepted_input` ↔ `provider::input::accepted_input`，其参数 `preset` ↔ `preset::input_for(base_url, id)`。
-- `Gateway.Provider.Preset.model_for` ↔ `preset::model_for`，`own` ↔ host 自己那一行的 `models`，`vendors` ↔ `PRESETS` 全部的模型行，`isLocal` ↔ `reach::is_local(base_url)`；`longest` ↔ `max_by_key(|row| row.id_prefix.len())`。
+- `Gateway.Provider.Input.accepted_input` ↔ `provider::input::first_stated`（私有），`accepted_input` 用 `preset::input_for(base_url, id)` 的答案作它的参数 `preset`。
+- `Gateway.Provider.Preset.model_for` ↔ `preset::row_for`（私有；`preset::model_for` 交给它真实的表），`own` ↔ host 自己那一行的 `models`，`vendors` ↔ `PRESETS` 全部的模型行，`isLocal` ↔ `reach::is_local(base_url)`；`longest` ↔ `max_by_key(|row| row.id_prefix.len())`。
 - `Gateway.Endpoint.Failure.retry`、`refusal` ↔ `ProviderFailure::retry`、`ProviderFailure::refusal`；`busy` ↔ `retry` 里 408、429、`is_server_error` 那一臂的条件；`RETRIABLE_KINDS` ↔ `Reported` 那一臂的 `matches!` 列表；`Exchange` 的参数 ↔ `reqwest::Error::is_connect`。
 - `Gateway.Cost.settle`、`share` ↔ `cost::settle`、`cost::share`；`settle_from` ↔ `settle` 里逐项 `checked_add` 的循环；`checked` ↔ `u64` 的 `checked_mul`／`checked_add`；`exact` 是模型里不回绕的份额，Rust 没有对应。
 -/
@@ -364,10 +364,11 @@ golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返�
 
 形式化的义务由证明清偿：`lake build crates.gateway.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
 
-- 输出上限的梯子：`provider::ceiling` 的测试（`the_higher_rung_wins_and_says_that_it_did`、`on_a_face_that_takes_no_figure_the_provider_picks_when_nobody_stated_one`、`a_relay_forwarding_a_vendors_id_is_called_at_the_vendors_ceiling`、`an_unknown_model_at_an_unknown_host_is_still_callable`）。
-- 收得下什么：`provider::input` 的 `the_first_rung_that_states_a_fact_answers`，与 accounting 的 `a_preset_model_that_reads_pictures_is_registered_as_reading_them`（选型点的生产路径）。
-- 预置表的行：`provider::preset` 的测试（`a_documented_model_is_matched_by_the_longest_prefix_that_fits`、`a_relay_forwarding_a_vendors_id_reads_the_vendors_row_and_a_local_server_does_not`、`no_pinned_catalogue_row_is_also_matched_by_this_table`）。
+- 输出上限的梯子：`provider::ceiling` 的 proptest `the_ceiling_ladder_keeps_the_lean_properties` 与测试（`the_higher_rung_wins_and_says_that_it_did`、`on_a_face_that_takes_no_figure_the_provider_picks_when_nobody_stated_one`、`a_relay_forwarding_a_vendors_id_is_called_at_the_vendors_ceiling`、`an_unknown_model_at_an_unknown_host_is_still_callable`）。
+- 收得下什么：`provider::input` 的 `the_first_rung_that_states_a_fact_answers` 与 `every_answer_is_a_stated_fact_or_text_on_every_combination`（27 种组合），与 accounting 的 `a_preset_model_that_reads_pictures_is_registered_as_reading_them`（选型点的生产路径）。
+- 预置表的行：`provider::preset` 的 proptest `the_row_rule_keeps_the_lean_properties` 与测试（`a_documented_model_is_matched_by_the_longest_prefix_that_fits`、`a_relay_forwarding_a_vendors_id_reads_the_vendors_row_and_a_local_server_does_not`、`no_pinned_catalogue_row_is_also_matched_by_this_table`）。
 - 能否再试：`endpoint::failure` 的测试（`what_never_completed_is_asked_again_and_what_was_refused_is_not`、`a_provider_that_says_busy_or_broken_is_asked_again_and_one_that_refuses_is_not`、`a_request_that_outgrew_the_window_is_told_how_to_fit_again`）。
+- 名额：`concurrency` 的 proptest `permits_keep_the_lean_properties` 与 `a_trace_without_narrowing_keeps_in_use_within_the_limit`，`endpoint::permit` 的 `grants_follow_arrival`。
 - 结算：`cost` 的测试（`the_authoritative_amount_always_wins`、`the_price_sheet_computes_integer_shares`、`overflowing_settlements_are_errors_not_wraps`）。
 
 只有节注释的分部，其要求由类型与 `cargo nextest run -p sprawling-gateway` 的各模块测试守住。

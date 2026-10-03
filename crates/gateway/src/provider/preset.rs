@@ -255,15 +255,28 @@ fn host_row(base_url: &str) -> Option<&'static HostPreset> {
 /// answers.
 #[must_use]
 pub fn model_for(base_url: &str, id: &str) -> Option<&'static ModelPreset> {
-    let own = host_row(base_url).map_or(&[][..], |row| row.models);
-    let relayed = own.is_empty() && !crate::reach::is_local(base_url);
+    row_for(
+        host_row(base_url).map_or(&[][..], |row| row.models),
+        PRESETS.iter().flat_map(|row| row.models.iter()),
+        crate::reach::is_local(base_url),
+        id,
+    )
+}
+
+/// Which row answers for `id`, over any row table:
+/// `Gateway.Provider.Preset.model_for` with `own` the host's own model
+/// rows, `vendors` every model row in table order, and `local` whether
+/// the base URL is on this machine. The table is a parameter so a check
+/// can drive the rule over tables [`PRESETS`] does not hold.
+fn row_for<'rows>(
+    own: &'rows [ModelPreset],
+    vendors: impl Iterator<Item = &'rows ModelPreset>,
+    local: bool,
+    id: &str,
+) -> Option<&'rows ModelPreset> {
+    let relayed = own.is_empty() && !local;
     own.iter()
-        .chain(
-            PRESETS
-                .iter()
-                .filter(|_| relayed)
-                .flat_map(|row| row.models.iter()),
-        )
+        .chain(vendors.filter(|_| relayed))
         .filter(|row| id.starts_with(row.id_prefix))
         .max_by_key(|row| row.id_prefix.len())
 }
@@ -582,5 +595,54 @@ mod tests {
         let listed = hosts.len();
         hosts.dedup();
         assert_eq!(hosts.len(), listed, "a host with two rows is two answers");
+    }
+
+    /// A model row with only the prefix this rule reads.
+    fn row(id_prefix: &'static str) -> ModelPreset {
+        ModelPreset {
+            id_prefix,
+            context_tokens: 1,
+            max_output_tokens: 1,
+            input: InputKinds::Text,
+            source: "test",
+        }
+    }
+
+    /// The prefixes of a random row table; rows are built in the test,
+    /// because `ModelPreset` carries no `Debug` for proptest to print.
+    fn prefixes() -> impl proptest::strategy::Strategy<Value = Vec<&'static str>> {
+        proptest::collection::vec(
+            proptest::sample::select(vec!["", "a", "ab", "abc", "b", "ba", "c"]),
+            0..6,
+        )
+    }
+
+    proptest::proptest! {
+        /// The three theorems of `crates/gateway/spec/Provider/Preset.lean`
+        /// over random row tables and ids, rather than over the shipped
+        /// table alone.
+        #[test]
+        fn the_row_rule_keeps_the_lean_properties(
+            own in prefixes(),
+            vendors in prefixes(),
+            local in proptest::bool::ANY,
+            id in "[abc]{0,4}",
+        ) {
+            let own: Vec<ModelPreset> = own.into_iter().map(row).collect();
+            let vendors: Vec<ModelPreset> = vendors.into_iter().map(row).collect();
+            let found = row_for(&own, vendors.iter(), local, &id);
+            // a_server_on_this_machine_borrows_no_vendor_row
+            if own.is_empty() && local {
+                proptest::prop_assert!(found.is_none());
+            }
+            if let Some(answer) = found {
+                // a_host_with_rows_of_its_own_answers_from_them
+                if !own.is_empty() {
+                    proptest::prop_assert!(own.iter().any(|mine| std::ptr::eq(mine, answer)));
+                }
+                // the_answer_is_a_prefix_of_the_id
+                proptest::prop_assert!(id.starts_with(answer.id_prefix));
+            }
+        }
     }
 }
