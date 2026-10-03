@@ -83,6 +83,8 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode;
 
 **形状。** `main/view.rs` 是 adapter：读命令行、开账本索引、把选中的行写到 stdout。`lineage.rs`（库里，`accounting::lineage`）是 projection（ARCHITECTURE §9 形状 7）：把账本折成每个 run 一条 `RunLine`，查看器的 `tree` 透镜（S5.8I）与 WebUI 以后的 run 树读的都是它。`view` 只读，`Effect::ReadsOnly`。
 
+**`--shells` 透镜。** 每个 shell 解释器一行 JSON：`{"interpreter": <名>, "calls": <有退出码的 shell 行数>, "failures": {"command_not_found": n, "syntax": n, "encoding": n}}`，只列出现过的类，按解释器名排序。折叠是 `runtime::ShellTally`，它读每条 `tool_result` 的 `result`，分类的规则与没有 `interpreter` 字段的旧记录怎么计，都在 `crates/runtime/Spec.lean` §8-13-2 D30；本透镜只读账本、交给它、写出来，所以「每类失败占多少」只有那一处权威。它回答的是 D30 留下的问题：pwsh 7 的成功率是否明显更高。
+
 ```rust
 // bin::main::view
 pub(super) fn verb(read: &Arguments) -> ExitCode;
@@ -92,6 +94,8 @@ pub(super) fn write_records(dir: &Path, chosen: &Selection, audience: Audience, 
 enum HashWidth { Whole, Glance }             // 64 位，或前 GLANCE_DIGITS 位
 const GLANCE_DIGITS: usize;                  // 12
 fn chain_label(line: &[u8], width: HashWidth) -> String; // 十六进制位，后接两个空格
+// bin::main::view::shells
+pub(super) fn write_shells(dir: &Path, out: &mut impl Write) -> Result<(), ViewError>;  // --shells：每个解释器一行 JSON
 // accounting::lineage
 pub struct RunLine { run, addr, session, parent, forked_at, predecessor, first_seq, last_seq, state, unanswered }
 pub struct Lineage;                       // fold：apply(&EventRecord) -> Result<(), AxError>
