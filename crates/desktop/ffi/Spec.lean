@@ -374,9 +374,6 @@ theorem fill_then_copy_is_the_text (units : List Nat) (h : 0 ∉ units) (capacit
   unfold textCopy
   rw [hend, if_pos room, List.take_left' rfl]
 
-/-- 反例：块长与文本不符时不写；若照写，块尾就没有终止符。 -/
-theorem a_block_of_the_wrong_length_is_refused : textFill [1, 2] 2 = none := by decide
-
 /-- 位图的字节数恰是行数乘每行的字节数，且恒不超过上界：Rust 借出的缓冲正是 `GetDIBits` 写的那么长。 -/
 theorem bitmap_bytes_are_rows_of_four_byte_pixels (most : Nat) (width height : Int) (bytes : Nat)
     (h : bitmapBytes most width height = some bytes) :

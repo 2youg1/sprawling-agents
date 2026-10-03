@@ -45,7 +45,7 @@ pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) ->
 
 `StorageError::into_ax` 是本 crate 失败越过 crate 边界的唯一出口。下面的 `code` 列出每个变体答的 `AxCode`；`Draft` 与 `ChainHalted` 不造码，原样交出它们带着的那个 `AxError`（`carried`）。码本身（拼写、语义、装载期白名单）的权威是 kernel 的错误码表（`crates/kernel/Spec.lean` §8-4），这里只说 storage 的哪个失败落在哪个码上，以及为什么它不能被定义掉。
 
-`ledger_failures_stop_the_writer` 陈述：账本介质的失败（`Io`、`LedgerBroken`）与快照的盘拒绝都答 `E_STORAGE_FATAL`，宁停不脏；`only_two_variants_carry` 陈述只有 `Draft` 与 `ChainHalted` 不造码，所以别的变体的码都在这张表里写死。
+账本介质的失败（`Io`、`LedgerBroken`）与快照的盘拒绝都答 `E_STORAGE_FATAL`，宁停不脏：这是 `code` 的三个分支本身，单独立一条只核对这三格的定理只会重述定义；`only_two_variants_carry` 陈述只有 `Draft` 与 `ChainHalted` 不造码，所以别的变体的码都在这张表里写死。
 -/
 
 namespace Storage.Error
@@ -177,11 +177,6 @@ def code : StorageError → Answer
   | .ChainHalted => .carried
   | .Unproven => .own .HistoryUnproven
   | .Snapshot => .own .StorageFatal
-
-theorem ledger_failures_stop_the_writer :
-    code .Io = .own .StorageFatal ∧ code .LedgerBroken = .own .StorageFatal ∧
-      code .Snapshot = .own .StorageFatal := by
-  decide
 
 theorem only_two_variants_carry (e : StorageError) :
     code e = .carried ↔ e = .Draft ∨ e = .ChainHalted := by

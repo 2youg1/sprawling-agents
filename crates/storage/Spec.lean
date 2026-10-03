@@ -100,7 +100,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 - `spec/Worktree/Trees/Stock.lean`：接管在任何一步之后断掉都收得回来（`every_cut_is_recovered`）；备树被拿走只成一次（`the_stock_is_taken_once`）。
 - `spec/Worktree/Back.lean`：回到过去的树恰在那一点、拒绝活树、只动自己的树、账本只增不减（§8-27）。
 - `spec/Index.lean`：从某个 seq 往后读，答的是索引里不小于它的每一条（`seqs_from_answers_the_held_seqs_at_or_after`），与从头读再跳过前面的相同（`seqs_from_is_the_walk_past_the_smaller`），答案不取决于它之前的任何一格（`seqs_from_reads_no_slot_before_its_start`）。
-- `spec/Error.lean`：账本介质的失败答 `E_STORAGE_FATAL`（`ledger_failures_stop_the_writer`），只有两个变体原样交出它们带着的错误（`only_two_variants_carry`）。
+- `spec/Error.lean`：账本介质的失败答 `E_STORAGE_FATAL`（`code` 的分支本身，不另立定理），只有两个变体原样交出它们带着的错误（`only_two_variants_carry`）。
 
 每个模型都带一个可实现的正常路径（走得通的两行账本、一次没有打扰的 `put`、恰触界的范围、没有断掉的接管、Lean 里的 `example`），所以这些保证不是从一个无法满足的前提推出来的。生产实现与模型的对应由 §16 列出的 Rust 测试检查；一条 Lean 定理证明的是模型，不是 Rust。
 -/
