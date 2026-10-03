@@ -310,7 +310,13 @@ mod tests {
     }
 
     fn recogniser_for_test(chosen: &Chosen<'_>) -> Recogniser {
-        super::super::recogniser_for(chosen, resolver(), Vec::new(), crate::endpoint::fakes::monotonic).unwrap()
+        super::super::recogniser_for(
+            chosen,
+            resolver(),
+            Vec::new(),
+            crate::endpoint::fakes::monotonic,
+        )
+        .unwrap()
     }
 
     /// The picture is written in the shape of the face the chosen

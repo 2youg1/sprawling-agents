@@ -51,7 +51,12 @@ pub fn recogniser_for(
                     )
             })
     });
-    let model = crate::adapter_for(chosen, Redemption::new(secrets, images), dialect_headers, monotonic)?;
+    let model = crate::adapter_for(
+        chosen,
+        Redemption::new(secrets, images),
+        dialect_headers,
+        monotonic,
+    )?;
     Ok(Recogniser::attached(Seeing {
         model,
         model_id: chosen.entry.id.clone(),
