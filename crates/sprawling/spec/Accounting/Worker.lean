@@ -1248,13 +1248,16 @@ transcript 已经在盘上，所以记账线程的 `land` 里没有这一步。�
 交给记账线程判定：它按队列次序看见每一个认领，先问的拿到节点，后问的当场被拒，一次模型调用都不白花。
 
 ```rust
-pub(crate) struct Claimant { pub(crate) building: Address, pub(crate) room: Address, pub(crate) run: RunId, pub(crate) who: String }
+pub(crate) struct PlanRead(u64);  // 桌子读计划时 ClaimBook 已看见的停止行数
+pub(crate) struct Claimant { pub(crate) building: Address, pub(crate) room: Address, pub(crate) run: RunId, pub(crate) who: String, pub(crate) clock: Arc<dyn Clock>, pub(crate) read: PlanRead }
 pub(crate) struct ClaimAsk { /* building、node、roadmap_claimed 那一行的 EventDraft、放回行 effect::Line、回信的 SyncSender —— 私有 */ }
 #[derive(Default)]
 pub(crate) struct ClaimBook { /* (building, node) → 在飞的 RunId 与放回行 —— 私有 */ }
 impl ClaimBook {
     pub(crate) fn answer(&mut self, ask: ClaimAsk, ledger: &mut impl Ledger); // 入账并登记，或拒绝；然后回信
     pub(crate) fn release(&mut self, run: RunId) -> OpenClaims; // 这轮活回家时放开它持有的节点，交出它们的放回行
+    pub(crate) fn read_mark(&self) -> PlanRead;                 // 现在开的桌子带的计数
+    pub(crate) fn absorb(&mut self, kind: EventKind, addr: Option<&Address>, data: &Payload) -> Result<(), AxError>; // 停止行加计数，放回行让节点重新就绪
 }
 #[must_use] pub(crate) struct OpenClaims { /* run 与 node → 放回行 —— 私有 */ }
 impl OpenClaims {
@@ -1276,11 +1279,20 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
 - **先入账再登记**：`answer` 接受认领时，在记账线程上把 `roadmap_claimed` 追加进账本，追加成功才登记节点并回 `Ok`；
   账本拒绝那一行时不登记，拒绝原样回给模型——于是没有哪轮活持有一个历史上看不出它持有的节点。那一行由车道在调用那一刻
   用 `ClaimEffect::kind`／`payload` 拼好（时刻取自 `Claimant.clock`，即 worker 自己的 `accounting::Clock`），归在那轮活的房间下；`Claimant` 是派活时就定下、
-  随每次认领一起走的四个值。被拒的认领不留任何一行。
+  随每次认领一起走的六个值。被拒的认领不留任何一行。
 - **登记持续到那轮活回家**：`Flight::arrived` 放开它，而它的落地在同一线程上、在下一次 `serve` 之前跑完，
   所以没有任何认领会在「放开」与「盘上的计划写明节点结局」之间被答复。
-- **落地时的 `still_true` 比对保留为兜底**（`effect::Claims::of`）：一条车道在别人落地之后才用旧副本认领一个已经做完的节点，
-  这里不拦它，落地时仍被丢弃并告诉人。那条认领已在账本上，所以 `Claims::Stale` 带着给每条认领补的 `roadmap_released`
+- **桌子的副本比节点的结局旧时，账本的停止行作答**：一轮活的桌子可能在另一轮活落地、把节点写成完成／拆分／阻塞之前读了计划，
+  副本里那个节点仍是就绪。`ClaimBook` 经 `RunWorker::absorb` 看见 worker 写下的每一行：`roadmap_finished`、`roadmap_split`、
+  `roadmap_blocked` 把计数 `PlanRead` 加一并记下这个节点停在哪个计数上，`roadmap_released` 让节点重新就绪、把它移出。
+  `open_desks` 读计划的同时把当时的计数放进 `Claimant.read`；落地先写文件再写行，两者与开桌子同在记账线程上，所以计数不超过 `read`
+  的停止都已在那份副本里。认领的节点停在比 `read` 更大的计数上时当场拒绝，拒词同上一条的形状，说节点在这轮活读计划之后已经结束。
+  于是认领读的是账本上的结局，不是渲染出来的文件；人在编辑器里把节点改回就绪之后开的桌子读到的是新文件，计数也已越过那次停止，不受影响。
+  重启时计数从零开始：那时没有在飞的桌子持有旧副本。被否：认领时在记账线程上重读 `Roadmap.md`——文件是账本的渲染，
+  它与账本之间隔着落地的写盘；以及让 `ClaimBook` 永久记住被阻塞的节点——人改回就绪的节点会被永远拒绝。只有类型与内存里的表，
+  Windows、macOS、Linux 上一样。
+- **落地时的 `still_true` 比对保留为兜底**（`effect::Claims::of`）：上一条只拦停止过的节点；文件在落地前被城外的写者改动时，
+  落地仍丢弃并告诉人。那条认领已在账本上，所以 `Claims::Stale` 带着给每条认领补的 `roadmap_released`
   （`StopCause::HandedBack`，说明是计划在落地前变了）一起落账；只丢弃不补，`folds::collaboration` 会把那一行读成永远有人占着。
   落地成功时 `Claims::of` 照样重放 `Claimed` 改文本，但不再写它的行，否则同一次认领在历史里数成两次。
 - **落地重放效应，不写桌子的副本**：`Claims::of` 把本轮的效应按次序经 `ClaimEffect::apply` 重放到落地时读到的盘上文本，

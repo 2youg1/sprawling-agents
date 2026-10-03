@@ -764,15 +764,10 @@ fn a_node_two_residents_read_as_ready_in_one_wave_is_held_by_the_first_to_claim(
 /// first child has frozen. The second child starts under the same
 /// parent. The failed child spent its claim on `FrozeWithoutEvidence`
 /// (`crates/kernel/spec/Plan.lean`), so the node is blocked, not put
-/// back, and the second child's claim is refused at the call.
-///
-/// Ignored until the accounting worker holds one answer for a blocked
-/// node: on some runs the second child's desk reads a `Roadmap.md` that
-/// does not yet show the block the ledger already carries and the
-/// booking admits the claim, and on others the lead's second `delegate`
-/// fails on the plan's staging file.
+/// back, and the second child's claim is refused at the call, even when
+/// its desk read `Roadmap.md` before the first child's landing wrote the
+/// block: the booking answers from the ledger's stop line.
 #[test]
-#[ignore = "red: a blocked node is claimable by a run dispatched after the block; see the doc comment"]
 fn a_room_delegated_again_after_its_child_failed_starts_under_the_same_parent() {
     let dir = tempfile::tempdir().unwrap();
     let board = Arc::new(Board::default());
