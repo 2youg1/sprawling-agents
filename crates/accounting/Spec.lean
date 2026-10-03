@@ -121,6 +121,8 @@ import crates.accounting.spec.Worker.Workbench.Tools
 本 crate 有四个端口。`ModelFactory` 的生产适配器是 `accounting::worker::models::GatewayModels`，`Connectors` 的是 `accounting::worker::mcp::Residents`，两者都由 `RunWorker` 的构造器装上（D18）；`Clock` 的生产适配器是 `bin::assembly::production::SystemClock`，经 `Hands.clock` 交进来；`Machine` 的是 `bin::doctor::ThisMachine`，经 `Hands.machine` 交进来。生产的 `Hands` 只由 `bin::assembly::production::hands` 一处造出（§8-11）。四个端口的第二实现依次在 `crates/sprawling/tests/model_factory.rs`、`connectors.rs`、`clock.rs`、`machine.rs`。
 
 生产消费者是 `crates/sprawling`：装配根造 `Hands`、起写者线程与视图折叠线程，服务面与 CLI 经 §8-10、§8-11 列出的 `pub` 面读本 crate；citysim 经同一组端口驱动一次 dispatch（§3）。
+
+**常驻内存。** 本 crate 在进程里留三份随城增长、今天没有上界的工作集：视图折叠（`views`，每个 run 一份摘要，随记录数与 run 数增长）、待批项的 `sent` 表（`worker`，每个 run 一条）、playback 导出（`playback::export` 走账本是流式的，但整份 `Document` 与整份 `Bundle` 留在内存里，上界 `BUNDLE_MAX_BYTES`）。冻结的 run 的记录在账本里，视图只该留它的摘要，不留它的消息与工具结果。它们的字节预算（视图 `VIEWS_RESIDENT_BYTES`）、按字节计的缓存与读回规则都写在 `crates/sprawling/spec/Serving/Memory.lean` §8-173，本 crate 照它改：视图与 `sent` 经那份缓存读回，playback 导出改成边走边编码。三个平台上做法相同，读回走 std 的定位读。
 -/
 
 /-! ## 5 权威信源

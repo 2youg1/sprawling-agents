@@ -24,6 +24,7 @@ import crates.sprawling.spec.Outside
 import crates.sprawling.spec.Outside.Conduit
 import crates.sprawling.spec.Serving
 import crates.sprawling.spec.Serving.OutputRing
+import crates.sprawling.spec.Serving.Memory
 import crates.sprawling.spec.Serving.Placement
 import crates.sprawling.spec.Serving.Standing
 import crates.sprawling.spec.Supervising
@@ -64,6 +65,7 @@ import crates.sprawling.spec.WireClient
 | `spec/Outside.lean` | `bin::outside` |
 | `spec/Outside/Conduit.lean` | `bin::outside::conduit` |
 | `spec/Serving.lean` | `bin::serving` |
+| `spec/Serving/Memory.lean` | 常驻内存：工作集清点、按字节计预算的缓存（W6b 在 storage 里建新模块 `resident`，登记进模块图之后这里写它的路径）、私有字节的平台读数 |
 | `spec/Serving/OutputRing.lean` | `bin::serving::output_ring` |
 | `spec/Serving/Placement.lean` | 热线程的理想处理器（W6 建的模块，登记进模块图之后这里写它的路径） |
 | `spec/Serving/Standing.lean` | `bin::serving::standing` |
@@ -85,6 +87,7 @@ import crates.sprawling.spec.WireClient
 - `spec/Monitor.lean`：没人看不读也不留历史，看整页读整页，历史不超过 300 点、新的在最后（§8-94）。
 - `spec/Supervising.lean`：人选的收口总是停下，重启带出的预算有界且都在窗口里，一分钟内第三次崩溃即 degraded（§8-109）。
 - `spec/Serving/OutputRing.lean`：最新的一块总留着，每个 run 不超过上界或只剩一块，只从最旧的整块丢起（§8-115）。
+- `spec/Serving/Memory.lean`：任意的放入、读、逐出与冻结序列上，常驻字节不超过预算，冻结的 run 名下没有项，每次读（包括读回被逐出的项）答出盘上的字节；按项数计的预算给出一条超过字节预算的序列（§8-173）。
 - `spec/Assembly/ChainWatch.lean`：证明线程的四种结局各给出判定，只有完好才放行（§8-90）。
 - `spec/Outside/Conduit.lean`：到城的只有放行的帧，只看的设备从不转发动手的动词，读不懂的帧与会话已结束时都不到城（§8-139）。
 - `spec/Assembly/Listening.lean`：锁之前的拒绝一行不写，横幅只在 `listen` 成功之后印，第二个进程在写任何东西之前被拒（§8-88）。
@@ -343,6 +346,7 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | 8-170 | `crates/sprawling/spec/Accounting/Worker.lean` |
 | 8-171 | `crates/sprawling/spec/Accounting/Worker.lean` |
 | 8-172 | `crates/sprawling/spec/Accounting/Worker.lean` |
+| 8-173 | `crates/sprawling/spec/Serving/Memory.lean` |
 
 §8-163 到 §8-172 是迁移时给重号的节新编的号：这几节在 Markdown 里与另一节同号（§8-27、§8-28、§8-29、§8-40、§8-41、§8-42、§8-50、§8-60 各有两到三节），保留原号的是先出现、被引用的那一节。
 -/
@@ -411,6 +415,8 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D37 | `crates/sprawling/spec/Accounting/Landing.lean` |
 | D40 | `crates/sprawling/spec/Serving/Standing.lean` |
 | D41 | `crates/sprawling/spec/Serving/Placement.lean` |
+| D42 | `crates/sprawling/spec/Serving/Memory.lean` |
+| D43 | `crates/sprawling/spec/Serving/Memory.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）

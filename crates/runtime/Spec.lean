@@ -245,6 +245,7 @@ tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、storage(cas 经 p
 | 8-45 | `crates/runtime/spec/Run/Checkpoint.lean` |
 | 8-46 | `crates/runtime/spec/Bench.lean` |
 | 8-47 | `crates/runtime/spec/Conversation.lean` |
+| 8-47-1 | `crates/runtime/spec/Conversation.lean` |
 | 8-52 | `crates/runtime/spec/Run.lean` |
 -/
 
@@ -326,6 +327,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D29 | 每个 run 的 job 按权重分 CPU、设作业级内存上限；子进程在 macOS 降到 utility，在 Linux 用 cgroup v2 或只用 nice | `crates/runtime/spec/Tools/Exec.lean` |
 | D30 | shell 默认仍是平台的 shell，一栋楼可以换成 pwsh 7，exec 的失败按 shell 从账本折出 | `crates/runtime/spec/Tools/Exec.lean` |
 | D32 | 沙箱臂的调研表（SB0）与按平台的缺省臂、可选臂 | `crates/runtime/spec/Tools/Exec.lean` |
+| D34 | 对话窗口每个 run 有字节预算，已发出的消息超出时移出进程、按 `Locator` 从 CAS 读回 | `crates/runtime/spec/Conversation.lean`（§8-47-1） |
 -/
 
 /-! ## 13 依赖选型
