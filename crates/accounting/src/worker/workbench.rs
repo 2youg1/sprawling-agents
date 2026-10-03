@@ -303,6 +303,8 @@ pub(super) struct Desks {
     pub(super) goals: std::sync::Arc<std::sync::Mutex<collab::GoalDesk>>,
     pub(super) plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
     pub(super) shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
+    /// The tree the shelf files in, set once the lane has placed it.
+    pub(super) shelf_root: std::sync::Arc<std::sync::OnceLock<PathBuf>>,
     pub(super) pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
     /// The room's workshop, holding what it already got back and handed
     /// down, so a graph laid out again hands nothing down twice.
@@ -328,6 +330,7 @@ pub(in crate::worker) struct BenchDesks {
     goals: std::sync::Arc<std::sync::Mutex<collab::GoalDesk>>,
     plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
     shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
+    shelf_root: std::sync::Arc<std::sync::OnceLock<PathBuf>>,
     pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
     workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
     waiting: u32,
@@ -340,6 +343,7 @@ impl Desks {
             goals: std::sync::Arc::clone(&self.goals),
             plan: std::sync::Arc::clone(&self.plan),
             shelf: std::sync::Arc::clone(&self.shelf),
+            shelf_root: std::sync::Arc::clone(&self.shelf_root),
             pr: std::sync::Arc::clone(&self.pr),
             workshop: std::sync::Arc::clone(&self.workshop),
             waiting: self.waiting,

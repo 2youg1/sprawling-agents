@@ -112,7 +112,7 @@ impl Laying {
         let goal_tool = collab::GoalTool::new(addr.clone(), Arc::clone(&desks.goals))?;
         let pr_tool = collab::PrTool::new(addr.clone(), Arc::clone(&desks.pr))?;
         let claim_tool = collab::ClaimTool::new(Arc::clone(&desks.plan))?;
-        let archive_tool = collab::ArchiveTool::new(Arc::clone(&desks.shelf))?;
+        let archive_tool = desks.archive_tool(&site.write_root)?;
         // The refusal face of the building's own governance. It reaches
         // for the reserved subtree, which no write domain does, and
         // `Effect::Govern` is refused at the effect layer: a run does

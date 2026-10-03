@@ -9,7 +9,7 @@
 use kernel::{Address, AxError};
 
 use super::super::RunWorker;
-use super::{Desks, Site};
+use super::{BenchDesks, Desks, Site};
 
 impl RunWorker {
     /// Opens the desks this run works at, and lends them what they hold.
@@ -112,10 +112,11 @@ impl RunWorker {
                 text: entry.subject,
             })
             .collect();
+        let shelf_root = std::sync::Arc::new(std::sync::OnceLock::new());
         let shelf = std::sync::Arc::new(std::sync::Mutex::new(collab::ArchiveDesk::new(
             addr.clone(),
             held,
-            self.filer(site, addr),
+            self.filer(site, addr, std::sync::Arc::clone(&shelf_root)),
         )));
         // Copied rather than lent: the join and the graph stay with the
         // worker, which answers a handback while this run is still going.
@@ -140,6 +141,7 @@ impl RunWorker {
             goals,
             plan,
             shelf,
+            shelf_root,
             pr,
             workshop,
             plan_path,
@@ -177,19 +179,33 @@ impl RunWorker {
     /// entry is filed in the tree this run writes, so the run's own
     /// recall reads it back and the history has it before the tool
     /// answers (kernel `spec/Event/Record.lean` D24).
-    fn filer(&self, site: &Site, room: &Address) -> collab::Filer {
+    ///
+    /// The desks open before the lane places a review room's tree, so
+    /// the tree is read from `shelf_root` at the call, where the lane
+    /// put it once placed: a root captured here would be the city's,
+    /// and the entry would reach the building's shelf unchecked.
+    fn filer(
+        &self,
+        site: &Site,
+        room: &Address,
+        shelf_root: std::sync::Arc<std::sync::OnceLock<std::path::PathBuf>>,
+    ) -> collab::Filer {
         let mut relay = self.flight.gate.issue();
         let clock = std::sync::Arc::clone(&self.clock);
-        let (run, write_root, building) = (
-            site.run_id,
-            site.write_root.clone(),
-            site.building.addr().clone(),
-        );
+        let (run, building) = (site.run_id, site.building.addr().clone());
         let (room, who) = (room.clone(), site.who.clone());
         collab::Filer::new(move |record: &collab::ArchiveEffect| {
+            let write_root = shelf_root.get().ok_or_else(|| {
+                AxError::failure(
+                    kernel::AxCode::StorageFatal,
+                    "archive something",
+                    "the run's tree was not placed before the archive desk was called",
+                )
+                .with_recovery("report this against accounting::worker::dispatching: the lane places the tree before it lays out the bench")
+            })?;
             let landing = crate::effect::Landing::shelf(
                 vec![record.clone()],
-                &write_root,
+                write_root,
                 &building,
                 clock.now()?,
                 &room,
@@ -239,5 +255,33 @@ impl RunWorker {
             who.to_owned(),
             super::super::registering::booking(self.bell(), run, room.clone()),
         )
+    }
+}
+
+impl BenchDesks {
+    /// The archive tool, its shelf pointed at `tree`: the lane has placed
+    /// the run's tree by the time it lays out the bench, so under review
+    /// the shelf files inside the checkpoint nobody has checked yet.
+    ///
+    /// # Errors
+    /// Refuses a shelf already pointed at another tree, and propagates
+    /// the tool's own refusal to be built.
+    pub(in crate::worker) fn archive_tool(
+        &self,
+        tree: &std::path::Path,
+    ) -> Result<collab::ArchiveTool, AxError> {
+        if let Err(placed) = self.shelf_root.set(tree.to_path_buf())
+            && self.shelf_root.get() != Some(&placed)
+        {
+            return Err(AxError::failure(
+                kernel::AxCode::StorageFatal,
+                "lay out the archive desk",
+                "the shelf was already pointed at another tree",
+            )
+            .with_recovery(
+                "report this against accounting::worker::workbench: one run files in one tree",
+            ));
+        }
+        collab::ArchiveTool::new(std::sync::Arc::clone(&self.shelf))
     }
 }
