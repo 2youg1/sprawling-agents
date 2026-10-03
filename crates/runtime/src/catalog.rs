@@ -246,12 +246,11 @@ impl Catalog {
     }
 
     /// Whether `name` travels as a tool in this run's requests: it is in
-    /// the core of the mode the run sits in (`mode::core_tools`). A
-    /// catalog told no mode carries no tool, so nothing reaches a model
-    /// that the mode did not decide.
+    /// the core of some mode (`mode::in_some_core`, runtime D25), whatever
+    /// mode the run sits in. A catalog told no mode carries no tool, so
+    /// nothing reaches a model before a mode was decided.
     fn is_core(&self, name: &str) -> bool {
-        self.mode
-            .is_some_and(|mode| crate::mode::core_tools(mode).contains(&name))
+        self.mode.is_some() && crate::mode::in_some_core(name)
     }
 
     /// The call a `call` stands for, with the id the model gave it, so its
@@ -268,7 +267,7 @@ impl Catalog {
     }
 
     /// The only source of `ChatRequest.tools`: the admitted tools in the
-    /// core of this run's mode, and no other.
+    /// union of the modes' cores, and no other.
     pub fn tool_defs(&self) -> Vec<ToolDef> {
         self.tools
             .iter()

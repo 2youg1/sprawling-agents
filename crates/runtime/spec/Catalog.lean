@@ -60,7 +60,9 @@ impl Catalog {
     pub fn resolve_call(&self, call: &ToolCall) -> Result<ToolCall, AxError>; // `call` 的唯一解包与按 schema 核对（§8-61）
 }
 // runtime::mode
-pub fn core_tools(mode: kernel::Mode) -> &'static [&'static str];     // 本 mode 常驻的工具名，含两扇门
+pub fn core_tools(mode: kernel::Mode) -> &'static [&'static str];     // 本 mode 允许执行的常驻工具名，含两扇门
+pub fn in_some_core(name: &str) -> bool;                               // 在某个 mode 的核心里：ChatRequest.tools 取的就是它（D25）
+pub fn mode_admits(policy: &kernel::RunPolicy, name: &str) -> Result<(), AxError>; // 在某个核心里而不在生效 mode 的核心里 → E_GATE_DENIED
 // runtime::tools（名字是各自的关联常量，登记与 core_tools 读同一个）
 impl DescribeTool { pub const NAME: &'static str = "describe"; }
 impl CallTool { pub const NAME: &'static str = "call"; }
@@ -305,7 +307,7 @@ end Runtime.Catalog
 
 /-! D25 会话中可改运行策略之后，常驻核心是各 mode 核心的并集，mode 只改门与追加的一句
 
-**决定**：`ChatRequest.tools` 的常驻核心在 session 开始时定成 `Mode::ALL` 各自 `core_tools` 的并集（今天即 `work` 的那一组：`read`、`search`、`status`、`describe`、`call`、`edit`、`exec`，仍只取楼已准入的）；`mode::core_tools(mode)` 继续回答「这个 mode 允许哪些常驻工具真正执行」，由效果层在过门时读，不再决定工具表。会话中改运行策略（kernel D21）只改两件事：门按新策略判，下一段消息末尾追加一句说明新策略。工具表与冻结的前缀一个字节都不动，所以提示缓存不失效。
+**决定**：`ChatRequest.tools` 的常驻核心在 session 开始时定成 `Mode::ALL` 各自 `core_tools` 的并集（今天即 `work` 的那一组：`read`、`search`、`status`、`describe`、`call`、`edit`、`exec`，仍只取楼已准入的）；`mode::core_tools(mode)` 继续回答「这个 mode 允许哪些常驻工具真正执行」，不再决定工具表：`mode::mode_admits` 读它，`edit` 与 `exec` 在每次调用的第一道门问它，读的是 run 的策略格（§8-62）；模式之间差的正是这两件，而它们本就持格的读方，所以门不放在 bench——bench 不持格，放那里要再造一个读方。不在任何核心里的工具经 `call` 到达，这道门不判它。会话中改运行策略（kernel D21）只改两件事：门按新策略判，下一段消息末尾追加一句说明新策略。工具表与冻结的前缀一个字节都不动，所以提示缓存不失效。
 
 **理由**：D21 要工具表在 session 里恒不变，因为中途改工具定义会丢掉整份 prompt cache；A15 要权限与模式能在会话中改（roadmap A15）。两者同时成立的唯一办法是工具表从开头就够大，模式的差别落在门上。代价是 `chat` 的 session 多带两件工具的定义字节；它们由同一个前缀缓存，只在 session 的第一次请求付一次。
 

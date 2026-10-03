@@ -145,6 +145,9 @@ impl Tool for EditTool {
                 self.meta.name.as_str()
             )));
         }
+        // Read once: every door below judges this call under one policy.
+        let policy = self.policy.now();
+        crate::mode::mode_admits(&policy, Self::NAME)?;
         let args = call.args.as_map();
         let spelled =
             super::chosen_path::within_city(&self.city_root, arg(args, "path")?, "edit file")?;
@@ -180,7 +183,7 @@ impl Tool for EditTool {
             return self.create(rel, &path, old, new);
         }
         // Every arm below changes a file that is already there.
-        match kernel::gate::replacing(self.policy.now().write, &target) {
+        match kernel::gate::replacing(policy.write, &target) {
             kernel::GateOutcome::Allow => {}
             kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
             kernel::GateOutcome::Ask { question } => return Err(*question),

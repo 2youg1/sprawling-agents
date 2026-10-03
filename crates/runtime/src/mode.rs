@@ -22,7 +22,7 @@
 //! evidence was gathered but whether enough of it exists.
 
 use crate::catalog::CatalogEntry;
-use kernel::{AdmissionRequirement, LandingPolicy, Mode, RunPolicy};
+use kernel::{AdmissionRequirement, AxCode, AxError, LandingPolicy, Mode, RunPolicy};
 use std::sync::{Arc, PoisonError, RwLock};
 
 /// The name of the catalog row that opens the developer discipline.
@@ -90,10 +90,12 @@ pub fn catalog_entry(mode: Mode) -> CatalogEntry {
     }
 }
 
-/// The tools a session in `mode` carries in its request; every other
-/// admitted tool waits in the dormant index (`crates/runtime/Spec.lean`
-/// §8-60). A name here travels only where the building admitted it: the
-/// hall registers no `exec`, so `exec` is in no tier there.
+/// The resident tools a run in `mode` may run (`crates/runtime/Spec.lean`
+/// §8-60). The request carries the union of every mode's core
+/// ([`in_some_core`]), and [`mode_admits`] refuses at the call a tool the
+/// mode in force does not run; every other admitted tool waits in the
+/// dormant index. A name here travels only where the building admitted
+/// it: the hall registers no `exec`, so `exec` is in no tier there.
 ///
 /// The two doors of the truncation lock are in every mode, because a
 /// dormant capability is reachable only through them. Chat answers the
@@ -121,6 +123,37 @@ pub fn core_tools(mode: Mode) -> &'static [&'static str] {
             crate::tools::StatusTool::NAME,
         ],
     }
+}
+
+/// Whether `name` travels as a tool in every request of a session: it is
+/// in the core of some mode. The tool array is this union in every mode
+/// (runtime D25), so a change of mode mid-session leaves its bytes
+/// alone; [`mode_admits`] is where the mode in force still decides.
+#[must_use]
+pub fn in_some_core(name: &str) -> bool {
+    Mode::ALL
+        .iter()
+        .any(|mode| core_tools(*mode).contains(&name))
+}
+
+/// The gate a resident tool asks at its call: a tool that some mode
+/// carries and the mode in force does not is refused, before it does
+/// anything (runtime D25). A tool outside every core is the catalog's
+/// to reach through `call`, and this gate does not judge it.
+///
+/// # Errors
+/// `E_GATE_DENIED`, naming the tool and the mode, when the mode in
+/// force does not run it.
+pub fn mode_admits(policy: &RunPolicy, name: &str) -> Result<(), AxError> {
+    if !in_some_core(name) || core_tools(policy.mode).contains(&name) {
+        return Ok(());
+    }
+    Err(AxError::failure(
+        AxCode::GateDenied,
+        format!("run {name}"),
+        format!("{name} does not run in {} mode", policy.mode.as_str()),
+    )
+    .with_recovery("answer in the conversation, or ask the User to switch this run to work mode"))
 }
 
 /// The run policy in force for one run (`crates/runtime/spec/PolicyTake.lean`

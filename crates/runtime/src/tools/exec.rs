@@ -358,6 +358,7 @@ impl Tool for ExecTool {
                 self.meta.name.as_str()
             )));
         }
+        crate::mode::mode_admits(&self.setup.policy.now(), kernel::ToolName::EXEC)?;
         let placement = parse_placement(call.args.as_map())?.opened_by(&self.setup)?;
         let answer = match parse_arm(call.args.as_map())? {
             ExecArm::Program { path, args } => self.run_program(&path, &args, placement),
