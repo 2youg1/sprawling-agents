@@ -70,9 +70,12 @@
   {:else}
     <p class="text-note text-text-faint">{say($lang, "bld_no_rooms")}</p>
   {/if}
-  <div class="mt-base flex items-center gap-snug">
+  <!-- The box keeps room for its whole placeholder, and in a column too
+  narrow for both the button moves under it rather than cutting the
+  words that say what the box is for. -->
+  <div class="mt-base flex flex-wrap items-center gap-snug">
     <input
-      class="h-control min-w-0 flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-faint"
+      class="h-control min-w-[min(100%,26ch)] flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-faint"
       aria-label={say($lang, "bld_room_name")}
       placeholder={say($lang, "bld_room_name")}
       bind:value={roomName}

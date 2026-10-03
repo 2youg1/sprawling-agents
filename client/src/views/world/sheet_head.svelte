@@ -75,15 +75,18 @@
         aria-selected={tab.pane === shown}
         tabindex={tab.pane === shown ? 0 : -1}
         class={[
-          "flex h-bar items-center border-b-2 px-base text-label whitespace-nowrap",
-          tab.pane === shown ? "border-accent text-text" : "border-transparent text-text-quiet hover:text-text",
+          "flex h-bar min-w-0 items-center border-b-2 px-base text-label whitespace-nowrap",
+          tab.pane === shown ? "shrink-0 border-accent text-text" : "border-transparent text-text-quiet hover:text-text",
         ]}
         onclick={() => {
           onShow(tab.pane);
         }}
         onkeydown={travel}
       >
-        {tab.label}
+        <!-- On a phone the three names outrun the strip; the tab that is
+        shown keeps its whole name and the others give up their ends, so
+        the name of what the sheet shows is never the one cut. -->
+        <span class="truncate">{tab.label}</span>
       </button>
     {/each}
   </div>

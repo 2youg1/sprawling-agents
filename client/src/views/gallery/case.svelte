@@ -34,7 +34,10 @@
   // to the subject and not to the page. A component takes the
   // conversation's width unless the case says otherwise; a page states
   // the window it is a page of; a container under test states its own
-  // and is drawn at exactly that width.
+  // and is drawn at exactly that width. The stated width is also the
+  // container every `@container` query inside the subject answers to,
+  // because a page drawn "at 390" whose queries read the gallery's own
+  // column lays itself out for a desktop and spills past its frame.
 
   import type { Snippet } from "svelte";
 
@@ -70,7 +73,7 @@
     <div class="w-full {FRAME}" style:max-width="{String(TALK)}px">{@render children()}</div>
   {:else}
     <div class="w-max max-w-full {FRAME}">
-      <div style:width="{String(width)}px" style:max-width="100%">{@render children()}</div>
+      <div class="@container" style:width="{String(width)}px" style:max-width="100%">{@render children()}</div>
     </div>
   {/if}
 </section>

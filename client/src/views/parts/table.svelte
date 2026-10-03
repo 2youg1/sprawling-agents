@@ -202,9 +202,12 @@ const held: Snippet<Parameters<typeof drawHeld>> = drawHeld;
                      contributes to the column's minimum - an input asked
                      for its intrinsic width answers with its whole
                      default width, and a cell holding it grows past the
-                     figure however small the column was declared to be. -->
+                     figure however small the column was declared to be.
+                     The box is the figure plus the control's own padding
+                     and border, so a six-digit token count stays whole
+                     inside an input rather than losing its last digits. -->
                 {#if column.min === "figure"}
-                  <div class="w-figure">{@render held(column, row)}</div>
+                  <div class="w-[calc(var(--spacing-figure)+var(--spacing-wide))]">{@render held(column, row)}</div>
                 {:else}
                   {@render held(column, row)}
                 {/if}

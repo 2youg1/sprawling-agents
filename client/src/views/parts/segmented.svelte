@@ -29,6 +29,11 @@
   // move is a compositor job and no script measures anything. The one
   // stylesheet decides whether it travels at all.
   //
+  // The track never grows past the box it stands in: where the cells'
+  // words do not fit on one line at one width each, they break inside
+  // their cells instead of running past the box's edge, so a narrow
+  // column gets a taller track rather than a clipped choice.
+  //
   // The words are the caller's: this file holds no prose.
 
   import Tip from "./tip.svelte";
@@ -117,12 +122,12 @@
   };
 </script>
 
-<div class="inline-flex items-end gap-snug" role="radiogroup" aria-label={label}>
+<div class="inline-flex max-w-full items-end gap-snug" role="radiogroup" aria-label={label}>
   {#each runs as band (band.from)}
     {#if band.from > 0}
       <span aria-hidden="true" class="w-hair self-stretch bg-edge-panel"></span>
     {/if}
-    <div class="flex flex-col gap-tight">
+    <div class="flex min-w-0 flex-col gap-tight">
       {#if band.group}
         <span class="px-base text-note text-text-quiet">{band.group.label}</span>
       {/if}
@@ -159,7 +164,7 @@
               aria-describedby={hint}
               tabindex={band.from + inBand === stop ? 0 : -1}
               class={[
-                "relative w-full rounded-pill px-base py-tight text-label whitespace-nowrap",
+                "relative h-full w-full rounded-pill px-base py-tight text-label text-balance",
                 ink(choice),
               ]}
               onclick={() => {
