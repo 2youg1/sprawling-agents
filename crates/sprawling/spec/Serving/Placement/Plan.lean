@@ -179,7 +179,7 @@ theorem the_plan_ignores_the_order_it_is_read_in (t t' : Topology) (hp : t.Perm 
     exact ⟨fun ⟨hx, h⟩ => ⟨hu.mem_iff.mp hx, h⟩, fun ⟨hx, h⟩ => ⟨hu.mem_iff.mpr hx, h⟩⟩
   · exact Iff.rfl
 
-/-- 本机 i5-1340P 的形状缩小一半：两个 P 核（各带超线程兄弟）、四个 E 核，计划是两个 P 核各自的第一个逻辑处理器。 -/
+/-- i5-1340P 的形状缩小一半：两个 P 核（各带超线程兄弟）、四个 E 核，计划是两个 P 核各自的第一个逻辑处理器。 -/
 example :
     (plan [⟨0, 1, 0, 0, true⟩, ⟨1, 1, 0, 0, true⟩, ⟨2, 1, 1, 0, true⟩, ⟨3, 1, 1, 0, true⟩,
       ⟨4, 0, 2, 0, true⟩, ⟨5, 0, 3, 0, true⟩, ⟨6, 0, 4, 0, true⟩, ⟨7, 0, 5, 0, true⟩]).map (·.id)

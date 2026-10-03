@@ -109,11 +109,6 @@ extern "kernel32" fn GlobalFree(block: ?HANDLE) callconv(.winapi) ?HANDLE;
 extern "kernel32" fn GlobalLock(block: ?HANDLE) callconv(.winapi) ?*anyopaque;
 extern "kernel32" fn GlobalUnlock(block: HANDLE) callconv(.winapi) BOOL;
 extern "kernel32" fn GlobalSize(block: HANDLE) callconv(.winapi) usize;
-extern "kernel32" fn GetSystemCpuSetInformation(info: ?*anyopaque, len: u32, returned: *u32, process: ?HANDLE, flags: u32) callconv(.winapi) BOOL;
-extern "kernel32" fn GetThreadGroupAffinity(thread: HANDLE, affinity: *GROUP_AFFINITY) callconv(.winapi) BOOL;
-extern "kernel32" fn SetProcessInformation(process: HANDLE, class: u32, info: *const anyopaque, size: u32) callconv(.winapi) BOOL;
-extern "kernel32" fn QueryInformationJobObject(job: HANDLE, class: u32, info: *anyopaque, size: u32, returned: ?*u32) callconv(.winapi) BOOL;
-extern "kernel32" fn SetInformationJobObject(job: HANDLE, class: u32, info: *const anyopaque, size: u32) callconv(.winapi) BOOL;
 extern "shcore" fn SetProcessDpiAwareness(awareness: u32) callconv(.winapi) HRESULT;
 extern "shcore" fn GetProcessDpiAwareness(process: ?HANDLE, awareness: *u32) callconv(.winapi) HRESULT;
 
@@ -124,17 +119,17 @@ fn lastError() u32 {
 }
 
 /// One operation's end: the step it stopped at and the code it read.
-const Ended = struct {
+pub const Ended = struct {
     step: Step,
     code: u32 = 0,
 
-    const finished: Ended = .{ .step = .Finished };
+    pub const finished: Ended = .{ .step = .Finished };
 
-    fn failed(step: Step) Ended {
+    pub fn failed(step: Step) Ended {
         return .{ .step = step, .code = lastError() };
     }
 
-    fn answer(self: Ended, code: *u32) u32 {
+    pub fn answer(self: Ended, code: *u32) u32 {
         code.* = self.code;
         return @intFromEnum(self.step);
     }
@@ -323,128 +318,6 @@ export fn sprawling_desktop_dpi_awareness(awareness: *u32) u32 {
     return @bitCast(GetProcessDpiAwareness(null, awareness));
 }
 
-// -------------------------------------------------------------------- cpu
-
-// The SDK's values for the processor and job calls, each written once,
-// here (`crates/desktop/ffi/Spec.lean` D4).
-const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
-const PROCESS_POWER_THROTTLING: u32 = 4;
-const PROCESS_POWER_THROTTLING_CURRENT_VERSION: u32 = 1;
-const PROCESS_POWER_THROTTLING_EXECUTION_SPEED: u32 = 0x1;
-const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION: u32 = 9;
-const JOB_OBJECT_CPU_RATE_CONTROL_INFORMATION: u32 = 15;
-const JOB_OBJECT_LIMIT_JOB_MEMORY: u32 = 0x200;
-const JOB_OBJECT_CPU_RATE_CONTROL_ENABLE: u32 = 0x1;
-const JOB_OBJECT_CPU_RATE_CONTROL_WEIGHT_BASED: u32 = 0x2;
-
-const GROUP_AFFINITY = extern struct {
-    Mask: usize = 0,
-    Group: u16 = 0,
-    Reserved: [3]u16 = .{ 0, 0, 0 },
-};
-
-const PROCESS_POWER_THROTTLING_STATE = extern struct {
-    Version: u32,
-    ControlMask: u32,
-    StateMask: u32,
-};
-
-const JOBOBJECT_CPU_RATE_CONTROL_INFORMATION = extern struct {
-    ControlFlags: u32,
-    Weight: u32,
-};
-
-const JOBOBJECT_BASIC_LIMIT_INFORMATION = extern struct {
-    PerProcessUserTimeLimit: i64 = 0,
-    PerJobUserTimeLimit: i64 = 0,
-    LimitFlags: u32 = 0,
-    MinimumWorkingSetSize: usize = 0,
-    MaximumWorkingSetSize: usize = 0,
-    ActiveProcessLimit: u32 = 0,
-    Affinity: usize = 0,
-    PriorityClass: u32 = 0,
-    SchedulingClass: u32 = 0,
-};
-
-const IO_COUNTERS = extern struct {
-    ReadOperationCount: u64 = 0,
-    WriteOperationCount: u64 = 0,
-    OtherOperationCount: u64 = 0,
-    ReadTransferCount: u64 = 0,
-    WriteTransferCount: u64 = 0,
-    OtherTransferCount: u64 = 0,
-};
-
-const JOBOBJECT_EXTENDED_LIMIT_INFORMATION = extern struct {
-    BasicLimitInformation: JOBOBJECT_BASIC_LIMIT_INFORMATION = .{},
-    IoInfo: IO_COUNTERS = .{},
-    ProcessMemoryLimit: usize = 0,
-    JobMemoryLimit: usize = 0,
-    PeakProcessMemoryUsed: usize = 0,
-    PeakJobMemoryUsed: usize = 0,
-};
-
-/// Every CPU set record of this machine, copied unread into `into` up to
-/// `capacity` bytes; `found` is the length the whole answer needs.
-/// `NoRoom` asks for a longer buffer; the records are parsed in Rust.
-export fn sprawling_desktop_cpu_sets(into: [*]u8, capacity: usize, found: *usize, code: *u32) u32 {
-    const len = std.math.cast(u32, capacity) orelse return (Ended{ .step = .Measuring }).answer(code);
-    var returned: u32 = 0;
-    const buffer: ?*anyopaque = if (len == 0) null else @ptrCast(into);
-    const answered = GetSystemCpuSetInformation(buffer, len, &returned, windows.GetCurrentProcess(), 0);
-    found.* = returned;
-    if (answered != .FALSE) return Ended.finished.answer(code);
-    const ended = Ended.failed(.CpuSets);
-    if (ended.code == ERROR_INSUFFICIENT_BUFFER) return (Ended{ .step = .NoRoom, .code = ended.code }).answer(code);
-    return ended.answer(code);
-}
-
-/// The calling thread's processor group and the processors of that group
-/// it may run on.
-export fn sprawling_desktop_thread_group(group: *u16, mask: *u64, code: *u32) u32 {
-    var affinity: GROUP_AFFINITY = .{};
-    if (GetThreadGroupAffinity(windows.GetCurrentThread(), &affinity) == .FALSE) return Ended.failed(.Affinity).answer(code);
-    group.* = affinity.Group;
-    mask.* = affinity.Mask;
-    return Ended.finished.answer(code);
-}
-
-/// This process's execution speed is never throttled: the control bit set
-/// and the state bit clear (`crates/sprawling/spec/Serving/Standing.lean` D40).
-export fn sprawling_desktop_full_speed(code: *u32) u32 {
-    const state: PROCESS_POWER_THROTTLING_STATE = .{
-        .Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION,
-        .ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
-        .StateMask = 0,
-    };
-    if (SetProcessInformation(windows.GetCurrentProcess(), PROCESS_POWER_THROTTLING, &state, @sizeOf(PROCESS_POWER_THROTTLING_STATE)) == .FALSE)
-        return Ended.failed(.Throttling).answer(code);
-    return Ended.finished.answer(code);
-}
-
-/// A weighted CPU share for `job` (1 to 9; 5 is an even share) and, when
-/// `memory` is not zero, a limit on the memory all its processes commit
-/// together. The job's other limits are read first and written back as
-/// they were.
-export fn sprawling_desktop_job_share(job: ?HANDLE, weight: u32, memory: usize, code: *u32) u32 {
-    const named = job orelse return (Ended{ .step = .JobShare }).answer(code);
-    const rate: JOBOBJECT_CPU_RATE_CONTROL_INFORMATION = .{
-        .ControlFlags = JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | JOB_OBJECT_CPU_RATE_CONTROL_WEIGHT_BASED,
-        .Weight = weight,
-    };
-    if (SetInformationJobObject(named, JOB_OBJECT_CPU_RATE_CONTROL_INFORMATION, &rate, @sizeOf(JOBOBJECT_CPU_RATE_CONTROL_INFORMATION)) == .FALSE)
-        return Ended.failed(.JobShare).answer(code);
-    if (memory == 0) return Ended.finished.answer(code);
-    var limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = .{};
-    if (QueryInformationJobObject(named, JOB_OBJECT_EXTENDED_LIMIT_INFORMATION, &limits, @sizeOf(JOBOBJECT_EXTENDED_LIMIT_INFORMATION), null) == .FALSE)
-        return Ended.failed(.JobShare).answer(code);
-    limits.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_JOB_MEMORY;
-    limits.JobMemoryLimit = memory;
-    if (SetInformationJobObject(named, JOB_OBJECT_EXTENDED_LIMIT_INFORMATION, &limits, @sizeOf(JOBOBJECT_EXTENDED_LIMIT_INFORMATION)) == .FALSE)
-        return Ended.failed(.JobShare).answer(code);
-    return Ended.finished.answer(code);
-}
-
 // --------------------------------------------------------------- boundary
 
 // The rules of `boundary.zig`, callable on their own so the Rust
@@ -474,8 +347,15 @@ export fn sprawling_desktop_bitmap_bytes(width: i32, height: i32, bytes: *usize)
     return @intFromEnum(Step.Finished);
 }
 
+// The processor and job exports live in `cpu.zig`; naming it here is
+// what makes this library emit them.
+comptime {
+    _ = @import("cpu.zig");
+}
+
 test {
     _ = boundary;
+    _ = @import("cpu.zig");
 }
 
 test "a block that will not lock is a refusal, not an empty clipboard" {
@@ -483,17 +363,6 @@ test "a block that will not lock is a refusal, not an empty clipboard" {
     var found: usize = 0;
     const ended = lockedCopy(null, &into, &found);
     try std.testing.expectEqual(Step.Locking, ended.step);
-}
-
-test "the layouts the processor and job calls lend match the SDK's sizes" {
-    try std.testing.expectEqual(@as(usize, 16), @sizeOf(GROUP_AFFINITY));
-    try std.testing.expectEqual(@as(usize, 12), @sizeOf(PROCESS_POWER_THROTTLING_STATE));
-    try std.testing.expectEqual(@as(usize, 144), @sizeOf(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
-}
-
-test "a job share without a job is refused before any call" {
-    var code: u32 = 0;
-    try std.testing.expectEqual(@intFromEnum(Step.JobShare), sprawling_desktop_job_share(null, 5, 0, &code));
 }
 
 test "a null window is refused before any context is taken" {

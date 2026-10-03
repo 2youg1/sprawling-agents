@@ -989,6 +989,7 @@ flowchart TD
     gateway --> kernel
     kernel
     remote_access --> kernel
+    runtime --> desktop_ffi
     runtime --> gateway
     runtime --> kernel
     runtime --> storage
@@ -998,6 +999,7 @@ flowchart TD
     sprawling --> city
     sprawling --> collab
     sprawling --> desktop
+    sprawling --> desktop_ffi
     sprawling --> gateway
     sprawling --> kernel
     sprawling --> remote_access

@@ -170,34 +170,27 @@ proptest! {
     }
 }
 
-/// A run of physical cores of one class: `cores` cores of `threads`
-/// threads each, sharing the last-level cache `cache`.
-struct Run {
-    class: u8,
-    cores: u32,
-    threads: u32,
-    cache: u32,
-}
-
-/// A part as Windows numbers it in one group: the runs in the order
-/// given, each core's threads adjacent.
-fn part(runs: &[Run]) -> Vec<Cpu> {
+/// A part as Windows numbers it in one group: each run is
+/// `(class, cores, threads per core, last-level cache)`, the runs in the
+/// order given, each core's threads adjacent.
+fn part(runs: &[(u8, u32, u32, u32)]) -> Vec<Cpu> {
     let mut cpus = Vec::new();
     let mut number = 0u32;
     let mut core = 0u32;
-    for run in runs {
-        for _ in 0..run.cores {
-            for _ in 0..run.threads {
+    for &(class, cores, threads, cache) in runs {
+        for _ in 0..cores {
+            for _ in 0..threads {
+                let processor = Processor { group: 0, number };
                 cpus.push(Cpu {
-                    processor: Processor { group: 0, number },
-                    class: run.class,
+                    processor,
+                    class,
                     core,
-                    cache: run.cache,
+                    cache,
                     access: Access::Allowed,
                 });
                 number += 1;
             }
-            core += run.threads;
+            core += threads;
         }
     }
     cpus
@@ -218,20 +211,7 @@ fn even(below: u32) -> Vec<u32> {
 
 /// i5-1340P (Raptor Lake-P): 4 P-cores with SMT, 8 E-cores, one L3.
 fn i5_1340p() -> Vec<Cpu> {
-    part(&[
-        Run {
-            class: 1,
-            cores: 4,
-            threads: 2,
-            cache: 0,
-        },
-        Run {
-            class: 0,
-            cores: 8,
-            threads: 1,
-            cache: 0,
-        },
-    ])
+    part(&[(1, 4, 2, 0), (0, 8, 1, 0)])
 }
 
 #[test]
@@ -242,20 +222,7 @@ fn a_raptor_lake_laptop_seats_one_thread_per_performance_core() {
 #[test]
 fn a_raptor_lake_desktop_seats_its_eight_performance_cores() {
     // i9-13900K: 8 P-cores with SMT, 16 E-cores.
-    let cpus = part(&[
-        Run {
-            class: 1,
-            cores: 8,
-            threads: 2,
-            cache: 0,
-        },
-        Run {
-            class: 0,
-            cores: 16,
-            threads: 1,
-            cache: 0,
-        },
-    ]);
+    let cpus = part(&[(1, 8, 2, 0), (0, 16, 1, 0)]);
     assert_eq!(plan(&Topology::new(cpus)), numbers(&even(16)));
 }
 
@@ -263,61 +230,23 @@ fn a_raptor_lake_desktop_seats_its_eight_performance_cores() {
 fn a_meteor_lake_laptop_seats_performance_cores_and_never_the_low_power_tier() {
     // Core Ultra 7 155H: 6 P-cores with SMT, 8 E-cores, 2 low-power E-cores
     // on the SoC tile with a cache of their own: three classes.
-    let cpus = part(&[
-        Run {
-            class: 2,
-            cores: 6,
-            threads: 2,
-            cache: 0,
-        },
-        Run {
-            class: 1,
-            cores: 8,
-            threads: 1,
-            cache: 0,
-        },
-        Run {
-            class: 0,
-            cores: 2,
-            threads: 1,
-            cache: 1,
-        },
-    ]);
+    let cpus = part(&[(2, 6, 2, 0), (1, 8, 1, 0), (0, 2, 1, 1)]);
     assert_eq!(plan(&Topology::new(cpus)), numbers(&even(12)));
 }
 
 #[test]
 fn a_meteor_lake_container_without_performance_cores_prefers_the_e_cores_not_the_low_power_ones() {
-    let cpus: Vec<Cpu> = part(&[
-        Run {
-            class: 2,
-            cores: 6,
-            threads: 2,
-            cache: 0,
-        },
-        Run {
-            class: 1,
-            cores: 8,
-            threads: 1,
-            cache: 0,
-        },
-        Run {
-            class: 0,
-            cores: 2,
-            threads: 1,
-            cache: 1,
-        },
-    ])
-    .into_iter()
-    .map(|cpu| Cpu {
-        access: if cpu.class == 2 {
-            Access::Barred
-        } else {
-            Access::Allowed
-        },
-        ..cpu
-    })
-    .collect();
+    let cpus: Vec<Cpu> = part(&[(2, 6, 2, 0), (1, 8, 1, 0), (0, 2, 1, 1)])
+        .into_iter()
+        .map(|cpu| Cpu {
+            access: if cpu.class == 2 {
+                Access::Barred
+            } else {
+                Access::Allowed
+            },
+            ..cpu
+        })
+        .collect();
     assert_eq!(
         plan(&Topology::new(cpus)),
         numbers(&(12..20).collect::<Vec<_>>())
@@ -327,32 +256,14 @@ fn a_meteor_lake_container_without_performance_cores_prefers_the_e_cores_not_the
 #[test]
 fn a_lunar_lake_laptop_seats_its_four_performance_cores() {
     // Core Ultra 7 258V: 4 P-cores without SMT, 4 low-power E-cores.
-    let cpus = part(&[
-        Run {
-            class: 1,
-            cores: 4,
-            threads: 1,
-            cache: 0,
-        },
-        Run {
-            class: 0,
-            cores: 4,
-            threads: 1,
-            cache: 1,
-        },
-    ]);
+    let cpus = part(&[(1, 4, 1, 0), (0, 4, 1, 1)]);
     assert_eq!(plan(&Topology::new(cpus)), numbers(&[0, 1, 2, 3]));
 }
 
 #[test]
 fn a_single_ccd_x3d_is_left_to_the_operating_system() {
     // Ryzen 7 7800X3D: 8 cores with SMT, one CCD, one L3.
-    let cpus = part(&[Run {
-        class: 0,
-        cores: 8,
-        threads: 2,
-        cache: 0,
-    }]);
+    let cpus = part(&[(0, 8, 2, 0)]);
     assert_eq!(plan(&Topology::new(cpus)), Plan::LeftToOs(Left::OneClass));
 }
 
@@ -360,20 +271,7 @@ fn a_single_ccd_x3d_is_left_to_the_operating_system() {
 fn a_dual_ccd_x3d_is_left_to_the_operating_system_and_its_cache_steering() {
     // Ryzen 9 7950X3D and 9950X3D: 16 cores with SMT, two CCDs, one class,
     // two L3 sizes.
-    let topology = Topology::new(part(&[
-        Run {
-            class: 0,
-            cores: 8,
-            threads: 2,
-            cache: 0,
-        },
-        Run {
-            class: 0,
-            cores: 8,
-            threads: 2,
-            cache: 1,
-        },
-    ]));
+    let topology = Topology::new(part(&[(0, 8, 2, 0), (0, 8, 2, 1)]));
     assert_eq!(plan(&topology), Plan::LeftToOs(Left::OneClass));
     assert_eq!(topology.shape().caches, 2);
 }
@@ -382,20 +280,7 @@ fn a_dual_ccd_x3d_is_left_to_the_operating_system_and_its_cache_steering() {
 fn a_zen_5_and_zen_5c_laptop_seats_its_four_zen_5_cores() {
     // Ryzen AI 9 HX 370: 4 Zen 5 and 8 Zen 5c cores, all with SMT, each
     // kind on a complex with its own L3.
-    let cpus = part(&[
-        Run {
-            class: 1,
-            cores: 4,
-            threads: 2,
-            cache: 0,
-        },
-        Run {
-            class: 0,
-            cores: 8,
-            threads: 2,
-            cache: 1,
-        },
-    ]);
+    let cpus = part(&[(1, 4, 2, 0), (0, 8, 2, 1)]);
     assert_eq!(plan(&Topology::new(cpus)), numbers(&even(8)));
 }
 
@@ -403,31 +288,26 @@ fn a_zen_5_and_zen_5c_laptop_seats_its_four_zen_5_cores() {
 fn a_threadripper_in_two_groups_is_left_to_the_operating_system() {
     // Threadripper 7980X: 64 cores with SMT, 128 logical processors in two
     // groups of 64; one class. The reading thread may use group 0 only.
-    let cpus: Vec<Cpu> = part(&[Run {
-        class: 0,
-        cores: 64,
-        threads: 2,
-        cache: 0,
-    }])
-    .into_iter()
-    .map(|cpu| {
-        let group = u16::from(cpu.processor.number >= 64);
-        Cpu {
-            processor: Processor {
-                group,
-                number: cpu.processor.number % 64,
-            },
-            core: cpu.core % 64,
-            cache: cpu.processor.number / 16,
-            access: if group == 0 {
-                Access::Allowed
-            } else {
-                Access::Barred
-            },
-            ..cpu
-        }
-    })
-    .collect();
+    let cpus: Vec<Cpu> = part(&[(0, 64, 2, 0)])
+        .into_iter()
+        .map(|cpu| {
+            let group = u16::from(cpu.processor.number >= 64);
+            Cpu {
+                processor: Processor {
+                    group,
+                    number: cpu.processor.number % 64,
+                },
+                core: cpu.core % 64,
+                cache: cpu.processor.number / 16,
+                access: if group == 0 {
+                    Access::Allowed
+                } else {
+                    Access::Barred
+                },
+                ..cpu
+            }
+        })
+        .collect();
     let topology = Topology::new(cpus);
     assert_eq!(plan(&topology), Plan::LeftToOs(Left::OneClass));
     assert_eq!(
@@ -439,56 +319,19 @@ fn a_threadripper_in_two_groups_is_left_to_the_operating_system() {
 #[test]
 fn a_snapdragon_x_with_one_class_is_left_to_the_operating_system() {
     // Snapdragon X Elite X1E-78-100: 12 Oryon cores in three clusters.
-    let cpus = part(&[
-        Run {
-            class: 0,
-            cores: 4,
-            threads: 1,
-            cache: 0,
-        },
-        Run {
-            class: 0,
-            cores: 4,
-            threads: 1,
-            cache: 1,
-        },
-        Run {
-            class: 0,
-            cores: 4,
-            threads: 1,
-            cache: 2,
-        },
-    ]);
+    let cpus = part(&[(0, 4, 1, 0), (0, 4, 1, 1), (0, 4, 1, 2)]);
     assert_eq!(plan(&Topology::new(cpus)), Plan::LeftToOs(Left::OneClass));
 }
 
 #[test]
 fn a_four_vcpu_virtual_machine_is_left_to_the_operating_system() {
-    let cpus = part(&[Run {
-        class: 0,
-        cores: 4,
-        threads: 1,
-        cache: 0,
-    }]);
+    let cpus = part(&[(0, 4, 1, 0)]);
     assert_eq!(plan(&Topology::new(cpus)), Plan::LeftToOs(Left::OneClass));
 }
 
 #[test]
 fn a_virtual_machine_that_reports_one_core_in_two_classes_is_left_to_the_operating_system() {
-    let mut cpus = part(&[
-        Run {
-            class: 1,
-            cores: 2,
-            threads: 1,
-            cache: 0,
-        },
-        Run {
-            class: 0,
-            cores: 2,
-            threads: 1,
-            cache: 0,
-        },
-    ]);
+    let mut cpus = part(&[(1, 2, 1, 0), (0, 2, 1, 0)]);
     cpus[3].core = cpus[0].core;
     assert_eq!(
         plan(&Topology::new(cpus)),

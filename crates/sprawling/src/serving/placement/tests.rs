@@ -54,7 +54,7 @@ fn check_trace(plan: &[Processor], trace: &[Event]) {
         match event {
             Event::Start(holder) => {
                 table.start(holder);
-                check_start(&table, plan, &before, holder, trace);
+                check_start(&table, plan, &before, holder);
             }
             Event::Exit(holder) => {
                 table.exit(holder);
@@ -95,7 +95,6 @@ fn check_start(
     plan: &[Processor],
     before: &[Option<Processor>],
     holder: Holder,
-    trace: &[Event],
 ) {
     let index = usize::try_from(holder.0).unwrap();
     if before[index].is_some() {
@@ -108,7 +107,7 @@ fn check_start(
     assert_eq!(
         table.seat_of(holder),
         first_free,
-        "the first free seat or none: {plan:?} {trace:?}"
+        "the first free seat or none: {plan:?} {before:?}"
     );
 }
 
