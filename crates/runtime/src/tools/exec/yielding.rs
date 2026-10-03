@@ -101,8 +101,28 @@ fn start_below_the_core() -> Command {
     nice_below_the_core()
 }
 
+/// Where macOS keeps `taskpolicy`, which starts a program with its QoS
+/// clamped: utility work is placed on the efficiency cores first, on
+/// Apple silicon and Intel Macs alike (`crates/runtime/spec/Tools/Exec.lean` D29).
+#[cfg(target_os = "macos")]
+const TASKPOLICY: &str = "/usr/sbin/taskpolicy";
+
+/// The wrapper a dispatched program starts under on macOS: `nice`, and
+/// `taskpolicy -c utility` around it when the system has it; without it
+/// the command keeps the CPU half rather than failing at spawn.
+#[cfg(target_os = "macos")]
+fn start_below_the_core() -> Command {
+    if is_executable_on_path(std::ffi::OsStr::new(TASKPOLICY), None) {
+        let mut both = Command::new(TASKPOLICY);
+        both.args(["-c", "utility", "nice"]);
+        both.args(["-n", NICENESS_BELOW_THE_CORE, "--"]);
+        return both;
+    }
+    nice_below_the_core()
+}
+
 /// The wrapper a dispatched program starts under: `nice`.
-#[cfg(all(unix, not(target_os = "linux")))]
+#[cfg(all(unix, not(any(target_os = "linux", target_os = "macos"))))]
 fn start_below_the_core() -> Command {
     nice_below_the_core()
 }
