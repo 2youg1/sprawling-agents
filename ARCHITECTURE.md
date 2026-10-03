@@ -354,7 +354,13 @@ than any diagram of boxes.
    after a 429 until the provider's `Retry-After` instant has passed; this
    provider queue is the one concurrency limit, because the driving pool
    sets no lane count (`crates/gateway/Spec.lean` §8-6,
-   `crates/sprawling/Spec.lean` D34).
+   `crates/sprawling/Spec.lean` D34). Each endpoint keeps one HTTP client,
+   so its connections stay open between calls, and a request to
+   `api.openai.com` carries the conversation's id as `prompt_cache_key`,
+   so the provider can route the turns of one conversation to one cache
+   (gateway D25). The city opens no connection before the first call and
+   speaks no WebSocket to a provider; `crates/gateway/Spec.lean` §3 names
+   the evidence that would add either.
 9. **The reply is scanned before it is recorded.** `runtime::redact` puts
    model output through the same secret scan as everything else, so a key a
    model repeated does not become permanent.
@@ -363,7 +369,12 @@ than any diagram of boxes.
     `runtime::run::checkpoint` decides whether a wave needs a git checkpoint first,
     `storage::checkpoint` commits the checkpoint and scans the worktree after the
     wave, and anything that disappeared becomes a `file_discarded` event
-    carrying the way back.
+    carrying the way back. Runs checkpoint at the same time: each writer
+    builds its tree in an index of its own, and only the object store and
+    the move of HEAD are shared, the latter under one lock that guards
+    HEAD alone (storage D25, D26). The scan never opens a file another
+    writer is still staging, so a document mid-write or a landing's
+    `.part` file is not read as the building's content (storage D30).
 11. **The result comes back shaped.** `runtime::pipeline` builds the result
     envelope — clock stamp, network reminder, any steer a person sent — and
     `runtime::compaction` shortens what is too long, always reporting how
@@ -373,7 +384,11 @@ than any diagram of boxes.
     what the pages ask for. The views fold each record on their own thread
     (`bin::serving::folding`), and only then is it broadcast to every socket
     as one `Committed` frame, so a page that asks right after an event
-    arrives is answered from views that already hold it. The client folds
+    arrives is answered from views that already hold it. A socket worker
+    that wakes writes every record already queued for it, each as its own
+    `Event` frame, and flushes once, so a burst costs one flush rather than
+    one per record; frames keep their shape and their `seq` order
+    (`crates/wire/spec/Server/Socket.lean` §8-47h, wire D45). The client folds
     the event into what it believes. The same fold, on both sides of the
     wire.
 13. **A signal reaches whoever it names, working or not, when it is sent.**
@@ -486,6 +501,7 @@ stale.
 │  ├─ remote/                  the remote gate's own state
 │  │  └─ devices.toml         the devices paired to reach this city from outside the machine
 │  ├─ CONFIG.toml              city layer of the three-layer configuration
+│  ├─ MONITOR.toml             the sampling beat the performance page last set
 │  └─ FILTERS.toml             what this scope keeps out of a transcript
 └─ <building>/                 one building, one line of business
    ├─ .sprawling/              the building's reserved subtree: what governs it
@@ -549,6 +565,16 @@ A `dispatch` carries the run policy — mode, write limit, admission
 requirement, landing policy — as one value, and the city writes that same
 value into the run's `run_started` line, so what a person chose is read
 back from the Ledger rather than inferred.
+
+How often each skill and each tool server was used is a question the
+Ledger answers, not a counter the city keeps: `Query::SkillUsage`,
+`Query::McpUsage` and `Query::UsageExport` fold the whole Ledger when they
+are asked (`accounting::views::usage`, accounting D49). A skill use is a
+`describe` or `read` of a skill that the run's `run_started` pinned by
+name and hash; a tool server use is a `tool_called` line whose effect
+names the server's label, so a server removed from a building's
+`CONFIG.toml` keeps its history (wire D33). The answer stays cached until
+a run freezes or a skill is audited, and the export is JSONL or CSV.
 
 Two properties are worth stating because they are enforced by types rather
 than by review. A `Command` carrying a credential **cannot be serialised**:
@@ -665,7 +691,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review. A library crate starts a thread in eight places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; `accounting::worker::pool` gives each run one lane that drives it, writes its transcript and reads its checkpoint sweep, and ends when the run comes home; `storage::chain_audit` reads a proof's segments in waves of at most eight, one scoped thread each with the calling thread as the first, and joins every wave before it walks the chain through those segments in order; and `remote_access::route::command` gives each command route one reader that ends when the command ends and its output closes. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open, the console, which `bin::assembly::remote_door` starts on the thread that first reads the city key, so a Keychain dialog nobody answers cannot hold up Ctrl-C, the remote listener's tasks in `bin::outside::listener`, which end when the remote door closes, first run, the doctor's probes, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does. The hot ones among them, the accounting thread, the view fold and the socket workers, take a **seat** from the serving placement table as they start and give it back as they exit; a run's lane takes none yet; on Windows the seat becomes the thread's ideal processor, and macOS and Linux place nothing (`crates/sprawling/spec/Serving/Placement.lean`) |
+| 3 | One spawn point | review. A library crate starts a thread in eight places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; `accounting::worker::pool` gives each run one lane that drives it, writes its transcript and reads its checkpoint sweep, and ends when the run comes home; `storage::chain_audit` reads a proof's segments in waves of at most eight, one scoped thread each with the calling thread as the first, and joins every wave before it walks the chain through those segments in order; and `remote_access::route::command` gives each command route one reader that ends when the command ends and its output closes. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open, the console, which `bin::assembly::remote_door` starts on the thread that first reads the city key, so a Keychain dialog nobody answers cannot hold up Ctrl-C, the remote listener's tasks in `bin::outside::listener`, which end when the remote door closes, first run, the doctor's probes, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does. The hot ones among them, the accounting thread, the view fold, the socket workers and each run's lane, ask the serving placement table for a **seat** as they start and give it back as they exit; *CPU placement* below says where seats come from and what each platform does with them |
 | 4 | No random source on a decision path; OS entropy mints only values a stranger must not guess | review; citysim has no random source to seed |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
@@ -695,6 +721,101 @@ handle, one `Instant::now()`, or a bare spawn inside `kernel` disables
 replay, formal verification and deterministic simulation at the same time.
 The gates hold that line so the property survives a builder who has never
 read this file.
+
+### CPU placement
+
+Under heavy load the city's latency is decided by which cores its own
+threads wait for. The threads that matter are the hot ones of rule 3: the
+accounting thread `sprawling-runs`, which owns the Ledger and takes every
+relay; the view fold `sprawling-views`; the tokio workers that serve the
+sockets; and one lane per driving run. Around them stand the processes the
+city starts: each run's commands, which on Windows sit in that run's Job
+Object (`runtime::backlog::jobs`), and a harness resident's own process.
+Placement is the policy that decides which cores the hot threads prefer
+and how much of the machine the children may take. It gives hints and
+soft preferences; the operating system's scheduler decides, and the city
+never sets hard affinity by default (`crates/sprawling/spec/Serving/Placement.lean`
+D41).
+
+**The topology is read, never assumed.** `bin::serving::placement::reading`
+reads, on each platform, every logical processor's efficiency class, its
+physical core, its last-level cache group, its processor group and whether
+this process may use it. Windows reads `GetSystemCpuSetInformation` through
+the Zig leaf in `crates/desktop/ffi`, which only makes the call and fills a
+buffer Rust lends it; safe Rust (`desktop_ffi::cpu_set`) parses the records,
+and the usable set is the reading thread's group affinity, which already
+counts a Job Object's limit. Linux reads `Cpus_allowed_list`, the hybrid
+`cpu_core` and `cpu_atom` lists or `cpu_capacity`, and the `topology` and
+`cache` entries under `/sys`. macOS reads `hw.nperflevels` and the
+per-level core counts through `/usr/sbin/sysctl`. A reading that fails or
+contradicts itself is reported, not guessed around (sprawling D45).
+
+**The plan is a pure function of that reading**
+(`bin::serving::placement::plan`). One usable class, or one class with
+several cache groups, gives no plan: the threads are left to the operating
+system, which on a dual-CCD X3D part already steers by cache, so a second
+opinion would only fight it. Several classes give one seat per physical
+core of the fastest class, the lowest-numbered usable logical processor of
+each; the slowest class is never in the plan, and threads beyond the seats
+take none and are placed by the operating system. A partial, inconsistent
+or unusable topology, which is what most virtual machines report, gives no
+plan. The seat table hands a starting hot thread the first free seat and
+keeps it until the thread exits, so no two hot threads prefer one core and
+a thread never changes preference mid-life. One step of work, from a wake
+to the next block, stays on one thread on every platform; that is how the
+code is written, not a platform call.
+
+**What each platform does with it.**
+
+| Platform | Hot threads | The process | Children |
+|---|---|---|---|
+| Windows | the seat becomes the thread's soft ideal processor, inside the reading thread's processor group | EcoQoS opted out once for the whole process, so no hot thread is throttled as background work (sprawling D40) | each run's Job Object gets CPU weight 5 (`RUN_CPU_WEIGHT`), below the city's own share; commands start below normal priority |
+| macOS | no ideal-processor call exists, so the seat table is not built; the topology is read for the doctor only | no EcoQoS; the hot threads keep the default QoS class | commands run under `taskpolicy -c utility`, which moves them toward efficiency cores |
+| Linux | no soft ideal-processor call exists (`sched_setaffinity` is hard affinity), so the seat table is not built; the topology is read for the doctor only | nothing to opt out of: frequency policy is machine-wide | commands run under `nice -n 10` |
+
+No platform sets a per-run memory limit, and Linux sets no cgroup
+`cpu.weight` per run; `crates/runtime/spec/Tools/Exec.lean` D29 states both
+as open.
+
+**One setting turns it off, and the doctor says what it did.** The
+User's configuration `[core] placement` takes `"soft"`, the default, or
+`"none"`, which reads no topology, takes no seat and makes no platform
+call; the two other arms of the planned comparison, `"soft_shares"` and
+`"pinned"`, are refused as unreadable until they are built (sprawling
+D47). `sprawling doctor` prints one line, written only in
+`placement::report`, naming the classes it read and whether hot threads
+prefer the top class or are left to the operating system.
+
+**Where it is proved.** `crates/sprawling/spec/Serving/Placement/Plan.lean`
+proves the plan's rules over every topology (a planned processor is usable,
+never of the slowest class, one per physical core, independent of the
+reading order, absent for one class or an inconsistent reading), and
+`crates/sprawling/spec/Serving/Placement.lean` proves the seat table over
+every trace of starts and exits. The derived checks sit beside the code:
+a proptest over generated topologies and a table of processor families in
+`crates/sprawling/src/serving/placement/plan/tests.rs`, the
+`GetSystemCpuSetInformation` records of a real hybrid laptop part, kept
+as a fixture that the tests of `placement::reading` parse on every
+platform, and an exhaustive walk of small seat traces in
+`crates/sprawling/src/serving/placement/tests.rs`.
+
+**No reading exists yet.** The benefit under load is unmeasured: the
+four-arm comparison the specification plans (nothing, soft placement, soft
+placement with per-run shares, hard affinity) has not been run, so the
+default `"soft"` is a choice the design supports, not one a measurement
+has confirmed.
+
+**The seam for a smarter scheduler.** `plan` is the one place a
+load-aware or adaptive policy would replace: it takes a reading and returns
+seats, and nothing else decides where a hot thread prefers to run. Such a
+policy would need live inputs the static plan does without: each core's
+run queue, and the waits the M2 instruments split out of every duration
+(relay queueing, the accounting thread's busy share, fold and broadcast
+lag). It would also have to keep the seat table's property that a thread does not
+change preference mid-step. The decision re-opens when readings across
+several machine classes show that the static plan leaves waits a dynamic
+one removes; until then the static plan stands, because it is the one
+whose properties are proved.
 
 ## 11 How this is verified, and what it costs
 
@@ -867,7 +988,9 @@ budget: TTFT as median and mean, tokens per second as p50 and p99. Each
 duration splits into waiting, work and the durability barrier, because a
 total alone cannot show a wait the harness caused. Memory is private bytes
 sampled on a fixed tick, 100 ms unless set, reported as p50, p99, max, time
-spent above p50 and slope per hour. Windows reads `PagefileUsage`, Linux
+spent above p50 and slope per hour; the performance page sets the beat
+between 10 ms and 1 s, and the city keeps it in `.sprawling/MONITOR.toml`
+for the next serve (sprawling D48, wire D46). Windows reads `PagefileUsage`, Linux
 `Private_Clean` plus `Private_Dirty` from `/proc/self/smaps_rollup` (or
 `RssAnon` without it), and macOS the virtual size, named as such, because
 no safe interface reaches its physical footprint yet
@@ -928,6 +1051,23 @@ limits, then the blocking pool. RAM is not among them. **Runs are driven in
 parallel and accounted for in series** — every line a lane writes crosses to
 the one thread that owns the Ledger and waits there — so concurrency buys
 model time back and buys nothing from the Ledger.
+
+**What stays in memory.** The Ledger and the content store are on disk,
+so the process holds working sets only, and
+`crates/sprawling/spec/Serving/Memory.lean` lists each one with its owner,
+what bounds it today and what it grows with. A cache that may grow is
+budgeted in bytes, not in entries, because one entry can be a few hundred
+bytes or several MiB (sprawling D42); `storage::Resident` is that cache,
+with its properties proved, and it reads an evicted entry back from disk
+by position. A frozen run keeps no task or goal in memory: an approval
+reads them back from its `run_started` line when it is answered. The
+doctor reads a child's output one line at a time and keeps only the lines
+it chose, and a playback export encodes into the bundle's one buffer and
+stops at its byte ceiling. Three working sets still grow with the city
+and do not yet go through a byte budget: the views, the hot view's
+tombstones of frozen runs, and the Ledger's side index; the memory
+specification names them, and no reading of the one-hour slope exists
+yet.
 
 ## 12 Changing this document
 
@@ -1117,8 +1257,8 @@ flowchart TD
     ledger -->|"each EventRecord"| fold[bin::serving::folding]
     fold --> proj[projection]
     fold -->|"after the fold"| committed[one Committed frame]
-    committed --> s1[socket 1]
-    committed --> sn[socket n]
+    committed -->|"what is queued, one flush"| s1[socket 1]
+    committed -->|"what is queued, one flush"| sn[socket n]
 ```
 
 `crates/accounting/src/worker/relay.rs` (`Wake`),
