@@ -335,6 +335,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D22 探针落到会话内存时，编不出的 `provider_degraded` 通告并进 `custody()` 的拒词，不被丢掉：`crates/gateway/spec/Credential.lean`
 - D23 `NO_PROXY` 的读法与匹配规则跟着客户端走：域名按点为界，非 Unicode 的值读作没设：`crates/gateway/spec/Reach.lean`
 - D24 一个凭证环境变量的值不是 Unicode 时，它是一个点名变量的配置错，不是「没配过」：`crates/gateway/spec/Credential.lean`
+- D25 `prompt_cache_key` 是预置表的一列，只写给文档说收它的主机，值是会话标识：`crates/gateway/spec/Provider.lean`
 -/
 
 /-! ## 13 依赖选型

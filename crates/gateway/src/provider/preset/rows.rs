@@ -34,6 +34,7 @@ pub const PRESETS: [HostPreset; 13] = [
         models: ANTHROPIC_MODELS,
         chat: ChatSpelling::DOCUMENTED,
         session_header: None,
+        cache_key_field: None,
         source: "https://platform.claude.com/docs/en/api/messages",
     },
     HostPreset {
@@ -58,6 +59,10 @@ pub const PRESETS: [HostPreset; 13] = [
             ..ChatSpelling::DOCUMENTED
         },
         session_header: None,
+        // `prompt_cache_key` on `CreateChatCompletionRequest` and on
+        // `CreateResponse` (through `ResponseProperties`) in
+        // `openai/openai-openapi`.
+        cache_key_field: Some("prompt_cache_key"),
         source: "https://github.com/openai/openai-openapi/blob/master/openapi.yaml",
     },
     HostPreset {
@@ -91,6 +96,7 @@ pub const PRESETS: [HostPreset; 13] = [
             ..ChatSpelling::DOCUMENTED
         },
         session_header: None,
+        cache_key_field: None,
         source: "https://api-docs.deepseek.com/guides/thinking_mode",
     },
     HostPreset {
@@ -115,6 +121,7 @@ pub const PRESETS: [HostPreset; 13] = [
             ..ChatSpelling::DOCUMENTED
         },
         session_header: None,
+        cache_key_field: None,
         source: "https://docs.x.ai/developers/rest-api-reference/inference/chat-completions",
     },
     HostPreset {
@@ -139,6 +146,7 @@ pub const PRESETS: [HostPreset; 13] = [
             reasoning: ReasoningReturn::AsReasoningContent,
         },
         session_header: None,
+        cache_key_field: None,
         source: "https://openrouter.ai/docs/guides/best-practices/reasoning-tokens",
     },
     HostPreset {
@@ -152,6 +160,7 @@ pub const PRESETS: [HostPreset; 13] = [
         models: &[],
         chat: ChatSpelling::DOCUMENTED,
         session_header: None,
+        cache_key_field: None,
         source: "https://ai.google.dev/gemini-api/docs/openai",
     },
     HostPreset {
@@ -170,6 +179,7 @@ pub const PRESETS: [HostPreset; 13] = [
             ..ChatSpelling::DOCUMENTED
         },
         session_header: None,
+        cache_key_field: None,
         source: "https://docs.bigmodel.cn/api-reference/%E6%A8%A1%E5%9E%8B-api/%E5%AF%B9%E8%AF%9D%E8%A1%A5%E5%85%A8",
     },
     HostPreset {
@@ -184,6 +194,7 @@ pub const PRESETS: [HostPreset; 13] = [
             ..ChatSpelling::DOCUMENTED
         },
         session_header: None,
+        cache_key_field: None,
         source: "https://docs.z.ai/api-reference/llm/chat-completion",
     },
     HostPreset {
@@ -209,6 +220,7 @@ pub const PRESETS: [HostPreset; 13] = [
         models: &[],
         chat: ChatSpelling::DOCUMENTED,
         session_header: Some("x-opencode-session"),
+        cache_key_field: None,
         source: "https://opencode.ai/docs/go/",
     },
     HostPreset {
@@ -241,6 +253,7 @@ pub const PRESETS: [HostPreset; 13] = [
         models: &[],
         chat: MOONSHOT_CHAT,
         session_header: None,
+        cache_key_field: None,
         source: "https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/auth/platforms.py",
     },
     HostPreset {
@@ -254,6 +267,7 @@ pub const PRESETS: [HostPreset; 13] = [
         models: &[],
         chat: MOONSHOT_CHAT,
         session_header: None,
+        cache_key_field: None,
         source: "https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/auth/platforms.py",
     },
     HostPreset {
@@ -267,6 +281,7 @@ pub const PRESETS: [HostPreset; 13] = [
         models: &[],
         chat: MOONSHOT_CHAT,
         session_header: None,
+        cache_key_field: None,
         source: "https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/auth/platforms.py",
     },
     HostPreset {
@@ -281,6 +296,7 @@ pub const PRESETS: [HostPreset; 13] = [
         models: &[],
         chat: ChatSpelling::DOCUMENTED,
         session_header: None,
+        cache_key_field: None,
         source: "https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope",
     },
 ];

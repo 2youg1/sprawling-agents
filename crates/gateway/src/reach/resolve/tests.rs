@@ -31,6 +31,9 @@ struct Shape {
     dialect: DialectKind,
     /// For the chat face: the field the output ceiling was written in.
     ceiling: Option<&'static str>,
+    /// The prompt cache key field the body carried, when its value is
+    /// this request's conversation id.
+    cache_key: Option<&'static str>,
 }
 
 #[test]
@@ -71,6 +74,10 @@ fn owed(row: &HostPreset, face: &Face) -> Shape {
                 CeilingField::MaxCompletionTokens => "max_completion_tokens",
             }),
             DialectKind::Anthropic | DialectKind::OpenAiResponses => None,
+        },
+        cache_key: match face.dialect {
+            DialectKind::OpenAi | DialectKind::OpenAiResponses => row.cache_key_field,
+            DialectKind::Anthropic => None,
         },
     }
 }
@@ -124,11 +131,12 @@ fn heard(row: &HostPreset, face: &Face) -> Shape {
     });
     let refused = model.call(&request).unwrap_err();
     assert_eq!(*refused.code(), AxCode::Provider, "{refused}");
-    shape_of(round(row, face), &stand_in.heard())
+    let conversation = crate::endpoint::conversation_id(&request).unwrap();
+    shape_of(round(row, face), &stand_in.heard(), &conversation)
 }
 
 /// One request taken apart into the terms `owed` speaks in.
-fn shape_of(round: String, heard: &Heard) -> Shape {
+fn shape_of(round: String, heard: &Heard, conversation: &str) -> Shape {
     let header = |name: &str| heard.headers.get(name).cloned();
     let credential = ["x-api-key", "authorization"]
         .into_iter()
@@ -157,6 +165,12 @@ fn shape_of(round: String, heard: &Heard) -> Shape {
             .find(|field| heard.body.get(*field).is_some()),
         DialectKind::Anthropic | DialectKind::OpenAiResponses => None,
     };
+    let cache_key = PRESETS
+        .iter()
+        .filter_map(|row| row.cache_key_field)
+        .find(|field| {
+            heard.body.get(*field).and_then(serde_json::Value::as_str) == Some(conversation)
+        });
     Shape {
         round,
         path: heard.path.clone(),
@@ -165,5 +179,6 @@ fn shape_of(round: String, heard: &Heard) -> Shape {
         sessions,
         dialect,
         ceiling,
+        cache_key,
     }
 }

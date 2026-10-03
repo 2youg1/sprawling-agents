@@ -60,7 +60,12 @@ pub struct HostPreset {
     /// The header this vendor asks to carry one conversation's id, so
     /// that its routing and prompt cache see a conversation as one.
     pub session_header: Option<&'static str>,
-    /// Where `faces`, `chat` and `session_header` were read.
+    /// The body field this vendor's OpenAI-compatible faces take a
+    /// prompt cache key in, so that requests sharing one conversation's
+    /// prefix are routed to one cache (gateway D25).
+    pub cache_key_field: Option<&'static str>,
+    /// Where `faces`, `chat`, `session_header` and `cache_key_field`
+    /// were read.
     pub source: &'static str,
 }
 
@@ -232,6 +237,13 @@ pub fn chat_spelling(base_url: &str) -> ChatSpelling {
 #[must_use]
 pub fn session_header(base_url: &str) -> Option<&'static str> {
     host_row(base_url)?.session_header
+}
+
+/// The body field the host at one base URL takes a prompt cache key in,
+/// where its documentation names one (gateway D25).
+#[must_use]
+pub(crate) fn cache_key_field(base_url: &str) -> Option<&'static str> {
+    host_row(base_url)?.cache_key_field
 }
 
 fn host_row(base_url: &str) -> Option<&'static HostPreset> {

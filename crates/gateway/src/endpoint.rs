@@ -27,6 +27,10 @@ mod stream;
 mod transport;
 
 pub use adapter::adapter_for;
+/// The stand-in rounds of `reach::resolve` compare the prompt cache key
+/// a body carried with the conversation id of the request they sent.
+#[cfg(test)]
+pub(crate) use call::conversation_id;
 pub use config::{AuthSpec, Endpoint, EndpointConfig};
 pub use header::HeaderValue;
 pub use kernel::event::record::ModelFacts;
