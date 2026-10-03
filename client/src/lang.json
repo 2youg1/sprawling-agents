@@ -5907,6 +5907,10 @@
     "en": "performance",
     "zh": "性能"
   },
+  "monitor_band": {
+    "en": "p50 {p50} · p99 {p99}",
+    "zh": "p50 {p50}，p99 {p99}"
+  },
   "monitor_core_cpu": {
     "en": "core cpu",
     "zh": "核心 CPU"

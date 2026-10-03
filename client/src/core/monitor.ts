@@ -4,11 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The performance panel's reading of the monitor history: a row per
-// counter with its latest reading and its curve, drawn exactly as
-// `sprawling top` draws them (`crates/sprawling/Spec.lean` §8-95), so a person at the
-// page and an agent at the terminal read one sample the same way.
+// counter with its latest reading, its window's p50 and p99, and its
+// bars. The readings are written by the unit rule `sprawling top` uses
+// (`crates/sprawling/spec/Monitor.lean` §8-95), so a User at the page
+// and an agent at the terminal read one sample as the same figure;
 // `monitor.test.ts` holds this to the fixture `bin::monitor::top`'s own
-// screen test uses.
+// screen test uses. The bars are the page's own drawing (D82 in
+// `client/Spec.lean`): the terminal has eight glyph heights, the page
+// has as many pixels as it gives a plot.
 
 import type { Sample } from "../wire";
 import type { Key } from "./lang";
@@ -16,23 +19,29 @@ import type { Key } from "./lang";
 export interface Row {
   readonly label: Key;
   readonly reading: string;
-  readonly curve: string;
+  // The window's p50 and p99 by nearest rank, in the counter's unit.
+  readonly p50: string;
+  readonly p99: string;
+  readonly plot: Plot;
 }
 
-// A row per counter; none before the first sample.
+// A row per counter over the last `width` samples; none before the first sample.
 export function rows(samples: readonly Sample[], width: number): readonly Row[] {
   const latest = samples.at(-1);
   if (latest === undefined) {
     return [];
   }
-  return COUNTERS.map(({ label, field, unit }) => ({
-    label,
-    reading: reading(unit, latest[field]),
-    curve: sparkline(
-      samples.map((sample) => sample[field]),
-      width,
-    ),
-  }));
+  const window = samples.slice(Math.max(samples.length - width, 0));
+  return COUNTERS.map(({ label, field, unit }) => {
+    const values = window.map((sample) => sample[field]);
+    return {
+      label,
+      reading: reading(unit, latest[field]),
+      p50: reading(unit, nearestRank(values, 50) ?? latest[field]),
+      p99: reading(unit, nearestRank(values, 99) ?? latest[field]),
+      plot: plot(values),
+    };
+  });
 }
 
 // The fact bar's summary of the latest reading: this process's CPU
@@ -44,20 +53,45 @@ export function summary(latest: Sample): { readonly cpu: string; readonly memory
   };
 }
 
-// The eight heights a curve is drawn in, lowest first.
-const LEVELS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
+// A plot's heights, in thousandths of the height the page gives it.
+export interface Plot {
+  // One bar per value, oldest first.
+  readonly bars: readonly number[];
+  // Where the window's p50 and p99 stand, the band a bar is read against.
+  readonly p50: number;
+  readonly p99: number;
+}
 
-// The last `width` values as one block each, scaled from the window's
-// own minimum (lowest block) to its maximum (highest); a flat window
-// draws the lowest block.
-export function sparkline(values: readonly number[], width: number): string {
-  const window = values.slice(Math.max(values.length - width, 0));
-  const low = Math.min(...window);
-  const span = Math.max(...window) - low;
-  const top = LEVELS.length - 1;
-  return window
-    .map((value) => LEVELS[span === 0 ? 0 : Math.floor(((value - low) * top) / span)] ?? "")
-    .join("");
+// The full height of a plot, and the height of the window's lowest bar.
+export const FULL = 1000;
+const FLOOR = 80;
+
+// The values as bars scaled from the window's own minimum (`FLOOR`, so
+// the lowest bar still shows) to its maximum (`FULL`); a flat window
+// stands at half height. The scale is linear from the minimum rather
+// than from zero on a linear or a logarithmic scale, because the panel
+// watches change: a working set moving between 3.1 and 3.2 GiB draws a
+// flat line on both of those (D82). An empty window has no bars and no band.
+export function plot(values: readonly number[]): Plot {
+  if (values.length === 0) {
+    return { bars: [], p50: 0, p99: 0 };
+  }
+  const low = Math.min(...values);
+  const span = Math.max(...values) - low;
+  const height = (value: number): number =>
+    span === 0 ? FULL / 2 : FLOOR + Math.floor(((value - low) * (FULL - FLOOR)) / span);
+  return {
+    bars: values.map(height),
+    p50: height(nearestRank(values, 50) ?? low),
+    p99: height(nearestRank(values, 99) ?? low),
+  };
+}
+
+// The `percent`th percentile by nearest rank, the rank rule
+// `bin::monitor::spread::Spread` reads with; none of an empty window.
+function nearestRank(values: readonly number[], percent: number): number | undefined {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.max(Math.ceil((percent * sorted.length) / 100) - 1, 0)];
 }
 
 type Unit = "permille" | "bytes" | "nanos" | "count";
