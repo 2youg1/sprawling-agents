@@ -109,6 +109,15 @@ fn every_door_has_a_name_of_its_own() {
     }
 }
 
+/// A signal id is compared, logged and replayed, so an empty one and one
+/// carrying whitespace are refused, each on its own.
+#[test]
+fn a_signal_id_is_neither_empty_nor_spaced() {
+    for refused in ["", "run 1", "run\t1", " "] {
+        assert!(SignalId::parse(refused).is_err(), "{refused:?}");
+    }
+}
+
 proptest! {
     /// An id adopted from text is that text, on the wire and back.
     #[test]

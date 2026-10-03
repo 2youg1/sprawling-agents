@@ -134,3 +134,53 @@ fn writes_join_without_losing_or_repeating_a_path() {
     assert_eq!(these.clone().and(Writes::Nothing), these);
     assert_eq!(these.and(Writes::Domain), Writes::Domain);
 }
+
+/// The tool suite is judged against two implementations of its own: one
+/// that refuses a call bearing another tool's name passes, and one that
+/// routes it silently fails, which is the failure the suite exists for.
+#[cfg(feature = "conformance")]
+#[test]
+fn the_tool_suite_passes_a_fail_closed_tool_and_bites_a_silent_router() {
+    struct Echo {
+        meta: ToolMeta,
+        routes_any_name: bool,
+    }
+    impl Tool for Echo {
+        fn meta(&self) -> &ToolMeta {
+            &self.meta
+        }
+        fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
+            if call.name != self.meta.name && !self.routes_any_name {
+                return Err(
+                    AxError::failure(AxCode::InvalidArgs, "call echo", call.name.as_str())
+                        .with_recovery("call echo by its own name"),
+                );
+            }
+            Ok(ToolOutcome {
+                result: call.args.clone(),
+                attachments: Vec::new(),
+            })
+        }
+    }
+    let echo = |routes_any_name| Echo {
+        meta: ToolMeta {
+            name: ToolName::parse("echo").unwrap(),
+            disclosure: "answers with its arguments; call it to see a call arrive".into(),
+            params: Payload::empty(),
+            effect: Effect::Read,
+            cost_tier: CostTier::Free,
+            timeout: None,
+            render: RenderIntent::Generic,
+            temporal: Temporal::Timestamped,
+        },
+        routes_any_name,
+    };
+    conformance::assert_tool_conformance(&mut echo(false));
+    let silent = std::panic::catch_unwind(|| {
+        conformance::assert_tool_conformance(&mut echo(true));
+    });
+    assert!(
+        silent.is_err(),
+        "the suite must bite a tool that routes any name"
+    );
+}

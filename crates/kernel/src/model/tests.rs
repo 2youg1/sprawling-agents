@@ -271,3 +271,46 @@ fn a_tail_breakpoint_is_carried_by_the_last_message_alone() {
         )
     );
 }
+
+/// The model suite is judged against two adapters of its own: one that
+/// answers every round passes, and one that has never met a picture and
+/// falls over on the first fails, which is the round the suite adds for it.
+#[cfg(feature = "conformance")]
+#[test]
+fn the_model_suite_passes_an_answering_adapter_and_bites_one_that_cannot_see() {
+    struct Scripted {
+        sees_pictures: bool,
+    }
+    impl Model for Scripted {
+        fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
+            let pictured = req.chat.messages.iter().any(|message| {
+                message
+                    .content
+                    .iter()
+                    .any(|block| matches!(block, ContentBlock::Image(_)))
+            });
+            assert!(self.sees_pictures || !pictured, "no arm for a picture");
+            Ok(ModelReturn::bare(Payload::empty(), Vec::new()))
+        }
+    }
+    let benign = ModelRequest {
+        policy: BuildingPolicy::default(),
+        segments: [B3Hash::digest(b"a"); 4],
+        chat: ChatRequest::empty("m", Ceiling::new(64).unwrap()),
+    };
+    conformance::assert_model_conformance(
+        &mut Scripted {
+            sees_pictures: true,
+        },
+        &benign,
+    );
+    let blind = std::panic::catch_unwind(|| {
+        conformance::assert_model_conformance(
+            &mut Scripted {
+                sees_pictures: false,
+            },
+            &benign,
+        );
+    });
+    assert!(blind.is_err(), "the suite must reach the picture round");
+}
