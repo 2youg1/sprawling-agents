@@ -478,6 +478,9 @@ mutants: (mutants-modules "0/1") (mutants-score "mutants.out")
 # The error value gives a function returning the kernel's error one more
 # mutant; outside the functions whose error type it names it does not
 # compile, and cargo-mutants counts it unviable, not missed.
+# `--all-features` builds and tests each mutant as `test` does: code behind
+# a feature (the kernel's `schema` and `conformance` modules) otherwise
+# compiles to nothing, so its mutants pass untested and count as missed.
 mutants-modules shard:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -490,7 +493,7 @@ mutants-modules shard:
     files=()
     for glob in "${globs[@]}"; do files+=(--file "$glob"); done
     status=0
-    cargo mutants --workspace "${files[@]}" --shard '{{shard}}' --test-tool nextest --minimum-test-timeout 60 --error 'kernel::AxError::failure(kernel::AxCode::InvalidArgs, "mutant", "mutant")' || status=$?
+    cargo mutants --workspace --all-features "${files[@]}" --shard '{{shard}}' --test-tool nextest --minimum-test-timeout 60 --error 'kernel::AxError::failure(kernel::AxCode::InvalidArgs, "mutant", "mutant")' || status=$?
     case "$status" in
         0|2|3) ;;
         *) exit "$status" ;;
@@ -572,7 +575,7 @@ mutants-diff base shard:
     mkdir -p target
     git diff "$(git merge-base "$tip" HEAD)" HEAD -- '*.rs' > target/mutants.diff
     status=0
-    cargo mutants --workspace --in-diff target/mutants.diff --shard '{{shard}}' --test-tool nextest --minimum-test-timeout 60 || status=$?
+    cargo mutants --workspace --all-features --in-diff target/mutants.diff --shard '{{shard}}' --test-tool nextest --minimum-test-timeout 60 || status=$?
     case "$status" in
         0|2|3) ;;
         *) exit "$status" ;;
