@@ -395,3 +395,67 @@ fn a_name_that_is_no_address_is_named_among_the_unread() {
     let why = format!("its name is not an address: {reason}");
     assert_eq!(named, Some(("lab/a:b".to_owned(), why)));
 }
+
+/// The test city's transcripts are one JSON object per line, tens of
+/// kilobytes each: four whole lines spent the answer's byte budget and
+/// the search stopped with every later transcript in the directory
+/// unsearched. A hit carries a window of its line around the match, so
+/// a directory of such files answers every hit.
+#[test]
+fn hits_in_long_lines_all_come_back_and_each_carries_its_match() {
+    let dir = tempfile::tempdir().unwrap();
+    let room = dir.path().join("hall").join("clerk");
+    std::fs::create_dir_all(&room).unwrap();
+    let filler = "x".repeat(30_000);
+    for at in 0..12 {
+        std::fs::write(
+            room.join(format!("run-{at:02}.jsonl")),
+            format!("{{\"text\":\"{filler} hall/mayor {filler}\"}}\n"),
+        )
+        .unwrap();
+    }
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let outcome = tool
+        .invoke(&call(&[
+            ("text", Value::String("hall/mayor".to_owned())),
+            ("path", Value::String("hall/clerk".to_owned())),
+            ("context", Value::Number(1.into())),
+        ]))
+        .unwrap();
+    let map = outcome.result.as_map();
+    let matches = map["matches"].as_array().unwrap();
+    assert_eq!(
+        (map["count"].as_u64(), map["truncated"].as_bool()),
+        (Some(12), Some(false))
+    );
+    assert!(
+        matches
+            .iter()
+            .all(|hit| hit["text"].as_str().unwrap().contains("hall/mayor"))
+    );
+}
+
+/// A search that stops at a limit says which limit and how to narrow,
+/// because `truncated: true` alone reads as a fault of the tool.
+#[test]
+fn a_search_stopped_at_the_hit_cap_says_so_and_how_to_narrow() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(
+        dir.path().join("lab").join("Many.md"),
+        "needle\n".repeat(100),
+    )
+    .unwrap();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let outcome = tool.invoke(&text("needle")).unwrap();
+    let map = outcome.result.as_map();
+    assert_eq!(map["truncated"], Value::Bool(true));
+    let stopped = map
+        .get("stopped")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    assert!(
+        stopped.contains("64") && stopped.contains("path"),
+        "stopped: {stopped:?}"
+    );
+}
