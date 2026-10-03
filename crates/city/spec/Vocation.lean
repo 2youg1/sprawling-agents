@@ -24,7 +24,7 @@ pub fn vocation_of(building: &Address) -> Vocation;
 
 - **按地址判，不按提示词判**：City Hall 的居民写 Markdown 和计划，不建造。装配层据此为它组工具台：没有 `exec`、没有 `delegate`、没有 `workshop`。把这件事交给 `MAYOR.md` 的措辞，就是把不变量交给提示词。
 - **返回穷尽枚举而不是 bool**：`is_hall()` 只答得出「是不是市政厅」，而调用点要问的是「这个地址上的人是干什么的」。第三种职分出现时，缺臂是编译错误，不是一个悄悄落到 `else` 里的新楼。
-- **依据是首段等于 `kernel::consts_policy::HALL_BUILDING`**：`hall` 这个名字只有一处权威，本模块不重抄字面量。
+- **依据是楼的地址整体等于 `kernel::consts_policy::HALL_BUILDING`**（调用方递的是楼的地址，`accounting::worker::workbench::tools` 递 `site.building.addr()`；递进一个房间地址 `hall/<room>` 答 `Builds`，所以比的不是首段）：`hall` 这个名字只有一处权威，本模块不重抄字面量。
 -/
 
 /-!

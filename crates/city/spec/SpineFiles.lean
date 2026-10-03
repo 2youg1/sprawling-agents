@@ -31,12 +31,14 @@ pub fn write_job(city_root: &Path, addr: &Address, brief: &JobBrief<'_>) -> Resu
 pub fn write_brief(city_root: &Path, addr: &Address, brief: &JobBrief<'_>) -> Result<RunBrief, AxError>;
 pub fn handoff_path(city_root: &Path, room: &Address) -> PathBuf;           // 交接住房间（§8-24）
 pub fn handoff(city_root: &Path, room: &Address) -> Result<Option<String>, AxError>;
+pub fn clear_handoff(city_root: &Path, room: &Address) -> Result<(), AxError>;   // 删掉文件，不写空白表单；本就不在不算失败
+pub(crate) fn lay_out_handoff(room_dir: &Path, room: &Address) -> Result<(), AxError>;  // 唯一调用方是 room::open
 pub struct HandoffSections { pub overall: Option<String>, pub progress: Option<String>, pub context: Option<String>, pub next_step: Option<String> }
 pub fn handoff_sections(text: &str) -> HandoffSections;           // city::handoff_form
 pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError>;
 ```
 
-- **四文档三写一不写**：`lay_out` 写 Roadmap／Memo／Handoff；`RULES.toml` 归 `building::create`（它的含义归 `policy`）——同一份文件有两个写入者就是两个权威。
+- **楼级三份由 `lay_out` 写，交接住房间**：`lay_out` 写 Roadmap／Memo／`SPEC.md`；`Handoff.md` 由 `room::open` 经 `lay_out_handoff` 铺在房间里（§8-24）；`RULES.toml` 归 `building::create`（它的含义归 `policy`）——同一份文件有两个写入者就是两个权威。
 - **已存在的文档恒不覆写**：一栋已在干活的楼的计划不得因为又跑了一次建楼而回到空白。
 - **模板的占位行不进新楼的 Roadmap**：`crates/city/templates/Roadmap.md` 里的两行 `Not started` 是给人看的例子；照抄进去，一栋新楼开局就有两件不存在的待办，而它们会进分母。实例化时删掉 Item 列为空的数据行，断言是「新楼的分母是 0」。
 - **JOB.md 先落盘，再产 `run_started`**（模板第一行就这么写）；内容同时进 CAS，于是盘上那份是现场、CAS 那份是历史——Agent 改了 JOB.md 也不会使「当时派的是什么活」不可考。同一个房间再派一件活即覆写它（JOB.md 是本次会话的任务，不是档案）。**人那句话在表单里只出现一次**：标题只写 `# JOB.md`，任务正文只进 `<task>` 节——标题再插一遍，一段粘贴每次请求就多付一遍。
@@ -68,11 +70,11 @@ pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   // 立�
 -/
 
 /-!
-### 8-24 Handoff 从楼搬到房间
+### 8-24 Handoff 住房间
 
-> 权威在 `crates/runtime/Spec.lean` §8-33；本节只记 city 这一侧怎么变。
+> 权威在 `crates/runtime/Spec.lean` §8-33；本节只记 city 这一侧。
 
-`handoff_path(city_root, room)` 与 `handoff(city_root, room)` 的第二个参数从楼地址改为**房间地址**：`<city>/<room>/Handoff.md`。签名一字不变，变的是调用方递什么——装配层的 `run_segment` 递本跑的地址。模板由 `room::open` 在打开房间时经 `spine_files::lay_out_handoff` 铺下；楼级 `lay_out` 不再铺 `Handoff.md`。理由是同楼并发：两个房间同时冻结，一份楼级文件就是两份内容抢一个名字。没有房间的地址（直接派到楼根的跑）读到 `None`，与从前空表单的读法一致。
+`handoff_path(city_root, room)`、`handoff(city_root, room)` 与 `clear_handoff(city_root, room)` 的第二个参数是**房间地址**：`<city>/<room>/Handoff.md`，装配层的 `run_segment` 递本跑的地址。模板由 `room::open` 在打开房间时经 `spine_files::lay_out_handoff` 铺下；楼级 `lay_out` 不铺 `Handoff.md`。理由是同楼并发：两个房间同时冻结，一份楼级文件就是两份内容抢一个名字。没有房间的地址（直接派到楼根的跑）读到 `None`，与空白表单的读法一致。`clear_handoff` 删掉文件而不是写回空白表单：空白表单与没有文件都读成 `None`，写一份只会让两种盘上状态说同一件事（`crates/sprawling/Spec.lean` §8-82 的新会话）。
 -/
 
 /-!

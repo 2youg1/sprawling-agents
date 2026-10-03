@@ -27,8 +27,8 @@ impl Neighbourhood {
     pub fn residents(&self) -> u32;            // here 中真有人站着的个数
 }
 // 房间与楼的枚举各归其既有权威，本模块只调用：
-pub fn room::all(city_root: &Path, building: &Address) -> Vec<Address>;   // city::rooms
-pub fn building::all(city_root: &Path) -> Vec<Address>;                   // city::buildings
+pub fn room::all(city_root: &Path, building: &Address) -> Result<Vec<Address>, AxError>;   // city::rooms
+pub fn building::all(city_root: &Path) -> Result<Vec<Address>, AxError>;                   // city::buildings
 ```
 
 - **这栋楼里有言语，却没有地址簿**：`signal` 的 `to` 只说「the address you are speaking to」，越界拒词只报边界不报住户，于是地址靠猜；而装配层投递时 `.entry(room).or_insert_with(new_inbox)`，**猜错的一句话会当场开出一个没人读的信箱并回 `queued: true`**。本模块存在的第一个理由是让那次猜测消失。
