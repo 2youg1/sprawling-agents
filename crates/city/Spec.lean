@@ -37,7 +37,7 @@ import crates.city.spec.Wizard
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被别的规格与 rustdoc 的引用锚住，所以不重排。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `city D<n>`；D7、D12、D14、D15 是空号，§12 末尾列出其余每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：配置梯子（`spec/ConfigLayers/Ladder.lean`）、写配置先过读者（`spec/ConfigLayers.lean`）、一个地址归哪栋楼管与建楼的三道拒（`spec/Building.lean`）、楼规的求值与写域（`spec/Policy.lean`）、读—判—换的锁（`spec/Document.lean`）、近的书架盖远的（`spec/Library.lean`）、审核绑在内容摘要上（`spec/Library/Audit.lean`）、治理文件在一切写域之外（`spec/Governed.lean`、`spec/Policy.lean`）、谁规划（`spec/Vocation.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：配置梯子（`spec/ConfigLayers/Ladder.lean`）、写配置先过读者（`spec/ConfigLayers.lean`）、一个地址归哪栋楼管与建楼的三道拒（`spec/Building.lean`）、楼规的求值与写域（`spec/Policy.lean`）、读—判—换的锁（`spec/Document.lean`）、近的书架盖远的（`spec/Library.lean`）、审核绑在内容摘要上（`spec/Library/Audit.lean`）、自带 skill 只在成形时放一次（`spec/Library/Install.lean`）、治理文件在一切写域之外（`spec/Governed.lean`、`spec/Policy.lean`）、谁规划（`spec/Vocation.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -83,6 +83,7 @@ import crates.city.spec.Wizard
 - `spec/Document.lean`：不在的文档读作空（`a_missing_document_reads_as_no_bytes`）；文件动过即拒且不动（`a_moved_document_is_refused_and_left`）；同一版出发的两次保存只落先到的（`two_saves_from_one_version_land_once`）；锁里的 `n` 次加一恰好加了 `n`，锁外有反例（`increments_under_the_lock_add_up`、`without_the_lock_an_update_is_lost`，D17）。
 - `spec/Library.lean`：一个名字留下最近一格书架上的那一件（`the_nearest_shelf_keeps_the_name`、`the_building_shelf_beats_the_city_and_the_outside`）。
 - `spec/Library/Audit.lean`：显示为已审时轨迹里有对此刻这份摘要的审核（`audited_only_what_was_audited`），内容改成没审过的字节之后不显示为已审（`changed_content_is_never_shown_audited`）；取审核失败不改变书架（`failed_fetches_change_nothing`），也拦不住上架（`a_failed_fetch_never_blocks_an_install`，D19）。
+- `spec/Library/Install.lean`：自带的每一件 skill 至多被放上书架一次（`a_builtin_is_placed_at_most_once`），成形之后被 User 拿下的一件不再回来（`a_removed_builtin_is_not_put_back`，D20）。
 - `spec/Governed.lean`：三份治理文件在一切写域之外（`the_governed_documents_are_out_of_every_write_domain`）。
 - `spec/Vocation.lean`：规划的恰是 City Hall（`only_the_hall_plans`）。
 
@@ -176,6 +177,7 @@ workspace 内只依赖 `kernel`（ARCHITECTURE.md §3 的 `depmap`），规格�
 | 8-27 | `crates/city/spec/Document.lean` |
 | 8-28 | `crates/city/spec/Library/Install.lean` |
 | 8-28b | `crates/city/spec/Library/Audit.lean` |
+| 8-28c | `crates/city/spec/Library/Install.lean` |
 | 8-29 | `crates/city/spec/Check.lean` |
 | 8-30 | `crates/city/spec/History.lean` |
 | 8-31 | `crates/city/spec/ConfigLayers.lean` |
@@ -327,6 +329,10 @@ Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第�
 建楼与配置九条：新建的楼被 `policy::load` 读回且 confidential 模板真的锁本地模型池｜二次出生恒拒｜reserved prefix 下建楼恒拒｜房间地址建楼恒拒且拒词指出该建哪栋｜下层配置盖上层｜**同一层写模型又写 harness 即拒，城自己的写路径也写不出这样的文件；房间有会话记录时梯子上的 harness 不生效，`/new` 之后生效**｜不认的键即拒｜**写在 `CONFIG.toml` 里的 effort 出现在真实出线请求体里**（bin 侧端到端，假 provider 录下请求体）｜**`usersbrowser` 的三种值各读回各的形状，`browser` 与它互不影响，confidential 楼写它即拒**。
 
 技能安装六条（`library::install::tests`，CAS 绑定一例在 `crates/sprawling/tests/skill_install.rs`）：装上架的字节与来源一致且扫描读回的 `Holding` 整体相等｜同哈希重装幂等且盘上字节不变｜**plan 与 apply 之间来源目录被换即整体拒收**（盘上无文件、登记零调用）｜经符号链接的包（包目录本身或 `SKILL.md`）恒拒｜同格异哈希占名拒｜跨 section 同名拒。
+
+自带 skill 一条（`accounting::worker::genesis::tests`）：新城成形之后城库的 `shipped` 格恰是包目录 `skills/` 下的每件 skill，二次成形被拒后书架不变（§8-28c）。
+
+审核状态一张轨迹向量表（`library::audit::tests`）：上架、审、改、迟到的旧摘要审核、失败的取，逐行比对 `audit_state` 与 Audit.lean 的 `shown` 在同一条轨迹上的答案（§8-28b，Roadmap §3.3 LV1）。
 
 读界两条：`kernel::address::tests` 的三类读者矩阵（本楼读本楼、他楼读非机密楼、楼外读机密楼，外加机密楼读自己、规则读不出）逐格判出 `ReadVerdict`，且本楼的读从不调用规则闭包｜bin 侧 `a_run_in_another_building_reads_nothing_of_a_confidential_one`：普通楼里的 run 按路径 `read`、再不带路径 `search` 机密楼里的文件，假 provider 录下的每一份请求体里都没有那份文件的字节，且最后一份带着 `E_GATE_DENIED`。
 
