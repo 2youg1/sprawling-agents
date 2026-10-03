@@ -31,9 +31,11 @@ use std::collections::{BTreeMap, BTreeSet};
 mod install;
 mod reading;
 mod shelf;
+mod shipped;
 
 pub use install::{Installed, Placed, PlannedInstall, Slot, install, plan_install};
 pub use shelf::{Holding, Shelf};
+pub use shipped::{SHIPPED_SECTION, shelve_shipped};
 
 use shelf::OwnShelf;
 use shelf::ShelfKey;

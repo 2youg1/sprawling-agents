@@ -68,7 +68,7 @@ pub use gitignore::place_everywhere as keep_records_out_of_git;
 pub use handoff_form::{HandoffSections, handoff_sections};
 pub use kernel::layout::{ARCHIVE_DIR, BUILDING_SHELF, CONFIG_FILE, LIBRARY_DIR, URBANITE_FILE};
 pub use library::{Holding, Library, Shelf};
-pub use library::{Installed, Placed, PlannedInstall, Slot};
+pub use library::{Installed, Placed, PlannedInstall, SHIPPED_SECTION, Slot, shelve_shipped};
 pub use library::{install as install_skill, plan_install as plan_skill_install};
 pub use neighbourhood::{Neighbour, Neighbourhood, Occupancy};
 pub use neighbours_tool::NeighboursTool;

@@ -105,6 +105,10 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
              write, then run `sprawling init` again",
         )
     })?;
+    // Before line zero, so a forming refused here leaves no history and
+    // the next forming finds what already landed as already shelved
+    // (`crates/city/spec/Library/Install.lean` section 8-28c).
+    shelve_shipped(city_root)?;
     let now = crate::Clock::now(&*hands.clock)?;
     let (mut ledger, report) =
         JsonlLedger::open(&dir, now).map_err(storage::StorageError::into_ax)?;
@@ -191,6 +195,17 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
         standing,
         adopted,
     })
+}
+
+/// Puts the skills the binary carries on the new city's library shelf,
+/// each registered in the city's store before it lands.
+fn shelve_shipped(city_root: &Path) -> Result<(), AxError> {
+    let mut cas = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
+        .map_err(storage::StorageError::into_ax)?;
+    city::shelve_shipped(city_root, &mut |bytes| {
+        cas.put(bytes).map_err(storage::StorageError::into_ax)
+    })?;
+    Ok(())
 }
 
 /// The city segment as this city has it: the file the person may edit,
