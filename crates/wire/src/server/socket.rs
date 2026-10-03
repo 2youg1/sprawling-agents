@@ -264,8 +264,22 @@ pub(crate) fn framed<R>(
     phase: SessionState,
     arrivals: Vec<Arrival<R>>,
 ) -> (Vec<Said<R>>, Stream) {
-    drop((phase, arrivals));
-    (Vec::new(), stream)
+    let live = phase == SessionState::Live;
+    let mut said = Vec::with_capacity(arrivals.len());
+    let after = arrivals
+        .into_iter()
+        .fold(stream, |stream, arrival| match arrival {
+            Arrival::Record(seq, record) if live => {
+                let (lag, next) = stream.before(seq);
+                said.extend(lag.map(Said::Lagged));
+                said.push(Said::Record(record));
+                next
+            }
+            // A session that has not been welcomed is shown no stream.
+            Arrival::Record(..) => stream,
+            Arrival::Skipped => stream.skipped(live),
+        });
+    (said, after)
 }
 
 /// Feeds each thing said to the socket as its own frame, then flushes
