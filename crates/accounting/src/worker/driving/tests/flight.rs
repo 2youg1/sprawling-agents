@@ -319,15 +319,15 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     );
 }
 
-/// **The lane count is one wall for every entrance.** Five pieces of
-/// work sent at once drive four at a time: the fifth waits in the pool
-/// rather than opening a thread to park on the provider's admission,
-/// and starts when a lane comes home, so all five still freeze.
+/// **A prepared run gets a lane at once** (`crates/sprawling/Spec.lean`
+/// D34). Six pieces of work sent at once all drive at once on a machine
+/// with memory to spare: none waits in the pool for a lane, because the
+/// pool holds no lane count, and all six still freeze.
 #[test]
-fn work_past_the_lane_count_waits_for_a_lane() {
+fn tp2_more_than_four_runs_start_at_once() {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
-    let rooms = ["lab/a", "lab/b", "lab/c", "lab/d", "lab/e"];
+    let rooms = ["lab/a", "lab/b", "lab/c", "lab/d", "lab/e", "lab/f"];
     for room in rooms {
         std::fs::create_dir_all(dir.path().join(room)).unwrap();
     }
@@ -354,8 +354,8 @@ fn work_past_the_lane_count_waits_for_a_lane() {
     }
     assert_eq!(
         worker.flight.in_flight(),
-        crate::worker::pool::DRIVING_LANES,
-        "no more runs drive at once than there are lanes"
+        u32::try_from(rooms.len()).unwrap(),
+        "every prepared run drives at once"
     );
     worker.land_the_rest().unwrap();
     drop(provider);
@@ -366,6 +366,6 @@ fn work_past_the_lane_count_waits_for_a_lane() {
     assert_eq!(
         frozen,
         rooms.len(),
-        "the run that waited for a lane ran too"
+        "every run that started froze"
     );
 }
