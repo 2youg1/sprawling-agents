@@ -51,6 +51,11 @@ tokio-tungstenite = { workspace = true }
 # crate's surface is safe, so no foreign call lives in this crate
 # (`crates/sprawling/Spec.lean` §8-93).
 thread-priority = "3.1"
+# The processor topology the placement plan reads, and the
+# power-throttling opt-out: no safe crate offers them, so they come
+# through the one FFI seam (`crates/sprawling/spec/Serving/Placement.lean`
+# D45). Its CPU set parser is safe Rust on every platform.
+desktop_ffi = { workspace = true }
 # The desktop server this binary runs as `sprawling desktop`, a child
 # the city starts for a building whose rules ask for the desktop
 # (`crates/sprawling/Spec.lean` §8-4d).
@@ -105,6 +110,7 @@ bin-dir = "{ name }-{ version }-x86_64-unknown-linux-musl/{ bin }{ binary-ext }"
 flate2 = { workspace = true }
 
 [dev-dependencies]
+proptest.workspace = true
 tempfile.workspace = true
 
 [lints]
