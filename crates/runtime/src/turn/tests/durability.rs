@@ -4,8 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The checks derived from `crates/runtime/spec/Turn/Durability.lean`
-//! (runtime D24): how many barriers a turn pays, and that a write's
-//! intent is durable before the write runs.
+//! (runtime D24): how many barriers a turn pays, that a write's intent
+//! is durable before the write runs, and what a power cut at any line of
+//! the ledger's write sequence leaves on disk.
 
 use std::sync::{Arc, Mutex};
 
@@ -14,29 +15,46 @@ use super::helpers::*;
 use crate::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
 use crate::conversation::Opening;
 use kernel::{Effect, EventDraft, EventRef, IdemKey, Seq, Tool, ToolOutcome};
+use proptest::prelude::*;
 
 /// The kinds of the lines a ledger holds, shared with the tools so a
 /// tool can read what is durable at the moment it runs.
 type Durable = Arc<Mutex<Vec<String>>>;
 
 /// A ledger that counts its barriers: each call into it is one round
-/// trip through the relay, and so one disk barrier.
+/// trip through the relay, and so one disk barrier. The power goes out
+/// when it is about to write line `cut_at` (counted from zero): that line
+/// and every later one never reach the disk.
 struct Barriers {
     inner: TestLedger,
     durable: Durable,
     barriers: usize,
+    cut_at: usize,
 }
 
 impl Barriers {
     fn new() -> Barriers {
+        Barriers::cut_at(usize::MAX)
+    }
+
+    fn cut_at(line: usize) -> Barriers {
         Barriers {
             inner: TestLedger::new(),
             durable: Arc::default(),
             barriers: 0,
+            cut_at: line,
         }
     }
 
     fn keep(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
+        if self.durable.lock().unwrap().len() >= self.cut_at {
+            return Err(AxError::failure(
+                AxCode::Busy,
+                "append to the ledger",
+                "the power went out",
+            )
+            .with_recovery("open the ledger again; it holds what reached the disk"));
+        }
         let kind = serde_json::to_value(draft.kind)
             .unwrap()
             .as_str()
@@ -184,39 +202,40 @@ fn call(id: &str, tool: &str) -> ToolCall {
 /// tool saw durable when it ran comes back in call order.
 fn turn_of(ledger: &mut Barriers, calls: Vec<ToolCall>) -> (TurnReport, Vec<Vec<String>>) {
     let saw = Arc::default();
-    let mut face = Face::new(&ledger.durable, &saw);
+    let report = run_turn(ledger, calls, &saw).unwrap();
+    let saw = saw.lock().unwrap().clone();
+    (report, saw)
+}
+
+/// The same turn, ending on the ledger's refusal instead of unwrapping it.
+fn run_turn(
+    ledger: &mut Barriers,
+    calls: Vec<ToolCall>,
+    saw: &Arc<Mutex<Vec<Vec<String>>>>,
+) -> Result<TurnReport, AxError> {
+    let mut face = Face::new(&ledger.durable, saw);
     let mut model = OneShotModel { calls };
     let mut conversation = Conversation::new();
     conversation.push_task_lines("read and write", "a mixed wave", Opening::FromJob);
+    let turn = advance(opened::<1>().assemble(
+        Interrupt::None,
+        ledger,
+        RunPrompt::new(&prefix(), &mut PromptRecord::default()),
+        &conversation,
+        &[],
+        &shape(),
+    )?);
+    let turn = advance(turn.call(
+        Interrupt::None,
+        ledger,
+        &mut model,
+        &BuildingPolicy::default(),
+        Generating::Unwatched,
+    )?);
     let turn = advance(
-        opened::<1>()
-            .assemble(
-                Interrupt::None,
-                ledger,
-                RunPrompt::new(&prefix(), &mut PromptRecord::default()),
-                &conversation,
-                &[],
-                &shape(),
-            )
-            .unwrap(),
+        turn.execute_concurrent(Interrupt::None, ledger, &mut face, &mut |_| Interrupt::None)?,
     );
-    let turn = advance(
-        turn.call(
-            Interrupt::None,
-            ledger,
-            &mut model,
-            &BuildingPolicy::default(),
-            Generating::Unwatched,
-        )
-        .unwrap(),
-    );
-    let turn = advance(
-        turn.execute_concurrent(Interrupt::None, ledger, &mut face, &mut |_| Interrupt::None)
-            .unwrap(),
-    );
-    let report = advance(turn.record(Interrupt::None, ledger).unwrap());
-    let saw = saw.lock().unwrap().clone();
-    (report, saw)
+    Ok(advance(turn.record(Interrupt::None, ledger)?))
 }
 
 /// `tf1_write_intent_durable`: when a write runs, its own `tool_called`
@@ -245,9 +264,9 @@ fn tf1_write_intent_is_durable_before_the_write_runs() {
 }
 
 /// `closed_turn_barriers`: a turn pays one barrier for its model call,
-/// one for the reply, one for each write, and one to close, however many
-/// reads it makes, plus one on a run's first turn for `prompt_assembled`;
-/// the report's refs are every line the turn wrote, all durable.
+/// which carries a first turn's `prompt_assembled` too, one for each
+/// write, and one to close, however many reads it makes; the report's
+/// refs are every line the turn wrote, all durable.
 #[test]
 fn tf1_turn_barriers() {
     let mut ledger = Barriers::new();
@@ -267,6 +286,51 @@ fn tf1_turn_barriers() {
             report.refs().len(),
             ledger.inner.lines.len()
         ),
-        (1 + 3 + 2, 13, 13)
+        (2 + 2, 13, 13)
     );
+}
+
+/// The wave a model asks for: `true` is a write, `false` a read.
+fn wave_of(writes: &[bool]) -> Vec<ToolCall> {
+    writes
+        .iter()
+        .enumerate()
+        .map(|(i, write)| match write {
+            true => call(&format!("w{i}"), "write"),
+            false => call(&format!("r{i}"), "read"),
+        })
+        .collect()
+}
+
+proptest! {
+    /// `tf1_write_intent_durable` and `tf1_durable_is_reference_prefix`
+    /// under a power cut at any line of the ledger's write sequence:
+    /// every write that ran saw its own `tool_called` as the last durable
+    /// line, with one `tool_called` per call before it, and what reached
+    /// the disk is a prefix of the lines the uncut turn writes.
+    #[test]
+    fn tf1_a_power_cut_leaves_a_prefix_and_no_write_without_its_intent(
+        writes in proptest::collection::vec(any::<bool>(), 0..8),
+        cut in 0usize..24,
+    ) {
+        let mut whole = Barriers::new();
+        run_turn(&mut whole, wave_of(&writes), &Arc::default()).unwrap();
+        let serial = whole.durable.lock().unwrap().clone();
+
+        let mut ledger = Barriers::cut_at(cut);
+        let saw = Arc::default();
+        let ended = run_turn(&mut ledger, wave_of(&writes), &saw);
+        let durable = ledger.durable.lock().unwrap().clone();
+        prop_assert!(serial.starts_with(&durable));
+        prop_assert_eq!(ended.is_ok(), durable.len() == serial.len());
+
+        let ran = saw.lock().unwrap().clone();
+        for (i, seen) in ran.iter().enumerate() {
+            if writes[i] {
+                let intents = seen.iter().filter(|kind| *kind == "tool_called").count();
+                prop_assert_eq!(seen.last().map(String::as_str), Some("tool_called"));
+                prop_assert_eq!(intents, i + 1);
+            }
+        }
+    }
 }

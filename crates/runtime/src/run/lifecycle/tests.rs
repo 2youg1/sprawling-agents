@@ -7,7 +7,8 @@
 
 use kernel::ledger::chain_hash;
 use kernel::{
-    Address, B3Hash, Ceiling, EventRef, GENESIS_PREV, Locator, Seq, ToolCall, ToolOutcome,
+    Address, B3Hash, Ceiling, ContentBlock, EventDraft, EventKind, EventRef, GENESIS_PREV, Locator,
+    ModelRequest, ModelReturn, Seq, ToolCall, ToolOutcome,
 };
 
 use super::*;
@@ -17,15 +18,26 @@ use crate::run::Opening;
 use crate::turn::CallShape;
 use kernel::{Retries, RunId, TimeMs};
 
-/// A ledger that records nothing but how often it was asked.
+/// A ledger that records nothing but the kinds it was given and how
+/// often it was asked: each call into it is one disk barrier.
 struct CountingLedger {
     appended: Vec<EventKind>,
+    barriers: usize,
     next: Seq,
     prev: B3Hash,
 }
 
-impl Ledger for CountingLedger {
-    fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
+impl CountingLedger {
+    fn new() -> CountingLedger {
+        CountingLedger {
+            appended: Vec::new(),
+            barriers: 0,
+            next: Seq::FIRST,
+            prev: GENESIS_PREV,
+        }
+    }
+
+    fn keep(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
         let kind = draft.kind;
         let record = kernel::EventRecord::from_draft(draft, self.next, self.prev);
         let line = record.canonical_line()?;
@@ -33,6 +45,32 @@ impl Ledger for CountingLedger {
         self.next = self.next.next()?;
         self.appended.push(kind);
         Ok(record.to_ref())
+    }
+}
+
+impl Ledger for CountingLedger {
+    fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
+        self.barriers = self.barriers.saturating_add(1);
+        self.keep(draft)
+    }
+
+    fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
+        self.barriers = self.barriers.saturating_add(1);
+        drafts.into_iter().map(|draft| self.keep(draft)).collect()
+    }
+}
+
+/// A model that answers once with text and asks for no tool.
+struct Answering;
+
+impl Model for Answering {
+    fn call(&mut self, _req: &ModelRequest) -> Result<ModelReturn, AxError> {
+        Ok(ModelReturn::bare(
+            kernel::model::message_payload(&[ContentBlock::Text {
+                text: "done".to_owned(),
+            }])?,
+            Vec::new(),
+        ))
     }
 }
 
@@ -99,11 +137,7 @@ fn the_charter_carries_the_effort_the_request_froze() {
 /// and a third sample appearing here is a defect rather than weather.
 #[test]
 fn a_dispatch_writes_two_lines_and_samples_the_clock_twice() {
-    let mut ledger = CountingLedger {
-        appended: Vec::new(),
-        next: Seq::FIRST,
-        prev: GENESIS_PREV,
-    };
+    let mut ledger = CountingLedger::new();
     let mut samples = 0u32;
     let mut now = || {
         samples = samples.saturating_add(1);
@@ -142,4 +176,47 @@ fn a_dispatch_writes_two_lines_and_samples_the_clock_twice() {
         "the job pin lands first, then the run exists"
     );
     assert_eq!(samples, 2, "one stamp per fact, and no third sample");
+}
+
+/// `closed_turn_barriers` through the run: the run's own
+/// `prompt_shape_compared` waits among the turn's lines, so a run's first
+/// turn that calls no tool pays one barrier for its model call, which
+/// carries `prompt_assembled` too, and one to close.
+#[test]
+fn tf1_run_turn_barriers() {
+    let mut ledger = CountingLedger::new();
+    let mut now = || Ok(TimeMs::new(1));
+    let mut interrupt = |_: SafePoint| crate::turn::Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        monotonic_us: &mut || 0,
+        interrupt: &mut interrupt,
+        checkpoint: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
+        invoke: &mut invoke,
+        wait: &mut |_: TimeMs| crate::NextCall::Allowed,
+        deltas: None,
+    };
+    let mut run = Run::dispatch(plan(), &mut ledger, &mut hooks).unwrap();
+    let opened = ledger.barriers;
+    run.advance(&mut ledger, &mut Answering, &mut hooks)
+        .unwrap();
+    assert_eq!(
+        (ledger.barriers - opened, &ledger.appended[2..]),
+        (
+            2,
+            &[
+                EventKind::PromptAssembled,
+                EventKind::PromptShapeCompared,
+                EventKind::ModelCalled,
+                EventKind::ModelReturned,
+            ][..]
+        )
+    );
 }
