@@ -218,6 +218,7 @@ pub enum Shell {                                    // runtime::tools::exec::she
 }
 ```
 
+  shell 臂可用（`Found`）时，exec 工具的说明在末尾多一句 `A shell line runs under <name>.`，`<name>` 与结果里的 `interpreter` 同一个拼写：模型写哪种语法取决于它，cmd、pwsh 与 sh 的同一行命令意思不同，不说出来就是让模型猜。`Absent` 与 `Missing` 不加这句，调用时的拒绝已经说清。
   `Missing { asked: Pwsh }` 在调用时以 `E_TOOL_UNAVAILABLE` 拒绝，主语点名 pwsh 7，恢复语是「install PowerShell 7, or set `[sandbox] interpreter = "system"` in this building's CONFIG.toml」。不退回 cmd：为 pwsh 写的命令行在 cmd 下是另一种语言，退回只会把一次清楚的拒绝换成一次看不懂的失败。三个平台行为相同，只有 `"system"` 指的程序随平台变。
 - **账本上留什么**：shell 臂的结果载荷加 `interpreter` 字段，值是实际起动的解释器的程序名（去掉扩展名、小写：`cmd`、`pwsh`、`sh`、`bash`、`zsh`……），拼写只在 `tools::exec::outcome::interpreter_name` 一处。配置不入账本（§8-31），所以要按 shell 统计，这次跑的是哪一个只能记在结果上。加这个字段之前的记录没有它，按它们实际跑的那一个计：那时只有 `"system"`，折叠把它们计在 `system` 名下。转进后台的 shell 命令（`outcome: backgrounded`）当时没有退出码，不计。
 - **失败类别**：`tools::exec::outcome` 的纯函数 `FailureClass::of(interpreter, exit_code, stdout, stderr)` 把一次 shell 臂的结果分进 `CommandNotFound`、`Syntax`、`Encoding` 或不分类（`None`）；按 shell 统计的折叠 `ShellTally::absorb(result)` 读一条 `ToolResult` 载荷里的 `result`。两者住 `outcome`，因为那个文件是 exec 结果键名（`arm`、`exit_code`、`stdout`、`stderr`、`interpreter`）的唯一主人，折叠读的正是这几个键；每个解释器打印什么也只在这一处。`runtime` 在根上导出 `FailureClass`、`ShellTally`。账本的视图（accounting 的 views）读记录、把每条 `result` 交给 `ShellTally`，折出来的是每个解释器的调用数与每类失败数。规则：
