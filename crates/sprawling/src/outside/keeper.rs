@@ -121,7 +121,8 @@ impl Doorway {
     /// the table on disk names.
     ///
     /// # Errors
-    /// An unreadable device table; a random source that refuses.
+    /// An unreadable device table; a random source that refuses. A city
+    /// key the vault cannot give back is kept as its refusal instead.
     pub(crate) fn keep(keeping: Keeping) -> Result<Doorway, AxError> {
         let Keeping {
             devices,
@@ -131,9 +132,7 @@ impl Doorway {
             key,
         } = keeping;
         let known = super::devices::read(&devices)?;
-        let mut seed = [0u8; remote_access::keys::SEED_BYTES];
-        (senses.entropy)(&mut seed)?;
-        let city = Ok(SigningKey::from_seed(&seed)?);
+        let city = key.held(&senses.entropy);
         let door = Door::start(known, Epoch::from_entropy(drawn(&senses)?));
         Ok(Doorway {
             kept: Arc::new(Mutex::new(Kept {
