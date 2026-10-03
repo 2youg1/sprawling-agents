@@ -25,13 +25,14 @@ pub(super) fn watched(
 ) -> Result<wire::MonitorFeed, AxError> {
     let monitor = Arc::new(std::sync::Mutex::new(crate::monitor::Monitor::new()));
     let samples = tokio::sync::broadcast::channel(1).0;
-    crate::monitor::sampler::spawn_sampler(
+    let beat = crate::monitor::sampler::spawn_sampler(
         Arc::downgrade(&monitor),
         samples.clone(),
         city_root.to_path_buf(),
         gauges,
     )?;
     Ok(wire::MonitorFeed {
+        beat: Arc::new(move |chosen| beat.set(chosen)),
         watch: Arc::new(move |watched| -> Box<dyn Send> {
             // The count is an atomic, so a poisoned lock guards no
             // half-written state and the watcher still counts.

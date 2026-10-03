@@ -110,6 +110,7 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         watching = Some(((state.monitor.watch)(watched), samples));
                     }
                     SessionStep::Release => watching = None,
+                    SessionStep::Beat(beat) => (state.monitor.beat)(beat),
                     SessionStep::Refuse { error, close } => {
                         if send(&mut socket, &ServerFrame::Refusal(error)).await.is_err() {
                             return;

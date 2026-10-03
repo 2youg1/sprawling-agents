@@ -42,7 +42,7 @@ mod monitor;
 mod query;
 
 pub use ask::{Answered, Ask, AskId, AskOutcome};
-pub use monitor::{Monitoring, Sample, Watched};
+pub use monitor::{BEAT_MAX_MS, BEAT_MIN_MS, BeatMs, Monitoring, Sample, Watched};
 pub use query::{QUERY_NAMES, Query};
 
 use crate::answer::Answer;

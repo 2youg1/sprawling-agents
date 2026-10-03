@@ -28,7 +28,7 @@ fn a_json_line_carries_every_counter_under_its_field_name() {
             object["queued_runs"].as_u64(),
             object["volume_free_bytes"].as_u64(),
         ),
-        (false, 15, Some(7), Some(3), Some(u64::MAX)),
+        (false, 16, Some(7), Some(3), Some(u64::MAX)),
     );
 }
 
@@ -73,6 +73,7 @@ fn a_screen_shows_each_counter_in_its_unit_beside_its_curve() {
         queued_runs: 1,
         view_backlog: 0,
         read_nanos: 2_000,
+        beat_ms: 100,
     };
     let after = Sample {
         core_cpu_permille: 123,

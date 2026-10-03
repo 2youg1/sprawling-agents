@@ -76,6 +76,9 @@ pub const DEVICES_FILE: &str = "devices.toml";
 /// Where residents' playback exports land, under the city's reserved
 /// subtree, one directory per building.
 pub const PLAYBACK_DIR: &str = "playback";
+/// The beat the performance monitor samples at, under the city's
+/// reserved subtree (`crates/sprawling/spec/Monitor.lean` D44).
+pub const MONITOR_FILE: &str = "MONITOR.toml";
 
 /// What the staging file of a document named `name` is called: the
 /// name hidden by a dot and suffixed `.staging`, in the document's own
@@ -265,6 +268,13 @@ impl CityLayout {
     #[must_use]
     pub fn playback_exports(&self) -> PathBuf {
         self.governed_root().join(PLAYBACK_DIR)
+    }
+
+    /// Where this city remembers its monitor's sampling beat: a setting
+    /// of how this machine measures, which no write domain reaches.
+    #[must_use]
+    pub fn monitor(&self) -> PathBuf {
+        self.governed_root().join(MONITOR_FILE)
     }
 
     /// The layout whose ledger is `dir`, when `dir` is a city's.

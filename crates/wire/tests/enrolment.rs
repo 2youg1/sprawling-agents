@@ -93,6 +93,7 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
         monitor: wire::MonitorFeed {
             watch: Arc::new(|_| -> Box<dyn Send> { Box::new(()) }),
             samples: tokio::sync::broadcast::channel(1).0,
+            beat: Arc::new(|_| {}),
         },
         client: Arc::new(wire::ClientAssets::Embedded(&[])),
         commands: Arc::new(|_, _| Ok(())),

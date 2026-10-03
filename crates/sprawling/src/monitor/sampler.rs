@@ -3,28 +3,25 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The thread that ticks the monitor once a second and sends each fresh
-//! reading to the watching sessions, and notes this process's private
-//! bytes on every memory beat in between (`crates/sprawling/spec/Monitor.lean` §8-96).
+//! The thread that ticks the monitor once every ten memory beats and
+//! sends each fresh reading to the watching sessions, and notes this
+//! process's private bytes on every memory beat in between
+//! (`crates/sprawling/spec/Monitor.lean` §8-96). The memory beat is the
+//! one a page sets (`super::beat`), 100 ms until it does.
 
-use std::sync::{Mutex, PoisonError, Weak};
+use std::sync::{Arc, Mutex, PoisonError, Weak};
 use std::time::{Duration, Instant};
 
 use kernel::{AxCode, AxError};
 use tokio::sync::broadcast;
 
+use super::beat::Beat;
 use super::counters::Counters;
 use super::{Monitor, Sample};
 use accounting::worker::health::Health;
 
-/// How often private bytes are read while somebody watches: the memory
-/// beat of `crates/sprawling/spec/Serving/Memory.lean`'s measuring plan.
-const MEMORY_BEAT: Duration = Duration::from_millis(100);
-
 /// Memory beats in one beat of the monitor.
 const MEMORY_BEATS_PER_BEAT: u32 = 10;
-
-const BEAT: Duration = MEMORY_BEAT.saturating_mul(MEMORY_BEATS_PER_BEAT);
 
 /// What a beat adds to the counters it read: the accounting queue's two
 /// counts (`crates/sprawling/spec/Accounting/Worker.lean` §8-98), the view fold's backlog (8-123), and
@@ -64,8 +61,10 @@ impl<B: Fn() -> u64> Gauges<B> {
     }
 }
 
-/// Starts the `sprawling-monitor` thread. It ends at the first beat
-/// after the monitor it was handed has been dropped.
+/// Starts the `sprawling-monitor` thread, at the beat the city at
+/// `volume` kept (`super::beat`, D44), and hands back that beat so a
+/// page can set it. The thread ends at the first beat after the monitor
+/// it was handed has been dropped.
 ///
 /// # Errors
 /// `StorageFatal` when the thread cannot be started.
@@ -74,11 +73,20 @@ pub(crate) fn spawn_sampler(
     samples: broadcast::Sender<Sample>,
     volume: std::path::PathBuf,
     mut gauges: Gauges<impl Fn() -> u64 + Send + 'static>,
-) -> Result<(), AxError> {
+) -> Result<Arc<Beat>, AxError> {
+    let beat = Arc::new(Beat::open(&volume));
+    let held = Arc::clone(&beat);
     std::thread::Builder::new()
         .name("sprawling-monitor".to_owned())
-        .spawn(move || sample_until_dropped(&monitor, &samples, volume, &mut gauges))
-        .map(drop)
+        .spawn(move || {
+            sample_until_dropped(
+                &monitor,
+                &samples,
+                &Measured { volume, beat: held },
+                &mut gauges,
+            )
+        })
+        .map(|_| beat)
         .map_err(|source| {
             AxError::failure(
                 AxCode::StorageFatal,
@@ -89,29 +97,40 @@ pub(crate) fn spawn_sampler(
         })
 }
 
+/// What the thread measures and how often: the city's volume and the
+/// beat a page sets, which travel together into the thread.
+struct Measured {
+    volume: std::path::PathBuf,
+    beat: Arc<Beat>,
+}
+
 fn sample_until_dropped(
     monitor: &Weak<Mutex<Monitor>>,
     samples: &broadcast::Sender<Sample>,
-    volume: std::path::PathBuf,
+    measured: &Measured,
     gauges: &mut Gauges<impl Fn() -> u64>,
 ) {
+    let Measured { volume, beat } = measured;
     let mut counters: Option<Counters> = None;
     loop {
-        std::thread::sleep(MEMORY_BEAT);
+        std::thread::sleep(beat.duration());
         (1..MEMORY_BEATS_PER_BEAT).for_each(|_| {
             if let Some(open) = counters.as_mut() {
                 open.note_private();
             }
-            std::thread::sleep(MEMORY_BEAT);
+            std::thread::sleep(beat.duration());
         });
         let Some(monitor) = monitor.upgrade() else {
             return;
         };
-        beat(&monitor, samples, |watched| {
-            gauges.sample(|| {
-                counters
+        let sampled_at = beat.now();
+        let elapsed = beat.duration().saturating_mul(MEMORY_BEATS_PER_BEAT);
+        self::beat(&monitor, samples, |watched| {
+            gauges.sample(|| Sample {
+                beat_ms: u64::from(sampled_at.ms()),
+                ..counters
                     .get_or_insert_with(|| Counters::open(volume.clone()))
-                    .read(watched, BEAT)
+                    .read(watched, elapsed)
             })
         });
         if !lock(&monitor).is_watched() {

@@ -99,6 +99,7 @@ pub use frames::wire_schema;
 pub use frames::{Answered, Ask, AskId, AskOutcome};
 pub use frames::{ClientFrame, Delta, LiveOutput, OutputStream, ServerFrame};
 pub use frames::{Hello, Query, Welcome};
+pub use frames::{BEAT_MAX_MS, BEAT_MIN_MS, BeatMs};
 pub use frames::{Lagged, LogLevel, LogLine, Monitoring, Sample, Watched};
 pub use frames::{QUERY_NAMES, WIRE_V, schema_hash};
 pub use guide::{GuideMark, GuideProgress, GuideState, GuideStep};

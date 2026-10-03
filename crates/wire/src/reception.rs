@@ -218,6 +218,8 @@ pub enum SessionStep {
     Watch(Watched),
     /// Stop counting this session and stop sending it readings.
     Release,
+    /// Sample the monitor at this beat, for every session of this city.
+    Beat(crate::BeatMs),
     /// Send this refusal; `close` ends the session afterwards.
     Refuse { error: Box<AxError>, close: bool },
 }
@@ -284,6 +286,9 @@ pub fn decide_frame(
             SessionStep::Watch(Watched::Summary)
         }
         (SessionState::Live, ClientFrame::Monitor(Monitoring::Release)) => SessionStep::Release,
+        (SessionState::Live, ClientFrame::Monitor(Monitoring::Beat(beat))) => {
+            SessionStep::Beat(beat)
+        }
         (SessionState::Live, ClientFrame::Hello(_)) => SessionStep::Refuse {
             error: Box::new(
                 AxError::failure(

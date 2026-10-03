@@ -11,6 +11,7 @@
 //! holds no memory. Where the counters come from is the caller's
 //! reading function; this module touches no platform interface.
 
+pub(crate) mod beat;
 pub(crate) mod counters;
 pub mod memory;
 pub(crate) mod sampler;
