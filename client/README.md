@@ -29,7 +29,7 @@ state of its own beyond the browser cache behind `core/prefs.ts`.
 bun install        # once
 bun run lint       # eslint, zero warnings allowed
 bun run typecheck  # svelte-check + the TS7 lane, both strict
-bun test --conditions=browser   # the logic next to what it judges
+bun run test [file...]          # the logic next to what it judges
 bun run build      # dist/ for build.rs to embed
 ```
 
