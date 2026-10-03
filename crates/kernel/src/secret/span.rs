@@ -129,6 +129,27 @@ mod tests {
     /// same text. The refusal names what was rejected, because a person
     /// holding a 422 has to see which realm or name the city would not
     /// take.
+    /// Every character of the reference alphabet is admitted on its own:
+    /// letters, digits, `-`, `_` and `.`, in either segment.
+    #[test]
+    fn every_character_of_the_alphabet_is_admitted() {
+        for (realm, name) in [
+            ("a", "b"),
+            ("7", "9"),
+            ("-", "-"),
+            ("_", "_"),
+            (".", "."),
+            ("my_realm.v2", "api-key_2.old"),
+        ] {
+            let built = SecretRef::new(realm, name).unwrap();
+            assert_eq!(
+                SecretRef::parse(&built.to_string()).unwrap(),
+                built,
+                "{realm}/{name}"
+            );
+        }
+    }
+
     #[test]
     fn secret_ref_grammar_is_fail_closed() {
         let ok = SecretRef::new("anthropic", "api-key").unwrap();
