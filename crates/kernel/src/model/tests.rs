@@ -236,3 +236,38 @@ fn a_cache_count_absent_from_a_row_reads_as_unreported_and_a_zero_stays_reported
         (None, unreported)
     );
 }
+
+/// A tail breakpoint sits on the last message and on no other, and an
+/// unmarked request carries none.
+#[test]
+fn a_tail_breakpoint_is_carried_by_the_last_message_alone() {
+    let said = |text: &str| ChatMessage {
+        role: Role::User,
+        content: vec![ContentBlock::Text {
+            text: text.to_owned(),
+        }],
+    };
+    let messages = vec![said("a"), said("b"), said("c")];
+    let ceiling = Ceiling::new(1024).unwrap();
+    let tail = ChatRequest {
+        messages: std::borrow::Cow::Borrowed(&messages),
+        breakpoint: MessageBreakpoint::Tail,
+        ..ChatRequest::empty("m", ceiling)
+    };
+    let unmarked = ChatRequest {
+        messages: std::borrow::Cow::Borrowed(&messages),
+        ..ChatRequest::empty("m", ceiling)
+    };
+    let carried = |request: &ChatRequest<'_>| -> Vec<bool> {
+        (0..=messages.len())
+            .map(|at| request.carries_breakpoint(at))
+            .collect()
+    };
+    assert_eq!(
+        (carried(&tail), carried(&unmarked)),
+        (
+            vec![false, false, true, false],
+            vec![false, false, false, false]
+        )
+    );
+}

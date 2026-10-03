@@ -318,6 +318,42 @@ mod conformance_self_test {
         assert!(outcome.is_err(), "the suite must bite a broken chain");
     }
 
+    /// A wave handed over at once answers positionally and leaves the
+    /// same log as its drafts appended one at a time: the default
+    /// `append_all` is that promise for a store with no batch of its own.
+    #[test]
+    fn a_wave_appended_at_once_is_the_log_of_its_drafts_one_by_one() {
+        let drafts: Vec<EventDraft> = [
+            crate::event::EventKind::CityInitialized,
+            crate::event::EventKind::RunStarted,
+            crate::event::EventKind::RunFrozen,
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(at, kind)| EventDraft {
+            run: crate::event::RunId::CITY,
+            t: crate::event::TimeMs::new(u64::try_from(at).unwrap()),
+            who: "city".to_owned(),
+            addr: None,
+            kind,
+            data: crate::event::Payload::empty(),
+            ig: false,
+        })
+        .collect();
+        let mut one_by_one = VecLedger::new();
+        let singly: Vec<EventRef> = drafts
+            .iter()
+            .map(|draft| one_by_one.append(draft.clone()).unwrap())
+            .collect();
+        let mut at_once = VecLedger::new();
+        let waved = at_once.append_all(drafts).unwrap();
+        assert_eq!(waved, singly);
+        assert_eq!(
+            at_once.raw_lines().unwrap(),
+            one_by_one.raw_lines().unwrap()
+        );
+    }
+
     #[test]
     fn suite_error_paths_use_invalid_args() {
         // Anchors the AxCode used when a draft cannot even serialize.
