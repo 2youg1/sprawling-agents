@@ -70,7 +70,7 @@ pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String>
 
 **理由**：页面只去 npm 查，而 crates.io 上也有发布（roadmap A10）；用 cargo 装的人照 npm 的命令更新，会装出第二份二进制。两边各自可能读不到，所以每个注册表各带自己的结果。
 
-每一行的读数是三臂的 `RegistryReading` 而不是 `Result`：「这一边还没有问」是第三种如实的答案，`Result` 说不出它，而 serde 给 `Result` 的 `Ok`／`Err` 外壳也不是线上其余各处的拼法。
+每一行的读数是两臂的 `RegistryReading` 而不是 `Result`：每个注册表都问，所以没有「还没有问」这一臂；serde 给 `Result` 的 `Ok`／`Err` 外壳不是线上其余各处的拼法。
 
 **被否**：①只问与安装方式对应的那一个注册表：源码构建的人看不到任何一边的最新版；②让页面按路径猜命令：一条领域规则抄进另一门语言。
 
