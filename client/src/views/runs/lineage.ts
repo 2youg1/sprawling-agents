@@ -54,7 +54,9 @@ export function boardRuns(runs: Readonly<Record<string, RunBelief>>): BoardRun[]
 // run that has ended, how it ended. A run somebody stopped and a run
 // that ran out of budget are not a run that finished, and drawing all
 // three with one check mark told a person their cancelled work was done.
-export type Phase = "model" | "tool" | "person" | "idle" | "done" | "stopped" | "capped";
+// `reply` is a run stopped at a synchronous `send` until another room
+// answers: live, because nobody but that room has to act.
+export type Phase = "model" | "tool" | "person" | "reply" | "idle" | "done" | "stopped" | "capped";
 
 export function phaseOf(doing: Doing): Phase {
   switch (doing.kind) {
@@ -64,6 +66,8 @@ export function phaseOf(doing: Doing): Phase {
       return "tool";
     case "waiting":
       return "person";
+    case "awaiting_reply":
+      return "reply";
     case "unknown":
       return "idle";
     case "frozen":

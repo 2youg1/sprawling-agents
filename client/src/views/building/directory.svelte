@@ -120,6 +120,8 @@
         return say($lang, "run_doing_calling");
       case "waiting":
         return say($lang, "talk_waiting_you");
+      case "awaiting_reply":
+        return say($lang, "run_doing_awaiting_reply");
       // A phase this page was never told: the run is working and the
       // page cannot say at what, which is what the one word states.
       case "unknown":

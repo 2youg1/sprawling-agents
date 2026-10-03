@@ -213,6 +213,8 @@
           : callWord(doing.tool, doing.subject);
       case "waiting":
         return say($lang, "talk_waiting_you");
+      case "awaiting_reply":
+        return say($lang, "run_doing_awaiting_reply");
       case "unknown":
         return say($lang, "city_at_work");
       case "frozen":

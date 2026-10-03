@@ -68,6 +68,7 @@ export function outcomeOf(run: RunBelief): Outcome | null {
     case "unknown":
     case "thinking":
     case "calling":
+    case "awaiting_reply":
       return null;
   }
 }

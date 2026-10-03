@@ -15,7 +15,7 @@
 // `thinking` answered that question wrongly for every run stopped at
 // an approval.
 
-import type { EventKind } from "../wire";
+import type { EventKind, ReplyEnd, Waiting } from "../wire";
 import type { Key } from "./lang";
 
 export type Doing =
@@ -29,6 +29,11 @@ export type Doing =
   // record's payload, which an answer does not carry.
   | { readonly kind: "calling"; readonly tool: string | null; readonly subject: string | null }
   | { readonly kind: "waiting" }
+  // Stopped at a synchronous `send` until the room it wrote to answers
+  // or the deadline passes. The shape is the wire's own `Waiting`, the
+  // one `RunSummary.waiting` carries, so the stream and the answer hand
+  // the page the same value (client/Spec.lean D88).
+  | { readonly kind: "awaiting_reply"; readonly wait: Waiting }
   | { readonly kind: "frozen"; readonly completion: string | null };
 
 // Where a message typed right now will land.
@@ -54,14 +59,36 @@ export function sendingInto(doing: Doing | undefined): Sending {
     // phase this page has not been told is not a promise that the words
     // land at a boundary either - so all three go as a queued steer,
     // the spelling that promises a person least.
+    // A run waiting for a reply is inside the `send` call itself, so it
+    // is the same case as `calling`.
     case "unknown":
     case "calling":
     case "waiting":
+    case "awaiting_reply":
       return "queued";
   }
 }
 
-// The six kinds whose record states what the run is doing. A list, so
+// Where the end of a reply wait leaves a run. Only a run still waiting
+// moves: a `run_frozen` folded first has already said more than the
+// ending can. A reply or a timeout hands the run back to its model at
+// the safe point; a run that left its room is told nothing yet, and the
+// `run_frozen` that follows says how it ended.
+export function afterWait(doing: Doing, end: ReplyEnd): Doing {
+  if (doing.kind !== "awaiting_reply") return doing;
+  switch (end) {
+    case "reply":
+    case "timeout":
+      return { kind: "thinking" };
+    case "left":
+      return { kind: "unknown" };
+  }
+}
+
+// The six kinds whose record alone states what the run is doing. The
+// reply wait's two kinds are not here: they state a phase only with the
+// room their payload names, which `belief/fold.ts` reads, and an answer
+// carries the same fact as `RunSummary.waiting`. A list, so
 // that the type below is read off it: a kind named here is a member of
 // `Moving`, and the switch in `PHASES` cannot be left part-done without
 // the build refusing.
@@ -102,5 +129,6 @@ export const POSTURE_WORD: Record<Doing["kind"], Key> = {
   thinking: "run_doing_thinking",
   calling: "run_doing_calling",
   waiting: "run_doing_waiting",
+  awaiting_reply: "run_doing_awaiting_reply",
   frozen: "run_doing_frozen",
 };

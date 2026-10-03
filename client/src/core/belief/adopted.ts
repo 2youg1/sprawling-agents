@@ -16,6 +16,20 @@ function frozen(summary: RunSummary, held: RunBelief | undefined): Doing {
   return held?.doing.kind === "frozen" ? held.doing : PHASES.run_frozen;
 }
 
+// What an answer says a run still going is doing. A wait it names comes
+// first, because the city folded it from the payload the last kind
+// alone cannot carry; then the phase the last kind states; then what
+// the page knew - except a wait, which the newer answer has just said
+// is over, and which it does not replace with anything it could state
+// (client/Spec.lean D88).
+function going(summary: RunSummary, held: RunBelief | undefined): Doing {
+  const wait = summary.waiting ?? null;
+  if (wait !== null) return { kind: "awaiting_reply", wait };
+  if (moves(summary.last_kind)) return PHASES[summary.last_kind];
+  const known = held?.doing ?? { kind: "unknown" };
+  return known.kind === "awaiting_reply" ? { kind: "unknown" } : known;
+}
+
 // One `city_view` row read as a belief, keeping whatever the stream
 // already knew that the row does not carry. The run page reads it too:
 // a run reached by somebody's link was never streamed here, so the
@@ -37,11 +51,9 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
       local: false,
     };
   }
-  // The answer is the newer reading. Its `last_kind` states the phase
-  // where the kind does; a kind that states none leaves what the page
-  // already knew in place, and a run this page never saw keeps the one
-  // thing it knows, which is that the run exists.
-  const stated = moves(summary.last_kind) ? PHASES[summary.last_kind] : undefined;
+  // The answer is the newer reading, and `going` says what it states
+  // about a run that has not frozen; a run this page never saw keeps the
+  // one thing it knows, which is that the run exists.
   return {
     run: summary.run,
     addr: summary.addr ?? held?.addr ?? null,
@@ -49,7 +61,7 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
     task: summary.task ?? held?.task ?? null,
     goal: summary.goal ?? held?.goal ?? null,
     lastSeq: summary.last_seq,
-    doing: summary.frozen ? frozen(summary, held) : (stated ?? held?.doing ?? { kind: "unknown" }),
+    doing: summary.frozen ? frozen(summary, held) : going(summary, held),
     model: held?.model ?? null,
     pr: summary.pr ?? held?.pr ?? null,
     ask: summary.ask ?? null,

@@ -5,7 +5,11 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { sendingInto, type Doing } from "./doing";
+import { afterWait, sendingInto, type Doing } from "./doing";
+import { Address, TimeMs } from "../wire";
+import type { ReplyEnd } from "../wire";
+
+const AWAITING: Doing = { kind: "awaiting_reply", wait: { on: Address.make("lab/west"), until: TimeMs.make(60_000) } };
 
 describe("sending", () => {
   // The defect this pins is one of wording, and it is the one a
@@ -17,6 +21,8 @@ describe("sending", () => {
     const calling: Doing = { kind: "calling", tool: "exec", subject: "just check" };
     expect(sendingInto(calling)).toBe("queued");
     expect(sendingInto({ kind: "waiting" })).toBe("queued");
+    // Waiting for a reply is waiting inside the `send` call.
+    expect(sendingInto(AWAITING)).toBe("queued");
   });
 
   test("a run between calls hears a steer at the next boundary", () => {
@@ -36,5 +42,26 @@ describe("sending", () => {
     expect(sendingInto(undefined)).toBe("dispatch");
     expect(sendingInto({ kind: "frozen", completion: "done" })).toBe("dispatch");
     expect(sendingInto({ kind: "frozen", completion: null })).toBe("dispatch");
+  });
+});
+
+// client/Spec.lean D88: every ending leaves the posture, and only a run
+// still waiting is moved by one.
+describe("the end of a reply wait", () => {
+  test("a reply or a timeout hands the run back to its model, a run that left is told nothing yet", () => {
+    const ends: readonly ReplyEnd[] = ["reply", "timeout", "left"];
+    expect(ends.map((end) => afterWait(AWAITING, end))).toEqual([
+      { kind: "thinking" },
+      { kind: "thinking" },
+      { kind: "unknown" },
+    ]);
+  });
+
+  // The defect this pins: a `run_frozen` folded before the ending would
+  // be read back to thinking, and a finished run would look alive.
+  test("an ending leaves a run that is no longer waiting where it is", () => {
+    const frozen: Doing = { kind: "frozen", completion: "cancelled" };
+    expect(afterWait(frozen, "left")).toEqual(frozen);
+    expect(afterWait({ kind: "calling", tool: "read", subject: null }, "reply")).toEqual({ kind: "calling", tool: "read", subject: null });
   });
 });

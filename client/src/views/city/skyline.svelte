@@ -142,9 +142,11 @@
         return "fill-accent-solid blink";
       case "thinking":
         return "fill-accent-solid";
-      // A live run whose phase this page was never told: the window is
-      // lit, without the blink that says a model is thinking.
+      // A live run whose phase this page was never told, or one waiting
+      // for another room's reply: the window is lit, without the blink
+      // that says a model is thinking.
       case "unknown":
+      case "awaiting_reply":
         return "fill-accent-solid";
     }
   }

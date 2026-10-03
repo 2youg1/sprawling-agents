@@ -29,8 +29,8 @@
 import { Option, Schema } from "effect";
 
 import { scopeOf } from "./scope";
-import { RunPolicy } from "../wire";
-import type { EventRecord, HaltScope, Seq, TimeMs } from "../wire";
+import { RunPolicy, Waiting } from "../wire";
+import type { EventRecord, HaltScope, ReplyEnd, Seq, TimeMs } from "../wire";
 
 // One field of a payload, with the name that field is known by when this
 // build cannot read it. `at` is null when it could.
@@ -151,6 +151,31 @@ export function askOf(record: EventRecord): [string | null, string | null] {
 export function branchOf(record: EventRecord): [string | null, string | null] {
   const held = required(record, "branch");
   return [held.value, first(held)];
+}
+
+// `SignalWaitStarted::on` and `deadline_ms`, read as the wire's own
+// `Waiting`: the deadline is a reading of the city's injected clock in
+// epoch milliseconds, so it is already the wall-clock instant
+// `RunSummary.waiting.until` carries (wire D34). A record either key of
+// which this build cannot read names the first one that failed.
+export function waitOf(record: EventRecord): [Waiting | null, string | null] {
+  const read = Schema.decodeUnknownOption(Waiting)({ on: record.data.on, until: record.data.deadline_ms });
+  if (Option.isSome(read)) return [read.value, null];
+  const on = Schema.decodeUnknownOption(Waiting.fields.on)(record.data.on);
+  return [null, where(record, Option.isSome(on) ? "deadline_ms" : "on")];
+}
+
+// The three words `kernel::event::record::WaitEnd` tags its arms with.
+// Closed: a fourth is a wire this build was not taught, and a caller
+// must then leave the run where it was.
+const WAIT_ENDS: readonly ReplyEnd[] = ["reply", "timeout", "left"];
+
+// `SignalWaitEnded::by`, an object tagged by `end`.
+export function waitEndOf(record: EventRecord): [ReplyEnd | null, string | null] {
+  const by = record.data.by;
+  const tag = typeof by === "object" && by !== null && "end" in by ? by.end : undefined;
+  const found = WAIT_ENDS.find((word) => word === tag);
+  return found === undefined ? [null, where(record, "by.end")] : [found, null];
 }
 
 // The two words `kernel::event::record::Admittance` spells. Closed on

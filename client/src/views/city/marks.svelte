@@ -66,6 +66,8 @@
         return say($lang, "run_doing_calling");
       case "waiting":
         return say($lang, "run_doing_waiting");
+      case "awaiting_reply":
+        return say($lang, "run_doing_awaiting_reply");
       case "frozen":
         return say($lang, "run_doing_frozen");
     }

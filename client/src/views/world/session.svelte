@@ -76,6 +76,7 @@
       case "unknown":
       case "thinking":
       case "calling":
+      case "awaiting_reply":
         return "running";
     }
   });

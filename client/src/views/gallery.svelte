@@ -75,6 +75,7 @@
   import Thr from "./gallery/thr.svelte";
   import AgentMessages from "./gallery/agent_messages.svelte";
   import AgentLetters from "./gallery/agent_letters.svelte";
+  import AgentWaits from "./gallery/agent_waits.svelte";
   import Tables from "./gallery/tables.svelte";
   import Monitored from "./gallery/monitored.svelte";
   import Timed from "./gallery/timed.svelte";
@@ -120,6 +121,7 @@
   <Thr />
   <AgentMessages />
   <AgentLetters />
+  <AgentWaits />
   <G1 />
   <Folded />
   <Followed />

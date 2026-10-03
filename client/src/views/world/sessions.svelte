@@ -40,6 +40,7 @@
   import ContextBar from "./context_bar.svelte";
   import { called, dispatcherOf } from "../talk/naming";
   import { ticker } from "../talk/timing";
+  import { phaseSaid } from "../runs/phase";
   import SessionMenu from "./session_menu.svelte";
   import { askStretches } from "./stretches.svelte";
 
@@ -78,6 +79,7 @@
       case "unknown":
       case "thinking":
       case "calling":
+      case "awaiting_reply":
         return "run";
     }
   }
@@ -247,6 +249,9 @@
               </span>
               {#if !narrow}
                 <span class="figure text-note text-text-faint">{when(stretch, state)}</span>
+                {#if state === "run" && last?.doing.kind === "awaiting_reply"}
+                  <span class="col-start-2 col-end-4 truncate text-note text-text-quiet">{phaseSaid($lang, last.doing, $tick)}</span>
+                {/if}
                 {#if delegatedBy(stretch) !== ""}
                   <span class="col-start-2 col-end-4 truncate text-note text-text-faint">{delegatedBy(stretch)}</span>
                 {/if}

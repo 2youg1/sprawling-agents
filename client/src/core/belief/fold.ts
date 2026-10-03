@@ -7,8 +7,8 @@
 // `belief.ts` decides which run a record belongs to and whether it is
 // new; this decides what the record does to that run.
 
-import { PHASES } from "../doing";
-import { askOf, branchOf, completionOf, modelOf, openingOf, toolCall } from "../reading";
+import { PHASES, afterWait } from "../doing";
+import { askOf, branchOf, completionOf, modelOf, openingOf, toolCall, waitEndOf, waitOf } from "../reading";
 
 import type { EventRecord, RunId, Seq } from "../../wire";
 
@@ -75,6 +75,16 @@ export function fold(held: RunBelief, record: EventRecord): [RunBelief, string |
       const [ask, bad] = askOf(record);
       return [{ ...moved, doing: PHASES.approval_requested, ask }, bad];
     }
+    // A reply wait states a phase only with the room it names; a payload
+    // this build cannot read leaves the run where it was.
+    case "signal_wait_started": {
+      const [wait, bad] = waitOf(record);
+      return [wait === null ? moved : { ...moved, doing: { kind: "awaiting_reply", wait } }, bad];
+    }
+    case "signal_wait_ended": {
+      const [end, bad] = waitEndOf(record);
+      return [end === null ? moved : { ...moved, doing: afterWait(held.doing, end) }, bad];
+    }
     case "pr_opened": {
       const [pr, bad] = branchOf(record);
       return [{ ...moved, pr }, bad];
@@ -128,7 +138,7 @@ export function fold(held: RunBelief, record: EventRecord): [RunBelief, string |
     case "document_written": case "proposal_offered": case "proposal_decided":
     case "proposal_withdrawn":
     case "session_named": case "run_policy_changed": case "skill_audited":
-    case "signal_wait_started": case "signal_wait_ended": case "signal_landed":
+    case "signal_landed":
       return [moved, null];
   }
 }

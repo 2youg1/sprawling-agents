@@ -12,8 +12,9 @@
   // names the room, the phase in its mark and word, how long the run has
   // gone, and its task; it is a link to that room's conversation. The
   // newest room first, the order a person who just dispatched looks in.
+  // A run waiting for a reply says which room it waits on and how long
+  // is left, on the same clock as its age (client/Spec.lean D88).
   import type { RunBelief } from "../../core/belief";
-  import { say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { lasted } from "../../core/time";
   import { ui } from "../../ui";
@@ -21,7 +22,7 @@
   import Glyph from "../parts/glyph.svelte";
   import type { Weight } from "../parts/glyph";
   import { phaseOf } from "../runs/lineage";
-  import { PHASE_MARK, PHASE_WORD } from "../runs/phase";
+  import { PHASE_MARK, phaseSaid } from "../runs/phase";
   import Section from "./section.svelte";
   import { ticker } from "../talk/timing";
 
@@ -70,7 +71,7 @@
           <Glyph name={mark.glyph} size="sm" class={INK[mark.weight]} />
           <span class="min-w-0 truncate font-label">{room}</span>
           <span class="figure text-note text-text-faint">
-            {say($lang, PHASE_WORD[phase])} · {run.started === null ? "" : lasted($tick - run.started)}
+            {phaseSaid($lang, run.doing, $tick)} · {run.started === null ? "" : lasted($tick - run.started)}
           </span>
           <kbd class="entry-n" aria-hidden="true"></kbd>
           {#if run.task !== null}

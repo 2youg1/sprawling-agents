@@ -7094,5 +7094,17 @@
   "signal_kind_steer": {
     "en": "steer",
     "zh": "插话"
+  },
+  "run_doing_awaiting_reply": {
+    "en": "waiting for a reply",
+    "zh": "在等回信"
+  },
+  "run_awaiting_reply_left": {
+    "en": "waiting for {room}, {left} left",
+    "zh": "在等 {room} 回信，还剩 {left}"
+  },
+  "run_awaiting_reply_due": {
+    "en": "waiting for {room}, past its deadline",
+    "zh": "在等 {room} 回信，已过时限"
   }
 }

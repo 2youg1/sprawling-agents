@@ -43,7 +43,7 @@
   import { FOLDS, along } from "./fold";
   import type { Row } from "./lineage";
   import { phaseOf, rowsOf, viewOf, windowOf } from "./lineage";
-  import { PHASES, PHASE_FILL as FILL, PHASE_MARK as MARK, PHASE_WORD as WORD } from "./phase";
+  import { PHASES, PHASE_FILL as FILL, PHASE_MARK as MARK, PHASE_WORD as WORD, phaseSaid } from "./phase";
 
   const { runs, now, level = 1 }: RunsBoardProps = $props();
   const u = ui();
@@ -251,7 +251,7 @@
           <Glyph name={look.glyph} size="sm" class={["shrink-0", INK[look.weight]]} />
           <span class="hidden shrink-0 font-mono text-text-quiet @lg/page:inline">{row.run.run.slice(0, 8)}</span>
           <span class="min-w-0 flex-1 truncate text-text">{titleOf(row.run)}</span>
-          <span class={["hidden shrink-0 text-note @lg/page:inline", INK[look.weight]]}>{say($lang, WORD[phase])}</span>
+          <span class={["hidden max-w-[30%] shrink-0 truncate text-note @lg/page:inline", INK[look.weight]]}>{phaseSaid($lang, row.run.doing, now)}</span>
           <span class="relative h-snug w-[40%] shrink-0" aria-hidden="true">
             <span class="absolute inset-y-0 rounded-pill bg-edge" style:left={span.left} style:width={span.width}></span>
             <span class={["absolute inset-y-0 w-snug rounded-pill", FILL[phase]]} style:left="clamp(0px, calc({span.left} + {span.width} - var(--spacing-snug)), calc(100% - var(--spacing-snug)))"></span>
