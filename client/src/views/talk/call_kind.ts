@@ -19,6 +19,12 @@
 import type { Key } from "../../core/lang";
 import type { Call } from "../../wire";
 
+// What the subject cell of a line says. A send and a delegation read
+// their own arguments (client D85); every other call reads its subject.
+export type CallLine =
+  | { readonly kind: "subject"; readonly subject: string }
+  | { readonly kind: "worded"; readonly word: Key; readonly fills: Readonly<Record<string, string>> };
+
 export type CallKind = { readonly kind: "registered"; readonly word: Key } | { readonly kind: "unregistered"; readonly tool: string };
 
 export function kindOf(call: Call): CallKind {
@@ -38,4 +44,12 @@ export function kindOf(call: Call): CallKind {
   // A boundary the kernel adds fails to compile here until it has a word.
   const unnamed: never = effect;
   return unnamed;
+}
+
+export function lineOf(call: Call): CallLine {
+  return { kind: "subject", subject: call.subject ?? "" };
+}
+
+export function outcomeOf(_call: Call): Key | null {
+  return null;
 }

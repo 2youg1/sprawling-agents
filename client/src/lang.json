@@ -6974,5 +6974,37 @@
   "world_cache_unknown": {
     "en": "unknown: the provider did not report its cache",
     "zh": "未知：provider 没有报告缓存"
+  },
+  "talk_kind_send": {
+    "en": "send",
+    "zh": "send"
+  },
+  "talk_kind_pull": {
+    "en": "pull",
+    "zh": "pull"
+  },
+  "talk_kind_delegate": {
+    "en": "delegate",
+    "zh": "delegate"
+  },
+  "talk_send_line": {
+    "en": "to {to}: {text}",
+    "zh": "给 {to}：{text}"
+  },
+  "talk_delegate_line": {
+    "en": "to {room}: {task}",
+    "zh": "交给 {room}：{task}"
+  },
+  "talk_send_sent": {
+    "en": "sent",
+    "zh": "已发出"
+  },
+  "talk_send_waiting": {
+    "en": "awaiting reply",
+    "zh": "等回信"
+  },
+  "talk_delegate_starts": {
+    "en": "starts after this turn",
+    "zh": "本回合后开始"
   }
 }
