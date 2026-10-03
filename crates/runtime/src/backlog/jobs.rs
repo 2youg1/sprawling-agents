@@ -99,7 +99,7 @@ impl Backlog {
     /// Enters a member into the table, and a command into its run's job.
     pub(super) fn enrol(&self, id: BacklogId, member: Member) -> Result<(), AxError> {
         let mut table = self.hold()?;
-        table.jobs.enter(&member);
+        table.jobs.enter(&member, self.shares);
         table.members.insert(id, member);
         Ok(())
     }
@@ -116,7 +116,7 @@ impl Jobs {
     pub(super) fn forget(&mut self, _owner: RunId) {}
 
     #[cfg(windows)]
-    fn enter(&mut self, member: &Member) {
+    fn enter(&mut self, member: &Member, shares: Shares) {
         let Body::Command {
             child,
             claim: Claim::Window(owner) | Claim::Run(owner),
@@ -126,13 +126,13 @@ impl Jobs {
             return;
         };
         let run = self.runs.entry(*owner).or_default();
-        if run.join(child).is_none() {
+        if run.join(child, shares).is_none() {
             run.unjoined = run.unjoined.saturating_add(1);
         }
     }
 
     #[cfg(not(windows))]
-    fn enter(&mut self, _member: &Member) {}
+    fn enter(&mut self, _member: &Member, _shares: Shares) {}
 
     #[cfg(windows)]
     fn follow(&self, readings: &mut BTreeMap<RunId, RunProcesses>) {
@@ -176,26 +176,49 @@ struct RunJob {
 
 #[cfg(windows)]
 impl RunJob {
-    /// Puts `child` into this run's job, creating the job on first use.
-    /// `None` when the job cannot be made or the process cannot join it.
-    fn join(&mut self, child: &std::process::Child) -> Option<()> {
+    /// Puts `child` into this run's job, creating the job on first use
+    /// with the shares asked for. `None` when the job cannot be made or
+    /// the process cannot join it.
+    fn join(&mut self, child: &std::process::Child, shares: Shares) -> Option<()> {
         use std::os::windows::io::AsRawHandle;
         let handle = isize::try_from(child.as_raw_handle().addr()).ok()?;
         let job = match self.job.take() {
             Some(job) => job,
             None => {
                 let job = win32job::Job::create().ok()?;
-                // A job that refuses the weight still follows the run's
-                // processes; the run is read as unshared (D29).
-                self.share = match desktop_ffi::cpu::job_share(job.handle(), RUN_CPU_WEIGHT, 0) {
-                    Ok(()) => Shares::Cpu,
-                    Err(_refused) => Shares::Unset,
-                };
+                self.share = given(&job, shares);
                 job
             }
         };
         let joined = job.assign_process(handle).ok();
         self.job = Some(job);
         joined
+    }
+}
+
+/// The shares `job` takes of those `asked`. A job that refuses them still
+/// follows the run's processes, and the run is read as unshared; a limit
+/// past this process's address space limits nothing, so the job takes
+/// the weight alone (D29).
+#[cfg(windows)]
+fn given(job: &win32job::Job, asked: Shares) -> Shares {
+    let memory = match asked {
+        Shares::Unset => return Shares::Unset,
+        Shares::Cpu => 0,
+        Shares::CpuAndMemory { limit } => match usize::try_from(limit.get()) {
+            Ok(bytes) => bytes,
+            Err(_beyond) => return weigh(job, 0, Shares::Cpu),
+        },
+    };
+    weigh(job, memory, asked)
+}
+
+/// Sets the run weight and `memory` (none when zero) on `job`: `held`
+/// when the platform takes them, `Unset` when it refuses.
+#[cfg(windows)]
+fn weigh(job: &win32job::Job, memory: usize, held: Shares) -> Shares {
+    match desktop_ffi::cpu::job_share(job.handle(), RUN_CPU_WEIGHT, memory) {
+        Ok(()) => held,
+        Err(_refused) => Shares::Unset,
     }
 }

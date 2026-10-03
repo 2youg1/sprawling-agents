@@ -10,16 +10,20 @@
 //! core is busy (`crates/sprawling/spec/Serving/Placement.lean`, D41 and
 //! D45-D47). The seats are the plan `plan` makes of the topology
 //! `reading` reports; `tests` checks this table against the seat model.
+//! This module is also the one place that decides what each arm of the
+//! person's `[core] placement` turns on (D47), the runs' shares included.
 
 pub(crate) mod plan;
 pub(crate) mod reading;
 
+use std::num::NonZeroU64;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Mutex, OnceLock, PoisonError};
 
 use accounting::person::CorePlacement;
 use plan::{Left, Plan, Processor, Shape, Topology};
 use reading::Unread;
+use runtime::Shares;
 
 /// Who holds a seat: one per hot thread for as long as it lives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -136,14 +140,48 @@ fn first_table() -> SeatTable {
     }
 }
 
-/// The person's `[core] placement`. A setting that does not read is told
-/// on stderr once, here, and placement stays on (D47).
+/// The person's `[core] placement`, read once for the process. A setting
+/// that does not read is told on stderr once, here, and placement stays
+/// on (D47).
 fn setting() -> CorePlacement {
-    accounting::person::core_placement().unwrap_or_else(|err| {
-        eprintln!("CPU placement stays on: {err}");
-        CorePlacement::Soft
+    static ARM: OnceLock<CorePlacement> = OnceLock::new();
+    *ARM.get_or_init(|| {
+        accounting::person::core_placement().unwrap_or_else(|err| {
+            eprintln!("CPU placement stays on: {err}");
+            CorePlacement::Soft
+        })
     })
 }
+
+/// The shares each run's commands ask for under the person's arm (D47),
+/// handed to the runtime through `Hands`.
+pub(crate) fn run_shares() -> Shares {
+    shares_of(setting(), crate::monitor::memory::read().physical)
+}
+
+/// What one arm asks for each run: nothing with placement off, an even
+/// CPU share by default, and with `"soft_shares"` a memory limit of half
+/// the physical memory as well. A physical memory read as zero leaves the
+/// limit out, and says so on stderr.
+fn shares_of(arm: CorePlacement, physical: u64) -> Shares {
+    match arm {
+        CorePlacement::Off => Shares::Unset,
+        CorePlacement::Soft => Shares::Cpu,
+        CorePlacement::SoftShares => match NonZeroU64::new(physical / RUN_MEMORY_PARTS) {
+            Some(limit) => Shares::CpuAndMemory { limit },
+            None => {
+                eprintln!(
+                    "each run keeps no memory limit: this machine's memory reads as {physical} bytes"
+                );
+                Shares::Cpu
+            }
+        },
+    }
+}
+
+/// A run under `"soft_shares"` may commit one part in this many of the
+/// physical memory (`crates/runtime/spec/Tools/Exec.lean` D29).
+const RUN_MEMORY_PARTS: u64 = 2;
 
 fn soft_table() -> SeatTable {
     if let Err(reason) = full_speed() {
@@ -160,21 +198,64 @@ fn soft_table() -> SeatTable {
     SeatTable::new(seats)
 }
 
-/// The doctor's line: the topology this machine reports and what the
-/// plan does with it, in the User's words (D47).
+/// The doctor's line: the topology this machine reports, what the plan
+/// does with it, and what each run's commands share, in the User's words
+/// (D47).
 pub(crate) fn report() -> String {
-    match accounting::person::core_placement() {
-        Ok(CorePlacement::Off) => {
+    let (arm, unread) = match accounting::person::core_placement() {
+        Ok(arm) => (arm, String::new()),
+        Err(err) => (
+            CorePlacement::Soft,
+            format!(" ([core] placement does not read, so placement stays on: {err})"),
+        ),
+    };
+    let threads = match arm {
+        CorePlacement::Off => {
             "CPU: placement is off ([core] placement = \"none\"); the operating system places every thread"
                 .to_owned()
         }
-        Ok(CorePlacement::Soft | CorePlacement::SoftShares) => describe(&reading::read()),
-        Err(err) => format!(
-            "{} ([core] placement does not read, so placement stays on: {err})",
-            describe(&reading::read())
+        CorePlacement::Soft | CorePlacement::SoftShares => describe(&reading::read()),
+    };
+    let runs = runs_share(shares_of(arm, crate::monitor::memory::read().physical));
+    format!("{threads}; {runs}{unread}")
+}
+
+/// What each run's commands share on this platform, given what the arm
+/// asks for: Windows sets both halves on the run's job, macOS has the
+/// CPU half alone (`taskpolicy`), and Linux sets neither yet (D29).
+fn runs_share(asked: Shares) -> String {
+    const ALONE: &str = "runs' commands compete thread by thread";
+    match (asked, PLATFORM_SHARES) {
+        (Shares::Unset, _) | (_, PlatformShares::None) => ALONE.to_owned(),
+        (Shares::Cpu, PlatformShares::Cpu | PlatformShares::CpuAndMemory) => {
+            "each run's commands share the processors evenly".to_owned()
+        }
+        (Shares::CpuAndMemory { .. }, PlatformShares::Cpu) => {
+            "each run's commands share the processors evenly; this platform sets no memory limit"
+                .to_owned()
+        }
+        (Shares::CpuAndMemory { limit }, PlatformShares::CpuAndMemory) => format!(
+            "each run's commands share the processors evenly and commit at most {} MiB",
+            limit.get() / (1 << 20)
         ),
     }
 }
+
+/// Which halves of a run's shares this platform can set (D29).
+#[derive(Debug, Clone, Copy)]
+enum PlatformShares {
+    None,
+    Cpu,
+    CpuAndMemory,
+}
+
+const PLATFORM_SHARES: PlatformShares = if cfg!(windows) {
+    PlatformShares::CpuAndMemory
+} else if cfg!(target_os = "macos") {
+    PlatformShares::Cpu
+} else {
+    PlatformShares::None
+};
 
 /// [`report`] for a reading already made.
 pub(crate) fn describe(read: &Result<Topology, Unread>) -> String {

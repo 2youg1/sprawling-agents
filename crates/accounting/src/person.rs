@@ -161,15 +161,16 @@ pub enum CorePlacement {
     SoftShares,
 }
 
-/// How the core places its hot threads: `placement` in the `[core]`
-/// section, `"soft"` when absent and `"none"` to turn placement off
+/// Which arm of CPU placement the core takes: `placement` in the
+/// `[core]` section, `"soft"` when absent, `"soft_shares"` to hold each
+/// run to a memory limit as well, `"none"` to turn placement off
 /// (`crates/sprawling/spec/Serving/Placement.lean` D47).
 ///
 /// # Errors
 ///
 /// As [`read`] for a file that cannot be read or parsed, and
-/// `ConfigInvalid` for a `placement` that is neither `"soft"` nor
-/// `"none"`, including the two comparison arms not yet built.
+/// `ConfigInvalid` for a `placement` that is none of those three,
+/// including the comparison arm `"pinned"`, not yet built.
 pub fn core_placement() -> Result<CorePlacement, AxError> {
     stated_core_placement(&file()?)
 }
@@ -182,6 +183,7 @@ fn stated_core_placement(file: &Path) -> Result<CorePlacement, AxError> {
         None => Ok(CorePlacement::Soft),
         Some(stated) => match stated.as_str() {
             Some("soft") => Ok(CorePlacement::Soft),
+            Some("soft_shares") => Ok(CorePlacement::SoftShares),
             Some("none") => Ok(CorePlacement::Off),
             Some(_) | None => Err(AxError::failure(
                 AxCode::ConfigInvalid,
@@ -189,7 +191,7 @@ fn stated_core_placement(file: &Path) -> Result<CorePlacement, AxError> {
                 format!("{}: [{CORE}] {PLACEMENT} = {stated}", file.display()),
             )
             .with_recovery(
-                "write placement = \"soft\" or placement = \"none\" under [core], or delete the line",
+                "write placement = \"soft\", \"soft_shares\" or \"none\" under [core], or delete the line",
             )),
         },
     }

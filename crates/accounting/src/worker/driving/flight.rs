@@ -92,11 +92,13 @@ impl Flight {
     /// before it starts a run (`crates/sprawling/Spec.lean` §8-46-3).
     /// `monotonic` is the clock every wait the crossing records is read
     /// off (`crates/sprawling/spec/Accounting/Worker.lean` §8-98).
-    /// `seat_lane` is called at the top of every lane.
+    /// `seat_lane` is called at the top of every lane, and `shares` is
+    /// what the backlog asks for each run's commands.
     pub(in crate::worker) fn open(
         read_memory: fn() -> crate::worker::pool::Memory,
         monotonic: fn() -> std::time::Instant,
         seat_lane: crate::worker::hands::SeatLane,
+        shares: runtime::Shares,
     ) -> Flight {
         let gate = RelayGate::open(monotonic);
         let lanes = crate::worker::pool::LaneHands {
@@ -109,7 +111,7 @@ impl Flight {
             gate,
             driving: BTreeMap::new(),
             homes: VecDeque::new(),
-            backlog: runtime::Backlog::new(),
+            backlog: runtime::Backlog::new().with_shares(shares),
         }
     }
 
