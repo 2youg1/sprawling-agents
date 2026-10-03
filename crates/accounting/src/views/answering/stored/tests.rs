@@ -78,6 +78,7 @@ fn bytes_the_store_does_not_hold_are_unavailable() {
         bytes(&mut views, version, 0),
         wire::Answer::Unavailable {
             query: format!("Bytes({version})"),
+            reason: None,
         }
     );
 }
@@ -126,6 +127,7 @@ fn a_kept_markdown_version_exports_as_one_page() {
         }),
         wire::Answer::Unavailable {
             query: format!("Export({missing})"),
+            reason: None,
         }
     );
 }

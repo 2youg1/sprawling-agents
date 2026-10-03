@@ -149,7 +149,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 **`ApprovalsAnswer.items` 携 `kernel::ApprovalItem` 全项，不另设摘要类型。** 摘要会丢掉 `cluster_key` 与 `created`，于是界面无法按类聚合、也排不出「谁等得最久」，服务端为了填它还要从事件载荷里猜一个从来没被写过的字段。载荷本身就是 `ApprovalItem` 的序列化，原样送过去既少一次有损转换，也让「什么算一类」只由客户端读 `cluster_key` 这一处回答。
 
 - **为什么是强类型答面而不是一团 `Payload`**：客户端读帧的词汇是 `client/src/wire.ts`，由 `cargo xtask wire-ts` 从本 crate 的 schema 生成，故发帧的边界 crate 欠对方一套有类型的读帧词汇（同 kernel 再导出的理由）。一个无类型载荷会把解析责任推给每一个视图模块，每一个都得自己猜一遍形状。
-- **`Answer::Unavailable { query }` 是一个真答案**：不求值的视图报自己的名字，而不是返回空结果——空城与未实现在界面上必须长得不一样。
+- **`Answer::Unavailable { query, reason }` 是一个真答案**：不求值的视图报自己的名字，而不是返回空结果——空城与未实现在界面上必须长得不一样。看了却没看成的视图在 `reason` 里说出没看成的原因（D47）；`reason` 缺席时视图只报名字：这份构建不求值这个查询，或这个读面还没有说出原因。
 - **`CityAnswer.buildings: Vec<BuildingProgress>`**：每栋楼一行，携 `Progress` 与 `problems`。解析不出的行进 `problems` 并照显——悄悄丢掉读不懂的行，等于按一个没人选过的分母报进度。
 - **五维成本携权威总额**：`CostAnswer.total` 与 actor、segment、tool、skill 四个维度各自求和相等；`by_run` 只带活跃的跑与花得最多的前几个（`crates/sprawling/Spec.lean` §8-90），和可以小于 `total`。界面按 `total` 算占比而不自己归一，未归因余额与列表之外的跑因此都看得见。
 - **无报价的调用单独报数**：`CostAnswer.unpriced: UnpricedCalls { calls, tokens }` 是账本上没有权威计费额的模型调用次数与它们的 token 总数（`storage::Attribution` 的 `unpriced` 原样上线）。它们不进 `total`，所以缺了这一项，一座只用订阅登录或本地模型的城跑了多少次都读作「没花钱」；界面据 `calls > 0` 说「有调用没有报价」并给出 token 数，而不是把 `$0.00` 当作量出来的数。
@@ -175,6 +175,27 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 **三帧登记面**（§8-1 golden 同集更新）——`AttachEndpoint`（人刚输入的 URL＋兼容格式＋`secret:` 引用；**引用有字节形，凭证没有**）、`SelectModel`（标签→模型＋两个探不到的 token 数＋人说的「收得下什么」；输出上限是 `Option<Ceiling>`，缺席即「没人登记过」，零在类型上不存在；`input: Option<kernel::InputKinds>` 紧接在 `max_output_tokens` 之后，出现时是 `gateway::accepted_input` 的第一档，缺席时梯子从目录开始，`crates/gateway/Spec.lean` §8-37、gateway D16）、`EndpointView`（设置页的读；`EndpointsAnswer` 里 `has_credential` 是关于凭证能回答的全部）。
 
 **三个 kernel 类型的再导出**（`DialectKind`／`Effort`／`ModelTag`）。客户端只读 `wire` 的 schema，而设置页要拼写这三个词；再导出而非镜像定义，因为镜像就是同一规则的第二个权威——同 §8-0 对 `Mode` 的口径。
+-/
+
+/-! D47 `Answer::Unavailable` 带上没看成的原因
+
+```rust
+Unavailable {
+    query: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reason: Option<String>,   // 读面遇到的错误的文字（`kernel::AxError` 的 Display）；缺席即只报名字
+}
+```
+
+**决定**：一个视图去读账本、盘或子进程而没有读成时，答 `Unavailable` 并把它遇到的错误的文字放进 `reason`；不去读的视图（这份构建不求值这个查询）不带 `reason`。第一个带原因的读面是被热视图逐出的 run 的回读（`LedgerAsk::recalled`、`recalled_bill`，accounting `views::answering::history`）：它们返回 `Result<_, AxError>`，答 `Run`、`CostOf`、`Commit` 的视图把错误映射进 `reason`。其余以 `views::prepared::unavailable` 作答的读面先保持没有 `reason`，各自改成带原因时只改它自己那一处。
+
+**理由**：只有 `query` 时，「账本这一行读不回」与「这份构建不答这个查询」在线上长得一样，读面只好把错误丢掉（`.ok()?`）；而页面和读日志的人要据此决定是等一会儿、修盘，还是换一份构建。
+
+**被否**：①`reason` 必填：四十多处不读的视图只能填一句「不求值」，那是 `query` 已经说过的话；②一个原因的枚举：错误本身已经带稳定的码与恢复（`AxError`），线上再列一份码表就是第二个权威；③为读不成另开一个 `Answer` 变体：页面对两者都画「城没能回答」，区别只是要不要多给一句原因。
+
+**三个平台**：相同；`reason` 里的路径按所在平台拼写。
+
+与 D48 同一次 `WIRE_V` 进位。
 -/
 
 /-! D20 送页面的两条路由是一个公开函数，城的端口与远程监听各把它并进自己的路由表

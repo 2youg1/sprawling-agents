@@ -62,6 +62,7 @@ async fn send(uri: &str, bytes: Vec<u8>) -> (u16, String) {
                 kernel::Seq::FIRST,
                 Ok(Answer::Unavailable {
                     query: "none".to_owned(),
+                    reason: None,
                 }),
             )
         }),

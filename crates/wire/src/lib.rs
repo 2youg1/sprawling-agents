@@ -78,9 +78,9 @@ pub use answer::{RoundsAnswer, Timing, Turn};
 pub use answer::{RunSummary, Waiting};
 pub use answer::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use answer::{SecondDomain, SettledEffort, SettledSecond, TuningDefaults};
+pub use answer::{ShellCalls, ShellsAnswer, UsageExportAnswer, UsageKind, UseOutcome};
 pub use answer::{SkillAudit, SkillUsageAnswer, SkillUsageLine, SkillUse, SkillVersion};
 pub use answer::{Standing, ToolkitLine, ToolkitsAnswer};
-pub use answer::{UsageExportAnswer, UsageKind, UseOutcome};
 pub use answer::{VERSIONS_MAX, VersionSource, VersionsAnswer};
 #[cfg(feature = "server")]
 pub use assets::{AssetReply, ClientAssets, EmbeddedFile};

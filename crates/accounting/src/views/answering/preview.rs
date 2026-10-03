@@ -96,6 +96,7 @@ mod tests {
             preview(&mut views, never, 0, 10),
             wire::Answer::Unavailable {
                 query: format!("Preview({never})"),
+                reason: None,
             }
         );
     }
@@ -219,6 +220,7 @@ mod tests {
             preview(&mut views, version, 0, 16),
             wire::Answer::Unavailable {
                 query: format!("Preview({version})"),
+                reason: None,
             }
         );
     }

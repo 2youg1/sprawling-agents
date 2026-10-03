@@ -111,8 +111,8 @@ pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
 pub use usage::{
     DayCount, ExportFormat, HeldSkill, McpServerUsage, McpToolUsage, McpUsageAnswer, McpUse,
 };
+pub use usage::{ShellCalls, ShellsAnswer, UsageExportAnswer, UsageKind, UseOutcome};
 pub use usage::{SkillAudit, SkillUsageAnswer, SkillUsageLine, SkillUse, SkillVersion};
-pub use usage::{UsageExportAnswer, UsageKind, UseOutcome};
 
 /// What moved between two checkpoints, one row per file, path order.
 ///
@@ -235,6 +235,7 @@ pub enum Answer {
     SkillUsage(Box<SkillUsageAnswer>),
     McpUsage(Box<McpUsageAnswer>),
     UsageExport(Box<UsageExportAnswer>),
+    Shells(Box<ShellsAnswer>),
     Toolkits(Box<ToolkitsAnswer>),
     Release(Box<ReleaseAnswer>),
     Preferences(Box<PreferencesAnswer>),
@@ -243,8 +244,13 @@ pub enum Answer {
     Automation(Box<AutomationAnswer>),
     GithubLogin(GithubLoginAnswer),
     Guide(GuideProgress),
+    /// `reason` is the text of what stopped a view that tried to look
+    /// (`crates/wire/spec/Server.lean` D47); absent when the view names
+    /// the query alone.
     Unavailable {
         query: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
     },
 }
 

@@ -9,6 +9,8 @@
 //! Folded from the ledger by `accounting::views::usage`; nothing here
 //! decides what counts as a use, which D33 states once.
 
+use std::collections::BTreeMap;
+
 use kernel::event::record::AuditVerdict;
 use kernel::{Address, B3Hash, RunId, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
@@ -184,4 +186,27 @@ pub struct UsageExportAnswer {
     pub format: ExportFormat,
     /// UTF-8 text the page hands the User as a download.
     pub body: String,
+}
+
+/// Every shell interpreter the ledger saw, with how its shell lines
+/// ended (`crates/wire/spec/Reading.lean` D48). The fold is
+/// `runtime::ShellTally`'s; this is its reading on the wire.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ShellsAnswer {
+    /// In interpreter name order.
+    pub interpreters: Vec<ShellCalls>,
+}
+
+/// One interpreter's shell lines that ended with a code.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ShellCalls {
+    /// The program that ran, as the result recorded it; a result written
+    /// before the field existed counts under `system`.
+    pub interpreter: String,
+    pub calls: u64,
+    /// Failures per class that occurred, keyed by
+    /// `runtime::FailureClass::as_str`.
+    pub failures: BTreeMap<String, u64>,
 }

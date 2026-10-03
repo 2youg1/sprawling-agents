@@ -196,6 +196,7 @@ mod tests {
             range(&mut views, never, 0, 10),
             wire::Answer::Unavailable {
                 query: format!("Range({never})"),
+                reason: None,
             }
         );
     }

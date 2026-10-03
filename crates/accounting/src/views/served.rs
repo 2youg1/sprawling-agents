@@ -203,7 +203,8 @@ mod tests {
                 .prepare(&wire::Query::Harnesses)
                 .finish(),
             wire::Answer::Unavailable {
-                query: "Harnesses".to_owned()
+                query: "Harnesses".to_owned(),
+                reason: None,
             },
         );
     }

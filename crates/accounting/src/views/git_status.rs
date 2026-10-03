@@ -26,7 +26,7 @@
 
 use std::path::PathBuf;
 
-use kernel::Address;
+use kernel::{Address, AxError};
 
 use super::holding::Views;
 
@@ -41,10 +41,10 @@ pub struct GitStatusAsk {
 impl Views {
     /// The building's last checkpoint and the city root, for a read of the
     /// working tree after the views are released.
-    /// `None` when the newest checkpoint's row cannot be read, which the
-    /// caller answers as `Unavailable`, as the commits column does.
-    pub(super) fn git_status_ask(&self, building: &Address) -> Option<GitStatusAsk> {
-        Some(GitStatusAsk {
+    /// An error when the newest checkpoint's row cannot be read, which
+    /// the caller answers as `Unavailable`, as the commits column does.
+    pub(super) fn git_status_ask(&self, building: &Address) -> Result<GitStatusAsk, AxError> {
+        Ok(GitStatusAsk {
             city_root: self.city_root.clone(),
             building: building.clone(),
             // The newest commit the city checkpointed at this building or
@@ -72,9 +72,7 @@ impl GitStatusAsk {
             Some(self.building.as_str()),
             self.checkpoint.as_ref().map(|commit| commit.oid),
         ) else {
-            return wire::Answer::Unavailable {
-                query: format!("GitStatus({})", self.building.as_str()),
-            };
+            return super::prepared::unavailable(format!("GitStatus({})", self.building.as_str()));
         };
         wire::Answer::GitStatus(Box::new(wire::GitStatusAnswer {
             building: self.building,

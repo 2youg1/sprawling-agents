@@ -7,7 +7,7 @@
 //! named range with its endpoints echoed, a run's own transcript, and
 //! the summary of a run the hot view evicted.
 
-use kernel::{EventRecord, UsdMicros};
+use kernel::{AxCode, AxError, EventRecord, UsdMicros};
 
 use crate::views::lines::summarize;
 use crate::views::prepared::LedgerAsk;
@@ -29,7 +29,7 @@ impl LedgerAsk {
             records: Vec::new(),
             earlier: None,
         };
-        let Some((index, dir)) = self.indexed() else {
+        let Ok((index, dir)) = self.indexed() else {
             return empty;
         };
         let Some(tail) = index.tail_seq() else {
@@ -96,7 +96,7 @@ impl LedgerAsk {
         if to < from {
             return empty;
         }
-        let Some((index, dir)) = self.indexed() else {
+        let Ok((index, dir)) = self.indexed() else {
             return empty;
         };
         let want = u64::from(limit.clamp(1, wire::HISTORY_MAX));
@@ -153,7 +153,7 @@ impl LedgerAsk {
             records: Vec::new(),
             earlier: None,
         };
-        let Some((index, dir)) = self.indexed() else {
+        let Ok((index, dir)) = self.indexed() else {
             return empty;
         };
         let want = usize::try_from(limit.clamp(1, wire::HISTORY_MAX)).unwrap_or(1);
@@ -189,40 +189,59 @@ impl LedgerAsk {
     /// alone, so the cold side maps a record to a row by the same rule
     /// as the hot one (`crates/sprawling/Spec.lean` §8-106).
     ///
-    /// `None` when the records cannot be read: an evicted run always has
-    /// some, so the caller answers that it could not look.
-    pub(in crate::views) fn recalled(&self, run: kernel::RunId) -> Option<wire::RunSummary> {
+    /// An error when the records cannot be read, or when they fold to no
+    /// run at all: an evicted run always has some, so the caller answers
+    /// that it could not look, and says why (wire D47).
+    pub(in crate::views) fn recalled(
+        &self,
+        run: kernel::RunId,
+    ) -> Result<wire::RunSummary, AxError> {
         let mut alone = storage::HotView::new();
         self.fold_recalled(run, |record| alone.apply(record))?;
-        alone.get(&run).map(|hot| summarize(run, hot))
+        alone
+            .get(&run)
+            .map(|hot| summarize(run, hot))
+            .ok_or_else(|| {
+                AxError::failure(
+                    AxCode::PathNotFound,
+                    "recall an evicted run",
+                    run.to_string(),
+                )
+                .with_recovery(
+                    "the ledger holds no record of this run; ask for the city view again",
+                )
+            })
     }
 
     /// What a run the attribution no longer holds was billed, folded
     /// from its own records through a `storage::Attribution` holding it
     /// alone, so the cold side prices by the same rule as the hot one.
-    /// `None` when the records cannot be read.
-    pub(in crate::views) fn recalled_bill(&self, run: kernel::RunId) -> Option<UsdMicros> {
+    /// An error when the records cannot be read.
+    pub(in crate::views) fn recalled_bill(&self, run: kernel::RunId) -> Result<UsdMicros, AxError> {
         let mut alone = storage::Attribution::new();
         self.fold_recalled(run, |record| alone.apply(record))?;
-        Some(alone.billed_to(&run).unwrap_or_default())
+        Ok(alone.billed_to(&run).unwrap_or_default())
     }
 
     /// Folds every record `run` wrote, oldest first, through `apply`;
     /// the index names them, so the work is the run's records alone.
-    /// `None` when a line cannot be read or `apply` refuses it.
+    /// The first failure stops the fold: a line that cannot be read, or
+    /// a record `apply` refuses.
     fn fold_recalled(
         &self,
         run: kernel::RunId,
         mut apply: impl FnMut(&EventRecord) -> Result<(), storage::StorageError>,
-    ) -> Option<()> {
-        let (index, dir) = self.indexed()?;
+    ) -> Result<(), AxError> {
+        let (index, dir) = self.indexed().map_err(storage::StorageError::into_ax)?;
         let mut oldest_first: Vec<kernel::Seq> = index.run_seqs_before(run, None).collect();
         oldest_first.reverse();
         let mut reader = index.reader(&dir);
         for seq in oldest_first {
-            let line = reader.line_at(seq).ok()?;
-            apply(&EventRecord::parse_line(&line).ok()?).ok()?;
+            let line = reader
+                .line_at(seq)
+                .map_err(storage::StorageError::into_ax)?;
+            apply(&EventRecord::parse_line(&line)?).map_err(storage::StorageError::into_ax)?;
         }
-        Some(())
+        Ok(())
     }
 }

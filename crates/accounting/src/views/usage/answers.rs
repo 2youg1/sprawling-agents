@@ -3,14 +3,35 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two tables the fold answers: one line per skill name, and one
-//! entry per tool server with its tools (wire D33).
+//! The tables the fold answers: one line per skill name, one entry per
+//! tool server with its tools (wire D33), and one line per shell
+//! interpreter (wire D48).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{McpCall, Shelved, Usage, per_day};
 
 impl Usage {
+    /// One line per shell interpreter, in name order, as
+    /// `runtime::ShellTally` counted it.
+    pub(crate) fn shells(&self) -> wire::ShellsAnswer {
+        wire::ShellsAnswer {
+            interpreters: self
+                .shells
+                .interpreters()
+                .map(|(interpreter, count)| wire::ShellCalls {
+                    interpreter: interpreter.to_owned(),
+                    calls: count.calls,
+                    failures: count
+                        .failures
+                        .iter()
+                        .map(|(class, times)| (class.as_str().to_owned(), *times))
+                        .collect(),
+                })
+                .collect(),
+        }
+    }
+
     /// One line per skill name that a shelf holds or a run read, in name
     /// order; `only` narrows it to one name.
     pub(crate) fn skills(&self, shelved: &[Shelved], only: Option<&str>) -> wire::SkillUsageAnswer {

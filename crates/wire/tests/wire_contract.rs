@@ -46,7 +46,7 @@ fn exposed() -> SocketAddr {
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
     assert_eq!(COMMAND_NAMES.len(), 42, "command table");
-    assert_eq!(QUERY_NAMES.len(), 55, "query table");
+    assert_eq!(QUERY_NAMES.len(), 56, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
@@ -56,7 +56,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 55, "query names are distinct");
+    assert_eq!(sorted.len(), 56, "query names are distinct");
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 54,
+        WIRE_V, 55,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "b98b124426ce8fe8927fc5dda4e97d62fd0f022c9ba96c3098d0395a75bde86c";
+const WIRE_SCHEMA_GOLDEN: &str = "7622c050c06af963759f4859c781f770cbccbf18ccc9c891c1f7fba69c6d63a0";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "2a539427017fa73495a2aa6eea80a9bba2819e3d1eb0284fec228e3166702705";
+const WIRE_SHAPE_GOLDEN: &str = "7774feec359e5c9ec04af82019e19911e267c3b6738c2f9c6935b2f7e49b1aef";
 
 // -------------------------------------------------------------- binding face
 

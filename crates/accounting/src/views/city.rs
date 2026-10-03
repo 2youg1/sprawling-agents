@@ -91,9 +91,7 @@ impl CityAsk {
     /// whether a city had finished would be the second.
     pub(super) fn read(self) -> wire::Answer {
         let Ok(buildings) = buildings_of(&self.city_root) else {
-            return wire::Answer::Unavailable {
-                query: "CityView".to_owned(),
-            };
+            return super::prepared::unavailable("CityView".to_owned());
         };
         let wanted: BTreeSet<Address> = buildings
             .iter()

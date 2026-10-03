@@ -392,6 +392,9 @@ pub enum Query {
     McpUsage { server: Option<String> },
     /// Every use as one JSONL or CSV row for the User to download; the city writes no file.
     UsageExport { what: crate::UsageKind, format: crate::ExportFormat },
+    /// Every shell interpreter's calls and failures by class, folded from the whole ledger in
+    /// the same pass as the usage tables (`crates/wire/spec/Reading.lean` D48).
+    Shells,
 }
 
 /// The Query surface, in declaration order — the order the handshake

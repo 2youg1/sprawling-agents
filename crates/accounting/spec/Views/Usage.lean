@@ -21,6 +21,7 @@ impl Usage {
     pub(crate) fn fold<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Usage;
     pub(crate) fn skills(&self, shelves: &[Shelved], only: Option<&str>) -> wire::SkillUsageAnswer;
     pub(crate) fn mcp(&self, configured: &BTreeSet<String>, only: Option<&str>) -> wire::McpUsageAnswer;
+    pub(crate) fn shells(&self) -> wire::ShellsAnswer;
 }
 // accounting::views::usage::export
 pub(super) fn skill_rows(answer: &wire::SkillUsageAnswer) -> Vec<Row>;
@@ -28,7 +29,8 @@ pub(super) fn mcp_rows(answer: &wire::McpUsageAnswer) -> Vec<Row>;
 pub(super) fn write(rows: &[Row], format: wire::ExportFormat) -> String;
 ```
 
-- **一遍读完整本账。** `Query::SkillUsage`、`McpUsage` 与 `UsageExport` 在快照放开之后由 `LedgerAsk` 从第一行读到最后一行，交给 `Usage::fold`；读不下去的一行结束这一遍，已经读到的照答（与 `history` 同一条规则）。
+- **一遍读完整本账。** `Query::SkillUsage`、`McpUsage`、`UsageExport` 与 `Shells` 在快照放开之后由 `LedgerAsk` 从第一行读到最后一行，交给 `Usage::fold`；读不下去的一行结束这一遍，已经读到的照答（与 `history` 同一条规则）；账本索引本身打不开时答 `Unavailable`，`reason` 是那个错误（wire D47）。
+- **shell 读数**（wire D48）：同一遍里每一条 `tool_result` 的 `result` 对象交给 `runtime::ShellTally::absorb`，`shells` 照它的 `interpreters` 逐行写出；哪些行算、怎么分类只在 `crates/runtime/spec/Tools/Exec.lean` D30。
 - **skill 的一次使用**照 wire D33：这一行是 `tool_called`，它的 run 的 `run_started` 钉住了这件 skill 的名字；`describe` 的 `name` 是那个名字或 `skill <名字>` 时部分记作 `guide`，`read` 的 `path` 是那个名字时记作 `SKILL.md`，是 `<名字>/<相对路径>` 时记作那个相对路径。使用的版本是钉住时的哈希。
 - **一个内容版本**是某件 skill 在某个 `run_started` 里第一次以某个哈希出现：摘要、那一行的 `seq` 与时刻、钉住它的 run。账本里还没有一种行记录「谁把这一版放上书架」（kernel D23 预留的 `skill_shelved`），所以版本说的是「从哪一刻起有 run 读到它」。
 - **书架上的每一件都有一行**，没被用过的计数为零；书架上已经没有、但账上用过的名字也有一行，`held` 为空。同名的件在几格书架上时，`held` 每格一项，各带此刻的摘要与审核状态。

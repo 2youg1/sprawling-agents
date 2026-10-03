@@ -122,6 +122,7 @@ mod tests {
             ask_reply(&mut views, "a\0b", ReplyState::Settled),
             wire::Answer::Unavailable {
                 query: "Reply".to_owned(),
+                reason: None,
             }
         );
     }

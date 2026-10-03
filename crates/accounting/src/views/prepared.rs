@@ -38,7 +38,19 @@ use crate::plan_view::{PlanView, plans_of};
 /// difference, and every caller spelling the refusal itself is how the
 /// two start looking alike.
 pub(super) fn unavailable(query: String) -> wire::Answer {
-    wire::Answer::Unavailable { query }
+    wire::Answer::Unavailable {
+        query,
+        reason: None,
+    }
+}
+
+/// The answer to a question this city tried to look up and could not,
+/// with what stopped it (`crates/wire/spec/Server.lean` D47).
+pub(super) fn unavailable_because(query: String, stopped: &kernel::AxError) -> wire::Answer {
+    wire::Answer::Unavailable {
+        query,
+        reason: Some(stopped.to_string()),
+    }
 }
 
 /// What a read of now - a tool server's handshake, the broker's shelf -
@@ -212,14 +224,16 @@ pub struct LedgerAsk {
 
 impl LedgerAsk {
     /// The ledger's directory, and its index brought up to the segments
-    /// on disk and held for one read; `None` when the refresh fails.
+    /// on disk and held for one read, or the refresh's failure.
     ///
     /// A poisoned lock means a refresh was cut short and may have left an
     /// offset pointing at another line, so the index is replaced by an
     /// empty one and the poison cleared: the refresh that follows scans
     /// the whole ledger once, and later reads refresh incrementally again
     /// (`crates/sprawling/Spec.lean` §8-100).
-    pub(super) fn indexed(&self) -> Option<(MutexGuard<'_, storage::LedgerIndex>, PathBuf)> {
+    pub(super) fn indexed(
+        &self,
+    ) -> Result<(MutexGuard<'_, storage::LedgerIndex>, PathBuf), storage::StorageError> {
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         let mut index = self.index.lock().unwrap_or_else(|poisoned| {
             let mut index = poisoned.into_inner();
@@ -227,8 +241,8 @@ impl LedgerAsk {
             self.index.clear_poison();
             index
         });
-        index.refresh(&dir).ok()?;
-        Some((index, dir))
+        index.refresh(&dir)?;
+        Ok((index, dir))
     }
 }
 
@@ -266,8 +280,8 @@ impl Prepared {
             // An evicted run always has records in the Ledger, so a
             // recall that cannot read them is "I could not look".
             Self::Recalled { ledger, run } => match ledger.recalled(run) {
-                Some(summary) => wire::Answer::Run(Some(Box::new(summary))),
-                None => unavailable(format!("RunView({run})")),
+                Ok(summary) => wire::Answer::Run(Some(Box::new(summary))),
+                Err(stopped) => unavailable_because(format!("RunView({run})"), &stopped),
             },
             // An unreadable settings file is not an empty one.
             Self::Preferences => match crate::person::read() {
