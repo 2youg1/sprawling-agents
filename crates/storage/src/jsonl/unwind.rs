@@ -76,13 +76,23 @@ impl JsonlLedger {
         Ok(())
     }
 
+    /// Puts the segments back where the in-memory position says they
+    /// end, durably: power lost before the next wave must not bring back
+    /// a segment this removed or bytes this cut off.
     fn restore(&mut self, created: &[PathBuf]) -> Result<(), StorageError> {
+        let mut removed = false;
         for path in created {
             if self.vfs.exists(path) {
                 self.vfs
                     .remove_file(path)
                     .map_err(io_err("remove a segment the failed wave created", path))?;
+                removed = true;
             }
+        }
+        if removed {
+            self.vfs
+                .sync_dir(&self.dir)
+                .map_err(io_err("sync ledger dir", &self.dir))?;
         }
         if !created.contains(&self.seg_path) {
             self.vfs
@@ -91,6 +101,10 @@ impl JsonlLedger {
                     "truncate a segment back before the failed wave",
                     &self.seg_path,
                 ))?;
+            self.vfs.sync_data(&self.seg_path).map_err(io_err(
+                "sync a segment cut back before the failed wave",
+                &self.seg_path,
+            ))?;
         }
         Ok(())
     }
