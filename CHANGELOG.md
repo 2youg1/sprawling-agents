@@ -62,7 +62,7 @@ payload field is optional, and a line written by 0.0.8 reads unchanged.
   safe point, calls no model and spends no tokens until the reply comes, the
   run leaves its room, or 240 s of patience run out. A reply that lands
   before the run stops is kept for the wait, one run has at most one open
-  wait, and the page reads `waiting` off the run's summary.
+  wait, and the run's summary on the wire carries `waiting`.
 - A run policy the User changes reaches the run working in the room at its
   next `BeforeWave`, so one wave never runs under two policies. Every mode
   offers the same tool list and the mode is asked at the call, so a policy
