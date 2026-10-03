@@ -129,18 +129,18 @@ inductive Op where
   deriving DecidableEq, Repr
 
 /-- 效果层看得到的两种效果；其余效果与这一条性质无关。 -/
-inductive Effect where
+inductive CallEffect where
   | read
   | govern
   deriving DecidableEq, Repr
 
 /-- `Tool::effect_of`（D26）：效果按一次调用的操作定，不按工具定。 -/
-def effectOf : Op → Effect
+def effectOf : Op → CallEffect
   | .reads => .read
   | .rewrites => .govern
 
 /-- 效果层在 run 里的判定（§8-27 的 `Governance` 行）：Govern 恒拒，Read 无门。 -/
-def admittedInRun : Effect → Bool
+def admittedInRun : CallEffect → Bool
   | .read => true
   | .govern => false
 
