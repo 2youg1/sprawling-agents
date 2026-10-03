@@ -282,21 +282,15 @@ theorem dropping_focus_loses_the_opener :
     dropToBody 0 (openLayer (⟨7, []⟩ : Focus Nat) 3) ≠ ⟨7, []⟩ := by
   decide
 
-/-! ### 模态：安全的答案在手下，点在外面不算回答（§7-3）
+/-! ### 模态：外面的事件从不确认（§7-3）
 
-`dialog.svelte` 取焦由文档顺序决定，取消写在确认之前；Escape 由部件拦下交给 `onCancel`，点 `::backdrop` 不关闭。 -/
+`dialog.svelte` 取焦由文档顺序决定，取消写在确认之前，所以安全的答案在手下——这是那个文件里的一行顺序，不是这里的一条定理；Escape 由部件拦下交给 `onCancel`，点 `::backdrop` 不关闭。 -/
 
 /-- 一扇撤不回来的模态里的两个答复，按文档顺序。 -/
 inductive Reply where
   | cancel
   | confirm
   deriving DecidableEq, Repr
-
-/-- 模态里控件的文档顺序。 -/
-def replies : List Reply := [.cancel, .confirm]
-
-/-- 平台取第一个可聚焦控件。 -/
-def initialFocus (order : List Reply) : Option Reply := order.head?
 
 /-- 模态收到的两种「外面」的事件。 -/
 inductive Outside where
@@ -308,10 +302,6 @@ inductive Outside where
 def answered : Outside → Option Reply
   | .escape => some .cancel
   | .backdrop => none
-
-theorem the_safe_answer_is_under_the_hand : initialFocus replies = some .cancel := rfl
-
-theorem a_click_outside_answers_nothing : answered .backdrop = none := rfl
 
 theorem escape_never_confirms (event : Outside) : answered event ≠ some .confirm := by
   cases event <;> decide
