@@ -146,3 +146,45 @@ fn the_now_line_reports_the_drivers_latest_reading_in_iso_utc() {
     clock.keep(TimeMs::new(1_785_585_607_000));
     assert_eq!(now_line(&tool), "now: 2026-08-01T12:00:07Z");
 }
+
+/// The test city's run read `worktree: …\city (0 bytes)` over a tree of
+/// files. The line reports the tree as it stands at the call: every file
+/// under it, the city's own `.sprawling` state left out because a run
+/// cannot read it.
+#[test]
+fn the_worktree_line_counts_the_files_the_tree_holds_at_the_call() {
+    let tree = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(tree.path().join("hall").join("Mayor")).unwrap();
+    std::fs::write(tree.path().join("hall").join("Memo.md"), "1234").unwrap();
+    std::fs::write(
+        tree.path().join("hall").join("Mayor").join("a.md"),
+        "123456",
+    )
+    .unwrap();
+    std::fs::create_dir_all(tree.path().join(".sprawling")).unwrap();
+    std::fs::write(tree.path().join(".sprawling").join("ledger"), "not counted").unwrap();
+    let mut seen = snapshot();
+    seen.worktree_path = tree.path().display().to_string();
+    seen.worktree_disk = ByteLen::default();
+    let tool = StatusTool::new(seen).unwrap();
+    let line = |tool: &StatusTool| -> String {
+        let outcome = tool.invoke(&call()).unwrap();
+        let value = serde_json::to_value(&outcome.result).unwrap();
+        value["text"]
+            .as_str()
+            .unwrap()
+            .lines()
+            .find(|line| line.starts_with("worktree: "))
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(
+        line(&tool),
+        format!("worktree: {} (10 bytes)", tree.path().display())
+    );
+    std::fs::write(tree.path().join("hall").join("New.md"), "12").unwrap();
+    assert_eq!(
+        line(&tool),
+        format!("worktree: {} (12 bytes)", tree.path().display())
+    );
+}
