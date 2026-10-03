@@ -15,11 +15,14 @@
 
 import { isKey, type Key } from "../../core/lang";
 import type {
+  DoctorAbsence,
   DoctorAnswer,
+  DoctorFault,
   DoctorInstall,
   DoctorItem,
   DoctorState,
   DoctorTier,
+  DoctorVersion,
 } from "../../wire";
 
 // What the item is for, in the page's words: the wire carries the item's
@@ -55,6 +58,83 @@ export function versionOf(state: DoctorState): string | null {
   const said = state.present.version;
   if (typeof said !== "object") return null;
   return /\d+(?:\.\d+)+/u.exec(said.said.text)?.[0] ?? said.said.text;
+}
+
+// Why the state is what it is, in one phrase, when the state alone does
+// not say it: a present program that gave no version, a broken one and
+// its fault, an absent one and where the city looked. `said` is the
+// program's or the platform's own words, or a path, shown as they came.
+export interface Reason {
+  readonly key: Key;
+  readonly said: string | null;
+}
+
+export function reasonOf(state: DoctorState): Reason | null {
+  if ("present" in state) return wordless(state.present.version);
+  if ("broken" in state) return faultOf(state.broken.fault);
+  return absenceReason(state.absent.absence);
+}
+
+function wordless(version: DoctorVersion): Reason | null {
+  if (typeof version === "object") return null;
+  switch (version) {
+    case "silent":
+      return { key: "machine_version_silent", said: null };
+    case "unreadable":
+      return { key: "machine_version_unreadable", said: null };
+    case "late":
+      return { key: "machine_version_late", said: null };
+  }
+}
+
+function faultOf(fault: DoctorFault): Reason {
+  if (typeof fault === "string") return { key: "machine_fault_half_written", said: null };
+  return "will_not_start" in fault
+    ? { key: "machine_fault_will_not_start", said: fault.will_not_start.said }
+    : { key: "machine_fault_unreadable", said: fault.unreadable.said };
+}
+
+function absenceReason(absence: DoctorAbsence): Reason {
+  if (typeof absence === "object") {
+    return "variable_names_nothing" in absence
+      ? {
+          key: "machine_absence_variable",
+          said: `${absence.variable_names_nothing.variable}=${absence.variable_names_nothing.path}`,
+        }
+      : { key: "machine_absence_component", said: absence.no_component.dir };
+  }
+  switch (absence) {
+    case "not_on_search_path":
+      return { key: "machine_absence_search_path", said: null };
+    case "no_home":
+      return { key: "machine_absence_no_home", said: null };
+    case "not_in_this_build":
+      return { key: "machine_absence_build", said: null };
+  }
+}
+
+// One row of the dependency list: every item, here or not,
+// says its state, why when the state alone does not, the version it gave,
+// and how to get it when this machine lacks it. The card draws exactly
+// these four, so a row cannot leave one out for one state and show it
+// for another.
+export interface Row {
+  readonly state: Key;
+  readonly reason: Reason | null;
+  readonly version: string | null;
+  readonly install: string | null;
+  readonly offer: Offer;
+}
+
+export function rowOf(item: DoctorItem): Row {
+  const offer = offerOf(item);
+  return {
+    state: stateKey(item.state),
+    reason: reasonOf(item.state),
+    version: versionOf(item.state),
+    install: offer === "held" ? null : spelledOf(item.install),
+    offer,
+  };
 }
 
 // The command that would get a missing item, as a person would type it.

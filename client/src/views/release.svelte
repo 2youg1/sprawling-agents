@@ -18,10 +18,13 @@
 // that polled a registry would be spending the promise QUICKSTART.md
 // opens with on a question nobody asked.
 //
-// Nothing here updates anything. The command under a `behind` verdict
-// is the city's `update.command`, printed for a person to run, because `sprawling install` owns the
-// archive path and npm owns its own, and a third party writing over
-// either would be a second authority for where this binary lives.
+// Nothing here updates anything. The answer is drawn by
+// `release/answer.svelte`: both registries the city asked, and the
+// city's `update.command` for the channel that installed this binary,
+// printed for a User to run, because `sprawling install` owns the
+// archive path and npm and cargo own their own, and a third party
+// writing over either would be a second authority for where this binary
+// lives.
 
 // wording-ok: the project's own release page; a proper noun identical
 // in both languages
@@ -33,10 +36,11 @@ const RELEASES = "https://github.com/2youg1/sprawling-agents/releases";
   import type { Readable } from "svelte/store";
 
   import { QUERIES } from "../core/asking";
-  import { fill, say } from "../core/lang";
+  import { say } from "../core/lang";
   import { ui } from "../ui";
-  import type { Answer, RegistryNewest, ReleaseAnswer, ReleaseLine } from "../wire";
+  import type { Answer, ReleaseAnswer } from "../wire";
   import Button from "./parts/button.svelte";
+  import ReleaseAnswerView from "./release/answer.svelte";
 
   const u = ui();
   const lang = u.lang;
@@ -50,26 +54,6 @@ const RELEASES = "https://github.com/2youg1/sprawling-agents/releases";
     const now = $slot;
     return now !== undefined && "release" in now ? now.release : undefined;
   });
-  // One derivation per state, because the check and the read have to
-  // happen on one value: asking `"stands" in answer` and then reading
-  // `answer.stands` are two calls, and the second is not narrowed by
-  // the first.
-  // npm's reading, which the verdict judges (wire D24); the page draws
-  // the other registries once it renders them.
-  function npmNewest(registries: readonly RegistryNewest[]): ReleaseLine | undefined {
-    for (const line of registries) {
-      if (line.registry === "npm" && typeof line.reading === "object" && "read" in line.reading) {
-        return line.reading.read.newest;
-      }
-    }
-    return undefined;
-  }
-  const refused = $derived(answer !== undefined && "refused" in answer ? answer.refused : undefined);
-  const unreleased = $derived(answer !== undefined && "unreleased" in answer ? answer.unreleased : undefined);
-  const stands = $derived(answer !== undefined && "stands" in answer ? answer.stands : undefined);
-  const unreleasedNewest = $derived(unreleased === undefined ? undefined : npmNewest(unreleased.registries));
-  const standsNewest = $derived(stands === undefined ? undefined : npmNewest(stands.registries));
-
   // A fresh answer ends the wait, whoever asked for it.
   $effect(() => {
     if (answer !== undefined) {
@@ -97,48 +81,7 @@ client/Spec.lean §4-50). -->
       {RELEASES}
     </a>
   </div>
-  {#if refused !== undefined}
-    <p class="text-note text-alert">
-      {say($lang, "release_refused")}
-      <code class="font-mono text-note text-text-quiet">{refused.refusal.recovery}</code>
-    </p>
-  {/if}
-  {#if unreleased !== undefined}
-    <p class="text-note text-text-quiet">
-      {say($lang, "release_source")}
-      {#if unreleasedNewest !== undefined}
-        {fill(say($lang, "release_newest"), {
-          version: unreleasedNewest.version,
-          released: unreleasedNewest.released,
-        })}
-      {/if}
-    </p>
-  {/if}
-  {#if stands !== undefined}
-    <div class="flex flex-col gap-tight">
-      <p class="text-note text-text">
-        {fill(say($lang, "release_mine"), {
-          version: stands.mine.version,
-          released: stands.mine.released,
-        })}
-      </p>
-      {#if stands.verdict === "current"}
-        <p class="text-note text-accent">{say($lang, "release_current")}</p>
-      {:else if stands.verdict === "ahead"}
-        <p class="text-note text-text-quiet">
-          {fill(say($lang, "release_ahead"), { version: standsNewest?.version ?? "" })}
-        </p>
-      {:else if stands.verdict === "behind"}
-        <p class="text-note text-alert">
-          {fill(say($lang, "release_behind"), {
-            version: standsNewest?.version ?? "",
-            released: standsNewest?.released ?? "",
-          })}
-        </p>
-        <code class="block w-fit border-l-2 border-edge-input pl-base font-mono text-note text-text">
-          {stands.update.command ?? ""}
-        </code>
-      {/if}
-    </div>
+  {#if answer !== undefined}
+    <ReleaseAnswerView {answer} />
   {/if}
 </section>

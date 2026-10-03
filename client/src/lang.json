@@ -6662,5 +6662,173 @@
   "talk_policy_changed": {
     "en": "From the next step: {mode} mode, {limit}",
     "zh": "从下一步起：{mode}模式，{limit}"
+  },
+  "machine_version_silent": {
+    "en": "gave no version when asked",
+    "zh": "问版本时什么也没说"
+  },
+  "machine_version_unreadable": {
+    "en": "answered its version in a form that is not text",
+    "zh": "答的版本不是文字"
+  },
+  "machine_version_late": {
+    "en": "did not say its version in time",
+    "zh": "没有及时说出版本"
+  },
+  "machine_fault_half_written": {
+    "en": "is only half there: an install stopped part way",
+    "zh": "只装了一半：某次安装中途停了"
+  },
+  "machine_fault_will_not_start": {
+    "en": "is here but will not start:",
+    "zh": "在这里，但起不来："
+  },
+  "machine_fault_unreadable": {
+    "en": "is here but cannot be read:",
+    "zh": "在这里，但读不了："
+  },
+  "machine_absence_variable": {
+    "en": "the variable names a place where it is not:",
+    "zh": "变量指向的地方没有它："
+  },
+  "machine_absence_component": {
+    "en": "this component is missing from",
+    "zh": "缺这个组件，所在目录"
+  },
+  "machine_absence_search_path": {
+    "en": "not on the search path",
+    "zh": "不在搜索路径上"
+  },
+  "machine_absence_no_home": {
+    "en": "its home directory could not be found",
+    "zh": "找不到它的主目录"
+  },
+  "machine_absence_build": {
+    "en": "this build of sprawling does not include it",
+    "zh": "这一版 sprawling 没有带它"
+  },
+  "machine_scan_title": {
+    "en": "Scanning in front of the city",
+    "zh": "城目录前的扫描"
+  },
+  "machine_scan_city": {
+    "en": "city directory",
+    "zh": "城目录"
+  },
+  "machine_scan_city_read": {
+    "en": "read for",
+    "zh": "读的是"
+  },
+  "machine_scan_drive": {
+    "en": "Dev Drive",
+    "zh": "Dev Drive"
+  },
+  "machine_scan_exclusion": {
+    "en": "Defender exclusion",
+    "zh": "Defender 排除项"
+  },
+  "machine_scan_realtime": {
+    "en": "real-time scanning",
+    "zh": "实时扫描"
+  },
+  "machine_scan_not_windows": {
+    "en": "Does not apply: macOS and Linux run no system scanner in front of every write, so there is nothing to read here. Windows reads Defender and the Dev Drive.",
+    "zh": "不适用：macOS 与 Linux 没有在每次写入前扫描的系统组件，这里没有可读的。Windows 上读 Defender 与 Dev Drive。"
+  },
+  "machine_scan_stopped": {
+    "en": "off on this computer, so nothing slows the city's writes",
+    "zh": "这台电脑上关着，城的写入不会被拖慢"
+  },
+  "machine_scan_drive_trusted": {
+    "en": "the city is on a trusted Dev Drive",
+    "zh": "城在一个受信任的 Dev Drive 上"
+  },
+  "machine_scan_drive_untrusted": {
+    "en": "a Dev Drive that is not trusted, so Defender still scans it:",
+    "zh": "是 Dev Drive，但没有受信任，Defender 仍会扫描："
+  },
+  "machine_scan_drive_not": {
+    "en": "not a Dev Drive:",
+    "zh": "不是 Dev Drive："
+  },
+  "machine_scan_outside": {
+    "en": "no exclusion holds the city, so Defender scans each write",
+    "zh": "没有排除项覆盖城，Defender 会扫描每次写入"
+  },
+  "machine_scan_inside": {
+    "en": "the city is inside an exclusion:",
+    "zh": "城在一个排除项之内："
+  },
+  "machine_untold_no_disk": {
+    "en": "not read: the city's directory is on no local disk",
+    "zh": "没读到：城目录不在本地磁盘上"
+  },
+  "machine_untold_admin_only": {
+    "en": "not read: only an administrator can ask",
+    "zh": "没读到：只有管理员才能问"
+  },
+  "machine_untold_unread": {
+    "en": "not read: this command's answer could not be read:",
+    "zh": "没读到：读不懂这个命令的回答："
+  },
+  "machine_untold_failed": {
+    "en": "not read: this command failed:",
+    "zh": "没读到：这个命令失败了："
+  },
+  "machine_untold_unstarted": {
+    "en": "not read: this command did not start:",
+    "zh": "没读到：这个命令没起来："
+  },
+  "machine_untold_unanswered": {
+    "en": "not read: this command did not answer in time:",
+    "zh": "没读到：这个命令没有及时回答："
+  },
+  "harness_launcher_missing": {
+    "en": "launcher not found",
+    "zh": "没找到启动程序"
+  },
+  "harness_not_set_up": {
+    "en": "not installed or not signed in",
+    "zh": "没装或没登录"
+  },
+  "harness_ready": {
+    "en": "ready",
+    "zh": "可用"
+  },
+  "harness_looked": {
+    "en": "looked in",
+    "zh": "找过这些地方"
+  },
+  "release_registry_npm": {
+    "en": "npm",
+    "zh": "npm"
+  },
+  "release_registry_crates_io": {
+    "en": "crates.io",
+    "zh": "crates.io"
+  },
+  "release_registry_unasked": {
+    "en": "not asked: the city has no rule yet for comparing its versions with this one",
+    "zh": "没问：城还没有拿它的版本与这一版比较的规则"
+  },
+  "release_registry_refused": {
+    "en": "could not be read:",
+    "zh": "读不到："
+  },
+  "release_channel_npm": {
+    "en": "Installed through npm. To update, run:",
+    "zh": "经 npm 安装。要更新，运行："
+  },
+  "release_channel_cargo": {
+    "en": "Installed through cargo. To update, run:",
+    "zh": "经 cargo 安装。要更新，运行："
+  },
+  "release_channel_archive": {
+    "en": "Installed from the release archive. To update, run:",
+    "zh": "从发行压缩包安装。要更新，运行："
+  },
+  "release_channel_source": {
+    "en": "Built from source. To update, pull the repository and build again.",
+    "zh": "从源码构建。要更新，拉取仓库后重新构建。"
   }
 }

@@ -16,7 +16,9 @@
 //
 // **A row per program, and a row only as tall as what is left to do.**
 // A program this machine has is one line: its name, its state, its
-// version. A missing one adds the command that gets it, the install or
+// version (`rowOf`). A state the badge alone does not explain
+// - a program that gave no version, a fault, where the city looked - adds
+// one line of reason. A missing one adds the command that gets it, the install or
 // copy control, and one line saying where the command gets it from and
 // why the page waits for a press before running it.
 //
@@ -24,6 +26,9 @@
 // here, pinned by this repository, newest upstream. The cargo tools this
 // repository calls are one row, the Rust tools pack (`pack.svelte`),
 // with one press for the members it is missing.
+//
+// Last, the scan in front of the city's directory (`scanning.svelte`): read
+// on Windows, and on macOS and Linux the reason there is nothing to read.
 //
 // The develop section carries the one press that installs everything
 // it is missing (`views/setup/installing`); the screen's `machine.svelte`
@@ -75,7 +80,7 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
   import { fill, say } from "../../core/lang";
   import type { DoctorAnswer, DoctorNewest, DoctorTier } from "../../wire";
   import { ui } from "../../ui";
-  import { absenceOf, enablesKey, offerOf, ofTier, outstanding, siteOf, sourceOf, spelledOf, standing, stateKey } from "../setup/dependencies";
+  import { absenceOf, enablesKey, ofTier, outstanding, rowOf, siteOf, sourceOf, standing } from "../setup/dependencies";
   import { over, type Walk } from "../setup/installing";
   import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
@@ -83,6 +88,7 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
   import Tip from "../parts/tip.svelte";
   import Copy from "./copy.svelte";
   import Pack from "./pack.svelte";
+  import Scanning from "./scanning.svelte";
   import Versions from "./versions.svelte";
 
   interface Props {
@@ -124,9 +130,9 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
 </script>
 
 {#snippet row(item: DoctorItem, absence: Absence)}
-  {@const how = spelledOf(item.install)}
+  {@const line = rowOf(item)}
+  {@const how = line.install}
   {@const enables = enablesKey(item.name)}
-  {@const here = "present" in item.state}
   <li class="flex min-w-0 flex-col gap-tight border-t border-edge pt-snug pb-base">
     <div class="flex min-w-0 items-center gap-snug">
       {#if item.homepage === undefined || item.homepage === null}
@@ -147,7 +153,7 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
           {/snippet}
         </Tip></span>
       {/if}
-      <Badge text={say($lang, stateKey(item.state))} weight={weightOf(item, absence)} dot />
+      <Badge text={say($lang, line.state)} weight={weightOf(item, absence)} dot />
       {#if item.need === "optional"}
         <span class="shrink-0 text-note text-text-faint">{say($lang, "machine_optional")}</span>
       {:else if absence === "spare"}
@@ -155,10 +161,18 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
       {/if}
     </div>
     <Versions {item} newest={newest[item.name]} />
+    {#if line.reason !== null}
+      <p class="flex min-w-0 flex-wrap items-baseline gap-tight text-note">
+        <span class="text-text-quiet">{say($lang, line.reason.key)}</span>
+        {#if line.reason.said !== null}
+          <span class="min-w-0 break-all font-mono text-text-faint">{line.reason.said}</span>
+        {/if}
+      </p>
+    {/if}
     {#if enables !== null}
       <p class="text-note text-text-faint">{say($lang, enables)}</p>
     {/if}
-    {#if !here}
+    {#if line.offer !== "held"}
       {#if how === null}
         <span class="text-note text-text-faint">{say($lang, "machine_no_recipe")}</span>
       {:else}
@@ -172,7 +186,7 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
                 >{word}</span
               >{/each}</code
           >
-          {#if offerOf(item) === "press"}
+          {#if line.offer === "press"}
             <Button
               label={say($lang, "machine_install")}
               tone="secondary"
@@ -270,4 +284,5 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
       <span class="min-w-0 break-words text-text-faint">{core.said}</span>
     {/if}
   </p>
+  <Scanning scanning={answer.scanning} />
 </div>

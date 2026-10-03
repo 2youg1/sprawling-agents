@@ -35,6 +35,7 @@
   import { setUi, ui } from "../ui";
   import Anchored from "./gallery/anchored.svelte";
   import Conversation from "./gallery/conversation.svelte";
+  import Doc from "./gallery/doc.svelte";
   import Filed from "./gallery/filed.svelte";
   import FirstRun from "./gallery/first_run.svelte";
   import G2 from "./gallery/g2.svelte";
@@ -132,6 +133,7 @@
   <SettingsPanel />
   <G2 />
   <R3 />
+  <Doc />
   <Tables />
   <Monitor />
   <Parts />
