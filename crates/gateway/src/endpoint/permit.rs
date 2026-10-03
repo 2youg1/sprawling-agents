@@ -151,12 +151,12 @@ impl Queue {
 
     /// Takes a permit for `ticket` when it is at the head of the queue.
     fn try_take(&mut self, ticket: u64, now: Instant) -> Turn {
-        if self.waiting.back() != Some(&ticket) {
+        if self.waiting.front() != Some(&ticket) {
             return Turn::Wait(None);
         }
         match self.permits.take(now) {
             Take::Granted => {
-                self.waiting.pop_back();
+                self.waiting.pop_front();
                 Turn::Granted
             }
             Take::Full => Turn::Wait(None),
