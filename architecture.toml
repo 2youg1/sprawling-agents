@@ -1229,6 +1229,7 @@ module = [
   { name = "citysim::wire_script::exchange", file = "tools/citysim/src/wire_script/exchange.rs", owns = "one request read off a loopback connection, its scripted answer written back, and the exchange appended to a record", shape = "adapter", since = "V0.0.8", status = "built", spec = "tools.citysim.spec.WireScript.Exchange" },
   { name = "citysim::wire_script::tests", file = "tools/citysim/src/wire_script/tests.rs", owns = "the same request recorded byte for byte alike, a used-up script refused with its code, and a reply the city could not read refused when the script is read", shape = "test", since = "V0.0.8", status = "built", spec = "tools.citysim.spec.WireScript" },
   { name = "citysim::provider (main)", file = "tools/citysim/src/bin/provider.rs", owns = "the stand-in provider as a process: a loopback port, its URL printed, then the script replayed", shape = "adapter", since = "V0.0.8", status = "built", spec = "tools.citysim.spec.WireScript" },
+  { name = "citysim::serve_grouped (main)", file = "tools/citysim/src/bin/serve_grouped.rs", owns = "a served city in a process group of its own, closed in order on a line from stdin, so the acceptance walk and pgo-train close their Windows cities the way a User would", shape = "adapter", since = "V0.0.9", status = "built", spec = "tools.citysim.Spec" },
 ]
 
 # What each family of modules is for. Keyed by the prefix its module
