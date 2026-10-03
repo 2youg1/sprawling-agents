@@ -30,7 +30,7 @@ inductive CeilingSource where
   | Policy
   deriving DecidableEq, Repr
 
-/-- 请求写在哪一面（`kernel::DialectKind`）。kernel 的规格还没有迁到 Lean，这里照它的三个变体写一份模型里的类型。 -/
+/-- 请求写在哪一面（`kernel::DialectKind`）。kernel 的 Lean 规格（`crates/kernel/Spec.lean`）不定义这个类型，这里照它的三个变体写一份模型里的类型。 -/
 inductive DialectKind where
   | Anthropic
   | OpenAi

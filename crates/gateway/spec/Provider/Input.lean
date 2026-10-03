@@ -31,7 +31,7 @@ pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds>;
 
 namespace Gateway.Provider.Input
 
-/-- 一个模型收得下什么（`kernel::event::record::InputKinds`，`gateway::InputKinds` 是它的再导出）。kernel 的规格还没有迁到 Lean，所以这里照它的两个变体写一份模型里的类型，拼写与 Rust 相同。 -/
+/-- 一个模型收得下什么（`kernel::event::record::InputKinds`，`gateway::InputKinds` 是它的再导出）。kernel 的 Lean 规格（`crates/kernel/Spec.lean`）不定义这个类型，所以这里照它的两个变体写一份模型里的类型，拼写与 Rust 相同。 -/
 inductive InputKinds where
   | Text
   | TextImage

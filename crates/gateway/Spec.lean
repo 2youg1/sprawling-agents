@@ -86,7 +86,7 @@ import crates.gateway.spec.Transcribe.Recording
 - **上游 `/models` 说了 `image` 算不算「收得下什么」的一档，未定。** 探测把每一行的 `input_modalities` 原样记进 `ModelFacts`（§8-16），`AttachedEndpoint.models` 带着它，而 `accepted_input`（§8-37）不读它：那是供应方自己的词（`image`、`audio`），一个中转站可能为一个厂商自己拒图的 id 写上 `image`。若定为一档，它排在人之后、目录之前，与上限梯的 `Upstream` 同位；要定下它，需要一份真实中转站的 `/models` 记录，其中写着 `image` 的模型在那条线上确实收图。
 - **responses 面答 `usage: null` 时算不算「供应方没报用量」，未定。** `openai-openapi` 把 `Response.usage` 写作 `ResponseUsage` 或 `null`。`dialect::responses::reply` 在 `usage` 缺席时报 `E_WIRE_MISMATCH`，为 `null` 时经 `mismatch::tokens_or_zero` 把输入与输出都读成 0 token（缓存两数经 `mismatch::cache_count` 读成 `Unreported`，kernel D36）：两种缺法得到相反的结论，后一种让这次调用的用量从账上静默消失。规格没有说 `status` 为 `completed` 的 response 会不会带 `null`，所以读法暂不改；要定下它，需要一个真实供应方在已完成的 response 里答出 `usage: null` 的记录。
 
-模型自己的假设写在各分部的定义与定理假设里，不写成公理：`InputKinds`、`DialectKind`、`Ceiling` 是 kernel 的类型，kernel 的规格还没有迁到 Lean，所以分部照它们的变体与不变量各写一份模型里的类型，拼写与 Rust 相同；预置表按 host 与前缀查到的答案、`reach::is_local` 的判断、拒词里有没有窗口标记，都当作参数交给模型，它们各自的读法由 Rust 的测试检查。
+模型自己的假设写在各分部的定义与定理假设里，不写成公理：`InputKinds`、`DialectKind`、`Ceiling` 是 kernel 的类型，kernel 的 Lean 规格不定义它们，所以分部照它们的变体与不变量各写一份模型里的类型，拼写与 Rust 相同；预置表按 host 与前缀查到的答案、`reach::is_local` 的判断、拒词里有没有窗口标记，都当作参数交给模型，它们各自的读法由 Rust 的测试检查。
 -/
 
 /-! ## 4 现状分析
@@ -117,7 +117,7 @@ Lean 里的名字与 Rust 的对应：
 /-! ## 7 模块边界
 
 ```
-dialect（路由，纯函数）◀── endpoint（I/O 适配器，impl kernel::Model）
+dialect（路由，纯函数）◀── endpoint（I/O 适配器；endpoint::permit::Gated 是 kernel::Model 的实现）
 dialect ───────────────▶ anthropic／openai（各自一种线格式的两向翻译）
 anthropic／openai ──────▶ mismatch（共用的读取器与拒词；单向，无环）
 credential ──▶ 内缝 Vault（pub(crate) trait：平台凭证库生产适配器＋会话内存第二适配器）
@@ -231,8 +231,8 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 **决定**：
 - **配置**：wire 的 `EndpointTuning` 多 `max_in_flight: Option<u32>`（`crates/wire/spec/Command/Tuning.lean` §8-29），装配层的 `tuning_of` 把零与缺席读成 `None`、把 1 到 `IN_FLIGHT_MAX` 的值经 `MaxInFlight::try_from` 收下、其余拒 `E_CONFIG_INVALID`（与同一张表单上读作凭据的请求头同一个码，一张表单的拒绝不分两种码）；gateway 的 `EndpointTuning::max_in_flight: Option<MaxInFlight>` 是 D17 那把键，住在 tuning 而不是每次调用的 `EndpointConfig`，因为门是端点的、一次建成，调用只取名额。`router/payload.rs` 的 `endpoint_attached` 载荷多同一把键，`#[serde(default, skip_serializing_if = "Option::is_none")]`：旧账本没有它的行读作 `None`，重开的城取缺省，从没被定过的端点写出的字节与今天相同。
 - **缺省**：`None` 时取 `vendor_in_flight(base_url)`，一张住在 `gateway::concurrency` 的小表；今天没有厂商在文档里给出并发数（厂商给的是每分钟请求数与 token 数），所以表里只有一行：`reach::is_local` 认作这台电脑上的服务器取 `IN_FLIGHT_LOCAL`（4，本地推理服务器的并行槽位常见的缺省），其余取 `IN_FLIGHT_DEFAULT`（16）。
-- **读数**（Roadmap M2）：每个 `Transport` 记三样，`EndpointBook::queue_readings()` 按端点名一次读出 `QueueReading { endpoint, limit, in_use, queued, waited: WaitTally }`——`queued` 是此刻排队的号数，`waited` 是自启动以来每次排队等了多少微秒的计数直方图（与 `throughput` 台的 `relay_queue` 同一个分桶，p50／p99／p999 与 max 由它读出），没排队就拿到名额的调用记作 0 µs 一次，于是「等待为 0」可以被读出而不是被推断。读数是内存里的计数，不进账本：它说的是这一个进程的排队，不是城的历史。
-- **预算行**：`tools/xtask/budgets.toml` 加一行 `[provider_queue]`（测量、不设门），`what` 写「一次模型调用在端点名额前从拿号到取到的等待，注入的单调时钟，p50／p99／p999 与 max」，读数来自 TP1 吞吐台在 N = 16 与 64 时的 `queue_readings()`。
+- **读数**（Roadmap M2）：排队的等待由测试台 `endpoint::permit` 的 `instrument_provider_queue`（`#[ignore]`，`just bench` 跑它）读出：16 与 64 个调用方抢四个名额，从拿号到取到的等待按注入的单调时钟计，印出 p50／p99／p999 与 max。读数是测试进程里的计数，不进账本、不进产品路径。按端点名读出此刻排队数与等待直方图的公开面（`EndpointBook` 上一个读数方法）今天没有：它在页面第一次要显示排队的那一次改动里与它的读者一起加，因为没有生产调用者的公开面不留（下文重开参数里的线上字段是同一次改动）。
+- **预算行**：`tools/xtask/budgets.toml` 的 `[provider_queue]`（测量、不设门）写「一次模型调用在端点名额前从拿号到取到的等待，注入的单调时钟，p50／p99／p999 与 max，16 与 64 个调用方对四个名额」，`measured_by` 指向 `instrument_provider_queue`；它的 `status` 写明读数欠着。
 
 **理由**：上限是 User 对一个端点定的规矩，与 `timeout_ms` 同属 tuning，随端点上线、随 `endpoint_attached` 进账本，重放才能说出某次调用是在什么上限下排的队。缺省写成一张表而不是一个常数，是因为本地服务器与云端的可承受并发差一个数量级；表今天几乎是空的，因为编一个厂商没写的数比给一个保守的缺省更糟。排队读数放在 gateway，是因为排队只发生在这里（D17）；不入账，是因为每次调用一行等待会让账本随调用数线性长，而它回答的是「这个进程现在堵不堵」。
 
@@ -246,7 +246,7 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 /-!
 ### 8-14 gateway 目录化（形状：主类型居索引，方法按簇归文件）
 
-`credential`、`dialect`、`endpoint`、`router` 各是一个目录：主类型居索引文件，方法按职责簇归文件（例如 `endpoint/config.rs` 管类型与构造，`call.rs` 管往返，`model.rs` 管 `kernel::Model` 的门）。跨文件的私有项开 `pub(crate)`，对外拼写不变；文件清单以 ARCHITECTURE 的模块图为准。
+`credential`、`dialect`、`endpoint`、`router` 各是一个目录：主类型居索引文件，方法按职责簇归文件（例如 `endpoint/config.rs` 管类型与构造，`call.rs` 管往返，`model.rs` 管 `Endpoint` 自己的三扇门，`permit.rs` 管 crate 外唯一的 `kernel::Model` 实现 `Gated`）。跨文件的私有项开 `pub(crate)`，对外拼写不变；文件清单以 ARCHITECTURE 的模块图为准。
 -/
 
 /-!

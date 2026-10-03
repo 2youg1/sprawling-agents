@@ -33,6 +33,8 @@ pub enum DialectKind { Anthropic, OpenAi, OpenAiResponses }   // 定义在 kerne
 pub fn request_wire(kind: DialectKind, req: &ChatRequest, images: &ImageBytes, spelling: ChatSpelling) -> Result<serde_json::Value, AxError>;
                                     // spelling 只有 chat 面读；另两面各只有一种拼法（§8-17 厂商拼法列）
 pub fn response_from_wire(kind: DialectKind, wire: &serde_json::Value) -> Result<ChatResponse, AxError>;
+pub fn increment_of(kind: DialectKind, frame: &serde_json::Value) -> Option<Increment>;          // §8-13
+pub fn settled_from_stream(kind: DialectKind, frames: &[serde_json::Value]) -> Result<serde_json::Value, AxError>;   // §8-13
 #[cfg(test)]
 pub(crate) fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<serde_json::Value, AxError>;
                                     // 响应侧的反方向只供测试：造 provider 回复、证往返（wire→canonical→wire 等值）；生产里没有调用者，所以不编进发行的二进制
@@ -73,8 +75,7 @@ impl ImageBytes {
     pub fn len(&self) -> usize;  pub fn is_empty(&self) -> bool;
     pub(crate) fn encoded(&self, at: &Locator) -> Result<String, AxError>;  // 标准 base64
 }
-pub fn request_wire(kind: DialectKind, req: &ChatRequest, images: &ImageBytes)
-    -> Result<serde_json::Value, AxError>;
+// request_wire 收 &ImageBytes，签名见上文 §8-1 那一块（第四个参数是 ChatSpelling）
 ```
 
 - **dialect 仍是数据的纯函数**。字节不在这里取：`ImageBytes` 是参数，不是一个 store 句柄。同一份 `(ChatRequest, ImageBytes)` 永远翻出同一串字节，重放因此仍能重推当时实发的请求。
