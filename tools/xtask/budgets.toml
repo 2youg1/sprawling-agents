@@ -397,35 +397,35 @@ what = "the share of kernel mutants the tests kill"
 mutation_files = ["crates/kernel/src/**"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
-status = "gated by just mutants-score, not by just check; the score is owed until the first dispatched mutants-modules run reports it"
+status = "gated by just mutants-score, not by just check; the score is owed: on-demand run 37120210843 (mutants-modules on wave/W11) had not finished when this row was last written, and its mutants-modules-score job prints the score"
 
 [storage_jsonl_mutation]
 what = "the share of storage::jsonl mutants the tests kill"
 mutation_files = ["crates/storage/src/jsonl.rs", "crates/storage/src/jsonl/**"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
-status = "gated by just mutants-score, not by just check; the score is owed until the first dispatched mutants-modules run reports it"
+status = "gated by just mutants-score, not by just check; the score is owed: on-demand run 37120210843 (mutants-modules on wave/W11) had not finished when this row was last written, and its mutants-modules-score job prints the score"
 
 [accounting_relay_mutation]
 what = "the share of accounting::worker::relay mutants the tests kill"
 mutation_files = ["crates/accounting/src/worker/relay.rs"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
-status = "gated by just mutants-score, not by just check; the score is owed until the first dispatched mutants-modules run reports it"
+status = "gated by just mutants-score, not by just check; the score is owed: on-demand run 37120210843 (mutants-modules on wave/W11) had not finished when this row was last written, and its mutants-modules-score job prints the score"
 
 [collab_signal_tool_mutation]
 what = "the share of collab::signal_tool mutants the tests kill"
 mutation_files = ["crates/collab/src/signal_tool.rs"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
-status = "gated by just mutants-score, not by just check; the score is owed until the first dispatched mutants-modules run reports it"
+status = "gated by just mutants-score, not by just check; the score is owed: on-demand run 37120210843 (mutants-modules on wave/W11) had not finished when this row was last written, and its mutants-modules-score job prints the score"
 
 [kernel_share_mutation]
 what = "the share of kernel::share mutants the tests kill"
 mutation_files = ["crates/kernel/src/share.rs"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
-status = "gated by just mutants-score, not by just check; the score is owed until the first dispatched mutants-modules run reports it"
+status = "gated by just mutants-score, not by just check; the score is owed: on-demand run 37120210843 (mutants-modules on wave/W11) had not finished when this row was last written, and its mutants-modules-score job prints the score"
 
 [ledger_append]
 what = "append plus fsync, p50 and p99"
