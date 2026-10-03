@@ -54,9 +54,12 @@ impl Conversation {
     /// the assigned opening names it rather than repeating it: the run
     /// segment is not cached, and a pasted task written here again
     /// would be paid for twice on every turn.
-    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening, _from: &str) {
+    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening, from: &str) {
         self.push_user_text(match opening {
-            Opening::FromJob => format!("The task is in JOB.md above.\nGoal: {goal}"),
+            // The goal is in the job file, escaped; written here in a
+            // user-role message, a resident's goal could spell a `user:`
+            // line (`crates/city/spec/SpineFiles.lean` D21).
+            Opening::FromJob => format!("The task is in JOB.md above, handed down by {from}."),
             Opening::Inherited => format!("Task: {task}\nGoal: {goal}"),
             // The person's own line, unwrapped. A conversational turn
             // dressed in field labels reads as a form, and a form is

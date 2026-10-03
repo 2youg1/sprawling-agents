@@ -76,8 +76,9 @@ const HANDOFF_TEMPLATE: &str = include_str!("../templates/Handoff.md");
 /// owes left out. One template, so a building's SPEC and a crate's SPEC
 /// stay one shape rather than two competing ones.
 const SPEC_TEMPLATE: &str = include_str!("../templates/SPEC.md");
-/// The job file and the two markers `write_job` fills: one form, one home.
+/// The job file and the three markers `write_job` fills: one form, one home.
 const JOB_TEMPLATE: &str = include_str!("../templates/JOB.md");
+const FROM_PLACEHOLDER: &str = "<fill-from>";
 const TASK_PLACEHOLDER: &str = "<fill-task>";
 const GOAL_PLACEHOLDER: &str = "<fill-goal>";
 use crate::building::template::NAME_PLACEHOLDER;
@@ -198,8 +199,8 @@ pub fn clear_handoff(city_root: &Path, room: &Address) -> Result<(), AxError> {
             format!("{}: {err}", path.display()),
         )
         .with_recovery(
-            "a new session carries nothing handoff; \
-             make this file removable, then start the session again",
+            "a new session leaves the last session's handoff behind only once this \
+             file is gone; make it removable, then start the session again",
         )),
     }
 }
@@ -322,17 +323,23 @@ pub fn roadmap(city_root: &Path, building_addr: &Address) -> Result<String, AxEr
 
 /// The job form with the brief written into it.
 ///
-/// Each marker is scanned once and neither value is ever re-scanned,
-/// so a task naming the goal marker and a goal naming the task marker
-/// both survive verbatim: `split` divides the form on one marker,
-/// `replace` fills the other inside each part, and the join inserts
-/// the first value without looking at it again.
+/// The task and the goal are escaped, whoever wrote them, so neither can
+/// close the element it sits in (`crates/city/spec/SpineFiles.lean`
+/// D21). An escaped value holds no `<`, so it cannot spell a marker
+/// either, and the markers can be filled one after another without a
+/// value being read as a marker it happens to name.
 fn filled(brief: &JobBrief<'_>) -> String {
     JOB_TEMPLATE
-        .split(TASK_PLACEHOLDER)
-        .map(|part| part.replace(GOAL_PLACEHOLDER, brief.goal))
-        .collect::<Vec<_>>()
-        .join(brief.task)
+        .replace(TASK_PLACEHOLDER, &escaped(brief.task))
+        .replace(GOAL_PLACEHOLDER, &escaped(brief.goal))
+        .replace(FROM_PLACEHOLDER, brief.from)
+}
+
+/// Text made safe to sit inside one of the job form's elements.
+fn escaped(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 /// Writes the job file for one run and returns the bytes written, so the
