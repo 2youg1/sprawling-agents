@@ -115,6 +115,40 @@ pub struct SignalConsumed {
     pub by: String,
 }
 
+/// `signal_wait_started`: a run that sent `signal` with `wait` stopped
+/// at its safe point until a reply from `on` or the deadline
+/// (`crates/kernel/spec/Event/Record.lean` D32). `deadline_ms` is a
+/// reading of the injected clock, not the wall: replay orders by seq,
+/// and the wire turns it into a wall-clock instant (wire D34).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignalWaitStarted {
+    pub on: Address,
+    pub signal: SignalId,
+    pub deadline_ms: u64,
+}
+
+/// `signal_wait_ended`: the one line that pairs with a
+/// `signal_wait_started`, and what ended the wait.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignalWaitEnded {
+    pub signal: SignalId,
+    pub by: WaitEnd,
+}
+
+/// What ended a reply wait. Three arms and no fourth: the model's
+/// `waits_end` holds every wait to one of them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "end")]
+pub enum WaitEnd {
+    /// The room waited on sent a signal to the waiting run's room.
+    Reply { reply: SignalId },
+    /// The injected clock passed the deadline.
+    Timeout,
+    /// The run left its room while it waited: cancelled, failed, or
+    /// frozen after the process died.
+    Left,
+}
+
 /// `worktree_opened`: the tree a resident was given to work a claimed
 /// node in, by name and measured size. It carries no path: an absolute
 /// path is a fact about one machine, and a history that holds one does

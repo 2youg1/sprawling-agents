@@ -554,7 +554,7 @@ pub enum WaitEnd { Reply { reply: SignalId }, Timeout, Left }   // 回信到了�
 - `deadline_ms` 是注入时钟上的读数，不是墙钟：重放按 seq 读次序，不按时刻；线上把它换成墙钟时刻（wire D34）。
 - 等待期间 run 不调模型、不写 `model_returned`，watchdog 读到一个未配对的 `started` 就知道这个 run 是停着而不是卡住，不对它退避或报警。
 
-**现状**：两个种类已在 `crates/kernel/spec/Event/Kind.lean` 的表里与 `EventKind` 里（`ALL` 末尾，入窗），还没有写方；上面三个载荷类型与写方（collab 的发信门，collab D9）同一次改动落地，读者在那之前把两个种类当作没有内容的行跳过。
+**现状**：两个种类已在 `crates/kernel/spec/Event/Kind.lean` 的表里与 `EventKind` 里（`ALL` 末尾，入窗），上面三个载荷类型在 `kernel::event::record`（`crates/kernel/src/event/record/collaboration.rs`；`WaitEnd` 线上以 `end` 键区分三臂），还没有写方；写方是 collab 的发信门（collab D9），读者在那之前把两个种类当作没有内容的行跳过。
 
 **理由**：一个停着的 run 必须在账本里看得出来，否则 `status`、页面、watchdog 与重放都分不清它在等还是卡住（`crates/collab/spec/Delivery.lean` 的 `wait_bounded`、`waits_end` 说的是模型，账本要能把同一件事说给读者）。开始与结束分两行，是因为等待跨越安全点、可能跨越进程死亡；只记一行「等过多久」要等结束才写，中间那段时间什么都看不见。入窗，是因为下一次模型调用要知道它是被回信还是被超时叫醒的。
 
