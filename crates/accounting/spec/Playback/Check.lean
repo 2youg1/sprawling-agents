@@ -73,7 +73,7 @@ pub fn land(place: Place<'_>, bytes: &[u8]) -> Result<(), AxError>;
 1. **CSP 在前。** 第一个 `meta http-equiv="Content-Security-Policy"` 的父元素是 `head`，在它之前建出的元素只有 `html`、`head`、`title` 和不带 `http-equiv` 的 `meta`。它的策略有 `default-src`，`connect-src`、`base-uri`、`form-action` 三条恰好是 `'none'`。页面上每一条 CSP 的每一个值都在这张表里：`'none'`、`'unsafe-inline'`、`'unsafe-eval'`、`'wasm-unsafe-eval'`、`data:`、`blob:`、`'sha256-…'`、`'sha384-…'`、`'sha512-…'`、`'nonce-…'`。主机、`'self'`、`*`、`http:` 一类的 scheme、`'strict-dynamic'`，以及取值不是来源表的指令（`sandbox`、`report-uri`、`report-to` 等）都是发现。
 2. **不出现的元素。** HTML 命名空间的 `base`、`form`、`iframe`、`frame`、`frameset`、`object`、`embed`、`portal`、`applet`。`meta` 的 `http-equiv` 只许 `content-type` 与 `content-security-policy`，`refresh` 等都是发现。
 3. **URL 属性。** 任何命名空间的 `href`、`src`、`poster`、`action`、`formaction`、`data`、`background`、`cite`、`longdesc`、`manifest`、`ping`、`codebase`、`archive` 与 xlink 的 `href`：按 URL 规范去掉首尾的 C0 控制字符与空格、删掉其中的制表符与换行之后，值以 `#` 开头，或 scheme 是 `data`、`blob`。空值也是发现。`srcset`、`imagesrcset` 一律是发现。
-4. **CSS。** `style` 元素的文本、任何元素的 `style` 属性、SVG 与 MathML 元素的其余属性，都用 CSS 语法的分词器读（`cssparser`），逐层进入函数与块：`url()`、`src()` 的参数与 `image-set()`、`-webkit-image-set()` 里的字符串按上面第 3 条判；`@import`、坏的 url token、超过分词器嵌套上限的块都是发现。
+4. **CSS。** `style` 元素的文本、任何元素的 `style` 属性、SVG 与 MathML 元素的其余属性，都用 CSS 语法的分词器读（`cssparser`），逐层进入函数与块：不带引号的 `url()` 整个按上面第 3 条判，`url()`、`src()`、`image-set()`、`-webkit-image-set()` 这四个函数直接含的字符串也按第 3 条判（它们里面再开的函数或块按自己的名字另判）；任何深度的 `@import`、坏的 url token、超过 `cssparser` 默认嵌套上限（`REASONABLE_NESTED_BLOCK_LIMIT`）的块都是发现，碰到嵌套上限时这一段 CSS 余下的部分不再读。
 
 静态离线通过，说的只是页面声明的资源与策略：内联 JS 可以给 `location` 赋值、动态建链接，这些路径静态检查看不见。CSP 也不是任意 JS 的沙箱。所以这一项从不说「不联网」；在某些路径下没看到联网，是浏览器观察一项的话。
 
