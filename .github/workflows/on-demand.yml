@@ -211,7 +211,12 @@ jobs:
   shots:
     if: inputs.job == 'shots'
     runs-on: windows-latest
-    timeout-minutes: 60
+    # The fold cap moved from 200 to 512, so the gallery is photographed
+    # in all 372 folds at 1440 and all 251 at 1920 instead of 200 each:
+    # about 1300 launches against the 866 of the run measured at 25
+    # minutes on a hosted runner, so about 38 minutes now. 90 minutes
+    # keeps the same headroom the 60 gave the smaller run.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
