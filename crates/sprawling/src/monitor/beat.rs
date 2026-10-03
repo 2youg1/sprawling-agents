@@ -5,7 +5,7 @@
 
 //! The beat the monitor samples at: one atomic the sampling thread reads
 //! on every wake, and the file under the city's reserved subtree that
-//! keeps it from one serve to the next (`crates/sprawling/spec/Monitor.lean` §8-96, D44).
+//! keeps it from one serve to the next (`crates/sprawling/spec/Monitor.lean` §8-96, D48).
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};

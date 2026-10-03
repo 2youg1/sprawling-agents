@@ -166,7 +166,7 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 
 **定下的值。** 内存节拍默认 `wire::BeatMs::DEFAULT` 100 ms（Memory.lean 的测量计划与 Roadmap M0 第 7 条），可在 `BEAT_MIN_MS`–`BEAT_MAX_MS` 之内由页面调（`crates/wire/spec/Frames/Monitor.lean` §8-47i）；一拍是 `MEMORY_BEATS_PER_BEAT` 个内存节拍，默认即 1 s（§8-94 的「每秒一点」）；线程名 `sprawling-monitor`。
 
-**节拍按城记住**（D44）：`monitor::beat::Beat` 持有当前节拍（一个原子数，采样线程每次醒来读它）与城里记它的文件 `kernel::layout::CityLayout::monitor()`（`.sprawling/MONITOR.toml`，一行 `beat_ms = <n>`）。`Beat::open(city_root)` 在 serve 时读这个文件，文件不在时是默认，读不懂或越界时也是默认并记一条 warn 日志；`Beat::set(b)` 先改原子数、再整份重写文件（`city::document::replace` 之外的保留子树文件照 `GUIDE.toml` 的做法写），写不成记 warn 日志，此刻的节拍仍生效。三个平台上的读写都只经标准库的文件接口。
+**节拍按城记住**（D48）：`monitor::beat::Beat` 持有当前节拍（一个原子数，采样线程每次醒来读它）与城里记它的文件 `kernel::layout::CityLayout::monitor()`（`.sprawling/MONITOR.toml`，一行 `beat_ms = <n>`）。`Beat::open(city_root)` 在 serve 时读这个文件，文件不在时是默认，读不懂或越界时也是默认并记一条 warn 日志；`Beat::set(b)` 先改原子数、再整份重写文件（`city::document::replace` 之外的保留子树文件照 `GUIDE.toml` 的做法写），写不成记 warn 日志，此刻的节拍仍生效。三个平台上的读写都只经标准库的文件接口。
 
 **决定。**
 
@@ -203,11 +203,11 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 **本节接口的当前状态。** `Wake` 等不经人的入口尚未接入；性能摘要与 doctor 尚不显示降级；盘慢、内存紧、CPU 被占满三种状态还没有生产的读数（`crates/kernel/spec/Degradation.lean` §8-74）。
 -/
 
-/-! D44 采样节拍按城记在保留子树的一个文件里，由持有监视器的外壳读写
+/-! D48 采样节拍按城记在保留子树的一个文件里，由持有监视器的外壳读写
 
 **决定**：`monitor::beat::Beat` 是节拍的唯一持有者：采样线程读它，`MonitorFeed::beat` 写它，`MONITOR.toml` 让它跨 serve 留住。文件在城的保留子树下，没有写域够得到它。
 
-**理由**：节拍是这座城怎样测量自己的设定，不是这座城的历史，所以不写账本；也不是 User 的偏好，两座城可以不同（wire D44）。原子数让采样线程每次醒来不必加锁。
+**理由**：节拍是这座城怎样测量自己的设定，不是这座城的历史，所以不写账本；也不是 User 的偏好，两座城可以不同（wire D46）。原子数让采样线程每次醒来不必加锁。
 
 **被否**：①写进城的 `CONFIG.toml`：那是配置阶梯的城一层，楼与房间会继承或覆盖它，而节拍只对整座城有一个值，要再加一条「只许城一层写」的规则；②写进账本一行：重放与回放都不需要它，而每次拖动控件都会多一行历史。
 

@@ -62,7 +62,7 @@ impl<B: Fn() -> u64> Gauges<B> {
 }
 
 /// Starts the `sprawling-monitor` thread, at the beat the city at
-/// `volume` kept (`super::beat`, D44), and hands back that beat so a
+/// `volume` kept (`super::beat`, D48), and hands back that beat so a
 /// page can set it. The thread ends at the first beat after the monitor
 /// it was handed has been dropped.
 ///

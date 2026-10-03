@@ -77,7 +77,7 @@ pub const DEVICES_FILE: &str = "devices.toml";
 /// subtree, one directory per building.
 pub const PLAYBACK_DIR: &str = "playback";
 /// The beat the performance monitor samples at, under the city's
-/// reserved subtree (`crates/sprawling/spec/Monitor.lean` D44).
+/// reserved subtree (`crates/sprawling/spec/Monitor.lean` D48).
 pub const MONITOR_FILE: &str = "MONITOR.toml";
 
 /// What the staging file of a document named `name` is called: the

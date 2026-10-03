@@ -33,7 +33,7 @@ pub const RUN_ID_PATTERN: &str = "????????-????-????-????-????????????";   // `R
 pub const REMOTE_DIR: &str = "remote";                               // 远程门的状态，城的保留子树下（§8-76）
 pub const DEVICES_FILE: &str = "devices.toml";                       // 配对过的设备表
 pub const PLAYBACK_DIR: &str = "playback";                           // playback 导出件，城的保留子树下
-pub const MONITOR_FILE: &str = "MONITOR.toml";                      // 监视器的采样节拍，城的保留子树下（`crates/sprawling/spec/Monitor.lean` D44）
+pub const MONITOR_FILE: &str = "MONITOR.toml";                      // 监视器的采样节拍，城的保留子树下（`crates/sprawling/spec/Monitor.lean` D48）
 pub fn document_staging_name(name: &OsStr) -> OsString;              // `.<name>.staging`：整写整不写的文件写者的暂存名（8-27），与目标同目录
 pub fn is_document_staging_name(name: &OsStr) -> bool;               // 这个名字是不是上一行拼出来的；检查点的暂存过滤问它（storage D30）
 

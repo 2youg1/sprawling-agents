@@ -354,8 +354,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D33 | skill 与 MCP 的使用各从哪一行折出、按天怎么数、怎样导出 | `crates/wire/spec/Reading.lean` |
 | D34 | 停在同步 `send` 上的 run 在 `RunSummary` 上多一个 `waiting`；`wait` 是工具参数 | `crates/wire/spec/Reading.lean` |
 | D35 | `Used` 的两个缓存数在 provider 没报时缺席，页面写「未知」 | `crates/wire/spec/Reading.lean` |
-| D44 | 采样节拍是 `Monitoring` 的第四个变体，按城记住 | `crates/wire/spec/Frames/Monitor.lean` |
 | D45 | 视图广播按帧合并只合并刷写，不改帧的形状，也不按 session 重排 | `crates/wire/spec/Server/Socket.lean` |
+| D46 | 采样节拍是 `Monitoring` 的第四个变体，按城记住 | `crates/wire/spec/Frames/Monitor.lean` |
 -/
 
 /-! ## 13 依赖选型

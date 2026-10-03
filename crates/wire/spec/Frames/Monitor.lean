@@ -65,9 +65,9 @@ pub struct MonitorFeed { /* …既有… */ pub beat: Arc<dyn Fn(BeatMs) + Send 
 
 -/
 
-/-! D44 采样节拍是 `Monitoring` 的第四个变体，而不是一个 `Command`
+/-! D46 采样节拍是 `Monitoring` 的第四个变体，而不是一个 `Command`
 
-**理由**：它与看不看一样只改这座城此刻怎样采样，不写账本、不改城的任何状态，执行者是持有监视器的外壳，而 `Command` 的执行者是记账线程，它够不到采样线程；城记住它（`crates/sprawling/spec/Monitor.lean` D44），是为了下一次 serve 不回到默认。
+**理由**：它与看不看一样只改这座城此刻怎样采样，不写账本、不改城的任何状态，执行者是持有监视器的外壳，而 `Command` 的执行者是记账线程，它够不到采样线程；城记住它（`crates/sprawling/spec/Monitor.lean` D48），是为了下一次 serve 不回到默认。
 
 **被否**：①一个 `Command::SetMonitorBeat`：要过记账线程，再由它转交外壳，多一条只为转交的路；②放进 User 的偏好文件：偏好跟人走，而节拍是这座城自己的测量设定，两座城可以不同。
 
