@@ -18,7 +18,7 @@ import { get } from "svelte/store";
 import { QUERIES } from "./asking";
 import { putPreferences } from "./commands";
 import { blendOf, type Appearance } from "./appearance";
-import type { PreferenceDoor, Preferences } from "./prefs";
+import { themeOf, type PreferenceDoor, type Preferences } from "./prefs";
 import type { Connection } from "./socket";
 import type { Appearance as WireAppearance, PreferencesAnswer } from "../wire";
 
@@ -45,6 +45,7 @@ export function adopted(held: Preferences, answer: PreferencesAnswer): Preferenc
     panel: answer.panel ?? held.panel,
     proxying: answer.proxying ?? held.proxying,
     appearance: answer.appearance === undefined ? held.appearance : appearanceOfCity(answer.appearance, held.appearance),
+    theme: answer.theme === undefined ? held.theme : themeOf(answer.theme),
   };
 }
 

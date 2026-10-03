@@ -23,6 +23,7 @@ import { dialFor } from "./core/remote/session";
 import { openConnection, tokenIn } from "./core/socket";
 import type { Opening } from "./ui";
 import { applyAppearance, watchMachineLighting } from "./views/setup/appearance";
+import { documentStage, wearKeptTheme } from "./views/setup/colours";
 import "./theme.css";
 
 const main = document.getElementById("main");
@@ -33,6 +34,9 @@ if (main !== null) {
   // of shape a person did not ask for.
   applyAppearance(document.documentElement, get(prefs.held).appearance);
   watchMachineLighting(document.documentElement, prefs);
+  // The person's colours, laid over the built-in theme now and again
+  // whenever they or the city's answer change them (roadmap CT).
+  wearKeptTheme(documentStage(document), prefs);
   // Read once: the socket greets with it and the HTTP doors carry it
   // as a bearer header, and a second read could answer differently
   // after the address bar changed.

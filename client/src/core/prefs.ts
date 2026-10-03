@@ -382,8 +382,9 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
       settle({ ...get(held), appearance });
       told({ appearance: appearanceOnWire(appearance) });
     },
-    setTheme() {
-      return undefined;
+    setTheme(theme) {
+      settle({ ...get(held), theme });
+      told({ theme: { tokens: { ...theme.tokens }, css: theme.css } });
     },
     setProxying(proxying) {
       settle({ ...get(held), proxying });

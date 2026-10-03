@@ -35,6 +35,7 @@ const STATED: Preferences = {
   proxying: "always",
   notifying: "on",
   showing: "results",
+  theme: { tokens: { "--color-accent": "#3366ff" }, css: ":root { color-scheme: dark }" },
 };
 
 describe("the cache in front of the city", () => {
