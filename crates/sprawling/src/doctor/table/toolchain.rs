@@ -433,7 +433,7 @@ pub(super) const PYTHON: Requirement = row(
 pub(super) const CARGO_MUTANTS: Requirement = row(
     "cargo-mutants",
     Need::Optional,
-    "`just mutants`, which asks whether the tests notice a changed kernel",
+    "`just mutants`, which asks whether the tests notice a change in a module held to a mutation score",
     program("cargo-mutants"),
     "https://mutants.rs/",
     same_command("cargo", &["install", "cargo-mutants", "--locked"]),

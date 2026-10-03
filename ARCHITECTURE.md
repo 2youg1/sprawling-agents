@@ -702,7 +702,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `tools/fuzz/fuzz_targets` |
 | V5 formal | termination, absence of overflow and monotonicity in the code; a design rule false on some input nobody tried | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape; the Lean specifications under `crates/`, proved by `just models` in every `just check` |
 | V6 deterministic simulation | components each correct and wrong together | citysim, <!-- xtask:begin citysim_scenarios -->10<!-- xtask:end --> scenario files, failures replayed from their script |
-| V7 mutation | tests that do not bite | `cargo-mutants`, by `just mutants` |
+| V7 mutation | tests that do not bite | `cargo-mutants` over the modules the `mutation_files` rows of `tools/xtask/budgets.toml` name, by `just mutants` locally and `on-demand.yml -f job=mutants-modules` on a runner |
 | V8 cross-version, cross-OS fixtures | byte drift after an upgrade or a platform change | golden ledgers in `tools/fixtures/` |
 | V9 end to end | the thing a person actually wants to do | the real client in a real browser against a real server, on a developer machine |
 | V10 adversarial | a promise the door makes that holds on the traces we wrote and not on the ones we did not | `tools/adversary/`, out of tree, in Lean, driving the shipped binary over the wire |
@@ -880,7 +880,7 @@ User accepts it.
 | Projection rebuild | ≥50,000 records/s | p50 <!-- xtask:begin budget_figure:views_rebuild_per_mb.best_p50_us -->436,676<!-- xtask:end --> µs for <!-- xtask:begin budget_figure:views_rebuild_per_mb.fold_records -->50,000<!-- xtask:end --> records, the large-ledger fold below | no |
 | Prefix assembly | ≤<!-- xtask:begin budget_figure:prefix_assembly.budget_us -->1,000<!-- xtask:end --> µs | `[prefix_assembly]`, with its machine class | no |
 | Runs driving at once | no lane count: a prepared run gets a lane at once, and `accounting::worker::pool` asks only for memory (`crates/sprawling/Spec.lean` D34) | one thread per run, one accounting thread taking every write, and each endpoint's `max_in_flight` permits (`gateway::concurrency`) | no: the one concurrency limit is the endpoint's, not a measurement |
-| Kernel mutation score | ≥90% | by `just mutants` | by that command, not by `just check` |
+| Mutation score of each module a `mutation_files` row names | ≥90%, each row's `minimum_percent` | by `just mutants-score` over the outcomes of `just mutants-modules` | by that command, not by `just check` |
 | Load scenarios (four heavy-load classes) | two stages of one latency metric, stated in `tools/xtask/budgets.toml` `[local_latency]` | the baselines below, each with its machine class | no: a wall-clock figure is the machine's |
 
 The four load scenarios — multi-run parallel, large-ledger fold,

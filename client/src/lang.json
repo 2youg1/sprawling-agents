@@ -1552,8 +1552,8 @@
     "zh": "just fuzz <target>，另外还需要一个 nightly 工具链"
   },
   "machine_enables_cargo_mutants": {
-    "en": "just mutants, which asks whether the tests notice a changed kernel",
-    "zh": "just mutants，检验内核被改动后测试能否发现"
+    "en": "just mutants, which asks whether the tests notice a change in a module held to a mutation score",
+    "zh": "just mutants，检验受变异分数约束的模块被改动后测试能否发现"
   },
   "machine_enables_cargo_nextest": {
     "en": "just test, the test runner every check here calls",
