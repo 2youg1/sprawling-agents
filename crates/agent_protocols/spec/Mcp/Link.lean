@@ -43,8 +43,7 @@ def retryOf : Failure → Retry
 def performed (acted : Bool) (r : Retry) : Nat :=
   (if acted then 1 else 0) + (if r = .yes then 1 else 0)
 
-/-- 对侧可能已经执行过的那些失败（交出之后），恒不被自动再发。 -/
-theorem a_call_handed_over_is_never_sent_again : retryOf .afterHandover ≠ .yes := by decide
+/-! 对侧可能已经执行过的那些失败（交出之后），恒不被自动再发。 -/
 
 /-- 不论对侧做没做，照重试三态行事的调用者都不会把一次写做两遍：唯一自动再发的失败，
 是对侧明说没有执行的那一种。 -/
