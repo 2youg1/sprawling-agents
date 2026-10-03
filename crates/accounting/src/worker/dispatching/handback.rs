@@ -21,6 +21,7 @@ use kernel::{Address, EventKind, Locator};
 
 use crate::effect;
 
+use super::super::waking::landing::Arrival;
 use super::super::{Assignment, CITY_VERIFIER, Owing, RunWorker};
 use super::Dispatched;
 
@@ -36,8 +37,9 @@ impl RunWorker {
     /// `Completion::Done` is something the city observed, and a producer
     /// verifying itself is what `Claim::verified` refuses.
     ///
-    /// Returns the signal it delivered, which is what a knock at the
-    /// parent's room is made from.
+    /// Returns the letter as it arrived in the parent's room: a knock at
+    /// that room is made from it, and it owes its `signal_landed` line
+    /// once the caller has decided the knock (kernel D38).
     ///
     /// # Errors
     /// Propagates the store's refusal of the account, an address that
@@ -46,7 +48,7 @@ impl RunWorker {
         &mut self,
         parent: &Address,
         child: &Dispatched,
-    ) -> Result<collab::Signal, kernel::AxError> {
+    ) -> Result<Arrival, kernel::AxError> {
         let account = format!(
             "room: {}\nby: {}\nending: {}\n",
             child.addr.as_str(),
@@ -100,12 +102,13 @@ impl RunWorker {
             kernel::Completion::Done(_) | kernel::Completion::Limit => collab::SenderState::Frozen,
             kernel::Completion::Cancelled => collab::SenderState::Cancelled,
         });
-        self.collaborating.rooms.deliver(&signal)?;
+        let arrival = self.arrive(signal)?;
         // And into the room's join, by the same reading a restart would
         // do: `Handback::from_signal` is the one inverse of the writer
         // just above, so a live delivery and a rebuild cannot disagree
         // about what a handback signal means.
-        if let Some(collab::Handback::Finished(artifact)) = collab::Handback::from_signal(&signal)?
+        if let Some(collab::Handback::Finished(artifact)) =
+            collab::Handback::from_signal(arrival.signal())?
         {
             self.collaborating
                 .joins
@@ -113,7 +116,7 @@ impl RunWorker {
                 .or_default()
                 .accept(artifact);
         }
-        Ok(signal)
+        Ok(arrival)
     }
 
     /// Hands down the nodes of the parent room's graph that its join has

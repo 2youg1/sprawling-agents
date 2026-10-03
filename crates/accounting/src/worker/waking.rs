@@ -5,12 +5,12 @@
 
 //! The two ways a resident who is not working is set going.
 
-use kernel::event::record::{Landing, SignalLanded};
 use kernel::{Address, AxError};
 
 use super::{Assignment, Knock, Owing, RunWorker, Unasked};
 
 pub(super) mod handing;
+pub(super) mod landing;
 
 impl RunWorker {
     /// Something arrived from outside.
@@ -203,8 +203,9 @@ impl RunWorker {
     /// empty, the reader's slot when a run is working there, which
     /// reads it at its next safe point (collab D7).
     ///
-    /// Then it writes `signal_landed`, decided only now (kernel D38): a
-    /// working run's slot, the queue, or a knock.
+    /// Then it writes `signal_landed` through the one landing decision
+    /// (`waking::landing`, kernel D38): a working run's slot, the queue,
+    /// or a knock.
     /// The knock goes out here too, while the sender still drives: the
     /// flight keeps who the sender speaks as, so a resident who is not
     /// working is woken by the delivery rather than by the sender's
@@ -226,32 +227,13 @@ impl RunWorker {
         let signal = collab::Signal::from_payload(&line.data)?
             .delivered(collab::SenderState::Running)
             .sent_by(line.run);
-        let line_room = signal.room().clone();
-        let working = self.collaborating.rooms.worked_by(&line_room).is_some();
-        self.collaborating.rooms.deliver(&signal)?;
-        let knocks = self.doorstep.knocks.len();
+        let arrival = self.arrive(signal)?;
         if let Some(speaker) = self.flight.speaker(line.run) {
             let (room, policy, chain) =
                 (speaker.room.clone(), speaker.policy, speaker.chain.clone());
-            self.knock(&signal, &room, policy, &chain)?;
+            self.knock(arrival.signal(), &room, policy, &chain)?;
         }
-        let landing = match (working, self.doorstep.knocks.len() > knocks) {
-            (true, _) => Landing::Delivered,
-            (false, true) => Landing::Knocked,
-            (false, false) => Landing::Queued,
-        };
-        let (signal, who) = (signal.id().clone(), line.who.clone());
-        let data = kernel::Payload::of(&SignalLanded { signal, landing })?;
-        let (addr, kind) = (line_room, kernel::EventKind::SignalLanded);
-        self.record_for(
-            line.run,
-            crate::effect::Line {
-                who,
-                addr,
-                kind,
-                data,
-            },
-        )
+        self.record_landing(arrival, line.run, &line.who)
     }
 
     fn knock_resident(

@@ -18,7 +18,8 @@ impl RunWorker {
     /// this match and nothing else.
     ///
     /// # Errors
-    /// Propagates a handback the parent's room will not take.
+    /// Propagates a handback the parent's room will not take, and the
+    /// ledger's refusal of where it landed.
     pub(in crate::worker) fn discharge(
         &mut self,
         owing: Owing,
@@ -46,14 +47,25 @@ impl RunWorker {
             Owed::Child { parent } => {
                 let parent = parent.clone();
                 let handback = self.deliver_handback(&parent, done)?;
-                self.hand_down_what_is_ready(&parent, at, &owing)?;
+                let handed = self.hand_down_what_is_ready(&parent, at, &owing);
                 // The asker is woken by the decision every signal takes,
                 // once its graph has joined or been closed: each node that
                 // is still out comes back on its own (collab §8
                 // `collab::handback`, `crates/collab/spec/Workshop.lean`).
-                if !self.collaborating.workshops.contains_key(&parent) {
-                    self.knock(&handback, &done.addr, at.policy, owing.knock_chain())?;
+                if handed.is_ok() && !self.collaborating.workshops.contains_key(&parent) {
+                    self.knock(
+                        handback.signal(),
+                        &done.addr,
+                        at.policy,
+                        owing.knock_chain(),
+                    )?;
                 }
+                // The child wrote the letter, so its landing is the child's
+                // line too, and it is written even when handing down the
+                // next nodes was refused: the letter is in the room either
+                // way (kernel D38).
+                self.record_landing(handback, done.run, &done.who)?;
+                handed?;
                 Ok(Landed::Elsewhere)
             }
         }

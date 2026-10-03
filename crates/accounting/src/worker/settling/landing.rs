@@ -40,16 +40,19 @@ impl RunWorker {
         chain: &super::super::KnockChain,
     ) -> Result<(), AxError> {
         let then = landing.record(&mut |line: effect::Line| self.record_for(run, line))?;
-        self.carry_out_landing(at, then, chain)
+        self.carry_out_landing(at, run, then, chain)
     }
 
     /// Carries out what a landing's lines, already on the ledger, ask of
     /// the city outside it. A caller that must act between the two — the
     /// plan desk closes its claims once their closing lines are written —
-    /// records the landing itself and then calls this.
+    /// records the landing itself and then calls this. `run` is the run
+    /// whose lines those are: a letter it delivers lands under its name
+    /// (kernel D38).
     pub(in crate::worker) fn carry_out_landing(
         &mut self,
         at: &Assignment,
+        run: RunId,
         then: effect::Then,
         chain: &super::super::KnockChain,
     ) -> Result<(), AxError> {
@@ -58,20 +61,25 @@ impl RunWorker {
             effect::Then::Deliver(signals) => {
                 let knocks_mark = self.doorstep.knocks.len();
                 let outcome = (|| {
-                    for signal in &signals {
+                    for signal in signals {
                         // The room table decides what a delivery means,
                         // including a room whose queue is out with a
                         // run and a room that sheds: the refusal is
                         // spelled once, there, because the line is
                         // already on the ledger and a line no queue
                         // holds is a torn city.
-                        self.collaborating.rooms.deliver(signal)?;
+                        let arrival = self.arrive(signal)?;
                         // Somebody was spoken to. Whether that starts a run
                         // is decided in one place, so that the two ways of
                         // reaching a resident stay one decision. The
                         // speaking run's place in the conversation rides on,
                         // so the knock this queues is one hop further in.
-                        self.knock(signal, &at.addr, at.policy, chain)?;
+                        self.knock(arrival.signal(), &at.addr, at.policy, chain)?;
+                        // `effect::Landing::signals` writes each letter's
+                        // `signal_enqueued` under the name the letter is
+                        // from, so its landing takes the same name.
+                        let who = arrival.signal().from().to_owned();
+                        self.record_landing(arrival, run, &who)?;
                     }
                     Ok(())
                 })();

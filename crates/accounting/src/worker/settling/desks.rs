@@ -121,7 +121,7 @@ impl RunWorker {
             {
                 effect::Claims::Landed(taken) => {
                     let then = taken.record(&mut close)?;
-                    self.carry_out_landing(at, then, &chain)?;
+                    self.carry_out_landing(at, run_id, then, &chain)?;
                     self.tell_whoever_is_behind(
                         at,
                         Reporter {
@@ -135,7 +135,7 @@ impl RunWorker {
                 }
                 effect::Claims::Stale { node, released } => {
                     let then = released.record(&mut close)?;
-                    self.carry_out_landing(at, then, &chain)?;
+                    self.carry_out_landing(at, run_id, then, &chain)?;
                     self.note(
                         runtime::diagnostics::Level::Refuse,
                         "collab::claim_tool",
