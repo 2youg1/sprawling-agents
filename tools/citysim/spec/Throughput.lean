@@ -20,24 +20,28 @@
 
 **读数**（一次运行一组，每组一行吞吐、每处等待一行）：
 
-`throughput n_runs=<N> latency=<arm> tool_calls_per_run=<M> runs=<n> records=<n> tool_calls=<n> wall_us=<n> runs_per_s=<x> records_per_s=<x> tool_calls_per_s=<x> machine=<os>-<arch>, <k> core(s)`
+`throughput n_runs=<N> latency=<arm> tool_calls_per_run=<M> runs=<n> records=<n> tool_calls=<n> wall_us=<n> runs_per_s=<x> records_per_s=<x> tool_calls_per_s=<x> ledger_thread_idle_us=<n> ledger_thread_busy_permille=<n> machine=<os>-<arch>, <k> core(s)`
+
+吞吐行的 `ledger_thread_busy_permille` 是账本线程在这段墙钟里没睡的份额（千分比），由它在队列上睡掉的时间（`ledger_thread_idle_us`）减出。
 
 `throughput_wait n_runs=<N> latency=<arm> wait=<name> n=<n> p50_us=<n> p99_us=<n> p999_us=<n>|p999=insufficient max_us=<n>`
 
 吞吐行的 `*_per_s` 是整数部分加三位小数的定点数，由整数运算得出（ledger 载荷之外，但读数仍不经浮点）。尾部规则见下面的 `tail`：n ≥ `P999_FLOOR`（1,000）才印 `p999_us`，否则印 `p999=insufficient`；`max_us` 总是印。分位取最近秩，第 ⌈n·p⌉ 个。
 
-**本 wave 读到的等待**（M0 第 6 条把每个耗时拆成等待、工作、落盘屏障；下表写明每一行属于哪一段，以及它今天能不能只靠账本与仪表的外侧读出）：
+**读到的等待**（M0 第 6 条把每个耗时拆成等待、工作、落盘屏障；下表写明每一行属于哪一段，以及它从哪里读出）：
 
 | `wait=` | 量的是什么 | 段 | 读法 |
 |---|---|---|---|
 | `lane` | 一个 run 从投出到 `run_started` 落账 | 等待（含准备的工作） | 账本时刻（毫秒）减投出时刻，×1000 记成 µs；毫秒分辨率，M1 落地后换成微秒字段 |
 | `first_call` | `run_started` 到第一次 `model_called` | 工作（放置、准备） | 账本时刻差 |
 | `relay_under_load` | 负载期间，仪表经 `measuring_relay` 发出的一次 relay 往返 | 等待＋工作＋屏障 | 单调时钟，测试侧；减去空载的 `relay_idle` 就是排队的份额 |
-| `relay_idle` | 同样的往返，城里没有 run | 工作＋屏障 | 同上 |
+| `relay_queue` | 一次 relay 请求从车道把它排进队到账本线程取走 | 纯等待 | worker 注入的单调时钟，在生产代码的测量点上取（`worker::health`） |
+| `lane_pure` | 一个准备好的 run 从进队到 driving pool 为它开车道 | 纯等待 | 同上；不设车道数时恒为零或近零（`budgets.toml` 的 `[lane_wait]`） |
+| `relay_idle` | 同样的往返，城里没有 run | 工作＋屏障 | 单调时钟，测试侧，与 `relay_under_load` 同 |
 
 `lane` 一行不含车道排队：pool 不设车道数（`crates/sprawling/Spec.lean` D34），投出的 run 立刻开车，N 再大也不等前面的 run 回家。一个 run 只在 provider 的准入处等，那是 `gateway::concurrency` 按端点给的并发许可，遇 429 收窄、持续应答后放宽（`crates/gateway/Spec.lean` D17）；替身 provider 不回 429，所以本台读到的 `lane` 是准备的工作，不是排队。
 
-**还没有读到的等待**：车道等待里「准备好」到「拿到 lane」的纯等待段、relay 从请求到账本线程取走的纯排队段、账本线程忙占比、折叠滞后、广播滞后与私有字节节拍采样，都要在生产代码的测量点上取时刻（经注入给 worker 的那一个时钟，ARCHITECTURE §10），本节的读数从外侧只能读出它们的和。它们是 M2 的下一段，W2 接着做。
+**本台之外的等待**：折叠滞后与广播滞后由 `crates/sprawling` 的 `instrument_view_backlog` 读（`budgets.toml` 的 `[fold_lag]`、`[broadcast_lag]`）；私有内存节拍还没有读数的计算者（`[private_memory_beat]` 的 `measured_by` 写着缺什么）。
 
 **计数对拍**（`throughput_counts`，在 `just check` 里跑）：N = 4、`zero` 档、M = 4 时，`run_frozen` 恰 N 条，`tool_called` 恰 N·M 条，每个 `tool_called` 都有它的 `tool_result`。计数只取决于脚本，不取决于时钟，所以三个平台的 CI 都能跑它。
 
