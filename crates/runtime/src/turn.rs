@@ -28,7 +28,7 @@ use std::borrow::Cow;
 use kernel::event::record::{CancelReceived, ModelReturned, SteerReceived};
 use kernel::model::content_from_message;
 use kernel::{
-    AxCode, AxError, B3Hash, BuildingPolicy, ChatRequest, ContentBlock, EventRef, Ledger, Model,
+    Address, AxCode, AxError, B3Hash, BuildingPolicy, ChatRequest, ContentBlock, Ledger, Model,
     ModelRequest, ModelReturn, ModelUsage, Payload, RunId, StopReason, TimeMs, ToolCall, ToolDef,
 };
 
@@ -43,7 +43,8 @@ mod report;
 mod speculation;
 mod wave;
 
-use ledger::{Authored, Carried, Journal};
+pub(crate) use ledger::RunLine;
+use ledger::{Authored, Carried, Entry, Journal};
 
 pub use boundary::{Interrupt, NextCall, PhaseOutcome, TurnCancelled};
 pub use prompt::{PromptRecord, RunPrompt};
@@ -74,7 +75,7 @@ pub struct Calling<'c> {
 pub struct ToolWave {
     calls: Vec<ToolCall>,
     speculated: speculation::Speculated,
-    model_returned: EventRef,
+    model_returned: Entry,
     assistant: Vec<ContentBlock>,
     usage: Option<ModelUsage>,
     stop: Option<StopReason>,
@@ -82,7 +83,7 @@ pub struct ToolWave {
 
 #[derive(Debug)]
 pub struct Recording {
-    model_returned: EventRef,
+    model_returned: Entry,
     calls_made: usize,
     exchange: Exchange,
     usage: Option<ModelUsage>,
@@ -147,10 +148,6 @@ impl<'h> Turn<'h, Assembling> {
                 .append_authored(Authored::PromptAssembled, payload.clone());
             prompt.recorded.remember(payload);
         }
-        // The run writes its own lines between this phase and the next
-        // (`run::lifecycle`), so what this phase holds goes down first and
-        // the ledger keeps the order the lines were appended in.
-        self.journal.barrier(ledger)?;
         let chat = ChatRequest {
             model: shape.model.clone(),
             max_tokens: shape.max_tokens,
@@ -245,11 +242,6 @@ impl<'h> Turn<'h, Calling<'_>> {
             Carried::ModelReturned { at: arrived.at },
             Payload::of(&returned)?,
         )?;
-        // The run may write a checkpoint before the wave, so the reply goes
-        // down here rather than with the wave, for the same reason as at
-        // the end of `assemble`.
-        self.journal.barrier(ledger)?;
-        let model_returned = self.journal.durable(model_returned)?;
         Ok(PhaseOutcome::Advanced(Turn {
             journal: self.journal,
             state: ToolWave {
@@ -295,6 +287,8 @@ impl Turn<'_, Recording> {
             stop,
         } = self.state;
         exchange.compact()?;
+        self.journal.barrier(ledger)?;
+        let model_returned = self.journal.durable(model_returned)?;
         Ok(PhaseOutcome::Advanced(TurnReport {
             redacted: self.journal.redacted(),
             refs: self.journal.close(ledger)?,
@@ -309,6 +303,14 @@ impl Turn<'_, Recording> {
 }
 
 impl<S> Turn<'_, S> {
+    /// Holds a line the run writes at `addr` between two phases, in its
+    /// place among the turn's lines: it reaches the ledger at the next
+    /// barrier with them, so the run's line costs no barrier of its own
+    /// and the ledger's order is still the order of appending.
+    pub(crate) fn hold_run_line(&mut self, line: RunLine, addr: Address, data: Payload) {
+        self.journal.append_run_line(line, addr, data);
+    }
+
     /// Ends the turn where it stands: `cancel_received` and the refs of
     /// everything this turn wrote.
     ///

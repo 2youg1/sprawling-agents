@@ -118,6 +118,26 @@ pub(super) fn shape() -> CallShape {
     }
 }
 
+/// Runs a wave that asks for nothing and closes the turn: the barrier
+/// that carries `model_returned` to the ledger.
+pub(super) fn closed(turn: Turn<'_, ToolWave>, ledger: &mut dyn Ledger) -> TurnReport {
+    let recording = advance(
+        turn.execute_concurrent(
+            Interrupt::None,
+            ledger,
+            &mut |_: &ToolCall, _: TimeMs| -> Result<kernel::ToolOutcome, AxError> {
+                Ok(kernel::ToolOutcome {
+                    result: Payload::empty(),
+                    attachments: Vec::new(),
+                })
+            },
+            &mut |_| Interrupt::None,
+        )
+        .unwrap(),
+    );
+    advance(recording.record(Interrupt::None, ledger).unwrap())
+}
+
 pub(super) fn advance<N>(outcome: PhaseOutcome<N>) -> N {
     match outcome {
         PhaseOutcome::Advanced(next) => next,

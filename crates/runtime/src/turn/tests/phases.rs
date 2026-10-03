@@ -161,7 +161,7 @@ fn steer_at_a_boundary_records_and_advances() {
         )
         .unwrap(),
     );
-    let _ = advance(
+    let turn = advance(
         turn.call(
             Interrupt::None,
             &mut ledger,
@@ -171,6 +171,7 @@ fn steer_at_a_boundary_records_and_advances() {
         )
         .unwrap(),
     );
+    closed(turn, &mut ledger);
     assert_eq!(
         ledger.kinds(),
         [

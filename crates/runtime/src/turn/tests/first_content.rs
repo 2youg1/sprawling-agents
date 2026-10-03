@@ -179,7 +179,7 @@ fn a_timed_turn_records_its_reply_in_microseconds_from_the_attempt() {
             .unwrap(),
     );
     let mut page = |_: &Increment| {};
-    drop(advance(
+    let turn = advance(
         turn.call(
             Interrupt::None,
             &mut ledger,
@@ -188,7 +188,8 @@ fn a_timed_turn_records_its_reply_in_microseconds_from_the_attempt() {
             Generating::Watched(&mut page),
         )
         .unwrap(),
-    ));
+    );
+    closed(turn, &mut ledger);
     let returned: serde_json::Value = serde_json::from_slice(&ledger.lines[2]).unwrap();
     assert_eq!(
         (

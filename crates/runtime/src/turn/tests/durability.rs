@@ -240,7 +240,7 @@ fn run_turn(
 
 /// `tf1_write_intent_durable`: when a write runs, its own `tool_called`
 /// and every line before it are already on the ledger, while the read
-/// before it ran without waiting for its own.
+/// before it ran without waiting for its own or for `model_returned`.
 #[test]
 fn tf1_write_intent_is_durable_before_the_write_runs() {
     let mut ledger = Barriers::new();
@@ -248,7 +248,7 @@ fn tf1_write_intent_is_durable_before_the_write_runs() {
         &mut ledger,
         vec![call("r1", "read"), call("w1", "write"), call("r2", "read")],
     );
-    let opening = ["prompt_assembled", "model_called", "model_returned"];
+    let opening = ["prompt_assembled", "model_called"];
     let at_write = [
         "prompt_assembled",
         "model_called",
@@ -329,7 +329,7 @@ proptest! {
             if writes[i] {
                 let intents = seen.iter().filter(|kind| *kind == "tool_called").count();
                 prop_assert_eq!(seen.last().map(String::as_str), Some("tool_called"));
-                prop_assert_eq!(intents, i + 1);
+                prop_assert_eq!(Some(intents), i.checked_add(1));
             }
         }
     }

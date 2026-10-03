@@ -253,7 +253,7 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
         )
         .unwrap(),
     );
-    drop(turn);
+    closed(turn, &mut ledger);
     assert_eq!(
         ledger.kinds(),
         vec![

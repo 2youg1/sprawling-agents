@@ -6,15 +6,13 @@
 //! What an active run does on the ledger: the dispatch pair that brings
 //! it into existence, one turn, and the freeze that is its only exit.
 
-use kernel::{
-    AxError, Completion, EventDraft, EventKind, Evidence, Ledger, Model, Payload, StopReason,
-};
+use kernel::{AxError, Completion, Evidence, Ledger, Model, Payload, StopReason};
 
 use crate::conversation::Conversation;
 use crate::handoff::Handoff;
 use crate::prefix::shape::PromptShape;
 use crate::reminder::ContextGauge;
-use crate::turn::{Generating, Interrupt, PhaseOutcome, RunPrompt, Turn, TurnReport};
+use crate::turn::{Generating, Interrupt, PhaseOutcome, RunLine, RunPrompt, Turn, TurnReport};
 
 use super::checkpoint::{CheckpointPolicy, Wave, WaveCheckpoint};
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
@@ -114,7 +112,7 @@ impl Run<Active> {
             .timed(&mut *hooks.monotonic_us);
         let opening = (hooks.interrupt)(SafePoint::BeforeAssemble { turn: index });
         fold_steer(&mut self.state.conversation, &opening);
-        let turn = match turn.assemble(
+        let mut turn = match turn.assemble(
             opening,
             ledger,
             RunPrompt::new(&self.plan.prefix, &mut self.state.prompt),
@@ -129,22 +127,20 @@ impl Run<Active> {
         // regions moved since the request before it. Written here, after the
         // turn has assembled, so the line describes a request that exists;
         // the shape of the first request says so rather than claiming a
-        // comparison nobody made.
+        // comparison nobody made. It is held among the turn's lines, so it
+        // goes down with `model_called` rather than through a barrier of its
+        // own.
         let shape = PromptShape::of(
             &self.plan.prefix,
             &self.plan.tools,
             self.state.conversation.messages(),
         )?;
         let changed = shape.attribute(self.state.prior_shape.as_ref());
-        ledger.append(EventDraft {
-            run: self.plan.run,
-            t,
-            who: self.plan.who.clone(),
-            addr: Some(self.plan.addr.clone()),
-            kind: EventKind::PromptShapeCompared,
-            data: Payload::of(&shape.recorded(changed)?)?,
-            ig: false,
-        })?;
+        turn.hold_run_line(
+            RunLine::PromptShapeCompared,
+            self.plan.addr.clone(),
+            Payload::of(&shape.recorded(changed)?)?,
+        );
         self.state.prior_shape = Some(shape);
         let calling = (hooks.interrupt)(SafePoint::BeforeCall { turn: index });
         let called = turn.call(
@@ -165,7 +161,7 @@ impl Run<Active> {
         // next request, whatever the call answered.
         self.state.conversation.mark_sent();
         fold_steer(&mut self.state.conversation, &calling);
-        let turn = match called? {
+        let mut turn = match called? {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
         };
@@ -180,16 +176,11 @@ impl Run<Active> {
         let touches = Wave::of(turn.calls(), hooks.writes);
         let decided = self.state.checkpoint.for_wave(touches);
         if let (WaveCheckpoint::Stage, Some(checkpoint)) = (decided, hooks.checkpoint.as_mut()) {
-            let committed = checkpoint(t)?;
-            ledger.append(EventDraft {
-                run: self.plan.run,
-                t,
-                who: self.plan.who.clone(),
-                addr: Some(self.plan.addr.clone()),
-                kind: EventKind::CheckpointCommitted,
-                data: committed,
-                ig: false,
-            })?;
+            turn.hold_run_line(
+                RunLine::CheckpointCommitted,
+                self.plan.addr.clone(),
+                checkpoint(t)?,
+            );
         }
 
         self.state.checkpoint.record_wave(decided, touches);

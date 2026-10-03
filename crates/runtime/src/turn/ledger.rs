@@ -19,7 +19,9 @@
 //! [`Authored`] and [`Carried`] partition this module's event kinds,
 //! neither can name the other's, and no other spelling of [`EventKind`]
 //! reaches an [`EventDraft`] — which is what makes the scan structural
-//! rather than remembered.
+//! rather than remembered. The run's own lines between the turn's
+//! phases are a third kind, [`RunLine`]: the run authored them, so they
+//! are not scanned, and they carry the run's address.
 //!
 //! The same variants decide when a line happened. The four lines a turn
 //! waited for - a model attempt sent, its reply whole, a tool call
@@ -28,7 +30,9 @@
 //! those readings come from is read in this module and nowhere else in
 //! the turn (`crates/kernel/Spec.lean` §8-4, "what the envelope `t` records").
 
-use kernel::{AxCode, AxError, EventDraft, EventKind, EventRef, Ledger, Payload, RunId, TimeMs};
+use kernel::{
+    Address, AxCode, AxError, EventDraft, EventKind, EventRef, Ledger, Payload, RunId, TimeMs,
+};
 
 /// Events whose payload this module built from values it computed.
 #[derive(Debug, Clone, Copy)]
@@ -40,6 +44,28 @@ pub(super) enum Authored {
     },
     CancelReceived,
     SteerReceived,
+}
+
+/// A line the run writes between two of the turn's phases. It goes
+/// through the turn's journal so that it takes its place among the
+/// turn's held lines rather than ahead of them, which is what lets those
+/// lines wait for the next barrier instead of going down first
+/// (`crates/runtime/spec/Turn/Durability.lean`, `closedTurn`).
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum RunLine {
+    /// What the assembled request looks like to a prompt cache.
+    PromptShapeCompared,
+    /// The commit taken before a wave that may write.
+    CheckpointCommitted,
+}
+
+impl RunLine {
+    fn kind(self) -> EventKind {
+        match self {
+            RunLine::PromptShapeCompared => EventKind::PromptShapeCompared,
+            RunLine::CheckpointCommitted => EventKind::CheckpointCommitted,
+        }
+    }
 }
 
 /// Events whose payload came back from a provider or from a tool, and
@@ -118,8 +144,8 @@ impl Moment {
 /// Appending holds a line; [`Journal::barrier`] hands every held line to
 /// the ledger in one `Ledger::append_all` and only then keeps their refs,
 /// so a ref this journal hands out names a durable record. The turn calls
-/// the barrier before each outside effect - a model call, a write, the
-/// turn's end - and nowhere else (runtime D24,
+/// the barrier before each outside effect - a model call, a write - and
+/// at the turn's end, and nowhere else (runtime D24,
 /// `crates/runtime/spec/Turn/Durability.lean`).
 ///
 /// The phase data lives beside this in `Turn`, not inside it, so a
@@ -236,7 +262,13 @@ impl<'h> Journal<'h> {
     /// until the next [`Journal::barrier`].
     pub(super) fn append_authored(&mut self, event: Authored, data: Payload) -> Entry {
         let at = event.at(self.t);
-        self.append(event.kind(), at, data)
+        self.append(event.kind(), at, None, data)
+    }
+
+    /// Appends a line the run wrote at `addr`, at the turn's stamp. The
+    /// line is held until the next [`Journal::barrier`].
+    pub(super) fn append_run_line(&mut self, line: RunLine, addr: Address, data: Payload) -> Entry {
+        self.append(line.kind(), self.t, Some(addr), data)
     }
 
     /// Appends an event the turn carried, with every secret-shaped span
@@ -258,7 +290,7 @@ impl<'h> Journal<'h> {
     ) -> Result<Entry, AxError> {
         let (scanned, hits) = crate::redact::redact(data.as_map());
         self.redacted = self.redacted.saturating_add(hits);
-        Ok(self.append(event.kind(), event.at(), Payload::new(scanned)?))
+        Ok(self.append(event.kind(), event.at(), None, Payload::new(scanned)?))
     }
 
     /// The turn's stamp: the time every line of this turn carries except
@@ -282,13 +314,19 @@ impl<'h> Journal<'h> {
     /// The single place an [`EventDraft`] of this turn is built: the
     /// time, the author and the place among the turn's lines cannot drift
     /// between phases.
-    fn append(&mut self, kind: EventKind, at: TimeMs, data: Payload) -> Entry {
+    fn append(
+        &mut self,
+        kind: EventKind,
+        at: TimeMs,
+        addr: Option<Address>,
+        data: Payload,
+    ) -> Entry {
         let entry = Entry(self.refs.len().saturating_add(self.held.len()));
         self.held.push(EventDraft {
             run: self.run,
             t: at,
             who: self.who.clone(),
-            addr: None,
+            addr,
             kind,
             data,
             ig: false,
