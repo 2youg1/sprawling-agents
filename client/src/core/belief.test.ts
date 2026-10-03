@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
 
 import { createBelief } from "./belief";
-import type { AxError, CityAnswer, EventKind, EventRecord, RunSummary } from "../wire";
+import type { AxError, CityAnswer, EventKind, EventRecord, Mode, RunPolicy, RunSummary } from "../wire";
 import { Address, B3Hash, CITY_RUN, RunId, Seq, TimeMs } from "../wire";
 
 const ONE = RunId.make("11111111-1111-4111-8111-111111111111");
@@ -386,7 +386,7 @@ describe("the run policy a room holds", () => {
   test("the newest readable change holds per room, in any arrival order", () => {
     const store = createBelief(() => 0);
     const room = Address.make("lab/policy");
-    const policy = (mode: string) => ({ admit: "standing", landing: "ordinary", mode, write: "create" });
+    const policy = (mode: Mode): RunPolicy => ({ admit: "standing", landing: "ordinary", mode, write: "create" });
     const change = (at: number, data: Record<string, unknown>): EventRecord => ({ ...event(ONE, at, "run_policy_changed", data), addr: room });
     store.apply(change(9, { policy: policy("work"), by: "person" }));
     store.apply(change(5, { policy: policy("chat"), by: "person" }));
