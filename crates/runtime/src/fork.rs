@@ -134,7 +134,10 @@ fn fold_run<'a>(
             EventKind::PromptShapeCompared => conversation.mark_sent(),
             EventKind::SteerReceived => {
                 let steer = record.data().read::<SteerReceived>()?;
-                conversation.push_steer(&steer.source, &steer.text);
+                conversation.push_steer(
+                    &crate::conversation::Speaker::from_recorded(&steer.source)?,
+                    &steer.text,
+                );
             }
             // Everything else is not the conversation: the segment
             // hashes a call was assembled from, the accounting, the

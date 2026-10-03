@@ -53,10 +53,11 @@ pub(crate) struct DriveContext {
 /// its backlog member, the person, then a neighbour's steer.
 ///
 /// Two speakers, one landing, and the person outranks the resident.
-/// What keeps them apart where the model reads them is `collab::Steer`:
-/// only the person's entrance can write the `user` prefix, and a
-/// resident's writes `@` and its own address - the address a reply is
-/// sent to. A run that could not tell the two apart would answer the
+/// What keeps them apart where the model reads them is
+/// `runtime::conversation::Speaker`: only the person's entrance builds
+/// `Speaker::Person`, rendered as `user`, and a resident's words land in
+/// a `<letter>` naming its own address - the address a reply is sent to
+/// (collab D16). A run that could not tell the two apart would answer the
 /// person by signalling them, and answer a neighbour by talking to
 /// nobody.
 struct Interrupting {
@@ -132,8 +133,12 @@ impl Interrupting {
             let turn = self.steers.lock().ok()?.wait_out(at).ok()?;
             match turn {
                 collab::WaitTurn::Idle => return None,
-                collab::WaitTurn::Ended { source, text } => {
-                    return Some(Interrupt::Steer { source, text });
+                collab::WaitTurn::Replied(letter) => return Some(steer_of(&letter)),
+                collab::WaitTurn::TimedOut { text } => {
+                    return Some(Interrupt::Steer {
+                        speaker: runtime::conversation::Speaker::City,
+                        text,
+                    });
                 }
                 collab::WaitTurn::Waiting => {}
             }
@@ -188,10 +193,7 @@ impl Interrupting {
             return Interrupt::None;
         };
         match desk.take_steer() {
-            Ok(Some(steer)) => Interrupt::Steer {
-                source: steer.source().to_owned(),
-                text: steer.text().to_owned(),
-            },
+            Ok(Some(letter)) => steer_of(&letter),
             Ok(None) => Interrupt::None,
             // A signal the desk took out of the queue and could not read as
             // a steer does not interrupt, and the ledger still has it: the
@@ -202,6 +204,23 @@ impl Interrupting {
             // the two arriving here as one case; they do not.
             Err(_) => Interrupt::None,
         }
+    }
+}
+
+/// A resident's letter as the runtime renders it: inside an envelope,
+/// never as the User (collab D16).
+fn steer_of(letter: &collab::Letter) -> Interrupt {
+    Interrupt::Steer {
+        speaker: runtime::conversation::Speaker::Resident(runtime::conversation::Letter {
+            from: letter.from().to_owned(),
+            run: letter.run(),
+            kind: match letter.kind() {
+                collab::LetterKind::Steer => runtime::conversation::LetterKind::Steer,
+                collab::LetterKind::Reply => runtime::conversation::LetterKind::Reply,
+            },
+            sender: letter.sender().map(|state| state.as_str().to_owned()),
+        }),
+        text: letter.text().to_owned(),
     }
 }
 

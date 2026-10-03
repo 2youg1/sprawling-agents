@@ -151,15 +151,16 @@ fn cut_now(half: &HarnessHalf, context: &DriveContext, deadline: TimeMs) -> Opti
         // A harness's turn has no write gate of its own to re-judge, and
         // its next run reads the change from `run_started.policy`.
         runtime::Interrupt::None | runtime::Interrupt::Policy { .. } => None,
-        runtime::Interrupt::Steer { source, .. } => {
+        runtime::Interrupt::Steer { speaker, .. } => {
             half.notes.write(
                 runtime::diagnostics::Level::Refuse,
                 half.staged_at,
                 "accounting::worker::driving::harness",
                 &format!(
-                    "{} is a harness's turn and takes no steer: the one from {source} was not \
+                    "{} is a harness's turn and takes no steer: the one from {} was not \
                      delivered",
-                    half.chartered.run
+                    half.chartered.run,
+                    speaker.recorded()
                 ),
             );
             None

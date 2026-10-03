@@ -150,7 +150,7 @@ fn steer_at_a_boundary_records_and_advances() {
     let turn = advance(
         turn.assemble(
             Interrupt::Steer {
-                source: "user".to_owned(),
+                speaker: crate::conversation::Speaker::Person,
                 text: "prefer the short route".to_owned(),
             },
             &mut ledger,

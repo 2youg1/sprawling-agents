@@ -51,7 +51,7 @@ impl Conversation {
 ### 8-47-2 runtime::conversation：谁在说话写在类型里，居民的话装在一个它关不上的信封里（形状 2 值类型）
 
 ```rust
-pub enum Speaker { Person, Resident(Letter) }
+pub enum Speaker { Person, City, Resident(Letter) }
 pub struct Letter { pub from: String, pub run: Option<kernel::RunId>, pub kind: LetterKind, pub sender: Option<String> }
 pub enum LetterKind { Steer, Reply }
 impl Speaker {
@@ -60,13 +60,12 @@ impl Speaker {
 }
 impl Conversation {
     pub fn push_steer(&mut self, speaker: &Speaker, text: &str);
-    pub fn push_city_note(&mut self, text: &str);             // 城市自己的话（策略变更），以 `city: ` 开头
 }
 ```
 
-- **规则**：`push_steer` 是 steer 进窗口的唯一入口，它按 `Speaker` 渲染。`Person` 渲染成 `user: <text>`；`Resident` 渲染成 `<letter from="@<room>" run="<run>" kind="steer|reply" sender="<state>"><body></letter>`，没有的属性不写，属性值与正文里的 `<`、`>`、`&` 写成 `&lt;`、`&gt;`、`&amp;`。所以以 `user:` 开头的一块文字只来自 User 的 steer，居民的正文里没有 `<`，关不上自己的信封，也开不出第二个。
+- **规则**：`push_steer` 是 steer 进窗口的唯一入口，它按 `Speaker` 渲染。`Person` 渲染成 `user: <text>`；`City`（城市自己的话：策略变更、同步等待超时）渲染成 `city: <text>`；`Resident` 渲染成 `<letter from="@<room>" run="<run>" kind="steer|reply" sender="<state>"><body></letter>`，没有的属性不写，属性值与正文里的 `<`、`>`、`&` 写成 `&lt;`、`&gt;`、`&amp;`。所以以 `user:` 开头的一块文字只来自 User 的 steer，居民的正文里没有 `<`，关不上自己的信封，也开不出第二个。
 - **构造**：`Speaker::Person` 在生产代码里只由 `accounting::worker::desk`（User 经控制面送来的 steer）构造，另一处是 `Speaker::from_recorded` 读回账本上的 `user`，那一行只由前者写下。
-- **账本**：`steer_received.source` 记 `Speaker::recorded()`：`user`，或 `@<room>`，后面跟零到三个 `run=<uuid>`、`kind=steer|reply`、`sender=<state>`，以空格分开。旧的行只有 `@<room>`，读回成 `kind=steer`、没有 run 与 sender 的信；居民的回信在旧行里是正文 `<room> replied: …`，读回时仍在信封里。
+- **账本**：`steer_received.source` 记 `Speaker::recorded()`：`user`、`city`，或 `@<room>`，后面跟零到三个 `run=<uuid>`、`kind=steer|reply`、`sender=<state>`，以空格分开。旧的行只有 `@<room>`，读回成 `kind=steer`、没有 run 与 sender 的信；居民的回信在旧行里是正文 `<room> replied: …`，读回时仍在信封里。
 - **三个平台**：只有文字与类型，Windows、macOS、Linux 上一样。
 - **被否**见 `crates/collab/Spec.lean` D16。
 -/
@@ -76,6 +75,7 @@ namespace Runtime.Conversation
 /-- 谁在说话。居民的属性由城市写，模型里只是一串字符。 -/
 inductive Speaker where
   | person
+  | city
   | resident (attrs : List Char)
 
 def escapeChar (c : Char) : List Char :=
@@ -88,6 +88,8 @@ def escape (text : List Char) : List Char := text.flatMap escapeChar
 
 def userTag : List Char := ['u', 's', 'e', 'r', ':', ' ']
 
+def cityTag : List Char := ['c', 'i', 't', 'y', ':', ' ']
+
 def closeTag : List Char := ['<', '/', 'l', 'e', 't', 't', 'e', 'r', '>']
 
 def openTag (attrs : List Char) : List Char :=
@@ -95,6 +97,7 @@ def openTag (attrs : List Char) : List Char :=
 
 def render : Speaker → List Char → List Char
   | .person, body => userTag ++ body
+  | .city, body => cityTag ++ body
   | .resident attrs, body => openTag attrs ++ escape body ++ closeTag
 
 /-- 窗口里的块：每次 push 渲染出一块，按次序。 -/
@@ -152,6 +155,9 @@ theorem user_line_only_from_person (pushes : List (Speaker × List Char)) (line 
   obtain ⟨⟨speaker, body⟩, hin, hline⟩ := List.mem_map.mp h
   cases speaker with
   | person => exact ⟨body, hin, hline.symm⟩
+  | city =>
+    subst hline
+    simp [render, cityTag, userTag, List.isPrefixOf] at hu
   | resident attrs =>
     subst hline
     exact absurd hu (resident_not_user attrs body)

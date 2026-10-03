@@ -41,7 +41,7 @@ pub use pr_tool::{MergedRequest, OpenRequest, PrDesk, PrEffect, PrTool, Rejected
 pub use reply_wait::WaitTurn;
 pub use signal_desk::{Post, RoomMail, SignalDesk, SignalEffect};
 pub use signal_tool::SignalTool;
-pub use steer::{AgentSteer, Steer};
+pub use steer::{AgentSteer, Letter, LetterKind, Steer};
 pub use triage::{Arrival, Landing, Reflex, Rule, Triage};
 pub use workshop::{LaidOut, NodeContract, NodeId, Underway, Workshop};
 pub use workshop_tool::{WorkshopDesk, WorkshopTool};

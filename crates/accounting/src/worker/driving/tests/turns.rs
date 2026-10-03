@@ -166,10 +166,10 @@ fn a_cancel_reaches_the_run_it_cancels_without_waiting_for_it_to_end() {
     // Cancel outranks a steer that arrived first: stopping and
     // changing course are exclusive, and stopping cannot be undone.
     assert!(matches!(desk.interrupt_for(mine), Interrupt::Cancel));
-    let Interrupt::Steer { source, text } = desk.interrupt_for(mine) else {
+    let Interrupt::Steer { speaker, text } = desk.interrupt_for(mine) else {
         panic!("the steer for this run is still waiting");
     };
-    assert_eq!(source, "user");
+    assert_eq!(speaker, runtime::conversation::Speaker::Person);
     assert_eq!(text, "measure it in metres");
     assert!(matches!(desk.interrupt_for(mine), Interrupt::None));
 
@@ -206,7 +206,7 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
             .is_ok()
         {
             return Interrupt::Steer {
-                source: "user".to_owned(),
+                speaker: runtime::conversation::Speaker::Person,
                 text: "measure it in metres".to_owned(),
             };
         }

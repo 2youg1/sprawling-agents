@@ -171,12 +171,12 @@ impl SignalDesk {
     /// and folding the second into the first is what this refuses to do.
     /// How a safe point treats the refusal is the caller's decision, and
     /// a slot or a post that fails is refused the same way.
-    pub fn take_steer(&mut self) -> Result<Option<crate::Steer>, AxError> {
+    pub fn take_steer(&mut self) -> Result<Option<crate::Letter>, AxError> {
         self.collect()?;
         let Some(signal) = self.inbox.take_steer() else {
             return Ok(None);
         };
-        match crate::Steer::from_signal(&signal) {
+        match crate::Letter::from_signal(&signal) {
             Ok(steer) => {
                 self.held.push(signal);
                 Ok(Some(steer))

@@ -29,8 +29,8 @@ use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
 /// assembly — a steer never rewrites a request already on the wire, which
 /// the conversation holds by knowing what the last assembly sent.
 fn fold_steer(conversation: &mut Conversation, interrupt: &Interrupt) {
-    if let Interrupt::Steer { source, text } = interrupt {
-        conversation.push_steer(source, text);
+    if let Interrupt::Steer { speaker, text } = interrupt {
+        conversation.push_steer(speaker, text);
     }
 }
 
@@ -270,7 +270,7 @@ impl Run<Active> {
         if let Some(policy) = taken {
             self.state
                 .conversation
-                .push_steer("city", &policy_note(&policy));
+                .push_steer(&crate::conversation::Speaker::City, &policy_note(&policy));
         }
         // The provider's count for this call, against the model's
         // window: a fact against a fact. It lands after the results the

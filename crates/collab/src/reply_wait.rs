@@ -145,9 +145,12 @@ pub enum WaitTurn {
     Idle,
     /// Still waiting: ask again after a slice of the clock.
     Waiting,
-    /// The wait ended; `text` is what the model reads when it goes on,
-    /// landed as a steer from `source` (`@<the room waited on>`).
-    Ended { source: String, text: String },
+    /// The room waited on replied: its words land as a letter of kind
+    /// `reply` (collab D16).
+    Replied(crate::Letter),
+    /// Nobody replied in time; `text` is the city's own word, and lands
+    /// as the city's.
+    TimedOut { text: String },
 }
 
 impl SignalDesk {
@@ -181,29 +184,16 @@ impl SignalDesk {
                 reply: reply.id().clone(),
             }))?;
             self.waiting = None;
-            let text = format!(
-                "{} replied: {}",
-                wait.on.as_str(),
-                reply
-                    .payload()
-                    .as_map()
-                    .get("text")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default()
-            );
+            let letter = crate::Letter::reply(&reply);
             self.held.push(reply);
-            return Ok(WaitTurn::Ended {
-                source: crate::steer::agent_source(wait.on.as_str()),
-                text,
-            });
+            return Ok(WaitTurn::Replied(letter));
         }
         if now < deadline {
             return Ok(WaitTurn::Waiting);
         }
         (self.post.0)(&wait.ended(WaitEnd::Timeout))?;
         self.waiting = None;
-        Ok(WaitTurn::Ended {
-            source: crate::steer::agent_source(wait.on.as_str()),
+        Ok(WaitTurn::TimedOut {
             text: format!(
                 "no reply came from {} within {} s; go on without it",
                 wait.on.as_str(),

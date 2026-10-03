@@ -106,6 +106,15 @@ impl Room {
     }
 }
 
+/// Who replied and what they said, from a turn that must be a reply.
+fn replied(turn: WaitTurn) -> (String, String) {
+    let WaitTurn::Replied(letter) = turn else {
+        panic!("the wait ended on a reply, got {turn:?}");
+    };
+    assert_eq!(letter.kind(), crate::LetterKind::Reply);
+    (letter.from().to_owned(), letter.text().to_owned())
+}
+
 fn letter(from: &str, to: &str, n: u32) -> Signal {
     let mut payload = serde_json::Map::new();
     payload.insert("text".to_owned(), Value::String(format!("letter {n}")));
@@ -135,11 +144,8 @@ fn a_reply_that_lands_before_the_stop_still_ends_the_wait() {
     a.slot.drop_in(letter("lab/c", "lab/a", 1), 64).unwrap();
     assert_eq!(a.desk.lock().unwrap().take_steer().unwrap(), None);
     assert_eq!(
-        a.turn(START + 1),
-        WaitTurn::Ended {
-            source: "@lab/b".to_owned(),
-            text: "lab/b replied: free now".to_owned(),
-        }
+        replied(a.turn(START + 1)),
+        ("lab/b".to_owned(), "free now".to_owned())
     );
     assert_eq!(
         a.desk.lock().unwrap().pending(),
@@ -159,11 +165,8 @@ fn a_waiting_send_resumes_with_the_reply() {
     b.send("lab/a", "free now", false);
     b.deliver_to(&a);
     assert_eq!(
-        a.turn(START + 2),
-        WaitTurn::Ended {
-            source: "@lab/b".to_owned(),
-            text: "lab/b replied: free now".to_owned(),
-        }
+        replied(a.turn(START + 2)),
+        ("lab/b".to_owned(), "free now".to_owned())
     );
     assert_eq!(a.turn(START + 3), WaitTurn::Idle);
     let ends: Vec<_> = a
@@ -189,8 +192,7 @@ fn an_unanswered_wait_ends_at_the_deadline() {
     }
     assert_eq!(
         a.turn(START + PATIENCE_MS),
-        WaitTurn::Ended {
-            source: "@lab/b".to_owned(),
+        WaitTurn::TimedOut {
             text: format!(
                 "no reply came from lab/b within {} s; go on without it",
                 PATIENCE_MS / 1000
@@ -274,7 +276,7 @@ fn run_trace(acts: &[Act]) {
             );
         }
         match turn {
-            WaitTurn::Ended { .. } | WaitTurn::Idle => open_since = None,
+            WaitTurn::Replied(_) | WaitTurn::TimedOut { .. } | WaitTurn::Idle => open_since = None,
             WaitTurn::Waiting => {
                 let since = open_since.unwrap();
                 assert!(

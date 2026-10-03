@@ -216,7 +216,7 @@ fn a_steer_inside_the_reads_lands_where_the_serial_wave_writes_it() {
     let calls = || vec![call("c1", "read"), call("c2", "read"), call("c3", "read")];
     let steer_at_one = |index: u32| match index {
         1 => Interrupt::Steer {
-            source: "person".into(),
+            speaker: crate::conversation::Speaker::Person,
             text: "only the tests".into(),
         },
         _ => Interrupt::None,

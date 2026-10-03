@@ -654,7 +654,7 @@ fn a_steer_at_a_safe_point_reaches_the_next_window_and_not_only_the_ledger() {
     // One steer, at the boundary before the second assembly.
     let mut interrupt = |point: SafePoint| match point {
         SafePoint::BeforeAssemble { turn: 1 } => Interrupt::Steer {
-            source: "user".to_owned(),
+            speaker: runtime::conversation::Speaker::Person,
             text: "measure it in metres".to_owned(),
         },
         _ => Interrupt::None,
@@ -931,7 +931,7 @@ fn a_steer_inside_a_tool_wave_is_recorded_before_the_model_reads_it() {
     let mut now = counter();
     let mut interrupt = |point: SafePoint| match point {
         SafePoint::BeforeToolCall { turn: 0, call: 1 } => Interrupt::Steer {
-            source: "user".to_owned(),
+            speaker: runtime::conversation::Speaker::Person,
             text: "measure it in metres".to_owned(),
         },
         _ => Interrupt::None,
@@ -1198,7 +1198,7 @@ fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
     let mut now = counter();
     let mut interrupt = |point: SafePoint| match point {
         SafePoint::BeforeCall { turn: 0 } => Interrupt::Steer {
-            source: "user".to_owned(),
+            speaker: runtime::conversation::Speaker::Person,
             text: "measure it in metres".to_owned(),
         },
         _ => Interrupt::None,

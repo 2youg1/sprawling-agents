@@ -218,8 +218,11 @@ impl RunWorker {
         }
         // A line a lane relayed comes from a run that is driving; the
         // state is stamped now and never revised (collab D10).
-        let signal =
-            collab::Signal::from_payload(&line.data)?.delivered(collab::SenderState::Running);
+        // The run that wrote the line is the one the receiver's letter
+        // names (collab D16), taken from the line rather than the id.
+        let signal = collab::Signal::from_payload(&line.data)?
+            .delivered(collab::SenderState::Running)
+            .sent_by(line.run);
         self.collaborating.rooms.deliver(&signal)?;
         let Some(speaker) = self.flight.speaker(line.run) else {
             return Ok(());

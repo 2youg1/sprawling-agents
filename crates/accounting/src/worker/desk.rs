@@ -259,11 +259,12 @@ impl CommandDesk {
         else {
             return Interrupt::None;
         };
-        // The person's entrance is the only one that renders as `user`,
-        // and an empty steer is not an interruption.
+        // The User's entrance is the only production code that builds
+        // `Speaker::Person`, the one speaker rendered as `user` (collab
+        // D16), and an empty steer is not an interruption.
         match collab::Steer::from_person(&text) {
             Ok(steer) => Interrupt::Steer {
-                source: steer.source().to_owned(),
+                speaker: runtime::conversation::Speaker::Person,
                 text: steer.text().to_owned(),
             },
             Err(_) => Interrupt::None,

@@ -18,202 +18,12 @@
 //! and what stands in the prefix is nothing at all — only `status`
 //! reports that signals are waiting.
 
-use kernel::event::record::{Lane, SignalConsumed, SignalEnqueued, SignalId, SignalKind};
-use kernel::{Address, Admission, AxCode, AxError, IdemKey, Payload, RunId, Seq, TimeMs, Version};
+use kernel::event::record::Lane;
+use kernel::{Admission, AxCode, AxError, IdemKey, RunId, Seq};
 use storage::{EventQueue, QueueLane};
 
-/// Where the run that sent a signal stood when the city delivered it,
-/// stamped at delivery and never revised: a signal is history once it
-/// is sent, and the reader decides from this whether it still applies
-/// (collab D10).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SenderState {
-    /// The sender was still driving: an ordinary send.
-    Running,
-    /// The sender had frozen with its work done or at its limit.
-    Frozen,
-    /// The sender had been cancelled.
-    Cancelled,
-}
-
-impl SenderState {
-    /// The word the reader is shown after the sender's `@address`.
-    #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            SenderState::Running => "running",
-            SenderState::Frozen => "frozen",
-            SenderState::Cancelled => "cancelled",
-        }
-    }
-}
-
-/// One communication between residents.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Signal {
-    id: SignalId,
-    kind: SignalKind,
-    from: String,
-    room: Address,
-    room_version: Version,
-    payload: Payload,
-    at: TimeMs,
-    /// Stamped by the city when it delivers the signal; absent on a
-    /// signal rebuilt from the history, whose sender's state at delivery
-    /// the history does not carry.
-    sender: Option<SenderState>,
-}
-
-impl Signal {
-    /// Sole constructor.
-    ///
-    /// # Errors
-    /// Refuses a signal with no sender: `from` decides how the receiver
-    /// renders it, and an unattributed signal renders as nobody.
-    pub fn new(
-        id: SignalId,
-        kind: SignalKind,
-        from: String,
-        room: Address,
-        room_version: Version,
-        payload: Payload,
-        at: TimeMs,
-    ) -> Result<Signal, AxError> {
-        if from.is_empty() {
-            return Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "build a signal",
-                id.as_str().to_owned(),
-            )
-            .with_recovery("name the sender; a signal is read as coming from someone"));
-        }
-        Ok(Signal {
-            id,
-            kind,
-            from,
-            room,
-            room_version,
-            payload,
-            at,
-            sender: None,
-        })
-    }
-
-    /// This signal as the city delivers it, with where its sender stood
-    /// at that moment (collab D10).
-    #[must_use]
-    pub fn delivered(self, sender: SenderState) -> Signal {
-        Signal {
-            sender: Some(sender),
-            ..self
-        }
-    }
-
-    /// Where the sender stood when the city delivered this signal.
-    #[must_use]
-    pub fn sender(&self) -> Option<SenderState> {
-        self.sender
-    }
-
-    #[must_use]
-    pub fn id(&self) -> &SignalId {
-        &self.id
-    }
-
-    #[must_use]
-    pub fn kind(&self) -> SignalKind {
-        self.kind
-    }
-
-    #[must_use]
-    pub fn from(&self) -> &str {
-        &self.from
-    }
-
-    #[must_use]
-    pub fn room(&self) -> &Address {
-        &self.room
-    }
-
-    /// The room version the sender saw when speaking. A held draft is
-    /// judged against it.
-    #[must_use]
-    pub fn room_version(&self) -> Version {
-        self.room_version
-    }
-
-    #[must_use]
-    pub fn payload(&self) -> &Payload {
-        &self.payload
-    }
-
-    #[must_use]
-    pub fn at(&self) -> TimeMs {
-        self.at
-    }
-
-    /// Urgent for a steer, ordinary for everything else. Derived rather
-    /// than supplied: see the module note on deduplication.
-    #[must_use]
-    pub fn lane(&self) -> Lane {
-        match self.kind {
-            SignalKind::Steer => Lane::Urgent,
-            SignalKind::Mention | SignalKind::Thread | SignalKind::Broadcast => Lane::Ordinary,
-        }
-    }
-
-    /// The `signal_enqueued` record.
-    ///
-    /// # Errors
-    /// Propagates the payload's refusal to hold what it was given.
-    pub fn enqueued_payload(&self) -> Result<Payload, AxError> {
-        Payload::of(&SignalEnqueued {
-            id: self.id.clone(),
-            kind: self.kind,
-            from: self.from.clone(),
-            room: self.room.clone(),
-            room_version: self.room_version,
-            payload: self.payload.clone(),
-            at: self.at,
-            lane: Some(self.lane()),
-        })
-    }
-
-    /// The `signal_consumed` record: the id and who took it, because the
-    /// content is already in the enqueue record and history does not
-    /// need it twice.
-    ///
-    /// # Errors
-    /// Propagates the payload's refusal to hold what it was given.
-    pub fn consumed_payload(&self, by: &str) -> Result<Payload, AxError> {
-        Payload::of(&SignalConsumed {
-            id: self.id.clone(),
-            by: by.to_owned(),
-        })
-    }
-
-    /// Reads back what [`enqueued_payload`](Self::enqueued_payload)
-    /// wrote. The inverse is public because rebuilding the queues from
-    /// the ledger is the only way the city knows what is waiting after a
-    /// restart, and a second parser of this shape would be a second
-    /// answer to that question.
-    ///
-    /// # Errors
-    /// Refuses a payload missing a field or carrying a kind this version
-    /// does not know.
-    pub fn from_payload(payload: &Payload) -> Result<Signal, AxError> {
-        let line: SignalEnqueued = payload.read()?;
-        Signal::new(
-            line.id,
-            line.kind,
-            line.from,
-            line.room,
-            line.room_version,
-            line.payload,
-            line.at,
-        )
-    }
-}
+mod signal;
+pub use signal::{SenderState, Signal};
 
 /// The receiving side: two lines, what a leaving run gave back, and a
 /// bandwidth.
@@ -262,7 +72,7 @@ impl Inbox {
     /// Propagates the queue's own refusal to hold the payload.
     pub fn deliver(&mut self, signal: &Signal) -> Result<Admission, AxError> {
         let key = IdemKey::derive(&RunId::CITY, Seq::FIRST, signal.id().as_str().as_bytes());
-        let payload = signal.enqueued_payload()?;
+        let payload = signal.queued_payload()?;
         let queue = match signal.lane() {
             Lane::Urgent => &mut self.urgent,
             Lane::Ordinary => &mut self.ordinary,
@@ -300,7 +110,7 @@ impl Inbox {
                     None => break,
                 },
             };
-            out.push(Signal::from_payload(&item.payload)?);
+            out.push(Signal::from_queued(&item.payload)?);
         }
         Ok(out)
     }
@@ -328,7 +138,7 @@ impl Inbox {
             return Some(signal);
         }
         let item = self.urgent.consume()?;
-        Signal::from_payload(&item.payload).ok()
+        Signal::from_queued(&item.payload).ok()
     }
 
     /// What `status` reports as `signals_pending`.

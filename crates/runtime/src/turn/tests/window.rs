@@ -12,7 +12,49 @@
 )]
 
 use super::super::*;
-use crate::conversation::Opening;
+use crate::conversation::{Letter, LetterKind, Opening, Speaker};
+
+fn planner() -> Speaker {
+    Speaker::Resident(Letter {
+        from: "planner".to_owned(),
+        run: None,
+        kind: LetterKind::Steer,
+        sender: None,
+    })
+}
+
+/// A `steer_received` line written before the envelope carries only
+/// `@<room>`, and still folds, as a steer letter (collab D16); a new
+/// line reads back as the speaker that wrote it.
+#[test]
+fn a_recorded_source_reads_back_as_its_speaker() {
+    let speaker = Speaker::Resident(Letter {
+        from: "lab/room1".to_owned(),
+        run: Some(kernel::RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000001").unwrap()),
+        kind: LetterKind::Reply,
+        sender: Some("running".to_owned()),
+    });
+    assert_eq!(
+        [
+            Speaker::from_recorded(&speaker.recorded()).unwrap(),
+            Speaker::from_recorded("user").unwrap(),
+            Speaker::from_recorded("city").unwrap(),
+            Speaker::from_recorded("@lab/room1").unwrap(),
+        ],
+        [
+            speaker,
+            Speaker::Person,
+            Speaker::City,
+            Speaker::Resident(Letter {
+                from: "lab/room1".to_owned(),
+                run: None,
+                kind: LetterKind::Steer,
+                sender: None,
+            }),
+        ]
+    );
+    assert!(Speaker::from_recorded("lab/room1").is_err());
+}
 
 /// The two openings are two situations, and the words differ.
 /// A session nobody assigned a task to gets the person's own line,
@@ -68,7 +110,7 @@ fn the_window_folds_steer_into_the_open_user_message() {
         is_error: false,
         attachments: Vec::new(),
     }]);
-    conversation.push_steer("user", "look again");
+    conversation.push_steer(&Speaker::Person, "look again");
     assert_eq!(
         conversation.messages().len(),
         1,
@@ -78,7 +120,7 @@ fn the_window_folds_steer_into_the_open_user_message() {
     conversation.push_assistant(vec![ContentBlock::Text {
         text: "ok".to_owned(),
     }]);
-    conversation.push_steer("@planner", "hurry");
+    conversation.push_steer(&planner(), "hurry");
     assert_eq!(
         conversation.messages().len(),
         3,
@@ -94,7 +136,7 @@ fn tool_results_after_an_empty_reply_reach_the_window() {
     let mut conversation = Conversation::new();
     conversation.push_task_lines("find it", "found", Opening::FromJob);
     conversation.mark_sent();
-    conversation.push_steer("user", "narrow the search");
+    conversation.push_steer(&Speaker::Person, "narrow the search");
     conversation.push_assistant(Vec::new());
     let result = ContentBlock::ToolResult {
         tool_use_id: "call-1".to_owned(),
@@ -135,7 +177,7 @@ fn a_steer_after_results_on_a_sent_message_joins_them() {
         attachments: Vec::new(),
     };
     conversation.push_tool_results(vec![result.clone()]);
-    conversation.push_steer("user", "narrow the search");
+    conversation.push_steer(&Speaker::Person, "narrow the search");
     let tail: Vec<&ContentBlock> = conversation
         .messages()
         .iter()

@@ -6,6 +6,8 @@
 use serde_json::{Map, Value};
 
 use super::*;
+use kernel::event::record::{SignalConsumed, SignalId, SignalKind};
+use kernel::{Address, Payload, TimeMs, Version};
 
 fn signal(id: &str, kind: SignalKind) -> Signal {
     let mut body = Map::new();
@@ -180,4 +182,18 @@ fn a_consumption_that_does_not_read_is_a_refusal_rather_than_a_skip() {
     assert_eq!(taken.id.as_str(), "s-9");
     assert_eq!(taken.by, "lab/room2");
     assert!(Payload::empty().read::<SignalConsumed>().is_err());
+}
+
+/// D10, D16: what the city stamped on a signal when it delivered it —
+/// where the sender stood, and the run that sent it — survives the
+/// queue, which keeps the ledger's line and the stamps beside it.
+#[test]
+fn a_queued_signal_keeps_the_stamps_of_its_delivery() {
+    let run = RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000001").unwrap();
+    let sent = signal("s-1", SignalKind::Steer)
+        .delivered(SenderState::Running)
+        .sent_by(run);
+    let mut inbox = Inbox::new(8, 4);
+    inbox.deliver(&sent).unwrap();
+    assert_eq!(inbox.take_steer(), Some(sent));
 }

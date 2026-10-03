@@ -8,6 +8,8 @@
 
 use kernel::EventRef;
 
+use crate::conversation::Speaker;
+
 /// Boundary snapshot, supplied by the executor at every phase change.
 /// `Cancel` ends the turn at the boundary; `Steer` records and advances
 /// (the executor folds the text into its `Conversation`); `Policy`
@@ -19,8 +21,15 @@ use kernel::EventRef;
 pub enum Interrupt {
     None,
     Cancel,
-    Steer { source: String, text: String },
-    Policy { policy: kernel::RunPolicy },
+    /// Who spoke is a type, so only the entrance that builds
+    /// [`Speaker::Person`] can make a steer render as the User's.
+    Steer {
+        speaker: Speaker,
+        text: String,
+    },
+    Policy {
+        policy: kernel::RunPolicy,
+    },
 }
 
 /// Whether the wave may start its next call, asked once before each of
