@@ -351,6 +351,20 @@ mod tests {
         assert_eq!(observe_edit_war(&bursts), EditWarVerdict::Calm);
     }
 
+    /// A file passed on from run to run, none of them taking it back, is
+    /// work handed along rather than a war.
+    #[test]
+    fn a_file_handed_along_without_a_reclaim_stays_calm() {
+        let file = addr("b/relay.md");
+        let relay: Vec<EditSample> = (1..=6)
+            .map(|n| EditSample {
+                addr: file.clone(),
+                run: run(n),
+            })
+            .collect();
+        assert_eq!(observe_edit_war(&relay), EditWarVerdict::Calm);
+    }
+
     #[test]
     fn wars_are_per_address_not_global() {
         let samples: Vec<EditSample> = [

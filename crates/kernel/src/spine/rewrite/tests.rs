@@ -159,3 +159,110 @@ fn a_split_that_would_delete_or_hide_work_is_refused() {
         .is_err()
     );
 }
+
+/// A status edit rewrites the row it names and leaves every other row as
+/// it was, whole.
+#[test]
+fn a_status_edit_changes_the_named_row_and_no_other() {
+    let edited = set_roadmap_status(GOOD, &node("2"), RoadmapStatus::Blocked, None).unwrap();
+    let mut expected = rows_of(GOOD);
+    if let Some(row) = expected.get_mut(1) {
+        row.status = RoadmapStatus::Blocked;
+    }
+    assert_eq!(rows_of(&edited), expected);
+}
+
+/// Children land in the plan's own table, after the parent's last
+/// descendant even when that descendant is the table's last line, and a
+/// second table further down the document is not the plan, whatever its
+/// rows look like.
+#[test]
+fn children_land_in_the_plan_s_table_after_its_last_line_of_the_branch() {
+    let notes = "\
+| # | Note |
+|---|------|
+| 1.7 | a numbered note, not a plan row |
+";
+    let text = format!(
+        "\
+| # | Item | Weight | Needs | Status | Evidence |
+|---|------|--------|-------|--------|----------|
+| 1 | build | 1 |  | Not started |  |
+| 1.1 | design | 1 |  | Not started |  |
+
+{notes}"
+    );
+    let split = insert_children(
+        &text,
+        &node("1"),
+        &[NewChild {
+            item: "code".to_owned(),
+            weight: 1,
+        }],
+    )
+    .unwrap();
+    let ids: Vec<String> = rows_of(&split)
+        .iter()
+        .map(|row| row.id.as_str().to_owned())
+        .collect();
+    assert_eq!(ids, ["1", "1.1", "1.2"]);
+    assert!(split.ends_with(&format!("\n\n{notes}")), "{split}");
+}
+
+/// A top-level row is added after the plan's last row under the index the
+/// caller chose; an index a row already carries, or one that is not
+/// top-level, is refused rather than renumbered.
+#[test]
+fn a_top_level_row_is_added_last_under_the_index_the_caller_chose() {
+    let text = "\
+| # | Item | Weight | Needs | Status | Evidence |
+|---|------|--------|-------|--------|----------|
+| 1 | build | 1 |  | Not started |  |
+| 1.1 | design | 1 |  | Not started |  |
+";
+    let child = NewChild {
+        item: "ship".to_owned(),
+        weight: 2,
+    };
+    let added = append_top_level(text, &node("2"), &child).unwrap();
+    let rows = rows_of(&added);
+    let ids: Vec<&str> = rows.iter().map(|row| row.id.as_str()).collect();
+    assert_eq!(ids, ["1", "1.1", "2"]);
+    assert_eq!(
+        rows.last().map(|row| (row.item.as_str(), row.weight)),
+        Some(("ship", 2))
+    );
+    assert_eq!(
+        append_top_level(text, &node("1"), &child)
+            .unwrap_err()
+            .subject(),
+        "a row numbered 1 is already there"
+    );
+    assert_eq!(
+        append_top_level(text, &node("1.2"), &child)
+            .unwrap_err()
+            .subject(),
+        "1.2 is not a top-level index"
+    );
+}
+
+/// The separator is the row of dashes, with or without the colons that
+/// align a column, and a body row with every cell filled is a row of the
+/// plan, never mistaken for the separator.
+#[test]
+fn an_aligned_separator_is_the_separator_and_a_full_row_is_a_row() {
+    let text = format!(
+        "\
+| # | Item | Weight | Needs | Status | Evidence |
+|:--|:----:|-------:|-------|--------|----------|
+| 1 | design | 1 |  | Done | cas:b3-{h} |
+| 2 | code | 2 | 1 | Done | cas:b3-{h} |
+",
+        h = "ab".repeat(32)
+    );
+    let ids: Vec<String> = rows_of(&text)
+        .iter()
+        .map(|row| row.id.as_str().to_owned())
+        .collect();
+    assert_eq!(ids, ["1", "2"]);
+}
