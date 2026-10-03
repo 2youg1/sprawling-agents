@@ -8,7 +8,7 @@
 //! names no SPEC the tree does not have.
 //!
 //! A migration that stops halfway leaves two specifications a builder
-//! has to choose between (`skills/sdd`, migration step 5); a migration
+//! has to choose between (`crates/city/skills/sdd`, migration step 5); a migration
 //! that deleted the Markdown SPEC and left its citations behind sends a
 //! reader to a file that is gone. The second has already happened
 //! without any migration: a gate's rustdoc cited a `web` SPEC long after

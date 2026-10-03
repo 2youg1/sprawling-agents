@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `cargo xtask spec <lib>`: create a crate's `Spec.lean` with the MPL
-//! notice and the seventeen numbered section comments `skills/sdd` lists
+//! notice and the seventeen numbered section comments `crates/city/skills/sdd` lists
 //! (tools/xtask/Spec.lean §8-41), in the directory of the package whose lib
 //! (or, for a tool without one, whose package) goes by that name.
 //! Creation only: an existing `Spec.lean` is never overwritten, because
@@ -32,7 +32,7 @@ mod theorems;
 /// §8-47): the checker is a Lean program, so no cargo package stands for it.
 const CHECKER: &str = "tools/adversary";
 
-/// The seventeen responsibilities of `skills/sdd`, in its order. What each
+/// The seventeen responsibilities of `crates/city/skills/sdd`, in its order. What each
 /// section holds is that skill's to say, so the skeleton carries titles only.
 const SECTIONS: [&str; 17] = [
     "需求分解",

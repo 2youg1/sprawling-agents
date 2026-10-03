@@ -37,7 +37,8 @@ pub(super) enum Packaged {
     /// The CycloneDX bill of materials, so a person who wants to know
     /// what is inside the binary does not have to build it.
     Sbom,
-    /// The skills a release ships: `skills/`, walked as it stands. One
+    /// The skills a release ships: `crates/city/skills/`, walked as it
+    /// stands and carried as `skills/`. One
     /// part rather than one row per skill, because the list of skills is
     /// the directory's business and a closed per-file list here would be
     /// a second home for it.
@@ -67,9 +68,14 @@ const EXECUTABLE_MODE: u32 = 0o755;
 /// Everything else is read, not run.
 const READABLE_MODE: u32 = 0o644;
 
-/// The name of the tree of skills, spelled once for the walk and for
-/// every entry name the walk produces.
-const SKILLS_DIR: &str = "skills";
+/// Where the tree of skills lives in the repository: the city crate
+/// owns it, because its build script embeds the same files a new city
+/// shelves.
+const SKILLS_DIR: &str = "crates/city/skills";
+
+/// The name the archive carries the tree of skills under, so the person
+/// who unpacks a release finds `skills/` beside the binary.
+const SKILLS_ENTRY: &str = "skills";
 
 /// The release build this archive is assembled around: where it landed,
 /// and what the target it was built for calls it.
@@ -145,14 +151,15 @@ impl Packaged {
             }
             Self::Sbom => "run `just sbom`, or `just dist`, which ends with it",
             Self::Skills => {
-                "restore `skills/` from the tree, or change this table and the archive in \
+                "restore `crates/city/skills/` from the tree, or change this table and the archive in \
                  one change-set"
             }
         }
     }
 }
 
-/// Every file under `skills/`, one entry each, named `skills/<path>`.
+/// Every file under `crates/city/skills/`, one entry each, named
+/// `skills/<path>`.
 ///
 /// Walked rather than listed: which skills a release carries is the
 /// directory's business, and `walk::files` already returns them sorted
@@ -161,7 +168,7 @@ impl Packaged {
 /// text travels with the files it covers.
 ///
 /// # Errors
-/// Refuses a tree with no `skills/` directory - the part is required
+/// Refuses a tree with no `crates/city/skills/` directory - the part is required
 /// like every other, and an archive that silently ships without the
 /// skills is the defect this table exists to prevent.
 fn skills(root: &Path) -> Result<Vec<Entry>, XtaskError> {
@@ -179,7 +186,7 @@ fn skills(root: &Path) -> Result<Vec<Entry>, XtaskError> {
     let mut out = Vec::new();
     for file in walk::files(&dir)? {
         out.push(Entry {
-            name: format!("{SKILLS_DIR}/{}", walk::rel(&dir, &file)),
+            name: format!("{SKILLS_ENTRY}/{}", walk::rel(&dir, &file)),
             source: file,
             mode: READABLE_MODE,
         });
@@ -222,10 +229,10 @@ mod tests {
     fn the_skills_ride_in_the_archive_under_their_own_paths() {
         let dir = std::env::temp_dir().join(format!("sprawling-skills-{}", std::process::id()));
         std::fs::remove_dir_all(&dir).ok();
-        let skill = dir.join("skills").join("alpha");
+        let skill = dir.join(SKILLS_DIR).join("alpha");
         std::fs::create_dir_all(&skill).unwrap();
         std::fs::write(skill.join("SKILL.md"), b"one").unwrap();
-        std::fs::write(dir.join("skills").join("LICENSES.md"), b"two").unwrap();
+        std::fs::write(dir.join(SKILLS_DIR).join("LICENSES.md"), b"two").unwrap();
 
         let found = skills(&dir).unwrap();
         let names: Vec<&str> = found.iter().map(|entry| entry.name.as_str()).collect();

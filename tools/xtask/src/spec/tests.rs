@@ -14,7 +14,7 @@ fn a_relocated_package_gets_its_spec_skeleton_in_its_own_directory() {
 }
 
 /// The skeleton is Lean: the notice as Lean comments, then the seventeen
-/// section comments `skills/sdd` lists, numbered in order.
+/// section comments `crates/city/skills/sdd` lists, numbered in order.
 #[test]
 fn the_skeleton_opens_with_the_notice_and_numbers_the_seventeen_sections_in_order() {
     let text = super::skeleton("k");

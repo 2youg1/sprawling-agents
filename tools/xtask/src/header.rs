@@ -8,7 +8,7 @@
 //! `//` both languages comment a line with.
 //!
 //! Markdown is out of this gate's scope by ruling: a skill document
-//! carries its own licence in its frontmatter and in `skills/LICENSES.md`,
+//! carries its own licence in its frontmatter and in `crates/city/skills/LICENSES.md`,
 //! and an MPL notice on one of the MIT adaptations would misstate its
 //! terms.
 //!

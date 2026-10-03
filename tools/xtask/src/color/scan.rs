@@ -19,7 +19,7 @@ use crate::walk;
 /// question this table answers - which files the scan walks past - is not
 /// the question `THEME` answers, so the page joins it without touching
 /// which file the token assertions read.
-const PRODUCTION_POINTS: [&str; 2] = [THEME, "skills/playback/template.html"];
+const PRODUCTION_POINTS: [&str; 2] = [THEME, "crates/city/skills/playback/template.html"];
 
 /// The files that spell colour because reading a colour means naming
 /// it, and the one test that writes the spelling it asserts. Same shape
