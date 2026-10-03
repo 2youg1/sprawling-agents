@@ -107,6 +107,10 @@
   });
 </script>
 
+<!-- Before the city answers, the bar is not drawn at all: an empty
+  grid would still draw its bottom rule, a second line under the page
+  head with nothing between the two. -->
+{#if readings !== null || spent !== null}
 <dl
   class="grid grid-cols-[repeat(auto-fit,minmax(16ch,1fr))] gap-x-gutter gap-y-base border-b border-edge pb-base"
   aria-label={say($lang, "city_bar")}
@@ -134,3 +138,4 @@
     </div>
   {/if}
 </dl>
+{/if}
