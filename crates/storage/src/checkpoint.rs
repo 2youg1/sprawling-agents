@@ -37,6 +37,7 @@ pub(crate) mod commit;
 mod opening;
 mod provenance;
 pub(crate) mod scan;
+mod sweep;
 
 pub use base::BaseProgress;
 pub use commit::Checkpoint;
