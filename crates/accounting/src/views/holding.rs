@@ -390,3 +390,45 @@ impl Views {
         self.head
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+mod tests {
+    use kernel::{Address, B3Hash, EventKind, RunId, Seq};
+
+    use super::Views;
+    use crate::views::tests::{Place, view_record};
+
+    /// `crates/wire/spec/Frames/Ask.lean`,
+    /// `an_answer_contains_genesis_exactly_when_something_was_folded`: an
+    /// answer's `as_of` is the first seq the view has not folded, so a
+    /// view that folded nothing answers `Seq::FIRST` and its answer does
+    /// not contain genesis, and once genesis (seq 0) is folded it does.
+    #[test]
+    fn an_answer_contains_genesis_exactly_when_something_was_folded() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut views = Views::new(dir.path());
+        let contains_genesis = |views: &Views| Seq::FIRST.value() < views.next_unfolded().value();
+        let before = contains_genesis(&views);
+        let serde_json::Value::Object(data) = serde_json::json!({
+            "at": "lab/Memo.md",
+            "baseline": B3Hash::digest(b"zero"),
+            "version": B3Hash::digest(b"one"),
+            "bytes": 3,
+        }) else {
+            panic!("an object");
+        };
+        views
+            .apply(&view_record(
+                Place {
+                    seq: 0,
+                    run: RunId::CITY,
+                },
+                EventKind::DocumentWritten,
+                &Address::parse("lab/Memo.md").unwrap(),
+                data,
+            ))
+            .unwrap();
+        assert_eq!((before, contains_genesis(&views)), (false, true));
+    }
+}
