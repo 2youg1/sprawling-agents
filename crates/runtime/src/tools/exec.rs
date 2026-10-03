@@ -66,8 +66,6 @@ pub struct ExecSetup {
     /// The run this tool serves: a command it hands to the background
     /// is owed to this run, and its output reaches no other.
     pub run: RunId,
-    /// The run's policy cell, asked at each host placement for the
-    /// write limit in force.
     pub policy: crate::mode::PolicyReader,
 }
 
@@ -124,8 +122,7 @@ impl ExecTool {
         // The arm and what it does not hold are in front of the caller,
         // because a tool that said only "sandboxed" would let a command
         // that needs a closed network be launched in a box whose network
-        // is open. The write limit is not: it can change while the run
-        // goes, and the note a change appends spells it (§8-62).
+        // is open.
         let disclosure = format!(
             "Run a program, a Python snippet, or a shell line. A program or shell \
              line runs in this machine's confinement, {}. Ask for `where: host` to \

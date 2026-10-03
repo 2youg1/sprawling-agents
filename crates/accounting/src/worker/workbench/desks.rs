@@ -6,10 +6,12 @@
 //! The desks one dispatch lends out: opened together, lent what they
 //! hold, and taken back together when the drive ends.
 
+use std::path::PathBuf;
+
 use kernel::{Address, AxError};
 
 use super::super::RunWorker;
-use super::{BenchDesks, Desks, Site};
+use super::Site;
 
 impl RunWorker {
     /// Opens the desks this run works at, and lends them what they hold.
@@ -292,5 +294,74 @@ impl BenchDesks {
             ));
         }
         collab::ArchiveTool::new(std::sync::Arc::clone(&self.shelf))
+    }
+}
+
+/// The desks one dispatch lends out, and takes back when the drive ends.
+///
+/// Grouped because they are lent and taken back together: five handles
+/// passed side by side are five chances to take four of them back. Three
+/// of them settle in one order in `settle_desks`, `goals` is answered at
+/// each call on the accounting thread, and `pr` settles after,
+/// once the run has something to show for itself, and it belongs here
+/// all the same - what makes them one value is the lending, not the
+/// settling.
+pub(in crate::worker) struct Desks {
+    pub(in crate::worker) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
+    pub(in crate::worker) goals: std::sync::Arc<std::sync::Mutex<collab::GoalDesk>>,
+    pub(in crate::worker) plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
+    pub(in crate::worker) shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
+    /// The tree the shelf files in, set once the lane has placed it.
+    pub(in crate::worker) shelf_root: std::sync::Arc<std::sync::OnceLock<PathBuf>>,
+    pub(in crate::worker) pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
+    /// The room's workshop (what it got back and handed down, so nothing
+    /// is handed twice) and the run's delegate desk, read at the call.
+    pub(in crate::worker) workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
+    pub(in crate::worker) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
+    /// Where the shared plan lives, so the claims that survive are
+    /// written back to the file they were checked against.
+    pub(in crate::worker) plan_path: PathBuf,
+    /// What was already in the room's queue when it was lent out, which
+    /// is what `status` reports as waiting. Read before the queue goes
+    /// to the desk, so it is counted here or not at all.
+    pub(in crate::worker) waiting: u32,
+    /// This run's tenure over its room's queue, shown when it lands:
+    /// only the holder gives a queue back (`crates/sprawling/Spec.lean` §8-46-9).
+    pub(in crate::worker) tenure: crate::worker::QueueTenure,
+    /// Where a change of the room's run policy waits for this run.
+    pub(in crate::worker) policy: crate::worker::rooms::PolicySlot,
+}
+
+/// The desks a run's bench holds while it drives: clones of the handles
+/// in [`Desks`], for the lane that lays the bench out. The room's queue
+/// and the tenure over it stay in [`Desks`], with the landing, because
+/// only the holder gives a queue back.
+pub(in crate::worker) struct BenchDesks {
+    pub(in crate::worker) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
+    pub(in crate::worker) goals: std::sync::Arc<std::sync::Mutex<collab::GoalDesk>>,
+    pub(in crate::worker) plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
+    pub(in crate::worker) shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
+    pub(in crate::worker) shelf_root: std::sync::Arc<std::sync::OnceLock<PathBuf>>,
+    pub(in crate::worker) pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
+    pub(in crate::worker) workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
+    pub(in crate::worker) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
+    pub(in crate::worker) waiting: u32,
+    pub(in crate::worker) policy: crate::worker::rooms::PolicySlot,
+}
+
+impl Desks {
+    pub(in crate::worker) fn for_bench(&self) -> BenchDesks {
+        BenchDesks {
+            signals: std::sync::Arc::clone(&self.signals),
+            goals: std::sync::Arc::clone(&self.goals),
+            plan: std::sync::Arc::clone(&self.plan),
+            shelf: std::sync::Arc::clone(&self.shelf),
+            shelf_root: std::sync::Arc::clone(&self.shelf_root),
+            pr: std::sync::Arc::clone(&self.pr),
+            workshop: std::sync::Arc::clone(&self.workshop),
+            delegates: std::sync::Arc::clone(&self.delegates),
+            waiting: self.waiting,
+            policy: self.policy.clone(),
+        }
     }
 }

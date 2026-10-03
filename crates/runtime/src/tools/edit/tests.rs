@@ -4,19 +4,15 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-use kernel::Address;
+use crate::PolicyCell;
+use kernel::{Address, Mode, RunPolicy};
 
 fn tool(root: &Path) -> EditTool {
     let work = Address::parse("work").unwrap();
     let domain = kernel::WriteDomain::new(vec![work.clone()]).unwrap();
     std::fs::create_dir_all(root.join("work")).unwrap();
-    EditTool::new(
-        root,
-        work,
-        domain,
-        crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
-    )
-    .unwrap()
+    let policy = PolicyCell::new(RunPolicy::of(Mode::Work)).reader();
+    EditTool::new(root, work, domain, policy).unwrap()
 }
 
 fn call(path: &str, base: &str, old: &str, new: &str) -> ToolCall {
@@ -34,28 +30,6 @@ fn call(path: &str, base: &str, old: &str, new: &str) -> ToolCall {
         name: ToolName::parse("edit").unwrap(),
         args: Payload::new(args).unwrap(),
     }
-}
-
-/// The tool list is the same in every mode, so the mode in force is
-/// asked at the call: a chat run creates nothing (runtime D25).
-#[test]
-fn a_chat_run_is_refused_an_edit_and_the_disk_is_untouched() {
-    let tmp = tempfile::tempdir().unwrap();
-    let work = Address::parse("work").unwrap();
-    std::fs::create_dir_all(tmp.path().join("work")).unwrap();
-    let tool = EditTool::new(
-        tmp.path(),
-        work.clone(),
-        kernel::WriteDomain::new(vec![work]).unwrap(),
-        crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Chat)).reader(),
-    )
-    .unwrap();
-    let refused = tool.invoke(&call("work/new.md", "new", "", "text"));
-    assert_eq!(
-        refused.err().map(|err| *err.code()),
-        Some(AxCode::GateDenied)
-    );
-    assert!(!tmp.path().join("work/new.md").exists());
 }
 
 #[test]
@@ -252,7 +226,7 @@ fn a_documents_tool_writes_markdown_and_refuses_code_by_name() {
         tmp.path(),
         Address::parse("hall/mayor").unwrap(),
         domain,
-        crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
+        PolicyCell::new(RunPolicy::of(Mode::Work)).reader(),
     )
     .unwrap();
     tool.invoke(&call(

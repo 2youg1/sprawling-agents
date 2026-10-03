@@ -430,6 +430,39 @@ mod tests {
         walk(start, &[Step::Call, Step::Change(tighter), Step::Call]).unwrap();
     }
 
+    /// The tool list is the same in every mode, so the mode in force is
+    /// asked at the call: a chat run creates nothing (runtime D25).
+    #[test]
+    fn a_chat_run_is_refused_an_edit_and_the_disk_is_untouched() {
+        let tmp = tempfile::tempdir().unwrap();
+        let work = kernel::Address::parse("work").unwrap();
+        std::fs::create_dir_all(tmp.path().join("work")).unwrap();
+        let tool = crate::tools::EditTool::new(
+            tmp.path(),
+            work.clone(),
+            kernel::WriteDomain::new(vec![work]).unwrap(),
+            crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Chat)).reader(),
+        )
+        .unwrap();
+        let refused = kernel::Tool::invoke(&tool, &edit_call());
+        assert_eq!(
+            refused.err().map(|err| *err.code()),
+            Some(AxCode::GateDenied)
+        );
+        assert!(!tmp.path().join("work/new.md").exists());
+    }
+
+    fn edit_call() -> kernel::ToolCall {
+        let args = serde_json::json!({
+            "path": "work/new.md", "base_version": "new", "old": "", "new": "text",
+        });
+        kernel::ToolCall {
+            id: "call-1".to_owned(),
+            name: kernel::ToolName::parse("edit").unwrap(),
+            args: kernel::Payload::of(&args).unwrap(),
+        }
+    }
+
     fn work(admit: AdmissionRequirement) -> RunPolicy {
         RunPolicy {
             admit,

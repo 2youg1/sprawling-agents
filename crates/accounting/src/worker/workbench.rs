@@ -20,6 +20,7 @@ use runtime::bench::ToolBench;
 use kernel::event::record::autonomy_word;
 
 mod desks;
+pub(in crate::worker) use desks::{BenchDesks, Desks};
 mod desktop;
 mod engine;
 mod servers;
@@ -306,75 +307,6 @@ impl Site {
 /// staged more than the claim checked out, cannot happen.
 pub(in crate::worker) fn tree_scope(building: &city::Building) -> Vec<String> {
     vec![building.addr().as_str().to_owned()]
-}
-
-/// The desks one dispatch lends out, and takes back when the drive ends.
-///
-/// Grouped because they are lent and taken back together: five handles
-/// passed side by side are five chances to take four of them back. Three
-/// of them settle in one order in `settle_desks`, `goals` is answered at
-/// each call on the accounting thread, and `pr` settles after,
-/// once the run has something to show for itself, and it belongs here
-/// all the same - what makes them one value is the lending, not the
-/// settling.
-pub(super) struct Desks {
-    pub(super) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
-    pub(super) goals: std::sync::Arc<std::sync::Mutex<collab::GoalDesk>>,
-    pub(super) plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
-    pub(super) shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
-    /// The tree the shelf files in, set once the lane has placed it.
-    pub(super) shelf_root: std::sync::Arc<std::sync::OnceLock<PathBuf>>,
-    pub(super) pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
-    /// The room's workshop (what it got back and handed down, so nothing
-    /// is handed twice) and the run's delegate desk, read at the call.
-    pub(super) workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
-    pub(super) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
-    /// Where the shared plan lives, so the claims that survive are
-    /// written back to the file they were checked against.
-    pub(super) plan_path: PathBuf,
-    /// What was already in the room's queue when it was lent out, which
-    /// is what `status` reports as waiting. Read before the queue goes
-    /// to the desk, so it is counted here or not at all.
-    waiting: u32,
-    /// This run's tenure over its room's queue, shown when it lands:
-    /// only the holder gives a queue back (`crates/sprawling/Spec.lean` §8-46-9).
-    pub(super) tenure: super::QueueTenure,
-    /// Where a change of the room's run policy waits for this run.
-    pub(super) policy: super::rooms::PolicySlot,
-}
-
-/// The desks a run's bench holds while it drives: clones of the handles
-/// in [`Desks`], for the lane that lays the bench out. The room's queue
-/// and the tenure over it stay in [`Desks`], with the landing, because
-/// only the holder gives a queue back.
-pub(in crate::worker) struct BenchDesks {
-    pub(in crate::worker) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
-    goals: std::sync::Arc<std::sync::Mutex<collab::GoalDesk>>,
-    plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
-    shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
-    shelf_root: std::sync::Arc<std::sync::OnceLock<PathBuf>>,
-    pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
-    workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
-    delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
-    waiting: u32,
-    pub(in crate::worker) policy: super::rooms::PolicySlot,
-}
-
-impl Desks {
-    pub(in crate::worker) fn for_bench(&self) -> BenchDesks {
-        BenchDesks {
-            signals: std::sync::Arc::clone(&self.signals),
-            goals: std::sync::Arc::clone(&self.goals),
-            plan: std::sync::Arc::clone(&self.plan),
-            shelf: std::sync::Arc::clone(&self.shelf),
-            shelf_root: std::sync::Arc::clone(&self.shelf_root),
-            pr: std::sync::Arc::clone(&self.pr),
-            workshop: std::sync::Arc::clone(&self.workshop),
-            delegates: std::sync::Arc::clone(&self.delegates),
-            waiting: self.waiting,
-            policy: self.policy.clone(),
-        }
-    }
 }
 
 /// What a run can be told about itself at the moment it starts.
