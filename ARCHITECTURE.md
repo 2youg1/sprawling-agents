@@ -379,11 +379,14 @@ than any diagram of boxes.
 13. **A signal reaches whoever it names, working or not, when it is sent.**
     `signal send` is recorded at the call (`signal_enqueued`, through the
     lane's relay), and the accounting thread delivers it into the named
-    room as it shows that line. A run working in that room receives it at
-    its next safe point, through the same door a steer uses, with `@` and
-    the sender's address in front of it and the sender run's state at
-    delivery (running for a send, frozen or cancelled for a handback); a
-    room with no run is *knocked* at that delivery, once, while the sender
+    room as it shows that line, then records where it landed as the
+    `signal_landed` line that follows: delivered, queued or knocked
+    (kernel D38). A run working in that room receives it at its next safe
+    point, through the same door a steer uses, as one *letter*: an escaped
+    `<letter>` element that names the sending room, the sending run, the
+    kind and the sender run's state at delivery (running for a send,
+    frozen or cancelled for a handback), which its body cannot close
+    (collab D16); a room with no run is *knocked* at that delivery, once, while the sender
     still drives — `bin::assembly` starts a run whose brief names the
     resident who spoke, or waits for the room's current reader to leave.
     The sender carries on. A signal counts as consumed only when a model
@@ -396,8 +399,11 @@ than any diagram of boxes.
     mailslot, the injected clock reaches the stop's reading plus
     `collab::signal_tool::PATIENCE_MS` (240 s), or the run is stopped;
     `signal_wait_started` and `signal_wait_ended` record it, and the end
-    lands in the next request as a steer (collab D9). Only the person's own
-    entrance can render as `user`. A knock addresses a resident, never a
+    lands in the next request as a steer (collab D9). Who speaks is a type,
+    `runtime::conversation::Speaker`: only the person's own entrance
+    renders as `user`, the city's own words as `city`, and a resident's as
+    a letter; a delegated child's JOB.md names who handed its task down
+    (city D21). A knock addresses a resident, never a
     frozen run: history is read, not woken. (collab D7–D11,
     `crates/collab/spec/Delivery.lean`.)
 
@@ -659,7 +665,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review. A library crate starts a thread in eight places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; `accounting::worker::pool` gives each run one lane that drives it, writes its transcript and reads its checkpoint sweep, and ends when the run comes home; `storage::chain_audit` reads a proof's segments in waves of at most eight, one scoped thread each with the calling thread as the first, and joins every wave before it walks the chain through those segments in order; and `remote_access::route::command` gives each command route one reader that ends when the command ends and its output closes. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open, the console, the remote listener's tasks in `bin::outside::listener`, which end when the remote door closes, first run, the doctor's probes, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does. The hot ones among them, the accounting thread, the view fold and the socket workers, take a **seat** from the serving placement table as they start and give it back as they exit; a run's lane takes none yet; on Windows the seat becomes the thread's ideal processor, and macOS and Linux place nothing (`crates/sprawling/spec/Serving/Placement.lean`) |
+| 3 | One spawn point | review. A library crate starts a thread in eight places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; `accounting::worker::pool` gives each run one lane that drives it, writes its transcript and reads its checkpoint sweep, and ends when the run comes home; `storage::chain_audit` reads a proof's segments in waves of at most eight, one scoped thread each with the calling thread as the first, and joins every wave before it walks the chain through those segments in order; and `remote_access::route::command` gives each command route one reader that ends when the command ends and its output closes. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open, the console, which `bin::assembly::remote_door` starts on the thread that first reads the city key, so a Keychain dialog nobody answers cannot hold up Ctrl-C, the remote listener's tasks in `bin::outside::listener`, which end when the remote door closes, first run, the doctor's probes, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does. The hot ones among them, the accounting thread, the view fold and the socket workers, take a **seat** from the serving placement table as they start and give it back as they exit; a run's lane takes none yet; on Windows the seat becomes the thread's ideal processor, and macOS and Linux place nothing (`crates/sprawling/spec/Serving/Placement.lean`) |
 | 4 | No random source on a decision path; OS entropy mints only values a stranger must not guess | review; citysim has no random source to seed |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
@@ -871,7 +877,10 @@ class and load (idle, N concurrent runs, a build in the background); the
 criterion is written before the reading, rounds of the two arms interleave,
 and the measurement has the machine to itself. Target numbers are not set
 in advance: a target enters `budgets.toml` once its baseline is read and the
-User accepts it.
+User accepts it. The figures quoted below were taken on earlier trees:
+the User ruled to skip measurement in 0.0.9, so each row of the register
+that waits on a reading says this version's reading is owed and names the
+recipe that retakes it.
 
 | Metric | Budget | Measured | Gated |
 |---|---|---|---|
@@ -1200,7 +1209,7 @@ stateDiagram-v2
     [*] --> Refused: agree_to_work says no; nothing written
     [*] --> Prepared: room opened, brief written
     Prepared --> Driving: memory admits it; a lane starts at once
-    Driving --> Driving: a Steer or a run policy change lands at a safe point
+    Driving --> Driving: a steer, a letter or a run policy change lands at a safe point
     Driving --> Waiting: a send with wait stops at its next safe point
     Waiting --> Driving: the reply came, or patience ran out
     Waiting --> Frozen: a stop while waiting, the wait ends as left
