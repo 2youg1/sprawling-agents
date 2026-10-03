@@ -24,6 +24,10 @@
 use std::sync::{Arc, Mutex};
 
 use kernel::{AxError, IdemKey, RunId, Seq};
+// The city is formed with an in-memory vault, because these tests are
+// about the worker and must not write to the credential service of the
+// machine that runs them.
+use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
 struct OneItem;
@@ -69,7 +73,12 @@ impl accounting::Machine for OneItem {
 #[test]
 fn a_refresh_counts_the_items_the_machine_it_was_handed_answered() {
     let dir = tempfile::tempdir().unwrap();
-    assembly::init_city(dir.path()).unwrap();
+    form(
+        dir.path(),
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
     let lines = Arc::new(Mutex::new(Vec::<String>::new()));
     let heard = Arc::clone(&lines);
     let log = runtime::diagnostics::Diagnostics::new(
@@ -147,7 +156,12 @@ impl accounting::Machine for Recording {
 #[test]
 fn an_install_hands_the_table_command_to_the_machine_it_was_handed() {
     let dir = tempfile::tempdir().unwrap();
-    assembly::init_city(dir.path()).unwrap();
+    form(
+        dir.path(),
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
     let lines = Arc::new(Mutex::new(Vec::<String>::new()));
     let heard = Arc::clone(&lines);
     let log = runtime::diagnostics::Diagnostics::new(

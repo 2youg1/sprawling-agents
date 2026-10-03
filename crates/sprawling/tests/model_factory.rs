@@ -26,6 +26,10 @@ use kernel::{
     Address, AxCode, AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest,
     ModelReturn, RunId, Seq,
 };
+// The city is formed with an in-memory vault, because these tests are
+// about the worker and must not write to the credential service of the
+// machine that runs them.
+use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
 const LAB: &str = "lab";
@@ -99,7 +103,12 @@ fn city_on(
     template: &str,
     factory: Scripted,
 ) -> (accounting::worker::RunWorker, PathBuf) {
-    let raised = assembly::init_city(dir).unwrap();
+    let raised = form(
+        dir,
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
     let mut worker = accounting::worker::RunWorker::new(
         dir,
         runtime::diagnostics::Diagnostics::off(),

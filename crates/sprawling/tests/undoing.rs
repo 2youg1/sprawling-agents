@@ -26,11 +26,20 @@
 )]
 
 use kernel::{IdemKey, RunId, Seq};
+// The city is formed with an in-memory vault, because these tests are
+// about the worker and must not write to the credential service of the
+// machine that runs them.
+use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
 /// Opens a city and the worker that runs it.
 fn a_city(dir: &std::path::Path) -> accounting::worker::RunWorker {
-    assembly::init_city(dir).unwrap();
+    form(
+        dir,
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
     accounting::worker::RunWorker::new(
         dir,
         runtime::diagnostics::Diagnostics::off(),

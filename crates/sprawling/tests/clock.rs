@@ -21,6 +21,10 @@
 use std::sync::Arc;
 
 use kernel::{Address, AxError, EventRecord, IdemKey, RunId, Seq, TimeMs};
+// The city is formed with an in-memory vault, because these tests are
+// about the worker and must not write to the credential service of the
+// machine that runs them.
+use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
 /// A moment no wall clock reads today.
@@ -37,7 +41,12 @@ impl accounting::Clock for Stopped {
 #[test]
 fn a_worker_stamps_its_lines_with_the_clock_it_was_handed() {
     let dir = tempfile::tempdir().unwrap();
-    let raised = assembly::init_city(dir.path()).unwrap();
+    let raised = form(
+        dir.path(),
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
     let before = runtime::replay::verify_ledger_dir(&raised.ledger_dir)
         .unwrap()
         .raw_lines()
