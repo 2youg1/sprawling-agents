@@ -10,10 +10,14 @@
   // carries (client D86): the User's steer beside a resident's letter,
   // a reply wait in progress and each of its three endings, a child's
   // handback finished and stopped, and two queued signals with their
-  // first lines. Each case is one room with one run, so each thread
-  // shows only its own case.
+  // first lines. A letter names its kind and links the session that sent
+  // it, and one from an older Ledger names neither (client D89); four
+  // sends say where each letter landed - delivered, queued, knocked - and
+  // what the tool answered when the Ledger recorded no landing (wire
+  // D42). Each case is one room with one run, so each thread shows only
+  // its own case.
 
-  import type { Answer, Call, EventKind, EventRecord, Note, Query, SignalLine, Turn } from "../../wire";
+  import type { Answer, Call, EventKind, EventRecord, Landing, Note, Query, SignalLine, Turn } from "../../wire";
   import { Address, B3Hash, RunId, Seq, TimeMs, Tokens } from "../../wire";
 
   const MODEL = "anthropic/claude-sonnet-5";
@@ -28,8 +32,18 @@
   export const FINISHED = Address.make("lab/lead");
   export const STOPPED = Address.make("lab/chief");
   export const QUEUED = Address.make("lab/queue");
+  export const OLDER = Address.make("lab/archive");
+  export const SENDS = Address.make("lab/sends");
 
   const CHILD_SESSION = RunId.make("0199c0de-b0b0-4000-8000-0000000000c1");
+  const PLANNER_SESSION = RunId.make("0199c0de-b0b0-4000-8000-0000000000c2");
+  const PARSER_SESSION = RunId.make("0199c0de-b0b0-4000-8000-0000000000c3");
+
+  // Who sent a letter, as the paired sending line says (wire D43).
+  interface Sent {
+    readonly kind: string;
+    readonly session: RunId;
+  }
 
   interface Scene {
     readonly room: Address;
@@ -40,8 +54,10 @@
     readonly calls: (seq: number, t: number) => readonly Call[];
   }
 
-  function arrived(at: number, t: number, by: "user" | "resident", from: string, said: string): Note {
-    return { arrived: { at: Seq.make(at), by, from, said, t: TimeMs.make(t), handback: null } };
+  function arrived(at: number, t: number, by: "user" | "resident", from: string, said: string, sent: Sent | null = null): Note {
+    return {
+      arrived: { at: Seq.make(at), by, from, said, t: TimeMs.make(t), handback: null, kind: sent?.kind ?? null, session: sent?.session ?? null },
+    };
   }
 
   function awaiting(at: number, t: number, on: Address, until: number, ended: Note | null): readonly Note[] {
@@ -72,11 +88,33 @@
         from,
         said: null,
         t: TimeMs.make(t),
+        kind: "thread",
+        session: CHILD_SESSION,
         handback:
           outcome === "finished"
-            ? { finished: { verified_by: "cargo nextest run -p parser", session: CHILD_SESSION } }
-            : { stopped: { because: "the grammar's Span type changed under it; the offsets need a decision", session: CHILD_SESSION } },
+            ? { finished: { verified_by: "cargo nextest run -p parser" } }
+            : { stopped: { because: "the grammar's Span type changed under it; the offsets need a decision" } },
       },
+    };
+  }
+
+  // A sent letter as the tool line draws a `signal` call, with where it
+  // landed when the Ledger recorded it (wire D42).
+  function sent(at: number, called: number, to: Address, text: string, landing: Landing | null): Call {
+    return {
+      tool: "signal",
+      subject: "send",
+      arguments: { head: JSON.stringify({ action: "send", to, text }), cut: 0 },
+      outcome: "answered",
+      at: Seq.make(at),
+      output: { head: JSON.stringify({ id: `sends-s${String(at)}`, to, kind: "mention", delivered: true }), cut: 0 },
+      called: TimeMs.make(called),
+      answered: TimeMs.make(called + 12),
+      timing: "measured",
+      effect: { write: { domain: Address.make("lab") } },
+      render: "signal",
+      took_us: 12_000,
+      landing,
     };
   }
 
@@ -106,7 +144,14 @@
       running: false,
       notes: (seq, t) => [
         arrived(seq + 3, t + 4_000, "user", "user", "Keep the grammar file as it is; only the errors change."),
-        arrived(seq + 4, t + 6_000, "resident", PLANNER, "The grammar keeps `Span` as two byte offsets.\nBuild the error positions on it, and tell me when the tests pass."),
+        arrived(
+          seq + 4,
+          t + 6_000,
+          "resident",
+          PLANNER,
+          "The grammar keeps `Span` as two byte offsets.\nBuild the error positions on it, and tell me when the tests pass.",
+          { kind: "thread", session: PLANNER_SESSION },
+        ),
       ],
       calls: (seq, t) => [pulled(seq + 5, t + 7_000)],
     },
@@ -124,7 +169,13 @@
       said: "lab/parser answered: offsets count bytes from zero, which matches the checklist.",
       running: false,
       notes: (seq, t) =>
-        awaiting(seq + 3, t + 3_000, PARSER, t + 5 * 60_000, arrived(seq + 4, t + 45_000, "resident", PARSER, "Byte offsets, counted from zero.")),
+        awaiting(
+          seq + 3,
+          t + 3_000,
+          PARSER,
+          t + 5 * 60_000,
+          arrived(seq + 4, t + 45_000, "resident", PARSER, "Byte offsets, counted from zero.", { kind: "mention", session: PARSER_SESSION }),
+        ),
       calls: () => [],
     },
     {
@@ -158,6 +209,27 @@
       running: false,
       notes: (seq, t) => [handback(seq + 3, t + 8_000, PARSER, "stopped")],
       calls: () => [],
+    },
+    {
+      room: OLDER,
+      task: "Read what the planner sent before the city recorded a letter's kind.",
+      said: "The planner's old letter asks for byte offsets; nothing in it says which session sent it.",
+      running: false,
+      notes: (seq, t) => [arrived(seq + 3, t + 4_000, "resident", PLANNER, "Use byte offsets for every error position.")],
+      calls: () => [],
+    },
+    {
+      room: SENDS,
+      task: "Tell the three rooms that the error format is settled.",
+      said: "Told all three: the parser read it at once, the docs room will read it on its next run, and review was woken for it.",
+      running: false,
+      notes: () => [],
+      calls: (seq, t) => [
+        sent(seq + 3, t + 2_000, PARSER, "The error format is settled: byte offsets from zero.", "delivered"),
+        sent(seq + 4, t + 2_100, Address.make("lab/docs"), "Error positions are byte offsets now; the section can say so.", "queued"),
+        sent(seq + 5, t + 2_200, Address.make("lab/review"), "Please check the new error offsets against the checklist.", "knocked"),
+        sent(seq + 6, t + 2_300, PLANNER, "Settled, as you asked.", null),
+      ],
     },
     {
       room: QUEUED,
@@ -277,6 +349,8 @@
     ["agent messages · a handback, finished", FINISHED],
     ["agent messages · a handback, stopped", STOPPED],
     ["agent messages · two queued signals with their first lines", QUEUED],
+    ["agent messages · a letter from an older Ledger, without its kind or session", OLDER],
+    ["agent messages · send lines: delivered, queued, knocked a new run, and not recorded", SENDS],
   ];
 </script>
 

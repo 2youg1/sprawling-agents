@@ -7202,5 +7202,21 @@
   "monitor_beat_ms": {
     "en": "{n} ms",
     "zh": "{n} 毫秒"
+  },
+  "talk_landed_delivered": {
+    "en": "delivered to a running run",
+    "zh": "已投进正在跑的 run"
+  },
+  "talk_landed_queued": {
+    "en": "queued",
+    "zh": "进了队列"
+  },
+  "talk_landed_knocked": {
+    "en": "knocked a new run",
+    "zh": "敲门开了新 run"
+  },
+  "talk_letter_session": {
+    "en": "sending session",
+    "zh": "发信的会话"
   }
 }

@@ -37,9 +37,15 @@ question is what this turn did or waits on. -->
 
 {#if "arrived" in note}
   {#if note.arrived.handback !== undefined && note.arrived.handback !== null}
-    <HandbackNote from={note.arrived.from} handback={note.arrived.handback} t={note.arrived.t} />
+    <HandbackNote from={note.arrived.from} handback={note.arrived.handback} session={note.arrived.session ?? null} t={note.arrived.t} />
   {:else if note.arrived.by === "resident"}
-    <LetterNote from={note.arrived.from} said={note.arrived.said ?? ""} t={note.arrived.t} />
+    <LetterNote
+      from={note.arrived.from}
+      said={note.arrived.said ?? ""}
+      kind={note.arrived.kind ?? null}
+      session={note.arrived.session ?? null}
+      t={note.arrived.t}
+    />
   {:else}
     <Person
       text={note.arrived.said ?? ""}

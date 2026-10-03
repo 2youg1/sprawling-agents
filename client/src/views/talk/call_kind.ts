@@ -19,7 +19,7 @@
 import { Option, Schema } from "effect";
 
 import type { Key } from "../../core/lang";
-import type { Call } from "../../wire";
+import type { Call, Landing } from "../../wire";
 
 // What the subject cell of a line says. A send and a delegation read
 // their own arguments (client D85); every other call reads its subject.
@@ -70,10 +70,15 @@ export function lineOf(call: Call): CallLine {
   return fallback;
 }
 
-// What the result cell says once the tool answered: what the tool itself
-// reported, never where the letter landed, which is decided after the
-// call (collab D17). `null` while the call runs and for every other tool.
+// What the result cell says. A send whose letter's landing the city
+// recorded reads that landing (wire D42, client D89), even while a sync
+// send still waits for its reply: the letter is delivered by then.
+// Otherwise, once the tool answered, what the tool itself reported - a
+// Ledger older than the landing line, or a landing outside the window.
+// `null` while the call runs and for every other tool.
 export function outcomeOf(call: Call): Key | null {
+  const landing = call.render === "signal" && call.outcome !== "failed" ? (call.landing ?? null) : null;
+  if (landing !== null) return LANDED[landing];
   if (call.outcome !== "answered") return null;
   if (call.render === "signal") {
     return Option.match(decoded(call.output, Sent), {
@@ -84,6 +89,12 @@ export function outcomeOf(call: Call): Key | null {
   if (call.render === "delegate") return Option.isSome(decoded(call.output, Started)) ? "talk_delegate_starts" : null;
   return null;
 }
+
+const LANDED: Readonly<Record<Landing, Key>> = {
+  delivered: "talk_landed_delivered",
+  queued: "talk_landed_queued",
+  knocked: "talk_landed_knocked",
+};
 
 // The signal tool's own argument grammar (crates/collab/src/signal_tool.rs).
 // wording-ok: an argument value the tool reads, never shown to a reader

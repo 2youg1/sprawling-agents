@@ -78,3 +78,25 @@ describe("a send and a delegation read as what they did (client D85)", () => {
     expect([readingOf(sent), readingOf(handed)]).toEqual(["printed", "printed"]);
   });
 });
+
+describe("a send reads where its letter landed when the city recorded it (wire D42, client D89)", () => {
+  test("each landing replaces what the tool answered", () => {
+    expect([
+      words({ ...sent, landing: "delivered" }),
+      words({ ...sent, landing: "queued" }),
+      words({ ...sent, landing: "knocked" }),
+    ]).toEqual([
+      "send | to lab/kiln: glaze is dry | delivered to a running run",
+      "send | to lab/kiln: glaze is dry | queued",
+      "send | to lab/kiln: glaze is dry | knocked a new run",
+    ]);
+  });
+
+  test("a sync send still waiting for its reply already says where its letter went", () => {
+    expect(outcomeOf({ ...call("signal", { action: "send", to: "lab/kiln", text: "x", wait: true }, null), landing: "knocked" })).toBe("talk_landed_knocked");
+  });
+
+  test("a Ledger written before the landing line reads what the tool answered", () => {
+    expect(words({ ...sent, landing: null })).toBe("send | to lab/kiln: glaze is dry | sent");
+  });
+});
