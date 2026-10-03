@@ -1623,10 +1623,6 @@
     "en": "the browser tool against Safari, experimentally: BiDi support is partial and safaridriver --enable has to be run once",
     "zh": "对 Safari 使用浏览器工具，尚属试验：BiDi 支持不全，且须先运行一次 safaridriver --enable"
   },
-  "machine_enables_cargo_public_api": {
-    "en": "cargo xtask apisync, which the nightly job runs; it reads a nightly rustdoc as well",
-    "zh": "cargo xtask apisync，夜间任务会跑它；它还要一个 nightly 的 rustdoc"
-  },
   "machine_enables_lean": {
     "en": "just models, the Lean design models, at the version lean-toolchain pins",
     "zh": "just models 跑的 Lean 设计模型，版本是 lean-toolchain 钉住的那个"
@@ -6406,10 +6402,6 @@
   "world_ttft": {
     "en": "{n} ms TTFT",
     "zh": "TTFT {n} ms"
-  },
-  "world_speed_turns": {
-    "en": "median of {n} turns",
-    "zh": "{n} 个回合的中位数"
   },
   "world_ttft_turns": {
     "en": "TTFT over {n} turns",
