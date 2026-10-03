@@ -24,6 +24,7 @@ import crates.sprawling.spec.Outside
 import crates.sprawling.spec.Outside.Conduit
 import crates.sprawling.spec.Serving
 import crates.sprawling.spec.Serving.OutputRing
+import crates.sprawling.spec.Serving.Placement
 import crates.sprawling.spec.Serving.Standing
 import crates.sprawling.spec.Supervising
 import crates.sprawling.spec.WireClient
@@ -64,6 +65,7 @@ import crates.sprawling.spec.WireClient
 | `spec/Outside/Conduit.lean` | `bin::outside::conduit` |
 | `spec/Serving.lean` | `bin::serving` |
 | `spec/Serving/OutputRing.lean` | `bin::serving::output_ring` |
+| `spec/Serving/Placement.lean` | 热线程的理想处理器（W6 建的模块，登记进模块图之后这里写它的路径） |
 | `spec/Serving/Standing.lean` | `bin::serving::standing` |
 | `spec/Supervising.lean` | `bin::supervising` |
 | `spec/WireClient.lean` | `bin::wire_client` |
@@ -79,6 +81,7 @@ import crates.sprawling.spec.WireClient
 - `spec/Main/Exit.lean`：五个退出码两两不同，`Unheard` 的三种原因各落到一个码（§8-103）。
 - `spec/Main/Grammar.lean`：版本先于一切，帮助先于任何动词运行，`--` 之后的词不参与这两个判断，空行是首屏（§8-89）。
 - `spec/Serving/Standing.lean`：降回是吸收态、窗口没关上不判、忙满一个窗口即判降回、设置为 `normal` 从不升档、平台拒绝之后不再试（§8-93）。
+- `spec/Serving/Placement.lean`：任意的起动与退出序列上，一次起动挑到较差的处理器时每个更好的处理器上都坐着热线程；线程活着时座位不变，退出即交还（§8-93）。
 - `spec/Monitor.lean`：没人看不读也不留历史，看整页读整页，历史不超过 300 点、新的在最后（§8-94）。
 - `spec/Supervising.lean`：人选的收口总是停下，重启带出的预算有界且都在窗口里，一分钟内第三次崩溃即 degraded（§8-109）。
 - `spec/Serving/OutputRing.lean`：最新的一块总留着，每个 run 不超过上界或只剩一块，只从最旧的整块丢起（§8-115）。
@@ -265,7 +268,7 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | 8-90 | `crates/sprawling/spec/Assembly/Listening.lean` |
 | 8-91 | `crates/sprawling/spec/Assembly/Listening.lean` |
 | 8-92 | `crates/sprawling/spec/Supervising.lean` |
-| 8-93 | `crates/sprawling/spec/Serving/Standing.lean` |
+| 8-93 | `crates/sprawling/spec/Serving/Standing.lean`，放置一半在 `crates/sprawling/spec/Serving/Placement.lean` |
 | 8-94 | `crates/sprawling/spec/Monitor.lean` |
 | 8-95 | `crates/sprawling/spec/Monitor.lean` |
 | 8-96 | `crates/sprawling/spec/Monitor.lean` |
@@ -406,6 +409,8 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D33 | `crates/sprawling/spec/Doctor.lean` |
 | D34 | `crates/sprawling/Spec.lean` |
 | D37 | `crates/sprawling/spec/Accounting/Landing.lean` |
+| D40 | `crates/sprawling/spec/Serving/Standing.lean` |
+| D41 | `crates/sprawling/spec/Serving/Placement.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）
