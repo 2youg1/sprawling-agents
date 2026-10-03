@@ -228,3 +228,28 @@ fn a_staged_blob_the_scan_cannot_read_refuses_the_checkpoint() {
     let refused = |result: Result<(), StorageError>| matches!(result, Err(StorageError::Checkpoint { op, .. }) if op == "scan a staged file");
     assert_eq!((refused(on_first), refused(on_later)), (true, true));
 }
+
+/// A staging file is half of somebody's write, and the writer renames it
+/// away whenever it likes: the walk must not open it, whether a prefix
+/// scope walks past it or a wave names it as the file it touched
+/// (storage D30). Both spellings are asked of their one authority.
+#[test]
+fn a_staging_file_beside_a_document_is_never_staged() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "work/Roadmap.md", "the document");
+    let document = kernel::layout::document_staging_name(std::ffi::OsStr::new("Roadmap.md"));
+    let document = format!("work/{}", document.to_string_lossy());
+    write(tmp.path(), &document, "half of the next version");
+    write(tmp.path(), "work/.edit.rs.part", "half of an edit");
+    let mut checkpoint = Checkpoint::open(tmp.path()).unwrap();
+
+    let walked = checkpoint.stage_scopes(&["work".to_owned()]).unwrap();
+    let named = checkpoint
+        .stage_scopes(&[document.clone(), "work/.edit.rs.part".to_owned()])
+        .unwrap();
+
+    assert_eq!(
+        (walked, named),
+        (vec!["work/Roadmap.md".to_owned()], Vec::<String>::new())
+    );
+}

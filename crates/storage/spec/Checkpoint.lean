@@ -133,6 +133,13 @@ impl Checkpoint {
 **重开参数。** pack 落盘之后的检出（约 1.2 s）成了第一次放置的主成本，或 libgit2 给出可卸下的 odb 后端。
 -/
 
+/-! D30 检查点的暂存过滤（`StageFilter::admit`）在 libgit2 打开一个文件之前跳过两种暂存名：文件写者的 `.<name>.staging`（`kernel::layout::is_document_staging_name`，写者是 `crates/city/src/document.rs`）与落盘门的 `.<name>.part`（`bundle::landing::is_staging_name`，写者是 `WriteTarget::replace`，runtime 的 edit 经它落盘，storage D15）。
+**为什么。** 这两种文件是一次写的一半：写者写完、flush、再改名到目标上，它们从不是城里的一个文件，账本也不认它们。可它们落在写域里，而同一座城里别的 run 的检查点在同一刻 `add_all` 这一片目录：libgit2 先枚举、再 stat、再读进对象库，三步之间暂存文件可能被改名拿走，或者还在长。Windows 上 libgit2 打开着它时写者的改名被拒（`MoveFileExW` 撞上一个开着的文件），写者那一次写失败；macOS 与 Linux 上改名照常，libgit2 的 stat 报 `failed to stat`，或者读到的字节数与 stat 给的尺寸不符、报 `failed to read file into stream`，整波检查点被拒成 `E_WORKTREE_BUSY`。所以过滤必须在打开之前按名字认出它们；三个平台同一条规则，区别只在不认时坏在哪一边。跳过而不是拒波：它们不是任何人的作品，与 session 切片、受保护元数据同属「别有归宿的字节」。
+**被否：重试那一次失败的暂存。** 竞态窗口仍在，重试只把失败的概率压低，并且 Windows 上坏的是写者，不是检查点。**被否：给暂存文件起一个唯一名或放进保留子树。** 前者让崩溃留下的碎片无从归属（`crates/city/spec/Document.lean`），后者让改名跨目录、在某些平台上跨卷，失去原子性。
+**没有挡住的。** exec 在写域里就地改写或删掉的任意文件也能在 stat 与读之间变化；它们没有可认的名字，按名字的过滤够不着，那一类仍以 `E_WORKTREE_BUSY` 拒波、由重试那一波恢复。
+**重开参数。** 写者改用不在写域里的暂存位置，或 libgit2 给出在读失败时跳过一个路径的选项。
+-/
+
 /-!
 ### 8-20 重启后凭证扫描的比较基准
 

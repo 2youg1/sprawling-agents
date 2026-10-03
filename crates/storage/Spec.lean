@@ -290,6 +290,8 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | D26 | 移动 HEAD 的两步在每一座城上都经同一进程里一把只护 HEAD 的锁，不按盘的种类分路 | `crates/storage/spec/Checkpoint/Concurrent.lean` |
 | D27 | 城的第一个提交与收楼的基线同一种写法：对象进 mempack、一个 pack 落盘，之后才写 index、以比较后交换建分支 | `crates/storage/spec/Checkpoint.lean` |
 | D28 | 备树还在检出时来的第二个新房间自己全量检出一次，不等那棵备树，也不多备一棵 | `crates/storage/spec/Worktree/Trees/Stock.lean` |
+| D29 | 热视图的 `waiting` 是这次跑最后一个还没结束的等待 | `crates/storage/spec/Hot.lean` |
+| D30 | 检查点的暂存过滤在 libgit2 打开之前跳过文件写者与落盘门的暂存名 | `crates/storage/spec/Checkpoint.lean` |
 -/
 
 /-! ## 13 依赖选型

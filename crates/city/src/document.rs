@@ -38,22 +38,11 @@
 //!   read the same original and write back over the other's change.
 
 use std::collections::BTreeMap;
-use std::ffi::OsString;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use kernel::{AxCode, AxError};
-
-/// What a staging file is called: the target's name, hidden by a dot
-/// and suffixed, in the target's own directory.
-///
-/// The same name every time rather than a unique one: a writer killed
-/// between the flush and the rename leaves this file behind, and a
-/// fixed name means the next write of that document reuses it instead
-/// of growing a directory of debris nobody can attribute. The dot keeps
-/// it out of every scan the city makes, all of which skip dot entries.
-const STAGING_SUFFIX: &str = ".staging";
 
 /// Replaces `path` with `body`, creating the directories above it.
 ///
@@ -295,19 +284,23 @@ fn settle(_dir: &Path) -> Result<(), AxError> {
     Ok(())
 }
 
-/// The staging file beside `path`.
+/// The staging file beside `path`, named by
+/// [`kernel::layout::document_staging_name`].
 ///
 /// Built from the target's own file name as the operating system spells
 /// it, so a document whose name is not valid Unicode is staged under a
-/// name derived from it rather than refused.
+/// name derived from it rather than refused. The same name every time
+/// rather than a unique one: a writer killed between the flush and the
+/// rename leaves this file behind, and a fixed name means the next write
+/// of that document reuses it instead of growing a directory of debris
+/// nobody can attribute. The checkpoint scan refuses this name before
+/// git opens it, because the rename can take it away mid-walk
+/// (storage D30).
 fn staging_path(path: &Path) -> Result<PathBuf, AxError> {
     let name = path
         .file_name()
         .ok_or_else(|| storage(path, "a document needs a file name of its own".to_owned()))?;
-    let mut staged = OsString::from(".");
-    staged.push(name);
-    staged.push(STAGING_SUFFIX);
-    Ok(path.with_file_name(staged))
+    Ok(path.with_file_name(kernel::layout::document_staging_name(name)))
 }
 
 /// The lock for one document, made on first use and kept for the life

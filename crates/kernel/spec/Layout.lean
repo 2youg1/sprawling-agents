@@ -33,6 +33,8 @@ pub const RUN_ID_PATTERN: &str = "????????-????-????-????-????????????";   // `R
 pub const REMOTE_DIR: &str = "remote";                               // 远程门的状态，城的保留子树下（§8-76）
 pub const DEVICES_FILE: &str = "devices.toml";                       // 配对过的设备表
 pub const PLAYBACK_DIR: &str = "playback";                           // playback 导出件，城的保留子树下
+pub fn document_staging_name(name: &OsStr) -> OsString;              // `.<name>.staging`：整写整不写的文件写者的暂存名（8-27），与目标同目录
+pub fn is_document_staging_name(name: &OsStr) -> bool;               // 这个名字是不是上一行拼出来的；检查点的暂存过滤问它（storage D30）
 
 pub struct CityLayout { /* root —— 私有 */ }
 impl CityLayout {
@@ -60,7 +62,7 @@ impl CityLayout {
 }
 ```
 
-**五条口径：**
+**八条口径：**
 
 1. **一个事实一个家，而这里的事实是「哪一类文件落在哪」。** 每个目录名与文件名在这里声明一次，每条路径在这里拼一次；调用点各自拼路径时，改名一个目录要靠 grep 找齐，漏掉的那一处会安静地读一个空目录。
 2. **形状 2 值，不碰磁盘。** `CityLayout` 只回答某个文件*会在*哪里；创建、读取、拒绝归拥有 I/O 的那一层。路径是数据而不是效应，故它住在 kernel，与它所依赖的地址文法同处一地（ARCHITECTURE.md 第 1 段）。
@@ -69,6 +71,7 @@ impl CityLayout {
 5. **一个落点一个方法，不是便利方法。** 少一个落点，就有一处调用点继续自己拼，于是本模块不再是唯一权威。后续新增一类文件时，先在此加方法与常量，再写调用点。
 6. **session 切片的路径不在此处。** 切片是账本的可弃投影，只有 `storage::sessions` 一个写者、没有读者；它的目录名与路径推导是该模块的私有项（`crates/storage/Spec.lean` §8-24），于是「别处点名这条路」在编译期就写不出来，不必再靠文本扫描去拦。
 7. **`of_ledger` 是 `ledger` 的逆，为「只拿到账本目录」的写者而存在。** 账本的写者手里只有它打开的那一个目录，而切片落在城根之下，故城根必须能从这一个输入反推回来；逆运算住在具名常量所在的同一模块里，任何调用点都不许用 `parent().parent()` 重新拼一遍。不是 `ledger()` 形状的目录不是城（夹具、bundle 的校验台、直接打开的存储），回答 `None`。
+8. **文件写者的暂存名也是一个落点。** `crates/city/src/document.rs` 把新字节先写进 `.<name>.staging` 再改名过去；检查点的暂存过滤（`storage::checkpoint::scan::stage_filter`）必须在 libgit2 打开它之前认出它并跳过，因为改名可能在 libgit2 的 stat 与读之间把它拿走（storage D30）。写者与过滤分属 city 与 storage，二者都依赖 kernel 而互不依赖，所以拼法与识别都住在这里，而不是在任一方各写一份。
 -/
 
 /-!

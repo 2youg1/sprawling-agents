@@ -23,6 +23,7 @@
 //! the documents residents write — the job, the handoff, the urbanite
 //! page, the archive — sit in the open where residents can edit them.
 
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 use crate::{Address, RESERVED_PREFIX};
@@ -75,6 +76,36 @@ pub const DEVICES_FILE: &str = "devices.toml";
 /// Where residents' playback exports land, under the city's reserved
 /// subtree, one directory per building.
 pub const PLAYBACK_DIR: &str = "playback";
+
+/// What the staging file of a document named `name` is called: the
+/// name hidden by a dot and suffixed `.staging`, in the document's own
+/// directory (`crates/kernel/spec/Layout.lean` §8-56).
+///
+/// The whole-or-nothing document writer stages here and renames over
+/// the document; the checkpoint scan refuses this name before git opens
+/// it, because the file can be renamed away between the scan's stat and
+/// its read (storage D30). Both ask this function, so the two spellings
+/// cannot drift apart.
+#[must_use]
+pub fn document_staging_name(name: &OsStr) -> OsString {
+    let mut staged = OsString::from(STAGING_PREFIX);
+    staged.push(name);
+    staged.push(STAGING_SUFFIX);
+    staged
+}
+
+/// Whether `name` is spelled the way [`document_staging_name`] spells
+/// the staging file of some document.
+#[must_use]
+pub fn is_document_staging_name(name: &OsStr) -> bool {
+    let spelled = name.as_encoded_bytes();
+    spelled.len() > STAGING_PREFIX.len().saturating_add(STAGING_SUFFIX.len())
+        && spelled.starts_with(STAGING_PREFIX.as_bytes())
+        && spelled.ends_with(STAGING_SUFFIX.as_bytes())
+}
+
+const STAGING_PREFIX: &str = ".";
+const STAGING_SUFFIX: &str = ".staging";
 
 /// The disk layout of one city, derived from its root.
 ///

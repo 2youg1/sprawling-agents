@@ -142,3 +142,23 @@ fn the_device_table_sits_in_the_remote_gate_s_own_directory_of_the_reserved_subt
         "{spelled} is reachable by a write domain"
     );
 }
+
+/// The writer's name and the scan's question are one rule: every name
+/// the writer makes is recognised, and a document whose own name merely
+/// looks similar is not.
+#[test]
+fn a_document_staging_name_is_recognised_and_a_document_is_not() {
+    use std::ffi::OsStr;
+    for name in ["Roadmap.md", "CONFIG.toml", "a", ".hidden"] {
+        let staged = document_staging_name(OsStr::new(name));
+        assert!(is_document_staging_name(&staged), "{staged:?}");
+        assert!(!is_document_staging_name(OsStr::new(name)), "{name}");
+    }
+    assert_eq!(
+        document_staging_name(OsStr::new("Roadmap.md")),
+        OsStr::new(".Roadmap.md.staging")
+    );
+    for name in [".staging", "..staging", "Roadmap.md.staging", ".Roadmap.md"] {
+        assert!(!is_document_staging_name(OsStr::new(name)), "{name}");
+    }
+}

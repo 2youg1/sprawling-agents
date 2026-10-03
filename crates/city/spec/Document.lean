@@ -33,7 +33,7 @@ pub(crate) fn place_tree(target: &Path, entries: &[TreeEntry<'_>]) -> Result<(),
 - **同一刻只有一个写者**：一份文档的读-改-写在本进程内互斥。`Held` 只能从 `edit` 里拿到，于是「改写期间锁是持有的」由类型成立，而不是由每个调用点记得成立。
 - **`edit_against` 是有第二个写者那份文档的门**：四份 spine 文档（以及楼的规则），人手在编辑器里与城的命令流同时在写，而本进程的锁对编辑器毫无约束。写者有权替换的只是它起手时读到的那份正文（`base`），文件已经变了就拒而不覆写，报 `E_VERSION_CONFLICT`；`base` 为空即「这份文档本不该存在」，同一条规则读在它的起点。「文件被人动过就拒」这条规则全城只在这里判定，`put_spine` 经它写。
 
-**暂存文件名固定为 `.<文件名>.staging`**：写者在 flush 与 rename 之间被杀会留下它，固定名让下一次写复用同一个位置，而不是攒出一目录谁也说不清归属的碎片；点前缀使城里每一处扫描都跳过它（扫描一律跳过点开头的项）。
+**暂存文件名固定为 `.<文件名>.staging`**：写者在 flush 与 rename 之间被杀会留下它，固定名让下一次写复用同一个位置，而不是攒出一目录谁也说不清归属的碎片。这个拼法只住 `kernel::layout::document_staging_name`（`crates/kernel/spec/Layout.lean` §8-56），本模块与检查点的暂存过滤都问它。点前缀不足以把它挡在扫描之外：检查点的 `add_all` 照样暂存点开头的文件，所以那里按名字拒它（storage D30）。
 
 **父目录的 `sync_all` 只在 unix 上做**（macOS 与 Linux）：目录项住在目录里，光刷文件不够；Windows 没有可供进程打开的目录句柄，也不需要——`rename` 调到的 `MoveFileEx`（`REPLACE_EXISTING`）由文件系统自己记日志。
 
