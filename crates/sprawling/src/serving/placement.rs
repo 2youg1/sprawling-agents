@@ -81,11 +81,15 @@ impl SeatTable {
         if self.seats.contains_key(&holder) {
             return;
         }
-        let next = self.seats.len();
-        let Some(index) = next.checked_rem(self.load.len()) else {
-            return;
-        };
-        if let Some(load) = self.load.get_mut(index) {
+        let least = self
+            .load
+            .iter()
+            .enumerate()
+            .min_by_key(|&(index, load)| (*load, index))
+            .map(|(index, _)| index);
+        if let Some(index) = least
+            && let Some(load) = self.load.get_mut(index)
+        {
             *load = load.saturating_add(1);
             self.seats.insert(holder, index);
         }

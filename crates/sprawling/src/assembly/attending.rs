@@ -156,6 +156,9 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     let worker_thread = std::thread::Builder::new()
         .name("sprawling-runs".to_owned())
         .spawn(move || {
+            // Held to the closure's end: the seat goes back as the
+            // thread exits (`crates/sprawling/spec/Serving/Placement.lean`).
+            let _seat = crate::serving::placement::seat_this_thread("sprawling-runs");
             let mut worker = match RunWorker::holding(&worker_root, log, super::hands(vault), held)
             {
                 Ok(mut worker) => {

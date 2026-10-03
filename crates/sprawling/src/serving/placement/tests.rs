@@ -48,7 +48,7 @@ fn check_trace(cores: &Cores, trace: &[Event]) {
         match event {
             Event::Start(holder) => {
                 table.start(holder);
-                check_start(cores, &table, &before, holder, trace);
+                check_start(&table, &before, holder, trace);
             }
             Event::Exit(holder) => {
                 table.exit(holder);
@@ -74,29 +74,23 @@ fn check_trace(cores: &Cores, trace: &[Event]) {
 
 /// A start of a thread with no seat takes one when the table has a core,
 /// and takes a worse core only when every better core was already seated.
-fn check_start(
-    cores: &Cores,
-    table: &SeatTable,
-    before: &[Option<usize>],
-    holder: Holder,
-    trace: &[Event],
-) {
+fn check_start(table: &SeatTable, before: &[Option<usize>], holder: Holder, trace: &[Event]) {
     let index = usize::try_from(holder.0).unwrap();
     if before[index].is_some() {
         return;
     }
     let Some(seat) = table.seat_of(holder) else {
         assert!(
-            cores.get(0).is_none(),
+            table.core(0).is_none(),
             "a non-empty table seats every start: {trace:?}"
         );
         return;
     };
-    let rank = cores.get(seat).unwrap().rank;
-    for better in (0..MOST_CORES).filter(|&p| cores.get(p).is_some_and(|c| c.rank < rank)) {
+    let rank = table.core(seat).unwrap().rank;
+    for better in (0..MOST_CORES).filter(|&p| table.core(p).is_some_and(|c| c.rank < rank)) {
         assert!(
             before.contains(&Some(better)),
-            "a worse core is taken only when every better one is seated: {cores:?} {trace:?}"
+            "a worse core is taken only when every better one is seated: {table:?} {trace:?}"
         );
     }
 }
