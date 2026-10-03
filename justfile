@@ -692,18 +692,22 @@ acceptance archive:
 # It is the acceptance walk above - a scripted city on the stand-in
 # provider: an endpoint attached, a building raised, runs that edit,
 # read and ask status, two runs sent at once, a plan divided, a review,
-# a kill mid-run and the resume - followed by the one-shot verbs on a
-# city of its own: init, adopt, check, the ledger views, playback
+# a kill mid-run and the resume - followed by a city of its own: init,
+# adopt, check, a served stretch closed in order, resume, the ledger views, playback
 # export over three ranges and its check, and the offline verifier.
 #
 # LLVM_PROFILE_FILE must name where the profiles land, with `%p` and
 # `%m` in it, because several instrumented processes run at once and a
 # shared name would let the last one overwrite the rest. A process that
 # is killed writes no profile, so the walk's served city, which the walk
-# ends by terminating it, contributes nothing on Windows; the one-shot
-# verbs exit normally and always do. The held-out load below shares no
+# ends by terminating it, contributes nothing on Windows; the city of its
+# own is closed in order, and the one-shot verbs exit normally. The held-out load below shares no
 # step with this one, so a gain it shows is not a gain on the training
 # script alone.
+# The loopback port the training load serves its city on; one constant,
+# moved when a runner already holds it.
+pgo_port := "47613"
+
 pgo-train archive:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -724,6 +728,56 @@ pgo-train archive:
     cp -r "$city/../adopted" "$city/adopted"
     "$binary" adopt "$city" adopted
     "$binary" check "$city"
+    # The served city: queries, commands, eight clients at once, the
+    # metrics beat, then the orderly close, so this process exits normally
+    # and writes its profile. On Windows a console process takes an orderly
+    # close only as Ctrl-Break delivered on its own console: it is started
+    # hidden in one by Start-Process, and a helper attaches to that console
+    # to raise the event. Elsewhere SIGINT is the orderly close.
+    at="127.0.0.1:{{pgo_port}}"
+    taken() { grep -q 'commands are taken' "$city/../serve.err" 2>/dev/null; }
+    if command -v cygpath >/dev/null 2>&1; then
+        cat > "$city/../break.ps1" <<'EOF'
+    param([uint32]$Target)
+    Add-Type -Namespace Pgo -Name Con -MemberDefinition @"
+    [DllImport("kernel32.dll")] public static extern bool FreeConsole();
+    [DllImport("kernel32.dll")] public static extern bool AttachConsole(uint p);
+    [DllImport("kernel32.dll")] public static extern bool GenerateConsoleCtrlEvent(uint e, uint g);
+    "@
+    [void][Pgo.Con]::FreeConsole()
+    if (-not [Pgo.Con]::AttachConsole($Target)) { exit 3 }
+    [void][Pgo.Con]::GenerateConsoleCtrlEvent(1, 0)
+    EOF
+        win="$(cygpath -w "$city/..")"
+        powershell -NoProfile -Command "\$p = Start-Process -FilePath '$(cygpath -w "$binary")' -ArgumentList 'serve','$(cygpath -m "$city")','$at','--no-open' -RedirectStandardOutput '$win\serve.out' -RedirectStandardError '$win\serve.err' -WindowStyle Hidden -PassThru; Set-Content -Path '$win\serve.pid' -Value \$p.Id" > /dev/null
+        server="$(tr -dc 0-9 < "$city/../serve.pid")"
+        stop() { powershell -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$city/../break.ps1")" "$server" > /dev/null 2>&1 || true; }
+        alive() { powershell -NoProfile -Command "if (Get-Process -Id $server -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"; }
+    else
+        "$binary" serve "$city" "$at" --no-open > "$city/../serve.out" 2> "$city/../serve.err" &
+        server=$!
+        stop() { kill -INT "$server"; }
+        alive() { kill -0 "$server" 2>/dev/null; }
+    fi
+    for _ in $(seq 1 100); do taken && break; sleep 0.1; done
+    taken || { cat "$city/../serve.err" >&2; echo "pgo-train: the served city took no command within ten seconds" >&2; exit 1; }
+    ask() { "$binary" call "$1" --at "$at" --quiet-ms 300 > /dev/null 2>&1; }
+    for query in city_view endpoint_view preferences metrics known_hosts approval_queue cost_view registry_view governance harnesses toolkits; do
+        ask "{\"ask\":{\"ask_id\":1,\"query\":\"$query\"}}"
+    done
+    ask '{"ask":{"ask_id":1,"query":{"building_view":{"addr":"hall"}}}}'
+    clients=()
+    for n in 1 2 3 4 5 6 7 8; do
+        ask "{\"command\":{\"create_building\":{\"addr\":\"north$n\",\"template\":\"minimal\",\"idem\":\"idem1-0000000000000000000000000000000$n\"}}}" &
+        clients+=($!)
+    done
+    for client in "${clients[@]}"; do wait "$client" || true; done
+    "$binary" gauge --at "$at" --every 250 --samples 4 > /dev/null 2>&1 || true
+    stop
+    for _ in $(seq 1 100); do alive || break; sleep 0.1; done
+    if alive; then echo "pgo-train: the served city did not close in order within ten seconds" >&2; exit 1; fi
+    grep -q 'closed by the User' "$city"/.sprawling/ledger/*.jsonl || { echo "pgo-train: the served city ended without its handoff, so it wrote no profile" >&2; exit 1; }
+    "$binary" resume "$city"
     "$binary" view "$city" > /dev/null
     "$binary" view "$city" --runs > /dev/null
     "$binary" view "$city" --tail 2 --kind building_created > /dev/null
