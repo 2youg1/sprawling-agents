@@ -325,6 +325,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D28 | 会话中换运行策略只由驱动循环在 `BeforeWave` 写进策略格，工具只读格 | `crates/runtime/spec/PolicyTake.lean` |
 | D29 | 每个 run 的 job 按权重分 CPU、设作业级内存上限；子进程在 macOS 降到 utility，在 Linux 用 cgroup v2 或只用 nice | `crates/runtime/spec/Tools/Exec.lean` |
 | D30 | shell 默认仍是平台的 shell，一栋楼可以换成 pwsh 7，exec 的失败按 shell 从账本折出 | `crates/runtime/spec/Tools/Exec.lean` |
+| D32 | 沙箱臂的调研表（SB0）与按平台的缺省臂、可选臂 | `crates/runtime/spec/Tools/Exec.lean` |
 -/
 
 /-! ## 13 依赖选型

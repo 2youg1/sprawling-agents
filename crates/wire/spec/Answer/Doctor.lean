@@ -120,19 +120,21 @@ pub enum DoctorUntold { NoDisk, AdminOnly, Unread { command: String }, Failed { 
 
 /-! D26 沙箱臂按机制族命名，每个名字在三个平台上都有可填的臂
 
-**决定**：设置与线上用来选沙箱臂的名字是一个闭集 `SandboxArm { None, CopiedTree, Native, Container, Python }`，线上拼作 `none｜copied_tree｜native｜container｜python`；`CONFIG.toml` 的键是 `[sandbox] arm = "<名字>"`，缺省由 SB1 按平台定，在 SB0 的表交给 User 之前缺省维持今天的行为。各名字在三个平台上的臂：
+**决定**：设置与线上用来选沙箱臂的名字是一个闭集 `SandboxArm { None, CopiedTree, Native, Container, Python }`，线上拼作 `none｜copied_tree｜native｜container｜python`；`CONFIG.toml` 的键是 `[sandbox] arm = "<名字>"`。缺省按平台取下表的「缺省」一列，这一列是缺省的唯一定义处：调研表与取舍的理由在 `crates/runtime/spec/Tools/Exec.lean` D32，这一列是那里推断出的选择，User 另定时只改这一列的一个值（Roadmap §7 第 1 条）。SB1 落地之前，代码里每个平台照旧解出 `copied_tree`（Linux 上有 `bwrap` 时是 `native`），doctor 照实报。各名字在三个平台上的臂：
 
 | 名字 | Windows | macOS | Linux |
 |---|---|---|---|
 | `none` | 宿主机本身 | 宿主机本身 | 宿主机本身 |
-| `copied_tree` | 复制工作树 | 复制工作树 | 复制工作树 |
-| `native` | Job Object（与 SB0 选出的不要管理员权限的机制，如 AppContainer） | Seatbelt 配置 | 命名空间包装程序（今天的臂），或 Landlock 加 seccomp |
-| `container` | Docker／Podman Desktop | Docker／Podman Desktop | rootless Podman／Docker |
+| `copied_tree` | 复制工作树 | 复制工作树（**缺省**） | 复制工作树 |
+| `native` | Job Object 加 AppContainer（**缺省**） | Seatbelt 配置；未核实之前答 `Unavailable` | 命名空间包装程序 `bwrap`（**缺省**；今天的臂），Landlock 加 seccomp 待核实 |
+| `container` | Docker／Podman Desktop（要另装） | Docker／Podman Desktop（要另装） | rootless Podman／Docker（要另装） |
 | `python` | wasip1 里的 Python | wasip1 里的 Python | wasip1 里的 Python |
+
+缺省的 `native` 在一台机器上缺机制时解出 `copied_tree`，doctor 与 exec 的说明写出退了、缺什么；User 明写的名字缺机制时答 `Unavailable`，exec 拒（Exec.lean D32 的理由）。
 
 `DoctorSandboxArm` 的 `LinuxNamespaces` 与 `WindowsJobObject` 是 `native` 在两个平台上的具体机制，留作「一台电脑上的 `native` 是什么」的说明；它们不是人选择的名字。每个臂照旧用五条保证（文件、网络、进程树、用户、资源）说明自己守住几条。
 
-**理由**：D94 要求不为一个平台选一个另外两个平台没有对应物的接口形状；按平台命名的臂（`linux_namespaces`）在另外两个平台上无从填写，于是设置里的那个控件在两个平台上是空的。按机制族命名，每个名字在三个平台上都有一个臂，平台之间的差别落在五条保证的说明里，而不是名字是否存在。默认臂与可选臂等 SB0 的表交给 User 再定，这里只定名字，后来的选择是一个配置值。
+**理由**：D94 要求不为一个平台选一个另外两个平台没有对应物的接口形状；按平台命名的臂（`linux_namespaces`）在另外两个平台上无从填写，于是设置里的那个控件在两个平台上是空的。按机制族命名，每个名字在三个平台上都有一个臂，平台之间的差别落在五条保证的说明里，而不是名字是否存在。缺省臂与可选臂由 SB0 的调研表推出（Exec.lean D32），User 另定时是上表「缺省」一列里的一个值。
 
 **被否**：①沿用 `LinuxNamespaces｜WindowsJobObject｜CopiedTree` 作选择名：两个名字各只在一个平台上有意义；②按产品命名（`docker`、`appcontainer`）：换一个实现就要改名，且产品名与机制不是一一对应。
 

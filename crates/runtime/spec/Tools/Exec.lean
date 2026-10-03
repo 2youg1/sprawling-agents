@@ -17,7 +17,7 @@
 
 | 臂 | 保 | 不保 |
 |---|---|---|
-| `LinuxNamespaces { wrapper }` | 文件系统、网络、进程树、用户 | CPU／内存上限 |
+| `LinuxNamespaces { wrapper }` | 文件系统、网络、进程树、用户（见下文 `--unshare-all` 一条） | CPU／内存上限；整机对命令只读可见（`--ro-bind / /`），读不受限 |
 | `WindowsJobObject` | 文件系统（工作目录为副本）、进程树、CPU／内存上限 | **网络**（作业对象不隔离网络）、用户 |
 | `CopiedTree` | 文件系统（写入只落副本、源树只读） | 网络、进程树、用户、CPU／内存上限 |
 | `Unavailable { missing }` | —— | 一切；`missing` 指名缺的是什么 |
@@ -50,9 +50,10 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 ```
 
 - **保证清单在类型上**：`Assurances` 逐轴五字段，每一臂的 `assurances()` 必须写满五轴，故新增一轴即四臂同时编译红——任何一臂都不会留下一个没人问过它的旧答案。`statement()` 由 `Assurances` 与 `Guarantee::phrase()`／`unkept()` 派生而非另写一段话，句子与类型因此不可能分家。
+- **`LinuxNamespaces` 的「用户」一轴今天是有条件的**：`namespaced()` 给 `bwrap` 的是 `--unshare-all`，而 bubblewrap 的手册写明它等于 `--unshare-user-try --unshare-ipc --unshare-pid --unshare-net --unshare-uts --unshare-cgroup-try`：内核不让未提权的进程建 user namespace、`bwrap` 又以 setuid 方式装着时（bubblewrap README 说它历史上支持这种方式），user namespace 静默不建，清单上的 `user: Yes` 就是对一个与 harness 同一身份的盒子说「有自己的身份」。规格的意图是清单只写兑现得了的轴，所以这是代码的缺陷，修法列在下文「SB1 未落地的工作」第 1 条。`--ro-bind / /` 让整机对命令只读可见：「文件系统」一轴的含义是写入只落副本（`Guarantee::Filesystem` 的文档），不是读不到别处，这一点 `statement()` 的句子与本表都照实写。
 - **选择是纯函数**：`choose` 取 `Offerings`——有 wrapper 即 `LinuxNamespaces`，否则 `CopiedTree`；scratch 根不可用即 `Unavailable { missing: ScratchDirectory }`。采样只有 `Offerings::this_machine()` 一处（`PATH`＋`std::env::temp_dir()`），两个 `detect()` 都只读它；测试用 `Offerings` 陈述一台机器而不是借一台。wrapper 是按确切名字 `bwrap` 在 `PATH` 上找到的程序，只在 Linux 上找（`cfg!(target_os = "linux")`），别的平台 `namespace_tool` 恒为 `None`。
 - **逐平台的臂**：Linux 上 `PATH` 里有 `bwrap` 得 `LinuxNamespaces`（副本加 wrapper 给的命名空间），没有得 `CopiedTree`；Windows 上恒得 `CopiedTree`（`WindowsJobObject` 不构造，见下条）；macOS 上今天没有任何平台隔离接入，恒得 `CopiedTree`。三个平台上 temp 目录不可用都得 `Unavailable { missing: ScratchDirectory }`，`place()` 拒。缺的是哪一轴，User 与 Agent 都从同一句 `statement()` 读到：它进 exec 工具的 disclosure 与 doctor 的回报，`CopiedTree` 的那一句逐字写出网络、进程树、用户与资源上限都不保。
-- **`WindowsJobObject` 本构建不构造，且拒而不降级**：Job Object 本身已经可以不写 `unsafe` 地取得——`runtime::backlog::jobs` 经 `win32job` 2.0.3 的安全接口创建 job、装进进程、读进程表（下文「job 的取法」）。不构造的理由是这一臂的保证清单今天兑现不了两轴：①**资源**——`win32job` 2.0.3 的 `ExtendedLimitInfo` 对外只给按进程的工作集上限（`limit_working_memory`，未提权账户上被系统以 os error 1314 拒绝）、优先级档位（`limit_priority_class`）、调度级别（`limit_scheduling_class`）、亲和性（`limit_affinity`）与 kill-on-close、breakaway 两组开关，作业级提交上限的字段在 crate 私有的结构里，CPU 速率控制它根本不设（D29 说这两项改走哪一档），清单写 `resources: Yes` 就是对一个没有上限的盒子说「有上限」；②**进程树**——子进程起动之后才装进 job，中间一小段里起的孙进程不在 job 里（下文「job 的取法」的代价），`limit_kill_on_job_close` 收不到它。以 `CopiedTree` 冒充这一臂会对着一个开着网络的盒子回答「网络已关」的同类错误，故 `place()` 对它返 `E_SANDBOX_DENIED` 并给「改用 copied tree 且让命令离开网络」的 recovery。Windows 上 `detect()` 因此答 `CopiedTree`，其清单逐字写出网络未隔离——这一句就是 Agent 必须看见的那一句。
+- **`WindowsJobObject` 本构建不构造，且拒而不降级**：Job Object 本身已经可以不写 `unsafe` 地取得——`runtime::backlog::jobs` 经 `win32job` 2.0.3 的安全接口创建 job、装进进程、读进程表（下文「job 的取法」）。不构造的理由是这一臂的保证清单今天兑现不了两轴：①**资源**——`win32job` 2.0.3 的 `ExtendedLimitInfo` 对外只给按进程的工作集上限（`limit_working_memory`；经 `win32job` 设它在一台未提权账户上被系统以 os error 1314 拒绝，而 D32 的探测在另一台未提权的 Windows 11 上直接调 `SetInformationJobObject` 设 `JOB_OBJECT_LIMIT_WORKINGSET` 得到成功——要不要特权随账户令牌而变，推断是 `SeIncreaseWorkingSetPrivilege` 在不在令牌里；无论哪种，它限的是常驻页而不是提交量，不兑现「资源」一轴）、优先级档位（`limit_priority_class`）、调度级别（`limit_scheduling_class`）、亲和性（`limit_affinity`）与 kill-on-close、breakaway 两组开关，作业级提交上限的字段在 crate 私有的结构里，CPU 速率控制它根本不设（D29 说这两项改走哪一档），清单写 `resources: Yes` 就是对一个没有上限的盒子说「有上限」；②**进程树**——子进程起动之后才装进 job，中间一小段里起的孙进程不在 job 里（下文「job 的取法」的代价），`limit_kill_on_job_close` 收不到它。以 `CopiedTree` 冒充这一臂会对着一个开着网络的盒子回答「网络已关」的同类错误，故 `place()` 对它返 `E_SANDBOX_DENIED` 并给「改用 copied tree 且让命令离开网络」的 recovery。Windows 上 `detect()` 因此答 `CopiedTree`，其清单逐字写出网络未隔离——这一句就是 Agent 必须看见的那一句。
 - **副本按工具一份，每条命令之前同步成工作目录此刻的样子，有界。** `place()` 取这个 `Confined` 留着的副本（没有，或留着的那份抄的是别的目录，就在 scratch 根下新建一个），把它同步成 `workdir` 此刻的样子，命令在副本里跑；`settled()` 在等待结束时把副本留给下一条命令（已留着一份时删掉这份）；交给 backlog 的后台命令由 `handed(id, …)` 记名，其成员报结时 `reaped(&[Finished])` 同样把副本留下或删掉；`Drop` 删掉留着的与未报结的副本。同步的规则：源侧跟随链接（指向树外的链接带进来的是内容，而不是通向人那棵树的入口）；副本侧不跟随链接，因为副本里的东西是上一条命令写的。副本里的一项与源不同类（命令把文件换成了链接、把目录换成了文件），或同名文件内容不同，就先删掉这一项再从源复制，落成一个新的目录项——命令可能在副本里造了指向别处的硬链接，就地改写会写穿到那一头；同名同类同长的文件逐字节比较，相同就不动；副本里源没有的项删掉。于是每条命令开始时，副本与工作目录逐文件相同，上一条命令写下的东西不会留给下一条。逐字节比较而不比 mtime 与长度：同一个时间戳刻度里的等长改写比不出来，副本就会为一个它没有带上的版本担保；比较只读两边的文件，不新建，而实时扫描等的是新建的文件。`Placed::work()` 报这次同步的 `storage::FileWork`（`crates/storage/Spec.lean` §8-31）：第一次放置 `created` 是树里的文件数，一次什么都没变的再放置 `created`、`rewritten`、`removed` 都是 0，`walked` 是两侧读过的目录项；`confinement::tests` 的 `a_sandbox_copy_is_synced_rather_than_made_again` 在 N 与 2N 个文件的树上断言这些数。**删不掉不把命令判成失败**（与 `backlog/member.rs`、`collect()` 同一条判断：命令的收场是调用方应得的事实，一个临时目录只值磁盘）。界：`MAX_FILES = 100_000`、`MAX_BYTES = 256 MiB`、`MAX_DEPTH = 64`，按源侧计；越界**拒**并报出越过的那一对数字，已同步一半的副本随之删掉——半份副本会为一堆没带上的文件担保，而本模块的全部理由是防这个。`MAX_DEPTH` 同时终结自指链接造成的无底走查。
 - **`Mount`／`Fuel` 不沿用**：`Fuel` 是 wasmtime 指令计量、`Mount.guest` 是 guest 路径别名，二者 wasip1 专属。本模块保留的是**判断**（能力面＝能到达的路径集）而不是词形。宿主环境照旧不继承（exec 的 env allowlist 未动）；`SandboxJob.env` 的显式注入属 guest 面。
 - **placement**：调用参数 `where: sandbox|host`，缺省 `sandbox`。`host` 是「在原地跑」——它才是碰得到人那棵树的那一臂，故必须由调用方按名说出，也正是与 A-8 同一条纪律（默认引导先在沙箱里做，出沙箱才需要审批）里「需要审批」的那个动作。python 臂无 host 形（它是 wasip1 guest）：要宿主解释器走 program 臂。
@@ -60,6 +61,18 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 - 证据：`crates/runtime/src/tools/exec/tests.rs` 的 `a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`（真命令、真树：沙箱里写得到、人那棵树不动；同一命令 `where: host` 则写进原树——此对拍使「没动」是能力判定而非命令没写）；`crates/runtime/src/tools/exec/confinement/tests.rs` 的 `the_sandbox_arm_a_machine_gets_is_chosen_from_what_it_has`、`every_sandbox_arm_states_what_it_does_not_hold`、`a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end`、`a_sandbox_copy_is_synced_rather_than_made_again`、`a_sandbox_copy_goes_with_the_tool`。
 
 这一臂何时构造、构造时清单写什么，见 D29 的 (e)：资源一轴由 D29 的 job 限额兑现，进程树一轴要挂起态起动，两者都落在同一个 Zig 叶子上之后按原清单构造，不缩成一个只保一部分的臂。
+
+**SB1 未落地的工作**（D32 选定的臂；W6b 的 SB1 实现，按这里的顺序）：
+
+1. **`LinuxNamespaces` 的用户一轴改成强制**：`namespaced()` 在 `--unshare-all` 之后显式加 `--unshare-user`（bubblewrap 对同一命名空间的「try」与强制形取强制形；推断，需在 Linux runner 上以 `bwrap --unshare-all --unshare-user -- true` 核实组合被接受），建不成 user namespace 时 `bwrap` 失败，`place()` 把它报成 `E_SANDBOX_DENIED` 并说出缺的是未提权的 user namespace，而不是静默少一轴。有的发行版以 LSM 策略限制未提权的 user namespace（推断，本调研没有读到发行版的文档），GitHub 的 ubuntu runner 上这一臂能不能起是 CI 要读的第一件事。
+2. **`[sandbox] arm` 的解析与解出**：键与五个拼写已由 `crates/wire/spec/Answer/Doctor.lean` D26 定，缺省按平台取那里的表；`kernel::config::SandboxLimits` 加 `arm`（规格的所有者 `crates/kernel/spec/Config.lean` §8-22），未知拼写 `E_CONFIG_INVALID`。`Offerings` 加各机制的采样（Linux 的 `bwrap`、Landlock ABI；Windows 的 AppContainer 与 job 叶子是否在本构建里；三个平台上 `docker`／`podman` 是否在 `PATH` 上且 `version` 应答），`choose` 改为取（名字，`Offerings`）给出 `Confinement`：缺省名字的机制缺席时退到 `CopiedTree`，并在 `statement()` 与 doctor 行里说出「缺省的 native 不可用：缺 X」；User 明写的名字的机制缺席时答 `Unavailable { missing }`，`place()` 拒。`Missing` 随之加各机制的缺项（`NamespaceWrapper`、`UserNamespace`、`JobLeaf`、`ContainerRuntime`），每一项一句 `phrase` 与一句 `recovery`，要另装的给安装指引。
+3. **Windows 的 `native`**：D29 (e) 的挂起态起动与恢复落在 `crates/desktop/ffi` 的同一个 Zig 叶子上之后构造 `WindowsJobObject`；同一个叶子再加「以 AppContainer 身份起动」（`CreateProcessW` 带 `PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES`，零个 capability 即无网络），副本目录给这个容器的 SID 加上读写的 ACL。exec 的命令在两者之下：文件系统、网络、进程树、用户、资源五轴都保；harness 居民只进 job、不进 AppContainer（它要连 provider，网络必须开），清单照实写网络与用户不保。叶子的边界性质在 Lean 里证、与 Rust 参照做等价性质测试并两侧 fuzz（AGENTS.md 的平台调用档位）。
+4. **`container` 臂**：`docker`／`podman` 二者取先应答的一个，`run --rm --network none --user <非零> --cpus --memory -v <副本>:<工作目录>`，镜像名由城配置给出、缺省不预拉；五轴都保。要另装 Docker Desktop、Podman Desktop 或 rootless Podman，安装指引指向 D32 引的安装页。
+5. **设置的「沙箱」控件**：列出这座城所在的电脑解得出的每个名字与它的五轴清单（读 doctor 的同一份 `DoctorSandbox`，不另算），缺的给 `Missing` 的那一句与安装指引；选中写 `[sandbox] arm`（经设置的那扇门）。
+6. **doctor 每臂一行**：`crates/sprawling/spec/Doctor.lean` 的 doctor 表为 `native`、`container`、`python` 各加一行，读 `Offerings` 的同一次采样。
+7. **每条保证的测试**：每个构造得出的臂，五轴各一个真命令的对拍——写工作目录（副本里有、源树没有）、连回环上一个监听的端口（开网的臂连得上、关网的臂连不上）、起一个比命令活得久的孙进程（进程树轴保时命令结束后它不在）、读自己的身份（用户轴保时与 harness 不同）、分配超过上限的内存（资源轴保时失败）；与 `every_sandbox_arm_states_what_it_does_not_hold` 并列，清单与对拍不一致即红。
+8. **要另装的臂实跑一次**：`container` 在 GitHub 的 ubuntu runner（自带 Docker）上跑第 7 条的对拍；Linux 的 Landlock 回退与 macOS 的 Seatbelt 在 D32 的未决解开之前不构造。
+9. 本模块文档的链接 `[placing::copy](crate::tools::Confinement)` 指向了枚举而不是副本所在的模块，随第 2 条一起改正。
 
 **未决（§3 口径）**：同步仍按命令读两侧的每个目录项，并逐字节比较同长的文件，代价随工作树的大小长；一棵带大构建缓存的工作树每条命令要读两遍缓存。判定它的证据是一棵真实 room 的每条命令同步耗时（毫秒）与其文件数的读数；若读数显示读取成了主项，再比较「按 mtime 与长度跳过、只对同一时间戳刻度里的文件逐字节比较」。
 -/
@@ -205,4 +218,66 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 **被否**：①默认改成 pwsh——D88 第 1 条：保持 cmd；②把 `shell` 从布尔改成三值（关、system、pwsh）——每一层已写的 `shell = true` 都要迁移，而两件事（给不给、给哪一个）各有各的读者；③在配置里写 shell 的路径——城会带着一台机器的路径搬家；④从 stderr 的本地化文字分类——见上；⑤把失败类别作为一种新的账本事件在执行时写下——那是同一事实的第二个权威，账本上已经有退出码与输出，折叠就能读出。
 
 **重开参数**：视图显示某类失败的「不分类」占比高到读不出差别（例如非英文 Windows 上 cmd 的语法错误）——那时再议是否以 cmd 的错误级别或别的不随语言变的信号补上；或者 User 按读数改了缺省。
+-/
+
+/-! D32 沙箱臂的调研表（SB0）与按平台的缺省臂、可选臂（D86，D20，D23，D94）
+
+**调研表**。五轴的列序照 `Guarantee::ALL`：文件（写入只落副本）、网络、进程树、用户、资源；「保」与「不保」按 `Kept` 的意思，「条件」写在格里。「居民」一列问这一臂能不能同时装下 harness 居民（代理作为主进程）：居民要连 provider，所以一个关网的臂装居民时网络一轴必然不保。每一行的依据是行末列出的官方页面（本调研取过的页面）与本节末尾的探测；没有取到官方页面的格写「未核实」，并进下文的未决。
+
+| 族（`SandboxArm`） | 机制 | 平台 | 要管理员或系统功能 | 文件 | 网络 | 进程树 | 用户 | 资源 | 居民 | 依赖与维护 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `copied_tree` | 复制工作树（今天的臂，§8-13-2） | 三个平台 | 否 | 保 | 不保 | 不保 | 不保 | 不保 | 不适用：只放 exec | 无外部依赖 |
+| `native` | Job Object（D29 的叶子） | Windows | 否；探测里未提权的进程建 job、设 CPU 权重 5、设作业级提交上限与 kill-on-close 全部成功 | 保（副本） | 不保 | 保（要 D29 (e) 的挂起态起动） | 不保 | 保 | 能：job 装得下任意进程树 | `crates/desktop/ffi` 的 Zig 叶子（D29 已定） |
+| `native` | AppContainer | Windows | 否；探测里未提权的进程建、删 AppContainer 配置文件都返回 `S_OK` | 保，且更强：容器 SID 只够得到 ACL 授给它的路径，副本目录要显式授权 | 保（零个 capability） | 不保（单独时） | 保（容器 SID，低完整性级别） | 不保（单独时） | 只能开网装：居民要 `internetClient` 一类 capability，网络一轴随之不保 | 起动要 `PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES`，稳定版 Rust 不给安全接口，进同一个 Zig 叶子；用户目录下装的工具（`cargo`、`bun`）默认不对容器可读，要授 ACL（推断，SB1 实跑核实） |
+| `native` | 受限令牌 | Windows | 否；探测里 `CreateRestrictedToken`（去掉特权）成功 | 不保（单独时） | 不保 | 不保 | 部分：去特权、deny-only SID，仍是同一个用户 | 不保 | 能 | 起动要 `CreateProcessAsUserW`，FFI；它给的已被 AppContainer 覆盖，不单独成臂 |
+| （不收） | Windows Sandbox | Windows | 是：只在 Pro、Enterprise、Education 版上，要打开可选功能；官方页写明 Home 版不支持 | 保 | 可配置 | 保 | 保 | 保 | 能，但整个是一台虚拟机 | 每条命令要一条宿主到虚拟机的通道，本调研没有读到受支持的命令行接口；探测机是 Home 版，`WindowsSandbox.exe` 不存在 |
+| `container` | Docker Desktop（WSL 2 后端） | Windows、macOS | Windows：安装与更新不要管理员（官方页），但 WSL 2 功能要先打开，打开它要管理员；超过 250 人或 1000 万美元年收入的企业商用要付费订阅 | 保（只挂副本） | 保（`--network none`） | 保 | 保（`--user`） | 保（`--cpus`、`--memory`） | 能 | 外部运行时、镜像要拉取与更新；macOS 上支持当前与前两个大版本 |
+| `container` | Podman Desktop | Windows、macOS | Windows：「只为我」安装不要管理员；打开 WSL 或 Hyper-V 功能要管理员（官方页） | 保 | 保 | 保 | 保 | 保 | 能 | 外部运行时与镜像 |
+| （经 `container`） | WSL 2 | Windows | 是：`wsl --install` 要以管理员身份运行（官方页）；探测机上 WSL 与虚拟机平台两项功能已开、没有发行版 | —— | —— | —— | —— | —— | —— | 它本身不是一个臂：是 Windows 上两个 Desktop 容器运行时的后端，也是在 Windows 上得到 Linux 各臂的途径 |
+| `native` | 命名空间包装程序 `bwrap`（今天的臂） | Linux | 否，要内核允许未提权的 user namespace；否则 `bwrap` 只能以 setuid 装 | 保（整机只读可见） | 保 | 保（`--die-with-parent`） | 条件：今天是 `--unshare-user-try`，见 §8-13-2 与 SB1 第 1 条 | 不保（D29 的 cgroup 另给 CPU 与内存） | 能，但居民要开网，开网时网络一轴不保 | 发行版的 `bubblewrap` 包 |
+| `native` | Landlock 加 seccomp | Linux | 否：Landlock 让任何进程、包括未提权的进程限制自己；内核 5.13 起，且要编进内核并在启动时启用；TCP 规则从 ABI v4 起，UDP 从 v10 起；seccomp 过滤要先 `PR_SET_NO_NEW_PRIVS` | 保（还能限读） | 条件：按 ABI，只管 TCP（与 v10 起的 UDP） | 不保 | 不保 | 不保 | 能 | 要在子进程里自限：`pre_exec` 是 `unsafe`，所以只能由 harness 以自己的一个子命令重新起动、自限之后再 `exec` 目标命令；这一做法未核实，进未决 |
+| `container` | rootless Podman／Docker | Linux | 装要包管理器；运行要 `newuidmap`、`newgidmap` 与 `/etc/subuid`、`/etc/subgid` 里至少 65536 个从属 id（官方页） | 保 | 保 | 保 | 保 | 保（cgroup v2 委派时） | 能 | 外部运行时与镜像；rootless Podman 的网络走 pasta |
+| （`container` 的运行时） | gVisor `runsc` | Linux | 经 Docker、Kubernetes 或直接用 `runsc`（官方页） | 保 | 保 | 保 | 保 | 保 | 能 | 一个 OCI 运行时，在已有的容器臂下作为可选项，不另起名字 |
+| （不收） | microVM（Firecracker） | Linux | 要 KVM（`/dev/kvm`） | 保 | 保 | 保 | 保 | 保 | 能 | 要内核镜像与根文件系统的供给；桌面与 CI 主机常没有 `/dev/kvm` |
+| `native` | Seatbelt（`sandbox-exec` 配置） | macOS | 未核实 | 未核实 | 未核实 | 未核实 | 未核实 | 未核实 | 未核实 | 未核实：本调研没有取到 Apple 关于 `sandbox-exec` 的官方页（App Sandbox 的文档页靠脚本渲染，取回的正文是空的） |
+| （不收） | NVIDIA OpenShell | 三个平台 | Roadmap §6 SB 记下的 Support Matrix：沙箱靠 Landlock 与 seccomp，网络按策略放行，要一个跑在 Docker、Podman、Kubernetes 或 MicroVM 上的 gateway；Windows 上只在 WSL 2 加 Docker Desktop 下，标为 Experimental | —— | —— | —— | —— | —— | —— | 它的隔离来自上面已经各成一行的机制，再加一个 gateway 进程与它自己的策略层；本调研没有重新取它的页面 |
+| `python` | wasip1 里的 Python（§8-13） | 三个平台 | 否 | 保（只够得到 preopen） | 保（wasip1 没有获得 socket 的途径） | 保（wasip1 没有起进程的接口） | 不保 | 条件：CPU 由 fuel 限，内存没有另设上限 | 不能：只跑 Python | `wasm` feature 里的 wasmtime 48 |
+
+**每条命令的起动开销**（暂定读数，取于一台负载很重的 Windows 11 x86_64 笔记本，别的构建同时在跑；登记的读数归 W7 之后的测量）：`cmd /c exit 0` 起动并等它退出，各 200 次——直接起动 p50 33.9 ms、p99 60.7 ms；起动后装进一个 job p50 32.0 ms、p99 55.2 ms，这个次数下看不出装 job 的开销。`copied_tree` 的开销是同步副本的开销，见 D10。其余的臂在取读数的那一类电脑上没有，读数归 SB1 第 8 条的实跑。
+
+**探测**（未提权的 PowerShell，经 `Add-Type` 直接调 Win32；只列带出结论的那几行）：
+
+```
+elevated: False
+CreateJobObject handle nonzero: True
+CPU rate control weight=5: True
+JOB_MEMORY 1 GiB + KILL_ON_JOB_CLOSE: True
+WORKINGSET limit: True
+CreateAppContainerProfile hr=0x00000000
+DeleteAppContainerProfile hr=0x00000000
+CreateRestrictedToken(DISABLE_MAX_PRIVILEGE): True
+VirtualMachinePlatform InstallState=1
+Microsoft-Windows-Subsystem-Linux InstallState=1
+WindowsSandbox.exe present: False
+```
+
+`wsl --status` 答默认版本 2，`wsl -l -v` 答没有已安装的发行版；`docker` 与 `podman` 都不在 `PATH` 上。
+
+**决定**：按平台的缺省臂与可选臂如下，缺省是 `crates/wire/spec/Answer/Doctor.lean` D26 的那一张表上的「缺省」一列，那里是唯一的定义处，User 以后改它就是改一个值（推断的选择，待 User 定，Roadmap §7 第 1 条）。
+
+| 平台 | 缺省 | 可选 |
+|---|---|---|
+| Windows | `native`：Job Object 加 AppContainer（exec），Job Object（居民）；SB1 第 3 条落地之前解出 `copied_tree` 并照实说 | `copied_tree`、`container`（Docker Desktop 或 Podman Desktop，要另装）、`python`、`none` |
+| macOS | `copied_tree`：Seatbelt 的未决解开之前，`native` 在 macOS 上答 `Unavailable` | `container`（Docker Desktop 或 Podman Desktop，要另装）、`python`、`none` |
+| Linux | `native`：`bwrap`；没有 `bwrap` 时解出 `copied_tree` 并照实说 | `copied_tree`、`container`（rootless Podman 或 Docker，要另装；gVisor 作为它的运行时）、`python`、`none` |
+
+安装指引：Docker Desktop（https://docs.docker.com/desktop/setup/install/windows-install/ 、https://docs.docker.com/desktop/setup/install/mac-install/）、Podman Desktop（https://podman-desktop.io/docs/installation/windows-install）、rootless Podman（https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md）、rootless Docker（https://docs.docker.com/engine/security/rootless/）、bubblewrap（https://github.com/containers/bubblewrap）。
+
+**理由**：按 Roadmap §6 SB 列出的六项依次比较。①方便：缺省的臂不要另装，一台新机器开城就有；`container` 要装一个运行时与镜像，只作可选。②不要管理员（D20）：Windows 上探测过的不要管理员的三种机制里，Job Object 与 AppContainer 合起来保五轴（AppContainer 给网络与用户，job 给进程树与资源，副本给文件），受限令牌给的被 AppContainer 覆盖；Windows Sandbox 要专业版以上加管理员，WSL 2 的安装要管理员。③五轴：Windows 的 `native` 保五轴，Linux 的 `bwrap` 保四轴（资源由 D29 的 cgroup 另给），都多于 `copied_tree` 的一轴。④居民：job 装得下居民；关网的机制装居民时网络一轴不保，这一点写进清单而不是挑一个能关居民网络的臂——没有这样的臂。⑤依赖（D23）：缺省的臂只依赖平台本身与已有的 Zig 叶子（Windows）或发行版的一个小包（Linux）；容器运行时、gVisor、microVM 与 OpenShell 各是一个大的外部系统。⑥三个平台（D94）：三个平台都有 `copied_tree`、`container` 与 `python`，`native` 在 macOS 上缺的是证据而不是名字，答 `Unavailable` 并说明缺什么。缺省的 `native` 缺机制时退到 `copied_tree` 而不是拒：缺省是城替 User 选的，一条拒绝会让一台没装 `bwrap` 的机器上 exec 整个不能用；退的时候 `statement()` 与 doctor 说出退了、缺什么，所以不是静默变弱。User 明写的名字缺机制时拒，因为那是 User 要的那种盒子。
+
+**被否**：①Windows 缺省 `copied_tree` 不变：它对 Agent 只保文件一轴，而不要管理员的机制能保五轴；②Windows Sandbox 作 Windows 的 `native`：要专业版以上与管理员，探测机就没有；③缺省 `container`：每台机器先要装一个运行时、拉一个镜像，与「方便」与 D23 都相反；④OpenShell 作缺省：它的隔离是 Landlock、seccomp 与容器，已各成一行，多出的是一个 gateway 与一套自己的策略层，Windows 上只是实验性的；⑤Linux 缺省换成 Landlock 加 seccomp：不保进程树与用户，网络只管 TCP，而且起动方式未核实；它留作 `bwrap` 缺席时 `native` 的第二种机制，等未决解开；⑥按产品给每个机制一个名字：D26 已否。
+
+**重开参数**：Seatbelt 的未决解开（macOS 的 `native` 有了臂，macOS 缺省改 `native`）；Windows 的 Zig 叶子在 SB1 里证明做不出 AppContainer 起动（Windows 的 `native` 缩成 Job Object，清单照实写网络与用户不保）；User 按这张表另定缺省。
+
+**未决（§3 口径）**：①macOS 的 Seatbelt：判定它的证据是 GitHub 的 macOS runner 上 `man sandbox-exec` 的原文（是否标为已弃用）、一个 `(version 1)(deny default)` 起头、只放开副本目录写入并 `(deny network*)` 的配置下跑写文件、连回环端口与起孙进程三条命令的结果，以及 Apple 的一页可取的官方文档；②Linux 的 Landlock 回退：判定它的证据是一个不写 `unsafe` 的起动方式（harness 以自己的子命令自限后 `exec`）在 Linux runner 上跑通，并读出 runner 内核的 Landlock ABI。
 -/

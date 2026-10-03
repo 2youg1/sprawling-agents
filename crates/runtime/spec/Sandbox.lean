@@ -29,6 +29,7 @@ pub struct FaultSandbox { /* 故障替身：逐次弹出预置 SandboxExit／fue
 pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob);  // 良序两连调不中毒＋outcome 形合法
 ```
 
+- **按五轴说明**（与 §8-13-2 的臂同一套，设置里的 `python` 臂照它说；`crates/wire/spec/Answer/Doctor.lean` D26）：文件——保，guest 只够得到 preopen 的目录，`Mount.writable` 为假的目录只读；网络——保，理由见下文「无出网的机械形」；进程树——保，wasip1 没有起进程的接口；用户——不保，引擎跑在 harness 的进程与身份里；资源——条件：CPU 由 `Fuel` 限，`WasmtimeSandbox` 不设 store 的内存上限，guest 的线性内存只受 wasm32 的地址空间所限，所以「CPU 与内存上限」这一轴整体答不保。它装不下 harness 居民，只跑 Python。
 - 能力面＝wasip1 preopen 集（Mount 逐条）；无网络能力（WASI p1 天然无 socket 宿主实现——Python 臂禁网的机械保证）；fuel 上限即 Fuel（耗尽＝FuelExhausted，不是 Err：宿主无故障）。
 - 未授能力被拒的观察形：guest 内 open 失败→非零退出（Failure）；宿主恒不代 guest 隐藏失败。A10 三断言在真 wasmtime 上以手写 WAT 模块定形（不依赖 CPython 工件）；CPython-WASI 集成测试以环境变量指向工件（住机器本地的忽略目录，恒不入库），缺工件即 skip——`just check` 自足。
 **A10 三断言结论书**（证据＝`crates/runtime/tests/sandbox_a10.rs`，真 wasmtime（版本由 `Cargo.lock` 钉），手写 WAT 不依赖任何外部工件）：
