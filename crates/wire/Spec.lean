@@ -356,6 +356,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D35 | `Used` 的两个缓存数在 provider 没报时缺席，页面写「未知」 | `crates/wire/spec/Reading.lean` |
 | D45 | 视图广播按帧合并只合并刷写，不改帧的形状，也不按 session 重排 | `crates/wire/spec/Server/Socket.lean` |
 | D46 | 采样节拍是 `Monitoring` 的第四个变体，按城记住 | `crates/wire/spec/Frames/Monitor.lean` |
+| D47 | `Answer::Unavailable` 带上没看成的原因 | `crates/wire/spec/Server.lean` |
+| D48 | 每个 shell 解释器的读数是一个查询，与 skill、MCP 的使用同一遍折叠 | `crates/wire/spec/Reading.lean` |
 -/
 
 /-! ## 13 依赖选型

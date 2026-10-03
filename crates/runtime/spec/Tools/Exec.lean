@@ -229,7 +229,7 @@ pub enum Shell {                                    // runtime::tools::exec::she
   - `Encoding`：`stdout` 或 `stderr` 里有 U+FFFD。载荷里的文字经 `String::from_utf8_lossy` 写下（`crates/runtime/src/tools/exec/outcome.rs`），所以替换字符就是一段不是 UTF-8 的字节——cmd 按控制台代码页输出，中文 Windows 上是 936。一个真的打印了 U+FFFD 的程序也会被计进来，这是多计的一侧。
   - 先看退出码，再看不随语言变的错误 id，最后才看英文文字：cmd 的提示随 Windows 的显示语言变，非英文系统上 cmd 的语法错误落进「不分类」，这一点照实写在视图的说明里。本仓不收一张各语言提示的表：那会是第二份 Microsoft 文字的权威。
   - 退出码为 0 的结果不分类：一条成功的命令即使输出里有 U+FFFD 也不算失败。
-- **现状**：配置项、`Shell`、拒绝、`interpreter` 字段、分类与 `ShellTally` 已落地，测试在 `tools::exec::tests::shell`、`kernel::config::interpreter`、`crates/city/src/config_layers/write/tests.rs` 与 `doctor::tests::host`。读它的视图是 `sprawling view <city> --shells`（`crates/sprawling/Spec.lean` §8-105），每个解释器一行 JSON；把 `ShellTally` 接成一个线上查询（一条 `Query` 与它的 `Answer`、`WIRE_V`、`client/src/wire.ts`）与页面上的一张表尚未做；楼页的沙箱卡只把读到的 `interpreter` 原样送回，不给选择控件，改它今天靠手写 `CONFIG.toml`。
+- **现状**：配置项、`Shell`、拒绝、`interpreter` 字段、分类与 `ShellTally` 已落地，测试在 `tools::exec::tests::shell`、`kernel::config::interpreter`、`crates/city/src/config_layers/write/tests.rs` 与 `doctor::tests::host`。读它的视图是 `sprawling view <city> --shells`（`crates/sprawling/Spec.lean` §8-105），每个解释器一行 JSON；同一份读数经线上的 `Query::Shells`（wire D48）画在页面工具页的一张表里；楼页的沙箱卡只把读到的 `interpreter` 原样送回，不给选择控件，改它今天靠手写 `CONFIG.toml`。
 - **何时再定默认**：视图按解释器给出每类失败占 shell 臂调用的比例；pwsh 7 的成功率明显更高时，把读数交 User 再定缺省（D88 第 7 条读作这样，待 User 确认）。不做 pwsh 预热池：启动时间不是问题（D88 第 7 条）。
 - **program 臂在 `CopiedTree` 下每条命令前同步副本的成本**：计数已经有了（`Placed::work()`，§8-13-2），读数归波后的 mid 读数，判定它的证据与重开参数写在 §8-13-2 的「未决」与 D10。
 

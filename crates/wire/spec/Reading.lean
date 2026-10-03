@@ -501,3 +501,29 @@ pub enum HandbackNote {
 
 D42、D43 与本波其他改形同一次 `WIRE_V` 进位（D22）。
 -/
+
+/-! D48 每个 shell 解释器的调用数与按类的失败数是一个查询，与 skill、MCP 的使用同一遍折叠
+
+```rust
+// Query
+Shells,                                   // VerbClass::Read
+// Answer
+Shells(Box<ShellsAnswer>),
+pub struct ShellsAnswer { pub interpreters: Vec<ShellCalls> }        // 按解释器名排序
+pub struct ShellCalls {
+    pub interpreter: String,              // `result.interpreter`；没有这个字段的旧记录记作 `system`
+    pub calls: u64,                       // 有退出码的 shell 行数
+    pub failures: BTreeMap<String, u64>,  // 只列出现过的类；键是 `runtime::FailureClass::as_str`
+}
+```
+
+**决定**：`Query::Shells` 答整本账本上每个 shell 解释器的读数。折叠是 `runtime::ShellTally`（`crates/runtime/spec/Tools/Exec.lean` D30），线上的答面与 `sprawling view --shells` 的每一行同形：同一份折叠，两种写法。读面是 accounting 的使用折叠（`views::usage::Usage`）：它本来就在快照放开之后从头读一遍账本、看每一条 `tool_result`，多交一份给 `ShellTally`，不另读一遍。账本读不了时答 `Unavailable` 并带原因（D47）。页面把这张表画在工具（MCP）页的使用表旁边，类名按 `lang.json` 措辞，认不得的类原样写出。
+
+**理由**：pwsh 7 是否该成为默认（runtime D30）要看这份读数；只有命令行能读时，用浏览器的 User 看不到它。
+
+**被否**：①一个枚举做 `failures` 的键：类的拼法只由 `runtime::FailureClass` 定义，wire 不依赖 runtime，再写一份枚举就是第二个权威；②热视图逐条折叠：读数只在页面打开时要，常驻折叠让每一条记录都付代价。
+
+**三个平台**：折叠相同；解释器的名字随平台（Windows 上常见 `system` 即 cmd、`pwsh`，macOS 与 Linux 上 `system` 即 sh）。
+
+与 D47 同一次 `WIRE_V` 进位。
+-/
