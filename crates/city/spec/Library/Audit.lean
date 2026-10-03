@@ -6,7 +6,7 @@
 /-!
 # city::library::audit
 
-规定 `library::audit`（city 的 `src/library/` 下同名的文件，由实现它的那次改动登记进模块图后再建）：书架上一件 skill 的审核状态怎么从账本读出来。本文件是 `crates/city/Spec.lean` 的一个分部，标签 §8-28b，决定引作 `city D19`。
+规定 `library::audit`（`crates/city/src/library/audit.rs`）：书架上一件 skill 的审核状态怎么从账本读出来。本文件是 `crates/city/Spec.lean` 的一个分部，标签 §8-28b，决定引作 `city D19`。
 
 模型放在 city 而不放在 accounting：「这件 skill 此刻的内容摘要是什么」是书架的事实（§8-8 的 `Holding::hash`、§8-28 的整包哈希），审核绑定的正是这个摘要；accounting 的折叠（wire D32）只读本模块给出的判定，不另写一份「过期」的规则。
 -/
@@ -29,7 +29,9 @@ pub fn audit_state(content: &B3Hash, audits: &[(B3Hash, AuditVerdict, Seq)]) -> 
 1. 显示为「已审」时，轨迹里必有一次对**此刻这份内容摘要**的审核，结论就是显示的那一个（`audited_only_what_was_audited`）；于是内容改成一份从没被审过的字节之后，无论其后发生什么（只要内容不再变、也没有对它的审核），都不显示为已审（`changed_content_is_never_shown_audited`）。
 2. 取审核失败不改变书架上的任何东西：从轨迹里删掉全部失败的取，书架状态逐字相同（`failed_fetches_change_nothing`）；于是一次通过预检的上架，不论之前失败过多少次取、审出过什么结论，都落下它的摘要（`a_failed_fetch_never_blocks_an_install`）。
 
-**派生检查**（实现 `library::audit` 的那次改动写，Roadmap §3.3 LV1）：`library::audit::tests` 里一张轨迹向量表——上架、审、改、迟到的旧摘要审核、失败的取——逐行比对 `audit_state` 的答案；先对一个「审核后只记布尔标志」的坏实现看它变红，再换上按摘要取最新审核的实现。
+**派生检查**（`library::audit::tests`）：一张轨迹向量表——上架、拒收、审、改、改回审过的字节、迟到的旧摘要审核、失败的取——逐行比对 `audit_state` 读出的状态与本模型 `shown` 在同一条轨迹上的答案；同一张表的每一行再各回放一遍上面的四条性质。表能咬住两种坏实现：「审核后只记布尔标志」（不看摘要）让向量表与两条已审性质变红，「把 `Unreachable` 当一条审核」让失败的取那条也变红。
+
+- **现状：`audit_state` 还没有生产调用者**：它的调用者是 wire D32 的审核折叠与书架页上的审核标记，与 `InstallSkill` 的执行者同一次改动落地；在那之前它与 D4（没有生产调用者的公开面不留）不合，留着是因为折叠只读本模块的判定，不另写一份规则。
 -/
 
 /-! D19 审核状态是从账本与书架摘要读出的判定；审核由城在落位之后、对落下的那份摘要发起，不拦上架

@@ -28,11 +28,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+mod audit;
 mod install;
 mod reading;
 mod shelf;
 mod shipped;
 
+pub use audit::{AuditState, audit_state};
 pub use install::{Installed, Placed, PlannedInstall, Slot, install, plan_install};
 pub use shelf::{Holding, Shelf};
 pub use shipped::{SHIPPED_SECTION, shelve_shipped};
