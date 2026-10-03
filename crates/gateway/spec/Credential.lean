@@ -57,7 +57,7 @@ impl Custodian {
   | 平台 | 生产存放处（`Store::PlatformService`） | `Persistence` | 对 provider key 与城钥匙意味着什么 |
   |---|---|---|---|
   | Windows | 凭据管理器（`windows-native-keyring-store`），target name `<name>.sprawling/<realm>` | `AcrossReboots` | 跨重启保留；城钥匙不变，已配对设备跨重启保持配对 |
-  | macOS | 钥匙串（`apple-native-keyring-store` 的 `keychain`），service 与 account 两个字段 | `AcrossReboots` | 跨重启保留；二进制更新后钥匙串可能对新二进制再问一次是否允许读取，这一点由 CI 的 macOS runner 核实 |
+  | macOS | 钥匙串（`apple-native-keyring-store` 的 `keychain`），service 与 account 两个字段 | `AcrossReboots` | 跨重启保留；二进制更新后钥匙串可能对新二进制再问一次是否允许读取；城钥匙跨更新是否留住尚无读数，由 `on-demand.yml` 的 `keychain` 作业在 macOS runner 上读（`crates/remote_access/Spec.lean` §3），它的判词点名 vault 选的存储 |
   | Linux | 内核 keyutils（`linux-keyutils-keyring-store`），description `keyring-rs:<name>@sprawling/<realm>` | `ThisBoot` | 活到这次开机结束；重启电脑后 key 要重新输入，城钥匙换新，设备要重新配对。用加密的 vault 文件（§8-21，`AcrossRebootsWithPassphrase`）就跨重启保留，代价是每次启动输一次口令；那条接线尚未落地（§8-21） |
   | 其他目标，或探针失败 | 会话内存（`MemoryVault`），探针写一条 `provider_degraded` | `ThisProcess` | 每次城重启都要重新输入 key、重新配对设备，`describe` 与 `resolve` 的恢复语照实说出这一句 |
 
