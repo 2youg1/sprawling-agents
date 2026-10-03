@@ -512,7 +512,7 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 /-! D23 skill 上架时的审核是一个 record-only 种类 `skill_audited`；调用记录不加种类，从已有的行折出
 
-**决定**：加一个种类 `skill_audited`（`EventKind::SkillAudited`，record-only，追加在 `ALL` 末尾），由城在一个 skill 上架（本地路径、git 地址或 skills.sh）时、以及它的内容摘要变了之后第一次被读到时写，`run` 为 `RunId::CITY`，`addr` 是书架所在的 scope。载荷：
+**决定**：加一个种类 `skill_audited`（`EventKind::SkillAudited`，record-only，追加在 `ALL` 末尾），由城在一个 skill 落位之后、以及扫架时看见它此刻的整包摘要没有审核时写（每个 `(skill, digest)` 在一个城进程里只发起一次；何时发起、问谁、怎样读回答由 `crates/city/spec/Library/Audit.lean` city D19 规定），`run` 为 `RunId::CITY`，`addr` 是书架所在的 scope。载荷：
 
 ```rust
 pub struct SkillAudited {
@@ -527,13 +527,39 @@ pub struct SkillAudited {
 }
 ```
 
-`Unreachable` 是「这次没审成」：取不到 skills.sh、SkillSpector 不在，不拦上架（D89：skills.sh 默认、SkillSpector 可选）。使用记录不入新行：`describe` 取指南与读 skill 目录下的文件都已在 `tool_called` 里，按 skill 折叠的视图由 accounting 从这些行折出；MCP 的使用同样从 `call` 与 MCP 工具调用的 `tool_called` 折出。
+`Unreachable` 是「这次问了、没审成」：skills.sh 不答、答 401／403、超时或答复读不出，SkillSpector 的退出码既不是 0 也不是 1；不拦上架（D89：skills.sh 默认、SkillSpector 可选）。没有一个审核方适用时（本地路径或自带的 skill，且 PATH 上没有 SkillSpector）不写行：没人问过就不该有一行说问过。skills.sh 每个合作方一行，`scanner` 是合作方名。使用记录不入新行：`describe` 取指南与读 skill 目录下的文件都已在 `tool_called` 里，按 skill 折叠的视图由 accounting 从这些行折出；MCP 的使用同样从 `call` 与 MCP 工具调用的 `tool_called` 折出。
+
+**内容版本另有一行**：skill 页的「内容版本（摘要、时刻、谁改的）」读一个计划中的 record-only 种类 `skill_shelved`：载荷 `SkillShelved { skill: String, digest: B3Hash, source: ShelvedFrom }`，`ShelvedFrom { Path, Git { url, rev }, SkillsSh { name }, Shipped, Page }`，`addr` 是书架所在的 scope，`run` 为 `RunId::CITY`；`InstallSkill`（wire D32）与 `PutShelved` 每次真正落位（`Placed::Fresh`）时由城写一行，答 `AlreadyShelved` 时一个字节没变、不写，`digest` 是 `Installed::hash`。它取代此前为 `PutShelved` 计划的 `shelved_document_written`：两条上架的路是同一件事，一个种类；种类表的行与 `InstallSkill` 的执行者同一次改动落地。User 在架外直接改文件没有行，由扫架时架上摘要与这件 skill 最近一行 `skill_shelved` 的 `digest` 不同读出，页面把这一版的「谁改的」显示为「在架外」。
 
 **理由**：审核的结论要和它审的那份内容绑定，才能说「内容变了要重审」，所以摘要必须在同一行；审核来自城外，结论是城收到的事实，重放不能再去问一次外网，所以入账。使用早已入账，再记一行只是同一件事的第二份。
 
 **被否**：①每次读 skill 记一行 `skill_used`：与 `tool_called` 是两份定义；②审核结果只缓存在保留子树的文件里：重放与导出读不到，「谁在什么时候审过哪一版」没有历史；③取不到审核就拦上架：skills.sh 的无令牌接口随时可能关，拦住会让书架整个不能用。
 
 **重开参数**：审核来源超过两个、或要按 skill 记多个合作方的分项结论时，重议 `scanner` 与 `verdict` 是否改成一张表。
+-/
+
+/-! D32 同步 `send` 的一次等待是一对种类 `signal_wait_started`／`signal_wait_ended`，都入窗，种类表的行与实现同一次改动落地
+
+**决定**：两个种类（追加在 `ALL` 末尾，入窗：模型下一次调用要读到「等过、为什么停」），写方都是 collab 的发信门（collab D9），`run` 是等待的那个 run，`addr` 是它的房间：
+
+```rust
+pub struct SignalWaitStarted { pub on: Address, pub signal: SignalId, pub deadline_ms: u64 }   // 注入时钟上的 deadline
+pub struct SignalWaitEnded { pub signal: SignalId, pub by: WaitEnd }
+pub enum WaitEnd { Reply { reply: SignalId }, Timeout, Left }   // 回信到了｜到了 deadline｜run 离开房间
+```
+
+- `signal_wait_started` 紧跟在它那一封信的 `signal_enqueued` 之后写，`signal` 指那封信；一个 run 同一时刻至多一个没配对的 `started`（模型 `Collab.Delivery` 的 `waits` 每个 run 一条）。
+- 每一行 `started` 恰有一行 `ended` 与它配对：回信到了写 `Reply`（`reply` 是那封回信），注入的时钟过了 deadline 写 `Timeout`，run 在等待中离开房间（取消、失败、进程死后冻结）写 `Left`；`waits_end` 保证没有第四种。进程死后的那一行由冻结它的那一处补写（D14 同一口径），所以重放不会留下一个永远在等的 run。
+- `deadline_ms` 是注入时钟上的读数，不是墙钟：重放按 seq 读次序，不按时刻；线上把它换成墙钟时刻（wire D34）。
+- 等待期间 run 不调模型、不写 `model_returned`，watchdog 读到一个未配对的 `started` 就知道这个 run 是停着而不是卡住，不对它退避或报警。
+
+**现状**：两个种类还不在 `crates/kernel/spec/Event/Kind.lean` 的表里，也不在 `EventKind` 里；表的行与 Rust 的变体由实现 TP3 同步一半的那次改动同时加，于是 `specalign` 在每一次提交上都比得齐。
+
+**理由**：一个停着的 run 必须在账本里看得出来，否则 `status`、页面、watchdog 与重放都分不清它在等还是卡住（`crates/collab/spec/Delivery.lean` 的 `wait_bounded`、`waits_end` 说的是模型，账本要能把同一件事说给读者）。开始与结束分两行，是因为等待跨越安全点、可能跨越进程死亡；只记一行「等过多久」要等结束才写，中间那段时间什么都看不见。入窗，是因为下一次模型调用要知道它是被回信还是被超时叫醒的。
+
+**被否**：①不入账、只在内存里停：重放与重开的页面看不到一个正在等的 run；②在 `signal_enqueued` 的载荷上加 `wait` 字段：说得出开始，说不出结束；③用 `run_policy_changed` 之类的已有种类表示停住：一个种类两种意思。
+
+**重开参数**：一个 run 可以同时等两封回信时，重议「至多一个未配对的 `started`」。
 -/
 
 /-! D24 `asset_archived` 在 `archive record` 被调用时写，不等 run 冻结

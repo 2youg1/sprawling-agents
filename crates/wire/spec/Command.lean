@@ -130,6 +130,33 @@ Dispatch { addr, task, goal, policy: kernel::RunPolicy, idem, session, effort, m
 **重开参数**：运行策略多出一个只有部分派活才需要的值时，重议那个值要不要缺省。
 -/
 
+/-! D32 `InstallSkill` 是 User 往书架上加 skill 的命令：来源是一个四臂的值，落点沿用 `Shelf`
+
+**决定**：命令面多一个动词（与本版其他改形同一次 `WIRE_V` 进位，D22），类 `client`、`VerbClass::LocalOnly`（与 `PutShelved` 同类：书架在保留子树里，远程设备不往城里装东西）：
+
+```rust
+Command::InstallSkill { source: SkillSource, shelf: Shelf, section: String, idem: IdemKey }
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SkillSource {
+    Path { path: String },                                   // User 写下的绝对路径或 `~` 开头，照原样，不在页面上改写
+    Git { url: String, rev: Option<String>, subdir: Option<String> },   // 只收 https://
+    SkillsSh { name: String },                               // `<owner>/<repo>/<skill>`
+    Shipped,                                                 // 二进制自带的那几件
+}
+```
+
+- `shelf` 是已有的 `Shelf { Library, Building(Address) }`，`section` 是格名；`Shipped` 时城忽略这两个值、放进城库的 `shipped` 格（city D20），帧上仍要写，于是一个形状盖住四臂。
+- 字段的合法性由城在执行者里判，线上只判形：`path` 与 `url` 非空、`name` 恰好三段、`section` 是单段名（与 `Slot` 同一条规则，判法只在 city 一处，线上不复写）。失败以命令的拒词回到页面：`E_INVALID_ARGS`（相对路径、非 https、名字不是三段、clone 里找不到或找到多个同名目录、§8-28 的各条拒因）、`E_PATH_NOT_FOUND`（来源不在）、`E_TOOL_UNAVAILABLE`（PATH 上没有 git，或 clone 失败）、`E_TIMEOUT`（clone 超时）、`E_VERSION_CONFLICT`（规划与落位之间来源被换）、`E_CAS_CORRUPT`、`E_STORAGE_FATAL`；每一条带动作、主体与恢复语，恢复语归城（city D8）。
+- 执行者写 `skill_shelved`（kernel D23），随后由城另起审核（city D19）；回执只说这一次落没落位，审核结论经 `SkillUsage` 读回。
+- `PutShelved` 留在文法里、仍答 `not_built`：它写的是一份文本（居民自建技能、在页面上改一件已有的），与从远处装一个包是两件事；它的执行者落地时同样只经 `library::install`。
+
+**理由**：一个包有目录与脚本，`PutShelved` 只携一份文本，装不进来；来源的三种远处在城里变成一个本地目录再进 §8-28 的门（city D20），所以线上只需说出「从哪来、放哪格」。路径照原样携带，是因为 Windows 的盘符与反斜杠、POSIX 的斜杠都只有城那一侧的 `Path` 读得对，页面改写一次就多一处会错的地方。
+
+**被否**：①给 `PutShelved` 加一个 `source` 字段：一帧两种意思，`text` 与 `source` 必有一个空着；②三个来源各一个动词：执行者是同一条路，拒词也同形，三帧只是同一个 match 拆开写；③页面先发一个「规划」命令拿哈希、再发「批准」：User 在自己的页面上按下的就是批准，而 §8-28 的 TOCTOU 复查已经守住规划与落位之间的那道缝。
+
+**重开参数**：居民（而不是 User）需要装 skill 时，重议「规划—批准」两步；一件包大到一次 clone 超过 `CLONE_TIMEOUT` 时，重议命令改成后台任务带进度。
+-/
+
 namespace Wire.Command
 
 open Wire.Command.Kind

@@ -269,11 +269,41 @@ pub struct FrozenNames {
 
 **决定**：`Call` 多一件 `#[serde(default)] took_us: Option<u64>`，照录配对的 `tool_result.took_us`（kernel D20）；`Used` 多 `first_us` 与 `took_us` 两件，照录 `model_returned`。缺席时页面退回信封时刻之差，以毫秒显示。显示规则（不到 10 ms 用 µs，10 ms 及以上用 ms）在客户端一处实现。
 
-查询面多三帧：`Query::SkillUsage { skill: Option<String> }` 答 `SkillUsageAnswer { skills: Vec<SkillUsageLine> }`，每行是一个 skill 的内容版本（摘要、时刻、写它的那一行）、最后一次审核（`skill_audited`，kernel D23）、最后一次使用、使用列表（run、居民、时刻、读的是哪一部分）与按天的计数，书架上从没被用过的 skill 也有一行，计数为零；`Query::McpUsage { server: Option<String> }` 答按服务器与工具折叠的同形一张表；`Query::UsageExport { what: UsageKind, format: ExportFormat }` 答 JSONL 或 CSV 的正文，`UsageKind { Skills, Mcp }`、`ExportFormat { Jsonl, Csv }`。三帧都是 `VerbClass::Read`。审核本身由城在上架时做，不另开命令帧：上架已经有自己的门（`PutShelved`）。它们与本版其他改形同一次 `WIRE_V` 进位（D22）。
+查询面多三帧：`Query::SkillUsage { skill: Option<String> }` 答 `SkillUsageAnswer { skills: Vec<SkillUsageLine> }`，每行是一个 skill 的内容版本（摘要、时刻、写它的那一行）、最后一次审核（`skill_audited`，kernel D23）、最后一次使用、使用列表（run、居民、时刻、读的是哪一部分）与按天的计数，书架上从没被用过的 skill 也有一行，计数为零；`Query::McpUsage { server: Option<String> }` 答按服务器与工具折叠的同形一张表；`Query::UsageExport { what: UsageKind, format: ExportFormat }` 答 JSONL 或 CSV 的正文，`UsageKind { Skills, Mcp }`、`ExportFormat { Jsonl, Csv }`。三帧都是 `VerbClass::Read`。审核本身由城在落位之后做（city D19），不另开命令帧；装 skill 的门是 `InstallSkill`（D32），每一行算什么、怎样导出在 D33。它们与本版其他改形同一次 `WIRE_V` 进位（D22）。
 
 **理由**：使用早已在 `tool_called` 里（kernel D23），视图只是按 skill 折叠；折叠住 accounting，线上只给答复的形状。导出走查询而不是让页面拼文件，是因为折叠规则只在 Rust 一处。
 
 **被否**：①页面拉全部 `tool_called` 自己折：浏览器里多一份折叠规则；②导出写进城目录的文件：城目录多一份没人清理的派生物。
 
 **重开参数**：使用列表大到一次答复装不下时，加分页游标。
+-/
+
+/-! D33 一次 skill 使用与一次 MCP 使用各从哪一行折出，按天怎么数，导出的每一行长什么样
+
+**决定**：折叠是 accounting 里一个读账本的纯函数，`SkillUsage`、`McpUsage` 与 `UsageExport` 三帧读同一个函数的结果（D28）。
+- **一次 skill 使用**是一行 `tool_called`，它所在的 run 的 `run_started` 钉住了一件 skill（名字与哈希，`crates/runtime/Spec.lean` §8-11），而这一行是：`describe`，问的就是那个名字（部分记作 `guide`）；或 `read`，路径是那个名字（部分记作 `SKILL.md`）或 `<名字>/<相对路径>`（部分记作那个相对路径）。认的是「这个 run 钉住了这个名字」，不从路径的写法猜：一个恰好与某件 skill 同名的普通文件，在没钉住它的 run 里不是一次使用。使用的内容版本是钉住时的哈希，所以 skill 改过之后，旧的使用仍指向它当时读到的那一版。
+- **一次 MCP 使用**是一行 `tool_called`，它的工具名是某个 MCP 服务器登记的工具，或者是 `call`、而 `call` 指名的那件是这样的工具。名字到 `(服务器, 工具)` 的对应读城此刻的 MCP 登记（`agent_protocols::mcp` 唯一造这个名字的那一处），不拆字符串：服务器名可以含 `_`，`<server>_<tool>` 的拆法有歧义。此刻没有服务器登记的名字归在 `server: None` 下，页面写作「已移除」并给出完整工具名。
+- **结果**也算：每次使用带上配对的 `tool_result` 是否成功；没有配对行（run 被杀）记作未知。
+- **按天数**：按信封时刻的 UTC 日历日分桶，`day` 写作 `YYYY-MM-DD`；导出带每一行的毫秒时刻，要按本地时区重新分桶的分析自己做。
+- **从没用过的**：每一格书架（城库、每栋楼的楼架、城外书架）上扫到的每一件 skill 都有一行，没被用过的计数为零、使用列表为空；MCP 是此刻登记的每个服务器的每件工具。
+- **导出**：每次使用一行，列序固定：`kind`（`skill`｜`mcp`）、`name`、`server`、`part`、`run`、`resident`（房间地址）、`seq`、`at_ms`、`digest`、`outcome`（`ok`｜`failed`｜`unknown`）。JSONL 每行一个对象、键即列名、缺席的值写 `null`；CSV 首行是列名，按 RFC 4180 加引号，行尾 `\r\n`，缺席的值为空。正文以 UTF-8 回答，页面经浏览器的下载交给 User，城目录里不写文件（D28）。
+
+**理由**：一次使用必须能在重放时由同一个函数算出同一张表，所以只读账本里已有的行；用 `run_started` 钉住的名字来认，是因为那是 run 自己说过「我能读这几件」的唯一一处，路径的写法会把巧合当成使用。按 UTC 分桶，是因为折叠在 Rust 一处、在城里算，城不知道页面在哪个时区，而导出的毫秒时刻让任何分桶都做得出来。
+
+**被否**：①读文件系统的访问时间：Windows、macOS 与 Linux 上 atime 的语义各不相同，Linux 默认 `relatime` 一天只更新一次，而且它说不出是哪个 run；②按页面所在时区分桶：同一个城在两台设备上答两张表；③MCP 名字按第一个 `_` 拆：服务器名含 `_` 时把工具归错服务器。
+
+**重开参数**：一次查询在一座大城里要读的行多到答复超过 100 ms 时，把折叠改成随账本增量维护；User 要求按本地日历日看时，加一个由页面送来的 UTC 偏移参数。
+
+**三个平台**：折叠只读账本，三个平台相同；CSV 的 `\r\n` 是 RFC 4180 的规定，与平台无关。
+-/
+
+/-! D34 一个停在同步 `send` 上的 run，在 `RunSummary` 上多一个 `waiting`；`send` 的 `wait` 是工具参数，不是线上帧
+
+**决定**：`RunSummary` 多一件 `#[serde(default)] waiting: Option<Waiting>`，`Waiting { on: Address, until: TimeMs }`：这个 run 最近一行 `signal_wait_started`（kernel D32）还没有配对的 `signal_wait_ended` 时，`on` 是它等的房间，`until` 是那一行的 deadline 换成的墙钟时刻；配对行到了就缺席。直播的页面从事件流里自己折同一对种类，查询答的是没看过流的读者。`send` 的同步开关是 `send` 工具的输入 `wait: bool`（缺省 `false`，collab D9），走模型的工具调用，不经过线上的任何一帧；线上只多这一件字段，与本版其他改形同一次 `WIRE_V` 进位（D22）。
+
+**理由**：一个停着等回信的 run 与一个卡住的 run 在 `last_kind` 上看起来一样，页面与 watchdog 都要能把两者分开，所以等待要成为 run 的状态的一部分；它从账本的两行读出，重放与远程设备看到的是同一个状态。`until` 用墙钟时刻而不是剩余毫秒，是因为答复会被缓存与转发，剩余时间一离开城就不对了。
+
+**被否**：①一个新的 `RunWaiting` 帧：等待是 run 的一个状态，不是一类消息，单开一帧的页面要把两路拼回一个 run；②把 `wait` 放进一个 User 发的命令：同步与否是发信的那个 run 的选择（D89 第 1 条：C 是 `send` 上的开关），User 不在这条路上。
+
+**重开参数**：一个 run 可以同时等两个房间时，`waiting` 改成一张表。
 -/
