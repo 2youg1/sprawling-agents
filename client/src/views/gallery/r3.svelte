@@ -13,7 +13,8 @@
   // before the doctor answered, across restarts, until reboot, and in
   // the city's memory only. Drawn through the group's own
   // body, with the presses going nowhere; the dialog that confirms a
-  // forget is `parts/dialog.svelte`'s, drawn in the parts section.
+  // forget is `parts/dialog.svelte`'s, drawn in the parts section. The
+  // door controls are drawn once at each width, at rest.
 
   import type { Device } from "../../core/remote/device";
   import type { Standing } from "../settings/remote";
@@ -70,6 +71,7 @@
 </script>
 
 <script lang="ts">
+  import RemoteDoor from "../settings/remote_door.svelte";
   import RemoteState from "../settings/remote_state.svelte";
   import Case from "./case.svelte";
 
@@ -87,3 +89,10 @@
     {/each}
   {/each}
 {/await}
+{#each WIDTHS as width (width)}
+  <Case label={`remote group · the door controls at ${String(width)}`} {width}>
+    <div class="@container/page">
+      <RemoteDoor />
+    </div>
+  </Case>
+{/each}
