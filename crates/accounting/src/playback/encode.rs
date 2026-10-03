@@ -174,14 +174,74 @@ impl Escaping {
 
     /// The bytes written, a held prefix that no separator completed
     /// written as it came.
-    fn finish(self) -> Vec<u8> {
+    fn finish(mut self) -> Vec<u8> {
+        let held = self.release();
+        self.out.extend_from_slice(held);
         self.out
+    }
+
+    /// Takes one byte of compact JSON.
+    fn take(&mut self, byte: u8) -> std::io::Result<()> {
+        match (self.held, byte) {
+            (Held::Nothing, b'<') => self.emit(b"\\u003c"),
+            (Held::Nothing, b'>') => self.emit(b"\\u003e"),
+            (Held::Nothing, b'&') => self.emit(b"\\u0026"),
+            (Held::Nothing, 0xE2) => {
+                self.held = Held::E2;
+                Ok(())
+            }
+            (Held::Nothing, other) => self.emit(&[other]),
+            (Held::E2, 0x80) => {
+                self.held = Held::E280;
+                Ok(())
+            }
+            (Held::E280, 0xA8) => {
+                self.held = Held::Nothing;
+                self.emit(b"\\u2028")
+            }
+            (Held::E280, 0xA9) => {
+                self.held = Held::Nothing;
+                self.emit(b"\\u2029")
+            }
+            // The prefix was some other character's: it goes out as it
+            // came, and this byte is taken afresh.
+            (Held::E2 | Held::E280, other) => {
+                let held = self.release();
+                self.emit(held)?;
+                self.take(other)
+            }
+        }
+    }
+
+    /// The held prefix's bytes, and nothing held afterwards.
+    fn release(&mut self) -> &'static [u8] {
+        let held = match self.held {
+            Held::Nothing => &[][..],
+            Held::E2 => &[0xE2][..],
+            Held::E280 => &[0xE2, 0x80][..],
+        };
+        self.held = Held::Nothing;
+        held
+    }
+
+    /// Appends `bytes`, or refuses them all when they would carry the
+    /// buffer past its ceiling.
+    fn emit(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+        match self.out.len().checked_add(bytes.len()) {
+            Some(length) if length <= self.ceiling => {
+                self.out.extend_from_slice(bytes);
+                Ok(())
+            }
+            Some(_) | None => Err(std::io::Error::other("over the bundle's ceiling")),
+        }
     }
 }
 
 impl std::io::Write for Escaping {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        self.out.extend_from_slice(bytes);
+        for byte in bytes {
+            self.take(*byte)?;
+        }
         Ok(bytes.len())
     }
 
