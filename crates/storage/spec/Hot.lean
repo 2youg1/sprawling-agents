@@ -8,7 +8,7 @@
 
 规定 `hot`（`crates/storage/src/` 下同名的文件）。内存热视图：界面查询在此命中，不读盘。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与模块旁的测试守住（`crates/storage/Spec.lean` §16）。
+这一分部大半是文字，由 Rust 的类型与模块旁的测试守住（`crates/storage/Spec.lean` §16）；`waiting` 这一折（D29）有一个小模型与它的证明，模块旁的 proptest 从同一条性质导出。
 -/
 
 /-!
@@ -19,7 +19,9 @@ pub struct HotView { /* runs: BTreeMap<RunId, RunHot>、evicted: BTreeSet<RunId>
 pub struct RunHot { pub phase: RunPhase, pub last_seq: Seq, pub last_kind: EventKind, pub who: String,
                     pub addr: Option<Address>, pub started: Option<TimeMs>,     // 房间与开始时刻
                     pub completion: Option<String>, pub pr: Option<String>, pub ask: Option<String>,  // 结局、PR、所等之事
-                    pub task: Option<String>, pub goal: Option<String> }                              // 人交给它的任务与目标
+                    pub task: Option<String>, pub goal: Option<String>,                               // 人交给它的任务与目标
+                    pub waiting: Option<RunWaiting> }                                                 // 停在同步 send 上等的房间与期限
+pub struct RunWaiting { pub on: Address, pub until: TimeMs }
 pub enum RunPhase { Active, Frozen }
 impl HotView {
     pub fn new() -> HotView;
@@ -41,3 +43,82 @@ pub const RECENT_FROZEN: usize = 32;
 - **`task` 与 `goal` 从 `run_started` 记下**：那条记录的同名两个字段，与 `addr`、`started` 同一处赋值、同一个口径——只在这一种记录上写，其余记录不动它们；字段缺失或是空串记 `None`，因为一句空的任务不是一个名字。理由：run 板以它们给一行 run 起名，而重载后的页面只有 `RunSummary`（`crates/wire/Spec.lean` §8-48e）。
 - **城市级记录不进 run 表**：`RunId::CITY`（nil）标记的是属于城而不属于任何 Run 的记录——创世记录、`building_created`。把它们折进 run 表会让 `active_count()` 在一座**从未派过活的城**里返回 1：城市页读服务端的这个数、写「1 run in flight」，而总览页折同一条流写「什么都没在跑」——**一个问题两个答案，而错的那个是服务端的**。
 -/
+
+/-! D29 `RunHot.waiting` 是这次跑的最后一行 `signal_wait_started` 还没被 `signal_wait_ended` 或 `run_frozen` 结束时的那对值
+
+**决定**：`signal_wait_started`（kernel D32）把 `waiting` 设成 `{ on, until = deadline_ms }`，按键读那一行的 `on` 与 `deadline_ms`，与本节其余字段同一个口径——字段缺失或读不成就记 `None`，看不到的事不猜；`signal_wait_ended` 或 `run_frozen` 把它清掉；别的记录不动它。冻结之后到的 `signal_wait_started` 不再设它，因为冻结在热视图里是终态：一次冻结了的跑不在等任何人。一次跑同时只开一个等待（collab D9 拒绝第二个），所以结束行不按 `signal` 配对，任何一条结束行都清掉当前的等待。`until` 直接是 `deadline_ms`：那是城的注入时钟（epoch 毫秒）读出的时刻，wire D34 说的「换成墙钟」在三个平台上都是恒等。
+
+**理由**：页面与 watchdog 要把「停着等回信」和「卡住」分开，而 `last_kind` 在两者上一样；重放与远程设备读到的状态要从账本的两行折出，所以这一折放在已经折每一条记录的热视图里，`accounting` 的 `summarize` 只是搬过去。
+
+**被否**：①按 `signal` 配对、存下等待的 `SignalId`：一次跑只有一个开着的等待，配对只多一个字段而不多一种答案；②让 `accounting` 另折一遍这对种类：同一个状态两处折，两份答案。
+
+**重开参数**：一次跑可以同时等两个房间时（wire D34 的重开参数），`waiting` 改成按 `signal` 键的表，结束行按 `signal` 配对。
+-/
+namespace Storage.Hot
+
+/-- 一条记录在 `waiting` 这一折里是什么。房间与期限是抽象的值；其余种类一律是 `other`。 -/
+inductive Line where
+  | waitStarted (on deadline : Nat)
+  | waitEnded
+  | frozen
+  | other
+
+structure Waiting where
+  on : Nat
+  deadline : Nat
+deriving DecidableEq
+
+/-- 一次跑在这一折里的状态：是否已冻结，以及在等什么。 -/
+structure Fold where
+  frozen : Bool
+  waiting : Option Waiting
+
+def Fold.start : Fold := ⟨false, none⟩
+
+/-- 一条记录怎样折进来，对应 `RunHot::absorb`。 -/
+def step (s : Fold) : Line → Fold
+  | .waitStarted on deadline => if s.frozen then s else { s with waiting := some ⟨on, deadline⟩ }
+  | .waitEnded => { s with waiting := none }
+  | .frozen => ⟨true, none⟩
+  | .other => s
+
+def fold (trace : List Line) : Fold := trace.foldl step Fold.start
+
+/-- 不变式：冻结的跑不在等。 -/
+def Settled (s : Fold) : Prop := s.frozen = true → s.waiting = none
+
+theorem step_keeps_settled (s : Fold) (line : Line) (h : Settled s) : Settled (step s line) := by
+  cases line with
+  | waitStarted on deadline =>
+    unfold step
+    by_cases hf : s.frozen = true
+    · simp [hf]; exact h
+    · simp [hf, Settled]
+  | waitEnded => intro _; rfl
+  | frozen => intro _; rfl
+  | other => exact h
+
+theorem foldl_keeps_settled (trace : List Line) (s : Fold) (h : Settled s) :
+    Settled (trace.foldl step s) := by
+  induction trace generalizing s with
+  | nil => exact h
+  | cons line rest ih => exact ih (step s line) (step_keeps_settled s line h)
+
+/-- 任何一段记录折完，一次冻结了的跑都不在等。 -/
+theorem frozen_run_never_waits (trace : List Line) :
+    (fold trace).frozen = true → (fold trace).waiting = none :=
+  foldl_keeps_settled trace Fold.start (fun h => nomatch h)
+
+/-- 一条结束行之后不在等。 -/
+theorem ended_wait_is_gone (trace : List Line) :
+    (fold (trace ++ [.waitEnded])).waiting = none := by
+  simp [fold, List.foldl_append, step]
+
+/-- 一次没冻结的跑，最后一行是开始等待时，`waiting` 正是那一行的房间与期限。 -/
+theorem started_wait_is_shown (trace : List Line) (on deadline : Nat)
+    (h : (fold trace).frozen = false) :
+    (fold (trace ++ [.waitStarted on deadline])).waiting = some ⟨on, deadline⟩ := by
+  simp only [fold, List.foldl_append, List.foldl_cons, List.foldl_nil] at *
+  simp [step, h]
+
+end Storage.Hot
